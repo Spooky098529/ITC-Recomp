@@ -8,6 +8,7 @@
 
 #include "base/log.h"
 #include "car_physics/float_ops.h"
+#include "debug/frame_state_diff.h"
 #include "interpolation/blend_state.h"
 #include "matrix_math/matrix_math.h"
 #include "ui_movies/game.h"
@@ -262,6 +263,249 @@ bool QueueText(uint8_t* base, uint32_t context, uint32_t node, uint32_t layer, u
   AppendText(base, guest::LoadU32(base, context + 100), item, &appended);
   *r3 = ClearTextItem(base, item);
   return true;
+}
+
+namespace {
+
+constexpr uint32_t kColorToInteger = 0x82000C44;  // the vertex colors' scale
+constexpr uint32_t kLayerDepth = 0x82071520;      // the layer to the depth
+
+// fctidz, as the translation does it: NaN gives INT64_MIN, above INT64_MAX
+// INT64_MAX, else truncated (out of range INT64_MIN).
+int64_t Fctidz(double x) {
+  if (std::isnan(x)) {
+    return INT64_MIN;
+  }
+  if (x > double(INT64_MAX)) {
+    return INT64_MAX;
+  }
+  return simde_mm_cvttsd_si64(simde_mm_set_sd(x));
+}
+
+// A word as lfd of its std (zero-extended) then fcfid then frsp.
+double UnsignedToFloat(uint32_t n) {
+  return double(float(double(int64_t(uint64_t(n)))));
+}
+
+// The texture the context's table (at [[context + 96]]) holds at the index
+// in `entry`.
+uint32_t TextureAt(uint8_t* base, uint32_t context, uint32_t entry) {
+  const uint32_t index = guest::LoadU32(base, entry) << 2;
+  const uint32_t table = guest::LoadU32(base, guest::LoadU32(base, context + 96));
+  return guest::LoadU32(base, table + index);
+}
+
+// The quad's clip (+100 the flag, +104..+110 the rectangle as 16-bit
+// integers, sorted) from the context's (+64..+76; +72 isn't checked for
+// "none", as read).
+void QuadClip(uint8_t* base, uint32_t context, uint32_t quad) {
+  const uint32_t c64 = guest::LoadU32(base, context + 64);
+  if (c64 == 0 && guest::LoadU32(base, context + 68) == 0 &&
+      guest::LoadU32(base, context + 76) == 0) {
+    guest::StoreU32(base, quad + 100, 0);
+    for (uint32_t at = 104; at < 112; at += 2) {
+      guest::StoreU16(base, quad + at, 0);
+    }
+    return;
+  }
+  const int16_t left = int16_t(c64);
+  const int16_t right = int16_t(guest::LoadU32(base, context + 72));
+  const int16_t top = int16_t(guest::LoadU32(base, context + 68));
+  const int16_t bottom = int16_t(guest::LoadU32(base, context + 76));
+  guest::StoreU16(base, quad + 104, uint16_t(left));
+  guest::StoreU32(base, quad + 100, 1);
+  guest::StoreU16(base, quad + 108, uint16_t(right));
+  guest::StoreU16(base, quad + 106, uint16_t(top));
+  guest::StoreU16(base, quad + 110, uint16_t(bottom));
+  if (left > right) {
+    guest::StoreU16(base, quad + 104, uint16_t(right));
+    guest::StoreU16(base, quad + 108, uint16_t(left));
+  }
+  if (top > bottom) {
+    guest::StoreU16(base, quad + 106, uint16_t(bottom));
+    guest::StoreU16(base, quad + 110, uint16_t(top));
+  }
+}
+
+// Swaps the 16-byte texture coordinate entries a and b.
+void SwapEntries(uint8_t* base, uint32_t a, uint32_t b) {
+  uint32_t ta[4], tb[4];
+  for (uint32_t i = 0; i < 4; i++) {
+    ta[i] = guest::LoadU32(base, a + 4 * i);
+    tb[i] = guest::LoadU32(base, b + 4 * i);
+  }
+  for (uint32_t i = 0; i < 4; i++) {
+    guest::StoreU32(base, a + 4 * i, tb[i]);
+    guest::StoreU32(base, b + 4 * i, ta[i]);
+  }
+}
+
+// The vertices' w (+12 of each of the 16 positions from `positions`) = 1.0.
+void SetWs(uint8_t* base, uint32_t positions) {
+  const uint32_t one = guest::LoadU32(base, kOne);
+  for (uint32_t i = 0; i < 16; i++) {
+    guest::StoreU32(base, positions + 12 + 16 * i, one);
+  }
+}
+
+}  // namespace
+
+uint32_t PictureTextureOf(uint8_t* base, uint32_t context, uint32_t picture) {
+  if (guest::LoadU32(base, picture + 140) == 0) {
+    return 0;
+  }
+  return TextureAt(base, context, PictureTexture(picture, guest::LoadU32(base, picture + 108)));
+}
+
+QuadCall BuildPicture(uint8_t* base, uint32_t context, uint32_t picture, uint32_t layer,
+                      uint32_t frame) {
+  ITC_NATIVE_RUNNING("sub_8259ED40 UiMovie::DrawPicture");
+  const uint32_t quad = frame + 112;
+  const uint32_t positions = frame + 240, colors = frame + 496, coords = frame + 752;
+  const uint32_t one = guest::LoadU32(base, kOne), zero = guest::LoadU32(base, kZero);
+  SetWs(base, positions);
+  MakeQuad(base, quad);
+  ApplyTransform(base, context, picture, frame - 352);
+  guest::StoreU32(base, quad + 80, 4);
+  guest::StoreU32(base, quad + 88, positions);
+  guest::StoreU32(base, quad + 92, colors);
+  guest::StoreU32(base, quad + 96, coords);
+  const uint32_t texture = PictureTextureOf(base, context, picture);
+  guest::StoreU32(base, quad + 84, guest::LoadU32(base, texture));
+  // The colors, each vertex the context's, as integers.
+  const double scale = Lfs(base, kColorToInteger);
+  for (uint32_t v = 0; v < 64; v += 16) {
+    for (uint32_t c = 0; c < 16; c += 4) {
+      const double value = Fmuls(Lfs(base, context + 80 + c), scale);
+      guest::StoreU32(base, colors + v + c, uint32_t(uint64_t(Fctidz(value))));
+    }
+  }
+  // The corners (0, 0), (+100, 0), (0, +104), (+100, +104), transformed.
+  for (uint32_t i = 0; i < 4; i++) {
+    const uint32_t p = positions + 16 * i;
+    if (i & 1) {
+      CopyWord(base, picture + 100, p + 0);
+    } else {
+      guest::StoreU32(base, p + 0, zero);
+    }
+    if (i & 2) {
+      CopyWord(base, picture + 104, p + 4);
+    } else {
+      guest::StoreU32(base, p + 4, zero);
+    }
+    guest::StoreU32(base, p + 8, zero);
+    guest::StoreU32(base, p + 12, one);
+  }
+  for (uint32_t i = 0; i < 4; i++) {
+    debug::Vec4Transform(base, positions + 16 * i, context, positions + 16 * i);
+  }
+  // The texture coordinates: the pixel rectangle +116..+128 over the
+  // texture's size, else (a size of 0) 0 to 1.
+  const uint32_t width = guest::LoadU32(base, texture + 4);
+  if (width != 0 && guest::LoadU32(base, texture + 8) != 0) {
+    const auto ratio = [&](uint32_t pixel, uint32_t size_at) {
+      const double size = UnsignedToFloat(guest::LoadU32(base, texture + size_at));
+      return Fdivs(IntToFloat(int32_t(guest::LoadU32(base, picture + pixel))), size);
+    };
+    Stfs(base, coords + 0, ratio(116, 4));
+    Stfs(base, coords + 4, ratio(120, 8));
+    Stfs(base, coords + 16, ratio(124, 4));
+    Stfs(base, coords + 20, ratio(120, 8));
+    Stfs(base, coords + 32, ratio(116, 4));
+    Stfs(base, coords + 36, ratio(128, 8));
+    Stfs(base, coords + 48, ratio(124, 4));
+    Stfs(base, coords + 52, ratio(128, 8));
+  } else {
+    guest::StoreU32(base, coords + 0, zero);
+    guest::StoreU32(base, coords + 4, zero);
+    guest::StoreU32(base, coords + 16, one);
+    guest::StoreU32(base, coords + 20, zero);
+    guest::StoreU32(base, coords + 32, zero);
+    guest::StoreU32(base, coords + 36, one);
+    guest::StoreU32(base, coords + 48, one);
+    guest::StoreU32(base, coords + 52, one);
+  }
+  if (guest::LoadU32(base, picture + 132) != 0) {  // flipped across
+    SwapEntries(base, coords + 0, coords + 16);
+    SwapEntries(base, coords + 32, coords + 48);
+  }
+  if (guest::LoadU32(base, picture + 136) != 0) {  // flipped down
+    SwapEntries(base, coords + 0, coords + 32);
+    SwapEntries(base, coords + 16, coords + 48);
+  }
+  QuadClip(base, context, quad);
+  guest::StoreU32(base, quad + 68, 0);
+  guest::StoreU32(base, quad + 72, 0);
+  guest::StoreU32(base, quad + 112, guest::LoadU32(base, context + 108));
+  const double depth = Fmuls(UnsignedToFloat(layer), Lfs(base, kLayerDepth));
+  return {quad, guest::LoadU32(base, picture + 72), depth};
+}
+
+QuadCall BuildPrimitive(uint8_t* base, uint32_t context, uint32_t primitive, uint32_t layer,
+                        uint32_t frame) {
+  ITC_NATIVE_RUNNING("sub_8259F348 UiMovie::DrawPrimitive");
+  const uint32_t quad = frame + 96;
+  const uint32_t positions = frame + 272, colors = frame + 528, coords = frame + 784;
+  const uint32_t one = guest::LoadU32(base, kOne), zero = guest::LoadU32(base, kZero);
+  SetWs(base, positions);
+  MakeQuad(base, quad);
+  ApplyTransform(base, context, primitive, frame - 352);
+  guest::StoreU32(base, quad + 88, positions);
+  guest::StoreU32(base, quad + 80, guest::LoadU32(base, primitive + 116));
+  guest::StoreU32(base, quad + 92, colors);
+  guest::StoreU32(base, quad + 96, coords);
+  uint32_t texture = 0;
+  if (guest::LoadU32(base, primitive + 112) != 0) {
+    texture = TextureAt(base, context,
+                        PrimitiveTexture(primitive, guest::LoadU32(base, primitive + 104)));
+  }
+  guest::StoreU32(base, quad + 84, texture != 0 ? guest::LoadU32(base, texture) : 0);
+  const double to_integer = Lfs(base, kColorToInteger);
+  const double scale = Lfs(base, kColorScale);
+  for (uint32_t i = 0; i < guest::LoadU32(base, primitive + 116); i++) {
+    const uint32_t vertex = PrimitiveVertex(base, primitive, i);
+    const uint32_t p = positions + 16 * i, c = colors + 16 * i, t = coords + 16 * i;
+    CopyWord(base, vertex + 0, p + 0);
+    CopyWord(base, vertex + 4, p + 4);
+    guest::StoreU32(base, p + 8, zero);
+    guest::StoreU32(base, p + 12, one);
+    debug::Vec4Transform(base, p, context, p);
+    if (texture != 0) {
+      Stfs(base, t + 0,
+           Fdivs(IntToFloat(int32_t(guest::LoadU32(base, vertex + 24))),
+                 UnsignedToFloat(guest::LoadU32(base, texture + 4))));
+      Stfs(base, t + 4,
+           Fdivs(IntToFloat(int32_t(guest::LoadU32(base, vertex + 28))),
+                 UnsignedToFloat(guest::LoadU32(base, texture + 8))));
+    } else {
+      guest::StoreU32(base, t + 0, zero);
+      guest::StoreU32(base, t + 4, zero);
+    }
+    // The vertex's color (integers, then its float alpha) times the
+    // context's, squared with +100 set, as integers.
+    const double alpha = Fmuls(Lfs(base, vertex + 20), Lfs(base, context + 92));
+    double r = Fmuls(Fmuls(IntToFloat(int32_t(guest::LoadU32(base, vertex + 8))), scale),
+                     Lfs(base, context + 80));
+    double g = Fmuls(Fmuls(IntToFloat(int32_t(guest::LoadU32(base, vertex + 12))), scale),
+                     Lfs(base, context + 84));
+    double b = Fmuls(Fmuls(IntToFloat(int32_t(guest::LoadU32(base, vertex + 16))), scale),
+                     Lfs(base, context + 88));
+    if (guest::LoadU32(base, primitive + 100) != 0) {
+      r = Fmuls(r, r);
+      g = Fmuls(g, g);
+      b = Fmuls(b, b);
+    }
+    guest::StoreU32(base, c + 0, uint32_t(uint64_t(Fctidz(Fmuls(r, to_integer)))));
+    guest::StoreU32(base, c + 4, uint32_t(uint64_t(Fctidz(Fmuls(g, to_integer)))));
+    guest::StoreU32(base, c + 8, uint32_t(uint64_t(Fctidz(Fmuls(b, to_integer)))));
+    guest::StoreU32(base, c + 12, uint32_t(uint64_t(Fctidz(Fmuls(alpha, to_integer)))));
+  }
+  QuadClip(base, context, quad);
+  guest::StoreU32(base, quad + 72, 0);
+  guest::StoreU32(base, quad + 68, guest::LoadU32(base, primitive + 100));
+  guest::StoreU32(base, quad + 112, guest::LoadU32(base, context + 108));
+  const double depth = Fmuls(UnsignedToFloat(layer), Lfs(base, kLayerDepth));
+  return {quad, guest::LoadU32(base, primitive + 72), depth};
 }
 
 }  // namespace ui_movies

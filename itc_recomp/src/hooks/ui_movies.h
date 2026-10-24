@@ -20,4 +20,15 @@ void ResetAfterMovie(PPCContext& ctx, uint8_t* base);
 // --log_pause_movie.
 void RestorePose(PPCContext& ctx, uint8_t* base);
 
+// UiMovie::DrawPicture (sub_8259ED40) and UiMovie::DrawPrimitive
+// (sub_8259F348; r3 = the draw context, r5 = the node, r6 = the layer):
+// natively (the quad built by the plain C++, then handed to sub_8259EBE8's
+// adapter from a frame like the original's, with its return address) or,
+// with --native_ui_movies off, the original. r3 as sub_8259EBE8 leaves it.
+void DrawPicture(PPCContext& ctx, uint8_t* base);
+void DrawPrimitive(PPCContext& ctx, uint8_t* base);
+// The same natively, whatever the flag (for the harness).
+void RecordPicture(PPCContext& ctx, uint8_t* base);
+void RecordPrimitive(PPCContext& ctx, uint8_t* base);
+
 }  // namespace ui_movies_hooks

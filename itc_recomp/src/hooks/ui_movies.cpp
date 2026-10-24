@@ -26,7 +26,9 @@ ITC_FLAG_BOOL(native_ui_movies, true, "ITC",
               "sub_8259EBE8 and sub_8259DAC0, which call the recorders; UiMovie::RestorePose "
               "sub_82119B80; UiMovie::ApplyTransform sub_8259E6C8, with sub_8259D730; the draw "
               "context copy sub_8259D9F8; the queued texts' copy sub_8259E620, append "
-              "sub_8259F700 (its grow the original's) and UiMovie::QueueText sub_8259F770) "
+              "sub_8259F700 (its grow the original's) and UiMovie::QueueText sub_8259F770; "
+              "UiMovie::DrawPicture sub_8259ED40 and UiMovie::DrawPrimitive sub_8259F348, which "
+              "hand their quads to sub_8259EBE8) "
               "natively instead of through the translated code (same results; checked by "
               "--run_harnesses=ui_movies)");
 
@@ -133,6 +135,17 @@ extern "C" REX_FUNC(sub_8259F770) {
     }
   }
   __imp__sub_8259F770(ctx, base);
+}
+
+// UiMovie::DrawPicture and DrawPrimitive: r3 = the draw context, r5 = the
+// node, r6 = the layer (src/hooks/ui_movies.h).
+extern "C" REX_FUNC(sub_8259ED40) {
+  REX_FUNC_PROLOGUE();
+  ui_movies_hooks::DrawPicture(ctx, base);
+}
+extern "C" REX_FUNC(sub_8259F348) {
+  REX_FUNC_PROLOGUE();
+  ui_movies_hooks::DrawPrimitive(ctx, base);
 }
 
 // sub_8259D5C8: r3 = a chunk, r4 = a tag; the next chunk with that tag.
@@ -366,6 +379,63 @@ extern "C" REX_FUNC(sub_8259EBE8) {
 }
 
 namespace ui_movies_hooks {
+
+namespace {
+// The quad built natively, then handed to sub_8259EBE8 from a frame of
+// `frame_bytes` (the original's) returning to `return_address`.
+template <typename Build>
+void BuildAndRecord(PPCContext& ctx, uint8_t* base, uint32_t frame_bytes,
+                    uint32_t return_address, Build build) {
+  const uint64_t lr = ctx.lr;
+  ctx.fpscr.disableFlushMode();
+  const ui_movies::QuadCall call = build(ctx.r1.u32 - frame_bytes);
+  guest_call::InFrame(ctx, base, frame_bytes, return_address, [&](uint32_t) {
+    ctx.r3.u64 = call.quad;
+    ctx.r4.u64 = call.key;
+    ctx.fpscr.disableFlushMode();
+    ctx.f1.f64 = call.depth;
+    sub_8259EBE8(ctx, base);
+  });
+  ctx.lr = lr;
+}
+}  // namespace
+
+void DrawPicture(PPCContext& ctx, uint8_t* base) {
+  if (!ITC_FLAG(native_ui_movies)) {
+    __imp__sub_8259ED40(ctx, base);
+    return;
+  }
+  // Without a texture the original faults (its size read at guest address
+  // 4; never so in play): it's left to run.
+  if (ui_movies::PictureTextureOf(base, ctx.r3.u32, ctx.r5.u32) == 0) {
+    __imp__sub_8259ED40(ctx, base);
+    return;
+  }
+  RecordPicture(ctx, base);
+}
+
+void RecordPicture(PPCContext& ctx, uint8_t* base) {
+  const uint32_t context = ctx.r3.u32, picture = ctx.r5.u32, layer = ctx.r6.u32;
+  BuildAndRecord(ctx, base, 1088, 0x8259F338, [&](uint32_t frame) {
+    return ui_movies::BuildPicture(base, context, picture, layer, frame);
+  });
+}
+
+void DrawPrimitive(PPCContext& ctx, uint8_t* base) {
+  if (!ITC_FLAG(native_ui_movies)) {
+    __imp__sub_8259F348(ctx, base);
+    return;
+  }
+  RecordPrimitive(ctx, base);
+}
+
+void RecordPrimitive(PPCContext& ctx, uint8_t* base) {
+  const uint32_t context = ctx.r3.u32, primitive = ctx.r5.u32, layer = ctx.r6.u32;
+  BuildAndRecord(ctx, base, 1152, 0x8259F6EC, [&](uint32_t frame) {
+    return ui_movies::BuildPrimitive(base, context, primitive, layer, frame);
+  });
+}
+
 void ResetAfterMovie(PPCContext& ctx, uint8_t* base) {
   if (!ITC_FLAG(native_ui_movies)) {
     __imp__sub_8259DAC0(ctx, base);

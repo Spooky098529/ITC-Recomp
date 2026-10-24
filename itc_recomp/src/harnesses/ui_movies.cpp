@@ -4,8 +4,10 @@
 
 #include "harness.h"
 
+#include "base/flags.h"
 #include "base/log.h"
 #include "command_list/command_list.h"
+#include "hooks/ui_movies.h"
 #include "ui_movies/ui_movies.h"
 
 #include <algorithm>
@@ -13,6 +15,8 @@
 #include <cmath>
 #include <iterator>
 #include <limits>
+
+ITC_FLAG_DECLARE(bool, native_ui_movies);
 
 namespace harness {
 
@@ -1039,6 +1043,186 @@ void ApplyTransformCases(Context& h) {
 // junk in r6's upper half). Floats only where the code loads and stores
 // them as floats (the matrix's and color's arithmetic in QueueText's
 // transform, the items' +80); the rest exactly.
+// UiMovie::DrawPicture (sub_8259ED40) and UiMovie::DrawPrimitive
+// (sub_8259F348), the whole path: the quad built natively and handed to
+// sub_8259EBE8's adapter (ui_movies_hooks::RecordPicture and
+// RecordPrimitive) against the originals run with --native_ui_movies off
+// (so their callees are the translated ones too). A made-up command list,
+// renderer (slot 4 BillboardMaterial::SetLights, storing r4 and r5 at its
+// +32 and +36, as RecorderCases) and texture table in the scratch area, the
+// game's globals pointed at them during the cases. A random draw context
+// (matrix, clip set or not, color, +108) and node (the transform's fields,
+// a texture or none, a zero-sized texture, the flips; a primitive's 0 to 16
+// vertices, its color flag), with odd floats (NaN, infinities) in some.
+// Compared: the whole scratch area (the recorded chunks, the context, the
+// node), the open chunk count and r3.
+void QuadDrawCases(Context& h) {
+  Random r;  // its own, so the harnesses after it keep their inputs
+  constexpr uint32_t kList = 0, kRendererObject = 64, kVtable = 128, kContext = 256,
+                     kNode = 512, kTableRef = 1536, kTable = 1600, kTexture = 1664,
+                     kSlots = 2048;
+  const uint32_t saved_renderer = guest::LoadU32(h.base, ui_movies_kRenderer);
+  const uint32_t saved_list = guest::LoadU32(h.base, ui_movies_kRenderer + 4);
+  const uint32_t saved_open = guest::LoadU32(h.base, command_list::kOpenChunks);
+  const uint32_t odd[] = {0x7FC00000u, 0xFFC00000u, 0x7F800000u, 0xFF800000u, 0x80000000u,
+                          0x7F800001u, 0x00000001u, 0x5F800000u};
+  const auto value = [&](float lo, float hi) {
+    return r.Below(40) == 0 ? odd[r.Below(std::size(odd))] : RandomFloat(r, lo, hi);
+  };
+  for (int kind = 0; kind < 2; kind++) {
+    const bool picture = kind == 0;
+    Results results(picture ? "UiMovie::DrawPicture (sub_8259ED40)"
+                            : "UiMovie::DrawPrimitive (sub_8259F348)");
+    for (int c = 0; c < 600; c++) {
+      uint32_t cw[28];
+      for (int i = 0; i < 16; i++) {
+        cw[i] = value(-2, 2);
+      }
+      const bool clip = r.Below(2) == 0;
+      for (int i = 16; i < 20; i++) {
+        cw[i] = clip ? (r.Below(4) == 0 ? uint32_t(r.Next()) : r.Below(1400)) : 0;
+      }
+      if (clip && r.Below(4) == 0) {  // only +72 set: no clip, as read
+        cw[16] = cw[17] = cw[19] = 0;
+      }
+      for (int i = 20; i < 24; i++) {
+        cw[i] = value(0, 1);
+      }
+      cw[24] = 0;  // the texture table, set below
+      cw[25] = uint32_t(r.Next());
+      cw[26] = uint32_t(r.Next());
+      cw[27] = r.Below(2) ? 0 : 1;
+      // The node: the transform's fields mostly at rest.
+      uint32_t nw[256];
+      for (uint32_t& w : nw) {
+        w = r.Below(4) == 0 ? uint32_t(r.Next()) : r.Below(64);
+      }
+      nw[3] = r.Below(2) ? 0 : value(-640, 640);
+      nw[4] = r.Below(2) ? 0 : value(-360, 360);
+      nw[5] = r.Below(2) ? 0 : r.Below(200);
+      nw[6] = r.Below(2) ? 0 : r.Below(200);
+      nw[7] = r.Below(2) ? 0x3F800000u : value(-3, 3);
+      nw[8] = r.Below(2) ? 0x3F800000u : value(-3, 3);
+      nw[9] = r.Below(2) ? 0 : value(-360, 360);
+      for (int i = 10; i < 14; i++) {
+        nw[i] = r.Below(3) == 0 ? r.Below(1280) : 0;
+      }
+      for (int i = 14; i < 17; i++) {
+        nw[i] = r.Below(256);
+      }
+      nw[17] = value(0, 1);
+      nw[18] = r.Below(1000);  // +72: the key
+      const uint32_t texture_index = r.Below(4);
+      const bool textured = r.Below(4) != 0;
+      uint32_t vertices = 0;
+      if (picture) {
+        nw[25] = value(0, 512);  // +100, +104: the size
+        nw[26] = value(0, 512);
+        nw[27] = r.Below(3);  // +108: the texture entry
+        for (int i = 29; i < 33; i++) {  // +116..+128: the pixel rectangle
+          nw[i] = r.Below(8) == 0 ? uint32_t(r.Next()) : r.Below(512);
+        }
+        nw[33] = r.Below(2) ? 0 : 1 + r.Below(3);  // +132, +136: the flips
+        nw[34] = r.Below(2) ? 0 : 1;
+        nw[35] = 1 + r.Below(2);  // +140: a texture (see null_texture)
+        for (int i = 0; i < 3; i++) {  // the entries from +144: +0 the index
+          nw[36 + 4 * i] = texture_index;
+        }
+      } else {
+        nw[25] = r.Below(2) ? 0 : 1 + r.Below(3);  // +100: the color flag (and blend mode)
+        const uint32_t entries = textured ? 1 + r.Below(2) : 0;
+        nw[26] = 0;  // +104: the texture entry
+        nw[28] = entries;  // +112
+        vertices = r.Below(8) == 0 ? 16 : r.Below(9);
+        nw[29] = vertices;  // +116
+        for (uint32_t i = 0; i < entries; i++) {
+          nw[32 + 4 * i] = texture_index;
+        }
+        for (uint32_t i = 0; i < vertices; i++) {
+          const uint32_t at = 32 + 4 * entries + 8 * i;
+          nw[at + 0] = value(-300, 300);
+          nw[at + 1] = value(-300, 300);
+          nw[at + 2] = r.Below(256);
+          nw[at + 3] = r.Below(256);
+          nw[at + 4] = r.Below(8) == 0 ? uint32_t(r.Next()) : r.Below(256);
+          nw[at + 5] = value(0, 1);
+          nw[at + 6] = r.Below(512);
+          nw[at + 7] = r.Below(512);
+        }
+      }
+      const uint32_t size_case = r.Below(6);  // 0: a zero width, 1: a zero height
+      const uint32_t width = size_case == 0 ? 0 : 1 + r.Below(1024);
+      const uint32_t height = size_case == 1 ? 0 : 1 + r.Below(1024);
+      // A picture without a texture faults in the original (its size read at
+      // guest address 4): the adapter leaves those to it, so no cases.
+      const bool null_texture = !picture && r.Below(6) == 0;
+      const uint32_t texture_word = uint32_t(r.Next());
+      const uint32_t layer = r.Below(8) == 0 ? uint32_t(r.Next()) : r.Below(100);
+      std::vector<uint8_t> result[2];
+      for (int v = 0; v < 2; v++) {
+        Fill(h.base, h.data, kScratchBytes);
+        const uint32_t list = h.data + kList;
+        guest::StoreU32(h.base, list + 8, 1000);
+        guest::StoreU32(h.base, list + 12, 0);
+        guest::StoreU32(h.base, list + 32, h.data + kSlots);
+        guest::StoreU8(h.base, list + 52, 0);
+        guest::StoreU32(h.base, command_list::kOpenChunks, 0);
+        guest::StoreU32(h.base, h.data + kRendererObject, h.data + kVtable);
+        guest::StoreU32(h.base, h.data + kVtable + 16, 0x8209F5C8);
+        const uint32_t context = h.data + kContext, node = h.data + kNode;
+        for (int i = 0; i < 28; i++) {
+          guest::StoreU32(h.base, context + 4 * i, cw[i]);
+        }
+        guest::StoreU32(h.base, context + 96, h.data + kTableRef);
+        guest::StoreU32(h.base, h.data + kTableRef, h.data + kTable);
+        for (uint32_t i = 0; i < 4; i++) {
+          guest::StoreU32(h.base, h.data + kTable + 4 * i,
+                          null_texture && i == texture_index ? 0 : h.data + kTexture);
+        }
+        guest::StoreU32(h.base, h.data + kTexture + 0, texture_word);
+        guest::StoreU32(h.base, h.data + kTexture + 4, width);
+        guest::StoreU32(h.base, h.data + kTexture + 8, height);
+        for (int i = 0; i < 256; i++) {
+          guest::StoreU32(h.base, node + 4 * i, nw[i]);
+        }
+        guest::StoreU32(h.base, ui_movies_kRenderer, h.data + kRendererObject);
+        guest::StoreU32(h.base, ui_movies_kRenderer + 4, list);
+        PPCContext t = CallContext(h);
+        t.r3.u64 = context;
+        t.r4.u64 = node;  // the scene, not read
+        t.r5.u64 = node;
+        t.r6.u64 = layer;
+        if (v == 0) {
+          ITC_FLAG(native_ui_movies) = false;
+          (picture ? __imp__sub_8259ED40 : __imp__sub_8259F348)(t, h.base);
+          ITC_FLAG(native_ui_movies) = true;
+        } else {
+          (picture ? ui_movies_hooks::RecordPicture : ui_movies_hooks::RecordPrimitive)(t, h.base);
+        }
+        result[v] = Read(h.base, h.data, kScratchBytes);
+        AppendWord(result[v], guest::LoadU32(h.base, command_list::kOpenChunks));
+        AppendWord(result[v], uint32_t(t.r3.u64 >> 32));
+        AppendWord(result[v], t.r3.u32);
+      }
+      size_t at = 0;
+      while (at < result[0].size() && result[0][at] == result[1][at]) {
+        at++;
+      }
+      const size_t from = at < result[0].size() ? at : 0;
+      const size_t to = std::min(result[0].size(), from + 32);
+      results.Check({result[0].begin() + from, result[0].begin() + to},
+                    {result[1].begin() + from, result[1].begin() + to},
+                    fmt::format("case {}: clip {} textured {} size {} null {} vertices {}, "
+                                "from byte {}",
+                                c, clip, textured, size_case, null_texture, vertices, from));
+    }
+    results.Report();
+  }
+  guest::StoreU32(h.base, ui_movies_kRenderer, saved_renderer);
+  guest::StoreU32(h.base, ui_movies_kRenderer + 4, saved_list);
+  guest::StoreU32(h.base, command_list::kOpenChunks, saved_open);
+}
+
 void DrawWalkCases(Context& h) {
   Random r;  // its own, so the harnesses after it keep their inputs
   const auto random_words = [&](uint32_t* words, int count) {
@@ -1261,6 +1445,7 @@ void UiMovies(Context& h) {
   RestorePoseCases(h);
   ApplyTransformCases(h);
   DrawWalkCases(h);
+  QuadDrawCases(h);
 }
 
 }  // namespace harness

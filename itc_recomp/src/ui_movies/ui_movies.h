@@ -208,6 +208,38 @@ bool AppendText(uint8_t* base, uint32_t list, uint32_t item, uint32_t* r3);
 bool QueueText(uint8_t* base, uint32_t context, uint32_t node, uint32_t layer, uint32_t frame,
                uint32_t* r3);
 
+// A quad or primitive built for sub_8259EBE8: r3 = `quad` (on the
+// builder's frame), r4 = `key`, f1 = `depth`.
+struct QuadCall {
+  uint32_t quad;
+  uint32_t key;
+  double depth;
+};
+// UiMovie::DrawPicture (sub_8259ED40)'s work before its call of
+// sub_8259EBE8: the picture's transform applied (ApplyTransform), its quad
+// built at `frame` + 112 (the original's 1,088-byte frame: positions at
+// +240, colors +496, texture coordinates +752): the corners (0, 0) to
+// (+100, +104) transformed by the context (Vec4::Transform through
+// debug::Vec4Transform), the context's color as integers, the texture's
+// coordinates (+116..+128 over its size, else 0 to 1; +132 and +136 flip
+// them), the clip; the key +72 and the depth (the layer times the float at
+// 0x82071520).
+// Its caller checks first that the picture has a texture (PictureTextureOf
+// below not 0): without one, the original reads its size at guest address
+// 4, which faults (never so in play), and the original is left to run.
+QuadCall BuildPicture(uint8_t* base, uint32_t context, uint32_t picture, uint32_t layer,
+                      uint32_t frame);
+// The picture's texture: with +140 set, the context's table entry for its
+// texture entry [+108]; else 0.
+uint32_t PictureTextureOf(uint8_t* base, uint32_t context, uint32_t picture);
+// UiMovie::DrawPrimitive (sub_8259F348)'s work before its call of
+// sub_8259EBE8: the same for a primitive's [+116] vertices, its quad at
+// `frame` + 96 (the original's 1,152-byte frame: positions +272, colors
+// +528, texture coordinates +784), the vertices' colors times the
+// context's (squared with +100, which is also the quad's blend mode).
+QuadCall BuildPrimitive(uint8_t* base, uint32_t context, uint32_t primitive, uint32_t layer,
+                        uint32_t frame);
+
 // The recorders (recording.cpp), on the command list `list` (the global at
 // 0x82970C1C). Each records a chunk and returns its first slot, which the
 // caller hands to the renderer (vtable slot 4); nothing is done (nullopt)
