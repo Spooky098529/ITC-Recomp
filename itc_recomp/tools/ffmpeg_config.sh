@@ -1,10 +1,12 @@
 #!/bin/bash
 # Generates the files FFmpeg's configure makes, for the build of upstream
-# FFmpeg (itc_recomp/thirdparty/FFmpeg, a submodule) with only the xma2
-# decoder (B2 in docs/rexglue-removal.md), and keeps them in
-# itc_recomp/thirdparty/ffmpeg-config/<platform>/: config.h,
-# config_components.h, libavutil/avconfig.h and ffversion.h, libavcodec's
-# codec, parser and bsf lists, and sources.txt (the .c files the build
+# FFmpeg (itc_recomp/thirdparty/FFmpeg, a submodule) with only what the game's
+# data needs: the xma2 decoder (B2 in docs/rexglue-removal.md) and, for the
+# movies (docs/native-movies.md), the asf demuxer and the wmv3 and wmav2
+# decoders. Keeps them in itc_recomp/thirdparty/ffmpeg-config/<platform>/:
+# config.h, config_components.h, libavutil/avconfig.h and ffversion.h,
+# libavcodec's codec, parser and bsf lists, libavformat's demuxer, muxer and
+# protocol lists, and sources.txt (the .c files the build
 # compiles, from a real build). itc_recomp/cmake/ffmpeg.cmake builds from
 # them, so configure never runs in the game's build (it can't for the Windows
 # cross-compile). Run again after moving the submodule to another release.
@@ -24,10 +26,13 @@ XWIN=$R/itc_recomp/out/xwin-sdk
 WORK=$(mktemp -d)
 trap 'rm -rf "$WORK"' EXIT
 
-# Only libavutil and libavcodec, only the xma2 decoder, plain C (no assembly),
-# threads on (FFmpeg's one-time set-up isn't thread-safe without them).
-COMMON=(--disable-everything --enable-decoder=xma2 --disable-programs --disable-doc
-        --disable-avdevice --disable-avformat --disable-swscale --disable-swresample
+# Only libavutil, libavcodec and libavformat, only those decoders and the
+# demuxer (no protocols: the movies' bytes come through our own AVIOContext),
+# plain C (no assembly), threads on (FFmpeg's one-time set-up isn't
+# thread-safe without them).
+COMMON=(--disable-everything --enable-decoder=xma2,wmv3,wmav2 --enable-demuxer=asf
+        --disable-programs --disable-doc
+        --disable-avdevice --disable-swscale --disable-swresample
         --disable-avfilter --disable-network --disable-autodetect --disable-x86asm
         --disable-inline-asm --disable-debug --enable-static --disable-shared)
 
@@ -41,12 +46,13 @@ generate() {  # <platform> <configure flags...>
     { tail -20 "$build/make.log" >&2; exit 1; }
   local dest=$OUT/$platform
   rm -rf "$dest"
-  mkdir -p "$dest/libavutil" "$dest/libavcodec"
+  mkdir -p "$dest/libavutil" "$dest/libavcodec" "$dest/libavformat"
   for f in config.h config_components.h libavutil/avconfig.h libavutil/ffversion.h \
-           libavcodec/codec_list.c libavcodec/parser_list.c libavcodec/bsf_list.c; do
+           libavcodec/codec_list.c libavcodec/parser_list.c libavcodec/bsf_list.c \
+           libavformat/demuxer_list.c libavformat/muxer_list.c libavformat/protocol_list.c; do
     sed -e "s|$XWIN|<xwin-sdk>|g" -e "s|$R/||g" -e "s|$HOME|~|g" "$build/$f" >"$dest/$f"
   done
-  grep -oE '\-o (libavcodec|libavutil)/[^ ]+\.o' "$build/make.log" | sed -e 's/^-o //' -e 's/\.o$/.c/' |
+  grep -oE '\-o (libavcodec|libavutil|libavformat)/[^ ]+\.o' "$build/make.log" | sed -e 's/^-o //' -e 's/\.o$/.c/' |
     sort -u >"$dest/sources.txt"
   echo "$platform: $(wc -l <"$dest/sources.txt") sources"
 }
