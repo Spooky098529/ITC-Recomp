@@ -22,7 +22,13 @@ file's history. What's left to see in a drive, from every run:
   from `leads.md`): `racer-controllers.md`, mapped in b5491fb (26 rows,
   9 ready groups, no outside blockers). Migration 1 (699bbde..7b85ae8):
   27 of 27 ours (one row added), `--native_racer_controllers`; nothing
-  left. Step: validation (agent running).
+  left. Validated (`itc_1227` 28 s, `itc_1228`, replay ok; 25 of 25
+  harness lines; 2 never-seen ports to drive), except OnEnd, OnHold and
+  OnState7 (`sub_8215F5E8`, `sub_8215FC28`, `sub_82160940`): adapters
+  calling other plain C++ directly, no print of their own; given
+  one-line functions with prints as `data_tables::RecordsItem` was (the
+  user's call in the eighth run). Step: that fix (migration agent
+  running), then their validation.
 
 ## Done
 

@@ -50,6 +50,14 @@ Migration 5's, not in the attract race or the replay (`itc_1203`,
 
 - `sub_8213A000` AiDrivers::StartGroup (`ai-drivers.md`)
 
+The racer controllers', not in the attract race or the replay
+(`itc_1227`, `itc_1228`, ok):
+
+- Never seen in play, no rows (ported with their callers,
+  `racer-controllers.md`'s intro): `sub_8215F5F0`
+  RaceFlow::ClearAllRecords, `sub_82160880`
+  RaceFlow::PlayersAndAiNoPause
+
 ## Run 2026-10-23 17:22 (`b7-loop-23-10-26-4`)
 
 Not in the attract race or the replay (`itc_1043`, `itc_1044`, ok):
