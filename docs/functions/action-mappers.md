@@ -13,7 +13,7 @@ mapper bound to its pad and listener), the update every pass
 on logic passes only, `src/hooks/input.cpp`), and the read slots seen in
 play. The input path below them (Input::Update, the pads, the input
 processors and the listeners' update) is B1's native code in
-`itc_recomp/src/input/` (rows in `functions.md`); the mappers are B1's
+`itc_recomp/src/input/` (rows in `input.md`); the mappers are B1's
 "read but recompiled" part. What the update does, step by step, and the
 mapper's fields: "The action mappers' update" and "Revised plan" in
 `../pause-menu-fix.md` (the per-tick fix is there too); the mapper's
@@ -25,9 +25,9 @@ Callers outside: `ActionMappers::Init` from the app's start-up
 (`sub_8220C020`, `sub_8220BD50`), the pause menu and the car
 (`sub_82102400`, `sub_82102468`), not rows here. The mapper's
 listener is an input processor (vtable `0x8206C0C4`, made by
-`sub_8258CE60`, a lead; its update `sub_82592188` in `functions.md`);
+`sub_8258CE60`, `input.md`; its update `sub_82592188` there too);
 the other button tests (`sub_8258CEB0`, `sub_8258CEE0`, `sub_82592500`,
-`sub_82592520`) are the app's, in `functions.md`. The read slots never
+`sub_82592520`) are the app's, in `input.md`. The read slots never
 seen in play (`sub_8210BA68` analog float, `sub_8210BED8` held before,
 `sub_8210BFA8` released; all Wrapped for `--log_pause_menu`) keep their
 rows in `functions.md`; slot 1 `sub_8210BDB8` (reset) and slot 13
