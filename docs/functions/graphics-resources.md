@@ -31,6 +31,20 @@ its cache flush packet, which the renderer skips, `src/native/gpu_link.cpp`;
 EDRAM allocator holds the kernel's critical section
 (`RtlEnterCriticalSection` and `RtlLeaveCriticalSection`).
 
+Made native by the B7 loop's migration (2026-10-24, `--native_graphics_resources`,
+harness `graphics_resources`): the header math, level descriptions and
+layouts in `src/graphics/resources.cpp`, the EDRAM allocator in
+`src/graphics/edram.cpp` (one `std::mutex` in place of its critical
+section, the user's call; the bases, bitmap and free count the game's
+exactly), adapters in `src/hooks/graphics_resources.cpp`; AddRef's work is
+`refcount::AddRef` (`src/native/refcount.cpp`) for native callers. Learned
+on the way: `Resource::Destroy`'s surface case (`sub_822A6268`) is a piece
+the recompiler split off, entered with Destroy's frame, so its adapter
+ends as Destroy does; `TextureLayout::LevelSize` keeps the original's
+divide trap (a linear format with no bytes a block logs a warning and goes
+on with 0); the allocation layer stops the game when out of memory, so
+the creation functions' failure paths have no harness cases.
+
 Callers in other files: `Texture::GetLevelDesc` (`sub_822A5B78`) from
 `UiMovie::OnLoaded` and `sub_8211BEE8` (`ui-movies-game.md`),
 `Font::OnPageLoaded` (`strings-and-font.md`), `sub_822135B0`,
