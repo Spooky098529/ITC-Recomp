@@ -72,6 +72,8 @@ set(ITC_SOURCES
     src/hooks/cockpit_dials.cpp
     src/hooks/input.cpp
     src/hooks/input_update.cpp
+    src/hooks/input_manager.cpp
+    src/std_list/ptr_list.cpp
     src/hooks/debug_output.cpp
     src/hooks/object_attributes.cpp
     src/hooks/time.cpp
@@ -243,6 +245,7 @@ set(ITC_SOURCES
     src/harnesses/std_string.cpp
     src/harnesses/sound_cues.cpp
     src/harnesses/xact.cpp
+    src/harnesses/input.cpp
     src/helpers/debug_output.cpp
     src/helpers/object_attributes.cpp
     src/helpers/time.cpp
