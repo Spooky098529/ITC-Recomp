@@ -167,5 +167,6 @@ void AiDrivers(Context& h);
 void RacerControllers(Context& h);
 void TrackZones(Context& h);
 void GraphicsResources(Context& h);
+void VideoOutput(Context& h);
 
 }  // namespace harness
