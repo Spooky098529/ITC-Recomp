@@ -49,6 +49,17 @@ void NativeStarDefInit(PPCContext& ctx, uint8_t* base) {
                                ctx.f4.f64, ctx.r10.u32);
 }
 
+// RenderTexture::Release: r3 = the entry; the original when the frees
+// aren't the layer's (as its adapter was).
+void NativeRenderTextureRelease(PPCContext& ctx, uint8_t* base) {
+  const auto r3 = pe::RenderTextureRelease(base, ctx.r3.u32);
+  if (!r3) {
+    __imp__sub_82133070(ctx, base);
+    return;
+  }
+  ctx.r3.u64 = *r3;
+}
+
 constexpr uint32_t kBlockBytes = 0x4000;
 constexpr uint32_t kGlowVtable = 0x820088B0;  // the game's (slots 2, 6, 8 the setters)
 
@@ -637,7 +648,7 @@ void RenderTextureCases(Context& h, uint32_t block) {
         if (pool) {
           Run(v, __imp__sub_821332F0, sub_821332F0, t, h.base);
         } else {
-          Run(v, __imp__sub_82133070, sub_82133070, t, h.base);
+          Run(v, __imp__sub_82133070, NativeRenderTextureRelease, t, h.base);
         }
         const std::initializer_list<uint32_t> made = {header, memory, entry};
         for (uint32_t i = 0; i < 0x200; i += 4) {

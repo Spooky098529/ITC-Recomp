@@ -10,7 +10,8 @@
 // PostEffects::ToggleNoHistory (sub_82133A38) and ScreenObject::ToggleHidden
 // (sub_8212EDE0) have no adapters: only Race::ToggleEffects' plain C++ calls
 // them, and the flag switches it. StarDef::Init (sub_8212EA98) has none
-// either: only GlareDef::Init's plain C++ calls it.
+// either: only GlareDef::Init's plain C++ calls it; nor RenderTexture::Release
+// (sub_82133070): only RenderTextures::Release's plain C++ calls it.
 
 #include "guest.h"
 
@@ -39,7 +40,8 @@ ITC_FLAG_BOOL(native_post_effects, true, "ITC",
               "sub_82133F58, without the command list's diagnostics; the glare's GlareDef::GlareDef "
               "sub_8212ED78, GlareDef::Init sub_8212EC90 and StarDef::Init sub_8212EA98 (no adapter: only "
               "GlareDef::Init's plain C++ calls it, and the flag switches that); "
-              "RenderTexture::Release sub_82133070 and RenderTextures::Release sub_821332F0 (with "
+              "RenderTexture::Release sub_82133070 (no adapter: only RenderTextures::Release's "
+              "plain C++ calls it, and the flag switches that) and RenderTextures::Release sub_821332F0 (with "
               "--native_heap and --native_c_runtime_heap), PostEffect::ReleaseSurface sub_82133C60 "
               "(with --native_video_output) and TargetFilter::TargetFilter sub_82135AA8 (with "
               "--native_graphics_resources and --native_heap)) natively instead of through the "
@@ -205,9 +207,7 @@ uint32_t VideoOutputCall(PPCContext& ctx, uint8_t* base, uint32_t first, uint32_
 
 }  // namespace
 
-// r3 = the entry; r3 = the address of an effect's entry pointer.
-ITC_POST_EFFECTS_RECORD(82133070, FreesNative() ? RenderTextureRelease(base, ctx.r3.u32)
-                                                : std::optional<uint32_t>())
+// RenderTextures::Release: r3 = the address of an effect's entry pointer.
 ITC_POST_EFFECTS_RECORD(821332F0, FreesNative() ? RenderTexturesRelease(base, ctx.r3.u32)
                                                 : std::optional<uint32_t>())
 
