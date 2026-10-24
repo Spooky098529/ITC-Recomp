@@ -20,7 +20,9 @@ see in a drive, from every run: `to-drive.md`.
   overlays' address range but not overlays; all four ready). Mapped as the post effects
   (`post-effects.md`, 57 rows: 3 moved from `functions.md`, 54 new;
   f3643e1; 32 ready groups; 3 leads added); map checked (0 errors, 57 of
-  57 in play). Migration 1 running.
+  57 in play). Migration 1 done (ece3c32..66b8f81: 43 functions,
+  44 of 57 ours, nothing ready left; 9 adapters removed;
+  `--native_post_effects`). Validation running.
 
 ## Done
 
@@ -43,6 +45,9 @@ This run's groups: `expected-differences.md` (the "17:46 run" lines).
 - Start: ours 1714, work left 5046 (wrapped 122, known 587, unknown 4337).
 - After mapping the post effects: ours 1714, work left 5046 (wrapped
   122, known 641, unknown 4283).
+- After the post effects' migration 1: ours 1757, work left 5003
+  (wrapped 122, known 598, unknown 4283). Race 25 s (`itc_1394`) with
+  `--run_harnesses=all`, 0 errors, every harness 0 differing.
 
 ## Stopped
 

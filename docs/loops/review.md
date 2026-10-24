@@ -32,6 +32,33 @@ When the user has reviewed a run's section, its heading gets
   - `RenderTextures::Acquire` (`sub_82133190`) returns an uninitialized
     stack word when an id is in use with another key (split screen's
     second player, probably; not checked whether it runs).
+  Migration 1 (ece3c32..66b8f81): 43 functions native under
+  `--native_post_effects` (`src/post_effects/`, adapters in
+  `src/hooks/post_effects.cpp`, harness `post_effects`), 9 adapters
+  removed. For review:
+  - Stack leftovers below the stack pointer not reproduced
+    (RecordTexelSize's c32, StarDef::Init's colors, AddQuad's integer
+    conversions); nothing reads them.
+  - The recording helpers check for room first; with the list full the
+    whole original runs (its message and write through address 0); the
+    command list's diagnostics (`--log_slot_callers`) skipped, as in
+    earlier native recorders.
+  - RecordBeginStates and RecordEndStates allocate one slot more than
+    they write (24 and 13), as the original.
+  - Left on the recompiled code behind fallbacks: the release paths and
+    deleting destructors when a block isn't the allocation layer's or
+    `--native_c_runtime_heap`/`--native_heap` is off; ReleaseSurface
+    without `--native_video_output`; TargetFilter::TargetFilter where
+    memcpy's copy can't be native or without
+    `--native_graphics_resources`/`--native_heap`.
+  - Frame interpolation's overrides untouched (`Glow::Record`, the
+    motion blur's copy at 8213653C, `PostEffects::RecordAll`).
+  - `RenderTextures::Acquire` not ported (blocked by `sub_8235A9F8`):
+    its uninitialized-word path is still the original's.
+  - The destructors, release paths and DestroyRace run only when a race
+    ends: attract races don't reach them (harness only).
+  - New helpers in `src/hooks/post_effects.h`: `PostEffectsReleaseTexture`,
+    `PostEffectsReleaseSurface`, `PostEffectsDestroyCalls`.
 
 ## Run 2026-10-24 16:01 (`b7-loop-24-10-26-2`)
 
