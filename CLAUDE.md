@@ -20,6 +20,9 @@ render command replay and the graphics library), and
 that replaced the emulated GPU, and (its last section) the investigation
 of the render thread's performance. `docs/native-audio.md` is the same for
 the SDK's audio (the Audio Worker's spin, the game's sounds, the plan).
+`docs/native-movies.md` is the plan (not started) to play the movies
+through FFmpeg and draw them with our renderer, replacing the movie
+library linked into the game (`docs/functions/movies.md`).
 `docs/unlocked-res.md` covers drawing at other resolutions (`--width`,
 `--height`, `--fullscreen`, black bars) and what's left to try.
 `docs/windows.md` is the Windows build: cross-compiled on Linux, tested
