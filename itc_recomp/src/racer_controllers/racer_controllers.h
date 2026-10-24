@@ -53,6 +53,11 @@ struct Calls {
   // when not null.
   uint64_t (*call)(void* user, uint32_t function, uint64_t r3, uint64_t r4, bool set_r4,
                    uint32_t frame, uint32_t lr, double* f1);
+  // AiDriver::UpdateIdle (sub_821399A8; hooks::AiUpdateIdle) on `driver`
+  // (Of's r3), with f1 set to `f1` first when not null (what the original
+  // leaves there before the call).
+  void (*update_idle)(void* user, uint64_t driver, uint32_t frame, uint32_t lr,
+                      const double* f1);
   // Whether the action mappers' read slots run natively (their flag,
   // --native_action_mappers); when not, they're called through `call`.
   bool native_slots;
@@ -155,6 +160,42 @@ uint32_t PadIsConnected(uint8_t* base, uint32_t entry, uint32_t sp, const Calls&
 // Pad::IsWheel (sub_8209F3B8): the pad as PadIsConnected finds it; 1 when
 // its byte +193 has bit 0x2.
 uint32_t PadIsWheel(uint8_t* base, uint32_t entry, uint32_t sp, const Calls& calls);
+
+// --- The pad reader and the human cars ---
+
+// InputRecording::Next (sub_82102A28, never seen in play): with the
+// player's recording's position (its count word) under 54,000, the record
+// there copied out and the position up, 1; else 0.
+uint32_t RecordingNext(uint8_t* base, uint32_t record, uint32_t player);
+// A message posted to the ring at the owner's +204 (50 records of 12
+// bytes, the count at +804 and the start at +808): (message, 0, 0).
+void PostMessage(uint8_t* base, uint32_t owner, uint32_t message);
+// PlayerControl::ReadPad (sub_8215FCA8): the record filled from the
+// player's pad through the player's control map (see the row); the control
+// words in the original's frame (+80 and +84; 288 bytes below `sp`).
+// Returns 1 after the pause messages or with no pad, else 0. `f1` the
+// vehicle's speed when it was read (the original's f1 then, before
+// UpdateIdle).
+uint32_t ReadPad(uint8_t* base, uint32_t record, uint32_t index, uint32_t player, uint32_t owner,
+                 uint32_t may_pause, uint32_t sp, const Calls& calls);
+// PlayerControl::Update (sub_821604C8): the racer's record of the race
+// data (`slot`) picks the source: a cleared record, or ReadPad with the
+// recording or replay; the record in the original's frame (+80, 192 bytes
+// below `sp`; its bytes +18 and +19 the frame's) copied to the racer's
+// input record. Returns 0 when frozen, else ReadPad's answer (0 cleared).
+uint32_t PlayerUpdate(uint8_t* base, uint32_t slot, uint32_t index, uint32_t player,
+                      uint32_t owner, uint32_t may_pause, uint32_t sp, const Calls& calls);
+// RacerControl::DriveByAiWithPad (sub_8215F7E8): as DriveByAi (its frame
+// 192 bytes below `sp`, the record at +128), with the player's pad's
+// controls +20 (flag 0x40) and +48 (the halfword +12) added (see the row).
+// `regs.r3` the second control's answer (kept when frozen); f1 DriveCar's.
+void DriveByAiWithPad(uint8_t* base, uint32_t index, uint32_t hold, uint32_t player,
+                      uint32_t sp, const Calls& calls, Regs* regs);
+// RaceFlow::AllByAi (sub_8215FA68): each racer by its AI driver, held:
+// those whose vehicle's flags +6148 have 0x1 with the pad of the player at
+// the flow's +9612, 0x80 with +9616's (DriveByAiWithPad), the others
+// DriveByAi. Returns 1.
+uint32_t AllByAi(uint8_t* base, uint32_t flow, uint32_t sp, const Calls& calls);
 
 // --- The AI drivers' set-up ---
 

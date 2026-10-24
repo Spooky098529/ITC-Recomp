@@ -8,7 +8,8 @@
 // CarInputs::Destroy (sub_82102300), from RaceFlow::OnEnd; sub_8215F5F0
 // (never seen in play), from RaceFlow::OnState16; and RaceFlow::HoldAll
 // (sub_8215FA10), from RaceFlow::OnHold and OnState16; PlayerInput::Read
-// (sub_82102350), from PlayerInput::Control.
+// (sub_82102350), from PlayerInput::Control; and InputRecording::Next
+// (sub_82102A28, never seen in play), from PlayerControl::Update.
 
 #include "guest.h"
 
@@ -26,11 +27,13 @@ ITC_FLAG_BOOL(native_racer_controllers, true, "ITC",
               "RaceFlow::OnHold sub_8215FC28, RaceFlow::OnState16 sub_8215FB90, "
               "AiDriver::Setup sub_82170FF8, PlayerInput::Read sub_82102350, "
               "PlayerInput::Control sub_82102488, Pad::IsConnected sub_8209F340, "
-              "Pad::IsWheel sub_8209F3B8) "
+              "Pad::IsWheel sub_8209F3B8, PlayerControl::ReadPad sub_8215FCA8, "
+              "PlayerControl::Update sub_821604C8, RacerControl::DriveByAiWithPad sub_8215F7E8, "
+              "RaceFlow::AllByAi sub_8215FA68) "
               "natively instead of through the translated code (the same words; checked by "
               "--run_harnesses=racer_controllers). Those reached only from native callers "
               "have no adapters, and the flag switches their callers: sub_82102258, "
-              "sub_82102300, sub_8215F5F0, sub_8215FA10, sub_82102350; merged into their callers: "
+              "sub_82102300, sub_8215F5F0, sub_8215FA10, sub_82102350, sub_82102A28; merged into their callers: "
               "sub_821024D0, sub_82591C08");
 
 // Defines an adapter: the body (the arguments after the address) uses `ctx`
@@ -68,6 +71,20 @@ void CallDriveCar(void* user, uint32_t input, uint32_t index, uint32_t flag, uin
   ctx.r1.u64 = saved;
 }
 
+void CallUpdateIdle(void* user, uint64_t driver, uint32_t frame, uint32_t lr, const double* f1) {
+  auto& call = *static_cast<GuestCalls*>(user);
+  PPCContext& ctx = *call.ctx;
+  const uint64_t saved = ctx.r1.u64;
+  ctx.r1.u64 = frame;
+  ctx.lr = lr;
+  ctx.r3.u64 = driver;
+  if (f1 != nullptr) {
+    ctx.f1.f64 = *f1;
+  }
+  hooks::AiUpdateIdle(ctx, call.base);
+  ctx.r1.u64 = saved;
+}
+
 uint64_t CallGuest(void* user, uint32_t function, uint64_t r3, uint64_t r4, bool set_r4,
                    uint32_t frame, uint32_t lr, double* f1) {
   auto& call = *static_cast<GuestCalls*>(user);
@@ -94,7 +111,8 @@ uint64_t CallGuest(void* user, uint32_t function, uint64_t r3, uint64_t r4, bool
 // The calls the plain C++ makes into code that takes the context.
 #define ITC_RACER_CALLS          \
   GuestCalls call{&ctx, base};   \
-  const Calls calls { &call, CallDriveCar, CallGuest, ITC_FLAG(native_action_mappers) }
+  const Calls calls { &call, CallDriveCar, CallGuest, CallUpdateIdle, \
+                      ITC_FLAG(native_action_mappers) }
 
 // --- The input recording ---
 
@@ -177,4 +195,35 @@ ITC_RACER_CONTROLLERS(8209F340, {
 ITC_RACER_CONTROLLERS(8209F3B8, {
   ITC_RACER_CALLS;
   ctx.r3.u64 = PadIsWheel(base, ctx.r3.u32, ctx.r1.u32, calls);
+})
+
+// --- The pad reader and the human cars ---
+
+// r3 = the record, r4 = the racer's index, r5 = the player, r6 = the message
+// ring's owner, r7 = may pause. f1 left by UpdateIdle (the speed before it,
+// when read).
+ITC_RACER_CONTROLLERS(8215FCA8, {
+  ITC_RACER_CALLS;
+  ctx.fpscr.disableFlushMode();
+  ctx.r3.u64 = ReadPad(base, ctx.r3.u32, ctx.r4.u32, ctx.r5.u32, ctx.r6.u32, ctx.r7.u32,
+                       ctx.r1.u32, calls);
+})
+// r3 = the racer's record slot, r4 = the racer's index, then as ReadPad.
+ITC_RACER_CONTROLLERS(821604C8, {
+  ITC_RACER_CALLS;
+  ctx.fpscr.disableFlushMode();
+  ctx.r3.u64 = PlayerUpdate(base, ctx.r3.u32, ctx.r4.u32, ctx.r5.u32, ctx.r6.u32, ctx.r7.u32,
+                            ctx.r1.u32, calls);
+})
+// r3 not read, r4 = the racer's index, r5 = the hold flag, r6 = the player.
+ITC_RACER_CONTROLLERS(8215F7E8, {
+  ITC_RACER_CALLS;
+  Regs regs{ctx.r3.u64, 0, false};
+  DriveByAiWithPad(base, ctx.r4.u32, ctx.r5.u32, ctx.r6.u32, ctx.r1.u32, calls, &regs);
+  ctx.r3.u64 = regs.r3;
+})
+// r3 = the race flow.
+ITC_RACER_CONTROLLERS(8215FA68, {
+  ITC_RACER_CALLS;
+  ctx.r3.u64 = AllByAi(base, ctx.r3.u32, ctx.r1.u32, calls);
 })

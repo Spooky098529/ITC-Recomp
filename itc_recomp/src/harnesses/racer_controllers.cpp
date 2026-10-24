@@ -23,6 +23,8 @@
 #include <fmt/format.h>
 
 #include <algorithm>
+#include <bit>
+#include <iterator>
 #include <string>
 #include <vector>
 
@@ -151,12 +153,25 @@ uint64_t CallGuest(void* user, uint32_t function, uint64_t r3, uint64_t r4, bool
   }
   return ctx.r3.u64;
 }
+void CallUpdateIdle(void* user, uint64_t driver, uint32_t frame, uint32_t lr, const double* f1) {
+  auto& call = *static_cast<HarnessCalls*>(user);
+  PPCContext& ctx = *call.ctx;
+  const uint64_t saved = ctx.r1.u64;
+  ctx.r1.u64 = frame;
+  ctx.lr = lr;
+  ctx.r3.u64 = driver;
+  if (f1 != nullptr) {
+    ctx.f1.f64 = *f1;
+  }
+  hooks::AiUpdateIdle(ctx, call.base);
+  ctx.r1.u64 = saved;
+}
 // Whether the native side reads the mappers' slots natively (alternated by
 // the cases; the adapters use --native_action_mappers).
 bool g_native_slots = true;
 #define ITC_HARNESS_CALLS          \
   HarnessCalls call{&ctx, base};   \
-  const rc::Calls calls { &call, CallDriveCar, CallGuest, g_native_slots }
+  const rc::Calls calls { &call, CallDriveCar, CallGuest, CallUpdateIdle, g_native_slots }
 
 void NativeDriveByAi(PPCContext& ctx, uint8_t* base) {
   ITC_HARNESS_CALLS;
@@ -200,6 +215,31 @@ void NativeIsConnected(PPCContext& ctx, uint8_t* base) {
 void NativeIsWheel(PPCContext& ctx, uint8_t* base) {
   ITC_HARNESS_CALLS;
   ctx.r3.u64 = rc::PadIsWheel(base, ctx.r3.u32, ctx.r1.u32, calls);
+}
+void NativeReadPad(PPCContext& ctx, uint8_t* base) {
+  ITC_HARNESS_CALLS;
+  ctx.fpscr.disableFlushMode();
+  ctx.r3.u64 = rc::ReadPad(base, ctx.r3.u32, ctx.r4.u32, ctx.r5.u32, ctx.r6.u32, ctx.r7.u32,
+                           ctx.r1.u32, calls);
+}
+void NativePlayerUpdate(PPCContext& ctx, uint8_t* base) {
+  ITC_HARNESS_CALLS;
+  ctx.fpscr.disableFlushMode();
+  ctx.r3.u64 = rc::PlayerUpdate(base, ctx.r3.u32, ctx.r4.u32, ctx.r5.u32, ctx.r6.u32, ctx.r7.u32,
+                                ctx.r1.u32, calls);
+}
+void NativeDriveByAiWithPad(PPCContext& ctx, uint8_t* base) {
+  ITC_HARNESS_CALLS;
+  rc::Regs regs{ctx.r3.u64, 0, false};
+  rc::DriveByAiWithPad(base, ctx.r4.u32, ctx.r5.u32, ctx.r6.u32, ctx.r1.u32, calls, &regs);
+  ctx.r3.u64 = regs.r3;
+}
+void NativeAllByAi(PPCContext& ctx, uint8_t* base) {
+  ITC_HARNESS_CALLS;
+  ctx.r3.u64 = rc::AllByAi(base, ctx.r3.u32, ctx.r1.u32, calls);
+}
+void NativeNext(PPCContext& ctx, uint8_t* base) {
+  ctx.r3.u64 = rc::RecordingNext(base, ctx.r3.u32, ctx.r4.u32);
 }
 void NativeSetup(PPCContext& ctx, uint8_t* base) {
   ctx.fpscr.disableFlushMode();
@@ -707,6 +747,242 @@ void Controls(Context& h, Random& r) {
   memory::Free(mappers);
 }
 
+// --- The pad reader and the human cars ---
+
+// Everything the pad reader and its callers read, in blocks of our own: the
+// race data (its mode, stage, flags and racers' records), the race and its
+// racers, the vehicles, the save data (the control maps and settings), the
+// recordings, the mappers and the globals 0x826C7960 and 0x826C7964.
+constexpr uint32_t kVehiclesGlobal = 0x826C2E34, kSaveDataGlobal = 0x826C5B58;
+constexpr uint32_t kPadGlobals = 0x826C7960;
+constexpr uint32_t kVehicleBytes = 6272;
+constexpr uint32_t kSaveBytes = 0x1F888 + 120 * 4 + 64;
+
+void Pads(Context& h, Random& r) {
+  const Globals saved(h.base);
+  const uint32_t saved_vehicles = guest::LoadU32(h.base, kVehiclesGlobal);
+  const uint32_t saved_save = guest::LoadU32(h.base, kSaveDataGlobal);
+  const uint32_t saved_pads[2] = {guest::LoadU32(h.base, kPadGlobals),
+                                  guest::LoadU32(h.base, kPadGlobals + 4)};
+  const std::vector<uint8_t> table = Bytes(h.base, rc::kMapperEntries, kTableBytes);
+  const uint32_t race_data = memory::Alloc(0xA3B00, 0);
+  const uint32_t block = memory::Alloc(0x1000, 0);
+  const Racers at{block, block + 0xA00, block + 0xE00};
+  const uint32_t vehicles = memory::Alloc(7 * kVehicleBytes, 0);
+  const uint32_t save = memory::Alloc(kSaveBytes, 0);
+  const uint32_t recordings = memory::Alloc(4 * rc::kRecordingBytes, 0);
+  const uint32_t mappers = memory::Alloc(4 * kMapperBytes, 0);
+  const uint32_t record = h.data + 0x100;
+  const uint32_t owner = h.data + 0x200;  // the ring at +204 to +812
+  const uint32_t flow = h.data + 0x600 - 9600;  // +9612 and +9616 in the scratch area
+  const StandIns stand_ins;
+  enum Kind { kReadPad, kUpdate, kWithPad, kAllByAi, kNext };
+  const struct {
+    const char* name;
+    GuestFunction recompiled, native;
+    Kind kind;
+    int cases;
+  } functions[] = {
+      {"PlayerControl::ReadPad (sub_8215FCA8)", Original<__imp__sub_8215FCA8>, NativeReadPad,
+       kReadPad, 2000},
+      {"PlayerControl::Update (sub_821604C8)", Original<__imp__sub_821604C8>, NativePlayerUpdate,
+       kUpdate, 2000},
+      {"RacerControl::DriveByAiWithPad (sub_8215F7E8)", Original<__imp__sub_8215F7E8>,
+       NativeDriveByAiWithPad, kWithPad, 1000},
+      {"RaceFlow::AllByAi (sub_8215FA68)", Original<__imp__sub_8215FA68>, NativeAllByAi, kAllByAi,
+       500},
+      {"InputRecording::Next (sub_82102A28, never seen in play)", Original<__imp__sub_82102A28>,
+       NativeNext, kNext, 300},
+  };
+  for (const auto& f : functions) {
+    Results results(f.name);
+    for (int c = 0; c < f.cases; c++) {
+      // The racers and their records; the race data's flags (0x100 now and
+      // then, 0x20, 0x40, 0x80 in any mix), mode (1 often: the counting;
+      // 6 with a stage not 1 often: the pad read without the connection
+      // check, whose pads the input manager's real ones are), stage and
+      // racers' records (+3936 flags with 0x400 now and then, +3940).
+      RandomRacers(h.base, r, at, race_data);
+      RandomStage(h.base, r, race_data);
+      if (r.Below(2) == 0) {
+        guest::StoreU32(h.base, race_data + rc::kMode, r.Below(2) ? 6 : 1);
+        const uint32_t stages = race_data + rc::kStages;
+        guest::StoreU32(h.base, stages + 80 * guest::LoadU32(h.base, stages + 804),
+                        r.Below(4) == 0 ? 1 : 2 + r.Below(3));
+      }
+      uint32_t flags = guest::LoadU32(h.base, race_data + rc::kFlags) & ~0x1E0u;
+      flags |= (r.Below(3) == 0 ? 0x20u : 0u) | (r.Below(3) == 0 ? 0x40u : 0u) |
+               (r.Below(4) == 0 ? 0x80u : 0u) | (r.Below(4) == 0 ? 0x100u : 0u);
+      guest::StoreU32(h.base, race_data + rc::kFlags, flags);
+      guest::StoreU32(h.base, race_data + rc::kCount, uint32_t(r.Next()));
+      for (uint32_t i = 0; i < 7; i++) {
+        const uint32_t racer = race_data + 3936 * i;
+        guest::StoreU32(h.base, racer + 3936,
+                        r.Below(6) == 0 ? 0x400u | uint32_t(r.Next()) : uint32_t(r.Next()) & ~0x400u);
+        guest::StoreU32(h.base, racer + 3940, r.Below(2) ? 0 : uint32_t(r.Next()));
+      }
+      // The vehicles: +2249, +2252 (-1 half the time), the speed +48 (m/s:
+      // around the brake's threshold), the flags +6148.
+      RandomWords(h.base, r, vehicles, 7 * kVehicleBytes);
+      for (uint32_t i = 0; i < 7; i++) {
+        const uint32_t vehicle = vehicles + kVehicleBytes * i;
+        guest::StoreU8(h.base, vehicle + 2249, uint8_t(r.Below(2)));
+        guest::StoreU32(h.base, vehicle + 2252, r.Below(2) ? 0xFFFFFFFFu : r.Below(8));
+        const float speed = float(r.Below(400)) / 10.0f;
+        guest::StoreU32(h.base, vehicle + 48,
+                        r.Below(16) == 0 ? 0x7FC00000u : std::bit_cast<uint32_t>(speed));
+        const uint32_t vflags[] = {0, 1, 0x80, 0x81, uint32_t(r.Next())};
+        guest::StoreU32(h.base, vehicle + 6148, vflags[r.Below(5)]);
+      }
+      // The save data: the control maps (controls 0 to 30, now and then
+      // above), the settings bytes.
+      RandomWords(h.base, r, save + 0x1F880, kSaveBytes - 0x1F880);
+      for (uint32_t i = 0; i < (120 * 4 + 64) / 4; i++) {
+        guest::StoreU32(h.base, save + 0x1F888 + 4 * i, r.Below(16) == 0 ? 31 + r.Below(4)
+                                                                          : r.Below(31));
+      }
+      // The recordings' counts (positions).
+      for (uint32_t p = 0; p < 4; p++) {
+        const uint32_t count = r.Below(4) == 0 ? rc::kRecordingMax - 1 + r.Below(3)
+                                               : r.Below(rc::kRecordingMax);
+        guest::StoreU32(h.base, recordings + p * rc::kRecordingBytes + rc::kRecordingCount, count);
+        RandomWords(h.base, r, recordings + p * rc::kRecordingBytes + 20 * std::min(count, 53999u),
+                    20);
+      }
+      RandomMappers(h.base, r, mappers);
+      RandomWords(h.base, r, record, 20);
+      RandomWords(h.base, r, owner + 204, 608);
+      guest::StoreU32(h.base, owner + 804, r.Below(60));
+      guest::StoreU32(h.base, owner + 808, r.Below(2) ? r.Below(50) : uint32_t(r.Next()));
+      guest::StoreU32(h.base, flow + 9612, r.Below(4));
+      guest::StoreU32(h.base, flow + 9616, r.Below(4));
+      const uint32_t pads[2] = {r.Below(8) == 0 ? 1u : 0u, r.Below(8) == 0 ? 1u : 0u};
+      const std::vector<uint8_t> state[] = {
+          Bytes(h.base, race_data + 0x59000, 0xA3B00 - 0x59000),
+          Bytes(h.base, race_data, 7 * 3936 + 3936),
+          Bytes(h.base, block, 0x1000),
+          Bytes(h.base, vehicles, 7 * kVehicleBytes),
+          Bytes(h.base, save + 0x1F880, kSaveBytes - 0x1F880),
+          Bytes(h.base, mappers, 4 * kMapperBytes),
+          Bytes(h.base, rc::kMapperEntries, kTableBytes),
+          Bytes(h.base, h.data, kScratchBytes),
+      };
+      const uint32_t addresses[] = {race_data + 0x59000, race_data, block, vehicles,
+                                    save + 0x1F880, mappers, rc::kMapperEntries, h.data};
+      // Each recording's count and the two records at it (the one Next
+      // reads or Append writes, and the one after).
+      std::vector<uint8_t> recorded[4];
+      uint32_t counts[4];
+      for (uint32_t p = 0; p < 4; p++) {
+        counts[p] =
+            guest::LoadU32(h.base, recordings + p * rc::kRecordingBytes + rc::kRecordingCount);
+        recorded[p] = Bytes(
+            h.base, recordings + p * rc::kRecordingBytes + 20 * std::min(counts[p], 53998u), 40);
+      }
+      const uint32_t slot = r.Below(7);
+      const uint32_t index = r.Below(7);
+      const uint32_t player = r.Below(4);
+      const uint32_t may_pause = r.Below(4) == 0 ? 0 : 1;
+      const uint32_t hold = r.Below(2);
+      g_native_slots = r.Below(4) != 0;
+      Outputs out[2];
+      for (int v = 0; v < 2; v++) {
+        for (size_t k = 0; k < std::size(addresses); k++) {
+          Write(h.base, addresses[k], state[k].data(), uint32_t(state[k].size()));
+        }
+        for (uint32_t p = 0; p < 4; p++) {
+          const uint32_t at_p = recordings + p * rc::kRecordingBytes;
+          guest::StoreU32(h.base, at_p + rc::kRecordingCount, counts[p]);
+          Write(h.base, at_p + 20 * std::min(counts[p], 53998u), recorded[p].data(), 40);
+        }
+        Fill(h.base, h.data - 1024 - 0x800, 0x800, 0xA5);
+        guest::StoreU32(h.base, rc::kRaceData, race_data);
+        guest::StoreU32(h.base, rc::kRace, at.race);
+        guest::StoreU32(h.base, rc::kRecordings, recordings);
+        guest::StoreU32(h.base, kVehiclesGlobal, vehicles);
+        guest::StoreU32(h.base, kSaveDataGlobal, save);
+        guest::StoreU32(h.base, ai_drivers::kDrivers, 0x40000000);
+        guest::StoreU32(h.base, kPadGlobals, pads[0]);
+        guest::StoreU32(h.base, kPadGlobals + 4, pads[1]);
+        for (uint32_t i = 0; i < 7; i++) {
+          guest::StoreU32(h.base, rc::kInputs + 4 * i, at.records + 20 * i);
+        }
+        StandIns::Reset();
+        PPCContext t = CallContext(h);
+        t.fpscr.disableFlushModeUnconditional();
+        t.f1.u64 = 0x7FF8DEADBEEF0000ull;
+        switch (f.kind) {
+          case kReadPad:
+            t.r3.u64 = record;
+            t.r4.u64 = index;
+            t.r5.u64 = player;
+            t.r6.u64 = owner;
+            t.r7.u64 = may_pause;
+            break;
+          case kUpdate:
+            t.r3.u64 = slot;
+            t.r4.u64 = index;
+            t.r5.u64 = player;
+            t.r6.u64 = owner;
+            t.r7.u64 = may_pause;
+            break;
+          case kWithPad:
+            t.r3.u64 = 0x12345678;
+            t.r4.u64 = index;
+            t.r5.u64 = hold;
+            t.r6.u64 = player;
+            break;
+          case kAllByAi:
+            t.r3.u64 = flow;
+            t.r4.u64 = 0x12345678;
+            break;
+          case kNext:
+            t.r3.u64 = record;
+            t.r4.u64 = player;
+            break;
+        }
+        (v == 0 ? f.recompiled : f.native)(t, h.base);
+        saved.Restore();
+        guest::StoreU32(h.base, kVehiclesGlobal, saved_vehicles);
+        guest::StoreU32(h.base, kSaveDataGlobal, saved_save);
+        guest::StoreU32(h.base, kPadGlobals, saved_pads[0]);
+        guest::StoreU32(h.base, kPadGlobals + 4, saved_pads[1]);
+        const std::vector<uint8_t> mapper_table = Bytes(h.base, rc::kMapperEntries, kTableBytes);
+        Write(h.base, rc::kMapperEntries, table.data(), kTableBytes);
+        // Everything the case set up, in pieces (what changed shows where).
+        for (size_t k = 0; k < std::size(addresses); k++) {
+          const std::vector<uint8_t> now =
+              k == 6 ? mapper_table : Bytes(h.base, addresses[k], uint32_t(state[k].size()));
+          for (size_t i = 0; i < now.size(); i += 4096) {
+            out[v].Bytes(std::vector<uint8_t>(now.begin() + i,
+                                              now.begin() + std::min(now.size(), i + 4096)));
+          }
+        }
+        for (uint32_t p = 0; p < 4; p++) {
+          const uint32_t at_p = recordings + p * rc::kRecordingBytes;
+          out[v].Word(guest::LoadU32(h.base, at_p + rc::kRecordingCount));
+          out[v].Bytes(Bytes(h.base, at_p + 20 * std::min(counts[p], 53998u), 40));
+        }
+        for (uint32_t word : g_stand_in_log) {
+          out[v].Word(word);
+        }
+        out[v].Word(uint32_t(t.r3.u64 >> 32));
+        out[v].Word(t.r3.u32);
+        out[v].Double(t.f1.u64);
+      }
+      results.Check(out[0], out[1], fmt::format("case {}", c));
+    }
+    results.Report();
+  }
+  g_native_slots = true;
+  memory::Free(mappers);
+  memory::Free(recordings);
+  memory::Free(save);
+  memory::Free(vehicles);
+  memory::Free(block);
+  memory::Free(race_data);
+}
+
 }  // namespace
 
 void RacerControllers(Context& h) {
@@ -718,6 +994,7 @@ void RacerControllers(Context& h) {
   Handoff(h, r);
   SetUp(h, r);
   Controls(h, r);
+  Pads(h, r);
 }
 
 }  // namespace harness
