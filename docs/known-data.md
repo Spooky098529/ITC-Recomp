@@ -29,6 +29,10 @@ to it. Read only these from it:
 | `0x82602570` | The vinyl sheet's size: 1024, 1024, 16, 16 | `sub_820D5EC8`, `sub_820D5D20`, `sub_820D5750`, `sub_820D3C80`, `sub_820EE638`, `sub_820EE698` |
 | `0x82602A50` | The vinyl sheet's ten regions (16 bytes each) | `sub_820EE638`, `sub_820EE698` |
 | `0x82616C64` | The data tables' eight asset ids: 86, 87, 91, 88, 92, 89, 90, 93 | `DataTables::Init` (`sub_82116DB0`), `DataTables::Load` (`sub_82117240`) |
+| `0x826388F8` | The graphics device's render state table: 96 entries of 12 bytes (the getter, the setter, the default value), by state / 4 (`functions/device-state.md`) | `Device::SetDefaultState` (`sub_822ACB90`) |
+| `0x82638D78` | The device's sampler state table: 20 entries of 12 bytes, as above | `Device::SetDefaultState` |
+| `0x82013600`, `0x82013618` | The full viewport (0, 0, `0x7FFFFFFF`, `0x7FFFFFFF`, Z 0.0 to 1.0) and the full scissor rectangle (0, 0, `0x7FFFFFFF`, `0x7FFFFFFF`) | `Device::SetSurfaceInfo` (`sub_822A3C88`) |
+| `0x82013628` | The max anisotropy's register values: 0, 0, 2, 2, 3, 3, 3, 4, 4, 4, 4, 4, 4, 5, 5, 5, 5 | `Device::SetSamplerState_MagFilter`, `MinFilter` and `MaxAnisotropy` |
 
 Anything else in `.data` (the globals and pointers the game sets, such
 as `[0x826C2E48]`, which is 0 in the image) gets the same check before
@@ -221,6 +225,15 @@ it's read from the image, and a row here.
 | `0x829537C4` | The hi-z taken | 1 while a depth surface holds the hi-z (`Device::CreateSurface`), cleared when it's destroyed (`sub_822A6268`). |
 | device +12184, +12200, +12204, +12272 | The device's render targets (4 bytes an index), depth surface, stream buffers (4 bytes a stream) and strides (a byte a stream, × 4) | Read by `Device::GetRenderTarget`, `GetDepthStencilSurface` and `GetStreamSource`. |
 | `0x820007B0` | A pointer to the graphics device's pointer | Read by `Resource::Lock` and `Resource::Destroy`. |
+| device +56, +440, +520, +904 | The device's state tables (`functions/device-state.md`): render state setters at +56 + state, sampler state setters at +440 + state, their getters at +520 + state and +904 + state | Filled by `Device::SetDefaultState` from the image's tables; called by the command replay's SetRenderState and SetSamplerState. |
+| device +11592, +11596 | The blend control's software copy (color in bits 0-12, alpha in 16-28) and flags (bit 31 blending on, bit 30 separate alpha, bits 23-29 the present immediate threshold) | Written into RB_BLENDCONTROL0-3's shadows by the blend render states. |
+| device +11600, +11604..+11644 | The scissor test's enable, then the render states kept as set (color write masks +11604..+11616, Z enable +11620, stencil enable +11624, point sprites +11628, point sizes +11636..+11644) | Applied again to the shadow when a render target or depth surface is bound. |
+| device +11668, +11694, +11720, +11746 | Per sampler (a byte each): max anisotropy, max and min mip level, the z filters' bits | Read by the sampler state setters and `Device::SetTexture`. |
+| device +11772..+11784 | The high-precision blend state per render target | Applied again by `Device::SetRenderTarget`. |
+| device +12288 | The textures bound, 4 bytes a stage | `Device::SetTexture`; the max and min mip level setters clamp to it. |
+| device +12392..+12428 | The viewport (X, Y, width, height, min Z, max Z) and the scissor rectangle (left, top, right, bottom) | `Device::SetViewport`, `Device::GetViewport`, `Device::SetScissorRect`; the renderer reads the rectangle (+12416) and +11600 (`src/native/state.h`). |
+| device +10808 bit 1 | Predicated tiling on (`0x2`) | Worked out by `Device::SetRenderTarget`, `SetDepthStencilSurface` and `SetDefaultState`; read by the renderer's indexed draw (`src/native/draw_packets.cpp`). |
+| device +10792, +13240 | The GPU register split (`Device::SetShaderGprAllocation`; read by nothing) and the present interval (render state 376) | +13240 read by `sub_822A0718` before each Swap. |
 | shader file | A compiled shader | Big-endian: +0 the magic, `0x102A0E01` vertex or `0x102A0E00` pixel (the low 6 bits tested), +4 the header size (where the microcode starts), +8 the microcode size; the constant table in between (names like `matWVPVS`, SBX-Recomp). Parsed by `sub_822A8568`. |
 | `0x826BFCB8`, `0x826BDC98` | The vertex and pixel shaders by pair index | 2,056 pointers each (pairs 0-33, 1000-1005 and 2000-2055 used), set by `sub_820A06D0` from `Shaders::LoadAll`; their addresses are handed to the graphics library at `0x8296B7B4`, `0x8296B7B8` (`sub_825896C0`). |
 | `0x826C1CD8` | The shader loads' offset | Bytes used so far in the shared load buffer (`[0x826A5134]`) by `Shaders::LoadAll`; 0 at its start. |

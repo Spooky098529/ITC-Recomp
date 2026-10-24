@@ -209,6 +209,13 @@ Rows not yet moved stay in the table below. So far:
   wait, the frame's unbinding, the device lock (with the device's thread
   word) and the core's sync primitives under it (the semaphore, events,
   critical sections, scoped locks, waits) (B7).
+- [`device-state.md`](device-state.md): the graphics device's state
+  setters: the render states and sampler states (the device's setter
+  tables), the render target, depth surface, viewport and scissor, the
+  stream sources, index buffer and textures, the blend controls and
+  shader constants, the default state at boot, and the GPU register
+  split, the screen scissor and the gamma ramp with the packets they
+  write (B7).
 
 These files hold functions only. What used to follow the table here moved
 out on 2026-10-20: how frame interpolation works, its options and what
@@ -354,7 +361,6 @@ old performance notes to the end of `../native-renderer.md`.
 | `sub_822B0AB0` | `ComputeGammaRampPwl` | Overridden | Same files. The same curve for a 128-entry piecewise-linear ramp (three channels of (base, delta) pairs): base `curve[base >> 6] << 6`, delta `(curve[min(base>>6 + delta>>6, 1023)] − curve[base >> 6]) << 6`, wrapped to 16 bits. Never called in play. Not needed to draw today (`--xbox_gamma` uses fixed tables captured from the game), but kept native so it can follow the game's ramp later. |
 | `sub_822B07B0` | `SrgbCurve` | Native | `display::Srgb` (`src/display/gamma.cpp`). f1 x, r4 to linear; returns f1 (float). To linear: x > 0.04045 → ((x + 0.055) × (1/1.055))^2.4, else x / 12.92; from linear: x > 0.0031308 → 1.055 × x^(1/2.4) − 0.055 (fused), else x × 12.92. Called only by the two gamma ramps, now native. |
 | `sub_822B0860` | `Bt709Curve` | Native | `display::Bt709`, same file. To linear: x ≥ 0.0812 → ((x + 0.099) × (1/1.099))^(1/0.45), else x / 4.5; from linear: x ≥ 0.018 → 1.099 × x^0.45 − 0.099 (fused), else x × 4.5. Called only by the two gamma ramps, now native. |
-| `sub_822A3A20` | | | Calls `ComputeGammaRamp` (r5 = 0); from `Device::SetDisplayMode`. Not read. |
 | `sub_822A3AA8` | | | Calls `ComputeGammaRampPwl`; from `Device::SetDisplayMode` for formats 7 and 54. Not read. |
 | `sub_822B0E08` | | | Fill a ramp (r3, r4 = 0) before `Device::SetDisplayMode` runs it through the gamma functions; also called by `sub_822A05A8`. Probably the default (identity) ramps. Not read. |
 | `sub_822B0E60` | | | Fill a ramp (r3, r4 = 0) before `Device::SetDisplayMode` runs it through the gamma functions; also called by `sub_822A05A8`. Probably the default (identity) ramps. Not read. |
@@ -372,9 +378,6 @@ old performance notes to the end of `../native-renderer.md`.
 | `sub_822A0688` | | | Reads GPU registers at `7FC8xxxx`. No callers in code. Not read. Never called (attract races and play, 2026-10-20, a counter). |
 | `sub_822AD500` | `Device::Release` | | r3 device. Waits, frees, `sub_822ACFB8`, `sub_822B58C0`, clears the interrupt callback, `sub_8229F280(device, 0)`, unregisters the terminate notification, `VdShutdownEngines`. From `sub_8229D978`. Never called in an attract race. Not needed to draw: never called (attract race and play). |
 | `sub_8229DB38` | | | Probably Direct3D's CreateDevice: r3 0, r4 1, r5 0, r6 0, r7 the presentation parameters, r8 where the device goes; calls `Device::Init`; returns a negative value on failure. From the display set-up `sub_8258D568` (`8258D6C8`), once at boot. Not read in detail. |
-| `sub_822A1EE8` | | | r3 device, r4 value: stores it at +11608 and sets dirty bits (+10332, +24). `sub_822A1F20` (+11612) and `sub_822A1F58` (+11616) are the same for the next two; probably render states of render targets 1-3. From the display set-up with 0. Not read in detail. |
-| `sub_822A1F20` | | | Same as `sub_822A1EE8`, for +11612. Not read in detail. |
-| `sub_822A1F58` | | | Same as `sub_822A1EE8`, for +11616. Not read in detail. |
 | `sub_8229DA20` | | | Stores r4 at device +15144: the callback the interrupt handler `sub_8229DEA0` calls on vblanks. From the display set-up with `sub_8258D4D8`. |
 | `sub_8229D978` | | | Calls `Device::Release`. Called by `sub_8229DB38`, `sub_824829A0`, `sub_82491758`, `sub_82491A00`, `sub_8258DBA8`. Probably the device's reference count drop. Not read. |
 | `sub_8229F148` | | | Reserves r4 words in the command buffer: ends the segment if +40 + 4·r4 passes the end (+44), then a new segment (`sub_8229EC00`) if still short; returns the write position (+40; the words are written after it), or 0. From Swap (64 words for `VdSwap`), `sub_8229B9C8`, `sub_8229BFE8`, `sub_822AEBF0`, the gamma packets `sub_822B0C38`/`sub_822B0D18`, `RetrainEdram`, `Device::SetUpScaler`, `sub_822B5208`. |
@@ -387,21 +390,16 @@ old performance notes to the end of `../native-renderer.md`.
 | `sub_822B6D70` | | | From `Device::Init`: creates the library's worker threads (`ExCreateThread`, `KeSetBasePriorityThread`) and ends the command segment; 0 on failure. Not read in detail. |
 | `sub_822B6370` | | | Calls `sub_8229DD70` (writes into the primary ring). Not read. |
 | `sub_822AC2A0` | | | From `Device::Init` (r3 device); writes into the command buffer (ends the segment through `sub_8229EF48`). Not read. |
-| `sub_822ACB90` | | | From `Device::Init` (r3 device); calls `sub_8229B7D8`, `sub_822A2A40`, `sub_822A6008`, `sub_822A8A60`, `sub_822AA0E8`. Not read. |
-| `sub_822A3B90` | | | r3 device, r4 0 (Swap, `Device::Init`) or not (then only the second half). With r4 0: the binning packets (opcodes `0x60`-`0x63` from +12448/+12452), `sub_8229B7D8(device, (+10788 >> 12) & 3)`. Then `sub_822A0F80` with the rectangle at +10308/+10312, and all ones in the dirty masks at +0..+39. Also from `sub_825BED08` and `EndTiling` (`sub_825BF200`). Needed to draw: the renderer takes those masks at each draw (`MarkDeviceDirty`), so the next frame's first draw copies every register block. |
 | `sub_822B43C0` | | | From `Device::Init` (r3 device); a 0 return makes it print a warning (the string at `82014180`). Not read. |
 | `sub_822B1E70` | | | From `Device::Init` (no arguments): passes two callbacks (28: `822B1AC8`; 47: a block holding 2 and `822B1CB0`) to a function from the kernel variable at `820007B4`, or from the debug monitor data (`820007F0`, +24) if that's set (it points to 0 without a debugger), and clears the global at `82953D14`. Not read in detail. |
 | `sub_822AC530` | | | The library's debug print (r3 a format): `_vsnprintf` into a 260-byte buffer, then `DbgPrint` (see B6). From `Device::Init`'s failures (ours too), `sub_8229DEA0`, `sub_822AC5B8`, the "GPU hung" handler `sub_822ACAA8`, the capture `sub_822B1788` (Dropped) and mounting `sub_822B58F0` (never called). Never called in play (two attract races and two sessions the user played, 2026-10-21). |
 | `sub_825B9A60` | | Overridden | The current thread's id (r13 +256's +332). Leaf. From `sub_822AD228` (its result goes to device +10760; in play +10760 reads 0, the main thread 3), `Resource::Lock` (whose native code leaves it out with the packet it picks a path for: Dropped, `graphics-resources.md`) and `XACTEngine::CheckNotInCallback` (`xact.md`). Native in `src/graphics/video_output.cpp` (`CurrentThreadId`, `--native_video_output`, harness `video_output`): the guest thread's id through the SDK's `XThread::GetCurrentThreadId` (the same word: the thread object's +332); called directly by `Device::AcquireThreadOwnership`'s plain C++ (`video-output.md`). The adapter stays (`sub_822AD228` and XACT are recompiled). |
 | `sub_8229DDD8` | | | Widens the device's pending cache flush range (r3 = device +11560: a 64-bit start and end, the start the smaller, the end the larger) to r4-r5, by a compare-and-swap. From `Resource::Lock` off the device's thread (always in play), whose native code (`graphics-resources.md`) leaves the call out (Dropped, the user's call: the renderer skips coherency packets). |
-| `sub_822A3D30` | | | Probably `Device::SetRenderTarget` (r3 device, r4 index, r5 surface); from `Device::SetUpDisplay` with the default render target. Not read. |
-| `sub_822A4060` | | | Probably `Device::SetDepthStencilSurface` (r3 device, r4 surface); from `Device::SetUpDisplay` with the default depth surface. Not read. |
 | `sub_822B42D0` | | | The scaler's parameters: r3 device, r4 them (presentation parameters +96); calls `sub_822B2598`, then `sub_822B4250` (which sets +10810 bit 5, the scaler set up at the next Swap). From `Device::SetUpDisplay`; from Swap only when r5 differs from +13284 (never). Not read in detail. |
 | `sub_822B4250` | | | Copies 56 bytes (probably the scaler's parameters into the device) and calls `sub_822B2610` (Dropped), returning what it returns. Not read in detail. |
 | `sub_822B2598` | | | From `sub_822B42D0`. Not read. |
 | `sub_822B3798` | | | From `sub_822B3A78` (twice): the scaler's filters. Not read. |
 | `sub_822B0760` | | Native | One piecewise-linear gamma ramp entry (r3 out, r4 in, r5 the curve), from `sub_822B0AB0`: base `curve[in.base >> 6] << 6`, delta the curve's rise to `min(base>>6 + delta>>6, 1023)` `<< 6`. `display::ApplyGammaCurve` does it natively; no longer called. |
-| `sub_822B0C38` | | | Called by `sub_822A3A20` and `sub_822A3AA8` after their gamma ramp. Not read. |
 | `sub_822B0D18` | | | Called by `sub_822A3A20` and `sub_822A3AA8` after their gamma ramp. Not read. |
 | `sub_822A05A8` | | | r3 device, r4 front buffer format, r5 a ramp (or 0). The display's gamma packets: REG_RMW on `0x1841` (bit 8 for format `28280136`), register `0x1930` (3 for that format, else 0), then the ramp (the default from `sub_822B0E08`/`sub_822B0E60` when r5 is 0) through `sub_822B0D18` or `sub_822B0C38`. Only from Swap, with +10811 bit 7, which no code sets: never called. Not needed to draw: display registers. The native Swap leaves the call out: no callers left. |
 | `sub_822B5C58` | | Dropped | The capture check: r3 device, r4 the front buffer. With the byte at `82953E1C` set: tail-calls `sub_822B5208` (device +20424 bit 3) or the mounting `sub_822B58F0`; else `sub_822B4F10` with bit 3; else returns. No code writes either (0 in play), so it returns. Was called once a frame, only from Swap. The native Swap leaves the call out (before that, skipped behind a temporary switch: nothing changed). |
@@ -418,8 +416,6 @@ old performance notes to the end of `../native-renderer.md`.
 | `sub_822B1718` | | | Capture: the full wait, then an object from `sub_822B7AF8` stored in +19980, given the progress block's physical address. From `sub_822B1788` (states 13-15). Not read in detail. |
 | `sub_822B1AC8` | | | Two `sprintf` calls, `sub_822B43E8` and one indirect call; no direct caller (through a pointer). Never called in play (two attract races and two sessions the user played, 2026-10-21). Not read. |
 | `sub_822B69A8` | | | The library's worker thread (r3 its block). Waits on its event (`KeWaitForSingleObject`, block +32); on a timeout (258), under the device's lock (+13548), when +10810 bit 2 is set (no code sets it): `sub_822A0718` and Swap with the header at +13444 (shows the last frame again); else `sub_822B6780`. Its event is set by the interrupt callback `sub_822B6A78`. Not read in detail. |
-| `sub_822A0F80` | | | The screen scissor: r3 device, r4-r7 rectangle. Context registers from `0x2080`, or when tiling (+10808 bits 4-5) one SET_CONSTANT per tile clipped to it (+12488 tiles at +12492/+12732) and the binning packets. From `sub_822A3B90`, `sub_8229F680`, `sub_822A3450`, `sub_822AFA58`. Not read in detail. |
-| `sub_8229B7D8` | | | r3 device, r4 2 bits put in +10788 bits 12-13; writes WAIT_UNTIL (`0x5C8` = `0x20000`) and register `0xF01` = +10788. From `sub_822A3B90` (r4 the bits it holds) and `sub_822ACB90`. |
 | `sub_822B5208` | | | From `sub_822B5C58` (capture, device +20424 bit 3; never), its only caller, now Dropped: no callers left. Reserves words with `sub_8229F148`. Not read. |
 | `sub_822A0E50` | | | Movies (per Swap's callers): `sub_822A0718`, `sub_822A3450`, then Swap with +13428 and +13284. Never seen calling Swap. Not read in detail. |
 | `sub_8209ACB8` | | | Calls `sub_822A0718`, `sub_8258D4A8`, then Swap (its result as the front buffer, r5 0). No direct callers. Not read in detail. |

@@ -89,8 +89,8 @@ level count) and the XPR2's relocations `sub_8235A9F8` and
 `sub_8229EF48`) and the data cache flush `sub_822AC470` in
 `functions.md`. The device's state setters beside these
 (`sub_822A3450` to `sub_822A4340`, `sub_822A3758`, `sub_822A3908`,
-`sub_822A6008`) are another subsystem (a lead), as is the gamma's
-`sub_822A3A20` (`functions.md`). Not in play, so no rows: the cube
+`sub_822A6008`) and the gamma's `sub_822A3A20` are in
+`device-state.md`. Not in play, so no rows: the cube
 map's surface level `sub_822A5C50` (`GetSurfaceLevel` with a face)
 and the gamma's `sub_822A3AA8` (the EDRAM free `sub_822B5EA8` and the
 packed mip tail's offset `sub_822A4A40`, not seen in play either, have
