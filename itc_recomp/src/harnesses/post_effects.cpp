@@ -32,6 +32,13 @@ namespace {
 
 namespace pe = post_effects;
 
+// The removed adapters' register steps (ToggleNoHistory, ToggleHidden),
+// without the flag.
+void NativeToggleNoHistory(PPCContext&, uint8_t* base) { pe::ToggleNoHistory(base); }
+void NativeToggleHidden(PPCContext& ctx, uint8_t* base) {
+  pe::ToggleScreenObjectHidden(base, ctx.r3.u32);
+}
+
 constexpr uint32_t kBlockBytes = 0x4000;
 constexpr uint32_t kGlowVtable = 0x820088B0;  // the game's (slots 2, 6, 8 the setters)
 
@@ -104,7 +111,7 @@ void EffectsCases(Context& h, uint32_t block) {
   const Function functions[] = {
       {"sub_82133AE8 PostEffects::Get", __imp__sub_82133AE8, sub_82133AE8},
       {"sub_82133A08 PostEffects::MarkUpdated", __imp__sub_82133A08, sub_82133A08},
-      {"sub_82133A38 PostEffects::ToggleNoHistory", __imp__sub_82133A38, sub_82133A38},
+      {"sub_82133A38 PostEffects::ToggleNoHistory", __imp__sub_82133A38, NativeToggleNoHistory},
       {"sub_82133A70 PostEffects::DestroyRace", __imp__sub_82133A70, sub_82133A70},
   };
   constexpr uint32_t kVtable = 0x3F00;  // in the block: slot 1 ToggleHidden
@@ -209,7 +216,7 @@ void ToggleCases(Context& h, uint32_t block) {
         if (race) {
           Run(v, __imp__sub_8215B690, sub_8215B690, t, h.base);
         } else {
-          Run(v, __imp__sub_8212EDE0, sub_8212EDE0, t, h.base);
+          Run(v, __imp__sub_8212EDE0, NativeToggleHidden, t, h.base);
         }
         out[v].Bytes(Read(h.base, block, kBlockBytes));
         out[v].Word(t.r3.u32);

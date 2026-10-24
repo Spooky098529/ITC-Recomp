@@ -7,6 +7,9 @@
 // (sub_821363F0) is recompiled with interpolation's notes at its return
 // 8213653C, and PostEffects::RecordAll (sub_82133960) is the diagnostics'
 // rewrite (src/debug/frame_state_diff.cpp): none of them is here.
+// PostEffects::ToggleNoHistory (sub_82133A38) and ScreenObject::ToggleHidden
+// (sub_8212EDE0) have no adapters: only Race::ToggleEffects' plain C++ calls
+// them, and the flag switches it.
 
 #include "guest.h"
 
@@ -16,9 +19,10 @@
 
 ITC_FLAG_BOOL(native_post_effects, true, "ITC",
               "Run the post effects (docs/functions/post-effects.md: PostEffects::Get "
-              "sub_82133AE8, MarkUpdated sub_82133A08, ToggleNoHistory sub_82133A38, DestroyRace "
+              "sub_82133AE8, MarkUpdated sub_82133A08, ToggleNoHistory sub_82133A38 (no adapter: only "
+              "Race::ToggleEffects' plain C++ calls it, and the flag switches that), DestroyRace "
               "sub_82133A70, Race::ToggleEffects sub_8215B690 with ScreenObject::ToggleHidden "
-              "sub_8212EDE0, the glow's setters sub_82136EF8 to sub_82136F48 and "
+              "sub_8212EDE0 (no adapter, the same), the glow's setters sub_82136EF8 to sub_82136F48 and "
               "Glow::SetFromSpeed sub_82133878, the color filter's setters sub_821350F8, "
               "sub_82135138, sub_82135140 and sub_82135148) natively instead of through the "
               "translated code (the same writes; checked by --run_harnesses=post_effects)");
@@ -39,7 +43,6 @@ using namespace post_effects;
 
 ITC_POST_EFFECTS(82133AE8, ctx.r3.u64 = Get(base, ctx.r3.u32))
 ITC_POST_EFFECTS(82133A08, MarkUpdated(base))
-ITC_POST_EFFECTS(82133A38, ToggleNoHistory(base))
 // The deleting destructors through the effects' slot 1 (r4 = 1), from the
 // original's 112-byte frame.
 ITC_POST_EFFECTS(82133A70, uint32_t r3 = 0;
@@ -55,8 +58,6 @@ ITC_POST_EFFECTS(82133A70, uint32_t r3 = 0;
                  });
                  ctx.r3.u64 = r3)
 
-// r3 = a screen object.
-ITC_POST_EFFECTS(8212EDE0, ToggleScreenObjectHidden(base, ctx.r3.u32))
 // r3 = the race object.
 ITC_POST_EFFECTS(8215B690, ctx.r3.u64 = ToggleRaceEffects(base, ctx.r3.u32))
 
