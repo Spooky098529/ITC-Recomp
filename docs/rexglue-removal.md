@@ -2539,6 +2539,7 @@ B7. **The game logic inside**: everything else, subsystem by subsystem,
 | 2026-10-24 | The AI drivers (the computer racers' driving: each driver's path along the course's route, its corners and line, the other racers' records, the skill block, the steering, throttle and brake into the car's input record; `AiDriver::DriveCar` and `AiDrivers::UpdateAll`) | `ai-drivers.md` | 143 of 148 (five migrations; 119 Native) | `--native_ai_drivers` |
 | 2026-10-24 | The racer controllers (each car's input record filled from the player's pad or its AI driver each tick: the pad reader, the input recording and replay, the race flow's per-state handlers, `AiDriver::Setup`) | `racer-controllers.md` | 27 of 27 (one migration) | `--native_racer_controllers` |
 | 2026-10-24 | The track zones (70 hardcoded stretches of the course's route the player's car is checked against each tick for the HUD: their set-ups, route ranges, fixed-size lists and the owner at `[0x828161EC]`) | `track-zones.md` | 92 of 92 (one migration; 9 Native) | `--native_track_zones` |
+| 2026-10-24 | The graphics resources (the graphics library's texture, surface and buffer headers and descriptions, their creation, the EDRAM allocator, surface levels, the device's current targets and stream, locks, reference counts and destruction; the user's calls: `Edram::Alloc` with a `std::mutex`, the locks' fence waits and cache flushes Dropped) | `graphics-resources.md` | 46 of 46 (two migrations) | `--native_graphics_resources` |
 
     The first run (2026-10-22, branch `b7-loop-test`): every harness at 0 differing, attract races at 20-21 s with no errors,
     and a race the user drove looked right. Ours went from 162 to 335 (work
@@ -3151,3 +3152,15 @@ called, 62 with a live caller. B7 (`b7_status.py`): 6,758 in play, ours
 the rest of the run's subsystems: the array destructor iterator
 (`sub_820900C0`), the getter of `[0x826C6078]` (`sub_821434E8`), the
 race flow's functors (`sub_82160AE0`) and the camera modes (leads).
+
+**2026-10-24, B7's tenth loop run, the graphics resources (branch
+`b7-loop-24-10-26`):** 449 functions (916 pairs): overridden 67, Native
+5 (from 3), Dropped 23, never called 70, live 284 (from 286):
+`Edram::Alloc`'s critical section calls, replaced by a `std::mutex`
+(the user's call). Imports: 186 called, 62 with a live caller. B7
+(`b7_status.py`): 6,760 in play, ours 1,529, work left 5,231 (Wrapped
+123, with a row 554, no row yet 4,554); `graphics-resources.md` 46
+ours of 46. 1,127 overrides in `src/`. `Resource::Lock`'s, `Unlock`'s
+and `Destroy`'s fence waits and cache flushes are left out (the user's
+call); adapters stay for callers in other files still recompiled
+(`Device::Resolve`, the DXT compressor, the game's direct calls).

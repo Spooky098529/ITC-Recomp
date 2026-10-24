@@ -21,6 +21,12 @@ replay (`itc_1267`, `itc_1269`, ok):
 - `sub_822B5EA8` Edram::Free (`graphics-resources.md`; not seen in play
   either)
 
+Migration 2's, not in the attract race or the replay (`itc_1292`,
+`itc_1293`, ok):
+
+- `sub_822A4A40` TextureLayout::MipTailOffset (`graphics-resources.md`;
+  not seen in play either)
+
 ## Run 2026-10-23 20:22 (`b7-loop-23-10-26-5`)
 
 Not in the attract race or the replay (`itc_1124`, `itc_1125`, ok):

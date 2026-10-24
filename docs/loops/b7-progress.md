@@ -21,9 +21,19 @@ see in a drive, from every run: `to-drive.md`.
   choices for the user, so the loop stopped before migrating (below); resumed with the
   user's calls. Migration 1 done (e4730b8..e6b9811, 25 of 45 ours),
   validated (`itc_1267`, `itc_1269`; replay ok; 1 to drive): migration 2
-  done (062da1d..4be0508, 46 of 46 ours): validation agent running.
+  done (062da1d..4be0508, 46 of 46 ours), validated (`itc_1292`,
+  `itc_1293`; replay ok; 1 to drive). Finished.
+- Subsystem 2 of 4: being picked.
 
 ## Done
+
+- The graphics resources (`graphics-resources.md`, mapped in 0e67c00;
+  46 rows): 46 ours in two migrations (e4730b8..e6b9811,
+  062da1d..4be0508), each validated (`itc_1267`/`1269`, `itc_1292`/`1293`;
+  replays ok; 2 to drive); `--native_graphics_resources`. The user's
+  calls: `Edram::Alloc` with a `std::mutex`, the locks' fence waits and
+  flushes Dropped. Left: none; adapters stay for other files' recompiled
+  callers.
 
 ## Rows to review
 
