@@ -192,7 +192,10 @@ rows) and stopped for two of the user's calls, then went on (the
 user's calls, 2026-10-24: `Edram::Alloc`, `sub_822B5EF8`, native with a
 `std::mutex` for the kernel's critical section; the resource locks'
 fence waits and cache flushes Dropped, their lock count, address and
-freeing kept). Harness runs use `attract_race.sh 40` (the user's call,
+freeing kept; 46 of 46 ours, `--native_graphics_resources`, ours 1,485
+-> 1,529), then mapped the video output and the device lock
+(`video-output.md`) and stopped again for the user's call on the
+device lock's kernel sync (`docs/loops/b7-progress.md`, "Stopped"). Harness runs use `attract_race.sh 40` (the user's call,
 2026-10-23); a race short only because the harnesses took longer is
 no halt.
 After each plan item, run `itc_recomp/tools/boundary_status.py` and record

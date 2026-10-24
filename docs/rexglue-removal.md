@@ -86,7 +86,10 @@ goes in `src/` as overrides), American English.
   graphics resources (`graphics-resources.md`, 44 rows) and stopped
   for two of the user's calls before migrating: `Edram::Alloc` native
   with a `std::mutex` for the kernel's critical section, and the
-  resource locks' fence waits and cache flushes Dropped (2026-10-24). The
+  resource locks' fence waits and cache flushes Dropped (2026-10-24);
+  46 of 46 ours (ours 1,529). It then mapped the video output and the
+  device lock (`video-output.md`) and stopped for the user's call on
+  the device lock's kernel sync. The
   runs' rows wait for the user's review (`docs/loops/review.md`). See
   "B7's loop runs" under B7, and `docs/loops/b7-progress.md`. Guest
   allocation is no longer a block (`docs/native-memory.md`); what the
