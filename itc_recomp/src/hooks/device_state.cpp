@@ -19,7 +19,9 @@ ITC_FLAG_BOOL(native_device_state, true, "ITC",
               "sub_822A3B30, the shader constants sub_822A81F8, sub_822A8308 and "
               "sub_822A8470, SetFVF sub_822AA0E8 with VertexDeclaration::FromFvf "
               "sub_822A6A88, SetScissorRect sub_822A3450, ScissorTestEnable sub_822A3D20, "
-              "SetViewport sub_822A3518, SetSurfaceInfo sub_822A3C88, with SetScreenScissor "
+              "SetViewport sub_822A3518, SetSurfaceInfo sub_822A3C88, SetRenderTarget "
+              "sub_822A3D30 with SetRenderTarget_External sub_822A4340, "
+              "SetDepthStencilSurface sub_822A4060, with SetScreenScissor "
               "sub_822A0F80 dropped; the fence list's flush left to the originals) natively instead of "
               "through the translated code (the same writes to the register shadow and the "
               "dirty masks; checked by --run_harnesses=device_state).");
@@ -240,4 +242,19 @@ ITC_DEVICE_STATE_CALL(822A3518, {
 ITC_DEVICE_STATE_CALL(822A3C88, {
   ctx.fpscr.disableFlushMode();
   ds::SetSurfaceInfo(base, ctx.r3.u32, ctx.r4.u32);
+})
+// SetRenderTarget, SetRenderTarget_External and SetDepthStencilSurface: the
+// originals leave a temporary in r3, which none of their callers read; these
+// leave the device.
+ITC_DEVICE_STATE_CALL(822A3D30, {
+  ctx.fpscr.disableFlushMode();
+  ds::SetRenderTarget(base, ctx.r3.u32, ctx.r4.u32, ctx.r5.u32);
+})
+ITC_DEVICE_STATE_CALL(822A4340, {
+  ctx.fpscr.disableFlushMode();
+  ds::SetRenderTargetExternal(base, ctx.r3.u32, ctx.r4.u32, ctx.r5.u32);
+})
+ITC_DEVICE_STATE_CALL(822A4060, {
+  ctx.fpscr.disableFlushMode();
+  ds::SetDepthStencilSurface(base, ctx.r3.u32, ctx.r4.u32);
 })

@@ -520,6 +520,19 @@ void NativeSetSurfaceInfo(PPCContext& ctx, uint8_t* base) {
   ds::SetSurfaceInfo(base, ctx.r3.u32, ctx.r4.u32);
 }
 
+void NativeSetRenderTarget(PPCContext& ctx, uint8_t* base) {
+  ctx.fpscr.disableFlushMode();
+  ds::SetRenderTarget(base, ctx.r3.u32, ctx.r4.u32, ctx.r5.u32);
+}
+void NativeSetRenderTargetExternal(PPCContext& ctx, uint8_t* base) {
+  ctx.fpscr.disableFlushMode();
+  ds::SetRenderTargetExternal(base, ctx.r3.u32, ctx.r4.u32, ctx.r5.u32);
+}
+void NativeSetDepthStencilSurface(PPCContext& ctx, uint8_t* base) {
+  ctx.fpscr.disableFlushMode();
+  ds::SetDepthStencilSurface(base, ctx.r3.u32, ctx.r4.u32);
+}
+
 uint32_t RandomCoordinate(Random& r) {
   switch (r.Below(4)) {
     case 0: return uint32_t(r.Next());
@@ -628,6 +641,53 @@ void ScissorAndViewport(Context& h, uint32_t device) {
                    Original<__imp__sub_822A3C88>, NativeSetSurfaceInfo, 200,
                    [&](PPCContext& t, Random& a) {
                      t.r4.u64 = h.data + kObjectBytes * a.Below(kObjects);
+                   });
+  // The surfaces: the predicated tiling's inputs (+12456 0 mostly, the
+  // bytes +11865 and +11931 0 half the time), the high-precision blends
+  // (+11772..: 0, 1 or random) and the objects' color formats (+28 bits
+  // 16-19: the ones the high-precision blend switches, mostly). The
+  // originals' r3 isn't compared (they leave a temporary there, which
+  // their callers don't read; the adapters leave the device).
+  auto surfaces = [&](PPCContext& t, Random& a) {
+    if (a.Below(4) != 0) {
+      guest::StoreU32(h.base, device + 12456, 0);
+    }
+    for (uint32_t at : {11865u, 11931u}) {
+      if (a.Below(2)) {
+        guest::StoreU8(h.base, device + at, 0);
+      }
+    }
+    for (uint32_t k = 0; k < 8; k++) {
+      const uint32_t pick = a.Below(3);
+      if (pick != 2) {
+        guest::StoreU32(h.base, device + 11772 + 4 * k, pick);
+      }
+    }
+    for (uint32_t k = 0; k < kObjects; k++) {
+      static const uint32_t kFormats[] = {2, 3, 10, 12, 2, 3, 10, 12, 0, 6};
+      const uint32_t at = h.data + kObjectBytes * k + 28;
+      const uint32_t format = kFormats[a.Below(std::size(kFormats))];
+      guest::StoreU32(h.base, at, (guest::LoadU32(h.base, at) & ~0xF0000u) | (format << 16));
+    }
+    const uint32_t surface = a.Below(4) == 0 ? 0 : h.data + kObjectBytes * a.Below(kObjects);
+    if (t.r4.u32 == 0xFFFFFFFFu) {  // SetDepthStencilSurface: r4 the surface
+      t.r4.u64 = surface;
+      return;
+    }
+    t.r4.u64 = a.Below(6) == 0 ? 4 + a.Below(4) : a.Below(4);
+    t.r5.u64 = surface;
+  };
+  RunViewportCases(h, device, "Device::SetRenderTarget (sub_822A3D30)",
+                   Original<__imp__sub_822A3D30>, NativeSetRenderTarget, 600,
+                   [&](PPCContext& t, Random& a) { surfaces(t, a); });
+  RunViewportCases(h, device, "Device::SetRenderTarget_External (sub_822A4340)",
+                   Original<__imp__sub_822A4340>, NativeSetRenderTargetExternal, 100,
+                   [&](PPCContext& t, Random& a) { surfaces(t, a); });
+  RunViewportCases(h, device, "Device::SetDepthStencilSurface (sub_822A4060)",
+                   Original<__imp__sub_822A4060>, NativeSetDepthStencilSurface, 500,
+                   [&](PPCContext& t, Random& a) {
+                     t.r4.u64 = 0xFFFFFFFFu;
+                     surfaces(t, a);
                    });
 }
 

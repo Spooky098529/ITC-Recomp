@@ -162,7 +162,7 @@ void SetColorWriteMask(uint8_t* base, uint32_t device, uint32_t value, uint32_t 
 // surface's color format switched between its two forms (2 and 10, 3 and
 // 12) when it doesn't match, in the surface and RB_COLOR_INFO's shadow.
 void SetHighPrecisionBlend(uint8_t* base, uint32_t device, uint32_t value, uint32_t target,
-                           uint32_t color_info, int dirty_bit) {
+                           uint32_t color_info, uint64_t dirty) {
   const uint32_t surface = Load(base, device + kRenderTargets + 4 * target);
   Store(base, device + 11772 + 4 * target, value);
   if (surface == 0) {
@@ -183,7 +183,7 @@ void SetHighPrecisionBlend(uint8_t* base, uint32_t device, uint32_t value, uint3
   const uint32_t field = (switched & 0xF) << 16;
   Store(base, surface + 28, (now & ~0xF0000u) | field);
   Store(base, device + color_info, (Load(base, device + color_info) & ~0xF0000u) | field);
-  Mark(base, device + kRenderDirty, 1ull << dirty_bit);
+  Mark(base, device + kRenderDirty, dirty);
 }
 
 // The depth bias enables: PA_SU_SC_MODE_CNTL bits 11 and 12 (front and
@@ -787,22 +787,22 @@ void SetViewportEnable(uint8_t* base, uint32_t device, uint32_t value) {
 
 void SetHighPrecisionBlendEnable(uint8_t* base, uint32_t device, uint32_t value) {
   ITC_NATIVE_RUNNING("sub_822A2480 Device::SetRenderState_HighPrecisionBlendEnable");
-  SetHighPrecisionBlend(base, device, value, 0, 10244, 37);
+  SetHighPrecisionBlend(base, device, value, 0, 10244, 1ull << 37);
 }
 
 void SetHighPrecisionBlendEnable1(uint8_t* base, uint32_t device, uint32_t value) {
   ITC_NATIVE_RUNNING("sub_822A2530 Device::SetRenderState_HighPrecisionBlendEnable1");
-  SetHighPrecisionBlend(base, device, value, 1, 10252, 35);
+  SetHighPrecisionBlend(base, device, value, 1, 10252, 1ull << 35);
 }
 
 void SetHighPrecisionBlendEnable2(uint8_t* base, uint32_t device, uint32_t value) {
   ITC_NATIVE_RUNNING("sub_822A25E0 Device::SetRenderState_HighPrecisionBlendEnable2");
-  SetHighPrecisionBlend(base, device, value, 2, 10256, 34);
+  SetHighPrecisionBlend(base, device, value, 2, 10256, 1ull << 34);
 }
 
 void SetHighPrecisionBlendEnable3(uint8_t* base, uint32_t device, uint32_t value) {
   ITC_NATIVE_RUNNING("sub_822A2690 Device::SetRenderState_HighPrecisionBlendEnable3");
-  SetHighPrecisionBlend(base, device, value, 3, 10260, 33);
+  SetHighPrecisionBlend(base, device, value, 3, 10260, 1ull << 33);
 }
 
 void SetHalfPixelOffset(uint8_t* base, uint32_t device, uint32_t value) {
@@ -1398,6 +1398,120 @@ void SetSurfaceInfo(uint8_t* base, uint32_t device, uint32_t surface) {
     Store(base, device + 12416 + i, Load(base, 0x82013618 + i));  // the whole surface
   }
   SetViewport(base, device, 0x82013600);
+}
+
+namespace {
+
+// Whether predicated tiling holds the bound set: flag 0x10 of +10808, or
+// 0x20 with each bound surface (four render targets and the depth surface)
+// the one saved at +12468..+12484 or none.
+bool TilingHoldsBoundSet(uint8_t* base, uint32_t device, uint8_t flags) {
+  if (flags & 0x10) {
+    return true;
+  }
+  if (!(flags & 0x20)) {
+    return false;
+  }
+  for (uint32_t k = 0; k < 5; k++) {
+    const uint32_t bound = Load(base, device + kRenderTargets + 4 * k);
+    if (Load(base, device + 12468 + 4 * k) != bound && bound != 0) {
+      return false;
+    }
+  }
+  return true;
+}
+
+// The predicated tiling bit (+10808 bit 1) worked out again, as
+// SetRenderTarget and SetDepthStencilSurface do: with no tiling under way
+// (+12456 0), the bound set held by the tiling, +10808 bit 3 clear, and
+// +10811 bit 6 or neither +11865 nor +11931 set.
+void UpdatePredicatedTiling(uint8_t* base, uint32_t device) {
+  bool on = false;
+  if (Load(base, device + 12456) == 0) {
+    const uint8_t flags = guest::LoadU8(base, device + 10808);
+    on = TilingHoldsBoundSet(base, device, flags) && !(flags & 0x8) &&
+         ((guest::LoadU8(base, device + 10811) & 0x40) ||
+          (guest::LoadU8(base, device + 11865) == 0 &&
+           guest::LoadU8(base, device + 11931) == 0));
+  }
+  const uint8_t flags = guest::LoadU8(base, device + 10808);
+  guest::StoreU8(base, device + 10808, uint8_t((flags & ~0x2) | (on ? 0x2 : 0)));
+}
+
+}  // namespace
+
+void SetRenderTarget(uint8_t* base, uint32_t device, uint32_t index, uint32_t surface) {
+  ITC_NATIVE_RUNNING("sub_822A3D30 Device::SetRenderTarget");
+  Store(base, device + kRenderTargets + 4 * index, surface);
+  if (surface != 0) {
+    // RB_COLOR_INFO's shadow: 0x2001 for target 0, 0x2003-0x2005 for 1-3
+    // (+24 bit 37, 35, 34, 33), then the high-precision blend applied
+    // again to the surface's format.
+    const uint32_t slot = index == 0 ? 0 : index + 1;
+    const uint32_t color_info = 10244 + 4 * slot;
+    Store(base, device + color_info, Load(base, surface + 28));
+    const uint32_t shift = (26 + slot) & 0xFF;
+    const uint64_t bit = (shift & 0x40) ? 0 : (0x8000000000000000ull >> (shift & 0x7F));
+    Mark(base, device + kRenderDirty, bit);
+    SetHighPrecisionBlend(base, device, Load(base, device + 11772 + 4 * index), index,
+                          color_info, bit);
+  }
+  if (index > 3) {
+    return;
+  }
+  if (index == 0) {
+    const uint32_t info = surface != 0 ? surface : Load(base, device + kDepthSurface);
+    if (info != 0) {
+      SetSurfaceInfo(base, device, info);
+    }
+    UpdatePredicatedTiling(base, device);
+  }
+  // The target's color write mask applied again to RB_COLOR_MASK; +24
+  // bit 18.
+  SetColorWriteMask(base, device, Load(base, device + 11604 + 4 * index), index);
+}
+
+void SetRenderTargetExternal(uint8_t* base, uint32_t device, uint32_t index,
+                             uint32_t surface) {
+  ITC_NATIVE_RUNNING("sub_822A4340 Device::SetRenderTarget_External");
+  SetRenderTarget(base, device, index, surface);
+}
+
+void SetDepthStencilSurface(uint8_t* base, uint32_t device, uint32_t surface) {
+  ITC_NATIVE_RUNNING("sub_822A4060 Device::SetDepthStencilSurface");
+  Store(base, device + kDepthSurface, surface);
+  if (surface != 0) {
+    if (Load(base, device + kRenderTargets) == 0) {
+      SetSurfaceInfo(base, device, surface);
+    }
+    const bool own_tiling = (guest::LoadU8(base, device + 10811) & 0x40) != 0;
+    Store(base, device + 10248, Load(base, surface + 28));  // RB_DEPTH_INFO
+    Store(base, device + kRbDepthHiZ, Load(base, surface + 32));
+    const uint32_t hiz = Load(base, surface + 32);
+    const uint8_t b10810 = guest::LoadU8(base, device + 10810);
+    guest::StoreU8(base, device + 10810, uint8_t((Rotl(hiz, 6) & 0x40) | (b10810 & ~0x40)));
+    if (own_tiling && TilingHoldsBoundSet(base, device, guest::LoadU8(base, device + 10808))) {
+      // RB_SURFACE_INFO's top 14 bits from the tiling's +12912.
+      Insert(base, device + 10240, Load(base, device + 12912), 18, 0xFFFC0000u);
+    }
+    Mark(base, device + kRenderDirty, 1ull << 36);
+    Mark(base, device + kShaderDirty, 0x100 | (1ull << 49));
+  } else {
+    Store(base, device + kRbDepthHiZ, Load(base, device + kRbDepthHiZ) & 0xFFFFFFF0u);
+    const uint8_t b10810 = guest::LoadU8(base, device + 10810);
+    guest::StoreU8(base, device + 10810, uint8_t(b10810 & 191));
+    Mark(base, device + kShaderDirty, 0x100);
+  }
+  UpdatePredicatedTiling(base, device);
+  // The Z and stencil enables applied again to RB_DEPTHCONTROL (0 without
+  // a depth surface).
+  const uint32_t z = Load(base, device + 11620);
+  Store(base, device + 11620, z);
+  SetDepthControl(base, device, Load(base, device + kDepthSurface) != 0 ? z : 0, 1, 0x2, true);
+  const uint32_t stencil = Load(base, device + 11624);
+  Store(base, device + 11624, stencil);
+  SetDepthControl(base, device, Load(base, device + kDepthSurface) != 0 ? stencil : 0, 0, 0x1,
+                  true);
 }
 
 uint32_t GetViewportEnable(uint8_t* base, uint32_t device) {

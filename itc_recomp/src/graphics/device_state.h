@@ -234,6 +234,26 @@ void SetViewport(uint8_t* base, uint32_t device, uint32_t viewport);
 // surface (from the image's 0x82013618 and 0x82013600).
 void SetSurfaceInfo(uint8_t* base, uint32_t device, uint32_t surface);
 
+// sub_822A3D30 Device::SetRenderTarget: render target `index` = `surface`
+// (+12184 + 4 x index); with a surface, its +28 into RB_COLOR_INFO's shadow
+// and the target's high-precision blend applied again to its format.
+// Target 0: SetSurfaceInfo with the surface (or the depth surface) and the
+// predicated tiling bit (+10808 bit 1) worked out again; targets 0-3 their
+// color write mask applied again to RB_COLOR_MASK (+24 bit 18).
+void SetRenderTarget(uint8_t* base, uint32_t device, uint32_t index, uint32_t surface);
+
+// sub_822A4340 Device::SetRenderTarget_External: a jump to SetRenderTarget.
+void SetRenderTargetExternal(uint8_t* base, uint32_t device, uint32_t index,
+                             uint32_t surface);
+
+// sub_822A4060 Device::SetDepthStencilSurface: the depth surface
+// (+12200) = `surface`; with one, SetSurfaceInfo when no render target 0 is
+// bound, RB_DEPTH_INFO and the hi-z control from it (and RB_SURFACE_INFO's
+// top bits from the tiling's with +10811 bit 6); the predicated tiling bit
+// worked out again, and the Z and stencil enables applied again to
+// RB_DEPTHCONTROL.
+void SetDepthStencilSurface(uint8_t* base, uint32_t device, uint32_t surface);
+
 // Device fields the setters write (byte offsets).
 constexpr uint32_t kShaderDirty = 16;  // the dirty masks: the shader state
 constexpr uint32_t kRenderDirty = 24;  // the render state
