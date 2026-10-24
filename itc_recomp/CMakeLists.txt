@@ -153,6 +153,8 @@ set(ITC_SOURCES
     src/graphics/edram.cpp
     src/hooks/video_output.cpp
     src/graphics/video_output.cpp
+    src/hooks/device_state.cpp
+    src/graphics/device_state.cpp
     src/hooks/action_mappers.cpp
     src/action_mappers/action_mappers.cpp
     src/hooks/data_tables.cpp
@@ -223,6 +225,7 @@ set(ITC_SOURCES
     src/harnesses/track_zones.cpp
     src/harnesses/graphics_resources.cpp
     src/harnesses/video_output.cpp
+    src/harnesses/device_state.cpp
     src/harnesses/action_mappers.cpp
     src/harnesses/data_tables.cpp
     src/harnesses/model_animation.cpp
