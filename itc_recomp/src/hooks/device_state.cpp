@@ -7,6 +7,7 @@
 
 #include "guest.h"
 #include "guest_call.h"
+#include "hooks/device_state_calls.h"
 
 #include "base/flags.h"
 #include "graphics/device_state.h"
@@ -221,7 +222,8 @@ ITC_DEVICE_STATE_CALL(822A8470, ds::SetPixelShaderConstantB(base, ctx.r3.u32, ct
                                                             ctx.r5.u32, ctx.r6.u32))
 // VertexDeclaration::FromFvf (sub_822A6A88) has no adapter: its only caller
 // is Device::SetFVF, whose plain C++ calls it.
-ITC_DEVICE_STATE_CALL(822AA0E8, ds::SetFVF(base, ctx.r3.u32, ctx.r4.u32))
+// Device::SetFVF (sub_822AA0E8) has no adapter either: its only caller in
+// play, Device::SetDefaultState, is native.
 
 // Device::SetScreenScissor (sub_822A0F80): Dropped. It only wrote the window
 // scissor (or one per tile, and the binning packets) into the command
@@ -260,53 +262,14 @@ ITC_DEVICE_STATE_CALL(822A4060, {
 
 // --- The packet writers (their packets left out, src/graphics/device_state.h) ---
 
-namespace {
-
-// The guest calls they keep: the draw's flush helpers (Wrapped, in
-// src/native/draw_packets.cpp), table setters that aren't native, and
-// SetTexture's original. Each sets the registers the original's call does.
-ds::DeviceCalls Calls(PPCContext& ctx, uint8_t* base, uint32_t device) {
-  ds::DeviceCalls calls;
-  calls.flush_hiz = [&ctx, base, device](uint64_t mask, uint32_t hiz) {
-    ctx.r3.u64 = device;
-    ctx.r4.u64 = mask;
-    ctx.r5.u64 = hiz;
-    ctx.r6.u64 = 0;
-    ctx.lr = 0x8229F6B8;
-    sub_822ADC08(ctx, base);
-    return ctx.r3.u64;
-  };
-  calls.flush_registers = [&ctx, base, device](uint64_t mask, uint32_t first, uint32_t shadow) {
-    ctx.r3.u64 = device;
-    ctx.r4.u64 = mask;
-    ctx.r5.u64 = first;
-    ctx.r6.u64 = shadow;
-    ctx.lr = 0x8229F6E8;
-    sub_822ADE30(ctx, base);
-  };
-  calls.setter = [&ctx, base, device](uint32_t setter, uint32_t r4, uint32_t r5) {
-    ctx.r3.u64 = device;
-    ctx.r4.u64 = r4;
-    ctx.r5.u64 = r5;
-    ctx.lr = 0x822ACBF0;
-    REX_CALL_INDIRECT_FUNC(setter);
-  };
-  calls.set_texture = [&ctx, base, device](uint32_t stage, uint32_t texture, uint64_t dirty) {
-    ctx.r3.u64 = device;
-    ctx.r4.u64 = stage;
-    ctx.r5.u64 = texture;
-    ctx.r6.u64 = dirty;
-    ctx.lr = 0x822ACC8C;
-    __imp__sub_822A6008(ctx, base);
-  };
-  return calls;
-}
-
-}  // namespace
 
 // sub_8229B7D8 and sub_8229F680 have no adapters: their callers (DirtyAllState
 // and SetDefaultState, SetShaderGprAllocation) are native. sub_822B0C38 (the
 // gamma ramp's packets) has none either: SetGammaRamp leaves the call out.
+// Device::SetDefaultState (sub_822ACB90) and Device::SetGammaRamp
+// (sub_822A3A20) have none: their only callers, Device::Init's and
+// Device::SetDisplayMode's overrides (src/hooks/graphics_device.cpp), call
+// the plain C++.
 
 // Device::DirtyAllState: r3 left as the device (the original's with
 // SetScreenScissor dropped; Device::Swap returns it).
@@ -319,20 +282,9 @@ ITC_DEVICE_STATE_CALL(822A3B90, {
 ITC_DEVICE_STATE_CALL(822A8A60, {
   const uint32_t device = ctx.r3.u32, vertex = ctx.r5.u32, pixel = ctx.r6.u32;
   guest_call::InFrame(ctx, base, 112, 0x822A8AF4, [&](uint32_t) {
-    ds::SetShaderGprAllocation(base, device, vertex, pixel, Calls(ctx, base, device));
+    ds::SetShaderGprAllocation(base, device, vertex, pixel,
+                               hooks::DeviceStateCalls(ctx, base, device));
   });
 })
 
-ITC_DEVICE_STATE_CALL(822A3A20, {
-  if (!ds::SetGammaRamp(base, ctx.r3.u32, ctx.r5.u32)) {
-    __imp__sub_822A3A20(ctx, base);
-  }
-})
 
-ITC_DEVICE_STATE_CALL(822ACB90, {
-  const uint32_t device = ctx.r3.u32;
-  ctx.fpscr.disableFlushMode();  // the float setters'
-  guest_call::InFrame(ctx, base, 160, 0x822ACBF0, [&](uint32_t) {
-    ds::SetDefaultState(base, device, Calls(ctx, base, device));
-  });
-})
