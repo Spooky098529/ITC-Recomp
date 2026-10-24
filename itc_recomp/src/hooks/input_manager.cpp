@@ -20,8 +20,8 @@ ITC_FLAG_BOOL(native_input, true, "ITC",
               "(docs/functions/input.md: PtrList::AllocateNodes sub_82099C08, IncSize "
               "sub_820958B8 (no adapter), PtrList sub_820AD058 and Insert sub_82095958, with --native_heap; "
               "the pads' and processors' constructors sub_82591B38, sub_82591B68, sub_825920D0 "
-              "(no adapter) and sub_8258CE60, LogicalPad::Bind sub_825918F0, the pads' values sub_82591B30 "
-              "and sub_820988B8, InputProcessor::Assign sub_82098D60, the button tests "
+              "and sub_8258CE60, LogicalPad::Bind sub_825918F0 (all but sub_8258CE60 without adapters), the pads' values sub_82591B30 "
+              "and sub_820988B8, InputProcessor::Assign sub_82098D60 (no adapter), the button tests "
               "sub_8258CEB0 and sub_8258CEE0 with sub_82592500 and sub_82592520 (no adapters), the manager's slots "
               "sub_82098CB8, sub_82098CD0 and sub_82098FE0; Input::Create sub_820993E8, "
               "InputManager::InputManager sub_820991E0 and AddListener sub_82099430, with "
@@ -84,32 +84,15 @@ extern "C" REX_FUNC(sub_82095958) {
     return;                            \
   }
 
-// The constructors: r3 = the object; r3 comes back as it (LogicalPad's
-// leaves it untouched). InputProcessorBase's (sub_825920D0) has no adapter:
-// its only caller is InputProcessor's, whose plain C++ calls its plain C++.
-extern "C" REX_FUNC(sub_82591B38) {
-  ITC_INPUT_FALLBACK(82591B38)
-  input::LogicalPadConstruct(base, ctx.r3.u32);
-}
-extern "C" REX_FUNC(sub_82591B68) {
-  ITC_INPUT_FALLBACK(82591B68)
-  input::PhysicalPadConstruct(base, ctx.r3.u32);
-}
+// InputProcessor's constructor: r3 = the processor, which r3 comes back as.
+// The pads' constructors, LogicalPad::Bind and InputProcessor::Assign
+// (sub_82591B38, sub_82591B68, sub_825918F0, sub_82098D60) and
+// InputProcessorBase's constructor (sub_825920D0) have no adapters: their
+// only callers in play (the manager's constructor, AddListener and
+// InputProcessor's constructor) call their plain C++.
 extern "C" REX_FUNC(sub_8258CE60) {
   ITC_INPUT_FALLBACK(8258CE60)
   input::InputProcessorConstruct(base, ctx.r3.u32);
-}
-
-// LogicalPad::Bind: r3 = the pad, r4 = the index's address, r5 = the device.
-extern "C" REX_FUNC(sub_825918F0) {
-  ITC_INPUT_FALLBACK(825918F0)
-  input::LogicalPadBind(base, ctx.r3.u32, guest::LoadU32(base, ctx.r4.u32), ctx.r5.u32);
-}
-
-// InputProcessor::Assign: r3 = the destination, r4 = the source.
-extern "C" REX_FUNC(sub_82098D60) {
-  ITC_INPUT_FALLBACK(82098D60)
-  input::InputProcessorAssign(base, ctx.r3.u32, ctx.r4.u32);
 }
 
 // The manager's slots 1, 2 and 5: r3 = the manager, r4 = the index's address.
