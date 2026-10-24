@@ -70,6 +70,18 @@ When the user has reviewed a run's section, its heading gets
   `XQueryMemoryProtect`, over MmQueryAddressProtect), kept for the core;
   1 lead (`sub_82562FF0`). `atexit` left out of this subsystem (its
   critical sections).
+  Migration 1 (671f5d0..b549e6c): XMemSet native under
+  `--native_c_runtime`, with what it unblocked: `Scenery::Init`
+  (`--native_course_scenery`), `CameraPasses::Init` and `InitPasses`
+  (`--native_cameras`); `InitPasses`' and `SetMode`'s adapters removed.
+  For review: `[0x8263830C]` logged as 16 (nothing in `generated/`
+  stores there), so XMemSet is one host memset at stride 16 and follows
+  the translated steps for any other stride (harness cases for 0, 8, 20,
+  32, 48); the scratch below r1 not written; `CameraPass::Init`'s adapter
+  has a thread-local test hook (`hooks::camera_pass_init_calls`, null
+  outside the harness) so the harness can record its calls;
+  `Scenery::Init` leaves r3 as the original does. `Viewports::Init` and
+  `Viewport::Init` still wait on `atexit`.
 
 ## Run 2026-10-24 03:25 (`b7-loop-24-10-26`)
 

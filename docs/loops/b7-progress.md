@@ -40,7 +40,10 @@ file's history. What's left to see in a drive, from every run:
   puts it with the core. Mapped (a212f92): memset, probably XAPI's
   `XMemSet`, in `c-runtime.md`, and XAPI's two memory query wrappers in
   `heap.md` (kernel imports, left for the core); 1 ready group, 1 lead;
-  map checked (0 errors, all in play). Migration agent running.
+  map checked (0 errors, all in play). Migration 1 done
+  (671f5d0..b549e6c: XMemSet, with `Scenery::Init` and
+  `CameraPasses::Init` and `InitPasses` it unblocked; two adapters
+  removed); validation agent running.
 
 ## Done
 
@@ -81,6 +84,9 @@ This run's groups: `expected-differences.md` (the "16:01 run" lines).
   123, known 623, unknown 4340).
 - After mapping memset: ours 1710, work left 5050 (wrapped 122, known
   591, unknown 4337).
+- After memset's migration 1: ours 1714, work left 5046 (wrapped 122,
+  known 587, unknown 4337). Races 27, 25, 25 s with
+  `--run_harnesses=all`, 0 errors, every harness 0 differing.
 - After the course scenery's migration 1: ours 1710, work left 5050
   (wrapped 122, known 588, unknown 4340). Race 27 s with
   `--run_harnesses=all`, 0 errors, every harness 0 differing.
