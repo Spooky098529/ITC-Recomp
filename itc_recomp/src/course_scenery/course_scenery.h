@@ -165,6 +165,12 @@ void LimitLargeModels(uint8_t* base, uint32_t manager, uint32_t stack);
 void ModelListInit(uint8_t* base, uint32_t list);
 // Scenery::ClearGlobal (sub_820F1480): [0x826C5514] = 0.
 void ClearGlobal(uint8_t* base);
+// Scenery::Init (sub_820F1360): [0x826C5514] = `manager`, then through that
+// global (read again before each store, as the original): +52, +56 = 0;
+// +60 to +107 cleared in six 8-byte pieces (XMemSet, sub_822962B0); +108,
+// +112, +184, +188 = 0; the two lists +116 and +144 (28 bytes each)
+// cleared; +172 = +176 = -1; +192 = 0.
+void Init(uint8_t* base, uint32_t manager);
 // SceneryList::ReleaseUnused (sub_820F17C0): the used objects of `list`'s
 // pool in the manager's pools (the manager is the pool set): loaded and not
 // seen this update: marked about to be released with a countdown of 2, or,

@@ -930,6 +930,40 @@ void Lists(Context& h) {
     guest::StoreU32(h.base, cs::kManager, saved);
     results.Report();
   }
+  {
+    // Scenery::Init on a manager in the scratch area (random bytes first,
+    // at places of every alignment the stores allow); the game's own global
+    // put back after. r3 as the adapter leaves it.
+    Results results("Scenery::Init (sub_820F1360)");
+    const uint32_t saved = guest::LoadU32(h.base, cs::kManager);
+    for (int c = 0; c < 64; c++) {
+      const uint32_t manager = h.data + 4 * h.random.Below(700);
+      std::vector<uint8_t> bytes(kScratchBytes);
+      for (uint8_t& b : bytes) {
+        b = uint8_t(h.random.Next());
+      }
+      Outputs out[2];
+      for (int v = 0; v < 2; v++) {
+        Write(h.base, h.data, bytes.data(), kScratchBytes);
+        guest::StoreU32(h.base, cs::kManager, 0x12345678u + c);
+        PPCContext t = CallContext(h);
+        t.r3.u64 = manager;
+        With(v, [&] {
+          if (v == 0) {
+            __imp__sub_820F1360(t, h.base);
+          } else {
+            cs::Init(h.base, t.r3.u32);
+            t.r3.u64 = guest::LoadU32(h.base, cs::kManager) + 144u;
+          }
+        });
+        out[v].Word(guest::LoadU32(h.base, cs::kManager));
+        ScratchAndR3(h, out[v], t);
+      }
+      results.Check(out[0], out[1], fmt::format("case {} manager +{}", c, manager - h.data));
+    }
+    guest::StoreU32(h.base, cs::kManager, saved);
+    results.Report();
+  }
 }
 
 // SceneryList::ReleaseUnused: the manager (the pool set) and its pools as

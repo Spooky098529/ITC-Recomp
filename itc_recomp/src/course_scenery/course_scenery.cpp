@@ -598,6 +598,24 @@ void ClearGlobal(uint8_t* base) {
   Store(base, kManager, 0);
 }
 
+void Init(uint8_t* base, uint32_t manager) {
+  ITC_NATIVE_RUNNING("sub_820F1360 Scenery::Init");
+  Store(base, kManager, manager);
+  Store(base, manager + 52, 0);
+  Store(base, Load(base, kManager) + 56, 0);
+  for (uint32_t at = 60; at < 108; at += 8) {
+    c_runtime::XMemSet(base, Load(base, kManager) + at, 0, 8);
+  }
+  for (uint32_t at : {108u, 112u, 184u, 188u}) {
+    Store(base, Load(base, kManager) + at, 0);
+  }
+  c_runtime::XMemSet(base, Load(base, kManager) + 116, 0, 28);
+  c_runtime::XMemSet(base, Load(base, kManager) + 144, 0, 28);
+  Store(base, Load(base, kManager) + 172, 0xFFFFFFFFu);
+  Store(base, Load(base, kManager) + 176, 0xFFFFFFFFu);
+  Store(base, Load(base, kManager) + 192, 0);
+}
+
 uint32_t ReleaseUnused(uint8_t* base, const Calls& calls, uint32_t stack, uint32_t manager,
                        uint32_t list) {
   ITC_NATIVE_RUNNING("sub_820F17C0 SceneryList::ReleaseUnused");
