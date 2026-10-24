@@ -63,6 +63,12 @@ NaN groups below stay as recorded.
   position); ours leaves them. Only cases taking the packet path (flags
   without 0x2 or 0x10) differ; the header, ranges, lock count and r3
   match. The renderer skips coherency packets.
+- **Constant order:** the HLSL compiler (`sub_822B8F10`) places the HSV
+  gradient's literal constants (1 to 6, source `82071528`) in another
+  order when it compiles during a race than at boot, where every compile
+  gave the order stored (`--use_hardcoded_shaders`, the boot's bytes);
+  probably state of its own, such as heap addresses. The same program
+  either way: only the constants' registers differ.
 
 ## By function file
 
@@ -222,3 +228,9 @@ were at 0.
 | `sub_822A8A60` Device::SetShaderGprAllocation | the command buffer | 300 of 300 | Packets nothing reads | for review (03:25 run) |
 | `sub_822A3A20` Device::SetGammaRamp | the command buffer | 40 of 60 | Packets nothing reads | for review (03:25 run) |
 | `sub_822ACB90` Device::SetDefaultState | the command buffer | 40 of 40 | Packets nothing reads | for review (03:25 run) |
+
+### `functions.md`
+
+| Function | Group | Differ | Reason | Review |
+|---|---|---|---|---|
+| `sub_822B8F10` D3DXCompileShader | the HSV gradient's constant order | 1 of 1 | Constant order | for review (2026-10-24) |
