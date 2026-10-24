@@ -17,7 +17,10 @@ file's history. What's left to see in a drive, from every run:
 - Limit for this run: 3 subsystems.
 - Subsystem 1 of 3: `leads.md`'s top lead (`sub_820900C0`,
   `sub_820911A8`, probably the C runtime's array destructor and
-  constructor helpers): mapping agent running.
+  constructor helpers): mapped into `c-runtime.md` (2 new rows, 3a15cda;
+  probably the compiler's `vector constructor iterator` and `vector
+  destructor iterator`; 2 ready groups; 2 leads added); map checked (0
+  errors, 2 of 2 in play). Migration agent running.
 
 ## Done
 
@@ -38,6 +41,8 @@ This run's groups: `expected-differences.md` (the "16:01 run" lines).
 ## Totals
 
 - Start: ours 1672, work left 5088 (wrapped 123, known 555, unknown 4410).
+- After mapping the array helpers: ours 1672, work left 5088 (wrapped
+  123, known 557, unknown 4408).
 
 ## Stopped
 

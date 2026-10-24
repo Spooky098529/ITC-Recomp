@@ -13,7 +13,14 @@ When the user has reviewed a run's section, its heading gets
 
 ## Run 2026-10-24 16:01 (`b7-loop-24-10-26-2`)
 
-(nothing yet)
+- `c-runtime.md`: 2 new rows (mapped in 3a15cda), `sub_820911A8` and
+  `sub_820900C0`, probably the compiler's `vector constructor iterator`
+  and `vector destructor iterator` (no exception handling, so not the
+  library's `__ehvec_*`), added to the C runtime file instead of a new
+  one, with an intro paragraph; `known-data.md` (the race data's
+  +0x59AEC records, `0x826D82D4`); 2 leads (the race object at
+  `[0x826D82D4]`, `sub_8217C708` with `sub_821DF350`) and the race data
+  lead extended with `sub_82101D20`.
 
 ## Run 2026-10-24 03:25 (`b7-loop-24-10-26`)
 
