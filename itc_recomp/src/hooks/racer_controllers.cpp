@@ -5,8 +5,9 @@
 // their adapters stay until it's native. Functions reached only from native
 // callers have no adapters (the flag switches their callers):
 // CarInputs::Create (sub_82102258), from RaceFlow::OnSetUp; and
-// CarInputs::Destroy (sub_82102300), from RaceFlow::OnEnd; and sub_8215F5F0
-// (never seen in play), from RaceFlow::OnState16.
+// CarInputs::Destroy (sub_82102300), from RaceFlow::OnEnd; sub_8215F5F0
+// (never seen in play), from RaceFlow::OnState16; and RaceFlow::HoldAll
+// (sub_8215FA10), from RaceFlow::OnHold and OnState16.
 
 #include "guest.h"
 
@@ -24,7 +25,7 @@ ITC_FLAG_BOOL(native_racer_controllers, true, "ITC",
               "natively instead of through the translated code (the same words; checked by "
               "--run_harnesses=racer_controllers). Those reached only from native callers "
               "have no adapters, and the flag switches their callers: sub_82102258, "
-              "sub_82102300, sub_8215F5F0");
+              "sub_82102300, sub_8215F5F0, sub_8215FA10");
 
 // Defines an adapter: `body` uses `ctx` and `base`.
 #define ITC_RACER_CONTROLLERS(address, body)   \
@@ -101,10 +102,6 @@ ITC_RACER_CONTROLLERS(8215F5E8, {
 ITC_RACER_CONTROLLERS(8215F968, {
   ITC_RACER_CALLS;
   DriveByAi(base, ctx.r3.u32, ctx.r4.u32, ctx.r1.u32, calls, &ctx.r3.u64);
-})
-ITC_RACER_CONTROLLERS(8215FA10, {
-  ITC_RACER_CALLS;
-  ctx.r3.u64 = HoldAll(base, ctx.r1.u32, calls);
 })
 // Through the race flow's functors: a jump to HoldAll, and state 16's.
 ITC_RACER_CONTROLLERS(8215FC28, {
