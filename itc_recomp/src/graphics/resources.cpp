@@ -1095,6 +1095,177 @@ StreamSource GetStreamSource(uint8_t* base, uint32_t device, uint32_t stream) {
   return source;
 }
 
+namespace {
+
+// Adds `delta` to the big-endian word at `address` atomically (the
+// library's lwarx/stwcx loop, without the recompiler's global lock, as
+// src/native/refcount.cpp does); returns the old value.
+uint32_t AddToWord(uint8_t* base, uint32_t address, uint32_t delta) {
+  uint32_t* word = reinterpret_cast<uint32_t*>(base + address);
+  uint32_t old_raw = __atomic_load_n(word, __ATOMIC_RELAXED);
+  uint32_t value;
+  do {
+    value = __builtin_bswap32(old_raw);
+  } while (!__atomic_compare_exchange_n(word, &old_raw, __builtin_bswap32(value + delta), false,
+                                        __ATOMIC_SEQ_CST, __ATOMIC_RELAXED));
+  return value;
+}
+
+constexpr uint32_t kLockCount = 256;  // +0's lock count step (bits 8-11)
+
+// An address in the other view of physical memory (0x40000000 below the
+// one at the same place).
+uint32_t OtherView(uint32_t address) {
+  return ((((address >> 20) & 0xFFF) + 512) & 0x1000) + (address & 0x1FFFFFFF) - 0x40000000;
+}
+
+}  // namespace
+
+uint32_t LockResource(uint8_t* base, uint32_t resource, uint32_t mips, uint32_t data,
+                      uint32_t mip_data, uint32_t address, uint32_t size, uint32_t flags) {
+  ITC_NATIVE_RUNNING("sub_822A63F8 Resource::Lock");
+  // The fence wait and the cache flush packet are Dropped (resources.h).
+  const uint32_t other_view = flags & 0x10;
+  if (other_view || (Load(base, resource) & 0x200000)) {
+    if (!(flags & 1)) {
+      uint32_t offset, slot;
+      if (mips != 0 && mip_data != 0) {
+        offset = address - mip_data;
+        slot = resource + 24;
+      } else {
+        offset = address - data;
+        slot = resource + 20;
+      }
+      const uint32_t range = Load(base, slot);
+      uint32_t end = (offset + size + 127) >> 7;
+      const uint32_t old_end = range & 0xFFFF;
+      uint32_t start = range >> 16;
+      if (end <= old_end) {
+        end = old_end;
+      }
+      const uint32_t new_start = offset >> 7;
+      if (new_start < start) {
+        start = new_start;
+      }
+      Store(base, slot, ((start << 16) & 0xFFFF0000) | end);
+    }
+    if (other_view) {
+      address = OtherView(address);
+    }
+  }
+  AddToWord(base, resource, kLockCount);
+  return address;
+}
+
+uint32_t UnlockResource(uint8_t* base, uint32_t resource, uint32_t data, uint32_t mip_data) {
+  ITC_NATIVE_RUNNING("sub_822A6630 Resource::Unlock");
+  const uint32_t old = AddToWord(base, resource, 0u - kLockCount);
+  uint32_t r3 = resource;
+  if ((old & 0xF00) != 0x100) {
+    return r3;
+  }
+  // The last lock: the ranges reset (their data cache flush Dropped; r3 is
+  // the flush's start address, as the original leaves it).
+  auto reset = [&](uint32_t slot, uint32_t start_address) {
+    const uint32_t range = Load(base, resource + slot);
+    if (range == kUnlocked) {
+      return;
+    }
+    const uint32_t common = Load(base, resource);
+    Store(base, resource + slot, kUnlocked);
+    if (!(common & 0x200000)) {
+      start_address = OtherView(start_address);
+    }
+    r3 = ((range >> 16) << 7) + start_address;
+  };
+  reset(20, data);
+  if (mip_data != 0) {
+    reset(24, mip_data);
+  }
+  return r3;
+}
+
+LevelLock LockTextureLevel(uint8_t* base, uint32_t texture, uint32_t face, uint32_t level,
+                           uint32_t flags) {
+  ITC_NATIVE_RUNNING("sub_822A54B0 Texture::LockLevel");
+  const LevelPlace place = TextureLevelOffset(base, texture, face, level);
+  const Block block = GpuBlockSize(Load(base, texture + 32) & 0x3F);
+  LevelLock lock;
+  lock.pitch = place.pitch * block.height;
+  lock.slice = place.slice;
+  lock.tail = place.tail;
+  lock.r3 = LockResource(base, texture, level, Load(base, texture + 32) & 0xFFFFF000,
+                         Load(base, texture + 48) & 0xFFFFF000, place.offset - place.tail,
+                         place.size, flags);
+  lock.address = place.tail + lock.r3;
+  return lock;
+}
+
+uint32_t LockTextureRect(uint8_t* base, uint32_t texture, uint32_t face, uint32_t level,
+                         uint32_t locked, uint32_t rect, uint32_t flags) {
+  ITC_NATIVE_RUNNING("sub_822A5578 Texture::LockRect");
+  const LevelLock lock = LockTextureLevel(base, texture, face, level, flags);
+  uint32_t bits = lock.address;
+  if (rect != 0) {
+    const uint32_t format = Load(base, texture + 32) & 0x3F;
+    const uint32_t pixel_bits = guest::LoadU8(base, kFormatTable + 1 + (format << 1));
+    bits = ((pixel_bits * Load(base, rect + 0)) >> 3) + Load(base, rect + 4) * lock.pitch +
+           lock.address;
+  }
+  Store(base, locked + 0, lock.pitch);
+  Store(base, locked + 4, bits);
+  return lock.r3;
+}
+
+uint32_t LockTextureRectLevel(uint8_t* base, uint32_t texture, uint32_t level, uint32_t locked,
+                              uint32_t rect, uint32_t flags) {
+  ITC_NATIVE_RUNNING("sub_822A5C38 Texture::LockRectLevel");
+  return LockTextureRect(base, texture, 0, level, locked, rect, flags);
+}
+
+uint32_t UnlockTexture(uint8_t* base, uint32_t texture) {
+  ITC_NATIVE_RUNNING("sub_822A43E0 Texture::Unlock");
+  return UnlockResource(base, texture, Load(base, texture + 32) & 0xFFFFF000,
+                        Load(base, texture + 48) & 0xFFFFF000);
+}
+
+uint32_t UnlockSurface(uint8_t* base, uint32_t surface) {
+  ITC_NATIVE_RUNNING("sub_822A43F8 Surface::Unlock");
+  const uint32_t texture = Load(base, surface + 24);
+  return UnlockResource(base, texture, Load(base, texture + 32) & 0xFFFFF000,
+                        Load(base, texture + 48) & 0xFFFFF000);
+}
+
+uint32_t LockSurfaceRect(uint8_t* base, uint32_t surface, uint32_t locked, uint32_t rect,
+                         uint32_t flags) {
+  ITC_NATIVE_RUNNING("sub_822A5FE8 Surface::LockRect");
+  const uint32_t w28 = Load(base, surface + 28);
+  return LockTextureRect(base, Load(base, surface + 24), (w28 >> 22) & 0x3F, w28 >> 28, locked,
+                         rect, flags);
+}
+
+uint32_t LockVertexBuffer(uint8_t* base, uint32_t buffer, uint32_t offset, uint32_t size,
+                          uint32_t flags) {
+  ITC_NATIVE_RUNNING("sub_822A68F8 VertexBuffer::Lock");
+  if (size == 0) {
+    size = Load(base, buffer + 28) & 0x3FFFFFC;
+    offset = 0;
+  }
+  const uint32_t data = Load(base, buffer + 24) & 0xFFFFFFFC;
+  return LockResource(base, buffer, 0, data, 0, data + offset, size, flags);
+}
+
+uint32_t LockIndexBuffer(uint8_t* base, uint32_t buffer, uint32_t offset, uint32_t size,
+                         uint32_t flags) {
+  ITC_NATIVE_RUNNING("sub_822A6A18 IndexBuffer::Lock");
+  if (size == 0) {
+    size = Load(base, buffer + 28);
+    offset = 0;
+  }
+  const uint32_t data = Load(base, buffer + 24);
+  return LockResource(base, buffer, 0, data, 0, data + offset, size, flags | 2);
+}
+
 uint32_t DestroySurface(uint8_t* base, uint32_t surface, uint32_t common) {
   ITC_NATIVE_RUNNING("sub_822A6268 Resource::DestroySurface");
   if (!(common & 0x40000000)) {
@@ -1107,6 +1278,47 @@ uint32_t DestroySurface(uint8_t* base, uint32_t surface, uint32_t common) {
     }
   }
   return memory::crt::XMemFree(surface, kHeaderFreeAttributes);
+}
+
+uint32_t UnlockVertexBuffer(uint8_t* base, uint32_t buffer) {
+  ITC_NATIVE_RUNNING("sub_822A6958 VertexBuffer::Unlock");
+  return UnlockResource(base, buffer, Load(base, buffer + 24) & 0xFFFFFFFC, 0);
+}
+
+uint32_t UnlockIndexBuffer(uint8_t* base, uint32_t buffer) {
+  ITC_NATIVE_RUNNING("sub_822A6A78 IndexBuffer::Unlock");
+  return UnlockResource(base, buffer, Load(base, buffer + 24), 0);
+}
+
+uint32_t DestroyResource(uint8_t* base, uint32_t resource) {
+  ITC_NATIVE_RUNNING("sub_822A6210 Resource::Destroy");
+  // The fence waits are Dropped (resources.h).
+  constexpr uint32_t kDataFreeAttributes = 0xB1800000;
+  const uint32_t common = Load(base, resource);
+  switch (common & 0xF) {
+    case 1:
+      memory::crt::XMemFree(Load(base, resource + 24) & 0xFFFFFFFC, kDataFreeAttributes);
+      break;
+    case 2:
+    case 7:
+    case 8:
+      memory::crt::XMemFree(Load(base, resource + 24), kDataFreeAttributes);
+      break;
+    case 3: {
+      const uint32_t mips = Load(base, resource + 48) & 0xFFFFF000;
+      memory::crt::XMemFree(Load(base, resource + 32) & 0xFFFFF000, kDataFreeAttributes);
+      memory::crt::XMemFree(mips, kDataFreeAttributes);
+      break;
+    }
+    case 4:
+      return DestroySurface(base, resource, common);
+    case 6:
+      memory::crt::XMemFree(Load(base, resource + 48), kDataFreeAttributes);
+      break;
+    default:
+      break;  // 5 and the others: the header only (9 is the adapter's)
+  }
+  return memory::crt::XMemFree(resource, kHeaderFreeAttributes);
 }
 
 }  // namespace graphics

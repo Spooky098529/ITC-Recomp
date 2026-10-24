@@ -255,6 +255,79 @@ struct StreamSource {
 };
 StreamSource GetStreamSource(uint8_t* base, uint32_t device, uint32_t stream);
 
+// --- Locks. The library's GPU work around them is Dropped (the user's
+// call, 2026-10-24): the fence waits (sub_8229E908, which pass at once),
+// Lock's cache flush packet into the device's command buffer (with
+// sub_8229EF48, sub_8229DDD8 and the thread check sub_825B9A60 between
+// them; the renderer skips coherency packets, src/native/gpu_link.cpp) and
+// Unlock's data cache flush (sub_822AC470: a PC has none). The lock count
+// (+0, 256 a lock), the locked ranges (+20 the base data's, +24 the mips',
+// in 128-byte units: start << 16 | end, 0xFFFF0000 for none) and the
+// returned address are the library's. ---
+
+// sub_822A63F8 Resource::Lock: `data` and `mip_data` the resource's base and
+// mip data, `mips` nonzero for a mip level, `address` and `size` the range
+// locked, `flags` (0x1 no range noted, 0x10 the other view). Notes the range
+// (with flag 0x10 or a write-combined resource, +0 bit 0x200000), adds a lock
+// and returns the address (in the other view, 0x40000000 below, with 0x10).
+uint32_t LockResource(uint8_t* base, uint32_t resource, uint32_t mips, uint32_t data,
+                      uint32_t mip_data, uint32_t address, uint32_t size, uint32_t flags);
+
+// sub_822A6630 Resource::Unlock: takes a lock; at the last, resets the
+// locked ranges (+20, and +24 when `mip_data`). Returns the original's r3:
+// the resource, or the last range's start address (the flush's argument).
+uint32_t UnlockResource(uint8_t* base, uint32_t resource, uint32_t data, uint32_t mip_data);
+
+// sub_822A54B0 Texture::LockLevel: the level's place (TextureLevelOffset),
+// its pitch times the block's height, and Resource::Lock over it (the tail
+// offset taken off, added back to the address out). The out pointers are
+// taken not to overlap (the callers' are separate stack words). Levels from
+// 2^31 on are the adapter's (the original).
+struct LevelLock {
+  uint32_t address;  // out: the lock's address plus the tail offset
+  uint32_t pitch;    // out
+  uint32_t slice;    // out
+  uint32_t tail;     // out
+  uint32_t r3;       // the lock's address
+};
+LevelLock LockTextureLevel(uint8_t* base, uint32_t texture, uint32_t face, uint32_t level,
+                           uint32_t flags);
+
+// sub_822A5578 Texture::LockRect: LockTextureLevel, then the locked rect at
+// `locked` (+0 the pitch, +4 the bits, moved to `rect`'s left and top when
+// one is given: left x bits a pixel / 8 + top x pitch). Returns the lock's
+// address (the original's r3).
+uint32_t LockTextureRect(uint8_t* base, uint32_t texture, uint32_t face, uint32_t level,
+                         uint32_t locked, uint32_t rect, uint32_t flags);
+
+// sub_822A5C38 Texture::LockRectLevel: LockTextureRect with face 0.
+uint32_t LockTextureRectLevel(uint8_t* base, uint32_t texture, uint32_t level, uint32_t locked,
+                              uint32_t rect, uint32_t flags);
+
+// sub_822A5FE8 Surface::LockRect: LockTextureRect on the surface's texture
+// (+24), face (+28 bits 22-27) and level (+28's top 4 bits).
+uint32_t LockSurfaceRect(uint8_t* base, uint32_t surface, uint32_t locked, uint32_t rect,
+                         uint32_t flags);
+
+// sub_822A43E0 Texture::Unlock: UnlockResource over the base and mip data
+// (+32's and +48's top 20 bits); sub_822A43F8 Surface::Unlock the same on
+// the surface's texture (+24).
+uint32_t UnlockTexture(uint8_t* base, uint32_t texture);
+uint32_t UnlockSurface(uint8_t* base, uint32_t surface);
+
+// sub_822A68F8 VertexBuffer::Lock and sub_822A6A18 IndexBuffer::Lock: the
+// buffer's data (+24; a vertex buffer's low 2 bits off) from `offset`, `size`
+// bytes (0: all of it, +28's size, from 0); an index buffer adds flag 0x2.
+uint32_t LockVertexBuffer(uint8_t* base, uint32_t buffer, uint32_t offset, uint32_t size,
+                          uint32_t flags);
+uint32_t LockIndexBuffer(uint8_t* base, uint32_t buffer, uint32_t offset, uint32_t size,
+                         uint32_t flags);
+
+// sub_822A6958 VertexBuffer::Unlock and sub_822A6A78 IndexBuffer::Unlock:
+// UnlockResource over the data (+24; a vertex buffer's low 2 bits off).
+uint32_t UnlockVertexBuffer(uint8_t* base, uint32_t buffer);
+uint32_t UnlockIndexBuffer(uint8_t* base, uint32_t buffer);
+
 // --- Destruction (the allocation layer: run only with --native_heap) ---
 
 // sub_822A6268 Resource::Destroy's surface case: a render target's EDRAM
@@ -263,5 +336,13 @@ StreamSource GetStreamSource(uint8_t* base, uint32_t device, uint32_t stream);
 // texture's surface (+0 bit 0x40000000); then the header freed. `common` is
 // the header's +0 as the caller read it; returns XMemFree's r3.
 uint32_t DestroySurface(uint8_t* base, uint32_t surface, uint32_t common);
+
+// sub_822A6210 Resource::Destroy: frees a resource's data by its type
+// (+0's low 4 bits: 1 a vertex buffer's +24, low 2 bits off; 2, 7 and 8 its
+// +24; 3 a texture's base and mip data, +32's and +48's top 20 bits; 6 its
+// +48; 4 a surface, DestroySurface; others none), then the header; returns
+// XMemFree's r3. Type 9 (sub_822AD9D8 first, not seen in play) is the
+// adapter's (the original). Its fence waits are Dropped (above).
+uint32_t DestroyResource(uint8_t* base, uint32_t resource);
 
 }  // namespace graphics

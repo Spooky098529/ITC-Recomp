@@ -1410,6 +1410,503 @@ void EdramAllocator(Context& h, Random& r) {
   guest::StoreU32(h.base, edram::kAllocator, saved);
 }
 
+// --- Locks and destruction ---
+
+// The device (the kernel's VdGlobalDevice slot) and what makes the
+// library's GPU work around locks safe to run from a harness: fences at or
+// before the one the GPU is done with pass at once (no wait, no kick), and
+// Lock's cache flush packet goes into the command buffer on the device's
+// thread when there's room before the soft end (else the cases skip it,
+// flag 0x2), and from other threads its range is queued in the device's
+// pending flush (+11560, a start and an end; in play the device's thread
+// word is 0, so every packet is queued). The originals' packets and queued
+// ranges are taken back after each case (the write position, the words
+// past it and the pending range put back): nothing is submitted in
+// between, as the harness runs on the thread that writes them.
+struct DeviceState {
+  uint32_t device = 0;
+  uint32_t done = 0;     // the fence the GPU is done with
+  bool packets = false;  // Lock's packet path can run
+};
+
+constexpr uint32_t kDeviceSlot = 0x820007B0;
+constexpr uint32_t kWritePosition = 40;
+constexpr uint32_t kPacketBytes = 40;
+
+DeviceState Device(Context& h) {
+  DeviceState d;
+  d.device = guest::LoadU32(h.base, guest::LoadU32(h.base, kDeviceSlot));
+  if (d.device == 0) {
+    return d;
+  }
+  d.done = guest::LoadU32(h.base, guest::LoadU32(h.base, d.device + 10768));
+  PPCContext t = CallContext(h);
+  __imp__sub_825B9A60(t, h.base);
+  ITC_LOG_INFO("harness: graphics_resources: the device's thread {:08X}, this {:08X}, write "
+               "position {:08X}, soft end {:08X}",
+               guest::LoadU32(h.base, d.device + 10760), t.r3.u32,
+               guest::LoadU32(h.base, d.device + kWritePosition),
+               guest::LoadU32(h.base, d.device + 48));
+  // Off the device's thread the packet's range is queued (device +11560,
+  // put back too); on it, written when there's room before the soft end.
+  d.packets = guest::LoadU32(h.base, d.device + 10760) != t.r3.u32 ||
+              guest::LoadU32(h.base, d.device + kWritePosition) <=
+                  guest::LoadU32(h.base, d.device + 48);
+  return d;
+}
+
+// A fence for a resource: none, or one the GPU is done with.
+uint32_t SafeFence(const DeviceState& d, Random& r) {
+  return r.Below(2) || d.device == 0 ? 0 : d.done - r.Below(4);
+}
+
+// The command buffer past the write position, kept to be put back.
+struct CommandBuffer {
+  uint32_t position;
+  std::vector<uint8_t> words;
+  std::vector<uint8_t> pending;  // device +11560
+};
+constexpr uint32_t kPendingFlush = 11560;
+CommandBuffer SaveCommandBuffer(Context& h, const DeviceState& d) {
+  CommandBuffer saved{};
+  if (d.device != 0) {
+    saved.position = guest::LoadU32(h.base, d.device + kWritePosition);
+    saved.words = Read(h.base, saved.position + 4, kPacketBytes);
+    saved.pending = Read(h.base, d.device + kPendingFlush, 8);
+  }
+  return saved;
+}
+// What a case left there (the write position and the words), then the
+// buffer put back.
+std::vector<uint8_t> RestoreCommandBuffer(Context& h, const DeviceState& d,
+                                          const CommandBuffer& saved) {
+  if (d.device == 0) {
+    return {};
+  }
+  std::vector<uint8_t> left = Read(h.base, saved.position + 4, kPacketBytes);
+  const uint32_t position = guest::LoadU32(h.base, d.device + kWritePosition);
+  for (int i = 0; i < 4; i++) {
+    left.push_back(uint8_t(position >> (24 - 8 * i)));
+  }
+  const std::vector<uint8_t> pending = Read(h.base, d.device + kPendingFlush, 8);
+  left.insert(left.end(), pending.begin(), pending.end());
+  Write(h.base, d.device + kPendingFlush, saved.pending.data(), 8);
+  Write(h.base, saved.position + 4, saved.words.data(), kPacketBytes);
+  guest::StoreU32(h.base, d.device + kWritePosition, saved.position);
+  return left;
+}
+
+uint32_t LockFlags(const DeviceState& d, Random& r) {
+  const uint32_t flags[] = {0, 1, 2, 0x10, 0x11, 0x12, 0x1000, 0x1010, 0x4, 0x20};
+  uint32_t f = r.Below(8) ? flags[r.Below(10)] : uint32_t(r.Next());
+  if (!d.packets) {
+    f |= 2;
+  }
+  return f;
+}
+
+// A locked range word: none, or a start and an end (the end not before
+// the start: Unlock's original data cache flush loops ~2^29 times over a
+// range that ends before it starts).
+uint32_t RangeWord(Random& r) {
+  switch (r.Below(4)) {
+    case 0:
+      return 0xFFFF0000;
+    case 1: {
+      const uint32_t start = r.Below(0xFFFF);
+      return (start << 16) | (start + r.Below(0x10000 - start));
+    }
+    default: {
+      const uint32_t start = r.Below(512);
+      return (start << 16) | (start + r.Below(1024));
+    }
+  }
+}
+
+// A resource header at `address` for the locks: random words, a type (a
+// texture's surface pointing at `parent` now and then), the lock count and
+// the write-combined bit drawn, safe fences, random ranges.
+void LockHeader(uint8_t* base, uint32_t address, uint32_t parent, const DeviceState& d,
+                Random& r) {
+  for (uint32_t i = 0; i < 64; i += 4) {
+    guest::StoreU32(base, address + i, uint32_t(r.Next()));
+  }
+  uint32_t common = guest::LoadU32(base, address);
+  const uint32_t types[] = {1, 2, 3, 4};
+  common = (common & ~0x40200F0Fu) | types[r.Below(4)] | (r.Below(4) << 8);
+  if (r.Below(2)) {
+    common |= 0x200000;
+  }
+  if ((common & 0xF) == 4 && r.Below(2)) {
+    common |= 0x40000000;
+  }
+  guest::StoreU32(base, address, common);
+  guest::StoreU32(base, address + 8, SafeFence(d, r));
+  guest::StoreU32(base, address + 12, SafeFence(d, r));
+  guest::StoreU32(base, address + 20, RangeWord(r));
+  guest::StoreU32(base, address + 24, r.Below(4) == 0 ? 0 : parent);
+}
+
+void NativeLock(PPCContext& ctx, uint8_t* base) {
+  ctx.r3.u64 = gr::LockResource(base, ctx.r3.u32, ctx.r5.u32, ctx.r6.u32, ctx.r7.u32,
+                                ctx.r8.u32, ctx.r9.u32, ctx.r10.u32);
+}
+void NativeUnlock(PPCContext& ctx, uint8_t* base) {
+  ctx.r3.u64 = gr::UnlockResource(base, ctx.r3.u32, ctx.r4.u32, ctx.r5.u32);
+}
+void NativeLockLevel(PPCContext& ctx, uint8_t* base) {
+  const gr::LevelLock lock =
+      gr::LockTextureLevel(base, ctx.r3.u32, ctx.r4.u32, ctx.r5.u32, ctx.r6.u32);
+  guest::StoreU32(base, ctx.r7.u32, lock.address);
+  guest::StoreU32(base, ctx.r8.u32, lock.pitch);
+  guest::StoreU32(base, ctx.r9.u32, lock.slice);
+  guest::StoreU32(base, ctx.r10.u32, lock.tail);
+  ctx.r3.u64 = lock.r3;
+}
+void NativeLockRect(PPCContext& ctx, uint8_t* base) {
+  ctx.r3.u64 = gr::LockTextureRect(base, ctx.r3.u32, ctx.r4.u32, ctx.r5.u32, ctx.r6.u32,
+                                   ctx.r7.u32, ctx.r8.u32);
+}
+void NativeLockRectLevel(PPCContext& ctx, uint8_t* base) {
+  ctx.r3.u64 = gr::LockTextureRectLevel(base, ctx.r3.u32, ctx.r4.u32, ctx.r5.u32, ctx.r6.u32,
+                                        ctx.r7.u32);
+}
+void NativeSurfaceLockRect(PPCContext& ctx, uint8_t* base) {
+  ctx.r3.u64 = gr::LockSurfaceRect(base, ctx.r3.u32, ctx.r4.u32, ctx.r5.u32, ctx.r6.u32);
+}
+void NativeTextureUnlock(PPCContext& ctx, uint8_t* base) {
+  ctx.r3.u64 = gr::UnlockTexture(base, ctx.r3.u32);
+}
+void NativeSurfaceUnlock(PPCContext& ctx, uint8_t* base) {
+  ctx.r3.u64 = gr::UnlockSurface(base, ctx.r3.u32);
+}
+void NativeVertexBufferLock(PPCContext& ctx, uint8_t* base) {
+  ctx.r3.u64 = gr::LockVertexBuffer(base, ctx.r3.u32, ctx.r4.u32, ctx.r5.u32, ctx.r6.u32);
+}
+void NativeIndexBufferLock(PPCContext& ctx, uint8_t* base) {
+  ctx.r3.u64 = gr::LockIndexBuffer(base, ctx.r3.u32, ctx.r4.u32, ctx.r5.u32, ctx.r6.u32);
+}
+void NativeVertexBufferUnlock(PPCContext& ctx, uint8_t* base) {
+  ctx.r3.u64 = gr::UnlockVertexBuffer(base, ctx.r3.u32);
+}
+void NativeIndexBufferUnlock(PPCContext& ctx, uint8_t* base) {
+  ctx.r3.u64 = gr::UnlockIndexBuffer(base, ctx.r3.u32);
+}
+void NativeDestroy(PPCContext& ctx, uint8_t* base) {
+  ctx.r3.u64 = gr::DestroyResource(base, ctx.r3.u32);
+}
+
+// Resource::Lock and Unlock on random headers (above), data and mip
+// addresses, ranges, sizes and flags; compared: the header (the lock count,
+// the ranges) and r3. Lock's cache flush packet is Dropped, so the command
+// buffer (its words past the write position, the position and the pending
+// flush range) is compared in its own group, "(expected to differ)": every
+// case taking the packet path (neither flag 0x2 nor 0x10) differs there (in
+// play, in the pending range). Unlock's data cache flush
+// writes nothing outside its own stack.
+void LocksAndUnlocks(Context& h, Random& r) {
+  const DeviceState d = Device(h);
+  ITC_LOG_INFO("harness: graphics_resources: the device {:08X}, done fence {:08X}, packets {}",
+               d.device, d.done, d.packets);
+  {
+    Results results("Resource::Lock (sub_822A63F8)");
+    // The cache flush packet the original writes (Dropped: the user's call).
+    Results packets("Resource::Lock (sub_822A63F8), its command buffer (expected to differ)");
+    for (int i = 0; i < 1000; i++) {
+      Fill(h.base, h.data, kScratchBytes);
+      LockHeader(h.base, h.data + kHeader, h.data + kParent, d, r);
+      LockHeader(h.base, h.data + kParent, h.data + kParent, d, r);
+      const std::vector<uint8_t> inputs = Read(h.base, h.data, 128);
+      const uint32_t data = r.Below(2) ? 0xA0000000u + (r.Below(0x8000) << 12)
+                                       : 0xC0000000u + (r.Below(0x8000) << 12);
+      const uint32_t mip_data = r.Below(3) == 0 ? 0 : data + (r.Below(256) << 12);
+      const uint32_t mips = r.Below(2) ? 0 : r.Below(13);
+      const uint32_t address = (mips && mip_data ? mip_data : data) +
+                               (r.Below(4) ? r.Below(0x10000) : uint32_t(r.Next()) & 0xFFFFFF);
+      const uint32_t size = r.Below(4) ? r.Below(0x10000) : uint32_t(r.Next()) & 0xFFFFFF;
+      const uint32_t flags = LockFlags(d, r);
+      const uint32_t code = r.Below(2) ? 14 : 10 + r.Below(4);
+      const uint32_t word = uint32_t(r.Next());
+      Outputs out[2], left[2];
+      for (int v = 0; v < 2; v++) {
+        Fill(h.base, h.data, kScratchBytes);
+        Write(h.base, h.data, inputs.data(), uint32_t(inputs.size()));
+        PPCContext t = CallContext(h);
+        guest::StoreU32(h.base, t.r1.u32 + 84, word);
+        t.r3.u64 = h.data + kHeader;
+        t.r4.u64 = code;
+        t.r5.u64 = mips;
+        t.r6.u64 = data;
+        t.r7.u64 = mip_data;
+        t.r8.u64 = address;
+        t.r9.u64 = size;
+        t.r10.u64 = flags;
+        const CommandBuffer saved = SaveCommandBuffer(h, d);
+        (v == 0 ? Original<__imp__sub_822A63F8> : NativeLock)(t, h.base);
+        left[v].Bytes(RestoreCommandBuffer(h, d, saved));
+        out[v].Bytes(Read(h.base, h.data, 128));
+        out[v].Word(t.r3.u32);
+      }
+      const std::string what =
+          fmt::format("case {}: mips {}, data {:08X}, mips at {:08X}, address {:08X}, size {:X}, "
+                      "flags {:X}, {}",
+                      i, mips, data, mip_data, address, size, flags, Hex(inputs));
+      results.Check(out[0], out[1], what);
+      packets.Check(left[0], left[1], what);
+    }
+    results.Report();
+    packets.Report();
+  }
+  {
+    Results results("Resource::Unlock (sub_822A6630)");
+    for (int i = 0; i < 1000; i++) {
+      Fill(h.base, h.data, kScratchBytes);
+      LockHeader(h.base, h.data + kHeader, h.data + kParent, d, r);
+      if (r.Below(2)) {
+        guest::StoreU32(h.base, h.data + kHeader + 24, RangeWord(r));
+      }
+      const std::vector<uint8_t> inputs = Read(h.base, h.data, 64);
+      const uint32_t data = uint32_t(r.Next());
+      const uint32_t mip_data = r.Below(3) == 0 ? 0 : uint32_t(r.Next());
+      Outputs out[2];
+      for (int v = 0; v < 2; v++) {
+        Fill(h.base, h.data, kScratchBytes);
+        Write(h.base, h.data, inputs.data(), uint32_t(inputs.size()));
+        PPCContext t = CallContext(h);
+        t.r3.u64 = h.data + kHeader;
+        t.r4.u64 = data;
+        t.r5.u64 = mip_data;
+        (v == 0 ? Original<__imp__sub_822A6630> : NativeUnlock)(t, h.base);
+        out[v].Bytes(Read(h.base, h.data, 64));
+        out[v].Word(t.r3.u32);
+      }
+      results.Check(out[0], out[1],
+                    fmt::format("case {}: data {:08X}, mips {:08X}, {}", i, data, mip_data,
+                                Hex(inputs)));
+    }
+    results.Report();
+  }
+}
+
+// The lock and unlock wrappers on random textures (as LevelDescs's, their
+// data in the physical views, safe fences, random lock counts and ranges)
+// and buffers; a texture's surface (type 4, a child) pointing at one for
+// Surface's. Compared: the texture's or buffer's header, every output, r3.
+// The command buffer is put back after each original (Lock's group above
+// compares it).
+void LockWrappers(Context& h, Random& r) {
+  const DeviceState d = Device(h);
+  auto texture = [&](uint32_t address) {
+    RandomTexture(h.base, address, r);
+    const uint32_t common = guest::LoadU32(h.base, address);
+    guest::StoreU32(h.base, address, (common & ~0x40000F00u) | (r.Below(4) << 8));
+    guest::StoreU32(h.base, address + 8, SafeFence(d, r));
+    guest::StoreU32(h.base, address + 12, SafeFence(d, r));
+    guest::StoreU32(h.base, address + 20, RangeWord(r));
+    guest::StoreU32(h.base, address + 24, RangeWord(r));
+    const uint32_t format = guest::LoadU32(h.base, address + 32) & 0x3F;
+    if (guest::LoadU8(h.base, 0x82013468 + 1 + (format << 1)) == 0 && r.Below(16)) {
+      const uint32_t w28 = guest::LoadU32(h.base, address + 28);
+      guest::StoreU32(h.base, address + 28, w28 | 0x80000000);
+    }
+  };
+  struct Wrapper {
+    const char* name;
+    GuestFunction recompiled;
+    GuestFunction native;
+    int kind;  // 0 LockLevel, 1 LockRect, 2 LockRectLevel, 3 Surface::LockRect,
+               // 4 Texture::Unlock, 5 Surface::Unlock, 6-9 the buffers'
+  };
+  const Wrapper wrappers[] = {
+      {"Texture::LockLevel (sub_822A54B0)", Original<__imp__sub_822A54B0>, NativeLockLevel, 0},
+      {"Texture::LockRect (sub_822A5578)", Original<__imp__sub_822A5578>, NativeLockRect, 1},
+      {"Texture::LockRectLevel (sub_822A5C38)", Original<__imp__sub_822A5C38>,
+       NativeLockRectLevel, 2},
+      {"Surface::LockRect (sub_822A5FE8)", Original<__imp__sub_822A5FE8>, NativeSurfaceLockRect,
+       3},
+      {"Texture::Unlock (sub_822A43E0)", Original<__imp__sub_822A43E0>, NativeTextureUnlock, 4},
+      {"Surface::Unlock (sub_822A43F8)", Original<__imp__sub_822A43F8>, NativeSurfaceUnlock, 5},
+      {"VertexBuffer::Lock (sub_822A68F8)", Original<__imp__sub_822A68F8>,
+       NativeVertexBufferLock, 6},
+      {"IndexBuffer::Lock (sub_822A6A18)", Original<__imp__sub_822A6A18>, NativeIndexBufferLock,
+       7},
+      {"VertexBuffer::Unlock (sub_822A6958)", Original<__imp__sub_822A6958>,
+       NativeVertexBufferUnlock, 8},
+      {"IndexBuffer::Unlock (sub_822A6A78)", Original<__imp__sub_822A6A78>,
+       NativeIndexBufferUnlock, 9},
+  };
+  constexpr uint32_t kSurface = 128;  // 64 bytes; kHeader the texture
+  constexpr uint32_t kRect = 192;     // the rectangle
+  for (const Wrapper& w : wrappers) {
+    Results results(w.name);
+    for (int i = 0; i < 500; i++) {
+      Fill(h.base, h.data, kScratchBytes);
+      if (w.kind >= 6) {
+        LockHeader(h.base, h.data + kHeader, h.data + kParent, d, r);
+        guest::StoreU32(h.base, h.data + kHeader + 24,
+                        0xA0000000u + (r.Below(0x8000) << 12) + r.Below(4));
+        guest::StoreU32(h.base, h.data + kHeader + 28,
+                        r.Below(2) ? r.Below(0x10000) : uint32_t(r.Next()));
+      } else {
+        texture(h.data + kHeader);
+        const uint32_t data = 0xA0000000u + (r.Below(0x8000) << 12);
+        const uint32_t w32 = guest::LoadU32(h.base, h.data + kHeader + 32);
+        guest::StoreU32(h.base, h.data + kHeader + 32, (w32 & 0xFFF) | data);
+        if (r.Below(2)) {
+          const uint32_t w48 = guest::LoadU32(h.base, h.data + kHeader + 48);
+          guest::StoreU32(h.base, h.data + kHeader + 48,
+                          (w48 & 0xFFF) | (data + (r.Below(64) << 12)));
+        }
+      }
+      for (uint32_t k = 0; k < 64; k += 4) {
+        guest::StoreU32(h.base, h.data + kSurface + k, uint32_t(r.Next()));
+      }
+      const uint32_t surface_common = guest::LoadU32(h.base, h.data + kSurface);
+      guest::StoreU32(h.base, h.data + kSurface, (surface_common & ~0xFu) | 0x40000004);
+      guest::StoreU32(h.base, h.data + kSurface + 24, h.data + kHeader);
+      const uint32_t w28 = guest::LoadU32(h.base, h.data + kSurface + 28);
+      guest::StoreU32(h.base, h.data + kSurface + 28,
+                      (w28 & 0x003FFFFF) | (r.Below(13) << 28) | (r.Below(6) << 22));
+      guest::StoreU32(h.base, h.data + kRect, r.Below(256));
+      guest::StoreU32(h.base, h.data + kRect + 4, r.Below(256));
+      const std::vector<uint8_t> inputs = Read(h.base, h.data, 256);
+      const uint32_t face = r.Below(4) ? 0 : r.Below(6);
+      const uint32_t level = r.Below(13);
+      const uint32_t flags = LockFlags(d, r);
+      const bool rect = r.Below(4) != 0;
+      const uint32_t offset = r.Below(2) ? 0 : r.Below(0x10000);
+      const uint32_t size = r.Below(3) == 0 ? 0 : r.Below(0x10000);
+      Outputs out[2];
+      for (int v = 0; v < 2; v++) {
+        Fill(h.base, h.data, kScratchBytes);
+        Write(h.base, h.data, inputs.data(), uint32_t(inputs.size()));
+        PPCContext t = CallContext(h);
+        const uint32_t texture_header = h.data + kHeader;
+        switch (w.kind) {
+          case 0:
+            t.r3.u64 = texture_header;
+            t.r4.u64 = face;
+            t.r5.u64 = level;
+            t.r6.u64 = flags;
+            t.r7.u64 = h.data + kOut;
+            t.r8.u64 = h.data + kOut + 4;
+            t.r9.u64 = h.data + kOut + 8;
+            t.r10.u64 = h.data + kOut + 12;
+            break;
+          case 1:
+            t.r3.u64 = texture_header;
+            t.r4.u64 = face;
+            t.r5.u64 = level;
+            t.r6.u64 = h.data + kOut;
+            t.r7.u64 = rect ? h.data + kRect : 0;
+            t.r8.u64 = flags;
+            break;
+          case 2:
+            t.r3.u64 = texture_header;
+            t.r4.u64 = level;
+            t.r5.u64 = h.data + kOut;
+            t.r6.u64 = rect ? h.data + kRect : 0;
+            t.r7.u64 = flags;
+            break;
+          case 3:
+            t.r3.u64 = h.data + kSurface;
+            t.r4.u64 = h.data + kOut;
+            t.r5.u64 = rect ? h.data + kRect : 0;
+            t.r6.u64 = flags;
+            break;
+          case 4:
+          case 8:
+          case 9:
+            t.r3.u64 = texture_header;
+            break;
+          case 5:
+            t.r3.u64 = h.data + kSurface;
+            break;
+          default:  // the buffers' locks
+            t.r3.u64 = texture_header;
+            t.r4.u64 = offset;
+            t.r5.u64 = size;
+            t.r6.u64 = flags;
+            break;
+        }
+        const CommandBuffer saved = SaveCommandBuffer(h, d);
+        (v == 0 ? w.recompiled : w.native)(t, h.base);
+        RestoreCommandBuffer(h, d, saved);
+        out[v].Bytes(Read(h.base, h.data, kOut + 16));
+        out[v].Word(t.r3.u32);
+      }
+      results.Check(out[0], out[1],
+                    fmt::format("case {}: face {}, level {}, flags {:X}, rect {}, offset {:X}, "
+                                "size {:X}, {}",
+                                i, face, level, flags, rect, offset, size, Hex(inputs)));
+    }
+    results.Report();
+  }
+}
+
+// Resource::Destroy on headers from the allocation layer by type (data
+// from it as the type frees it: buffers' and others' +24, a texture's +32
+// and +48, type 6's +48; a surface without EDRAM, the hi-z flag put back),
+// safe fences; compared: r3, whether the header is still a heap block, the
+// hi-z flag. Type 9 is the original's (the adapter's). The data's frees
+// aren't seen (the layer answers nothing for physical blocks).
+void Destroys(Context& h, Random& r) {
+  const DeviceState d = Device(h);
+  Results results("Resource::Destroy (sub_822A6210)");
+  const uint32_t hi_z = guest::LoadU32(h.base, kHiZTaken);
+  const uint32_t types[] = {1, 2, 3, 4, 5, 6, 7, 8, 0, 10, 15};
+  for (int i = 0; i < 300; i++) {
+    const uint32_t type = types[r.Below(11)];
+    uint32_t words[16];
+    for (uint32_t& word : words) {
+      word = uint32_t(r.Next());
+    }
+    words[0] = (words[0] & ~0xC000000Fu) | type;
+    if (type == 4 && r.Below(2)) {
+      words[0] |= 0x40000000;  // a texture's surface
+    }
+    const bool mips = r.Below(2) != 0;
+    const uint32_t fence = SafeFence(d, r);
+    Outputs out[2];
+    for (int v = 0; v < 2; v++) {
+      guest::StoreU32(h.base, kHiZTaken, 1);
+      const uint32_t header = memory::crt::XMemAlloc(h.base, 64, 0x64800000);
+      guest::StoreU32s(h.base, header, words, 16);
+      guest::StoreU32(h.base, header + 8, fence);
+      auto data = [&] { return memory::crt::XMemAlloc(h.base, 4096, 0xBC800000); };
+      switch (type) {
+        case 1:
+          guest::StoreU32(h.base, header + 24, data() | (words[6] & 3));
+          break;
+        case 2:
+        case 7:
+        case 8:
+          guest::StoreU32(h.base, header + 24, data());
+          break;
+        case 3:
+          guest::StoreU32(h.base, header + 32, data() | (words[8] & 0xFFF));
+          guest::StoreU32(h.base, header + 48, (mips ? data() : 0) | (words[12] & 0xFFF));
+          break;
+        case 6:
+          guest::StoreU32(h.base, header + 48, data());
+          break;
+        default:
+          break;
+      }
+      PPCContext t = CallContext(h);
+      t.r3.u64 = header;
+      (v == 0 ? Original<__imp__sub_822A6210> : NativeDestroy)(t, h.base);
+      out[v].Word(t.r3.u32);
+      out[v].Word(memory::IsHeapBlock(header));
+      out[v].Word(guest::LoadU32(h.base, kHiZTaken));
+    }
+    results.Check(out[0], out[1], fmt::format("case {}: type {}, mips {}, fence {:08X}", i, type,
+                                              mips, fence));
+  }
+  guest::StoreU32(h.base, kHiZTaken, hi_z);
+  results.Report();
+}
+
 }  // namespace
 
 void GraphicsResources(Context& h) {
@@ -1426,6 +1923,9 @@ void GraphicsResources(Context& h) {
   SurfaceHeaders(h, r);
   EdramLeaves(h, r);
   EdramAllocator(h, r);
+  LocksAndUnlocks(h, r);
+  LockWrappers(h, r);
+  Destroys(h, r);
 }
 
 }  // namespace harness
