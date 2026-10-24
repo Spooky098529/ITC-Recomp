@@ -169,6 +169,21 @@ std::optional<double> CubicFloat(uint8_t* base, uint32_t k0, uint32_t k1, double
 // sub_8259FC18: the same cubic on integer values, truncated (fctiwz).
 std::optional<uint32_t> CubicInteger(uint8_t* base, uint32_t k0, uint32_t k1, double t);
 
+// The drawing walk (draw.cpp).
+//
+// UiMovie::ApplyTransform (sub_8259E6C8): the node's transform applied to
+// the draw context: the clip (the node's rectangle +40..+52 offset by the
+// context's +32 and +36 as integers, kept at +64 or intersected with the
+// context's, sub_8259D730 merged), the color (+80..+92), and the matrix
+// (Matrix::Multiply, local first, each noted for frame interpolation with the
+// original's return address): translated by the position plus the pivot,
+// turned (Matrix::RotateZ), scaled (+108 set when a factor isn't 1.0), and
+// translated back. `frame` is the original's 352-byte frame (the local
+// matrices at +176 and +240, the angle at +80, the turn's at -80). Returns
+// the r3 the original leaves (the context, or its clip when no matrix was
+// multiplied). Flush-to-zero off on entry (the adapter's job).
+uint32_t ApplyTransform(uint8_t* base, uint32_t context, uint32_t node, uint32_t frame);
+
 // The recorders (recording.cpp), on the command list `list` (the global at
 // 0x82970C1C). Each records a chunk and returns its first slot, which the
 // caller hands to the renderer (vtable slot 4); nothing is done (nullopt)

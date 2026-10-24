@@ -42,6 +42,13 @@ void NativeFixUpAnimation(PPCContext& ctx, uint8_t* base) {
   ctx.r3.u64 = ui_movies::FixUpAnimation(base, ctx.r3.u32, ctx.r4.u32);
 }
 
+// UiMovie::ApplyTransform's register steps (as its adapter's, without the
+// flag).
+void NativeApplyTransform(PPCContext& ctx, uint8_t* base) {
+  ctx.fpscr.disableFlushMode();
+  ctx.r3.u64 = ui_movies::ApplyTransform(base, ctx.r3.u32, ctx.r4.u32, ctx.r1.u32 - 352);
+}
+
 constexpr uint32_t ui_movies_kTrm = 0x54524D00;       // "TRM\0"
 constexpr uint32_t ui_movies_kSce = 0x53434500;       // "SCE\0"
 constexpr uint32_t ui_movies_kRenderer = 0x82970C18;  // then the command list at +4
@@ -895,6 +902,103 @@ void RestorePoseCases(Context& h) {
   results.Report();
 }
 
+// UiMovie::ApplyTransform (sub_8259E6C8): a draw context (random matrix,
+// clip zero or random, color) and a node (position, pivot, scale, rotation,
+// rectangle, color) in the scratch area, each field often at its "nothing to
+// do" value (0, 1.0, near the threshold) and with odd floats (NaN, -0.0,
+// infinities, huge). The context's matrix and color compared as floats, the
+// rest (clip, +96..+108, the node) exactly, and r3.
+void ApplyTransformCases(Context& h) {
+  Results results("UiMovie::ApplyTransform (sub_8259E6C8)");
+  Random r;  // its own, so the harnesses after it keep their inputs
+  const uint32_t threshold = guest::LoadU32(h.base, 0x82002A44);
+  const float threshold_f = std::bit_cast<float>(threshold);
+  const uint32_t odd[] = {0x7FC00000u, 0xFFC00000u, 0x80000000u, 0x7F800000u, 0xFF800000u,
+                          0x4F000000u /* 2^31 */, 0xCF000001u, 0x5F000000u, 0x00000001u,
+                          threshold, threshold ^ 0x80000000u, threshold + 1,
+                          (threshold + 1) ^ 0x80000000u, threshold - 1, 0x3F800000u};
+  const auto odd_or = [&](uint32_t usual, uint32_t otherwise) {
+    const uint32_t pick = r.Below(10);
+    if (pick == 0) {
+      return odd[r.Below(std::size(odd))];
+    }
+    return pick < 5 ? usual : otherwise;
+  };
+  const auto small_int = [&] {
+    const uint32_t pick = r.Below(12);
+    if (pick == 0) return 0x80000000u;
+    if (pick == 1) return 0x7FFFFFFFu;
+    if (pick == 2) return uint32_t(r.Next());
+    return uint32_t(int32_t(r.Below(1400)) - 700);
+  };
+  for (int c = 0; c < 3000; c++) {
+    const uint32_t context = h.data + 16 * r.Below(2);  // aligned, and not (a frame's +16)
+    const uint32_t node = h.data + 192 + 4 * r.Below(4);
+    uint32_t cw[28];
+    for (int i = 0; i < 16; i++) {
+      cw[i] = r.Below(12) == 0 ? odd[r.Below(std::size(odd))] : RandomFloat(r, -800, 800);
+    }
+    const bool clip_set = r.Below(2) == 0;
+    for (int i = 16; i < 20; i++) {
+      cw[i] = clip_set ? small_int() : 0;
+    }
+    for (int i = 20; i < 24; i++) {
+      cw[i] = odd_or(0x3F800000u, RandomFloat(r, 0, 1));
+    }
+    for (int i = 24; i < 28; i++) {
+      cw[i] = r.Below(2) == 0 ? 0 : uint32_t(r.Next());
+    }
+    uint32_t nw[18];
+    for (int i = 0; i < 3; i++) {
+      nw[i] = uint32_t(r.Next());
+    }
+    nw[3] = odd_or(0, RandomFloat(r, -640, 640));  // +12, +16: the position
+    nw[4] = odd_or(0, RandomFloat(r, -360, 360));
+    nw[5] = r.Below(2) == 0 ? 0 : small_int();  // +20, +24: the pivot
+    nw[6] = r.Below(2) == 0 ? 0 : small_int();
+    nw[7] = odd_or(0x3F800000u, RandomFloat(r, -3, 3));  // +28, +32: the scale
+    nw[8] = odd_or(0x3F800000u, r.Below(3) == 0 ? RandomFloat(r, -threshold_f * 2,
+                                                              threshold_f * 2)
+                                                : RandomFloat(r, -3, 3));
+    nw[9] = odd_or(0, RandomFloat(r, -720, 720));  // +36: the rotation
+    const bool rect = r.Below(2) == 0;
+    for (int i = 10; i < 14; i++) {  // +40..+52
+      nw[i] = rect && r.Below(4) != 0 ? small_int() : 0;
+    }
+    for (int i = 14; i < 17; i++) {  // +56..+64
+      nw[i] = r.Below(3) == 0 ? small_int() : r.Below(256);
+    }
+    nw[17] = odd_or(0x3F800000u, RandomFloat(r, 0, 1));  // +68
+    Outputs out[2];
+    for (int v = 0; v < 2; v++) {
+      Fill(h.base, h.data, kScratchBytes);
+      for (int i = 0; i < 28; i++) {
+        guest::StoreU32(h.base, context + 4 * i, cw[i]);
+      }
+      for (int i = 0; i < 18; i++) {
+        guest::StoreU32(h.base, node + 4 * i, nw[i]);
+      }
+      PPCContext t = CallContext(h);
+      t.r3.u64 = context;
+      t.r4.u64 = node;
+      (v == 0 ? __imp__sub_8259E6C8 : NativeApplyTransform)(t, h.base);
+      out[v].Floats(h.base, context, 16);
+      out[v].Bytes(Read(h.base, context + 64, 16));
+      out[v].Floats(h.base, context + 80, 4);
+      out[v].Bytes(Read(h.base, context + 96, 16));
+      out[v].Bytes(Read(h.base, node, 72));
+      out[v].Word(uint32_t(t.r3.u64 >> 32));
+      out[v].Word(t.r3.u32);
+    }
+    results.Check(out[0], out[1],
+                  fmt::format("case {}: clip {} rect {} pos {:08X} {:08X} pivot {:08X} {:08X} "
+                              "scale {:08X} {:08X} turn {:08X}",
+                              c, clip_set, rect, nw[3], nw[4], nw[5], nw[6], nw[7], nw[8],
+                              nw[9]));
+  }
+  results.Report();
+}
+
 }  // namespace
 
 void UiMovies(Context& h) {
@@ -926,6 +1030,7 @@ void UiMovies(Context& h) {
   FixUpSceneCases(h);
   FixUpFileCases(h);
   RestorePoseCases(h);
+  ApplyTransformCases(h);
 }
 
 }  // namespace harness
