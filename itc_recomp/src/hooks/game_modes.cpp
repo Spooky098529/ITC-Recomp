@@ -3,7 +3,9 @@
 // original does. Functions reached only from native callers have no
 // adapters (the flag switches their callers): StateKey::Equals
 // (sub_82106040), from StateMachine::IndexOf; StateMachine::IndexOf
-// (sub_821060A0), from StateMachine::Add and Find.
+// (sub_821060A0), from StateMachine::Add and Find; StateMachine::Find
+// (sub_821061F0), from StateMachine::Handle (its register step,
+// hooks::GameModesFind, kept for the harness).
 
 #include "guest.h"
 
@@ -17,7 +19,8 @@ ITC_FLAG_BOOL(native_game_modes, true, "ITC",
               "StateMachine::IndexOf sub_821060A0 with StateKey::Equals sub_82106040 (no adapters: "
               "only Add and Find call IndexOf, and only IndexOf Equals), Transition::Make sub_82106100, Transition::Assign "
               "sub_82105FE0, StateMachine::StateMachine sub_82107108, StateMachine::Add "
-              "sub_82106158, StateMachine::Find sub_821061F0, StateMachine::Handle sub_82106280, "
+              "sub_82106158, StateMachine::Find sub_821061F0 (no adapter: only Handle calls it), "
+              "StateMachine::Handle sub_82106280, "
               "Mode::Mode sub_82106C20, the race overlays' state machine's handlers "
               "sub_8215DD58, sub_8215DD90, sub_8215DDD0 and sub_8215DE10, the last's virtual "
               "calls guest calls) "
@@ -54,10 +57,6 @@ ITC_GAME_MODES(82106C20, ModeConstruct(base, ctx.r3.u32))
 // part; r3 = the index, or the new transition (as the original computes it,
 // from the machine's whole register).
 ITC_GAME_MODES(82106158, hooks::GameModesAdd(ctx, base))
-
-// StateMachine::Find: r3 = the state machine, r4 = the key; r3 = the
-// functor part.
-ITC_GAME_MODES(821061F0, hooks::GameModesFind(ctx, base))
 
 // StateMachine::Handle: r3 = the state machine, r4 = the message; r3 = the
 // functor part.
