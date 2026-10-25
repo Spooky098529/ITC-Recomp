@@ -120,6 +120,19 @@ std::optional<uint32_t> MemmoveS(uint8_t* base, uint32_t destination, uint32_t s
 constexpr uint32_t kXMemSetStride = 0x8263830C;
 void XMemSet(uint8_t* base, uint32_t destination, uint32_t value, uint32_t bytes);
 
+// XAPI's vectorized copy (sub_82295890, probably XMemCpy, with its line
+// copy for unaligned sources, sub_82296FE0): `bytes` bytes from `source` to
+// `destination`, forward. The bytes are a plain copy's where the two ranges
+// don't share memory (its 128-byte line clears lie inside the destination
+// before they're written). Under 16 bytes, its last byte loop counts down by
+// the word at 0x82638308 (kXMemCpyStep, 1 in the xex, logged by the harness):
+// with another step, the bytes that loop copies before its count reaches 0.
+// False, with nothing copied, where the original must run: ranges that may
+// share memory (c_runtime::Memcpy refuses them), or a step whose count never
+// reaches 0 (0, or one that doesn't divide what's left).
+constexpr uint32_t kXMemCpyStep = 0x82638308;
+bool XMemCpy(uint8_t* base, uint32_t destination, uint32_t source, uint32_t bytes);
+
 // Whether `size` bytes at `address` lie in one guest view (not crossing
 // into the next one).
 bool InOneView(uint32_t address, uint32_t size);

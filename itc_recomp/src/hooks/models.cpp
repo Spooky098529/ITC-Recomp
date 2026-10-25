@@ -22,6 +22,7 @@
 #include "models/model.h"
 #include "models/texture_provider.h"
 #include "models/xpr.h"
+#include "shader_objects/shader_objects.h"
 
 ITC_FLAG_BOOL(native_models, true, "ITC",
               "Run the model class's pieces (docs/functions/models.md: the memory blocks' "
@@ -40,7 +41,7 @@ ITC_FLAG_BOOL(native_models, true, "ITC",
               "sub_82594850 and ~TextureProvider sub_825943E0; Model::Model sub_825948C0, "
               "Model::Release sub_82594970 and Model::~Model sub_82594F58, their members' "
               "plain C++ called directly; Model::MaterialCount sub_82594AD8, Model::Material "
-              "sub_82594B20, the shared shaders sub_825896D8 and sub_82589700, the vertex "
+              "sub_82594B20, ShaderFile::Parse sub_822A8568 (in src/shader_objects/), the shared shaders sub_825896D8 and sub_82589700, the vertex "
               "declaration sub_82589728 (its message for a type pair the tables don't cover, "
               "never seen in play, the original's), Model::RecordShape sub_82595550 (in "
               "src/scenery_lists/model_draws.cpp, adapter in src/hooks/scenery_lists.cpp: the "
@@ -248,3 +249,13 @@ ITC_MODELS_ACCESSOR(82594B20, ModelsMaterial)
 ITC_MODELS_ACCESSOR(825896D8, ModelsSharedVertexShader)
 ITC_MODELS_ACCESSOR(82589700, ModelsSharedPixelShader)
 ITC_MODELS_ACCESSOR(82589728, ModelsVertexDeclaration)
+
+// ShaderFile::Parse: r3 = the file, r4 = the record. No return value.
+extern "C" REX_FUNC(sub_822A8568) {
+  REX_FUNC_PROLOGUE();
+  if (!ITC_FLAG(native_models)) {
+    __imp__sub_822A8568(ctx, base);
+    return;
+  }
+  shader_objects::ParseFile(base, ctx.r3.u32, ctx.r4.u32);
+}

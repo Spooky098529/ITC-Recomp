@@ -25,7 +25,7 @@
 
 ITC_FLAG_BOOL(native_c_runtime, true, "ITC",
               "Run the C runtime's helpers natively instead of through the translated code: "
-              "memset (sub_825A71D0); XAPI's vectorized memset (sub_822962B0, XMemSet); wcslen, wcscpy, wcscat and wcscmp "
+              "memset (sub_825A71D0); XAPI's vectorized memset (sub_822962B0, XMemSet) and copy (sub_82295890, XMemCpy, with its line copy sub_82296FE0 inside it); wcslen, wcscpy, wcscat and wcscmp "
               "(sub_825A9958, sub_825A7F30, sub_825A7EF8, sub_825A7EB0); mbtowc's single-byte "
               "path (sub_825B7EC8); strncpy, strcpy_s, strncmp, _stricmp, _strnicmp and its compare, "
               "strstr (sub_825A7F50, sub_825A9DD8, sub_825AACD0, sub_825AA100, sub_825AC710, "
@@ -178,6 +178,19 @@ extern "C" REX_FUNC(sub_822962B0) {
     return;
   }
   c_runtime::XMemSet(base, ctx.r3.u32, ctx.r4.u32, ctx.r5.u32);
+}
+
+// XAPI's vectorized copy (probably XMemCpy): r3 = destination, r4 = source,
+// r5 = the count (32 bits); r3 comes back unchanged. Ranges that may share
+// memory, and a byte loop step that never counts down to 0, go to the
+// original. Its scratch below r1 isn't written; like the original, its copies
+// aren't recorded for the renderer's mirrors (memcpy's wrapper does that).
+extern "C" REX_FUNC(sub_82295890) {
+  REX_FUNC_PROLOGUE();
+  if (!ITC_FLAG(native_c_runtime) ||
+      !c_runtime::XMemCpy(base, ctx.r3.u32, ctx.r4.u32, ctx.r5.u32)) {
+    __imp__sub_82295890(ctx, base);
+  }
 }
 
 // wcscpy: r3 = destination, r4 = source; returns r3 (left as it is).

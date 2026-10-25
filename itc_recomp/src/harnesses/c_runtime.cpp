@@ -594,6 +594,94 @@ void CRuntime(Context& h) {
     results.Report();
   }
 
+  // XMemCpy (sub_82295890, with its line copy sub_82296FE0): counts 0-300
+  // and up to 1,800, the destination at every place in a 128-byte line, the
+  // source at every alignment in 16 bytes (the line copy for unaligned
+  // ones), random bytes; the whole scratch area and r3 compared. Its byte
+  // loop's step at 0x82638308 is logged, and the short counts also run with
+  // steps 2, 3 and 8 written there for a while (restored), only where the
+  // count reaches 0 (else the original never ends). Overlapping ranges go to
+  // the original on the native side too.
+  {
+    const uint32_t step = guest::LoadU32(h.base, c_runtime::kXMemCpyStep);
+    ITC_LOG_INFO("harness: XMemCpy (sub_82295890): the step at 0x82638308 is {}", step);
+    Results results("XMemCpy (sub_82295890)");
+    const uint32_t line = (h.data + 127) & ~127u;
+    auto native = [](PPCContext& t, uint8_t* base) {
+      if (!c_runtime::XMemCpy(base, t.r3.u32, t.r4.u32, t.r5.u32)) {
+        __imp__sub_82295890(t, base);
+      }
+    };
+    auto one = [&](uint32_t destination, uint32_t source, uint32_t count, const std::string& what) {
+      const std::vector<uint8_t> bytes = RandomBytes(h, count + 32);
+      Outputs out[2];
+      for (int v = 0; v < 2; v++) {
+        Fill(h.base, h.data, kScratchBytes);
+        Write(h.base, source - 16, bytes.data(), uint32_t(bytes.size()));
+        PPCContext t = CallContext(h);
+        t.r3.u64 = destination;
+        t.r4.u64 = source;
+        t.r5.u64 = count;
+        (v == 0 ? __imp__sub_82295890 : native)(t, h.base);
+        out[v].Bytes(Read(h.base, h.data, kScratchBytes));
+        out[v].Word(t.r3.u32);
+      }
+      results.Check(out[0], out[1], what);
+    };
+    for (uint32_t count = 0; count <= 300; count++) {
+      for (uint32_t d : {0u, 1u, 7u, 8u, 16u, 17u, 100u, 127u}) {
+        for (uint32_t sa : {0u, 1u, 4u, 8u, 15u}) {
+          one(line + d, line + 2064 + sa, count,
+              fmt::format("count {} destination +{} source +{}", count, d, sa));
+        }
+      }
+    }
+    for (uint32_t count : {383u, 384u, 385u, 511u, 512u, 513u, 1023u, 1024u, 1025u, 1500u, 1800u}) {
+      for (uint32_t d = 0; d < 128; d += 9) {
+        for (uint32_t sa = 0; sa < 16; sa += 3) {
+          one(line + d, line + 2064 + sa, count,
+              fmt::format("count {} destination +{} source +{}", count, d, sa));
+        }
+      }
+    }
+    for (int i = 0; i < 300; i++) {
+      const uint32_t d = h.random.Below(128), sa = h.random.Below(16);
+      const uint32_t count = h.random.Below(1800);
+      one(line + d, line + 2064 + sa, count,
+          fmt::format("count {} destination +{} source +{}", count, d, sa));
+    }
+    // Overlapping either way (the original's on both sides).
+    for (uint32_t count : {5u, 15u, 16u, 40u, 300u}) {
+      for (int32_t shift : {-17, -1, 1, 3, 130}) {
+        one(uint32_t(int32_t(line + 1000) + shift), line + 1000, count,
+            fmt::format("count {} overlapping by {}", count, shift));
+      }
+    }
+    // Other steps, where the byte loop's count reaches 0.
+    for (uint32_t other : {2u, 3u, 8u}) {
+      guest::StoreU32(h.base, c_runtime::kXMemCpyStep, other);
+      for (uint32_t count = 0; count < 16; count++) {
+        for (uint32_t sa : {0u, 1u, 2u, 4u, 8u}) {
+          uint32_t at = 0, left = count;
+          if (left >= 8 && (sa & 7) == 0) {
+            at += 8;
+            left -= 8;
+          }
+          if (((sa + at) & 3) == 0 && left >= 4) {
+            left &= 3;
+          }
+          if (left % other != 0) {
+            continue;
+          }
+          one(line + 5, line + 2064 + sa, count,
+              fmt::format("step {} count {} source +{}", other, count, sa));
+        }
+      }
+      guest::StoreU32(h.base, c_runtime::kXMemCpyStep, step);
+    }
+    results.Report();
+  }
+
   // The wide string helpers: every length in kLengths at each place (odd
   // addresses and across a page end included), units with high bits; the
   // destination apart from the source, or overlapping below it.

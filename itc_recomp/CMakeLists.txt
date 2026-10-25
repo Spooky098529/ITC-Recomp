@@ -187,6 +187,8 @@ set(ITC_SOURCES
     src/models/xpr.cpp
     src/models/texture_provider.cpp
     src/models/model.cpp
+    src/hooks/shader_objects.cpp
+    src/shader_objects/shader_objects.cpp
     src/hooks/race_hud.cpp
     src/race_hud/race_hud.cpp
     src/hooks/screen_objects.cpp
@@ -277,6 +279,7 @@ set(ITC_SOURCES
     src/harnesses/minimap.cpp
     src/harnesses/scene_models.cpp
     src/harnesses/scenery_lists.cpp
+    src/harnesses/shader_objects.cpp
     src/harnesses/race_hud.cpp
     src/harnesses/ui_movie_objects.cpp
     src/harnesses/models.cpp
