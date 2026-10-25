@@ -6,8 +6,13 @@
 
 #include "base/log.h"
 #include "c_runtime/strings.h"
+#include "game_data/data_file.h"
 #include "hooks/heap.h"
 #include "memory/heap.h"
+#include "models/model.h"
+#include "models/model_load.h"
+#include "models/xpr.h"
+#include "scenery_lists/scenery_lists.h"
 
 #include <initializer_list>
 
@@ -728,6 +733,172 @@ void AdvanceAnimation(uint8_t* base, uint32_t animation) {
     Store(base, animation + 4, next);
   }
   Store(base, animation + 8, Load(base, animation + 8) + 1);
+}
+
+// --- The files' parses ---
+
+namespace {
+
+// The originals the parses hand to where a callee's plain C++ declines,
+// called through `calls` from 512 bytes below `stack`.
+struct ParseCalls {
+  uint8_t* base;
+  const Calls* calls;
+  uint32_t stack;
+
+  uint32_t Call(uint32_t lr, uint32_t function, std::initializer_list<uint32_t> args) const {
+    return CallGuest(base, *calls, stack, 512, lr, function, args);
+  }
+  static uint32_t Allocate(void* self, uint32_t size) {
+    return static_cast<ParseCalls*>(self)->Call(0x821484C0, 0x825A6880, {size});
+  }
+  static void Construct(void* self, uint32_t model) {
+    static_cast<ParseCalls*>(self)->Call(0x821484D0, 0x825948C0, {model});
+  }
+  static void Load(void* self, uint32_t model, uint32_t entry) {
+    static_cast<ParseCalls*>(self)->Call(0x82148500, 0x82596920, {model, entry, 0});
+  }
+  static void Init(void* self, uint32_t object, uint32_t microcode) {
+    static_cast<ParseCalls*>(self)->Call(0x82594DEC, 0x822A8740, {object, microcode});
+  }
+  static void Function(void* self, uint32_t function, uint32_t r3, uint32_t r4, uint32_t r5,
+                       uint32_t return_address) {
+    static_cast<ParseCalls*>(self)->Call(return_address, function, {r3, r4, r5});
+  }
+
+  models::LoadCalls ModelLoad() {
+    models::LoadCalls load;
+    load.init = &Init;
+    load.call = &Function;
+    load.user = this;
+    return load;
+  }
+  scenery_lists::LoadCalls ListLoad() {
+    scenery_lists::LoadCalls load;
+    load.allocate = &Allocate;
+    load.construct = &Construct;
+    load.load = &Load;
+    load.model_load = ModelLoad();
+    load.user = this;
+    return load;
+  }
+};
+
+// Model::Load(model, entry, 0) natively, else its original; returns its r3
+// (the model's +412 natively).
+uint32_t LoadModel(uint8_t* base, ParseCalls& parse, uint32_t model, uint32_t entry,
+                   uint32_t lr) {
+  if (model != 0 && models::ModelLoad(base, model, entry, 0, parse.ModelLoad())) {
+    return Load(base, model + 412);
+  }
+  return parse.Call(lr, 0x82596920, {model, entry, 0});
+}
+
+// XPR::Create natively, else its original; returns its r3.
+uint32_t CreateXpr(uint8_t* base, ParseCalls& parse, uint32_t xpr, uint32_t file, uint32_t lr) {
+  if (const auto r3 = models::XprCreate(base, xpr, file)) {
+    return *r3;
+  }
+  return parse.Call(lr, 0x82596F68, {xpr, file});
+}
+
+}  // namespace
+
+uint32_t CourseSetParse(uint8_t* base, const Calls& calls, uint32_t stack, uint32_t set) {
+  ITC_NATIVE_RUNNING("sub_820F1A70 CourseSet::Parse");
+  ParseCalls parse{base, &calls, stack};
+  const uint32_t frame = stack - 128;
+  Store(base, frame, stack);
+  const uint32_t first = Load(base, set + 3808);
+  uint32_t entry = game_data::GetEntry(base, first, 0, true);
+  if (entry != 0) {
+    const uint32_t xpr = set + 64;
+    if (xpr != 0) {
+      models::XprConstruct(base, xpr);
+    }
+    CreateXpr(base, parse, xpr, entry, 0x820F1AB8);
+  }
+  entry = game_data::GetEntry(base, first, 1, true);
+  if (entry != 0) {
+    const uint32_t model = set + 96;
+    if (model != 0 && !models::ModelConstruct(base, model)) {
+      parse.Call(0x820F1AE0, 0x825948C0, {model});
+    }
+    LoadModel(base, parse, model, game_data::GetEntry(base, entry, 0, false), 0x820F1B00);
+  }
+  const scenery_lists::LoadCalls list_calls = parse.ListLoad();
+  constexpr uint32_t kLists[] = {528, 1064, 1596, 2124, 2652};
+  for (uint32_t i = 0; i < 5; i++) {
+    entry = game_data::GetEntry(base, first, 2 + i, true);
+    if (entry != 0) {
+      const uint32_t list_frame = frame - 160;
+      Store(base, list_frame, frame);
+      scenery_lists::ModelListLoad(base, set + kLists[i], entry, list_frame, list_calls);
+    }
+  }
+  entry = game_data::GetEntry(base, first, 7, true);
+  if (entry != 0) {
+    const uint32_t points_frame = frame - 192;
+    Store(base, points_frame, frame);
+    scenery_lists::ModelListLoadPoints(base, set + 3180, entry, points_frame, list_calls);
+  }
+  const uint32_t second = Load(base, set + 3812);
+  constexpr uint32_t kSecond[] = {1056, 1060, 1592};
+  for (uint32_t i = 0; i < 3; i++) {
+    entry = game_data::GetEntry(base, second, i, true);
+    if (entry != 0) {
+      Store(base, set + kSecond[i], entry);
+    }
+  }
+  return entry;
+}
+
+uint32_t AreaLightsParse(uint8_t* base, uint32_t lights) {
+  ITC_NATIVE_RUNNING("sub_820F11C0 AreaLights::Parse");
+  const uint32_t entry = game_data::GetEntry(base, Load(base, lights + 4), 0, true);
+  if (entry != 0) {
+    Store(base, lights + 80, entry);
+  }
+  return entry;
+}
+
+uint32_t AreaModelParse(uint8_t* base, const Calls& calls, uint32_t stack, uint32_t model) {
+  ITC_NATIVE_RUNNING("sub_820F1258 AreaModel::Parse");
+  ParseCalls parse{base, &calls, stack};
+  Store(base, stack - 144, stack);
+  const uint32_t file = Load(base, Load(base, kManager) + 188);
+  const uint32_t entry = game_data::GetEntry(base, file, 0, true);
+  const uint32_t xpr_entry = game_data::GetEntry(base, file, 1, true);
+  uint32_t r3 = xpr_entry;
+  if (entry != 0) {
+    r3 = LoadModel(base, parse, model + 80, entry, 0x820F12C0);
+    Store(base, model + 56, model + 80);
+  } else {
+    Store(base, model + 56, 0);
+  }
+  if (xpr_entry != 0) {
+    r3 = CreateXpr(base, parse, model + 528, xpr_entry, 0x820F12E0);
+    Store(base, model + 60, model + 528);
+  } else {
+    Store(base, model + 60, 0);
+  }
+  return r3;
+}
+
+uint32_t AreaLightsOnLoaded(uint8_t* base, uint32_t lights) {
+  ITC_NATIVE_RUNNING("sub_820F1C30 AreaLights::OnLoaded");
+  AreaLightsParse(base, lights);
+  MarkLoaded(base, lights);
+  return lights;
+}
+
+uint32_t AreaModelOnLoaded(uint8_t* base, const Calls& calls, uint32_t stack, uint32_t model) {
+  ITC_NATIVE_RUNNING("sub_820F1CE8 AreaModel::OnLoaded");
+  const uint32_t frame = stack - 96;
+  Store(base, frame, stack);
+  AreaModelParse(base, calls, frame, model);
+  MarkLoaded(base, model);
+  return model;
 }
 
 }  // namespace course_scenery

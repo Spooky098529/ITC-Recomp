@@ -14,6 +14,7 @@
 #include "guest.h"
 
 #include "base/flags.h"
+#include "hooks/models.h"
 #include "course_scenery/course_scenery.h"
 
 ITC_FLAG_BOOL(native_course_scenery, true, "ITC",
@@ -30,7 +31,11 @@ ITC_FLAG_BOOL(native_course_scenery, true, "ITC",
               "sub_820F2B80, ModelList::Init sub_820F1A20, Scenery::ClearGlobal sub_820F1480, Scenery::Init sub_820F1360, "
               "SceneryList::ReleaseUnused sub_820F17C0, Scenery::StartLoad sub_820F1E00, "
               "TextureAnimations::Advance sub_820F11A8 (in the per-frame logic's wrap), "
-              "AnimationSet::Advance sub_82146B20, Animation::Advance sub_82146AC0) "
+              "AnimationSet::Advance sub_82146B20, Animation::Advance sub_82146AC0, "
+              "AreaLights::Parse sub_820F11C0 and OnLoaded sub_820F1C30; with --native_models "
+              "CourseSet::Parse sub_820F1A70, AreaModel::Parse sub_820F1258 and OnLoaded "
+              "sub_820F1CE8, the model class's and the model lists' plain C++ called directly, "
+              "their originals where it declines guest calls) "
               "natively instead of through the translated code (the same writes; checked by "
               "--run_harnesses=course_scenery). Those reached only from native callers have no "
               "adapters, and the flag switches their callers: sub_82146B20, sub_82146AC0, "
@@ -193,3 +198,62 @@ ITC_COURSE_SCENERY(820F17C0, ITC_SCENERY_CALLS;
 // r3 = the manager.
 ITC_COURSE_SCENERY(820F1E00, ITC_SCENERY_CALLS;
                    ctx.r3.u64 = StartLoad(base, calls, ctx.r1.u32, ctx.r3.u32))
+
+// --- The files' parses ---
+//
+// CourseSet::Parse and AreaModel::Parse (with its callback) call the model
+// class's plain C++, so they run natively only where Model::Load's adapter
+// does. Flush-to-zero off, as Model::Load leaves it.
+
+namespace {
+
+bool NativeParses() {
+  return ITC_FLAG(native_course_scenery) && hooks::ModelsNativeLifetime();
+}
+
+}  // namespace
+
+// CourseSet::Parse: r3 = the course set; r3 as the original leaves it.
+extern "C" REX_FUNC(sub_820F1A70) {
+  REX_FUNC_PROLOGUE();
+  if (!NativeParses()) {
+    __imp__sub_820F1A70(ctx, base);
+    return;
+  }
+  ctx.fpscr.disableFlushMode();
+  ITC_SCENERY_CALLS;
+  ctx.r3.u64 = CourseSetParse(base, calls, ctx.r1.u32, ctx.r3.u32);
+}
+
+// AreaLights::Parse: r3 = the area's lights; r3 the entry (or 0).
+ITC_COURSE_SCENERY(820F11C0, ctx.r3.u64 = AreaLightsParse(base, ctx.r3.u32))
+
+// AreaLights::OnLoaded (Archive::Load's callback): r6 = the area's lights;
+// r3 = them, as PoolObject::MarkLoaded leaves it.
+ITC_COURSE_SCENERY(820F1C30, guest::StoreU32(base, ctx.r1.u32 - 96, ctx.r1.u32);
+                   ctx.r3.u64 = AreaLightsOnLoaded(base, ctx.r6.u32))
+
+// AreaModel::Parse: r3 = the area's model; r3 as the original leaves it.
+extern "C" REX_FUNC(sub_820F1258) {
+  REX_FUNC_PROLOGUE();
+  if (!NativeParses()) {
+    __imp__sub_820F1258(ctx, base);
+    return;
+  }
+  ctx.fpscr.disableFlushMode();
+  ITC_SCENERY_CALLS;
+  ctx.r3.u64 = AreaModelParse(base, calls, ctx.r1.u32, ctx.r3.u32);
+}
+
+// AreaModel::OnLoaded (Archive::Load's callback): r6 = the area's model; r3
+// = it, as PoolObject::MarkLoaded leaves it.
+extern "C" REX_FUNC(sub_820F1CE8) {
+  REX_FUNC_PROLOGUE();
+  if (!NativeParses()) {
+    __imp__sub_820F1CE8(ctx, base);
+    return;
+  }
+  ctx.fpscr.disableFlushMode();
+  ITC_SCENERY_CALLS;
+  ctx.r3.u64 = AreaModelOnLoaded(base, calls, ctx.r1.u32, ctx.r6.u32);
+}

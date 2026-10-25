@@ -187,6 +187,40 @@ uint32_t ReleaseUnused(uint8_t* base, const Calls& calls, uint32_t stack, uint32
 // +192 = 1. Returns what the original leaves in r3.
 uint32_t StartLoad(uint8_t* base, const Calls& calls, uint32_t stack, uint32_t manager);
 
+// --- The files' parses (the loads' callbacks) ---
+//
+// Model::Model, Model::Load, XPR::Create and the model lists' loads are
+// their plain C++, so these run natively only where Model::Load's adapter
+// does (hooks::ModelsNativeLifetime, the adapters' condition). Where a
+// callee's plain C++ declines, its original runs through `calls` (by its
+// address, the original's return address) from 512 bytes below `stack`,
+// below the frames the originals would have.
+
+// CourseSet::Parse (sub_820F1A70): from the first file (+3808, entries by
+// DataFile::GetEntry with r5 = 1): entry 0 into the XPR at +64 (XPR::XPR,
+// XPR::Create), entry 1's entry 0 into the model at +96 (Model::Model,
+// Model::Load), entries 2 to 6 into the lists at +528, +1064, +1596, +2124,
+// +2652 (ModelList::Load) and 7 into +3180 (ModelList::LoadPoints); from the
+// second (+3812): entries 0 to 2 to +1056, +1060, +1592 when there. Its
+// frame (128 bytes below `stack`) and the lists' below it get their back
+// chains. Returns the r3 the original leaves (the last entry looked up).
+uint32_t CourseSetParse(uint8_t* base, const Calls& calls, uint32_t stack, uint32_t set);
+// AreaLights::Parse (sub_820F11C0): +80 = entry 0 of the file at +4 when
+// there is one. Returns that entry (0 for none).
+uint32_t AreaLightsParse(uint8_t* base, uint32_t lights);
+// AreaModel::Parse (sub_820F1258): from the file at the manager's +188:
+// entry 0 into the model at +80 (Model::Load, r5 = 0) and +56 = +80, else
+// +56 = 0; entry 1 into the XPR at +528 (XPR::Create) and +60 = +528, else
+// +60 = 0. Returns the r3 the original leaves (XPR::Create's; else
+// Model::Load's, the model's +412; else 0).
+uint32_t AreaModelParse(uint8_t* base, const Calls& calls, uint32_t stack, uint32_t model);
+// AreaLights::OnLoaded (sub_820F1C30, Archive::Load's callback): Parse,
+// then PoolObject::MarkLoaded. AreaModel::OnLoaded (sub_820F1CE8): the
+// same with AreaModel::Parse (its frame 96 bytes below `stack`, the back
+// chain written). Each returns the object (the r3 MarkLoaded leaves).
+uint32_t AreaLightsOnLoaded(uint8_t* base, uint32_t lights);
+uint32_t AreaModelOnLoaded(uint8_t* base, const Calls& calls, uint32_t stack, uint32_t model);
+
 // --- The texture animations (the course set's +1060) ---
 
 // TextureAnimations::Advance (sub_820F11A8): the set at `course_set` +
