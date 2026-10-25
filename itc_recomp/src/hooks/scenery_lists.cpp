@@ -337,12 +337,10 @@ namespace {
 // The draws' guest calls (scenery_lists::DrawCalls), each from the frame and
 // with the return address the plain C++ gives.
 struct DrawContext {
-  PPCContext& ctx;
-  uint8_t* base;
 
   static uint32_t Call(void* self, uint32_t function, const uint32_t* args, int count,
                        uint32_t frame, uint32_t lr) {
-    auto& d = *static_cast<DrawContext*>(self);
+    auto& d = *static_cast<SceneryDrawGuest*>(self);
     PPCContext& ctx = d.ctx;
     uint8_t* base = d.base;
     const uint64_t stack = ctx.r1.u64;
@@ -363,7 +361,7 @@ struct DrawContext {
   }
   static uint32_t Submit(void* self, uint32_t entry, uint32_t key, double depth, uint32_t frame,
                          uint32_t lr) {
-    auto& d = *static_cast<DrawContext*>(self);
+    auto& d = *static_cast<SceneryDrawGuest*>(self);
     PPCContext& ctx = d.ctx;
     uint8_t* base = d.base;
     const uint64_t stack = ctx.r1.u64;
@@ -386,6 +384,18 @@ struct DrawContext {
 
 }  // namespace
 
+bool SceneryListsSlotDiagnostics() {
+  return SlotDiagnostics();
+}
+
+scenery_lists::DrawCalls SceneryListsDrawCalls(SceneryDrawGuest* guest) {
+  scenery_lists::DrawCalls calls;
+  calls.call = &DrawContext::Call;
+  calls.submit = &DrawContext::Submit;
+  calls.user = guest;
+  return calls;
+}
+
 void SceneryListsRecordShape(PPCContext& ctx, uint8_t* base) {
   if (SlotDiagnostics()) {
     __imp__sub_82146BD0(ctx, base);
@@ -394,7 +404,7 @@ void SceneryListsRecordShape(PPCContext& ctx, uint8_t* base) {
   ctx.fpscr.disableFlushMode();
   const uint64_t lr = ctx.lr;
   const uint32_t frame = ctx.r1.u32 - scenery_lists::kRecordShapeFrame;
-  DrawContext context{ctx, base};
+  SceneryDrawGuest context{ctx, base};
   scenery_lists::DrawCalls calls;
   calls.call = &DrawContext::Call;
   calls.submit = &DrawContext::Submit;
@@ -425,7 +435,7 @@ void SceneryListsDrawShape(PPCContext& ctx, uint8_t* base) {
   ctx.fpscr.disableFlushMode();
   const uint64_t lr = ctx.lr;
   const uint32_t frame = ctx.r1.u32 - scenery_lists::kSceneryDrawShapeFrame;
-  DrawContext context{ctx, base};
+  SceneryDrawGuest context{ctx, base};
   scenery_lists::DrawCalls calls;
   calls.call = &DrawContext::Call;
   calls.submit = &DrawContext::Submit;
@@ -459,7 +469,7 @@ void SceneryListsModelRecordShape(PPCContext& ctx, uint8_t* base) {
   ctx.fpscr.disableFlushMode();
   const uint64_t lr = ctx.lr;
   const uint32_t frame = ctx.r1.u32 - scenery_lists::kModelRecordShapeFrame;
-  DrawContext context{ctx, base};
+  SceneryDrawGuest context{ctx, base};
   scenery_lists::DrawCalls calls;
   calls.call = &DrawContext::Call;
   calls.submit = &DrawContext::Submit;
@@ -488,7 +498,7 @@ void SceneryListsModelDrawShape(PPCContext& ctx, uint8_t* base) {
   ctx.fpscr.disableFlushMode();
   const uint64_t lr = ctx.lr;
   const uint32_t frame = ctx.r1.u32 - scenery_lists::kModelDrawShapeFrame;
-  DrawContext context{ctx, base};
+  SceneryDrawGuest context{ctx, base};
   scenery_lists::DrawCalls calls;
   calls.call = &DrawContext::Call;
   calls.submit = &DrawContext::Submit;
@@ -522,7 +532,7 @@ void SceneryListsPointListDraw(PPCContext& ctx, uint8_t* base) {
   ctx.fpscr.disableFlushMode();
   const uint64_t lr = ctx.lr;
   const uint32_t frame = ctx.r1.u32 - scenery_lists::kPointListDrawFrame;
-  DrawContext context{ctx, base};
+  SceneryDrawGuest context{ctx, base};
   scenery_lists::DrawCalls calls;
   calls.call = &DrawContext::Call;
   calls.submit = &DrawContext::Submit;

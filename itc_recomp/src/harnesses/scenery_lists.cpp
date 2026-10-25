@@ -12,6 +12,8 @@
 
 #include "base/flags.h"
 #include "base/log.h"
+#include "course_scenery/course_scenery.h"
+#include "hooks/course_scenery.h"
 #include "hooks/models.h"
 #include "hooks/scenery_lists.h"
 #include "memory/c_runtime_heap.h"
@@ -1037,6 +1039,139 @@ void PointLists(Context& h, Random& r, uint32_t block, uint32_t slots) {
   results.Report();
 }
 
+// Scenery::DrawSetLists (src/course_scenery/collect.cpp, its row in
+// docs/functions/course-scenery.md; here for this file's model draws): the
+// manager at the block's +0x7000 (+112 the set at +0x9000, the texture
+// provider at +228 with its vtable at +0x7200: slot 4 TextureProvider::Set
+// or the empty function, slots 5 and 6 the empty function; its storage at
+// +0x7500), the pass description at +0x7300 naming one of the game's
+// camera passes (their 21 x 592 bytes saved and put back; its view and an
+// identity view-projection written), the set's lists +1596, +2124 and +2652
+// of 0 to 3 nodes holding the model at +0x100 (shape 0) and its point list
+// +3180 of 0 to 3 entries as PointList::Draw's cases (the race's table at
+// [0x826D82E8] in the block's +0x7400), the race data for the picks, the
+// command list's slots in their own buffer. Compared: the block, the
+// globals, the draw keys [0x8296B900] and [0x8296B90C], the slots used, the
+// frame's temporaries (r1 - 384 + 80 to + 256) and r3.
+void DrawSetListsCases(Context& h, Random& r, uint32_t block, uint32_t slots) {
+  constexpr uint32_t kSlotsBytes = 0x40000;
+  constexpr uint32_t kCameraPasses = 0x826BAC00, kCameraBytes = 21 * 592;
+  constexpr uint32_t kRaceTable = 0x826D82E8;
+  const std::vector<uint8_t> cameras = Read(h.base, kCameraPasses, kCameraBytes);
+  const std::vector<uint8_t> keys = Read(h.base, 0x8296B900, 16);
+  const uint32_t race_table = guest::LoadU32(h.base, kRaceTable);
+  const uint32_t model = block + 0x100;
+  const uint32_t queue = block + 0x7C0;
+  const uint32_t manager = block + 0x7000;
+  const uint32_t pass = block + 0x7300;
+  const uint32_t set = block + 0x9000;
+  Results results("Scenery::DrawSetLists (sub_820F52A8)");
+  int drawn = 0;
+  for (int c = 0; c < 128; c++) {
+    Case(
+        h, results, block, r,
+        [&](PPCContext& t) {
+          g_flush_on_entry = r.Below(2) != 0;
+          RandomList(h.base, block, r, 100);
+          const uint32_t record = guest::LoadU32(h.base, scenery_lists::kRecordList);
+          guest::StoreU32(h.base, record + 32, slots);
+          guest::StoreU32(h.base, record + 44, slots);
+          guest::StoreU32(h.base, record + 8, kSlotsBytes / 16);
+          RandomShape(h.base, block, r, 0, true);
+          RandomMaterials(h.base, block, r, 0);
+          FiniteFloats(h.base, 0x8265ECA0, 0xA0 / 4, r);
+          FiniteFloats(h.base, 0x8296B940, 0x3A0 / 4, r);
+          RandomBytes(h.base, 0x8296B8F0, 16, r);
+          RandomBytes(h.base, 0x8296B900, 16, r);
+          guest::StoreU32(h.base, scenery_lists::kRenderQueue, queue);
+          guest::StoreU32(h.base, queue, queue + 0x20);
+          guest::StoreU32(h.base, queue + 0x20 + 16, kEmptyFunction);
+          // The race data for the picks (always there: IsBEntryOn and
+          // IsCEntryOn read it without a check).
+          RandomRace(h.base, block + kRace, r);
+          guest::StoreU32(h.base, sl::kRaceData, block + kRace);
+          // The manager, its texture provider and the pass.
+          guest::StoreU32(h.base, manager + 112, set);
+          const uint32_t provider = manager + 228;
+          const uint32_t vtable = block + 0x7200;
+          guest::StoreU32(h.base, provider, vtable);
+          guest::StoreU32(h.base, vtable + 16,
+                          r.Below(6) == 0 ? kEmptyFunction : 0x82594718u);
+          guest::StoreU32(h.base, vtable + 20, kEmptyFunction);
+          guest::StoreU32(h.base, vtable + 24, kEmptyFunction);
+          const uint32_t storage = block + 0x7500;
+          guest::StoreU32(h.base, provider + 8, storage);
+          guest::StoreU32(h.base, provider + 12, storage + 4 * (2 + r.Below(4)));
+          guest::StoreU32(h.base, provider + 16, storage + 4 * 8);
+          const uint32_t index = r.Below(21);
+          guest::StoreU32(h.base, pass + 20, index);
+          const uint32_t camera = kCameraPasses + 592 * index;
+          FiniteFloats(h.base, camera + 16, 16, r);
+          StoreFloats(h.base, camera + 144, {1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1});
+          // The set: its XPR's address and texture animations, the lists.
+          guest::StoreU32(h.base, set + 1060, r.Below(2) ? block + 0xC00 : 0);
+          for (uint32_t list : {set + 1596, set + 2124, set + 2652}) {
+            const uint32_t count = r.Below(4);
+            guest::StoreU32(h.base, list, count);
+            const uint32_t nodes = list + 4;
+            guest::StoreU16(h.base, nodes + 260, 1);
+            for (uint32_t i = 0; i < 4; i++) {
+              guest::StoreU16(h.base, nodes + 4 * (1 + i), uint16_t(2 + i));
+              guest::StoreU16(h.base, nodes + 4 * (1 + i) + 2, uint16_t(i));
+              guest::StoreU32(h.base, list + 272 + 4 * i, model);
+            }
+          }
+          // The point list, as PointList::Draw's cases.
+          const uint32_t points = set + 3180;
+          guest::StoreU16(h.base, points + 4 + 260, 3);
+          guest::StoreU16(h.base, points + 4 + 12, 9);
+          guest::StoreU16(h.base, points + 4 + 14, 5);
+          guest::StoreU16(h.base, points + 4 + 36, 0xFFFF);
+          guest::StoreU16(h.base, points + 4 + 38, 7);
+          guest::StoreU32(h.base, points + 272 + 4 * 5, model);
+          guest::StoreU32(h.base, points + 272 + 4 * 7, model);
+          guest::StoreU32(h.base, points + 620, r.Below(4));
+          const uint32_t point_data = block + 0x1100;
+          for (uint32_t e = 0; e < 3; e++) {
+            guest::StoreU32(h.base, points + 528 + 4 * e, point_data);
+          }
+          for (uint32_t i = 0; i < 16; i++) {
+            StoreFloats(h.base, point_data + 16 * i,
+                        {Spread(r, 0.3f), r.Below(8) == 0 ? Spread(r, 0.3f) : -2000.0f,
+                         Spread(r, 0.3f), Spread(r, 4.0f)});
+          }
+          // The race's table: +2184 + 836 an index, +2184 + 76 x it + 84
+          // the point lists' first group.
+          const uint32_t table = block + 0x7400;
+          guest::StoreU32(h.base, kRaceTable, table);
+          const uint32_t at = r.Below(4);
+          guest::StoreU32(h.base, table + 2184 + 836, at);
+          guest::StoreU32(h.base, table + 2184 + 76 * at + 84, r.Below(5) - 1);
+          t.r3.u64 = manager;
+          t.r4.u64 = pass;
+        },
+        __imp__sub_820F52A8, hooks::CourseSceneryDrawSetLists, {}, fmt::format("case {}", c),
+        true,
+        [&](const PPCContext& t, Outputs& out) {
+          const uint32_t record = guest::LoadU32(h.base, scenery_lists::kRecordList);
+          const uint32_t end = guest::LoadU32(h.base, record + 44);
+          out.Word(end - slots);
+          out.Bytes(Read(h.base, slots, std::min(end - slots, kSlotsBytes)));
+          out.Bytes(Read(h.base, 0x8296B900, 16));
+          out.Bytes(Read(h.base, t.r1.u32 - 384 + 80, 176));
+          out.Word(t.r24.u32);
+          drawn += end != slots;
+        },
+        [&] { Fill(h.base, slots, kSlotsBytes, 0xCD); });
+  }
+  Write(h.base, kCameraPasses, cameras.data(), kCameraBytes);
+  Write(h.base, 0x8296B900, keys.data(), 16);
+  guest::StoreU32(h.base, kRaceTable, race_table);
+  ITC_LOG_INFO("harness: Scenery::DrawSetLists: {} of 128 cases recorded slots",
+               drawn / 2);
+  results.Report();
+}
+
 // --- ModelList::Load and LoadPoints ---
 
 // A word inside one of a side's blocks (or up to 16 bytes past its end) made
@@ -1199,6 +1334,7 @@ void SceneryLists(Context& h) {
   ModelShapes(h, r, block);
   const uint32_t slots = memory::Alloc(0x40000 + 16, 0);
   PointLists(h, r, block, (slots + 15) & ~15u);
+  DrawSetListsCases(h, r, block, (slots + 15) & ~15u);
   ModelListLoads(h, r);
   memory::Free(slots);
   memory::Free(allocation);

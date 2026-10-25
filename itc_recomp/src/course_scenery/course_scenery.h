@@ -12,6 +12,10 @@
 
 #include <cstdint>
 
+namespace scenery_lists {
+struct DrawCalls;
+}  // namespace scenery_lists
+
 namespace course_scenery {
 
 // The manager's pointers ([0x826C5514] by Scenery::Init, [0x826C551C] by
@@ -212,6 +216,32 @@ uint32_t CollectAreas(uint8_t* base, uint32_t stack, uint32_t manager, uint32_t 
 // list B (+144) with the view's mask when that isn't 0.
 uint32_t CollectModels(uint8_t* base, uint32_t stack, uint32_t manager, uint32_t view,
                        uint32_t viewport, uint32_t r3);
+
+// Scenery::DrawSetLists (sub_820F52A8): r4's pass description (+20 its
+// camera pass, +24 and +28 the draw keys): the texture provider at the
+// manager's +228 gets the course set's XPR (+64) in slot 1 (its vtable's
+// slot 4: TextureProvider::Set natively, else a guest call); [0x8296B90C] =
+// +24, [0x8296B900] = +28; the camera pass's view (+16) copied to
+// 0x8265ECA0 (Matrix::Copy, noted for interpolation as its wrapper does);
+// then the set's lists drawn with the camera pass's view-projection (+144,
+// copied to `stack` - 384 + 192) and an identity world (+80), each model's
+// +48 = the provider and +436 = the set's +1060, shape 0 and the range
+// (the floats at 0x82002814 and 0x82006804, 0, 0) at +176, +160 or +144:
+// every model of +1596; those of +2124 and +2652 that ModelList::IsBEntryOn
+// and IsCEntryOn pick (their draw state reset first); and the entries of
+// +3180 that PointList::IsEntryOn picks by PointList::Draw (+612, +608 as
+// the models', +616 from the race's table at [0x826D82E8]). The draws'
+// plain C++ is called directly (SceneryModel::DrawShape with the caller's
+// r24 = the view-projection's address, as the original's); where one
+// declines, with nothing done, its adapter runs through `calls` (so `ctx`'s
+// r24 must be that address too). Its stack temporaries (the identity, the
+// copy and the ranges) are written in its frame, as its callees read them.
+// Returns the r3 the original leaves.
+uint32_t DrawSetLists(uint8_t* base, const scenery_lists::DrawCalls& calls, uint32_t stack,
+                      uint32_t manager, uint32_t pass);
+// The view-projection's address DrawSetLists draws with (the camera pass's
+// +144), its r24.
+uint32_t DrawSetListsViewProjection(uint8_t* base, uint32_t pass);
 
 // --- The files' parses (the loads' callbacks) ---
 //

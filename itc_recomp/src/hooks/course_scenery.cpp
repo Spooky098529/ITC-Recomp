@@ -14,7 +14,9 @@
 #include "guest.h"
 
 #include "base/flags.h"
+#include "hooks/course_scenery.h"
 #include "hooks/models.h"
+#include "hooks/scenery_lists.h"
 #include "course_scenery/course_scenery.h"
 
 ITC_FLAG_BOOL(native_course_scenery, true, "ITC",
@@ -31,6 +33,8 @@ ITC_FLAG_BOOL(native_course_scenery, true, "ITC",
               "sub_820F2B80, ModelList::Init sub_820F1A20, Scenery::ClearGlobal sub_820F1480, Scenery::Init sub_820F1360, "
               "SceneryList::ReleaseUnused sub_820F17C0, Scenery::StartLoad sub_820F1E00, "
               "Scenery::CollectAreas sub_820F3098, Scenery::CollectModels sub_820F32D0, "
+              "Scenery::DrawSetLists sub_820F52A8 (the scenery lists' draws' plain C++ called "
+              "directly, their adapters where it declines), "
               "TextureAnimations::Advance sub_820F11A8 (in the per-frame logic's wrap), "
               "AnimationSet::Advance sub_82146B20, Animation::Advance sub_82146AC0, "
               "AreaLights::Parse sub_820F11C0 (no adapter: only its OnLoaded calls it) and OnLoaded "
@@ -212,6 +216,28 @@ ITC_COURSE_SCENERY(820F3098, ctx.fpscr.disableFlushMode();
 ITC_COURSE_SCENERY(820F32D0, ctx.fpscr.disableFlushMode();
                    ctx.r3.u64 = CollectModels(base, ctx.r1.u32, ctx.r3.u32, ctx.r4.u32,
                                               ctx.r5.u32, ctx.r3.u32))
+
+// --- The course set's draws ---
+
+void hooks::CourseSceneryDrawSetLists(PPCContext& ctx, uint8_t* base) {
+  if (hooks::SceneryListsSlotDiagnostics()) {
+    __imp__sub_820F52A8(ctx, base);
+    return;
+  }
+  ctx.fpscr.disableFlushMode();
+  const uint64_t lr = ctx.lr;
+  const uint64_t r24 = ctx.r24.u64;
+  ctx.r24.u64 = DrawSetListsViewProjection(base, ctx.r4.u32);
+  hooks::SceneryDrawGuest guest{ctx, base};
+  const scenery_lists::DrawCalls calls = hooks::SceneryListsDrawCalls(&guest);
+  const uint32_t r3 = DrawSetLists(base, calls, ctx.r1.u32, ctx.r3.u32, ctx.r4.u32);
+  ctx.r24.u64 = r24;
+  ctx.lr = lr;
+  ctx.r3.u64 = r3;
+  ctx.fpscr.disableFlushMode();
+}
+
+ITC_COURSE_SCENERY(820F52A8, hooks::CourseSceneryDrawSetLists(ctx, base))
 
 // --- The files' parses ---
 //

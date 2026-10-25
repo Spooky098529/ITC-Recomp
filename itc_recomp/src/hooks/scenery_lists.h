@@ -8,7 +8,22 @@
 
 #include "guest.h"
 
+#include "scenery_lists/scenery_lists.h"
+
 namespace hooks {
+
+// The draws' guest calls (scenery_lists::DrawCalls) through `ctx`, each from
+// the frame and with the return address the plain C++ gives, for native
+// callers outside this file (Scenery::DrawSetLists, src/course_scenery/).
+struct SceneryDrawGuest {
+  PPCContext& ctx;
+  uint8_t* base;
+};
+scenery_lists::DrawCalls SceneryListsDrawCalls(SceneryDrawGuest* guest);
+// Whether the command list's diagnostics are on (--log_overlay_uploads,
+// --log_slot_callers, --log_recording_by_pass): the recorders' originals run
+// then, and so do their native callers'.
+bool SceneryListsSlotDiagnostics();
 
 // ModelList::Release (sub_82147FB8): r3 = the list; the guest calls from a
 // 128-byte frame like the original's.
