@@ -3,7 +3,9 @@
 #include "guest.h"
 
 #include "base/log.h"
+#include "c_runtime/exit.h"
 #include "c_runtime/math.h"
+#include "c_runtime/strings.h"
 #include "command_list/command_list.h"
 #include "graphics/resources.h"
 #include "graphics/video_output.h"
@@ -1332,6 +1334,106 @@ bool PassUpdate(uint8_t* base, uint32_t pass, uint32_t frame,
   matrix_math::Multiply(base, pass + 144, view_out, pass + 80);
   interpolation::BlendState_OnMultiply(base, pass + 144, view_out, pass + 80, 0x820A3D90);
   return true;
+}
+
+// --- Viewports::Init and Viewport::Init ---
+
+void ViewportInit(uint8_t* base, uint32_t viewport, double tangent, uint32_t frame,
+                  const ViewportCalls& calls) {
+  ITC_NATIVE_RUNNING("sub_820AAFF0 Viewport::Init");
+  constexpr uint32_t kZero = 0x82000A34, kPasses = 0x826BAC00, kGuard = 0x826C2D20;
+  const uint32_t video = calls.video_output(frame);
+  const int32_t width = int32_t(guest::LoadU32(base, video + 296));
+  const double scaled = Fmuls(double(float(double(int64_t(width)))), double(float(tangent)));
+  ViewportSetZoom(base, viewport, Fmuls(scaled, Lfs(base, kHalf)));
+  const double zero = Lfs(base, kZero);
+  const double one = Lfs(base, kOne);
+  ViewportSetRoll(base, viewport, zero);
+  Stfs(base, kPasses + 384, one);
+  guest::StoreU32(base, viewport + 1860, 0);
+  // The entries' far planes: entry 0 from pass 0, 1 to 16 from passes 3 to
+  // 18, 17 the float at 0x82002814, 18 and 19 from passes 19 and 20.
+  for (uint32_t entry = 0; entry < 20; entry++) {
+    const uint32_t from = entry == 17 ? 0x82002814
+                          : entry == 0 ? kPasses + 388
+                          : entry <= 16 ? kPasses + 592 * (entry + 2) + 388
+                                        : kPasses + 592 * (entry + 1) + 388;
+    Stfs(base, viewport + 80 * entry + 72, Lfs(base, from));
+  }
+  for (uint32_t entry = 0; entry < 20; entry++) {
+    guest::StoreU32(base, viewport + 80 * entry, 0);
+  }
+  // The three vectors, each made once.
+  constexpr uint32_t kOrigin = 0x826C2D10, kSide = 0x826C2D00, kUp = 0x826C2CF0;
+  if ((guest::LoadU32(base, kGuard) & 1) == 0) {
+    const uint32_t guard = guest::LoadU32(base, kGuard) | 1;
+    Stfs(base, kOrigin + 0, zero);
+    Stfs(base, kOrigin + 4, zero);
+    Stfs(base, kOrigin + 8, zero);
+    Stfs(base, kOrigin + 12, one);
+    guest::StoreU32(base, kGuard, guard);
+    c_runtime::AtexitFrom(base, 0x825DAE00, calls.atexit);
+  }
+  if ((guest::LoadU32(base, kGuard) & 2) == 0) {
+    guest::StoreU32(base, kGuard, guest::LoadU32(base, kGuard) | 2);
+    Stfs(base, kSide + 0, Lfs(base, 0x82001FD8));
+    Stfs(base, kSide + 4, zero);
+    Stfs(base, kSide + 8, zero);
+    Stfs(base, kSide + 12, one);
+    c_runtime::AtexitFrom(base, 0x825DADF8, calls.atexit);
+  }
+  if ((guest::LoadU32(base, kGuard) & 4) == 0) {
+    const uint32_t guard = guest::LoadU32(base, kGuard) | 4;
+    Stfs(base, kUp + 0, zero);
+    Stfs(base, kUp + 4, one);
+    Stfs(base, kUp + 8, zero);
+    Stfs(base, kUp + 12, one);
+    guest::StoreU32(base, kGuard, guard);
+    c_runtime::AtexitFrom(base, 0x825DADF0, calls.atexit);
+  }
+  const uint32_t vectors[3] = {kOrigin, kSide, kUp};
+  for (uint32_t v = 0; v < 3; v++) {
+    for (uint32_t k = 0; k < 4; k++) {
+      Stfs(base, viewport + 1680 + 16 * v + 4 * k, Lfs(base, vectors[v] + 4 * k));
+    }
+  }
+  for (uint32_t v = 0; v < 7; v++) {
+    Stfs(base, viewport + 1728 + 16 * v + 0, zero);
+    Stfs(base, viewport + 1728 + 16 * v + 4, zero);
+    Stfs(base, viewport + 1728 + 16 * v + 8, zero);
+    Stfs(base, viewport + 1728 + 16 * v + 12, one);
+  }
+  const double far = Lfs(base, 0x82002810);
+  Stfs(base, viewport + 1864, Lfs(base, viewport + 68));
+  Stfs(base, viewport + 1868, Lfs(base, kPasses + 384));
+  Stfs(base, viewport + 1856, far);
+  Stfs(base, viewport + 1508, Lfs(base, 0x8200280C));
+  Stfs(base, viewport + 1512, far);
+}
+
+std::optional<uint32_t> ViewportsInit(uint8_t* base, uint32_t frame, const ViewportCalls& calls) {
+  ITC_NATIVE_RUNNING("sub_820AB358 Viewports::Init");
+  // tan (sub_825A8A50) as its adapter gives it with nearest rounding set.
+  using Fpscr = rex::platform::FPSCRPlatform;
+  double tangent;
+  if ((Fpscr::getcsr() & Fpscr::RoundMaskVal) != 0 ||
+      !c_runtime::Tan(std::bit_cast<double>(uint64_t(guest::LoadU32(base, 0x82002818)) << 32 |
+                                            guest::LoadU32(base, 0x8200281C)),
+                      &tangent)) {
+    return std::nullopt;
+  }
+  const uint32_t block = memory::AllocPages(12, 4096);
+  guest::StoreU32(base, kViewports, block);
+  c_runtime::XMemSet(base, block, 0, 12);
+  uint32_t viewport = 0;
+  for (uint32_t i = 0; i < 2; i++) {
+    viewport = memory::AllocPages(1872, 4096);
+    guest::StoreU32(base, block + 4 * i, viewport);
+    c_runtime::XMemSet(base, viewport, 0, 1872);
+    ViewportInit(base, viewport, tangent, frame - kViewportInitFrame, calls);
+  }
+  guest::StoreU32(base, block + 8, 0);
+  return viewport;
 }
 
 }  // namespace cameras

@@ -15,6 +15,7 @@
 #include "base/flags.h"
 #include "cameras/cameras.h"
 #include "hooks/cameras.h"
+#include "hooks/c_runtime.h"
 #include "hooks/guest_call.h"
 #include "hooks/heap.h"
 
@@ -45,7 +46,9 @@ ITC_FLAG_BOOL(native_cameras, true, "ITC",
               "CameraPass::SetUpSurfaces sub_820A2F40 with its types 0-2 chunk sub_820A2F94, with "
               "--native_video_output, --native_graphics_resources and --native_heap; CameraPass::Init "
               "sub_820A3DB0 with its type 0 chunk sub_820A3E04; CameraPasses::Init sub_8209F9B8 and InitPasses "
-              "sub_8209F960 (no adapter: only Init's plain C++ calls it, and the flag switches that)) natively instead of "
+              "sub_8209F960 (no adapter: only Init's plain C++ calls it, and the flag switches that); "
+              "Viewports::Init sub_820AB358 with Viewport::Init sub_820AAFF0 (no adapter: only "
+              "Viewports::Init calls it), with --native_heap and native atexit) natively instead of "
               "through the translated code (the same words, bit for bit; checked by "
               "--run_harnesses=cameras)");
 
@@ -361,6 +364,27 @@ bool CameraPassInit(PPCContext& ctx, uint8_t* base) {
   return true;
 }
 
+std::optional<uint32_t> ViewportsInit(PPCContext& ctx, uint8_t* base) {
+  ctx.fpscr.disableFlushMode();
+  const uint64_t lr = ctx.lr;
+  const uint32_t frame = ctx.r1.u32 - cameras::kViewportsInitFrame;
+  guest::StoreU32(base, frame, ctx.r1.u32);  // the back chains, as stwu
+  guest::StoreU32(base, frame - cameras::kViewportInitFrame, frame);
+  GuestAtexit atexit{ctx, base};
+  cameras::ViewportCalls calls;
+  calls.atexit = atexit.Call();
+  calls.video_output = [&](uint32_t at) {
+    const uint64_t stack = ctx.r1.u64;
+    ctx.r1.u64 = at;
+    const uint32_t video = VideoOutputCall(ctx, base, 0x820AB030, 0x820AB040);
+    ctx.r1.u64 = stack;
+    return video;
+  };
+  const auto viewport = cameras::ViewportsInit(base, frame, calls);
+  ctx.lr = lr;
+  return viewport;
+}
+
 }  // namespace hooks
 
 // CameraPasses::MakeRenderTarget: r3 = the id (hooks::CameraPassesMakeRenderTarget).
@@ -413,6 +437,20 @@ extern "C" REX_FUNC(sub_820AA430) {
     return;
   }
   ctx.r3.u64 = 1;
+}
+
+// Viewports::Init: no arguments; r3 = the second viewport, as the
+// original's last Viewport::Init leaves it. Only while --native_heap routes
+// VirtualAlloc to the allocation layer, with native atexit.
+extern "C" REX_FUNC(sub_820AB358) {
+  ITC_CAMERAS_FALLBACK(820AB358)
+  if (hooks::NativeHeapActive() && hooks::NativeAtexit()) {
+    if (const auto viewport = hooks::ViewportsInit(ctx, base)) {
+      ctx.r3.u64 = *viewport;
+      return;
+    }
+  }
+  __imp__sub_820AB358(ctx, base);
 }
 
 // Viewport::SetZoom: r3 = the viewport, f1 = the zoom.

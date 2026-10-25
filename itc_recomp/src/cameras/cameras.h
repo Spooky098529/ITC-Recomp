@@ -19,6 +19,8 @@
 
 #pragma once
 
+#include "c_runtime/exit.h"
+
 #include <cstdint>
 #include <functional>
 #include <optional>
@@ -347,6 +349,40 @@ void PassSetZoom(uint8_t* base, uint32_t pass, double zoom);
 // with nothing done, where one isn't the allocation layer's pages (the
 // original frees it).
 bool ReleaseViewports(uint8_t* base);
+
+// The guest calls the viewports' set-up makes (its adapter's): the video
+// output (`[0x8266D088]`'s vtable slot 7, then that object's slot 3) with
+// r1 = `frame` (Viewport::Init's frame), and atexit where the native one
+// can't.
+struct ViewportCalls {
+  std::function<uint32_t(uint32_t frame)> video_output;
+  c_runtime::AtexitCall atexit;
+};
+// The originals' frames: Viewports::Init's 112 bytes, Viewport::Init's 160
+// below it.
+constexpr uint32_t kViewportsInitFrame = 112;
+constexpr uint32_t kViewportInitFrame = 160;
+
+// Viewport::Init (sub_820AAFF0): Viewport::SetZoom(the video output's width
+// (+296, an integer) x tan(the double at 0x82002818) x 0.5, in single
+// precision; `tangent` is that tan), Viewport::SetRoll(0.0); camera pass 0's
+// near plane (+384) = 1.0; +1860 = 0; the entries' far planes (+72) from
+// passes 0, 3 to 18, 10,000.0, 19 and 20; their +0 = 0; the three vectors
+// at 0x826C2D10 (0, 0, 0, 1), 0x826C2D00 (10, 0, 0, 1) and 0x826C2CF0 (0,
+// 1, 0, 1) made once each (guard bits 1, 2, 4 of 0x826C2D20, each with an
+// atexit: 0x825DAE00, 0x825DADF8, 0x825DADF0), copied to +1680, +1696,
+// +1712; seven (0, 0, 0, 1) from +1728; +1864 = entry 0's zoom, +1868 = pass
+// 0's near plane, +1856 and +1512 = 8,000.0, +1508 = 4.096.
+void ViewportInit(uint8_t* base, uint32_t viewport, double tangent, uint32_t frame,
+                  const ViewportCalls& calls);
+// Viewports::Init (sub_820AB358): [kViewports] = a 12-byte block
+// (VirtualAlloc: memory::AllocPages) cleared (XMemSet), +0 and +4 two
+// 1,872-byte viewports made and cleared the same way, each Viewport::Init'd
+// (with Viewport::Init's frame below `frame`, Viewports::Init's own); +8 = 0.
+// Returns the second viewport (the original's r3). nullopt, with nothing
+// done, where tan would go to the original (a rounding mode other than
+// nearest).
+std::optional<uint32_t> ViewportsInit(uint8_t* base, uint32_t frame, const ViewportCalls& calls);
 
 // Viewport::SetZoom (sub_820AAE90): the entries' zoom (+68): entries 0, 1,
 // 8 to 17 and 19 = `zoom` (f1) as a float; 2 to 7 = atan(the integer at
