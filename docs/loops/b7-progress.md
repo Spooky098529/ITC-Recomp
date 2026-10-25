@@ -118,7 +118,9 @@ file's history. What's left to see in a drive, from every run:
   `draws.txt` the same as the fallback within one of the attract race's
   two variants, 2,412 or 2,414 draws). Left ready:
   `Scenery::CollectAreas`, `CollectModels`, `DrawSetLists`,
-  `Strings::FormatV`. Step: validation 2, agent running.
+  `Strings::FormatV`. Validated (`itc_1831`: 17 of 17 harness lines,
+  15 in the attract race, 2 in the replay `itc_1832`, ok; nothing to
+  drive). Step: migration 3 (the four left), agent running.
 
 ## Done
 
@@ -166,6 +168,8 @@ This run's groups: `expected-differences.md` (the "16:38 run" lines).
 - After the scenery lists' validation: race 24 s (`itc_1769`), 0
   errors, every harness 0 differing; replay 127 s (`itc_1770`), 0
   errors.
+- After the shader objects' validation 2: race 24 s (`itc_1831`), 0
+  errors, every harness 0 differing; replay (`itc_1832`), 0 errors.
 - After the shader objects' migration 2: ours 2147, work left 4304
   (wrapped 104, known 545, unknown 3655).
 - After the shader objects' validation: race 24 s (`itc_1795`), 0
