@@ -90,6 +90,19 @@ When the user has reviewed a run's section, its heading gets
     harnesses.
   - The first batch's two groups in one commit (ce8d477); one counter
     race for the six removals, each then built and committed alone.
+- `mode-tick.md` (new, 2a11eec): 23 rows, what `Modes::Tick` calls
+  besides the mode's slots: the per-mode settings (`Modes::SetChecks`,
+  `SetSceneTargetMode`, `Presence::SetForMode`, presence probably
+  Dropped at `Modes::Tick` by B5's call), the sign-in watch
+  (`SignInWatch::Update`, `CheckIdle`, `OnModeChange`; its nine prompt
+  handlers never ran, no rows), `Billboards::FlipRing`, the screen fades
+  (two layers at `0x826A50AC`), `Music::Play` (`BGM_SYSTEM`,
+  `bgm_tmp_01`-`17`). `game-modes.md`: `Modes::Modes` (`sub_821067F8`)
+  added. `known-data.md`: their fields and globals. `leads.md`: the save
+  data's creation and deletion. The lead's "loading screen" guess was
+  wrong. Also: `models.md`'s `TextureProvider::Clear` row reworded ("it
+  never reaches `memmove_s`") so `b7_status.py` doesn't read it as never
+  called.
 
 ## Run 2026-10-25 01:17 (`by-loop-25-10-26`)
 

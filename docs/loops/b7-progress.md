@@ -63,8 +63,12 @@ file's history. What's left to see in a drive, from every run:
   `sub_82106740`, `sub_822934B8`, `sub_8209EEC8`, `sub_8209BD18`,
   `sub_8209D130`, `sub_8209E7E8`, `sub_8209F318`, `sub_821063B0`:
   probably the loading screen or the mode change's loads), picked as the
-  closest to ready (7 of its 9 roots ready, 37 functions left). Step:
-  mapping agent running.
+  closest to ready (7 of its 9 roots ready, 37 functions left). Mapped
+  as the mode tick (`mode-tick.md`, 23 rows, and `Modes::Modes` in
+  `game-modes.md`; 2a11eec): the per-mode settings, the sign-in watch,
+  the billboard ring flip, the screen fades, the menu music. Map checked
+  (0 errors, 23 of 23 in play, 13 ready groups; presence Dropped by B5's
+  call). Step: migration agent 1 running.
 
 ## Done
 
@@ -99,6 +103,8 @@ This run's groups: `expected-differences.md` (the "03:59 run" lines).
 - Start: ours 1903, work left 4548 (wrapped 111, known 597, unknown 3840).
 - After the game modes' map: ours 1903, work left 4548 (wrapped 111,
   known 625, unknown 3812).
+- After the mode tick's map: ours 1961, work left 4490 (wrapped 111,
+  known 619, unknown 3760).
 - After the game modes' cleanup's validation: race 27 s (`itc_1624`),
   0 errors, every harness 0 differing; replay 127 s (`itc_1625`), 0
   errors.
