@@ -26,6 +26,12 @@ file's history. What's left to see in a drive, from every run:
   constructors and `Modes::Tick`'s callees. Validated (`itc_1603`: 18 of
   18 harness lines, 12 ran in play; the replay broke at boot,
   `itc_1605`, so 6 go to `to-drive.md`). Finished.
+- Subsystem 2 of 5: the model class lead (`Model::Model`,
+  `Model::~Model`, the texture provider, the XPR's destructor:
+  `sub_825948C0`, `sub_82594F58`, `sub_82594850`, `sub_825943E0`,
+  `sub_82597148`), picked as closest to ready (ready groups under each
+  root; `XPR::XPR` under it blocks the race mode's constructor). Step:
+  mapping agent running.
 
 ## Done
 
