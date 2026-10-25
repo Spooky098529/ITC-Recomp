@@ -2,6 +2,9 @@
 // (docs/functions/framework.md). The getters and the thunks are reached
 // through the framework's vtables (and the folded getters also from other
 // classes' code), so their adapters stay while recompiled code calls them.
+// Word64 (sub_82090778), Word44 (sub_824892F8) and DebugFont::SetPosition
+// (sub_8258BE08) have none: in play only the thunks' and
+// DebugText::SetPosition's plain C++ call them.
 
 #include "guest.h"
 
@@ -10,12 +13,14 @@
 
 ITC_FLAG_BOOL(native_framework, true, "ITC",
               "Run the app framework (docs/functions/framework.md): the framework's flags "
-              "sub_82090760 and sub_82090768, the folded getters sub_82090770, sub_82090778, "
-              "sub_82090788, sub_8248F030 and sub_824892F8, the interfaces' thunks sub_82090828, "
+              "sub_82090760 and sub_82090768, the folded getters sub_82090770, sub_82090788 and "
+              "sub_8248F030 (and without adapters, as only the thunks call them, sub_82090778 and "
+              "sub_824892F8), the interfaces' thunks sub_82090828, "
               "sub_82090830, sub_82090838, sub_82090860, sub_82090868, sub_820908E0, sub_820908E8 "
-              "and sub_82090908, DebugText::SetPosition sub_82091050 and DebugFont::SetPosition "
-              "sub_8258BE08) natively instead of through the translated code (the same results; "
-              "checked by --run_harnesses=framework)");
+              "and sub_82090908, DebugText::SetPosition sub_82091050 with DebugFont::SetPosition "
+              "sub_8258BE08 (no adapter: only its plain C++ calls it)) natively instead of "
+              "through the translated code (the same results; checked by "
+              "--run_harnesses=framework)");
 
 namespace fw = framework;
 
@@ -36,10 +41,8 @@ namespace fw = framework;
 ITC_FRAMEWORK_WORD(82090760, Flag133)
 ITC_FRAMEWORK_WORD(82090768, Flag134)
 ITC_FRAMEWORK_WORD(82090770, Word60)
-ITC_FRAMEWORK_WORD(82090778, Word64)
 ITC_FRAMEWORK_WORD(82090788, Word88)
 ITC_FRAMEWORK_WORD(8248F030, Word68)
-ITC_FRAMEWORK_WORD(824892F8, Word44)
 ITC_FRAMEWORK_WORD(82090830, InputManagerFrom36)
 ITC_FRAMEWORK_WORD(82090828, RendererFrom52)
 ITC_FRAMEWORK_WORD(82090838, WorkerPoolFrom52)
@@ -48,14 +51,6 @@ ITC_FRAMEWORK_WORD(82090868, SceneFrom52)
 ITC_FRAMEWORK_WORD(820908E0, RendererFrom36)
 ITC_FRAMEWORK_WORD(820908E8, WorkerPoolFrom36)
 ITC_FRAMEWORK_WORD(82090908, SceneFrom36)
-
-// DebugFont::SetPosition: r3 = x, r4 = y; r11 left at the position, as the
-// original's.
-extern "C" REX_FUNC(sub_8258BE08) {
-  ITC_FRAMEWORK_FALLBACK(8258BE08)
-  fw::DebugFontSetPosition(base, ctx.r3.u32, ctx.r4.u32);
-  ctx.r11.u64 = fw::kDebugFontPosition;
-}
 
 // DebugText::SetPosition: r4, r5 = pointers to x and y; r3, r4 the words
 // and r11 as the original leaves them.
