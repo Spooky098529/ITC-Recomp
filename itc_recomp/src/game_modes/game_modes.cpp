@@ -30,12 +30,6 @@ constexpr uint32_t kStorageWords = 6;
 // storage, next state at +28) and its guard (bit 0x1).
 constexpr uint32_t kDefaultGuard = 0x826C5B88;
 
-void CopyKey(uint8_t* base, uint32_t destination, uint32_t source) {
-  for (uint32_t i = 0; i < 4; i++) {
-    guest::StoreU32(base, destination + 4 * i, guest::LoadU32(base, source + 4 * i));
-  }
-}
-
 }  // namespace
 
 StateKey LoadStateKey(uint8_t* base, uint32_t address) {
@@ -137,17 +131,6 @@ uint32_t StateMachineHandle(uint8_t* base, uint32_t machine, uint32_t message, b
     guest::StoreU32(base, machine + kState, next);
   }
   return part;
-}
-
-void TransitionAssign(uint8_t* base, uint32_t destination, uint32_t source) {
-  ITC_NATIVE_RUNNING("sub_82105FE0 Transition::Assign");
-  CopyKey(base, destination, source);
-  for (uint32_t i = 0; i < kStorageWords; i++) {
-    guest::StoreU32(base, destination + kFunctorStorage + 4 * i,
-                    guest::LoadU32(base, source + kFunctorStorage + 4 * i));
-  }
-  guest::StoreU32(base, destination + kFunctorPointer, destination + kFunctorStorage);
-  guest::StoreU32(base, destination + kNextState, guest::LoadU32(base, source + kNextState));
 }
 
 void StateMachineConstruct(uint8_t* base, uint32_t machine) {

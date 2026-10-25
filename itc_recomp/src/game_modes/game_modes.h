@@ -52,8 +52,6 @@ constexpr uint32_t kDefaultTransition = 0x826C5B68;
 // and the 12-byte message at `message`; the state moved to the transition's
 // next one when that isn't 0.
 uint32_t StateMachineHandle(uint8_t* base, uint32_t machine, uint32_t message, bool* found);
-// sub_82105FE0 Transition::Assign: a transition copied over another.
-void TransitionAssign(uint8_t* base, uint32_t destination, uint32_t source);
 // sub_82107108 StateMachine::StateMachine: the 200 transitions emptied.
 void StateMachineConstruct(uint8_t* base, uint32_t machine);
 

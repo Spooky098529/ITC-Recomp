@@ -36,10 +36,6 @@ void NativeStateMachineIndexOf(PPCContext& ctx, uint8_t* base) {
   ctx.r3.s64 = gm::StateMachineIndexOf(base, ctx.r3.u32, gm::LoadStateKey(base, ctx.r4.u32));
 }
 
-void NativeTransitionAssign(PPCContext& ctx, uint8_t* base) {
-  gm::TransitionAssign(base, ctx.r3.u32, ctx.r4.u32);
-}
-
 void NativeStateMachineConstruct(PPCContext& ctx, uint8_t* base) {
   gm::StateMachineConstruct(base, ctx.r3.u32);
 }
@@ -49,6 +45,8 @@ void NativeModeConstruct(PPCContext& ctx, uint8_t* base) {
 }
 
 // Add, Find and Handle: their r3 steps are hooks' (the whole registers).
+// Transition::Make and Assign (sub_82106100, sub_82105FE0) are merged into
+// StateMachine::Add, whose cases cover them.
 constexpr GuestFunction NativeStateMachineAdd = hooks::GameModesAdd;
 constexpr GuestFunction NativeStateMachineFind = hooks::GameModesFind;
 constexpr GuestFunction NativeStateMachineHandle = hooks::GameModesHandle;
@@ -182,32 +180,6 @@ void IndexOf(Context& h, const Block& block) {
         __imp__sub_821060A0, NativeStateMachineIndexOf, fmt::format("case {}", c));
   }
   results.Report();
-}
-
-// Assign: a destination and a source in the scratch area, apart or
-// overlapping (the copies are word by word in the original's order).
-// Transition::Make (sub_82106100) is merged into StateMachine::Add, whose
-// cases cover it.
-void Copies(Context& h, const Block& block) {
-  Results assign("Transition::Assign (sub_82105FE0)");
-  for (int c = 0; c < 64; c++) {
-    const bool overlap = c % 4 == 3;
-    const uint32_t destination = h.data + 256 + 4 * (c % 8);
-    const uint32_t source =
-        overlap ? destination + 4 * (int32_t(c % 16) - 8) : h.data + 1024 + 4 * (c % 5);
-    auto setup = [&](Random& random) {
-      WriteRandom(h.base, h.data, kScratchBytes / 4 - 256, random);
-    };
-    Case(
-        h, assign, block, setup,
-        [&](PPCContext& t) {
-          t.r3.u64 = destination;
-          t.r4.u64 = source;
-        },
-        __imp__sub_82105FE0, NativeTransitionAssign,
-        fmt::format("case {}{}", c, overlap ? " (overlapping)" : ""));
-  }
-  assign.Report();
 }
 
 void Constructors(Context& h, const Block& block) {
@@ -387,7 +359,6 @@ void GameModes(Context& h) {
     const Block block(kOverlayArea + kOverlayBytes * gm::kOverlaySlots);
     Keys(h, block);
     IndexOf(h, block);
-    Copies(h, block);
     Constructors(h, block);
     Lookups(h, block);
     Handlers(h, block);
