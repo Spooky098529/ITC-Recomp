@@ -280,6 +280,9 @@ Rows not yet moved stay in the table below. So far:
   an `XLMM` header they are made in (the virtual and physical makers and
   the pending frees' walk at the pass's start); `XMemCpy`'s rows are in
   `c-runtime.md` (B7).
+- [`race-hud.md`](race-hud.md): the race HUD's movie picker (a UI
+  movie run by the HUD's state) and the rival intro's logo draw (B7;
+  the HUD's set-up, update and teardown aren't in it).
 
 These files hold functions only. What used to follow the table here moved
 out on 2026-10-20: how frame interpolation works, its options and what

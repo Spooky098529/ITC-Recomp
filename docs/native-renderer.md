@@ -830,7 +830,11 @@ memory).
   nothing wrong on screen. So the tracking hasn't been seen catching a
   real change, but nothing in the game was found that changes vertex or
   index data after loading it. With that, the data could live in VRAM
-  (see "What the mirror copies").
+  (see "What the mirror copies"). Since the B7 loop (2026-10-25) native code that copies
+  into the physical views (the models' microcode, vertex and XPR data)
+  goes through the same recording, `native::Buffers_Memcpy` (split out
+  of the wrapper; it declines what the wrapper hands to the original:
+  `--native_memcpy` off, ranges that may share memory).
 - **Since v0.3.8** (2026-10-15, on by default): with
   `--native_renderer_mirror_by_tick` and `--native_renderer_mirror_to_both`
   the mirrors are given memcpy's writes at each frame's start instead, and
