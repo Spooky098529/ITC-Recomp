@@ -141,6 +141,7 @@ void Notify(Context& h);
 void Profile(Context& h);
 void Saves(Context& h);
 void FileClass(Context& h);
+void DataFile(Context& h);
 void MovieFiles(Context& h);
 void Xma(Context& h);
 void Sprites(Context& h);
@@ -186,5 +187,10 @@ void ModeTick(Context& h);
 void Minimap(Context& h);
 void CRuntimeExit(Context& h);
 void Models(Context& h);
+void SceneModels(Context& h);
+void RaceHud(Context& h);
+void UiMovieObjects(Context& h);
+void SceneryLists(Context& h);
+void ShaderObjects(Context& h);
 
 }  // namespace harness

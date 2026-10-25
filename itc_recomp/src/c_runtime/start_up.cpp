@@ -22,23 +22,38 @@ void InitFloatConversions(uint8_t* base) {
 }
 
 void SetHandler82971170(uint8_t* base, uint32_t value) {
+  ITC_NATIVE_RUNNING("sub_825AD140 (sets 0x82971170)");
   guest::StoreU32(base, 0x82971170, value);
 }
 
 void SetHandler82971178(uint8_t* base, uint32_t value) {
+  ITC_NATIVE_RUNNING("sub_825AEE18 (sets 0x82971178)");
   guest::StoreU32(base, 0x82971178, value);
 }
 
 void SetInvalidParameterHandler(uint8_t* base, uint32_t value) {
+  ITC_NATIVE_RUNNING("sub_825AFCB8 (sets 0x82978320)");
   guest::StoreU32(base, 0x82978320, value);
 }
 
 void SetCriticalSectionInitializer(uint8_t* base, uint32_t value) {
+  ITC_NATIVE_RUNNING("sub_825B3560 (sets 0x8297132C)");
   guest::StoreU32(base, 0x8297132C, value);
 }
 
 void SetDefaultCriticalSectionInitializer(uint8_t* base) {
+  ITC_NATIVE_RUNNING("sub_825B3548 (sets 0x82971328)");
   guest::StoreU32(base, 0x82971328, 0x825B3498);
+}
+
+void InitPointers(uint8_t* base) {
+  ITC_NATIVE_RUNNING("sub_825AA398 _init_pointers");
+  SetHandler82971170(base, 0);
+  SetCriticalSectionInitializer(base, 0);
+  SetInvalidParameterHandler(base, 0);
+  SetHandler82971178(base, 0);
+  SetDefaultCriticalSectionInitializer(base);
+  guest::StoreU32(base, 0x8266B7B0, 0x825AA378);
 }
 
 int32_t InitMbcTable(uint8_t* base) {

@@ -6,9 +6,11 @@
 #include "base/log.h"
 #include "guest.h"
 #include "memory/c_runtime_heap.h"
+#include "memory/heap.h"
 #include "std_list/ptr_list.h"
 
 #include <cstdlib>
+#include <vector>
 
 namespace models {
 
@@ -133,6 +135,123 @@ bool FreePhysicalLater(uint8_t* base, uint32_t block, uint32_t attributes) {
   }
   Store(base, header + kBlockAttributes, attributes);
   Queue(base, header);
+  return true;
+}
+
+namespace {
+
+constexpr uint32_t kBlockKind = 4;
+constexpr uint32_t kBlockPasses = 8;
+
+uint32_t PagesFor(uint32_t bytes) { return (bytes + 8191) & 0xFFFFF000u; }
+
+// The header written after a successful allocation, in the originals' store
+// orders (each maker's own).
+uint32_t Made(uint8_t* base, uint32_t header, uint32_t kind) {
+  if (header == 0) {
+    return 0;
+  }
+  switch (kind) {
+    case 0:
+      Store(base, header + kBlockPasses, 1);
+      Store(base, header + 0, kBlockTag);
+      Store(base, header + kBlockKind, 0);
+      Store(base, header + kBlockAttributes, 0);
+      break;
+    case 1:
+      Store(base, header + kBlockAttributes, 0);
+      Store(base, header + 0, kBlockTag);
+      Store(base, header + kBlockKind, 1);
+      Store(base, header + kBlockPasses, 1);
+      break;
+    default:
+      Store(base, header + kBlockKind, 2);
+      Store(base, header + 0, kBlockTag);
+      Store(base, header + kBlockPasses, 1);
+      Store(base, header + kBlockAttributes, 0);
+      break;
+  }
+  return header + kBlockHeaderBytes;
+}
+
+constexpr uint32_t kXMemPhysical = 0x80000000u;  // XMemAlloc's physical bit
+
+}  // namespace
+
+uint32_t AllocVirtual(uint8_t* base, uint32_t bytes) {
+  ITC_NATIVE_RUNNING("sub_8258DFF0 Memory::AllocVirtual");
+  std::lock_guard<std::recursive_mutex> lock(MemoryBlocksMutex());
+  return Made(base, memory::AllocPages(PagesFor(bytes), 4096), 0);
+}
+
+uint32_t AllocPhysicalEx(uint8_t* base, uint32_t bytes, uint32_t low, uint32_t high,
+                         uint32_t alignment, uint32_t protection) {
+  ITC_NATIVE_RUNNING("sub_8258E098 Memory::AllocPhysicalEx");
+  std::lock_guard<std::recursive_mutex> lock(MemoryBlocksMutex());
+  return Made(base,
+              memory::crt::XPhysicalAllocEx(base, PagesFor(bytes), low, high, alignment,
+                                            protection),
+              1);
+}
+
+uint32_t AllocPhysical(uint8_t* base, uint32_t bytes, uint32_t attributes) {
+  ITC_NATIVE_RUNNING("sub_8258E138 Memory::AllocPhysical");
+  std::lock_guard<std::recursive_mutex> lock(MemoryBlocksMutex());
+  return Made(base, memory::crt::XMemAlloc(base, PagesFor(bytes), attributes), 2);
+}
+
+bool FreeDue(uint8_t* base) {
+  ITC_NATIVE_RUNNING("sub_8258E1D8 PendingFrees::FreeDue");
+  std::lock_guard<std::recursive_mutex> lock(MemoryBlocksMutex());
+  const uint32_t head = Load(base, kPendingFrees + kListHead);
+  // The checks first, over the due headers.
+  std::vector<uint32_t> due;
+  for (uint32_t node = Load(base, head + kNodeNext); node != head;
+       node = Load(base, node + kNodeNext)) {
+    const uint32_t header = Load(base, node + kNodeValue);
+    if (Load(base, header + kBlockPasses) != 0) {
+      continue;
+    }
+    for (const uint32_t other : due) {
+      if (other == header) {
+        return false;
+      }
+    }
+    due.push_back(header);
+    const uint32_t kind = Load(base, header + kBlockKind);
+    if (!memory::IsHeapBlock(node) || (kind == 0 && !memory::IsPages(header)) ||
+        (kind == 2 && !(Load(base, header + kBlockAttributes) & kXMemPhysical) &&
+         !memory::IsHeapBlock(header))) {
+      return false;
+    }
+  }
+  uint32_t node = Load(base, head + kNodeNext);
+  while (Load(base, kPendingFrees + kListHead) != node) {
+    const uint32_t header = Load(base, node + kNodeValue);
+    const uint32_t passes = Load(base, header + kBlockPasses);
+    if (passes != 0) {
+      Store(base, header + kBlockPasses, passes - 1);
+      node = Load(base, node + kNodeNext);
+      continue;
+    }
+    const uint32_t kind = Load(base, header + kBlockKind);
+    Store(base, header + 0, 0);
+    if (kind == 0) {
+      memory::FreePages(header);
+    } else if (kind == 1) {
+      memory::FreePhysical(header);
+    } else if (kind == 2) {
+      memory::crt::XMemFree(header, Load(base, header + kBlockAttributes));
+    }
+    const uint32_t next = Load(base, node + kNodeNext);
+    if (node != Load(base, kPendingFrees + kListHead)) {
+      Store(base, Load(base, node + kNodePrevious) + kNodeNext, next);
+      Store(base, Load(base, node + kNodeNext) + kNodePrevious, Load(base, node + kNodePrevious));
+      memory::crt::OperatorDelete(node);
+      Store(base, kPendingFrees + kListSize, Load(base, kPendingFrees + kListSize) - 1);
+    }
+    node = next;
+  }
   return true;
 }
 

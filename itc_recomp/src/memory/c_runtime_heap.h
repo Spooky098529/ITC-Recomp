@@ -47,6 +47,11 @@ uint32_t LocalFree(uint32_t block);
 // sub_822976F8 XMemAlloc: physical memory with bit 0x80000000 of
 // `attributes`, else LocalAlloc; bit 0x40000000 clears the block.
 uint32_t XMemAlloc(uint8_t* base, uint32_t size, uint32_t attributes);
+// sub_82296550 XPhysicalAllocEx as its adapter (src/hooks/heap.cpp) does it:
+// X_MEM_LARGE_PAGES cleared from the protection when the word at 0x829537B0
+// isn't 0, then the layer's AllocPhysical.
+uint32_t XPhysicalAllocEx(uint8_t* base, uint32_t size, uint32_t low, uint32_t high,
+                          uint32_t alignment, uint32_t protection);
 // sub_82297790 XMemFree: what the game's leaves in r3 (0 or the block).
 uint32_t XMemFree(uint32_t block, uint32_t attributes);
 

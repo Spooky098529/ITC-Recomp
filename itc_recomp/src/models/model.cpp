@@ -140,4 +140,61 @@ std::optional<uint32_t> ModelDestruct(uint8_t* base, uint32_t model) {
   return *r3;
 }
 
+uint32_t MaterialCount(uint8_t* base, uint32_t model, uint32_t shape, int32_t group) {
+  ITC_NATIVE_RUNNING("sub_82594AD8 Model::MaterialCount");
+  const uint32_t block = Load(base, shape * 544 + Load(base, model + 40) + 396);
+  return Load(base, block + (group == 0 ? 8 : 12));
+}
+
+uint32_t Material(uint8_t* base, uint32_t model, uint32_t shape, uint32_t index, int32_t group) {
+  ITC_NATIVE_RUNNING("sub_82594B20 Model::Material");
+  const uint32_t block = Load(base, shape * 544 + Load(base, model + 40) + 396);
+  if (group == 0) {
+    return (index << 9) + block + 16;
+  }
+  return ((Load(base, block + 8) + index) << 9) + block + 16;
+}
+
+uint32_t SharedVertexShader(uint8_t* base, uint32_t pair) {
+  ITC_NATIVE_RUNNING("sub_825896D8 SharedVertexShader");
+  const uint32_t table = Load(base, 0x8296B7B4);
+  return table == 0 ? 0 : Load(base, (pair << 2) + table);
+}
+
+uint32_t SharedPixelShader(uint8_t* base, uint32_t pair) {
+  ITC_NATIVE_RUNNING("sub_82589700 SharedPixelShader");
+  const uint32_t table = Load(base, 0x8296B7B8);
+  return table == 0 ? 0 : Load(base, (pair << 2) + table);
+}
+
+std::optional<uint32_t> VertexDeclaration(uint8_t* base, uint32_t a, int32_t b, uint32_t c) {
+  ITC_NATIVE_RUNNING("sub_82589728 VertexDeclaration");
+  constexpr uint32_t kKinds = 0x8265EC00;
+  constexpr uint32_t kTable = 0x8296B7F4;
+  const uint32_t index = Load(base, (a << 2) + kKinds) << 2;
+  const int32_t kind = int32_t(Load(base, (c << 2) + kKinds + 72));
+  int32_t offset;
+  if (b == 9) {
+    offset = -28;
+  } else if (b == 10) {
+    offset = -56;
+  } else if (b == 5) {
+    static constexpr int32_t kSmall[3] = {224, 196, 168};
+    static constexpr int32_t kLarge[3] = {140, 112, 84};
+    if (kind < 0 || kind > 2) {
+      return std::nullopt;
+    }
+    offset = int32_t(a) <= 4 ? kSmall[kind] : kLarge[kind];
+  } else if (b == 11) {
+    static constexpr int32_t kOffsets[3] = {56, 28, 0};
+    if (kind < 0 || kind > 2) {
+      return std::nullopt;
+    }
+    offset = kOffsets[kind];
+  } else {
+    return std::nullopt;
+  }
+  return Load(base, index + kTable + uint32_t(offset));
+}
+
 }  // namespace models

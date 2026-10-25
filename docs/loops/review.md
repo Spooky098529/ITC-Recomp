@@ -11,6 +11,205 @@ functions to check in a drive in the progress file.
 When the user has reviewed a run's section, its heading gets
 "(reviewed <date>)"; the section stays for the record.
 
+## Run 2026-10-25 16:38 (`b7-loop-25-10-26-3`)
+
+- For later (the user's call, 2026-10-25: debug when the code is
+  translated): one pad replay after the shader objects' migration 3
+  (`itc_1847`, killed partway) ran the menus unpaced from boot
+  (150-188 ticks/s, later 1,300-2,267): with `--skip_intro` (a testing
+  flag, off for players), menus skip the 30 Hz tick wait until frame
+  pacing sees the first race (`TitleScreen_SkipTickWait`,
+  `renderer_hooks.cpp`), and that run apparently never saw the race the
+  title screen runs at boot. Not reproduced (`itc_1851` with
+  `--log_race_changes=true`, `itc_1849`, `itc_1850`, `itc_1848`: all at
+  30). The user's suggestion: default to paced menus and flip on the
+  first race.
+- For later (the user's call, 2026-10-25: dropped for now): native code
+  reaches `generated/` three ways: the adapters' `--native_X=false`
+  fallbacks, ports that hand uncovered cases to `__imp__` from the start
+  (some for cases that can occur in play: a full command list, another
+  list's chunk, more than 4 textures; nothing logs when one fires), and
+  guest calls from native code into still-recompiled callees (vtables,
+  callbacks). To investigate later.
+- The user's call: `_mtinit` `sub_825AA708` (the C runtime's
+  per-thread data over KeTlsAlloc/KeTlsSetValue) left for the core;
+  raised again only when it blocks a subsystem's ready work.
+- `scene-models.md` (new, 9a490b3): 48 rows, all new: the cars as the
+  scene holds them (pool 7 of the second pool set at `[0x826C2E44]`):
+  `SceneModel::SetUp` (`sub_820DB458`, from a 4,244-byte record),
+  `SceneModel::Build` (`sub_820D9870`, claiming parts in the other
+  pools), `SceneModel::Update` (`sub_820DA180`), `ScenePools::SetUpB`
+  (`sub_820C5B28`), the parts' links, the records' defaults and
+  copies, the first set's loaders `car-models.md` lacked, the changed
+  record's re-apply (`sub_820DA758`) and the decals' reload. Shared
+  rows stay in `vehicle-accessors.md`, `car-models.md` and
+  `race-overlays.md`. `known-data.md`: the car parts object, the scene
+  model's fields, the 4,244-byte record, `0x826C5510` (probably the
+  accessories' set), the sound slots at `0x826D8334`-`0x826D83AC` and
+  their asset table `0x82616318` (probably the engine sound banks).
+  `leads.md`: 6 leads (the load poll, `ScenePools::ReleaseB`'s ~80
+  release cases, the scene models' owners, the sound slots' readers,
+  the scene's update and teardown, the archive queue's append).
+- `scene-models.md` migration 1 (8c076d0..88bdea2; `src/scene_models/`,
+  `src/hooks/scene_models.cpp`, harness `src/harnesses/scene_models.cpp`):
+  23 of 48 ours, `--native_scene_models`. For review:
+  `sub_820C3CA0`'s VirtualAlloc through `memory::AllocPages` (the
+  2026-10-22 call; native only under `--native_heap`); the originals'
+  stack temporaries not written (the post effects' and track route's
+  precedent); copies into the physical views, overlapping records or
+  anything `c_runtime::Memcpy` refuses fall back to the original (the
+  minimap's `List80::Copy` precedent); `sub_820D0A20` Native with no
+  adapter (only `CarRecord::Reset` calls it).
+- The "no mapping" lead, `UiMovie::DrawTexts` and what it unblocks
+  (c4141e4..b8b7f8a; `src/ui_movies/texts.cpp`, `update.cpp`,
+  `src/hooks/strings_and_font.h`): `DrawTexts`, `ScrollOffset`
+  (Native, no adapter), `UiMovie::Update`, `Draw`, `Run` under the
+  existing `--native_ui_movies_game` and `--native_ui_movies`;
+  `_init_pointers` and the empty destructor `sub_82106540` under
+  `--native_c_runtime`; 9 adapters removed (the text accessors,
+  `Font::TextWidth`, `_init_pointers`' five setters). For review: two
+  harness stand-in hooks (`hooks::g_text_draw_stand_in`,
+  `ui_movies_hooks::g_update_callee_stand_in`) checked by the
+  overrides; four removable adapters kept (`DrawTexts`, `sub_8259FA00`,
+  `sub_8259DAC0`, `Update`: the `--log_pause_movie` watch and the frame
+  pacing's replay and track handling live there); `_mtinit`
+  (`sub_825AA708`) left, as it calls KeTlsAlloc/KeTlsSetValue (no
+  precedent for TLS). A replay (`itc_1719`) logged the SDK's
+  "BaseHeap::Release failed" twice at transitions, also in `itc_1528`
+  (before this run), not in a re-run (`itc_1721`).
+- The DrawTexts lead's migration 2 (81a1ede, dc97a73):
+  `UiMovie::Finish`, `FinishNamed` (inside their `--log_pause_movie`
+  overrides in `src/debug/pause_movie_log.cpp`; with the flag on the
+  originals run, as `Loop` and `Play`) and `FinishAll`
+  (`--native_ui_movies_game`); `race-hud.md` (new, 3 rows):
+  `RaceHud::RunMovie` `sub_822141E8` (probably; Overridden),
+  `sub_82212908` Merged into it (its `RaceTime::FromTicks` call left
+  out: a pure leaf whose result nothing reads), the rival logo's draw
+  `sub_82211A28` (moved from `functions.md`, Overridden; its
+  `--redraw_rival_logo` override now calls the native draw;
+  `frame-interpolation.md` noted); `--native_race_hud`. State 3's
+  `sub_82212958` never ran: the original runs there, no row. Four
+  removable adapters kept (the pause movie watch's three, called
+  through `ctx`; `UiMovie::Draw`'s, all guest calls).
+- The UI movies' ready groups (no mapping; 7d83fb5..ad1dbcb;
+  `src/ui_movies/objects.cpp`, `effect.cpp`, harness
+  `src/harnesses/ui_movie_objects.cpp`): 26 rows in `ui-movies-game.md`
+  (the vectors, `UiMovie::UiMovie`, `~UiMovie`, the texts freed,
+  `GetText`, the named animations' set-up, `sub_8211BEE8` named
+  `RaceHud::DrawMirror` (probably), the six text setters over
+  `GetText`) and a new intro paragraph; under `--native_ui_movies_game`
+  (the allocating ones also need `--native_heap` and
+  `--native_c_runtime_heap`). For review: each function hands a case it
+  couldn't do natively to the original first, with nothing done (the
+  destructor and texts' free check every block, none freed twice);
+  `sub_8211E378`'s `std::string` calls abort with a log if one refuses
+  after the checks (as `std_string`'s `Require`); `sub_8259EBE8`'s
+  override in `src/hooks/ui_movies.cpp` also checks the harness stand-in
+  hook.
+- `scenery-lists.md` (new, a373941): 27 rows (3 moved from
+  `functions.md`: `sub_825951E0`, `Recorder::RecordObject`
+  `sub_825953D0`, `sub_82146B80`; 24 new): `ModelList::Load`,
+  `LoadPoints` (the +3180 list's 20 point-group pointers at
+  `0x82617750` + 256 × i), `Release`; the draw decisions
+  (`sub_82147850` by the race data's +24 flags, `sub_82147958` by the
+  course layout, `sub_82147B18` by race mode and course,
+  `Race::CourseLayout` `sub_8228F408`); `PointList::Draw`,
+  `SceneryModel::DrawShape` and `RecordShape`; the shared model draws
+  (`Model::IsShapeVisible`, `Recorder::RecordSceneLights`,
+  `Model::RecordShapeDepth`, `DrawShape`, `DrawShapeDepth`) and the
+  texture provider's slots 2 and 4. `sub_82147A20` and `sub_8228F484`
+  are pieces the recompiler split from their parents. Pointers in
+  `course-scenery.md` and `sprites.md`; `known-data.md`: the draws'
+  constants `0x8265ECA0`-`0x8265ED3F`, the vertex declaration table
+  `0x8296B8B8`, the sort keys `0x8296B8FC`-`0x8296B90C`, the scene light
+  constants `0x8296B950`-`0x8296BCDF`. Not read: two switch tables, and
+  `SceneryModel::RecordShape` past its outline. 2 leads added.
+- `scenery-lists.md` migration 1 (e3295c1..c96cd1b;
+  `src/scenery_lists/`, `src/hooks/scenery_lists.cpp`): 24 rows in
+  `scenery-lists.md` and 5 in `models.md` (`--native_scenery_lists`,
+  `--native_models`). For review: `Recorder::RecordObject` records
+  natively inside its interpolation wrapper (`blend_state.cpp`); native
+  callers call `BlendState_BeforeRecordObject`/`AfterRecordObject`
+  themselves with the wrapper's lr and r24-r31 through a new
+  `BlendState_SetRecordContext` (frame dumps and `--log_blend_state`
+  counts matched the fallback); the draws' adapters set flush-to-zero
+  off at entry and after each guest call, as the originals do before
+  their scalar float work (59d655c; the harness runs cases with it on);
+  each recorder runs the original from the start when the command list
+  would refuse a slot, another list's chunk is open or a command list
+  diagnostic flag is on; left on the recompiled path (never ran): slot
+  4's reserve, debug prints and resize, `sub_82589728`'s message path,
+  `RecordShape`'s material animations and more than 4 textures;
+  `RecordShape`'s adapter kept (guest calls to the model's and
+  provider's slots).
+- `scenery-lists.md` migration 2 (343035d): `Model::DrawShape`
+  `sub_82596B18` (`--native_scenery_lists`) and `Model::RecordShape`
+  `sub_82595550` (`models.md`, `--native_models`) in
+  `src/scenery_lists/model_draws.cpp`, reusing the recorders' helpers.
+  For review: the same declines as migration 1 (material animations,
+  more than 4 textures, a vertex declaration it leaves to the original,
+  diagnostics, another list's chunk, no room) run the original from the
+  start; its interpolation record context (`0x82596BA0`, the queue
+  calls' return addresses) as the original's; the harness turns
+  `--native_models` off on the recompiled side, compares
+  `IsShapeVisible`'s product only where no recompiled `RecordShape` ran
+  (its register saves below the stack pointer aren't copied), and sets
+  the fake model's +364 to 0; both adapters kept (guest calls through
+  `ctx`).
+- `shader-objects.md` (new, 4047496): 7 rows: `VertexShader::Create`
+  `sub_822AA018`, `PixelShader::Create` `sub_822A9EE8`,
+  `VertexShader::Init` `sub_822A8740` (up to 32 12-byte entries,
+  probably the vertex fetches), `PixelShader::Init` `sub_822A85B8`, the
+  memory blocks' `Memory::AllocVirtual` `sub_8258DFF0` (kind 0),
+  `AllocPhysicalEx` `sub_8258E098` (kind 1) and `PendingFrees::FreeDue`
+  `sub_8258E1D8`; `c-runtime.md`: `XMemCpy` `sub_82295890` (probably)
+  and its unaligned 128-byte line copy `sub_82296FE0`. `known-data.md`:
+  `[0x82638308]` (read only by `XMemCpy`'s byte loop, never stored,
+  probably 1: to confirm by a log, as `XMemSet`'s step was), the memory
+  block's kinds and makers. `models.md`: `sub_822A9FD8`, `sub_822A9EA8`
+  read in full. `leads.md`: the ScopedLock users' lead trimmed to
+  `sub_82593E78`; 1 lead added (`XMemCpy`'s other callers).
+- `shader-objects.md` migration 1 (7bc02b9..840ecff;
+  `--native_shader_objects`, with `XMemCpy` under `--native_c_runtime`
+  and `models.md`'s chain up to `Model::Load` under `--native_models`).
+  For review: a new `native::Buffers_Memcpy` split out of memcpy's
+  override in `src/native/buffers.cpp`, so native callers' copies into
+  physical memory (microcode, vertex data, XPR data) are recorded for
+  the renderer as the game's memcpy's are; where a callee's plain C++
+  declines (never seen in play), `Model::Load`, `Mesh::LoadShaders` and
+  `VertexShader::Create` call that callee's original as a guest call
+  (as `scenery_lists`' `ReleaseCalls`); the game's debug prints in these
+  functions are warnings in our log (`Mesh::Parse`'s without its "Version
+  Error" text, which the harness counted as an error line); correction
+  to the map: `Resource::Relocate`'s type 6 does nothing;
+  `0x82638308` logged as 1 (`XMemCpy` does one host copy then, else
+  replays the byte loop).
+- The shader objects' migration 2 (800b20c..49bad70): `DataFile::GetEntry`
+  (`files-and-saves.md`, new flag `--native_data_files`,
+  `src/game_data/data_file.cpp`); `ModelList::Load`, `LoadPoints`
+  (`scenery-lists.md`, Native); 12 rows in `course-scenery.md` (the
+  course set's parse, the areas' lights and models parsed and their
+  callbacks, `Scenery::MakePoolObject` with the constructors, the
+  resets, `AreaModel::~Model`); `Strings::Get` and a slot's
+  `XPR::Release` (`strings-and-font.md`). For review: everything that
+  makes or frees models runs natively only where `Model::Load`'s adapter
+  does (`hooks::ModelsNativeLifetime()` and `hooks::ModelLoadGuest`
+  exported from `src/hooks/models.h`); the attract race has two
+  variants (2,412 or 2,414 draws in a dump) by timing, so dumps compare
+  only within one.
+- The shader objects' migration 3 (220ea7f..a5141f5): `course-scenery.md`:
+  `Scenery::CollectAreas`, `CollectModels`, `DrawSetLists` (new
+  `src/course_scenery/collect.cpp`, strict floats; `DrawSetLists`'
+  harness in `src/harnesses/scenery_lists.cpp`); `strings-and-font.md`:
+  `Strings::FormatV` (its 0xFFD2 case's `sub_82108A70`, the font's
+  number, never seen, left a guest call) and `Strings::Format`; 8
+  adapters removed (`SceneryList::Add`, `PoolObject::PoolObject`,
+  `ModelList::Init`, `Strings::Get`, `FormatGrouped`, `PageCount`,
+  `ModelList::IsBEntryOn`, `IsCEntryOn` now Native). For review: new
+  exported helpers (`hooks::SceneryDrawGuest`, `SceneryListsDrawCalls`,
+  `SceneryListsSlotDiagnostics`, `CourseSceneryDrawSetLists`,
+  `StringsFormatVSteps`, `StringsFormatSteps`).
+
 ## Run 2026-10-25 03:59 (`b7-loop-25-10-26-2`)
 
 - `game-modes.md` (new, 7871fe6): 31 rows (3 moved from

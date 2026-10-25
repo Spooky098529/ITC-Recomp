@@ -926,6 +926,88 @@ void ModelDestructs(Context& h, const Block& block) {
 
 }  // namespace
 
+// The materials' and shared shaders' accessors: a model, its shapes and
+// material blocks, and the tables, at random in a block; the block and r3
+// compared (they write nothing). Each case's inputs come from its own seed,
+// the same for both versions.
+void Accessors(Context& h, const Block& block) {
+  struct Accessor {
+    const char* name;
+    GuestFunction recompiled;
+    GuestFunction native;
+  };
+  const Accessor accessors[] = {
+      {"Model::MaterialCount (sub_82594AD8)", __imp__sub_82594AD8, hooks::ModelsMaterialCount},
+      {"Model::Material (sub_82594B20)", __imp__sub_82594B20, hooks::ModelsMaterial},
+      {"SharedVertexShader (sub_825896D8)", __imp__sub_825896D8, hooks::ModelsSharedVertexShader},
+      {"SharedPixelShader (sub_82589700)", __imp__sub_82589700, hooks::ModelsSharedPixelShader},
+      {"VertexDeclaration (sub_82589728)", __imp__sub_82589728, hooks::ModelsVertexDeclaration},
+  };
+  // The tables they read (the shared shaders' at 0x8296B7B4 and 0x8296B7B8,
+  // the declarations' about 0x8296B7F4, the stream kinds at 0x8265EC00):
+  // saved, set at random, put back after.
+  constexpr uint32_t kTables = 0x8296B7B0, kTablesBytes = 0x140;
+  constexpr uint32_t kKinds = 0x8265EC00, kKindsBytes = 0x90;
+  const std::vector<uint8_t> tables = Read(h.base, kTables, kTablesBytes);
+  const std::vector<uint8_t> kinds = Read(h.base, kKinds, kKindsBytes);
+  for (const Accessor& accessor : accessors) {
+    Results results(accessor.name);
+    const bool declaration = accessor.recompiled == __imp__sub_82589728;
+    const bool shader = accessor.recompiled == __imp__sub_825896D8 ||
+                        accessor.recompiled == __imp__sub_82589700;
+    for (int c = 0; c < 256; c++) {
+      const uint64_t seed = h.random.Next();
+      Random r;
+      Both(
+          h, results,
+          [&] {
+            r = Random(seed);
+            for (uint32_t i = 0; i < block.bytes; i += 4) {
+              Store(h.base, block.address + i, uint32_t(r.Next()));
+            }
+            // The model's shape c % 4 at the block's +0x100 (544 bytes
+            // each), its material block at +0x400.
+            Store(h.base, block.address + 40, block.address + 0x100 - 544 * (c % 4));
+            Store(h.base, block.address + 0x100 + 396, block.address + 0x400);
+            Store(h.base, block.address + 0x400 + 8, r.Below(16));
+            for (uint32_t i = 0; i < kTablesBytes; i += 4) {
+              Store(h.base, kTables + i, uint32_t(r.Next()));
+            }
+            Store(h.base, 0x8296B7B4, r.Below(8) == 0 ? 0 : block.address + 0x200);
+            Store(h.base, 0x8296B7B8, r.Below(8) == 0 ? 0 : block.address + 0x280);
+            // The kinds: indices 0 to 7, the third type's 0 to 2 (now and
+            // then 3: the message the original prints).
+            for (uint32_t i = 0; i < 18; i++) {
+              Store(h.base, kKinds + 4 * i, r.Below(8));
+              Store(h.base, kKinds + 72 + 4 * i, r.Below(16) == 0 ? 3 : r.Below(3));
+            }
+          },
+          [&](PPCContext& t) {
+            if (declaration) {
+              // 5, 9, 10, 11, or another now and then.
+              static constexpr int kTypes[] = {5, 9, 10, 11};
+              t.r3.u64 = r.Below(18);
+              t.r4.u64 = r.Below(16) == 0 ? 7 : kTypes[r.Below(4)];
+              t.r5.u64 = r.Below(18);
+            } else if (shader) {
+              t.r3.u64 = r.Below(32);
+            } else {
+              t.r3.u64 = block.address;
+              t.r4.u64 = uint32_t(c % 4);
+              const uint32_t group = r.Below(4) == 0 ? 0 : r.Below(3);
+              t.r5.u64 = accessor.recompiled == __imp__sub_82594AD8 ? group : r.Below(8);
+              t.r6.u64 = group;
+            }
+          },
+          accessor.recompiled, accessor.native, block.address, block.bytes,
+          fmt::format("case {}", c));
+    }
+    results.Report();
+  }
+  Write(h.base, kTables, tables.data(), kTablesBytes);
+  Write(h.base, kKinds, kinds.data(), kKindsBytes);
+}
+
 void Models(Context& h) {
   // Fixes the lock's choice before any flag is switched.
   hooks::ModelsHostLock();
@@ -956,6 +1038,7 @@ void Models(Context& h) {
     ModelConstructs(h, block);
     ModelReleases(h, block);
     ModelDestructs(h, block);
+    Accessors(h, block);
   }
 }
 

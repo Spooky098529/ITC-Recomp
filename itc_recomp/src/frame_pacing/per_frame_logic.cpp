@@ -12,6 +12,7 @@
 #include "debug/frame_state_diff.h"
 #include "debug/pause_movie_log.h"
 #include "hooks/cameras.h"
+#include "hooks/race_hud.h"
 #include "hooks/ui_movies.h"
 #include "interpolation/blend_state.h"
 
@@ -239,12 +240,13 @@ ReplayFromLogicPass g_ui_movies("UI movies", 0xA000);
 }  // namespace
 
 namespace {
+// The update's work: natively with --native_ui_movies (src/hooks/ui_movies.cpp).
 void UpdateUiMovie(PPCContext& ctx, uint8_t* base) {
   if (ctx.r4.u32 != 0 || !ITC_FLAG(per_tick_ui_movies)) {
-    __imp__sub_8211D2F8(ctx, base);
+    ui_movies_hooks::Update(ctx, base);
     return;
   }
-  g_ui_movies.Run(base, ctx.r3.u32, [&] { __imp__sub_8211D2F8(ctx, base); });
+  g_ui_movies.Run(base, ctx.r3.u32, [&] { ui_movies_hooks::Update(ctx, base); });
 }
 }  // namespace
 
@@ -353,6 +355,10 @@ extern "C" REX_FUNC(sub_825A0548) {
 
 extern "C" REX_FUNC(sub_8211D2F8) {
   REX_FUNC_PROLOGUE();
+  if (ui_movies_hooks::g_update_callee_stand_in != nullptr &&
+      ui_movies_hooks::g_update_callee_stand_in(0x8211D2F8, ctx, base)) {
+    return;
+  }
   uint32_t movie = ctx.r3.u32, r4 = ctx.r4.u32, caller = uint32_t(ctx.lr);
   uint32_t movie_before = g_ui_movie;
   std::vector<AddedTarget>* added_before = g_added;
@@ -463,7 +469,8 @@ extern "C" REX_FUNC(sub_8215DEA0) {
 // handler too (--redraw_rival_logo, game_messages.cpp); there the cutscene
 // isn't stepped, only the logo's draw is run, with the entry the logic pass
 // drew. The UI movie replay (sub_8211D2F8 above) keeps the movie advancing
-// once a tick.
+// once a tick. The logo's draw itself: natively with --native_race_hud
+// (src/hooks/race_hud.cpp).
 namespace {
 bool g_in_rival_cutscene = false;
 uint32_t g_rival_logo = 0;  // the entry the last logic pass drew, or 0
@@ -474,7 +481,7 @@ extern "C" REX_FUNC(sub_82211A28) {
   if (g_in_rival_cutscene) {
     g_rival_logo = ctx.r3.u32;
   }
-  __imp__sub_82211A28(ctx, base);
+  race_hud_hooks::DrawRivalLogo(ctx, base);
 }
 
 extern "C" REX_FUNC(sub_821594B8) {

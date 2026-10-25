@@ -5,11 +5,15 @@
 #include "base/log.h"
 #include "c_runtime/format.h"
 #include "c_runtime/strings.h"
+#include "game_data/data_file.h"
 #include "guest.h"
+#include "memory/c_runtime_heap.h"
 #include "memory/heap.h"
+#include "models/xpr.h"
 
 #include "strings_and_font/steps.h"
 
+#include <bit>
 #include <cmath>
 
 namespace strings_and_font {
@@ -199,6 +203,149 @@ bool StringsFormatGrouped(uint8_t* base, int32_t value, uint32_t out, uint32_t f
   return true;
 }
 
+namespace {
+
+constexpr uint32_t kFormatFrame = 4800;
+constexpr uint32_t kIntFormat = 0x82007EA8;     // L"%%%dd"
+constexpr uint32_t kFloatFormat = 0x82007EB4;   // L"%%.%df"
+constexpr uint32_t kZeroedFormat = 0x82007EC4;  // L"%%0%dd"
+constexpr uint32_t kSwprintf = 0x8210A490;
+constexpr uint32_t kFormatGroupedFunction = 0x8210A680;
+constexpr uint32_t kFontNumber = 0x82108A70;
+
+// swprintf of `format` with one argument from FormatV's frame (its
+// parameter area at +32 written as the original's stores): natively, else
+// its adapter through `calls`.
+void FormatSwprintf(uint8_t* base, const FormatCalls& calls, uint32_t frame, uint32_t buffer,
+                    uint32_t format, uint64_t argument, uint32_t lr) {
+  guest::StoreU32(base, frame + 32, uint32_t(argument >> 32));
+  guest::StoreU32(base, frame + 36, uint32_t(argument));
+  int32_t count;
+  if (!Swprintf(base, buffer, format, frame + 32, frame - 96 - 144 - 2336, &count)) {
+    calls.call(calls.user, kSwprintf, buffer, format, argument, frame, lr);
+  }
+}
+
+// memset(buffer, 0, 4096).
+void ClearBuffer(uint8_t* base, uint32_t buffer) {
+  for (uint32_t at = 0; at < 4096; at += 4) {
+    guest::StoreU32(base, buffer + at, 0);
+  }
+}
+
+// The next 8-byte slot of the va_list at `args`: its address, `args` moved
+// past it.
+uint32_t NextSlot(uint32_t& args) {
+  const uint32_t slot = (args + 7) & ~7u;
+  args = slot + 8;
+  return slot;
+}
+
+}  // namespace
+
+namespace {
+
+// What differs between FormatV's loop and Format's: the frame's size, the
+// return addresses of the guest calls (the swprintf pairs, FormatGrouped's,
+// the font number's) and whether 0xFFD2 is a case.
+struct FormatSite {
+  uint32_t frame_bytes;
+  uint32_t int_lr[2];
+  uint32_t double_lr[2];
+  uint32_t grouped_lr;
+  bool font_number;
+};
+constexpr FormatSite kFormatV = {4800, {0x8210AA78, 0x8210AA88}, {0x8210AAD0, 0x8210AAE8},
+                                 0x8210AB4C, true};
+constexpr FormatSite kFormat = {4784, {0x8210ACC4, 0x8210ACD4}, {0x8210AD1C, 0x8210AD34},
+                                0x8210AD90, false};
+
+// The loop both share over `text`, from their frame at `frame`.
+uint32_t FormatText(uint8_t* base, const FormatCalls& calls, uint32_t frame, uint32_t table,
+                    uint32_t out, uint32_t text, uint32_t args, const FormatSite& site) {
+  const uint32_t buffer = frame + 608;
+  const uint32_t format = frame + 96;
+  for (uint32_t c; (c = guest::LoadU16(base, text)) != 0; text += 2) {
+    uint32_t append = buffer;
+    if (c == 0xFFD7) {
+      const uint32_t slot = NextSlot(args);
+      const uint32_t inner = guest::LoadU16(base, slot + 6);
+      ClearBuffer(base, buffer);
+      append = StringsFormatV(base, calls, frame, table, buffer, inner, args);
+    } else if (c > 0xFFEB && c <= 0xFFF5) {
+      const uint32_t slot = NextSlot(args);
+      const uint32_t value = guest::LoadU32(base, slot + 4);
+      FormatSwprintf(base, calls, frame, format, kIntFormat, (0xFFF5 - c) & 0xFFFF,
+                     site.int_lr[0]);
+      FormatSwprintf(base, calls, frame, buffer, format, value, site.int_lr[1]);
+    } else if (c > 0xFFE1 && c <= 0xFFEB) {
+      const uint32_t slot = NextSlot(args);
+      const double value =
+          std::bit_cast<double>((uint64_t(guest::LoadU32(base, slot)) << 32) |
+                                guest::LoadU32(base, slot + 4));
+      FormatSwprintf(base, calls, frame, format, kFloatFormat, (0xFFEB - c) & 0xFFFF,
+                     site.double_lr[0]);
+      const double rounded = double(float(value));
+      FormatSwprintf(base, calls, frame, buffer, format, std::bit_cast<uint64_t>(rounded),
+                     site.double_lr[1]);
+    } else if (c > 0xFFD7 && c <= 0xFFE1) {
+      const uint32_t slot = NextSlot(args);
+      const uint32_t value = guest::LoadU32(base, slot + 4);
+      FormatSwprintf(base, calls, frame, format, kZeroedFormat, (0xFFE1 - c) & 0xFFFF,
+                     site.int_lr[0]);
+      FormatSwprintf(base, calls, frame, buffer, format, value, site.int_lr[1]);
+    } else if (c == 0xFFD3) {
+      const uint32_t slot = NextSlot(args);
+      ClearBuffer(base, buffer);
+      const uint32_t value = guest::LoadU32(base, slot + 4);
+      if (!StringsFormatGrouped(base, int32_t(value), buffer, frame - 640)) {
+        calls.call(calls.user, kFormatGroupedFunction, table, value, buffer, frame,
+                   site.grouped_lr);
+      }
+    } else if (c == 0xFFD2 && site.font_number) {
+      const uint32_t slot = NextSlot(args);
+      ClearBuffer(base, buffer);
+      calls.call(calls.user, kFontNumber, guest::LoadU32(base, kFont), buffer,
+                 guest::LoadU32(base, slot + 4), frame, 0x8210AB84);
+    } else {
+      guest::StoreU16(base, frame + 80, uint16_t(c));
+      guest::StoreU16(base, frame + 82, 0);
+      append = frame + 80;
+    }
+    c_runtime::Wcscat(base, out, append);
+  }
+  return out;
+}
+
+}  // namespace
+
+uint32_t StringsFormatV(uint8_t* base, const FormatCalls& calls, uint32_t stack, uint32_t table,
+                        uint32_t out, uint32_t id, uint32_t args) {
+  ITC_NATIVE_RUNNING("sub_8210A990 Strings::FormatV");
+  const uint32_t frame = stack - kFormatV.frame_bytes;
+  guest::StoreU32(base, frame, stack);  // the back chain, as stwu
+  const uint32_t text = StringsGet(base, table, id & 0xFFFF).value_or(table);
+  ClearBuffer(base, frame + 608);
+  return FormatText(base, calls, frame, table, out, text, args, kFormatV);
+}
+
+uint32_t StringsFormat(uint8_t* base, const FormatCalls& calls, uint32_t stack, uint32_t table,
+                       uint32_t out, uint32_t id, const uint64_t varargs[5]) {
+  ITC_NATIVE_RUNNING("sub_8210ABC0 Strings::Format");
+  // r6 to r10 into the caller's parameter area, the va_list from there.
+  for (uint32_t i = 0; i < 5; i++) {
+    guest::StoreU32(base, stack + 40 + 8 * i, uint32_t(varargs[i] >> 32));
+    guest::StoreU32(base, stack + 44 + 8 * i, uint32_t(varargs[i]));
+  }
+  const uint32_t frame = stack - kFormat.frame_bytes;
+  guest::StoreU32(base, frame, stack);  // the back chain, as stwu
+  const uint32_t text = StringsGet(base, table, id & 0xFFFF).value_or(table);
+  ClearBuffer(base, frame + 608);
+  const uint32_t args = stack + 40;
+  guest::StoreU32(base, frame + 80, args);  // the va_list, as the original keeps it
+  return FormatText(base, calls, frame, table, out, text, args, kFormat);
+}
+
 uint32_t StringsPageCount(uint8_t* base, uint32_t text) {
   ITC_NATIVE_RUNNING("sub_8210A5C0 Strings::PageCount");
   uint32_t count = 0;
@@ -279,6 +426,32 @@ void FontSetParams(uint8_t* base, uint32_t font, uint32_t params) {
                     float(ToSingle(int32_t(guest::LoadU32(base, params + 84)))));
   guest::StoreFloat(base, font + 16452,
                     float(ToSingle(int32_t(guest::LoadU32(base, params + 88)))));
+}
+
+std::optional<uint32_t> StringsGet(uint8_t* base, uint32_t table, uint32_t id) {
+  ITC_NATIVE_RUNNING("sub_8210A800 Strings::Get");
+  constexpr uint32_t kBounds = 0x82007E18;
+  for (uint32_t i = 0; i < 17; i++) {
+    if (int32_t(id) < int32_t(guest::LoadU32(base, kBounds + 4 + 4 * i))) {
+      const uint32_t bound = guest::LoadU32(base, kBounds + 4 * i);
+      return game_data::GetEntry(base, guest::LoadU32(base, table + 4 * i), id - bound, false);
+    }
+  }
+  return std::nullopt;
+}
+
+std::optional<uint32_t> ReleaseXprSlot(uint8_t* base, uint32_t slot) {
+  ITC_NATIVE_RUNNING("sub_82108860 XPR::Release (a slot)");
+  const uint32_t xpr = guest::LoadU32(base, slot);
+  if (xpr == 0) {
+    return slot;
+  }
+  if (!memory::IsHeapBlock(xpr) || !models::XprDestruct(base, xpr)) {
+    return std::nullopt;
+  }
+  memory::crt::OperatorDelete(xpr);
+  guest::StoreU32(base, slot, 0);
+  return xpr;
 }
 
 }  // namespace strings_and_font

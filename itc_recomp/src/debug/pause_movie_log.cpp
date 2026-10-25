@@ -473,22 +473,31 @@ void WatchMovingTargets(const char* name, PPCContext& ctx, uint8_t* base, Call&&
 
 // The functions the UI movie update (sub_8211D2F8) calls besides the
 // tracks' sub_825A08E0, watched for writes to the moved words.
-#define WATCH_MOVIE_CALL(address)                                                       \
-  extern "C" REX_FUNC(sub_##address) {                                                  \
-    REX_FUNC_PROLOGUE();                                                                \
-    if (!ITC_FLAG(log_pause_movie)) {                                                \
-      __imp__sub_##address(ctx, base);                                                  \
-      return;                                                                           \
-    }                                                                                   \
-    debug::WatchMovingTargets(#address, ctx, base, [&] { __imp__sub_##address(ctx, base); }); \
+//
+// UiMovie::DrawTexts; its work (natively with --native_ui_movies_game) is in
+// src/hooks/ui_movies_game.cpp.
+extern "C" REX_FUNC(sub_8211CD90) {
+  REX_FUNC_PROLOGUE();
+  if (ui_movies_hooks::g_update_callee_stand_in != nullptr &&
+      ui_movies_hooks::g_update_callee_stand_in(0x8211CD90, ctx, base)) {
+    return;
   }
-WATCH_MOVIE_CALL(8211CD90)
-#undef WATCH_MOVIE_CALL
+  if (!ITC_FLAG(log_pause_movie)) {
+    ui_movies_game_hooks::DrawTexts(ctx, base);
+    return;
+  }
+  debug::WatchMovingTargets("8211CD90", ctx, base,
+                            [&] { ui_movies_game_hooks::DrawTexts(ctx, base); });
+}
 
 // UiMovie::Draw, watched as the others; its work (natively with
 // --native_ui_movies) is in src/hooks/ui_movies.cpp.
 extern "C" REX_FUNC(sub_8259FA00) {
   REX_FUNC_PROLOGUE();
+  if (ui_movies_hooks::g_update_callee_stand_in != nullptr &&
+      ui_movies_hooks::g_update_callee_stand_in(0x8259FA00, ctx, base)) {
+    return;
+  }
   if (!ITC_FLAG(log_pause_movie)) {
     ui_movies_hooks::Draw(ctx, base);
     return;
@@ -523,6 +532,10 @@ extern "C" REX_FUNC(sub_8211B080) {
 // watched as the others (its recursive calls come back here, each watched).
 extern "C" REX_FUNC(sub_82119B80) {
   REX_FUNC_PROLOGUE();
+  if (ui_movies_hooks::g_update_callee_stand_in != nullptr &&
+      ui_movies_hooks::g_update_callee_stand_in(0x82119B80, ctx, base)) {
+    return;
+  }
   if (!ITC_FLAG(log_pause_movie)) {
     ui_movies_hooks::RestorePose(ctx, base);
     return;
@@ -534,6 +547,10 @@ extern "C" REX_FUNC(sub_82119B80) {
 // --native_ui_movies) is in src/hooks/ui_movies.cpp.
 extern "C" REX_FUNC(sub_8259DAC0) {
   REX_FUNC_PROLOGUE();
+  if (ui_movies_hooks::g_update_callee_stand_in != nullptr &&
+      ui_movies_hooks::g_update_callee_stand_in(0x8259DAC0, ctx, base)) {
+    return;
+  }
   if (!ITC_FLAG(log_pause_movie)) {
     ui_movies_hooks::ResetAfterMovie(ctx, base);
     return;
@@ -604,10 +621,12 @@ extern "C" REX_FUNC(sub_8211D978) {
   __imp__sub_8211D978(ctx, base);
 }
 
+// Its work (natively with --native_ui_movies_game) is in
+// src/hooks/ui_movies_game.cpp; logged, the original runs.
 extern "C" REX_FUNC(sub_8211DE38) {
   REX_FUNC_PROLOGUE();
   if (!ITC_FLAG(log_pause_movie)) {
-    __imp__sub_8211DE38(ctx, base);
+    ui_movies_game_hooks::Finish(ctx, base);
     return;
   }
   debug::LogCall("8211DE38", ctx);
@@ -626,10 +645,12 @@ extern "C" REX_FUNC(sub_8211DDD8) {
   __imp__sub_8211DDD8(ctx, base);
 }
 
+// Its work (natively with --native_ui_movies_game) is in
+// src/hooks/ui_movies_game.cpp; logged, the original runs.
 extern "C" REX_FUNC(sub_8211DF20) {
   REX_FUNC_PROLOGUE();
   if (!ITC_FLAG(log_pause_movie)) {
-    __imp__sub_8211DF20(ctx, base);
+    ui_movies_game_hooks::FinishNamed(ctx, base);
     return;
   }
   debug::LogCall("8211DF20", ctx);

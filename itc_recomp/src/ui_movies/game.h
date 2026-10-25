@@ -131,6 +131,29 @@ void StoreSlot(uint8_t* base, uint32_t address, const Slot& slot);
 // that can't share the list's memory. Returns the slot written.
 uint32_t Append(uint8_t* base, uint32_t list, const Slot& slot);
 
+// UiMovie::Update (sub_8211D2F8, docs/functions/ui-movies.md)'s own work;
+// the adapter (src/hooks/ui_movies.cpp) makes its calls. Its frame (1,616
+// bytes) holds a local animation list at +80 (the slots moved off the queue
+// this update, applied after drawing and dropped).
+constexpr uint32_t kUpdateFrame = 1616;
+constexpr uint32_t kUpdateLocal = 80;
+// The local list set up: link k's next k + 1 and slot k, link 31's next -1,
+// the free chain from 0, no slots used (+130, +132 and +134 set to -1).
+void UpdateBegin(uint8_t* base, uint32_t local);
+// A queued slot's time (+20) stepped by the float at 0x820021E8, back when
+// reversed (+28), and kept within 0 and its animation's length ([+16] +
+// 12).
+void StepQueuedTime(uint8_t* base, uint32_t slot);
+// A looping slot's time stepped forward, wrapped: below 0 to the length,
+// past the length to 0.
+void StepLoopingTime(uint8_t* base, uint32_t slot);
+// The list's first link unlinked onto the free chain and the count down by
+// one, with the original's loads and stores in their order: the queue's
+// (its first read here), and the local list's (its first, `first`, and its
+// link read before the slot's animation was applied).
+void UnlinkQueueFirst(uint8_t* base, uint32_t list);
+void UnlinkLocalFirst(uint8_t* base, uint32_t list, uint32_t link, uint16_t first);
+
 // sub_8211DBE0 (UiMovie::MoveAnimation) and sub_8211DCE8
 // (UiMovie::MoveNamedAnimation): the first slot naming the animation (its
 // +4 `sub_scene` and +0 `index`, or by name its +8 `index`) in the queue
@@ -148,6 +171,25 @@ Moved MoveNamedAnimation(uint8_t* base, uint32_t movie, uint32_t index, bool to_
 // sub_8211DDE8 (UiMovie::LoopLast): the last started animation moved to the
 // looping list, by name when its +8 isn't -1.
 Moved LoopLast(uint8_t* base, uint32_t movie);
+
+// The time a finished animation's slot is applied at: the float word at
+// 0x82000A34 (0.0) when reversed (+28), else its animation's length ([+16]
+// + 12).
+uint32_t FinishTime(uint8_t* base, uint32_t slot);
+// sub_8211DE38 (UiMovie::Finish)'s and sub_8211DF20 (UiMovie::FinishNamed)'s
+// search, after their move of the animation to the queue (MoveAnimation or
+// MoveNamedAnimation, not to the looping list): the first queued slot with
+// its +4 `sub_scene` and +0 `index`, or by name its +8 `named` (the count
+// read then, 16-bit, sign-extended and compared unsigned), its position and
+// FinishTime. The adapters apply it there (UiMovie::ApplyAnimation on +12
+// and +16, r6 = 0) and remove it (RemoveAt): the live scene keeps its end
+// pose.
+struct Finishing {
+  uint32_t position = 0, slot = 0, time = 0;
+};
+std::optional<Finishing> FindFinishing(uint8_t* base, uint32_t movie, uint32_t sub_scene,
+                                       uint32_t index);
+std::optional<Finishing> FindFinishingNamed(uint8_t* base, uint32_t movie, uint32_t named);
 
 // sub_8211D978 (UiMovie::Play): animation `index` of the live scene (or of
 // its sub-scene `sub_scene` when that isn't -1; SceneAnimation) started:
@@ -211,6 +253,39 @@ uint32_t TextField(uint8_t* base, uint32_t movie, uint32_t id, uint32_t offset);
 // record of 0 (the original's neither).
 void AdvanceTextScroll(uint8_t* base, uint32_t movie, uint32_t id);
 
+// sub_8211B800 (UiMovie::ScrollOffset): a scrolling text's x for the draw
+// parameters at `params` (+0 x, +8 the origin's x, +28 the scale, +68 the
+// gap, +120 the text id): the start x as Font::SetParams works it out; while
+// the text's scroll counter (+8) is below its delay (+12), x itself; after
+// it, the start less the ticks past the delay times the speed (+16), moved
+// on by the text's width (Font::TextWidth on [0x826C5C00]) plus the gap
+// until it's not left of the start less the width (a step of 0 or less
+// there loops forever, as the original). Returns f1.
+double ScrollOffset(uint8_t* base, uint32_t movie, uint32_t params);
+
+// UiMovie::DrawTexts (sub_8211CD90): r3 = movie, r4 = the text list (movie +
+// 40: +0 the items, 128 bytes each, +8 the count), r5 = 1 to draw without
+// advancing. Each item, last first, is drawn from the original's 4,752-byte
+// frame (`frame`, its r1), where its callees read what it builds: the item
+// copied to +368, the draw parameters at +112 (124 bytes), the text at +496
+// (4,096 bytes), and the original's other stores (+80..+108, +240..+367).
+constexpr uint32_t kDrawTextsFrame = 4752;
+constexpr uint32_t kDrawTextsParams = 112;
+constexpr uint32_t kDrawTextsItem = 368;
+constexpr uint32_t kDrawTextsBuffer = 496;
+// One item's start: the text buffer cleared (memset), the count down by
+// one; returns the item to copy to +368 (sub_8211AED0: CopyTextItem, or the
+// original where they may share memory).
+uint32_t DrawTextsPop(uint8_t* base, uint32_t frame, uint32_t list);
+// The copied item's drawing up to Text::Draw: its origin transformed by its
+// matrix (Vec4::Transform), the node's (+0) scale and clip rectangle set,
+// the draw parameters built, a scrolling text's x (ScrollOffset) and its
+// counter stepped unless `draw_only` (sub_8211B940), and the text's page
+// copied into the buffer (Strings::CopyPage). Text::Draw (r4 = the
+// parameters, r5 = the buffer) and TextItem::~TextItem on the copy follow,
+// the adapter's.
+void DrawTextsItem(uint8_t* base, uint32_t frame, uint32_t movie, bool draw_only);
+
 // sub_8211AD00's work after its renderer calls: the UI movie library's
 // renderer and command list set (SetRenderer), every entry of the movie
 // table marked free (key -1, value 0; nothing freed), and the screen's
@@ -240,5 +315,163 @@ void ResetMovieTable(uint8_t* base, uint32_t renderer, uint32_t list);
 bool LayersFit(uint8_t* base, uint32_t scene, uint32_t group);
 uint32_t AssignLayers(uint8_t* base, uint32_t stack, uint32_t movie, uint32_t scene,
                       uint32_t group, uint32_t layer, bool by_bucket);
+
+// --- The movies' vectors and objects (objects.cpp) ---
+//
+// Blocks come from operator new and new[] and go back with operator delete
+// and delete[] (the C runtime heap's plain C++, memory/c_runtime_heap.h): the
+// adapters call these only while --native_heap routes the game's heap to the
+// allocation layer, and each function's checks come first, with nothing
+// done (nullopt or false) where the original must run (a size malloc
+// refuses, a block the layer didn't give).
+
+// Whether operator new or new[] gives `size` bytes natively (malloc's
+// checks), and whether operator delete or delete[] frees `block` natively (0
+// or a block the layer gave).
+bool CanAllocate(uint8_t* base, uint32_t size);
+bool CanDelete(uint32_t block);
+
+// The vectors of 8-byte {key, value} pairs (the movie table at 0x826C5CCC)
+// and of words (a movie's textures, +28): +0 the array, +4 the capacity, +8
+// the count.
+//
+// sub_8211B0E8: capacity 64, 512 bytes (operator new[]) with the 64 pairs
+// cleared when given (+0 = 0 otherwise); the count isn't written (the movie
+// table is a static). nullopt where the original must run.
+std::optional<uint32_t> MakePairs(uint8_t* base, uint32_t vector);
+// sub_8211B458 (with sub_8211B160, the capacity changed): the pair appended
+// at the count, the capacity doubled first when the count has reached it (a
+// new array, cleared, the pairs that fit copied, the old one freed; nothing
+// when the doubled capacity is the same). Returns the r3 the original
+// leaves: the old array when it was freed, else the vector.
+std::optional<uint32_t> PairsAppend(uint8_t* base, uint32_t vector, uint32_t key, uint32_t value);
+// sub_8211C168: the value set for the key (compared as signed words) when
+// it's there, else the pair appended (PairsAppend). Returns r3 as the
+// original leaves it (the vector, or PairsAppend's).
+std::optional<uint32_t> PairsSet(uint8_t* base, uint32_t vector, uint32_t key, uint32_t value);
+// sub_8211AE18: capacity 512, 2 KB (operator new[], not checked for 0), the
+// count 0. nullopt where the original must run.
+std::optional<uint32_t> MakeWords(uint8_t* base, uint32_t vector);
+// sub_8211AE68 (with sub_8211A788, the capacity changed: the new array not
+// cleared): the word appended, as PairsAppend.
+std::optional<uint32_t> WordsAppend(uint8_t* base, uint32_t vector, uint32_t word);
+
+// A movie's named animations: 1,024 entries of 36 bytes from +176 (a
+// std::string, then +28 the scene and +32 the animation), the count at
+// +0x90B0 (176 + 0x9000). A movie's texts: the map at +0x9BCC (kMovieTexts)
+// of 28-byte records (+0 a 4 KB buffer from VirtualAlloc), their count at
+// +0x9FCC. Its text list at +40 (+0 the items, 128 bytes each after a
+// 16-byte count; +4 the capacity, +8 the count) and draw context at +64.
+constexpr uint32_t kMovieNamed = 176;
+constexpr uint32_t kNamedBytes = 36;
+constexpr uint32_t kNamedCount = 1024;
+constexpr uint32_t kMovieNamedUsed = kMovieNamed + 0x9000;
+constexpr uint32_t kMovieTextCount = 0x9FCC;
+constexpr uint32_t kMovieTextList = 40;
+
+// sub_8211E1C0 (UiMovie::UiMovie): the textures (MakeWords on +28), the text
+// list (sub_8211B018: capacity 512, 512 items made with MakeTextItem after
+// their count, 512, in a block from operator new[]; its count, +48, 0), the
+// draw context reset (ResetDrawContext), the 1,024 named animations made
+// (sub_8211D210: an empty string, as its copy of an empty temporary leaves
+// it, and +28, +32 = 0), the named count 0, and the texts' 128 pairs and
+// their count cleared. Returns the movie; nullopt where the original must
+// run.
+std::optional<uint32_t> ConstructMovie(uint8_t* base, uint32_t movie);
+// sub_8211E160 (UiMovie::~UiMovie): the named animations' strings
+// destroyed last first (sub_8211D1B8: _Tidy(entry, true, 0)), the text
+// items destroyed last first and their block freed (sub_8211AF90 with 3,
+// when +40 isn't 0), then the textures' array freed (operator delete[]).
+// Returns the r3 the original leaves (the textures' array); nullopt, with
+// nothing done, where a free wouldn't run natively.
+std::optional<uint32_t> DestroyMovie(uint8_t* base, uint32_t movie);
+// sub_8211AC90: each text record ([+0x9FCC] of them, the values from the
+// texts' map) freed: its buffer (VirtualFree, MEM_RELEASE: the allocation
+// layer's pages) and itself (operator delete); the count 0. Returns the r3
+// the original leaves (the last record, or the movie when there were
+// none); nullopt, with nothing done, where a free wouldn't run natively.
+std::optional<uint32_t> FreeTexts(uint8_t* base, uint32_t movie);
+
+// sub_8211B660 (UiMovie::GetText): r4's node id (a TXT node's +108, at
+// `id_address`) set to [movie + 0x9FCC] + 1 when 0, then its text record
+// (TextMapFindKey; an id not there reads the word at 0x826C5CD8); when that
+// is 0, one is made (not stored in the map: the caller does): 28 bytes from
+// operator new, +0 a 4 KB buffer from VirtualAlloc (the layer's pages, as
+// its adapter: MEM_COMMIT, 4 KB aligned) cleared (memset), +16 the float
+// word at 0x82000A34 (0.0), +4..+12, +20 and +24 = 0. Returns the record;
+// nullopt, with nothing done, where operator new wouldn't run natively.
+std::optional<uint32_t> GetText(uint8_t* base, uint32_t movie, uint32_t id_address);
+
+// sub_8211E378: the scene's named animations added to the movie's (+176,
+// the count at +0x90B0, no check against the 1,024): its SCE children's
+// first (recursed into), then for each animation (SceneAnimation) the name
+// "<scene's +84><the byte at 0x82001DE8><the animation's +16>" built in
+// std::strings in the original's 240-byte frame below `stack` (its r1: +96
+// the name, +128 its copy; the recursions' frames below), then copied into
+// the next entry (sub_8211E318: AssignFrom the copy, +28 the scene, +32 the
+// animation) and both temporaries destroyed (_Tidy). The strings through
+// std_string's plain C++ (a logged abort if one refuses after the
+// adapter's checks: the process heap there). Returns the r3 the original
+// leaves (the movie, the last child looked up or a recursion's, or the
+// name's _Tidy: its block when it was on the heap, else the name).
+uint32_t AddNamedAnimations(uint8_t* base, uint32_t stack, uint32_t movie, uint32_t scene);
+
+// sub_8211BEE8 (effect.cpp): a primitive node drawn over the full frame's
+// texture, from the original's 1,248-byte frame (`frame`, its r1): the quad
+// at +160 (blend mode 4, key 597), its positions at +384, colors +640 and
+// texture coordinates +896, a scale matrix at +320 (the identity built at
+// +96 first), the level description at +288. The adapter calls
+// CameraPasses::RenderTarget(0) between the two parts and hands the quad to
+// sub_8259EBE8 (r4 = 597, f1 = the depth EffectQuad returns).
+constexpr uint32_t kEffectFrame = 1248;
+constexpr uint32_t kEffectQuad = 160;
+constexpr uint32_t kEffectKey = 597;
+// Before RenderTarget: the positions' w (the float at 0x82000A30, 1.0) in
+// all 16, the quad made (MakeQuad), the identity, and the scale matrix (the
+// identity with the float at 0x82001070 at its +0 and +20).
+void EffectBegin(uint8_t* base, uint32_t frame);
+// After it: the texture's level 0 description (TextureLevelDesc), the
+// quad's vertex count (the primitive's +116), texture and arrays; for each
+// vertex (PrimitiveVertex) its x and y plus the primitive's +12 and +16 (z
+// the float at 0x82000A34, w 1.0) through the scale matrix
+// (debug::Vec4Transform), its +24 and +28 over the texture's width and
+// height, and the primitive's color (+56..+64) and alpha (+68 times the
+// float at 0x82000C44, as an integer); with any vertex, the clip cleared
+// (+100..+111). Blend mode 4, +72 = 0. Returns the depth (the float at
+// 0x82000A34). The original's integer temporaries at +80 and +88 written as
+// it leaves them.
+double EffectQuad(uint8_t* base, uint32_t frame, uint32_t primitive, uint32_t texture);
+
+// The text setters: r3 = movie, r4 = a sub-scene's index or -1, r5 = a
+// child's index: the node (FindNode), its text record (GetText, which may
+// make one), the change, then the record stored for the node's id
+// (TextMapSetKey). Each returns the r3 the original leaves (the movie's
+// texts' map, as TextMap::Set leaves it); nullopt, with nothing done, where
+// GetText would run the original.
+//
+// sub_8211C470 (UiMovie::ClearText): the buffer's 4 KB cleared (memset)
+// and +8 = 0.
+std::optional<uint32_t> ClearText(uint8_t* base, uint32_t movie, uint32_t sub_scene,
+                                  uint32_t child);
+// sub_8211C4F0: +12 = `delay`, +16 = `speed` (f1) as stfs stores it.
+std::optional<uint32_t> SetTextScrollSpeed(uint8_t* base, uint32_t movie, uint32_t sub_scene,
+                                           uint32_t child, uint32_t delay, double speed);
+// sub_8211C570 (UiMovie::ScrollText): +4 = `scrolling`, +12 = 45, +16 the
+// float word at 0x820021F8 (copied).
+std::optional<uint32_t> ScrollText(uint8_t* base, uint32_t movie, uint32_t sub_scene,
+                                   uint32_t child, uint32_t scrolling);
+// sub_8211C5F8: the scroll counter (+8) = 0.
+std::optional<uint32_t> ResetTextScroll(uint8_t* base, uint32_t movie, uint32_t sub_scene,
+                                        uint32_t child);
+// sub_8211D880 (UiMovie::RevealText, with sub_8211C930): when the record's
+// page (+20) + 1 is at most its buffer's page count (Strings::PageCount,
+// compared signed), the page + 1 and 1, else 0; the record stored either
+// way. Returns r3 (1 or 0).
+std::optional<uint32_t> RevealText(uint8_t* base, uint32_t movie, uint32_t sub_scene,
+                                   uint32_t child);
+// sub_8211D8D8 (with sub_8211C9C0): the same test with no step and nothing
+// stored: 1 while there's another page, else 0.
+std::optional<uint32_t> HasMoreText(uint8_t* base, uint32_t movie, uint32_t sub_scene,
+                                    uint32_t child);
 
 }  // namespace ui_movies

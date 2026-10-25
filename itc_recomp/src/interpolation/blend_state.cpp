@@ -31,6 +31,7 @@
 #include "frame_pacing/game_messages.h"
 #include "guest.h"
 #include "hooks/guest_call.h"
+#include "hooks/scenery_lists.h"
 #include "matrix_math/matrix_math.h"
 #include "sprites/billboards.h"
 #include "transform.h"
@@ -3822,6 +3823,10 @@ void BlendState_AfterRecordObject(uint8_t* base) {
   GetDrawState().AfterRecordObject(base);
 }
 
+void BlendState_SetRecordContext(const std::array<uint32_t, 9>& context) {
+  g_record_context = context;
+}
+
 void BlendState_OnReplayFrameStart() {
   if (ITC_FLAG(log_object_extras)) {
     GetObjectExtrasLog().OnFrameStart();
@@ -4361,14 +4366,19 @@ extern "C" REX_FUNC(sub_8258FD48) {
 }
 
 // The per-object recorder (~150 calls a pass in a race): r4 = camera
-// view-projection, r5 = the object's world matrix.
+// view-projection, r5 = the object's world matrix. Its interpolation hooks
+// stay here around the recording, native or translated.
 extern "C" REX_FUNC(sub_825953D0) {
   REX_FUNC_PROLOGUE();
   interpolation::BlendState_BeforeRecordObject(base, ctx.r4.u32, ctx.r5.u32);
   interpolation::g_record_context = {uint32_t(ctx.lr), ctx.r24.u32, ctx.r25.u32, ctx.r26.u32,
                                      ctx.r27.u32,      ctx.r28.u32, ctx.r29.u32, ctx.r30.u32,
                                      ctx.r31.u32};
-  __imp__sub_825953D0(ctx, base);
+  // The recording natively (src/scenery_lists/model_draws.cpp,
+  // --native_scenery_lists) or translated.
+  if (!hooks::SceneryListsRecordObject(ctx, base)) {
+    __imp__sub_825953D0(ctx, base);
+  }
   interpolation::g_record_context = {};
   interpolation::BlendState_AfterRecordObject(base);
 }

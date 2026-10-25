@@ -17,6 +17,7 @@
 #pragma once
 
 #include <cstdint>
+#include <optional>
 
 namespace strings_and_font {
 
@@ -75,6 +76,57 @@ bool Swprintf(uint8_t* base, uint32_t buffer, uint32_t format, uint32_t args, ui
 // wouldn't do natively (`out` holding the unit 0xFFFF) or wouldn't fit its
 // buffer (the original would overrun its frame).
 bool StringsFormatGrouped(uint8_t* base, int32_t value, uint32_t out, uint32_t frame);
+
+// Strings::Get (sub_8210A800): the file i of `table` (its words) whose
+// bound (0x82007E18 + 4i, signed) is at most `id` and the next above it,
+// and its entry id - bound i (DataFile::GetEntry, r5 = 0: the UTF-16
+// string). nullopt for an id at or past the last bound (the original
+// returns with r3 unchanged).
+std::optional<uint32_t> StringsGet(uint8_t* base, uint32_t table, uint32_t id);
+
+// Strings::FormatV's calls into code that still takes the guest context:
+// `function` with r3, r4 and r5 (all 64 bits of it) from a frame at `frame`
+// (r1) with the return address `lr`; returns its r3.
+struct FormatCalls {
+  void* user;
+  uint32_t (*call)(void* user, uint32_t function, uint32_t r3, uint32_t r4, uint64_t r5,
+                   uint32_t frame, uint32_t lr);
+};
+
+// Strings::FormatV (sub_8210A990): string `id` of `table` (Strings::Get;
+// the table itself read as the string for an id past the last bound, as
+// the original's r3 left) appended to `out` a unit at a time (wcscat), the
+// control units replaced: 0xFFD7 the string whose 16-bit id is in the next
+// 8-byte slot of `args` (the va_list), formatted recursively with the slots
+// after it; 0xFFEC-0xFFF5 the slot's int with "%<0xFFF5 - c>d", 0xFFE2-
+// 0xFFEB its double, rounded to a float, with "%.<0xFFEB - c>f", 0xFFD8-
+// 0xFFE1 its int with "%0<0xFFE1 - c>d" (the format made by swprintf from
+// "%%%dd", "%%.%df" or "%%0%dd" first); 0xFFD3 the int with separators
+// (Strings::FormatGrouped); 0xFFD2 a number through the font (sub_82108A70,
+// never ran in play: a guest call). Its 4,800-byte frame below `stack` (the
+// back chain written): the 4 KB buffer at +608 (cleared before each slot),
+// the made format at +96, the one-unit string at +80, swprintf's argument
+// at +32 (as the originals store them). swprintf and FormatGrouped natively,
+// where they decline swprintf's adapter and FormatGrouped's original through
+// `calls`. Returns `out`.
+uint32_t StringsFormatV(uint8_t* base, const FormatCalls& calls, uint32_t stack, uint32_t table,
+                        uint32_t out, uint32_t id, uint32_t args);
+
+// Strings::Format (sub_8210ABC0): FormatV with the arguments as varargs:
+// `varargs` (r6 to r10) stored in the caller's parameter area (`stack` + 40
+// to + 79) and the va_list from there, kept at its frame's +80 (a 4,784-byte
+// frame); 0xFFD2 isn't a case (appended as itself); 0xFFD7's strings
+// through FormatV. Returns `out`.
+uint32_t StringsFormat(uint8_t* base, const FormatCalls& calls, uint32_t stack, uint32_t table,
+                       uint32_t out, uint32_t id, const uint64_t varargs[5]);
+
+// sub_82108860, probably XPR::Release of a slot: the XPR at `slot` (when
+// set) destroyed (XPR::~XPR), freed (operator delete) and the slot cleared.
+// Returns the r3 the original leaves (the XPR, else the slot); nullopt,
+// with nothing done, where the original must run (a block the layer didn't
+// give, or XPR::~XPR's plain C++ declines). Only over the allocation layer
+// with the memory blocks' host lock (the adapter's condition).
+std::optional<uint32_t> ReleaseXprSlot(uint8_t* base, uint32_t slot);
 
 // Strings::PageCount (sub_8210A5C0): the page breaks (0xFFD1) in `text`.
 uint32_t StringsPageCount(uint8_t* base, uint32_t text);

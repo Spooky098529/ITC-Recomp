@@ -6,9 +6,12 @@
 #include <bit>
 
 #include "base/flags.h"
+#include "base/log.h"
 #include "c_runtime/strings.h"
 #include "hooks/guest_call.h"
+#include "hooks/heap.h"
 #include "hooks/ui_movies_game.h"
+#include "strings_and_font/strings_and_font.h"
 #include "ui_movies/game.h"
 #include "ui_movies/ui_movies.h"
 
@@ -35,15 +38,33 @@ ITC_FLAG_BOOL(native_ui_movies_game, true, "ITC",
               "sub_8211B9B8 and sub_8211B940, and UiMovies::IsLoaded sub_8211BE98; the moves "
               "between the animation lists UiMovie::MoveAnimation sub_8211DBE0, "
               "UiMovie::MoveNamedAnimation sub_8211DCE8, UiMovie::Loop sub_8211DDD8, "
-              "UiMovie::LoopNamed sub_8211DDE0 and UiMovie::LoopLast sub_8211DDE8, and the "
+              "UiMovie::LoopNamed sub_8211DDE0, UiMovie::LoopLast sub_8211DDE8, the "
+              "stops UiMovie::Finish sub_8211DE38, UiMovie::FinishNamed sub_8211DF20 and "
+              "UiMovie::FinishAll sub_8211DFF8 (UiMovie::ApplyAnimation through its override), "
+              "and the "
               "starts UiMovie::Play sub_8211D978 and UiMovie::PlayNamed sub_8211DAC8 (these "
-              "without --log_pause_movie) "
-              "(same results; checked by --run_harnesses=ui_movies_game). sub_8211A660, "
-              "sub_8211B230 and AnimationList::Get have no adapters: only native callers reach "
+              "without --log_pause_movie); the texts drawn UiMovie::DrawTexts sub_8211CD90 (its "
+              "Text::Draw through that adapter) with UiMovie::ScrollOffset sub_8211B800; "
+              "UiMovie::Draw sub_8211D280 and UiMovie::Run sub_8211E1B8 (their calls through "
+              "their overrides); with --native_heap and --native_c_runtime_heap, the vectors' "
+              "sub_8211B0E8, sub_8211C168 (sub_8211B458, sub_8211B160) and sub_8211AE68 "
+              "(sub_8211A788), UiMovie::UiMovie sub_8211E1C0 (sub_8211AE18, sub_8211B018, "
+              "sub_8211D210), UiMovie::~UiMovie sub_8211E160 (sub_8211D1B8, sub_8211AF90) and "
+              "the texts freed sub_8211AC90, UiMovie::GetText sub_8211B660, and the named animations "
+              "added sub_8211E378 (sub_8211E318; its strings through std::string's plain C++), "
+              "the text setters UiMovie::ClearText sub_8211C470, sub_8211C4F0, "
+              "UiMovie::ScrollText sub_8211C570, sub_8211C5F8, UiMovie::RevealText sub_8211D880 "
+              "(sub_8211C930) and sub_8211D8D8 (sub_8211C9C0); "
+              "the full-frame effect sub_8211BEE8 (CameraPasses::RenderTarget and sub_8259EBE8 "
+              "through their overrides) "
+              "(same results; checked by --run_harnesses=ui_movies_game and ui_movie_objects). sub_8211A660, "
+              "sub_8211B230, AnimationList::Get, UiMovie::ScrollOffset, sub_8211B7B8, sub_8211B9B8 and "
+              "sub_8211B940 have no adapters: only native callers reach "
               "them, and the flag switches those");
 
 ITC_FLAG_DECLARE(bool, native_ui_movies);
 ITC_FLAG_DECLARE(bool, log_pause_movie);
+ITC_FLAG_DECLARE(bool, native_c_runtime_heap);
 
 #define NATIVE_OR_ORIGINAL(address)          \
   if (!ITC_FLAG(native_ui_movies_game)) {    \
@@ -324,33 +345,13 @@ extern "C" REX_FUNC(sub_8211B720) {
   ctx.r3.u64 = ui_movies::TextString(base, ctx.r3.u32, ctx.r4.u32);
 }
 
-// The text's +20, +24 and +4: r3 = movie, r4 = a text id.
+// The text's +20: r3 = movie, r4 = a text id. (Its +24 and +4,
+// sub_8211B7B8 and sub_8211B9B8, and the scroll counter's sub_8211B940 have
+// no adapters: only DrawTexts' plain C++ calls them in play.)
 extern "C" REX_FUNC(sub_8211B770) {
   REX_FUNC_PROLOGUE();
   NATIVE_OR_ORIGINAL(8211B770);
   ctx.r3.u64 = ui_movies::TextField(base, ctx.r3.u32, ctx.r4.u32, 20);
-}
-
-extern "C" REX_FUNC(sub_8211B7B8) {
-  REX_FUNC_PROLOGUE();
-  NATIVE_OR_ORIGINAL(8211B7B8);
-  ctx.r3.u64 = ui_movies::TextField(base, ctx.r3.u32, ctx.r4.u32, 24);
-}
-
-extern "C" REX_FUNC(sub_8211B9B8) {
-  REX_FUNC_PROLOGUE();
-  NATIVE_OR_ORIGINAL(8211B9B8);
-  ctx.r3.u64 = ui_movies::TextField(base, ctx.r3.u32, ctx.r4.u32, 4);
-}
-
-// sub_8211B940: r3 = movie, r4 = a text id; r3 left at the movie's texts
-// (TextMap::Set's).
-extern "C" REX_FUNC(sub_8211B940) {
-  REX_FUNC_PROLOGUE();
-  NATIVE_OR_ORIGINAL(8211B940);
-  const uint32_t movie = ctx.r3.u32;
-  ui_movies::AdvanceTextScroll(base, movie, ctx.r4.u32);
-  ctx.r3.u64 = movie + ui_movies::kMovieTexts;
 }
 
 namespace {
@@ -443,10 +444,359 @@ void PlayNamed(PPCContext& ctx, uint8_t* base) {
                                     ctx.r7.u32, ctx.r8.u32);
 }
 
+void DrawTexts(PPCContext& ctx, uint8_t* base) {
+  NATIVE_OR_ORIGINAL(8211CD90);
+  const uint32_t movie = ctx.r3.u32, list = ctx.r4.u32;
+  const bool draw_only = ctx.r5.u32 != 0;
+  if (guest::LoadU32(base, list + 8) == 0) {
+    return;
+  }
+  ctx.fpscr.disableFlushMode();
+  const uint64_t lr = ctx.lr;
+  guest_call::InFrame(ctx, base, ui_movies::kDrawTextsFrame, 0x8211CE30, [&](uint32_t frame) {
+    const uint32_t item = frame + ui_movies::kDrawTextsItem;
+    do {
+      const uint32_t from = ui_movies::DrawTextsPop(base, frame, list);
+      if (!ui_movies::CopyTextItem(base, item, from)) {
+        ctx.r3.u64 = item;
+        ctx.r4.u64 = from;
+        ctx.lr = 0x8211CE30;
+        __imp__sub_8211AED0(ctx, base);
+      }
+      ui_movies::DrawTextsItem(base, frame, movie, draw_only);
+      // Text::Draw (its adapter: the render queue's guest call).
+      ctx.r3.u64 = guest::LoadU32(base, strings_and_font::kStrings);
+      ctx.r4.u64 = frame + ui_movies::kDrawTextsParams;
+      ctx.r5.u64 = frame + ui_movies::kDrawTextsBuffer;
+      ctx.lr = 0x8211D190;
+      sub_8210A758(ctx, base);
+      ctx.fpscr.disableFlushMode();
+      ctx.r3.u64 = ui_movies::ClearTextItem(base, item);
+    } while (guest::LoadU32(base, list + 8) != 0);
+  });
+  ctx.lr = lr;
+}
+
 void Loop(PPCContext& ctx, uint8_t* base) {
   NATIVE_UNWATCHED_OR_ORIGINAL(8211DDD8);
   const uint32_t movie = ctx.r3.u32;
   ctx.r3.u64 = MovedR3(ui_movies::MoveAnimation(base, movie, ctx.r4.u32, ctx.r5.u32, true),
                        ctx.r1.u32, movie);
 }
+
+// UiMovie::Finish and FinishNamed: the animation moved to the queue
+// (MoveAnimation or MoveNamedAnimation), then, when the queue has it,
+// applied at its end through UiMovie::ApplyAnimation's override and
+// removed, from a frame like the original's with its return addresses. r3
+// as the original leaves it: the move's, or the queue after the removal.
+namespace {
+template <typename Move, typename Find>
+void FinishIn(PPCContext& ctx, uint8_t* base, uint32_t movie, uint32_t frame_bytes,
+              uint32_t move_return, uint32_t apply_return, Move move, Find find) {
+  const uint64_t lr = ctx.lr;
+  guest_call::InFrame(ctx, base, frame_bytes, move_return, [&](uint32_t frame) {
+    ctx.r3.u64 = MovedR3(move(), frame, movie);
+    const std::optional<ui_movies::Finishing> found = find();
+    if (!found) {
+      return;
+    }
+    ctx.r3.u64 = guest::LoadU32(base, found->slot + 12);
+    ctx.r4.u64 = guest::LoadU32(base, found->slot + 16);
+    ctx.r6.u64 = 0;
+    ctx.fpscr.disableFlushMode();
+    ctx.f1.f64 = double(std::bit_cast<float>(found->time));
+    ctx.lr = apply_return;
+    sub_825A08E0(ctx, base);
+    const uint32_t queue = movie + ui_movies::kMovieQueue;
+    ui_movies::RemoveAt(base, queue, found->position);
+    ctx.r3.u64 = queue;
+  });
+  ctx.lr = lr;
+}
+}  // namespace
+
+void Finish(PPCContext& ctx, uint8_t* base) {
+  NATIVE_UNWATCHED_OR_ORIGINAL(8211DE38);
+  const uint32_t movie = ctx.r3.u32, sub_scene = ctx.r4.u32, index = ctx.r5.u32;
+  FinishIn(
+      ctx, base, movie, 128, 0x8211DE58, 0x8211DF08,
+      [&] { return ui_movies::MoveAnimation(base, movie, sub_scene, index, false); },
+      [&] { return ui_movies::FindFinishing(base, movie, sub_scene, index); });
+}
+
+void FinishNamed(PPCContext& ctx, uint8_t* base) {
+  NATIVE_UNWATCHED_OR_ORIGINAL(8211DF20);
+  const uint32_t movie = ctx.r3.u32, named = ctx.r4.u32;
+  FinishIn(
+      ctx, base, movie, 112, 0x8211DF3C, 0x8211DFE0,
+      [&] { return ui_movies::MoveNamedAnimation(base, movie, named, false); },
+      [&] { return ui_movies::FindFinishingNamed(base, movie, named); });
+}
 }  // namespace ui_movies_game_hooks
+
+// UiMovie::Draw (the game's, sub_8211D280): r3 = movie; the pose saved
+// (UiMovie::RestorePose), then the drawing as the update's (UiMovie::Draw
+// sub_8259FA00, DrawTexts with r5 = 0, sub_8259DAC0 with 678 and 148), each
+// through its override from a frame like the original's (112 bytes) with
+// its return address. r3 as the last call leaves it.
+extern "C" REX_FUNC(sub_8211D280) {
+  REX_FUNC_PROLOGUE();
+  NATIVE_OR_ORIGINAL(8211D280);
+  ITC_NATIVE_RUNNING("sub_8211D280 UiMovie::Draw");
+  const uint32_t movie = ctx.r3.u32;
+  const uint64_t lr = ctx.lr;
+  guest_call::InFrame(ctx, base, 112, 0x8211D2A4, [&](uint32_t) {
+    ctx.r3.u64 = movie;
+    ctx.r4.u64 = guest::LoadU32(base, movie + ui_movies::kMovieSaved);
+    ctx.r5.u64 = guest::LoadU32(base, movie + ui_movies::kMovieLive);
+    ctx.r6.u64 = 0;
+    ctx.r7.u64 = 0;
+    ctx.lr = 0x8211D2A4;
+    sub_82119B80(ctx, base);
+    ctx.r3.u64 = movie + 64;
+    ctx.r4.u64 = guest::LoadU32(base, movie + ui_movies::kMovieLive);
+    ctx.r5.u64 = movie + ui_movies::kMovieTextures;
+    ctx.r6.u64 = movie + 40;
+    ctx.r7.s64 = -1;
+    ctx.lr = 0x8211D2C4;
+    sub_8259FA00(ctx, base);
+    ctx.r3.u64 = movie;
+    ctx.r4.u64 = movie + 40;
+    ctx.r5.u64 = 0;
+    ctx.lr = 0x8211D2D4;
+    sub_8211CD90(ctx, base);
+    for (uint32_t k = 0; k < 2; k++) {
+      ctx.r3.u64 = movie + 64;
+      ctx.r4.u64 = k == 0 ? 678 : 148;
+      ctx.lr = k == 0 ? 0x8211D2E0 : 0x8211D2EC;
+      sub_8259DAC0(ctx, base);
+    }
+  });
+  ctx.lr = lr;
+}
+
+// UiMovie::Run (sub_8211E1B8): a jump to the update (r3 = movie, r4 = 0 to
+// advance, else draw only), its override (the frame pacing's); lr kept, so
+// the update sees the caller's return address as the original's jump leaves
+// it.
+extern "C" REX_FUNC(sub_8211E1B8) {
+  REX_FUNC_PROLOGUE();
+  NATIVE_OR_ORIGINAL(8211E1B8);
+  ITC_NATIVE_RUNNING("sub_8211E1B8 UiMovie::Run");
+  sub_8211D2F8(ctx, base);
+}
+
+// UiMovie::FinishAll (sub_8211DFF8): r3 = movie. Every looping slot moved
+// to the queue's end (copied into the frame, +80, unlinked, then
+// AnimationList::Insert), then every queued slot copied there, applied at
+// its end (UiMovie::ApplyAnimation, r6 = 0, at FinishTime) and unlinked:
+// the live scene keeps each one's end pose. Its calls through their
+// overrides from a frame like the original's (176 bytes) with its return
+// addresses; the copies the host's (the game's memcpy where they might
+// share memory). The counts are read once each, 16-bit, sign-extended, and
+// counted down to 0 as the original's. r3 as the last call leaves it.
+extern "C" REX_FUNC(sub_8211DFF8) {
+  REX_FUNC_PROLOGUE();
+  NATIVE_UNWATCHED_OR_ORIGINAL(8211DFF8);
+  ITC_NATIVE_RUNNING("sub_8211DFF8 UiMovie::FinishAll");
+  const uint32_t movie = ctx.r3.u32;
+  const uint32_t queue = movie + ui_movies::kMovieQueue;
+  const uint32_t looping = movie + ui_movies::kMovieLooping;
+  const uint64_t lr = ctx.lr;
+  auto count = [&](uint32_t list) {
+    return uint32_t(int32_t(int16_t(guest::LoadU16(base, list + 136))));
+  };
+  guest_call::InFrame(ctx, base, 176, 0x8211E05C, [&](uint32_t frame) {
+    const uint32_t copy = frame + 80;
+    // The list's first slot copied to the frame (memcpy, r3 its
+    // destination).
+    auto copy_first = [&](uint32_t list, uint32_t return_address) {
+      const uint32_t from = ui_movies::SlotOf(base, list, ui_movies::LinkAt(base, list, 0));
+      if (!c_runtime::Memcpy(base, copy, from, 40)) {
+        ctx.r3.u64 = copy;
+        ctx.r4.u64 = from;
+        ctx.r5.u64 = 40;
+        ctx.lr = return_address;
+        sub_825A7410(ctx, base);
+      }
+      ctx.r3.u64 = copy;
+    };
+    uint32_t n = count(looping);
+    if (n != 0) {
+      do {
+        copy_first(looping, 0x8211E05C);
+        ui_movies::UnlinkQueueFirst(base, looping);
+        ctx.r3.u64 = queue;
+        ctx.r4.u64 = copy;
+        ctx.r5.s64 = int32_t(count(queue));
+        ctx.lr = 0x8211E0A0;
+        sub_8211B4D0(ctx, base);
+      } while (--n != 0);
+    }
+    n = count(queue);
+    if (n != 0) {
+      do {
+        copy_first(queue, 0x8211E0F0);
+        ctx.r3.u64 = guest::LoadU32(base, copy + 12);
+        ctx.r4.u64 = guest::LoadU32(base, copy + 16);
+        ctx.r6.u64 = 0;
+        ctx.fpscr.disableFlushMode();
+        ctx.f1.f64 = double(std::bit_cast<float>(ui_movies::FinishTime(base, copy)));
+        ctx.lr = 0x8211E118;
+        sub_825A08E0(ctx, base);
+        ui_movies::UnlinkQueueFirst(base, queue);
+      } while (--n != 0);
+    }
+  });
+  ctx.lr = lr;
+}
+
+// --- The movies' vectors and objects (src/ui_movies/objects.cpp) ---
+//
+// They allocate and free: natively only over the allocation layer, with the
+// C runtime's heap native (--native_c_runtime_heap), as the callees' plain
+// C++ is called directly; each falls back to the original where its checks
+// say so (nothing done then).
+
+namespace {
+bool NativeHeap() {
+  return ITC_FLAG(native_ui_movies_game) && ITC_FLAG(native_c_runtime_heap) &&
+         hooks::NativeHeapActive();
+}
+}  // namespace
+
+#define NATIVE_HEAP_OR_ORIGINAL(address, call) \
+  if (NativeHeap()) {                          \
+    if (const auto r3 = (call)) {              \
+      ctx.r3.u64 = *r3;                        \
+      return;                                  \
+    }                                          \
+  }                                            \
+  __imp__sub_##address(ctx, base);
+
+// sub_8211B0E8: r3 = a vector of pairs; returned.
+extern "C" REX_FUNC(sub_8211B0E8) {
+  REX_FUNC_PROLOGUE();
+  NATIVE_HEAP_OR_ORIGINAL(8211B0E8, ui_movies::MakePairs(base, ctx.r3.u32));
+}
+
+// sub_8211C168: r3 = a vector of pairs, r4 = the key's address, r5 = the
+// value's address.
+extern "C" REX_FUNC(sub_8211C168) {
+  REX_FUNC_PROLOGUE();
+  NATIVE_HEAP_OR_ORIGINAL(8211C168,
+                          ui_movies::PairsSet(base, ctx.r3.u32, guest::LoadU32(base, ctx.r4.u32),
+                                              guest::LoadU32(base, ctx.r5.u32)));
+}
+
+// sub_8211AE68: r3 = a vector of words, r4 = the word's address.
+extern "C" REX_FUNC(sub_8211AE68) {
+  REX_FUNC_PROLOGUE();
+  NATIVE_HEAP_OR_ORIGINAL(8211AE68,
+                          ui_movies::WordsAppend(base, ctx.r3.u32, guest::LoadU32(base, ctx.r4.u32)));
+}
+
+// UiMovie::UiMovie: r3 = movie; returned.
+extern "C" REX_FUNC(sub_8211E1C0) {
+  REX_FUNC_PROLOGUE();
+  NATIVE_HEAP_OR_ORIGINAL(8211E1C0, ui_movies::ConstructMovie(base, ctx.r3.u32));
+}
+
+// UiMovie::~UiMovie: r3 = movie.
+extern "C" REX_FUNC(sub_8211E160) {
+  REX_FUNC_PROLOGUE();
+  NATIVE_HEAP_OR_ORIGINAL(8211E160, ui_movies::DestroyMovie(base, ctx.r3.u32));
+}
+
+// sub_8211AC90: r3 = movie.
+extern "C" REX_FUNC(sub_8211AC90) {
+  REX_FUNC_PROLOGUE();
+  NATIVE_HEAP_OR_ORIGINAL(8211AC90, ui_movies::FreeTexts(base, ctx.r3.u32));
+}
+
+// UiMovie::GetText: r3 = movie, r4 = the address of a TXT node's id; the
+// text record.
+extern "C" REX_FUNC(sub_8211B660) {
+  REX_FUNC_PROLOGUE();
+  NATIVE_HEAP_OR_ORIGINAL(8211B660, ui_movies::GetText(base, ctx.r3.u32, ctx.r4.u32));
+}
+
+// sub_8211E378: r3 = movie, r4 = a scene; its temporaries in a frame like
+// the original's below r1.
+extern "C" REX_FUNC(sub_8211E378) {
+  REX_FUNC_PROLOGUE();
+  if (!NativeHeap() || !ui_movies::CanAllocate(base, 0)) {
+    __imp__sub_8211E378(ctx, base);
+    return;
+  }
+  ctx.r3.u64 = ui_movies::AddNamedAnimations(base, ctx.r1.u32, ctx.r3.u32, ctx.r4.u32);
+}
+
+// sub_8211BEE8: r3 = a primitive node. The quad built natively in a frame
+// like the original's (1,248 bytes), CameraPasses::RenderTarget(0) and
+// sub_8259EBE8 through their overrides with its return addresses. r3 as the
+// last call leaves it.
+extern "C" REX_FUNC(sub_8211BEE8) {
+  REX_FUNC_PROLOGUE();
+  NATIVE_OR_ORIGINAL(8211BEE8);
+  const uint32_t primitive = ctx.r3.u32;
+  const uint64_t lr = ctx.lr;
+  ctx.fpscr.disableFlushMode();
+  guest_call::InFrame(ctx, base, ui_movies::kEffectFrame, 0x8211BF9C, [&](uint32_t frame) {
+    ui_movies::EffectBegin(base, frame);
+    ctx.r3.u64 = 0;
+    ctx.lr = 0x8211BF9C;
+    sub_8209F7A8(ctx, base);
+    const uint32_t texture = ctx.r3.u32;
+    ctx.fpscr.disableFlushMode();
+    const double depth = ui_movies::EffectQuad(base, frame, primitive, texture);
+    ctx.r3.u64 = frame + ui_movies::kEffectQuad;
+    ctx.r4.u64 = ui_movies::kEffectKey;
+    ctx.fpscr.disableFlushMode();
+    ctx.f1.f64 = depth;
+    ctx.lr = 0x8211C154;
+    sub_8259EBE8(ctx, base);
+  });
+  ctx.lr = lr;
+}
+
+// The text setters: r3 = movie, r4 = a sub-scene's index or -1, r5 = a
+// child's index (sub_8211C4F0: r6 = the delay, f1 = the speed;
+// UiMovie::ScrollText: r6 = scrolling).
+extern "C" REX_FUNC(sub_8211C470) {
+  REX_FUNC_PROLOGUE();
+  NATIVE_HEAP_OR_ORIGINAL(8211C470,
+                          ui_movies::ClearText(base, ctx.r3.u32, ctx.r4.u32, ctx.r5.u32));
+}
+
+extern "C" REX_FUNC(sub_8211C4F0) {
+  REX_FUNC_PROLOGUE();
+  NATIVE_HEAP_OR_ORIGINAL(8211C4F0,
+                          ui_movies::SetTextScrollSpeed(base, ctx.r3.u32, ctx.r4.u32, ctx.r5.u32,
+                                                        ctx.r6.u32, ctx.f1.f64));
+}
+
+extern "C" REX_FUNC(sub_8211C570) {
+  REX_FUNC_PROLOGUE();
+  NATIVE_HEAP_OR_ORIGINAL(8211C570, ui_movies::ScrollText(base, ctx.r3.u32, ctx.r4.u32,
+                                                          ctx.r5.u32, ctx.r6.u32));
+}
+
+extern "C" REX_FUNC(sub_8211C5F8) {
+  REX_FUNC_PROLOGUE();
+  NATIVE_HEAP_OR_ORIGINAL(8211C5F8,
+                          ui_movies::ResetTextScroll(base, ctx.r3.u32, ctx.r4.u32, ctx.r5.u32));
+}
+
+// UiMovie::RevealText and sub_8211D8D8: 1 or 0.
+extern "C" REX_FUNC(sub_8211D880) {
+  REX_FUNC_PROLOGUE();
+  NATIVE_HEAP_OR_ORIGINAL(8211D880,
+                          ui_movies::RevealText(base, ctx.r3.u32, ctx.r4.u32, ctx.r5.u32));
+}
+
+extern "C" REX_FUNC(sub_8211D8D8) {
+  REX_FUNC_PROLOGUE();
+  NATIVE_HEAP_OR_ORIGINAL(8211D8D8,
+                          ui_movies::HasMoreText(base, ctx.r3.u32, ctx.r4.u32, ctx.r5.u32));
+}

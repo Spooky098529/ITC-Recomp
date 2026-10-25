@@ -162,6 +162,23 @@ const uint32_t kLengths[] = {0, 1, 2, 3, 4, 5, 7, 8, 15, 16, 17, 31, 64, 200, 45
 // where the plain C++ refuses (the error paths the adapters left to the
 // original), the original runs, as the adapters did.
 
+// _init_pointers' setters: r3 = the value (left).
+void NativeSetHandler82971170(PPCContext& ctx, uint8_t* base) {
+  c_runtime::SetHandler82971170(base, ctx.r3.u32);
+}
+void NativeSetHandler82971178(PPCContext& ctx, uint8_t* base) {
+  c_runtime::SetHandler82971178(base, ctx.r3.u32);
+}
+void NativeSetInvalidParameterHandler(PPCContext& ctx, uint8_t* base) {
+  c_runtime::SetInvalidParameterHandler(base, ctx.r3.u32);
+}
+void NativeSetCriticalSectionInitializer(PPCContext& ctx, uint8_t* base) {
+  c_runtime::SetCriticalSectionInitializer(base, ctx.r3.u32);
+}
+void NativeSetDefaultCriticalSectionInitializer(PPCContext&, uint8_t* base) {
+  c_runtime::SetDefaultCriticalSectionInitializer(base);
+}
+
 // strcpy_s: r3 = destination, r4 = its size, r5 = source; returns 0.
 void NativeStrcpyS(PPCContext& ctx, uint8_t* base) {
   if (!c_runtime::StrcpyS(base, ctx.r3.u32, ctx.r4.u32, ctx.r5.u32)) {
@@ -573,6 +590,94 @@ void CRuntime(Context& h) {
         }
       }
       guest::StoreU32(h.base, c_runtime::kXMemSetStride, stride);
+    }
+    results.Report();
+  }
+
+  // XMemCpy (sub_82295890, with its line copy sub_82296FE0): counts 0-300
+  // and up to 1,800, the destination at every place in a 128-byte line, the
+  // source at every alignment in 16 bytes (the line copy for unaligned
+  // ones), random bytes; the whole scratch area and r3 compared. Its byte
+  // loop's step at 0x82638308 is logged, and the short counts also run with
+  // steps 2, 3 and 8 written there for a while (restored), only where the
+  // count reaches 0 (else the original never ends). Overlapping ranges go to
+  // the original on the native side too.
+  {
+    const uint32_t step = guest::LoadU32(h.base, c_runtime::kXMemCpyStep);
+    ITC_LOG_INFO("harness: XMemCpy (sub_82295890): the step at 0x82638308 is {}", step);
+    Results results("XMemCpy (sub_82295890)");
+    const uint32_t line = (h.data + 127) & ~127u;
+    auto native = [](PPCContext& t, uint8_t* base) {
+      if (!c_runtime::XMemCpy(base, t.r3.u32, t.r4.u32, t.r5.u32)) {
+        __imp__sub_82295890(t, base);
+      }
+    };
+    auto one = [&](uint32_t destination, uint32_t source, uint32_t count, const std::string& what) {
+      const std::vector<uint8_t> bytes = RandomBytes(h, count + 32);
+      Outputs out[2];
+      for (int v = 0; v < 2; v++) {
+        Fill(h.base, h.data, kScratchBytes);
+        Write(h.base, source - 16, bytes.data(), uint32_t(bytes.size()));
+        PPCContext t = CallContext(h);
+        t.r3.u64 = destination;
+        t.r4.u64 = source;
+        t.r5.u64 = count;
+        (v == 0 ? __imp__sub_82295890 : native)(t, h.base);
+        out[v].Bytes(Read(h.base, h.data, kScratchBytes));
+        out[v].Word(t.r3.u32);
+      }
+      results.Check(out[0], out[1], what);
+    };
+    for (uint32_t count = 0; count <= 300; count++) {
+      for (uint32_t d : {0u, 1u, 7u, 8u, 16u, 17u, 100u, 127u}) {
+        for (uint32_t sa : {0u, 1u, 4u, 8u, 15u}) {
+          one(line + d, line + 2064 + sa, count,
+              fmt::format("count {} destination +{} source +{}", count, d, sa));
+        }
+      }
+    }
+    for (uint32_t count : {383u, 384u, 385u, 511u, 512u, 513u, 1023u, 1024u, 1025u, 1500u, 1800u}) {
+      for (uint32_t d = 0; d < 128; d += 9) {
+        for (uint32_t sa = 0; sa < 16; sa += 3) {
+          one(line + d, line + 2064 + sa, count,
+              fmt::format("count {} destination +{} source +{}", count, d, sa));
+        }
+      }
+    }
+    for (int i = 0; i < 300; i++) {
+      const uint32_t d = h.random.Below(128), sa = h.random.Below(16);
+      const uint32_t count = h.random.Below(1800);
+      one(line + d, line + 2064 + sa, count,
+          fmt::format("count {} destination +{} source +{}", count, d, sa));
+    }
+    // Overlapping either way (the original's on both sides).
+    for (uint32_t count : {5u, 15u, 16u, 40u, 300u}) {
+      for (int32_t shift : {-17, -1, 1, 3, 130}) {
+        one(uint32_t(int32_t(line + 1000) + shift), line + 1000, count,
+            fmt::format("count {} overlapping by {}", count, shift));
+      }
+    }
+    // Other steps, where the byte loop's count reaches 0.
+    for (uint32_t other : {2u, 3u, 8u}) {
+      guest::StoreU32(h.base, c_runtime::kXMemCpyStep, other);
+      for (uint32_t count = 0; count < 16; count++) {
+        for (uint32_t sa : {0u, 1u, 2u, 4u, 8u}) {
+          uint32_t at = 0, left = count;
+          if (left >= 8 && (sa & 7) == 0) {
+            at += 8;
+            left -= 8;
+          }
+          if (((sa + at) & 3) == 0 && left >= 4) {
+            left &= 3;
+          }
+          if (left % other != 0) {
+            continue;
+          }
+          one(line + 5, line + 2064 + sa, count,
+              fmt::format("step {} count {} source +{}", other, count, sa));
+        }
+      }
+      guest::StoreU32(h.base, c_runtime::kXMemCpyStep, step);
     }
     results.Report();
   }
@@ -1334,11 +1439,11 @@ void CRuntime(Context& h) {
       const char* name;
     };
     const Setter setters[] = {
-        {__imp__sub_825AD140, sub_825AD140, 0x82971170, "sub_825AD140"},
-        {__imp__sub_825AEE18, sub_825AEE18, 0x82971178, "sub_825AEE18"},
-        {__imp__sub_825AFCB8, sub_825AFCB8, 0x82978320, "sub_825AFCB8"},
-        {__imp__sub_825B3560, sub_825B3560, 0x8297132C, "sub_825B3560"},
-        {__imp__sub_825B3548, sub_825B3548, 0x82971328, "sub_825B3548"},
+        {__imp__sub_825AD140, NativeSetHandler82971170, 0x82971170, "sub_825AD140"},
+        {__imp__sub_825AEE18, NativeSetHandler82971178, 0x82971178, "sub_825AEE18"},
+        {__imp__sub_825AFCB8, NativeSetInvalidParameterHandler, 0x82978320, "sub_825AFCB8"},
+        {__imp__sub_825B3560, NativeSetCriticalSectionInitializer, 0x8297132C, "sub_825B3560"},
+        {__imp__sub_825B3548, NativeSetDefaultCriticalSectionInitializer, 0x82971328, "sub_825B3548"},
     };
     for (const Setter& setter : setters) {
       for (uint64_t value : {uint64_t(0), uint64_t(0x825B3498), uint64_t(0xFFFFFFFF), h.random.Next(), h.random.Next()}) {
@@ -1346,6 +1451,54 @@ void CRuntime(Context& h) {
                     [&](PPCContext& t) { t.r3.u64 = value; }, setter.recompiled, setter.native,
                     fmt::format("{} r3 {:X}", setter.name, value));
       }
+    }
+    // _init_pointers on its six globals (from random words), and the empty
+    // destructor on random registers (all left): the globals, the scratch
+    // area and the registers it could touch compared.
+    {
+      Results init("_init_pointers (sub_825AA398) and the empty destructor (sub_82106540)");
+      constexpr uint32_t kGlobals[] = {0x82971170, 0x8297132C, 0x82978320,
+                                       0x82971178, 0x82971328, 0x8266B7B0};
+      for (int i = 0; i < 20; i++) {
+        const Random start = h.random;
+        for (bool empty : {false, true}) {
+          Outputs out[2];
+          for (int v = 0; v < 2; v++) {
+            h.random = start;
+            uint32_t saved[6];
+            for (int k = 0; k < 6; k++) {
+              saved[k] = guest::LoadU32(h.base, kGlobals[k]);
+              guest::StoreU32(h.base, kGlobals[k], uint32_t(h.random.Next()));
+            }
+            Fill(h.base, h.data, kScratchBytes);
+            PPCContext t = CallContext(h);
+            t.r3.u64 = i == 0 ? 0 : h.random.Next();
+            t.r4.u64 = h.random.Next();
+            t.r10.u64 = h.random.Next();
+            t.r11.u64 = h.random.Next();
+            if (empty) {
+              (v == 0 ? __imp__sub_82106540 : sub_82106540)(t, h.base);
+            } else {
+              (v == 0 ? __imp__sub_825AA398 : sub_825AA398)(t, h.base);
+            }
+            for (int k = 0; k < 6; k++) {
+              out[v].Word(guest::LoadU32(h.base, kGlobals[k]));
+              guest::StoreU32(h.base, kGlobals[k], saved[k]);
+            }
+            out[v].Bytes(Read(h.base, h.data, kScratchBytes));
+            out[v].Word(t.r3.u32);
+            out[v].Word(uint32_t(t.r3.u64 >> 32));
+            out[v].Word(t.r4.u32);
+            if (empty) {
+              out[v].Word(t.r10.u32);
+              out[v].Word(t.r11.u32);
+            }
+          }
+          init.Check(out[0], out[1],
+                     fmt::format("{} case {}", empty ? "sub_82106540" : "_init_pointers", i));
+        }
+      }
+      init.Report();
     }
     const uint32_t info = guest::LoadU32(h.base, 0x8266C450);
     const std::vector<std::pair<uint32_t, uint32_t>> mbc = {

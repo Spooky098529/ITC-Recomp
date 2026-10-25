@@ -133,6 +133,14 @@ uint32_t XMemAlloc(uint8_t* base, uint32_t size, uint32_t attributes) {
   return block;
 }
 
+uint32_t XPhysicalAllocEx(uint8_t* base, uint32_t size, uint32_t low, uint32_t high,
+                          uint32_t alignment, uint32_t protection) {
+  if (guest::LoadU32(base, kNoLargePhysicalPages) != 0) {
+    protection &= ~kMemLargePages;
+  }
+  return memory::AllocPhysical(size, low, high, alignment, protection);
+}
+
 uint32_t XMemFree(uint32_t block, uint32_t attributes) {
   ITC_NATIVE_RUNNING("sub_82297790 XMemFree");
   if (!(attributes & kPhysical)) {

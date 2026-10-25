@@ -117,6 +117,10 @@ set(ITC_SOURCES
     src/ui_movies/files.cpp
     src/hooks/ui_movies_game.cpp
     src/ui_movies/game.cpp
+    src/ui_movies/objects.cpp
+    src/ui_movies/effect.cpp
+    src/ui_movies/texts.cpp
+    src/ui_movies/update.cpp
     src/hooks/race_overlays.cpp
     src/race_overlays/race_overlays.cpp
     src/hooks/vehicle_accessors.cpp
@@ -173,16 +177,27 @@ set(ITC_SOURCES
     src/hooks/minimap.cpp
     src/mode_tick/mode_tick.cpp
     src/minimap/minimap.cpp
+    src/hooks/scenery_lists.cpp
+    src/scenery_lists/scenery_lists.cpp
+    src/scenery_lists/model_draws.cpp
+    src/hooks/scene_models.cpp
+    src/scene_models/scene_models.cpp
     src/hooks/models.cpp
     src/models/memory_blocks.cpp
     src/models/xpr.cpp
     src/models/texture_provider.cpp
     src/models/model.cpp
+    src/models/model_load.cpp
+    src/hooks/shader_objects.cpp
+    src/shader_objects/shader_objects.cpp
+    src/hooks/race_hud.cpp
+    src/race_hud/race_hud.cpp
     src/hooks/screen_objects.cpp
     src/screen_objects/uv_trees.cpp
     src/screen_objects/screen_objects.cpp
     src/hooks/course_scenery.cpp
     src/course_scenery/course_scenery.cpp
+    src/course_scenery/collect.cpp
     src/hooks/action_mappers.cpp
     src/action_mappers/action_mappers.cpp
     src/hooks/data_tables.cpp
@@ -215,6 +230,8 @@ set(ITC_SOURCES
     src/c_runtime/arrays.cpp
     src/c_runtime/exit.cpp
     src/game_data/game_data.cpp
+    src/game_data/data_file.cpp
+    src/hooks/data_file.cpp
     src/display/gamma.cpp
     src/harnesses/harness.cpp
     src/harnesses/clock.cpp
@@ -264,6 +281,12 @@ set(ITC_SOURCES
     src/harnesses/game_modes.cpp
     src/harnesses/mode_tick.cpp
     src/harnesses/minimap.cpp
+    src/harnesses/scene_models.cpp
+    src/harnesses/scenery_lists.cpp
+    src/harnesses/shader_objects.cpp
+    src/harnesses/data_file.cpp
+    src/harnesses/race_hud.cpp
+    src/harnesses/ui_movie_objects.cpp
     src/harnesses/models.cpp
     src/harnesses/action_mappers.cpp
     src/harnesses/data_tables.cpp
@@ -331,7 +354,10 @@ set(ITC_SOURCES
 # negation into an addition (LLVM's default model treats a NaN's sign as
 # free; seen with -O3 on asin of a negative NaN). See
 # docs/functions/c-runtime.md. The UI movie keys' interpolation
-# (src/ui_movies/keys.cpp) and its drawing walk (src/ui_movies/draw.cpp) likewise (docs/functions/ui-movies.md), and the
+# (src/ui_movies/keys.cpp) and its drawing walk (src/ui_movies/draw.cpp) and the
+# game's texts drawn (src/ui_movies/texts.cpp), the full-frame effect's quad
+# (src/ui_movies/effect.cpp) and the update's time steps
+# (src/ui_movies/update.cpp) likewise (docs/functions/ui-movies.md), and the
 # matrix math (src/matrix_math/matrix_math.cpp, docs/functions/matrix-math.md)
 # and the car physics (src/car_physics/, docs/functions/car-physics.md) and
 # the collision shapes (src/collision/, docs/functions/collision.md) and the
@@ -342,11 +368,17 @@ set(ITC_SOURCES
 # docs/functions/cameras.md) and the string table and font
 # (src/strings_and_font/, docs/functions/strings-and-font.md) and the
 # course's route (src/track_route/, docs/functions/track-route.md) and the AI
-# drivers (src/ai_drivers/, docs/functions/ai-drivers.md) and the screen
-# objects (src/screen_objects/, docs/functions/screen-objects.md).
+# drivers (src/ai_drivers/, docs/functions/ai-drivers.md) and the course
+# scenery's collection and draws (src/course_scenery/collect.cpp,
+# docs/functions/course-scenery.md) and the screen
+# objects (src/screen_objects/, docs/functions/screen-objects.md) and the
+# model draws (src/scenery_lists/model_draws.cpp,
+# docs/functions/scenery-lists.md) and the model's load (its weights,
+# src/models/model_load.cpp, docs/functions/models.md).
 set_source_files_properties(src/c_runtime/math.cpp src/ui_movies/keys.cpp
     src/ui_movies/animation.cpp
-    src/ui_movies/draw.cpp
+    src/ui_movies/draw.cpp src/ui_movies/texts.cpp src/ui_movies/update.cpp
+    src/ui_movies/effect.cpp
     src/matrix_math/matrix_math.cpp src/car_physics/rigid_body.cpp
     src/car_physics/vehicle_step.cpp src/car_physics/vehicle_update.cpp
     src/car_physics/vehicle_state.cpp src/car_physics/collision_world.cpp
@@ -360,7 +392,8 @@ set_source_files_properties(src/c_runtime/math.cpp src/ui_movies/keys.cpp
     src/car_specs/car_specs.cpp src/cameras/cameras.cpp
     src/strings_and_font/strings_and_font.cpp src/strings_and_font/font.cpp
     src/track_route/track_route.cpp src/ai_drivers/ai_drivers.cpp
-    src/screen_objects/screen_objects.cpp PROPERTIES
+    src/screen_objects/screen_objects.cpp src/scenery_lists/model_draws.cpp
+    src/models/model_load.cpp src/course_scenery/collect.cpp PROPERTIES
     COMPILE_OPTIONS "-ffp-model=strict;-ffp-contract=off"
     SKIP_PRECOMPILE_HEADERS ON)
 

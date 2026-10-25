@@ -11,6 +11,7 @@
 #include "xact/xact.h"
 
 #include <cstdlib>
+#include <initializer_list>
 
 namespace model_animation {
 
@@ -597,6 +598,143 @@ bool TrackSetReleasable(uint8_t* base, uint32_t set, bool array) {
 
 bool SkeletonDestructible(uint8_t* base, uint32_t skeleton) {
   return Deletable(Load(base, skeleton + 176)) && BaseFreeable(base, skeleton);
+}
+
+void NodeFileView(uint8_t* base, uint32_t view, uint32_t file) {
+  ITC_NATIVE_RUNNING("sub_825A21A8 NodeFile::View");
+  Store(base, view + 0, file);
+  for (uint32_t k = 0; k < 7; k++) {
+    Store(base, view + 4 + 4 * k, Load(base, file + 16 + 4 * k) + file);
+  }
+  const uint32_t tail = Load(base, file + 44) + file;
+  Store(base, view + 32, tail);
+  Store(base, view + 36, tail + 16);
+  Store(base, view + 40, Load(base, file + 48) + file);
+  Store(base, view + 44, Load(base, file + 4) - Load(base, file + 8));
+}
+
+namespace {
+
+// operator new[]'s size for `count` elements of `bytes` with a 16-byte
+// header, as the compiler works it out: -1 past `limit` or when it would
+// pass -17.
+uint32_t ArrayBytes(uint32_t count, uint32_t bytes, uint32_t limit) {
+  if (count > limit) {
+    return 0xFFFFFFFFu;
+  }
+  const uint32_t body = count * bytes;
+  return body > 0xFFFFFFEFu ? 0xFFFFFFFFu : body + 16;
+}
+
+constexpr uint32_t kNodeLimit = 0x01C71C71;    // 144-byte entries
+constexpr uint32_t kMatrixLimit = 0x03FFFFFF;  // 64-byte entries
+constexpr uint32_t kCursorLimit = 0x0CCCCCCC;  // 20-byte cursors
+
+// A counted array (its count at +0, the elements from +16): the element
+// count's 64-byte (or 144-byte) entries get 1.0 at `ones`.
+uint32_t CountedArray(uint8_t* base, uint32_t count, uint32_t bytes, uint32_t limit,
+                      std::initializer_list<uint32_t> ones, double one) {
+  const uint32_t array = NewArray(base, ArrayBytes(count, bytes, limit));
+  Store(base, array, count);
+  for (int32_t j = 0; j <= int32_t(count - 1); j++) {
+    const uint32_t entry = array + 16 + bytes * uint32_t(j);
+    for (const uint32_t offset : ones) {
+      Stfs(base, entry + offset, one);
+    }
+    if (bytes == 144) {
+      Store(base, entry + 132, 0);
+      for (uint32_t w = 0; w < 16; w++) {
+        Store(base, entry + 64 + 4 * w, 0);
+      }
+    }
+  }
+  return array + 16;
+}
+
+}  // namespace
+
+bool SkeletonSetUp(uint8_t* base, uint32_t skeleton, uint32_t file, uint32_t matrices,
+                   int32_t instances) {
+  ITC_NATIVE_RUNNING("sub_8259A9E0 SkeletonBase::SetUp");
+  // The checks first: the sizes operator new[] takes (the counts are the
+  // file's, which the view only points at), and Free's.
+  const uint32_t count = instances > 0 ? uint32_t(instances) : 1;
+  const uint32_t nodes = Load(base, file + 4);
+  const uint32_t entries = Load(base, file + 8);
+  if (count > kCursorLimit || !Allocatable(base, count * 20) ||
+      (nodes != 0 && !Allocatable(base, ArrayBytes(nodes, 144, kNodeLimit))) ||
+      (nodes != 0 && matrices == 0 && !Allocatable(base, ArrayBytes(nodes, 64, kMatrixLimit))) ||
+      (entries != 0 && !Allocatable(base, ArrayBytes(entries, 64, kMatrixLimit))) ||
+      !BaseFreeable(base, skeleton)) {
+    return false;
+  }
+  SkeletonBaseFree(base, skeleton);
+  Store(base, skeleton + 160, uint32_t(instances));
+  if (instances <= 0) {
+    Store(base, skeleton + 160, 1);
+  }
+  const uint32_t cursors = NewArray(base, count * 20);
+  for (uint32_t k = 0; k < count; k++) {
+    SkeletonCursorClear(base, cursors + 20 * k);
+  }
+  Store(base, skeleton + 128, cursors);
+  const uint32_t view = skeleton + 80;
+  NodeFileView(base, view, file);
+  const double one = Lfs(base, kOne);
+  const uint32_t node_count = Load(base, Load(base, view) + 4);
+  if (node_count != 0) {
+    Store(base, skeleton + 136,
+          CountedArray(base, node_count, 144, kNodeLimit, {12, 28, 44, 60}, one));
+    if (matrices == 0) {
+      const uint32_t again = Load(base, Load(base, view) + 4);
+      const uint32_t array = CountedArray(base, again, 64, kMatrixLimit, {12, 28, 44, 60}, one);
+      Store(base, skeleton + 132, array);
+      Store(base, skeleton + 148, array);
+    } else {
+      Store(base, skeleton + 148, matrices);
+    }
+  }
+  const uint32_t entry_count = Load(base, Load(base, view) + 8);
+  if (entry_count != 0) {
+    Store(base, skeleton + 144,
+          CountedArray(base, entry_count, 64, kMatrixLimit, {12, 28, 44}, one));
+    for (int32_t i = 0; i < int32_t(Load(base, Load(base, view) + 8)); i++) {
+      Store(base, Load(base, skeleton + 144) + 64 * uint32_t(i) + 52, 1);
+    }
+  }
+  Store(base, skeleton + 140,
+        Load(base, skeleton + 136) + 144 * Load(base, Load(base, view) + 12));
+  return true;
+}
+
+bool SkeletonBind(uint8_t* base, uint32_t skeleton, uint32_t file, uint32_t matrices) {
+  ITC_NATIVE_RUNNING("sub_82599A20 Skeleton::Bind");
+  const uint32_t nodes = Load(base, file + 4);
+  const uint32_t values_bytes = nodes > 0x0FFFFFFFu ? 0xFFFFFFFFu : nodes * 16;
+  if (!Deletable(Load(base, skeleton + 176)) ||
+      (nodes != 0 && !Allocatable(base, values_bytes)) ||
+      !SkeletonSetUp(base, skeleton, file, matrices, 1)) {
+    return false;
+  }
+  const uint32_t values = Load(base, skeleton + 176);
+  if (values != 0) {
+    memory::crt::OperatorDeleteArray(values);
+  }
+  Store(base, skeleton + 176, 0);
+  const uint32_t count = Load(base, Load(base, skeleton + 80) + 4);
+  if (count != 0) {
+    Store(base, skeleton + 176, NewArray(base, values_bytes));
+  }
+  const double zero = Lfs(base, kZero);
+  int32_t n = int32_t(SkeletonNodeCount(base, skeleton));
+  for (int32_t i = 0; i < n; i++) {
+    const uint32_t value = Load(base, skeleton + 176) + 16 * uint32_t(i);
+    Stfs(base, value + 0, zero);
+    Stfs(base, value + 4, zero);
+    Stfs(base, value + 8, zero);
+    n = int32_t(SkeletonNodeCount(base, skeleton));
+  }
+  return true;
 }
 
 void SkeletonCursorClear(uint8_t* base, uint32_t cursor) {

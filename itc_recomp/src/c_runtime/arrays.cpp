@@ -57,4 +57,8 @@ void VectorDestruct(uint8_t* base, uint64_t array, uint64_t size, uint64_t count
   }
 }
 
+void EmptyDestructor() {
+  ITC_NATIVE_RUNNING("sub_82106540 (an empty destructor)");
+}
+
 }  // namespace c_runtime

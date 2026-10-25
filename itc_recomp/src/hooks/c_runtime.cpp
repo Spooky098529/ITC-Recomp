@@ -25,7 +25,7 @@
 
 ITC_FLAG_BOOL(native_c_runtime, true, "ITC",
               "Run the C runtime's helpers natively instead of through the translated code: "
-              "memset (sub_825A71D0); XAPI's vectorized memset (sub_822962B0, XMemSet); wcslen, wcscpy, wcscat and wcscmp "
+              "memset (sub_825A71D0); XAPI's vectorized memset (sub_822962B0, XMemSet) and copy (sub_82295890, XMemCpy, with its line copy sub_82296FE0 inside it); wcslen, wcscpy, wcscat and wcscmp "
               "(sub_825A9958, sub_825A7F30, sub_825A7EF8, sub_825A7EB0); mbtowc's single-byte "
               "path (sub_825B7EC8); strncpy, strcpy_s, strncmp, _stricmp, _strnicmp and its compare, "
               "strstr (sub_825A7F50, sub_825A9DD8, sub_825AACD0, sub_825AA100, sub_825AC710, "
@@ -40,8 +40,9 @@ ITC_FLAG_BOOL(native_c_runtime, true, "ITC",
               "sub_825B61E8); write_char "
               "(sub_825AF000), write_multi_char (sub_825AF098), the wide write_char and _putwc_nolock "
               "(sub_825B1368, sub_825B7A80); __iob_func (sub_825AD4C0); the start-up's _cfltcvt_init (sub_825A6DB0, "
-              "sub_825A6E48), _init_pointers' setters (sub_825AD140, sub_825AEE18, sub_825AFCB8, "
-              "sub_825B3560, sub_825B3548), __initmbctable and setSBCS (sub_825B6958, sub_825B68C8); "
+              "sub_825A6E48), _init_pointers (sub_825AA398) with its setters (sub_825AD140, "
+              "sub_825AEE18, sub_825AFCB8, sub_825B3560, sub_825B3548: no adapters of their own), the empty "
+              "destructor (sub_82106540), __initmbctable and setSBCS (sub_825B6958, sub_825B68C8); "
               "the compiler's vector constructor and destructor iterators (sub_820911A8, "
               "sub_820900C0: the elements' native functions called as plain C++, the empty "
               "destructor sub_82106540 skipped, any other called in the translated code); "
@@ -177,6 +178,19 @@ extern "C" REX_FUNC(sub_822962B0) {
     return;
   }
   c_runtime::XMemSet(base, ctx.r3.u32, ctx.r4.u32, ctx.r5.u32);
+}
+
+// XAPI's vectorized copy (probably XMemCpy): r3 = destination, r4 = source,
+// r5 = the count (32 bits); r3 comes back unchanged. Ranges that may share
+// memory, and a byte loop step that never counts down to 0, go to the
+// original. Its scratch below r1 isn't written; like the original, its copies
+// aren't recorded for the renderer's mirrors (memcpy's wrapper does that).
+extern "C" REX_FUNC(sub_82295890) {
+  REX_FUNC_PROLOGUE();
+  if (!ITC_FLAG(native_c_runtime) ||
+      !c_runtime::XMemCpy(base, ctx.r3.u32, ctx.r4.u32, ctx.r5.u32)) {
+    __imp__sub_82295890(ctx, base);
+  }
 }
 
 // wcscpy: r3 = destination, r4 = source; returns r3 (left as it is).
@@ -561,50 +575,30 @@ extern "C" REX_FUNC(sub_825A6E48) {
   c_runtime::InitFloatConversions(base);
 }
 
-// _init_pointers' setters: r3 = the value.
-extern "C" REX_FUNC(sub_825AD140) {
+// _init_pointers' setters (sub_825AD140, sub_825AEE18, sub_825AFCB8,
+// sub_825B3560, sub_825B3548) have no adapters: only _init_pointers' plain
+// C++ calls them.
+
+// _init_pointers: no arguments; r3 left 0, as the original's last setter
+// call leaves it.
+extern "C" REX_FUNC(sub_825AA398) {
   REX_FUNC_PROLOGUE();
   if (!ITC_FLAG(native_c_runtime)) {
-    __imp__sub_825AD140(ctx, base);
+    __imp__sub_825AA398(ctx, base);
     return;
   }
-  c_runtime::SetHandler82971170(base, ctx.r3.u32);
+  c_runtime::InitPointers(base);
+  ctx.r3.u64 = 0;
 }
 
-extern "C" REX_FUNC(sub_825AEE18) {
+// The empty destructor (blr): every register left.
+extern "C" REX_FUNC(sub_82106540) {
   REX_FUNC_PROLOGUE();
   if (!ITC_FLAG(native_c_runtime)) {
-    __imp__sub_825AEE18(ctx, base);
+    __imp__sub_82106540(ctx, base);
     return;
   }
-  c_runtime::SetHandler82971178(base, ctx.r3.u32);
-}
-
-extern "C" REX_FUNC(sub_825AFCB8) {
-  REX_FUNC_PROLOGUE();
-  if (!ITC_FLAG(native_c_runtime)) {
-    __imp__sub_825AFCB8(ctx, base);
-    return;
-  }
-  c_runtime::SetInvalidParameterHandler(base, ctx.r3.u32);
-}
-
-extern "C" REX_FUNC(sub_825B3560) {
-  REX_FUNC_PROLOGUE();
-  if (!ITC_FLAG(native_c_runtime)) {
-    __imp__sub_825B3560(ctx, base);
-    return;
-  }
-  c_runtime::SetCriticalSectionInitializer(base, ctx.r3.u32);
-}
-
-extern "C" REX_FUNC(sub_825B3548) {
-  REX_FUNC_PROLOGUE();
-  if (!ITC_FLAG(native_c_runtime)) {
-    __imp__sub_825B3548(ctx, base);
-    return;
-  }
-  c_runtime::SetDefaultCriticalSectionInitializer(base);
+  c_runtime::EmptyDestructor();
 }
 
 // __initmbctable: returns 0.

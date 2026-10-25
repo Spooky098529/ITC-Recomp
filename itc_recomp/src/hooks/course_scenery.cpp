@@ -9,11 +9,18 @@
 // PoolObject::KeyEquals (sub_820FBA60), from ObjectPools::Find; and
 // PoolObject::IsVisible (sub_820FB908), IsExpiring (sub_820FB920),
 // ObjectPools::Pool (sub_820FBB10) and Release (sub_820FC038), from
-// SceneryList::ReleaseUnused.
+// SceneryList::ReleaseUnused; and, since every caller seen in play became
+// native, SceneryList::Add (sub_820F1888, from Scenery::StartLoad,
+// CollectAreas and CollectModels), PoolObject::PoolObject (sub_820FBB20,
+// from the pools' objects' constructors) and ModelList::Init (sub_820F1A20,
+// from CourseSet::CourseSet and InitParts).
 
 #include "guest.h"
 
 #include "base/flags.h"
+#include "hooks/course_scenery.h"
+#include "hooks/models.h"
+#include "hooks/scenery_lists.h"
 #include "course_scenery/course_scenery.h"
 
 ITC_FLAG_BOOL(native_course_scenery, true, "ITC",
@@ -21,21 +28,32 @@ ITC_FLAG_BOOL(native_course_scenery, true, "ITC",
               "sub_820FB8B8, InUse sub_820FB8E0, IsLoaded sub_820FB8F0, IsVisible sub_820FB908, "
               "IsExpiring sub_820FB920, SetVisible sub_820FB938, SetExpiring sub_820FB968, "
               "ClearLoadFlags sub_820FB998, MarkLoaded sub_820FB9A8, Reset sub_820FB9D8, Key "
-              "sub_820FB9F0, PoolObject sub_820FBB20, SetKey sub_820FBA00, KeyEquals "
+              "sub_820FB9F0, PoolObject sub_820FBB20 (no adapter), SetKey sub_820FBA00, KeyEquals "
               "sub_820FBA60, AreaLights::Key sub_820F1C20, AreaModel::Key sub_820F1CD8, "
               "ObjectPools::Pool sub_820FBB10, Object sub_820FC0E8, Acquire sub_820FBF08, Find "
               "sub_820FBE80, Load sub_820FBFD0, Release sub_820FC038, Init sub_820FBBE8, "
               "Shutdown sub_820FBDC8, SceneryConfig::ModelAsset sub_820F1530, SceneryList::Clear "
-              "sub_820F1588, Add sub_820F1888, Sort sub_820F1930, Scenery::LimitLargeModels "
-              "sub_820F2B80, ModelList::Init sub_820F1A20, Scenery::ClearGlobal sub_820F1480, Scenery::Init sub_820F1360, "
+              "sub_820F1588, Add sub_820F1888 (no adapter), Sort sub_820F1930, Scenery::LimitLargeModels "
+              "sub_820F2B80, ModelList::Init sub_820F1A20 (no adapter), Scenery::ClearGlobal sub_820F1480, Scenery::Init sub_820F1360, "
               "SceneryList::ReleaseUnused sub_820F17C0, Scenery::StartLoad sub_820F1E00, "
+              "Scenery::CollectAreas sub_820F3098, Scenery::CollectModels sub_820F32D0, "
+              "Scenery::DrawSetLists sub_820F52A8 (the scenery lists' draws' plain C++ called "
+              "directly, their adapters where it declines), "
               "TextureAnimations::Advance sub_820F11A8 (in the per-frame logic's wrap), "
-              "AnimationSet::Advance sub_82146B20, Animation::Advance sub_82146AC0) "
+              "AnimationSet::Advance sub_82146B20, Animation::Advance sub_82146AC0, "
+              "AreaLights::Parse sub_820F11C0 (no adapter: only its OnLoaded calls it) and OnLoaded "
+              "sub_820F1C30; with --native_models CourseSet::Parse sub_820F1A70, AreaModel::Parse "
+              "sub_820F1258 (no adapter: only its OnLoaded calls it) and OnLoaded sub_820F1CE8, "
+              "Scenery::MakePoolObject sub_820F2638 (with CourseSet::CourseSet sub_820F2478, "
+              "CourseSet::InitParts sub_820F2230 and AreaModel::AreaModel sub_820F1C68, no "
+              "adapters: only it calls them), CourseSet::Reset sub_820F1138, AreaModel::Reset "
+              "sub_820F12F8 and AreaModel::~Model sub_820F1208, the model class's and the model lists' plain C++ called directly, "
+              "their originals where it declines guest calls) "
               "natively instead of through the translated code (the same writes; checked by "
               "--run_harnesses=course_scenery). Those reached only from native callers have no "
               "adapters, and the flag switches their callers: sub_82146B20, sub_82146AC0, "
               "sub_820FBA00, sub_820FBA60, sub_820FB908, sub_820FB920, sub_820FBB10, "
-              "sub_820FC038");
+              "sub_820FC038, sub_820F1888, sub_820FBB20, sub_820F1A20");
 
 // Defines an adapter: the body (the arguments after the address) uses `ctx`
 // and `base`.
@@ -114,9 +132,6 @@ ITC_COURSE_SCENERY(820F1C20, uint32_t size = 0;
 ITC_COURSE_SCENERY(820F1CD8, uint32_t size = 0;
                    ctx.r3.u64 = AreaModelKey(ctx.r3.u32, &size);
                    guest::StoreU32(base, ctx.r4.u32, size))
-// r4 = its own size, r5 = the data size, r6 = its index.
-ITC_COURSE_SCENERY(820FBB20, ConstructObject(base, ctx.r3.u32, ctx.r4.u32, ctx.r5.u32,
-                                             ctx.r6.u32))
 
 // --- The pools: r3 = the pool set, r4 = a pool ---
 
@@ -170,9 +185,6 @@ extern "C" REX_FUNC(sub_820FBDC8) {
 ITC_COURSE_SCENERY(820F1530, SetIndex(ctx, ModelAsset(base, ctx.r3.u32, ctx.r4.u32, ctx.r5.u32)))
 // r3 = the manager (not read), r4 = a list.
 ITC_COURSE_SCENERY(820F1588, ListClear(base, ctx.r4.u32))
-// f1 = a distance, r6 = an area, r7 = a model, r8 = a mask.
-ITC_COURSE_SCENERY(820F1888, ctx.r3.u64 = ListAdd(base, ctx.r4.u32, ctx.f1.f64, ctx.r6.u32,
-                                                  ctx.r7.u32, ctx.r8.u32, ctx.r3.u32))
 // r5, r6 = the first and last item.
 ITC_COURSE_SCENERY(820F1930, ListSort(base, ctx.r4.u32, ctx.r5.s32, ctx.r6.s32))
 // r3 = the manager; leaves r3 = the manager + 100. The original's register
@@ -181,7 +193,6 @@ ITC_COURSE_SCENERY(820F1930, ListSort(base, ctx.r4.u32, ctx.r5.s32, ctx.r6.s32))
 ITC_COURSE_SCENERY(820F2B80, ctx.r12.u64 = ctx.lr; __savegprlr_27(ctx, base);
                    LimitLargeModels(base, ctx.r3.u32, ctx.r1.u32);
                    ctx.r3.u64 = ctx.r3.u64 + 100)
-ITC_COURSE_SCENERY(820F1A20, ModelListInit(base, ctx.r3.u32))
 ITC_COURSE_SCENERY(820F1480, ClearGlobal(base))
 // Scenery::Init: r3 = the manager; r3 comes back as the original's last
 // call (XMemSet) leaves it: its destination, [0x826C5514] + 144.
@@ -193,3 +204,130 @@ ITC_COURSE_SCENERY(820F17C0, ITC_SCENERY_CALLS;
 // r3 = the manager.
 ITC_COURSE_SCENERY(820F1E00, ITC_SCENERY_CALLS;
                    ctx.r3.u64 = StartLoad(base, calls, ctx.r1.u32, ctx.r3.u32))
+
+// --- What a view sees: r3 = the manager, r4 = the view, r5 = its viewport
+// (flush-to-zero off, as the originals' float instructions set it) ---
+ITC_COURSE_SCENERY(820F3098, ctx.fpscr.disableFlushMode();
+                   ctx.r3.u64 = CollectAreas(base, ctx.r1.u32, ctx.r3.u32, ctx.r4.u32,
+                                             ctx.r5.u32, ctx.r3.u32))
+ITC_COURSE_SCENERY(820F32D0, ctx.fpscr.disableFlushMode();
+                   ctx.r3.u64 = CollectModels(base, ctx.r1.u32, ctx.r3.u32, ctx.r4.u32,
+                                              ctx.r5.u32, ctx.r3.u32))
+
+// --- The course set's draws ---
+
+void hooks::CourseSceneryDrawSetLists(PPCContext& ctx, uint8_t* base) {
+  if (hooks::SceneryListsSlotDiagnostics()) {
+    __imp__sub_820F52A8(ctx, base);
+    return;
+  }
+  ctx.fpscr.disableFlushMode();
+  const uint64_t lr = ctx.lr;
+  const uint64_t r24 = ctx.r24.u64;
+  ctx.r24.u64 = DrawSetListsViewProjection(base, ctx.r4.u32);
+  hooks::SceneryDrawGuest guest{ctx, base};
+  const scenery_lists::DrawCalls calls = hooks::SceneryListsDrawCalls(&guest);
+  const uint32_t r3 = DrawSetLists(base, calls, ctx.r1.u32, ctx.r3.u32, ctx.r4.u32);
+  ctx.r24.u64 = r24;
+  ctx.lr = lr;
+  ctx.r3.u64 = r3;
+  ctx.fpscr.disableFlushMode();
+}
+
+ITC_COURSE_SCENERY(820F52A8, hooks::CourseSceneryDrawSetLists(ctx, base))
+
+// --- The files' parses ---
+//
+// CourseSet::Parse and AreaModel::Parse (with its callback) call the model
+// class's plain C++, so they run natively only where Model::Load's adapter
+// does. Flush-to-zero off, as Model::Load leaves it.
+
+namespace {
+
+bool NativeParses() {
+  return ITC_FLAG(native_course_scenery) && hooks::ModelsNativeLifetime();
+}
+
+}  // namespace
+
+// CourseSet::Parse: r3 = the course set; r3 as the original leaves it.
+extern "C" REX_FUNC(sub_820F1A70) {
+  REX_FUNC_PROLOGUE();
+  if (!NativeParses()) {
+    __imp__sub_820F1A70(ctx, base);
+    return;
+  }
+  ctx.fpscr.disableFlushMode();
+  ITC_SCENERY_CALLS;
+  ctx.r3.u64 = CourseSetParse(base, calls, ctx.r1.u32, ctx.r3.u32);
+}
+
+// AreaLights::OnLoaded (Archive::Load's callback): r6 = the area's lights;
+// r3 = them, as PoolObject::MarkLoaded leaves it.
+ITC_COURSE_SCENERY(820F1C30, guest::StoreU32(base, ctx.r1.u32 - 96, ctx.r1.u32);
+                   ctx.r3.u64 = AreaLightsOnLoaded(base, ctx.r6.u32))
+
+// AreaModel::OnLoaded (Archive::Load's callback): r6 = the area's model; r3
+// = it, as PoolObject::MarkLoaded leaves it.
+extern "C" REX_FUNC(sub_820F1CE8) {
+  REX_FUNC_PROLOGUE();
+  if (!NativeParses()) {
+    __imp__sub_820F1CE8(ctx, base);
+    return;
+  }
+  ctx.fpscr.disableFlushMode();
+  ITC_SCENERY_CALLS;
+  ctx.r3.u64 = AreaModelOnLoaded(base, calls, ctx.r1.u32, ctx.r6.u32);
+}
+
+// --- The pools' objects: made and reset (as the parses' condition) ---
+// CourseSet::CourseSet (sub_820F2478), CourseSet::InitParts (sub_820F2230)
+// and AreaModel::AreaModel (sub_820F1C68) have no adapters: only
+// MakePoolObject calls them. The others are reached through the pools'
+// descriptors and vtables, so their adapters stay.
+
+// Scenery::MakePoolObject: r3 = the pool, r4 = the address, r5 and r6 the
+// sizes, r7 the index; r3 = the address.
+extern "C" REX_FUNC(sub_820F2638) {
+  REX_FUNC_PROLOGUE();
+  if (!NativeParses()) {
+    __imp__sub_820F2638(ctx, base);
+    return;
+  }
+  ctx.fpscr.disableFlushMode();
+  ITC_SCENERY_CALLS;
+  ctx.r3.u64 = MakePoolObject(base, calls, ctx.r1.u32, ctx.r3.u32, ctx.r4.u32, ctx.r5.u32,
+                              ctx.r6.u32, ctx.r7.u32);
+}
+
+// CourseSet::Reset and AreaModel::Reset (slot 2): r3 = the object, left.
+extern "C" REX_FUNC(sub_820F1138) {
+  REX_FUNC_PROLOGUE();
+  if (!NativeParses()) {
+    __imp__sub_820F1138(ctx, base);
+    return;
+  }
+  ITC_SCENERY_CALLS;
+  ctx.r3.u64 = CourseSetReset(base, calls, ctx.r1.u32, ctx.r3.u32);
+}
+extern "C" REX_FUNC(sub_820F12F8) {
+  REX_FUNC_PROLOGUE();
+  if (!NativeParses()) {
+    __imp__sub_820F12F8(ctx, base);
+    return;
+  }
+  ITC_SCENERY_CALLS;
+  ctx.r3.u64 = AreaModelReset(base, calls, ctx.r1.u32, ctx.r3.u32);
+}
+
+// AreaModel::~Model (slot 0 of the scenery models' vtable): r3 = the model,
+// r4 = the flags; r3 = the model.
+extern "C" REX_FUNC(sub_820F1208) {
+  REX_FUNC_PROLOGUE();
+  if (!NativeParses()) {
+    __imp__sub_820F1208(ctx, base);
+    return;
+  }
+  ITC_SCENERY_CALLS;
+  ctx.r3.u64 = SceneryModelDestruct(base, calls, ctx.r1.u32, ctx.r3.u32, ctx.r4.u32);
+}

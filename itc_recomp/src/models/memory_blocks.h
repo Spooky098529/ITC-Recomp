@@ -88,4 +88,33 @@ bool FreeLater(uint8_t* base, uint32_t block);
 // at the header's +12 first.
 bool FreePhysicalLater(uint8_t* base, uint32_t block, uint32_t attributes);
 
+// The memory blocks' makers (docs/functions/shader-objects.md): under the
+// lock, the block's pages, `bytes` + the header rounded up to 4 KiB
+// ((bytes + 8191) & ~0xFFF), from the allocation layer; the header's +0 =
+// `XLMM`, +4 = the kind, +8 = 1 (the passes until it's freed once put off),
+// +12 = 0. They return the block (the header + 4096), or 0 when the
+// allocation gives 0. Only over the allocation layer (--native_heap), as the
+// adapters check.
+//
+// sub_8258DFF0 Memory::AllocVirtual: kind 0, VirtualAlloc(0, size,
+// MEM_COMMIT | MEM_NOZERO, PAGE_READWRITE) (the layer's pages).
+uint32_t AllocVirtual(uint8_t* base, uint32_t bytes);
+// sub_8258E098 Memory::AllocPhysicalEx: kind 1, XPhysicalAllocEx(size,
+// `low`, `high`, `alignment`, `protection`).
+uint32_t AllocPhysicalEx(uint8_t* base, uint32_t bytes, uint32_t low, uint32_t high,
+                         uint32_t alignment, uint32_t protection);
+// sub_8258E138 Memory::AllocPhysical (probably): kind 2, XMemAlloc(size,
+// `attributes`).
+uint32_t AllocPhysical(uint8_t* base, uint32_t bytes, uint32_t attributes);
+
+// sub_8258E1D8 PendingFrees::FreeDue: under the lock, the pending frees
+// walked from the first node; a header whose +8 is 0 has its +0 cleared and
+// is freed by its kind (+4: 0 VirtualFree, 1 XPhysicalFree, 2 XMemFree with
+// its +12 attributes, 3 and above nothing), and its node unlinked and
+// deleted (the size down by 1); any other header's +8 goes down by 1. False,
+// with nothing done, where the original must run: a due header the layer
+// can't free natively (kind 0 not the layer's pages, kind 2 not physical and
+// not a heap block), a node not a heap block, or a header queued twice.
+bool FreeDue(uint8_t* base);
+
 }  // namespace models

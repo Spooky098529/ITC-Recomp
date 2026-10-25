@@ -28,4 +28,18 @@ void Loop(PPCContext& ctx, uint8_t* base);
 void Play(PPCContext& ctx, uint8_t* base);
 void PlayNamed(PPCContext& ctx, uint8_t* base);
 
+// UiMovie::DrawTexts (sub_8211CD90; r3 = movie, r4 = the text list, r5 = 1
+// to draw without advancing): natively with --native_ui_movies_game, else
+// the original. Its override (src/debug/pause_movie_log.cpp) watches it for
+// --log_pause_movie. r3 left as the original leaves it.
+void DrawTexts(PPCContext& ctx, uint8_t* base);
+
+// UiMovie::Finish (sub_8211DE38; r3 = movie, r4 = a sub-scene's index or
+// -1, r5 = an animation's index) and UiMovie::FinishNamed (sub_8211DF20;
+// r4 = a named animation's index), as Loop: their overrides log them for
+// --log_pause_movie.
+// UiMovie::ApplyAnimation through its override.
+void Finish(PPCContext& ctx, uint8_t* base);
+void FinishNamed(PPCContext& ctx, uint8_t* base);
+
 }  // namespace ui_movies_game_hooks

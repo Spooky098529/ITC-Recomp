@@ -412,6 +412,38 @@ Moved LoopLast(uint8_t* base, uint32_t movie) {
                        guest::LoadU32(base, movie + kMovieLastStarted), true);
 }
 
+uint32_t FinishTime(uint8_t* base, uint32_t slot) {
+  const uint32_t reversed = guest::LoadU32(base, slot + 28);
+  return guest::LoadU32(base, reversed != 0 ? kZero : guest::LoadU32(base, slot + 16) + 12);
+}
+
+namespace {
+template <typename Match>
+std::optional<Finishing> FindQueued(uint8_t* base, uint32_t movie, Match match) {
+  const uint32_t queue = movie + kMovieQueue;
+  const std::optional<uint32_t> position = FindPosition(base, queue, match);
+  if (!position) {
+    return std::nullopt;
+  }
+  const uint32_t slot = SlotOf(base, queue, LinkAt(base, queue, *position));
+  return Finishing{*position, slot, FinishTime(base, slot)};
+}
+}  // namespace
+
+std::optional<Finishing> FindFinishing(uint8_t* base, uint32_t movie, uint32_t sub_scene,
+                                       uint32_t index) {
+  ITC_NATIVE_RUNNING("sub_8211DE38 UiMovie::Finish");
+  return FindQueued(base, movie, [&](uint32_t slot) {
+    return guest::LoadU32(base, slot + 4) == sub_scene && guest::LoadU32(base, slot) == index;
+  });
+}
+
+std::optional<Finishing> FindFinishingNamed(uint8_t* base, uint32_t movie, uint32_t named) {
+  ITC_NATIVE_RUNNING("sub_8211DF20 UiMovie::FinishNamed");
+  return FindQueued(base, movie,
+                    [&](uint32_t slot) { return guest::LoadU32(base, slot + 8) == named; });
+}
+
 namespace {
 constexpr uint32_t kTextMapNone = 0x826C5CD8;
 constexpr uint32_t kPairsNone = 0x826C5CDC;
@@ -493,11 +525,16 @@ uint32_t TextString(uint8_t* base, uint32_t movie, uint32_t id) {
 }
 
 uint32_t TextField(uint8_t* base, uint32_t movie, uint32_t id, uint32_t offset) {
+  // One print per native function sharing this body (sub_8211B770's +20
+  // still has its adapter).
+  if (offset == 4) ITC_NATIVE_RUNNING("sub_8211B9B8 (a text's +4)");
+  if (offset == 24) ITC_NATIVE_RUNNING("sub_8211B7B8 (a text's +24)");
   const uint32_t text = TextRecord(base, movie, id);
   return text == 0 ? 0 : guest::LoadU32(base, text + offset);
 }
 
 void AdvanceTextScroll(uint8_t* base, uint32_t movie, uint32_t id) {
+  ITC_NATIVE_RUNNING("sub_8211B940 (a text's scroll counter)");
   const uint32_t text = TextRecord(base, movie, id);
   guest::StoreU32(base, text + 8, guest::LoadU32(base, text + 8) + 1);
   TextMapSetKey(base, movie + kMovieTexts, id, text);

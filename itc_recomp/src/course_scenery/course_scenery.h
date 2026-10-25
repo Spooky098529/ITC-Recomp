@@ -12,6 +12,10 @@
 
 #include <cstdint>
 
+namespace scenery_lists {
+struct DrawCalls;
+}  // namespace scenery_lists
+
 namespace course_scenery {
 
 // The manager's pointers ([0x826C5514] by Scenery::Init, [0x826C551C] by
@@ -186,6 +190,137 @@ uint32_t ReleaseUnused(uint8_t* base, const Calls& calls, uint32_t stack, uint32
 // +36 (the manager's +44) set, pool 0's object the same way into +108;
 // +192 = 1. Returns what the original leaves in r3.
 uint32_t StartLoad(uint8_t* base, const Calls& calls, uint32_t stack, uint32_t manager);
+
+// --- What a view sees (collect.cpp) ---
+//
+// The views' masks: the OR of the bits (+12) of the 16-byte records at
+// 0x82602F80 (14) whose view (+0) is `view` and whose camera pass (+8; 592
+// bytes each from 0x826BAC00) is enabled (its +588 not 0). The distances
+// are from the viewport's eye (+1600 x, +1608 z), the far distance its +72.
+// Each returns the r3 the original leaves (`r3` when it makes no call); its
+// stack temporaries (the corners' copy) aren't written.
+
+// Scenery::CollectAreas (sub_820F3098): every area of the course set's area
+// file (the manager's +112, its +1056; little-endian count, each entry by
+// DataFile::GetEntry), its rectangle of corners 0 and 2 (16-byte points
+// from the entry's +32): 0.0 with the eye inside; else, for each corner in
+// turn, half the far distance when the eye moved by that (x, then z, each
+// way) is inside, else the nearest corner so far. Added to list A (+116,
+// model 0, the view's mask) within the far distance + 70.0.
+uint32_t CollectAreas(uint8_t* base, uint32_t stack, uint32_t manager, uint32_t view,
+                      uint32_t viewport, uint32_t r3);
+// Scenery::CollectModels (sub_820F32D0): every model of list A's areas (the
+// entry's big-endian count at +0, 96-byte records from +96: +0 the model's
+// number, four corners from +32): the nearest corner, kept within the far
+// distance plus the float at 0x8200257C, 0.0 with the eye inside, added to
+// list B (+144) with the view's mask when that isn't 0.
+uint32_t CollectModels(uint8_t* base, uint32_t stack, uint32_t manager, uint32_t view,
+                       uint32_t viewport, uint32_t r3);
+
+// Scenery::DrawSetLists (sub_820F52A8): r4's pass description (+20 its
+// camera pass, +24 and +28 the draw keys): the texture provider at the
+// manager's +228 gets the course set's XPR (+64) in slot 1 (its vtable's
+// slot 4: TextureProvider::Set natively, else a guest call); [0x8296B90C] =
+// +24, [0x8296B900] = +28; the camera pass's view (+16) copied to
+// 0x8265ECA0 (Matrix::Copy, noted for interpolation as its wrapper does);
+// then the set's lists drawn with the camera pass's view-projection (+144,
+// copied to `stack` - 384 + 192) and an identity world (+80), each model's
+// +48 = the provider and +436 = the set's +1060, shape 0 and the range
+// (the floats at 0x82002814 and 0x82006804, 0, 0) at +176, +160 or +144:
+// every model of +1596; those of +2124 and +2652 that ModelList::IsBEntryOn
+// and IsCEntryOn pick (their draw state reset first); and the entries of
+// +3180 that PointList::IsEntryOn picks by PointList::Draw (+612, +608 as
+// the models', +616 from the race's table at [0x826D82E8]). The draws'
+// plain C++ is called directly (SceneryModel::DrawShape with the caller's
+// r24 = the view-projection's address, as the original's); where one
+// declines, with nothing done, its adapter runs through `calls` (so `ctx`'s
+// r24 must be that address too). Its stack temporaries (the identity, the
+// copy and the ranges) are written in its frame, as its callees read them.
+// Returns the r3 the original leaves.
+uint32_t DrawSetLists(uint8_t* base, const scenery_lists::DrawCalls& calls, uint32_t stack,
+                      uint32_t manager, uint32_t pass);
+// The view-projection's address DrawSetLists draws with (the camera pass's
+// +144), its r24.
+uint32_t DrawSetListsViewProjection(uint8_t* base, uint32_t pass);
+
+// --- The files' parses (the loads' callbacks) ---
+//
+// Model::Model, Model::Load, XPR::Create and the model lists' loads are
+// their plain C++, so these run natively only where Model::Load's adapter
+// does (hooks::ModelsNativeLifetime, the adapters' condition). Where a
+// callee's plain C++ declines, its original runs through `calls` (by its
+// address, the original's return address) from 512 bytes below `stack`,
+// below the frames the originals would have.
+
+// CourseSet::Parse (sub_820F1A70): from the first file (+3808, entries by
+// DataFile::GetEntry with r5 = 1): entry 0 into the XPR at +64 (XPR::XPR,
+// XPR::Create), entry 1's entry 0 into the model at +96 (Model::Model,
+// Model::Load), entries 2 to 6 into the lists at +528, +1064, +1596, +2124,
+// +2652 (ModelList::Load) and 7 into +3180 (ModelList::LoadPoints); from the
+// second (+3812): entries 0 to 2 to +1056, +1060, +1592 when there. Its
+// frame (128 bytes below `stack`) and the lists' below it get their back
+// chains. Returns the r3 the original leaves (the last entry looked up).
+uint32_t CourseSetParse(uint8_t* base, const Calls& calls, uint32_t stack, uint32_t set);
+// AreaLights::Parse (sub_820F11C0): +80 = entry 0 of the file at +4 when
+// there is one. Returns that entry (0 for none).
+uint32_t AreaLightsParse(uint8_t* base, uint32_t lights);
+// AreaModel::Parse (sub_820F1258): from the file at the manager's +188:
+// entry 0 into the model at +80 (Model::Load, r5 = 0) and +56 = +80, else
+// +56 = 0; entry 1 into the XPR at +528 (XPR::Create) and +60 = +528, else
+// +60 = 0. Returns the r3 the original leaves (XPR::Create's; else
+// Model::Load's, the model's +412; else 0).
+uint32_t AreaModelParse(uint8_t* base, const Calls& calls, uint32_t stack, uint32_t model);
+// AreaLights::OnLoaded (sub_820F1C30, Archive::Load's callback): Parse,
+// then PoolObject::MarkLoaded. AreaModel::OnLoaded (sub_820F1CE8): the
+// same with AreaModel::Parse (its frame 96 bytes below `stack`, the back
+// chain written). Each returns the object (the r3 MarkLoaded leaves).
+uint32_t AreaLightsOnLoaded(uint8_t* base, uint32_t lights);
+uint32_t AreaModelOnLoaded(uint8_t* base, const Calls& calls, uint32_t stack, uint32_t model);
+
+// --- The pools' objects: made and reset ---
+//
+// As the parses, natively only where Model::Load's adapter is (they make,
+// release and destroy models), the originals through `calls` from 512 bytes
+// below `stack` where a callee's plain C++ declines.
+
+// Scenery::MakePoolObject (sub_820F2638, the pools' factory): `pool` 0 and
+// 1 a PoolObject with the vtable 0x8200674C or 0x82006758 and +56 = 0; 2
+// CourseSet::CourseSet; 3 a PoolObject with the vtable 0x8200676C and an
+// XPR at +56 (XPR::XPR); 4 AreaModel::AreaModel; others (unsigned) and a
+// null `object` nothing. The sizes and the index go to PoolObject::
+// PoolObject. Returns `object`.
+uint32_t MakePoolObject(uint8_t* base, const Calls& calls, uint32_t stack, uint32_t pool,
+                        uint32_t object, uint32_t own_size, uint32_t data_size, uint32_t index);
+// CourseSet::CourseSet (sub_820F2478): PoolObject::PoolObject, the vtable
+// 0x82006784, CourseSet::InitParts(+64), +3808, +3812, +1056, +1060 = 0,
+// the lists at +528 and +1064 made empty (ModelList::Init) with +1592 = 0
+// between, then +1596, +2124, +2652 and +3180, the last's +608 to +620 = 0
+// (each list skipped when its address is 0, as the original checks).
+void CourseSetConstruct(uint8_t* base, const Calls& calls, uint32_t stack, uint32_t set,
+                        uint32_t own_size, uint32_t data_size, uint32_t index);
+// CourseSet::InitParts (sub_820F2230): XPR::XPR at +0, Model::Model at +32,
+// ModelList::Init at +464, +1000, +1532, +2060, +2588, +3116, the last's
+// +608 to +620 = 0.
+void CourseSetInitParts(uint8_t* base, const Calls& calls, uint32_t stack, uint32_t parts);
+// AreaModel::AreaModel (sub_820F1C68): PoolObject::PoolObject, the vtable
+// 0x82006778, Model::Model at +80 with the vtable 0x82006764, XPR::XPR at
+// +528, +56 = +60 = 0.
+void AreaModelConstruct(uint8_t* base, const Calls& calls, uint32_t stack, uint32_t model,
+                        uint32_t own_size, uint32_t data_size, uint32_t index);
+// CourseSet::Reset (sub_820F1138, slot 2): XPR::Release(+64),
+// Model::Release(+96), ModelList::Release of the six lists (their models'
+// Model::Release and vtable slot 0 with 1: the scenery models'
+// SceneryModelDestruct natively), PoolObject::Reset. Returns the set.
+uint32_t CourseSetReset(uint8_t* base, const Calls& calls, uint32_t stack, uint32_t set);
+// AreaModel::Reset (sub_820F12F8, slot 2): the model at +56 released
+// (Model::Release) and +56 = 0 when there; the XPR at +60 (XPR::Release) and
+// +60 = 0 the same; PoolObject::Reset. Returns the object.
+uint32_t AreaModelReset(uint8_t* base, const Calls& calls, uint32_t stack, uint32_t model);
+// The scenery models' destructor (sub_820F1208, slot 0 of 0x82006764):
+// Model::~Model, then with bit 0 of `flags` operator delete. Returns the
+// model.
+uint32_t SceneryModelDestruct(uint8_t* base, const Calls& calls, uint32_t stack, uint32_t model,
+                              uint32_t flags);
 
 // --- The texture animations (the course set's +1060) ---
 

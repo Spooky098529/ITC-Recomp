@@ -9,6 +9,10 @@
 #include "base/flags.h"
 #include "base/log.h"
 #include "c_runtime/strings.h"
+#include "hooks/strings_and_font.h"
+#include "hooks/ui_movies.h"
+#include "hooks/ui_movies_game.h"
+#include "strings_and_font/strings_and_font.h"
 #include "ui_movies/game.h"
 
 #include <rex/system/kernel_state.h>
@@ -19,6 +23,7 @@
 #include <algorithm>
 #include <bit>
 #include <functional>
+#include <initializer_list>
 #include <iterator>
 #include <string>
 #include <vector>
@@ -54,6 +59,22 @@ void NativeGet(PPCContext& ctx, uint8_t* base) {
     return;
   }
   ctx.r3.u64 = to;
+}
+
+// sub_8211B7B8 and sub_8211B9B8: r3 = movie, r4 = a text id; the text's
+// +24 or +4.
+void NativeTextField24(PPCContext& ctx, uint8_t* base) {
+  ctx.r3.u64 = ui_movies::TextField(base, ctx.r3.u32, ctx.r4.u32, 24);
+}
+void NativeTextField4(PPCContext& ctx, uint8_t* base) {
+  ctx.r3.u64 = ui_movies::TextField(base, ctx.r3.u32, ctx.r4.u32, 4);
+}
+
+// sub_8211B940: r3 = movie, r4 = a text id; r3 left at the movie's texts.
+void NativeAdvanceTextScroll(PPCContext& ctx, uint8_t* base) {
+  const uint32_t movie = ctx.r3.u32;
+  ui_movies::AdvanceTextScroll(base, movie, ctx.r4.u32);
+  ctx.r3.u64 = movie + ui_movies::kMovieTexts;
 }
 
 // Runs the recompiled version with --native_ui_movies_game off, so the
@@ -858,9 +879,9 @@ void TextCases(Context& h, const Block& block) {
   const Accessor accessors[] = {
       {"UiMovie::TextString (sub_8211B720)", __imp__sub_8211B720, sub_8211B720, false},
       {"sub_8211B770 (a text's +20)", __imp__sub_8211B770, sub_8211B770, false},
-      {"sub_8211B7B8 (a text's +24)", __imp__sub_8211B7B8, sub_8211B7B8, false},
-      {"sub_8211B9B8 (a text's +4)", __imp__sub_8211B9B8, sub_8211B9B8, false},
-      {"sub_8211B940 (a text's scroll counter)", __imp__sub_8211B940, sub_8211B940, true},
+      {"sub_8211B7B8 (a text's +24)", __imp__sub_8211B7B8, NativeTextField24, false},
+      {"sub_8211B9B8 (a text's +4)", __imp__sub_8211B9B8, NativeTextField4, false},
+      {"sub_8211B940 (a text's scroll counter)", __imp__sub_8211B940, NativeAdvanceTextScroll, true},
   };
   for (const Accessor& f : accessors) {
     Results results(f.name);
@@ -1077,6 +1098,652 @@ void PlayCases(Context& h, const Block& block) {
   }
 }
 
+// --- The texts drawn: UiMovie::DrawTexts and UiMovie::ScrollOffset ---
+
+// sub_8211B800 (UiMovie::ScrollOffset, no adapter: only DrawTexts' plain
+// C++ calls it): r3 = movie, r4 = the draw parameters; f1 the x, r3 left
+// at the text's value in the movie's map (TextMap::Find's).
+void NativeScrollOffset(PPCContext& ctx, uint8_t* base) {
+  ctx.fpscr.disableFlushMode();
+  const uint32_t movie = ctx.r3.u32, params = ctx.r4.u32;
+  ctx.f1.f64 = ui_movies::ScrollOffset(base, movie, params);
+  ctx.r3.u64 = ui_movies::TextMapFindKey(base, movie + ui_movies::kMovieTexts,
+                                         guest::LoadU32(base, params + 120));
+}
+
+// What Text::Draw was handed (its stand-in, hooks::g_text_draw_stand_in):
+// the registers, the draw parameters' 124 bytes and the text to its end.
+struct TextDraw {
+  uint32_t r1, r3, r4, r5;
+  std::vector<uint8_t> params, text;
+};
+std::vector<TextDraw>* g_text_draws = nullptr;
+
+void TextDrawStandIn(PPCContext& ctx, uint8_t* base) {
+  TextDraw d{ctx.r1.u32, ctx.r3.u32, ctx.r4.u32, ctx.r5.u32, Read(base, ctx.r4.u32, 124), {}};
+  for (uint32_t k = 0; k < 2048; k++) {
+    const uint16_t unit = guest::LoadU16(base, ctx.r5.u32 + 2 * k);
+    d.text.push_back(uint8_t(unit >> 8));
+    d.text.push_back(uint8_t(unit));
+    if (unit == 0) {
+      break;
+    }
+  }
+  g_text_draws->push_back(std::move(d));
+}
+
+// Bytes with the float words at `floats` (offsets into them) compared as
+// floats: taken out (zeroed) and added after.
+void BytesWithFloats(Outputs& out, std::vector<uint8_t> bytes,
+                     std::initializer_list<uint32_t> floats) {
+  std::vector<uint32_t> words;
+  for (uint32_t offset : floats) {
+    uint32_t word = 0;
+    for (uint32_t i = 0; i < 4; i++) {
+      word = (word << 8) | bytes[offset + i];
+      bytes[offset + i] = 0;
+    }
+    words.push_back(word);
+  }
+  out.Bytes(bytes);
+  for (uint32_t word : words) {
+    out.Float(word);
+  }
+}
+
+// The draw parameters' float words.
+#define ITC_PARAMS_FLOATS(at) \
+  at + 16, at + 24, at + 28, at + 32, at + 36, at + 40, at + 96, at + 100, at + 104
+
+// A made-up world for the texts in the block: the movie (its map of texts
+// at +0x9BCC), its text list's items (+0xA000, four of 128 bytes), the TXT
+// nodes (+0xA400, four of 160), the text records (+0xA800, eight of 32),
+// their strings (+0xA900, eight of 128 bytes), the font (+0xB000; [0x826C5C00]
+// pointed at it) with its four pages (+0xF200) sharing one glyph table
+// (+0xF300: 256 codes, the advance at +2) and the draw parameters for
+// ScrollOffset's own cases (+0xF800). The texts are characters below 256,
+// new lines, page breaks and colors. With `scrolls`, the values a scrolling
+// text's loop depends on are kept where it ends (a scale of 0.25-2, a small
+// letter spacing, a gap of 1,000, a finite speed of 0-4: the original loops
+// forever, or nearly, otherwise).
+struct TextWorld {
+  static constexpr uint32_t kItems = 0xA000, kNodes = 0xA400, kRecords = 0xA800,
+                            kStrings = 0xA900, kFont = 0xB000, kPages = 0xF200,
+                            kGlyphs = 0xF300, kParams = 0xF800, kBytes = 0xF900;
+  uint32_t at;
+  explicit TextWorld(uint32_t block) : at(block) {}
+
+  void Write(Context& h, bool scrolls, uint32_t map_count) const {
+    uint8_t* base = h.base;
+    Random& r = h.random;
+    // The strings.
+    for (uint32_t s = 0; s < 8; s++) {
+      const uint32_t string = at + kStrings + 128 * s;
+      const uint32_t length = s == 0 ? 0 : r.Below(60);
+      for (uint32_t k = 0; k < length; k++) {
+        const uint32_t pick = r.Below(30);
+        uint16_t unit = uint16_t(1 + r.Below(255));
+        if (pick == 0) unit = 0xFFD1;
+        else if (pick < 3) unit = '\n';
+        else if (pick == 3) unit = 0xFFD6;
+        else if (pick == 4) unit = uint16_t(0xFFF6 + r.Below(10));
+        guest::StoreU16(base, string + 2 * k, unit);
+      }
+      guest::StoreU16(base, string + 2 * length, 0);
+    }
+    // The records: +0 a string, +4 scrolling, +8 the counter, +12 the delay,
+    // +16 the speed, +20 the page, +24 the lines to skip.
+    for (uint32_t k = 0; k < 8; k++) {
+      const uint32_t record = at + kRecords + 32 * k;
+      guest::StoreU32(base, record + 0, at + kStrings + 128 * r.Below(8));
+      guest::StoreU32(base, record + 4, scrolls && r.Below(2) == 0 ? uint32_t(r.Next()) | 1 : 0);
+      guest::StoreU32(base, record + 8, r.Below(4) == 0 ? uint32_t(r.Next()) : r.Below(100));
+      guest::StoreU32(base, record + 12, r.Below(4) == 0 ? uint32_t(r.Next()) : r.Below(50));
+      guest::StoreU32(base, record + 16,
+                      scrolls ? (r.Below(8) == 0 ? 0x7FC00000u
+                                                 : std::bit_cast<uint32_t>(float(r.Below(17)) / 4.0f))
+                              : RandomWord(r));
+      guest::StoreU32(base, record + 20, r.Below(3));
+      guest::StoreU32(base, record + 24, r.Below(3));
+      if (scrolls) {
+        // The ticks past the delay small: the counter and delay both small.
+        guest::StoreU32(base, record + 8, r.Below(100));
+        guest::StoreU32(base, record + 12, r.Below(50));
+      }
+    }
+    // The map: ids 0-9 to records (some 0), the count.
+    const uint32_t map = at + ui_movies::kMovieTexts;
+    for (uint32_t k = 0; k < 128; k++) {
+      guest::StoreU32(base, map + 8 * k, r.Below(10));
+      guest::StoreU32(base, map + 8 * k + 4,
+                      r.Below(8) == 0 ? 0 : at + kRecords + 32 * r.Below(8));
+    }
+    guest::StoreU32(base, map + 1024, map_count);
+    guest::StoreU32(base, 0x826C5CD8, r.Below(3) == 0 ? 0 : at + kRecords + 32 * r.Below(8));
+    // The font: four pages, one glyph table.
+    const uint32_t font = at + kFont;
+    for (uint32_t p = 0; p < 4; p++) {
+      guest::StoreU32(base, font + 20 + 4 * p, at + kPages + 16 * p);
+      guest::StoreU32(base, at + kPages + 16 * p + 4, at + kGlyphs);
+    }
+    for (uint32_t c = 0; c < 256; c++) {
+      guest::StoreU32(base, at + kGlyphs + 4 * c, uint32_t(r.Below(256) << 2) | r.Below(4));
+    }
+    guest::StoreU32(base, strings_and_font::kFont, font);
+  }
+
+  // A TXT node's fields the drawing reads.
+  void WriteNode(Context& h, uint32_t node, bool scrolls) const {
+    uint8_t* base = h.base;
+    Random& r = h.random;
+    for (uint32_t k = 0; k < 160; k += 4) {
+      guest::StoreU32(base, node + k, RandomWord(r));
+    }
+    auto small_float = [&](int32_t range) {
+      return r.Below(5) == 0 && !scrolls
+                 ? RandomWord(r)
+                 : std::bit_cast<uint32_t>(float(int32_t(r.Below(2 * range)) - range));
+    };
+    guest::StoreU32(base, node + 20, scrolls ? r.Below(64) : uint32_t(r.Next()));
+    guest::StoreU32(base, node + 24, uint32_t(r.Next()));
+    for (uint32_t k : {56u, 60u, 64u}) {
+      guest::StoreU32(base, node + k, r.Below(4) == 0 ? uint32_t(r.Next()) : r.Below(256));
+    }
+    guest::StoreU32(base, node + 68, r.Below(4) == 0 ? RandomWord(r)
+                                                     : std::bit_cast<uint32_t>(float(r.Below(5)) / 4.0f));
+    guest::StoreU32(base, node + 76, r.Below(4) == 0 ? uint32_t(r.Next()) : r.Below(32));
+    guest::StoreU32(base, node + 100, scrolls ? std::bit_cast<uint32_t>(1000.0f) : small_float(500));
+    guest::StoreU32(base, node + 104, small_float(500));
+    guest::StoreU32(base, node + 116, scrolls ? std::bit_cast<uint32_t>(float(r.Below(5)))
+                                              : small_float(8));
+    guest::StoreU32(base, node + 120, small_float(8));
+    guest::StoreU32(base, node + 108, r.Below(8) == 0 ? uint32_t(r.Next()) : r.Below(12));
+  }
+
+  // A text item: +0 the node, +16 its matrix (the scale +16 kept in 0.25-2
+  // with `scrolls`), +80 the depth, +84 the color, +100 the clip rectangle.
+  void WriteItem(Context& h, uint32_t item, uint32_t node, bool scrolls) const {
+    uint8_t* base = h.base;
+    Random& r = h.random;
+    for (uint32_t k = 0; k < 128; k += 4) {
+      guest::StoreU32(base, item + k, RandomWord(r));
+    }
+    guest::StoreU32(base, item + 0, node);
+    for (uint32_t k = 0; k < 16; k++) {
+      const uint32_t word =
+          r.Below(6) == 0 && !scrolls
+              ? RandomWord(r)
+              : std::bit_cast<uint32_t>(float(int32_t(r.Below(64)) - 16) / 8.0f);
+      guest::StoreU32(base, item + 16 + 4 * k, word);
+    }
+    if (scrolls) {
+      guest::StoreU32(base, item + 16, std::bit_cast<uint32_t>(float(1 + r.Below(8)) / 4.0f));
+    }
+    for (uint32_t k = 0; k < 4; k++) {
+      guest::StoreU32(base, item + 84 + 4 * k,
+                      r.Below(5) == 0 ? RandomWord(r)
+                                      : std::bit_cast<uint32_t>(float(r.Below(5)) / 4.0f));
+      guest::StoreU32(base, item + 100 + 4 * k, uint32_t(int32_t(r.Below(1400)) - 100));
+    }
+  }
+};
+
+void ScrollOffsetCases(Context& h, const Block& block) {
+  constexpr uint32_t kGlobals = 0x826C5CCC, kGlobalBytes = 0x14;
+  const std::vector<uint8_t> globals = Read(h.base, kGlobals, kGlobalBytes);
+  const uint32_t font_word = guest::LoadU32(h.base, strings_and_font::kFont);
+  const TextWorld world(block.at);
+  Results results("UiMovie::ScrollOffset (sub_8211B800)");
+  for (int i = 0; i < 1000; i++) {
+    const Random start = h.random;
+    Outputs out[2];
+    for (int v = 0; v < 2; v++) {
+      h.random = start;
+      Fill(h.base, block.at, TextWorld::kBytes);
+      Random& r = h.random;
+      const uint32_t params = block.at + TextWorld::kParams;
+      world.Write(h, true, 1 + r.Below(12));
+      // No record of 0 here (the original reads its +8 at address 8): only
+      // DrawTexts calls it, for a text whose record scrolls.
+      for (uint32_t k = 0; k < 128; k++) {
+        const uint32_t value = block.at + ui_movies::kMovieTexts + 8 * k + 4;
+        if (guest::LoadU32(h.base, value) == 0) {
+          guest::StoreU32(h.base, value, block.at + TextWorld::kRecords);
+        }
+      }
+      guest::StoreU32(h.base, 0x826C5CD8, block.at + TextWorld::kRecords + 32 * r.Below(8));
+      // The parameters as DrawTexts builds them; a counter past the delay
+      // (the loop) only with the values it ends with.
+      for (uint32_t k = 0; k < 124; k += 4) {
+        guest::StoreU32(h.base, params + k, RandomWord(r));
+      }
+      guest::StoreU32(h.base, params + 0, uint32_t(int32_t(r.Below(2000)) - 500));
+      guest::StoreU32(h.base, params + 8, r.Below(64));
+      guest::StoreU32(h.base, params + 28, std::bit_cast<uint32_t>(float(1 + r.Below(8)) / 4.0f));
+      guest::StoreU32(h.base, params + 36, std::bit_cast<uint32_t>(float(1 + r.Below(8)) / 4.0f));
+      guest::StoreU32(h.base, params + 60, r.Below(4));
+      guest::StoreU32(h.base, params + 68, r.Below(2) == 0 ? 1000 : 100 + r.Below(500));
+      guest::StoreU32(h.base, params + 76, r.Below(5));
+      guest::StoreU32(h.base, params + 84, r.Below(5));
+      guest::StoreU32(h.base, params + 120, r.Below(8) == 0 ? uint32_t(r.Next()) : r.Below(12));
+      PPCContext t = CallContext(h);
+      t.r3.u64 = block.at;
+      t.r4.u64 = params;
+      t.f1.u64 = r.Next();
+      if (v == 0) {
+        RunRecompiled(__imp__sub_8211B800, t, h.base);
+      } else {
+        NativeScrollOffset(t, h.base);
+      }
+      out[v].Bytes(Read(h.base, block.at, TextWorld::kBytes));
+      out[v].Double(t.f1.u64);
+      out[v].Word(t.r3.u32);
+      Write(h.base, kGlobals, globals.data(), kGlobalBytes);
+      guest::StoreU32(h.base, strings_and_font::kFont, font_word);
+    }
+    results.Check(out[0], out[1], fmt::format("case {}", i));
+  }
+  results.Report();
+}
+
+// DrawTexts through its adapter against the original: 0 to 4 queued items
+// on made-up nodes and texts, Text::Draw answered by the stand-in (what it
+// was handed compared). Compared: the block, the frame's stores (from its
+// +80 to the text buffer's end; filled with 0xCD first), each Text::Draw's
+// registers, parameters and text, and r3.
+void DrawTextsCases(Context& h, const Block& block) {
+  constexpr uint32_t kGlobals = 0x826C5CCC, kGlobalBytes = 0x14;
+  const std::vector<uint8_t> globals = Read(h.base, kGlobals, kGlobalBytes);
+  const uint32_t font_word = guest::LoadU32(h.base, strings_and_font::kFont);
+  const TextWorld world(block.at);
+  std::vector<TextDraw> draws;
+  g_text_draws = &draws;
+  hooks::g_text_draw_stand_in = TextDrawStandIn;
+  Results results("UiMovie::DrawTexts (sub_8211CD90)");
+  for (int i = 0; i < 600; i++) {
+    const Random start = h.random;
+    Outputs out[2];
+    uint32_t items = 0;
+    bool scrolling = false;
+    for (int v = 0; v < 2; v++) {
+      h.random = start;
+      Random& r = h.random;
+      draws.clear();
+      Fill(h.base, block.at, TextWorld::kBytes);
+      const bool scrolls = r.Below(2) == 0;
+      world.Write(h, scrolls, r.Below(13));
+      const uint32_t list = block.at + 40;
+      const uint32_t count = i < 2 ? uint32_t(i) : r.Below(5);
+      guest::StoreU32(h.base, list + 0, block.at + TextWorld::kItems);
+      guest::StoreU32(h.base, list + 8, count);
+      items = count;
+      scrolling = scrolls;
+      for (uint32_t k = 0; k < 4; k++) {
+        world.WriteNode(h, block.at + TextWorld::kNodes + 160 * k, scrolls);
+      }
+      for (uint32_t k = 0; k < 4; k++) {
+        world.WriteItem(h, block.at + TextWorld::kItems + 128 * k,
+                        block.at + TextWorld::kNodes + 160 * r.Below(4), scrolls);
+      }
+      const uint32_t r5 = r.Below(3) == 0 ? uint32_t(r.Next()) : r.Below(2);
+      PPCContext t = CallContext(h);
+      const uint32_t frame = t.r1.u32 - ui_movies::kDrawTextsFrame;
+      Fill(h.base, frame - 512, ui_movies::kDrawTextsFrame + 512);
+      t.r3.u64 = block.at;
+      t.r4.u64 = list;
+      t.r5.u64 = r5;
+      if (v == 0) {
+        RunRecompiled(__imp__sub_8211CD90, t, h.base);
+      } else {
+        sub_8211CD90(t, h.base);
+      }
+      std::vector<uint8_t> bytes = Read(h.base, block.at, TextWorld::kBytes);
+      std::vector<uint32_t> node_floats;
+      for (uint32_t k = 0; k < 4; k++) {
+        for (uint32_t offset : {28u, 32u}) {
+          const uint32_t at = TextWorld::kNodes + 160 * k + offset;
+          node_floats.push_back(guest::LoadU32(h.base, block.at + at));
+          std::fill(bytes.begin() + at, bytes.begin() + at + 4, 0);
+        }
+      }
+      out[v].Bytes(bytes);
+      for (uint32_t word : node_floats) {
+        out[v].Float(word);
+      }
+      constexpr uint32_t kFrom = 80, kTo = ui_movies::kDrawTextsBuffer + 4096;
+      constexpr uint32_t p = ui_movies::kDrawTextsParams - kFrom;
+      BytesWithFloats(out[v], Read(h.base, frame + kFrom, kTo - kFrom),
+                      {96 - kFrom, 100 - kFrom, 104 - kFrom, 108 - kFrom, ITC_PARAMS_FLOATS(p)});
+      out[v].Word(uint32_t(draws.size()));
+      for (const TextDraw& d : draws) {
+        out[v].Word(d.r1);
+        out[v].Word(d.r3);
+        out[v].Word(d.r4);
+        out[v].Word(d.r5);
+        BytesWithFloats(out[v], d.params, {ITC_PARAMS_FLOATS(0u)});
+        out[v].Bytes(d.text);
+      }
+      out[v].Word(t.r3.u32);
+      Write(h.base, kGlobals, globals.data(), kGlobalBytes);
+      guest::StoreU32(h.base, strings_and_font::kFont, font_word);
+    }
+    results.Check(out[0], out[1],
+                  fmt::format("case {}: {} items{}", i, items, scrolling ? ", scrolling" : ""));
+  }
+  hooks::g_text_draw_stand_in = nullptr;
+  g_text_draws = nullptr;
+  results.Report();
+}
+#undef ITC_PARAMS_FLOATS
+
+// --- UiMovie::Update (sub_8211D2F8, docs/functions/ui-movies.md) ---
+
+// What the update's callees were handed (their stand-in,
+// ui_movies_hooks::g_update_callee_stand_in): the function, its return
+// address and stack pointer, the registers it takes, and f1 for
+// ApplyAnimation, which answers from its own random sequence (0, 1, or a
+// negative or large word).
+struct UpdateCall {
+  uint32_t function, lr, r1;
+  std::vector<uint64_t> registers;
+  uint64_t f1;
+};
+std::vector<UpdateCall>* g_update_calls = nullptr;
+Random g_apply_answers;
+
+bool UpdateCalleeStandIn(uint32_t function, PPCContext& ctx, uint8_t*) {
+  UpdateCall call{function, uint32_t(ctx.lr), ctx.r1.u32, {}, 0};
+  switch (function) {
+    case 0x825A08E0: {
+      call.registers = {ctx.r3.u64, ctx.r4.u64, ctx.r6.u64};
+      call.f1 = ctx.f1.u64;
+      const uint32_t pick = g_apply_answers.Below(8);
+      ctx.r3.u64 = pick < 4 ? 0 : pick < 7 ? 1 : uint64_t(g_apply_answers.Next());
+      break;
+    }
+    case 0x8259FA00:
+    case 0x82119B80:
+      call.registers = {ctx.r3.u64, ctx.r4.u64, ctx.r5.u64, ctx.r6.u64, ctx.r7.u64};
+      break;
+    case 0x8211CD90:
+      call.registers = {ctx.r3.u64, ctx.r4.u64, ctx.r5.u64};
+      break;
+    default:
+      call.registers = {ctx.r3.u64, ctx.r4.u64};
+      break;
+  }
+  g_update_calls->push_back(std::move(call));
+  return true;
+}
+
+// The update against the original on two made-up lists (0 to 32 slots
+// used each) whose slots name made-up animations (+16; their length at
+// +12), with chained (+24), reversed (+28), kept (+32) and paused (+36)
+// words mostly 0 or 1, and random times (odd floats among them); its
+// callees answered by the stand-in, AnimationList::Insert and RemoveAt run
+// (the native ones against the originals). Compared: the block (the slots'
+// times as floats), the frame's local list (filled with 0xCD first), every
+// call the update made, and r3.
+void UpdateCases(Context& h, const Block& block) {
+  const uint32_t movie = block.at;
+  const uint32_t animations = block.at + 0xA500;  // eight of 32 bytes
+  constexpr uint32_t kBytes = 0xA600;
+  std::vector<UpdateCall> calls;
+  g_update_calls = &calls;
+  ui_movies_hooks::g_update_callee_stand_in = UpdateCalleeStandIn;
+  Results results("UiMovie::Update (sub_8211D2F8)");
+  for (int i = 0; i < 800; i++) {
+    const Random start = h.random;
+    Outputs out[2];
+    uint32_t used[2] = {}, r4 = 0;
+    for (int v = 0; v < 2; v++) {
+      h.random = start;
+      Random& r = h.random;
+      calls.clear();
+      Fill(h.base, block.at, kBytes);
+      ListSpec lists[2] = {ListSpec(r, i < 2 ? 0 : r.Below(33)), ListSpec(r, r.Below(33))};
+      for (ListSpec& list : lists) {
+        for (auto& words : list.slots) {
+          words[4] = animations + 32 * r.Below(8);
+          words[6] = r.Below(6) == 0 ? uint32_t(r.Next()) : r.Below(2);
+          words[7] = r.Below(6) == 0 ? uint32_t(r.Next()) : r.Below(2);
+          words[8] = r.Below(6) == 0 ? uint32_t(r.Next()) : r.Below(2);
+          words[9] = r.Below(4) == 0 ? 1 : 0;
+          if (r.Below(2) == 0) {
+            words[5] = std::bit_cast<uint32_t>(float(int32_t(r.Below(80)) - 10) / 4.0f);
+          }
+        }
+      }
+      lists[0].Write(h.base, movie + ui_movies::kMovieQueue);
+      lists[1].Write(h.base, movie + ui_movies::kMovieLooping);
+      used[0] = lists[0].used;
+      used[1] = lists[1].used;
+      for (uint32_t j = 0; j < 8; j++) {
+        guest::StoreU32(h.base, animations + 32 * j + 12,
+                        r.Below(4) == 0 ? RandomWord(r)
+                                        : std::bit_cast<uint32_t>(float(r.Below(40)) / 4.0f));
+      }
+      g_apply_answers = Random(r.Next());
+      r4 = r.Below(3) == 0 ? (r.Below(4) == 0 ? uint32_t(r.Next()) : 1) : 0;
+      PPCContext t = CallContext(h);
+      const uint32_t frame = t.r1.u32 - ui_movies::kUpdateFrame;
+      Fill(h.base, frame - 256, ui_movies::kUpdateFrame + 256);
+      t.r3.u64 = movie;
+      t.r4.u64 = r4;
+      if (v == 0) {
+        RunRecompiled(__imp__sub_8211D2F8, t, h.base);
+      } else {
+        ui_movies_hooks::Update(t, h.base);
+      }
+      // The slots' times (+20) as floats.
+      auto times = [](uint32_t list) {
+        std::vector<uint32_t> offsets;
+        for (uint32_t k = 0; k < 32; k++) {
+          offsets.push_back(list + 140 + 40 * k + 20);
+        }
+        return offsets;
+      };
+      auto with_times = [&](uint32_t address, uint32_t bytes, const std::vector<uint32_t>& at) {
+        std::vector<uint8_t> data = Read(h.base, address, bytes);
+        std::vector<uint32_t> words;
+        for (uint32_t offset : at) {
+          words.push_back(guest::LoadU32(h.base, address + offset));
+          std::fill(data.begin() + offset, data.begin() + offset + 4, 0);
+        }
+        out[v].Bytes(data);
+        for (uint32_t w : words) {
+          out[v].Float(w);
+        }
+      };
+      std::vector<uint32_t> block_times = times(ui_movies::kMovieQueue);
+      for (uint32_t offset : times(ui_movies::kMovieLooping)) {
+        block_times.push_back(offset);
+      }
+      with_times(block.at, kBytes, block_times);
+      with_times(frame + ui_movies::kUpdateLocal, kListBytes, times(0));
+      out[v].Word(uint32_t(calls.size()));
+      for (const UpdateCall& call : calls) {
+        out[v].Word(call.function);
+        out[v].Word(call.lr);
+        out[v].Word(call.r1);
+        for (uint64_t value : call.registers) {
+          out[v].Word(uint32_t(value >> 32));
+          out[v].Word(uint32_t(value));
+        }
+        if (call.function == 0x825A08E0) {
+          out[v].Double(call.f1);
+        }
+      }
+      out[v].Word(t.r3.u32);
+      out[v].Word(uint32_t(t.r3.u64 >> 32));
+    }
+    results.Check(out[0], out[1],
+                  fmt::format("case {}: {} queued, {} looping, r4 {:X}", i, used[0], used[1], r4));
+  }
+  ui_movies_hooks::g_update_callee_stand_in = nullptr;
+  g_update_calls = nullptr;
+  results.Report();
+}
+
+// UiMovie::Draw (sub_8211D280) and UiMovie::Run (sub_8211E1B8) against the
+// originals: their calls answered by the update's stand-in (Run's the
+// update itself), each call's function, return address, stack pointer and
+// registers compared, with r3.
+void DrawAndRunCases(Context& h, const Block& block) {
+  std::vector<UpdateCall> calls;
+  g_update_calls = &calls;
+  ui_movies_hooks::g_update_callee_stand_in = UpdateCalleeStandIn;
+  struct Case {
+    const char* name;
+    GuestFunction recompiled, native;
+  };
+  for (const Case& f : {Case{"UiMovie::Draw (sub_8211D280)", __imp__sub_8211D280, sub_8211D280},
+                        Case{"UiMovie::Run (sub_8211E1B8)", __imp__sub_8211E1B8, sub_8211E1B8}}) {
+    Results results(f.name);
+    for (int i = 0; i < 100; i++) {
+      const Random start = h.random;
+      Outputs out[2];
+      for (int v = 0; v < 2; v++) {
+        h.random = start;
+        Random& r = h.random;
+        calls.clear();
+        Fill(h.base, block.at, 0x100);
+        const uint32_t movie = block.at + 16 * r.Below(8);
+        guest::StoreU32(h.base, movie + ui_movies::kMovieLive, uint32_t(r.Next()));
+        guest::StoreU32(h.base, movie + ui_movies::kMovieSaved, uint32_t(r.Next()));
+        PPCContext t = CallContext(h);
+        t.r3.u64 = movie;
+        t.r4.u64 = r.Below(3) == 0 ? r.Next() : r.Below(2);
+        t.lr = 0x82000000 | (r.Below(0x10000) << 2);
+        if (v == 0) {
+          RunRecompiled(f.recompiled, t, h.base);
+        } else {
+          f.native(t, h.base);
+        }
+        out[v].Bytes(Read(h.base, block.at, 0x100));
+        out[v].Word(uint32_t(calls.size()));
+        for (const UpdateCall& call : calls) {
+          out[v].Word(call.function);
+          out[v].Word(call.lr);
+          out[v].Word(call.r1);
+          for (uint64_t value : call.registers) {
+            out[v].Word(uint32_t(value >> 32));
+            out[v].Word(uint32_t(value));
+          }
+        }
+        out[v].Word(t.r3.u32);
+        out[v].Word(uint32_t(t.lr));
+      }
+      results.Check(out[0], out[1], fmt::format("case {}", i));
+    }
+    results.Report();
+  }
+  ui_movies_hooks::g_update_callee_stand_in = nullptr;
+  g_update_calls = nullptr;
+}
+
+// The stops against the originals: UiMovie::Finish (sub_8211DE38),
+// FinishNamed (sub_8211DF20) and FinishAll (sub_8211DFF8). Two made-up lists
+// (0 to 32 slots used each; for FinishAll 32 at most together, as moving
+// more into a full queue follows its -1 links out of the block) with small
+// indices (+0, +4, +8), made-up animations (+16; their length at +12, odd
+// floats among them) and reversed words (+28) mostly 0 or 1; the moves,
+// AnimationList::Insert and RemoveAt run (the native ones against the
+// originals), UiMovie::ApplyAnimation answered by the update's stand-in.
+// Compared: the lists, the frame's slot copy (FinishAll's, +80), every call
+// made (with f1), r3, f1 and lr.
+void FinishCases(Context& h, const Block& block) {
+  const uint32_t movie = block.at;
+  const uint32_t animations = block.at + 0xA500;  // eight of 32 bytes
+  constexpr uint32_t kBytes = 0xA600;
+  std::vector<UpdateCall> calls;
+  g_update_calls = &calls;
+  ui_movies_hooks::g_update_callee_stand_in = UpdateCalleeStandIn;
+  struct Case {
+    const char* name;
+    GuestFunction recompiled, native;
+    bool all;
+  };
+  for (const Case& f :
+       {Case{"UiMovie::Finish (sub_8211DE38)", __imp__sub_8211DE38, ui_movies_game_hooks::Finish,
+             false},
+        Case{"UiMovie::FinishNamed (sub_8211DF20)", __imp__sub_8211DF20,
+             ui_movies_game_hooks::FinishNamed, false},
+        Case{"UiMovie::FinishAll (sub_8211DFF8)", __imp__sub_8211DFF8, sub_8211DFF8, true}}) {
+    Results results(f.name);
+    for (int i = 0; i < 600; i++) {
+      const Random start = h.random;
+      Outputs out[2];
+      uint32_t used[2] = {}, r4 = 0, r5 = 0;
+      for (int v = 0; v < 2; v++) {
+        h.random = start;
+        Random& r = h.random;
+        calls.clear();
+        Fill(h.base, block.at, kBytes);
+        const uint32_t queued = i == 0 ? 0 : r.Below(33);
+        const uint32_t looping = i == 1 ? 0 : r.Below(f.all ? 33 - queued : 33);
+        ListSpec lists[2] = {ListSpec(r, queued), ListSpec(r, looping)};
+        for (ListSpec& list : lists) {
+          for (auto& words : list.slots) {
+            words[4] = animations + 32 * r.Below(8);
+            words[7] = r.Below(6) == 0 ? uint32_t(r.Next()) : r.Below(2);
+          }
+        }
+        lists[0].Write(h.base, movie + ui_movies::kMovieQueue);
+        lists[1].Write(h.base, movie + ui_movies::kMovieLooping);
+        used[0] = lists[0].used;
+        used[1] = lists[1].used;
+        for (uint32_t j = 0; j < 8; j++) {
+          guest::StoreU32(h.base, animations + 32 * j + 12,
+                          r.Below(4) == 0 ? RandomWord(r)
+                                          : std::bit_cast<uint32_t>(float(r.Below(40)) / 4.0f));
+        }
+        g_apply_answers = Random(r.Next());
+        r4 = r.Below(5) == 0 ? 0xFFFFFFFFu : r.Below(f.native == ui_movies_game_hooks::Finish ? 3 : 6);
+        r5 = r.Below(4);
+        PPCContext t = CallContext(h);
+        const uint32_t copy = t.r1.u32 - 176 + 80;
+        Fill(h.base, copy, 40);
+        t.r3.u64 = movie;
+        t.r4.u64 = r4;
+        t.r5.u64 = r5;
+        t.f1.u64 = r.Next();
+        t.lr = 0x82000000 | (r.Below(0x10000) << 2);
+        if (v == 0) {
+          RunRecompiled(f.recompiled, t, h.base);
+        } else {
+          f.native(t, h.base);
+        }
+        out[v].Bytes(Read(h.base, block.at, kBytes));
+        if (f.all) {
+          out[v].Bytes(Read(h.base, copy, 40));
+        }
+        out[v].Word(uint32_t(calls.size()));
+        for (const UpdateCall& call : calls) {
+          out[v].Word(call.function);
+          out[v].Word(call.lr);
+          out[v].Word(call.r1);
+          for (uint64_t value : call.registers) {
+            out[v].Word(uint32_t(value >> 32));
+            out[v].Word(uint32_t(value));
+          }
+          out[v].Double(call.f1);
+        }
+        out[v].Word(t.r3.u32);
+        out[v].Word(uint32_t(t.r3.u64 >> 32));
+        out[v].Double(t.f1.u64);
+        out[v].Word(uint32_t(t.lr));
+      }
+      results.Check(out[0], out[1],
+                    fmt::format("case {}: {} queued, {} looping, r4 {:X} r5 {}", i, used[0],
+                                used[1], r4, r5));
+    }
+    results.Report();
+  }
+  ui_movies_hooks::g_update_callee_stand_in = nullptr;
+  g_update_calls = nullptr;
+}
+
 }  // namespace
 
 void UiMoviesGame(Context& h) {
@@ -1101,6 +1768,11 @@ void UiMoviesGame(Context& h) {
   TextCases(h, block);
   MoveCases(h, block);
   PlayCases(h, block);
+  ScrollOffsetCases(h, block);
+  DrawTextsCases(h, block);
+  UpdateCases(h, block);
+  DrawAndRunCases(h, block);
+  FinishCases(h, block);
   memory->SystemHeapFree(block.at);
 }
 

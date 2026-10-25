@@ -112,7 +112,13 @@ goes in `src/` as overrides), American English.
   run (branch `b7-loop-25-10-26-2`) made the game modes, the model
   class (the memory blocks' lock a host mutex), the mode tick, the
   minimap's parts and `atexit` (the exit lock a host mutex) with what
-  it unblocked native as far as they were ready (ours 2,013). The
+  it unblocked native as far as they were ready (ours 2,013); its
+  sixteenth run (branch `b7-loop-25-10-26-3`) made the scene models'
+  set-up side, the UI movies' text draw, update and objects with the
+  race HUD's movie picker (two leads without mapping), the scenery
+  lists and the model draws, and the shader objects up to `Model::Load`
+  with the course set and string table it unblocked native as far as
+  they were ready (ours 2,152). The
   runs' rows wait for the user's review (`docs/loops/review.md`). See
   "B7's loop runs" under B7, and `docs/loops/b7-progress.md`. Guest
   allocation is no longer a block (`docs/native-memory.md`); what the
@@ -2580,6 +2586,11 @@ B7. **The game logic inside**: everything else, subsystem by subsystem,
 | 2026-10-25 | The mode tick (what `Modes::Tick` calls besides the mode's slots: the per-mode settings, the sign-in watch, the billboards' ring flip, the two layers of screen fades, the menu music with XAPI's `lstrcmpA` and `CompareStringA` as plain C++ by B6's call; presence Dropped by B5's; with `Modes::Modes` in `game-modes.md`) | `mode-tick.md` | 21 of 23 (one migration; 1 Dropped, 4 Merged) | `--native_mode_tick` |
 | 2026-10-25 | The minimap's parts (the race manager's lookups, the car marker's type, the scaling, the marker triangles and their 80-slot lists, the transform and the triangles' records; interpolation's hooks kept, `Minimap::Draw`'s blink wrap untouched; the marker draws and `Minimap::Draw` left waiting on `atexit` and the course set's lists) | `minimap.md` | 12 of 15 (one migration) | `--native_minimap` |
 | 2026-10-25 | `atexit` and what it unblocked (`atexit`, `_onexit` and `__onexitinit` over the game's exit table, the C runtime's exit lock a host mutex taken by every user through `_lock`/`_unlock` overridden for lock 8 only, the user's call by the recorded lock call; the global strings' static set-ups, `SignInWatch::StaticInit`, `UiMovie::TrackProperty`, `ApplyTrack` and `ApplyAnimation`, the minimap's marker draws, `Viewports::Init` and `Viewport::Init`; no mapping) | `c-runtime.md`, and `ui-movies.md`, `minimap.md`, `cameras.md`, `std-string.md`, `mode-tick.md` | 18 made native, 12 adapters removed (two migrations) | under `--native_c_runtime` and the files' own flags |
+| 2026-10-25 | The scene models' set-up side (the cars as the scene holds them, pool 7 of the second pool set: the parts' links, the 4,244-byte records' defaults, copies and constructor, the car records' reset and copy, the accessory, the sound loads' callback, the car model's pages through `memory::AllocPages`; `SceneModel::SetUp`, `Build`, `Update` and the loaders left waiting) | `scene-models.md` | 23 of 48 (one migration; 1 Native with no adapter) | `--native_scene_models` |
+| 2026-10-25 | `UiMovie::DrawTexts` and what it unblocked (no mapping, not counted: `DrawTexts`, `ScrollOffset`, `UiMovie::Update`, `Draw`, `Run`, `Finish`, `FinishNamed`, `FinishAll`; `_init_pointers` and the empty destructor `sub_82106540`; the race HUD's movie picker and the rival logo's draw in the new `race-hud.md`) | `ui-movies-game.md`, `ui-movies.md`, `c-runtime.md`, `race-hud.md` | 13 made native, 9 adapters removed, 1 Merged (two migrations) | `--native_ui_movies_game`, `--native_ui_movies`, `--native_c_runtime`, `--native_race_hud` |
+| 2026-10-25 | The UI movies' ready groups (no mapping, not counted: the movie's vectors, `UiMovie::UiMovie` and `~UiMovie`, the texts freed, `GetText` and the six text setters over it, the named animations' set-up, the HUD's mirror effect `sub_8211BEE8`) | `ui-movies-game.md` | 26 rows (19 with plain C++, 7 Merged; no adapter removable yet) | `--native_ui_movies_game` |
+| 2026-10-25 | The scenery lists (the course set's six model lists: release, the draw picks by race data, course layout and mode, `PointList::Draw`; the scenery model's and the shared model draws: `IsShapeVisible`, `RecordObject` inside its interpolation wrapper, `RecordSceneLights`, the depth draws, `Model::DrawShape` and `RecordShape`; the texture provider's slots 2 and 4; `models.md`'s accessors) | `scenery-lists.md` | 25 of 27, and 6 in `models.md` (two migrations; 1 adapter removed, 2 Native with none, 3 Merged) | `--native_scenery_lists`, `--native_models` |
+| 2026-10-25 | The shader objects and what they unblocked (the shader creates and inits, the memory blocks' makers and put-off frees under the host lock, `XMemCpy`, the relocations, `XPR::Create`, `Mesh::LoadShaders`, `Mesh::Parse`, `Model::Load`; then `DataFile::GetEntry`, the scenery lists' loads, the course set's parsers, pool objects, collect and draw, `Strings::Get`, `FormatV` and `Format`) | `shader-objects.md`, with `models.md`, `c-runtime.md`, `files-and-saves.md`, `scenery-lists.md`, `course-scenery.md`, `strings-and-font.md` | 7 of 7, and 38 in the other files (three migrations; 15 adapters removed) | `--native_shader_objects`, `--native_data_files` and the files' flags |
 
     The first run (2026-10-22, branch `b7-loop-test`): every harness at 0 differing, attract races at 20-21 s with no errors,
     and a race the user drove looked right. Ours went from 162 to 335 (work
@@ -3463,3 +3474,84 @@ lists; the semaphores' and the vblank event's static set-ups on their
 kernel objects; `sprintf` and `_vsnprintf_l` on `_output_l` and
 `_vsnprintf`.
 
+**2026-10-25, the scene models (branch `b7-loop-25-10-26-3`):** the
+sixteenth run's first subsystem mapped the scene models' set-up side
+(`scene-models.md`, 48 rows; the rest of their code, ~227 functions, in
+six leads) and made 23 native (`--native_scene_models`): the parts'
+links, the records' defaults, copies and constructor, the car records'
+reset and copy, the accessory, the sound loads' callback and the car
+model's pages (VirtualAlloc through `memory::AllocPages`). Validated:
+every function ran in its harness and in play (two only in the pad
+replay). The boundary unchanged: 449 functions (916 pairs): overridden
+69, Native 5, Dropped 23, never called 70, live 282. Imports: 186
+called, 62 with a live caller. B7 (`b7_status.py`): 6,451 in play, ours
+2,037, work left 4,414 (Wrapped 110, with a row 614, no row yet 3,690),
+from 4,438. `SceneModel::SetUp`, `Build` and `Update` wait on the load
+slots, `Archive::Load`, `ScenePools::SetUp`, the asset's size,
+`sprintf` and `Texture::Create`.
+
+**2026-10-25, `UiMovie::DrawTexts` and what it unblocked (branch
+`b7-loop-25-10-26-3`):** a "no mapping" lead (not counted) made the UI
+movies' text draw native and what it unblocked: `UiMovie::Update`,
+`Draw`, `Run`, `Finish`, `FinishNamed` and `FinishAll`, `_init_pointers`
+with the empty destructor, the race HUD's movie picker and the rival
+logo's draw (`race-hud.md`, `--native_race_hud`; `--redraw_rival_logo`
+calls the native draw); 9 adapters removed; the title screen's text
+pixel-identical with the fallback. `_mtinit` waits on the kernel's TLS
+(no call yet). The boundary unchanged: 449 functions (916 pairs):
+overridden 69, Native 5, Dropped 23, never called 70, live 282.
+Imports: 186 called, 62 with a live caller. B7 (`b7_status.py`): ours
+2,050, work left 4,401 (Wrapped 105, with a row 608, no row yet 3,688),
+from 4,414.
+
+**2026-10-25, the UI movies' ready groups (branch
+`b7-loop-25-10-26-3`):** a "no mapping" lead (not counted) made the
+rest of `ui-movies-game.md`'s ready groups native (26 rows: the vectors,
+the movie's constructor and destructor, the texts freed, `GetText` and
+the text setters, the named animations' set-up, the HUD's mirror
+effect, whose replay frame dumps match the fallback's). The boundary
+unchanged: 449 functions (916 pairs): overridden 69, Native 5, Dropped
+23, never called 70, live 282. Imports: 186 called, 62 with a live
+caller. B7 (`b7_status.py`): ours 2,076, work left 4,375 (Wrapped 105,
+with a row 582, no row yet 3,688), from 4,401. The rest of the file
+waits on `sub_82108860`, the string table's formatting, the archive
+load's events (`NtWaitForSingleObjectEx`, `NtSetEvent`) and the texture
+set.
+
+**2026-10-25, the scenery lists (branch `b7-loop-25-10-26-3`):** the
+sixteenth run's second subsystem mapped the course set's model lists and
+the model draws (`scenery-lists.md`, 27 rows) and made them native as
+far as they were ready (`--native_scenery_lists`; `models.md`'s
+accessors and `Model::RecordShape` under `--native_models`): every model
+draw in a race now records natively, `Recorder::RecordObject` inside its
+interpolation wrapper (native callers run its hooks through
+`BlendState_SetRecordContext`); frame dumps and `--log_blend_state`
+counts matched the fallback. Cases the ports don't cover (material
+animations, more than 4 textures, a full command list, another list's
+chunk open) run the original from the start. The boundary unchanged:
+449 functions (916 pairs): overridden 69, Native 5, Dropped 23, never
+called 70, live 282. Imports: 186 called, 62 with a live caller. B7
+(`b7_status.py`): ours 2,107, work left 4,344 (Wrapped 104, with a row
+576, no row yet 3,664), from 4,375. The lists' loads wait on
+`Model::Load` (the shader objects' set-up, the memory blocks).
+
+**2026-10-25, the shader objects and what they unblocked (branch
+`b7-loop-25-10-26-3`):** the sixteenth run's third and last subsystem
+mapped the shader objects and the memory blocks (`shader-objects.md`, 7
+rows; `XMemCpy` in `c-runtime.md`) and, in three migrations, made the
+whole chain up to `Model::Load` native (`--native_shader_objects`;
+`models.md`'s under `--native_models`; `XMemCpy`'s step word logged as
+1; native copies into physical memory recorded for the renderer through
+a new `native::Buffers_Memcpy`), then `DataFile::GetEntry` (new
+`--native_data_files`) and what it unblocked: the scenery lists' loads,
+the course set's parsers, pool objects, `CollectAreas`, `CollectModels`
+and `DrawSetLists`, and the string table's `Get`, `FormatV` and `Format`
+(15 adapters removed). Race frame dumps matched the fallback (the
+attract race comes in two timing variants, 2,412 or 2,414 draws). The
+boundary unchanged: 449 functions (916 pairs): overridden 69, Native 5,
+Dropped 23, never called 70, live 282. Imports: 186 called, 62 with a
+live caller. B7 (`b7_status.py`): 6,451 in play, ours 2,152, work left
+4,299 (Wrapped 104, with a row 540, no row yet 3,655), from 4,344 (from
+4,438 at the run's start). What's left in these files waits on the
+generic critical section wrappers, the video output's events and
+semaphores, `Archive::Load` and the asset's size.

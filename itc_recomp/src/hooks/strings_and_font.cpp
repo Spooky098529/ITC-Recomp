@@ -14,7 +14,10 @@
 // (sub_821082A0) any more: only their native callers' plain C++ calls them in
 // play (Font::TextWidth's, Font::Draw's and Font::DrawPass's down), and the
 // flag switches those callers. Font::DrawPass's and Font::Draw's adapters
-// stay: they make the render queue's guest call. The registers the
+// stay: they make the render queue's guest call. Font::TextWidth
+// (sub_82108B30) has no adapter either: only UiMovie::ScrollOffset's plain
+// C++ (src/ui_movies/texts.cpp) calls it in play, and --native_ui_movies_game
+// switches that caller (this flag no longer switches it). The registers the
 // originals leave that a caller could read (r3) are left the same.
 
 #include "guest.h"
@@ -22,6 +25,8 @@
 #include "base/flags.h"
 #include "hooks/guest_call.h"
 #include "hooks/heap.h"
+#include "hooks/models.h"
+#include "hooks/strings_and_font.h"
 #include "strings_and_font/strings_and_font.h"
 
 ITC_FLAG_BOOL(native_strings_and_font, true, "ITC",
@@ -32,19 +37,27 @@ ITC_FLAG_BOOL(native_strings_and_font, true, "ITC",
               "sub_821081A0, swprintf sub_8210A490 (with vswprintf sub_825A9A80, _vswprintf_l "
               "sub_825A9980 and _woutput_l sub_825B13D0, no adapters of their own; the original "
               "for %n, %Z, floats but %f and the unit 0xFFFF), Strings::FormatGrouped "
-              "sub_8210A680, Strings::PageCount sub_8210A5C0, Strings::CopyPage sub_8210A5E8, "
-              "the font's pixel shader entries sub_825D9590, Font::TextWidth sub_82108B30 "
-              "with Font::SetParams sub_82108368, Font::DrawPass sub_82109EF0 (without the "
+              "sub_8210A680 (no adapter: Strings::FormatV's and Format's plain C++ call it), "
+              "Strings::PageCount sub_8210A5C0 (no adapter: the UI movies' plain C++ calls it), "
+              "Strings::CopyPage sub_8210A5E8, "
+              "the font's pixel shader entries sub_825D9590, Font::SetParams sub_82108368 (and "
+              "under Font::TextWidth sub_82108B30, which has no adapter: its caller "
+              "UiMovie::ScrollOffset is switched by --native_ui_movies_game), Font::DrawPass sub_82109EF0 (without the "
               "command list's diagnostics; with Font::CountGlyphs sub_82108210, "
               "Font::BuildVertices sub_82109AA8, Font::LineX sub_82108FE0 with Font::LineWidth "
               "sub_82108458 and sub_82108810, Font::LineY sub_82108568, Font::AddGlyph "
               "sub_82109560, Font::ClipGlyph sub_82108C90 and Font::OutCode sub_821082A0, no "
-              "adapters of their own), Font::Draw sub_8210A400 and Text::Draw sub_8210A758; "
+              "adapters of their own), Font::Draw sub_8210A400, Text::Draw sub_8210A758, "
+              "Strings::Get sub_8210A800 (no adapter: Strings::FormatV's and Format's plain C++ "
+              "call it), Strings::FormatV sub_8210A990 (the font's number sub_82108A70, never in play, a guest call), Strings::Format sub_8210ABC0, and, with --native_models, XPR::Release of a slot "
+              "sub_82108860; "
               "rotated text and the second pass, never in play, on the translated code) "
               "natively instead of through the translated code (same results; checked by "
               "--run_harnesses=strings_and_font)");
 
 using namespace strings_and_font;
+
+hooks::GuestStandIn hooks::g_text_draw_stand_in = nullptr;
 
 // The command list's diagnostics (blend_state.cpp) see the slots the
 // originals allocate through AllocateSlots: with any of them on, the
@@ -121,23 +134,69 @@ extern "C" REX_FUNC(sub_8210A490) {
   ctx.r3.u64 = uint32_t(count);
 }
 
-// Strings::FormatGrouped: r4 = the value, r5 = the output; r3 the output
-// (wcscat's or wcscpy's), its frame where the original's would be (640
-// bytes down). Flush-to-zero off, as its lfd leaves it.
-extern "C" REX_FUNC(sub_8210A680) {
-  ITC_STRINGS_AND_FONT_FALLBACK(8210A680)
+// Strings::FormatV: r3 = the table, r4 = the output, r5 = the id, r6 = the
+// va_list; r3 the output. Flush-to-zero off, as its frsp leaves it. Its
+// guest calls (swprintf's adapter and FormatGrouped's original where their
+// plain C++ declines, the font's number) from its frame.
+namespace {
+
+struct FormatGuest {
+  PPCContext& ctx;
+  uint8_t* base;
+};
+
+uint32_t FormatCall(void* user, uint32_t function, uint32_t r3, uint32_t r4, uint64_t r5,
+                    uint32_t frame, uint32_t lr) {
+  auto& guest = *static_cast<FormatGuest*>(user);
+  PPCContext& ctx = guest.ctx;
+  uint8_t* base = guest.base;
+  const uint64_t stack = ctx.r1.u64;
+  ctx.r1.u64 = frame;
+  ctx.lr = lr;
+  ctx.r3.u64 = r3;
+  ctx.r4.u64 = r4;
+  ctx.r5.u64 = r5;
+  ctx.ctr.u64 = function;
+  REX_CALL_INDIRECT_FUNC(function);
+  ctx.r1.u64 = stack;
   ctx.fpscr.disableFlushMode();
-  if (!StringsFormatGrouped(base, ctx.r4.s32, ctx.r5.u32, ctx.r1.u32 - 640)) {
-    __imp__sub_8210A680(ctx, base);
-    return;
-  }
-  ctx.r3.u64 = ctx.r5.u32;
+  return ctx.r3.u32;
 }
 
-// Strings::PageCount: r4 = the text; r3 the count.
-extern "C" REX_FUNC(sub_8210A5C0) {
-  ITC_STRINGS_AND_FONT_FALLBACK(8210A5C0)
-  ctx.r3.u64 = StringsPageCount(base, ctx.r4.u32);
+}  // namespace
+
+void hooks::StringsFormatVSteps(PPCContext& ctx, uint8_t* base) {
+  ctx.fpscr.disableFlushMode();
+  const uint64_t lr = ctx.lr;
+  FormatGuest guest{ctx, base};
+  const FormatCalls calls{&guest, FormatCall};
+  const uint32_t out = StringsFormatV(base, calls, ctx.r1.u32, ctx.r3.u32, ctx.r4.u32,
+                                      ctx.r5.u32, ctx.r6.u32);
+  ctx.lr = lr;
+  ctx.r3.u64 = out;
+}
+
+extern "C" REX_FUNC(sub_8210A990) {
+  ITC_STRINGS_AND_FONT_FALLBACK(8210A990)
+  hooks::StringsFormatVSteps(ctx, base);
+}
+
+// Strings::Format: as FormatV with r6 to r10 the varargs; r3 the output.
+void hooks::StringsFormatSteps(PPCContext& ctx, uint8_t* base) {
+  ctx.fpscr.disableFlushMode();
+  const uint64_t lr = ctx.lr;
+  FormatGuest guest{ctx, base};
+  const FormatCalls calls{&guest, FormatCall};
+  const uint64_t varargs[5] = {ctx.r6.u64, ctx.r7.u64, ctx.r8.u64, ctx.r9.u64, ctx.r10.u64};
+  const uint32_t out = StringsFormat(base, calls, ctx.r1.u32, ctx.r3.u32, ctx.r4.u32,
+                                     ctx.r5.u32, varargs);
+  ctx.lr = lr;
+  ctx.r3.u64 = out;
+}
+
+extern "C" REX_FUNC(sub_8210ABC0) {
+  ITC_STRINGS_AND_FONT_FALLBACK(8210ABC0)
+  hooks::StringsFormatSteps(ctx, base);
 }
 
 // Strings::CopyPage: r4 = the output, r5 = the text, r6 = the page, r7 =
@@ -152,14 +211,6 @@ extern "C" REX_FUNC(sub_8210A5E8) {
 extern "C" REX_FUNC(sub_825D9590) {
   ITC_STRINGS_AND_FONT_FALLBACK(825D9590)
   InitShaderEntries(base);
-}
-
-// Font::TextWidth: r3 = the font, r4 = the draw parameters, r5 = the text;
-// f1 the width.
-extern "C" REX_FUNC(sub_82108B30) {
-  ITC_STRINGS_AND_FONT_FALLBACK(82108B30)
-  ctx.fpscr.disableFlushMode();
-  ctx.f1.f64 = FontTextWidth(base, ctx.r3.u32, ctx.r4.u32, ctx.r5.u32);
 }
 
 namespace {
@@ -257,10 +308,32 @@ extern "C" REX_FUNC(sub_8210A400) {
 // Text::Draw: r4 = the draw parameters, r5 = the text: Font::Draw on
 // [0x826C5C00].
 extern "C" REX_FUNC(sub_8210A758) {
-  ITC_STRINGS_AND_FONT_FALLBACK(8210A758)
+  REX_FUNC_PROLOGUE();
+  if (hooks::g_text_draw_stand_in != nullptr) {
+    hooks::g_text_draw_stand_in(ctx, base);
+    return;
+  }
+  if (!ITC_FLAG(native_strings_and_font)) {
+    __imp__sub_8210A758(ctx, base);
+    return;
+  }
   if (guest::LoadU32(base, ctx.r4.u32 + 112) != 0 || SlotDiagnostics()) {
     __imp__sub_8210A758(ctx, base);
     return;
   }
   FontDraw(ctx, base, [&](uint32_t params) { return TextDrawSetUp(base, params); });
+}
+
+// XPR::Release of a slot (sub_82108860): r3 = the slot; r3 as the original
+// leaves it. Natively only where the model class's lifetime functions are
+// (hooks::ModelsNativeLifetime: XPR::~XPR puts its blocks off).
+extern "C" REX_FUNC(sub_82108860) {
+  REX_FUNC_PROLOGUE();
+  if (ITC_FLAG(native_strings_and_font) && hooks::ModelsNativeLifetime()) {
+    if (const auto r3 = ReleaseXprSlot(base, ctx.r3.u32)) {
+      ctx.r3.u64 = *r3;
+      return;
+    }
+  }
+  __imp__sub_82108860(ctx, base);
 }

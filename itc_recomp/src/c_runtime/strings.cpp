@@ -454,6 +454,43 @@ void XMemSet(uint8_t* base, uint32_t destination, uint32_t value, uint32_t bytes
   }
 }
 
+std::optional<uint32_t> XMemCpyBytes(uint8_t* base, uint32_t source, uint32_t bytes) {
+  if (bytes >= 16) {
+    return bytes;
+  }
+  // The doubleword (8 or more, an 8-aligned source), the words (a word
+  // aligned source, 4 or more left), then the byte loop's step.
+  uint32_t at = 0;
+  uint32_t left = bytes;
+  if (left >= 8 && (source & 7) == 0) {
+    at += 8;
+    left -= 8;
+  }
+  if (((source + at) & 3) == 0 && left >= 4) {
+    at += left & ~3u;
+    left &= 3;
+  }
+  if (left != 0) {
+    const uint32_t step = guest::LoadU32(base, kXMemCpyStep);
+    if (step == 0 || left % step != 0) {
+      return std::nullopt;
+    }
+    left /= step;
+  }
+  return at + left;
+}
+
+bool XMemCpyFits(uint8_t* base, uint32_t destination, uint32_t source, uint32_t bytes) {
+  const auto copied = XMemCpyBytes(base, source, bytes);
+  return copied && (*copied == 0 || !MayShare(destination, *copied, source, *copied));
+}
+
+bool XMemCpy(uint8_t* base, uint32_t destination, uint32_t source, uint32_t bytes) {
+  ITC_NATIVE_RUNNING("sub_82295890 XMemCpy");
+  const auto copied = XMemCpyBytes(base, source, bytes);
+  return copied && Memcpy(base, destination, source, *copied);
+}
+
 bool MemmoveDown(uint8_t* base, uint32_t destination, uint32_t source, uint32_t size) {
   if (size == 0) {
     return true;

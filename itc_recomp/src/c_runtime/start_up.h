@@ -22,6 +22,12 @@ void SetCriticalSectionInitializer(uint8_t* base, uint32_t value);  // sub_825B3
 // sub_825B3548: stores 0x825B3498 at 0x82971328.
 void SetDefaultCriticalSectionInitializer(uint8_t* base);
 
+// _init_pointers (sub_825AA398): the setters above with 0 (0x82971170,
+// 0x8297132C, 0x82978320, 0x82971178, in that order), the default critical
+// section initializer (0x82971328), and 0x825AA378 stored at 0x8266B7B0.
+// Its call of the empty destructor (sub_82106540, with 0) is left out.
+void InitPointers(uint8_t* base);
+
 // __initmbctable (sub_825B6958): once (the flag at 0x82978338), sets
 // 0x8297136C to -3 and 0x8297135C to 0 and the multibyte info at
 // [0x8266C450] to the C locale's with setSBCS; returns 0.

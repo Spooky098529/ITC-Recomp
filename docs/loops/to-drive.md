@@ -13,6 +13,28 @@ function goes from this list when a log shows its `native running
 (game):` line (say which log in the commit). A run with nothing left
 here loses its heading.
 
+## Run 2026-10-25 16:38 (`b7-loop-25-10-26-3`)
+
+- The DrawTexts lead's migration 2 (attract race `itc_1729`, replay
+  `itc_1730`, ok): `sub_82211A28` RivalLogo::Draw (`race-hud.md`; runs
+  only with a rival at the race start)
+- The UI movies' ready groups (attract race `itc_1740`, replay
+  `itc_1741`, ok): `sub_8211B160` (the pairs vector's growth),
+  `sub_8211C4F0` (a text's scroll delay and speed), `sub_8211D880`
+  UiMovie::RevealText, `sub_8211D8D8` (whether a text has another
+  page) (`ui-movies-game.md`)
+- The scenery lists (attract race `itc_1769`, replay `itc_1770`, ok):
+  `sub_82146BD0` SceneryModel::RecordShape, `sub_82148058`
+  PointList::Draw (`scenery-lists.md`)
+- The scenery lists' migration 2 (attract race `itc_1777`, replay
+  `itc_1778`, ok): `sub_82595550` Model::RecordShape (`models.md`; its
+  work runs in play inside `Model::DrawShape`, which calls
+  `ModelRecordShapeChecked` past the print; only its own adapter, from
+  `sub_820EF790`, never ran)
+- The shader objects' migration 3 (attract race `itc_1852`, replay
+  `itc_1853`, ok): `sub_8210A5C0` Strings::PageCount
+  (`strings-and-font.md`)
+
 ## Run 2026-10-25 03:59 (`b7-loop-25-10-26-2`)
 
 Until d83677c the replay's boot marker was a line gone since the movies

@@ -9,6 +9,7 @@
 
 #pragma once
 
+#include <array>
 #include <cstdint>
 #include <functional>
 
@@ -56,6 +57,10 @@ float BlendState_Amount();
 // camera's view-projection matrix and r5 the object's world matrix.
 void BlendState_BeforeRecordObject(uint8_t* base, uint32_t view_projection, uint32_t world);
 void BlendState_AfterRecordObject(uint8_t* base);
+// Main thread: while the per-object recorder records natively for a native
+// caller, the caller's return address and r24-r31 at the call it replaces
+// (what its wrapper keeps for pairing products); cleared with all zeros.
+void BlendState_SetRecordContext(const std::array<uint32_t, 9>& context);
 
 // Render thread diagnostics (--log_replayed_constants): a frame starting
 // (after a logic tick, or not), and each shader constant upload replayed.
