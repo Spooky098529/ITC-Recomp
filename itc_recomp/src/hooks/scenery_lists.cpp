@@ -34,7 +34,10 @@ ITC_FLAG_BOOL(native_scenery_lists, true, "ITC",
               "sub_82589B58, no adapters: only it calls them), Model::RecordShapeDepth "
               "sub_825960D0, Model::DrawShapeDepth sub_82596D48 (RecordObject with the "
               "interpolation's hooks; the render queue's slot 4 a guest call), "
-              "TextureProvider::ClearAll "
+              "SceneryModel::RecordShape sub_82146BD0 and SceneryModel::DrawShape sub_82147D88 "
+              "(the model's slot 1, the texture provider's slots 5 and 6 and the render "
+              "queue's slot 4 guest calls; the material animation, never seen in play, the "
+              "original's), TextureProvider::ClearAll "
               "sub_82594328 and TextureProvider::Set sub_82594718 (its reserve, debug prints "
               "and resize, never seen in play, the original's)) natively instead of through "
               "the translated code (the same writes; checked by "
@@ -233,6 +236,117 @@ void SceneryListsDrawShapeDepth(PPCContext& ctx, uint8_t* base) {
   ctx.lr = lr;
 }
 
+namespace {
+
+// The draws' guest calls (scenery_lists::DrawCalls), each from the frame and
+// with the return address the plain C++ gives.
+struct DrawContext {
+  PPCContext& ctx;
+  uint8_t* base;
+
+  static uint32_t Call(void* self, uint32_t function, const uint32_t* args, int count,
+                       uint32_t frame, uint32_t lr) {
+    auto& d = *static_cast<DrawContext*>(self);
+    PPCContext& ctx = d.ctx;
+    uint8_t* base = d.base;
+    const uint64_t stack = ctx.r1.u64;
+    ctx.r1.u64 = frame;
+    ctx.lr = lr;
+    PPCRegister* registers[5] = {&ctx.r3, &ctx.r4, &ctx.r5, &ctx.r6, &ctx.r7};
+    for (int i = 0; i < count; i++) {
+      registers[i]->u64 = args[i];
+    }
+    ctx.ctr.u64 = function;
+    REX_CALL_INDIRECT_FUNC(function);
+    ctx.r1.u64 = stack;
+    return ctx.r3.u32;
+  }
+  static void Submit(void* self, uint32_t entry, uint32_t key, double depth, uint32_t frame,
+                     uint32_t lr) {
+    auto& d = *static_cast<DrawContext*>(self);
+    PPCContext& ctx = d.ctx;
+    uint8_t* base = d.base;
+    const uint64_t stack = ctx.r1.u64;
+    ctx.r1.u64 = frame;
+    ctx.lr = lr;
+    const uint32_t queue = guest::LoadU32(base, scenery_lists::kRenderQueue);
+    ctx.fpscr.disableFlushMode();
+    ctx.f1.f64 = depth;
+    ctx.r4.u64 = entry;
+    ctx.r3.u64 = queue;
+    ctx.r5.u64 = key;
+    const uint32_t function = guest::LoadU32(base, guest::LoadU32(base, queue) + 16);
+    ctx.ctr.u64 = function;
+    REX_CALL_INDIRECT_FUNC(function);
+    ctx.r1.u64 = stack;
+  }
+};
+
+}  // namespace
+
+void SceneryListsRecordShape(PPCContext& ctx, uint8_t* base) {
+  if (SlotDiagnostics()) {
+    __imp__sub_82146BD0(ctx, base);
+    return;
+  }
+  const uint64_t lr = ctx.lr;
+  const uint32_t frame = ctx.r1.u32 - scenery_lists::kRecordShapeFrame;
+  DrawContext context{ctx, base};
+  scenery_lists::DrawCalls calls;
+  calls.call = &DrawContext::Call;
+  calls.submit = &DrawContext::Submit;
+  calls.user = &context;
+  const uint32_t model = ctx.r3.u32, shape = ctx.r4.u32, set_shaders = ctx.r6.u32;
+  const uint32_t c76 = ctx.r7.u32, range = ctx.r8.u32, pair_offset = ctx.r9.u32;
+  const int32_t group = ctx.r5.s32;
+  // The back chain first (as stwu): the plain C++ writes into the frame.
+  const uint32_t chain = guest::LoadU32(base, frame);
+  guest::StoreU32(base, frame, ctx.r1.u32);
+  const auto first = scenery_lists::SceneryRecordShape(base, calls, frame, model, shape, group,
+                                                       set_shaders, c76, range, pair_offset);
+  if (!first) {
+    guest::StoreU32(base, frame, chain);
+    __imp__sub_82146BD0(ctx, base);
+    return;
+  }
+  ctx.lr = lr;
+  ctx.fpscr.disableFlushMode();
+  ctx.r3.u64 = *first;
+}
+
+void SceneryListsDrawShape(PPCContext& ctx, uint8_t* base) {
+  if (SlotDiagnostics()) {
+    __imp__sub_82147D88(ctx, base);
+    return;
+  }
+  const uint64_t lr = ctx.lr;
+  const uint32_t frame = ctx.r1.u32 - scenery_lists::kSceneryDrawShapeFrame;
+  DrawContext context{ctx, base};
+  scenery_lists::DrawCalls calls;
+  calls.call = &DrawContext::Call;
+  calls.submit = &DrawContext::Submit;
+  calls.user = &context;
+  const uint32_t chain = guest::LoadU32(base, frame);
+  guest::StoreU32(base, frame, ctx.r1.u32);
+  const auto draw = scenery_lists::SceneryDrawShape(
+      base, calls, frame, ctx.r3.u32, ctx.r4.u32, ctx.r5.u32, ctx.r6.u32, ctx.r7.u32,
+      ctx.r8.u32, ctx.r9.u32, ctx.r10.u32, ctx.r24.u32);
+  if (!draw) {
+    guest::StoreU32(base, frame, chain);
+    __imp__sub_82147D88(ctx, base);
+    return;
+  }
+  ctx.lr = lr;
+  // r3 is the last queue call's, or as the original leaves it (the model
+  // when its +28 is 0 and nothing ran).
+  if (draw->queued) {
+    ctx.fpscr.disableFlushMode();
+  } else if (draw->r3 != ctx.r3.u32) {
+    ctx.r3.u64 = draw->r3;
+    ctx.fpscr.disableFlushMode();
+  }
+}
+
 }  // namespace hooks
 
 #define ITC_SCENERY_LISTS(address, steps)    \
@@ -258,5 +372,7 @@ ITC_SCENERY_LISTS(825951E0, SceneryListsIsShapeVisible)
 ITC_SCENERY_LISTS(82595490, SceneryListsRecordSceneLights)
 ITC_SCENERY_LISTS(825960D0, SceneryListsRecordShapeDepth)
 ITC_SCENERY_LISTS(82596D48, SceneryListsDrawShapeDepth)
+ITC_SCENERY_LISTS(82146BD0, SceneryListsRecordShape)
+ITC_SCENERY_LISTS(82147D88, SceneryListsDrawShape)
 ITC_SCENERY_LISTS(82594328, SceneryListsTextureProviderClearAll)
 ITC_SCENERY_LISTS(82594718, SceneryListsTextureProviderSet)

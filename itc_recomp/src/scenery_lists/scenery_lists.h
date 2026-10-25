@@ -181,4 +181,64 @@ std::optional<DepthDraw> DrawShapeDepth(uint8_t* base, uint32_t model, uint32_t 
                                         uint32_t mask, uint32_t with_flagged, uint32_t frame,
                                         const std::array<uint32_t, 9>& context);
 
+// --- The scenery model's shapes (model_draws.cpp) ---
+
+// The guest calls the draws make: `call` runs `function` with r3 up to r7 =
+// `args` from a frame at `frame` (r1) with the return address `lr`, and
+// returns r3; `submit` hands an entry to the render queue
+// ([0x8296B91C]'s vtable slot 4: r4 = the entry, r5 = the key, f1 = the
+// depth) the same way.
+struct DrawCalls {
+  uint32_t (*call)(void* user, uint32_t function, const uint32_t* args, int count,
+                   uint32_t frame, uint32_t lr) = nullptr;
+  void (*submit)(void* user, uint32_t entry, uint32_t key, double depth, uint32_t frame,
+                 uint32_t lr) = nullptr;
+  void* user = nullptr;
+};
+
+// SceneryModel::RecordShape's frame (its caller's r1 less this).
+constexpr uint32_t kRecordShapeFrame = 304;
+
+// SceneryModel::RecordShape (sub_82146BD0): the shape's group `group`
+// materials recorded (docs/functions/scenery-lists.md has the commands),
+// the model's vtable slot 1 (with &the blend index at `frame` + 80) and the
+// texture provider's slots 5 and 6 guest calls from `frame`, the
+// originals' stack temporaries (+80, +96 to +127) written there as the
+// original does. Returns 0 when the group has no materials, else the
+// chunk's first slot. nullopt, with nothing done, where the original must
+// run: a vertex declaration the plain C++ leaves to it, a material
+// animation (+396 not -1, never seen in play), more than 4 textures on a
+// material, a chunk open on another list, or no room for its slots.
+std::optional<uint32_t> SceneryRecordShape(uint8_t* base, const DrawCalls& calls, uint32_t frame,
+                                           uint32_t model, uint32_t shape, int32_t group,
+                                           uint32_t set_shaders, uint32_t c76, uint32_t range,
+                                           uint32_t pair_offset);
+
+// SceneryModel::DrawShape's frame.
+constexpr uint32_t kSceneryDrawShapeFrame = 208;
+
+// SceneryModel::DrawShape (sub_82147D88): nothing when the model's +28 is
+// 0 or the shape isn't visible (IsShapeVisible, its product at `frame` -
+// 96); then a chunk with two 3-slot entries, RecordObject (inside the
+// interpolation's hooks, with the context its wrapper keeps: the return
+// address 0x82147E10 and r24-r31 = `caller_r24`, the world matrix,
+// 0x82960000, the shape, the view-projection, the second and first entries
+// and the model) and RecordSceneLights, each group with materials recorded
+// (SceneryRecordShape with the shaders) and handed to the render queue
+// (keys [0x8296B90C] with minus the constants' +72 and [0x8296B900] with
+// it), and with `depth_too` a 2-slot entry for group 0's RecordShapeDepth
+// (key [0x8296B908]). Returns r3 as the original leaves it when nothing
+// went to the queue (the model for +28 = 0, 0 when not visible); nullopt,
+// with nothing done, where a recorder would decline.
+struct SceneryDraw {
+  bool queued = false;  // r3 is the last guest call's
+  uint32_t r3 = 0;
+};
+std::optional<SceneryDraw> SceneryDrawShape(uint8_t* base, const DrawCalls& calls,
+                                            uint32_t frame, uint32_t model,
+                                            uint32_t view_projection, uint32_t world,
+                                            uint32_t shape, uint32_t depth_too, uint32_t c76,
+                                            uint32_t range, uint32_t pair_offset,
+                                            uint32_t caller_r24);
+
 }  // namespace scenery_lists

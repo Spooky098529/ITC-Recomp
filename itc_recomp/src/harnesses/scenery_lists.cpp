@@ -38,12 +38,13 @@ struct Region {
   uint32_t bytes;
 };
 // the command list the recorders use and the open chunks' count, the view,
-// the camera's position, the projector origin and pixel c43, the scene
-// lights, the depth draws' sort key.
+// the camera's position, the projector origin, pixel c43 and the constants
+// put back, the scene lights, the draws' sort keys, the vertex declarations'
+// and shared shaders' tables, the stream kinds.
 constexpr Region kRegions[] = {
     {0x826C5B20, 0x10}, {0x8296B8B8, 0x20}, {0x8296B910, 0x10},
-    {0x8296BD20, 0x10}, {0x8265ECA0, 0x80}, {0x8296B940, 0x3A0},
-    {0x8296B8F0, 0x10},
+    {0x8296BD20, 0x10}, {0x8265ECA0, 0xA0}, {0x8296B940, 0x3A0},
+    {0x8296B8F0, 0x10}, {0x8296B7B0, 0x140}, {0x8265EC00, 0x90},
 };
 
 // The block: 64 KB for the lists, models and sets, then room for the race
@@ -450,15 +451,15 @@ void Visibility(Context& h, Random& r, uint32_t block) {
 }
 
 // The command list at [0x8296B918], in the block at +0x3000, its slots from
-// +0x4000: the next chunk's start and the write pointer there, a chunk open
+// +0x8000: the next chunk's start and the write pointer there, a chunk open
 // on it or another list now and then, room for `slots` (sometimes just).
 void RandomList(uint8_t* base, uint32_t block, Random& r, uint32_t slots) {
   const uint32_t list = block + 0x3000;
   guest::StoreU32(base, scenery_lists::kRecordList, list);
-  const uint32_t start = block + 0x4000;
+  const uint32_t start = block + 0x8000;
   guest::StoreU32(base, list + 32, start);
   guest::StoreU32(base, list + 44, start);
-  const uint32_t capacity = 200;
+  const uint32_t capacity = 1000;
   guest::StoreU32(base, list + 8, capacity);
   // Never too few: the original then writes through 0 (a full list's
   // AllocateSlots returns 0); the plain C++ declines those for it.
@@ -469,7 +470,7 @@ void RandomList(uint8_t* base, uint32_t block, Random& r, uint32_t slots) {
 }
 
 void Recorders(Context& h, Random& r, uint32_t block) {
-  const uint32_t slots = block + 0x4000;
+  const uint32_t slots = block + 0x8000;
   {
     Results results("Recorder::RecordObject (sub_825953D0)");
     for (int c = 0; c < 256; c++) {
@@ -617,7 +618,7 @@ void DepthDraws(Context& h, Random& r, uint32_t block) {
             t.r9.u64 = r.Next();
           },
           __imp__sub_82596D48, hooks::SceneryListsDrawShapeDepth,
-          {{0x4000 + 16, 32}, {0x400, 16}, {0x500, 16}}, fmt::format("case {}", c), false,
+          {{0x8000 + 16, 32}, {0x400, 16}, {0x500, 16}}, fmt::format("case {}", c), false,
           [&](const PPCContext& t, Outputs& out) {
             // The product IsShapeVisible leaves in its frame (r1 - 256).
             out.Floats(h.base, t.r1.u32 - 256, 16);
@@ -636,6 +637,171 @@ void DepthDraws(Context& h, Random& r, uint32_t block) {
   }
 }
 
+// A finite float, a few units either way.
+float Finite(Random& r) {
+  return Spread(r, 8.0f);
+}
+void FiniteFloats(uint8_t* base, uint32_t address, uint32_t count, Random& r) {
+  for (uint32_t i = 0; i < count; i++) {
+    guest::StoreFloat(base, address + 4 * i, Finite(r));
+  }
+}
+
+// The shapes' materials as SceneryModel::RecordShape reads them (finite
+// floats: everything is compared exactly), the model's pair table, color
+// table, animation set, vtable (slot 1 the empty function) and texture
+// provider (slots 5 and 6 the empty function), and the tables the vertex
+// declaration and shared shaders read.
+void RandomMaterials(uint8_t* base, uint32_t block, Random& r, uint32_t shape) {
+  const uint32_t model = block + 0x100;
+  const uint32_t at = block + 0x2000 + 544 * shape;
+  // The model.
+  guest::StoreU32(base, model, block + 0x740);
+  guest::StoreU32(base, block + 0x740 + 4, kEmptyFunction);
+  guest::StoreU32(base, model + 24, block + 0x800);
+  RandomBytes(base, block + 0x800, 0x100, r);
+  guest::StoreU32(base, model + 320, block + 0xA00);
+  FiniteFloats(base, block + 0xA00, 0x80 / 4, r);
+  const bool provider = r.Below(6) != 0;
+  guest::StoreU32(base, model + 48, provider ? block + 0x700 : 0);
+  guest::StoreU32(base, block + 0x700, block + 0x780);
+  guest::StoreU32(base, block + 0x780 + 20, kEmptyFunction);
+  guest::StoreU32(base, block + 0x780 + 24, kEmptyFunction);
+  guest::StoreU32(base, model + 432, uint32_t(r.Next()));
+  // An animation set of four animations with up to four frames, or none.
+  const uint32_t set = block + 0xC00;
+  guest::StoreU32(base, model + 436, r.Below(2) ? set : 0);
+  guest::StoreU32(base, set, 4);
+  for (uint32_t i = 0; i < 4; i++) {
+    guest::StoreU32(base, set + 4 + 4 * i, 0x40 * i);
+    const uint32_t animation = set + 20 + 0x40 * i;
+    guest::StoreU32(base, animation, r.Below(5));
+    guest::StoreU32(base, animation + 4, r.Below(5));
+  }
+  // The shape's streams and declaration types: 5, 9, 10 or 11 (now and
+  // then another, which the original prints a message for), and the
+  // second stream kind now and then 6.
+  guest::StoreU32(base, at + 244, r.Below(18));
+  static constexpr uint32_t kTypes[] = {5, 9, 10, 11};
+  guest::StoreU32(base, at + 260, r.Below(16) == 0 ? 7 : kTypes[r.Below(4)]);
+  guest::StoreU32(base, at + 276, r.Below(4) == 0 ? 6 : r.Below(18));
+  for (uint32_t i = 0; i < 18; i++) {
+    guest::StoreU32(base, 0x8265EC00 + 4 * i, r.Below(8));
+    guest::StoreU32(base, 0x8265EC00 + 72 + 4 * i, r.Below(3));
+  }
+  RandomBytes(base, 0x8296B7B0, 0x140, r);
+  guest::StoreU32(base, 0x8296B7B4, r.Below(8) == 0 ? 0 : block + 0x900);
+  guest::StoreU32(base, 0x8296B7B8, r.Below(8) == 0 ? 0 : block + 0x980);
+  // The materials (RandomShape wrote their counts).
+  const uint32_t materials = block + 0x6000;
+  const uint32_t count = guest::LoadU32(base, materials + 8) + guest::LoadU32(base, materials + 12);
+  for (uint32_t m = 0; m < count; m++) {
+    const uint32_t material = materials + 16 + 512 * m;
+    FiniteFloats(base, material, 32, r);  // +0 to +127: the constants
+    guest::StoreU32(base, material + 96, r.Below(16));
+    guest::StoreU32(base, material + 104, uint32_t(r.Next()) & (provider ? 6u : 0u));
+    guest::StoreU32(base, material + 108, r.Below(8));
+    const uint32_t textures = r.Below(16) == 0 ? 5 : r.Below(5);
+    guest::StoreU32(base, material + 128, textures);
+    // Five, for the cases with five textures (which the plain C++ leaves to
+    // the original).
+    for (uint32_t j = 0; j < 5; j++) {
+      guest::StoreU32(base, material + 144 + 4 * j, r.Below(2) ? 0 : uint32_t(r.Next()));
+      guest::StoreU32(base, material + 176 + 4 * j, r.Below(4));
+      guest::StoreU32(base, material + 208 + 4 * j, r.Below(3) == 0 ? 0xFFFFFFFFu : r.Below(8));
+      guest::StoreFloat(base, material + 240 + 4 * j, Finite(r));
+    }
+    guest::StoreU32(base, material + 392, r.Below(2) ? 0 : 1 + r.Below(4));
+    guest::StoreU32(base, material + 396, r.Below(16) == 0 ? 0 : 0xFFFFFFFFu);
+  }
+}
+
+void SceneryShapes(Context& h, Random& r, uint32_t block) {
+  const uint32_t model = block + 0x100;
+  const uint32_t queue = block + 0x7C0;  // the provider is at +0x700
+  {
+    Results results("SceneryModel::RecordShape (sub_82146BD0)");
+    for (int c = 0; c < 512; c++) {
+      Case(
+          h, results, block, r,
+          [&](PPCContext& t) {
+            RandomList(h.base, block, r, 400);
+            const uint32_t shape = r.Below(4);
+            RandomShape(h.base, block, r, shape, false);
+            RandomMaterials(h.base, block, r, shape);
+            FiniteFloats(h.base, 0x8265ED20, 8, r);
+            FiniteFloats(h.base, block + 0x600, 8, r);
+            t.r3.u64 = model;
+            t.r4.u64 = shape;
+            t.r5.u64 = r.Below(2);
+            t.r6.u64 = r.Below(4) == 0 ? 0 : 1;
+            t.r7.u64 = r.Below(2) ? 0 : block + 0x600;
+            t.r8.u64 = r.Below(2) ? 0 : block + 0x610;
+            t.r9.u64 = r.Below(3);
+          },
+          __imp__sub_82146BD0, hooks::SceneryListsRecordShape, {}, fmt::format("case {}", c),
+          false, [&](const PPCContext& t, Outputs& out) {
+            // The original's stack temporaries (r1 - 304 + 80 to + 128).
+            out.Bytes(Read(h.base, t.r1.u32 - 304 + 80, 48));
+          });
+    }
+    results.Report();
+  }
+  {
+    Results results("SceneryModel::DrawShape (sub_82147D88)");
+    int queued = 0;
+    for (int c = 0; c < 512; c++) {
+      Case(
+          h, results, block, r,
+          [&](PPCContext& t) {
+            RandomList(h.base, block, r, 600);
+            const uint32_t shape = r.Below(4);
+            const bool in_view = r.Below(4) != 0;
+            RandomShape(h.base, block, r, shape, in_view);
+            RandomMaterials(h.base, block, r, shape);
+            FiniteFloats(h.base, 0x8265ECA0, 0xA0 / 4, r);
+            FiniteFloats(h.base, 0x8296B940, 0x3A0 / 4, r);
+            FiniteFloats(h.base, block + 0x600, 8, r);
+            RandomBytes(h.base, 0x8296B8F0, 16, r);
+            RandomBytes(h.base, 0x8296B900, 16, r);
+            guest::StoreU32(h.base, scenery_lists::kRenderQueue, queue);
+            guest::StoreU32(h.base, queue, queue + 0x20);
+            guest::StoreU32(h.base, queue + 0x20 + 16, kEmptyFunction);
+            const uint32_t view_projection = block + 0x400;
+            const uint32_t world = block + 0x500;
+            StoreFloats(h.base, view_projection, {1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1});
+            StoreFloats(h.base, world, {1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1, 0, Spread(r, 0.1f),
+                                        Spread(r, 0.1f), in_view ? 0.0f : 9.0f, 1});
+            t.r3.u64 = model;
+            t.r4.u64 = view_projection;
+            t.r5.u64 = world;
+            t.r6.u64 = shape;
+            t.r7.u64 = r.Below(2);
+            t.r8.u64 = r.Below(2) ? 0 : block + 0x600;
+            t.r9.u64 = r.Below(2) ? 0 : block + 0x610;
+            t.r10.u64 = r.Below(3);
+          },
+          __imp__sub_82147D88, hooks::SceneryListsDrawShape, {}, fmt::format("case {}", c),
+          false, [&](const PPCContext& t, Outputs& out) {
+            // IsShapeVisible's product (r1 - 208 - 96) and RecordShape's
+            // stack temporaries (r1 - 208 - 304 + 80 to + 128).
+            out.Bytes(Read(h.base, t.r1.u32 - 304, 64));
+            out.Bytes(Read(h.base, t.r1.u32 - 512 + 80, 48));
+            if (t.r3.u32 == queue) {
+              queued++;
+              out.Word(t.r4.u32);
+              out.Word(t.r5.u32);
+              out.Double(t.f1.u64);
+            }
+          });
+    }
+    ITC_LOG_INFO("harness: SceneryModel::DrawShape: {} of 512 cases ended handing an entry to "
+                 "the render queue",
+                 queued / 2);
+    results.Report();
+  }
+}
+
 }  // namespace
 
 void SceneryLists(Context& h) {
@@ -649,6 +815,7 @@ void SceneryLists(Context& h) {
   Visibility(h, r, block);
   Recorders(h, r, block);
   DepthDraws(h, r, block);
+  SceneryShapes(h, r, block);
   memory::Free(allocation);
 }
 

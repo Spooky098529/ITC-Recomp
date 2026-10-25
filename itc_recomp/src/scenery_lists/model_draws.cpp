@@ -16,7 +16,9 @@
 #include <rex/platform/fpscr.h>
 #include <simde/x86/sse4.1.h>
 
+#include <algorithm>
 #include <bit>
+#include <tuple>
 #include <cstdlib>
 
 namespace scenery_lists {
@@ -453,6 +455,496 @@ std::optional<DepthDraw> DrawShapeDepth(uint8_t* base, uint32_t model, uint32_t 
   draw.entry = entry;
   draw.key = guest::LoadU32(base, kDepthKey);
   draw.depth = -Lfs(base, *constants + 72);
+  return draw;
+}
+
+namespace {
+
+constexpr uint32_t kBlendStates = 0x82008E6C;   // render state 3 by blend index
+constexpr uint32_t kRangeAfter = 0x8265ED20;    // vertex c86 put back
+constexpr uint32_t kPixelC76After = 0x8265ED30;  // pixel c76 put back
+constexpr uint32_t kGroup0Key = 0x8296B90C;
+constexpr uint32_t kGroup1Key = 0x8296B900;
+constexpr uint32_t kSceneryDepthKey = 0x8296B908;
+
+// SceneryRecordShape's slots, or nullopt where it declines (see the header).
+std::optional<uint32_t> SceneryRecordShapeSlots(uint8_t* base, uint32_t model, uint32_t shape,
+                                                int32_t group, uint32_t set_shaders,
+                                                uint32_t c76, uint32_t range) {
+  const int32_t count = int32_t(models::MaterialCount(base, model, shape, group));
+  if (count == 0) {
+    return 0;
+  }
+  const uint32_t at = ShapeAt(base, model, shape);
+  if (!models::VertexDeclaration(base, guest::LoadU32(base, at + 244),
+                                 int32_t(guest::LoadU32(base, at + 260)),
+                                 guest::LoadU32(base, at + 276))) {
+    return std::nullopt;
+  }
+  const uint32_t type = guest::LoadU32(base, at + 260);
+  const bool short_streams = type == 9 || type == 10 || guest::LoadU32(base, at + 276) == 6;
+  uint32_t slots = 2 + (short_streams ? 3 : 4) + 1 + 4 + 1 + 12 + 1 + 8 + 1;
+  if (guest::LoadU32(base, at + 428) == 1 &&
+      guest::LoadU32(base, guest::LoadU32(base, at + 408) + 20) != 0) {
+    slots += 2;
+  }
+  uint32_t material = models::Material(base, model, shape, 0, group);
+  for (int32_t i = 0; i < count; i++, material += 512) {
+    const int32_t textures = int32_t(guest::LoadU32(base, material + 128));
+    if (textures > 4 || int32_t(guest::LoadU32(base, material + 396)) != -1) {
+      return std::nullopt;
+    }
+    slots += (set_shaders != 0 ? 4 : 0) + 6 + 6 + 2 + (group == 0 ? 3 : 0) + 2 + 4;
+    if (guest::LoadU32(base, model + 48) != 0 && textures != 0) {
+      slots += 2 + 4 * uint32_t(std::max(textures, 0));
+    } else {
+      slots += 5;
+    }
+    const uint32_t flags = guest::LoadU32(base, material + 104);
+    slots += ((flags & 2) != 0 ? 2 : 0) + ((flags & 4) != 0 ? 2 : 0);
+    slots += (range != 0 ? 4 : 0) + (c76 != 0 ? 4 : 0);
+  }
+  return slots;
+}
+
+// A slot, which the checks before made sure of.
+uint32_t Take(uint8_t* base, uint32_t list, uint32_t count = 1) {
+  const uint32_t slot = command_list::AllocateSlots(base, list, count);
+  if (slot == 0) {
+    ITC_LOG_ERROR("scenery_lists: the command list refused a slot after its checks");
+    std::abort();
+  }
+  return slot;
+}
+
+uint32_t RecordShapeChecked(uint8_t* base, const DrawCalls& calls, uint32_t frame,
+                            uint32_t model, uint32_t shape, int32_t group, uint32_t set_shaders,
+                            uint32_t c76, uint32_t range, uint32_t pair_offset) {
+  const uint32_t list = guest::LoadU32(base, kRecordList);
+  const uint32_t at = ShapeAt(base, model, shape);
+  uint32_t stream = at + 320;
+  uint32_t second = at + 352;
+  if (guest::LoadU32(base, at + 428) == 1) {
+    stream = guest::LoadU32(base, at + 412);
+    second = guest::LoadU32(base, at + 420);
+  }
+  command_list::OpenChunk(base, list);
+  const uint32_t header = Take(base, list);
+  guest::StoreU32(base, frame + 84, header);
+  Slot(base, header, 10, 1, 0);
+  const uint32_t declaration = Take(base, list);
+  guest::StoreU32(base, declaration,
+                  *models::VertexDeclaration(base, guest::LoadU32(base, at + 244),
+                                             int32_t(guest::LoadU32(base, at + 260)),
+                                             guest::LoadU32(base, at + 276)));
+  const uint32_t type = guest::LoadU32(base, at + 260);
+  uint32_t slot;
+  if (type != 9 && type != 10 && guest::LoadU32(base, at + 276) != 6) {
+    Slot(base, Take(base, list), 11, 3, 0);
+    slot = Take(base, list);
+    Slot(base, slot, 0, at + 288, 0);
+    guest::StoreU32(base, slot + 12, guest::LoadU32(base, at + 248));
+    slot = Take(base, list);
+    Slot(base, slot, 1, stream, 0);
+    guest::StoreU32(base, slot + 12, guest::LoadU32(base, at + 264));
+    slot = Take(base, list);
+    Slot(base, slot, 2, second, 0);
+    guest::StoreU32(base, slot + 12, guest::LoadU32(base, at + 280));
+  } else {
+    Slot(base, Take(base, list), 11, 2, 0);
+    slot = Take(base, list);
+    Slot(base, slot, 0, at + 288, 0);
+    guest::StoreU32(base, slot + 12, guest::LoadU32(base, at + 248));
+    slot = Take(base, list);
+    Slot(base, slot, 1, stream, 0);
+    guest::StoreU32(base, slot + 12, guest::LoadU32(base, at + 264));
+  }
+  if (guest::LoadU32(base, at + 428) == 1) {
+    const uint32_t indices = guest::LoadU32(base, at + 408);
+    if (guest::LoadU32(base, indices + 20) != 0) {
+      Slot(base, Take(base, list), 22, 1, 0);
+      slot = Take(base, list);
+      guest::StoreU32(base, slot + 8, 1);
+      guest::StoreU32(base, slot + 4, guest::LoadU32(base, indices + 20));
+    }
+  }
+  Slot(base, Take(base, list), 2, 4, 0);
+  for (uint32_t k = 0; k < 4; k++) {
+    Slot(base, Take(base, list), k, 28, guest::LoadU32(base, at + 432));
+  }
+  uint32_t material = models::Material(base, model, shape, 0, group);
+  Slot(base, Take(base, list), 2, 12, 0);
+  for (uint32_t k = 0; k < 4; k++) {
+    Slot(base, Take(base, list), k, 16, 4);
+    Slot(base, Take(base, list), k, 20, 4);
+    Slot(base, Take(base, list), k, 36, 3);
+  }
+  const double one = Lfs(base, kOne);
+  const double zero = Lfs(base, kZero);
+  if (int32_t(models::MaterialCount(base, model, shape, group)) > 0) {
+    guest::StoreFloat(base, frame + 116, float(one));
+    guest::StoreFloat(base, frame + 120, float(zero));
+    guest::StoreFloat(base, frame + 124, float(zero));
+    for (int32_t i = 0; i < int32_t(models::MaterialCount(base, model, shape, group));
+         i++, material += 512) {
+      for (uint32_t offset = 96; offset < 112; offset += 4) {
+        guest::StoreFloat(base, frame + offset, float(one));
+      }
+      guest::StoreU32(base, frame + 80, guest::LoadU32(base, material + 108));
+      // The shaders: the model's own pair, or the shared one.
+      if (set_shaders != 0) {
+        const uint32_t pair = guest::LoadU32(base, material + 392);
+        if (pair == 0) {
+          Slot(base, Take(base, list), 8, 1, 0);
+          guest::StoreU32(base, Take(base, list),
+                          guest::LoadU32(base, (guest::LoadU32(base, material + 96) << 4) +
+                                                   guest::LoadU32(base, model + 24)));
+          Slot(base, Take(base, list), 9, 1, 0);
+          guest::StoreU32(base, Take(base, list),
+                          guest::LoadU32(base, (guest::LoadU32(base, material + 96) << 4) +
+                                                   guest::LoadU32(base, model + 24) + 4));
+        } else {
+          Slot(base, Take(base, list), 8, 1, 0);
+          slot = Take(base, list);
+          guest::StoreU32(base, slot,
+                          models::SharedVertexShader(
+                              base, guest::LoadU32(base, material + 392) + pair_offset));
+          Slot(base, Take(base, list), 9, 1, 0);
+          slot = Take(base, list);
+          guest::StoreU32(base, slot,
+                          models::SharedPixelShader(
+                              base, guest::LoadU32(base, material + 392) + pair_offset));
+        }
+      }
+      // Vertex c9-c13: the textures' colors, then the material's +0.
+      Slot(base, Take(base, list), 7, 5, 0x00010905);
+      const uint32_t vertex = Take(base, list, 5);
+      for (int32_t j = 0; j < int32_t(guest::LoadU32(base, material + 128)); j++) {
+        const uint32_t out = vertex + 16 * uint32_t(j);
+        const int32_t index = int32_t(guest::LoadU32(base, material + 208 + 4 * uint32_t(j)));
+        double third;
+        if (index != -1) {
+          const uint32_t color = (uint32_t(index) << 4);
+          CopyFloat(base, out + 0, color + guest::LoadU32(base, model + 320));
+          CopyFloat(base, out + 4, color + guest::LoadU32(base, model + 320) + 4);
+          third = Lfs(base, color + guest::LoadU32(base, model + 320) + 8);
+        } else {
+          guest::StoreFloat(base, out + 0, float(zero));
+          guest::StoreFloat(base, out + 4, float(zero));
+          guest::StoreFloat(base, out + 8, float(zero));
+          guest::StoreFloat(base, out + 12, float(one));
+          third = Lfs(base, material + 240 + 4 * uint32_t(j));
+        }
+        guest::StoreFloat(base, frame + 96 + 4 * uint32_t(j), float(third));
+      }
+      CopyWords(base, vertex + 64, material, 4);
+      // The model's per-draw hook (slot 1).
+      {
+        const uint32_t args[5] = {model, shape, uint32_t(i), vertex + 64, frame + 80};
+        calls.call(calls.user,
+                   guest::LoadU32(base, guest::LoadU32(base, model) + 4), args, 5, frame,
+                   0x82147170);
+      }
+      // Pixel c63-c67.
+      Slot(base, Take(base, list), 7, 5, 0x01013F05);
+      const uint32_t pixel = Take(base, list, 5);
+      const uint32_t colors_low = guest::LoadU32(base, frame + 96);
+      const uint32_t colors_low2 = guest::LoadU32(base, frame + 100);
+      const uint32_t colors_high = guest::LoadU32(base, frame + 104);
+      const uint32_t colors_high2 = guest::LoadU32(base, frame + 108);
+      CopyWords(base, pixel + 0, material + 64, 4);
+      CopyFloat(base, frame + 112, material + 80);
+      CopyWords(base, pixel + 16, frame + 112, 4);
+      CopyWords(base, pixel + 32, material + 16, 4);
+      CopyFloat(base, pixel + 44, material + 88);
+      CopyWords(base, pixel + 48, material + 32, 4);
+      guest::StoreU32(base, pixel + 64, colors_low);
+      guest::StoreU32(base, pixel + 68, colors_low2);
+      guest::StoreU32(base, pixel + 72, colors_high);
+      guest::StoreU32(base, pixel + 76, colors_high2);
+      // The blend (render state 3) and, for group 0, 96 and 100.
+      Slot(base, Take(base, list), 3, 1, 0);
+      slot = Take(base, list);
+      guest::StoreU32(base, slot + 0, 0);
+      guest::StoreU32(base, slot + 4,
+                      guest::LoadU32(base, (guest::LoadU32(base, frame + 80) << 2) + kBlendStates));
+      if (group == 0) {
+        if (guest::LoadU32(base, material + 388) != 0) {
+          Slot(base, Take(base, list), 1, 2, 0);
+          slot = Take(base, list);
+          guest::StoreU32(base, slot + 4, 1);
+          guest::StoreU32(base, slot + 0, 96);
+          slot = Take(base, list);
+          guest::StoreU32(base, slot + 0, 100);
+          guest::StoreU32(base, slot + 4, 64);
+        } else {
+          Slot(base, Take(base, list), 1, 2, 0);
+          slot = Take(base, list);
+          guest::StoreU32(base, slot + 4, 0);
+          guest::StoreU32(base, slot + 0, 96);
+          slot = Take(base, list);
+          guest::StoreU32(base, slot + 0, 100);
+          guest::StoreU32(base, slot + 4, guest::LoadU32(base, material + 112));
+        }
+      }
+      Slot(base, Take(base, list), 1, 1, 0);
+      slot = Take(base, list);
+      guest::StoreU32(base, slot + 0, 56);
+      guest::StoreU32(base, slot + 4, guest::LoadU32(base, material + 344));
+      // The textures and their sampler states.
+      const uint32_t provider = guest::LoadU32(base, model + 48);
+      if (provider != 0 && guest::LoadU32(base, material + 128) != 0) {
+        slot = Take(base, list);
+        guest::StoreU32(base, slot + 0, 4);
+        guest::StoreU32(base, slot + 8, 0);
+        guest::StoreU32(base, slot + 4, guest::LoadU32(base, material + 128));
+        for (int32_t k = 0; k < int32_t(guest::LoadU32(base, material + 128)); k++) {
+          const uint32_t id = material + 144 + 4 * uint32_t(k);
+          const uint32_t set = guest::LoadU32(base, model + 436);
+          uint32_t texture = 0;
+          bool lookup = true;
+          uint32_t first = guest::LoadU32(base, id);
+          uint32_t second_word = guest::LoadU32(base, id + 32);
+          if (set != 0 && guest::LoadU32(base, id) == 0) {
+            const uint32_t entry = AnimationCurrentFrame(base, set, guest::LoadU32(base, id + 32));
+            if (entry == 0) {
+              lookup = false;
+            } else {
+              second_word = guest::LoadU32(base, entry + 4);
+              first = guest::LoadU32(base, entry + 0);
+            }
+          }
+          if (lookup) {
+            const uint32_t from = guest::LoadU32(base, model + 48);
+            const uint32_t args[3] = {from, first, second_word};
+            texture = calls.call(calls.user,
+                                 guest::LoadU32(base, guest::LoadU32(base, from) + 20), args, 3,
+                                 frame, 0x821473D0);
+          }
+          slot = Take(base, list);
+          guest::StoreU32(base, slot + 4, texture);
+          guest::StoreU32(base, slot + 0, uint32_t(k));
+        }
+        slot = Take(base, list);
+        guest::StoreU32(base, slot + 0, 2);
+        guest::StoreU32(base, slot + 8, 0);
+        guest::StoreU32(base, slot + 4, guest::LoadU32(base, material + 128) * 3);
+        for (int32_t k = 0; k < int32_t(guest::LoadU32(base, material + 128)); k++) {
+          const uint32_t sampler = uint32_t(k);
+          slot = Take(base, list);
+          guest::StoreU32(base, slot + 0, sampler);
+          guest::StoreU32(base, slot + 4, 0);
+          guest::StoreU32(base, slot + 8, guest::LoadU32(base, material + 272 + 4 * sampler));
+          slot = Take(base, list);
+          guest::StoreU32(base, slot + 0, sampler);
+          guest::StoreU32(base, slot + 4, 4);
+          guest::StoreU32(base, slot + 8, guest::LoadU32(base, material + 304 + 4 * sampler));
+          slot = Take(base, list);
+          guest::StoreU32(base, slot + 0, sampler);
+          guest::StoreU32(base, slot + 4, 24);
+          guest::StoreU32(base, slot + 8, guest::LoadU32(base, model + 432));
+        }
+      } else {
+        Slot(base, Take(base, list), 4, 4, 0);
+        for (uint32_t k = 0; k < 4; k++) {
+          slot = Take(base, list);
+          guest::StoreU32(base, slot + 0, k);
+          guest::StoreU32(base, slot + 4, 0);
+        }
+      }
+      // The environment textures.
+      for (const auto& [bit, function_slot, lr] :
+           {std::tuple<uint32_t, uint32_t, uint32_t>{2, 24, 0x82147534},
+            std::tuple<uint32_t, uint32_t, uint32_t>{4, 20, 0x82147590}}) {
+        if ((guest::LoadU32(base, material + 104) & bit) == 0) {
+          continue;
+        }
+        const uint32_t from = guest::LoadU32(base, model + 48);
+        const uint32_t args[3] = {from, guest::LoadU32(base, material + 124),
+                                  guest::LoadU32(base, material + 120)};
+        const uint32_t texture = calls.call(
+            calls.user, guest::LoadU32(base, guest::LoadU32(base, from) + function_slot), args,
+            3, frame, lr);
+        Slot(base, Take(base, list), 4, 1, 0);
+        slot = Take(base, list);
+        guest::StoreU32(base, slot + 4, texture);
+        guest::StoreU32(base, slot + 0, 6);
+      }
+      // Vertex c86 from the range and pixel c76.
+      if (range != 0) {
+        Slot(base, Take(base, list), 7, 1, 0x00015601);
+        slot = Take(base, list);
+        const double near = Lfs(base, range);
+        const double far = Lfs(base, range + 4);
+        const double span = double(float(far - near));
+        guest::StoreFloat(base, slot + 0, float(near));
+        guest::StoreFloat(base, slot + 12, float(zero));
+        guest::StoreFloat(base, slot + 4, float(far));
+        guest::StoreFloat(base, slot + 8, float(double(float(one / span))));
+      }
+      if (c76 != 0) {
+        Slot(base, Take(base, list), 7, 1, 0x01014C01);
+        slot = Take(base, list);
+        for (uint32_t w = 0; w < 4; w++) {
+          CopyFloat(base, slot + 4 * w, c76 + 4 * w);
+        }
+      }
+      // The draw.
+      Slot(base, Take(base, list), 12, 1, 0);
+      guest::StoreU32(base, Take(base, list), material + 352);
+      Slot(base, Take(base, list), 18, 1, 0);
+      slot = Take(base, list);
+      guest::StoreU16(base, slot + 4, 0);
+      guest::StoreU16(base, slot + 6, 0);
+      guest::StoreU32(base, slot + 0, guest::LoadU32(base, material + 348));
+      guest::StoreU32(base, slot + 8, guest::LoadU32(base, material + 340));
+      // The constants put back.
+      if (range != 0) {
+        Slot(base, Take(base, list), 7, 1, 0x00015601);
+        slot = Take(base, list);
+        for (uint32_t w = 0; w < 4; w++) {
+          CopyFloat(base, slot + 4 * w, kRangeAfter + 4 * w);
+        }
+      }
+      if (c76 != 0) {
+        Slot(base, Take(base, list), 7, 1, 0x01014C01);
+        slot = Take(base, list);
+        for (uint32_t w = 0; w < 4; w++) {
+          CopyFloat(base, slot + 4 * w, kPixelC76After + 4 * w);
+        }
+      }
+    }
+  }
+  Slot(base, Take(base, list), 2, 8, 0);
+  for (uint32_t k = 0; k < 4; k++) {
+    slot = Take(base, list);
+    guest::StoreU32(base, slot + 0, k);
+    guest::StoreU32(base, slot + 8, 1);
+    guest::StoreU32(base, slot + 4, 16);
+    slot = Take(base, list);
+    guest::StoreU32(base, slot + 8, 1);
+    guest::StoreU32(base, slot + 0, k);
+    guest::StoreU32(base, slot + 4, 20);
+  }
+  EndRecord(base, list);
+  return header;
+}
+
+}  // namespace
+
+std::optional<uint32_t> SceneryRecordShape(uint8_t* base, const DrawCalls& calls, uint32_t frame,
+                                           uint32_t model, uint32_t shape, int32_t group,
+                                           uint32_t set_shaders, uint32_t c76, uint32_t range,
+                                           uint32_t pair_offset) {
+  ITC_NATIVE_RUNNING("sub_82146BD0 SceneryModel::RecordShape");
+  const auto slots =
+      SceneryRecordShapeSlots(base, model, shape, group, set_shaders, c76, range);
+  if (!slots) {
+    return std::nullopt;
+  }
+  if (*slots == 0) {
+    return 0;
+  }
+  if (!CanRecord(base, guest::LoadU32(base, kRecordList), *slots)) {
+    return std::nullopt;
+  }
+  return RecordShapeChecked(base, calls, frame, model, shape, group, set_shaders, c76, range,
+                            pair_offset);
+}
+
+std::optional<SceneryDraw> SceneryDrawShape(uint8_t* base, const DrawCalls& calls,
+                                            uint32_t frame, uint32_t model,
+                                            uint32_t view_projection, uint32_t world,
+                                            uint32_t shape, uint32_t depth_too, uint32_t c76,
+                                            uint32_t range, uint32_t pair_offset,
+                                            uint32_t caller_r24) {
+  ITC_NATIVE_RUNNING("sub_82147D88 SceneryModel::DrawShape");
+  const uint32_t list = guest::LoadU32(base, kRecordList);
+  // Every slot it would take, checked before anything is done.
+  const auto group0 = SceneryRecordShapeSlots(base, model, shape, 0, 1, c76, range);
+  const auto group1 = SceneryRecordShapeSlots(base, model, shape, 1, 1, c76, range);
+  if (!group0 || !group1) {
+    return std::nullopt;
+  }
+  uint32_t slots = 6 + 11 + 65 + *group0 + *group1;
+  if (int32_t(depth_too) != 0) {
+    slots += 2 + RecordShapeDepthSlots(base, model, shape, 0, 0, 0);
+  }
+  if (!CanRecord(base, list, slots)) {
+    return std::nullopt;
+  }
+  SceneryDraw draw;
+  if (guest::LoadU32(base, model + 28) == 0) {
+    draw.r3 = model;
+    return draw;
+  }
+  if ((IsShapeVisible(base, model, view_projection, world, shape, frame - 96) & 0xFF) == 0) {
+    draw.r3 = 0;
+    return draw;
+  }
+  command_list::OpenChunk(base, list);
+  const uint32_t entry0 = Take(base, list, 3);
+  const uint32_t entry1 = Take(base, list, 3);
+  command_list::CloseChunk(base, list);
+  interpolation::BlendState_BeforeRecordObject(base, view_projection, world);
+  interpolation::BlendState_SetRecordContext({0x82147E10, caller_r24, world, 0x82960000u, shape,
+                                              view_projection, entry1, entry0, model});
+  const auto constants = RecordObject(base, view_projection, world);
+  interpolation::BlendState_SetRecordContext({});
+  interpolation::BlendState_AfterRecordObject(base);
+  const auto lights = RecordSceneLights(base);
+  if (!constants || !lights) {
+    ITC_LOG_ERROR("SceneryModel::DrawShape: a recorder declined after its checks");
+    std::abort();
+  }
+  const uint32_t record_frame = frame - kRecordShapeFrame;
+  guest::StoreU32(base, record_frame, frame);  // its back chain, as stwu
+  struct Group {
+    int32_t group;
+    uint32_t entry;
+    uint32_t key;
+    bool negate;
+    uint32_t lr;
+  };
+  const Group groups[2] = {{0, entry0, kGroup0Key, true, 0x82147EA8},
+                           {1, entry1, kGroup1Key, false, 0x82147F1C}};
+  for (const Group& g : groups) {
+    if (models::MaterialCount(base, model, shape, g.group) == 0) {
+      draw.queued = false;
+      draw.r3 = 0;
+      continue;
+    }
+    guest::StoreU16(base, g.entry + 2, 3);
+    guest::StoreU32(base, g.entry + 4, *constants);
+    guest::StoreU16(base, g.entry + 18, 3);
+    guest::StoreU32(base, g.entry + 20, *lights);
+    guest::StoreU16(base, g.entry + 34, 4);
+    guest::StoreU32(base, g.entry + 36,
+                    RecordShapeChecked(base, calls, record_frame, model, shape, g.group, 1, c76,
+                                       range, pair_offset));
+    const double depth = Lfs(base, *constants + 72);
+    calls.submit(calls.user, g.entry, guest::LoadU32(base, g.key), g.negate ? -depth : depth,
+                 frame, g.lr);
+    draw.queued = true;
+  }
+  if (int32_t(depth_too) == 0) {
+    return draw;
+  }
+  command_list::OpenChunk(base, list);
+  const uint32_t entry = Take(base, list, 2);
+  command_list::CloseChunk(base, list);
+  if (models::MaterialCount(base, model, shape, 0) == 0) {
+    draw.queued = false;
+    draw.r3 = 0;
+    return draw;
+  }
+  guest::StoreU16(base, entry + 2, 3);
+  guest::StoreU32(base, entry + 4, *constants);
+  guest::StoreU16(base, entry + 18, 4);
+  guest::StoreU32(base, entry + 20, RecordShapeDepthChecked(base, model, shape, 0, 0, 0));
+  calls.submit(calls.user, entry, guest::LoadU32(base, kSceneryDepthKey),
+               -Lfs(base, *constants + 72), frame, 0x82147FB0);
+  draw.queued = true;
   return draw;
 }
 

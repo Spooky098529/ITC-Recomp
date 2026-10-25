@@ -60,4 +60,15 @@ void SceneryListsRecordShapeDepth(PPCContext& ctx, uint8_t* base);
 // a 160-byte frame like the original's.
 void SceneryListsDrawShapeDepth(PPCContext& ctx, uint8_t* base);
 
+// SceneryModel::RecordShape (sub_82146BD0): r3 = the model, r4 = the
+// shape, r5 = the group, r6 = whether to set the shaders, r7 = pixel c76,
+// r8 = the range, r9 = the shared pair's offset; the guest calls from a
+// 304-byte frame like the original's.
+void SceneryListsRecordShape(PPCContext& ctx, uint8_t* base);
+// SceneryModel::DrawShape (sub_82147D88): r3 = the model, r4 = the
+// view-projection, r5 = the world matrix, r6 = the shape, r7 = the depth
+// pass too, r8 = pixel c76, r9 = the range, r10 = the pair offset; from a
+// 208-byte frame.
+void SceneryListsDrawShape(PPCContext& ctx, uint8_t* base);
+
 }  // namespace hooks
