@@ -396,7 +396,9 @@ find /dev/shm -maxdepth 1 -user "$USER" -name 'xenia_memory_*' -delete
   when `<dir>/now` appears). The attract mode puts a random sepia or
   grayscale filter over the screen: a gray or brown frame from an attract
   race is the game's, not a rendering bug. Never screenshot the user's desktop. Without the GPU plugin, `--skip_intro` sometimes
-  stalls the boot (no "called from 8248466C" in the log): restart it.
+  stalls the boot (no "Resolve (822AFA58) called from 8258D9E8" in the
+  log; "called from 8248466C" before the movies moved to our FFmpeg):
+  restart it.
 - `itc_recomp/tools/attract_race.sh <seconds> [flags]` runs such a race
   with the standard flags and prints the log's path, the seconds raced,
   error lines and harness results. `--run_harnesses=all` (or a list)
