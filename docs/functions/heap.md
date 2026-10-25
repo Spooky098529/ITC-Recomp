@@ -31,7 +31,7 @@ callees outside this file run in play from other callers and so count as
 blockers to `b7_groups.py`: GetLastError (`sub_82295F18` jumping to
 `sub_82296EC0`, in `functions.md` beside SetLastError, a ready group; only
 on free's and realloc's failure paths here) and `atexit` (`sub_825A7068`,
-the core's, `c-runtime.md`'s "Not here"; only on operator new's
+native since 2026-10-25, in `c-runtime.md`; only on operator new's
 `bad_alloc` path). With those paths left recompiled, GetProcessHeap
 (a leaf), malloc, free, `_calloc_impl`, calloc, `_msize`, realloc,
 LocalAlloc, LocalFree, XMemAlloc, XMemFree and operator new and delete
