@@ -8,7 +8,8 @@
 // hooks::GameModesFind, kept for the harness); Buffer28::~Buffer28
 // (sub_82152D28), from sub_82106A00; RaceModeMember::RaceModeMember
 // (sub_82107168), from RaceMode::RaceMode; Member56896::Member56896
-// (sub_82106A50), from RaceModeMember::RaceModeMember.
+// (sub_82106A50), from RaceModeMember::RaceModeMember; Member13360::Member13360
+// (sub_82155118), from RaceModeMember::RaceModeMember.
 
 #include "guest.h"
 
@@ -28,7 +29,8 @@ ITC_FLAG_BOOL(native_game_modes, true, "ITC",
               "Mode::Mode sub_82106C20, the race overlays' state machine's handlers "
               "sub_8215DD58, sub_8215DD90, sub_8215DDD0 and sub_8215DE10, the last's virtual "
               "calls guest calls, RaceOverlaysMachine::Init sub_8215E6C8, the race mode's member's "
-              "parts sub_82155D90 and sub_82155118, and with "
+              "parts sub_82155D90 and sub_82155118 (no adapter: only RaceModeMember::RaceModeMember "
+              "calls it), and with "
               "--native_heap Buffer28::Free sub_82152028, Reset sub_82152D38, ~Buffer28 "
               "sub_82152D28 (no adapter: only sub_82106A00 calls it) and sub_82106A00, "
               "XprHolder::XprHolder sub_821067A0 (XPR::XPR's plain C++ called directly), and "
@@ -127,7 +129,6 @@ void hooks::GameModesHandle(PPCContext& ctx, uint8_t* base) {
 
 // The race mode's member's parts: r3 = the object (left).
 ITC_GAME_MODES(82155D90, Member67760Construct(base, ctx.r3.u32))
-ITC_GAME_MODES(82155118, Member13360Construct(base, ctx.r3.u32))
 
 // RaceOverlaysMachine::Init: r3 = the race overlays' state machine; r3 as
 // the last StateMachine::Add leaves it.
