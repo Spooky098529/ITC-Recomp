@@ -221,6 +221,51 @@ uint32_t AreaModelParse(uint8_t* base, const Calls& calls, uint32_t stack, uint3
 uint32_t AreaLightsOnLoaded(uint8_t* base, uint32_t lights);
 uint32_t AreaModelOnLoaded(uint8_t* base, const Calls& calls, uint32_t stack, uint32_t model);
 
+// --- The pools' objects: made and reset ---
+//
+// As the parses, natively only where Model::Load's adapter is (they make,
+// release and destroy models), the originals through `calls` from 512 bytes
+// below `stack` where a callee's plain C++ declines.
+
+// Scenery::MakePoolObject (sub_820F2638, the pools' factory): `pool` 0 and
+// 1 a PoolObject with the vtable 0x8200674C or 0x82006758 and +56 = 0; 2
+// CourseSet::CourseSet; 3 a PoolObject with the vtable 0x8200676C and an
+// XPR at +56 (XPR::XPR); 4 AreaModel::AreaModel; others (unsigned) and a
+// null `object` nothing. The sizes and the index go to PoolObject::
+// PoolObject. Returns `object`.
+uint32_t MakePoolObject(uint8_t* base, const Calls& calls, uint32_t stack, uint32_t pool,
+                        uint32_t object, uint32_t own_size, uint32_t data_size, uint32_t index);
+// CourseSet::CourseSet (sub_820F2478): PoolObject::PoolObject, the vtable
+// 0x82006784, CourseSet::InitParts(+64), +3808, +3812, +1056, +1060 = 0,
+// the lists at +528 and +1064 made empty (ModelList::Init) with +1592 = 0
+// between, then +1596, +2124, +2652 and +3180, the last's +608 to +620 = 0
+// (each list skipped when its address is 0, as the original checks).
+void CourseSetConstruct(uint8_t* base, const Calls& calls, uint32_t stack, uint32_t set,
+                        uint32_t own_size, uint32_t data_size, uint32_t index);
+// CourseSet::InitParts (sub_820F2230): XPR::XPR at +0, Model::Model at +32,
+// ModelList::Init at +464, +1000, +1532, +2060, +2588, +3116, the last's
+// +608 to +620 = 0.
+void CourseSetInitParts(uint8_t* base, const Calls& calls, uint32_t stack, uint32_t parts);
+// AreaModel::AreaModel (sub_820F1C68): PoolObject::PoolObject, the vtable
+// 0x82006778, Model::Model at +80 with the vtable 0x82006764, XPR::XPR at
+// +528, +56 = +60 = 0.
+void AreaModelConstruct(uint8_t* base, const Calls& calls, uint32_t stack, uint32_t model,
+                        uint32_t own_size, uint32_t data_size, uint32_t index);
+// CourseSet::Reset (sub_820F1138, slot 2): XPR::Release(+64),
+// Model::Release(+96), ModelList::Release of the six lists (their models'
+// Model::Release and vtable slot 0 with 1: the scenery models'
+// SceneryModelDestruct natively), PoolObject::Reset. Returns the set.
+uint32_t CourseSetReset(uint8_t* base, const Calls& calls, uint32_t stack, uint32_t set);
+// AreaModel::Reset (sub_820F12F8, slot 2): the model at +56 released
+// (Model::Release) and +56 = 0 when there; the XPR at +60 (XPR::Release) and
+// +60 = 0 the same; PoolObject::Reset. Returns the object.
+uint32_t AreaModelReset(uint8_t* base, const Calls& calls, uint32_t stack, uint32_t model);
+// The scenery models' destructor (sub_820F1208, slot 0 of 0x82006764):
+// Model::~Model, then with bit 0 of `flags` operator delete. Returns the
+// model.
+uint32_t SceneryModelDestruct(uint8_t* base, const Calls& calls, uint32_t stack, uint32_t model,
+                              uint32_t flags);
+
 // --- The texture animations (the course set's +1060) ---
 
 // TextureAnimations::Advance (sub_820F11A8): the set at `course_set` +

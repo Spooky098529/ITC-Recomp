@@ -26,6 +26,7 @@
 #include "models/model.h"
 #include "models/xpr.h"
 #include "scenery_lists/scenery_lists.h"
+#include "track_zones/track_zones.h"
 #include "memory/heap.h"
 
 #include <fmt/format.h>
@@ -1470,6 +1471,167 @@ void CourseSetParses(Context& h) {
   results.Report();
 }
 
+// --- The pools' objects: made and reset ---
+
+// A scenery model as ModelList::Load makes one (no blocks).
+uint32_t NewSceneryModel(uint8_t* base) {
+  const auto block = memory::crt::OperatorNew(base, scenery_lists::kSceneryModelBytes);
+  RequireDone(block.has_value() && *block != 0);
+  RequireDone(models::ModelConstruct(base, *block));
+  guest::StoreU32(base, *block, scenery_lists::kSceneryModelVtable);
+  return *block;
+}
+
+// Scenery::MakePoolObject: pools 0 to 6 (5 and 6 nothing), a null address
+// now and then, random sizes and index, over random bytes. Compared: r3 and
+// the object's 4,096 bytes, the models' texture provider slots' pointers
+// made offsets.
+void MakePoolObjects(Context& h) {
+  Results results("Scenery::MakePoolObject (sub_820F2638, with CourseSet::CourseSet "
+                  "sub_820F2478, CourseSet::InitParts sub_820F2230, AreaModel::AreaModel "
+                  "sub_820F1C68)");
+  Random r(0x706F6F6C6F626Aull);
+  const uint32_t allocation = memory::Alloc(4096 + 16, 0);
+  const uint32_t object = (allocation + 15) & ~15u;
+  for (int c = 0; c < 70; c++) {
+    const uint32_t pool = uint32_t(c) % 7;
+    const uint32_t address = c % 10 == 9 ? 0 : object;
+    const uint32_t own = r.Below(4096), data = r.Below(4096), index = r.Below(64);
+    std::vector<uint32_t> words(1024);
+    for (auto& w : words) w = uint32_t(r.Next());
+    Outputs out[2];
+    for (int v = 0; v < 2; v++) {
+      for (uint32_t k = 0; k < 1024; k++) guest::StoreU32(h.base, object + 4 * k, words[k]);
+      PPCContext t = CallContext(h);
+      t.r3.u64 = pool;
+      t.r4.u64 = address;
+      t.r5.u64 = own;
+      t.r6.u64 = data;
+      t.r7.u64 = index;
+      if (v == 0) {
+        __imp__sub_820F2638(t, h.base);
+      } else {
+        WithCalls(t, h.base, [&](const cs::Calls& calls) {
+          t.r3.u64 =
+              cs::MakePoolObject(h.base, calls, t.r1.u32, pool, address, own, data, index);
+        });
+      }
+      const uint32_t model = address == 0 ? 0 : pool == 2 ? object + 96 : pool == 4 ? object + 80 : 0;
+      Regions regions;
+      if (model != 0) regions.Add(guest::LoadU32(h.base, model + 88), 256);
+      out[v].Word(t.r3.u32);
+      regions.AddBytes(out[v], h.base, object, 4096);
+      if (model != 0) RequireDone(models::ModelDestruct(h.base, model).has_value());
+    }
+    results.Check(out[0], out[1], fmt::format("case {} (pool {}{})", c, pool,
+                                              address == 0 ? ", no address" : ""));
+  }
+  memory::Free(allocation);
+  results.Report();
+}
+
+// CourseSet::Reset and AreaModel::Reset: objects made by their
+// constructors' plain C++; the course set's lists with 0 to 2 scenery models
+// each (no blocks), the area model's +56 and +60 set or not. Compared: r3
+// and the object's bytes (the freed models' addresses in the lists made
+// offsets).
+void Resets(Context& h) {
+  Results results("CourseSet::Reset (sub_820F1138) and AreaModel::Reset (sub_820F12F8)");
+  Random r(0x7265736574ull);
+  const uint32_t allocation = memory::Alloc(4096 + 16, 0);
+  const uint32_t object = (allocation + 15) & ~15u;
+  for (int c = 0; c < 40; c++) {
+    const bool course = c % 2 == 0;
+    uint32_t counts[6];
+    for (auto& n : counts) n = r.Below(3);
+    const bool with_model = r.Below(2) == 0, with_xpr = r.Below(2) == 0;
+    const uint32_t flags = uint32_t(r.Next());
+    Outputs out[2];
+    for (int v = 0; v < 2; v++) {
+      Fill(h.base, object, 4096, 0);
+      PPCContext t = CallContext(h);
+      Regions regions;
+      WithCalls(t, h.base, [&](const cs::Calls& calls) {
+        if (course) {
+          cs::CourseSetConstruct(h.base, calls, t.r1.u32, object, 3824, 0, 2);
+        } else {
+          cs::AreaModelConstruct(h.base, calls, t.r1.u32, object, 560, 0, 4);
+        }
+      });
+      guest::StoreU32(h.base, object + 32, flags);
+      if (course) {
+        constexpr uint32_t kLists[] = {528, 1064, 1596, 2124, 2652, 3180};
+        for (int i = 0; i < 6; i++) {
+          const uint32_t list = object + kLists[i];
+          for (uint32_t k = 0; k < counts[i]; k++) {
+            const uint32_t model = NewSceneryModel(h.base);
+            regions.Add(model, scenery_lists::kSceneryModelBytes);
+            track_zones::List64Insert(h.base, list + 4, model, k);
+          }
+          guest::StoreU32(h.base, list, counts[i]);
+        }
+        regions.Add(guest::LoadU32(h.base, object + 96 + 88), 256);
+      } else {
+        guest::StoreU32(h.base, object + 56, with_model ? object + 80 : 0);
+        guest::StoreU32(h.base, object + 60, with_xpr ? object + 528 : 0);
+        regions.Add(guest::LoadU32(h.base, object + 80 + 88), 256);
+      }
+      t.r3.u64 = object;
+      if (v == 0) {
+        (course ? __imp__sub_820F1138 : __imp__sub_820F12F8)(t, h.base);
+      } else {
+        WithCalls(t, h.base, [&](const cs::Calls& calls) {
+          t.r3.u64 = course ? cs::CourseSetReset(h.base, calls, t.r1.u32, object)
+                            : cs::AreaModelReset(h.base, calls, t.r1.u32, object);
+        });
+      }
+      out[v].Word(t.r3.u32);
+      regions.AddBytes(out[v], h.base, object, course ? 3824 : 560);
+      RequireDone(models::ModelDestruct(h.base, object + (course ? 96 : 80)).has_value());
+    }
+    results.Check(out[0], out[1],
+                  fmt::format("case {} ({}{}{})", c, course ? "CourseSet" : "AreaModel",
+                              !course && with_model ? ", model" : "",
+                              !course && with_xpr ? ", XPR" : ""));
+  }
+  memory::Free(allocation);
+  results.Report();
+}
+
+// AreaModel::~Model: a scenery model (no blocks), the flags 0 to 3. Compared:
+// r3 and, when it isn't freed, the model's first 432 bytes (its texture
+// provider's slots' pointer made an offset).
+void SceneryModelDestructs(Context& h) {
+  Results results("AreaModel::~Model (sub_820F1208)");
+  for (int c = 0; c < 16; c++) {
+    const uint32_t flags = uint32_t(c) % 4;
+    Outputs out[2];
+    for (int v = 0; v < 2; v++) {
+      const uint32_t model = NewSceneryModel(h.base);
+      Regions regions;
+      regions.Add(model, scenery_lists::kSceneryModelBytes);
+      regions.Add(guest::LoadU32(h.base, model + 88), 256);
+      PPCContext t = CallContext(h);
+      t.r3.u64 = model;
+      t.r4.u64 = flags;
+      if (v == 0) {
+        __imp__sub_820F1208(t, h.base);
+      } else {
+        WithCalls(t, h.base, [&](const cs::Calls& calls) {
+          t.r3.u64 = cs::SceneryModelDestruct(h.base, calls, t.r1.u32, model, flags);
+        });
+      }
+      out[v].Word(regions.Normalized(t.r3.u32));
+      if ((flags & 1) == 0) {
+        regions.AddBytes(out[v], h.base, model, 432);
+        RequireDone(memory::crt::OperatorDelete(model));
+      }
+    }
+    results.Check(out[0], out[1], fmt::format("case {} (flags {})", c, flags));
+  }
+  results.Report();
+}
+
 void Parses(Context& h) {
   AreaLightsParses(h);
   if (!hooks::ModelsNativeLifetime()) {
@@ -1479,6 +1641,9 @@ void Parses(Context& h) {
   }
   AreaModelParses(h);
   CourseSetParses(h);
+  MakePoolObjects(h);
+  Resets(h);
+  SceneryModelDestructs(h);
 }
 
 }  // namespace

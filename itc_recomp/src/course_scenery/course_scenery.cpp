@@ -7,6 +7,7 @@
 #include "base/log.h"
 #include "c_runtime/strings.h"
 #include "game_data/data_file.h"
+#include "memory/c_runtime_heap.h"
 #include "hooks/heap.h"
 #include "memory/heap.h"
 #include "models/model.h"
@@ -898,6 +899,189 @@ uint32_t AreaModelOnLoaded(uint8_t* base, const Calls& calls, uint32_t stack, ui
   Store(base, frame, stack);
   AreaModelParse(base, calls, frame, model);
   MarkLoaded(base, model);
+  return model;
+}
+
+// --- The pools' objects: made and reset ---
+
+namespace {
+
+// Model::Model natively, else its original.
+void MakeModel(uint8_t* base, const ParseCalls& parse, uint32_t model, uint32_t lr) {
+  if (!models::ModelConstruct(base, model)) {
+    parse.Call(lr, 0x825948C0, {model});
+  }
+}
+
+// Model::Release natively, else its original; its r3.
+uint32_t ReleaseModel(uint8_t* base, const ParseCalls& parse, uint32_t model, uint32_t lr) {
+  if (const auto r3 = models::ModelRelease(base, model)) {
+    return *r3;
+  }
+  return parse.Call(lr, 0x82594970, {model});
+}
+
+// XPR::Release natively, else its original; its r3.
+uint32_t ReleaseXpr(uint8_t* base, const ParseCalls& parse, uint32_t xpr, uint32_t lr) {
+  if (const auto r3 = models::XprRelease(base, xpr)) {
+    return *r3;
+  }
+  return parse.Call(lr, 0x825970A8, {xpr});
+}
+
+constexpr uint32_t kSceneryModelDestruct = 0x820F1208;
+
+// ModelList::Release's calls: Model::Release, and the models' vtable slot 0
+// with 1 (the scenery models' destructor natively).
+struct ListRelease {
+  uint8_t* base;
+  const ParseCalls* parse;
+
+  static uint32_t Release(void* self, uint32_t model) {
+    auto& r = *static_cast<ListRelease*>(self);
+    return ReleaseModel(r.base, *r.parse, model, 0x82148020);
+  }
+  static uint32_t Destroy(void* self, uint32_t model) {
+    auto& r = *static_cast<ListRelease*>(self);
+    const uint32_t slot = Load(r.base, Load(r.base, model));
+    if (slot == kSceneryModelDestruct) {
+      return SceneryModelDestruct(r.base, *r.parse->calls, r.parse->stack, model, 1);
+    }
+    return r.parse->Call(0x82148040, slot, {model, 1});
+  }
+};
+
+}  // namespace
+
+uint32_t MakePoolObject(uint8_t* base, const Calls& calls, uint32_t stack, uint32_t pool,
+                        uint32_t object, uint32_t own_size, uint32_t data_size, uint32_t index) {
+  ITC_NATIVE_RUNNING("sub_820F2638 Scenery::MakePoolObject");
+  Store(base, stack - 96, stack);
+  if (pool >= 5 || object == 0) {
+    return object;
+  }
+  switch (pool) {
+    case 0:
+    case 1:
+      ConstructObject(base, object, own_size, data_size, index);
+      Store(base, object + 0, pool == 0 ? 0x8200674Cu : 0x82006758u);
+      Store(base, object + 56, 0);
+      break;
+    case 2:
+      CourseSetConstruct(base, calls, stack - 96, object, own_size, data_size, index);
+      break;
+    case 3:
+      ConstructObject(base, object, own_size, data_size, index);
+      Store(base, object + 0, 0x8200676C);
+      models::XprConstruct(base, object + 56);
+      break;
+    default:
+      AreaModelConstruct(base, calls, stack - 96, object, own_size, data_size, index);
+      break;
+  }
+  return object;
+}
+
+void CourseSetConstruct(uint8_t* base, const Calls& calls, uint32_t stack, uint32_t set,
+                        uint32_t own_size, uint32_t data_size, uint32_t index) {
+  ITC_NATIVE_RUNNING("sub_820F2478 CourseSet::CourseSet");
+  const uint32_t frame = stack - 112;
+  Store(base, frame, stack);
+  ConstructObject(base, set, own_size, data_size, index);
+  Store(base, set + 0, 0x82006784);
+  CourseSetInitParts(base, calls, frame, set + 64);
+  Store(base, set + 3808, 0);
+  Store(base, set + 3812, 0);
+  Store(base, set + 1056, 0);
+  Store(base, set + 1060, 0);
+  if (set + 528 != 0) ModelListInit(base, set + 528);
+  Store(base, set + 1592, 0);
+  for (uint32_t offset : {1064u, 1596u, 2124u, 2652u}) {
+    if (set + offset != 0) ModelListInit(base, set + offset);
+  }
+  const uint32_t points = set + 3180;
+  if (points != 0) {
+    ModelListInit(base, points);
+    for (uint32_t offset : {608u, 612u, 616u, 620u}) Store(base, points + offset, 0);
+  }
+}
+
+void CourseSetInitParts(uint8_t* base, const Calls& calls, uint32_t stack, uint32_t parts) {
+  ITC_NATIVE_RUNNING("sub_820F2230 CourseSet::InitParts");
+  Store(base, stack - 112, stack);
+  ParseCalls parse{base, &calls, stack};
+  models::XprConstruct(base, parts);
+  MakeModel(base, parse, parts + 32, 0x820F2254);
+  for (uint32_t offset : {464u, 1000u, 1532u, 2060u, 2588u, 3116u}) {
+    ModelListInit(base, parts + offset);
+  }
+  for (uint32_t offset : {608u, 612u, 616u, 620u}) Store(base, parts + 3116 + offset, 0);
+}
+
+void AreaModelConstruct(uint8_t* base, const Calls& calls, uint32_t stack, uint32_t model,
+                        uint32_t own_size, uint32_t data_size, uint32_t index) {
+  ITC_NATIVE_RUNNING("sub_820F1C68 AreaModel::AreaModel");
+  Store(base, stack - 112, stack);
+  ParseCalls parse{base, &calls, stack};
+  ConstructObject(base, model, own_size, data_size, index);
+  Store(base, model + 0, 0x82006778);
+  MakeModel(base, parse, model + 80, 0x820F1C9C);
+  Store(base, model + 80, scenery_lists::kSceneryModelVtable);
+  models::XprConstruct(base, model + 528);
+  Store(base, model + 56, 0);
+  Store(base, model + 60, 0);
+}
+
+uint32_t CourseSetReset(uint8_t* base, const Calls& calls, uint32_t stack, uint32_t set) {
+  ITC_NATIVE_RUNNING("sub_820F1138 CourseSet::Reset");
+  const uint32_t frame = stack - 96;
+  Store(base, frame, stack);
+  ParseCalls parse{base, &calls, stack};
+  ReleaseXpr(base, parse, set + 64, 0x820F1154);
+  ReleaseModel(base, parse, set + 96, 0x820F115C);
+  ListRelease list_release{base, &parse};
+  scenery_lists::ReleaseCalls release;
+  release.release = &ListRelease::Release;
+  release.destroy = &ListRelease::Destroy;
+  release.user = &list_release;
+  for (uint32_t offset : {528u, 1064u, 1596u, 2124u, 2652u, 3180u}) {
+    // ModelList::Release's frame (128 bytes) below this one.
+    Store(base, frame - 128, frame);
+    scenery_lists::ModelListRelease(base, set + offset, release);
+  }
+  ResetObject(base, set);
+  return set;
+}
+
+uint32_t AreaModelReset(uint8_t* base, const Calls& calls, uint32_t stack, uint32_t model) {
+  ITC_NATIVE_RUNNING("sub_820F12F8 AreaModel::Reset");
+  Store(base, stack - 112, stack);
+  ParseCalls parse{base, &calls, stack};
+  const uint32_t mesh = Load(base, model + 56);
+  if (mesh != 0) {
+    ReleaseModel(base, parse, mesh, 0x820F1324);
+    Store(base, model + 56, 0);
+  }
+  const uint32_t xpr = Load(base, model + 60);
+  if (xpr != 0) {
+    ReleaseXpr(base, parse, xpr, 0x820F1338);
+    Store(base, model + 60, 0);
+  }
+  ResetObject(base, model);
+  return model;
+}
+
+uint32_t SceneryModelDestruct(uint8_t* base, const Calls& calls, uint32_t stack, uint32_t model,
+                              uint32_t flags) {
+  ITC_NATIVE_RUNNING("sub_820F1208 AreaModel::~Model");
+  Store(base, stack - 112, stack);
+  ParseCalls parse{base, &calls, stack};
+  if (!models::ModelDestruct(base, model)) {
+    parse.Call(0x820F1228, 0x82594F58, {model});
+  }
+  if ((flags & 1) != 0 && !memory::crt::OperatorDelete(model)) {
+    parse.Call(0x820F1238, 0x825A70E8, {model});
+  }
   return model;
 }
 
