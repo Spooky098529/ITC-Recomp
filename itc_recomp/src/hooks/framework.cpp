@@ -10,6 +10,7 @@
 
 #include "base/flags.h"
 #include "framework/framework.h"
+#include "framework/main_loop.h"
 #include "framework/run_loop.h"
 #include "hooks/framework.h"
 #include "hooks/guest_call.h"
@@ -43,7 +44,10 @@ ITC_FLAG_BOOL(native_framework, true, "ITC",
               "Framework::Framework sub_82090420, no adapter) and DebugText::Create sub_82091160 "
               "(with DebugText::DebugText sub_82090EA8, no adapter), FrameStart::FrameStart "
               "sub_82092710 and the "
-              "PoolMakers sub_820AC8F8 and sub_820AC848, their calls guest calls) natively "
+              "PoolMakers sub_820AC8F8 and sub_820AC848, their calls guest calls; the entry and "
+              "the main loop, main sub_82090108, sub_82090378, sub_8209ABE8, App::Run "
+              "sub_8209A760, ForEachTickHandler sub_82099D50 and ForEachRequest sub_82099EE8, "
+              "their virtual calls and functors guest calls) natively "
               "instead of "
               "through the translated code (the same results; checked by "
               "--run_harnesses=framework)");
@@ -458,4 +462,166 @@ extern "C" REX_FUNC(sub_82091160) {
     return;
   }
   ctx.r3.u64 = *text;
+}
+
+// --- The entry and the main loop (src/framework/main_loop.h) ---
+
+fw::MainLoopCalls hooks::MainLoopCalls(PPCContext& ctx, uint8_t* base) {
+  fw::MainLoopCalls calls;
+  calls.call = [&ctx, base](uint32_t target, uint32_t r3, std::optional<uint64_t> r4,
+                            std::optional<uint64_t> r5, uint32_t return_address) {
+    ctx.r3.u64 = r3;
+    if (r4) {
+      ctx.r4.u64 = *r4;
+    }
+    if (r5) {
+      ctx.r5.u64 = *r5;
+    }
+    ctx.ctr.u64 = target;
+    ctx.lr = return_address;
+    REX_CALL_INDIRECT_FUNC(ctx.ctr.u32);
+    return ctx.r3.u32;
+  };
+  calls.in_frame = [&ctx, base](uint32_t bytes, const std::function<void(uint32_t)>& body) {
+    uint64_t kept[18];
+    for (int i = 0; i < 18; i++) {
+      kept[i] = (&ctx.r14)[i].u64;
+    }
+    guest_call::InFrame(ctx, base, bytes, uint32_t(ctx.lr), body);
+    for (int i = 0; i < 18; i++) {
+      (&ctx.r14)[i].u64 = kept[i];
+    }
+  };
+  calls.set_register = [&ctx](int reg, uint64_t value) { (&ctx.r0)[reg].u64 = value; };
+  calls.increment = [&ctx, base](uint32_t iterator) {
+    ctx.r3.u64 = iterator;
+    ctx.lr = 0x82099DFC;
+    __imp__sub_82099B18(ctx, base);
+  };
+  calls.clear = [&ctx, base](uint32_t vector) {
+    ctx.r3.u64 = vector;
+    ctx.lr = 0x8209A870;
+    __imp__sub_8209A080(ctx, base);
+  };
+  calls.construct_run_loop = [&ctx, base](uint32_t loop) {
+    if (NativeHeap() && fw::CanAllocate(base)) {
+      fw::RunLoopConstruct(base, loop);
+      return;
+    }
+    ctx.r3.u64 = loop;
+    ctx.lr = 0x8209AC04;
+    __imp__sub_8209A9F0(ctx, base);
+  };
+  calls.create_framework = [&ctx, base](uint32_t holder) {
+    if (NativeHeap() && fw::FrameworkCreate(base, holder)) {
+      return;
+    }
+    ctx.r3.u64 = holder;
+    ctx.lr = 0x82090120;
+    __imp__sub_820909B8(ctx, base);
+  };
+  calls.destroy_run_loop = [&ctx, base](uint32_t loop) {
+    ctx.r3.u64 = loop;
+    ctx.lr = 0x8209AC18;
+    sub_8209A6E0(ctx, base);
+  };
+  calls.delete_framework = [&ctx, base](uint32_t holder) {
+    ctx.r3.u64 = holder;
+    ctx.lr = 0x82090130;
+    sub_82090350(ctx, base);
+  };
+  return calls;
+}
+
+void hooks::ForEachTickHandler(PPCContext& ctx, uint8_t* base) {
+  const uint32_t result = ctx.r3.u32;
+  const uint64_t first = ctx.r4.u64, last = ctx.r5.u64, functor = ctx.r6.u64;
+  const fw::MainLoopCalls calls = MainLoopCalls(ctx, base);
+  guest_call::InFrame(ctx, base, 128, uint32_t(ctx.lr), [&](uint32_t frame) {
+    fw::ForEachTickHandler(base, result, first, last, functor, frame, calls);
+  });
+  ctx.r3.u64 = result;
+}
+
+void hooks::ForEachRequest(PPCContext& ctx, uint8_t* base) {
+  const uint32_t result = ctx.r3.u32;
+  const uint64_t first = ctx.r4.u64, last = ctx.r5.u64, functor = ctx.r6.u64;
+  const fw::MainLoopCalls calls = MainLoopCalls(ctx, base);
+  guest_call::InFrame(ctx, base, 128, uint32_t(ctx.lr), [&](uint32_t frame) {
+    fw::ForEachRequest(base, result, first, last, functor, frame, calls);
+  });
+  ctx.r3.u64 = result;
+}
+
+void hooks::AppRun(PPCContext& ctx, uint8_t* base) {
+  const uint32_t loop = ctx.r3.u32;
+  const uint32_t framework = ctx.r4.u32;
+  const fw::MainLoopCalls calls = MainLoopCalls(ctx, base);
+  uint32_t answer = 0;
+  guest_call::InFrame(ctx, base, 208, uint32_t(ctx.lr), [&](uint32_t frame) {
+    answer = fw::AppRun(base, loop, framework, frame, calls);
+  });
+  ctx.r3.u64 = answer;
+}
+
+void hooks::RunFramework(PPCContext& ctx, uint8_t* base) {
+  const uint32_t framework = ctx.r3.u32;
+  const fw::MainLoopCalls calls = MainLoopCalls(ctx, base);
+  uint32_t answer = 0;
+  guest_call::InFrame(ctx, base, 160, uint32_t(ctx.lr), [&](uint32_t frame) {
+    answer = fw::RunFramework(base, framework, frame, calls);
+  });
+  ctx.r3.u64 = answer;
+}
+
+void hooks::RunFrameworkAt(PPCContext& ctx, uint8_t* base) {
+  const uint32_t holder = ctx.r3.u32;
+  const fw::MainLoopCalls calls = MainLoopCalls(ctx, base);
+  ctx.r3.u64 = fw::RunFrameworkAt(base, holder, calls);
+}
+
+void hooks::Main(PPCContext& ctx, uint8_t* base) {
+  const fw::MainLoopCalls calls = MainLoopCalls(ctx, base);
+  uint32_t answer = 0;
+  guest_call::InFrame(ctx, base, 112, uint32_t(ctx.lr),
+                      [&](uint32_t frame) { answer = fw::Main(base, frame, calls); });
+  ctx.r3.u64 = answer;
+}
+
+// main: the guest's entry on the main thread (from xstart); r3 the run's
+// answer (never, in play).
+extern "C" REX_FUNC(sub_82090108) {
+  ITC_FRAMEWORK_FALLBACK(82090108)
+  hooks::Main(ctx, base);
+}
+
+// sub_82090378: r3 = the holder.
+extern "C" REX_FUNC(sub_82090378) {
+  ITC_FRAMEWORK_FALLBACK(82090378)
+  hooks::RunFrameworkAt(ctx, base);
+}
+
+// sub_8209ABE8: r3 = the framework.
+extern "C" REX_FUNC(sub_8209ABE8) {
+  ITC_FRAMEWORK_FALLBACK(8209ABE8)
+  hooks::RunFramework(ctx, base);
+}
+
+// App::Run: r3 = the run loop, r4 = the framework.
+extern "C" REX_FUNC(sub_8209A760) {
+  ITC_FRAMEWORK_FALLBACK(8209A760)
+  hooks::AppRun(ctx, base);
+}
+
+// ForEachTickHandler: r3 = the result, r4 / r5 the iterators, r6 the
+// functor (also reached from the run loop's event send, sub_8209A008).
+extern "C" REX_FUNC(sub_82099D50) {
+  ITC_FRAMEWORK_FALLBACK(82099D50)
+  hooks::ForEachTickHandler(ctx, base);
+}
+
+// ForEachRequest: r3 = the result, r4 / r5 the iterators, r6 the functor.
+extern "C" REX_FUNC(sub_82099EE8) {
+  ITC_FRAMEWORK_FALLBACK(82099EE8)
+  hooks::ForEachRequest(ctx, base);
 }

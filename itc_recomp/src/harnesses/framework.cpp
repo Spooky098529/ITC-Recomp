@@ -26,9 +26,12 @@
 #include "memory/c_runtime_heap.h"
 #include "memory/heap.h"
 
+#include <rex/memory/utils.h>
+
 #include <fmt/format.h>
 
 #include <algorithm>
+#include <array>
 #include <deque>
 #include <optional>
 #include <string>
@@ -197,17 +200,18 @@ Places PlacesOf(const Context& h) {
 
 uint32_t Load(uint8_t* base, uint32_t address) { return guest::LoadU32(base, address); }
 
-// A map built by the game's own functions with the keys given (each with a
-// delegate made from it); duplicates aren't added.
-void BuildMap(Context& h, uint32_t map, const std::vector<uint32_t>& keys) {
+// A map built by the game's own functions with the keys and delegates
+// given; duplicates aren't added.
+void BuildMapOf(Context& h, uint32_t map,
+                const std::vector<std::pair<uint32_t, uint32_t>>& entries) {
   FlagOff off;
   const Places p = PlacesOf(h);
   PPCContext t = CallContext(h);
   t.r3.u64 = map;
   __imp__sub_82099FB0(t, h.base);
-  for (uint32_t key : keys) {
+  for (const auto& [key, delegate] : entries) {
     guest::StoreU32(h.base, p.value, key);
-    guest::StoreU32(h.base, p.value + 4, key ^ 0xDE1E0000u);
+    guest::StoreU32(h.base, p.value + 4, delegate);
     t = CallContext(h);
     t.r3.u64 = p.result;
     t.r4.u64 = map;
@@ -216,6 +220,15 @@ void BuildMap(Context& h, uint32_t map, const std::vector<uint32_t>& keys) {
   }
   Fill(h.base, p.result, 16);
   Fill(h.base, p.value, 16);
+}
+
+// A map with the keys given, each with a delegate made from it.
+void BuildMap(Context& h, uint32_t map, const std::vector<uint32_t>& keys) {
+  std::vector<std::pair<uint32_t, uint32_t>> entries;
+  for (uint32_t key : keys) {
+    entries.emplace_back(key, key ^ 0xDE1E0000u);
+  }
+  BuildMapOf(h, map, entries);
 }
 
 // The nodes reachable from a map's head, numbered in the order met.
@@ -317,10 +330,13 @@ std::vector<uint32_t> RandomKeys(Random& r) {
 // One case through both versions: `setup()` builds the inputs (the same
 // both times: it's handed a copy of the generator's state), `args(t)` sets
 // the registers, the original (flag off) or the native step runs, then
-// `collect(out, t)` keeps what's compared.
+// `collect(out, t)` keeps what's compared. The caller's words at r1 + 32 to
+// + 48 are compared as they are unless `raw_stack` is false (the case then
+// compares them itself, as they may hold heap addresses).
 template <typename Setup, typename Args, typename Collect>
 void MapCase(Context& h, Results& results, Setup setup, Args args, GuestFunction recompiled,
-             GuestFunction native, Collect collect, const std::string& what) {
+             GuestFunction native, Collect collect, const std::string& what,
+             bool raw_stack = true) {
   Outputs out[2];
   const Random start = h.random;
   Random after;
@@ -338,7 +354,9 @@ void MapCase(Context& h, Results& results, Setup setup, Args args, GuestFunction
       }
       (v == 0 ? recompiled : native)(t, h.base);
     }
-    out[v].Bytes(Read(h.base, t.r1.u32 + 32, 16));
+    if (raw_stack) {
+      out[v].Bytes(Read(h.base, t.r1.u32 + 32, 16));
+    }
     collect(out[v], t);
     after = h.random;
   }
@@ -1393,6 +1411,405 @@ void Constructors(Context& h) {
   Write(h.base, rl::kDebugTextGlobal, kept.data(), 4);
 }
 
+// --- The entry and the main loop (src/framework/main_loop.h) ---
+//
+// The adapters' register steps (hooks::ForEachTickHandler and the rest,
+// src/hooks/framework.cpp) against the originals (with the flag off, so
+// their callees are the originals too), on objects in the scratch area
+// whose slots point at small guest functions: the recorder and getters
+// above, and sub_8245F860 and sub_825A2370, which add one to the word at
+// r3 + 4 and + 8 (counters). The functors are the recorder or the game's own
+// (TickHandler::Invoke, RunLoop::ApplyRequest); App::Run's loop runs while
+// the tick handler map isn't empty, so its tick handler is the game's
+// Framework::OnTick (sub_820902C8) on an object whose app answers 0, which
+// removes it (tick handler 7, through the run loop's slot 4 and
+// ApplyRequest's removal, never seen in play): one, two or three passes.
+// What they leave is compared with the heap's nodes and blocks by number.
+
+constexpr uint32_t kCount4 = 0x8245F860;
+constexpr uint32_t kCount8 = 0x825A2370;
+constexpr uint32_t kTickHandlerInvoke = 0x82099A98;
+constexpr uint32_t kApplyRequest = 0x8209A458;
+constexpr uint32_t kFrameworkOnTick = 0x820902C8;
+
+// Words numbered: a node met in the walk, or a word into one of `blocks`
+// (by block and offset); others as they are.
+struct Numbering {
+  Walk walk;
+  std::vector<uint32_t> blocks;
+  uint32_t Of(uint32_t word) const {
+    const uint32_t node = walk.Of(word);
+    if (node != word) {
+      return node;
+    }
+    for (uint32_t i = 0; i < blocks.size(); i++) {
+      if (blocks[i] != 0 && word - blocks[i] < 0x400) {
+        return 0xB1100000u + 0x1000 * i + (word - blocks[i]);
+      }
+    }
+    return word;
+  }
+  void Words(uint8_t* base, Outputs& out, uint32_t address, uint32_t bytes) const {
+    for (uint32_t at = 0; at < bytes; at += 4) {
+      out.Word(Of(Load(base, address + at)));
+    }
+  }
+};
+
+// A run loop at `loop` built by the game's RunLoop::RunLoop.
+void BuildRunLoop(Context& h, uint32_t loop) {
+  FlagOff off;
+  PPCContext t = CallContext(h);
+  t.r3.u64 = loop;
+  __imp__sub_8209A9F0(t, h.base);
+}
+
+// A request vector at `vector` holding `requests` (type, key, delegate) in a
+// heap block with room for `spare` more; returns the block (0 when empty
+// with no room).
+uint32_t BuildRequests(Context& h, uint32_t vector, const std::vector<std::array<uint32_t, 3>>& requests,
+                       uint32_t spare) {
+  const uint32_t capacity = uint32_t(requests.size()) + spare;
+  uint32_t block = 0;
+  if (capacity != 0) {
+    block = *memory::crt::OperatorNew(h.base, capacity * rl::kRequestBytes);
+    Fill(h.base, block, capacity * rl::kRequestBytes);
+    for (uint32_t i = 0; i < requests.size(); i++) {
+      for (uint32_t w = 0; w < 3; w++) {
+        guest::StoreU32(h.base, block + rl::kRequestBytes * i + 4 * w, requests[i][w]);
+      }
+    }
+  }
+  guest::StoreU32(h.base, vector + rl::kVectorFirst, block);
+  guest::StoreU32(h.base, vector + rl::kVectorLast, block + uint32_t(requests.size()) * rl::kRequestBytes);
+  guest::StoreU32(h.base, vector + rl::kVectorEnd, block + capacity * rl::kRequestBytes);
+  return block;
+}
+
+// The run loop's maps walked (both heads), its vector's block, then
+// `more()` adds what the case compares; the nodes and the block freed.
+template <typename More>
+void RunLoopOut(Context& h, Outputs& out, uint32_t loop, uint32_t old_block, More more) {
+  Numbering n;
+  n.walk = WalkFrom(h.base, Load(h.base, loop + rl::kTickHandlers + rl::kMapHead),
+                    {Load(h.base, loop + rl::kListeners + rl::kMapHead)});
+  const uint32_t first = Load(h.base, loop + rl::kRequests + rl::kVectorFirst);
+  n.blocks = {old_block, first};
+  more(n);
+  const uint32_t last = Load(h.base, loop + rl::kRequests + rl::kVectorLast);
+  if (first != 0 && last >= first && last - first < 0x1000) {
+    n.Words(h.base, out, first, last - first);
+  }
+  NodesOut(h.base, out, n.walk);
+  if (first != 0 && memory::IsHeapBlock(first)) {
+    memory::crt::OperatorDelete(first);
+  }
+  if (old_block != 0 && old_block != first && memory::IsHeapBlock(old_block)) {
+    memory::crt::OperatorDelete(old_block);
+  }
+}
+
+void MainLoop(Context& h) {
+  const uint32_t loop = h.data + 3072;
+  {
+    Results results("ForEachTickHandler (sub_82099D50)");
+    for (int c = 0; c < 300; c++) {
+      const bool invoke = c % 2 == 1;
+      uint32_t function = 0, object = 0, first = 0, last = 0, map = 0;
+      MapCase(
+          h, results,
+          [&] {
+            DispatchObjects(h, 5, std::vector<uint32_t>(16, kCount4));
+            BuildRunLoop(h, loop);
+            map = loop + rl::kTickHandlers;
+            std::vector<std::pair<uint32_t, uint32_t>> entries;
+            for (uint32_t key : RandomKeys(h.random)) {
+              entries.emplace_back(key, invoke ? ObjectAt(h, 1 + h.random.Below(4))
+                                               : uint32_t(h.random.Next()));
+            }
+            Fill(h.base, h.data, 64);
+            BuildMapOf(h, map, entries);
+            // A range of the map in key order (the head its end).
+            std::vector<uint32_t> nodes = InOrder(h.base, map);
+            nodes.push_back(Load(h.base, map + rl::kMapHead));
+            const uint32_t i = h.random.Below(uint32_t(nodes.size()));
+            const uint32_t j = i + h.random.Below(uint32_t(nodes.size()) - i);
+            first = nodes[i];
+            last = nodes[j];
+            function = invoke ? kTickHandlerInvoke : kStoreR4At4;
+            object = invoke ? uint32_t(h.random.Next()) : ObjectAt(h, 0);
+          },
+          [&](PPCContext& t) {
+            t.r3.u64 = h.data + 400;
+            t.r4.u64 = (uint64_t(map) << 32) | first;
+            t.r5.u64 = (uint64_t(map) << 32) | last;
+            t.r6.u64 = (uint64_t(function) << 32) | object;
+            Fill(h.base, t.r1.u32 - 128, 128 + 48);
+          },
+          __imp__sub_82099D50, hooks::ForEachTickHandler,
+          [&](Outputs& out, const PPCContext& t) {
+            RunLoopOut(h, out, loop, 0, [&](const Numbering& n) {
+              n.Words(h.base, out, h.data, 3072 + 56);
+              // The callee's r4 (TickHandler::Invoke's, at the frame's +24),
+              // the iterator and the key and delegate at its +80, the
+              // caller's words.
+              n.Words(h.base, out, t.r1.u32 - 128 + 24, 8);
+              n.Words(h.base, out, t.r1.u32 - 128 + 80, 16);
+              n.Words(h.base, out, t.r1.u32 + 24, 24);
+              out.Word(n.Of(t.r3.u32));
+            });
+          },
+          fmt::format("{} case {}", invoke ? "TickHandler::Invoke" : "recorder", c), false);
+    }
+    results.Report();
+  }
+  {
+    Results results("ForEachRequest (sub_82099EE8)");
+    for (int c = 0; c < 300; c++) {
+      const bool apply = c % 2 == 1;
+      uint32_t function = 0, object = 0, first = 0, last = 0, block = 0;
+      const uint32_t vector = h.data + 64;
+      MapCase(
+          h, results,
+          [&] {
+            DispatchObjects(h, 1, std::vector<uint32_t>(16, kCount4));
+            BuildRunLoop(h, loop);
+            BuildMap(h, loop + rl::kTickHandlers, RandomKeys(h.random));
+            BuildMap(h, loop + rl::kListeners, RandomKeys(h.random));
+            std::vector<std::array<uint32_t, 3>> requests(h.random.Below(9));
+            const uint32_t types[] = {0, 2, 4, 7};
+            for (auto& request : requests) {
+              request = {types[h.random.Below(4)], h.random.Below(16), uint32_t(h.random.Next())};
+            }
+            Fill(h.base, h.data, 128);
+            block = BuildRequests(h, vector, requests, h.random.Below(3));
+            const uint32_t size = uint32_t(requests.size());
+            const uint32_t i = h.random.Below(size + 1);
+            const uint32_t j = i + h.random.Below(size + 1 - i);
+            first = block + rl::kRequestBytes * i;
+            last = block + rl::kRequestBytes * j;
+            function = apply ? kApplyRequest : kStoreR4At4;
+            object = apply ? loop : ObjectAt(h, 0);
+          },
+          [&](PPCContext& t) {
+            t.r3.u64 = h.data + 400;
+            t.r4.u64 = (uint64_t(vector) << 32) | first;
+            t.r5.u64 = (uint64_t(vector) << 32) | last;
+            t.r6.u64 = (uint64_t(function) << 32) | object;
+            Fill(h.base, t.r1.u32 - 128, 128 + 48);
+          },
+          __imp__sub_82099EE8, hooks::ForEachRequest,
+          [&](Outputs& out, const PPCContext& t) {
+            // The vector's block is the run loop's for the walk: the case's
+            // vector is at data + 64, so it's freed here.
+            Numbering n;
+            n.walk = WalkFrom(h.base, Load(h.base, loop + rl::kTickHandlers + rl::kMapHead),
+                              {Load(h.base, loop + rl::kListeners + rl::kMapHead)});
+            n.blocks = {block};
+            n.Words(h.base, out, h.data, 3072 + 56);
+            // ApplyRequest's r4 and r5 at the frame's +32, the caller's words.
+            n.Words(h.base, out, t.r1.u32 - 128 + 32, 16);
+            n.Words(h.base, out, t.r1.u32 + 24, 24);
+            out.Word(n.Of(t.r3.u32));
+            NodesOut(h.base, out, n.walk);
+            if (block != 0) {
+              memory::crt::OperatorDelete(block);
+            }
+          },
+          fmt::format("{} case {}", apply ? "RunLoop::ApplyRequest" : "recorder", c), false);
+    }
+    results.Report();
+  }
+  {
+    // The framework (at data + 2048, its vtable at + 2200, apart, as its
+    // +133 would be in an object's slots): slot 1 (Init) a getter of +133 or
+    // +60, 2 (Start) the +4 counter, 3 the +8 counter, 4 and 5 getters or
+    // the +4 counter. Tick handler 7's delegate (at data + 2240, its vtable
+    // at + 2400, as OnTick writes its +133 and +134): slot 0 (its release)
+    // the +8 counter, 1 Framework::OnTick, its input manager (+88, object 2:
+    // slot 1 the recorder) and app (+120, object 3: slot 11 the getter of
+    // +133, 0). The listeners' delegates (object 4): slot 1 the +4 counter.
+    Results results("App::Run (sub_8209A760)");
+    for (int c = 0; c < 300; c++) {
+      uint32_t block = 0;
+      bool init = true;
+      MapCase(
+          h, results,
+          [&] {
+            const uint32_t getters[] = {kByte133, kWord60, kCount4};
+            std::vector<uint32_t> list(16, kCount4);
+            DispatchObjects(h, 5, list);
+            const uint32_t framework = h.data + 2048;
+            const uint32_t vtable = h.data + 2200;
+            guest::StoreU32(h.base, framework, vtable);
+            guest::StoreU32(h.base, vtable + 4, getters[h.random.Below(2)]);
+            guest::StoreU32(h.base, vtable + 8, kCount4);
+            guest::StoreU32(h.base, vtable + 12, kCount8);
+            guest::StoreU32(h.base, vtable + 16, getters[h.random.Below(3)]);
+            guest::StoreU32(h.base, vtable + 20, getters[h.random.Below(3)]);
+            guest::StoreU8(h.base, framework + 133, h.random.Below(4) == 0 ? 0 : uint8_t(h.random.Next()));
+            guest::StoreU32(h.base, framework + 60, h.random.Below(4) == 0 ? 0 : uint32_t(h.random.Next()));
+            init = !(Load(h.base, vtable + 4) == kByte133
+                         ? guest::LoadU8(h.base, framework + 133) == 0
+                         : (Load(h.base, framework + 60) & 0xFF) == 0);
+            const uint32_t handler = h.data + 2240;
+            guest::StoreU32(h.base, handler, h.data + 2400);
+            guest::StoreU32(h.base, h.data + 2400 + 0, kCount8);
+            guest::StoreU32(h.base, h.data + 2400 + 4, kFrameworkOnTick);
+            guest::StoreU32(h.base, handler + 88, ObjectAt(h, 2));
+            guest::StoreU32(h.base, handler + 120, ObjectAt(h, 3));
+            guest::StoreU32(h.base, ObjectAt(h, 2) + 0x80 + 4, kStoreR4At4);
+            guest::StoreU32(h.base, ObjectAt(h, 3) + 0x80 + 44, kByte133);
+            guest::StoreU8(h.base, ObjectAt(h, 3) + 133, 0);
+            BuildRunLoop(h, loop);
+            const uint32_t passes = h.random.Below(3);
+            if (passes == 1) {
+              BuildMapOf(h, loop + rl::kTickHandlers, {{7, handler}});
+            }
+            std::vector<std::pair<uint32_t, uint32_t>> listeners;
+            for (uint32_t i = h.random.Below(4); i > 0; i--) {
+              listeners.emplace_back(h.random.Below(8), ObjectAt(h, 4));
+            }
+            BuildMapOf(h, loop + rl::kListeners, listeners);
+            std::vector<std::array<uint32_t, 3>> requests;
+            for (uint32_t i = h.random.Below(4); i > 0; i--) {
+              const uint32_t kinds[] = {2, 4};
+              requests.push_back({kinds[h.random.Below(2)], h.random.Below(8), ObjectAt(h, 4)});
+            }
+            if (passes == 2 || (passes == 1 && h.random.Below(2))) {
+              requests.insert(requests.begin() + h.random.Below(uint32_t(requests.size()) + 1),
+                              {0, 7, handler});
+            }
+            Fill(h.base, h.data, 512);
+            block = h.random.Below(3) == 0 && requests.empty()
+                        ? 0
+                        : BuildRequests(h, loop + rl::kRequests, requests, h.random.Below(3));
+          },
+          [&](PPCContext& t) {
+            t.r3.u64 = loop;
+            t.r4.u64 = h.data + 2048;
+            Fill(h.base, t.r1.u32 - 208, 208 + 48);
+          },
+          __imp__sub_8209A760, hooks::AppRun,
+          [&](Outputs& out, const PPCContext& t) {
+            RunLoopOut(h, out, loop, block, [&](const Numbering& n) {
+              n.Words(h.base, out, h.data, 3072 + 56);
+              // The frame's words +80 to +152 (the event, the functors, the
+              // iterators and the results); the last pass's first tick
+              // handler (+116) as whether it's the head (+108), as it may
+              // be a node freed since.
+              const uint32_t frame = t.r1.u32 - 208;
+              n.Words(h.base, out, frame + 80, 36);
+              out.Word(Load(h.base, frame + 116) == Load(h.base, frame + 108));
+              n.Words(h.base, out, frame + 120, 32);
+              out.Word(t.r3.u32);
+            });
+          },
+          fmt::format("{} case {}", init ? "init" : "no init", c), false);
+    }
+    results.Report();
+  }
+  for (int which = 0; which < 2; which++) {
+    // The framework (data + 2048) as App::Run's, with an empty run loop:
+    // one pass. sub_82090378 is given a holder (data + 8).
+    Results results(which == 0 ? "sub_8209ABE8 (RunFramework)" : "sub_82090378 (RunFrameworkAt)");
+    for (int c = 0; c < 50; c++) {
+      MapCase(
+          h, results,
+          [&] {
+            const uint32_t getters[] = {kByte133, kWord60, kCount4};
+            DispatchObjects(h, 0, {});
+            const uint32_t framework = h.data + 2048;
+            const uint32_t vtable = h.data + 2200;
+            guest::StoreU32(h.base, framework, vtable);
+            guest::StoreU32(h.base, vtable + 4, getters[h.random.Below(2)]);
+            guest::StoreU32(h.base, vtable + 8, kStoreR4At4);
+            guest::StoreU32(h.base, vtable + 12, kCount8);
+            guest::StoreU32(h.base, vtable + 16, getters[h.random.Below(3)]);
+            guest::StoreU32(h.base, vtable + 20, getters[h.random.Below(3)]);
+            guest::StoreU8(h.base, framework + 133, h.random.Below(3) == 0 ? 0 : uint8_t(h.random.Next()));
+            guest::StoreU32(h.base, framework + 60, h.random.Below(3) == 0 ? 0 : uint32_t(h.random.Next()));
+            guest::StoreU32(h.base, h.data + 8, framework);
+          },
+          [&](PPCContext& t) {
+            t.r3.u64 = which == 0 ? h.data + 2048 : h.data + 8;
+            Fill(h.base, t.r1.u32 - 160, 160 + 48);
+          },
+          which == 0 ? __imp__sub_8209ABE8 : __imp__sub_82090378,
+          which == 0 ? hooks::RunFramework : hooks::RunFrameworkAt,
+          [&](Outputs& out, const PPCContext& t) {
+            out.Bytes(Read(h.base, h.data, 2400));
+            // The run loop on the frame (+80) after its destructor: the
+            // vtable, the maps' sizes and the vector (the freed heads' words,
+            // +8 and +20, left out).
+            const uint32_t run_loop = t.r1.u32 - 160 + 80;
+            for (uint32_t at : {0u, 4u, 12u, 16u, 24u, 28u, 32u, 36u, 40u, 44u}) {
+              out.Word(Load(h.base, run_loop + at));
+            }
+            out.Bytes(Read(h.base, run_loop + 48, 4));
+            out.Word(t.r3.u32);
+          },
+          fmt::format("case {}", c));
+    }
+    results.Report();
+  }
+  {
+    // main with the game's own framework (Framework::Create): its vtable
+    // (0x82000B90, in the image's read-only data: its page made writable
+    // for the cases through the SDK's memory utilities, then given its
+    // access back) has slots 0 to 5 swapped for the counters and getters for
+    // the case (put back after), so Framework::Init (slot 1) answers its
+    // +133 (0: App::Run returns at once) or +60 (a vtable: one pass with an
+    // empty run loop), and the deletion (slot 0) counts at +8.
+    constexpr uint32_t kFrameworkVtable = 0x82000B90;
+    // The host page holding it (mprotect wants it aligned).
+    const size_t page_size = rex::memory::page_size();
+    uint8_t* const page = reinterpret_cast<uint8_t*>(
+        reinterpret_cast<uintptr_t>(h.base + kFrameworkVtable) & ~uintptr_t(page_size - 1));
+    rex::memory::PageAccess access = rex::memory::PageAccess::kReadOnly;
+    if (!rex::memory::Protect(page, page_size, rex::memory::PageAccess::kReadWrite, &access)) {
+      ITC_LOG_ERROR("harness: framework: main's cases: the framework's vtable can't be made "
+                    "writable");
+      return;
+    }
+    const std::vector<uint8_t> kept = Read(h.base, kFrameworkVtable, 24);
+    Results results("main (sub_82090108)");
+    for (int c = 0; c < 20; c++) {
+      MapCase(
+          h, results,
+          [&] {
+            DispatchObjects(h, 0, {});
+            const uint32_t getters[] = {kByte133, kWord60};
+            guest::StoreU32(h.base, kFrameworkVtable + 0, kCount8);
+            guest::StoreU32(h.base, kFrameworkVtable + 4, getters[c % 2]);
+            guest::StoreU32(h.base, kFrameworkVtable + 8, kCount4);
+            guest::StoreU32(h.base, kFrameworkVtable + 12, kCount8);
+            guest::StoreU32(h.base, kFrameworkVtable + 16, getters[h.random.Below(2)]);
+            guest::StoreU32(h.base, kFrameworkVtable + 20, getters[h.random.Below(2)]);
+          },
+          [&](PPCContext& t) { Fill(h.base, t.r1.u32 - 112, 112 + 48); },
+          __imp__sub_82090108, hooks::Main,
+          [&](Outputs& out, const PPCContext& t) {
+            Write(h.base, kFrameworkVtable, kept.data(), 24);
+            out.Bytes(Read(h.base, h.data, 2048));
+            out.Word(t.r3.u32);
+            // The run loop on sub_8209ABE8's frame (below main's: sub_82090378
+            // has none), as in sub_8209ABE8's cases.
+            const uint32_t run_loop = t.r1.u32 - 112 - 160 + 80;
+            for (uint32_t at : {0u, 4u, 12u, 16u, 24u, 28u, 32u, 36u, 40u, 44u}) {
+              out.Word(Load(h.base, run_loop + at));
+            }
+            out.Bytes(Read(h.base, run_loop + 48, 4));
+            HeapBlockOut(h, out, Load(h.base, t.r1.u32 - 112 + 80), 136);
+          },
+          fmt::format("{} case {}", c % 2 == 0 ? "no init" : "init", c));
+    }
+    Write(h.base, kFrameworkVtable, kept.data(), 24);
+    rex::memory::Protect(page, page_size, access);
+    results.Report();
+  }
+}
+
 void Containers(Context& h) {
   Requests(h);
   Dispatchers(h);
@@ -1407,6 +1824,7 @@ void Containers(Context& h) {
   Inserts(h);
   VectorGrowth(h);
   RunLoops(h);
+  MainLoop(h);
   ITC_LOG_INFO("harness: framework: {} InsertN and Insert cases handed to the original (a tail "
                "at least the count long, its copy_backward never seen in play)",
                g_fallbacks_expected);
