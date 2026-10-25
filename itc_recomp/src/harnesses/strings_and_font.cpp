@@ -1264,10 +1264,13 @@ void StringsGets(Context& h) {
 // (the table read as the text); the va_list at +3072 (16 slots: ints,
 // doubles and ids in the order the string's units ask, then random); the
 // output in a 32 KB block of its own (a string of doubles printed whole can
-// run long), holding a short prefix. Compared: the scratch area, the
-// output's block and r3.
+// run long), holding a short prefix. Strings::Format (sub_8210ABC0) on the
+// same inputs, the first five slots in r6 to r10 and the rest past its
+// caller's parameter area. Compared: the scratch area, the output's block,
+// the stack above r1 (to the scratch area) and r3.
 void FormatVCases(Context& h) {
   Results results("Strings::FormatV (sub_8210A990)");
+  Results format_results("Strings::Format (sub_8210ABC0)");
   Random r(0x666F726D617476ull);  // "formatv"
   constexpr uint32_t kBounds = 0x82007E18;
   const uint32_t table = h.data, container = h.data + 128, strings = h.data + 200;
@@ -1335,43 +1338,62 @@ void FormatVCases(Context& h) {
       add(kind == 0 ? 0xFFE2 : kind == 1 ? 0xFFEC : 0xFFD7);
     }
     const uint32_t prefix = r.Below(4) == 0 ? r.Below(16) : 0;
-    Outputs out[2];
-    for (int v = 0; v < 2; v++) {
-      Fill(h.base, h.data, kScratchBytes);
-      Fill(h.base, output, output_block.bytes);
-      for (uint32_t i = 0; i < 18; i++) {
-        guest::StoreU32(h.base, table + 4 * i, container);
-      }
-      guest::StoreU32(h.base, container, __builtin_bswap32(8));
-      for (uint32_t s = 0; s < 8; s++) {
-        const uint32_t at = strings + 2 * kStringUnits * s;
-        guest::StoreU32(h.base, container + 4 + 4 * s, __builtin_bswap32(at - container));
-        for (size_t k = 0; k < units[s].size(); k++) {
-          guest::StoreU16(h.base, at + 2 * uint32_t(k), units[s][k]);
+    // FormatV (the va_list at +3072), then Format (the first five slots in
+    // r6 to r10, the rest at r1 + 80 on: its caller's parameter area and
+    // the stack arguments past it, compared too).
+    for (int which = 0; which < 2; which++) {
+      Outputs out[2];
+      for (int v = 0; v < 2; v++) {
+        Fill(h.base, h.data, kScratchBytes);
+        Fill(h.base, output, output_block.bytes);
+        for (uint32_t i = 0; i < 18; i++) {
+          guest::StoreU32(h.base, table + 4 * i, container);
         }
-        guest::StoreU16(h.base, at + 2 * uint32_t(units[s].size()), 0);
+        guest::StoreU32(h.base, container, __builtin_bswap32(8));
+        for (uint32_t s = 0; s < 8; s++) {
+          const uint32_t at = strings + 2 * kStringUnits * s;
+          guest::StoreU32(h.base, container + 4 + 4 * s, __builtin_bswap32(at - container));
+          for (size_t k = 0; k < units[s].size(); k++) {
+            guest::StoreU16(h.base, at + 2 * uint32_t(k), units[s][k]);
+          }
+          guest::StoreU16(h.base, at + 2 * uint32_t(units[s].size()), 0);
+        }
+        PPCContext t = CallContext(h);
+        const uint32_t list = which == 0 ? args : t.r1.u32 + 40;
+        Fill(h.base, t.r1.u32 + 40, 1024 - 40);
+        for (uint32_t i = which == 0 ? 0 : 5; i < 16; i++) {
+          guest::StoreU32(h.base, list + 8 * i, uint32_t(slots[i] >> 32));
+          guest::StoreU32(h.base, list + 8 * i + 4, uint32_t(slots[i]));
+        }
+        for (uint32_t k = 0; k < prefix; k++) {
+          guest::StoreU16(h.base, output + 2 * k, uint16_t('a' + k));
+        }
+        guest::StoreU16(h.base, output + 2 * prefix, 0);
+        t.r3.u64 = table;
+        t.r4.u64 = output;
+        t.r5.u64 = id;
+        if (which == 0) {
+          t.r6.u64 = args;
+          Run(v, __imp__sub_8210A990, hooks::StringsFormatVSteps, t, h.base);
+        } else {
+          t.r6.u64 = slots[0];
+          t.r7.u64 = slots[1];
+          t.r8.u64 = slots[2];
+          t.r9.u64 = slots[3];
+          t.r10.u64 = slots[4];
+          Run(v, __imp__sub_8210ABC0, hooks::StringsFormatSteps, t, h.base);
+        }
+        out[v].Bytes(Read(h.base, h.data, kScratchBytes));
+        out[v].Bytes(Read(h.base, output, output_block.bytes));
+        out[v].Bytes(Read(h.base, t.r1.u32 + 40, 1024 - 40));
+        out[v].Word(t.r3.u32);
       }
-      for (uint32_t i = 0; i < 16; i++) {
-        guest::StoreU32(h.base, args + 8 * i, uint32_t(slots[i] >> 32));
-        guest::StoreU32(h.base, args + 8 * i + 4, uint32_t(slots[i]));
-      }
-      for (uint32_t k = 0; k < prefix; k++) {
-        guest::StoreU16(h.base, output + 2 * k, uint16_t('a' + k));
-      }
-      guest::StoreU16(h.base, output + 2 * prefix, 0);
-      PPCContext t = CallContext(h);
-      t.r3.u64 = table;
-      t.r4.u64 = output;
-      t.r5.u64 = id;
-      t.r6.u64 = args;
-      Run(v, __imp__sub_8210A990, hooks::StringsFormatVSteps, t, h.base);
-      out[v].Bytes(Read(h.base, h.data, kScratchBytes));
-      out[v].Bytes(Read(h.base, output, output_block.bytes));
-      out[v].Word(t.r3.u32);
+      (which == 0 ? results : format_results)
+          .Check(out[0], out[1], fmt::format("case {} (id {}, string {})", c, id, pick));
     }
-    results.Check(out[0], out[1], fmt::format("case {} (id {}, string {})", c, id, pick));
   }
   results.Report();
+  format_results.Report();
 }
 
 // XPR::Release of a slot (sub_82108860): the slot empty, or an XPR (24

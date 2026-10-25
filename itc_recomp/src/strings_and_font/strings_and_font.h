@@ -111,6 +111,14 @@ struct FormatCalls {
 uint32_t StringsFormatV(uint8_t* base, const FormatCalls& calls, uint32_t stack, uint32_t table,
                         uint32_t out, uint32_t id, uint32_t args);
 
+// Strings::Format (sub_8210ABC0): FormatV with the arguments as varargs:
+// `varargs` (r6 to r10) stored in the caller's parameter area (`stack` + 40
+// to + 79) and the va_list from there, kept at its frame's +80 (a 4,784-byte
+// frame); 0xFFD2 isn't a case (appended as itself); 0xFFD7's strings
+// through FormatV. Returns `out`.
+uint32_t StringsFormat(uint8_t* base, const FormatCalls& calls, uint32_t stack, uint32_t table,
+                       uint32_t out, uint32_t id, const uint64_t varargs[5]);
+
 // sub_82108860, probably XPR::Release of a slot: the XPR at `slot` (when
 // set) destroyed (XPR::~XPR), freed (operator delete) and the slot cleared.
 // Returns the r3 the original leaves (the XPR, else the slot); nullopt,

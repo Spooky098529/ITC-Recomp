@@ -17,5 +17,7 @@ extern GuestStandIn g_text_draw_stand_in;
 // adapter's and the harness's): r3 = the table, r4 = the output, r5 = the
 // id, r6 = the va_list; r3 the output.
 void StringsFormatVSteps(PPCContext& ctx, uint8_t* base);
+// Strings::Format (sub_8210ABC0)'s: the same with r6 to r10 the varargs.
+void StringsFormatSteps(PPCContext& ctx, uint8_t* base);
 
 }  // namespace hooks

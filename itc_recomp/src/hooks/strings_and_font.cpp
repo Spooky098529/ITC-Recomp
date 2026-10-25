@@ -46,7 +46,7 @@ ITC_FLAG_BOOL(native_strings_and_font, true, "ITC",
               "sub_82108458 and sub_82108810, Font::LineY sub_82108568, Font::AddGlyph "
               "sub_82109560, Font::ClipGlyph sub_82108C90 and Font::OutCode sub_821082A0, no "
               "adapters of their own), Font::Draw sub_8210A400, Text::Draw sub_8210A758, "
-              "Strings::Get sub_8210A800, Strings::FormatV sub_8210A990 (the font's number sub_82108A70, never in play, a guest call), and, with --native_models, XPR::Release of a slot "
+              "Strings::Get sub_8210A800, Strings::FormatV sub_8210A990 (the font's number sub_82108A70, never in play, a guest call), Strings::Format sub_8210ABC0, and, with --native_models, XPR::Release of a slot "
               "sub_82108860; "
               "rotated text and the second pass, never in play, on the translated code) "
               "natively instead of through the translated code (same results; checked by "
@@ -189,6 +189,24 @@ void hooks::StringsFormatVSteps(PPCContext& ctx, uint8_t* base) {
 extern "C" REX_FUNC(sub_8210A990) {
   ITC_STRINGS_AND_FONT_FALLBACK(8210A990)
   hooks::StringsFormatVSteps(ctx, base);
+}
+
+// Strings::Format: as FormatV with r6 to r10 the varargs; r3 the output.
+void hooks::StringsFormatSteps(PPCContext& ctx, uint8_t* base) {
+  ctx.fpscr.disableFlushMode();
+  const uint64_t lr = ctx.lr;
+  FormatGuest guest{ctx, base};
+  const FormatCalls calls{&guest, FormatCall};
+  const uint64_t varargs[5] = {ctx.r6.u64, ctx.r7.u64, ctx.r8.u64, ctx.r9.u64, ctx.r10.u64};
+  const uint32_t out = StringsFormat(base, calls, ctx.r1.u32, ctx.r3.u32, ctx.r4.u32,
+                                     ctx.r5.u32, varargs);
+  ctx.lr = lr;
+  ctx.r3.u64 = out;
+}
+
+extern "C" REX_FUNC(sub_8210ABC0) {
+  ITC_STRINGS_AND_FONT_FALLBACK(8210ABC0)
+  hooks::StringsFormatSteps(ctx, base);
 }
 
 // Strings::PageCount: r4 = the text; r3 the count.
