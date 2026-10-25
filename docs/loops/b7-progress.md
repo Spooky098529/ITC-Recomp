@@ -13,8 +13,11 @@ file's history. What's left to see in a drive, from every run:
 - Limit for this run: 5 subsystems (the user's call, 2026-10-25; 3 by default).
 - Subsystem 1 of 5: `leads.md`'s top lead, `sub_8215E6C8` (a race
   object's set-up registering message handlers, with the owner's
-  constructor and destructor `sub_821073B8`, `sub_82107518`). Step:
-  mapping agent running.
+  constructor and destructor `sub_821073B8`, `sub_82107518`). Mapped
+  as the game modes (`game-modes.md`, 31 rows, 7871fe6; the first
+  mapping agent was cut off by a crash before writing anything, and
+  started again). Map checked (0 errors, 31 of 31 in play, 11 ready
+  groups; nothing calls the kernel). Step: migration agent 1 running.
 
 ## Done
 
@@ -35,3 +38,5 @@ This run's groups: `expected-differences.md` (the "03:59 run" lines).
 ## Totals
 
 - Start: ours 1903, work left 4548 (wrapped 111, known 597, unknown 3840).
+- After the game modes' map: ours 1903, work left 4548 (wrapped 111,
+  known 625, unknown 3812).

@@ -13,7 +13,18 @@ When the user has reviewed a run's section, its heading gets
 
 ## Run 2026-10-25 03:59 (`b7-loop-25-10-26-2`)
 
-(Nothing yet.)
+- `game-modes.md` (new, 7871fe6): 31 rows (3 moved from
+  `functions.md`, 28 new): the game's modes (`Mode::Create`,
+  `Modes::Tick`), the race mode (type 1, 167,264 bytes; constructor
+  `sub_821073B8`, destructor `sub_82107518`), its message dispatcher and
+  state machines (`StateMachine::Handle`, `Find`, `IndexOf`), the race
+  overlays' state machine set-up `sub_8215E6C8` (33 transitions listed)
+  and its four handlers, and the race-only `Buffer28::` functions in the
+  camera modes' range. `known-data.md`: the mode, race mode, state
+  machine and transition layouts, `0x826032DC`/`0x826032E0`,
+  `0x826C5B68`; the race flow's row now says it's the race mode's
+  +97548. `leads.md`: 2 leads added, notes on the camera modes and
+  framework objects leads.
 
 ## Run 2026-10-25 01:17 (`by-loop-25-10-26`)
 
