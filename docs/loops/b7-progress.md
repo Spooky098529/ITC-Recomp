@@ -55,8 +55,10 @@ file's history. What's left to see in a drive, from every run:
   differing). Nothing ready left in the file. The replay's boot marker
   fixed meanwhile (d83677c, the user's go-ahead: it waited for the movie
   library's draw, gone since the FFmpeg movies, so every replay since
-  "stalled"). Step: validation agent running (its replay is the new
-  marker's first test).
+  "stalled"). Validated (`itc_1624`: 21 of 21 harness lines; the
+  replay `itc_1625` ran, the new marker's first test: front end, a race,
+  the screen after it; 4 earlier functions seen and 2 from older runs,
+  off `to-drive.md`; 5 mode types not entered go on it). Finished.
 
 ## Done
 
@@ -70,6 +72,9 @@ file's history. What's left to see in a drive, from every run:
   `memmove_s` in `c-runtime.md`): all 17 ours in one migration
   (6148c1e..b35547a), 3 adapters removed; the memory blocks' lock a host
   lock (the user's call); validated (`itc_1614`); `--native_models`.
+- The game modes' cleanup (no mapping; ce8d477..4ff0b54): 38 of 42
+  ours, 6 more adapters removed, 11 rows added; validated (`itc_1624`,
+  replay `itc_1625`).
 
 ## Rows to review
 
@@ -88,6 +93,9 @@ This run's groups: `expected-differences.md` (the "03:59 run" lines).
 - Start: ours 1903, work left 4548 (wrapped 111, known 597, unknown 3840).
 - After the game modes' map: ours 1903, work left 4548 (wrapped 111,
   known 625, unknown 3812).
+- After the game modes' cleanup's validation: race 27 s (`itc_1624`),
+  0 errors, every harness 0 differing; replay 127 s (`itc_1625`), 0
+  errors.
 - After the game modes' cleanup: ours 1961, work left 4490 (wrapped
   111, known 595, unknown 3784).
 - After the model class's validation: race 27 s (`itc_1614`), 0 errors,

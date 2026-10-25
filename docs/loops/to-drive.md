@@ -15,23 +15,25 @@ here loses its heading.
 
 ## Run 2026-10-25 03:59 (`b7-loop-25-10-26-2`)
 
-The game modes' migration 1, not in the attract race (`itc_1603`); the
-replay broke (`itc_1605`: the boot stalled twice, before the title
-screen):
+Until d83677c the replay's boot marker was a line gone since the movies
+moved to our FFmpeg, so the first two validations' replays "stalled"
+(`itc_1605`, `itc_1616`); the cleanup's replay with the new marker ran
+(`itc_1625`, ok: the front end, a race, the screen after it) and showed
+`sub_82152D28`, `sub_82106A00`, `sub_825943E0` and `sub_82594F58`, now
+off the list. Left:
 
-- `sub_8215DD58` RaceOverlaysMachine::SetFlags, `sub_8215DD90`
+- The game modes' migration 1 (attract race `itc_1603`): `sub_8215DD58`
+  RaceOverlaysMachine::SetFlags, `sub_8215DD90`
   RaceOverlaysMachine::ClearFlags, `sub_8215DDD0`
   RaceOverlaysMachine::SetFlag820, `sub_8215DE10`
-  RaceOverlaysMachine::ResetOverlays, `sub_82152D28`
-  Buffer28::~Buffer28, `sub_82106A00` Buffers28::~Buffers28
-  (`game-modes.md`)
-
-The model class's migration, not in the attract race (`itc_1614`); the
-replay broke (`itc_1616`: the boot stalled twice):
-
-- `sub_825A7348` memmove_s (`c-runtime.md`), `sub_825943E0`
-  TextureProvider::~TextureProvider, `sub_82594F58` Model::~Model
-  (`models.md`)
+  RaceOverlaysMachine::ResetOverlays (`game-modes.md`)
+- The model class (attract race `itc_1614`): `sub_825A7348` memmove_s
+  (`c-runtime.md`)
+- The game modes' cleanup (`itc_1624`, `itc_1625`): the modes not
+  entered, `sub_82106F08` ModeType5::ModeType5, `sub_82235E88`
+  ModeType6::ModeType6, `sub_82246340` ModeType7::ModeType7,
+  `sub_82107088` ModeType10::ModeType10, `sub_82106F88`
+  ModeType12::ModeType12 (`game-modes.md`)
 
 ## Run 2026-10-24 21:33 (`b7-loop-24-10-26-4`)
 
@@ -92,7 +94,6 @@ Migration 2's, not in the attract race or the replay (`itc_1145`,
 Migration 3's, not in the attract race or the replay (`itc_1169`,
 `itc_1170`, ok):
 
-- `sub_8213B890` AiPath::SpreadOffset (`ai-drivers.md`)
 - Never seen in play, no rows (ported with their callers,
   `ai-drivers.md`'s "Not seen in play"): `sub_8213D898`
   AiPath::AvoidByLane, `sub_8213F7E0` AiSkill::EntryWord,
@@ -156,7 +157,6 @@ their callers are the front end's:
 
 - `sub_821171B0` DataTables::Find20 (`data-tables.md`)
 - `sub_82117210` DataTables::Entry20 (`data-tables.md`)
-- `sub_82117228` DataTables::Entry40 (`data-tables.md`)
 
 ## Run 2026-10-22 14:39 (`b7-loop-22-10-26`, the third run)
 
