@@ -108,7 +108,10 @@ file's history. What's left to see in a drive, from every run:
   errors, every harness 0 differing; race frame dumps the same 2,412
   draws as the fallback). Left ready: `DataFile::GetEntry`
   `sub_82294730`, which blocks `ModelList::Load` and `LoadPoints`.
-  Step: validation, agent running.
+  Validated (`itc_1795`: 21 of 21 harness lines, all 21 ran in the
+  attract race; no replay needed). Step: migration 2
+  (`DataFile::GetEntry`, then `ModelList::Load` and `LoadPoints`),
+  agent running.
 
 ## Done
 
@@ -156,6 +159,8 @@ This run's groups: `expected-differences.md` (the "16:38 run" lines).
 - After the scenery lists' validation: race 24 s (`itc_1769`), 0
   errors, every harness 0 differing; replay 127 s (`itc_1770`), 0
   errors.
+- After the shader objects' validation: race 24 s (`itc_1795`), 0
+  errors, every harness 0 differing.
 - After the shader objects' migration 1: ours 2130, work left 4321
   (wrapped 104, known 562, unknown 3655).
 - After the shader objects' map: ours 2107, work left 4344 (wrapped
