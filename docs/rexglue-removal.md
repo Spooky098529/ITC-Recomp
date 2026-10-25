@@ -108,7 +108,11 @@ goes in `src/` as overrides), American English.
   `by-loop-25-10-26`) made the app framework native as far as
   it was ready (`framework.md`, 56 of 68 ours, with `main` and
   `App::Run`; `--native_framework`; ours 1,903), after fixing an
-  `ai_drivers` harness case that read a wild address. The
+  `ai_drivers` harness case that read a wild address; its fifteenth
+  run (branch `b7-loop-25-10-26-2`) made the game modes, the model
+  class (the memory blocks' lock a host mutex), the mode tick, the
+  minimap's parts and `atexit` (the exit lock a host mutex) with what
+  it unblocked native as far as they were ready (ours 2,013). The
   runs' rows wait for the user's review (`docs/loops/review.md`). See
   "B7's loop runs" under B7, and `docs/loops/b7-progress.md`. Guest
   allocation is no longer a block (`docs/native-memory.md`); what the
@@ -2575,6 +2579,7 @@ B7. **The game logic inside**: everything else, subsystem by subsystem,
 | 2026-10-25 | The model class (`Model::Model`, `Release`, `~Model`, the texture provider and its `std::vector` helpers, `XPR::XPR`, `Release` and `~XPR`, the put-off frees; the memory blocks' lock `0x8296BD38` a host lock taken by every user, the user's call; with `memmove_s` in `c-runtime.md`) | `models.md` | 17 of 17 new rows (19 of 50 in the file; one migration) | `--native_models` |
 | 2026-10-25 | The mode tick (what `Modes::Tick` calls besides the mode's slots: the per-mode settings, the sign-in watch, the billboards' ring flip, the two layers of screen fades, the menu music with XAPI's `lstrcmpA` and `CompareStringA` as plain C++ by B6's call; presence Dropped by B5's; with `Modes::Modes` in `game-modes.md`) | `mode-tick.md` | 21 of 23 (one migration; 1 Dropped, 4 Merged) | `--native_mode_tick` |
 | 2026-10-25 | The minimap's parts (the race manager's lookups, the car marker's type, the scaling, the marker triangles and their 80-slot lists, the transform and the triangles' records; interpolation's hooks kept, `Minimap::Draw`'s blink wrap untouched; the marker draws and `Minimap::Draw` left waiting on `atexit` and the course set's lists) | `minimap.md` | 12 of 15 (one migration) | `--native_minimap` |
+| 2026-10-25 | `atexit` and what it unblocked (`atexit`, `_onexit` and `__onexitinit` over the game's exit table, the C runtime's exit lock a host mutex taken by every user through `_lock`/`_unlock` overridden for lock 8 only, the user's call by the recorded lock call; the global strings' static set-ups, `SignInWatch::StaticInit`, `UiMovie::TrackProperty`, `ApplyTrack` and `ApplyAnimation`, the minimap's marker draws, `Viewports::Init` and `Viewport::Init`; no mapping) | `c-runtime.md`, and `ui-movies.md`, `minimap.md`, `cameras.md`, `std-string.md`, `mode-tick.md` | 18 made native, 12 adapters removed (two migrations) | under `--native_c_runtime` and the files' own flags |
 
     The first run (2026-10-22, branch `b7-loop-test`): every harness at 0 differing, attract races at 20-21 s with no errors,
     and a race the user drove looked right. Ours went from 162 to 335 (work
@@ -3436,3 +3441,24 @@ ours 1,995, work left 4,456 (Wrapped 111, with a row 599, no row yet
 3,746), from 4,468. The marker draws and `Minimap::Draw` wait on
 `atexit` (next, by the user's go-ahead: the exit lock a host mutex) and
 the course set's lists.
+
+**2026-10-25, `atexit` and what it unblocked (branch
+`b7-loop-25-10-26-2`):** the fifteenth run's last step (the user's
+go-ahead, counted as its fifth subsystem) made `atexit`, `_onexit` and
+`__onexitinit` native over the game's exit table, the C runtime's exit
+lock (lock 8, critical section `0x82971248`) a host
+`std::recursive_mutex` taken by every user (`_lock`/`_unlock`
+overridden for lock 8 only; its other users, the exit path, never run:
+closing the window hard-exits), then what it unblocked: the global
+strings' static set-ups, `SignInWatch::StaticInit`, the UI movies'
+`TrackProperty`, `ApplyTrack` and `ApplyAnimation`, the minimap's marker
+draws and the viewports (12 adapters removed). The boundary: 449
+functions (916 pairs): overridden 69, Native 5, Dropped 23, never called
+70, live 282 (the two lock overrides). Imports: 186 called, 62 with a
+live caller. B7 (`b7_status.py`): 6,451 in play, ours 2,013, work left
+4,438 (Wrapped 110, with a row 590, no row yet 3,738), from 4,456 (from
+4,548 at the run's start). `Minimap::Draw` waits on the course set's
+lists; the semaphores' and the vblank event's static set-ups on their
+kernel objects; `sprintf` and `_vsnprintf_l` on `_output_l` and
+`_vsnprintf`.
+

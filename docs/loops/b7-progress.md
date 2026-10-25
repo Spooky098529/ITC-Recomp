@@ -114,7 +114,9 @@ file's history. What's left to see in a drive, from every run:
   `UiMovie::ApplyTrack`, `__onexitinit`, `UiMovie::ApplyAnimation`; 11
   adapters removed; 27 s, 0 errors, every harness 0 differing; frame
   dumps identical). Nothing ready left in its files. Step: validation
-  agent running (the run's last). The run ends after its part 2 (the callers) is validated
+  validated (`itc_1690`: 14 of 14 harness lines, 10 prints added in
+  8b142a7 to older UI movie and C runtime functions; replay `itc_1691`
+  ok). Finished. The run ends after its part 2 (the callers) is validated
   (the user's call, 2026-10-25).
 
 ## Done
@@ -140,7 +142,11 @@ file's history. What's left to see in a drive, from every run:
 - The minimap (`minimap.md`, mapped in f86ea54; 15 rows): 12 ours in one
   migration (3d8e197, 20d9037); validated (`itc_1648`, `itc_1649`);
   `--native_minimap`. Left: the marker draws and `Minimap::Draw`
-  (`atexit`, the course set's lists).
+  (the course set's lists).
+- `atexit` and what it unblocked (no mapping, subsystem 5 by the user's
+  call): 18 made native in two migrations (19f9deb..1244dd3,
+  8a0dd9e..9e046a9), 12 adapters removed, the exit lock a host mutex;
+  validated (`itc_1665`, `itc_1690`).
 
 ## Rows to review
 
@@ -159,6 +165,9 @@ This run's groups: `expected-differences.md` (the "03:59 run" lines).
 - Start: ours 1903, work left 4548 (wrapped 111, known 597, unknown 3840).
 - After the game modes' map: ours 1903, work left 4548 (wrapped 111,
   known 625, unknown 3812).
+- At the end (after the atexit step's validation, `itc_1690`: race 27
+  s, 0 errors, every harness 0 differing): ours 2013, work left 4438
+  (wrapped 110, known 590, unknown 3738).
 - After the atexit step's migration 2: ours 2013, work left 4438
   (wrapped 110, known 590, unknown 3738).
 - After the atexit step's validation: race 27 s (`itc_1665`), 0
@@ -192,3 +201,13 @@ This run's groups: `expected-differences.md` (the "03:59 run" lines).
   every harness 0 differing.
 - After the game modes' migration 1: ours 1923, work left 4528 (wrapped
   111, known 605, unknown 3812).
+
+## Stopped
+
+2026-10-25, at the run's limit: 5 subsystems (the game modes, the model
+class, the mode tick, the minimap, `atexit` and what it unblocked; the
+user's calls: 5 for this run, `atexit` counted, end after its callers'
+validation). `check_function_statuses.py`: 0 errors. Earlier in the
+run: the first mapping agent was cut off by a crash and started again;
+the model class's map stopped on the memory blocks' lock (the user's
+call: port it).
