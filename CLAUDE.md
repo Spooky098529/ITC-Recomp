@@ -273,7 +273,8 @@ first" in `docs/loops/b7-loop.md`); `scripted_run.sh`'s boot marker
 was fixed (it waited for the movie library's draw, gone since the
 FFmpeg movies). The rest waits on the race mode's set-ups, the course
 set's lists, the save data's creation and the kernel objects' set-ups.
-Its sixteenth run (`b7-loop-25-10-26-3`, 2026-10-25, not yet merged;
+Its sixteenth run (`b7-loop-25-10-26-3`, 2026-10-25, merged into
+`rexglue-removal-project` the same day after a drive;
 summary `docs/loops/b7-loop-2026-10-25-1638.md`; 3 subsystems) made
 the scene models' set-up side, the scenery lists with the model draws
 and the shader objects up to `Model::Load` native as far as they were
