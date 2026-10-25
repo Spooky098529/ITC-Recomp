@@ -22,7 +22,8 @@ void MinimapRacerMarkerType(PPCContext& ctx, uint8_t* base);
 // Minimap::Scaling (sub_820F2EF8): r3 = out, r4 = the vector; r3 = out (as
 // memcpy leaves it).
 void MinimapScaling(PPCContext& ctx, uint8_t* base);
-// Triangle::Init (sub_820F4040): r3 = the triangle (left).
+// Triangle::Init (sub_820F4040): r3 = the triangle (left). No adapter: the
+// harness's steps.
 void MinimapTriangleInit(PPCContext& ctx, uint8_t* base);
 // List80::Insert (sub_820F5238): r3 = the list, r4 = the matrix, r5 = the
 // position; r3 = the data slot (as Matrix::Copy leaves it).

@@ -15,7 +15,7 @@ ITC_FLAG_BOOL(native_minimap, true, "ITC",
               "sub_82170608, Race::RacerVehicle sub_82170578, SetList::Point sub_82147D18, "
               "Minimap::RacerMarkerType sub_820F2D28 (with its switch's case 1, sub_820F2E68; "
               "sub_820F2CA8's chained record the original's), Minimap::Scaling sub_820F2EF8, "
-              "Triangle::Init sub_820F4040, List80::Insert sub_820F5238 (with List80::Link "
+              "Triangle::Init sub_820F4040 (no adapter: only the marker draws' plain C++ calls it), List80::Insert sub_820F5238 (with List80::Link "
               "sub_820F40C0, no adapter: only it calls it) and List80::Copy sub_820F51A8, Primitive::RecordTransform sub_8217AEA8, Triangle::Record "
               "sub_8217DAA0 (with Triangle::RecordFlat sub_8217C370, no adapter: only it calls "
               "it; the render queue's submit a guest call; sub_8217C4C0, never seen in play, the "
@@ -211,6 +211,10 @@ void MinimapDrawPointMarker(PPCContext& ctx, uint8_t* base) {
 
 // List80::Link (sub_820F40C0) has no adapter: only List80::Insert calls it.
 
+// Triangle::Init (sub_820F4040) has no adapter: only the marker draws call
+// it, and their plain C++ calls its plain C++ (MinimapTriangleInit is the
+// harness's register steps).
+
 // Defines an adapter: the flag, else the original.
 #define ITC_MINIMAP(address, step)      \
   extern "C" REX_FUNC(sub_##address) {  \
@@ -227,7 +231,6 @@ ITC_MINIMAP(82170578, MinimapRacerVehicle)
 ITC_MINIMAP(82147D18, MinimapSetListPoint)
 ITC_MINIMAP(820F2D28, MinimapRacerMarkerType)
 ITC_MINIMAP(820F2EF8, MinimapScaling)
-ITC_MINIMAP(820F4040, MinimapTriangleInit)
 ITC_MINIMAP(820F5238, MinimapList80Insert)
 ITC_MINIMAP(820F51A8, MinimapList80Copy)
 ITC_MINIMAP(8217AEA8, MinimapRecordTransform)
