@@ -17,7 +17,14 @@ file's history. What's left to see in a drive, from every run:
   as the game modes (`game-modes.md`, 31 rows, 7871fe6; the first
   mapping agent was cut off by a crash before writing anything, and
   started again). Map checked (0 errors, 31 of 31 in play, 11 ready
-  groups; nothing calls the kernel). Step: migration agent 1 running.
+  groups; nothing calls the kernel). Migration 1 done after four batches
+  (21ff7d5..c504e59: the state machines, the overlays' machine and
+  handlers, the race mode's members and 28-byte buffers; 21 of 31 ours,
+  3 adapters removed, 2 Merged; `--native_game_modes`; `itc_1602`: 27
+  s, 0 errors, every harness 0 differing). Nothing ready left; the rest
+  waits on `XPR::XPR` (`models.md`), the race mode's set-ups, the mode
+  constructors and `Modes::Tick`'s callees. Step: validation agent
+  running.
 
 ## Done
 
@@ -40,3 +47,5 @@ This run's groups: `expected-differences.md` (the "03:59 run" lines).
 - Start: ours 1903, work left 4548 (wrapped 111, known 597, unknown 3840).
 - After the game modes' map: ours 1903, work left 4548 (wrapped 111,
   known 625, unknown 3812).
+- After the game modes' migration 1: ours 1923, work left 4528 (wrapped
+  111, known 605, unknown 3812).

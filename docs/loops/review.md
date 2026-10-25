@@ -25,6 +25,22 @@ When the user has reviewed a run's section, its heading gets
   `0x826C5B68`; the race flow's row now says it's the race mode's
   +97548. `leads.md`: 2 leads added, notes on the camera modes and
   framework objects leads.
+- `game-modes.md` migration 1 (21ff7d5..c504e59; `src/game_modes/`,
+  `src/hooks/game_modes.cpp`, harness `src/harnesses/game_modes.cpp`):
+  21 of 31 ours, `--native_game_modes`. For review:
+  - `RaceOverlaysMachine::Init` (`sub_8215E6C8`) replays the original's
+    377 stores and copies in the same stack frame (`r1 - 2272`, a table
+    read off the generated code), so the transitions get the same three
+    unwritten functor storage words (stack leftovers; nothing reads
+    them; as track zones did).
+  - `StateMachine::Find`'s default is returned as
+    `0xFFFFFFFF826C5B68` in r3 (sign-extended, as the original).
+  - `Transition::Make` (`sub_82105FE0`) and `Transition::Assign`
+    (`sub_82106100`) are Merged into `StateMachine::Add`; their own
+    harness cases went with them (Add's cover them).
+  - New names: `RaceOverlaysMachine::SetFlags`, `ClearFlags`,
+    `SetFlag820`, `ResetOverlays`, `Member67760::Member67760`,
+    `Member13360::Member13360`, `Buffers28::~Buffers28`.
 
 ## Run 2026-10-25 01:17 (`by-loop-25-10-26`)
 
