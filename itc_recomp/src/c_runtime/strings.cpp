@@ -40,6 +40,7 @@ void Wcscat(uint8_t* base, uint32_t destination, uint32_t source) {
 }
 
 int32_t Wcscmp(uint8_t* base, uint32_t a, uint32_t b) {
+  ITC_NATIVE_RUNNING("sub_825A7EB0 wcscmp");
   for (;;) {
     const uint16_t x = guest::LoadU16(base, a);
     const uint16_t y = guest::LoadU16(base, b);

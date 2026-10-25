@@ -11,6 +11,7 @@
 
 #include "guest.h"
 
+#include "base/log.h"
 #include "c_runtime/exit.h"
 
 #include <cstdint>
@@ -29,19 +30,28 @@ inline uint32_t Entry(uint8_t* base, uint32_t object, uint32_t first_entry,
 }
 
 // sub_825A6508: a node track list's track i (16 bytes from +16).
-inline uint32_t NodeTrack(uint32_t list, uint32_t i) { return list + 16 * (i + 1); }
+inline uint32_t NodeTrack(uint32_t list, uint32_t i) {
+  ITC_NATIVE_RUNNING("sub_825A6508 NodeTrack");
+  return list + 16 * (i + 1);
+}
 // sub_825A6518: a key list's key i (32 bytes from +16).
-inline uint32_t Key(uint32_t list, uint32_t i) { return list + 32 * i + 16; }
+inline uint32_t Key(uint32_t list, uint32_t i) {
+  ITC_NATIVE_RUNNING("sub_825A6518 Key");
+  return list + 32 * i + 16;
+}
 // sub_825A6528: an animation's node track list i (from index [+32]).
 inline uint32_t NodeTrackList(uint8_t* base, uint32_t animation, uint32_t i) {
+  ITC_NATIVE_RUNNING("sub_825A6528 NodeTrackList");
   return Entry(base, animation, 64, 32, i);
 }
 // sub_825A6540: an animation's key list i (from index [+40]).
 inline uint32_t KeyList(uint8_t* base, uint32_t animation, uint32_t i) {
+  ITC_NATIVE_RUNNING("sub_825A6540 KeyList");
   return Entry(base, animation, 64, 40, i);
 }
 // sub_825A6558: an animation's sub-animation i (from index [+48]).
 inline uint32_t SubAnimation(uint8_t* base, uint32_t animation, uint32_t i) {
+  ITC_NATIVE_RUNNING("sub_825A6558 SubAnimation");
   return Entry(base, animation, 64, 48, i);
 }
 
@@ -49,6 +59,7 @@ inline uint32_t SubAnimation(uint8_t* base, uint32_t animation, uint32_t i) {
 // `textures` texture entries (16 * (textures + 2 * (vertex + 4))): the
 // indirect tracks' extra offset.
 inline uint32_t VertexOffset(uint32_t textures, uint32_t vertex) {
+  ITC_NATIVE_RUNNING("sub_8259D600 VertexOffset");
   return 16 * (textures + 2 * (vertex + 4));
 }
 // sub_8259D618: a primitive's texture entry i (16 bytes from +128).

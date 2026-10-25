@@ -90,6 +90,7 @@ std::optional<double> Tan(double x) {
 }  // namespace
 
 uint32_t EaseInteger(uint8_t* base, uint32_t k0, uint32_t k1, double t) {
+  ITC_NATIVE_RUNNING("sub_8259FA20 EaseInteger");
   const double one = LoadFloat(base, kOne);
   const double c = LoadFloat(base, kEaseScale);
   double f11 = R(LoadFloat(base, k1 + 16) * t);
@@ -111,6 +112,7 @@ uint32_t EaseInteger(uint8_t* base, uint32_t k0, uint32_t k1, double t) {
 }
 
 std::optional<double> CubicFloat(uint8_t* base, uint32_t k0, uint32_t k1, double t) {
+  ITC_NATIVE_RUNNING("sub_8259FB30 CubicFloat");
   const double one = LoadFloat(base, kOne);
   const double v0 = LoadFloat(base, k0 + 8);
   const double u = R(one - t);
@@ -149,6 +151,7 @@ std::optional<double> CubicFloat(uint8_t* base, uint32_t k0, uint32_t k1, double
 }
 
 std::optional<uint32_t> CubicInteger(uint8_t* base, uint32_t k0, uint32_t k1, double t) {
+  ITC_NATIVE_RUNNING("sub_8259FC18 CubicInteger");
   const double one = LoadFloat(base, kOne);
   const double u = R(one - t);
   const double dt = R(LoadFloat(base, k1 + 4) - LoadFloat(base, k0 + 4));
