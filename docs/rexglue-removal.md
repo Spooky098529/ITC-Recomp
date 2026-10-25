@@ -105,7 +105,7 @@ goes in `src/` as overrides), American English.
   race's screen objects native (`screen-objects.md`, 38 of 42) and
   mapped the app framework, beside the hardcoded shaders and the movies
   through FFmpeg (ours 1,847); its fourteenth run (branch
-  `by-loop-25-10-26`) made the app framework native as far as five
+  `by-loop-25-10-26`) made the app framework native as far as
   it was ready (`framework.md`, 56 of 68 ours, with `main` and
   `App::Run`; `--native_framework`; ours 1,903), after fixing an
   `ai_drivers` harness case that read a wild address. The

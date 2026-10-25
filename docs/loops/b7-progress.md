@@ -22,12 +22,17 @@ file's history. What's left to see in a drive, from every run:
   (the user's call, 2026-10-25, after dbc8ee0's harness fix). Validated
   (`itc_1569`: 50 of 50 harness lines, all 50 ran in play; 0 errors).
   Migration 2 done (eb25d68, ad01ea7: the main group, 7 adapters
-  removed; 56 of 68 ours, nothing ready left). Step: its validation,
-  agent running.
+  removed; 56 of 68 ours, nothing ready left), validated (`itc_1587`:
+  8 of 8 harness lines, all ran in play). Finished.
 
 ## Done
 
-(none finished: the framework has its main group left, see "Stopped")
+- The app framework (`framework.md`, mapped in c4b5b86; 68 rows): 56
+  ours in two migrations (f27748b..e080edd, eb25d68..ad01ea7), 22
+  adapters removed; validated (`itc_1569`, `itc_1587`);
+  `--native_framework`. Left: `Framework::Init` and the services'
+  set-ups, `sub_820908D8`, `Users::Create`, `SaveDevices::Create`,
+  `sub_82090840`/`890`/`8C0`, `FrameStart::OnTick`.
 
 ## Rows to review
 
@@ -44,6 +49,9 @@ This run's groups: `expected-differences.md` (the "01:17 run" lines).
 ## Totals
 
 - Start: ours 1847, work left 4604 (wrapped 113, known 651, unknown 3840).
+- At the end (after migration 2 and its validation): ours 1903, work
+  left 4548 (wrapped 111, known 597, unknown 3840). Race 27 s
+  (`itc_1587`), 0 errors, every harness 0 differing.
 - After the framework's validation: race 27 s (`itc_1569`), 0 errors,
   every harness 0 differing.
 - After the framework's migration 1: ours 1897, work left 4554 (wrapped
@@ -52,27 +60,11 @@ This run's groups: `expected-differences.md` (the "01:17 run" lines).
 
 ## Stopped
 
-Resumed (the user's call). Earlier: 2026-10-25, after the framework's migration 1, whose report's `stop:`
-wasn't `none`: `attract_race.sh 40 --run_harnesses=all` fails on this
-branch, not from the framework. The `ai_drivers` harness's
-`AiDriver::UpdateIdle` (`sub_821399A8`) case 1928 makes the recompiled
-original fault (guest reads near `0x7035xxxx`, millions of "Unhandled
-guest access violation" lines, 0 s raced; `itc_1535`-`itc_1538`, the
-same with `--native_framework=false`) whenever `--use_hardcoded_shaders`
-is on, the default since the HLSL compiler's replacement; with it off
-the harness passes (`itc_1539`); the last good run was `itc_1518`. The
-agent's guess, not confirmed: the case reads guest memory its set-up
-doesn't write, and sees different leftovers now. For the user: how to
-fix or exclude that case; then the framework's validation, and its
-main group (`main`, `App::Run`, ~304 lines). 1 of 3 subsystems
-started. `check_function_statuses.py`: 0 errors.
-
-Fixed afterward (dbc8ee0, the user's go-ahead): a harness bug, not the
-shaders. The Update family's cases (AiPath::Update, AiDriver::Update,
-DriveCar, UpdateIdle) reach `AiPath::MeasureOthers` but never set the
-racer count or the driver's list at +452, so an index was a fill word and
-its record a wild address, mapped or not by where the harness block
-landed (`0x02191000` since the shaders changed the boot's allocations).
-Now set as the Avoid cases do. `attract_race.sh 40 --run_harnesses=all`
-(`itc_1568`): 27 s, 0 errors, every harness 0 differing outside
-"(expected to differ)". Still to do: the framework's validation.
+2026-10-25, after the framework, by the user's call (end the run after
+this subsystem). 1 subsystem migrated. `check_function_statuses.py`: 0
+errors. Earlier in the run: stopped after migration 1 on the
+`ai_drivers` harness's fault (UpdateIdle's case 1928 reading a wild
+address: the Update family's cases never set the racer count and the
+list at +452, left to the fill, mapped or not by where the harness
+block landed; exposed when the hardcoded shaders changed the boot's
+allocations, not caused by them), fixed in dbc8ee0, then resumed.
