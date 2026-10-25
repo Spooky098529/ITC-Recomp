@@ -2792,7 +2792,8 @@ B7. **The game logic inside**: everything else, subsystem by subsystem,
     `generated/`: it is one host memset at 16, and the translated steps
     at any other stride. `atexit` (`sub_825A7068`) stays with the core
     (its critical sections) and blocks `Viewports::Init` and
-    `Viewport::Init`. The rest of the scenery waits on
+    `Viewport::Init` (native since 2026-10-25, the fifteenth run: the
+    exit lock a host mutex, with both viewports). The rest of the scenery waits on
     `MmQueryAllocationSize`'s wrapper, `DataFile::GetEntry`, the XPR,
     the archive's queue and the texture provider. Harnesses then drew
     from one shared `h.random`, so adding cases shifted the inputs of
