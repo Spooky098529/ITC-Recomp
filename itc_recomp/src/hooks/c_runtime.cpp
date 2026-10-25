@@ -48,7 +48,8 @@ ITC_FLAG_BOOL(native_c_runtime, true, "ITC",
               "the exit lock (the C runtime's lock 8) as a host mutex for every user, through "
               "_lock sub_825B3430 and _unlock sub_825B32D0 for lock 8 (chosen at start-up, "
               "other locks the game's), and with --native_heap and --native_c_runtime_heap "
-              "atexit (sub_825A7068) and _onexit (sub_825A6F60) over the game's table "
+              "atexit (sub_825A7068) and _onexit (sub_825A6F60) over the game's table, and "
+              "the table's set-up __onexitinit (sub_825A6F00) by the native calloc "
               "(checked by "
               "--run_harnesses=c_runtime). Those reached only from native callers have no "
               "adapters, and the flag switches their callers: wcslen, mbtowc, the wide write_char, "
@@ -116,6 +117,21 @@ extern "C" REX_FUNC(sub_825A7068) {
     }
   }
   __imp__sub_825A7068(ctx, base);
+}
+
+// __onexitinit: no arguments; r3 = 0, or 24 when calloc fails. Natively
+// with --native_c_runtime and the C runtime's heap on the layer (the native
+// calloc).
+extern "C" REX_FUNC(sub_825A6F00) {
+  REX_FUNC_PROLOGUE();
+  if (ITC_FLAG(native_c_runtime) && ITC_FLAG(native_c_runtime_heap) &&
+      hooks::NativeHeapActive()) {
+    if (const auto result = c_runtime::InitExitTable(base)) {
+      ctx.r3.u64 = *result;
+      return;
+    }
+  }
+  __imp__sub_825A6F00(ctx, base);
 }
 
 int32_t hooks::GuestAtexit::Run(void* self, uint32_t function) {

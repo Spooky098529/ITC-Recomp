@@ -53,6 +53,14 @@ std::optional<uint32_t> OnExit(uint8_t* base, uint32_t function);
 // _onexit's.
 std::optional<int32_t> Atexit(uint8_t* base, uint32_t function);
 
+// sub_825A6F00 __onexitinit (probably; an initializer _cinit's _initterm_e
+// runs once at boot, reading r3): the table made by calloc(32, 4), begin and
+// end set to it (begin first), its first word cleared; returns 0, or 24
+// (_RT_ONEXIT) for a null table (begin and end then 0). nullopt, with
+// nothing done, when the native calloc would take its error path (the caller
+// runs the original from the start, which sets errno).
+std::optional<uint32_t> InitExitTable(uint8_t* base);
+
 // For native callers of atexit (the static set-ups, first uses): the game's
 // atexit for `function`, its r3, called when the native one can't (its
 // nullopt, never seen in play): an adapter's call into the translated code

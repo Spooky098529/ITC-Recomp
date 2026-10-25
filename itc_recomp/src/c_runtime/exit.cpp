@@ -83,6 +83,21 @@ std::optional<uint32_t> OnExit(uint8_t* base, uint32_t function) {
   return function;
 }
 
+std::optional<uint32_t> InitExitTable(uint8_t* base) {
+  ITC_NATIVE_RUNNING("sub_825A6F00 __onexitinit");
+  const std::optional<uint32_t> table = memory::crt::Calloc(32, 4);
+  if (!table) {
+    return std::nullopt;
+  }
+  guest::StoreU32(base, kExitTableBegin, *table);
+  guest::StoreU32(base, kExitTableEnd, *table);
+  if (*table == 0) {
+    return 24u;
+  }
+  guest::StoreU32(base, *table, 0);
+  return 0u;
+}
+
 std::optional<int32_t> Atexit(uint8_t* base, uint32_t function) {
   ITC_NATIVE_RUNNING("sub_825A7068 atexit");
   const std::optional<uint32_t> result = OnExit(base, function);

@@ -13,6 +13,10 @@
 // each side: they're compared by their contents, size and the end's offset.
 // Nothing here is a float: all exact.
 //
+// __onexitinit (the table's set-up at boot): on the game's globals, saved
+// and put back after each side; each side's new table compared by contents
+// and size, then freed.
+//
 // _lock and _unlock: each case takes and gives back one lock (8, and other
 // numbers made at boot) through the original or the adapter's steps; held
 // in between (lock 8's host mutex: another thread can't take it; others:
@@ -300,6 +304,51 @@ void Locks(Context& h) {
   results.Report();
 }
 
+// __onexitinit through the adapter's steps, without its flags.
+void NativeInitExitTable(PPCContext& ctx, uint8_t* base) {
+  if (const auto result = c_runtime::InitExitTable(base)) {
+    ctx.r3.u64 = *result;
+    return;
+  }
+  __imp__sub_825A6F00(ctx, base);
+}
+
+// __onexitinit on the game's globals, saved and put back after each side
+// (begin and end set before it to the game's, or made-up values, which it
+// overwrites). Each side's new table is compared by the end's offset, its
+// block's size and its first 128 bytes (calloc's, so cleared), then freed.
+void InitCases(Context& h) {
+  Results results("__onexitinit (sub_825A6F00, on the game's globals, saved and put back)");
+  const uint32_t saved_begin = Load(h.base, c_runtime::kExitTableBegin);
+  const uint32_t saved_end = Load(h.base, c_runtime::kExitTableEnd);
+  for (int c = 0; c < 8; c++) {
+    const uint32_t begin = c < 2 ? saved_begin : uint32_t(h.random.Next());
+    const uint32_t end = c < 2 ? saved_end : uint32_t(h.random.Next());
+    Outputs out[2];
+    for (int v = 0; v < 2; v++) {
+      Store(h.base, c_runtime::kExitTableBegin, begin);
+      Store(h.base, c_runtime::kExitTableEnd, end);
+      PPCContext t = CallContext(h);
+      t.r3.u64 = h.random.Next();  // not read
+      (v == 0 ? __imp__sub_825A6F00 : NativeInitExitTable)(t, h.base);
+      out[v].Word(t.r3.u32);
+      out[v].Word(uint32_t(t.r3.u64 >> 32));
+      const uint32_t table = Load(h.base, c_runtime::kExitTableBegin);
+      out[v].Word(Load(h.base, c_runtime::kExitTableEnd) - table);
+      out[v].Word(table == 0 ? 0 : 1);
+      if (table != 0) {
+        out[v].Word(memory::crt::Msize(table).value_or(0xFFFFFFFF));
+        out[v].Bytes(Read(h.base, table, 128));
+        memory::crt::Free(table);
+      }
+      Store(h.base, c_runtime::kExitTableBegin, saved_begin);
+      Store(h.base, c_runtime::kExitTableEnd, saved_end);
+    }
+    results.Check(out[0], out[1], fmt::format("case {} (begin {:08X}, end {:08X})", c, begin, end));
+  }
+  results.Report();
+}
+
 }  // namespace
 
 void CRuntimeExit(Context& h) {
@@ -317,6 +366,7 @@ void CRuntimeExit(Context& h) {
   InPlace(h);
   OnCopies(h);
   MadeUp(h);
+  InitCases(h);
 }
 
 }  // namespace harness
