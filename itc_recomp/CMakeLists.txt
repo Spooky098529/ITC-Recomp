@@ -197,6 +197,7 @@ set(ITC_SOURCES
     src/screen_objects/screen_objects.cpp
     src/hooks/course_scenery.cpp
     src/course_scenery/course_scenery.cpp
+    src/course_scenery/collect.cpp
     src/hooks/action_mappers.cpp
     src/action_mappers/action_mappers.cpp
     src/hooks/data_tables.cpp
@@ -367,7 +368,9 @@ set(ITC_SOURCES
 # docs/functions/cameras.md) and the string table and font
 # (src/strings_and_font/, docs/functions/strings-and-font.md) and the
 # course's route (src/track_route/, docs/functions/track-route.md) and the AI
-# drivers (src/ai_drivers/, docs/functions/ai-drivers.md) and the screen
+# drivers (src/ai_drivers/, docs/functions/ai-drivers.md) and the course
+# scenery's collection and draws (src/course_scenery/collect.cpp,
+# docs/functions/course-scenery.md) and the screen
 # objects (src/screen_objects/, docs/functions/screen-objects.md) and the
 # model draws (src/scenery_lists/model_draws.cpp,
 # docs/functions/scenery-lists.md) and the model's load (its weights,
@@ -390,7 +393,7 @@ set_source_files_properties(src/c_runtime/math.cpp src/ui_movies/keys.cpp
     src/strings_and_font/strings_and_font.cpp src/strings_and_font/font.cpp
     src/track_route/track_route.cpp src/ai_drivers/ai_drivers.cpp
     src/screen_objects/screen_objects.cpp src/scenery_lists/model_draws.cpp
-    src/models/model_load.cpp PROPERTIES
+    src/models/model_load.cpp src/course_scenery/collect.cpp PROPERTIES
     COMPILE_OPTIONS "-ffp-model=strict;-ffp-contract=off"
     SKIP_PRECOMPILE_HEADERS ON)
 

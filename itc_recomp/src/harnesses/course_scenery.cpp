@@ -1096,6 +1096,188 @@ void StartLoadCases(Context& h) {
   results.Report();
 }
 
+// Scenery::CollectAreas and CollectModels: the manager at +0 (+112 the course
+// set, at +180, whose +1056 names the area file at +1240; lists A at +116
+// and B at +144, their pointers and items at +176/+240 and +496/+624), the
+// file's areas (1 to 4, little-endian count and offsets, each entry a model
+// count at +0, its four corners at +32 and 0 to 3 96-byte model records from
+// +96: a number, four corners at +32), the viewport at +2480 (+72 the far
+// distance, +1600 and +1608 the eye, in the scratch area's end). Rectangles
+// around the eye, near it and far, NaNs and infinities now and then; the
+// view one of the mask table's (0x82602F80) or not, the camera passes it
+// names enabled at random (their words put back after). The lists' items'
+// distances are compared as floats, the rest of the scratch area and r3
+// exactly.
+void CollectCases(Context& h) {
+  Random& r = h.random;
+  constexpr uint32_t kViewMasks = 0x82602F80;
+  constexpr uint32_t kCameraPasses = 0x826BAC00;
+  constexpr uint32_t kManager = 0, kSetAt = 180, kFile = 1240, kViewport = 2480;
+  constexpr uint32_t kPointersA = 176, kItemsA = 240, kPointersB = 496, kItemsB = 624;
+  constexpr uint32_t kItemsMaxA = 16, kItemsMaxB = 32;
+  // The camera passes' enabled words the table names, put back at the end.
+  std::vector<std::pair<uint32_t, uint32_t>> saved;
+  uint32_t views[14];
+  for (uint32_t i = 0; i < 14; i++) {
+    views[i] = guest::LoadU32(h.base, kViewMasks + 16 * i);
+    const uint32_t word =
+        guest::LoadU32(h.base, kViewMasks + 16 * i + 8) * 592u + kCameraPasses + 588;
+    if (std::none_of(saved.begin(), saved.end(), [&](const auto& s) { return s.first == word; })) {
+      saved.emplace_back(word, guest::LoadU32(h.base, word));
+    }
+  }
+  auto coordinate = [&](float center, float spread) -> uint32_t {
+    switch (r.Below(40)) {
+      case 0:
+        return 0x7FC00000u | (r.Below(2) << 31);
+      case 1:
+        return 0x7F800000u | (r.Below(2) << 31);
+      default:
+        return std::bit_cast<uint32_t>(center + (float(r.Below(20001)) / 10000.0f - 1.0f) * spread);
+    }
+  };
+  // A rectangle's four corners (0 and 2 the low and high), at `at`.
+  auto write_corners = [&](uint32_t at, float cx, float cz, float spread) {
+    const float x0 = cx - float(r.Below(400)) / 4.0f, x1 = cx + float(r.Below(400)) / 4.0f;
+    const float z0 = cz - float(r.Below(400)) / 4.0f, z1 = cz + float(r.Below(400)) / 4.0f;
+    const float xs[4] = {x0, x1, x1, x0}, zs[4] = {z0, z0, z1, z1};
+    for (uint32_t c = 0; c < 4; c++) {
+      const uint32_t point = at + 16 * c;
+      guest::StoreU32(h.base, point + 0, r.Below(30) == 0 ? coordinate(cx, spread)
+                                                         : std::bit_cast<uint32_t>(xs[c]));
+      guest::StoreU32(h.base, point + 4, uint32_t(r.Next()));
+      guest::StoreU32(h.base, point + 8, r.Below(30) == 0 ? coordinate(cz, spread)
+                                                         : std::bit_cast<uint32_t>(zs[c]));
+      guest::StoreU32(h.base, point + 12, uint32_t(r.Next()));
+    }
+  };
+  for (int which = 0; which < 2; which++) {
+    Results results(which == 0 ? "Scenery::CollectAreas (sub_820F3098)"
+                               : "Scenery::CollectModels (sub_820F32D0)");
+    for (int c = 0; c < 400; c++) {
+      // The inputs, written once and copied for each version.
+      Fill(h.base, h.data, kScratchBytes);
+      const uint32_t manager = h.data + kManager;
+      guest::StoreU32(h.base, manager + 112, h.data + kSetAt);
+      guest::StoreU32(h.base, h.data + kSetAt + 1056, h.data + kFile);
+      const uint32_t areas = 1 + r.Below(4);
+      const float eye_x = float(r.Below(2001)) / 10.0f - 100.0f;
+      const float eye_z = float(r.Below(2001)) / 10.0f - 100.0f;
+      const uint32_t viewport = h.data + kViewport;
+      guest::StoreU32(h.base, viewport + 72,
+                      r.Below(20) == 0 ? coordinate(50.0f, 50.0f)
+                                       : std::bit_cast<uint32_t>(float(r.Below(1600)) / 8.0f));
+      guest::StoreU32(h.base, viewport + 1600,
+                      r.Below(30) == 0 ? coordinate(eye_x, 10.0f) : std::bit_cast<uint32_t>(eye_x));
+      guest::StoreU32(h.base, viewport + 1608,
+                      r.Below(30) == 0 ? coordinate(eye_z, 10.0f) : std::bit_cast<uint32_t>(eye_z));
+      // The file: little-endian count and offsets, then the entries.
+      const uint32_t file = h.data + kFile;
+      guest::StoreU32(h.base, file, std::byteswap(areas));
+      uint32_t offset = 4 + 4 * areas;
+      uint32_t models_left = 6;
+      uint32_t model_counts[4] = {};
+      for (uint32_t a = 0; a < areas; a++) {
+        const uint32_t entry = file + offset;
+        guest::StoreU32(h.base, file + 4 + 4 * a, std::byteswap(offset));
+        const uint32_t models = std::min(models_left, r.Below(4));
+        models_left -= models;
+        model_counts[a] = models;
+        guest::StoreU32(h.base, entry, models);
+        // Near the eye mostly, far now and then.
+        const float spread = r.Below(4) == 0 ? 400.0f : 60.0f;
+        const float cx = eye_x + (float(r.Below(2001)) / 1000.0f - 1.0f) * spread;
+        const float cz = eye_z + (float(r.Below(2001)) / 1000.0f - 1.0f) * spread;
+        write_corners(entry + 32, cx, cz, spread);
+        for (uint32_t m = 0; m < models; m++) {
+          const uint32_t record = entry + 96 + 96 * m;
+          guest::StoreU32(h.base, record, r.Below(5) == 0 ? uint32_t(r.Next()) : r.Below(8));
+          write_corners(record + 32, cx + float(r.Below(80)) - 40.0f,
+                        cz + float(r.Below(80)) - 40.0f, spread);
+        }
+        offset += 96 + 96 * models;
+      }
+      // The lists, with a few items already (areas and models below 6, so
+      // some match what's added).
+      const uint32_t lists[2] = {manager + 116, manager + 144};
+      const uint32_t pointers[2] = {h.data + kPointersA, h.data + kPointersB};
+      const uint32_t items[2] = {h.data + kItemsA, h.data + kItemsB};
+      for (uint32_t l = 0; l < 2; l++) {
+        guest::StoreU32(h.base, lists[l] + 4, 0);
+        guest::StoreU32(h.base, lists[l] + 16, pointers[l]);
+        guest::StoreU32(h.base, lists[l] + 20, items[l]);
+        const uint32_t max = l == 0 ? kItemsMaxA : kItemsMaxB;
+        for (uint32_t i = 0; i < max; i++) {
+          const uint32_t item = items[l] + 16 * i;
+          guest::StoreU32(h.base, item + 0, std::bit_cast<uint32_t>(float(r.Below(800)) / 4.0f));
+          guest::StoreU32(h.base, item + 4, r.Below(4) == 0 ? uint32_t(r.Next()) : 0u);
+          guest::StoreU16(h.base, item + 8, uint16_t(r.Below(areas)));
+          guest::StoreU16(h.base, item + 10, uint16_t(r.Below(6)));
+          guest::StoreU32(h.base, item + 12, uint32_t(r.Next()));
+          guest::StoreU32(h.base, pointers[l] + 4 * i, item);
+        }
+      }
+      // List A: up to 4 items for the areas (room for every area); up to 6
+      // for the models (list B has room for all of theirs).
+      guest::StoreU32(h.base, lists[0] + 8, which == 0 ? r.Below(5) : r.Below(7));
+      guest::StoreU32(h.base, lists[1] + 8, r.Below(5));
+      const uint32_t view = r.Below(4) == 0 ? r.Below(16) : views[r.Below(14)];
+      std::vector<uint32_t> enabled;
+      for (size_t i = 0; i < saved.size(); i++) {
+        enabled.push_back(r.Below(3) == 0 ? 0u : 1u + r.Below(2));
+      }
+      const std::vector<uint8_t> inputs = Read(h.base, h.data, kScratchBytes);
+      Outputs out[2];
+      for (int v = 0; v < 2; v++) {
+        Write(h.base, h.data, inputs.data(), kScratchBytes);
+        for (size_t i = 0; i < saved.size(); i++) {
+          guest::StoreU32(h.base, saved[i].first, enabled[i]);
+        }
+        PPCContext t = CallContext(h);
+        t.r3.u64 = manager;
+        t.r4.u64 = view;
+        t.r5.u64 = viewport;
+        With(v, [&] {
+          if (v == 0) {
+            if (which == 0) {
+              __imp__sub_820F3098(t, h.base);
+            } else {
+              __imp__sub_820F32D0(t, h.base);
+            }
+          } else if (which == 0) {
+            t.r3.u64 = cs::CollectAreas(h.base, t.r1.u32, t.r3.u32, t.r4.u32, t.r5.u32, t.r3.u32);
+          } else {
+            t.r3.u64 = cs::CollectModels(h.base, t.r1.u32, t.r3.u32, t.r4.u32, t.r5.u32, t.r3.u32);
+          }
+        });
+        // The scratch area in order, the items' distances as floats.
+        uint32_t at = 0;
+        for (uint32_t l = 0; l < 2; l++) {
+          const uint32_t first = (l == 0 ? kItemsA : kItemsB);
+          const uint32_t max = l == 0 ? kItemsMaxA : kItemsMaxB;
+          out[v].Bytes(Read(h.base, h.data + at, first - at));
+          for (uint32_t i = 0; i < max; i++) {
+            const uint32_t item = h.data + first + 16 * i;
+            out[v].Floats(h.base, item, 1);
+            out[v].Bytes(Read(h.base, item + 4, 12));
+          }
+          at = first + 16 * max;
+        }
+        out[v].Bytes(Read(h.base, h.data + at, kScratchBytes - at));
+        out[v].Word(t.r3.u32);
+      }
+      results.Check(out[0], out[1],
+                    fmt::format("case {} areas {} models {} {} {} {} view {}", c, areas,
+                                model_counts[0], model_counts[1], model_counts[2],
+                                model_counts[3], view));
+    }
+    results.Report();
+  }
+  for (const auto& [word, value] : saved) {
+    guest::StoreU32(h.base, word, value);
+  }
+}
+
 // TextureAnimations::Advance (with AnimationSet::Advance and
 // Animation::Advance): a course set's +1060 (0 now and then) naming a set
 // of up to 6 animations at random offsets, each with up to 8 frames, its
@@ -1658,6 +1840,7 @@ void CourseScenery(Context& h) {
   Lists(h);
   ReleaseUnusedCases(h);
   StartLoadCases(h);
+  CollectCases(h);
   TextureAnimationCases(h);
   Parses(h);
 }

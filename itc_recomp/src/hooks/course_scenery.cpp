@@ -30,6 +30,7 @@ ITC_FLAG_BOOL(native_course_scenery, true, "ITC",
               "sub_820F1588, Add sub_820F1888, Sort sub_820F1930, Scenery::LimitLargeModels "
               "sub_820F2B80, ModelList::Init sub_820F1A20, Scenery::ClearGlobal sub_820F1480, Scenery::Init sub_820F1360, "
               "SceneryList::ReleaseUnused sub_820F17C0, Scenery::StartLoad sub_820F1E00, "
+              "Scenery::CollectAreas sub_820F3098, Scenery::CollectModels sub_820F32D0, "
               "TextureAnimations::Advance sub_820F11A8 (in the per-frame logic's wrap), "
               "AnimationSet::Advance sub_82146B20, Animation::Advance sub_82146AC0, "
               "AreaLights::Parse sub_820F11C0 (no adapter: only its OnLoaded calls it) and OnLoaded "
@@ -202,6 +203,15 @@ ITC_COURSE_SCENERY(820F17C0, ITC_SCENERY_CALLS;
 // r3 = the manager.
 ITC_COURSE_SCENERY(820F1E00, ITC_SCENERY_CALLS;
                    ctx.r3.u64 = StartLoad(base, calls, ctx.r1.u32, ctx.r3.u32))
+
+// --- What a view sees: r3 = the manager, r4 = the view, r5 = its viewport
+// (flush-to-zero off, as the originals' float instructions set it) ---
+ITC_COURSE_SCENERY(820F3098, ctx.fpscr.disableFlushMode();
+                   ctx.r3.u64 = CollectAreas(base, ctx.r1.u32, ctx.r3.u32, ctx.r4.u32,
+                                             ctx.r5.u32, ctx.r3.u32))
+ITC_COURSE_SCENERY(820F32D0, ctx.fpscr.disableFlushMode();
+                   ctx.r3.u64 = CollectModels(base, ctx.r1.u32, ctx.r3.u32, ctx.r4.u32,
+                                              ctx.r5.u32, ctx.r3.u32))
 
 // --- The files' parses ---
 //

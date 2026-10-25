@@ -187,6 +187,32 @@ uint32_t ReleaseUnused(uint8_t* base, const Calls& calls, uint32_t stack, uint32
 // +192 = 1. Returns what the original leaves in r3.
 uint32_t StartLoad(uint8_t* base, const Calls& calls, uint32_t stack, uint32_t manager);
 
+// --- What a view sees (collect.cpp) ---
+//
+// The views' masks: the OR of the bits (+12) of the 16-byte records at
+// 0x82602F80 (14) whose view (+0) is `view` and whose camera pass (+8; 592
+// bytes each from 0x826BAC00) is enabled (its +588 not 0). The distances
+// are from the viewport's eye (+1600 x, +1608 z), the far distance its +72.
+// Each returns the r3 the original leaves (`r3` when it makes no call); its
+// stack temporaries (the corners' copy) aren't written.
+
+// Scenery::CollectAreas (sub_820F3098): every area of the course set's area
+// file (the manager's +112, its +1056; little-endian count, each entry by
+// DataFile::GetEntry), its rectangle of corners 0 and 2 (16-byte points
+// from the entry's +32): 0.0 with the eye inside; else, for each corner in
+// turn, half the far distance when the eye moved by that (x, then z, each
+// way) is inside, else the nearest corner so far. Added to list A (+116,
+// model 0, the view's mask) within the far distance + 70.0.
+uint32_t CollectAreas(uint8_t* base, uint32_t stack, uint32_t manager, uint32_t view,
+                      uint32_t viewport, uint32_t r3);
+// Scenery::CollectModels (sub_820F32D0): every model of list A's areas (the
+// entry's big-endian count at +0, 96-byte records from +96: +0 the model's
+// number, four corners from +32): the nearest corner, kept within the far
+// distance plus the float at 0x8200257C, 0.0 with the eye inside, added to
+// list B (+144) with the view's mask when that isn't 0.
+uint32_t CollectModels(uint8_t* base, uint32_t stack, uint32_t manager, uint32_t view,
+                       uint32_t viewport, uint32_t r3);
+
 // --- The files' parses (the loads' callbacks) ---
 //
 // Model::Model, Model::Load, XPR::Create and the model lists' loads are
