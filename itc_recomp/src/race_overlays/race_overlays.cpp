@@ -3,10 +3,14 @@
 #include "guest.h"
 
 #include "base/log.h"
+#include "c_runtime/arrays.h"
 #include "c_runtime/math.h"
 #include "c_runtime/strings.h"
 #include "debug/frame_state_diff.h"
 #include "hooks/vehicle.h"
+#include "memory/c_runtime_heap.h"
+#include "memory/heap.h"
+#include "vehicle_accessors/vectors.h"
 #include "vehicle_accessors/vehicle_accessors.h"
 
 #include <rex/platform/fpscr.h>
@@ -603,6 +607,37 @@ simde__m128 VectorOf(uint32_t w0, uint32_t w1, uint32_t w2, uint32_t w3) {
       simde_mm_set_epi32(int32_t(w0), int32_t(w1), int32_t(w2), int32_t(w3)));
 }
 
+// The vector unit's flush-to-zero around vector work: the control word set
+// to `flushing`, `work(in...)` run, `csr` put back. Compiler barriers
+// (vector_library::PinInMode, as the vector library's since ee810a9) keep
+// the inputs computed before the window and the work inside it: the
+// compiler doesn't know the control word writes change how SSE rounds, and
+// ThinLTO had moved Smoke::InRegion's second dpps past the restore
+// (2026-10-24, found by its "tiny values" harness group).
+template <typename Work, typename... In>
+simde__m128 Flushing(uint32_t csr, uint32_t flushing, Work work, In... in) {
+  vector_library::PinInMode(in...);
+  Fpscr::setcsr(flushing);
+  vector_library::PinInMode(in...);
+  simde__m128 out = work(in...);
+  vector_library::PinInMode(out);
+  Fpscr::setcsr(csr);
+  return out;
+}
+
+simde__m128 Mul(simde__m128 a, simde__m128 b) {
+  return simde_mm_mul_ps(a, b);
+}
+simde__m128 Add(simde__m128 a, simde__m128 b) {
+  return simde_mm_add_ps(a, b);
+}
+simde__m128 Sub(simde__m128 a, simde__m128 b) {
+  return simde_mm_sub_ps(a, b);
+}
+simde__m128 Dot3(simde__m128 a, simde__m128 b) {
+  return simde_mm_dp_ps(a, b, 0xEF);
+}
+
 // lvx: the 16 bytes at `address` rounded down to 16, as the translated code
 // loads them.
 simde__m128 LoadVector(uint8_t* base, uint32_t address) {
@@ -623,14 +658,27 @@ uint32_t WordOf(simde__m128 v, int i) {
 // quieted. addps passes on its first operand's NaN, but the compiler may
 // swap the operands of an addition: in this build the translated
 // Smoke::Emit keeps vA first, while the translated Sparks::UpdateStreak and
-// Sparks::Emit have theirs swapped (seen in the disassembly), so the sparks
-// use a plain addps, which matches them as built.
+// Sparks::Emit have theirs swapped (seen in the disassembly), so
+// Sparks::UpdateStreak uses a plain addps, which matches it as built, and
+// Sparks::Emit's step names the operands it keeps (MulKeepingFirstNaN, then
+// this with the product first), since the flush-to-zero barriers changed
+// the order the compiler picked for its plain mulps.
 simde__m128 AddKeepingFirstNaN(simde__m128 a, simde__m128 b) {
   const simde__m128 sum = simde_mm_add_ps(a, b);
   const simde__m128 a_nan = simde_mm_cmpunord_ps(a, a);
   const simde__m128 quieted =
       simde_mm_or_ps(a, simde_mm_castsi128_ps(simde_mm_set1_epi32(0x00400000)));
   return simde_mm_blendv_ps(sum, quieted, a_nan);
+}
+
+// mulps with `a` as its first operand, whatever order the compiler picks:
+// the product, except that lanes where `a` is a NaN get `a` quieted.
+simde__m128 MulKeepingFirstNaN(simde__m128 a, simde__m128 b) {
+  const simde__m128 product = simde_mm_mul_ps(a, b);
+  const simde__m128 a_nan = simde_mm_cmpunord_ps(a, a);
+  const simde__m128 quieted =
+      simde_mm_or_ps(a, simde_mm_castsi128_ps(simde_mm_set1_epi32(0x00400000)));
+  return simde_mm_blendv_ps(product, quieted, a_nan);
 }
 
 // The original's vector length, with flush-to-zero on (the caller's job):
@@ -686,9 +734,7 @@ bool TrailAddPoint(uint8_t* base, uint32_t trail, uint32_t position, double spee
                                 guest::LoadFloat(base, last + 8));
     const simde__m128 moved = VectorOf(std::bit_cast<uint32_t>(dx), std::bit_cast<uint32_t>(dy),
                                        std::bit_cast<uint32_t>(dz), one);
-    Fpscr::setcsr(flushing);
-    const simde__m128 length = Length(moved);
-    Fpscr::setcsr(csr);
+    const simde__m128 length = Flushing(csr, flushing, Length, moved);
     if (double(std::bit_cast<float>(WordOf(length, 0))) == double(std::bit_cast<float>(zero))) {
       return true;
     }
@@ -737,25 +783,29 @@ bool TrailAddPoint(uint8_t* base, uint32_t trail, uint32_t position, double spee
   const float stored_width = guest::LoadFloat(base, point + 52);
   const float px = guest::LoadFloat(base, point + 0);
   const simde__m128 sign = simde_mm_castsi128_ps(simde_mm_set1_epi32(int(0x80000000)));
+  // In one window as Flushing's (two results): the barriers keep the
+  // inputs before it and the work inside.
+  simde__m128 side_in = difference, along_in = along;
+  vector_library::PinInMode(side_in, along_in);
   Fpscr::setcsr(flushing);
+  vector_library::PinInMode(side_in, along_in);
   simde__m128 side = simde_mm_mul_ps(
-      simde_mm_castsi128_ps(simde_mm_shuffle_epi32(simde_mm_castps_si128(difference), 0x9C)),
-      simde_mm_castsi128_ps(simde_mm_shuffle_epi32(simde_mm_castps_si128(along), 0x78)));
+      simde_mm_castsi128_ps(simde_mm_shuffle_epi32(simde_mm_castps_si128(side_in), 0x9C)),
+      simde_mm_castsi128_ps(simde_mm_shuffle_epi32(simde_mm_castps_si128(along_in), 0x78)));
   side = simde_mm_xor_ps(
       simde_mm_sub_ps(
           simde_mm_mul_ps(
               simde_mm_castsi128_ps(
-                  simde_mm_shuffle_epi32(simde_mm_castps_si128(difference), 0x78)),
-              simde_mm_castsi128_ps(simde_mm_shuffle_epi32(simde_mm_castps_si128(along), 0x9C))),
+                  simde_mm_shuffle_epi32(simde_mm_castps_si128(side_in), 0x78)),
+              simde_mm_castsi128_ps(simde_mm_shuffle_epi32(simde_mm_castps_si128(along_in), 0x9C))),
           side),
       sign);
-  const simde__m128 side_length = Length(side);
+  simde__m128 side_length = Length(side);
+  vector_library::PinInMode(side, side_length);
   Fpscr::setcsr(csr);
   const float scale = float(double(stored_width) / double(std::bit_cast<float>(WordOf(side_length, 0))));
   const uint32_t s = std::bit_cast<uint32_t>(scale);
-  Fpscr::setcsr(flushing);
-  const simde__m128 scaled = simde_mm_mul_ps(side, VectorOf(s, s, s, zero));
-  Fpscr::setcsr(csr);
+  const simde__m128 scaled = Flushing(csr, flushing, Mul, side, VectorOf(s, s, s, zero));
   const double factor = guest::LoadFloat(base, kTrailSideScale);
   const double sx = float(double(std::bit_cast<float>(WordOf(scaled, 0))) * factor);
   const double sy = float(double(std::bit_cast<float>(WordOf(scaled, 1))) * factor);
@@ -859,9 +909,7 @@ bool ParticlesBEmit(uint8_t* base, uint32_t effect, uint32_t position, double a,
     // as lvx does).
     const simde__m128 less = LoadVector(base, moved);
     const simde__m128 from = LoadVector(base, particle);
-    Fpscr::setcsr(flushing);
-    const simde__m128 difference = simde_mm_sub_ps(from, less);
-    Fpscr::setcsr(csr);
+    const simde__m128 difference = Flushing(csr, flushing, Sub, from, less);
     const uint32_t to = particle & ~0xFu;
     for (int k = 0; k < 4; k++) {
       guest::StoreU32(base, to + 4 * k, WordOf(difference, k));
@@ -1017,9 +1065,7 @@ constexpr uint32_t kSparksBytes = 144;
 void AddVectorTo(uint8_t* base, uint32_t to, uint32_t from, uint32_t csr, uint32_t flushing) {
   const simde__m128 a = LoadVector(base, to);
   const simde__m128 b = LoadVector(base, from);
-  Fpscr::setcsr(flushing);
-  const simde__m128 sum = simde_mm_add_ps(a, b);
-  Fpscr::setcsr(csr);
+  const simde__m128 sum = Flushing(csr, flushing, Add, a, b);
   const uint32_t at = to & ~0xFu;
   for (int k = 0; k < 4; k++) {
     guest::StoreU32(base, at + 4 * k, WordOf(sum, k));
@@ -1110,9 +1156,7 @@ void SparksUpdateStreak(uint8_t* base, uint32_t sparks, double speed,
         const simde__m128 moved =
             VectorOf(std::bit_cast<uint32_t>(dx), std::bit_cast<uint32_t>(dy),
                      std::bit_cast<uint32_t>(dz), one);
-        Fpscr::setcsr(flushing);
-        const simde__m128 length = Length(moved);
-        Fpscr::setcsr(csr);
+        const simde__m128 length = Flushing(csr, flushing, Length, moved);
         if (double(limit) < double(std::bit_cast<float>(WordOf(length, 0)))) {
           guest::StoreU32(base, spark + 128, 2);
         } else {
@@ -1258,18 +1302,23 @@ bool SparksEmit(uint8_t* base, uint32_t sparks, uint32_t position, double streng
                    std::bit_cast<uint32_t>(dz), one);
       const uint32_t csr = Fpscr::getcsr();
       const uint32_t flushing = csr | uint32_t(Fpscr::FlushMask);
-      Fpscr::setcsr(flushing);
-      const simde__m128 length = Length(toward);
-      Fpscr::setcsr(csr);
+      const simde__m128 length = Flushing(csr, flushing, Length, toward);
       const double length_x = std::bit_cast<float>(WordOf(length, 0));
       if (!(length_x == zero)) {
         const simde__m128 from = LoadVector(base, at);
         const float s = float(double(guest::LoadFloat(base, kSparksStep)) / length_x);
         const uint32_t sw = std::bit_cast<uint32_t>(s);
         const simde__m128 factor = VectorOf(sw, sw, sw, guest::LoadU32(base, kZero));
-        Fpscr::setcsr(flushing);
-        const simde__m128 moved = simde_mm_add_ps(from, simde_mm_mul_ps(toward, factor));
-        Fpscr::setcsr(csr);
+        const simde__m128 moved = Flushing(
+            csr, flushing,
+            // The NaNs the translated code keeps where two meet, as built
+            // (the harness showed it): the step's (toward) in the product,
+            // then the product's in the sum. Made explicit since the
+            // barriers changed the compiler's operand order.
+            [](simde__m128 f, simde__m128 t, simde__m128 k) {
+              return AddKeepingFirstNaN(MulKeepingFirstNaN(t, k), f);
+            },
+            from, toward, factor);
         const uint32_t to = at & ~0xFu;
         for (int k = 0; k < 4; k++) {
           guest::StoreU32(base, to + 4 * k, WordOf(moved, k));
@@ -1482,9 +1531,7 @@ bool SmokeEmit(uint8_t* base, uint32_t smoke, double size, double speed, uint32_
   const simde__m128 drift_b =
       VectorOf(std::bit_cast<uint32_t>(float(oz)), zero_word, std::bit_cast<uint32_t>(float(ox)),
                one_word);
-  Fpscr::setcsr(flushing);
-  const simde__m128 drift = AddKeepingFirstNaN(drift_a, drift_b);
-  Fpscr::setcsr(csr);
+  const simde__m128 drift = Flushing(csr, flushing, AddKeepingFirstNaN, drift_a, drift_b);
   int32_t particles = Fctiwz(double(float(speed * double(guest::LoadFloat(base, kSmokeCountScale)))));
   if (particles < 2) {
     particles = 2;
@@ -1900,10 +1947,12 @@ uint32_t SmokeInRegion(uint8_t* base, uint32_t smoke, uint32_t point) {
   const simde__m128 p_b = VectorOf(bits(Difference(px, bx)), bits(Difference(py, by)),
                                    bits(Difference(pz, bz)), one);
   const uint32_t csr = Fpscr::getcsr();
-  Fpscr::setcsr(csr | uint32_t(Fpscr::FlushMask));
-  const simde__m128 past_a = simde_mm_dp_ps(p_a, a_b, 0xEF);
-  const simde__m128 past_b = simde_mm_dp_ps(p_b, b_a, 0xEF);
-  Fpscr::setcsr(csr);
+  const uint32_t flushing = csr | uint32_t(Fpscr::FlushMask);
+  // Each in its own window (the same results: the control word is the same
+  // for both); the second had been moved past the restore before the
+  // barriers.
+  const simde__m128 past_a = Flushing(csr, flushing, Dot3, p_a, a_b);
+  const simde__m128 past_b = Flushing(csr, flushing, Dot3, p_b, b_a);
   const double zero = guest::LoadFloat(base, kZero);
   if (!(double(std::bit_cast<float>(WordOf(past_a, 0))) < zero)) {
     return 0;
@@ -2090,6 +2139,76 @@ void SparksConstruct(uint8_t* base, uint32_t sparks) {
   for (uint32_t i = 0; i < 50; i++) {
     ApplyStores(base, sparks + 29036 + 16 * i, {{0, 'o'}});
   }
+}
+
+namespace {
+
+constexpr uint32_t kSmokeVtable = 0x820086F4;
+constexpr uint32_t kParticlesBVtable = 0x82008720;
+constexpr uint32_t kParticleConstructor = 0x8212B3D0;  // Particle::Particle
+constexpr uint32_t kEmptyDestructor = 0x82106540;      // blr
+
+// The deleting destructors' frees: 0 or a block the layer gave.
+bool Deletable(uint32_t block) {
+  return block == 0 || memory::IsHeapBlock(block);
+}
+
+}  // namespace
+
+void ParticlesBConstruct(uint8_t* base, uint32_t particles) {
+  ITC_NATIVE_RUNNING("sub_8212BFE8 ParticlesB::ParticlesB");
+  ConstructOverlay(base, particles, kParticlesBVtable);
+  for (uint32_t i = 0; i < 15; i++) {
+    const uint32_t entry = particles + 128 + 176 * i;
+    ApplyStores(base, entry, {{12, 'o'}, {28, 'o'}, {44, 'o'}, {60, 'o'}, {76, 'o'}});
+    // Particle::Particle is native, so the helper calls no guest code.
+    c_runtime::VectorConstruct(base, entry + 128, 48, 1, kParticleConstructor, nullptr, nullptr);
+  }
+  ApplyStores(base, particles, {{2796, 'o'}, {2812, 'o'}});
+}
+
+void SmokeDestruct(uint8_t* base, uint32_t smoke) {
+  ITC_NATIVE_RUNNING("sub_8212B288 Smoke::~Smoke");
+  guest::StoreU32(base, smoke, kSmokeVtable);
+  for (int32_t i = 44; i >= 0; i--) {
+    c_runtime::VectorDestruct(base, smoke + 128 + 720 * uint32_t(i) + 240, 48, 10,
+                              kEmptyDestructor, nullptr, nullptr);
+  }
+  OverlayConstruct(base, smoke);
+}
+
+bool SmokeDeletingDestructor(uint8_t* base, uint32_t smoke, uint32_t flags) {
+  ITC_NATIVE_RUNNING("sub_8212B358 Smoke::~Smoke (deleting)");
+  if ((flags & 1) != 0 && !Deletable(smoke)) {
+    return false;
+  }
+  SmokeDestruct(base, smoke);
+  if ((flags & 1) != 0) {
+    memory::crt::OperatorDelete(smoke);
+  }
+  return true;
+}
+
+void ParticlesBDestruct(uint8_t* base, uint32_t particles) {
+  ITC_NATIVE_RUNNING("sub_8212BF88 ParticlesB::~ParticlesB");
+  guest::StoreU32(base, particles, kParticlesBVtable);
+  for (int32_t i = 14; i >= 0; i--) {
+    c_runtime::VectorDestruct(base, particles + 128 + 176 * uint32_t(i) + 128, 48, 1,
+                              kEmptyDestructor, nullptr, nullptr);
+  }
+  OverlayConstruct(base, particles);
+}
+
+bool ParticlesBDeletingDestructor(uint8_t* base, uint32_t particles, uint32_t flags) {
+  ITC_NATIVE_RUNNING("sub_8212C070 ParticlesB::~ParticlesB (deleting)");
+  if ((flags & 1) != 0 && !Deletable(particles)) {
+    return false;
+  }
+  ParticlesBDestruct(base, particles);
+  if ((flags & 1) != 0) {
+    memory::crt::OperatorDelete(particles);
+  }
+  return true;
 }
 
 void SmokeReset(uint8_t* base, uint32_t smoke) {
@@ -2349,9 +2468,7 @@ bool ParticlesBUpdate(uint8_t* base, uint32_t effect) {
     for (int32_t i = 0; i < int32_t(guest::LoadU32(base, entry + 116)); i++) {
       const uint32_t particle = entry + 128 + 48 * uint32_t(i);
       const simde__m128 moved = LoadVector(base, effect + kParticlesBMoved);
-      Fpscr::setcsr(flushing);
-      const simde__m128 length = Length(moved);
-      Fpscr::setcsr(csr);
+      const simde__m128 length = Flushing(csr, flushing, Length, moved);
       const double scale = guest::LoadFloat(base, table + 4);
       double speed = float(std::fma(scale, double(std::bit_cast<float>(WordOf(length, 0))),
                                     least_speed));
@@ -2498,9 +2615,7 @@ bool ParticlesCUpdate(uint8_t* base, uint32_t effect, uint32_t* r3) {
     const float dz = Difference(guest::LoadFloat(base, a + 8), guest::LoadFloat(base, b + 8));
     auto bits = [](float f) { return std::bit_cast<uint32_t>(f); };
     const simde__m128 apart = VectorOf(bits(dx), bits(dy), bits(dz), one_word);
-    Fpscr::setcsr(flushing);
-    const simde__m128 length = Length(apart);
-    Fpscr::setcsr(csr);
+    const simde__m128 length = Flushing(csr, flushing, Length, apart);
     const double distance = std::bit_cast<float>(WordOf(length, 0));
     if (!(distance == zero)) {
       double most = float(double(guest::LoadFloat(base, effect + kParticlesCSpeed)) * pull_scale);
@@ -2512,9 +2627,7 @@ bool ParticlesCUpdate(uint8_t* base, uint32_t effect, uint32_t* r3) {
       // vmulfp with the difference's NaN kept where both are NaNs (the
       // translated code's mulps keeps its first operand's, seen in the
       // disassembly; the compiler may swap a plain mulps's operands).
-      Fpscr::setcsr(flushing);
-      const simde__m128 product = simde_mm_mul_ps(apart, ratios);
-      Fpscr::setcsr(csr);
+      const simde__m128 product = Flushing(csr, flushing, Mul, apart, ratios);
       const simde__m128 apart_nan = simde_mm_cmpunord_ps(apart, apart);
       const simde__m128 quieted =
           simde_mm_or_ps(apart, simde_mm_castsi128_ps(simde_mm_set1_epi32(0x00400000)));
@@ -2634,9 +2747,8 @@ uint32_t IsBehindCamera(uint8_t* base, uint32_t overlays, uint32_t point) {
                bits(Difference(py, guest::LoadFloat(base, matrix + 52))),
                bits(Difference(pz, guest::LoadFloat(base, matrix + 56))), one);
   const uint32_t csr = Fpscr::getcsr();
-  Fpscr::setcsr(csr | uint32_t(Fpscr::FlushMask));
-  const simde__m128 dot = simde_mm_dp_ps(from_car, from_eye, 0xEF);
-  Fpscr::setcsr(csr);
+  const simde__m128 dot =
+      Flushing(csr, csr | uint32_t(Fpscr::FlushMask), Dot3, from_car, from_eye);
   return double(std::bit_cast<float>(WordOf(dot, 0))) < double(guest::LoadFloat(base, kZero)) ? 0
                                                                                               : 1;
 }
@@ -2741,9 +2853,8 @@ bool UpdateTrails(uint8_t* base, uint32_t overlays, uint32_t scratch) {
     };
     const simde__m128 at = VectorOf(sum(0), sum(1), sum(2), one);
     const uint32_t csr = Fpscr::getcsr();
-    Fpscr::setcsr(csr | uint32_t(Fpscr::FlushMask));
-    const simde__m128 point = simde_mm_add_ps(at, LoadVector(base, kTrailLift));
-    Fpscr::setcsr(csr);
+    const simde__m128 point = Flushing(csr, csr | uint32_t(Fpscr::FlushMask), Add, at,
+                                       LoadVector(base, kTrailLift));
     for (int k = 0; k < 4; k++) {
       guest::StoreU32(base, scratch + 4 * k, WordOf(point, k));
     }

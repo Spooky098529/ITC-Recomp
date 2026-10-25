@@ -160,6 +160,9 @@ set(ITC_SOURCES
     src/graphics/device_state.cpp
     src/hooks/post_effects.cpp
     src/post_effects/post_effects.cpp
+    src/hooks/screen_objects.cpp
+    src/screen_objects/uv_trees.cpp
+    src/screen_objects/screen_objects.cpp
     src/hooks/course_scenery.cpp
     src/course_scenery/course_scenery.cpp
     src/hooks/action_mappers.cpp
@@ -236,6 +239,8 @@ set(ITC_SOURCES
     src/harnesses/device_state.cpp
     src/harnesses/course_scenery.cpp
     src/harnesses/post_effects.cpp
+    src/harnesses/screen_objects.cpp
+    src/harnesses/hardcoded_shaders.cpp
     src/harnesses/action_mappers.cpp
     src/harnesses/data_tables.cpp
     src/harnesses/model_animation.cpp
@@ -268,6 +273,10 @@ set(ITC_SOURCES
     src/debug/pause_menu_log.cpp
     src/debug/pause_movie_log.cpp
     src/debug/image_dump.cpp
+    src/debug/shader_compile_dump.cpp
+    src/hooks/shader_compiles.cpp
+    src/hooks/movies.cpp
+    src/movies/movie.cpp
     src/debug/replay_stats.cpp
     src/debug/thread_cpu.cpp
     src/native/app_window.cpp
@@ -307,7 +316,8 @@ set(ITC_SOURCES
 # docs/functions/cameras.md) and the string table and font
 # (src/strings_and_font/, docs/functions/strings-and-font.md) and the
 # course's route (src/track_route/, docs/functions/track-route.md) and the AI
-# drivers (src/ai_drivers/, docs/functions/ai-drivers.md).
+# drivers (src/ai_drivers/, docs/functions/ai-drivers.md) and the screen
+# objects (src/screen_objects/, docs/functions/screen-objects.md).
 set_source_files_properties(src/c_runtime/math.cpp src/ui_movies/keys.cpp
     src/ui_movies/draw.cpp
     src/matrix_math/matrix_math.cpp src/car_physics/rigid_body.cpp
@@ -322,7 +332,8 @@ set_source_files_properties(src/c_runtime/math.cpp src/ui_movies/keys.cpp
     src/action_mappers/action_mappers.cpp src/model_animation/model_animation.cpp
     src/car_specs/car_specs.cpp src/cameras/cameras.cpp
     src/strings_and_font/strings_and_font.cpp src/strings_and_font/font.cpp
-    src/track_route/track_route.cpp src/ai_drivers/ai_drivers.cpp PROPERTIES
+    src/track_route/track_route.cpp src/ai_drivers/ai_drivers.cpp
+    src/screen_objects/screen_objects.cpp PROPERTIES
     COMPILE_OPTIONS "-ffp-model=strict;-ffp-contract=off"
     SKIP_PRECOMPILE_HEADERS ON)
 
@@ -331,6 +342,12 @@ set_source_files_properties(src/c_runtime/math.cpp src/ui_movies/keys.cpp
 add_library(itc_xma STATIC src/audio/xma_packets.cpp src/audio/xma_stream.cpp)
 target_include_directories(itc_xma PUBLIC src)
 target_link_libraries(itc_xma PRIVATE itc_avcodec)
+
+# The movies played through our own FFmpeg (src/movies/: docs/native-movies.md),
+# in a library of its own for the same reason.
+add_library(itc_movies STATIC src/movies/player.cpp)
+target_include_directories(itc_movies PUBLIC src)
+target_link_libraries(itc_movies PRIVATE itc_avformat)
 
 # The SDK's Xenos shader translator (to SPIR-V), built into our binary for
 # the native renderer (docs/native-renderer.md: reused for now, to be
@@ -378,7 +395,7 @@ function(itc_add_executable name)
     # include path can't stand in for them.
     target_include_directories(${name} PRIVATE thirdparty)
 
-    target_link_libraries(${name} PRIVATE itc_xma itc_xenos_shaders)
+    target_link_libraries(${name} PRIVATE itc_xma itc_movies itc_xenos_shaders)
 
     # The native renderer (src/native/) uses SDL, which lives in librexruntime,
     # and loads Vulkan at runtime: it needs only the headers. Both are the SDK's
@@ -417,3 +434,8 @@ endif()
 # built by default.
 add_executable(itc_xma_check EXCLUDE_FROM_ALL tests/xma_check.cpp)
 target_link_libraries(itc_xma_check PRIVATE itc_xma itc_avcodec)
+
+# Plays one movie through src/movies/ in real time (docs/native-movies.md; how
+# to run it is at the top of the file). Not built by default.
+add_executable(itc_movie_check EXCLUDE_FROM_ALL tests/movie_check.cpp)
+target_link_libraries(itc_movie_check PRIVATE itc_movies)

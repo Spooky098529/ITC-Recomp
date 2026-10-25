@@ -4,6 +4,7 @@
 #include "guest.h"
 
 #include "base/flags.h"
+#include "hooks/heap.h"
 #include "race_overlays/race_overlays.h"
 
 ITC_FLAG_BOOL(native_race_overlays, true, "ITC",
@@ -19,7 +20,8 @@ ITC_FLAG_BOOL(native_race_overlays, true, "ITC",
               "sub_8215E000; the resets, sub_8211E9F0 to sub_8212D6E0; Smoke::InRegion, "
               "sub_8212A868; Sparks::Update, sub_8212DDC8; Smoke::Update, sub_8212AA78; ParticlesB::Update, sub_8212B748; ParticlesC::Update, sub_8212C2F0; RaceOverlays::SlotOf, sub_8215E048; the children's constructors, "
               "sub_8211F060 to sub_8212E9A0, and Smoke and ParticlesB::Reset, sub_8212A9E0 and "
-              "sub_8212BA98; the view's body and wheels through the vehicle accessors, sub_821268B0 to "
+              "sub_8212BA98; ParticlesB::ParticlesB, sub_8212BFE8, and Smoke's and ParticlesB's destructors, "
+              "sub_8212B288 to sub_8212C070; the view's body and wheels through the vehicle accessors, sub_821268B0 to "
               "sub_82126FF0; CarOverlays::IsBehindCamera, sub_82124630; the racers' "
               "save flags and stages, sub_82126B50 to sub_82126CB0; CarOverlays::UpdateTrails, "
               "sub_82124EE0; CarOverlays::MarkerKind, sub_82122EA8; the effects' updates "
@@ -281,6 +283,26 @@ ITC_OVERLAY_SET(8212B2E8, SmokeConstruct(base, ctx.r3.u32))
 ITC_OVERLAY_SET(8212CAF8, ParticlesCConstruct(base, ctx.r3.u32))
 ITC_OVERLAY_SET(8212D620, MarkerConstruct(base, ctx.r3.u32))
 ITC_OVERLAY_SET(8212E9A0, SparksConstruct(base, ctx.r3.u32))
+// ParticlesB::ParticlesB: Particle::Particle, through the array helper, is
+// done by its plain C++.
+ITC_OVERLAY_SET(8212BFE8, ParticlesBConstruct(base, ctx.r3.u32))
+
+// Smoke's and ParticlesB's deleting destructors (slot 0, reached through
+// the vtables): r3 = the object, r4 = the flags; r3 comes back as the
+// object. The plain destructors they call (Smoke::~Smoke, sub_8212B288,
+// and ParticlesB::~ParticlesB, sub_8212BF88) have no adapters: only these
+// call them. Only while the game's heap is the layer's, as operator delete
+// is then the layer's free.
+#define ITC_OVERLAY_DELETING(address, call)                          \
+  extern "C" REX_FUNC(sub_##address) {                               \
+    REX_FUNC_PROLOGUE();                                             \
+    if (!ITC_FLAG(native_race_overlays) || !hooks::NativeHeapActive() || \
+        !(call)) {                                                   \
+      __imp__sub_##address(ctx, base);                               \
+    }                                                                \
+  }
+ITC_OVERLAY_DELETING(8212B358, SmokeDeletingDestructor(base, ctx.r3.u32, ctx.r4.u32))
+ITC_OVERLAY_DELETING(8212C070, ParticlesBDeletingDestructor(base, ctx.r3.u32, ctx.r4.u32))
 // Smoke::Reset and ParticlesB::Reset (slot 3): r3 = the object; the entry
 // resets they call are done by their plain C++.
 ITC_OVERLAY_SET(8212A9E0, SmokeReset(base, ctx.r3.u32))

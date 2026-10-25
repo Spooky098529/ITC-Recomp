@@ -7,6 +7,7 @@
 #include "frame_pacing/game_messages.h"
 #include "guest.h"
 #include "input/input_manager.h"
+#include "memory/c_runtime_heap.h"
 #include "std_list/ptr_list.h"
 
 #include <immintrin.h>
@@ -823,6 +824,47 @@ uint32_t MapperBind(uint8_t* base, uint32_t mapper, uint32_t object) {
   }
   guest::StoreU8(base, mapper + 2884, 1);
   return 1;
+}
+
+namespace {
+
+constexpr uint32_t kInitManager = 0x826BAB78;
+constexpr uint32_t kInitList = 0x826BAB7C;
+constexpr uint32_t kListBytes = 52;
+constexpr uint32_t kMapperBytes = 2896;
+
+}  // namespace
+
+bool InitCreate(uint8_t* base, uint32_t manager, uint32_t* list) {
+  ITC_NATIVE_RUNNING("sub_8209F430 ActionMappers::Init");
+  // operator new's error paths are the original's: every block made first
+  // (in the original's order: the list, then mappers 0-3; the constructors
+  // allocate nothing), then built and stored.
+  constexpr uint32_t kSizes[5] = {kListBytes, kMapperBytes, kMapperBytes, kMapperBytes,
+                                  kMapperBytes};
+  uint32_t blocks[5];
+  for (int i = 0; i < 5; i++) {
+    const auto block = memory::crt::OperatorNew(base, kSizes[i]);
+    if (!block) {
+      for (int k = 0; k < i; k++) {
+        memory::crt::OperatorDelete(blocks[k]);
+      }
+      return false;
+    }
+    blocks[i] = *block;
+  }
+  guest::StoreU32(base, kInitManager, manager);
+  InputClientListConstruct(base, blocks[0], guest::LoadU32(base, kInitManager));
+  guest::StoreU32(base, kInitList, blocks[0]);
+  for (uint32_t j = 0; j < 4; j++) {
+    MapperConstruct(base, blocks[1 + j], j);
+    guest::StoreU32(base, kMappers + 8 * j, blocks[1 + j]);
+  }
+  for (uint32_t j = 0; j < 4; j++) {
+    InputClientListAdd(base, guest::LoadU32(base, kMappers + 8 * j));
+  }
+  *list = guest::LoadU32(base, kInitList);
+  return true;
 }
 
 }  // namespace action_mappers

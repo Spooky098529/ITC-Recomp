@@ -9,7 +9,9 @@
 
 #include "base/flags.h"
 #include "base/log.h"
+#include "hooks/heap.h"
 #include "hooks/vehicle.h"
+#include "memory/heap.h"
 #include "race_overlays/race_overlays.h"
 
 #include <rex/system/kernel_state.h>
@@ -19,6 +21,7 @@
 
 #include <algorithm>
 #include <bit>
+#include <cmath>
 #include <iterator>
 #include <string>
 #include <utility>
@@ -28,6 +31,7 @@ ITC_FLAG_DECLARE(bool, native_race_overlays);
 ITC_FLAG_DECLARE(bool, native_vehicle_accessors);
 ITC_FLAG_DECLARE(bool, native_vector_library);
 ITC_FLAG_DECLARE(bool, native_matrix_math);
+ITC_FLAG_DECLARE(bool, native_c_runtime);
 
 namespace harness {
 
@@ -2116,6 +2120,56 @@ void SmokeInRegionCases(Context& h, uint32_t block) {
             __imp__sub_8212A868, NativeSmokeInRegion, fmt::format("case {}", i));
   }
   results.Report();
+
+  // Tiny values, so the point's dot product with b's side (computed after
+  // the one with a's, which must come out negative) is denormal: the vector
+  // unit's flush-to-zero (and denormals read as 0) decide its sign. Even
+  // cases: a of small numbers, b and the point denormal words (either
+  // sign); odd cases: a near 2^-60, b and the point near 2^-70, so the
+  // products are denormal and past a's normal.
+  Results tiny("Smoke::InRegion (sub_8212A868), tiny values");
+  auto scaled = [](Random& fill, int exponent) {
+    return std::bit_cast<uint32_t>(
+        std::ldexp(float(int32_t(fill.Below(1 << 20)) - (1 << 19)), exponent - 19));
+  };
+  for (int i = 0; i < 400; i++) {
+    const uint64_t seed = r.Next();
+    harness::Outputs out[2];
+    for (int v = 0; v < 2; v++) {
+      Random fill;
+      for (uint64_t n = 0; n < seed % 61; n++) {
+        fill.Next();
+      }
+      const bool denormal = i % 2 == 0;
+      for (uint32_t k = 0; k < 3; k++) {
+        const float value = float(int32_t(fill.Below(21)) - 10) * 0.5f;
+        guest::StoreU32(h.base, smoke + 32592 + 4 * k,
+                        denormal ? std::bit_cast<uint32_t>(value) : scaled(fill, -60));
+        for (const uint32_t at : {smoke + 32608 + 4 * k, point + 4 * k}) {
+          guest::StoreU32(h.base, at,
+                          denormal ? uint32_t(fill.Next()) & 0x807FFFFF : scaled(fill, -70));
+        }
+      }
+      guest::StoreU32(h.base, smoke + 32604, RandomWord(fill));
+      guest::StoreU32(h.base, point + 12, RandomWord(fill));
+      PPCContext t = CallContext(h);
+      // Flush-to-zero off for real (the side before may have left it on,
+      // which disableFlushMode's cached state doesn't see).
+      t.fpscr.disableFlushModeUnconditional();
+      t.r3.u64 = smoke;
+      t.r4.u64 = point;
+      if (v == 0) {
+        RunRecompiled(__imp__sub_8212A868, t, h.base);
+      } else {
+        NativeSmokeInRegion(t, h.base);
+      }
+      out[v].Bytes(Read(h.base, point, 16));
+      out[v].Bytes(Read(h.base, smoke + 32592, 32));
+      out[v].Word(t.r3.u32);
+    }
+    tiny.Check(out[0], out[1], fmt::format("case {}", i));
+  }
+  tiny.Report();
 }
 
 // Sparks::Update: entries of random words with small lives (0 to 20, some
@@ -3204,6 +3258,116 @@ void ModelMatrixCases(Context& h, uint32_t block) {
   }
   results.Report();
 }
+
+// The children with particle arrays: ParticlesB::ParticlesB, Smoke's and
+// ParticlesB's destructors and their deleting ones (the adapters' steps;
+// the plain destructors have no adapters). The recompiled side runs with
+// --native_race_overlays and --native_c_runtime off (the array helpers the
+// originals call, too).
+void NativeParticlesBConstruct(PPCContext& ctx, uint8_t* base) {
+  ctx.fpscr.disableFlushMode();
+  ro::ParticlesBConstruct(base, ctx.r3.u32);
+}
+void NativeSmokeDestruct(PPCContext& ctx, uint8_t* base) {
+  ro::SmokeDestruct(base, ctx.r3.u32);
+}
+void NativeParticlesBDestruct(PPCContext& ctx, uint8_t* base) {
+  ro::ParticlesBDestruct(base, ctx.r3.u32);
+}
+void NativeSmokeDeleting(PPCContext& ctx, uint8_t* base) {
+  if (!ro::SmokeDeletingDestructor(base, ctx.r3.u32, ctx.r4.u32)) {
+    __imp__sub_8212B358(ctx, base);
+  }
+}
+void NativeParticlesBDeleting(PPCContext& ctx, uint8_t* base) {
+  if (!ro::ParticlesBDeletingDestructor(base, ctx.r3.u32, ctx.r4.u32)) {
+    __imp__sub_8212C070(ctx, base);
+  }
+}
+void RunArraysRecompiled(GuestFunction recompiled, PPCContext& t, uint8_t* base) {
+  const bool arrays = ITC_FLAG(native_c_runtime);
+  ITC_FLAG(native_c_runtime) = false;
+  RunRecompiled(recompiled, t, base);
+  ITC_FLAG(native_c_runtime) = arrays;
+}
+
+// Objects of random words (odd floats among them) at 4-byte steps from a
+// 16-byte boundary, compared over the object and 32 bytes around it, and
+// r3 (all exactly: the floats are the game's 1.0 word copied). The
+// deleting destructors: with bit 0 of the flags clear, an object in the
+// block; with it set, a block from the allocation layer (only with
+// --native_heap, the adapters' condition), compared by whether it was
+// freed and, when it wasn't, its bytes, r3 by whether it is the block.
+void ParticleArrayCases(Context& h, uint32_t block) {
+  Random& r = h.random;
+  enum Kind { kPlain, kDeleting };
+  const struct {
+    const char* name;
+    GuestFunction recompiled, native;
+    uint32_t bytes;
+    Kind kind;
+  } functions[] = {
+      {"ParticlesB::ParticlesB (sub_8212BFE8)", __imp__sub_8212BFE8, NativeParticlesBConstruct,
+       2816, kPlain},
+      {"Smoke::~Smoke (sub_8212B288)", __imp__sub_8212B288, NativeSmokeDestruct, 32640, kPlain},
+      {"ParticlesB::~ParticlesB (sub_8212BF88)", __imp__sub_8212BF88, NativeParticlesBDestruct,
+       2816, kPlain},
+      {"Smoke::~Smoke, deleting (sub_8212B358)", __imp__sub_8212B358, NativeSmokeDeleting, 32640,
+       kDeleting},
+      {"ParticlesB::~ParticlesB, deleting (sub_8212C070)", __imp__sub_8212C070,
+       NativeParticlesBDeleting, 2816, kDeleting},
+  };
+  const bool heap = hooks::NativeHeapActive();
+  if (!heap) {
+    ITC_LOG_INFO("harness: race_overlays: the deleting destructors' frees skipped "
+                 "(--native_heap off)");
+  }
+  for (const auto& f : functions) {
+    Results results(f.name);
+    for (int i = 0; i < 32; i++) {
+      const uint64_t seed = r.Next();
+      uint32_t flags = uint32_t(r.Next());
+      const bool frees = f.kind == kDeleting && heap && i % 2 == 1;
+      if (f.kind == kDeleting) {
+        flags = frees ? flags | 1 : flags & ~1u;
+      }
+      harness::Outputs out[2];
+      for (int v = 0; v < 2; v++) {
+        const uint32_t object = frees ? memory::Alloc(f.bytes, 0)
+                                      : block + 0x100 + 4 * uint32_t(i % 4);
+        const uint32_t at = frees ? object : object - 32;
+        const uint32_t bytes = frees ? f.bytes : f.bytes + 64;
+        Random fill;
+        for (uint64_t n = 0; n < seed % 61; n++) {
+          fill.Next();
+        }
+        FillRandom(h.base, fill, at, bytes);
+        PPCContext t = CallContext(h);
+        t.r3.u64 = object;
+        t.r4.u64 = flags;
+        if (v == 0) {
+          RunArraysRecompiled(f.recompiled, t, h.base);
+        } else {
+          f.native(t, h.base);
+        }
+        if (frees) {
+          const bool freed = !memory::IsHeapBlock(object);
+          out[v].Word(freed ? 1 : 0);
+          if (!freed) {
+            out[v].Bytes(Read(h.base, object, f.bytes));
+            memory::Free(object);
+          }
+          out[v].Word(t.r3.u32 == object ? 1 : 0);
+        } else {
+          out[v].Bytes(Read(h.base, at, bytes));
+          out[v].Word(t.r3.u32);
+        }
+      }
+      results.Check(out[0], out[1], fmt::format("case {} flags {:08X}", i, flags));
+    }
+    results.Report();
+  }
+}
 }  // namespace
 
 void RaceOverlays(Context& h) {
@@ -3242,6 +3406,7 @@ void RaceOverlays(Context& h) {
   EffectUpdateCases(h, block);
   UpdateSmokeCases(h, block);
   ModelMatrixCases(h, block);
+  ParticleArrayCases(h, block);
   memory->SystemHeapFree(block);
 }
 

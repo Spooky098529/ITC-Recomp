@@ -11,6 +11,135 @@ functions to check in a drive in the progress file.
 When the user has reviewed a run's section, its heading gets
 "(reviewed <date>)"; the section stays for the record.
 
+## Run 2026-10-24 21:33 (`b7-loop-24-10-26-4`)
+
+- Cleanup lead `sub_8209F430` ActionMappers::Init (`action-mappers.md`;
+  3ac7be7, 9e36924): plain C++ `InitCreate`
+  (`src/action_mappers/action_mappers.cpp`), under
+  `--native_action_mappers` (needs `--native_heap`); 24 cases in the
+  `action_mappers_binding` harness. 7 adapters removed (Native:
+  `sub_8259C868`, `sub_8259C898`, `sub_8259C818`, `sub_8209F228`,
+  `sub_8210AEB0`, `sub_8210AF00`, `sub_8210C180`). For review:
+  - Init takes its five blocks from operator new first, in the
+    original's order; if one isn't given, it frees them all and runs the
+    original.
+  - Its adapter runs BindAll's adapter inside the original's 112-byte
+    frame; BindAll stays Overridden (a guest call to the owner's slot
+    +36: `sub_820944C8` -> `sub_82094350` -> probably `sub_82090788`,
+    the app's, unmapped).
+  - The harness cases call Init's adapter (it makes guest calls), and
+    give both versions the same operator new blocks with the same
+    random leftovers.
+  - Kept though `--removable` lists them: `sub_8210C370`,
+    `sub_8258CF10`, `sub_825924E0` (the fallback's `--log_pause_menu`
+    and `--log_input_reads` diagnostics), `sub_820991E0` and
+    `sub_8210AF08` (guest calls through `ctx`).
+- Three cleanup leads (2e5ce7c..b6888ac; `race-overlays.md`,
+  `ai-drivers.md`, `c-runtime.md`):
+  - `sub_8212BFE8` ParticlesB::ParticlesB and the deleting destructors
+    `sub_8212B358`, `sub_8212C070` Overridden; `sub_8212B288`,
+    `sub_8212BF88` Native from the start (only the native deleting
+    destructors call them). The deleting destructors run natively only
+    with `--native_heap`, and fall back to the original (bit 0 set) for
+    a block the allocation layer didn't give. They're called from the
+    recompiled CarOverlays::DeleteChildren at a race's end, so attract
+    races don't reach them.
+  - `sub_8213BDF0`, `sub_8213BE80` (JoinCornersByExit, ByEntry; never
+    seen in play, no rows) native inside AiPath::JoinCornerPair;
+    PathCalls' join callback gone. Like the other native joins, they
+    don't write the original's fcfid scratch below the stack pointer.
+    What's left of PathCalls is the +5532 normalizer's other targets
+    (never in the game), so UpdateIdle's (`sub_821399A8`, listed
+    removable) and DriveCar's adapters stay.
+  - Flush-to-zero: the problem was real. ThinLTO had moved
+    Smoke::InRegion's second `dpps` past the control word's restore: a
+    new "tiny values" group had 135 of 400 differing. Fixed as in
+    ee810a9 (a `Flushing()` helper, `vector_library::PinInMode`
+    barriers); 0 differing since. The barriers changed Sparks::Emit's
+    `mulps` operand order (14 NaN-only differences), so it now picks
+    the kept NaN explicitly (`MulKeepingFirstNaN`); Sparks::UpdateStreak
+    still relies on a plain `addps` that happens to match.
+  - A latent harness input: with the shared random stream shifted,
+    AiDriver::DriveCar's case 540 made the recompiled side fault without
+    end (guest `0x7028C0CC`; `itc_1497`, `itc_1498`). The new groups
+    were put last so earlier inputs stay as before, but DriveCar's case
+    generation can make an input the original faults on.
+  - `sub_82138D00` SetParams, `sub_82139DA0` StartRace,
+    `sub_82139580` ResetControl: adapters removed (Native).
+- `screen-objects.md` (new, mapped in 78f986b): 42 rows (1 moved from
+  `functions.md`: `sub_82130978`, now `ScreenObject::Record`, Wrapped),
+  the race's screen object (128,000 bytes, one a view: a 1024-wide
+  A8R8G8B8 texture, a 720-triangle fan with `rand`-jittered UVs and 20
+  rings of 36 points; strength = speed km/h / 300 at +76; probably a
+  screen blur while the nitrous runs, started and stopped by the race's
+  update from the vehicle's byte +2424). `Start` and `Stop`
+  (`sub_8212EDF8`, `sub_8212EED0`) never ran, so `Record`'s 1,038-line
+  body never ran either. For review:
+  - Names on guesses: the `ScreenObject::` functions, `UvMap::` and
+    `UvColumn::` (the two map types), the nitrous trigger, +84 as the
+    sort key (599/601).
+  - Correction: the lead said `std::string`-keyed trees; the keys are
+    doubles (the string is only the `length_error` message).
+  - `sub_82131680` (`UvColumn::Insert`) and `sub_82131FB0`
+    (`UvMap::Insert`) mapped here, not under the containers' lead (only
+    the screen objects use these two map types).
+  - `post-effects.md`'s intro and `sub_8215B690`, `sub_8212EDE0` rows
+    now point here; `known-data.md` gets the screen object and the race
+    object's +31152/+31156/+31160.
+  - Left open: the objects at +88 and +92 (set through vtable calls in
+    `Record`; who makes them isn't known).
+  Migration 1 (472d5ac..4e3513e): 38 of 42 native under
+  `--native_screen_objects` (`src/screen_objects/`, adapters in
+  `src/hooks/screen_objects.cpp`, harness `screen_objects`; the tree
+  functions also need `--native_heap`, `~ScreenObject`
+  `--native_video_output`), 8 adapters removed. For review:
+  - `sub_8212EEF8` (UvColumn's iterator decrement, never seen in play,
+    no row) ported so the native InsertUnique has no recompiled callee;
+    its own harness group.
+  - Handed to the original from the start: the trees' `bad_alloc` and
+    `length_error`; erasing part of a tree (`sub_8212F030`,
+    `sub_8212EFA8`, `sub_82132318`, `sub_821318B8`, never ran); a
+    checked iterator's trap; SetSpeed while +24 is set (calls
+    `sub_8212F778`, never ran); BuildRings over a map that isn't empty.
+  - Inside a native caller, an operator new or delete refusal after the
+    checks, or a broken tree, is logged and aborts (as
+    `std_list/ptr_list.cpp`).
+  - AddRingPoint's r3 set to what the original leaves (no caller reads
+    it), compared only by kind for the freed head; its temporaries live
+    in the original's 272-byte guest stack frame.
+  - Two corrected notes: both AllocateNodes rows said 0 returns 0 (it
+    calls operator new(0)).
+  - Left: `rand` (`sub_825A9BB8`, the core's thread data) blocks
+    BuildFan, Init and the constructor; `sub_822A8980` and the shader
+    pairs not taken (they unblock nothing yet); `Record`'s body never
+    ran, so no frame dump was compared.
+- `framework.md` (new, mapped in c4b5b86): 68 rows (5 moved from
+  `functions.md`: `main` `sub_82090108`, `App::Run` `sub_8209A760`,
+  `ForEachTickHandler` `sub_82099D50`, `TickHandler::Invoke`
+  `sub_82099A98`, `sub_82096340`), the app's framework (its services
+  made through factories at boot, the run loop and its tick handlers);
+  `known-data.md`'s framework, run loop, app (partial), `0x8296B910`,
+  `0x8296B914`, `0x8266D080`, `0x8296BCE0`; 5 leads added. For review:
+  - BindAll's slot +36 worked out: `sub_820944C8` -> `sub_82094350` ->
+    `sub_82090830` -> `sub_82090778`, the input manager at framework+88
+    (natively `[[owner + 8] + 52]`), not `sub_82090788` as the lead
+    guessed (that's framework+124, the save devices); corrected in
+    `action-mappers.md` and `input.md`.
+  - Names on guesses: `Framework::`, `RunLoop::`, `HandlerMap::`
+    (probably `std::map<unsigned, Delegate*>`), `RequestVector::`
+    (probably `std::vector`), `FrameStart`, `DebugText`,
+    `DebugFont::SetPosition`, `PoolMaker::PoolMaker`, the factories
+    (`Users::`, `SaveDevices::`, `WorkerPool::`, `Renderer::`,
+    `Scene::`, `App::Create`).
+  - Corrections: `App::Run`'s "quit flag at this+12" is the tick
+    handler map's size; `TickHandler::Invoke`'s r3 is the run loop;
+    `system-services.md`'s "app" (`App::ReadUsers`, `App::PollSignIn`)
+    is the users and sign-in object at framework+128 (noted in
+    `framework.md` only, not renamed).
+  - Taken from other leads: `sub_82093400`, `sub_82093740` (the
+    containers'), `sub_820944C8`, `sub_82094350` (the app's start-up);
+    both lines updated.
+
 ## Run 2026-10-24 17:46 (`b7-loop-24-10-26-3`) (reviewed 2026-10-24)
 
 - `post-effects.md` (new, mapped in f3643e1): 57 rows (3 moved from

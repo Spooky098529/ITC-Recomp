@@ -395,27 +395,36 @@ uint32_t JoinCorners(uint8_t* base, uint32_t a, uint32_t b, uint32_t count);
 // AiPath::JoinCornersShort (sub_8213BF28): the same for corners closer than
 // the gap (the count at `count` read, not changed). Returns b's word +4.
 uint32_t JoinCornersShort(uint8_t* base, uint32_t a, uint32_t b, uint32_t count);
+// JoinCornerPair's steps for corners that overlap with the same direction
+// (+16), never seen in play: `count` = &the overlap in slices (the gap
+// negated). The slices joined: a's at the count and b's at its data's +0
+// less one, both moved back to a's exit (its data's +50) when the count is
+// past it. AiPath::JoinCornersByExit (sub_8213BDF0, b's data +28 below
+// 100.0): a +14 = a's slice, a +36 = 1, a +28 = (b's table less a's at
+// those slices, +4 of the 8-byte entries) / (a's exit less the count); r3
+// kept. AiPath::JoinCornersByEntry (sub_8213BE80): b +37 = 1, b +32 = (a's
+// less b's) / (b's slice less its data's +52), b +14 kept within that +52,
+// a +14 = a's slice; returns a's table (+4: the r3 it leaves).
+void JoinCornersByExit(uint8_t* base, uint32_t a, uint32_t b, uint32_t count);
+uint32_t JoinCornersByEntry(uint8_t* base, uint32_t a, uint32_t b, uint32_t count);
 // AiPath::JoinCornerPair (sub_8213DD40): with both records' data and
 // tables, the gap (a +10 - b +10 - b's data +0, written at frame + 80:
 // `frame` the original's, 112 bytes below the caller's stack pointer):
-// negative, JoinCorners when the directions (+16) differ (1, `r3` set),
-// else 2 (sub_8213BDF0, b's data +28 below 100.0) or 3 (sub_8213BE80), for
-// the caller to run the translated step (never seen in play) with r6 =
-// frame + 80; positive and at most 100.0 times the slice length,
-// JoinCornersShort (1, `r3` set). 0 otherwise (r3 kept).
-uint32_t JoinCornerPair(uint8_t* base, uint32_t a, uint32_t b, uint32_t frame, uint32_t* r3);
+// negative, JoinCorners when the directions (+16) differ, else the gap
+// negated there and JoinCornersByExit (b's data +28 below 100.0) or
+// JoinCornersByEntry; positive and at most 100.0 times the slice length,
+// JoinCornersShort. True with `r3` set to the r3 the join leaves; false
+// where the original keeps r3 (no join, or JoinCornersByExit).
+bool JoinCornerPair(uint8_t* base, uint32_t a, uint32_t b, uint32_t frame, uint32_t* r3);
 
 // AiPath::AddCornersAt (sub_8213E970): of the corners listed on the path
 // entry's slice (+52: +58 the count, 4-byte entries from +60), the first not
 // among the path's records whose data (the route file's +16 table) ends past
 // the listed slice and SharesSections, added (at most 8: InitCorner, then
 // JoinCornerPair with the one before; `frame` the original's, 144 bytes
-// below the caller's stack pointer) and the count +5162 raised. 0 when done
-// (`r3` the r3 the original leaves); 2 or 3 when JoinCornerPair's
-// translated step is to run (r3 = the path, r4 = `a`, r5 = `b`, from 112
-// bytes below `frame`), then AddCornersAtFinish.
-uint32_t AddCornersAt(uint8_t* base, uint32_t path, uint32_t entry, uint32_t frame,
-                      uint32_t* r3, uint32_t* a, uint32_t* b);
+// below the caller's stack pointer) and the count +5162 raised
+// (AddCornersAtFinish). `r3` the r3 the original leaves.
+void AddCornersAt(uint8_t* base, uint32_t path, uint32_t entry, uint32_t frame, uint32_t* r3);
 // AddCornersAt's last step: the count +5162 raised by one.
 void AddCornersAtFinish(uint8_t* base, uint32_t path);
 
@@ -881,18 +890,15 @@ bool DropPassed(uint8_t* base, uint32_t path, uint32_t point, uint32_t frame, ui
 
 // --- The path's update ---
 
-// The calls the path's update can't make natively, made by the caller (the
+// The call the path's update can't make natively, made by the caller (the
 // adapter, on the translated code): the path's normalizer (+5532) when it's
-// neither NormalizeByLane nor NormalizeByBranch (from Extend's frame, `frame`,
-// with r3 to r7 as given), and AddCornersAt's translated join step (2 or 3:
-// r3 = the path, r4 = `a`, r5 = `b`, from 112 bytes below AddCornersAt's frame
-// `frame`). Each returns the r3 it leaves.
+// neither NormalizeByLane nor NormalizeByBranch (never in the game:
+// AiPath::SetMode sets only those), from Extend's frame (`frame`) with r3 to
+// r7 as given. Returns the r3 it leaves.
 struct PathCalls {
   void* user;
   uint64_t (*normalize)(void* user, uint32_t function, uint32_t frame, uint32_t path,
                         uint32_t entry, uint32_t position, uint32_t lane, uint64_t masks);
-  uint64_t (*join)(void* user, uint32_t step, uint32_t frame, uint32_t path, uint32_t a,
-                   uint32_t b);
 };
 // The path's corner records where AdvanceCorners' copies can be native
 // (outside the physical views, in one view).

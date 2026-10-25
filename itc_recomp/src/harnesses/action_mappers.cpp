@@ -1028,6 +1028,150 @@ void BindOut(Context& h, Outputs& out, uint32_t block, const BindSetup& setup) {
   }
 }
 
+// ActionMappers::Init (sub_8209F430) over a bind block with no mappers of
+// its own (its manager, the owner as r3, some cases with a list already
+// holding a listener), r4 the settings' index. The blocks Init gets from
+// operator new are taken first, filled with random bytes (the same in both
+// versions) and freed, so both versions get the same blocks with the same
+// leftovers in the bytes the constructors don't write (whether each did is
+// compared). Compared: the block, the nodes AddListener made, the list and
+// the four mappers (addresses inside them as markers; each listener's
+// floats as floats), the globals ([0x826BAB78] to the table's end, the
+// client list's, the settings' index), r3 and f1-f3. Everything is freed
+// and the globals put back after each version. Its adapter makes guest
+// calls (BindAll's), so the cases run the adapter itself.
+void InitCases(Context& h, uint32_t block) {
+  Results results("sub_8209F430 ActionMappers::Init");
+  constexpr uint32_t kGlobals = 0x826BAB78;  // the manager, the list, the table
+  constexpr uint32_t kGlobalBytes = 40;
+  constexpr uint32_t kIndex = 0x82600B84;
+  constexpr uint32_t kSizes[5] = {52, kMapperBytes, kMapperBytes, kMapperBytes, kMapperBytes};
+  const std::vector<uint8_t> globals = Read(h.base, kGlobals, kGlobalBytes);
+  const uint32_t index_global = guest::LoadU32(h.base, kIndex);
+  const uint32_t list_global = guest::LoadU32(h.base, am::kClientList);
+  for (int i = 0; i < 24; i++) {
+    Outputs out[2];
+    const Random start = h.random;
+    Random after;
+    for (int v = 0; v < 2; v++) {
+      h.random = start;
+      BindSetup setup;
+      setup.mappers = 0;
+      if (i % 6 == 5) {
+        setup.filled = h.random.Below(4);
+      }
+      MakeBindBlock(h, block, setup);
+      uint32_t given[5] = {};
+      for (int k = 0; k < 5; k++) {
+        given[k] = memory::crt::OperatorNew(h.base, kSizes[k]).value_or(0);
+        for (uint32_t at = 0; given[k] != 0 && at < kSizes[k]; at += 4) {
+          guest::StoreU32(h.base, given[k] + at, uint32_t(h.random.Next()));
+        }
+      }
+      for (int k = 4; k >= 0; k--) {
+        memory::crt::OperatorDelete(given[k]);
+      }
+      for (uint32_t at = 0; at < kGlobalBytes; at += 4) {
+        guest::StoreU32(h.base, kGlobals + at, uint32_t(h.random.Next()));
+      }
+      guest::StoreU32(h.base, kIndex, uint32_t(h.random.Next()));
+      PPCContext t = CallContext(h);
+      t.r3.u64 = block + kBindManager - 36;
+      t.r4.u64 = i < 16 ? uint32_t(i % 4) : 1;
+      t.f1.f64 = double(RandomFloat(h.random, 1.0f));
+      t.f2.f64 = double(RandomFloat(h.random, 1.0f));
+      t.f3.f64 = double(RandomFloat(h.random, 1.0f));
+      ITC_FLAG(native_action_mappers) = v == 1;
+      ITC_FLAG(native_input) = v == 1;
+      (v == 0 ? __imp__sub_8209F430 : sub_8209F430)(t, h.base);
+      ITC_FLAG(native_action_mappers) = true;
+      ITC_FLAG(native_input) = true;
+
+      uint32_t objects[5] = {guest::LoadU32(h.base, kGlobals + 4)};
+      for (uint32_t j = 0; j < 4; j++) {
+        objects[1 + j] = guest::LoadU32(h.base, kGlobals + 8 + 8 * j);
+      }
+      for (int k = 0; k < 5; k++) {
+        out[v].Word(objects[k] == given[k] && memory::IsHeapBlock(objects[k]));
+      }
+      std::vector<uint32_t> nodes;
+      for (uint32_t j = 0; j < 5; j++) {
+        const uint32_t head = block + kBindHeads + 32 * j;
+        uint32_t node = guest::LoadU32(h.base, head + std_list::kNext);
+        for (int n = 0; n < 8 && node != head; n++) {
+          if (node != head + 16) {
+            nodes.push_back(node);
+          }
+          node = guest::LoadU32(h.base, node + std_list::kNext);
+        }
+      }
+      auto normalize = [&](uint32_t word) {
+        for (size_t k = 0; k < nodes.size(); k++) {
+          if (word == nodes[k]) {
+            return 0xB10C0000 + uint32_t(k);
+          }
+        }
+        for (uint32_t k = 0; k < 5; k++) {
+          if (objects[k] != 0 && word >= objects[k] && word < objects[k] + kSizes[k]) {
+            return 0x0B000000 + (k << 16) + (word - objects[k]);
+          }
+        }
+        return word;
+      };
+      for (uint32_t at = block; at < block + kBindBytes; at += 4) {
+        out[v].Word(normalize(guest::LoadU32(h.base, at)));
+      }
+      out[v].Word(uint32_t(nodes.size()));
+      for (uint32_t node : nodes) {
+        out[v].Word(memory::IsHeapBlock(node) ? memory::Size(node) : 0xFFFFFFFF);
+        for (uint32_t w = 0; w < 3; w++) {
+          out[v].Word(normalize(guest::LoadU32(h.base, node + 4 * w)));
+        }
+      }
+      for (uint32_t k = 0; k < 5; k++) {
+        if (objects[k] == 0 || !memory::IsHeapBlock(objects[k])) {
+          continue;
+        }
+        for (uint32_t at = 0; at < kSizes[k]; at += 4) {
+          const uint32_t word = guest::LoadU32(h.base, objects[k] + at);
+          if (k > 0 && at >= am::kListener + 128 && at < am::kListener + 264) {
+            out[v].Float(word);
+          } else {
+            out[v].Word(normalize(word));
+          }
+        }
+      }
+      for (uint32_t at = 0; at < kGlobalBytes; at += 4) {
+        out[v].Word(normalize(guest::LoadU32(h.base, kGlobals + at)));
+      }
+      out[v].Word(normalize(guest::LoadU32(h.base, am::kClientList)));
+      out[v].Word(guest::LoadU32(h.base, kIndex));
+      out[v].Word(normalize(t.r3.u32));
+      out[v].Double(t.f1.u64);
+      out[v].Double(t.f2.u64);
+      out[v].Double(t.f3.u64);
+
+      for (uint32_t node : nodes) {
+        if (memory::IsHeapBlock(node)) {
+          memory::crt::OperatorDelete(node);
+        }
+      }
+      for (uint32_t k = 0; k < 5; k++) {
+        if (objects[k] != 0 && memory::IsHeapBlock(objects[k])) {
+          memory::crt::OperatorDelete(objects[k]);
+        }
+      }
+      Write(h.base, kGlobals, globals.data(), kGlobalBytes);
+      guest::StoreU32(h.base, kIndex, index_global);
+      guest::StoreU32(h.base, am::kClientList, list_global);
+      after = h.random;
+    }
+    h.random = after;
+    results.Check(out[0], out[1], fmt::format("case {}", i));
+  }
+  results.Report();
+}
+
 }  // namespace
 
 void ActionMappers(Context& h) {
@@ -1126,6 +1270,7 @@ void ActionMappersBinding(Context& h) {
                     g_bind_fallbacks, expected_fallbacks);
     }
   }
+  InitCases(h, block);
   memory::Free(block);
 }
 

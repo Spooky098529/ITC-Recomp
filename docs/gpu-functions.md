@@ -538,6 +538,11 @@ per tile.
 
 ## Movies
 
+(Since 2026-10-25, with `--play_movies_with_ffmpeg` on, by default, none of
+this runs: the movies are decoded by our own FFmpeg and their frames drawn
+by `Passes::DrawMovie` at command 28's place; `native-movies.md`. What the
+movie library does:)
+
 (2026-10-14.) The boot movie (`UBI_LOGO.wmv`) is drawn outside the command
 list, on the render thread: `sub_824842C8` (reached through a function
 pointer) sets three textures, shaders, sampler states and stream 0 (a

@@ -7,71 +7,73 @@ records: `b7-loop-2026-10-22-0111.md`, `b7-loop-2026-10-22-1047.md`,
 `b7-loop-2026-10-23-0152.md`, `b7-loop-2026-10-23-1106.md`,
 `b7-loop-2026-10-23-1344.md`, `b7-loop-2026-10-23-1722.md`,
 `b7-loop-2026-10-23-2022.md`, `b7-loop-2026-10-24-0325.md`,
-`b7-loop-2026-10-24-1601.md`, and this file's history. What's left to
-see in a drive, from every run: `to-drive.md`.
+`b7-loop-2026-10-24-1601.md`, `b7-loop-2026-10-24-1746.md`, and this
+file's history. What's left to see in a drive, from every run:
+`to-drive.md`.
 
 ## Now
 
-- Run started 2026-10-24 17:46 on `b7-loop-24-10-26-3` (the user's
-  branch), from 206854d; summary `b7-loop-2026-10-24-1746.md`.
+- Run started 2026-10-24 21:33 on `b7-loop-24-10-26-4` (the user's
+  branch), from 953a342; summary `b7-loop-2026-10-24-2133.md`.
 - Limit for this run: 3 subsystems.
-- Subsystem 1 of 3: `leads.md`'s top lead (`sub_8212EC90`,
-  `sub_8212ED78`, `sub_8212EA98`, `sub_8212EDE0`: at the end of the race
-  overlays' address range but not overlays; all four ready). Mapped as the post effects
-  (`post-effects.md`, 57 rows: 3 moved from `functions.md`, 54 new;
-  f3643e1; 32 ready groups; 3 leads added); map checked (0 errors, 57 of
-  57 in play). Migration 1 done (ece3c32..66b8f81: 43 functions,
-  44 of 57 ours, nothing ready left; 9 adapters removed;
-  `--native_post_effects`), validated (`itc_1395`, `itc_1396`; all
-  ran in play or the replay). Finished.
+- Between subsystems (no mapping, not counted): `leads.md`'s top lead,
+  `sub_8209F430` ActionMappers::Init (`action-mappers.md`, ready), with
+  the harness lines of `sub_8258CEB0` and `sub_8258CEE0` to check.
+  Migration done (3ac7be7, 9e36924: Init native, 7 adapters removed;
+  action-mappers.md and input.md have nothing ready left; TestPressed's
+  and TestRepeat's harness lines seen), validated (`itc_1494`,
+  `itc_1495`; all ran in play or the replay). Done.
 - Between subsystems (no mapping, not counted): `leads.md`'s three
-  cleanup leads, `sub_8259E6C8` UiMovie::ApplyTransform
-  (`ui-movies.md`), `sub_8213B2B8` AiDrivers::Destroy and `sub_8213AD98`
-  AiDrivers::DestroyRings (`ai-drivers.md`), `sub_820BAAA0`
-  CollisionShape::~CollisionShape's adapter (`collision.md`). Migration
-  done (1197f81..cdaa66d: the collision shape's adapter removed, the AI
-  drivers' teardown, the UI movie walk from ApplyTransform up to
-  `UiMovie::Draw`; 6 adapters removed), validated (`itc_1420`, `itc_1421`; all ran in
-  play or the replay). Done.
-- Subsystem 2 of 3: `leads.md`'s input processor's constructors
-  (`sub_8258CE60`, `sub_825920D0`; both ready, 3 functions left; block
-  `ActionMapper::ActionMapper`). Mapped as the input manager and
-  processors (`input.md`, 29 rows: 13 moved from `functions.md`, 16 new;
-  167d407; 17 ready groups; 1 lead added); map checked (0 errors, 29 of
-  29 in play). Migration 1 done (57373be..4dd7a11: input.md 29 of
-  29 ours, with `ActionMapper::ActionMapper`, `Bind` and
-  `InputClientList::BindAll` it unblocked; 16 adapters removed;
-  `--native_input`); `ActionMappers::Init` (`sub_8209F430`) ready, left
-  for migration 2. Validation 1 (`itc_1448`, `itc_1449`; prints added
-  in 0c64e99; all ran in play or the replay) reported two functions
-  `missing:`: the loop stopped (below).
+  cleanup leads: `sub_8212B288` Smoke::~Smoke, `sub_8212BF88`
+  ParticlesB::~ParticlesB, `sub_8212BFE8` ParticlesB::ParticlesB and
+  their deleting destructors (`race-overlays.md`); `sub_8213BDF0`,
+  `sub_8213BE80`, `AiPath::JoinCornerPair`'s steps (`ai-drivers.md`);
+  the race overlays' flush-to-zero window (`src/race_overlays/`).
+  Migration done (2e5ce7c..b6888ac: the particle arrays, the joins'
+  steps with PathCalls' join callback gone, the flush-to-zero windows
+  fixed (ThinLTO had moved a `dpps` out of one), 3 AI driver adapters
+  removed), validated (`itc_1508`, `itc_1509`; the joins' two steps,
+  never seen in play, to `to-drive.md`). Done.
+- Subsystem 1 of 3: `leads.md`'s race's screen objects (`sub_8212F148`,
+  `sub_821329B8`, `sub_82132778`, `sub_8212FCC8`, `sub_8212EDF8`,
+  `sub_8212EED0`; `8212EDF8`-`82133000`). Mapped as the screen objects
+  (`screen-objects.md`, 42 rows: 1 moved from `functions.md`, 41 new;
+  78f986b; 12 ready groups; 0 leads added); map checked (0 errors, 42
+  of 42 in play). Migration 1 done (472d5ac..4e3513e: both maps, the
+  rings, strength and teardown; 38 of 42 ours, nothing ready left; 8
+  adapters removed; `--native_screen_objects`), validated (`itc_1518`,
+  `itc_1519`; `sub_8212EEF8`, never seen in play, to `to-drive.md`).
+  Finished.
+- Subsystem 2 of 3: `leads.md`'s framework's set-up (`sub_82090A08`,
+  `sub_82090788`, `sub_820944C8`, `sub_82094350`, `sub_82090830`, the
+  getters `sub_82090760`-`sub_82090788`; 12 of 18 named ready).
+  Mapped as the app framework (`framework.md`, 68 rows: 5 moved from
+  `functions.md`, 63 new; c4b5b86; 29 ready groups; 5 leads added, 2
+  updated); all 68 in play. Not migrated: the run ended (its lead back
+  in `leads.md`).
 
 ## Done
 
-- The input manager and processors (`input.md`, mapped in 167d407; 29
-  rows): 29 ours in one migration (57373be..4dd7a11), with three action
-  mapper functions it unblocked; 16 adapters removed; validated with
-  two missing harness lines (below); `--native_input`. Left:
-  `ActionMappers::Init` (`sub_8209F430`, ready).
-
-- Cleanup leads (no mapping): the collision shape's adapter, the AI
-  drivers' teardown, the UI movie walk (`collision.md`, `ai-drivers.md`,
-  `ui-movies.md`; 1197f81..cdaa66d); validated (`itc_1420`,
-  `itc_1421`); existing flags.
-
-- The post effects (`post-effects.md`, mapped in f3643e1; 57 rows): 44
-  ours in one migration (ece3c32..66b8f81), 9 adapters removed;
-  validated (`itc_1395`, `itc_1396`); `--native_post_effects`. Left:
-  `RenderTextures::Acquire` and the recorders on `sub_8235A9F8`, the
-  models' shader pairs, the vertex declaration, `sub_8209AE48`.
+- The screen objects (`screen-objects.md`, mapped in 78f986b; 42
+  rows): 38 ours in one migration (472d5ac..4e3513e), 8 adapters
+  removed; validated (`itc_1518`, `itc_1519`);
+  `--native_screen_objects`. Left: BuildFan, Init, the constructor (on
+  `rand`), `Record` (on the shader pairs).
+- Cleanup leads (no mapping): the particle arrays, the joins' steps,
+  the flush-to-zero windows (`race-overlays.md`, `ai-drivers.md`;
+  2e5ce7c..b6888ac), 3 adapters removed; validated (`itc_1508`,
+  `itc_1509`); existing flags.
+- Cleanup lead (no mapping): `ActionMappers::Init` (`action-mappers.md`;
+  3ac7be7, 9e36924), 7 adapters removed; validated (`itc_1494`,
+  `itc_1495`); `--native_action_mappers`.
 
 ## Rows to review
 
-This run's rows: `review.md` ("Run 2026-10-24 17:46").
+This run's rows: `review.md` ("Run 2026-10-24 21:33").
 
 ## Expected to differ
 
-This run's groups: `expected-differences.md` (the "17:46 run" lines).
+This run's groups: `expected-differences.md` (the "21:33 run" lines).
 
 ## To check in a drive
 
@@ -79,39 +81,27 @@ This run's groups: `expected-differences.md` (the "17:46 run" lines).
 
 ## Totals
 
-- Start: ours 1714, work left 5046 (wrapped 122, known 587, unknown 4337).
-- After mapping the post effects: ours 1714, work left 5046 (wrapped
-  122, known 641, unknown 4283).
-- After the post effects' migration 1: ours 1757, work left 5003
-  (wrapped 122, known 598, unknown 4283). Race 25 s (`itc_1394`) with
+- Start: ours 1794, work left 4967 (wrapped 115, known 585, unknown 4267).
+- After ActionMappers::Init's migration: ours 1795, work left 4966
+  (wrapped 115, known 584, unknown 4267). Race 27 s (`itc_1493`) with
   `--run_harnesses=all`, 0 errors, every harness 0 differing.
+- After mapping the screen objects: ours 1800, work left 4961 (wrapped
+  115, known 620, unknown 4226).
+- After the screen objects' migration 1: ours 1838, work left 4923
+  (wrapped 115, known 582, unknown 4226). Race 27 s, 0 errors, every
+  harness 0 differing.
+- After the three cleanup leads' migration: ours 1800, work left 4961
+  (wrapped 115, known 579, unknown 4267). Race 27 s (`itc_1507`), 0
+  errors, every harness 0 differing.
+- At the end (2026-10-25, after the hardcoded shaders, the movies and
+  two coverage lists made again): ours 1847, work left 4604 (wrapped
+  113, known 651, unknown 3840).
 
 ## Stopped
 
-2026-10-24, after the input's validation 1: two functions `missing:`
-(`b7-loop.md`'s "When to halt"). `sub_8258CEB0` InputProcessor::
-TestPressed and `sub_8258CEE0` InputProcessor::TestRepeat have no plain
-C++ of their own: their adapters (`ITC_INPUT_WRAPPER`,
-`src/hooks/input_manager.cpp`) read the mask and call AnyPressed's and
-PressedOrRepeat's plain C++, and hold their prints (0c64e99); the
-`input` harness's native side for them (`NativeAnyPressed`,
-`NativePressedOrRepeat` in `src/harnesses/input.cpp`) calls the inner
-plain C++ directly, so their prints aren't reached. Both harnesses at
-300 cases, 0 differ; both ran in play or the replay. Everything else
-passed: harnesses 0 differing (none added to expected differences),
-races 24-25 s under `attract_race.sh 40`, no errors, replays ok.
-For the user: whether those two become plain C++ functions of their own
-(with the harness calling them), get Merged rows, or the harness calls
-their adapters; then the input subsystem's migration 2
-(`ActionMappers::Init`, ready). Run limit: 2 of 3 subsystems done.
-Also: `review.md` ("Run 2026-10-24 17:46"), among it the harness that
-depends on the heap's layout (`strings_and_font`).
-Resolved (the user's calls, 2026-10-24): TestPressed and TestRepeat
-given plain C++ of their own, which their adapters and the `input`
-harness call (7021b78; both harness lines seen, `itc_1490`); the
-harness that seemed to depend on the heap's layout was the harnesses'
-shared random generator, with `swprintf`'s format generator and the
-drawing cases' vertex comparison (1ce3182; `review.md`). The run isn't
-resumed: `ActionMappers::Init` is the top of `leads.md` for the next
-run. Concluded (the user's call, 2026-10-24): merged into
-`rexglue-removal-project`; `review.md`'s section for this run reviewed.
+Ended 2026-10-25 (the user's call), after the user's work beside it: the
+HLSL compiler and the movie library replaced (`--use_hardcoded_shaders`,
+`--play_movies_with_ffmpeg`; `b7-loop-2026-10-24-2133.md`). 1 of 3
+subsystems migrated; the framework's map (`framework.md`, c4b5b86) is
+recorded but not checked or migrated, and its lead is back at the top of
+`leads.md`. `check_function_statuses.py`: 0 errors.

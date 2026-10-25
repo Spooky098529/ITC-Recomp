@@ -2058,12 +2058,63 @@ uint32_t JoinCornersShort(uint8_t* base, uint32_t a, uint32_t b, uint32_t count)
   return r3;
 }
 
-uint32_t JoinCornerPair(uint8_t* base, uint32_t a, uint32_t b, uint32_t frame, uint32_t* r3) {
+void JoinCornersByExit(uint8_t* base, uint32_t a, uint32_t b, uint32_t count) {
+  ITC_NATIVE_RUNNING("sub_8213BDF0 AiPath::JoinCornersByExit");
+  const uint32_t data_b = Load(base, b + 0);
+  const uint32_t data_a = Load(base, a + 0);
+  const uint32_t have = Load(base, count);
+  const int32_t exit = LoadS16(base, data_a + 50);
+  uint32_t at_b = uint32_t(LoadS16(base, data_b + 0)) - 1;
+  uint32_t at_a = have;
+  if (int32_t(have) > exit) {
+    at_a = uint32_t(exit);
+    at_b = (uint32_t(exit) - have) + at_b;
+  }
+  const uint32_t span = uint32_t(LoadS16(base, data_a + 50)) - have;
+  const double to = Lfs(base, ((at_b << 3) & 0xFFFFFFF8u) + Load(base, b + 4) + 4);
+  const double from = Lfs(base, ((at_a << 3) & 0xFFFFFFF8u) + Load(base, a + 4) + 4);
+  guest::StoreU16(base, a + 14, uint16_t(at_a));
+  const double rise = Fsubs(to, from);
+  guest::StoreU8(base, a + 36, 1);
+  Stfs(base, a + 28, Fdivs(rise, IntToFloat(int32_t(span))));
+}
+
+uint32_t JoinCornersByEntry(uint8_t* base, uint32_t a, uint32_t b, uint32_t count) {
+  ITC_NATIVE_RUNNING("sub_8213BE80 AiPath::JoinCornersByEntry");
+  const uint32_t data_b = Load(base, b + 0);
+  const uint32_t data_a = Load(base, a + 0);
+  const uint32_t have = Load(base, count);
+  const uint32_t ends = data_b + 48;
+  uint32_t at_b = uint32_t(LoadS16(base, data_b + 0)) - 1;
+  const int32_t exit = LoadS16(base, data_a + 50);
+  uint32_t at_a = have;
+  if (int32_t(have) > exit) {
+    at_a = uint32_t(exit);
+    at_b = (uint32_t(exit) - have) + at_b;
+  }
+  const uint32_t table_b = Load(base, b + 4);
+  const uint32_t r3 = Load(base, a + 4);
+  const double from_b = Lfs(base, ((at_b << 3) & 0xFFFFFFF8u) + table_b + 4);
+  const double from_a = Lfs(base, ((at_a << 3) & 0xFFFFFFF8u) + r3 + 4);
+  const double rise = Fsubs(from_a, from_b);
+  const int32_t enter = LoadS16(base, ends + 4);
+  guest::StoreU8(base, b + 37, 1);
+  const int32_t held = LoadS16(base, b + 14);
+  Stfs(base, b + 32, Fdivs(rise, IntToFloat(int32_t(at_b - uint32_t(enter)))));
+  const int32_t most = LoadS16(base, ends + 4);
+  if (held > most) {
+    guest::StoreU16(base, b + 14, uint16_t(most));
+  }
+  guest::StoreU16(base, a + 14, uint16_t(at_a));
+  return r3;
+}
+
+bool JoinCornerPair(uint8_t* base, uint32_t a, uint32_t b, uint32_t frame, uint32_t* r3) {
   ITC_NATIVE_RUNNING("sub_8213DD40 AiPath::JoinCornerPair");
   const uint32_t data_b = Load(base, b + 0);
   if (data_b == 0 || Load(base, b + 4) == 0 || Load(base, a + 0) == 0 ||
       Load(base, a + 4) == 0) {
-    return 0;
+    return false;
   }
   const int32_t gap = int32_t(uint32_t(LoadS16(base, a + 10)) - uint32_t(LoadS16(base, b + 10)) -
                               uint32_t(LoadS16(base, data_b + 0)));
@@ -2071,34 +2122,38 @@ uint32_t JoinCornerPair(uint8_t* base, uint32_t a, uint32_t b, uint32_t frame, u
   if (gap < 0) {
     if (!(Lfs(base, a + 16) == Lfs(base, b + 16))) {
       *r3 = JoinCorners(base, a, b, frame + 80);
-      return 1;
+      return true;
     }
     guest::StoreU32(base, frame + 80, uint32_t(-gap));
-    return Lfs(base, data_b + 28) < Lfs(base, kHundred) ? 2 : 3;
+    if (Lfs(base, data_b + 28) < Lfs(base, kHundred)) {
+      JoinCornersByExit(base, a, b, frame + 80);  // r3 kept
+      return false;
+    }
+    *r3 = JoinCornersByEntry(base, a, b, frame + 80);
+    return true;
   }
   const double length = Lfs(base, Load(base, track_route::kRoute) + 8);
   if (Fmuls(length, IntToFloat(gap)) > Lfs(base, kHundred)) {
-    return 0;
+    return false;
   }
   *r3 = JoinCornersShort(base, a, b, frame + 80);
-  return 1;
+  return true;
 }
 
-uint32_t AddCornersAt(uint8_t* base, uint32_t path, uint32_t entry, uint32_t frame,
-                      uint32_t* r3, uint32_t* a, uint32_t* b) {
+void AddCornersAt(uint8_t* base, uint32_t path, uint32_t entry, uint32_t frame, uint32_t* r3) {
   ITC_NATIVE_RUNNING("sub_8213E970 AiPath::AddCornersAt");
   *r3 = path;
   const uint32_t slice = Load(base, entry + 52);
   uint32_t listed = slice + 60;
   const int32_t n = LoadS16(base, slice + 58);
   if (n <= 0) {
-    return 0;
+    return;
   }
   const int32_t have = LoadS16(base, path + 5162);
   if (have > 0) {
     const int32_t entries = LoadS16(base, path + 5136);
     if (LoadS16(base, uint32_t(have) * 44 + path + 5132) > entries) {  // the last's +12
-      return 0;
+      return;
     }
   }
   const uint32_t route = Load(base, track_route::kRoute);
@@ -2134,7 +2189,7 @@ uint32_t AddCornersAt(uint8_t* base, uint32_t path, uint32_t entry, uint32_t fra
       continue;
     }
     if (!(have < 8)) {
-      return 0;
+      return;
     }
     const uint32_t record = uint32_t(have) * 44 + path + 5164;
     InitCorner(base, record, data, listed, path + 5136);
@@ -2143,18 +2198,12 @@ uint32_t AddCornersAt(uint8_t* base, uint32_t path, uint32_t entry, uint32_t fra
     if (now > 0) {
       const uint32_t before = uint32_t(now) * 44 + path + 5120;
       uint32_t joined = path;
-      const uint32_t step = JoinCornerPair(base, record, before, frame - 112, &joined);
-      if (step >= 2) {
-        *a = record;
-        *b = before;
-        return step;
-      }
+      JoinCornerPair(base, record, before, frame - 112, &joined);
       *r3 = joined;
     }
     AddCornersAtFinish(base, path);
-    return 0;
+    return;
   }
-  return 0;
 }
 
 void AddCornersAtFinish(uint8_t* base, uint32_t path) {
@@ -5348,15 +5397,9 @@ uint64_t Extend(uint8_t* base, uint32_t path, uint32_t point, uint32_t frame,
         Stfs(base, entry + 8, Fmadds(Lfs(base, record + 40), offset, Lfs(base, record + 8)));
         add_section(section);
       }
-      uint32_t corners_r3 = 0, a = 0, b = 0;
-      const uint32_t corners = frame - 144;
-      const uint32_t step = AddCornersAt(base, path, entry, corners, &corners_r3, &a, &b);
-      if (step >= 2) {
-        r3 = calls.join(calls.user, step, corners, path, a, b);
-        AddCornersAtFinish(base, path);
-      } else {
-        r3 = corners_r3;
-      }
+      uint32_t corners_r3 = 0;
+      AddCornersAt(base, path, entry, frame - 144, &corners_r3);
+      r3 = corners_r3;
       previous = entry;
       const int16_t added = int16_t(guest::LoadU16(base, path + 5136) + 1);
       guest::StoreU16(base, path + 5136, uint16_t(added));

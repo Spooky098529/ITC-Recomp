@@ -20,6 +20,10 @@ render command replay and the graphics library), and
 that replaced the emulated GPU, and (its last section) the investigation
 of the render thread's performance. `docs/native-audio.md` is the same for
 the SDK's audio (the Audio Worker's spin, the game's sounds, the plan).
+`docs/native-movies.md` is the movies played through our own FFmpeg and
+drawn by our renderer (`--play_movies_with_ffmpeg`, on by default, since
+2026-10-25), replacing the movie library linked into the game
+(`docs/functions/movies.md`; `itc_movie_check` plays one on its own).
 `docs/unlocked-res.md` covers drawing at other resolutions (`--width`,
 `--height`, `--fullscreen`, black bars) and what's left to try.
 `docs/windows.md` is the Windows build: cross-compiled on Linux, tested
@@ -229,6 +233,19 @@ their prints (given plain C++ of their own since; each harness now has
 its own random generator); `ActionMappers::Init` tops the leads; the rest waits on the models'
 resource relocation and shader pairs, the vertex declaration and the
 critical section wrappers.
+Its thirteenth run (`b7-loop-24-10-26-4`, 2026-10-24 to 25, ended by the
+user before the framework's migration, merged into `rexglue-removal-project`
+2026-10-25; summary
+`docs/loops/b7-loop-2026-10-24-2133.md`) made `ActionMappers::Init`, three
+cleanup leads and the race's screen objects native (`screen-objects.md`,
+`--native_screen_objects`, 38 of 42) and mapped the app framework
+(`framework.md`, 68 rows, its migration the first lead); beside it, the
+user's work replaced two libraries linked into the game: the HLSL
+compiler (its 14 shaders stored, `--use_hardcoded_shaders`) and the movie
+library (`--play_movies_with_ffmpeg`, `docs/native-movies.md`), whose
+~640 and ~580 functions no longer run; replaced libraries aren't mapped
+("Rules that still hold" in `docs/loops/b7-loop.md`); ours 1,794 ->
+1,847, work left 4,967 -> 4,604 (the coverage list made again twice).
 Harness runs use `attract_race.sh 40` (the user's call,
 2026-10-23); a race short only because the harnesses took longer is
 no halt.

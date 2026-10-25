@@ -6,6 +6,7 @@
 #include "generated_gamma_comp.h"
 #include "generated_id_frag.h"
 #include "xbox_gamma_table.h"
+#include "generated_movie_frag.h"
 #include "generated_resolve_frag.h"
 #include "generated_resolve_ms_frag.h"
 #include "generated_resolve_vert.h"
@@ -1044,6 +1045,28 @@ struct Passes::State {
   // Source and destination pairs logged so far.
   std::unordered_set<uint64_t> logged_resolves;
 
+  // Movies' frames (DrawMovie): their own pixel shader with the resolve's
+  // vertex shader; per frame in flight, the three planes and the buffer
+  // they're uploaded through. Made at the first frame, for its size.
+  struct MovieUpload {
+    Image planes[3];
+    VkImageLayout layouts[3] = {VK_IMAGE_LAYOUT_UNDEFINED, VK_IMAGE_LAYOUT_UNDEFINED,
+                                VK_IMAGE_LAYOUT_UNDEFINED};
+    VkBuffer staging = VK_NULL_HANDLE;
+    VkDeviceMemory staging_memory = VK_NULL_HANDLE;
+    uint8_t* mapped = nullptr;
+    VkDescriptorSet set = VK_NULL_HANDLE;
+  };
+  std::vector<MovieUpload> movie_uploads;
+  VkExtent2D movie_extent{};
+  bool movie_failed = false;
+  VkDescriptorSetLayout movie_set_layout = VK_NULL_HANDLE;
+  VkPipelineLayout movie_layout = VK_NULL_HANDLE;
+  VkDescriptorPool movie_pool = VK_NULL_HANDLE;
+  VkShaderModule movie_pixel = VK_NULL_HANDLE;
+  VkSampler movie_sampler = VK_NULL_HANDLE;
+  std::map<std::pair<VkFormat, VkSampleCountFlagBits>, VkPipeline> movie_pipelines;
+
   struct ConstantBlock {
     VkBuffer buffer = VK_NULL_HANDLE;
     VkDeviceMemory memory = VK_NULL_HANDLE;
@@ -1180,6 +1203,12 @@ struct Passes::State {
   VkExtent2D tiling_extent{};
   bool CreateResolveResources();
   VkPipeline GetResolvePipeline(VkFormat format, bool multisample);
+  // A pipeline drawing the resolve's viewport-covering triangle with
+  // `pixel`, into one color attachment, no blending.
+  VkPipeline MakeFullscreenPipeline(VkShaderModule pixel, VkPipelineLayout layout,
+                                    VkFormat format, VkSampleCountFlagBits samples);
+  bool CreateMovieResources(VkExtent2D extent);
+  VkPipeline GetMoviePipeline(VkFormat format, VkSampleCountFlagBits samples);
   void EndRendering(VkCommandBuffer commands);
   bool CreateGuestMemoryMirror();
   bool CreateGuestMemoryMirror(GuestMirror& mirror);
@@ -2706,6 +2735,17 @@ VkPipeline Passes::State::GetResolvePipeline(VkFormat format, bool multisample) 
   if (!added) {
     return it->second;
   }
+  it->second = MakeFullscreenPipeline(multisample ? resolve_pixel_ms : resolve_pixel,
+                                      resolve_layout, format, VK_SAMPLE_COUNT_1_BIT);
+  if (!it->second) {
+    ITC_LOG_ERROR("native renderer: couldn't create a resolve pipeline for format {}",
+                  int(format));
+  }
+  return it->second;
+}
+
+VkPipeline Passes::State::MakeFullscreenPipeline(VkShaderModule pixel, VkPipelineLayout layout,
+                                                 VkFormat format, VkSampleCountFlagBits samples) {
   VkPipelineShaderStageCreateInfo stages[2] = {};
   for (VkPipelineShaderStageCreateInfo& stage : stages) {
     stage = {VK_STRUCTURE_TYPE_PIPELINE_SHADER_STAGE_CREATE_INFO};
@@ -2714,7 +2754,7 @@ VkPipeline Passes::State::GetResolvePipeline(VkFormat format, bool multisample) 
   stages[0].stage = VK_SHADER_STAGE_VERTEX_BIT;
   stages[0].module = resolve_vertex;
   stages[1].stage = VK_SHADER_STAGE_FRAGMENT_BIT;
-  stages[1].module = multisample ? resolve_pixel_ms : resolve_pixel;
+  stages[1].module = pixel;
   VkPipelineVertexInputStateCreateInfo vertex_input{
       VK_STRUCTURE_TYPE_PIPELINE_VERTEX_INPUT_STATE_CREATE_INFO};
   VkPipelineInputAssemblyStateCreateInfo input_assembly{
@@ -2730,7 +2770,7 @@ VkPipeline Passes::State::GetResolvePipeline(VkFormat format, bool multisample) 
   raster.lineWidth = 1.0f;
   VkPipelineMultisampleStateCreateInfo multisample_state{
       VK_STRUCTURE_TYPE_PIPELINE_MULTISAMPLE_STATE_CREATE_INFO};
-  multisample_state.rasterizationSamples = VK_SAMPLE_COUNT_1_BIT;
+  multisample_state.rasterizationSamples = samples;
   VkPipelineColorBlendAttachmentState attachment{};
   attachment.colorWriteMask = 0xF;
   VkPipelineColorBlendStateCreateInfo blend{VK_STRUCTURE_TYPE_PIPELINE_COLOR_BLEND_STATE_CREATE_INFO};
@@ -2754,14 +2794,13 @@ VkPipeline Passes::State::GetResolvePipeline(VkFormat format, bool multisample) 
   info.pMultisampleState = &multisample_state;
   info.pColorBlendState = &blend;
   info.pDynamicState = &dynamic;
-  info.layout = resolve_layout;
+  info.layout = layout;
+  VkPipeline pipeline = VK_NULL_HANDLE;
   if (vk::vkCreateGraphicsPipelines(context.device, pipeline_cache, 1, &info, nullptr,
-                                    &it->second) != VK_SUCCESS) {
-    ITC_LOG_ERROR("native renderer: couldn't create a resolve pipeline for format {}",
-                  int(format));
-    it->second = VK_NULL_HANDLE;
+                                    &pipeline) != VK_SUCCESS) {
+    return VK_NULL_HANDLE;
   }
-  return it->second;
+  return pipeline;
 }
 
 bool Passes::State::ResolveInto(VkCommandBuffer commands, uint8_t* base, Target& source,
@@ -2905,6 +2944,207 @@ bool Passes::State::ResolveInto(VkCommandBuffer commands, uint8_t* base, Target&
     }
   }
   return true;
+}
+
+bool Passes::State::CreateMovieResources(VkExtent2D extent) {
+  VkDevice device = context.device;
+  if (!movie_layout) {
+    VkDescriptorSetLayoutBinding bindings[3];
+    for (uint32_t i = 0; i < 3; i++) {
+      bindings[i] = {i, VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, 1,
+                     VK_SHADER_STAGE_FRAGMENT_BIT, nullptr};
+    }
+    VkDescriptorSetLayoutCreateInfo set_info{
+        VK_STRUCTURE_TYPE_DESCRIPTOR_SET_LAYOUT_CREATE_INFO};
+    set_info.bindingCount = 3;
+    set_info.pBindings = bindings;
+    VkPushConstantRange push{VK_SHADER_STAGE_FRAGMENT_BIT, 0, 16};
+    VkPipelineLayoutCreateInfo layout_info{VK_STRUCTURE_TYPE_PIPELINE_LAYOUT_CREATE_INFO};
+    layout_info.setLayoutCount = 1;
+    layout_info.pSetLayouts = &movie_set_layout;
+    layout_info.pushConstantRangeCount = 1;
+    layout_info.pPushConstantRanges = &push;
+    VkShaderModuleCreateInfo module_info{VK_STRUCTURE_TYPE_SHADER_MODULE_CREATE_INFO};
+    module_info.codeSize = sizeof(k_movie_frag);
+    module_info.pCode = k_movie_frag;
+    // Bilinear, as the movie library's sampler states.
+    VkSamplerCreateInfo sampler_info{VK_STRUCTURE_TYPE_SAMPLER_CREATE_INFO};
+    sampler_info.magFilter = sampler_info.minFilter = VK_FILTER_LINEAR;
+    sampler_info.addressModeU = sampler_info.addressModeV = sampler_info.addressModeW =
+        VK_SAMPLER_ADDRESS_MODE_CLAMP_TO_EDGE;
+    VkDescriptorPoolSize size{VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER,
+                              3 * frames_in_flight};
+    VkDescriptorPoolCreateInfo pool_info{VK_STRUCTURE_TYPE_DESCRIPTOR_POOL_CREATE_INFO};
+    pool_info.maxSets = frames_in_flight;
+    pool_info.poolSizeCount = 1;
+    pool_info.pPoolSizes = &size;
+    if (vk::vkCreateDescriptorSetLayout(device, &set_info, nullptr, &movie_set_layout) !=
+            VK_SUCCESS ||
+        vk::vkCreatePipelineLayout(device, &layout_info, nullptr, &movie_layout) != VK_SUCCESS ||
+        vk::vkCreateShaderModule(device, &module_info, nullptr, &movie_pixel) != VK_SUCCESS ||
+        vk::vkCreateSampler(device, &sampler_info, nullptr, &movie_sampler) != VK_SUCCESS ||
+        vk::vkCreateDescriptorPool(device, &pool_info, nullptr, &movie_pool) != VK_SUCCESS) {
+      return false;
+    }
+  }
+  // Another size than the last movie's (none in the game: all are
+  // 1280x720): the old planes are left, as the renderer leaves its other
+  // images at exit.
+  movie_uploads.assign(frames_in_flight, {});
+  movie_extent = extent;
+  const VkExtent2D sizes[3] = {extent,
+                               {extent.width / 2, extent.height / 2},
+                               {extent.width / 2, extent.height / 2}};
+  const VkDeviceSize staging_size = VkDeviceSize(extent.width) * extent.height * 3 / 2;
+  for (MovieUpload& upload : movie_uploads) {
+    for (uint32_t i = 0; i < 3; i++) {
+      if (!CreateImage(upload.planes[i], VK_IMAGE_TYPE_2D, VK_IMAGE_VIEW_TYPE_2D,
+                       VK_FORMAT_R8_UNORM, {sizes[i].width, sizes[i].height, 1}, 1,
+                       VK_IMAGE_USAGE_SAMPLED_BIT | VK_IMAGE_USAGE_TRANSFER_DST_BIT,
+                       VK_IMAGE_ASPECT_COLOR_BIT, 0, VK_SAMPLE_COUNT_1_BIT)) {
+        return false;
+      }
+    }
+    VkBufferCreateInfo info{VK_STRUCTURE_TYPE_BUFFER_CREATE_INFO};
+    info.size = staging_size;
+    info.usage = VK_BUFFER_USAGE_TRANSFER_SRC_BIT;
+    info.sharingMode = VK_SHARING_MODE_EXCLUSIVE;
+    if (vk::vkCreateBuffer(device, &info, nullptr, &upload.staging) != VK_SUCCESS) {
+      return false;
+    }
+    VkMemoryRequirements requirements;
+    vk::vkGetBufferMemoryRequirements(device, upload.staging, &requirements);
+    VkMemoryAllocateInfo alloc{VK_STRUCTURE_TYPE_MEMORY_ALLOCATE_INFO};
+    alloc.allocationSize = requirements.size;
+    alloc.memoryTypeIndex =
+        FindMemoryType(memory_properties, requirements.memoryTypeBits,
+                       VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT);
+    if (alloc.memoryTypeIndex == UINT32_MAX ||
+        vk::vkAllocateMemory(device, &alloc, nullptr, &upload.staging_memory) != VK_SUCCESS ||
+        vk::vkBindBufferMemory(device, upload.staging, upload.staging_memory, 0) != VK_SUCCESS ||
+        vk::vkMapMemory(device, upload.staging_memory, 0, VK_WHOLE_SIZE, 0,
+                        reinterpret_cast<void**>(&upload.mapped)) != VK_SUCCESS) {
+      return false;
+    }
+    gpu_memory::Allocated(gpu_memory::Kind::kOther, alloc.allocationSize);
+    VkDescriptorSetAllocateInfo set_alloc{VK_STRUCTURE_TYPE_DESCRIPTOR_SET_ALLOCATE_INFO};
+    set_alloc.descriptorPool = movie_pool;
+    set_alloc.descriptorSetCount = 1;
+    set_alloc.pSetLayouts = &movie_set_layout;
+    if (vk::vkAllocateDescriptorSets(device, &set_alloc, &upload.set) != VK_SUCCESS) {
+      return false;
+    }
+    VkDescriptorImageInfo images[3];
+    VkWriteDescriptorSet writes[3];
+    for (uint32_t i = 0; i < 3; i++) {
+      images[i] = {movie_sampler, upload.planes[i].view, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL};
+      writes[i] = {VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET};
+      writes[i].dstSet = upload.set;
+      writes[i].dstBinding = i;
+      writes[i].descriptorCount = 1;
+      writes[i].descriptorType = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
+      writes[i].pImageInfo = &images[i];
+    }
+    vk::vkUpdateDescriptorSets(device, 3, writes, 0, nullptr);
+  }
+  return true;
+}
+
+VkPipeline Passes::State::GetMoviePipeline(VkFormat format, VkSampleCountFlagBits samples) {
+  auto [it, added] = movie_pipelines.try_emplace({format, samples}, VK_NULL_HANDLE);
+  if (added) {
+    it->second = MakeFullscreenPipeline(movie_pixel, movie_layout, format, samples);
+    if (!it->second) {
+      ITC_LOG_ERROR("native renderer: couldn't create a movie pipeline for format {}",
+                    int(format));
+    }
+  }
+  return it->second;
+}
+
+void Passes::DrawMovie(VkCommandBuffer commands, uint8_t* base, uint32_t device,
+                       const MoviePlanes& planes) {
+  State& s = *state_;
+  if (s.movie_failed || !planes.width || !planes.height) {
+    return;
+  }
+  if (planes.width != s.movie_extent.width || planes.height != s.movie_extent.height) {
+    if (!s.CreateMovieResources({planes.width, planes.height})) {
+      ITC_LOG_ERROR("native renderer: couldn't make the movies' resources; movies aren't drawn");
+      s.movie_failed = true;
+      return;
+    }
+    ITC_LOG_INFO("native renderer: movies drawn from {}x{} planes", planes.width, planes.height);
+  }
+  uint32_t object = guest::LoadU32(base, device + kDeviceRenderTarget0);
+  Target* target = object ? s.GetTarget(commands, base, object, false) : nullptr;
+  if (!target) {
+    return;
+  }
+  VkPipeline pipeline = s.GetMoviePipeline(target->format, target->samples);
+  if (!pipeline) {
+    return;
+  }
+  State::MovieUpload& upload = s.movie_uploads[s.frame];
+  // The planes into this frame's buffer, then into its images.
+  const VkExtent2D sizes[3] = {{planes.width, planes.height},
+                               {planes.width / 2, planes.height / 2},
+                               {planes.width / 2, planes.height / 2}};
+  const uint8_t* sources[3] = {planes.y, planes.u, planes.v};
+  VkDeviceSize offsets[3];
+  VkDeviceSize offset = 0;
+  for (uint32_t i = 0; i < 3; i++) {
+    offsets[i] = offset;
+    VkDeviceSize bytes = VkDeviceSize(sizes[i].width) * sizes[i].height;
+    std::memcpy(upload.mapped + offset, sources[i], bytes);
+    offset += bytes;
+  }
+  s.EndRendering(commands);
+  for (uint32_t i = 0; i < 3; i++) {
+    Transition(commands, upload.planes[i].image, VK_IMAGE_ASPECT_COLOR_BIT, upload.layouts[i],
+               VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL);
+    VkBufferImageCopy copy{};
+    copy.bufferOffset = offsets[i];
+    copy.imageSubresource = {VK_IMAGE_ASPECT_COLOR_BIT, 0, 0, 1};
+    copy.imageExtent = {sizes[i].width, sizes[i].height, 1};
+    vk::vkCmdCopyBufferToImage(commands, upload.staging, upload.planes[i].image,
+                               VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, 1, &copy);
+    Transition(commands, upload.planes[i].image, VK_IMAGE_ASPECT_COLOR_BIT, upload.layouts[i],
+               VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL);
+  }
+  // The library's rectangle: the target's top-left 1280x720 guest pixels.
+  int32_t width = std::min(State::ScaledBy(1280, target->scale), int32_t(target->extent.width));
+  int32_t height = std::min(State::ScaledBy(720, target->scale), int32_t(target->extent.height));
+  if (width <= 0 || height <= 0) {
+    return;
+  }
+  Transition(commands, target->image.image, target->aspects(), target->layout,
+             VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL);
+  VkRect2D area{{0, 0}, {uint32_t(width), uint32_t(height)}};
+  VkRenderingAttachmentInfo attachment{VK_STRUCTURE_TYPE_RENDERING_ATTACHMENT_INFO};
+  attachment.imageView = target->image.view;
+  attachment.imageLayout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL;
+  attachment.loadOp = VK_ATTACHMENT_LOAD_OP_LOAD;
+  attachment.storeOp = VK_ATTACHMENT_STORE_OP_STORE;
+  VkRenderingInfo info{VK_STRUCTURE_TYPE_RENDERING_INFO};
+  info.renderArea = area;
+  info.layerCount = 1;
+  info.colorAttachmentCount = 1;
+  info.pColorAttachments = &attachment;
+  vk::vkCmdBeginRendering(commands, &info);
+  VkViewport viewport{0.0f, 0.0f, float(width), float(height), 0.0f, 1.0f};
+  vk::vkCmdSetViewport(commands, 0, 1, &viewport);
+  vk::vkCmdSetScissor(commands, 0, 1, &area);
+  vk::vkCmdBindPipeline(commands, VK_PIPELINE_BIND_POINT_GRAPHICS, pipeline);
+  vk::vkCmdBindDescriptorSets(commands, VK_PIPELINE_BIND_POINT_GRAPHICS, s.movie_layout, 0, 1,
+                              &upload.set, 0, nullptr);
+  float constants[4] = {0.0f, 0.0f, float(width), float(height)};
+  vk::vkCmdPushConstants(commands, s.movie_layout, VK_SHADER_STAGE_FRAGMENT_BIT, 0,
+                         sizeof(constants), constants);
+  vk::vkCmdDraw(commands, 3, 1, 0, 0);
+  vk::vkCmdEndRendering(commands);
+  s.recorded.valid = false;
+  s.stats.movie_draws++;
 }
 
 Passes::Passes() : state_(std::make_unique<State>()) {

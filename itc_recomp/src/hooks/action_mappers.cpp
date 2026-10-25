@@ -24,7 +24,8 @@ ITC_FLAG_BOOL(native_action_mappers, true, "ITC",
               "ActionMappers::Configure, sub_8209F228; the set-up, sub_8210C078, sub_8210BB38, "
               "sub_8210BAB0, sub_8210B8A8, sub_8210B438, sub_8210AEB0, sub_8210AE60 and "
               "sub_8210AF00; the mapper's constructor, sub_8210C180; ActionMapper::Bind, "
-              "sub_8210B270 (no adapter), and InputClientList::BindAll, sub_8210AF08, with --native_heap) "
+              "sub_8210B270 (no adapter), and InputClientList::BindAll, sub_8210AF08, with --native_heap; "
+              "ActionMappers::Init, sub_8209F430, with --native_heap) "
               "natively instead of through the translated "
               "code (same results; checked by --run_harnesses=action_mappers)");
 
@@ -42,13 +43,6 @@ ITC_FLAG_BOOL(native_action_mappers, true, "ITC",
   extern "C" REX_FUNC(sub_##address) {  \
     ITC_MAPPERS_FALLBACK(address)       \
     ctx.r3.u64 = uint32_t(expr);        \
-  }
-
-// An adapter leaving r3 as it was (the originals don't change it).
-#define ITC_MAPPERS_VOID(address, call) \
-  extern "C" REX_FUNC(sub_##address) { \
-    ITC_MAPPERS_FALLBACK(address)      \
-    call;                              \
   }
 
 using namespace action_mappers;
@@ -93,12 +87,11 @@ extern "C" REX_FUNC(sub_8258CF10) {
   NoteListenerTest(caller, listener, mask, ctx.r3.u32);
 }
 
-// IndexOf (sub_8210B140), ClientNode::ClientNode, ClientList::ClientList and
-// ClientList::Add (sub_8259C6D0, sub_8259C7B8, sub_8259C960) have no
-// adapters: their callers in play are native.
-ITC_MAPPERS_WORD(8259C868, ClientListCount(base, ctx.r3.u32, ctx.r4.u32, ctx.r5.u32))
-ITC_MAPPERS_WORD(8259C898, ClientListBoundCount(base, ctx.r3.u32, ctx.r4.u32, ctx.r5.u32))
-ITC_MAPPERS_WORD(8259C818, ClientListFind(base, ctx.r3.u32, ctx.r4.u32))
+// IndexOf (sub_8210B140), ClientNode::ClientNode, ClientList::ClientList,
+// ClientList::Add, Count, BoundCount and Find (sub_8259C6D0, sub_8259C7B8,
+// sub_8259C960, sub_8259C868, sub_8259C898, sub_8259C818) have no adapters:
+// their callers in play (BindAll and ActionMappers::Update) are native and
+// call their plain C++.
 
 // The update. sub_8210C0E0, sub_8210B7D0, sub_8210B4A8, sub_8210B500,
 // sub_8210B718 and sub_8210BBA0 have no adapters: their only callers in
@@ -157,20 +150,9 @@ ITC_MAPPERS_WORD(8210BDF0, SetRepeat(base, ctx.r3.u32, ctx.r4.u32, ctx.r5.u32, c
 ITC_MAPPERS_WORD(8210BE30, SetCurve(base, ctx.r3.u32, ctx.r4.u32, ctx.f1.f64, ctx.f2.f64,
                                     ctx.f3.f64))
 
-// ActionMappers::Configure: the original unless the four mappers' slots are
-// the setters above.
-extern "C" REX_FUNC(sub_8209F228) {
-  ITC_MAPPERS_FALLBACK(8209F228)
-  if (!ConfigureKnown(base)) {
-    __imp__sub_8209F228(ctx, base);
-    return;
-  }
-  double f[3] = {ctx.f1.f64, ctx.f2.f64, ctx.f3.f64};
-  ctx.r3.u64 = Configure(base, ctx.r3.u32, f);
-  ctx.f1.f64 = f[0];
-  ctx.f2.f64 = f[1];
-  ctx.f3.f64 = f[2];
-}
+// ActionMappers::Configure (sub_8209F228) has no adapter: its only caller
+// in play, ActionMappers::Init below, calls its plain C++ (the original when
+// ConfigureKnown fails).
 
 // The set-up. ResetWords, ResetAnalog, InitRepeats, InitCurves and
 // ResetStages (sub_8210B8A8, sub_8210B438, sub_8210BB38, sub_8210BAB0,
@@ -179,24 +161,11 @@ extern "C" REX_FUNC(sub_8209F228) {
 // native and call their plain C++ (a recompiled caller reaching them runs
 // the original, and the flag switches the constructor).
 
-ITC_MAPPERS_VOID(8210AEB0, InputClientListConstruct(base, ctx.r3.u32, ctx.r4.u32))
-extern "C" REX_FUNC(sub_8210AF00) {
-  ITC_MAPPERS_FALLBACK(8210AF00)
-  InputClientListAdd(base, ctx.r4.u32);
-  ctx.r3.u64 = ctx.r4.u32;
-}
-
-// ActionMapper::ActionMapper: r3 = the mapper, r4 = the player; r3 the
-// mapper. The original unless the repeat and curve vtables' slot 0 are the
-// resets seen in play.
-extern "C" REX_FUNC(sub_8210C180) {
-  ITC_MAPPERS_FALLBACK(8210C180)
-  if (!MapperConstructKnown(base)) {
-    __imp__sub_8210C180(ctx, base);
-    return;
-  }
-  MapperConstruct(base, ctx.r3.u32, ctx.r4.u32);
-}
+// InputClientList::InputClientList, InputClientList::Add and
+// ActionMapper::ActionMapper (sub_8210AEB0, sub_8210AF00, sub_8210C180) have
+// no adapters: their only caller in play, ActionMappers::Init below, calls
+// their plain C++ (a recompiled caller reaching them runs the original, and
+// the flag switches Init).
 
 // ActionMapper::Bind (sub_8210B270) has no adapter: its only caller in
 // play, BindAll below, calls its plain C++ (a recompiled caller reaching it
@@ -235,4 +204,38 @@ extern "C" REX_FUNC(sub_8210AF08) {
   });
   ctx.lr = saved_lr;
   ctx.r3.u64 = 1;
+}
+
+// ActionMappers::Init: r3 = the manager (the app object), r4 = the settings'
+// index. The list and the mappers made natively (InitCreate), then BindAll
+// through its adapter (it makes a guest call to the owner's slot +36) and
+// Configure, in the original's frame (112 bytes). The original unless the
+// heap is the allocation layer's, the mappers' constructor runs natively and
+// operator new gives every block. r3 and f1-f3 are Configure's.
+extern "C" REX_FUNC(sub_8209F430) {
+  ITC_MAPPERS_FALLBACK(8209F430)
+  uint32_t list = 0;
+  if (!hooks::NativeHeapActive() || !MapperConstructKnown(base) ||
+      !InitCreate(base, ctx.r3.u32, &list)) {
+    __imp__sub_8209F430(ctx, base);
+    return;
+  }
+  const uint32_t index = ctx.r4.u32;
+  const uint64_t saved_lr = ctx.lr;
+  guest_call::InFrame(ctx, base, 112, 0x8209F56C, [&](uint32_t) {
+    ctx.r3.u64 = list;
+    sub_8210AF08(ctx, base);
+    if (ConfigureKnown(base)) {
+      double f[3] = {ctx.f1.f64, ctx.f2.f64, ctx.f3.f64};
+      ctx.r3.u64 = Configure(base, index, f);
+      ctx.f1.f64 = f[0];
+      ctx.f2.f64 = f[1];
+      ctx.f3.f64 = f[2];
+    } else {
+      ctx.r3.u64 = index;
+      ctx.lr = 0x8209F574;
+      sub_8209F228(ctx, base);
+    }
+  });
+  ctx.lr = saved_lr;
 }

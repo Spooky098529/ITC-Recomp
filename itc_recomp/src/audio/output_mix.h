@@ -14,7 +14,13 @@
 namespace audio {
 
 // `input` has `samples` samples a channel, six channels one after another.
-void ToInterleaved51(const float* input, size_t samples, float* output);
-void ToInterleavedStereo(const float* input, size_t samples, float* output);
+// `front`, if given, is stereo (interleaved native floats, left then right)
+// added to the front channels before the fold and the clamp, as XAudio's
+// default matrix routes a stereo voice: the movies' sound
+// (docs/native-movies.md).
+void ToInterleaved51(const float* input, size_t samples, float* output,
+                     const float* front = nullptr);
+void ToInterleavedStereo(const float* input, size_t samples, float* output,
+                         const float* front = nullptr);
 
 }  // namespace audio

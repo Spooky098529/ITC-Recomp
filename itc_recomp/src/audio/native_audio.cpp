@@ -15,6 +15,7 @@
 #include "audio/native_audio.h"
 
 #include "audio/output_mix.h"
+#include "movies/player.h"
 
 #include "guest.h"
 
@@ -333,25 +334,33 @@ class ItcAudioSystem : public rex::audio::AudioSystem {
     }
     size_t index = reinterpret_cast<size_t>(userdata);
     std::array<float, kFrameSamples> data;
+    // A frame of silence, for a movie's sound where the mixer has none.
+    static const Frame kSilence{};
     bool played = false;
     {
       std::lock_guard<std::mutex> lock(self->mutex_);
       Client& client = self->clients_[index];
       const int len = int(sizeof(float)) * int(kChannelSamples) * client.device_channels;
       while (additional_amount > 0) {
+        // The playing movie's sound, if any, for this frame's time.
+        std::array<float, 2 * kChannelSamples> movie{};
+        movies::MixSoundingAudio(movie.data(), kChannelSamples);
+        auto convert = [&](const Frame& frame) {
+          if (ITC_FLAG(audio_mute)) {
+            std::memset(data.data(), 0, len);
+          } else if (client.device_channels == 6) {
+            audio::ToInterleaved51(frame.data(), kChannelSamples, data.data(), movie.data());
+          } else {
+            audio::ToInterleavedStereo(frame.data(), kChannelSamples, data.data(), movie.data());
+          }
+        };
         if (client.queued.empty()) {
-          std::memset(data.data(), 0, len);
+          convert(kSilence);
           client.silence_fills++;
         } else {
           std::unique_ptr<Frame> frame = std::move(client.queued.front());
           client.queued.pop_front();
-          if (ITC_FLAG(audio_mute)) {
-            std::memset(data.data(), 0, len);
-          } else if (client.device_channels == 6) {
-            audio::ToInterleaved51(frame->data(), kChannelSamples, data.data());
-          } else {
-            audio::ToInterleavedStereo(frame->data(), kChannelSamples, data.data());
-          }
+          convert(*frame);
           client.unused.push_back(std::move(frame));
           client.credits++;
           client.frames_played++;

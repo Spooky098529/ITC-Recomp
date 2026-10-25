@@ -54,6 +54,19 @@ class Passes {
                     uint32_t rect, uint32_t destination, uint32_t point, uint32_t clear_color,
                     float clear_z, uint32_t tile, uint32_t tiles);
   void EndTiling();
+  // A movie's frame (docs/native-movies.md), drawn over render target 0 of
+  // `device` at the place of the command that drew it (command 28): the Y
+  // plane (width x height) and the half-size U and V, rows with no padding,
+  // stretched over the target's top-left 1280x720 guest pixels, as the
+  // movie library drew them.
+  struct MoviePlanes {
+    uint32_t width = 0, height = 0;
+    const uint8_t* y = nullptr;
+    const uint8_t* u = nullptr;
+    const uint8_t* v = nullptr;
+  };
+  void DrawMovie(VkCommandBuffer commands, uint8_t* base, uint32_t device,
+                 const MoviePlanes& planes);
   // The frame's end (sub_8258D998, outside the command list): the game
   // resolves render target 0 of `device` whole into a front buffer texture
   // (`front_buffer`, its fetch constant at +28). That target is then shown.
@@ -199,6 +212,8 @@ class Passes {
     // Draws with render targets 1-3 bound to another surface than 0 (only 0
     // is drawn), or color and depth of different sample counts.
     uint64_t extra_targets = 0, mismatched_samples = 0;
+    // Movie frames drawn (DrawMovie).
+    uint64_t movie_draws = 0;
     // Draws with a depth bias, and with an "equal" depth test.
     uint64_t depth_biased = 0, depth_equal = 0;
     // Draws reading a vertex buffer past the size its fetch constant gives,

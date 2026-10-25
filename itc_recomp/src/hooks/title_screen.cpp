@@ -119,14 +119,17 @@ extern "C" REX_FUNC(sub_820A4450) {
   __imp__sub_820A4450(ctx, base);
 }
 
-// The render thread's command that starts the boot movie (1280x720, through
-// sub_82481A70); it waits in the movie player (sub_82491C50) for the first
-// decoded frame. If the movie step ends the movie before then, the main
-// thread waits on the render thread in Boot::EndMovie and the decoder never
-// delivers: --skip_intro stalled about 1 boot in 6 that way without the GPU
-// plugin. So --skip_intro waits for this to return.
-extern "C" REX_FUNC(sub_820AE958) {
-  REX_FUNC_PROLOGUE();
-  __imp__sub_820AE958(ctx, base);
+namespace hooks {
+
+// Movie::RenderFrame (sub_820AE958, hooks/movies.cpp) has returned. With the
+// movie library (--play_movies_with_ffmpeg=false), its first call waits in
+// the player (sub_82491C50) for the first decoded frame; if the movie step
+// ended the movie before then, the main thread waited on the render thread
+// in Boot::EndMovie and the decoder never delivered: --skip_intro stalled
+// about 1 boot in 6 that way without the GPU plugin. So --skip_intro waits
+// for it.
+void TitleScreen_MovieRendered() {
   g_movie_started = true;
 }
+
+}  // namespace hooks

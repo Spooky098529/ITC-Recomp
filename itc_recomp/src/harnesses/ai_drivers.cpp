@@ -193,45 +193,23 @@ ITC_NATIVE_STEP(NativeJoinCorners,
                 ctx.r3.u64 = ai::JoinCorners(base, ctx.r4.u32, ctx.r5.u32, ctx.r6.u32))
 ITC_NATIVE_STEP(NativeJoinCornersShort,
                 ctx.r3.u64 = ai::JoinCornersShort(base, ctx.r4.u32, ctx.r5.u32, ctx.r6.u32))
-void RunJoinStep(PPCContext& ctx, uint8_t* base, uint32_t step, uint32_t frame,
-                 uint32_t chain) {
-  const uint32_t saved = ctx.r1.u32;
-  guest::StoreU32(base, frame, chain);
-  ctx.r1.u32 = frame;
-  ctx.r6.u64 = frame + 80;
-  if (step == 2) {
-    sub_8213BDF0(ctx, base);
-  } else {
-    sub_8213BE80(ctx, base);
-  }
-  ctx.r1.u32 = saved;
-}
+// JoinCornerPair's equal directions' steps (never seen in play): r4 = a,
+// r5 = b, r6 = &the count.
+ITC_NATIVE_STEP(NativeJoinCornersByExit,
+                ai::JoinCornersByExit(base, ctx.r4.u32, ctx.r5.u32, ctx.r6.u32))
+ITC_NATIVE_STEP(NativeJoinCornersByEntry,
+                ctx.r3.u64 = ai::JoinCornersByEntry(base, ctx.r4.u32, ctx.r5.u32, ctx.r6.u32))
 void NativeJoinCornerPair(PPCContext& ctx, uint8_t* base) {
   ctx.fpscr.disableFlushMode();
   uint32_t r3 = 0;
-  const uint32_t frame = ctx.r1.u32 - 112;
-  const uint32_t step = ai::JoinCornerPair(base, ctx.r4.u32, ctx.r5.u32, frame, &r3);
-  if (step == 1) {
+  if (ai::JoinCornerPair(base, ctx.r4.u32, ctx.r5.u32, ctx.r1.u32 - 112, &r3)) {
     ctx.r3.u64 = r3;
-  } else if (step >= 2) {
-    RunJoinStep(ctx, base, step, frame, ctx.r1.u32);
   }
 }
 void NativeAddCornersAt(PPCContext& ctx, uint8_t* base) {
   ctx.fpscr.disableFlushMode();
-  const uint32_t path = ctx.r3.u32;
-  const uint32_t frame = ctx.r1.u32 - 144;
-  uint32_t r3 = 0, a = 0, b = 0;
-  const uint32_t step = ai::AddCornersAt(base, path, ctx.r4.u32, frame, &r3, &a, &b);
-  if (step >= 2) {
-    guest::StoreU32(base, frame, ctx.r1.u32);
-    ctx.r3.u64 = path;
-    ctx.r4.u64 = a;
-    ctx.r5.u64 = b;
-    RunJoinStep(ctx, base, step, frame - 112, frame);
-    ai::AddCornersAtFinish(base, path);
-    return;
-  }
+  uint32_t r3 = 0;
+  ai::AddCornersAt(base, ctx.r3.u32, ctx.r4.u32, ctx.r1.u32 - 144, &r3);
   ctx.r3.u64 = r3;
 }
 
@@ -462,29 +440,16 @@ uint64_t CallNormalizer(void* user, uint32_t function, uint32_t frame, uint32_t 
   ctx.fpscr.disableFlushMode();
   return ctx.r3.u64;
 }
-uint64_t CallJoinStep(void* user, uint32_t step, uint32_t frame, uint32_t path, uint32_t a,
-                      uint32_t b) {
-  auto& call = *static_cast<PathCall*>(user);
-  PPCContext& ctx = *call.ctx;
-  uint8_t* base = call.base;
-  guest::StoreU32(base, frame, frame + 144);
-  ctx.r3.u64 = path;
-  ctx.r4.u64 = a;
-  ctx.r5.u64 = b;
-  RunJoinStep(ctx, base, step, frame - 112, frame);
-  ctx.fpscr.disableFlushMode();
-  return ctx.r3.u64;
-}
 void NativeExtend(PPCContext& ctx, uint8_t* base) {
   ctx.fpscr.disableFlushMode();
   PathCall call{&ctx, base};
-  const ai::PathCalls calls{&call, CallNormalizer, CallJoinStep};
+  const ai::PathCalls calls{&call, CallNormalizer};
   ctx.r3.u64 = ai::Extend(base, ctx.r3.u32, ctx.r4.u32, ctx.r1.u32 - 208, calls);
 }
 void NativeUpdatePath(PPCContext& ctx, uint8_t* base) {
   ctx.fpscr.disableFlushMode();
   PathCall call{&ctx, base};
-  const ai::PathCalls calls{&call, CallNormalizer, CallJoinStep};
+  const ai::PathCalls calls{&call, CallNormalizer};
   uint64_t r3 = 0;
   if (ai::UpdatePath(base, ctx.r3.u32, ctx.r1.u32 - 144, calls, &r3)) {
     ctx.r3.u64 = r3;
@@ -496,7 +461,7 @@ void NativeUpdatePath(PPCContext& ctx, uint8_t* base) {
 void NativeUpdateDriver(PPCContext& ctx, uint8_t* base) {
   ctx.fpscr.disableFlushMode();
   PathCall call{&ctx, base};
-  const ai::PathCalls calls{&call, CallNormalizer, CallJoinStep};
+  const ai::PathCalls calls{&call, CallNormalizer};
   uint64_t r3 = 0;
   double f1 = 0;
   if (ai::UpdateDriver(base, ctx.r3.u32, ctx.r4.u32, ctx.r5.u32, ctx.r1.u32 - 112, calls, &r3,
@@ -511,7 +476,7 @@ void NativeUpdateDriver(PPCContext& ctx, uint8_t* base) {
 void NativeDriveCar(PPCContext& ctx, uint8_t* base) {
   ctx.fpscr.disableFlushMode();
   PathCall call{&ctx, base};
-  const ai::PathCalls calls{&call, CallNormalizer, CallJoinStep};
+  const ai::PathCalls calls{&call, CallNormalizer};
   uint64_t r3 = 0;
   double f1 = 0;
   const uint64_t input = ctx.r3.u64;
@@ -526,7 +491,7 @@ void NativeDriveCar(PPCContext& ctx, uint8_t* base) {
 void NativeUpdateIdle(PPCContext& ctx, uint8_t* base) {
   ctx.fpscr.disableFlushMode();
   PathCall call{&ctx, base};
-  const ai::PathCalls calls{&call, CallNormalizer, CallJoinStep};
+  const ai::PathCalls calls{&call, CallNormalizer};
   bool done = false;
   const uint64_t r3 = ai::UpdateIdle(base, ctx.r3.u32, ctx.r1.u32 - 96, calls, &done);
   if (done) {
@@ -696,6 +661,8 @@ enum Kind {
   kClearAll,
   kJoinCorners,
   kJoinCornersShort,
+  kJoinCornersByExit,
+  kJoinCornersByEntry,
   kJoinCornerPair,
   kAddCornersAt,
   kUpdateState2,
@@ -1077,6 +1044,13 @@ void AiDrivers(Context& h) {
        kDriveCar, 2000},
       {"AiDriver::UpdateIdle (sub_821399A8)", Original<__imp__sub_821399A8>, NativeUpdateIdle,
        kUpdateIdle, 2000},
+      // Last, so the cases before them keep the shared generator's inputs
+      // (a different stream makes AiDriver::DriveCar's case 540 fault on the
+      // recompiled side: a latent input of its cases, docs/loops/review.md).
+      {"AiPath::JoinCornersByExit (sub_8213BDF0, never seen in play)",
+       Original<__imp__sub_8213BDF0>, NativeJoinCornersByExit, kJoinCornersByExit, 3000},
+      {"AiPath::JoinCornersByEntry (sub_8213BE80, never seen in play)",
+       Original<__imp__sub_8213BE80>, NativeJoinCornersByEntry, kJoinCornersByEntry, 3000},
   };
   const uint32_t area = memory::Alloc(kAreaBytes, 0);
   const uint32_t driver = area + kDriver, vehicle = area + kVehicle, io = area + kIo;
@@ -1885,6 +1859,8 @@ void AiDrivers(Context& h) {
         }
         case kJoinCorners:
         case kJoinCornersShort:
+        case kJoinCornersByExit:
+        case kJoinCornersByEntry:
         case kJoinCornerPair: {
           // Two corner records (+0x100, +0x140 in the driver's bytes), their
           // data (+0x200, +0x280) and tables (+0x400, +0x600, 8-byte entries:

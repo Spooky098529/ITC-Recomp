@@ -2562,6 +2562,7 @@ B7. **The game logic inside**: everything else, subsystem by subsystem,
 | 2026-10-24 | The course scenery (the course's areas, their models and lights collected around each viewport and streamed into five pools of physical memory: the pools, pool objects and their keys, the scenery lists, `StartLoad`, `ReleaseUnused`, `LimitLargeModels`; with the texture animations' advance, interpolation's render-only skip kept) | `course-scenery.md` | 37 of 73 (one migration) | `--native_course_scenery` |
 | 2026-10-24 | XAPI's memset (`XMemSet`: one host memset at the stride the game sets, the translated steps at any other; with what it unblocked: `Scenery::Init`, `CameraPasses::Init` and `InitPasses`; XAPI's `XPhysicalSize` and `XQueryMemoryProtect` mapped in `heap.md`, kept for the core) | `c-runtime.md` | 1 of 1 new (85 of 92 in the file; and `cameras.md` 40 of 42, `course-scenery.md` 38 of 73) | `--native_c_runtime` (`--native_cameras`, `--native_course_scenery`) |
 | 2026-10-24 | The post effects (the screen-space effects drawn over each view: the effect list's globals and toggles, the glow's and color filter's setters, the recording helpers (states, targets, constants, quads, resolves), the glare's definitions, the render textures' release, the destructors; frame interpolation's overrides kept; `RenderTextures::Acquire` left on `sub_8235A9F8`) | `post-effects.md` | 44 of 57 (one migration) | `--native_post_effects` |
+| 2026-10-24 | The race's screen objects (one 128,000-byte object a view: probably a screen blur while the nitrous runs, its strength from the speed; the two `std::map` instantiations of its ring UVs (`UvMap`, `UvColumn`: double keys), the rings, the strength, the release and teardown; the fan, its set-up and the draw left waiting on `rand` and the shader pairs) | `screen-objects.md` | 38 of 42 (one migration) | `--native_screen_objects` |
 
     The first run (2026-10-22, branch `b7-loop-test`): every harness at 0 differing, attract races at 20-21 s with no errors,
     and a race the user drove looked right. Ours went from 162 to 335 (work
@@ -3303,3 +3304,40 @@ row yet 4,267); `input.md` 29 ours of 29, `action-mappers.md` 39 of 40,
 `post-effects.md` 44 of 57. 1,325 overrides in `src/`. Stopped on two
 input functions whose harness doesn't reach their prints; the input's
 `ActionMappers::Init` is ready.
+
+**2026-10-24, B7's thirteenth loop run, the screen objects (branch
+`b7-loop-24-10-26-4`; with `ActionMappers::Init` and three cleanup
+leads before it):** the boundary unchanged: 449 functions (916 pairs):
+overridden 67, Native 5, Dropped 23, never called 70, live 284.
+Imports: 186 called, 62 with a live caller. B7 (`b7_status.py`): 6,761
+in play, ours 1,838, work left 4,923 (Wrapped 115, with a row 582, no
+row yet 4,226); `screen-objects.md` 38 ours of 42, `action-mappers.md`
+40 of 40. 1,323 overrides in `src/`. The screen objects' rest waits on
+`rand` (`sub_825A9BB8`, its thread data through the core) and the
+shader pairs (`sub_825896D8`, `sub_82589700`).
+
+**2026-10-25, the hardcoded shaders and a new coverage list (branch
+`b7-loop-24-10-26-4`):** the game's HLSL compiler (`sub_822B8F10`) no
+longer runs: its 14 compiles at boot are answered with the shaders they
+made (`--use_hardcoded_shaders`, `src/hooks/shader_compiles.cpp`). The
+boundary unchanged (the compiler calls no imports): 449 functions (916
+pairs): overridden 67, Native 5, Dropped 23, never called 70, live 284.
+Imports: 186 called, 62 with a live caller. `seen_in_play.txt` made
+again from the user's second session ("Running a session" in
+`docs/coverage.md`), so the compiler's ~640 functions left it. B7
+(`b7_status.py`): 7,039 in play, ours 1,839, work left 5,200 (Wrapped
+117, with a row 644, no row yet 4,439): more than before, from the 917
+functions the second session reached that the first hadn't.
+
+**2026-10-25, the movies through our FFmpeg and a new coverage list
+(branch `b7-loop-24-10-26-4`):** the movie library linked into the game
+(`82481A70`-`82575B07`, ~580 functions seen in play) no longer runs: the
+movie class's slots play the movies through our own FFmpeg and our
+renderer draws them (`--play_movies_with_ffmpeg`, `docs/native-movies.md`;
+the boot movie shows in our window for the first time; the user: "movie
+playback looks perfect"). The boundary unchanged: 449 functions (916
+pairs): overridden 67, Native 5, Dropped 23, never called 70, live 284.
+Imports: 186 called, 62 with a live caller. `seen_in_play.txt` made again
+from the user's third session (`docs/coverage.md`). B7 (`b7_status.py`):
+6,451 in play, ours 1,847, work left 4,604 (Wrapped 113, with a row 651,
+no row yet 3,840), from 5,200.

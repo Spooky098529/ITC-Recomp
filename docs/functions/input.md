@@ -20,7 +20,8 @@ holds and what the update does, step by step: "The input processors",
 "Physical pad", "Logical pad" and "Who reads the input manager" in
 `../pause-menu-fix.md`. The objects' fields: `../known-data.md`.
 
-Callers outside: the framework's set-up (`sub_82090A08`, a lead) makes
+Callers outside: the framework's set-up (`Framework::Init`,
+`framework.md`) makes
 the manager (`Input::Create`); the action mappers (`action-mappers.md`)
 make their listeners with `InputProcessor::InputProcessor`
 (`ActionMapper::ActionMapper`) and bind them through the manager's slots
@@ -28,8 +29,8 @@ make their listeners with `InputProcessor::InputProcessor`
 gets the manager from its owner's vtable slot +36: the object
 `ActionMappers::Init` is given, the app of `sub_82106548` rather than the
 input manager: its slot +36 is `sub_820944C8`, through `sub_82094350`,
-probably reaching `sub_82090788`, the framework's +88; logged 2026-10-24,
-every call returned the input manager);
+reaching `sub_82090830`, the framework's +88 (`framework.md`); logged
+2026-10-24, every call returned the input manager);
 the first tick handler (`sub_82093DC0`, `functions.md`) gets processor 0
 through slot 1 and tests its buttons; `InputProcessor::TestHeld` and
 `AllHeld` (the mappers' listener tests) are in `action-mappers.md`, and
