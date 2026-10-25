@@ -110,11 +110,16 @@ ITC_GAME_MODES(82155D90, Member67760Construct(base, ctx.r3.u32))
 // four); r3 as the originals leave it. Over the allocation layer only, and
 // only when the blocks are its pages (else the originals, whose VirtualFree
 // takes its other paths).
-#define ITC_GAME_MODES_FREE(address, freeable, function)                        \
-  ITC_GAME_MODES(address, if (!hooks::NativeHeapActive() || !freeable(base, ctx.r3.u32)) { \
-    __imp__sub_##address(ctx, base);                                           \
-    return;                                                                    \
-  } ctx.r3.u64 = function(base, ctx.r3.u32))
+#define ITC_GAME_MODES_FREE(address, freeable, function)                    \
+  extern "C" REX_FUNC(sub_##address) {                                     \
+    REX_FUNC_PROLOGUE();                                                   \
+    if (!ITC_FLAG(native_game_modes) || !hooks::NativeHeapActive() ||      \
+        !freeable(base, ctx.r3.u32)) {                                     \
+      __imp__sub_##address(ctx, base);                                     \
+      return;                                                              \
+    }                                                                      \
+    ctx.r3.u64 = function(base, ctx.r3.u32);                               \
+  }
 
 ITC_GAME_MODES_FREE(82152028, Buffer28Freeable, Buffer28Free)
 ITC_GAME_MODES_FREE(82152D38, Buffer28Freeable, Buffer28Reset)
