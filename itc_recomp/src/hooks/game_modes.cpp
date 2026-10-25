@@ -6,7 +6,8 @@
 // (sub_821060A0), from StateMachine::Add and Find; StateMachine::Find
 // (sub_821061F0), from StateMachine::Handle (its register step,
 // hooks::GameModesFind, kept for the harness); Buffer28::~Buffer28
-// (sub_82152D28), from sub_82106A00; RaceModeMember::RaceModeMember
+// (sub_82152D28), from sub_82106A00; sub_82106A00, from
+// RaceModeMember::~RaceModeMember; RaceModeMember::RaceModeMember
 // (sub_82107168), from RaceMode::RaceMode; Member56896::Member56896
 // (sub_82106A50), from RaceModeMember::RaceModeMember; Member13360::Member13360
 // (sub_82155118), from RaceModeMember::RaceModeMember.
@@ -32,7 +33,8 @@ ITC_FLAG_BOOL(native_game_modes, true, "ITC",
               "parts sub_82155D90 and sub_82155118 (no adapters: only RaceModeMember::RaceModeMember "
               "calls them), and with "
               "--native_heap Buffer28::Free sub_82152028, Reset sub_82152D38, ~Buffer28 "
-              "sub_82152D28 (no adapter: only sub_82106A00 calls it) and sub_82106A00, "
+              "sub_82152D28 (no adapter: only sub_82106A00 calls it) and sub_82106A00 (no adapter: "
+              "only RaceModeMember::~RaceModeMember calls it), "
               "XprHolder::XprHolder sub_821067A0 (XPR::XPR's plain C++ called directly), and "
               "with --native_heap and the memory blocks' host lock "
               "RaceModeMember::~RaceModeMember sub_82106AF0 (XPR::~XPR's and sub_82106A00's "
@@ -132,8 +134,7 @@ void hooks::GameModesHandle(PPCContext& ctx, uint8_t* base) {
 // the last StateMachine::Add leaves it.
 ITC_GAME_MODES(8215E6C8, hooks::GameModesRaceOverlaysMachineInit(ctx, base))
 
-// The 28-byte buffers: r3 = the buffer (sub_82106A00: the object holding
-// four); r3 as the originals leave it. Over the allocation layer only, and
+// The 28-byte buffers: r3 = the buffer; r3 as the originals leave it. Over the allocation layer only, and
 // only when the blocks are its pages (else the originals, whose VirtualFree
 // takes its other paths).
 #define ITC_GAME_MODES_FREE(address, freeable, function)                    \
@@ -149,7 +150,6 @@ ITC_GAME_MODES(8215E6C8, hooks::GameModesRaceOverlaysMachineInit(ctx, base))
 
 ITC_GAME_MODES_FREE(82152028, Buffer28Freeable, Buffer28Free)
 ITC_GAME_MODES_FREE(82152D38, Buffer28Freeable, Buffer28Reset)
-ITC_GAME_MODES_FREE(82106A00, Buffers28Freeable, Buffers28Destroy)
 
 // sub_8215DE10's work with its virtual calls (each overlay's slot 3) made
 // from a frame like the original's (112 bytes, returning to 0x8215DE4C).
