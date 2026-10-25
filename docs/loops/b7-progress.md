@@ -109,9 +109,16 @@ file's history. What's left to see in a drive, from every run:
   draws as the fallback). Left ready: `DataFile::GetEntry`
   `sub_82294730`, which blocks `ModelList::Load` and `LoadPoints`.
   Validated (`itc_1795`: 21 of 21 harness lines, all 21 ran in the
-  attract race; no replay needed). Step: migration 2
-  (`DataFile::GetEntry`, then `ModelList::Load` and `LoadPoints`),
-  agent running.
+  attract race; no replay needed). Migration 2 done after five batches
+  (800b20c..49bad70: `DataFile::GetEntry` under the new
+  `--native_data_files`, `ModelList::Load` and `LoadPoints`, the course
+  set's parsers, pool objects, resets and `AreaModel::~Model`,
+  `Strings::Get`, a slot's `XPR::Release`; 4 adapters removed, 3 Native
+  with none; `itc_1828`: 24 s, 0 errors, every harness 0 differing;
+  `draws.txt` the same as the fallback within one of the attract race's
+  two variants, 2,412 or 2,414 draws). Left ready:
+  `Scenery::CollectAreas`, `CollectModels`, `DrawSetLists`,
+  `Strings::FormatV`. Step: validation 2, agent running.
 
 ## Done
 
@@ -159,6 +166,8 @@ This run's groups: `expected-differences.md` (the "16:38 run" lines).
 - After the scenery lists' validation: race 24 s (`itc_1769`), 0
   errors, every harness 0 differing; replay 127 s (`itc_1770`), 0
   errors.
+- After the shader objects' migration 2: ours 2147, work left 4304
+  (wrapped 104, known 545, unknown 3655).
 - After the shader objects' validation: race 24 s (`itc_1795`), 0
   errors, every harness 0 differing.
 - After the shader objects' migration 1: ours 2130, work left 4321

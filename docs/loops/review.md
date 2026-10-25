@@ -173,6 +173,19 @@ When the user has reviewed a run's section, its heading gets
   to the map: `Resource::Relocate`'s type 6 does nothing;
   `0x82638308` logged as 1 (`XMemCpy` does one host copy then, else
   replays the byte loop).
+- The shader objects' migration 2 (800b20c..49bad70): `DataFile::GetEntry`
+  (`files-and-saves.md`, new flag `--native_data_files`,
+  `src/game_data/data_file.cpp`); `ModelList::Load`, `LoadPoints`
+  (`scenery-lists.md`, Native); 12 rows in `course-scenery.md` (the
+  course set's parse, the areas' lights and models parsed and their
+  callbacks, `Scenery::MakePoolObject` with the constructors, the
+  resets, `AreaModel::~Model`); `Strings::Get` and a slot's
+  `XPR::Release` (`strings-and-font.md`). For review: everything that
+  makes or frees models runs natively only where `Model::Load`'s adapter
+  does (`hooks::ModelsNativeLifetime()` and `hooks::ModelLoadGuest`
+  exported from `src/hooks/models.h`); the attract race has two
+  variants (2,412 or 2,414 draws in a dump) by timing, so dumps compare
+  only within one.
 
 ## Run 2026-10-25 03:59 (`b7-loop-25-10-26-2`)
 
