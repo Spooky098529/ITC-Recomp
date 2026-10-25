@@ -273,6 +273,23 @@ first" in `docs/loops/b7-loop.md`); `scripted_run.sh`'s boot marker
 was fixed (it waited for the movie library's draw, gone since the
 FFmpeg movies). The rest waits on the race mode's set-ups, the course
 set's lists, the save data's creation and the kernel objects' set-ups.
+Its sixteenth run (`b7-loop-25-10-26-3`, 2026-10-25, not yet merged;
+summary `docs/loops/b7-loop-2026-10-25-1638.md`; 3 subsystems) made
+the scene models' set-up side, the scenery lists with the model draws
+and the shader objects up to `Model::Load` native as far as they were
+ready, with two leads without mapping (the UI movies' text draw, update
+and objects; the race HUD's movie picker and the rival logo's draw)
+and what `DataFile::GetEntry` unblocked (`scene-models.md`,
+`race-hud.md`, `scenery-lists.md`, `shader-objects.md`;
+`--native_scene_models`, `--native_race_hud`, `--native_scenery_lists`,
+`--native_shader_objects`, `--native_data_files`; ours 2,013 -> 2,152).
+The user's calls: `_mtinit` (kernel TLS) waits until it blocks
+something; native code reaching `generated/` (fallbacks, guest calls)
+is left to investigate later; one replay with the menus unpaced under
+`--skip_intro` wasn't reproduced and is left to debug later
+(`docs/loops/review.md`). The rest waits on the generic critical
+section wrappers, the video output's events and semaphores and the
+archive.
 Harness runs use `attract_race.sh 40` (the user's call,
 2026-10-23); a race short only because the harnesses took longer is
 no halt.

@@ -132,11 +132,19 @@ file's history. What's left to see in a drive, from every run:
   later over 1,000), as `TitleScreen_SkipTickWait` does until the first
   race is seen, so the race at boot wasn't. Not reproduced: the same
   replay with `--log_race_changes=true` (`itc_1851`) and two boots ran
-  at 30. Left to debug later (the user's call). Step: validation 3
-  again, agent running.
+  at 30. Left to debug later (the user's call). Validated again
+  (`itc_1852`: 13 of 13 harness lines; replay `itc_1853` ok, menus at
+  30 ticks/s, the race changes logged as expected; 1 to
+  `to-drive.md`). Finished.
 
 ## Done
 
+- The shader objects (`shader-objects.md`, mapped in 4047496; 7 rows):
+  7 ours, and 38 in six other files in three migrations
+  (7bc02b9..a5141f5: the chain up to `Model::Load`, `DataFile::GetEntry`
+  and what it unblocked), 15 adapters removed; validated (`itc_1795`,
+  `itc_1831`, `itc_1852`); `--native_shader_objects`,
+  `--native_data_files`.
 - The scenery lists (`scenery-lists.md`, mapped in a373941; 27 rows):
   25 ours and 6 in `models.md` in two migrations (e3295c1..343035d), 1
   adapter removed, 2 Native with none, 3 Merged; validated (`itc_1769`,
@@ -181,6 +189,9 @@ This run's groups: `expected-differences.md` (the "16:38 run" lines).
 - After the scenery lists' validation: race 24 s (`itc_1769`), 0
   errors, every harness 0 differing; replay 127 s (`itc_1770`), 0
   errors.
+- At the end (after the shader objects' validation 3, `itc_1852`: race
+  24 s, 0 errors, every harness 0 differing; replay `itc_1853`): ours
+  2152, work left 4299 (wrapped 104, known 540, unknown 3655).
 - After the shader objects' migration 3: ours 2152, work left 4299
   (wrapped 104, known 540, unknown 3655).
 - After the shader objects' validation 2: race 24 s (`itc_1831`), 0
@@ -215,3 +226,13 @@ This run's groups: `expected-differences.md` (the "16:38 run" lines).
 - After the DrawTexts lead's validation: race 27 s (`itc_1722`), 0
   errors, every harness 0 differing; replay 127 s (`itc_1723`), 0
   errors.
+
+## Stopped
+
+2026-10-25, at the run's limit: 3 subsystems (the scene models, the
+scenery lists, the shader objects; the DrawTexts lead and the UI
+movies' ready groups, without mapping, not counted).
+`check_function_statuses.py`: 0 errors. Earlier in the run: the first
+validation of the shader objects' migration 3 was stopped when the user
+saw the menus run too fast (one replay, not reproduced; left for
+later).
