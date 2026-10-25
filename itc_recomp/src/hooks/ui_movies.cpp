@@ -16,7 +16,7 @@
 ITC_FLAG_BOOL(native_ui_movies, true, "ITC",
               "Run the UI movie library's functions (the movies the HUD and the menus are made "
               "of: the accessors sub_825A6508, sub_825A6518, sub_825A6528, sub_825A6540, "
-              "sub_825A6558, sub_8259D600, sub_8259D618, sub_8259D628, sub_8259D648, "
+              "sub_825A6558, sub_8259D618, sub_8259D628, sub_8259D648, "
               "UiMovie::Child sub_8259D658 and sub_8259D670; the chunk and file helpers "
               "sub_8259D5C8, sub_825A0EB0 and sub_825A0CD0; UiMovie::SetRenderer sub_8259D798; "
               "the draw context reset sub_8259D930; the recorders sub_8259DAD0, sub_8259E098 and sub_8259D7B0; the "
@@ -32,8 +32,8 @@ ITC_FLAG_BOOL(native_ui_movies, true, "ITC",
               "sub_8259E620, append sub_8259F700 (its grow the original's) and "
               "UiMovie::QueueText sub_8259F770; UiMovie::ApplyTrack sub_825A0548, with native "
               "atexit, and under it, without adapters (the flag switches ApplyTrack), "
-              "UiMovie::TrackProperty sub_8259FE68 and the keys sub_8259FA20, sub_8259FB30 "
-              "and sub_8259FC18) "
+              "UiMovie::TrackProperty sub_8259FE68, the keys sub_8259FA20, sub_8259FB30 "
+              "and sub_8259FC18, and the accessor sub_8259D600) "
               "natively instead of through the translated code (same results; checked by "
               "--run_harnesses=ui_movies)");
 
@@ -70,7 +70,6 @@ UI_MOVIE_ACCESSOR(825A6518, ui_movies::Key(object, i))
 UI_MOVIE_ACCESSOR(825A6528, ui_movies::NodeTrackList(base, object, i))
 UI_MOVIE_ACCESSOR(825A6540, ui_movies::KeyList(base, object, i))
 UI_MOVIE_ACCESSOR(825A6558, ui_movies::SubAnimation(base, object, i))
-UI_MOVIE_ACCESSOR(8259D600, ui_movies::VertexOffset(object, i))
 UI_MOVIE_ACCESSOR(8259D618, ui_movies::PrimitiveTexture(object, i))
 UI_MOVIE_ACCESSOR(8259D628, ui_movies::PrimitiveVertex(base, object, i))
 UI_MOVIE_ACCESSOR(8259D648, ui_movies::PictureTexture(object, i))

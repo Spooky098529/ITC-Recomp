@@ -98,6 +98,12 @@ struct Function {
   GuestFunction recompiled, native;
 };
 
+// sub_8259D600 through the adapter's steps (its adapter is gone).
+void NativeVertexOffset(PPCContext& ctx, uint8_t* base) {
+  (void)base;
+  ctx.r3.u64 = ui_movies::VertexOffset(ctx.r3.u32, ctx.r4.u32);
+}
+
 // The accessors that only add: r3 and r4 random, and their edges.
 void Arithmetic(Context& h, const Function& f) {
   Results results(f.name);
@@ -1901,7 +1907,7 @@ void UiMovies(Context& h) {
   const Function arithmetic[] = {
       {"NodeTrack (sub_825A6508)", __imp__sub_825A6508, sub_825A6508},
       {"Key (sub_825A6518)", __imp__sub_825A6518, sub_825A6518},
-      {"VertexOffset (sub_8259D600)", __imp__sub_8259D600, sub_8259D600},
+      {"VertexOffset (sub_8259D600)", __imp__sub_8259D600, NativeVertexOffset},
       {"PrimitiveTexture (sub_8259D618)", __imp__sub_8259D618, sub_8259D618},
       {"PictureTexture (sub_8259D648)", __imp__sub_8259D648, sub_8259D648},
   };
