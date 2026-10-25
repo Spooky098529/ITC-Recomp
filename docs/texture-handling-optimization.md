@@ -49,7 +49,7 @@ automated attract race (see `CLAUDE.md`). The log gives:
   memcpy's writes, the textures they marked and the time marking took.
 
 These need info logging (`--log_level=info`); released builds turn it off
-(`itc.toml`) and the timing with it (`log_enabled.h`).
+(`itc.toml`) and the timing with it (`base::InfoLogEnabled`, `src/base/log.h`).
 
 ## Done
 

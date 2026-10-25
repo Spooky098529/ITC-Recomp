@@ -2,9 +2,12 @@
 
 #include "frame_pacing/game_messages.h"
 #include "guest.h"
+#include "cameras/cameras.h"
+#include "hooks/cameras.h"
+#include "matrix_math/matrix_math.h"
 
-#include <rex/cvar.h>
-#include <rex/logging.h>
+#include "base/flags.h"
+#include "base/log.h"
 
 #include <chrono>
 #include <cmath>
@@ -19,29 +22,32 @@
 #include <string>
 #include <vector>
 
-REXCVAR_DEFINE_BOOL(find_per_frame_state, false, "ITC",
-                    "Find game state that advances on render-only passes, and the code that "
-                    "advances it");
-REXCVAR_DEFINE_INT32(find_per_frame_state_interval_ms, 2000, "ITC",
-                     "How often --find_per_frame_state samples a render-only pass (0 = every "
-                     "one; slow)");
-REXCVAR_DEFINE_STRING(debug_hide, "", "ITC",
-                      "Testing: wrapped draw functions (hex, comma-separated) never to run, "
-                      "to see what they draw");
-REXCVAR_DEFINE_STRING(watch_addresses, "", "ITC",
-                      "With --find_per_frame_state, guest addresses (hex, comma-separated) to "
-                      "watch from the start, logging every change with the code making it");
-REXCVAR_DEFINE_BOOL(find_any_steps, false, "ITC",
-                    "With --find_per_frame_state, look for any steady step (a float changing "
-                    "by less than 1, or an integer by up to 4, by the same amount in two "
-                    "samples) instead of timer steps only");
-REXCVAR_DEFINE_BOOL(watch_lights, false, "ITC",
-                    "With --find_per_frame_state, watch the light billboards' lights (the "
-                    "first 2 of each list drawn by sub_8209CC38, up to 64 lists), logging every change");
-REXCVAR_DEFINE_BOOL(find_countdowns, false, "ITC",
-                    "With --find_per_frame_state, look for values counting down (a float in "
-                    "0..10 going down, or a small integer going down by one) instead of any "
-                    "timer step");
+ITC_FLAG_DECLARE(bool, native_matrix_math);
+ITC_FLAG_DECLARE(bool, native_cameras);
+
+ITC_FLAG_BOOL(find_per_frame_state, false, "ITC",
+              "Find game state that advances on render-only passes, and the code that "
+              "advances it");
+ITC_FLAG_INT32(find_per_frame_state_interval_ms, 2000, "ITC",
+               "How often --find_per_frame_state samples a render-only pass (0 = every "
+               "one; slow)");
+ITC_FLAG_STRING(debug_hide, "", "ITC",
+                "Testing: wrapped draw functions (hex, comma-separated) never to run, "
+                "to see what they draw");
+ITC_FLAG_STRING(watch_addresses, "", "ITC",
+                "With --find_per_frame_state, guest addresses (hex, comma-separated) to "
+                "watch from the start, logging every change with the code making it");
+ITC_FLAG_BOOL(find_any_steps, false, "ITC",
+              "With --find_per_frame_state, look for any steady step (a float changing "
+              "by less than 1, or an integer by up to 4, by the same amount in two "
+              "samples) instead of timer steps only");
+ITC_FLAG_BOOL(watch_lights, false, "ITC",
+              "With --find_per_frame_state, watch the light billboards' lights (the "
+              "first 2 of each list drawn by sub_8209CC38, up to 64 lists), logging every change");
+ITC_FLAG_BOOL(find_countdowns, false, "ITC",
+              "With --find_per_frame_state, look for values counting down (a float in "
+              "0..10 going down, or a small integer going down by one) instead of any "
+              "timer step");
 
 namespace debug {
 
@@ -132,7 +138,7 @@ const char* AnyStep(uint32_t before, uint32_t after, double& step) {
 // Whether a word stepped like a frame timer: a float by +-1/30 or +-1/60 s,
 // or a small integer by +-1.
 const char* TimerStep(uint32_t before, uint32_t after) {
-  if (REXCVAR_GET(find_countdowns)) {
+  if (ITC_FLAG(find_countdowns)) {
     return CountdownStep(before, after);
   }
   float a = AsFloat(before), b = AsFloat(after);
@@ -152,7 +158,7 @@ const char* TimerStep(uint32_t before, uint32_t after) {
 class FrameStateDiff {
  public:
   void OnPassStart(uint8_t* base, bool render_only) {
-    if (!REXCVAR_GET(find_per_frame_state)) {
+    if (!ITC_FLAG(find_per_frame_state)) {
       return;
     }
     if (snapshot_taken_) {
@@ -163,7 +169,7 @@ class FrameStateDiff {
     before_.clear();
     auto now = std::chrono::steady_clock::now();
     if (render_only && now - last_snapshot_ >= std::chrono::milliseconds(
-                           REXCVAR_GET(find_per_frame_state_interval_ms))) {
+                           ITC_FLAG(find_per_frame_state_interval_ms))) {
       last_snapshot_ = now;
       ranges_ = ReadableGuestRanges(base);
       snapshot_.clear();
@@ -176,7 +182,7 @@ class FrameStateDiff {
   }
 
   void Before(uint8_t* base) {
-    if (!REXCVAR_GET(find_per_frame_state) || !render_only_) {
+    if (!ITC_FLAG(find_per_frame_state) || !render_only_) {
       return;
     }
     AddForcedWatches();
@@ -191,7 +197,7 @@ class FrameStateDiff {
   }
 
   void After(uint8_t* base, const char* kind, uint32_t id) {
-    if (!REXCVAR_GET(find_per_frame_state) || !render_only_ || before_.empty()) {
+    if (!ITC_FLAG(find_per_frame_state) || !render_only_ || before_.empty()) {
       return;
     }
     std::vector<uint32_t> values = std::move(before_.back());
@@ -202,9 +208,9 @@ class FrameStateDiff {
         changes_[{std::string(kind), id, watched_[i]}]++;
         if (forced_.count(watched_[i]) && logged_values_ < kMaxLoggedValues) {
           logged_values_++;
-          REXLOG_INFO("per-frame state: pass {} {} {:08X} wrote {:08X}: {} -> {}",
-                      frame_pacing::GameMessages_PassNumber(), kind, id, watched_[i], values[i],
-                      now);
+          ITC_LOG_INFO("per-frame state: pass {} {} {:08X} wrote {:08X}: {} -> {}",
+                       frame_pacing::GameMessages_PassNumber(), kind, id, watched_[i], values[i],
+                       now);
         }
       }
     }
@@ -229,7 +235,7 @@ class FrameStateDiff {
         uint32_t before = __builtin_bswap32(*reinterpret_cast<const uint32_t*>(then + i));
         uint32_t after = guest::LoadU32(base, address);
         const char* step;
-        if (REXCVAR_GET(find_any_steps)) {
+        if (ITC_FLAG(find_any_steps)) {
           // Only steps equal to the word's step in an earlier sample: a
           // steady rate, not a buffer being rewritten.
           double change = 0;
@@ -260,8 +266,8 @@ class FrameStateDiff {
       }
       offset += r.size;
     }
-    REXLOG_INFO("per-frame state: {} words stepped like timers over a render-only pass:{}", found,
-                sample);
+    ITC_LOG_INFO("per-frame state: {} words stepped like timers over a render-only pass:{}", found,
+                 sample);
     // Watch words that stepped in more than one sampled pass: steady
     // per-frame counters, not one-off changes (a load finishing).
     for (uint32_t address : stepped_now) {
@@ -289,8 +295,8 @@ class FrameStateDiff {
     last_log_ = now;
     logged_values_ = 0;
     for (const auto& [key, n] : changes_) {
-      REXLOG_INFO("per-frame state: {} {:08X} changed {:08X} ({} times)", std::get<0>(key),
-                  std::get<1>(key), std::get<2>(key), n);
+      ITC_LOG_INFO("per-frame state: {} {:08X} changed {:08X} ({} times)", std::get<0>(key),
+                   std::get<1>(key), std::get<2>(key), n);
     }
     changes_.clear();
   }
@@ -302,7 +308,7 @@ class FrameStateDiff {
     forced_added_ = true;
     if (!forced_parsed_) {
       forced_parsed_ = true;
-      std::string list = REXCVAR_GET(watch_addresses);
+      std::string list = ITC_FLAG(watch_addresses);
       size_t start = 0;
       while (start < list.size()) {
         size_t end = list.find(',', start);
@@ -369,7 +375,7 @@ void FrameStateDiff_Before(uint8_t* base) {
 }
 
 bool IsHidden(uint32_t function) {
-  std::string list = REXCVAR_GET(debug_hide);
+  std::string list = ITC_FLAG(debug_hide);
   size_t start = 0;
   while (start < list.size()) {
     size_t end = list.find(',', start);
@@ -393,6 +399,15 @@ void FrameStateDiff_Watch(uint32_t address) {
   Get().Watch(address);
 }
 
+void Vec4Transform(uint8_t* base, uint32_t out, uint32_t m, uint32_t v) {
+  if (IsHidden(0x820AB560)) {
+    return;
+  }
+  FrameStateDiff_Before(base);
+  matrix_math::Vec4Transform(base, out, m, v);
+  FrameStateDiff_After(base, "draw step part", 0x820AB560);
+}
+
 }  // namespace debug
 
 // The race draw step's parts (sub_8215B4F8 calls these), wrapped only to
@@ -407,27 +422,102 @@ void FrameStateDiff_Watch(uint32_t address) {
     __imp__sub_##address(ctx, base);                        \
     debug::FrameStateDiff_After(base, "draw step part", 0x##address); \
   }
-ITC_FRAME_STATE_WRAP(8209F8A0)
-ITC_FRAME_STATE_WRAP(8209F900)
+// CameraPasses::RecordBegins and RecordEnds: the passes' recording natively
+// (src/cameras/cameras.cpp, --native_cameras) or translated, inside the
+// same wrap.
+#define ITC_FRAME_STATE_WRAP_RECORDS(address, native)                 \
+  extern "C" REX_FUNC(sub_##address) {                                \
+    REX_FUNC_PROLOGUE();                                              \
+    if (debug::IsHidden(0x##address)) {                               \
+      return;                                                         \
+    }                                                                 \
+    debug::FrameStateDiff_Before(base);                               \
+    if (ITC_FLAG(native_cameras)) {                                   \
+      native(ctx, base);                                              \
+    } else {                                                          \
+      __imp__sub_##address(ctx, base);                                \
+    }                                                                 \
+    debug::FrameStateDiff_After(base, "draw step part", 0x##address); \
+  }
+ITC_FRAME_STATE_WRAP_RECORDS(8209F8A0, hooks::CameraPassesRecordBegins)
+ITC_FRAME_STATE_WRAP_RECORDS(8209F900, hooks::CameraPassesRecordEnds)
 ITC_FRAME_STATE_WRAP(820C5DE8)
 ITC_FRAME_STATE_WRAP(820F6068)
 ITC_FRAME_STATE_WRAP(82130978)
-// The render orchestrator's (sub_820C5DE8) callees.
-ITC_FRAME_STATE_WRAP(8209F7A8)
-ITC_FRAME_STATE_WRAP(820A0958)
-ITC_FRAME_STATE_WRAP(820AA1A8)
-ITC_FRAME_STATE_WRAP(820AB560)
+// The render orchestrator's (sub_820C5DE8) callees. The camera passes'
+// work natively (src/cameras/cameras.cpp, --native_cameras) or translated,
+// inside the same wrap. CameraPasses::RenderTarget: r3 = the id; r3 = its
+// texture (zero-extended, as lwz leaves it).
+extern "C" REX_FUNC(sub_8209F7A8) {
+  REX_FUNC_PROLOGUE();
+  if (debug::IsHidden(0x8209F7A8)) {
+    return;
+  }
+  debug::FrameStateDiff_Before(base);
+  if (ITC_FLAG(native_cameras)) {
+    ctx.r3.u64 = cameras::RenderTarget(base, ctx.r3.u32);
+  } else {
+    __imp__sub_8209F7A8(ctx, base);
+  }
+  debug::FrameStateDiff_After(base, "draw step part", 0x8209F7A8);
+}
+// CameraPass::Disable: r3 = the pass.
+extern "C" REX_FUNC(sub_820A0958) {
+  REX_FUNC_PROLOGUE();
+  if (debug::IsHidden(0x820A0958)) {
+    return;
+  }
+  debug::FrameStateDiff_Before(base);
+  if (ITC_FLAG(native_cameras)) {
+    cameras::Disable(base, ctx.r3.u32);
+  } else {
+    __imp__sub_820A0958(ctx, base);
+  }
+  debug::FrameStateDiff_After(base, "draw step part", 0x820A0958);
+}
+// CameraPasses::EnableForView: r3 = the last pass enabled, as the original
+// leaves it.
+extern "C" REX_FUNC(sub_820AA1A8) {
+  REX_FUNC_PROLOGUE();
+  if (debug::IsHidden(0x820AA1A8)) {
+    return;
+  }
+  debug::FrameStateDiff_Before(base);
+  if (ITC_FLAG(native_cameras)) {
+    ctx.r3.u64 = cameras::EnableForView(base);
+  } else {
+    __imp__sub_820AA1A8(ctx, base);
+  }
+  debug::FrameStateDiff_After(base, "draw step part", 0x820AA1A8);
+}
+// Vec4::Transform: r3 = out, r4 = a matrix, r5 = a vector; its work natively
+// (src/matrix_math/matrix_math.cpp, --native_matrix_math; the translated
+// code leaves flush-to-zero on) or translated, inside the same wrap.
+extern "C" REX_FUNC(sub_820AB560) {
+  REX_FUNC_PROLOGUE();
+  if (debug::IsHidden(0x820AB560)) {
+    return;
+  }
+  debug::FrameStateDiff_Before(base);
+  if (ITC_FLAG(native_matrix_math)) {
+    matrix_math::Vec4Transform(base, ctx.r3.u32, ctx.r4.u32, ctx.r5.u32);
+    ctx.fpscr.enableFlushMode();
+  } else {
+    __imp__sub_820AB560(ctx, base);
+  }
+  debug::FrameStateDiff_After(base, "draw step part", 0x820AB560);
+}
 ITC_FRAME_STATE_WRAP(820C4EB8)
 ITC_FRAME_STATE_WRAP(820C4FB8)
 ITC_FRAME_STATE_WRAP(820DAA38)
 ITC_FRAME_STATE_WRAP(820DAAC8)
 ITC_FRAME_STATE_WRAP(820DAB10)
-ITC_FRAME_STATE_WRAP(820FFD88)
-ITC_FRAME_STATE_WRAP(82593FC0)
 ITC_FRAME_STATE_WRAP(82597118)
 ITC_FRAME_STATE_WRAP(82597518)
 ITC_FRAME_STATE_WRAP(82597610)
 ITC_FRAME_STATE_WRAP(82598768)
+// Stages::Copy (sub_820FFD88) and List::At (sub_82593FC0) were wrapped here
+// too; their native adapters (src/hooks/vehicle_accessors.cpp) do the same.
 // The light billboards' batch (calls sub_8209C1A0 and sub_8209C6E0); r4 is
 // the light list: count at +32, 48-byte lights at +36 (position at +0, size
 // at +32 and +36; a light with neither size above 0 is skipped).
@@ -437,14 +527,14 @@ extern "C" REX_FUNC(sub_8209CC38) {
   if (debug::IsHidden(0x8209CC38)) {
     return;
   }
-  if (REXCVAR_GET(watch_lights) && REXCVAR_GET(find_per_frame_state)) {
+  if (ITC_FLAG(watch_lights) && ITC_FLAG(find_per_frame_state)) {
     static std::set<uint32_t> seen;
     uint32_t list = ctx.r4.u32;
     uint32_t lights = guest::LoadU32(base, list + 36);
     uint32_t count = guest::LoadU32(base, list + 32);
     if (seen.insert(lights).second && seen.size() <= 64) {
-      REXLOG_INFO("per-frame state: watching light list {:08X}: {} lights at {:08X}, type {}",
-                  list, count, lights, guest::LoadU32(base, list));
+      ITC_LOG_INFO("per-frame state: watching light list {:08X}: {} lights at {:08X}, type {}",
+                   list, count, lights, guest::LoadU32(base, list));
       for (uint32_t i = 0; i < std::min<uint32_t>(count, 2) * 48; i += 4) {
         debug::FrameStateDiff_Watch(lights + i);
       }

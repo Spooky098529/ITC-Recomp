@@ -1,5 +1,5 @@
 // Lights::FindNearest (sub_820F4128) done natively: the lights nearest a
-// point, nearest first. See docs/functions.md for what it does, and "The main
+// point, nearest first. See docs/functions/functions.md for what it does, and "The main
 // thread" in docs/native-renderer.md for why (13% of the main thread).
 //
 // The translated original spends most of its time per light tested on
@@ -13,7 +13,7 @@
 
 #include "guest.h"
 
-#include <rex/cvar.h>
+#include "base/flags.h"
 
 #include <smmintrin.h>
 
@@ -21,9 +21,9 @@
 #include <iterator>
 #include <utility>
 
-REXCVAR_DEFINE_BOOL(native_nearest_lights, true, "ITC",
-                    "Find the lights nearest a point (sub_820F4128) natively, four lights "
-                    "tested at once, instead of through the translated code (same results)");
+ITC_FLAG_BOOL(native_nearest_lights, true, "ITC",
+              "Find the lights nearest a point (sub_820F4128) natively, four lights "
+              "tested at once, instead of through the translated code (same results)");
 
 namespace {
 
@@ -243,7 +243,7 @@ extern "C" REX_FUNC(sub_820F4128) {
   ctx.fpscr.disableFlushMode();
   // Comparisons the original makes in double are made here in float: the
   // caller passes floats (lfs, frsp), but anything else goes to the original.
-  if (!REXCVAR_GET(native_nearest_lights) || !IsFloat(ctx.f2.f64) || !IsFloat(ctx.f3.f64))
+  if (!ITC_FLAG(native_nearest_lights) || !IsFloat(ctx.f2.f64) || !IsFloat(ctx.f3.f64))
       [[unlikely]] {
     __imp__sub_820F4128(ctx, base);
     return;

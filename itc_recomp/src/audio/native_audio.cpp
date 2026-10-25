@@ -6,23 +6,24 @@
 // took ~80% of a core. Here the game's driver object calls ours instead:
 // one guest thread runs each client's mixer whenever SDL has played a
 // frame, waiting on a condition variable in between. The frames are
-// converted for SDL as the SDK's driver does (same downmix and settings).
-// The SDK's XMA decoder is kept.
+// converted for SDL with the SDK driver's numbers (audio/output_mix.h). XMA
+// sounds are decoded by our own code (hooks/xma.cpp), so the SDK's XMA
+// decoder isn't set up.
 //
 // --native_audio=false brings back the SDK's driver, for comparison.
 
 #include "audio/native_audio.h"
 
+#include "audio/output_mix.h"
+#include "movies/player.h"
+
 #include "guest.h"
 
 #include <rex/audio/audio_driver.h>
 #include <rex/audio/audio_system.h>
-#include <rex/audio/conversion.h>
-#include <rex/audio/downmix.h>
 #include <rex/audio/flags.h>
-#include <rex/audio/xma/decoder.h>
-#include <rex/cvar.h>
-#include <rex/logging.h>
+#include "base/flags.h"
+#include "base/log.h"
 #include <rex/system/function_dispatcher.h>
 #include <rex/system/kernel_state.h>
 #include <rex/system/xthread.h>
@@ -41,10 +42,10 @@
 #include <mutex>
 #include <vector>
 
-REXCVAR_DEFINE_BOOL(native_audio, true, "ITC",
-                    "Our own audio output instead of the SDK's render driver and Audio Worker");
+ITC_FLAG_BOOL(native_audio, true, "ITC",
+              "Our own audio output instead of the SDK's render driver and Audio Worker");
 
-REXCVAR_DECLARE(int32_t, audio_maxqframes);
+ITC_FLAG_DECLARE(int32_t, audio_maxqframes);
 
 namespace native_audio {
 namespace {
@@ -92,7 +93,7 @@ class ItcAudioSystem : public rex::audio::AudioSystem {
  public:
   explicit ItcAudioSystem(rex::runtime::FunctionDispatcher* function_dispatcher)
       : AudioSystem(function_dispatcher) {
-    queued_frames_limit_ = uint32_t(std::clamp<int32_t>(REXCVAR_GET(audio_maxqframes), 4, 64));
+    queued_frames_limit_ = uint32_t(std::clamp<int32_t>(ITC_FLAG(audio_maxqframes), 4, 64));
   }
 
   ~ItcAudioSystem() override {
@@ -106,12 +107,9 @@ class ItcAudioSystem : public rex::audio::AudioSystem {
     return std::make_unique<ItcAudioSystem>(function_dispatcher);
   }
 
-  // Only the XMA decoder; the base class would also start the Audio Worker.
+  // Only our thread: the base class would start the Audio Worker and the XMA
+  // decoder (its thread and the XMA registers), which nothing uses since B2.
   X_STATUS Setup(rex::system::KernelState* kernel_state) override {
-    X_STATUS result = xma_decoder_->Setup(kernel_state);
-    if (result) {
-      return result;
-    }
     running_ = true;
     thread_ = rex::system::object_ref<rex::system::XHostThread>(new rex::system::XHostThread(
         kernel_state, 128 * 1024, 0, [this]() {
@@ -121,16 +119,13 @@ class ItcAudioSystem : public rex::audio::AudioSystem {
     thread_->set_name("ITC Audio");
     thread_->Create();
     g_system = this;
-    REXLOG_INFO("native audio: started ({} frames queued at most)", queued_frames_limit_);
+    ITC_LOG_INFO("native audio: started ({} frames queued at most)", queued_frames_limit_);
     return X_STATUS_SUCCESS;
   }
 
   void Shutdown() override {
     if (!running_) {
       return;
-    }
-    if (xma_decoder_) {
-      xma_decoder_->Shutdown();
     }
     {
       std::lock_guard<std::mutex> lock(mutex_);
@@ -145,7 +140,7 @@ class ItcAudioSystem : public rex::audio::AudioSystem {
                                                      std::chrono::milliseconds(500)) ==
                                        rex::thread::WaitResult::kSuccess;
       if (!exited) {
-        REXLOG_WARN("native audio: thread didn't exit within 500 ms; terminating");
+        ITC_LOG_WARN("native audio: thread didn't exit within 500 ms; terminating");
         thread_->Terminate(0);
       }
       thread_.reset();
@@ -170,7 +165,7 @@ class ItcAudioSystem : public rex::audio::AudioSystem {
       }
     }
     if (index == kMaxClients) {
-      REXLOG_ERROR("native audio: no free client for callback {:08X}", callback);
+      ITC_LOG_ERROR("native audio: no free client for callback {:08X}", callback);
       return 0;
     }
     Client& client = clients_[index];
@@ -191,8 +186,8 @@ class ItcAudioSystem : public rex::audio::AudioSystem {
       client.stream = stream;
       client.device_channels = device_channels;
     }
-    REXLOG_INFO("native audio: client {} registered: callback {:08X}, argument {:08X}", index,
-                callback, callback_arg);
+    ITC_LOG_INFO("native audio: client {} registered: callback {:08X}, argument {:08X}", index,
+                 callback, callback_arg);
     // SDL starts asking for frames once the device is resumed.
     SDL_ResumeAudioDevice(SDL_GetAudioStreamDevice(stream));
     wake_.notify_all();
@@ -202,7 +197,7 @@ class ItcAudioSystem : public rex::audio::AudioSystem {
   void Unregister(uint32_t handle) {
     size_t index = handle & 0xFFFF;
     if ((handle & 0xFFFF0000) != kHandleBase || index >= kMaxClients) {
-      REXLOG_ERROR("native audio: unregistering unknown driver handle {:08X}", handle);
+      ITC_LOG_ERROR("native audio: unregistering unknown driver handle {:08X}", handle);
       return;
     }
     // Destroying the stream stops its SDL callback; do it outside our lock,
@@ -221,8 +216,8 @@ class ItcAudioSystem : public rex::audio::AudioSystem {
     {
       std::lock_guard<std::mutex> lock(mutex_);
       Client& client = clients_[index];
-      REXLOG_INFO("native audio: client {} unregistered ({} frames played, {} silence fills)",
-                  index, client.frames_played, client.silence_fills);
+      ITC_LOG_INFO("native audio: client {} unregistered ({} frames played, {} silence fills)",
+                   index, client.frames_played, client.silence_fills);
       wrapped_arg = client.wrapped_arg;
       client = {};
     }
@@ -234,7 +229,7 @@ class ItcAudioSystem : public rex::audio::AudioSystem {
   void Submit(uint32_t handle, uint32_t samples) {
     size_t index = handle & 0xFFFF;
     if ((handle & 0xFFFF0000) != kHandleBase || index >= kMaxClients) {
-      REXLOG_ERROR("native audio: frame for unknown driver handle {:08X}", handle);
+      ITC_LOG_ERROR("native audio: frame for unknown driver handle {:08X}", handle);
       return;
     }
     const float* input = memory()->TranslateVirtual<const float*>(samples);
@@ -259,7 +254,7 @@ class ItcAudioSystem : public rex::audio::AudioSystem {
   // XAudioRegisterRenderDriverClient.
   X_STATUS CreateDriver(size_t index, rex::thread::Semaphore*,
                         rex::audio::AudioDriver**) override {
-    REXLOG_ERROR("native audio: the SDK's render driver was asked for (client {})", index);
+    ITC_LOG_ERROR("native audio: the SDK's render driver was asked for (client {})", index);
     return X_STATUS_NOT_IMPLEMENTED;
   }
   void DestroyDriver(rex::audio::AudioDriver*) override {}
@@ -294,7 +289,7 @@ class ItcAudioSystem : public rex::audio::AudioSystem {
 
   bool OpenStream(size_t index, SDL_AudioStream** out_stream, int* out_channels) {
     if (!SDL_InitSubSystem(SDL_INIT_AUDIO)) {
-      REXLOG_ERROR("native audio: SDL_InitSubSystem(SDL_INIT_AUDIO) failed: {}", SDL_GetError());
+      ITC_LOG_ERROR("native audio: SDL_InitSubSystem(SDL_INIT_AUDIO) failed: {}", SDL_GetError());
       return false;
     }
     SDL_AudioSpec spec = {};
@@ -317,13 +312,13 @@ class ItcAudioSystem : public rex::audio::AudioSystem {
                                          userdata);
     }
     if (!stream) {
-      REXLOG_ERROR("native audio: SDL_OpenAudioDeviceStream failed: {}", SDL_GetError());
+      ITC_LOG_ERROR("native audio: SDL_OpenAudioDeviceStream failed: {}", SDL_GetError());
       SDL_QuitSubSystem(SDL_INIT_AUDIO);
       return false;
     }
     const char* name = SDL_GetAudioDeviceName(SDL_GetAudioStreamDevice(stream));
-    REXLOG_INFO("native audio: endpoint '{}': {} ch, {} Hz; submitting {} ch", name ? name : "?",
-                device_spec.channels, device_spec.freq, spec.channels);
+    ITC_LOG_INFO("native audio: endpoint '{}': {} ch, {} Hz; submitting {} ch", name ? name : "?",
+                 device_spec.channels, device_spec.freq, spec.channels);
     *out_stream = stream;
     *out_channels = spec.channels;
     return true;
@@ -338,38 +333,41 @@ class ItcAudioSystem : public rex::audio::AudioSystem {
       return;
     }
     size_t index = reinterpret_cast<size_t>(userdata);
-    const rex::audio::StereoFold fold = rex::audio::GetStereoFold();
-    const rex::audio::SurroundMix mix = rex::audio::GetSurroundMix();
-    const float gain = rex::audio::GetOutputGain();
     std::array<float, kFrameSamples> data;
+    // A frame of silence, for a movie's sound where the mixer has none.
+    static const Frame kSilence{};
     bool played = false;
     {
       std::lock_guard<std::mutex> lock(self->mutex_);
       Client& client = self->clients_[index];
       const int len = int(sizeof(float)) * int(kChannelSamples) * client.device_channels;
       while (additional_amount > 0) {
+        // The playing movie's sound, if any, for this frame's time.
+        std::array<float, 2 * kChannelSamples> movie{};
+        movies::MixSoundingAudio(movie.data(), kChannelSamples);
+        auto convert = [&](const Frame& frame) {
+          if (ITC_FLAG(audio_mute)) {
+            std::memset(data.data(), 0, len);
+          } else if (client.device_channels == 6) {
+            audio::ToInterleaved51(frame.data(), kChannelSamples, data.data(), movie.data());
+          } else {
+            audio::ToInterleavedStereo(frame.data(), kChannelSamples, data.data(), movie.data());
+          }
+        };
         if (client.queued.empty()) {
-          std::memset(data.data(), 0, len);
+          convert(kSilence);
           client.silence_fills++;
         } else {
           std::unique_ptr<Frame> frame = std::move(client.queued.front());
           client.queued.pop_front();
-          if (REXCVAR_GET(audio_mute)) {
-            std::memset(data.data(), 0, len);
-          } else if (client.device_channels == 6) {
-            rex::audio::conversion::sequential_6_BE_to_interleaved_6_LE(
-                data.data(), frame->data(), kChannelSamples, mix, gain);
-          } else {
-            rex::audio::conversion::sequential_6_BE_to_interleaved_2_LE(
-                data.data(), frame->data(), kChannelSamples, fold, gain);
-          }
+          convert(*frame);
           client.unused.push_back(std::move(frame));
           client.credits++;
           client.frames_played++;
           played = true;
         }
         if (!SDL_PutAudioStreamData(stream, data.data(), len)) {
-          REXLOG_ERROR("native audio: SDL_PutAudioStreamData failed: {}", SDL_GetError());
+          ITC_LOG_ERROR("native audio: SDL_PutAudioStreamData failed: {}", SDL_GetError());
           break;
         }
         additional_amount -= len;
@@ -380,12 +378,12 @@ class ItcAudioSystem : public rex::audio::AudioSystem {
       if (client.logged_at == std::chrono::steady_clock::time_point{}) {
         client.logged_at = now;
       } else if (now - client.logged_at >= std::chrono::seconds(10)) {
-        REXLOG_INFO("native audio: client {}: {} frames played, {} silence fills in {:.1f} s; {} "
-                    "queued",
-                    index, client.frames_played - client.logged_frames_played,
-                    client.silence_fills - client.logged_silence_fills,
-                    std::chrono::duration<double>(now - client.logged_at).count(),
-                    client.queued.size());
+        ITC_LOG_INFO("native audio: client {}: {} frames played, {} silence fills in {:.1f} s; {} "
+                     "queued",
+                     index, client.frames_played - client.logged_frames_played,
+                     client.silence_fills - client.logged_silence_fills,
+                     std::chrono::duration<double>(now - client.logged_at).count(),
+                     client.queued.size());
         client.logged_frames_played = client.frames_played;
         client.logged_silence_fills = client.silence_fills;
         client.logged_at = now;
@@ -411,7 +409,7 @@ bool IsOurHandle(uint32_t handle) {
 }  // namespace
 
 void Configure(rex::RuntimeConfig& config) {
-  if (REXCVAR_GET(native_audio)) {
+  if (ITC_FLAG(native_audio)) {
     config.audio_factory = REX_AUDIO_BACKEND(ItcAudioSystem);
   }
 }

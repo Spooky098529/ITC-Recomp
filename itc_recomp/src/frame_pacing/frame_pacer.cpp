@@ -1,7 +1,7 @@
 #include "frame_pacer.h"
 
-#include <rex/cvar.h>
-#include <rex/logging.h>
+#include "base/flags.h"
+#include "base/log.h"
 
 #include <algorithm>
 #include <thread>
@@ -12,8 +12,8 @@
 #include <windows.h>
 #endif
 
-REXCVAR_DEFINE_INT32(max_fps, 0, "ITC", "Frame rate cap; 0 means unlimited");
-REXCVAR_DEFINE_BOOL(log_fps, false, "ITC", "Log frames and game ticks per second");
+ITC_FLAG_INT32(max_fps, 0, "ITC", "Frame rate cap; 0 means unlimited");
+ITC_FLAG_BOOL(log_fps, false, "ITC", "Log frames and game ticks per second");
 
 namespace frame_pacing {
 
@@ -102,7 +102,7 @@ float FramePacer::TickProgress() const {
 }
 
 FramePacer::Clock::duration FramePacer::FramePeriod() const {
-  int max_fps = REXCVAR_GET(max_fps);
+  int max_fps = ITC_FLAG(max_fps);
   if (max_fps <= 0) {
     return Clock::duration::zero();
   }
@@ -110,14 +110,14 @@ FramePacer::Clock::duration FramePacer::FramePeriod() const {
 }
 
 void FramePacer::LogRates(Clock::time_point now) {
-  if (!REXCVAR_GET(log_fps)) {
+  if (!ITC_FLAG(log_fps)) {
     return;
   }
   if (now - last_log_ < std::chrono::seconds(1)) {
     return;
   }
-  REXLOG_INFO("fps {} ticks/s {} (late {}, grid restarts {})", frames_since_log_,
-              ticks_since_log_, late_ticks_since_log_, dropped_ticks_since_log_);
+  ITC_LOG_INFO("fps {} ticks/s {} (late {}, grid restarts {})", frames_since_log_,
+               ticks_since_log_, late_ticks_since_log_, dropped_ticks_since_log_);
   last_log_ = now;
   frames_since_log_ = 0;
   ticks_since_log_ = 0;

@@ -1,0 +1,482 @@
+// The race overlays' update side natively: adapters in front of
+// src/race_overlays/race_overlays.cpp (docs/functions/race-overlays.md).
+
+#include "guest.h"
+
+#include "base/flags.h"
+#include "hooks/heap.h"
+#include "race_overlays/race_overlays.h"
+
+ITC_FLAG_BOOL(native_race_overlays, true, "ITC",
+              "Run the race overlays' update helpers (the car overlays' view and vehicle "
+              "accessors, sub_82126550 to sub_82127178, and OverlayView::SpeedKmh, sub_821268C0; the child overlays' setters, "
+              "sub_8211E9C8 to sub_8212DF90; the game's rand, sub_82293568, and RandomRange, "
+              "sub_8211F118; Marker::Set and Update, sub_8212CCE0 and sub_8212CBE0; Trail::Update and "
+              "AddPoint, sub_821292E8 and sub_82129598; ParticlesB and ParticlesC::Emit, sub_8212B4A8 and sub_8212C1C0; the "
+              "car-model sprites' kind and table entry, sub_82123188 and sub_8211F300; the model "
+              "points' checks and positions, sub_82126A78 and sub_82127140; Sparks::UpdateStreak, "
+              "sub_8212E660; Sparks::Emit, sub_8212D818; CarOverlays::EmitSmoke, sub_82123240, "
+              "with Smoke::Emit; the set-up's constructors, clears and bindings, sub_82126498 to "
+              "sub_8215E000; the resets, sub_8211E9F0 to sub_8212D6E0; Smoke::InRegion, "
+              "sub_8212A868; Sparks::Update, sub_8212DDC8; Smoke::Update, sub_8212AA78; ParticlesB::Update, sub_8212B748; ParticlesC::Update, sub_8212C2F0; RaceOverlays::SlotOf, sub_8215E048; the children's constructors, "
+              "sub_8211F060 to sub_8212E9A0, and Smoke and ParticlesB::Reset, sub_8212A9E0 and "
+              "sub_8212BA98; ParticlesB::ParticlesB, sub_8212BFE8, and Smoke's and ParticlesB's destructors, "
+              "sub_8212B288 to sub_8212C070; the view's body and wheels through the vehicle accessors, sub_821268B0 to "
+              "sub_82126FF0; CarOverlays::IsBehindCamera, sub_82124630; the racers' "
+              "save flags and stages, sub_82126B50 to sub_82126CB0; CarOverlays::UpdateTrails, "
+              "sub_82124EE0; CarOverlays::MarkerKind, sub_82122EA8; the effects' updates "
+              "UpdateLightSprites, UpdateParticlesB and UpdateParticlesC, sub_821251C0, "
+              "sub_821252D0 and sub_82125798; CarOverlays::UpdateSmoke, sub_82125B60; OverlayView::ModelMatrix, sub_821270E8) natively "
+              "instead of through the translated code (same results; checked by "
+              "--run_harnesses=race_overlays)");
+
+// Defines an adapter for a function of the view or overlays in r3 that
+// returns a word in r3: `address` the function's (sub_<address>), `expr` the
+// result (using `ctx` and `base`).
+#define ITC_OVERLAY_WORD(address, expr)      \
+  extern "C" REX_FUNC(sub_##address) {      \
+    REX_FUNC_PROLOGUE();                    \
+    if (!ITC_FLAG(native_race_overlays)) {  \
+      __imp__sub_##address(ctx, base);      \
+      return;                               \
+    }                                       \
+    ctx.r3.u64 = uint32_t(expr);            \
+  }
+
+using namespace race_overlays;
+
+// CarOverlays::View: r3 = the car overlays, r4 = a slot.
+ITC_OVERLAY_WORD(82126550, View(base, ctx.r3.u32, ctx.r4.u32))
+// CarOverlays::ViewportEntry: r4 = an index (r3 isn't read).
+ITC_OVERLAY_WORD(821264A8, ViewportEntry(ctx.r4.u32))
+// OverlayView::SpeedKmh: r3 = a view. The original loads the vehicle into
+// r3 and tail-calls Vehicle::GetSpeedKmh, so r3 comes back as the vehicle.
+extern "C" REX_FUNC(sub_821268C0) {
+  REX_FUNC_PROLOGUE();
+  if (!ITC_FLAG(native_race_overlays)) {
+    __imp__sub_821268C0(ctx, base);
+    return;
+  }
+  ctx.fpscr.disableFlushMode();
+  const uint32_t view = ctx.r3.u32;
+  ctx.r3.u64 = guest::LoadU32(base, view + 4);
+  ctx.f1.f64 = double(SpeedKmh(base, view));
+}
+
+// The view's wheel values WheelSpin, WheelValue512, AxleValue3764,
+// AxleValue3384 and WheelOnGround (sub_821268F0, sub_82126908, sub_82126920,
+// sub_82126958, sub_82126998) have no adapters: their only callers in play,
+// CarOverlays::UpdateTrails and UpdateSmoke, are native.
+// The view's (r3) vehicle's fields.
+// VehicleByte2504, VehicleWord2252, VehicleFloat6256 and VehicleFloat6252
+// (sub_82126A80, sub_82126AA0, sub_82126AC0, sub_82126AD0) have no adapters:
+// their only callers in play, the effects' updates, are native.
+ITC_OVERLAY_WORD(82126AB0, VehicleWord340(base, ctx.r3.u32))
+ITC_OVERLAY_WORD(82126D18, RaceMode(base))
+ITC_OVERLAY_WORD(82127178, RacerFlags(base, ctx.r3.u32))
+
+// OverlayView::RacerId: r3 = a view; the racer's id or -1.
+extern "C" REX_FUNC(sub_82126AE0) {
+  REX_FUNC_PROLOGUE();
+  if (!ITC_FLAG(native_race_overlays)) {
+    __imp__sub_82126AE0(ctx, base);
+    return;
+  }
+  ctx.r3.s64 = RacerId(base, ctx.r3.u32);
+}
+
+// Defines an adapter for a setter returning nothing (`call` uses `ctx` and
+// `base`).
+#define ITC_OVERLAY_SET(address, call)       \
+  extern "C" REX_FUNC(sub_##address) {      \
+    REX_FUNC_PROLOGUE();                    \
+    if (!ITC_FLAG(native_race_overlays)) {  \
+      __imp__sub_##address(ctx, base);      \
+      return;                               \
+    }                                       \
+    ctx.fpscr.disableFlushMode();           \
+    call;                                   \
+  }
+
+// The child overlays' setters: r3 = the overlay, r4 = a vector (or a word).
+// Smoke::SetVelocity and SetRegion (sub_8212A840, sub_8212A998) have no
+// adapters: their only caller in play, CarOverlays::UpdateSmoke, is native.
+// ParticlesB::SetPosition and ParticlesC::SetPosition (sub_8212BA70,
+// sub_8212C6A8) have no adapters: their only callers in play,
+// CarOverlays::UpdateParticlesB and UpdateParticlesC, are native.
+ITC_OVERLAY_SET(8212DF90, SparksSetPosition(base, ctx.r3.u32, ctx.r4.u32))
+// Trail::SetLastPosition (sub_821299D8) has no adapter: its only caller in
+// play, CarOverlays::UpdateTrails, is native.
+ITC_OVERLAY_SET(8212CE18, MarkerSetCameraPosition(base, ctx.r3.u32, ctx.r4.u32))
+// LightSprite::SetPosition (sub_8211EBE0) has no adapter: its only caller in
+// play, CarOverlays::UpdateLightSprites, is native.
+ITC_OVERLAY_SET(82121560, ModelSpritePlaceHidden(base, ctx.r3.u32, ctx.r4.u32))
+ITC_OVERLAY_SET(8212C0E0, SetTextures104(base, ctx.r3.u32, ctx.r4.u32))
+ITC_OVERLAY_SET(8212D6D8, SetTextures108(base, ctx.r3.u32, ctx.r4.u32))
+ITC_OVERLAY_SET(8212CC10, MarkerSetTextures(base, ctx.r3.u32, ctx.r4.u32))
+ITC_OVERLAY_SET(8211E9C8, LightSpriteSetTextures(base, ctx.r3.u32, ctx.r4.u32))
+ITC_OVERLAY_SET(8211F408, ModelSpriteSetTextures(base, ctx.r3.u32, ctx.r4.u32))
+
+// rand: returns r3.
+ITC_OVERLAY_WORD(82293568, Rand(base))
+
+// RandomRange (sub_8211F118) has no adapter: its callers in play (the
+// emitters and CarOverlays::UpdateSmoke) are native.
+
+// Marker::Set: r3 = the marker, r4 = position, f1 = distance, r6 = view
+// mode, r7 = kind; returns 1.
+extern "C" REX_FUNC(sub_8212CCE0) {
+  REX_FUNC_PROLOGUE();
+  if (!ITC_FLAG(native_race_overlays)) {
+    __imp__sub_8212CCE0(ctx, base);
+    return;
+  }
+  ctx.fpscr.disableFlushMode();
+  ctx.r3.u64 =
+      MarkerSet(base, ctx.r3.u32, ctx.r4.u32, ctx.f1.f64, ctx.r6.u32, ctx.r7.u32);
+}
+
+// Marker::Update (its vtable's slot 4, so the adapter stays while the
+// update loop calling it is recompiled): r3 = the marker.
+ITC_OVERLAY_SET(8212CBE0, MarkerUpdate(base, ctx.r3.u32))
+
+// Trail::Update (its vtable's slot 4, so the adapter stays while the update
+// loop calling it is recompiled): r3 = the trail. Where the native version
+// declines (a capacity of 0 or -1), the original runs.
+extern "C" REX_FUNC(sub_821292E8) {
+  REX_FUNC_PROLOGUE();
+  if (!ITC_FLAG(native_race_overlays)) {
+    __imp__sub_821292E8(ctx, base);
+    return;
+  }
+  ctx.fpscr.disableFlushMode();
+  if (!TrailUpdate(base, ctx.r3.u32)) {
+    __imp__sub_821292E8(ctx, base);
+  }
+}
+
+// CarOverlays::ModelSpriteKind: r3 = the car overlays (not needed), r4 = a
+// racer id; returns the kind.
+ITC_OVERLAY_WORD(82123188, ModelSpriteKind(ctx.r4.s32))
+// ModelSprite::Entry: r4 = a kind, r5 = an index (r3 isn't read); returns
+// the table's word.
+ITC_OVERLAY_WORD(8211F300, ModelSpriteEntry(base, ctx.r4.u32, ctx.r5.u32))
+
+// ParticlesC::Emit (sub_8212C1C0) has no adapter: its only caller in play,
+// CarOverlays::UpdateParticlesC, is native.
+
+// Trail::AddPoint (sub_82129598) has no adapter: its only caller in play,
+// CarOverlays::UpdateTrails, is native (and declines first where AddPoint
+// would).
+
+// ParticlesB::Emit (sub_8212B4A8) has no adapter: its only caller in play,
+// CarOverlays::UpdateParticlesB, is native (and declines first where Emit
+// would).
+
+// OverlayView::HasPoint and PointPosition (sub_82126A78, sub_82127140) have
+// no adapters: their only callers in play, the effects' updates, are native.
+
+// Sparks::UpdateStreak: r3 = the sparks, f1 = speed, r4 and r5 = a position
+// (a vector passed by value), r6 = streaking, r8 = a mode (r7 isn't read);
+// r3 and f1 are left the last rand() and RandomRange results, as the
+// original leaves them.
+extern "C" REX_FUNC(sub_8212E660) {
+  REX_FUNC_PROLOGUE();
+  if (!ITC_FLAG(native_race_overlays)) {
+    __imp__sub_8212E660(ctx, base);
+    return;
+  }
+  ctx.fpscr.disableFlushMode();
+  const uint32_t position[4] = {uint32_t(ctx.r4.u64 >> 32), ctx.r4.u32,
+                                uint32_t(ctx.r5.u64 >> 32), ctx.r5.u32};
+  uint32_t drawn = ctx.r3.u32;
+  double value = ctx.f1.f64;
+  SparksUpdateStreak(base, ctx.r3.u32, ctx.f1.f64, position, ctx.r6.u32, ctx.r8.u32, &drawn,
+                     &value);
+  ctx.r3.u64 = drawn;
+  ctx.f1.f64 = value;
+}
+
+// Sparks::Emit: r3 = the sparks, r4 = a position, r6 and r7 = a vector
+// (passed by value), f2 = strength (f1 isn't read); returns 1, or 0 when
+// full, with f1 left as the original leaves it. Where the native version
+// declines (a capacity of 0 or -1), the original runs.
+extern "C" REX_FUNC(sub_8212D818) {
+  REX_FUNC_PROLOGUE();
+  if (!ITC_FLAG(native_race_overlays)) {
+    __imp__sub_8212D818(ctx, base);
+    return;
+  }
+  ctx.fpscr.disableFlushMode();
+  const uint32_t vector[4] = {uint32_t(ctx.r6.u64 >> 32), ctx.r6.u32,
+                              uint32_t(ctx.r7.u64 >> 32), ctx.r7.u32};
+  uint32_t result = 0;
+  double last = ctx.f1.f64;
+  if (!SparksEmit(base, ctx.r3.u32, ctx.r4.u32, ctx.f2.f64, vector, &result, &last)) {
+    __imp__sub_8212D818(ctx, base);
+    return;
+  }
+  ctx.r3.u64 = result;
+  ctx.f1.f64 = last;
+}
+
+// CarOverlays::EmitSmoke (sub_82123240) has no adapter: its only caller in
+// play, CarOverlays::UpdateSmoke, is native (and declines first where it
+// would).
+
+// The set-up's constructors, clears and bindings (none allocates).
+// Overlay::Overlay, CarOverlays::ClearViews, ViewDesc::Clear,
+// OverlayView::OverlayView, Particle::Particle and RaceOverlays::Clear: r3 =
+// the object.
+ITC_OVERLAY_SET(82126498, OverlayConstruct(base, ctx.r3.u32))
+ITC_OVERLAY_SET(82126530, ClearViews(base, ctx.r3.u32))
+ITC_OVERLAY_SET(82126860, ViewDescClear(base, ctx.r3.u32))
+ITC_OVERLAY_SET(82126870, OverlayViewConstruct(base, ctx.r3.u32))
+ITC_OVERLAY_SET(8212B3D0, ParticleConstruct(base, ctx.r3.u32))
+ITC_OVERLAY_SET(8215DE80, RaceOverlaysClear(base, ctx.r3.u32))
+// OverlayView::Set: r3 = the view, r4 = a description.
+ITC_OVERLAY_SET(82126890, OverlayViewSet(base, ctx.r3.u32, ctx.r4.u32))
+// CarOverlays::BindViewport: r4 = out, r5 = the viewport entry, r6 = a
+// second index (r3 isn't read).
+ITC_OVERLAY_SET(821264C0, BindViewport(base, ctx.r4.u32, ctx.r5.u32, ctx.r6.u32))
+// Overlays::SetRenderTargets: r3 = the render queue, r4 = the command list.
+ITC_OVERLAY_SET(82128190, SetRenderTargets(base, ctx.r3.u32, ctx.r4.u32))
+// RaceOverlays::ShareTextures: r3 = the list; r3 comes back as entry 24, as
+// the original leaves it. SetTextures104, which it calls, is done by its
+// plain C++.
+ITC_OVERLAY_WORD(8215E000, ShareTextures(base, ctx.r3.u32))
+
+// The resets (most are slot 3, reached through the vtables): r3 = the
+// object.
+ITC_OVERLAY_SET(8211E9F0, LightSpriteReset(base, ctx.r3.u32))
+ITC_OVERLAY_SET(8211F430, ModelSpriteReset(base, ctx.r3.u32))
+ITC_OVERLAY_SET(82123A00, SpriteResetStyle2(base, ctx.r3.u32))
+ITC_OVERLAY_SET(82129498, TrailReset(base, ctx.r3.u32))
+ITC_OVERLAY_SET(8212C0E8, ParticlesCReset(base, ctx.r3.u32))
+ITC_OVERLAY_SET(8212CC38, MarkerReset(base, ctx.r3.u32))
+ITC_OVERLAY_SET(8212D6E0, SparksReset(base, ctx.r3.u32))
+// SmokeEmitter::Reset, Smoke::InRegion and ParticlesB::ResetEntry have no
+// adapters: only Smoke::Reset, Smoke::Update, ParticlesB::Reset and
+// ParticlesB::Update call them, and those call their plain C++.
+
+// Sparks::Update: r3 = the sparks. Where the native version declines (the
+// original could trap or reach outside its entries), the original runs.
+extern "C" REX_FUNC(sub_8212DDC8) {
+  REX_FUNC_PROLOGUE();
+  if (!ITC_FLAG(native_race_overlays)) {
+    __imp__sub_8212DDC8(ctx, base);
+    return;
+  }
+  ctx.fpscr.disableFlushMode();
+  if (!SparksUpdate(base, ctx.r3.u32)) {
+    __imp__sub_8212DDC8(ctx, base);
+  }
+}
+
+// The children's constructors: r3 = the object, returned in r3.
+ITC_OVERLAY_SET(8211F060, LightSpriteConstruct(base, ctx.r3.u32))
+ITC_OVERLAY_SET(82122880, ModelSpriteConstruct(base, ctx.r3.u32))
+ITC_OVERLAY_SET(8212A140, TrailConstruct(base, ctx.r3.u32))
+// Smoke::Smoke: SmokeEmitter::SmokeEmitter, which only it calls, is done by
+// its plain C++ (that one has no adapter).
+ITC_OVERLAY_SET(8212B2E8, SmokeConstruct(base, ctx.r3.u32))
+ITC_OVERLAY_SET(8212CAF8, ParticlesCConstruct(base, ctx.r3.u32))
+ITC_OVERLAY_SET(8212D620, MarkerConstruct(base, ctx.r3.u32))
+ITC_OVERLAY_SET(8212E9A0, SparksConstruct(base, ctx.r3.u32))
+// ParticlesB::ParticlesB: Particle::Particle, through the array helper, is
+// done by its plain C++.
+ITC_OVERLAY_SET(8212BFE8, ParticlesBConstruct(base, ctx.r3.u32))
+
+// Smoke's and ParticlesB's deleting destructors (slot 0, reached through
+// the vtables): r3 = the object, r4 = the flags; r3 comes back as the
+// object. The plain destructors they call (Smoke::~Smoke, sub_8212B288,
+// and ParticlesB::~ParticlesB, sub_8212BF88) have no adapters: only these
+// call them. Only while the game's heap is the layer's, as operator delete
+// is then the layer's free.
+#define ITC_OVERLAY_DELETING(address, call)                          \
+  extern "C" REX_FUNC(sub_##address) {                               \
+    REX_FUNC_PROLOGUE();                                             \
+    if (!ITC_FLAG(native_race_overlays) || !hooks::NativeHeapActive() || \
+        !(call)) {                                                   \
+      __imp__sub_##address(ctx, base);                               \
+    }                                                                \
+  }
+ITC_OVERLAY_DELETING(8212B358, SmokeDeletingDestructor(base, ctx.r3.u32, ctx.r4.u32))
+ITC_OVERLAY_DELETING(8212C070, ParticlesBDeletingDestructor(base, ctx.r3.u32, ctx.r4.u32))
+// Smoke::Reset and ParticlesB::Reset (slot 3): r3 = the object; the entry
+// resets they call are done by their plain C++.
+ITC_OVERLAY_SET(8212A9E0, SmokeReset(base, ctx.r3.u32))
+ITC_OVERLAY_SET(8212BA98, ParticlesBReset(base, ctx.r3.u32))
+
+// Smoke::Update (its vtable's slot 4, so the adapter stays while the update
+// loop calling it is recompiled): r3 = the smoke, left as the original
+// leaves it. SmokeEmitter::Reset and Smoke::InRegion are called as plain
+// C++. Where the native version declines (the original could trap or reach
+// outside its emitters), the original runs.
+extern "C" REX_FUNC(sub_8212AA78) {
+  REX_FUNC_PROLOGUE();
+  if (!ITC_FLAG(native_race_overlays)) {
+    __imp__sub_8212AA78(ctx, base);
+    return;
+  }
+  ctx.fpscr.disableFlushMode();
+  uint32_t r3 = ctx.r3.u32;
+  if (!SmokeUpdate(base, ctx.r3.u32, &r3)) {
+    __imp__sub_8212AA78(ctx, base);
+    return;
+  }
+  ctx.r3.u64 = r3;
+}
+
+// ParticlesB::Update (its vtable's slot 4, so the adapter stays while the
+// update loop calling it is recompiled): r3 = the effect. ParticlesB's
+// ResetEntry is called as plain C++. Where the native version declines (the
+// original could trap or reach outside its entries), the original runs.
+extern "C" REX_FUNC(sub_8212B748) {
+  REX_FUNC_PROLOGUE();
+  if (!ITC_FLAG(native_race_overlays)) {
+    __imp__sub_8212B748(ctx, base);
+    return;
+  }
+  ctx.fpscr.disableFlushMode();
+  if (!ParticlesBUpdate(base, ctx.r3.u32)) {
+    __imp__sub_8212B748(ctx, base);
+  }
+}
+
+// ParticlesC::Update (its vtable's slot 4, so the adapter stays while the
+// update loop calling it is recompiled): r3 = the effect, left as the
+// original leaves it. rand is called as plain C++. Where the native version
+// declines (a capacity of 0, where the original traps), the original runs.
+extern "C" REX_FUNC(sub_8212C2F0) {
+  REX_FUNC_PROLOGUE();
+  if (!ITC_FLAG(native_race_overlays)) {
+    __imp__sub_8212C2F0(ctx, base);
+    return;
+  }
+  ctx.fpscr.disableFlushMode();
+  uint32_t r3 = ctx.r3.u32;
+  if (!ParticlesCUpdate(base, ctx.r3.u32, &r3)) {
+    __imp__sub_8212C2F0(ctx, base);
+    return;
+  }
+  ctx.r3.u64 = r3;
+}
+
+// RaceOverlays::SlotOf: r3 = an index; returns the slot (its jump table's
+// first case, sub_8215E078, is done by the plain C++).
+ITC_OVERLAY_WORD(8215E048, SlotOf(ctx.r3.u32))
+
+// The view's (r3) body and wheels, through the vehicle accessors' plain C++.
+// OverlayView::BodyMatrix (sub_821268B0) has no adapter: its only caller in
+// play, CarOverlays::IsBehindCamera, is native.
+// WheelContact and WheelSurfaceMarks (sub_821268C8, sub_821269B0) have no
+// adapters: their only callers in play, CarOverlays::UpdateTrails and
+// UpdateSmoke, are native.
+// r3 = out, r4 = the view; returns out.
+ITC_OVERLAY_WORD(82126F80, BodyPosition(base, ctx.r3.u32, ctx.r4.u32))
+ITC_OVERLAY_WORD(82126FF0, BodyMatrixCopy(base, ctx.r3.u32, ctx.r4.u32))
+
+// OverlayView::WheelSlip (sub_82126A70) has no adapter: its only callers in
+// play, CarOverlays::UpdateTrails and UpdateSmoke, are native.
+
+// CarOverlays::IsBehindCamera (sub_82124630) has no adapter: its only caller
+// in play, CarOverlays::UpdateParticlesC, is native.
+
+// The racers' save flags and stages: r4 = a racer id (r3 isn't read).
+ITC_OVERLAY_WORD(82126BB0, SaveFlag199FA(base, ctx.r4.u32))
+// SaveFlag199F8 and SaveFlag199FC (sub_82126C08, sub_82126C58) have no
+// adapters: their only caller in play, SaveFlag199F8Or199FC, is native.
+ITC_OVERLAY_WORD(82126CB0, SaveFlag199F8Or199FC(base, ctx.r4.u32))
+ITC_OVERLAY_WORD(82126B50, RacerInCurrentStage(base, ctx.r4.u32))
+
+// CarOverlays::UpdateTrails: r3 = the car overlays. Its point goes in the
+// original's own stack slot (r1 - 336 + 112, below the stack pointer).
+// Where the native version declines (a trail's capacity 0 or -1), the
+// original runs.
+extern "C" REX_FUNC(sub_82124EE0) {
+  REX_FUNC_PROLOGUE();
+  if (!ITC_FLAG(native_race_overlays)) {
+    __imp__sub_82124EE0(ctx, base);
+    return;
+  }
+  ctx.fpscr.disableFlushMode();
+  if (!UpdateTrails(base, ctx.r3.u32, ctx.r1.u32 - 336 + 112)) {
+    __imp__sub_82124EE0(ctx, base);
+  }
+}
+
+// CarOverlays::MarkerKind: r3 = the car overlays, r4 = a racer id, r5 = a
+// fallback; returns the kind (FlagsKind and NoSaveFlags, which only it
+// calls, are done by its plain C++).
+ITC_OVERLAY_WORD(82122EA8, MarkerKind(base, ctx.r3.u32, ctx.r4.s32, ctx.r5.u32))
+
+// The effects' updates: r3 = the car overlays. Their points go in the
+// originals' own stack frames (r1 - 256, or - 240 for UpdateParticlesC,
+// below the stack pointer). LightSprite::Show (sub_8211EAA0) and
+// sub_82126A90 have no adapters: UpdateLightSprites is their only caller.
+extern "C" REX_FUNC(sub_821251C0) {
+  REX_FUNC_PROLOGUE();
+  if (!ITC_FLAG(native_race_overlays)) {
+    __imp__sub_821251C0(ctx, base);
+    return;
+  }
+  ctx.fpscr.disableFlushMode();
+  UpdateLightSprites(base, ctx.r3.u32, ctx.r1.u32 - 256);
+}
+
+// Where the native version declines (an emitter's capacity 0 or -1), the
+// original runs.
+extern "C" REX_FUNC(sub_821252D0) {
+  REX_FUNC_PROLOGUE();
+  if (!ITC_FLAG(native_race_overlays)) {
+    __imp__sub_821252D0(ctx, base);
+    return;
+  }
+  ctx.fpscr.disableFlushMode();
+  if (!UpdateParticlesB(base, ctx.r3.u32, ctx.r1.u32 - 256)) {
+    __imp__sub_821252D0(ctx, base);
+  }
+}
+
+extern "C" REX_FUNC(sub_82125798) {
+  REX_FUNC_PROLOGUE();
+  if (!ITC_FLAG(native_race_overlays)) {
+    __imp__sub_82125798(ctx, base);
+    return;
+  }
+  ctx.fpscr.disableFlushMode();
+  UpdateParticlesC(base, ctx.r3.u32, ctx.r1.u32 - 240);
+}
+
+// CarOverlays::UpdateSmoke: r3 = the car overlays; its frame in the
+// original's own stack frame (r1 - 400). Where the native version declines
+// (EmitSmoke or Smoke::SetFrame would), the original runs. Smoke::SetFrame
+// (sub_8212B1B0), sub_82126A00 and sub_82126A38 have no adapters: it's
+// their only caller.
+extern "C" REX_FUNC(sub_82125B60) {
+  REX_FUNC_PROLOGUE();
+  if (!ITC_FLAG(native_race_overlays)) {
+    __imp__sub_82125B60(ctx, base);
+    return;
+  }
+  ctx.fpscr.disableFlushMode();
+  if (!UpdateSmoke(base, ctx.r3.u32, ctx.r1.u32 - 400)) {
+    __imp__sub_82125B60(ctx, base);
+  }
+}
+
+// OverlayView::ModelMatrix: r3 = out, r4 = a view; returns out. Where the
+// native version declines (the copy wouldn't be memcpy's plain one), the
+// original runs.
+extern "C" REX_FUNC(sub_821270E8) {
+  REX_FUNC_PROLOGUE();
+  if (!ITC_FLAG(native_race_overlays)) {
+    __imp__sub_821270E8(ctx, base);
+    return;
+  }
+  ctx.fpscr.disableFlushMode();
+  if (!ModelMatrix(base, ctx.r3.u32, ctx.r4.u32)) {
+    __imp__sub_821270E8(ctx, base);
+  }
+}

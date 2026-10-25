@@ -17,6 +17,20 @@ namespace interpolation {
 // Main thread, before a logic pass (one that runs game logic) starts.
 void BlendState_OnLogicPassStart();
 
+// After a matrix multiply out = a * b (Matrix::Multiply, sub_8209BD50) done
+// by native code calling matrix_math::Multiply directly: notes it as the
+// multiply's wrapper does, `caller` the guest return address of the call it
+// replaces (any thread: only the main thread's are noted).
+void BlendState_OnMultiply(uint8_t* base, uint32_t out, uint32_t a, uint32_t b,
+                           uint32_t caller);
+
+// After a matrix copy dst = src (Matrix::Copy, sub_820A0AC0) done by native
+// code calling matrix_math::Copy directly: notes it as the copy's wrapper
+// does, `caller` the guest return address of the call it replaces (any
+// thread: only the main thread's are noted). Not for the motion blur's copy
+// (caller 0x8213653C), which the wrapper notes under another source.
+void BlendState_OnCopy(uint8_t* base, uint32_t dst, uint32_t src, uint32_t caller);
+
 // Main thread: the message handler being run (its target), 0 after it.
 // Diagnostics (--log_overlay_uploads): after the race overlays recorded on a
 // logic pass, logs every slot they allocated, every 3 s.

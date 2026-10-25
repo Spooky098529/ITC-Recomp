@@ -26,6 +26,14 @@ inline void StoreU8(uint8_t* base, uint32_t address, uint8_t value) {
   REX_STORE_U8(address, value);
 }
 
+inline uint16_t LoadU16(uint8_t* base, uint32_t address) {
+  return REX_LOAD_U16(address);
+}
+
+inline void StoreU16(uint8_t* base, uint32_t address, uint16_t value) {
+  REX_STORE_U16(address, value);
+}
+
 inline uint32_t LoadU32(uint8_t* base, uint32_t address) {
   return REX_LOAD_U32(address);
 }
@@ -131,6 +139,22 @@ inline void SwapStoreU32s(uint8_t* out, const uint8_t* in, uint32_t count) {
     value = __builtin_bswap32(value);
     std::memcpy(out + 4 * i, &value, 4);
   }
+}
+
+// The host memory for `bytes` bytes of guest memory at `address`, as one or
+// two contiguous parts (split at 0xE0000000, where the host offset changes, as
+// in CopyU32s): calls part(host, offset into the range, part's bytes). For
+// bulk copies such as file reads (no byte swap).
+template <typename Part>
+inline void ForEachHostPart(uint8_t* base, uint32_t address, uint32_t bytes, Part part) {
+  constexpr uint32_t kOffsetChange = 0xE0000000u;
+  if (bytes && address < kOffsetChange && uint64_t(address) + bytes > kOffsetChange) {
+    uint32_t below = kOffsetChange - address;
+    part(REX_RAW_ADDR(address), 0u, below);
+    part(REX_RAW_ADDR(kOffsetChange), below, bytes - below);
+    return;
+  }
+  part(REX_RAW_ADDR(address), 0u, bytes);
 }
 
 // Stores count words (floats or integers, in host byte order) to guest

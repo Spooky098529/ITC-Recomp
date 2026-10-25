@@ -20,3 +20,4 @@ compile resolve_frag resolve.frag
 compile resolve_ms_frag resolve.frag -DMULTISAMPLE
 compile id_frag id.frag
 compile gamma_comp gamma.comp
+compile movie_frag movie.frag

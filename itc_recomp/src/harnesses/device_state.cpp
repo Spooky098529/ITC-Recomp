@@ -1,0 +1,930 @@
+// The graphics device's state setters (src/graphics/device_state.h,
+// docs/functions/device-state.md) against the recompiled functions, on a
+// block standing for the device (every word random, the render targets'
+// and depth surface's slots, and the textures', null now and then or one of
+// four surfaces in the scratch area, whose +28 has the formats the high-precision blend
+// switches). The values: edge values first (0, 1, the fields' widths,
+// all ones, float bits including NaNs, infinities and denormals), then
+// random. Compared: the whole device block, the surfaces and r3; the float
+// fields the setters store with float instructions are compared as floats
+// (two NaNs match: the originals' float stores quiet a signaling NaN, the
+// native ones copy its bits). The originals call nothing, so they run as
+// they are (`__imp__`); the native steps turn the flush mode off as the
+// adapters do.
+
+#include "harness.h"
+
+#include "base/flags.h"
+#include "base/log.h"
+#include "display/gamma.h"
+#include "graphics/device_state.h"
+#include "memory/heap.h"
+
+#include <fmt/format.h>
+
+#include <algorithm>
+#include <bit>
+#include <cstdint>
+#include <string>
+#include <string_view>
+#include <vector>
+
+ITC_FLAG_DECLARE(bool, native_device_state);
+
+namespace harness {
+
+namespace {
+
+namespace ds = graphics::device_state;
+
+constexpr uint32_t kDeviceBytes = 13312;  // through +13240, the present interval
+constexpr uint32_t kSurfaces = 4;
+constexpr uint32_t kSurfaceBytes = 64;
+
+// The device's float fields the setters store as floats.
+constexpr uint32_t kFloatFields[] = {10336, 10340, 10344, 10348, 10372, 10492, 10496,
+                                     10564, 10568, 10572, 10576, 10704, 10708, 10712,
+                                     10716, 11636, 11640, 11644};
+
+uint32_t FloatBits(float f) { return std::bit_cast<uint32_t>(f); }
+
+// The values tried first.
+const uint32_t kEdgeValues[] = {
+    0, 1, 2, 3, 4, 6, 7, 8, 0xF, 0x10, 0x1F, 0x87, 0xFF, 0x100, 0xFFFF, 0x10000,
+    0x7FFFFFFF, 0x80000000u, 0xFFFFFFFFu, FloatBits(1.0f), FloatBits(-1.0f),
+    FloatBits(2.0f), FloatBits(64.0f), FloatBits(0.5f), FloatBits(-0.0f),
+    FloatBits(1e30f), FloatBits(-1e30f), FloatBits(3.0e9f), 0x7F800000, 0xFF800000u,
+    0x7FC00000, 0x7F800001, 0xFFC00001u, 0x00000001, 0x80400000u, FloatBits(1.0e-3f)};
+
+void DeviceOutputs(Context& h, uint32_t device, Outputs& out) {
+  uint32_t at = 0;
+  for (uint32_t field : kFloatFields) {
+    out.Bytes(Read(h.base, device + at, field - at));
+    out.Float(guest::LoadU32(h.base, device + field));
+    at = field + 4;
+  }
+  out.Bytes(Read(h.base, device + at, kDeviceBytes - at));
+}
+
+struct Setter {
+  const char* name;
+  GuestFunction recompiled;
+  GuestFunction native;
+  bool sampler = false;       // r4 a sampler, r5 the value
+  uint32_t values = 0;        // the values below this only (0: any)
+};
+
+#define ITC_NATIVE_STEP(address, name, uses_float)             \
+  void Native##name(PPCContext& ctx, uint8_t* base) {          \
+    ctx.fpscr.disableFlushMode();                              \
+    ds::name(base, ctx.r3.u32, ctx.r4.u32);                    \
+  }
+ITC_RENDER_STATE_SETTERS(ITC_NATIVE_STEP)
+#undef ITC_NATIVE_STEP
+
+void NativeGetViewportEnable(PPCContext& ctx, uint8_t* base) {
+  ctx.r3.u64 = ds::GetViewportEnable(base, ctx.r3.u32);
+}
+
+#define ITC_SETTER_ENTRY(address, name, uses_float) \
+  {"Device::" #name " (sub_" #address ")", __imp__sub_##address, Native##name},
+const Setter kRenderStateSetters[] = {ITC_RENDER_STATE_SETTERS(ITC_SETTER_ENTRY)};
+#undef ITC_SETTER_ENTRY
+
+#define ITC_NATIVE_SAMPLER_STEP(address, name, uses_float)   \
+  void Native##name(PPCContext& ctx, uint8_t* base) {        \
+    ctx.fpscr.disableFlushMode();                            \
+    ds::name(base, ctx.r3.u32, ctx.r4.u32, ctx.r5.u32);      \
+  }
+ITC_SAMPLER_STATE_SETTERS(ITC_NATIVE_SAMPLER_STEP)
+#undef ITC_NATIVE_SAMPLER_STEP
+
+// MaxAnisotropy reads the image's table by the value: values below 256
+// (the table's 17 entries and the image's words after them).
+#define ITC_SAMPLER_ENTRY(address, name, uses_float)                                     \
+  {"Device::" #name " (sub_" #address ")", __imp__sub_##address,                        \
+   Native##name, true, std::string_view(#name) == "SetMaxAnisotropy" ? 256u : 0u},
+const Setter kSamplerStateSetters[] = {ITC_SAMPLER_STATE_SETTERS(ITC_SAMPLER_ENTRY)};
+#undef ITC_SAMPLER_ENTRY
+
+// Samplers past the 26 now and then (the dirty bit's shift past the mask
+// from 44 on).
+const uint32_t kOddSamplers[] = {26, 27, 31, 43, 44, 45, 50};
+
+// One setter's cases on the device block.
+void RunSetter(Context& h, uint32_t device, const Setter& setter, int cases) {
+  Random& r = h.random;
+  Results results(setter.name);
+  auto surface = [&](uint32_t i) { return h.data + kSurfaceBytes * i; };
+  for (int c = 0; c < cases; c++) {
+    std::vector<uint32_t> words(kDeviceBytes / 4);
+    for (uint32_t& w : words) {
+      w = uint32_t(r.Next());
+    }
+    // The render targets and the depth surface: null or a surface.
+    for (uint32_t slot = ds::kRenderTargets; slot <= ds::kDepthSurface; slot += 4) {
+      words[slot / 4] = r.Below(3) == 0 ? 0 : surface(r.Below(kSurfaces));
+    }
+    // The textures (a stage's slot read by the mip levels): null or a
+    // surface (their +44 random).
+    for (uint32_t stage = 0; stage <= 50; stage++) {
+      words[(ds::kTextures + 4 * stage) / 4] = r.Below(3) == 0 ? 0 : surface(r.Below(kSurfaces));
+    }
+    // Floats now and then in the float fields the setters read back.
+    for (uint32_t field : {10704u, 10708u, 10712u, 10716u}) {
+      const uint32_t pick = r.Below(4);
+      words[field / 4] = pick == 0 ? 0 : pick == 1 ? 0x80000000u
+                         : pick == 2 ? kEdgeValues[r.Below(std::size(kEdgeValues))]
+                                     : words[field / 4];
+    }
+    std::vector<uint32_t> surfaces(kSurfaces * kSurfaceBytes / 4);
+    for (uint32_t& w : surfaces) {
+      w = uint32_t(r.Next());
+    }
+    for (uint32_t k = 0; k < kSurfaces; k++) {
+      static const uint32_t kFormats[] = {2, 3, 10, 12, 2, 3, 10, 12, 0, 6};
+      const uint32_t format = kFormats[r.Below(std::size(kFormats))];
+      uint32_t& info = surfaces[k * kSurfaceBytes / 4 + 7];
+      info = (info & ~0xF0000u) | (format << 16);
+    }
+    uint32_t value = size_t(c) < std::size(kEdgeValues)
+                         ? kEdgeValues[c]
+                         : (r.Below(2) ? uint32_t(r.Next()) : r.Below(32));
+    if (setter.values != 0) {
+      value %= setter.values;
+    }
+    const uint32_t sampler =
+        r.Below(8) == 0 ? kOddSamplers[r.Below(std::size(kOddSamplers))] : r.Below(26);
+    Outputs out[2];
+    for (int v = 0; v < 2; v++) {
+      Fill(h.base, h.data, kScratchBytes);
+      guest::StoreU32s(h.base, h.data, surfaces.data(), uint32_t(surfaces.size()));
+      guest::StoreU32s(h.base, device, words.data(), uint32_t(words.size()));
+      PPCContext t = CallContext(h);
+      t.r3.u64 = device;
+      if (setter.sampler) {
+        t.r4.u64 = sampler;
+        t.r5.u64 = value;
+      } else {
+        t.r4.u64 = value;
+      }
+      (v == 0 ? setter.recompiled : setter.native)(t, h.base);
+      DeviceOutputs(h, device, out[v]);
+      out[v].Bytes(Read(h.base, h.data, kSurfaces * kSurfaceBytes));
+      out[v].Word(t.r3.u32);
+    }
+    results.Check(out[0], out[1],
+                  setter.sampler ? fmt::format("case {}: sampler {}, value {:08X}", c, sampler, value)
+                                 : fmt::format("case {}: value {:08X}", c, value));
+  }
+  results.Report();
+}
+
+// --- The bound objects and the shader constants ---
+//
+// The scratch area holds eight objects (buffers, textures, the resources
+// fenced: +0 their flags, +8 their fence, +24/+28 a buffer's address and
+// size, +28-+48 a texture's fetch constant), the fence list, the constants'
+// source and GetViewport's out. The device block is random but for the
+// slots (null or an object), the command position (0 half the time), the
+// fence mask (0, all ones or random) and the fence list (in the scratch
+// area, never full: a full one runs the original, sub_822AD790 not seen in
+// play). Compared: the device block, the scratch area and, for GetViewport,
+// r3; the void setters' r3 isn't (the originals leave the fence list's
+// position there when they queue a fence, which their callers don't read).
+// The fence list entry's bit 31 is the original's uninitialized stack word
+// (the native one writes 0): left out of the comparison and compared in its
+// own group, expected to differ (the entry is in the command buffer, which
+// nothing reads since the emulated GPU went).
+
+constexpr uint32_t kObjects = 8;
+constexpr uint32_t kObjectBytes = 64;
+constexpr uint32_t kList = 1024;      // the fence list, in the scratch area
+constexpr uint32_t kConstants = 2048;  // the constants' source
+constexpr uint32_t kOut = 3584;        // GetViewport's out
+
+struct BoundCase {
+  std::vector<uint32_t> device;
+  std::vector<uint32_t> scratch;
+  uint32_t list = 0;  // the fence list's position before
+};
+
+BoundCase MakeBoundCase(Context& h, Random& r) {
+  BoundCase c;
+  c.device.resize(kDeviceBytes / 4);
+  for (uint32_t& w : c.device) {
+    w = uint32_t(r.Next());
+  }
+  auto object = [&] { return h.data + kObjectBytes * r.Below(kObjects); };
+  for (uint32_t slot = 12180; slot < 12288 + 4 * 32; slot += 4) {  // indices, streams, textures
+    c.device[slot / 4] = r.Below(3) == 0 ? 0 : object();
+  }
+  c.device[10780 / 4] = r.Below(2) == 0 ? 0 : uint32_t(r.Next());
+  const uint32_t pick = r.Below(3);
+  c.device[10784 / 4] = pick == 0 ? 0 : pick == 1 ? 0xFFFFFFFFu : uint32_t(r.Next());
+  c.list = h.data + kList + 8 * r.Below(32);
+  c.device[13168 / 4] = c.list;
+  c.device[13172 / 4] = c.list + 8 * (1 + r.Below(4));
+  c.scratch.resize(kScratchBytes / 4);
+  for (uint32_t& w : c.scratch) {
+    w = uint32_t(r.Next());
+  }
+  return c;
+}
+
+// The device block and the scratch area, the fence list entry's bit 31
+// left out (in `bit31` instead).
+void BoundOutputs(Context& h, uint32_t device, const BoundCase& c, Outputs& out,
+                  Outputs& bit31) {
+  out.Bytes(Read(h.base, device, kDeviceBytes));
+  std::vector<uint8_t> scratch = Read(h.base, h.data, kScratchBytes);
+  const uint32_t entry = c.list - h.data;
+  bit31.Word(scratch[entry] & 0x80);
+  scratch[entry] &= 0x7F;
+  out.Bytes(scratch);
+}
+
+template <typename Args>
+void RunBound(Context& h, uint32_t device, const char* name, GuestFunction recompiled,
+              GuestFunction native, int cases, Args args, bool fences, bool compare_r3 = false) {
+  Random& r = h.random;
+  Results results(name);
+  Results bit31_results(std::string(name) +
+                        ", the fence list entry's bit 31 (expected to differ)");
+  for (int i = 0; i < cases; i++) {
+    BoundCase c = MakeBoundCase(h, r);
+    Random args_random = r;  // the same arguments for both versions
+    r.Next();
+    Outputs out[2], bit31[2];
+    for (int v = 0; v < 2; v++) {
+      Random a = args_random;
+      guest::StoreU32s(h.base, h.data, c.scratch.data(), uint32_t(c.scratch.size()));
+      PPCContext t = CallContext(h);
+      t.r3.u64 = device;
+      args(t, a, c);
+      guest::StoreU32s(h.base, device, c.device.data(), uint32_t(c.device.size()));
+      (v == 0 ? recompiled : native)(t, h.base);
+      BoundOutputs(h, device, c, out[v], bit31[v]);
+      if (compare_r3) {
+        out[v].Word(t.r3.u32);
+      }
+    }
+    results.Check(out[0], out[1], fmt::format("case {}", i));
+    bit31_results.Check(bit31[0], bit31[1], fmt::format("case {}", i));
+  }
+  results.Report();
+  if (fences) {
+    bit31_results.Report();
+  }
+}
+
+void NativeGetViewport(PPCContext& ctx, uint8_t* base) {
+  if (!ds::GetViewport(base, ctx.r3.u32, ctx.r4.u32)) {
+    ITC_LOG_INFO("harness: device_state: GetViewport fell back");
+    return;
+  }
+  ctx.r3.u64 = ctx.r4.u32;
+}
+void NativeSetStreamSource(PPCContext& ctx, uint8_t* base) {
+  if (!ds::SetStreamSource(base, ctx.r3.u32, ctx.r4.u32, ctx.r5.u32, ctx.r6.u32, ctx.r7.u32,
+                           ctx.r8.u64)) {
+    ITC_LOG_INFO("harness: device_state: SetStreamSource fell back");
+  }
+}
+void NativeSetIndices(PPCContext& ctx, uint8_t* base) {
+  if (!ds::SetIndices(base, ctx.r3.u32, ctx.r4.u32)) {
+    ITC_LOG_INFO("harness: device_state: SetIndices fell back");
+  }
+}
+void NativeSetTexture(PPCContext& ctx, uint8_t* base) {
+  if (!ds::SetTexture(base, ctx.r3.u32, ctx.r4.u32, ctx.r5.u32, ctx.r6.u64)) {
+    ITC_LOG_INFO("harness: device_state: SetTexture fell back");
+  }
+}
+void NativeSetBlendControl(PPCContext& ctx, uint8_t* base) {
+  ds::SetBlendControl(base, ctx.r3.u32, ctx.r4.u32, ctx.r5.u32);
+}
+void NativeSetVertexShaderConstantF(PPCContext& ctx, uint8_t* base) {
+  ds::SetVertexShaderConstantF(base, ctx.r3.u32, ctx.r4.u32, ctx.r5.u32, ctx.r6.u32,
+                               ctx.r7.u64);
+}
+void NativeSetPixelShaderConstantF(PPCContext& ctx, uint8_t* base) {
+  ds::SetPixelShaderConstantF(base, ctx.r3.u32, ctx.r4.u32, ctx.r5.u32, ctx.r6.u32,
+                              ctx.r7.u64);
+}
+void NativeSetPixelShaderConstantB(PPCContext& ctx, uint8_t* base) {
+  ds::SetPixelShaderConstantB(base, ctx.r3.u32, ctx.r4.u32, ctx.r5.u32, ctx.r6.u32);
+}
+
+void BoundObjects(Context& h, uint32_t device) {
+  auto object = [&](Random& a) {
+    return a.Below(4) == 0 ? 0 : h.data + kObjectBytes * a.Below(kObjects);
+  };
+  RunBound(h, device, "Device::GetViewport (sub_822A3740)", __imp__sub_822A3740,
+           NativeGetViewport, 32,
+           [&](PPCContext& t, Random& a, BoundCase&) { t.r4.u64 = h.data + kOut + a.Below(8); },
+           false, true);
+  RunBound(h, device, "Device::SetStreamSource (sub_822A3758)", __imp__sub_822A3758,
+           NativeSetStreamSource, 400, [&](PPCContext& t, Random& a, BoundCase& c) {
+             const uint32_t stream = a.Below(16);
+             t.r4.u64 = stream;
+             t.r5.u64 = object(a);
+             t.r6.u64 = a.Below(2) ? a.Below(256) : uint32_t(a.Next());
+             const uint32_t stride = a.Below(4) == 0 ? uint32_t(a.Next()) : 4 * a.Below(32);
+             t.r7.u64 = stride;
+             t.r8.u64 = a.Next();
+             // The vertex shader's stride now and then the same.
+             if (a.Below(2)) {
+               const uint32_t at = 11568 + stream;
+               uint32_t& w = c.device[at / 4];
+               const int shift = 24 - 8 * int(at % 4);
+               w = (w & ~(0xFFu << shift)) | (((stride >> 2) & 0xFF) << shift);
+             }
+           },
+           true);
+  RunBound(h, device, "Device::SetIndices (sub_822A3908)", __imp__sub_822A3908,
+           NativeSetIndices, 200,
+           [&](PPCContext& t, Random& a, BoundCase&) { t.r4.u64 = object(a); }, true);
+  RunBound(h, device, "Device::SetTexture (sub_822A6008)", __imp__sub_822A6008,
+           NativeSetTexture, 400, [&](PPCContext& t, Random& a, BoundCase&) {
+             t.r4.u64 = a.Below(26);
+             t.r5.u64 = object(a);
+             t.r6.u64 = a.Next();
+           },
+           true);
+  RunBound(h, device, "Device::SetBlendControl (sub_822A3B30)", __imp__sub_822A3B30,
+           NativeSetBlendControl, 200, [&](PPCContext& t, Random& a, BoundCase&) {
+             t.r4.u64 = a.Below(8) == 0 ? a.Below(200) : a.Below(4);
+             t.r5.u64 = uint32_t(a.Next());
+           },
+           false);
+  for (int pixel = 0; pixel < 2; pixel++) {
+    RunBound(h, device,
+             pixel ? "Device::SetPixelShaderConstantF (sub_822A8308)"
+                   : "Device::SetVertexShaderConstantF (sub_822A81F8)",
+             pixel ? __imp__sub_822A8308 : __imp__sub_822A81F8,
+             pixel ? NativeSetPixelShaderConstantF : NativeSetVertexShaderConstantF, 300,
+             [&](PPCContext& t, Random& a, BoundCase&) {
+               const uint32_t count = a.Below(4) == 0 ? a.Below(4) : a.Below(32);
+               t.r4.u64 = a.Below(256 - count);
+               t.r5.u64 = h.data + kConstants + a.Below(16);
+               t.r6.u64 = count;
+               t.r7.u64 = a.Next();
+             },
+             false);
+  }
+  RunBound(h, device, "Device::SetPixelShaderConstantB (sub_822A8470)", __imp__sub_822A8470,
+           NativeSetPixelShaderConstantB, 200, [&](PPCContext& t, Random& a, BoundCase&) {
+             const uint32_t count = 1 + a.Below(40);
+             t.r4.u64 = a.Below(256 - count);
+             t.r5.u64 = h.data + kConstants + 4 * a.Below(64);
+             t.r6.u64 = count;
+           },
+           false);
+}
+
+// --- The flexible vertex format ---
+//
+// FromFvf on codes with each position kind (2, 4, 6, 8, 10, 12, 14, 0x4002
+// and random ones), the last beta's two bits, the normal, point size and
+// colors, 0-15 texture coordinates of random formats; the declaration in the
+// scratch area. SetFVF on the device block. Compared: the declaration (the
+// scratch area) or the device block, but the end marker's last byte, the
+// original's uninitialized stack byte (a pad; 0 natively), in its own
+// group, expected to differ.
+
+uint32_t RandomFvf(Random& r) {
+  static const uint32_t kKinds[] = {0, 2, 4, 6, 8, 10, 12, 14, 0x4002};
+  uint32_t fvf = r.Below(6) == 0 ? uint32_t(r.Next()) : kKinds[r.Below(std::size(kKinds))];
+  if (r.Below(6) != 0) {
+    fvf = (fvf & 0x400E) | (uint32_t(r.Next()) & 0xFFFF9FF0u);
+  }
+  return fvf;
+}
+
+void Fvf(Context& h, uint32_t device) {
+  Random& r = h.random;
+  {
+    Results results("VertexDeclaration::FromFvf (sub_822A6A88)");
+    Results pad("VertexDeclaration::FromFvf (sub_822A6A88), the end marker's pad byte "
+                "(expected to differ)");
+    for (int c = 0; c < 400; c++) {
+      const uint32_t fvf = RandomFvf(r);
+      std::vector<uint32_t> scratch(kScratchBytes / 4);
+      for (uint32_t& w : scratch) {
+        w = uint32_t(r.Next());
+      }
+      const uint32_t declaration = h.data + 64;
+      uint32_t elements = 0;
+      std::vector<uint8_t> bytes[2];
+      for (int v = 0; v < 2; v++) {
+        guest::StoreU32s(h.base, h.data, scratch.data(), uint32_t(scratch.size()));
+        PPCContext t = CallContext(h);
+        t.r3.u64 = fvf;
+        t.r4.u64 = declaration;
+        if (v == 0) {
+          __imp__sub_822A6A88(t, h.base);
+        } else {
+          elements = ds::VertexDeclarationFromFvf(h.base, fvf, declaration);
+        }
+        bytes[v] = Read(h.base, h.data, kScratchBytes);
+      }
+      const uint32_t at = declaration - h.data + 52 + 12 * elements + 11;
+      Outputs out[2], last[2];
+      for (int v = 0; v < 2; v++) {
+        last[v].Word(bytes[v][at]);
+        bytes[v][at] = 0;
+        out[v].Bytes(bytes[v]);
+      }
+      results.Check(out[0], out[1], fmt::format("fvf {:08X}", fvf));
+      pad.Check(last[0], last[1], fmt::format("fvf {:08X}", fvf));
+    }
+    results.Report();
+    pad.Report();
+  }
+  {
+    Results results("Device::SetFVF (sub_822AA0E8)");
+    Results pad("Device::SetFVF (sub_822AA0E8), the end marker's pad byte (expected to differ)");
+    for (int c = 0; c < 100; c++) {
+      const uint32_t fvf = RandomFvf(r);
+      std::vector<uint32_t> words(kDeviceBytes / 4);
+      for (uint32_t& w : words) {
+        w = uint32_t(r.Next());
+      }
+      std::vector<uint8_t> bytes[2];
+      for (int v = 0; v < 2; v++) {
+        guest::StoreU32s(h.base, device, words.data(), uint32_t(words.size()));
+        PPCContext t = CallContext(h);
+        t.r3.u64 = device;
+        t.r4.u64 = fvf;
+        if (v == 0) {
+          __imp__sub_822AA0E8(t, h.base);
+        } else {
+          ds::SetFVF(h.base, device, fvf);
+        }
+        bytes[v] = Read(h.base, device, kDeviceBytes);
+      }
+      // The end marker: after the elements (counted by a build in the
+      // scratch area, not compared here).
+      const uint32_t elements = ds::VertexDeclarationFromFvf(h.base, fvf, h.data);
+      const uint32_t at = 11936 + 52 + 12 * elements + 11;
+      Outputs out[2], last[2];
+      for (int v = 0; v < 2; v++) {
+        last[v].Word(bytes[v][at]);
+        bytes[v][at] = 0;
+        out[v].Bytes(bytes[v]);
+      }
+      results.Check(out[0], out[1], fmt::format("fvf {:08X}", fvf));
+      pad.Check(last[0], last[1], fmt::format("fvf {:08X}", fvf));
+    }
+    results.Report();
+    pad.Report();
+  }
+}
+
+// --- The scissor and the viewport ---
+//
+// SetScissorRect, ScissorTestEnable, SetViewport and SetSurfaceInfo; the
+// originals run with --native_device_state off, so they reach
+// Device::SetScreenScissor (Dropped natively), which writes its packets at
+// the command buffer position (+40, set to the scratch area's second half;
+// the segment limit +48 high, so no segment ends; at most three tiles).
+// Compared: the device block but +40, the scratch area's first half (the
+// objects, the viewport and the rectangle) and the viewport's float fields
+// as floats; the command buffer's words and +40 in their own group, expected
+// to differ (the graphics rule: packets nothing reads).
+
+constexpr uint32_t kViewport = 1024;  // the viewport or rectangle passed
+constexpr uint32_t kCommands = 2048;  // the command buffer, the scratch area's second half
+constexpr uint32_t kViewportFloats[] = {10376, 10380, 10384, 10388, 10392, 10396, 12408, 12412};
+
+template <GuestFunction recompiled>
+void Original(PPCContext& ctx, uint8_t* base) {
+  const bool saved = ITC_FLAG(native_device_state);
+  ITC_FLAG(native_device_state) = false;
+  recompiled(ctx, base);
+  ITC_FLAG(native_device_state) = saved;
+}
+
+void NativeSetScissorRect(PPCContext& ctx, uint8_t* base) {
+  ds::SetScissorRect(base, ctx.r3.u32, ctx.r4.u32);
+}
+void NativeSetScissorTestEnable(PPCContext& ctx, uint8_t* base) {
+  ds::SetScissorTestEnable(base, ctx.r3.u32, ctx.r4.u32);
+}
+void NativeSetViewport(PPCContext& ctx, uint8_t* base) {
+  ctx.fpscr.disableFlushMode();
+  ds::SetViewport(base, ctx.r3.u32, ctx.r4.u32);
+}
+void NativeSetSurfaceInfo(PPCContext& ctx, uint8_t* base) {
+  ctx.fpscr.disableFlushMode();
+  ds::SetSurfaceInfo(base, ctx.r3.u32, ctx.r4.u32);
+}
+
+void NativeSetRenderTarget(PPCContext& ctx, uint8_t* base) {
+  ctx.fpscr.disableFlushMode();
+  ds::SetRenderTarget(base, ctx.r3.u32, ctx.r4.u32, ctx.r5.u32);
+}
+void NativeSetRenderTargetExternal(PPCContext& ctx, uint8_t* base) {
+  ctx.fpscr.disableFlushMode();
+  ds::SetRenderTargetExternal(base, ctx.r3.u32, ctx.r4.u32, ctx.r5.u32);
+}
+void NativeSetDepthStencilSurface(PPCContext& ctx, uint8_t* base) {
+  ctx.fpscr.disableFlushMode();
+  ds::SetDepthStencilSurface(base, ctx.r3.u32, ctx.r4.u32);
+}
+
+uint32_t RandomCoordinate(Random& r) {
+  switch (r.Below(4)) {
+    case 0: return uint32_t(r.Next());
+    case 1: return uint32_t(-int32_t(r.Below(64)));
+    default: return r.Below(2048);
+  }
+}
+
+template <typename Args>
+void RunViewportCases(Context& h, uint32_t device, const char* name, GuestFunction recompiled,
+                      GuestFunction native, int cases, Args args) {
+  Random& r = h.random;
+  Results results(name);
+  Results packets(std::string(name) + ", the command buffer (expected to differ)");
+  for (int i = 0; i < cases; i++) {
+    std::vector<uint32_t> words(kDeviceBytes / 4);
+    for (uint32_t& w : words) {
+      w = uint32_t(r.Next());
+    }
+    auto object = [&] { return h.data + kObjectBytes * r.Below(kObjects); };
+    for (uint32_t k = 0; k < 5; k++) {
+      const uint32_t bound = r.Below(3) == 0 ? 0 : object();
+      words[(ds::kRenderTargets + 4 * k) / 4] = bound;
+      // The tiling's saved set: the same now and then.
+      words[(12468 + 4 * k) / 4] = r.Below(2) ? bound : (r.Below(2) ? 0 : object());
+    }
+    words[11600 / 4] = r.Below(3) == 0 ? uint32_t(r.Next()) : r.Below(2);
+    for (uint32_t at = 12392; at < 12408; at += 4) {
+      words[at / 4] = RandomCoordinate(r);
+    }
+    words[12916 / 4] = r.Below(4096);
+    words[12920 / 4] = r.Below(4096);
+    words[40 / 4] = h.data + kCommands - 4;  // where the next packet goes, minus 4
+    words[48 / 4] = 0xFFFFFFF0u;
+    words[12488 / 4] = r.Below(4);
+    std::vector<uint32_t> scratch(kScratchBytes / 4);
+    for (uint32_t& w : scratch) {
+      w = uint32_t(r.Next());
+    }
+    for (uint32_t k = 0; k < kObjects; k++) {
+      // A surface's size word (+36): widths and heights up to 2048 mostly.
+      uint32_t& size = scratch[(kObjectBytes * k + 36) / 4];
+      if (r.Below(4) != 0) {
+        size = (r.Below(2048) << 18) | (r.Below(2048) << 3) | (size & 0x7);
+      }
+    }
+    for (uint32_t at = 0; at < 16; at += 4) {
+      scratch[(kViewport + at) / 4] = RandomCoordinate(r);
+    }
+    {
+      static const uint32_t kZ[] = {0, 0x3F800000, 0x3F000000, 0x7FC00000, 0x7F800001,
+                                    0xFF800000u, 0x80000000u};
+      scratch[(kViewport + 16) / 4] = r.Below(3) ? kZ[r.Below(std::size(kZ))] : uint32_t(r.Next());
+      scratch[(kViewport + 20) / 4] = r.Below(3) ? kZ[r.Below(std::size(kZ))] : uint32_t(r.Next());
+    }
+    Random args_random = r;
+    r.Next();
+    Outputs out[2], commands[2];
+    for (int v = 0; v < 2; v++) {
+      Random a = args_random;
+      guest::StoreU32s(h.base, h.data, scratch.data(), uint32_t(scratch.size()));
+      guest::StoreU32s(h.base, device, words.data(), uint32_t(words.size()));
+      PPCContext t = CallContext(h);
+      t.r3.u64 = device;
+      args(t, a);
+      (v == 0 ? recompiled : native)(t, h.base);
+      uint32_t at = 0;
+      auto bytes_to = [&](uint32_t end) {
+        out[v].Bytes(Read(h.base, device + at, end - at));
+        at = end;
+      };
+      bytes_to(40);
+      commands[v].Word(guest::LoadU32(h.base, device + 40));
+      at = 44;
+      for (uint32_t field : kViewportFloats) {
+        bytes_to(field);
+        out[v].Float(guest::LoadU32(h.base, device + field));
+        at = field + 4;
+      }
+      bytes_to(kDeviceBytes);
+      out[v].Bytes(Read(h.base, h.data, kCommands));
+      commands[v].Bytes(Read(h.base, h.data + kCommands, kScratchBytes - kCommands));
+    }
+    results.Check(out[0], out[1], fmt::format("case {}", i));
+    packets.Check(commands[0], commands[1], fmt::format("case {}", i));
+  }
+  results.Report();
+  packets.Report();
+}
+
+void ScissorAndViewport(Context& h, uint32_t device) {
+  RunViewportCases(h, device, "Device::SetScissorRect (sub_822A3450)",
+                   Original<__imp__sub_822A3450>, NativeSetScissorRect, 300,
+                   [&](PPCContext& t, Random& a) {
+                     t.r4.u64 = a.Below(4) == 0 ? device + 12416 : h.data + kViewport;
+                   });
+  RunViewportCases(h, device, "Device::SetRenderState_ScissorTestEnable (sub_822A3D20)",
+                   Original<__imp__sub_822A3D20>, NativeSetScissorTestEnable, 200,
+                   [&](PPCContext& t, Random& a) {
+                     t.r4.u64 = a.Below(4) == 0 ? uint32_t(a.Next()) : a.Below(2);
+                   });
+  RunViewportCases(h, device, "Device::SetViewport (sub_822A3518)",
+                   Original<__imp__sub_822A3518>, NativeSetViewport, 400,
+                   [&](PPCContext& t, Random&) { t.r4.u64 = h.data + kViewport; });
+  RunViewportCases(h, device, "Device::SetSurfaceInfo (sub_822A3C88)",
+                   Original<__imp__sub_822A3C88>, NativeSetSurfaceInfo, 200,
+                   [&](PPCContext& t, Random& a) {
+                     t.r4.u64 = h.data + kObjectBytes * a.Below(kObjects);
+                   });
+  // The surfaces: the predicated tiling's inputs (+12456 0 mostly, the
+  // bytes +11865 and +11931 0 half the time), the high-precision blends
+  // (+11772..: 0, 1 or random) and the objects' color formats (+28 bits
+  // 16-19: the ones the high-precision blend switches, mostly). The
+  // originals' r3 isn't compared (they leave a temporary there, which
+  // their callers don't read; the adapters leave the device).
+  auto surfaces = [&](PPCContext& t, Random& a) {
+    if (a.Below(4) != 0) {
+      guest::StoreU32(h.base, device + 12456, 0);
+    }
+    for (uint32_t at : {11865u, 11931u}) {
+      if (a.Below(2)) {
+        guest::StoreU8(h.base, device + at, 0);
+      }
+    }
+    for (uint32_t k = 0; k < 8; k++) {
+      const uint32_t pick = a.Below(3);
+      if (pick != 2) {
+        guest::StoreU32(h.base, device + 11772 + 4 * k, pick);
+      }
+    }
+    for (uint32_t k = 0; k < kObjects; k++) {
+      static const uint32_t kFormats[] = {2, 3, 10, 12, 2, 3, 10, 12, 0, 6};
+      const uint32_t at = h.data + kObjectBytes * k + 28;
+      const uint32_t format = kFormats[a.Below(std::size(kFormats))];
+      guest::StoreU32(h.base, at, (guest::LoadU32(h.base, at) & ~0xF0000u) | (format << 16));
+    }
+    const uint32_t surface = a.Below(4) == 0 ? 0 : h.data + kObjectBytes * a.Below(kObjects);
+    if (t.r4.u32 == 0xFFFFFFFFu) {  // SetDepthStencilSurface: r4 the surface
+      t.r4.u64 = surface;
+      return;
+    }
+    t.r4.u64 = a.Below(6) == 0 ? 4 + a.Below(4) : a.Below(4);
+    t.r5.u64 = surface;
+  };
+  RunViewportCases(h, device, "Device::SetRenderTarget (sub_822A3D30)",
+                   Original<__imp__sub_822A3D30>, NativeSetRenderTarget, 600,
+                   [&](PPCContext& t, Random& a) { surfaces(t, a); });
+  RunViewportCases(h, device, "Device::SetRenderTarget_External (sub_822A4340)",
+                   Original<__imp__sub_822A4340>, NativeSetRenderTargetExternal, 100,
+                   [&](PPCContext& t, Random& a) { surfaces(t, a); });
+  RunViewportCases(h, device, "Device::SetDepthStencilSurface (sub_822A4060)",
+                   Original<__imp__sub_822A4060>, NativeSetDepthStencilSurface, 500,
+                   [&](PPCContext& t, Random& a) {
+                     t.r4.u64 = 0xFFFFFFFFu;
+                     surfaces(t, a);
+                   });
+}
+
+// --- The packet writers ---
+//
+// SetDefaultState, DirtyAllState, sub_8229B7D8, SetShaderGprAllocation (with
+// sub_8229F680) and SetGammaRamp; the originals run with --native_device_state
+// off (their setters, SetTexture and SetScreenScissor the originals too). The
+// device is a bigger block (the gamma ramp at +13608), random but for the
+// slots (render targets, depth surface, index buffer, streams, textures: null
+// or an object in the scratch area), the command position (+10780, never 0,
+// so fences go into the resources), and the command buffer: +40 at a block of
+// its own, +44 and +48 high (no segment ends), +10809 bit 6 set (the
+// reservation for sub_8229F680's dummy draws fails at once: its allocator, the
+// command buffer's own, isn't run). Compared: the device block but +40, and
+// the scratch area; the command buffer's words and +40 in their own group,
+// expected to differ (the graphics rule: packets nothing reads). The flush
+// helpers (sub_822ADC08, sub_822ADE30) are guest calls on both sides.
+
+constexpr uint32_t kBigDeviceBytes = 15360;  // through the gamma ramp (+13608, 1,536 bytes)
+constexpr uint32_t kCommandBytes = 65536;
+
+ds::DeviceCalls HarnessCalls(PPCContext& ctx, uint8_t* base, uint32_t device) {
+  ds::DeviceCalls calls;
+  calls.flush_hiz = [&ctx, base, device](uint64_t mask, uint32_t hiz) {
+    ctx.r3.u64 = device;
+    ctx.r4.u64 = mask;
+    ctx.r5.u64 = hiz;
+    ctx.r6.u64 = 0;
+    sub_822ADC08(ctx, base);
+    return ctx.r3.u64;
+  };
+  calls.flush_registers = [&ctx, base, device](uint64_t mask, uint32_t first, uint32_t shadow) {
+    ctx.r3.u64 = device;
+    ctx.r4.u64 = mask;
+    ctx.r5.u64 = first;
+    ctx.r6.u64 = shadow;
+    sub_822ADE30(ctx, base);
+  };
+  calls.setter = [&ctx, base, device](uint32_t setter, uint32_t r4, uint32_t r5) {
+    ctx.r3.u64 = device;
+    ctx.r4.u64 = r4;
+    ctx.r5.u64 = r5;
+    REX_CALL_INDIRECT_FUNC(setter);
+  };
+  calls.set_texture = [&ctx, base, device](uint32_t stage, uint32_t texture, uint64_t dirty) {
+    ctx.r3.u64 = device;
+    ctx.r4.u64 = stage;
+    ctx.r5.u64 = texture;
+    ctx.r6.u64 = dirty;
+    __imp__sub_822A6008(ctx, base);
+  };
+  return calls;
+}
+
+void NativeSetRegisterF01Bits(PPCContext& ctx, uint8_t* base) {
+  ds::SetRegisterF01Bits(base, ctx.r3.u32, ctx.r4.u32);
+}
+void NativeDirtyAllState(PPCContext& ctx, uint8_t* base) {
+  ds::DirtyAllState(base, ctx.r3.u32, ctx.r4.u32);
+}
+void NativeSetShaderGprAllocation(PPCContext& ctx, uint8_t* base) {
+  const uint32_t device = ctx.r3.u32;
+  ds::SetShaderGprAllocation(base, device, ctx.r5.u32, ctx.r6.u32,
+                             HarnessCalls(ctx, base, device));
+}
+void NativeSetGammaRamp(PPCContext& ctx, uint8_t* base) {
+  if (!ds::SetGammaRamp(base, ctx.r3.u32, ctx.r5.u32)) {
+    ITC_LOG_INFO("harness: device_state: SetGammaRamp left to the original");
+    __imp__sub_822A3A20(ctx, base);
+  }
+}
+void NativeSetDefaultState(PPCContext& ctx, uint8_t* base) {
+  ctx.fpscr.disableFlushMode();
+  const uint32_t device = ctx.r3.u32;
+  ds::SetDefaultState(base, device, HarnessCalls(ctx, base, device));
+}
+
+template <typename Args>
+void RunPacketCases(Context& h, uint32_t device, uint32_t commands, const char* name,
+                    GuestFunction recompiled, GuestFunction native, int cases, Args args) {
+  Random& r = h.random;
+  Results results(name);
+  Results packets(std::string(name) + ", the command buffer (expected to differ)");
+  for (int i = 0; i < cases; i++) {
+    std::vector<uint32_t> words(kBigDeviceBytes / 4);
+    for (uint32_t& w : words) {
+      w = uint32_t(r.Next());
+    }
+    auto object = [&] { return h.data + kObjectBytes * r.Below(kObjects); };
+    for (uint32_t slot = 12180; slot < 12288 + 4 * 32; slot += 4) {
+      words[slot / 4] = r.Below(3) == 0 ? 0 : object();
+    }
+    for (uint32_t k = 0; k < 5; k++) {
+      words[(12468 + 4 * k) / 4] = r.Below(2) ? words[(ds::kRenderTargets + 4 * k) / 4]
+                                              : (r.Below(2) ? 0 : object());
+    }
+    words[12456 / 4] = r.Below(4) == 0 ? uint32_t(r.Next()) : 0;
+    words[10780 / 4] |= 1;
+    words[40 / 4] = commands - 4;
+    words[44 / 4] = 0xFFFFFFF0u;
+    words[48 / 4] = 0xFFFFFFF0u;
+    words[12488 / 4] = r.Below(4);
+    for (uint32_t at = 12392; at < 12408; at += 4) {
+      words[at / 4] = RandomCoordinate(r);
+    }
+    std::vector<uint32_t> scratch(kScratchBytes / 4);
+    for (uint32_t& w : scratch) {
+      w = uint32_t(r.Next());
+    }
+    for (uint32_t k = 0; k < kObjects; k++) {
+      uint32_t& size = scratch[(kObjectBytes * k + 36) / 4];
+      if (r.Below(4) != 0) {
+        size = (r.Below(2048) << 18) | (r.Below(2048) << 3) | (size & 0x7);
+      }
+    }
+    Random args_random = r;
+    r.Next();
+    Outputs out[2], commands_out[2];
+    for (int v = 0; v < 2; v++) {
+      Random a = args_random;
+      guest::StoreU32s(h.base, h.data, scratch.data(), uint32_t(scratch.size()));
+      guest::StoreU32s(h.base, device, words.data(), uint32_t(words.size()));
+      guest::StoreU8(h.base, device + 10809, guest::LoadU8(h.base, device + 10809) | 0x40);
+      Fill(h.base, commands, kCommandBytes);
+      PPCContext t = CallContext(h);
+      t.r3.u64 = device;
+      args(t, a, device);
+      (v == 0 ? recompiled : native)(t, h.base);
+      out[v].Bytes(Read(h.base, device, 40));
+      commands_out[v].Word(guest::LoadU32(h.base, device + 40));
+      out[v].Bytes(Read(h.base, device + 44, kBigDeviceBytes - 44));
+      out[v].Bytes(Read(h.base, h.data, kScratchBytes));
+      commands_out[v].Bytes(Read(h.base, commands, kCommandBytes));
+    }
+    results.Check(out[0], out[1], fmt::format("case {}", i));
+    packets.Check(commands_out[0], commands_out[1], fmt::format("case {}", i));
+  }
+  results.Report();
+  packets.Report();
+}
+
+void PacketWriters(Context& h) {
+  const uint32_t device = memory::Alloc(kBigDeviceBytes, 0);
+  const uint32_t commands = memory::Alloc(kCommandBytes, 0);
+  if (device == 0 || commands == 0) {
+    ITC_LOG_INFO("harness: device_state: no blocks for the packet writers");
+    memory::Free(device);
+    memory::Free(commands);
+    return;
+  }
+  auto none = [](PPCContext&, Random&, uint32_t) {};
+  RunPacketCases(h, device, commands, "sub_8229B7D8", Original<__imp__sub_8229B7D8>,
+                 NativeSetRegisterF01Bits, 200, [](PPCContext& t, Random& a, uint32_t) {
+                   t.r4.u64 = a.Below(4) == 0 ? uint32_t(a.Next()) : a.Below(4);
+                 });
+  RunPacketCases(h, device, commands, "Device::DirtyAllState (sub_822A3B90)",
+                 Original<__imp__sub_822A3B90>, NativeDirtyAllState, 200,
+                 [](PPCContext& t, Random& a, uint32_t) {
+                   t.r4.u64 = a.Below(2) ? 0 : (a.Below(2) ? 1 : uint32_t(a.Next()));
+                 });
+  RunPacketCases(h, device, commands, "Device::SetShaderGprAllocation (sub_822A8A60)",
+                 Original<__imp__sub_822A8A60>, NativeSetShaderGprAllocation, 300,
+                 [](PPCContext& t, Random& a, uint32_t) {
+                   static const uint32_t kSplits[][2] = {{0, 0}, {32, 96}, {96, 32}, {64, 64}};
+                   const uint32_t pick = a.Below(6);
+                   if (pick < 4) {
+                     t.r5.u64 = kSplits[pick][0];
+                     t.r6.u64 = kSplits[pick][1];
+                   } else {
+                     t.r5.u64 = pick == 4 ? a.Below(256) : uint32_t(a.Next());
+                     t.r6.u64 = pick == 4 ? a.Below(256) : uint32_t(a.Next());
+                   }
+                   t.r4.u64 = uint32_t(a.Next());
+                 });
+  // The gamma ramp: the scratch area's start (1,536 bytes), and half the time
+  // the device's already the result (nothing copied).
+  RunPacketCases(h, device, commands, "Device::SetGammaRamp (sub_822A3A20)",
+                 Original<__imp__sub_822A3A20>, NativeSetGammaRamp, 60,
+                 [&](PPCContext& t, Random& a, uint32_t dev) {
+                   display::GammaRamp in;
+                   for (int c = 0; c < 3; c++) {
+                     for (int k = 0; k < 256; k++) {
+                       const uint32_t pick = a.Below(4);
+                       in[c][k] = pick == 0 ? uint16_t(a.Next())
+                                  : pick == 1 ? uint16_t(k * 257)
+                                              : uint16_t(std::min(65535u, k * 257 + a.Below(512)));
+                       guest::StoreU16(h.base, h.data + 512 * c + 2 * k, in[c][k]);
+                     }
+                   }
+                   if (a.Below(2)) {
+                     const display::GammaRamp out = display::ApplyGammaCurve(
+                         display::MakeGammaCurve(display::kGamma, false), in);
+                     for (int c = 0; c < 3; c++) {
+                       for (int k = 0; k < 256; k++) {
+                         guest::StoreU16(h.base, dev + 13608 + 512 * c + 2 * k, out[c][k]);
+                       }
+                     }
+                     if (a.Below(4) == 0) {  // one entry off
+                       guest::StoreU8(h.base, dev + 13608 + a.Below(1536), uint8_t(a.Next()));
+                     }
+                   }
+                   t.r4.u64 = uint32_t(a.Next());
+                   t.r5.u64 = h.data;
+                 });
+  // SetDefaultState: +13240 (the present interval) and +10808 (bit 7 skips
+  // the register split) random with the rest.
+  RunPacketCases(h, device, commands, "Device::SetDefaultState (sub_822ACB90)",
+                 Original<__imp__sub_822ACB90>, NativeSetDefaultState, 40, none);
+  memory::Free(commands);
+  memory::Free(device);
+}
+
+}  // namespace
+
+void DeviceState(Context& h) {
+  const uint32_t device = memory::Alloc(kDeviceBytes, 0);
+  if (device == 0) {
+    ITC_LOG_INFO("harness: device_state: no block for the device");
+    return;
+  }
+  for (const Setter& setter : kRenderStateSetters) {
+    RunSetter(h, device, setter, 64);
+  }
+  for (const Setter& setter : kSamplerStateSetters) {
+    RunSetter(h, device, setter, 96);
+  }
+  RunSetter(h, device,
+            {"Device::GetRenderState_ViewportEnable (sub_822A2470)", __imp__sub_822A2470,
+             NativeGetViewportEnable},
+            32);
+  BoundObjects(h, device);
+  Fvf(h, device);
+  ScissorAndViewport(h, device);
+  memory::Free(device);
+  PacketWriters(h);
+}
+
+}  // namespace harness

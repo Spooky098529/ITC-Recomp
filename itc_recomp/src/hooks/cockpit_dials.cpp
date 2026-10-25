@@ -45,8 +45,8 @@
 #include "interpolation/blend_state.h"
 #include "interpolation/transform.h"
 
-#include <rex/cvar.h>
-#include <rex/logging.h>
+#include "base/flags.h"
+#include "base/log.h"
 
 #include <smmintrin.h>
 
@@ -58,13 +58,13 @@
 #include <cstdio>
 #include <unordered_map>
 
-REXCVAR_DEFINE_BOOL(native_cockpit_dials, true, "ITC",
-                    "Pose the cockpit dials natively (sub_820E42E8, sub_820E45A8) from the "
-                    "tick's gauge values and the car's blended world matrix, instead of "
-                    "through the translated code with the needles' matrices blended");
-REXCVAR_DEFINE_BOOL(check_native_cockpit_dials, false, "ITC",
-                    "--native_cockpit_dials: compare its angles and poses with the translated "
-                    "code's on logic passes, logged every 2 s");
+ITC_FLAG_BOOL(native_cockpit_dials, true, "ITC",
+              "Pose the cockpit dials natively (sub_820E42E8, sub_820E45A8) from the "
+              "tick's gauge values and the car's blended world matrix, instead of "
+              "through the translated code with the needles' matrices blended");
+ITC_FLAG_BOOL(check_native_cockpit_dials, false, "ITC",
+              "--native_cockpit_dials: compare its angles and poses with the translated "
+              "code's on logic passes, logged every 2 s");
 
 namespace {
 
@@ -271,7 +271,7 @@ struct Check {
   std::chrono::steady_clock::time_point logged = std::chrono::steady_clock::now();
 
   bool Wanted() const {
-    return REXCVAR_GET(check_native_cockpit_dials) &&
+    return ITC_FLAG(check_native_cockpit_dials) &&
            !frame_pacing::GameMessages_IsRenderOnlyPass();
   }
   void Angle(float native, float game) {
@@ -326,8 +326,8 @@ struct Check {
     auto now = std::chrono::steady_clock::now();
     if (now - logged >= std::chrono::seconds(2)) {
       logged = now;
-      REXLOG_INFO("cockpit dials check: {} angles (max error {:.7f}), {} poses (max error {:.7f})",
-                  angles, angle_error, poses, pose_error);
+      ITC_LOG_INFO("cockpit dials check: {} angles (max error {:.7f}), {} poses (max error {:.7f})",
+                   angles, angle_error, poses, pose_error);
       angles = poses = 0;
       angle_error = pose_error = 0;
     }
@@ -395,7 +395,7 @@ constexpr std::array<std::array<uint32_t, 3>, 2> kTachNeedles = {{
 // In mode 5 ([dash + 4]) the second needle is the turbo gauge, from car + 704.
 extern "C" REX_FUNC(sub_820E45A8) {
   REX_FUNC_PROLOGUE();
-  if (!REXCVAR_GET(native_cockpit_dials)) {
+  if (!ITC_FLAG(native_cockpit_dials)) {
     __imp__sub_820E45A8(ctx, base);
     return;
   }
@@ -442,7 +442,7 @@ extern "C" REX_FUNC(sub_820E45A8) {
 // speedometer's and the tachometer's.
 extern "C" REX_FUNC(sub_820E42E8) {
   REX_FUNC_PROLOGUE();
-  if (!REXCVAR_GET(native_cockpit_dials)) {
+  if (!ITC_FLAG(native_cockpit_dials)) {
     __imp__sub_820E42E8(ctx, base);
     return;
   }

@@ -21,8 +21,8 @@
 #include "frame_pacing/game_messages.h"
 #include "guest.h"
 
-#include <rex/cvar.h>
-#include <rex/logging.h>
+#include "base/flags.h"
+#include "base/log.h"
 
 #include <algorithm>
 #include <array>
@@ -33,14 +33,14 @@
 #include <utility>
 #include <vector>
 
-REXCVAR_DECLARE(bool, interpolate_draw_state);
-REXCVAR_DEFINE_BOOL(blend_glow, true, "ITC",
-                    "Blend the glow's strength and history weight between ticks");
-REXCVAR_DEFINE_BOOL(glow_history_every_frame, true, "ITC",
-                    "Write the glow's history every frame, its weight scaled to the frame's "
-                    "share of a tick, instead of once a tick");
-REXCVAR_DEFINE_BOOL(log_glow_recorder, false, "ITC",
-                    "Log the glow recorder's history flags and weights, every 2 s");
+ITC_FLAG_DECLARE(bool, interpolate_draw_state);
+ITC_FLAG_BOOL(blend_glow, true, "ITC",
+              "Blend the glow's strength and history weight between ticks");
+ITC_FLAG_BOOL(glow_history_every_frame, true, "ITC",
+              "Write the glow's history every frame, its weight scaled to the frame's "
+              "share of a tick, instead of once a tick");
+ITC_FLAG_BOOL(log_glow_recorder, false, "ITC",
+              "Log the glow recorder's history flags and weights, every 2 s");
 
 namespace {
 
@@ -74,12 +74,12 @@ void LogGlow() {
   if (now - g_log.last < std::chrono::seconds(2)) {
     return;
   }
-  REXLOG_INFO("glow recorder: logic passes {} (writing the history {}), render-only {} "
-              "(history write added {}), resets {}; tick weight {:.4f}, weights used "
-              "{:.4f}-{:.4f}, pass shares of a tick {:.3f}-{:.3f}",
-              g_log.logic, g_log.logic_writes, g_log.render_only, g_log.forced_writes,
-              g_log.resets, g_log.tick_weight, g_log.weight_min, g_log.weight_max,
-              g_log.share_min, g_log.share_max);
+  ITC_LOG_INFO("glow recorder: logic passes {} (writing the history {}), render-only {} "
+               "(history write added {}), resets {}; tick weight {:.4f}, weights used "
+               "{:.4f}-{:.4f}, pass shares of a tick {:.3f}-{:.3f}",
+               g_log.logic, g_log.logic_writes, g_log.render_only, g_log.forced_writes,
+               g_log.resets, g_log.tick_weight, g_log.weight_min, g_log.weight_max,
+               g_log.share_min, g_log.share_max);
   g_log = {};
   g_log.last = now;
 }
@@ -89,14 +89,14 @@ void LogGlow() {
 extern "C" REX_FUNC(sub_821379D8) {
   REX_FUNC_PROLOGUE();
   bool render_only = frame_pacing::GameMessages_IsRenderOnlyPass();
-  if (!REXCVAR_GET(interpolate_draw_state) || !frame_pacing::GameMessages_InRace()) {
+  if (!ITC_FLAG(interpolate_draw_state) || !frame_pacing::GameMessages_InRace()) {
     __imp__sub_821379D8(ctx, base);
     return;
   }
   uint32_t object = ctx.r3.u32;
   Glow& glow = g_glows[object];
   auto now = Clock::now();
-  bool log = REXCVAR_GET(log_glow_recorder);
+  bool log = ITC_FLAG(log_glow_recorder);
   if (!render_only) {
     // The object's update has set this tick's values.
     glow.before = glow.now;
@@ -120,7 +120,7 @@ extern "C" REX_FUNC(sub_821379D8) {
   bool reset = guest::LoadU32(base, object + kReset) != 0;
   float amount = frame_pacing::GetFramePacer().TickProgress();
   float weight = guest::LoadFloat(base, object + kHistoryWeight);
-  if (REXCVAR_GET(blend_glow) && glow.have_before && !reset) {
+  if (ITC_FLAG(blend_glow) && glow.have_before && !reset) {
     for (size_t i = 0; i < kBlended.size(); i++) {
       float a = glow.before[i], b = glow.now[i];
       if (!std::isfinite(a) || !std::isfinite(b)) {
@@ -133,7 +133,7 @@ extern "C" REX_FUNC(sub_821379D8) {
       }
     }
   }
-  if (REXCVAR_GET(glow_history_every_frame) && glow.write_history) {
+  if (ITC_FLAG(glow_history_every_frame) && glow.write_history) {
     // This pass's share of a tick: the time since the object's last pass.
     float share = 1.0f;
     if (glow.last_record != Clock::time_point{}) {

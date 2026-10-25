@@ -4,11 +4,13 @@
 #include "debug/idle_timer_scan.h"
 #include "debug/menu_selection_scan.h"
 #include "guest.h"
+#include "harnesses/harness.h"
+#include "hooks/input_update.h"
 #include "interpolation/blend_state.h"
 #include "native/textures.h"
 
-#include <rex/cvar.h>
-#include <rex/logging.h>
+#include "base/flags.h"
+#include "base/log.h"
 
 #include <algorithm>
 #include <bit>
@@ -21,39 +23,39 @@
 #include <tuple>
 #include <thread>
 
-REXCVAR_DEFINE_BOOL(log_race_changes, false, "ITC",
-                    "Log when the game enters and leaves a race (the race's draw step starts or "
-                    "stops running)");
-REXCVAR_DEFINE_BOOL(log_game_messages, false, "ITC",
-                    "Log game messages delivered and skipped, once a second");
-REXCVAR_DEFINE_STRING(render_only_update_handlers, "", "ITC",
-                      "Testing: message handler targets (hex, comma-separated) that still get "
-                      "Update on render-only passes");
-REXCVAR_DEFINE_BOOL(redraw_race_overlays, true, "ITC",
-                    "Record the race overlays (the marker above opponent cars) on render-only "
-                    "passes too");
-REXCVAR_DEFINE_BOOL(redraw_rival_logo, true, "ITC",
-                    "Draw the rival's logo in the rival intro cutscene on render-only passes "
-                    "too (the cutscene still steps once a tick)");
-REXCVAR_DEFINE_BOOL(log_recording_handlers, false, "ITC",
-                    "Log which message handlers record render commands, by message, once a "
-                    "second");
+ITC_FLAG_BOOL(log_race_changes, false, "ITC",
+              "Log when the game enters and leaves a race (the race's draw step starts or "
+              "stops running)");
+ITC_FLAG_BOOL(log_game_messages, false, "ITC",
+              "Log game messages delivered and skipped, once a second");
+ITC_FLAG_STRING(render_only_update_handlers, "", "ITC",
+                "Testing: message handler targets (hex, comma-separated) that still get "
+                "Update on render-only passes");
+ITC_FLAG_BOOL(redraw_race_overlays, true, "ITC",
+              "Record the race overlays (the marker above opponent cars) on render-only "
+              "passes too");
+ITC_FLAG_BOOL(redraw_rival_logo, true, "ITC",
+              "Draw the rival's logo in the rival intro cutscene on render-only passes "
+              "too (the cutscene still steps once a tick)");
+ITC_FLAG_BOOL(log_recording_handlers, false, "ITC",
+              "Log which message handlers record render commands, by message, once a "
+              "second");
 // Testing: main loop tick handlers or message handlers to skip on
 // render-only passes, by target (comma-separated hex), to find which one
 // counts frames.
-REXCVAR_DEFINE_STRING(render_only_skip, "", "ITC",
-                      "Testing: tick handler or message handler targets (hex, "
-                      "comma-separated) to skip on render-only passes");
+ITC_FLAG_STRING(render_only_skip, "", "ITC",
+                "Testing: tick handler or message handler targets (hex, "
+                "comma-separated) to skip on render-only passes");
 // docs/pause-menu-fix.md, step 0.
-REXCVAR_DEFINE_BOOL(log_input, false, "ITC",
-                    "Log the input manager's objects once a race, the pause signs on change, "
-                    "and the handlers run by pass type and pause sign, once a second");
-REXCVAR_DEFINE_BOOL(log_input_writes, false, "ITC",
-                    "Log which tick and message handlers write to the input manager and its "
-                    "listener objects, by pass type and pause sign, once a second");
-REXCVAR_DEFINE_BOOL(log_input_reads, false, "ITC",
-                    "Log calls to the input processors' button tests by caller, pass type and "
-                    "pause, once a second");
+ITC_FLAG_BOOL(log_input, false, "ITC",
+              "Log the input manager's objects once a race, the pause signs on change, "
+              "and the handlers run by pass type and pause sign, once a second");
+ITC_FLAG_BOOL(log_input_writes, false, "ITC",
+              "Log which tick and message handlers write to the input manager and its "
+              "listener objects, by pass type and pause sign, once a second");
+ITC_FLAG_BOOL(log_input_reads, false, "ITC",
+              "Log calls to the input processors' button tests by caller, pass type and "
+              "pause, once a second");
 
 namespace frame_pacing {
 namespace {
@@ -87,7 +89,7 @@ bool InTargetList(const std::string& list, uint32_t target) {
 bool SkipOnRenderOnlyPass(uint32_t target) {
   static std::string parsed_from;
   static std::vector<uint32_t> targets;
-  std::string list = REXCVAR_GET(render_only_skip);
+  std::string list = ITC_FLAG(render_only_skip);
   if (list != parsed_from) {
     parsed_from = list;
     targets.clear();
@@ -158,7 +160,7 @@ uint64_t g_input_log_passes[16] = {};
 std::chrono::steady_clock::time_point g_input_log_last{};
 
 void InputLog_Run(int kind, uint32_t id, uint32_t target) {
-  if (REXCVAR_GET(log_input)) {
+  if (ITC_FLAG(log_input)) {
     g_input_log_runs[{InputLogCombo(), kind, id, target}]++;
   }
 }
@@ -200,13 +202,13 @@ void InputWatch_Copy(uint8_t* base, std::vector<uint32_t>& out) {
 }
 
 void InputWatch_Before(uint8_t* base) {
-  if (REXCVAR_GET(log_input_writes) && !g_input_ranges.empty()) {
+  if (ITC_FLAG(log_input_writes) && !g_input_ranges.empty()) {
     InputWatch_Copy(base, g_input_before);
   }
 }
 
 void InputWatch_After(uint8_t* base, int kind, uint32_t target) {
-  if (!REXCVAR_GET(log_input_writes) || g_input_ranges.empty() || g_input_before.empty()) {
+  if (!ITC_FLAG(log_input_writes) || g_input_ranges.empty() || g_input_before.empty()) {
     return;
   }
   InputWatch_Copy(base, g_input_after);
@@ -233,11 +235,11 @@ void InputWatch_Flush() {
   for (const auto& [key, write] : g_input_writes) {
     auto [combo, kind, target, range, offset] = key;
     if (lines++ == kMaxLines) {
-      REXLOG_INFO("input writes: {} more", g_input_writes.size() - kMaxLines);
+      ITC_LOG_INFO("input writes: {} more", g_input_writes.size() - kMaxLines);
       break;
     }
     const InputRange& r = g_input_ranges[std::min<size_t>(range, g_input_ranges.size() - 1)];
-    REXLOG_INFO(
+    ITC_LOG_INFO(
         "input writes: {} in_race {} r31+588 {} record0 {} ({} passes): {} {:08X}: {} {} +{:X} "
         "x{} (last {:08X} -> {:08X})",
         (combo & 1) ? "render-only" : "logic", (combo >> 1) & 1, (combo >> 2) & 1,
@@ -249,7 +251,7 @@ void InputWatch_Flush() {
 
 // At a pass's start: counts the pass, and logs what ran once a second.
 void InputLog_OnPassStart() {
-  if (!REXCVAR_GET(log_input)) {
+  if (!ITC_FLAG(log_input)) {
     return;
   }
   auto now = std::chrono::steady_clock::now();
@@ -258,7 +260,7 @@ void InputLog_OnPassStart() {
     std::string line;
     auto flush = [&] {
       if (!line.empty()) {
-        REXLOG_INFO("{}", line);
+        ITC_LOG_INFO("{}", line);
         line.clear();
       }
     };
@@ -303,7 +305,7 @@ Counts& GetCounts() {
 }
 
 void LogCounts() {
-  if (!REXCVAR_GET(log_game_messages)) {
+  if (!ITC_FLAG(log_game_messages)) {
     return;
   }
   Counts& c = GetCounts();
@@ -311,8 +313,8 @@ void LogCounts() {
   if (now - c.last_log < std::chrono::seconds(1)) {
     return;
   }
-  REXLOG_INFO("game messages: {} updates ({} skipped), {} draws, {} others", c.updates,
-              c.updates_skipped, c.draws, c.others);
+  ITC_LOG_INFO("game messages: {} updates ({} skipped), {} draws, {} others", c.updates,
+               c.updates_skipped, c.draws, c.others);
   c = {};
   c.last_log = now;
 }
@@ -331,8 +333,8 @@ void LogRecording(uint32_t message, uint32_t handler, int slots) {
   }
   last = now;
   for (const auto& [key, value] : recorded) {
-    REXLOG_INFO("recording: message {} handler {:08X}: {} calls, {} slots", key.first,
-                key.second, value.first, value.second);
+    ITC_LOG_INFO("recording: message {} handler {:08X}: {} calls, {} slots", key.first,
+                 key.second, value.first, value.second);
   }
   recorded.clear();
 }
@@ -390,7 +392,7 @@ void Deliver(PPCContext& ctx, uint8_t* base, uint32_t dispatcher, uint32_t messa
     debug::MenuSelectionScan_After(base, "message handler", target);
     debug::IdleTimerScan_After(base, "message handler", target);
     debug::FrameStateDiff_After(base, "message handler", target);
-    if (REXCVAR_GET(log_recording_handlers) && list &&
+    if (ITC_FLAG(log_recording_handlers) && list &&
         guest::LoadU32(base, kCommandListPointer) == list) {
       uint32_t used_after = guest::LoadU32(base, list + kCommandListUsedOffset);
       if (used_after != used_before) {
@@ -423,14 +425,14 @@ void DispatchMessages(PPCContext& ctx, uint8_t* base, uint32_t dispatcher) {
         // The race overlays' Update handler (sub_8215E150) records the
         // marker above opponent cars; on render-only passes it only records
         // (per_frame_logic.cpp).
-        std::string only = REXCVAR_GET(render_only_update_handlers);
-        if (REXCVAR_GET(redraw_race_overlays)) {
+        std::string only = ITC_FLAG(render_only_update_handlers);
+        if (ITC_FLAG(redraw_race_overlays)) {
           only += only.empty() ? "8215E150" : ",8215E150";
         }
         // The rival intro cutscene's handler (82159948, sub_821594B8): on
         // render-only passes it only draws the rival's logo
         // (per_frame_logic.cpp).
-        if (REXCVAR_GET(redraw_rival_logo)) {
+        if (ITC_FLAG(redraw_rival_logo)) {
           only += only.empty() ? "82159948" : ",82159948";
         }
         if (!only.empty()) {
@@ -458,8 +460,8 @@ void GameMessages_OnPassFinished() {
   if (!g_render_only_pass) {
     // The pass that just ran was a logic pass: it decides whether we're in a race.
     if (g_in_race != g_race_draw_step_seen) {
-      if (REXCVAR_GET(log_race_changes)) {
-        REXLOG_INFO("game messages: {} a race", g_race_draw_step_seen ? "entered" : "left");
+      if (ITC_FLAG(log_race_changes)) {
+        ITC_LOG_INFO("game messages: {} a race", g_race_draw_step_seen ? "entered" : "left");
       }
       if (!g_race_draw_step_seen) {
         native::TextureCache_RaceLeft();
@@ -524,7 +526,7 @@ bool GameMessages_IsRenderOnlyPass() {
 namespace {
 
 void InputLog_PauseSigns(uint8_t* base, uint32_t r31, uint32_t r31_value) {
-  if (!REXCVAR_GET(log_input)) {
+  if (!ITC_FLAG(log_input)) {
     return;
   }
   // sub_8215B4F8 reads +588 of record 0 of 0x826BAC00 (21 records of 592
@@ -543,7 +545,7 @@ void InputLog_PauseSigns(uint8_t* base, uint32_t r31, uint32_t r31_value) {
     return;
   }
   g_pause_signs = signs;
-  REXLOG_INFO(
+  ITC_LOG_INFO(
       "input pause signs: pass {} {}: record0+588 {:08X} record1 {:08X} record2 {:08X} mode {:X} "
       "r31 {:08X} r31+588 {:08X}",
       GameMessages_PassNumber(), g_render_only_pass ? "render-only" : "logic", signs.records[0],
@@ -574,33 +576,33 @@ void LogInputManager(PPCContext& ctx, uint8_t* base, uint32_t manager) {
   auto slot1 = [&](uint32_t object) {
     return guest::LoadU32(base, guest::LoadU32(base, object) + 4);
   };
-  REXLOG_INFO("input manager {:08X}", manager);
+  ITC_LOG_INFO("input manager {:08X}", manager);
   for (uint32_t i = 0; i < 4; i++) {
     uint32_t pad = manager + kPhysicalPads + kPhysicalPadBytes * i;
-    REXLOG_INFO("input physical pad {} at {:08X}: vtable {:08X} slot 1 {:08X} flags {:X}", i, pad,
-                guest::LoadU32(base, pad), slot1(pad), guest::LoadU32(base, pad + 4));
+    ITC_LOG_INFO("input physical pad {} at {:08X}: vtable {:08X} slot 1 {:08X} flags {:X}", i, pad,
+                 guest::LoadU32(base, pad), slot1(pad), guest::LoadU32(base, pad + 4));
   }
   for (uint32_t j = 0; j < 5; j++) {
     uint32_t processor = manager + kProcessors + kProcessorBytes * j;
-    REXLOG_INFO("input processor {} at {:08X}: vtable {:08X} slot 1 {:08X}", j, processor,
-                guest::LoadU32(base, processor), slot1(processor));
+    ITC_LOG_INFO("input processor {} at {:08X}: vtable {:08X} slot 1 {:08X}", j, processor,
+                 guest::LoadU32(base, processor), slot1(processor));
   }
   for (uint32_t j = 0; j < 5; j++) {
     uint32_t s = manager + kListeners + kListenerBytes * j;
     uint32_t count = guest::LoadU32(base, s + 4);
     uint32_t head = guest::LoadU32(base, s);
     if (!count || !head) {
-      REXLOG_INFO("input listener slot {}: count {} head {:08X}", j, count, head);
+      ITC_LOG_INFO("input listener slot {}: count {} head {:08X}", j, count, head);
       continue;
     }
     uint32_t node = guest::LoadU32(base, head + 4);
     if (node == head) {
-      REXLOG_INFO("input listener slot {}: count {} head {:08X}, empty list", j, count, head);
+      ITC_LOG_INFO("input listener slot {}: count {} head {:08X}, empty list", j, count, head);
       continue;
     }
     uint32_t object = guest::LoadU32(base, node + 8);
-    REXLOG_INFO("input listener slot {}: count {} object {:08X} vtable {:08X} slot 1 {:08X}", j,
-                count, object, guest::LoadU32(base, object), slot1(object));
+    ITC_LOG_INFO("input listener slot {}: count {} object {:08X} vtable {:08X} slot 1 {:08X}", j,
+                 count, object, guest::LoadU32(base, object), slot1(object));
   }
   // Each binding's slot 1 is called as sub_82591918 calls it (r3 = device,
   // returns the values' address in r3); the caller's r3 and lr are kept.
@@ -612,7 +614,7 @@ void LogInputManager(PPCContext& ctx, uint8_t* base, uint32_t manager) {
       uint32_t enabled = guest::LoadU8(base, pad + 4 + 8 * k);
       uint32_t device = guest::LoadU32(base, pad + 8 + 8 * k);
       if (!device) {
-        REXLOG_INFO("input logical pad {} binding {}: enabled {} device 0", j, k, enabled);
+        ITC_LOG_INFO("input logical pad {} binding {}: enabled {} device 0", j, k, enabled);
         continue;
       }
       int physical = -1;
@@ -630,7 +632,7 @@ void LogInputManager(PPCContext& ctx, uint8_t* base, uint32_t manager) {
         uint32_t v = ctx.r3.u32;
         values = fmt::format("returns {:08X} (device + 8: {})", v, v == device + 8);
       }
-      REXLOG_INFO(
+      ITC_LOG_INFO(
           "input logical pad {} binding {}: enabled {} device {:08X} (physical pad {}) vtable "
           "{:08X} slot 1 {:08X} {}",
           j, k, enabled, device, physical, guest::LoadU32(base, device), function, values);
@@ -642,7 +644,7 @@ void LogInputManager(PPCContext& ctx, uint8_t* base, uint32_t manager) {
        {0x82000A30u, 0x82000A34u, 0x82001BE0u, 0x82002200u, 0x8200223Cu, 0x82002BD4u,
         0x8206CBFCu}) {
     uint32_t bits = guest::LoadU32(base, address);
-    REXLOG_INFO("input constant {:08X}: {:08X} = {}", address, bits, std::bit_cast<float>(bits));
+    ITC_LOG_INFO("input constant {:08X}: {:08X} = {}", address, bits, std::bit_cast<float>(bits));
   }
 }
 
@@ -652,12 +654,16 @@ bool g_input_manager_logged = false;  // this race
 
 extern "C" REX_FUNC(sub_820990F0) {
   REX_FUNC_PROLOGUE();
+  {
+    base::InHarnessScope in_harness;  // ITC_NATIVE_RUNNING's harness lines
+    harness::RunRequested(ctx, base);  // --run_harnesses, once
+  }
   if (frame_pacing::GameMessages_IsRenderOnlyPass()) {
     return;
   }
   if (!frame_pacing::GameMessages_InRace()) {
     g_input_manager_logged = false;
-  } else if (REXCVAR_GET(log_input) && !g_input_manager_logged) {
+  } else if (ITC_FLAG(log_input) && !g_input_manager_logged) {
     g_input_manager_logged = true;
     LogInputManager(ctx, base, ctx.r3.u32);
   }
@@ -668,7 +674,7 @@ extern "C" REX_FUNC(sub_820990F0) {
     uint32_t node = head && guest::LoadU32(base, s + 4) ? guest::LoadU32(base, head + 4) : 0;
     frame_pacing::g_input_listener0 = node && node != head ? guest::LoadU32(base, node + 8) : 0;
   }
-  if (REXCVAR_GET(log_input_writes)) {
+  if (ITC_FLAG(log_input_writes)) {
     // The manager (its last part, the listener slots, ends at +3984) and
     // each listener's first object, 416 bytes (the processors' size: they
     // share the processors' vtable).
@@ -687,7 +693,7 @@ extern "C" REX_FUNC(sub_820990F0) {
     }
     frame_pacing::InputWatch_SetRanges(std::move(ranges));
   }
-  __imp__sub_820990F0(ctx, base);
+  input_hooks::InputUpdate_Run(ctx, base);
 }
 
 // The race's draw step: r3 = its argument. Noted to tell races from menus.
@@ -709,8 +715,8 @@ extern "C" REX_FUNC(sub_821062E8) {
 // Diagnostics (--log_tick_handlers): the main loop's tick handlers that run
 // on render-only passes, once a second. Each handler is an object whose
 // vtable slot 1 is its tick; delegates keep their target at +8.
-REXCVAR_DEFINE_BOOL(log_tick_handlers, false, "ITC",
-                    "Log the main loop tick handlers run on render-only passes, once a second");
+ITC_FLAG_BOOL(log_tick_handlers, false, "ITC",
+              "Log the main loop tick handlers run on render-only passes, once a second");
 
 namespace {
 std::map<std::pair<uint32_t, uint32_t>, int> g_tick_handlers;
@@ -724,7 +730,7 @@ extern "C" REX_FUNC(sub_82099A98) {
       frame_pacing::SkipTickHandlerOnRenderOnlyPass(guest::LoadU32(base, ctx.r4.u32 + 8))) {
     return;
   }
-  if (REXCVAR_GET(log_tick_handlers) && frame_pacing::GameMessages_IsRenderOnlyPass()) {
+  if (ITC_FLAG(log_tick_handlers) && frame_pacing::GameMessages_IsRenderOnlyPass()) {
     uint32_t handler = ctx.r4.u32;
     uint32_t tick = guest::LoadU32(base, guest::LoadU32(base, handler) + 4);
     uint32_t target = guest::LoadU32(base, handler + 8);
@@ -732,8 +738,8 @@ extern "C" REX_FUNC(sub_82099A98) {
     auto now = std::chrono::steady_clock::now();
     if (now - g_tick_handlers_logged >= std::chrono::seconds(1)) {
       for (const auto& [key, n] : g_tick_handlers) {
-        REXLOG_INFO("tick handler on render-only passes: tick {:08X} target {:08X}: {} calls",
-                    key.first, key.second, n);
+        ITC_LOG_INFO("tick handler on render-only passes: tick {:08X} target {:08X}: {} calls",
+                     key.first, key.second, n);
       }
       g_tick_handlers.clear();
       g_tick_handlers_logged = now;
@@ -787,10 +793,10 @@ void InputRead_Note(uint32_t function, uint32_t caller, uint32_t object, uint32_
   size_t lines = 0;
   for (const auto& [k, n] : g_input_reads) {
     if (lines++ == kMaxLines) {
-      REXLOG_INFO("input reads: {} more", g_input_reads.size() - kMaxLines);
+      ITC_LOG_INFO("input reads: {} more", g_input_reads.size() - kMaxLines);
       break;
     }
-    REXLOG_INFO(
+    ITC_LOG_INFO(
         "input reads: {} paused {} message {:X} handler {:08X} tick {:08X}: {:08X} from {:08X} "
         "object {:08X} mask {:08X} -> {} x{}",
         k.render_only ? "render-only" : "logic", int(k.paused), k.message, k.handler, k.tick,
@@ -801,41 +807,15 @@ void InputRead_Note(uint32_t function, uint32_t caller, uint32_t object, uint32_
 
 }  // namespace
 
-#define ITC_INPUT_READ(address)                                                    \
-  extern "C" REX_FUNC(sub_##address) {                                             \
-    REX_FUNC_PROLOGUE();                                                           \
-    if (!REXCVAR_GET(log_input_reads)) {                                           \
-      __imp__sub_##address(ctx, base);                                             \
-      return;                                                                      \
-    }                                                                              \
-    uint32_t caller = uint32_t(ctx.lr);                                            \
-    uint32_t object = ctx.r3.u32;                                                  \
-    uint32_t mask = guest::LoadU32(base, ctx.r4.u32);                              \
-    __imp__sub_##address(ctx, base);                                               \
-    InputRead_Note(0x##address, caller, object, mask, ctx.r3.u32 & 0xFF);          \
-  }
-ITC_INPUT_READ(825924E0)
-ITC_INPUT_READ(82592500)
-ITC_INPUT_READ(82592520)
-ITC_INPUT_READ(8258CF10)
-ITC_INPUT_READ(8258CEB0)
-ITC_INPUT_READ(8258CEE0)
-#undef ITC_INPUT_READ
+bool frame_pacing::GameMessages_LogInputReads() {
+  return ITC_FLAG(log_input_reads);
+}
 
-// The pads' values (vtable slot 1, r3 = pad, returns a pointer to its 40
-// floats, the stick's among them): 82591B30 a logical pad's (+36), 820988B8
-// a physical pad's (+8). Input::Update calls them itself; any other caller
-// reads the stick. Logged like the button tests, with mask and result 0.
-#define ITC_INPUT_VALUES(address)                                                  \
-  extern "C" REX_FUNC(sub_##address) {                                             \
-    REX_FUNC_PROLOGUE();                                                           \
-    uint32_t caller = uint32_t(ctx.lr);                                            \
-    uint32_t object = ctx.r3.u32;                                                  \
-    __imp__sub_##address(ctx, base);                                               \
-    if (REXCVAR_GET(log_input_reads)) {                                            \
-      InputRead_Note(0x##address, caller, object, 0, 0);                           \
-    }                                                                              \
-  }
-ITC_INPUT_VALUES(82591B30)
-ITC_INPUT_VALUES(820988B8)
-#undef ITC_INPUT_VALUES
+void frame_pacing::GameMessages_NoteInputRead(uint32_t function, uint32_t caller,
+                                              uint32_t object, uint32_t mask, uint32_t result) {
+  InputRead_Note(function, caller, object, mask, result);
+}
+
+// The button tests and the pads' values are native (--native_input): their
+// adapters, src/hooks/input_manager.cpp, note them the same way, as the
+// action mappers' (src/hooks/action_mappers.cpp) note 825924E0 and 8258CF10.

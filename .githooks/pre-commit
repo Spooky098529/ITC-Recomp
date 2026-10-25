@@ -1,0 +1,18 @@
+#!/bin/sh
+# Refuses a commit whose added lines hold an absolute path from someone's
+# machine (/home/...): the repo is public. Use paths relative to
+# the repo root, or "beside this repo" (../SBX-Recomp) for sibling folders.
+# Enabled by: git config core.hooksPath .githooks. Skips .githooks/ itself
+# (its pattern and comments name the path).
+
+pattern='/home/[A-Za-z0-9._-]+'
+found=$(git diff --cached -U0 --no-color --ignore-submodules=all |
+  awk '/^\+\+\+ / { file = substr($0, 7); next }
+       /^\+/ && file !~ /^\.githooks\// { print file ": " substr($0, 2) }' |
+  grep -E "$pattern")
+if [ -n "$found" ]; then
+  echo "pre-commit: absolute local paths in the staged changes (the repo is public):" >&2
+  echo "$found" | head -20 >&2
+  echo "Use paths relative to the repo root instead." >&2
+  exit 1
+fi

@@ -5,16 +5,16 @@
 #include <map>
 #include <set>
 #include <vector>
-#include <rex/hash.h>
+#include "base/hash.h"
 #include <tuple>
 #include <chrono>
 #include <string>
-#include <rex/logging.h>
-#include <rex/cvar.h>
+#include "base/log.h"
+#include "base/flags.h"
 
-REXCVAR_DEFINE_BOOL(log_replay_commands, false, "ITC",
-                    "Log how often each render command is replayed per frame, and sample "
-                    "arguments of the unidentified ones, every 2 s");
+ITC_FLAG_BOOL(log_replay_commands, false, "ITC",
+              "Log how often each render command is replayed per frame, and sample "
+              "arguments of the unidentified ones, every 2 s");
 
 namespace {
 
@@ -156,7 +156,7 @@ void TraceCommand(uint8_t* base, uint32_t id, uint32_t payload, uint32_t arg1, u
     default:
       return;
   }
-  REXLOG_INFO("frame trace: {} draws, then command {}:{}", s.trace_draws, id, what);
+  ITC_LOG_INFO("frame trace: {} draws, then command {}:{}", s.trace_draws, id, what);
   s.trace_draws = 0;
 }
 
@@ -205,8 +205,8 @@ void TraceCommand(uint8_t* base, uint32_t id, uint32_t payload, uint32_t arg1, u
                                  guest::LoadU32(base, texture + 32) & 0xFFF,
                                  guest::LoadU32(base, texture + 36));
       if (s.texture_fetches[key]++ == 0) {
-        REXLOG_INFO("replay texture fetch (new): dword0 {:08X} dword1&FFF {:03X} dword2 {:08X}",
-                    std::get<0>(key), std::get<1>(key), std::get<2>(key));
+        ITC_LOG_INFO("replay texture fetch (new): dword0 {:08X} dword1&FFF {:03X} dword2 {:08X}",
+                     std::get<0>(key), std::get<1>(key), std::get<2>(key));
       }
     }
   }
@@ -222,15 +222,15 @@ void TraceCommand(uint8_t* base, uint32_t id, uint32_t payload, uint32_t arg1, u
       for (uint32_t i = 0; i < bytes.size(); i++) {
         bytes[i] = guest::LoadU8(base, ucode + i);
       }
-      uint64_t hash = XXH3_64bits(bytes.data(), bytes.size());
+      uint64_t hash = base::Hash64(bytes.data(), bytes.size());
       if (s.shaders.emplace(shader, hash).second) {
         std::string header;
         for (uint32_t i = 0; i < 20; i++) {
           header += fmt::format(" {:08X}", guest::LoadU32(base, shader + 4 * i));
         }
-        REXLOG_INFO("replay {} shader (new) {:08X}: microcode {:08X}, {} bytes, hash {:016X}; "
-                    "words 0-19:{}",
-                    vertex ? "vertex" : "pixel", shader, ucode, size, hash, header);
+        ITC_LOG_INFO("replay {} shader (new) {:08X}: microcode {:08X}, {} bytes, hash {:016X}; "
+                     "words 0-19:{}",
+                     vertex ? "vertex" : "pixel", shader, ucode, size, hash, header);
       }
     }
   }
@@ -243,8 +243,8 @@ void TraceCommand(uint8_t* base, uint32_t id, uint32_t payload, uint32_t arg1, u
       for (uint32_t i = 0; i < 16; i++) {
         words += fmt::format(" {:08X}", guest::LoadU32(base, object + 4 * i));
       }
-      REXLOG_INFO("replay {} (new) {:08X}: words 0-15:{}",
-                  id == 10 ? "vertex declaration" : "index buffer", object, words);
+      ITC_LOG_INFO("replay {} (new) {:08X}: words 0-15:{}",
+                   id == 10 ? "vertex declaration" : "index buffer", object, words);
     }
   }
   if (IsUnknown(id)) {
@@ -260,23 +260,23 @@ void TraceCommand(uint8_t* base, uint32_t id, uint32_t payload, uint32_t arg1, u
 
 void debug::ReplayStats_OnCommand(uint8_t* base, uint32_t id, uint32_t payload, uint32_t arg1,
                                   uint32_t arg2) {
-  if (REXCVAR_GET(log_replay_commands) && id < kCommandCount) {
+  if (ITC_FLAG(log_replay_commands) && id < kCommandCount) {
     OnCommandLogged(base, id, payload, arg1, arg2);
   }
 }
 
 void debug::ReplayStats_OnFrame() {
-  if (!REXCVAR_GET(log_replay_commands)) {
+  if (!ITC_FLAG(log_replay_commands)) {
     return;
   }
   Stats& s = GetStats();
   s.frames++;
   auto now = std::chrono::steady_clock::now();
   if (s.tracing) {
-    REXLOG_INFO("frame trace: {} draws, then the frame ends", s.trace_draws);
+    ITC_LOG_INFO("frame trace: {} draws, then the frame ends", s.trace_draws);
     s.tracing = false;
   } else if (now - s.last_trace >= std::chrono::seconds(10)) {
-    REXLOG_INFO("frame trace: starts");
+    ITC_LOG_INFO("frame trace: starts");
     s.tracing = true;
     s.trace_draws = 0;
     s.last_trace = now;
@@ -291,19 +291,19 @@ void debug::ReplayStats_OnFrame() {
                           double(s.items[id]) / s.frames);
     }
   }
-  REXLOG_INFO("replay commands per frame ({} frames):{}", s.frames, line);
+  ITC_LOG_INFO("replay commands per frame ({} frames):{}", s.frames, line);
   for (uint32_t id = 0; id < kCommandCount; id++) {
     if (!s.sample[id].empty()) {
-      REXLOG_INFO("replay command {} sample: {}", id, s.sample[id]);
+      ITC_LOG_INFO("replay command {} sample: {}", id, s.sample[id]);
     }
   }
   if (s.new_states) {
     for (auto& [name, uses] : {std::pair{"render", &s.render_states},
                                std::pair{"sampler", &s.sampler_states}}) {
       for (auto& [state, use] : *uses) {
-        REXLOG_INFO("replay {} state {} (0x{:X}): setter {:08X}, {} uses, {} values, last {:08X}",
-                    name, state, state, use.setter, use.count, use.distinct_values,
-                    use.last_value);
+        ITC_LOG_INFO("replay {} state {} (0x{:X}): setter {:08X}, {} uses, {} values, last {:08X}",
+                     name, state, state, use.setter, use.count, use.distinct_values,
+                     use.last_value);
       }
     }
     s.new_states = false;

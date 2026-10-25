@@ -1,6 +1,6 @@
 // Decides when the render thread draws frames and when game logic may tick.
 //
-// Game logic advances a fixed 1/30 s per tick (see docs/functions.md), so
+// Game logic advances a fixed 1/30 s per tick (see docs/frame-interpolation.md), so
 // ticks are released on a steady 30 Hz clock. Between ticks the renderer
 // draws as many frames as the frame cap allows. Pure host code: it knows
 // nothing about guest state.

@@ -20,18 +20,22 @@
 // throughout), so both are skipped; the rest of the call runs as before.
 // How many calls bind the same shader is logged every 5 s.
 //
-// --refcount_global_lock=true runs the library's own functions instead.
+// --refcount_global_lock=true runs the library's own functions instead
+// (for the recompiled callers; native callers, src/graphics/, call
+// refcount::AddRef, lock-free, either way).
+
+#include "native/refcount.h"
 
 #include "guest.h"
 
-#include <rex/cvar.h>
-#include <rex/logging.h>
+#include "base/flags.h"
+#include "base/log.h"
 
 #include <chrono>
 
-REXCVAR_DEFINE_BOOL(refcount_global_lock, false, "ITC",
-                    "Let the graphics library's AddRef and Release take the recompiler's "
-                    "global lock as before (they're lock-free otherwise)");
+ITC_FLAG_BOOL(refcount_global_lock, false, "ITC",
+              "Let the graphics library's AddRef and Release take the recompiler's "
+              "global lock as before (they're lock-free otherwise)");
 
 namespace {
 
@@ -67,29 +71,34 @@ bool HoldsChild(uint8_t* base, uint32_t object) {
 
 }  // namespace
 
-extern "C" REX_FUNC(sub_822A6738) {
-  REX_FUNC_PROLOGUE();
-  if (REXCVAR_GET(refcount_global_lock)) {
-    __imp__sub_822A6738(ctx, base);
-    return;
-  }
-  uint32_t object = ctx.r3.u32;
+namespace refcount {
+
+uint32_t AddRef(uint8_t* base, uint32_t object) {
+  ITC_NATIVE_RUNNING("sub_822A6738 Resource::AddRef");
   if (object == g_unchanged_shader) {
-    ctx.r3.u64 = guest::LoadU32(base, object + kCount);  // unused by the caller
-    return;
+    return guest::LoadU32(base, object + kCount);  // unused by the caller
   }
   uint32_t count = AddToCount(base, object + kCount, 1);
   if (count == 1 && HoldsChild(base, object)) {
-    ctx.r3.u64 = guest::LoadU32(base, object + kChild);
-    ctx.lr = 0x822A6794;
-    sub_822A6738(ctx, base);
+    AddRef(base, guest::LoadU32(base, object + kChild));
   }
-  ctx.r3.u64 = count;
+  return count;
+}
+
+}  // namespace refcount
+
+extern "C" REX_FUNC(sub_822A6738) {
+  REX_FUNC_PROLOGUE();
+  if (ITC_FLAG(refcount_global_lock)) {
+    __imp__sub_822A6738(ctx, base);
+    return;
+  }
+  ctx.r3.u64 = refcount::AddRef(base, ctx.r3.u32);
 }
 
 extern "C" REX_FUNC(sub_822A67B0) {
   REX_FUNC_PROLOGUE();
-  if (REXCVAR_GET(refcount_global_lock)) {
+  if (ITC_FLAG(refcount_global_lock)) {
     __imp__sub_822A67B0(ctx, base);
     return;
   }
@@ -116,7 +125,7 @@ extern "C" REX_FUNC(sub_822A67B0) {
 
 extern "C" REX_FUNC(sub_822A8808) {
   REX_FUNC_PROLOGUE();
-  if (REXCVAR_GET(refcount_global_lock)) {
+  if (ITC_FLAG(refcount_global_lock)) {
     __imp__sub_822A8808(ctx, base);
     return;
   }
@@ -132,9 +141,9 @@ extern "C" REX_FUNC(sub_822A8808) {
     auto now = std::chrono::steady_clock::now();
     if (now - g_last_log >= std::chrono::seconds(5)) {
       g_last_log = now;
-      REXLOG_INFO("refcount: SetVertexShader: {} calls on this thread, {} binding the shader "
-                  "already bound (AddRef and Release skipped)",
-                  g_set_calls, g_set_same);
+      ITC_LOG_INFO("refcount: SetVertexShader: {} calls on this thread, {} binding the shader "
+                   "already bound (AddRef and Release skipped)",
+                   g_set_calls, g_set_same);
     }
   }
 }

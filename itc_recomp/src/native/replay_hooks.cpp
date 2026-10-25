@@ -7,7 +7,7 @@
 #include "renderer.h"
 #include "state.h"
 
-#include <rex/logging.h>
+#include "base/log.h"
 
 #include <set>
 #include <utility>
@@ -82,11 +82,11 @@ struct PendingInline {
 // the front buffer resolve), logged once per function and caller.
 std::set<std::pair<uint32_t, uint32_t>> g_logged_outside;
 void LogOutside(const char* what, uint32_t function, uint32_t caller, uint32_t command) {
-  if (!native::Renderer_Enabled() || !g_logged_outside.insert({function, caller}).second) {
+  if (!g_logged_outside.insert({function, caller}).second) {
     return;
   }
-  REXLOG_INFO("native renderer: {} ({:08X}) called from {:08X} in command {}{}", what, function,
-              caller, command, command ? "" : " (outside the command list)");
+  ITC_LOG_INFO("native renderer: {} ({:08X}) called from {:08X} in command {}{}", what, function,
+               caller, command, command ? "" : " (outside the command list)");
 }
 }  // namespace
 

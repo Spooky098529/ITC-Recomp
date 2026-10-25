@@ -4,7 +4,7 @@
 // delivers to every registered handler. Message 0 is Update (all physics and
 // fixed-step logic run in its handlers) and message 1 is Draw (the draw step
 // that records the scene). See "Separating drawing from the game tick" in
-// docs/functions.md.
+// docs/frame-interpolation.md.
 //
 // On a render-only pass, Update messages are consumed without being
 // delivered, so the pass draws the scene without advancing the game.
@@ -50,5 +50,12 @@ bool GameMessages_InRace();
 // race).
 bool GameMessages_Paused();
 uint32_t GameMessages_InputListener0();
+
+// Diagnostics (--log_input_reads): whether the input processors' button
+// tests are logged, and a test to count (`function` called from `caller` on
+// `object` with `mask`, returning `result`).
+bool GameMessages_LogInputReads();
+void GameMessages_NoteInputRead(uint32_t function, uint32_t caller, uint32_t object,
+                                uint32_t mask, uint32_t result);
 
 }  // namespace frame_pacing

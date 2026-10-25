@@ -5,8 +5,9 @@ system, in `rexglue-sdk/src/audio/` and
 `rexglue-sdk/src/kernel/xboxkrnl/xboxkrnl_audio.cpp`) with our own, as
 the native renderer replaced the emulated GPU (`native-renderer.md`). Why:
 the SDK's "Audio Worker" thread takes ~80% of a core for the whole game
-(see "Measured" below). As with rendering, the game's own audio library is
-kept and only what's under it is replaced.
+(see "Measured" below). As with rendering, the game's own audio library was
+kept at first and only what's under it replaced; since 2026-10-23 XACT
+itself is being translated to native C++ (B7, "Decisions" below).
 
 ## How the game's audio works
 
@@ -113,6 +114,18 @@ Not known yet:
 - **Keep the game's XACT and XAudio**; replace the SDK's render driver.
   Replacing XACT itself (e.g. with FAudio) isn't planned: the banks are XACT2-era big-endian files, and the engine
   sounds depend on XACT's runtime variables.
+  **Changed (the user's call, 2026-10-23, B7's fifth loop run):** XACT
+  is translated to native C++, the game's own copy function by
+  function, as B7 does with the game's code: no host library plays its
+  data (FAudio's XACT doesn't read these XACT2-era big-endian banks), so
+  there is no upstream library to use instead. The translation runs from
+  the leaves up under `--native_xact` (`itc_recomp/src/xact/`,
+  `docs/functions/xact.md`; the game's sound manager above it under
+  `--native_sound_cues`, `docs/functions/sound-cues.md`). Below XACT,
+  XAudio is still the game's recompiled copy: XACT's voice class calls
+  it, and its mixer runs on our own output's thread, which takes its
+  frames (`itc_recomp/src/audio/`, step 1 below). XAudio is the next
+  layer to translate the same way; the output itself is already ours.
 - **Keep the SDK's XMA decoder** (the user's call, 2026-10-14): it costs
   nothing measurable, so replacing it gains no speed. (Considered:
   converting the XMA wave banks to PCM banks on first launch, decoded once
@@ -120,6 +133,14 @@ Not known yet:
   wrapper `sub_82295508`, so that XACT plays music and menu sounds through
   its PCM path and no XMA context is made. Its open question was whether
   this XACT streams PCM from banks laid out for XMA.)
+  **Changed (the user's call, 2026-10-21, for B2 in
+  `docs/rexglue-removal.md`):** XMA is decoded by our own code calling
+  FFmpeg, in place of the SDK's XMA decoder and its emulated hardware
+  (contexts, the registers at `7FEA0000`), so the SDK's audio system can
+  go. The PCM bank conversion isn't the plan. Upstream FFmpeg's `xma2`
+  decoder, our own build, fed whole packets: we aren't emulating the XMA
+  hardware (the survey and plan are under B2 in
+  `docs/rexglue-removal.md`).
 - **No SDK patch**: override the game's functions in `itc_recomp/src/`,
   as the native renderer does.
 
@@ -193,10 +214,27 @@ Not known yet:
 - **Still to do**: a stereo device as well as the 6-channel one here (a
   HyperX headset that SDL reports as 6 channels, through PipeWire).
 
+## XMA decoded by our own code (B2, 2026-10-21)
+
+Since B2 (`rexglue-removal.md`, B2, branch `native-xma`), XMA sounds (the
+music and the menus' sounds) no longer go through the SDK's XMA decoder:
+each is decoded with our own upstream FFmpeg (`xma2`) into a flat buffer
+the game's XMA source voice reads by position (`src/audio/xma_stream.h`,
+`src/hooks/xma.cpp`). The SDK's decoder isn't set up (no "XMA Decoder"
+thread, no XMA registers), and the output's conversion and stereo fold
+are ours (`src/audio/output_mix.h`). The decoding runs on our "ITC Audio"
+thread, inside the game's mixer callback. The functions are in
+`functions/audio.md`.
+
 ## Tools
 
 - `--native_audio=false`: the SDK's audio system and render driver, for
   comparison.
+- `--log_xma`: each XMA sound's start (data, size, channels, rate,
+  samples, buffer), loop data (bits and the sample positions they give),
+  loop jumps, end and reset.
+- `itc_xma_check` (`itc_recomp/tests/xma_check.cpp`, built on request)
+  decodes one wave of a bank with our FFmpeg and writes a WAV.
 - With logging on, our audio logs its endpoint, each client registered,
   and every 10 s each client's frames played, silence fills (frames the
   mixer didn't have ready in time) and frames queued.

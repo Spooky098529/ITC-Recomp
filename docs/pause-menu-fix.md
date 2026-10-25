@@ -153,6 +153,183 @@ A physical pad's values (+8, 40 floats) line up with these 40, so its
 vtable slot 1 probably returns `pad + 8`: check that in step 0 (log the
 device pointers' vtables and whether `v == device + 8`).
 
+### The input processors (`sub_82592188`), 416 bytes
+
+Read 2026-10-19 (native since: `src/input/input_processor.cpp`). The
+processors and the listeners' first objects share this class (vtable
+`0x8206C0C4`); slot 1 is the update, r3 = object, r4 = its logical pad.
+It calls nothing but the pad's slot 1 (its 40 values, `pad + 36`), and
+leaves that address in r3.
+
+| Offset | What |
+|---|---|
+| +16 | dead zones, 4 floats (read): x, y, trigger, unused; both sticks use them |
+| +32 | the values 0-7 copied (LX, LY, LT, 0, RX, RY, RT, 0) |
+| +64 | the same with the dead zone taken out |
+| +96, +112 | each stick's (x, y, 0, 0) normalized, or 0 when centered |
+| +128, +132 | each stick's length |
+| +136 | the values 8-39 copied (32 floats) |
+| +264 | pressed: bits newly set this tick |
+| +268 | released: bits newly clear this tick |
+| +272 | held: bit `i` set while value `8 + i` is above 0.5 (`0x82001BE4`) |
+| +276, +280 | repeat delay and period (read) |
+| +284 | 32 hold counters (ticks) |
+
+In order:
+
+1. Copy the values 0-7 to +32.
+2. For each stick (values 0-3, then 4-7), for each of its four values
+   `x` with dead zone `d = +16[i]`: if `x > 0`, `(x - d) / (1 - d)`, then
+   0 if below 0; otherwise `(x + d) / (1 - d)`, then 0 if above 0 (NaN
+   is kept). To +64.
+3. Each stick's length `sqrt(x² + y²)` (an `fmuls` and two `fmadds`) to
+   +128; its direction: (x, y, 0, 0) times the reciprocal square root of
+   its dot product with one Newton step (AltiVec `vmsum3fp128`,
+   `vrsqrtefp`, `vnmsubfp`, `vmaddfp`), or 0 where the dot product is 0,
+   to +96 (stored with `stvx`: the object is 16-byte aligned).
+4. For each value `8 + i`, `i` = 0..31: copy it to +136; if above 0.5,
+   set bit `i` in held, add 1 to counter `i`, and if the counter is then
+   above delay + period (signed), set it back to delay; else counter `i`
+   = 0. This is the hold-to-repeat cycle: the counters seen at +180 and
+   +190 in step 0 are counters 25 and 29 (stick directions).
+5. pressed = held & (held ^ old held); released = (held ^ old held) &
+   old held.
+
+### Who reads the input manager (2026-10-19)
+
+Asked for docs/rexglue-removal.md (B1): if the action mappers were
+native, could the input manager (3,984 bytes at `0x40059F50`) and the
+four listener objects (inside the mappers at +0x9A0) stop being written
+to guest memory? Found with a page-protection read watch
+(`--watch_input_reads`, `src/debug/input_read_watch.cpp` and
+`tools/resolve_input_reads.py`, written by a subagent; not committed:
+kept in a git stash, "input read watch (--watch_input_reads) from the
+subagent", `git stash list` to find it; Linux only): the host pages behind the
+ranges are made `PROT_NONE`, each fault logs the host instruction (local
+builds keep symbols, so `addr2line` names the `sub_XXXXXXXX`) and the
+offset, and the page is opened for one single-stepped instruction. Our
+Input::Update runs with the pages open.
+
+Three unattended runs (boot, the front end, attract races), then a
+session the user played (2026-10-20, `itc_183.log`: the title, front-end
+menus, a race with the rival intro, the pause menu and its sub-menus),
+resolved with `tools/resolve_input_reads.py`:
+
+| Reader | Reads | When |
+|---|---|---|
+| `sub_8210C370` (the mappers' update) | logical pads 0-3's values 0-7 (+44..+72 + 196j) | front end, race, paused |
+| `sub_8258CF10` → `sub_825924E0` (button test, for the mappers) | listener objects' held word (+272) | front end, race, paused |
+| `sub_8258CEB0` → `sub_82592500` (button test), called twice by `sub_82093DC0` | processor 0's pressed word (manager +2104 = +1840 + 264) | every phase |
+| `sub_8258CEE0` → `sub_82592520`, called by `sub_82093DC0` | processor 0's held word (+2112), and for a held bit its counter (+284 + 4i) against the delay (+276): true on the first tick held or once repeating | every phase, render-only passes too |
+| `sub_8209F340` → `sub_82591C08`, called by `sub_8215FCA8` and `sub_822231B0` | a physical pad's flags (+4; pad 0 at manager +992): connected | race |
+| `sub_8209F3B8`, called by `sub_8215FCA8` | a physical pad's capabilities subtype (+193, bit 2: a wheel, XInput subtype 2, probably) | race |
+| `sub_82093DC0`, `sub_820902C8`, `sub_8209F340`, `sub_8209F3B8` | the manager's vtable (+0) only, to call its methods | every pass |
+
+`sub_8209F340` and `sub_8209F3B8` find the player's physical pad through
+the manager (the global at `0x826BAB78`) and two of its methods (vtable
+slots 9 and 5, with the player index at `[r3] + 2888`). The subtype test
+is why our fixed capabilities report a gamepad (subtype 1), as the SDK
+did.
+
+- The mappers' +2880 points to logical pad `j`'s values (manager +44,
+  +240, +436, +632 for mappers 0-3): they read the sticks from the
+  logical pads, not from the processors.
+- Readers outside the mappers: the app's update tests processor 0's
+  pressed, held and repeat state directly (`sub_8258CEB0`,
+  `sub_8258CEE0`), and in a race `sub_8215FCA8` and `sub_822231B0` ask
+  whether the player's pad is connected and whether it's a wheel. The
+  pause menu reads nothing here directly: it goes through the mappers.
+
+### The action mappers' update (read 2026-10-20)
+
+Read for making the mappers native (docs/rexglue-removal.md, B1). One
+mapper per player (vtable `0x82007F78`); `sub_8210B018` updates each
+with `sub_8210C370` (r3 = mapper). Actions are indexed 0-29 (id - 151).
+Offsets are from the mapper.
+
+| Offset | What |
+|---|---|
+| +372 | config: +0 a pointer to 30 words (each action's kind; 1 = digital), +4 to 30 words (a linked action, 30 = none), +8 and +12 two more such pointers for the analog stage (+8 kinds, +12 linked actions) |
+| +388 | 30 u16: this tick's raw value per action |
+| +448 | words: held, held before, pressed, released, fired, then +468 a "pending" word ORed into the next update's held-before and pressed |
+| +472 | 30 repeat objects (vtable slot 1: r4 = held bit, returns "fire") |
+| +1072 | 30 u16: the analog stage's values |
+| +1132 | 30 floats: the analog stage's values through each action's curve |
+| +1252 | 30 curve objects (vtable slot 1: f1 in, f1 out) |
+| +1852 | 30 entries of 20 bytes: {float on, float off, u32 suppress ticks, u32 counter, u8 state} |
+| +2464 | the listener object (416 bytes, our InputProcessor) |
+| +2880 | pointer to logical pad `j`'s 40 values |
+
+`sub_8210C370`, in order:
+
+1. Clear the 30 raw u16s (+388).
+2. Sticks and triggers from the logical pad's values `v`, each as
+   `fctidz(|v * C|)` kept to 16 bits (`C` = float at `0x82007F58`):
+   `v[1]` (LY) > 0 to index 16, < 0 to 17; `v[0]` (LX) < 0 to 18, > 0 to
+   19; `v[5]` (RY) > 0 to 20, < 0 to 21; `v[4]` (RX) < 0 to 22, > 0 to
+   23; `v[2]` (LT) to 12 and `v[6]` (RT) to 13, unconditionally.
+3. Buttons: for 14 (mask, id) pairs, if the listener's held word has
+   every bit of the mask (`sub_8258CF10` → `sub_825924E0`), raw[index of
+   id] = 32767, the index from `sub_8210B140` (a jump table indexed by
+   id - 151 through the bytes at `0x82007F20`, returning 30 for ids out
+   of range; probably the identity, to check). Pairs: 0x1 153, 0x2 154,
+   0x4 155, 0x8 156 (d-pad), 0x10 159 (A), 0x20 158 (B), 0x40 160 (X),
+   0x80 157 (Y), 0x1000 161 (LB), 0x10000 162 (RB), 0x4000 165 (left
+   stick), 0x40000 166 (right stick), 0x100000 152 (Start), 0x200000 151
+   (Back). The masks are the processor's held bits (value slot numbers).
+4. Six axes from pairs of the raw u16s, each `fctidz((0.5 - a*K + b*K)
+   * C)` kept to 16 bits (`K` = float at `0x82007F5C`; `0.5 - a*K` is
+   `fnmsubs`, `+ b*K` `fmadds`, both as `float(fma(double...))` in the
+   translation): d-pad (4 left, 5 right) to 24, (2 up, 3 down) to 25;
+   stick (18, 19) to 26, (16, 17) to 27; right stick (22, 23) to 28,
+   (20, 21) to 29.
+5. `sub_8210C0E0(r3 = mapper + 448, r4 = mapper + 372, r5 = mapper + 388)`.
+
+`sub_8210C0E0` (`M` = mapper + 448):
+
+1. The analog stage, `sub_8210B7D0(mapper + 1072, config + 8, raw)`: for
+   each action `i`, with kind `k` = (+8)[i] and link `l` = (+12)[i]: if
+   `l < i` and raw[l] ≠ 0, `k` = 0. `k` = 0: u16 and float 0. `k` = 1:
+   u16 = raw[i], float = curve[i](raw[i] / 32767) (`sub_8210B4A8`, the
+   constant at `0x82002BD4`). `k` = 2: u16 = raw[i], float =
+   curve[i]((raw[i] - A) * B) (`sub_8210B500`, `A` at `0x82007F64`, `B`
+   at `0x82007F60`). `k` ≥ 3: left as it was.
+2. For each action `i`, `sub_8210B718(M, i, float[i], config)`: `x` =
+   |float[i]| (times -1 when negative); with the entry at +1852 + 20i:
+   if on == off, state = `x > off`; else state = 1 when `x >= on`, 0
+   when `x <= off`, else kept. If the counter is nonzero it counts down
+   and state = 0. When state is 1 and the action's link (config +4) isn't
+   30, the linked action's counter = its suppress ticks. Bit `i` of a
+   local word = state.
+3. `sub_8210BBA0(M, config, &word)`: for each `i`, bit `i` of a new word
+   = bit `i` of the input, if kind (config +0)[i] is 1 and its link `l`
+   is either ≥ `i` or has bit `l` clear in the new word; else 0. Then
+   held before = held | pending; held = new; changed = held before ^
+   held; pressed = (held & changed) | pending; released = changed &
+   ~held; fired = pressed; pending = 0. Then for each `i`, repeat[i]
+   (vtable slot 1, r4 = bit `i` of held); if it returns true, fired |=
+   bit `i`.
+
+Both local words start as whatever is on the guest stack: only bits 0-29
+are written, so bits 30 and 31 of held (and so of held before, pressed
+and released) are stack leftovers. A native version would have them 0;
+whether anything reads bit 30 (`sub_8210B140`'s "none") isn't known.
+Read further (2026-10-23, B7's loop): the states word's bits 30-31 are
+never read (only bits 0-29 are tested), and the held word's stack word
+(`sub_8210BBA0`'s +80) is always, below `sub_8210C0E0`, the high half of
+r25 as `sub_8210B7D0`'s `__savegprlr_24` saved it. So the native update
+(`--native_action_mappers`, `src/action_mappers/`, rows in
+`functions/action-mappers.md`) is handed that word and gives the same
+bits 30 and 31; its harness checks it against the recompiled one with
+r25 random. The update is native under the same per-tick override (step 2
+below), and the repeat counts are unchanged, so the pause menu's repeat
+behaves as before.
+
+Not known yet (a run will tell): the constants at `0x82007F58`,
+`0x82007F5C`, `0x82007F60` and `0x82007F64`; the bytes at `0x82007F20`;
+the config's tables; and the classes of the repeat and curve objects
+(their vtables, slot 1) in each mapper.
+
 ## Plan
 
 ### Step 0: logging (`--log_input`)
@@ -618,6 +795,11 @@ scripts don't need to pass it.
 
 ### Step 4: later, toward moving off ReXGlue (not needed for the fix)
 
+Done differently (2026-10-19, see B1 in `docs/rexglue-removal.md`): no
+`--native_input` flag or verify mode; Input::Update, the physical and
+logical pads are native, reading SDL through our own XInput instead of
+the SDK's (no `--mnk_mode` any more). The plan as written:
+
 - Native Input::Update (`--native_input`, in `src/hooks/input.cpp`):
   follow `src/hooks/lights.cpp` (the override calling the translated code
   when the flag is off), off by default until checked.
@@ -653,19 +835,17 @@ What's known and what isn't yet, for whoever picks this up:
   manager's objects as built in races ("Step 0 results"), and the
   mapper's words and read slots ("The pause menu's code", "Revised
   plan"'s table).
-- Known only from the outside: the processors' and listeners' update
-  (vtable `0x8206C0C4` slot 1 `0x82592188`): the button tests read +264,
-  +272, +276 and +284 + 4b, and the counters count ticks, but the update
-  itself isn't read. The plan keeps it a guest call.
+- The processors' and listeners' update (vtable `0x8206C0C4` slot 1
+  `0x82592188`): read since (2026-10-19), see "The input processors".
+- Read since (2026-10-20, "The action mappers' update"): `8210C370`,
+  `8210C0E0`, `8210B7D0`, `8210B718`, `8210BBA0`, and `8210B140` (a jump
+  table; whether it's the identity needs its bytes at `0x82007F20`).
 - Not read yet (read these first for the native mappers):
-  - `8210C370`, `8210C0E0`, `8210BBA0` in full: how each action's held
-    bit and its analog values (+1072 u16s, +1132 floats) come from the
-    stick floats (`[+2880]`) and the listener at +2464.
-  - `8210B140` (action id to index; ids 151-180 map to 0-29, 30 means
-    none, but whether it's a plain subtraction isn't checked).
   - The repeat objects (pointers at +472; `8210B568` looks like one
     class) and their parameters from the table at `0x82600B88`, set by
-    `8209F228` at boot, and slot 13 `8210B6E8`.
+    `8209F228` at boot, and slot 13 `8210B6E8`; the curve objects
+    (pointers at +1252); the constants and config tables listed at the
+    end of "The action mappers' update".
   - Which input each action id is: only the menu's directions (153-156
     d-pad, 167-170 stick) are known. The car reads 155, 156, 160, 163,
     164, 169, 170, 173, 174 (analog, `82102400`), 152, 157, 158, 161,
@@ -688,12 +868,12 @@ What's known and what isn't yet, for whoever picks this up:
 
 ### When done
 
-Update the `Input::Update` row and "Menus run at 30 fps" in
-`docs/functions.md` (the pause menu then runs at the full frame rate with
+Update the `Input::Update` row in `docs/functions/functions.md` and
+"Menus run at 30 fps" in `docs/known-issues.md` (the pause menu then runs at the full frame rate with
 the right repeat; the front end's menus still run at 30 fps), this
 document's status, and CLAUDE.md's line for this document.
 
-Done (2026-10-18): `docs/functions.md` has a row for `sub_8210B018`
+Done (2026-10-18): `docs/functions/functions.md` has a row for `sub_8210B018`
 (the `Input::Update` row was still right) and the known issue says the
 pause menu runs at the race's rate.
 
@@ -796,7 +976,7 @@ ticks: next, 144 fps with `--interpolate_draw_state=false`.
 keyframe interpolation (it finds the keys around the animation's time and
 applies t = (time - k0) / (k1 - k0), clamped): it sets values from the
 time, so replays can't step it. The game never measures time (see
-"Fixed time step" in `docs/functions.md`), so the arrow isn't scaled by
+"Fixed time step" in `docs/frame-interpolation.md`), so the arrow isn't scaled by
 frame time; something steps once a pass. With interpolation off at 144
 fps the user still saw the arrow wrong, so it isn't the blending either.
 

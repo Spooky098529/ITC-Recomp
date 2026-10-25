@@ -8,7 +8,10 @@
 #include <rex/rex_app.h>
 
 #include "audio/native_audio.h"
+#include "base/log_sdk.h"
 #include "debug/thread_cpu.h"
+#include "game_data/game_data.h"
+#include "input/gamepads.h"
 #include "native/app_window.h"
 
 class ItcApp : public rex::ReXApp {
@@ -28,17 +31,29 @@ class ItcApp : public rex::ReXApp {
       return false;
     }
     native::AppWindow_SetSdkWindow(window());
+    // Our own gamepad reading (src/input/gamepads.cpp); the SDK's UI thread
+    // pumps SDL's events.
+    auto* context = &app_context();
+    input::Gamepads_Start([context](std::function<void()> function) {
+      context->CallInUIThreadDeferred(std::move(function));
+    });
     return true;
   }
 
   // Our own audio output instead of the SDK's (src/audio/native_audio.cpp).
+  // No SDK input system: the game's XInput calls are answered from our own
+  // gamepad reading (src/input/xinput.cpp, from src/hooks/input_update.cpp).
   void OnPreSetup(rex::RuntimeConfig& config) override {
     native_audio::Configure(config);
+    config.input_factory = nullptr;
   }
 
   // --log_thread_cpu (src/debug/thread_cpu.cpp).
   void OnPostSetup() override { debug::ThreadCpu_Start(); }
-  void OnShutdown() override { debug::ThreadCpu_Stop(); }
+  void OnShutdown() override {
+    debug::ThreadCpu_Stop();
+    input::Gamepads_Stop();
+  }
 
   // Without --game_data_root, the game's files are next to the executable
   // (where run.sh points it). The SDK reads that flag before itc.toml is
@@ -47,10 +62,13 @@ class ItcApp : public rex::ReXApp {
     if (paths.game_data_root.empty()) {
       paths.game_data_root = rex::filesystem::GetExecutableFolder();
     }
+    game_data::SetRoot(paths.game_data_root);
   }
 
+  // Our log takes over the file the SDK just opened (src/base/log_sdk.cpp).
+  void OnPostInitLogging() override { base::TakeOverSdkLogFile(); }
+
   // Override virtual hooks for customization:
-  // void OnPostInitLogging() override {}
   // void OnLoadXexImage(std::string& xex_image) override {}
   // void OnPostLoadXexImage() override {}
   // void OnCreateDialogs(rex::ui::ImGuiDrawer* drawer) override {}

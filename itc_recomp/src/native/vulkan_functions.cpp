@@ -1,6 +1,6 @@
 #include "vulkan_functions.h"
 
-#include <rex/logging.h>
+#include "base/log.h"
 
 namespace native::vk {
 
@@ -17,7 +17,7 @@ PFN_vkGetInstanceProcAddr g_get_instance_proc_addr = nullptr;
 #define NATIVE_VK_LOAD(name, getter, handle)                                   \
   name = reinterpret_cast<PFN_##name>(getter(handle, #name));                  \
   if (!name) {                                                                 \
-    REXLOG_ERROR("native renderer: Vulkan function {} is missing", #name);    \
+    ITC_LOG_ERROR("native renderer: Vulkan function {} is missing", #name);    \
     ok = false;                                                                \
   }
 

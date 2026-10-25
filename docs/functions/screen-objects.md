@@ -1,0 +1,164 @@
+# Known functions: the race's screen objects
+
+The race's **screen objects** (`ScreenObject::`, the code at
+`8212EDF8`-`82133000`, between the race overlays' range and the post
+effects'): one 128,000-byte object a view, made by the race's set-up
+`sub_8215D100` (a lead in `../loops/leads.md`) at the race object
+`[0x826D82D4]` + 31152 (1024 × 576, camera pass 0), or two at + 31156
+and + 31160 in split screen (1024 × 288 each, at y 0 and 288, camera
+passes 1 and 2; when the race data's word + 0xA3AF0 is 4). Each holds a
+1024-wide A8R8G8B8 texture (+4) and a vertex declaration (+0: a float2
+position, a color, a float2 texture coordinate, 20 bytes a vertex), and
+two vertex arrays built once at its set-up: a fan of 720 triangles from
+the screen's center to its edges, 0.5° each, whose edge texture
+coordinates are pulled toward the center by a random amount
+(`ScreenObject::BuildFan`, `rand`), and 20 rings of 36 points around the
+center (`ScreenObject::BuildRings`), with each ring point's texture
+coordinates kept in a map keyed by its position (x, then y, rounded to
+0.001: a `std::map<double, std::map<double, {float u, v}>>`, the
+`UvMap::` and `UvColumn::` rows below, the C++ library's red-black trees
+with checked iterators). The race's update (`sub_8215D2B0`) starts it
+when a racer's vehicle byte + 2424 is set (`ScreenObject::Start`, set and
+cleared by the AI drivers, `ai-drivers.md`: probably the nitrous),
+stops it when that clears (`ScreenObject::Stop`), and sets its strength
+every tick from the car's speed (`ScreenObject::SetSpeed`, km/h ÷ 300,
+clamped to [0, 1]); `Race::DrawStep` (`sub_8215B4F8`, `functions.md`)
+records each object's draw (`ScreenObject::Record`): the frame resolved
+into its texture and the fan or rings drawn over it with the shared
+shader pairs (`sub_825896D8`, `sub_82589700`, `models.md`), into its own
+chunk of the scene's command list (`command-list.md`). Probably a
+screen blur while the nitrous runs (a radial blur from the screen's
+center), not seen: `Start` and `Stop` never ran in play, so every
+`Record` seen returned at once (+24 clear) and every `SetSpeed` only set
+the strength. `Race::ToggleEffects` (`sub_8215B690`) and
+`ScreenObject::ToggleHidden` (`sub_8212EDE0`), which toggle +25 (hidden),
+are in `post-effects.md`, with their caller.
+
+The object's fields are in `../known-data.md` ("screen object").
+
+Native since 2026-10-24 (the B7 loop, `--native_screen_objects`, on by
+default; `src/screen_objects/`, adapters in `src/hooks/screen_objects.cpp`,
+harness `--run_harnesses=screen_objects`): the two maps' functions
+(`uv_trees.cpp`, one copy of the red-black tree code for both layouts,
+store for store as the originals, nodes from the C runtime heap's plain
+C++, so only with `--native_heap`), `BuildRings` with `AddRingPoint`,
+`SetSpeed`, and `~ScreenObject` with `Release` (`screen_objects.cpp`; the
+device lock native, so with `--native_video_output`). The paths that never
+ran in play (the trees' `bad_alloc` and `length_error`, an erase of part of
+a tree, a checked iterator's trap, `SetSpeed` while running, `BuildRings`
+over a map not empty) hand the call to the original from the start.
+Still recompiled: `ScreenObject::ScreenObject` and `Init` above
+`BuildFan`, which calls `rand` (its thread data, `_getptd`, goes through
+the core), and `Record`, whose body never ran (it waits on the shader
+pairs `sub_825896D8` and `sub_82589700`, `models.md`). Nothing the objects
+draw was seen in play (`Start` never ran), so no frame dump was compared.
+
+Graphics: what our Vulkan renderer needs stays native, the rest is
+Dropped (the user's rule). The draw records render commands our
+renderer replays, and the set-up makes the texture and vertex
+declaration those commands use: kept-kind. `ScreenObject::Release` takes
+the device lock (`VideoOutput::LockDevice`, `video-output.md`) around its
+two releases.
+
+Mapped by the B7 loop (`../loops/b7-loop.md`) from its lead in
+`../loops/leads.md` (found by the post effects' map), 2026-10-24.
+`ScreenObject::Record` (`sub_82130978`, wrapped for the frame state
+diagnostics) moved here from `functions.md`. `UvColumn::Insert`
+(`sub_82131680`) and `UvMap::Insert` (`sub_82131FB0`), listed in the C++
+containers' lead, are these two map types' own instantiations (only
+called from here): their rows are here. Never ran in play, so no rows:
+`sub_8212EEF8` (probably `UvColumn`'s iterator decrement, from
+`UvColumn::InsertUnique`), `sub_8212EFA8` and `sub_8212F030` (probably
+the two maps' iterator increments, from the erases), `sub_82132318` and
+`sub_821318B8` (probably the two maps' single-node erase), `sub_8212F778`
+(from `SetSpeed` and `Record` when +24 is set: probably applies or
+restores the settings `Start` saved), and `Start` and `Stop` themselves.
+
+Status:
+
+- **Native**: plain C++ in `itc_recomp/src/` that doesn't use the
+  PowerPC context (`ctx`): normal arguments and host structs (it may
+  still read and write guest memory through `src/guest.h` while
+  recompiled code shares the data). The game reaches it without `ctx`,
+  from native or overridden callers, and the recompiled original is no
+  longer called (except behind a fallback flag or to check against it).
+  No `REX_FUNC` override of it exists, not even an adapter kept only for
+  a harness (that's Overridden until the adapter goes).
+  The end state for every function.
+- **Overridden**: an `extern "C" REX_FUNC(sub_XXXXXXXX)` override in
+  `itc_recomp/src/` (or a macro defining one) does the work instead of
+  the original: a thin adapter in front of native code, or a body that
+  still uses `ctx` (calling guest code, reading registers). It may call
+  the original when its flag is off, or to check itself against it.
+- **Wrapped**: an override that does something of its own (skipping
+  render-only passes, logging, timing) and still calls the original
+  (`__imp__sub_XXXXXXXX`) for the work.
+- **Dropped**: its work isn't needed on PC (hardware set-up, kernel calls
+  the SDK already stubbed), so it no longer runs: an override in
+  `itc_recomp/src/` replaces it with nothing (or a fixed return value), or
+  its callers, made native, leave the call out (no override then; the row
+  says which caller). Logs, a harness or the renderer's frame dumps have
+  shown that nothing reads what it did. The original is no longer called,
+  except behind a fallback flag while the drop is being checked. A
+  function the game never calls in the first place isn't Dropped: its
+  status stays blank and its row says it's never called.
+- **Merged**: its work is done inside a native caller's plain C++ (a
+  few lines only that caller needs), so it has no function or override of
+  its own in `itc_recomp/src/`. The row names the caller(s) and the
+  harness that covers the work. The original is no longer called, except
+  behind the caller's fallback flag.
+- **Patched**: the generated code was edited in place (search for
+  `PATCH:`).
+
+A function usually moves from recompiled or Wrapped to Overridden to
+Native as the `ctx` edge moves up through its callers, or straight to
+Dropped when its work isn't needed.
+`itc_recomp/tools/check_function_statuses.py` checks this column, in
+every file of the tables, against `src/` (an override marked Native, a
+status with no override, an override with no row, a row in two files);
+run it after changing either, on any branch.
+
+| Address | Name | Status | Notes |
+|---|---|---|---|
+| `sub_82133000` | `ScreenObject::ScreenObject` (probably) | | r3 = the object (128,000 bytes from `operator new`), r4 = width, r5 = height, r6 = x, r7 = y, r8 = the camera pass, r9 = a key (599, or 599 and 601 in split screen; probably the sort key its chunk is handed on with, as the post effects' are): +88 and +92 = 0, the `UvMap` at +76124 made (`UvMap::UvMap`), then `ScreenObject::Init` with the same arguments. Returns r3. From `sub_8215D100` (three call sites, one per object), once a race. Read in full. |
+| `sub_82132CE0` | `ScreenObject::Init` (probably) | | r3 = the object, r4-r9 as `ScreenObject::ScreenObject`: +8 width, +12 height, +16 x, +20 y, +80 the camera pass, +84 the key; +24, +25, +26 = 0, +27 = 1; +40 = 0.25, +44 = 0.035, +48 = 0.6, +64 = +68 = 0.95, +72 = 1.05; +88 = 0; the fan's vertex count +60096 and the rings' +127976 = 0, and the floats and words at +76100 to +76120 and +127980 to +127996 set (0, 1.0, 0.5). Then `ScreenObject::BuildFan`, `ScreenObject::BuildRings`, and under the device lock (`VideoOutput::LockDevice`, `UnlockDevice`, `video-output.md`; the video output from `[0x8266D088]`'s slots 7 and 3) +4 = `Device::CreateTexture(width, height, 1, 1, 1, A8R8G8B8 0x18280186, 0, 3)` (`graphics-resources.md`) and +0 = `sub_822A8980` (probably CreateVertexDeclaration, `functions.md`) over three elements on the stack: offset 0 FLOAT2 (`0x2C23A5`) position, 8 D3DCOLOR (`0x182886`) color, 12 FLOAT2 texture coordinate 0. From `ScreenObject::ScreenObject` only. Read in full. |
+| `sub_8212F148` | `ScreenObject::BuildFan` (probably) | | r3 = the object. One vertex at the screen's center ((width, height) × 0.5, color `0x7FFFFFFF`, texture coordinates (0.5, 0.5)), then for the angle from 45° to 405° by 0.5° (720 steps), a triangle: the center and two points where the angle's ray meets the screen's edge (one formula per side: 45-135°, 135-225°, 225-315°, 315-405°), each with texture coordinates 0.5 + d × (1 + n), d the point's offset from the center in [-0.5, 0.5] and n = `rand()` × 1.5259e-6 - 0.0375 (in [-0.0375, 0.0125]), drawn again every second point (the toggle at +76100, the value at +76104). 20-byte vertices at +96, their count at +60096; each step's two offsets also kept at +60100 + 16 × step (probably for the draw). The constants are read from the image (`0x820087E0`-`0x820087F8`: -4.0, 1/180, 225, 315, 405, 1.5259e-6, 0.0375; 45, 135, 180, 0.5, -0.5, 0.0, 1.0). Calls `rand` (`c-runtime.md`), the subsystem's blocker (`_getptd`). From `ScreenObject::Init` only, once an object. Not read in detail (the edge formulas). |
+| `sub_821329B8` | `ScreenObject::BuildRings` (probably) | Overridden | r3 = the object. For ring i from 0 to 19 and the angle a from 0° to 350° by 10° (× π/180, the float at `0x82002948`): two points, at the radius i × 0.035 and (i + 1) × 0.035 (`0x82008810`): u = cos(a) × r + 0.5, v = sin(a) × r + 0.5 (`cos`, `sin`, `c-runtime.md`), the vertex (width × u, height × v, color `0xFFFFFFFF`, u, v) appended to the 20-byte array at +76136 (its count at +127976: 1,440 vertices), and `ScreenObject::AddRingPoint(x, y, u, v)` for each. From `ScreenObject::Init` only. Read in full. Native in `src/screen_objects/screen_objects.cpp` (`--native_screen_objects`, with `--native_heap`; the original when the map isn't empty, never in play), its adapter in `src/hooks/screen_objects.cpp`; r3 left as the last `AddRingPoint` leaves it. Checked by `--run_harnesses=screen_objects`. |
+| `sub_82132778` | `ScreenObject::AddRingPoint` (probably) | Native | r3 = the object, f1 = x, f2 = y, f3 = u, f4 = v. The keys: kx = `floor`(x × 1000 + 0.5) × 0.001, ky the same with y (the doubles at `0x82008808`, `0x820022B8`, `0x82002B98`; `floor` in `c-runtime.md`). Finds kx in the `UvMap` at +76124 (`UvMap::Find`): when missing, a `UvColumn` holding {ky, (u, v)} (`UvColumn::UvColumn`, `UvColumn::InsertUnique`) copied twice into temporaries (`UvColumn::Copy`) and inserted under kx (`UvMap::InsertUnique`), the three columns destroyed (`UvColumn::~UvColumn`); when there, {ky, (u, v)} inserted into its column unless ky is already in it (`UvColumn::Find`, `UvColumn::InsertUnique`). From `ScreenObject::BuildRings` only (1,440 calls an object). Read in full. Native in `src/screen_objects/screen_objects.cpp`, with no adapter: only `BuildRings`' plain C++ calls it (`--native_screen_objects` switches that), its temporaries in its 272-byte frame as the original's; r3 as the original leaves it (the first temporary column's freed head for a new column, else the iterator out at frame +80 or +112), read by no caller. Checked by `--run_harnesses=screen_objects`. |
+| `sub_8212FCC8` | `ScreenObject::SetSpeed` (probably) | Overridden | r3 = the object, f1 = the strength (the race's update passes the car's speed in km/h × 1/300, `Vehicle::GetSpeedKmh`, the float at `0x820086EC`). When +24 is set (running), `sub_8212F778(r3, 0.0)` (never ran) first. +27 = 1, then +76 = f1 clamped to [0.0, 1.0]. From the race's update `sub_8215D2B0` (two call sites: the player's object, or each split screen object), every tick in a race. Read in full. Native in `src/screen_objects/screen_objects.cpp` (`--native_screen_objects`; the original when +24 is set, never in play), its adapter in `src/hooks/screen_objects.cpp`. Checked by `--run_harnesses=screen_objects`. |
+| `sub_82130978` | `ScreenObject::Record` (probably) | Wrapped | The race draw step's parts and the per-car update's callees, wrapped only to name which one advances per-frame state (`--find_per_frame_state`) and to skip one (`--debug_hide`) (`ITC_FRAME_STATE_WRAP`, `src/debug/frame_state_diff.cpp`). r3 = a screen object (from `Race::DrawStep` `sub_8215B4F8`, for each of the race object's three that exists, when the race's mode word is 0, 1 or 2). Returns at once when +24 (running) is clear, as every call seen in play did (`ScreenObject::Start` never ran). Otherwise (1,038 lines, 87 indirect calls): a chunk of the scene's command list `[0x826BABA0]` opened (`CommandList::OpenChunk`, `AllocateSlots`, `AllocateResolve`, `command-list.md`), the screen's rectangle (+16, +20, +8, +12) resolved into the texture +4, the camera pass (+80, `0x826BAC00` + 592 × it), the vertex declaration +0, the shader pairs (`sub_825896D8`, `sub_82589700`, `models.md`), and the fan (+96) or the rings (+76136) drawn by +25 (hidden), +26 (stopping) and +27, with the strength +76 (probably faded while stopping, by the floats at +76104 to +76120; once done, `sub_8212F778`, +24 and +26 cleared); the objects at +88 (slots 2, 10, 11 with +40, +44, +48) and +92 (slot 4 with +64, +68, +72) set; the chunk closed (`CommandList::CloseChunk`) and handed on with the key +84; +27 cleared. Not read in detail. |
+| `sub_8212F0B8` | `ScreenObject::Release` (probably) | Native | r3 = the object. Under the device lock (`VideoOutput::LockDevice`, `UnlockDevice`, `video-output.md`): `Resource::Release` (`graphics-resources.md`) on the vertex declaration +0 and the texture +4, both then 0. From `ScreenObject::~ScreenObject` only. Listed in the device lock's lead (`../loops/leads.md`). Read in full. Native in `src/screen_objects/screen_objects.cpp`, with no adapter: only `~ScreenObject`'s plain C++ calls it (`--native_screen_objects` and `--native_video_output` switch that); the video output's two slots and `Resource::Release` are guest calls from a 128-byte frame (`hooks::ScreenObjectRelease`, `src/hooks/screen_objects.cpp`). Returns the video output. Checked by `--run_harnesses=screen_objects` (stand-in resources). |
+| `sub_82132FC8` | `ScreenObject::~ScreenObject` (probably) | Overridden | r3 = the object: `ScreenObject::Release`, then `UvMap::~UvMap` on +76124. From the race's teardown `sub_8215B720` (after `PostEffects::DestroyRace`, `post-effects.md`: for each of the three objects that exists, then `operator delete` and the pointer cleared; a lead in `../loops/leads.md`), once a race. Read in full. Native in `src/screen_objects/screen_objects.cpp` (`--native_screen_objects` with `--native_heap` and `--native_video_output`), its adapter in `src/hooks/screen_objects.cpp` (from a 96-byte frame, `Release`'s calls 128 bytes below); r3 the map's freed head. Not seen in an attract race (the teardown runs when a race ends). Checked by `--run_harnesses=screen_objects`. |
+| `sub_82130198` | `UvMap::UvMap` | Overridden | r3 = the map (`std::map<double, UvColumn>`: +4 the head node, +8 the size): head = `UvMap::NewHead`, its isnil byte +41 = 1, its left, parent and right pointing at itself, size 0. From `ScreenObject::ScreenObject`. Read in full. Native in `src/screen_objects/uv_trees.cpp` (`--native_screen_objects`, with `--native_heap`), its adapter in `src/hooks/screen_objects.cpp`; checked by `--run_harnesses=screen_objects`. |
+| `sub_8212FF68` | `UvMap::NewHead` | Native | Allocates one 48-byte node (`UvMap::AllocateNodes(1)`); when made, left +0, parent +4, right +8 = 0, color +40 = 1 (black), isnil +41 = 0. Returns it. From `UvMap::UvMap`. Read in full. Native in `src/screen_objects/uv_trees.cpp`, with no adapter: only the other tree functions' plain C++ calls it (`--native_screen_objects` switches their adapters); checked by `--run_harnesses=screen_objects`. |
+| `sub_8212FC50` | `UvMap::AllocateNodes` | Native | r3 = the count: `operator new(count × 48)` (`heap.md`), for 0 too (corrected 2026-10-24: the map said 0 returns 0); a count over 0xFFFFFFFF / 48 throws `bad_alloc` (`sub_82091200`, never ran; the native code hands that path to the original). From `UvMap::NewHead` and `UvMap::Insert`. Read in full. Native in `src/screen_objects/uv_trees.cpp`, with no adapter: only the other tree functions' plain C++ calls it (`--native_screen_objects` switches their adapters); checked by `--run_harnesses=screen_objects`. |
+| `sub_82131F50` | `UvMap::ConstructNode` | Native | r3 = the node, r4 = left, r5 = parent, r6 = right, r7 = the value ({double x at +0, a `UvColumn` at +8}), r8 = the color: +0, +4, +8 stored, the key at +16, the column at +24 made (`UvColumn::UvColumn`) and copied from the value's (`UvColumn::Copy`), +40 the color, +41 (isnil) = 0. Returns r3. From `UvMap::Insert`. Read in full. Native in `src/screen_objects/uv_trees.cpp`, with no adapter: only the other tree functions' plain C++ calls it (`--native_screen_objects` switches their adapters); checked by `--run_harnesses=screen_objects`. |
+| `sub_82131FB0` | `UvMap::Insert` | Native | `std::_Tree::_Insert`: r3 = the iterator out, r4 = the map, r5 = add on the left, r6 = the parent node, r7 = the value. At the size limit (0x0AAAAAA9) a "map/set<T> too long" `std::string` (`sub_825931D0`, `std-string.md`) is made and `length_error` thrown (`sub_820919B8`, `sub_820915F8`; never ran); else a node (`UvMap::AllocateNodes(1)`, `UvMap::ConstructNode`, red), size + 1, linked under the parent (the head's leftmost and rightmost kept), and the tree rebalanced with `UvMap::RotateLeft` and `RotateRight`. Returns the iterator {map, node}. From `UvMap::InsertUnique`. In the C++ containers' lead (its first name there). Not read in detail (the rebalance). Native in `src/screen_objects/uv_trees.cpp`, with no adapter: only the other tree functions' plain C++ calls it (`--native_screen_objects` switches their adapters); checked by `--run_harnesses=screen_objects`. |
+| `sub_821321F8` | `UvMap::InsertUnique` | Native | `std::map::insert`: r3 = the result ({iterator, bool} at +0, +8), r4 = the map, r5 = the value (its double key first). Walks from the root to the key's place (by `fcmpu` on the nodes' +16); when the key's lower neighbor (`UvMap::Decrement`) isn't equal, `UvMap::Insert` and true; else that node and false. From `ScreenObject::AddRingPoint`. Read in full. Native in `src/screen_objects/uv_trees.cpp`, reached from the plain C++ of `ScreenObject::AddRingPoint`; its adapter removed 2026-10-24 (no recompiled caller in play), so `--native_screen_objects` now switches only those callers. Checked by `--run_harnesses=screen_objects`. |
+| `sub_82130028` | `UvMap::LowerBound` | Native | r3 = the iterator out, r4 = the map, r5 = the key (a double): {map, `UvMap::LowerBoundNode`}; a null map traps (`twi`, the checked iterator). From `UvMap::Find`. Read in full. Native in `src/screen_objects/uv_trees.cpp`, with no adapter: only the other tree functions' plain C++ calls it (`--native_screen_objects` switches their adapters); checked by `--run_harnesses=screen_objects`. |
+| `sub_8212F9F8` | `UvMap::LowerBoundNode` | Native | r3 = the map, r4 = the key: the first node whose key (+16) isn't below it, or the head. Leaf. From `UvMap::LowerBound`. Read in full. Native in `src/screen_objects/uv_trees.cpp`, with no adapter: only the other tree functions' plain C++ calls it (`--native_screen_objects` switches their adapters); checked by `--run_harnesses=screen_objects`. |
+| `sub_82130290` | `UvMap::Find` | Native | `std::map::find`: r3 = the iterator out, r4 = the map, r5 = the key: `UvMap::LowerBound`, then end ({map, head}) when that's the head or the key is below its key. From `ScreenObject::AddRingPoint`. Read in full. Native in `src/screen_objects/uv_trees.cpp`, reached from the plain C++ of `ScreenObject::AddRingPoint`; its adapter removed 2026-10-24 (no recompiled caller in play), so `--native_screen_objects` now switches only those callers. Checked by `--run_harnesses=screen_objects`. |
+| `sub_8212FB28` | `UvMap::Decrement` | Native | The checked iterator's `operator--`: r3 = the iterator ({map, node}); traps when the map is null. From the head (end), the rightmost node; else the left subtree's rightmost, or up the parents while coming from the left; traps when it lands on the head (before begin). Leaf. From `UvMap::InsertUnique`. Read in full. Native in `src/screen_objects/uv_trees.cpp`, with no adapter: only the other tree functions' plain C++ calls it (`--native_screen_objects` switches their adapters); checked by `--run_harnesses=screen_objects`. |
+| `sub_8212FA50` | `UvMap::RotateLeft` | Native | `_Lrotate`: r3 = the map, r4 = the node; isnil at +41. Leaf. From `UvMap::Insert`. Read in full. Native in `src/screen_objects/uv_trees.cpp`, with no adapter: only the other tree functions' plain C++ calls it (`--native_screen_objects` switches their adapters); checked by `--run_harnesses=screen_objects`. |
+| `sub_8212FAB8` | `UvMap::RotateRight` | Native | `_Rrotate`, as `UvMap::RotateLeft`. Leaf. From `UvMap::Insert`. Read in full. Native in `src/screen_objects/uv_trees.cpp`, with no adapter: only the other tree functions' plain C++ calls it (`--native_screen_objects` switches their adapters); checked by `--run_harnesses=screen_objects`. |
+| `sub_82132F58` | `UvMap::~UvMap` | Native | r3 = the map: `UvMap::Erase(begin, end)`, the head freed (`operator delete`, `heap.md`), +4 and +8 = 0. From `ScreenObject::~ScreenObject`. Read in full. Native in `src/screen_objects/uv_trees.cpp`, reached from the plain C++ of `ScreenObject::~ScreenObject`; its adapter removed 2026-10-24 (no recompiled caller in play), so `--native_screen_objects` now switches only those callers. Checked by `--run_harnesses=screen_objects`. |
+| `sub_82132BD8` | `UvMap::Erase` | Native | `erase(first, last)`: r3 = the iterator out, r4 = the map, r5, r6 = the two iterators (checked: an iterator of another map traps). The whole map (first at the leftmost, last at the head) is `UvMap::Clear`; otherwise one node at a time (`sub_8212EFA8`, `sub_82132318`, never ran). Returns the iterator. From `UvMap::~UvMap`. Read in full. Native in `src/screen_objects/uv_trees.cpp`, with no adapter: only the other tree functions' plain C++ calls it (`--native_screen_objects` switches their adapters); checked by `--run_harnesses=screen_objects`. |
+| `sub_82132960` | `UvMap::Clear` | Native | r3 = the map: `UvMap::EraseSubtree` from the root, then the head's left, parent and right pointing at itself, size 0. From `UvMap::Erase`. Read in full. Native in `src/screen_objects/uv_trees.cpp`, with no adapter: only the other tree functions' plain C++ calls it (`--native_screen_objects` switches their adapters); checked by `--run_harnesses=screen_objects`. |
+| `sub_82132720` | `UvMap::EraseSubtree` | Native | `_Erase`: r3 = the map, r4 = the node: down the left links, each node's right subtree erased (itself), its column destroyed (`UvColumn::~UvColumn` on +24) and the node freed (`operator delete`), until an isnil node (+41). From `UvMap::Clear` and itself. Read in full. Native in `src/screen_objects/uv_trees.cpp`, with no adapter: only the other tree functions' plain C++ calls it (`--native_screen_objects` switches their adapters); checked by `--run_harnesses=screen_objects`. |
+| `sub_82130140` | `UvColumn::UvColumn` | Native | r3 = the column (`std::map<double, {float u, v}>`: +4 the head node, +8 the size): head = `UvColumn::NewHead`, its isnil byte +33 = 1, linked to itself, size 0. From `ScreenObject::AddRingPoint` and `UvMap::ConstructNode`. Read in full. Native in `src/screen_objects/uv_trees.cpp`, reached from the plain C++ of `ScreenObject::AddRingPoint` and `UvMap::ConstructNode`; its adapter removed 2026-10-24 (no recompiled caller in play), so `--native_screen_objects` now switches only those callers. Checked by `--run_harnesses=screen_objects`. |
+| `sub_8212FF08` | `UvColumn::NewHead` | Native | One 40-byte node (`UvColumn::AllocateNodes(1)`); left, parent, right = 0, color +32 = 1, isnil +33 = 0. From `UvColumn::UvColumn`. Read in full. Native in `src/screen_objects/uv_trees.cpp`, with no adapter: only the other tree functions' plain C++ calls it (`--native_screen_objects` switches their adapters); checked by `--run_harnesses=screen_objects`. |
+| `sub_8212FBD8` | `UvColumn::AllocateNodes` | Native | As `UvMap::AllocateNodes`, 40 bytes a node. From `UvColumn::NewHead` and `UvColumn::NewNode`. Read in full. Native in `src/screen_objects/uv_trees.cpp`, with no adapter: only the other tree functions' plain C++ calls it (`--native_screen_objects` switches their adapters); checked by `--run_harnesses=screen_objects`. |
+| `sub_8212FDB0` | `UvColumn::NewNode` | Native | `_Buynode`: r4 = left, r5 = parent, r6 = right, r7 = the value (16 bytes: double y, float u, float v), r8 = the color: one node (`UvColumn::AllocateNodes(1)`), the links at +0, +4, +8, the value at +16, the color +32, isnil +33 = 0. Returns it. From `UvColumn::Insert` and `UvColumn::CopySubtree`. Read in full. Native in `src/screen_objects/uv_trees.cpp`, with no adapter: only the other tree functions' plain C++ calls it (`--native_screen_objects` switches their adapters); checked by `--run_harnesses=screen_objects`. |
+| `sub_82131680` | `UvColumn::Insert` | Native | `std::_Tree::_Insert`, as `UvMap::Insert` (its size limit 0x0FFFFFFE, the node from `UvColumn::NewNode`, `UvColumn::RotateLeft` and `RotateRight`). From `UvColumn::InsertUnique`. In the C++ containers' lead (its second name there). Not read in detail (the rebalance). Native in `src/screen_objects/uv_trees.cpp`, with no adapter: only the other tree functions' plain C++ calls it (`--native_screen_objects` switches their adapters); checked by `--run_harnesses=screen_objects`. |
+| `sub_82131CB8` | `UvColumn::InsertUnique` | Native | `std::map::insert`, as `UvMap::InsertUnique` (isnil at +33; the lower neighbor by `sub_8212EEF8`, never ran in play: the same code as `UvMap::Decrement` with isnil at +33, ported with it, `ColumnDecrement`, its own harness group "sub_8212EEF8 UvColumn::iterator decrement"). From `ScreenObject::AddRingPoint` (two call sites). Read in full. Native in `src/screen_objects/uv_trees.cpp`, reached from the plain C++ of `ScreenObject::AddRingPoint`; its adapter removed 2026-10-24 (no recompiled caller in play), so `--native_screen_objects` now switches only those callers. Checked by `--run_harnesses=screen_objects`. |
+| `sub_8212FFC8` | `UvColumn::LowerBound` | Native | As `UvMap::LowerBound`, over `UvColumn::LowerBoundNode`. From `UvColumn::Find`. Read in full. Native in `src/screen_objects/uv_trees.cpp`, with no adapter: only the other tree functions' plain C++ calls it (`--native_screen_objects` switches their adapters); checked by `--run_harnesses=screen_objects`. |
+| `sub_8212F8C8` | `UvColumn::LowerBoundNode` | Native | As `UvMap::LowerBoundNode` (isnil at +33). Leaf. From `UvColumn::LowerBound`. Read in full. Native in `src/screen_objects/uv_trees.cpp`, with no adapter: only the other tree functions' plain C++ calls it (`--native_screen_objects` switches their adapters); checked by `--run_harnesses=screen_objects`. |
+| `sub_821301F0` | `UvColumn::Find` | Native | `std::map::find`, as `UvMap::Find`. From `ScreenObject::AddRingPoint`. Read in full. Native in `src/screen_objects/uv_trees.cpp`, reached from the plain C++ of `ScreenObject::AddRingPoint`; its adapter removed 2026-10-24 (no recompiled caller in play), so `--native_screen_objects` now switches only those callers. Checked by `--run_harnesses=screen_objects`. |
+| `sub_8212F920` | `UvColumn::RotateLeft` | Native | `_Lrotate` (isnil at +33). Leaf. From `UvColumn::Insert`. Read in full. Native in `src/screen_objects/uv_trees.cpp`, with no adapter: only the other tree functions' plain C++ calls it (`--native_screen_objects` switches their adapters); checked by `--run_harnesses=screen_objects`. |
+| `sub_8212F988` | `UvColumn::RotateRight` | Native | `_Rrotate` (isnil at +33). Leaf. From `UvColumn::Insert`. Read in full. Native in `src/screen_objects/uv_trees.cpp`, with no adapter: only the other tree functions' plain C++ calls it (`--native_screen_objects` switches their adapters); checked by `--run_harnesses=screen_objects`. |
+| `sub_82130088` | `UvColumn::Copy` | Native | The copy's body: r3 = a new column (made by `UvColumn::UvColumn`), r4 = the source: the root = `UvColumn::CopySubtree(source's root, head)`, the size copied, then the head's leftmost (+0) and rightmost (+8) found from the root (the head itself when empty). From `ScreenObject::AddRingPoint` (twice) and `UvMap::ConstructNode`. Read in full. Native in `src/screen_objects/uv_trees.cpp`, reached from the plain C++ of `ScreenObject::AddRingPoint` and `UvMap::ConstructNode`; its adapter removed 2026-10-24 (no recompiled caller in play), so `--native_screen_objects` now switches only those callers. Checked by `--run_harnesses=screen_objects`. |
+| `sub_8212FE80` | `UvColumn::CopySubtree` | Native | `_Copy`: r3 = the column, r4 = the source node, r5 = the new parent: an isnil source returns the head; else a node with the same value and color (`UvColumn::NewNode`), its left and right copied (itself). Returns the new node. From `UvColumn::Copy` and itself. Read in full. Native in `src/screen_objects/uv_trees.cpp`, with no adapter: only the other tree functions' plain C++ calls it (`--native_screen_objects` switches their adapters); checked by `--run_harnesses=screen_objects`. |
+| `sub_82131EE0` | `UvColumn::~UvColumn` | Native | As `UvMap::~UvMap`: `UvColumn::Erase(begin, end)`, the head freed (`operator delete`), +4, +8 = 0. From `ScreenObject::AddRingPoint` (three temporaries) and `UvMap::EraseSubtree`. Read in full. Native in `src/screen_objects/uv_trees.cpp`, reached from the plain C++ of `ScreenObject::AddRingPoint` and `UvMap::EraseSubtree`; its adapter removed 2026-10-24 (no recompiled caller in play), so `--native_screen_objects` now switches only those callers. Checked by `--run_harnesses=screen_objects`. |
+| `sub_82131DD8` | `UvColumn::Erase` | Native | As `UvMap::Erase` (the whole column by `UvColumn::Clear`; one node at a time by `sub_8212F030`, `sub_821318B8`, never ran). From `UvColumn::~UvColumn`. Read in full. Native in `src/screen_objects/uv_trees.cpp`, with no adapter: only the other tree functions' plain C++ calls it (`--native_screen_objects` switches their adapters); checked by `--run_harnesses=screen_objects`. |
+| `sub_8212FE28` | `UvColumn::Clear` | Native | As `UvMap::Clear`, over `UvColumn::EraseSubtree`. From `UvColumn::Erase`. Read in full. Native in `src/screen_objects/uv_trees.cpp`, with no adapter: only the other tree functions' plain C++ calls it (`--native_screen_objects` switches their adapters); checked by `--run_harnesses=screen_objects`. |
+| `sub_8212FD50` | `UvColumn::EraseSubtree` | Native | `_Erase`: down the left links, each right subtree erased (itself), the node freed (`operator delete`), until an isnil node (+33). From `UvColumn::Clear` and itself. Read in full. Native in `src/screen_objects/uv_trees.cpp`, with no adapter: only the other tree functions' plain C++ calls it (`--native_screen_objects` switches their adapters); checked by `--run_harnesses=screen_objects`. |
