@@ -164,6 +164,8 @@ set(ITC_SOURCES
     src/framework/framework.cpp
     src/framework/run_loop.cpp
     src/framework/main_loop.cpp
+    src/hooks/game_modes.cpp
+    src/game_modes/game_modes.cpp
     src/hooks/screen_objects.cpp
     src/screen_objects/uv_trees.cpp
     src/screen_objects/screen_objects.cpp
@@ -246,6 +248,7 @@ set(ITC_SOURCES
     src/harnesses/screen_objects.cpp
     src/harnesses/hardcoded_shaders.cpp
     src/harnesses/framework.cpp
+    src/harnesses/game_modes.cpp
     src/harnesses/action_mappers.cpp
     src/harnesses/data_tables.cpp
     src/harnesses/model_animation.cpp
