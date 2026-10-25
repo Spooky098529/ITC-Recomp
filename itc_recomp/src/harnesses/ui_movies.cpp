@@ -116,6 +116,12 @@ void NativeKey(PPCContext& ctx, uint8_t* base) {
   ctx.r3.u64 = ui_movies::Key(ctx.r3.u32, ctx.r4.u32);
 }
 
+// sub_825A6528 through the adapter's steps (its adapter is gone).
+void NativeNodeTrackList(PPCContext& ctx, uint8_t* base) {
+  (void)base;
+  ctx.r3.u64 = ui_movies::NodeTrackList(base, ctx.r3.u32, ctx.r4.u32);
+}
+
 // The accessors that only add: r3 and r4 random, and their edges.
 void Arithmetic(Context& h, const Function& f) {
   Results results(f.name);
@@ -2096,7 +2102,7 @@ void UiMovies(Context& h) {
   for (const Function& f : arithmetic) {
     Arithmetic(h, f);
   }
-  Indexed(h, {"NodeTrackList (sub_825A6528)", __imp__sub_825A6528, sub_825A6528}, 64, 32);
+  Indexed(h, {"NodeTrackList (sub_825A6528)", __imp__sub_825A6528, NativeNodeTrackList}, 64, 32);
   Indexed(h, {"KeyList (sub_825A6540)", __imp__sub_825A6540, sub_825A6540}, 64, 40);
   Indexed(h, {"SubAnimation (sub_825A6558)", __imp__sub_825A6558, sub_825A6558}, 64, 48);
   Indexed(h, {"UiMovie::Child (sub_8259D658)", __imp__sub_8259D658, sub_8259D658}, 128, 108);
