@@ -96,5 +96,26 @@ bool PresenceSetForMode(uint8_t* base, uint32_t pcr, uint32_t type);
 // original would trap (the network's vector at 0x826C7308 with its end
 // before its begin, or not a whole number of 384-byte entries).
 bool SignInWatchCheckIdle(uint8_t* base);
+// Whether SignInWatch::CheckIdle's plain C++ would hand the original the
+// call (its traps).
+bool SignInWatchCheckIdleTraps(uint8_t* base);
+
+// The user table's names (32-byte UTF-16, from +14, 32 bytes a slot;
+// Network::Update's), the last pass's signed-in count, mask and name.
+constexpr uint32_t kUserNames = 0x826C7670 + 14;
+constexpr uint32_t kSignedInCount = 0x826C7958;
+constexpr uint32_t kLastCount = 0x826BAB60;
+constexpr uint32_t kLastMask = 0x826BAB64;
+constexpr uint32_t kLastName = 0x826BAB1C;
+
+// sub_8209EEC8 SignInWatch::Update (with its switch's piece sub_8209F040):
+// the player's user compared with the last pass's, the mode's checks
+// applied, state 0's check (SignInWatch::CheckIdle), and the users kept for
+// the next pass. The player's name is copied into the original's frame at
+// `frame` + 80 (its r1 less kSignInWatchUpdateFrame), as it leaves it.
+// False, with nothing written, where the original must run: the state 1 to
+// 9 (the prompts' handlers, never seen in play) or CheckIdle's traps.
+constexpr uint32_t kSignInWatchUpdateFrame = 224;
+bool SignInWatchUpdate(uint8_t* base, uint32_t frame);
 
 }  // namespace mode_tick

@@ -42,6 +42,7 @@ constexpr Region kRegions[] = {
     {0x826C7820, 0x60},  // the network's session words
     {0x82816110, 0x10},  // the original Network::Update's connection word
     {0x8266D080, 0x10},  // the 1024 x 576 target object's pointer
+    {0x826C7670, 0x90},  // the user table's names
 };
 
 // The register steps: the plain C++ through these, not the adapters.
@@ -73,6 +74,13 @@ void NativeSetSceneTargetMode(PPCContext& ctx, uint8_t* base) {
 void NativeCheckIdle(PPCContext& ctx, uint8_t* base) {
   if (!mt::SignInWatchCheckIdle(base)) {
     __imp__sub_8209ED58(ctx, base);
+  }
+}
+void NativeSignInWatchUpdate(PPCContext& ctx, uint8_t* base) {
+  if (!mt::SignInWatchUpdate(base, ctx.r1.u32 - mt::kSignInWatchUpdateFrame)) {
+    __imp__sub_8209EEC8(ctx, base);
+  } else {
+    ctx.r3.s64 = int32_t(mt::kLastName);
   }
 }
 void NativePresence(PPCContext& ctx, uint8_t* base) {
@@ -352,6 +360,76 @@ void CheckIdle(Context& h) {
   results.Report();
 }
 
+// A UTF-16 name of 0 to 15 units from a few letters (so names often
+// match), terminated, in 32 bytes.
+void WriteName(uint8_t* base, uint32_t address, Random& random) {
+  const uint32_t length = random.Below(16);
+  for (uint32_t i = 0; i < 16; i++) {
+    guest::StoreU16(base, address + 2 * i, i < length ? uint16_t('a' + random.Below(3)) : 0);
+  }
+}
+
+void WatchUpdate(Context& h) {
+  Results results("SignInWatch::Update (sub_8209EEC8)");
+  for (int c = 0; c < 256; c++) {
+    Case(
+        h, results,
+        [&](Random& random) {
+          auto flag = [&]() -> uint32_t {
+            return random.Below(8) == 0 ? uint32_t(random.Next()) : random.Below(2);
+          };
+          // The state 0 (the game's), or above 9; not the prompts' 1 to 9,
+          // whose handlers (never seen in play) the original runs.
+          guest::StoreU32(h.base, mt::kWatchState,
+                          random.Below(8) == 0 ? 10 + random.Below(0x7FFFFFF0) : 0);
+          guest::StoreU32(h.base, mt::kPlayerUsers,
+                          random.Below(8) == 0 ? uint32_t(random.Next()) : random.Below(4));
+          // The masks and counts: ours (user 0 alone, one), or others.
+          const bool ours = random.Below(3) == 0;
+          guest::StoreU32(h.base, mt::kSignedInMask, ours ? 1 : random.Below(16));
+          guest::StoreU32(h.base, mt::kSignedInCount, ours ? 1 : random.Below(5));
+          guest::StoreU32(h.base, mt::kLastMask,
+                          ours || random.Below(2) ? guest::LoadU32(h.base, mt::kSignedInMask)
+                                                  : random.Below(16));
+          guest::StoreU32(h.base, mt::kLastCount,
+                          random.Below(2) ? guest::LoadU32(h.base, mt::kSignedInCount)
+                                          : random.Below(5));
+          for (uint32_t slot = 0; slot < 4; slot++) {
+            WriteName(h.base, mt::kUserNames + 32 * slot, random);
+          }
+          if (random.Below(2)) {
+            const uint32_t from = mt::kUserNames + 32 * random.Below(4);
+            for (uint32_t i = 0; i < 32; i += 4) {
+              guest::StoreU32(h.base, mt::kLastName + i, guest::LoadU32(h.base, from + i));
+            }
+          } else {
+            WriteName(h.base, mt::kLastName, random);
+          }
+          guest::StoreU32(h.base, mt::kOtherUserSignedIn, random.Below(4) == 0 ? flag() : 0);
+          guest::StoreU32(h.base, mt::kUserSignedOut, random.Below(4) == 0 ? flag() : 0);
+          for (uint32_t i = 0; i < 7; i++) {
+            guest::StoreU32(h.base, mt::kChecks + 4 * i, flag());
+          }
+          guest::StoreU32(h.base, 0x82816118, random.Below(4) == 0 ? flag() : 0);
+          guest::StoreU32(h.base, 0x826C7824, flag());
+          guest::StoreU32(h.base, 0x826C7878, flag());
+          const uint32_t begin = 0x40000000 + 16 * random.Below(1024);
+          guest::StoreU32(h.base, 0x826C7308 + 4, begin);
+          guest::StoreU32(h.base, 0x826C7308 + 8, begin + 384 * random.Below(3));
+          guest::StoreU32(h.base, 0x826C795C, random.Below(16));
+        },
+        [&](PPCContext& t) {
+          t.r3.u64 = 0x826C5B9C;
+          t.r4.u64 = h.data + 256;
+        },
+        __imp__sub_8209EEC8, NativeSignInWatchUpdate, fmt::format("case {}", c),
+        [&](const PPCContext& t, Outputs& out) {
+          out.Bytes(Read(h.base, t.r1.u32 - mt::kSignInWatchUpdateFrame + 80, 32));
+        });
+  }
+  results.Report();
+}
+
 }  // namespace
 
 void ModeTick(Context& h) {
@@ -360,6 +438,7 @@ void ModeTick(Context& h) {
   Players(h);
   Settings(h);
   CheckIdle(h);
+  WatchUpdate(h);
 }
 
 }  // namespace harness

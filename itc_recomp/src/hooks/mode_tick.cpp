@@ -14,6 +14,8 @@ ITC_FLAG_BOOL(native_mode_tick, true, "ITC",
               "ActionMappers::SetBlocked sub_8209F318, Modes::SetChecks sub_82106868 (Stages::Copy's "
               "plain C++ called directly), Modes::SetSceneTargetMode sub_82106740 (with "
               "sub_82106778 merged into it), SignInWatch::CheckIdle sub_8209ED58, and "
+              "SignInWatch::Update sub_8209EEC8 (with sub_8209F040 merged; wcscpy's and wcscmp's plain "
+              "C++ called directly; the prompts' states 1 to 9 the original's), "
               "Presence::SetForMode sub_822934B8 Dropped (presence isn't ported: only the "
               "last error its dropped XUserSetContextEx wrapper clears; sub_82293504 merged)) natively instead of through the "
               "translated code (the same writes; checked by --run_harnesses=mode_tick)");
@@ -84,3 +86,17 @@ extern "C" REX_FUNC(sub_8209ED58) {
 // Presence::SetForMode: r3 = the type; r3 = 0 where the original's last
 // XUserSetContextEx call answers it, else left.
 ITC_MODE_TICK(822934B8, if (PresenceSetForMode(base, ctx.r13.u32, ctx.r3.u32)) ctx.r3.u64 = 0)
+
+// SignInWatch::Update: r3 = 0x826C5B9C, r4 = the mode (both only for the
+// prompts' handlers); r3 = the last name's address as wcscpy and memset
+// leave it (sign-extended, as the original's addi). Where the plain C++
+// says so (the prompts' states, CheckIdle's traps), the original.
+extern "C" REX_FUNC(sub_8209EEC8) {
+  REX_FUNC_PROLOGUE();
+  if (!ITC_FLAG(native_mode_tick) ||
+      !SignInWatchUpdate(base, ctx.r1.u32 - kSignInWatchUpdateFrame)) {
+    __imp__sub_8209EEC8(ctx, base);
+    return;
+  }
+  ctx.r3.s64 = int32_t(kLastName);
+}

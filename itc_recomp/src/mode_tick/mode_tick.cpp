@@ -5,6 +5,7 @@
 
 #include "base/log.h"
 #include "guest.h"
+#include "c_runtime/strings.h"
 #include "hooks/last_error.h"
 #include "vehicle_accessors/vehicle_accessors.h"
 
@@ -200,6 +201,15 @@ bool PresenceSetForMode(uint8_t* base, uint32_t pcr, uint32_t type) {
   return true;
 }
 
+bool SignInWatchCheckIdleTraps(uint8_t* base) {
+  if (guest::LoadU32(base, 0x826C7824) == 0) {
+    return false;
+  }
+  const uint32_t begin = guest::LoadU32(base, 0x826C7308 + 4);
+  const uint32_t end = guest::LoadU32(base, 0x826C7308 + 8);
+  return begin > end || (end - begin) % 384 != 0;
+}
+
 bool SignInWatchCheckIdle(uint8_t* base) {
   ITC_NATIVE_RUNNING("sub_8209ED58 SignInWatch::CheckIdle");
   auto prompt = [&](uint32_t reason) {
@@ -223,12 +233,10 @@ bool SignInWatchCheckIdle(uint8_t* base) {
   // No network session: r8 0 in the original.
   bool session = true;
   if (guest::LoadU32(base, 0x826C7824) != 0) {
-    const uint32_t begin = guest::LoadU32(base, 0x826C7308 + 4);
-    const uint32_t end = guest::LoadU32(base, 0x826C7308 + 8);
-    if (begin > end || (end - begin) % 384 != 0) {
+    if (SignInWatchCheckIdleTraps(base)) {
       return false;
     }
-    session = begin != end;
+    session = guest::LoadU32(base, 0x826C7308 + 4) != guest::LoadU32(base, 0x826C7308 + 8);
   } else {
     session = guest::LoadU32(base, 0x826C7878) == 0;
   }
@@ -244,6 +252,64 @@ bool SignInWatchCheckIdle(uint8_t* base) {
     return true;
   }
   prompt(4);
+  return true;
+}
+
+namespace {
+
+// The player's name (player 0's slot among the signed-in users) copied to
+// `to` (wcscpy), or 32 bytes of zeros when not signed in (the frame's are
+// four doubleword stores, the last name's a memset: the same bytes).
+void CopyPlayerName(uint8_t* base, uint32_t to) {
+  if (PlayersSignedInSlot(base, 0) >= 0) {
+    const uint32_t slot = uint32_t(PlayersSignedInSlot(base, 0));
+    c_runtime::Wcscpy(base, to, kUserNames + (slot << 5));
+  } else {
+    for (uint32_t i = 0; i < 32; i += 4) {
+      guest::StoreU32(base, to + i, 0);
+    }
+  }
+}
+
+}  // namespace
+
+bool SignInWatchUpdate(uint8_t* base, uint32_t frame) {
+  ITC_NATIVE_RUNNING("sub_8209EEC8 SignInWatch::Update");
+  const uint32_t state = guest::LoadU32(base, kWatchState);
+  if ((state >= 1 && state <= 9) || (state == 0 && SignInWatchCheckIdleTraps(base))) {
+    return false;
+  }
+  const uint32_t shift = guest::LoadU32(base, kPlayerUsers) & 0x3F;
+  const uint32_t user = shift >= 32 ? 0 : 1u << shift;
+  const uint32_t name = frame + 80;
+  CopyPlayerName(base, name);
+  const uint32_t last_mask = guest::LoadU32(base, kLastMask);
+  const bool was_in = (last_mask & user) == user;
+  if (!was_in && last_mask != guest::LoadU32(base, kSignedInMask)) {
+    if (guest::LoadU32(base, kLastCount) > guest::LoadU32(base, kSignedInCount)) {
+      guest::StoreU32(base, kUserSignedOut, 1);
+    } else {
+      guest::StoreU32(base, kOtherUserSignedIn, 1);
+    }
+  }
+  if (was_in && ((user & guest::LoadU32(base, kSignedInMask)) == 0 ||
+                 c_runtime::Wcscmp(base, kLastName, name) != 0)) {
+    guest::StoreU32(base, kUserSignedOut, 1);
+  }
+  if (int32_t(guest::LoadU32(base, kChecks)) == 1) {
+    guest::StoreU32(base, kOtherUserSignedIn, 0);
+  }
+  if (int32_t(guest::LoadU32(base, kChecks + 4)) == 1) {
+    guest::StoreU32(base, kUserSignedOut, 0);
+  }
+  if (state == 0) {
+    SignInWatchCheckIdle(base);
+  }
+  // States 3 to 9 run sub_822910F0 here: CheckIdle sets 1 at most, and a
+  // state above 9 isn't among them.
+  guest::StoreU32(base, kLastCount, guest::LoadU32(base, kSignedInCount));
+  guest::StoreU32(base, kLastMask, guest::LoadU32(base, kSignedInMask));
+  CopyPlayerName(base, kLastName);
   return true;
 }
 
