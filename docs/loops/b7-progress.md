@@ -35,7 +35,10 @@ file's history. What's left to see in a drive, from every run:
   no new flags; 27 s, 0 errors, every harness 0 differing; the title
   screen's text frame dump identical with the fallback). Left ready:
   `sub_822141E8`, `sub_8211DF20`; `_mtinit` `sub_825AA708` not taken
-  (kernel TLS, no precedent). Step: validation, agent running.
+  (kernel TLS, no precedent). Validated (`itc_1722`: 16 of 16 harness
+  lines, 8 prints added in e517b98; replay `itc_1723` ok; 1 to
+  `to-drive.md`). Step: migration 2 (`sub_822141E8`, `sub_8211DF20`),
+  agent running.
 
 ## Done
 
@@ -70,3 +73,6 @@ This run's groups: `expected-differences.md` (the "16:38 run" lines).
   errors.
 - After the DrawTexts lead's migration 1: ours 2044, work left 4407
   (wrapped 108, known 609, unknown 3690).
+- After the DrawTexts lead's validation: race 27 s (`itc_1722`), 0
+  errors, every harness 0 differing; replay 127 s (`itc_1723`), 0
+  errors.
