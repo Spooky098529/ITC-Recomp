@@ -11,6 +11,8 @@ file's history. What's left to see in a drive, from every run:
 - Run started 2026-10-25 16:38 on `b7-loop-25-10-26-3` (the user's
   branch), from c67ef00; summary `b7-loop-2026-10-25-1638.md`.
 - Limit for this run: 3 subsystems (the default).
+- The user's call (2026-10-25): `_mtinit` (kernel TLS) stays; raise it
+  only if it becomes a blocker (`b7-loop.md`'s "Precedent first").
 - Subsystem 1 of 3: `leads.md`'s top lead, `sub_820DA180`,
   `sub_820D97B8`, `sub_820D9870` (probably the scene models' update,
   from `sub_820C5A60` for each model in the scene's pool 7). Mapped as

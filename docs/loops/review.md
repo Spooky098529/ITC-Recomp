@@ -13,6 +13,9 @@ When the user has reviewed a run's section, its heading gets
 
 ## Run 2026-10-25 16:38 (`b7-loop-25-10-26-3`)
 
+- The user's call: `_mtinit` `sub_825AA708` (the C runtime's
+  per-thread data over KeTlsAlloc/KeTlsSetValue) left for the core;
+  raised again only when it blocks a subsystem's ready work.
 - `scene-models.md` (new, 9a490b3): 48 rows, all new: the cars as the
   scene holds them (pool 7 of the second pool set at `[0x826C2E44]`):
   `SceneModel::SetUp` (`sub_820DB458`, from a 4,244-byte record),
