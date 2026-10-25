@@ -2581,6 +2581,7 @@ B7. **The game logic inside**: everything else, subsystem by subsystem,
 | 2026-10-25 | The minimap's parts (the race manager's lookups, the car marker's type, the scaling, the marker triangles and their 80-slot lists, the transform and the triangles' records; interpolation's hooks kept, `Minimap::Draw`'s blink wrap untouched; the marker draws and `Minimap::Draw` left waiting on `atexit` and the course set's lists) | `minimap.md` | 12 of 15 (one migration) | `--native_minimap` |
 | 2026-10-25 | `atexit` and what it unblocked (`atexit`, `_onexit` and `__onexitinit` over the game's exit table, the C runtime's exit lock a host mutex taken by every user through `_lock`/`_unlock` overridden for lock 8 only, the user's call by the recorded lock call; the global strings' static set-ups, `SignInWatch::StaticInit`, `UiMovie::TrackProperty`, `ApplyTrack` and `ApplyAnimation`, the minimap's marker draws, `Viewports::Init` and `Viewport::Init`; no mapping) | `c-runtime.md`, and `ui-movies.md`, `minimap.md`, `cameras.md`, `std-string.md`, `mode-tick.md` | 18 made native, 12 adapters removed (two migrations) | under `--native_c_runtime` and the files' own flags |
 | 2026-10-25 | The scene models' set-up side (the cars as the scene holds them, pool 7 of the second pool set: the parts' links, the 4,244-byte records' defaults, copies and constructor, the car records' reset and copy, the accessory, the sound loads' callback, the car model's pages through `memory::AllocPages`; `SceneModel::SetUp`, `Build`, `Update` and the loaders left waiting) | `scene-models.md` | 23 of 48 (one migration; 1 Native with no adapter) | `--native_scene_models` |
+| 2026-10-25 | `UiMovie::DrawTexts` and what it unblocked (no mapping, not counted: `DrawTexts`, `ScrollOffset`, `UiMovie::Update`, `Draw`, `Run`, `Finish`, `FinishNamed`, `FinishAll`; `_init_pointers` and the empty destructor `sub_82106540`; the race HUD's movie picker and the rival logo's draw in the new `race-hud.md`) | `ui-movies-game.md`, `ui-movies.md`, `c-runtime.md`, `race-hud.md` | 13 made native, 9 adapters removed, 1 Merged (two migrations) | `--native_ui_movies_game`, `--native_ui_movies`, `--native_c_runtime`, `--native_race_hud` |
 
     The first run (2026-10-22, branch `b7-loop-test`): every harness at 0 differing, attract races at 20-21 s with no errors,
     and a race the user drove looked right. Ours went from 162 to 335 (work
@@ -3479,3 +3480,17 @@ called, 62 with a live caller. B7 (`b7_status.py`): 6,451 in play, ours
 from 4,438. `SceneModel::SetUp`, `Build` and `Update` wait on the load
 slots, `Archive::Load`, `ScenePools::SetUp`, the asset's size,
 `sprintf` and `Texture::Create`.
+
+**2026-10-25, `UiMovie::DrawTexts` and what it unblocked (branch
+`b7-loop-25-10-26-3`):** a "no mapping" lead (not counted) made the UI
+movies' text draw native and what it unblocked: `UiMovie::Update`,
+`Draw`, `Run`, `Finish`, `FinishNamed` and `FinishAll`, `_init_pointers`
+with the empty destructor, the race HUD's movie picker and the rival
+logo's draw (`race-hud.md`, `--native_race_hud`; `--redraw_rival_logo`
+calls the native draw); 9 adapters removed; the title screen's text
+pixel-identical with the fallback. `_mtinit` waits on the kernel's TLS
+(no call yet). The boundary unchanged: 449 functions (916 pairs):
+overridden 69, Native 5, Dropped 23, never called 70, live 282.
+Imports: 186 called, 62 with a live caller. B7 (`b7_status.py`): ours
+2,050, work left 4,401 (Wrapped 105, with a row 608, no row yet 3,688),
+from 4,414.

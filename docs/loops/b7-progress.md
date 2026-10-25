@@ -42,11 +42,20 @@ file's history. What's left to see in a drive, from every run:
   `sub_82212908` Merged, the rival logo's draw `sub_82211A28`, in the
   new `race-hud.md`; `--native_race_hud`; `itc_1726`: 26 s, 0 errors,
   every harness 0 differing). Left: 10 ready groups in
-  `ui-movies-game.md` outside this lead (a new "no mapping" lead). Step:
-  validation 2, agent running.
+  `ui-movies-game.md` outside this lead (a new "no mapping" lead).
+  Validated (`itc_1729`: 5 of 5 harness lines; replay `itc_1730` ok; 1
+  to `to-drive.md`). Finished.
+- The "no mapping" lead (not counted): the UI movies' 10 ready groups
+  left in `ui-movies-game.md` (the constructor and destructor, the named
+  animations' walk, the small vectors). Step: migration, agent
+  running.
 
 ## Done
 
+- `UiMovie::DrawTexts` and what it unblocked (no mapping; two
+  migrations, c4141e4..dc97a73): 13 made native, 9 adapters removed, 1
+  Merged; `race-hud.md` new (3 rows); validated (`itc_1722`,
+  `itc_1729`); `--native_race_hud`. Left: `_mtinit` (kernel TLS).
 - The scene models (`scene-models.md`, mapped in 9a490b3; 48 rows): 23
   ours in one migration (8c076d0..88bdea2), 1 Native with no adapter;
   validated (`itc_1696`, `itc_1697`); `--native_scene_models`. Left:
@@ -76,6 +85,8 @@ This run's groups: `expected-differences.md` (the "16:38 run" lines).
 - After the scene models' validation: race 27 s (`itc_1696`), 0
   errors, every harness 0 differing; replay 126 s (`itc_1697`), 0
   errors.
+- After the DrawTexts lead's validation 2: race 26 s (`itc_1729`), 0
+  errors, every harness 0 differing; replay (`itc_1730`), 0 errors.
 - After the DrawTexts lead's migration 2: ours 2050, work left 4401
   (wrapped 105, known 608, unknown 3688).
 - After the DrawTexts lead's migration 1: ours 2044, work left 4407
