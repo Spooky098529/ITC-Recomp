@@ -13,6 +13,19 @@ function goes from this list when a log shows its `native running
 (game):` line (say which log in the commit). A run with nothing left
 here loses its heading.
 
+## Run 2026-10-25 03:59 (`b7-loop-25-10-26-2`)
+
+The game modes' migration 1, not in the attract race (`itc_1603`); the
+replay broke (`itc_1605`: the boot stalled twice, before the title
+screen):
+
+- `sub_8215DD58` RaceOverlaysMachine::SetFlags, `sub_8215DD90`
+  RaceOverlaysMachine::ClearFlags, `sub_8215DDD0`
+  RaceOverlaysMachine::SetFlag820, `sub_8215DE10`
+  RaceOverlaysMachine::ResetOverlays, `sub_82152D28`
+  Buffer28::~Buffer28, `sub_82106A00` Buffers28::~Buffers28
+  (`game-modes.md`)
+
 ## Run 2026-10-24 21:33 (`b7-loop-24-10-26-4`)
 
 The three cleanup leads' migration, not in the attract race or the

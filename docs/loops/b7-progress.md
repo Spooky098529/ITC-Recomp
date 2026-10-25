@@ -23,12 +23,18 @@ file's history. What's left to see in a drive, from every run:
   3 adapters removed, 2 Merged; `--native_game_modes`; `itc_1602`: 27
   s, 0 errors, every harness 0 differing). Nothing ready left; the rest
   waits on `XPR::XPR` (`models.md`), the race mode's set-ups, the mode
-  constructors and `Modes::Tick`'s callees. Step: validation agent
-  running.
+  constructors and `Modes::Tick`'s callees. Validated (`itc_1603`: 18 of
+  18 harness lines, 12 ran in play; the replay broke at boot,
+  `itc_1605`, so 6 go to `to-drive.md`). Finished.
 
 ## Done
 
-(none yet)
+- The game modes (`game-modes.md`, mapped in 7871fe6; 31 rows): 21
+  ours in one migration (21ff7d5..c504e59), 3 adapters removed, 2
+  Merged; validated (`itc_1603`); `--native_game_modes`. Left: the race
+  mode's constructor and destructor (`XPR::XPR`, its destructor,
+  `RaceOverlays::Destroy`), `RaceMode::Init`'s other set-ups, the mode
+  constructors, `Modes::Tick`.
 
 ## Rows to review
 
@@ -47,5 +53,7 @@ This run's groups: `expected-differences.md` (the "03:59 run" lines).
 - Start: ours 1903, work left 4548 (wrapped 111, known 597, unknown 3840).
 - After the game modes' map: ours 1903, work left 4548 (wrapped 111,
   known 625, unknown 3812).
+- After the game modes' validation: race 27 s (`itc_1603`), 0 errors,
+  every harness 0 differing.
 - After the game modes' migration 1: ours 1923, work left 4528 (wrapped
   111, known 605, unknown 3812).
