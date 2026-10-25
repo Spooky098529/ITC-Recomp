@@ -59,6 +59,12 @@ file's history. What's left to see in a drive, from every run:
   replay `itc_1625` ran, the new marker's first test: front end, a race,
   the screen after it; 4 earlier functions seen and 2 from older runs,
   off `to-drive.md`; 5 mode types not entered go on it). Finished.
+- Subsystem 3 of 5: `Modes::Tick`'s callees (`sub_82106868`,
+  `sub_82106740`, `sub_822934B8`, `sub_8209EEC8`, `sub_8209BD18`,
+  `sub_8209D130`, `sub_8209E7E8`, `sub_8209F318`, `sub_821063B0`:
+  probably the loading screen or the mode change's loads), picked as the
+  closest to ready (7 of its 9 roots ready, 37 functions left). Step:
+  mapping agent running.
 
 ## Done
 
