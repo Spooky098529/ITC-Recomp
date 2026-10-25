@@ -9,6 +9,7 @@
 #include "base/log.h"
 #include "c_runtime/strings.h"
 #include "hooks/guest_call.h"
+#include "hooks/heap.h"
 #include "hooks/ui_movies_game.h"
 #include "strings_and_font/strings_and_font.h"
 #include "ui_movies/game.h"
@@ -45,14 +46,17 @@ ITC_FLAG_BOOL(native_ui_movies_game, true, "ITC",
               "without --log_pause_movie); the texts drawn UiMovie::DrawTexts sub_8211CD90 (its "
               "Text::Draw through that adapter) with UiMovie::ScrollOffset sub_8211B800; "
               "UiMovie::Draw sub_8211D280 and UiMovie::Run sub_8211E1B8 (their calls through "
-              "their overrides) "
-              "(same results; checked by --run_harnesses=ui_movies_game). sub_8211A660, "
+              "their overrides); with --native_heap and --native_c_runtime_heap, the vectors' "
+              "sub_8211B0E8, sub_8211C168 (sub_8211B458, sub_8211B160) and sub_8211AE68 "
+              "(sub_8211A788) "
+              "(same results; checked by --run_harnesses=ui_movies_game and ui_movie_objects). sub_8211A660, "
               "sub_8211B230, AnimationList::Get, UiMovie::ScrollOffset, sub_8211B7B8, sub_8211B9B8 and "
               "sub_8211B940 have no adapters: only native callers reach "
               "them, and the flag switches those");
 
 ITC_FLAG_DECLARE(bool, native_ui_movies);
 ITC_FLAG_DECLARE(bool, log_pause_movie);
+ITC_FLAG_DECLARE(bool, native_c_runtime_heap);
 
 #define NATIVE_OR_ORIGINAL(address)          \
   if (!ITC_FLAG(native_ui_movies_game)) {    \
@@ -637,4 +641,49 @@ extern "C" REX_FUNC(sub_8211DFF8) {
     }
   });
   ctx.lr = lr;
+}
+
+// --- The movies' vectors and objects (src/ui_movies/objects.cpp) ---
+//
+// They allocate and free: natively only over the allocation layer, with the
+// C runtime's heap native (--native_c_runtime_heap), as the callees' plain
+// C++ is called directly; each falls back to the original where its checks
+// say so (nothing done then).
+
+namespace {
+bool NativeHeap() {
+  return ITC_FLAG(native_ui_movies_game) && ITC_FLAG(native_c_runtime_heap) &&
+         hooks::NativeHeapActive();
+}
+}  // namespace
+
+#define NATIVE_HEAP_OR_ORIGINAL(address, call) \
+  if (NativeHeap()) {                          \
+    if (const auto r3 = (call)) {              \
+      ctx.r3.u64 = *r3;                        \
+      return;                                  \
+    }                                          \
+  }                                            \
+  __imp__sub_##address(ctx, base);
+
+// sub_8211B0E8: r3 = a vector of pairs; returned.
+extern "C" REX_FUNC(sub_8211B0E8) {
+  REX_FUNC_PROLOGUE();
+  NATIVE_HEAP_OR_ORIGINAL(8211B0E8, ui_movies::MakePairs(base, ctx.r3.u32));
+}
+
+// sub_8211C168: r3 = a vector of pairs, r4 = the key's address, r5 = the
+// value's address.
+extern "C" REX_FUNC(sub_8211C168) {
+  REX_FUNC_PROLOGUE();
+  NATIVE_HEAP_OR_ORIGINAL(8211C168,
+                          ui_movies::PairsSet(base, ctx.r3.u32, guest::LoadU32(base, ctx.r4.u32),
+                                              guest::LoadU32(base, ctx.r5.u32)));
+}
+
+// sub_8211AE68: r3 = a vector of words, r4 = the word's address.
+extern "C" REX_FUNC(sub_8211AE68) {
+  REX_FUNC_PROLOGUE();
+  NATIVE_HEAP_OR_ORIGINAL(8211AE68,
+                          ui_movies::WordsAppend(base, ctx.r3.u32, guest::LoadU32(base, ctx.r4.u32)));
 }

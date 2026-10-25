@@ -117,6 +117,7 @@ set(ITC_SOURCES
     src/ui_movies/files.cpp
     src/hooks/ui_movies_game.cpp
     src/ui_movies/game.cpp
+    src/ui_movies/objects.cpp
     src/ui_movies/texts.cpp
     src/ui_movies/update.cpp
     src/hooks/race_overlays.cpp
@@ -272,6 +273,7 @@ set(ITC_SOURCES
     src/harnesses/minimap.cpp
     src/harnesses/scene_models.cpp
     src/harnesses/race_hud.cpp
+    src/harnesses/ui_movie_objects.cpp
     src/harnesses/models.cpp
     src/harnesses/action_mappers.cpp
     src/harnesses/data_tables.cpp

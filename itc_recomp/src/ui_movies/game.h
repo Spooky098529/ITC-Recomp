@@ -316,4 +316,44 @@ bool LayersFit(uint8_t* base, uint32_t scene, uint32_t group);
 uint32_t AssignLayers(uint8_t* base, uint32_t stack, uint32_t movie, uint32_t scene,
                       uint32_t group, uint32_t layer, bool by_bucket);
 
+// --- The movies' vectors and objects (objects.cpp) ---
+//
+// Blocks come from operator new and new[] and go back with operator delete
+// and delete[] (the C runtime heap's plain C++, memory/c_runtime_heap.h): the
+// adapters call these only while --native_heap routes the game's heap to the
+// allocation layer, and each function's checks come first, with nothing
+// done (nullopt or false) where the original must run (a size malloc
+// refuses, a block the layer didn't give).
+
+// Whether operator new or new[] gives `size` bytes natively (malloc's
+// checks), and whether operator delete or delete[] frees `block` natively (0
+// or a block the layer gave).
+bool CanAllocate(uint8_t* base, uint32_t size);
+bool CanDelete(uint32_t block);
+
+// The vectors of 8-byte {key, value} pairs (the movie table at 0x826C5CCC)
+// and of words (a movie's textures, +28): +0 the array, +4 the capacity, +8
+// the count.
+//
+// sub_8211B0E8: capacity 64, 512 bytes (operator new[]) with the 64 pairs
+// cleared when given (+0 = 0 otherwise); the count isn't written (the movie
+// table is a static). nullopt where the original must run.
+std::optional<uint32_t> MakePairs(uint8_t* base, uint32_t vector);
+// sub_8211B458 (with sub_8211B160, the capacity changed): the pair appended
+// at the count, the capacity doubled first when the count has reached it (a
+// new array, cleared, the pairs that fit copied, the old one freed; nothing
+// when the doubled capacity is the same). Returns the r3 the original
+// leaves: the old array when it was freed, else the vector.
+std::optional<uint32_t> PairsAppend(uint8_t* base, uint32_t vector, uint32_t key, uint32_t value);
+// sub_8211C168: the value set for the key (compared as signed words) when
+// it's there, else the pair appended (PairsAppend). Returns r3 as the
+// original leaves it (the vector, or PairsAppend's).
+std::optional<uint32_t> PairsSet(uint8_t* base, uint32_t vector, uint32_t key, uint32_t value);
+// sub_8211AE18: capacity 512, 2 KB (operator new[], not checked for 0), the
+// count 0. nullopt where the original must run.
+std::optional<uint32_t> MakeWords(uint8_t* base, uint32_t vector);
+// sub_8211AE68 (with sub_8211A788, the capacity changed: the new array not
+// cleared): the word appended, as PairsAppend.
+std::optional<uint32_t> WordsAppend(uint8_t* base, uint32_t vector, uint32_t word);
+
 }  // namespace ui_movies
