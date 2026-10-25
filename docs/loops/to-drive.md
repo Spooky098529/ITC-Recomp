@@ -25,6 +25,9 @@ here loses its heading.
   `sub_8211C4F0` (a text's scroll delay and speed), `sub_8211D880`
   UiMovie::RevealText, `sub_8211D8D8` (whether a text has another
   page) (`ui-movies-game.md`)
+- The scenery lists (attract race `itc_1769`, replay `itc_1770`, ok):
+  `sub_82146BD0` SceneryModel::RecordShape, `sub_82148058`
+  PointList::Draw (`scenery-lists.md`)
 
 ## Run 2026-10-25 03:59 (`b7-loop-25-10-26-2`)
 

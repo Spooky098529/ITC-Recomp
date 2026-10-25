@@ -77,7 +77,10 @@ file's history. What's left to see in a drive, from every run:
   `--native_scenery_lists`; `itc_1768`: 24 s, 0 errors, every harness 0
   differing; frame dumps matched the fallback). Left ready:
   `Model::DrawShape` `sub_82596B18` with `Model::RecordShape`
-  `sub_82595550` (1,063 lines). Step: validation, agent running.
+  `sub_82595550` (1,063 lines). Validated (`itc_1769`: 26 of 26 harness
+  lines, 3 Merged skipped; replay `itc_1770` ok; 2 to `to-drive.md`).
+  Step: migration 2 (`Model::DrawShape`, `Model::RecordShape`), agent
+  running.
 
 ## Done
 
@@ -116,6 +119,9 @@ This run's groups: `expected-differences.md` (the "16:38 run" lines).
   (wrapped 110, known 614, unknown 3690).
 - After the scene models' validation: race 27 s (`itc_1696`), 0
   errors, every harness 0 differing; replay 126 s (`itc_1697`), 0
+  errors.
+- After the scenery lists' validation: race 24 s (`itc_1769`), 0
+  errors, every harness 0 differing; replay 127 s (`itc_1770`), 0
   errors.
 - After the scenery lists' migration 1: ours 2105, work left 4346
   (wrapped 104, known 578, unknown 3664).
