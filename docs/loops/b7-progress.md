@@ -77,6 +77,10 @@ file's history. What's left to see in a drive, from every run:
   and `atexit`. Validated (`itc_1639`: 17 of 17 harness lines, all ran
   in the attract race; the replay `itc_1640` ok, showing the overlays'
   four handlers, off `to-drive.md`). Finished.
+- Subsystem 4 of 5: the minimap's parts (`sub_820F2D28`, `sub_820F2EF8`,
+  `sub_820F4888`, `sub_820F4BA8`, `sub_820F51A8`, `sub_820F5238`,
+  `sub_820F4040`, `sub_820F40C0`), picked as the closest to ready (6 of
+  its 8 roots ready, 31 functions left). Step: mapping agent running.
 
 ## Done
 
