@@ -29,6 +29,32 @@ constexpr size_t kIoBufferSize = 64 * 1024;
 
 using Clock = std::chrono::steady_clock;
 
+// 64-bit positions: POSIX's fseeko and ftello, the CRT's _fseeki64 and
+// _ftelli64.
+int Seek64(FILE* file, int64_t offset, int whence) {
+#ifdef _WIN32
+  return _fseeki64(file, offset, whence);
+#else
+  return fseeko(file, offset, whence);
+#endif
+}
+
+int64_t Tell64(FILE* file) {
+#ifdef _WIN32
+  return _ftelli64(file);
+#else
+  return ftello(file);
+#endif
+}
+
+FILE* OpenForReading(const std::filesystem::path& path) {
+#ifdef _WIN32
+  return _wfopen(path.c_str(), L"rb");
+#else
+  return std::fopen(path.c_str(), "rb");
+#endif
+}
+
 int ReadFile(void* opaque, uint8_t* buffer, int size) {
   size_t read = std::fread(buffer, 1, size_t(size), static_cast<FILE*>(opaque));
   return read ? int(read) : AVERROR_EOF;
@@ -37,13 +63,13 @@ int ReadFile(void* opaque, uint8_t* buffer, int size) {
 int64_t SeekFile(void* opaque, int64_t offset, int whence) {
   FILE* file = static_cast<FILE*>(opaque);
   if (whence == AVSEEK_SIZE) {
-    int64_t at = ftello(file);
-    fseeko(file, 0, SEEK_END);
-    int64_t size = ftello(file);
-    fseeko(file, at, SEEK_SET);
+    int64_t at = Tell64(file);
+    Seek64(file, 0, SEEK_END);
+    int64_t size = Tell64(file);
+    Seek64(file, at, SEEK_SET);
     return size;
   }
-  return fseeko(file, offset, whence & ~AVSEEK_FORCE) == 0 ? ftello(file) : -1;
+  return Seek64(file, offset, whence & ~AVSEEK_FORCE) == 0 ? Tell64(file) : -1;
 }
 
 struct Decoder {
@@ -130,7 +156,7 @@ struct Player::Impl {
   }
 
   bool Init(std::string& error) {
-    file = std::fopen(path.string().c_str(), "rb");
+    file = OpenForReading(path);
     if (!file) {
       error = "can't be opened";
       return false;
