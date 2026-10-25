@@ -34,4 +34,15 @@ void MinimapList80Copy(PPCContext& ctx, uint8_t* base);
 // primitive; r3 = the last slot.
 void MinimapRecordTransform(PPCContext& ctx, uint8_t* base);
 
+// Triangle::Record (sub_8217DAA0): r3 = the triangle, r4 = the camera
+// pass, r5 = the sort key: by the kind, Triangle::RecordFlat's step, the
+// original sub_8217C4C0 (never seen in play), or nothing.
+void MinimapTriangleRecord(PPCContext& ctx, uint8_t* base);
+// Triangle::RecordFlat (sub_8217C370), the same registers: the chunk
+// natively, handed to the render queue at [0x826D83D0] (its slot 4, a guest
+// call) from a 128-byte frame like the original's; r3 as that call leaves
+// it. The original with the command list's diagnostics on, or where the
+// plain C++ declines.
+void MinimapTriangleRecordFlat(PPCContext& ctx, uint8_t* base);
+
 }  // namespace hooks

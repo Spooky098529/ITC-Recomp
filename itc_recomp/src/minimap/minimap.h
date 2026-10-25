@@ -95,4 +95,30 @@ constexpr uint32_t kTransformProduct = 80;
 std::optional<uint32_t> RecordTransform(uint8_t* base, uint32_t pass, uint32_t primitive,
                                         uint32_t product);
 
+// Triangle::Record (sub_8217DAA0): which recording the triangle's kind
+// (+64) takes: 0 Triangle::RecordFlat, 1 sub_8217C4C0 (never seen in play;
+// the original's, a tail call), above 1 none.
+enum class TriangleRecording { kFlat, kOther, kNone };
+TriangleRecording TriangleRecord(uint8_t* base, uint32_t triangle);
+
+// The render queue (+0) and the command list (+4) the triangles go to.
+constexpr uint32_t kTriangleLists = 0x826D83D0;
+// Triangle::RecordFlat's frame (its r1 less this): Primitive::
+// RecordTransform's product is made below it, as the original's call does.
+constexpr uint32_t kRecordFlatFrame = 128;
+
+// Triangle::RecordFlat (sub_8217C370): on the list at [0x826D83D4] a chunk
+// (OpenChunk, its header slot), Primitive::RecordTransform(pass, triangle)
+// with its product at `frame` - 80, [13, 4, 0, 0], the three vertices
+// (AllocateVertices(3), with its header: x, y, z from +80, +96, +112 and the
+// color as ARGB from the low bytes of +140, +128, +132, +136, 16 bytes on
+// for the others; +16 to +23 not written), a slot with +0 = 15, CloseChunk,
+// and the header's +0, +2, +4, +12 = 0 and +8 = ChunkSlots - 1. Returns the
+// header, which the adapter hands to the render queue (its slot 4, with the
+// key and 0.0). nullopt, with nothing done, where the original's command
+// list calls would print a message (a chunk open on any list, or no room
+// for the 14 slots).
+std::optional<uint32_t> TriangleRecordFlat(uint8_t* base, uint32_t triangle, uint32_t pass,
+                                           uint32_t frame);
+
 }  // namespace minimap

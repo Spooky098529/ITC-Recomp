@@ -6,6 +6,7 @@
 #include "hooks/minimap.h"
 
 #include "base/flags.h"
+#include "hooks/guest_call.h"
 #include "minimap/minimap.h"
 
 ITC_FLAG_BOOL(native_minimap, true, "ITC",
@@ -13,8 +14,11 @@ ITC_FLAG_BOOL(native_minimap, true, "ITC",
               "sub_82170608, Race::RacerVehicle sub_82170578, SetList::Point sub_82147D18, "
               "Minimap::RacerMarkerType sub_820F2D28 (with its switch's case 1, sub_820F2E68; "
               "sub_820F2CA8's chained record the original's), Minimap::Scaling sub_820F2EF8, "
-              "Triangle::Init sub_820F4040, List80::Insert sub_820F5238 (with List80::Link sub_820F40C0, no adapter: only it calls it) and "
-              "Copy sub_820F51A8, Primitive::RecordTransform sub_8217AEA8) natively instead "
+              "Triangle::Init sub_820F4040, List80::Insert sub_820F5238 (with List80::Link "
+              "sub_820F40C0, no adapter: only it calls it) and List80::Copy sub_820F51A8, Primitive::RecordTransform sub_8217AEA8, Triangle::Record "
+              "sub_8217DAA0 (with Triangle::RecordFlat sub_8217C370, no adapter: only it calls "
+              "it; the render queue's submit a guest call; sub_8217C4C0, never seen in play, the "
+              "original's)) natively instead "
               "of through the translated code (the same writes; checked by "
               "--run_harnesses=minimap)");
 
@@ -88,7 +92,51 @@ void MinimapRecordTransform(PPCContext& ctx, uint8_t* base) {
   ctx.r3.u64 = *slot;
 }
 
+void MinimapTriangleRecordFlat(PPCContext& ctx, uint8_t* base) {
+  if (ITC_FLAG(log_overlay_uploads) || ITC_FLAG(log_slot_callers) ||
+      ITC_FLAG(log_recording_by_pass)) {
+    __imp__sub_8217C370(ctx, base);
+    return;
+  }
+  const uint32_t key = ctx.r5.u32;
+  const auto chunk = minimap::TriangleRecordFlat(
+      base, ctx.r3.u32, ctx.r4.u32, ctx.r1.u32 - minimap::kRecordFlatFrame);
+  if (!chunk) {
+    __imp__sub_8217C370(ctx, base);
+    return;
+  }
+  const uint64_t lr = ctx.lr;
+  guest_call::InFrame(ctx, base, minimap::kRecordFlatFrame, 0x8217C4B8, [&](uint32_t) {
+    // The render queue's slot 4 (sub_8258EDC8 in play): r4 = the chunk, r5 =
+    // the key, f1 = 0.0 (0x82000A34).
+    const uint32_t queue = guest::LoadU32(base, minimap::kTriangleLists);
+    ctx.r3.u64 = queue;
+    ctx.r4.u64 = *chunk;
+    ctx.r5.u64 = key;
+    ctx.fpscr.disableFlushMode();
+    ctx.f1.f64 = double(guest::LoadFloat(base, 0x82000A34));
+    REX_CALL_INDIRECT_FUNC(guest::LoadU32(base, guest::LoadU32(base, queue) + 16));
+  });
+  ctx.lr = lr;
+}
+
+void MinimapTriangleRecord(PPCContext& ctx, uint8_t* base) {
+  switch (minimap::TriangleRecord(base, ctx.r3.u32)) {
+    case minimap::TriangleRecording::kFlat:
+      MinimapTriangleRecordFlat(ctx, base);
+      return;
+    case minimap::TriangleRecording::kOther:
+      sub_8217C4C0(ctx, base);
+      return;
+    case minimap::TriangleRecording::kNone:
+      return;
+  }
+}
+
 }  // namespace hooks
+
+// Triangle::RecordFlat (sub_8217C370) has no adapter: only Triangle::Record
+// calls it.
 
 // List80::Link (sub_820F40C0) has no adapter: only List80::Insert calls it.
 
@@ -112,3 +160,4 @@ ITC_MINIMAP(820F4040, MinimapTriangleInit)
 ITC_MINIMAP(820F5238, MinimapList80Insert)
 ITC_MINIMAP(820F51A8, MinimapList80Copy)
 ITC_MINIMAP(8217AEA8, MinimapRecordTransform)
+ITC_MINIMAP(8217DAA0, MinimapTriangleRecord)

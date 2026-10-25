@@ -273,4 +273,55 @@ std::optional<uint32_t> RecordTransform(uint8_t* base, uint32_t pass, uint32_t p
   return slot;
 }
 
+TriangleRecording TriangleRecord(uint8_t* base, uint32_t triangle) {
+  ITC_NATIVE_RUNNING("sub_8217DAA0 Triangle::Record");
+  const uint32_t kind = guest::LoadU32(base, triangle + 64);
+  return kind == 0 ? TriangleRecording::kFlat
+                   : kind == 1 ? TriangleRecording::kOther : TriangleRecording::kNone;
+}
+
+std::optional<uint32_t> TriangleRecordFlat(uint8_t* base, uint32_t triangle, uint32_t pass,
+                                           uint32_t frame) {
+  ITC_NATIVE_RUNNING("sub_8217C370 Triangle::RecordFlat");
+  const uint32_t list = guest::LoadU32(base, kTriangleLists + 4);
+  // The header, the transform's five, [13], the vertices' header and five,
+  // and [15]: 14 slots, with no chunk open on any list.
+  const uint32_t used = guest::LoadU32(base, list + 12);
+  if (guest::LoadU8(base, list + 52) != 0 ||
+      guest::LoadU32(base, command_list::kOpenChunks) != 0 || used + 14 < used ||
+      used + 14 >= guest::LoadU32(base, list + 8)) {
+    return std::nullopt;
+  }
+  command_list::OpenChunk(base, list);
+  const uint32_t header = command_list::AllocateSlots(base, list, 1);
+  RecordTransform(base, pass, triangle, frame - kTransformProduct);
+  const uint32_t slot = command_list::AllocateSlots(base, list, 1);
+  guest::StoreU32(base, slot + 0, 13);
+  guest::StoreU32(base, slot + 4, 4);
+  guest::StoreU32(base, slot + 8, 0);
+  guest::StoreU32(base, slot + 12, 0);
+  uint32_t vertex = command_list::AllocateVertices(base, list, 3, true);
+  for (uint32_t i = 0; i < 3; i++) {
+    const uint32_t from = triangle + 80 + 16 * i;
+    CopyFloat(base, vertex + 0, from + 0);
+    CopyFloat(base, vertex + 4, from + 4);
+    CopyFloat(base, vertex + 8, from + 8);
+    const uint32_t color = (guest::LoadU32(base, from + 60) << 24) |
+                           (uint32_t(guest::LoadU8(base, from + 51)) << 16) |
+                           (uint32_t(guest::LoadU8(base, from + 55)) << 8) |
+                           guest::LoadU8(base, from + 59);
+    guest::StoreU32(base, vertex + 12, color);
+    vertex += 24;
+  }
+  guest::StoreU32(base, command_list::AllocateSlots(base, list, 1), 15);
+  command_list::CloseChunk(base, list);
+  const int32_t slots = command_list::ChunkSlots(base, list);
+  guest::StoreU16(base, header + 0, 0);
+  guest::StoreU16(base, header + 2, 0);
+  guest::StoreU32(base, header + 4, 0);
+  guest::StoreU32(base, header + 12, 0);
+  guest::StoreU32(base, header + 8, uint32_t(slots - 1));
+  return header;
+}
+
 }  // namespace minimap

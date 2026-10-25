@@ -9,6 +9,7 @@
 
 #include "harness.h"
 
+#include "command_list/command_list.h"
 #include "hooks/minimap.h"
 #include "memory/heap.h"
 #include "minimap/minimap.h"
@@ -36,7 +37,7 @@ struct Region {
 };
 constexpr Region kRegions[] = {
     {0x826D82F0, 0x10}, {0x826C2E30, 0x10}, {0x826C5B10, 0x60},
-    {0x826C5CA0, 0x10}, {0x826D83D0, 0x10},
+    {0x826C5CA0, 0x10}, {0x826D83D0, 0x10}, {0x8296BD20, 0x10},
 };
 constexpr uint32_t kVehicles = 0x826C2E34;
 constexpr uint32_t kSaveData = 0x826C5B58;
@@ -426,6 +427,68 @@ void Transform(Context& h, Random& r, uint32_t block) {
   results.Report();
 }
 
+// --- The triangles' recording ---
+
+void NativeRecordFlat(PPCContext& ctx, uint8_t* base) {
+  hooks::MinimapTriangleRecordFlat(ctx, base);
+}
+
+void Triangles(Context& h, Random& r, uint32_t block) {
+  // The render queue at +0x40 (its slot 4 BillboardMaterial::SetLights,
+  // sub_8209F5C8: +32 = r4, +36 = r5 unless r4 is 0), the command list at
+  // +0x100 and its slots from +0x1000, the camera pass at +0x200, the
+  // triangle at +0x400.
+  const uint32_t queue = block + 0x40, list = block + 0x100, slots = block + 0x1000;
+  const uint32_t pass = block + 0x200, triangle = block + 0x400;
+  // The slots' floats where the chunk starts at +0x1000: the transform's
+  // rows and the vertices' x, y and z.
+  const FloatRanges floats = {{0x1020, 16}, {0x1080, 3}, {0x1098, 3}, {0x10B0, 3}};
+  for (int which = 0; which < 2; which++) {
+    Results results(which == 0 ? "Triangle::RecordFlat (sub_8217C370)"
+                               : "Triangle::Record (sub_8217DAA0)");
+    for (int c = 0; c < 256; c++) {
+      Case(
+          h, results, block, r,
+          [&](PPCContext& t) {
+            guest::StoreU32(h.base, queue, block + 0xA0);
+            guest::StoreU32(h.base, block + 0xA0 + 16, 0x8209F5C8);
+            // Room (mostly), a chunk open on the list, or another open. (No
+            // full list: the original's allocations then print a message
+            // and it writes through 0.)
+            const uint32_t pick = r.Below(10);
+            const uint32_t used = r.Below(1000);
+            guest::StoreU32(h.base, list + 8, used + 14 + 1 + r.Below(500));
+            guest::StoreU32(h.base, list + 12, used);
+            guest::StoreU32(h.base, list + 32, slots);
+            guest::StoreU32(h.base, list + 44, pick == 1 ? slots + 16 : slots);
+            guest::StoreU8(h.base, list + 52, pick == 1 ? 1 : 0);
+            guest::StoreU32(h.base, command_list::kOpenChunks, pick == 2 ? 1 : 0);
+            guest::StoreU32(h.base, mm::kTriangleLists, queue);
+            guest::StoreU32(h.base, mm::kTriangleLists + 4, list);
+            RandomFloats(h.base, pass + 144, 16, r);
+            RandomFloats(h.base, triangle, 16, r);
+            RandomFloats(h.base, triangle + 80, 12, r);
+            // The kind: 0 (the game's), 1 (sub_8217C4C0) or anything.
+            const uint32_t kind = which == 0          ? 0
+                                  : r.Below(8) == 0 ? 1
+                                  : r.Below(8) == 0 ? uint32_t(r.Next())
+                                                    : 0;
+            guest::StoreU32(h.base, triangle + 64, kind);
+            t.r3.u64 = triangle;
+            t.r4.u64 = pass;
+            t.r5.u64 = r.Below(4) == 0 ? r.Next() : 104;
+          },
+          which == 0 ? __imp__sub_8217C370 : __imp__sub_8217DAA0,
+          which == 0 ? NativeRecordFlat : hooks::MinimapTriangleRecord, floats,
+          fmt::format("case {}", c), [&](const PPCContext& t, Outputs& out) {
+            out.Floats(h.base, t.r1.u32 - mm::kRecordFlatFrame - mm::kTransformProduct, 16);
+            out.Double(t.f1.u64);
+          });
+    }
+    results.Report();
+  }
+}
+
 }  // namespace
 
 void Minimap(Context& h) {
@@ -438,6 +501,7 @@ void Minimap(Context& h) {
   Shapes(h, r, block);
   Lists(h, r, block);
   Transform(h, r, block);
+  Triangles(h, r, block);
   memory::Free(allocation);
 }
 
