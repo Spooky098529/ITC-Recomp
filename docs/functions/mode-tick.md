@@ -54,8 +54,9 @@ Xbox features, don't port them; presence is one): XUserSetContextEx is
 already Dropped at its wrapper (`sub_82294F70`, B5 step 2), and
 `Presence::SetForMode` is Dropped too (B7 loop, 2026-10-25): its override
 does only what's left of its calls, the last error the dropped wrapper
-clears (`Modes::Tick` doesn't read it or r3 after the call, so when it's
-made native the call may be left out altogether, that caller named).
+clears (`Modes::Tick` overwrites r3 right after the call and reads no last
+error itself; the new mode's slot 0, called next, isn't read, so the
+clearing stays until that's known).
 
 Status:
 
