@@ -18,6 +18,25 @@ When the user has reviewed a run's section, its heading gets
   play). Note: `b7_status.py` flags `movies.md:108` `sub_82108018`, whose
   row says never called but which ran (the user's movie work, not this
   run's).
+- `framework.md` migration 1 (f27748b..e080edd; `src/framework/`,
+  `src/hooks/framework.cpp`, harness `src/harnesses/framework.cpp`):
+  50 of 68 ours, 15 adapters removed (Native), `--native_framework`.
+  For review:
+  - The map's rotations were swapped: `sub_82092B10` is
+    `HandlerMap::RotateLeft`, `sub_82092A00` `RotateRight`; corrected.
+  - Paths handed to the original (never seen in play): InsertN's
+    copy_backward path (316 Insert/InsertN cases go there, logged) and
+    `ApplyRequest`'s removal types 1 and 3.
+  - `TickHandler::Invoke` (`sub_82099A98`) and `sub_82096340`, Wrapped
+    before: their existing overrides (`game_messages.cpp`,
+    `frame_state_diff.cpp`) now call the native path (Overridden).
+  - `DebugText::DebugText` stores an uninitialized word of its own stack
+    frame as the job's state; the adapter reads and stores the same word.
+  - `sub_82094350`'s adapter stays: `sub_820A8508` calls it through a
+    vtable.
+  - Not compared in the harnesses: InsertN's r3, r4-r11 after
+    `Framework::Framework` and `Create`, a map head's key and delegate,
+    the nodes' padding bytes +22/+23 (nothing sets or reads them).
 
 ## Run 2026-10-24 21:33 (`b7-loop-24-10-26-4`)
 

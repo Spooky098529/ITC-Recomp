@@ -52,7 +52,7 @@ goes in `src/` as overrides), American English.
   the leftovers above (the movie player, Voice::Init skipped as high as
   is safe), or the main thread's performance leads
   (`sub_821298C0`, `sub_8209C6E0`, in `docs/native-renderer.md`).
-- **B7 in progress (2026-10-24):** its measure is `b7_status.py`
+- **B7 in progress (2026-10-25):** its measure is `b7_status.py`
   (`docs/coverage.md`), and the B7 loop (`docs/loops/b7-loop.md`, a
   `/loop` session handing each subsystem to a mapping agent, then
   migration agents) did its first run on the branch `b7-loop-test` (merged 2026-10-22): five
@@ -101,7 +101,16 @@ goes in `src/` as overrides), American English.
   (`post-effects.md`, 44 of 57), the UI movie walk and the AI drivers'
   teardown, and the input manager (`input.md`, 29 of 29) with the action
   mappers' constructor native (ours 1,794), stopped on two harness lines
-  missing. The
+  missing; its thirteenth run (branch `b7-loop-24-10-26-4`) made the
+  race's screen objects native (`screen-objects.md`, 38 of 42) and
+  mapped the app framework, beside the hardcoded shaders and the movies
+  through FFmpeg (ours 1,847); its fourteenth run (branch
+  `by-loop-25-10-26`) made the app framework native as far as five
+  batches went (`framework.md`, 50 of 68 ours, `--native_framework`;
+  ours 1,897) and stopped: `--run_harnesses=all` fails since the
+  hardcoded shaders (the `ai_drivers` harness's `AiDriver::UpdateIdle`
+  case 1928 faults in the recompiled original with
+  `--use_hardcoded_shaders` on). The
   runs' rows wait for the user's review (`docs/loops/review.md`). See
   "B7's loop runs" under B7, and `docs/loops/b7-progress.md`. Guest
   allocation is no longer a block (`docs/native-memory.md`); what the
