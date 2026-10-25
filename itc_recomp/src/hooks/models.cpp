@@ -1,0 +1,103 @@
+// The model class natively: adapters in front of src/models/
+// (docs/functions/models.md). The functions that allocate or free run
+// natively only while --native_heap routes the game's heap to the allocation
+// layer, and hand the paths left to the original back to it from the start,
+// nothing having been done. Functions reached only from native callers have
+// no adapters (the flag switches their callers): PendingFrees::IncSize
+// (sub_8258E2F8), from PendingFrees::Insert.
+
+#include "guest.h"
+
+#include "base/flags.h"
+#include "hooks/heap.h"
+#include "hooks/models.h"
+#include "models/memory_blocks.h"
+
+ITC_FLAG_BOOL(native_models, true, "ITC",
+              "Run the model class's pieces (docs/functions/models.md: the memory blocks' "
+              "lock, the critical section at 0x8296BD38, as a host mutex for every user, "
+              "through ScopedLock sub_8258E580 and sub_8258E5B8 for that critical section "
+              "(chosen at start-up, other critical sections the game's); with --native_heap "
+              "Memory::FreeLater sub_8258E410, FreePhysicalLater sub_8258E498, the pending "
+              "frees' Insert sub_8258E398 and IncSize sub_8258E2F8 (no adapter: only Insert "
+              "calls it)) natively instead of through the translated code (the same writes; "
+              "checked by --run_harnesses=models)");
+
+bool hooks::ModelsHostLock() {
+  static const bool host = ITC_FLAG(native_models);
+  return host;
+}
+
+namespace {
+
+// The functions that allocate or free: only over the allocation layer, and
+// with the host lock.
+bool NativeLifetime() {
+  return ITC_FLAG(native_models) && hooks::NativeHeapActive() && hooks::ModelsHostLock();
+}
+
+}  // namespace
+
+// --- The memory blocks' lock ---
+//
+// For the critical section at 0x8296BD38 only, whatever --native_models says
+// now (hooks::ModelsHostLock is fixed for the run): every user of it takes
+// the host mutex, the recompiled ones here. Other critical sections go to
+// the originals.
+
+// ScopedLock::ScopedLock: r3 = the lock word, r4 = the critical section; r3
+// left as it came.
+extern "C" REX_FUNC(sub_8258E580) {
+  REX_FUNC_PROLOGUE();
+  if (ctx.r4.u32 == models::kMemoryBlocksLock && hooks::ModelsHostLock()) {
+    models::ScopedLockEnter(base, ctx.r3.u32, ctx.r4.u32);
+    return;
+  }
+  __imp__sub_8258E580(ctx, base);
+}
+
+// ScopedLock::~ScopedLock: r3 = the lock word; r3 = the critical section (the
+// original's load before its LeaveCriticalSection).
+extern "C" REX_FUNC(sub_8258E5B8) {
+  REX_FUNC_PROLOGUE();
+  if (hooks::ModelsHostLock() &&
+      guest::LoadU32(base, ctx.r3.u32) == models::kMemoryBlocksLock) {
+    ctx.r3.u64 = models::ScopedLockLeave(base, ctx.r3.u32);
+    return;
+  }
+  __imp__sub_8258E5B8(ctx, base);
+}
+
+// --- The pending frees ---
+
+// PendingFrees::Insert: r3 = the list, r4 = the node to insert before, r5 =
+// the value's address; r3 left as it came (the list).
+extern "C" REX_FUNC(sub_8258E398) {
+  REX_FUNC_PROLOGUE();
+  if (!NativeLifetime() ||
+      !models::PendingFreesInsert(base, ctx.r3.u32, ctx.r4.u32, guest::LoadU32(base, ctx.r5.u32))) {
+    __imp__sub_8258E398(ctx, base);
+  }
+}
+
+// Memory::FreeLater: r3 = the block; r3 = the critical section, as
+// ScopedLock::~ScopedLock leaves it.
+extern "C" REX_FUNC(sub_8258E410) {
+  REX_FUNC_PROLOGUE();
+  if (NativeLifetime() && models::FreeLater(base, ctx.r3.u32)) {
+    ctx.r3.u64 = models::kMemoryBlocksLock;
+    return;
+  }
+  __imp__sub_8258E410(ctx, base);
+}
+
+// Memory::FreePhysicalLater: r3 = the block, r4 = the attributes; r3 as
+// FreeLater's.
+extern "C" REX_FUNC(sub_8258E498) {
+  REX_FUNC_PROLOGUE();
+  if (NativeLifetime() && models::FreePhysicalLater(base, ctx.r3.u32, ctx.r4.u32)) {
+    ctx.r3.u64 = models::kMemoryBlocksLock;
+    return;
+  }
+  __imp__sub_8258E498(ctx, base);
+}

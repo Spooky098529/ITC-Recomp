@@ -11,7 +11,7 @@
 ITC_FLAG_STRING(run_harnesses, "", "ITC",
                 "Run harnesses comparing native functions with the recompiled ones, once at "
                 "the first input update: \"all\" or a comma-separated list "
-                "(object_attributes, time, clock, strings, last_error, gamma, start_up, user, xmp, network, notify, profile, saves, file_class, movie_files, xma, sprites, billboards, command_list, c_runtime, math, ui_movies, ui_movies_game, race_overlays, vehicle_accessors, matrix_math, car_physics, collision, collision_world, heap, c_runtime_heap, sound_cues, xact, action_mappers, action_mappers_binding, data_tables, model_animation, car_specs, cameras, strings_and_font, std_string, track_route, ai_drivers, racer_controllers, track_zones, graphics_resources, video_output, device_state, course_scenery, post_effects, input, screen_objects, hardcoded_shaders, framework, game_modes)");
+                "(object_attributes, time, clock, strings, last_error, gamma, start_up, user, xmp, network, notify, profile, saves, file_class, movie_files, xma, sprites, billboards, command_list, c_runtime, math, ui_movies, ui_movies_game, race_overlays, vehicle_accessors, matrix_math, car_physics, collision, collision_world, heap, c_runtime_heap, sound_cues, xact, action_mappers, action_mappers_binding, data_tables, model_animation, car_specs, cameras, strings_and_font, std_string, track_route, ai_drivers, racer_controllers, track_zones, graphics_resources, video_output, device_state, course_scenery, post_effects, input, screen_objects, hardcoded_shaders, framework, game_modes, models)");
 
 namespace harness {
 
@@ -246,6 +246,7 @@ void RunRequested(PPCContext& ctx, uint8_t* base) {
       {"hardcoded_shaders", HardcodedShaders},
       {"framework", Framework},
       {"game_modes", GameModes},
+      {"models", Models},
   };
   auto wanted = [&](const char* name) {
     if (requested == "all") {
