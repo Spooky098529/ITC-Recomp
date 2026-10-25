@@ -10,8 +10,8 @@ file's history. What's left to see in a drive, from every run:
 
 - Run started 2026-10-25 03:59 on `b7-loop-25-10-26-2` (the user's
   branch), from e20b6ef; summary `b7-loop-2026-10-25-0359.md`.
-- Limit for this run: 3 subsystems.
-- Subsystem 1 of 3: `leads.md`'s top lead, `sub_8215E6C8` (a race
+- Limit for this run: 5 subsystems (the user's call, 2026-10-25; 3 by default).
+- Subsystem 1 of 5: `leads.md`'s top lead, `sub_8215E6C8` (a race
   object's set-up registering message handlers, with the owner's
   constructor and destructor `sub_821073B8`, `sub_82107518`). Step:
   mapping agent running.
