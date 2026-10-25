@@ -274,6 +274,12 @@ Rows not yet moved stay in the table below. So far:
   shape's visibility test, the per-object and scene light constants,
   the depth-only record, the generic shape draws and the texture
   provider's slots 2 and 4 (B7).
+- [`shader-objects.md`](shader-objects.md): the shader objects made
+  from shader files (vertex and pixel: their fields, their fetch
+  instructions, the library's create calls) and the memory blocks with
+  an `XLMM` header they are made in (the virtual and physical makers and
+  the pending frees' walk at the pass's start); `XMemCpy`'s rows are in
+  `c-runtime.md` (B7).
 
 These files hold functions only. What used to follow the table here moved
 out on 2026-10-20: how frame interpolation works, its options and what
