@@ -118,6 +118,7 @@ set(ITC_SOURCES
     src/hooks/ui_movies_game.cpp
     src/ui_movies/game.cpp
     src/ui_movies/texts.cpp
+    src/ui_movies/update.cpp
     src/hooks/race_overlays.cpp
     src/race_overlays/race_overlays.cpp
     src/hooks/vehicle_accessors.cpp
@@ -336,7 +337,8 @@ set(ITC_SOURCES
 # free; seen with -O3 on asin of a negative NaN). See
 # docs/functions/c-runtime.md. The UI movie keys' interpolation
 # (src/ui_movies/keys.cpp) and its drawing walk (src/ui_movies/draw.cpp) and the
-# game's texts drawn (src/ui_movies/texts.cpp) likewise (docs/functions/ui-movies.md), and the
+# game's texts drawn (src/ui_movies/texts.cpp) and the update's time steps
+# (src/ui_movies/update.cpp) likewise (docs/functions/ui-movies.md), and the
 # matrix math (src/matrix_math/matrix_math.cpp, docs/functions/matrix-math.md)
 # and the car physics (src/car_physics/, docs/functions/car-physics.md) and
 # the collision shapes (src/collision/, docs/functions/collision.md) and the
@@ -351,7 +353,7 @@ set(ITC_SOURCES
 # objects (src/screen_objects/, docs/functions/screen-objects.md).
 set_source_files_properties(src/c_runtime/math.cpp src/ui_movies/keys.cpp
     src/ui_movies/animation.cpp
-    src/ui_movies/draw.cpp src/ui_movies/texts.cpp
+    src/ui_movies/draw.cpp src/ui_movies/texts.cpp src/ui_movies/update.cpp
     src/matrix_math/matrix_math.cpp src/car_physics/rigid_body.cpp
     src/car_physics/vehicle_step.cpp src/car_physics/vehicle_update.cpp
     src/car_physics/vehicle_state.cpp src/car_physics/collision_world.cpp

@@ -10,6 +10,7 @@
 #include "base/log.h"
 #include "c_runtime/strings.h"
 #include "hooks/strings_and_font.h"
+#include "hooks/ui_movies.h"
 #include "strings_and_font/strings_and_font.h"
 #include "ui_movies/game.h"
 
@@ -1434,6 +1435,155 @@ void DrawTextsCases(Context& h, const Block& block) {
 }
 #undef ITC_PARAMS_FLOATS
 
+// --- UiMovie::Update (sub_8211D2F8, docs/functions/ui-movies.md) ---
+
+// What the update's callees were handed (their stand-in,
+// ui_movies_hooks::g_update_callee_stand_in): the function, its return
+// address and stack pointer, the registers it takes, and f1 for
+// ApplyAnimation, which answers from its own random sequence (0, 1, or a
+// negative or large word).
+struct UpdateCall {
+  uint32_t function, lr, r1;
+  std::vector<uint64_t> registers;
+  uint64_t f1;
+};
+std::vector<UpdateCall>* g_update_calls = nullptr;
+Random g_apply_answers;
+
+bool UpdateCalleeStandIn(uint32_t function, PPCContext& ctx, uint8_t*) {
+  UpdateCall call{function, uint32_t(ctx.lr), ctx.r1.u32, {}, 0};
+  switch (function) {
+    case 0x825A08E0: {
+      call.registers = {ctx.r3.u64, ctx.r4.u64, ctx.r6.u64};
+      call.f1 = ctx.f1.u64;
+      const uint32_t pick = g_apply_answers.Below(8);
+      ctx.r3.u64 = pick < 4 ? 0 : pick < 7 ? 1 : uint64_t(g_apply_answers.Next());
+      break;
+    }
+    case 0x8259FA00:
+    case 0x82119B80:
+      call.registers = {ctx.r3.u64, ctx.r4.u64, ctx.r5.u64, ctx.r6.u64, ctx.r7.u64};
+      break;
+    case 0x8211CD90:
+      call.registers = {ctx.r3.u64, ctx.r4.u64, ctx.r5.u64};
+      break;
+    default:
+      call.registers = {ctx.r3.u64, ctx.r4.u64};
+      break;
+  }
+  g_update_calls->push_back(std::move(call));
+  return true;
+}
+
+// The update against the original on two made-up lists (0 to 32 slots
+// used each) whose slots name made-up animations (+16; their length at
+// +12), with chained (+24), reversed (+28), kept (+32) and paused (+36)
+// words mostly 0 or 1, and random times (odd floats among them); its
+// callees answered by the stand-in, AnimationList::Insert and RemoveAt run
+// (the native ones against the originals). Compared: the block (the slots'
+// times as floats), the frame's local list (filled with 0xCD first), every
+// call the update made, and r3.
+void UpdateCases(Context& h, const Block& block) {
+  const uint32_t movie = block.at;
+  const uint32_t animations = block.at + 0xA500;  // eight of 32 bytes
+  constexpr uint32_t kBytes = 0xA600;
+  std::vector<UpdateCall> calls;
+  g_update_calls = &calls;
+  ui_movies_hooks::g_update_callee_stand_in = UpdateCalleeStandIn;
+  Results results("UiMovie::Update (sub_8211D2F8)");
+  for (int i = 0; i < 800; i++) {
+    const Random start = h.random;
+    Outputs out[2];
+    uint32_t used[2] = {}, r4 = 0;
+    for (int v = 0; v < 2; v++) {
+      h.random = start;
+      Random& r = h.random;
+      calls.clear();
+      Fill(h.base, block.at, kBytes);
+      ListSpec lists[2] = {ListSpec(r, i < 2 ? 0 : r.Below(33)), ListSpec(r, r.Below(33))};
+      for (ListSpec& list : lists) {
+        for (auto& words : list.slots) {
+          words[4] = animations + 32 * r.Below(8);
+          words[6] = r.Below(6) == 0 ? uint32_t(r.Next()) : r.Below(2);
+          words[7] = r.Below(6) == 0 ? uint32_t(r.Next()) : r.Below(2);
+          words[8] = r.Below(6) == 0 ? uint32_t(r.Next()) : r.Below(2);
+          words[9] = r.Below(4) == 0 ? 1 : 0;
+          if (r.Below(2) == 0) {
+            words[5] = std::bit_cast<uint32_t>(float(int32_t(r.Below(80)) - 10) / 4.0f);
+          }
+        }
+      }
+      lists[0].Write(h.base, movie + ui_movies::kMovieQueue);
+      lists[1].Write(h.base, movie + ui_movies::kMovieLooping);
+      used[0] = lists[0].used;
+      used[1] = lists[1].used;
+      for (uint32_t j = 0; j < 8; j++) {
+        guest::StoreU32(h.base, animations + 32 * j + 12,
+                        r.Below(4) == 0 ? RandomWord(r)
+                                        : std::bit_cast<uint32_t>(float(r.Below(40)) / 4.0f));
+      }
+      g_apply_answers = Random(r.Next());
+      r4 = r.Below(3) == 0 ? (r.Below(4) == 0 ? uint32_t(r.Next()) : 1) : 0;
+      PPCContext t = CallContext(h);
+      const uint32_t frame = t.r1.u32 - ui_movies::kUpdateFrame;
+      Fill(h.base, frame - 256, ui_movies::kUpdateFrame + 256);
+      t.r3.u64 = movie;
+      t.r4.u64 = r4;
+      if (v == 0) {
+        RunRecompiled(__imp__sub_8211D2F8, t, h.base);
+      } else {
+        ui_movies_hooks::Update(t, h.base);
+      }
+      // The slots' times (+20) as floats.
+      auto times = [](uint32_t list) {
+        std::vector<uint32_t> offsets;
+        for (uint32_t k = 0; k < 32; k++) {
+          offsets.push_back(list + 140 + 40 * k + 20);
+        }
+        return offsets;
+      };
+      auto with_times = [&](uint32_t address, uint32_t bytes, const std::vector<uint32_t>& at) {
+        std::vector<uint8_t> data = Read(h.base, address, bytes);
+        std::vector<uint32_t> words;
+        for (uint32_t offset : at) {
+          words.push_back(guest::LoadU32(h.base, address + offset));
+          std::fill(data.begin() + offset, data.begin() + offset + 4, 0);
+        }
+        out[v].Bytes(data);
+        for (uint32_t w : words) {
+          out[v].Float(w);
+        }
+      };
+      std::vector<uint32_t> block_times = times(ui_movies::kMovieQueue);
+      for (uint32_t offset : times(ui_movies::kMovieLooping)) {
+        block_times.push_back(offset);
+      }
+      with_times(block.at, kBytes, block_times);
+      with_times(frame + ui_movies::kUpdateLocal, kListBytes, times(0));
+      out[v].Word(uint32_t(calls.size()));
+      for (const UpdateCall& call : calls) {
+        out[v].Word(call.function);
+        out[v].Word(call.lr);
+        out[v].Word(call.r1);
+        for (uint64_t value : call.registers) {
+          out[v].Word(uint32_t(value >> 32));
+          out[v].Word(uint32_t(value));
+        }
+        if (call.function == 0x825A08E0) {
+          out[v].Double(call.f1);
+        }
+      }
+      out[v].Word(t.r3.u32);
+      out[v].Word(uint32_t(t.r3.u64 >> 32));
+    }
+    results.Check(out[0], out[1],
+                  fmt::format("case {}: {} queued, {} looping, r4 {:X}", i, used[0], used[1], r4));
+  }
+  ui_movies_hooks::g_update_callee_stand_in = nullptr;
+  g_update_calls = nullptr;
+  results.Report();
+}
+
 }  // namespace
 
 void UiMoviesGame(Context& h) {
@@ -1460,6 +1610,7 @@ void UiMoviesGame(Context& h) {
   PlayCases(h, block);
   ScrollOffsetCases(h, block);
   DrawTextsCases(h, block);
+  UpdateCases(h, block);
   memory->SystemHeapFree(block.at);
 }
 

@@ -131,6 +131,29 @@ void StoreSlot(uint8_t* base, uint32_t address, const Slot& slot);
 // that can't share the list's memory. Returns the slot written.
 uint32_t Append(uint8_t* base, uint32_t list, const Slot& slot);
 
+// UiMovie::Update (sub_8211D2F8, docs/functions/ui-movies.md)'s own work;
+// the adapter (src/hooks/ui_movies.cpp) makes its calls. Its frame (1,616
+// bytes) holds a local animation list at +80 (the slots moved off the queue
+// this update, applied after drawing and dropped).
+constexpr uint32_t kUpdateFrame = 1616;
+constexpr uint32_t kUpdateLocal = 80;
+// The local list set up: link k's next k + 1 and slot k, link 31's next -1,
+// the free chain from 0, no slots used (+130, +132 and +134 set to -1).
+void UpdateBegin(uint8_t* base, uint32_t local);
+// A queued slot's time (+20) stepped by the float at 0x820021E8, back when
+// reversed (+28), and kept within 0 and its animation's length ([+16] +
+// 12).
+void StepQueuedTime(uint8_t* base, uint32_t slot);
+// A looping slot's time stepped forward, wrapped: below 0 to the length,
+// past the length to 0.
+void StepLoopingTime(uint8_t* base, uint32_t slot);
+// The list's first link unlinked onto the free chain and the count down by
+// one, with the original's loads and stores in their order: the queue's
+// (its first read here), and the local list's (its first, `first`, and its
+// link read before the slot's animation was applied).
+void UnlinkQueueFirst(uint8_t* base, uint32_t list);
+void UnlinkLocalFirst(uint8_t* base, uint32_t list, uint32_t link, uint16_t first);
+
 // sub_8211DBE0 (UiMovie::MoveAnimation) and sub_8211DCE8
 // (UiMovie::MoveNamedAnimation): the first slot naming the animation (its
 // +4 `sub_scene` and +0 `index`, or by name its +8 `index`) in the queue

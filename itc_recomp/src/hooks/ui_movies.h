@@ -58,4 +58,20 @@ void ApplyTrackNative(PPCContext& ctx, uint8_t* base);
 // each track through sub_825A0548 (its override) from the level's frame.
 void ApplyAnimationNative(PPCContext& ctx, uint8_t* base);
 
+// UiMovie::Update (sub_8211D2F8; r3 = movie, r4 = 0 to advance a frame and
+// draw, else draw only): natively (the time steps and the lists' moves as
+// plain C++, its calls through their overrides from a frame like the
+// original's, with its return addresses) or, with --native_ui_movies off,
+// the original. r3 1 while an animation plays or is queued, else 0. Its
+// override (src/frame_pacing/per_frame_logic.cpp) wraps this.
+void Update(PPCContext& ctx, uint8_t* base);
+
+// For harnesses: while set, this is asked first by the overrides of the
+// functions UiMovie::Update calls (UiMovie::ApplyAnimation sub_825A08E0,
+// UiMovie::Draw sub_8259FA00, UiMovie::DrawTexts sub_8211CD90, sub_8259DAC0
+// and UiMovie::RestorePose sub_82119B80, by address), and runs instead of
+// them when it returns true.
+using UpdateCalleeStandIn = bool (*)(uint32_t function, PPCContext& ctx, uint8_t* base);
+extern UpdateCalleeStandIn g_update_callee_stand_in;
+
 }  // namespace ui_movies_hooks

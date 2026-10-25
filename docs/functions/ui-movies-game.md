@@ -18,7 +18,8 @@ pause screens. Its layout, the slots' and the texts' are in
 loop (`../loops/b7-loop.md`), 2026-10-22.
 
 Overrides kept from earlier work (all must be kept when these become
-native): the update `sub_8211D2F8` and the rest pose `sub_82119B80` stay
+native): the update `sub_8211D2F8` (native since 2026-10-25, its override
+still the frame pacing's) and the rest pose `sub_82119B80` stay
 in `ui-movies.md` (shared: the update replayed on render-only passes,
 `--per_tick_ui_movies`, with its adding tracks per tick,
 `--per_tick_ui_movie_tracks`; see "Per-frame logic" in

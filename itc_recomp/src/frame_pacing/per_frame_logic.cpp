@@ -239,12 +239,13 @@ ReplayFromLogicPass g_ui_movies("UI movies", 0xA000);
 }  // namespace
 
 namespace {
+// The update's work: natively with --native_ui_movies (src/hooks/ui_movies.cpp).
 void UpdateUiMovie(PPCContext& ctx, uint8_t* base) {
   if (ctx.r4.u32 != 0 || !ITC_FLAG(per_tick_ui_movies)) {
-    __imp__sub_8211D2F8(ctx, base);
+    ui_movies_hooks::Update(ctx, base);
     return;
   }
-  g_ui_movies.Run(base, ctx.r3.u32, [&] { __imp__sub_8211D2F8(ctx, base); });
+  g_ui_movies.Run(base, ctx.r3.u32, [&] { ui_movies_hooks::Update(ctx, base); });
 }
 }  // namespace
 
