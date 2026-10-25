@@ -182,6 +182,25 @@ When the user has reviewed a run's section, its heading gets
     taken at different moments (the map shifted).
   - Kept: `_lock`/`_unlock`'s adapters (they keep the exit lock's users
     together) and `Triangle::Record`'s (a guest call through `ctx`).
+- The `atexit` step's migration 2 (8a0dd9e..9e046a9): for review:
+  - `UiMovie::ApplyTrack` (`sub_825A0548`, Wrapped -> Overridden):
+    plain C++ in `src/ui_movies/keys.cpp`; frame pacing's override in
+    `per_frame_logic.cpp` keeps its per-tick skips and calls it; the two
+    cubic key functions where the native ones give `nullopt`, and type
+    2's cubic and eased keys (never seen in play), go to the originals
+    through `ctx` from a frame like the original's; the stand-in first
+    key written in the original's frame.
+  - `UiMovie::ApplyAnimation` (`sub_825A08E0`): plain C++ in the new
+    `src/ui_movies/animation.cpp` (strict float settings); the
+    original's key search kept, quirk included (the next key compared
+    against the animation's time, not the track's local time);
+    sub-animations recursed 224 bytes lower a level; each track through
+    ApplyTrack's override, so the per-tick skips still apply. Its
+    harness runs the recompiled side with `--native_ui_movies` off.
+  - `__onexitinit` (probably; `sub_825A6F00`): new row in
+    `c-runtime.md`, over the native calloc.
+  - 11 adapters removed (wcscmp, TrackProperty, the key functions, the
+    UI movies' accessors).
 
 ## Run 2026-10-25 01:17 (`by-loop-25-10-26`)
 

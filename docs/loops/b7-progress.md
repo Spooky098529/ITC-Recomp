@@ -110,7 +110,11 @@ file's history. What's left to see in a drive, from every run:
   differing). Left ready: `sub_825A0548` (TrackProperty's caller) and
   `sub_825A6F00` (the exit table's set-up). Validated (`itc_1665`: 13
   of 13 harness lines, 10 in the attract race; replay `itc_1666` ok; 3
-  to `to-drive.md`). Step: migration agent 2 running (those two). The run ends after its part 2 (the callers) is validated
+  to `to-drive.md`). Migration 2 done (8a0dd9e..9e046a9:
+  `UiMovie::ApplyTrack`, `__onexitinit`, `UiMovie::ApplyAnimation`; 11
+  adapters removed; 27 s, 0 errors, every harness 0 differing; frame
+  dumps identical). Nothing ready left in its files. Step: validation
+  agent running (the run's last). The run ends after its part 2 (the callers) is validated
   (the user's call, 2026-10-25).
 
 ## Done
@@ -155,6 +159,8 @@ This run's groups: `expected-differences.md` (the "03:59 run" lines).
 - Start: ours 1903, work left 4548 (wrapped 111, known 597, unknown 3840).
 - After the game modes' map: ours 1903, work left 4548 (wrapped 111,
   known 625, unknown 3812).
+- After the atexit step's migration 2: ours 2013, work left 4438
+  (wrapped 110, known 590, unknown 3738).
 - After the atexit step's validation: race 27 s (`itc_1665`), 0
   errors, every harness 0 differing; replay 127 s (`itc_1666`).
 - After the atexit step's migration 1: ours 2010, work left 4441
