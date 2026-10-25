@@ -21,7 +21,9 @@ file's history. What's left to see in a drive, from every run:
   every harness but `ai_drivers`). The loop stopped, then resumed
   (the user's call, 2026-10-25, after dbc8ee0's harness fix). Validated
   (`itc_1569`: 50 of 50 harness lines, all 50 ran in play; 0 errors).
-  Step: migration 2 (the main group, `sub_82090108`), agent running.
+  Migration 2 done (eb25d68, ad01ea7: the main group, 7 adapters
+  removed; 56 of 68 ours, nothing ready left). Step: its validation,
+  agent running.
 
 ## Done
 

@@ -37,6 +37,23 @@ When the user has reviewed a run's section, its heading gets
   - Not compared in the harnesses: InsertN's r3, r4-r11 after
     `Framework::Framework` and `Create`, a map head's key and delegate,
     the nodes' padding bytes +22/+23 (nothing sets or reads them).
+- `framework.md` migration 2 (eb25d68, ad01ea7; `src/framework/main_loop.cpp`):
+  the main group native (`main`, `sub_82090378`, `sub_8209ABE8`,
+  `App::Run`, `ForEachTickHandler`, `ForEachRequest`), 7 adapters removed;
+  56 of 68 ours, nothing ready left. For review:
+  - Every virtual call and functor stays a guest call, from frames like
+    the originals' (their return addresses and stack words); tick
+    handlers still go through `TickHandler::Invoke`'s override.
+  - The native loop sets r26 to r31 as the recompiled `App::Run` keeps
+    them, and puts them back on return: a recompiled device setter reads
+    r27's high word (`Device::SetDefaultState`'s harness differed without).
+  - The originals' traps (tw 22) log a warning and go on, as the
+    recompiled code does; none seen in play.
+  - `main`'s harness makes the read-only page of its framework vtable
+    (`0x82000B90`) writable through the SDK's `rex::memory::Protect` for
+    its test slots, then puts the access back.
+  - `FromFvf`'s and `SetFVF`'s pad byte groups now differ (400, 100):
+    `expected-differences.md`.
 
 ## Run 2026-10-24 21:33 (`b7-loop-24-10-26-4`)
 
