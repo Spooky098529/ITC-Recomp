@@ -386,6 +386,265 @@ void Creates(Context& h) {
   memory::Free(files);
 }
 
+// --- Resource::Relocate, XPR::Create, Mesh::LoadShaders ---
+
+void NativeRelocateResource(PPCContext& ctx, uint8_t* base) {
+  ctx.r3.u64 = models::RelocateResource(base, ctx.r3.u32, ctx.r4.u32);
+}
+void NativeXprCreate(PPCContext& ctx, uint8_t* base) {
+  if (const auto r3 = models::XprCreate(base, ctx.r3.u32, ctx.r4.u32)) {
+    ctx.r3.u64 = *r3;
+  } else {
+    __imp__sub_82596F68(ctx, base);
+  }
+}
+void NativeLoadShaders(PPCContext& ctx, uint8_t* base) {
+  InitCall call{ctx, base};
+  so::CreateCalls calls;
+  calls.init = &InitOriginal;
+  calls.user = &call;
+  if (!so::LoadShaders(base, ctx.r3.u32, ctx.r4.u32, calls)) {
+    __imp__sub_82594D20(ctx, base);
+  }
+}
+
+// A memory block's pages (Memory::AllocVirtual's, AllocPhysicalEx's or
+// AllocPhysical's) given back.
+void FreeBlock(uint32_t block, int kind) {
+  if (block == 0) {
+    return;
+  }
+  const uint32_t header = block - models::kBlockHeaderBytes;
+  if (kind == 0) {
+    memory::FreePages(header);
+  } else if (kind == 1) {
+    memory::FreePhysical(header);
+  } else {
+    memory::crt::XMemFree(header, models::kXprDataAllocation);
+  }
+}
+
+// Resource::Relocate: resources of every type (a texture's dimensions and
+// arrays, a surface with and without its parent flag, the parent in the
+// scratch area) with random words; the scratch area and r3.
+void ResourceRelocations(Context& h) {
+  Results results("Resource::Relocate (sub_8235A9F8)");
+  for (int c = 0; c < 600; c++) {
+    const uint32_t resource = h.data + 4 * h.random.Below(400);
+    const uint32_t parent = h.data + 2048 + 4 * h.random.Below(400);
+    const uint32_t type = c < 32 ? uint32_t(c & 15) : h.random.Below(16);
+    std::vector<uint8_t> fill(kScratchBytes);
+    for (auto& x : fill) x = uint8_t(h.random.Next());
+    const uint32_t address = c % 3 == 0 ? (uint32_t(h.random.Next()) & ~0xFFFu)
+                                        : uint32_t(h.random.Next());
+    Outputs out[2];
+    for (int v = 0; v < 2; v++) {
+      Write(h.base, h.data, fill.data(), kScratchBytes);
+      uint32_t common = (Load(h.base, resource) & ~0xFu) | type;
+      if (type == 4 && c % 2 == 0) {
+        common &= ~0x40000000u;
+      }
+      Store(h.base, resource, common);
+      if (type == 4) {
+        Store(h.base, resource + 24, parent);
+      }
+      if (c % 5 == 0) {
+        Store(h.base, resource + 48, Load(h.base, resource + 48) & 0xFFFu);
+      }
+      PPCContext t = CallContext(h);
+      t.r3.u64 = resource;
+      t.r4.u64 = address;
+      (v == 0 ? __imp__sub_8235A9F8 : NativeRelocateResource)(t, h.base);
+      out[v].Bytes(Read(h.base, h.data, kScratchBytes));
+      out[v].Word(t.r3.u32);
+    }
+    results.Check(out[0], out[1], fmt::format("case {} (type {})", c, type));
+  }
+  results.Report();
+}
+
+// XPR::Create: XPR2 files of 0 to 24 records (textures and others, their
+// headers in the header block) with random words, and files that aren't
+// XPR2. The object's words, and the blocks' bytes with the pointers the
+// function makes taken back to offsets (the blocks sit at different
+// addresses on each side), and r3; then the blocks freed.
+void XprCreates(Context& h) {
+  Results results("XPR::Create (sub_82596F68)");
+  constexpr uint32_t kFileBytes = 32 * 1024;
+  const uint32_t files = memory::Alloc(kFileBytes, 0);
+  for (int c = 0; c < 120; c++) {
+    const uint32_t records = h.random.Below(25);
+    const uint32_t textures_at = 4 + 16 * records;
+    const uint32_t header_bytes = textures_at + 52 * records + 4 * h.random.Below(64);
+    const uint32_t data_bytes = c % 10 == 0 ? 0 : 1 + h.random.Below(8000);
+    std::vector<uint8_t> fill(kFileBytes);
+    for (auto& x : fill) x = uint8_t(h.random.Next());
+    std::vector<bool> texture(records);
+    for (uint32_t i = 0; i < records; i++) {
+      texture[i] = h.random.Below(3) != 0;
+    }
+    const bool xpr2 = c % 17 != 5;
+    Outputs out[2];
+    for (int v = 0; v < 2; v++) {
+      Write(h.base, files, fill.data(), kFileBytes);
+      const uint32_t file = files;
+      Store(h.base, file + 0, xpr2 ? 0x58505232 : 0x58505231);
+      Store(h.base, file + 4, header_bytes);
+      Store(h.base, file + 8, data_bytes);
+      const uint32_t header = file + 12;
+      Store(h.base, header, records);
+      for (uint32_t i = 0; i < records; i++) {
+        const uint32_t record = header + 4 + 16 * i;
+        const uint32_t tag = Load(h.base, record) & 0xFFFFu;
+        Store(h.base, record, (texture[i] ? 0x54580000u : 0x56420000u) | tag);
+        Store(h.base, record + 4, textures_at + 52 * i);
+      }
+      const uint32_t xpr = h.data + 64;
+      Fill(h.base, h.data, kScratchBytes);
+      PPCContext t = CallContext(h);
+      t.r3.u64 = xpr;
+      t.r4.u64 = file;
+      (v == 0 ? __imp__sub_82596F68 : NativeXprCreate)(t, h.base);
+      out[v].Word(t.r3.u32);
+      if (!xpr2) {
+        out[v].Bytes(Read(h.base, h.data, kScratchBytes));
+        continue;
+      }
+      const uint32_t block = Load(h.base, xpr + 0), data = Load(h.base, xpr + 8);
+      out[v].Word(Load(h.base, xpr + 4));
+      out[v].Word(Load(h.base, xpr + 12));
+      out[v].Word(Load(h.base, xpr + 16) - block);
+      out[v].Word(Load(h.base, xpr + 20));
+      std::vector<uint8_t> bytes = Read(h.base, block, header_bytes);
+      auto word = [&](uint32_t offset, uint32_t minus) {
+        const uint32_t w = Load(h.base, block + offset) - minus;
+        for (int k = 0; k < 4; k++) bytes[offset + k] = uint8_t(w >> (24 - 8 * k));
+      };
+      for (uint32_t i = 0; i < records; i++) {
+        word(4 + 16 * i + 12, block);
+        if (texture[i]) {
+          const uint32_t at = textures_at + 52 * i;
+          word(at + 0x20, data);
+          if (((Load(h.base, block + at + 44) >> 6) & 0xF) != 0) {
+            word(at + 0x30, data);
+          }
+        }
+      }
+      out[v].Bytes(bytes);
+      out[v].Bytes(Read(h.base, data, data_bytes));
+      FreeBlock(block, 0);
+      FreeBlock(data, 2);
+    }
+    results.Check(out[0], out[1],
+                  fmt::format("case {} ({} records, {} header bytes, {} data bytes{})", c, records,
+                              header_bytes, data_bytes, xpr2 ? "" : ", not XPR2"));
+  }
+  memory::Free(files);
+  results.Report();
+}
+
+// Mesh::LoadShaders: shader sections of 0 to 6 pairs (vertex files with
+// fetch tables of 0 to 32 words, and 40; pixel files; microcode of 12 bytes
+// to 3 KB) in a block, the model in another; the model's +420, the pairs'
+// objects (their microcode pointers replaced by a marker) and microcode by
+// their contents; then the blocks freed.
+void LoadShaderSections(Context& h) {
+  Results results("Mesh::LoadShaders (sub_82594D20)");
+  constexpr uint32_t kSectionBytes = 64 * 1024;
+  constexpr uint32_t kMarker = 0x4D435245;
+  const uint32_t sections = memory::Alloc(kSectionBytes, 0);
+  const uint32_t models_block = memory::Alloc(1024, 0);
+  for (int c = 0; c < 60; c++) {
+    const uint32_t pairs = c < 3 ? uint32_t(c) : h.random.Below(7);
+    std::vector<uint8_t> fill(kSectionBytes);
+    for (auto& x : fill) x = uint8_t(h.random.Next());
+    std::vector<uint8_t> model_fill(1024);
+    for (auto& x : model_fill) x = uint8_t(h.random.Next());
+    struct Shader {
+      uint32_t header, code_bytes, magic, count, first, table;
+      std::vector<uint32_t> words;
+    };
+    std::vector<Shader> shaders(2 * pairs);
+    for (uint32_t k = 0; k < 2 * pairs; k++) {
+      Shader& sh = shaders[k];
+      const bool vertex = k % 2 == 0;
+      sh.header = 280 + 4 * h.random.Below(60);
+      sh.code_bytes = 12 + 12 * h.random.Below(256);
+      sh.magic = uint32_t(h.random.Next());
+      sh.magic = vertex ? (sh.magic | 1u) : (sh.magic & ~0x3Fu);
+      sh.table = 32 + 4 * h.random.Below(4);
+      sh.first = h.random.Below(8);
+      sh.count = (c % 20 == 9 && vertex) ? 40 : h.random.Below(33);
+      sh.words.resize(sh.count);
+      for (auto& w : sh.words) {
+        w = (uint32_t(h.random.Next()) & ~0xFFFu) | h.random.Below(sh.code_bytes / 12);
+      }
+    }
+    Outputs out[2];
+    for (int v = 0; v < 2; v++) {
+      Write(h.base, sections, fill.data(), kSectionBytes);
+      Write(h.base, models_block, model_fill.data(), 1024);
+      const uint32_t section = sections;
+      Store(h.base, section, pairs);
+      uint32_t pair = section + 32;
+      for (uint32_t i = 0; i < pairs; i++) {
+        uint32_t file = pair + 32;
+        uint32_t sizes[2];
+        for (int k = 0; k < 2; k++) {
+          const Shader& sh = shaders[2 * i + k];
+          Store(h.base, file + 0, sh.magic);
+          Store(h.base, file + 4, sh.header);
+          Store(h.base, file + 8, sh.code_bytes);
+          if (k == 0) {
+            Store(h.base, file + 20, sh.table);
+            Store(h.base, file + sh.table + 24, sh.first);
+            Store(h.base, file + sh.table + 28, sh.count);
+            for (uint32_t w = 0; w < sh.count; w++) {
+              Store(h.base, file + sh.table + 4 * (sh.first + 10 + w), sh.words[w]);
+            }
+          }
+          sizes[k] = sh.header + sh.code_bytes;
+          file += sizes[k];
+        }
+        Store(h.base, pair + 4, sizes[0]);
+        Store(h.base, pair + 8, sizes[1]);
+        pair = file;
+      }
+      const uint32_t model = models_block + 16;
+      PPCContext t = CallContext(h);
+      t.r3.u64 = model;
+      t.r4.u64 = section;
+      (v == 0 ? __imp__sub_82594D20 : NativeLoadShaders)(t, h.base);
+      out[v].Word(Load(h.base, model + 420));
+      const uint32_t block = Load(h.base, model + 24);
+      for (uint32_t i = 0; i < pairs; i++) {
+        for (int k = 0; k < 2; k++) {
+          const Shader& sh = shaders[2 * i + k];
+          const uint32_t object = Load(h.base, block + 16 * i + 4 * k);
+          const uint32_t code = Load(h.base, block + 16 * i + 8 + 4 * k);
+          const uint32_t fields = k == 0 ? so::kVertexShaderBytes : so::kPixelShaderBytes;
+          const uint32_t pointer = k == 0 ? 48 : 24;
+          out[v].Word(Load(h.base, object + pointer) == code);
+          Store(h.base, object + pointer, kMarker);
+          out[v].Bytes(Read(h.base, object, fields + sh.header));
+          out[v].Bytes(Read(h.base, code, sh.code_bytes));
+          FreeBlock(object, 0);
+          FreeBlock(code, 1);
+        }
+      }
+      if (pairs != 0) {
+        FreeBlock(block, 0);
+        Store(h.base, model + 24, 0);
+      }
+      out[v].Bytes(Read(h.base, models_block, 1024));
+    }
+    results.Check(out[0], out[1], fmt::format("case {} ({} pairs)", c, pairs));
+  }
+  memory::Free(models_block);
+  memory::Free(sections);
+  results.Report();
+}
+
 // --- The memory blocks ---
 
 // The makers' register steps.
@@ -619,6 +878,9 @@ void ShaderObjects(Context& h) {
   HeaderCopies(h);
   TextureRelocations(h);
   Creates(h);
+  ResourceRelocations(h);
+  XprCreates(h);
+  LoadShaderSections(h);
 }
 
 }  // namespace harness

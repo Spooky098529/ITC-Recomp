@@ -84,4 +84,22 @@ std::optional<uint32_t> VertexShaderCreate(uint8_t* base, uint32_t file, const C
 // 7, +4 = 1, +20 = 0xFFFF0000), +0 |= kCreatedFlag.
 std::optional<uint32_t> PixelShaderCreate(uint8_t* base, uint32_t file);
 
+// sub_82594D20 Mesh::LoadShaders (models.md): `section` = the model file's
+// shader section: +0 the pair count (to the model's +420); none, nothing
+// more. Else the pairs' block (16 bytes a pair) from Memory::AllocVirtual to
+// the model's +24, and from +32 a pair after another (+4 the vertex file's
+// size, +8 the pixel file's, the vertex file at +32, the pixel file after
+// it, the next pair after that). Each shader: its file parsed, its object
+// from Memory::AllocVirtual (the pair's +0, +4), its header copied after the
+// fields, its microcode into Memory::AllocPhysicalEx(size, 0, -1, 32, 0x404)
+// (the pair's +8, +12) through memcpy (recorded for the renderer:
+// native::Buffers_Memcpy), then its Init. A pair whose microcode block is 0
+// gets the original's debug messages (logged; never seen: the layer aborts
+// when out of memory). False, with nothing done, where the original must
+// run: memcpy's copy that wouldn't be native (--native_memcpy off), or a
+// header copy XMemCpy hands to the original. Only over the allocation layer
+// with the memory blocks' host lock (the adapter's condition). Where
+// VertexShaderInit declines, `calls.init` (the original).
+bool LoadShaders(uint8_t* base, uint32_t model, uint32_t section, const CreateCalls& calls);
+
 }  // namespace shader_objects

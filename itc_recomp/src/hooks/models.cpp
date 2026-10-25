@@ -16,6 +16,7 @@
 
 #include "base/flags.h"
 #include "base/log.h"
+#include "hooks/guest_call.h"
 #include "hooks/heap.h"
 #include "hooks/models.h"
 #include "models/memory_blocks.h"
@@ -43,7 +44,11 @@ ITC_FLAG_BOOL(native_models, true, "ITC",
               "plain C++ called directly; Model::MaterialCount sub_82594AD8, Model::Material "
               "sub_82594B20, ShaderFile::Parse sub_822A8568, VertexShader::CopyHeader sub_822A9FD8 and "
               "PixelShader::CopyHeader sub_822A9EA8 (in src/shader_objects/), "
-              "TextureHeader::Relocate sub_8235A990 (with sub_822A5B68), with --native_heap "
+              "TextureHeader::Relocate sub_8235A990 (with sub_822A5B68), Resource::Relocate sub_8235A9F8, "
+              "with --native_heap XPR::Create sub_82596F68 and Mesh::LoadShaders sub_82594D20 "
+              "(their copies as memcpy's override makes them, recorded for the renderer; "
+              "VertexShader::Init's original a guest call where its plain C++ declines), "
+              "with --native_heap "
               "Memory::AllocPhysical sub_8258E138 (in src/models/memory_blocks.cpp), the shared shaders sub_825896D8 and sub_82589700, the vertex "
               "declaration sub_82589728 (its message for a type pair the tables don't cover, "
               "never seen in play, the original's), Model::RecordShape sub_82595550 (in "
@@ -301,4 +306,66 @@ extern "C" REX_FUNC(sub_8235A990) {
     return;
   }
   ctx.r3.u64 = models::RelocateTexture(base, ctx.r3.u32, ctx.r4.u32, ctx.r5.u32);
+}
+
+// Resource::Relocate: r3 = the resource, r4 = the address; r3 as the
+// original leaves it.
+extern "C" REX_FUNC(sub_8235A9F8) {
+  REX_FUNC_PROLOGUE();
+  if (!ITC_FLAG(native_models)) {
+    __imp__sub_8235A9F8(ctx, base);
+    return;
+  }
+  ctx.r3.u64 = models::RelocateResource(base, ctx.r3.u32, ctx.r4.u32);
+}
+
+// XPR::Create: r3 = the XPR object, r4 = the XPR2 file; returns 0 or
+// 0x80004005.
+extern "C" REX_FUNC(sub_82596F68) {
+  REX_FUNC_PROLOGUE();
+  if (NativeLifetime()) {
+    if (const auto r3 = models::XprCreate(base, ctx.r3.u32, ctx.r4.u32)) {
+      ctx.r3.u64 = *r3;
+      return;
+    }
+  }
+  __imp__sub_82596F68(ctx, base);
+}
+
+namespace {
+
+// VertexShader::Init's original from a frame as Mesh::LoadShaders' own.
+struct LoadShadersContext {
+  PPCContext& ctx;
+  uint8_t* base;
+  static void Init(void* user, uint32_t object, uint32_t microcode) {
+    auto& c = *static_cast<LoadShadersContext*>(user);
+    guest_call::InFrame(c.ctx, c.base, 176, 0x82594DEC, [&](uint32_t) {
+      c.ctx.r3.u64 = object;
+      c.ctx.r4.u64 = microcode;
+      __imp__sub_822A8740(c.ctx, c.base);
+    });
+  }
+};
+
+}  // namespace
+
+// Mesh::LoadShaders: r3 = the model, r4 = the shader section. No return
+// value read.
+extern "C" REX_FUNC(sub_82594D20) {
+  REX_FUNC_PROLOGUE();
+  if (NativeLifetime()) {
+    const uint64_t lr = ctx.lr;
+    const uint32_t model = ctx.r3.u32, section = ctx.r4.u32;
+    LoadShadersContext context{ctx, base};
+    shader_objects::CreateCalls calls;
+    calls.init = &LoadShadersContext::Init;
+    calls.user = &context;
+    const bool done = shader_objects::LoadShaders(base, model, section, calls);
+    ctx.lr = lr;
+    if (done) {
+      return;
+    }
+  }
+  __imp__sub_82594D20(ctx, base);
 }

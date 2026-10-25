@@ -7,10 +7,12 @@
 #include "c_runtime/strings.h"
 #include "guest.h"
 #include "memory/c_runtime_heap.h"
+#include "models/memory_blocks.h"
 #include "native/buffers.h"
 
 #include <cstdlib>
 #include <cstring>
+#include <string>
 
 namespace shader_objects {
 
@@ -36,6 +38,9 @@ uint32_t ObjectBytes(uint32_t magic, uint32_t header) {
   return ((magic & 0x3F) != 0 ? kVertexShaderBytes : kPixelShaderBytes) + header;
 }
 
+// The header copy from `file` after `fields` cleared bytes, its checks made.
+void CopyHeaderFrom(uint8_t* base, uint32_t object, uint32_t file, uint32_t fields);
+
 // The header copy (sub_822A9FD8, sub_822A9EA8) for `fields` bytes.
 bool CopyHeader(uint8_t* base, uint32_t object, uint32_t record, uint32_t fields) {
   if (c_runtime::MayShare(record, 4, object, fields)) {
@@ -57,6 +62,35 @@ void Require(bool done, const char* what) {
     ITC_LOG_ERROR("shader objects: {} refused after its checks", what);
     std::abort();
   }
+}
+
+}  // namespace
+
+namespace {
+
+// What ParseFile writes in its record.
+struct FileRecord {
+  uint32_t file, object_bytes, code, code_bytes;
+};
+
+FileRecord ReadFile(uint8_t* base, uint32_t file) {
+  const uint32_t header = Load(base, file + 4);
+  return {file, ObjectBytes(Load(base, file + 0), header), header + file, Load(base, file + 8)};
+}
+
+// A debug message the original prints (sub_825A1318), logged.
+// The message without its line end.
+std::string TrimmedMessage(const char* host) {
+  std::string text(host, strnlen(host, 256));
+  while (!text.empty() && (text.back() == '\n' || text.back() == '\r')) {
+    text.pop_back();
+  }
+  return text;
+}
+
+void DebugMessage(uint8_t* base, const char* where, uint32_t text) {
+  const char* host = reinterpret_cast<const char*>(REX_RAW_ADDR(text));
+  ITC_LOG_WARN("{}: the game's debug message: {}", where, TrimmedMessage(host));
 }
 
 }  // namespace
@@ -210,6 +244,78 @@ std::optional<uint32_t> PixelShaderCreate(uint8_t* base, uint32_t file) {
   Store(base, object + 20, 0xFFFF0000u);
   Store(base, object + 0, 7 | kCreatedFlag);
   return object;
+}
+
+namespace {
+
+void CopyHeaderFrom(uint8_t* base, uint32_t object, uint32_t file, uint32_t fields) {
+  const uint32_t bytes = Load(base, file + 4);
+  Clear(base, object, fields);
+  Require(c_runtime::XMemCpy(base, object + fields, file, bytes), "XMemCpy");
+}
+
+}  // namespace
+
+bool LoadShaders(uint8_t* base, uint32_t model, uint32_t section, const CreateCalls& calls) {
+  ITC_NATIVE_RUNNING("sub_82594D20 Mesh::LoadShaders");
+  const uint32_t count = Load(base, section);
+  // The checks first: memcpy's flag, each header copy's byte loop (the
+  // new blocks can't share memory with the files).
+  if (!native::Buffers_NativeMemcpy()) {
+    return false;
+  }
+  uint32_t pair = section + 32;
+  for (uint32_t i = 0; i < count; i++) {
+    const uint32_t vertex = pair + 32;
+    const uint32_t pixel = Load(base, pair + 4) + vertex;
+    if (!c_runtime::XMemCpyBytes(base, vertex, Load(base, vertex + 4)) ||
+        !c_runtime::XMemCpyBytes(base, pixel, Load(base, pixel + 4))) {
+      return false;
+    }
+    pair = Load(base, pair + 8) + pixel;
+  }
+  Store(base, model + 420, count);
+  if (count == 0) {
+    return true;
+  }
+  Store(base, model + 24, models::AllocVirtual(base, count << 4));
+  pair = section + 32;
+  for (uint32_t i = 0; i < Load(base, model + 420); i++) {
+    const uint32_t vertex = pair + 32;
+    const uint32_t pixel = Load(base, pair + 4) + vertex;
+    const uint32_t shaders = Load(base, model + 24) + 16 * i;
+    const uint32_t next = Load(base, pair + 8) + pixel;
+    // The vertex shader.
+    FileRecord record = ReadFile(base, vertex);
+    Store(base, shaders + 0, models::AllocVirtual(base, record.object_bytes));
+    CopyHeaderFrom(base, Load(base, shaders + 0), vertex, kVertexShaderBytes);
+    Store(base, shaders + 8,
+          models::AllocPhysicalEx(base, record.code_bytes, 0, 0xFFFFFFFFu, 32, 0x404));
+    Require(native::Buffers_Memcpy(base, Load(base, shaders + 8), record.code, record.code_bytes,
+                                   0x82594DE0),
+            "memcpy");
+    if (!VertexShaderInit(base, Load(base, shaders + 0), Load(base, shaders + 8))) {
+      calls.init(calls.user, Load(base, shaders + 0), Load(base, shaders + 8));
+    }
+    // The pixel shader.
+    record = ReadFile(base, pixel);
+    Store(base, shaders + 4, models::AllocVirtual(base, record.object_bytes));
+    CopyHeaderFrom(base, Load(base, shaders + 4), pixel, kPixelShaderBytes);
+    Store(base, shaders + 12,
+          models::AllocPhysicalEx(base, record.code_bytes, 0, 0xFFFFFFFFu, 32, 0x404));
+    Require(native::Buffers_Memcpy(base, Load(base, shaders + 12), record.code,
+                                   record.code_bytes, 0x82594E38),
+            "memcpy");
+    PixelShaderInit(base, Load(base, shaders + 4), Load(base, shaders + 12));
+    if (Load(base, shaders + 8) == 0) {
+      DebugMessage(base, "Mesh::LoadShaders", 0x8206CD7C);
+    }
+    if (Load(base, shaders + 12) == 0) {
+      DebugMessage(base, "Mesh::LoadShaders", 0x8206CDA0);
+    }
+    pair = next;
+  }
+  return true;
 }
 
 }  // namespace shader_objects
