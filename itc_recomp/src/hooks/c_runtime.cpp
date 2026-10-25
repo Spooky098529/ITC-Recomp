@@ -40,8 +40,8 @@ ITC_FLAG_BOOL(native_c_runtime, true, "ITC",
               "sub_825B61E8); write_char "
               "(sub_825AF000), write_multi_char (sub_825AF098), the wide write_char and _putwc_nolock "
               "(sub_825B1368, sub_825B7A80); __iob_func (sub_825AD4C0); the start-up's _cfltcvt_init (sub_825A6DB0, "
-              "sub_825A6E48), _init_pointers' setters (sub_825AD140, sub_825AEE18, sub_825AFCB8, "
-              "sub_825B3560, sub_825B3548) and _init_pointers itself (sub_825AA398), the empty "
+              "sub_825A6E48), _init_pointers (sub_825AA398) with its setters (sub_825AD140, "
+              "sub_825AEE18, sub_825AFCB8, sub_825B3560, sub_825B3548: no adapters of their own), the empty "
               "destructor (sub_82106540), __initmbctable and setSBCS (sub_825B6958, sub_825B68C8); "
               "the compiler's vector constructor and destructor iterators (sub_820911A8, "
               "sub_820900C0: the elements' native functions called as plain C++, the empty "
@@ -562,51 +562,9 @@ extern "C" REX_FUNC(sub_825A6E48) {
   c_runtime::InitFloatConversions(base);
 }
 
-// _init_pointers' setters: r3 = the value.
-extern "C" REX_FUNC(sub_825AD140) {
-  REX_FUNC_PROLOGUE();
-  if (!ITC_FLAG(native_c_runtime)) {
-    __imp__sub_825AD140(ctx, base);
-    return;
-  }
-  c_runtime::SetHandler82971170(base, ctx.r3.u32);
-}
-
-extern "C" REX_FUNC(sub_825AEE18) {
-  REX_FUNC_PROLOGUE();
-  if (!ITC_FLAG(native_c_runtime)) {
-    __imp__sub_825AEE18(ctx, base);
-    return;
-  }
-  c_runtime::SetHandler82971178(base, ctx.r3.u32);
-}
-
-extern "C" REX_FUNC(sub_825AFCB8) {
-  REX_FUNC_PROLOGUE();
-  if (!ITC_FLAG(native_c_runtime)) {
-    __imp__sub_825AFCB8(ctx, base);
-    return;
-  }
-  c_runtime::SetInvalidParameterHandler(base, ctx.r3.u32);
-}
-
-extern "C" REX_FUNC(sub_825B3560) {
-  REX_FUNC_PROLOGUE();
-  if (!ITC_FLAG(native_c_runtime)) {
-    __imp__sub_825B3560(ctx, base);
-    return;
-  }
-  c_runtime::SetCriticalSectionInitializer(base, ctx.r3.u32);
-}
-
-extern "C" REX_FUNC(sub_825B3548) {
-  REX_FUNC_PROLOGUE();
-  if (!ITC_FLAG(native_c_runtime)) {
-    __imp__sub_825B3548(ctx, base);
-    return;
-  }
-  c_runtime::SetDefaultCriticalSectionInitializer(base);
-}
+// _init_pointers' setters (sub_825AD140, sub_825AEE18, sub_825AFCB8,
+// sub_825B3560, sub_825B3548) have no adapters: only _init_pointers' plain
+// C++ calls them.
 
 // _init_pointers: no arguments; r3 left 0, as the original's last setter
 // call leaves it.

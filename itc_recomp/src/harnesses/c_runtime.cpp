@@ -162,6 +162,23 @@ const uint32_t kLengths[] = {0, 1, 2, 3, 4, 5, 7, 8, 15, 16, 17, 31, 64, 200, 45
 // where the plain C++ refuses (the error paths the adapters left to the
 // original), the original runs, as the adapters did.
 
+// _init_pointers' setters: r3 = the value (left).
+void NativeSetHandler82971170(PPCContext& ctx, uint8_t* base) {
+  c_runtime::SetHandler82971170(base, ctx.r3.u32);
+}
+void NativeSetHandler82971178(PPCContext& ctx, uint8_t* base) {
+  c_runtime::SetHandler82971178(base, ctx.r3.u32);
+}
+void NativeSetInvalidParameterHandler(PPCContext& ctx, uint8_t* base) {
+  c_runtime::SetInvalidParameterHandler(base, ctx.r3.u32);
+}
+void NativeSetCriticalSectionInitializer(PPCContext& ctx, uint8_t* base) {
+  c_runtime::SetCriticalSectionInitializer(base, ctx.r3.u32);
+}
+void NativeSetDefaultCriticalSectionInitializer(PPCContext&, uint8_t* base) {
+  c_runtime::SetDefaultCriticalSectionInitializer(base);
+}
+
 // strcpy_s: r3 = destination, r4 = its size, r5 = source; returns 0.
 void NativeStrcpyS(PPCContext& ctx, uint8_t* base) {
   if (!c_runtime::StrcpyS(base, ctx.r3.u32, ctx.r4.u32, ctx.r5.u32)) {
@@ -1334,11 +1351,11 @@ void CRuntime(Context& h) {
       const char* name;
     };
     const Setter setters[] = {
-        {__imp__sub_825AD140, sub_825AD140, 0x82971170, "sub_825AD140"},
-        {__imp__sub_825AEE18, sub_825AEE18, 0x82971178, "sub_825AEE18"},
-        {__imp__sub_825AFCB8, sub_825AFCB8, 0x82978320, "sub_825AFCB8"},
-        {__imp__sub_825B3560, sub_825B3560, 0x8297132C, "sub_825B3560"},
-        {__imp__sub_825B3548, sub_825B3548, 0x82971328, "sub_825B3548"},
+        {__imp__sub_825AD140, NativeSetHandler82971170, 0x82971170, "sub_825AD140"},
+        {__imp__sub_825AEE18, NativeSetHandler82971178, 0x82971178, "sub_825AEE18"},
+        {__imp__sub_825AFCB8, NativeSetInvalidParameterHandler, 0x82978320, "sub_825AFCB8"},
+        {__imp__sub_825B3560, NativeSetCriticalSectionInitializer, 0x8297132C, "sub_825B3560"},
+        {__imp__sub_825B3548, NativeSetDefaultCriticalSectionInitializer, 0x82971328, "sub_825B3548"},
     };
     for (const Setter& setter : setters) {
       for (uint64_t value : {uint64_t(0), uint64_t(0x825B3498), uint64_t(0xFFFFFFFF), h.random.Next(), h.random.Next()}) {
