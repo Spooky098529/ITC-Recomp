@@ -51,7 +51,10 @@ ITC_FLAG_BOOL(native_ui_movies_game, true, "ITC",
               "(sub_8211A788), UiMovie::UiMovie sub_8211E1C0 (sub_8211AE18, sub_8211B018, "
               "sub_8211D210), UiMovie::~UiMovie sub_8211E160 (sub_8211D1B8, sub_8211AF90) and "
               "the texts freed sub_8211AC90, UiMovie::GetText sub_8211B660, and the named animations "
-              "added sub_8211E378 (sub_8211E318; its strings through std::string's plain C++); "
+              "added sub_8211E378 (sub_8211E318; its strings through std::string's plain C++), "
+              "the text setters UiMovie::ClearText sub_8211C470, sub_8211C4F0, "
+              "UiMovie::ScrollText sub_8211C570, sub_8211C5F8, UiMovie::RevealText sub_8211D880 "
+              "(sub_8211C930) and sub_8211D8D8 (sub_8211C9C0); "
               "the full-frame effect sub_8211BEE8 (CameraPasses::RenderTarget and sub_8259EBE8 "
               "through their overrides) "
               "(same results; checked by --run_harnesses=ui_movies_game and ui_movie_objects). sub_8211A660, "
@@ -755,4 +758,45 @@ extern "C" REX_FUNC(sub_8211BEE8) {
     sub_8259EBE8(ctx, base);
   });
   ctx.lr = lr;
+}
+
+// The text setters: r3 = movie, r4 = a sub-scene's index or -1, r5 = a
+// child's index (sub_8211C4F0: r6 = the delay, f1 = the speed;
+// UiMovie::ScrollText: r6 = scrolling).
+extern "C" REX_FUNC(sub_8211C470) {
+  REX_FUNC_PROLOGUE();
+  NATIVE_HEAP_OR_ORIGINAL(8211C470,
+                          ui_movies::ClearText(base, ctx.r3.u32, ctx.r4.u32, ctx.r5.u32));
+}
+
+extern "C" REX_FUNC(sub_8211C4F0) {
+  REX_FUNC_PROLOGUE();
+  NATIVE_HEAP_OR_ORIGINAL(8211C4F0,
+                          ui_movies::SetTextScrollSpeed(base, ctx.r3.u32, ctx.r4.u32, ctx.r5.u32,
+                                                        ctx.r6.u32, ctx.f1.f64));
+}
+
+extern "C" REX_FUNC(sub_8211C570) {
+  REX_FUNC_PROLOGUE();
+  NATIVE_HEAP_OR_ORIGINAL(8211C570, ui_movies::ScrollText(base, ctx.r3.u32, ctx.r4.u32,
+                                                          ctx.r5.u32, ctx.r6.u32));
+}
+
+extern "C" REX_FUNC(sub_8211C5F8) {
+  REX_FUNC_PROLOGUE();
+  NATIVE_HEAP_OR_ORIGINAL(8211C5F8,
+                          ui_movies::ResetTextScroll(base, ctx.r3.u32, ctx.r4.u32, ctx.r5.u32));
+}
+
+// UiMovie::RevealText and sub_8211D8D8: 1 or 0.
+extern "C" REX_FUNC(sub_8211D880) {
+  REX_FUNC_PROLOGUE();
+  NATIVE_HEAP_OR_ORIGINAL(8211D880,
+                          ui_movies::RevealText(base, ctx.r3.u32, ctx.r4.u32, ctx.r5.u32));
+}
+
+extern "C" REX_FUNC(sub_8211D8D8) {
+  REX_FUNC_PROLOGUE();
+  NATIVE_HEAP_OR_ORIGINAL(8211D8D8,
+                          ui_movies::HasMoreText(base, ctx.r3.u32, ctx.r4.u32, ctx.r5.u32));
 }

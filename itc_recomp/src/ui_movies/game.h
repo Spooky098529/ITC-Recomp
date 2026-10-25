@@ -442,4 +442,36 @@ void EffectBegin(uint8_t* base, uint32_t frame);
 // it leaves them.
 double EffectQuad(uint8_t* base, uint32_t frame, uint32_t primitive, uint32_t texture);
 
+// The text setters: r3 = movie, r4 = a sub-scene's index or -1, r5 = a
+// child's index: the node (FindNode), its text record (GetText, which may
+// make one), the change, then the record stored for the node's id
+// (TextMapSetKey). Each returns the r3 the original leaves (the movie's
+// texts' map, as TextMap::Set leaves it); nullopt, with nothing done, where
+// GetText would run the original.
+//
+// sub_8211C470 (UiMovie::ClearText): the buffer's 4 KB cleared (memset)
+// and +8 = 0.
+std::optional<uint32_t> ClearText(uint8_t* base, uint32_t movie, uint32_t sub_scene,
+                                  uint32_t child);
+// sub_8211C4F0: +12 = `delay`, +16 = `speed` (f1) as stfs stores it.
+std::optional<uint32_t> SetTextScrollSpeed(uint8_t* base, uint32_t movie, uint32_t sub_scene,
+                                           uint32_t child, uint32_t delay, double speed);
+// sub_8211C570 (UiMovie::ScrollText): +4 = `scrolling`, +12 = 45, +16 the
+// float word at 0x820021F8 (copied).
+std::optional<uint32_t> ScrollText(uint8_t* base, uint32_t movie, uint32_t sub_scene,
+                                   uint32_t child, uint32_t scrolling);
+// sub_8211C5F8: the scroll counter (+8) = 0.
+std::optional<uint32_t> ResetTextScroll(uint8_t* base, uint32_t movie, uint32_t sub_scene,
+                                        uint32_t child);
+// sub_8211D880 (UiMovie::RevealText, with sub_8211C930): when the record's
+// page (+20) + 1 is at most its buffer's page count (Strings::PageCount,
+// compared signed), the page + 1 and 1, else 0; the record stored either
+// way. Returns r3 (1 or 0).
+std::optional<uint32_t> RevealText(uint8_t* base, uint32_t movie, uint32_t sub_scene,
+                                   uint32_t child);
+// sub_8211D8D8 (with sub_8211C9C0): the same test with no step and nothing
+// stored: 1 while there's another page, else 0.
+std::optional<uint32_t> HasMoreText(uint8_t* base, uint32_t movie, uint32_t sub_scene,
+                                    uint32_t child);
+
 }  // namespace ui_movies

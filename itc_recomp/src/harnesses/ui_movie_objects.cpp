@@ -19,6 +19,7 @@
 #include <fmt/format.h>
 
 #include <algorithm>
+#include <bit>
 #include <cstring>
 #include <iterator>
 #include <string>
@@ -678,6 +679,132 @@ void EffectCases(Context& h) {
   results.Report();
 }
 
+// --- The text setters ---
+//
+// A movie whose live scene (+16) has a sub-scene (entry 0) and nodes
+// (entries 1 to 4; the sub-scene's 0 to 3), each node's id (+108) 0 or 1
+// to 6, and whose texts' map holds 0 to 5 ids with records of the case's
+// (each over a 4 KB buffer of its own: UTF-16 with page breaks, ended by
+// 0) or 0; the text count 0 to 6; the word at 0x826C5CD8 (an id not there)
+// a record of the case's or 0, put back after. Compared: the scratch area
+// (the tree and the records), the buffers, the map (records of the case's
+// by offset, new ones by their words and buffer's bytes; new ones freed),
+// r3 and f1.
+struct SetterFunction {
+  const char* name;
+  GuestFunction recompiled;
+  GuestFunction native;
+};
+
+void SetterCases(Context& h, uint32_t movie) {
+  const SetterFunction functions[] = {
+      {"UiMovie::ClearText (sub_8211C470)", __imp__sub_8211C470, sub_8211C470},
+      {"sub_8211C4F0 (a text's scroll delay and speed)", __imp__sub_8211C4F0, sub_8211C4F0},
+      {"UiMovie::ScrollText (sub_8211C570)", __imp__sub_8211C570, sub_8211C570},
+      {"sub_8211C5F8 (a text's scroll counter reset)", __imp__sub_8211C5F8, sub_8211C5F8},
+      {"UiMovie::RevealText (sub_8211D880; sub_8211C930)", __imp__sub_8211D880, sub_8211D880},
+      {"sub_8211D8D8 (whether a text has another page; sub_8211C9C0)", __imp__sub_8211D8D8,
+       sub_8211D8D8},
+  };
+  constexpr uint32_t kMissing = 0x826C5CD8;
+  constexpr uint32_t kOdd[] = {0x7FC00000, 0xFF800001, 0x7F800000, 0x80000000, 0x00000001};
+  const uint32_t missing = Load(h.base, kMissing);
+  const uint32_t scene = h.data, sub = h.data + 256, nodes = h.data + 512;  // 8 nodes of 128
+  const uint32_t records = h.data + 1536;                                   // 8 of 32
+  const uint32_t buffers = memory::Alloc(8 * 4096, 0);
+  for (const SetterFunction& f : functions) {
+    Results results(f.name);
+    for (int i = 0; i < 200; i++) {
+      const uint64_t seed = h.random.Next();
+      Outputs out[2];
+      for (int v = 0; v < 2; v++) {
+        Random r(seed);
+        Fill(h.base, h.data, kScratchBytes);
+        RandomFill(r, h.base, movie, 64);
+        RandomFill(r, h.base, movie + 0x9BC0, 0x420);
+        Store(h.base, movie + 16, scene);
+        Store(h.base, scene + 108, 0);
+        Store(h.base, scene + 128, sub);
+        Store(h.base, sub + 108, 0);
+        for (uint32_t k = 0; k < 8; k++) {
+          const uint32_t node = nodes + 128 * k;
+          RandomFill(r, h.base, node, 128);
+          Store(h.base, node + 108, r.Below(3) == 0 ? 0 : 1 + r.Below(6));
+          Store(h.base, (k < 4 ? scene + 136 : sub + 128) + 8 * (k % 4), node);
+        }
+        for (uint32_t k = 0; k < 8; k++) {
+          const uint32_t record = records + 32 * k, buffer = buffers + 4096 * k;
+          RandomFill(r, h.base, record, 32);
+          Store(h.base, record, buffer);
+          Store(h.base, record + 20, r.Below(5) - 1);
+          const uint32_t length = r.Below(40);
+          for (uint32_t c = 0; c < length; c++) {
+            guest::StoreU16(h.base, buffer + 2 * c,
+                            r.Below(5) == 0 ? 0xFFD1 : uint16_t(0x20 + r.Below(0x60)));
+          }
+          guest::StoreU16(h.base, buffer + 2 * length, 0);
+          for (uint32_t c = length + 1; c < 64; c++) {
+            guest::StoreU16(h.base, buffer + 2 * c, uint16_t(r.Next()));
+          }
+        }
+        const uint32_t count = r.Below(6);
+        for (uint32_t k = 0; k < count; k++) {
+          Store(h.base, movie + 0x9BCC + 8 * k, 1 + r.Below(6));
+          Store(h.base, movie + 0x9BCC + 8 * k + 4, r.Below(4) == 0 ? 0 : records + 32 * k);
+        }
+        Store(h.base, movie + 0x9BCC + 1024, count);
+        Store(h.base, movie + 0x9FCC, r.Below(7));
+        Store(h.base, kMissing, r.Below(2) == 0 ? 0 : records + 32 * 7);
+        PPCContext t = CallContext(h);
+        t.r3.u64 = movie;
+        t.r4.u64 = r.Below(2) == 0 ? 0xFFFFFFFFu : 0;
+        t.r5.u64 = r.Below(4);
+        t.r6.u64 = r.Below(3) == 0 ? uint32_t(r.Next()) : r.Below(4);
+        t.f1.f64 = r.Below(5) == 0 ? double(std::bit_cast<float>(kOdd[r.Below(std::size(kOdd))]))
+                                   : double(r.Below(1 << 20)) / 1000.0;
+        if (r.Below(8) == 0) {
+          t.f1.u64 = r.Next();  // a double that doesn't fit a float
+        }
+        if (v == 0) {
+          RunRecompiled(f.recompiled, t, h.base);
+        } else {
+          f.native(t, h.base);
+        }
+        Store(h.base, kMissing, missing);
+        out[v].Bytes(Read(h.base, h.data, kScratchBytes));
+        out[v].Bytes(Read(h.base, movie, 64));
+        for (uint32_t k = 0; k < 8; k++) {
+          out[v].Bytes(Read(h.base, buffers + 4096 * k, 4096));
+        }
+        std::vector<uint8_t> map = Read(h.base, movie + 0x9BC0, 0x420);
+        const uint32_t pairs = Load(h.base, movie + 0x9BCC + 1024);
+        for (uint32_t k = 0; k < pairs && k < 128; k++) {
+          const uint32_t at = 0x9BCC + 8 * k + 4;
+          const uint32_t value = Load(h.base, movie + at);
+          if (value != 0 && memory::IsHeapBlock(value)) {
+            const uint32_t buffer = Load(h.base, value);
+            out[v].Word(k);
+            out[v].Bytes(Read(h.base, value + 4, 24));
+            out[v].Word(memory::IsPages(buffer));
+            out[v].Bytes(Read(h.base, buffer, 4096));
+            memory::FreePages(buffer);
+            memory::crt::OperatorDelete(value);
+            for (uint32_t b = 0; b < 4; b++) {
+              map[at - 0x9BC0 + b] = 0;
+            }
+          }
+        }
+        out[v].Bytes(map);
+        out[v].Word(t.r3.u32);
+        out[v].Double(t.f1.u64);
+      }
+      results.Check(out[0], out[1], fmt::format("case {}", i));
+    }
+    results.Report();
+  }
+  memory::Free(buffers);
+}
+
 }  // namespace
 
 void UiMovieObjects(Context& h) {
@@ -693,6 +820,7 @@ void UiMovieObjects(Context& h) {
   FreeTextsCases(h, movie);
   GetTextCases(h, movie);
   AddNamedAnimationsCases(h, movie);
+  SetterCases(h, movie);
   memory::Free(movie);
   EffectCases(h);
 }

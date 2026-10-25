@@ -7,6 +7,7 @@
 #include "memory/c_runtime_heap.h"
 #include "memory/heap.h"
 #include "std_string/std_string.h"
+#include "strings_and_font/strings_and_font.h"
 #include "ui_movies/ui_movies.h"
 
 #include <cstdlib>
@@ -388,6 +389,102 @@ uint32_t AddNamedAnimations(uint8_t* base, uint32_t stack, uint32_t movie, uint3
     r3 = block ? *block : name;
   }
   return r3;
+}
+
+namespace {
+
+void Zero(uint8_t* base, uint32_t address, uint32_t bytes) {
+  guest::ForEachHostPart(base, address, bytes,
+                         [](uint8_t* host, uint32_t, uint32_t n) { std::memset(host, 0, n); });
+}
+
+// The setters' steps: the node's record, `change(record)`, then the record
+// stored for the node's id.
+template <typename Change>
+std::optional<uint32_t> ChangeText(uint8_t* base, uint32_t movie, uint32_t sub_scene,
+                                   uint32_t child, Change change) {
+  const uint32_t id_address = FindNode(base, movie, sub_scene, child) + 108;
+  const auto record = GetText(base, movie, id_address);
+  if (!record) {
+    return std::nullopt;
+  }
+  change(*record);
+  TextMapSetKey(base, movie + kMovieTexts, Load(base, id_address), *record);
+  return movie + kMovieTexts;
+}
+
+// Whether the record's next page is there: its page (+20) + 1 against its
+// buffer's page count, signed.
+bool HasNextPage(uint8_t* base, uint32_t record) {
+  const uint32_t pages = strings_and_font::StringsPageCount(base, Load(base, record));
+  return int32_t(Load(base, record + 20) + 1) <= int32_t(pages);
+}
+
+}  // namespace
+
+std::optional<uint32_t> ClearText(uint8_t* base, uint32_t movie, uint32_t sub_scene,
+                                  uint32_t child) {
+  return ChangeText(base, movie, sub_scene, child, [&](uint32_t record) {
+    ITC_NATIVE_RUNNING("sub_8211C470 UiMovie::ClearText");
+    Zero(base, Load(base, record), 4096);
+    Store(base, record + 8, 0);
+  });
+}
+
+std::optional<uint32_t> SetTextScrollSpeed(uint8_t* base, uint32_t movie, uint32_t sub_scene,
+                                           uint32_t child, uint32_t delay, double speed) {
+  return ChangeText(base, movie, sub_scene, child, [&](uint32_t record) {
+    ITC_NATIVE_RUNNING("sub_8211C4F0 (a text's scroll delay and speed)");
+    Store(base, record + 12, delay);
+    guest::StoreFloat(base, record + 16, float(speed));
+  });
+}
+
+std::optional<uint32_t> ScrollText(uint8_t* base, uint32_t movie, uint32_t sub_scene,
+                                   uint32_t child, uint32_t scrolling) {
+  return ChangeText(base, movie, sub_scene, child, [&](uint32_t record) {
+    ITC_NATIVE_RUNNING("sub_8211C570 UiMovie::ScrollText");
+    const uint32_t speed = Load(base, 0x820021F8);
+    Store(base, record + 4, scrolling);
+    Store(base, record + 12, 45);
+    Store(base, record + 16, speed);
+  });
+}
+
+std::optional<uint32_t> ResetTextScroll(uint8_t* base, uint32_t movie, uint32_t sub_scene,
+                                        uint32_t child) {
+  return ChangeText(base, movie, sub_scene, child, [&](uint32_t record) {
+    ITC_NATIVE_RUNNING("sub_8211C5F8 (a text's scroll counter reset)");
+    Store(base, record + 8, 0);
+  });
+}
+
+std::optional<uint32_t> RevealText(uint8_t* base, uint32_t movie, uint32_t sub_scene,
+                                   uint32_t child) {
+  bool stepped = false;
+  const auto r3 = ChangeText(base, movie, sub_scene, child, [&](uint32_t record) {
+    ITC_NATIVE_RUNNING("sub_8211D880 UiMovie::RevealText");
+    ITC_NATIVE_RUNNING("sub_8211C930 (a text's next page)");
+    stepped = HasNextPage(base, record);
+    if (stepped) {
+      Store(base, record + 20, Load(base, record + 20) + 1);
+    }
+  });
+  if (!r3) {
+    return std::nullopt;
+  }
+  return stepped ? 1u : 0u;
+}
+
+std::optional<uint32_t> HasMoreText(uint8_t* base, uint32_t movie, uint32_t sub_scene,
+                                    uint32_t child) {
+  const uint32_t id_address = FindNode(base, movie, sub_scene, child) + 108;
+  const auto record = GetText(base, movie, id_address);
+  if (!record) {
+    return std::nullopt;
+  }
+  ITC_NATIVE_RUNNING("sub_8211D8D8 (whether a text has another page; sub_8211C9C0)");
+  return HasNextPage(base, *record) ? 1u : 0u;
 }
 
 }  // namespace ui_movies
