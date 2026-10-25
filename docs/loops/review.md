@@ -13,6 +13,13 @@ When the user has reviewed a run's section, its heading gets
 
 ## Run 2026-10-25 16:38 (`b7-loop-25-10-26-3`)
 
+- For later (the user's call, 2026-10-25: dropped for now): native code
+  reaches `generated/` three ways: the adapters' `--native_X=false`
+  fallbacks, ports that hand uncovered cases to `__imp__` from the start
+  (some for cases that can occur in play: a full command list, another
+  list's chunk, more than 4 textures; nothing logs when one fires), and
+  guest calls from native code into still-recompiled callees (vtables,
+  callbacks). To investigate later.
 - The user's call: `_mtinit` `sub_825AA708` (the C runtime's
   per-thread data over KeTlsAlloc/KeTlsSetValue) left for the core;
   raised again only when it blocks a subsystem's ready work.

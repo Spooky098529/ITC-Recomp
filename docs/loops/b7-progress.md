@@ -87,11 +87,9 @@ file's history. What's left to see in a drive, from every run:
   loads wait on `Model::Load`. Validated (`itc_1777`: 2 of 2 harness
   lines; replay `itc_1778` ok; `Model::RecordShape` to `to-drive.md`:
   its work runs inside `Model::DrawShape`, past its print). Finished.
-- Waiting on the user (2026-10-25): whether ports may fall back to the
-  original for cases that can occur in play (a full command list,
-  another list's chunk, more than 4 textures), or only for paths not
-  seen in play, with a log line when a fallback fires. Subsystem 3
-  starts after the answer.
+- The user's call (2026-10-25): fallbacks to the original and native
+  code calling into `generated/` left as they are for now, to
+  investigate later (the functions will be made native anyway).
 
 ## Done
 
