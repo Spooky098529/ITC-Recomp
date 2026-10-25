@@ -26,4 +26,8 @@ void VectorConstruct(uint8_t* base, uint64_t array, uint64_t size, uint64_t coun
 void VectorDestruct(uint8_t* base, uint64_t array, uint64_t size, uint64_t count,
                     uint64_t destructor, ElementCall call, void* user);
 
+// sub_82106540: an empty function (`blr`), the do-nothing destructor many
+// objects share (and their vtables' empty slots). Nothing to do.
+void EmptyDestructor();
+
 }  // namespace c_runtime

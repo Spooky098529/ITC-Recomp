@@ -41,7 +41,8 @@ ITC_FLAG_BOOL(native_c_runtime, true, "ITC",
               "(sub_825AF000), write_multi_char (sub_825AF098), the wide write_char and _putwc_nolock "
               "(sub_825B1368, sub_825B7A80); __iob_func (sub_825AD4C0); the start-up's _cfltcvt_init (sub_825A6DB0, "
               "sub_825A6E48), _init_pointers' setters (sub_825AD140, sub_825AEE18, sub_825AFCB8, "
-              "sub_825B3560, sub_825B3548), __initmbctable and setSBCS (sub_825B6958, sub_825B68C8); "
+              "sub_825B3560, sub_825B3548) and _init_pointers itself (sub_825AA398), the empty "
+              "destructor (sub_82106540), __initmbctable and setSBCS (sub_825B6958, sub_825B68C8); "
               "the compiler's vector constructor and destructor iterators (sub_820911A8, "
               "sub_820900C0: the elements' native functions called as plain C++, the empty "
               "destructor sub_82106540 skipped, any other called in the translated code); "
@@ -605,6 +606,28 @@ extern "C" REX_FUNC(sub_825B3548) {
     return;
   }
   c_runtime::SetDefaultCriticalSectionInitializer(base);
+}
+
+// _init_pointers: no arguments; r3 left 0, as the original's last setter
+// call leaves it.
+extern "C" REX_FUNC(sub_825AA398) {
+  REX_FUNC_PROLOGUE();
+  if (!ITC_FLAG(native_c_runtime)) {
+    __imp__sub_825AA398(ctx, base);
+    return;
+  }
+  c_runtime::InitPointers(base);
+  ctx.r3.u64 = 0;
+}
+
+// The empty destructor (blr): every register left.
+extern "C" REX_FUNC(sub_82106540) {
+  REX_FUNC_PROLOGUE();
+  if (!ITC_FLAG(native_c_runtime)) {
+    __imp__sub_82106540(ctx, base);
+    return;
+  }
+  c_runtime::EmptyDestructor();
 }
 
 // __initmbctable: returns 0.

@@ -1347,6 +1347,54 @@ void CRuntime(Context& h) {
                     fmt::format("{} r3 {:X}", setter.name, value));
       }
     }
+    // _init_pointers on its six globals (from random words), and the empty
+    // destructor on random registers (all left): the globals, the scratch
+    // area and the registers it could touch compared.
+    {
+      Results init("_init_pointers (sub_825AA398) and the empty destructor (sub_82106540)");
+      constexpr uint32_t kGlobals[] = {0x82971170, 0x8297132C, 0x82978320,
+                                       0x82971178, 0x82971328, 0x8266B7B0};
+      for (int i = 0; i < 20; i++) {
+        const Random start = h.random;
+        for (bool empty : {false, true}) {
+          Outputs out[2];
+          for (int v = 0; v < 2; v++) {
+            h.random = start;
+            uint32_t saved[6];
+            for (int k = 0; k < 6; k++) {
+              saved[k] = guest::LoadU32(h.base, kGlobals[k]);
+              guest::StoreU32(h.base, kGlobals[k], uint32_t(h.random.Next()));
+            }
+            Fill(h.base, h.data, kScratchBytes);
+            PPCContext t = CallContext(h);
+            t.r3.u64 = i == 0 ? 0 : h.random.Next();
+            t.r4.u64 = h.random.Next();
+            t.r10.u64 = h.random.Next();
+            t.r11.u64 = h.random.Next();
+            if (empty) {
+              (v == 0 ? __imp__sub_82106540 : sub_82106540)(t, h.base);
+            } else {
+              (v == 0 ? __imp__sub_825AA398 : sub_825AA398)(t, h.base);
+            }
+            for (int k = 0; k < 6; k++) {
+              out[v].Word(guest::LoadU32(h.base, kGlobals[k]));
+              guest::StoreU32(h.base, kGlobals[k], saved[k]);
+            }
+            out[v].Bytes(Read(h.base, h.data, kScratchBytes));
+            out[v].Word(t.r3.u32);
+            out[v].Word(uint32_t(t.r3.u64 >> 32));
+            out[v].Word(t.r4.u32);
+            if (empty) {
+              out[v].Word(t.r10.u32);
+              out[v].Word(t.r11.u32);
+            }
+          }
+          init.Check(out[0], out[1],
+                     fmt::format("{} case {}", empty ? "sub_82106540" : "_init_pointers", i));
+        }
+      }
+      init.Report();
+    }
     const uint32_t info = guest::LoadU32(h.base, 0x8266C450);
     const std::vector<std::pair<uint32_t, uint32_t>> mbc = {
         {0x82978338, 4}, {0x8297135C, 4}, {0x8297136C, 4}, {info, 544}};
