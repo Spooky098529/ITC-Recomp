@@ -85,8 +85,9 @@ void MeshParse(uint8_t* base, uint32_t model, uint32_t file, const LoadCalls& ca
   ITC_NATIVE_RUNNING("sub_825963F0 Mesh::Parse");
   const uint32_t version = Load(base, file);
   if (version != kVersion) {
-    ITC_LOG_WARN("Mesh::Parse: the game's debug message: {} ({:#x})", Message(base, 0x8206CDE8),
-                 version);
+    // The game's debug print (sub_825ABFE8, its format at 0x8206CDE8).
+    ITC_LOG_WARN("Mesh::Parse: version {:#x}, not {:#x} (the game's debug print)", version,
+                 kVersion);
   }
   shader_objects::CreateCalls shader_calls;
   shader_calls.init = calls.init;
