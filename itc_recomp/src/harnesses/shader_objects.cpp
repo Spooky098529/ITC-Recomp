@@ -12,11 +12,15 @@
 #include "memory/heap.h"
 #include "model_animation/model_animation.h"
 #include "models/memory_blocks.h"
+#include "models/model.h"
+#include "models/model_load.h"
 #include "models/xpr.h"
 #include "shader_objects/shader_objects.h"
 
 #include <fmt/format.h>
 
+#include <bit>
+#include <cstdlib>
 #include <mutex>
 #include <string>
 #include <vector>
@@ -389,6 +393,13 @@ void Creates(Context& h) {
 
 // --- Resource::Relocate, XPR::Create, Mesh::LoadShaders ---
 
+void Require(bool done) {
+  if (!done) {
+    ITC_LOG_ERROR("harness: shader_objects: a model's set-up or teardown declined");
+    std::abort();
+  }
+}
+
 void NativeRelocateResource(PPCContext& ctx, uint8_t* base) {
   ctx.r3.u64 = models::RelocateResource(base, ctx.r3.u32, ctx.r4.u32);
 }
@@ -747,6 +758,294 @@ void SkeletonSetUps(Context& h) {
   }
 }
 
+// --- Model::Load (with Mesh::Parse) ---
+
+struct LoadCall {
+  PPCContext ctx;
+  uint8_t* base;
+};
+void LoadCallFunction(void* user, uint32_t function, uint32_t r3, uint32_t r4, uint32_t r5,
+                      uint32_t) {
+  auto& call = *static_cast<LoadCall*>(user);
+  PPCContext& ctx = call.ctx;
+  uint8_t* base = call.base;
+  ctx.r3.u64 = r3;
+  ctx.r4.u64 = r4;
+  ctx.r5.u64 = r5;
+  REX_CALL_INDIRECT_FUNC(function);
+}
+void LoadCallInit(void* user, uint32_t object, uint32_t microcode) {
+  auto& call = *static_cast<LoadCall*>(user);
+  call.ctx.r3.u64 = object;
+  call.ctx.r4.u64 = microcode;
+  __imp__sub_822A8740(call.ctx, call.base);
+}
+void NativeModelLoad(PPCContext& ctx, uint8_t* base) {
+  LoadCall call{ctx, base};
+  models::LoadCalls calls;
+  calls.init = &LoadCallInit;
+  calls.call = &LoadCallFunction;
+  calls.user = &call;
+  const uint32_t model = ctx.r3.u32;
+  if (models::ModelLoad(base, model, ctx.r4.u32, ctx.r5.u32, calls)) {
+    ctx.r3.u64 = Load(base, model + 412);
+  } else {
+    __imp__sub_82596920(ctx, base);
+  }
+}
+
+// A side's blocks, for comparing their bytes with the pointers into them
+// made offsets.
+struct Region {
+  uint32_t start, bytes;
+};
+
+void AddNormalized(Outputs& out, uint8_t* base, const std::vector<Region>& regions,
+                   uint32_t start, uint32_t bytes) {
+  std::vector<uint8_t> data = Read(base, start, bytes);
+  for (uint32_t at = 0; at + 4 <= bytes; at += 4) {
+    const uint32_t word = Load(base, start + at);
+    for (size_t r = 0; r < regions.size(); r++) {
+      if (word >= regions[r].start && word - regions[r].start < regions[r].bytes + 16) {
+        const uint32_t marker = 0xB0000000u | (uint32_t(r) << 20) | (word - regions[r].start);
+        for (int k = 0; k < 4; k++) data[at + k] = uint8_t(marker >> (24 - 8 * k));
+        break;
+      }
+    }
+  }
+  out.Bytes(data);
+}
+
+// Model::Load: a model made by Model::Model at one address for both sides,
+// and a part file built in a block: 0 to 3 shapes (resource headers of
+// types 1, 2, 3 and 8, materials, skinned or not with their weights), a
+// shader section of 0 to 2 pairs, vertex data; with or without the skeleton
+// (a node file, track sections with no tracks), with or without an XPR2 file
+// (a texture), a wrong version now and then. The model's 432 bytes and every
+// block it holds, with the pointers into those blocks made offsets (they sit
+// at different addresses on each side); then all freed.
+void ModelLoads(Context& h) {
+  Results results("Model::Load (sub_82596920, with Mesh::Parse sub_825963F0)");
+  constexpr uint32_t kModelBytes = 432;
+  constexpr uint32_t kFileBytes = 64 * 1024;
+  constexpr uint32_t kHeader = 0x4000;   // the header block's bytes
+  constexpr uint32_t kVertices = 0x800;  // the vertex data's
+  const uint32_t model = memory::Alloc(kModelBytes, 0);
+  const uint32_t files = memory::Alloc(kFileBytes, 0);
+  const uint32_t xprs = memory::Alloc(4096, 0);
+  auto store = [&](uint32_t at, uint32_t value) { Store(h.base, at, value); };
+  auto storef = [&](uint32_t at, float value) { Store(h.base, at, std::bit_cast<uint32_t>(value)); };
+  for (int c = 0; c < 80; c++) {
+    const uint32_t shapes = c < 4 ? uint32_t(c) : h.random.Below(4);
+    const uint32_t pairs = h.random.Below(3);
+    const bool skeleton = c % 3 == 1;
+    const bool with_xpr = c % 2 == 0;
+    const bool wrong_version = c % 13 == 6;
+    uint32_t nodes = 0, entries = 0;
+    std::vector<uint32_t> code_sizes;
+    // The file's words, built once and written for both sides.
+    std::vector<uint32_t> file(kFileBytes / 4, 0);
+    auto put = [&](uint32_t at, uint32_t value) { file[at / 4] = value; };
+    auto putf = [&](uint32_t at, float value) { put(at, std::bit_cast<uint32_t>(value)); };
+    put(0, wrong_version ? 0x00140000 : 0x00150000);
+    put(4, 7);
+    put(8, 9);
+    put(12, shapes);
+    put(16, 3);
+    put(20, 0x80);
+    put(24, 0x90);
+    put(28, 0x100);  // the shapes
+    put(32, 0xA0);
+    put(64, kHeader);
+    put(68, kVertices);
+    put(72, kHeader + kVertices);  // the shader section
+    put(76, skeleton ? 1 : 0);
+    // Sections with no tracks, and the node file.
+    put(44, 0x2000);
+    if (skeleton) {
+      put(36, 0x2100);
+      put(48, 0x2040);
+      put(52, 0x2060);
+      put(56, 0x2080);
+      put(60, 0x20A0);
+      nodes = 1 + h.random.Below(4);
+      entries = h.random.Below(3);
+      put(0x2100 + 4, nodes);
+      put(0x2100 + 8, entries);
+      put(0x2100 + 12, h.random.Below(nodes));
+      for (uint32_t k = 16; k <= 48; k += 4) put(0x2100 + k, 0x40 + k);
+    }
+    uint32_t free_at = 0x2400;  // materials and weights from here
+    for (uint32_t i = 0; i < shapes; i++) {
+      const uint32_t shape = 0x100 + 544 * i;
+      const uint32_t types[] = {1, 2, 3, 8};
+      for (uint32_t r : {288u, 320u, 352u}) {
+        put(shape + r, (uint32_t(h.random.Next()) & 0xFFFFFF00u & ~0x40000000u) |
+                           types[h.random.Below(4)]);
+        put(shape + r + 24, uint32_t(h.random.Next()) & 0x0FFFFFFFu);
+        put(shape + r + 28, uint32_t(h.random.Next()) & 0x0FFFFFFFu);
+        put(shape + r + 44, h.random.Below(1024));
+        put(shape + r + 48, uint32_t(h.random.Next()) & 0x0FFFFFFFu);
+      }
+      put(shape + 384, kHeader + 16 * h.random.Below(64));
+      put(shape + 388, kHeader + 16 * h.random.Below(64));
+      put(shape + 392, kHeader + 16 * h.random.Below(64));
+      const uint32_t skinned = h.random.Below(3) == 0 ? 0 : 1;
+      put(shape + 428, skinned);
+      // The materials.
+      const uint32_t materials = free_at;
+      const uint32_t count = h.random.Below(3);
+      put(shape + 396, materials);
+      put(materials, count);
+      for (uint32_t j = 0; j < count; j++) {
+        const uint32_t entry = materials + 512 * j;
+        put(entry + 368, (uint32_t(h.random.Next()) & 0xFFFFFF00u) | types[h.random.Below(4)]);
+        put(entry + 368 + 24, uint32_t(h.random.Next()) & 0x0FFFFFFFu);
+        put(entry + 368 + 48, uint32_t(h.random.Next()) & 0x0FFFFFFFu);
+        put(entry + 400, 16 * h.random.Below(64));
+      }
+      free_at += 16 + 512 * 3;
+      put(shape + 400, 0x60);
+      put(shape + 404, 0x70);
+      // The weights: vertices, their counts and floats.
+      const uint32_t weights = free_at;
+      const uint32_t vertices = h.random.Below(5);
+      put(shape + 408, weights);
+      put(weights + 0, vertices);
+      put(weights + 8, weights + 32);
+      uint32_t data = weights + 32 + 4 * vertices;
+      put(weights + 12, data);
+      put(weights + 16, 0x50);
+      for (uint32_t v = 0; v < vertices; v++) {
+        const uint32_t n = 1 + h.random.Below(4);
+        put(weights + 32 + 4 * v, n);
+        for (uint32_t k = 0; k < n; k++) {
+          for (uint32_t l = 0; l < 4; l++) {
+            putf(data + 16 * k + 4 * l, float(h.random.Below(1u << 20)) / float(1u << 20));
+          }
+        }
+        data += 16 * n;
+      }
+      free_at = (data + 15) & ~15u;
+    }
+    // The shader section after the vertex data.
+    {
+      uint32_t at = kHeader + kVertices;
+      put(at, pairs);
+      uint32_t pair = at + 32;
+      for (uint32_t i = 0; i < pairs; i++) {
+        uint32_t f = pair + 32;
+        uint32_t sizes[2];
+        for (int k = 0; k < 2; k++) {
+          const uint32_t header = 280;
+          const uint32_t code = 12 * (1 + h.random.Below(40));
+          put(f + 0, k == 0 ? 0x11u : 0x40u);
+          put(f + 4, header);
+          put(f + 8, code);
+          code_sizes.push_back(code);
+          if (k == 0) {
+            put(f + 20, 32);
+            put(f + 32 + 24, 0);
+            const uint32_t fetches = h.random.Below(8);
+            put(f + 32 + 28, fetches);
+            for (uint32_t w = 0; w < fetches; w++) {
+              put(f + 32 + 40 + 4 * w, h.random.Below(code / 12));
+            }
+          }
+          sizes[k] = header + code;
+          f += sizes[k];
+        }
+        put(pair + 4, sizes[0]);
+        put(pair + 8, sizes[1]);
+        pair = f;
+      }
+    }
+    for (uint32_t k = kHeader / 4; k < (kHeader + kVertices) / 4; k++) {
+      file[k] = uint32_t(h.random.Next()) & 0x0FFFFFFFu;
+    }
+    Outputs out[2];
+    for (int v = 0; v < 2; v++) {
+      for (uint32_t k = 0; k < file.size(); k++) store(files + 4 * k, file[k]);
+      // An XPR2 file with one texture record.
+      for (uint32_t k = 0; k < 1024; k++) store(xprs + 4 * k, 0);
+      store(xprs + 0, 0x58505232);
+      store(xprs + 4, 256);
+      store(xprs + 8, 4096 - 12 - 256);
+      store(xprs + 12, 1);                     // the header block: one record
+      store(xprs + 12 + 4, 0x54580000);        // TX
+      store(xprs + 12 + 8, 64);                // its texture header
+      store(xprs + 12 + 16, 128);              // the name
+      store(xprs + 12 + 64 + 0x20, 0x00001003);
+      store(xprs + 12 + 64 + 44, 0x80);
+      store(xprs + 12 + 64 + 0x30, 0x00002005);
+      Fill(h.base, model, kModelBytes, 0);
+      Require(models::ModelConstruct(h.base, model));
+      PPCContext t = CallContext(h);
+      t.r3.u64 = model;
+      t.r4.u64 = files;
+      t.r5.u64 = with_xpr ? xprs : 0;
+      (v == 0 ? __imp__sub_82596920 : NativeModelLoad)(t, h.base);
+      out[v].Word(t.r3.u32);
+      // The side's blocks: the model's, its shaders', its XPR's, its
+      // skeleton's.
+      std::vector<Region> regions;
+      auto add = [&](uint32_t start, uint32_t bytes) {
+        if (start != 0) regions.push_back({start, bytes});
+      };
+      add(Load(h.base, model + 16), kHeader);
+      add(Load(h.base, model + 20), kVertices);
+      const uint32_t pair_block = Load(h.base, model + 24);
+      if (Load(h.base, model + 420) != 0) {
+        add(pair_block, 16 * Load(h.base, model + 420));
+        for (uint32_t i = 0; i < Load(h.base, model + 420); i++) {
+          add(Load(h.base, pair_block + 16 * i + 0), so::kVertexShaderBytes + 280);
+          add(Load(h.base, pair_block + 16 * i + 4), so::kPixelShaderBytes + 280);
+          add(Load(h.base, pair_block + 16 * i + 8), code_sizes[2 * i]);
+          add(Load(h.base, pair_block + 16 * i + 12), code_sizes[2 * i + 1]);
+        }
+      }
+      add(Load(h.base, model + 56), 256);
+      add(Load(h.base, model + 64), 4096 - 12 - 256);
+      const uint32_t sk = model + 112;
+      add(Load(h.base, sk + 128), 20);
+      const uint32_t sizes[] = {64 * nodes, 144 * nodes, 64 * entries};
+      const uint32_t offsets[] = {132u, 136u, 144u};
+      for (int k = 0; k < 3; k++) {
+        const uint32_t at = Load(h.base, sk + offsets[k]);
+        if (at != 0) add(at - 16, 16 + sizes[k]);
+      }
+      add(Load(h.base, sk + 176), 16 * nodes);
+      // The model's words, then each block's bytes.
+      AddNormalized(out[v], h.base, regions, model, kModelBytes);
+      for (const Region& r : regions) {
+        AddNormalized(out[v], h.base, regions, r.start, r.bytes);
+      }
+      // Freed: the blocks, then the model's members.
+      for (uint32_t i = 0; pair_block != 0 && i < Load(h.base, model + 420); i++) {
+        FreeBlock(Load(h.base, pair_block + 16 * i + 0), 0);
+        FreeBlock(Load(h.base, pair_block + 16 * i + 4), 0);
+        FreeBlock(Load(h.base, pair_block + 16 * i + 8), 1);
+        FreeBlock(Load(h.base, pair_block + 16 * i + 12), 1);
+      }
+      if (Load(h.base, model + 420) != 0) FreeBlock(pair_block, 0);
+      FreeBlock(Load(h.base, model + 16), 0);
+      FreeBlock(Load(h.base, model + 20), 1);
+      FreeBlock(Load(h.base, model + 56), 0);
+      FreeBlock(Load(h.base, model + 64), 2);
+      for (uint32_t offset : {16u, 20u, 24u, 420u, 56u, 64u}) store(model + offset, 0);
+      Require(models::ModelDestruct(h.base, model).has_value());
+    }
+    results.Check(out[0], out[1],
+                  fmt::format("case {} ({} shapes, {} shader pairs{}{}{})", c, shapes, pairs,
+                              skeleton ? ", skeleton" : "", with_xpr ? ", XPR" : "",
+                              wrong_version ? ", wrong version" : ""));
+  }
+  memory::Free(xprs);
+  memory::Free(files);
+  memory::Free(model);
+  results.Report();
+}
+
 // --- The memory blocks ---
 
 // The makers' register steps.
@@ -984,6 +1283,7 @@ void ShaderObjects(Context& h) {
   XprCreates(h);
   LoadShaderSections(h);
   SkeletonSetUps(h);
+  ModelLoads(h);
 }
 
 }  // namespace harness

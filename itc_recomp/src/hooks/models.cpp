@@ -21,6 +21,7 @@
 #include "hooks/models.h"
 #include "models/memory_blocks.h"
 #include "models/model.h"
+#include "models/model_load.h"
 #include "models/texture_provider.h"
 #include "models/xpr.h"
 #include "model_animation/model_animation.h"
@@ -50,6 +51,8 @@ ITC_FLAG_BOOL(native_models, true, "ITC",
               "(their copies as memcpy's override makes them, recorded for the renderer; "
               "VertexShader::Init's original a guest call where its plain C++ declines), "
               "with --native_heap "
+              "Model::Load sub_82596920 (with Mesh::Parse sub_825963F0, no adapter: only it "
+              "calls it; the callees' originals, where their plain C++ declines, guest calls), "
               "SkeletonBase::SetUp sub_8259A9E0 (with NodeFile::View sub_825A21A8, no adapter: "
               "only it calls it) and Skeleton::Bind sub_82599A20 (in src/model_animation/), "
               "Memory::AllocPhysical sub_8258E138 (in src/models/memory_blocks.cpp), the shared shaders sub_825896D8 and sub_82589700, the vertex "
@@ -396,4 +399,62 @@ extern "C" REX_FUNC(sub_82599A20) {
     }
   }
   __imp__sub_82599A20(ctx, base);
+}
+
+namespace {
+
+// The guest calls Model::Load makes where a callee's plain C++ declines,
+// from a frame below the adapter's (room for the original's own frames).
+struct ModelLoadContext {
+  PPCContext& ctx;
+  uint8_t* base;
+  static void Init(void* user, uint32_t object, uint32_t microcode) {
+    auto& c = *static_cast<ModelLoadContext*>(user);
+    guest_call::InFrame(c.ctx, c.base, 512, 0x82594DEC, [&](uint32_t) {
+      c.ctx.r3.u64 = object;
+      c.ctx.r4.u64 = microcode;
+      __imp__sub_822A8740(c.ctx, c.base);
+    });
+  }
+  static void Call(void* user, uint32_t function, uint32_t r3, uint32_t r4, uint32_t r5,
+                   uint32_t return_address) {
+    auto& c = *static_cast<ModelLoadContext*>(user);
+    PPCContext& ctx = c.ctx;
+    uint8_t* base = c.base;
+    guest_call::InFrame(ctx, base, 512, return_address, [&](uint32_t) {
+      ctx.r3.u64 = r3;
+      ctx.r4.u64 = r4;
+      ctx.r5.u64 = r5;
+      REX_CALL_INDIRECT_FUNC(function);
+    });
+  }
+};
+
+}  // namespace
+
+// Model::Load: r3 = the model, r4 = the part file, r5 = an XPR2 file or 0;
+// r3 = the model's shape count (the original's loop counter). Flush-to-zero
+// off, as the original leaves it.
+extern "C" REX_FUNC(sub_82596920) {
+  REX_FUNC_PROLOGUE();
+  if (NativeLifetime()) {
+    ctx.fpscr.disableFlushMode();
+    const uint64_t lr = ctx.lr;
+    const uint32_t model = ctx.r3.u32, file = ctx.r4.u32, xpr = ctx.r5.u32;
+    ModelLoadContext context{ctx, base};
+    models::LoadCalls calls;
+    calls.init = &ModelLoadContext::Init;
+    calls.call = &ModelLoadContext::Call;
+    calls.user = &context;
+    const bool done = models::ModelLoad(base, model, file, xpr, calls);
+    ctx.lr = lr;
+    if (done) {
+      ctx.r3.u64 = guest::LoadU32(base, model + 412);
+      return;
+    }
+    ctx.r3.u64 = model;
+    ctx.r4.u64 = file;
+    ctx.r5.u64 = xpr;
+  }
+  __imp__sub_82596920(ctx, base);
 }
