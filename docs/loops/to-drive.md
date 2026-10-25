@@ -26,6 +26,13 @@ screen):
   Buffer28::~Buffer28, `sub_82106A00` Buffers28::~Buffers28
   (`game-modes.md`)
 
+The model class's migration, not in the attract race (`itc_1614`); the
+replay broke (`itc_1616`: the boot stalled twice):
+
+- `sub_825A7348` memmove_s (`c-runtime.md`), `sub_825943E0`
+  TextureProvider::~TextureProvider, `sub_82594F58` Model::~Model
+  (`models.md`)
+
 ## Run 2026-10-24 21:33 (`b7-loop-24-10-26-4`)
 
 The three cleanup leads' migration, not in the attract race or the

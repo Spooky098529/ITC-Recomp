@@ -43,7 +43,12 @@ file's history. What's left to see in a drive, from every run:
   for `0x8296BD38` only), 3 adapters removed; `--native_models`;
   `itc_1613`: 27 s, 0 errors, every harness 0 differing). Nothing ready
   left in it; it makes the game modes' `sub_82106AF0` and
-  `sub_821067A0` ready. Step: validation agent running.
+  `sub_821067A0` ready. Validated (`itc_1614`: 19 of 19 harness
+  lines, 16 ran in play; the replay broke at boot again, `itc_1616`, so
+  3 go to `to-drive.md`). Finished.
+- Next: the game modes' cleanup (no mapping, not counted):
+  `sub_821067A0`, `sub_82106AF0`, ready since the model class, and what
+  they unblock. Step: migration agent running.
 
 ## Done
 
@@ -53,6 +58,10 @@ file's history. What's left to see in a drive, from every run:
   mode's constructor and destructor (`XPR::XPR`, its destructor,
   `RaceOverlays::Destroy`), `RaceMode::Init`'s other set-ups, the mode
   constructors, `Modes::Tick`.
+- The model class (`models.md` rows of f28c6f7; 17 rows, and
+  `memmove_s` in `c-runtime.md`): all 17 ours in one migration
+  (6148c1e..b35547a), 3 adapters removed; the memory blocks' lock a host
+  lock (the user's call); validated (`itc_1614`); `--native_models`.
 
 ## Rows to review
 
@@ -71,6 +80,8 @@ This run's groups: `expected-differences.md` (the "03:59 run" lines).
 - Start: ours 1903, work left 4548 (wrapped 111, known 597, unknown 3840).
 - After the game modes' map: ours 1903, work left 4548 (wrapped 111,
   known 625, unknown 3812).
+- After the model class's validation: race 27 s (`itc_1614`), 0 errors,
+  every harness 0 differing.
 - After the model class's migration 1: ours 1944, work left 4507
   (wrapped 111, known 601, unknown 3795).
 - After the model class's map: ours 1923, work left 4528 (wrapped 111,

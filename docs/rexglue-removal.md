@@ -2572,6 +2572,7 @@ B7. **The game logic inside**: everything else, subsystem by subsystem,
 | 2026-10-24 | The race's screen objects (one 128,000-byte object a view: probably a screen blur while the nitrous runs, its strength from the speed; the two `std::map` instantiations of its ring UVs (`UvMap`, `UvColumn`: double keys), the rings, the strength, the release and teardown; the fan, its set-up and the draw left waiting on `rand` and the shader pairs) | `screen-objects.md` | 38 of 42 (one migration) | `--native_screen_objects` |
 | 2026-10-25 | The app framework (the framework object `main` makes, its services' factories and getters, the run loop `App::Run` with its two `std::map`s of handlers and its request vector, the tick handlers' dispatch, the constructors and `main` itself; `Framework::Init` and the services' set-ups left waiting on other subsystems and kernel sync) | `framework.md` | 56 of 68 (two migrations) | `--native_framework` |
 | 2026-10-25 | The game modes (the one mode object the game runs at a time; the race mode's message dispatcher and its state machines: transitions keyed by (state, message), `StateMachine::Add`, `Find` and `Handle`; the race overlays' state machine and its handlers; the race mode's members and 28-byte buffers; the race mode's constructor, destructor and set-ups left waiting on `XPR::XPR`, other set-ups and the mode constructors) | `game-modes.md` | 21 of 31 (one migration; 3 Native, 2 Merged) | `--native_game_modes` |
+| 2026-10-25 | The model class (`Model::Model`, `Release`, `~Model`, the texture provider and its `std::vector` helpers, `XPR::XPR`, `Release` and `~XPR`, the put-off frees; the memory blocks' lock `0x8296BD38` a host lock taken by every user, the user's call; with `memmove_s` in `c-runtime.md`) | `models.md` | 17 of 17 new rows (19 of 50 in the file; one migration) | `--native_models` |
 
     The first run (2026-10-22, branch `b7-loop-test`): every harness at 0 differing, attract races at 20-21 s with no errors,
     and a race the user drove looked right. Ours went from 162 to 335 (work
@@ -3380,3 +3381,19 @@ row yet 3,812), from 4,548. The rest waits on `XPR::XPR` (`models.md`,
 a leaf blocking the race mode's constructor), the race mode's other
 set-ups (leads), the other modes' constructors and `Modes::Tick`'s
 callees.
+
+**2026-10-25, the model class (branch `b7-loop-25-10-26-2`):** the
+fifteenth run made the model class native (`models.md`, all 17 new
+rows: `Model::Model`, `Release`, `~Model`, the texture provider, the
+XPR's constructor and teardown, the put-off frees; `memmove_s` in
+`c-runtime.md`; `--native_models`). The critical section at
+`0x8296BD38` (the memory blocks' pending frees) is a host
+`std::recursive_mutex` (the user's call, 2026-10-25), taken by the
+native frees and, through `ScopedLock` overridden for this critical
+section only, by its four recompiled users; the generic wrappers stay
+the game's. The boundary unchanged: 449 functions (916 pairs):
+overridden 67, Native 5, Dropped 23, never called 70, live 284.
+Imports: 186 called, 62 with a live caller. B7 (`b7_status.py`): 6,451
+in play, ours 1,944, work left 4,507 (Wrapped 111, with a row 601, no
+row yet 3,795), from 4,528. It makes the game modes' `sub_821067A0` and
+`sub_82106AF0` ready.
