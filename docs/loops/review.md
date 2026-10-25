@@ -11,6 +11,10 @@ functions to check in a drive in the progress file.
 When the user has reviewed a run's section, its heading gets
 "(reviewed <date>)"; the section stays for the record.
 
+## Run 2026-10-25 16:38 (`b7-loop-25-10-26-3`)
+
+(Nothing yet.)
+
 ## Run 2026-10-25 03:59 (`b7-loop-25-10-26-2`)
 
 - `game-modes.md` (new, 7871fe6): 31 rows (3 moved from
