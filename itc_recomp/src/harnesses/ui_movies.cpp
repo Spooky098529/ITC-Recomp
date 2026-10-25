@@ -104,6 +104,12 @@ void NativeVertexOffset(PPCContext& ctx, uint8_t* base) {
   ctx.r3.u64 = ui_movies::VertexOffset(ctx.r3.u32, ctx.r4.u32);
 }
 
+// sub_825A6508 through the adapter's steps (its adapter is gone).
+void NativeNodeTrack(PPCContext& ctx, uint8_t* base) {
+  (void)base;
+  ctx.r3.u64 = ui_movies::NodeTrack(ctx.r3.u32, ctx.r4.u32);
+}
+
 // The accessors that only add: r3 and r4 random, and their edges.
 void Arithmetic(Context& h, const Function& f) {
   Results results(f.name);
@@ -2075,7 +2081,7 @@ void ApplyAnimationCases(Context& h) {
 
 void UiMovies(Context& h) {
   const Function arithmetic[] = {
-      {"NodeTrack (sub_825A6508)", __imp__sub_825A6508, sub_825A6508},
+      {"NodeTrack (sub_825A6508)", __imp__sub_825A6508, NativeNodeTrack},
       {"Key (sub_825A6518)", __imp__sub_825A6518, sub_825A6518},
       {"VertexOffset (sub_8259D600)", __imp__sub_8259D600, NativeVertexOffset},
       {"PrimitiveTexture (sub_8259D618)", __imp__sub_8259D618, sub_8259D618},
