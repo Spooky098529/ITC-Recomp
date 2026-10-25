@@ -28,8 +28,9 @@ ITC_FLAG_BOOL(native_framework, true, "ITC",
               "only those call them: the decrement sub_82091AE8, RotateLeft sub_82092B10, "
               "RotateRight sub_82092A00, AllocateNodes sub_82099C80, NewHead sub_82099E88, NewNode "
               "sub_82099E20 and InsertNode sub_82093400) and request vector (Clear sub_8209A080, "
-              "with Erase sub_82092EF8, no adapter; with --native_heap InsertN sub_8209A0E8, "
-              "Insert sub_8209A600 and PushBack sub_8209A930), RunLoop::RunLoop sub_8209A9F0 and "
+              "with Erase sub_82092EF8, no adapter; with --native_heap PushBack sub_8209A930, and "
+              "without adapters, as only it calls them, Insert sub_8209A600 and InsertN "
+              "sub_8209A0E8), RunLoop::RunLoop sub_8209A9F0 and "
               "ApplyRequest sub_8209A458 (with --native_heap)) natively instead of "
               "through the translated code (the same results; checked by "
               "--run_harnesses=framework)");
@@ -80,9 +81,9 @@ extern "C" REX_FUNC(sub_82091050) {
 //
 // Only the functions recompiled code calls in play have adapters (the
 // iterator's increment, HandlerMap::HandlerMap, Insert and Clear); the
-// decrement, the rotations, AllocateNodes, NewHead, NewNode, InsertNode and
-// Erase are reached only from their plain C++ callers, and the flag switches
-// those.
+// decrement, the rotations, AllocateNodes, NewHead, NewNode, InsertNode,
+// Erase, and the request vector's Insert and InsertN are reached only from
+// their plain C++ callers, and the flag switches those.
 
 namespace {
 
@@ -142,40 +143,6 @@ extern "C" REX_FUNC(sub_8209A080) {
     return;
   }
   ctx.r3.u64 = ctx.r1.u32 - 16;
-}
-
-// RequestVector::InsertN: r3 = the vector, r4 = where (by value: the
-// vector in the high word, also stored in the caller's frame at r1 + 24 as
-// the original does), r5 = the count, r6 = the request. r3 isn't the
-// original's (a load's or operator delete's leftover, which its callers
-// don't read).
-extern "C" REX_FUNC(sub_8209A0E8) {
-  REX_FUNC_PROLOGUE();
-  if (!NativeHeap() ||
-      !fw::RequestsInsertN(base, ctx.r3.u32, ctx.r4.u32, ctx.r5.u32, ctx.r6.u32)) {
-    __imp__sub_8209A0E8(ctx, base);
-    return;
-  }
-  REX_STORE_U64(ctx.r1.u32 + 24, ctx.r4.u64);
-}
-
-// RequestVector::Insert: r3 = the result, r4 = the vector, r5 = where (by
-// value, also stored at the caller's r1 + 32), r6 = the request; r3 the
-// result.
-extern "C" REX_FUNC(sub_8209A600) {
-  REX_FUNC_PROLOGUE();
-  std::optional<fw::Iterator> it;
-  if (NativeHeap()) {
-    it = fw::RequestsInsert(base, ctx.r4.u32, {uint32_t(ctx.r5.u64 >> 32), ctx.r5.u32},
-                            ctx.r6.u32);
-  }
-  if (!it) {
-    __imp__sub_8209A600(ctx, base);
-    return;
-  }
-  REX_STORE_U64(ctx.r1.u32 + 32, ctx.r5.u64);
-  guest::StoreU32(base, ctx.r3.u32 + 0, it->container);
-  guest::StoreU32(base, ctx.r3.u32 + 4, it->node);
 }
 
 // RequestVector::PushBack: r3 = the vector, r4 = the request; r3 the
