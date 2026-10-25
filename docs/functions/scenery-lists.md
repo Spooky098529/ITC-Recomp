@@ -92,7 +92,19 @@ Migrated by the B7 loop's migration agent (2026-10-25) behind
 release, the race's picks with `Race::CourseLayout`, the draw state, the
 animation frames, the depth declaration and the texture provider's slots
 2 and 4 (slot 4's store only). The jump tables of `IsCEntryOn` and
-`CourseLayout` are taken as the translation's switches read them.
+`CourseLayout` are taken as the translation's switches read them. Then the
+model draws (`model_draws.cpp`, strict floats): `IsShapeVisible`,
+`RecordObject` (inside its interpolation wrapper; native callers set the
+context the wrapper keeps with `BlendState_SetRecordContext`),
+`RecordSceneLights`, the depth draws, `SceneryModel::RecordShape` and
+`DrawShape`, and `PointList::Draw`, with `models.md`'s material and shader
+accessors under `--native_models`. The recorders count their slots first
+and run the original where the command list would refuse one; the
+render queue, the models' slot 1 and the texture provider's slots 5 and 6
+stay guest calls from the originals' frames, after which flush-to-zero is
+set off again (the originals set it before each scalar float
+instruction). Left: `Model::DrawShape` with `Model::RecordShape` (ready,
+`models.md`), and the lists' loads (blocked by `Model::Load`).
 
 Status:
 
