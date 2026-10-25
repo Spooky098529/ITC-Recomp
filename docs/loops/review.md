@@ -126,6 +126,18 @@ When the user has reviewed a run's section, its heading gets
     like the original's, as the cameras do.
   - Map corrections: `ColorRect::Record` has one caller
     (`ScreenFades::Update`); `CompareStringA` read in full.
+- `minimap.md` (new, f86ea54): 15 rows (`Minimap::Draw` moved from
+  `functions.md`, 14 new): the map's models, the point markers, the car
+  markers (an arrow in five colors by type: the player, a human or
+  rival-less racer, three rivals by player 0's save), the five stack
+  pools and the blink phase (`0x826C5AA8`, stepping every five calls);
+  `Minimap::Draw` stays Wrapped by `--per_tick_minimap_blink`;
+  `sub_820F2E68` is case 1 of `Minimap::RacerMarkerType`'s switch (no
+  row, ported with it). Also: `matrix-math.md`'s `sub_8209B038` (the
+  minimap forms its address for the marker pools), `course-scenery.md`'s
+  intro, a note on the course set's lists lead, `known-data.md` (the
+  blink clock, the colors, the marker triangles, `0x826C7824`, the race
+  manager's 28-byte entries, the course set's +1064 and +3180 lists).
 
 ## Run 2026-10-25 01:17 (`by-loop-25-10-26`)
 

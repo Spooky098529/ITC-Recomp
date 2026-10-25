@@ -80,7 +80,12 @@ file's history. What's left to see in a drive, from every run:
 - Subsystem 4 of 5: the minimap's parts (`sub_820F2D28`, `sub_820F2EF8`,
   `sub_820F4888`, `sub_820F4BA8`, `sub_820F51A8`, `sub_820F5238`,
   `sub_820F4040`, `sub_820F40C0`), picked as the closest to ready (6 of
-  its 8 roots ready, 31 functions left). Step: mapping agent running.
+  its 8 roots ready, 31 functions left). Mapped (`minimap.md`, 15
+  rows, 1 moved; f86ea54): `Minimap::Draw` (the map's models, point
+  markers, car markers in five colors, the flashing by a blink phase;
+  Wrapped by `--per_tick_minimap_blink`, to keep) and its parts. Map
+  checked (0 errors, 15 of 15 in play, 9 ready groups). Step: migration
+  agent 1 running.
 
 ## Done
 
@@ -120,6 +125,8 @@ This run's groups: `expected-differences.md` (the "03:59 run" lines).
 - Start: ours 1903, work left 4548 (wrapped 111, known 597, unknown 3840).
 - After the game modes' map: ours 1903, work left 4548 (wrapped 111,
   known 625, unknown 3812).
+- After the minimap's map: ours 1983, work left 4468 (wrapped 111,
+  known 611, unknown 3746).
 - After the mode tick's validation: race 27 s (`itc_1639`), 0 errors,
   every harness 0 differing; replay 127 s (`itc_1640`), 0 errors.
 - After the mode tick's migration 1: ours 1983, work left 4468 (wrapped
