@@ -14,6 +14,8 @@
 #include <cstdint>
 #include <optional>
 
+#include "models/model_load.h"
+
 namespace scenery_lists {
 
 // The race data (its +4 the course, +20 flags, +24 the +2124 list's
@@ -42,6 +44,44 @@ struct ReleaseCalls {
 // slot 0. The count is read again after each model. Returns the r3 the
 // original leaves: `list` when there are no models, else the last call's.
 uint32_t ModelListRelease(uint8_t* base, uint32_t list, const ReleaseCalls& calls);
+
+// The guest calls ModelList::Load makes where a callee's plain C++ declines
+// (the originals, by the original's return addresses): operator new (r3 =
+// the size; returns the block), Model::Model (r3 = the model) and
+// Model::Load (r3 = the model, r4 = the entry, r5 = 0); `model_load` the
+// guest calls Model::Load's own plain C++ makes.
+struct LoadCalls {
+  uint32_t (*allocate)(void* user, uint32_t size) = nullptr;
+  void (*construct)(void* user, uint32_t model) = nullptr;
+  void (*load)(void* user, uint32_t model, uint32_t entry) = nullptr;
+  models::LoadCalls model_load;
+  void* user = nullptr;
+};
+
+// The scenery models' vtable (slot 0 sub_820F1208, slot 1 sub_82106540).
+constexpr uint32_t kSceneryModelVtable = 0x82006764;
+constexpr uint32_t kSceneryModelBytes = 448;
+
+// ModelList::Load (sub_82148428): the count = the container's first word
+// (little-endian); the List64 at +4 made empty again inline (as
+// ModelList::Init); for each i below the count (signed), a 448-byte scenery
+// model (operator new, Model::Model, the vtable; a null block skips both),
+// its word at `frame` + 80 (the original's frame, as it leaves it), loaded
+// from the container's entry i (DataFile::GetEntry(container, i, 0),
+// Model::Load(model, entry, 0)) and inserted at the list's end
+// (List64::Insert at the count +264); then +0 = the count. Returns the r3
+// the original leaves (the list's +4 after a model, else the list). Only
+// over the allocation layer with the memory blocks' host lock (the
+// adapter's condition, as Model::Load's).
+uint32_t ModelListLoad(uint8_t* base, uint32_t list, uint32_t container, uint32_t frame,
+                       const LoadCalls& calls);
+
+// ModelList::LoadPoints (sub_82148528): ModelList::Load (its frame 160
+// bytes below `frame`, the back chain written), then +528 to +604 = the 20
+// point groups 0x82617750 + 256 x i, +608 to +616 = 0, +620 = 20. Returns
+// the r3 the original leaves (0x82617F50, the eighth group).
+uint32_t ModelListLoadPoints(uint8_t* base, uint32_t list, uint32_t container, uint32_t frame,
+                             const LoadCalls& calls);
 
 // SceneryModel::ResetDrawState (sub_82146AA8, probably): +436 = 0, +432 = 1,
 // +440 = 0.

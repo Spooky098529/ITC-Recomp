@@ -10,6 +10,7 @@
 
 #include "base/flags.h"
 #include "hooks/guest_call.h"
+#include "hooks/models.h"
 #include "scenery_lists/scenery_lists.h"
 
 #include <array>
@@ -25,7 +26,10 @@ ITC_FLAG_DECLARE(bool, native_models);
 ITC_FLAG_BOOL(native_scenery_lists, true, "ITC",
               "Run the course set's lists of models and the model draws "
               "(docs/functions/scenery-lists.md: ModelList::Release sub_82147FB8 (Model::Release "
-              "and the models' vtable slot 0 guest calls), SceneryModel::ResetDrawState "
+              "and the models' vtable slot 0 guest calls), with --native_models ModelList::Load "
+              "sub_82148428 and ModelList::LoadPoints sub_82148528 (operator new, Model::Model, "
+              "DataFile::GetEntry, Model::Load and List64::Insert's plain C++ called directly; "
+              "their originals, where it declines, guest calls), SceneryModel::ResetDrawState "
               "sub_82146AA8, AnimationSet::CurrentFrame sub_82146B80, ModelList::IsBEntryOn "
               "sub_82147850, ModelList::IsCEntryOn sub_82147958 (with sub_82147A20), "
               "Race::CourseLayout sub_8228F408 (with sub_8228F484), PointList::IsEntryOn "
@@ -96,6 +100,83 @@ void SceneryListsModelListRelease(PPCContext& ctx, uint8_t* base) {
   // r3 is left as the last guest call leaves it (the list without models).
   scenery_lists::ModelListRelease(base, ctx.r3.u32, calls);
   ctx.lr = lr;
+}
+
+namespace {
+
+// ModelList::Load's guest calls where a callee's plain C++ declines, with
+// the original's return addresses.
+struct ModelListLoadGuest {
+  PPCContext& ctx;
+  uint8_t* base;
+
+  static uint32_t Allocate(void* self, uint32_t size) {
+    auto& c = *static_cast<ModelListLoadGuest*>(self);
+    guest_call::InFrame(c.ctx, c.base, 512, 0x821484C0, [&](uint32_t) {
+      c.ctx.r3.u64 = size;
+      __imp__sub_825A6880(c.ctx, c.base);
+    });
+    return c.ctx.r3.u32;
+  }
+  static void Construct(void* self, uint32_t model) {
+    auto& c = *static_cast<ModelListLoadGuest*>(self);
+    guest_call::InFrame(c.ctx, c.base, 512, 0x821484D0, [&](uint32_t) {
+      c.ctx.r3.u64 = model;
+      __imp__sub_825948C0(c.ctx, c.base);
+    });
+  }
+  static void Load(void* self, uint32_t model, uint32_t entry) {
+    auto& c = *static_cast<ModelListLoadGuest*>(self);
+    guest_call::InFrame(c.ctx, c.base, 512, 0x82148500, [&](uint32_t) {
+      c.ctx.r3.u64 = model;
+      c.ctx.r4.u64 = entry;
+      c.ctx.r5.u64 = 0;
+      __imp__sub_82596920(c.ctx, c.base);
+    });
+  }
+};
+
+template <typename Run>
+void ModelListLoadSteps(PPCContext& ctx, uint8_t* base, uint32_t frame_bytes, Run run) {
+  const uint64_t lr = ctx.lr;
+  const uint32_t frame = ctx.r1.u32 - frame_bytes;
+  guest::StoreU32(base, frame, ctx.r1.u32);  // the back chain, as stwu
+  ctx.fpscr.disableFlushMode();
+  ModelListLoadGuest guest{ctx, base};
+  hooks::ModelLoadGuest model_guest{ctx, base};
+  scenery_lists::LoadCalls calls;
+  calls.allocate = &ModelListLoadGuest::Allocate;
+  calls.construct = &ModelListLoadGuest::Construct;
+  calls.load = &ModelListLoadGuest::Load;
+  calls.model_load = model_guest.Calls();
+  calls.user = &guest;
+  const uint32_t list = ctx.r3.u32, container = ctx.r4.u32;
+  ctx.r3.u64 = run(list, container, frame, calls);
+  ctx.lr = lr;
+}
+
+}  // namespace
+
+void SceneryListsModelListLoad(PPCContext& ctx, uint8_t* base) {
+  if (!ModelsNativeLifetime()) {
+    __imp__sub_82148428(ctx, base);
+    return;
+  }
+  ModelListLoadSteps(ctx, base, 160, [&](uint32_t list, uint32_t container, uint32_t frame,
+                                         const scenery_lists::LoadCalls& calls) {
+    return scenery_lists::ModelListLoad(base, list, container, frame, calls);
+  });
+}
+
+void SceneryListsModelListLoadPoints(PPCContext& ctx, uint8_t* base) {
+  if (!ModelsNativeLifetime()) {
+    __imp__sub_82148528(ctx, base);
+    return;
+  }
+  ModelListLoadSteps(ctx, base, 192, [&](uint32_t list, uint32_t container, uint32_t frame,
+                                         const scenery_lists::LoadCalls& calls) {
+    return scenery_lists::ModelListLoadPoints(base, list, container, frame, calls);
+  });
 }
 
 void SceneryListsResetDrawState(PPCContext& ctx, uint8_t* base) {
@@ -471,6 +552,8 @@ void SceneryListsPointListDraw(PPCContext& ctx, uint8_t* base) {
   }
 
 ITC_SCENERY_LISTS(82147FB8, SceneryListsModelListRelease)
+ITC_SCENERY_LISTS(82148428, SceneryListsModelListLoad)
+ITC_SCENERY_LISTS(82148528, SceneryListsModelListLoadPoints)
 ITC_SCENERY_LISTS(82146AA8, SceneryListsResetDrawState)
 ITC_SCENERY_LISTS(82146B80, SceneryListsAnimationCurrentFrame)
 ITC_SCENERY_LISTS(82147850, SceneryListsIsBEntryOn)

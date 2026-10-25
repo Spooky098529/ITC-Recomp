@@ -13,6 +13,14 @@ namespace hooks {
 // ModelList::Release (sub_82147FB8): r3 = the list; the guest calls from a
 // 128-byte frame like the original's.
 void SceneryListsModelListRelease(PPCContext& ctx, uint8_t* base);
+// ModelList::Load (sub_82148428): r3 = the list, r4 = the container;
+// ModelList::LoadPoints (sub_82148528): the same. Natively only where
+// Model::Load's adapter is (hooks::ModelsNativeLifetime), else the original;
+// the callees' originals, where their plain C++ declines, guest calls from
+// 512 bytes below r1 with the original's return addresses. Flush-to-zero
+// off, as Model::Load leaves it.
+void SceneryListsModelListLoad(PPCContext& ctx, uint8_t* base);
+void SceneryListsModelListLoadPoints(PPCContext& ctx, uint8_t* base);
 // SceneryModel::ResetDrawState (sub_82146AA8): r3 = the model (left).
 void SceneryListsResetDrawState(PPCContext& ctx, uint8_t* base);
 // AnimationSet::CurrentFrame (sub_82146B80): r3 = the set, r4 = the index.

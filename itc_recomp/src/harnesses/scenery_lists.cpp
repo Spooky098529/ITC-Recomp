@@ -12,7 +12,11 @@
 
 #include "base/flags.h"
 #include "base/log.h"
+#include "hooks/models.h"
 #include "hooks/scenery_lists.h"
+#include "memory/c_runtime_heap.h"
+#include "models/memory_blocks.h"
+#include "models/model.h"
 #include "memory/heap.h"
 #include "scenery_lists/scenery_lists.h"
 
@@ -20,6 +24,7 @@
 
 #include <algorithm>
 #include <bit>
+#include <cstdlib>
 #include <functional>
 #include <string>
 #include <utility>
@@ -1032,6 +1037,151 @@ void PointLists(Context& h, Random& r, uint32_t block, uint32_t slots) {
   results.Report();
 }
 
+// --- ModelList::Load and LoadPoints ---
+
+// A word inside one of a side's blocks (or up to 16 bytes past its end) made
+// "region r, offset o", as the blocks sit at different addresses on each
+// side.
+struct HeapRegion {
+  uint32_t start, bytes;
+};
+uint32_t Normalized(uint32_t word, const std::vector<HeapRegion>& regions) {
+  for (size_t r = 0; r < regions.size(); r++) {
+    if (word >= regions[r].start && word - regions[r].start < regions[r].bytes + 16) {
+      return 0xB0000000u | (uint32_t(r) << 20) | (word - regions[r].start);
+    }
+  }
+  return word;
+}
+void AddNormalized(Outputs& out, uint8_t* base, const std::vector<HeapRegion>& regions,
+                   uint32_t start, uint32_t bytes) {
+  std::vector<uint8_t> data = Read(base, start, bytes);
+  for (uint32_t at = 0; at + 4 <= bytes; at += 4) {
+    const uint32_t word = Normalized(guest::LoadU32(base, start + at), regions);
+    for (int k = 0; k < 4; k++) data[at + k] = uint8_t(word >> (24 - 8 * k));
+  }
+  out.Bytes(data);
+}
+
+void RequireModel(bool done) {
+  if (!done) {
+    ITC_LOG_ERROR("harness: scenery_lists: a model's teardown declined");
+    std::abort();
+  }
+}
+
+// ModelList::Load and LoadPoints: a container of 0 to 4 part files (no
+// shapes, shader pairs or skeleton; the wrong version now and then; a count
+// not above 0 now and then) and a list of random bytes. Compared: r3, the
+// list's 624 bytes, the frame's model word and each model's first 432 bytes
+// (the scenery model's last 16 the original leaves as the heap gave them)
+// with its blocks (the header copy, the vertex data, the texture provider's
+// slots), the pointers into those made offsets; then all freed.
+void ModelListLoads(Context& h, Random& r) {
+  Results results("ModelList::Load (sub_82148428) and LoadPoints (sub_82148528)");
+  if (!hooks::ModelsNativeLifetime()) {
+    ITC_LOG_INFO("harness: ModelList::Load: skipped (Model::Load isn't native in this run)");
+    return;
+  }
+  constexpr uint32_t kFileBytes = 0x5000;
+  constexpr uint32_t kHeader = 0x4000;
+  constexpr uint32_t kVertices = 0x800;
+  constexpr uint32_t kListBytes = 624;
+  constexpr uint32_t kMaxModels = 4;
+  const uint32_t allocation = memory::Alloc(0x100 + kMaxModels * kFileBytes + kListBytes + 32, 0);
+  const uint32_t container = (allocation + 15) & ~15u;
+  const uint32_t list = container + 0x100 + kMaxModels * kFileBytes;
+  for (int c = 0; c < 40; c++) {
+    const bool points = c % 2 == 1;
+    const uint32_t models = c < 10 ? uint32_t(c / 2) % (kMaxModels + 1) : r.Below(kMaxModels + 1);
+    const uint32_t count = c % 13 == 12 ? 0x80000000u | r.Below(4) : models;
+    std::vector<uint32_t> words((0x100 + kMaxModels * kFileBytes) / 4, 0);
+    auto put = [&](uint32_t at, uint32_t value) { words[at / 4] = value; };
+    put(0, __builtin_bswap32(count));
+    std::vector<bool> wrong(kMaxModels);
+    for (uint32_t i = 0; i < kMaxModels; i++) {
+      const uint32_t file = 0x100 + i * kFileBytes;
+      put(4 + 4 * i, __builtin_bswap32(file));
+      wrong[i] = r.Below(5) == 0;
+      put(file + 0, wrong[i] ? 0x00140000 : 0x00150000);
+      put(file + 4, 7);
+      put(file + 8, 9);
+      put(file + 16, 3);
+      put(file + 20, 0x80);
+      put(file + 24, 0x90);
+      put(file + 28, 0x100);
+      put(file + 32, 0xA0);
+      put(file + 44, 0x2000);
+      put(file + 64, kHeader);
+      put(file + 68, kVertices);
+      put(file + 72, kHeader + kVertices);
+      for (uint32_t k = kHeader; k < kHeader + kVertices; k += 4) {
+        put(file + k, uint32_t(r.Next()) & 0x0FFFFFFFu);
+      }
+    }
+    std::vector<uint32_t> list_words(kListBytes / 4);
+    for (auto& w : list_words) w = uint32_t(r.Next());
+    Outputs out[2];
+    for (int v = 0; v < 2; v++) {
+      for (uint32_t k = 0; k < words.size(); k++) guest::StoreU32(h.base, container + 4 * k, words[k]);
+      for (uint32_t k = 0; k < list_words.size(); k++) {
+        guest::StoreU32(h.base, list + 4 * k, list_words[k]);
+      }
+      PPCContext t = CallContext(h);
+      t.r3.u64 = list;
+      t.r4.u64 = container;
+      if (points) {
+        (v == 0 ? __imp__sub_82148528 : hooks::SceneryListsModelListLoadPoints)(t, h.base);
+      } else {
+        (v == 0 ? __imp__sub_82148428 : hooks::SceneryListsModelListLoad)(t, h.base);
+      }
+      const uint32_t frame = t.r1.u32 - (points ? 192 + 160 : 160);
+      // The models, by the list's order (its data slots).
+      const uint32_t made = int32_t(count) > 0 ? count : 0;
+      std::vector<uint32_t> list_models;
+      std::vector<HeapRegion> regions;
+      for (uint32_t i = 0; i < made; i++) {
+        const uint32_t model = guest::LoadU32(h.base, list + 4 + 268 + 4 * i);
+        list_models.push_back(model);
+        regions.push_back({model, scenery_lists::kSceneryModelBytes});
+      }
+      for (uint32_t model : list_models) {
+        auto add = [&](uint32_t start, uint32_t bytes) {
+          if (start != 0) regions.push_back({start, bytes});
+        };
+        add(guest::LoadU32(h.base, model + 16), kHeader);
+        add(guest::LoadU32(h.base, model + 20), kVertices);
+        add(guest::LoadU32(h.base, model + 88), 256);
+      }
+      out[v].Word(t.r3.u32);
+      AddNormalized(out[v], h.base, regions, list, kListBytes);
+      out[v].Word(Normalized(guest::LoadU32(h.base, frame + 80), regions));
+      for (const HeapRegion& region : regions) {
+        const bool is_model = std::find(list_models.begin(), list_models.end(), region.start) !=
+                              list_models.end();
+        AddNormalized(out[v], h.base, regions, region.start, is_model ? 432 : region.bytes);
+      }
+      // Freed: each model's blocks, then the model.
+      for (uint32_t model : list_models) {
+        const uint32_t header = guest::LoadU32(h.base, model + 16);
+        const uint32_t vertices = guest::LoadU32(h.base, model + 20);
+        if (header != 0) memory::FreePages(header - models::kBlockHeaderBytes);
+        if (vertices != 0) memory::FreePhysical(vertices - models::kBlockHeaderBytes);
+        for (uint32_t offset : {16u, 20u, 24u, 420u}) guest::StoreU32(h.base, model + offset, 0);
+        RequireModel(models::ModelDestruct(h.base, model).has_value());
+        RequireModel(memory::crt::OperatorDelete(model));
+      }
+    }
+    std::string wrongs;
+    for (uint32_t i = 0; i < models; i++) wrongs += wrong[i] ? "w" : "-";
+    results.Check(out[0], out[1],
+                  fmt::format("case {} ({}, count {:#x}, versions {})", c,
+                              points ? "LoadPoints" : "Load", count, wrongs));
+  }
+  memory::Free(allocation);
+  results.Report();
+}
+
 }  // namespace
 
 void SceneryLists(Context& h) {
@@ -1049,6 +1199,7 @@ void SceneryLists(Context& h) {
   ModelShapes(h, r, block);
   const uint32_t slots = memory::Alloc(0x40000 + 16, 0);
   PointLists(h, r, block, (slots + 15) & ~15u);
+  ModelListLoads(h, r);
   memory::Free(slots);
   memory::Free(allocation);
 }

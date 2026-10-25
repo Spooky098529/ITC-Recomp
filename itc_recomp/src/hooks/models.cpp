@@ -74,13 +74,15 @@ bool hooks::ModelsHostLock() {
   return host;
 }
 
-namespace {
-
 // The functions that allocate or free: only over the allocation layer, and
 // with the host lock.
-bool NativeLifetime() {
+bool hooks::ModelsNativeLifetime() {
   return ITC_FLAG(native_models) && hooks::NativeHeapActive() && hooks::ModelsHostLock();
 }
+
+namespace {
+
+bool NativeLifetime() { return hooks::ModelsNativeLifetime(); }
 
 }  // namespace
 
@@ -350,32 +352,36 @@ namespace {
 
 // The guest calls Model::Load makes where a callee's plain C++ declines,
 // from a frame below the adapter's (room for the original's own frames).
-struct ModelLoadContext {
-  PPCContext& ctx;
-  uint8_t* base;
-  static void Init(void* user, uint32_t object, uint32_t microcode) {
-    auto& c = *static_cast<ModelLoadContext*>(user);
-    guest_call::InFrame(c.ctx, c.base, 512, 0x82594DEC, [&](uint32_t) {
-      c.ctx.r3.u64 = object;
-      c.ctx.r4.u64 = microcode;
-      __imp__sub_822A8740(c.ctx, c.base);
-    });
-  }
-  static void Call(void* user, uint32_t function, uint32_t r3, uint32_t r4, uint32_t r5,
+void ModelLoadInit(void* user, uint32_t object, uint32_t microcode) {
+  auto& c = *static_cast<hooks::ModelLoadGuest*>(user);
+  guest_call::InFrame(c.ctx, c.base, 512, 0x82594DEC, [&](uint32_t) {
+    c.ctx.r3.u64 = object;
+    c.ctx.r4.u64 = microcode;
+    __imp__sub_822A8740(c.ctx, c.base);
+  });
+}
+void ModelLoadCall(void* user, uint32_t function, uint32_t r3, uint32_t r4, uint32_t r5,
                    uint32_t return_address) {
-    auto& c = *static_cast<ModelLoadContext*>(user);
-    PPCContext& ctx = c.ctx;
-    uint8_t* base = c.base;
-    guest_call::InFrame(ctx, base, 512, return_address, [&](uint32_t) {
-      ctx.r3.u64 = r3;
-      ctx.r4.u64 = r4;
-      ctx.r5.u64 = r5;
-      REX_CALL_INDIRECT_FUNC(function);
-    });
-  }
-};
+  auto& c = *static_cast<hooks::ModelLoadGuest*>(user);
+  PPCContext& ctx = c.ctx;
+  uint8_t* base = c.base;
+  guest_call::InFrame(ctx, base, 512, return_address, [&](uint32_t) {
+    ctx.r3.u64 = r3;
+    ctx.r4.u64 = r4;
+    ctx.r5.u64 = r5;
+    REX_CALL_INDIRECT_FUNC(function);
+  });
+}
 
 }  // namespace
+
+models::LoadCalls hooks::ModelLoadGuest::Calls() {
+  models::LoadCalls calls;
+  calls.init = &ModelLoadInit;
+  calls.call = &ModelLoadCall;
+  calls.user = this;
+  return calls;
+}
 
 // Model::Load: r3 = the model, r4 = the part file, r5 = an XPR2 file or 0;
 // r3 = the model's shape count (the original's loop counter). Flush-to-zero
@@ -386,12 +392,8 @@ extern "C" REX_FUNC(sub_82596920) {
     ctx.fpscr.disableFlushMode();
     const uint64_t lr = ctx.lr;
     const uint32_t model = ctx.r3.u32, file = ctx.r4.u32, xpr = ctx.r5.u32;
-    ModelLoadContext context{ctx, base};
-    models::LoadCalls calls;
-    calls.init = &ModelLoadContext::Init;
-    calls.call = &ModelLoadContext::Call;
-    calls.user = &context;
-    const bool done = models::ModelLoad(base, model, file, xpr, calls);
+    hooks::ModelLoadGuest guest{ctx, base};
+    const bool done = models::ModelLoad(base, model, file, xpr, guest.Calls());
     ctx.lr = lr;
     if (done) {
       ctx.r3.u64 = guest::LoadU32(base, model + 412);

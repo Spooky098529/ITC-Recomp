@@ -4,7 +4,11 @@
 #include "scenery_lists/scenery_lists.h"
 
 #include "base/log.h"
+#include "game_data/data_file.h"
 #include "guest.h"
+#include "memory/c_runtime_heap.h"
+#include "models/model.h"
+#include "track_zones/track_zones.h"
 #include "vehicle_accessors/vehicle_accessors.h"
 
 namespace scenery_lists {
@@ -41,6 +45,67 @@ uint32_t ModelListRelease(uint8_t* base, uint32_t list, const ReleaseCalls& call
     i++;
   } while (i < int32_t(guest::LoadU32(base, list)));
   return r3;
+}
+
+uint32_t ModelListLoad(uint8_t* base, uint32_t list, uint32_t container, uint32_t frame,
+                       const LoadCalls& calls) {
+  ITC_NATIVE_RUNNING("sub_82148428 ModelList::Load");
+  const uint32_t nodes = list + 4;
+  const int32_t count = int32_t(__builtin_bswap32(guest::LoadU32(base, container)));
+  // The List64 made empty: node i's data slot i and next i + 1 (node 63's
+  // then -1), as the original's loop and stores.
+  for (int32_t i = 0; i < 64; i++) {
+    const uint32_t node = nodes + 4 * uint32_t(i);
+    guest::StoreU16(base, node + 2, uint16_t(i));
+    guest::StoreU16(base, node + 0, uint16_t(i + 1));
+  }
+  guest::StoreU16(base, nodes + 256, 0);
+  guest::StoreU16(base, nodes + 264, 0);
+  guest::StoreU16(base, nodes + 252, 0xFFFF);
+  guest::StoreU16(base, nodes + 260, 0xFFFF);
+  guest::StoreU16(base, nodes + 262, 0xFFFF);
+  guest::StoreU16(base, nodes + 258, 0xFFFF);
+  uint32_t r3 = list;
+  for (int32_t i = 0; i < count; i++) {
+    const auto block = memory::crt::OperatorNew(base, kSceneryModelBytes);
+    const uint32_t model = block ? *block : calls.allocate(calls.user, kSceneryModelBytes);
+    if (model != 0) {
+      if (!models::ModelConstruct(base, model)) {
+        calls.construct(calls.user, model);
+      }
+      guest::StoreU32(base, model, kSceneryModelVtable);
+    }
+    guest::StoreU32(base, frame + 80, model);
+    const uint32_t entry = game_data::GetEntry(base, container, uint32_t(i), false);
+    if (model == 0 || !models::ModelLoad(base, model, entry, 0, calls.model_load)) {
+      calls.load(calls.user, model, entry);
+    }
+    track_zones::List64Insert(base, nodes, model,
+                              uint32_t(int32_t(int16_t(guest::LoadU16(base, nodes + 264)))));
+    r3 = nodes;
+  }
+  guest::StoreU32(base, list, uint32_t(count));
+  return r3;
+}
+
+uint32_t ModelListLoadPoints(uint8_t* base, uint32_t list, uint32_t container, uint32_t frame,
+                             const LoadCalls& calls) {
+  ITC_NATIVE_RUNNING("sub_82148528 ModelList::LoadPoints");
+  const uint32_t load_frame = frame - 160;
+  guest::StoreU32(base, load_frame, frame);
+  ModelListLoad(base, list, container, load_frame, calls);
+  constexpr uint32_t kPoints = 0x82617750;
+  // The original's store order: +528, +532, +608, then +536 to +604.
+  guest::StoreU32(base, list + 528, kPoints);
+  guest::StoreU32(base, list + 532, kPoints + 256);
+  guest::StoreU32(base, list + 608, 0);
+  for (uint32_t i = 2; i < 20; i++) {
+    guest::StoreU32(base, list + 528 + 4 * i, kPoints + 256 * i);
+  }
+  guest::StoreU32(base, list + 612, 0);
+  guest::StoreU32(base, list + 616, 0);
+  guest::StoreU32(base, list + 620, 20);
+  return kPoints + 256 * 8;
 }
 
 void ResetDrawState(uint8_t* base, uint32_t model) {
