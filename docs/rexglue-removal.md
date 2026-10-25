@@ -2583,6 +2583,7 @@ B7. **The game logic inside**: everything else, subsystem by subsystem,
 | 2026-10-25 | The scene models' set-up side (the cars as the scene holds them, pool 7 of the second pool set: the parts' links, the 4,244-byte records' defaults, copies and constructor, the car records' reset and copy, the accessory, the sound loads' callback, the car model's pages through `memory::AllocPages`; `SceneModel::SetUp`, `Build`, `Update` and the loaders left waiting) | `scene-models.md` | 23 of 48 (one migration; 1 Native with no adapter) | `--native_scene_models` |
 | 2026-10-25 | `UiMovie::DrawTexts` and what it unblocked (no mapping, not counted: `DrawTexts`, `ScrollOffset`, `UiMovie::Update`, `Draw`, `Run`, `Finish`, `FinishNamed`, `FinishAll`; `_init_pointers` and the empty destructor `sub_82106540`; the race HUD's movie picker and the rival logo's draw in the new `race-hud.md`) | `ui-movies-game.md`, `ui-movies.md`, `c-runtime.md`, `race-hud.md` | 13 made native, 9 adapters removed, 1 Merged (two migrations) | `--native_ui_movies_game`, `--native_ui_movies`, `--native_c_runtime`, `--native_race_hud` |
 | 2026-10-25 | The UI movies' ready groups (no mapping, not counted: the movie's vectors, `UiMovie::UiMovie` and `~UiMovie`, the texts freed, `GetText` and the six text setters over it, the named animations' set-up, the HUD's mirror effect `sub_8211BEE8`) | `ui-movies-game.md` | 26 rows (19 with plain C++, 7 Merged; no adapter removable yet) | `--native_ui_movies_game` |
+| 2026-10-25 | The scenery lists (the course set's six model lists: release, the draw picks by race data, course layout and mode, `PointList::Draw`; the scenery model's and the shared model draws: `IsShapeVisible`, `RecordObject` inside its interpolation wrapper, `RecordSceneLights`, the depth draws, `Model::DrawShape` and `RecordShape`; the texture provider's slots 2 and 4; `models.md`'s accessors) | `scenery-lists.md` | 25 of 27, and 6 in `models.md` (two migrations; 1 adapter removed, 2 Native with none, 3 Merged) | `--native_scenery_lists`, `--native_models` |
 
     The first run (2026-10-22, branch `b7-loop-test`): every harness at 0 differing, attract races at 20-21 s with no errors,
     and a race the user drove looked right. Ours went from 162 to 335 (work
@@ -3509,3 +3510,20 @@ with a row 582, no row yet 3,688), from 4,401. The rest of the file
 waits on `sub_82108860`, the string table's formatting, the archive
 load's events (`NtWaitForSingleObjectEx`, `NtSetEvent`) and the texture
 set.
+
+**2026-10-25, the scenery lists (branch `b7-loop-25-10-26-3`):** the
+sixteenth run's second subsystem mapped the course set's model lists and
+the model draws (`scenery-lists.md`, 27 rows) and made them native as
+far as they were ready (`--native_scenery_lists`; `models.md`'s
+accessors and `Model::RecordShape` under `--native_models`): every model
+draw in a race now records natively, `Recorder::RecordObject` inside its
+interpolation wrapper (native callers run its hooks through
+`BlendState_SetRecordContext`); frame dumps and `--log_blend_state`
+counts matched the fallback. Cases the ports don't cover (material
+animations, more than 4 textures, a full command list, another list's
+chunk open) run the original from the start. The boundary unchanged:
+449 functions (916 pairs): overridden 69, Native 5, Dropped 23, never
+called 70, live 282. Imports: 186 called, 62 with a live caller. B7
+(`b7_status.py`): ours 2,107, work left 4,344 (Wrapped 104, with a row
+576, no row yet 3,664), from 4,375. The lists' loads wait on
+`Model::Load` (the shader objects' set-up, the memory blocks).

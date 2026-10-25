@@ -28,6 +28,11 @@ here loses its heading.
 - The scenery lists (attract race `itc_1769`, replay `itc_1770`, ok):
   `sub_82146BD0` SceneryModel::RecordShape, `sub_82148058`
   PointList::Draw (`scenery-lists.md`)
+- The scenery lists' migration 2 (attract race `itc_1777`, replay
+  `itc_1778`, ok): `sub_82595550` Model::RecordShape (`models.md`; its
+  work runs in play inside `Model::DrawShape`, which calls
+  `ModelRecordShapeChecked` past the print; only its own adapter, from
+  `sub_820EF790`, never ran)
 
 ## Run 2026-10-25 03:59 (`b7-loop-25-10-26-2`)
 

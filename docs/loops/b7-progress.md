@@ -84,10 +84,22 @@ file's history. What's left to see in a drive, from every run:
   every `Model::DrawShape` call in a race native, from `Scenery::Draw`;
   frame dumps and `--log_blend_state` counts matched the fallback; 24 s,
   0 errors, every harness 0 differing). Nothing ready left: the lists'
-  loads wait on `Model::Load`. Step: validation 2, agent running.
+  loads wait on `Model::Load`. Validated (`itc_1777`: 2 of 2 harness
+  lines; replay `itc_1778` ok; `Model::RecordShape` to `to-drive.md`:
+  its work runs inside `Model::DrawShape`, past its print). Finished.
+- Waiting on the user (2026-10-25): whether ports may fall back to the
+  original for cases that can occur in play (a full command list,
+  another list's chunk, more than 4 textures), or only for paths not
+  seen in play, with a log line when a fallback fires. Subsystem 3
+  starts after the answer.
 
 ## Done
 
+- The scenery lists (`scenery-lists.md`, mapped in a373941; 27 rows):
+  25 ours and 6 in `models.md` in two migrations (e3295c1..343035d), 1
+  adapter removed, 2 Native with none, 3 Merged; validated (`itc_1769`,
+  `itc_1777`); `--native_scenery_lists`. Left: the lists' loads (on
+  `Model::Load`).
 - The UI movies' ready groups (no mapping; 7d83fb5..ad1dbcb): 26 rows,
   19 plain C++, 7 Merged; validated (`itc_1740`, `itc_1741`);
   `--native_ui_movies_game`.
@@ -127,6 +139,10 @@ This run's groups: `expected-differences.md` (the "16:38 run" lines).
 - After the scenery lists' validation: race 24 s (`itc_1769`), 0
   errors, every harness 0 differing; replay 127 s (`itc_1770`), 0
   errors.
+- After the scenery lists' migration 2 and validation: ours 2107, work
+  left 4344 (wrapped 104, known 576, unknown 3664); race 24 s
+  (`itc_1777`), 0 errors, every harness 0 differing; replay 127 s
+  (`itc_1778`).
 - After the scenery lists' migration 1: ours 2105, work left 4346
   (wrapped 104, known 578, unknown 3664).
 - After the scenery lists' map: ours 2076, work left 4375 (wrapped 105,
