@@ -8,6 +8,7 @@
 #include "memory/heap.h"
 #include "models/memory_blocks.h"
 #include "models/xpr.h"
+#include "race_overlays/race_overlays.h"
 
 #include <cstdlib>
 
@@ -401,6 +402,105 @@ std::optional<uint32_t> RaceModeMemberDestruct(uint8_t* base, uint32_t member) {
     std::abort();
   }
   return Buffers28Destroy(base, member + kRaceModeMemberBuffers);
+}
+
+namespace {
+
+constexpr uint32_t kMember56896Vtable = 0x82006B3C;
+constexpr uint32_t kRecordVtable = 0x82006B34;
+constexpr uint32_t kRecord11856Vtable = 0x82006B2C;
+constexpr uint32_t kRecordBytes = 1104;
+
+// A 1,104-byte record of the member's: +16 and +20 = 0, the 1.0s, its
+// vtable, and 1.0 at +1100.
+void RecordConstruct(uint8_t* base, uint32_t record, uint32_t vtable, uint32_t one) {
+  guest::StoreU32(base, record + 16, 0);
+  guest::StoreU32(base, record + 20, 0);
+  StoreOnes(base, record, one);
+  guest::StoreU32(base, record + 0, vtable);
+  guest::StoreU32(base, record + 1100, one);
+}
+
+// The race mode's vtables (+0 and +32) and its state machines but the
+// member's, and its XPR and the race overlays' list.
+constexpr uint32_t kRaceModeVtable = 0x82006D34;
+constexpr uint32_t kRaceModeVtable32 = 0x82006D28;
+constexpr uint32_t kRaceModeDispatcher = 36;
+constexpr uint32_t kRaceModeMember = 10512;
+constexpr uint32_t kRaceModeXpr = 147892;
+constexpr uint32_t kRaceModeOverlays = 157552;
+
+void MachineConstruct(uint8_t* base, uint32_t machine) {
+  StateMachineConstruct(base, machine);
+  guest::StoreU32(base, machine + kTransitionCount, 0);
+  guest::StoreU32(base, machine + kState, 0);
+}
+
+}  // namespace
+
+void Member56896Construct(uint8_t* base, uint32_t object) {
+  ITC_NATIVE_RUNNING("sub_82106A50 Member56896::Member56896");
+  const uint32_t one = guest::LoadU32(base, kOne);
+  guest::StoreU32(base, object + 16, 0);
+  guest::StoreU32(base, object + 20, 0);
+  StoreOnes(base, object, one);
+  guest::StoreU32(base, object + 0, kMember56896Vtable);
+  XprHolderConstruct(base, object + 10780);
+}
+
+void RaceModeMemberConstruct(uint8_t* base, uint32_t member) {
+  ITC_NATIVE_RUNNING("sub_82107168 RaceModeMember::RaceModeMember");
+  MachineConstruct(base, member + 16);
+  guest::StoreU32(base, member + 0, kRaceModeMemberVtable);
+  // The original loads the 1.0 once (f31) for all its stores.
+  const uint32_t one = guest::LoadU32(base, kOne);
+  RecordConstruct(base, member + 9648, kRecordVtable, one);
+  RecordConstruct(base, member + 9648 + kRecordBytes, kRecordVtable, one);
+  RecordConstruct(base, member + 11856, kRecord11856Vtable, one);
+  const uint32_t inner = member + 12976;
+  guest::StoreU32(base, inner + 16, 0);
+  guest::StoreU32(base, inner + 20, 0);
+  StoreOnes(base, inner, one);
+  guest::StoreU32(base, inner + 0, kMember43136Vtable);
+  guest::StoreU32(base, inner + 364, one);
+  Member13360Construct(base, member + kRaceModeMemberBuffers);
+  Member56896Construct(base, member + 56896);
+  Member67760Construct(base, member + 67760);
+  for (uint32_t i = 0; i < 8; i++) {
+    guest::StoreU32(base, member + 69628 + kRecordBytes * i, one);
+  }
+  guest::StoreU32(base, member + 77380, 0);
+  guest::StoreU32(base, member + 77384, 0);
+  guest::StoreU32(base, member + 77388, 0);
+  guest::StoreU32(base, member + 77376, 0xFFFFFFFF);
+}
+
+void RaceModeConstruct(uint8_t* base, uint32_t mode) {
+  ITC_NATIVE_RUNNING("sub_821073B8 RaceMode::RaceMode");
+  ModeConstruct(base, mode);
+  // The dispatcher: its handler count, the ring's 50 messages, their count
+  // and start.
+  const uint32_t dispatcher = mode + kRaceModeDispatcher;
+  guest::StoreU32(base, dispatcher + 200, 0);
+  for (uint32_t i = 0; i < 50 * 3; i++) {
+    guest::StoreU32(base, dispatcher + 204 + 4 * i, 0);
+  }
+  guest::StoreU32(base, dispatcher + 804, 0);
+  guest::StoreU32(base, dispatcher + 808, 0);
+  guest::StoreU32(base, mode + 0, kRaceModeVtable);
+  guest::StoreU32(base, mode + 32, kRaceModeVtable32);
+  MachineConstruct(base, mode + 848);
+  RaceModeMemberConstruct(base, mode + kRaceModeMember);
+  MachineConstruct(base, mode + 87936);
+  MachineConstruct(base, mode + 97548);
+  MachineConstruct(base, mode + 107168);
+  MachineConstruct(base, mode + 116812);
+  MachineConstruct(base, mode + 128664);
+  MachineConstruct(base, mode + 138284);
+  models::XprConstruct(base, mode + kRaceModeXpr);
+  MachineConstruct(base, mode + 147944);
+  race_overlays::RaceOverlaysClear(base, mode + kRaceModeOverlays);
+  MachineConstruct(base, mode + 157652);
 }
 
 }  // namespace game_modes

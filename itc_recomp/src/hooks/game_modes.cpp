@@ -6,7 +6,9 @@
 // (sub_821060A0), from StateMachine::Add and Find; StateMachine::Find
 // (sub_821061F0), from StateMachine::Handle (its register step,
 // hooks::GameModesFind, kept for the harness); Buffer28::~Buffer28
-// (sub_82152D28), from sub_82106A00.
+// (sub_82152D28), from sub_82106A00; RaceModeMember::RaceModeMember
+// (sub_82107168), from RaceMode::RaceMode; Member56896::Member56896
+// (sub_82106A50), from RaceModeMember::RaceModeMember.
 
 #include "guest.h"
 
@@ -32,6 +34,10 @@ ITC_FLAG_BOOL(native_game_modes, true, "ITC",
               "XprHolder::XprHolder sub_821067A0 (XPR::XPR's plain C++ called directly), and "
               "with --native_heap and the memory blocks' host lock "
               "RaceModeMember::~RaceModeMember sub_82106AF0 (XPR::~XPR's and sub_82106A00's "
+              "plain C++ called directly), RaceMode::RaceMode sub_821073B8 with "
+              "RaceModeMember::RaceModeMember sub_82107168 and Member56896::Member56896 "
+              "sub_82106A50 (no adapters: only RaceMode::RaceMode calls the member's "
+              "constructor, and only it sub_82106A50; XPR::XPR's and RaceOverlays::Clear's "
               "plain C++ called directly)) "
               "natively instead of through the translated code (the same writes; checked by "
               "--run_harnesses=game_modes)");
@@ -175,3 +181,6 @@ extern "C" REX_FUNC(sub_82106AF0) {
   }
   __imp__sub_82106AF0(ctx, base);
 }
+
+// RaceMode::RaceMode: r3 = the race mode (left).
+ITC_GAME_MODES(821073B8, RaceModeConstruct(base, ctx.r3.u32))

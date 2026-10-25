@@ -137,4 +137,25 @@ void XprHolderConstruct(uint8_t* base, uint32_t object);
 constexpr uint32_t kRaceModeMemberXprHolder = 67676;
 std::optional<uint32_t> RaceModeMemberDestruct(uint8_t* base, uint32_t member);
 
+// sub_82106A50 Member56896::Member56896: the object at the race mode's
+// member's +56896 set up (its vtable, 1.0s in its w words, the XPR holder at
+// +10780).
+void Member56896Construct(uint8_t* base, uint32_t object);
+
+// sub_82107168 RaceModeMember::RaceModeMember: the member at the race mode's
+// +10512 (77,392 bytes) set up: its state machine at +16, its vtable, three
+// 1,104-byte records at +9648 (two) and +11856, an object at +12976, the
+// objects at +13360, +56896 and +67760 (Member13360, Member56896,
+// Member67760), eight more records' 1.0s from +69628, and +77376 to +77388.
+constexpr uint32_t kRaceModeMemberBytes = 77392;
+void RaceModeMemberConstruct(uint8_t* base, uint32_t member);
+
+// sub_821073B8 RaceMode::RaceMode: the race mode (167,264 bytes) set up: the
+// base (Mode::Mode), the dispatcher at +36 emptied, its vtables, the ten
+// state machines, the member at +10512 (RaceModeMember::RaceModeMember), an
+// XPR at +147892 (XPR::XPR) and the race overlays' list at +157552
+// (RaceOverlays::Clear).
+constexpr uint32_t kRaceModeBytes = 167264;
+void RaceModeConstruct(uint8_t* base, uint32_t mode);
+
 }  // namespace game_modes

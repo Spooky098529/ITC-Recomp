@@ -27,6 +27,7 @@
 
 ITC_FLAG_DECLARE(bool, native_game_modes);
 ITC_FLAG_DECLARE(bool, native_models);
+ITC_FLAG_DECLARE(bool, native_race_overlays);
 
 namespace harness {
 
@@ -82,6 +83,18 @@ void NativeXprHolderConstruct(PPCContext& ctx, uint8_t* base) {
   gm::XprHolderConstruct(base, ctx.r3.u32);
 }
 
+void NativeMember56896Construct(PPCContext& ctx, uint8_t* base) {
+  gm::Member56896Construct(base, ctx.r3.u32);
+}
+
+void NativeRaceModeMemberConstruct(PPCContext& ctx, uint8_t* base) {
+  gm::RaceModeMemberConstruct(base, ctx.r3.u32);
+}
+
+void NativeRaceModeConstruct(PPCContext& ctx, uint8_t* base) {
+  gm::RaceModeConstruct(base, ctx.r3.u32);
+}
+
 void NativeRaceModeMemberDestruct(PPCContext& ctx, uint8_t* base) {
   if (const auto r3 = gm::RaceModeMemberDestruct(base, ctx.r3.u32)) {
     ctx.r3.u64 = *r3;
@@ -123,9 +136,11 @@ void Case(Context& h, Results& results, const Block& block, Setup setup, Args ar
     args(t);
     ITC_FLAG(native_game_modes) = v == 1;
     ITC_FLAG(native_models) = v == 1;
+    ITC_FLAG(native_race_overlays) = v == 1;
     (v == 0 ? recompiled : native)(t, h.base);
     ITC_FLAG(native_game_modes) = true;
     ITC_FLAG(native_models) = true;
+    ITC_FLAG(native_race_overlays) = true;
     out[v].Bytes(Read(h.base, block.address, block.bytes));
     out[v].Bytes(Read(h.base, h.data, kScratchBytes));
     out[v].Bytes(Read(h.base, kDefault, kDefaultBytes));
@@ -539,6 +554,42 @@ void XprHolders(Context& h, const Block& block) {
   results.Report();
 }
 
+// The race mode's constructors: the object's bytes random (a few cases) or
+// left at 0xCD, at a few offsets in a block of its size and a bit more.
+void RaceModeConstructors(Context& h) {
+  struct Constructor {
+    const char* name;
+    uint32_t bytes;
+    GuestFunction recompiled;
+    GuestFunction native;
+    int cases;
+  };
+  const Constructor constructors[] = {
+      {"sub_82106A50 Member56896::Member56896", 10840, __imp__sub_82106A50,
+       NativeMember56896Construct, 16},
+      {"sub_82107168 RaceModeMember::RaceModeMember", gm::kRaceModeMemberBytes,
+       __imp__sub_82107168, NativeRaceModeMemberConstruct, 8},
+      {"sub_821073B8 RaceMode::RaceMode", gm::kRaceModeBytes, __imp__sub_821073B8,
+       NativeRaceModeConstruct, 6},
+  };
+  for (const Constructor& f : constructors) {
+    Results results(f.name);
+    const Block block(f.bytes + 64);
+    for (int c = 0; c < f.cases; c++) {
+      Case(
+          h, results, block,
+          [&](Random& random) {
+            if (c % 2 == 1) {
+              WriteRandom(h.base, block.address, block.bytes / 4, random);
+            }
+          },
+          [&](PPCContext& t) { t.r3.u64 = block.address + 4 * c; }, f.recompiled, f.native,
+          fmt::format("case {}", c));
+    }
+    results.Report();
+  }
+}
+
 // RaceModeMember::~RaceModeMember: the member's words random, its XPR's
 // header and data blocks none, untagged or tagged (on the game's pending
 // frees, held under the memory blocks' lock and put back after each case,
@@ -647,6 +698,7 @@ void GameModes(Context& h) {
   }
   Member13360(h);
   RaceModeMembers(h);
+  RaceModeConstructors(h);
   Write(h.base, kDefault, saved_default.data(), kDefaultBytes);
 }
 
