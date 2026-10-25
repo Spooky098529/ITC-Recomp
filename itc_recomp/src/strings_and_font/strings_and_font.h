@@ -84,6 +84,33 @@ bool StringsFormatGrouped(uint8_t* base, int32_t value, uint32_t out, uint32_t f
 // returns with r3 unchanged).
 std::optional<uint32_t> StringsGet(uint8_t* base, uint32_t table, uint32_t id);
 
+// Strings::FormatV's calls into code that still takes the guest context:
+// `function` with r3, r4 and r5 (all 64 bits of it) from a frame at `frame`
+// (r1) with the return address `lr`; returns its r3.
+struct FormatCalls {
+  void* user;
+  uint32_t (*call)(void* user, uint32_t function, uint32_t r3, uint32_t r4, uint64_t r5,
+                   uint32_t frame, uint32_t lr);
+};
+
+// Strings::FormatV (sub_8210A990): string `id` of `table` (Strings::Get;
+// the table itself read as the string for an id past the last bound, as
+// the original's r3 left) appended to `out` a unit at a time (wcscat), the
+// control units replaced: 0xFFD7 the string whose 16-bit id is in the next
+// 8-byte slot of `args` (the va_list), formatted recursively with the slots
+// after it; 0xFFEC-0xFFF5 the slot's int with "%<0xFFF5 - c>d", 0xFFE2-
+// 0xFFEB its double, rounded to a float, with "%.<0xFFEB - c>f", 0xFFD8-
+// 0xFFE1 its int with "%0<0xFFE1 - c>d" (the format made by swprintf from
+// "%%%dd", "%%.%df" or "%%0%dd" first); 0xFFD3 the int with separators
+// (Strings::FormatGrouped); 0xFFD2 a number through the font (sub_82108A70,
+// never ran in play: a guest call). Its 4,800-byte frame below `stack` (the
+// back chain written): the 4 KB buffer at +608 (cleared before each slot),
+// the made format at +96, the one-unit string at +80, swprintf's argument
+// at +32 (as the originals store them). swprintf and FormatGrouped natively,
+// their adapters through `calls` where they decline. Returns `out`.
+uint32_t StringsFormatV(uint8_t* base, const FormatCalls& calls, uint32_t stack, uint32_t table,
+                        uint32_t out, uint32_t id, uint32_t args);
+
 // sub_82108860, probably XPR::Release of a slot: the XPR at `slot` (when
 // set) destroyed (XPR::~XPR), freed (operator delete) and the slot cleared.
 // Returns the r3 the original leaves (the XPR, else the slot); nullopt,

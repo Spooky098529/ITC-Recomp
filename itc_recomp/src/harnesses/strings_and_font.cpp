@@ -15,6 +15,7 @@
 #include "command_list/command_list.h"
 #include "hooks/heap.h"
 #include "hooks/models.h"
+#include "hooks/strings_and_font.h"
 #include "memory/c_runtime_heap.h"
 #include "models/xpr.h"
 #include "memory/heap.h"
@@ -1253,6 +1254,126 @@ void StringsGets(Context& h) {
   results.Report();
 }
 
+// Strings::FormatV: a table at the scratch area's +0 whose 18 files are one
+// container at +128 of 8 strings (from +200, 16 units each with room): 0
+// to 3 plain (letters and the control units but 0xFFD7), 4 to 7 with 0xFFD7
+// too (its slot's id one of the plain strings', or now and then past the
+// last bound).
+// 0xFFD2 (the font's number, never in play) isn't used. The id a string's
+// (by a file's bound at 0x82007E18) or now and then past the last bound
+// (the table read as the text); the va_list at +3072 (16 slots: ints,
+// doubles and ids in the order the string's units ask, then random); the
+// output in a 32 KB block of its own (a string of doubles printed whole can
+// run long), holding a short prefix. Compared: the scratch area, the
+// output's block and r3.
+void FormatVCases(Context& h) {
+  Results results("Strings::FormatV (sub_8210A990)");
+  Random r(0x666F726D617476ull);  // "formatv"
+  constexpr uint32_t kBounds = 0x82007E18;
+  const uint32_t table = h.data, container = h.data + 128, strings = h.data + 200;
+  const Block output_block(32768);
+  const uint32_t output = output_block.address, args = h.data + 3072;
+  constexpr uint32_t kStringUnits = 24;
+  for (int c = 0; c < 1500; c++) {
+    // The strings: units, and the slot kinds each control unit asks for.
+    std::vector<uint16_t> units[8];
+    for (uint32_t s = 0; s < 8; s++) {
+      const uint32_t length = r.Below(12);
+      for (uint32_t k = 0; k < length; k++) {
+        uint16_t unit;
+        switch (r.Below(8)) {
+          case 0: unit = uint16_t(0xFFEC + r.Below(10)); break;  // %<w>d
+          case 1: unit = uint16_t(0xFFE2 + r.Below(10)); break;  // %.<p>f
+          case 2: unit = uint16_t(0xFFD8 + r.Below(10)); break;  // %0<w>d
+          case 3: unit = 0xFFD3; break;                          // grouped
+          case 4: unit = s >= 4 ? 0xFFD7 : uint16_t('a' + r.Below(26)); break;
+          case 5: {
+            constexpr uint16_t kOther[] = {0xFFD1, 0xFFD6, 0xFFF6, 0xFFFF, 0xFFD4, '\n', 0x00E9};
+            unit = kOther[r.Below(std::size(kOther))];
+            break;
+          }
+          default: unit = uint16_t('A' + r.Below(26)); break;
+        }
+        units[s].push_back(unit);
+      }
+    }
+    // A string's id: string `k` of a file whose bound leaves room for it
+    // (Strings::Get then finds that file), or past the last bound.
+    auto string_id = [&](uint32_t k) {
+      for (;;) {
+        const uint32_t file = r.Below(17);
+        const uint32_t bound = guest::LoadU32(h.base, kBounds + 4 * file);
+        const uint32_t next = guest::LoadU32(h.base, kBounds + 4 * (file + 1));
+        if (int32_t(bound + k) < int32_t(next)) {
+          return bound + k;
+        }
+      }
+    };
+    const uint32_t last = guest::LoadU32(h.base, kBounds + 4 * 17);
+    const uint32_t pick = r.Below(8);
+    const uint32_t id = r.Below(30) == 0 ? last + r.Below(4) : string_id(pick);
+    // The slots, in the order the picked string asks (its inner strings
+    // read on from there), then random.
+    std::vector<uint64_t> slots;
+    auto add = [&](uint16_t unit) {
+      if (unit >= 0xFFE2 && unit <= 0xFFEB) {
+        slots.push_back(r.Below(4) == 0 ? DoubleBits(r)
+                                        : std::bit_cast<uint64_t>(
+                                              double(int32_t(r.Below(2000000)) - 1000000) / 64.0));
+      } else if (unit == 0xFFD7) {
+        slots.push_back(((uint64_t(r.Next()) << 16) & ~0xFFFFull) |
+                        (r.Below(16) == 0 ? last + r.Below(4) : string_id(r.Below(4))));
+      } else if ((unit >= 0xFFD8 && unit <= 0xFFF5) || unit == 0xFFD3) {
+        AddInt(r, slots, r.Below(4) == 0);
+      }
+    };
+    for (uint16_t unit : units[pick]) {
+      add(unit);
+    }
+    while (slots.size() < 16) {
+      const uint32_t kind = r.Below(3);
+      add(kind == 0 ? 0xFFE2 : kind == 1 ? 0xFFEC : 0xFFD7);
+    }
+    const uint32_t prefix = r.Below(4) == 0 ? r.Below(16) : 0;
+    Outputs out[2];
+    for (int v = 0; v < 2; v++) {
+      Fill(h.base, h.data, kScratchBytes);
+      Fill(h.base, output, output_block.bytes);
+      for (uint32_t i = 0; i < 18; i++) {
+        guest::StoreU32(h.base, table + 4 * i, container);
+      }
+      guest::StoreU32(h.base, container, __builtin_bswap32(8));
+      for (uint32_t s = 0; s < 8; s++) {
+        const uint32_t at = strings + 2 * kStringUnits * s;
+        guest::StoreU32(h.base, container + 4 + 4 * s, __builtin_bswap32(at - container));
+        for (size_t k = 0; k < units[s].size(); k++) {
+          guest::StoreU16(h.base, at + 2 * uint32_t(k), units[s][k]);
+        }
+        guest::StoreU16(h.base, at + 2 * uint32_t(units[s].size()), 0);
+      }
+      for (uint32_t i = 0; i < 16; i++) {
+        guest::StoreU32(h.base, args + 8 * i, uint32_t(slots[i] >> 32));
+        guest::StoreU32(h.base, args + 8 * i + 4, uint32_t(slots[i]));
+      }
+      for (uint32_t k = 0; k < prefix; k++) {
+        guest::StoreU16(h.base, output + 2 * k, uint16_t('a' + k));
+      }
+      guest::StoreU16(h.base, output + 2 * prefix, 0);
+      PPCContext t = CallContext(h);
+      t.r3.u64 = table;
+      t.r4.u64 = output;
+      t.r5.u64 = id;
+      t.r6.u64 = args;
+      Run(v, __imp__sub_8210A990, hooks::StringsFormatVSteps, t, h.base);
+      out[v].Bytes(Read(h.base, h.data, kScratchBytes));
+      out[v].Bytes(Read(h.base, output, output_block.bytes));
+      out[v].Word(t.r3.u32);
+    }
+    results.Check(out[0], out[1], fmt::format("case {} (id {}, string {})", c, id, pick));
+  }
+  results.Report();
+}
+
 // XPR::Release of a slot (sub_82108860): the slot empty, or an XPR (24
 // bytes from operator new, made by XPR::XPR) without blocks. Compared: r3
 // (the XPR's address made an offset) and the slot.
@@ -1308,6 +1429,7 @@ void StringsAndFont(Context& h) {
   SwprintfCases(h);
   FormatGroupedCases(h);
   StringsGets(h);
+  FormatVCases(h);
   XprSlotReleases(h);
 }
 

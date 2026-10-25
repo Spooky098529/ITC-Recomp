@@ -13,4 +13,9 @@ namespace hooks {
 using GuestStandIn = void (*)(PPCContext&, uint8_t*);
 extern GuestStandIn g_text_draw_stand_in;
 
+// Strings::FormatV (sub_8210A990)'s register steps without the flag (the
+// adapter's and the harness's): r3 = the table, r4 = the output, r5 = the
+// id, r6 = the va_list; r3 the output.
+void StringsFormatVSteps(PPCContext& ctx, uint8_t* base);
+
 }  // namespace hooks
