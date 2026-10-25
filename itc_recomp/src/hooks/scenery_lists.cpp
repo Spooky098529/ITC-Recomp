@@ -4,7 +4,10 @@
 // recompiler split off a function (sub_82147A20 of sub_82147958, sub_8228F484
 // of sub_8228F408) are ported with it and have no adapters, nor do the
 // functions only native callers reach (the flag switches their callers):
-// VertexDeclarations::ForDepth (sub_82589970), from RecordShapeDepth.
+// VertexDeclarations::ForDepth (sub_82589970), from RecordShapeDepth, and
+// ModelList::Load and LoadPoints (sub_82148428, sub_82148528), from
+// CourseSet::Parse (src/course_scenery/); their register steps are the
+// harness's.
 
 #include "hooks/scenery_lists.h"
 
@@ -26,10 +29,9 @@ ITC_FLAG_DECLARE(bool, native_models);
 ITC_FLAG_BOOL(native_scenery_lists, true, "ITC",
               "Run the course set's lists of models and the model draws "
               "(docs/functions/scenery-lists.md: ModelList::Release sub_82147FB8 (Model::Release "
-              "and the models' vtable slot 0 guest calls), with --native_models ModelList::Load "
-              "sub_82148428 and ModelList::LoadPoints sub_82148528 (operator new, Model::Model, "
-              "DataFile::GetEntry, Model::Load and List64::Insert's plain C++ called directly; "
-              "their originals, where it declines, guest calls), SceneryModel::ResetDrawState "
+              "and the models' vtable slot 0 guest calls), ModelList::Load "
+              "sub_82148428 and ModelList::LoadPoints sub_82148528 (no adapters: only "
+              "CourseSet::Parse's plain C++ calls them, src/course_scenery/), SceneryModel::ResetDrawState "
               "sub_82146AA8, AnimationSet::CurrentFrame sub_82146B80, ModelList::IsBEntryOn "
               "sub_82147850, ModelList::IsCEntryOn sub_82147958 (with sub_82147A20), "
               "Race::CourseLayout sub_8228F408 (with sub_8228F484), PointList::IsEntryOn "
@@ -552,8 +554,6 @@ void SceneryListsPointListDraw(PPCContext& ctx, uint8_t* base) {
   }
 
 ITC_SCENERY_LISTS(82147FB8, SceneryListsModelListRelease)
-ITC_SCENERY_LISTS(82148428, SceneryListsModelListLoad)
-ITC_SCENERY_LISTS(82148528, SceneryListsModelListLoadPoints)
 ITC_SCENERY_LISTS(82146AA8, SceneryListsResetDrawState)
 ITC_SCENERY_LISTS(82146B80, SceneryListsAnimationCurrentFrame)
 ITC_SCENERY_LISTS(82147850, SceneryListsIsBEntryOn)

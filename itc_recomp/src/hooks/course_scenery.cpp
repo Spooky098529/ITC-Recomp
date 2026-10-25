@@ -32,9 +32,9 @@ ITC_FLAG_BOOL(native_course_scenery, true, "ITC",
               "SceneryList::ReleaseUnused sub_820F17C0, Scenery::StartLoad sub_820F1E00, "
               "TextureAnimations::Advance sub_820F11A8 (in the per-frame logic's wrap), "
               "AnimationSet::Advance sub_82146B20, Animation::Advance sub_82146AC0, "
-              "AreaLights::Parse sub_820F11C0 and OnLoaded sub_820F1C30; with --native_models "
-              "CourseSet::Parse sub_820F1A70, AreaModel::Parse sub_820F1258 and OnLoaded "
-              "sub_820F1CE8, the model class's and the model lists' plain C++ called directly, "
+              "AreaLights::Parse sub_820F11C0 (no adapter: only its OnLoaded calls it) and OnLoaded "
+              "sub_820F1C30; with --native_models CourseSet::Parse sub_820F1A70, AreaModel::Parse "
+              "sub_820F1258 (no adapter: only its OnLoaded calls it) and OnLoaded sub_820F1CE8, the model class's and the model lists' plain C++ called directly, "
               "their originals where it declines guest calls) "
               "natively instead of through the translated code (the same writes; checked by "
               "--run_harnesses=course_scenery). Those reached only from native callers have no "
@@ -225,25 +225,10 @@ extern "C" REX_FUNC(sub_820F1A70) {
   ctx.r3.u64 = CourseSetParse(base, calls, ctx.r1.u32, ctx.r3.u32);
 }
 
-// AreaLights::Parse: r3 = the area's lights; r3 the entry (or 0).
-ITC_COURSE_SCENERY(820F11C0, ctx.r3.u64 = AreaLightsParse(base, ctx.r3.u32))
-
 // AreaLights::OnLoaded (Archive::Load's callback): r6 = the area's lights;
 // r3 = them, as PoolObject::MarkLoaded leaves it.
 ITC_COURSE_SCENERY(820F1C30, guest::StoreU32(base, ctx.r1.u32 - 96, ctx.r1.u32);
                    ctx.r3.u64 = AreaLightsOnLoaded(base, ctx.r6.u32))
-
-// AreaModel::Parse: r3 = the area's model; r3 as the original leaves it.
-extern "C" REX_FUNC(sub_820F1258) {
-  REX_FUNC_PROLOGUE();
-  if (!NativeParses()) {
-    __imp__sub_820F1258(ctx, base);
-    return;
-  }
-  ctx.fpscr.disableFlushMode();
-  ITC_SCENERY_CALLS;
-  ctx.r3.u64 = AreaModelParse(base, calls, ctx.r1.u32, ctx.r3.u32);
-}
 
 // AreaModel::OnLoaded (Archive::Load's callback): r6 = the area's model; r3
 // = it, as PoolObject::MarkLoaded leaves it.

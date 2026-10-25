@@ -14,7 +14,8 @@ namespace hooks {
 // 128-byte frame like the original's.
 void SceneryListsModelListRelease(PPCContext& ctx, uint8_t* base);
 // ModelList::Load (sub_82148428): r3 = the list, r4 = the container;
-// ModelList::LoadPoints (sub_82148528): the same. Natively only where
+// ModelList::LoadPoints (sub_82148528): the same. No adapters (the
+// harness's steps; CourseSet::Parse's plain C++ calls them). Natively only where
 // Model::Load's adapter is (hooks::ModelsNativeLifetime), else the original;
 // the callees' originals, where their plain C++ declines, guest calls from
 // 512 bytes below r1 with the original's return addresses. Flush-to-zero
