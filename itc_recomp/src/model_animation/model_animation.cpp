@@ -590,6 +590,15 @@ bool SkeletonFreeNodeValues(uint8_t* base, uint32_t skeleton) {
   return true;
 }
 
+bool TrackSetReleasable(uint8_t* base, uint32_t set, bool array) {
+  const uint32_t values = Load(base, set + 16);
+  return values == 0 || Deletable(values - (array ? 16 : 0));
+}
+
+bool SkeletonDestructible(uint8_t* base, uint32_t skeleton) {
+  return Deletable(Load(base, skeleton + 176)) && BaseFreeable(base, skeleton);
+}
+
 void SkeletonCursorClear(uint8_t* base, uint32_t cursor) {
   ITC_NATIVE_RUNNING("sub_825A2068 SkeletonCursor::Clear");
   Stfs(base, cursor + 12, Lfs(base, kZero));

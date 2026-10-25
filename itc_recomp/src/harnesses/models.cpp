@@ -20,6 +20,7 @@
 #include "memory/c_runtime_heap.h"
 #include "memory/heap.h"
 #include "models/memory_blocks.h"
+#include "models/model.h"
 #include "models/texture_provider.h"
 #include "models/xpr.h"
 
@@ -775,6 +776,203 @@ void Providers(Context& h) {
   }
 }
 
+// --- The model ---
+
+void NativeModelConstruct(PPCContext& t, uint8_t* base) {
+  if (!models::ModelConstruct(base, t.r3.u32)) {
+    __imp__sub_825948C0(t, base);
+  }
+}
+void NativeModelRelease(PPCContext& t, uint8_t* base) {
+  if (const auto r3 = models::ModelRelease(base, t.r3.u32)) {
+    t.r3.u64 = *r3;
+  } else {
+    __imp__sub_82594970(t, base);
+  }
+}
+void NativeModelDestruct(PPCContext& t, uint8_t* base) {
+  if (const auto r3 = models::ModelDestruct(base, t.r3.u32)) {
+    t.r3.u64 = *r3;
+  } else {
+    __imp__sub_82594F58(t, base);
+  }
+}
+
+constexpr uint32_t kModelBytes = 432;
+constexpr uint32_t kPairsAt = 432;     // the shader pairs, in the block
+constexpr uint32_t kHeadersAt = 512;   // the blocks' headers, 16 bytes each
+
+void ModelConstructs(Context& h, const Block& block) {
+  Results results("Model::Model (sub_825948C0)");
+  for (int c = 0; c < 16; c++) {
+    const uint32_t model = block.address + 16 * h.random.Below(4);
+    Outputs out[2];
+    for (int v = 0; v < 2; v++) {
+      Fill(h.base, h.data, kScratchBytes);
+      Fill(h.base, block.address, block.bytes);
+      PPCContext t = CallContext(h);
+      t.r3.u64 = model;
+      Side(v, [&] { (v == 0 ? __imp__sub_825948C0 : NativeModelConstruct)(t, h.base); });
+      // The texture provider's storage: by its contents, then freed.
+      TakeVector(h.base, model + models::kModelTextures + tp::kTextureProviderVector, 0, t,
+                 out[v]);
+      out[v].Bytes(Read(h.base, block.address, block.bytes));
+      out[v].Bytes(Read(h.base, h.data, kScratchBytes));
+    }
+    results.Check(out[0], out[1], fmt::format("case {} (at +{})", c, model - block.address));
+  }
+  results.Report();
+}
+
+// The words a model's release frees, set from `random`: each 0, a block
+// whose header isn't tagged, or a tagged one (headers from kHeadersAt).
+struct ReleaseInputs {
+  uint32_t pairs;
+  uint32_t words[3 + 16];  // +16, +20, +24's use (unused), then four pairs
+  uint32_t kinds[3 + 16];
+  uint32_t xpr_kinds[2];
+  uint32_t header_words[24][3];
+};
+
+ReleaseInputs MakeReleaseInputs(Random& random, int c) {
+  ReleaseInputs in{};
+  in.pairs = c < 4 ? uint32_t(c) : random.Below(5);
+  for (uint32_t i = 0; i < 19; i++) {
+    in.kinds[i] = c < 2 ? 0 : random.Below(3);
+  }
+  in.kinds[2] = c == 2 ? 0 : 1 + random.Below(2);  // the pairs' array (+24)
+  in.xpr_kinds[0] = random.Below(3);
+  in.xpr_kinds[1] = random.Below(3);
+  for (auto& set : in.header_words) {
+    for (uint32_t& word : set) {
+      word = uint32_t(random.Next());
+    }
+  }
+  return in;
+}
+
+// Writes the release's inputs into a model at `model` in `block`.
+void WriteReleaseInputs(uint8_t* base, const Block& block, uint32_t model,
+                        const ReleaseInputs& in) {
+  uint32_t next = 0;
+  auto block_for = [&](uint32_t kind) {
+    const uint32_t header = block.address + kHeadersAt + 16 * next;
+    const uint32_t* words = in.header_words[next];
+    next++;
+    return WriteBlock(base, kind, header, words);
+  };
+  Store(base, model + 16, block_for(in.kinds[0]));
+  Store(base, model + 20, block_for(in.kinds[1]));
+  const uint32_t pairs = block.address + kPairsAt;
+  // The pairs' array: a block's address (its header elsewhere when tagged),
+  // the pairs themselves in the block either way.
+  Store(base, model + models::kModelShaderPairs, in.kinds[2] == 0 ? 0 : pairs);
+  if (in.kinds[2] == 2) {
+    // A tagged header 4 KiB before the pairs isn't in the block: left
+    // untagged (the free skipped), as for kind 1.
+  }
+  Store(base, model + models::kModelShaderPairCount, in.kinds[2] == 0 ? 0 : in.pairs);
+  for (uint32_t i = 0; i < 16; i++) {
+    Store(base, pairs + 4 * i, block_for(in.kinds[3 + i]));
+  }
+  Store(base, model + models::kModelXpr + models::kXprHeader, block_for(in.xpr_kinds[0]));
+  Store(base, model + models::kModelXpr + models::kXprData, block_for(in.xpr_kinds[1]));
+}
+
+void ModelReleases(Context& h, const Block& block) {
+  Results results("Model::Release (sub_82594970, on the game's list)");
+  if (!hooks::ModelsHostLock()) {
+    ITC_LOG_WARN("harness: models: --native_models was off at start-up: Model::Release's "
+                 "cases skipped");
+    return;
+  }
+  std::lock_guard<std::recursive_mutex> lock(models::MemoryBlocksMutex());
+  for (int c = 0; c < 48; c++) {
+    const ReleaseInputs in = MakeReleaseInputs(h.random, c);
+    const uint32_t model = block.address;
+    Outputs out[2];
+    for (int v = 0; v < 2; v++) {
+      Fill(h.base, h.data, kScratchBytes);
+      Fill(h.base, block.address, block.bytes);
+      WriteReleaseInputs(h.base, block, model, in);
+      const ListState was = SaveList(h.base);
+      PPCContext t = CallContext(h);
+      t.r3.u64 = model;
+      Side(v, [&] { (v == 0 ? __imp__sub_82594970 : NativeModelRelease)(t, h.base); });
+      TakeAddedNodes(h.base, was, out[v]);
+      out[v].Bytes(Read(h.base, block.address, block.bytes));
+      out[v].Bytes(Read(h.base, h.data, kScratchBytes));
+      out[v].Word(t.r3.u32);
+      out[v].Word(uint32_t(t.r3.u64 >> 32));
+    }
+    results.Check(out[0], out[1], fmt::format("case {} ({} pairs)", c, in.pairs));
+  }
+  results.Report();
+}
+
+// A heap block of `bytes` (0: none); `header` adds the 16-byte count header
+// operator delete[] takes back (the pointer kept is past it).
+uint32_t HeapArray(uint32_t bytes, bool header) {
+  if (bytes == 0) {
+    return 0;
+  }
+  const uint32_t block = memory::Alloc(bytes + (header ? 16 : 0), 0);
+  return header ? block + 16 : block;
+}
+
+void ModelDestructs(Context& h, const Block& block) {
+  Results results("Model::~Model (sub_82594F58, on the game's list)");
+  if (!hooks::ModelsHostLock()) {
+    ITC_LOG_WARN("harness: models: --native_models was off at start-up: Model::~Model's "
+                 "cases skipped");
+    return;
+  }
+  std::lock_guard<std::recursive_mutex> lock(models::MemoryBlocksMutex());
+  for (int c = 0; c < 48; c++) {
+    const ReleaseInputs in = MakeReleaseInputs(h.random, c);
+    // Which members hold heap blocks (each freed by the destructor).
+    const uint32_t held = c < 2 ? (c == 0 ? 0u : 0x3FFu) : h.random.Below(0x400);
+    const uint32_t capacity = h.random.Below(70);
+    const uint32_t model = block.address;
+    Outputs out[2];
+    for (int v = 0; v < 2; v++) {
+      Fill(h.base, h.data, kScratchBytes);
+      Fill(h.base, block.address, block.bytes);
+      WriteReleaseInputs(h.base, block, model, in);
+      // The track sets' values (+16): arrays with a header at +384, +364
+      // and +304, plain at +344 and +324.
+      static constexpr uint32_t kSets[] = {384, 364, 344, 324, 304};
+      for (uint32_t i = 0; i < 5; i++) {
+        Store(h.base, model + kSets[i] + 16,
+              HeapArray(held & (1u << i) ? 32 : 0, kSets[i] != 344 && kSets[i] != 324));
+      }
+      // The skeleton: +176 (no header), +128 (no header), +136, +144, +132.
+      const uint32_t skeleton = model + models::kModelSkeleton;
+      Store(h.base, skeleton + 176, HeapArray(held & 32 ? 48 : 0, false));
+      Store(h.base, skeleton + 128, HeapArray(held & 64 ? 40 : 0, false));
+      Store(h.base, skeleton + 136, HeapArray(held & 128 ? 144 : 0, true));
+      Store(h.base, skeleton + 144, HeapArray(held & 256 ? 64 : 0, true));
+      Store(h.base, skeleton + 132, HeapArray(held & 256 ? 160 : 0, true));
+      // The texture provider's storage.
+      const uint32_t storage = held & 512 ? memory::Alloc(4 * capacity + 4, 0) : 0;
+      WriteVector(h.base, model + models::kModelTextures + tp::kTextureProviderVector, storage,
+                  capacity / 2, capacity);
+      const ListState was = SaveList(h.base);
+      PPCContext t = CallContext(h);
+      t.r3.u64 = model;
+      Side(v, [&] { (v == 0 ? __imp__sub_82594F58 : NativeModelDestruct)(t, h.base); });
+      TakeAddedNodes(h.base, was, out[v]);
+      out[v].Bytes(Read(h.base, block.address, block.bytes));
+      out[v].Bytes(Read(h.base, h.data, kScratchBytes));
+      out[v].Word(t.r3.u32);
+      out[v].Word(uint32_t(t.r3.u64 >> 32));
+    }
+    results.Check(out[0], out[1],
+                  fmt::format("case {} ({} pairs, held {:03X})", c, in.pairs, held));
+  }
+  results.Report();
+}
+
 }  // namespace
 
 void Models(Context& h) {
@@ -801,6 +999,12 @@ void Models(Context& h) {
     ITC_LOG_INFO("harness: models: {} InsertN cases handed to the original (a tail at least "
                  "the count long, its copy_backward never seen in play)",
                  handed);
+  }
+  {
+    const Block block(1024);
+    ModelConstructs(h, block);
+    ModelReleases(h, block);
+    ModelDestructs(h, block);
   }
 }
 

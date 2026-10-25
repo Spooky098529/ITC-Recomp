@@ -101,6 +101,12 @@ bool PendingFreesInsert(uint8_t* base, uint32_t list, uint32_t where, uint32_t v
   return true;
 }
 
+bool PendingFreesHaveRoom(uint8_t* base, uint32_t count) {
+  std::lock_guard<std::recursive_mutex> lock(MemoryBlocksMutex());
+  return std_list::CanAllocate(base, 1) &&
+         0x3FFFFFFFu - Load(base, kPendingFrees + kListSize) >= count;
+}
+
 bool FreeLater(uint8_t* base, uint32_t block) {
   ITC_NATIVE_RUNNING("sub_8258E410 Memory::FreeLater");
   std::lock_guard<std::recursive_mutex> lock(MemoryBlocksMutex());

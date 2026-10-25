@@ -74,6 +74,11 @@ bool PendingFreesCanInsert(uint8_t* base, uint32_t list);
 // nothing done, where the original must run.
 bool PendingFreesInsert(uint8_t* base, uint32_t list, uint32_t where, uint32_t value);
 
+// For native callers checking before they put blocks off: whether the
+// pending frees take `count` more nodes natively (a process heap, the size
+// limit), read under the lock.
+bool PendingFreesHaveRoom(uint8_t* base, uint32_t count);
+
 // sub_8258E410 Memory::FreeLater: under the lock, a block (not null, its
 // header starting `XLMM`) put at the end of the pending frees. False, with
 // nothing done, where the original must run.

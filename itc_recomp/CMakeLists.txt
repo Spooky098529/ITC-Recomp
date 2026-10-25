@@ -171,6 +171,7 @@ set(ITC_SOURCES
     src/models/memory_blocks.cpp
     src/models/xpr.cpp
     src/models/texture_provider.cpp
+    src/models/model.cpp
     src/hooks/screen_objects.cpp
     src/screen_objects/uv_trees.cpp
     src/screen_objects/screen_objects.cpp

@@ -18,6 +18,7 @@
 #include "hooks/heap.h"
 #include "hooks/models.h"
 #include "models/memory_blocks.h"
+#include "models/model.h"
 #include "models/texture_provider.h"
 #include "models/xpr.h"
 
@@ -35,7 +36,9 @@ ITC_FLAG_BOOL(native_models, true, "ITC",
               "UninitializedCopy sub_82594380 (no adapters: only Reserve and InsertN call "
               "them), Reserve sub_82594570, InsertN sub_82590EF0 and Assign sub_825947D0 (no "
               "adapter: only the constructor calls it), TextureProvider::TextureProvider "
-              "sub_82594850 and ~TextureProvider sub_825943E0) natively instead of through the "
+              "sub_82594850 and ~TextureProvider sub_825943E0; Model::Model sub_825948C0, "
+              "Model::Release sub_82594970 and Model::~Model sub_82594F58, their members' "
+              "plain C++ called directly) natively instead of through the "
               "translated code (the same writes; "
               "checked by --run_harnesses=models)");
 
@@ -184,3 +187,22 @@ extern "C" REX_FUNC(sub_82594850) {
 
 // TextureProvider::~TextureProvider: r3 = the provider; r3 = its storage.
 ITC_MODELS_LIFETIME(825943E0, TextureProviderDestruct)
+
+// --- The model ---
+
+// Model::Model: r3 = the model (left).
+extern "C" REX_FUNC(sub_825948C0) {
+  REX_FUNC_PROLOGUE();
+  if (NativeLifetime()) {
+    ctx.fpscr.disableFlushMode();
+    if (models::ModelConstruct(base, ctx.r3.u32)) {
+      return;
+    }
+  }
+  __imp__sub_825948C0(ctx, base);
+}
+
+// Model::Release and Model::~Model: r3 = the model; r3 as the original
+// leaves it (XPR::Release's, XPR::~XPR's).
+ITC_MODELS_LIFETIME(82594970, ModelRelease)
+ITC_MODELS_LIFETIME(82594F58, ModelDestruct)

@@ -5,7 +5,6 @@
 #include "base/log.h"
 #include "guest.h"
 #include "models/memory_blocks.h"
-#include "std_list/ptr_list.h"
 
 #include <cstdlib>
 
@@ -39,14 +38,9 @@ void XprConstruct(uint8_t* base, uint32_t xpr) {
 
 std::optional<uint32_t> XprRelease(uint8_t* base, uint32_t xpr) {
   ITC_NATIVE_RUNNING("sub_825970A8 XPR::Release");
-  // Room for both blocks' nodes (the list's limit, a process heap), checked
-  // under the lock before anything changes.
-  {
-    std::lock_guard<std::recursive_mutex> lock(MemoryBlocksMutex());
-    if (!std_list::CanAllocate(base, 1) ||
-        0x3FFFFFFFu - Load(base, kPendingFrees + kListSize) < 2) {
-      return std::nullopt;
-    }
+  // Room for both blocks' nodes, checked before anything changes.
+  if (!PendingFreesHaveRoom(base, 2)) {
+    return std::nullopt;
   }
   const uint32_t header = Load(base, xpr + kXprHeader);
   if (header != 0) {
