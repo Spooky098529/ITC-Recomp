@@ -55,6 +55,20 @@ calls, `sub_8235A9F8`, `sub_82599A20` and `XPR::Create`. After that come
 has an indirect call (its texture provider's slot 4). Its unseen
 callees are debug prints (`sub_825A1318`, `sub_825ABFE8`).
 
+Made native 2026-10-25 by the B7 loop's migration (all seven rows, the
+two `XMemCpy` rows and the chain up to `Model::Load` in `models.md`):
+plain C++ in `src/shader_objects/` (the shader objects, the shader file
+parse, `Mesh::LoadShaders`), `src/models/memory_blocks.cpp` (the memory
+blocks), `src/models/xpr.cpp` and `model_load.cpp` (`XPR::Create`,
+`Mesh::Parse`, `Model::Load`), behind `--native_shader_objects` for this
+file's rows and `--native_models` for `models.md`'s; harness
+`shader_objects`. The copies these make with the library's `memcpy`
+(`sub_825A7410`) go through `native::Buffers_Memcpy`
+(`src/native/buffers.cpp`): the same native copy and the same work
+memcpy's override does around it (copies into the physical views, the
+microcode and the vertex data, recorded for the renderer's mirrors and
+texture cache).
+
 Status:
 
 - **Native**: plain C++ in `itc_recomp/src/` that doesn't use the
