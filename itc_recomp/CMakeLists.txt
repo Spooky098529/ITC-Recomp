@@ -173,6 +173,8 @@ set(ITC_SOURCES
     src/hooks/minimap.cpp
     src/mode_tick/mode_tick.cpp
     src/minimap/minimap.cpp
+    src/hooks/scene_models.cpp
+    src/scene_models/scene_models.cpp
     src/hooks/models.cpp
     src/models/memory_blocks.cpp
     src/models/xpr.cpp
@@ -264,6 +266,7 @@ set(ITC_SOURCES
     src/harnesses/game_modes.cpp
     src/harnesses/mode_tick.cpp
     src/harnesses/minimap.cpp
+    src/harnesses/scene_models.cpp
     src/harnesses/models.cpp
     src/harnesses/action_mappers.cpp
     src/harnesses/data_tables.cpp

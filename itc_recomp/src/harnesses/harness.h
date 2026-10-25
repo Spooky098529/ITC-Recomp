@@ -186,5 +186,6 @@ void ModeTick(Context& h);
 void Minimap(Context& h);
 void CRuntimeExit(Context& h);
 void Models(Context& h);
+void SceneModels(Context& h);
 
 }  // namespace harness
