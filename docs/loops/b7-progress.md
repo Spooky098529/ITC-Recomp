@@ -126,8 +126,14 @@ file's history. What's left to see in a drive, from every run:
   8 adapters removed; 21-24 s, 0 errors, every harness 0 differing;
   `DrawSetLists`' dumps the same as the fallback but for the texture
   animations' frames, as two fallback runs differ). Nothing ready left
-  in `course-scenery.md` or `strings-and-font.md`. Step: validation 3,
-  agent running.
+  in `course-scenery.md` or `strings-and-font.md`. The first validation
+  3 was stopped when the user saw the menus run too fast: its replay
+  (`itc_1847`, `--skip_intro`) ran unpaced from boot (150-188 ticks/s,
+  later over 1,000), as `TitleScreen_SkipTickWait` does until the first
+  race is seen, so the race at boot wasn't. Not reproduced: the same
+  replay with `--log_race_changes=true` (`itc_1851`) and two boots ran
+  at 30. Left to debug later (the user's call). Step: validation 3
+  again, agent running.
 
 ## Done
 

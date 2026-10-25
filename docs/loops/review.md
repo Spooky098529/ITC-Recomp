@@ -13,6 +13,17 @@ When the user has reviewed a run's section, its heading gets
 
 ## Run 2026-10-25 16:38 (`b7-loop-25-10-26-3`)
 
+- For later (the user's call, 2026-10-25: debug when the code is
+  translated): one pad replay after the shader objects' migration 3
+  (`itc_1847`, killed partway) ran the menus unpaced from boot
+  (150-188 ticks/s, later 1,300-2,267): with `--skip_intro` (a testing
+  flag, off for players), menus skip the 30 Hz tick wait until frame
+  pacing sees the first race (`TitleScreen_SkipTickWait`,
+  `renderer_hooks.cpp`), and that run apparently never saw the race the
+  title screen runs at boot. Not reproduced (`itc_1851` with
+  `--log_race_changes=true`, `itc_1849`, `itc_1850`, `itc_1848`: all at
+  30). The user's suggestion: default to paced menus and flip on the
+  first race.
 - For later (the user's call, 2026-10-25: dropped for now): native code
   reaches `generated/` three ways: the adapters' `--native_X=false`
   fallbacks, ports that hand uncovered cases to `__imp__` from the start
