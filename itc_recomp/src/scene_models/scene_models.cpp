@@ -60,6 +60,17 @@ uint32_t Accessories(uint8_t* base) {
   return guest::LoadU32(base, kAccessories);
 }
 
+uint32_t Accessory(uint8_t* base, uint32_t interior) {
+  ITC_NATIVE_RUNNING("sub_820D97B8 SceneModel::Accessory");
+  const uint32_t set = Accessories(base);
+  const uint32_t which = guest::LoadU32(base, interior + 140);
+  if (which == 3) {
+    return 0;
+  }
+  const uint32_t entry = guest::LoadU32(base, ((which + 1) << 2) + set);
+  return entry == 0 ? 0 : entry + 48;
+}
+
 void OnSoundLoaded(uint8_t* base, uint32_t context) {
   ITC_NATIVE_RUNNING("sub_82175EE0 SceneModel::OnSoundLoaded");
   uint32_t slot = guest::LoadU32(base, context);
@@ -145,6 +156,35 @@ bool CarRecordCopy(uint8_t* base, uint32_t to, uint32_t from) {
     guest::StoreU32(base, to + offset, guest::LoadU32(base, from + offset));
   }
   return true;
+}
+
+bool SceneModelRecordCopy(uint8_t* base, uint32_t to, uint32_t from) {
+  ITC_NATIVE_RUNNING("sub_820DB290 SceneModelRecord::Copy");
+  if (to >= kPhysical || from >= kPhysical || to - from < kSceneModelRecordBytes ||
+      from - to < kSceneModelRecordBytes) {
+    return false;
+  }
+  guest::StoreU32(base, to, guest::LoadU32(base, from));
+  if (!CarRecordCopy(base, to + 16, from + 16)) {
+    return false;
+  }
+  struct Part {
+    uint32_t offset, bytes;
+  };
+  constexpr Part kParts[] = {{3712, 60}, {3772, 120}, {3892, 144}, {4036, 156}, {4192, 52}};
+  for (const Part& part : kParts) {
+    if (!c_runtime::Memcpy(base, to + part.offset, from + part.offset, part.bytes)) {
+      return false;
+    }
+  }
+  return true;
+}
+
+void SceneModelRecordConstruct(uint8_t* base, uint32_t record) {
+  ITC_NATIVE_RUNNING("sub_820DB240 SceneModelRecord::SceneModelRecord");
+  CarRecordSetW(base, record + 16);
+  Record12Reset(base, record + 4036 + 44);
+  Record12Reset(base, record + 4036 + 56);
 }
 
 void CarRecordSetW(uint8_t* base, uint32_t record) {
@@ -268,6 +308,15 @@ void InteriorRecordReset(uint8_t* base, uint32_t record) {
   for (const Word& word : kWords) {
     guest::StoreU32(base, record + word.offset, word.value);
   }
+}
+
+uint32_t CockpitRecordReset(uint8_t* base, uint32_t record) {
+  ITC_NATIVE_RUNNING("sub_820D34B8 CockpitRecord::Reset");
+  for (uint32_t offset = 0; offset <= 16; offset += 4) {
+    guest::StoreU32(base, record + offset, 0);
+  }
+  InteriorRecordReset(base, record + 24);
+  return record + 24;
 }
 
 void WheelsRecordReset(uint8_t* base, uint32_t record) {

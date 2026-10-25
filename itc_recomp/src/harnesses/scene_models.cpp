@@ -140,6 +140,26 @@ void Links(Context& h, Random& r, uint32_t block) {
     results.Report();
   }
   {
+    Results results("SceneModel::Accessory (sub_820D97B8)");
+    for (int c = 0; c < 64; c++) {
+      Case(
+          h, results, block, r,
+          [&](PPCContext& t) {
+            const uint32_t set = block + 0x400;
+            guest::StoreU32(h.base, sm::kAccessories, set);
+            for (uint32_t i = 0; i < 3; i++) {
+              guest::StoreU32(h.base, set + 4 + 4 * i, r.Below(3) == 0 ? 0 : uint32_t(r.Next()));
+            }
+            // 0-3 mostly, now and then another small number.
+            const uint32_t interior = block + 4 * r.Below(16);
+            guest::StoreU32(h.base, interior + 140, r.Below(8) == 0 ? r.Below(64) : r.Below(4));
+            t.r3.u64 = interior;
+          },
+          __imp__sub_820D97B8, hooks::SceneModelsAccessory, {}, fmt::format("case {}", c));
+    }
+    results.Report();
+  }
+  {
     Results results("sub_82175EE0 (the sound loads' callback)");
     for (int c = 0; c < 128; c++) {
       Case(
@@ -264,6 +284,41 @@ void Copies(Context& h, Random& r, uint32_t block) {
     }
     results.Report();
   }
+  {
+    Results results("SceneModelRecord::Copy (sub_820DB290)");
+    for (int c = 0; c < 48; c++) {
+      const bool overlap = c % 16 == 15;
+      const bool reverse = c % 2 == 1;
+      const uint32_t low = block + 16 * r.Below(8);
+      const uint32_t high =
+          overlap ? low + 16 * (1 + r.Below(100)) : block + 0x2000 + 16 * r.Below(8);
+      const uint32_t to = reverse ? low : high;
+      const uint32_t from = reverse ? high : low;
+      FloatRanges floats;
+      if (!overlap) {
+        for (size_t b = 0; b < 10; b++) {
+          for (uint32_t i = 0; i < kLayerCounts[b]; i++) {
+            floats.push_back({to - block + 16 + kLayerOffsets[b] + 64 * i + 32, 1});
+          }
+        }
+      }
+      Case(
+          h, results, block, r,
+          [&](PPCContext& t) {
+            for (size_t b = 0; b < 10; b++) {
+              for (uint32_t i = 0; i < kLayerCounts[b]; i++) {
+                guest::StoreU32(h.base, from + 16 + kLayerOffsets[b] + 64 * i + 32,
+                                RandomFloat(r));
+              }
+            }
+            t.r3.u64 = to;
+            t.r4.u64 = from;
+          },
+          __imp__sub_820DB290, hooks::SceneModelsSceneModelRecordCopy, floats,
+          fmt::format("case {}{}", c, overlap ? " (overlapping: the original's)" : ""));
+    }
+    results.Report();
+  }
 }
 
 // --- Records' defaults ---
@@ -279,6 +334,9 @@ void Defaults(Context& h, Random& r, uint32_t block) {
       {"sub_820D3B38", __imp__sub_820D3B38, hooks::SceneModelsRecord12Reset},
       {"sub_820D0A20", __imp__sub_820D0A20, hooks::SceneModelsLayerReset},
       {"CarRecord::Reset (sub_820D0A98)", __imp__sub_820D0A98, hooks::SceneModelsCarRecordReset},
+      {"SceneModelRecord::SceneModelRecord (sub_820DB240)", __imp__sub_820DB240,
+       hooks::SceneModelsSceneModelRecordConstruct},
+      {"sub_820D34B8", __imp__sub_820D34B8, hooks::SceneModelsCockpitRecordReset},
       {"sub_820D3558", __imp__sub_820D3558, hooks::SceneModelsPartsRecordReset},
       {"sub_820D3840", __imp__sub_820D3840, hooks::SceneModelsInteriorRecordReset},
       {"sub_820D3900", __imp__sub_820D3900, hooks::SceneModelsWheelsRecordReset},

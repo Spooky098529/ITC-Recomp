@@ -22,6 +22,11 @@ constexpr uint32_t kAccessories = 0x826C5510;
 // sub_820F0E50: [0x826C5510].
 uint32_t Accessories(uint8_t* base);
 
+// SceneModel::Accessory (sub_820D97B8, probably): an interior's loading
+// object's +140 (0-2, or 3 for none) picks the accessories' set's entry
+// [set + 4 + 4i]; returns it + 48, or 0 for 3 or an entry of 0.
+uint32_t Accessory(uint8_t* base, uint32_t interior);
+
 // sub_82175EE0, Archive::Load's callback for SceneModel::SetUp's two sound
 // assets: `context` holds the slot i; byte 0x826D8350 + i up by one (wrapping
 // at 256), and when it's then 2 (i read again), 0x826D83AC + 4i = 1.
@@ -66,7 +71,20 @@ bool CarModelSetRecord(uint8_t* base, uint32_t car_model, uint32_t record);
 // which the original writes the same again).
 bool CarRecordCopy(uint8_t* base, uint32_t to, uint32_t from);
 
+// SceneModelRecord::Copy (sub_820DB290): the 4,244-byte record `from` into
+// `to`: +0, the car record (CarRecordCopy, +16), then memcpy of +3712 (60
+// bytes), +3772 (120), +3892 (144), +4036 (156) and +4192 (52). False where
+// it can't be done natively: either record in the physical views, the
+// records overlapping, or a copy refused (then after the parts before it,
+// which the original writes the same again).
+constexpr uint32_t kSceneModelRecordBytes = 4244;
+bool SceneModelRecordCopy(uint8_t* base, uint32_t to, uint32_t from);
+
 // --- Records' defaults ---
+
+// SceneModelRecord::SceneModelRecord (sub_820DB240): CarRecordSetW on +16,
+// Record12Reset on +4080 and +4092.
+void SceneModelRecordConstruct(uint8_t* base, uint32_t record);
 
 // sub_820D45B0: the image's 1.0 (0x82000A30) into +12 of the three 16-byte
 // rows of the blocks at +16, +64 and +112, and into +28 and +60 of the
@@ -86,6 +104,10 @@ void PartsRecordReset(uint8_t* base, uint32_t record);
 // sub_820D3840: the 120-byte interior record cleared, then +28 = 1, +40 = 2,
 // +52 = 3, +64 = 4, +72 = 1, +84 = 1, +88 = 1, +112 = 3.
 void InteriorRecordReset(uint8_t* base, uint32_t record);
+// sub_820D34B8: the 144-byte cockpit record: +0 to +16 = 0, then
+// InteriorRecordReset on +24. Returns +24 (the original's r3, from its tail
+// call).
+uint32_t CockpitRecordReset(uint8_t* base, uint32_t record);
 // sub_820D3900: the 156-byte wheels record's defaults.
 void WheelsRecordReset(uint8_t* base, uint32_t record);
 // sub_820D34E0: the 52-byte pool 4 record cleared, then 1.0 at +8, +12, +16,

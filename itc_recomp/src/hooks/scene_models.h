@@ -12,6 +12,9 @@ namespace hooks {
 
 // sub_820F0E50: r3 = the accessories' set.
 void SceneModelsAccessories(PPCContext& ctx, uint8_t* base);
+// SceneModel::Accessory sub_820D97B8: r3 = the interior's loading object; r3
+// = the accessory or 0.
+void SceneModelsAccessory(PPCContext& ctx, uint8_t* base);
 // sub_82175EE0: r6 = the context (the slot); r3 left.
 void SceneModelsOnSoundLoaded(PPCContext& ctx, uint8_t* base);
 // sub_820E7378, sub_820E70B8, SceneParts::Link sub_820DF1A8, sub_820DF1C0,
@@ -28,6 +31,8 @@ void SceneModelsSetWord11452(PPCContext& ctx, uint8_t* base);
 void SceneModelsCarModelSetRecord(PPCContext& ctx, uint8_t* base);
 // CarRecord::Copy sub_820D7EE8: r3 = to, r4 = from; r3 = to.
 void SceneModelsCarRecordCopy(PPCContext& ctx, uint8_t* base);
+// SceneModelRecord::Copy sub_820DB290: r3 = to, r4 = from; r3 = to.
+void SceneModelsSceneModelRecordCopy(PPCContext& ctx, uint8_t* base);
 // The records' defaults: r3 = the record; r3 left (memset's return, the
 // same), except CarRecord::Reset's (32).
 void SceneModelsCarRecordSetW(PPCContext& ctx, uint8_t* base);
@@ -36,6 +41,10 @@ void SceneModelsRecord12Reset(PPCContext& ctx, uint8_t* base);
 // steps.
 void SceneModelsLayerReset(PPCContext& ctx, uint8_t* base);
 void SceneModelsCarRecordReset(PPCContext& ctx, uint8_t* base);
+// SceneModelRecord::SceneModelRecord sub_820DB240: r3 = the record (left).
+void SceneModelsSceneModelRecordConstruct(PPCContext& ctx, uint8_t* base);
+// sub_820D34B8: r3 = the record; r3 = the record + 24.
+void SceneModelsCockpitRecordReset(PPCContext& ctx, uint8_t* base);
 void SceneModelsPartsRecordReset(PPCContext& ctx, uint8_t* base);
 void SceneModelsInteriorRecordReset(PPCContext& ctx, uint8_t* base);
 void SceneModelsWheelsRecordReset(PPCContext& ctx, uint8_t* base);

@@ -15,7 +15,9 @@ ITC_FLAG_BOOL(native_scene_models, true, "ITC",
               "sub_820E37D0, sub_820E3658, CarModel::SetRecord sub_820D3C70, CarRecord::Copy "
               "sub_820D7EE8, the records' defaults sub_820D45B0, sub_820D3B38, CarRecord::Reset "
               "sub_820D0A98 with sub_820D0A20 (no adapter: only CarRecord::Reset calls it), sub_820D3558, sub_820D3840, sub_820D3900 and "
-              "sub_820D34E0, and with --native_heap the car model's pages sub_820C3CA0) natively "
+              "sub_820D34E0, SceneModel::Accessory sub_820D97B8, SceneModelRecord::Copy sub_820DB290, "
+              "SceneModelRecord::SceneModelRecord sub_820DB240, sub_820D34B8, and with "
+              "--native_heap the car model's pages sub_820C3CA0) natively "
               "instead of through the translated code (the same writes; checked by "
               "--run_harnesses=scene_models)");
 
@@ -25,6 +27,10 @@ namespace sm = scene_models;
 
 void SceneModelsAccessories(PPCContext& ctx, uint8_t* base) {
   ctx.r3.u64 = sm::Accessories(base);
+}
+
+void SceneModelsAccessory(PPCContext& ctx, uint8_t* base) {
+  ctx.r3.u64 = sm::Accessory(base, ctx.r3.u32);
 }
 
 void SceneModelsOnSoundLoaded(PPCContext& ctx, uint8_t* base) {
@@ -70,6 +76,25 @@ void SceneModelsCarRecordCopy(PPCContext& ctx, uint8_t* base) {
   }
   ctx.fpscr.disableFlushMode();
   ctx.r3.u64 = ctx.r3.u32;
+}
+
+void SceneModelsSceneModelRecordCopy(PPCContext& ctx, uint8_t* base) {
+  if (!sm::SceneModelRecordCopy(base, ctx.r3.u32, ctx.r4.u32)) {
+    __imp__sub_820DB290(ctx, base);
+    return;
+  }
+  ctx.fpscr.disableFlushMode();
+  ctx.r3.u64 = ctx.r3.u32;
+}
+
+void SceneModelsSceneModelRecordConstruct(PPCContext& ctx, uint8_t* base) {
+  ctx.fpscr.disableFlushMode();
+  sm::SceneModelRecordConstruct(base, ctx.r3.u32);
+  ctx.r3.u64 = ctx.r3.u32;
+}
+
+void SceneModelsCockpitRecordReset(PPCContext& ctx, uint8_t* base) {
+  ctx.r3.u64 = sm::CockpitRecordReset(base, ctx.r3.u32);
 }
 
 void SceneModelsCarRecordSetW(PPCContext& ctx, uint8_t* base) {
@@ -145,6 +170,10 @@ ITC_SCENE_MODELS(820D0A98, SceneModelsCarRecordReset)
 // steps).
 ITC_SCENE_MODELS(820D3558, SceneModelsPartsRecordReset)
 ITC_SCENE_MODELS(820D3840, SceneModelsInteriorRecordReset)
+ITC_SCENE_MODELS(820D97B8, SceneModelsAccessory)
+ITC_SCENE_MODELS(820DB290, SceneModelsSceneModelRecordCopy)
+ITC_SCENE_MODELS(820DB240, SceneModelsSceneModelRecordConstruct)
+ITC_SCENE_MODELS(820D34B8, SceneModelsCockpitRecordReset)
 ITC_SCENE_MODELS(820D3900, SceneModelsWheelsRecordReset)
 ITC_SCENE_MODELS(820D34E0, SceneModelsPool4RecordReset)
 
