@@ -256,6 +256,11 @@ Rows not yet moved stay in the table below. So far:
   the scene target's mode, presence), the sign-in watch, the screen
   fades and the color rectangle they draw, the billboards' ring flip,
   the menu music's start and the input unblocked on a mode change (B7).
+- [`minimap.md`](minimap.md): the race's minimap: the map's models,
+  the point markers and the car markers (by type, in five colors, with
+  the blink clock that flashes the player's), the triangles they're
+  drawn with, their 80-slot lists, and two of the race manager's
+  accessors (B7).
 
 These files hold functions only. What used to follow the table here moved
 out on 2026-10-20: how frame interpolation works, its options and what
@@ -296,7 +301,6 @@ old performance notes to the end of `../native-renderer.md`.
 | `sub_82152CD8` | | | Camera shake; scales with speed. |
 | `sub_82146B80` | | | Returns the current frame's entry of animation r4 in set r3 (texture id at +4). |
 | `sub_82146A38` | | | Finds the animation in set r3 whose texture is r4; -1 if none. |
-| `sub_820F5740` | `Minimap::Draw` | Wrapped | From the draw step part `sub_820F6068`; steps the minimap blink clock at `0x826C5AA4`/`0x826C5AA8` after drawing (see "Per-frame logic" in `../frame-interpolation.md`). |
 | `sub_821109B8` | | | Turns the play time frame counter into hours, minutes and seconds (30, 1800, 108000 frames). |
 | `sub_82107B90` | `Boot::StartMovie` | | Message handler: plays the next boot movie, id from the table at `0x826C5BAC` (index at `0x826C5BC8`), via `Movies::Play` (`sub_820A43A8`, the path table at `0x82600BEC`; `movies.md`). See "The title screen" in `../title-screen.md`. |
 | `sub_82107C58` | `Boot::WaitForMovie` | Wrapped | Message handler, every tick while a boot movie plays; ends the step on a button press if skippable (`0x826C5BC4`) or when the movie has finished. The movie started (`Movies::Start`) when its state (`Movies::State`, twice a tick) is 1 with +9608 = 0 (then 1); finished when the state is 1 again with +9608 = 1. `--skip_intro` makes it finish at once. |
