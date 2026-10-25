@@ -17,7 +17,9 @@ file's history. What's left to see in a drive, from every run:
   1 done after five batches (f27748b..e080edd: getters, thunks, the
   run loop's maps and request vector, dispatchers, constructors; 50 of
   68 ours, 15 adapters removed; `--native_framework`; its races ran
-  every harness but `ai_drivers`). Not validated: the loop stopped.
+  every harness but `ai_drivers`). The loop stopped, then resumed
+  (the user's call, 2026-10-25, after dbc8ee0's harness fix). Step:
+  validation, agent running.
 
 ## Done
 
@@ -44,7 +46,7 @@ This run's groups: `expected-differences.md` (the "01:17 run" lines).
 
 ## Stopped
 
-2026-10-25, after the framework's migration 1, whose report's `stop:`
+Resumed (the user's call). Earlier: 2026-10-25, after the framework's migration 1, whose report's `stop:`
 wasn't `none`: `attract_race.sh 40 --run_harnesses=all` fails on this
 branch, not from the framework. The `ai_drivers` harness's
 `AiDriver::UpdateIdle` (`sub_821399A8`) case 1928 makes the recompiled
