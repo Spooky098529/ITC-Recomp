@@ -12,7 +12,8 @@
 // (sub_82107168), from RaceMode::RaceMode; Member56896::Member56896
 // (sub_82106A50), from RaceModeMember::RaceModeMember; the modes'
 // constructors (sub_82106DB8 and the others, ModeTypeConstruct) and
-// MachineMember::MachineMember (sub_82108160), from Mode::Create; Member13360::Member13360
+// MachineMember::MachineMember (sub_82108160), from Mode::Create;
+// RaceMode::RaceMode (sub_821073B8), from Mode::Create; Member13360::Member13360
 // (sub_82155118), from RaceModeMember::RaceModeMember.
 
 #include "guest.h"
@@ -41,7 +42,8 @@ ITC_FLAG_BOOL(native_game_modes, true, "ITC",
               "XprHolder::XprHolder sub_821067A0 (XPR::XPR's plain C++ called directly), and "
               "with --native_heap and the memory blocks' host lock "
               "RaceModeMember::~RaceModeMember sub_82106AF0 (XPR::~XPR's and sub_82106A00's "
-              "plain C++ called directly), RaceMode::RaceMode sub_821073B8 with "
+              "plain C++ called directly), RaceMode::RaceMode sub_821073B8 (no adapter: only "
+              "Mode::Create calls it) with "
               "RaceModeMember::RaceModeMember sub_82107168 and Member56896::Member56896 "
               "sub_82106A50 (no adapters: only RaceMode::RaceMode calls the member's "
               "constructor, and only it sub_82106A50; XPR::XPR's and RaceOverlays::Clear's "
@@ -187,9 +189,6 @@ extern "C" REX_FUNC(sub_82106AF0) {
   }
   __imp__sub_82106AF0(ctx, base);
 }
-
-// RaceMode::RaceMode: r3 = the race mode (left).
-ITC_GAME_MODES(821073B8, RaceModeConstruct(base, ctx.r3.u32))
 
 // Mode::Create: r3 = the holder (unused), r4 = the type; r3 = the mode or 0.
 // Over the allocation layer only (operator new's plain C++), and the
