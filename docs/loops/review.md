@@ -13,7 +13,22 @@ When the user has reviewed a run's section, its heading gets
 
 ## Run 2026-10-25 16:38 (`b7-loop-25-10-26-3`)
 
-(Nothing yet.)
+- `scene-models.md` (new, 9a490b3): 48 rows, all new: the cars as the
+  scene holds them (pool 7 of the second pool set at `[0x826C2E44]`):
+  `SceneModel::SetUp` (`sub_820DB458`, from a 4,244-byte record),
+  `SceneModel::Build` (`sub_820D9870`, claiming parts in the other
+  pools), `SceneModel::Update` (`sub_820DA180`), `ScenePools::SetUpB`
+  (`sub_820C5B28`), the parts' links, the records' defaults and
+  copies, the first set's loaders `car-models.md` lacked, the changed
+  record's re-apply (`sub_820DA758`) and the decals' reload. Shared
+  rows stay in `vehicle-accessors.md`, `car-models.md` and
+  `race-overlays.md`. `known-data.md`: the car parts object, the scene
+  model's fields, the 4,244-byte record, `0x826C5510` (probably the
+  accessories' set), the sound slots at `0x826D8334`-`0x826D83AC` and
+  their asset table `0x82616318` (probably the engine sound banks).
+  `leads.md`: 6 leads (the load poll, `ScenePools::ReleaseB`'s ~80
+  release cases, the scene models' owners, the sound slots' readers,
+  the scene's update and teardown, the archive queue's append).
 
 ## Run 2026-10-25 03:59 (`b7-loop-25-10-26-2`)
 

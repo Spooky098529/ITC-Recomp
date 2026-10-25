@@ -13,8 +13,12 @@ file's history. What's left to see in a drive, from every run:
 - Limit for this run: 3 subsystems (the default).
 - Subsystem 1 of 3: `leads.md`'s top lead, `sub_820DA180`,
   `sub_820D97B8`, `sub_820D9870` (probably the scene models' update,
-  from `sub_820C5A60` for each model in the scene's pool 7). Step:
-  mapping, agent running.
+  from `sub_820C5A60` for each model in the scene's pool 7). Mapped as
+  the scene models (`scene-models.md`, 48 rows, 9a490b3: the set-up
+  and build side only; the rest, ~227 functions, in 6 new leads). Map
+  checked (0 errors, 48 of 48 in play, 18 ready groups; only kernel use
+  `sub_820C3CA0`'s VirtualAlloc, the allocation call). Step: migration
+  1, agent running.
 
 ## Done
 
@@ -37,3 +41,5 @@ This run's groups: `expected-differences.md` (the "16:38 run" lines).
 - Start: ours 2013, work left 4438 (wrapped 110, known 590, unknown 3738).
   `b7_status.py`'s one check at the start: `movies.md:108`
   `sub_82108018`'s row says never called, but it ran (not this run's).
+- After the scene models' map: ours 2013, work left 4438 (wrapped 110,
+  known 638, unknown 3690).
