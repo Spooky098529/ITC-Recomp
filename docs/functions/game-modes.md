@@ -43,7 +43,7 @@ Shared, with rows in other files: `RaceOverlays::Destroy`
 (`sub_8215E1D0`) and the handler thunks the overlays' state machine
 registers (`sub_8215E680`, `sub_8215E6C0`, `RaceOverlays::OnUpdate`
 `sub_8215E150`, `sub_8215E158`, `sub_8215E688`; `sub_8215E140` never
-ran) and `RaceOverlays::Clear` (`sub_8215DE80`, Overridden) in
+ran) and `RaceOverlays::Clear` (`sub_8215DE80`, Native) in
 [`race-overlays.md`](race-overlays.md); `XPR::XPR` (`sub_82596E68`) in
 [`models.md`](models.md); the empty destructor `sub_82106540` in
 [`audio.md`](audio.md); `operator new` and `operator delete`
