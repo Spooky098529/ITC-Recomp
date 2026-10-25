@@ -77,4 +77,34 @@ void OverlaysSetFlag820(uint8_t* base, uint32_t machine);
 void OverlaysReset(uint8_t* base, uint32_t machine,
                    const std::function<void(uint32_t overlay, uint32_t target)>& reset);
 
+// --- The race mode's member at +10512's parts (in the camera modes' range,
+// 82152028-82156CC0) ---
+
+// sub_82155D90: the object at the member's +67760 set up (its vtable, 1.0s
+// in its w words, 16 linked halfword pairs).
+void Member67760Construct(uint8_t* base, uint32_t object);
+
+// A 28-byte buffer (vtable 0x82009390) holding a block at +20 from
+// VirtualAlloc. Freeing goes over the allocation layer only (the callers'
+// adapters check hooks::NativeHeapActive): Buffer28Freeable says whether the
+// block is the layer's pages (or none), else the originals run.
+constexpr uint32_t kBuffer28Block = 20;
+bool Buffer28Freeable(uint8_t* base, uint32_t buffer);
+// sub_82152028 Buffer28::Free: the block freed (VirtualFree, MEM_RELEASE)
+// and +20 = 0; returns r3 as the original leaves it (0 without a block, else
+// whether it was freed).
+uint32_t Buffer28Free(uint8_t* base, uint32_t buffer);
+// sub_82152D38 Buffer28::Reset: freed, then +12 and +16 = -1, +20 and +24 =
+// 0; r3 as Free's.
+uint32_t Buffer28Reset(uint8_t* base, uint32_t buffer);
+// sub_82152D28 Buffer28::~Buffer28: the vtable put back, then freed; r3 as
+// Free's.
+uint32_t Buffer28Destroy(uint8_t* base, uint32_t buffer);
+// sub_82106A00: the four buffers at +43100 down to +43016 destroyed; r3 as
+// the last Free's. Only when each is Buffer28Freeable.
+constexpr uint32_t kBuffers28 = 43016;
+constexpr uint32_t kBuffer28Bytes = 28;
+bool Buffers28Freeable(uint8_t* base, uint32_t object);
+uint32_t Buffers28Destroy(uint8_t* base, uint32_t object);
+
 }  // namespace game_modes

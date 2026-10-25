@@ -12,6 +12,7 @@
 #include "base/flags.h"
 #include "game_modes/game_modes.h"
 #include "hooks/game_modes.h"
+#include "hooks/heap.h"
 #include "memory/heap.h"
 
 #include <fmt/format.h>
@@ -61,6 +62,10 @@ void NativeOverlaysClearFlags(PPCContext& ctx, uint8_t* base) {
 
 void NativeOverlaysSetFlag820(PPCContext& ctx, uint8_t* base) {
   gm::OverlaysSetFlag820(base, ctx.r3.u32);
+}
+
+void NativeMember67760Construct(PPCContext& ctx, uint8_t* base) {
+  gm::Member67760Construct(base, ctx.r3.u32);
 }
 
 // StateMachine::Find's static default and its guard (put back afterwards).
@@ -351,6 +356,93 @@ void Handlers(Context& h, const Block& block) {
   }
 }
 
+void Member67760(Context& h, const Block& block) {
+  Results results("sub_82155D90 Member67760::Member67760");
+  for (int c = 0; c < 16; c++) {
+    Case(
+        h, results, block,
+        [&](Random& random) { WriteRandom(h.base, block.address, 800 / 4, random); },
+        [&](PPCContext& t) { t.r3.u64 = block.address + 4 * c; }, __imp__sub_82155D90,
+        NativeMember67760Construct, fmt::format("case {}", c));
+  }
+  results.Report();
+}
+
+// The 28-byte buffers: each version gets its own blocks (VirtualAlloc's
+// pages, or none), made in the same order with the same sizes; the buffers'
+// bytes (their blocks' addresses written as the block's number, so the two
+// versions' addresses don't matter), whether each block is still the
+// layer's afterwards, and r3 are compared.
+void Buffers(Context& h, const Block& block) {
+  struct Function {
+    const char* name;
+    GuestFunction recompiled;
+    uint32_t (*native)(uint8_t*, uint32_t);
+    uint32_t object_offset;  // r3 below the first buffer
+  };
+  const Function functions[] = {
+      {"Buffer28::Free (sub_82152028)", __imp__sub_82152028, gm::Buffer28Free, 0},
+      {"Buffer28::Reset (sub_82152D38)", __imp__sub_82152D38, gm::Buffer28Reset, 0},
+      {"Buffer28::~Buffer28 (sub_82152D28)", __imp__sub_82152D28, gm::Buffer28Destroy, 0},
+      {"sub_82106A00 Buffers28::~Buffers28", __imp__sub_82106A00, gm::Buffers28Destroy,
+       gm::kBuffers28},
+  };
+  if (!hooks::NativeHeapActive()) {
+    return;  // the adapters' condition
+  }
+  const uint32_t object = h.data + 64;  // the buffers at +0 (or r3 + 43016)
+  for (const Function& f : functions) {
+    Results results(f.name);
+    for (int c = 0; c < 40; c++) {
+      Outputs out[2];
+      const Random start = h.random;
+      for (int v = 0; v < 2; v++) {
+        Random random = start;
+        Fill(h.base, h.data, kScratchBytes);
+        uint32_t blocks[4] = {};
+        for (uint32_t i = 0; i < 4; i++) {
+          const uint32_t buffer = object + gm::kBuffer28Bytes * i;
+          WriteRandom(h.base, buffer, gm::kBuffer28Bytes / 4, random);
+          const uint32_t size = 4096 * (1 + random.Below(4));
+          if (c != 0 && random.Below(4) != 0) {
+            blocks[i] = memory::AllocPages(size, 4096);
+          }
+          guest::StoreU32(h.base, buffer + gm::kBuffer28Block, blocks[i]);
+        }
+        PPCContext t = CallContext(h);
+        t.r3.u64 = object - f.object_offset;
+        ITC_FLAG(native_game_modes) = false;
+        if (v == 0) {
+          f.recompiled(t, h.base);
+        } else {
+          t.r3.u64 = f.native(h.base, t.r3.u32);
+        }
+        ITC_FLAG(native_game_modes) = true;
+        for (uint32_t i = 0; i < 4; i++) {
+          const uint32_t buffer = object + gm::kBuffer28Bytes * i;
+          const uint32_t at = guest::LoadU32(h.base, buffer + gm::kBuffer28Block);
+          uint32_t number = at;
+          for (uint32_t b = 0; b < 4; b++) {
+            if (at != 0 && at == blocks[b]) {
+              number = 0xB0000000 | b;
+            }
+          }
+          guest::StoreU32(h.base, buffer + gm::kBuffer28Block, number);
+          out[v].Word(blocks[i] != 0 && memory::IsPages(blocks[i]));
+          if (blocks[i] != 0 && memory::IsPages(blocks[i])) {
+            memory::FreePages(blocks[i]);
+          }
+        }
+        out[v].Bytes(Read(h.base, h.data, kScratchBytes));
+        out[v].Word(t.r3.u32);
+        out[v].Word(uint32_t(t.r3.u64 >> 32));
+      }
+      results.Check(out[0], out[1], fmt::format("case {}", c));
+    }
+    results.Report();
+  }
+}
+
 }  // namespace
 
 void GameModes(Context& h) {
@@ -362,6 +454,8 @@ void GameModes(Context& h) {
     Constructors(h, block);
     Lookups(h, block);
     Handlers(h, block);
+    Member67760(h, block);
+    Buffers(h, block);
   }
   Write(h.base, kDefault, saved_default.data(), kDefaultBytes);
 }

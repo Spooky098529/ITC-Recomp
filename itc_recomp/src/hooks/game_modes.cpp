@@ -13,6 +13,7 @@
 #include "game_modes/game_modes.h"
 #include "hooks/game_modes.h"
 #include "hooks/guest_call.h"
+#include "hooks/heap.h"
 
 ITC_FLAG_BOOL(native_game_modes, true, "ITC",
               "Run the game modes and their state machines (docs/functions/game-modes.md: "
@@ -22,7 +23,9 @@ ITC_FLAG_BOOL(native_game_modes, true, "ITC",
               "StateMachine::Handle sub_82106280 (with Transition::Make sub_82106100 and Transition::Assign sub_82105FE0 merged into Add), "
               "Mode::Mode sub_82106C20, the race overlays' state machine's handlers "
               "sub_8215DD58, sub_8215DD90, sub_8215DDD0 and sub_8215DE10, the last's virtual "
-              "calls guest calls) "
+              "calls guest calls, the race mode's member's parts sub_82155D90, and with "
+              "--native_heap Buffer28::Free sub_82152028, Reset sub_82152D38, ~Buffer28 "
+              "sub_82152D28 and sub_82106A00) "
               "natively instead of through the translated code (the same writes; checked by "
               "--run_harnesses=game_modes)");
 
@@ -99,6 +102,24 @@ void hooks::GameModesHandle(PPCContext& ctx, uint8_t* base) {
   const uint32_t part = StateMachineHandle(base, machine, ctx.r4.u32, &found);
   SetPartR3(ctx, machine_r3, machine, part, found);
 }
+
+// The race mode's member's parts: r3 = the object (left).
+ITC_GAME_MODES(82155D90, Member67760Construct(base, ctx.r3.u32))
+
+// The 28-byte buffers: r3 = the buffer (sub_82106A00: the object holding
+// four); r3 as the originals leave it. Over the allocation layer only, and
+// only when the blocks are its pages (else the originals, whose VirtualFree
+// takes its other paths).
+#define ITC_GAME_MODES_FREE(address, freeable, function)                        \
+  ITC_GAME_MODES(address, if (!hooks::NativeHeapActive() || !freeable(base, ctx.r3.u32)) { \
+    __imp__sub_##address(ctx, base);                                           \
+    return;                                                                    \
+  } ctx.r3.u64 = function(base, ctx.r3.u32))
+
+ITC_GAME_MODES_FREE(82152028, Buffer28Freeable, Buffer28Free)
+ITC_GAME_MODES_FREE(82152D38, Buffer28Freeable, Buffer28Reset)
+ITC_GAME_MODES_FREE(82152D28, Buffer28Freeable, Buffer28Destroy)
+ITC_GAME_MODES_FREE(82106A00, Buffers28Freeable, Buffers28Destroy)
 
 // sub_8215DE10's work with its virtual calls (each overlay's slot 3) made
 // from a frame like the original's (112 bytes, returning to 0x8215DE4C).

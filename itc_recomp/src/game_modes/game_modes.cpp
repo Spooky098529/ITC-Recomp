@@ -5,6 +5,7 @@
 
 #include "base/log.h"
 #include "guest.h"
+#include "memory/heap.h"
 
 namespace game_modes {
 
@@ -221,6 +222,94 @@ void OverlaysReset(uint8_t* base, uint32_t machine,
     reset(overlay, guest::LoadU32(base, guest::LoadU32(base, overlay) + 12));
     StoreInOverlay(base, slot, 828, 1);
   });
+}
+
+namespace {
+
+constexpr uint32_t kMember67760Vtable = 0x820093C4;
+constexpr uint32_t kBuffer28Vtable = 0x82009390;
+// 1.0 in .rdata, the w words' value.
+constexpr uint32_t kOne = 0x82000A30;
+
+}  // namespace
+
+void Member67760Construct(uint8_t* base, uint32_t object) {
+  ITC_NATIVE_RUNNING("sub_82155D90 Member67760::Member67760");
+  // The original loads the float and stores it back as a single (the same
+  // bits for the constant 1.0).
+  const uint32_t one = guest::LoadU32(base, kOne);
+  guest::StoreU32(base, object + 16, 0);
+  guest::StoreU32(base, object + 20, 0);
+  for (uint32_t offset = 44; offset <= 252; offset += 16) {
+    guest::StoreU32(base, object + offset, one);
+  }
+  for (uint32_t offset = 284; offset <= 332; offset += 16) {
+    guest::StoreU32(base, object + offset, one);
+  }
+  guest::StoreU32(base, object + 0, kMember67760Vtable);
+  guest::StoreU32(base, object + 748, 0);
+  guest::StoreU32(base, object + 752, 0);
+  guest::StoreU32(base, object + 756, 2);
+  for (uint32_t i = 0; i < 16; i++) {
+    guest::StoreU16(base, object + 352 + 4 * i + 2, uint16_t(i));
+    guest::StoreU16(base, object + 352 + 4 * i, uint16_t(i + 1));
+  }
+  guest::StoreU16(base, object + 416, 0);
+  guest::StoreU16(base, object + 424, 0);
+  guest::StoreU16(base, object + 412, 0xFFFF);
+  guest::StoreU16(base, object + 420, 0xFFFF);
+  guest::StoreU16(base, object + 422, 0xFFFF);
+  guest::StoreU16(base, object + 418, 0xFFFF);
+}
+
+bool Buffer28Freeable(uint8_t* base, uint32_t buffer) {
+  const uint32_t block = guest::LoadU32(base, buffer + kBuffer28Block);
+  return block == 0 || memory::IsPages(block);
+}
+
+uint32_t Buffer28Free(uint8_t* base, uint32_t buffer) {
+  ITC_NATIVE_RUNNING("sub_82152028 Buffer28::Free");
+  const uint32_t block = guest::LoadU32(base, buffer + kBuffer28Block);
+  if (block == 0) {
+    return 0;
+  }
+  const uint32_t r3 = memory::FreePages(block) ? 1 : 0;
+  guest::StoreU32(base, buffer + kBuffer28Block, 0);
+  return r3;
+}
+
+uint32_t Buffer28Reset(uint8_t* base, uint32_t buffer) {
+  ITC_NATIVE_RUNNING("sub_82152D38 Buffer28::Reset");
+  const uint32_t r3 = Buffer28Free(base, buffer);
+  guest::StoreU32(base, buffer + 12, 0xFFFFFFFF);
+  guest::StoreU32(base, buffer + 16, 0xFFFFFFFF);
+  guest::StoreU32(base, buffer + 20, 0);
+  guest::StoreU32(base, buffer + 24, 0);
+  return r3;
+}
+
+uint32_t Buffer28Destroy(uint8_t* base, uint32_t buffer) {
+  ITC_NATIVE_RUNNING("sub_82152D28 Buffer28::~Buffer28");
+  guest::StoreU32(base, buffer + 0, kBuffer28Vtable);
+  return Buffer28Free(base, buffer);
+}
+
+bool Buffers28Freeable(uint8_t* base, uint32_t object) {
+  for (uint32_t i = 0; i < 4; i++) {
+    if (!Buffer28Freeable(base, object + kBuffers28 + kBuffer28Bytes * i)) {
+      return false;
+    }
+  }
+  return true;
+}
+
+uint32_t Buffers28Destroy(uint8_t* base, uint32_t object) {
+  ITC_NATIVE_RUNNING("sub_82106A00 Buffers28::~Buffers28");
+  uint32_t r3 = 0;
+  for (int32_t i = 3; i >= 0; i--) {
+    r3 = Buffer28Destroy(base, object + kBuffers28 + kBuffer28Bytes * uint32_t(i));
+  }
+  return r3;
 }
 
 }  // namespace game_modes
