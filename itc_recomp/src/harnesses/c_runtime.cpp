@@ -171,6 +171,11 @@ void NativeStrcpyS(PPCContext& ctx, uint8_t* base) {
   ctx.r3.u64 = 0;
 }
 
+// wcscmp: r3, r4 = UTF-16 strings; returns -1, 0 or 1.
+void NativeWcscmp(PPCContext& ctx, uint8_t* base) {
+  ctx.r3.s64 = c_runtime::Wcscmp(base, ctx.r3.u32, ctx.r4.u32);
+}
+
 // __ascii_strnicmp: r3, r4 = strings, r5 = count.
 void NativeAsciiStrnicmp(PPCContext& ctx, uint8_t* base) {
   ctx.r3.s64 = c_runtime::AsciiStrnicmp(base, ctx.r3.u32, ctx.r4.u32, ctx.r5.u32);
@@ -654,7 +659,7 @@ void CRuntime(Context& h) {
                          t.r3.u64 = first;
                          t.r4.u64 = second;
                        },
-                       __imp__sub_825A7EB0, sub_825A7EB0,
+                       __imp__sub_825A7EB0, NativeWcscmp,
                        fmt::format("length {} offset {} other {} order {}", length, offset, o,
                                    order));
           }

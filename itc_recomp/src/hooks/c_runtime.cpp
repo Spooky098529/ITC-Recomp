@@ -52,7 +52,7 @@ ITC_FLAG_BOOL(native_c_runtime, true, "ITC",
               "the table's set-up __onexitinit (sub_825A6F00) by the native calloc "
               "(checked by "
               "--run_harnesses=c_runtime). Those reached only from native callers have no "
-              "adapters, and the flag switches their callers: wcslen, mbtowc, the wide write_char, "
+              "adapters, and the flag switches their callers: wcslen, wcscmp, mbtowc, the wide write_char, "
               "strcpy_s, __ascii_strnicmp, "
               "strtoxl, ___dtold, _ld12tod, _atof_l, _fltin2, __strgtold12_l, __mtold12, $I10_OUTPUT, "
               "_fltout2, _cftof_l, _cftof2_l, _fptostr, _putwc_nolock, _cfltcvt_init, setSBCS "
@@ -197,16 +197,6 @@ extern "C" REX_FUNC(sub_825A7EF8) {
     return;
   }
   c_runtime::Wcscat(base, ctx.r3.u32, ctx.r4.u32);
-}
-
-// wcscmp: r3, r4 = UTF-16 strings; returns -1, 0 or 1.
-extern "C" REX_FUNC(sub_825A7EB0) {
-  REX_FUNC_PROLOGUE();
-  if (!ITC_FLAG(native_c_runtime)) {
-    __imp__sub_825A7EB0(ctx, base);
-    return;
-  }
-  ctx.r3.s64 = c_runtime::Wcscmp(base, ctx.r3.u32, ctx.r4.u32);
 }
 
 // strncpy: r3 = destination, r4 = source, r5 = count; returns r3.
