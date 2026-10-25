@@ -2573,6 +2573,7 @@ B7. **The game logic inside**: everything else, subsystem by subsystem,
 | 2026-10-25 | The app framework (the framework object `main` makes, its services' factories and getters, the run loop `App::Run` with its two `std::map`s of handlers and its request vector, the tick handlers' dispatch, the constructors and `main` itself; `Framework::Init` and the services' set-ups left waiting on other subsystems and kernel sync) | `framework.md` | 56 of 68 (two migrations) | `--native_framework` |
 | 2026-10-25 | The game modes (the one mode object the game runs at a time; the race mode's message dispatcher and its state machines: transitions keyed by (state, message), `StateMachine::Add`, `Find` and `Handle`; the race overlays' state machine and its handlers; the race mode's members and 28-byte buffers; the race mode's constructor, destructor and set-ups left waiting on `XPR::XPR`, other set-ups and the mode constructors) | `game-modes.md` | 38 of 42 (two migrations, the second after the model class; 9 adapters removed, 3 Merged) | `--native_game_modes` |
 | 2026-10-25 | The model class (`Model::Model`, `Release`, `~Model`, the texture provider and its `std::vector` helpers, `XPR::XPR`, `Release` and `~XPR`, the put-off frees; the memory blocks' lock `0x8296BD38` a host lock taken by every user, the user's call; with `memmove_s` in `c-runtime.md`) | `models.md` | 17 of 17 new rows (19 of 50 in the file; one migration) | `--native_models` |
+| 2026-10-25 | The mode tick (what `Modes::Tick` calls besides the mode's slots: the per-mode settings, the sign-in watch, the billboards' ring flip, the two layers of screen fades, the menu music with XAPI's `lstrcmpA` and `CompareStringA` as plain C++ by B6's call; presence Dropped by B5's; with `Modes::Modes` in `game-modes.md`) | `mode-tick.md` | 21 of 23 (one migration; 1 Dropped, 4 Merged) | `--native_mode_tick` |
 
     The first run (2026-10-22, branch `b7-loop-test`): every harness at 0 differing, attract races at 20-21 s with no errors,
     and a race the user drove looked right. Ours went from 162 to 335 (work
@@ -3409,3 +3410,15 @@ set-ups and `RaceMode::~RaceMode` (`RaceOverlays::Destroy`'s chain). The
 pad replay works again (d83677c: it waited for the movie library's draw,
 gone since the movies play through our FFmpeg).
 
+**2026-10-25, the mode tick (branch `b7-loop-25-10-26-2`):** the
+fifteenth run made what `Modes::Tick` calls besides the mode's slots
+native (`mode-tick.md`, 21 of 23: the per-mode settings, the sign-in
+watch, the ring flip, the screen fades, the menu music; presence
+Dropped; `--native_mode_tick`), with XAPI's `lstrcmpA` and
+`CompareStringA` as plain C++ in `src/helpers/` (B6's call). The
+boundary unchanged: 449 functions (916 pairs): overridden 67, Native 5,
+Dropped 23, never called 70, live 284. Imports: 186 called, 62 with a
+live caller. B7 (`b7_status.py`): ours 1,983, work left 4,468 (Wrapped
+111, with a row 597, no row yet 3,760), from 4,490. Left:
+`SignInWatch::OnModeChange` (the save data's creation and deletion, a
+lead), `SignInWatch::StaticInit` (`atexit`), and so `Modes::Tick`.

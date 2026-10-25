@@ -20,13 +20,11 @@ moved to our FFmpeg, so the first two validations' replays "stalled"
 (`itc_1605`, `itc_1616`); the cleanup's replay with the new marker ran
 (`itc_1625`, ok: the front end, a race, the screen after it) and showed
 `sub_82152D28`, `sub_82106A00`, `sub_825943E0` and `sub_82594F58`, now
-off the list. Left:
+off the list; the mode tick's replay (`itc_1640`, ok) showed the race
+overlays' machine's four handlers (`sub_8215DD58`, `sub_8215DD90`,
+`sub_8215DDD0`, `sub_8215DE10`), off it too. The mode tick's functions
+all ran in the attract race. Left:
 
-- The game modes' migration 1 (attract race `itc_1603`): `sub_8215DD58`
-  RaceOverlaysMachine::SetFlags, `sub_8215DD90`
-  RaceOverlaysMachine::ClearFlags, `sub_8215DDD0`
-  RaceOverlaysMachine::SetFlag820, `sub_8215DE10`
-  RaceOverlaysMachine::ResetOverlays (`game-modes.md`)
 - The model class (attract race `itc_1614`): `sub_825A7348` memmove_s
   (`c-runtime.md`)
 - The game modes' cleanup (`itc_1624`, `itc_1625`): the modes not

@@ -74,7 +74,9 @@ file's history. What's left to see in a drive, from every run:
   presence Dropped, `Modes::Modes` too; `--native_mode_tick`;
   `itc_1638`: 26 s, 0 errors, every harness 0 differing). Nothing ready
   left; the rest waits on the save data's creation and deletion (a lead)
-  and `atexit`. Step: validation agent running.
+  and `atexit`. Validated (`itc_1639`: 17 of 17 harness lines, all ran
+  in the attract race; the replay `itc_1640` ok, showing the overlays'
+  four handlers, off `to-drive.md`). Finished.
 
 ## Done
 
@@ -91,6 +93,11 @@ file's history. What's left to see in a drive, from every run:
 - The game modes' cleanup (no mapping; ce8d477..4ff0b54): 38 of 42
   ours, 6 more adapters removed, 11 rows added; validated (`itc_1624`,
   replay `itc_1625`).
+- The mode tick (`mode-tick.md`, mapped in 2a11eec; 23 rows): 21 ours
+  in one migration (4975324..1897994), presence Dropped, 1 adapter
+  removed, `Modes::Modes` too; validated (`itc_1639`, `itc_1640`);
+  `--native_mode_tick`. Left: `SignInWatch::OnModeChange` (the save
+  data), `SignInWatch::StaticInit` (`atexit`).
 
 ## Rows to review
 
@@ -109,6 +116,8 @@ This run's groups: `expected-differences.md` (the "03:59 run" lines).
 - Start: ours 1903, work left 4548 (wrapped 111, known 597, unknown 3840).
 - After the game modes' map: ours 1903, work left 4548 (wrapped 111,
   known 625, unknown 3812).
+- After the mode tick's validation: race 27 s (`itc_1639`), 0 errors,
+  every harness 0 differing; replay 127 s (`itc_1640`), 0 errors.
 - After the mode tick's migration 1: ours 1983, work left 4468 (wrapped
   111, known 597, unknown 3760).
 - After the mode tick's map: ours 1961, work left 4490 (wrapped 111,
