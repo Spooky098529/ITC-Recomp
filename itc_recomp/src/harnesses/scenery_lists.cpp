@@ -108,7 +108,8 @@ void Case(Context& h, Results& results, uint32_t block, Random& r,
           const std::function<void(PPCContext&)>& setup, GuestFunction recompiled,
           GuestFunction native, const FloatRanges& floats, const std::string& what,
           bool race = false,
-          const std::function<void(const PPCContext&, Outputs&)>& extra = {}) {
+          const std::function<void(const PPCContext&, Outputs&)>& extra = {},
+          const std::function<void()>& before = {}) {
   std::vector<std::vector<uint8_t>> saved;
   for (const Region& region : kRegions) {
     saved.push_back(Read(h.base, region.address, region.bytes));
@@ -137,6 +138,9 @@ void Case(Context& h, Results& results, uint32_t block, Random& r,
     }
     Fill(h.base, start.r1.u32 - 1024, 1024);  // the callee's frames
     PPCContext t = start;
+    if (before) {
+      before();
+    }
     if (g_flush_on_entry) {
       t.fpscr.enableFlushModeUnconditional();
     } else {
@@ -818,6 +822,88 @@ void SceneryShapes(Context& h, Random& r, uint32_t block) {
   }
 }
 
+// PointList::Draw: a list at the block's +0xE00 whose two nodes both hold
+// the model at +0x100 (shape 0), the entry's points at +0x1100 (most below
+// the lowest y, so a few are drawn), the camera pass at +0xD00 (an identity
+// view-projection), and the command list's slots in a buffer of their own
+// (`slots`, compared up to the slots used).
+void PointLists(Context& h, Random& r, uint32_t block, uint32_t slots) {
+  constexpr uint32_t kSlotsBytes = 0x40000;
+  const uint32_t model = block + 0x100;
+  const uint32_t list = block + 0xE00;
+  const uint32_t queue = block + 0x7C0;
+  const uint32_t pass = block + 0xD00;
+  Results results("PointList::Draw (sub_82148058)");
+  int drawn = 0;
+  for (int c = 0; c < 128; c++) {
+    Case(
+        h, results, block, r,
+        [&](PPCContext& t) {
+          g_flush_on_entry = r.Below(2) != 0;
+          RandomList(h.base, block, r, 100);
+          // The slots in their own buffer, room for all.
+          const uint32_t record = guest::LoadU32(h.base, scenery_lists::kRecordList);
+          guest::StoreU32(h.base, record + 32, slots);
+          guest::StoreU32(h.base, record + 44, slots);
+          guest::StoreU32(h.base, record + 8, kSlotsBytes / 16);
+          RandomShape(h.base, block, r, 0, true);
+          RandomMaterials(h.base, block, r, 0);
+          FiniteFloats(h.base, 0x8265ECA0, 0xA0 / 4, r);
+          FiniteFloats(h.base, 0x8296B940, 0x3A0 / 4, r);
+          RandomBytes(h.base, 0x8296B8F0, 16, r);
+          RandomBytes(h.base, 0x8296B900, 16, r);
+          guest::StoreU32(h.base, scenery_lists::kRenderQueue, queue);
+          guest::StoreU32(h.base, queue, queue + 0x20);
+          guest::StoreU32(h.base, queue + 0x20 + 16, kEmptyFunction);
+          StoreFloats(h.base, pass + 144, {1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1});
+          // The list: head node 3, then node 9, both holding the model.
+          guest::StoreU16(h.base, list + 4 + 260, 3);
+          guest::StoreU16(h.base, list + 4 + 12, 9);
+          guest::StoreU16(h.base, list + 4 + 14, 5);
+          guest::StoreU16(h.base, list + 4 + 36, 0xFFFF);
+          guest::StoreU16(h.base, list + 4 + 38, 7);
+          guest::StoreU32(h.base, list + 272 + 4 * 5, model);
+          guest::StoreU32(h.base, list + 272 + 4 * 7, model);
+          guest::StoreU32(h.base, list + 608, r.Below(2) ? block + 0xC00 : 0);
+          guest::StoreU32(h.base, list + 612, r.Below(6) ? block + 0x700 : 0);
+          guest::StoreU32(h.base, list + 616, r.Below(5) - 1);
+          const uint32_t entry = r.Below(20);
+          const uint32_t points = block + 0x1100;
+          guest::StoreU32(h.base, list + 528 + 4 * entry, points);
+          for (uint32_t i = 0; i < 16; i++) {
+            StoreFloats(h.base, points + 16 * i,
+                        {Spread(r, 0.3f), r.Below(5) == 0 ? Spread(r, 0.3f) : -2000.0f,
+                         Spread(r, 0.3f), Spread(r, 4.0f)});
+          }
+          // The material flags that call the provider only with one.
+          if (guest::LoadU32(h.base, list + 612) == 0) {
+            const uint32_t materials = block + 0x6000;
+            for (uint32_t m = 0; m < 6; m++) {
+              guest::StoreU32(h.base, materials + 16 + 512 * m + 104, 0);
+            }
+          }
+          t.r3.u64 = list;
+          t.r4.u64 = entry;
+          t.r5.u64 = pass;
+        },
+        __imp__sub_82148058, hooks::SceneryListsPointListDraw, {}, fmt::format("case {}", c),
+        false,
+        [&](const PPCContext& t, Outputs& out) {
+          const uint32_t record = guest::LoadU32(h.base, scenery_lists::kRecordList);
+          const uint32_t end = guest::LoadU32(h.base, record + 44);
+          out.Word(end - slots);
+          out.Bytes(Read(h.base, slots, std::min(end - slots, kSlotsBytes)));
+          // The frame's temporaries (r1 - 464 + 80 to + 256).
+          out.Bytes(Read(h.base, t.r1.u32 - 464 + 80, 176));
+          drawn += t.r3.u32 == queue;
+        },
+        [&] { Fill(h.base, slots, kSlotsBytes, 0xCD); });
+  }
+  ITC_LOG_INFO("harness: PointList::Draw: {} of 128 cases ended with a draw handed to the queue",
+               drawn / 2);
+  results.Report();
+}
+
 }  // namespace
 
 void SceneryLists(Context& h) {
@@ -832,6 +918,9 @@ void SceneryLists(Context& h) {
   Recorders(h, r, block);
   DepthDraws(h, r, block);
   SceneryShapes(h, r, block);
+  const uint32_t slots = memory::Alloc(0x40000 + 16, 0);
+  PointLists(h, r, block, (slots + 15) & ~15u);
+  memory::Free(slots);
   memory::Free(allocation);
 }
 

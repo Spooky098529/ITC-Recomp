@@ -365,6 +365,33 @@ void SceneryListsDrawShape(PPCContext& ctx, uint8_t* base) {
   }
 }
 
+void SceneryListsPointListDraw(PPCContext& ctx, uint8_t* base) {
+  if (SlotDiagnostics()) {
+    __imp__sub_82148058(ctx, base);
+    return;
+  }
+  ctx.fpscr.disableFlushMode();
+  const uint64_t lr = ctx.lr;
+  const uint32_t frame = ctx.r1.u32 - scenery_lists::kPointListDrawFrame;
+  DrawContext context{ctx, base};
+  scenery_lists::DrawCalls calls;
+  calls.call = &DrawContext::Call;
+  calls.submit = &DrawContext::Submit;
+  calls.user = &context;
+  const uint32_t chain = guest::LoadU32(base, frame);
+  guest::StoreU32(base, frame, ctx.r1.u32);
+  const auto r3 = scenery_lists::PointListDraw(base, calls, frame, ctx.r3.u32, ctx.r4.u32,
+                                               ctx.r5.u32, ctx.r24.u32, ctx.r3.u32);
+  if (!r3) {
+    guest::StoreU32(base, frame, chain);
+    __imp__sub_82148058(ctx, base);
+    return;
+  }
+  ctx.lr = lr;
+  ctx.fpscr.disableFlushMode();
+  ctx.r3.u64 = *r3;
+}
+
 }  // namespace hooks
 
 #define ITC_SCENERY_LISTS(address, steps)    \
@@ -391,5 +418,6 @@ ITC_SCENERY_LISTS(825960D0, SceneryListsRecordShapeDepth)
 ITC_SCENERY_LISTS(82596D48, SceneryListsDrawShapeDepth)
 ITC_SCENERY_LISTS(82146BD0, SceneryListsRecordShape)
 ITC_SCENERY_LISTS(82147D88, SceneryListsDrawShape)
+ITC_SCENERY_LISTS(82148058, SceneryListsPointListDraw)
 ITC_SCENERY_LISTS(82594328, SceneryListsTextureProviderClearAll)
 ITC_SCENERY_LISTS(82594718, SceneryListsTextureProviderSet)

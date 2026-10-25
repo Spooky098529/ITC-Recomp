@@ -10,6 +10,8 @@
 #include "command_list/command_list.h"
 #include "guest.h"
 #include "interpolation/blend_state.h"
+#include "c_runtime/strings.h"
+#include "car_physics/car_physics.h"
 #include "matrix_math/matrix_math.h"
 #include "models/model.h"
 
@@ -852,15 +854,13 @@ std::optional<uint32_t> SceneryRecordShape(uint8_t* base, const DrawCalls& calls
                             pair_offset);
 }
 
-std::optional<SceneryDraw> SceneryDrawShape(uint8_t* base, const DrawCalls& calls,
-                                            uint32_t frame, uint32_t model,
-                                            uint32_t view_projection, uint32_t world,
-                                            uint32_t shape, uint32_t depth_too, uint32_t c76,
-                                            uint32_t range, uint32_t pair_offset,
-                                            uint32_t caller_r24) {
-  ITC_NATIVE_RUNNING("sub_82147D88 SceneryModel::DrawShape");
-  const uint32_t list = guest::LoadU32(base, kRecordList);
-  // Every slot it would take, checked before anything is done.
+namespace {
+
+// The slots SceneryDrawShape takes when the shape is visible, or nullopt
+// where a recorder would decline.
+std::optional<uint32_t> SceneryDrawShapeSlots(uint8_t* base, uint32_t model, uint32_t shape,
+                                              uint32_t depth_too, uint32_t c76,
+                                              uint32_t range) {
   const auto group0 = SceneryRecordShapeSlots(base, model, shape, 0, 1, c76, range);
   const auto group1 = SceneryRecordShapeSlots(base, model, shape, 1, 1, c76, range);
   if (!group0 || !group1) {
@@ -870,7 +870,22 @@ std::optional<SceneryDraw> SceneryDrawShape(uint8_t* base, const DrawCalls& call
   if (int32_t(depth_too) != 0) {
     slots += 2 + RecordShapeDepthSlots(base, model, shape, 0, 0, 0);
   }
-  if (!CanRecord(base, list, slots)) {
+  return slots;
+}
+
+}  // namespace
+
+std::optional<SceneryDraw> SceneryDrawShape(uint8_t* base, const DrawCalls& calls,
+                                            uint32_t frame, uint32_t model,
+                                            uint32_t view_projection, uint32_t world,
+                                            uint32_t shape, uint32_t depth_too, uint32_t c76,
+                                            uint32_t range, uint32_t pair_offset,
+                                            uint32_t caller_r24) {
+  ITC_NATIVE_RUNNING("sub_82147D88 SceneryModel::DrawShape");
+  const uint32_t list = guest::LoadU32(base, kRecordList);
+  // Every slot it would take, checked before anything is done.
+  const auto slots = SceneryDrawShapeSlots(base, model, shape, depth_too, c76, range);
+  if (!slots || !CanRecord(base, list, *slots)) {
     return std::nullopt;
   }
   SceneryDraw draw;
@@ -946,6 +961,156 @@ std::optional<SceneryDraw> SceneryDrawShape(uint8_t* base, const DrawCalls& call
                          -Lfs(base, *constants + 72), frame, 0x82147FB0);
   draw.queued = true;
   return draw;
+}
+
+namespace {
+
+constexpr uint32_t kPointLow = 0x82006808;    // the lowest y drawn (-1000.0)
+constexpr uint32_t kPointTurn = 0x82002948;   // w's scale to an angle
+constexpr uint32_t kPointTurn2 = 0x82002A50;  // the second turn
+constexpr uint32_t kRangeNear = 0x82002814;
+constexpr uint32_t kRangeFar = 0x82006804;
+
+// The model of the List64 node `steps` from the head (0 or 1).
+uint32_t ListModel(uint8_t* base, uint32_t nodes, int steps) {
+  auto node_at = [&](int16_t index) { return uint32_t(int32_t(index) << 2) + nodes; };
+  uint32_t node = node_at(int16_t(guest::LoadU16(base, nodes + 260)));
+  if (steps != 0) {
+    node = node_at(int16_t(guest::LoadU16(base, node)));
+  }
+  const int32_t slot = int16_t(guest::LoadU16(base, node + 2));
+  return guest::LoadU32(base, uint32_t((slot + 67) << 2) + nodes);
+}
+
+// The identity's four rows at +96 (the vector unit's stores).
+void StoreIdentity(uint8_t* base, uint32_t frame) {
+  for (uint32_t row = 0; row < 4; row++) {
+    for (uint32_t i = 0; i < 4; i++) {
+      guest::StoreU32(base, frame + 96 + 16 * row + 4 * i, row == i ? 0x3F800000u : 0u);
+    }
+  }
+}
+
+}  // namespace
+
+std::optional<uint32_t> PointListDraw(uint8_t* base, const DrawCalls& calls, uint32_t frame,
+                                      uint32_t list, uint32_t entry, uint32_t pass,
+                                      uint32_t caller_r24, uint32_t r3) {
+  ITC_NATIVE_RUNNING("sub_82148058 PointList::Draw");
+  const uint32_t nodes = list + 4;
+  const uint32_t points = (entry + 132) << 2;  // the entry's word, from the list
+  const int32_t start = int32_t(guest::LoadU32(base, list + 616));
+  // Every draw's slots, checked before anything is done: the points drawn
+  // (y not below the lowest) times each model's draw.
+  {
+    const double low = Lfs(base, kPointLow);
+    uint64_t slots = 0;
+    for (int which = 0; which < 2; which++) {
+      const uint32_t model = ListModel(base, nodes, which);
+      const auto draw = SceneryDrawShapeSlots(base, model, 0, 0, 0, frame + (which ? 176 : 160));
+      if (!draw) {
+        return std::nullopt;
+      }
+      const int32_t first = which ? 192 : int32_t(uint32_t(start) << 6);
+      const int32_t end = which ? 256 : 192;
+      if (which == 0 && start >= 3) {
+        continue;
+      }
+      for (int32_t at = first; at < end; at += 16) {
+        const uint32_t point = guest::LoadU32(base, list + points) + uint32_t(at);
+        if (!(Lfs(base, point + 4) < low)) {
+          slots += *draw;
+        }
+      }
+    }
+    const uint32_t record_list = guest::LoadU32(base, kRecordList);
+    if (slots > 0xFFFFu || !CanRecord(base, record_list, uint32_t(slots))) {
+      return std::nullopt;
+    }
+  }
+  const double one = Lfs(base, kOne);
+  const double zero = Lfs(base, kZero);
+  for (uint32_t offset : {108u, 124u, 140u, 156u}) {
+    guest::StoreFloat(base, frame + offset, float(one));
+  }
+  for (uint32_t offset : {208u, 212u, 216u}) {
+    guest::StoreFloat(base, frame + offset, float(zero));
+  }
+  guest::StoreFloat(base, frame + 220, float(one));
+  StoreIdentity(base, frame);
+  const uint32_t view_projection = frame + 240;
+  if (!c_runtime::Memcpy(base, view_projection, pass + 144, 64)) {
+    return std::nullopt;
+  }
+  r3 = view_projection;
+  const double far = Lfs(base, kRangeFar);
+  const double near = Lfs(base, kRangeNear);
+  const double turn2 = Lfs(base, kPointTurn2);
+  const double low = Lfs(base, kPointLow);
+  const double turn = Lfs(base, kPointTurn);
+  // One point: its copies and the angle on the stack, then, when its y isn't
+  // below the lowest, the turned and moved identity and the model's shape 0.
+  // `at` is where the point's x, y, z go (+176 or +160), `range` the range's
+  // (+160 or +176).
+  auto draw_point = [&](uint32_t model, uint32_t point, uint32_t at, uint32_t range,
+                        uint32_t r24) {
+    CopyWords(base, frame + 192, point, 4);
+    CopyWords(base, frame + 224, point, 4);
+    CopyFloat(base, frame + at, frame + 192);
+    CopyFloat(base, frame + at + 8, frame + 200);
+    CopyFloat(base, frame + at + 4, frame + 196);
+    const double y = Lfs(base, frame + 196);
+    CopyWords(base, frame + 208, frame + at, 4);
+    guest::StoreFloat(base, frame + 80, float(Lfs(base, frame + 236) * turn));
+    if (y < low) {
+      return;
+    }
+    StoreIdentity(base, frame);
+    matrix_math::RotateY(base, frame + 96, frame + 96, frame + 80, frame - 80);
+    guest::StoreFloat(base, frame + 80, float(turn2));
+    matrix_math::RotateY(base, frame + 96, frame + 96, frame + 80, frame - 80);
+    car_physics::MatrixMultiplyTranslation(base, frame + 96, frame + 96, frame + 208,
+                                           frame - 192);
+    guest::StoreFloat(base, frame + range + 0, float(near));
+    guest::StoreFloat(base, frame + range + 4, float(far));
+    guest::StoreFloat(base, frame + range + 8, float(zero));
+    guest::StoreFloat(base, frame + range + 12, float(zero));
+    guest::StoreU32(base, frame - kSceneryDrawShapeFrame, frame);  // its back chain
+    const auto draw = SceneryDrawShape(base, calls, frame - kSceneryDrawShapeFrame, model,
+                                       view_projection, frame + 96, 0, 0, 0, frame + range, 0,
+                                       r24);
+    if (!draw) {
+      ITC_LOG_ERROR("PointList::Draw: a draw declined after its checks");
+      std::abort();
+    }
+    r3 = draw->r3;
+  };
+  // The first model at groups +616 to 2.
+  const uint32_t first = ListModel(base, nodes, 0);
+  ResetDrawState(base, first);
+  guest::StoreU32(base, first + 48, guest::LoadU32(base, list + 612));
+  guest::StoreU32(base, first + 436, guest::LoadU32(base, list + 608));
+  uint32_t r24 = caller_r24;
+  if (start < 3) {
+    guest::StoreFloat(base, frame + 188, float(one));
+    r24 = points;
+    uint32_t at = uint32_t(start) << 6;
+    do {
+      for (int i = 0; i < 4; i++, at += 16) {
+        draw_point(first, guest::LoadU32(base, list + points) + at, 176, 160, r24);
+      }
+    } while (int32_t(at) < 192);
+  }
+  // The second model at group 3.
+  guest::StoreFloat(base, frame + 172, float(one));
+  const uint32_t second = ListModel(base, nodes, 1);
+  ResetDrawState(base, second);
+  guest::StoreU32(base, second + 48, guest::LoadU32(base, list + 612));
+  guest::StoreU32(base, second + 436, guest::LoadU32(base, list + 608));
+  for (uint32_t at = 192; at < 256; at += 16) {
+    draw_point(second, guest::LoadU32(base, list + points) + at, 160, 176, r24);
+  }
+  return r3;
 }
 
 }  // namespace scenery_lists

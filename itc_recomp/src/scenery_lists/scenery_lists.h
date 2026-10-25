@@ -241,4 +241,25 @@ std::optional<SceneryDraw> SceneryDrawShape(uint8_t* base, const DrawCalls& call
                                             uint32_t range, uint32_t pair_offset,
                                             uint32_t caller_r24);
 
+// PointList::Draw's frame.
+constexpr uint32_t kPointListDrawFrame = 464;
+
+// PointList::Draw (sub_82148058): the camera pass's view-projection (+144)
+// copied to `frame` + 240 (memcpy); the list's first model (its draw state
+// reset, +48 = the list's +612, +436 = its +608) drawn at entry `entry`'s
+// points of groups +616 to 2, the second model at group 3's: each point
+// with y at least the float at 0x82006808 gets an identity turned about y
+// by w x the float at 0x82002948 and by the float at 0x82002A50
+// (Matrix::RotateY), moved to the point (Matrix::MultiplyTranslation),
+// and the model's shape 0 drawn (SceneryDrawShape, the range from
+// 0x82002814 and 0x82006804). Its stack temporaries (+80 to +255) are
+// written in `frame` as the original's, which its callees read.
+// `caller_r24` is its caller's r24 (the draws' context while the first
+// groups are skipped). Returns the r3 the original leaves; nullopt, with
+// nothing done, where the memcpy can't be made natively or a draw would
+// decline (then the original runs).
+std::optional<uint32_t> PointListDraw(uint8_t* base, const DrawCalls& calls, uint32_t frame,
+                                      uint32_t list, uint32_t entry, uint32_t pass,
+                                      uint32_t caller_r24, uint32_t r3);
+
 }  // namespace scenery_lists

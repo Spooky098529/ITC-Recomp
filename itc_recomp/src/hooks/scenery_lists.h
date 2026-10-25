@@ -72,4 +72,8 @@ void SceneryListsRecordShape(PPCContext& ctx, uint8_t* base);
 // 208-byte frame.
 void SceneryListsDrawShape(PPCContext& ctx, uint8_t* base);
 
+// PointList::Draw (sub_82148058): r3 = the list, r4 = the entry, r5 = the
+// camera pass; from a 464-byte frame.
+void SceneryListsPointListDraw(PPCContext& ctx, uint8_t* base);
+
 }  // namespace hooks
