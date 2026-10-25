@@ -246,7 +246,8 @@ library (`--play_movies_with_ffmpeg`, `docs/native-movies.md`), whose
 ~640 and ~580 functions no longer run; replaced libraries aren't mapped
 ("Rules that still hold" in `docs/loops/b7-loop.md`); ours 1,794 ->
 1,847, work left 4,967 -> 4,604 (the coverage list made again twice).
-Its fourteenth run (`by-loop-25-10-26`, 2026-10-25, not yet merged;
+Its fourteenth run (`by-loop-25-10-26`, 2026-10-25, merged into
+`rexglue-removal-project` the same day;
 summary `docs/loops/b7-loop-2026-10-25-0117.md`) made the app framework
 native as far as it was ready (`framework.md`, 56 of 68 ours, with
 `main` and `App::Run`; `--native_framework`; ours 1,847 -> 1,903),
