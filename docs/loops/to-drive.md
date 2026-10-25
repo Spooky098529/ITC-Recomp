@@ -27,6 +27,8 @@ all ran in the attract race. Left:
 
 - The model class (attract race `itc_1614`): `sub_825A7348` memmove_s
   (`c-runtime.md`)
+- The minimap (attract race `itc_1648`, replay `itc_1649`, ok):
+  `sub_82147D18` SetList::Point (`minimap.md`)
 - The game modes' cleanup (`itc_1624`, `itc_1625`): the modes not
   entered, `sub_82106F08` ModeType5::ModeType5, `sub_82235E88`
   ModeType6::ModeType6, `sub_82246340` ModeType7::ModeType7,

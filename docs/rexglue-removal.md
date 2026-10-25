@@ -2574,6 +2574,7 @@ B7. **The game logic inside**: everything else, subsystem by subsystem,
 | 2026-10-25 | The game modes (the one mode object the game runs at a time; the race mode's message dispatcher and its state machines: transitions keyed by (state, message), `StateMachine::Add`, `Find` and `Handle`; the race overlays' state machine and its handlers; the race mode's members and 28-byte buffers; the race mode's constructor, destructor and set-ups left waiting on `XPR::XPR`, other set-ups and the mode constructors) | `game-modes.md` | 38 of 42 (two migrations, the second after the model class; 9 adapters removed, 3 Merged) | `--native_game_modes` |
 | 2026-10-25 | The model class (`Model::Model`, `Release`, `~Model`, the texture provider and its `std::vector` helpers, `XPR::XPR`, `Release` and `~XPR`, the put-off frees; the memory blocks' lock `0x8296BD38` a host lock taken by every user, the user's call; with `memmove_s` in `c-runtime.md`) | `models.md` | 17 of 17 new rows (19 of 50 in the file; one migration) | `--native_models` |
 | 2026-10-25 | The mode tick (what `Modes::Tick` calls besides the mode's slots: the per-mode settings, the sign-in watch, the billboards' ring flip, the two layers of screen fades, the menu music with XAPI's `lstrcmpA` and `CompareStringA` as plain C++ by B6's call; presence Dropped by B5's; with `Modes::Modes` in `game-modes.md`) | `mode-tick.md` | 21 of 23 (one migration; 1 Dropped, 4 Merged) | `--native_mode_tick` |
+| 2026-10-25 | The minimap's parts (the race manager's lookups, the car marker's type, the scaling, the marker triangles and their 80-slot lists, the transform and the triangles' records; interpolation's hooks kept, `Minimap::Draw`'s blink wrap untouched; the marker draws and `Minimap::Draw` left waiting on `atexit` and the course set's lists) | `minimap.md` | 12 of 15 (one migration) | `--native_minimap` |
 
     The first run (2026-10-22, branch `b7-loop-test`): every harness at 0 differing, attract races at 20-21 s with no errors,
     and a race the user drove looked right. Ours went from 162 to 335 (work
@@ -3422,3 +3423,16 @@ live caller. B7 (`b7_status.py`): ours 1,983, work left 4,468 (Wrapped
 111, with a row 597, no row yet 3,760), from 4,490. Left:
 `SignInWatch::OnModeChange` (the save data's creation and deletion, a
 lead), `SignInWatch::StaticInit` (`atexit`), and so `Modes::Tick`.
+
+**2026-10-25, the minimap (branch `b7-loop-25-10-26-2`):** the
+fifteenth run made the minimap's parts native (`minimap.md`, 12 of 15;
+`--native_minimap`), keeping frame interpolation's `BlendState_OnMultiply`
+and `OnCopy` calls (with the original return addresses) and
+`Minimap::Draw`'s `--per_tick_minimap_blink` wrap; its frame dump is
+pixel-identical with the fallback. The boundary unchanged: 449 functions
+(916 pairs): overridden 67, Native 5, Dropped 23, never called 70, live
+284. Imports: 186 called, 62 with a live caller. B7 (`b7_status.py`):
+ours 1,995, work left 4,456 (Wrapped 111, with a row 599, no row yet
+3,746), from 4,468. The marker draws and `Minimap::Draw` wait on
+`atexit` (next, by the user's go-ahead: the exit lock a host mutex) and
+the course set's lists.
