@@ -3823,6 +3823,10 @@ void BlendState_AfterRecordObject(uint8_t* base) {
   GetDrawState().AfterRecordObject(base);
 }
 
+void BlendState_SetRecordContext(const std::array<uint32_t, 9>& context) {
+  g_record_context = context;
+}
+
 void BlendState_OnReplayFrameStart() {
   if (ITC_FLAG(log_object_extras)) {
     GetObjectExtrasLog().OnFrameStart();

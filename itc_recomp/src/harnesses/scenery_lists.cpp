@@ -38,10 +38,12 @@ struct Region {
   uint32_t bytes;
 };
 // the command list the recorders use and the open chunks' count, the view,
-// the camera's position and the projector origin, the scene lights.
+// the camera's position, the projector origin and pixel c43, the scene
+// lights, the depth draws' sort key.
 constexpr Region kRegions[] = {
     {0x826C5B20, 0x10}, {0x8296B8B8, 0x20}, {0x8296B910, 0x10},
-    {0x8296BD20, 0x10}, {0x8265ECA0, 0x70}, {0x8296B940, 0x3A0},
+    {0x8296BD20, 0x10}, {0x8265ECA0, 0x80}, {0x8296B940, 0x3A0},
+    {0x8296B8F0, 0x10},
 };
 
 // The block: 64 KB for the lists, models and sets, then room for the race
@@ -517,6 +519,123 @@ void Recorders(Context& h, Random& r, uint32_t block) {
   }
 }
 
+// A model at the block's +0x100 with four shapes from +0x2000 (544 bytes
+// each), the shape `shape`'s material block at +0x6000 (up to six
+// materials) and index buffer object at +0x5000, its corners about the
+// origin (in view of an identity view-projection) or anywhere.
+void RandomShape(uint8_t* base, uint32_t block, Random& r, uint32_t shape, bool in_view) {
+  const uint32_t model = block + 0x100;
+  guest::StoreU32(base, model + 28, r.Below(8) == 0 ? 0 : 1 + r.Below(4));
+  guest::StoreU32(base, model + 40, block + 0x2000);
+  const uint32_t at = block + 0x2000 + 544 * shape;
+  for (uint32_t i = 0; i < 8; i++) {
+    if (in_view) {
+      StoreFloats(base, at + 96 + 16 * i,
+                  {Spread(r, 0.9f), Spread(r, 0.9f), Spread(r, 0.9f), 1.0f});
+    } else {
+      RandomFloats(base, at + 96 + 16 * i, 4, r);
+    }
+  }
+  guest::StoreU32(base, at + 260, r.Below(2) ? 11 : r.Below(16));
+  guest::StoreU32(base, at + 428, r.Below(2) ? 1 : r.Below(4));
+  guest::StoreU32(base, at + 408, block + 0x5000);
+  guest::StoreU32(base, block + 0x5000 + 20, r.Below(3) == 0 ? 0 : uint32_t(r.Next()));
+  const uint32_t materials = block + 0x6000;
+  guest::StoreU32(base, at + 396, materials);
+  const uint32_t first = r.Below(8) == 0 ? 0 : r.Below(4);
+  const uint32_t second = r.Below(8) == 0 ? 0 : r.Below(3);
+  guest::StoreU32(base, materials + 8, first);
+  guest::StoreU32(base, materials + 12, second);
+  for (uint32_t m = 0; m < first + second; m++) {
+    const uint32_t material = materials + 16 + 512 * m;
+    // +388 set now and then, +404 a few bits.
+    guest::StoreU32(base, material + 388, r.Below(3) == 0 ? 1 + r.Below(4) : 0);
+    guest::StoreU32(base, material + 404, 1u << r.Below(4));
+  }
+}
+
+void DepthDraws(Context& h, Random& r, uint32_t block) {
+  const uint32_t model = block + 0x100;
+  {
+    Results results("Model::RecordShapeDepth (sub_825960D0)");
+    for (int c = 0; c < 256; c++) {
+      Case(
+          h, results, block, r,
+          [&](PPCContext& t) {
+            RandomList(h.base, block, r, 70);
+            const uint32_t shape = r.Below(4);
+            RandomShape(h.base, block, r, shape, false);
+            RandomBytes(h.base, 0x8296B8C0, 16, r);
+            RandomBytes(h.base, 0x8265ED10, 16, r);
+            t.r3.u64 = model;
+            t.r4.u64 = shape;
+            t.r5.u64 = r.Below(2);
+            t.r6.u64 = r.Next();
+            t.r7.u64 = r.Below(2) ? 0 : 1u << r.Below(4);
+            t.r8.u64 = r.Next();
+          },
+          __imp__sub_825960D0, hooks::SceneryListsRecordShapeDepth, {},
+          fmt::format("case {}", c));
+    }
+    results.Report();
+  }
+  {
+    Results results("Model::DrawShapeDepth (sub_82596D48)");
+    // The render queue: a vtable whose slot 4 does nothing.
+    const uint32_t queue = block + 0x700;
+    int submitted = 0;
+    for (int c = 0; c < 512; c++) {
+      Case(
+          h, results, block, r,
+          [&](PPCContext& t) {
+            RandomList(h.base, block, r, 80);
+            const uint32_t shape = r.Below(4);
+            const bool in_view = r.Below(4) != 0;
+            RandomShape(h.base, block, r, shape, in_view);
+            RandomBytes(h.base, 0x8296B8C0, 16, r);
+            RandomBytes(h.base, 0x8265ECE0, 64, r);
+            RandomBytes(h.base, 0x8296B8FC, 4, r);
+            guest::StoreU32(h.base, scenery_lists::kRenderQueue, queue);
+            guest::StoreU32(h.base, queue, queue + 0x20);
+            guest::StoreU32(h.base, queue + 0x20 + 16, kEmptyFunction);
+            const uint32_t view_projection = block + 0x400;
+            const uint32_t world = block + 0x500;
+            if (in_view) {
+              StoreFloats(h.base, view_projection, {1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1});
+              StoreFloats(h.base, world, {1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1, 0, Spread(r, 0.1f),
+                                          Spread(r, 0.1f), Spread(r, 0.1f), 1});
+            } else {
+              RandomFloats(h.base, view_projection, 16, r);
+              RandomFloats(h.base, world, 16, r);
+            }
+            t.r3.u64 = model;
+            t.r4.u64 = view_projection;
+            t.r5.u64 = world;
+            t.r6.u64 = shape;
+            t.r7.u64 = r.Below(2) ? r.Next() : uint64_t(r.Below(2));
+            t.r8.u64 = r.Below(2) ? 0 : 1u << r.Below(4);
+            t.r9.u64 = r.Next();
+          },
+          __imp__sub_82596D48, hooks::SceneryListsDrawShapeDepth,
+          {{0x4000 + 16, 32}, {0x400, 16}, {0x500, 16}}, fmt::format("case {}", c), false,
+          [&](const PPCContext& t, Outputs& out) {
+            // The product IsShapeVisible leaves in its frame (r1 - 256).
+            out.Floats(h.base, t.r1.u32 - 256, 16);
+            // What went to the render queue (its slot 4 left them).
+            if (t.r3.u32 == queue) {
+              submitted++;
+              out.Word(t.r4.u32);
+              out.Word(t.r5.u32);
+              out.Double(t.f1.u64);
+            }
+          });
+    }
+    ITC_LOG_INFO("harness: Model::DrawShapeDepth: {} of 512 cases handed to the render queue",
+                 submitted / 2);
+    results.Report();
+  }
+}
+
 }  // namespace
 
 void SceneryLists(Context& h) {
@@ -529,6 +648,7 @@ void SceneryLists(Context& h) {
   Provider(h, r, block);
   Visibility(h, r, block);
   Recorders(h, r, block);
+  DepthDraws(h, r, block);
   memory::Free(allocation);
 }
 

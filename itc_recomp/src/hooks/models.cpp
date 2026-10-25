@@ -39,7 +39,10 @@ ITC_FLAG_BOOL(native_models, true, "ITC",
               "adapter: only the constructor calls it), TextureProvider::TextureProvider "
               "sub_82594850 and ~TextureProvider sub_825943E0; Model::Model sub_825948C0, "
               "Model::Release sub_82594970 and Model::~Model sub_82594F58, their members' "
-              "plain C++ called directly) natively instead of through the "
+              "plain C++ called directly; Model::MaterialCount sub_82594AD8, Model::Material "
+              "sub_82594B20, the shared shaders sub_825896D8 and sub_82589700, the vertex "
+              "declaration sub_82589728 (its message for a type pair the tables don't cover, "
+              "never seen in play, the original's)) natively instead of through the "
               "translated code (the same writes; "
               "checked by --run_harnesses=models)");
 
@@ -194,3 +197,51 @@ extern "C" REX_FUNC(sub_825948C0) {
 // leaves it (XPR::Release's, XPR::~XPR's).
 ITC_MODELS_LIFETIME(82594970, ModelRelease)
 ITC_MODELS_LIFETIME(82594F58, ModelDestruct)
+
+// --- The materials and the shared shaders ---
+
+namespace hooks {
+
+void ModelsMaterialCount(PPCContext& ctx, uint8_t* base) {
+  ctx.r3.u64 = models::MaterialCount(base, ctx.r3.u32, ctx.r4.u32, ctx.r5.s32);
+}
+
+void ModelsMaterial(PPCContext& ctx, uint8_t* base) {
+  ctx.r3.u64 = models::Material(base, ctx.r3.u32, ctx.r4.u32, ctx.r5.u32, ctx.r6.s32);
+}
+
+void ModelsSharedVertexShader(PPCContext& ctx, uint8_t* base) {
+  ctx.r3.u64 = models::SharedVertexShader(base, ctx.r3.u32);
+}
+
+void ModelsSharedPixelShader(PPCContext& ctx, uint8_t* base) {
+  ctx.r3.u64 = models::SharedPixelShader(base, ctx.r3.u32);
+}
+
+void ModelsVertexDeclaration(PPCContext& ctx, uint8_t* base) {
+  const auto declaration =
+      models::VertexDeclaration(base, ctx.r3.u32, ctx.r4.s32, ctx.r5.u32);
+  if (!declaration) {
+    __imp__sub_82589728(ctx, base);
+    return;
+  }
+  ctx.r3.u64 = *declaration;
+}
+
+}  // namespace hooks
+
+#define ITC_MODELS_ACCESSOR(address, steps)  \
+  extern "C" REX_FUNC(sub_##address) {       \
+    REX_FUNC_PROLOGUE();                     \
+    if (!ITC_FLAG(native_models)) {          \
+      __imp__sub_##address(ctx, base);       \
+      return;                                \
+    }                                        \
+    hooks::steps(ctx, base);                 \
+  }
+
+ITC_MODELS_ACCESSOR(82594AD8, ModelsMaterialCount)
+ITC_MODELS_ACCESSOR(82594B20, ModelsMaterial)
+ITC_MODELS_ACCESSOR(825896D8, ModelsSharedVertexShader)
+ITC_MODELS_ACCESSOR(82589700, ModelsSharedPixelShader)
+ITC_MODELS_ACCESSOR(82589728, ModelsVertexDeclaration)

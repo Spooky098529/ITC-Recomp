@@ -7,8 +7,10 @@
 #include "hooks/scenery_lists.h"
 
 #include "base/flags.h"
+#include "hooks/guest_call.h"
 #include "scenery_lists/scenery_lists.h"
 
+#include <array>
 #include <optional>
 
 // The command list's diagnostics (blend_state.cpp) see who allocates slots:
@@ -29,7 +31,10 @@ ITC_FLAG_BOOL(native_scenery_lists, true, "ITC",
               "Recorder::RecordObject sub_825953D0 (inside its interpolation wrapper, "
               "src/interpolation/blend_state.cpp), Recorder::RecordSceneLights sub_82595490 "
               "(with SceneLights::RecordDirections sub_8258B980 and RecordProjectors "
-              "sub_82589B58, no adapters: only it calls them), TextureProvider::ClearAll "
+              "sub_82589B58, no adapters: only it calls them), Model::RecordShapeDepth "
+              "sub_825960D0, Model::DrawShapeDepth sub_82596D48 (RecordObject with the "
+              "interpolation's hooks; the render queue's slot 4 a guest call), "
+              "TextureProvider::ClearAll "
               "sub_82594328 and TextureProvider::Set sub_82594718 (its reserve, debug prints "
               "and resize, never seen in play, the original's)) natively instead of through "
               "the translated code (the same writes; checked by "
@@ -177,6 +182,57 @@ void SceneryListsRecordSceneLights(PPCContext& ctx, uint8_t* base) {
   ctx.r3.u64 = *header;
 }
 
+void SceneryListsRecordShapeDepth(PPCContext& ctx, uint8_t* base) {
+  const auto first =
+      SlotDiagnostics() ? std::nullopt
+                        : scenery_lists::RecordShapeDepth(base, ctx.r3.u32, ctx.r4.u32,
+                                                          ctx.r5.s32, ctx.r7.u32, ctx.r8.u32);
+  if (!first) {
+    __imp__sub_825960D0(ctx, base);
+    return;
+  }
+  ctx.r3.u64 = *first;
+}
+
+void SceneryListsDrawShapeDepth(PPCContext& ctx, uint8_t* base) {
+  constexpr uint32_t kFrame = 160;
+  // What the recorder's wrapper would keep: the call's return address and
+  // r24-r31 there (r9, r8, r7, r6, the caller's r28, the model, the world
+  // matrix and the view-projection).
+  const std::array<uint32_t, 9> context = {0x82596D9C,  ctx.r9.u32, ctx.r8.u32,
+                                           ctx.r7.u32,  ctx.r6.u32, ctx.r28.u32,
+                                           ctx.r3.u32,  ctx.r5.u32, ctx.r4.u32};
+  const auto draw =
+      SlotDiagnostics()
+          ? std::nullopt
+          : scenery_lists::DrawShapeDepth(base, ctx.r3.u32, ctx.r4.u32, ctx.r5.u32, ctx.r6.u32,
+                                          ctx.r7.u32, ctx.r8.u32, ctx.r9.u32,
+                                          ctx.r1.u32 - kFrame, context);
+  if (!draw) {
+    __imp__sub_82596D48(ctx, base);
+    return;
+  }
+  if (!draw->submit) {
+    // r3 stays the model when its +28 is 0 (nothing ran).
+    if (draw->r3 != ctx.r3.u32) {
+      ctx.r3.u64 = draw->r3;
+      ctx.fpscr.disableFlushMode();
+    }
+    return;
+  }
+  const uint64_t lr = ctx.lr;
+  guest_call::InFrame(ctx, base, kFrame, 0x82596E60, [&](uint32_t) {
+    const uint32_t queue = guest::LoadU32(base, scenery_lists::kRenderQueue);
+    ctx.fpscr.disableFlushMode();
+    ctx.f1.f64 = draw->depth;
+    ctx.r4.u64 = draw->entry;
+    ctx.r3.u64 = queue;
+    ctx.r5.u64 = draw->key;
+    REX_CALL_INDIRECT_FUNC(guest::LoadU32(base, guest::LoadU32(base, queue) + 16));
+  });
+  ctx.lr = lr;
+}
+
 }  // namespace hooks
 
 #define ITC_SCENERY_LISTS(address, steps)    \
@@ -200,5 +256,7 @@ ITC_SCENERY_LISTS(82148650, SceneryListsSetBillboardPass)
 ITC_SCENERY_LISTS(82589970, SceneryListsDepthVertexDeclaration)
 ITC_SCENERY_LISTS(825951E0, SceneryListsIsShapeVisible)
 ITC_SCENERY_LISTS(82595490, SceneryListsRecordSceneLights)
+ITC_SCENERY_LISTS(825960D0, SceneryListsRecordShapeDepth)
+ITC_SCENERY_LISTS(82596D48, SceneryListsDrawShapeDepth)
 ITC_SCENERY_LISTS(82594328, SceneryListsTextureProviderClearAll)
 ITC_SCENERY_LISTS(82594718, SceneryListsTextureProviderSet)

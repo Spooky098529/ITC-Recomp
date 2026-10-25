@@ -10,6 +10,7 @@
 
 #pragma once
 
+#include <array>
 #include <cstdint>
 #include <optional>
 
@@ -100,6 +101,8 @@ bool TextureProviderSet(uint8_t* base, uint32_t provider, uint32_t slot, uint32_
 // or no room for their slots): the original runs there.
 
 constexpr uint32_t kRecordList = 0x8296B918;
+// The render queue the draws hand their entries to (its vtable slot 4).
+constexpr uint32_t kRenderQueue = 0x8296B91C;
 
 // Model::IsShapeVisible (sub_825951E0): `world` x `view_projection` into
 // `product` (64 bytes of guest memory: the original's frame, r1 - 96, where
@@ -137,5 +140,45 @@ void SceneLightsRecordDirections(uint8_t* base, uint32_t out);
 // x, y, z at 0x8265ED00 with w 1.0, 12 floats from 0x8296B980, 12 from
 // 0x8296B9B0, 32 from 0x8296BAE0 and 32 from 0x8296BB60 (lfs and stfs).
 void SceneLightsRecordProjectors(uint8_t* base, uint32_t out);
+
+// Model::RecordShapeDepth (sub_825960D0, probably): the depth-only record
+// of shape `shape`'s `group` materials: command 10, the depth vertex
+// declaration (VertexDeclarations::ForDepth of the shape's +260), the
+// stream (11; the shape's +320, or with +428 = 1 its +412; stride +264),
+// pixel c43 from 0x8265ED10, the index buffer (22) when +428 is 1 and
+// [+408]'s +20 isn't 0, then each material (render states 100 and 56,
+// command 12 with &+352, the draw 18 from +348 and +340), skipping those
+// whose +404 doesn't share `mask` (when not 0) and those with +388 set
+// unless `with_flagged`'s low byte is; command 36, the chunk closed.
+// Returns the chunk's first slot, or 0 (nothing recorded) when the group
+// has no materials (the count +8 or +12 of the shape's +396 block).
+std::optional<uint32_t> RecordShapeDepth(uint8_t* base, uint32_t model, uint32_t shape,
+                                         int32_t group, uint32_t mask, uint32_t with_flagged);
+
+// What Model::DrawShapeDepth leaves for its adapter: r3 as the original
+// leaves it when nothing goes to the render queue, else the queue entry,
+// its sort key and depth (the queue's vtable slot 4 is a guest call).
+struct DepthDraw {
+  uint32_t r3 = 0;
+  bool submit = false;
+  uint32_t entry = 0;
+  uint32_t key = 0;
+  double depth = 0;
+};
+
+// Model::DrawShapeDepth (sub_82596D48, probably): nothing when the model's
+// +28 is 0 or the shape isn't visible (IsShapeVisible, its product at
+// `frame` - 96); then Recorder::RecordObject (with the interpolation's hooks
+// and `context`, the caller's return address and registers its wrapper
+// would keep), a 2-slot entry (+2 = 3, +4 the constants, +18 = 4, +20 =
+// RecordShapeDepth(group, mask, with_flagged)) in a chunk of its own, for
+// the render queue with the key [0x8296B8FC] and minus the constants'
+// +72, when the group (`group`'s low byte: 0 or 1) has materials. nullopt,
+// with nothing done, where a recorder would decline (a chunk open on
+// another list, or no room for all the slots).
+std::optional<DepthDraw> DrawShapeDepth(uint8_t* base, uint32_t model, uint32_t view_projection,
+                                        uint32_t world, uint32_t shape, uint32_t group,
+                                        uint32_t mask, uint32_t with_flagged, uint32_t frame,
+                                        const std::array<uint32_t, 9>& context);
 
 }  // namespace scenery_lists

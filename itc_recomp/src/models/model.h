@@ -39,4 +39,23 @@ std::optional<uint32_t> ModelRelease(uint8_t* base, uint32_t model);
 // in reverse. Returns the original's r3 (XPR::~XPR's).
 std::optional<uint32_t> ModelDestruct(uint8_t* base, uint32_t model);
 
+// --- The materials and the shared shaders (accessors) ---
+
+// Model::MaterialCount (sub_82594AD8): the shape's (544 bytes each from the
+// model's +40) material block (+396): its +8 for group 0, else +12.
+uint32_t MaterialCount(uint8_t* base, uint32_t model, uint32_t shape, int32_t group);
+// Model::Material (sub_82594B20): the block + 16 + 512 x index, past group
+// 0's materials (the block's +8) for any other group.
+uint32_t Material(uint8_t* base, uint32_t model, uint32_t shape, uint32_t index, int32_t group);
+// sub_825896D8 and sub_82589700: the shared vertex and pixel shaders of pair
+// `pair` ([0x8296B7B4] and [0x8296B7B8] + 4 x pair), 0 when the table is
+// unset.
+uint32_t SharedVertexShader(uint8_t* base, uint32_t pair);
+uint32_t SharedPixelShader(uint8_t* base, uint32_t pair);
+// sub_82589728: the vertex declaration for three stream types, from the
+// tables at 0x8265EC00 and 0x8296B7F4. nullopt for a type pair the tables
+// don't cover, where the original prints a message (never seen in play)
+// and returns the table's +196: left to it.
+std::optional<uint32_t> VertexDeclaration(uint8_t* base, uint32_t a, int32_t b, uint32_t c);
+
 }  // namespace models

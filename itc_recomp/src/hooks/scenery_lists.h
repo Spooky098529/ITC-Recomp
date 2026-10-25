@@ -50,4 +50,14 @@ void SceneryListsRecordObjectSteps(PPCContext& ctx, uint8_t* base);
 // Recorder::RecordSceneLights (sub_82595490): r3 = the header slot.
 void SceneryListsRecordSceneLights(PPCContext& ctx, uint8_t* base);
 
+// Model::RecordShapeDepth (sub_825960D0): r3 = the model, r4 = the shape,
+// r5 = the group, r7 = the mask, r8 = the byte; r3 = the chunk's first slot
+// or 0.
+void SceneryListsRecordShapeDepth(PPCContext& ctx, uint8_t* base);
+// Model::DrawShapeDepth (sub_82596D48): r3 = the model, r4 = the
+// view-projection, r5 = the world matrix, r6 = the shape, r7 = the group,
+// r8 = the mask, r9 = the byte; the render queue's slot 4 a guest call from
+// a 160-byte frame like the original's.
+void SceneryListsDrawShapeDepth(PPCContext& ctx, uint8_t* base);
+
 }  // namespace hooks

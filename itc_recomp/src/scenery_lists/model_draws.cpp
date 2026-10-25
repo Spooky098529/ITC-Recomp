@@ -11,11 +11,13 @@
 #include "guest.h"
 #include "interpolation/blend_state.h"
 #include "matrix_math/matrix_math.h"
+#include "models/model.h"
 
 #include <rex/platform/fpscr.h>
 #include <simde/x86/sse4.1.h>
 
 #include <bit>
+#include <cstdlib>
 
 namespace scenery_lists {
 
@@ -277,6 +279,181 @@ void SceneLightsRecordProjectors(uint8_t* base, uint32_t out) {
       CopyFloat(base, out + run.to + 4 * i, run.from + 4 * i);
     }
   }
+}
+
+namespace {
+
+constexpr uint32_t kDepthConstant = 0x8265ED10;  // pixel c43
+constexpr uint32_t kDepthKey = 0x8296B8FC;
+
+// A shape (544 bytes from the model's +40).
+uint32_t ShapeAt(uint8_t* base, uint32_t model, uint32_t shape) {
+  return shape * 544 + guest::LoadU32(base, model + 40);
+}
+
+// Whether RecordShapeDepth records material `material` (its +348 at
+// `at`): its +404 shares the mask (when not 0), and its +388 is 0 or the
+// byte is set.
+bool DepthRecords(uint8_t* base, uint32_t at, uint32_t mask, uint32_t with_flagged) {
+  if (mask != 0 && (guest::LoadU32(base, at + 56) & mask) == 0) {
+    return false;
+  }
+  return guest::LoadU32(base, at + 40) == 0 || (with_flagged & 0xFF) != 0;
+}
+
+// The first material of the group (as the original works it out).
+uint32_t FirstMaterial(uint8_t* base, uint32_t model, uint32_t shape, int32_t group) {
+  const uint32_t block = guest::LoadU32(base, ShapeAt(base, model, shape) + 396);
+  if (group == 0) {
+    return block + 16;
+  }
+  return (guest::LoadU32(base, block + 8) << 9) + block + 16;
+}
+
+// The slots RecordShapeDepth takes (0 when it records nothing).
+uint32_t RecordShapeDepthSlots(uint8_t* base, uint32_t model, uint32_t shape, int32_t group,
+                               uint32_t mask, uint32_t with_flagged) {
+  if (models::MaterialCount(base, model, shape, group) == 0) {
+    return 0;
+  }
+  const uint32_t at = ShapeAt(base, model, shape);
+  uint32_t slots = 7;
+  if (guest::LoadU32(base, at + 428) == 1 &&
+      guest::LoadU32(base, guest::LoadU32(base, at + 408) + 20) != 0) {
+    slots += 2;
+  }
+  uint32_t material = FirstMaterial(base, model, shape, group) + 348;
+  for (int32_t i = 0; i < int32_t(models::MaterialCount(base, model, shape, group));
+       i++, material += 512) {
+    if (DepthRecords(base, material, mask, with_flagged)) {
+      slots += 7;
+    }
+  }
+  return slots;
+}
+
+void Slot(uint8_t* base, uint32_t slot, uint32_t w0, uint32_t w1, uint32_t w2) {
+  guest::StoreU32(base, slot + 0, w0);
+  guest::StoreU32(base, slot + 4, w1);
+  guest::StoreU32(base, slot + 8, w2);
+}
+
+// RecordShapeDepth's recording, its room checked.
+uint32_t RecordShapeDepthChecked(uint8_t* base, uint32_t model, uint32_t shape, int32_t group,
+                                 uint32_t mask, uint32_t with_flagged) {
+  const uint32_t list = guest::LoadU32(base, kRecordList);
+  const uint32_t at = ShapeAt(base, model, shape);
+  const uint32_t stream =
+      guest::LoadU32(base, at + 428) == 1 ? guest::LoadU32(base, at + 412) : at + 320;
+  command_list::OpenChunk(base, list);
+  const uint32_t header = command_list::AllocateSlots(base, list, 1);
+  Slot(base, header, 10, 1, 0);
+  const uint32_t declaration = command_list::AllocateSlots(base, list, 1);
+  guest::StoreU32(base, declaration,
+                  DepthVertexDeclaration(base, int32_t(guest::LoadU32(base, at + 260))));
+  Slot(base, command_list::AllocateSlots(base, list, 1), 11, 1, 0);
+  uint32_t slot = command_list::AllocateSlots(base, list, 1);
+  Slot(base, slot, 1, stream, 0);
+  guest::StoreU32(base, slot + 12, guest::LoadU32(base, at + 264));
+  Slot(base, command_list::AllocateSlots(base, list, 1), 7, 1, 0x01012B01);
+  CopyWords(base, command_list::AllocateSlots(base, list, 1), kDepthConstant, 4);
+  if (guest::LoadU32(base, at + 428) == 1) {
+    const uint32_t indices = guest::LoadU32(base, at + 408);
+    if (guest::LoadU32(base, indices + 20) != 0) {
+      Slot(base, command_list::AllocateSlots(base, list, 1), 22, 1, 0);
+      slot = command_list::AllocateSlots(base, list, 1);
+      guest::StoreU32(base, slot + 8, 1);
+      guest::StoreU32(base, slot + 4, guest::LoadU32(base, indices + 20));
+    }
+  }
+  uint32_t material = FirstMaterial(base, model, shape, group) + 348;
+  for (int32_t i = 0; i < int32_t(models::MaterialCount(base, model, shape, group));
+       i++, material += 512) {
+    if (!DepthRecords(base, material, mask, with_flagged)) {
+      continue;
+    }
+    Slot(base, command_list::AllocateSlots(base, list, 1), 1, 2, 0);
+    slot = command_list::AllocateSlots(base, list, 1);
+    guest::StoreU32(base, slot + 0, 100);
+    guest::StoreU32(base, slot + 4, guest::LoadU32(base, material - 236));
+    slot = command_list::AllocateSlots(base, list, 1);
+    guest::StoreU32(base, slot + 0, 56);
+    guest::StoreU32(base, slot + 4, guest::LoadU32(base, material - 4));
+    Slot(base, command_list::AllocateSlots(base, list, 1), 12, 1, 0);
+    guest::StoreU32(base, command_list::AllocateSlots(base, list, 1), material + 4);
+    Slot(base, command_list::AllocateSlots(base, list, 1), 18, 1, 0);
+    slot = command_list::AllocateSlots(base, list, 1);
+    guest::StoreU16(base, slot + 4, 0);
+    guest::StoreU16(base, slot + 6, 0);
+    guest::StoreU32(base, slot + 0, guest::LoadU32(base, material));
+    guest::StoreU32(base, slot + 8, guest::LoadU32(base, material - 8));
+  }
+  EndRecord(base, list);
+  return header;
+}
+
+}  // namespace
+
+std::optional<uint32_t> RecordShapeDepth(uint8_t* base, uint32_t model, uint32_t shape,
+                                         int32_t group, uint32_t mask, uint32_t with_flagged) {
+  ITC_NATIVE_RUNNING("sub_825960D0 Model::RecordShapeDepth");
+  const uint32_t slots = RecordShapeDepthSlots(base, model, shape, group, mask, with_flagged);
+  if (slots == 0) {
+    return 0;
+  }
+  if (!CanRecord(base, guest::LoadU32(base, kRecordList), slots)) {
+    return std::nullopt;
+  }
+  return RecordShapeDepthChecked(base, model, shape, group, mask, with_flagged);
+}
+
+std::optional<DepthDraw> DrawShapeDepth(uint8_t* base, uint32_t model, uint32_t view_projection,
+                                        uint32_t world, uint32_t shape, uint32_t group,
+                                        uint32_t mask, uint32_t with_flagged, uint32_t frame,
+                                        const std::array<uint32_t, 9>& context) {
+  ITC_NATIVE_RUNNING("sub_82596D48 Model::DrawShapeDepth");
+  const uint32_t list = guest::LoadU32(base, kRecordList);
+  const int32_t which = (group & 0xFF) != 0 ? 1 : 0;
+  // Every slot it would take, checked before anything is done.
+  if (!CanRecord(base, list,
+                 11 + 2 + RecordShapeDepthSlots(base, model, shape, which, mask, with_flagged))) {
+    return std::nullopt;
+  }
+  DepthDraw draw;
+  if (guest::LoadU32(base, model + 28) == 0) {
+    draw.r3 = model;
+    return draw;
+  }
+  if ((IsShapeVisible(base, model, view_projection, world, shape, frame - 96) & 0xFF) == 0) {
+    draw.r3 = 0;
+    return draw;
+  }
+  interpolation::BlendState_BeforeRecordObject(base, view_projection, world);
+  interpolation::BlendState_SetRecordContext(context);
+  const auto constants = RecordObject(base, view_projection, world);
+  interpolation::BlendState_SetRecordContext({});
+  interpolation::BlendState_AfterRecordObject(base);
+  if (!constants) {
+    ITC_LOG_ERROR("Model::DrawShapeDepth: RecordObject declined after its checks");
+    std::abort();
+  }
+  command_list::OpenChunk(base, list);
+  const uint32_t entry = command_list::AllocateSlots(base, list, 2);
+  command_list::CloseChunk(base, list);
+  if (models::MaterialCount(base, model, shape, which) == 0) {
+    draw.r3 = list;
+    return draw;
+  }
+  guest::StoreU32(base, entry + 4, *constants);
+  guest::StoreU16(base, entry + 2, 3);
+  guest::StoreU16(base, entry + 18, 4);
+  guest::StoreU32(base, entry + 20,
+                  RecordShapeDepthChecked(base, model, shape, which, mask, with_flagged));
+  draw.submit = true;
+  draw.entry = entry;
+  draw.key = guest::LoadU32(base, kDepthKey);
+  draw.depth = -Lfs(base, *constants + 72);
+  return draw;
 }
 
 }  // namespace scenery_lists
