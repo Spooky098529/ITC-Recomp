@@ -92,4 +92,42 @@ std::optional<bool> RunLoopAddRequest(uint8_t* base, uint32_t loop, uint32_t typ
                                       uint32_t delegate, uint32_t request,
                                       const std::function<uint32_t(uint32_t)>& clone);
 
+// sub_82090420 Framework::Framework: the sixteen vtables (+0 to +60, the
+// base classes' first, then the framework's own: only the last stay), the
+// services' words and the flags cleared. +84 and +108 to +120 are left.
+void FrameworkConstruct(uint8_t* base, uint32_t framework);
+// sub_820909B8 Framework::Create: operator new(136) and the framework built
+// there, stored (or 0) at `holder`. nullopt where operator new fails (the
+// original's handler path) or without a heap.
+std::optional<uint32_t> FrameworkCreate(uint8_t* base, uint32_t holder);
+
+// sub_820AC8F8 PoolMaker::PoolMaker and sub_820AC848: the vtable
+// (0x82002848 or 0x82002840) and at +4 the interface's slot 1 (the second
+// worker pool, `pool`, a guest call). Returns the object.
+uint32_t PoolMakerConstruct(uint8_t* base, uint32_t maker, uint32_t vtable, uint32_t interface,
+                            const std::function<uint32_t(uint32_t)>& pool);
+
+// sub_82092710 FrameStart::FrameStart: the vtable and the block's interface,
+// then tick handler 4 (a delegate calling sub_82096330 with it, built at
+// `frame` + 88) and a listener for event 2 (sub_82096340, at `frame` + 104)
+// added through the run loop's slots 2 and 1 (`add`, guest calls; the key
+// at `frame` + 80). `frame` is the original's 144-byte frame. Returns it.
+uint32_t FrameStartConstruct(uint8_t* base, uint32_t frame_start, uint32_t block, uint32_t frame,
+                             const std::function<void(uint32_t loop, uint32_t offset,
+                                                      uint32_t key, uint32_t delegate)>& add);
+
+// sub_82090EA8 DebugText::DebugText: the vtable, the block's interface, the
+// debug font's load job at +8 (its state, +20, the word the original reads
+// from its own frame, `stack_word`, never set: given here), +48 cleared,
+// itself into 0x8266D080, and the job posted to the worker pool (the block's
+// +4 interface's slot 1, `post`, a guest call with r5 = 1).
+constexpr uint32_t kDebugTextGlobal = 0x8266D080;
+uint32_t DebugTextConstruct(uint8_t* base, uint32_t text, uint32_t block, uint32_t stack_word,
+                            const std::function<void(uint32_t interface, uint32_t job)>& post);
+// sub_82091160 DebugText::Create: operator new(52) and the debug text built
+// there (or 0). nullopt without a heap.
+std::optional<uint32_t> DebugTextCreate(
+    uint8_t* base, uint32_t block, uint32_t stack_word,
+    const std::function<void(uint32_t interface, uint32_t job)>& post);
+
 }  // namespace framework

@@ -1009,10 +1009,12 @@ void DispatchObjects(Context& h, uint32_t objects, const std::vector<uint32_t>& 
 }
 uint32_t ObjectAt(const Context& h, uint32_t i) { return h.data + 512 + 160 * i; }
 
-void DispatchOut(Context& h, Outputs& out, const PPCContext& t) {
+void DispatchOut(Context& h, Outputs& out, const PPCContext& t, bool r4 = true) {
   out.Bytes(Read(h.base, h.data, 2048));
   out.Word(t.r3.u32);
-  out.Word(t.r4.u32);
+  if (r4) {
+    out.Word(t.r4.u32);
+  }
 }
 
 void Dispatchers(Context& h) {
@@ -1185,9 +1187,191 @@ void Dispatchers(Context& h) {
   }
 }
 
+
+// --- The constructors ---
+//
+// As the dispatchers': the adapters against the originals, the services'
+// interfaces objects in the scratch area whose slots point at small guest
+// functions (sub_822A8C18 and sub_820CE9F8 store r4 and r5 at r3 + 60, + 64
+// and + 444, + 448). The debug text's global (0x8266D080) is kept and put
+// back around each case.
+
+constexpr uint32_t kStoreR4R5At60 = 0x822A8C18;
+constexpr uint32_t kStoreR4R5At444 = 0x820CE9F8;
+
+// The heap block `block` (if one): its size and words by number (it 0xB10C0000),
+// then freed.
+void HeapBlockOut(Context& h, Outputs& out, uint32_t block, uint32_t bytes) {
+  const bool heap = block != 0 && memory::IsHeapBlock(block);
+  out.Word(heap);
+  if (!heap) {
+    return;
+  }
+  out.Word(memory::Size(block));
+  for (uint32_t at = 0; at < bytes; at += 4) {
+    const uint32_t word = Load(h.base, block + at);
+    out.Word(word - block < 0x100 ? 0xB10C0000u + (word - block) : word);
+  }
+  memory::crt::OperatorDelete(block);
+}
+
+void Constructors(Context& h) {
+  {
+    Results results("Framework::Framework (sub_82090420)");
+    for (int c = 0; c < 20; c++) {
+      MapCase(
+          h, results, [&] { DispatchObjects(h, 0, {}); },
+          [&](PPCContext& t) { t.r3.u64 = h.data + 64; }, __imp__sub_82090420, sub_82090420,
+          // r4 to r11 aren't compared: the original leaves vtable addresses
+          // there, which Framework::Create (its only caller) doesn't read.
+          [&](Outputs& out, const PPCContext& t) { DispatchOut(h, out, t, false); },
+          fmt::format("case {}", c));
+    }
+    results.Report();
+  }
+  for (int which = 0; which < 2; which++) {
+    Results results(which == 0 ? "PoolMaker::PoolMaker (sub_820AC8F8)"
+                               : "PoolMaker2::PoolMaker2 (sub_820AC848)");
+    for (int c = 0; c < 50; c++) {
+      MapCase(
+          h, results,
+          [&] {
+            std::vector<uint32_t> list(16, kWord60);
+            list[1] = h.random.Below(2) ? kWord60 : kByte133;
+            DispatchObjects(h, 1, list);
+          },
+          [&](PPCContext& t) {
+            t.r3.u64 = h.data + 32;
+            t.r4.u64 = ObjectAt(h, 0);
+          },
+          which == 0 ? __imp__sub_820AC8F8 : __imp__sub_820AC848,
+          which == 0 ? sub_820AC8F8 : sub_820AC848,
+          [&](Outputs& out, const PPCContext& t) { DispatchOut(h, out, t); },
+          fmt::format("case {}", c));
+    }
+    results.Report();
+  }
+  {
+    // The block: the run loop (its slots 2 and 1 the recorders) and the
+    // interface; the frame's key and delegates compared too.
+    Results results("FrameStart::FrameStart (sub_82092710)");
+    for (int c = 0; c < 50; c++) {
+      MapCase(
+          h, results,
+          [&] {
+            DispatchObjects(h, 0, {});
+            const uint32_t loop = h.data + 2048;
+            guest::StoreU32(h.base, loop, loop + 0x200);
+            guest::StoreU32(h.base, loop + 0x200 + 4, kStoreR4R5At444);
+            guest::StoreU32(h.base, loop + 0x200 + 8, kStoreR4R5At60);
+            guest::StoreU32(h.base, h.data + 16, loop);
+            guest::StoreU32(h.base, h.data + 20, uint32_t(h.random.Next()));
+          },
+          [&](PPCContext& t) {
+            t.r3.u64 = h.data + 32;
+            t.r4.u64 = h.data + 16;
+            Fill(h.base, t.r1.u32 - 144, 144);
+          },
+          __imp__sub_82092710, sub_82092710,
+          [&](Outputs& out, const PPCContext& t) {
+            out.Bytes(Read(h.base, h.data, 2048 + 0x210));
+            out.Bytes(Read(h.base, t.r1.u32 - 144 + 80, 36));
+            out.Word(t.r3.u32);
+          },
+          fmt::format("case {}", c));
+    }
+    results.Report();
+  }
+  const std::vector<uint8_t> kept = Read(h.base, rl::kDebugTextGlobal, 4);
+  {
+    // The block: a word, and the worker pool's interface (its slot 1 the
+    // recorder); the stack below the call random (the word the constructor
+    // reads there).
+    Results results("DebugText::DebugText (sub_82090EA8)");
+    for (int c = 0; c < 50; c++) {
+      MapCase(
+          h, results,
+          [&] {
+            std::vector<uint32_t> list(16, kStoreR4R5At60);
+            DispatchObjects(h, 1, list);
+            guest::StoreU32(h.base, h.data + 16, uint32_t(h.random.Next()));
+            guest::StoreU32(h.base, h.data + 20, ObjectAt(h, 0));
+          },
+          [&](PPCContext& t) {
+            t.r3.u64 = h.data + 64;
+            t.r4.u64 = h.data + 16;
+            for (uint32_t at = 4; at <= 512; at += 4) {
+              guest::StoreU32(h.base, t.r1.u32 - at, uint32_t(h.random.Next()));
+            }
+          },
+          __imp__sub_82090EA8, sub_82090EA8,
+          [&](Outputs& out, const PPCContext& t) {
+            DispatchOut(h, out, t);
+            out.Bytes(Read(h.base, rl::kDebugTextGlobal, 4));
+          },
+          fmt::format("case {}", c));
+    }
+    results.Report();
+  }
+  if (hooks::NativeHeapActive()) {
+    {
+      Results results("Framework::Create (sub_820909B8)");
+      for (int c = 0; c < 20; c++) {
+        MapCase(
+            h, results, [&] { DispatchObjects(h, 0, {}); },
+            [&](PPCContext& t) { t.r3.u64 = h.data + 8; }, __imp__sub_820909B8, sub_820909B8,
+            [&](Outputs& out, const PPCContext& t) {
+              const uint32_t block = Load(h.base, h.data + 8);
+              guest::StoreU32(h.base, h.data + 8, 0);
+              DispatchOut(h, out, t, false);  // r4: as Framework::Framework's
+              HeapBlockOut(h, out, block, 136);
+            },
+            fmt::format("case {}", c));
+      }
+      results.Report();
+    }
+    {
+      Results results("DebugText::Create (sub_82091160)");
+      for (int c = 0; c < 50; c++) {
+        MapCase(
+            h, results,
+            [&] {
+              std::vector<uint32_t> list(16, kStoreR4R5At60);
+              DispatchObjects(h, 1, list);
+              guest::StoreU32(h.base, h.data + 16, uint32_t(h.random.Next()));
+              guest::StoreU32(h.base, h.data + 20, ObjectAt(h, 0));
+            },
+            [&](PPCContext& t) {
+              t.r3.u64 = h.data + 16;
+              for (uint32_t at = 4; at <= 512; at += 4) {
+                guest::StoreU32(h.base, t.r1.u32 - at, uint32_t(h.random.Next()));
+              }
+            },
+            __imp__sub_82091160, sub_82091160,
+            [&](Outputs& out, const PPCContext& t) {
+              const uint32_t text = t.r3.u32;
+              // The job's address recorded by the pool, and the global, by
+              // number.
+              const uint32_t pool = ObjectAt(h, 0);
+              out.Word(Load(h.base, pool + 60) - text);
+              guest::StoreU32(h.base, pool + 60, 0);
+              out.Word(Load(h.base, rl::kDebugTextGlobal) == text);
+              out.Bytes(Read(h.base, h.data, 2048));
+              out.Word(t.r4.u32 - text);
+              HeapBlockOut(h, out, text, 52);
+            },
+            fmt::format("case {}", c));
+      }
+      results.Report();
+    }
+  }
+  Write(h.base, rl::kDebugTextGlobal, kept.data(), 4);
+}
+
 void Containers(Context& h) {
   Requests(h);
   Dispatchers(h);
+  Constructors(h);
   if (!hooks::NativeHeapActive()) {
     ITC_LOG_INFO("harness: framework: the handler map's cases need --native_heap");
     return;

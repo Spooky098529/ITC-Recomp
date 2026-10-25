@@ -14,6 +14,7 @@
 #include "hooks/framework.h"
 #include "hooks/guest_call.h"
 #include "hooks/heap.h"
+#include "memory/c_runtime_heap.h"
 
 #include <optional>
 
@@ -37,8 +38,12 @@ ITC_FLAG_BOOL(native_framework, true, "ITC",
               "their targets as guest calls: the delegate thunks sub_82096330 and sub_82096340, "
               "TickHandler::Invoke sub_82099A98, Framework::Start sub_820902B0 and OnTick "
               "sub_820902C8, the app's input source sub_820944C8 and sub_82094350, and with "
-              "--native_heap RunLoop::AddTickHandler sub_8209AAA8 and AddListener sub_8209AB48) "
-              "natively instead of "
+              "--native_heap RunLoop::AddTickHandler sub_8209AAA8 and AddListener sub_8209AB48; "
+              "the constructors Framework::Framework sub_82090420, with --native_heap "
+              "Framework::Create sub_820909B8 and DebugText::Create sub_82091160, "
+              "DebugText::DebugText sub_82090EA8, FrameStart::FrameStart sub_82092710 and the "
+              "PoolMakers sub_820AC8F8 and sub_820AC848, their calls guest calls) natively "
+              "instead of "
               "through the translated code (the same results; checked by "
               "--run_harnesses=framework)");
 
@@ -355,4 +360,124 @@ extern "C" REX_FUNC(sub_8209AB48) {
     return;
   }
   AddRequest(ctx, base, 2, 0x8209AB80, 0x8209AB90);
+}
+
+// --- The framework's and its services' constructors ---
+
+// Framework::Framework: r3 = the framework; r3 left.
+extern "C" REX_FUNC(sub_82090420) {
+  ITC_FRAMEWORK_FALLBACK(82090420)
+  fw::FrameworkConstruct(base, ctx.r3.u32);
+}
+
+// Framework::Create: r3 = the holder; r3 left.
+extern "C" REX_FUNC(sub_820909B8) {
+  REX_FUNC_PROLOGUE();
+  if (!NativeHeap() || !fw::FrameworkCreate(base, ctx.r3.u32)) {
+    __imp__sub_820909B8(ctx, base);
+  }
+}
+
+namespace {
+
+// A guest call of `object`'s slot at `offset` with the original's return
+// address; r3 its answer.
+uint32_t VirtualCallFrom(PPCContext& ctx, uint8_t* base, uint32_t object, uint32_t offset,
+                         uint32_t return_address) {
+  ctx.r3.u64 = object;
+  ctx.ctr.u64 = fw::VirtualTarget(base, object, offset);
+  ctx.lr = return_address;
+  REX_CALL_INDIRECT_FUNC(ctx.ctr.u32);
+  return ctx.r3.u32;
+}
+
+// The PoolMakers: r3 = the maker, r4 = the interface; its slot 1 from a
+// 96-byte frame; r3 the maker.
+void PoolMaker(PPCContext& ctx, uint8_t* base, uint32_t vtable, uint32_t return_address) {
+  const uint32_t maker = ctx.r3.u32;
+  const uint32_t interface = ctx.r4.u32;
+  guest_call::InFrame(ctx, base, 96, return_address, [&](uint32_t) {
+    fw::PoolMakerConstruct(base, maker, vtable, interface, [&](uint32_t object) {
+      return VirtualCallFrom(ctx, base, object, 4, return_address);
+    });
+  });
+  ctx.r3.u64 = maker;
+}
+
+// DebugText::DebugText from the caller's frame at ctx.r1: its 160-byte
+// frame, the stack word it reads there (+100), the job's post.
+uint32_t DebugTextIn(PPCContext& ctx, uint8_t* base, uint32_t text, uint32_t block) {
+  const uint32_t stack_word = guest::LoadU32(base, ctx.r1.u32 - 160 + 100);
+  guest_call::InFrame(ctx, base, 160, 0x82090F78, [&](uint32_t) {
+    fw::DebugTextConstruct(base, text, block, stack_word, [&](uint32_t interface, uint32_t job) {
+      ctx.r4.u64 = job;
+      ctx.r5.u64 = 1;
+      VirtualCallFrom(ctx, base, interface, 4, 0x82090F78);
+    });
+  });
+  return text;
+}
+
+}  // namespace
+
+extern "C" REX_FUNC(sub_820AC8F8) {
+  ITC_FRAMEWORK_FALLBACK(820AC8F8)
+  PoolMaker(ctx, base, 0x82002848, 0x820AC92C);
+}
+
+extern "C" REX_FUNC(sub_820AC848) {
+  ITC_FRAMEWORK_FALLBACK(820AC848)
+  PoolMaker(ctx, base, 0x82002840, 0x820AC87C);
+}
+
+// FrameStart::FrameStart: r3 = it, r4 = the block; the run loop's slots
+// from a 144-byte frame (the key and delegates there, as the original's);
+// r3 it.
+extern "C" REX_FUNC(sub_82092710) {
+  ITC_FRAMEWORK_FALLBACK(82092710)
+  const uint32_t frame_start = ctx.r3.u32;
+  const uint32_t block = ctx.r4.u32;
+  guest_call::InFrame(ctx, base, 144, 0x82092780, [&](uint32_t frame) {
+    fw::FrameStartConstruct(
+        base, frame_start, block, frame,
+        [&](uint32_t loop, uint32_t offset, uint32_t key, uint32_t delegate) {
+          ctx.r4.u64 = key;
+          ctx.r5.u64 = delegate;
+          VirtualCallFrom(ctx, base, loop, offset, offset == 8 ? 0x82092780 : 0x820927CC);
+        });
+  });
+  ctx.r3.u64 = frame_start;
+}
+
+// DebugText::DebugText: r3 = it, r4 = the block; r3 it.
+extern "C" REX_FUNC(sub_82090EA8) {
+  ITC_FRAMEWORK_FALLBACK(82090EA8)
+  ctx.r3.u64 = DebugTextIn(ctx, base, ctx.r3.u32, ctx.r4.u32);
+}
+
+// DebugText::Create: r3 = the block; operator new(52) and the constructor,
+// its post from the constructor's 160-byte frame below Create's 96-byte one
+// (the stack word read there); r3 the debug text or 0.
+extern "C" REX_FUNC(sub_82091160) {
+  REX_FUNC_PROLOGUE();
+  if (!NativeHeap()) {
+    __imp__sub_82091160(ctx, base);
+    return;
+  }
+  const uint32_t stack_word = guest::LoadU32(base, ctx.r1.u32 - 96 - 160 + 100);
+  const auto text = fw::DebugTextCreate(
+      base, ctx.r3.u32, stack_word, [&](uint32_t interface, uint32_t job) {
+        guest_call::InFrame(ctx, base, 96, 0x8209118C, [&](uint32_t) {
+          guest_call::InFrame(ctx, base, 160, 0x82090F78, [&](uint32_t) {
+            ctx.r4.u64 = job;
+            ctx.r5.u64 = 1;
+            VirtualCallFrom(ctx, base, interface, 4, 0x82090F78);
+          });
+        });
+      });
+  if (!text) {
+    __imp__sub_82091160(ctx, base);
+    return;
+  }
+  ctx.r3.u64 = *text;
 }

@@ -6,6 +6,7 @@
 
 #include "base/log.h"
 #include "framework/run_loop.h"
+#include "memory/c_runtime_heap.h"
 
 namespace framework {
 
@@ -159,6 +160,119 @@ std::optional<bool> RunLoopAddRequest(uint8_t* base, uint32_t loop, uint32_t typ
   guest::StoreU32(base, request + 4, guest::LoadU32(base, key));
   guest::StoreU32(base, request + 8, clone(delegate));
   return RequestsPushBack(base, loop + kRequests, request);
+}
+
+void FrameworkConstruct(uint8_t* base, uint32_t framework) {
+  ITC_NATIVE_RUNNING("sub_82090420 Framework::Framework");
+  static constexpr uint32_t kVtables[16] = {
+      0x82000B90, 0x82000B8C, 0x82000B84, 0x82000B80, 0x82000B7C, 0x82000B70,
+      0x82000B4C, 0x82000B38, 0x82000B28, 0x82000AFC, 0x82000AF4, 0x82000AEC,
+      0x82000AE4, 0x82000AD4, 0x82000ACC, 0x82000AC8};
+  for (uint32_t i = 0; i < 16; i++) {
+    guest::StoreU32(base, framework + 4 * i, kVtables[i]);
+  }
+  for (uint32_t at : {64u, 76u, 80u, 68u, 72u, 88u, 92u, 96u, 100u, 104u, 124u, 128u}) {
+    guest::StoreU32(base, framework + at, 0);
+  }
+  guest::StoreU8(base, framework + 132, 0);
+  guest::StoreU8(base, framework + 133, 0);
+  guest::StoreU8(base, framework + 134, 0);
+}
+
+std::optional<uint32_t> FrameworkCreate(uint8_t* base, uint32_t holder) {
+  if (!CanAllocate(base)) {
+    return std::nullopt;
+  }
+  const auto block = memory::crt::OperatorNew(base, 136);
+  if (!block) {
+    return std::nullopt;
+  }
+  ITC_NATIVE_RUNNING("sub_820909B8 Framework::Create");
+  uint32_t framework = 0;
+  if (*block != 0) {
+    FrameworkConstruct(base, *block);
+    framework = *block;
+  }
+  guest::StoreU32(base, holder, framework);
+  return holder;
+}
+
+uint32_t PoolMakerConstruct(uint8_t* base, uint32_t maker, uint32_t vtable, uint32_t interface,
+                            const std::function<uint32_t(uint32_t)>& pool) {
+  if (vtable == 0x82002848) {
+    ITC_NATIVE_RUNNING("sub_820AC8F8 PoolMaker::PoolMaker");
+  } else {
+    ITC_NATIVE_RUNNING("sub_820AC848 PoolMaker2::PoolMaker2");
+  }
+  guest::StoreU32(base, maker + 0, vtable);
+  guest::StoreU32(base, maker + 4, pool(interface));
+  return maker;
+}
+
+uint32_t FrameStartConstruct(uint8_t* base, uint32_t frame_start, uint32_t block, uint32_t frame,
+                             const std::function<void(uint32_t loop, uint32_t offset,
+                                                      uint32_t key, uint32_t delegate)>& add) {
+  ITC_NATIVE_RUNNING("sub_82092710 FrameStart::FrameStart");
+  constexpr uint32_t kDelegateVtable = 0x82002850;
+  const uint32_t key = frame + 80;
+  const uint32_t tick = frame + 88;
+  const uint32_t listener = frame + 104;
+  guest::StoreU32(base, tick + 4, frame_start);
+  guest::StoreU32(base, frame_start + 0, 0x82000D84);
+  guest::StoreU32(base, tick + 0, kDelegateVtable);
+  guest::StoreU32(base, key, 4);
+  guest::StoreU32(base, tick + 8, 0x82096330);
+  guest::StoreU32(base, frame_start + 4, guest::LoadU32(base, block + 4));
+  add(guest::LoadU32(base, block + 0), 8, key, tick);
+  // The tick handler's delegate destroyed (its base vtable), the listener's
+  // built.
+  guest::StoreU32(base, listener + 4, frame_start);
+  guest::StoreU32(base, tick + 0, 0x82000ABC);
+  guest::StoreU32(base, listener + 0, kDelegateVtable);
+  guest::StoreU32(base, listener + 8, 0x82096340);
+  guest::StoreU32(base, key, 2);
+  add(guest::LoadU32(base, block + 0), 4, key, listener);
+  return frame_start;
+}
+
+uint32_t DebugTextConstruct(uint8_t* base, uint32_t text, uint32_t block, uint32_t stack_word,
+                            const std::function<void(uint32_t interface, uint32_t job)>& post) {
+  ITC_NATIVE_RUNNING("sub_82090EA8 DebugText::DebugText");
+  const uint32_t job = text + 8;
+  guest::StoreU32(base, text + 0, 0x82000BC8);
+  guest::StoreU32(base, text + 4, guest::LoadU32(base, block + 0));
+  guest::StoreU32(base, job + 0, 0x820066DC);
+  guest::StoreU32(base, job + 4, 0x82002908);
+  guest::StoreU32(base, job + 8, 0);
+  guest::StoreU32(base, job + 12, 0);
+  guest::StoreU8(base, job + 16, 0);
+  guest::StoreU8(base, job + 17, 1);
+  guest::StoreU8(base, job + 18, 0);
+  guest::StoreU32(base, job + 20, stack_word);
+  guest::StoreU32(base, job + 24, 0x82002850);
+  guest::StoreU32(base, job + 28, text);
+  guest::StoreU32(base, job + 32, 0x82090CC0);  // the debug font's load
+  guest::StoreU32(base, text + 48, 0);
+  guest::StoreU32(base, kDebugTextGlobal, text);
+  post(guest::LoadU32(base, block + 4), job);
+  return text;
+}
+
+std::optional<uint32_t> DebugTextCreate(
+    uint8_t* base, uint32_t block, uint32_t stack_word,
+    const std::function<void(uint32_t interface, uint32_t job)>& post) {
+  if (!CanAllocate(base)) {
+    return std::nullopt;
+  }
+  const auto text = memory::crt::OperatorNew(base, 52);
+  if (!text) {
+    return std::nullopt;
+  }
+  ITC_NATIVE_RUNNING("sub_82091160 DebugText::Create");
+  if (*text == 0) {
+    return 0u;
+  }
+  return DebugTextConstruct(base, *text, block, stack_word, post);
 }
 
 }  // namespace framework
