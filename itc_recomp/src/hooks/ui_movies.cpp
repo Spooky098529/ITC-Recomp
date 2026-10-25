@@ -19,7 +19,7 @@ ITC_FLAG_BOOL(native_ui_movies, true, "ITC",
               "sub_825A6558, sub_8259D600, sub_8259D618, sub_8259D628, sub_8259D648, "
               "UiMovie::Child sub_8259D658 and sub_8259D670; the chunk and file helpers "
               "sub_8259D5C8, sub_825A0EB0 and sub_825A0CD0; UiMovie::SetRenderer sub_8259D798; "
-              "the draw context reset sub_8259D930; the keys sub_8259FA20, sub_8259FB30 and "
+              "the draw context reset sub_8259D930; the keys sub_8259FB30 and "
               "sub_8259FC18; the recorders sub_8259DAD0, sub_8259E098 and sub_8259D7B0; the "
               "file fix-ups sub_825A0CF8 with sub_825A0C60, and UiMovie::FixUpFile "
               "sub_825A0EF0 with sub_825A0E40, sub_825A0ED8, sub_8259D688 and sub_825A6570, "
@@ -33,7 +33,7 @@ ITC_FLAG_BOOL(native_ui_movies, true, "ITC",
               "sub_8259E620, append sub_8259F700 (its grow the original's) and "
               "UiMovie::QueueText sub_8259F770; UiMovie::ApplyTrack sub_825A0548, with native "
               "atexit, and under it, without adapters (the flag switches ApplyTrack), "
-              "UiMovie::TrackProperty sub_8259FE68) "
+              "UiMovie::TrackProperty sub_8259FE68 and the eased key sub_8259FA20) "
               "natively instead of through the translated code (same results; checked by "
               "--run_harnesses=ui_movies)");
 
@@ -139,17 +139,8 @@ extern "C" REX_FUNC(sub_8259D930) {
   ui_movies::ResetDrawContext(base, ctx.r3.u32);
 }
 
-// The keys: r3, r4 = the two keys, f1 = t.
-// sub_8259FA20: an integer track's eased value in r3.
-extern "C" REX_FUNC(sub_8259FA20) {
-  REX_FUNC_PROLOGUE();
-  if (!ITC_FLAG(native_ui_movies)) {
-    __imp__sub_8259FA20(ctx, base);
-    return;
-  }
-  ctx.fpscr.disableFlushMode();
-  ctx.r3.u64 = ui_movies::EaseInteger(base, ctx.r3.u32, ctx.r4.u32, ctx.f1.f64);
-}
+// The keys: r3, r4 = the two keys, f1 = t. (sub_8259FA20's adapter is
+// gone: only the native ApplyTrack reaches it in play.)
 
 // sub_8259FB30: a float track's value in f1. r3 and r4, which tan leaves
 // as its second _ctrlfp does, aren't read by the one caller (sub_825A0548)

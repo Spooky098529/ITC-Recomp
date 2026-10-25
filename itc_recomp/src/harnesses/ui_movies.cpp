@@ -334,6 +334,12 @@ void ResetDrawContextCases(Context& h) {
 // small), t mostly in [0, 1] (the caller clamps it) with odd doubles. The
 // integer ones compare r3; CubicFloat compares f1 (its r3 and r4 are tan's
 // leftovers, which the caller doesn't read).
+// sub_8259FA20 through the adapter's steps (its adapter is gone).
+void NativeEaseInteger(PPCContext& ctx, uint8_t* base) {
+  ctx.fpscr.disableFlushMode();
+  ctx.r3.u64 = ui_movies::EaseInteger(base, ctx.r3.u32, ctx.r4.u32, ctx.f1.f64);
+}
+
 void KeyCases(Context& h) {
   struct KeyFunction {
     const char* name;
@@ -341,7 +347,7 @@ void KeyCases(Context& h) {
     bool integer_values, result_in_f1;
   };
   const KeyFunction functions[] = {
-      {"EaseInteger (sub_8259FA20)", __imp__sub_8259FA20, sub_8259FA20, true, false},
+      {"EaseInteger (sub_8259FA20)", __imp__sub_8259FA20, NativeEaseInteger, true, false},
       {"CubicFloat (sub_8259FB30)", __imp__sub_8259FB30, sub_8259FB30, false, true},
       {"CubicInteger (sub_8259FC18)", __imp__sub_8259FC18, sub_8259FC18, true, false},
   };
