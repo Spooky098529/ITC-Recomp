@@ -118,9 +118,9 @@ time, 9.09 s, then the front end; "looked fine".
 
 ## Open
 
-- The sound by ear (not yet said). The user's third coverage session
-  (2026-10-25) played the logo, `OPENING` and `STAGE1_OPENING`: "movie
-  playback looks perfect"; the library's 617 functions left the coverage
+- Nothing known. The user's third coverage session (2026-10-25) played
+  the logo, `OPENING` and `STAGE1_OPENING`: "movie playback looks
+  perfect", and the sound was fine; the library's 617 functions left the coverage
   list (work left 5,200 -> 4,604, `../coverage.md`).
 
 - The library's YUV to RGB math (done): built into its pixel shaders
