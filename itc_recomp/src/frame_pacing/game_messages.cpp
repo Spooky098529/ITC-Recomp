@@ -4,7 +4,9 @@
 #include "debug/idle_timer_scan.h"
 #include "debug/menu_selection_scan.h"
 #include "guest.h"
+#ifndef ITC_NO_HARNESSES
 #include "harnesses/harness.h"
+#endif
 #include "hooks/input_update.h"
 #include "interpolation/blend_state.h"
 #include "native/textures.h"
@@ -654,10 +656,12 @@ bool g_input_manager_logged = false;  // this race
 
 extern "C" REX_FUNC(sub_820990F0) {
   REX_FUNC_PROLOGUE();
+#ifndef ITC_NO_HARNESSES
   {
     base::InHarnessScope in_harness;  // ITC_NATIVE_RUNNING's harness lines
     harness::RunRequested(ctx, base);  // --run_harnesses, once
   }
+#endif
   if (frame_pacing::GameMessages_IsRenderOnlyPass()) {
     return;
   }

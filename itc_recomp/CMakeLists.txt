@@ -379,6 +379,15 @@ target_link_libraries(itc_xenos_shaders PUBLIC
     MachineIndependent GenericCodeGen OSDependent OGLCompiler)
 
 # The game's executable, from our sources and the recompiled code.
+# The harnesses (src/harnesses/, --run_harnesses: "Checking with a harness" in
+# docs/rexglue-removal.md) are for development: CI's builds, the releases'
+# among them, leave them out (-DITC_HARNESSES=OFF; the user's call,
+# 2026-10-25), and so does --run_harnesses with them.
+option(ITC_HARNESSES "Build the harnesses (src/harnesses/, --run_harnesses)" ON)
+if(NOT ITC_HARNESSES)
+    list(FILTER ITC_SOURCES EXCLUDE REGEX "^src/harnesses/")
+endif()
+
 function(itc_add_executable name)
     if(WIN32)
         add_executable(${name} WIN32 ${ARGN})
@@ -389,6 +398,9 @@ function(itc_add_executable name)
     rexglue_setup_target(${name})
 
     target_include_directories(${name} PRIVATE src)
+    if(NOT ITC_HARNESSES)
+        target_compile_definitions(${name} PRIVATE ITC_NO_HARNESSES)
+    endif()
 
     # Our own copies of header-only libraries (A1 in docs/rexglue-removal.md),
     # included with their folder (<xxHash/xxhash.h>) so the SDK's copies on the
