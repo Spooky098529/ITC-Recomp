@@ -73,6 +73,21 @@ When the user has reviewed a run's section, its heading gets
   `sub_82212958` never ran: the original runs there, no row. Four
   removable adapters kept (the pause movie watch's three, called
   through `ctx`; `UiMovie::Draw`'s, all guest calls).
+- The UI movies' ready groups (no mapping; 7d83fb5..ad1dbcb;
+  `src/ui_movies/objects.cpp`, `effect.cpp`, harness
+  `src/harnesses/ui_movie_objects.cpp`): 26 rows in `ui-movies-game.md`
+  (the vectors, `UiMovie::UiMovie`, `~UiMovie`, the texts freed,
+  `GetText`, the named animations' set-up, `sub_8211BEE8` named
+  `RaceHud::DrawMirror` (probably), the six text setters over
+  `GetText`) and a new intro paragraph; under `--native_ui_movies_game`
+  (the allocating ones also need `--native_heap` and
+  `--native_c_runtime_heap`). For review: each function hands a case it
+  couldn't do natively to the original first, with nothing done (the
+  destructor and texts' free check every block, none freed twice);
+  `sub_8211E378`'s `std::string` calls abort with a log if one refuses
+  after the checks (as `std_string`'s `Require`); `sub_8259EBE8`'s
+  override in `src/hooks/ui_movies.cpp` also checks the harness stand-in
+  hook.
 
 ## Run 2026-10-25 03:59 (`b7-loop-25-10-26-2`)
 

@@ -49,8 +49,14 @@ file's history. What's left to see in a drive, from every run:
   to `to-drive.md`). Finished.
 - The "no mapping" lead (not counted): the UI movies' 10 ready groups
   left in `ui-movies-game.md` (the constructor and destructor, the named
-  animations' walk, the small vectors). Step: migration, agent
-  running.
+  animations' walk, the small vectors). Migration done after five
+  batches (7d83fb5..ad1dbcb: all 10 groups and the 6 text setters they
+  unblocked, 26 rows; no adapter removable yet; no new flag, harness
+  group `ui_movie_objects`; 27 s, 0 errors, every harness 0 differing;
+  the HUD mirror's replay frame dumps the same with the fallback).
+  Nothing ready left; the rest waits on `sub_82108860`, the string
+  table's formatting, the archive load's events and the texture set.
+  Step: validation, agent running.
 
 ## Done
 
@@ -87,6 +93,8 @@ This run's groups: `expected-differences.md` (the "16:38 run" lines).
 - After the scene models' validation: race 27 s (`itc_1696`), 0
   errors, every harness 0 differing; replay 126 s (`itc_1697`), 0
   errors.
+- After the UI movies' ready groups' migration: ours 2076, work left
+  4375 (wrapped 105, known 582, unknown 3688).
 - After the DrawTexts lead's validation 2: race 26 s (`itc_1729`), 0
   errors, every harness 0 differing; replay (`itc_1730`), 0 errors.
 - After the DrawTexts lead's migration 2: ours 2050, work left 4401
