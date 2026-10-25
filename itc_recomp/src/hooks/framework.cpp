@@ -11,6 +11,8 @@
 #include "base/flags.h"
 #include "framework/framework.h"
 #include "framework/run_loop.h"
+#include "hooks/framework.h"
+#include "hooks/guest_call.h"
 #include "hooks/heap.h"
 
 #include <optional>
@@ -31,7 +33,12 @@ ITC_FLAG_BOOL(native_framework, true, "ITC",
               "with Erase sub_82092EF8, no adapter; with --native_heap PushBack sub_8209A930, and "
               "without adapters, as only it calls them, Insert sub_8209A600 and InsertN "
               "sub_8209A0E8), RunLoop::RunLoop sub_8209A9F0 and "
-              "ApplyRequest sub_8209A458 (with --native_heap)) natively instead of "
+              "ApplyRequest sub_8209A458 (with --native_heap); the thunks and dispatchers with "
+              "their targets as guest calls: the delegate thunks sub_82096330 and sub_82096340, "
+              "TickHandler::Invoke sub_82099A98, Framework::Start sub_820902B0 and OnTick "
+              "sub_820902C8, the app's input source sub_820944C8 and sub_82094350, and with "
+              "--native_heap RunLoop::AddTickHandler sub_8209AAA8 and AddListener sub_8209AB48) "
+              "natively instead of "
               "through the translated code (the same results; checked by "
               "--run_harnesses=framework)");
 
@@ -193,4 +200,159 @@ extern "C" REX_FUNC(sub_8209A458) {
   if (*inserted) {
     ctx.r3.u64 = ctx.r1.u32 - 32;
   }
+}
+
+// --- The thunks and dispatchers (guest calls into the targets) ---
+
+namespace {
+
+// A tail call: r3 = the object, the target through ctr, lr left.
+void TailCall(PPCContext& ctx, uint8_t* base, fw::VirtualCall call) {
+  ctx.r3.u64 = call.object;
+  ctx.ctr.u64 = call.target;
+  REX_CALL_INDIRECT_FUNC(ctx.ctr.u32);
+}
+
+}  // namespace
+
+bool hooks::NativeFramework() { return ITC_FLAG(native_framework); }
+
+void hooks::TickHandlerInvoke(PPCContext& ctx, uint8_t* base) {
+  const uint32_t loop = ctx.r3.u32;
+  const uint32_t delegate = ctx.r4.u32;
+  REX_STORE_U64(ctx.r1.u32 + 24, ctx.r4.u64);
+  const uint32_t target = fw::TickHandlerTarget(base, delegate);
+  guest_call::InFrame(ctx, base, 96, 0x82099AC4, [&](uint32_t) {
+    ctx.r3.u64 = delegate;
+    ctx.r4.u64 = loop;
+    ctx.ctr.u64 = target;
+    REX_CALL_INDIRECT_FUNC(ctx.ctr.u32);
+  });
+}
+
+void hooks::DelegateSlot1Thunk(PPCContext& ctx, uint8_t* base) {
+  const uint32_t target = fw::DelegateSlot1Target(base, ctx.r3.u32);
+  TailCall(ctx, base, {ctx.r3.u32, target});
+}
+
+// The delegate thunk sub_82096330 (FrameStart's tick handler 4): r3 = the
+// object; its slot 0 as a tail call.
+extern "C" REX_FUNC(sub_82096330) {
+  ITC_FRAMEWORK_FALLBACK(82096330)
+  TailCall(ctx, base, {ctx.r3.u32, fw::DelegateSlot0Target(base, ctx.r3.u32)});
+}
+
+// Framework::Start: r3 = the framework; the app's slot +36 as a tail call.
+extern "C" REX_FUNC(sub_820902B0) {
+  ITC_FRAMEWORK_FALLBACK(820902B0)
+  TailCall(ctx, base, fw::FrameworkStartCall(base, ctx.r3.u32));
+}
+
+namespace {
+
+// The app's input source: InputManagerFrom36's plain C++ when that's the
+// target (in play), else a tail call.
+void AppInputSource(PPCContext& ctx, uint8_t* base, fw::VirtualCall call) {
+  if (call.target == 0x82090830) {
+    ctx.r3.u64 = fw::InputManagerFrom36(base, call.object);
+    return;
+  }
+  TailCall(ctx, base, call);
+}
+
+}  // namespace
+
+// sub_82094350: r3 = app + 4; r3 the input source's answer.
+extern "C" REX_FUNC(sub_82094350) {
+  ITC_FRAMEWORK_FALLBACK(82094350)
+  AppInputSource(ctx, base, fw::AppInputSourceCall(base, ctx.r3.u32));
+}
+
+// sub_820944C8: r3 = app + 16; as sub_82094350 from app + 4.
+extern "C" REX_FUNC(sub_820944C8) {
+  ITC_FRAMEWORK_FALLBACK(820944C8)
+  AppInputSource(ctx, base, fw::AppInputSourceFrom16Call(base, ctx.r3.u32));
+}
+
+// Framework::OnTick: r3 = the framework, r4 = the run loop; its guest calls
+// from a 128-byte frame like the original's (the key at r1 + 80 there), with
+// the original's return addresses. r3 as the last call leaves it.
+extern "C" REX_FUNC(sub_820902C8) {
+  ITC_FRAMEWORK_FALLBACK(820902C8)
+  const uint32_t framework = ctx.r3.u32;
+  const uint32_t loop = ctx.r4.u32;
+  guest_call::InFrame(ctx, base, 128, 0x820902FC, [&](uint32_t frame) {
+    auto call = [&](uint32_t object, uint32_t offset, uint32_t r4, uint32_t return_address) {
+      ctx.r3.u64 = object;
+      ctx.r4.u64 = r4;
+      ctx.ctr.u64 = fw::VirtualTarget(base, object, offset);
+      ctx.lr = return_address;
+      REX_CALL_INDIRECT_FUNC(ctx.ctr.u32);
+      return ctx.r3.u32;
+    };
+    const fw::OnTickCalls calls{
+        [&](uint32_t manager, uint32_t key) { call(manager, 4, key, 0x820902FC); },
+        [&](uint32_t app) {
+          ctx.r3.u64 = app;
+          ctx.ctr.u64 = fw::VirtualTarget(base, app, 44);
+          ctx.lr = 0x82090314;
+          REX_CALL_INDIRECT_FUNC(ctx.ctr.u32);
+          return ctx.r3.u32;
+        },
+        [&](uint32_t run_loop, uint32_t key) { call(run_loop, 16, key, 0x8209033C); }};
+    fw::FrameworkOnTick(base, framework, loop, frame + 80, calls);
+  });
+}
+
+namespace {
+
+// AddTickHandler and AddListener: r3 = the run loop, r4 = the key's
+// address, r5 = the delegate; the copy made with its slot 2 and the request
+// pushed, from a 112-byte frame like the original's (the request at r1 + 80
+// there). r3 as PushBack leaves it.
+void AddRequest(PPCContext& ctx, uint8_t* base, uint32_t type, uint32_t clone_return,
+                uint32_t push_return) {
+  const uint32_t loop = ctx.r3.u32;
+  const uint32_t key = ctx.r4.u32;
+  const uint32_t delegate = ctx.r5.u32;
+  guest_call::InFrame(ctx, base, 112, clone_return, [&](uint32_t frame) {
+    const uint32_t request = frame + 80;
+    const auto clone = [&](uint32_t object) {
+      ctx.r3.u64 = object;
+      ctx.ctr.u64 = fw::VirtualTarget(base, object, 8);
+      ctx.lr = clone_return;
+      REX_CALL_INDIRECT_FUNC(ctx.ctr.u32);
+      return ctx.r3.u32;
+    };
+    const auto inserted = fw::RunLoopAddRequest(base, loop, type, key, delegate, request, clone);
+    if (!inserted) {
+      ctx.r3.u64 = loop + fw::kRequests;
+      ctx.r4.u64 = request;
+      ctx.lr = push_return;
+      __imp__sub_8209A930(ctx, base);
+      return;
+    }
+    ctx.r3.u64 = *inserted ? frame - 16 : loop + fw::kRequests;
+  });
+}
+
+}  // namespace
+
+// RunLoop::AddTickHandler (vtable slot 2) and AddListener (slot 1).
+extern "C" REX_FUNC(sub_8209AAA8) {
+  REX_FUNC_PROLOGUE();
+  if (!NativeHeap()) {
+    __imp__sub_8209AAA8(ctx, base);
+    return;
+  }
+  AddRequest(ctx, base, 0, 0x8209AAE0, 0x8209AAF0);
+}
+
+extern "C" REX_FUNC(sub_8209AB48) {
+  REX_FUNC_PROLOGUE();
+  if (!NativeHeap()) {
+    __imp__sub_8209AB48(ctx, base);
+    return;
+  }
+  AddRequest(ctx, base, 2, 0x8209AB80, 0x8209AB90);
 }

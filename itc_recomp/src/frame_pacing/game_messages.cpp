@@ -7,6 +7,7 @@
 #ifndef ITC_NO_HARNESSES
 #include "harnesses/harness.h"
 #endif
+#include "hooks/framework.h"
 #include "hooks/input_update.h"
 #include "interpolation/blend_state.h"
 #include "native/textures.h"
@@ -757,7 +758,11 @@ extern "C" REX_FUNC(sub_82099A98) {
   debug::MenuSelectionScan_Before(base);
   frame_pacing::InputWatch_Before(base);
   frame_pacing::g_current_tick = target;
-  __imp__sub_82099A98(ctx, base);
+  if (hooks::NativeFramework()) {
+    hooks::TickHandlerInvoke(ctx, base);
+  } else {
+    __imp__sub_82099A98(ctx, base);
+  }
   frame_pacing::g_current_tick = 0;
   frame_pacing::InputWatch_After(base, frame_pacing::kTickRun, target);
   debug::MenuSelectionScan_After(base, "tick handler", target);

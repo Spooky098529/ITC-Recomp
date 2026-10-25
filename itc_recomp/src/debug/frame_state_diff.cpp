@@ -4,6 +4,7 @@
 #include "guest.h"
 #include "cameras/cameras.h"
 #include "hooks/cameras.h"
+#include "hooks/framework.h"
 #include "matrix_math/matrix_math.h"
 
 #include "base/flags.h"
@@ -615,6 +616,10 @@ extern "C" REX_FUNC(sub_82096340) {
   REX_FUNC_PROLOGUE();
   uint32_t target = guest::LoadU32(base, guest::LoadU32(base, ctx.r3.u32) + 4);
   debug::FrameStateDiff_Before(base);
-  __imp__sub_82096340(ctx, base);
+  if (hooks::NativeFramework()) {
+    hooks::DelegateSlot1Thunk(ctx, base);
+  } else {
+    __imp__sub_82096340(ctx, base);
+  }
   debug::FrameStateDiff_After(base, "thunk target", target);
 }

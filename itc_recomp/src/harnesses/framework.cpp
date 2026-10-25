@@ -19,6 +19,7 @@
 #include "base/flags.h"
 #include "framework/framework.h"
 #include "framework/run_loop.h"
+#include "hooks/framework.h"
 #include "hooks/heap.h"
 #include "base/log.h"
 #include "memory/c_runtime_heap.h"
@@ -978,8 +979,215 @@ void RunLoops(Context& h) {
   }
 }
 
+
+// --- The thunks and dispatchers ---
+//
+// Their targets are guest calls, so the cases run the adapters themselves
+// (with the flag on; the originals with it off) on objects in the scratch
+// area whose vtables point at small guest functions that leave a trace:
+// sub_820A70A8 stores r4 at r3 + 4, the getters sub_82090760 (r3's byte
+// +133) and sub_82090770 (r3's word +60) answer from the object.
+
+constexpr uint32_t kStoreR4At4 = 0x820A70A8;
+constexpr uint32_t kByte133 = 0x82090760;
+constexpr uint32_t kWord60 = 0x82090770;
+
+
+// Random words in the scratch area's first 512 bytes, and `objects` objects
+// (at data + 512 + 160 * i) whose vtables (at their + 0x80) hold `targets`.
+void DispatchObjects(Context& h, uint32_t objects, const std::vector<uint32_t>& targets) {
+  for (uint32_t at = 0; at < 1024; at += 4) {
+    guest::StoreU32(h.base, h.data + at, uint32_t(h.random.Next()) & 0x7FFFFFFF);
+  }
+  for (uint32_t i = 0; i < objects; i++) {
+    const uint32_t object = h.data + 512 + 160 * i;
+    guest::StoreU32(h.base, object, object + 0x80);
+    for (uint32_t slot = 0; slot < targets.size(); slot++) {
+      guest::StoreU32(h.base, object + 0x80 + 4 * slot, targets[slot]);
+    }
+  }
+}
+uint32_t ObjectAt(const Context& h, uint32_t i) { return h.data + 512 + 160 * i; }
+
+void DispatchOut(Context& h, Outputs& out, const PPCContext& t) {
+  out.Bytes(Read(h.base, h.data, 2048));
+  out.Word(t.r3.u32);
+  out.Word(t.r4.u32);
+}
+
+void Dispatchers(Context& h) {
+  // Each slot's target picked from the three.
+  auto targets = [&] {
+    const uint32_t pick[] = {kStoreR4At4, kByte133, kWord60};
+    std::vector<uint32_t> list(16);
+    for (auto& target : list) {
+      target = pick[h.random.Below(3)];
+    }
+    return list;
+  };
+  struct Thunk {
+    const char* name;
+    GuestFunction recompiled;
+    GuestFunction native;
+  };
+  const Thunk thunks[] = {
+      {"Delegate slot 0 thunk (sub_82096330)", __imp__sub_82096330, sub_82096330},
+      {"Delegate slot 1 thunk (sub_82096340)", __imp__sub_82096340, hooks::DelegateSlot1Thunk},
+      {"Framework::Start (sub_820902B0)", __imp__sub_820902B0, sub_820902B0},
+      {"App input source (sub_82094350)", __imp__sub_82094350, sub_82094350},
+      {"App +16 slot +36 (sub_820944C8)", __imp__sub_820944C8, sub_820944C8},
+  };
+  for (const Thunk& thunk : thunks) {
+    Results results(thunk.name);
+    for (int c = 0; c < 100; c++) {
+      MapCase(
+          h, results,
+          [&] {
+            std::vector<uint32_t> list = targets();
+            if (c % 3 == 0) {
+              list[1] = 0x82090830;  // the input source in play (InputManagerFrom36)
+            }
+            DispatchObjects(h, 4, list);
+            // The framework's app (+120) and the app's input source (+20 of
+            // app + 4) are objects.
+            guest::StoreU32(h.base, h.data + 120, ObjectAt(h, 1));
+            guest::StoreU32(h.base, h.data + 4 + 20, ObjectAt(h, 2));
+            guest::StoreU32(h.base, h.data + 12 + 4 + 20, ObjectAt(h, 3));
+          },
+          [&](PPCContext& t) {
+            const bool framework = thunk.recompiled == __imp__sub_820902B0;
+            const bool app = thunk.recompiled == __imp__sub_82094350;
+            const bool app16 = thunk.recompiled == __imp__sub_820944C8;
+            t.r3.u64 = framework ? h.data : app ? h.data + 4 : app16 ? h.data + 28 : ObjectAt(h, 0);
+            t.r4.u64 = uint32_t(h.random.Next());
+          },
+          thunk.recompiled, thunk.native,
+          [&](Outputs& out, const PPCContext& t) { DispatchOut(h, out, t); },
+          fmt::format("case {}", c));
+    }
+    results.Report();
+  }
+  {
+    Results results("TickHandler::Invoke (sub_82099A98)");
+    for (int c = 0; c < 100; c++) {
+      MapCase(
+          h, results, [&] { DispatchObjects(h, 1, targets()); },
+          [&](PPCContext& t) {
+            t.r3.u64 = h.data + 64;
+            t.r4.u64 = (h.random.Next() << 32) | ObjectAt(h, 0);
+            Fill(h.base, t.r1.u32 + 24, 8);
+          },
+          __imp__sub_82099A98, hooks::TickHandlerInvoke,
+          [&](Outputs& out, const PPCContext& t) {
+            DispatchOut(h, out, t);
+            out.Bytes(Read(h.base, t.r1.u32 + 24, 8));
+          },
+          fmt::format("case {}", c));
+    }
+    results.Report();
+  }
+  {
+    // The framework at data: the input manager (+88), the app (+120) and
+    // the run loop objects; the app's answer its byte +133.
+    Results results("Framework::OnTick (sub_820902C8)");
+    for (int c = 0; c < 200; c++) {
+      MapCase(
+          h, results,
+          [&] {
+            std::vector<uint32_t> list = targets();
+            list[1] = kStoreR4At4;   // the manager's slot 1
+            list[11] = kByte133;     // the app's slot +44
+            list[4] = kStoreR4At4;   // the run loop's slot 4
+            DispatchObjects(h, 3, list);
+            guest::StoreU32(h.base, h.data + 88, ObjectAt(h, 0));
+            guest::StoreU32(h.base, h.data + 120, ObjectAt(h, 1));
+            guest::StoreU8(h.base, ObjectAt(h, 1) + 133, h.random.Below(2) ? 0 : uint8_t(h.random.Next()));
+          },
+          [&](PPCContext& t) {
+            t.r3.u64 = h.data;
+            t.r4.u64 = ObjectAt(h, 2);
+            Fill(h.base, t.r1.u32 - 128 + 80, 4);
+          },
+          __imp__sub_820902C8, sub_820902C8,
+          [&](Outputs& out, const PPCContext& t) {
+            DispatchOut(h, out, t);
+            out.Bytes(Read(h.base, t.r1.u32 - 128 + 80, 4));
+          },
+          fmt::format("case {}", c));
+    }
+    results.Report();
+  }
+  if (!hooks::NativeHeapActive()) {
+    return;
+  }
+  for (int which = 0; which < 2; which++) {
+    Results results(which == 0 ? "RunLoop::AddTickHandler (sub_8209AAA8)"
+                               : "RunLoop::AddListener (sub_8209AB48)");
+    // The run loop at data + 2048 - 64 (its vector at + 28, a block for
+    // 0 to 6 requests with room for up to 4 more, or none); the delegate an
+    // object whose slot 2 answers its word +60 (its copy).
+    const uint32_t loop = h.data + 2048 - 64;
+    uint32_t block = 0;
+    for (int c = 0; c < 200; c++) {
+      MapCase(
+          h, results,
+          [&] {
+            std::vector<uint32_t> list = targets();
+            list[2] = kWord60;
+            DispatchObjects(h, 1, list);
+            const bool none = h.random.Below(6) == 0;
+            const uint32_t size = none ? 0 : h.random.Below(7);
+            const uint32_t capacity = none ? 0 : size + h.random.Below(5);
+            block = 0;
+            if (capacity != 0) {
+              block = *memory::crt::OperatorNew(h.base, capacity * rl::kRequestBytes);
+              for (uint32_t i = 0; i < 3 * capacity; i++) {
+                guest::StoreU32(h.base, block + 4 * i, uint32_t(h.random.Next()));
+              }
+            }
+            const uint32_t vector = loop + rl::kRequests;
+            guest::StoreU32(h.base, vector + rl::kVectorFirst, block);
+            guest::StoreU32(h.base, vector + rl::kVectorLast, block + size * rl::kRequestBytes);
+            guest::StoreU32(h.base, vector + rl::kVectorEnd, block + capacity * rl::kRequestBytes);
+          },
+          [&](PPCContext& t) {
+            t.r3.u64 = loop;
+            t.r4.u64 = h.data + 8;  // the key's word
+            t.r5.u64 = ObjectAt(h, 0);
+            Fill(h.base, t.r1.u32 - 112 + 80, 12);
+          },
+          which == 0 ? __imp__sub_8209AAA8 : __imp__sub_8209AB48,
+          which == 0 ? sub_8209AAA8 : sub_8209AB48,
+          [&](Outputs& out, const PPCContext& t) {
+            const uint32_t vector = loop + rl::kRequests;
+            const uint32_t first = Load(h.base, vector + rl::kVectorFirst);
+            const uint32_t last = Load(h.base, vector + rl::kVectorLast);
+            const uint32_t end = Load(h.base, vector + rl::kVectorEnd);
+            out.Bytes(Read(h.base, h.data, 2048 - 64 + rl::kRequests));
+            out.Word(last - first);
+            out.Word(end - first);
+            out.Word(first == block);
+            const bool old_alive = block != 0 && memory::IsHeapBlock(block);
+            out.Word(old_alive);
+            out.Bytes(Read(h.base, first, last - first));
+            out.Bytes(Read(h.base, t.r1.u32 - 112 + 80, 12));
+            out.Word(t.r3.u32 == loop + rl::kRequests ? 0 : t.r3.u32 - t.r1.u32);
+            if (first != 0) {
+              memory::crt::OperatorDelete(first);
+            }
+            if (old_alive && block != first) {
+              memory::crt::OperatorDelete(block);
+            }
+          },
+          fmt::format("case {}", c));
+    }
+    results.Report();
+  }
+}
+
 void Containers(Context& h) {
   Requests(h);
+  Dispatchers(h);
   if (!hooks::NativeHeapActive()) {
     ITC_LOG_INFO("harness: framework: the handler map's cases need --native_heap");
     return;
