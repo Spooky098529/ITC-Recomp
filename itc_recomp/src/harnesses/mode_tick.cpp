@@ -12,6 +12,7 @@
 #include "base/flags.h"
 #include "base/log.h"
 #include "command_list/command_list.h"
+#include "helpers/compare_string.h"
 #include "hooks/mode_tick.h"
 #include "memory/heap.h"
 #include "mode_tick/mode_tick.h"
@@ -47,6 +48,7 @@ constexpr Region kRegions[] = {
     {0x826C7670, 0x90},  // the user table's names
     {0x826D83D0, 0x10},  // the color rectangles' render queue and command list
     {0x8296BD20, 0x10},  // the command lists' open chunk count
+    {0x826C5C70, 0x20},  // the music player's pointer
 };
 
 // The register steps: the plain C++ through these, not the adapters.
@@ -86,6 +88,13 @@ void NativeSignInWatchUpdate(PPCContext& ctx, uint8_t* base) {
   } else {
     ctx.r3.s64 = int32_t(mt::kLastName);
   }
+}
+void NativeCompareString(PPCContext& ctx, uint8_t* base) {
+  ctx.r3.u64 = helpers::CompareStringA(base, ctx.r13.u32, ctx.r3.u32, ctx.r4.u32, ctx.r5.s32,
+                                       ctx.r6.u32, ctx.r7.s32);
+}
+void NativeLstrcmp(PPCContext& ctx, uint8_t* base) {
+  ctx.r3.u64 = helpers::Lstrcmp(base, ctx.r13.u32, ctx.r3.u32, ctx.r4.u32);
 }
 void NativePresence(PPCContext& ctx, uint8_t* base) {
   if (mt::PresenceSetForMode(base, ctx.r13.u32, ctx.r3.u32)) {
@@ -514,6 +523,172 @@ void FadesUpdate(Context& h) {
   results.Report();
 }
 
+// The music names' addresses in the image (BGM_SYSTEM at 0x82006A18; see
+// docs/known-data.md).
+constexpr uint32_t kMusicNames[18] = {
+    0x82006A18, 0x82006A24, 0x82006A30, 0x82006A3C, 0x82006A48, 0x82006A54,
+    0x82006A60, 0x82006A6C, 0x82006A78, 0x82006A84, 0x82006A90, 0x82006A9C,
+    0x82006AA8, 0x82006AB4, 0x82006AC0, 0x82006ACC, 0x82006AD8, 0x82006AE4};
+
+// A string of up to `most` bytes at `at`, terminated: letters of both cases,
+// digits, symbols, spaces and bytes above 127, so the character table's
+// kinds come up.
+void WriteString(uint8_t* base, uint32_t at, uint32_t most, Random& random) {
+  static constexpr char kChars[] = "aAbBzZ09_-' .,!@#$%^&*()";
+  const uint32_t length = random.Below(most + 1);
+  for (uint32_t i = 0; i < length; i++) {
+    const uint32_t pick = random.Below(8);
+    const uint8_t c = pick == 0 ? uint8_t(1 + random.Below(255))
+                                : uint8_t(kChars[random.Below(sizeof(kChars) - 1)]);
+    guest::StoreU8(base, at + i, c);
+  }
+  guest::StoreU8(base, at + length, 0);
+}
+
+// The second string from the first: the same, a byte changed, its case
+// flipped, cut short, a symbol put in, or another.
+void WriteVariant(uint8_t* base, uint32_t to, uint32_t from, uint32_t most, Random& random) {
+  uint32_t length = 0;
+  while (guest::LoadU8(base, from + length) != 0) {
+    length++;
+  }
+  for (uint32_t i = 0; i <= length; i++) {
+    guest::StoreU8(base, to + i, guest::LoadU8(base, from + i));
+  }
+  const uint32_t at = length ? random.Below(length) : 0;
+  switch (random.Below(6)) {
+    case 0: break;
+    case 1:
+      if (length) guest::StoreU8(base, to + at, uint8_t(1 + random.Below(255)));
+      break;
+    case 2:
+      if (length) guest::StoreU8(base, to + at, guest::LoadU8(base, to + at) ^ 0x20);
+      break;
+    case 3: guest::StoreU8(base, to + at, 0); break;
+    case 4:
+      if (length < most) {
+        for (uint32_t i = length + 1; i > at; i--) {
+          guest::StoreU8(base, to + i, guest::LoadU8(base, to + i - 1));
+        }
+        guest::StoreU8(base, to + at, uint8_t("-' ,"[random.Below(4)]));
+      }
+      break;
+    default: WriteString(base, to, most, random); break;
+  }
+}
+
+void Compares(Context& h) {
+  const uint32_t slot = guest::LoadU32(h.base, h.ctx.r13.u32 + 256) + 352;
+  const uint32_t saved = guest::LoadU32(h.base, slot);
+  auto last_error = [&](const PPCContext&, Outputs& out) {
+    out.Word(guest::LoadU32(h.base, slot));
+  };
+  {
+    Results results("CompareStringA (sub_82297100)");
+    for (int c = 0; c < 2000; c++) {
+      uint32_t flags = 0, s1 = 0, s2 = 0;
+      int32_t n1 = -1, n2 = -1;
+      Case(
+          h, results,
+          [&](Random& random) {
+            guest::StoreU32(h.base, slot, 0xCDCDCDCD);
+            static constexpr uint32_t kFlags[] = {0, 1, 4, 0x1000, 5, 0x1001, 0x1004, 0x1005};
+            flags = random.Below(16) == 0 ? uint32_t(random.Next()) : kFlags[random.Below(8)];
+            s1 = h.data + 1024;
+            s2 = h.data + 1536;
+            WriteString(h.base, s1, 40, random);
+            WriteVariant(h.base, s2, s1, 40, random);
+            auto length = [&]() -> int32_t {
+              const uint32_t pick = random.Below(10);
+              return pick < 6 ? -1 : pick < 7 ? 0 : pick < 9 ? int32_t(random.Below(45))
+                                                              : -2 - int32_t(random.Below(4));
+            };
+            n1 = length();
+            n2 = length();
+            if (random.Below(20) == 0) s1 = 0;
+            if (random.Below(20) == 0) s2 = 0;
+          },
+          [&](PPCContext& t) {
+            t.r3.u64 = flags;
+            t.r4.u64 = s1;
+            t.r5.s64 = n1;
+            t.r6.u64 = s2;
+            t.r7.s64 = n2;
+          },
+          __imp__sub_82297100, NativeCompareString, fmt::format("case {}", c), last_error);
+    }
+    results.Report();
+  }
+  {
+    Results results("lstrcmpA (sub_82296130)");
+    for (int c = 0; c < 1000; c++) {
+      uint32_t a = 0, b = 0;
+      Case(
+          h, results,
+          [&](Random& random) {
+            guest::StoreU32(h.base, slot, 0xCDCDCDCD);
+            a = h.data + 1024;
+            b = h.data + 1536;
+            if (c < 324) {
+              // The music names against each other (the game's).
+              a = kMusicNames[(c / 18) % 18];
+              b = kMusicNames[c % 18];
+            } else {
+              WriteString(h.base, a, 40, random);
+              WriteVariant(h.base, b, a, 40, random);
+              if (random.Below(20) == 0) a = 0;
+              if (random.Below(20) == 0) b = 0;
+            }
+          },
+          [&](PPCContext& t) {
+            t.r3.u64 = a;
+            t.r4.u64 = b;
+          },
+          __imp__sub_82296130, NativeLstrcmp, fmt::format("case {}", c), last_error);
+    }
+    results.Report();
+  }
+  {
+    // The player at [0x826C5C80] made up in the scratch area: its slot 4 is
+    // BillboardMaterial::SetLights (sub_8209F5C8: +32 = r4, +36 = r5 unless
+    // r4 is 0). The frame's table and ids compared.
+    Results results("Music::Play (sub_821063B0)");
+    for (int c = 0; c < 64; c++) {
+      Case(
+          h, results,
+          [&](Random& random) {
+            guest::StoreU32(h.base, slot, 0xCDCDCDCD);
+            guest::StoreU32(h.base, mt::kMusicPlayer, h.data);
+            guest::StoreU32(h.base, h.data, h.data + 64);
+            guest::StoreU32(h.base, h.data + 64 + 16, 0x8209F5C8);
+            // A name: each of the game's (a copy in the scratch area or the
+            // image's own), or a near miss.
+            const uint32_t name = h.data + 1024;
+            if (c < 36) {
+              const uint32_t from = kMusicNames[c % 18];
+              for (uint32_t i = 0; i < 16; i++) {
+                guest::StoreU8(h.base, name + i, guest::LoadU8(h.base, from + i));
+              }
+            } else {
+              WriteVariant(h.base, name, kMusicNames[random.Below(18)], 20, random);
+            }
+          },
+          [&](PPCContext& t) {
+            t.r3.u64 = h.data + 512;
+            t.r4.u64 = c >= 18 && c < 36 ? kMusicNames[c % 18] : h.data + 1024;
+            t.r5.u64 = h.data + 516;
+          },
+          __imp__sub_821063B0, hooks::ModeTickMusicPlay, fmt::format("case {}", c),
+          [&](const PPCContext& t, Outputs& out) {
+            out.Word(guest::LoadU32(h.base, slot));
+            out.Bytes(Read(h.base, t.r1.u32 - mt::kMusicPlayFrame + 80, 96));
+          });
+    }
+    results.Report();
+  }
+  guest::StoreU32(h.base, slot, saved);
+}
+
 }  // namespace
 
 void ModeTick(Context& h) {
@@ -524,6 +699,7 @@ void ModeTick(Context& h) {
   CheckIdle(h);
   WatchUpdate(h);
   FadesUpdate(h);
+  Compares(h);
 }
 
 }  // namespace harness

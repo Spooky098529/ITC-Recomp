@@ -7,6 +7,7 @@
 #include "guest.h"
 #include "c_runtime/strings.h"
 #include "command_list/command_list.h"
+#include "helpers/compare_string.h"
 #include "hooks/last_error.h"
 #include "vehicle_accessors/vehicle_accessors.h"
 
@@ -290,6 +291,39 @@ std::optional<uint32_t> ColorRectRecordFlat(uint8_t* base, uint32_t rect) {
   WriteSlot(base, slot(), {{4, 0}, {0, 36}, {8, 0}});
   command_list::CloseChunk(base, list);
   return chunk;
+}
+
+MusicIds MusicPlay(uint8_t* base, uint32_t pcr, uint32_t frame, uint32_t name) {
+  ITC_NATIVE_RUNNING("sub_821063B0 Music::Play");
+  // The names (bgm_tmp_01 to bgm_tmp_17 and BGM_SYSTEM, in the image) in the
+  // order the original's table holds them, then its terminator.
+  static constexpr uint32_t kNames[19] = {
+      0x82006AD8, 0x82006ACC, 0x82006AC0, 0x82006AB4, 0x82006AA8, 0x82006A9C, 0x82006A90,
+      0x82006A84, 0x82006A78, 0x82006AE4, 0x82006A6C, 0x82006A60, 0x82006A54, 0x82006A48,
+      0x82006A3C, 0x82006A30, 0x82006A24, 0x82006A18, 0};
+  // The table's stores as the original's: +132 first, then the rest.
+  guest::StoreU32(base, frame + 132, kNames[9]);
+  for (uint32_t i = 0; i < 19; i++) {
+    if (i != 9) {
+      guest::StoreU32(base, frame + 96 + 4 * i, kNames[i]);
+    }
+  }
+  uint32_t index = 0;
+  while (uint32_t(helpers::Lstrcmp(base, pcr, name, kNames[index])) != 0) {
+    index++;
+    if (guest::LoadU32(base, frame + 96 + 4 * index) == 0) {
+      index = 99;
+      break;
+    }
+  }
+  if (index == 99) {
+    guest::StoreU32(base, frame + 80, 22887);
+    guest::StoreU32(base, frame + 84, 22888);
+    return {frame + 84, frame + 80};
+  }
+  guest::StoreU32(base, frame + 84, 22972 + index);
+  guest::StoreU32(base, frame + 80, 22990 + index);
+  return {frame + 80, frame + 84};
 }
 
 int32_t PlayersSignedInSlot(uint8_t* base, uint32_t player) {

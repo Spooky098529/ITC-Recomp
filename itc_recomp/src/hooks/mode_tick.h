@@ -15,4 +15,9 @@ namespace hooks {
 // their chunks wouldn't fit.
 void ModeTickScreenFadesUpdate(PPCContext& ctx, uint8_t* base);
 
+// Music::Play (sub_821063B0): its names' lookup natively, the call through
+// [0x826C5C80]'s slot 4 from a 288-byte frame like the original's; r3 as
+// that call leaves it.
+void ModeTickMusicPlay(PPCContext& ctx, uint8_t* base);
+
 }  // namespace hooks

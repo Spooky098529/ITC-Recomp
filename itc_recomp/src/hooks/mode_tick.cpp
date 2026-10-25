@@ -24,7 +24,9 @@ ITC_FLAG_BOOL(native_mode_tick, true, "ITC",
               "ScreenFades::Update sub_8209D130 (with ColorRect::Record sub_8217C348 merged; "
               "ScreenFades::RecordScissor sub_8209CE68 and ColorRect::RecordFlat sub_8217A370, no "
               "adapters: only it calls them; their scene getters and render queue submits guest "
-              "calls), Presence::SetForMode sub_822934B8 Dropped (presence isn't ported: only the "
+              "calls), Music::Play sub_821063B0 (with lstrcmpA sub_82296130 and CompareStringA "
+              "sub_82297100, XAPI's, no adapters: only it calls them in play; its player's "
+              "slot 4 a guest call), Presence::SetForMode sub_822934B8 Dropped (presence isn't ported: only the "
               "last error its dropped XUserSetContextEx wrapper clears; sub_82293504 merged)) natively instead of through the "
               "translated code (the same writes; checked by --run_harnesses=mode_tick)");
 
@@ -207,3 +209,26 @@ void hooks::ModeTickScreenFadesUpdate(PPCContext& ctx, uint8_t* base) {
 
 // ScreenFades::Update: r3 not read; r3 = 1 while any count isn't 0, else 0.
 ITC_MODE_TICK(8209D130, hooks::ModeTickScreenFadesUpdate(ctx, base))
+
+// Music::Play: r3, r5 = two pointers passed on, r4 = the music's name; r3 as
+// the call through [0x826C5C80]'s slot 4 leaves it, made from a 288-byte
+// frame like the original's (the ids its r7 and r8 point at in it).
+void hooks::ModeTickMusicPlay(PPCContext& ctx, uint8_t* base) {
+  const uint32_t name = ctx.r4.u32;
+  const uint64_t a = ctx.r3.u64, name64 = ctx.r4.u64, b = ctx.r5.u64;
+  const uint64_t lr = ctx.lr;
+  guest_call::InFrame(ctx, base, kMusicPlayFrame, 0x82106538, [&](uint32_t frame) {
+    const MusicIds ids = MusicPlay(base, ctx.r13.u32, frame, name);
+    ctx.r3.u64 = guest::LoadU32(base, kMusicPlayer);
+    ctx.r4.u64 = a;
+    ctx.r5.u64 = name64;
+    ctx.r6.u64 = b;
+    // The frame's addresses as the original's addi from r1 (InFrame's r1).
+    ctx.r7.u64 = ctx.r1.u64 + (ids.r7 - frame);
+    ctx.r8.u64 = ctx.r1.u64 + (ids.r8 - frame);
+    VtableCall(ctx, base, 4, 0x82106538);
+  });
+  ctx.lr = lr;
+}
+
+ITC_MODE_TICK(821063B0, hooks::ModeTickMusicPlay(ctx, base))

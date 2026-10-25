@@ -274,6 +274,7 @@ set(ITC_SOURCES
     src/helpers/time.cpp
     src/helpers/clock.cpp
     src/helpers/strings.cpp
+    src/helpers/compare_string.cpp
     src/helpers/executable.cpp
     src/user/profile.cpp
     src/input/gamepads.cpp

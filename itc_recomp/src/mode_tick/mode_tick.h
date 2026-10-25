@@ -88,6 +88,21 @@ uint32_t RecordScissorEndChunk(uint8_t* base, uint32_t list);
 constexpr uint32_t kColorRectLists = 0x826D83D0;
 std::optional<uint32_t> ColorRectRecordFlat(uint8_t* base, uint32_t rect);
 
+// --- The music ---
+
+// sub_821063B0 Music::Play: the music `name`'s index among the 18 names
+// (lstrcmpA, `pcr` the thread's r13), its two text ids written in the
+// original's frame at `frame` (its r1 less kMusicPlayFrame: the names'
+// table at +96, the ids at +80 and +84, as it leaves them). Returns the
+// addresses the call through [0x826C5C80]'s slot 4 takes in r7 and r8 (the
+// adapter's guest call).
+constexpr uint32_t kMusicPlayFrame = 288;
+constexpr uint32_t kMusicPlayer = 0x826C5C80;
+struct MusicIds {
+  uint32_t r7, r8;
+};
+MusicIds MusicPlay(uint8_t* base, uint32_t pcr, uint32_t frame, uint32_t name);
+
 // --- The sign-in watch and the players ---
 
 // Player n's controller's user (four words), the signed-in users' mask
