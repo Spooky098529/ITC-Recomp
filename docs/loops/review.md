@@ -158,6 +158,21 @@ When the user has reviewed a run's section, its heading gets
   block's kinds and makers. `models.md`: `sub_822A9FD8`, `sub_822A9EA8`
   read in full. `leads.md`: the ScopedLock users' lead trimmed to
   `sub_82593E78`; 1 lead added (`XMemCpy`'s other callers).
+- `shader-objects.md` migration 1 (7bc02b9..840ecff;
+  `--native_shader_objects`, with `XMemCpy` under `--native_c_runtime`
+  and `models.md`'s chain up to `Model::Load` under `--native_models`).
+  For review: a new `native::Buffers_Memcpy` split out of memcpy's
+  override in `src/native/buffers.cpp`, so native callers' copies into
+  physical memory (microcode, vertex data, XPR data) are recorded for
+  the renderer as the game's memcpy's are; where a callee's plain C++
+  declines (never seen in play), `Model::Load`, `Mesh::LoadShaders` and
+  `VertexShader::Create` call that callee's original as a guest call
+  (as `scenery_lists`' `ReleaseCalls`); the game's debug prints in these
+  functions are warnings in our log (`Mesh::Parse`'s without its "Version
+  Error" text, which the harness counted as an error line); correction
+  to the map: `Resource::Relocate`'s type 6 does nothing;
+  `0x82638308` logged as 1 (`XMemCpy` does one host copy then, else
+  replays the byte loop).
 
 ## Run 2026-10-25 03:59 (`b7-loop-25-10-26-2`)
 

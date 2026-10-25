@@ -98,8 +98,17 @@ file's history. What's left to see in a drive, from every run:
   in `c-runtime.md`; 4047496: the shader creates and inits, the memory
   blocks' `AllocVirtual`, `AllocPhysicalEx` and `PendingFrees::FreeDue`).
   Map checked (0 errors, all in play, 6 ready groups, no kernel imports;
-  the memory blocks' lock a host mutex by the user's call). Step:
-  migration 1, agent running.
+  the memory blocks' lock a host mutex by the user's call). Migration 1
+  done after six batches (7bc02b9..840ecff: `XMemCpy` (its step word
+  logged as 1), the shader inits and creates, the memory blocks' makers
+  and put-off frees, the header copies, the texture and resource
+  relocation, `XPR::Create`, `Mesh::LoadShaders`, the skeleton set-up
+  and bind, `Mesh::Parse` and `Model::Load`; 3 adapters removed, 2
+  Native with none; `--native_shader_objects`; `itc_1794`: 24 s, 0
+  errors, every harness 0 differing; race frame dumps the same 2,412
+  draws as the fallback). Left ready: `DataFile::GetEntry`
+  `sub_82294730`, which blocks `ModelList::Load` and `LoadPoints`.
+  Step: validation, agent running.
 
 ## Done
 
@@ -147,6 +156,8 @@ This run's groups: `expected-differences.md` (the "16:38 run" lines).
 - After the scenery lists' validation: race 24 s (`itc_1769`), 0
   errors, every harness 0 differing; replay 127 s (`itc_1770`), 0
   errors.
+- After the shader objects' migration 1: ours 2130, work left 4321
+  (wrapped 104, known 562, unknown 3655).
 - After the shader objects' map: ours 2107, work left 4344 (wrapped
   104, known 585, unknown 3655).
 - After the scenery lists' migration 2 and validation: ours 2107, work
