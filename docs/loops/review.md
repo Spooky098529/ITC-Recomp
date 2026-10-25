@@ -11,6 +11,10 @@ functions to check in a drive in the progress file.
 When the user has reviewed a run's section, its heading gets
 "(reviewed <date>)"; the section stays for the record.
 
+## Run 2026-10-25 23:42 (`b7-loop-25-10-26-4`)
+
+(running)
+
 ## Run 2026-10-25 16:38 (`b7-loop-25-10-26-3`)
 
 - For later (the user's call, 2026-10-25: debug when the code is
