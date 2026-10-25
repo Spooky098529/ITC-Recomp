@@ -50,7 +50,8 @@ ITC_FLAG_BOOL(native_ui_movies_game, true, "ITC",
               "sub_8211B0E8, sub_8211C168 (sub_8211B458, sub_8211B160) and sub_8211AE68 "
               "(sub_8211A788), UiMovie::UiMovie sub_8211E1C0 (sub_8211AE18, sub_8211B018, "
               "sub_8211D210), UiMovie::~UiMovie sub_8211E160 (sub_8211D1B8, sub_8211AF90) and "
-              "the texts freed sub_8211AC90 "
+              "the texts freed sub_8211AC90, UiMovie::GetText sub_8211B660, and the named animations "
+              "added sub_8211E378 (sub_8211E318; its strings through std::string's plain C++) "
               "(same results; checked by --run_harnesses=ui_movies_game and ui_movie_objects). sub_8211A660, "
               "sub_8211B230, AnimationList::Get, UiMovie::ScrollOffset, sub_8211B7B8, sub_8211B9B8 and "
               "sub_8211B940 have no adapters: only native callers reach "
@@ -706,4 +707,22 @@ extern "C" REX_FUNC(sub_8211E160) {
 extern "C" REX_FUNC(sub_8211AC90) {
   REX_FUNC_PROLOGUE();
   NATIVE_HEAP_OR_ORIGINAL(8211AC90, ui_movies::FreeTexts(base, ctx.r3.u32));
+}
+
+// UiMovie::GetText: r3 = movie, r4 = the address of a TXT node's id; the
+// text record.
+extern "C" REX_FUNC(sub_8211B660) {
+  REX_FUNC_PROLOGUE();
+  NATIVE_HEAP_OR_ORIGINAL(8211B660, ui_movies::GetText(base, ctx.r3.u32, ctx.r4.u32));
+}
+
+// sub_8211E378: r3 = movie, r4 = a scene; its temporaries in a frame like
+// the original's below r1.
+extern "C" REX_FUNC(sub_8211E378) {
+  REX_FUNC_PROLOGUE();
+  if (!NativeHeap() || !ui_movies::CanAllocate(base, 0)) {
+    __imp__sub_8211E378(ctx, base);
+    return;
+  }
+  ctx.r3.u64 = ui_movies::AddNamedAnimations(base, ctx.r1.u32, ctx.r3.u32, ctx.r4.u32);
 }

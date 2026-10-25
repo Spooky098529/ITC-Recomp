@@ -10,6 +10,7 @@
 #include "ui_movies/ui_movies.h"
 
 #include <cstdlib>
+#include <cstring>
 #include <unordered_set>
 
 namespace ui_movies {
@@ -306,6 +307,86 @@ std::optional<uint32_t> FreeTexts(uint8_t* base, uint32_t movie) {
     r3 = record;
   }
   Store(base, movie + kMovieTextCount, 0);
+  return r3;
+}
+
+std::optional<uint32_t> GetText(uint8_t* base, uint32_t movie, uint32_t id_address) {
+  uint32_t id = Load(base, id_address);
+  const bool new_id = id == 0;
+  if (new_id) {
+    id = Load(base, movie + kMovieTextCount) + 1;
+  }
+  const uint32_t map = movie + kMovieTexts;
+  uint32_t record = Load(base, TextMapFindKey(base, map, id));
+  if (record == 0 && !CanAllocate(base, 28)) {
+    return std::nullopt;
+  }
+  ITC_NATIVE_RUNNING("sub_8211B660 UiMovie::GetText");
+  if (new_id) {
+    Store(base, id_address, id);
+  }
+  if (record != 0) {
+    return record;
+  }
+  const auto made = memory::crt::OperatorNew(base, 28);
+  Require(made.has_value(), "operator new", 28);
+  record = *made;
+  const uint32_t buffer = memory::AllocPages(4096, 4096);
+  Store(base, record, buffer);
+  guest::ForEachHostPart(base, buffer, 4096,
+                         [](uint8_t* host, uint32_t, uint32_t n) { std::memset(host, 0, n); });
+  Store(base, record + 16, Load(base, 0x82000A34));
+  for (uint32_t offset : {4u, 8u, 12u, 20u, 24u}) {
+    Store(base, record + offset, 0);
+  }
+  return record;
+}
+
+uint32_t AddNamedAnimations(uint8_t* base, uint32_t stack, uint32_t movie, uint32_t scene) {
+  ITC_NATIVE_RUNNING("sub_8211E378 (a scene's named animations added)");
+  constexpr uint32_t kFrame = 240;
+  constexpr uint32_t kSeparator = 0x82001DE8;
+  const uint32_t frame = stack - kFrame;
+  const uint32_t name = frame + 96, copy = frame + 128;
+  uint32_t r3 = movie;
+  for (uint32_t i = 0; i < Load(base, scene + 112); i++) {
+    const uint32_t child = Child(base, scene, i);
+    r3 = child;
+    if (Load(base, child) == kTagSce) {
+      r3 = AddNamedAnimations(base, frame, movie, child);
+    }
+  }
+  auto length = [&](uint32_t text) {
+    uint32_t end = text;
+    while (guest::LoadU8(base, end) != 0) {
+      end++;
+    }
+    return end - text;
+  };
+  auto require = [&](bool done, const char* what) { Require(done, what, name); };
+  for (uint32_t i = 0; i < Load(base, scene + 120); i++) {
+    const uint32_t animation = SceneAnimation(base, scene, i);
+    std_string::Construct(base, name);
+    require(std_string::Append(base, name, scene + 84, length(scene + 84)), "append");
+    require(std_string::Append(base, name, kSeparator, 1), "append");
+    require(std_string::Append(base, name, animation + 16, length(animation + 16)), "append");
+    require(std_string::ConstructFrom(base, copy, name, 0, 0xFFFFFFFFu), "string(const string&)");
+    const uint32_t used = Load(base, movie + kMovieNamedUsed);
+    Store(base, copy + 28, scene);
+    Store(base, copy + 32, animation);
+    Store(base, movie + kMovieNamedUsed, used + 1);
+    const uint32_t entry = NamedEntry(movie, used);
+    {
+      ITC_NATIVE_RUNNING("sub_8211E318 (a named animation copied)");
+      require(std_string::AssignFrom(base, entry, copy, 0, 0xFFFFFFFFu), "assign");
+      Store(base, entry + 28, Load(base, copy + 28));
+      Store(base, entry + 32, Load(base, copy + 32));
+    }
+    require(std_string::Tidy(base, copy, true, 0), "_Tidy");
+    const auto block = StringBlock(base, name);
+    require(std_string::Tidy(base, name, true, 0), "_Tidy");
+    r3 = block ? *block : name;
+  }
   return r3;
 }
 

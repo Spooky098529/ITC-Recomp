@@ -17,6 +17,7 @@
 
 #include <fmt/format.h>
 
+#include <algorithm>
 #include <string>
 #include <vector>
 
@@ -374,6 +375,193 @@ void FreeTextsCases(Context& h, uint32_t movie) {
   results.Report();
 }
 
+// UiMovie::GetText over a movie whose texts' map holds 0 to 5 ids (1 to 6),
+// each with a record or 0, the node's id 0 or 1 to 7, the text count 0 to
+// 6, and the word at 0x826C5CD8 (read for an id not there) a record or 0
+// (put back after): the id, the movie, r3 (a record of the case's, or a new
+// one: its words, its buffer's pages and bytes); new ones freed.
+void GetTextCases(Context& h, uint32_t movie) {
+  Results results("UiMovie::GetText (sub_8211B660)");
+  constexpr uint32_t kMissing = 0x826C5CD8;
+  const uint32_t missing = Load(h.base, kMissing);
+  const uint32_t id_at = h.data, records = h.data + 64;  // 8 records of 28 bytes
+  for (int i = 0; i < 200; i++) {
+    const uint64_t seed = h.random.Next();
+    Outputs out[2];
+    for (int v = 0; v < 2; v++) {
+      Random r(seed);
+      Fill(h.base, h.data, 512);
+      RandomFill(r, h.base, movie + 0x9BC0, 0x420);
+      RandomFill(r, h.base, records, 8 * 28);
+      const uint32_t count = r.Below(6);
+      for (uint32_t k = 0; k < count; k++) {
+        Store(h.base, movie + 0x9BCC + 8 * k, 1 + r.Below(6));
+        Store(h.base, movie + 0x9BCC + 8 * k + 4, r.Below(3) == 0 ? 0 : records + 28 * k);
+      }
+      Store(h.base, movie + 0x9BCC + 1024, count);
+      Store(h.base, movie + 0x9FCC, r.Below(7));
+      Store(h.base, id_at, r.Below(3) == 0 ? 0 : 1 + r.Below(7));
+      Store(h.base, kMissing, r.Below(2) == 0 ? 0 : records + 28 * 7);
+      PPCContext t = CallContext(h);
+      t.r3.u64 = movie;
+      t.r4.u64 = id_at;
+      if (v == 0) {
+        RunRecompiled(__imp__sub_8211B660, t, h.base);
+      } else {
+        sub_8211B660(t, h.base);
+      }
+      Store(h.base, kMissing, missing);
+      out[v].Bytes(Read(h.base, h.data, 512));
+      out[v].Bytes(Read(h.base, movie + 0x9BC0, 0x420));
+      const uint32_t record = t.r3.u32;
+      if (record >= records && record < records + 8 * 28) {
+        out[v].Word(1);
+        out[v].Word(record - records);
+      } else if (memory::IsHeapBlock(record)) {
+        const uint32_t buffer = Load(h.base, record);
+        out[v].Word(2);
+        out[v].Word(memory::Size(record));
+        out[v].Word(memory::IsPages(buffer));
+        out[v].Bytes(Read(h.base, record + 4, 24));
+        out[v].Bytes(Read(h.base, buffer, 4096));
+        memory::FreePages(buffer);
+        memory::crt::OperatorDelete(record);
+      } else {
+        out[v].Word(3);
+        out[v].Word(record);
+      }
+    }
+    results.Check(out[0], out[1], fmt::format("case {}", i));
+  }
+  results.Report();
+}
+
+// sub_8211E378 over a made-up scene tree (in its own block): a scene with
+// 0 to 4 children (some SCE scenes with children and animations of their
+// own, two levels down) and 0 to 4 animations, names of 0 to 23 characters
+// at the scenes' +84 and 0 to 40 at the animations' +16 (so the names go
+// on the heap or stay in place), over a movie built natively whose entries
+// in use (0 to 5) may hold heap strings: the entries (their text, length,
+// capacity, +28 and +32; in-place ones byte for byte), the count, r3 (the
+// movie, a node, the name in the frame, or else a freed block).
+struct Tree {
+  uint32_t at;
+  uint32_t next;
+  uint32_t Take(uint32_t bytes) {
+    const uint32_t taken = next;
+    next += (bytes + 15) & ~15u;
+    return taken;
+  }
+};
+
+void WriteName(Random& r, uint8_t* base, uint32_t at, uint32_t max) {
+  const uint32_t n = r.Below(4) == 0 ? max : r.Below(max + 1);
+  for (uint32_t k = 0; k < n; k++) {
+    guest::StoreU8(base, at + k, uint8_t('a' + r.Below(26)));
+  }
+  guest::StoreU8(base, at + n, 0);
+}
+
+uint32_t MakeScene(Random& r, uint8_t* base, Tree& tree, int depth) {
+  constexpr uint32_t kSce = 0x53434500;
+  const uint32_t children = r.Below(5), animations = r.Below(5);
+  const uint32_t scene = tree.Take(128 + 8 * (children + animations));
+  RandomFill(r, base, scene, 128);
+  Store(base, scene, kSce);
+  WriteName(r, base, scene + 84, 23);
+  Store(base, scene + 108, 0);
+  Store(base, scene + 112, children);
+  Store(base, scene + 116, children);
+  Store(base, scene + 120, animations);
+  for (uint32_t k = 0; k < children; k++) {
+    uint32_t child;
+    if (depth < 2 && r.Below(3) == 0) {
+      child = MakeScene(r, base, tree, depth + 1);
+    } else {
+      child = tree.Take(16);
+      Store(base, child, r.Below(4) == 0 ? kSce - 1 : uint32_t(r.Next()));
+    }
+    Store(base, scene + 128 + 8 * k, child);
+  }
+  for (uint32_t k = 0; k < animations; k++) {
+    const uint32_t animation = tree.Take(64);
+    RandomFill(r, base, animation, 16);
+    WriteName(r, base, animation + 16, 40);
+    Store(base, scene + 128 + 8 * (children + k), animation);
+  }
+  return scene;
+}
+
+void NamedEntryOutputs(uint8_t* base, uint32_t entry, Outputs& out) {
+  if (Load(base, entry + 24) < 16) {
+    out.Bytes(Read(base, entry, 36));
+    return;
+  }
+  const uint32_t length = Load(base, entry + 20);
+  out.Bytes(Read(base, entry, 4));
+  out.Bytes(Read(base, Load(base, entry + 4), length + 1));
+  out.Bytes(Read(base, entry + 20, 16));
+}
+
+void AddNamedAnimationsCases(Context& h, uint32_t movie) {
+  Results results("sub_8211E378 (a scene's named animations added; sub_8211E318)");
+  const uint32_t tree_bytes = 0x4000;
+  const uint32_t tree_at = memory::Alloc(tree_bytes, 0);
+  for (int i = 0; i < 100; i++) {
+    const uint64_t seed = h.random.Next();
+    Outputs out[2];
+    for (int v = 0; v < 2; v++) {
+      Random r(seed);
+      Fill(h.base, movie, kMovieBytes);
+      ui_movies::ConstructMovie(h.base, movie);
+      memory::crt::OperatorDeleteArray(Load(h.base, movie + 40) - 16);
+      memory::crt::OperatorDeleteArray(Load(h.base, movie + 28));
+      const uint32_t used = r.Below(6);
+      for (uint32_t k = 0; k < used + 8; k++) {
+        if (r.Below(3) == 0) {
+          const uint32_t entry = movie + 176 + 36 * k;
+          const uint32_t capacity = 16 + r.Below(40);
+          const uint32_t block = memory::crt::OperatorNew(h.base, capacity + 1).value_or(0);
+          WriteName(r, h.base, block, capacity);
+          Store(h.base, entry + 4, block);
+          Store(h.base, entry + 20, r.Below(capacity + 1));
+          Store(h.base, entry + 24, capacity);
+        }
+      }
+      Store(h.base, movie + 176 + 0x9000, used);
+      Fill(h.base, tree_at, tree_bytes);
+      Tree tree{tree_at, tree_at};
+      const uint32_t scene = MakeScene(r, h.base, tree, 0);
+      PPCContext t = CallContext(h);
+      const uint32_t name = t.r1.u32 - 240 + 96;
+      t.r3.u64 = movie;
+      t.r4.u64 = scene;
+      if (v == 0) {
+        RunRecompiled(__imp__sub_8211E378, t, h.base);
+      } else {
+        sub_8211E378(t, h.base);
+      }
+      const uint32_t after = Load(h.base, movie + 176 + 0x9000);
+      out[v].Word(after);
+      for (uint32_t k = 0; k < std::min(after, 1024u) + 8; k++) {
+        NamedEntryOutputs(h.base, movie + 176 + 36 * k, out[v]);
+      }
+      out[v].Bytes(Read(h.base, tree_at, tree_bytes));
+      const uint32_t r3 = t.r3.u32;
+      out[v].Word(r3 == movie            ? 0
+                  : r3 - tree_at < tree_bytes ? 1 + (r3 - tree_at)
+                  : r3 == name             ? 0x10000
+                                           : 0x20000);
+      for (uint32_t k = 0; k < std::min(after, 1024u) + 8; k++) {
+        std_string::Tidy(h.base, movie + 176 + 36 * k, true, 0);
+      }
+    }
+    results.Check(out[0], out[1], fmt::format("case {}", i));
+  }
+  memory::Free(tree_at);
+  results.Report();
+}
+
 }  // namespace
 
 void UiMovieObjects(Context& h) {
@@ -387,6 +575,8 @@ void UiMovieObjects(Context& h) {
   ConstructCases(h, movie);
   DestroyCases(h, movie);
   FreeTextsCases(h, movie);
+  GetTextCases(h, movie);
+  AddNamedAnimationsCases(h, movie);
   memory::Free(movie);
 }
 

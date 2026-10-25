@@ -392,4 +392,28 @@ std::optional<uint32_t> DestroyMovie(uint8_t* base, uint32_t movie);
 // none); nullopt, with nothing done, where a free wouldn't run natively.
 std::optional<uint32_t> FreeTexts(uint8_t* base, uint32_t movie);
 
+// sub_8211B660 (UiMovie::GetText): r4's node id (a TXT node's +108, at
+// `id_address`) set to [movie + 0x9FCC] + 1 when 0, then its text record
+// (TextMapFindKey; an id not there reads the word at 0x826C5CD8); when that
+// is 0, one is made (not stored in the map: the caller does): 28 bytes from
+// operator new, +0 a 4 KB buffer from VirtualAlloc (the layer's pages, as
+// its adapter: MEM_COMMIT, 4 KB aligned) cleared (memset), +16 the float
+// word at 0x82000A34 (0.0), +4..+12, +20 and +24 = 0. Returns the record;
+// nullopt, with nothing done, where operator new wouldn't run natively.
+std::optional<uint32_t> GetText(uint8_t* base, uint32_t movie, uint32_t id_address);
+
+// sub_8211E378: the scene's named animations added to the movie's (+176,
+// the count at +0x90B0, no check against the 1,024): its SCE children's
+// first (recursed into), then for each animation (SceneAnimation) the name
+// "<scene's +84><the byte at 0x82001DE8><the animation's +16>" built in
+// std::strings in the original's 240-byte frame below `stack` (its r1: +96
+// the name, +128 its copy; the recursions' frames below), then copied into
+// the next entry (sub_8211E318: AssignFrom the copy, +28 the scene, +32 the
+// animation) and both temporaries destroyed (_Tidy). The strings through
+// std_string's plain C++ (a logged abort if one refuses after the
+// adapter's checks: the process heap there). Returns the r3 the original
+// leaves (the movie, the last child looked up or a recursion's, or the
+// name's _Tidy: its block when it was on the heap, else the name).
+uint32_t AddNamedAnimations(uint8_t* base, uint32_t stack, uint32_t movie, uint32_t scene);
+
 }  // namespace ui_movies
