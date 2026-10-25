@@ -100,8 +100,16 @@ file's history. What's left to see in a drive, from every run:
   host mutex by the recorded lock call, then the callers it unblocks
   (the minimap's marker draws and `Minimap::Draw`, the viewports,
   `UiMovie::TrackProperty`, `SignInWatch::StaticInit`, the static
-  set-ups); `leads.md`'s top line, taken. Step: migration agent
-  running. The run ends after its part 2 (the callers) is validated
+  set-ups); `leads.md`'s top line, taken. Migration 1 done after five
+  batches (19f9deb..1244dd3: `atexit` and `_onexit`, the exit lock a
+  host `std::recursive_mutex` taken by every user through `_lock` and
+  `_unlock` overridden for lock 8 only; the global strings' static
+  set-ups, `SignInWatch::StaticInit`, `UiMovie::TrackProperty`, the
+  minimap's marker draws, `Viewports::Init` and `Viewport::Init`; 1
+  adapter removed; 27 s, 0 errors, every harness 0
+  differing). Left ready: `sub_825A0548` (TrackProperty's caller) and
+  `sub_825A6F00` (the exit table's set-up). Step: validation agent
+  running, then migration 2 for those. The run ends after its part 2 (the callers) is validated
   (the user's call, 2026-10-25).
 
 ## Done
@@ -146,6 +154,8 @@ This run's groups: `expected-differences.md` (the "03:59 run" lines).
 - Start: ours 1903, work left 4548 (wrapped 111, known 597, unknown 3840).
 - After the game modes' map: ours 1903, work left 4548 (wrapped 111,
   known 625, unknown 3812).
+- After the atexit step's migration 1: ours 2010, work left 4441
+  (wrapped 111, known 591, unknown 3739).
 - After the minimap's validation: race 27 s (`itc_1648`), 0 errors,
   every harness 0 differing; replay 127 s (`itc_1649`), 0 errors.
 - After the minimap's migration 1: ours 1995, work left 4456 (wrapped

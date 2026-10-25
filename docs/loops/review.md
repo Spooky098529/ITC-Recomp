@@ -154,6 +154,34 @@ When the user has reviewed a run's section, its heading gets
   - `Triangle::RecordFlat`'s render-queue submit a guest call from a
     128-byte frame, as `ColorRect::RecordFlat`'s.
   - `List80::Link` and `Triangle::RecordFlat` Native with no adapter.
+- The `atexit` step (no mapping, counted as subsystem 5 by the user's
+  call; 19f9deb..1244dd3): `atexit` and `_onexit` native in
+  `src/c_runtime/exit.cpp` under `--native_c_runtime`, then its callers
+  under their own flags. For review:
+  - The exit lock (the C runtime's lock 8, critical section
+    `0x82971248`) is one host `std::recursive_mutex`: `_onexit` takes it
+    directly; `_lock`/`_unlock` (`sub_825B3430`, `sub_825B32D0`) are
+    overridden to take it for lock 8 only (r3 left as the originals
+    leave it), every other number the game's; host or guest chosen once
+    at boot. Recursive because `doexit` holds it while the registered
+    functions run, which may call `atexit`. Nothing else touches entry 8
+    (made at boot; the lazy creator and the teardown don't).
+  - New rows in `c-runtime.md` for the lock wrappers and the exit path
+    (`sub_825AA218`, `sub_825AA318`, `sub_825AA338`, never seen in
+    play).
+  - Native callers register through `c_runtime::AtexitFrom`; the game's
+    `atexit` through `ctx` only where the native one can't run (never in
+    play).
+  - `std-string.md` corrected: the global strings' static set-ups'
+    addresses were misread (`0x8265EE7C`/`0x8265EE98`, clean-ups
+    `0x825DB328`/`0x825DB380`); the harness caught it.
+  - `UiMovie::TrackProperty`'s two stack-leftover bytes read from the
+    original's frame.
+  - The minimap's marker draws: the frame dump draws the same car marker
+    as the fallback, not pixel-identical only because the two dumps were
+    taken at different moments (the map shifted).
+  - Kept: `_lock`/`_unlock`'s adapters (they keep the exit lock's users
+    together) and `Triangle::Record`'s (a guest call through `ctx`).
 
 ## Run 2026-10-25 01:17 (`by-loop-25-10-26`)
 
