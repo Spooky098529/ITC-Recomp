@@ -493,11 +493,16 @@ uint32_t TextString(uint8_t* base, uint32_t movie, uint32_t id) {
 }
 
 uint32_t TextField(uint8_t* base, uint32_t movie, uint32_t id, uint32_t offset) {
+  // One print per native function sharing this body (sub_8211B770's +20
+  // still has its adapter).
+  if (offset == 4) ITC_NATIVE_RUNNING("sub_8211B9B8 (a text's +4)");
+  if (offset == 24) ITC_NATIVE_RUNNING("sub_8211B7B8 (a text's +24)");
   const uint32_t text = TextRecord(base, movie, id);
   return text == 0 ? 0 : guest::LoadU32(base, text + offset);
 }
 
 void AdvanceTextScroll(uint8_t* base, uint32_t movie, uint32_t id) {
+  ITC_NATIVE_RUNNING("sub_8211B940 (a text's scroll counter)");
   const uint32_t text = TextRecord(base, movie, id);
   guest::StoreU32(base, text + 8, guest::LoadU32(base, text + 8) + 1);
   TextMapSetKey(base, movie + kMovieTexts, id, text);
