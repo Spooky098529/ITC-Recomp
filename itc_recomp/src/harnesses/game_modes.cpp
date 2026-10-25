@@ -36,10 +36,6 @@ void NativeStateMachineIndexOf(PPCContext& ctx, uint8_t* base) {
   ctx.r3.s64 = gm::StateMachineIndexOf(base, ctx.r3.u32, gm::LoadStateKey(base, ctx.r4.u32));
 }
 
-void NativeTransitionMake(PPCContext& ctx, uint8_t* base) {
-  gm::TransitionMake(base, ctx.r3.u32, ctx.r4.u32, ctx.r5.u32);
-}
-
 void NativeTransitionAssign(PPCContext& ctx, uint8_t* base) {
   gm::TransitionAssign(base, ctx.r3.u32, ctx.r4.u32);
 }
@@ -188,29 +184,20 @@ void IndexOf(Context& h, const Block& block) {
   results.Report();
 }
 
-// Make and Assign: a destination and a source in the scratch area, apart
-// or overlapping (the copies are word by word in the original's order).
+// Assign: a destination and a source in the scratch area, apart or
+// overlapping (the copies are word by word in the original's order).
+// Transition::Make (sub_82106100) is merged into StateMachine::Add, whose
+// cases cover it.
 void Copies(Context& h, const Block& block) {
-  Results make("Transition::Make (sub_82106100)");
   Results assign("Transition::Assign (sub_82105FE0)");
   for (int c = 0; c < 64; c++) {
     const bool overlap = c % 4 == 3;
     const uint32_t destination = h.data + 256 + 4 * (c % 8);
     const uint32_t source =
         overlap ? destination + 4 * (int32_t(c % 16) - 8) : h.data + 1024 + 4 * (c % 5);
-    const uint32_t key = h.data + 2048;
     auto setup = [&](Random& random) {
       WriteRandom(h.base, h.data, kScratchBytes / 4 - 256, random);
     };
-    Case(
-        h, make, block, setup,
-        [&](PPCContext& t) {
-          t.r3.u64 = destination;
-          t.r4.u64 = key;
-          t.r5.u64 = source;
-        },
-        __imp__sub_82106100, NativeTransitionMake,
-        fmt::format("case {}{}", c, overlap ? " (overlapping)" : ""));
     Case(
         h, assign, block, setup,
         [&](PPCContext& t) {
@@ -220,7 +207,6 @@ void Copies(Context& h, const Block& block) {
         __imp__sub_82105FE0, NativeTransitionAssign,
         fmt::format("case {}{}", c, overlap ? " (overlapping)" : ""));
   }
-  make.Report();
   assign.Report();
 }
 

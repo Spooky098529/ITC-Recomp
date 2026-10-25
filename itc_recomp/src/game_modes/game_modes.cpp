@@ -139,18 +139,6 @@ uint32_t StateMachineHandle(uint8_t* base, uint32_t machine, uint32_t message, b
   return part;
 }
 
-void TransitionMake(uint8_t* base, uint32_t transition, uint32_t key, uint32_t functor) {
-  ITC_NATIVE_RUNNING("sub_82106100 Transition::Make");
-  CopyKey(base, transition, key);
-  // Word by word, as the original copies (the source may overlap).
-  for (uint32_t i = 0; i < kStorageWords; i++) {
-    guest::StoreU32(base, transition + kFunctorStorage + 4 * i,
-                    guest::LoadU32(base, functor + 4 + 4 * i));
-  }
-  guest::StoreU32(base, transition + kFunctorPointer, transition + kFunctorStorage);
-  guest::StoreU32(base, transition + kNextState, guest::LoadU32(base, functor + 28));
-}
-
 void TransitionAssign(uint8_t* base, uint32_t destination, uint32_t source) {
   ITC_NATIVE_RUNNING("sub_82105FE0 Transition::Assign");
   CopyKey(base, destination, source);

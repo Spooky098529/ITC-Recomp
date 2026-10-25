@@ -17,10 +17,10 @@
 ITC_FLAG_BOOL(native_game_modes, true, "ITC",
               "Run the game modes and their state machines (docs/functions/game-modes.md: "
               "StateMachine::IndexOf sub_821060A0 with StateKey::Equals sub_82106040 (no adapters: "
-              "only Add and Find call IndexOf, and only IndexOf Equals), Transition::Make sub_82106100, Transition::Assign "
+              "only Add and Find call IndexOf, and only IndexOf Equals), Transition::Assign "
               "sub_82105FE0, StateMachine::StateMachine sub_82107108, StateMachine::Add "
               "sub_82106158, StateMachine::Find sub_821061F0 (no adapter: only Handle calls it), "
-              "StateMachine::Handle sub_82106280, "
+              "StateMachine::Handle sub_82106280 (with Transition::Make sub_82106100 merged into Add), "
               "Mode::Mode sub_82106C20, the race overlays' state machine's handlers "
               "sub_8215DD58, sub_8215DD90, sub_8215DDD0 and sub_8215DE10, the last's virtual "
               "calls guest calls) "
@@ -40,9 +40,6 @@ ITC_FLAG_BOOL(native_game_modes, true, "ITC",
   }
 
 using namespace game_modes;
-
-// Transition::Make: r3 = the transition, r4 = the key, r5 = the functor part.
-ITC_GAME_MODES(82106100, TransitionMake(base, ctx.r3.u32, ctx.r4.u32, ctx.r5.u32))
 
 // Transition::Assign: r3 = the destination, r4 = the source.
 ITC_GAME_MODES(82105FE0, TransitionAssign(base, ctx.r3.u32, ctx.r4.u32))
