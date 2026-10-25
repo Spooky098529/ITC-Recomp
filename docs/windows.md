@@ -155,6 +155,10 @@ package as below, put it in the game folder and run `wine itc.exe` there
 (add `--log_level=info` for logs; without `--game_data_root`, the game's
 files are looked for next to `itc.exe`).
 
+A start that logs "native renderer: couldn't start" right after naming
+the GPU (2026-10-25, once, with a KDE window rule the user had added; the
+next start was fine) is probably the desktop's, not ours.
+
 Test zips, as for Linux:
 
 ```sh
