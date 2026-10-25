@@ -229,6 +229,8 @@ set(ITC_SOURCES
     src/c_runtime/arrays.cpp
     src/c_runtime/exit.cpp
     src/game_data/game_data.cpp
+    src/game_data/data_file.cpp
+    src/hooks/data_file.cpp
     src/display/gamma.cpp
     src/harnesses/harness.cpp
     src/harnesses/clock.cpp
@@ -281,6 +283,7 @@ set(ITC_SOURCES
     src/harnesses/scene_models.cpp
     src/harnesses/scenery_lists.cpp
     src/harnesses/shader_objects.cpp
+    src/harnesses/data_file.cpp
     src/harnesses/race_hud.cpp
     src/harnesses/ui_movie_objects.cpp
     src/harnesses/models.cpp
