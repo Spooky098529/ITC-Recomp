@@ -53,4 +53,18 @@ std::optional<uint32_t> OnExit(uint8_t* base, uint32_t function);
 // _onexit's.
 std::optional<int32_t> Atexit(uint8_t* base, uint32_t function);
 
+// For native callers of atexit (the static set-ups, first uses): the game's
+// atexit for `function`, its r3, called when the native one can't (its
+// nullopt, never seen in play): an adapter's call into the translated code
+// (hooks::GuestAtexit), as the array helpers' ElementCall.
+using GuestAtexitCall = int32_t (*)(void* user, uint32_t function);
+struct AtexitCall {
+  GuestAtexitCall guest = nullptr;
+  void* user = nullptr;
+};
+
+// atexit for a native caller: natively, else through `call`; returns its r3
+// (0, or -1 when the table can't take the function).
+int32_t AtexitFrom(uint8_t* base, uint32_t function, const AtexitCall& call);
+
 }  // namespace c_runtime

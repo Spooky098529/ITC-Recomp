@@ -8,6 +8,8 @@
 
 #pragma once
 
+#include "c_runtime/exit.h"
+
 #include <cstdint>
 #include <functional>
 #include <optional>
@@ -177,5 +179,12 @@ constexpr uint32_t kLastName = 0x826BAB1C;
 // 9 (the prompts' handlers, never seen in play) or CheckIdle's traps.
 constexpr uint32_t kSignInWatchUpdateFrame = 224;
 bool SignInWatchUpdate(uint8_t* base, uint32_t frame);
+
+// sub_825D9518 SignInWatch::StaticInit (a static set-up, no direct callers):
+// the state 0x826BAB3C = 0, the seven checks at 0x826BAB40 = 0, 0x826BAB70 =
+// 0, the 32-byte name at 0x826BAB1C cleared, and its clean-up 0x825DAF08 (an
+// empty function) registered with atexit (through `call` when the native one
+// can't); returns atexit's r3.
+int32_t SignInWatchStaticInit(uint8_t* base, const c_runtime::AtexitCall& call);
 
 }  // namespace mode_tick

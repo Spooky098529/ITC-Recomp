@@ -572,4 +572,18 @@ bool SignInWatchUpdate(uint8_t* base, uint32_t frame) {
   return true;
 }
 
+int32_t SignInWatchStaticInit(uint8_t* base, const c_runtime::AtexitCall& call) {
+  ITC_NATIVE_RUNNING("sub_825D9518 SignInWatch::StaticInit");
+  guest::StoreU32(base, 0x826BAB3C, 0);
+  for (uint32_t i = 0; i < 7; i++) {
+    guest::StoreU32(base, 0x826BAB40 + 4 * i, 0);
+  }
+  guest::StoreU32(base, 0x826BAB70, 0);
+  // memset (sub_825A71D0): the same bytes.
+  for (uint32_t i = 0; i < 32; i++) {
+    guest::StoreU8(base, 0x826BAB1C + i, 0);
+  }
+  return c_runtime::AtexitFrom(base, 0x825DAF08, call);
+}
+
 }  // namespace mode_tick

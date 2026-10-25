@@ -8,9 +8,12 @@
 // float, so everything is compared exactly.
 
 #include "harness.h"
+#include "exit_table.h"
 
 #include "base/flags.h"
 #include "base/log.h"
+#include "c_runtime/exit.h"
+#include "hooks/c_runtime.h"
 #include "command_list/command_list.h"
 #include "helpers/compare_string.h"
 #include "hooks/mode_tick.h"
@@ -19,6 +22,7 @@
 
 #include <fmt/format.h>
 
+#include <mutex>
 #include <string>
 #include <vector>
 
@@ -689,6 +693,47 @@ void Compares(Context& h) {
   guest::StoreU32(h.base, slot, saved);
 }
 
+// --- SignInWatch::StaticInit (on the game's sign-in watch and exit table,
+// each put back after a side). ---
+
+void NativeSignInWatchStaticInit(PPCContext& ctx, uint8_t* base) {
+  hooks::GuestAtexit guest{ctx, base};
+  ctx.r3.s64 = mode_tick::SignInWatchStaticInit(base, guest.Call());
+}
+
+void SignInWatchStaticInits(Context& h) {
+  Results results("sub_825D9518 SignInWatch::StaticInit");
+  if (!hooks::NativeAtexit()) {
+    ITC_LOG_WARN("harness: mode_tick: native atexit off: SignInWatch::StaticInit's cases skipped");
+    return;
+  }
+  std::lock_guard<std::recursive_mutex> lock(c_runtime::ExitMutex());
+  constexpr uint32_t kFrom = 0x826BAB10, kBytes = 0x70;  // the watch, and words around it
+  const auto saved = Read(h.base, kFrom, kBytes);
+  for (int c = 0; c < 8; c++) {
+    std::vector<uint8_t> start = saved;
+    if (c > 0) {
+      for (auto& byte : start) {
+        byte = uint8_t(h.random.Next());
+      }
+    }
+    Outputs out[2];
+    for (int v = 0; v < 2; v++) {
+      Write(h.base, kFrom, start.data(), kBytes);
+      const uint32_t mark = exit_table::Mark(h.base);
+      PPCContext t = CallContext(h);
+      (v == 0 ? __imp__sub_825D9518 : NativeSignInWatchStaticInit)(t, h.base);
+      out[v].Bytes(Read(h.base, kFrom, kBytes));
+      out[v].Word(t.r3.u32);
+      out[v].Word(uint32_t(t.r3.u64 >> 32));
+      exit_table::Take(h.base, mark, out[v]);
+    }
+    Write(h.base, kFrom, saved.data(), kBytes);
+    results.Check(out[0], out[1], fmt::format("case {}", c));
+  }
+  results.Report();
+}
+
 }  // namespace
 
 void ModeTick(Context& h) {
@@ -700,6 +745,7 @@ void ModeTick(Context& h) {
   WatchUpdate(h);
   FadesUpdate(h);
   Compares(h);
+  SignInWatchStaticInits(h);
 }
 
 }  // namespace harness

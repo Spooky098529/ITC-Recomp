@@ -118,6 +118,13 @@ extern "C" REX_FUNC(sub_825A7068) {
   __imp__sub_825A7068(ctx, base);
 }
 
+int32_t hooks::GuestAtexit::Run(void* self, uint32_t function) {
+  auto& call = *static_cast<GuestAtexit*>(self);
+  call.ctx.r3.u64 = function;
+  __imp__sub_825A7068(call.ctx, call.base);
+  return call.ctx.r3.s32;
+}
+
 // __chkstk: r12 = minus the frame about to be made (4 KB or more). Reads one
 // word every 4,096 bytes below r1 down to the new frame, touching the guard
 // pages on the 360; the guest stack here is ordinary memory, so the reads do

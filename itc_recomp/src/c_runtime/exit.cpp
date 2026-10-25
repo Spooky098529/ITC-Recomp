@@ -92,4 +92,11 @@ std::optional<int32_t> Atexit(uint8_t* base, uint32_t function) {
   return *result == 0 ? -1 : 0;
 }
 
+int32_t AtexitFrom(uint8_t* base, uint32_t function, const AtexitCall& call) {
+  if (const std::optional<int32_t> result = Atexit(base, function)) {
+    return *result;
+  }
+  return call.guest(call.user, function);
+}
+
 }  // namespace c_runtime

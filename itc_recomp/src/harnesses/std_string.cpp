@@ -12,8 +12,11 @@
 // so they run only with --native_heap (the adapters' condition).
 
 #include "harness.h"
+#include "exit_table.h"
 
 #include "base/log.h"
+#include "c_runtime/exit.h"
+#include "hooks/c_runtime.h"
 #include "hooks/heap.h"
 #include "memory/c_runtime_heap.h"
 #include "memory/heap.h"
@@ -24,6 +27,7 @@
 #include <algorithm>
 #include <cstring>
 #include <iterator>
+#include <mutex>
 #include <string>
 #include <vector>
 
@@ -745,6 +749,68 @@ void ReplaceAllCases(Context& h) {
 
 }  // namespace
 
+// --- The global strings' static set-ups (on the game's strings and exit
+// table, each put back after a side). ---
+
+void NativeStaticInit(PPCContext& ctx, uint8_t* base, bool second) {
+  hooks::GuestAtexit guest{ctx, base};
+  const auto result = second ? ss::InitGlobalString8265EE98(base, guest.Call())
+                             : ss::InitGlobalString8265EE7C(base, guest.Call());
+  if (result) {
+    ctx.r3.s64 = *result;
+  } else {
+    g_fallbacks++;
+    (second ? __imp__sub_825DA580 : __imp__sub_825DA540)(ctx, base);
+  }
+}
+
+void StaticInitCases(Context& h) {
+  Results results("sub_825DA540, sub_825DA580 (the global strings' static set-ups)");
+  if (!hooks::NativeAtexit()) {
+    ITC_LOG_WARN("harness: std_string: native atexit off: the static set-ups' cases skipped");
+    return;
+  }
+  std::lock_guard<std::recursive_mutex> lock(c_runtime::ExitMutex());
+  for (int c = 0; c < 16; c++) {
+    const bool second = (c & 1) != 0;
+    const uint32_t string = second ? 0x8265EE98 : 0x8265EE7C;
+    const auto saved = Read(h.base, string, 28);
+    // The game's string as it is, or another in place (its capacity 15).
+    std::vector<uint8_t> start = saved;
+    if (c >= 2) {
+      for (auto& byte : start) {
+        byte = uint8_t(h.random.Next());
+      }
+      const uint32_t length = h.random.Below(16);
+      for (uint32_t i = 0; i < 16; i++) {
+        start[4 + i] = i < length ? uint8_t('a' + h.random.Below(26)) : 0;
+      }
+      for (int k = 0; k < 4; k++) {
+        start[20 + k] = uint8_t(length >> (24 - 8 * k));
+        start[24 + k] = uint8_t(15 >> (24 - 8 * k));
+      }
+    }
+    Outputs out[2];
+    for (int v = 0; v < 2; v++) {
+      Write(h.base, string, start.data(), 28);
+      const uint32_t mark = exit_table::Mark(h.base);
+      PPCContext t = CallContext(h);
+      if (v == 0) {
+        (second ? __imp__sub_825DA580 : __imp__sub_825DA540)(t, h.base);
+      } else {
+        NativeStaticInit(t, h.base, second);
+      }
+      out[v].Bytes(Read(h.base, string, 28));
+      out[v].Word(t.r3.u32);
+      out[v].Word(uint32_t(t.r3.u64 >> 32));
+      exit_table::Take(h.base, mark, out[v]);
+    }
+    Write(h.base, string, saved.data(), 28);
+    results.Check(out[0], out[1], fmt::format("case {} ({})", c, second ? "0x8265EE98" : "0x8265EE7C"));
+  }
+  results.Report();
+}
+
 void StdString(Context& h) {
   if (!hooks::NativeHeapActive()) {
     ITC_LOG_INFO("harness: std_string: skipped (--native_heap off)");
@@ -765,6 +831,7 @@ void StdString(Context& h) {
   WildcardSearchCases(h);
   FindCases(h);
   ReplaceAllCases(h);
+  StaticInitCases(h);
   if (g_fallbacks != 0) {
     ITC_LOG_INFO("harness: std_string: {} cases handed to the original by the plain C++",
                  g_fallbacks);

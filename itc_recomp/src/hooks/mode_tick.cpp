@@ -7,6 +7,7 @@
 #include "guest.h"
 
 #include "base/flags.h"
+#include "hooks/c_runtime.h"
 #include "hooks/guest_call.h"
 #include "hooks/mode_tick.h"
 #include "mode_tick/mode_tick.h"
@@ -27,7 +28,8 @@ ITC_FLAG_BOOL(native_mode_tick, true, "ITC",
               "calls), Music::Play sub_821063B0 (with lstrcmpA sub_82296130 and CompareStringA "
               "sub_82297100, XAPI's, no adapters: only it calls them in play; its player's "
               "slot 4 a guest call), Presence::SetForMode sub_822934B8 Dropped (presence isn't ported: only the "
-              "last error its dropped XUserSetContextEx wrapper clears; sub_82293504 merged)) natively instead of through the "
+              "last error its dropped XUserSetContextEx wrapper clears; sub_82293504 merged), "
+              "SignInWatch::StaticInit sub_825D9518 (with native atexit)) natively instead of through the "
               "translated code (the same writes; checked by --run_harnesses=mode_tick)");
 
 // Defines an adapter: the body (the arguments after the address) uses `ctx`
@@ -232,3 +234,14 @@ void hooks::ModeTickMusicPlay(PPCContext& ctx, uint8_t* base) {
 }
 
 ITC_MODE_TICK(821063B0, hooks::ModeTickMusicPlay(ctx, base))
+
+// SignInWatch::StaticInit: no arguments; r3 = atexit's.
+extern "C" REX_FUNC(sub_825D9518) {
+  REX_FUNC_PROLOGUE();
+  if (!ITC_FLAG(native_mode_tick) || !hooks::NativeAtexit()) {
+    __imp__sub_825D9518(ctx, base);
+    return;
+  }
+  hooks::GuestAtexit guest{ctx, base};
+  ctx.r3.s64 = SignInWatchStaticInit(base, guest.Call());
+}

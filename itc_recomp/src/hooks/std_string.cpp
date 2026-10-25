@@ -16,6 +16,7 @@
 #include "guest.h"
 
 #include "base/flags.h"
+#include "hooks/c_runtime.h"
 #include "hooks/heap.h"
 #include "std_string/std_string.h"
 
@@ -27,7 +28,8 @@ ITC_FLAG_BOOL(native_std_string, true, "ITC",
               "sub_82593040, the last three with --native_heap; the "
               "wildcard replace sub_82593088 with its find sub_82592970 and search "
               "sub_82592740, no adapters of their own; replace sub_82592E18, for a match, on "
-              "the translated code) "
+              "the translated code; the global strings' static set-ups sub_825DA540 and "
+              "sub_825DA580 with --native_heap and native atexit) "
               "natively instead of through the translated code (same results; checked by "
               "--run_harnesses=std_string)");
 
@@ -143,3 +145,20 @@ extern "C" REX_FUNC(sub_82593088) {
   }
   __imp__sub_82593088(ctx, base);
 }
+
+// The global strings' static set-ups: no arguments; r3 = atexit's.
+#define ITC_STD_STRING_STATIC_INIT(address, function)                    \
+  extern "C" REX_FUNC(sub_##address) {                                   \
+    REX_FUNC_PROLOGUE();                                                 \
+    if (NativeLifetime() && hooks::NativeAtexit()) {                     \
+      hooks::GuestAtexit guest{ctx, base};                               \
+      if (const auto result = function(base, guest.Call())) {            \
+        ctx.r3.s64 = *result;                                            \
+        return;                                                          \
+      }                                                                  \
+    }                                                                    \
+    __imp__sub_##address(ctx, base);                                     \
+  }
+
+ITC_STD_STRING_STATIC_INIT(825DA540, InitGlobalString8265EE7C)
+ITC_STD_STRING_STATIC_INIT(825DA580, InitGlobalString8265EE98)
