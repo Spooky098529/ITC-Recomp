@@ -183,16 +183,16 @@ std::optional<DepthDraw> DrawShapeDepth(uint8_t* base, uint32_t model, uint32_t 
 
 // --- The scenery model's shapes (model_draws.cpp) ---
 
-// The guest calls the draws make: `call` runs `function` with r3 up to r7 =
+// The guest calls the draws make: `call` runs `function` with r3 up to r10 =
 // `args` from a frame at `frame` (r1) with the return address `lr`, and
 // returns r3; `submit` hands an entry to the render queue
 // ([0x8296B91C]'s vtable slot 4: r4 = the entry, r5 = the key, f1 = the
-// depth) the same way.
+// depth) the same way; both return r3 and leave flush-to-zero off.
 struct DrawCalls {
   uint32_t (*call)(void* user, uint32_t function, const uint32_t* args, int count,
                    uint32_t frame, uint32_t lr) = nullptr;
-  void (*submit)(void* user, uint32_t entry, uint32_t key, double depth, uint32_t frame,
-                 uint32_t lr) = nullptr;
+  uint32_t (*submit)(void* user, uint32_t entry, uint32_t key, double depth, uint32_t frame,
+                     uint32_t lr) = nullptr;
   void* user = nullptr;
 };
 
@@ -231,7 +231,7 @@ constexpr uint32_t kSceneryDrawShapeFrame = 208;
 // went to the queue (the model for +28 = 0, 0 when not visible); nullopt,
 // with nothing done, where a recorder would decline.
 struct SceneryDraw {
-  bool queued = false;  // r3 is the last guest call's
+  bool queued = false;  // r3 is the last queue call's (also in `r3`)
   uint32_t r3 = 0;
 };
 std::optional<SceneryDraw> SceneryDrawShape(uint8_t* base, const DrawCalls& calls,

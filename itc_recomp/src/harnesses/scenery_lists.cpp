@@ -97,6 +97,10 @@ void RandomRace(uint8_t* base, uint32_t race, Random& r) {
   guest::StoreU32(base, race + sl::kRaceMode, small(10));
 }
 
+// Whether the next case runs with flush-to-zero on at its start (the
+// originals set it off before their float work; set by a case's setup).
+bool g_flush_on_entry = false;
+
 // One case through both versions: the block filled at random and
 // `setup(t)` writing the inputs and the registers (once: its inputs are
 // written back for the second run); `floats` the block's float ranges.
@@ -133,6 +137,11 @@ void Case(Context& h, Results& results, uint32_t block, Random& r,
     }
     Fill(h.base, start.r1.u32 - 1024, 1024);  // the callee's frames
     PPCContext t = start;
+    if (g_flush_on_entry) {
+      t.fpscr.enableFlushModeUnconditional();
+    } else {
+      t.fpscr.disableFlushModeUnconditional();
+    }
     (v == 0 ? recompiled : native)(t, h.base);
     AddBlock(out[v], h.base, block, floats);
     for (const Region& region : kRegions) {
@@ -147,6 +156,8 @@ void Case(Context& h, Results& results, uint32_t block, Random& r,
   for (size_t i = 0; i < saved.size(); i++) {
     Write(h.base, kRegions[i].address, saved[i].data(), kRegions[i].bytes);
   }
+  start.fpscr.disableFlushModeUnconditional();
+  g_flush_on_entry = false;
   results.Check(out[0], out[1], what);
 }
 
@@ -404,6 +415,7 @@ void Visibility(Context& h, Random& r, uint32_t block) {
     Case(
         h, results, block, r,
         [&](PPCContext& t) {
+          g_flush_on_entry = r.Below(2) != 0;
           const uint32_t model = block + 0x100;
           const uint32_t shapes = block + 0x2000;
           guest::StoreU32(h.base, model + 40, shapes);
@@ -498,6 +510,7 @@ void Recorders(Context& h, Random& r, uint32_t block) {
       Case(
           h, results, block, r,
           [&](PPCContext& t) {
+            g_flush_on_entry = r.Below(2) != 0;
             RandomList(h.base, block, r, 65);
             RandomFloats(h.base, 0x8265ECA0, 0x70 / 4, r);
             RandomFloats(h.base, 0x8296B940, 0x3A0 / 4, r);
@@ -589,6 +602,7 @@ void DepthDraws(Context& h, Random& r, uint32_t block) {
       Case(
           h, results, block, r,
           [&](PPCContext& t) {
+            g_flush_on_entry = r.Below(2) != 0;
             RandomList(h.base, block, r, 80);
             const uint32_t shape = r.Below(4);
             const bool in_view = r.Below(4) != 0;
@@ -725,6 +739,7 @@ void SceneryShapes(Context& h, Random& r, uint32_t block) {
       Case(
           h, results, block, r,
           [&](PPCContext& t) {
+            g_flush_on_entry = r.Below(2) != 0;
             RandomList(h.base, block, r, 400);
             const uint32_t shape = r.Below(4);
             RandomShape(h.base, block, r, shape, false);
@@ -754,6 +769,7 @@ void SceneryShapes(Context& h, Random& r, uint32_t block) {
       Case(
           h, results, block, r,
           [&](PPCContext& t) {
+            g_flush_on_entry = r.Below(2) != 0;
             RandomList(h.base, block, r, 600);
             const uint32_t shape = r.Below(4);
             const bool in_view = r.Below(4) != 0;

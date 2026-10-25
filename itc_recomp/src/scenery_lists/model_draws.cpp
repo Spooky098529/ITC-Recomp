@@ -923,8 +923,8 @@ std::optional<SceneryDraw> SceneryDrawShape(uint8_t* base, const DrawCalls& call
                     RecordShapeChecked(base, calls, record_frame, model, shape, g.group, 1, c76,
                                        range, pair_offset));
     const double depth = Lfs(base, *constants + 72);
-    calls.submit(calls.user, g.entry, guest::LoadU32(base, g.key), g.negate ? -depth : depth,
-                 frame, g.lr);
+    draw.r3 = calls.submit(calls.user, g.entry, guest::LoadU32(base, g.key),
+                           g.negate ? -depth : depth, frame, g.lr);
     draw.queued = true;
   }
   if (int32_t(depth_too) == 0) {
@@ -942,8 +942,8 @@ std::optional<SceneryDraw> SceneryDrawShape(uint8_t* base, const DrawCalls& call
   guest::StoreU32(base, entry + 4, *constants);
   guest::StoreU16(base, entry + 18, 4);
   guest::StoreU32(base, entry + 20, RecordShapeDepthChecked(base, model, shape, 0, 0, 0));
-  calls.submit(calls.user, entry, guest::LoadU32(base, kSceneryDepthKey),
-               -Lfs(base, *constants + 72), frame, 0x82147FB0);
+  draw.r3 = calls.submit(calls.user, entry, guest::LoadU32(base, kSceneryDepthKey),
+                         -Lfs(base, *constants + 72), frame, 0x82147FB0);
   draw.queued = true;
   return draw;
 }

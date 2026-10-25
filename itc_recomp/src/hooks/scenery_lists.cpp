@@ -147,12 +147,14 @@ bool SlotDiagnostics() {
 }  // namespace
 
 void SceneryListsIsShapeVisible(PPCContext& ctx, uint8_t* base) {
+  ctx.fpscr.disableFlushMode();
   ctx.r3.u64 = scenery_lists::IsShapeVisible(base, ctx.r3.u32, ctx.r4.u32, ctx.r5.u32,
                                              ctx.r6.u32, ctx.r1.u32 - 96);
   ctx.fpscr.disableFlushMode();
 }
 
 void SceneryListsRecordObjectSteps(PPCContext& ctx, uint8_t* base) {
+  ctx.fpscr.disableFlushMode();
   const auto header = SlotDiagnostics()
                           ? std::nullopt
                           : scenery_lists::RecordObject(base, ctx.r4.u32, ctx.r5.u32);
@@ -168,6 +170,7 @@ bool SceneryListsRecordObject(PPCContext& ctx, uint8_t* base) {
   if (!ITC_FLAG(native_scenery_lists) || SlotDiagnostics()) {
     return false;
   }
+  ctx.fpscr.disableFlushMode();
   const auto header = scenery_lists::RecordObject(base, ctx.r4.u32, ctx.r5.u32);
   if (!header) {
     return false;
@@ -178,6 +181,7 @@ bool SceneryListsRecordObject(PPCContext& ctx, uint8_t* base) {
 }
 
 void SceneryListsRecordSceneLights(PPCContext& ctx, uint8_t* base) {
+  ctx.fpscr.disableFlushMode();
   const auto header =
       SlotDiagnostics() ? std::nullopt : scenery_lists::RecordSceneLights(base);
   if (!header) {
@@ -201,6 +205,9 @@ void SceneryListsRecordShapeDepth(PPCContext& ctx, uint8_t* base) {
 }
 
 void SceneryListsDrawShapeDepth(PPCContext& ctx, uint8_t* base) {
+  // The plain C++'s scalar float work expects flush-to-zero off, as the
+  // original sets it.
+  ctx.fpscr.disableFlushMode();
   constexpr uint32_t kFrame = 160;
   // What the recorder's wrapper would keep: the call's return address and
   // r24-r31 there (r9, r8, r7, r6, the caller's r28, the model, the world
@@ -255,17 +262,21 @@ struct DrawContext {
     const uint64_t stack = ctx.r1.u64;
     ctx.r1.u64 = frame;
     ctx.lr = lr;
-    PPCRegister* registers[5] = {&ctx.r3, &ctx.r4, &ctx.r5, &ctx.r6, &ctx.r7};
+    PPCRegister* registers[8] = {&ctx.r3, &ctx.r4, &ctx.r5, &ctx.r6,
+                                 &ctx.r7, &ctx.r8, &ctx.r9, &ctx.r10};
     for (int i = 0; i < count; i++) {
       registers[i]->u64 = args[i];
     }
     ctx.ctr.u64 = function;
     REX_CALL_INDIRECT_FUNC(function);
     ctx.r1.u64 = stack;
+    // The plain C++'s scalar float work expects flush-to-zero off (the
+    // originals set it before each float instruction).
+    ctx.fpscr.disableFlushMode();
     return ctx.r3.u32;
   }
-  static void Submit(void* self, uint32_t entry, uint32_t key, double depth, uint32_t frame,
-                     uint32_t lr) {
+  static uint32_t Submit(void* self, uint32_t entry, uint32_t key, double depth, uint32_t frame,
+                         uint32_t lr) {
     auto& d = *static_cast<DrawContext*>(self);
     PPCContext& ctx = d.ctx;
     uint8_t* base = d.base;
@@ -282,6 +293,8 @@ struct DrawContext {
     ctx.ctr.u64 = function;
     REX_CALL_INDIRECT_FUNC(function);
     ctx.r1.u64 = stack;
+    ctx.fpscr.disableFlushMode();
+    return ctx.r3.u32;
   }
 };
 
@@ -292,6 +305,7 @@ void SceneryListsRecordShape(PPCContext& ctx, uint8_t* base) {
     __imp__sub_82146BD0(ctx, base);
     return;
   }
+  ctx.fpscr.disableFlushMode();
   const uint64_t lr = ctx.lr;
   const uint32_t frame = ctx.r1.u32 - scenery_lists::kRecordShapeFrame;
   DrawContext context{ctx, base};
@@ -322,6 +336,7 @@ void SceneryListsDrawShape(PPCContext& ctx, uint8_t* base) {
     __imp__sub_82147D88(ctx, base);
     return;
   }
+  ctx.fpscr.disableFlushMode();
   const uint64_t lr = ctx.lr;
   const uint32_t frame = ctx.r1.u32 - scenery_lists::kSceneryDrawShapeFrame;
   DrawContext context{ctx, base};
