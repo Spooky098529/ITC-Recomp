@@ -1,0 +1,142 @@
+# Known functions: the game modes and their state machines
+
+The game's **modes** (`Mode::`): the object the app runs at a time, one
+of 12 types made by a factory (`Mode::Create`, from the mode manager's
+tick `Modes::Tick`, a tick handler) when the current type
+(`[0x826032DC]`) has no object yet, and deleted when the mode's delegate
+asks for another type. Type 1 is the **race** (`RaceMode::`, 167,264
+bytes); the others are 852 bytes (types 2 to 7 and 9 to 12, their
+constructors a lead) or 87,768 (type 8, never made in play). Every mode
+starts with the base (`Mode::Mode`: vtables at +0 and +32, a pointer at
++4 to the delegate at +8) and holds, at +36, the **message dispatcher**
+`GameMessages::Dispatch` delivers from (50 handler pointers, their count
+at +200, a ring of 50 12-byte messages at +204, its count and start at
++804 and +808). Each handler is a **state machine** (`StateMachine::`,
+9,608 bytes and its owner's members after it): a table of up to 200
+48-byte transitions keyed by (state, message id, the message's two other
+words), the count at +9600 and the state at +9604. A message picks the
+transition for the current state (`StateMachine::Handle`), moves to its
+next state (when not 0) and then runs its functor: a member function
+(`0x82011918`, probably `Delegate::Invoke`, `sub_8223A3F0` in
+`functions.md`: the function at +8 with the object at +4) or nothing
+(`0x820069BC`, the default; message ids without a transition get the
+static one at `0x826C5B68`). Message 0 is Update and 1 Draw
+(`GameMessages::Dispatch` below, `../frame-interpolation.md`).
+
+The race mode makes ten state machines in its constructor and its set-up
+(`RaceMode::Init`, probably vtable slot 0 from `Modes::Tick`) sets nine
+of them up, one function each, and adds them to its dispatcher in this
+order: +848, +97548 (the race flow, `racer-controllers.md`), +116812,
++10528 (the state machine at +16 of the member at +10512), +107168,
++87936, +128664, +138284 and +147944 (+157652 isn't added there). The
+lead this file was mapped from is the last one's set-up
+(`RaceOverlaysMachine::Init`, `sub_8215E6C8`): the race overlays'
+state machine, whose members after it are the overlay list at +9608
+(`race-overlays.md`); its transitions name the race's states from the
+overlays' side (0 at set-up, 1 the overlays made, 3, 2 the views bound,
+5 running, 6 probably paused, 7 and 8 the end). The other set-ups are
+leads (`../loops/leads.md`), as are the member at +10512's internals (the
+camera modes' range, `82152028`-`82156CC0`; the constructors, buffer
+frees and destructor the race mode calls there are here).
+
+Shared, with rows in other files: `RaceOverlays::Destroy`
+(`sub_8215E1D0`) and the handler thunks the overlays' state machine
+registers (`sub_8215E680`, `sub_8215E6C0`, `RaceOverlays::OnUpdate`
+`sub_8215E150`, `sub_8215E158`, `sub_8215E688`; `sub_8215E140` never
+ran) and `RaceOverlays::Clear` (`sub_8215DE80`, Overridden) in
+[`race-overlays.md`](race-overlays.md); `XPR::XPR` (`sub_82596E68`) in
+[`models.md`](models.md); the empty destructor `sub_82106540` in
+[`audio.md`](audio.md); `operator new` and `operator delete`
+(`sub_825A6880`, `sub_825A70E8`) and VirtualFree (`sub_82295330`) in
+[`heap.md`](heap.md); `ActionMappers::Update`
+(`sub_8210B018`) in [`action-mappers.md`](action-mappers.md);
+`Network::Update` (`sub_8214E268`) in
+[`system-services.md`](system-services.md); GlobalMemoryStatus
+(`sub_82294DA0`, Dropped) and `Delegate::Invoke` (`sub_8223A3F0`) in
+[`functions.md`](functions.md); `TickHandler::Invoke` (`sub_82099A98`)
+in [`framework.md`](framework.md). The XPR's
+destructor (`sub_82597148`) is in the model class's lead. Layouts are in
+`../known-data.md` ("game mode", "race mode", "state machine",
+"transition", `0x826032DC`, `0x826C5B68`). Mapped by the B7 loop's
+mapping agent (`../loops/b7-loop.md`), 2026-10-25, from the generated
+code only (no runs): call counts aren't known; vtable slots are inferred
+from the callers' offsets (the vtables in `.rdata` weren't read). Names
+are ours.
+
+Status:
+
+- **Native**: plain C++ in `itc_recomp/src/` that doesn't use the
+  PowerPC context (`ctx`): normal arguments and host structs (it may
+  still read and write guest memory through `src/guest.h` while
+  recompiled code shares the data). The game reaches it without `ctx`,
+  from native or overridden callers, and the recompiled original is no
+  longer called (except behind a fallback flag or to check against it).
+  No `REX_FUNC` override of it exists, not even an adapter kept only for
+  a harness (that's Overridden until the adapter goes).
+  The end state for every function.
+- **Overridden**: an `extern "C" REX_FUNC(sub_XXXXXXXX)` override in
+  `itc_recomp/src/` (or a macro defining one) does the work instead of
+  the original: a thin adapter in front of native code, or a body that
+  still uses `ctx` (calling guest code, reading registers). It may call
+  the original when its flag is off, or to check itself against it.
+- **Wrapped**: an override that does something of its own (skipping
+  render-only passes, logging, timing) and still calls the original
+  (`__imp__sub_XXXXXXXX`) for the work.
+- **Dropped**: its work isn't needed on PC (hardware set-up, kernel calls
+  the SDK already stubbed), so it no longer runs: an override in
+  `itc_recomp/src/` replaces it with nothing (or a fixed return value), or
+  its callers, made native, leave the call out (no override then; the row
+  says which caller). Logs, a harness or the renderer's frame dumps have
+  shown that nothing reads what it did. The original is no longer called,
+  except behind a fallback flag while the drop is being checked. A
+  function the game never calls in the first place isn't Dropped: its
+  status stays blank and its row says it's never called.
+- **Merged**: its work is done inside a native caller's plain C++ (a
+  few lines only that caller needs), so it has no function or override of
+  its own in `itc_recomp/src/`. The row names the caller(s) and the
+  harness that covers the work. The original is no longer called, except
+  behind the caller's fallback flag.
+- **Patched**: the generated code was edited in place (search for
+  `PATCH:`).
+
+A function usually moves from recompiled or Wrapped to Overridden to
+Native as the `ctx` edge moves up through its callers, or straight to
+Dropped when its work isn't needed.
+`itc_recomp/tools/check_function_statuses.py` checks this column, in
+every file of the tables, against `src/` (an override marked Native, a
+status with no override, an override with no row, a row in two files);
+run it after changing either, on any branch.
+
+| Address | Name | Status | Notes |
+|---|---|---|---|
+| `sub_82107910` | `Modes::Tick` | Wrapped | From Draw; adds one to the play time frame counter at `0x826C5B90` (see "Per-frame logic" in `../frame-interpolation.md`). Read (2026-10-25, B7 loop): no direct callers (a tick handler, probably through `TickHandler::Invoke`); r3 = the modes' holder (its +4 the current mode), r4 an object whose slot 1 it asks twice, into `0x826C5B60` and `0x826C5B64`, after making a mode. With no mode at +4: GlobalMemoryStatus into its frame, `Mode::Create(holder, [0x826032DC])` into +4, `sub_82106868` and `sub_82106740` (holder, type), `sub_822934B8(type)`, then the mode's slot 0 (its set-up: `RaceMode::Init` for the race, probably). Then (`0x826C5B94` 0 and `0x826C5B98` 1) `sub_821063B0` once; `ActionMappers::Update([0x826BAB7C])`; `[0x8260185C]` minus 1; `Network::Update`; `sub_8209EEC8(0x826C5B9C, mode)`, `sub_8209BD18`; the mode's delegate (`[mode + 4]`, slot 0, an 8-byte answer) and `sub_8209D130(0)`: when the answer's byte is set, `[0x826032E0]` = the old type, `[0x826032DC]` = the answer's word, the mode's slot 1 and slot 7 (r4 = 1: deleted, `RaceMode`'s `sub_82107590`), +4 = 0, `sub_8209E7E8(0x826C5B9C)`, `sub_8209F318(0)`, GlobalMemoryStatus again. Last, `0x826C5B98` = whether the type is 2, 4 to 10 or 12; when that turns 0 with `0x826C5B94` set, `[0x826C5C80]`'s slot 5 with 1. Not read in detail past the calls; its callees not named here are a lead. |
+| `sub_821077A8` | `Mode::Create` | | r3 = the holder (unused), r4 = the type (1-12): allocates the mode (`operator new`) and builds it: 1 the race (167,264 bytes, `RaceMode::RaceMode`), 2 `sub_82106DB8`, 3 `sub_821077EC` (a piece of this switch), 4 `sub_82106E88`, 5 `sub_82106F08`, 6 `sub_82235E88`, 7 `sub_82246340`, 9 `sub_82107008`, 10 `sub_82107088`, 12 `sub_82106F88` (852 bytes each; a lead), 8 `sub_82107670` (87,768 bytes, never ran); 11 or out of range, or no memory: 0. From `Modes::Tick`. |
+| `sub_82106C20` | `Mode::Mode` | | r3 = the mode: vtables `0x820069EC` at +0 and `0x82006A0C` at +32 (after the intermediate `0x82006B44`), +4 = +8, the delegate at +8 with vtable `0x82006B20` (the default; +4 = 0 if +8 were null). Leaf. From the mode constructors (`RaceMode::RaceMode`, `sub_82106C80`, `sub_82106DB8`, `sub_82106E88`, `sub_82106F08`, `sub_82106F88`, `sub_82107008`, `sub_82107088`, `sub_82235E88`, `sub_82246340`). |
+| `sub_821073B8` | `RaceMode::RaceMode` | | r3 = the race mode (167,264 bytes): `Mode::Mode`; the dispatcher at +36 emptied (its count, the ring's 50 messages, count and start); vtables `0x82006D34` (+0) and `0x82006D28` (+32); then the state machines, each `StateMachine::StateMachine` with +9600 and +9604 = 0, at +848, +87936, +97548, +107168, +116812, +128664, +138284 (its +9608, an XPR: `XPR::XPR`), +147944 (its +9608 the race overlays' list: `RaceOverlays::Clear`) and +157652; between them the member at +10512 (`sub_82107168`). Returns r3. From `Mode::Create` (type 1). |
+| `sub_82151D20` | `RaceMode::Init` | | No direct callers (probably the race mode's slot 0, from `Modes::Tick`): r3 = the race mode. The last word (+167260) = 1; the nine state machines set up, each by its own function (+848 `sub_821517D8`, +97548 `RaceFlow` `sub_82160AE0`, +116812 `sub_82174D28`, +10512 `sub_82159950`, +107168 `sub_82169920`, +87936 `sub_8215D808`, +128664 `sub_8216E6E8`, +138284 `sub_82177378`, +147944 `RaceOverlaysMachine::Init`), then added to the dispatcher (+36, the count at +236) in the order +848, +97548, +116812, +10528 (when the member at +10512 is there), +107168, +87936, +128664, +138284, +147944; `sub_822478D0`; then the mode's delegate at +8 (+4 pointing at it) replaced: vtable `0x82010FA0`, +12 the mode, +16 `0x82235C08` (a member function, probably the next-mode query), +20 = 0. The set-ups are leads. |
+| `sub_82107518` | `RaceMode::~RaceMode` | | r3 = the race mode: its vtables put back (`0x82006D34`, `0x82006D28`), `RaceOverlays::Destroy` (+157552), the empty destructor `sub_82106540` on +147892 (the XPR), `sub_82106AF0` on +10512, then the base's vtables (`0x820069EC`, `0x82006A0C`). Its other state machines need nothing. From `sub_82107590`. |
+| `sub_82107590` | `RaceMode::DeletingDestructor` | | r3 = the race mode, r4 = flags: `RaceMode::~RaceMode`, then `operator delete` when bit 0 is set; returns r3. No direct callers (probably the race mode's slot 7: `Modes::Tick` calls slot 7 with r4 = 1). |
+| `sub_821062E8` | `GameMessages::Dispatch` | Overridden | Delivers the game's queued messages to its handlers: 0 = Update (all game logic), 1 = Draw. Skips Update on render-only passes (`src/frame_pacing/game_messages.cpp`). r3 = the dispatcher: probably a mode's +36 (handlers at +0, count +200, ring +204, count +804, start +808: the race mode's layout, `RaceMode::RaceMode` and `RaceMode::Init`); each message goes to every handler through `StateMachine::Handle`, the returned functor's slot 0 called with r4 = the dispatcher (2026-10-25, B7 loop). |
+| `sub_82106280` | `StateMachine::Handle` | | Picks the handler object a message goes to; its method 0 handles it. Read (2026-10-25, B7 loop): r3 = the state machine, r4 = the message (12 bytes): the key (state +9604, the message's three words) looked up (`StateMachine::Find`); when the transition's next state (its +28) isn't 0, it becomes +9604 (before the functor runs); returns the transition's functor part (+0 the functor pointer). From `GameMessages::Dispatch` (`Deliver` in `src/frame_pacing/game_messages.cpp`). |
+| `sub_821061F0` | `StateMachine::Find` | | r3 = the state machine, r4 = the key (16 bytes): `StateMachine::IndexOf`; returns the transition's +16 (its functor pointer, storage and next state), or the static default at `0x826C5B68` (made on the first call, guard bit 0x1 at `0x826C5B88`: functor `0x820069BC`, next state 0). From `StateMachine::Handle`. |
+| `sub_821060A0` | `StateMachine::IndexOf` | | r3 = the state machine, r4 = the key: the first of the +9600 transitions (48 bytes each from +0) whose key matches (`StateKey::Equals`), or -1. From `StateMachine::Add` and `StateMachine::Find`. |
+| `sub_82106040` | `StateKey::Equals` | | r3, r4 = two 16-byte keys: 1 when all four words match (signed compares), else 0. Leaf. From `StateMachine::IndexOf`. |
+| `sub_82106158` | `StateMachine::Add` | | r3 = the state machine, r4 = the key, r5 = the transition's functor part (a pointer to its storage, 24 bytes of storage, the next state at +28): when the key is there, its functor storage and next state replaced (+16 pointing at +20 again); else the transition built on the stack (`Transition::Make`) and copied to entry +9600 (`Transition::Assign`), +9600 plus 1 (no bound check against the 200 entries). From the state machines' set-ups (74 callers seen in play: `RaceOverlaysMachine::Init`, the race flow's `sub_82160AE0`, `sub_8215D808`, the race mode's other set-ups and many at `82185920`-`8228AC48`). |
+| `sub_82106100` | `Transition::Make` | | r3 = the transition, r4 = the key, r5 = the functor part: the key's four words copied, +16 = +20, the six storage words from r5 + 4, +44 = r5 + 28. Leaf. From `StateMachine::Add`. |
+| `sub_82105FE0` | `Transition::Assign` | | r3 = the destination, r4 = the source transition: the key copied, +16 = +20, the six storage words from +20, +44 from +44. Leaf. From `StateMachine::Add`. |
+| `sub_82107108` | `StateMachine::StateMachine` | | r3 = the state machine: its 200 transitions emptied (key 0, +16 = +20, functor vtable `0x820069BC`, next state 0); the caller sets +9600 and +9604 to 0. Leaf. From `RaceMode::RaceMode` (nine), `sub_82107168`, `sub_82107358`, `sub_82108160`. |
+| `sub_8215E6C8` | `RaceOverlaysMachine::Init` | | r3 = the race overlays' state machine (race mode + 147944): +9604 = 0, then 33 transitions through `StateMachine::Add` ((state, message) → next, functor; 0 = stay): (0, 0) → 1 `sub_8215E680` (overlays made); (1, 3) → 3 `sub_82106540` (nothing); (3, 4) → 2 `sub_8215E6C0` (views bound); (2, 5) and (2, 46) → 5 (no functor); (2, 17) → 5 `sub_8215DD58`; (2, 42) → 6 `sub_8215DE10`; in 5: 0 `RaceOverlays::OnUpdate`, 17, 41, 22, 23, 24 `sub_8215DD58`, 19, 34, 36 `sub_8215DD90`, 26, 28 `sub_8215DDD0`, 42, 43, 47 `sub_8215DE10`, 29, 31, 58 → 6, 44 → 7, 49 → 8 `sub_8215E688`; in 6: 0 `sub_8215E158` (recordings only), 29, 31, 58 → 5, 44 → 7, 49 → 8 `sub_8215E688`; (7, 0) `sub_8215E140` (never ran). Functors: vtable `0x82011918`, +4 the state machine, +8 the function. Which messages these are isn't known (29 and 30 are posted by the pad reader, probably the pause, and 34 by the replay's end, `racer-controllers.md`). From `RaceMode::Init`. |
+| `sub_8215DD58` | | | Message handler (no direct callers; `RaceOverlaysMachine::Init`'s messages 17, 41, 22, 23, 24 in state 5 and 17 in state 2): r3 = the state machine; for each of the 25 overlays at +9608 that's there, its +820 and +824 = 1 (`CarOverlays::UpdateModelSprites` reads +820 and +828). Leaf. |
+| `sub_8215DD90` | | | Message handler (messages 19, 34, 36 in state 5): each overlay's +820, +824 and +828 = 0. Leaf. |
+| `sub_8215DDD0` | | | Message handler (messages 26, 28 in state 5): each overlay's +820 = 1, +824 = 0. Leaf. |
+| `sub_8215DE10` | | | Message handler (messages 42, 43, 47 in state 5 and 42 in state 2): each overlay's slot 3 (`CarOverlays::Reset`, `race-overlays.md`), then its +828 = 1. |
+| `sub_82107168` | | | r3 = the race mode's member at +10512 (about 77,400 bytes; set up by `sub_82159950`, a lead): `StateMachine::StateMachine` at +16 (+9600, +9604 = 0); vtable `0x82006B60`; two 1,104-byte records at +9648 (vtable `0x82006B34`, w words of `[0x82000A30]`, 1.0); objects with vtables `0x82006B2C` (+11856) and `0x82006B24` (+12976); `sub_82155118` (+13360), `sub_82106A50` (+56896), `sub_82155D90` (+67760); eight more 1,104-byte records' 1.0s from +69628; +77376 = -1, +77380 to +77388 = 0. Returns r3. From `RaceMode::RaceMode`. Not read in detail (what the records are isn't known). |
+| `sub_82106AF0` | | | r3 = the member at +10512: vtable `0x82006B60` back, the two 12-byte records at +67708 and +67720 cleared, the XPR at +67680 destroyed (`sub_82597148`), then the four buffers (`sub_82106A00` on +13360). From `RaceMode::~RaceMode`. |
+| `sub_82106A50` | | | r3 = an object (the member's +56896): vtable `0x82006B3C`, +16 and +20 = 0, 1.0 (`[0x82000A30]`) in the w words of +32 to +332, then `sub_821067A0` on +10780. Returns r3. From `sub_82107168`. |
+| `sub_821067A0` | | | r3 = an object: `XPR::XPR` on +4, two 12-byte records at +32 cleared. Returns r3. From `sub_82106A50` and the camera modes' `sub_82156CC0`. |
+| `sub_82155118` | | | r3 = an object (the member's +13360, about 43,500 bytes; in the camera modes' range): vtable `0x820093BC`, +16 and +20 = 0, 1.0 in w words from +44 and at +396, +412, +428; four 28-byte buffers at +43016 (vtable `0x82009390`, +12 and +16 = -1, +20 and +24 = 0), each then reset (`sub_82152D38`); an object at +43136 (vtable `0x82006B24`, +16, +20 = 0, 1.0s, +364 = 1.0); +360 = -1, +448 = 0, +452 = `[0x82618BB4]`. Returns r3. From `sub_82107168`. Not read in detail. |
+| `sub_82155D90` | | | r3 = an object (the member's +67760; in the camera modes' range): vtable `0x820093C4`, +16 and +20 = 0, 1.0 in w words from +44; +748, +752 = 0, +756 = 2; at +352 16 pairs of halfwords (i + 1, i: probably a free list's links), then halfwords +412, +418, +420 and +422 = -1, +416 and +424 = 0. Leaf. From `sub_82107168`. |
+| `sub_82152D38` | `Buffer28::Reset` | | r3 = a 28-byte buffer (vtable `0x82009390`): `Buffer28::Free`, then +12 and +16 = -1, +20 and +24 = 0. From `sub_82155118` and the camera modes' `sub_82152E08`. What the buffer holds isn't known. |
+| `sub_82152028` | `Buffer28::Free` | | r3 = the buffer: when +20 isn't 0, VirtualFree(+20, 0, MEM_RELEASE) and +20 = 0. From `Buffer28::Reset`, `Buffer28::~Buffer28` and `sub_82152E08` (camera modes). |
+| `sub_82152D28` | `Buffer28::~Buffer28` | | r3 = the buffer: vtable `0x82009390`, then tail-calls `Buffer28::Free`. From `sub_82106A00`. |
+| `sub_82106A00` | | | r3 = the object at the member's +13360: the four buffers at +43100 down to +43016 destroyed (`Buffer28::~Buffer28`). From `sub_82106AF0`. |

@@ -246,6 +246,11 @@ Rows not yet moved stay in the table below. So far:
   interfaces' getters, the run loop (`App::Run`, its tick handler and
   listener maps and the requests applied each pass) and the frame start
   and debug text it owns (B7).
+- [`game-modes.md`](game-modes.md): the game modes (the object the app
+  runs at a time, made by type when the mode changes) and the race's,
+  their message dispatcher and the state machines that handle the
+  messages (a transition table keyed by state and message), with the
+  race overlays' state machine and its handlers (B7).
 
 These files hold functions only. What used to follow the table here moved
 out on 2026-10-20: how frame interpolation works, its options and what
@@ -278,8 +283,6 @@ old performance notes to the end of `../native-renderer.md`.
 | `sub_8220BC28` | `MenuList::GetPreviousSelection` (probably) | Overridden | Returns the word at +20: the menu list's previous selection ("The menu list" in `../pause-menu-fix.md`). A one-instruction getter the linker folded, so XACT's `sub_825C8440` ([`xact.md`](xact.md)) calls it for an entry accessor's play offset (+20). 52 callers, 7 seen in play: the menus' `8220C7B8`, `8220D898`, `8220DD98`, `8220E1F8`, `82218788`, `82222E88`, and XACT's. Leaf. Native in `src/xact/xact.cpp` (`WaveEntryGetPlayOffset`) behind `--native_xact` (adapter in `src/hooks/xact.cpp`, harness `xact`, its wave entries and lookups group): one load, so the override gives every caller, the menus' too, the same result. Runs in attract races. |
 | `sub_820C0128` | `Vehicle::GetSpeedKmh` | Overridden | Returns the float at vehicle+48 (m/s) times 3.6. The plain C++ (`Vehicle_GetSpeedKmh`, `src/hooks/vehicle.h`) is also called directly by the native `OverlayView::SpeedKmh` (`sub_821268C0`, [`race-overlays.md`](race-overlays.md)); the adapter also tells the state capture (`--capture_dir`) about the vehicle. Checked against the original by the `race_overlays` harness. |
 | `sub_82093DC0` | | | First tick handler: polls input, then walks listener lists that run both game logic and the draw step (see "Separating drawing from the game tick" in `../frame-interpolation.md`). Tests player 1's input itself, on every pass: processor 0's pressed bits (`sub_8258CEB0`) and held-or-repeating bits (`sub_8258CEE0`), read from the input manager in guest memory ("Who reads the input manager" in `docs/pause-menu-fix.md`). |
-| `sub_821062E8` | `GameMessages::Dispatch` | Overridden | Delivers the game's queued messages to its handlers: 0 = Update (all game logic), 1 = Draw. Skips Update on render-only passes (`src/frame_pacing/game_messages.cpp`). |
-| `sub_82106280` | | | Picks the handler object a message goes to; its method 0 handles it. |
 | `sub_8215B4F8` | `Race::DrawStep` | Wrapped | The race's draw step (Draw message). Its running marks the pass as in a race. |
 | `sub_825953D0` | `Recorder::RecordObject` | Wrapped | The bulk per-object recorder, ~150 calls per pass in a race: records command 7 with vertex constants 0-8: world (r5) * camera view-projection (r4) in c0-c3, the world matrix in c4-c7 (for some objects a projective matrix instead), and the camera's world position in c8. The camera is often a stack copy, not a camera pass. |
 | `sub_825951E0` | | | Multiplies a world matrix and camera into a stack temporary; not recorded (likely a visibility test). |
@@ -289,7 +292,6 @@ old performance notes to the end of `../native-renderer.md`.
 | `sub_82146B80` | | | Returns the current frame's entry of animation r4 in set r3 (texture id at +4). |
 | `sub_82146A38` | | | Finds the animation in set r3 whose texture is r4; -1 if none. |
 | `sub_820F5740` | `Minimap::Draw` | Wrapped | From the draw step part `sub_820F6068`; steps the minimap blink clock at `0x826C5AA4`/`0x826C5AA8` after drawing (see "Per-frame logic" in `../frame-interpolation.md`). |
-| `sub_82107910` | | Wrapped | From Draw; adds one to the play time frame counter at `0x826C5B90` (see "Per-frame logic" in `../frame-interpolation.md`). |
 | `sub_821109B8` | | | Turns the play time frame counter into hours, minutes and seconds (30, 1800, 108000 frames). |
 | `sub_82107B90` | `Boot::StartMovie` | | Message handler: plays the next boot movie, id from the table at `0x826C5BAC` (index at `0x826C5BC8`), via `Movies::Play` (`sub_820A43A8`, the path table at `0x82600BEC`; `movies.md`). See "The title screen" in `../title-screen.md`. |
 | `sub_82107C58` | `Boot::WaitForMovie` | Wrapped | Message handler, every tick while a boot movie plays; ends the step on a button press if skippable (`0x826C5BC4`) or when the movie has finished. The movie started (`Movies::Start`) when its state (`Movies::State`, twice a tick) is 1 with +9608 = 0 (then 1); finished when the state is 1 again with +9608 = 1. `--skip_intro` makes it finish at once. |
