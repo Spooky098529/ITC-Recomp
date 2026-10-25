@@ -120,7 +120,14 @@ file's history. What's left to see in a drive, from every run:
   `Scenery::CollectAreas`, `CollectModels`, `DrawSetLists`,
   `Strings::FormatV`. Validated (`itc_1831`: 17 of 17 harness lines,
   15 in the attract race, 2 in the replay `itc_1832`, ok; nothing to
-  drive). Step: migration 3 (the four left), agent running.
+  drive). Migration 3 done (220ea7f..a5141f5: `Scenery::CollectAreas`,
+  `CollectModels`, `DrawSetLists`, `Strings::FormatV` (the font number's
+  `sub_82108A70`, never seen, left a guest call) and `Strings::Format`;
+  8 adapters removed; 21-24 s, 0 errors, every harness 0 differing;
+  `DrawSetLists`' dumps the same as the fallback but for the texture
+  animations' frames, as two fallback runs differ). Nothing ready left
+  in `course-scenery.md` or `strings-and-font.md`. Step: validation 3,
+  agent running.
 
 ## Done
 
@@ -168,6 +175,8 @@ This run's groups: `expected-differences.md` (the "16:38 run" lines).
 - After the scenery lists' validation: race 24 s (`itc_1769`), 0
   errors, every harness 0 differing; replay 127 s (`itc_1770`), 0
   errors.
+- After the shader objects' migration 3: ours 2152, work left 4299
+  (wrapped 104, known 540, unknown 3655).
 - After the shader objects' validation 2: race 24 s (`itc_1831`), 0
   errors, every harness 0 differing; replay (`itc_1832`), 0 errors.
 - After the shader objects' migration 2: ours 2147, work left 4304

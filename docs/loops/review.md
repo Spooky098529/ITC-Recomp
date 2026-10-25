@@ -186,6 +186,18 @@ When the user has reviewed a run's section, its heading gets
   exported from `src/hooks/models.h`); the attract race has two
   variants (2,412 or 2,414 draws in a dump) by timing, so dumps compare
   only within one.
+- The shader objects' migration 3 (220ea7f..a5141f5): `course-scenery.md`:
+  `Scenery::CollectAreas`, `CollectModels`, `DrawSetLists` (new
+  `src/course_scenery/collect.cpp`, strict floats; `DrawSetLists`'
+  harness in `src/harnesses/scenery_lists.cpp`); `strings-and-font.md`:
+  `Strings::FormatV` (its 0xFFD2 case's `sub_82108A70`, the font's
+  number, never seen, left a guest call) and `Strings::Format`; 8
+  adapters removed (`SceneryList::Add`, `PoolObject::PoolObject`,
+  `ModelList::Init`, `Strings::Get`, `FormatGrouped`, `PageCount`,
+  `ModelList::IsBEntryOn`, `IsCEntryOn` now Native). For review: new
+  exported helpers (`hooks::SceneryDrawGuest`, `SceneryListsDrawCalls`,
+  `SceneryListsSlotDiagnostics`, `CourseSceneryDrawSetLists`,
+  `StringsFormatVSteps`, `StringsFormatSteps`).
 
 ## Run 2026-10-25 03:59 (`b7-loop-25-10-26-2`)
 
