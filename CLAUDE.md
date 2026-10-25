@@ -256,7 +256,8 @@ read a wild address (exposed when the hardcoded shaders moved the
 harness's block) was fixed on the way (dbc8ee0); the rest waits on
 `Framework::Init`'s services, `sub_824936E8` and `sub_8258E1D8`'s
 critical section.
-Its fifteenth run (`b7-loop-25-10-26-2`, 2026-10-25, not yet merged;
+Its fifteenth run (`b7-loop-25-10-26-2`, 2026-10-25, merged into
+`rexglue-removal-project` the same day after a drive;
 summary `docs/loops/b7-loop-2026-10-25-0359.md`; 5 subsystems, the
 user's limit for it) made the game modes, the model class, the mode
 tick, the minimap's parts and `atexit` with what it unblocked native as
