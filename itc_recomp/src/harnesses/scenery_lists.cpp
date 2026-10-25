@@ -25,6 +25,8 @@
 #include <utility>
 #include <vector>
 
+ITC_FLAG_DECLARE(bool, native_models);
+
 namespace harness {
 
 namespace {
@@ -822,6 +824,132 @@ void SceneryShapes(Context& h, Random& r, uint32_t block) {
   }
 }
 
+// Model::RecordShape reads the environment textures' ids (+124, +120) as
+// words and skips them when either is -1: now and then one is. The model's
+// material animations (+364, read by sub_825A1148 for a material whose +396
+// isn't -1, which the plain C++ leaves to the original): none, as in play.
+void RandomEnvironmentIds(uint8_t* base, uint32_t block, Random& r) {
+  guest::StoreU32(base, block + 0x100 + 364, 0);
+  const uint32_t materials = block + 0x6000;
+  const uint32_t count = guest::LoadU32(base, materials + 8) + guest::LoadU32(base, materials + 12);
+  for (uint32_t m = 0; m < count && m < 8; m++) {
+    const uint32_t material = materials + 16 + 512 * m;
+    if (r.Below(4) == 0) {
+      guest::StoreU32(base, material + (r.Below(2) ? 120 : 124), 0xFFFFFFFFu);
+    }
+  }
+}
+
+void ModelShapes(Context& h, Random& r, uint32_t block) {
+  const uint32_t model = block + 0x100;
+  const uint32_t queue = block + 0x7C0;  // the provider is at +0x700
+  {
+    Results results("Model::RecordShape (sub_82595550)");
+    uint32_t stack = 0;
+    for (int c = 0; c < 512; c++) {
+      Case(
+          h, results, block, r,
+          [&](PPCContext& t) {
+            g_flush_on_entry = r.Below(2) != 0;
+            stack = t.r1.u32;
+            RandomList(h.base, block, r, 400);
+            const uint32_t shape = r.Below(4);
+            RandomShape(h.base, block, r, shape, false);
+            RandomMaterials(h.base, block, r, shape);
+            RandomEnvironmentIds(h.base, block, r);
+            FiniteFloats(h.base, 0x8265ED20, 8, r);
+            FiniteFloats(h.base, block + 0x600, 8, r);
+            t.r3.u64 = model;
+            t.r4.u64 = shape;
+            t.r5.u64 = r.Below(2);
+            t.r6.u64 = r.Below(4) == 0 ? 0 : 1;
+            t.r7.u64 = r.Below(2) ? 0 : block + 0x600;
+            t.r8.u64 = r.Below(2) ? 0 : block + 0x610;
+          },
+          __imp__sub_82595550, hooks::SceneryListsModelRecordShape, {},
+          fmt::format("case {}", c), false,
+          [&](const PPCContext& t, Outputs& out) {
+            // The stack temporaries (r1 - 304 + 80 to + 128) and the
+            // arguments saved in the caller's frame (r1 + 28 to + 64).
+            out.Bytes(Read(h.base, t.r1.u32 - 304 + 80, 48));
+            out.Bytes(Read(h.base, t.r1.u32 + 28, 36));
+          },
+          [&] { Fill(h.base, stack, 64); });
+    }
+    results.Report();
+  }
+  {
+    Results results("Model::DrawShape (sub_82596B18)");
+    int queued = 0;
+    // The recompiled Model::DrawShape calls the recompiled Model::RecordShape
+    // (--native_models off for it).
+    const bool models_flag = ITC_FLAG(native_models);
+    int version = 0;
+    bool with_materials = false;
+    for (int c = 0; c < 512; c++) {
+      Case(
+          h, results, block, r,
+          [&](PPCContext& t) {
+            g_flush_on_entry = r.Below(2) != 0;
+            RandomList(h.base, block, r, 600);
+            const uint32_t shape = r.Below(4);
+            const bool in_view = r.Below(4) != 0;
+            RandomShape(h.base, block, r, shape, in_view);
+            RandomMaterials(h.base, block, r, shape);
+            RandomEnvironmentIds(h.base, block, r);
+            with_materials = guest::LoadU32(h.base, block + 0x6000 + 8) != 0 ||
+                             guest::LoadU32(h.base, block + 0x6000 + 12) != 0;
+            FiniteFloats(h.base, 0x8265ECA0, 0xA0 / 4, r);
+            FiniteFloats(h.base, 0x8296B940, 0x3A0 / 4, r);
+            FiniteFloats(h.base, block + 0x600, 8, r);
+            RandomBytes(h.base, 0x8296B8F0, 16, r);
+            RandomBytes(h.base, 0x8296B900, 16, r);
+            guest::StoreU32(h.base, scenery_lists::kRenderQueue, queue);
+            guest::StoreU32(h.base, queue, queue + 0x20);
+            guest::StoreU32(h.base, queue + 0x20 + 16, kEmptyFunction);
+            const uint32_t view_projection = block + 0x400;
+            const uint32_t world = block + 0x500;
+            StoreFloats(h.base, view_projection, {1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1});
+            StoreFloats(h.base, world, {1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1, 0, Spread(r, 0.1f),
+                                        Spread(r, 0.1f), in_view ? 0.0f : 9.0f, 1});
+            t.r3.u64 = model;
+            t.r4.u64 = view_projection;
+            t.r5.u64 = world;
+            t.r6.u64 = shape;
+            t.r7.u64 = r.Below(4) == 0 ? r.Next() : r.Below(2);
+            t.r8.u64 = r.Below(2) ? 0 : block + 0x600;
+            t.r9.u64 = r.Below(2) ? 0 : block + 0x610;
+          },
+          __imp__sub_82596B18, hooks::SceneryListsModelDrawShape, {}, fmt::format("case {}", c),
+          false, [&](const PPCContext& t, Outputs& out) {
+            ITC_FLAG(native_models) = models_flag;
+            // IsShapeVisible's product (r1 - 208 - 96) when no RecordShape
+            // ran after it (the recompiled one saves its registers over it),
+            // RecordShape's stack temporaries (r1 - 208 - 304 + 80 to + 128)
+            // and the arguments it saves in the draw's frame (r1 - 208 + 28
+            // to + 64).
+            if (t.r3.u32 == model || t.r3.u32 == 0 || !with_materials) {
+              out.Bytes(Read(h.base, t.r1.u32 - 304, 64));
+            }
+            out.Bytes(Read(h.base, t.r1.u32 - 512 + 80, 48));
+            out.Bytes(Read(h.base, t.r1.u32 - 208 + 28, 36));
+            if (t.r3.u32 == queue) {
+              queued++;
+              out.Word(t.r4.u32);
+              out.Word(t.r5.u32);
+              out.Double(t.f1.u64);
+            }
+          },
+          [&] { ITC_FLAG(native_models) = version++ % 2 == 1; });
+    }
+    ITC_LOG_INFO("harness: Model::DrawShape: {} of 512 cases ended handing an entry to the "
+                 "render queue",
+                 queued / 2);
+    ITC_FLAG(native_models) = models_flag;
+    results.Report();
+  }
+}
+
 // PointList::Draw: a list at the block's +0xE00 whose two nodes both hold
 // the model at +0x100 (shape 0), the entry's points at +0x1100 (most below
 // the lowest y, so a few are drawn), the camera pass at +0xD00 (an identity
@@ -918,6 +1046,7 @@ void SceneryLists(Context& h) {
   Recorders(h, r, block);
   DepthDraws(h, r, block);
   SceneryShapes(h, r, block);
+  ModelShapes(h, r, block);
   const uint32_t slots = memory::Alloc(0x40000 + 16, 0);
   PointLists(h, r, block, (slots + 15) & ~15u);
   memory::Free(slots);

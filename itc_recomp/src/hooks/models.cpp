@@ -42,9 +42,12 @@ ITC_FLAG_BOOL(native_models, true, "ITC",
               "plain C++ called directly; Model::MaterialCount sub_82594AD8, Model::Material "
               "sub_82594B20, the shared shaders sub_825896D8 and sub_82589700, the vertex "
               "declaration sub_82589728 (its message for a type pair the tables don't cover, "
-              "never seen in play, the original's)) natively instead of through the "
+              "never seen in play, the original's), Model::RecordShape sub_82595550 (in "
+              "src/scenery_lists/model_draws.cpp, adapter in src/hooks/scenery_lists.cpp: the "
+              "model's slot 1 and the texture provider's slots 5 and 6 guest calls; the "
+              "material animation, never seen in play, the original's)) natively instead of through the "
               "translated code (the same writes; "
-              "checked by --run_harnesses=models)");
+              "checked by --run_harnesses=models and, for Model::RecordShape, scenery_lists)");
 
 bool hooks::ModelsHostLock() {
   static const bool host = ITC_FLAG(native_models);

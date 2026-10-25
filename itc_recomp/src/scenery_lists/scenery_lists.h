@@ -241,6 +241,49 @@ std::optional<SceneryDraw> SceneryDrawShape(uint8_t* base, const DrawCalls& call
                                             uint32_t range, uint32_t pair_offset,
                                             uint32_t caller_r24);
 
+// --- The generic model's shapes (model_draws.cpp) ---
+
+// Model::RecordShape's frame.
+constexpr uint32_t kModelRecordShapeFrame = 304;
+
+// Model::RecordShape (sub_82595550, docs/functions/models.md): as
+// SceneryRecordShape without the course's texture animations, the shared
+// pair's offset and the samplers' states 12/16/20/36 around the materials:
+// the arguments saved in the caller's frame (`frame` + 332 to + 364), the
+// header slot at `frame` + 92, the put-back constants' addresses at + 84 and
+// + 88; per material its shaders (with `set_shaders`), vertex c9-c13, the
+// model's vtable slot 1 (&the blend index at `frame` + 80), pixel c63-c67
+// (c64 the material's +80 with w the float at +92, c65 its +16 with w the
+// float at +88), render state 3 from the table at 0x8265EEB4, 96 and 100
+// for group 0, 56, the textures (the provider's slot 5) with sampler states
+// 0 and 4, the environment textures (slots 6 and 5, when neither id is
+// -1), vertex c86 from `range` (through `frame` + 112) and pixel c76 (`c76`'s
+// words), the draw, the constants put back. Returns 0 when the group has no
+// materials, else the chunk's first slot. nullopt, with nothing done, where
+// the original must run: a vertex declaration the plain C++ leaves to it,
+// a material animation (+396 not -1), more than 4 textures on a material,
+// a chunk open on another list, or no room for its slots.
+std::optional<uint32_t> ModelRecordShape(uint8_t* base, const DrawCalls& calls, uint32_t frame,
+                                         uint32_t model, uint32_t shape, int32_t group,
+                                         uint32_t set_shaders, uint32_t c76, uint32_t range);
+
+// Model::DrawShape's frame.
+constexpr uint32_t kModelDrawShapeFrame = 208;
+
+// Model::DrawShape (sub_82596B18): as SceneryDrawShape with ModelRecordShape
+// for the groups, the interpolation's context of its own (the return address
+// 0x82596BA0 and r24-r31 = `caller_r24`, the world matrix, the shape, the
+// view-projection, 0x82970000, the second and first entries, the model) and
+// its queue calls' return addresses. r3 as the original leaves it: the
+// model for +28 = 0, 0 when not visible, else the last queue call's, or
+// the lights' header when no group has materials, or the command list after
+// the depth entry's chunk when group 0 has none. nullopt, with nothing done,
+// where a recorder would decline.
+std::optional<SceneryDraw> ModelDrawShape(uint8_t* base, const DrawCalls& calls, uint32_t frame,
+                                          uint32_t model, uint32_t view_projection,
+                                          uint32_t world, uint32_t shape, uint32_t depth_too,
+                                          uint32_t c76, uint32_t range, uint32_t caller_r24);
+
 // PointList::Draw's frame.
 constexpr uint32_t kPointListDrawFrame = 464;
 

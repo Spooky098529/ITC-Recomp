@@ -72,6 +72,16 @@ void SceneryListsRecordShape(PPCContext& ctx, uint8_t* base);
 // 208-byte frame.
 void SceneryListsDrawShape(PPCContext& ctx, uint8_t* base);
 
+// Model::RecordShape (sub_82595550, behind --native_models): r3 = the
+// model, r4 = the shape, r5 = the group, r6 = whether to set the shaders,
+// r7 = pixel c76, r8 = the range; the guest calls from a 304-byte frame like
+// the original's.
+void SceneryListsModelRecordShape(PPCContext& ctx, uint8_t* base);
+// Model::DrawShape (sub_82596B18): r3 = the model, r4 = the view-projection,
+// r5 = the world matrix, r6 = the shape, r7 = the depth pass too, r8 =
+// pixel c76, r9 = the range; from a 208-byte frame.
+void SceneryListsModelDrawShape(PPCContext& ctx, uint8_t* base);
+
 // PointList::Draw (sub_82148058): r3 = the list, r4 = the entry, r5 = the
 // camera pass; from a 464-byte frame.
 void SceneryListsPointListDraw(PPCContext& ctx, uint8_t* base);

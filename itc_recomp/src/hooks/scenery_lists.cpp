@@ -20,6 +20,7 @@
 ITC_FLAG_DECLARE(bool, log_overlay_uploads);
 ITC_FLAG_DECLARE(bool, log_slot_callers);
 ITC_FLAG_DECLARE(bool, log_recording_by_pass);
+ITC_FLAG_DECLARE(bool, native_models);
 
 ITC_FLAG_BOOL(native_scenery_lists, true, "ITC",
               "Run the course set's lists of models and the model draws "
@@ -37,7 +38,9 @@ ITC_FLAG_BOOL(native_scenery_lists, true, "ITC",
               "sub_82589B58, no adapters: only it calls them), Model::RecordShapeDepth "
               "sub_825960D0, Model::DrawShapeDepth sub_82596D48 (RecordObject with the "
               "interpolation's hooks; the render queue's slot 4 a guest call), "
-              "SceneryModel::RecordShape sub_82146BD0 and SceneryModel::DrawShape sub_82147D88 "
+              "SceneryModel::RecordShape sub_82146BD0, SceneryModel::DrawShape sub_82147D88 and "
+              "Model::DrawShape sub_82596B18 (with Model::RecordShape sub_82595550's plain C++; "
+              "that one's adapter under --native_models) "
               "(the model's slot 1, the texture provider's slots 5 and 6 and the render "
               "queue's slot 4 guest calls; the material animation, never seen in play, the "
               "original's), TextureProvider::ClearAll "
@@ -365,6 +368,69 @@ void SceneryListsDrawShape(PPCContext& ctx, uint8_t* base) {
   }
 }
 
+void SceneryListsModelRecordShape(PPCContext& ctx, uint8_t* base) {
+  if (SlotDiagnostics()) {
+    __imp__sub_82595550(ctx, base);
+    return;
+  }
+  ctx.fpscr.disableFlushMode();
+  const uint64_t lr = ctx.lr;
+  const uint32_t frame = ctx.r1.u32 - scenery_lists::kModelRecordShapeFrame;
+  DrawContext context{ctx, base};
+  scenery_lists::DrawCalls calls;
+  calls.call = &DrawContext::Call;
+  calls.submit = &DrawContext::Submit;
+  calls.user = &context;
+  // The back chain first (as stwu): the plain C++ writes into the frame.
+  const uint32_t chain = guest::LoadU32(base, frame);
+  guest::StoreU32(base, frame, ctx.r1.u32);
+  const auto first = scenery_lists::ModelRecordShape(base, calls, frame, ctx.r3.u32, ctx.r4.u32,
+                                                     ctx.r5.s32, ctx.r6.u32, ctx.r7.u32,
+                                                     ctx.r8.u32);
+  if (!first) {
+    guest::StoreU32(base, frame, chain);
+    __imp__sub_82595550(ctx, base);
+    return;
+  }
+  ctx.lr = lr;
+  ctx.fpscr.disableFlushMode();
+  ctx.r3.u64 = *first;
+}
+
+void SceneryListsModelDrawShape(PPCContext& ctx, uint8_t* base) {
+  if (SlotDiagnostics()) {
+    __imp__sub_82596B18(ctx, base);
+    return;
+  }
+  ctx.fpscr.disableFlushMode();
+  const uint64_t lr = ctx.lr;
+  const uint32_t frame = ctx.r1.u32 - scenery_lists::kModelDrawShapeFrame;
+  DrawContext context{ctx, base};
+  scenery_lists::DrawCalls calls;
+  calls.call = &DrawContext::Call;
+  calls.submit = &DrawContext::Submit;
+  calls.user = &context;
+  const uint32_t chain = guest::LoadU32(base, frame);
+  guest::StoreU32(base, frame, ctx.r1.u32);
+  const auto draw = scenery_lists::ModelDrawShape(base, calls, frame, ctx.r3.u32, ctx.r4.u32,
+                                                  ctx.r5.u32, ctx.r6.u32, ctx.r7.u32,
+                                                  ctx.r8.u32, ctx.r9.u32, ctx.r24.u32);
+  if (!draw) {
+    guest::StoreU32(base, frame, chain);
+    __imp__sub_82596B18(ctx, base);
+    return;
+  }
+  ctx.lr = lr;
+  // r3 is the last queue call's, or as the original leaves it (the model
+  // when its +28 is 0 and nothing ran).
+  if (draw->queued) {
+    ctx.fpscr.disableFlushMode();
+  } else if (draw->r3 != ctx.r3.u32) {
+    ctx.r3.u64 = draw->r3;
+    ctx.fpscr.disableFlushMode();
+  }
+}
+
 void SceneryListsPointListDraw(PPCContext& ctx, uint8_t* base) {
   if (SlotDiagnostics()) {
     __imp__sub_82148058(ctx, base);
@@ -419,5 +485,17 @@ ITC_SCENERY_LISTS(82596D48, SceneryListsDrawShapeDepth)
 ITC_SCENERY_LISTS(82146BD0, SceneryListsRecordShape)
 ITC_SCENERY_LISTS(82147D88, SceneryListsDrawShape)
 ITC_SCENERY_LISTS(82148058, SceneryListsPointListDraw)
+ITC_SCENERY_LISTS(82596B18, SceneryListsModelDrawShape)
 ITC_SCENERY_LISTS(82594328, SceneryListsTextureProviderClearAll)
 ITC_SCENERY_LISTS(82594718, SceneryListsTextureProviderSet)
+
+// Model::RecordShape's row is in docs/functions/models.md: behind that file's
+// flag.
+extern "C" REX_FUNC(sub_82595550) {
+  REX_FUNC_PROLOGUE();
+  if (!ITC_FLAG(native_models)) {
+    __imp__sub_82595550(ctx, base);
+    return;
+  }
+  hooks::SceneryListsModelRecordShape(ctx, base);
+}
