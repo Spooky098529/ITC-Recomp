@@ -2580,6 +2580,7 @@ B7. **The game logic inside**: everything else, subsystem by subsystem,
 | 2026-10-25 | The mode tick (what `Modes::Tick` calls besides the mode's slots: the per-mode settings, the sign-in watch, the billboards' ring flip, the two layers of screen fades, the menu music with XAPI's `lstrcmpA` and `CompareStringA` as plain C++ by B6's call; presence Dropped by B5's; with `Modes::Modes` in `game-modes.md`) | `mode-tick.md` | 21 of 23 (one migration; 1 Dropped, 4 Merged) | `--native_mode_tick` |
 | 2026-10-25 | The minimap's parts (the race manager's lookups, the car marker's type, the scaling, the marker triangles and their 80-slot lists, the transform and the triangles' records; interpolation's hooks kept, `Minimap::Draw`'s blink wrap untouched; the marker draws and `Minimap::Draw` left waiting on `atexit` and the course set's lists) | `minimap.md` | 12 of 15 (one migration) | `--native_minimap` |
 | 2026-10-25 | `atexit` and what it unblocked (`atexit`, `_onexit` and `__onexitinit` over the game's exit table, the C runtime's exit lock a host mutex taken by every user through `_lock`/`_unlock` overridden for lock 8 only, the user's call by the recorded lock call; the global strings' static set-ups, `SignInWatch::StaticInit`, `UiMovie::TrackProperty`, `ApplyTrack` and `ApplyAnimation`, the minimap's marker draws, `Viewports::Init` and `Viewport::Init`; no mapping) | `c-runtime.md`, and `ui-movies.md`, `minimap.md`, `cameras.md`, `std-string.md`, `mode-tick.md` | 18 made native, 12 adapters removed (two migrations) | under `--native_c_runtime` and the files' own flags |
+| 2026-10-25 | The scene models' set-up side (the cars as the scene holds them, pool 7 of the second pool set: the parts' links, the 4,244-byte records' defaults, copies and constructor, the car records' reset and copy, the accessory, the sound loads' callback, the car model's pages through `memory::AllocPages`; `SceneModel::SetUp`, `Build`, `Update` and the loaders left waiting) | `scene-models.md` | 23 of 48 (one migration; 1 Native with no adapter) | `--native_scene_models` |
 
     The first run (2026-10-22, branch `b7-loop-test`): every harness at 0 differing, attract races at 20-21 s with no errors,
     and a race the user drove looked right. Ours went from 162 to 335 (work
@@ -3463,3 +3464,18 @@ lists; the semaphores' and the vblank event's static set-ups on their
 kernel objects; `sprintf` and `_vsnprintf_l` on `_output_l` and
 `_vsnprintf`.
 
+**2026-10-25, the scene models (branch `b7-loop-25-10-26-3`):** the
+sixteenth run's first subsystem mapped the scene models' set-up side
+(`scene-models.md`, 48 rows; the rest of their code, ~227 functions, in
+six leads) and made 23 native (`--native_scene_models`): the parts'
+links, the records' defaults, copies and constructor, the car records'
+reset and copy, the accessory, the sound loads' callback and the car
+model's pages (VirtualAlloc through `memory::AllocPages`). Validated:
+every function ran in its harness and in play (two only in the pad
+replay). The boundary unchanged: 449 functions (916 pairs): overridden
+69, Native 5, Dropped 23, never called 70, live 282. Imports: 186
+called, 62 with a live caller. B7 (`b7_status.py`): 6,451 in play, ours
+2,037, work left 4,414 (Wrapped 110, with a row 614, no row yet 3,690),
+from 4,438. `SceneModel::SetUp`, `Build` and `Update` wait on the load
+slots, `Archive::Load`, `ScenePools::SetUp`, the asset's size,
+`sprintf` and `Texture::Create`.

@@ -23,11 +23,20 @@ file's history. What's left to see in a drive, from every run:
   `--native_scene_models`; `itc_1695`: 26 s, 0 errors, every harness 0
   differing). Nothing ready left; the rest waits on the load slots,
   `Archive::Load`, `ScenePools::SetUp`, the asset's size, `sprintf`,
-  `Texture::Create`. Step: validation, agent running.
+  `Texture::Create`. Validated (`itc_1696`: 24 of 24 harness lines, 22
+  ran in the attract race, 2 in the replay `itc_1697`, ok; nothing to
+  drive). Finished.
+- The "no mapping" lead (not counted): `UiMovie::DrawTexts`
+  `sub_8211CD90` and what it unblocks (`UiMovie::Update`
+  `sub_8211D2F8`), with `sub_82106540` (blocking `_init_pointers`
+  `sub_825AA398`). Step: migration, agent running.
 
 ## Done
 
-(none yet)
+- The scene models (`scene-models.md`, mapped in 9a490b3; 48 rows): 23
+  ours in one migration (8c076d0..88bdea2), 1 Native with no adapter;
+  validated (`itc_1696`, `itc_1697`); `--native_scene_models`. Left:
+  `SceneModel::SetUp`, `Build`, `Update`, the loaders.
 
 ## Rows to review
 
@@ -50,3 +59,6 @@ This run's groups: `expected-differences.md` (the "16:38 run" lines).
   known 638, unknown 3690).
 - After the scene models' migration 1: ours 2037, work left 4414
   (wrapped 110, known 614, unknown 3690).
+- After the scene models' validation: race 27 s (`itc_1696`), 0
+  errors, every harness 0 differing; replay 126 s (`itc_1697`), 0
+  errors.
