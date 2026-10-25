@@ -10,6 +10,7 @@
 #include "base/flags.h"
 #include "base/log.h"
 #include "hooks/heap.h"
+#include "hooks/ui_movies.h"
 #include "memory/c_runtime_heap.h"
 #include "memory/heap.h"
 #include "std_string/std_string.h"
@@ -18,6 +19,8 @@
 #include <fmt/format.h>
 
 #include <algorithm>
+#include <cstring>
+#include <iterator>
 #include <string>
 #include <vector>
 
@@ -562,6 +565,119 @@ void AddNamedAnimationsCases(Context& h, uint32_t movie) {
   results.Report();
 }
 
+// --- sub_8211BEE8 (the full-frame effect) ---
+//
+// sub_8259EBE8 (the quad handed to the recorders) stood in for while the
+// cases run: the call's registers (r3 and r1 against the caller's stack)
+// and the frame's first 1,152 bytes (the identity, the quad, the level
+// description, the matrix and the arrays; the saved registers above) kept.
+// CameraPasses::RenderTarget(0) and Texture::GetLevelDesc are the game's
+// (they read the render target's texture).
+struct EffectCall {
+  bool called = false;
+  uint32_t r3, r4, r1, lr;
+  uint64_t f1;
+  std::vector<uint8_t> frame;
+};
+EffectCall* g_effect_call = nullptr;
+uint32_t g_effect_stack = 0;
+
+bool EffectStandIn(uint32_t function, PPCContext& ctx, uint8_t* base) {
+  if (function != 0x8259EBE8 || g_effect_call == nullptr) {
+    return false;
+  }
+  EffectCall& call = *g_effect_call;
+  call.called = true;
+  call.r3 = g_effect_stack - ctx.r3.u32;
+  call.r4 = ctx.r4.u32;
+  call.r1 = g_effect_stack - ctx.r1.u32;
+  call.lr = uint32_t(ctx.lr);
+  call.f1 = ctx.f1.u64;
+  call.frame = Read(base, ctx.r1.u32, 1152);
+  return true;
+}
+
+void EffectCases(Context& h) {
+  Results results("sub_8211BEE8 (a full-frame effect drawn)");
+  constexpr uint32_t kOdd[] = {0x7FC00000, 0xFF800001, 0x7F800000, 0xFF800000,
+                               0x00000001, 0x80000000, 0x7F7FFFFF};
+  ui_movies_hooks::g_update_callee_stand_in = EffectStandIn;
+  const uint32_t primitive = h.data;
+  for (int i = 0; i < 300; i++) {
+    const uint64_t seed = h.random.Next();
+    Outputs out[2];
+    for (int v = 0; v < 2; v++) {
+      Random r(seed);
+      auto value = [&](float lo, float hi) {
+        if (r.Below(30) == 0) {
+          return kOdd[r.Below(std::size(kOdd))];
+        }
+        const float f = lo + (hi - lo) * float(r.Below(1 << 20)) / float(1 << 20);
+        uint32_t bits;
+        std::memcpy(&bits, &f, 4);
+        return bits;
+      };
+      Fill(h.base, h.data, kScratchBytes);
+      RandomFill(r, h.base, primitive, 128);
+      const uint32_t entries = r.Below(3);
+      const uint32_t count = r.Below(5) == 0 ? 0 : 1 + r.Below(16);
+      Store(h.base, primitive + 112, entries);
+      Store(h.base, primitive + 116, count);
+      Store(h.base, primitive + 12, value(-640, 640));
+      Store(h.base, primitive + 16, value(-360, 360));
+      Store(h.base, primitive + 68, value(0, 1));
+      for (uint32_t k = 0; k < count; k++) {
+        const uint32_t vertex = primitive + 128 + 16 * entries + 32 * k;
+        RandomFill(r, h.base, vertex, 32);
+        Store(h.base, vertex + 0, value(-1280, 1280));
+        Store(h.base, vertex + 4, value(-720, 720));
+        Store(h.base, vertex + 24, r.Below(4) == 0 ? uint32_t(r.Next()) : r.Below(2048));
+        Store(h.base, vertex + 28, r.Below(4) == 0 ? uint32_t(r.Next()) : r.Below(2048));
+      }
+      PPCContext t = CallContext(h);
+      Fill(h.base, t.r1.u32 - 1600, 1600);
+      t.r3.u64 = primitive;
+      t.lr = 0x822128F0;
+      EffectCall call;
+      g_effect_call = &call;
+      g_effect_stack = t.r1.u32;
+      if (v == 0) {
+        RunRecompiled(__imp__sub_8211BEE8, t, h.base);
+      } else {
+        sub_8211BEE8(t, h.base);
+      }
+      g_effect_call = nullptr;
+      out[v].Bytes(Read(h.base, h.data, kScratchBytes));
+      out[v].Word(call.called);
+      if (call.called) {
+        out[v].Word(call.r3);
+        out[v].Word(call.r4);
+        out[v].Word(call.r1);
+        out[v].Word(call.lr);
+        out[v].Double(call.f1);
+        // The positions (+384) and coordinates (+896) as floats.
+        std::vector<uint8_t>& f = call.frame;
+        out[v].Bytes({f.begin(), f.begin() + 384});
+        for (uint32_t at = 384; at < 1152; at += 4) {
+          const uint32_t word = uint32_t(f[at]) << 24 | uint32_t(f[at + 1]) << 16 |
+                                uint32_t(f[at + 2]) << 8 | f[at + 3];
+          const bool is_float = (at < 640 || at >= 896) && (at % 16) < 8 + 8 * (at < 640);
+          if (is_float) {
+            out[v].Float(word);
+          } else {
+            out[v].Word(word);
+          }
+        }
+      }
+      out[v].Word(t.r3.u32);
+      out[v].Word(uint32_t(t.lr));
+    }
+    results.Check(out[0], out[1], fmt::format("case {}", i));
+  }
+  ui_movies_hooks::g_update_callee_stand_in = nullptr;
+  results.Report();
+}
+
 }  // namespace
 
 void UiMovieObjects(Context& h) {
@@ -578,6 +694,7 @@ void UiMovieObjects(Context& h) {
   GetTextCases(h, movie);
   AddNamedAnimationsCases(h, movie);
   memory::Free(movie);
+  EffectCases(h);
 }
 
 }  // namespace harness

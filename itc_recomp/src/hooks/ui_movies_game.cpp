@@ -51,7 +51,9 @@ ITC_FLAG_BOOL(native_ui_movies_game, true, "ITC",
               "(sub_8211A788), UiMovie::UiMovie sub_8211E1C0 (sub_8211AE18, sub_8211B018, "
               "sub_8211D210), UiMovie::~UiMovie sub_8211E160 (sub_8211D1B8, sub_8211AF90) and "
               "the texts freed sub_8211AC90, UiMovie::GetText sub_8211B660, and the named animations "
-              "added sub_8211E378 (sub_8211E318; its strings through std::string's plain C++) "
+              "added sub_8211E378 (sub_8211E318; its strings through std::string's plain C++); "
+              "the full-frame effect sub_8211BEE8 (CameraPasses::RenderTarget and sub_8259EBE8 "
+              "through their overrides) "
               "(same results; checked by --run_harnesses=ui_movies_game and ui_movie_objects). sub_8211A660, "
               "sub_8211B230, AnimationList::Get, UiMovie::ScrollOffset, sub_8211B7B8, sub_8211B9B8 and "
               "sub_8211B940 have no adapters: only native callers reach "
@@ -725,4 +727,32 @@ extern "C" REX_FUNC(sub_8211E378) {
     return;
   }
   ctx.r3.u64 = ui_movies::AddNamedAnimations(base, ctx.r1.u32, ctx.r3.u32, ctx.r4.u32);
+}
+
+// sub_8211BEE8: r3 = a primitive node. The quad built natively in a frame
+// like the original's (1,248 bytes), CameraPasses::RenderTarget(0) and
+// sub_8259EBE8 through their overrides with its return addresses. r3 as the
+// last call leaves it.
+extern "C" REX_FUNC(sub_8211BEE8) {
+  REX_FUNC_PROLOGUE();
+  NATIVE_OR_ORIGINAL(8211BEE8);
+  const uint32_t primitive = ctx.r3.u32;
+  const uint64_t lr = ctx.lr;
+  ctx.fpscr.disableFlushMode();
+  guest_call::InFrame(ctx, base, ui_movies::kEffectFrame, 0x8211BF9C, [&](uint32_t frame) {
+    ui_movies::EffectBegin(base, frame);
+    ctx.r3.u64 = 0;
+    ctx.lr = 0x8211BF9C;
+    sub_8209F7A8(ctx, base);
+    const uint32_t texture = ctx.r3.u32;
+    ctx.fpscr.disableFlushMode();
+    const double depth = ui_movies::EffectQuad(base, frame, primitive, texture);
+    ctx.r3.u64 = frame + ui_movies::kEffectQuad;
+    ctx.r4.u64 = ui_movies::kEffectKey;
+    ctx.fpscr.disableFlushMode();
+    ctx.f1.f64 = depth;
+    ctx.lr = 0x8211C154;
+    sub_8259EBE8(ctx, base);
+  });
+  ctx.lr = lr;
 }

@@ -416,4 +416,30 @@ std::optional<uint32_t> GetText(uint8_t* base, uint32_t movie, uint32_t id_addre
 // name's _Tidy: its block when it was on the heap, else the name).
 uint32_t AddNamedAnimations(uint8_t* base, uint32_t stack, uint32_t movie, uint32_t scene);
 
+// sub_8211BEE8 (effect.cpp): a primitive node drawn over the full frame's
+// texture, from the original's 1,248-byte frame (`frame`, its r1): the quad
+// at +160 (blend mode 4, key 597), its positions at +384, colors +640 and
+// texture coordinates +896, a scale matrix at +320 (the identity built at
+// +96 first), the level description at +288. The adapter calls
+// CameraPasses::RenderTarget(0) between the two parts and hands the quad to
+// sub_8259EBE8 (r4 = 597, f1 = the depth EffectQuad returns).
+constexpr uint32_t kEffectFrame = 1248;
+constexpr uint32_t kEffectQuad = 160;
+constexpr uint32_t kEffectKey = 597;
+// Before RenderTarget: the positions' w (the float at 0x82000A30, 1.0) in
+// all 16, the quad made (MakeQuad), the identity, and the scale matrix (the
+// identity with the float at 0x82001070 at its +0 and +20).
+void EffectBegin(uint8_t* base, uint32_t frame);
+// After it: the texture's level 0 description (TextureLevelDesc), the
+// quad's vertex count (the primitive's +116), texture and arrays; for each
+// vertex (PrimitiveVertex) its x and y plus the primitive's +12 and +16 (z
+// the float at 0x82000A34, w 1.0) through the scale matrix
+// (debug::Vec4Transform), its +24 and +28 over the texture's width and
+// height, and the primitive's color (+56..+64) and alpha (+68 times the
+// float at 0x82000C44, as an integer); with any vertex, the clip cleared
+// (+100..+111). Blend mode 4, +72 = 0. Returns the depth (the float at
+// 0x82000A34). The original's integer temporaries at +80 and +88 written as
+// it leaves them.
+double EffectQuad(uint8_t* base, uint32_t frame, uint32_t primitive, uint32_t texture);
+
 }  // namespace ui_movies

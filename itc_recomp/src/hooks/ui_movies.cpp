@@ -251,6 +251,10 @@ extern "C" REX_FUNC(sub_825A0EF0) {
 // (112 bytes) with its return addresses.
 extern "C" REX_FUNC(sub_8259EBE8) {
   REX_FUNC_PROLOGUE();
+  if (ui_movies_hooks::g_update_callee_stand_in != nullptr &&
+      ui_movies_hooks::g_update_callee_stand_in(0x8259EBE8, ctx, base)) {
+    return;
+  }
   if (!ITC_FLAG(native_ui_movies)) {
     __imp__sub_8259EBE8(ctx, base);
     return;
