@@ -88,6 +88,24 @@ When the user has reviewed a run's section, its heading gets
   after the checks (as `std_string`'s `Require`); `sub_8259EBE8`'s
   override in `src/hooks/ui_movies.cpp` also checks the harness stand-in
   hook.
+- `scenery-lists.md` (new, a373941): 27 rows (3 moved from
+  `functions.md`: `sub_825951E0`, `Recorder::RecordObject`
+  `sub_825953D0`, `sub_82146B80`; 24 new): `ModelList::Load`,
+  `LoadPoints` (the +3180 list's 20 point-group pointers at
+  `0x82617750` + 256 × i), `Release`; the draw decisions
+  (`sub_82147850` by the race data's +24 flags, `sub_82147958` by the
+  course layout, `sub_82147B18` by race mode and course,
+  `Race::CourseLayout` `sub_8228F408`); `PointList::Draw`,
+  `SceneryModel::DrawShape` and `RecordShape`; the shared model draws
+  (`Model::IsShapeVisible`, `Recorder::RecordSceneLights`,
+  `Model::RecordShapeDepth`, `DrawShape`, `DrawShapeDepth`) and the
+  texture provider's slots 2 and 4. `sub_82147A20` and `sub_8228F484`
+  are pieces the recompiler split from their parents. Pointers in
+  `course-scenery.md` and `sprites.md`; `known-data.md`: the draws'
+  constants `0x8265ECA0`-`0x8265ED3F`, the vertex declaration table
+  `0x8296B8B8`, the sort keys `0x8296B8FC`-`0x8296B90C`, the scene light
+  constants `0x8296B950`-`0x8296BCDF`. Not read: two switch tables, and
+  `SceneryModel::RecordShape` past its outline. 2 leads added.
 
 ## Run 2026-10-25 03:59 (`b7-loop-25-10-26-2`)
 

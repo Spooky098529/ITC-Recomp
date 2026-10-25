@@ -61,7 +61,13 @@ file's history. What's left to see in a drive, from every run:
 - Subsystem 2 of 3: the course scenery's model lists (`sub_82147FB8`,
   `sub_82147D88` and the others at `82146AA8`-`82148650`), picked as
   closest to ready (5 of its 9 roots ready, 64 functions left under
-  them; `Minimap::Draw` waits on them). Step: mapping, agent running.
+  them; `Minimap::Draw` waits on them). Mapped as the scenery lists
+  (`scenery-lists.md`, 27 rows, a373941: the six lists' load, points
+  and release, the draw decisions, `PointList::Draw`, the scenery and
+  shared model draws, the texture provider's slots 2 and 4). Map checked
+  (0 errors, 27 of 27 in play, 14 ready groups; no kernel calls;
+  `Recorder::RecordObject` Wrapped for interpolation, its hooks kept).
+  Step: migration 1, agent running.
 
 ## Done
 
@@ -101,6 +107,8 @@ This run's groups: `expected-differences.md` (the "16:38 run" lines).
 - After the scene models' validation: race 27 s (`itc_1696`), 0
   errors, every harness 0 differing; replay 126 s (`itc_1697`), 0
   errors.
+- After the scenery lists' map: ours 2076, work left 4375 (wrapped 105,
+  known 606, unknown 3664).
 - After the UI movies' ready groups' validation: race 23 s (`itc_1740`,
   the harnesses' time), 0 errors, every harness 0 differing; replay
   (`itc_1741`), 0 errors.
