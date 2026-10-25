@@ -5,6 +5,7 @@
 
 #include "base/log.h"
 #include "guest.h"
+#include "memory/c_runtime_heap.h"
 #include "memory/heap.h"
 #include "models/memory_blocks.h"
 #include "models/xpr.h"
@@ -436,6 +437,26 @@ void MachineConstruct(uint8_t* base, uint32_t machine) {
   guest::StoreU32(base, machine + kState, 0);
 }
 
+// What every mode's constructor does first: the base (Mode::Mode), the
+// dispatcher at +36 emptied (its handler count, the ring's 50 messages,
+// their count and start), +848 = 0 for type 6, then the type's vtables.
+void ModeBaseConstruct(uint8_t* base, uint32_t mode, uint32_t vtable, uint32_t vtable32,
+                       bool word848 = false) {
+  ModeConstruct(base, mode);
+  const uint32_t dispatcher = mode + kRaceModeDispatcher;
+  guest::StoreU32(base, dispatcher + 200, 0);
+  for (uint32_t i = 0; i < 50 * 3; i++) {
+    guest::StoreU32(base, dispatcher + 204 + 4 * i, 0);
+  }
+  guest::StoreU32(base, dispatcher + 804, 0);
+  guest::StoreU32(base, dispatcher + 808, 0);
+  if (word848) {
+    guest::StoreU32(base, mode + 848, 0);
+  }
+  guest::StoreU32(base, mode + 0, vtable);
+  guest::StoreU32(base, mode + 32, vtable32);
+}
+
 }  // namespace
 
 void Member56896Construct(uint8_t* base, uint32_t object) {
@@ -477,18 +498,7 @@ void RaceModeMemberConstruct(uint8_t* base, uint32_t member) {
 
 void RaceModeConstruct(uint8_t* base, uint32_t mode) {
   ITC_NATIVE_RUNNING("sub_821073B8 RaceMode::RaceMode");
-  ModeConstruct(base, mode);
-  // The dispatcher: its handler count, the ring's 50 messages, their count
-  // and start.
-  const uint32_t dispatcher = mode + kRaceModeDispatcher;
-  guest::StoreU32(base, dispatcher + 200, 0);
-  for (uint32_t i = 0; i < 50 * 3; i++) {
-    guest::StoreU32(base, dispatcher + 204 + 4 * i, 0);
-  }
-  guest::StoreU32(base, dispatcher + 804, 0);
-  guest::StoreU32(base, dispatcher + 808, 0);
-  guest::StoreU32(base, mode + 0, kRaceModeVtable);
-  guest::StoreU32(base, mode + 32, kRaceModeVtable32);
+  ModeBaseConstruct(base, mode, kRaceModeVtable, kRaceModeVtable32);
   MachineConstruct(base, mode + 848);
   RaceModeMemberConstruct(base, mode + kRaceModeMember);
   MachineConstruct(base, mode + 87936);
@@ -501,6 +511,87 @@ void RaceModeConstruct(uint8_t* base, uint32_t mode) {
   MachineConstruct(base, mode + 147944);
   race_overlays::RaceOverlaysClear(base, mode + kRaceModeOverlays);
   MachineConstruct(base, mode + 157652);
+}
+
+void MachineMemberConstruct(uint8_t* base, uint32_t machine) {
+  ITC_NATIVE_RUNNING("sub_82108160 MachineMember::MachineMember");
+  MachineConstruct(base, machine);
+}
+
+namespace {
+
+#define ITC_MODE_TYPE(address, type, vtable, vtable32, word848)                  \
+  void ModeType##type##Construct(uint8_t* base, uint32_t mode) {                \
+    ITC_NATIVE_RUNNING("sub_" #address " ModeType" #type "::ModeType" #type);    \
+    ModeBaseConstruct(base, mode, vtable, vtable32, word848);                 \
+  }
+
+ITC_MODE_TYPE(82106DB8, 2, 0x82006B9C, 0x82006B90, false)
+ITC_MODE_TYPE(82106E88, 4, 0x82006BE0, 0x82006BD4, false)
+ITC_MODE_TYPE(82106F08, 5, 0x82006C24, 0x82006C18, false)
+ITC_MODE_TYPE(82235E88, 6, 0x82010A48, 0x82010A3C, true)
+ITC_MODE_TYPE(82246340, 7, 0x82010FB0, 0x82010FA4, false)
+ITC_MODE_TYPE(82107008, 9, 0x82006CAC, 0x82006CA0, false)
+ITC_MODE_TYPE(82107088, 10, 0x82006CF0, 0x82006CE4, false)
+ITC_MODE_TYPE(82106F88, 12, 0x82006C6C, 0x82006C60, false)
+
+#undef ITC_MODE_TYPE
+
+void ModeType3Construct(uint8_t* base, uint32_t mode) {
+  ITC_NATIVE_RUNNING("sub_82106C80 ModeType3::ModeType3");
+  ModeBaseConstruct(base, mode, 0x82006B70, 0x82006B64, false);
+  MachineMemberConstruct(base, mode + 848);
+}
+
+}  // namespace
+
+void ModeTypeConstruct(uint8_t* base, uint32_t type, uint32_t mode) {
+  switch (type) {
+    case 2: ModeType2Construct(base, mode); break;
+    case 3: ModeType3Construct(base, mode); break;
+    case 4: ModeType4Construct(base, mode); break;
+    case 5: ModeType5Construct(base, mode); break;
+    case 6: ModeType6Construct(base, mode); break;
+    case 7: ModeType7Construct(base, mode); break;
+    case 9: ModeType9Construct(base, mode); break;
+    case 10: ModeType10Construct(base, mode); break;
+    case 12: ModeType12Construct(base, mode); break;
+    default: break;
+  }
+}
+
+uint32_t ModeBytes(uint32_t type) {
+  switch (type) {
+    case 1: return kRaceModeBytes;
+    case 3: return kMode3Bytes;
+    case 8: return 87768;
+    case 2: case 4: case 5: case 6: case 7: case 9: case 10: case 12: return kModeBytes;
+    default: return 0;
+  }
+}
+
+std::optional<uint32_t> ModeCreate(uint8_t* base, uint32_t type) {
+  ITC_NATIVE_RUNNING("sub_821077A8 Mode::Create");
+  const uint32_t bytes = ModeBytes(type);
+  if (bytes == 0) {
+    return 0;  // 11, or out of range
+  }
+  if (type == 8) {
+    return std::nullopt;  // sub_82107670, never seen in play
+  }
+  const auto mode = memory::crt::OperatorNew(base, bytes);
+  if (!mode) {
+    return std::nullopt;
+  }
+  if (*mode == 0) {
+    return 0;
+  }
+  if (type == 1) {
+    RaceModeConstruct(base, *mode);
+  } else {
+    ModeTypeConstruct(base, type, *mode);
+  }
+  return *mode;
 }
 
 }  // namespace game_modes

@@ -158,4 +158,25 @@ void RaceModeMemberConstruct(uint8_t* base, uint32_t member);
 constexpr uint32_t kRaceModeBytes = 167264;
 void RaceModeConstruct(uint8_t* base, uint32_t mode);
 
+// The other modes' constructors: the base (Mode::Mode), the dispatcher at +36
+// emptied, the type's vtables at +0 and +32 (852 bytes; type 3's 10,460, with
+// a state machine at +848). Type 2 sub_82106DB8, 3 sub_82106C80, 4
+// sub_82106E88, 5 sub_82106F08, 6 sub_82235E88 (+848 = 0 too), 7
+// sub_82246340, 9 sub_82107008, 10 sub_82107088, 12 sub_82106F88.
+constexpr uint32_t kModeBytes = 852;
+constexpr uint32_t kMode3Bytes = 10460;
+void ModeTypeConstruct(uint8_t* base, uint32_t type, uint32_t mode);
+// sub_82108160 MachineMember::MachineMember: StateMachine::StateMachine, then
+// its count and state = 0.
+void MachineMemberConstruct(uint8_t* base, uint32_t machine);
+// The bytes Mode::Create allocates for a type (1 to 12), 0 for none (11).
+uint32_t ModeBytes(uint32_t type);
+
+// sub_821077A8 Mode::Create: the mode of `type` allocated (operator new,
+// the C runtime heap's) and built; 0 for type 11 or out of range. nullopt,
+// with nothing done, where the original must run: type 8 (sub_82107670,
+// never seen in play) and an allocation operator new's plain C++ leaves to
+// the original.
+std::optional<uint32_t> ModeCreate(uint8_t* base, uint32_t type);
+
 }  // namespace game_modes

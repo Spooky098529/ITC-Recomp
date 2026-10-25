@@ -16,6 +16,7 @@
 #include "hooks/game_modes.h"
 #include "hooks/heap.h"
 #include "hooks/models.h"
+#include "memory/c_runtime_heap.h"
 #include "memory/heap.h"
 #include "models/memory_blocks.h"
 
@@ -93,6 +94,23 @@ void NativeRaceModeMemberConstruct(PPCContext& ctx, uint8_t* base) {
 
 void NativeRaceModeConstruct(PPCContext& ctx, uint8_t* base) {
   gm::RaceModeConstruct(base, ctx.r3.u32);
+}
+
+template <uint32_t Type>
+void NativeModeTypeConstruct(PPCContext& ctx, uint8_t* base) {
+  gm::ModeTypeConstruct(base, Type, ctx.r3.u32);
+}
+
+void NativeMachineMemberConstruct(PPCContext& ctx, uint8_t* base) {
+  gm::MachineMemberConstruct(base, ctx.r3.u32);
+}
+
+void NativeModeCreate(PPCContext& ctx, uint8_t* base) {
+  if (const auto r3 = gm::ModeCreate(base, ctx.r4.u32)) {
+    ctx.r3.u64 = *r3;
+  } else {
+    __imp__sub_821077A8(ctx, base);
+  }
 }
 
 void NativeRaceModeMemberDestruct(PPCContext& ctx, uint8_t* base) {
@@ -680,6 +698,108 @@ void RaceModeMembers(Context& h) {
   results.Report();
 }
 
+// The modes' constructors by type, each on random words or 0xCD, at a few
+// offsets; and MachineMember::MachineMember.
+void ModeConstructors(Context& h) {
+  struct Constructor {
+    const char* name;
+    GuestFunction recompiled;
+    GuestFunction native;
+  };
+  const Constructor constructors[] = {
+      {"sub_82106DB8 ModeType2::ModeType2", __imp__sub_82106DB8, NativeModeTypeConstruct<2>},
+      {"sub_82106C80 ModeType3::ModeType3", __imp__sub_82106C80, NativeModeTypeConstruct<3>},
+      {"sub_82106E88 ModeType4::ModeType4", __imp__sub_82106E88, NativeModeTypeConstruct<4>},
+      {"sub_82106F08 ModeType5::ModeType5", __imp__sub_82106F08, NativeModeTypeConstruct<5>},
+      {"sub_82235E88 ModeType6::ModeType6", __imp__sub_82235E88, NativeModeTypeConstruct<6>},
+      {"sub_82246340 ModeType7::ModeType7", __imp__sub_82246340, NativeModeTypeConstruct<7>},
+      {"sub_82107008 ModeType9::ModeType9", __imp__sub_82107008, NativeModeTypeConstruct<9>},
+      {"sub_82107088 ModeType10::ModeType10", __imp__sub_82107088, NativeModeTypeConstruct<10>},
+      {"sub_82106F88 ModeType12::ModeType12", __imp__sub_82106F88, NativeModeTypeConstruct<12>},
+  };
+  const Block block(gm::kMode3Bytes + 64);
+  for (const Constructor& f : constructors) {
+    Results results(f.name);
+    for (int c = 0; c < 8; c++) {
+      Case(
+          h, results, block,
+          [&](Random& random) {
+            if (c % 2 == 1) {
+              WriteRandom(h.base, block.address, block.bytes / 4, random);
+            }
+          },
+          [&](PPCContext& t) { t.r3.u64 = block.address + 4 * c; }, f.recompiled, f.native,
+          fmt::format("case {}", c));
+    }
+    results.Report();
+  }
+  Results machine("sub_82108160 MachineMember::MachineMember");
+  for (int c = 0; c < 8; c++) {
+    Case(
+        h, machine, block,
+        [&](Random& random) {
+          if (c % 2 == 1) {
+            WriteRandom(h.base, block.address, block.bytes / 4, random);
+          }
+        },
+        [&](PPCContext& t) { t.r3.u64 = block.address + 4 * c; }, __imp__sub_82108160,
+        NativeMachineMemberConstruct, fmt::format("case {}", c));
+  }
+  machine.Report();
+}
+
+// Mode::Create: each type (and some out of range; not 8, sub_82107670, never
+// seen in play). The mode each side makes is its own block: before each
+// side, a block of the type's size is taken, filled with 0xCD and given
+// back, so operator new (first fit) hands the same one again and the bytes
+// the constructor doesn't write are the same; whether it did, the mode's
+// bytes, the scratch area and r3 are compared, then the mode is freed.
+void ModeCreates(Context& h) {
+  Results results("Mode::Create (sub_821077A8)");
+  if (!hooks::NativeHeapActive()) {
+    return;  // the adapter's condition
+  }
+  static constexpr uint32_t kTypes[] = {0, 1, 2, 3, 4, 5, 6, 7, 9, 10, 11, 12, 13, 0xFFFFFFFF};
+  for (int round = 0; round < 2; round++) {
+    for (const uint32_t type : kTypes) {
+      const uint32_t bytes = gm::ModeBytes(type);
+      Outputs out[2];
+      for (int v = 0; v < 2; v++) {
+        Fill(h.base, h.data, kScratchBytes);
+        uint32_t expected = 0;
+        if (bytes != 0) {
+          expected = memory::crt::OperatorNew(h.base, bytes).value_or(0);
+          if (expected != 0) {
+            Fill(h.base, expected, bytes);
+            memory::crt::OperatorDelete(expected);
+          }
+        }
+        PPCContext t = CallContext(h);
+        t.r3.u64 = h.data;
+        t.r4.u64 = round == 0 ? type : (0xABCD000000000000ull | type);
+        ITC_FLAG(native_game_modes) = v == 1;
+        ITC_FLAG(native_models) = v == 1;
+        ITC_FLAG(native_race_overlays) = v == 1;
+        (v == 0 ? GuestFunction(__imp__sub_821077A8) : NativeModeCreate)(t, h.base);
+        ITC_FLAG(native_game_modes) = true;
+        ITC_FLAG(native_models) = true;
+        ITC_FLAG(native_race_overlays) = true;
+        const uint32_t mode = t.r3.u32;
+        out[v].Word(mode != 0);
+        out[v].Word(mode == expected);
+        if (mode != 0) {
+          out[v].Bytes(Read(h.base, mode, bytes));
+          memory::crt::OperatorDelete(mode);
+        }
+        out[v].Bytes(Read(h.base, h.data, kScratchBytes));
+        out[v].Word(uint32_t(t.r3.u64 >> 32));
+      }
+      results.Check(out[0], out[1], fmt::format("type {} (round {})", int32_t(type), round));
+    }
+  }
+  results.Report();
+}
+
 }  // namespace
 
 void GameModes(Context& h) {
@@ -699,6 +819,8 @@ void GameModes(Context& h) {
   Member13360(h);
   RaceModeMembers(h);
   RaceModeConstructors(h);
+  ModeConstructors(h);
+  ModeCreates(h);
   Write(h.base, kDefault, saved_default.data(), kDefaultBytes);
 }
 

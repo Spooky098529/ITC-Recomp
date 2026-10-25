@@ -9,7 +9,9 @@
 // (sub_82152D28), from sub_82106A00; sub_82106A00, from
 // RaceModeMember::~RaceModeMember; RaceModeMember::RaceModeMember
 // (sub_82107168), from RaceMode::RaceMode; Member56896::Member56896
-// (sub_82106A50), from RaceModeMember::RaceModeMember; Member13360::Member13360
+// (sub_82106A50), from RaceModeMember::RaceModeMember; the modes'
+// constructors (sub_82106DB8 and the others, ModeTypeConstruct) and
+// MachineMember::MachineMember (sub_82108160), from Mode::Create; Member13360::Member13360
 // (sub_82155118), from RaceModeMember::RaceModeMember.
 
 #include "guest.h"
@@ -42,7 +44,13 @@ ITC_FLAG_BOOL(native_game_modes, true, "ITC",
               "RaceModeMember::RaceModeMember sub_82107168 and Member56896::Member56896 "
               "sub_82106A50 (no adapters: only RaceMode::RaceMode calls the member's "
               "constructor, and only it sub_82106A50; XPR::XPR's and RaceOverlays::Clear's "
-              "plain C++ called directly)) "
+              "plain C++ called directly), and with --native_heap Mode::Create sub_821077A8 "
+              "(operator new's plain C++ called directly; type 8, sub_82107670, never seen in "
+              "play, the original's) with the modes' constructors sub_82106DB8, sub_82106C80 "
+              "(with MachineMember::MachineMember sub_82108160), sub_82106E88, sub_82106F08, "
+              "sub_82235E88, sub_82246340, sub_82107008, sub_82107088 and sub_82106F88 (no "
+              "adapters: only Mode::Create calls them; sub_821077EC, a piece of its switch, "
+              "merged into it)) "
               "natively instead of through the translated code (the same writes; checked by "
               "--run_harnesses=game_modes)");
 
@@ -183,3 +191,17 @@ extern "C" REX_FUNC(sub_82106AF0) {
 
 // RaceMode::RaceMode: r3 = the race mode (left).
 ITC_GAME_MODES(821073B8, RaceModeConstruct(base, ctx.r3.u32))
+
+// Mode::Create: r3 = the holder (unused), r4 = the type; r3 = the mode or 0.
+// Over the allocation layer only (operator new's plain C++), and the
+// original from the start where the plain C++ says so.
+extern "C" REX_FUNC(sub_821077A8) {
+  REX_FUNC_PROLOGUE();
+  if (ITC_FLAG(native_game_modes) && hooks::NativeHeapActive()) {
+    if (const auto r3 = ModeCreate(base, ctx.r4.u32)) {
+      ctx.r3.u64 = *r3;
+      return;
+    }
+  }
+  __imp__sub_821077A8(ctx, base);
+}
