@@ -30,7 +30,8 @@ ITC_FLAG_BOOL(native_ui_movies, true, "ITC",
               "UiMovie::DrawNode sub_8259F848, UiMovie::ApplyTransform sub_8259E6C8 with "
               "sub_8259D730, the draw context copy sub_8259D9F8, the queued texts' copy "
               "sub_8259E620, append sub_8259F700 (its grow the original's) and "
-              "UiMovie::QueueText sub_8259F770; UiMovie::ApplyTrack sub_825A0548, with native "
+              "UiMovie::QueueText sub_8259F770; UiMovie::ApplyAnimation sub_825A08E0 (its tracks "
+              "through sub_825A0548's override); UiMovie::ApplyTrack sub_825A0548, with native "
               "atexit, and under it, without adapters (the flag switches ApplyTrack), "
               "UiMovie::TrackProperty sub_8259FE68, the keys sub_8259FA20, sub_8259FB30 "
               "and sub_8259FC18, and the accessor sub_8259D600) "
@@ -473,3 +474,51 @@ void ApplyTrack(PPCContext& ctx, uint8_t* base) {
   ApplyTrackNative(ctx, base);
 }
 }  // namespace ui_movies_hooks
+
+namespace {
+// ApplyAnimation's tracks (ui_movies::TrackCall): sub_825A0548 (its override)
+// from the level's frame, with the original's return address.
+struct GuestTracks {
+  PPCContext& ctx;
+  uint8_t* base;
+  ui_movies::TrackCall Call() { return {&GuestTracks::Run, this}; }
+  static void Run(void* self, uint32_t frame, uint32_t node, uint32_t track, double t,
+                  uint32_t k0, uint32_t k1) {
+    auto& tracks = *static_cast<GuestTracks*>(self);
+    PPCContext& ctx = tracks.ctx;
+    uint8_t* base = tracks.base;
+    const uint64_t stack = ctx.r1.u64, lr = ctx.lr;
+    ctx.r1.u64 = frame;
+    ctx.r3.u64 = node;
+    ctx.r4.u64 = track;
+    ctx.r5.u64 = k0;
+    ctx.r6.u64 = k1;
+    ctx.fpscr.disableFlushMode();
+    ctx.f1.f64 = t;
+    ctx.lr = 0x825A0AF4;
+    sub_825A0548(ctx, base);
+    ctx.r1.u64 = stack;
+    ctx.lr = lr;
+  }
+};
+}  // namespace
+
+void ui_movies_hooks::ApplyAnimationNative(PPCContext& ctx, uint8_t* base) {
+  ctx.fpscr.disableFlushMode();
+  GuestTracks tracks{ctx, base};
+  const uint32_t node = ctx.r3.u32, animation = ctx.r4.u32, loop = ctx.r6.u32;
+  const double time = ctx.f1.f64;
+  ctx.r3.u64 =
+      ui_movies::ApplyAnimation(base, node, animation, time, loop, ctx.r1.u32 - 224, tracks.Call());
+}
+
+// UiMovie::ApplyAnimation: r3 = the node, r4 = the animation, f1 = the time,
+// r6 = loop; r3 = 1 while playing.
+extern "C" REX_FUNC(sub_825A08E0) {
+  REX_FUNC_PROLOGUE();
+  if (!ITC_FLAG(native_ui_movies)) {
+    __imp__sub_825A08E0(ctx, base);
+    return;
+  }
+  ui_movies_hooks::ApplyAnimationNative(ctx, base);
+}

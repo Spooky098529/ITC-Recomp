@@ -204,6 +204,32 @@ void ApplyTrack(uint8_t* base, uint32_t node, uint32_t track, double t, uint32_t
                 uint32_t k1, uint32_t frame, const c_runtime::AtexitCall& atexit,
                 const KeyCall& keys);
 
+// For ApplyAnimation: one track applied (UiMovie::ApplyTrack, sub_825A0548,
+// called through its override, which keeps --per_tick_ui_movie_tracks'
+// skips and --log_pause_movie's log), from the original's frame `frame` (the
+// level's r1 - 224) with r3 = node, r4 = track, f1 = t, r5 = k0, r6 = k1.
+using GuestTrackFunction = void (*)(void* user, uint32_t frame, uint32_t node, uint32_t track,
+                                    double t, uint32_t k0, uint32_t k1);
+struct TrackCall {
+  GuestTrackFunction call = nullptr;
+  void* user = nullptr;
+};
+
+// sub_825A08E0 UiMovie::ApplyAnimation (animation.cpp, built as keys.cpp):
+// for each node track list (NodeTrackList, [animation + 36] of them) and
+// each child of `node` with its id (+8), each track's keys around `time` (k
+// at or before the track's local time, time - its start +8, and `time`
+// itself before the next; before the first key none and it, at or after
+// the last it and none) and its t, clamped to 0..1 (0 for keys at the same
+// time), applied through `apply`; then each sub-animation (SubAnimation,
+// [animation + 52]) from its start (+24) at the time mapped from +24..+28
+// onto +32..+36, recursively on `node` (id +8 = 0) or its children with
+// that id, from the frame 224 bytes below. Returns 1 while playing (with
+// `loop`, time above 0; else time below the length +12), else 0. `frame` =
+// the original's frame (r1 - 224); none of its stores are made.
+uint32_t ApplyAnimation(uint8_t* base, uint32_t node, uint32_t animation, double time,
+                        uint32_t loop, uint32_t frame, const TrackCall& apply);
+
 // The drawing walk (draw.cpp).
 //
 // UiMovie::ApplyTransform (sub_8259E6C8): the node's transform applied to

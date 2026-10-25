@@ -110,6 +110,7 @@ set(ITC_SOURCES
     src/hooks/ui_movies.cpp
     src/ui_movies/ui_movies.cpp
     src/ui_movies/keys.cpp
+    src/ui_movies/animation.cpp
     src/ui_movies/track_properties.cpp
     src/ui_movies/recording.cpp
     src/ui_movies/draw.cpp
@@ -344,6 +345,7 @@ set(ITC_SOURCES
 # drivers (src/ai_drivers/, docs/functions/ai-drivers.md) and the screen
 # objects (src/screen_objects/, docs/functions/screen-objects.md).
 set_source_files_properties(src/c_runtime/math.cpp src/ui_movies/keys.cpp
+    src/ui_movies/animation.cpp
     src/ui_movies/draw.cpp
     src/matrix_math/matrix_math.cpp src/car_physics/rigid_body.cpp
     src/car_physics/vehicle_step.cpp src/car_physics/vehicle_update.cpp

@@ -53,4 +53,9 @@ void ApplyTrack(PPCContext& ctx, uint8_t* base);
 // The same natively, whatever the flags (for the harness).
 void ApplyTrackNative(PPCContext& ctx, uint8_t* base);
 
+// UiMovie::ApplyAnimation (sub_825A08E0; r3 = the node, r4 = the animation,
+// f1 = the time, r6 = loop) natively, whatever the flag (for the harness):
+// each track through sub_825A0548 (its override) from the level's frame.
+void ApplyAnimationNative(PPCContext& ctx, uint8_t* base);
+
 }  // namespace ui_movies_hooks
