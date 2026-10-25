@@ -8,6 +8,7 @@
 
 #include "base/flags.h"
 #include "base/log.h"
+#include "hooks/c_runtime.h"
 #include "hooks/guest_call.h"
 #include "hooks/ui_movies.h"
 #include "ui_movies/ui_movies.h"
@@ -30,7 +31,8 @@ ITC_FLAG_BOOL(native_ui_movies, true, "ITC",
               "UiMovie::DrawNode sub_8259F848, UiMovie::ApplyTransform sub_8259E6C8 with "
               "sub_8259D730, the draw context copy sub_8259D9F8, the queued texts' copy "
               "sub_8259E620, append sub_8259F700 (its grow the original's) and "
-              "UiMovie::QueueText sub_8259F770) "
+              "UiMovie::QueueText sub_8259F770; UiMovie::TrackProperty sub_8259FE68, with "
+              "native atexit) "
               "natively instead of through the translated code (same results; checked by "
               "--run_harnesses=ui_movies)");
 
@@ -452,3 +454,16 @@ void RestorePose(PPCContext& ctx, uint8_t* base) {
                                       ctx.r7.u32);
 }
 }  // namespace ui_movies_hooks
+
+// UiMovie::TrackProperty: r3 = the property id; r3 = its descriptor's
+// address. Its frame (r1 - 128) holds the two bytes it leaves in the +8 words.
+extern "C" REX_FUNC(sub_8259FE68) {
+  REX_FUNC_PROLOGUE();
+  if (!ITC_FLAG(native_ui_movies) || !hooks::NativeAtexit()) {
+    __imp__sub_8259FE68(ctx, base);
+    return;
+  }
+  const uint64_t id = ctx.r3.u64;
+  hooks::GuestAtexit guest{ctx, base};
+  ctx.r3.u64 = ui_movies::TrackProperty(base, id, ctx.r1.u32 - 128, guest.Call());
+}

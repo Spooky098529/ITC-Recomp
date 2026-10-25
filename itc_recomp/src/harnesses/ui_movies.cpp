@@ -3,10 +3,13 @@
 // in the scratch area, so nothing the game holds is read or written.
 
 #include "harness.h"
+#include "exit_table.h"
 
 #include "base/flags.h"
 #include "base/log.h"
 #include "command_list/command_list.h"
+#include "c_runtime/exit.h"
+#include "hooks/c_runtime.h"
 #include "hooks/ui_movies.h"
 #include "memory/heap.h"
 #include "ui_movies/ui_movies.h"
@@ -16,6 +19,7 @@
 #include <cmath>
 #include <iterator>
 #include <limits>
+#include <mutex>
 
 ITC_FLAG_DECLARE(bool, native_ui_movies);
 
@@ -1637,6 +1641,72 @@ void TreeDrawCases(Context& h) {
   memory::Free(block);
 }
 
+// --- UiMovie::TrackProperty (on the game's table, guard and filled byte,
+// and the exit table, each put back after a side). ---
+
+void NativeTrackProperty(PPCContext& ctx, uint8_t* base) {
+  const uint64_t id = ctx.r3.u64;
+  hooks::GuestAtexit guest{ctx, base};
+  ctx.r3.u64 = ui_movies::TrackProperty(base, id, ctx.r1.u32 - 128, guest.Call());
+}
+
+void TrackPropertyCases(Context& h) {
+  Results results("sub_8259FE68 UiMovie::TrackProperty");
+  if (!hooks::NativeAtexit()) {
+    ITC_LOG_WARN("harness: ui_movies: native atexit off: TrackProperty's cases skipped");
+    return;
+  }
+  std::lock_guard<std::recursive_mutex> lock(c_runtime::ExitMutex());
+  constexpr uint32_t kGuard = 0x82970F28, kFilled = 0x82970C20;
+  const uint32_t table = ui_movies::kTrackProperties;
+  const auto saved_table = Read(h.base, table, 64 * 12);
+  const auto saved_guard = Read(h.base, kGuard, 4);
+  const auto saved_filled = Read(h.base, kFilled, 4);
+  for (int c = 0; c < 40; c++) {
+    // 0-7: the game's table as it is; then cleared, filled or both redone,
+    // over random bytes.
+    const int redo = c < 8 ? 0 : 1 + (c % 3);
+    std::vector<uint8_t> start_table = saved_table;
+    uint32_t guard = guest::LoadU32(h.base, kGuard);
+    uint8_t filled = guest::LoadU8(h.base, kFilled);
+    if (redo != 0) {
+      for (auto& byte : start_table) {
+        byte = uint8_t(h.random.Next());
+      }
+      guard = uint32_t(h.random.Next());
+      guard = (redo & 1) ? guard & ~1u : guard | 1u;
+      filled = (redo & 2) ? 0 : uint8_t(1 + h.random.Below(255));
+    }
+    const uint64_t id = c % 5 == 4 ? h.random.Next() : h.random.Below(64);
+    std::vector<uint8_t> frame(128);
+    for (auto& byte : frame) {
+      byte = uint8_t(h.random.Next());
+    }
+    Outputs out[2];
+    for (int v = 0; v < 2; v++) {
+      Write(h.base, table, start_table.data(), 64 * 12);
+      guest::StoreU32(h.base, kGuard, guard);
+      guest::StoreU8(h.base, kFilled, filled);
+      PPCContext t = CallContext(h);
+      Write(h.base, t.r1.u32 - 128, frame.data(), 128);
+      const uint32_t mark = exit_table::Mark(h.base);
+      t.r3.u64 = id;
+      (v == 0 ? __imp__sub_8259FE68 : NativeTrackProperty)(t, h.base);
+      out[v].Bytes(Read(h.base, table, 64 * 12));
+      out[v].Word(guest::LoadU32(h.base, kGuard));
+      out[v].Bytes(Read(h.base, kFilled, 4));
+      out[v].Word(t.r3.u32);
+      out[v].Word(uint32_t(t.r3.u64 >> 32));
+      exit_table::Take(h.base, mark, out[v]);
+    }
+    results.Check(out[0], out[1], fmt::format("case {} (redo {}, id {:X})", c, redo, id));
+  }
+  Write(h.base, table, saved_table.data(), 64 * 12);
+  Write(h.base, kGuard, saved_guard.data(), 4);
+  Write(h.base, kFilled, saved_filled.data(), 4);
+  results.Report();
+}
+
 }  // namespace
 
 void UiMovies(Context& h) {
@@ -1672,6 +1742,7 @@ void UiMovies(Context& h) {
   DrawWalkCases(h);
   QuadDrawCases(h);
   TreeDrawCases(h);
+  TrackPropertyCases(h);
 }
 
 }  // namespace harness

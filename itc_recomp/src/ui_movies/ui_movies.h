@@ -11,6 +11,8 @@
 
 #include "guest.h"
 
+#include "c_runtime/exit.h"
+
 #include <cstdint>
 #include <initializer_list>
 #include <optional>
@@ -283,5 +285,21 @@ std::optional<uint32_t> RecordQuad(uint8_t* base, uint32_t list, uint32_t quad, 
 extern const std::vector<uint32_t> kResetChunkSlots;
 uint32_t RecordClipReset(uint8_t* base, uint32_t list);
 uint32_t RecordStateReset(uint8_t* base, uint32_t list);
+
+// --- The tracks' properties (track_properties.cpp) ---
+
+// The 64 12-byte descriptors (+0 the node offset, +4 the type: 0 float, 1
+// and 2 integer, byte +8 set/add, byte +9 indirect).
+constexpr uint32_t kTrackProperties = 0x82970C28;
+
+// sub_8259FE68 UiMovie::TrackProperty: r3 = the property id; returns its
+// descriptor's address (id x 12 on the table, the full 64 bits). The first
+// call (guard bit 0 of 0x82970F28) clears the table and registers its
+// clean-up 0x825DB3F0 with atexit (through `call` when the native one
+// can't); the first with byte 0x82970C20 clear fills the 48 descriptors and
+// sets it. `frame` = the original's frame (r1 - 128): the +8 words' last two
+// bytes are its +90 and +91, as the original leaves them.
+uint64_t TrackProperty(uint8_t* base, uint64_t id, uint32_t frame,
+                       const c_runtime::AtexitCall& call);
 
 }  // namespace ui_movies

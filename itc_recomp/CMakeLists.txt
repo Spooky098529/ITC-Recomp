@@ -110,6 +110,7 @@ set(ITC_SOURCES
     src/hooks/ui_movies.cpp
     src/ui_movies/ui_movies.cpp
     src/ui_movies/keys.cpp
+    src/ui_movies/track_properties.cpp
     src/ui_movies/recording.cpp
     src/ui_movies/draw.cpp
     src/ui_movies/files.cpp
