@@ -58,3 +58,13 @@ doesn't write, and sees different leftovers now. For the user: how to
 fix or exclude that case; then the framework's validation, and its
 main group (`main`, `App::Run`, ~304 lines). 1 of 3 subsystems
 started. `check_function_statuses.py`: 0 errors.
+
+Fixed afterward (dbc8ee0, the user's go-ahead): a harness bug, not the
+shaders. The Update family's cases (AiPath::Update, AiDriver::Update,
+DriveCar, UpdateIdle) reach `AiPath::MeasureOthers` but never set the
+racer count or the driver's list at +452, so an index was a fill word and
+its record a wild address, mapped or not by where the harness block
+landed (`0x02191000` since the shaders changed the boot's allocations).
+Now set as the Avoid cases do. `attract_race.sh 40 --run_harnesses=all`
+(`itc_1568`): 27 s, 0 errors, every harness 0 differing outside
+"(expected to differ)". Still to do: the framework's validation.
