@@ -5,7 +5,8 @@
 // (sub_82106040), from StateMachine::IndexOf; StateMachine::IndexOf
 // (sub_821060A0), from StateMachine::Add and Find; StateMachine::Find
 // (sub_821061F0), from StateMachine::Handle (its register step,
-// hooks::GameModesFind, kept for the harness).
+// hooks::GameModesFind, kept for the harness); Buffer28::~Buffer28
+// (sub_82152D28), from sub_82106A00.
 
 #include "guest.h"
 
@@ -25,7 +26,7 @@ ITC_FLAG_BOOL(native_game_modes, true, "ITC",
               "sub_8215DD58, sub_8215DD90, sub_8215DDD0 and sub_8215DE10, the last's virtual "
               "calls guest calls, the race mode's member's parts sub_82155D90, and with "
               "--native_heap Buffer28::Free sub_82152028, Reset sub_82152D38, ~Buffer28 "
-              "sub_82152D28 and sub_82106A00) "
+              "sub_82152D28 (no adapter: only sub_82106A00 calls it) and sub_82106A00) "
               "natively instead of through the translated code (the same writes; checked by "
               "--run_harnesses=game_modes)");
 
@@ -123,7 +124,6 @@ ITC_GAME_MODES(82155D90, Member67760Construct(base, ctx.r3.u32))
 
 ITC_GAME_MODES_FREE(82152028, Buffer28Freeable, Buffer28Free)
 ITC_GAME_MODES_FREE(82152D38, Buffer28Freeable, Buffer28Reset)
-ITC_GAME_MODES_FREE(82152D28, Buffer28Freeable, Buffer28Destroy)
 ITC_GAME_MODES_FREE(82106A00, Buffers28Freeable, Buffers28Destroy)
 
 // sub_8215DE10's work with its virtual calls (each overlay's slot 3) made
