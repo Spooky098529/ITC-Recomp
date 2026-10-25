@@ -13,7 +13,14 @@ When the user has reviewed a run's section, its heading gets
 
 ## Run 2026-10-25 23:42 (`b7-loop-25-10-26-4`)
 
-(running)
+- The race's set-up (map 7d2acaa): `docs/functions/race-setup.md`, 52
+  new rows (none moved); shared rows left in `vehicle-accessors.md`
+  (`RacerRecord::Init`), `car-physics.md` and others; `known-data.md`'s
+  race data, stage list, racer records (the race data's 77 records at
+  +0x59AE8), `0x826C6078`, save data, item and car object rows extended,
+  four rows added (course route, route, course record, 972-byte entry);
+  3 leads added, 6 extended. Never seen in play: `sub_82105BF8`,
+  `sub_820FFA88`, `sub_820CC450`.
 
 ## Run 2026-10-25 16:38 (`b7-loop-25-10-26-3`)
 
