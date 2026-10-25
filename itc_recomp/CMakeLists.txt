@@ -177,6 +177,8 @@ set(ITC_SOURCES
     src/hooks/minimap.cpp
     src/mode_tick/mode_tick.cpp
     src/minimap/minimap.cpp
+    src/hooks/scenery_lists.cpp
+    src/scenery_lists/scenery_lists.cpp
     src/hooks/scene_models.cpp
     src/scene_models/scene_models.cpp
     src/hooks/models.cpp
@@ -273,6 +275,7 @@ set(ITC_SOURCES
     src/harnesses/mode_tick.cpp
     src/harnesses/minimap.cpp
     src/harnesses/scene_models.cpp
+    src/harnesses/scenery_lists.cpp
     src/harnesses/race_hud.cpp
     src/harnesses/ui_movie_objects.cpp
     src/harnesses/models.cpp

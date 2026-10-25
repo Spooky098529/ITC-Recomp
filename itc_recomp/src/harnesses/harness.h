@@ -189,5 +189,6 @@ void Models(Context& h);
 void SceneModels(Context& h);
 void RaceHud(Context& h);
 void UiMovieObjects(Context& h);
+void SceneryLists(Context& h);
 
 }  // namespace harness
