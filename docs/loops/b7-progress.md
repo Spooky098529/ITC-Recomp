@@ -19,8 +19,9 @@ file's history. What's left to see in a drive, from every run:
   run loop's maps and request vector, dispatchers, constructors; 50 of
   68 ours, 15 adapters removed; `--native_framework`; its races ran
   every harness but `ai_drivers`). The loop stopped, then resumed
-  (the user's call, 2026-10-25, after dbc8ee0's harness fix). Step:
-  validation, agent running.
+  (the user's call, 2026-10-25, after dbc8ee0's harness fix). Validated
+  (`itc_1569`: 50 of 50 harness lines, all 50 ran in play; 0 errors).
+  Step: migration 2 (the main group, `sub_82090108`), agent running.
 
 ## Done
 
@@ -41,6 +42,8 @@ This run's groups: `expected-differences.md` (the "01:17 run" lines).
 ## Totals
 
 - Start: ours 1847, work left 4604 (wrapped 113, known 651, unknown 3840).
+- After the framework's validation: race 27 s (`itc_1569`), 0 errors,
+  every harness 0 differing.
 - After the framework's migration 1: ours 1897, work left 4554 (wrapped
   111, known 603, unknown 3840). Race 30 s (`itc_1559`, every harness
   but `ai_drivers`), 0 errors, those harnesses 0 differing.
