@@ -183,6 +183,7 @@ void HardcodedShaders(Context& h);
 void Framework(Context& h);
 void GameModes(Context& h);
 void ModeTick(Context& h);
+void Minimap(Context& h);
 void Models(Context& h);
 
 }  // namespace harness

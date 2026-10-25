@@ -168,7 +168,9 @@ set(ITC_SOURCES
     src/game_modes/game_modes.cpp
     src/game_modes/race_overlays_machine.cpp
     src/hooks/mode_tick.cpp
+    src/hooks/minimap.cpp
     src/mode_tick/mode_tick.cpp
+    src/minimap/minimap.cpp
     src/hooks/models.cpp
     src/models/memory_blocks.cpp
     src/models/xpr.cpp
@@ -258,6 +260,7 @@ set(ITC_SOURCES
     src/harnesses/framework.cpp
     src/harnesses/game_modes.cpp
     src/harnesses/mode_tick.cpp
+    src/harnesses/minimap.cpp
     src/harnesses/models.cpp
     src/harnesses/action_mappers.cpp
     src/harnesses/data_tables.cpp
