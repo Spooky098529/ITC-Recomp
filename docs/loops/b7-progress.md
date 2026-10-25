@@ -93,8 +93,13 @@ file's history. What's left to see in a drive, from every run:
 - Subsystem 3 of 3: the shader objects' set-up under `Mesh::LoadShaders`
   (`sub_822A8740`, `sub_822A85B8`, `sub_82295890`, `sub_82296FE0`),
   picked as all 4 roots ready and blocking `Model::Load` (which blocks
-  the scenery lists' loads and the race mode). Step: mapping, agent
-  running.
+  the scenery lists' loads and the race mode). Mapped as the shader
+  objects (`shader-objects.md`, 7 rows, and `XMemCpy` with its line copy
+  in `c-runtime.md`; 4047496: the shader creates and inits, the memory
+  blocks' `AllocVirtual`, `AllocPhysicalEx` and `PendingFrees::FreeDue`).
+  Map checked (0 errors, all in play, 6 ready groups, no kernel imports;
+  the memory blocks' lock a host mutex by the user's call). Step:
+  migration 1, agent running.
 
 ## Done
 
@@ -142,6 +147,8 @@ This run's groups: `expected-differences.md` (the "16:38 run" lines).
 - After the scenery lists' validation: race 24 s (`itc_1769`), 0
   errors, every harness 0 differing; replay 127 s (`itc_1770`), 0
   errors.
+- After the shader objects' map: ours 2107, work left 4344 (wrapped
+  104, known 585, unknown 3655).
 - After the scenery lists' migration 2 and validation: ours 2107, work
   left 4344 (wrapped 104, known 576, unknown 3664); race 24 s
   (`itc_1777`), 0 errors, every harness 0 differing; replay 127 s

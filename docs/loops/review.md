@@ -145,6 +145,19 @@ When the user has reviewed a run's section, its heading gets
   (its register saves below the stack pointer aren't copied), and sets
   the fake model's +364 to 0; both adapters kept (guest calls through
   `ctx`).
+- `shader-objects.md` (new, 4047496): 7 rows: `VertexShader::Create`
+  `sub_822AA018`, `PixelShader::Create` `sub_822A9EE8`,
+  `VertexShader::Init` `sub_822A8740` (up to 32 12-byte entries,
+  probably the vertex fetches), `PixelShader::Init` `sub_822A85B8`, the
+  memory blocks' `Memory::AllocVirtual` `sub_8258DFF0` (kind 0),
+  `AllocPhysicalEx` `sub_8258E098` (kind 1) and `PendingFrees::FreeDue`
+  `sub_8258E1D8`; `c-runtime.md`: `XMemCpy` `sub_82295890` (probably)
+  and its unaligned 128-byte line copy `sub_82296FE0`. `known-data.md`:
+  `[0x82638308]` (read only by `XMemCpy`'s byte loop, never stored,
+  probably 1: to confirm by a log, as `XMemSet`'s step was), the memory
+  block's kinds and makers. `models.md`: `sub_822A9FD8`, `sub_822A9EA8`
+  read in full. `leads.md`: the ScopedLock users' lead trimmed to
+  `sub_82593E78`; 1 lead added (`XMemCpy`'s other callers).
 
 ## Run 2026-10-25 03:59 (`b7-loop-25-10-26-2`)
 
