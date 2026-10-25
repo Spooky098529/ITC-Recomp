@@ -90,6 +90,11 @@ file's history. What's left to see in a drive, from every run:
 - The user's call (2026-10-25): fallbacks to the original and native
   code calling into `generated/` left as they are for now, to
   investigate later (the functions will be made native anyway).
+- Subsystem 3 of 3: the shader objects' set-up under `Mesh::LoadShaders`
+  (`sub_822A8740`, `sub_822A85B8`, `sub_82295890`, `sub_82296FE0`),
+  picked as all 4 roots ready and blocking `Model::Load` (which blocks
+  the scenery lists' loads and the race mode). Step: mapping, agent
+  running.
 
 ## Done
 
