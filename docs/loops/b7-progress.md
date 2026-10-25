@@ -10,7 +10,8 @@ file's history. What's left to see in a drive, from every run:
 
 - Run started 2026-10-25 01:17 on `by-loop-25-10-26` (the user's
   branch), from db25cd9; summary `b7-loop-2026-10-25-0117.md`.
-- Limit for this run: 3 subsystems.
+- Limit for this run: 3 subsystems; since 2026-10-25, the framework only
+  (the user's call: end the run after it).
 - Subsystem 1 of 3: `leads.md`'s top lead, the app framework, mapped
   last run (`framework.md`, 68 rows, c4b5b86). Map checked (0 errors,
   68 of 68 in play, ready groups; nothing calls the kernel). Migration
