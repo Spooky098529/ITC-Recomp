@@ -251,6 +251,11 @@ Rows not yet moved stay in the table below. So far:
   their message dispatcher and the state machines that handle the
   messages (a transition table keyed by state and message), with the
   race overlays' state machine and its handlers (B7).
+- [`mode-tick.md`](mode-tick.md): what the mode manager's tick runs
+  besides the mode: the per-mode settings (the system checks allowed,
+  the scene target's mode, presence), the sign-in watch, the screen
+  fades and the color rectangle they draw, the billboards' ring flip,
+  the menu music's start and the input unblocked on a mode change (B7).
 
 These files hold functions only. What used to follow the table here moved
 out on 2026-10-20: how frame interpolation works, its options and what
