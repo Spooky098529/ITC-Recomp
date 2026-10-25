@@ -372,6 +372,18 @@ void Pool4RecordReset(uint8_t* base, uint32_t record) {
   CopyFloat(base, record + 48, kOne);
 }
 
+uint32_t SceneModelRecordReset(uint8_t* base, uint32_t record) {
+  ITC_NATIVE_RUNNING("sub_820D9810 SceneModelRecord::Reset");
+  guest::StoreU32(base, record, 1);
+  CarRecordReset(base, record + 16);
+  PartsRecordReset(base, record + 3712);
+  InteriorRecordReset(base, record + 3772);
+  CockpitRecordReset(base, record + 3892);
+  WheelsRecordReset(base, record + 4036);
+  Pool4RecordReset(base, record + 4192);
+  return record + 4192;
+}
+
 uint32_t AllocPages(uint8_t* base, uint32_t out, uint32_t size) {
   ITC_NATIVE_RUNNING("sub_820C3CA0 CarModel::AllocPages");
   const uint32_t pages = memory::AllocPages(size, 4096);

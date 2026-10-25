@@ -337,6 +337,8 @@ void Defaults(Context& h, Random& r, uint32_t block) {
       {"SceneModelRecord::SceneModelRecord (sub_820DB240)", __imp__sub_820DB240,
        hooks::SceneModelsSceneModelRecordConstruct},
       {"sub_820D34B8", __imp__sub_820D34B8, hooks::SceneModelsCockpitRecordReset},
+      {"SceneModelRecord::Reset (sub_820D9810)", __imp__sub_820D9810,
+       hooks::SceneModelsSceneModelRecordReset},
       {"sub_820D3558", __imp__sub_820D3558, hooks::SceneModelsPartsRecordReset},
       {"sub_820D3840", __imp__sub_820D3840, hooks::SceneModelsInteriorRecordReset},
       {"sub_820D3900", __imp__sub_820D3900, hooks::SceneModelsWheelsRecordReset},

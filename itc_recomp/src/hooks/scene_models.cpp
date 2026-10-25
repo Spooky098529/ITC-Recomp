@@ -16,7 +16,7 @@ ITC_FLAG_BOOL(native_scene_models, true, "ITC",
               "sub_820D7EE8, the records' defaults sub_820D45B0, sub_820D3B38, CarRecord::Reset "
               "sub_820D0A98 with sub_820D0A20 (no adapter: only CarRecord::Reset calls it), sub_820D3558, sub_820D3840, sub_820D3900 and "
               "sub_820D34E0, SceneModel::Accessory sub_820D97B8, SceneModelRecord::Copy sub_820DB290, "
-              "SceneModelRecord::SceneModelRecord sub_820DB240, sub_820D34B8, and with "
+              "SceneModelRecord::SceneModelRecord sub_820DB240, sub_820D34B8, SceneModelRecord::Reset sub_820D9810, and with "
               "--native_heap the car model's pages sub_820C3CA0) natively "
               "instead of through the translated code (the same writes; checked by "
               "--run_harnesses=scene_models)");
@@ -135,6 +135,11 @@ void SceneModelsPool4RecordReset(PPCContext& ctx, uint8_t* base) {
   sm::Pool4RecordReset(base, ctx.r3.u32);
 }
 
+void SceneModelsSceneModelRecordReset(PPCContext& ctx, uint8_t* base) {
+  ctx.fpscr.disableFlushMode();
+  ctx.r3.u64 = sm::SceneModelRecordReset(base, ctx.r3.u32);
+}
+
 void SceneModelsAllocPages(PPCContext& ctx, uint8_t* base) {
   ctx.r3.u64 = sm::AllocPages(base, ctx.r4.u32, ctx.r5.u32);
 }
@@ -174,6 +179,7 @@ ITC_SCENE_MODELS(820D97B8, SceneModelsAccessory)
 ITC_SCENE_MODELS(820DB290, SceneModelsSceneModelRecordCopy)
 ITC_SCENE_MODELS(820DB240, SceneModelsSceneModelRecordConstruct)
 ITC_SCENE_MODELS(820D34B8, SceneModelsCockpitRecordReset)
+ITC_SCENE_MODELS(820D9810, SceneModelsSceneModelRecordReset)
 ITC_SCENE_MODELS(820D3900, SceneModelsWheelsRecordReset)
 ITC_SCENE_MODELS(820D34E0, SceneModelsPool4RecordReset)
 

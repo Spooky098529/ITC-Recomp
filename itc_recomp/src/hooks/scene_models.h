@@ -49,6 +49,9 @@ void SceneModelsPartsRecordReset(PPCContext& ctx, uint8_t* base);
 void SceneModelsInteriorRecordReset(PPCContext& ctx, uint8_t* base);
 void SceneModelsWheelsRecordReset(PPCContext& ctx, uint8_t* base);
 void SceneModelsPool4RecordReset(PPCContext& ctx, uint8_t* base);
+// SceneModelRecord::Reset sub_820D9810: r3 = the record; r3 = the record +
+// 4192.
+void SceneModelsSceneModelRecordReset(PPCContext& ctx, uint8_t* base);
 // sub_820C3CA0: r4 = out, r5 = the size; r3 = the pages (VirtualAlloc's).
 void SceneModelsAllocPages(PPCContext& ctx, uint8_t* base);
 

@@ -114,6 +114,13 @@ void WheelsRecordReset(uint8_t* base, uint32_t record);
 // +24, +28, +32, +40, +44, +48.
 void Pool4RecordReset(uint8_t* base, uint32_t record);
 
+// SceneModelRecord::Reset (sub_820D9810): the 4,244-byte record's defaults:
+// +0 = 1 (kind 1), then CarRecordReset (+16), PartsRecordReset (+3712),
+// InteriorRecordReset (+3772), CockpitRecordReset (+3892),
+// WheelsRecordReset (+4036) and Pool4RecordReset (+4192). Returns +4192
+// (the original's r3, as the last leaves it).
+uint32_t SceneModelRecordReset(uint8_t* base, uint32_t record);
+
 // --- Allocation ---
 
 // sub_820C3CA0: VirtualAlloc(0, size, MEM_COMMIT, PAGE_READWRITE) (the
