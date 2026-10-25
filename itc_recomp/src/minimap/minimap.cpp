@@ -4,6 +4,7 @@
 #include "minimap/minimap.h"
 
 #include "base/log.h"
+#include "c_runtime/exit.h"
 #include "c_runtime/strings.h"
 #include "command_list/command_list.h"
 #include "data_tables/data_tables.h"
@@ -322,6 +323,142 @@ std::optional<uint32_t> TriangleRecordFlat(uint8_t* base, uint32_t triangle, uin
   guest::StoreU32(base, header + 12, 0);
   guest::StoreU32(base, header + 8, uint32_t(slots - 1));
   return header;
+}
+
+// --- The markers' draws ---
+
+namespace {
+
+// The floats each marker's table is filled from, word by word (the
+// originals' lfs and stfs, in their order: by offset).
+constexpr uint32_t kCarMarkerSources[] = {
+    0x820067D8, 0x82000A34, 0x820067D4, 0x82000A30, 0x820067D0, 0x82000A34,
+    0x820067D4, 0x82000A30, 0x82000A34, 0x82000A34, 0x820067CC, 0x82000A30,
+    0x820067D8, 0x82000A34, 0x820067D4, 0x82000A30, 0x820067D0, 0x82000A34,
+    0x820067D4, 0x82000A30, 0x820067C8, 0x82000A34, 0x820067C4, 0x82000A30,
+    0x820067C8, 0x82000A34, 0x820067C4, 0x82000A30, 0x820067C0, 0x82000A34,
+    0x820067C4, 0x82000A30, 0x820067D8, 0x82000A34, 0x820067D4, 0x82000A30,
+    0x820067D0, 0x82000A34, 0x820067D4, 0x82000A30, 0x82000A34, 0x82000A34,
+    0x820067CC, 0x82000A30, 0x82000A34, 0x82000A34, 0x820067BC, 0x82000A30,
+    0x82000A34, 0x82000A34, 0x820067BC, 0x82000A30, 0x820067C8, 0x82000A34,
+    0x820067C4, 0x82000A30, 0x820067D0, 0x82000A34, 0x820067D4, 0x82000A30,
+    0x82000A34, 0x82000A34, 0x820067CC, 0x82000A30, 0x820067D8, 0x82000A34,
+    0x820067D4, 0x82000A30, 0x820067C0, 0x82000A34, 0x820067C4, 0x82000A30,
+    0x820067C0, 0x82000A34, 0x820067C4, 0x82000A30, 0x82000A34, 0x82000A34,
+    0x820067BC, 0x82000A30, 0x82000A34, 0x82000A34, 0x820067CC, 0x82000A30,
+};
+constexpr uint32_t kPointMarkerSources[] = {
+    0x82006800, 0x82000A34, 0x820067FC, 0x82000A30, 0x820067F8, 0x82000A34,
+    0x82000A34, 0x82000A30, 0x82006800, 0x82000A34, 0x82006800, 0x82000A30,
+    0x82006800, 0x82000A34, 0x82006800, 0x82000A30, 0x82000A34, 0x82000A34,
+    0x820067F8, 0x82000A30, 0x82006800, 0x82000A34, 0x820067FC, 0x82000A30,
+    0x82002C1C, 0x82000A34, 0x82000A34, 0x82000A30, 0x820067FC, 0x82000A34,
+    0x820067FC, 0x82000A30, 0x82000A34, 0x82000A34, 0x82002C1C, 0x82000A30,
+    0x82000A34, 0x82000A34, 0x82002C1C, 0x82000A30, 0x820067FC, 0x82000A34,
+    0x82006800, 0x82000A30, 0x82002C1C, 0x82000A34, 0x82000A34, 0x82000A30,
+    0x82000A34, 0x82000A34, 0x82002C1C, 0x82000A30, 0x82006800, 0x82000A34,
+    0x820067FC, 0x82000A30, 0x82000A34, 0x82000A34, 0x820067F8, 0x82000A30,
+    0x82000A34, 0x82000A34, 0x820067F8, 0x82000A30, 0x820067FC, 0x82000A34,
+    0x82006800, 0x82000A30, 0x82000A34, 0x82000A34, 0x82002C1C, 0x82000A30,
+    0x820067F4, 0x82000A34, 0x82000A34, 0x82000A30, 0x820067F0, 0x82000A34,
+    0x820067EC, 0x82000A30, 0x820067FC, 0x82000A34, 0x820067FC, 0x82000A30,
+    0x820067FC, 0x82000A34, 0x820067FC, 0x82000A30, 0x82002C1C, 0x82000A34,
+    0x82000A34, 0x82000A30, 0x820067F4, 0x82000A34, 0x82000A34, 0x82000A30,
+    0x820067F0, 0x82000A34, 0x820067EC, 0x82000A30, 0x82000A34, 0x82000A34,
+    0x820067F4, 0x82000A30, 0x82000A34, 0x82000A34, 0x82002C1C, 0x82000A30,
+    0x82000A34, 0x82000A34, 0x82002C1C, 0x82000A30, 0x820067FC, 0x82000A34,
+    0x820067FC, 0x82000A30, 0x820067F0, 0x82000A34, 0x820067EC, 0x82000A30,
+    0x82000A34, 0x82000A34, 0x820067F4, 0x82000A30, 0x820067E8, 0x82000A34,
+    0x820067EC, 0x82000A30, 0x82006800, 0x82000A34, 0x820067FC, 0x82000A30,
+    0x82006800, 0x82000A34, 0x820067FC, 0x82000A30, 0x82000A34, 0x82000A34,
+    0x82002C1C, 0x82000A30, 0x82000A34, 0x82000A34, 0x820067F4, 0x82000A30,
+    0x820067E8, 0x82000A34, 0x820067EC, 0x82000A30, 0x820067E4, 0x82000A34,
+    0x82000A34, 0x82000A30, 0x820067F8, 0x82000A34, 0x82000A34, 0x82000A30,
+    0x820067F8, 0x82000A34, 0x82000A34, 0x82000A30, 0x82006800, 0x82000A34,
+    0x820067FC, 0x82000A30, 0x820067E8, 0x82000A34, 0x820067EC, 0x82000A30,
+    0x820067E4, 0x82000A34, 0x82000A34, 0x82000A30, 0x820067E8, 0x82000A34,
+    0x820067E0, 0x82000A30, 0x82006800, 0x82000A34, 0x82006800, 0x82000A30,
+    0x82006800, 0x82000A34, 0x82006800, 0x82000A30, 0x820067F8, 0x82000A34,
+    0x82000A34, 0x82000A30, 0x820067E4, 0x82000A34, 0x82000A34, 0x82000A30,
+    0x820067E8, 0x82000A34, 0x820067E0, 0x82000A30, 0x82000A34, 0x82000A34,
+    0x820067DC, 0x82000A30, 0x82000A34, 0x82000A34, 0x820067F8, 0x82000A30,
+    0x82000A34, 0x82000A34, 0x820067F8, 0x82000A30, 0x82006800, 0x82000A34,
+    0x82006800, 0x82000A30, 0x820067E8, 0x82000A34, 0x820067E0, 0x82000A30,
+    0x82000A34, 0x82000A34, 0x820067DC, 0x82000A30, 0x820067F0, 0x82000A34,
+    0x820067E0, 0x82000A30, 0x820067FC, 0x82000A34, 0x82006800, 0x82000A30,
+    0x820067FC, 0x82000A34, 0x82006800, 0x82000A30, 0x82000A34, 0x82000A34,
+    0x820067F8, 0x82000A30, 0x82000A34, 0x82000A34, 0x820067DC, 0x82000A30,
+    0x820067F0, 0x82000A34, 0x820067E0, 0x82000A30, 0x820067F4, 0x82000A34,
+    0x82000A34, 0x82000A30, 0x82002C1C, 0x82000A34, 0x82000A34, 0x82000A30,
+    0x82002C1C, 0x82000A34, 0x82000A34, 0x82000A30, 0x820067FC, 0x82000A34,
+    0x82006800, 0x82000A30, 0x820067F0, 0x82000A34, 0x820067E0, 0x82000A30,
+};
+
+struct Marker {
+  uint32_t table;  // 48 bytes a triangle: three (x, y, z, w) vertices
+  uint32_t guard;  // bit 0: the table made
+  uint32_t clean_up;
+  const uint32_t* sources;
+  uint32_t words;
+  uint32_t triangles;
+  uint32_t colored;  // triangles 0 to colored - 1 in the color, the rest black
+};
+constexpr Marker kCarMarker = {0x826C5520, 0x826C5670, 0x825DAEF8, kCarMarkerSources,
+                               std::size(kCarMarkerSources), 7, 1};
+constexpr Marker kPointMarker = {0x826C5680, 0x826C5AA0, 0x825DAF00, kPointMarkerSources,
+                                 std::size(kPointMarkerSources), 22, 6};
+static_assert(std::size(kCarMarkerSources) == 7 * 12);
+static_assert(std::size(kPointMarkerSources) == 22 * 12);
+
+void DrawMarker(uint8_t* base, const Marker& marker, uint32_t pass, uint32_t color,
+                uint32_t matrix, uint32_t frame, const MarkerCalls& calls) {
+  const uint32_t guard = guest::LoadU32(base, marker.guard);
+  if ((guard & 1) == 0) {
+    guest::StoreU32(base, marker.guard, guard | 1);
+    for (uint32_t i = 0; i < marker.words; i++) {
+      CopyFloat(base, marker.table + 4 * i, marker.sources[i]);
+    }
+    c_runtime::AtexitFrom(base, marker.clean_up, calls.atexit);
+  }
+  const uint32_t triangle = frame + kMarkerTriangle;
+  for (uint32_t i = 0; i < marker.triangles; i++) {
+    TriangleInit(base, triangle);
+    // The vertices (+80 to +127), lfs and stfs.
+    for (uint32_t k = 0; k < 12; k++) {
+      CopyFloat(base, triangle + 80 + 4 * k, marker.table + 48 * i + 4 * k);
+    }
+    // The three vertices' colors (+128 to +175): the color's four words, or
+    // (0, 0, 0, 255).
+    uint32_t words[4] = {0, 0, 0, 255};
+    if (i < marker.colored) {
+      for (uint32_t k = 0; k < 4; k++) {
+        words[k] = guest::LoadU32(base, color + 4 * k);
+      }
+    }
+    for (uint32_t v = 0; v < 3; v++) {
+      for (uint32_t k = 0; k < 4; k++) {
+        guest::StoreU32(base, triangle + 128 + 16 * v + 4 * k, words[k]);
+      }
+    }
+    if (!c_runtime::Memcpy(base, triangle, matrix, 64)) {
+      calls.memcpy(calls.user, triangle, matrix, 64);
+    }
+    calls.record(calls.user, triangle, pass, kMarkerKey);
+  }
+}
+
+}  // namespace
+
+void DrawCarMarker(uint8_t* base, uint32_t pass, uint32_t color, uint32_t matrix,
+                   uint32_t frame, const MarkerCalls& calls) {
+  ITC_NATIVE_RUNNING("sub_820F4888 Minimap::DrawCarMarker");
+  DrawMarker(base, kCarMarker, pass, color, matrix, frame, calls);
+}
+
+void DrawPointMarker(uint8_t* base, uint32_t pass, uint32_t color, uint32_t matrix,
+                     uint32_t frame, const MarkerCalls& calls) {
+  ITC_NATIVE_RUNNING("sub_820F4BA8 Minimap::DrawPointMarker");
+  DrawMarker(base, kPointMarker, pass, color, matrix, frame, calls);
 }
 
 }  // namespace minimap

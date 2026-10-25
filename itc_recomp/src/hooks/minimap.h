@@ -45,4 +45,7 @@ void MinimapTriangleRecord(PPCContext& ctx, uint8_t* base);
 // plain C++ declines.
 void MinimapTriangleRecordFlat(PPCContext& ctx, uint8_t* base);
 
+void MinimapDrawCarMarker(PPCContext& ctx, uint8_t* base);
+void MinimapDrawPointMarker(PPCContext& ctx, uint8_t* base);
+
 }  // namespace hooks

@@ -6,6 +6,7 @@
 #include "hooks/minimap.h"
 
 #include "base/flags.h"
+#include "hooks/c_runtime.h"
 #include "hooks/guest_call.h"
 #include "minimap/minimap.h"
 
@@ -18,7 +19,9 @@ ITC_FLAG_BOOL(native_minimap, true, "ITC",
               "sub_820F40C0, no adapter: only it calls it) and List80::Copy sub_820F51A8, Primitive::RecordTransform sub_8217AEA8, Triangle::Record "
               "sub_8217DAA0 (with Triangle::RecordFlat sub_8217C370, no adapter: only it calls "
               "it; the render queue's submit a guest call; sub_8217C4C0, never seen in play, the "
-              "original's)) natively instead "
+              "original's), Minimap::DrawCarMarker sub_820F4888 and Minimap::DrawPointMarker "
+              "sub_820F4BA8 (with native atexit; Triangle::Record from their frames, through "
+              "its adapter)) natively instead "
               "of through the translated code (the same writes; checked by "
               "--run_harnesses=minimap)");
 
@@ -133,6 +136,74 @@ void MinimapTriangleRecord(PPCContext& ctx, uint8_t* base) {
   }
 }
 
+namespace {
+
+// A marker draw's guest calls (minimap::MarkerCalls), made from its frame
+// with the original's return addresses.
+struct MarkerContext {
+  PPCContext& ctx;
+  uint8_t* base;
+  uint32_t frame;
+  uint32_t record_return;
+  uint32_t memcpy_return;
+  GuestAtexit atexit;
+
+  static void Record(void* self, uint32_t triangle, uint32_t pass, uint32_t key) {
+    auto& m = *static_cast<MarkerContext*>(self);
+    const uint64_t stack = m.ctx.r1.u64;
+    m.ctx.r1.u64 = m.frame;
+    m.ctx.lr = m.record_return;
+    m.ctx.r3.u64 = triangle;
+    m.ctx.r4.u64 = pass;
+    m.ctx.r5.u64 = key;
+    sub_8217DAA0(m.ctx, m.base);
+    m.ctx.r1.u64 = stack;
+  }
+  static void Memcpy(void* self, uint32_t to, uint32_t from, uint32_t size) {
+    auto& m = *static_cast<MarkerContext*>(self);
+    const uint64_t stack = m.ctx.r1.u64;
+    m.ctx.r1.u64 = m.frame;
+    m.ctx.lr = m.memcpy_return;
+    m.ctx.r3.u64 = to;
+    m.ctx.r4.u64 = from;
+    m.ctx.r5.u64 = size;
+    sub_825A7410(m.ctx, m.base);
+    m.ctx.r1.u64 = stack;
+  }
+};
+
+using MarkerDraw = void (*)(uint8_t*, uint32_t, uint32_t, uint32_t, uint32_t,
+                            const minimap::MarkerCalls&);
+
+void DrawMarker(PPCContext& ctx, uint8_t* base, MarkerDraw draw, uint32_t frame_bytes,
+                uint32_t record_return, uint32_t memcpy_return) {
+  const uint64_t lr = ctx.lr;
+  const uint32_t pass = ctx.r3.u32, color = ctx.r4.u32, matrix = ctx.r5.u32;
+  const uint32_t frame = ctx.r1.u32 - frame_bytes;
+  guest::StoreU32(base, frame, ctx.r1.u32);  // the back chain, as stwu
+  MarkerContext m{ctx, base, frame, record_return, memcpy_return, {ctx, base}};
+  minimap::MarkerCalls calls;
+  calls.atexit = m.atexit.Call();
+  calls.record = &MarkerContext::Record;
+  calls.memcpy = &MarkerContext::Memcpy;
+  calls.user = &m;
+  draw(base, pass, color, matrix, frame, calls);
+  ctx.lr = lr;
+}
+
+}  // namespace
+
+// r3 = the camera pass, r4 = the color, r5 = the matrix; r3 as the last
+// Triangle::Record leaves it.
+void MinimapDrawCarMarker(PPCContext& ctx, uint8_t* base) {
+  DrawMarker(ctx, base, minimap::DrawCarMarker, minimap::kCarMarkerFrame, 0x820F4B94,
+             0x820F4B84);
+}
+void MinimapDrawPointMarker(PPCContext& ctx, uint8_t* base) {
+  DrawMarker(ctx, base, minimap::DrawPointMarker, minimap::kPointMarkerFrame, 0x820F5188,
+             0x820F5178);
+}
+
 }  // namespace hooks
 
 // Triangle::RecordFlat (sub_8217C370) has no adapter: only Triangle::Record
@@ -161,3 +232,17 @@ ITC_MINIMAP(820F5238, MinimapList80Insert)
 ITC_MINIMAP(820F51A8, MinimapList80Copy)
 ITC_MINIMAP(8217AEA8, MinimapRecordTransform)
 ITC_MINIMAP(8217DAA0, MinimapTriangleRecord)
+
+// The marker draws: also only with native atexit (their tables' first use).
+#define ITC_MINIMAP_MARKER(address, step)                        \
+  extern "C" REX_FUNC(sub_##address) {                           \
+    REX_FUNC_PROLOGUE();                                         \
+    if (!ITC_FLAG(native_minimap) || !hooks::NativeAtexit()) {   \
+      __imp__sub_##address(ctx, base);                           \
+      return;                                                    \
+    }                                                            \
+    hooks::step(ctx, base);                                      \
+  }
+
+ITC_MINIMAP_MARKER(820F4888, MinimapDrawCarMarker)
+ITC_MINIMAP_MARKER(820F4BA8, MinimapDrawPointMarker)

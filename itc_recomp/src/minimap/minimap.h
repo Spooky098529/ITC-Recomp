@@ -4,13 +4,15 @@
 // the markers' 80-slot lists, their triangles and the transform they're
 // recorded with. Minimap::Draw (sub_820F5740) stays recompiled (Wrapped by
 // frame interpolation, src/frame_pacing/per_frame_logic.cpp, and blocked by
-// atexit and the course set's lists). The data is guest data shared with
+// the course set's lists). The data is guest data shared with
 // the recompiled code, so these work on guest memory, with the originals'
 // loads and stores in their order. The originals' stack temporaries aren't
 // written, except where the interpolation reads them (the transform's
 // product). Adapters: src/hooks/minimap.cpp.
 
 #pragma once
+
+#include "c_runtime/exit.h"
 
 #include <cstdint>
 #include <optional>
@@ -120,5 +122,42 @@ constexpr uint32_t kRecordFlatFrame = 128;
 // for the 14 slots).
 std::optional<uint32_t> TriangleRecordFlat(uint8_t* base, uint32_t triangle, uint32_t pass,
                                            uint32_t frame);
+
+// --- The markers' draws ---
+
+// The guest calls a marker's draw makes, from its adapter: Triangle::Record
+// (sub_8217DAA0) of the triangle on the draw's frame (with r1 that frame,
+// as the original's), memcpy (sub_825A7410) where c_runtime::Memcpy can't,
+// and atexit where the native one can't.
+struct MarkerCalls {
+  c_runtime::AtexitCall atexit;
+  void (*record)(void* user, uint32_t triangle, uint32_t pass, uint32_t key) = nullptr;
+  void (*memcpy)(void* user, uint32_t to, uint32_t from, uint32_t size) = nullptr;
+  void* user = nullptr;
+};
+
+// The draws' frames (their r1 less these), the triangle at the frame's +80
+// as the originals', and the sort key they record with.
+constexpr uint32_t kCarMarkerFrame = 320;
+constexpr uint32_t kPointMarkerFrame = 336;
+constexpr uint32_t kMarkerTriangle = 80;
+constexpr uint32_t kMarkerKey = 104;
+
+// Minimap::DrawCarMarker (sub_820F4888): r3 = the camera pass, r4 = the
+// color (four words), r5 = the marker's matrix. The first call (guard bit 0
+// of 0x826C5670) fills the seven triangles' table at 0x826C5520 (336 bytes
+// from the floats at 0x82000A30, 0x82000A34 and 0x820067BC-0x820067D8) and
+// registers its clean-up 0x825DAEF8 with atexit. Then each triangle, on the
+// frame's +80: Triangle::Init, its vertices from the table, its three
+// colors (the color for triangle 0, else (0, 0, 0, 255)), the matrix copied
+// in (memcpy, 64 bytes), and Triangle::Record with key 104.
+void DrawCarMarker(uint8_t* base, uint32_t pass, uint32_t color, uint32_t matrix,
+                   uint32_t frame, const MarkerCalls& calls);
+// Minimap::DrawPointMarker (sub_820F4BA8): the same with 22 triangles (the
+// table at 0x826C5680, 1,056 bytes, also from 0x82002C1C and
+// 0x820067DC-0x82006800; guard 0x826C5AA0, clean-up 0x825DAF00), 0 to 5 in
+// the color.
+void DrawPointMarker(uint8_t* base, uint32_t pass, uint32_t color, uint32_t matrix,
+                     uint32_t frame, const MarkerCalls& calls);
 
 }  // namespace minimap

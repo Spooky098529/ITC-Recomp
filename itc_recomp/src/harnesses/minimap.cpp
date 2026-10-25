@@ -8,8 +8,12 @@
 // stfs, Matrix::Copy, Matrix::Multiply); everything else exactly.
 
 #include "harness.h"
+#include "exit_table.h"
 
+#include "base/log.h"
+#include "c_runtime/exit.h"
 #include "command_list/command_list.h"
+#include "hooks/c_runtime.h"
 #include "hooks/minimap.h"
 #include "memory/heap.h"
 #include "minimap/minimap.h"
@@ -18,6 +22,7 @@
 
 #include <algorithm>
 #include <functional>
+#include <mutex>
 #include <string>
 #include <utility>
 #include <vector>
@@ -38,6 +43,9 @@ struct Region {
 constexpr Region kRegions[] = {
     {0x826D82F0, 0x10}, {0x826C2E30, 0x10}, {0x826C5B10, 0x60},
     {0x826C5CA0, 0x10}, {0x826D83D0, 0x10}, {0x8296BD20, 0x10},
+    // The marker draws' tables and guards (each table made once, only from
+    // the image's floats).
+    {0x826C5520, 0x160}, {0x826C5680, 0x430},
 };
 constexpr uint32_t kVehicles = 0x826C2E34;
 constexpr uint32_t kSaveData = 0x826C5B58;
@@ -489,6 +497,87 @@ void Triangles(Context& h, Random& r, uint32_t block) {
   }
 }
 
+// --- The marker draws ---
+
+void Markers(Context& h, Random& r, uint32_t block) {
+  if (!hooks::NativeAtexit()) {
+    ITC_LOG_WARN("harness: minimap: native atexit off: the marker draws' cases skipped");
+    return;
+  }
+  std::lock_guard<std::recursive_mutex> lock(c_runtime::ExitMutex());
+  // As Triangles': the render queue at +0x40, the command list at +0x100
+  // and its slots from +0x1000 (a chunk of 14 slots, 0xE0 bytes, a
+  // triangle), the camera pass at +0x200; the color at +0x300, the matrix
+  // at +0x340.
+  const uint32_t queue = block + 0x40, list = block + 0x100, slots = block + 0x1000;
+  const uint32_t pass = block + 0x200, color = block + 0x300, matrix = block + 0x340;
+  for (int which = 0; which < 2; which++) {
+    const bool point = which == 1;
+    const uint32_t triangles = point ? 22 : 7;
+    const uint32_t table = point ? 0x826C5680 : 0x826C5520;
+    const uint32_t guard = point ? 0x826C5AA0 : 0x826C5670;
+    const uint32_t frame_bytes = point ? mm::kPointMarkerFrame : mm::kCarMarkerFrame;
+    FloatRanges floats;
+    for (uint32_t k = 0; k < triangles; k++) {
+      const uint32_t chunk = 0x1000 + 0xE0 * k;
+      floats.push_back({chunk + 0x20, 16});
+      floats.push_back({chunk + 0x80, 3});
+      floats.push_back({chunk + 0x98, 3});
+      floats.push_back({chunk + 0xB0, 3});
+    }
+    Results results(point ? "Minimap::DrawPointMarker (sub_820F4BA8)"
+                          : "Minimap::DrawCarMarker (sub_820F4888)");
+    for (int c = 0; c < 24; c++) {
+      const uint32_t mark = exit_table::Mark(h.base);
+      // 0-3: the tables as the game has them; then made again (the guard
+      // cleared over random bytes), or set over random floats.
+      const int pick = c < 4 ? 0 : 1 + c % 2;
+      Case(
+          h, results, block, r,
+          [&](PPCContext& t) {
+            guest::StoreU32(h.base, queue, block + 0xA0);
+            guest::StoreU32(h.base, block + 0xA0 + 16, 0x8209F5C8);
+            const uint32_t used = r.Below(1000);
+            guest::StoreU32(h.base, list + 8, used + 14 * triangles + 1 + r.Below(500));
+            guest::StoreU32(h.base, list + 12, used);
+            guest::StoreU32(h.base, list + 32, slots);
+            guest::StoreU32(h.base, list + 44, slots);
+            guest::StoreU8(h.base, list + 52, 0);
+            guest::StoreU32(h.base, command_list::kOpenChunks, 0);
+            guest::StoreU32(h.base, mm::kTriangleLists, queue);
+            guest::StoreU32(h.base, mm::kTriangleLists + 4, list);
+            RandomFloats(h.base, pass + 144, 16, r);
+            RandomFloats(h.base, matrix, 16, r);
+            if (pick == 1) {
+              RandomBytes(h.base, table, 12 * 4 * triangles, r);
+              guest::StoreU32(h.base, guard, uint32_t(r.Next()) & ~1u);
+            } else if (pick == 2) {
+              RandomFloats(h.base, table, 12 * triangles, r);
+              guest::StoreU32(h.base, guard, uint32_t(r.Next()) | 1u);
+            }
+            t.r3.u64 = pass;
+            t.r4.u64 = color;
+            t.r5.u64 = matrix;
+          },
+          point ? __imp__sub_820F4BA8 : __imp__sub_820F4888,
+          point ? hooks::MinimapDrawPointMarker : hooks::MinimapDrawCarMarker, floats,
+          fmt::format("case {} ({})", c, pick == 0 ? "the game's table"
+                                         : pick == 1 ? "made again" : "random floats"),
+          [&](const PPCContext& t, Outputs& out) {
+            const uint32_t frame = t.r1.u32 - frame_bytes;
+            const uint32_t triangle = frame + mm::kMarkerTriangle;
+            out.Bytes(Read(h.base, triangle, 80));
+            out.Floats(h.base, triangle + 80, 12);
+            out.Bytes(Read(h.base, triangle + 128, 48));
+            out.Floats(h.base, frame - mm::kRecordFlatFrame - mm::kTransformProduct, 16);
+            out.Double(t.f1.u64);
+            exit_table::Take(h.base, mark, out);
+          });
+    }
+    results.Report();
+  }
+}
+
 }  // namespace
 
 void Minimap(Context& h) {
@@ -502,6 +591,7 @@ void Minimap(Context& h) {
   Lists(h, r, block);
   Transform(h, r, block);
   Triangles(h, r, block);
+  Markers(h, r, block);
   memory::Free(allocation);
 }
 
