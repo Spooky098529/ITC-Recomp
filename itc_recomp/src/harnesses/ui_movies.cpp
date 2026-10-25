@@ -340,6 +340,18 @@ void NativeEaseInteger(PPCContext& ctx, uint8_t* base) {
   ctx.r3.u64 = ui_movies::EaseInteger(base, ctx.r3.u32, ctx.r4.u32, ctx.f1.f64);
 }
 
+// sub_8259FB30 through the adapter's steps (its adapter is gone): the
+// original where the plain C++ gives nullopt.
+void NativeCubicFloat(PPCContext& ctx, uint8_t* base) {
+  ctx.fpscr.disableFlushMode();
+  if (const std::optional<double> value =
+          ui_movies::CubicFloat(base, ctx.r3.u32, ctx.r4.u32, ctx.f1.f64)) {
+    ctx.f1.f64 = *value;
+    return;
+  }
+  __imp__sub_8259FB30(ctx, base);
+}
+
 void KeyCases(Context& h) {
   struct KeyFunction {
     const char* name;
@@ -348,7 +360,7 @@ void KeyCases(Context& h) {
   };
   const KeyFunction functions[] = {
       {"EaseInteger (sub_8259FA20)", __imp__sub_8259FA20, NativeEaseInteger, true, false},
-      {"CubicFloat (sub_8259FB30)", __imp__sub_8259FB30, sub_8259FB30, false, true},
+      {"CubicFloat (sub_8259FB30)", __imp__sub_8259FB30, NativeCubicFloat, false, true},
       {"CubicInteger (sub_8259FC18)", __imp__sub_8259FC18, sub_8259FC18, true, false},
   };
   const double odd_t[] = {0.0, 1.0, -0.0, 0.5, 1e-40, -1.0, 2.0, 1.0000001, std::nan(""),
