@@ -354,6 +354,10 @@ extern "C" REX_FUNC(sub_825A0548) {
 
 extern "C" REX_FUNC(sub_8211D2F8) {
   REX_FUNC_PROLOGUE();
+  if (ui_movies_hooks::g_update_callee_stand_in != nullptr &&
+      ui_movies_hooks::g_update_callee_stand_in(0x8211D2F8, ctx, base)) {
+    return;
+  }
   uint32_t movie = ctx.r3.u32, r4 = ctx.r4.u32, caller = uint32_t(ctx.lr);
   uint32_t movie_before = g_ui_movie;
   std::vector<AddedTarget>* added_before = g_added;

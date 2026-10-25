@@ -1584,6 +1584,63 @@ void UpdateCases(Context& h, const Block& block) {
   results.Report();
 }
 
+// UiMovie::Draw (sub_8211D280) and UiMovie::Run (sub_8211E1B8) against the
+// originals: their calls answered by the update's stand-in (Run's the
+// update itself), each call's function, return address, stack pointer and
+// registers compared, with r3.
+void DrawAndRunCases(Context& h, const Block& block) {
+  std::vector<UpdateCall> calls;
+  g_update_calls = &calls;
+  ui_movies_hooks::g_update_callee_stand_in = UpdateCalleeStandIn;
+  struct Case {
+    const char* name;
+    GuestFunction recompiled, native;
+  };
+  for (const Case& f : {Case{"UiMovie::Draw (sub_8211D280)", __imp__sub_8211D280, sub_8211D280},
+                        Case{"UiMovie::Run (sub_8211E1B8)", __imp__sub_8211E1B8, sub_8211E1B8}}) {
+    Results results(f.name);
+    for (int i = 0; i < 100; i++) {
+      const Random start = h.random;
+      Outputs out[2];
+      for (int v = 0; v < 2; v++) {
+        h.random = start;
+        Random& r = h.random;
+        calls.clear();
+        Fill(h.base, block.at, 0x100);
+        const uint32_t movie = block.at + 16 * r.Below(8);
+        guest::StoreU32(h.base, movie + ui_movies::kMovieLive, uint32_t(r.Next()));
+        guest::StoreU32(h.base, movie + ui_movies::kMovieSaved, uint32_t(r.Next()));
+        PPCContext t = CallContext(h);
+        t.r3.u64 = movie;
+        t.r4.u64 = r.Below(3) == 0 ? r.Next() : r.Below(2);
+        t.lr = 0x82000000 | (r.Below(0x10000) << 2);
+        if (v == 0) {
+          RunRecompiled(f.recompiled, t, h.base);
+        } else {
+          f.native(t, h.base);
+        }
+        out[v].Bytes(Read(h.base, block.at, 0x100));
+        out[v].Word(uint32_t(calls.size()));
+        for (const UpdateCall& call : calls) {
+          out[v].Word(call.function);
+          out[v].Word(call.lr);
+          out[v].Word(call.r1);
+          for (uint64_t value : call.registers) {
+            out[v].Word(uint32_t(value >> 32));
+            out[v].Word(uint32_t(value));
+          }
+        }
+        out[v].Word(t.r3.u32);
+        out[v].Word(uint32_t(t.lr));
+      }
+      results.Check(out[0], out[1], fmt::format("case {}", i));
+    }
+    results.Report();
+  }
+  ui_movies_hooks::g_update_callee_stand_in = nullptr;
+  g_update_calls = nullptr;
+}
+
 }  // namespace
 
 void UiMoviesGame(Context& h) {
@@ -1611,6 +1668,7 @@ void UiMoviesGame(Context& h) {
   ScrollOffsetCases(h, block);
   DrawTextsCases(h, block);
   UpdateCases(h, block);
+  DrawAndRunCases(h, block);
   memory->SystemHeapFree(block.at);
 }
 

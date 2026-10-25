@@ -69,7 +69,8 @@ void Update(PPCContext& ctx, uint8_t* base);
 // For harnesses: while set, this is asked first by the overrides of the
 // functions UiMovie::Update calls (UiMovie::ApplyAnimation sub_825A08E0,
 // UiMovie::Draw sub_8259FA00, UiMovie::DrawTexts sub_8211CD90, sub_8259DAC0
-// and UiMovie::RestorePose sub_82119B80, by address), and runs instead of
+// and UiMovie::RestorePose sub_82119B80) and of the update itself
+// (sub_8211D2F8, for UiMovie::Run's cases), by address, and runs instead of
 // them when it returns true.
 using UpdateCalleeStandIn = bool (*)(uint32_t function, PPCContext& ctx, uint8_t* base);
 extern UpdateCalleeStandIn g_update_callee_stand_in;

@@ -6,6 +6,7 @@
 #include <bit>
 
 #include "base/flags.h"
+#include "base/log.h"
 #include "c_runtime/strings.h"
 #include "hooks/guest_call.h"
 #include "hooks/ui_movies_game.h"
@@ -39,7 +40,9 @@ ITC_FLAG_BOOL(native_ui_movies_game, true, "ITC",
               "UiMovie::LoopNamed sub_8211DDE0 and UiMovie::LoopLast sub_8211DDE8, and the "
               "starts UiMovie::Play sub_8211D978 and UiMovie::PlayNamed sub_8211DAC8 (these "
               "without --log_pause_movie); the texts drawn UiMovie::DrawTexts sub_8211CD90 (its "
-              "Text::Draw through that adapter) with UiMovie::ScrollOffset sub_8211B800 "
+              "Text::Draw through that adapter) with UiMovie::ScrollOffset sub_8211B800; "
+              "UiMovie::Draw sub_8211D280 and UiMovie::Run sub_8211E1B8 (their calls through "
+              "their overrides) "
               "(same results; checked by --run_harnesses=ui_movies_game). sub_8211A660, "
               "sub_8211B230, AnimationList::Get, UiMovie::ScrollOffset, sub_8211B7B8, sub_8211B9B8 and "
               "sub_8211B940 have no adapters: only native callers reach "
@@ -466,3 +469,55 @@ void Loop(PPCContext& ctx, uint8_t* base) {
                        ctx.r1.u32, movie);
 }
 }  // namespace ui_movies_game_hooks
+
+// UiMovie::Draw (the game's, sub_8211D280): r3 = movie; the pose saved
+// (UiMovie::RestorePose), then the drawing as the update's (UiMovie::Draw
+// sub_8259FA00, DrawTexts with r5 = 0, sub_8259DAC0 with 678 and 148), each
+// through its override from a frame like the original's (112 bytes) with
+// its return address. r3 as the last call leaves it.
+extern "C" REX_FUNC(sub_8211D280) {
+  REX_FUNC_PROLOGUE();
+  NATIVE_OR_ORIGINAL(8211D280);
+  ITC_NATIVE_RUNNING("sub_8211D280 UiMovie::Draw");
+  const uint32_t movie = ctx.r3.u32;
+  const uint64_t lr = ctx.lr;
+  guest_call::InFrame(ctx, base, 112, 0x8211D2A4, [&](uint32_t) {
+    ctx.r3.u64 = movie;
+    ctx.r4.u64 = guest::LoadU32(base, movie + ui_movies::kMovieSaved);
+    ctx.r5.u64 = guest::LoadU32(base, movie + ui_movies::kMovieLive);
+    ctx.r6.u64 = 0;
+    ctx.r7.u64 = 0;
+    ctx.lr = 0x8211D2A4;
+    sub_82119B80(ctx, base);
+    ctx.r3.u64 = movie + 64;
+    ctx.r4.u64 = guest::LoadU32(base, movie + ui_movies::kMovieLive);
+    ctx.r5.u64 = movie + ui_movies::kMovieTextures;
+    ctx.r6.u64 = movie + 40;
+    ctx.r7.s64 = -1;
+    ctx.lr = 0x8211D2C4;
+    sub_8259FA00(ctx, base);
+    ctx.r3.u64 = movie;
+    ctx.r4.u64 = movie + 40;
+    ctx.r5.u64 = 0;
+    ctx.lr = 0x8211D2D4;
+    sub_8211CD90(ctx, base);
+    for (uint32_t k = 0; k < 2; k++) {
+      ctx.r3.u64 = movie + 64;
+      ctx.r4.u64 = k == 0 ? 678 : 148;
+      ctx.lr = k == 0 ? 0x8211D2E0 : 0x8211D2EC;
+      sub_8259DAC0(ctx, base);
+    }
+  });
+  ctx.lr = lr;
+}
+
+// UiMovie::Run (sub_8211E1B8): a jump to the update (r3 = movie, r4 = 0 to
+// advance, else draw only), its override (the frame pacing's); lr kept, so
+// the update sees the caller's return address as the original's jump leaves
+// it.
+extern "C" REX_FUNC(sub_8211E1B8) {
+  REX_FUNC_PROLOGUE();
+  NATIVE_OR_ORIGINAL(8211E1B8);
+  ITC_NATIVE_RUNNING("sub_8211E1B8 UiMovie::Run");
+  sub_8211D2F8(ctx, base);
+}
