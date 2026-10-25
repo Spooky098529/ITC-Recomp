@@ -28,7 +28,9 @@ ITC_FLAG_BOOL(native_framework, true, "ITC",
               "only those call them: the decrement sub_82091AE8, RotateLeft sub_82092B10, "
               "RotateRight sub_82092A00, AllocateNodes sub_82099C80, NewHead sub_82099E88, NewNode "
               "sub_82099E20 and InsertNode sub_82093400) and request vector (Clear sub_8209A080, "
-              "with Erase sub_82092EF8, no adapter)) natively instead of "
+              "with Erase sub_82092EF8, no adapter; with --native_heap InsertN sub_8209A0E8, "
+              "Insert sub_8209A600 and PushBack sub_8209A930), RunLoop::RunLoop sub_8209A9F0 and "
+              "ApplyRequest sub_8209A458 (with --native_heap)) natively instead of "
               "through the translated code (the same results; checked by "
               "--run_harnesses=framework)");
 
@@ -140,4 +142,88 @@ extern "C" REX_FUNC(sub_8209A080) {
     return;
   }
   ctx.r3.u64 = ctx.r1.u32 - 16;
+}
+
+// RequestVector::InsertN: r3 = the vector, r4 = where (by value: the
+// vector in the high word, also stored in the caller's frame at r1 + 24 as
+// the original does), r5 = the count, r6 = the request. r3 isn't the
+// original's (a load's or operator delete's leftover, which its callers
+// don't read).
+extern "C" REX_FUNC(sub_8209A0E8) {
+  REX_FUNC_PROLOGUE();
+  if (!NativeHeap() ||
+      !fw::RequestsInsertN(base, ctx.r3.u32, ctx.r4.u32, ctx.r5.u32, ctx.r6.u32)) {
+    __imp__sub_8209A0E8(ctx, base);
+    return;
+  }
+  REX_STORE_U64(ctx.r1.u32 + 24, ctx.r4.u64);
+}
+
+// RequestVector::Insert: r3 = the result, r4 = the vector, r5 = where (by
+// value, also stored at the caller's r1 + 32), r6 = the request; r3 the
+// result.
+extern "C" REX_FUNC(sub_8209A600) {
+  REX_FUNC_PROLOGUE();
+  std::optional<fw::Iterator> it;
+  if (NativeHeap()) {
+    it = fw::RequestsInsert(base, ctx.r4.u32, {uint32_t(ctx.r5.u64 >> 32), ctx.r5.u32},
+                            ctx.r6.u32);
+  }
+  if (!it) {
+    __imp__sub_8209A600(ctx, base);
+    return;
+  }
+  REX_STORE_U64(ctx.r1.u32 + 32, ctx.r5.u64);
+  guest::StoreU32(base, ctx.r3.u32 + 0, it->container);
+  guest::StoreU32(base, ctx.r3.u32 + 4, it->node);
+}
+
+// RequestVector::PushBack: r3 = the vector, r4 = the request; r3 the
+// vector, or Insert's result in its 96-byte frame (r1 - 16) when it took
+// Insert, as the original leaves it.
+extern "C" REX_FUNC(sub_8209A930) {
+  REX_FUNC_PROLOGUE();
+  std::optional<bool> inserted;
+  if (NativeHeap()) {
+    inserted = fw::RequestsPushBack(base, ctx.r3.u32, ctx.r4.u32);
+  }
+  if (!inserted) {
+    __imp__sub_8209A930(ctx, base);
+    return;
+  }
+  if (*inserted) {
+    ctx.r3.u64 = ctx.r1.u32 - 16;
+  }
+}
+
+// RunLoop::RunLoop: r3 = the run loop; r3 left.
+extern "C" REX_FUNC(sub_8209A9F0) {
+  REX_FUNC_PROLOGUE();
+  if (!NativeHeap() || !fw::CanAllocate(base)) {
+    __imp__sub_8209A9F0(ctx, base);
+    return;
+  }
+  fw::RunLoopConstruct(base, ctx.r3.u32);
+}
+
+// RunLoop::ApplyRequest: r3 = the run loop, r4 = the type (high word) and
+// key, r5 = the delegate (high word), both also stored in the caller's
+// frame (r1 + 32, + 40) as the original does; r3 HandlerMap::Insert's
+// result in its 128-byte frame (r1 - 32) when it inserted, else left.
+extern "C" REX_FUNC(sub_8209A458) {
+  REX_FUNC_PROLOGUE();
+  std::optional<bool> inserted;
+  if (NativeHeap()) {
+    inserted = fw::RunLoopApplyRequest(base, ctx.r3.u32, uint32_t(ctx.r4.u64 >> 32), ctx.r4.u32,
+                                       uint32_t(ctx.r5.u64 >> 32));
+  }
+  if (!inserted) {
+    __imp__sub_8209A458(ctx, base);
+    return;
+  }
+  REX_STORE_U64(ctx.r1.u32 + 32, ctx.r4.u64);
+  REX_STORE_U64(ctx.r1.u32 + 40, ctx.r5.u64);
+  if (*inserted) {
+    ctx.r3.u64 = ctx.r1.u32 - 32;
+  }
 }

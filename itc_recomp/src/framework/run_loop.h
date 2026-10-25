@@ -44,6 +44,15 @@ constexpr uint32_t kMapMaxSize = 0x1FFFFFFE;  // Insert's length_error from here
 constexpr uint32_t kRequestBytes = 12;
 constexpr uint32_t kVectorFirst = 4;
 constexpr uint32_t kVectorLast = 8;
+constexpr uint32_t kVectorEnd = 12;
+constexpr uint32_t kRequestsMaxSize = 0x15555555;
+
+// The run loop (RunLoop::RunLoop): its vtable, the tick handler map, the
+// listener map and the request vector.
+constexpr uint32_t kRunLoopVtable = 0x82000FE8;
+constexpr uint32_t kTickHandlers = 4;
+constexpr uint32_t kListeners = 16;
+constexpr uint32_t kRequests = 28;
 
 struct Iterator {
   uint32_t container;
@@ -80,16 +89,22 @@ uint32_t MapConstruct(uint8_t* base, uint32_t map);
 // `value` and the color.
 uint32_t MapNewNode(uint8_t* base, uint32_t left, uint32_t parent, uint32_t right, uint32_t value,
                     uint8_t color);
+uint32_t MapNewNodeOf(uint8_t* base, uint32_t left, uint32_t parent, uint32_t right, uint32_t key,
+                      uint32_t delegate, uint8_t color);
 // sub_82093400 (_Insert): a node for the 8-byte value at `value` linked
 // under `where` (on its left when `add_left`) and the tree rebalanced.
 // nullopt, with nothing done, at the size limit (the original's
 // length_error) or without a heap.
 std::optional<Iterator> MapInsert(uint8_t* base, uint32_t map, bool add_left, uint32_t where,
                                   uint32_t value);
+std::optional<Iterator> MapInsertOf(uint8_t* base, uint32_t map, bool add_left, uint32_t where,
+                                    uint32_t key, uint32_t delegate);
 // sub_82093740 HandlerMap::Insert (std::map::insert): the value at `value`
 // (its key first) added unless its key is there. nullopt, with nothing done,
 // where the original would throw or trap.
 std::optional<InsertResult> MapInsertUnique(uint8_t* base, uint32_t map, uint32_t value);
+std::optional<InsertResult> MapInsertUniqueOf(uint8_t* base, uint32_t map, uint32_t key,
+                                              uint32_t delegate);
 
 // sub_82092EF8: the vector's erase(first, last), 12-byte elements: the
 // elements after the range moved down, last set. false where the original
@@ -98,5 +113,35 @@ bool RequestsErase(uint8_t* base, uint32_t vector, Iterator first, Iterator last
 // sub_8209A080 RequestVector::Clear: erase(first, last) over everything.
 // false where the original traps (first past last).
 bool RequestsClear(uint8_t* base, uint32_t vector);
+
+// sub_8209A0E8 RequestVector::InsertN (_Insert_n): `count` copies of the
+// request at `value` inserted before `where` (a reallocation through
+// PtrList::AllocateNodes, the 12-byte allocator, when it doesn't fit, the
+// old block freed). false, with nothing done, for the length_error, an
+// allocation the heap can't give, and a tail at least `count` long (its
+// copy_backward, sub_82091CD0, never seen in play).
+bool RequestsInsertN(uint8_t* base, uint32_t vector, uint32_t where, uint32_t count,
+                     uint32_t value);
+// sub_8209A600 RequestVector::Insert (insert(where, value)): InsertN of one,
+// then the iterator at the inserted request. nullopt where the original
+// traps or InsertN hands back.
+std::optional<Iterator> RequestsInsert(uint8_t* base, uint32_t vector, Iterator where,
+                                       uint32_t value);
+// sub_8209A930 RequestVector::PushBack: the request at `value` copied to
+// the end, or Insert at the end when full. Whether it took Insert (the
+// original's r3 differs), or nullopt where it traps or Insert hands back.
+std::optional<bool> RequestsPushBack(uint8_t* base, uint32_t vector, uint32_t value);
+
+// sub_8209A9F0 RunLoop::RunLoop: the vtable, the two maps
+// (HandlerMap::HandlerMap), the request vector empty, +48 to +50 cleared.
+// Returns the run loop.
+uint32_t RunLoopConstruct(uint8_t* base, uint32_t loop);
+// sub_8209A458 RunLoop::ApplyRequest: type 0 inserts the delegate under the
+// key in the tick handler map, 2 in the listener map (HandlerMap::Insert);
+// other types but 1 and 3 do nothing. Whether it inserted (the original's r3
+// differs), or nullopt for 1 and 3 (a removal, never seen in play) or an
+// insert handed back.
+std::optional<bool> RunLoopApplyRequest(uint8_t* base, uint32_t loop, uint32_t type, uint32_t key,
+                                        uint32_t delegate);
 
 }  // namespace framework

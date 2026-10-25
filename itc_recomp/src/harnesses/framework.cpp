@@ -180,8 +180,10 @@ struct FlagOff {
   bool saved_;
 };
 
-// Cases the plain C++ handed to the original (none expected).
+// Cases the plain C++ handed to the original (none expected), and those
+// expected (InsertN's copy_backward path).
 int g_fallbacks = 0;
+int g_fallbacks_expected = 0;
 
 // Where a case keeps things in the scratch area.
 struct Places {
@@ -257,9 +259,12 @@ void NodesOut(uint8_t* base, Outputs& out, const Walk& w) {
     for (uint32_t at : {rl::kNodeLeft, rl::kNodeParent, rl::kNodeRight}) {
       out.Word(w.Of(Load(base, node + at)));
     }
-    out.Word(Load(base, node + rl::kNodeKey));
-    out.Word(Load(base, node + rl::kNodeDelegate));
-    out.Bytes(Read(base, node + rl::kNodeColor, 4));
+    // A head's key and delegate are never set (heap leftovers).
+    if (guest::LoadU8(base, node + rl::kNodeIsNil) == 0) {
+      out.Word(Load(base, node + rl::kNodeKey));
+      out.Word(Load(base, node + rl::kNodeDelegate));
+    }
+    out.Bytes(Read(base, node + rl::kNodeColor, 2));  // +22, +23 are never set
   }
   for (uint32_t node : w.nodes) {
     memory::crt::OperatorDelete(node);
@@ -706,6 +711,273 @@ void Requests(Context& h) {
   }
 }
 
+
+// --- The request vector's growth and the run loop ---
+
+void NativeInsertN(PPCContext& ctx, uint8_t* base) {
+  if (!rl::RequestsInsertN(base, ctx.r3.u32, ctx.r4.u32, ctx.r5.u32, ctx.r6.u32)) {
+    g_fallbacks_expected++;
+    __imp__sub_8209A0E8(ctx, base);
+    return;
+  }
+  REX_STORE_U64(ctx.r1.u32 + 24, ctx.r4.u64);
+}
+// Whether Insert of one at `where` takes InsertN's copy_backward path (a
+// fallback expected).
+bool CopyBackward(uint8_t* base, uint32_t vector, uint32_t where) {
+  const uint32_t first = Load(base, vector + rl::kVectorFirst);
+  const uint32_t last = Load(base, vector + rl::kVectorLast);
+  const uint32_t end = Load(base, vector + rl::kVectorEnd);
+  return first != 0 && last != end && where != last;
+}
+void NativeRequestInsert(PPCContext& ctx, uint8_t* base) {
+  const bool expected = CopyBackward(base, ctx.r4.u32, ctx.r5.u32);
+  const auto it =
+      rl::RequestsInsert(base, ctx.r4.u32, {uint32_t(ctx.r5.u64 >> 32), ctx.r5.u32}, ctx.r6.u32);
+  if (!it) {
+    (expected ? g_fallbacks_expected : g_fallbacks)++;
+    __imp__sub_8209A600(ctx, base);
+    return;
+  }
+  REX_STORE_U64(ctx.r1.u32 + 32, ctx.r5.u64);
+  guest::StoreU32(base, ctx.r3.u32 + 0, it->container);
+  guest::StoreU32(base, ctx.r3.u32 + 4, it->node);
+}
+void NativePushBack(PPCContext& ctx, uint8_t* base) {
+  const auto inserted = rl::RequestsPushBack(base, ctx.r3.u32, ctx.r4.u32);
+  if (!inserted) {
+    g_fallbacks++;
+    __imp__sub_8209A930(ctx, base);
+    return;
+  }
+  if (*inserted) {
+    ctx.r3.u64 = ctx.r1.u32 - 16;
+  }
+}
+void NativeRunLoop(PPCContext& ctx, uint8_t* base) { rl::RunLoopConstruct(base, ctx.r3.u32); }
+void NativeApplyRequest(PPCContext& ctx, uint8_t* base) {
+  const auto inserted = rl::RunLoopApplyRequest(base, ctx.r3.u32, uint32_t(ctx.r4.u64 >> 32),
+                                                ctx.r4.u32, uint32_t(ctx.r5.u64 >> 32));
+  if (!inserted) {
+    g_fallbacks++;
+    __imp__sub_8209A458(ctx, base);
+    return;
+  }
+  REX_STORE_U64(ctx.r1.u32 + 32, ctx.r4.u64);
+  REX_STORE_U64(ctx.r1.u32 + 40, ctx.r5.u64);
+  if (*inserted) {
+    ctx.r3.u64 = ctx.r1.u32 - 32;
+  }
+}
+
+// A request vector at p.vector with `size` random requests in a heap block
+// of `capacity` (none when 0); returns the block.
+uint32_t BuildVector(Context& h, uint32_t size, uint32_t capacity) {
+  const Places p = PlacesOf(h);
+  uint32_t block = 0;
+  if (capacity != 0) {
+    block = *memory::crt::OperatorNew(h.base, capacity * rl::kRequestBytes);
+    for (uint32_t i = 0; i < 3 * capacity; i++) {
+      guest::StoreU32(h.base, block + 4 * i, i < 3 * size ? uint32_t(h.random.Next()) : 0xCDCDCDCDu);
+    }
+  }
+  guest::StoreU32(h.base, p.vector + rl::kVectorFirst, block);
+  guest::StoreU32(h.base, p.vector + rl::kVectorLast, block + size * rl::kRequestBytes);
+  guest::StoreU32(h.base, p.vector + rl::kVectorEnd, block + capacity * rl::kRequestBytes);
+  return block;
+}
+
+// The vector after a case: its words with the blocks by number (the one it
+// started with 0, a new one 1), its requests, whether the first block is
+// still a heap block; the scratch area by number. Its block(s) freed.
+void VectorOut(Context& h, Outputs& out, uint32_t old_block, const std::vector<uint32_t>& words) {
+  const Places p = PlacesOf(h);
+  const uint32_t first = Load(h.base, p.vector + rl::kVectorFirst);
+  const uint32_t last = Load(h.base, p.vector + rl::kVectorLast);
+  auto number = [&](uint32_t word) {
+    if (old_block != 0 && word - old_block < 0x10000) {
+      return 0xB10C0000u + (word - old_block);
+    }
+    if (first != old_block && first != 0 && word - first < 0x10000) {
+      return 0xB1100000u + (word - first);
+    }
+    return word;
+  };
+  for (uint32_t at = 0; at < 512; at += 4) {
+    out.Word(number(Load(h.base, h.data + at)));
+  }
+  for (uint32_t word : words) {
+    out.Word(number(word));
+  }
+  out.Word(first != 0 && memory::IsHeapBlock(first) ? memory::Size(first) : 0);
+  if (first != 0 && last >= first && last - first < 0x10000) {
+    out.Bytes(Read(h.base, first, last - first));
+  }
+  const bool old_alive = old_block != 0 && memory::IsHeapBlock(old_block);
+  out.Word(old_alive);
+  if (first != 0 && memory::IsHeapBlock(first)) {
+    memory::crt::OperatorDelete(first);
+  }
+  if (old_alive && old_block != first) {
+    memory::crt::OperatorDelete(old_block);
+  }
+}
+
+void VectorGrowth(Context& h) {
+  const Places p = PlacesOf(h);
+  uint32_t block = 0;
+  // A vector of 0 to 6 requests, its capacity 0 to 4 more (none at all now
+  // and then: an empty vector with no block), and the request inserted from
+  // the scratch area or (now and then) one of the vector's own.
+  auto setup = [&](uint32_t& size, uint32_t& where) {
+    const bool none = h.random.Below(8) == 0;
+    size = none ? 0 : h.random.Below(7);
+    const uint32_t capacity = none ? 0 : size + h.random.Below(5);
+    block = BuildVector(h, size, capacity);
+    where = block + h.random.Below(size + 1) * rl::kRequestBytes;
+    for (uint32_t i = 0; i < 3; i++) {
+      guest::StoreU32(h.base, p.value + 4 * i, uint32_t(h.random.Next()));
+    }
+    guest::StoreU32(h.base, p.result + 12, size != 0 && h.random.Below(4) == 0
+                                               ? block + h.random.Below(size) * rl::kRequestBytes
+                                               : p.value);
+  };
+  {
+    Results results("RequestVector::InsertN (sub_8209A0E8)");
+    for (int c = 0; c < 500; c++) {
+      uint32_t count = 0;
+      MapCase(
+          h, results,
+          [&] {
+            uint32_t size = 0, where = 0;
+            setup(size, where);
+            count = h.random.Below(5);
+            guest::StoreU32(h.base, p.iterator, where);
+          },
+          [&](PPCContext& t) {
+            t.r3.u64 = p.vector;
+            t.r4.u64 = (uint64_t(p.vector) << 32) | Load(h.base, p.iterator);
+            t.r5.u64 = count;
+            t.r6.u64 = Load(h.base, p.result + 12);
+            Fill(h.base, t.r1.u32 + 24, 8);
+          },
+          __imp__sub_8209A0E8, NativeInsertN,
+          [&](Outputs& out, const PPCContext& t) {
+            // r3 isn't compared (see the adapter).
+            VectorOut(h, out, block, {Load(h.base, t.r1.u32 + 24), Load(h.base, t.r1.u32 + 28)});
+          },
+          fmt::format("case {}", c));
+    }
+    results.Report();
+  }
+  {
+    Results results("RequestVector::Insert (sub_8209A600)");
+    for (int c = 0; c < 500; c++) {
+      MapCase(
+          h, results,
+          [&] {
+            uint32_t size = 0, where = 0;
+            setup(size, where);
+            guest::StoreU32(h.base, p.iterator, where);
+          },
+          [&](PPCContext& t) {
+            t.r3.u64 = p.result;
+            t.r4.u64 = p.vector;
+            t.r5.u64 = (uint64_t(p.vector) << 32) | Load(h.base, p.iterator);
+            t.r6.u64 = Load(h.base, p.result + 12);
+          },
+          __imp__sub_8209A600, NativeRequestInsert,
+          [&](Outputs& out, const PPCContext& t) { VectorOut(h, out, block, {t.r3.u32}); },
+          fmt::format("case {}", c));
+    }
+    results.Report();
+  }
+  {
+    Results results("RequestVector::PushBack (sub_8209A930)");
+    for (int c = 0; c < 500; c++) {
+      MapCase(
+          h, results,
+          [&] {
+            uint32_t size = 0, where = 0;
+            setup(size, where);
+          },
+          [&](PPCContext& t) {
+            t.r3.u64 = p.vector;
+            t.r4.u64 = Load(h.base, p.result + 12);
+          },
+          __imp__sub_8209A930, NativePushBack,
+          [&](Outputs& out, const PPCContext& t) { VectorOut(h, out, block, {t.r3.u32}); },
+          fmt::format("case {}", c));
+    }
+    results.Report();
+  }
+}
+
+// A run loop at p.map's place (56 bytes: through p.value's).
+void RunLoops(Context& h) {
+  const uint32_t loop = h.data + 64;
+  {
+    Results results("RunLoop::RunLoop (sub_8209A9F0)");
+    for (int c = 0; c < 20; c++) {
+      MapCase(
+          h, results, [] {}, [&](PPCContext& t) { t.r3.u64 = loop; }, __imp__sub_8209A9F0,
+          NativeRunLoop,
+          [&](Outputs& out, const PPCContext& t) {
+            const uint32_t listeners = Load(h.base, loop + rl::kListeners + rl::kMapHead);
+            const Walk w =
+                WalkFrom(h.base, Load(h.base, loop + rl::kTickHandlers + rl::kMapHead), {listeners});
+            for (uint32_t at = 0; at < 512; at += 4) {
+              out.Word(w.Of(Load(h.base, h.data + at)));
+            }
+            out.Word(w.Of(t.r3.u32));
+            NodesOut(h.base, out, w);
+          },
+          fmt::format("case {}", c));
+    }
+    results.Report();
+  }
+  {
+    Results results("RunLoop::ApplyRequest (sub_8209A458)");
+    for (int c = 0; c < 600; c++) {
+      uint32_t type = 0, key = 0, delegate = 0;
+      MapCase(
+          h, results,
+          [&] {
+            {
+              FlagOff off;
+              PPCContext t = CallContext(h);
+              t.r3.u64 = loop;
+              __imp__sub_8209A9F0(t, h.base);
+            }
+            BuildMap(h, loop + rl::kTickHandlers, RandomKeys(h.random));
+            BuildMap(h, loop + rl::kListeners, RandomKeys(h.random));
+            const uint32_t kinds[] = {0, 2, 0, 2, 4, 7, 0xFFFFFFFF};
+            type = kinds[h.random.Below(7)];
+            key = h.random.Below(2) ? h.random.Below(32) : uint32_t(h.random.Next());
+            delegate = uint32_t(h.random.Next());
+          },
+          [&](PPCContext& t) {
+            t.r3.u64 = loop;
+            t.r4.u64 = (uint64_t(type) << 32) | key;
+            t.r5.u64 = (uint64_t(delegate) << 32) | uint32_t(h.random.Next());
+          },
+          __imp__sub_8209A458, NativeApplyRequest,
+          [&](Outputs& out, const PPCContext& t) {
+            const uint32_t listeners = Load(h.base, loop + rl::kListeners + rl::kMapHead);
+            const Walk w =
+                WalkFrom(h.base, Load(h.base, loop + rl::kTickHandlers + rl::kMapHead), {listeners});
+            for (uint32_t at = 0; at < 512; at += 4) {
+              out.Word(w.Of(Load(h.base, h.data + at)));
+            }
+            out.Word(w.Of(t.r3.u32));
+            NodesOut(h.base, out, w);
+          },
+          fmt::format("type {} case {}", type, c));
+    }
+    results.Report();
+  }
+}
+
 void Containers(Context& h) {
   Requests(h);
   if (!hooks::NativeHeapActive()) {
@@ -716,6 +988,11 @@ void Containers(Context& h) {
   Rotations(h);
   Allocations(h);
   Inserts(h);
+  VectorGrowth(h);
+  RunLoops(h);
+  ITC_LOG_INFO("harness: framework: {} InsertN and Insert cases handed to the original (a tail "
+               "at least the count long, its copy_backward never seen in play)",
+               g_fallbacks_expected);
   if (g_fallbacks != 0) {
     ITC_LOG_INFO("harness: framework: {} cases handed to the original", g_fallbacks);
   }
