@@ -29,6 +29,11 @@ all ran in the attract race. Left:
   (`c-runtime.md`)
 - The minimap (attract race `itc_1648`, replay `itc_1649`, ok):
   `sub_82147D18` SetList::Point (`minimap.md`)
+- The `atexit` step (attract race `itc_1665`, replay `itc_1666`, ok):
+  `sub_820F4BA8` Minimap::DrawPointMarker (`minimap.md`); `sub_825B3430`
+  _lock and `sub_825B32D0` _unlock (`c-runtime.md`: their plain C++
+  runs only for lock 8, which only the exit path takes, never in play:
+  closing the window hard-exits, so probably never in a drive either)
 - The game modes' cleanup (`itc_1624`, `itc_1625`): the modes not
   entered, `sub_82106F08` ModeType5::ModeType5, `sub_82235E88`
   ModeType6::ModeType6, `sub_82246340` ModeType7::ModeType7,
