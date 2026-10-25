@@ -79,8 +79,12 @@ file's history. What's left to see in a drive, from every run:
   `Model::DrawShape` `sub_82596B18` with `Model::RecordShape`
   `sub_82595550` (1,063 lines). Validated (`itc_1769`: 26 of 26 harness
   lines, 3 Merged skipped; replay `itc_1770` ok; 2 to `to-drive.md`).
-  Step: migration 2 (`Model::DrawShape`, `Model::RecordShape`), agent
-  running.
+  Migration 2 done (343035d: `Model::DrawShape` under
+  `--native_scenery_lists`, `Model::RecordShape` under `--native_models`;
+  every `Model::DrawShape` call in a race native, from `Scenery::Draw`;
+  frame dumps and `--log_blend_state` counts matched the fallback; 24 s,
+  0 errors, every harness 0 differing). Nothing ready left: the lists'
+  loads wait on `Model::Load`. Step: validation 2, agent running.
 
 ## Done
 

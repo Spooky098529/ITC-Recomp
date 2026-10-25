@@ -124,6 +124,20 @@ When the user has reviewed a run's section, its heading gets
   `RecordShape`'s material animations and more than 4 textures;
   `RecordShape`'s adapter kept (guest calls to the model's and
   provider's slots).
+- `scenery-lists.md` migration 2 (343035d): `Model::DrawShape`
+  `sub_82596B18` (`--native_scenery_lists`) and `Model::RecordShape`
+  `sub_82595550` (`models.md`, `--native_models`) in
+  `src/scenery_lists/model_draws.cpp`, reusing the recorders' helpers.
+  For review: the same declines as migration 1 (material animations,
+  more than 4 textures, a vertex declaration it leaves to the original,
+  diagnostics, another list's chunk, no room) run the original from the
+  start; its interpolation record context (`0x82596BA0`, the queue
+  calls' return addresses) as the original's; the harness turns
+  `--native_models` off on the recompiled side, compares
+  `IsShapeVisible`'s product only where no recompiled `RecordShape` ran
+  (its register saves below the stack pointer aren't copied), and sets
+  the fake model's +364 to 0; both adapters kept (guest calls through
+  `ctx`).
 
 ## Run 2026-10-25 03:59 (`b7-loop-25-10-26-2`)
 
