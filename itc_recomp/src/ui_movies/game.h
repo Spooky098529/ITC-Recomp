@@ -172,6 +172,25 @@ Moved MoveNamedAnimation(uint8_t* base, uint32_t movie, uint32_t index, bool to_
 // looping list, by name when its +8 isn't -1.
 Moved LoopLast(uint8_t* base, uint32_t movie);
 
+// The time a finished animation's slot is applied at: the float word at
+// 0x82000A34 (0.0) when reversed (+28), else its animation's length ([+16]
+// + 12).
+uint32_t FinishTime(uint8_t* base, uint32_t slot);
+// sub_8211DE38 (UiMovie::Finish)'s and sub_8211DF20 (UiMovie::FinishNamed)'s
+// search, after their move of the animation to the queue (MoveAnimation or
+// MoveNamedAnimation, not to the looping list): the first queued slot with
+// its +4 `sub_scene` and +0 `index`, or by name its +8 `named` (the count
+// read then, 16-bit, sign-extended and compared unsigned), its position and
+// FinishTime. The adapters apply it there (UiMovie::ApplyAnimation on +12
+// and +16, r6 = 0) and remove it (RemoveAt): the live scene keeps its end
+// pose.
+struct Finishing {
+  uint32_t position = 0, slot = 0, time = 0;
+};
+std::optional<Finishing> FindFinishing(uint8_t* base, uint32_t movie, uint32_t sub_scene,
+                                       uint32_t index);
+std::optional<Finishing> FindFinishingNamed(uint8_t* base, uint32_t movie, uint32_t named);
+
 // sub_8211D978 (UiMovie::Play): animation `index` of the live scene (or of
 // its sub-scene `sub_scene` when that isn't -1; SceneAnimation) started:
 // unless the looping list has a slot with its +4 `sub_scene` and +0

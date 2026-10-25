@@ -37,7 +37,10 @@ ITC_FLAG_BOOL(native_ui_movies_game, true, "ITC",
               "sub_8211B9B8 and sub_8211B940, and UiMovies::IsLoaded sub_8211BE98; the moves "
               "between the animation lists UiMovie::MoveAnimation sub_8211DBE0, "
               "UiMovie::MoveNamedAnimation sub_8211DCE8, UiMovie::Loop sub_8211DDD8, "
-              "UiMovie::LoopNamed sub_8211DDE0 and UiMovie::LoopLast sub_8211DDE8, and the "
+              "UiMovie::LoopNamed sub_8211DDE0, UiMovie::LoopLast sub_8211DDE8, the "
+              "stops UiMovie::Finish sub_8211DE38, UiMovie::FinishNamed sub_8211DF20 and "
+              "UiMovie::FinishAll sub_8211DFF8 (UiMovie::ApplyAnimation through its override), "
+              "and the "
               "starts UiMovie::Play sub_8211D978 and UiMovie::PlayNamed sub_8211DAC8 (these "
               "without --log_pause_movie); the texts drawn UiMovie::DrawTexts sub_8211CD90 (its "
               "Text::Draw through that adapter) with UiMovie::ScrollOffset sub_8211B800; "
@@ -468,6 +471,55 @@ void Loop(PPCContext& ctx, uint8_t* base) {
   ctx.r3.u64 = MovedR3(ui_movies::MoveAnimation(base, movie, ctx.r4.u32, ctx.r5.u32, true),
                        ctx.r1.u32, movie);
 }
+
+// UiMovie::Finish and FinishNamed: the animation moved to the queue
+// (MoveAnimation or MoveNamedAnimation), then, when the queue has it,
+// applied at its end through UiMovie::ApplyAnimation's override and
+// removed, from a frame like the original's with its return addresses. r3
+// as the original leaves it: the move's, or the queue after the removal.
+namespace {
+template <typename Move, typename Find>
+void FinishIn(PPCContext& ctx, uint8_t* base, uint32_t movie, uint32_t frame_bytes,
+              uint32_t move_return, uint32_t apply_return, Move move, Find find) {
+  const uint64_t lr = ctx.lr;
+  guest_call::InFrame(ctx, base, frame_bytes, move_return, [&](uint32_t frame) {
+    ctx.r3.u64 = MovedR3(move(), frame, movie);
+    const std::optional<ui_movies::Finishing> found = find();
+    if (!found) {
+      return;
+    }
+    ctx.r3.u64 = guest::LoadU32(base, found->slot + 12);
+    ctx.r4.u64 = guest::LoadU32(base, found->slot + 16);
+    ctx.r6.u64 = 0;
+    ctx.fpscr.disableFlushMode();
+    ctx.f1.f64 = double(std::bit_cast<float>(found->time));
+    ctx.lr = apply_return;
+    sub_825A08E0(ctx, base);
+    const uint32_t queue = movie + ui_movies::kMovieQueue;
+    ui_movies::RemoveAt(base, queue, found->position);
+    ctx.r3.u64 = queue;
+  });
+  ctx.lr = lr;
+}
+}  // namespace
+
+void Finish(PPCContext& ctx, uint8_t* base) {
+  NATIVE_UNWATCHED_OR_ORIGINAL(8211DE38);
+  const uint32_t movie = ctx.r3.u32, sub_scene = ctx.r4.u32, index = ctx.r5.u32;
+  FinishIn(
+      ctx, base, movie, 128, 0x8211DE58, 0x8211DF08,
+      [&] { return ui_movies::MoveAnimation(base, movie, sub_scene, index, false); },
+      [&] { return ui_movies::FindFinishing(base, movie, sub_scene, index); });
+}
+
+void FinishNamed(PPCContext& ctx, uint8_t* base) {
+  NATIVE_UNWATCHED_OR_ORIGINAL(8211DF20);
+  const uint32_t movie = ctx.r3.u32, named = ctx.r4.u32;
+  FinishIn(
+      ctx, base, movie, 112, 0x8211DF3C, 0x8211DFE0,
+      [&] { return ui_movies::MoveNamedAnimation(base, movie, named, false); },
+      [&] { return ui_movies::FindFinishingNamed(base, movie, named); });
+}
 }  // namespace ui_movies_game_hooks
 
 // UiMovie::Draw (the game's, sub_8211D280): r3 = movie; the pose saved
@@ -520,4 +572,69 @@ extern "C" REX_FUNC(sub_8211E1B8) {
   NATIVE_OR_ORIGINAL(8211E1B8);
   ITC_NATIVE_RUNNING("sub_8211E1B8 UiMovie::Run");
   sub_8211D2F8(ctx, base);
+}
+
+// UiMovie::FinishAll (sub_8211DFF8): r3 = movie. Every looping slot moved
+// to the queue's end (copied into the frame, +80, unlinked, then
+// AnimationList::Insert), then every queued slot copied there, applied at
+// its end (UiMovie::ApplyAnimation, r6 = 0, at FinishTime) and unlinked:
+// the live scene keeps each one's end pose. Its calls through their
+// overrides from a frame like the original's (176 bytes) with its return
+// addresses; the copies the host's (the game's memcpy where they might
+// share memory). The counts are read once each, 16-bit, sign-extended, and
+// counted down to 0 as the original's. r3 as the last call leaves it.
+extern "C" REX_FUNC(sub_8211DFF8) {
+  REX_FUNC_PROLOGUE();
+  NATIVE_UNWATCHED_OR_ORIGINAL(8211DFF8);
+  ITC_NATIVE_RUNNING("sub_8211DFF8 UiMovie::FinishAll");
+  const uint32_t movie = ctx.r3.u32;
+  const uint32_t queue = movie + ui_movies::kMovieQueue;
+  const uint32_t looping = movie + ui_movies::kMovieLooping;
+  const uint64_t lr = ctx.lr;
+  auto count = [&](uint32_t list) {
+    return uint32_t(int32_t(int16_t(guest::LoadU16(base, list + 136))));
+  };
+  guest_call::InFrame(ctx, base, 176, 0x8211E05C, [&](uint32_t frame) {
+    const uint32_t copy = frame + 80;
+    // The list's first slot copied to the frame (memcpy, r3 its
+    // destination).
+    auto copy_first = [&](uint32_t list, uint32_t return_address) {
+      const uint32_t from = ui_movies::SlotOf(base, list, ui_movies::LinkAt(base, list, 0));
+      if (!c_runtime::Memcpy(base, copy, from, 40)) {
+        ctx.r3.u64 = copy;
+        ctx.r4.u64 = from;
+        ctx.r5.u64 = 40;
+        ctx.lr = return_address;
+        sub_825A7410(ctx, base);
+      }
+      ctx.r3.u64 = copy;
+    };
+    uint32_t n = count(looping);
+    if (n != 0) {
+      do {
+        copy_first(looping, 0x8211E05C);
+        ui_movies::UnlinkQueueFirst(base, looping);
+        ctx.r3.u64 = queue;
+        ctx.r4.u64 = copy;
+        ctx.r5.s64 = int32_t(count(queue));
+        ctx.lr = 0x8211E0A0;
+        sub_8211B4D0(ctx, base);
+      } while (--n != 0);
+    }
+    n = count(queue);
+    if (n != 0) {
+      do {
+        copy_first(queue, 0x8211E0F0);
+        ctx.r3.u64 = guest::LoadU32(base, copy + 12);
+        ctx.r4.u64 = guest::LoadU32(base, copy + 16);
+        ctx.r6.u64 = 0;
+        ctx.fpscr.disableFlushMode();
+        ctx.f1.f64 = double(std::bit_cast<float>(ui_movies::FinishTime(base, copy)));
+        ctx.lr = 0x8211E118;
+        sub_825A08E0(ctx, base);
+        ui_movies::UnlinkQueueFirst(base, queue);
+      } while (--n != 0);
+    }
+  });
+  ctx.lr = lr;
 }

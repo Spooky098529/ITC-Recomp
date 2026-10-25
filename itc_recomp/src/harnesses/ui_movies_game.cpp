@@ -11,6 +11,7 @@
 #include "c_runtime/strings.h"
 #include "hooks/strings_and_font.h"
 #include "hooks/ui_movies.h"
+#include "hooks/ui_movies_game.h"
 #include "strings_and_font/strings_and_font.h"
 #include "ui_movies/game.h"
 
@@ -1641,6 +1642,108 @@ void DrawAndRunCases(Context& h, const Block& block) {
   g_update_calls = nullptr;
 }
 
+// The stops against the originals: UiMovie::Finish (sub_8211DE38),
+// FinishNamed (sub_8211DF20) and FinishAll (sub_8211DFF8). Two made-up lists
+// (0 to 32 slots used each; for FinishAll 32 at most together, as moving
+// more into a full queue follows its -1 links out of the block) with small
+// indices (+0, +4, +8), made-up animations (+16; their length at +12, odd
+// floats among them) and reversed words (+28) mostly 0 or 1; the moves,
+// AnimationList::Insert and RemoveAt run (the native ones against the
+// originals), UiMovie::ApplyAnimation answered by the update's stand-in.
+// Compared: the lists, the frame's slot copy (FinishAll's, +80), every call
+// made (with f1), r3, f1 and lr.
+void FinishCases(Context& h, const Block& block) {
+  const uint32_t movie = block.at;
+  const uint32_t animations = block.at + 0xA500;  // eight of 32 bytes
+  constexpr uint32_t kBytes = 0xA600;
+  std::vector<UpdateCall> calls;
+  g_update_calls = &calls;
+  ui_movies_hooks::g_update_callee_stand_in = UpdateCalleeStandIn;
+  struct Case {
+    const char* name;
+    GuestFunction recompiled, native;
+    bool all;
+  };
+  for (const Case& f :
+       {Case{"UiMovie::Finish (sub_8211DE38)", __imp__sub_8211DE38, ui_movies_game_hooks::Finish,
+             false},
+        Case{"UiMovie::FinishNamed (sub_8211DF20)", __imp__sub_8211DF20,
+             ui_movies_game_hooks::FinishNamed, false},
+        Case{"UiMovie::FinishAll (sub_8211DFF8)", __imp__sub_8211DFF8, sub_8211DFF8, true}}) {
+    Results results(f.name);
+    for (int i = 0; i < 600; i++) {
+      const Random start = h.random;
+      Outputs out[2];
+      uint32_t used[2] = {}, r4 = 0, r5 = 0;
+      for (int v = 0; v < 2; v++) {
+        h.random = start;
+        Random& r = h.random;
+        calls.clear();
+        Fill(h.base, block.at, kBytes);
+        const uint32_t queued = i == 0 ? 0 : r.Below(33);
+        const uint32_t looping = i == 1 ? 0 : r.Below(f.all ? 33 - queued : 33);
+        ListSpec lists[2] = {ListSpec(r, queued), ListSpec(r, looping)};
+        for (ListSpec& list : lists) {
+          for (auto& words : list.slots) {
+            words[4] = animations + 32 * r.Below(8);
+            words[7] = r.Below(6) == 0 ? uint32_t(r.Next()) : r.Below(2);
+          }
+        }
+        lists[0].Write(h.base, movie + ui_movies::kMovieQueue);
+        lists[1].Write(h.base, movie + ui_movies::kMovieLooping);
+        used[0] = lists[0].used;
+        used[1] = lists[1].used;
+        for (uint32_t j = 0; j < 8; j++) {
+          guest::StoreU32(h.base, animations + 32 * j + 12,
+                          r.Below(4) == 0 ? RandomWord(r)
+                                          : std::bit_cast<uint32_t>(float(r.Below(40)) / 4.0f));
+        }
+        g_apply_answers = Random(r.Next());
+        r4 = r.Below(5) == 0 ? 0xFFFFFFFFu : r.Below(f.native == ui_movies_game_hooks::Finish ? 3 : 6);
+        r5 = r.Below(4);
+        PPCContext t = CallContext(h);
+        const uint32_t copy = t.r1.u32 - 176 + 80;
+        Fill(h.base, copy, 40);
+        t.r3.u64 = movie;
+        t.r4.u64 = r4;
+        t.r5.u64 = r5;
+        t.f1.u64 = r.Next();
+        t.lr = 0x82000000 | (r.Below(0x10000) << 2);
+        if (v == 0) {
+          RunRecompiled(f.recompiled, t, h.base);
+        } else {
+          f.native(t, h.base);
+        }
+        out[v].Bytes(Read(h.base, block.at, kBytes));
+        if (f.all) {
+          out[v].Bytes(Read(h.base, copy, 40));
+        }
+        out[v].Word(uint32_t(calls.size()));
+        for (const UpdateCall& call : calls) {
+          out[v].Word(call.function);
+          out[v].Word(call.lr);
+          out[v].Word(call.r1);
+          for (uint64_t value : call.registers) {
+            out[v].Word(uint32_t(value >> 32));
+            out[v].Word(uint32_t(value));
+          }
+          out[v].Double(call.f1);
+        }
+        out[v].Word(t.r3.u32);
+        out[v].Word(uint32_t(t.r3.u64 >> 32));
+        out[v].Double(t.f1.u64);
+        out[v].Word(uint32_t(t.lr));
+      }
+      results.Check(out[0], out[1],
+                    fmt::format("case {}: {} queued, {} looping, r4 {:X} r5 {}", i, used[0],
+                                used[1], r4, r5));
+    }
+    results.Report();
+  }
+  ui_movies_hooks::g_update_callee_stand_in = nullptr;
+  g_update_calls = nullptr;
+}
+
 }  // namespace
 
 void UiMoviesGame(Context& h) {
@@ -1669,6 +1772,7 @@ void UiMoviesGame(Context& h) {
   DrawTextsCases(h, block);
   UpdateCases(h, block);
   DrawAndRunCases(h, block);
+  FinishCases(h, block);
   memory->SystemHeapFree(block.at);
 }
 

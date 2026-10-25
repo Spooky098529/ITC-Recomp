@@ -621,10 +621,12 @@ extern "C" REX_FUNC(sub_8211D978) {
   __imp__sub_8211D978(ctx, base);
 }
 
+// Its work (natively with --native_ui_movies_game) is in
+// src/hooks/ui_movies_game.cpp; logged, the original runs.
 extern "C" REX_FUNC(sub_8211DE38) {
   REX_FUNC_PROLOGUE();
   if (!ITC_FLAG(log_pause_movie)) {
-    __imp__sub_8211DE38(ctx, base);
+    ui_movies_game_hooks::Finish(ctx, base);
     return;
   }
   debug::LogCall("8211DE38", ctx);
@@ -643,10 +645,12 @@ extern "C" REX_FUNC(sub_8211DDD8) {
   __imp__sub_8211DDD8(ctx, base);
 }
 
+// Its work (natively with --native_ui_movies_game) is in
+// src/hooks/ui_movies_game.cpp; logged, the original runs.
 extern "C" REX_FUNC(sub_8211DF20) {
   REX_FUNC_PROLOGUE();
   if (!ITC_FLAG(log_pause_movie)) {
-    __imp__sub_8211DF20(ctx, base);
+    ui_movies_game_hooks::FinishNamed(ctx, base);
     return;
   }
   debug::LogCall("8211DF20", ctx);
