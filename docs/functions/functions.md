@@ -261,6 +261,12 @@ Rows not yet moved stay in the table below. So far:
   the blink clock that flashes the player's), the triangles they're
   drawn with, their 80-slot lists, and two of the race manager's
   accessors (B7).
+- [`scene-models.md`](scene-models.md): the scene models (the cars as
+  the scene holds them, in its second set of pools): their set-up and
+  build over the parts' pools, the build deferred to their update, the
+  set-up dispatch, the parts' links, the records' defaults and copies,
+  the parts' and the traffic body's loaders, and a record re-applied
+  (B7; the load poll and the release aren't in it).
 
 These files hold functions only. What used to follow the table here moved
 out on 2026-10-20: how frame interpolation works, its options and what
