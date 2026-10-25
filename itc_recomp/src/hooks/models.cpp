@@ -23,6 +23,7 @@
 #include "models/model.h"
 #include "models/texture_provider.h"
 #include "models/xpr.h"
+#include "model_animation/model_animation.h"
 #include "shader_objects/shader_objects.h"
 
 ITC_FLAG_BOOL(native_models, true, "ITC",
@@ -49,6 +50,8 @@ ITC_FLAG_BOOL(native_models, true, "ITC",
               "(their copies as memcpy's override makes them, recorded for the renderer; "
               "VertexShader::Init's original a guest call where its plain C++ declines), "
               "with --native_heap "
+              "SkeletonBase::SetUp sub_8259A9E0 (with NodeFile::View sub_825A21A8, no adapter: "
+              "only it calls it) and Skeleton::Bind sub_82599A20 (in src/model_animation/), "
               "Memory::AllocPhysical sub_8258E138 (in src/models/memory_blocks.cpp), the shared shaders sub_825896D8 and sub_82589700, the vertex "
               "declaration sub_82589728 (its message for a type pair the tables don't cover, "
               "never seen in play, the original's), Model::RecordShape sub_82595550 (in "
@@ -368,4 +371,29 @@ extern "C" REX_FUNC(sub_82594D20) {
     }
   }
   __imp__sub_82594D20(ctx, base);
+}
+
+// SkeletonBase::SetUp: r3 = the skeleton, r4 = the node file, r5 = the
+// matrices or 0, r6 = the instance count. Skeleton::Bind: r3 to r5 the same.
+// No return value read. Flush-to-zero off, as the originals leave it.
+extern "C" REX_FUNC(sub_8259A9E0) {
+  REX_FUNC_PROLOGUE();
+  if (NativeLifetime()) {
+    ctx.fpscr.disableFlushMode();
+    if (model_animation::SkeletonSetUp(base, ctx.r3.u32, ctx.r4.u32, ctx.r5.u32, ctx.r6.s32)) {
+      return;
+    }
+  }
+  __imp__sub_8259A9E0(ctx, base);
+}
+
+extern "C" REX_FUNC(sub_82599A20) {
+  REX_FUNC_PROLOGUE();
+  if (NativeLifetime()) {
+    ctx.fpscr.disableFlushMode();
+    if (model_animation::SkeletonBind(base, ctx.r3.u32, ctx.r4.u32, ctx.r5.u32)) {
+      return;
+    }
+  }
+  __imp__sub_82599A20(ctx, base);
 }

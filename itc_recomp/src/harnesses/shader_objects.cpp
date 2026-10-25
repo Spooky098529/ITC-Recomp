@@ -10,6 +10,7 @@
 #include "base/log.h"
 #include "memory/c_runtime_heap.h"
 #include "memory/heap.h"
+#include "model_animation/model_animation.h"
 #include "models/memory_blocks.h"
 #include "models/xpr.h"
 #include "shader_objects/shader_objects.h"
@@ -645,6 +646,107 @@ void LoadShaderSections(Context& h) {
   results.Report();
 }
 
+// --- The skeleton's set-up and bind ---
+
+void NativeSkeletonSetUp(PPCContext& ctx, uint8_t* base) {
+  if (!model_animation::SkeletonSetUp(base, ctx.r3.u32, ctx.r4.u32, ctx.r5.u32, ctx.r6.s32)) {
+    __imp__sub_8259A9E0(ctx, base);
+  }
+}
+void NativeSkeletonBind(PPCContext& ctx, uint8_t* base) {
+  if (!model_animation::SkeletonBind(base, ctx.r3.u32, ctx.r4.u32, ctx.r5.u32)) {
+    __imp__sub_82599A20(ctx, base);
+  }
+}
+
+// SkeletonBase::SetUp and Skeleton::Bind: a skeleton (192 bytes of random
+// words, with arrays from an earlier set-up or none) and a node file of 0 to
+// 20 nodes and 0 to 10 entries; instance counts -1 to 3; matrices or none.
+// The skeleton's words with its arrays compared by their contents (they sit
+// at different addresses on each side), then freed.
+void SkeletonSetUps(Context& h) {
+  constexpr uint32_t kSkeletonBytes = 192;
+  for (int bind = 0; bind < 2; bind++) {
+    Results results(bind ? "Skeleton::Bind (sub_82599A20)"
+                         : "SkeletonBase::SetUp (sub_8259A9E0, with NodeFile::View sub_825A21A8)");
+    for (int c = 0; c < 200; c++) {
+      const uint32_t nodes = c % 9 == 0 ? 0 : h.random.Below(21);
+      const uint32_t entries = c % 7 == 0 ? 0 : h.random.Below(11);
+      const int32_t instances = int32_t(h.random.Below(5)) - 1;
+      const bool with_matrices = c % 3 == 0;
+      const bool earlier = c % 2 == 1;
+      const uint32_t chosen = h.random.Below(nodes + 1);
+      std::vector<uint32_t> words(kSkeletonBytes / 4), file_words(64);
+      for (auto& w : words) w = uint32_t(h.random.Next());
+      for (auto& w : file_words) w = uint32_t(h.random.Next());
+      Outputs out[2];
+      for (int v = 0; v < 2; v++) {
+        const uint32_t skeleton = h.data;
+        const uint32_t file = h.data + 1024;
+        for (uint32_t i = 0; i < words.size(); i++) Store(h.base, skeleton + 4 * i, words[i]);
+        for (uint32_t i = 0; i < file_words.size(); i++) Store(h.base, file + 4 * i, file_words[i]);
+        Store(h.base, file + 4, nodes);
+        Store(h.base, file + 8, entries);
+        Store(h.base, file + 12, chosen);
+        for (uint32_t offset : {128u, 132u, 136u, 144u, 176u}) {
+          Store(h.base, skeleton + offset, 0);
+        }
+        if (earlier) {
+          Store(h.base, skeleton + 128, *memory::crt::OperatorNewArray(h.base, 40));
+          Store(h.base, skeleton + 136, *memory::crt::OperatorNewArray(h.base, 16 + 144) + 16);
+          Store(h.base, skeleton + 176, *memory::crt::OperatorNewArray(h.base, 64));
+        }
+        PPCContext t = CallContext(h);
+        t.r3.u64 = skeleton;
+        t.r4.u64 = file;
+        t.r5.u64 = with_matrices ? h.data + 2048 : 0;
+        t.r6.s64 = instances;
+        if (bind) {
+          (v == 0 ? __imp__sub_82599A20 : NativeSkeletonBind)(t, h.base);
+        } else {
+          (v == 0 ? __imp__sub_8259A9E0 : NativeSkeletonSetUp)(t, h.base);
+        }
+        // The arrays by their contents, their words replaced by 0.
+        const uint32_t count = Load(h.base, skeleton + 160);
+        struct Array {
+          uint32_t offset, bytes, header;
+        };
+        const Array arrays[] = {{128, 20 * count, 0},
+                                {136, 144 * nodes, 16},
+                                {132, 64 * nodes, 16},
+                                {144, 64 * entries, 16},
+                                {176, 16 * nodes, 0}};
+        for (const Array& a : arrays) {
+          const uint32_t at = Load(h.base, skeleton + a.offset);
+          out[v].Word(at != 0);
+          if (at != 0 && !(a.offset == 176 && !bind && earlier)) {
+            if (a.header) out[v].Word(Load(h.base, at - 16));
+            out[v].Bytes(Read(h.base, at, a.bytes));
+          }
+        }
+        const uint32_t nodes_at = Load(h.base, skeleton + 136);
+        out[v].Word(Load(h.base, skeleton + 140) - nodes_at);
+        const uint32_t matrices_at = Load(h.base, skeleton + 148);
+        out[v].Word(matrices_at == Load(h.base, skeleton + 132) ? 1 : matrices_at);
+        std::vector<uint8_t> rest = Read(h.base, skeleton, kSkeletonBytes);
+        for (uint32_t offset : {128u, 132u, 136u, 140u, 144u, 148u, 176u}) {
+          for (int k = 0; k < 4; k++) rest[offset + k] = 0;
+        }
+        out[v].Bytes(rest);
+        for (const Array& a : arrays) {
+          const uint32_t at = Load(h.base, skeleton + a.offset);
+          if (at != 0) memory::crt::OperatorDeleteArray(at - a.header);
+        }
+      }
+      results.Check(out[0], out[1],
+                    fmt::format("case {} ({} nodes, {} entries, {} instances{}{})", c, nodes,
+                                entries, instances, with_matrices ? ", matrices" : "",
+                                earlier ? ", arrays before" : ""));
+    }
+    results.Report();
+  }
+}
+
 // --- The memory blocks ---
 
 // The makers' register steps.
@@ -881,6 +983,7 @@ void ShaderObjects(Context& h) {
   ResourceRelocations(h);
   XprCreates(h);
   LoadShaderSections(h);
+  SkeletonSetUps(h);
 }
 
 }  // namespace harness

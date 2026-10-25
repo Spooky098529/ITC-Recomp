@@ -116,6 +116,29 @@ bool SkeletonFreeNodeValues(uint8_t* base, uint32_t skeleton);
 bool TrackSetReleasable(uint8_t* base, uint32_t set, bool array);
 bool SkeletonDestructible(uint8_t* base, uint32_t skeleton);
 
+// sub_825A21A8 NodeFile::View (probably; models.md): the view's +0 = the
+// file, +4 to +32 its +16 to +44 made pointers, +36 = +32's + 16, +40 its +48
+// made a pointer, +44 = its +4 - its +8.
+void NodeFileView(uint8_t* base, uint32_t view, uint32_t file);
+// sub_8259A9E0 SkeletonBase::SetUp (probably; models.md): Free, +160 = the
+// instance count (1 when not above 0), +128 that many cursors (operator
+// new[], each SkeletonCursor::Clear), the node file's view at +80; with
+// nodes ([file + 4]): +136 a 144-byte entry a node (+12, +28, +44, +60 =
+// 1.0, +64 to +127 and +132 = 0), and +148 `matrices`, or when that's 0
+// +132 and +148 a 64-byte matrix a node (+12, +28, +44, +60 = 1.0); with
+// [file + 8] entries, +144 a 64-byte entry each (+12, +28, +44 = 1.0, +52 =
+// 1); +140 = +136 + 144 x [file + 12]. Arrays have a 16-byte count header
+// (operator new[]). False, with nothing done, where the original must run:
+// a block Free can't free natively, or a size operator new[] would refuse.
+bool SkeletonSetUp(uint8_t* base, uint32_t skeleton, uint32_t file, uint32_t matrices,
+                   int32_t instances);
+// sub_82599A20 Skeleton::Bind (probably; models.md): SetUp with one
+// instance, +176 freed (operator delete[]) and made again (16 bytes a node,
+// none without nodes), each node's x, y, z = 0.0 (by Skeleton::NodeCount).
+// False, with nothing done, where the original must run (SetUp's, or a +176
+// the layer didn't give, or a size operator new[] would refuse).
+bool SkeletonBind(uint8_t* base, uint32_t skeleton, uint32_t file, uint32_t matrices);
+
 // SkeletonCursor::Clear (sub_825A2068): +0, +4, +8, +16 = 0, +12 = 0.0.
 void SkeletonCursorClear(uint8_t* base, uint32_t cursor);
 // SkeletonCursor::View (sub_825A2090): as TrackSet::View, +16 = 0.
