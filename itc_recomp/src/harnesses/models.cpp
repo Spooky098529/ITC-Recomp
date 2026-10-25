@@ -20,6 +20,7 @@
 #include "memory/c_runtime_heap.h"
 #include "memory/heap.h"
 #include "models/memory_blocks.h"
+#include "models/texture_provider.h"
 #include "models/xpr.h"
 
 #include <fmt/format.h>
@@ -439,6 +440,341 @@ void XprReleases(Context& h, const Block& block) {
   results.Report();
 }
 
+// --- The texture provider and its vector ---
+
+namespace tp = models;
+
+constexpr uint32_t kOldMarker = 0x4F4C4421;  // a word that pointed at the given storage
+constexpr uint32_t kNewMarker = 0x4E455721;  // ... at storage the function made
+
+void SetR3(PPCContext& t, const std::optional<models::R3>& r3, GuestFunction original,
+           uint8_t* base) {
+  if (!r3) {
+    original(t, base);
+  } else if (!r3->kept) {
+    t.r3.u64 = r3->value;
+  }
+}
+
+void NativeReserve(PPCContext& t, uint8_t* base) {
+  SetR3(t, models::PointersReserve(base, t.r3.u32, t.r4.u32), __imp__sub_82594570, base);
+}
+void NativeInsertN(PPCContext& t, uint8_t* base) {
+  SetR3(t, models::PointersInsertN(base, t.r3.u32, t.r4.u32, t.r5.u32, Load(base, t.r6.u32)),
+        __imp__sub_82590EF0, base);
+}
+void NativeAssign(PPCContext& t, uint8_t* base) {
+  SetR3(t, models::PointersAssign(base, t.r3.u32, t.r4.u32, Load(base, t.r5.u32)),
+        __imp__sub_825947D0, base);
+}
+void NativeClear(PPCContext& t, uint8_t* base) {
+  t.r3.u64 = models::PointersClear(base, t.r3.u32);
+}
+void NativeAllocate(PPCContext& t, uint8_t* base) {
+  if (const auto block = models::PointersAllocate(base, t.r4.u32)) {
+    t.r3.u64 = *block;
+  } else {
+    __imp__sub_825942B8(t, base);
+  }
+}
+void NativeUninitializedCopy(PPCContext& t, uint8_t* base) {
+  t.r3.u64 = models::PointersUninitializedCopy(base, t.r3.u32, t.r4.u32, t.r5.u32);
+}
+void NativeProviderConstruct(PPCContext& t, uint8_t* base) {
+  if (!models::TextureProviderConstruct(base, t.r3.u32, t.r4.s32)) {
+    __imp__sub_82594850(t, base);
+  }
+}
+void NativeProviderDestruct(PPCContext& t, uint8_t* base) {
+  if (const auto r3 = models::TextureProviderDestruct(base, t.r3.u32)) {
+    t.r3.u64 = *r3;
+  } else {
+    __imp__sub_825943E0(t, base);
+  }
+}
+
+// A word as compared: storage addresses replaced with their markers.
+uint32_t Marked(uint32_t word, uint32_t old_storage, uint32_t new_storage) {
+  if (old_storage != 0 && word == old_storage) {
+    return kOldMarker;
+  }
+  if (new_storage != 0 && word == new_storage) {
+    return kNewMarker;
+  }
+  return word;
+}
+
+// After a case on the vector at `vector` given `old_storage` (0 for none):
+// its words (as offsets into whichever storage it holds), its elements, the
+// r3 (marked), then the words cleared and the storage it holds freed (the
+// old one also when the function didn't free it). `old_freed` says whether
+// the function was expected to free the old storage: when the vector holds
+// new storage.
+void TakeVector(uint8_t* base, uint32_t vector, uint32_t old_storage, const PPCContext& t,
+                Outputs& out) {
+  const uint32_t first = Load(base, vector + tp::kVectorFirst);
+  const uint32_t last = Load(base, vector + tp::kVectorLast);
+  const uint32_t end = Load(base, vector + tp::kVectorEnd);
+  const bool fresh = first != 0 && first != old_storage;
+  const uint32_t new_storage = fresh ? first : 0;
+  out.Word(Marked(first, old_storage, new_storage));
+  out.Word(last - first);
+  out.Word(end - first);
+  if (first != 0 && last - first <= 4096) {
+    for (uint32_t p = first; p != last; p += 4) {
+      out.Word(Marked(Load(base, p), old_storage, new_storage));
+    }
+  }
+  out.Word(Marked(t.r3.u32, old_storage, new_storage));
+  out.Word(uint32_t(t.r3.u64 >> 32));
+  Store(base, vector + tp::kVectorFirst, Marked(first, old_storage, new_storage));
+  Store(base, vector + tp::kVectorLast, 0);
+  Store(base, vector + tp::kVectorEnd, 0);
+  if (fresh) {
+    memory::crt::OperatorDelete(first);
+  } else if (old_storage != 0) {
+    memory::crt::OperatorDelete(old_storage);
+  }
+}
+
+// Storage of `capacity` pointers (0: none) holding `size` random ones.
+uint32_t MakeStorage(uint8_t* base, uint32_t capacity, uint32_t size, Random& random) {
+  if (capacity == 0) {
+    return 0;
+  }
+  const uint32_t storage = memory::crt::OperatorNew(base, capacity * 4).value_or(0);
+  for (uint32_t i = 0; i < capacity; i++) {
+    Store(base, storage + 4 * i, i < size ? uint32_t(random.Next()) : 0xCDCDCDCD);
+  }
+  return storage;
+}
+
+// The vector's words for `storage` of `capacity` holding `size`.
+void WriteVector(uint8_t* base, uint32_t vector, uint32_t storage, uint32_t size,
+                 uint32_t capacity) {
+  Store(base, vector + tp::kVectorFirst, storage);
+  Store(base, vector + tp::kVectorLast, storage == 0 ? 0 : storage + 4 * size);
+  Store(base, vector + tp::kVectorEnd, storage == 0 ? 0 : storage + 4 * capacity);
+}
+
+void Allocates(Context& h) {
+  Results results("TextureProvider::Allocate (sub_825942B8)");
+  for (int c = 0; c < 24; c++) {
+    static constexpr uint32_t kCounts[] = {0, 1, 2, 64, 100, 1000};
+    const uint32_t count = c < 6 ? kCounts[c] : h.random.Below(300);
+    Outputs out[2];
+    for (int v = 0; v < 2; v++) {
+      Fill(h.base, h.data, kScratchBytes);
+      PPCContext t = CallContext(h);
+      t.r3.u64 = 0x12345678;
+      t.r4.u64 = count;
+      Side(v, [&] { (v == 0 ? __imp__sub_825942B8 : NativeAllocate)(t, h.base); });
+      const uint32_t block = t.r3.u32;
+      out[v].Word(block != 0 && memory::IsHeapBlock(block));
+      out[v].Word(block != 0 ? memory::Size(block) : 0);
+      out[v].Bytes(Read(h.base, h.data, kScratchBytes));
+      if (block != 0) {
+        memory::crt::OperatorDelete(block);
+      }
+    }
+    results.Check(out[0], out[1], fmt::format("case {} (count {})", c, count));
+  }
+  results.Report();
+}
+
+void UninitializedCopies(Context& h, const Block& block) {
+  Results results("TextureProvider::UninitializedCopy (sub_82594380)");
+  for (int c = 0; c < 32; c++) {
+    // A null destination only for one word (the null check is per slot: the
+    // next slot would be address 4).
+    const uint32_t count = c < 4 ? uint32_t(c & 1) : h.random.Below(20);
+    const uint32_t from = block.address + 4 * h.random.Below(8);
+    const uint32_t to = c < 4 ? 0 : block.address + 128 + 4 * h.random.Below(8);
+    const Random start = h.random;
+    Outputs out[2];
+    for (int v = 0; v < 2; v++) {
+      Random random = start;
+      Fill(h.base, h.data, kScratchBytes);
+      Fill(h.base, block.address, block.bytes);
+      for (uint32_t i = 0; i < count; i++) {
+        Store(h.base, from + 4 * i, uint32_t(random.Next()));
+      }
+      PPCContext t = CallContext(h);
+      t.r3.u64 = from;
+      t.r4.u64 = from + 4 * count;
+      t.r5.u64 = to;
+      Side(v, [&] { (v == 0 ? __imp__sub_82594380 : NativeUninitializedCopy)(t, h.base); });
+      out[v].Bytes(Read(h.base, block.address, block.bytes));
+      out[v].Bytes(Read(h.base, h.data, kScratchBytes));
+      out[v].Word(t.r3.u32);
+      out[v].Word(uint32_t(t.r3.u64 >> 32));
+    }
+    results.Check(out[0], out[1], fmt::format("case {} ({} words, to {:08X})", c, count, to));
+  }
+  results.Report();
+}
+
+// One case on a vector in the scratch area (at +256): storage of `capacity`
+// holding `size`, `args(t, vector, storage)` the registers.
+template <typename Args>
+void VectorCase(Context& h, Results& results, uint32_t capacity, uint32_t size, Args args,
+                GuestFunction recompiled, GuestFunction native, const std::string& what) {
+  const uint32_t vector = h.data + 256;
+  const Random start = h.random;
+  Outputs out[2];
+  for (int v = 0; v < 2; v++) {
+    Random random = start;
+    Fill(h.base, h.data, kScratchBytes);
+    const uint32_t storage = MakeStorage(h.base, capacity, size, random);
+    WriteVector(h.base, vector, storage, size, capacity);
+    PPCContext t = CallContext(h);
+    args(t, vector, storage, random);
+    Side(v, [&] { (v == 0 ? recompiled : native)(t, h.base); });
+    TakeVector(h.base, vector, storage, t, out[v]);
+    out[v].Bytes(Read(h.base, h.data, kScratchBytes));
+  }
+  h.random.Next();
+  results.Check(out[0], out[1], what);
+}
+
+void Reserves(Context& h) {
+  Results results("TextureProvider::Reserve (sub_82594570)");
+  for (int c = 0; c < 64; c++) {
+    const uint32_t capacity = c < 4 ? 0 : h.random.Below(40);
+    const uint32_t size = capacity == 0 ? 0 : h.random.Below(capacity + 1);
+    const uint32_t count = c == 0 ? 0 : (c == 1 ? 64 : h.random.Below(80));
+    VectorCase(
+        h, results, capacity, size,
+        [&](PPCContext& t, uint32_t vector, uint32_t, Random&) {
+          t.r3.u64 = vector;
+          t.r4.u64 = count;
+        },
+        __imp__sub_82594570, NativeReserve,
+        fmt::format("case {} (capacity {}, size {}, count {})", c, capacity, size, count));
+  }
+  results.Report();
+}
+
+void InsertNs(Context& h, int& handed) {
+  Results results("TextureProvider::InsertN (sub_82590EF0)");
+  for (int c = 0; c < 200; c++) {
+    const uint32_t capacity = c < 8 ? 0 : h.random.Below(40);
+    const uint32_t size = capacity == 0 ? 0 : h.random.Below(capacity + 1);
+    const uint32_t at = h.random.Below(size + 1);
+    const uint32_t count = c < 4 ? uint32_t(c) : h.random.Below(c % 3 == 0 ? 50 : 8);
+    const uint32_t value = h.random.Below(4) == 0 ? 0 : uint32_t(h.random.Next());
+    // Room, and a tail at least the count long: copy_backward's path,
+    // handed to the original by both sides.
+    if (count != 0 && capacity >= size + count && size - at >= count) {
+      handed++;
+    }
+    VectorCase(
+        h, results, capacity, size,
+        [&](PPCContext& t, uint32_t vector, uint32_t storage, Random&) {
+          Store(h.base, h.data + 64, value);
+          t.r3.u64 = vector;
+          t.r4.u64 = storage + 4 * at;
+          t.r5.u64 = count;
+          t.r6.u64 = h.data + 64;
+        },
+        __imp__sub_82590EF0, NativeInsertN,
+        fmt::format("case {} (capacity {}, size {}, at {}, count {})", c, capacity, size, at,
+                    count));
+  }
+  results.Report();
+}
+
+void Assigns(Context& h) {
+  Results results("TextureProvider::Assign (sub_825947D0)");
+  for (int c = 0; c < 64; c++) {
+    const uint32_t capacity = c < 4 ? 0 : h.random.Below(80);
+    const uint32_t size = capacity == 0 ? 0 : h.random.Below(capacity + 1);
+    const uint32_t count = c == 0 ? 0 : (c == 1 ? 64 : h.random.Below(100));
+    const uint32_t value = c < 8 ? 0 : uint32_t(h.random.Next());
+    VectorCase(
+        h, results, capacity, size,
+        [&](PPCContext& t, uint32_t vector, uint32_t, Random&) {
+          Store(h.base, h.data + 64, value);
+          t.r3.u64 = vector;
+          t.r4.u64 = count;
+          t.r5.u64 = h.data + 64;
+        },
+        __imp__sub_825947D0, NativeAssign,
+        fmt::format("case {} (capacity {}, size {}, count {})", c, capacity, size, count));
+  }
+  results.Report();
+}
+
+void Clears(Context& h) {
+  Results results("TextureProvider::Clear (sub_82590D68)");
+  for (int c = 0; c < 32; c++) {
+    const uint32_t capacity = c < 4 ? 0 : h.random.Below(40);
+    const uint32_t size = capacity == 0 ? 0 : h.random.Below(capacity + 1);
+    VectorCase(
+        h, results, capacity, size,
+        [&](PPCContext& t, uint32_t vector, uint32_t, Random&) { t.r3.u64 = vector; },
+        __imp__sub_82590D68, NativeClear,
+        fmt::format("case {} (capacity {}, size {})", c, capacity, size));
+  }
+  results.Report();
+}
+
+void Providers(Context& h) {
+  {
+    Results results("TextureProvider::TextureProvider (sub_82594850)");
+    for (int c = 0; c < 24; c++) {
+      static constexpr int32_t kCounts[] = {-1, 0, 1, 2, 64, 100};
+      const int32_t count = c < 6 ? kCounts[c] : (c < 12 ? -1 : int32_t(h.random.Below(200)));
+      const uint32_t provider = h.data + 240;
+      Outputs out[2];
+      for (int v = 0; v < 2; v++) {
+        Fill(h.base, h.data, kScratchBytes);
+        PPCContext t = CallContext(h);
+        t.r3.u64 = provider;
+        t.r4.s64 = count;
+        Side(v, [&] { (v == 0 ? __imp__sub_82594850 : NativeProviderConstruct)(t, h.base); });
+        out[v].Word(Load(h.base, provider));
+        TakeVector(h.base, provider + tp::kTextureProviderVector, 0, t, out[v]);
+        out[v].Bytes(Read(h.base, h.data, kScratchBytes));
+      }
+      results.Check(out[0], out[1], fmt::format("case {} (count {})", c, count));
+    }
+    results.Report();
+  }
+  {
+    Results results("TextureProvider::~TextureProvider (sub_825943E0)");
+    for (int c = 0; c < 32; c++) {
+      const uint32_t capacity = c < 4 ? 0 : h.random.Below(80);
+      const uint32_t size = capacity == 0 ? 0 : h.random.Below(capacity + 1);
+      const uint32_t provider = h.data + 240;
+      const Random start = h.random;
+      Outputs out[2];
+      for (int v = 0; v < 2; v++) {
+        Random random = start;
+        Fill(h.base, h.data, kScratchBytes);
+        const uint32_t storage = MakeStorage(h.base, capacity, size, random);
+        WriteVector(h.base, provider + tp::kTextureProviderVector, storage, size, capacity);
+        PPCContext t = CallContext(h);
+        t.r3.u64 = provider;
+        Side(v, [&] { (v == 0 ? __imp__sub_825943E0 : NativeProviderDestruct)(t, h.base); });
+        // The storage is freed by the destructor: only its words and r3.
+        out[v].Word(Load(h.base, provider));
+        for (uint32_t offset : {tp::kVectorFirst, tp::kVectorLast, tp::kVectorEnd}) {
+          out[v].Word(Load(h.base, provider + tp::kTextureProviderVector + offset));
+        }
+        out[v].Word(Marked(t.r3.u32, storage, 0));
+        out[v].Word(uint32_t(t.r3.u64 >> 32));
+        out[v].Word(storage != 0 && memory::IsHeapBlock(storage));
+        out[v].Bytes(Read(h.base, h.data, kScratchBytes));
+      }
+      h.random.Next();
+      results.Check(out[0], out[1], fmt::format("case {} (capacity {}, size {})", c, capacity,
+                                                size));
+    }
+    results.Report();
+  }
+}
+
 }  // namespace
 
 void Models(Context& h) {
@@ -452,6 +788,19 @@ void Models(Context& h) {
     FreesLater(h, block);
     XprConstructs(h, block);
     XprReleases(h, block);
+    Allocates(h);
+    UninitializedCopies(h, block);
+  }
+  {
+    int handed = 0;
+    Reserves(h);
+    InsertNs(h, handed);
+    Assigns(h);
+    Clears(h);
+    Providers(h);
+    ITC_LOG_INFO("harness: models: {} InsertN cases handed to the original (a tail at least "
+                 "the count long, its copy_backward never seen in play)",
+                 handed);
   }
 }
 

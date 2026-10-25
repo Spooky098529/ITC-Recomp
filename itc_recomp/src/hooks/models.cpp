@@ -5,7 +5,10 @@
 // nothing having been done. Functions reached only from native callers have
 // no adapters (the flag switches their callers): PendingFrees::IncSize
 // (sub_8258E2F8), from PendingFrees::Insert; PendingFrees::Insert
-// (sub_8258E398), from Memory::FreeLater and FreePhysicalLater.
+// (sub_8258E398), from Memory::FreeLater and FreePhysicalLater;
+// TextureProvider::Allocate and UninitializedCopy (sub_825942B8,
+// sub_82594380), from Reserve and InsertN; TextureProvider::Assign
+// (sub_825947D0), from TextureProvider::TextureProvider.
 
 #include "guest.h"
 
@@ -14,6 +17,7 @@
 #include "hooks/heap.h"
 #include "hooks/models.h"
 #include "models/memory_blocks.h"
+#include "models/texture_provider.h"
 #include "models/xpr.h"
 
 ITC_FLAG_BOOL(native_models, true, "ITC",
@@ -24,7 +28,12 @@ ITC_FLAG_BOOL(native_models, true, "ITC",
               "Memory::FreeLater sub_8258E410, FreePhysicalLater sub_8258E498, the pending "
               "frees' Insert sub_8258E398 and IncSize sub_8258E2F8 (no adapters: only the "
               "put-off frees call Insert, and only Insert IncSize); XPR::XPR sub_82596E68, and with --native_heap XPR::Release "
-              "sub_825970A8 and XPR::~XPR sub_82597148) natively instead of through the "
+              "sub_825970A8 and XPR::~XPR sub_82597148; the texture provider's vector: "
+              "Clear sub_82590D68, and with --native_heap Allocate sub_825942B8, "
+              "UninitializedCopy sub_82594380 (no adapters: only Reserve and InsertN call "
+              "them), Reserve sub_82594570, InsertN sub_82590EF0 and Assign sub_825947D0 (no "
+              "adapter: only the constructor calls it), TextureProvider::TextureProvider "
+              "sub_82594850 and ~TextureProvider sub_825943E0) natively instead of through the "
               "translated code (the same writes; "
               "checked by --run_harnesses=models)");
 
@@ -124,3 +133,63 @@ extern "C" REX_FUNC(sub_82596E68) {
 
 ITC_MODELS_LIFETIME(825970A8, XprRelease)
 ITC_MODELS_LIFETIME(82597148, XprDestruct)
+
+// --- The texture provider ---
+
+namespace {
+
+void SetR3(PPCContext& ctx, const models::R3& r3) {
+  if (!r3.kept) {
+    ctx.r3.u64 = r3.value;
+  }
+}
+
+}  // namespace
+
+// TextureProvider::Reserve: r3 = the vector, r4 = the count.
+extern "C" REX_FUNC(sub_82594570) {
+  REX_FUNC_PROLOGUE();
+  if (NativeLifetime()) {
+    if (const auto r3 = models::PointersReserve(base, ctx.r3.u32, ctx.r4.u32)) {
+      SetR3(ctx, *r3);
+      return;
+    }
+  }
+  __imp__sub_82594570(ctx, base);
+}
+
+// TextureProvider::InsertN: r3 = the vector, r4 = where, r5 = the count, r6 =
+// the value's address.
+extern "C" REX_FUNC(sub_82590EF0) {
+  REX_FUNC_PROLOGUE();
+  if (NativeLifetime()) {
+    if (const auto r3 = models::PointersInsertN(base, ctx.r3.u32, ctx.r4.u32, ctx.r5.u32,
+                                                guest::LoadU32(base, ctx.r6.u32))) {
+      SetR3(ctx, *r3);
+      return;
+    }
+  }
+  __imp__sub_82590EF0(ctx, base);
+}
+
+// TextureProvider::Clear: r3 = the vector; r3 = its first element.
+extern "C" REX_FUNC(sub_82590D68) {
+  REX_FUNC_PROLOGUE();
+  if (!ITC_FLAG(native_models)) {
+    __imp__sub_82590D68(ctx, base);
+    return;
+  }
+  ctx.r3.u64 = models::PointersClear(base, ctx.r3.u32);
+}
+
+// TextureProvider::TextureProvider: r3 = the provider (left), r4 = the slot
+// count (-1: 64).
+extern "C" REX_FUNC(sub_82594850) {
+  REX_FUNC_PROLOGUE();
+  if (!NativeLifetime() || !models::TextureProviderConstruct(base, ctx.r3.u32, ctx.r4.s32)) {
+    __imp__sub_82594850(ctx, base);
+  }
+}
+
+// TextureProvider::~TextureProvider: r3 = the provider; r3 = its storage.
+ITC_MODELS_LIFETIME(825943E0, TextureProviderDestruct)

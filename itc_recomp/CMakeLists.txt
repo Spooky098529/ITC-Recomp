@@ -170,6 +170,7 @@ set(ITC_SOURCES
     src/hooks/models.cpp
     src/models/memory_blocks.cpp
     src/models/xpr.cpp
+    src/models/texture_provider.cpp
     src/hooks/screen_objects.cpp
     src/screen_objects/uv_trees.cpp
     src/screen_objects/screen_objects.cpp
