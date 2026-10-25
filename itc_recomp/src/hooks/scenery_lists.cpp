@@ -2,7 +2,9 @@
 // front of src/scenery_lists/ (docs/functions/scenery-lists.md), with the
 // register steps the harness shares (hooks/scenery_lists.h). The parts the
 // recompiler split off a function (sub_82147A20 of sub_82147958, sub_8228F484
-// of sub_8228F408) are ported with it and have no adapters.
+// of sub_8228F408) are ported with it and have no adapters, nor do the
+// functions only native callers reach (the flag switches their callers):
+// VertexDeclarations::ForDepth (sub_82589970), from RecordShapeDepth.
 
 #include "hooks/scenery_lists.h"
 
@@ -27,7 +29,8 @@ ITC_FLAG_BOOL(native_scenery_lists, true, "ITC",
               "sub_82147850, ModelList::IsCEntryOn sub_82147958 (with sub_82147A20), "
               "Race::CourseLayout sub_8228F408 (with sub_8228F484), PointList::IsEntryOn "
               "sub_82147B18, PassDescription::SetBillboardPass sub_82148650 (with sub_8209BD40), "
-              "VertexDeclarations::ForDepth sub_82589970, Model::IsShapeVisible sub_825951E0, "
+              "VertexDeclarations::ForDepth sub_82589970 (no adapter: only RecordShapeDepth's plain "
+              "C++ calls it), Model::IsShapeVisible sub_825951E0, "
               "Recorder::RecordObject sub_825953D0 (inside its interpolation wrapper, "
               "src/interpolation/blend_state.cpp), Recorder::RecordSceneLights sub_82595490 "
               "(with SceneLights::RecordDirections sub_8258B980 and RecordProjectors "
@@ -367,7 +370,6 @@ ITC_SCENERY_LISTS(82147958, SceneryListsIsCEntryOn)
 ITC_SCENERY_LISTS(8228F408, SceneryListsCourseLayout)
 ITC_SCENERY_LISTS(82147B18, SceneryListsPointListIsEntryOn)
 ITC_SCENERY_LISTS(82148650, SceneryListsSetBillboardPass)
-ITC_SCENERY_LISTS(82589970, SceneryListsDepthVertexDeclaration)
 ITC_SCENERY_LISTS(825951E0, SceneryListsIsShapeVisible)
 ITC_SCENERY_LISTS(82595490, SceneryListsRecordSceneLights)
 ITC_SCENERY_LISTS(825960D0, SceneryListsRecordShapeDepth)

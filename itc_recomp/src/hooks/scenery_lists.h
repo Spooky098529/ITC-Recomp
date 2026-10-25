@@ -27,7 +27,8 @@ void SceneryListsCourseLayout(PPCContext& ctx, uint8_t* base);
 // PassDescription::SetBillboardPass (sub_82148650): r3 = the description, r4
 // and r6 its words (r3 left).
 void SceneryListsSetBillboardPass(PPCContext& ctx, uint8_t* base);
-// VertexDeclarations::ForDepth (sub_82589970): r3 = the stream type.
+// VertexDeclarations::ForDepth (sub_82589970): r3 = the stream type. No
+// adapter (the harness's steps).
 void SceneryListsDepthVertexDeclaration(PPCContext& ctx, uint8_t* base);
 // TextureProvider::ClearAll and Set (sub_82594328, sub_82594718): r3 = the
 // provider (left); Set's r4 = the slot, r5 = the value.
