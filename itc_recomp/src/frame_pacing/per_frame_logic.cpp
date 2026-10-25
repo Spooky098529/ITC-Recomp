@@ -12,6 +12,7 @@
 #include "debug/frame_state_diff.h"
 #include "debug/pause_movie_log.h"
 #include "hooks/cameras.h"
+#include "hooks/ui_movies.h"
 #include "interpolation/blend_state.h"
 
 #include "base/flags.h"
@@ -313,7 +314,7 @@ void NotePutBackTargets(uint8_t* base, uint32_t movie, const std::vector<AddedTa
 extern "C" REX_FUNC(sub_825A0548) {
   REX_FUNC_PROLOGUE();
   if (guest::LoadU8(base, kTrackPropertiesReady) == 0) {
-    __imp__sub_825A0548(ctx, base);
+    ui_movies_hooks::ApplyTrack(ctx, base);
     return;
   }
   uint32_t node = ctx.r3.u32, track = ctx.r4.u32;
@@ -324,7 +325,7 @@ extern "C" REX_FUNC(sub_825A0548) {
   bool noted = adds && g_added != nullptr;
   bool log = ITC_FLAG(log_pause_movie) && debug::PauseMovieLog_TracksWanted();
   if (type >= 3 || (!noted && !log)) {
-    __imp__sub_825A0548(ctx, base);
+    ui_movies_hooks::ApplyTrack(ctx, base);
     return;
   }
   uint32_t target = TrackTarget(base, node, track, descriptor);
@@ -342,7 +343,7 @@ extern "C" REX_FUNC(sub_825A0548) {
       debug::PauseMovieLog_Skipped(g_ui_movie, property, target);
     }
   } else {
-    __imp__sub_825A0548(ctx, base);
+    ui_movies_hooks::ApplyTrack(ctx, base);
   }
   if (log) {
     debug::PauseMovieLog_Track(g_ui_movie, node, property, type, adds, target, before,

@@ -31,8 +31,8 @@ ITC_FLAG_BOOL(native_ui_movies, true, "ITC",
               "UiMovie::DrawNode sub_8259F848, UiMovie::ApplyTransform sub_8259E6C8 with "
               "sub_8259D730, the draw context copy sub_8259D9F8, the queued texts' copy "
               "sub_8259E620, append sub_8259F700 (its grow the original's) and "
-              "UiMovie::QueueText sub_8259F770; UiMovie::TrackProperty sub_8259FE68, with "
-              "native atexit) "
+              "UiMovie::QueueText sub_8259F770; UiMovie::TrackProperty sub_8259FE68 and "
+              "UiMovie::ApplyTrack sub_825A0548, with native atexit) "
               "natively instead of through the translated code (same results; checked by "
               "--run_harnesses=ui_movies)");
 
@@ -467,3 +467,60 @@ extern "C" REX_FUNC(sub_8259FE68) {
   hooks::GuestAtexit guest{ctx, base};
   ctx.r3.u64 = ui_movies::TrackProperty(base, id, ctx.r1.u32 - 128, guest.Call());
 }
+
+namespace {
+// ApplyTrack's key functions through the translated code (ui_movies::KeyCall),
+// from a frame like the original's (224 bytes) with its return addresses.
+struct GuestKeys {
+  PPCContext& ctx;
+  uint8_t* base;
+  ui_movies::KeyCall Call() { return {&GuestKeys::Run, this}; }
+  static ui_movies::KeyResult Run(void* self, uint32_t function, uint32_t k0, uint32_t k1,
+                                  double t) {
+    auto& keys = *static_cast<GuestKeys*>(self);
+    PPCContext& ctx = keys.ctx;
+    uint8_t* base = keys.base;
+    uint32_t return_address = 0;
+    switch (function) {
+      case 0x8259FB30: return_address = 0x825A0840; break;
+      case 0x8259FC18: return_address = 0x825A0700; break;
+      case 0x8259FD40: return_address = 0x825A0670; break;
+      case 0x8259FAA8: return_address = 0x825A065C; break;
+      default: ITC_LOG_ERROR("ui_movies: ApplyTrack: no key function {:08X}", function); return {};
+    }
+    const uint64_t lr = ctx.lr;
+    guest_call::InFrame(ctx, base, 224, return_address, [&](uint32_t) {
+      ctx.r3.u64 = k0;
+      ctx.r4.u64 = k1;
+      ctx.fpscr.disableFlushMode();
+      ctx.f1.f64 = t;
+      switch (function) {
+        case 0x8259FB30: __imp__sub_8259FB30(ctx, base); break;
+        case 0x8259FC18: __imp__sub_8259FC18(ctx, base); break;
+        case 0x8259FD40: sub_8259FD40(ctx, base); break;
+        default: sub_8259FAA8(ctx, base); break;
+      }
+    });
+    ctx.lr = lr;
+    return {ctx.r3.u64, ctx.f1.f64};
+  }
+};
+}  // namespace
+
+namespace ui_movies_hooks {
+void ApplyTrackNative(PPCContext& ctx, uint8_t* base) {
+  ctx.fpscr.disableFlushMode();
+  hooks::GuestAtexit atexit{ctx, base};
+  GuestKeys keys{ctx, base};
+  ui_movies::ApplyTrack(base, ctx.r3.u32, ctx.r4.u32, ctx.f1.f64, ctx.r5.u32, ctx.r6.u32,
+                        ctx.r1.u32 - 224, atexit.Call(), keys.Call());
+}
+
+void ApplyTrack(PPCContext& ctx, uint8_t* base) {
+  if (!ITC_FLAG(native_ui_movies) || !hooks::NativeAtexit()) {
+    __imp__sub_825A0548(ctx, base);
+    return;
+  }
+  ApplyTrackNative(ctx, base);
+}
+}  // namespace ui_movies_hooks

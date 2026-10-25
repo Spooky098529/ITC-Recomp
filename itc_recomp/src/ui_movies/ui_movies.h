@@ -171,6 +171,39 @@ std::optional<double> CubicFloat(uint8_t* base, uint32_t k0, uint32_t k1, double
 // sub_8259FC18: the same cubic on integer values, truncated (fctiwz).
 std::optional<uint32_t> CubicInteger(uint8_t* base, uint32_t k0, uint32_t k1, double t);
 
+// For ApplyTrack: a key function's original, called through the translated
+// code from ApplyTrack's original frame (the adapter's, hooks/ui_movies.cpp)
+// with r3 = k0, r4 = k1, f1 = t; returns its r3 and f1. For sub_8259FB30 and
+// sub_8259FC18 where CubicFloat and CubicInteger give nullopt, and
+// sub_8259FD40 and sub_8259FAA8 (type 2's cubic and eased keys), which
+// never ran in play and aren't ported.
+struct KeyResult {
+  uint64_t r3;
+  double f1;
+};
+using GuestKeyFunction = KeyResult (*)(void* user, uint32_t function, uint32_t k0, uint32_t k1,
+                                       double t);
+struct KeyCall {
+  GuestKeyFunction guest = nullptr;
+  void* user = nullptr;
+};
+
+// sub_825A0548 UiMovie::ApplyTrack: one track's value at t between keys k0
+// and k1 (0 for none: k0 the stand-in key at frame + 112, k1 then k0)
+// written into the node: the descriptor from TrackProperty (called as the
+// original calls it, `atexit` its atexit fallback), the target node + its
+// offset (+ VertexOffset([node + 112], [track + 12]) when indirect), set or
+// added by the descriptor's byte +8; type 0 a float, 1 and 2 integers
+// (signed and unsigned), 3 and up nothing. The value by the second key's
+// kind (+0): 0 step, 1 linear, 2 cubic, 3 eased, others zero. `frame` = the
+// original's frame (r1 - 224): the stand-in key is written there as the
+// original writes it (+112 0, +116 zero, +120 0 or the target's value when
+// the track sets it, +124 and +128 zero); its other stores (+80, +88, +96,
+// the saved registers) aren't written. Built as keys.cpp.
+void ApplyTrack(uint8_t* base, uint32_t node, uint32_t track, double t, uint32_t k0,
+                uint32_t k1, uint32_t frame, const c_runtime::AtexitCall& atexit,
+                const KeyCall& keys);
+
 // The drawing walk (draw.cpp).
 //
 // UiMovie::ApplyTransform (sub_8259E6C8): the node's transform applied to
