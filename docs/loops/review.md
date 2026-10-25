@@ -29,6 +29,16 @@ When the user has reviewed a run's section, its heading gets
   `leads.md`: 6 leads (the load poll, `ScenePools::ReleaseB`'s ~80
   release cases, the scene models' owners, the sound slots' readers,
   the scene's update and teardown, the archive queue's append).
+- `scene-models.md` migration 1 (8c076d0..88bdea2; `src/scene_models/`,
+  `src/hooks/scene_models.cpp`, harness `src/harnesses/scene_models.cpp`):
+  23 of 48 ours, `--native_scene_models`. For review:
+  `sub_820C3CA0`'s VirtualAlloc through `memory::AllocPages` (the
+  2026-10-22 call; native only under `--native_heap`); the originals'
+  stack temporaries not written (the post effects' and track route's
+  precedent); copies into the physical views, overlapping records or
+  anything `c_runtime::Memcpy` refuses fall back to the original (the
+  minimap's `List80::Copy` precedent); `sub_820D0A20` Native with no
+  adapter (only `CarRecord::Reset` calls it).
 
 ## Run 2026-10-25 03:59 (`b7-loop-25-10-26-2`)
 

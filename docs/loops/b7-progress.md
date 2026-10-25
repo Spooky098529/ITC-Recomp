@@ -17,8 +17,13 @@ file's history. What's left to see in a drive, from every run:
   the scene models (`scene-models.md`, 48 rows, 9a490b3: the set-up
   and build side only; the rest, ~227 functions, in 6 new leads). Map
   checked (0 errors, 48 of 48 in play, 18 ready groups; only kernel use
-  `sub_820C3CA0`'s VirtualAlloc, the allocation call). Step: migration
-  1, agent running.
+  `sub_820C3CA0`'s VirtualAlloc, the allocation call). Migration 1 done
+  after three batches (8c076d0..88bdea2: all 18 ready groups and 5
+  they unblocked, 23 of 48 ours, `sub_820D0A20` Native with no adapter;
+  `--native_scene_models`; `itc_1695`: 26 s, 0 errors, every harness 0
+  differing). Nothing ready left; the rest waits on the load slots,
+  `Archive::Load`, `ScenePools::SetUp`, the asset's size, `sprintf`,
+  `Texture::Create`. Step: validation, agent running.
 
 ## Done
 
@@ -43,3 +48,5 @@ This run's groups: `expected-differences.md` (the "16:38 run" lines).
   `sub_82108018`'s row says never called, but it ran (not this run's).
 - After the scene models' map: ours 2013, work left 4438 (wrapped 110,
   known 638, unknown 3690).
+- After the scene models' migration 1: ours 2037, work left 4414
+  (wrapped 110, known 614, unknown 3690).
