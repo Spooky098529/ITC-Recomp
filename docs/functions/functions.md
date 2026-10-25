@@ -267,6 +267,13 @@ Rows not yet moved stay in the table below. So far:
   set-up dispatch, the parts' links, the records' defaults and copies,
   the parts' and the traffic body's loaders, and a record re-applied
   (B7; the load poll and the release aren't in it).
+- [`scenery-lists.md`](scenery-lists.md): the course set's six lists
+  of models (loaded, released, picked by the race and drawn, the +3180
+  list at its points), the scenery model's shape draw and record with
+  the course's texture animations, and the model draws they share: the
+  shape's visibility test, the per-object and scene light constants,
+  the depth-only record, the generic shape draws and the texture
+  provider's slots 2 and 4 (B7).
 
 These files hold functions only. What used to follow the table here moved
 out on 2026-10-20: how frame interpolation works, its options and what
@@ -300,12 +307,9 @@ old performance notes to the end of `../native-renderer.md`.
 | `sub_820C0128` | `Vehicle::GetSpeedKmh` | Overridden | Returns the float at vehicle+48 (m/s) times 3.6. The plain C++ (`Vehicle_GetSpeedKmh`, `src/hooks/vehicle.h`) is also called directly by the native `OverlayView::SpeedKmh` (`sub_821268C0`, [`race-overlays.md`](race-overlays.md)); the adapter also tells the state capture (`--capture_dir`) about the vehicle. Checked against the original by the `race_overlays` harness. |
 | `sub_82093DC0` | | | First tick handler: polls input, then walks listener lists that run both game logic and the draw step (see "Separating drawing from the game tick" in `../frame-interpolation.md`). Tests player 1's input itself, on every pass: processor 0's pressed bits (`sub_8258CEB0`) and held-or-repeating bits (`sub_8258CEE0`), read from the input manager in guest memory ("Who reads the input manager" in `docs/pause-menu-fix.md`). |
 | `sub_8215B4F8` | `Race::DrawStep` | Wrapped | The race's draw step (Draw message). Its running marks the pass as in a race. |
-| `sub_825953D0` | `Recorder::RecordObject` | Wrapped | The bulk per-object recorder, ~150 calls per pass in a race: records command 7 with vertex constants 0-8: world (r5) * camera view-projection (r4) in c0-c3, the world matrix in c4-c7 (for some objects a projective matrix instead), and the camera's world position in c8. The camera is often a stack copy, not a camera pass. |
-| `sub_825951E0` | | | Multiplies a world matrix and camera into a stack temporary; not recorded (likely a visibility test). |
 | `sub_8258FD48` | `Command::SetShaderConstants` | Wrapped | Render thread, command 7: r3 = payload, r4 = register count, r5 = stage << 24 \| type << 16 \| start << 8 \| count. Interpolation substitutes blended values here. |
 | `sub_8210EDB0` | | | Wind sound; scales with speed. |
 | `sub_82152CD8` | | | Camera shake; scales with speed. |
-| `sub_82146B80` | | | Returns the current frame's entry of animation r4 in set r3 (texture id at +4). |
 | `sub_82146A38` | | | Finds the animation in set r3 whose texture is r4; -1 if none. |
 | `sub_821109B8` | | | Turns the play time frame counter into hours, minutes and seconds (30, 1800, 108000 frames). |
 | `sub_82107B90` | `Boot::StartMovie` | | Message handler: plays the next boot movie, id from the table at `0x826C5BAC` (index at `0x826C5BC8`), via `Movies::Play` (`sub_820A43A8`, the path table at `0x82600BEC`; `movies.md`). See "The title screen" in `../title-screen.md`. |
