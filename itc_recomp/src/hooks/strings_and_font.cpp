@@ -22,6 +22,7 @@
 #include "base/flags.h"
 #include "hooks/guest_call.h"
 #include "hooks/heap.h"
+#include "hooks/strings_and_font.h"
 #include "strings_and_font/strings_and_font.h"
 
 ITC_FLAG_BOOL(native_strings_and_font, true, "ITC",
@@ -45,6 +46,8 @@ ITC_FLAG_BOOL(native_strings_and_font, true, "ITC",
               "--run_harnesses=strings_and_font)");
 
 using namespace strings_and_font;
+
+hooks::GuestStandIn hooks::g_text_draw_stand_in = nullptr;
 
 // The command list's diagnostics (blend_state.cpp) see the slots the
 // originals allocate through AllocateSlots: with any of them on, the
@@ -257,7 +260,15 @@ extern "C" REX_FUNC(sub_8210A400) {
 // Text::Draw: r4 = the draw parameters, r5 = the text: Font::Draw on
 // [0x826C5C00].
 extern "C" REX_FUNC(sub_8210A758) {
-  ITC_STRINGS_AND_FONT_FALLBACK(8210A758)
+  REX_FUNC_PROLOGUE();
+  if (hooks::g_text_draw_stand_in != nullptr) {
+    hooks::g_text_draw_stand_in(ctx, base);
+    return;
+  }
+  if (!ITC_FLAG(native_strings_and_font)) {
+    __imp__sub_8210A758(ctx, base);
+    return;
+  }
   if (guest::LoadU32(base, ctx.r4.u32 + 112) != 0 || SlotDiagnostics()) {
     __imp__sub_8210A758(ctx, base);
     return;

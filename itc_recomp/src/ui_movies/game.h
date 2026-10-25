@@ -211,6 +211,39 @@ uint32_t TextField(uint8_t* base, uint32_t movie, uint32_t id, uint32_t offset);
 // record of 0 (the original's neither).
 void AdvanceTextScroll(uint8_t* base, uint32_t movie, uint32_t id);
 
+// sub_8211B800 (UiMovie::ScrollOffset): a scrolling text's x for the draw
+// parameters at `params` (+0 x, +8 the origin's x, +28 the scale, +68 the
+// gap, +120 the text id): the start x as Font::SetParams works it out; while
+// the text's scroll counter (+8) is below its delay (+12), x itself; after
+// it, the start less the ticks past the delay times the speed (+16), moved
+// on by the text's width (Font::TextWidth on [0x826C5C00]) plus the gap
+// until it's not left of the start less the width (a step of 0 or less
+// there loops forever, as the original). Returns f1.
+double ScrollOffset(uint8_t* base, uint32_t movie, uint32_t params);
+
+// UiMovie::DrawTexts (sub_8211CD90): r3 = movie, r4 = the text list (movie +
+// 40: +0 the items, 128 bytes each, +8 the count), r5 = 1 to draw without
+// advancing. Each item, last first, is drawn from the original's 4,752-byte
+// frame (`frame`, its r1), where its callees read what it builds: the item
+// copied to +368, the draw parameters at +112 (124 bytes), the text at +496
+// (4,096 bytes), and the original's other stores (+80..+108, +240..+367).
+constexpr uint32_t kDrawTextsFrame = 4752;
+constexpr uint32_t kDrawTextsParams = 112;
+constexpr uint32_t kDrawTextsItem = 368;
+constexpr uint32_t kDrawTextsBuffer = 496;
+// One item's start: the text buffer cleared (memset), the count down by
+// one; returns the item to copy to +368 (sub_8211AED0: CopyTextItem, or the
+// original where they may share memory).
+uint32_t DrawTextsPop(uint8_t* base, uint32_t frame, uint32_t list);
+// The copied item's drawing up to Text::Draw: its origin transformed by its
+// matrix (Vec4::Transform), the node's (+0) scale and clip rectangle set,
+// the draw parameters built, a scrolling text's x (ScrollOffset) and its
+// counter stepped unless `draw_only` (sub_8211B940), and the text's page
+// copied into the buffer (Strings::CopyPage). Text::Draw (r4 = the
+// parameters, r5 = the buffer) and TextItem::~TextItem on the copy follow,
+// the adapter's.
+void DrawTextsItem(uint8_t* base, uint32_t frame, uint32_t movie, bool draw_only);
+
 // sub_8211AD00's work after its renderer calls: the UI movie library's
 // renderer and command list set (SetRenderer), every entry of the movie
 // table marked free (key -1, value 0; nothing freed), and the screen's

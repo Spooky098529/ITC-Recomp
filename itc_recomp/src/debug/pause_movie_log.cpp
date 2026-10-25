@@ -473,17 +473,18 @@ void WatchMovingTargets(const char* name, PPCContext& ctx, uint8_t* base, Call&&
 
 // The functions the UI movie update (sub_8211D2F8) calls besides the
 // tracks' sub_825A08E0, watched for writes to the moved words.
-#define WATCH_MOVIE_CALL(address)                                                       \
-  extern "C" REX_FUNC(sub_##address) {                                                  \
-    REX_FUNC_PROLOGUE();                                                                \
-    if (!ITC_FLAG(log_pause_movie)) {                                                \
-      __imp__sub_##address(ctx, base);                                                  \
-      return;                                                                           \
-    }                                                                                   \
-    debug::WatchMovingTargets(#address, ctx, base, [&] { __imp__sub_##address(ctx, base); }); \
+//
+// UiMovie::DrawTexts; its work (natively with --native_ui_movies_game) is in
+// src/hooks/ui_movies_game.cpp.
+extern "C" REX_FUNC(sub_8211CD90) {
+  REX_FUNC_PROLOGUE();
+  if (!ITC_FLAG(log_pause_movie)) {
+    ui_movies_game_hooks::DrawTexts(ctx, base);
+    return;
   }
-WATCH_MOVIE_CALL(8211CD90)
-#undef WATCH_MOVIE_CALL
+  debug::WatchMovingTargets("8211CD90", ctx, base,
+                            [&] { ui_movies_game_hooks::DrawTexts(ctx, base); });
+}
 
 // UiMovie::Draw, watched as the others; its work (natively with
 // --native_ui_movies) is in src/hooks/ui_movies.cpp.

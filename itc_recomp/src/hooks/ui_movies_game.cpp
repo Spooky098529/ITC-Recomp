@@ -9,6 +9,7 @@
 #include "c_runtime/strings.h"
 #include "hooks/guest_call.h"
 #include "hooks/ui_movies_game.h"
+#include "strings_and_font/strings_and_font.h"
 #include "ui_movies/game.h"
 #include "ui_movies/ui_movies.h"
 
@@ -37,9 +38,10 @@ ITC_FLAG_BOOL(native_ui_movies_game, true, "ITC",
               "UiMovie::MoveNamedAnimation sub_8211DCE8, UiMovie::Loop sub_8211DDD8, "
               "UiMovie::LoopNamed sub_8211DDE0 and UiMovie::LoopLast sub_8211DDE8, and the "
               "starts UiMovie::Play sub_8211D978 and UiMovie::PlayNamed sub_8211DAC8 (these "
-              "without --log_pause_movie) "
+              "without --log_pause_movie); the texts drawn UiMovie::DrawTexts sub_8211CD90 (its "
+              "Text::Draw through that adapter) with UiMovie::ScrollOffset sub_8211B800 "
               "(same results; checked by --run_harnesses=ui_movies_game). sub_8211A660, "
-              "sub_8211B230 and AnimationList::Get have no adapters: only native callers reach "
+              "sub_8211B230, AnimationList::Get and UiMovie::ScrollOffset have no adapters: only native callers reach "
               "them, and the flag switches those");
 
 ITC_FLAG_DECLARE(bool, native_ui_movies);
@@ -441,6 +443,39 @@ void PlayNamed(PPCContext& ctx, uint8_t* base) {
   NATIVE_UNWATCHED_OR_ORIGINAL(8211DAC8);
   ctx.r3.u64 = ui_movies::PlayNamed(base, ctx.r3.u32, ctx.r4.u32, ctx.r5.u32, ctx.r6.u32,
                                     ctx.r7.u32, ctx.r8.u32);
+}
+
+void DrawTexts(PPCContext& ctx, uint8_t* base) {
+  NATIVE_OR_ORIGINAL(8211CD90);
+  const uint32_t movie = ctx.r3.u32, list = ctx.r4.u32;
+  const bool draw_only = ctx.r5.u32 != 0;
+  if (guest::LoadU32(base, list + 8) == 0) {
+    return;
+  }
+  ctx.fpscr.disableFlushMode();
+  const uint64_t lr = ctx.lr;
+  guest_call::InFrame(ctx, base, ui_movies::kDrawTextsFrame, 0x8211CE30, [&](uint32_t frame) {
+    const uint32_t item = frame + ui_movies::kDrawTextsItem;
+    do {
+      const uint32_t from = ui_movies::DrawTextsPop(base, frame, list);
+      if (!ui_movies::CopyTextItem(base, item, from)) {
+        ctx.r3.u64 = item;
+        ctx.r4.u64 = from;
+        ctx.lr = 0x8211CE30;
+        __imp__sub_8211AED0(ctx, base);
+      }
+      ui_movies::DrawTextsItem(base, frame, movie, draw_only);
+      // Text::Draw (its adapter: the render queue's guest call).
+      ctx.r3.u64 = guest::LoadU32(base, strings_and_font::kStrings);
+      ctx.r4.u64 = frame + ui_movies::kDrawTextsParams;
+      ctx.r5.u64 = frame + ui_movies::kDrawTextsBuffer;
+      ctx.lr = 0x8211D190;
+      sub_8210A758(ctx, base);
+      ctx.fpscr.disableFlushMode();
+      ctx.r3.u64 = ui_movies::ClearTextItem(base, item);
+    } while (guest::LoadU32(base, list + 8) != 0);
+  });
+  ctx.lr = lr;
 }
 
 void Loop(PPCContext& ctx, uint8_t* base) {
