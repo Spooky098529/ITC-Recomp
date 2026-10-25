@@ -29,7 +29,13 @@ file's history. What's left to see in a drive, from every run:
 - The "no mapping" lead (not counted): `UiMovie::DrawTexts`
   `sub_8211CD90` and what it unblocks (`UiMovie::Update`
   `sub_8211D2F8`), with `sub_82106540` (blocking `_init_pointers`
-  `sub_825AA398`). Step: migration, agent running.
+  `sub_825AA398`). Migration 1 done after six batches (c4141e4..b8b7f8a:
+  `DrawTexts` with `ScrollOffset`, `UiMovie::Update`, `UiMovie::Draw`,
+  `UiMovie::Run`, `_init_pointers`, `sub_82106540`; 9 adapters removed;
+  no new flags; 27 s, 0 errors, every harness 0 differing; the title
+  screen's text frame dump identical with the fallback). Left ready:
+  `sub_822141E8`, `sub_8211DF20`; `_mtinit` `sub_825AA708` not taken
+  (kernel TLS, no precedent). Step: validation, agent running.
 
 ## Done
 
@@ -62,3 +68,5 @@ This run's groups: `expected-differences.md` (the "16:38 run" lines).
 - After the scene models' validation: race 27 s (`itc_1696`), 0
   errors, every harness 0 differing; replay 126 s (`itc_1697`), 0
   errors.
+- After the DrawTexts lead's migration 1: ours 2044, work left 4407
+  (wrapped 108, known 609, unknown 3690).

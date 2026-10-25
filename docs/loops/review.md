@@ -39,6 +39,23 @@ When the user has reviewed a run's section, its heading gets
   anything `c_runtime::Memcpy` refuses fall back to the original (the
   minimap's `List80::Copy` precedent); `sub_820D0A20` Native with no
   adapter (only `CarRecord::Reset` calls it).
+- The "no mapping" lead, `UiMovie::DrawTexts` and what it unblocks
+  (c4141e4..b8b7f8a; `src/ui_movies/texts.cpp`, `update.cpp`,
+  `src/hooks/strings_and_font.h`): `DrawTexts`, `ScrollOffset`
+  (Native, no adapter), `UiMovie::Update`, `Draw`, `Run` under the
+  existing `--native_ui_movies_game` and `--native_ui_movies`;
+  `_init_pointers` and the empty destructor `sub_82106540` under
+  `--native_c_runtime`; 9 adapters removed (the text accessors,
+  `Font::TextWidth`, `_init_pointers`' five setters). For review: two
+  harness stand-in hooks (`hooks::g_text_draw_stand_in`,
+  `ui_movies_hooks::g_update_callee_stand_in`) checked by the
+  overrides; four removable adapters kept (`DrawTexts`, `sub_8259FA00`,
+  `sub_8259DAC0`, `Update`: the `--log_pause_movie` watch and the frame
+  pacing's replay and track handling live there); `_mtinit`
+  (`sub_825AA708`) left, as it calls KeTlsAlloc/KeTlsSetValue (no
+  precedent for TLS). A replay (`itc_1719`) logged the SDK's
+  "BaseHeap::Release failed" twice at transitions, also in `itc_1528`
+  (before this run), not in a re-run (`itc_1721`).
 
 ## Run 2026-10-25 03:59 (`b7-loop-25-10-26-2`)
 
