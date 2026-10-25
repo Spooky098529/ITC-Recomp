@@ -63,6 +63,11 @@ NaN groups below stay as recorded.
   position); ours leaves them. Only cases taking the packet path (flags
   without 0x2 or 0x10) differ; the header, ranges, lock count and r3
   match. The renderer skips coherency packets.
+- **Uninitialized stack byte:** the original fills a pad byte from an
+  uninitialized stack byte, the native code writes 0; how many cases
+  differ depends on what the callers left on the stack (0 while the run
+  loop was recompiled, every case since `main` and `App::Run` are native,
+  2026-10-25: the byte is now 0x33).
 - **Constant order:** the HLSL compiler (`sub_822B8F10`) places the HSV
   gradient's literal constants (1 to 6, source `82071528`) in another
   order when it compiles during a race than at boot, where every compile
@@ -228,6 +233,8 @@ were at 0.
 | `sub_822A8A60` Device::SetShaderGprAllocation | the command buffer | 300 of 300 | Packets nothing reads | for review (03:25 run) |
 | `sub_822A3A20` Device::SetGammaRamp | the command buffer | 40 of 60 | Packets nothing reads | for review (03:25 run) |
 | `sub_822ACB90` Device::SetDefaultState | the command buffer | 40 of 40 | Packets nothing reads | for review (03:25 run) |
+| `sub_822A6A88` VertexDeclaration::FromFvf | the end marker's pad byte | 400 of 400 | Uninitialized stack byte | for review (01:17 run) |
+| `sub_822AA0E8` Device::SetFVF | the end marker's pad byte | 100 of 100 | Uninitialized stack byte | for review (01:17 run) |
 
 ### `functions.md`
 

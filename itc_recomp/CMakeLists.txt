@@ -160,6 +160,10 @@ set(ITC_SOURCES
     src/graphics/device_state.cpp
     src/hooks/post_effects.cpp
     src/post_effects/post_effects.cpp
+    src/hooks/framework.cpp
+    src/framework/framework.cpp
+    src/framework/run_loop.cpp
+    src/framework/main_loop.cpp
     src/hooks/screen_objects.cpp
     src/screen_objects/uv_trees.cpp
     src/screen_objects/screen_objects.cpp
@@ -241,6 +245,7 @@ set(ITC_SOURCES
     src/harnesses/post_effects.cpp
     src/harnesses/screen_objects.cpp
     src/harnesses/hardcoded_shaders.cpp
+    src/harnesses/framework.cpp
     src/harnesses/action_mappers.cpp
     src/harnesses/data_tables.cpp
     src/harnesses/model_animation.cpp

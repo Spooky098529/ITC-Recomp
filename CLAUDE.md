@@ -246,6 +246,15 @@ library (`--play_movies_with_ffmpeg`, `docs/native-movies.md`), whose
 ~640 and ~580 functions no longer run; replaced libraries aren't mapped
 ("Rules that still hold" in `docs/loops/b7-loop.md`); ours 1,794 ->
 1,847, work left 4,967 -> 4,604 (the coverage list made again twice).
+Its fourteenth run (`by-loop-25-10-26`, 2026-10-25, not yet merged;
+summary `docs/loops/b7-loop-2026-10-25-0117.md`) made the app framework
+native as far as it was ready (`framework.md`, 56 of 68 ours, with
+`main` and `App::Run`; `--native_framework`; ours 1,847 -> 1,903),
+ended after it by the user's call; an `ai_drivers` harness case that
+read a wild address (exposed when the hardcoded shaders moved the
+harness's block) was fixed on the way (dbc8ee0); the rest waits on
+`Framework::Init`'s services, `sub_824936E8` and `sub_8258E1D8`'s
+critical section.
 Harness runs use `attract_race.sh 40` (the user's call,
 2026-10-23); a race short only because the harnesses took longer is
 no halt.

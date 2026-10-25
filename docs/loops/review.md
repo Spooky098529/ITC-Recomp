@@ -11,6 +11,50 @@ functions to check in a drive in the progress file.
 When the user has reviewed a run's section, its heading gets
 "(reviewed <date>)"; the section stays for the record.
 
+## Run 2026-10-25 01:17 (`by-loop-25-10-26`)
+
+- `framework.md` (mapped in c4b5b86, last run; its rows are in that
+  run's section below): map checked this run (0 errors, 68 of 68 in
+  play). Note: `b7_status.py` flags `movies.md:108` `sub_82108018`, whose
+  row says never called but which ran (the user's movie work, not this
+  run's).
+- `framework.md` migration 1 (f27748b..e080edd; `src/framework/`,
+  `src/hooks/framework.cpp`, harness `src/harnesses/framework.cpp`):
+  50 of 68 ours, 15 adapters removed (Native), `--native_framework`.
+  For review:
+  - The map's rotations were swapped: `sub_82092B10` is
+    `HandlerMap::RotateLeft`, `sub_82092A00` `RotateRight`; corrected.
+  - Paths handed to the original (never seen in play): InsertN's
+    copy_backward path (316 Insert/InsertN cases go there, logged) and
+    `ApplyRequest`'s removal types 1 and 3.
+  - `TickHandler::Invoke` (`sub_82099A98`) and `sub_82096340`, Wrapped
+    before: their existing overrides (`game_messages.cpp`,
+    `frame_state_diff.cpp`) now call the native path (Overridden).
+  - `DebugText::DebugText` stores an uninitialized word of its own stack
+    frame as the job's state; the adapter reads and stores the same word.
+  - `sub_82094350`'s adapter stays: `sub_820A8508` calls it through a
+    vtable.
+  - Not compared in the harnesses: InsertN's r3, r4-r11 after
+    `Framework::Framework` and `Create`, a map head's key and delegate,
+    the nodes' padding bytes +22/+23 (nothing sets or reads them).
+- `framework.md` migration 2 (eb25d68, ad01ea7; `src/framework/main_loop.cpp`):
+  the main group native (`main`, `sub_82090378`, `sub_8209ABE8`,
+  `App::Run`, `ForEachTickHandler`, `ForEachRequest`), 7 adapters removed;
+  56 of 68 ours, nothing ready left. For review:
+  - Every virtual call and functor stays a guest call, from frames like
+    the originals' (their return addresses and stack words); tick
+    handlers still go through `TickHandler::Invoke`'s override.
+  - The native loop sets r26 to r31 as the recompiled `App::Run` keeps
+    them, and puts them back on return: a recompiled device setter reads
+    r27's high word (`Device::SetDefaultState`'s harness differed without).
+  - The originals' traps (tw 22) log a warning and go on, as the
+    recompiled code does; none seen in play.
+  - `main`'s harness makes the read-only page of its framework vtable
+    (`0x82000B90`) writable through the SDK's `rex::memory::Protect` for
+    its test slots, then puts the access back.
+  - `FromFvf`'s and `SetFVF`'s pad byte groups now differ (400, 100):
+    `expected-differences.md`.
+
 ## Run 2026-10-24 21:33 (`b7-loop-24-10-26-4`)
 
 - Cleanup lead `sub_8209F430` ActionMappers::Init (`action-mappers.md`;

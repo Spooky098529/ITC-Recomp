@@ -180,5 +180,6 @@ void Input(Context& h);
 void ActionMappersBinding(Context& h);
 void ScreenObjects(Context& h);
 void HardcodedShaders(Context& h);
+void Framework(Context& h);
 
 }  // namespace harness

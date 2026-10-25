@@ -2,78 +2,45 @@
 
 Kept by the loop's lead (`b7-loop.md`). Short: details are in the
 commits, the function files and the subsystems' docs. Earlier runs'
-records: `b7-loop-2026-10-22-0111.md`, `b7-loop-2026-10-22-1047.md`,
-`b7-loop-2026-10-22-1439.md`, `b7-loop-2026-10-22-2211.md`,
-`b7-loop-2026-10-23-0152.md`, `b7-loop-2026-10-23-1106.md`,
-`b7-loop-2026-10-23-1344.md`, `b7-loop-2026-10-23-1722.md`,
-`b7-loop-2026-10-23-2022.md`, `b7-loop-2026-10-24-0325.md`,
-`b7-loop-2026-10-24-1601.md`, `b7-loop-2026-10-24-1746.md`, and this
+records: the `b7-loop-2026-*.md` summaries beside this file, and this
 file's history. What's left to see in a drive, from every run:
 `to-drive.md`.
 
 ## Now
 
-- Run started 2026-10-24 21:33 on `b7-loop-24-10-26-4` (the user's
-  branch), from 953a342; summary `b7-loop-2026-10-24-2133.md`.
-- Limit for this run: 3 subsystems.
-- Between subsystems (no mapping, not counted): `leads.md`'s top lead,
-  `sub_8209F430` ActionMappers::Init (`action-mappers.md`, ready), with
-  the harness lines of `sub_8258CEB0` and `sub_8258CEE0` to check.
-  Migration done (3ac7be7, 9e36924: Init native, 7 adapters removed;
-  action-mappers.md and input.md have nothing ready left; TestPressed's
-  and TestRepeat's harness lines seen), validated (`itc_1494`,
-  `itc_1495`; all ran in play or the replay). Done.
-- Between subsystems (no mapping, not counted): `leads.md`'s three
-  cleanup leads: `sub_8212B288` Smoke::~Smoke, `sub_8212BF88`
-  ParticlesB::~ParticlesB, `sub_8212BFE8` ParticlesB::ParticlesB and
-  their deleting destructors (`race-overlays.md`); `sub_8213BDF0`,
-  `sub_8213BE80`, `AiPath::JoinCornerPair`'s steps (`ai-drivers.md`);
-  the race overlays' flush-to-zero window (`src/race_overlays/`).
-  Migration done (2e5ce7c..b6888ac: the particle arrays, the joins'
-  steps with PathCalls' join callback gone, the flush-to-zero windows
-  fixed (ThinLTO had moved a `dpps` out of one), 3 AI driver adapters
-  removed), validated (`itc_1508`, `itc_1509`; the joins' two steps,
-  never seen in play, to `to-drive.md`). Done.
-- Subsystem 1 of 3: `leads.md`'s race's screen objects (`sub_8212F148`,
-  `sub_821329B8`, `sub_82132778`, `sub_8212FCC8`, `sub_8212EDF8`,
-  `sub_8212EED0`; `8212EDF8`-`82133000`). Mapped as the screen objects
-  (`screen-objects.md`, 42 rows: 1 moved from `functions.md`, 41 new;
-  78f986b; 12 ready groups; 0 leads added); map checked (0 errors, 42
-  of 42 in play). Migration 1 done (472d5ac..4e3513e: both maps, the
-  rings, strength and teardown; 38 of 42 ours, nothing ready left; 8
-  adapters removed; `--native_screen_objects`), validated (`itc_1518`,
-  `itc_1519`; `sub_8212EEF8`, never seen in play, to `to-drive.md`).
-  Finished.
-- Subsystem 2 of 3: `leads.md`'s framework's set-up (`sub_82090A08`,
-  `sub_82090788`, `sub_820944C8`, `sub_82094350`, `sub_82090830`, the
-  getters `sub_82090760`-`sub_82090788`; 12 of 18 named ready).
-  Mapped as the app framework (`framework.md`, 68 rows: 5 moved from
-  `functions.md`, 63 new; c4b5b86; 29 ready groups; 5 leads added, 2
-  updated); all 68 in play. Not migrated: the run ended (its lead back
-  in `leads.md`).
+- Run started 2026-10-25 01:17 on `by-loop-25-10-26` (the user's
+  branch), from db25cd9; summary `b7-loop-2026-10-25-0117.md`.
+- Limit for this run: 3 subsystems; since 2026-10-25, the framework only
+  (the user's call: end the run after it).
+- Subsystem 1 of 3: `leads.md`'s top lead, the app framework, mapped
+  last run (`framework.md`, 68 rows, c4b5b86). Map checked (0 errors,
+  68 of 68 in play, ready groups; nothing calls the kernel). Migration
+  1 done after five batches (f27748b..e080edd: getters, thunks, the
+  run loop's maps and request vector, dispatchers, constructors; 50 of
+  68 ours, 15 adapters removed; `--native_framework`; its races ran
+  every harness but `ai_drivers`). The loop stopped, then resumed
+  (the user's call, 2026-10-25, after dbc8ee0's harness fix). Validated
+  (`itc_1569`: 50 of 50 harness lines, all 50 ran in play; 0 errors).
+  Migration 2 done (eb25d68, ad01ea7: the main group, 7 adapters
+  removed; 56 of 68 ours, nothing ready left), validated (`itc_1587`:
+  8 of 8 harness lines, all ran in play). Finished.
 
 ## Done
 
-- The screen objects (`screen-objects.md`, mapped in 78f986b; 42
-  rows): 38 ours in one migration (472d5ac..4e3513e), 8 adapters
-  removed; validated (`itc_1518`, `itc_1519`);
-  `--native_screen_objects`. Left: BuildFan, Init, the constructor (on
-  `rand`), `Record` (on the shader pairs).
-- Cleanup leads (no mapping): the particle arrays, the joins' steps,
-  the flush-to-zero windows (`race-overlays.md`, `ai-drivers.md`;
-  2e5ce7c..b6888ac), 3 adapters removed; validated (`itc_1508`,
-  `itc_1509`); existing flags.
-- Cleanup lead (no mapping): `ActionMappers::Init` (`action-mappers.md`;
-  3ac7be7, 9e36924), 7 adapters removed; validated (`itc_1494`,
-  `itc_1495`); `--native_action_mappers`.
+- The app framework (`framework.md`, mapped in c4b5b86; 68 rows): 56
+  ours in two migrations (f27748b..e080edd, eb25d68..ad01ea7), 22
+  adapters removed; validated (`itc_1569`, `itc_1587`);
+  `--native_framework`. Left: `Framework::Init` and the services'
+  set-ups, `sub_820908D8`, `Users::Create`, `SaveDevices::Create`,
+  `sub_82090840`/`890`/`8C0`, `FrameStart::OnTick`.
 
 ## Rows to review
 
-This run's rows: `review.md` ("Run 2026-10-24 21:33").
+This run's rows: `review.md` ("Run 2026-10-25 01:17").
 
 ## Expected to differ
 
-This run's groups: `expected-differences.md` (the "21:33 run" lines).
+This run's groups: `expected-differences.md` (the "01:17 run" lines).
 
 ## To check in a drive
 
@@ -81,27 +48,23 @@ This run's groups: `expected-differences.md` (the "21:33 run" lines).
 
 ## Totals
 
-- Start: ours 1794, work left 4967 (wrapped 115, known 585, unknown 4267).
-- After ActionMappers::Init's migration: ours 1795, work left 4966
-  (wrapped 115, known 584, unknown 4267). Race 27 s (`itc_1493`) with
-  `--run_harnesses=all`, 0 errors, every harness 0 differing.
-- After mapping the screen objects: ours 1800, work left 4961 (wrapped
-  115, known 620, unknown 4226).
-- After the screen objects' migration 1: ours 1838, work left 4923
-  (wrapped 115, known 582, unknown 4226). Race 27 s, 0 errors, every
-  harness 0 differing.
-- After the three cleanup leads' migration: ours 1800, work left 4961
-  (wrapped 115, known 579, unknown 4267). Race 27 s (`itc_1507`), 0
-  errors, every harness 0 differing.
-- At the end (2026-10-25, after the hardcoded shaders, the movies and
-  two coverage lists made again): ours 1847, work left 4604 (wrapped
-  113, known 651, unknown 3840).
+- Start: ours 1847, work left 4604 (wrapped 113, known 651, unknown 3840).
+- At the end (after migration 2 and its validation): ours 1903, work
+  left 4548 (wrapped 111, known 597, unknown 3840). Race 27 s
+  (`itc_1587`), 0 errors, every harness 0 differing.
+- After the framework's validation: race 27 s (`itc_1569`), 0 errors,
+  every harness 0 differing.
+- After the framework's migration 1: ours 1897, work left 4554 (wrapped
+  111, known 603, unknown 3840). Race 30 s (`itc_1559`, every harness
+  but `ai_drivers`), 0 errors, those harnesses 0 differing.
 
 ## Stopped
 
-Ended 2026-10-25 (the user's call), after the user's work beside it: the
-HLSL compiler and the movie library replaced (`--use_hardcoded_shaders`,
-`--play_movies_with_ffmpeg`; `b7-loop-2026-10-24-2133.md`). 1 of 3
-subsystems migrated; the framework's map (`framework.md`, c4b5b86) is
-recorded but not checked or migrated, and its lead is back at the top of
-`leads.md`. `check_function_statuses.py`: 0 errors.
+2026-10-25, after the framework, by the user's call (end the run after
+this subsystem). 1 subsystem migrated. `check_function_statuses.py`: 0
+errors. Earlier in the run: stopped after migration 1 on the
+`ai_drivers` harness's fault (UpdateIdle's case 1928 reading a wild
+address: the Update family's cases never set the racer count and the
+list at +452, left to the fill, mapped or not by where the harness
+block landed; exposed when the hardcoded shaders changed the boot's
+allocations, not caused by them), fixed in dbc8ee0, then resumed.
