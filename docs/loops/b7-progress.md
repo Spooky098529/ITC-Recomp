@@ -93,6 +93,12 @@ file's history. What's left to see in a drive, from every run:
   minimap's frame dump pixel-identical with the fallback). Nothing ready
   left; the rest waits on `atexit` and the course set's lists. Step:
   validation agent running.
+- Queued next (the user's go-ahead, 2026-10-25; no mapping, not
+  counted): `atexit` and `_onexit` native with the exit lock (lock 8) a
+  host mutex by the recorded lock call, then the callers it unblocks
+  (the minimap's marker draws and `Minimap::Draw`, the viewports,
+  `UiMovie::TrackProperty`, `SignInWatch::StaticInit`, the static
+  set-ups); `leads.md`'s top line. Then subsystem 5.
 
 ## Done
 
