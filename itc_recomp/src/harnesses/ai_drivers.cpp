@@ -2846,6 +2846,41 @@ void AiDrivers(Context& h) {
             floats.push_back({kDriver + 164, 2});
             floats.push_back({kPath + 5516, 1});
           }
+          if (update) {
+            // AvoidOthers' inputs (Update reaches MeasureOthers), as its
+            // cases: the racers' count, the driver's list +452 (an index
+            // into the driver's records and the table), the other drivers
+            // in the table and the driver's records of them. Left to the
+            // fill, an index was any word and its record any address, mapped
+            // or not as the block's address fell (2026-10-25). DriveCar keeps
+            // the game's table: it drives racer 0's driver (AiDriver::Of), not
+            // this one, and the table isn't there yet when the harnesses run.
+            guest::StoreU32(h.base, area + kRacers + 56, r.Below(9));
+            for (uint32_t i = 0; i < 8; i++) {
+              guest::StoreU32(h.base, driver + 452 + 4 * i, r.Below(8) == 0 ? 0xFFFFFFFFu : r.Below(7));
+            }
+            if (f.kind != kDriveCar) {
+              drivers = table;
+              table_written = true;
+            }
+            for (uint32_t i = 0; i < 7; i++) {
+              const uint32_t other = table + i * ai::kDriverBytes;
+              for (uint32_t at : {80u, 88u, 144u}) {
+                guest::StoreU32(h.base, other + at, RandomFloat(r, 20.0f));
+              }
+              guest::StoreU32(h.base, other + 116, RandomFloat(r, 2.0f));
+            }
+            for (uint32_t i = 0; i < 7; i++) {
+              const uint32_t record = driver + 172 + 40 * i;
+              guest::StoreU32(h.base, record + 0, RandomFloat(r, 40.0f));
+              guest::StoreU32(h.base, record + 4, RandomFloat(r, 10.0f));
+              guest::StoreU32(h.base, record + 12, RandomFloat(r, 3.0f));
+              guest::StoreU32(h.base, record + 16, RandomFloat(r, 100.0f));
+              guest::StoreU16(h.base, record + 24, uint16_t(r.Below(5)));
+              guest::StoreU16(h.base, record + 26, uint16_t(int32_t(r.Below(90)) - 3));
+              guest::StoreU16(h.base, record + 28, uint16_t((1u << r.Below(6)) & 0x17));
+            }
+          }
           if (f.kind == kUpdateDriver || f.kind == kDriveCar || f.kind == kUpdateIdle) {
             // The resets' and Drive's: the vehicle's box shape (+344, or
             // none), the skill's source (+6048: seven halfwords at io + 0xA0,
