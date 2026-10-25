@@ -356,4 +356,40 @@ std::optional<uint32_t> MakeWords(uint8_t* base, uint32_t vector);
 // cleared): the word appended, as PairsAppend.
 std::optional<uint32_t> WordsAppend(uint8_t* base, uint32_t vector, uint32_t word);
 
+// A movie's named animations: 1,024 entries of 36 bytes from +176 (a
+// std::string, then +28 the scene and +32 the animation), the count at
+// +0x90B0 (176 + 0x9000). A movie's texts: the map at +0x9BCC (kMovieTexts)
+// of 28-byte records (+0 a 4 KB buffer from VirtualAlloc), their count at
+// +0x9FCC. Its text list at +40 (+0 the items, 128 bytes each after a
+// 16-byte count; +4 the capacity, +8 the count) and draw context at +64.
+constexpr uint32_t kMovieNamed = 176;
+constexpr uint32_t kNamedBytes = 36;
+constexpr uint32_t kNamedCount = 1024;
+constexpr uint32_t kMovieNamedUsed = kMovieNamed + 0x9000;
+constexpr uint32_t kMovieTextCount = 0x9FCC;
+constexpr uint32_t kMovieTextList = 40;
+
+// sub_8211E1C0 (UiMovie::UiMovie): the textures (MakeWords on +28), the text
+// list (sub_8211B018: capacity 512, 512 items made with MakeTextItem after
+// their count, 512, in a block from operator new[]; its count, +48, 0), the
+// draw context reset (ResetDrawContext), the 1,024 named animations made
+// (sub_8211D210: an empty string, as its copy of an empty temporary leaves
+// it, and +28, +32 = 0), the named count 0, and the texts' 128 pairs and
+// their count cleared. Returns the movie; nullopt where the original must
+// run.
+std::optional<uint32_t> ConstructMovie(uint8_t* base, uint32_t movie);
+// sub_8211E160 (UiMovie::~UiMovie): the named animations' strings
+// destroyed last first (sub_8211D1B8: _Tidy(entry, true, 0)), the text
+// items destroyed last first and their block freed (sub_8211AF90 with 3,
+// when +40 isn't 0), then the textures' array freed (operator delete[]).
+// Returns the r3 the original leaves (the textures' array); nullopt, with
+// nothing done, where a free wouldn't run natively.
+std::optional<uint32_t> DestroyMovie(uint8_t* base, uint32_t movie);
+// sub_8211AC90: each text record ([+0x9FCC] of them, the values from the
+// texts' map) freed: its buffer (VirtualFree, MEM_RELEASE: the allocation
+// layer's pages) and itself (operator delete); the count 0. Returns the r3
+// the original leaves (the last record, or the movie when there were
+// none); nullopt, with nothing done, where a free wouldn't run natively.
+std::optional<uint32_t> FreeTexts(uint8_t* base, uint32_t movie);
+
 }  // namespace ui_movies

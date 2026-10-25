@@ -48,7 +48,9 @@ ITC_FLAG_BOOL(native_ui_movies_game, true, "ITC",
               "UiMovie::Draw sub_8211D280 and UiMovie::Run sub_8211E1B8 (their calls through "
               "their overrides); with --native_heap and --native_c_runtime_heap, the vectors' "
               "sub_8211B0E8, sub_8211C168 (sub_8211B458, sub_8211B160) and sub_8211AE68 "
-              "(sub_8211A788) "
+              "(sub_8211A788), UiMovie::UiMovie sub_8211E1C0 (sub_8211AE18, sub_8211B018, "
+              "sub_8211D210), UiMovie::~UiMovie sub_8211E160 (sub_8211D1B8, sub_8211AF90) and "
+              "the texts freed sub_8211AC90 "
               "(same results; checked by --run_harnesses=ui_movies_game and ui_movie_objects). sub_8211A660, "
               "sub_8211B230, AnimationList::Get, UiMovie::ScrollOffset, sub_8211B7B8, sub_8211B9B8 and "
               "sub_8211B940 have no adapters: only native callers reach "
@@ -686,4 +688,22 @@ extern "C" REX_FUNC(sub_8211AE68) {
   REX_FUNC_PROLOGUE();
   NATIVE_HEAP_OR_ORIGINAL(8211AE68,
                           ui_movies::WordsAppend(base, ctx.r3.u32, guest::LoadU32(base, ctx.r4.u32)));
+}
+
+// UiMovie::UiMovie: r3 = movie; returned.
+extern "C" REX_FUNC(sub_8211E1C0) {
+  REX_FUNC_PROLOGUE();
+  NATIVE_HEAP_OR_ORIGINAL(8211E1C0, ui_movies::ConstructMovie(base, ctx.r3.u32));
+}
+
+// UiMovie::~UiMovie: r3 = movie.
+extern "C" REX_FUNC(sub_8211E160) {
+  REX_FUNC_PROLOGUE();
+  NATIVE_HEAP_OR_ORIGINAL(8211E160, ui_movies::DestroyMovie(base, ctx.r3.u32));
+}
+
+// sub_8211AC90: r3 = movie.
+extern "C" REX_FUNC(sub_8211AC90) {
+  REX_FUNC_PROLOGUE();
+  NATIVE_HEAP_OR_ORIGINAL(8211AC90, ui_movies::FreeTexts(base, ctx.r3.u32));
 }

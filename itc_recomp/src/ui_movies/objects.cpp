@@ -6,8 +6,11 @@
 #include "base/log.h"
 #include "memory/c_runtime_heap.h"
 #include "memory/heap.h"
+#include "std_string/std_string.h"
+#include "ui_movies/ui_movies.h"
 
 #include <cstdlib>
+#include <unordered_set>
 
 namespace ui_movies {
 
@@ -177,6 +180,132 @@ std::optional<uint32_t> WordsAppend(uint8_t* base, uint32_t vector, uint32_t wor
   const uint32_t array = Load(base, vector + kArray);
   Store(base, vector + kCount, count + 1);
   Store(base, array + 4 * count, word);
+  return r3;
+}
+
+namespace {
+
+// A free the checks said would run natively: a logged abort when it
+// doesn't.
+void Require(bool done, const char* what, uint32_t block) {
+  if (!done) {
+    ITC_LOG_ERROR("UI movies: {}({:08X}) failed after its checks", what, block);
+    std::abort();
+  }
+}
+
+uint32_t NamedEntry(uint32_t movie, uint32_t i) {
+  return movie + kMovieNamed + kNamedBytes * i;
+}
+
+// The block a named animation's string frees (_Tidy with `built`): its
+// pointer while the capacity is 16 or more, else none.
+std::optional<uint32_t> StringBlock(uint8_t* base, uint32_t string) {
+  if (Load(base, string + std_string::kCapacity) < std_string::kInPlace) {
+    return std::nullopt;
+  }
+  return Load(base, string + std_string::kText);
+}
+
+}  // namespace
+
+std::optional<uint32_t> ConstructMovie(uint8_t* base, uint32_t movie) {
+  if (!CanAllocate(base, 2048) || !CanAllocate(base, 65552)) {
+    return std::nullopt;
+  }
+  ITC_NATIVE_RUNNING("sub_8211E1C0 UiMovie::UiMovie");
+  MakeWords(base, movie + kMovieTextures);
+  {
+    ITC_NATIVE_RUNNING("sub_8211B018 (the text list made)");
+    const uint32_t list = movie + kMovieTextList;
+    Store(base, list + kCapacity, 512);
+    const uint32_t block = NewArray(base, 65552);
+    Store(base, block, 512);
+    const uint32_t items = block + 16;
+    for (uint32_t i = 0; i < 512; i++) {
+      MakeTextItem(base, items + 128 * i);
+    }
+    Store(base, list + kArray, items);
+    Store(base, list + kCount, 0);
+  }
+  ResetDrawContext(base, movie + 64);
+  for (uint32_t i = 0; i < kNamedCount; i++) {
+    ITC_NATIVE_RUNNING("sub_8211D210 (a named animation made)");
+    const uint32_t entry = NamedEntry(movie, i);
+    std_string::Construct(base, entry);
+    Store(base, entry + 28, 0);
+    Store(base, entry + 32, 0);
+  }
+  Store(base, movie + kMovieNamedUsed, 0);
+  for (uint32_t i = 0; i < 128; i++) {
+    Store(base, movie + kMovieTexts + 8 * i, 0);
+    Store(base, movie + kMovieTexts + 8 * i + 4, 0);
+  }
+  Store(base, movie + kMovieTexts + 1024, 0);
+  return movie;
+}
+
+std::optional<uint32_t> DestroyMovie(uint8_t* base, uint32_t movie) {
+  std::unordered_set<uint32_t> blocks;
+  auto deletable = [&](uint32_t block) {
+    return CanDelete(block) && (block == 0 || blocks.insert(block).second);
+  };
+  for (uint32_t i = 0; i < kNamedCount; i++) {
+    const auto block = StringBlock(base, NamedEntry(movie, i));
+    if (block && !deletable(*block)) {
+      return std::nullopt;
+    }
+  }
+  const uint32_t items = Load(base, movie + kMovieTextList);
+  if ((items != 0 && !deletable(items - 16)) || !deletable(Load(base, movie + kMovieTextures))) {
+    return std::nullopt;
+  }
+  ITC_NATIVE_RUNNING("sub_8211E160 UiMovie::~UiMovie");
+  {
+    ITC_NATIVE_RUNNING("sub_8211D1B8 (the named animations destroyed)");
+    for (uint32_t i = kNamedCount; i-- > 0;) {
+      const uint32_t entry = NamedEntry(movie, i);
+      Require(std_string::Tidy(base, entry, true, 0), "a named animation's _Tidy", entry);
+    }
+  }
+  // The draw context's destructor (sub_82106540) is empty.
+  if (items != 0) {
+    ITC_NATIVE_RUNNING("sub_8211AF90 (the text items' deleting destructor)");
+    const uint32_t block = items - 16;
+    const uint32_t count = Load(base, block);
+    uint32_t item = items + (count << 7);
+    for (int32_t k = int32_t(count - 1); k >= 0; k--) {
+      item -= 128;
+      ClearTextItem(base, item);
+    }
+    DeleteArray(block);
+  }
+  const uint32_t textures = Load(base, movie + kMovieTextures);
+  DeleteArray(textures);
+  return textures;
+}
+
+std::optional<uint32_t> FreeTexts(uint8_t* base, uint32_t movie) {
+  const uint32_t count = Load(base, movie + kMovieTextCount);
+  std::unordered_set<uint32_t> records;
+  for (uint32_t k = 0; k < count; k++) {
+    const uint32_t record = Load(base, movie + kMovieTexts + 4 + 8 * k);
+    if (!memory::InRange(Load(base, record)) || !CanDelete(record) ||
+        (record != 0 && !records.insert(record).second)) {
+      return std::nullopt;
+    }
+  }
+  ITC_NATIVE_RUNNING("sub_8211AC90 (a movie's texts freed)");
+  uint32_t r3 = movie;
+  for (uint32_t k = 0; k < Load(base, movie + kMovieTextCount); k++) {
+    const uint32_t record = Load(base, movie + kMovieTexts + 4 + 8 * k);
+    // VirtualFree(buffer, 0, MEM_RELEASE), as its adapter frees the layer's
+    // pages.
+    memory::FreePages(Load(base, record));
+    Require(memory::crt::OperatorDelete(record), "operator delete", record);
+    r3 = record;
+  }
+  Store(base, movie + kMovieTextCount, 0);
   return r3;
 }
 
