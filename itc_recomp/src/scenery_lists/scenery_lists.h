@@ -11,6 +11,7 @@
 #pragma once
 
 #include <cstdint>
+#include <optional>
 
 namespace scenery_lists {
 
@@ -89,5 +90,52 @@ void TextureProviderClearAll(uint8_t* base, uint32_t provider);
 // only path seen in play). False, with nothing written, otherwise: the
 // original's reserve, debug prints and resize (never ran) run there.
 bool TextureProviderSet(uint8_t* base, uint32_t provider, uint32_t slot, uint32_t value);
+
+// --- The model draws (model_draws.cpp, built with strict floats) ---
+//
+// The recorders work on the command list at [0x8296B918]: each opens a
+// chunk (or finds the list's open), takes its slots and closes the chunk at
+// the end. They return nullopt, with nothing done, where the original's
+// command list calls would print a message (a chunk open on another list,
+// or no room for their slots): the original runs there.
+
+constexpr uint32_t kRecordList = 0x8296B918;
+
+// Model::IsShapeVisible (sub_825951E0): `world` x `view_projection` into
+// `product` (64 bytes of guest memory: the original's frame, r1 - 96, where
+// the interpolation notes it), then the shape's eight bounding box corners
+// (+96 of shape `shape`, 544 bytes each from the model's +40) transformed
+// and divided by w, counted against the near plane and the floats at
+// 0x82002B90 and 0x8206CDC4 as the translation's vector and scalar steps;
+// 0 when all eight are past one plane, else 1.
+uint32_t IsShapeVisible(uint8_t* base, uint32_t model, uint32_t view_projection, uint32_t world,
+                        uint32_t shape, uint32_t product);
+
+// Recorder::RecordObject (sub_825953D0): the header (7, 9, 0x00010009),
+// c0-c3 = world x view-projection (Matrix::Multiply, noted for
+// interpolation with the original's return address), c4-c7 the world
+// matrix (Matrix::Copy, noted), c8 the 16 bytes at 0x8265ECE0, command 36,
+// the chunk closed. Returns the header slot. The interpolation's hooks
+// around it (BlendState_BeforeRecordObject and After, the caller's
+// context) are its adapter's.
+std::optional<uint32_t> RecordObject(uint8_t* base, uint32_t view_projection, uint32_t world);
+
+// Recorder::RecordSceneLights (sub_82595490, probably): the header (7, 63,
+// 0x0101003F), c0-c3 the view at 0x8265ECA0 (Matrix::Copy, noted), c4 the
+// 16 bytes at 0x8265ECE0, c5-c39 SceneLightsRecordDirections, c40-c62
+// SceneLightsRecordProjectors, command 36, the chunk closed. Returns the
+// header slot.
+std::optional<uint32_t> RecordSceneLights(uint8_t* base);
+
+// SceneLights::RecordDirections (sub_8258B980, probably): at `out`, 3
+// vectors from 0x8296B950 normalized (the translation's estimate and Newton
+// step; a zero length gives its zero dot product), 8 from 0x8296B9E0 and 8
+// from 0x8296BA60 copied, 8 from 0x8296BBE0 normalized, 8 from 0x8296BC60
+// copied.
+void SceneLightsRecordDirections(uint8_t* base, uint32_t out);
+// SceneLights::RecordProjectors (sub_82589B58, probably): at `out`, the
+// x, y, z at 0x8265ED00 with w 1.0, 12 floats from 0x8296B980, 12 from
+// 0x8296B9B0, 32 from 0x8296BAE0 and 32 from 0x8296BB60 (lfs and stfs).
+void SceneLightsRecordProjectors(uint8_t* base, uint32_t out);
 
 }  // namespace scenery_lists

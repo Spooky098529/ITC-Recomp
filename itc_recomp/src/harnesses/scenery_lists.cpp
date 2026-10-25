@@ -19,6 +19,7 @@
 #include <fmt/format.h>
 
 #include <algorithm>
+#include <bit>
 #include <functional>
 #include <string>
 #include <utility>
@@ -36,9 +37,11 @@ struct Region {
   uint32_t address;
   uint32_t bytes;
 };
+// the command list the recorders use and the open chunks' count, the view,
+// the camera's position and the projector origin, the scene lights.
 constexpr Region kRegions[] = {
-    {0x826C5B20, 0x10},
-    {0x8296B8B8, 0x20},
+    {0x826C5B20, 0x10}, {0x8296B8B8, 0x20}, {0x8296B910, 0x10},
+    {0x8296BD20, 0x10}, {0x8265ECA0, 0x70}, {0x8296B940, 0x3A0},
 };
 
 // The block: 64 KB for the lists, models and sets, then room for the race
@@ -97,7 +100,8 @@ void RandomRace(uint8_t* base, uint32_t race, Random& r) {
 void Case(Context& h, Results& results, uint32_t block, Random& r,
           const std::function<void(PPCContext&)>& setup, GuestFunction recompiled,
           GuestFunction native, const FloatRanges& floats, const std::string& what,
-          bool race = false) {
+          bool race = false,
+          const std::function<void(const PPCContext&, Outputs&)>& extra = {}) {
   std::vector<std::vector<uint8_t>> saved;
   for (const Region& region : kRegions) {
     saved.push_back(Read(h.base, region.address, region.bytes));
@@ -130,6 +134,9 @@ void Case(Context& h, Results& results, uint32_t block, Random& r,
     AddBlock(out[v], h.base, block, floats);
     for (const Region& region : kRegions) {
       out[v].Bytes(Read(h.base, region.address, region.bytes));
+    }
+    if (extra) {
+      extra(t, out[v]);
     }
     out[v].Word(t.r3.u32);
     out[v].Word(uint32_t(t.r3.u64 >> 32));
@@ -352,6 +359,164 @@ void Provider(Context& h, Random& r, uint32_t block) {
   }
 }
 
+// --- The model draws ---
+
+// A float's bits: now and then a NaN (either sign, quiet or signaling), an
+// infinity, a zero or a denormal; else a value of a few hundred.
+uint32_t RandomFloat(Random& r) {
+  switch (r.Below(12)) {
+    case 0: return 0x7FC00000u | (r.Below(2) << 31) | r.Below(0x400000);
+    case 1: return 0x7F800001u | (r.Below(2) << 31) | r.Below(0x3FFFFF);
+    case 2: return 0x7F800000u | (r.Below(2) << 31);
+    case 3: return r.Below(2) << 31;
+    case 4: return r.Below(0x800000) | (r.Below(2) << 31);
+    default: {
+      const float f = (float(r.Below(200000)) - 100000.0f) / 256.0f;
+      return std::bit_cast<uint32_t>(f);
+    }
+  }
+}
+
+void RandomFloats(uint8_t* base, uint32_t address, uint32_t count, Random& r) {
+  for (uint32_t i = 0; i < count; i++) {
+    guest::StoreU32(base, address + 4 * i, RandomFloat(r));
+  }
+}
+
+void StoreFloats(uint8_t* base, uint32_t address, std::initializer_list<float> values) {
+  for (float f : values) {
+    guest::StoreFloat(base, address, f);
+    address += 4;
+  }
+}
+
+float Spread(Random& r, float range) {
+  return (float(r.Below(20001)) - 10000.0f) / 10000.0f * range;
+}
+
+void Visibility(Context& h, Random& r, uint32_t block) {
+  Results results("Model::IsShapeVisible (sub_825951E0)");
+  int visible[2] = {0, 0};  // both versions' results, counted
+  for (int c = 0; c < 512; c++) {
+    Case(
+        h, results, block, r,
+        [&](PPCContext& t) {
+          const uint32_t model = block + 0x100;
+          const uint32_t shapes = block + 0x2000;
+          guest::StoreU32(h.base, model + 40, shapes);
+          const uint32_t shape = r.Below(4);
+          const uint32_t corners = shapes + 544 * shape + 96;
+          const uint32_t view_projection = block + 0x400 + 16 * r.Below(4);
+          const uint32_t world = block + 0x500 + 4 * r.Below(4);
+          if (c % 4 == 0) {
+            // Anything (NaNs, infinities, zeros among them).
+            RandomFloats(h.base, view_projection, 16, r);
+            RandomFloats(h.base, world, 16, r);
+            RandomFloats(h.base, corners, 32, r);
+          } else {
+            // An identity view-projection now and then scaled, a world
+            // moved, and the corners in a cluster about a point (sometimes
+            // behind the camera: w below 0 when the scale is negative).
+            const float scale = c % 4 == 1 ? 1.0f : Spread(r, 2.0f);
+            StoreFloats(h.base, view_projection, {scale, 0, 0, 0, 0, scale, 0, 0, 0, 0, scale, 0,
+                                                  0, 0, 0, c % 8 == 3 ? -1.0f : 1.0f});
+            StoreFloats(h.base, world, {1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1, 0, Spread(r, 3),
+                                        Spread(r, 3), Spread(r, 3), 1});
+            const float x = Spread(r, 3), y = Spread(r, 3), z = Spread(r, 3);
+            const float size = Spread(r, 0.5f);
+            for (uint32_t i = 0; i < 8; i++) {
+              StoreFloats(h.base, corners + 16 * i,
+                          {x + (i & 1 ? size : -size), y + (i & 2 ? size : -size),
+                           z + (i & 4 ? size : -size), c % 16 == 5 ? Spread(r, 1) : 1.0f});
+            }
+          }
+          t.r3.u64 = model;
+          t.r4.u64 = view_projection;
+          t.r5.u64 = world;
+          t.r6.u64 = shape;
+        },
+        __imp__sub_825951E0, hooks::SceneryListsIsShapeVisible, {}, fmt::format("case {}", c),
+        false, [&](const PPCContext& t, Outputs& out) {
+          // The product the original leaves in its frame.
+          out.Floats(h.base, t.r1.u32 - 96, 16);
+          visible[t.r3.u32 & 1]++;
+        });
+  }
+  ITC_LOG_INFO("harness: Model::IsShapeVisible: results 0, 1: {}, {}", visible[0] / 2,
+               visible[1] / 2);
+  results.Report();
+}
+
+// The command list at [0x8296B918], in the block at +0x3000, its slots from
+// +0x4000: the next chunk's start and the write pointer there, a chunk open
+// on it or another list now and then, room for `slots` (sometimes just).
+void RandomList(uint8_t* base, uint32_t block, Random& r, uint32_t slots) {
+  const uint32_t list = block + 0x3000;
+  guest::StoreU32(base, scenery_lists::kRecordList, list);
+  const uint32_t start = block + 0x4000;
+  guest::StoreU32(base, list + 32, start);
+  guest::StoreU32(base, list + 44, start);
+  const uint32_t capacity = 200;
+  guest::StoreU32(base, list + 8, capacity);
+  // Never too few: the original then writes through 0 (a full list's
+  // AllocateSlots returns 0); the plain C++ declines those for it.
+  guest::StoreU32(base, list + 12, r.Below(8) == 0 ? capacity - slots - 1 : r.Below(64));
+  const bool open = r.Below(3) == 0;
+  guest::StoreU8(base, list + 52, open ? 1 : 0);
+  guest::StoreU32(base, 0x8296BD28, open ? 1 : r.Below(8) == 0 ? 1 : 0);
+}
+
+void Recorders(Context& h, Random& r, uint32_t block) {
+  const uint32_t slots = block + 0x4000;
+  {
+    Results results("Recorder::RecordObject (sub_825953D0)");
+    for (int c = 0; c < 256; c++) {
+      Case(
+          h, results, block, r,
+          [&](PPCContext& t) {
+            RandomList(h.base, block, r, 11);
+            const uint32_t view_projection = block + 0x400 + 16 * r.Below(4);
+            const uint32_t world = block + 0x500 + 16 * r.Below(4);
+            RandomFloats(h.base, view_projection, 16, r);
+            RandomFloats(h.base, world, 16, r);
+            RandomBytes(h.base, 0x8265ECE0, 16, r);
+            t.r3.u64 = block + 0x100;
+            t.r4.u64 = view_projection;
+            t.r5.u64 = world;
+          },
+          __imp__sub_825953D0, hooks::SceneryListsRecordObjectSteps,
+          {{slots + 16 - block, 32}}, fmt::format("case {}", c));
+    }
+    results.Report();
+  }
+  {
+    Results results("Recorder::RecordSceneLights (sub_82595490)");
+    for (int c = 0; c < 256; c++) {
+      Case(
+          h, results, block, r,
+          [&](PPCContext& t) {
+            RandomList(h.base, block, r, 65);
+            RandomFloats(h.base, 0x8265ECA0, 0x70 / 4, r);
+            RandomFloats(h.base, 0x8296B940, 0x3A0 / 4, r);
+            // Zero vectors now and then among the normalized ones.
+            for (uint32_t v = 0; v < 11; v++) {
+              if (r.Below(6) == 0) {
+                const uint32_t at = v < 3 ? 0x8296B950 + 16 * v : 0x8296BBE0 + 16 * (v - 3);
+                StoreFloats(h.base, at, {r.Below(2) ? -0.0f : 0.0f, 0, 0, Spread(r, 1)});
+              }
+            }
+            t.r3.u64 = block + 0x100;
+            t.r4.u64 = block + 0x500;
+          },
+          __imp__sub_82595490, hooks::SceneryListsRecordSceneLights,
+          {{slots + 16 + 80 - block, 12}, {slots + 16 + 384 - block, 32},
+           {slots + 16 + 640 - block, 92}},
+          fmt::format("case {}", c));
+    }
+    results.Report();
+  }
+}
+
 }  // namespace
 
 void SceneryLists(Context& h) {
@@ -362,6 +527,8 @@ void SceneryLists(Context& h) {
   DrawState(h, r, block);
   Picks(h, r, block);
   Provider(h, r, block);
+  Visibility(h, r, block);
+  Recorders(h, r, block);
   memory::Free(allocation);
 }
 

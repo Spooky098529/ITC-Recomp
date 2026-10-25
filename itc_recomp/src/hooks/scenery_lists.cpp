@@ -9,6 +9,14 @@
 #include "base/flags.h"
 #include "scenery_lists/scenery_lists.h"
 
+#include <optional>
+
+// The command list's diagnostics (blend_state.cpp) see who allocates slots:
+// with any of them on, the recorders' originals run.
+ITC_FLAG_DECLARE(bool, log_overlay_uploads);
+ITC_FLAG_DECLARE(bool, log_slot_callers);
+ITC_FLAG_DECLARE(bool, log_recording_by_pass);
+
 ITC_FLAG_BOOL(native_scenery_lists, true, "ITC",
               "Run the course set's lists of models and the model draws "
               "(docs/functions/scenery-lists.md: ModelList::Release sub_82147FB8 (Model::Release "
@@ -17,7 +25,11 @@ ITC_FLAG_BOOL(native_scenery_lists, true, "ITC",
               "sub_82147850, ModelList::IsCEntryOn sub_82147958 (with sub_82147A20), "
               "Race::CourseLayout sub_8228F408 (with sub_8228F484), PointList::IsEntryOn "
               "sub_82147B18, PassDescription::SetBillboardPass sub_82148650 (with sub_8209BD40), "
-              "VertexDeclarations::ForDepth sub_82589970, TextureProvider::ClearAll "
+              "VertexDeclarations::ForDepth sub_82589970, Model::IsShapeVisible sub_825951E0, "
+              "Recorder::RecordObject sub_825953D0 (inside its interpolation wrapper, "
+              "src/interpolation/blend_state.cpp), Recorder::RecordSceneLights sub_82595490 "
+              "(with SceneLights::RecordDirections sub_8258B980 and RecordProjectors "
+              "sub_82589B58, no adapters: only it calls them), TextureProvider::ClearAll "
               "sub_82594328 and TextureProvider::Set sub_82594718 (its reserve, debug prints "
               "and resize, never seen in play, the original's)) natively instead of through "
               "the translated code (the same writes; checked by "
@@ -114,6 +126,57 @@ void SceneryListsTextureProviderSet(PPCContext& ctx, uint8_t* base) {
   }
 }
 
+namespace {
+
+bool SlotDiagnostics() {
+  return ITC_FLAG(log_overlay_uploads) || ITC_FLAG(log_slot_callers) ||
+         ITC_FLAG(log_recording_by_pass);
+}
+
+}  // namespace
+
+void SceneryListsIsShapeVisible(PPCContext& ctx, uint8_t* base) {
+  ctx.r3.u64 = scenery_lists::IsShapeVisible(base, ctx.r3.u32, ctx.r4.u32, ctx.r5.u32,
+                                             ctx.r6.u32, ctx.r1.u32 - 96);
+  ctx.fpscr.disableFlushMode();
+}
+
+void SceneryListsRecordObjectSteps(PPCContext& ctx, uint8_t* base) {
+  const auto header = SlotDiagnostics()
+                          ? std::nullopt
+                          : scenery_lists::RecordObject(base, ctx.r4.u32, ctx.r5.u32);
+  if (!header) {
+    __imp__sub_825953D0(ctx, base);
+    return;
+  }
+  ctx.fpscr.disableFlushMode();
+  ctx.r3.u64 = *header;
+}
+
+bool SceneryListsRecordObject(PPCContext& ctx, uint8_t* base) {
+  if (!ITC_FLAG(native_scenery_lists) || SlotDiagnostics()) {
+    return false;
+  }
+  const auto header = scenery_lists::RecordObject(base, ctx.r4.u32, ctx.r5.u32);
+  if (!header) {
+    return false;
+  }
+  ctx.fpscr.disableFlushMode();
+  ctx.r3.u64 = *header;
+  return true;
+}
+
+void SceneryListsRecordSceneLights(PPCContext& ctx, uint8_t* base) {
+  const auto header =
+      SlotDiagnostics() ? std::nullopt : scenery_lists::RecordSceneLights(base);
+  if (!header) {
+    __imp__sub_82595490(ctx, base);
+    return;
+  }
+  ctx.fpscr.disableFlushMode();
+  ctx.r3.u64 = *header;
+}
+
 }  // namespace hooks
 
 #define ITC_SCENERY_LISTS(address, steps)    \
@@ -135,5 +198,7 @@ ITC_SCENERY_LISTS(8228F408, SceneryListsCourseLayout)
 ITC_SCENERY_LISTS(82147B18, SceneryListsPointListIsEntryOn)
 ITC_SCENERY_LISTS(82148650, SceneryListsSetBillboardPass)
 ITC_SCENERY_LISTS(82589970, SceneryListsDepthVertexDeclaration)
+ITC_SCENERY_LISTS(825951E0, SceneryListsIsShapeVisible)
+ITC_SCENERY_LISTS(82595490, SceneryListsRecordSceneLights)
 ITC_SCENERY_LISTS(82594328, SceneryListsTextureProviderClearAll)
 ITC_SCENERY_LISTS(82594718, SceneryListsTextureProviderSet)

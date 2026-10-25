@@ -81,7 +81,11 @@ recorded commands are replayed.
 - `sub_825953D0` is the bulk per-object recorder (vertex constants 0, 9
   registers); it allocates the payload with the call returning to
   `0x82595428` and fills it with the multiply returning to `0x82595438`.
-  It runs on every pass, including render-only ones.
+  It runs on every pass, including render-only ones. Since the B7 loop
+  (2026-10-25) its recording is native (`src/scenery_lists/model_draws.cpp`,
+  `--native_scenery_lists`) inside the same wrapper: the multiply and copy
+  are noted with those return addresses, and the command list's
+  diagnostics (`--log_slot_callers` and the others) run the original.
 - `sub_82595550`, `sub_82146BD0` and `sub_820CECA0` record draws with a
   command 7 (vertex constants 9, 5 registers). `sub_82595490` records pixel
   constants 0, 63 registers.

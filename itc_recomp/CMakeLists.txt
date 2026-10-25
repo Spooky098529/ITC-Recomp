@@ -179,6 +179,7 @@ set(ITC_SOURCES
     src/minimap/minimap.cpp
     src/hooks/scenery_lists.cpp
     src/scenery_lists/scenery_lists.cpp
+    src/scenery_lists/model_draws.cpp
     src/hooks/scene_models.cpp
     src/scene_models/scene_models.cpp
     src/hooks/models.cpp
@@ -360,7 +361,9 @@ set(ITC_SOURCES
 # (src/strings_and_font/, docs/functions/strings-and-font.md) and the
 # course's route (src/track_route/, docs/functions/track-route.md) and the AI
 # drivers (src/ai_drivers/, docs/functions/ai-drivers.md) and the screen
-# objects (src/screen_objects/, docs/functions/screen-objects.md).
+# objects (src/screen_objects/, docs/functions/screen-objects.md) and the
+# model draws (src/scenery_lists/model_draws.cpp,
+# docs/functions/scenery-lists.md).
 set_source_files_properties(src/c_runtime/math.cpp src/ui_movies/keys.cpp
     src/ui_movies/animation.cpp
     src/ui_movies/draw.cpp src/ui_movies/texts.cpp src/ui_movies/update.cpp
@@ -378,7 +381,7 @@ set_source_files_properties(src/c_runtime/math.cpp src/ui_movies/keys.cpp
     src/car_specs/car_specs.cpp src/cameras/cameras.cpp
     src/strings_and_font/strings_and_font.cpp src/strings_and_font/font.cpp
     src/track_route/track_route.cpp src/ai_drivers/ai_drivers.cpp
-    src/screen_objects/screen_objects.cpp PROPERTIES
+    src/screen_objects/screen_objects.cpp src/scenery_lists/model_draws.cpp PROPERTIES
     COMPILE_OPTIONS "-ffp-model=strict;-ffp-contract=off"
     SKIP_PRECOMPILE_HEADERS ON)
 

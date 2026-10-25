@@ -34,4 +34,20 @@ void SceneryListsDepthVertexDeclaration(PPCContext& ctx, uint8_t* base);
 void SceneryListsTextureProviderClearAll(PPCContext& ctx, uint8_t* base);
 void SceneryListsTextureProviderSet(PPCContext& ctx, uint8_t* base);
 
+// Model::IsShapeVisible (sub_825951E0): r3 = the model, r4 = the
+// view-projection, r5 = the world matrix, r6 = the shape; the product in a
+// 192-byte frame like the original's (at r1 - 96).
+void SceneryListsIsShapeVisible(PPCContext& ctx, uint8_t* base);
+// Recorder::RecordObject (sub_825953D0): r4 = the view-projection, r5 = the
+// world matrix; r3 = the header slot. False, with nothing done, where the
+// original must run (--native_scenery_lists off, the command list's
+// diagnostics on, or the plain C++ declines). Called from its wrapper
+// (src/interpolation/blend_state.cpp), inside the interpolation's hooks.
+bool SceneryListsRecordObject(PPCContext& ctx, uint8_t* base);
+// The same without the flag (the harness's steps): the original runs where
+// the plain C++ declines.
+void SceneryListsRecordObjectSteps(PPCContext& ctx, uint8_t* base);
+// Recorder::RecordSceneLights (sub_82595490): r3 = the header slot.
+void SceneryListsRecordSceneLights(PPCContext& ctx, uint8_t* base);
+
 }  // namespace hooks
