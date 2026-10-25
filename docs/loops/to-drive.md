@@ -20,6 +20,11 @@ here loses its heading.
 - The DrawTexts lead's migration 2 (attract race `itc_1729`, replay
   `itc_1730`, ok): `sub_82211A28` RivalLogo::Draw (`race-hud.md`; runs
   only with a rival at the race start)
+- The UI movies' ready groups (attract race `itc_1740`, replay
+  `itc_1741`, ok): `sub_8211B160` (the pairs vector's growth),
+  `sub_8211C4F0` (a text's scroll delay and speed), `sub_8211D880`
+  UiMovie::RevealText, `sub_8211D8D8` (whether a text has another
+  page) (`ui-movies-game.md`)
 
 ## Run 2026-10-25 03:59 (`b7-loop-25-10-26-2`)
 

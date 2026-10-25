@@ -56,10 +56,14 @@ file's history. What's left to see in a drive, from every run:
   the HUD mirror's replay frame dumps the same with the fallback).
   Nothing ready left; the rest waits on `sub_82108860`, the string
   table's formatting, the archive load's events and the texture set.
-  Step: validation, agent running.
+  Validated (`itc_1740`: 19 of 19 harness lines, 7 Merged skipped;
+  replay `itc_1741` ok; 4 to `to-drive.md`). Finished.
 
 ## Done
 
+- The UI movies' ready groups (no mapping; 7d83fb5..ad1dbcb): 26 rows,
+  19 plain C++, 7 Merged; validated (`itc_1740`, `itc_1741`);
+  `--native_ui_movies_game`.
 - `UiMovie::DrawTexts` and what it unblocked (no mapping; two
   migrations, c4141e4..dc97a73): 13 made native, 9 adapters removed, 1
   Merged; `race-hud.md` new (3 rows); validated (`itc_1722`,
@@ -93,6 +97,9 @@ This run's groups: `expected-differences.md` (the "16:38 run" lines).
 - After the scene models' validation: race 27 s (`itc_1696`), 0
   errors, every harness 0 differing; replay 126 s (`itc_1697`), 0
   errors.
+- After the UI movies' ready groups' validation: race 23 s (`itc_1740`,
+  the harnesses' time), 0 errors, every harness 0 differing; replay
+  (`itc_1741`), 0 errors.
 - After the UI movies' ready groups' migration: ours 2076, work left
   4375 (wrapped 105, known 582, unknown 3688).
 - After the DrawTexts lead's validation 2: race 26 s (`itc_1729`), 0
