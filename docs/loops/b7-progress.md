@@ -58,6 +58,10 @@ file's history. What's left to see in a drive, from every run:
   table's formatting, the archive load's events and the texture set.
   Validated (`itc_1740`: 19 of 19 harness lines, 7 Merged skipped;
   replay `itc_1741` ok; 4 to `to-drive.md`). Finished.
+- Subsystem 2 of 3: the course scenery's model lists (`sub_82147FB8`,
+  `sub_82147D88` and the others at `82146AA8`-`82148650`), picked as
+  closest to ready (5 of its 9 roots ready, 64 functions left under
+  them; `Minimap::Draw` waits on them). Step: mapping, agent running.
 
 ## Done
 
