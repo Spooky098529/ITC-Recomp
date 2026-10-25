@@ -107,7 +107,8 @@ struct FormatCalls {
 // back chain written): the 4 KB buffer at +608 (cleared before each slot),
 // the made format at +96, the one-unit string at +80, swprintf's argument
 // at +32 (as the originals store them). swprintf and FormatGrouped natively,
-// their adapters through `calls` where they decline. Returns `out`.
+// where they decline swprintf's adapter and FormatGrouped's original through
+// `calls`. Returns `out`.
 uint32_t StringsFormatV(uint8_t* base, const FormatCalls& calls, uint32_t stack, uint32_t table,
                         uint32_t out, uint32_t id, uint32_t args);
 

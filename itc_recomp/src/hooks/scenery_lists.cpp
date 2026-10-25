@@ -6,8 +6,9 @@
 // functions only native callers reach (the flag switches their callers):
 // VertexDeclarations::ForDepth (sub_82589970), from RecordShapeDepth, and
 // ModelList::Load and LoadPoints (sub_82148428, sub_82148528), from
-// CourseSet::Parse (src/course_scenery/); their register steps are the
-// harness's.
+// CourseSet::Parse (src/course_scenery/), and ModelList::IsBEntryOn and
+// IsCEntryOn (sub_82147850, sub_82147958), from Scenery::DrawSetLists
+// (src/course_scenery/collect.cpp); their register steps are the harness's.
 
 #include "hooks/scenery_lists.h"
 
@@ -33,7 +34,8 @@ ITC_FLAG_BOOL(native_scenery_lists, true, "ITC",
               "sub_82148428 and ModelList::LoadPoints sub_82148528 (no adapters: only "
               "CourseSet::Parse's plain C++ calls them, src/course_scenery/), SceneryModel::ResetDrawState "
               "sub_82146AA8, AnimationSet::CurrentFrame sub_82146B80, ModelList::IsBEntryOn "
-              "sub_82147850, ModelList::IsCEntryOn sub_82147958 (with sub_82147A20), "
+              "sub_82147850 and ModelList::IsCEntryOn sub_82147958 (with sub_82147A20) (no adapters: "
+              "Scenery::DrawSetLists' plain C++ calls them, src/course_scenery/), "
               "Race::CourseLayout sub_8228F408 (with sub_8228F484), PointList::IsEntryOn "
               "sub_82147B18, PassDescription::SetBillboardPass sub_82148650 (with sub_8209BD40), "
               "VertexDeclarations::ForDepth sub_82589970 (no adapter: only RecordShapeDepth's plain "
@@ -566,8 +568,6 @@ void SceneryListsPointListDraw(PPCContext& ctx, uint8_t* base) {
 ITC_SCENERY_LISTS(82147FB8, SceneryListsModelListRelease)
 ITC_SCENERY_LISTS(82146AA8, SceneryListsResetDrawState)
 ITC_SCENERY_LISTS(82146B80, SceneryListsAnimationCurrentFrame)
-ITC_SCENERY_LISTS(82147850, SceneryListsIsBEntryOn)
-ITC_SCENERY_LISTS(82147958, SceneryListsIsCEntryOn)
 ITC_SCENERY_LISTS(8228F408, SceneryListsCourseLayout)
 ITC_SCENERY_LISTS(82147B18, SceneryListsPointListIsEntryOn)
 ITC_SCENERY_LISTS(82148650, SceneryListsSetBillboardPass)

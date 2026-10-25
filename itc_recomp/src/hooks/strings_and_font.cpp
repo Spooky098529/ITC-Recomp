@@ -37,7 +37,9 @@ ITC_FLAG_BOOL(native_strings_and_font, true, "ITC",
               "sub_821081A0, swprintf sub_8210A490 (with vswprintf sub_825A9A80, _vswprintf_l "
               "sub_825A9980 and _woutput_l sub_825B13D0, no adapters of their own; the original "
               "for %n, %Z, floats but %f and the unit 0xFFFF), Strings::FormatGrouped "
-              "sub_8210A680, Strings::PageCount sub_8210A5C0, Strings::CopyPage sub_8210A5E8, "
+              "sub_8210A680 (no adapter: Strings::FormatV's and Format's plain C++ call it), "
+              "Strings::PageCount sub_8210A5C0 (no adapter: the UI movies' plain C++ calls it), "
+              "Strings::CopyPage sub_8210A5E8, "
               "the font's pixel shader entries sub_825D9590, Font::SetParams sub_82108368 (and "
               "under Font::TextWidth sub_82108B30, which has no adapter: its caller "
               "UiMovie::ScrollOffset is switched by --native_ui_movies_game), Font::DrawPass sub_82109EF0 (without the "
@@ -46,7 +48,8 @@ ITC_FLAG_BOOL(native_strings_and_font, true, "ITC",
               "sub_82108458 and sub_82108810, Font::LineY sub_82108568, Font::AddGlyph "
               "sub_82109560, Font::ClipGlyph sub_82108C90 and Font::OutCode sub_821082A0, no "
               "adapters of their own), Font::Draw sub_8210A400, Text::Draw sub_8210A758, "
-              "Strings::Get sub_8210A800, Strings::FormatV sub_8210A990 (the font's number sub_82108A70, never in play, a guest call), Strings::Format sub_8210ABC0, and, with --native_models, XPR::Release of a slot "
+              "Strings::Get sub_8210A800 (no adapter: Strings::FormatV's and Format's plain C++ "
+              "call it), Strings::FormatV sub_8210A990 (the font's number sub_82108A70, never in play, a guest call), Strings::Format sub_8210ABC0, and, with --native_models, XPR::Release of a slot "
               "sub_82108860; "
               "rotated text and the second pass, never in play, on the translated code) "
               "natively instead of through the translated code (same results; checked by "
@@ -131,23 +134,10 @@ extern "C" REX_FUNC(sub_8210A490) {
   ctx.r3.u64 = uint32_t(count);
 }
 
-// Strings::FormatGrouped: r4 = the value, r5 = the output; r3 the output
-// (wcscat's or wcscpy's), its frame where the original's would be (640
-// bytes down). Flush-to-zero off, as its lfd leaves it.
-extern "C" REX_FUNC(sub_8210A680) {
-  ITC_STRINGS_AND_FONT_FALLBACK(8210A680)
-  ctx.fpscr.disableFlushMode();
-  if (!StringsFormatGrouped(base, ctx.r4.s32, ctx.r5.u32, ctx.r1.u32 - 640)) {
-    __imp__sub_8210A680(ctx, base);
-    return;
-  }
-  ctx.r3.u64 = ctx.r5.u32;
-}
-
 // Strings::FormatV: r3 = the table, r4 = the output, r5 = the id, r6 = the
 // va_list; r3 the output. Flush-to-zero off, as its frsp leaves it. Its
-// guest calls (swprintf's and FormatGrouped's adapters where their plain C++
-// declines, the font's number) from its frame.
+// guest calls (swprintf's adapter and FormatGrouped's original where their
+// plain C++ declines, the font's number) from its frame.
 namespace {
 
 struct FormatGuest {
@@ -207,12 +197,6 @@ void hooks::StringsFormatSteps(PPCContext& ctx, uint8_t* base) {
 extern "C" REX_FUNC(sub_8210ABC0) {
   ITC_STRINGS_AND_FONT_FALLBACK(8210ABC0)
   hooks::StringsFormatSteps(ctx, base);
-}
-
-// Strings::PageCount: r4 = the text; r3 the count.
-extern "C" REX_FUNC(sub_8210A5C0) {
-  ITC_STRINGS_AND_FONT_FALLBACK(8210A5C0)
-  ctx.r3.u64 = StringsPageCount(base, ctx.r4.u32);
 }
 
 // Strings::CopyPage: r4 = the output, r5 = the text, r6 = the page, r7 =
@@ -338,15 +322,6 @@ extern "C" REX_FUNC(sub_8210A758) {
     return;
   }
   FontDraw(ctx, base, [&](uint32_t params) { return TextDrawSetUp(base, params); });
-}
-
-// Strings::Get: r3 = the table, r4 = the id (its low 16 bits); r3 the
-// string, or left for an id past the last bound.
-extern "C" REX_FUNC(sub_8210A800) {
-  ITC_STRINGS_AND_FONT_FALLBACK(8210A800)
-  if (const auto text = StringsGet(base, ctx.r3.u32, ctx.r4.u32 & 0xFFFF)) {
-    ctx.r3.u64 = *text;
-  }
 }
 
 // XPR::Release of a slot (sub_82108860): r3 = the slot; r3 as the original
