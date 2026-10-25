@@ -37,7 +37,13 @@ file's history. What's left to see in a drive, from every run:
   section `0x8296BD38`, under `Memory::FreeLater` and
   `FreePhysicalLater`, which the destructors need). The user's call,
   2026-10-25: port the lock too (a host `std::mutex`, as `Edram::Alloc`
-  got). Step: migration agent 1 running.
+  got). Migration 1 done (6148c1e..b35547a: the put-off frees with the
+  lock, the XPR, `memmove_s`, the texture provider, `Model::Model`,
+  `Release`, `~Model`; all 17 rows ours (and `ScopedLock` overridden
+  for `0x8296BD38` only), 3 adapters removed; `--native_models`;
+  `itc_1613`: 27 s, 0 errors, every harness 0 differing). Nothing ready
+  left in it; it makes the game modes' `sub_82106AF0` and
+  `sub_821067A0` ready. Step: validation agent running.
 
 ## Done
 
@@ -65,6 +71,8 @@ This run's groups: `expected-differences.md` (the "03:59 run" lines).
 - Start: ours 1903, work left 4548 (wrapped 111, known 597, unknown 3840).
 - After the game modes' map: ours 1903, work left 4548 (wrapped 111,
   known 625, unknown 3812).
+- After the model class's migration 1: ours 1944, work left 4507
+  (wrapped 111, known 601, unknown 3795).
 - After the model class's map: ours 1923, work left 4528 (wrapped 111,
   known 622, unknown 3795).
 - After the game modes' validation: race 27 s (`itc_1603`), 0 errors,

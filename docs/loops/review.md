@@ -51,6 +51,28 @@ When the user has reviewed a run's section, its heading gets
   `leads.md`: one lead (`sub_820C5008`/`sub_820C5168`), notes on three.
   The map stopped on the memory blocks' lock; the user's call
   (2026-10-25): port it too (a host `std::mutex`).
+- `models.md` migration 1 (6148c1e..b35547a; `src/models/`,
+  `src/hooks/models.cpp`, harness `src/harnesses/models.cpp`): all 17
+  rows ours, `--native_models` (`memmove_s` under `--native_c_runtime`).
+  For review:
+  - The memory blocks' lock is a `std::recursive_mutex`, not a plain
+    `std::mutex`: the critical section it replaces is recursive, and the
+    harness holds it around its cases on the game's own pending-frees
+    list while the functions take it again. No user in play takes it
+    twice.
+  - Every user of `0x8296BD38` takes it: `FreeLater` and
+    `FreePhysicalLater` directly; the recompiled ones (`sub_8258DFF0`,
+    `sub_8258E098`, `sub_8258E138`, `sub_8258E1D8`) through `ScopedLock`
+    (`sub_8258E580`, `sub_8258E5B8`, `video-output.md`), overridden to
+    take the host lock for this critical section only (every other one
+    goes to `__imp__`). Host lock or guest critical section is chosen
+    once, from `--native_models` at the first call.
+  - New read-only helpers in the model animation code for
+    `Model::~Model`'s checks: `TrackSetReleasable`,
+    `SkeletonDestructible`.
+  - An `UninitializedCopy` harness case with a null destination was
+    fixed in the case (the original checks null per slot and writes
+    from address 4), noted in the row.
 
 ## Run 2026-10-25 01:17 (`by-loop-25-10-26`)
 
