@@ -162,6 +162,7 @@ set(ITC_SOURCES
     src/post_effects/post_effects.cpp
     src/hooks/framework.cpp
     src/framework/framework.cpp
+    src/framework/run_loop.cpp
     src/hooks/screen_objects.cpp
     src/screen_objects/uv_trees.cpp
     src/screen_objects/screen_objects.cpp
