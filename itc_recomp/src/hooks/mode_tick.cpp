@@ -11,7 +11,11 @@ ITC_FLAG_BOOL(native_mode_tick, true, "ITC",
               "Run the mode manager's tick services (docs/functions/mode-tick.md: "
               "Billboards::FlipRing sub_8209BD18, ScreenFades::Init sub_8209CDE8, FadeIn "
               "sub_8209D038 and FadeOut sub_8209D0C8, Players::SignedInSlot sub_8209F658 and "
-              "ActionMappers::SetBlocked sub_8209F318) natively instead of through the "
+              "ActionMappers::SetBlocked sub_8209F318, Modes::SetChecks sub_82106868 (Stages::Copy's "
+              "plain C++ called directly), Modes::SetSceneTargetMode sub_82106740 (with "
+              "sub_82106778 merged into it), SignInWatch::CheckIdle sub_8209ED58, and "
+              "Presence::SetForMode sub_822934B8 Dropped (presence isn't ported: only the "
+              "last error its dropped XUserSetContextEx wrapper clears; sub_82293504 merged)) natively instead of through the "
               "translated code (the same writes; checked by --run_harnesses=mode_tick)");
 
 // Defines an adapter: the body (the arguments after the address) uses `ctx`
@@ -47,3 +51,36 @@ ITC_MODE_TICK(8209F658, ctx.r3.s64 = PlayersSignedInSlot(base, ctx.r3.u32))
 
 // ActionMappers::SetBlocked: r3 = the value (left).
 ITC_MODE_TICK(8209F318, ActionMappersSetBlocked(base, ctx.r3.u32))
+
+// Modes::SetChecks: r3 = the holder (not read), r4 = the type; r3 left, but
+// for type 1, Stages::Copy's out (the frame's +80, from the original's r1,
+// whose high word its stwu leaves). Where Stages::Copy's plain C++ declines,
+// the original from the start.
+extern "C" REX_FUNC(sub_82106868) {
+  REX_FUNC_PROLOGUE();
+  const uint32_t frame = ctx.r1.u32 - kSetChecksFrame;
+  if (!ITC_FLAG(native_mode_tick) || !ModesSetChecks(base, ctx.r4.u32, frame)) {
+    __imp__sub_82106868(ctx, base);
+    return;
+  }
+  if (ctx.r4.s32 == 1) {
+    ctx.r3.u64 = ((ctx.r1.u64 & 0xFFFFFFFF00000000ull) | frame) + 80;
+  }
+}
+
+// Modes::SetSceneTargetMode: r3 = the holder (not read), r4 = the type (r3
+// left).
+ITC_MODE_TICK(82106740, ModesSetSceneTargetMode(base, ctx.r4.u32))
+
+// SignInWatch::CheckIdle: no arguments (r3 left); where the original would
+// trap, the original.
+extern "C" REX_FUNC(sub_8209ED58) {
+  REX_FUNC_PROLOGUE();
+  if (!ITC_FLAG(native_mode_tick) || !SignInWatchCheckIdle(base)) {
+    __imp__sub_8209ED58(ctx, base);
+  }
+}
+
+// Presence::SetForMode: r3 = the type; r3 = 0 where the original's last
+// XUserSetContextEx call answers it, else left.
+ITC_MODE_TICK(822934B8, if (PresenceSetForMode(base, ctx.r13.u32, ctx.r3.u32)) ctx.r3.u64 = 0)

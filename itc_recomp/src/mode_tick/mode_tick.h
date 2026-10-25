@@ -60,4 +60,41 @@ constexpr uint32_t kActionMapperEntries = 0x826BAB80;
 // sub_8209F318 ActionMappers::SetBlocked: each entry's +4 = value.
 void ActionMappersSetBlocked(uint8_t* base, uint32_t value);
 
+// --- The per-mode settings, set when a mode is made ---
+
+// The sign-in watch's seven checks a mode turns off (1 = off), its state
+// (0 to 9) and the reason its prompt was started for.
+constexpr uint32_t kChecks = 0x826BAB40;
+constexpr uint32_t kWatchState = 0x826BAB3C;
+constexpr uint32_t kWatchReason = 0x826BAB5C;
+constexpr uint32_t kOtherUserSignedIn = 0x826BAB68;
+constexpr uint32_t kUserSignedOut = 0x826BAB6C;
+
+// sub_82106868 Modes::SetChecks: the checks by the new mode's type. Type 1
+// (the race) copies the current stage (Stages::Copy) into the original's
+// frame at `frame` + 80 (its r1 less kSetChecksFrame), as it leaves it.
+// False, with nothing written, where Stages::Copy's plain C++ declines (the
+// original then runs).
+constexpr uint32_t kSetChecksFrame = 176;
+bool ModesSetChecks(uint8_t* base, uint32_t type, uint32_t frame);
+
+// sub_82106740 Modes::SetSceneTargetMode (with its switch's piece
+// sub_82106778): the 1024 x 576 target object's (`[0x8266D08C]`) +28 by the
+// new mode's type.
+void ModesSetSceneTargetMode(uint8_t* base, uint32_t type);
+
+// sub_822934B8 Presence::SetForMode (with its switch's piece sub_82293504):
+// presence is an Xbox feature (mapped, not ported), and its calls'
+// XUserSetContextEx wrapper (sub_82294F70) is Dropped (B5 step 2): what's
+// left of the calls is the wrapper's, the last error cleared (`pcr` the
+// thread's r13). False for type 1, which makes no call (r3 left); true
+// otherwise (r3 = 0, the wrapper's answer).
+bool PresenceSetForMode(uint8_t* base, uint32_t pcr, uint32_t type);
+
+// sub_8209ED58 SignInWatch::CheckIdle: state 0's check, the state set to 1
+// with a reason when one comes up. False, with nothing written, where the
+// original would trap (the network's vector at 0x826C7308 with its end
+// before its begin, or not a whole number of 384-byte entries).
+bool SignInWatchCheckIdle(uint8_t* base);
+
 }  // namespace mode_tick
