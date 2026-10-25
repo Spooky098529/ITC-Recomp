@@ -14,6 +14,9 @@
 #include "base/log.h"
 #include "command_list/command_list.h"
 #include "hooks/heap.h"
+#include "hooks/models.h"
+#include "memory/c_runtime_heap.h"
+#include "models/xpr.h"
 #include "memory/heap.h"
 #include "strings_and_font/strings_and_font.h"
 
@@ -1201,6 +1204,96 @@ void FormatGroupedCases(Context& h) {
 
 }  // namespace
 
+namespace {
+
+// Strings::Get: a table of 18 containers in the scratch area (0 to 6
+// entries each), ids around each file's bound (the game's table at
+// 0x82007E18), past the last and random; r3 and the scratch area exactly.
+void StringsGets(Context& h) {
+  Results results("Strings::Get (sub_8210A800)");
+  Random r(0x737472676574ull);
+  constexpr uint32_t kBounds = 0x82007E18;
+  const uint32_t table = h.data, containers = h.data + 128;
+  for (int c = 0; c < 400; c++) {
+    uint32_t id;
+    const uint32_t file = r.Below(18);
+    const uint32_t bound = guest::LoadU32(h.base, kBounds + 4 * file);
+    switch (r.Below(4)) {
+      case 0: id = r.Below(0x10000); break;
+      case 1: id = guest::LoadU32(h.base, kBounds + 4 * 17) + r.Below(8); break;
+      default: id = bound + r.Below(8); break;
+    }
+    std::vector<uint32_t> counts(18);
+    for (auto& n : counts) n = r.Below(7);
+    const uint32_t r4_high = uint32_t(r.Next()) & 0xFFFF0000u;
+    Outputs out[2];
+    for (int v = 0; v < 2; v++) {
+      Fill(h.base, h.data, kScratchBytes);
+      for (uint32_t i = 0; i < 18; i++) {
+        const uint32_t container = containers + 64 * i;
+        guest::StoreU32(h.base, table + 4 * i, container);
+        guest::StoreU32(h.base, container, __builtin_bswap32(counts[i]));
+        for (uint32_t k = 0; k < 8; k++) {
+          guest::StoreU32(h.base, container + 4 + 4 * k, __builtin_bswap32(36 + 2 * k));
+        }
+      }
+      PPCContext t = CallContext(h);
+      t.r3.u64 = table;
+      t.r4.u64 = r4_high | id;
+      if (v == 0) {
+        __imp__sub_8210A800(t, h.base);
+      } else if (const auto text = strings_and_font::StringsGet(h.base, table, id)) {
+        t.r3.u64 = *text;
+      }
+      out[v].Word(t.r3.u32);
+      out[v].Bytes(Read(h.base, h.data, kScratchBytes));
+    }
+    results.Check(out[0], out[1], fmt::format("case {} (id {})", c, id));
+  }
+  results.Report();
+}
+
+// XPR::Release of a slot (sub_82108860): the slot empty, or an XPR (24
+// bytes from operator new, made by XPR::XPR) without blocks. Compared: r3
+// (the XPR's address made an offset) and the slot.
+void XprSlotReleases(Context& h) {
+  Results results("XPR::Release of a slot (sub_82108860)");
+  if (!hooks::ModelsNativeLifetime()) {
+    ITC_LOG_INFO("harness: XPR::Release of a slot: skipped (the model class isn't native)");
+    return;
+  }
+  const uint32_t slot = h.data;
+  for (int c = 0; c < 16; c++) {
+    const bool set = c % 4 != 0;
+    Outputs out[2];
+    for (int v = 0; v < 2; v++) {
+      Fill(h.base, h.data, kScratchBytes);
+      uint32_t xpr = 0;
+      if (set) {
+        const auto block = memory::crt::OperatorNew(h.base, models::kXprBytes);
+        xpr = block ? *block : 0;
+        models::XprConstruct(h.base, xpr);
+      }
+      guest::StoreU32(h.base, slot, xpr);
+      PPCContext t = CallContext(h);
+      t.r3.u64 = slot;
+      if (v == 0) {
+        __imp__sub_82108860(t, h.base);
+      } else if (const auto r3 = strings_and_font::ReleaseXprSlot(h.base, slot)) {
+        t.r3.u64 = *r3;
+      } else {
+        __imp__sub_82108860(t, h.base);
+      }
+      out[v].Word(xpr != 0 && t.r3.u32 == xpr ? 0xB0000000u : t.r3.u32);
+      out[v].Word(guest::LoadU32(h.base, slot));
+    }
+    results.Check(out[0], out[1], fmt::format("case {} ({})", c, set ? "set" : "empty"));
+  }
+  results.Report();
+}
+
+}  // namespace
+
 void StringsAndFont(Context& h) {
   Init(h);
   OnLoaded(h);
@@ -1214,6 +1307,8 @@ void StringsAndFont(Context& h) {
   FontDrawing(h);
   SwprintfCases(h);
   FormatGroupedCases(h);
+  StringsGets(h);
+  XprSlotReleases(h);
 }
 
 }  // namespace harness

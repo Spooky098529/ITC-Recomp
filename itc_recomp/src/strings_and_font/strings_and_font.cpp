@@ -5,8 +5,11 @@
 #include "base/log.h"
 #include "c_runtime/format.h"
 #include "c_runtime/strings.h"
+#include "game_data/data_file.h"
 #include "guest.h"
+#include "memory/c_runtime_heap.h"
 #include "memory/heap.h"
+#include "models/xpr.h"
 
 #include "strings_and_font/steps.h"
 
@@ -279,6 +282,32 @@ void FontSetParams(uint8_t* base, uint32_t font, uint32_t params) {
                     float(ToSingle(int32_t(guest::LoadU32(base, params + 84)))));
   guest::StoreFloat(base, font + 16452,
                     float(ToSingle(int32_t(guest::LoadU32(base, params + 88)))));
+}
+
+std::optional<uint32_t> StringsGet(uint8_t* base, uint32_t table, uint32_t id) {
+  ITC_NATIVE_RUNNING("sub_8210A800 Strings::Get");
+  constexpr uint32_t kBounds = 0x82007E18;
+  for (uint32_t i = 0; i < 17; i++) {
+    if (int32_t(id) < int32_t(guest::LoadU32(base, kBounds + 4 + 4 * i))) {
+      const uint32_t bound = guest::LoadU32(base, kBounds + 4 * i);
+      return game_data::GetEntry(base, guest::LoadU32(base, table + 4 * i), id - bound, false);
+    }
+  }
+  return std::nullopt;
+}
+
+std::optional<uint32_t> ReleaseXprSlot(uint8_t* base, uint32_t slot) {
+  ITC_NATIVE_RUNNING("sub_82108860 XPR::Release (a slot)");
+  const uint32_t xpr = guest::LoadU32(base, slot);
+  if (xpr == 0) {
+    return slot;
+  }
+  if (!memory::IsHeapBlock(xpr) || !models::XprDestruct(base, xpr)) {
+    return std::nullopt;
+  }
+  memory::crt::OperatorDelete(xpr);
+  guest::StoreU32(base, slot, 0);
+  return xpr;
 }
 
 }  // namespace strings_and_font

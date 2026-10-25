@@ -25,6 +25,7 @@
 #include "base/flags.h"
 #include "hooks/guest_call.h"
 #include "hooks/heap.h"
+#include "hooks/models.h"
 #include "hooks/strings_and_font.h"
 #include "strings_and_font/strings_and_font.h"
 
@@ -44,7 +45,9 @@ ITC_FLAG_BOOL(native_strings_and_font, true, "ITC",
               "Font::BuildVertices sub_82109AA8, Font::LineX sub_82108FE0 with Font::LineWidth "
               "sub_82108458 and sub_82108810, Font::LineY sub_82108568, Font::AddGlyph "
               "sub_82109560, Font::ClipGlyph sub_82108C90 and Font::OutCode sub_821082A0, no "
-              "adapters of their own), Font::Draw sub_8210A400 and Text::Draw sub_8210A758; "
+              "adapters of their own), Font::Draw sub_8210A400, Text::Draw sub_8210A758, "
+              "Strings::Get sub_8210A800 and, with --native_models, XPR::Release of a slot "
+              "sub_82108860; "
               "rotated text and the second pass, never in play, on the translated code) "
               "natively instead of through the translated code (same results; checked by "
               "--run_harnesses=strings_and_font)");
@@ -270,4 +273,27 @@ extern "C" REX_FUNC(sub_8210A758) {
     return;
   }
   FontDraw(ctx, base, [&](uint32_t params) { return TextDrawSetUp(base, params); });
+}
+
+// Strings::Get: r3 = the table, r4 = the id (its low 16 bits); r3 the
+// string, or left for an id past the last bound.
+extern "C" REX_FUNC(sub_8210A800) {
+  ITC_STRINGS_AND_FONT_FALLBACK(8210A800)
+  if (const auto text = StringsGet(base, ctx.r3.u32, ctx.r4.u32 & 0xFFFF)) {
+    ctx.r3.u64 = *text;
+  }
+}
+
+// XPR::Release of a slot (sub_82108860): r3 = the slot; r3 as the original
+// leaves it. Natively only where the model class's lifetime functions are
+// (hooks::ModelsNativeLifetime: XPR::~XPR puts its blocks off).
+extern "C" REX_FUNC(sub_82108860) {
+  REX_FUNC_PROLOGUE();
+  if (ITC_FLAG(native_strings_and_font) && hooks::ModelsNativeLifetime()) {
+    if (const auto r3 = ReleaseXprSlot(base, ctx.r3.u32)) {
+      ctx.r3.u64 = *r3;
+      return;
+    }
+  }
+  __imp__sub_82108860(ctx, base);
 }

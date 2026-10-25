@@ -17,6 +17,7 @@
 #pragma once
 
 #include <cstdint>
+#include <optional>
 
 namespace strings_and_font {
 
@@ -75,6 +76,21 @@ bool Swprintf(uint8_t* base, uint32_t buffer, uint32_t format, uint32_t args, ui
 // wouldn't do natively (`out` holding the unit 0xFFFF) or wouldn't fit its
 // buffer (the original would overrun its frame).
 bool StringsFormatGrouped(uint8_t* base, int32_t value, uint32_t out, uint32_t frame);
+
+// Strings::Get (sub_8210A800): the file i of `table` (its words) whose
+// bound (0x82007E18 + 4i, signed) is at most `id` and the next above it,
+// and its entry id - bound i (DataFile::GetEntry, r5 = 0: the UTF-16
+// string). nullopt for an id at or past the last bound (the original
+// returns with r3 unchanged).
+std::optional<uint32_t> StringsGet(uint8_t* base, uint32_t table, uint32_t id);
+
+// sub_82108860, probably XPR::Release of a slot: the XPR at `slot` (when
+// set) destroyed (XPR::~XPR), freed (operator delete) and the slot cleared.
+// Returns the r3 the original leaves (the XPR, else the slot); nullopt,
+// with nothing done, where the original must run (a block the layer didn't
+// give, or XPR::~XPR's plain C++ declines). Only over the allocation layer
+// with the memory blocks' host lock (the adapter's condition).
+std::optional<uint32_t> ReleaseXprSlot(uint8_t* base, uint32_t slot);
 
 // Strings::PageCount (sub_8210A5C0): the page breaks (0xFFD1) in `text`.
 uint32_t StringsPageCount(uint8_t* base, uint32_t text);
