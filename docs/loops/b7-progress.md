@@ -95,13 +95,14 @@ file's history. What's left to see in a drive, from every run:
   Validated (`itc_1648`: 12 of 12 harness lines, 10 in the attract
   race, 1 more in the replay `itc_1649`, ok; `SetList::Point` to
   `to-drive.md`). Finished.
-- Next (the user's go-ahead, 2026-10-25; no mapping, not
-  counted): `atexit` and `_onexit` native with the exit lock (lock 8) a
+- Subsystem 5 of 5 (the user's go-ahead, 2026-10-25; no mapping, but
+  counted, the user's call): `atexit` and `_onexit` native with the exit lock (lock 8) a
   host mutex by the recorded lock call, then the callers it unblocks
   (the minimap's marker draws and `Minimap::Draw`, the viewports,
   `UiMovie::TrackProperty`, `SignInWatch::StaticInit`, the static
   set-ups); `leads.md`'s top line, taken. Step: migration agent
-  running. Then subsystem 5.
+  running. The run ends after its part 2 (the callers) is validated
+  (the user's call, 2026-10-25).
 
 ## Done
 
