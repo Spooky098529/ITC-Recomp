@@ -11,6 +11,14 @@ functions to check in a drive in the progress file.
 When the user has reviewed a run's section, its heading gets
 "(reviewed <date>)"; the section stays for the record.
 
+## Run 2026-10-25 01:17 (`by-loop-25-10-26`)
+
+- `framework.md` (mapped in c4b5b86, last run; its rows are in that
+  run's section below): map checked this run (0 errors, 68 of 68 in
+  play). Note: `b7_status.py` flags `movies.md:108` `sub_82108018`, whose
+  row says never called but which ran (the user's movie work, not this
+  run's).
+
 ## Run 2026-10-24 21:33 (`b7-loop-24-10-26-4`)
 
 - Cleanup lead `sub_8209F430` ActionMappers::Init (`action-mappers.md`;
