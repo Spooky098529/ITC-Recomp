@@ -37,8 +37,13 @@ file's history. What's left to see in a drive, from every run:
   `sub_822141E8`, `sub_8211DF20`; `_mtinit` `sub_825AA708` not taken
   (kernel TLS, no precedent). Validated (`itc_1722`: 16 of 16 harness
   lines, 8 prints added in e517b98; replay `itc_1723` ok; 1 to
-  `to-drive.md`). Step: migration 2 (`sub_822141E8`, `sub_8211DF20`),
-  agent running.
+  `to-drive.md`). Migration 2 done (81a1ede, dc97a73: `UiMovie::Finish`,
+  `FinishNamed`, `FinishAll`; `RaceHud::RunMovie` `sub_822141E8` with
+  `sub_82212908` Merged, the rival logo's draw `sub_82211A28`, in the
+  new `race-hud.md`; `--native_race_hud`; `itc_1726`: 26 s, 0 errors,
+  every harness 0 differing). Left: 10 ready groups in
+  `ui-movies-game.md` outside this lead (a new "no mapping" lead). Step:
+  validation 2, agent running.
 
 ## Done
 
@@ -71,6 +76,8 @@ This run's groups: `expected-differences.md` (the "16:38 run" lines).
 - After the scene models' validation: race 27 s (`itc_1696`), 0
   errors, every harness 0 differing; replay 126 s (`itc_1697`), 0
   errors.
+- After the DrawTexts lead's migration 2: ours 2050, work left 4401
+  (wrapped 105, known 608, unknown 3688).
 - After the DrawTexts lead's migration 1: ours 2044, work left 4407
   (wrapped 108, known 609, unknown 3690).
 - After the DrawTexts lead's validation: race 27 s (`itc_1722`), 0

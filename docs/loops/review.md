@@ -56,6 +56,20 @@ When the user has reviewed a run's section, its heading gets
   precedent for TLS). A replay (`itc_1719`) logged the SDK's
   "BaseHeap::Release failed" twice at transitions, also in `itc_1528`
   (before this run), not in a re-run (`itc_1721`).
+- The DrawTexts lead's migration 2 (81a1ede, dc97a73):
+  `UiMovie::Finish`, `FinishNamed` (inside their `--log_pause_movie`
+  overrides in `src/debug/pause_movie_log.cpp`; with the flag on the
+  originals run, as `Loop` and `Play`) and `FinishAll`
+  (`--native_ui_movies_game`); `race-hud.md` (new, 3 rows):
+  `RaceHud::RunMovie` `sub_822141E8` (probably; Overridden),
+  `sub_82212908` Merged into it (its `RaceTime::FromTicks` call left
+  out: a pure leaf whose result nothing reads), the rival logo's draw
+  `sub_82211A28` (moved from `functions.md`, Overridden; its
+  `--redraw_rival_logo` override now calls the native draw;
+  `frame-interpolation.md` noted); `--native_race_hud`. State 3's
+  `sub_82212958` never ran: the original runs there, no row. Four
+  removable adapters kept (the pause movie watch's three, called
+  through `ctx`; `UiMovie::Draw`'s, all guest calls).
 
 ## Run 2026-10-25 03:59 (`b7-loop-25-10-26-2`)
 
