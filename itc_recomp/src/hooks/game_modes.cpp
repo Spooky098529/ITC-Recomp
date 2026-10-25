@@ -39,7 +39,8 @@ ITC_FLAG_BOOL(native_game_modes, true, "ITC",
               "--native_heap Buffer28::Free sub_82152028, Reset sub_82152D38, ~Buffer28 "
               "sub_82152D28 (no adapter: only sub_82106A00 calls it) and sub_82106A00 (no adapter: "
               "only RaceModeMember::~RaceModeMember calls it), "
-              "XprHolder::XprHolder sub_821067A0 (XPR::XPR's plain C++ called directly), and "
+              "XprHolder::XprHolder sub_821067A0 (XPR::XPR's plain C++ called directly), "
+              "Modes::Modes sub_821067F8, and "
               "with --native_heap and the memory blocks' host lock "
               "RaceModeMember::~RaceModeMember sub_82106AF0 (XPR::~XPR's and sub_82106A00's "
               "plain C++ called directly), RaceMode::RaceMode sub_821073B8 (no adapter: only "
@@ -174,6 +175,9 @@ void hooks::GameModesResetOverlays(PPCContext& ctx, uint8_t* base) {
 
 // XprHolder::XprHolder: r3 = the object (left).
 ITC_GAME_MODES(821067A0, XprHolderConstruct(base, ctx.r3.u32))
+
+// Modes::Modes: r3 = the holder (left), r4 = the first mode's type.
+ITC_GAME_MODES(821067F8, ModesConstruct(base, ctx.r3.u32, ctx.r4.u32))
 
 // RaceModeMember::~RaceModeMember: r3 = the member; r3 as sub_82106A00 leaves
 // it. Over the allocation layer and the memory blocks' host lock only (XPR::~XPR

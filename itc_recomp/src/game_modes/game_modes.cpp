@@ -39,6 +39,21 @@ constexpr uint32_t kDefaultGuard = 0x826C5B88;
 
 }  // namespace
 
+void ModesConstruct(uint8_t* base, uint32_t holder, uint32_t type) {
+  ITC_NATIVE_RUNNING("sub_821067F8 Modes::Modes");
+  guest::StoreU32(base, holder, 0x82006AF0);
+  guest::StoreU32(base, 0x826032DC, type);
+  guest::StoreU32(base, 0x826032E0, type);
+  guest::StoreU32(base, holder + 4, 0);
+  guest::StoreU32(base, 0x826C5B8C, 0);  // the data load's flag
+  guest::StoreU32(base, 0x826BAB3C, 0);  // the sign-in watch's state
+  for (uint32_t i = 0; i < 7; i++) {
+    guest::StoreU32(base, 0x826BAB40 + 4 * i, 0);  // its checks
+  }
+  guest::StoreU32(base, 0x826BAB70, 0);
+  guest::StoreU32(base, 0x826C5B90, 0);  // the play time frame counter
+}
+
 StateKey LoadStateKey(uint8_t* base, uint32_t address) {
   StateKey key;
   for (uint32_t i = 0; i < 4; i++) {

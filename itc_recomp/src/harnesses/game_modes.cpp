@@ -800,6 +800,58 @@ void ModeCreates(Context& h) {
   results.Report();
 }
 
+// Modes::Modes (sub_821067F8): the holder in the scratch area and the
+// globals it writes (with the words around them), filled with random words
+// and put back after each case.
+void ModesConstructors(Context& h) {
+  Results results("Modes::Modes (sub_821067F8)");
+  struct Region {
+    uint32_t address, bytes;
+  };
+  static constexpr Region kRegions[] = {
+      {0x826032D0, 0x20}, {0x826C5B80, 0x20}, {0x826BAB30, 0x50}};
+  for (int c = 0; c < 16; c++) {
+    std::vector<std::vector<uint8_t>> saved;
+    for (const Region& region : kRegions) {
+      saved.push_back(Read(h.base, region.address, region.bytes));
+    }
+    const uint32_t type = c < 13 ? uint32_t(c) : uint32_t(h.random.Next());
+    Outputs out[2];
+    const Random start = h.random;
+    for (int v = 0; v < 2; v++) {
+      Random random = start;
+      Fill(h.base, h.data, kScratchBytes);
+      for (const Region& region : kRegions) {
+        WriteRandom(h.base, region.address, region.bytes / 4, random);
+      }
+      PPCContext t = CallContext(h);
+      t.r3.u64 = h.data + 64;
+      t.r4.u64 = type;
+      ITC_FLAG(native_game_modes) = v == 1;
+      if (v == 0) {
+        __imp__sub_821067F8(t, h.base);
+      } else {
+        gm::ModesConstruct(h.base, t.r3.u32, t.r4.u32);
+      }
+      ITC_FLAG(native_game_modes) = true;
+      for (const Region& region : kRegions) {
+        out[v].Bytes(Read(h.base, region.address, region.bytes));
+      }
+      out[v].Bytes(Read(h.base, h.data, kScratchBytes));
+      out[v].Word(t.r3.u32);
+      out[v].Word(uint32_t(t.r3.u64 >> 32));
+      if (v == 1) {
+        h.random = random;
+      }
+    }
+    for (size_t i = 0; i < saved.size(); i++) {
+      Write(h.base, kRegions[i].address, saved[i].data(), kRegions[i].bytes);
+    }
+    results.Check(out[0], out[1], fmt::format("type {}", int32_t(type)));
+  }
+  results.Report();
+}
+
 }  // namespace
 
 void GameModes(Context& h) {
@@ -821,6 +873,7 @@ void GameModes(Context& h) {
   RaceModeConstructors(h);
   ModeConstructors(h);
   ModeCreates(h);
+  ModesConstructors(h);
   Write(h.base, kDefault, saved_default.data(), kDefaultBytes);
 }
 

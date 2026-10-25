@@ -56,6 +56,14 @@ uint32_t StateMachineHandle(uint8_t* base, uint32_t machine, uint32_t message, b
 // sub_82107108 StateMachine::StateMachine: the 200 transitions emptied.
 void StateMachineConstruct(uint8_t* base, uint32_t machine);
 
+// --- The mode holder (Modes::) ---
+
+// sub_821067F8 Modes::Modes: the holder (8 bytes) set up for the first
+// mode's type: its vtable, no mode yet, the type at 0x826032DC and
+// 0x826032E0, the data load's flag and the play time frame counter 0, and
+// the sign-in watch's state, checks and 0x826BAB70 0 (mode-tick.md).
+void ModesConstruct(uint8_t* base, uint32_t holder, uint32_t type);
+
 // --- The modes (Mode::) ---
 
 // sub_82106C20 Mode::Mode: the base's vtables and default delegate.
