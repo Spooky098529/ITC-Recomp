@@ -41,6 +41,16 @@ When the user has reviewed a run's section, its heading gets
   - New names: `RaceOverlaysMachine::SetFlags`, `ClearFlags`,
     `SetFlag820`, `ResetOverlays`, `Member67760::Member67760`,
     `Member13360::Member13360`, `Buffers28::~Buffers28`.
+- `models.md` (f28c6f7): 16 new rows for the model class
+  (`Model::Model`, `~Model`, `Model::Release` read), the texture
+  provider and its `std::vector` helpers, `XPR::~XPR`, `XPR::Release`,
+  the put-off frees (`Memory::FreeLater`, `FreePhysicalLater`, the
+  pending frees list at `0x8296BD54`, freed by `sub_8258E1D8` each
+  pass); `memmove_s` in `c-runtime.md`. `known-data.md`: the texture
+  provider, the `XLMM` block header, `0x8296BD38`, `0x8296BD54`.
+  `leads.md`: one lead (`sub_820C5008`/`sub_820C5168`), notes on three.
+  The map stopped on the memory blocks' lock; the user's call
+  (2026-10-25): port it too (a host `std::mutex`).
 
 ## Run 2026-10-25 01:17 (`by-loop-25-10-26`)
 
