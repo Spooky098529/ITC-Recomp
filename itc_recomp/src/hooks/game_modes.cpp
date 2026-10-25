@@ -6,7 +6,8 @@
 // (sub_821060A0), from StateMachine::Add and Find; StateMachine::Find
 // (sub_821061F0), from StateMachine::Handle (its register step,
 // hooks::GameModesFind, kept for the harness); Buffer28::~Buffer28
-// (sub_82152D28), from sub_82106A00; sub_82106A00, from
+// (sub_82152D28), from sub_82106A00; Mode::Mode (sub_82106C20), from the
+// modes' constructors; sub_82106A00, from
 // RaceModeMember::~RaceModeMember; RaceModeMember::RaceModeMember
 // (sub_82107168), from RaceMode::RaceMode; Member56896::Member56896
 // (sub_82106A50), from RaceModeMember::RaceModeMember; the modes'
@@ -29,7 +30,7 @@ ITC_FLAG_BOOL(native_game_modes, true, "ITC",
               "only Add and Find call IndexOf, and only IndexOf Equals), StateMachine::StateMachine sub_82107108, StateMachine::Add "
               "sub_82106158, StateMachine::Find sub_821061F0 (no adapter: only Handle calls it), "
               "StateMachine::Handle sub_82106280 (with Transition::Make sub_82106100 and Transition::Assign sub_82105FE0 merged into Add), "
-              "Mode::Mode sub_82106C20, the race overlays' state machine's handlers "
+              "Mode::Mode sub_82106C20 (no adapter: only the modes' constructors call it), the race overlays' state machine's handlers "
               "sub_8215DD58, sub_8215DD90, sub_8215DDD0 and sub_8215DE10, the last's virtual "
               "calls guest calls, RaceOverlaysMachine::Init sub_8215E6C8, the race mode's member's "
               "parts sub_82155D90 and sub_82155118 (no adapters: only RaceModeMember::RaceModeMember "
@@ -71,8 +72,6 @@ using namespace game_modes;
 // StateMachine::StateMachine: r3 = the state machine (left).
 ITC_GAME_MODES(82107108, StateMachineConstruct(base, ctx.r3.u32))
 
-// Mode::Mode: r3 = the mode (left).
-ITC_GAME_MODES(82106C20, ModeConstruct(base, ctx.r3.u32))
 
 // StateMachine::Add: r3 = the state machine, r4 = the key, r5 = the functor
 // part; r3 = the index, or the new transition (as the original computes it,
