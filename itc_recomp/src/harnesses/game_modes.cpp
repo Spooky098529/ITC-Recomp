@@ -8,19 +8,25 @@
 // functions write is computed as a float.
 
 #include "harness.h"
+#include "pending_frees.h"
 
 #include "base/flags.h"
+#include "base/log.h"
 #include "game_modes/game_modes.h"
 #include "hooks/game_modes.h"
 #include "hooks/heap.h"
+#include "hooks/models.h"
 #include "memory/heap.h"
+#include "models/memory_blocks.h"
 
 #include <fmt/format.h>
 
+#include <mutex>
 #include <string>
 #include <vector>
 
 ITC_FLAG_DECLARE(bool, native_game_modes);
+ITC_FLAG_DECLARE(bool, native_models);
 
 namespace harness {
 
@@ -72,6 +78,18 @@ void NativeMember13360Construct(PPCContext& ctx, uint8_t* base) {
   gm::Member13360Construct(base, ctx.r3.u32);
 }
 
+void NativeXprHolderConstruct(PPCContext& ctx, uint8_t* base) {
+  gm::XprHolderConstruct(base, ctx.r3.u32);
+}
+
+void NativeRaceModeMemberDestruct(PPCContext& ctx, uint8_t* base) {
+  if (const auto r3 = gm::RaceModeMemberDestruct(base, ctx.r3.u32)) {
+    ctx.r3.u64 = *r3;
+  } else {
+    __imp__sub_82106AF0(ctx, base);
+  }
+}
+
 // StateMachine::Find's static default and its guard (put back afterwards).
 constexpr uint32_t kDefault = 0x826C5B68;
 constexpr uint32_t kDefaultBytes = 0x24;
@@ -104,8 +122,10 @@ void Case(Context& h, Results& results, const Block& block, Setup setup, Args ar
     PPCContext t = CallContext(h);
     args(t);
     ITC_FLAG(native_game_modes) = v == 1;
+    ITC_FLAG(native_models) = v == 1;
     (v == 0 ? recompiled : native)(t, h.base);
     ITC_FLAG(native_game_modes) = true;
+    ITC_FLAG(native_models) = true;
     out[v].Bytes(Read(h.base, block.address, block.bytes));
     out[v].Bytes(Read(h.base, h.data, kScratchBytes));
     out[v].Bytes(Read(h.base, kDefault, kDefaultBytes));
@@ -507,6 +527,108 @@ void Buffers(Context& h, const Block& block) {
   }
 }
 
+void XprHolders(Context& h, const Block& block) {
+  Results results("sub_821067A0 XprHolder::XprHolder");
+  for (int c = 0; c < 16; c++) {
+    Case(
+        h, results, block,
+        [&](Random& random) { WriteRandom(h.base, block.address, 128 / 4, random); },
+        [&](PPCContext& t) { t.r3.u64 = block.address + 4 * c; }, __imp__sub_821067A0,
+        NativeXprHolderConstruct, fmt::format("case {}", c));
+  }
+  results.Report();
+}
+
+// RaceModeMember::~RaceModeMember: the member's words random, its XPR's
+// header and data blocks none, untagged or tagged (on the game's pending
+// frees, held under the memory blocks' lock and put back after each case,
+// as the models harness does), and its four buffers' blocks VirtualAlloc's
+// pages or none (each side its own, numbered as in Buffers). The member's
+// bytes, the nodes added, whether each buffer's block is still the layer's,
+// and r3 compared.
+void RaceModeMembers(Context& h) {
+  Results results("sub_82106AF0 RaceModeMember::~RaceModeMember (on the game's list)");
+  if (!hooks::NativeHeapActive() || !hooks::ModelsHostLock()) {
+    ITC_LOG_WARN("harness: game_modes: --native_heap or the memory blocks' host lock is off: "
+                 "RaceModeMember::~RaceModeMember's cases skipped (the adapter's condition)");
+    return;
+  }
+  constexpr uint32_t kMemberBytes = 67744;
+  constexpr uint32_t kBuffers = 13360 + gm::kBuffers28;
+  const Block block(kMemberBytes + 1024);
+  std::lock_guard<std::recursive_mutex> lock(models::MemoryBlocksMutex());
+  for (int c = 0; c < 32; c++) {
+    const uint32_t header_kind = c < 9 ? uint32_t(c) % 3 : h.random.Below(3);
+    const uint32_t data_kind = c < 9 ? uint32_t(c) / 3 : h.random.Below(3);
+    const uint32_t member = block.address + 4 * h.random.Below(4);
+    const uint32_t first = block.address + kMemberBytes + 64 + 16 * h.random.Below(4);
+    const uint32_t second = block.address + kMemberBytes + 256 + 16 * h.random.Below(4);
+    uint32_t words[2][3];
+    for (auto& set : words) {
+      for (uint32_t& word : set) {
+        word = uint32_t(h.random.Next());
+      }
+    }
+    Outputs out[2];
+    const Random start = h.random;
+    Random after;
+    for (int v = 0; v < 2; v++) {
+      Random random = start;
+      Fill(h.base, h.data, kScratchBytes);
+      Fill(h.base, block.address, block.bytes);
+      WriteRandom(h.base, member, 64 / 4, random);
+      WriteRandom(h.base, member + gm::kRaceModeMemberXprHolder, 64 / 4, random);
+      WriteRandom(h.base, member + kBuffers, 4 * gm::kBuffer28Bytes / 4, random);
+      const uint32_t xpr = member + gm::kRaceModeMemberXprHolder + 4;
+      guest::StoreU32(h.base, xpr + 0,
+                      pending_frees::WriteBlock(h.base, header_kind, first, words[0]));
+      guest::StoreU32(h.base, xpr + 8,
+                      pending_frees::WriteBlock(h.base, data_kind, second, words[1]));
+      uint32_t blocks[4] = {};
+      for (uint32_t i = 0; i < 4; i++) {
+        const uint32_t size = 4096 * (1 + random.Below(4));
+        if (c != 0 && random.Below(4) != 0) {
+          blocks[i] = memory::AllocPages(size, 4096);
+        }
+        guest::StoreU32(h.base, member + kBuffers + gm::kBuffer28Bytes * i + gm::kBuffer28Block,
+                        blocks[i]);
+      }
+      after = random;
+      const pending_frees::ListState was = pending_frees::SaveList(h.base);
+      PPCContext t = CallContext(h);
+      t.r3.u64 = member;
+      ITC_FLAG(native_game_modes) = v == 1;
+      ITC_FLAG(native_models) = v == 1;
+      (v == 0 ? GuestFunction(__imp__sub_82106AF0) : NativeRaceModeMemberDestruct)(t, h.base);
+      ITC_FLAG(native_game_modes) = true;
+      ITC_FLAG(native_models) = true;
+      pending_frees::TakeAddedNodes(h.base, was, out[v]);
+      for (uint32_t i = 0; i < 4; i++) {
+        const uint32_t at = member + kBuffers + gm::kBuffer28Bytes * i + gm::kBuffer28Block;
+        const uint32_t now = guest::LoadU32(h.base, at);
+        for (uint32_t b = 0; b < 4; b++) {
+          if (now != 0 && now == blocks[b]) {
+            guest::StoreU32(h.base, at, 0xB0000000 | b);
+          }
+        }
+        const bool kept = blocks[i] != 0 && memory::IsPages(blocks[i]);
+        out[v].Word(kept);
+        if (kept) {
+          memory::FreePages(blocks[i]);
+        }
+      }
+      out[v].Bytes(Read(h.base, block.address, block.bytes));
+      out[v].Bytes(Read(h.base, h.data, kScratchBytes));
+      out[v].Word(t.r3.u32);
+      out[v].Word(uint32_t(t.r3.u64 >> 32));
+    }
+    h.random = after;
+    results.Check(out[0], out[1],
+                  fmt::format("case {} (header {}, data {})", c, header_kind, data_kind));
+  }
+  results.Report();
+}
+
 }  // namespace
 
 void GameModes(Context& h) {
@@ -521,8 +643,10 @@ void GameModes(Context& h) {
     Member67760(h, block);
     RaceOverlaysInit(h, block);
     Buffers(h, block);
+    XprHolders(h, block);
   }
   Member13360(h);
+  RaceModeMembers(h);
   Write(h.base, kDefault, saved_default.data(), kDefaultBytes);
 }
 

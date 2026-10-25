@@ -15,6 +15,7 @@
 #include "hooks/game_modes.h"
 #include "hooks/guest_call.h"
 #include "hooks/heap.h"
+#include "hooks/models.h"
 
 ITC_FLAG_BOOL(native_game_modes, true, "ITC",
               "Run the game modes and their state machines (docs/functions/game-modes.md: "
@@ -27,7 +28,11 @@ ITC_FLAG_BOOL(native_game_modes, true, "ITC",
               "calls guest calls, RaceOverlaysMachine::Init sub_8215E6C8, the race mode's member's "
               "parts sub_82155D90 and sub_82155118, and with "
               "--native_heap Buffer28::Free sub_82152028, Reset sub_82152D38, ~Buffer28 "
-              "sub_82152D28 (no adapter: only sub_82106A00 calls it) and sub_82106A00) "
+              "sub_82152D28 (no adapter: only sub_82106A00 calls it) and sub_82106A00, "
+              "XprHolder::XprHolder sub_821067A0 (XPR::XPR's plain C++ called directly), and "
+              "with --native_heap and the memory blocks' host lock "
+              "RaceModeMember::~RaceModeMember sub_82106AF0 (XPR::~XPR's and sub_82106A00's "
+              "plain C++ called directly)) "
               "natively instead of through the translated code (the same writes; checked by "
               "--run_harnesses=game_modes)");
 
@@ -151,4 +156,22 @@ void hooks::GameModesResetOverlays(PPCContext& ctx, uint8_t* base) {
       REX_CALL_INDIRECT_FUNC(ctx.ctr.u32);
     });
   });
+}
+
+// XprHolder::XprHolder: r3 = the object (left).
+ITC_GAME_MODES(821067A0, XprHolderConstruct(base, ctx.r3.u32))
+
+// RaceModeMember::~RaceModeMember: r3 = the member; r3 as sub_82106A00 leaves
+// it. Over the allocation layer and the memory blocks' host lock only (XPR::~XPR
+// puts its blocks on the pending frees under that lock), and only when the
+// plain C++'s checks pass (else the original, from the start).
+extern "C" REX_FUNC(sub_82106AF0) {
+  REX_FUNC_PROLOGUE();
+  if (ITC_FLAG(native_game_modes) && hooks::NativeHeapActive() && hooks::ModelsHostLock()) {
+    if (const auto r3 = RaceModeMemberDestruct(base, ctx.r3.u32)) {
+      ctx.r3.u64 = *r3;
+      return;
+    }
+  }
+  __imp__sub_82106AF0(ctx, base);
 }

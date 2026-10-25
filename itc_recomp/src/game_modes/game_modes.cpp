@@ -6,6 +6,10 @@
 #include "base/log.h"
 #include "guest.h"
 #include "memory/heap.h"
+#include "models/memory_blocks.h"
+#include "models/xpr.h"
+
+#include <cstdlib>
 
 namespace game_modes {
 
@@ -355,6 +359,48 @@ uint32_t Buffers28Destroy(uint8_t* base, uint32_t object) {
     r3 = Buffer28Destroy(base, object + kBuffers28 + kBuffer28Bytes * uint32_t(i));
   }
   return r3;
+}
+
+void XprHolderConstruct(uint8_t* base, uint32_t object) {
+  ITC_NATIVE_RUNNING("sub_821067A0 XprHolder::XprHolder");
+  models::XprConstruct(base, object + 4);
+  for (uint32_t i = 0; i < 2; i++) {
+    const uint32_t record = object + 32 + 12 * i;
+    guest::StoreU32(base, record + 0, 0);
+    guest::StoreU32(base, record + 4, 0);
+    guest::StoreU32(base, record + 8, 0);
+  }
+}
+
+namespace {
+
+constexpr uint32_t kRaceModeMemberVtable = 0x82006B60;
+constexpr uint32_t kRaceModeMemberBuffers = 13360;
+
+}  // namespace
+
+std::optional<uint32_t> RaceModeMemberDestruct(uint8_t* base, uint32_t member) {
+  ITC_NATIVE_RUNNING("sub_82106AF0 RaceModeMember::~RaceModeMember");
+  // What XPR::~XPR and the buffers' destructors would leave to the
+  // originals, before anything changes: room for the XPR's two nodes, and
+  // each buffer's block the layer's pages (or none).
+  if (!models::PendingFreesHaveRoom(base, 2) ||
+      !Buffers28Freeable(base, member + kRaceModeMemberBuffers)) {
+    return std::nullopt;
+  }
+  const uint32_t holder = member + kRaceModeMemberXprHolder;
+  guest::StoreU32(base, member + 0, kRaceModeMemberVtable);
+  for (int32_t i = 1; i >= 0; i--) {
+    const uint32_t record = holder + 32 + 12 * uint32_t(i);
+    guest::StoreU32(base, record + 0, 0);
+    guest::StoreU32(base, record + 4, 0);
+    guest::StoreU32(base, record + 8, 0);
+  }
+  if (!models::XprDestruct(base, holder + 4)) {
+    ITC_LOG_ERROR("RaceModeMember::~RaceModeMember: XPR::~XPR refused after its checks");
+    std::abort();
+  }
+  return Buffers28Destroy(base, member + kRaceModeMemberBuffers);
 }
 
 }  // namespace game_modes

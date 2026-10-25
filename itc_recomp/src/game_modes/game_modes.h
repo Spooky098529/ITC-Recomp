@@ -10,6 +10,7 @@
 
 #include <cstdint>
 #include <functional>
+#include <optional>
 
 namespace game_modes {
 
@@ -119,5 +120,21 @@ constexpr uint32_t kBuffers28 = 43016;
 constexpr uint32_t kBuffer28Bytes = 28;
 bool Buffers28Freeable(uint8_t* base, uint32_t object);
 uint32_t Buffers28Destroy(uint8_t* base, uint32_t object);
+
+// sub_821067A0 XprHolder::XprHolder: an object holding an XPR at +4
+// (XPR::XPR, models/xpr.h) and two 12-byte records at +32, cleared. The
+// race mode's member has one at +67676.
+void XprHolderConstruct(uint8_t* base, uint32_t object);
+
+// sub_82106AF0 RaceModeMember::~RaceModeMember: the member at the race mode's
+// +10512 torn down: its vtable put back, the XPR holder's two records (+67720,
+// then +67708) cleared, its XPR (+67680) destroyed (XPR::~XPR), then the four
+// buffers (sub_82106A00 on +13360). Returns r3 as the original leaves it
+// (sub_82106A00's); nullopt, with nothing done, where the original must run
+// (the pending frees can't take the XPR's blocks, or a buffer's block isn't
+// the allocation layer's). Over the allocation layer and the memory blocks'
+// host lock only (the adapter's condition).
+constexpr uint32_t kRaceModeMemberXprHolder = 67676;
+std::optional<uint32_t> RaceModeMemberDestruct(uint8_t* base, uint32_t member);
 
 }  // namespace game_modes
