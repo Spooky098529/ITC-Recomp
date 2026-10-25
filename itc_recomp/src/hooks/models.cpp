@@ -9,9 +9,11 @@
 #include "guest.h"
 
 #include "base/flags.h"
+#include "base/log.h"
 #include "hooks/heap.h"
 #include "hooks/models.h"
 #include "models/memory_blocks.h"
+#include "models/xpr.h"
 
 ITC_FLAG_BOOL(native_models, true, "ITC",
               "Run the model class's pieces (docs/functions/models.md: the memory blocks' "
@@ -20,7 +22,9 @@ ITC_FLAG_BOOL(native_models, true, "ITC",
               "(chosen at start-up, other critical sections the game's); with --native_heap "
               "Memory::FreeLater sub_8258E410, FreePhysicalLater sub_8258E498, the pending "
               "frees' Insert sub_8258E398 and IncSize sub_8258E2F8 (no adapter: only Insert "
-              "calls it)) natively instead of through the translated code (the same writes; "
+              "calls it); XPR::XPR sub_82596E68, and with --native_heap XPR::Release "
+              "sub_825970A8 and XPR::~XPR sub_82597148) natively instead of through the "
+              "translated code (the same writes; "
               "checked by --run_harnesses=models)");
 
 bool hooks::ModelsHostLock() {
@@ -101,3 +105,31 @@ extern "C" REX_FUNC(sub_8258E498) {
   }
   __imp__sub_8258E498(ctx, base);
 }
+
+// --- The XPR object ---
+
+// XPR::XPR: r3 = the object (left).
+extern "C" REX_FUNC(sub_82596E68) {
+  REX_FUNC_PROLOGUE();
+  if (!ITC_FLAG(native_models)) {
+    __imp__sub_82596E68(ctx, base);
+    return;
+  }
+  models::XprConstruct(base, ctx.r3.u32);
+}
+
+// XPR::Release and XPR::~XPR: r3 = the object; r3 as the original leaves it.
+#define ITC_MODELS_LIFETIME(address, function)                       \
+  extern "C" REX_FUNC(sub_##address) {                               \
+    REX_FUNC_PROLOGUE();                                             \
+    if (NativeLifetime()) {                                          \
+      if (const auto r3 = models::function(base, ctx.r3.u32)) {      \
+        ctx.r3.u64 = *r3;                                            \
+        return;                                                      \
+      }                                                              \
+    }                                                                \
+    __imp__sub_##address(ctx, base);                                 \
+  }
+
+ITC_MODELS_LIFETIME(825970A8, XprRelease)
+ITC_MODELS_LIFETIME(82597148, XprDestruct)

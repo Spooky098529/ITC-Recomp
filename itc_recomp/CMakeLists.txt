@@ -169,6 +169,7 @@ set(ITC_SOURCES
     src/game_modes/race_overlays_machine.cpp
     src/hooks/models.cpp
     src/models/memory_blocks.cpp
+    src/models/xpr.cpp
     src/hooks/screen_objects.cpp
     src/screen_objects/uv_trees.cpp
     src/screen_objects/screen_objects.cpp

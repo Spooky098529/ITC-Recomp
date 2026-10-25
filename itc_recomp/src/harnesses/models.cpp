@@ -20,6 +20,7 @@
 #include "memory/c_runtime_heap.h"
 #include "memory/heap.h"
 #include "models/memory_blocks.h"
+#include "models/xpr.h"
 
 #include <fmt/format.h>
 
@@ -234,6 +235,48 @@ void Inserts(Context& h, const Block& block) {
 
 // --- The put-off frees, on the game's list ---
 
+// The game's pending frees as they were before a case.
+struct ListState {
+  uint32_t head;
+  uint32_t previous;  // the head's previous (the last node)
+  uint32_t size;
+};
+
+ListState SaveList(uint8_t* base) {
+  const uint32_t head = Load(base, models::kPendingFrees + models::kListHead);
+  return {head, Load(base, head + models::kNodePrevious),
+          Load(base, models::kPendingFrees + models::kListSize)};
+}
+
+// After a case: the nodes added at the end (oldest first) kept by their
+// values and links, the list put back as it was, the nodes freed.
+void TakeAddedNodes(uint8_t* base, const ListState& was, Outputs& out) {
+  std::vector<uint32_t> added;
+  for (uint32_t node = Load(base, was.head + models::kNodePrevious);
+       node != was.previous && added.size() < 8;
+       node = Load(base, node + models::kNodePrevious)) {
+    added.insert(added.begin(), node);
+  }
+  out.Word(Load(base, models::kPendingFrees + models::kListSize) - was.size);
+  out.Word(uint32_t(added.size()));
+  for (size_t i = 0; i < added.size(); i++) {
+    const uint32_t node = added[i];
+    const uint32_t next = i + 1 < added.size() ? added[i + 1] : was.head;
+    const uint32_t previous = i > 0 ? added[i - 1] : was.previous;
+    out.Word(Load(base, node + models::kNodeValue));
+    out.Word(Load(base, node + models::kNodeNext) == next);
+    out.Word(Load(base, node + models::kNodePrevious) == previous);
+  }
+  out.Word(Load(base, was.previous + models::kNodeNext) ==
+           (added.empty() ? was.head : added[0]));
+  Store(base, was.head + models::kNodePrevious, was.previous);
+  Store(base, was.previous + models::kNodeNext, was.head);
+  Store(base, models::kPendingFrees + models::kListSize, was.size);
+  for (const uint32_t node : added) {
+    memory::crt::OperatorDelete(node);
+  }
+}
+
 void FreesLater(Context& h, const Block& block) {
   Results results(
       "Memory::FreeLater, FreePhysicalLater (sub_8258E410, sub_8258E498, on the game's list)");
@@ -243,8 +286,6 @@ void FreesLater(Context& h, const Block& block) {
     return;
   }
   std::lock_guard<std::recursive_mutex> lock(models::MemoryBlocksMutex());
-  const uint32_t list = models::kPendingFrees;
-  const uint32_t head = Load(h.base, list + models::kListHead);
   for (int c = 0; c < 48; c++) {
     const bool physical = (c & 1) != 0;
     // 0: null, 1: no tag, else a tagged header.
@@ -263,8 +304,7 @@ void FreesLater(Context& h, const Block& block) {
       Store(h.base, header + 4, words[0]);
       Store(h.base, header + 8, words[1]);
       Store(h.base, header + 12, words[2]);
-      const uint32_t old_previous = Load(h.base, head + models::kNodePrevious);
-      const uint32_t old_size = Load(h.base, list + models::kListSize);
+      const ListState was = SaveList(h.base);
       PPCContext t = CallContext(h);
       t.r3.u64 = kind == 0 ? 0 : header + models::kBlockHeaderBytes;
       t.r4.s64 = int32_t(attributes);
@@ -275,13 +315,7 @@ void FreesLater(Context& h, const Block& block) {
           (v == 0 ? __imp__sub_8258E410 : NativeFreeLater)(t, h.base);
         }
       });
-      out[v].Word(Load(h.base, list + models::kListSize) - old_size);
-      if (TakeNewNode(h.base, head, old_previous, out[v])) {
-        // The list put back.
-        Store(h.base, head + models::kNodePrevious, old_previous);
-        Store(h.base, old_previous + models::kNodeNext, head);
-      }
-      Store(h.base, list + models::kListSize, old_size);
+      TakeAddedNodes(h.base, was, out[v]);
       out[v].Bytes(Read(h.base, block.address, block.bytes));
       out[v].Bytes(Read(h.base, h.data, kScratchBytes));
       out[v].Word(t.r3.u32);
@@ -290,6 +324,117 @@ void FreesLater(Context& h, const Block& block) {
     results.Check(out[0], out[1],
                   fmt::format("case {} ({}, kind {}, header at +{})", c,
                               physical ? "physical" : "plain", kind, header - block.address));
+  }
+  results.Report();
+}
+
+// --- The XPR object ---
+
+void NativeXprConstruct(PPCContext& ctx, uint8_t* base) {
+  models::XprConstruct(base, ctx.r3.u32);
+}
+void NativeXprRelease(PPCContext& ctx, uint8_t* base) {
+  if (const auto r3 = models::XprRelease(base, ctx.r3.u32)) {
+    ctx.r3.u64 = *r3;
+  } else {
+    __imp__sub_825970A8(ctx, base);
+  }
+}
+void NativeXprDestruct(PPCContext& ctx, uint8_t* base) {
+  if (const auto r3 = models::XprDestruct(base, ctx.r3.u32)) {
+    ctx.r3.u64 = *r3;
+  } else {
+    __imp__sub_82597148(ctx, base);
+  }
+}
+
+void XprConstructs(Context& h, const Block& block) {
+  Results results("XPR::XPR (sub_82596E68)");
+  for (int c = 0; c < 16; c++) {
+    const uint32_t xpr = block.address + 4 * h.random.Below(32);
+    Outputs out[2];
+    for (int v = 0; v < 2; v++) {
+      Fill(h.base, h.data, kScratchBytes);
+      Fill(h.base, block.address, block.bytes);
+      PPCContext t = CallContext(h);
+      t.r3.u64 = xpr;
+      Side(v, [&] { (v == 0 ? __imp__sub_82596E68 : NativeXprConstruct)(t, h.base); });
+      out[v].Bytes(Read(h.base, block.address, block.bytes));
+      out[v].Bytes(Read(h.base, h.data, kScratchBytes));
+      out[v].Word(t.r3.u32);
+      out[v].Word(uint32_t(t.r3.u64 >> 32));
+    }
+    results.Check(out[0], out[1], fmt::format("case {}", c));
+  }
+  results.Report();
+}
+
+// A block's pointer for a case: 0 (none), an untagged header's block, or a
+// tagged one's; the header at `header`.
+uint32_t WriteBlock(uint8_t* base, uint32_t kind, uint32_t header, const uint32_t words[3]) {
+  if (kind == 0) {
+    return 0;
+  }
+  Store(base, header, kind == 1 ? 0x584C4D4C : models::kBlockTag);
+  Store(base, header + 4, words[0]);
+  Store(base, header + 8, words[1]);
+  Store(base, header + 12, words[2]);
+  return header + models::kBlockHeaderBytes;
+}
+
+void XprReleases(Context& h, const Block& block) {
+  Results results("XPR::Release, XPR::~XPR (sub_825970A8, sub_82597148, on the game's list)");
+  if (!hooks::ModelsHostLock()) {
+    ITC_LOG_WARN("harness: models: --native_models was off at start-up: XPR::Release's cases "
+                 "skipped");
+    return;
+  }
+  std::lock_guard<std::recursive_mutex> lock(models::MemoryBlocksMutex());
+  for (int c = 0; c < 64; c++) {
+    const bool destructor = (c & 1) != 0;
+    const uint32_t header_kind = c < 18 ? uint32_t(c / 2) % 3 : h.random.Below(3);
+    const uint32_t data_kind = c < 18 ? uint32_t(c / 6) : h.random.Below(3);
+    const uint32_t xpr = block.address + 4 * h.random.Below(8);
+    const uint32_t first = block.address + 64 + 16 * h.random.Below(4);
+    const uint32_t second = block.address + 160 + 16 * h.random.Below(4);
+    uint32_t words[2][3];
+    uint32_t fields[6];
+    for (auto& set : words) {
+      for (uint32_t& word : set) {
+        word = uint32_t(h.random.Next());
+      }
+    }
+    for (uint32_t& word : fields) {
+      word = uint32_t(h.random.Next());
+    }
+    Outputs out[2];
+    for (int v = 0; v < 2; v++) {
+      Fill(h.base, h.data, kScratchBytes);
+      Fill(h.base, block.address, block.bytes);
+      for (uint32_t i = 0; i < 6; i++) {
+        Store(h.base, xpr + 4 * i, fields[i]);
+      }
+      Store(h.base, xpr + models::kXprHeader, WriteBlock(h.base, header_kind, first, words[0]));
+      Store(h.base, xpr + models::kXprData, WriteBlock(h.base, data_kind, second, words[1]));
+      const ListState was = SaveList(h.base);
+      PPCContext t = CallContext(h);
+      t.r3.u64 = xpr;
+      Side(v, [&] {
+        if (destructor) {
+          (v == 0 ? __imp__sub_82597148 : NativeXprDestruct)(t, h.base);
+        } else {
+          (v == 0 ? __imp__sub_825970A8 : NativeXprRelease)(t, h.base);
+        }
+      });
+      TakeAddedNodes(h.base, was, out[v]);
+      out[v].Bytes(Read(h.base, block.address, block.bytes));
+      out[v].Bytes(Read(h.base, h.data, kScratchBytes));
+      out[v].Word(t.r3.u32);
+      out[v].Word(uint32_t(t.r3.u64 >> 32));
+    }
+    results.Check(out[0], out[1],
+                  fmt::format("case {} ({}, header {}, data {})", c,
+                              destructor ? "~XPR" : "Release", header_kind, data_kind));
   }
   results.Report();
 }
@@ -305,6 +450,8 @@ void Models(Context& h) {
     IncSizes(h, block);
     Inserts(h, block);
     FreesLater(h, block);
+    XprConstructs(h, block);
+    XprReleases(h, block);
   }
 }
 
