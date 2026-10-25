@@ -20,6 +20,7 @@
 #include "framework/framework.h"
 #include "framework/run_loop.h"
 #include "hooks/framework.h"
+#include "hooks/guest_call.h"
 #include "hooks/heap.h"
 #include "base/log.h"
 #include "memory/c_runtime_heap.h"
@@ -1215,13 +1216,37 @@ void HeapBlockOut(Context& h, Outputs& out, uint32_t block, uint32_t bytes) {
   memory::crt::OperatorDelete(block);
 }
 
+// The register steps of the constructors whose adapters went: the
+// framework's, and the debug text's with its post from a 160-byte frame (the
+// stack word read there) as the adapter did.
+void NativeFrameworkConstruct(PPCContext& ctx, uint8_t* base) {
+  rl::FrameworkConstruct(base, ctx.r3.u32);
+}
+void NativeDebugTextConstruct(PPCContext& ctx, uint8_t* base) {
+  const uint32_t text = ctx.r3.u32;
+  const uint32_t block = ctx.r4.u32;
+  const uint32_t stack_word = guest::LoadU32(base, ctx.r1.u32 - 160 + 100);
+  guest_call::InFrame(ctx, base, 160, 0x82090F78, [&](uint32_t) {
+    rl::DebugTextConstruct(base, text, block, stack_word, [&](uint32_t interface, uint32_t job) {
+      ctx.r3.u64 = interface;
+      ctx.r4.u64 = job;
+      ctx.r5.u64 = 1;
+      ctx.ctr.u64 = rl::VirtualTarget(base, interface, 4);
+      ctx.lr = 0x82090F78;
+      REX_CALL_INDIRECT_FUNC(ctx.ctr.u32);
+    });
+  });
+  ctx.r3.u64 = text;
+}
+
 void Constructors(Context& h) {
   {
     Results results("Framework::Framework (sub_82090420)");
     for (int c = 0; c < 20; c++) {
       MapCase(
           h, results, [&] { DispatchObjects(h, 0, {}); },
-          [&](PPCContext& t) { t.r3.u64 = h.data + 64; }, __imp__sub_82090420, sub_82090420,
+          [&](PPCContext& t) { t.r3.u64 = h.data + 64; }, __imp__sub_82090420,
+          NativeFrameworkConstruct,
           // r4 to r11 aren't compared: the original leaves vtable addresses
           // there, which Framework::Create (its only caller) doesn't read.
           [&](Outputs& out, const PPCContext& t) { DispatchOut(h, out, t, false); },
@@ -1304,7 +1329,7 @@ void Constructors(Context& h) {
               guest::StoreU32(h.base, t.r1.u32 - at, uint32_t(h.random.Next()));
             }
           },
-          __imp__sub_82090EA8, sub_82090EA8,
+          __imp__sub_82090EA8, NativeDebugTextConstruct,
           [&](Outputs& out, const PPCContext& t) {
             DispatchOut(h, out, t);
             out.Bytes(Read(h.base, rl::kDebugTextGlobal, 4));
