@@ -6,7 +6,8 @@
 // no adapters (the flag switches their callers): PendingFrees::IncSize
 // (sub_8258E2F8), from PendingFrees::Insert; PendingFrees::Insert
 // (sub_8258E398), from Memory::FreeLater and FreePhysicalLater;
-// Memory::FreePhysicalLater (sub_8258E498), from XPR::Release;
+// Memory::FreeLater and FreePhysicalLater (sub_8258E410, sub_8258E498), from
+// XPR::Release and Model::Release;
 // TextureProvider::Allocate and UninitializedCopy (sub_825942B8,
 // sub_82594380), from Reserve and InsertN; TextureProvider::Assign
 // (sub_825947D0), from TextureProvider::TextureProvider.
@@ -27,8 +28,8 @@ ITC_FLAG_BOOL(native_models, true, "ITC",
               "lock, the critical section at 0x8296BD38, as a host mutex for every user, "
               "through ScopedLock sub_8258E580 and sub_8258E5B8 for that critical section "
               "(chosen at start-up, other critical sections the game's); with --native_heap "
-              "Memory::FreeLater sub_8258E410, FreePhysicalLater sub_8258E498 (no adapter: "
-              "only XPR::Release calls it), the pending "
+              "Memory::FreeLater sub_8258E410 and FreePhysicalLater sub_8258E498 (no adapters: "
+              "only XPR::Release and Model::Release call them), the pending "
               "frees' Insert sub_8258E398 and IncSize sub_8258E2F8 (no adapters: only the "
               "put-off frees call Insert, and only Insert IncSize); XPR::XPR sub_82596E68, and with --native_heap XPR::Release "
               "sub_825970A8 and XPR::~XPR sub_82597148; the texture provider's vector: "
@@ -85,19 +86,6 @@ extern "C" REX_FUNC(sub_8258E5B8) {
     return;
   }
   __imp__sub_8258E5B8(ctx, base);
-}
-
-// --- The pending frees ---
-
-// Memory::FreeLater: r3 = the block; r3 = the critical section, as
-// ScopedLock::~ScopedLock leaves it.
-extern "C" REX_FUNC(sub_8258E410) {
-  REX_FUNC_PROLOGUE();
-  if (NativeLifetime() && models::FreeLater(base, ctx.r3.u32)) {
-    ctx.r3.u64 = models::kMemoryBlocksLock;
-    return;
-  }
-  __imp__sub_8258E410(ctx, base);
 }
 
 // --- The XPR object ---
