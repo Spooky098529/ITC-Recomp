@@ -180,16 +180,6 @@ extern "C" REX_FUNC(sub_8209A930) {
   }
 }
 
-// RunLoop::RunLoop: r3 = the run loop; r3 left.
-extern "C" REX_FUNC(sub_8209A9F0) {
-  REX_FUNC_PROLOGUE();
-  if (!NativeHeap() || !fw::CanAllocate(base)) {
-    __imp__sub_8209A9F0(ctx, base);
-    return;
-  }
-  fw::RunLoopConstruct(base, ctx.r3.u32);
-}
-
 // RunLoop::ApplyRequest: r3 = the run loop, r4 = the type (high word) and
 // key, r5 = the delegate (high word), both also stored in the caller's
 // frame (r1 + 32, + 40) as the original does; r3 HandlerMap::Insert's
@@ -370,15 +360,9 @@ extern "C" REX_FUNC(sub_8209AB48) {
 // --- The framework's and its services' constructors ---
 //
 // Framework::Framework and DebugText::DebugText have no adapters: in play
-// only Framework::Create's and DebugText::Create's plain C++ call them.
-
-// Framework::Create: r3 = the holder; r3 left.
-extern "C" REX_FUNC(sub_820909B8) {
-  REX_FUNC_PROLOGUE();
-  if (!NativeHeap() || !fw::FrameworkCreate(base, ctx.r3.u32)) {
-    __imp__sub_820909B8(ctx, base);
-  }
-}
+// only Framework::Create's and DebugText::Create's plain C++ call them; nor
+// has Framework::Create, called only from main's plain C++
+// (hooks::MainLoopCalls).
 
 namespace {
 
@@ -465,6 +449,13 @@ extern "C" REX_FUNC(sub_82091160) {
 }
 
 // --- The entry and the main loop (src/framework/main_loop.h) ---
+//
+// Only main has an adapter (xstart, recompiled, calls it); sub_82090378,
+// sub_8209ABE8, App::Run, ForEachRequest, ForEachTickHandler (whose other
+// caller, the run loop's event send sub_8209A008, never ran) and
+// RunLoop::RunLoop are reached in play only from main's plain C++, so the
+// flag switches them through main. Their register steps stay for the
+// harness.
 
 fw::MainLoopCalls hooks::MainLoopCalls(PPCContext& ctx, uint8_t* base) {
   fw::MainLoopCalls calls;
@@ -595,33 +586,3 @@ extern "C" REX_FUNC(sub_82090108) {
   hooks::Main(ctx, base);
 }
 
-// sub_82090378: r3 = the holder.
-extern "C" REX_FUNC(sub_82090378) {
-  ITC_FRAMEWORK_FALLBACK(82090378)
-  hooks::RunFrameworkAt(ctx, base);
-}
-
-// sub_8209ABE8: r3 = the framework.
-extern "C" REX_FUNC(sub_8209ABE8) {
-  ITC_FRAMEWORK_FALLBACK(8209ABE8)
-  hooks::RunFramework(ctx, base);
-}
-
-// App::Run: r3 = the run loop, r4 = the framework.
-extern "C" REX_FUNC(sub_8209A760) {
-  ITC_FRAMEWORK_FALLBACK(8209A760)
-  hooks::AppRun(ctx, base);
-}
-
-// ForEachTickHandler: r3 = the result, r4 / r5 the iterators, r6 the
-// functor (also reached from the run loop's event send, sub_8209A008).
-extern "C" REX_FUNC(sub_82099D50) {
-  ITC_FRAMEWORK_FALLBACK(82099D50)
-  hooks::ForEachTickHandler(ctx, base);
-}
-
-// ForEachRequest: r3 = the result, r4 / r5 the iterators, r6 the functor.
-extern "C" REX_FUNC(sub_82099EE8) {
-  ITC_FRAMEWORK_FALLBACK(82099EE8)
-  hooks::ForEachRequest(ctx, base);
-}

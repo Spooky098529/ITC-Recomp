@@ -1240,6 +1240,13 @@ void HeapBlockOut(Context& h, Outputs& out, uint32_t block, uint32_t bytes) {
 void NativeFrameworkConstruct(PPCContext& ctx, uint8_t* base) {
   rl::FrameworkConstruct(base, ctx.r3.u32);
 }
+// Framework::Create's, as its adapter did (the original where the plain C++
+// hands back).
+void NativeFrameworkCreate(PPCContext& ctx, uint8_t* base) {
+  if (!rl::FrameworkCreate(base, ctx.r3.u32)) {
+    __imp__sub_820909B8(ctx, base);
+  }
+}
 void NativeDebugTextConstruct(PPCContext& ctx, uint8_t* base) {
   const uint32_t text = ctx.r3.u32;
   const uint32_t block = ctx.r4.u32;
@@ -1362,7 +1369,8 @@ void Constructors(Context& h) {
       for (int c = 0; c < 20; c++) {
         MapCase(
             h, results, [&] { DispatchObjects(h, 0, {}); },
-            [&](PPCContext& t) { t.r3.u64 = h.data + 8; }, __imp__sub_820909B8, sub_820909B8,
+            [&](PPCContext& t) { t.r3.u64 = h.data + 8; }, __imp__sub_820909B8,
+            NativeFrameworkCreate,
             [&](Outputs& out, const PPCContext& t) {
               const uint32_t block = Load(h.base, h.data + 8);
               guest::StoreU32(h.base, h.data + 8, 0);
