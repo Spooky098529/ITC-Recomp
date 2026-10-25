@@ -4,6 +4,7 @@
 #include "guest.h"
 
 #include "base/flags.h"
+#include "hooks/guest_call.h"
 #include "hooks/heap.h"
 #include "hooks/models.h"
 #include "models/memory_blocks.h"
@@ -13,7 +14,10 @@ ITC_FLAG_BOOL(native_shader_objects, true, "ITC",
               "Run the graphics library's shader objects (docs/functions/shader-objects.md: "
               "VertexShader::Init sub_822A8740 (an object in the physical views, or a fetch "
               "table sharing memory with its fields, never seen in play, the original's), "
-              "PixelShader::Init sub_822A85B8; with --native_heap and the memory blocks' host "
+              "PixelShader::Init sub_822A85B8; with --native_heap VertexShader::Create sub_822AA018 "
+              "(VertexShader::Init's original a guest call where its plain C++ declines) and "
+              "PixelShader::Create sub_822A9EE8 (their microcode copied as memcpy's override "
+              "copies it, recorded for the renderer); with --native_heap and the memory blocks' host "
               "lock (--native_models at start-up), the memory blocks' Memory::AllocVirtual "
               "sub_8258DFF0, Memory::AllocPhysicalEx sub_8258E098 and PendingFrees::FreeDue "
               "sub_8258E1D8 (a block the layer can't free natively, never seen in play, the "
@@ -80,4 +84,55 @@ extern "C" REX_FUNC(sub_8258E1D8) {
   if (!NativeBlocks() || !models::FreeDue(base)) {
     __imp__sub_8258E1D8(ctx, base);
   }
+}
+
+// --- The creates ---
+
+namespace {
+
+struct CreateContext {
+  PPCContext& ctx;
+  uint8_t* base;
+  // VertexShader::Init's original, from a frame as the create's own.
+  static void Init(void* user, uint32_t object, uint32_t microcode) {
+    auto& c = *static_cast<CreateContext*>(user);
+    guest_call::InFrame(c.ctx, c.base, 128, 0x822AA0CC, [&](uint32_t) {
+      c.ctx.r3.u64 = object;
+      c.ctx.r4.u64 = microcode;
+      __imp__sub_822A8740(c.ctx, c.base);
+    });
+  }
+};
+
+}  // namespace
+
+// VertexShader::Create and PixelShader::Create: r3 = the shader file;
+// returns the object or 0.
+extern "C" REX_FUNC(sub_822AA018) {
+  REX_FUNC_PROLOGUE();
+  if (ITC_FLAG(native_shader_objects) && hooks::NativeHeapActive()) {
+    const uint64_t lr = ctx.lr;
+    CreateContext context{ctx, base};
+    shader_objects::CreateCalls calls;
+    calls.init = &CreateContext::Init;
+    calls.user = &context;
+    const auto object = shader_objects::VertexShaderCreate(base, ctx.r3.u32, calls);
+    ctx.lr = lr;
+    if (object) {
+      ctx.r3.u64 = *object;
+      return;
+    }
+  }
+  __imp__sub_822AA018(ctx, base);
+}
+
+extern "C" REX_FUNC(sub_822A9EE8) {
+  REX_FUNC_PROLOGUE();
+  if (ITC_FLAG(native_shader_objects) && hooks::NativeHeapActive()) {
+    if (const auto object = shader_objects::PixelShaderCreate(base, ctx.r3.u32)) {
+      ctx.r3.u64 = *object;
+      return;
+    }
+  }
+  __imp__sub_822A9EE8(ctx, base);
 }

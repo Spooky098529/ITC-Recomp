@@ -6,7 +6,10 @@
 #include "base/log.h"
 #include "c_runtime/strings.h"
 #include "guest.h"
+#include "memory/c_runtime_heap.h"
+#include "native/buffers.h"
 
+#include <cstdlib>
 #include <cstring>
 
 namespace shader_objects {
@@ -26,6 +29,35 @@ void Clear(uint8_t* base, uint32_t address, uint32_t bytes) {
 
 constexpr uint32_t kPhysical = 0xA0000000u;
 constexpr uint32_t kMaxFetches = 32;  // 64 + 4 x 32 = 192, 192 + 12 x 32 = 576
+
+// The size of the object a file makes: 592 or 56 (by the magic's low 6
+// bits) plus the header's.
+uint32_t ObjectBytes(uint32_t magic, uint32_t header) {
+  return ((magic & 0x3F) != 0 ? kVertexShaderBytes : kPixelShaderBytes) + header;
+}
+
+// The header copy (sub_822A9FD8, sub_822A9EA8) for `fields` bytes.
+bool CopyHeader(uint8_t* base, uint32_t object, uint32_t record, uint32_t fields) {
+  if (c_runtime::MayShare(record, 4, object, fields)) {
+    return false;
+  }
+  const uint32_t file = Load(base, record);
+  const uint32_t bytes = Load(base, file + 4);
+  if (!c_runtime::XMemCpyFits(base, object + fields, file, bytes)) {
+    return false;
+  }
+  Clear(base, object, fields);
+  c_runtime::XMemCpy(base, object + fields, file, bytes);
+  return true;
+}
+
+// A step that can't fail after its checks.
+void Require(bool done, const char* what) {
+  if (!done) {
+    ITC_LOG_ERROR("shader objects: {} refused after its checks", what);
+    std::abort();
+  }
+}
 
 }  // namespace
 
@@ -93,6 +125,91 @@ void PixelShaderInit(uint8_t* base, uint32_t object, uint32_t microcode) {
   Store(base, object + 0, 7);
   Store(base, object + 4, 1);
   Store(base, object + 20, 0xFFFF0000u);
+}
+
+bool CopyVertexHeader(uint8_t* base, uint32_t object, uint32_t record) {
+  ITC_NATIVE_RUNNING("sub_822A9FD8 VertexShader::CopyHeader");
+  return CopyHeader(base, object, record, kVertexShaderBytes);
+}
+
+bool CopyPixelHeader(uint8_t* base, uint32_t object, uint32_t record) {
+  ITC_NATIVE_RUNNING("sub_822A9EA8 PixelShader::CopyHeader");
+  return CopyHeader(base, object, record, kPixelShaderBytes);
+}
+
+namespace {
+
+// The creates' shared steps: the object made and its header copied after
+// `fields` cleared bytes; the microcode made and copied. 0 for the object
+// when an allocation fails (the object then freed).
+struct Made {
+  uint32_t object = 0;
+  uint32_t microcode = 0;
+};
+
+std::optional<Made> MakeShader(uint8_t* base, uint32_t file, uint32_t fields, uint32_t caller) {
+  const uint32_t magic = Load(base, file + 0);
+  const uint32_t code_bytes = Load(base, file + 8);
+  const uint32_t header = Load(base, file + 4);
+  // The header copy's step and memcpy's flag, checked first (the new
+  // blocks can't share memory with the file).
+  if (!native::Buffers_NativeMemcpy() || !c_runtime::XMemCpyBytes(base, file, header)) {
+    return std::nullopt;
+  }
+  const uint32_t code = header + file;
+  Made made;
+  made.object = memory::crt::XMemAlloc(base, ObjectBytes(magic, header), kObjectAttributes);
+  if (made.object == 0) {
+    return made;
+  }
+  const uint32_t copied = Load(base, file + 4);
+  Clear(base, made.object, fields);
+  Require(c_runtime::XMemCpy(base, made.object + fields, file, copied), "XMemCpy");
+  made.microcode = memory::crt::XMemAlloc(base, code_bytes, kMicrocodeAttributes);
+  if (made.microcode == 0) {
+    memory::crt::XMemFree(made.object, kObjectAttributes);
+    made.object = 0;
+    return made;
+  }
+  Require(native::Buffers_Memcpy(base, made.microcode, code, code_bytes, caller), "memcpy");
+  return made;
+}
+
+}  // namespace
+
+std::optional<uint32_t> VertexShaderCreate(uint8_t* base, uint32_t file, const CreateCalls& calls) {
+  ITC_NATIVE_RUNNING("sub_822AA018 VertexShader::Create");
+  const auto made = MakeShader(base, file, kVertexShaderBytes, 0x822AA0C0);
+  if (!made) {
+    return std::nullopt;
+  }
+  if (made->object == 0) {
+    return 0;
+  }
+  if (!VertexShaderInit(base, made->object, made->microcode)) {
+    calls.init(calls.user, made->object, made->microcode);
+  }
+  Store(base, made->object, Load(base, made->object) | kCreatedFlag);
+  return made->object;
+}
+
+std::optional<uint32_t> PixelShaderCreate(uint8_t* base, uint32_t file) {
+  ITC_NATIVE_RUNNING("sub_822A9EE8 PixelShader::Create");
+  const auto made = MakeShader(base, file, kPixelShaderBytes, 0x822A9F90);
+  if (!made) {
+    return std::nullopt;
+  }
+  if (made->object == 0) {
+    return 0;
+  }
+  const uint32_t object = made->object;
+  Clear(base, object, kPixelShaderBytes);
+  Store(base, object + 24, made->microcode);
+  Store(base, object + 0, 7);
+  Store(base, object + 4, 1);
+  Store(base, object + 20, 0xFFFF0000u);
+  Store(base, object + 0, 7 | kCreatedFlag);
+  return object;
 }
 
 }  // namespace shader_objects

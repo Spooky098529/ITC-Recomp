@@ -132,6 +132,13 @@ void XMemSet(uint8_t* base, uint32_t destination, uint32_t value, uint32_t bytes
 // reaches 0 (0, or one that doesn't divide what's left).
 constexpr uint32_t kXMemCpyStep = 0x82638308;
 bool XMemCpy(uint8_t* base, uint32_t destination, uint32_t source, uint32_t bytes);
+// The bytes XMemCpy copies: all of them, or under 16 with a step other than
+// 1, those its byte loop copies before its count is 0; nullopt when it never
+// is (the original then runs on).
+std::optional<uint32_t> XMemCpyBytes(uint8_t* base, uint32_t source, uint32_t bytes);
+// Whether XMemCpy copies these natively (for native callers checking before
+// they write anything).
+bool XMemCpyFits(uint8_t* base, uint32_t destination, uint32_t source, uint32_t bytes);
 
 // Whether `size` bytes at `address` lie in one guest view (not crossing
 // into the next one).

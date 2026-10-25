@@ -33,4 +33,12 @@ std::optional<uint32_t> XprRelease(uint8_t* base, uint32_t xpr);
 // sub_82597148 XPR::~XPR: a jump to XPR::Release.
 std::optional<uint32_t> XprDestruct(uint8_t* base, uint32_t xpr);
 
+// sub_8235A990 TextureHeader::Relocate: `base_address` added to the upper
+// 20 bits of the header's +0x20 (the low 12 kept), and when the header has
+// more than one mip level (sub_822A5B68: ((+44 >> 6) & 0xF) + 1, merged
+// here) `mip_address` to +0x30's the same way. Returns the level count (the
+// r3 the original leaves).
+uint32_t RelocateTexture(uint8_t* base, uint32_t header, uint32_t base_address,
+                         uint32_t mip_address);
+
 }  // namespace models

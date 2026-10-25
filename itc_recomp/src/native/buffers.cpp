@@ -626,17 +626,15 @@ void Buffers_OnMirror(uint32_t physical, uint32_t size, bool index) {
 
 ITC_FLAG_DECLARE(bool, native_memcpy);
 
-// The library's memcpy (r3 destination, r4 source, r5 size): copies into
-// the physical views are recorded once done (see Buffers_NewestWrite); with
-// --native_renderer_log_buffers, copies into a known buffer header logged.
-// The copy itself is native (c_runtime::Memcpy, --native_memcpy) where the
-// ranges don't share memory; r3 stays the destination either way, and the
-// other registers the original changes are read by no caller.
-extern "C" REX_FUNC(sub_825A7410) {
-  REX_FUNC_PROLOGUE();
-  using namespace native;
-  uint32_t destination = ctx.r3.u32, source = ctx.r4.u32, size = ctx.r5.u32;
-  uint32_t caller = uint32_t(ctx.lr);
+namespace native {
+
+namespace {
+
+// The override's work around a copy (`copy()`): the logging, and copies
+// into the physical views recorded once done.
+template <typename Copy>
+void CopyWithRecords(uint8_t* base, uint32_t destination, uint32_t source, uint32_t size,
+                     uint32_t caller, Copy copy) {
   if (Buffers_Logging() && size) {
     uint32_t header_object = 0;
     {
@@ -663,9 +661,7 @@ extern "C" REX_FUNC(sub_825A7410) {
   }
   bool log_write = size && destination >= 0xA0000000u && Buffers_LogPhysicalWrites();
   bool same = log_write && !std::memcmp(base + destination, base + source, size);
-  if (!ITC_FLAG(native_memcpy) || !c_runtime::Memcpy(base, destination, source, size)) {
-    __imp__sub_825A7410(ctx, base);
-  }
+  copy();
   if (log_write) {
     LoggedWrite write;
     write.start = GpuPhysicalAddress(destination);
@@ -692,4 +688,39 @@ extern "C" REX_FUNC(sub_825A7410) {
     g_pending.push_back({physical, physical + size, caller});
     g_has_pending.store(true, std::memory_order_release);
   }
+}
+
+}  // namespace
+
+bool Buffers_NativeMemcpy() {
+  return ITC_FLAG(native_memcpy);
+}
+
+bool Buffers_Memcpy(uint8_t* base, uint32_t destination, uint32_t source, uint32_t size,
+                    uint32_t caller) {
+  if (!ITC_FLAG(native_memcpy) ||
+      (size != 0 && c_runtime::MayShare(destination, size, source, size))) {
+    return false;
+  }
+  CopyWithRecords(base, destination, source, size, caller,
+                  [&] { c_runtime::Memcpy(base, destination, source, size); });
+  return true;
+}
+
+}  // namespace native
+
+// The library's memcpy (r3 destination, r4 source, r5 size): copies into
+// the physical views are recorded once done (see Buffers_NewestWrite); with
+// --native_renderer_log_buffers, copies into a known buffer header logged.
+// The copy itself is native (c_runtime::Memcpy, --native_memcpy) where the
+// ranges don't share memory; r3 stays the destination either way, and the
+// other registers the original changes are read by no caller.
+extern "C" REX_FUNC(sub_825A7410) {
+  REX_FUNC_PROLOGUE();
+  native::CopyWithRecords(base, ctx.r3.u32, ctx.r4.u32, ctx.r5.u32, uint32_t(ctx.lr), [&] {
+    if (!ITC_FLAG(native_memcpy) ||
+        !c_runtime::Memcpy(base, ctx.r3.u32, ctx.r4.u32, ctx.r5.u32)) {
+      __imp__sub_825A7410(ctx, base);
+    }
+  });
 }

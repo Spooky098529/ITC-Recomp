@@ -41,7 +41,9 @@ ITC_FLAG_BOOL(native_models, true, "ITC",
               "sub_82594850 and ~TextureProvider sub_825943E0; Model::Model sub_825948C0, "
               "Model::Release sub_82594970 and Model::~Model sub_82594F58, their members' "
               "plain C++ called directly; Model::MaterialCount sub_82594AD8, Model::Material "
-              "sub_82594B20, ShaderFile::Parse sub_822A8568 (in src/shader_objects/), with --native_heap "
+              "sub_82594B20, ShaderFile::Parse sub_822A8568, VertexShader::CopyHeader sub_822A9FD8 and "
+              "PixelShader::CopyHeader sub_822A9EA8 (in src/shader_objects/), "
+              "TextureHeader::Relocate sub_8235A990 (with sub_822A5B68), with --native_heap "
               "Memory::AllocPhysical sub_8258E138 (in src/models/memory_blocks.cpp), the shared shaders sub_825896D8 and sub_82589700, the vertex "
               "declaration sub_82589728 (its message for a type pair the tables don't cover, "
               "never seen in play, the original's), Model::RecordShape sub_82595550 (in "
@@ -270,4 +272,33 @@ extern "C" REX_FUNC(sub_8258E138) {
     return;
   }
   ctx.r3.u64 = models::AllocPhysical(base, ctx.r3.u32, ctx.r4.u32);
+}
+
+// VertexShader::CopyHeader and PixelShader::CopyHeader: r3 = the object, r5
+// = the file's record (r4 unread). No return value.
+extern "C" REX_FUNC(sub_822A9FD8) {
+  REX_FUNC_PROLOGUE();
+  if (!ITC_FLAG(native_models) ||
+      !shader_objects::CopyVertexHeader(base, ctx.r3.u32, ctx.r5.u32)) {
+    __imp__sub_822A9FD8(ctx, base);
+  }
+}
+
+extern "C" REX_FUNC(sub_822A9EA8) {
+  REX_FUNC_PROLOGUE();
+  if (!ITC_FLAG(native_models) ||
+      !shader_objects::CopyPixelHeader(base, ctx.r3.u32, ctx.r5.u32)) {
+    __imp__sub_822A9EA8(ctx, base);
+  }
+}
+
+// TextureHeader::Relocate: r3 = the header, r4 and r5 the base and mip
+// addresses; r3 = the level count (as the original leaves it).
+extern "C" REX_FUNC(sub_8235A990) {
+  REX_FUNC_PROLOGUE();
+  if (!ITC_FLAG(native_models)) {
+    __imp__sub_8235A990(ctx, base);
+    return;
+  }
+  ctx.r3.u64 = models::RelocateTexture(base, ctx.r3.u32, ctx.r4.u32, ctx.r5.u32);
 }

@@ -11,6 +11,7 @@
 #include "memory/c_runtime_heap.h"
 #include "memory/heap.h"
 #include "models/memory_blocks.h"
+#include "models/xpr.h"
 #include "shader_objects/shader_objects.h"
 
 #include <fmt/format.h>
@@ -189,6 +190,200 @@ void VertexShaderInits(Context& h) {
   memory::FreePhysical(physical_code);
   memory::Free(virtual_code);
   memory::Free(block);
+}
+
+// --- The header copies, the texture relocation and the creates ---
+
+void NativeCopyVertexHeader(PPCContext& ctx, uint8_t* base) {
+  if (!so::CopyVertexHeader(base, ctx.r3.u32, ctx.r5.u32)) {
+    __imp__sub_822A9FD8(ctx, base);
+  }
+}
+void NativeCopyPixelHeader(PPCContext& ctx, uint8_t* base) {
+  if (!so::CopyPixelHeader(base, ctx.r3.u32, ctx.r5.u32)) {
+    __imp__sub_822A9EA8(ctx, base);
+  }
+}
+void NativeRelocateTexture(PPCContext& ctx, uint8_t* base) {
+  ctx.r3.u64 = models::RelocateTexture(base, ctx.r3.u32, ctx.r4.u32, ctx.r5.u32);
+}
+struct InitCall {
+  PPCContext ctx;
+  uint8_t* base;
+};
+void InitOriginal(void* user, uint32_t object, uint32_t microcode) {
+  auto& call = *static_cast<InitCall*>(user);
+  call.ctx.r3.u64 = object;
+  call.ctx.r4.u64 = microcode;
+  __imp__sub_822A8740(call.ctx, call.base);
+}
+void NativeVertexShaderCreate(PPCContext& ctx, uint8_t* base) {
+  InitCall call{ctx, base};
+  so::CreateCalls calls;
+  calls.init = &InitOriginal;
+  calls.user = &call;
+  if (const auto object = so::VertexShaderCreate(base, ctx.r3.u32, calls)) {
+    ctx.r3.u64 = *object;
+  } else {
+    __imp__sub_822AA018(ctx, base);
+  }
+}
+void NativePixelShaderCreate(PPCContext& ctx, uint8_t* base) {
+  if (const auto object = so::PixelShaderCreate(base, ctx.r3.u32)) {
+    ctx.r3.u64 = *object;
+  } else {
+    __imp__sub_822A9EE8(ctx, base);
+  }
+}
+
+// The header copies: the object in a 4 KB block, the file (header sizes 0
+// to 1,200, any alignment) and the record in another; both blocks compared.
+// (A record inside the cleared bytes, the native side's fallback, would have
+// the original copy from address 0.)
+void HeaderCopies(Context& h) {
+  constexpr uint32_t kBlockBytes = 4096;
+  const uint32_t objects = memory::Alloc(kBlockBytes, 0);
+  const uint32_t files = memory::Alloc(kBlockBytes, 0);
+  for (int pixel = 0; pixel < 2; pixel++) {
+    Results results(pixel ? "PixelShader::CopyHeader (sub_822A9EA8)"
+                          : "VertexShader::CopyHeader (sub_822A9FD8)");
+    const uint32_t fields = pixel ? so::kPixelShaderBytes : so::kVertexShaderBytes;
+    for (int c = 0; c < 300; c++) {
+      const uint32_t object = objects + 4 * h.random.Below(64);
+      const uint32_t file = files + 64 + h.random.Below(1024);
+      const uint32_t record = files + 4 * h.random.Below(14);
+      const uint32_t bytes = c < 40 ? uint32_t(c) : h.random.Below(1200);
+      std::vector<uint8_t> a(kBlockBytes), b(kBlockBytes);
+      for (auto& x : a) x = uint8_t(h.random.Next());
+      for (auto& x : b) x = uint8_t(h.random.Next());
+      Outputs out[2];
+      for (int v = 0; v < 2; v++) {
+        Write(h.base, objects, a.data(), kBlockBytes);
+        Write(h.base, files, b.data(), kBlockBytes);
+        const uint32_t at = record;
+        Store(h.base, at, file);
+        Store(h.base, file + 4, bytes);
+        PPCContext t = CallContext(h);
+        t.r3.u64 = object;
+        t.r4.u64 = uint32_t(h.random.Next());
+        t.r5.u64 = at;
+        if (pixel) {
+          (v == 0 ? __imp__sub_822A9EA8 : NativeCopyPixelHeader)(t, h.base);
+        } else {
+          (v == 0 ? __imp__sub_822A9FD8 : NativeCopyVertexHeader)(t, h.base);
+        }
+        out[v].Bytes(Read(h.base, objects, kBlockBytes));
+        out[v].Bytes(Read(h.base, files, kBlockBytes));
+      }
+      results.Check(out[0], out[1],
+                    fmt::format("case {} ({} header bytes)", c, bytes));
+    }
+    results.Report();
+  }
+  memory::Free(files);
+  memory::Free(objects);
+}
+
+void TextureRelocations(Context& h) {
+  Results results("TextureHeader::Relocate (sub_8235A990, with sub_822A5B68)");
+  for (int c = 0; c < 400; c++) {
+    const uint32_t header = h.data + 4 * h.random.Below(900);
+    const uint32_t a = uint32_t(h.random.Next()), b = uint32_t(h.random.Next());
+    std::vector<uint8_t> fill(kScratchBytes);
+    for (auto& x : fill) x = uint8_t(h.random.Next());
+    Outputs out[2];
+    for (int v = 0; v < 2; v++) {
+      Write(h.base, h.data, fill.data(), kScratchBytes);
+      if (c % 4 == 0) {
+        Store(h.base, header + 44, Load(h.base, header + 44) & ~0x3C0u);  // one level
+      }
+      PPCContext t = CallContext(h);
+      t.r3.u64 = header;
+      t.r4.u64 = c % 3 == 0 ? (a & 0xFFFFF000u) : a;
+      t.r5.u64 = b;
+      (v == 0 ? __imp__sub_8235A990 : NativeRelocateTexture)(t, h.base);
+      out[v].Bytes(Read(h.base, h.data, kScratchBytes));
+      out[v].Word(t.r3.u32);
+    }
+    results.Check(out[0], out[1], fmt::format("case {}", c));
+  }
+  results.Report();
+}
+
+// The creates: a shader file in a block (a header of 280 to 1,000 bytes
+// holding a fetch table of 0 to 32 words, or 40, for a vertex shader;
+// microcode of 12 bytes to 6 KB
+// referenced by the fetches), the original and the native create from it;
+// the object's bytes (its microcode pointer replaced by a marker), the
+// microcode's bytes and r3 compared, then both freed.
+void Creates(Context& h) {
+  constexpr uint32_t kFileBytes = 16 * 1024;
+  constexpr uint32_t kMarker = 0x4D435245;
+  const uint32_t files = memory::Alloc(kFileBytes, 0);
+  for (int pixel = 0; pixel < 2; pixel++) {
+    Results results(pixel ? "PixelShader::Create (sub_822A9EE8)"
+                          : "VertexShader::Create (sub_822AA018)");
+    for (int c = 0; c < 150; c++) {
+      const uint32_t file = files + 4 * h.random.Below(16);
+      const uint32_t header = 280 + 4 * h.random.Below(180);
+      const uint32_t code_bytes = 12 + 12 * h.random.Below(512);
+      uint32_t magic = uint32_t(h.random.Next());
+      if (pixel ? c % 5 != 0 : true) {
+        magic = pixel ? (magic & ~0x3Fu) : (magic | 1u);
+      }
+      std::vector<uint8_t> fill(kFileBytes);
+      for (auto& x : fill) x = uint8_t(h.random.Next());
+      const uint32_t table = 32 + 4 * h.random.Below(4);  // the header's +20
+      const uint32_t first = h.random.Below(8);
+      const uint32_t count = c % 30 == 7 ? 40 : h.random.Below(33);
+      std::vector<uint32_t> words(count);
+      for (auto& w : words) {
+        w = (uint32_t(h.random.Next()) & ~0xFFFu) | h.random.Below(code_bytes / 12);
+      }
+      Outputs out[2];
+      for (int v = 0; v < 2; v++) {
+        Write(h.base, files, fill.data(), kFileBytes);
+        Store(h.base, file + 0, magic);
+        Store(h.base, file + 4, header);
+        Store(h.base, file + 8, code_bytes);
+        if (!pixel) {
+          Store(h.base, file + 20, table);
+          Store(h.base, file + table + 24, first);
+          Store(h.base, file + table + 28, count);
+          for (uint32_t i = 0; i < count; i++) {
+            const uint32_t at = table + 4 * (first + 10 + i);
+            if (at + 4 <= header) {
+              Store(h.base, file + at, words[i]);
+            }
+          }
+        }
+        PPCContext t = CallContext(h);
+        t.r3.u64 = file;
+        if (pixel) {
+          (v == 0 ? __imp__sub_822A9EE8 : NativePixelShaderCreate)(t, h.base);
+        } else {
+          (v == 0 ? __imp__sub_822AA018 : NativeVertexShaderCreate)(t, h.base);
+        }
+        const uint32_t object = t.r3.u32;
+        out[v].Word(object != 0);
+        if (object != 0) {
+          const uint32_t fields = pixel ? so::kPixelShaderBytes : so::kVertexShaderBytes;
+          const uint32_t pointer = pixel ? 24 : 48;
+          const uint32_t code = Load(h.base, object + pointer);
+          Store(h.base, object + pointer, kMarker);
+          out[v].Bytes(Read(h.base, object, fields + header));
+          out[v].Bytes(Read(h.base, code, code_bytes));
+          memory::crt::XMemFree(code, so::kMicrocodeAttributes);
+          memory::crt::XMemFree(object, so::kObjectAttributes);
+        }
+      }
+      results.Check(out[0], out[1],
+                    fmt::format("case {} (magic {:X}, header {}, microcode {}, fetches {})", c,
+                                magic, header, code_bytes, count));
+    }
+    results.Report();
+  }
+  memory::Free(files);
 }
 
 // --- The memory blocks ---
@@ -421,6 +616,9 @@ void ShaderObjects(Context& h) {
   VertexShaderInits(h);
   BlockMakers(h);
   FreesDue(h);
+  HeaderCopies(h);
+  TextureRelocations(h);
+  Creates(h);
 }
 
 }  // namespace harness
