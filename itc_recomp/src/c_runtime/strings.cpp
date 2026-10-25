@@ -475,4 +475,28 @@ bool MemmoveDown(uint8_t* base, uint32_t destination, uint32_t source, uint32_t 
   return true;
 }
 
+std::optional<uint32_t> MemmoveS(uint8_t* base, uint32_t destination, uint32_t size,
+                                 uint32_t source, uint32_t count) {
+  ITC_NATIVE_RUNNING("sub_825A7348 memmove_s");
+  if (count == 0) {
+    return 0;
+  }
+  if (destination == 0 || source == 0 || size < count) {
+    return std::nullopt;
+  }
+  if (int32_t(destination) == int32_t(source)) {
+    return 0;
+  }
+  if (int32_t(destination) < int32_t(source)) {
+    if (destination >= 0xA0000000u || !Memcpy(base, destination, source, count)) {
+      return std::nullopt;
+    }
+    return 0;
+  }
+  if (!MemmoveDown(base, destination, source, count)) {
+    return std::nullopt;
+  }
+  return 0;
+}
+
 }  // namespace c_runtime

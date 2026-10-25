@@ -26,7 +26,7 @@ ITC_FLAG_BOOL(native_c_runtime, true, "ITC",
               "path (sub_825B7EC8); strncpy, strcpy_s, strncmp, _stricmp, _strnicmp and its compare, "
               "strstr (sub_825A7F50, sub_825A9DD8, sub_825AACD0, sub_825AA100, sub_825AC710, "
               "sub_825AC6B0, sub_825A98A8); the second memcpy (sub_825A7830); memmove and memcpy_s "
-              "(sub_825AA840, sub_825A7270); toupper, tolower, "
+              "(sub_825AA840, sub_825A7270); memmove_s (sub_825A7348); toupper, tolower, "
               "isalpha, isdigit, isalnum and isleadbyte (sub_825A8600, sub_825A8618, sub_825AB020, "
               "sub_825AB040, sub_825AB0A0, sub_825B6898); strtoul and strtoxl (sub_825A85E0, "
               "sub_825A82C8); ___dtold and _ld12tod (sub_825B6378, sub_825B69B8); atof, _atof_l, "
@@ -212,6 +212,22 @@ extern "C" REX_FUNC(sub_825AA840) {
   if (!c_runtime::MemmoveDown(base, ctx.r3.u32, ctx.r4.u32, ctx.r5.u32)) {
     __imp__sub_825AA840(ctx, base);
   }
+}
+
+// memmove_s: r3 = destination, r4 = its size, r5 = source, r6 = count; r3 =
+// 0. The paths c_runtime::MemmoveS leaves to the original (its errors, a
+// copy memcpy's override records for the mirrors, a copy its checks refuse)
+// run it from the start, nothing having been copied.
+extern "C" REX_FUNC(sub_825A7348) {
+  REX_FUNC_PROLOGUE();
+  if (ITC_FLAG(native_c_runtime)) {
+    if (const auto r3 = c_runtime::MemmoveS(base, ctx.r3.u32, ctx.r4.u32, ctx.r5.u32,
+                                            ctx.r6.u32)) {
+      ctx.r3.u64 = *r3;
+      return;
+    }
+  }
+  __imp__sub_825A7348(ctx, base);
 }
 
 // memcpy_s: r3 = destination, r4 = its size, r5 = source, r6 = count;
