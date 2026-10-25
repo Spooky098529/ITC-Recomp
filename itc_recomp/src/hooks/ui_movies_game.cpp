@@ -41,7 +41,8 @@ ITC_FLAG_BOOL(native_ui_movies_game, true, "ITC",
               "without --log_pause_movie); the texts drawn UiMovie::DrawTexts sub_8211CD90 (its "
               "Text::Draw through that adapter) with UiMovie::ScrollOffset sub_8211B800 "
               "(same results; checked by --run_harnesses=ui_movies_game). sub_8211A660, "
-              "sub_8211B230, AnimationList::Get and UiMovie::ScrollOffset have no adapters: only native callers reach "
+              "sub_8211B230, AnimationList::Get, UiMovie::ScrollOffset, sub_8211B7B8, sub_8211B9B8 and "
+              "sub_8211B940 have no adapters: only native callers reach "
               "them, and the flag switches those");
 
 ITC_FLAG_DECLARE(bool, native_ui_movies);
@@ -326,33 +327,13 @@ extern "C" REX_FUNC(sub_8211B720) {
   ctx.r3.u64 = ui_movies::TextString(base, ctx.r3.u32, ctx.r4.u32);
 }
 
-// The text's +20, +24 and +4: r3 = movie, r4 = a text id.
+// The text's +20: r3 = movie, r4 = a text id. (Its +24 and +4,
+// sub_8211B7B8 and sub_8211B9B8, and the scroll counter's sub_8211B940 have
+// no adapters: only DrawTexts' plain C++ calls them in play.)
 extern "C" REX_FUNC(sub_8211B770) {
   REX_FUNC_PROLOGUE();
   NATIVE_OR_ORIGINAL(8211B770);
   ctx.r3.u64 = ui_movies::TextField(base, ctx.r3.u32, ctx.r4.u32, 20);
-}
-
-extern "C" REX_FUNC(sub_8211B7B8) {
-  REX_FUNC_PROLOGUE();
-  NATIVE_OR_ORIGINAL(8211B7B8);
-  ctx.r3.u64 = ui_movies::TextField(base, ctx.r3.u32, ctx.r4.u32, 24);
-}
-
-extern "C" REX_FUNC(sub_8211B9B8) {
-  REX_FUNC_PROLOGUE();
-  NATIVE_OR_ORIGINAL(8211B9B8);
-  ctx.r3.u64 = ui_movies::TextField(base, ctx.r3.u32, ctx.r4.u32, 4);
-}
-
-// sub_8211B940: r3 = movie, r4 = a text id; r3 left at the movie's texts
-// (TextMap::Set's).
-extern "C" REX_FUNC(sub_8211B940) {
-  REX_FUNC_PROLOGUE();
-  NATIVE_OR_ORIGINAL(8211B940);
-  const uint32_t movie = ctx.r3.u32;
-  ui_movies::AdvanceTextScroll(base, movie, ctx.r4.u32);
-  ctx.r3.u64 = movie + ui_movies::kMovieTexts;
 }
 
 namespace {

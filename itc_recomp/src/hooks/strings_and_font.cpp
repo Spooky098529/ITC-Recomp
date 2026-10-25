@@ -14,7 +14,10 @@
 // (sub_821082A0) any more: only their native callers' plain C++ calls them in
 // play (Font::TextWidth's, Font::Draw's and Font::DrawPass's down), and the
 // flag switches those callers. Font::DrawPass's and Font::Draw's adapters
-// stay: they make the render queue's guest call. The registers the
+// stay: they make the render queue's guest call. Font::TextWidth
+// (sub_82108B30) has no adapter either: only UiMovie::ScrollOffset's plain
+// C++ (src/ui_movies/texts.cpp) calls it in play, and --native_ui_movies_game
+// switches that caller (this flag no longer switches it). The registers the
 // originals leave that a caller could read (r3) are left the same.
 
 #include "guest.h"
@@ -34,8 +37,9 @@ ITC_FLAG_BOOL(native_strings_and_font, true, "ITC",
               "sub_825A9980 and _woutput_l sub_825B13D0, no adapters of their own; the original "
               "for %n, %Z, floats but %f and the unit 0xFFFF), Strings::FormatGrouped "
               "sub_8210A680, Strings::PageCount sub_8210A5C0, Strings::CopyPage sub_8210A5E8, "
-              "the font's pixel shader entries sub_825D9590, Font::TextWidth sub_82108B30 "
-              "with Font::SetParams sub_82108368, Font::DrawPass sub_82109EF0 (without the "
+              "the font's pixel shader entries sub_825D9590, Font::SetParams sub_82108368 (and "
+              "under Font::TextWidth sub_82108B30, which has no adapter: its caller "
+              "UiMovie::ScrollOffset is switched by --native_ui_movies_game), Font::DrawPass sub_82109EF0 (without the "
               "command list's diagnostics; with Font::CountGlyphs sub_82108210, "
               "Font::BuildVertices sub_82109AA8, Font::LineX sub_82108FE0 with Font::LineWidth "
               "sub_82108458 and sub_82108810, Font::LineY sub_82108568, Font::AddGlyph "
@@ -155,14 +159,6 @@ extern "C" REX_FUNC(sub_8210A5E8) {
 extern "C" REX_FUNC(sub_825D9590) {
   ITC_STRINGS_AND_FONT_FALLBACK(825D9590)
   InitShaderEntries(base);
-}
-
-// Font::TextWidth: r3 = the font, r4 = the draw parameters, r5 = the text;
-// f1 the width.
-extern "C" REX_FUNC(sub_82108B30) {
-  ITC_STRINGS_AND_FONT_FALLBACK(82108B30)
-  ctx.fpscr.disableFlushMode();
-  ctx.f1.f64 = FontTextWidth(base, ctx.r3.u32, ctx.r4.u32, ctx.r5.u32);
 }
 
 namespace {

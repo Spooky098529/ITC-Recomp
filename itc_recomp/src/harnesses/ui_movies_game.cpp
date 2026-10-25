@@ -59,6 +59,22 @@ void NativeGet(PPCContext& ctx, uint8_t* base) {
   ctx.r3.u64 = to;
 }
 
+// sub_8211B7B8 and sub_8211B9B8: r3 = movie, r4 = a text id; the text's
+// +24 or +4.
+void NativeTextField24(PPCContext& ctx, uint8_t* base) {
+  ctx.r3.u64 = ui_movies::TextField(base, ctx.r3.u32, ctx.r4.u32, 24);
+}
+void NativeTextField4(PPCContext& ctx, uint8_t* base) {
+  ctx.r3.u64 = ui_movies::TextField(base, ctx.r3.u32, ctx.r4.u32, 4);
+}
+
+// sub_8211B940: r3 = movie, r4 = a text id; r3 left at the movie's texts.
+void NativeAdvanceTextScroll(PPCContext& ctx, uint8_t* base) {
+  const uint32_t movie = ctx.r3.u32;
+  ui_movies::AdvanceTextScroll(base, movie, ctx.r4.u32);
+  ctx.r3.u64 = movie + ui_movies::kMovieTexts;
+}
+
 // Runs the recompiled version with --native_ui_movies_game off, so the
 // functions it calls that are ours (its recursions among them) run the
 // originals too.
@@ -861,9 +877,9 @@ void TextCases(Context& h, const Block& block) {
   const Accessor accessors[] = {
       {"UiMovie::TextString (sub_8211B720)", __imp__sub_8211B720, sub_8211B720, false},
       {"sub_8211B770 (a text's +20)", __imp__sub_8211B770, sub_8211B770, false},
-      {"sub_8211B7B8 (a text's +24)", __imp__sub_8211B7B8, sub_8211B7B8, false},
-      {"sub_8211B9B8 (a text's +4)", __imp__sub_8211B9B8, sub_8211B9B8, false},
-      {"sub_8211B940 (a text's scroll counter)", __imp__sub_8211B940, sub_8211B940, true},
+      {"sub_8211B7B8 (a text's +24)", __imp__sub_8211B7B8, NativeTextField24, false},
+      {"sub_8211B9B8 (a text's +4)", __imp__sub_8211B9B8, NativeTextField4, false},
+      {"sub_8211B940 (a text's scroll counter)", __imp__sub_8211B940, NativeAdvanceTextScroll, true},
   };
   for (const Accessor& f : accessors) {
     Results results(f.name);
