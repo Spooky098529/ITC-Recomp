@@ -49,7 +49,8 @@ file's history. What's left to see in a drive, from every run:
   getters `sub_82090760`-`sub_82090788`; 12 of 18 named ready).
   Mapped as the app framework (`framework.md`, 68 rows: 5 moved from
   `functions.md`, 63 new; c4b5b86; 29 ready groups; 5 leads added, 2
-  updated); all 68 in play. Not migrated (paused).
+  updated); all 68 in play. Not migrated: the run ended (its lead back
+  in `leads.md`).
 
 ## Done
 
@@ -92,14 +93,15 @@ This run's groups: `expected-differences.md` (the "21:33 run" lines).
 - After the three cleanup leads' migration: ours 1800, work left 4961
   (wrapped 115, known 579, unknown 4267). Race 27 s (`itc_1507`), 0
   errors, every harness 0 differing.
+- At the end (2026-10-25, after the hardcoded shaders, the movies and
+  two coverage lists made again): ours 1847, work left 4604 (wrapped
+  113, known 651, unknown 3840).
 
 ## Stopped
 
-Paused 2026-10-24 (the user's call) while the framework's mapping agent
-ran: the loop stops after recording its report; no migration started.
-1 of 3 subsystems done. The framework's map is recorded, and its
-check is left for when the loop resumes: `check_function_statuses.py`
-has 1 error that isn't the loop's, `sub_822B8F10` in `functions.md`
-with no status since 2f4ed30 (`--dump_shader_compiles`, the user's
-work beside the loop, with an uncommitted change in
-`src/debug/shader_compile_dump.cpp`).
+Ended 2026-10-25 (the user's call), after the user's work beside it: the
+HLSL compiler and the movie library replaced (`--use_hardcoded_shaders`,
+`--play_movies_with_ffmpeg`; `b7-loop-2026-10-24-2133.md`). 1 of 3
+subsystems migrated; the framework's map (`framework.md`, c4b5b86) is
+recorded but not checked or migrated, and its lead is back at the top of
+`leads.md`. `check_function_statuses.py`: 0 errors.
