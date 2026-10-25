@@ -12,6 +12,7 @@
 #include "debug/frame_state_diff.h"
 #include "debug/pause_movie_log.h"
 #include "hooks/cameras.h"
+#include "hooks/race_hud.h"
 #include "hooks/ui_movies.h"
 #include "interpolation/blend_state.h"
 
@@ -468,7 +469,8 @@ extern "C" REX_FUNC(sub_8215DEA0) {
 // handler too (--redraw_rival_logo, game_messages.cpp); there the cutscene
 // isn't stepped, only the logo's draw is run, with the entry the logic pass
 // drew. The UI movie replay (sub_8211D2F8 above) keeps the movie advancing
-// once a tick.
+// once a tick. The logo's draw itself: natively with --native_race_hud
+// (src/hooks/race_hud.cpp).
 namespace {
 bool g_in_rival_cutscene = false;
 uint32_t g_rival_logo = 0;  // the entry the last logic pass drew, or 0
@@ -479,7 +481,7 @@ extern "C" REX_FUNC(sub_82211A28) {
   if (g_in_rival_cutscene) {
     g_rival_logo = ctx.r3.u32;
   }
-  __imp__sub_82211A28(ctx, base);
+  race_hud_hooks::DrawRivalLogo(ctx, base);
 }
 
 extern "C" REX_FUNC(sub_821594B8) {

@@ -187,5 +187,6 @@ void Minimap(Context& h);
 void CRuntimeExit(Context& h);
 void Models(Context& h);
 void SceneModels(Context& h);
+void RaceHud(Context& h);
 
 }  // namespace harness

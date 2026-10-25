@@ -182,6 +182,8 @@ set(ITC_SOURCES
     src/models/xpr.cpp
     src/models/texture_provider.cpp
     src/models/model.cpp
+    src/hooks/race_hud.cpp
+    src/race_hud/race_hud.cpp
     src/hooks/screen_objects.cpp
     src/screen_objects/uv_trees.cpp
     src/screen_objects/screen_objects.cpp
@@ -269,6 +271,7 @@ set(ITC_SOURCES
     src/harnesses/mode_tick.cpp
     src/harnesses/minimap.cpp
     src/harnesses/scene_models.cpp
+    src/harnesses/race_hud.cpp
     src/harnesses/models.cpp
     src/harnesses/action_mappers.cpp
     src/harnesses/data_tables.cpp

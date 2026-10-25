@@ -231,7 +231,9 @@ passes before Draw (since removed), and hiding
 `rival-logo-flicker`, `--redraw_rival_logo`). Entering a race against a rival plays the rival
 intro cutscene (about 13 s): the rival's cars, with the rival's 2D logo
 over them. The logo flickers with frames above 30; the attract race's
-logo (drawn from Draw) doesn't. Found
+logo (drawn from Draw) doesn't. (The logo's draw, `sub_82211A28`, is
+native since 2026-10-25, `--native_race_hud`, `functions/race-hud.md`; its
+override's noting and the redraw are unchanged.) Found
 with logs (2026-10-18, `itc_064.log` to `itc_066.log`):
 
 - `--log_recording_handlers`: Update handler `0x82159948` (a jump to
