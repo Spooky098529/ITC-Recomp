@@ -13,6 +13,33 @@ function goes from this list when a log shows its `native running
 (game):` line (say which log in the commit). A run with nothing left
 here loses its heading.
 
+## Run 2026-10-25 03:59 (`b7-loop-25-10-26-2`)
+
+Until d83677c the replay's boot marker was a line gone since the movies
+moved to our FFmpeg, so the first two validations' replays "stalled"
+(`itc_1605`, `itc_1616`); the cleanup's replay with the new marker ran
+(`itc_1625`, ok: the front end, a race, the screen after it) and showed
+`sub_82152D28`, `sub_82106A00`, `sub_825943E0` and `sub_82594F58`, now
+off the list; the mode tick's replay (`itc_1640`, ok) showed the race
+overlays' machine's four handlers (`sub_8215DD58`, `sub_8215DD90`,
+`sub_8215DDD0`, `sub_8215DE10`), off it too. The mode tick's functions
+all ran in the attract race. Left:
+
+- The model class (attract race `itc_1614`): `sub_825A7348` memmove_s
+  (`c-runtime.md`)
+- The minimap (attract race `itc_1648`, replay `itc_1649`, ok):
+  `sub_82147D18` SetList::Point (`minimap.md`)
+- The `atexit` step (attract race `itc_1665`, replay `itc_1666`, ok):
+  `sub_820F4BA8` Minimap::DrawPointMarker (`minimap.md`); `sub_825B3430`
+  _lock and `sub_825B32D0` _unlock (`c-runtime.md`: their plain C++
+  runs only for lock 8, which only the exit path takes, never in play:
+  closing the window hard-exits, so probably never in a drive either)
+- The game modes' cleanup (`itc_1624`, `itc_1625`): the modes not
+  entered, `sub_82106F08` ModeType5::ModeType5, `sub_82235E88`
+  ModeType6::ModeType6, `sub_82246340` ModeType7::ModeType7,
+  `sub_82107088` ModeType10::ModeType10, `sub_82106F88`
+  ModeType12::ModeType12 (`game-modes.md`)
+
 ## Run 2026-10-24 21:33 (`b7-loop-24-10-26-4`)
 
 The three cleanup leads' migration, not in the attract race or the
@@ -72,7 +99,6 @@ Migration 2's, not in the attract race or the replay (`itc_1145`,
 Migration 3's, not in the attract race or the replay (`itc_1169`,
 `itc_1170`, ok):
 
-- `sub_8213B890` AiPath::SpreadOffset (`ai-drivers.md`)
 - Never seen in play, no rows (ported with their callers,
   `ai-drivers.md`'s "Not seen in play"): `sub_8213D898`
   AiPath::AvoidByLane, `sub_8213F7E0` AiSkill::EntryWord,
@@ -136,7 +162,6 @@ their callers are the front end's:
 
 - `sub_821171B0` DataTables::Find20 (`data-tables.md`)
 - `sub_82117210` DataTables::Entry20 (`data-tables.md`)
-- `sub_82117228` DataTables::Entry40 (`data-tables.md`)
 
 ## Run 2026-10-22 14:39 (`b7-loop-22-10-26`, the third run)
 

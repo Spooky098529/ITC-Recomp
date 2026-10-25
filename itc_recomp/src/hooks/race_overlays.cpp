@@ -226,14 +226,14 @@ extern "C" REX_FUNC(sub_8212D818) {
 
 // The set-up's constructors, clears and bindings (none allocates).
 // Overlay::Overlay, CarOverlays::ClearViews, ViewDesc::Clear,
-// OverlayView::OverlayView, Particle::Particle and RaceOverlays::Clear: r3 =
-// the object.
+// OverlayView::OverlayView and Particle::Particle: r3 = the object.
+// RaceOverlays::Clear (sub_8215DE80) has no adapter: in play only
+// RaceMode::RaceMode's plain C++ (src/game_modes/) calls it.
 ITC_OVERLAY_SET(82126498, OverlayConstruct(base, ctx.r3.u32))
 ITC_OVERLAY_SET(82126530, ClearViews(base, ctx.r3.u32))
 ITC_OVERLAY_SET(82126860, ViewDescClear(base, ctx.r3.u32))
 ITC_OVERLAY_SET(82126870, OverlayViewConstruct(base, ctx.r3.u32))
 ITC_OVERLAY_SET(8212B3D0, ParticleConstruct(base, ctx.r3.u32))
-ITC_OVERLAY_SET(8215DE80, RaceOverlaysClear(base, ctx.r3.u32))
 // OverlayView::Set: r3 = the view, r4 = a description.
 ITC_OVERLAY_SET(82126890, OverlayViewSet(base, ctx.r3.u32, ctx.r4.u32))
 // CarOverlays::BindViewport: r4 = out, r5 = the viewport entry, r6 = a

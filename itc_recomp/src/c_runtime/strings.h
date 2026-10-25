@@ -8,6 +8,7 @@
 #pragma once
 
 #include <cstdint>
+#include <optional>
 
 namespace c_runtime {
 
@@ -99,6 +100,16 @@ bool Memcpy(uint8_t* base, uint32_t destination, uint32_t source, uint32_t size)
 // views; the original runs there. (A destination below the source is the
 // original's tail call to memcpy, sub_825A7410.)
 bool MemmoveDown(uint8_t* base, uint32_t destination, uint32_t source, uint32_t size);
+
+// sub_825A7348 memmove_s: 0 for a count of 0; else memmove's copy (a
+// destination equal to the source as signed words nothing, below it
+// memcpy's copy, above it MemmoveDown) and 0. nullopt, with nothing copied,
+// where the original must run: a null destination or source or a count above
+// the size (errno and _invalid_parameter, never seen in play), a copy into
+// the physical views below the source (memcpy's override records those for
+// the renderer's mirrors), or a copy Memcpy or MemmoveDown refuses.
+std::optional<uint32_t> MemmoveS(uint8_t* base, uint32_t destination, uint32_t size,
+                                 uint32_t source, uint32_t count);
 
 // XAPI's vectorized memset (sub_822962B0, probably XMemSet): `bytes` bytes
 // at `destination` set to `value`'s low byte. Its 16-byte store loops step

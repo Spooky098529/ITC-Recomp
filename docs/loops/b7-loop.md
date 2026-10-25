@@ -199,7 +199,8 @@ Before any migration, the lead checks, and halts on any failure:
   file is in play.
 - The report's `stop:` is `none`, and nothing in the file needs a
   decision only the user can make: a kernel import replaced, behavior
-  changed on purpose, a new dependency. Allocating guest memory isn't
+  changed on purpose, a new dependency (a decision the user has already
+  made for the same case doesn't count: "Precedent first" below). Allocating guest memory isn't
   one (since 2026-10-22): native code calls the allocation layer
   (`src/memory/heap.h`: `memory::Alloc`, `Free`, `Realloc`, `AllocPages`,
   `FreePages`, `AllocPhysical`; `docs/native-memory.md`), which every
@@ -455,7 +456,8 @@ file, when:
   expected: the user's call, 2026-10-23; the report still gives the
   seconds);
 - an agent left work uncommitted, or a commit doesn't build;
-- a report's `stop:` isn't `none`;
+- a report's `stop:` isn't `none`, and the user's answer ("Precedent
+  first" below) is to halt;
 - a map fails its check, or `leads.md` has nothing the loop can take;
 - the run's limit is reached;
 - the tree has changes the loop didn't make, or isn't on the run's branch.
@@ -467,6 +469,40 @@ step 9 of the cycle): the "B7 in progress" line near the top of
 `docs/rexglue-removal.md` and the B7 sentence in `CLAUDE.md`'s overview
 (which subsystems are done, the branch, what the rest waits on), and
 commits them with the "Stopped" entry. The user reviews and merges.
+
+## Precedent first
+
+(The user's rule, 2026-10-25, after a run waited on a question.) A
+decision the user has already made holds for every later case like it:
+the lead and the agents follow it without asking again. Before raising
+anything as a `stop:` or a question, look for the user's call: this
+file, `docs/rexglue-removal.md`, the function files' notes and intros,
+`docs/loops/review.md`, CLAUDE.md and the memory notes ("the user's
+call, <date>"). Say in the report or the row which call was followed.
+Calls so far for decisions the loop meets often:
+
+- Allocating guest memory: through `src/memory/heap.h` (2026-10-22).
+- A kernel critical section a subsystem's code locks: a host
+  `std::mutex` for that lock, taken by every user of it, native and
+  recompiled (`Edram::Alloc`, 2026-10-24; the memory blocks' lock
+  `0x8296BD38`, 2026-10-25). The generic wrappers and `ScopedLock` stay
+  recompiled for the other critical sections. A device-wide lock over a
+  host semaphore: the device lock (2026-10-24).
+- The graphics: native if the renderer needs it, else Dropped (fence
+  waits, cache flushes, packets nothing reads).
+- XACT is translated (2026-10-23); libraries replaced wholesale aren't
+  mapped ("Rules that still hold").
+- B7 changes no game behavior: stack leftovers and unwritten words are
+  copied as the original leaves them (track zones, the race overlays'
+  machine).
+
+Only something new (no call covers it, or it's unclear whether one
+does) goes to the user. Then the lead asks the user directly
+(AskUserQuestion: the case, the precedent nearest to it, the options)
+and waits for the answer instead of halting the loop; once answered, it
+records the call in the progress file, `review.md` and, when it's one
+the loop will meet again, the list above, and goes on. It halts only if
+the user says to.
 
 ## Rules that still hold
 

@@ -1,12 +1,16 @@
 // The game's statically linked C runtime (docs/functions/c-runtime.md): the
 // stack probe dropped, memset natively, and adapters in front of the string
 // and character helpers in src/c_runtime/strings.cpp, and in front of the
-// compiler's array helpers in src/c_runtime/arrays.cpp.
+// compiler's array helpers in src/c_runtime/arrays.cpp, and atexit and the
+// exit lock in src/c_runtime/exit.cpp.
 
 #include "guest.h"
+#include "hooks/c_runtime.h"
 #include "hooks/guest_call.h"
+#include "hooks/heap.h"
 
 #include "c_runtime/arrays.h"
+#include "c_runtime/exit.h"
 #include "c_runtime/format.h"
 #include "c_runtime/parse.h"
 #include "c_runtime/start_up.h"
@@ -26,7 +30,7 @@ ITC_FLAG_BOOL(native_c_runtime, true, "ITC",
               "path (sub_825B7EC8); strncpy, strcpy_s, strncmp, _stricmp, _strnicmp and its compare, "
               "strstr (sub_825A7F50, sub_825A9DD8, sub_825AACD0, sub_825AA100, sub_825AC710, "
               "sub_825AC6B0, sub_825A98A8); the second memcpy (sub_825A7830); memmove and memcpy_s "
-              "(sub_825AA840, sub_825A7270); toupper, tolower, "
+              "(sub_825AA840, sub_825A7270); memmove_s (sub_825A7348); toupper, tolower, "
               "isalpha, isdigit, isalnum and isleadbyte (sub_825A8600, sub_825A8618, sub_825AB020, "
               "sub_825AB040, sub_825AB0A0, sub_825B6898); strtoul and strtoxl (sub_825A85E0, "
               "sub_825A82C8); ___dtold and _ld12tod (sub_825B6378, sub_825B69B8); atof, _atof_l, "
@@ -40,19 +44,102 @@ ITC_FLAG_BOOL(native_c_runtime, true, "ITC",
               "sub_825B3560, sub_825B3548), __initmbctable and setSBCS (sub_825B6958, sub_825B68C8); "
               "the compiler's vector constructor and destructor iterators (sub_820911A8, "
               "sub_820900C0: the elements' native functions called as plain C++, the empty "
-              "destructor sub_82106540 skipped, any other called in the translated code) "
+              "destructor sub_82106540 skipped, any other called in the translated code); "
+              "the exit lock (the C runtime's lock 8) as a host mutex for every user, through "
+              "_lock sub_825B3430 and _unlock sub_825B32D0 for lock 8 (chosen at start-up, "
+              "other locks the game's), and with --native_heap and --native_c_runtime_heap "
+              "atexit (sub_825A7068) and _onexit (sub_825A6F60) over the game's table, and "
+              "the table's set-up __onexitinit (sub_825A6F00) by the native calloc "
               "(checked by "
               "--run_harnesses=c_runtime). Those reached only from native callers have no "
-              "adapters, and the flag switches their callers: wcslen, mbtowc, the wide write_char, "
+              "adapters, and the flag switches their callers: wcslen, wcscmp, mbtowc, the wide write_char, "
               "strcpy_s, __ascii_strnicmp, "
               "strtoxl, ___dtold, _ld12tod, _atof_l, _fltin2, __strgtold12_l, __mtold12, $I10_OUTPUT, "
-              "_fltout2, _cftof_l, _cftof2_l, _fptostr, _putwc_nolock, _cfltcvt_init and setSBCS");
+              "_fltout2, _cftof_l, _cftof2_l, _fptostr, _putwc_nolock, _cfltcvt_init, setSBCS "
+              "and _onexit");
 
 ITC_FLAG_BOOL(native_memcpy, true, "ITC",
               "Copy natively in the C runtime's memcpy (sub_825A7410), inside its override in "
               "src/native/buffers.cpp that records copies for the renderer's memory mirrors: the "
               "host's memcpy where the two ranges don't share memory, the translated code "
               "otherwise (checked by --run_harnesses=c_runtime)");
+
+ITC_FLAG_DECLARE(bool, native_c_runtime_heap);
+
+bool hooks::CRuntimeExitHostLock() {
+  static const bool host = ITC_FLAG(native_c_runtime);
+  return host;
+}
+
+bool hooks::NativeAtexit() {
+  return ITC_FLAG(native_c_runtime) && hooks::CRuntimeExitHostLock() &&
+         ITC_FLAG(native_c_runtime_heap) && hooks::NativeHeapActive();
+}
+
+// --- The exit lock ---
+//
+// For lock 8 only, whatever --native_c_runtime says now
+// (hooks::CRuntimeExitHostLock is fixed for the run, from the first _lock
+// call at boot): every user of it takes the host mutex, the recompiled ones
+// (the exit path) here. Other locks go to the originals. Lock 8 is made at
+// boot (its table entry's +4 is 1), so the original's lazy creation
+// (sub_825B32F0) is never its path.
+
+// _lock: r3 = the lock number; r3 = its critical section (the original's
+// argument to RtlEnterCriticalSection, which leaves r3).
+extern "C" REX_FUNC(sub_825B3430) {
+  REX_FUNC_PROLOGUE();
+  if (hooks::CRuntimeExitHostLock() && ctx.r3.u32 == c_runtime::kExitLock) {
+    ctx.r3.u64 = c_runtime::LockExit(base);
+    return;
+  }
+  __imp__sub_825B3430(ctx, base);
+}
+
+// _unlock: r3 = the lock number; r3 = its critical section, as _lock's.
+extern "C" REX_FUNC(sub_825B32D0) {
+  REX_FUNC_PROLOGUE();
+  if (hooks::CRuntimeExitHostLock() && ctx.r3.u32 == c_runtime::kExitLock) {
+    ctx.r3.u64 = c_runtime::UnlockExit(base);
+    return;
+  }
+  __imp__sub_825B32D0(ctx, base);
+}
+
+// atexit: r3 = the function; returns 0, or -1 when the table can't take it.
+// _onexit (sub_825A6F60) has no adapter: only atexit calls it.
+extern "C" REX_FUNC(sub_825A7068) {
+  REX_FUNC_PROLOGUE();
+  if (hooks::NativeAtexit()) {
+    if (const auto result = c_runtime::Atexit(base, ctx.r3.u32)) {
+      ctx.r3.s64 = *result;
+      return;
+    }
+  }
+  __imp__sub_825A7068(ctx, base);
+}
+
+// __onexitinit: no arguments; r3 = 0, or 24 when calloc fails. Natively
+// with --native_c_runtime and the C runtime's heap on the layer (the native
+// calloc).
+extern "C" REX_FUNC(sub_825A6F00) {
+  REX_FUNC_PROLOGUE();
+  if (ITC_FLAG(native_c_runtime) && ITC_FLAG(native_c_runtime_heap) &&
+      hooks::NativeHeapActive()) {
+    if (const auto result = c_runtime::InitExitTable(base)) {
+      ctx.r3.u64 = *result;
+      return;
+    }
+  }
+  __imp__sub_825A6F00(ctx, base);
+}
+
+int32_t hooks::GuestAtexit::Run(void* self, uint32_t function) {
+  auto& call = *static_cast<GuestAtexit*>(self);
+  call.ctx.r3.u64 = function;
+  __imp__sub_825A7068(call.ctx, call.base);
+  return call.ctx.r3.s32;
+}
 
 // __chkstk: r12 = minus the frame about to be made (4 KB or more). Reads one
 // word every 4,096 bytes below r1 down to the new frame, touching the guard
@@ -110,16 +197,6 @@ extern "C" REX_FUNC(sub_825A7EF8) {
     return;
   }
   c_runtime::Wcscat(base, ctx.r3.u32, ctx.r4.u32);
-}
-
-// wcscmp: r3, r4 = UTF-16 strings; returns -1, 0 or 1.
-extern "C" REX_FUNC(sub_825A7EB0) {
-  REX_FUNC_PROLOGUE();
-  if (!ITC_FLAG(native_c_runtime)) {
-    __imp__sub_825A7EB0(ctx, base);
-    return;
-  }
-  ctx.r3.s64 = c_runtime::Wcscmp(base, ctx.r3.u32, ctx.r4.u32);
 }
 
 // strncpy: r3 = destination, r4 = source, r5 = count; returns r3.
@@ -212,6 +289,22 @@ extern "C" REX_FUNC(sub_825AA840) {
   if (!c_runtime::MemmoveDown(base, ctx.r3.u32, ctx.r4.u32, ctx.r5.u32)) {
     __imp__sub_825AA840(ctx, base);
   }
+}
+
+// memmove_s: r3 = destination, r4 = its size, r5 = source, r6 = count; r3 =
+// 0. The paths c_runtime::MemmoveS leaves to the original (its errors, a
+// copy memcpy's override records for the mirrors, a copy its checks refuse)
+// run it from the start, nothing having been copied.
+extern "C" REX_FUNC(sub_825A7348) {
+  REX_FUNC_PROLOGUE();
+  if (ITC_FLAG(native_c_runtime)) {
+    if (const auto r3 = c_runtime::MemmoveS(base, ctx.r3.u32, ctx.r4.u32, ctx.r5.u32,
+                                            ctx.r6.u32)) {
+      ctx.r3.u64 = *r3;
+      return;
+    }
+  }
+  __imp__sub_825A7348(ctx, base);
 }
 
 // memcpy_s: r3 = destination, r4 = its size, r5 = source, r6 = count;

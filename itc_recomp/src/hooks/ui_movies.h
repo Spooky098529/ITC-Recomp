@@ -44,4 +44,18 @@ void Draw(PPCContext& ctx, uint8_t* base);
 // = the scene, r5 = the node, r6 = the layer; for the harness).
 void RecordDrawNode(PPCContext& ctx, uint8_t* base);
 
+// UiMovie::ApplyTrack (sub_825A0548; r3 = the node, r4 = the track, f1 = t,
+// r5 and r6 = the keys): natively (with native atexit, hooks::NativeAtexit)
+// or, with --native_ui_movies off, the original. Its override
+// (src/frame_pacing/per_frame_logic.cpp) wraps this for
+// --per_tick_ui_movie_tracks and --log_pause_movie.
+void ApplyTrack(PPCContext& ctx, uint8_t* base);
+// The same natively, whatever the flags (for the harness).
+void ApplyTrackNative(PPCContext& ctx, uint8_t* base);
+
+// UiMovie::ApplyAnimation (sub_825A08E0; r3 = the node, r4 = the animation,
+// f1 = the time, r6 = loop) natively, whatever the flag (for the harness):
+// each track through sub_825A0548 (its override) from the level's frame.
+void ApplyAnimationNative(PPCContext& ctx, uint8_t* base);
+
 }  // namespace ui_movies_hooks

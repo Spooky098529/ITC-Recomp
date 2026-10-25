@@ -3,10 +3,13 @@
 // in the scratch area, so nothing the game holds is read or written.
 
 #include "harness.h"
+#include "exit_table.h"
 
 #include "base/flags.h"
 #include "base/log.h"
 #include "command_list/command_list.h"
+#include "c_runtime/exit.h"
+#include "hooks/c_runtime.h"
 #include "hooks/ui_movies.h"
 #include "memory/heap.h"
 #include "ui_movies/ui_movies.h"
@@ -16,6 +19,7 @@
 #include <cmath>
 #include <iterator>
 #include <limits>
+#include <mutex>
 
 ITC_FLAG_DECLARE(bool, native_ui_movies);
 
@@ -93,6 +97,42 @@ struct Function {
   const char* name;
   GuestFunction recompiled, native;
 };
+
+// sub_8259D600 through the adapter's steps (its adapter is gone).
+void NativeVertexOffset(PPCContext& ctx, uint8_t* base) {
+  (void)base;
+  ctx.r3.u64 = ui_movies::VertexOffset(ctx.r3.u32, ctx.r4.u32);
+}
+
+// sub_825A6508 through the adapter's steps (its adapter is gone).
+void NativeNodeTrack(PPCContext& ctx, uint8_t* base) {
+  (void)base;
+  ctx.r3.u64 = ui_movies::NodeTrack(ctx.r3.u32, ctx.r4.u32);
+}
+
+// sub_825A6518 through the adapter's steps (its adapter is gone).
+void NativeKey(PPCContext& ctx, uint8_t* base) {
+  (void)base;
+  ctx.r3.u64 = ui_movies::Key(ctx.r3.u32, ctx.r4.u32);
+}
+
+// sub_825A6528 through the adapter's steps (its adapter is gone).
+void NativeNodeTrackList(PPCContext& ctx, uint8_t* base) {
+  (void)base;
+  ctx.r3.u64 = ui_movies::NodeTrackList(base, ctx.r3.u32, ctx.r4.u32);
+}
+
+// sub_825A6540 through the adapter's steps (its adapter is gone).
+void NativeKeyList(PPCContext& ctx, uint8_t* base) {
+  (void)base;
+  ctx.r3.u64 = ui_movies::KeyList(base, ctx.r3.u32, ctx.r4.u32);
+}
+
+// sub_825A6558 through the adapter's steps (its adapter is gone).
+void NativeSubAnimation(PPCContext& ctx, uint8_t* base) {
+  (void)base;
+  ctx.r3.u64 = ui_movies::SubAnimation(base, ctx.r3.u32, ctx.r4.u32);
+}
 
 // The accessors that only add: r3 and r4 random, and their edges.
 void Arithmetic(Context& h, const Function& f) {
@@ -330,6 +370,36 @@ void ResetDrawContextCases(Context& h) {
 // small), t mostly in [0, 1] (the caller clamps it) with odd doubles. The
 // integer ones compare r3; CubicFloat compares f1 (its r3 and r4 are tan's
 // leftovers, which the caller doesn't read).
+// sub_8259FA20 through the adapter's steps (its adapter is gone).
+void NativeEaseInteger(PPCContext& ctx, uint8_t* base) {
+  ctx.fpscr.disableFlushMode();
+  ctx.r3.u64 = ui_movies::EaseInteger(base, ctx.r3.u32, ctx.r4.u32, ctx.f1.f64);
+}
+
+// sub_8259FB30 through the adapter's steps (its adapter is gone): the
+// original where the plain C++ gives nullopt.
+void NativeCubicFloat(PPCContext& ctx, uint8_t* base) {
+  ctx.fpscr.disableFlushMode();
+  if (const std::optional<double> value =
+          ui_movies::CubicFloat(base, ctx.r3.u32, ctx.r4.u32, ctx.f1.f64)) {
+    ctx.f1.f64 = *value;
+    return;
+  }
+  __imp__sub_8259FB30(ctx, base);
+}
+
+// sub_8259FC18 through the adapter's steps (its adapter is gone): the
+// original where the plain C++ gives nullopt.
+void NativeCubicInteger(PPCContext& ctx, uint8_t* base) {
+  ctx.fpscr.disableFlushMode();
+  if (const std::optional<uint32_t> value =
+          ui_movies::CubicInteger(base, ctx.r3.u32, ctx.r4.u32, ctx.f1.f64)) {
+    ctx.r3.u64 = *value;
+    return;
+  }
+  __imp__sub_8259FC18(ctx, base);
+}
+
 void KeyCases(Context& h) {
   struct KeyFunction {
     const char* name;
@@ -337,9 +407,9 @@ void KeyCases(Context& h) {
     bool integer_values, result_in_f1;
   };
   const KeyFunction functions[] = {
-      {"EaseInteger (sub_8259FA20)", __imp__sub_8259FA20, sub_8259FA20, true, false},
-      {"CubicFloat (sub_8259FB30)", __imp__sub_8259FB30, sub_8259FB30, false, true},
-      {"CubicInteger (sub_8259FC18)", __imp__sub_8259FC18, sub_8259FC18, true, false},
+      {"EaseInteger (sub_8259FA20)", __imp__sub_8259FA20, NativeEaseInteger, true, false},
+      {"CubicFloat (sub_8259FB30)", __imp__sub_8259FB30, NativeCubicFloat, false, true},
+      {"CubicInteger (sub_8259FC18)", __imp__sub_8259FC18, NativeCubicInteger, true, false},
   };
   const double odd_t[] = {0.0, 1.0, -0.0, 0.5, 1e-40, -1.0, 2.0, 1.0000001, std::nan(""),
                           std::numeric_limits<double>::infinity(), 0.1, 1.0 / 3.0};
@@ -1637,22 +1707,416 @@ void TreeDrawCases(Context& h) {
   memory::Free(block);
 }
 
+// --- UiMovie::TrackProperty (on the game's table, guard and filled byte,
+// and the exit table, each put back after a side). ---
+
+void NativeTrackProperty(PPCContext& ctx, uint8_t* base) {
+  const uint64_t id = ctx.r3.u64;
+  hooks::GuestAtexit guest{ctx, base};
+  ctx.r3.u64 = ui_movies::TrackProperty(base, id, ctx.r1.u32 - 128, guest.Call());
+}
+
+void TrackPropertyCases(Context& h) {
+  Results results("sub_8259FE68 UiMovie::TrackProperty");
+  if (!hooks::NativeAtexit()) {
+    ITC_LOG_WARN("harness: ui_movies: native atexit off: TrackProperty's cases skipped");
+    return;
+  }
+  std::lock_guard<std::recursive_mutex> lock(c_runtime::ExitMutex());
+  constexpr uint32_t kGuard = 0x82970F28, kFilled = 0x82970C20;
+  const uint32_t table = ui_movies::kTrackProperties;
+  const auto saved_table = Read(h.base, table, 64 * 12);
+  const auto saved_guard = Read(h.base, kGuard, 4);
+  const auto saved_filled = Read(h.base, kFilled, 4);
+  for (int c = 0; c < 40; c++) {
+    // 0-7: the game's table as it is; then cleared, filled or both redone,
+    // over random bytes.
+    const int redo = c < 8 ? 0 : 1 + (c % 3);
+    std::vector<uint8_t> start_table = saved_table;
+    uint32_t guard = guest::LoadU32(h.base, kGuard);
+    uint8_t filled = guest::LoadU8(h.base, kFilled);
+    if (redo != 0) {
+      for (auto& byte : start_table) {
+        byte = uint8_t(h.random.Next());
+      }
+      guard = uint32_t(h.random.Next());
+      guard = (redo & 1) ? guard & ~1u : guard | 1u;
+      filled = (redo & 2) ? 0 : uint8_t(1 + h.random.Below(255));
+    }
+    const uint64_t id = c % 5 == 4 ? h.random.Next() : h.random.Below(64);
+    std::vector<uint8_t> frame(128);
+    for (auto& byte : frame) {
+      byte = uint8_t(h.random.Next());
+    }
+    Outputs out[2];
+    for (int v = 0; v < 2; v++) {
+      Write(h.base, table, start_table.data(), 64 * 12);
+      guest::StoreU32(h.base, kGuard, guard);
+      guest::StoreU8(h.base, kFilled, filled);
+      PPCContext t = CallContext(h);
+      Write(h.base, t.r1.u32 - 128, frame.data(), 128);
+      const uint32_t mark = exit_table::Mark(h.base);
+      t.r3.u64 = id;
+      (v == 0 ? __imp__sub_8259FE68 : NativeTrackProperty)(t, h.base);
+      out[v].Bytes(Read(h.base, table, 64 * 12));
+      out[v].Word(guest::LoadU32(h.base, kGuard));
+      out[v].Bytes(Read(h.base, kFilled, 4));
+      out[v].Word(t.r3.u32);
+      out[v].Word(uint32_t(t.r3.u64 >> 32));
+      exit_table::Take(h.base, mark, out[v]);
+    }
+    results.Check(out[0], out[1], fmt::format("case {} (redo {}, id {:X})", c, redo, id));
+  }
+  Write(h.base, table, saved_table.data(), 64 * 12);
+  Write(h.base, kGuard, saved_guard.data(), 4);
+  Write(h.base, kFilled, saved_filled.data(), 4);
+  results.Report();
+}
+
+// --- UiMovie::ApplyTrack (a made-up node, track and keys in a block; the
+// descriptor table made up, or the game's filled from scratch with the
+// guard, the filled byte or both clear; the table, guard, filled byte and
+// exit table put back after). Both sides: the same bytes below the stack
+// pointer (TrackProperty's leftovers). Compared: the node, the stand-in key
+// in the original's frame, the table, guard and filled byte, and the exit
+// table's additions. Type 2's cubic and eased keys (sub_8259FD40,
+// sub_8259FAA8) run their originals on both sides. ---
+
+void ApplyTrackCases(Context& h) {
+  Results results("sub_825A0548 UiMovie::ApplyTrack");
+  if (!hooks::NativeAtexit()) {
+    ITC_LOG_WARN("harness: ui_movies: native atexit off: ApplyTrack's cases skipped");
+    return;
+  }
+  std::lock_guard<std::recursive_mutex> lock(c_runtime::ExitMutex());
+  constexpr uint32_t kGuard = 0x82970F28, kFilled = 0x82970C20;
+  constexpr uint32_t kNodeBytes = 1024;
+  const uint32_t table = ui_movies::kTrackProperties;
+  const auto saved_table = Read(h.base, table, 64 * 12);
+  const auto saved_guard = Read(h.base, kGuard, 4);
+  const auto saved_filled = Read(h.base, kFilled, 4);
+  const uint32_t block = memory::Alloc(2048, 0);
+  const uint32_t node = block, track = block + kNodeBytes, keys = block + kNodeBytes + 64;
+  const double odd_t[] = {0.0, 1.0, -0.0, 0.5, 1e-40, -1.0, 2.0, 1.0000001, std::nan(""),
+                          std::numeric_limits<double>::infinity(), 0.1, 1.0 / 3.0,
+                          0.9999999, 1.000001};
+  Random& r = h.random;
+  for (int c = 0; c < 3000; c++) {
+    // 0: the first call (guard and filled clear); 1: filled clear; else a
+    // made-up filled table.
+    const int mode = c % 16 < 2 ? c % 16 : 2;
+    std::vector<uint8_t> start_table = saved_table;
+    uint32_t guard = guest::LoadU32(h.base, kGuard) | 1;
+    uint8_t filled = 1;
+    if (mode == 0) {
+      guard &= ~1u;
+      filled = 0;
+    } else if (mode == 1) {
+      filled = 0;
+    } else {
+      for (uint32_t i = 0; i < 64; i++) {
+        uint8_t* e = start_table.data() + 12 * i;
+        const uint32_t words[3] = {
+            4 * r.Below(64), r.Below(5),
+            uint32_t(r.Below(2)) << 24 | uint32_t(r.Below(4) == 0) << 16 | r.Below(1u << 16)};
+        for (int w = 0; w < 3; w++) {
+          for (int b = 0; b < 4; b++) {
+            e[4 * w + b] = uint8_t(words[w] >> (24 - 8 * b));
+          }
+        }
+      }
+    }
+    const uint32_t id = r.Below(64);
+    std::vector<uint8_t> node_bytes(kNodeBytes);
+    for (auto& byte : node_bytes) {
+      byte = uint8_t(r.Next());
+    }
+    const uint32_t counts = r.Below(8);
+    for (int b = 0; b < 4; b++) {
+      node_bytes[112 + b] = uint8_t(counts >> (24 - 8 * b));
+    }
+    const uint32_t vertex = r.Below(8);
+    // Integer-style or float-style values (the descriptor's type decides
+    // how they're read).
+    const bool integer_values = r.Below(2) == 0;
+    uint32_t key[2][5];
+    for (int k = 0; k < 2; k++) {
+      key[k][0] = r.Below(12) == 0 ? uint32_t(r.Next()) : r.Below(5);
+      key[k][1] = RandomFloat(r, 0, 10);
+      if (integer_values) {
+        key[k][2] = r.Below(3) == 0 ? uint32_t(r.Next()) : uint32_t(int32_t(r.Below(2000)) - 1000);
+      } else {
+        key[k][2] = RandomFloat(r, -1000, 1000);
+      }
+      key[k][3] = RandomFloat(r, -1.5f, 1.5f);
+      key[k][4] = RandomFloat(r, -1.5f, 1.5f);
+    }
+    if (r.Below(20) == 0) {  // tan's error paths: huge angles
+      key[1][3 + r.Below(2)] = std::bit_cast<uint32_t>(4e8f);
+    }
+    const bool no_k0 = r.Below(8) == 0, no_k1 = r.Below(8) == 0;
+    double t;
+    if (r.Below(8) == 0) {
+      t = odd_t[r.Below(std::size(odd_t))];
+    } else if (r.Below(2) == 0) {
+      t = double(float(r.Below(1u << 24)) / float(1u << 24));
+    } else {
+      t = double(r.Below(1u << 30)) / double(1u << 30);
+    }
+    std::vector<uint8_t> stack(352);
+    for (auto& byte : stack) {
+      byte = uint8_t(r.Next());
+    }
+    Outputs out[2];
+    for (int v = 0; v < 2; v++) {
+      Write(h.base, table, start_table.data(), 64 * 12);
+      guest::StoreU32(h.base, kGuard, guard);
+      guest::StoreU8(h.base, kFilled, filled);
+      Write(h.base, node, node_bytes.data(), kNodeBytes);
+      for (uint32_t w = 0; w < 16; w++) {
+        guest::StoreU32(h.base, track + 4 * w, 0xCDCDCDCD);
+      }
+      guest::StoreU32(h.base, track, id);
+      guest::StoreU32(h.base, track + 12, vertex);
+      for (int k = 0; k < 2; k++) {
+        for (int w = 0; w < 5; w++) {
+          guest::StoreU32(h.base, keys + 32 * k + 4 * w, key[k][w]);
+        }
+      }
+      PPCContext x = CallContext(h);
+      Write(h.base, x.r1.u32 - 352, stack.data(), 352);
+      const uint32_t frame = x.r1.u32 - 224;
+      const uint32_t mark = exit_table::Mark(h.base);
+      x.r3.u64 = node;
+      x.r4.u64 = track;
+      x.r5.u64 = no_k0 ? 0 : keys;
+      x.r6.u64 = no_k1 ? 0 : keys + 32;
+      x.f1.f64 = t;
+      (v == 0 ? __imp__sub_825A0548 : ui_movies_hooks::ApplyTrackNative)(x, h.base);
+      // The target, from the descriptor as it is now.
+      const uint32_t descriptor = table + 12 * id;
+      const uint32_t type = guest::LoadU32(h.base, descriptor + 4);
+      uint32_t target = guest::LoadU32(h.base, descriptor);
+      if (guest::LoadU8(h.base, descriptor + 9) != 0) {
+        target += ui_movies::VertexOffset(counts, vertex);
+      }
+      std::vector<uint8_t> node_after = Read(h.base, node, kNodeBytes);
+      if (type == 0 && target + 4 <= kNodeBytes) {
+        out[v].Float(guest::LoadU32(h.base, node + target));
+        std::fill_n(node_after.begin() + target, 4, uint8_t(0));
+      }
+      out[v].Bytes(node_after);
+      out[v].Word(guest::LoadU32(h.base, frame + 112));
+      out[v].Floats(h.base, frame + 116, 1);
+      if (type == 0) {
+        out[v].Floats(h.base, frame + 120, 1);
+      } else {
+        out[v].Word(guest::LoadU32(h.base, frame + 120));
+      }
+      out[v].Floats(h.base, frame + 124, 2);
+      out[v].Bytes(Read(h.base, table, 64 * 12));
+      out[v].Word(guest::LoadU32(h.base, kGuard));
+      out[v].Bytes(Read(h.base, kFilled, 4));
+      exit_table::Take(h.base, mark, out[v]);
+    }
+    results.Check(out[0], out[1],
+                  fmt::format("case {} (mode {}, id {}, t {}, k0 {}, k1 {}, kinds {:X} {:X})", c,
+                              mode, id, t, no_k0 ? "none" : "set", no_k1 ? "none" : "set",
+                              key[0][0], key[1][0]));
+  }
+  Write(h.base, table, saved_table.data(), 64 * 12);
+  Write(h.base, kGuard, saved_guard.data(), 4);
+  Write(h.base, kFilled, saved_filled.data(), 4);
+  memory::Free(block);
+  results.Report();
+}
+
+// --- UiMovie::ApplyAnimation (a made-up scene and two animations in a
+// block: animation A with up to 3 node track lists, 4 key lists and 3
+// sub-animations, all onto animation B, which has the same track lists and
+// none; a root node with up to 4 children, each with up to 2 of the others
+// as children; a made-up descriptor table, filled, so no atexit). The
+// descriptors' offsets (160 to 396, plus up to 256 when indirect) keep the
+// writes off the nodes' ids and children. The recompiled side runs with
+// --native_ui_movies off (its recursive calls and tracks recompiled too);
+// the native side applies its tracks through sub_825A0548's override (the
+// native ApplyTrack). Compared: the
+// block (exactly: the nodes' fields are floats and integers) and r3. ---
+
+void ApplyAnimationCases(Context& h) {
+  Results results("sub_825A08E0 UiMovie::ApplyAnimation");
+  if (!hooks::NativeAtexit()) {
+    ITC_LOG_WARN("harness: ui_movies: native atexit off: ApplyAnimation's cases skipped");
+    return;
+  }
+  constexpr uint32_t kGuard = 0x82970F28, kFilled = 0x82970C20;
+  constexpr uint32_t kBlockBytes = 0x5000;
+  const uint32_t table = ui_movies::kTrackProperties;
+  const auto saved_table = Read(h.base, table, 64 * 12);
+  const auto saved_guard = Read(h.base, kGuard, 4);
+  const auto saved_filled = Read(h.base, kFilled, 4);
+  const uint32_t block = memory::Alloc(kBlockBytes, 0);
+  const uint32_t anim_a = block, anim_b = block + 0x400, lists = block + 0x800,
+                 key_lists = block + 0x1000, subs = block + 0x1800, root = block + 0x2000,
+                 children = block + 0x3000;
+  const double odd_t[] = {0.0, 1.0, -0.0, 0.5, -1.0, 2.0, 1.0000001, std::nan(""),
+                          std::numeric_limits<double>::infinity(), 0.1, 100.0, 3.5};
+  Random& r = h.random;
+  std::vector<uint8_t> start(kBlockBytes);
+  auto put = [&](uint32_t address, uint32_t value) {
+    for (int b = 0; b < 4; b++) {
+      start[address - block + b] = uint8_t(value >> (24 - 8 * b));
+    }
+  };
+  auto time_word = [&](float low, float high) { return RandomFloat(r, low, high); };
+  for (int c = 0; c < 1000; c++) {
+    for (auto& byte : start) {
+      byte = uint8_t(r.Next());
+    }
+    // The table.
+    std::vector<uint8_t> made_table(64 * 12);
+    for (uint32_t i = 0; i < 64; i++) {
+      const uint32_t words[3] = {
+          160 + 4 * r.Below(60), r.Below(5),
+          uint32_t(r.Below(2)) << 24 | uint32_t(r.Below(4) == 0) << 16 | r.Below(1u << 16)};
+      for (int w = 0; w < 3; w++) {
+        for (int b = 0; b < 4; b++) {
+          made_table[12 * i + 4 * w + b] = uint8_t(words[w] >> (24 - 8 * b));
+        }
+      }
+    }
+    // The animations: entries from +64 (8 bytes each): 3 track lists, 4 key
+    // lists, 3 sub-animations, at index bases +32, +40, +48.
+    const uint32_t list_count = r.Below(4), sub_count = r.Below(4);
+    for (uint32_t a = 0; a < 2; a++) {
+      const uint32_t anim = a == 0 ? anim_a : anim_b;
+      put(anim + 12, time_word(0, 4));
+      put(anim + 32, 0);
+      put(anim + 36, list_count);
+      put(anim + 40, 3);
+      put(anim + 48, 7);
+      put(anim + 52, a == 0 ? sub_count : 0);
+      for (uint32_t i = 0; i < 3; i++) {
+        put(anim + 64 + 8 * i, lists + 0x100 * i);
+        put(anim + 64 + 8 * (7 + i), subs + 0x40 * i);
+      }
+      for (uint32_t i = 0; i < 4; i++) {
+        put(anim + 64 + 8 * (3 + i), key_lists + 0x100 * i);
+      }
+    }
+    for (uint32_t i = 0; i < 3; i++) {
+      const uint32_t list = lists + 0x100 * i;
+      put(list + 8, r.Below(4));
+      put(list + 12, r.Below(4));
+      for (uint32_t j = 0; j < 3; j++) {
+        const uint32_t track = list + 16 + 16 * j;
+        put(track, r.Below(64));
+        put(track + 4, r.Below(4));
+        put(track + 8, r.Below(3) == 0 ? time_word(-1, 2) : 0);
+        put(track + 12, r.Below(4));
+      }
+    }
+    for (uint32_t i = 0; i < 4; i++) {
+      const uint32_t keys = key_lists + 0x100 * i;
+      const uint32_t count = 1 + r.Below(5);
+      put(keys + 12, count);
+      float time = std::bit_cast<float>(time_word(-0.5f, 0.5f));
+      const bool integer_values = r.Below(2) == 0;
+      for (uint32_t k = 0; k < count; k++) {
+        const uint32_t key = keys + 16 + 32 * k;
+        put(key, r.Below(12) == 0 ? uint32_t(r.Next()) : r.Below(5));
+        put(key + 4, r.Below(16) == 0 ? time_word(-1, 4) : std::bit_cast<uint32_t>(time));
+        time += r.Below(4) == 0 ? 0.0f : std::bit_cast<float>(time_word(0, 1.5f));
+        put(key + 8, integer_values ? uint32_t(int32_t(r.Below(2000)) - 1000)
+                                    : time_word(-1000, 1000));
+        put(key + 12, time_word(-1.5f, 1.5f));
+        put(key + 16, time_word(-1.5f, 1.5f));
+      }
+    }
+    for (uint32_t i = 0; i < 3; i++) {
+      const uint32_t sub = subs + 0x40 * i;
+      put(sub + 8, r.Below(2) == 0 ? 0 : r.Below(4));
+      put(sub + 16, anim_b);
+      const uint32_t s0 = time_word(-1, 2);
+      put(sub + 24, s0);
+      put(sub + 28, r.Below(6) == 0 ? s0 : time_word(-1, 4));
+      put(sub + 32, time_word(-1, 2));
+      put(sub + 36, time_word(-1, 4));
+    }
+    // The nodes: the root's children (index base +108 = 0, pointers from
+    // +128), each child's id +8 and up to 2 of the others as its children.
+    const uint32_t child_count = r.Below(5);
+    put(root + 8, r.Below(4));
+    put(root + 108, 0);
+    put(root + 112, child_count);
+    for (uint32_t i = 0; i < 4; i++) {
+      const uint32_t child = children + 0x400 * i;
+      put(root + 128 + 8 * i, child);
+      put(child + 8, r.Below(4));
+      put(child + 108, 0);
+      put(child + 112, r.Below(3));
+      for (uint32_t j = 0; j < 2; j++) {
+        put(child + 128 + 8 * j, children + 0x400 * r.Below(4));
+      }
+    }
+    const bool on_b = r.Below(8) == 0;
+    const uint32_t loop = r.Below(2) == 0 ? 0 : uint32_t(r.Next()) | 1;
+    double time;
+    if (r.Below(8) == 0) {
+      time = odd_t[r.Below(std::size(odd_t))];
+    } else {
+      time = double(std::bit_cast<float>(time_word(-0.5f, 4)));
+    }
+    Outputs out[2];
+    for (int v = 0; v < 2; v++) {
+      Write(h.base, table, made_table.data(), 64 * 12);
+      guest::StoreU32(h.base, kGuard, guest::LoadU32(h.base, kGuard) | 1);
+      guest::StoreU8(h.base, kFilled, 1);
+      Write(h.base, block, start.data(), kBlockBytes);
+      PPCContext x = CallContext(h);
+      x.r3.u64 = root;
+      x.r4.u64 = on_b ? anim_b : anim_a;
+      x.r6.u64 = loop;
+      x.f1.f64 = time;
+      if (v == 0) {
+        // The recursive calls and the tracks recompiled too.
+        ITC_FLAG(native_ui_movies) = false;
+        __imp__sub_825A08E0(x, h.base);
+        ITC_FLAG(native_ui_movies) = true;
+      } else {
+        ui_movies_hooks::ApplyAnimationNative(x, h.base);
+      }
+      out[v].Bytes(Read(h.base, block, kBlockBytes));
+      out[v].Word(x.r3.u32);
+      out[v].Word(uint32_t(x.r3.u64 >> 32));
+    }
+    results.Check(out[0], out[1],
+                  fmt::format("case {} (time {}, loop {:X}, lists {}, subs {}, children {})", c,
+                              time, loop, list_count, sub_count, child_count));
+  }
+  Write(h.base, table, saved_table.data(), 64 * 12);
+  Write(h.base, kGuard, saved_guard.data(), 4);
+  Write(h.base, kFilled, saved_filled.data(), 4);
+  memory::Free(block);
+  results.Report();
+}
+
 }  // namespace
 
 void UiMovies(Context& h) {
   const Function arithmetic[] = {
-      {"NodeTrack (sub_825A6508)", __imp__sub_825A6508, sub_825A6508},
-      {"Key (sub_825A6518)", __imp__sub_825A6518, sub_825A6518},
-      {"VertexOffset (sub_8259D600)", __imp__sub_8259D600, sub_8259D600},
+      {"NodeTrack (sub_825A6508)", __imp__sub_825A6508, NativeNodeTrack},
+      {"Key (sub_825A6518)", __imp__sub_825A6518, NativeKey},
+      {"VertexOffset (sub_8259D600)", __imp__sub_8259D600, NativeVertexOffset},
       {"PrimitiveTexture (sub_8259D618)", __imp__sub_8259D618, sub_8259D618},
       {"PictureTexture (sub_8259D648)", __imp__sub_8259D648, sub_8259D648},
   };
   for (const Function& f : arithmetic) {
     Arithmetic(h, f);
   }
-  Indexed(h, {"NodeTrackList (sub_825A6528)", __imp__sub_825A6528, sub_825A6528}, 64, 32);
-  Indexed(h, {"KeyList (sub_825A6540)", __imp__sub_825A6540, sub_825A6540}, 64, 40);
-  Indexed(h, {"SubAnimation (sub_825A6558)", __imp__sub_825A6558, sub_825A6558}, 64, 48);
+  Indexed(h, {"NodeTrackList (sub_825A6528)", __imp__sub_825A6528, NativeNodeTrackList}, 64, 32);
+  Indexed(h, {"KeyList (sub_825A6540)", __imp__sub_825A6540, NativeKeyList}, 64, 40);
+  Indexed(h, {"SubAnimation (sub_825A6558)", __imp__sub_825A6558, NativeSubAnimation}, 64, 48);
   Indexed(h, {"UiMovie::Child (sub_8259D658)", __imp__sub_8259D658, sub_8259D658}, 128, 108);
   Indexed(h, {"SceneAnimation (sub_8259D670)", __imp__sub_8259D670, sub_8259D670}, 128, 116);
   PrimitiveVertex(h);
@@ -1672,6 +2136,9 @@ void UiMovies(Context& h) {
   DrawWalkCases(h);
   QuadDrawCases(h);
   TreeDrawCases(h);
+  TrackPropertyCases(h);
+  ApplyTrackCases(h);
+  ApplyAnimationCases(h);
 }
 
 }  // namespace harness

@@ -11,6 +11,9 @@
 
 #include "guest.h"
 
+#include "base/log.h"
+#include "c_runtime/exit.h"
+
 #include <cstdint>
 #include <initializer_list>
 #include <optional>
@@ -27,19 +30,28 @@ inline uint32_t Entry(uint8_t* base, uint32_t object, uint32_t first_entry,
 }
 
 // sub_825A6508: a node track list's track i (16 bytes from +16).
-inline uint32_t NodeTrack(uint32_t list, uint32_t i) { return list + 16 * (i + 1); }
+inline uint32_t NodeTrack(uint32_t list, uint32_t i) {
+  ITC_NATIVE_RUNNING("sub_825A6508 NodeTrack");
+  return list + 16 * (i + 1);
+}
 // sub_825A6518: a key list's key i (32 bytes from +16).
-inline uint32_t Key(uint32_t list, uint32_t i) { return list + 32 * i + 16; }
+inline uint32_t Key(uint32_t list, uint32_t i) {
+  ITC_NATIVE_RUNNING("sub_825A6518 Key");
+  return list + 32 * i + 16;
+}
 // sub_825A6528: an animation's node track list i (from index [+32]).
 inline uint32_t NodeTrackList(uint8_t* base, uint32_t animation, uint32_t i) {
+  ITC_NATIVE_RUNNING("sub_825A6528 NodeTrackList");
   return Entry(base, animation, 64, 32, i);
 }
 // sub_825A6540: an animation's key list i (from index [+40]).
 inline uint32_t KeyList(uint8_t* base, uint32_t animation, uint32_t i) {
+  ITC_NATIVE_RUNNING("sub_825A6540 KeyList");
   return Entry(base, animation, 64, 40, i);
 }
 // sub_825A6558: an animation's sub-animation i (from index [+48]).
 inline uint32_t SubAnimation(uint8_t* base, uint32_t animation, uint32_t i) {
+  ITC_NATIVE_RUNNING("sub_825A6558 SubAnimation");
   return Entry(base, animation, 64, 48, i);
 }
 
@@ -47,6 +59,7 @@ inline uint32_t SubAnimation(uint8_t* base, uint32_t animation, uint32_t i) {
 // `textures` texture entries (16 * (textures + 2 * (vertex + 4))): the
 // indirect tracks' extra offset.
 inline uint32_t VertexOffset(uint32_t textures, uint32_t vertex) {
+  ITC_NATIVE_RUNNING("sub_8259D600 VertexOffset");
   return 16 * (textures + 2 * (vertex + 4));
 }
 // sub_8259D618: a primitive's texture entry i (16 bytes from +128).
@@ -169,6 +182,65 @@ std::optional<double> CubicFloat(uint8_t* base, uint32_t k0, uint32_t k1, double
 // sub_8259FC18: the same cubic on integer values, truncated (fctiwz).
 std::optional<uint32_t> CubicInteger(uint8_t* base, uint32_t k0, uint32_t k1, double t);
 
+// For ApplyTrack: a key function's original, called through the translated
+// code from ApplyTrack's original frame (the adapter's, hooks/ui_movies.cpp)
+// with r3 = k0, r4 = k1, f1 = t; returns its r3 and f1. For sub_8259FB30 and
+// sub_8259FC18 where CubicFloat and CubicInteger give nullopt, and
+// sub_8259FD40 and sub_8259FAA8 (type 2's cubic and eased keys), which
+// never ran in play and aren't ported.
+struct KeyResult {
+  uint64_t r3;
+  double f1;
+};
+using GuestKeyFunction = KeyResult (*)(void* user, uint32_t function, uint32_t k0, uint32_t k1,
+                                       double t);
+struct KeyCall {
+  GuestKeyFunction guest = nullptr;
+  void* user = nullptr;
+};
+
+// sub_825A0548 UiMovie::ApplyTrack: one track's value at t between keys k0
+// and k1 (0 for none: k0 the stand-in key at frame + 112, k1 then k0)
+// written into the node: the descriptor from TrackProperty (called as the
+// original calls it, `atexit` its atexit fallback), the target node + its
+// offset (+ VertexOffset([node + 112], [track + 12]) when indirect), set or
+// added by the descriptor's byte +8; type 0 a float, 1 and 2 integers
+// (signed and unsigned), 3 and up nothing. The value by the second key's
+// kind (+0): 0 step, 1 linear, 2 cubic, 3 eased, others zero. `frame` = the
+// original's frame (r1 - 224): the stand-in key is written there as the
+// original writes it (+112 0, +116 zero, +120 0 or the target's value when
+// the track sets it, +124 and +128 zero); its other stores (+80, +88, +96,
+// the saved registers) aren't written. Built as keys.cpp.
+void ApplyTrack(uint8_t* base, uint32_t node, uint32_t track, double t, uint32_t k0,
+                uint32_t k1, uint32_t frame, const c_runtime::AtexitCall& atexit,
+                const KeyCall& keys);
+
+// For ApplyAnimation: one track applied (UiMovie::ApplyTrack, sub_825A0548,
+// called through its override, which keeps --per_tick_ui_movie_tracks'
+// skips and --log_pause_movie's log), from the original's frame `frame` (the
+// level's r1 - 224) with r3 = node, r4 = track, f1 = t, r5 = k0, r6 = k1.
+using GuestTrackFunction = void (*)(void* user, uint32_t frame, uint32_t node, uint32_t track,
+                                    double t, uint32_t k0, uint32_t k1);
+struct TrackCall {
+  GuestTrackFunction call = nullptr;
+  void* user = nullptr;
+};
+
+// sub_825A08E0 UiMovie::ApplyAnimation (animation.cpp, built as keys.cpp):
+// for each node track list (NodeTrackList, [animation + 36] of them) and
+// each child of `node` with its id (+8), each track's keys around `time` (k
+// at or before the track's local time, time - its start +8, and `time`
+// itself before the next; before the first key none and it, at or after
+// the last it and none) and its t, clamped to 0..1 (0 for keys at the same
+// time), applied through `apply`; then each sub-animation (SubAnimation,
+// [animation + 52]) from its start (+24) at the time mapped from +24..+28
+// onto +32..+36, recursively on `node` (id +8 = 0) or its children with
+// that id, from the frame 224 bytes below. Returns 1 while playing (with
+// `loop`, time above 0; else time below the length +12), else 0. `frame` =
+// the original's frame (r1 - 224); none of its stores are made.
+uint32_t ApplyAnimation(uint8_t* base, uint32_t node, uint32_t animation, double time,
+                        uint32_t loop, uint32_t frame, const TrackCall& apply);
+
 // The drawing walk (draw.cpp).
 //
 // UiMovie::ApplyTransform (sub_8259E6C8): the node's transform applied to
@@ -283,5 +355,21 @@ std::optional<uint32_t> RecordQuad(uint8_t* base, uint32_t list, uint32_t quad, 
 extern const std::vector<uint32_t> kResetChunkSlots;
 uint32_t RecordClipReset(uint8_t* base, uint32_t list);
 uint32_t RecordStateReset(uint8_t* base, uint32_t list);
+
+// --- The tracks' properties (track_properties.cpp) ---
+
+// The 64 12-byte descriptors (+0 the node offset, +4 the type: 0 float, 1
+// and 2 integer, byte +8 set/add, byte +9 indirect).
+constexpr uint32_t kTrackProperties = 0x82970C28;
+
+// sub_8259FE68 UiMovie::TrackProperty: r3 = the property id; returns its
+// descriptor's address (id x 12 on the table, the full 64 bits). The first
+// call (guard bit 0 of 0x82970F28) clears the table and registers its
+// clean-up 0x825DB3F0 with atexit (through `call` when the native one
+// can't); the first with byte 0x82970C20 clear fills the 48 descriptors and
+// sets it. `frame` = the original's frame (r1 - 128): the +8 words' last two
+// bytes are its +90 and +91, as the original leaves them.
+uint64_t TrackProperty(uint8_t* base, uint64_t id, uint32_t frame,
+                       const c_runtime::AtexitCall& call);
 
 }  // namespace ui_movies

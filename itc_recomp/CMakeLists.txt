@@ -110,6 +110,8 @@ set(ITC_SOURCES
     src/hooks/ui_movies.cpp
     src/ui_movies/ui_movies.cpp
     src/ui_movies/keys.cpp
+    src/ui_movies/animation.cpp
+    src/ui_movies/track_properties.cpp
     src/ui_movies/recording.cpp
     src/ui_movies/draw.cpp
     src/ui_movies/files.cpp
@@ -164,6 +166,18 @@ set(ITC_SOURCES
     src/framework/framework.cpp
     src/framework/run_loop.cpp
     src/framework/main_loop.cpp
+    src/hooks/game_modes.cpp
+    src/game_modes/game_modes.cpp
+    src/game_modes/race_overlays_machine.cpp
+    src/hooks/mode_tick.cpp
+    src/hooks/minimap.cpp
+    src/mode_tick/mode_tick.cpp
+    src/minimap/minimap.cpp
+    src/hooks/models.cpp
+    src/models/memory_blocks.cpp
+    src/models/xpr.cpp
+    src/models/texture_provider.cpp
+    src/models/model.cpp
     src/hooks/screen_objects.cpp
     src/screen_objects/uv_trees.cpp
     src/screen_objects/screen_objects.cpp
@@ -199,6 +213,7 @@ set(ITC_SOURCES
     src/c_runtime/start_up.cpp
     src/c_runtime/parse.cpp
     src/c_runtime/arrays.cpp
+    src/c_runtime/exit.cpp
     src/game_data/game_data.cpp
     src/display/gamma.cpp
     src/harnesses/harness.cpp
@@ -246,6 +261,10 @@ set(ITC_SOURCES
     src/harnesses/screen_objects.cpp
     src/harnesses/hardcoded_shaders.cpp
     src/harnesses/framework.cpp
+    src/harnesses/game_modes.cpp
+    src/harnesses/mode_tick.cpp
+    src/harnesses/minimap.cpp
+    src/harnesses/models.cpp
     src/harnesses/action_mappers.cpp
     src/harnesses/data_tables.cpp
     src/harnesses/model_animation.cpp
@@ -256,11 +275,13 @@ set(ITC_SOURCES
     src/harnesses/sound_cues.cpp
     src/harnesses/xact.cpp
     src/harnesses/input.cpp
+    src/harnesses/c_runtime_exit.cpp
     src/helpers/debug_output.cpp
     src/helpers/object_attributes.cpp
     src/helpers/time.cpp
     src/helpers/clock.cpp
     src/helpers/strings.cpp
+    src/helpers/compare_string.cpp
     src/helpers/executable.cpp
     src/user/profile.cpp
     src/input/gamepads.cpp
@@ -324,6 +345,7 @@ set(ITC_SOURCES
 # drivers (src/ai_drivers/, docs/functions/ai-drivers.md) and the screen
 # objects (src/screen_objects/, docs/functions/screen-objects.md).
 set_source_files_properties(src/c_runtime/math.cpp src/ui_movies/keys.cpp
+    src/ui_movies/animation.cpp
     src/ui_movies/draw.cpp
     src/matrix_math/matrix_math.cpp src/car_physics/rigid_body.cpp
     src/car_physics/vehicle_step.cpp src/car_physics/vehicle_update.cpp

@@ -1167,6 +1167,13 @@ pose restored it) or not. On render-only passes, adding tracks run as
 usual when their target was put back, and are skipped otherwise, so adds
 that really pile up happen once a tick. Setting tracks always run. The
 movie's own bytes are still replayed as before (`--per_tick_ui_movies`).
+Since 2026-10-25 (B7's fifteenth loop run) the track itself is native
+(`UiMovie::ApplyTrack`, `ui_movies::ApplyTrack` in
+`src/ui_movies/keys.cpp`, `--native_ui_movies`): the override keeps its
+skips and its log and calls the native version instead of the original,
+and the native `UiMovie::ApplyAnimation` (`825A08E0`) sends each track
+through the override, so the skips still apply
+(`docs/functions/ui-movies.md`).
 
 Result (user, 2026-10-18, 144 fps, `itc_059.log`): **the arrow stops on
 its item, no pause menu flicker or overlap, and the race start countdown is

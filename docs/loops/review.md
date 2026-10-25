@@ -11,6 +11,197 @@ functions to check in a drive in the progress file.
 When the user has reviewed a run's section, its heading gets
 "(reviewed <date>)"; the section stays for the record.
 
+## Run 2026-10-25 03:59 (`b7-loop-25-10-26-2`)
+
+- `game-modes.md` (new, 7871fe6): 31 rows (3 moved from
+  `functions.md`, 28 new): the game's modes (`Mode::Create`,
+  `Modes::Tick`), the race mode (type 1, 167,264 bytes; constructor
+  `sub_821073B8`, destructor `sub_82107518`), its message dispatcher and
+  state machines (`StateMachine::Handle`, `Find`, `IndexOf`), the race
+  overlays' state machine set-up `sub_8215E6C8` (33 transitions listed)
+  and its four handlers, and the race-only `Buffer28::` functions in the
+  camera modes' range. `known-data.md`: the mode, race mode, state
+  machine and transition layouts, `0x826032DC`/`0x826032E0`,
+  `0x826C5B68`; the race flow's row now says it's the race mode's
+  +97548. `leads.md`: 2 leads added, notes on the camera modes and
+  framework objects leads.
+- `game-modes.md` migration 1 (21ff7d5..c504e59; `src/game_modes/`,
+  `src/hooks/game_modes.cpp`, harness `src/harnesses/game_modes.cpp`):
+  21 of 31 ours, `--native_game_modes`. For review:
+  - `RaceOverlaysMachine::Init` (`sub_8215E6C8`) replays the original's
+    377 stores and copies in the same stack frame (`r1 - 2272`, a table
+    read off the generated code), so the transitions get the same three
+    unwritten functor storage words (stack leftovers; nothing reads
+    them; as track zones did).
+  - `StateMachine::Find`'s default is returned as
+    `0xFFFFFFFF826C5B68` in r3 (sign-extended, as the original).
+  - `Transition::Make` (`sub_82105FE0`) and `Transition::Assign`
+    (`sub_82106100`) are Merged into `StateMachine::Add`; their own
+    harness cases went with them (Add's cover them).
+  - New names: `RaceOverlaysMachine::SetFlags`, `ClearFlags`,
+    `SetFlag820`, `ResetOverlays`, `Member67760::Member67760`,
+    `Member13360::Member13360`, `Buffers28::~Buffers28`.
+- `models.md` (f28c6f7): 16 new rows for the model class
+  (`Model::Model`, `~Model`, `Model::Release` read), the texture
+  provider and its `std::vector` helpers, `XPR::~XPR`, `XPR::Release`,
+  the put-off frees (`Memory::FreeLater`, `FreePhysicalLater`, the
+  pending frees list at `0x8296BD54`, freed by `sub_8258E1D8` each
+  pass); `memmove_s` in `c-runtime.md`. `known-data.md`: the texture
+  provider, the `XLMM` block header, `0x8296BD38`, `0x8296BD54`.
+  `leads.md`: one lead (`sub_820C5008`/`sub_820C5168`), notes on three.
+  The map stopped on the memory blocks' lock; the user's call
+  (2026-10-25): port it too (a host `std::mutex`).
+- `models.md` migration 1 (6148c1e..b35547a; `src/models/`,
+  `src/hooks/models.cpp`, harness `src/harnesses/models.cpp`): all 17
+  rows ours, `--native_models` (`memmove_s` under `--native_c_runtime`).
+  For review:
+  - The memory blocks' lock is a `std::recursive_mutex`, not a plain
+    `std::mutex`: the critical section it replaces is recursive, and the
+    harness holds it around its cases on the game's own pending-frees
+    list while the functions take it again. No user in play takes it
+    twice.
+  - Every user of `0x8296BD38` takes it: `FreeLater` and
+    `FreePhysicalLater` directly; the recompiled ones (`sub_8258DFF0`,
+    `sub_8258E098`, `sub_8258E138`, `sub_8258E1D8`) through `ScopedLock`
+    (`sub_8258E580`, `sub_8258E5B8`, `video-output.md`), overridden to
+    take the host lock for this critical section only (every other one
+    goes to `__imp__`). Host lock or guest critical section is chosen
+    once, from `--native_models` at the first call.
+  - New read-only helpers in the model animation code for
+    `Model::~Model`'s checks: `TrackSetReleasable`,
+    `SkeletonDestructible`.
+  - An `UninitializedCopy` harness case with a null destination was
+    fixed in the case (the original checks null per slot and writes
+    from address 4), noted in the row.
+- `game-modes.md` cleanup (no mapping; ce8d477..4ff0b54): 38 of 42
+  ours. For review:
+  - 11 new rows read on the way: `Mode::Create`'s mode constructors
+    (types 2-7, 9, 10, 12) and `MachineMember::MachineMember`
+    (`sub_82108160`); `sub_821077EC`, a piece of `Mode::Create`'s switch
+    in its stack frame, Merged into it; type 8 (`sub_82107670`, never
+    seen in play) still runs the original.
+  - `sub_82106A50`, `sub_82107168`, `sub_82108160` and the mode
+    constructors are Native with no adapter (only native code calls
+    them).
+  - `race-overlays.md`'s `RaceOverlays::Clear` (`sub_8215DE80`) adapter
+    removed (RaceMode::RaceMode its only caller in play).
+  - The pending-frees harness helpers moved to
+    `src/harnesses/pending_frees.h`, shared by the models and game modes
+    harnesses.
+  - The first batch's two groups in one commit (ce8d477); one counter
+    race for the six removals, each then built and committed alone.
+- `mode-tick.md` (new, 2a11eec): 23 rows, what `Modes::Tick` calls
+  besides the mode's slots: the per-mode settings (`Modes::SetChecks`,
+  `SetSceneTargetMode`, `Presence::SetForMode`, presence probably
+  Dropped at `Modes::Tick` by B5's call), the sign-in watch
+  (`SignInWatch::Update`, `CheckIdle`, `OnModeChange`; its nine prompt
+  handlers never ran, no rows), `Billboards::FlipRing`, the screen fades
+  (two layers at `0x826A50AC`), `Music::Play` (`BGM_SYSTEM`,
+  `bgm_tmp_01`-`17`). `game-modes.md`: `Modes::Modes` (`sub_821067F8`)
+  added. `known-data.md`: their fields and globals. `leads.md`: the save
+  data's creation and deletion. The lead's "loading screen" guess was
+  wrong. Also: `models.md`'s `TextureProvider::Clear` row reworded ("it
+  never reaches `memmove_s`") so `b7_status.py` doesn't read it as never
+  called.
+- `mode-tick.md` migration 1 (4975324..1897994; `src/mode_tick/`,
+  `src/hooks/mode_tick.cpp`, harness `src/harnesses/mode_tick.cpp`):
+  21 of 23 ours, `--native_mode_tick`; `Modes::Modes` under
+  `--native_game_modes`. For review:
+  - `Presence::SetForMode` Dropped (B5's presence call): no presence
+    set; only what's left once its wrapper `sub_82294F70` is dropped (the
+    last error cleared, r3 = 0) is kept, as the new mode's slot 0 after
+    it isn't read. `check_function_statuses.py` lists it under "to
+    check" for its fallback, as device-state's.
+  - `lstrcmpA` (`sub_82296130`) and `CompareStringA` (`sub_82297100`),
+    XAPI's, still recompiled with no rows: made plain C++ in
+    `src/helpers/compare_string.{h,cpp}` by B6's call for the pure
+    string helpers (as `MultiByteToWideChar`, and XAPI's memset in B7);
+    the agent asks the user to confirm that call reaches them. 2,000 and
+    1,000 harness cases, 0 differing.
+  - The sign-in watch's prompt states 1-9 (never seen in play) and the
+    trap paths run the original.
+  - Stack copies (the stage copy, the player's name, the color
+    rectangle, the music table) written into the original's frames; the
+    scene getters and render-queue submits as guest calls from frames
+    like the original's, as the cameras do.
+  - Map corrections: `ColorRect::Record` has one caller
+    (`ScreenFades::Update`); `CompareStringA` read in full.
+- `minimap.md` (new, f86ea54): 15 rows (`Minimap::Draw` moved from
+  `functions.md`, 14 new): the map's models, the point markers, the car
+  markers (an arrow in five colors by type: the player, a human or
+  rival-less racer, three rivals by player 0's save), the five stack
+  pools and the blink phase (`0x826C5AA8`, stepping every five calls);
+  `Minimap::Draw` stays Wrapped by `--per_tick_minimap_blink`;
+  `sub_820F2E68` is case 1 of `Minimap::RacerMarkerType`'s switch (no
+  row, ported with it). Also: `matrix-math.md`'s `sub_8209B038` (the
+  minimap forms its address for the marker pools), `course-scenery.md`'s
+  intro, a note on the course set's lists lead, `known-data.md` (the
+  blink clock, the colors, the marker triangles, `0x826C7824`, the race
+  manager's 28-byte entries, the course set's +1064 and +3180 lists).
+- `minimap.md` migration 1 (3d8e197, 20d9037; `src/minimap/`,
+  `src/hooks/minimap.cpp`, harness `src/harnesses/minimap.cpp`): 12 of
+  15 ours, `--native_minimap`. For review:
+  - Interpolation kept: `Primitive::RecordTransform` makes its product
+    where the original's call puts it and calls `BlendState_OnMultiply`
+    with return address 0x8217AEDC; `List80::Insert` calls
+    `BlendState_OnCopy` with 0x820F529C; `Minimap::Draw` (still
+    recompiled) keeps its `--per_tick_minimap_blink` wrap.
+  - To the original: with the command list's diagnostics on, an open
+    chunk or a full list; `sub_820F2CA8`'s branch (never seen in play;
+    its harness cases left out: on made-up data its chained records
+    recursed until the stack overflowed); `Triangle::Record`'s kind 1
+    (`sub_8217C4C0`, never seen in play).
+  - `Triangle::RecordFlat`'s render-queue submit a guest call from a
+    128-byte frame, as `ColorRect::RecordFlat`'s.
+  - `List80::Link` and `Triangle::RecordFlat` Native with no adapter.
+- The `atexit` step (no mapping, counted as subsystem 5 by the user's
+  call; 19f9deb..1244dd3): `atexit` and `_onexit` native in
+  `src/c_runtime/exit.cpp` under `--native_c_runtime`, then its callers
+  under their own flags. For review:
+  - The exit lock (the C runtime's lock 8, critical section
+    `0x82971248`) is one host `std::recursive_mutex`: `_onexit` takes it
+    directly; `_lock`/`_unlock` (`sub_825B3430`, `sub_825B32D0`) are
+    overridden to take it for lock 8 only (r3 left as the originals
+    leave it), every other number the game's; host or guest chosen once
+    at boot. Recursive because `doexit` holds it while the registered
+    functions run, which may call `atexit`. Nothing else touches entry 8
+    (made at boot; the lazy creator and the teardown don't).
+  - New rows in `c-runtime.md` for the lock wrappers and the exit path
+    (`sub_825AA218`, `sub_825AA318`, `sub_825AA338`, never seen in
+    play).
+  - Native callers register through `c_runtime::AtexitFrom`; the game's
+    `atexit` through `ctx` only where the native one can't run (never in
+    play).
+  - `std-string.md` corrected: the global strings' static set-ups'
+    addresses were misread (`0x8265EE7C`/`0x8265EE98`, clean-ups
+    `0x825DB328`/`0x825DB380`); the harness caught it.
+  - `UiMovie::TrackProperty`'s two stack-leftover bytes read from the
+    original's frame.
+  - The minimap's marker draws: the frame dump draws the same car marker
+    as the fallback, not pixel-identical only because the two dumps were
+    taken at different moments (the map shifted).
+  - Kept: `_lock`/`_unlock`'s adapters (they keep the exit lock's users
+    together) and `Triangle::Record`'s (a guest call through `ctx`).
+- The `atexit` step's migration 2 (8a0dd9e..9e046a9): for review:
+  - `UiMovie::ApplyTrack` (`sub_825A0548`, Wrapped -> Overridden):
+    plain C++ in `src/ui_movies/keys.cpp`; frame pacing's override in
+    `per_frame_logic.cpp` keeps its per-tick skips and calls it; the two
+    cubic key functions where the native ones give `nullopt`, and type
+    2's cubic and eased keys (never seen in play), go to the originals
+    through `ctx` from a frame like the original's; the stand-in first
+    key written in the original's frame.
+  - `UiMovie::ApplyAnimation` (`sub_825A08E0`): plain C++ in the new
+    `src/ui_movies/animation.cpp` (strict float settings); the
+    original's key search kept, quirk included (the next key compared
+    against the animation's time, not the track's local time);
+    sub-animations recursed 224 bytes lower a level; each track through
+    ApplyTrack's override, so the per-tick skips still apply. Its
+    harness runs the recompiled side with `--native_ui_movies` off.
+  - `__onexitinit` (probably; `sub_825A6F00`): new row in
+    `c-runtime.md`, over the native calloc.
+  - 11 adapters removed (wcscmp, TrackProperty, the key functions, the
+    UI movies' accessors).
+
 ## Run 2026-10-25 01:17 (`by-loop-25-10-26`)
 
 - `framework.md` (mapped in c4b5b86, last run; its rows are in that

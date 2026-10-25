@@ -9,9 +9,13 @@
 // --native_cameras off.
 
 #include "harness.h"
+#include "exit_table.h"
 
 #include "base/flags.h"
+#include "base/log.h"
+#include "c_runtime/exit.h"
 #include "cameras/cameras.h"
+#include "hooks/c_runtime.h"
 #include "command_list/command_list.h"
 #include "hooks/cameras.h"
 #include "hooks/heap.h"
@@ -27,6 +31,7 @@
 #include <functional>
 #include <iterator>
 #include <limits>
+#include <mutex>
 #include <cmath>
 #include <string>
 #include <vector>
@@ -1587,6 +1592,80 @@ void InitPassCases(Context& h) {
   results.Report();
 }
 
+// --- Viewports::Init (with Viewport::Init): on the game's viewports
+// pointer, camera pass 0's near plane, the three vectors and their guard,
+// and the exit table, each put back after a side; the new blocks compared
+// by their contents, then freed. ---
+
+void NativeViewportsInit(PPCContext& ctx, uint8_t* base) {
+  if (const auto viewport = hooks::ViewportsInit(ctx, base)) {
+    ctx.r3.u64 = *viewport;
+  } else {
+    __imp__sub_820AB358(ctx, base);
+  }
+}
+
+void ViewportsInitCases(Context& h) {
+  Results results("sub_820AB358 Viewports::Init, sub_820AAFF0 Viewport::Init");
+  if (!hooks::NativeHeapActive() || !hooks::NativeAtexit()) {
+    ITC_LOG_WARN("harness: cameras: --native_heap or native atexit off: Viewports::Init's "
+                 "cases skipped");
+    return;
+  }
+  std::lock_guard<std::recursive_mutex> lock(c_runtime::ExitMutex());
+  constexpr uint32_t kVectors = 0x826C2CF0, kVectorBytes = 0x34;  // to the guard, 0x826C2D20
+  constexpr uint32_t kNear = 0x826BAC00 + 384;
+  const uint32_t saved_viewports = guest::LoadU32(h.base, cm::kViewports);
+  const uint32_t saved_near = guest::LoadU32(h.base, kNear);
+  const auto saved_vectors = Read(h.base, kVectors, kVectorBytes);
+  for (int c = 0; c < 12; c++) {
+    // 0-1: as the game has them (made); then each guard bit cleared at
+    // random over random bytes.
+    std::vector<uint8_t> vectors = saved_vectors;
+    if (c >= 2) {
+      for (auto& byte : vectors) {
+        byte = uint8_t(h.random.Next());
+      }
+      uint32_t guard = uint32_t(h.random.Next());
+      if (c == 2) {
+        guard &= ~7u;
+      }
+      for (int k = 0; k < 4; k++) {
+        vectors[0x30 + k] = uint8_t(guard >> (24 - 8 * k));
+      }
+    }
+    const uint32_t near_plane = c >= 2 ? uint32_t(h.random.Next()) : saved_near;
+    Outputs out[2];
+    for (int v = 0; v < 2; v++) {
+      Write(h.base, kVectors, vectors.data(), kVectorBytes);
+      guest::StoreU32(h.base, kNear, near_plane);
+      const uint32_t mark = exit_table::Mark(h.base);
+      PPCContext t = CallContext(h);
+      (v == 0 ? __imp__sub_820AB358 : NativeViewportsInit)(t, h.base);
+      const uint32_t block = guest::LoadU32(h.base, cm::kViewports);
+      const uint32_t first = guest::LoadU32(h.base, block);
+      const uint32_t second = guest::LoadU32(h.base, block + 4);
+      out[v].Word(guest::LoadU32(h.base, block + 8));
+      out[v].Bytes(Read(h.base, first, 1872));
+      out[v].Bytes(Read(h.base, second, 1872));
+      out[v].Word(t.r3.u32 == second);
+      out[v].Word(uint32_t(t.r3.u64 >> 32));
+      out[v].Word(guest::LoadU32(h.base, kNear));
+      out[v].Bytes(Read(h.base, kVectors, kVectorBytes));
+      exit_table::Take(h.base, mark, out[v]);
+      memory::FreePages(first);
+      memory::FreePages(second);
+      memory::FreePages(block);
+    }
+    guest::StoreU32(h.base, cm::kViewports, saved_viewports);
+    results.Check(out[0], out[1], fmt::format("case {}", c));
+  }
+  guest::StoreU32(h.base, cm::kViewports, saved_viewports);
+  guest::StoreU32(h.base, kNear, saved_near);
+  Write(h.base, kVectors, saved_vectors.data(), kVectorBytes);
+  results.Report();
+}
+
 void Cameras(Context& h) {
   SetFieldOfViewCases(h);
   BuildProjectionCases(h);
@@ -1606,6 +1685,7 @@ void Cameras(Context& h) {
   SetUpSurfacesCases(h);
   InitPassCases(h);
   PassesInitCases(h);
+  ViewportsInitCases(h);
 }
 
 }  // namespace harness

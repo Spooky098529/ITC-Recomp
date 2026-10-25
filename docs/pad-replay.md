@@ -33,7 +33,9 @@ itc_recomp/tools/scripted_run.sh <recording> [extra flags]
 ```
 
 It starts the game with the standard flags, `--log_level=info` and
-`--skip_intro`, waits for the boot's first draw ("called from 8248466C" in
+`--skip_intro`, waits for the boot's first draw (its first resolve, "Resolve (822AFA58)
+called from 8258D9E8"; "called from 8248466C", the movie library's draw,
+until the movies moved to our FFmpeg on 2026-10-25, in
 the log; if it doesn't come in 30 s, the boot stalled and the game is
 restarted once), waits `PAD_DELAY` seconds (3), and runs `pad_play.py`.
 The game is closed 5 s after the last input (or, if it hangs, the

@@ -171,6 +171,11 @@ void NativeStrcpyS(PPCContext& ctx, uint8_t* base) {
   ctx.r3.u64 = 0;
 }
 
+// wcscmp: r3, r4 = UTF-16 strings; returns -1, 0 or 1.
+void NativeWcscmp(PPCContext& ctx, uint8_t* base) {
+  ctx.r3.s64 = c_runtime::Wcscmp(base, ctx.r3.u32, ctx.r4.u32);
+}
+
 // __ascii_strnicmp: r3, r4 = strings, r5 = count.
 void NativeAsciiStrnicmp(PPCContext& ctx, uint8_t* base) {
   ctx.r3.s64 = c_runtime::AsciiStrnicmp(base, ctx.r3.u32, ctx.r4.u32, ctx.r5.u32);
@@ -654,7 +659,7 @@ void CRuntime(Context& h) {
                          t.r3.u64 = first;
                          t.r4.u64 = second;
                        },
-                       __imp__sub_825A7EB0, sub_825A7EB0,
+                       __imp__sub_825A7EB0, NativeWcscmp,
                        fmt::format("length {} offset {} other {} order {}", length, offset, o,
                                    order));
           }
@@ -1453,6 +1458,72 @@ void CRuntime(Context& h) {
       move_case(h.data + places.page_end - 3, h.data + 64 + 1, size);
       move_case(h.data + places.page_end - 3, h.data + places.page_end - 9, size);
     }
+    results.Report();
+  }
+
+  // memmove_s (sub_825A7348): counts of 0, below and at the size, the
+  // destination below, at and above the source, apart and overlapping, at
+  // several alignments and across a page end; a count above the size and
+  // null buffers only with a count of 0 (the error paths, _errno and
+  // _invalid_parameter, never ran in play). The plain C++ (falling back to
+  // the original where it refuses, as its adapter) against the original;
+  // the scratch area and r3 compared exactly.
+  {
+    Results results("memmove_s (sub_825A7348)");
+    const auto native = [](PPCContext& t, uint8_t* base) {
+      if (const auto r3 = c_runtime::MemmoveS(base, t.r3.u32, t.r4.u32, t.r5.u32, t.r6.u32)) {
+        t.r3.u64 = *r3;
+      } else {
+        __imp__sub_825A7348(t, base);
+      }
+    };
+    auto move_s = [&](uint32_t to, uint32_t size, uint32_t from, uint32_t count) {
+      const auto bytes = RandomBytes(h, count + 16);
+      Outputs out[2];
+      for (int v = 0; v < 2; v++) {
+        Fill(h.base, h.data, kScratchBytes);
+        if (from != 0) {
+          Write(h.base, from - 8, bytes.data(), count + 16);
+        }
+        PPCContext t = CallContext(h);
+        t.r3.u64 = to;
+        t.r4.u64 = size;
+        t.r5.u64 = from;
+        t.r6.u64 = count;
+        if (v == 0) {
+          __imp__sub_825A7348(t, h.base);
+        } else {
+          native(t, h.base);
+        }
+        out[v].Bytes(Read(h.base, h.data, kScratchBytes));
+        out[v].Word(t.r3.u32);
+        out[v].Word(uint32_t(t.r3.u64 >> 32));
+      }
+      results.Check(out[0], out[1],
+                    fmt::format("to +{} size {} from +{} count {}", to - h.data, size,
+                                from - h.data, count));
+    };
+    for (uint32_t count : {0u, 1u, 3u, 4u, 8u, 17u, 64u, 200u, 1000u}) {
+      for (uint32_t extra : {0u, 1u, 50u}) {
+        for (uint32_t a = 0; a < 4; a++) {
+          move_s(h.data + 2048 + a, count + extra, h.data + 64 + 3 - a, count);
+          move_s(h.data + 64 + a, count + extra, h.data + 2048 + 3 - a, count);
+        }
+      }
+      move_s(h.data + 1024, count, h.data + 1024, count);
+      for (uint32_t k : {1u, 4u, 9u, 16u}) {
+        move_s(h.data + 1024 + k, count, h.data + 1024, count);
+        move_s(h.data + 1024, count, h.data + 1024 + k, count);
+      }
+    }
+    for (uint32_t count : {5u, 64u, 200u}) {
+      move_s(h.data + places.page_end - 3, count, h.data + 64 + 1, count);
+      move_s(h.data + places.page_end - 3, count, h.data + places.page_end - 9, count);
+    }
+    // A count of 0 returns 0 before anything is checked.
+    move_s(0, 0, 0, 0);
+    move_s(h.data + 64, 0, 0, 0);
+    move_s(0, 5, h.data + 64, 0);
     results.Report();
   }
 

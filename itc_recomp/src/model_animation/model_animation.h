@@ -110,6 +110,12 @@ bool SkeletonDestruct(uint8_t* base, uint32_t skeleton);
 // Skeleton::FreeNodeValues (sub_825997A0): +176 freed and cleared.
 bool SkeletonFreeNodeValues(uint8_t* base, uint32_t skeleton);
 
+// For native callers checking before they free (nothing changed): whether
+// TrackSetReleaseArray (`array`) or TrackSetRelease would free the set's
+// values natively, and whether SkeletonDestruct would.
+bool TrackSetReleasable(uint8_t* base, uint32_t set, bool array);
+bool SkeletonDestructible(uint8_t* base, uint32_t skeleton);
+
 // SkeletonCursor::Clear (sub_825A2068): +0, +4, +8, +16 = 0, +12 = 0.0.
 void SkeletonCursorClear(uint8_t* base, uint32_t cursor);
 // SkeletonCursor::View (sub_825A2090): as TrackSet::View, +16 = 0.

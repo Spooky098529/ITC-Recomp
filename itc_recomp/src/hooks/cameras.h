@@ -5,6 +5,8 @@
 
 #include "guest.h"
 
+#include <optional>
+
 #include <array>
 #include <vector>
 
@@ -89,5 +91,13 @@ void CameraPassRecordViewport(PPCContext& ctx, uint8_t* base);
 // RecordClear (sub_8209FA38)'s adapter's work, without the flag: r4 = the
 // key, r5 = the flags, r6 = the color, r7 = the depth (for the harness).
 void RecordClear(PPCContext& ctx, uint8_t* base);
+
+// Viewports::Init (sub_820AB358) natively, without the flag: from frames
+// like the originals' (112 and Viewport::Init's 160 below it), the video
+// output's slots as guest calls with Viewport::Init's return addresses, and
+// atexit through the game's only where the native one can't. Returns the
+// second viewport (r3 left for the caller); nullopt, with nothing done,
+// where the original must run (cameras::ViewportsInit's).
+std::optional<uint32_t> ViewportsInit(PPCContext& ctx, uint8_t* base);
 
 }  // namespace hooks

@@ -8,18 +8,18 @@
 
 #include "base/flags.h"
 #include "base/log.h"
+#include "hooks/c_runtime.h"
 #include "hooks/guest_call.h"
 #include "hooks/ui_movies.h"
 #include "ui_movies/ui_movies.h"
 
 ITC_FLAG_BOOL(native_ui_movies, true, "ITC",
               "Run the UI movie library's functions (the movies the HUD and the menus are made "
-              "of: the accessors sub_825A6508, sub_825A6518, sub_825A6528, sub_825A6540, "
-              "sub_825A6558, sub_8259D600, sub_8259D618, sub_8259D628, sub_8259D648, "
+              "of: the accessors "
+              "sub_8259D618, sub_8259D628, sub_8259D648, "
               "UiMovie::Child sub_8259D658 and sub_8259D670; the chunk and file helpers "
               "sub_8259D5C8, sub_825A0EB0 and sub_825A0CD0; UiMovie::SetRenderer sub_8259D798; "
-              "the draw context reset sub_8259D930; the keys sub_8259FA20, sub_8259FB30 and "
-              "sub_8259FC18; the recorders sub_8259DAD0, sub_8259E098 and sub_8259D7B0; the "
+              "the draw context reset sub_8259D930; the recorders sub_8259DAD0, sub_8259E098 and sub_8259D7B0; the "
               "file fix-ups sub_825A0CF8 with sub_825A0C60, and UiMovie::FixUpFile "
               "sub_825A0EF0 with sub_825A0E40, sub_825A0ED8, sub_8259D688 and sub_825A6570, "
               "the helpers without adapters (the flag switches their callers); "
@@ -30,7 +30,12 @@ ITC_FLAG_BOOL(native_ui_movies, true, "ITC",
               "UiMovie::DrawNode sub_8259F848, UiMovie::ApplyTransform sub_8259E6C8 with "
               "sub_8259D730, the draw context copy sub_8259D9F8, the queued texts' copy "
               "sub_8259E620, append sub_8259F700 (its grow the original's) and "
-              "UiMovie::QueueText sub_8259F770) "
+              "UiMovie::QueueText sub_8259F770; UiMovie::ApplyAnimation sub_825A08E0 (its tracks "
+              "through sub_825A0548's override; the accessors only it calls, without adapters: "
+              "sub_825A6508, sub_825A6518, sub_825A6528, sub_825A6540, sub_825A6558); UiMovie::ApplyTrack sub_825A0548, with native "
+              "atexit, and under it, without adapters (the flag switches ApplyTrack), "
+              "UiMovie::TrackProperty sub_8259FE68, the keys sub_8259FA20, sub_8259FB30 "
+              "and sub_8259FC18, and the accessor sub_8259D600) "
               "natively instead of through the translated code (same results; checked by "
               "--run_harnesses=ui_movies)");
 
@@ -62,12 +67,6 @@ bool SlotDiagnostics() {
     ctx.r3.u64 = (expression);                    \
   }
 
-UI_MOVIE_ACCESSOR(825A6508, ui_movies::NodeTrack(object, i))
-UI_MOVIE_ACCESSOR(825A6518, ui_movies::Key(object, i))
-UI_MOVIE_ACCESSOR(825A6528, ui_movies::NodeTrackList(base, object, i))
-UI_MOVIE_ACCESSOR(825A6540, ui_movies::KeyList(base, object, i))
-UI_MOVIE_ACCESSOR(825A6558, ui_movies::SubAnimation(base, object, i))
-UI_MOVIE_ACCESSOR(8259D600, ui_movies::VertexOffset(object, i))
 UI_MOVIE_ACCESSOR(8259D618, ui_movies::PrimitiveTexture(object, i))
 UI_MOVIE_ACCESSOR(8259D628, ui_movies::PrimitiveVertex(base, object, i))
 UI_MOVIE_ACCESSOR(8259D648, ui_movies::PictureTexture(object, i))
@@ -136,47 +135,9 @@ extern "C" REX_FUNC(sub_8259D930) {
   ui_movies::ResetDrawContext(base, ctx.r3.u32);
 }
 
-// The keys: r3, r4 = the two keys, f1 = t.
-// sub_8259FA20: an integer track's eased value in r3.
-extern "C" REX_FUNC(sub_8259FA20) {
-  REX_FUNC_PROLOGUE();
-  if (!ITC_FLAG(native_ui_movies)) {
-    __imp__sub_8259FA20(ctx, base);
-    return;
-  }
-  ctx.fpscr.disableFlushMode();
-  ctx.r3.u64 = ui_movies::EaseInteger(base, ctx.r3.u32, ctx.r4.u32, ctx.f1.f64);
-}
+// The keys (sub_8259FA20, sub_8259FB30, sub_8259FC18) have no adapters:
+// only the native ApplyTrack reaches them in play.
 
-// sub_8259FB30: a float track's value in f1. r3 and r4, which tan leaves
-// as its second _ctrlfp does, aren't read by the one caller (sub_825A0548)
-// and are left as they were.
-extern "C" REX_FUNC(sub_8259FB30) {
-  REX_FUNC_PROLOGUE();
-  if (ITC_FLAG(native_ui_movies)) {
-    ctx.fpscr.disableFlushMode();
-    if (const std::optional<double> value =
-            ui_movies::CubicFloat(base, ctx.r3.u32, ctx.r4.u32, ctx.f1.f64)) {
-      ctx.f1.f64 = *value;
-      return;
-    }
-  }
-  __imp__sub_8259FB30(ctx, base);
-}
-
-// sub_8259FC18: an integer track's cubic value in r3.
-extern "C" REX_FUNC(sub_8259FC18) {
-  REX_FUNC_PROLOGUE();
-  if (ITC_FLAG(native_ui_movies)) {
-    ctx.fpscr.disableFlushMode();
-    if (const std::optional<uint32_t> value =
-            ui_movies::CubicInteger(base, ctx.r3.u32, ctx.r4.u32, ctx.f1.f64)) {
-      ctx.r3.u64 = *value;
-      return;
-    }
-  }
-  __imp__sub_8259FC18(ctx, base);
-}
 
 namespace {
 // Hands a recorded chunk to the renderer (vtable slot 4: r3 = the renderer,
@@ -452,3 +413,108 @@ void RestorePose(PPCContext& ctx, uint8_t* base) {
                                       ctx.r7.u32);
 }
 }  // namespace ui_movies_hooks
+
+namespace {
+// ApplyTrack's key functions through the translated code (ui_movies::KeyCall),
+// from a frame like the original's (224 bytes) with its return addresses.
+struct GuestKeys {
+  PPCContext& ctx;
+  uint8_t* base;
+  ui_movies::KeyCall Call() { return {&GuestKeys::Run, this}; }
+  static ui_movies::KeyResult Run(void* self, uint32_t function, uint32_t k0, uint32_t k1,
+                                  double t) {
+    auto& keys = *static_cast<GuestKeys*>(self);
+    PPCContext& ctx = keys.ctx;
+    uint8_t* base = keys.base;
+    uint32_t return_address = 0;
+    switch (function) {
+      case 0x8259FB30: return_address = 0x825A0840; break;
+      case 0x8259FC18: return_address = 0x825A0700; break;
+      case 0x8259FD40: return_address = 0x825A0670; break;
+      case 0x8259FAA8: return_address = 0x825A065C; break;
+      default: ITC_LOG_ERROR("ui_movies: ApplyTrack: no key function {:08X}", function); return {};
+    }
+    const uint64_t lr = ctx.lr;
+    guest_call::InFrame(ctx, base, 224, return_address, [&](uint32_t) {
+      ctx.r3.u64 = k0;
+      ctx.r4.u64 = k1;
+      ctx.fpscr.disableFlushMode();
+      ctx.f1.f64 = t;
+      switch (function) {
+        case 0x8259FB30: __imp__sub_8259FB30(ctx, base); break;
+        case 0x8259FC18: __imp__sub_8259FC18(ctx, base); break;
+        case 0x8259FD40: sub_8259FD40(ctx, base); break;
+        default: sub_8259FAA8(ctx, base); break;
+      }
+    });
+    ctx.lr = lr;
+    return {ctx.r3.u64, ctx.f1.f64};
+  }
+};
+}  // namespace
+
+namespace ui_movies_hooks {
+void ApplyTrackNative(PPCContext& ctx, uint8_t* base) {
+  ctx.fpscr.disableFlushMode();
+  hooks::GuestAtexit atexit{ctx, base};
+  GuestKeys keys{ctx, base};
+  ui_movies::ApplyTrack(base, ctx.r3.u32, ctx.r4.u32, ctx.f1.f64, ctx.r5.u32, ctx.r6.u32,
+                        ctx.r1.u32 - 224, atexit.Call(), keys.Call());
+}
+
+void ApplyTrack(PPCContext& ctx, uint8_t* base) {
+  if (!ITC_FLAG(native_ui_movies) || !hooks::NativeAtexit()) {
+    __imp__sub_825A0548(ctx, base);
+    return;
+  }
+  ApplyTrackNative(ctx, base);
+}
+}  // namespace ui_movies_hooks
+
+namespace {
+// ApplyAnimation's tracks (ui_movies::TrackCall): sub_825A0548 (its override)
+// from the level's frame, with the original's return address.
+struct GuestTracks {
+  PPCContext& ctx;
+  uint8_t* base;
+  ui_movies::TrackCall Call() { return {&GuestTracks::Run, this}; }
+  static void Run(void* self, uint32_t frame, uint32_t node, uint32_t track, double t,
+                  uint32_t k0, uint32_t k1) {
+    auto& tracks = *static_cast<GuestTracks*>(self);
+    PPCContext& ctx = tracks.ctx;
+    uint8_t* base = tracks.base;
+    const uint64_t stack = ctx.r1.u64, lr = ctx.lr;
+    ctx.r1.u64 = frame;
+    ctx.r3.u64 = node;
+    ctx.r4.u64 = track;
+    ctx.r5.u64 = k0;
+    ctx.r6.u64 = k1;
+    ctx.fpscr.disableFlushMode();
+    ctx.f1.f64 = t;
+    ctx.lr = 0x825A0AF4;
+    sub_825A0548(ctx, base);
+    ctx.r1.u64 = stack;
+    ctx.lr = lr;
+  }
+};
+}  // namespace
+
+void ui_movies_hooks::ApplyAnimationNative(PPCContext& ctx, uint8_t* base) {
+  ctx.fpscr.disableFlushMode();
+  GuestTracks tracks{ctx, base};
+  const uint32_t node = ctx.r3.u32, animation = ctx.r4.u32, loop = ctx.r6.u32;
+  const double time = ctx.f1.f64;
+  ctx.r3.u64 =
+      ui_movies::ApplyAnimation(base, node, animation, time, loop, ctx.r1.u32 - 224, tracks.Call());
+}
+
+// UiMovie::ApplyAnimation: r3 = the node, r4 = the animation, f1 = the time,
+// r6 = loop; r3 = 1 while playing.
+extern "C" REX_FUNC(sub_825A08E0) {
+  REX_FUNC_PROLOGUE();
+  if (!ITC_FLAG(native_ui_movies)) {
+    __imp__sub_825A08E0(ctx, base);
+    return;
+  }
+  ui_movies_hooks::ApplyAnimationNative(ctx, base);
+}

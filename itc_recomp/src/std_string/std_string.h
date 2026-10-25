@@ -26,6 +26,8 @@
 
 #pragma once
 
+#include "c_runtime/exit.h"
+
 #include <cstdint>
 #include <optional>
 
@@ -134,5 +136,16 @@ uint32_t Find(uint8_t* base, uint32_t string, uint32_t pattern, uint32_t offset_
 // one: replace (sub_82592E18) never ran in play, so the original runs.
 std::optional<uint32_t> ReplaceAll(uint8_t* base, uint32_t string, uint32_t pattern,
                                    uint32_t frame);
+
+// --- Static set-ups (the start-up's initializer table, no direct callers) ---
+
+// sub_825DA540: the global string at 0x8265EE7C = the 9 characters at
+// 0x8206CC74 (AssignText), its clean-up 0x825DB328 registered with atexit
+// (through `call` when the native one can't); returns atexit's r3. nullopt,
+// with nothing done, where AssignText hands the original the work.
+std::optional<int32_t> InitGlobalString8265EE7C(uint8_t* base, const c_runtime::AtexitCall& call);
+// sub_825DA580: the same for the string at 0x8265EE98, 13 characters from
+// 0x8206CC80, its clean-up 0x825DB380.
+std::optional<int32_t> InitGlobalString8265EE98(uint8_t* base, const c_runtime::AtexitCall& call);
 
 }  // namespace std_string

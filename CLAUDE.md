@@ -256,6 +256,22 @@ read a wild address (exposed when the hardcoded shaders moved the
 harness's block) was fixed on the way (dbc8ee0); the rest waits on
 `Framework::Init`'s services, `sub_824936E8` and `sub_8258E1D8`'s
 critical section.
+Its fifteenth run (`b7-loop-25-10-26-2`, 2026-10-25, not yet merged;
+summary `docs/loops/b7-loop-2026-10-25-0359.md`; 5 subsystems, the
+user's limit for it) made the game modes, the model class, the mode
+tick, the minimap's parts and `atexit` with what it unblocked native as
+far as they were ready (`game-modes.md`, `models.md`, `mode-tick.md`,
+`minimap.md`, `c-runtime.md`; `--native_game_modes`, `--native_models`,
+`--native_mode_tick`, `--native_minimap`; `atexit` and the UI movies'
+animation under `--native_c_runtime` and `--native_ui_movies`; ours
+1,903 -> 2,013). Two kernel critical sections became host mutexes by
+the user's call (the memory blocks' lock `0x8296BD38`; the C runtime's
+exit lock), taken by every user, as `Edram::Alloc`'s; the loop now
+follows the user's earlier calls without asking again ("Precedent
+first" in `docs/loops/b7-loop.md`); `scripted_run.sh`'s boot marker
+was fixed (it waited for the movie library's draw, gone since the
+FFmpeg movies). The rest waits on the race mode's set-ups, the course
+set's lists, the save data's creation and the kernel objects' set-ups.
 Harness runs use `attract_race.sh 40` (the user's call,
 2026-10-23); a race short only because the harnesses took longer is
 no halt.
@@ -396,7 +412,9 @@ find /dev/shm -maxdepth 1 -user "$USER" -name 'xenia_memory_*' -delete
   when `<dir>/now` appears). The attract mode puts a random sepia or
   grayscale filter over the screen: a gray or brown frame from an attract
   race is the game's, not a rendering bug. Never screenshot the user's desktop. Without the GPU plugin, `--skip_intro` sometimes
-  stalls the boot (no "called from 8248466C" in the log): restart it.
+  stalls the boot (no "Resolve (822AFA58) called from 8258D9E8" in the
+  log; "called from 8248466C" before the movies moved to our FFmpeg):
+  restart it.
 - `itc_recomp/tools/attract_race.sh <seconds> [flags]` runs such a race
   with the standard flags and prints the log's path, the seconds raced,
   error lines and harness results. `--run_harnesses=all` (or a list)
