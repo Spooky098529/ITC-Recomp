@@ -84,8 +84,15 @@ file's history. What's left to see in a drive, from every run:
   rows, 1 moved; f86ea54): `Minimap::Draw` (the map's models, point
   markers, car markers in five colors, the flashing by a blink phase;
   Wrapped by `--per_tick_minimap_blink`, to keep) and its parts. Map
-  checked (0 errors, 15 of 15 in play, 9 ready groups). Step: migration
-  agent 1 running.
+  checked (0 errors, 15 of 15 in play, 9 ready groups). Migration 1
+  done (3d8e197, 20d9037: the race manager's lookups, the marker type,
+  scaling, triangles, the 80-slot lists, the transform and the
+  triangles' records; 12 of 15 ours; `--native_minimap`; interpolation's
+  `BlendState_OnMultiply`/`OnCopy` kept, `Minimap::Draw`'s wrap
+  untouched; `itc_1645`: 27 s, 0 errors, every harness 0 differing; the
+  minimap's frame dump pixel-identical with the fallback). Nothing ready
+  left; the rest waits on `atexit` and the course set's lists. Step:
+  validation agent running.
 
 ## Done
 
@@ -125,6 +132,8 @@ This run's groups: `expected-differences.md` (the "03:59 run" lines).
 - Start: ours 1903, work left 4548 (wrapped 111, known 597, unknown 3840).
 - After the game modes' map: ours 1903, work left 4548 (wrapped 111,
   known 625, unknown 3812).
+- After the minimap's migration 1: ours 1995, work left 4456 (wrapped
+  111, known 599, unknown 3746).
 - After the minimap's map: ours 1983, work left 4468 (wrapped 111,
   known 611, unknown 3746).
 - After the mode tick's validation: race 27 s (`itc_1639`), 0 errors,

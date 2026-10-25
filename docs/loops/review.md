@@ -138,6 +138,22 @@ When the user has reviewed a run's section, its heading gets
   intro, a note on the course set's lists lead, `known-data.md` (the
   blink clock, the colors, the marker triangles, `0x826C7824`, the race
   manager's 28-byte entries, the course set's +1064 and +3180 lists).
+- `minimap.md` migration 1 (3d8e197, 20d9037; `src/minimap/`,
+  `src/hooks/minimap.cpp`, harness `src/harnesses/minimap.cpp`): 12 of
+  15 ours, `--native_minimap`. For review:
+  - Interpolation kept: `Primitive::RecordTransform` makes its product
+    where the original's call puts it and calls `BlendState_OnMultiply`
+    with return address 0x8217AEDC; `List80::Insert` calls
+    `BlendState_OnCopy` with 0x820F529C; `Minimap::Draw` (still
+    recompiled) keeps its `--per_tick_minimap_blink` wrap.
+  - To the original: with the command list's diagnostics on, an open
+    chunk or a full list; `sub_820F2CA8`'s branch (never seen in play;
+    its harness cases left out: on made-up data its chained records
+    recursed until the stack overflowed); `Triangle::Record`'s kind 1
+    (`sub_8217C4C0`, never seen in play).
+  - `Triangle::RecordFlat`'s render-queue submit a guest call from a
+    128-byte frame, as `ColorRect::RecordFlat`'s.
+  - `List80::Link` and `Triangle::RecordFlat` Native with no adapter.
 
 ## Run 2026-10-25 01:17 (`by-loop-25-10-26`)
 
