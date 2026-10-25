@@ -6,8 +6,12 @@
 #include "base/log.h"
 #include "guest.h"
 #include "c_runtime/strings.h"
+#include "command_list/command_list.h"
 #include "hooks/last_error.h"
 #include "vehicle_accessors/vehicle_accessors.h"
+
+#include <climits>
+#include <cmath>
 
 namespace mode_tick {
 
@@ -65,6 +69,227 @@ void ScreenFadesFadeOut(uint8_t* base, uint32_t passes, uint32_t red, uint32_t g
   guest::StoreU32(base, kFadeAlphas + word, 0);
   guest::StoreU32(base, color + 4, green);
   guest::StoreU32(base, color + 8, blue);
+}
+
+namespace {
+
+// fctiwz's answer as the translated code computes it (a NaN 0x80000000, at
+// or above INT_MAX INT_MAX, else truncated: below INT_MIN 0x80000000).
+uint32_t ToInt(double value) {
+  if (std::isnan(value)) {
+    return 0x80000000u;
+  }
+  if (value >= double(INT_MAX)) {
+    return uint32_t(INT_MAX);
+  }
+  if (value <= double(INT_MIN) - 1.0) {
+    return 0x80000000u;
+  }
+  return uint32_t(int32_t(value));
+}
+
+// 255.0 / duration × count, as the original's fdivs and fmuls (single
+// rounding each), truncated.
+uint32_t FadeAlpha(uint8_t* base, int32_t duration, int32_t count) {
+  const double scale = double(guest::LoadFloat(base, 0x82000C44));  // 255.0
+  const double d = double(float(double(duration)));
+  const double c = double(float(double(count)));
+  return ToInt(double(float(double(float(scale / d)) * c)));
+}
+
+// A layer's counts stepped: the in count (the alpha down from 255), then
+// the out count (the alpha up to 255, held there at 0).
+void StepFade(uint8_t* base, uint32_t layer) {
+  const uint32_t word = 4 * layer;
+  int32_t count = int32_t(guest::LoadU32(base, kFadeInCounts + word));
+  if (count > 0) {
+    const int32_t duration = int32_t(guest::LoadU32(base, kFadeInDurations + word));
+    count--;
+    guest::StoreU32(base, kFadeInCounts + word, uint32_t(count));
+    guest::StoreU32(base, kFadeAlphas + word, FadeAlpha(base, duration, count));
+  }
+  count = int32_t(guest::LoadU32(base, kFadeOutCounts + word));
+  if (count > 0) {
+    count--;
+    guest::StoreU32(base, kFadeOutCounts + word, uint32_t(count));
+    if (count == 0) {
+      guest::StoreU32(base, kFadeAlphas + word, 255);
+    } else {
+      const int32_t duration = int32_t(guest::LoadU32(base, kFadeOutDurations + word));
+      guest::StoreU32(base, kFadeAlphas + word,
+                      FadeAlpha(base, duration, int32_t(uint32_t(duration) - uint32_t(count))));
+    }
+  }
+}
+
+// The layer's color rectangle at `rect`, in the original's store order (its
+// matrix rows are vector stores, at 16-byte aligned addresses, over the
+// 1.0s it stores at +12, +28, +44 and +60 first).
+void BuildFadeRect(uint8_t* base, uint32_t rect, uint32_t layer) {
+  const uint32_t one = guest::LoadU32(base, 0x82000A30);  // 1.0
+  for (uint32_t row = 0; row < 4; row++) {
+    guest::StoreU32(base, rect + 16 * row + 12, one);
+  }
+  const uint32_t color = kFadeColors + 12 * layer;
+  const uint32_t red = guest::LoadU32(base, color);
+  for (uint32_t row = 0; row < 4; row++) {
+    const uint32_t at = (rect + 16 * row) & ~0xFu;
+    for (uint32_t i = 0; i < 4; i++) {
+      guest::StoreU32(base, at + 4 * i, i == row ? 0x3F800000u : 0);
+    }
+  }
+  const uint32_t green = guest::LoadU32(base, color + 4);
+  const uint32_t blue = guest::LoadU32(base, color + 8);
+  guest::StoreU32(base, rect + 64, 0);
+  guest::StoreU32(base, rect + 68, 0);
+  guest::StoreU32(base, rect + 80, 0);
+  guest::StoreU32(base, rect + 84, 0);
+  guest::StoreU32(base, rect + 72, 2);
+  guest::StoreU32(base, rect + 96, red);
+  guest::StoreU32(base, rect + 100, green);
+  guest::StoreU32(base, rect + 104, blue);
+  guest::StoreU32(base, rect + 88, 1280);
+  guest::StoreU32(base, rect + 92, 720);
+  guest::StoreU32(base, rect + 108, guest::LoadU32(base, kFadeAlphas + 4 * layer));
+}
+
+// A slot's three words (+0, +4, +8) in the order given.
+struct SlotWrite {
+  uint32_t offset, value;
+};
+void WriteSlot(uint8_t* base, uint32_t slot, std::initializer_list<SlotWrite> writes) {
+  for (const SlotWrite& w : writes) {
+    guest::StoreU32(base, slot + w.offset, w.value);
+  }
+}
+
+// Whether `slots` more slots can be allocated on `list` without the
+// original's messages: no chunk open (on it or another list), and room
+// (the count not wrapping).
+bool ChunkFits(uint8_t* base, uint32_t list, uint32_t slots) {
+  if (guest::LoadU8(base, list + 52) != 0 || guest::LoadU32(base, command_list::kOpenChunks) != 0) {
+    return false;
+  }
+  const uint32_t used = guest::LoadU32(base, list + 12);
+  return used + slots >= used && used + slots < guest::LoadU32(base, list + 8);
+}
+
+}  // namespace
+
+uint32_t ScreenFadesUpdate(uint8_t* base, uint32_t frame,
+                           const std::function<void(uint32_t key, uint32_t rect)>& draw) {
+  ITC_NATIVE_RUNNING("sub_8209D130 ScreenFades::Update");
+  const uint32_t rect = frame + kFadeRect;
+  for (uint32_t layer = 0; layer < 2; layer++) {
+    if (layer == 1 || (guest::LoadU32(base, kFadeInCounts + 4) == 0 &&
+                       guest::LoadU32(base, kFadeOutCounts + 4) == 0)) {
+      StepFade(base, layer);
+    }
+    BuildFadeRect(base, rect, layer);
+    if (int32_t(guest::LoadU32(base, kFadeAlphas + 4 * layer)) > 0) {
+      draw(guest::LoadU32(base, kFadeKeys + 4 * layer), rect);
+    }
+  }
+  if ((guest::LoadU32(base, kFadeOutCounts) | guest::LoadU32(base, kFadeInCounts)) != 0) {
+    return 1;
+  }
+  return (guest::LoadU32(base, kFadeOutCounts + 4) | guest::LoadU32(base, kFadeInCounts + 4)) != 0
+             ? 1
+             : 0;
+}
+
+bool ScissorChunksFit(uint8_t* base, uint32_t list) { return ChunkFits(base, list, 8); }
+
+uint32_t RecordScissorChunk(uint8_t* base, uint32_t list) {
+  ITC_NATIVE_RUNNING("sub_8209CE68 ScreenFades::RecordScissor");
+  command_list::OpenChunk(base, list);
+  auto slot = [&] { return command_list::AllocateSlots(base, list, 1); };
+  const uint32_t chunk = slot();
+  guest::StoreU16(base, chunk + 2, 5);
+  guest::StoreU32(base, chunk + 4, 0);
+  WriteSlot(base, slot(), {{8, 0}, {0, 31}, {4, 1}});
+  const uint32_t s = slot();
+  guest::StoreU16(base, s + 0, 0);
+  guest::StoreU16(base, s + 2, 0);
+  guest::StoreU16(base, s + 4, 1280);
+  guest::StoreU16(base, s + 6, 720);
+  WriteSlot(base, slot(), {{4, 0}, {0, 36}, {8, 0}});
+  command_list::CloseChunk(base, list);
+  return chunk;
+}
+
+uint32_t RecordScissorEndChunk(uint8_t* base, uint32_t list) {
+  command_list::OpenChunk(base, list);
+  auto slot = [&] { return command_list::AllocateSlots(base, list, 1); };
+  const uint32_t chunk = slot();
+  guest::StoreU16(base, chunk + 2, 5);
+  guest::StoreU32(base, chunk + 4, 0);
+  WriteSlot(base, slot(), {{0, 1}, {4, 1}, {8, 0}});
+  WriteSlot(base, slot(), {{4, 0}, {0, 200}});
+  WriteSlot(base, slot(), {{0, 36}, {4, 0}, {8, 0}});
+  command_list::CloseChunk(base, list);
+  return chunk;
+}
+
+std::optional<uint32_t> ColorRectRecordFlat(uint8_t* base, uint32_t rect) {
+  ITC_NATIVE_RUNNING("sub_8217A370 ColorRect::RecordFlat");
+  const uint32_t list = guest::LoadU32(base, kColorRectLists + 4);
+  const bool blend = int32_t(guest::LoadU32(base, rect + 108)) > 0;
+  // The header, the blend states (6 or 4), 13, 6, 5, the vertices (6), 15,
+  // a slot left as it is and 36.
+  if (!ChunkFits(base, list, blend ? 19 : 17)) {
+    return std::nullopt;
+  }
+  command_list::OpenChunk(base, list);
+  auto slot = [&] { return command_list::AllocateSlots(base, list, 1); };
+  const uint32_t chunk = slot();
+  guest::StoreU16(base, chunk + 2, 5);
+  guest::StoreU32(base, chunk + 4, 0);
+  uint32_t last;
+  if (blend) {
+    WriteSlot(base, slot(), {{4, 5}, {0, 1}, {8, 0}});
+    WriteSlot(base, slot(), {{0, 56}, {4, 6}});
+    WriteSlot(base, slot(), {{4, 0}, {0, 96}});
+    WriteSlot(base, slot(), {{4, 1}, {0, 60}});
+    WriteSlot(base, slot(), {{4, 6}, {0, 72}});
+    last = slot();
+    WriteSlot(base, last, {{4, 7}, {0, 76}});
+  } else {
+    WriteSlot(base, slot(), {{8, 0}, {4, 3}, {0, 1}});
+    WriteSlot(base, slot(), {{0, 56}, {4, 6}});
+    WriteSlot(base, slot(), {{4, 0}, {0, 96}});
+    last = slot();
+    WriteSlot(base, last, {{4, 0}, {0, 60}});
+  }
+  WriteSlot(base, slot(), {{4, 1}, {0, 13}, {8, 0}});
+  WriteSlot(base, slot(), {{0, 6}, {4, 1}, {8, 0}});
+  WriteSlot(base, slot(), {{0, 5}, {4, 4}, {8, 0}});
+  uint32_t vertex = command_list::AllocateVertices(base, list, 4, false);
+  const uint32_t z = guest::LoadU32(base, 0x82000A30);  // 1.0
+  const int32_t x = int32_t(guest::LoadU32(base, rect + 80));
+  const int32_t y = int32_t(guest::LoadU32(base, rect + 84));
+  const int32_t right = int32_t(guest::LoadU32(base, rect + 88) + uint32_t(x));
+  const int32_t bottom = int32_t(guest::LoadU32(base, rect + 92) + uint32_t(y));
+  const float corners[4][2] = {{float(x), float(y)},
+                               {float(right), float(y)},
+                               {float(x), float(bottom)},
+                               {float(right), float(bottom)}};
+  for (const auto& corner : corners) {
+    guest::StoreFloat(base, vertex + 0, corner[0]);
+    guest::StoreFloat(base, vertex + 4, corner[1]);
+    guest::StoreU32(base, vertex + 8, z);
+    const uint32_t color = (guest::LoadU32(base, rect + 108) << 24) |
+                           (uint32_t(guest::LoadU8(base, rect + 99)) << 16) |
+                           (uint32_t(guest::LoadU8(base, rect + 103)) << 8) |
+                           guest::LoadU8(base, rect + 107);
+    guest::StoreU32(base, vertex + 12, color);
+    vertex += 24;
+  }
+  WriteSlot(base, slot(), {{4, 1}, {0, 15}, {8, 0}});
+  slot();
+  WriteSlot(base, slot(), {{4, 0}, {0, 36}, {8, 0}});
+  command_list::CloseChunk(base, list);
+  return chunk;
 }
 
 int32_t PlayersSignedInSlot(uint8_t* base, uint32_t player) {

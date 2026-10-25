@@ -7,6 +7,8 @@
 #include "guest.h"
 
 #include "base/flags.h"
+#include "hooks/guest_call.h"
+#include "hooks/mode_tick.h"
 #include "mode_tick/mode_tick.h"
 
 ITC_FLAG_BOOL(native_mode_tick, true, "ITC",
@@ -19,7 +21,10 @@ ITC_FLAG_BOOL(native_mode_tick, true, "ITC",
               "SignInWatch::Update calls it), and "
               "SignInWatch::Update sub_8209EEC8 (with sub_8209F040 merged; wcscpy's and wcscmp's plain "
               "C++ called directly; the prompts' states 1 to 9 the original's), "
-              "Presence::SetForMode sub_822934B8 Dropped (presence isn't ported: only the "
+              "ScreenFades::Update sub_8209D130 (with ColorRect::Record sub_8217C348 merged; "
+              "ScreenFades::RecordScissor sub_8209CE68 and ColorRect::RecordFlat sub_8217A370, no "
+              "adapters: only it calls them; their scene getters and render queue submits guest "
+              "calls), Presence::SetForMode sub_822934B8 Dropped (presence isn't ported: only the "
               "last error its dropped XUserSetContextEx wrapper clears; sub_82293504 merged)) natively instead of through the "
               "translated code (the same writes; checked by --run_harnesses=mode_tick)");
 
@@ -94,3 +99,111 @@ extern "C" REX_FUNC(sub_8209EEC8) {
   }
   ctx.r3.s64 = int32_t(kLastName);
 }
+
+// --- ScreenFades::Update and its recording ---
+
+// The command list's diagnostics (blend_state.cpp) see who allocates slots:
+// with any of them on, the original runs.
+ITC_FLAG_DECLARE(bool, log_overlay_uploads);
+ITC_FLAG_DECLARE(bool, log_slot_callers);
+ITC_FLAG_DECLARE(bool, log_recording_by_pass);
+
+namespace {
+
+constexpr uint32_t kScene = 0x826BABA0;
+
+// A call through slot `slot` of r3's vtable, returning to `return_address`.
+void VtableCall(PPCContext& ctx, uint8_t* base, uint32_t slot, uint32_t return_address) {
+  ctx.lr = return_address;
+  REX_CALL_INDIRECT_FUNC(guest::LoadU32(base, guest::LoadU32(base, ctx.r3.u32) + 4 * slot));
+}
+
+// A chunk handed to the render queue `queue` (its slot 4, sub_8258EDC8 in
+// play, which adds it to the queue's entries: r4 = the chunk, r5 = the key,
+// f1 = the depth's float at `depth`).
+void Submit(PPCContext& ctx, uint8_t* base, uint32_t queue, uint32_t chunk, uint32_t key,
+            uint32_t depth, uint32_t return_address) {
+  ctx.r3.u64 = queue;
+  ctx.r4.u64 = chunk;
+  ctx.r5.u64 = key;
+  ctx.fpscr.disableFlushMode();
+  ctx.f1.f64 = double(guest::LoadFloat(base, depth));
+  VtableCall(ctx, base, 4, return_address);
+}
+
+// ScreenFades::RecordScissor (r3 = the key, f1 = -10,000.0, not read) from
+// a 160-byte frame like the original's: the scene's command list and render
+// queue (four getters), then the two chunks natively, each handed on; where
+// they wouldn't fit, the original (whose getters are then called again,
+// never seen in play).
+void RecordScissor(PPCContext& ctx, uint8_t* base, uint32_t key) {
+  bool fit = false;
+  guest_call::InFrame(ctx, base, 160, 0x8209CE90, [&](uint32_t) {
+    ctx.r3.u64 = guest::LoadU32(base, kScene);
+    VtableCall(ctx, base, 8, 0x8209CE90);
+    VtableCall(ctx, base, 1, 0x8209CEA0);
+    const uint32_t list = ctx.r3.u32;
+    ctx.r3.u64 = guest::LoadU32(base, kScene);
+    VtableCall(ctx, base, 8, 0x8209CEBC);
+    VtableCall(ctx, base, 2, 0x8209CECC);
+    const uint32_t queue = ctx.r3.u32;
+    if (!mode_tick::ScissorChunksFit(base, list)) {
+      return;
+    }
+    fit = true;
+    Submit(ctx, base, queue, mode_tick::RecordScissorChunk(base, list), key, 0x82001C00,
+           0x8209CF90);
+    Submit(ctx, base, queue, mode_tick::RecordScissorEndChunk(base, list), key, 0x82001BFC,
+           0x8209D030);
+  });
+  if (!fit) {
+    ctx.r3.u64 = key;
+    ctx.fpscr.disableFlushMode();
+    ctx.f1.f64 = double(guest::LoadFloat(base, 0x82001C00));
+    ctx.lr = 0x8209D348;
+    __imp__sub_8209CE68(ctx, base);
+  }
+}
+
+// ColorRect::RecordFlat (r3 = the rectangle, r4 = the camera pass, r5 = the
+// key) natively, its chunk handed to the render queue at [0x826D83D0] from a
+// 368-byte frame like the original's; where the plain C++ declines, the
+// original.
+void RecordColorRect(PPCContext& ctx, uint8_t* base, uint32_t rect, uint32_t key) {
+  const auto chunk = mode_tick::ColorRectRecordFlat(base, rect);
+  if (!chunk) {
+    ctx.r3.u64 = rect;
+    ctx.r4.u64 = mode_tick::kFadeCameraPass;
+    ctx.r5.u64 = key;
+    ctx.lr = 0x8209D35C;
+    __imp__sub_8217A370(ctx, base);
+    return;
+  }
+  guest_call::InFrame(ctx, base, 368, 0x8217A74C, [&](uint32_t) {
+    Submit(ctx, base, guest::LoadU32(base, mode_tick::kColorRectLists), *chunk, key, 0x82000A34,
+           0x8217A74C);
+  });
+}
+
+}  // namespace
+
+void hooks::ModeTickScreenFadesUpdate(PPCContext& ctx, uint8_t* base) {
+  if (ITC_FLAG(log_overlay_uploads) || ITC_FLAG(log_slot_callers) ||
+      ITC_FLAG(log_recording_by_pass)) {
+    __imp__sub_8209D130(ctx, base);
+    return;
+  }
+  const uint64_t lr = ctx.lr;
+  uint32_t r3 = 0;
+  guest_call::InFrame(ctx, base, kScreenFadesUpdateFrame, 0x8209D348, [&](uint32_t frame) {
+    r3 = ScreenFadesUpdate(base, frame, [&](uint32_t key, uint32_t rect) {
+      RecordScissor(ctx, base, key);
+      RecordColorRect(ctx, base, rect, key + 1);
+    });
+  });
+  ctx.lr = lr;
+  ctx.r3.u64 = r3;
+}
+
+// ScreenFades::Update: r3 not read; r3 = 1 while any count isn't 0, else 0.
+ITC_MODE_TICK(8209D130, hooks::ModeTickScreenFadesUpdate(ctx, base))

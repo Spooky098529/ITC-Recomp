@@ -9,6 +9,8 @@
 #pragma once
 
 #include <cstdint>
+#include <functional>
+#include <optional>
 
 namespace mode_tick {
 
@@ -42,6 +44,49 @@ void ScreenFadesFadeIn(uint8_t* base, uint32_t passes, uint32_t red, uint32_t gr
 // `passes`.
 void ScreenFadesFadeOut(uint8_t* base, uint32_t passes, uint32_t red, uint32_t green,
                         uint32_t blue, uint32_t layer);
+
+// The two layers' sort keys (668 and 676, words in the image) and the camera
+// pass the color rectangles are recorded for (camera pass 0).
+constexpr uint32_t kFadeKeys = 0x82001BF4;
+constexpr uint32_t kFadeCameraPass = 0x826BAC00;
+// The color rectangle ScreenFades::Update builds in its frame (at the
+// original's r1 less kScreenFadesUpdateFrame, + 112): an identity matrix at
+// +0, the kind +64 (0: flat), +72 = 2, x, y, width, height at +80 to +92,
+// the color's red, green, blue and alpha words at +96 to +108 (+76 not
+// written).
+constexpr uint32_t kScreenFadesUpdateFrame = 416;
+constexpr uint32_t kFadeRect = 112;
+
+// sub_8209D130 ScreenFades::Update (with ColorRect::Record, sub_8217C348,
+// merged: the rectangle's kind is always 0, RecordFlat): layer 0's counts
+// stepped (only when layer 1's in and out counts are 0) and layer 1's, each
+// layer's rectangle built in the original's frame at `frame` + kFadeRect
+// and, when its alpha is above 0, `draw(key, rect)` (the adapter's
+// ScreenFades::RecordScissor with the key, then ColorRect::RecordFlat with
+// key + 1: guest calls). Returns 1 while any count isn't 0, else 0.
+uint32_t ScreenFadesUpdate(uint8_t* base, uint32_t frame,
+                           const std::function<void(uint32_t key, uint32_t rect)>& draw);
+
+// sub_8209CE68 ScreenFades::RecordScissor's two chunks on the scene's
+// command list `list` (the adapter's getters: [0x826BABA0]'s slot 8, then 1),
+// each handed to the render queue (slot 8, then 2; its slot 4) by the
+// adapter: the scissor rectangle (command 31: 0, 0, 1280, 720) with the key
+// and -10,000.0, then commands 1 and 200 with the key and -9,000.0.
+// ScissorChunksFit says whether both can be recorded without the messages
+// the original's command list calls would print (a chunk open, the list
+// full): else the original runs.
+bool ScissorChunksFit(uint8_t* base, uint32_t list);
+uint32_t RecordScissorChunk(uint8_t* base, uint32_t list);
+uint32_t RecordScissorEndChunk(uint8_t* base, uint32_t list);
+
+// sub_8217A370 ColorRect::RecordFlat's chunk on the command list at
+// [0x826D83D0 + 4]: the blend states by the alpha, the helper object's
+// draw and four 24-byte vertices of the rectangle `rect`. Returns its first
+// slot, which the adapter hands to the render queue at [0x826D83D0] (its
+// slot 4, with the key and 0.0); nullopt, with nothing done, where the
+// original's command list calls would print a message.
+constexpr uint32_t kColorRectLists = 0x826D83D0;
+std::optional<uint32_t> ColorRectRecordFlat(uint8_t* base, uint32_t rect);
 
 // --- The sign-in watch and the players ---
 

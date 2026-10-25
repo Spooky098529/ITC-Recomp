@@ -11,6 +11,8 @@
 
 #include "base/flags.h"
 #include "base/log.h"
+#include "command_list/command_list.h"
+#include "hooks/mode_tick.h"
 #include "memory/heap.h"
 #include "mode_tick/mode_tick.h"
 
@@ -43,6 +45,8 @@ constexpr Region kRegions[] = {
     {0x82816110, 0x10},  // the original Network::Update's connection word
     {0x8266D080, 0x10},  // the 1024 x 576 target object's pointer
     {0x826C7670, 0x90},  // the user table's names
+    {0x826D83D0, 0x10},  // the color rectangles' render queue and command list
+    {0x8296BD20, 0x10},  // the command lists' open chunk count
 };
 
 // The register steps: the plain C++ through these, not the adapters.
@@ -120,7 +124,7 @@ void Case(Context& h, Results& results, Setup setup, Args args, GuestFunction re
     setup(random);
     after = random;
     PPCContext t = CallContext(h);
-    Fill(h.base, t.r1.u32 - 256, 256);  // the callee's frame
+    Fill(h.base, t.r1.u32 - 1024, 1024);  // the callee's frames
     t.r3.u64 = random.Next();
     args(t);
     ITC_FLAG(native_mode_tick) = v == 1;
@@ -430,6 +434,86 @@ void WatchUpdate(Context& h) {
   results.Report();
 }
 
+// A made-up scene for the fades' recording, in the scratch area, as the
+// cameras' harness makes it: the scene's vtable slot 8 and the manager's
+// slots 1 and 2 are getters of the game's (sub_8248CA78 returns [r3 + 284],
+// sub_82379320 [r3 + 124]), and the queue's slot 4 is
+// BillboardMaterial::SetLights (sub_8209F5C8: +32 = r4, +36 = r5 unless r4
+// is 0), which keeps the last chunk and key it's handed. [0x826D83D0] (the
+// color rectangles' queue and list) points at the same queue and list.
+constexpr uint32_t kScene = 0, kSceneVtable = 320, kManager = 400, kManagerVtable = 720,
+                   kQueue = 760, kQueueVtable = 800, kList = 840, kSlots = 2048;
+
+// kind: 0 room, 1 a chunk already open on the list, 2 another open
+// (nested). (A full list isn't made: the original then writes its header
+// at guest address 0.)
+void SetScene(Context& h, uint32_t kind, uint32_t used) {
+  const uint32_t d = h.data;
+  guest::StoreU32(h.base, d + kScene, d + kSceneVtable);
+  guest::StoreU32(h.base, d + kSceneVtable + 32, 0x8248CA78);
+  guest::StoreU32(h.base, d + kScene + 284, d + kManager);
+  guest::StoreU32(h.base, d + kManager, d + kManagerVtable);
+  guest::StoreU32(h.base, d + kManagerVtable + 4, 0x8248CA78);
+  guest::StoreU32(h.base, d + kManagerVtable + 8, 0x82379320);
+  guest::StoreU32(h.base, d + kManager + 284, d + kList);
+  guest::StoreU32(h.base, d + kManager + 124, d + kQueue);
+  guest::StoreU32(h.base, d + kQueue, d + kQueueVtable);
+  guest::StoreU32(h.base, d + kQueueVtable + 16, 0x8209F5C8);
+  const uint32_t list = d + kList;
+  guest::StoreU32(h.base, list + 8, used + 1000);
+  guest::StoreU32(h.base, list + 12, used);
+  guest::StoreU32(h.base, list + 32, d + kSlots);
+  guest::StoreU32(h.base, list + 44, d + kSlots);
+  guest::StoreU8(h.base, list + 52, kind == 1 ? 1 : 0);
+  if (kind == 1) {
+    guest::StoreU32(h.base, list + 44, d + kSlots + 16);
+  }
+  guest::StoreU32(h.base, command_list::kOpenChunks, kind == 2 ? 1 : 0);
+  guest::StoreU32(h.base, 0x826BABA0, d + kScene);
+  guest::StoreU32(h.base, mt::kColorRectLists, d + kQueue);
+  guest::StoreU32(h.base, mt::kColorRectLists + 4, list);
+}
+
+void FadesUpdate(Context& h) {
+  Results results("ScreenFades::Update (sub_8209D130)");
+  for (int c = 0; c < 400; c++) {
+    Case(
+        h, results,
+        [&](Random& random) {
+          SetScene(h, random.Below(6) == 0 ? 1 + random.Below(2) : 0, random.Below(100));
+          auto count = [&]() -> uint32_t {
+            const uint32_t pick = random.Below(8);
+            return pick < 3 ? 0 : pick < 6 ? 1 + random.Below(3) : pick < 7 ? random.Below(60)
+                                                                           : uint32_t(random.Next());
+          };
+          auto duration = [&]() -> uint32_t {
+            const uint32_t pick = random.Below(8);
+            return pick == 0 ? 0 : pick == 1 ? uint32_t(random.Next()) : 1 + random.Below(60);
+          };
+          for (uint32_t layer = 0; layer < 2; layer++) {
+            // Each layer idle (both counts 0) often, so layer 0 steps.
+            const bool idle = random.Below(3) == 0;
+            guest::StoreU32(h.base, mt::kFadeInCounts + 4 * layer, idle ? 0 : count());
+            guest::StoreU32(h.base, mt::kFadeOutCounts + 4 * layer, idle ? 0 : count());
+            guest::StoreU32(h.base, mt::kFadeInDurations + 4 * layer, duration());
+            guest::StoreU32(h.base, mt::kFadeOutDurations + 4 * layer, duration());
+            guest::StoreU32(h.base, mt::kFadeAlphas + 4 * layer,
+                            random.Below(4) == 0 ? uint32_t(random.Next()) : random.Below(300));
+            for (uint32_t i = 0; i < 3; i++) {
+              guest::StoreU32(h.base, mt::kFadeColors + 12 * layer + 4 * i,
+                              random.Below(4) == 0 ? uint32_t(random.Next()) : random.Below(256));
+            }
+          }
+        },
+        [](PPCContext&) {}, __imp__sub_8209D130, hooks::ModeTickScreenFadesUpdate,
+        fmt::format("case {}", c), [&](const PPCContext& t, Outputs& out) {
+          // The color rectangle in the frame (its +76 left as it was).
+          out.Bytes(Read(h.base, t.r1.u32 - mt::kScreenFadesUpdateFrame + mt::kFadeRect, 112));
+        });
+  }
+  results.Report();
+}
+
 }  // namespace
 
 void ModeTick(Context& h) {
@@ -439,6 +523,7 @@ void ModeTick(Context& h) {
   Settings(h);
   CheckIdle(h);
   WatchUpdate(h);
+  FadesUpdate(h);
 }
 
 }  // namespace harness
