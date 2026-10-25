@@ -48,7 +48,15 @@ file's history. What's left to see in a drive, from every run:
   3 go to `to-drive.md`). Finished.
 - Next: the game modes' cleanup (no mapping, not counted):
   `sub_821067A0`, `sub_82106AF0`, ready since the model class, and what
-  they unblock. Step: migration agent running.
+  they unblock. Migration done (ce8d477..4ff0b54: `XprHolder`, the
+  race mode's member, `RaceMode::RaceMode`, `Mode::Create` with the
+  mode constructors (11 new rows), 6 adapters removed; `game-modes.md`
+  38 of 42 ours; 27 s, 0 errors, every harness 0
+  differing). Nothing ready left in the file. The replay's boot marker
+  fixed meanwhile (d83677c, the user's go-ahead: it waited for the movie
+  library's draw, gone since the FFmpeg movies, so every replay since
+  "stalled"). Step: validation agent running (its replay is the new
+  marker's first test).
 
 ## Done
 
@@ -80,6 +88,8 @@ This run's groups: `expected-differences.md` (the "03:59 run" lines).
 - Start: ours 1903, work left 4548 (wrapped 111, known 597, unknown 3840).
 - After the game modes' map: ours 1903, work left 4548 (wrapped 111,
   known 625, unknown 3812).
+- After the game modes' cleanup: ours 1961, work left 4490 (wrapped
+  111, known 595, unknown 3784).
 - After the model class's validation: race 27 s (`itc_1614`), 0 errors,
   every harness 0 differing.
 - After the model class's migration 1: ours 1944, work left 4507

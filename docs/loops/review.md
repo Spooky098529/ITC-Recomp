@@ -73,6 +73,23 @@ When the user has reviewed a run's section, its heading gets
   - An `UninitializedCopy` harness case with a null destination was
     fixed in the case (the original checks null per slot and writes
     from address 4), noted in the row.
+- `game-modes.md` cleanup (no mapping; ce8d477..4ff0b54): 38 of 42
+  ours. For review:
+  - 11 new rows read on the way: `Mode::Create`'s mode constructors
+    (types 2-7, 9, 10, 12) and `MachineMember::MachineMember`
+    (`sub_82108160`); `sub_821077EC`, a piece of `Mode::Create`'s switch
+    in its stack frame, Merged into it; type 8 (`sub_82107670`, never
+    seen in play) still runs the original.
+  - `sub_82106A50`, `sub_82107168`, `sub_82108160` and the mode
+    constructors are Native with no adapter (only native code calls
+    them).
+  - `race-overlays.md`'s `RaceOverlays::Clear` (`sub_8215DE80`) adapter
+    removed (RaceMode::RaceMode its only caller in play).
+  - The pending-frees harness helpers moved to
+    `src/harnesses/pending_frees.h`, shared by the models and game modes
+    harnesses.
+  - The first batch's two groups in one commit (ce8d477); one counter
+    race for the six removals, each then built and committed alone.
 
 ## Run 2026-10-25 01:17 (`by-loop-25-10-26`)
 
