@@ -103,6 +103,29 @@ When the user has reviewed a run's section, its heading gets
   wrong. Also: `models.md`'s `TextureProvider::Clear` row reworded ("it
   never reaches `memmove_s`") so `b7_status.py` doesn't read it as never
   called.
+- `mode-tick.md` migration 1 (4975324..1897994; `src/mode_tick/`,
+  `src/hooks/mode_tick.cpp`, harness `src/harnesses/mode_tick.cpp`):
+  21 of 23 ours, `--native_mode_tick`; `Modes::Modes` under
+  `--native_game_modes`. For review:
+  - `Presence::SetForMode` Dropped (B5's presence call): no presence
+    set; only what's left once its wrapper `sub_82294F70` is dropped (the
+    last error cleared, r3 = 0) is kept, as the new mode's slot 0 after
+    it isn't read. `check_function_statuses.py` lists it under "to
+    check" for its fallback, as device-state's.
+  - `lstrcmpA` (`sub_82296130`) and `CompareStringA` (`sub_82297100`),
+    XAPI's, still recompiled with no rows: made plain C++ in
+    `src/helpers/compare_string.{h,cpp}` by B6's call for the pure
+    string helpers (as `MultiByteToWideChar`, and XAPI's memset in B7);
+    the agent asks the user to confirm that call reaches them. 2,000 and
+    1,000 harness cases, 0 differing.
+  - The sign-in watch's prompt states 1-9 (never seen in play) and the
+    trap paths run the original.
+  - Stack copies (the stage copy, the player's name, the color
+    rectangle, the music table) written into the original's frames; the
+    scene getters and render-queue submits as guest calls from frames
+    like the original's, as the cameras do.
+  - Map corrections: `ColorRect::Record` has one caller
+    (`ScreenFades::Update`); `CompareStringA` read in full.
 
 ## Run 2026-10-25 01:17 (`by-loop-25-10-26`)
 

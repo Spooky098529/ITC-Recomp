@@ -68,7 +68,13 @@ file's history. What's left to see in a drive, from every run:
   `game-modes.md`; 2a11eec): the per-mode settings, the sign-in watch,
   the billboard ring flip, the screen fades, the menu music. Map checked
   (0 errors, 23 of 23 in play, 13 ready groups; presence Dropped by B5's
-  call). Step: migration agent 1 running.
+  call). Migration 1 done after five batches (4975324..1897994: the
+  ring flip, the fades, the per-mode settings, the sign-in watch, the
+  menu music with `lstrcmpA` and `CompareStringA`; 21 of 23 ours,
+  presence Dropped, `Modes::Modes` too; `--native_mode_tick`;
+  `itc_1638`: 26 s, 0 errors, every harness 0 differing). Nothing ready
+  left; the rest waits on the save data's creation and deletion (a lead)
+  and `atexit`. Step: validation agent running.
 
 ## Done
 
@@ -103,6 +109,8 @@ This run's groups: `expected-differences.md` (the "03:59 run" lines).
 - Start: ours 1903, work left 4548 (wrapped 111, known 597, unknown 3840).
 - After the game modes' map: ours 1903, work left 4548 (wrapped 111,
   known 625, unknown 3812).
+- After the mode tick's migration 1: ours 1983, work left 4468 (wrapped
+  111, known 597, unknown 3760).
 - After the mode tick's map: ours 1961, work left 4490 (wrapped 111,
   known 619, unknown 3760).
 - After the game modes' cleanup's validation: race 27 s (`itc_1624`),
