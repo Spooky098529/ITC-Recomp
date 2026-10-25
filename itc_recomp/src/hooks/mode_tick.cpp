@@ -1,6 +1,8 @@
 // The mode manager's tick services natively: adapters in front of
 // src/mode_tick/ (docs/functions/mode-tick.md). Each leaves r3 as the
-// original does.
+// original does. Functions reached only from native callers have no
+// adapters (the flag switches their callers): SignInWatch::CheckIdle
+// (sub_8209ED58), from SignInWatch::Update.
 
 #include "guest.h"
 
@@ -13,7 +15,8 @@ ITC_FLAG_BOOL(native_mode_tick, true, "ITC",
               "sub_8209D038 and FadeOut sub_8209D0C8, Players::SignedInSlot sub_8209F658 and "
               "ActionMappers::SetBlocked sub_8209F318, Modes::SetChecks sub_82106868 (Stages::Copy's "
               "plain C++ called directly), Modes::SetSceneTargetMode sub_82106740 (with "
-              "sub_82106778 merged into it), SignInWatch::CheckIdle sub_8209ED58, and "
+              "sub_82106778 merged into it), SignInWatch::CheckIdle sub_8209ED58 (no adapter: only "
+              "SignInWatch::Update calls it), and "
               "SignInWatch::Update sub_8209EEC8 (with sub_8209F040 merged; wcscpy's and wcscmp's plain "
               "C++ called directly; the prompts' states 1 to 9 the original's), "
               "Presence::SetForMode sub_822934B8 Dropped (presence isn't ported: only the "
@@ -73,15 +76,6 @@ extern "C" REX_FUNC(sub_82106868) {
 // Modes::SetSceneTargetMode: r3 = the holder (not read), r4 = the type (r3
 // left).
 ITC_MODE_TICK(82106740, ModesSetSceneTargetMode(base, ctx.r4.u32))
-
-// SignInWatch::CheckIdle: no arguments (r3 left); where the original would
-// trap, the original.
-extern "C" REX_FUNC(sub_8209ED58) {
-  REX_FUNC_PROLOGUE();
-  if (!ITC_FLAG(native_mode_tick) || !SignInWatchCheckIdle(base)) {
-    __imp__sub_8209ED58(ctx, base);
-  }
-}
 
 // Presence::SetForMode: r3 = the type; r3 = 0 where the original's last
 // XUserSetContextEx call answers it, else left.
