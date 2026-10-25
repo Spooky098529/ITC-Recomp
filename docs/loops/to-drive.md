@@ -15,8 +15,6 @@ here loses its heading.
 
 ## Run 2026-10-25 16:38 (`b7-loop-25-10-26-3`)
 
-- The DrawTexts lead (attract race `itc_1722`, replay `itc_1723`, ok):
-  `sub_8211D280` UiMovie::Draw (`ui-movies-game.md`)
 - The DrawTexts lead's migration 2 (attract race `itc_1729`, replay
   `itc_1730`, ok): `sub_82211A28` RivalLogo::Draw (`race-hud.md`; runs
   only with a rival at the race start)
