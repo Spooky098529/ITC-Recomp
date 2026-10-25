@@ -106,6 +106,24 @@ When the user has reviewed a run's section, its heading gets
   `0x8296B8B8`, the sort keys `0x8296B8FC`-`0x8296B90C`, the scene light
   constants `0x8296B950`-`0x8296BCDF`. Not read: two switch tables, and
   `SceneryModel::RecordShape` past its outline. 2 leads added.
+- `scenery-lists.md` migration 1 (e3295c1..c96cd1b;
+  `src/scenery_lists/`, `src/hooks/scenery_lists.cpp`): 24 rows in
+  `scenery-lists.md` and 5 in `models.md` (`--native_scenery_lists`,
+  `--native_models`). For review: `Recorder::RecordObject` records
+  natively inside its interpolation wrapper (`blend_state.cpp`); native
+  callers call `BlendState_BeforeRecordObject`/`AfterRecordObject`
+  themselves with the wrapper's lr and r24-r31 through a new
+  `BlendState_SetRecordContext` (frame dumps and `--log_blend_state`
+  counts matched the fallback); the draws' adapters set flush-to-zero
+  off at entry and after each guest call, as the originals do before
+  their scalar float work (59d655c; the harness runs cases with it on);
+  each recorder runs the original from the start when the command list
+  would refuse a slot, another list's chunk is open or a command list
+  diagnostic flag is on; left on the recompiled path (never ran): slot
+  4's reserve, debug prints and resize, `sub_82589728`'s message path,
+  `RecordShape`'s material animations and more than 4 textures;
+  `RecordShape`'s adapter kept (guest calls to the model's and
+  provider's slots).
 
 ## Run 2026-10-25 03:59 (`b7-loop-25-10-26-2`)
 

@@ -67,7 +67,17 @@ file's history. What's left to see in a drive, from every run:
   shared model draws, the texture provider's slots 2 and 4). Map checked
   (0 errors, 27 of 27 in play, 14 ready groups; no kernel calls;
   `Recorder::RecordObject` Wrapped for interpolation, its hooks kept).
-  Step: migration 1, agent running.
+  Migration 1 done after five batches (e3295c1..c96cd1b: the lists'
+  release and picks, the draw state, the texture provider's slots, the
+  visibility test, `RecordObject` inside its interpolation wrapper,
+  `RecordSceneLights`, the depth draws, `SceneryModel::DrawShape` and
+  `RecordShape`, `PointList::Draw`, and `models.md`'s five accessors
+  under `--native_models`; flush-to-zero set off in the draws' adapters,
+  59d655c; 1 adapter removed, 2 Native with none, 3 Merged;
+  `--native_scenery_lists`; `itc_1768`: 24 s, 0 errors, every harness 0
+  differing; frame dumps matched the fallback). Left ready:
+  `Model::DrawShape` `sub_82596B18` with `Model::RecordShape`
+  `sub_82595550` (1,063 lines). Step: validation, agent running.
 
 ## Done
 
@@ -107,6 +117,8 @@ This run's groups: `expected-differences.md` (the "16:38 run" lines).
 - After the scene models' validation: race 27 s (`itc_1696`), 0
   errors, every harness 0 differing; replay 126 s (`itc_1697`), 0
   errors.
+- After the scenery lists' migration 1: ours 2105, work left 4346
+  (wrapped 104, known 578, unknown 3664).
 - After the scenery lists' map: ours 2076, work left 4375 (wrapped 105,
   known 606, unknown 3664).
 - After the UI movies' ready groups' validation: race 23 s (`itc_1740`,
