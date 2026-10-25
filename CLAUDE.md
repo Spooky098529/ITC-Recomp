@@ -234,7 +234,8 @@ its own random generator); `ActionMappers::Init` tops the leads; the rest waits 
 resource relocation and shader pairs, the vertex declaration and the
 critical section wrappers.
 Its thirteenth run (`b7-loop-24-10-26-4`, 2026-10-24 to 25, ended by the
-user before the framework's migration; summary
+user before the framework's migration, merged into `rexglue-removal-project`
+2026-10-25; summary
 `docs/loops/b7-loop-2026-10-24-2133.md`) made `ActionMappers::Init`, three
 cleanup leads and the race's screen objects native (`screen-objects.md`,
 `--native_screen_objects`, 38 of 42) and mapped the app framework
