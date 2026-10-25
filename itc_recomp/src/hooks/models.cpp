@@ -4,7 +4,8 @@
 // layer, and hand the paths left to the original back to it from the start,
 // nothing having been done. Functions reached only from native callers have
 // no adapters (the flag switches their callers): PendingFrees::IncSize
-// (sub_8258E2F8), from PendingFrees::Insert.
+// (sub_8258E2F8), from PendingFrees::Insert; PendingFrees::Insert
+// (sub_8258E398), from Memory::FreeLater and FreePhysicalLater.
 
 #include "guest.h"
 
@@ -21,8 +22,8 @@ ITC_FLAG_BOOL(native_models, true, "ITC",
               "through ScopedLock sub_8258E580 and sub_8258E5B8 for that critical section "
               "(chosen at start-up, other critical sections the game's); with --native_heap "
               "Memory::FreeLater sub_8258E410, FreePhysicalLater sub_8258E498, the pending "
-              "frees' Insert sub_8258E398 and IncSize sub_8258E2F8 (no adapter: only Insert "
-              "calls it); XPR::XPR sub_82596E68, and with --native_heap XPR::Release "
+              "frees' Insert sub_8258E398 and IncSize sub_8258E2F8 (no adapters: only the "
+              "put-off frees call Insert, and only Insert IncSize); XPR::XPR sub_82596E68, and with --native_heap XPR::Release "
               "sub_825970A8 and XPR::~XPR sub_82597148) natively instead of through the "
               "translated code (the same writes; "
               "checked by --run_harnesses=models)");
@@ -73,16 +74,6 @@ extern "C" REX_FUNC(sub_8258E5B8) {
 }
 
 // --- The pending frees ---
-
-// PendingFrees::Insert: r3 = the list, r4 = the node to insert before, r5 =
-// the value's address; r3 left as it came (the list).
-extern "C" REX_FUNC(sub_8258E398) {
-  REX_FUNC_PROLOGUE();
-  if (!NativeLifetime() ||
-      !models::PendingFreesInsert(base, ctx.r3.u32, ctx.r4.u32, guest::LoadU32(base, ctx.r5.u32))) {
-    __imp__sub_8258E398(ctx, base);
-  }
-}
 
 // Memory::FreeLater: r3 = the block; r3 = the critical section, as
 // ScopedLock::~ScopedLock leaves it.
