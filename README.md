@@ -75,6 +75,7 @@ game hangs at startup with it; if it does, close it and start it again.
 - Tested on Linux on my PC (9800x3d, 7900XT) and the Steam Deck.
 - The game probably uses more RAM than necessary, currently it maintains several copies of the xbox 360 memory pool for performance reasons. This is going to be an issue until the rexglue runtime is removed (see "In progress: removing ReXGlue" above). RAM usage can hit about 1gb in races.
 - Some 2d elements flicker when races are paused when unlocking the framerate, like logos above cars or smoke trails
+- Some timing issues remain, menu music sometimes doesn't play after finishing races that end with a load to the garage/parking area
 ## Reporting problems
 
 Set `log_level = "info"` in `itc.toml`, play, then open an
