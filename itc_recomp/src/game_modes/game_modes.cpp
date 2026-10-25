@@ -228,6 +228,21 @@ namespace {
 
 constexpr uint32_t kMember67760Vtable = 0x820093C4;
 constexpr uint32_t kBuffer28Vtable = 0x82009390;
+constexpr uint32_t kMember13360Vtable = 0x820093BC;
+constexpr uint32_t kMember43136Vtable = 0x82006B24;
+// The word Member13360's +452 is set to.
+constexpr uint32_t kMember13360Word452 = 0x82618BB4;
+
+// The 1.0s the camera modes' objects start with: from +44 to +252 and +284
+// to +332, every 16 bytes (the w words of their matrices, probably).
+void StoreOnes(uint8_t* base, uint32_t object, uint32_t one) {
+  for (uint32_t offset = 44; offset <= 252; offset += 16) {
+    guest::StoreU32(base, object + offset, one);
+  }
+  for (uint32_t offset = 284; offset <= 332; offset += 16) {
+    guest::StoreU32(base, object + offset, one);
+  }
+}
 // 1.0 in .rdata, the w words' value.
 constexpr uint32_t kOne = 0x82000A30;
 
@@ -240,12 +255,7 @@ void Member67760Construct(uint8_t* base, uint32_t object) {
   const uint32_t one = guest::LoadU32(base, kOne);
   guest::StoreU32(base, object + 16, 0);
   guest::StoreU32(base, object + 20, 0);
-  for (uint32_t offset = 44; offset <= 252; offset += 16) {
-    guest::StoreU32(base, object + offset, one);
-  }
-  for (uint32_t offset = 284; offset <= 332; offset += 16) {
-    guest::StoreU32(base, object + offset, one);
-  }
+  StoreOnes(base, object, one);
   guest::StoreU32(base, object + 0, kMember67760Vtable);
   guest::StoreU32(base, object + 748, 0);
   guest::StoreU32(base, object + 752, 0);
@@ -260,6 +270,41 @@ void Member67760Construct(uint8_t* base, uint32_t object) {
   guest::StoreU16(base, object + 420, 0xFFFF);
   guest::StoreU16(base, object + 422, 0xFFFF);
   guest::StoreU16(base, object + 418, 0xFFFF);
+}
+
+void Member13360Construct(uint8_t* base, uint32_t object) {
+  ITC_NATIVE_RUNNING("sub_82155118 Member13360::Member13360");
+  const uint32_t one = guest::LoadU32(base, kOne);
+  guest::StoreU32(base, object + 16, 0);
+  guest::StoreU32(base, object + 20, 0);
+  StoreOnes(base, object, one);
+  guest::StoreU32(base, object + 0, kMember13360Vtable);
+  guest::StoreU32(base, object + 396, one);
+  guest::StoreU32(base, object + 412, one);
+  guest::StoreU32(base, object + 428, one);
+  for (uint32_t i = 0; i < 4; i++) {
+    const uint32_t buffer = object + kBuffers28 + kBuffer28Bytes * i;
+    guest::StoreU32(base, buffer + 12, 0xFFFFFFFF);
+    guest::StoreU32(base, buffer + 0, kBuffer28Vtable);
+    guest::StoreU32(base, buffer + 16, 0xFFFFFFFF);
+    guest::StoreU32(base, buffer + 20, 0);
+    guest::StoreU32(base, buffer + 24, 0);
+  }
+  const uint32_t inner = object + 43136;
+  guest::StoreU32(base, inner + 16, 0);
+  guest::StoreU32(base, inner + 20, 0);
+  guest::StoreU32(base, inner + 44, one);
+  guest::StoreU32(base, inner + 0, kMember43136Vtable);
+  StoreOnes(base, inner, one);
+  guest::StoreU32(base, inner + 364, one);
+  const uint32_t word = guest::LoadU32(base, kMember13360Word452);
+  guest::StoreU32(base, object + 360, 0xFFFFFFFF);
+  guest::StoreU32(base, object + 448, 0);
+  guest::StoreU32(base, object + 452, word);
+  // Each buffer reset (Buffer28::Reset; with no block yet, nothing freed).
+  for (uint32_t i = 0; i < 4; i++) {
+    Buffer28Reset(base, object + kBuffers28 + kBuffer28Bytes * i);
+  }
 }
 
 bool Buffer28Freeable(uint8_t* base, uint32_t buffer) {

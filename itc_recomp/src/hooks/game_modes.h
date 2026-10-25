@@ -12,6 +12,8 @@ namespace hooks {
 void GameModesAdd(PPCContext& ctx, uint8_t* base);
 void GameModesFind(PPCContext& ctx, uint8_t* base);
 void GameModesHandle(PPCContext& ctx, uint8_t* base);
+// RaceOverlaysMachine::Init (sub_8215E6C8), in the original's stack frame.
+void GameModesRaceOverlaysMachineInit(PPCContext& ctx, uint8_t* base);
 
 // sub_8215DE10 (the race overlays' state machine's reset handler): r3 = the
 // state machine; each overlay's slot 3 a guest call.

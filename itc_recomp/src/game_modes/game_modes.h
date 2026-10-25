@@ -77,12 +77,25 @@ void OverlaysSetFlag820(uint8_t* base, uint32_t machine);
 void OverlaysReset(uint8_t* base, uint32_t machine,
                    const std::function<void(uint32_t overlay, uint32_t target)>& reset);
 
+// sub_8215E6C8 RaceOverlaysMachine::Init: the race overlays' state
+// machine's state = 0 and its 33 transitions added, built in the original's
+// stack frame at `frame` (its r1 less 2,272: see race_overlays_machine.cpp);
+// returns the last StateMachine::Add's answer.
+uint32_t RaceOverlaysMachineInit(uint8_t* base, uint32_t machine, uint32_t frame,
+                                 bool* replaced);
+constexpr uint32_t kRaceOverlaysMachineInitFrame = 2272;
+
 // --- The race mode's member at +10512's parts (in the camera modes' range,
 // 82152028-82156CC0) ---
 
 // sub_82155D90: the object at the member's +67760 set up (its vtable, 1.0s
 // in its w words, 16 linked halfword pairs).
 void Member67760Construct(uint8_t* base, uint32_t object);
+
+// sub_82155118: the object at the member's +13360 set up (its vtable, 1.0s,
+// four 28-byte buffers at +43016 made and reset, an object at +43136);
+// returns it.
+void Member13360Construct(uint8_t* base, uint32_t object);
 
 // A 28-byte buffer (vtable 0x82009390) holding a block at +20 from
 // VirtualAlloc. Freeing goes over the allocation layer only (the callers'

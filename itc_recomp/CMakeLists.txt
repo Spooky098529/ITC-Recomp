@@ -166,6 +166,7 @@ set(ITC_SOURCES
     src/framework/main_loop.cpp
     src/hooks/game_modes.cpp
     src/game_modes/game_modes.cpp
+    src/game_modes/race_overlays_machine.cpp
     src/hooks/screen_objects.cpp
     src/screen_objects/uv_trees.cpp
     src/screen_objects/screen_objects.cpp

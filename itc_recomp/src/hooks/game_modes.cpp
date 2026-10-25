@@ -24,7 +24,8 @@ ITC_FLAG_BOOL(native_game_modes, true, "ITC",
               "StateMachine::Handle sub_82106280 (with Transition::Make sub_82106100 and Transition::Assign sub_82105FE0 merged into Add), "
               "Mode::Mode sub_82106C20, the race overlays' state machine's handlers "
               "sub_8215DD58, sub_8215DD90, sub_8215DDD0 and sub_8215DE10, the last's virtual "
-              "calls guest calls, the race mode's member's parts sub_82155D90, and with "
+              "calls guest calls, RaceOverlaysMachine::Init sub_8215E6C8, the race mode's member's "
+              "parts sub_82155D90 and sub_82155118, and with "
               "--native_heap Buffer28::Free sub_82152028, Reset sub_82152D38, ~Buffer28 "
               "sub_82152D28 (no adapter: only sub_82106A00 calls it) and sub_82106A00) "
               "natively instead of through the translated code (the same writes; checked by "
@@ -88,6 +89,15 @@ void hooks::GameModesAdd(PPCContext& ctx, uint8_t* base) {
   ctx.r3.u64 = replaced ? r3 : machine_r3 + (r3 - machine);
 }
 
+void hooks::GameModesRaceOverlaysMachineInit(PPCContext& ctx, uint8_t* base) {
+  const uint64_t machine_r3 = ctx.r3.u64;
+  const uint32_t machine = ctx.r3.u32;
+  bool replaced = false;
+  const uint32_t r3 = RaceOverlaysMachineInit(
+      base, machine, ctx.r1.u32 - kRaceOverlaysMachineInitFrame, &replaced);
+  ctx.r3.u64 = replaced ? r3 : machine_r3 + (r3 - machine);
+}
+
 void hooks::GameModesFind(PPCContext& ctx, uint8_t* base) {
   const uint64_t machine_r3 = ctx.r3.u64;
   const uint32_t machine = ctx.r3.u32;
@@ -106,6 +116,11 @@ void hooks::GameModesHandle(PPCContext& ctx, uint8_t* base) {
 
 // The race mode's member's parts: r3 = the object (left).
 ITC_GAME_MODES(82155D90, Member67760Construct(base, ctx.r3.u32))
+ITC_GAME_MODES(82155118, Member13360Construct(base, ctx.r3.u32))
+
+// RaceOverlaysMachine::Init: r3 = the race overlays' state machine; r3 as
+// the last StateMachine::Add leaves it.
+ITC_GAME_MODES(8215E6C8, hooks::GameModesRaceOverlaysMachineInit(ctx, base))
 
 // The 28-byte buffers: r3 = the buffer (sub_82106A00: the object holding
 // four); r3 as the originals leave it. Over the allocation layer only, and

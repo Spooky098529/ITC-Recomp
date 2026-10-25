@@ -68,6 +68,10 @@ void NativeMember67760Construct(PPCContext& ctx, uint8_t* base) {
   gm::Member67760Construct(base, ctx.r3.u32);
 }
 
+void NativeMember13360Construct(PPCContext& ctx, uint8_t* base) {
+  gm::Member13360Construct(base, ctx.r3.u32);
+}
+
 // StateMachine::Find's static default and its guard (put back afterwards).
 constexpr uint32_t kDefault = 0x826C5B68;
 constexpr uint32_t kDefaultBytes = 0x24;
@@ -368,6 +372,66 @@ void Member67760(Context& h, const Block& block) {
   results.Report();
 }
 
+void Member13360(Context& h) {
+  Results results("sub_82155118 Member13360::Member13360");
+  const Block block(44 * 1024);
+  for (int c = 0; c < 8; c++) {
+    Case(
+        h, results, block,
+        [&](Random& random) { WriteRandom(h.base, block.address, block.bytes / 4, random); },
+        [&](PPCContext& t) { t.r3.u64 = block.address + 4 * c; }, __imp__sub_82155118,
+        NativeMember13360Construct, fmt::format("case {}", c));
+  }
+  results.Report();
+}
+
+// RaceOverlaysMachine::Init: an empty state machine (as RaceMode::RaceMode
+// leaves it) or one with transitions already, and the original's frame
+// below the stack pointer filled with the same random words for both (the
+// words it never writes go into the transitions); the machine, the frame
+// (but its back chain and the saved registers) and r3 compared.
+void RaceOverlaysInit(Context& h, const Block& block) {
+  Results results("RaceOverlaysMachine::Init (sub_8215E6C8)");
+  const uint32_t stack = h.data - 1024;  // CallContext's r1
+  const uint32_t frame = stack - gm::kRaceOverlaysMachineInitFrame;
+  for (int c = 0; c < 20; c++) {
+    Outputs out[2];
+    const Random start = h.random;
+    Random after;
+    for (int v = 0; v < 2; v++) {
+      Random random = start;
+      Fill(h.base, h.data, kScratchBytes);
+      Fill(h.base, block.address, block.bytes);
+      WriteRandom(h.base, frame, gm::kRaceOverlaysMachineInitFrame / 4, random);
+      if (c % 2 == 0) {
+        gm::StateMachineConstruct(h.base, block.address);
+        guest::StoreU32(h.base, block.address + gm::kTransitionCount, 0);
+        guest::StoreU32(h.base, block.address + gm::kState, 0);
+      } else {
+        WriteMachine(h, block, random, c);
+        // Fewer, so the 33 fit below the slots.
+        guest::StoreU32(h.base, block.address + gm::kTransitionCount,
+                        guest::LoadU32(h.base, block.address + gm::kTransitionCount) % 150);
+      }
+      after = random;
+      PPCContext t = CallContext(h);
+      t.r3.u64 = block.address;
+      ITC_FLAG(native_game_modes) = v == 1;
+      (v == 0 ? GuestFunction(__imp__sub_8215E6C8) : hooks::GameModesRaceOverlaysMachineInit)(
+          t, h.base);
+      ITC_FLAG(native_game_modes) = true;
+      out[v].Bytes(Read(h.base, block.address, gm::kOverlays + 4 * gm::kOverlaySlots));
+      out[v].Bytes(Read(h.base, frame + 80, gm::kRaceOverlaysMachineInitFrame - 80 - 64));
+      out[v].Bytes(Read(h.base, h.data, kScratchBytes));
+      out[v].Word(t.r3.u32);
+      out[v].Word(uint32_t(t.r3.u64 >> 32));
+    }
+    h.random = after;
+    results.Check(out[0], out[1], fmt::format("case {}", c));
+  }
+  results.Report();
+}
+
 // The 28-byte buffers: each version gets its own blocks (VirtualAlloc's
 // pages, or none), made in the same order with the same sizes; the buffers'
 // bytes (their blocks' addresses written as the block's number, so the two
@@ -455,8 +519,10 @@ void GameModes(Context& h) {
     Lookups(h, block);
     Handlers(h, block);
     Member67760(h, block);
+    RaceOverlaysInit(h, block);
     Buffers(h, block);
   }
+  Member13360(h);
   Write(h.base, kDefault, saved_default.data(), kDefaultBytes);
 }
 
