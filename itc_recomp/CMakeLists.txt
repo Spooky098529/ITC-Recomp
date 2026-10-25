@@ -211,6 +211,7 @@ set(ITC_SOURCES
     src/c_runtime/start_up.cpp
     src/c_runtime/parse.cpp
     src/c_runtime/arrays.cpp
+    src/c_runtime/exit.cpp
     src/game_data/game_data.cpp
     src/display/gamma.cpp
     src/harnesses/harness.cpp
@@ -272,6 +273,7 @@ set(ITC_SOURCES
     src/harnesses/sound_cues.cpp
     src/harnesses/xact.cpp
     src/harnesses/input.cpp
+    src/harnesses/c_runtime_exit.cpp
     src/helpers/debug_output.cpp
     src/helpers/object_attributes.cpp
     src/helpers/time.cpp
