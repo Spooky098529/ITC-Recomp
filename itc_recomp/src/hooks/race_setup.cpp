@@ -10,7 +10,8 @@
 ITC_FLAG_BOOL(native_race_setup, true, "ITC",
               "Run the race's set-up (docs/functions/race-setup.md: the car object's parts "
               "Car::ResetDecals40 sub_820CC4A0, Car::ResetDecals6 sub_820CCBF0, "
-              "Car::ResetSettings sub_820CD760, sub_820CCC70, CarTuning::Reset sub_820CD618, "
+              "Car::ResetSettings sub_820CD760, sub_820CCC70 (these four without adapters: "
+              "reached from Car::Clear), CarTuning::Reset sub_820CD618, "
               "CarDecal::FromBuild sub_820CDC18 (with its setters sub_820CC450 to sub_820CC478 "
               "merged), Car::Clear sub_820CD7F0 and Car::Init sub_820CD5D8) natively instead of "
               "through the translated code (the same writes; checked by "
@@ -59,6 +60,10 @@ void RaceSetupCarInit(PPCContext& ctx, uint8_t* base) {
 
 }  // namespace hooks
 
+// Car::ResetDecals40, Car::ResetDecals6, Car::ResetSettings and sub_820CCC70
+// have no adapters: only Car::Clear calls them, and its plain C++ calls
+// theirs (the flag switches Car::Clear).
+
 // Defines an adapter: the flag, else the original.
 #define ITC_RACE_SETUP(address, step)     \
   extern "C" REX_FUNC(sub_##address) {    \
@@ -70,10 +75,6 @@ void RaceSetupCarInit(PPCContext& ctx, uint8_t* base) {
     hooks::step(ctx, base);               \
   }
 
-ITC_RACE_SETUP(820CC4A0, RaceSetupResetDecals40)
-ITC_RACE_SETUP(820CCBF0, RaceSetupResetDecals6)
-ITC_RACE_SETUP(820CD760, RaceSetupResetSettings)
-ITC_RACE_SETUP(820CCC70, RaceSetupReset1568)
 ITC_RACE_SETUP(820CD618, RaceSetupTuningReset)
 ITC_RACE_SETUP(820CDC18, RaceSetupDecalFromBuild)
 ITC_RACE_SETUP(820CD7F0, RaceSetupCarClear)
