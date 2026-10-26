@@ -68,6 +68,16 @@ NaN groups below stay as recorded.
   differ depends on what the callers left on the stack (0 while the run
   loop was recompiled, every case since `main` and `App::Run` are native,
   2026-10-25: the byte is now 0x33).
+- **Unwritten stack bytes copied:** a function builds a record on its
+  stack, its callees leave some of its bytes unwritten, and it copies
+  the whole record into a guest object; in the original those bytes are
+  what earlier calls left there (their register saves), which native
+  callees don't write on the guest stack. Here: `Racers::SetStart`'s 16
+  traffic records, 42 bytes each (the car object's +34, the record's
+  +3928 to +3935 and others) copied into the race data. The harness
+  finds the bytes by running the callees natively over two fills and
+  compares them in their own group; every other output matches.
+  Whether the game reads those bytes isn't known.
 - **Constant order:** the HLSL compiler (`sub_822B8F10`) places the HSV
   gradient's literal constants (1 to 6, source `82071528`) in another
   order when it compiles during a race than at boot, where every compile
@@ -241,3 +251,9 @@ were at 0.
 | Function | Group | Differ | Reason | Review |
 |---|---|---|---|---|
 | `sub_822B8F10` D3DXCompileShader | the HSV gradient's constant order | 1 of 1 | Constant order | for review (2026-10-24) |
+
+### `race-setup.md`
+
+| Function | Group | Differ | Reason | Review |
+|---|---|---|---|---|
+| `sub_82115D98` Race::SetUp | the traffic records' unwritten bytes | 46 of 48 (45 or 46 from run to run) | Unwritten stack bytes copied | for review (23:42 run) |

@@ -33,6 +33,23 @@ When the user has reviewed a run's section, its heading gets
   below the stack pointer (`CarTuning::Reset`'s red zone, the
   `fctiwz`/`fcfid` conversions, `sub_82101EB0`'s running mean); copied:
   `Car::SetModel`'s +72 twice and +73 left.
+- The race's set-up, migration 2 (9b93272..482c90c): 25 rows in
+  `race-setup.md` and `RacerRecord::Init` `sub_820FF808` in
+  `vehicle-accessors.md` (now under `--native_race_setup`). Each native
+  callee runs in the frame the original's call gives it, the frame
+  leftovers (route copies, stack-built records) written as the original
+  leaves them; register saves not written (as migration 1). Paths left
+  on the original from the same frame through a guest-call callback: a
+  memcpy its override wouldn't make natively, `Car::Refresh` refusing,
+  the never-seen branches (`sub_82105BF8`, `Race::PlaceRacers`'
+  +0xA3AF4 = 0 or 4; `sub_820FFA88`, `Race::SetUpRival`'s kind 1). f1
+  not handed back after `Car::FromBuild` (as its adapter). The harness
+  builds made-up specs, items, save data and an event (the game's
+  parameters aren't loaded when harnesses run). For a decision: one new
+  expected group, `Race::SetUp`'s traffic records' 42 unwritten bytes a
+  record, copied into the race data from register saves the native
+  callees don't write (`expected-differences.md`, "Unwritten stack bytes
+  copied"; whether the game reads them isn't known).
 
 ## Run 2026-10-25 16:38 (`b7-loop-25-10-26-3`)
 
