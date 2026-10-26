@@ -425,7 +425,8 @@ void RaceSetupStagesClear(PPCContext& ctx, uint8_t* base) {
 // RacerRecord::Init (from Racers::Add, Racers::Reset, Racers::SetStart,
 // Race::SetUpRival and Race::SetUp), sub_82101630 (from Race::SetUpRival),
 // sub_82110AC0, RaceEvent::CurrentFirstOwned or RaceEvent::Count (from
-// Race::SetUp): their register steps stay for the harness.
+// Race::SetUp), Stages::Reset (from Stages::Clear and RaceData::Reset):
+// their register steps stay for the harness.
 
 // Defines an adapter: the flag, else the original.
 #define ITC_RACE_SETUP(address, step)     \
@@ -451,7 +452,6 @@ ITC_RACE_SETUP(821430A0, RaceSetupEventFirstOwned)
 ITC_RACE_SETUP(821434E8, RaceSetupEventCurrent)
 ITC_RACE_SETUP(82105C90, RaceSetupCourseRecordReset)
 ITC_RACE_SETUP(820FFF50, RaceSetupCourseRoutesGet)
-ITC_RACE_SETUP(82101860, RaceSetupStagesReset)
 ITC_RACE_SETUP(821017C0, RaceSetupAddRacer)
 ITC_RACE_SETUP(82101F68, RaceSetupRecordReset)
 ITC_RACE_SETUP(82101D38, RaceSetupRaceSetRoute)
