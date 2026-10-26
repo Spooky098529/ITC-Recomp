@@ -118,4 +118,9 @@ void RaceSetupPlaceRacers(PPCContext& ctx, uint8_t* base);
 // native.
 void RaceSetupSetUpRival(PPCContext& ctx, uint8_t* base);
 
+// Race::SetUp sub_82115D98: r3 = the save data, r4 = a rival's item id or
+// -1; r3 = the save data + 48. The original where memcpy's override wouldn't
+// copy natively.
+void RaceSetupSetUp(PPCContext& ctx, uint8_t* base);
+
 }  // namespace hooks

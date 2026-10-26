@@ -361,4 +361,41 @@ bool SetUpRivalNative(uint8_t* base, uint64_t location, uint32_t rival, uint32_t
 uint32_t SetUpRival(uint8_t* base, uint64_t location, uint32_t rival, uint32_t add,
                     uint32_t frame, GuestRefresh refresh, void* user);
 
+
+// --- Race::SetUp (src/race_setup/set_up.cpp) ---
+
+// A guest function called as the original would (r3 to r6 = `args`, f1, the
+// stack pointer `r1`, the return address `lr`; the adapter's job). Returns
+// r3.
+using GuestCall = uint64_t (*)(void* user, uint32_t function, const uint64_t args[4], double f1,
+                               uint32_t r1, uint32_t lr);
+// Race::SetUp (sub_82115D98; `save` player 0's save data, `rival` an item id
+// or -1, `frame` its 11,984-byte frame): save +6112 = 48; RaceData::Reset
+// (RaceData::ResetGlobal); race data +0xA3AE0 = rand() % 10, +0xA3AF0 = 1,
+// +0xA3AF4 = 2; its +32 = save +6104 (the mode); the player's racer record
+// at frame + 7952 (Car::Init, 1,884 bytes of the garage car picked: the save's
+// +0x19920-th node of its list at +6120, cars of 1,968 bytes from +6332; its
+// +3892 = save data +0x1F870, Car::Refresh, Race::AddRacer with f1 the
+// garage car's float +1892 and r6 save byte +8); +0x59618 = 2, 1 or 3 by the
+// mode, +0x5961C = 5; Race::SetRoute(0, save +6108); then event 1 (save
+// +6100): the player and a fixed rival (car 11, built at frame + 80) in a
+// stage of type 0, +808 = 1, +0x59AE4 |= 8; else with a rival
+// Race::SetUpRival(location, rival, 1), +808 = 1, +0x59AE4 |= 0x10; else the
+// route again, +0x59AE4 |= 8, a racer record for each of the event's
+// entries (built at frame + 4016: Car::FromBuild of its item's build, +3912
+// its id, +3916 the entry's index, +3924 its byte +37, flags 0x2 and 0x300
+// when the entry's +8 is 0, +3904 the entry's +4), then
+// Race::SetUpRival(location, the first owned item, 0) or Race::AddStage(4);
+// then race data +20 = save +0x199E0, +24 = the event's two bits (the table
+// at 0x82008114); Race::PlaceRacers; save +5886 + 2 x (location - 14) (14 to
+// 19) or + 2 x location (0 to 13) up to 9999; sub_82110AC0(save + 48, the
+// mode). Returns save + 48 (the original's r3). Each callee runs with the
+// frame the original's call gives it, below this one; where a callee's plain
+// C++ would hand back to its original, that original is called through
+// `call` (from `frame`). Only after SetUpNative said yes (memcpy's native
+// copies for the garage car and the racer records).
+bool SetUpNative(uint8_t* base, uint32_t save, uint32_t frame);
+uint32_t SetUp(uint8_t* base, uint32_t save, uint64_t rival, uint32_t frame, GuestCall call,
+               void* user);
+
 }  // namespace race_setup

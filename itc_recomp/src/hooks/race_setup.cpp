@@ -5,6 +5,7 @@
 #include "hooks/race_setup.h"
 
 #include "base/flags.h"
+#include "base/log.h"
 #include "race_setup/race_setup.h"
 
 ITC_FLAG_BOOL(native_race_setup, true, "ITC",
@@ -31,7 +32,7 @@ ITC_FLAG_BOOL(native_race_setup, true, "ITC",
               "RaceData::ResetGlobal sub_821021A8, Racers::SetStart sub_82101D50, "
               "Race::PlaceRacers sub_82102048 (its save data branch, sub_82105BF8, the "
               "original's); Race::SetUpRival sub_82112DB0 with its switch piece sub_82112E2C (its "
-              "kind 1, with sub_820FFA88, the original's)) natively instead of "
+              "kind 1, with sub_820FFA88, the original's); Race::SetUp sub_82115D98) natively instead of "
               "through the translated code (the same writes; checked by "
               "--run_harnesses=race_setup)");
 
@@ -343,6 +344,68 @@ void RaceSetupSetUpRival(PPCContext& ctx, uint8_t* base) {
   ctx.r3.u64 = rs::SetUpRival(base, ctx.r3.u64, ctx.r4.u32, ctx.r5.u32, frame, GuestRefresh, &call);
 }
 
+namespace {
+
+// Race::SetUp's guest calls: the callees' originals, from its frame.
+struct SetUpCall {
+  PPCContext* ctx;
+  uint8_t* base;
+};
+
+uint64_t SetUpGuestCall(void* user, uint32_t function, const uint64_t args[4], double f1,
+                        uint32_t r1, uint32_t lr) {
+  SetUpCall& call = *static_cast<SetUpCall*>(user);
+  PPCContext& ctx = *call.ctx;
+  const uint64_t saved_r1 = ctx.r1.u64;
+  ctx.r1.u64 = r1;
+  ctx.r3.u64 = args[0];
+  ctx.r4.u64 = args[1];
+  ctx.r5.u64 = args[2];
+  ctx.r6.u64 = args[3];
+  ctx.f1.f64 = f1;
+  ctx.lr = lr;
+  switch (function) {
+    case 0x820C4998:
+      sub_820C4998(ctx, call.base);
+      break;
+    case 0x82112DB0:
+      sub_82112DB0(ctx, call.base);
+      break;
+    case 0x82102048:
+      sub_82102048(ctx, call.base);
+      break;
+    case 0x821017C0:
+      sub_821017C0(ctx, call.base);
+      break;
+    case 0x821021A8:
+      sub_821021A8(ctx, call.base);
+      break;
+    case 0x82101D38:
+      sub_82101D38(ctx, call.base);
+      break;
+    default:
+      ITC_LOG_ERROR("race_setup: no guest call for {:08X}", function);
+      break;
+  }
+  ctx.r1.u64 = saved_r1;
+  return ctx.r3.u64;
+}
+
+}  // namespace
+
+void RaceSetupSetUp(PPCContext& ctx, uint8_t* base) {
+  ctx.fpscr.disableFlushMode();
+  const uint32_t frame = ctx.r1.u32 - 11984;
+  if (!rs::SetUpNative(base, ctx.r3.u32, frame)) {
+    __imp__sub_82115D98(ctx, base);
+    return;
+  }
+  SetUpCall call{&ctx, base};
+  const uint64_t save = ctx.r3.u64;
+  rs::SetUp(base, ctx.r3.u32, ctx.r4.u64, frame, SetUpGuestCall, &call);
+  ctx.r3.u64 = save + 48;
+}
+
 }  // namespace hooks
 
 // Car::ResetDecals40, Car::ResetDecals6, Car::ResetSettings and sub_820CCC70
@@ -394,6 +457,7 @@ ITC_RACE_SETUP(82101E90, RaceSetupStagesSetRoute)
 ITC_RACE_SETUP(821021A8, RaceSetupRaceDataResetGlobal)
 ITC_RACE_SETUP(82102048, RaceSetupPlaceRacers)
 ITC_RACE_SETUP(82112DB0, RaceSetupSetUpRival)
+ITC_RACE_SETUP(82115D98, RaceSetupSetUp)
 // sub_82112E2C (a case of Race::SetUpRival's switch, in its frame) needs no
 // adapter: only the original Race::SetUpRival reaches it.
 // sub_82101FD0 has no adapter: only RaceData::Reset calls it.
