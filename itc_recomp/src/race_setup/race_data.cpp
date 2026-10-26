@@ -7,7 +7,9 @@
 #include "c_runtime/arrays.h"
 #include "car_physics/float_ops.h"
 #include "data_tables/data_tables.h"
+#include "c_runtime/strings.h"
 #include "guest.h"
+#include "native/buffers.h"
 #include "vehicle_accessors/vehicle_accessors.h"
 
 #include <cstring>
@@ -272,6 +274,103 @@ uint32_t RacerRecordInit(uint8_t* base, uint32_t record) {
   guest::StoreU16(base, record + 3906, 0xFFFF);
   guest::StoreU32(base, record + 3924, 0);
   return r3;
+}
+
+uint32_t RacersReset(uint8_t* base, uint32_t records) {
+  ITC_NATIVE_RUNNING("sub_820FF978 Racers::Reset");
+  guest::StoreU32(base, records + kRacersCount, 0);
+  guest::StoreU32(base, records + kRacersCount + 4, 0);
+  guest::StoreU32(base, records + kRacersCount + 8, 0);
+  guest::StoreU32(base, records + kRacersCount + 12, 0);
+  uint32_t r3 = 0;
+  for (uint32_t i = 0; i < 93; i++) {
+    r3 = RacerRecordInit(base, records + kRacerRecordBytes * i);
+  }
+  return r3;
+}
+
+namespace {
+
+// Racers::Add's record at the count (+0x595E0), as the original computes it.
+uint32_t RecordAtCount(uint8_t* base, uint32_t records) {
+  return uint32_t(uint64_t(guest::LoadU32(base, records + kRacersCount)) * kRacerRecordBytes +
+                  records);
+}
+
+bool CarIdAdds(uint8_t* base, uint32_t car) {
+  const int32_t id = int32_t(guest::LoadU32(base, car + 12));
+  return id >= 0 && id < 72;
+}
+
+}  // namespace
+
+bool RacersAddNative(uint8_t* base, uint32_t records, uint32_t car) {
+  if (!CarIdAdds(base, car)) {
+    return true;
+  }
+  return native::Buffers_NativeMemcpy() &&
+         !c_runtime::MayShare(RecordAtCount(base, records), 3904, car, 3904);
+}
+
+int64_t RacersAdd(uint8_t* base, uint32_t records, uint32_t car, double value, uint32_t word) {
+  ITC_NATIVE_RUNNING("sub_820FF860 Racers::Add");
+  if (!CarIdAdds(base, car)) {
+    return -1;
+  }
+  RacerRecordInit(base, RecordAtCount(base, records));
+  if (!native::Buffers_Memcpy(base, RecordAtCount(base, records), car, 3904, 0x820FF8C4)) {
+    ITC_LOG_ERROR("race_setup: Racers::Add's copy of {:08X} not made natively", car);
+  }
+  guest::StoreFloat(base, RecordAtCount(base, records) + 3920, float(value));
+  guest::StoreU32(base, RecordAtCount(base, records) + 3924, word);
+  const uint64_t count = guest::LoadU32(base, records + kRacersCount);
+  guest::StoreU32(base, records + kRacersCount, uint32_t(count + 1));
+  return int64_t(count);
+}
+
+bool AddRacerNative(uint8_t* base, uint32_t record) {
+  return RacersAddNative(base, guest::LoadU32(base, kRaceData) + 48, record);
+}
+
+int64_t AddRacer(uint8_t* base, uint32_t record, uint32_t flag, double value, uint32_t word) {
+  ITC_NATIVE_RUNNING("sub_821017C0 Race::AddRacer");
+  const uint32_t records = guest::LoadU32(base, kRaceData) + 48;
+  const uint32_t added = records + kRacersCount + 4;
+  const int32_t n = int32_t(guest::LoadU32(base, added));
+  if (n == 0) {
+    guest::StoreU32(base, record + 3888, guest::LoadU32(base, record + 3888) | 0x1);
+  } else if (n == 1) {
+    guest::StoreU32(base, record + 3888, guest::LoadU32(base, record + 3888) | 0x80);
+  }
+  if (int32_t(flag) != 0) {
+    guest::StoreU32(base, record + 3888, guest::LoadU32(base, record + 3888) | 0x400);
+  }
+  guest::StoreU32(base, added, guest::LoadU32(base, added) + 1);
+  return RacersAdd(base, records, record, value, word);
+}
+
+bool RecordResetNative(uint32_t frame) {
+  return RouteCopiesNative(frame - kRouteFrameBytes, kRouteFrameOut, 0);
+}
+
+bool RecordReset(uint8_t* base, uint32_t record, uint32_t frame) {
+  if (!RecordResetNative(frame)) {
+    return false;
+  }
+  ITC_NATIVE_RUNNING("sub_82101F68 (one of the race data's 77 records' reset)");
+  guest::StoreU32(base, record + 3912, 0);
+  guest::StoreU32(base, record + 3908, 1);
+  guest::StoreU32(base, record + 0, 0);
+  guest::StoreU32(base, record + 3924, 0);
+  guest::StoreU32(base, record + 3920, 0);
+  for (uint32_t k = 0; k < 4; k++) {
+    EntryReset(base, record + 4 + 972 * k);
+    guest::StoreU32(base, record + 788 + 972 * k, 12000);
+    guest::StoreU32(base, record + 792 + 972 * k, 12000);
+  }
+  guest::StoreU32(base, record + 3932, 0);
+  RouteReset(base, record + 3892, frame - kRouteFrameBytes);
+  return true;
 }
 
 }  // namespace race_setup

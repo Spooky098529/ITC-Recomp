@@ -39,6 +39,11 @@ constexpr uint32_t kRandSeed = 0x82638188;
 constexpr uint32_t kRaceData = 0x826C5B2C;
 constexpr uint32_t kStageList = 0x59620;
 constexpr uint32_t kEvent = 0x826C6078;
+// The racer records (the race data's +48): 93 of kRacerRecordBytes, then the
+// count (+0x595E0), the players' count (+0x595E4), +0x595E8 (the traffic's
+// flag) and +0x595EC.
+constexpr uint32_t kRacerRecordBytes = 3936;
+constexpr uint32_t kRacersCount = 0x595E0;
 
 // --- The car object's parts (src/race_setup/car.cpp) ---
 
@@ -239,5 +244,43 @@ bool RouteReset(uint8_t* base, uint32_t route, uint32_t frame);
 // its own place in the frame); others a fixed pair stored as halfwords at
 // frame + 80 and + 82 and loaded back as a word; outside 1 to 46, (135, 0).
 bool StartPosition(uint8_t* base, uint32_t location, uint32_t frame, uint32_t* result);
+
+
+// --- The racers and the records (src/race_setup/race_data.cpp) ---
+
+// Racers::Reset (sub_820FF978): the racer records' +0x595E0 to +0x595EC = 0,
+// then RacerRecord::Init on all 93. Returns the last one's r3.
+uint32_t RacersReset(uint8_t* base, uint32_t records);
+// Whether Racers::Add's copy of `car` would be native (always, when the car
+// id isn't added).
+bool RacersAddNative(uint8_t* base, uint32_t records, uint32_t car);
+// Racers::Add (sub_820FF860): unless `car`'s id (+12, signed) is 0 to 71
+// (then -1), the record at the count: RacerRecord::Init, 3,904 bytes from
+// the car (memcpy's native copy), +3920 = float(value), +3924 = word, the
+// count up (the record's address worked out again from the count before
+// each step, as the original). Returns the count before (zero-extended).
+// Only after RacersAddNative said yes.
+int64_t RacersAdd(uint8_t* base, uint32_t records, uint32_t car, double value, uint32_t word);
+// Race::AddRacer (sub_821017C0): with the racers' +0x595E4 (racers added
+// this way) 0 the record's flags +3888 |= 0x1, with 1 |= 0x80; a nonzero
+// `flag` |= 0x400; +0x595E4 up; then Racers::Add (a tail call). Returns its
+// r3. Only after AddRacerNative said yes.
+bool AddRacerNative(uint8_t* base, uint32_t record);
+int64_t AddRacer(uint8_t* base, uint32_t record, uint32_t flag, double value, uint32_t word);
+// sub_82101F68: one of the race data's 77 records (`frame` its frame, the
+// caller's r1 - 128): +3912 = 0, +3908 = 1, +0, +3924, +3920 = 0; its four
+// 972-byte entries at +4 reset (sub_82101EB0) with their +784 and +788 =
+// 12000; +3932 = 0; Route::Reset(+3892) (its frame below this one). False,
+// with nothing written, where Route::Reset's copies wouldn't be native.
+bool RecordResetNative(uint32_t frame);
+bool RecordReset(uint8_t* base, uint32_t record, uint32_t frame);
+
+// Race::SetRoute (sub_82101D38): Route::Set(the race data + 4, index,
+// location), a tail call (`frame` is Route::Set's: the caller's r1 - 496).
+bool RaceSetRoute(uint8_t* base, uint32_t index, uint32_t location, uint32_t frame);
+// Stages::SetRoute (sub_82101E90): Route::Set(stage `stage` (-1: the list's
+// +804) + 24, index, location), a tail call.
+bool StagesSetRoute(uint8_t* base, uint32_t list, uint32_t index, uint32_t location,
+                    uint32_t stage, uint32_t frame);
 
 }  // namespace race_setup

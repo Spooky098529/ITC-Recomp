@@ -84,4 +84,23 @@ void RaceSetupRouteReset(PPCContext& ctx, uint8_t* base);
 // (zero-extended). The original where a copy wouldn't be native.
 void RaceSetupStartPosition(PPCContext& ctx, uint8_t* base);
 
+// Racers::Reset sub_820FF978: r3 = the racer records; r3 = the last record
+// + 1568.
+void RaceSetupRacersReset(PPCContext& ctx, uint8_t* base);
+// Racers::Add sub_820FF860: r3 = the records, r4 = a car object, f1, r6; r3
+// = its index or -1. Race::AddRacer sub_821017C0: r3 = a racer record, r5 =
+// a flag, f1, r6; r3 = Racers::Add's. The originals where the copy wouldn't
+// be native.
+void RaceSetupRacersAdd(PPCContext& ctx, uint8_t* base);
+void RaceSetupAddRacer(PPCContext& ctx, uint8_t* base);
+// sub_82101F68: r3 = one of the 77 records; r3 = Route::Reset's frame + 80
+// (r1 - 544), f1 = 0.0. The original where a copy wouldn't be native.
+void RaceSetupRecordReset(PPCContext& ctx, uint8_t* base);
+// Race::SetRoute sub_82101D38: r3 = the index, r4 = the location; Stages::
+// SetRoute sub_82101E90: r3 = the list, r4, r5 as Route::Set's, r6 = the
+// stage or -1. r3 = Route::Set's (r1 - 416). The originals where a copy
+// wouldn't be native.
+void RaceSetupRaceSetRoute(PPCContext& ctx, uint8_t* base);
+void RaceSetupStagesSetRoute(PPCContext& ctx, uint8_t* base);
+
 }  // namespace hooks

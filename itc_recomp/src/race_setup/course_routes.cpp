@@ -637,4 +637,25 @@ bool StartPosition(uint8_t* base, uint32_t location, uint32_t frame, uint32_t* r
   return true;
 }
 
+bool RaceSetRoute(uint8_t* base, uint32_t index, uint32_t location, uint32_t frame) {
+  // (A tail call: Route::Set's frame is this one's caller's.)
+  if (!RouteCopiesNative(frame, kRouteFrameOut, index)) {
+    return false;
+  }
+  ITC_NATIVE_RUNNING("sub_82101D38 Race::SetRoute");
+  return RouteSet(base, guest::LoadU32(base, kRaceData) + 4, index, location, frame);
+}
+
+bool StagesSetRoute(uint8_t* base, uint32_t list, uint32_t index, uint32_t location,
+                    uint32_t stage, uint32_t frame) {
+  if (!RouteCopiesNative(frame, kRouteFrameOut, index)) {
+    return false;
+  }
+  ITC_NATIVE_RUNNING("sub_82101E90 Stages::SetRoute");
+  if (int32_t(stage) == -1) {
+    stage = guest::LoadU32(base, list + 804);
+  }
+  return RouteSet(base, stage * 80 + list + 24, index, location, frame);
+}
+
 }  // namespace race_setup

@@ -715,22 +715,35 @@ void CourseRoutes(Context& h, const Block& block) {
 }
 
 // A function copying a course route through its own frame (Route::Set,
-// Route::Reset, Race::StartPosition): the frames below the call's r1 (its
-// own, `frame_bytes`, and CourseRoutes::Get's under it) filled with random
-// words as CourseRoutes' cases do; compared: the block, CourseRoutes::Get's
-// frame from +4 to its register saves (+4328), the function's frame from +4
-// to its own saves (`saves` bytes below r1), the caller's frame from r1 to
-// the scratch area, the scratch area, r3 and r1. The back chains aren't
-// compared (not written natively).
-template <typename Args>
-void RouteCase(Context& h, Results& results, const Block& block, uint32_t frame_bytes,
-               uint32_t saves, Args args, GuestFunction recompiled, GuestFunction native,
-               const std::string& what) {
+// Route::Reset, Race::StartPosition and their callers): the frames below the
+// call's r1 (`frames`, outermost first: each one's bytes and the bytes of
+// register saves at its top, and CourseRoutes::Get's under the last) filled
+// with random words as CourseRoutes' cases do; compared: the block,
+// CourseRoutes::Get's frame from +4 to its register saves (+4328), each
+// frame from +4 to its saves, the caller's frame from r1 to the scratch
+// area, the scratch area, the `globals` (set by `setup`, put back after), r3
+// and r1. The back chains aren't compared (not written natively).
+struct Frame {
+  uint32_t bytes, saves;
+};
+
+template <typename Setup, typename Args>
+void FramesCase(Context& h, Results& results, const Block& block, const std::vector<Frame>& frames,
+                const std::vector<uint32_t>& globals, Setup setup, Args args,
+                GuestFunction recompiled, GuestFunction native,
+                const std::vector<uint32_t>& floats, const std::string& what) {
   const uint32_t r1 = CallContext(h).r1.u32;
-  const uint32_t own = r1 - frame_bytes;
-  const uint32_t routes = own - race_setup::kRoutesFrameBytes;
+  uint32_t routes = r1;
+  for (const Frame& frame : frames) {
+    routes -= frame.bytes;
+  }
+  routes -= race_setup::kRoutesFrameBytes;
   constexpr uint32_t kBelow = 1024;
   constexpr uint32_t kSaves = race_setup::kRoutesFrameBytes - 152;
+  std::vector<uint32_t> saved;
+  for (uint32_t global : globals) {
+    saved.push_back(guest::LoadU32(h.base, global));
+  }
   Outputs out[2];
   const Random start = h.random;
   Random after;
@@ -739,23 +752,42 @@ void RouteCase(Context& h, Results& results, const Block& block, uint32_t frame_
     WriteRandom(h.base, routes - kBelow, (h.data + kScratchBytes - (routes - kBelow)) / 4,
                 random);
     WriteRandom(h.base, block.address, block.bytes / 4, random);
+    setup(random);
     after = random;
     PPCContext t = CallContext(h);
     args(t);
     ITC_FLAG(native_race_setup) = v == 1;
     (v == 0 ? recompiled : native)(t, h.base);
     ITC_FLAG(native_race_setup) = true;
-    out[v].Bytes(Read(h.base, block.address, block.bytes));
+    Record(out[v], h.base, block, floats);
     out[v].Bytes(Read(h.base, routes + 4, kSaves - 4));
-    out[v].Bytes(Read(h.base, own + 4, frame_bytes - 4 - saves));
+    uint32_t top = r1;
+    for (const Frame& frame : frames) {
+      out[v].Bytes(Read(h.base, top - frame.bytes + 4, frame.bytes - 4 - frame.saves));
+      top -= frame.bytes;
+    }
     out[v].Bytes(Read(h.base, r1, h.data - r1));
     out[v].Bytes(Read(h.base, h.data, kScratchBytes));
+    for (size_t i = 0; i < globals.size(); i++) {
+      out[v].Word(guest::LoadU32(h.base, globals[i]));
+      guest::StoreU32(h.base, globals[i], saved[i]);
+    }
     out[v].Word(t.r3.u32);
     out[v].Word(uint32_t(t.r3.u64 >> 32));
     out[v].Word(t.r1.u32);
+    out[v].Double(t.f1.u64);
   }
   h.random = after;
   results.Check(out[0], out[1], what);
+}
+
+template <typename Args>
+void RouteCase(Context& h, Results& results, const Block& block, uint32_t frame_bytes,
+               uint32_t saves, Args args, GuestFunction recompiled, GuestFunction native,
+               const std::string& what) {
+  FramesCase(
+      h, results, block, {{frame_bytes, saves}}, {}, [](Random&) {}, args, recompiled, native,
+      {}, what);
 }
 
 // Route::Set (every course route twice, location 48 now and then, r4's high
@@ -811,6 +843,135 @@ void Routes(Context& h, const Block& block) {
   }
 }
 
+// Race::SetRoute (the race data's global pointed so its +4 is in the block),
+// Stages::SetRoute (a stage list at the block's start, the stage -1 or 0 to
+// 9) and sub_82101F68 (a record in `records`; Route::Reset's frame under its
+// own: the top 24 bytes of Route::Reset's are register saves, Route::Reset's
+// own and sub_82101EB0's r30 left there by the original's calls).
+void RouteCallers(Context& h, const Block& block, const Block& records) {
+  {
+    Results results("Race::SetRoute (sub_82101D38)");
+    for (int c = 0; c < 46; c++) {
+      const uint32_t index = uint32_t(c / 2);
+      const uint32_t at = block.address + 4 * h.random.Below((block.bytes - 16) / 4);
+      const uint32_t location = c % 2 == 0 ? 48u : h.random.Below(50);
+      FramesCase(
+          h, results, block, {{race_setup::kRouteFrameBytes, 16}}, {race_setup::kRaceData},
+          [&](Random&) { guest::StoreU32(h.base, race_setup::kRaceData, at - 4); },
+          [&](PPCContext& t) {
+            t.r3.u64 = index;
+            t.r4.u64 = location;
+          },
+          __imp__sub_82101D38, hooks::RaceSetupRaceSetRoute, {},
+          fmt::format("case {}: route {}, location {}", c, index, location));
+    }
+    results.Report();
+  }
+  {
+    Results results("Stages::SetRoute (sub_82101E90)");
+    for (int c = 0; c < 46; c++) {
+      const uint32_t index = uint32_t(c / 2);
+      const uint32_t location = c % 3 == 0 ? 48u : h.random.Below(50);
+      const uint32_t stage = c % 2 == 0 ? 0xFFFFFFFFu : h.random.Below(10);
+      FramesCase(
+          h, results, block, {{race_setup::kRouteFrameBytes, 16}}, {},
+          [&](Random& r) { guest::StoreU32(h.base, block.address + 804, r.Below(10)); },
+          [&](PPCContext& t) {
+            t.r3.u64 = block.address;
+            t.r4.u64 = index;
+            t.r5.u64 = location;
+            t.r6.u64 = stage;
+          },
+          __imp__sub_82101E90, hooks::RaceSetupStagesSetRoute, {},
+          fmt::format("case {}: route {}, location {}, stage {}", c, index, location,
+                      int32_t(stage)));
+    }
+    results.Report();
+  }
+  {
+    Results results("sub_82101F68");
+    for (int c = 0; c < 16; c++) {
+      const uint32_t at = records.address + 4 * h.random.Below((records.bytes - 3936) / 4);
+      FramesCase(
+          h, results, records, {{128, 48}, {race_setup::kRouteFrameBytes, 24}}, {},
+          [](Random&) {}, [&](PPCContext& t) { t.r3.u64 = at; }, __imp__sub_82101F68,
+          hooks::RaceSetupRecordReset, {},
+          fmt::format("case {}: at +{:X}", c, at - records.address));
+    }
+    results.Report();
+  }
+}
+
+// Racers::Reset, Racers::Add and Race::AddRacer on a block as big as the
+// racer records (93 records and the counts): the count 0 to 92, the car
+// object another record (its id 0 to 71, or -1, 72 or random now and then),
+// f1 a random float's value (its +3920 compared as a float).
+void Racers(Context& h) {
+  const Block records(0x59600);
+  if (!records.address) {
+    ITC_LOG_ERROR("harness: race_setup: no block for the racer records");
+    return;
+  }
+  {
+    Results results("Racers::Reset (sub_820FF978)");
+    for (int c = 0; c < 3; c++) {
+      GlobalsCase(
+          h, results, records, {}, [](Random&) {},
+          [&](PPCContext& t) { t.r3.u64 = records.address; }, __imp__sub_820FF978,
+          hooks::RaceSetupRacersReset, {}, fmt::format("case {}", c));
+    }
+    results.Report();
+  }
+  Results add("Racers::Add (sub_820FF860)");
+  Results add_racer("Race::AddRacer (sub_821017C0)");
+  for (int c = 0; c < 64; c++) {
+    const uint32_t count = h.random.Below(93);
+    const uint32_t other = (count + 1 + h.random.Below(92)) % 93;
+    const uint32_t car = records.address + race_setup::kRacerRecordBytes * other;
+    const uint32_t id = c % 8 == 0   ? 0xFFFFFFFFu
+                        : c % 8 == 1 ? 72u
+                        : c % 16 == 2 ? uint32_t(h.random.Next())
+                                      : h.random.Below(72);
+    const uint32_t value = RandomFloat(h.random);
+    const uint64_t word = h.random.Next();
+    const uint32_t added = c % 4 == 3 ? uint32_t(h.random.Next()) : h.random.Below(3);
+    const uint64_t flag = c % 3 == 0 ? 0 : c % 3 == 1 ? 1 : h.random.Next();
+    const std::vector<uint32_t> floats = {race_setup::kRacerRecordBytes * count + 3920};
+    auto setup = [&](Random&) {
+      guest::StoreU32(h.base, records.address + race_setup::kRacersCount, count);
+      guest::StoreU32(h.base, records.address + race_setup::kRacersCount + 4, added);
+      guest::StoreU32(h.base, car + 12, id);
+    };
+    GlobalsCase(
+        h, add, records, {}, setup,
+        [&](PPCContext& t) {
+          t.r3.u64 = records.address;
+          t.r4.u64 = car;
+          t.f1.f64 = double(std::bit_cast<float>(value));
+          t.r6.u64 = word;
+        },
+        __imp__sub_820FF860, hooks::RaceSetupRacersAdd, floats,
+        fmt::format("case {}: count {}, car {}, id {}", c, count, other, int32_t(id)));
+    GlobalsCase(
+        h, add_racer, records, {race_setup::kRaceData},
+        [&](Random& r) {
+          setup(r);
+          guest::StoreU32(h.base, race_setup::kRaceData, records.address - 48);
+        },
+        [&](PPCContext& t) {
+          t.r3.u64 = car;
+          t.r5.u64 = flag;
+          t.f1.f64 = double(std::bit_cast<float>(value));
+          t.r6.u64 = word;
+        },
+        __imp__sub_821017C0, hooks::RaceSetupAddRacer, floats,
+        fmt::format("case {}: count {}, car {}, id {}, added {}", c, count, other, int32_t(id),
+                    int32_t(added)));
+  }
+  add.Report();
+  add_racer.Report();
+}
+
 void RaceSetup(Context& h) {
   const Block block(0x1000);
   if (!block.address) {
@@ -838,6 +999,8 @@ void RaceSetup(Context& h) {
              hooks::RaceSetupStagesReset, 1224);
   OnePointer(h, cars, "RacerRecord::Init (sub_820FF808)", __imp__sub_820FF808,
              hooks::RaceSetupRacerRecordInit, 3936);
+  RouteCallers(h, block, cars);
+  Racers(h);
   RaceDataConstructs(h);
 }
 

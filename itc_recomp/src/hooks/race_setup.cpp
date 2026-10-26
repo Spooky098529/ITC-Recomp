@@ -24,7 +24,10 @@ ITC_FLAG_BOOL(native_race_setup, true, "ITC",
               "sub_821434C8; sub_82101EB0 and CourseRecord::Reset sub_82105C90; CourseRoutes::Get sub_820FFF50, "
               "its table written into its stack frame); Stages::Reset sub_82101860, RacerRecord::Init "
               "sub_820FF808, Route::Set sub_82101A10, Route::Reset sub_82101990, "
-              "Race::StartPosition sub_82101A98 (with its switch piece sub_82101ADC) natively instead of "
+              "Race::StartPosition sub_82101A98 (with its switch piece sub_82101ADC); "
+              "Racers::Reset sub_820FF978, Racers::Add sub_820FF860, Race::AddRacer "
+              "sub_821017C0, sub_82101F68, Race::SetRoute sub_82101D38, Stages::SetRoute "
+              "sub_82101E90) natively instead of "
               "through the translated code (the same writes; checked by "
               "--run_harnesses=race_setup)");
 
@@ -203,6 +206,61 @@ void RaceSetupStartPosition(PPCContext& ctx, uint8_t* base) {
   ctx.r3.u64 = result;
 }
 
+void RaceSetupRacersReset(PPCContext& ctx, uint8_t* base) {
+  ctx.fpscr.disableFlushMode();
+  ctx.r3.u64 = rs::RacersReset(base, ctx.r3.u32);
+}
+
+void RaceSetupRacersAdd(PPCContext& ctx, uint8_t* base) {
+  ctx.fpscr.disableFlushMode();
+  if (!rs::RacersAddNative(base, ctx.r3.u32, ctx.r4.u32)) {
+    __imp__sub_820FF860(ctx, base);
+    return;
+  }
+  ctx.r3.s64 = rs::RacersAdd(base, ctx.r3.u32, ctx.r4.u32, ctx.f1.f64, ctx.r6.u32);
+}
+
+void RaceSetupAddRacer(PPCContext& ctx, uint8_t* base) {
+  ctx.fpscr.disableFlushMode();
+  if (!rs::AddRacerNative(base, ctx.r3.u32)) {
+    __imp__sub_821017C0(ctx, base);
+    return;
+  }
+  ctx.r3.s64 = rs::AddRacer(base, ctx.r3.u32, ctx.r5.u32, ctx.f1.f64, ctx.r6.u32);
+}
+
+void RaceSetupRecordReset(PPCContext& ctx, uint8_t* base) {
+  ctx.fpscr.disableFlushMode();
+  const uint32_t frame = ctx.r1.u32 - 128;
+  if (!rs::RecordReset(base, ctx.r3.u32, frame)) {
+    __imp__sub_82101F68(ctx, base);
+    return;
+  }
+  // Route::Reset's r3 (its frame + 80), and f1 as the entries' resets leave
+  // it (0.0).
+  ctx.r3.u64 = ctx.r1.u64 - 128 - rs::kRouteFrameBytes + 80;
+  ctx.f1.f64 = double(guest::LoadFloat(base, rs::kZero));
+}
+
+void RaceSetupRaceSetRoute(PPCContext& ctx, uint8_t* base) {
+  ctx.fpscr.disableFlushMode();
+  if (!rs::RaceSetRoute(base, ctx.r3.u32, ctx.r4.u32, ctx.r1.u32 - rs::kRouteFrameBytes)) {
+    __imp__sub_82101D38(ctx, base);
+    return;
+  }
+  ctx.r3.u64 = ctx.r1.u64 - rs::kRouteFrameBytes + 80;
+}
+
+void RaceSetupStagesSetRoute(PPCContext& ctx, uint8_t* base) {
+  ctx.fpscr.disableFlushMode();
+  if (!rs::StagesSetRoute(base, ctx.r3.u32, ctx.r4.u32, ctx.r5.u32, ctx.r6.u32,
+                          ctx.r1.u32 - rs::kRouteFrameBytes)) {
+    __imp__sub_82101E90(ctx, base);
+    return;
+  }
+  ctx.r3.u64 = ctx.r1.u64 - rs::kRouteFrameBytes + 80;
+}
+
 }  // namespace hooks
 
 // Car::ResetDecals40, Car::ResetDecals6, Car::ResetSettings and sub_820CCC70
@@ -245,6 +303,12 @@ ITC_RACE_SETUP(820FF808, RaceSetupRacerRecordInit)
 ITC_RACE_SETUP(82101A10, RaceSetupRouteSet)
 ITC_RACE_SETUP(82101990, RaceSetupRouteReset)
 ITC_RACE_SETUP(82101A98, RaceSetupStartPosition)
+ITC_RACE_SETUP(820FF978, RaceSetupRacersReset)
+ITC_RACE_SETUP(820FF860, RaceSetupRacersAdd)
+ITC_RACE_SETUP(821017C0, RaceSetupAddRacer)
+ITC_RACE_SETUP(82101F68, RaceSetupRecordReset)
+ITC_RACE_SETUP(82101D38, RaceSetupRaceSetRoute)
+ITC_RACE_SETUP(82101E90, RaceSetupStagesSetRoute)
 // sub_82101ADC (a case of Race::StartPosition's switch, in its frame) needs
 // no adapter: only the original Race::StartPosition reaches it.
 // sub_82101D20 has no adapter: the array helper's plain C++
