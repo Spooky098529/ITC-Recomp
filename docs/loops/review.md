@@ -50,6 +50,13 @@ When the user has reviewed a run's section, its heading gets
   record, copied into the race data from register saves the native
   callees don't write (`expected-differences.md`, "Unwritten stack bytes
   copied"; whether the game reads them isn't known).
+- The race's set-up, migration 3 (62e7b9a..2f54d5a, four parts by
+  subagents): `car-physics.md`'s `sub_820AF1C0`, `sub_820C05C8` (named
+  `CarData::ApplySettings`, our name), `sub_820C0D28`, `sub_820C27E8`
+  rewritten from a full read; `sub_820AEE98`, `sub_820AF018`,
+  `sub_820B6A38` set to Native; `race-setup.md`'s `sub_820CD5C8`
+  Overridden. `SetupFromCar`'s and `SetupVehicle`'s adapters stay
+  (recompiled callers in play).
 
 ## Run 2026-10-25 16:38 (`b7-loop-25-10-26-3`)
 

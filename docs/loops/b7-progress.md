@@ -37,8 +37,14 @@ file's history. What's left to see in a drive, from every run:
   `Vehicle::SetupFromCar` `sub_820C27E8` (`car-physics.md`, 4,148
   lines, to split), blocking `Car::SetupVehicle`. Validated
   (`itc_1890`: 24 of 24 harness lines, 17 ran in the attract race, 4 in
-  the replay `itc_1891`, ok; 2 more to `to-drive.md`). Step: migration
-  agent 3 running (`Vehicle::SetupFromCar`, `Car::SetupVehicle`).
+  the replay `itc_1891`, ok; 2 more to `to-drive.md`). Migration 3 done
+  in four parts by subagents, one at a time (62e7b9a..2f54d5a:
+  `CarData::Derive`, `ApplySettings`, `Vehicle::ApplyTuning`,
+  `Vehicle::SetupFromCar` under `--native_car_physics`,
+  `Car::SetupVehicle`; 6 adapters removed in `car-physics.md`; 24 s, 0
+  errors, every harness 0 differing). Nothing left in `race-setup.md`
+  (52 of 52 ours); car physics' other ready groups to a "no mapping"
+  lead. Step: validation agent 3 running.
 
 ## Done
 
@@ -73,6 +79,8 @@ This run's groups: `expected-differences.md` (the "23:42 run" lines).
 - After the race's set-up's validation 2: race 24 s (`itc_1890`), 0
   errors, every harness 0 differing but the expected group; replay
   127 s (`itc_1891`), 0 errors.
+- After the race's set-up's migration 3: ours 2209, work left 4242
+  (wrapped 104, known 535, unknown 3603).
 
 ## Stopped
 
