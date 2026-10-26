@@ -145,10 +145,10 @@ ITC_ACCESSOR_WORD(820B7C90, CollisionObjectFirstContact(base, ctx.r3.u32, ctx.r4
 // masks' setters, SetSize and SetFloat224 (sub_820B7D18 to sub_820B7D70):
 // their callers in play, the vehicle's physics set-up and reset, are native.
 // CollisionRecord::Copy (sub_820B7D78) has no adapter: its caller in play,
-// CollisionRecords::Merge (src/car_physics/), is native.
-ITC_ACCESSOR_VOID(820B8768, CollisionSetGlobal78(base, ctx.r3.u32))
-ITC_ACCESSOR_VOID(820B8778, CollisionSetGlobal7C(base, ctx.r3.u32))
-ITC_ACCESSOR_VOID(820B8788, CollisionWorldSetCallback(base, ctx.r3.u32))
+// CollisionRecords::Merge (src/car_physics/), is native. Nor have the
+// queries' pointers' setters and CollisionWorld::SetCallback (sub_820B8768,
+// sub_820B8778, sub_820B8788): their caller in play, CollisionWorld::Setup,
+// is native.
 ITC_ACCESSOR_WORD(820B8A48, CollisionWorldNewContact(base))
 ITC_ACCESSOR_WORD(820B8C90, CollisionWorldWord60(base))
 ITC_ACCESSOR_WORD(820B8CA0, CollisionWorldWord64(base))

@@ -238,19 +238,11 @@ ITC_CAR_PHYSICS(820BC540, ctx.f1.f64 = CollisionSurfaceOfA(base, ctx.r3.u32))
 ITC_CAR_PHYSICS(820BC548, ctx.f1.f64 = CollisionSurfaceOfB(base, ctx.r3.u32))
 ITC_CAR_PHYSICS(820BC530, ctx.f1.f64 = CollisionSurfaceOfC(base, ctx.r3.u32))
 ITC_CAR_PHYSICS(820BC538, ctx.f1.f64 = CollisionSurfaceOfD(base, ctx.r3.u32))
-// r4 = the bits, f1 = the value.
-ITC_CAR_PHYSICS(820BC318, CollisionSurfaceSetA(base, ctx.r4.u32, ctx.f1.f64))
-ITC_CAR_PHYSICS(820BC360, CollisionSurfaceSetB(base, ctx.r4.u32, ctx.f1.f64))
-ITC_CAR_PHYSICS(820BC3A8, CollisionSurfaceSetC(base, ctx.r4.u32, ctx.f1.f64))
-ITC_CAR_PHYSICS(820BC3F0, CollisionSurfaceSetD(base, ctx.r4.u32, ctx.f1.f64))
-// CollisionSurfaces::Reset (sub_820BC438) has no adapter: its caller in
-// play, ResetSurfaces, is native.
-// r3 comes back as 0x826C2E30.
-ITC_CAR_PHYSICS(820BC550, CollisionWorldResetSurfaces(base); ctx.r3.u64 = 0x826C2E30)
-// CollisionShape::Init (sub_820BAA78) has no adapter: its caller in play,
-// the collision object's constructor, is native.
-// r3 = the object (left as it is).
-ITC_CAR_PHYSICS(820B7AE8, CollisionObjectConstruct(base, ctx.r3.u32))
+// The surface setters A to D (sub_820BC318, sub_820BC360, sub_820BC3A8,
+// sub_820BC3F0), CollisionWorld::ResetSurfaces (sub_820BC550, with
+// CollisionSurfaces::Reset, sub_820BC438) and CollisionObject::CollisionObject
+// (sub_820B7AE8, with CollisionShape::Init, sub_820BAA78) have no adapters:
+// their callers in play, CollisionWorld::Setup and Create, are native.
 // r4 = the point, r5 = the force; r3 comes back as +176.
 ITC_CAR_PHYSICS(820B7DF8, ctx.r3.u64 = CollisionObjectAccumulateForce(base, ctx.r3.u32,
                                                                       ctx.r4.u32, ctx.r5.u32,
