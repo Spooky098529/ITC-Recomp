@@ -11,7 +11,9 @@
 
 #include "base/flags.h"
 #include "base/log.h"
+#include "car_specs/car_specs.h"
 #include "hooks/race_setup.h"
+#include "race_setup/race_setup.h"
 #include "memory/heap.h"
 
 #include <fmt/format.h>
@@ -172,6 +174,175 @@ void Decals(Context& h, const Block& block) {
   results.Report();
 }
 
+// --- Car::SetModel and Car::FromBuild ---
+
+// The block's layout for them: the car object, the build, the spec and the
+// parameter object (its +12 the specs' table, set so the case's id finds the
+// spec here; +64 + 4m the wheel models' first records).
+constexpr uint32_t kCar = 0, kBuild = 0x800, kSpec = 0x1400, kParams = 0x1800;
+constexpr uint32_t kSpecBytes = 8432;
+
+uint32_t RandomId(Random& r) {
+  static constexpr uint32_t kIds[] = {0, 11, 55, 56, 63, 64, 66, 68, 69, 70, 71};
+  switch (r.Below(4)) {
+    case 0:
+      return kIds[r.Below(11)];
+    case 1:
+      return uint32_t(r.Next()) & 0xFFFF;
+    default:
+      return r.Below(72);
+  }
+}
+
+// A word near a threshold, or random.
+uint32_t Near(Random& r, uint32_t threshold) {
+  return r.Below(4) == 0 ? uint32_t(r.Next()) : threshold - 2 + r.Below(5);
+}
+
+// The spec: random words, its floats random floats, the drive type 0 to 3
+// or random, the four limits near theirs.
+void WriteSpec(uint8_t* base, uint32_t spec, Random& r) {
+  WriteRandom(base, spec, 0x400 / 4, r);
+  for (uint32_t offset = 372; offset <= 416; offset += 4) {
+    guest::StoreU32(base, spec + offset, RandomFloat(r));
+  }
+  guest::StoreU32(base, spec + 364, RandomFloat(r));
+  guest::StoreU32(base, spec + 356, r.Below(5) == 0 ? uint32_t(r.Next()) : r.Below(4));
+  guest::StoreU8(base, spec + 709, r.Below(2) ? 0 : uint8_t(r.Next()));
+  guest::StoreU32(base, spec + 648, Near(r, 2000));
+  guest::StoreU32(base, spec + 716, Near(r, 4700));
+  guest::StoreU32(base, spec + 720, Near(r, 2000));
+  guest::StoreU32(base, spec + 724, Near(r, 1700));
+}
+
+// The car object's float fields: the drive and gears (+36 to +68), the 46
+// decals' first five words.
+std::vector<uint32_t> CarFloats() {
+  std::vector<uint32_t> floats;
+  for (uint32_t offset = 36; offset <= 68; offset += 4) {
+    floats.push_back(kCar + offset);
+  }
+  for (uint32_t i = 0; i < 46; i++) {
+    for (uint32_t k = 0; k < 5; k++) {
+      floats.push_back(kCar + 96 + 32 * i + 4 * k);
+    }
+  }
+  return floats;
+}
+
+// One case through both versions with the parameter global and the rand
+// seed set alike on both sides (and compared after), put back afterwards.
+template <typename Setup, typename Args>
+void CarCase(Context& h, Results& results, const Block& block, Setup setup, Args args,
+             GuestFunction recompiled, GuestFunction native, const std::string& what) {
+  static const std::vector<uint32_t> floats = CarFloats();
+  const uint32_t params = guest::LoadU32(h.base, car_specs::kParams);
+  const uint32_t seed = guest::LoadU32(h.base, race_setup::kRandSeed);
+  Outputs out[2];
+  const Random start = h.random;
+  Random after;
+  for (int v = 0; v < 2; v++) {
+    Random random = start;
+    WriteRandom(h.base, h.data, kScratchBytes / 4, random);
+    WriteRandom(h.base, block.address, block.bytes / 4, random);
+    guest::StoreU32(h.base, race_setup::kRandSeed, uint32_t(random.Next()));
+    guest::StoreU32(h.base, car_specs::kParams, block.address + kParams);
+    setup(random);
+    after = random;
+    PPCContext t = CallContext(h);
+    args(t);
+    ITC_FLAG(native_race_setup) = v == 1;
+    (v == 0 ? recompiled : native)(t, h.base);
+    ITC_FLAG(native_race_setup) = true;
+    Record(out[v], h.base, block, floats);
+    out[v].Bytes(Read(h.base, h.data, kScratchBytes));
+    out[v].Word(guest::LoadU32(h.base, race_setup::kRandSeed));
+    out[v].Word(guest::LoadU32(h.base, car_specs::kParams));
+    out[v].Word(t.r3.u32);
+    out[v].Word(uint32_t(t.r3.u64 >> 32));
+    guest::StoreU32(h.base, car_specs::kParams, params);
+    guest::StoreU32(h.base, race_setup::kRandSeed, seed);
+  }
+  h.random = after;
+  results.Check(out[0], out[1], what);
+}
+
+// Points the parameter object's specs' table so that `id` finds the spec.
+void PointSpec(uint8_t* base, const Block& block, uint32_t id) {
+  guest::StoreU32(base, block.address + kParams + 12, block.address + kSpec - kSpecBytes * id);
+}
+
+void SetModels(Context& h, const Block& block) {
+  Results results("Car::SetModel (sub_820CD8A8)");
+  for (int c = 0; c < 300; c++) {
+    uint32_t id = 0;
+    CarCase(
+        h, results, block,
+        [&](Random& r) {
+          id = RandomId(r);
+          WriteSpec(h.base, block.address + kSpec, r);
+          PointSpec(h.base, block, id);
+          // Without the parameters now and then (Params::Exists 0).
+          if (r.Below(10) == 0) {
+            guest::StoreU32(h.base, car_specs::kParams, 0);
+          }
+        },
+        [&](PPCContext& t) {
+          t.r3.u64 = block.address + kCar;
+          t.r4.u64 = id;
+        },
+        __imp__sub_820CD8A8, hooks::RaceSetupSetModel, fmt::format("case {}: car {}", c, id));
+  }
+  results.Report();
+}
+
+void FromBuilds(Context& h, const Block& block) {
+  Results results("Car::FromBuild (sub_820CDCE0)");
+  for (int c = 0; c < 300; c++) {
+    uint32_t id = 0;
+    CarCase(
+        h, results, block,
+        [&](Random& r) {
+          const uint32_t build = block.address + kBuild;
+          id = RandomId(r);
+          WriteSpec(h.base, block.address + kSpec, r);
+          PointSpec(h.base, block, id);
+          guest::StoreU32(h.base, build + 2788, id);
+          // The gear factors: 0.0 of either sign now and then.
+          for (uint32_t i = 0; i < 7; i++) {
+            guest::StoreU32(h.base, build + 4 * i,
+                            r.Below(4) == 0 ? (r.Below(2) ? 0u : 0x80000000u) : RandomFloat(r));
+          }
+          // The decals' entries' floats.
+          for (uint32_t from : {392u, 500u}) {
+            for (uint32_t k = 0; k < 3; k++) {
+              for (uint32_t w = 0; w < 5; w++) {
+                guest::StoreU32(h.base, build + from + 36 * k + 4 * w, RandomFloat(r));
+              }
+            }
+          }
+          for (uint32_t from : {608u, 968u, 1328u, 1688u, 1868u, 2048u, 2408u, 2588u}) {
+            for (uint32_t k = 0; k < 5; k++) {
+              for (uint32_t w = 0; w < 5; w++) {
+                guest::StoreU32(h.base, build + from + 36 * k + 4 * w, RandomFloat(r));
+              }
+            }
+          }
+          // The wheel numbers: models -1 to 30 (the parameter object holds
+          // their first records), the number's last digit any.
+          for (uint32_t offset : {232u, 240u}) {
+            guest::StoreU32(h.base, build + offset, uint32_t(int32_t(r.Below(320)) - 15));
+          }
+        },
+        [&](PPCContext& t) {
+          t.r3.u64 = block.address + kCar;
+          t.r4.u64 = block.address + kBuild;
+        },
+        __imp__sub_820CDCE0, hooks::RaceSetupFromBuild, fmt::format("case {}: car {}", c, id));
+  }
+  results.Report();
+}
+
 }  // namespace
 
 void RaceSetup(Context& h) {
@@ -182,6 +353,13 @@ void RaceSetup(Context& h) {
   }
   Parts(h, block);
   Decals(h, block);
+  const Block cars(0x2000);
+  if (!cars.address) {
+    ITC_LOG_ERROR("harness: race_setup: no block from the allocation layer");
+    return;
+  }
+  SetModels(h, cars);
+  FromBuilds(h, cars);
 }
 
 }  // namespace harness

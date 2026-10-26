@@ -26,8 +26,15 @@
 namespace race_setup {
 
 // The image's floats the originals load with lfs.
-constexpr uint32_t kOne = 0x82000A30;   // 1.0
-constexpr uint32_t kZero = 0x82000A34;  // 0.0
+constexpr uint32_t kOne = 0x82000A30;      // 1.0
+constexpr uint32_t kZero = 0x82000A34;     // 0.0
+constexpr uint32_t kHundred = 0x82002A0C;  // 100.0
+constexpr uint32_t kTwenty = 0x82002568;   // 20.0
+constexpr uint32_t kTorqueScale = 0x8200222C;  // not read
+constexpr uint32_t kGearScale = 0x82002204;    // not read
+
+// The game's rand seed (race_overlays::Rand).
+constexpr uint32_t kRandSeed = 0x82638188;
 
 // --- The car object's parts (src/race_setup/car.cpp) ---
 
@@ -65,5 +72,40 @@ uint32_t CarClear(uint8_t* base, uint32_t car);
 // Car::Init (sub_820CD5D8): Car::Clear, then +3888 = 0 (the flags), +3892 =
 // 1. Returns Car::Clear's r3.
 uint32_t CarInit(uint8_t* base, uint32_t car);
+
+// Car::SetModel (sub_820CD8A8): +12 = the car id; unless Params::Exists is
+// 0 (then returns 0), from its spec (Params::GetCarSpec): CarTuning::Reset(
+// +1648, spec byte +709 != 0); +36 = the final drive (spec +372), +40 to +68
+// eight gear ratios (+388); setting bytes +76, +77 = spec +632, +636, +74,
+// +75 = +800, +808, +72 = +796 then +804 (+72 written twice, +73 left);
+// with the drive type (+356) neither 0 nor 1, +92 = 1 and +93 = the low byte
+// of fctiwz((1.0 - spec +364) x [0x82002A0C] x [0x82002568] x [0x8200222C])
+// (each step rounded to single), else +92 = 0; the tuning words +1676,
+// +1796, +1684, +1680, +1700, +1704 from spec +772 to +792; the three +1588
+// entries from spec +812 (+8 to +16 converted from integers to floats); the
+// tuning words +1716, +1712, +1724, +1720 from spec +884 to +896; the five
+// +1824 entries from spec +900 (+8 = the word, +0 = the next / 3 + 1, +4 =
+// it % 3); +1570, +1571 = 5, 0 when spec +648 <= 2000, +716 <= 4700, +720 <=
+// 2000 and +724 <= 1700 (unsigned), else 3, 3; +1572 = 0; at random (the
+// game's rand): +1569 = 0 to 13, +1573 = 1 to 10, +1574 and +1575 = 1 to 10
+// after a 10, else 1 to 9, +1576 = 1 to 9; +1580 = 1 for cars 56, 64 to 68
+// and 70. Returns the last rand() (the original's r3).
+uint32_t SetModel(uint8_t* base, uint32_t car, uint32_t id);
+// Car::FromBuild (sub_820CDCE0): a car object from a car build (an item's
+// +160, at least 2,812 bytes): Car::Clear; +12 = build +2788 and
+// Car::SetModel with it; the paint (halfwords +0, +2 = build +2792, +8 =
+// +2800, bytes +10, +11 = +2804, +2808, halfword +6 = +2796); the decals
+// (CarDecal::FromBuild): +96 + 32k from +392 + 36k and +192 + 32k from +500
+// + 36k (k < 3), then 40 from +288 by groups of five from +608, +968,
+// +1328, +1688, +1868, +2048, +2408, +2588; the final drive and the first
+// six gear ratios (+36 to +60) each x fma(build +4i, [0x82002204], 1.0)
+// (rounded to single, then the product) unless the build's float is 0.0;
+// setting bytes +72 to +94 from build words +28 to +116; +1568 (20 bytes)
+// from +2768; the three +1588 entries from +332 (+8 to +16 converted); the
+// tuning words +1656 to +1812 from +120 to +268; the wheel numbers +1728,
+// +1736 = Params::FirstWheelOfModel(build +232 / 10) + build +232 % 10 (and
+// +240), +1732, +1740 = +236, +244. Returns the last FirstWheelOfModel (the
+// original's r3).
+uint32_t FromBuild(uint8_t* base, uint32_t car, uint32_t build);
 
 }  // namespace race_setup

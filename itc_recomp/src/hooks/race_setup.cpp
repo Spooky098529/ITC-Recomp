@@ -13,7 +13,8 @@ ITC_FLAG_BOOL(native_race_setup, true, "ITC",
               "Car::ResetSettings sub_820CD760, sub_820CCC70 (these four without adapters: "
               "reached from Car::Clear), CarTuning::Reset sub_820CD618, "
               "CarDecal::FromBuild sub_820CDC18 (with its setters sub_820CC450 to sub_820CC478 "
-              "merged), Car::Clear sub_820CD7F0 and Car::Init sub_820CD5D8) natively instead of "
+              "merged), Car::Clear sub_820CD7F0, Car::Init sub_820CD5D8, Car::SetModel sub_820CD8A8 and "
+              "Car::FromBuild sub_820CDCE0) natively instead of "
               "through the translated code (the same writes; checked by "
               "--run_harnesses=race_setup)");
 
@@ -58,6 +59,16 @@ void RaceSetupCarInit(PPCContext& ctx, uint8_t* base) {
   ctx.r3.u64 = rs::CarInit(base, ctx.r3.u32);
 }
 
+void RaceSetupSetModel(PPCContext& ctx, uint8_t* base) {
+  ctx.fpscr.disableFlushMode();
+  ctx.r3.u64 = rs::SetModel(base, ctx.r3.u32, ctx.r4.u32);
+}
+
+void RaceSetupFromBuild(PPCContext& ctx, uint8_t* base) {
+  ctx.fpscr.disableFlushMode();
+  ctx.r3.u64 = rs::FromBuild(base, ctx.r3.u32, ctx.r4.u32);
+}
+
 }  // namespace hooks
 
 // Car::ResetDecals40, Car::ResetDecals6, Car::ResetSettings and sub_820CCC70
@@ -79,3 +90,5 @@ ITC_RACE_SETUP(820CD618, RaceSetupTuningReset)
 ITC_RACE_SETUP(820CDC18, RaceSetupDecalFromBuild)
 ITC_RACE_SETUP(820CD7F0, RaceSetupCarClear)
 ITC_RACE_SETUP(820CD5D8, RaceSetupCarInit)
+ITC_RACE_SETUP(820CD8A8, RaceSetupSetModel)
+ITC_RACE_SETUP(820CDCE0, RaceSetupFromBuild)

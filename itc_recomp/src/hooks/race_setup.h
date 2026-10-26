@@ -25,5 +25,11 @@ void RaceSetupDecalFromBuild(PPCContext& ctx, uint8_t* base);
 // + 1568.
 void RaceSetupCarClear(PPCContext& ctx, uint8_t* base);
 void RaceSetupCarInit(PPCContext& ctx, uint8_t* base);
+// Car::SetModel sub_820CD8A8: r3 = the car, r4 = the id; r3 = the last
+// rand() (0 without the parameters).
+void RaceSetupSetModel(PPCContext& ctx, uint8_t* base);
+// Car::FromBuild sub_820CDCE0: r3 = the car, r4 = the build; r3 = the last
+// Params::FirstWheelOfModel.
+void RaceSetupFromBuild(PPCContext& ctx, uint8_t* base);
 
 }  // namespace hooks
