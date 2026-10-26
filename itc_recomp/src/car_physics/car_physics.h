@@ -610,6 +610,25 @@ bool VehicleApplyTuningCopyFits(uint32_t car, uint32_t frame);
 // float at 0x8200256C (0.04; `*f1`).
 uint64_t VehicleApplyTuning(uint8_t* base, uint32_t data, uint32_t car, uint32_t frame,
                             double* f1);
+// Vehicle::SetupFromCar (sub_820C27E8): the car loader, the car data
+// filled from the car object (`car`; its copies of its spec: block 2 at
+// +1888, block 1 +2240, the engine stage +2880, the tires +3084 and +3176;
+// its row): the copies, the gear ratios' magnitudes, the torque curve
+// (copied again for fctiwz(+1280 x [0x82002CE8]) points, counted through
+// `frame` + 80), the axles (CarData::FillAxle from the tires' copies at
+// `frame` + 128 and + 208), the record by +176 from the table at
+// 0x8260181C (unchecked), Vehicle::ApplyTuning, CarData::ApplySettings, the
+// flag +3888, the axles' positions (built at `frame` + 112 and + 96, the
+// camber settings' widening by sin), CarData::ConvertUnits and
+// CarData::Derive. `frame`: the original's 368 bytes (its register saves
+// from +288 not reproduced); the callees' frames below it at the
+// original's offsets (ApplyTuning 480, ApplySettings 192, Derive 1008
+// bytes). False, with nothing written, where ApplyTuning's copy wouldn't be
+// native (VehicleApplyTuningCopyFits): the original runs there. Otherwise
+// `f1` gets what the original leaves (Derive's), and r3 comes back as
+// `frame` - 1008 + 352 (Derive's temporary body).
+bool VehicleSetupFromCar(uint8_t* base, uint32_t data, uint32_t car, uint32_t frame,
+                         double* f1);
 // Vehicle::Vehicle (sub_820B42C8): the w of its vectors 0.0, +3260 to
 // +3372 (every 16) 1.0, +336, +340, +344 = 0, Vehicle::Reset (its frame
 // below `frame`, the original's 112 bytes; `f1` what it leaves), byte

@@ -9,9 +9,12 @@
 #include "c_runtime/math.h"
 #include "c_runtime/strings.h"
 #include "collision/collision.h"
+#include "vehicle_accessors/vectors.h"
 #include "vehicle_accessors/vehicle_accessors.h"
 
 #include <bit>
+#include <climits>
+#include <cmath>
 #include <initializer_list>
 
 namespace car_physics {
@@ -847,6 +850,251 @@ uint64_t VehicleApplyTuning(uint8_t* base, uint32_t data, uint32_t car, uint32_t
   }
   *f1 = k(k0_04);
   return r3;
+}
+
+namespace {
+
+// Vehicle::SetupFromCar's constants (their values as the game has them).
+constexpr uint32_t kCurveScale = 0x82002CE8;  // the torque curve's points by +1280
+constexpr uint32_t kAxleTable = 0x8260181C;   // the records by the car data's +176
+constexpr uint32_t kRadians = 0x82002948;     // degrees to radians (probably)
+constexpr uint32_t kHalf = 0x82002BC0;        // 0.5
+constexpr uint32_t kMinusHalf = 0x82001BE8;   // -0.5
+constexpr uint32_t k84Scale = 0x82001070;     // +84's scale with the flag +3888 bit 1
+
+// The callees' frames below Vehicle::SetupFromCar's.
+constexpr uint32_t kTuningFrame = 480, kSettingsFrame = 192, kDeriveFrame = 1008;
+
+// One copy of the original's first run of copies: car data + `to` = block
+// 1 + `from` (the car's +2240), or (from_one) the float 1.0.
+struct SetupCopy {
+  uint16_t to, from;
+};
+
+// In the original's order (lfs then stfs: the bits; +172 and +176 are lwz
+// and stw). 0xFFFF: the game's 1.0.
+constexpr SetupCopy kSetupCopies[] = {
+    {32, 16},     {36, 20},     {40, 24},     {48, 32},     {52, 36},     {56, 40},
+    {28, 596},    {0, 532},     {4, 536},     {8, 540},     {12, 544},    {80, 48},
+    {84, 52},     {88, 56},     {1264, 556},  {1712, 560},  {1716, 564},  {1708, 568},
+    {1704, 572},  {1760, 64},   {1764, 68},   {1768, 72},   {1772, 0xFFFF}, {1776, 80},
+    {1780, 84},   {1784, 88},   {1788, 0xFFFF}, {1792, 576}, {1796, 580}, {316, 616},
+    {320, 620},   {324, 628},   {328, 624},   {332, 304},   {488, 112},   {492, 116},
+    {540, 96},    {544, 96},    {548, 100},   {596, 136},   {600, 140},   {604, 144},
+    {484, 108},   {384, 104},   {760, 176},   {764, 180},   {812, 160},   {816, 160},
+    {820, 164},   {868, 200},   {872, 204},   {876, 208},   {756, 172},   {656, 168},
+    {1720, 224},  {1724, 228},  {1728, 232},  {1736, 236},  {456, 152},   {460, 156},
+    {592, 148},   {1732, 240},  {1740, 244},  {1744, 248},  {1748, 252},  {1756, 256},
+    {728, 216},   {732, 220},   {864, 212},   {1752, 260},  {1820, 584},  {1824, 588},
+    {1828, 592},  {172, 356},   {176, 360},   {180, 364},   {128, 308},   {132, 268},
+    {136, 284},   {148, 312},   {308, 316},   {156, 264},   {160, 280},   {140, 272},
+    {144, 288},   {312, 320},   {1832, 604},  {1836, 608},  {1840, 612},  {164, 296},
+    {168, 300}};
+
+// fctiwz as the translated code does it: NaN and values at or below
+// -2^31 - 1 give INT32_MIN, values at or above INT32_MAX give INT32_MAX.
+int32_t Fctiwz(double v) {
+  if (std::isnan(v) || v <= -2147483649.0) {
+    return INT32_MIN;
+  }
+  if (v >= 2147483647.0) {
+    return INT32_MAX;
+  }
+  return int32_t(v);
+}
+
+// The torque curve's point count: fctiwz(+1280 x the scale), stored
+// through frame + 80 (stfiwx) as the original does.
+int32_t CurvePoints(uint8_t* base, uint32_t data, uint32_t frame, double scale) {
+  const int32_t n = Fctiwz(Fmuls(Lfs(base, data + 1280), scale));
+  guest::StoreU32(base, frame + 80, uint32_t(n));
+  return n;
+}
+
+// A tire's +8 to +36 and +44 to +76 copied to the frame at `to` (+40 left
+// out), as the original's loop and copies order them.
+void CopyTire(uint8_t* base, uint32_t to, uint32_t tire) {
+  for (uint32_t i = 0; i < 4; i++) {
+    CopyWord(base, tire + 8 + 4 * i, to + 4 * i);
+    CopyWord(base, tire + 24 + 4 * i, to + 16 + 4 * i);
+  }
+  for (uint32_t i = 0; i < 9; i++) {
+    CopyWord(base, tire + 44 + 4 * i, to + 32 + 4 * i);
+  }
+}
+
+// The axle's widening by its camber setting: radius x (sin(the new camber)
+// - sin(the spec's)), in radians by `radians`; 0.0 when the setting byte is
+// 0.
+double CamberWidening(uint8_t* base, uint32_t data, uint32_t car, uint32_t byte,
+                      uint32_t spec_angle, uint32_t angle, uint32_t radius, double radians,
+                      double zero) {
+  if (guest::LoadU8(base, car + byte) == 0) {
+    return zero;
+  }
+  const double old_sine = c_runtime::Sin(Fmuls(Lfs(base, spec_angle), radians));
+  const double new_angle = Fmuls(Lfs(base, data + angle), radians);
+  const double old_part = Fneg(Fmuls(double(float(old_sine)), Lfs(base, data + radius)));
+  const double new_sine = double(float(c_runtime::Sin(new_angle)));
+  return Fmadds(new_sine, Lfs(base, data + radius), old_part);
+}
+
+}  // namespace
+
+bool VehicleSetupFromCar(uint8_t* base, uint32_t data, uint32_t car, uint32_t frame,
+                         double* f1) {
+  if (!VehicleApplyTuningCopyFits(car, frame - kTuningFrame)) {
+    return false;
+  }
+  ITC_NATIVE_RUNNING("sub_820C27E8 Vehicle::SetupFromCar");
+  const uint32_t d = data, f = frame;
+  const uint32_t block2 = vehicle_accessors::ObjectRecord1888(car);  // car + 1888
+  const uint32_t block1 = block2 + 352;                               // car + 2240
+  const uint32_t engine = block2 + 992;                               // car + 2880
+  const uint32_t front_tire = block2 + 1196;                          // car + 3084
+  const uint32_t rear_tire = block2 + 1288;                           // car + 3176
+  auto copy = [&](uint32_t to, uint32_t from) { CopyWord(base, from, d + to); };
+
+  for (const SetupCopy& c : kSetupCopies) {
+    CopyWord(base, c.from == 0xFFFF ? kOne : block1 + c.from, d + c.to);
+  }
+  for (uint32_t i = 0; i < 8; i++) {
+    copy(276 + 4 * i, block1 + 324 + 4 * i);
+  }
+  guest::StoreU32(base, d + 1268, guest::LoadU32(base, block1 + 368));
+  const double zero = Lfs(base, kZero);
+  // The gear ratios' table (+1428, its magnitudes: a value below 0.0 is
+  // negated, a NaN kept), +1464, +1500 and +1632, 9 each.
+  for (uint32_t i = 0; i < 9; i++) {
+    double v = Lfs(base, block1 + 384 + 4 * i);
+    if (v < zero) {
+      v = Fneg(v);
+    }
+    Stfs(base, d + 1428 + 4 * i, v);
+    copy(1464 + 4 * i, block1 + 420 + 4 * i);
+    copy(1500 + 4 * i, block1 + 456 + 4 * i);
+    copy(1632 + 4 * i, block1 + 492 + 4 * i);
+  }
+  copy(1536, block1 + 372);
+  copy(1540, block1 + 376);
+  copy(1544, block1 + 380);
+  copy(1628, block1 + 600);
+  copy(1272, engine + 12);
+  copy(1276, engine + 16);
+  copy(1280, engine + 20);
+  copy(1420, engine + 24);
+  // +1288 = block 2's word +8 as a float (through frame + 80: std, lfd,
+  // fcfid, frsp; the word zero-extended).
+  {
+    const uint32_t word = guest::LoadU32(base, block2 + 8);
+    guest::StoreU32(base, f + 80, 0);
+    guest::StoreU32(base, f + 84, word);
+    Stfs(base, d + 1288, double(float(double(int64_t(word)))));
+  }
+  // The torque curve: 32 points from the engine's +28, then again for as
+  // many as +1280 x the scale says (counted again after each).
+  for (uint32_t i = 0; i < 32; i++) {
+    copy(1292 + 4 * i, engine + 28 + 4 * i);
+  }
+  {
+    const double scale = Lfs(base, kCurveScale);
+    if (CurvePoints(base, d, f, scale) > 0) {
+      int32_t j = 0;
+      do {
+        CopyWord(base, engine + 28 + 4 * uint32_t(j), d + 1292 + 4 * uint32_t(j));
+        j++;
+      } while (j < CurvePoints(base, d, f, scale));
+    }
+  }
+  copy(1548, engine + 156);
+  copy(1552, engine + 160);
+  copy(1556, engine + 164);
+  copy(1560, engine + 168);
+  guest::StoreU8(base, d + 1604, guest::LoadU32(base, engine + 172) != 0 ? 1 : 0);
+  copy(1616, engine + 176);
+  copy(1620, engine + 180);
+  copy(1624, engine + 184);
+  copy(1612, engine + 188);
+  guest::StoreU8(base, d + 1605, guest::LoadU32(base, engine + 192) != 0 ? 1 : 0);
+  copy(1608, engine + 196);
+
+  // The axles from the tires' copies on the frame (front +128, rear +208).
+  CopyTire(base, f + 128, front_tire);
+  CarDataFillAxle(base, d, f + 128, 1);
+  CopyTire(base, f + 208, rear_tire);
+  CarDataFillAxle(base, d, f + 208, 0);
+
+  // The record by +176 (unchecked): +184, +188, +192 to +255, +256, +260.
+  {
+    const uint32_t index = guest::LoadU32(base, d + 176);
+    const uint32_t record = guest::LoadU32(base, (index << 2) + kAxleTable);
+    copy(184, record + 4);
+    copy(188, record + 8);
+    for (uint32_t i = 0; i < 16; i++) {
+      copy(192 + 4 * i, record + 12 + 4 * i);
+    }
+    copy(256, record + 76);
+    copy(260, record + 80);
+  }
+
+  double tuning_f1 = 0.0;
+  VehicleApplyTuning(base, d, car, f - kTuningFrame, &tuning_f1);
+  CarDataApplySettings(base, d, car, block2, f - kSettingsFrame);
+
+  // The flag +3888 bit 1: +168 = +164, +84 x the scale.
+  if ((guest::LoadU32(base, car + 3888) >> 1) & 1) {
+    const double v84 = Lfs(base, d + 84);
+    copy(168, d + 164);
+    Stfs(base, d + 84, Fmuls(v84, Lfs(base, k84Scale)));
+  }
+
+  // The axles' positions (+336 and +608, Vec4::Copy from the frame's +112
+  // and +96): x half the wheelbase ahead and behind, y the ride heights
+  // +1736 and +1756, z half the track less the inch-up's widening (car +3876,
+  // +3880) and the camber setting's (bytes +80, +81), w 0.0.
+  const double radians = Lfs(base, kRadians);
+  {
+    const double widening =
+        CamberWidening(base, d, car, 80, block1 + 96, 544, 388, radians, zero);
+    const double track = Lfs(base, d + 8);
+    const double inch = Lfs(base, car + 3876);
+    const double wheelbase = Lfs(base, d + 4);
+    CopyWord(base, d + 1736, f + 116);
+    const double half = Lfs(base, kHalf);
+    const double z = Fnmsubs(track, half, inch);
+    Stfs(base, f + 124, zero);
+    Stfs(base, f + 112, Fmuls(wheelbase, half));
+    Stfs(base, f + 120, Fadds(z, widening));
+    vector_library::Vec4Copy(base, d + 336, f + 112);
+  }
+  {
+    const double widening =
+        CamberWidening(base, d, car, 81, block1 + 160, 816, 660, radians, zero);
+    CopyWord(base, d + 1756, f + 100);
+    const double wheelbase = Lfs(base, d + 4);
+    const double track = Lfs(base, d + 12);
+    const double inch = Lfs(base, car + 3880);
+    Stfs(base, f + 96, Fmuls(wheelbase, Lfs(base, kMinusHalf)));
+    const double z = Fnmsubs(track, Lfs(base, kHalf), inch);
+    Stfs(base, f + 108, zero);
+    Stfs(base, f + 104, Fadds(z, widening));
+    vector_library::Vec4Copy(base, d + 608, f + 96);
+  }
+
+  copy(1808, d + 1704);
+  copy(1812, d + 1712);
+  copy(1816, d + 1716);
+  copy(264, d + 132);
+  copy(268, d + 136);
+  copy(272, d + 148);
+  for (uint32_t i = 0; i < 9; i++) {
+    guest::StoreU32(base, d + 1564 + 4 * i, guest::LoadU32(base, d + 1428 + 4 * i));
+  }
+  copy(1424, d + 1420);
+  copy(1600, d + 1536);
+  CarDataConvertUnits(base, d);
+  *f1 = CarDataDerive(base, d, f - kDeriveFrame);
+  return true;
 }
 
 }  // namespace car_physics
