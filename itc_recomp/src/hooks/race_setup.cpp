@@ -19,7 +19,8 @@ ITC_FLAG_BOOL(native_race_setup, true, "ITC",
               "sub_821021B8 (its entries' sub_82101D20 through the array helper, without an "
               "adapter), sub_820FF558, RunningMean::Add sub_82101698, Time::Pack sub_82101700, "
               "sub_82110AC0; RaceEvent::FirstOwned sub_821430A0, RaceEvent::Current "
-              "sub_821434E8 and RaceEvent::Count sub_821434F8) natively instead of "
+              "sub_821434E8, RaceEvent::Count sub_821434F8, RaceEvent::CurrentFirstOwned "
+              "sub_821434C8; sub_82101EB0 and CourseRecord::Reset sub_82105C90) natively instead of "
               "through the translated code (the same writes; checked by "
               "--run_harnesses=race_setup)");
 
@@ -112,6 +113,21 @@ void RaceSetupEventFirstOwned(PPCContext& ctx, uint8_t* base) {
   ctx.r3.s64 = rs::EventFirstOwned(base, ctx.r3.u32);
 }
 
+void RaceSetupEventCurrentFirstOwned(PPCContext& ctx, uint8_t* base) {
+  ctx.r3.s64 = rs::EventCurrentFirstOwned(base);
+}
+
+void RaceSetupEntryReset(PPCContext& ctx, uint8_t* base) {
+  ctx.fpscr.disableFlushMode();
+  rs::EntryReset(base, ctx.r3.u32);
+  ctx.r3.u64 = ctx.r1.u64 - 144 + 80;
+  ctx.f1.f64 = double(guest::LoadFloat(base, rs::kZero));
+}
+
+void RaceSetupCourseRecordReset(PPCContext& ctx, uint8_t* base) {
+  ctx.r3.u64 = rs::CourseRecordReset(base, ctx.r3.u32);
+}
+
 void RaceSetupEventCurrent(PPCContext& ctx, uint8_t* base) {
   ctx.r3.u64 = rs::EventCurrent(base);
 }
@@ -158,6 +174,9 @@ ITC_RACE_SETUP(82110AC0, RaceSetupCountRace)
 ITC_RACE_SETUP(821430A0, RaceSetupEventFirstOwned)
 ITC_RACE_SETUP(821434E8, RaceSetupEventCurrent)
 ITC_RACE_SETUP(821434F8, RaceSetupEventCount)
+ITC_RACE_SETUP(821434C8, RaceSetupEventCurrentFirstOwned)
+ITC_RACE_SETUP(82101EB0, RaceSetupEntryReset)
+ITC_RACE_SETUP(82105C90, RaceSetupCourseRecordReset)
 // sub_82101D20 has no adapter: the array helper's plain C++
 // (c_runtime::VectorConstruct, --native_c_runtime) calls its plain C++ when
 // handed its address, as RaceData::RaceData's does.

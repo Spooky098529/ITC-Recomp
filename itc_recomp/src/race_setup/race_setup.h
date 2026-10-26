@@ -139,6 +139,19 @@ uint32_t LapRecordReset(uint8_t* base, uint32_t record);
 // += weight; unless that's 0, mean = fdivs(fmadds(old count, mean,
 // fmuls(weight, value)), new count) (the counts converted to single).
 void RunningMeanAdd(uint8_t* base, uint32_t mean, double value, uint32_t weight);
+// RunningMean::Add's arithmetic on host values: the mean after adding
+// `value` with `weight` to {mean, count} (the counts' sum not 0).
+float MeanAfterAdd(float mean, uint32_t count, double value, uint32_t weight);
+// sub_82101EB0: a 972-byte entry: +0, +4, +8 = -1, +12, +16 = 0; ten 76-byte
+// records from +20 (sub_820FF558); +780, +784 = 0; +792 a running mean set
+// to (0.0, 1) (RunningMean::Add of 0.0 with weight 1 on (0.0, 0), on the
+// original's stack: here on host values); +800, +816 to +828 = 0.0; +804,
+// +812, +808, +968 = 0, halfword +964 = 0, +832 = 0.
+void EntryReset(uint8_t* base, uint32_t entry);
+// CourseRecord::Reset (sub_82105C90): a 408-byte course record:
+// sub_820FF558(+332); halfwords +4i + 2 = i, +4i = i + 1 for i < 10; +40, +48
+// = 0, +36, +44, +46, +42 = -1. Returns sub_820FF558's (the record + 332).
+uint32_t CourseRecordReset(uint8_t* base, uint32_t record);
 // Time::Pack (sub_82101700): milliseconds (r3, all 64 bits as the original
 // computes with them) packed: the sign in bit 31, minutes in bits 16-30,
 // seconds in 10-15, milliseconds in 0-9. Its stack word (the original's r11
@@ -155,6 +168,9 @@ void CountRace(uint8_t* base, uint32_t stats, uint32_t mode);
 // below (the mapped row had it above 0: the original returns at `ble`);
 // else -1.
 int32_t EventFirstOwned(uint8_t* base, uint32_t event);
+// RaceEvent::CurrentFirstOwned (sub_821434C8): RaceEvent::FirstOwned of
+// [0x826C6078], or -1 when it's 0.
+int32_t EventCurrentFirstOwned(uint8_t* base);
 // RaceEvent::Current (sub_821434E8): [0x826C6078].
 uint32_t EventCurrent(uint8_t* base);
 // RaceEvent::Count (sub_821434F8): its halfword +20 (zero-extended).

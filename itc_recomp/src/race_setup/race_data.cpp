@@ -96,22 +96,73 @@ uint32_t LapRecordReset(uint8_t* base, uint32_t record) {
   return record;
 }
 
+float MeanAfterAdd(float mean, uint32_t count, double value, uint32_t weight) {
+  namespace ops = car_physics::ops;
+  const uint32_t new_count = count + weight;
+  const double w = double(float(double(int64_t(int32_t(weight)))));
+  const double o = double(float(double(int64_t(int32_t(count)))));
+  const double n = double(float(double(int64_t(int32_t(new_count)))));
+  return float(ops::Fdivs(ops::Fmadds(o, double(mean), ops::Fmuls(w, value)), n));
+}
+
 void RunningMeanAdd(uint8_t* base, uint32_t mean, double value, uint32_t weight) {
   ITC_NATIVE_RUNNING("sub_82101698 RunningMean::Add");
-  namespace ops = car_physics::ops;
   const uint32_t old_count = guest::LoadU32(base, mean + 4);
   const uint32_t new_count = old_count + weight;
   if (new_count == 0) {
     return;
   }
-  const double old_mean = ops::Lfs(base, mean + 0);
+  const float old_mean = guest::LoadFloat(base, mean + 0);
   guest::StoreU32(base, mean + 4, new_count);
   // (The three conversions go through the red zone: not written.)
-  const double w = double(float(double(int64_t(int32_t(weight)))));
-  const double o = double(float(double(int64_t(int32_t(old_count)))));
-  const double n = double(float(double(int64_t(int32_t(new_count)))));
-  const double result = ops::Fdivs(ops::Fmadds(o, old_mean, ops::Fmuls(w, value)), n);
-  ops::Stfs(base, mean + 0, result);
+  guest::StoreFloat(base, mean + 0, MeanAfterAdd(old_mean, old_count, value, weight));
+}
+
+void EntryReset(uint8_t* base, uint32_t entry) {
+  ITC_NATIVE_RUNNING("sub_82101EB0 (a 972-byte entry's reset)");
+  guest::StoreU32(base, entry + 0, 0xFFFFFFFFu);
+  guest::StoreU32(base, entry + 4, 0xFFFFFFFFu);
+  guest::StoreU32(base, entry + 8, 0xFFFFFFFFu);
+  guest::StoreU32(base, entry + 12, 0);
+  guest::StoreU32(base, entry + 16, 0);
+  for (uint32_t i = 0; i < 10; i++) {
+    LapRecordReset(base, entry + 20 + 76 * i);
+  }
+  guest::StoreU32(base, entry + 780, 0);
+  guest::StoreU32(base, entry + 784, 0);
+  // The running mean, built on the original's stack ({0.0, 0} plus 0.0 with
+  // weight 1), then copied as a doubleword.
+  const float zero = guest::LoadFloat(base, kZero);
+  const float mean = MeanAfterAdd(zero, 0, double(zero), 1);
+  guest::StoreFloat(base, entry + 800, zero);
+  guest::StoreU32(base, entry + 804, 0);
+  guest::StoreFloat(base, entry + 816, zero);
+  guest::StoreU32(base, entry + 812, 0);
+  guest::StoreFloat(base, entry + 820, zero);
+  guest::StoreU32(base, entry + 808, 0);
+  guest::StoreFloat(base, entry + 824, zero);
+  guest::StoreU32(base, entry + 968, 0);
+  guest::StoreFloat(base, entry + 828, zero);
+  guest::StoreFloat(base, entry + 792, mean);
+  guest::StoreU32(base, entry + 796, 1);
+  guest::StoreU16(base, entry + 964, 0);
+  guest::StoreU32(base, entry + 832, 0);
+}
+
+uint32_t CourseRecordReset(uint8_t* base, uint32_t record) {
+  ITC_NATIVE_RUNNING("sub_82105C90 CourseRecord::Reset");
+  const uint32_t r3 = LapRecordReset(base, record + 332);
+  for (uint32_t i = 0; i < 10; i++) {
+    guest::StoreU16(base, record + 4 * i + 2, uint16_t(i));
+    guest::StoreU16(base, record + 4 * i, uint16_t(i + 1));
+  }
+  guest::StoreU16(base, record + 40, 0);
+  guest::StoreU16(base, record + 48, 0);
+  guest::StoreU16(base, record + 36, 0xFFFF);
+  guest::StoreU16(base, record + 44, 0xFFFF);
+  guest::StoreU16(base, record + 46, 0xFFFF);
+  guest::StoreU16(base, record + 42, 0xFFFF);
+  return r3;
 }
 
 uint64_t TimePack(uint64_t milliseconds) {
@@ -169,6 +220,12 @@ int32_t EventFirstOwned(uint8_t* base, uint32_t event) {
     }
   }
   return -1;
+}
+
+int32_t EventCurrentFirstOwned(uint8_t* base) {
+  ITC_NATIVE_RUNNING("sub_821434C8 RaceEvent::CurrentFirstOwned");
+  const uint32_t event = guest::LoadU32(base, kEvent);
+  return event == 0 ? -1 : EventFirstOwned(base, event);
 }
 
 uint32_t EventCurrent(uint8_t* base) {

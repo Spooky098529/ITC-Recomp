@@ -458,6 +458,21 @@ void Leaves(Context& h, const Block& block) {
     results.Report();
   }
   {
+    Results entries("sub_82101EB0");
+    Results courses("CourseRecord::Reset (sub_82105C90)");
+    for (int c = 0; c < 32; c++) {
+      const uint32_t at = block.address + 4 * h.random.Below(256);
+      GlobalsCase(
+          h, entries, block, {}, [](Random&) {}, [&](PPCContext& t) { t.r3.u64 = at; },
+          __imp__sub_82101EB0, hooks::RaceSetupEntryReset, {}, fmt::format("case {}", c));
+      GlobalsCase(
+          h, courses, block, {}, [](Random&) {}, [&](PPCContext& t) { t.r3.u64 = at; },
+          __imp__sub_82105C90, hooks::RaceSetupCourseRecordReset, {}, fmt::format("case {}", c));
+    }
+    entries.Report();
+    courses.Report();
+  }
+  {
     Results results("sub_82101D20");
     for (int c = 0; c < 32; c++) {
       const uint32_t at = block.address + 4 * h.random.Below(256);
@@ -562,6 +577,7 @@ void Leaves(Context& h, const Block& block) {
     Results first("RaceEvent::FirstOwned (sub_821430A0)");
     Results current("RaceEvent::Current (sub_821434E8)");
     Results count("RaceEvent::Count (sub_821434F8)");
+    Results current_first("RaceEvent::CurrentFirstOwned (sub_821434C8)");
     const std::vector<uint32_t> globals = {race_setup::kEvent, data_tables::kTables,
                                            kSaveDataPointer};
     for (int c = 0; c < 200; c++) {
@@ -594,6 +610,16 @@ void Leaves(Context& h, const Block& block) {
       GlobalsCase(
           h, first, block, globals, setup, [&](PPCContext& t) { t.r3.u64 = block.address; },
           __imp__sub_821430A0, hooks::RaceSetupEventFirstOwned, {}, fmt::format("case {}", c));
+      GlobalsCase(
+          h, current_first, block, globals,
+          [&](Random& r) {
+            setup(r);
+            if (r.Below(8) == 0) {
+              guest::StoreU32(h.base, race_setup::kEvent, 0);
+            }
+          },
+          [](PPCContext&) {}, __imp__sub_821434C8, hooks::RaceSetupEventCurrentFirstOwned, {},
+          fmt::format("case {}", c));
       if (c < 16) {
         GlobalsCase(
             h, current, block, globals, setup, [](PPCContext&) {}, __imp__sub_821434E8,
@@ -606,6 +632,7 @@ void Leaves(Context& h, const Block& block) {
     first.Report();
     current.Report();
     count.Report();
+    current_first.Report();
   }
 }
 

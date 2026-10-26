@@ -53,6 +53,14 @@ void RaceSetupCountRace(PPCContext& ctx, uint8_t* base);
 // RaceEvent::FirstOwned sub_821430A0: r3 = the event; r3 = the id or -1
 // (sign-extended).
 void RaceSetupEventFirstOwned(PPCContext& ctx, uint8_t* base);
+// RaceEvent::CurrentFirstOwned sub_821434C8: r3 = the id or -1
+// (sign-extended).
+void RaceSetupEventCurrentFirstOwned(PPCContext& ctx, uint8_t* base);
+// sub_82101EB0: r3 = the entry; r3 = the original's frame + 80 (its stack
+// running mean: r1 - 64), f1 = 0.0.
+void RaceSetupEntryReset(PPCContext& ctx, uint8_t* base);
+// CourseRecord::Reset sub_82105C90: r3 = the record; r3 = the record + 332.
+void RaceSetupCourseRecordReset(PPCContext& ctx, uint8_t* base);
 // RaceEvent::Current sub_821434E8, RaceEvent::Count sub_821434F8.
 void RaceSetupEventCurrent(PPCContext& ctx, uint8_t* base);
 void RaceSetupEventCount(PPCContext& ctx, uint8_t* base);
