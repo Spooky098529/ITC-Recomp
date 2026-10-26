@@ -24,7 +24,7 @@ ITC_FLAG_BOOL(native_car_physics, true, "ITC",
               "sub_820B8BA8, sub_820B8AF8, and the collision objects' groups, sub_820B7CC8, "
               "sub_820B7CF0, and their translation, sub_820B7B60; the vehicle's forces applied, sub_820B2CC0; the car data and the "
               "vehicle's constructor, sub_820AEF80 with sub_820AECB8, sub_820AEE98, "
-              "sub_820AF018, sub_820B42C8) natively instead of through the translated code "
+              "sub_820AF018, sub_820AF1C0, sub_820B42C8) natively instead of through the translated code "
               "(the same words, bit for bit; checked by --run_harnesses=car_physics)");
 
 // Defines an adapter: `body` uses `ctx` and `base`. Flush-to-zero off for
@@ -424,6 +424,10 @@ ITC_CAR_PHYSICS(820AEF80, CarDataConstruct(base, ctx.r3.u32, ctx.r1.u32 - 96))
 ITC_CAR_PHYSICS(820AEE98, CarDataFillAxle(base, ctx.r3.u32, ctx.r4.u32, ctx.r5.u32))
 // f1 comes back as +812's new value.
 ITC_CAR_PHYSICS(820AF018, ctx.f1.f64 = CarDataConvertUnits(base, ctx.r3.u32))
+// r3 = the car data; f1 comes back as the second sqrtf, r3 as the
+// temporary body (the frame's +352).
+ITC_CAR_PHYSICS(820AF1C0, ctx.f1.f64 = CarDataDerive(base, ctx.r3.u32, ctx.r1.u32 - 1008);
+                ctx.r3.u64 = ctx.r1.u32 - 1008 + 352)
 // r3 = the vehicle (left as it is); f1 comes back as Vehicle::Reset's.
 extern "C" REX_FUNC(sub_820B42C8) {
   REX_FUNC_PROLOGUE();

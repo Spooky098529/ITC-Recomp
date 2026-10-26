@@ -573,6 +573,15 @@ void CarDataFillAxle(uint8_t* base, uint32_t data, uint32_t source, uint32_t is_
 // CarData::ConvertUnits (sub_820AF018): the file's units converted. Returns
 // what the original leaves in f1 (+812's new value).
 double CarDataConvertUnits(uint8_t* base, uint32_t data);
+// CarData::Derive (sub_820AF1C0): the parameters derived from the loaded
+// ones (its row): the axles' points, the four wheel set-up records (+880),
+// the center of mass and the inertia, the axles' weight shares, a
+// temporary rigid body (at `frame` + 352) for the effective masses, the
+// suspension sub-records, +1800, +1804 and the 9 reciprocals at +1668.
+// `frame`: the original's 1008 bytes (the callees' below it; temporaries
+// at its offsets). Returns what the original leaves in f1 (the second
+// sqrtf); r3 comes back as `frame` + 352.
+double CarDataDerive(uint8_t* base, uint32_t data, uint32_t frame);
 // Vehicle::Vehicle (sub_820B42C8): the w of its vectors 0.0, +3260 to
 // +3372 (every 16) 1.0, +336, +340, +344 = 0, Vehicle::Reset (its frame
 // below `frame`, the original's 112 bytes; `f1` what it leaves), byte

@@ -423,6 +423,7 @@ enum Shape {
 void CarPhysicsVehicle(Context& h);
 void CarPhysicsCollision(Context& h);
 void CarPhysicsPairs(Context& h);
+void CarPhysicsCarDataDerive(Context& h);
 
 void CarPhysics(Context& h) {
   // The block 16-byte aligned, as the game's bodies are.
@@ -604,6 +605,7 @@ void CarPhysics(Context& h) {
   CarPhysicsVehicle(h);
   CarPhysicsCollision(h);
   CarPhysicsPairs(h);
+  CarPhysicsCarDataDerive(h);
 }
 
 namespace {
@@ -1374,6 +1376,118 @@ void CarPhysicsPairs(Context& h) {
   }
   std::memcpy(h.base + kSurfaceGlobals, saved_surfaces, kSurfaceBytes);
   guest::StoreU32(h.base, kWorldPointer, saved_world);
+}
+
+
+namespace {
+
+// CarData::Derive's cases: a car data record (1,820 bytes) further down
+// (below the pairs' region) filled with float words, the call's frame (the
+// original's 1008 bytes, with its callees' below it) filled with random
+// words. Three groups, as the others here: numbers only, one NaN word in
+// the car data, and anything anywhere (NaNs and infinities too). Shapes the
+// branches take, some of the time: an axle's radius (+388, +660) 0.0, the
+// aero factors (+1800, +1804) 0.0, the cambers (+540, +812) 0.0, and the
+// axles' x equal with no offset (+80's x 0.0), so the distances from the
+// center and the wheelbase are 0.0. Compared (harness::Outputs): the car
+// data as floats (it only writes floats with stfs, and the quaternions'
+// bits; what it doesn't write is the same on both sides), the frame from
+// +4 to the register saves (+888) as floats except the temporary body's
+// integer words (+352: +0, +12, +516, exact), the caller's frame from r1
+// to the scratch area, r3, r1 and f1.
+constexpr uint32_t kDeriveArea = 0x1C000;
+constexpr uint32_t kDeriveBytes = 0x720;
+constexpr uint32_t kDeriveFrame = 1008, kDeriveSaves = 888;
+
+ITC_NATIVE_STEP(NativeCarDataDerive,
+                ctx.f1.f64 = cp::CarDataDerive(base, ctx.r3.u32, ctx.r1.u32 - 1008);
+                ctx.r3.u64 = ctx.r1.u32 - 1008 + 352)
+
+uint32_t SmallWord(Random& r) {
+  return std::bit_cast<uint32_t>(float(int32_t(r.Below(1 << 12)) - (1 << 11)) / 64.0f);
+}
+
+}  // namespace
+
+void CarPhysicsCarDataDerive(Context& h) {
+  const uint32_t data = (h.data - kDeriveArea) & ~0xFu;
+  const uint32_t r1 = CallContext(h).r1.u32;
+  const uint32_t frame = r1 - kDeriveFrame;
+  constexpr uint32_t kBelow = 1024;  // the callees' frames
+  enum Group { kNumbers, kOneNaN, kNaNs };
+  const char* const kGroupNames[] = {"", ", one NaN", ", NaNs and infinities anywhere"};
+  constexpr uint32_t kNaNWords[] = {0x7FC00000, 0x7F800001, 0xFFC00001, 0xFF800001};
+  for (Group group : {kNumbers, kOneNaN, kNaNs}) {
+    Results results(std::string("CarData::Derive (sub_820AF1C0)") + kGroupNames[group]);
+    for (uint64_t seed = 0; seed < 200; seed++) {
+      Random pick = Seeded(seed * 29 + 13 * uint64_t(group) + 9);
+      auto word = [group](Random& r) { return group == kNaNs ? FloatWord(r) : NumberWord(r); };
+      const bool zero_front_radius = pick.Below(4) == 0;
+      const bool zero_rear_radius = pick.Below(4) == 0;
+      const bool zero_aero = pick.Below(3) == 0;
+      const bool zero_length = pick.Below(3) == 0;
+      const bool zero_cambers = pick.Below(3) == 0;
+      const bool same_x = pick.Below(4) == 0;
+      const uint32_t x = SmallWord(pick);
+      const uint32_t nan_word = kNaNWords[pick.Below(std::size(kNaNWords))];
+      const uint32_t nan_at = pick.Below(kDeriveBytes / 4);
+      Outputs out[2];
+      for (int v = 0; v < 2; v++) {
+        Random fill = Seeded(seed * 31 + 17 * uint64_t(group) + 11);
+        for (uint32_t i = 0; i < kDeriveBytes; i += 4) {
+          guest::StoreU32(h.base, data + i, word(fill));
+        }
+        for (uint32_t at = frame - kBelow; at < h.data + kScratchBytes; at += 4) {
+          guest::StoreU32(h.base, at, uint32_t(fill.Next()));
+        }
+        if (zero_front_radius) {
+          guest::StoreU32(h.base, data + 388, 0);
+        }
+        if (zero_rear_radius) {
+          guest::StoreU32(h.base, data + 660, 0);
+        }
+        if (zero_aero) {
+          guest::StoreU32(h.base, data + 1800, 0);
+        }
+        if (zero_length) {
+          guest::StoreU32(h.base, data + 1804, 0);
+        }
+        if (zero_cambers) {
+          guest::StoreU32(h.base, data + 540, 0);
+          guest::StoreU32(h.base, data + 812, 0);
+        }
+        if (same_x) {
+          guest::StoreU32(h.base, data + 336, x);
+          guest::StoreU32(h.base, data + 608, x);
+          guest::StoreU32(h.base, data + 80, 0);
+        }
+        if (group == kOneNaN) {
+          guest::StoreU32(h.base, data + 4 * nan_at, nan_word);
+        }
+        PPCContext t = CallContext(h);
+        t.fpscr.disableFlushModeUnconditional();
+        t.r3.u64 = data;
+        (v == 0 ? GuestFunction(Original<__imp__sub_820AF1C0>) : NativeCarDataDerive)(t, h.base);
+        out[v].Floats(h.base, data, kDeriveBytes / 4);
+        out[v].Bytes(Read(h.base, frame + 4, 76));
+        out[v].Floats(h.base, frame + 80, (352 - 80) / 4);
+        const uint32_t body = frame + 352;
+        out[v].Word(guest::LoadU32(h.base, body + 0));
+        out[v].Floats(h.base, body + 4, 2);
+        out[v].Word(guest::LoadU32(h.base, body + 12));
+        out[v].Floats(h.base, body + 16, (516 - 16) / 4);
+        out[v].Word(guest::LoadU32(h.base, body + 516));
+        out[v].Floats(h.base, body + 520, 2);
+        out[v].Bytes(Read(h.base, frame + 880, kDeriveSaves - 880));
+        out[v].Bytes(Read(h.base, r1, h.data - r1));
+        out[v].Word(t.r3.u32);
+        out[v].Word(t.r1.u32);
+        out[v].Double(t.f1.u64);
+      }
+      results.Check(out[0], out[1], fmt::format("seed {}", seed));
+    }
+    results.Report();
+  }
 }
 
 }  // namespace harness
