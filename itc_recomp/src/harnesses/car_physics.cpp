@@ -424,6 +424,7 @@ void CarPhysicsVehicle(Context& h);
 void CarPhysicsCollision(Context& h);
 void CarPhysicsPairs(Context& h);
 void CarPhysicsCarDataDerive(Context& h);
+void CarPhysicsCarDataApplySettings(Context& h);
 
 void CarPhysics(Context& h) {
   // The block 16-byte aligned, as the game's bodies are.
@@ -606,6 +607,7 @@ void CarPhysics(Context& h) {
   CarPhysicsCollision(h);
   CarPhysicsPairs(h);
   CarPhysicsCarDataDerive(h);
+  CarPhysicsCarDataApplySettings(h);
 }
 
 namespace {
@@ -1481,6 +1483,128 @@ void CarPhysicsCarDataDerive(Context& h) {
         out[v].Bytes(Read(h.base, frame + 880, kDeriveSaves - 880));
         out[v].Bytes(Read(h.base, r1, h.data - r1));
         out[v].Word(t.r3.u32);
+        out[v].Word(t.r1.u32);
+        out[v].Double(t.f1.u64);
+      }
+      results.Check(out[0], out[1], fmt::format("seed {}", seed));
+    }
+    results.Report();
+  }
+}
+
+namespace {
+
+// sub_820C05C8's (CarData::ApplySettings, the name ours) cases: a car data
+// record (1,820 bytes) where Derive's goes, a car object (1,792 bytes) and
+// its spec's block 2 (320 bytes) above it, filled with float words; the
+// call's frame (the original's 192 bytes, its callees' below it) filled with
+// random words. Three groups, as Derive's: numbers only, one NaN word in the
+// car data, and anything anywhere (NaNs and infinities too). The car's
+// setting bytes (+72 to +94) random signed bytes, each at an extreme (-128,
+// -1, 0, 1, 127) some of the time; the tuning +1756 above 0 or not, +1700
+// 0, 1 or another, +1704 0, negative, or 1 to 5 (the table's index: 4 and 5
+// read the frame's leftovers at +96 and +100, the same on both sides; past
+// them the original's register saves); the car data's +172 0, 1 or another,
+// +176 1 or not, setting byte 76 0 or not; a radius (+388, +660) 0.0 some of
+// the time (asin of an infinity). Compared (harness::Outputs): the car data
+// as floats (it only writes floats with stfs), the car object and the spec
+// exactly (not written), the frame from +4 to the register saves (+104)
+// exactly (pow's stfd of x and y at +16 and +24, the setting bytes' std and
+// the table at +80), the caller's frame from r1 to the scratch area, r1 and
+// f1. Not r3: the original leaves pow's there, which its only caller
+// doesn't read, and the adapter leaves r3 as it was.
+constexpr uint32_t kSettingsFrame = 192, kSettingsSaves = 104;
+constexpr uint32_t kSettingsCar = 0x800, kSettingsCarBytes = 0x700;
+constexpr uint32_t kSettingsSpec = 0x1000, kSettingsSpecBytes = 0x140;
+
+ITC_NATIVE_STEP(NativeCarDataApplySettings,
+                ctx.f1.f64 = cp::CarDataApplySettings(base, ctx.r3.u32, ctx.r4.u32, ctx.r5.u32,
+                                                      ctx.r1.u32 - 192))
+
+}  // namespace
+
+void CarPhysicsCarDataApplySettings(Context& h) {
+  const uint32_t data = (h.data - kDeriveArea) & ~0xFu;
+  const uint32_t car = data + kSettingsCar, spec = data + kSettingsSpec;
+  const uint32_t r1 = CallContext(h).r1.u32;
+  const uint32_t frame = r1 - kSettingsFrame;
+  constexpr uint32_t kBelow = 1024;  // the callees' frames
+  enum Group { kNumbers, kOneNaN, kNaNs };
+  const char* const kGroupNames[] = {"", ", one NaN", ", NaNs and infinities anywhere"};
+  constexpr uint32_t kNaNWords[] = {0x7FC00000, 0x7F800001, 0xFFC00001, 0xFF800001};
+  constexpr int8_t kExtremes[] = {-128, -1, 0, 1, 127};
+  for (Group group : {kNumbers, kOneNaN, kNaNs}) {
+    Results results(std::string("CarData::ApplySettings (sub_820C05C8)") + kGroupNames[group]);
+    for (uint64_t seed = 0; seed < 300; seed++) {
+      Random pick = Seeded(seed * 37 + 19 * uint64_t(group) + 5);
+      auto word = [group](Random& r) { return group == kNaNs ? FloatWord(r) : NumberWord(r); };
+      uint8_t settings[23];
+      for (uint8_t& b : settings) {
+        b = pick.Below(3) == 0 ? uint8_t(kExtremes[pick.Below(std::size(kExtremes))])
+                               : uint8_t(pick.Next());
+      }
+      const uint32_t all_at = pick.Below(4);  // 1: every byte -128, 2: every byte 127
+      const uint32_t tuning_1756 = pick.Below(2) ? 1 + pick.Below(4) : -pick.Below(3);
+      const uint32_t picks[] = {0, 1, 2, uint32_t(pick.Next())};
+      const uint32_t tuning_1700 = picks[pick.Below(4)];
+      const uint32_t indices[] = {0, uint32_t(-1 - int32_t(pick.Below(4))), 1, 2, 3, 4, 5};
+      const uint32_t tuning_1704 = indices[pick.Below(std::size(indices))];
+      const uint32_t kinds[] = {0, 1, 2, uint32_t(pick.Next())};
+      const uint32_t kind = kinds[pick.Below(4)];
+      const uint32_t v176 = pick.Below(2) ? 1 : uint32_t(pick.Next());
+      const bool byte76_zero = pick.Below(4) == 0;
+      const bool zero_front_radius = pick.Below(6) == 0;
+      const bool zero_rear_radius = pick.Below(6) == 0;
+      const uint32_t nan_word = kNaNWords[pick.Below(std::size(kNaNWords))];
+      const uint32_t nan_at = pick.Below(kDeriveBytes / 4);
+      Outputs out[2];
+      for (int v = 0; v < 2; v++) {
+        Random fill = Seeded(seed * 41 + 23 * uint64_t(group) + 7);
+        for (uint32_t i = 0; i < kDeriveBytes; i += 4) {
+          guest::StoreU32(h.base, data + i, word(fill));
+        }
+        for (uint32_t i = 0; i < kSettingsCarBytes; i += 4) {
+          guest::StoreU32(h.base, car + i, word(fill));
+        }
+        for (uint32_t i = 0; i < kSettingsSpecBytes; i += 4) {
+          guest::StoreU32(h.base, spec + i, word(fill));
+        }
+        for (uint32_t at = frame - kBelow; at < h.data + kScratchBytes; at += 4) {
+          guest::StoreU32(h.base, at, uint32_t(fill.Next()));
+        }
+        for (uint32_t i = 0; i < std::size(settings); i++) {
+          const uint8_t b = all_at == 1 ? 0x80 : all_at == 2 ? 0x7F : settings[i];
+          guest::StoreU8(h.base, car + 72 + i, b);
+        }
+        if (byte76_zero) {
+          guest::StoreU8(h.base, car + 92, 0);
+        }
+        guest::StoreU32(h.base, car + 1756, tuning_1756);
+        guest::StoreU32(h.base, car + 1700, tuning_1700);
+        guest::StoreU32(h.base, car + 1704, tuning_1704);
+        guest::StoreU32(h.base, data + 172, kind);
+        guest::StoreU32(h.base, data + 176, v176);
+        if (zero_front_radius) {
+          guest::StoreU32(h.base, data + 388, 0);
+        }
+        if (zero_rear_radius) {
+          guest::StoreU32(h.base, data + 660, 0);
+        }
+        if (group == kOneNaN) {
+          guest::StoreU32(h.base, data + 4 * nan_at, nan_word);
+        }
+        PPCContext t = CallContext(h);
+        t.fpscr.disableFlushModeUnconditional();
+        t.r3.u64 = data;
+        t.r4.u64 = car;
+        t.r5.u64 = spec;
+        (v == 0 ? GuestFunction(Original<__imp__sub_820C05C8>) : NativeCarDataApplySettings)(
+            t, h.base);
+        out[v].Floats(h.base, data, kDeriveBytes / 4);
+        out[v].Bytes(Read(h.base, car, kSettingsCarBytes));
+        out[v].Bytes(Read(h.base, spec, kSettingsSpecBytes));
+        out[v].Bytes(Read(h.base, frame + 4, kSettingsSaves - 4));
+        out[v].Bytes(Read(h.base, r1, h.data - r1));
         out[v].Word(t.r1.u32);
         out[v].Double(t.f1.u64);
       }

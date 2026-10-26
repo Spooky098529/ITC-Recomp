@@ -135,6 +135,7 @@ set(ITC_SOURCES
     src/car_physics/vehicle_state.cpp
     src/car_physics/collision_world.cpp
     src/car_physics/car_data.cpp
+    src/car_physics/car_setup.cpp
     src/hooks/collision.cpp
     src/collision/shapes.cpp
     src/collision/boxes.cpp
@@ -389,7 +390,7 @@ set_source_files_properties(src/c_runtime/math.cpp src/ui_movies/keys.cpp
     src/matrix_math/matrix_math.cpp src/car_physics/rigid_body.cpp
     src/car_physics/vehicle_step.cpp src/car_physics/vehicle_update.cpp
     src/car_physics/vehicle_state.cpp src/car_physics/collision_world.cpp
-    src/car_physics/car_data.cpp src/collision/shapes.cpp
+    src/car_physics/car_data.cpp src/car_physics/car_setup.cpp src/collision/shapes.cpp
     src/collision/boxes.cpp src/collision/shape_record.cpp
     src/collision/box_box.cpp src/collision/impacts.cpp src/collision/pairs.cpp
     src/track_collision/track_world.cpp src/track_collision/track_mesh.cpp

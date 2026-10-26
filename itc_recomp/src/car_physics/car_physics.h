@@ -582,6 +582,15 @@ double CarDataConvertUnits(uint8_t* base, uint32_t data);
 // at its offsets). Returns what the original leaves in f1 (the second
 // sqrtf); r3 comes back as `frame` + 352.
 double CarDataDerive(uint8_t* base, uint32_t data, uint32_t frame);
+// sub_820C05C8 (the name ours: CarData::ApplySettings): the car object's
+// signed setting bytes (car +72 to +94) and tuning (+1700, +1704, +1756)
+// applied to the car data (its row), with the spec's block 2 (`spec`, car
+// +1888) for the ride heights. `frame`: the original's 192 bytes (each
+// setting byte converted through its +80, the tuning's table at +80 to +92;
+// pow's x and y at +16 and +24 as the recompiled pow stores them). Returns
+// what the original leaves in f1 (its last pow); r3 isn't kept (pow's).
+double CarDataApplySettings(uint8_t* base, uint32_t data, uint32_t car, uint32_t spec,
+                            uint32_t frame);
 // Vehicle::Vehicle (sub_820B42C8): the w of its vectors 0.0, +3260 to
 // +3372 (every 16) 1.0, +336, +340, +344 = 0, Vehicle::Reset (its frame
 // below `frame`, the original's 112 bytes; `f1` what it leaves), byte
