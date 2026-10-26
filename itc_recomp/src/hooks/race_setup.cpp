@@ -11,9 +11,9 @@ ITC_FLAG_BOOL(native_race_setup, true, "ITC",
               "Run the race's set-up (docs/functions/race-setup.md: the car object's parts "
               "Car::ResetDecals40 sub_820CC4A0, Car::ResetDecals6 sub_820CCBF0, "
               "Car::ResetSettings sub_820CD760, sub_820CCC70 (these four without adapters: "
-              "reached from Car::Clear), CarTuning::Reset sub_820CD618, "
-              "CarDecal::FromBuild sub_820CDC18 (with its setters sub_820CC450 to sub_820CC478 "
-              "merged), Car::Clear sub_820CD7F0, Car::Init sub_820CD5D8, Car::SetModel sub_820CD8A8 and "
+              "reached from Car::Clear), CarTuning::Reset sub_820CD618 (no adapter: from Car::Clear "
+              "and Car::SetModel), CarDecal::FromBuild sub_820CDC18 (no adapter: from "
+              "Car::FromBuild; with its setters sub_820CC450 to sub_820CC478 merged), Car::Clear sub_820CD7F0, Car::Init sub_820CD5D8, Car::SetModel sub_820CD8A8 and "
               "Car::FromBuild sub_820CDCE0) natively instead of "
               "through the translated code (the same writes; checked by "
               "--run_harnesses=race_setup)");
@@ -73,7 +73,8 @@ void RaceSetupFromBuild(PPCContext& ctx, uint8_t* base) {
 
 // Car::ResetDecals40, Car::ResetDecals6, Car::ResetSettings and sub_820CCC70
 // have no adapters: only Car::Clear calls them, and its plain C++ calls
-// theirs (the flag switches Car::Clear).
+// theirs (the flag switches Car::Clear); nor CarTuning::Reset (from
+// Car::Clear and Car::SetModel) or CarDecal::FromBuild (from Car::FromBuild).
 
 // Defines an adapter: the flag, else the original.
 #define ITC_RACE_SETUP(address, step)     \
@@ -86,8 +87,6 @@ void RaceSetupFromBuild(PPCContext& ctx, uint8_t* base) {
     hooks::step(ctx, base);               \
   }
 
-ITC_RACE_SETUP(820CD618, RaceSetupTuningReset)
-ITC_RACE_SETUP(820CDC18, RaceSetupDecalFromBuild)
 ITC_RACE_SETUP(820CD7F0, RaceSetupCarClear)
 ITC_RACE_SETUP(820CD5D8, RaceSetupCarInit)
 ITC_RACE_SETUP(820CD8A8, RaceSetupSetModel)
