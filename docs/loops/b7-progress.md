@@ -60,7 +60,9 @@ file's history. What's left to see in a drive, from every run:
   23 s, 0 errors, every harness 0 differing; frame dumps matched the
   fallback). `car-physics.md` 129 of 134 ours. Left ready:
   `CollisionWorld::Update` `sub_820B92C8` (5 functions, 774 lines).
-  Step: validation agent running.
+  Validated (`itc_1939`: 84 of 84 harness lines, 83 ran in the attract
+  race, `Vehicle::DestroyPhysics` in the replay `itc_1940`, ok; nothing
+  to drive). Step: migration agent 2 running (`CollisionWorld::Update`).
 
 ## Done
 
@@ -99,6 +101,9 @@ This run's groups: `expected-differences.md` (the "23:42 run" lines).
 - After the race's set-up's validation 2: race 24 s (`itc_1890`), 0
   errors, every harness 0 differing but the expected group; replay
   127 s (`itc_1891`), 0 errors.
+- After the car physics' validation: race 23 s (`itc_1939`), 0 errors,
+  every harness 0 differing but the expected groups; replay 127 s
+  (`itc_1940`), 0 errors.
 - After the car physics' migration 1: ours 2224, work left 4227
   (wrapped 104, known 521, unknown 3602).
 - After the race's set-up's validation 3: race 24 s (`itc_1909`), 0
