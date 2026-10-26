@@ -140,20 +140,26 @@ extern "C" REX_FUNC(sub_820B72C8) {
 
 // --- The vehicle's physics step: r3 = the vehicle ---
 
-// f1 = dt (left as it is).
-ITC_CAR_PHYSICS(820AFAE8, ctx.r3.u64 = VehicleBeginStep(base, ctx.r3.u32, ctx.f1.f64))
-ITC_CAR_PHYSICS(820AFD30, VehicleWheelLoads(base, ctx.r3.u32))
-// Vehicle::SurfaceValue, SurfaceValue20, SurfaceValue12 and SurfaceValue16
-// (sub_820B0508, sub_820B0560, sub_820B05B8, sub_820B0610) have no
-// adapters: their callers in play are native.
-ITC_CAR_PHYSICS(820B0908,
-                ctx.r3.u64 = VehicleAccumulateTireForces(base, ctx.r3.u32, ctx.r1.u32 - 192))
-ITC_CAR_PHYSICS(820B2748, VehicleRollingResistance(base, ctx.r3.u32))
-ITC_CAR_PHYSICS(820AFDA8, VehicleTurnWheels(base, ctx.r3.u32, ctx.r1.u32))
-ITC_CAR_PHYSICS(820B0838, VehicleBrakeTorques(base, ctx.r3.u32))
-ITC_CAR_PHYSICS(820B0718, VehicleAntiLock(base, ctx.r3.u32))
-ITC_CAR_PHYSICS(820AFBD8,
-                ctx.r3.u64 = VehicleSuspensionTorques(base, ctx.r3.u32, ctx.r1.u32 - 256))
+// The step's helpers and updates called only from Vehicle::PhysicsStep
+// (native) have no adapters: Vehicle::BeginStep, WheelLoads,
+// AccumulateTireForces, RollingResistance, TurnWheels, BrakeTorques,
+// AntiLock, SuspensionTorques, TractionControl, UpdateTireGrip,
+// UpdateEngineTorque, UpdateBrakeHeat, UpdateBackfire, UpdateTireWear,
+// UpdateSteering, UpdateTorqueSplit, UpdateTurbo, UpdateTireForces,
+// UpdateAtRest, UpdateAero, ApplyForces, UpdateSuspension, UpdateDrivetrain,
+// ShiftGears and Unflip (sub_820AFAE8, sub_820AFD30, sub_820B0908,
+// sub_820B2748, sub_820AFDA8, sub_820B0838, sub_820B0718, sub_820AFBD8,
+// sub_820B1790, sub_820B1FB8, sub_820B22D8, sub_820B35C8, sub_820B3788,
+// sub_820B39C8, sub_820B18B8, sub_820B2100, sub_820B24A8, sub_820B3F80,
+// sub_820B2808, sub_820B2A48, sub_820B2CC0, sub_820B6328, sub_820B4778,
+// sub_820B6430, sub_820AFE90), and UpdateWheelAxes (sub_820B1B00, also from
+// RefreshFromBody). The step runs UpdateSteering's and UpdateTorqueSplit's
+// originals where they refuse; Vehicle::SurfaceValue to SurfaceValue16
+// (sub_820B0508 to sub_820B0610), UpdateGearbox (sub_820B4CF0) and the
+// pairs' HasPair, LinkPair, UnlinkPair, MovePair and AddPairs (sub_820B8C20,
+// sub_820BC068, sub_820BBC40, sub_820BBD30, sub_820B94B0) likewise have
+// none: their callers in play are native.
+
 // f1 = x; f1 = the torque. The original passes the curve's index through
 // its r1 - 16.
 ITC_CAR_PHYSICS(820B00C8,
@@ -182,46 +188,6 @@ ITC_CAR_PHYSICS(820AFB78, MatrixCopyRows(base, ctx.r3.u32, ctx.r4.u32))
 // flush-to-zero on.
 ITC_CAR_PHYSICS_VECTOR(820B0D68, MatrixMultiplyTranslation(base, ctx.r3.u32, ctx.r4.u32,
                                                            ctx.r5.u32, ctx.r1.u32 - 192))
-// r3 = the vehicle, left as it is (the physics step relies on it).
-ITC_CAR_PHYSICS(820B1790, VehicleTractionControl(base, ctx.r3.u32, ctx.r1.u32))
-ITC_CAR_PHYSICS(820B1FB8, VehicleUpdateTireGrip(base, ctx.r3.u32))
-ITC_CAR_PHYSICS(820B22D8, VehicleUpdateEngineTorque(base, ctx.r3.u32, ctx.r1.u32 - 96))
-ITC_CAR_PHYSICS(820B35C8, VehicleUpdateBrakeHeat(base, ctx.r3.u32))
-ITC_CAR_PHYSICS(820B3788, VehicleUpdateBackfire(base, ctx.r3.u32, ctx.r1.u32))
-ITC_CAR_PHYSICS(820B39C8, VehicleUpdateTireWear(base, ctx.r3.u32, ctx.r1.u32 - 112))
-// Where tan would take its _except1 path (an infinite or NaN steering), the
-// original. r3 isn't kept: the step sets it again after this call.
-extern "C" REX_FUNC(sub_820B18B8) {
-  REX_FUNC_PROLOGUE();
-  if (!ITC_FLAG(native_car_physics)) {
-    __imp__sub_820B18B8(ctx, base);
-    return;
-  }
-  ctx.fpscr.disableFlushMode();
-  if (!VehicleUpdateSteering(base, ctx.r3.u32, ctx.r1.u32 - 160)) {
-    __imp__sub_820B18B8(ctx, base);
-  }
-}
-// Mode 2 in a forward gear (sub_820B0340, never in play): the original.
-extern "C" REX_FUNC(sub_820B2100) {
-  REX_FUNC_PROLOGUE();
-  if (!ITC_FLAG(native_car_physics)) {
-    __imp__sub_820B2100(ctx, base);
-    return;
-  }
-  ctx.fpscr.disableFlushMode();
-  if (!VehicleUpdateTorqueSplit(base, ctx.r3.u32)) {
-    __imp__sub_820B2100(ctx, base);
-  }
-}
-ITC_CAR_PHYSICS(820B24A8, VehicleUpdateTurbo(base, ctx.r3.u32))
-ITC_CAR_PHYSICS(820B3F80,
-                ctx.r3.u64 = VehicleUpdateTireForces(base, ctx.r3.u32, ctx.r1.u32 - 272))
-ITC_CAR_PHYSICS(820B2808, ctx.r3.u64 = VehicleUpdateAtRest(base, ctx.r3.u32, ctx.r1.u32 - 192))
-ITC_CAR_PHYSICS(820B2A48, ctx.r3.u64 = VehicleUpdateAero(base, ctx.r3.u32, ctx.r1.u32 - 240))
-ITC_CAR_PHYSICS(820B2CC0, ctx.r3.u64 = VehicleApplyForces(base, ctx.r3.u32, ctx.r1.u32 - 352))
-ITC_CAR_PHYSICS(820B1B00,
-                ctx.r3.u64 = VehicleUpdateWheelAxes(base, ctx.r3.u32, ctx.r1.u32 - 256))
 
 // --- The vehicle's state from its body, its copies ---
 
@@ -273,41 +239,13 @@ extern "C" REX_FUNC(sub_820B5FD8) {
 
 // --- The suspension ---
 
-// r3 comes back as +2592, f1 as wheel 3's +8.
-extern "C" REX_FUNC(sub_820B6328) {
-  REX_FUNC_PROLOGUE();
-  if (!ITC_FLAG(native_car_physics)) {
-    __imp__sub_820B6328(ctx, base);
-    return;
-  }
-  ctx.fpscr.disableFlushMode();
-  double f1 = 0.0;
-  ctx.r3.u64 = VehicleUpdateSuspension(base, ctx.r3.u32, ctx.r1.u32 - 144, &f1);
-  ctx.f1.f64 = f1;
-}
 // Vehicle::UpdateWheelSuspension and SuspensionSpring (sub_820B5588,
 // sub_820B0198) have no adapters: their callers in play are native.
 
 // --- The drivetrain ---
 
-// r3 left as it is (the physics step relies on it).
-ITC_CAR_PHYSICS(820B4778, VehicleUpdateDrivetrain(base, ctx.r3.u32, ctx.r1.u32 - 176))
 // Vehicle::UpdateDrivenAxle (sub_820B31D0) has no adapter: its caller in
 // play is native.
-
-// --- The gearbox ---
-
-// Vehicle::UpdateGearbox (sub_820B4CF0) has no adapter: its caller in play
-// is native. r3 left as it is (the physics step relies on it).
-extern "C" REX_FUNC(sub_820B6430) {
-  REX_FUNC_PROLOGUE();
-  if (!ITC_FLAG(native_car_physics)) {
-    __imp__sub_820B6430(ctx, base);
-    return;
-  }
-  ctx.fpscr.disableFlushMode();
-  VehicleShiftGears(base, ctx.r3.u32, ctx.r1.u32 - 96);
-}
 
 // --- The collision world ---
 
@@ -358,11 +296,6 @@ ITC_CAR_PHYSICS(820B7C50, ctx.r3.u64 = CollisionObjectAddContact(base, ctx.r3.u3
 ITC_CAR_PHYSICS(820B7ED0, ctx.r3.u64 = CollisionRecordsMerge(base, ctx.r3.u32, ctx.r4.u32,
                                                              ctx.r5.u32, ctx.r6.u32,
                                                              ctx.r1.u32 - 304))
-// CollisionWorld::HasPair, LinkPair, UnlinkPair and MovePair (sub_820B8C20,
-// sub_820BC068, sub_820BBC40, sub_820BBD30) have no adapters: their only
-// callers, AddPairs and RemovePair, are native.
-// r3 = the object, r4 = the groups.
-ITC_CAR_PHYSICS(820B94B0, ctx.r3.u64 = CollisionWorldAddPairs(base, ctx.r3.u32, ctx.r4.u32))
 // CollisionWorld::RemovePair (sub_820B8A88) has no adapter: its callers in
 // play, RemovePairsOf and RemovePairsByGroups, are native.
 // r3 comes back as 0x826C2E30 (ResetSurfaces').
@@ -529,21 +462,6 @@ extern "C" REX_FUNC(sub_820B4420) {
   double f1 = 0.0;
   ctx.r3.u64 = VehicleProbeGround(base, ctx.r3.u32, ctx.r1.u32 - 304, &f1);
   ctx.f1.f64 = f1;
-}
-// r3 = the vehicle; r3 comes back as the original leaves it.
-extern "C" REX_FUNC(sub_820AFE90) {
-  REX_FUNC_PROLOGUE();
-  if (!ITC_FLAG(native_car_physics)) {
-    __imp__sub_820AFE90(ctx, base);
-    return;
-  }
-  ctx.fpscr.disableFlushMode();
-  uint32_t r3 = 0;
-  if (!VehicleUnflip(base, ctx.r3.u32, ctx.r1.u32 - 384, &r3)) {
-    __imp__sub_820AFE90(ctx, base);
-    return;
-  }
-  ctx.r3.u64 = r3;
 }
 // r3 = the vehicle; r3 comes back as UpdateWheelAxes'.
 extern "C" REX_FUNC(sub_820B62E8) {

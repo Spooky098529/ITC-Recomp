@@ -99,7 +99,8 @@ ITC_ACCESSOR_FLOAT(820B6708, RigidBodyMass(base, ctx.r3.u32))
 ITC_ACCESSOR_VOID(820B67E0, RigidBodySetCenterOfMass(base, ctx.r3.u32, ctx.r4.u32);
                   ctx.r3.u64 = ctx.r3.u32 + 16)
 ITC_ACCESSOR_WORD(820B6880, RigidBodyField80(ctx.r3.u32))
-ITC_ACCESSOR_WORD(820B6888, RigidBodyVelocity(ctx.r3.u32))
+// RigidBody::Velocity (sub_820B6888) has no adapter: its callers in play,
+// Vehicle::ProbeGround and the car physics', are native.
 ITC_ACCESSOR_WORD(820B6890, RigidBodyField144(ctx.r3.u32))
 ITC_ACCESSOR_WORD(820B6898, RigidBodyField160(ctx.r3.u32))
 // RigidBody::Force (sub_820988C0) keeps its adapter: something reaches it
@@ -137,9 +138,9 @@ ITC_ACCESSOR_WORD(820C0450, VehicleSetObjectHalf114(base, ctx.r3.u32, ctx.r4.u32
 ITC_ACCESSOR_VOID(820C0550, QuaternionToMatrix(base, ctx.r3.u32, ctx.r4.u32))
 ITC_ACCESSOR_VOID(820C0590, VehicleSpeedRecord(base, ctx.r3.u32, ctx.r4.u32))
 
-// The collision object (r3) and the collision world.
-ITC_ACCESSOR_VOID(820B7BF0, CollisionObjectLink(base, ctx.r3.u32, ctx.r4.u32))
-ITC_ACCESSOR_VOID(820B7C18, CollisionObjectUnlink(base, ctx.r3.u32, ctx.r4.u32))
+// The collision object (r3) and the collision world. CollisionObject::Link
+// and Unlink (sub_820B7BF0, sub_820B7C18) have no adapters: their callers
+// in play, CollisionWorld::AddObject and RemoveObject, are native.
 ITC_ACCESSOR_WORD(820B7C90, CollisionObjectFirstContact(base, ctx.r3.u32, ctx.r4.u32))
 // CollisionObject::Word264 and SetWord264 (sub_820B7CB8, sub_820B7CC0) have
 // no adapters: their callers in play, the collision world's LinkPair,
@@ -305,18 +306,18 @@ ITC_VECTOR_FLOAT(82294170, Vec3Dot(base, ctx.r3.u32, ctx.r4.u32))
 ITC_VECTOR_FLOAT(822941B0, Vec3Normalize(base, ctx.r3.u32, ctx.r4.u32))
 ITC_VECTOR_FLOAT(82294200, Vec3Direction(base, ctx.r3.u32, ctx.r4.u32, ctx.r5.u32))
 ITC_VECTOR_FLOAT(82294270, Vec3Length(base, ctx.r3.u32))
-ITC_VECTOR_FLOAT(82294298, Vec3NormalizeSelf(base, ctx.r3.u32))
 ITC_VECTOR_VOID(822942A0, Vec3Sum(base, ctx.r3.u32, ctx.r4.u32, ctx.r5.u32))
 ITC_VECTOR_VOID(822942E0, Vec3Difference(base, ctx.r3.u32, ctx.r4.u32, ctx.r5.u32))
 ITC_VECTOR_VOID(82294320, Vec3AddTo(base, ctx.r3.u32, ctx.r4.u32))
-ITC_VECTOR_VOID(82294340, Vec4ScaleBy(base, ctx.r3.u32, ctx.f1.f64))
 // Vec4::DivideBy (sub_82294348) has no adapter: its caller in play,
 // CollisionRecords::Merge (src/car_physics/), is native.
 ITC_VECTOR_VOID(82294360, Vec3SubCopy(base, ctx.r3.u32, ctx.r4.u32, ctx.r5.u32))
 ITC_VECTOR_VOID(822943C8, Vec3AddCopy(base, ctx.r3.u32, ctx.r4.u32, ctx.r5.u32))
 ITC_VECTOR_VOID(82294430, Vec4Scaled(base, ctx.r3.u32, ctx.r4.u32, ctx.f1.f64))
-ITC_VECTOR_VOID(82294470, Vec4ScaledFrom(base, ctx.r3.u32, ctx.r5.u32, ctx.f1.f64))
 ITC_VECTOR_VOID(822944B0, Vec3ScaledCopy(base, ctx.r3.u32, ctx.r4.u32, ctx.f1.f64))
-ITC_VECTOR_VOID(82294518, Vec3Cross(base, ctx.r3.u32, ctx.r4.u32, ctx.r5.u32))
+// Vec3::NormalizeSelf, Vec4::ScaleBy, sub_82294470 (ScaledFrom) and
+// Vec3::Cross (sub_82294298, sub_82294340, sub_82294470, sub_82294518) have
+// no adapters: their callers in play (Vehicle::ProbeGround, Unflip and
+// CarData::Derive) are native.
 ITC_VECTOR_VOID(82294568, Vec3Lerp(base, ctx.r3.u32, ctx.r5.u32, ctx.r6.u32, ctx.f1.f64))
 ITC_VECTOR_FLOAT(82294608, Vec3DotOf(base, ctx.r3.u32, ctx.r4.u32))
