@@ -62,7 +62,12 @@ file's history. What's left to see in a drive, from every run:
   `CollisionWorld::Update` `sub_820B92C8` (5 functions, 774 lines).
   Validated (`itc_1939`: 84 of 84 harness lines, 83 ran in the attract
   race, `Vehicle::DestroyPhysics` in the replay `itc_1940`, ok; nothing
-  to drive). Step: migration agent 2 running (`CollisionWorld::Update`).
+  to drive). Migration 2 done (3a5e3bd, bd3e362: `CollisionWorld::Update`
+  with `SolvePairs`, `CollideAll`, `Collide`, `Respond`; the two
+  queries in play, `WallHits` and `GroundHits`, called natively; 10
+  adapters removed; 23 s, 0 errors, every harness 0 differing; frame
+  dumps the same as the fallback). `car-physics.md` 134 of 134 ours.
+  Step: validation agent 2 running.
 
 ## Done
 
@@ -101,6 +106,8 @@ This run's groups: `expected-differences.md` (the "23:42 run" lines).
 - After the race's set-up's validation 2: race 24 s (`itc_1890`), 0
   errors, every harness 0 differing but the expected group; replay
   127 s (`itc_1891`), 0 errors.
+- After the car physics' migration 2: ours 2230, work left 4222
+  (wrapped 104, known 516, unknown 3602).
 - After the car physics' validation: race 23 s (`itc_1939`), 0 errors,
   every harness 0 differing but the expected groups; replay 127 s
   (`itc_1940`), 0 errors.

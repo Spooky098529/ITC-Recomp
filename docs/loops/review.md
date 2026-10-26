@@ -72,6 +72,16 @@ When the user has reviewed a run's section, its heading gets
   original); `RemoveObject`'s branch in `DestroyPhysics` ported.
   Removable adapters outside the area left: `sub_820FF938`,
   `sub_820FF9F8`, `sub_820FFAB0`.
+- The car physics, migration 2 (3a5e3bd, bd3e362): `CollisionWorld::Update`
+  Overridden, its four callees Native with no adapter, 10 more Native;
+  `sub_82294330` `Vec3::SubFrom` a new Merged row in
+  `vehicle-accessors.md` (not seen in play, done inside `Respond`);
+  `collision-world.md`'s `sub_820FF1B0`, `sub_820FEBD0` notes. The two
+  queries in play (`TrackCollision::WallHits`, `GroundHits`) called
+  natively whatever `--native_collision_world` says (as the track
+  position calls the route's functions whatever `--native_track_route`
+  says); other query targets and refusing callees run as guest calls.
+  `Respond` wasn't reached in the attract race (harness only).
 
 ## Run 2026-10-25 16:38 (`b7-loop-25-10-26-3`)
 
