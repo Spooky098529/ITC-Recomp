@@ -265,6 +265,14 @@ uint32_t StagesReset(uint8_t* base, uint32_t list) {
   return CourseRecordReset(base, list + 812);
 }
 
+uint32_t StagesClear(uint8_t* base, uint32_t list) {
+  ITC_NATIVE_RUNNING("sub_82101900 Stages::Clear");
+  const uint32_t kept = guest::LoadU32(base, list + 1220);
+  const uint32_t r3 = StagesReset(base, list);
+  guest::StoreU32(base, list + 1220, kept);
+  return r3;
+}
+
 uint32_t RacerRecordInit(uint8_t* base, uint32_t record) {
   ITC_NATIVE_RUNNING("sub_820FF808 RacerRecord::Init");
   const uint32_t r3 = CarInit(base, record);

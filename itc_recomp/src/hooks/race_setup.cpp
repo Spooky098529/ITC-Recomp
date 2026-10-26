@@ -32,7 +32,7 @@ ITC_FLAG_BOOL(native_race_setup, true, "ITC",
               "RaceData::ResetGlobal sub_821021A8, Racers::SetStart sub_82101D50, "
               "Race::PlaceRacers sub_82102048 (its save data branch, sub_82105BF8, the "
               "original's); Race::SetUpRival sub_82112DB0 with its switch piece sub_82112E2C (its "
-              "kind 1, with sub_820FFA88, the original's); Race::SetUp sub_82115D98) natively instead of "
+              "kind 1, with sub_820FFA88, the original's); Race::SetUp sub_82115D98; Stages::Clear sub_82101900) natively instead of "
               "through the translated code (the same writes; checked by "
               "--run_harnesses=race_setup)");
 
@@ -406,6 +406,10 @@ void RaceSetupSetUp(PPCContext& ctx, uint8_t* base) {
   ctx.r3.u64 = save + 48;
 }
 
+void RaceSetupStagesClear(PPCContext& ctx, uint8_t* base) {
+  ctx.r3.u64 = rs::StagesClear(base, ctx.r3.u32);
+}
+
 }  // namespace hooks
 
 // Car::ResetDecals40, Car::ResetDecals6, Car::ResetSettings and sub_820CCC70
@@ -456,6 +460,7 @@ ITC_RACE_SETUP(821021A8, RaceSetupRaceDataResetGlobal)
 ITC_RACE_SETUP(82102048, RaceSetupPlaceRacers)
 ITC_RACE_SETUP(82112DB0, RaceSetupSetUpRival)
 ITC_RACE_SETUP(82115D98, RaceSetupSetUp)
+ITC_RACE_SETUP(82101900, RaceSetupStagesClear)
 // sub_82112E2C (a case of Race::SetUpRival's switch, in its frame) needs no
 // adapter: only the original Race::SetUpRival reaches it.
 // sub_82101FD0 has no adapter: only RaceData::Reset calls it.

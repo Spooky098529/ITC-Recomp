@@ -1412,6 +1412,8 @@ void RaceSetup(Context& h) {
   Routes(h, block);
   OnePointer(h, block, "Stages::Reset (sub_82101860)", __imp__sub_82101860,
              hooks::RaceSetupStagesReset, 1224);
+  OnePointer(h, block, "Stages::Clear (sub_82101900)", __imp__sub_82101900,
+             hooks::RaceSetupStagesClear, 1224);
   OnePointer(h, cars, "RacerRecord::Init (sub_820FF808)", __imp__sub_820FF808,
              hooks::RaceSetupRacerRecordInit, 3936);
   RouteCallers(h, block, cars);

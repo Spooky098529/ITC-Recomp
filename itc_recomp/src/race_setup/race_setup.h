@@ -186,6 +186,9 @@ uint32_t EventCount(uint8_t* base);
 // from +44 of (-1, 2), +76 = 0; +800, +804, +1220, +808 = 0;
 // CourseRecord::Reset(+812). Returns CourseRecord::Reset's r3.
 uint32_t StagesReset(uint8_t* base, uint32_t list);
+// Stages::Clear (sub_82101900): Stages::Reset keeping the list's +1220.
+// Returns Stages::Reset's r3.
+uint32_t StagesClear(uint8_t* base, uint32_t list);
 // RacerRecord::Init (sub_820FF808): Car::Init, then +3920 = [0x82000A34]
 // (0.0), +3912, +3916 = -1, halfwords +3904, +3906 = -1, +3924 = 0. Returns
 // Car::Init's r3.

@@ -123,4 +123,7 @@ void RaceSetupSetUpRival(PPCContext& ctx, uint8_t* base);
 // copy natively.
 void RaceSetupSetUp(PPCContext& ctx, uint8_t* base);
 
+// Stages::Clear sub_82101900: r3 = the list; r3 = Stages::Reset's.
+void RaceSetupStagesClear(PPCContext& ctx, uint8_t* base);
+
 }  // namespace hooks
