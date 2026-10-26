@@ -25,7 +25,7 @@ ITC_FLAG_BOOL(native_car_physics, true, "ITC",
               "sub_820B8BA8, sub_820B8AF8, and the collision objects' groups, sub_820B7CC8, "
               "sub_820B7CF0, and their translation, sub_820B7B60; the vehicle's forces applied, sub_820B2CC0; the car data and the "
               "vehicle's constructor, sub_820AEF80 with sub_820AECB8, sub_820AEE98, "
-              "sub_820AF018, sub_820AF1C0, sub_820B42C8; the car's settings and tuning, sub_820C05C8, sub_820C0D28; the car loader, sub_820C27E8; the vehicle's physics objects, sub_8259D5A8, sub_820B8798 (no adapter; the ground callback only), sub_820B7998, sub_820B9570 with sub_820B7A00, sub_820B0E70 (these two only while --native_heap routes the game's heap to the allocation layer), the ground probe sub_820B4420, sub_820AFE90, sub_820B62E8; the physics step, sub_820B6498; the physics' set-up and reset, sub_820B5670, sub_820B5B08 (only while --native_heap routes the game's heap to the allocation layer)) natively instead of through the translated code "
+              "sub_820AF018, sub_820AF1C0, sub_820B42C8; the car's settings and tuning, sub_820C05C8, sub_820C0D28; the car loader, sub_820C27E8; the vehicle's physics objects, sub_8259D5A8, sub_820B8798 (no adapter; the ground callback only), sub_820B7998, sub_820B9570 with sub_820B7A00, sub_820B0E70 (these two only while --native_heap routes the game's heap to the allocation layer), the ground probe sub_820B4420, sub_820AFE90, sub_820B62E8; the physics step, sub_820B6498; the physics' set-up and reset, sub_820B5670, sub_820B5B08, and the collision world's set-up, sub_820FF250 with sub_820B8D30 and sub_820B9198 (these only while --native_heap routes the game's heap to the allocation layer)) natively instead of through the translated code "
               "(the same words, bit for bit; checked by --run_harnesses=car_physics)");
 
 // Defines an adapter: `body` uses `ctx` and `base`. Flush-to-zero off for
@@ -471,5 +471,22 @@ extern "C" REX_FUNC(sub_820B5B08) {
     return;
   }
   ctx.f1.f64 = f1;
+  ctx.r3.u64 = r3;
+}
+// CollisionWorld::Create and SetQueryCapacity (sub_820B8D30, sub_820B9198)
+// have no adapters: their only caller, CollisionWorld::Setup, is native.
+// No arguments; r3 comes back as the query block (SetQueryCapacity's).
+extern "C" REX_FUNC(sub_820FF250) {
+  REX_FUNC_PROLOGUE();
+  if (!NativeLifetime()) {
+    __imp__sub_820FF250(ctx, base);
+    return;
+  }
+  ctx.fpscr.disableFlushMode();
+  uint32_t r3 = 0;
+  if (!CollisionWorldSetup(base, &r3)) {
+    __imp__sub_820FF250(ctx, base);
+    return;
+  }
   ctx.r3.u64 = r3;
 }

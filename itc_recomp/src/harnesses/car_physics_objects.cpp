@@ -27,6 +27,7 @@
 
 #include <algorithm>
 #include <bit>
+#include <cstring>
 #include <cmath>
 #include <iterator>
 #include <string>
@@ -196,6 +197,36 @@ void NativeResetPhysics(PPCContext& ctx, uint8_t* base) {
     return;
   }
   ctx.f1.f64 = f1;
+  ctx.r3.u64 = r3;
+}
+// Create and SetQueryCapacity have no adapters (their only caller is
+// native): the original where they wouldn't be native.
+void NativeWorldCreate(PPCContext& ctx, uint8_t* base) {
+  ctx.fpscr.disableFlushMode();
+  uint32_t r3 = 0;
+  if (ctx.r6.u32 != 0 ||
+      !cp::CollisionWorldCreate(base, ctx.r3.u32, ctx.r4.u32, ctx.r5.u32, &r3)) {
+    __imp__sub_820B8D30(ctx, base);
+    return;
+  }
+  ctx.r3.u64 = r3;
+}
+void NativeSetQueryCapacity(PPCContext& ctx, uint8_t* base) {
+  ctx.fpscr.disableFlushMode();
+  uint32_t r3 = 0;
+  if (!cp::CollisionWorldSetQueryCapacity(base, ctx.r3.u32, &r3)) {
+    __imp__sub_820B9198(ctx, base);
+    return;
+  }
+  ctx.r3.u64 = r3;
+}
+void NativeWorldSetup(PPCContext& ctx, uint8_t* base) {
+  ctx.fpscr.disableFlushMode();
+  uint32_t r3 = 0;
+  if (!cp::CollisionWorldSetup(base, &r3)) {
+    __imp__sub_820FF250(ctx, base);
+    return;
+  }
   ctx.r3.u64 = r3;
 }
 void NativeDestroyPhysics(PPCContext& ctx, uint8_t* base) {
@@ -1119,6 +1150,137 @@ void SetUpCases(Context& h, uint32_t region, uint32_t vehicle_region, bool reset
   }
 }
 
+// The world's set-up's cases: Create with 0 to 8 objects, 0 to 40 pairs and
+// 0 to 10 contacts, SetQueryCapacity (0 to 40) on a fake world whose +64 is
+// 0 or a block from the layer, and Setup; the surface settings, the
+// queries' pointers (0x826C2D78, 0x826C2D7C) and the world's pointer put
+// back after. The blocks come from the layer uncleared, so compared: what
+// the functions write (the world's 72 bytes, the objects' constructed words
+// and links and their count header, the records' zeroed w, the surface
+// settings as floats, the two pointers), the blocks' sizes, which given
+// blocks were freed, r3; heap blocks by their number.
+void WorldSetUpCases(Context& h, uint32_t region) {
+  enum Kind { kCreate, kCapacity, kSetup };
+  const struct {
+    const char* name;
+    GuestFunction recompiled, native;
+    Kind kind;
+  } functions[] = {
+      {"CollisionWorld::Create (sub_820B8D30)", Original<__imp__sub_820B8D30>, NativeWorldCreate,
+       kCreate},
+      {"CollisionWorld::SetQueryCapacity (sub_820B9198)", Original<__imp__sub_820B9198>,
+       NativeSetQueryCapacity, kCapacity},
+      {"CollisionWorld::Setup (sub_820FF250)", Original<__imp__sub_820FF250>, NativeWorldSetup,
+       kSetup},
+  };
+  constexpr uint32_t kSurfaceGlobals = 0x826C2DF0, kSurfaceBytes = 64;
+  constexpr uint32_t kQueryPointers = 0x826C2D78;
+  uint8_t saved[kSurfaceBytes + 8];
+  std::memcpy(saved, h.base + kSurfaceGlobals, kSurfaceBytes);
+  std::memcpy(saved + kSurfaceBytes, h.base + kQueryPointers, 8);
+  for (const auto& f : functions) {
+    Results results(f.name);
+    for (uint64_t seed = 0; seed < (f.kind == kSetup ? 20 : 100); seed++) {
+      Outputs out[2];
+      for (int v = 0; v < 2; v++) {
+        Random r(seed * 71 + 31 + 1000 * uint64_t(f.kind));
+        for (uint32_t i = 0; i < kSurfaceBytes; i += 4) {
+          guest::StoreU32(h.base, kSurfaceGlobals + i, NumberWord(r));
+        }
+        guest::StoreU32(h.base, kQueryPointers, uint32_t(r.Next()));
+        guest::StoreU32(h.base, kQueryPointers + 4, uint32_t(r.Next()));
+        Blocks blocks;
+        PPCContext t = CallContext(h);
+        t.fpscr.disableFlushModeUnconditional();
+        if (f.kind == kCapacity) {
+          BuildWorld(h, region, r, kNumbers, false);
+          const uint32_t world = region + kWorld;
+          guest::StoreU32(h.base, world + 0, 0);
+          uint32_t old = 0;
+          if (r.Below(4) != 0) {
+            old = memory::Alloc(64, 0);
+            blocks.given.push_back(old);
+          }
+          guest::StoreU32(h.base, world + 64, old);
+          t.r3.u64 = r.Below(41);
+        } else if (f.kind == kCreate) {
+          t.r3.u64 = r.Below(9);
+          t.r4.u64 = r.Below(41);
+          t.r5.u64 = r.Below(11);
+          t.r6.u64 = 0;
+        }
+        (v == 0 ? f.recompiled : f.native)(t, h.base);
+        const uint32_t world = guest::LoadU32(h.base, kWorldPointer);
+        if (f.kind != kCapacity) {
+          blocks.Note(world);
+        }
+        const uint32_t objects = guest::LoadU32(h.base, world + 16);
+        if (f.kind != kCapacity && objects != 0) {
+          blocks.Note(objects - 16);
+        }
+        for (uint32_t at : {36u, 48u, 64u}) {
+          blocks.Note(guest::LoadU32(h.base, world + at));
+        }
+        Outputs& o = out[v];
+        auto named = [&](uint32_t w) {
+          // A pointer into the objects' block: by its block and offset.
+          if (objects != 0 && w >= objects && w < objects + 320 * 64) {
+            return blocks.Name(objects - 16) + 0x100000u + (w - objects);
+          }
+          return blocks.Name(w);
+        };
+        o.Word(blocks.Name(world));
+        for (uint32_t i = 0; i < 72; i += 4) {
+          o.Word(i == 4 ? guest::LoadU32(h.base, world + i) : named(guest::LoadU32(h.base, world + i)));
+        }
+        if (f.kind != kCapacity) {
+          const uint32_t n = guest::LoadU32(h.base, world + 12);
+          if (objects != 0) {
+            o.Word(guest::LoadU32(h.base, objects - 16));
+            for (uint32_t i = 0; i < n; i++) {
+              const uint32_t object = objects + 320 * i;
+              for (uint32_t at : {0u, 32u, 36u, 40u, 228u, 232u}) {
+                o.Word(named(guest::LoadU32(h.base, object + at)));
+              }
+              for (uint32_t at : {60u, 76u, 172u, 188u, 220u, 316u}) {
+                o.Float(guest::LoadU32(h.base, object + at));
+              }
+            }
+          }
+          const uint32_t contacts = guest::LoadU32(h.base, world + 48);
+          for (uint32_t i = 0; contacts != 0 && i < guest::LoadU32(h.base, world + 44); i++) {
+            o.Floats(h.base, contacts + 80 * i + 28, 1);
+            o.Floats(h.base, contacts + 80 * i + 44, 1);
+            o.Floats(h.base, contacts + 80 * i + 60, 1);
+          }
+        }
+        const uint32_t queries = guest::LoadU32(h.base, world + 64);
+        for (uint32_t i = 0; queries != 0 && i < 2 * guest::LoadU32(h.base, world + 60); i++) {
+          o.Floats(h.base, queries + 80 * i + 12, 1);
+          o.Floats(h.base, queries + 80 * i + 28, 1);
+          o.Floats(h.base, queries + 80 * i + 44, 1);
+        }
+        o.Floats(h.base, kSurfaceGlobals, kSurfaceBytes / 4);
+        o.Word(guest::LoadU32(h.base, kQueryPointers));
+        o.Word(guest::LoadU32(h.base, kQueryPointers + 4));
+        for (uint32_t b : blocks.given) {
+          o.Word(memory::IsHeapBlock(b) ? 1 : 0);
+        }
+        for (uint32_t b : blocks.made) {
+          o.Word(memory::Size(b));
+        }
+        o.Word(named(t.r3.u32));
+        blocks.FreeAll();
+        guest::StoreU32(h.base, kWorldPointer, region + kWorld);
+      }
+      results.Check(out[0], out[1], fmt::format("seed {}", seed));
+    }
+    results.Report();
+  }
+  std::memcpy(h.base + kSurfaceGlobals, saved, kSurfaceBytes);
+  std::memcpy(h.base + kQueryPointers, saved + kSurfaceBytes, 8);
+}
+
 }  // namespace
 
 void CarPhysicsObjects(Context& h) {
@@ -1133,6 +1295,7 @@ void CarPhysicsObjects(Context& h) {
   if (hooks::NativeHeapActive()) {
     SetUpCases(h, region, vehicle_region, false);
     SetUpCases(h, region, vehicle_region, true);
+    WorldSetUpCases(h, region);
   }
   memory::Free(vehicle_region);
   if (hooks::NativeHeapActive()) {

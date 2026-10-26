@@ -764,4 +764,38 @@ bool VehicleSetUpPhysics(uint8_t* base, uint32_t vehicle, uint32_t data, uint32_
 bool VehicleResetPhysics(uint8_t* base, uint32_t vehicle, uint32_t data, uint32_t groups,
                          uint32_t frame, double* f1, uint32_t* r3);
 
+// --- The collision world's set-up (src/car_physics/collision_world.cpp),
+// over the C runtime's heap on the allocation layer (the adapter's
+// condition: --native_heap) ---
+
+// CollisionWorld::Create (sub_820B8D30) with no buffer (the only case in
+// play; the buffer's paths stay the original's): a 72-byte world into
+// 0x826C2D88 (+0 = 0, +56 = 0, +60 = 32, +12 = `objects`), +16 = that many
+// 320-byte collision objects (operator new[] with a count header, each
+// CollisionObject::CollisionObject; 0 when the allocation gives 0), +20 =
+// 0, +24 the free list of all of them (+228 next, +232 previous), +28 = 0,
+// +32 = `pairs`, +36 = that many 32-byte pairs, +40 = 0, +64 = 64 80-byte
+// query records (their w zeroed), +68 = +64 + 80 x +60, +44 = `contacts`,
+// +48 = that many 80-byte contacts (their w zeroed), +52 = 0, +4 = 1/30;
+// CollisionWorld::ResetSurfaces; the default callbacks (0x826C2D78 =
+// 0x825C8388, 0x826C2D7C = 0x820BC828, +8 = 0x820BC4D0). False, with
+// nothing done, with no process heap or a size operator new[] would refuse
+// (its error path). Returns the original's r3 (ResetSurfaces').
+bool CollisionWorldCreate(uint8_t* base, uint32_t objects, uint32_t pairs, uint32_t contacts,
+                          uint32_t* r3);
+// CollisionWorld::SetQueryCapacity (sub_820B9198) with no buffer (+0 0):
+// +60 = n, the old records (+64) freed (operator delete[]), +64 = 2n
+// 80-byte records (their w zeroed; 0 when the allocation gives 0), +68 =
+// +64 + 80n. False, with nothing done, where the old block isn't the
+// layer's, the world has a buffer, or the size would take operator new[]'s
+// error path. `r3`: what the original leaves (the new block).
+bool CollisionWorldSetQueryCapacity(uint8_t* base, uint32_t n, uint32_t* r3);
+// CollisionWorld::Setup (sub_820FF250): Create(50, 1000, 100, no buffer),
+// the queries' function pointers (0x820FF1B0, 0x820FEBD0), the world's +8
+// = TrackCollision::GroundCallback (0x820FEAB0), SetQueryCapacity(32) and
+// the surface settings (C 0.0 for the three bits, D 0.0, 1.0, 1.0, A 0.0,
+// 0.5, [0x82002968], B 0.0). False, with nothing done, where Create
+// wouldn't be native. `r3`: what the original leaves (the query block).
+bool CollisionWorldSetup(uint8_t* base, uint32_t* r3);
+
 }  // namespace car_physics

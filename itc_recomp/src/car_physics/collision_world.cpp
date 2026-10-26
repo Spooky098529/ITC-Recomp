@@ -707,3 +707,182 @@ void CollisionWorldDestroy(uint8_t* base) {
 }
 
 }  // namespace car_physics
+
+// --- The collision world's set-up ---
+
+namespace car_physics {
+
+namespace {
+
+constexpr uint32_t kRefused = 0xFFFFFFFFu;  // a size the originals make -1
+
+// operator new[]'s block, as its plain C++ gives it (0 where it gives none:
+// checked before by the callers, never in play).
+uint32_t NewArray(uint8_t* base, uint32_t bytes) {
+  return memory::crt::OperatorNewArray(base, bytes).value_or(0);
+}
+
+// `count` records of `bytes` (80 here) with the words at +12, +28 and +44
+// from `first` (the record's offset + 12) zeroed (stfs of 0.0).
+void ZeroRecordWs(uint8_t* base, uint32_t block, uint32_t count, uint32_t first) {
+  for (uint32_t i = 0; i < count; i++) {
+    const uint32_t at = block + first + 80 * i;
+    CopyWord(base, kZero, at);
+    CopyWord(base, kZero, at + 16);
+    CopyWord(base, kZero, at + 32);
+  }
+}
+
+// The sizes as the originals work them out (mulli, with their cmplw
+// limits), -1 past them.
+uint32_t ObjectsBytes(uint32_t n) {
+  const uint32_t bytes = n > 0x00CCCCCCu ? kRefused : n * 320;
+  return bytes > 0xFFFFFFEFu ? kRefused : bytes + 16;
+}
+uint32_t PairsBytes(uint32_t n) {
+  return n > 0x07FFFFFFu ? kRefused : n << 5;
+}
+uint32_t RecordsBytes(uint32_t n) {
+  return n > 0x03333333u ? kRefused : n * 80;
+}
+// Whether operator new[] gives a block for `bytes` (malloc's limit; the
+// process heap is checked by the callers).
+bool ArrayFits(uint32_t bytes) {
+  return bytes <= 0xFFFFF000u;
+}
+
+}  // namespace
+
+bool CollisionWorldCreate(uint8_t* base, uint32_t objects, uint32_t pairs, uint32_t contacts,
+                          uint32_t* r3) {
+  if (memory::crt::GetProcessHeap(base) == 0 || !ArrayFits(ObjectsBytes(objects)) ||
+      !ArrayFits(PairsBytes(pairs)) || !ArrayFits(RecordsBytes(64)) ||
+      !ArrayFits(RecordsBytes(contacts))) {
+    return false;
+  }
+  ITC_NATIVE_RUNNING("sub_820B8D30 CollisionWorld::Create");
+  const uint32_t world_block = memory::crt::OperatorNew(base, 72).value_or(0);
+  guest::StoreU32(base, kWorldPointer, world_block);
+  guest::StoreU32(base, world_block + 0, 0);
+  guest::StoreU32(base, World(base) + 56, 0);
+  guest::StoreU32(base, World(base) + 60, 32);
+  guest::StoreU32(base, World(base) + 12, objects);
+  // The objects, with operator new[]'s count header.
+  {
+    const uint32_t n = guest::LoadU32(base, World(base) + 12);
+    const uint32_t block = NewArray(base, ObjectsBytes(n));
+    uint32_t first = 0;
+    if (block != 0) {
+      first = block + 16;
+      guest::StoreU32(base, block, n);
+      for (uint32_t i = 0; i < n; i++) {
+        CollisionObjectConstruct(base, first + 320 * i);
+      }
+    }
+    guest::StoreU32(base, World(base) + 16, first);
+  }
+  // The free list of all of them, as CollisionWorld::Reset makes it.
+  uint32_t world = World(base);
+  guest::StoreU32(base, world + 20, 0);
+  guest::StoreU32(base, world + 24, guest::LoadU32(base, world + 16));
+  world = World(base);
+  uint32_t count = guest::LoadU32(base, world + 12);
+  for (uint32_t i = 0; i < count; i++) {
+    if (i < count - 1) {
+      const uint32_t object = guest::LoadU32(base, world + 16) + 320 * i;
+      guest::StoreU32(base, object + 228, object + 320);
+    } else {
+      guest::StoreU32(base, count * 320 + guest::LoadU32(base, world + 16) - 92, 0);
+    }
+    world = World(base);
+    const uint32_t object = guest::LoadU32(base, world + 16) + 320 * i;
+    guest::StoreU32(base, object + 232, int32_t(i) > 0 ? object - 320 : 0);
+    world = World(base);
+    count = guest::LoadU32(base, world + 12);
+  }
+  guest::StoreU32(base, world + 28, 0);
+  guest::StoreU32(base, World(base) + 32, pairs);
+  guest::StoreU32(base, World(base) + 36,
+                  NewArray(base, PairsBytes(guest::LoadU32(base, World(base) + 32))));
+  guest::StoreU32(base, World(base) + 40, 0);
+  // The query records: 2 x +60.
+  {
+    const uint32_t n = guest::LoadU32(base, World(base) + 60) << 1;
+    const uint32_t block = NewArray(base, RecordsBytes(n));
+    if (block != 0) {
+      ZeroRecordWs(base, block, n, 12);
+    }
+    guest::StoreU32(base, World(base) + 64, block);
+  }
+  world = World(base);
+  guest::StoreU32(base, world + 68,
+                  guest::LoadU32(base, world + 60) * 80 + guest::LoadU32(base, world + 64));
+  guest::StoreU32(base, World(base) + 44, contacts);
+  {
+    const uint32_t n = guest::LoadU32(base, World(base) + 44);
+    const uint32_t block = NewArray(base, RecordsBytes(n));
+    if (block != 0) {
+      ZeroRecordWs(base, block, n, 28);
+    }
+    guest::StoreU32(base, World(base) + 48, block);
+  }
+  guest::StoreU32(base, World(base) + 52, 0);
+  CopyWord(base, 0x820029EC, World(base) + 4);  // 1/30
+  CollisionWorldResetSurfaces(base);
+  guest::StoreU32(base, 0x826C2D78, 0x825C8388);
+  guest::StoreU32(base, 0x826C2D7C, 0x820BC828);
+  guest::StoreU32(base, World(base) + 8, 0x820BC4D0);
+  *r3 = 0x826C2E30;  // ResetSurfaces'
+  return true;
+}
+
+bool CollisionWorldSetQueryCapacity(uint8_t* base, uint32_t n, uint32_t* r3) {
+  const uint32_t world = World(base);
+  if (guest::LoadU32(base, world + 0) != 0 || !collision::Deletable(guest::LoadU32(base, world + 64)) ||
+      !ArrayFits(RecordsBytes(n << 1))) {
+    return false;
+  }
+  ITC_NATIVE_RUNNING("sub_820B9198 CollisionWorld::SetQueryCapacity");
+  guest::StoreU32(base, World(base) + 60, n);
+  memory::crt::OperatorDeleteArray(guest::LoadU32(base, World(base) + 64));
+  const uint32_t count = guest::LoadU32(base, World(base) + 60) << 1;
+  const uint32_t block = NewArray(base, RecordsBytes(count));
+  if (block != 0) {
+    ZeroRecordWs(base, block, count, 12);
+  }
+  guest::StoreU32(base, World(base) + 64, block);
+  const uint32_t w = World(base);
+  guest::StoreU32(base, w + 68,
+                  guest::LoadU32(base, w + 60) * 80 + guest::LoadU32(base, w + 64));
+  *r3 = block;
+  return true;
+}
+
+bool CollisionWorldSetup(uint8_t* base, uint32_t* r3) {
+  uint32_t ignored = 0;
+  if (!CollisionWorldCreate(base, 50, 1000, 100, &ignored)) {
+    return false;
+  }
+  ITC_NATIVE_RUNNING("sub_820FF250 CollisionWorld::Setup");
+  va::CollisionSetGlobal78(base, 0x820FF1B0);
+  va::CollisionSetGlobal7C(base, 0x820FEBD0);
+  va::CollisionWorldSetCallback(base, 0x820FEAB0);
+  // Create's query block is the layer's: SetQueryCapacity can't refuse.
+  CollisionWorldSetQueryCapacity(base, 32, r3);
+  const double zero = Lfs(base, kZero), one = Lfs(base, kOne);
+  CollisionSurfaceSetC(base, 0x02000000, zero);
+  CollisionSurfaceSetC(base, 0x01000000, zero);
+  CollisionSurfaceSetC(base, 0x04000000, zero);
+  CollisionSurfaceSetD(base, 0x02000000, zero);
+  CollisionSurfaceSetD(base, 0x01000000, one);
+  CollisionSurfaceSetD(base, 0x04000000, one);
+  CollisionSurfaceSetA(base, 0x02000000, zero);
+  CollisionSurfaceSetA(base, 0x01000000, Lfs(base, 0x82001BE4));
+  CollisionSurfaceSetA(base, 0x04000000, Lfs(base, 0x82002968));
+  CollisionSurfaceSetB(base, 0x02000000, zero);
+  CollisionSurfaceSetB(base, 0x01000000, zero);
+  CollisionSurfaceSetB(base, 0x04000000, zero);
+  return true;
+}
+
+}  // namespace car_physics
