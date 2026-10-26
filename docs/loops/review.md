@@ -21,6 +21,18 @@ When the user has reviewed a run's section, its heading gets
   four rows added (course route, route, course record, 972-byte entry);
   3 leads added, 6 extended. Never seen in play: `sub_82105BF8`,
   `sub_820FFA88`, `sub_820CC450`.
+- The race's set-up, migration 1 (2e9d8eb..357f247): 31 rows changed in
+  `race-setup.md`, one note in `c-runtime.md` (the array helper calls
+  `sub_82101D20`'s plain C++). Corrections to the map:
+  `RaceEvent::FirstOwned` `sub_821430A0` returns the first item whose
+  save record sums to 0 or below (the map had it reversed; the name may
+  be wrong); `CourseRoutes::Get` loads a fifth float at `0x82001FD4`.
+  `CourseRoutes::Get` replays the original's 1,175 constant stores into
+  its frame (`r1 - 4480`) on every call, with the index and out words.
+  Not reproduced (following earlier ports): register saves and scratch
+  below the stack pointer (`CarTuning::Reset`'s red zone, the
+  `fctiwz`/`fcfid` conversions, `sub_82101EB0`'s running mean); copied:
+  `Car::SetModel`'s +72 twice and +73 left.
 
 ## Run 2026-10-25 16:38 (`b7-loop-25-10-26-3`)
 

@@ -17,8 +17,15 @@ file's history. What's left to see in a drive, from every run:
   race's set-up (`race-setup.md`, 52 rows, 7d2acaa; 3 leads added).
   Map checked (0 errors, 52 of 52 in play, 19 ready groups, no kernel
   calls; blocked by `RacerRecord::Init` `sub_820FF808` and
-  `Vehicle::SetupFromCar` `sub_820C27E8`). Step: migration agent 1
-  running.
+  `Vehicle::SetupFromCar` `sub_820C27E8`). Migration 1 done after
+  five batches (2e9d8eb..357f247: the car object's resets, `Car::Init`,
+  `Clear`, `SetModel`, `FromBuild`, the race data's small pieces, the
+  event's getters, `CourseRecord::Reset`, `CourseRoutes::Get` by one
+  subagent; 8 Native with no adapter, 5 Merged; `--native_race_setup`;
+  `itc_1866`: 22 s, 0 errors, every harness 0 differing). Left ready:
+  `Race::StartPosition`, `Route::Set`, `Route::Reset`, `Stages::Reset`;
+  `RacerRecord::Init` (`vehicle-accessors.md`) now ready, blocking 10
+  groups. Step: validation agent 1 running.
 
 ## Done
 
@@ -43,6 +50,8 @@ This run's groups: `expected-differences.md` (the "23:42 run" lines).
   `sub_82108018`'s row says never called, but it ran (not this run's).
 - After the race's set-up's map: ours 2152, work left 4299 (wrapped
   104, known 592, unknown 3603).
+- After the race's set-up's migration 1: ours 2183, work left 4268
+  (wrapped 104, known 561, unknown 3603).
 
 ## Stopped
 
