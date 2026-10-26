@@ -735,7 +735,7 @@ void FramesCase(Context& h, Results& results, const Block& block, const std::vec
                 const std::vector<uint32_t>& globals, Setup setup, Args args,
                 GuestFunction recompiled, GuestFunction native,
                 const std::vector<uint32_t>& floats, const std::string& what,
-                bool compare_routes = true) {
+                bool compare_routes = true, bool compare_f1 = true) {
   const uint32_t r1 = CallContext(h).r1.u32;
   uint32_t routes = r1;
   for (const Frame& frame : frames) {
@@ -781,7 +781,9 @@ void FramesCase(Context& h, Results& results, const Block& block, const std::vec
     out[v].Word(t.r3.u32);
     out[v].Word(uint32_t(t.r3.u64 >> 32));
     out[v].Word(t.r1.u32);
-    out[v].Double(t.f1.u64);
+    if (compare_f1) {
+      out[v].Double(t.f1.u64);
+    }
   }
   h.random = after;
   results.Check(out[0], out[1], what);
@@ -1131,6 +1133,100 @@ void Start(Context& h) {
   }
 }
 
+// Race::SetUpRival over made-up items (the data tables' global pointed at
+// eight 3,008-byte items, ids 0 to 7) and the made-up specs: each item's
+// words normal floats (its car build's floats, read and converted by
+// Car::FromBuild, never NaN), its build's tuning words (+120 to +268) 0 (tire
+// type 0, wheel 0, aero levels 0: in range of the made-up tables) and its car
+// id one of the specs' (55 to 70); its id (+0), bytes +36 (the location's
+// switch), +37, +90, the kind (+88: the rival's 0 to 6 or random) and the
+// +92 list (ids above its own, increasing, or -1: the chains end). The race
+// data's block compared whole, the frame of Race::SetUpRival (the ones below
+// it not: its callees' register saves; the routes' copies are compared in
+// their own cases), the rand seed alike. f1 compared only without `add`:
+// with it, the original leaves the last CarDecal::FromBuild's float in f1 (a
+// volatile register no caller reads), which Car::FromBuild's plain C++
+// doesn't hand back (its own cases don't compare f1 either).
+void Rivals(Context& h) {
+  const MadeUpSpecs specs(h);
+  const Block items(64 + 8 * 3008);
+  const Block data(0xA4000);
+  if (!specs.params || !items.address || !data.address) {
+    ITC_LOG_ERROR("harness: race_setup: no blocks for Race::SetUpRival");
+    return;
+  }
+  auto normal = [](Random& r) {
+    return std::bit_cast<uint32_t>(float(int32_t(r.Below(20001)) - 10000) / 1000.0f);
+  };
+  Results results("Race::SetUpRival (sub_82112DB0)");
+  for (int c = 0; c < 96; c++) {
+    const uint32_t rival = h.random.Below(4);
+    const uint32_t kind = c % 16 == 15 ? uint32_t(h.random.Next()) : uint32_t(c % 7);
+    const uint64_t location = c % 3 == 0 ? 48 : h.random.Below(50);
+    const uint64_t add = c % 2 == 0 ? 1 : c % 4 == 1 ? 0 : (h.random.Next() << 32);
+    FramesCase(
+        h, results, data, {{4112, 88}},
+        {race_setup::kRandSeed, race_setup::kRaceData, car_specs::kParams, data_tables::kTables},
+        [&](Random& r) {
+          guest::StoreU32(h.base, race_setup::kRandSeed, uint32_t(r.Next()));
+          guest::StoreU32(h.base, race_setup::kRaceData, data.address);
+          guest::StoreU32(h.base, car_specs::kParams, specs.params);
+          guest::StoreU32(h.base, data_tables::kTables, items.address);
+          guest::StoreU32(h.base, items.address + 16, items.address + 64);
+          for (uint32_t k = 0; k < 8; k++) {
+            const uint32_t item = items.address + 64 + 3008 * k;
+            for (uint32_t w = 0; w < 3008 / 4; w++) {
+              guest::StoreU32(h.base, item + 4 * w, normal(r));
+            }
+            for (uint32_t offset = 160 + 120; offset <= 160 + 268; offset += 4) {
+              guest::StoreU32(h.base, item + offset, 0);
+            }
+            guest::StoreU32(h.base, item + 160 + 2788, 55 + r.Below(16));
+            guest::StoreU16(h.base, item + 0, uint16_t(r.Below(8) == 0 ? r.Next() : k));
+            guest::StoreU8(h.base, item + 36, uint8_t(r.Below(5) == 0 ? r.Next() : r.Below(10)));
+            guest::StoreU8(h.base, item + 37, uint8_t(r.Next()));
+            guest::StoreU8(h.base, item + 90, uint8_t(r.Below(4) == 0 ? r.Next() : r.Below(26)));
+            guest::StoreU16(h.base, item + 88, uint16_t(k == rival ? kind : r.Below(7)));
+            uint32_t id = k;
+            for (uint32_t i = 0; i < 3; i++) {
+              const uint32_t room = 7 - id;
+              const bool end = room == 0 || r.Below(4) == 0;
+              if (!end) {
+                id += 1 + r.Below(room);
+              }
+              guest::StoreU16(h.base, item + 92 + 2 * i, end ? 0xFFFF : uint16_t(id));
+              if (end) {
+                id = 7;
+              }
+            }
+          }
+          const uint32_t records = data.address + 48;
+          const uint32_t count = r.Below(21);
+          guest::StoreU32(h.base, records + race_setup::kRacersCount, count);
+          for (uint32_t k = 0; k < count + 2; k++) {
+            guest::StoreU32(h.base, records + race_setup::kRacerRecordBytes * k + 3912,
+                            r.Below(10));
+          }
+          const uint32_t list = data.address + race_setup::kStageList;
+          guest::StoreU32(h.base, list + 800, r.Below(3));
+          guest::StoreU32(h.base, list + 804, r.Below(3));
+          for (uint32_t k = 0; k < 10; k++) {
+            guest::StoreU32(h.base, list + 80 * k + 76, r.Below(3));
+          }
+        },
+        [&](PPCContext& t) {
+          t.r3.u64 = location;
+          t.r4.u64 = rival;
+          t.r5.u64 = add;
+        },
+        __imp__sub_82112DB0, hooks::RaceSetupSetUpRival, {},
+        fmt::format("case {}: rival {}, kind {}, location {}, add {:X}", c, rival, int32_t(kind),
+                    location, add),
+        false, int32_t(add) == 0);
+  }
+  results.Report();
+}
+
 void RaceSetup(Context& h) {
   const Block block(0x1000);
   if (!block.address) {
@@ -1161,6 +1257,7 @@ void RaceSetup(Context& h) {
   RouteCallers(h, block, cars);
   Racers(h);
   Start(h);
+  Rivals(h);
   RaceDataConstructs(h);
 }
 

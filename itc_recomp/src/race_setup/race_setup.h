@@ -331,4 +331,34 @@ uint32_t SetStart(uint8_t* base, uint32_t records, uint32_t location, uint32_t t
 bool PlaceRacersNative(uint8_t* base, uint32_t frame);
 uint32_t PlaceRacers(uint8_t* base, uint32_t frame, GuestRefresh refresh, void* user);
 
+
+// Race::SetUpRival (sub_82112DB0, with its switch piece sub_82112E2C;
+// `frame` its 4,112-byte frame): item = DataTables::Item(rival); location
+// 48 replaced by the item's byte +36 (0 to 9: 20, 22, 24, 25, 31, 33, 35,
+// 37, 39, 41); with `add` the rival's racer record made at frame + 80
+// (RacerRecord::Init, +3912 = the item's id, +3924 = its byte +37,
+// Car::FromBuild(item + 160), flag 0x2, Car::Refresh) and copied to the
+// records at their count (memcpy), else found (Racers::IndexOf);
+// Stages::AddRacer for the player (0) and the rival; then by the item's
+// halfword +88 (signed): 0, the route (Race::SetRoute(0, location) with
+// `add`, Stages::SetRoute(list, 0, location, -1)) and a type 0 stage
+// (Stages::SetType); 2 and 5, up to three racers from the item's +92 (-1
+// ends; made with flags 0x202, or found and marked 0x800) added to the
+// stage, then for 2 the route and a type 0 stage, for 5 the race data's
+// +0xA3AF4 = 3 and the rival location's route (sub_82101630(location, item
+// byte +90), Race::SetRoute(it, 48) with `add`, Stages::SetRoute(list, it,
+// 48, -1)) and with `add` a type 1 stage; 3, the route and a type 0 stage,
+// then the chain: the item's +92 list gives a stage's racers (the player and
+// up to three: flags 0x302, or found and marked), its last racer's item the
+// next list, until one is empty (0xFFFF), each stage of type 0; 4, +0xA3AF4 =
+// 3, the rival location's route and a type 1 stage. Returns 1. The route
+// frames below this one; Car::Refresh's original through `refresh` where its
+// plain C++ refuses. False from SetUpRivalNative for kind 1
+// (sub_820FFA88, never seen in play: the original runs) or where a copy
+// wouldn't be native.
+bool SetUpRivalNative(uint8_t* base, uint64_t location, uint32_t rival, uint32_t add,
+                      uint32_t frame);
+uint32_t SetUpRival(uint8_t* base, uint64_t location, uint32_t rival, uint32_t add,
+                    uint32_t frame, GuestRefresh refresh, void* user);
+
 }  // namespace race_setup

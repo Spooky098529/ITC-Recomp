@@ -564,4 +564,182 @@ uint32_t PlaceRacers(uint8_t* base, uint32_t frame, GuestRefresh refresh, void* 
                   refresh, user);
 }
 
+namespace {
+
+constexpr uint32_t kRivalFrameBytes = 4112;
+constexpr uint32_t kRivalRecord = 80;
+
+// Race::SetUpRival's location: 48 is replaced by the item's byte +36 (signed;
+// 0 to 9: the switch, its case 0 sub_82112E2C).
+uint64_t RivalRouteLocation(uint8_t* base, uint64_t location, uint32_t item) {
+  if (int32_t(location) != 48) {
+    return location;
+  }
+  static constexpr uint64_t kLocations[10] = {20, 22, 24, 25, 31, 33, 35, 37, 39, 41};
+  const uint32_t which = uint32_t(int32_t(int8_t(guest::LoadU8(base, item + 36))));
+  return which <= 9 ? kLocations[which] : location;
+}
+
+// A racer record for item `item` built at frame + 80 (RacerRecord::Init, +3912
+// = the item's id (halfword +0, signed), +3924 = its byte +37 (signed),
+// Car::FromBuild(item + 160), flags |= `flags`, Car::Refresh) and copied to
+// the records at their count, the count up. Returns the count before.
+uint32_t AddRivalRecord(uint8_t* base, uint32_t records, uint32_t item, uint32_t flags,
+                        uint32_t frame, GuestRefresh refresh, void* user, uint32_t caller) {
+  const uint32_t record = frame + kRivalRecord;
+  RacerRecordInit(base, record);
+  guest::StoreU32(base, record + 3912, uint32_t(int32_t(int16_t(guest::LoadU16(base, item + 0)))));
+  guest::StoreU32(base, record + 3924, uint32_t(int32_t(int8_t(guest::LoadU8(base, item + 37)))));
+  FromBuild(base, record, item + 160);
+  guest::StoreU32(base, record + 3888, guest::LoadU32(base, record + 3888) | flags);
+  uint32_t r3;
+  if (!car_specs::CarRefresh(base, record, &r3)) {
+    refresh(user, record);
+  }
+  const uint32_t count = records + kRacersCount;
+  const uint32_t to =
+      uint32_t(uint64_t(guest::LoadU32(base, count)) * kRacerRecordBytes + records);
+  if (!native::Buffers_Memcpy(base, to, record, kRacerRecordBytes, caller)) {
+    ITC_LOG_ERROR("race_setup: Race::SetUpRival's copy to {:08X} not made natively", to);
+  }
+  const uint32_t before = guest::LoadU32(base, count);
+  guest::StoreU32(base, count, before + 1);
+  return before;
+}
+
+// An existing racer of item id `id`: Racers::IndexOf, its flags |= 0x800 (at
+// the index's record, -1 included, as the original). Returns the index.
+uint32_t MarkRival(uint8_t* base, uint32_t records, uint32_t id) {
+  const uint32_t index = uint32_t(vehicle_accessors::RacersIndexOf(base, records, id));
+  const uint32_t flags = index * kRacerRecordBytes + records + 3888;
+  guest::StoreU32(base, flags, guest::LoadU32(base, flags) | 0x800);
+  return index;
+}
+
+}  // namespace
+
+bool SetUpRivalNative(uint8_t* base, uint64_t location, uint32_t rival, uint32_t add,
+                      uint32_t frame) {
+  const uint32_t item = data_tables::Item(base, rival);
+  const uint32_t kind = uint32_t(int32_t(int16_t(guest::LoadU16(base, item + 88))));
+  if (kind == 1) {
+    return false;  // sub_820FFA88, never seen in play: the original runs
+  }
+  const uint32_t route_frame = frame - kRouteFrameBytes;
+  if (!RouteCopiesNative(route_frame, kRouteFrameOut, 0)) {
+    return false;
+  }
+  const uint64_t to = RivalRouteLocation(base, location, item);
+  const uint64_t b = uint64_t(int64_t(int8_t(guest::LoadU8(base, item + 90))));
+  if (!RouteCopiesNative(route_frame, kRouteFrameOut, uint32_t(RivalLocation(int32_t(to), b)))) {
+    return false;
+  }
+  if (int32_t(add) == 0) {
+    return true;
+  }
+  const uint32_t records = guest::LoadU32(base, kRaceData) + 48;
+  return native::Buffers_NativeMemcpy() &&
+         !c_runtime::MayShare(records, 93 * kRacerRecordBytes, frame + kRivalRecord,
+                              kRacerRecordBytes);
+}
+
+uint32_t SetUpRival(uint8_t* base, uint64_t location, uint32_t rival, uint32_t add,
+                    uint32_t frame, GuestRefresh refresh, void* user) {
+  ITC_NATIVE_RUNNING("sub_82112DB0 Race::SetUpRival");
+  const uint32_t data = guest::LoadU32(base, kRaceData);
+  const uint32_t list = data + kStageList;
+  const uint32_t records = data + 48;
+  const bool adding = int32_t(add) != 0;
+  const uint32_t route_frame = frame - kRouteFrameBytes;
+  uint32_t item = data_tables::Item(base, rival);
+  location = RivalRouteLocation(base, location, item);
+  const uint32_t rival_index =
+      adding ? AddRivalRecord(base, records, item, 0x2, frame, refresh, user, 0x82112EE0)
+             : uint32_t(vehicle_accessors::RacersIndexOf(base, records, rival));
+  StagesAddRacer(base, list, 0, 2, -1);
+  StagesAddRacer(base, list, rival_index, 2, -1);
+  // The route (Race::SetRoute with r5, Stages::SetRoute) for course route 0
+  // at the location.
+  auto route = [&] {
+    if (adding) {
+      RaceSetRoute(base, 0, uint32_t(location), route_frame);
+    }
+    StagesSetRoute(base, list, 0, uint32_t(location), 0xFFFFFFFFu, route_frame);
+  };
+  // Kinds 4 and 5: the race data's +0xA3AF4 = 3 and the rival location's
+  // route (`b` read before the store, as the original).
+  auto rival_route = [&](uint64_t b) {
+    const uint32_t to = uint32_t(RivalLocation(int32_t(location), b));
+    if (adding) {
+      RaceSetRoute(base, to, 48, route_frame);
+    }
+    StagesSetRoute(base, list, uint32_t(RivalLocation(int32_t(location), b)), 48, 0xFFFFFFFFu,
+                   route_frame);
+  };
+  const uint32_t kind = uint32_t(int32_t(int16_t(guest::LoadU16(base, item + 88))));
+  if (kind == 0) {
+    route();
+    vehicle_accessors::StagesSetType(base, list, 0, 0xFFFFFFFFu);
+  } else if (kind == 4) {
+    const uint64_t b = uint64_t(int64_t(int8_t(guest::LoadU8(base, item + 90))));
+    guest::StoreU32(base, guest::LoadU32(base, kRaceData) + 0xA3AF4, 3);
+    rival_route(b);
+    vehicle_accessors::StagesSetType(base, list, 1, 0xFFFFFFFFu);
+  } else if (kind == 2 || kind == 5) {
+    for (uint32_t i = 0; i < 3; i++) {
+      const uint32_t id = uint32_t(int32_t(int16_t(guest::LoadU16(base, item + 92 + 2 * i))));
+      if (int32_t(id) == -1) {
+        break;
+      }
+      const uint32_t racer =
+          adding ? AddRivalRecord(base, records, data_tables::Item(base, id), 0x202, frame,
+                                  refresh, user, 0x82112FD4)
+                 : MarkRival(base, records, id);
+      StagesAddRacer(base, list, racer, 2, -1);
+    }
+    if (guest::LoadU16(base, item + 88) == 2) {
+      route();
+      vehicle_accessors::StagesSetType(base, list, 0, 0xFFFFFFFFu);
+    } else {
+      guest::StoreU32(base, guest::LoadU32(base, kRaceData) + 0xA3AF4, 3);
+      rival_route(uint64_t(int64_t(int8_t(guest::LoadU8(base, item + 90)))));
+      if (adding) {
+        vehicle_accessors::StagesSetType(base, list, 1, 0xFFFFFFFFu);
+      }
+    }
+  } else if (kind == 3) {
+    route();
+    vehicle_accessors::StagesSetType(base, list, 0, 0xFFFFFFFFu);
+    // The chain of stages: the item's +92 list the next stage's racers (with
+    // the player), its last racer's item the next list, until one is empty.
+    uint32_t next = rival;
+    for (;;) {
+      const uint32_t ids = data_tables::Item(base, next) + 92;
+      if (guest::LoadU16(base, ids) == 0xFFFF) {
+        break;
+      }
+      StagesAddRacer(base, list, 0, 2, -1);
+      uint32_t last = 0xFFFFFFFFu;
+      for (uint32_t i = 0; i < 3; i++) {
+        const uint32_t id = uint32_t(int32_t(int16_t(guest::LoadU16(base, ids + 2 * i))));
+        if (int32_t(id) == -1) {
+          break;
+        }
+        const uint32_t racer =
+            adding ? AddRivalRecord(base, records, data_tables::Item(base, id), 0x302, frame,
+                                    refresh, user, 0x82113124)
+                   : MarkRival(base, records, id);
+        StagesAddRacer(base, list, racer, 2, -1);
+        last = id;
+      }
+      if (int32_t(last) == -1) {
+        break;
+      }
+      vehicle_accessors::StagesSetType(base, list, 0, 0xFFFFFFFFu);
+      next = last;
+    }
+  }
+  return 1;
+}
+
 }  // namespace race_setup

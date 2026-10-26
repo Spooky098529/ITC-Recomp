@@ -30,7 +30,8 @@ ITC_FLAG_BOOL(native_race_setup, true, "ITC",
               "sub_82101E90; RaceData::Reset sub_821020F0 (with sub_82101FD0, no adapter), "
               "RaceData::ResetGlobal sub_821021A8, Racers::SetStart sub_82101D50, "
               "Race::PlaceRacers sub_82102048 (its save data branch, sub_82105BF8, the "
-              "original's)) natively instead of "
+              "original's); Race::SetUpRival sub_82112DB0 with its switch piece sub_82112E2C (its "
+              "kind 1, with sub_820FFA88, the original's)) natively instead of "
               "through the translated code (the same writes; checked by "
               "--run_harnesses=race_setup)");
 
@@ -293,6 +294,7 @@ struct RefreshCall {
   PPCContext* ctx;
   uint8_t* base;
   uint32_t r1;
+  uint32_t lr;  // a return address of the original's Car::Refresh calls
 };
 
 void GuestRefresh(void* user, uint32_t car) {
@@ -301,7 +303,7 @@ void GuestRefresh(void* user, uint32_t car) {
   const uint64_t r1 = ctx.r1.u64;
   ctx.r1.u64 = call.r1;
   ctx.r3.u64 = car;
-  ctx.lr = 0x82101DC8;
+  ctx.lr = call.lr;
   sub_820C4998(ctx, call.base);
   ctx.r1.u64 = r1;
 }
@@ -315,7 +317,7 @@ void RaceSetupSetStart(PPCContext& ctx, uint8_t* base) {
     __imp__sub_82101D50(ctx, base);
     return;
   }
-  RefreshCall call{&ctx, base, frame};
+  RefreshCall call{&ctx, base, frame, 0x82101DC8};
   ctx.r3.u64 = rs::SetStart(base, ctx.r3.u32, ctx.r4.u32, ctx.r5.u32, frame, GuestRefresh, &call);
 }
 
@@ -326,8 +328,19 @@ void RaceSetupPlaceRacers(PPCContext& ctx, uint8_t* base) {
     __imp__sub_82102048(ctx, base);
     return;
   }
-  RefreshCall call{&ctx, base, frame - 4096};
+  RefreshCall call{&ctx, base, frame - 4096, 0x82101DC8};
   ctx.r3.u64 = rs::PlaceRacers(base, frame, GuestRefresh, &call);
+}
+
+void RaceSetupSetUpRival(PPCContext& ctx, uint8_t* base) {
+  ctx.fpscr.disableFlushMode();
+  const uint32_t frame = ctx.r1.u32 - 4112;
+  if (!rs::SetUpRivalNative(base, ctx.r3.u64, ctx.r4.u32, ctx.r5.u32, frame)) {
+    __imp__sub_82112DB0(ctx, base);
+    return;
+  }
+  RefreshCall call{&ctx, base, frame, 0x82112EC4};
+  ctx.r3.u64 = rs::SetUpRival(base, ctx.r3.u64, ctx.r4.u32, ctx.r5.u32, frame, GuestRefresh, &call);
 }
 
 }  // namespace hooks
@@ -380,6 +393,9 @@ ITC_RACE_SETUP(82101D38, RaceSetupRaceSetRoute)
 ITC_RACE_SETUP(82101E90, RaceSetupStagesSetRoute)
 ITC_RACE_SETUP(821021A8, RaceSetupRaceDataResetGlobal)
 ITC_RACE_SETUP(82102048, RaceSetupPlaceRacers)
+ITC_RACE_SETUP(82112DB0, RaceSetupSetUpRival)
+// sub_82112E2C (a case of Race::SetUpRival's switch, in its frame) needs no
+// adapter: only the original Race::SetUpRival reaches it.
 // sub_82101FD0 has no adapter: only RaceData::Reset calls it.
 // sub_82101ADC (a case of Race::StartPosition's switch, in its frame) needs
 // no adapter: only the original Race::StartPosition reaches it.

@@ -113,4 +113,9 @@ void RaceSetupRaceDataResetGlobal(PPCContext& ctx, uint8_t* base);
 void RaceSetupSetStart(PPCContext& ctx, uint8_t* base);
 void RaceSetupPlaceRacers(PPCContext& ctx, uint8_t* base);
 
+// Race::SetUpRival sub_82112DB0: r3 = the location, r4 = the rival's item
+// id, r5 = add; r3 = 1. The original for kind 1 and where a copy wouldn't be
+// native.
+void RaceSetupSetUpRival(PPCContext& ctx, uint8_t* base);
+
 }  // namespace hooks
