@@ -591,6 +591,25 @@ double CarDataDerive(uint8_t* base, uint32_t data, uint32_t frame);
 // what the original leaves in f1 (its last pow); r3 isn't kept (pow's).
 double CarDataApplySettings(uint8_t* base, uint32_t data, uint32_t car, uint32_t spec,
                             uint32_t frame);
+// Whether Vehicle::ApplyTuning's memcpy (36 bytes of the car's aero parts,
+// car +3804 or +3840, to `frame` + 208) is copied natively
+// (c_runtime::Memcpy's ranges, as the C runtime's other native callers
+// check): callers check it before writing anything, and run the original
+// where it isn't.
+bool VehicleApplyTuningCopyFits(uint32_t car, uint32_t frame);
+// Vehicle::ApplyTuning (sub_820C0D28): the car object's tuning levels (car
+// +1648 on) applied to the car data (its row), through multiplier tables
+// the original builds on its stack, the cylinder count from the spec's
+// block 2 (car +1888) and the aero parts (car +3636). `frame`: the
+// original's 480 bytes (the tables at +96 to +244, read at the level x 4
+// unchecked, the levels' std at +80, the copied aero record at +208, a
+// last unused array at +96 to +112; its register saves from +256 not
+// reproduced). Call only where VehicleApplyTuningCopyFits. Returns r3 as
+// the original leaves it (the last of a constant's base, 0x82000000
+// sign-extended, memcpy's and Object::Record1888's); f1 comes back as the
+// float at 0x8200256C (0.04; `*f1`).
+uint64_t VehicleApplyTuning(uint8_t* base, uint32_t data, uint32_t car, uint32_t frame,
+                            double* f1);
 // Vehicle::Vehicle (sub_820B42C8): the w of its vectors 0.0, +3260 to
 // +3372 (every 16) 1.0, +336, +340, +344 = 0, Vehicle::Reset (its frame
 // below `frame`, the original's 112 bytes; `f1` what it leaves), byte

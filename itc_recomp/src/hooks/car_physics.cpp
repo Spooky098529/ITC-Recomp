@@ -24,7 +24,7 @@ ITC_FLAG_BOOL(native_car_physics, true, "ITC",
               "sub_820B8BA8, sub_820B8AF8, and the collision objects' groups, sub_820B7CC8, "
               "sub_820B7CF0, and their translation, sub_820B7B60; the vehicle's forces applied, sub_820B2CC0; the car data and the "
               "vehicle's constructor, sub_820AEF80 with sub_820AECB8, sub_820AEE98, "
-              "sub_820AF018, sub_820AF1C0, sub_820B42C8; the car's settings, sub_820C05C8) natively instead of through the translated code "
+              "sub_820AF018, sub_820AF1C0, sub_820B42C8; the car's settings and tuning, sub_820C05C8, sub_820C0D28) natively instead of through the translated code "
               "(the same words, bit for bit; checked by --run_harnesses=car_physics)");
 
 // Defines an adapter: `body` uses `ctx` and `base`. Flush-to-zero off for
@@ -434,6 +434,21 @@ ITC_CAR_PHYSICS(820AF1C0, ctx.f1.f64 = CarDataDerive(base, ctx.r3.u32, ctx.r1.u3
 // doesn't read.
 ITC_CAR_PHYSICS(820C05C8, ctx.f1.f64 = CarDataApplySettings(base, ctx.r3.u32, ctx.r4.u32,
                                                             ctx.r5.u32, ctx.r1.u32 - 192))
+// r3 = the car data, r4 = the car object; r3 and f1 come back as the
+// original leaves them. Where its memcpy isn't copied natively (ranges that
+// may share memory), the original.
+extern "C" REX_FUNC(sub_820C0D28) {
+  REX_FUNC_PROLOGUE();
+  const uint32_t frame = ctx.r1.u32 - 480;
+  if (!ITC_FLAG(native_car_physics) || !VehicleApplyTuningCopyFits(ctx.r4.u32, frame)) {
+    __imp__sub_820C0D28(ctx, base);
+    return;
+  }
+  ctx.fpscr.disableFlushMode();
+  double f1 = 0.0;
+  ctx.r3.u64 = VehicleApplyTuning(base, ctx.r3.u32, ctx.r4.u32, frame, &f1);
+  ctx.f1.f64 = f1;
+}
 // r3 = the vehicle (left as it is); f1 comes back as Vehicle::Reset's.
 extern "C" REX_FUNC(sub_820B42C8) {
   REX_FUNC_PROLOGUE();
