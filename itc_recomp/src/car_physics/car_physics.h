@@ -798,4 +798,66 @@ bool CollisionWorldSetQueryCapacity(uint8_t* base, uint32_t n, uint32_t* r3);
 // wouldn't be native. `r3`: what the original leaves (the query block).
 bool CollisionWorldSetup(uint8_t* base, uint32_t* r3);
 
+// --- The collision world's update (src/car_physics/collision_world.cpp) ---
+
+// A guest call from the update's plain C++ (which stays without ctx): the
+// function at `address` with r3 to r6, r1 and lr as given; returns the r3
+// it leaves. The adapter's: the originals where a native callee refuses
+// (CollisionShape::Place 0x820BB758, CollisionPair::Solve 0x820BBE30,
+// CollisionObject::Respond 0x820B81C8), and the queries' targets other than
+// TrackCollision::WallHits and GroundHits (called through the pointers).
+using CollisionGuestCall = std::function<uint32_t(uint32_t address, uint32_t r3, uint32_t r4,
+                                                  uint32_t r5, uint32_t r6, uint32_t r1,
+                                                  uint32_t lr)>;
+// CollisionObject::Respond (sub_820B81C8): the `count` hits merged into the
+// world's +68 with a summary (CollisionRecords::Merge), the object pushed
+// out by the summary (CollisionObject::Translate) when its +260 meets the
+// summary's surface bits, and for each hit whose bits meet +256 (unless the
+// first query's skip case: `flag`'s word set, body word +516 bits 0x1 and
+// 0x2, |body +160| below [0x820021F8] and the summary's normal against body
+// +144 above 0.5) the restitution and friction impulses, the surface's
+// torque and a contact on +240. The 0x02000000 branch's Vec3::SubFrom
+// (sub_82294330, never seen in play) as Vec3::Sub(v, v, b). False, with
+// nothing done, where the record's current copy (+40) isn't a box
+// (CollisionObject::Translate wouldn't be native). `frame`: the original's
+// 416 bytes (pow's stores into its linkage area, +16 and +24, made). `r3`:
+// what the original leaves there.
+bool CollisionObjectRespond(uint8_t* base, uint32_t object, uint32_t hits, uint32_t count,
+                            uint32_t flag, uint32_t frame, uint32_t* r3);
+// CollisionObject::Collide (sub_820B8548): the world's query records (+64)
+// filled by the queries through 0x826C2D78 (the shape record) and
+// 0x826C2D7C (its current copy), r5 the object's +248; with hits, Respond
+// (the flag 1, then 0, at `frame` + 80). TrackCollision::WallHits and
+// GroundHits natively (whatever --native_collision_world says), other
+// targets and their refusals by `guest`; Respond's refusals by `guest`.
+// `frame`: the original's 128 bytes. Returns the original's r3.
+uint32_t CollisionObjectCollide(uint8_t* base, uint32_t object, uint32_t frame,
+                                const CollisionGuestCall& guest);
+// CollisionWorld::CollideAll (sub_820B89F0): Collide for each active object
+// whose +272 is 0. `frame`: the original's 96 bytes; `r3` the r3 it came
+// with. Returns the original's r3.
+uint32_t CollisionWorldCollideAll(uint8_t* base, uint32_t frame, uint32_t r3,
+                                  const CollisionGuestCall& guest);
+// CollisionWorld::SolvePairs (sub_820B87B0): the clock 0x826C2D80 += dt
+// (wrapped by [0x82002AA0] with each pair's +28), 0x826C2D84 = dt; two
+// passes: each active object's +304 = zero; each pair with a moved object
+// (+288) or due: +28 = CollisionPair::NextCheckTime, and within the step
+// the bodies' centers saved (`frame` + 80, + 96), CollisionPair::Solve
+// (refusals by `guest`), and when it hits both objects Collide'd and their
+// centers put back; after a hit, each object's +304 scaled by +208 and its
+// body's center moved by it (the second pass only after hits). `frame`: the
+// original's 208 bytes; `r3` the r3 it came with. Returns the original's r3.
+uint32_t CollisionWorldSolvePairs(uint8_t* base, double dt, uint32_t frame, uint32_t r3,
+                                  const CollisionGuestCall& guest);
+// CollisionWorld::Update (sub_820B92C8): +52 = 0, +56 = 1; each active
+// object's shape record placed by its body's matrix (CollisionShape::Place,
+// refusals by `guest`) unless +284 is set, +240 = 0; SolvePairs unless dt
+// is 0.0; CollideAll; each object with contacts and pushes (+192): the body's
+// force += +160, its torque += +176 / +192 x +224, ApplyImpulses(1.0); then
+// +288 = 0, and with pushes +160, +176 = zero, +192 = 0; +56 = 0. `frame`:
+// the original's 176 bytes; `r3` the r3 it came with. Returns the
+// original's r3.
+uint32_t CollisionWorldUpdate(uint8_t* base, double dt, uint32_t frame, uint32_t r3,
+                              const CollisionGuestCall& guest);
+
 }  // namespace car_physics

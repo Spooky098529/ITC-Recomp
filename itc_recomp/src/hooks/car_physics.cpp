@@ -25,7 +25,7 @@ ITC_FLAG_BOOL(native_car_physics, true, "ITC",
               "sub_820B8BA8, sub_820B8AF8, and the collision objects' groups, sub_820B7CC8, "
               "sub_820B7CF0, and their translation, sub_820B7B60; the vehicle's forces applied, sub_820B2CC0; the car data and the "
               "vehicle's constructor, sub_820AEF80 with sub_820AECB8, sub_820AEE98, "
-              "sub_820AF018, sub_820AF1C0, sub_820B42C8; the car's settings and tuning, sub_820C05C8, sub_820C0D28; the car loader, sub_820C27E8; the vehicle's physics objects, sub_8259D5A8, sub_820B8798 (no adapter; the ground callback only), sub_820B7998, sub_820B9570 with sub_820B7A00, sub_820B0E70 (these two only while --native_heap routes the game's heap to the allocation layer), the ground probe sub_820B4420, sub_820AFE90, sub_820B62E8; the physics step, sub_820B6498; the physics' set-up and reset, sub_820B5670, sub_820B5B08, and the collision world's set-up, sub_820FF250 with sub_820B8D30 and sub_820B9198 (these only while --native_heap routes the game's heap to the allocation layer)) natively instead of through the translated code "
+              "sub_820AF018, sub_820AF1C0, sub_820B42C8; the car's settings and tuning, sub_820C05C8, sub_820C0D28; the car loader, sub_820C27E8; the vehicle's physics objects, sub_8259D5A8, sub_820B8798 (no adapter; the ground callback only), sub_820B7998, sub_820B9570 with sub_820B7A00, sub_820B0E70 (these two only while --native_heap routes the game's heap to the allocation layer), the ground probe sub_820B4420, sub_820AFE90, sub_820B62E8; the physics step, sub_820B6498; the physics' set-up and reset, sub_820B5670, sub_820B5B08, and the collision world's set-up, sub_820FF250 with sub_820B8D30 and sub_820B9198 (these only while --native_heap routes the game's heap to the allocation layer); the collision world's update, sub_820B92C8 with sub_820B87B0, sub_820B89F0, sub_820B8548, sub_820B81C8) natively instead of through the translated code "
               "(the same words, bit for bit; checked by --run_harnesses=car_physics)");
 
 // Defines an adapter: `body` uses `ctx` and `base`. Flush-to-zero off for
@@ -481,4 +481,46 @@ extern "C" REX_FUNC(sub_820FF250) {
     return;
   }
   ctx.r3.u64 = r3;
+}
+// CollisionWorld::SolvePairs, CollideAll, CollisionObject::Collide and
+// Respond (sub_820B87B0, sub_820B89F0, sub_820B8548, sub_820B81C8) have no
+// adapters: their only callers are the update's.
+// f1 = the time step; r3 comes back as the original leaves it. The guest
+// calls: the originals where a native callee refuses (Place, Solve,
+// Respond), and the queries' targets other than WallHits and GroundHits.
+extern "C" REX_FUNC(sub_820B92C8) {
+  REX_FUNC_PROLOGUE();
+  if (!ITC_FLAG(native_car_physics)) {
+    __imp__sub_820B92C8(ctx, base);
+    return;
+  }
+  ctx.fpscr.disableFlushMode();
+  auto guest = [&](uint32_t address, uint32_t r3, uint32_t r4, uint32_t r5, uint32_t r6,
+                   uint32_t r1, uint32_t lr) -> uint32_t {
+    const uint64_t stack = ctx.r1.u64;
+    ctx.r3.u64 = r3;
+    ctx.r4.u64 = r4;
+    ctx.r5.u64 = r5;
+    ctx.r6.u64 = r6;
+    ctx.r1.u64 = r1;
+    ctx.lr = lr;
+    switch (address) {
+      case 0x820BB758:
+        __imp__sub_820BB758(ctx, base);
+        break;
+      case 0x820BBE30:
+        __imp__sub_820BBE30(ctx, base);
+        break;
+      case 0x820B81C8:
+        __imp__sub_820B81C8(ctx, base);
+        break;
+      default:
+        REX_CALL_INDIRECT_FUNC(address);
+        break;
+    }
+    ctx.r1.u64 = stack;
+    ctx.fpscr.disableFlushMode();
+    return ctx.r3.u32;
+  };
+  ctx.r3.u64 = CollisionWorldUpdate(base, ctx.f1.f64, ctx.r1.u32 - 176, ctx.r3.u32, guest);
 }

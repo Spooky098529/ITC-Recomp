@@ -1281,6 +1281,309 @@ void WorldSetUpCases(Context& h, uint32_t region) {
   std::memcpy(h.base + kQueryPointers, saved + kSurfaceBytes, 8);
 }
 
+// --- The collision world's update ---
+
+// The update's guest calls, as the adapter's (src/hooks/car_physics.cpp).
+cp::CollisionGuestCall UpdateGuestCalls(PPCContext& ctx, uint8_t* base) {
+  return [&ctx, base](uint32_t address, uint32_t r3, uint32_t r4, uint32_t r5, uint32_t r6,
+                      uint32_t r1, uint32_t lr) -> uint32_t {
+    const uint64_t stack = ctx.r1.u64;
+    ctx.r3.u64 = r3;
+    ctx.r4.u64 = r4;
+    ctx.r5.u64 = r5;
+    ctx.r6.u64 = r6;
+    ctx.r1.u64 = r1;
+    ctx.lr = lr;
+    switch (address) {
+      case 0x820BB758:
+        __imp__sub_820BB758(ctx, base);
+        break;
+      case 0x820BBE30:
+        __imp__sub_820BBE30(ctx, base);
+        break;
+      case 0x820B81C8:
+        __imp__sub_820B81C8(ctx, base);
+        break;
+      default:
+        REX_CALL_INDIRECT_FUNC(address);
+        break;
+    }
+    ctx.r1.u64 = stack;
+    ctx.fpscr.disableFlushMode();
+    return ctx.r3.u32;
+  };
+}
+// Respond, Collide, CollideAll and SolvePairs have no adapters (their only
+// callers are native); Respond's refusal runs its original, as Collide's
+// guest call does.
+void NativeRespond(PPCContext& ctx, uint8_t* base) {
+  ctx.fpscr.disableFlushMode();
+  uint32_t r3 = 0;
+  if (!cp::CollisionObjectRespond(base, ctx.r3.u32, ctx.r4.u32, ctx.r5.u32, ctx.r6.u32,
+                                  ctx.r1.u32 - 416, &r3)) {
+    __imp__sub_820B81C8(ctx, base);
+    return;
+  }
+  ctx.r3.u64 = r3;
+}
+void NativeCollide(PPCContext& ctx, uint8_t* base) {
+  ctx.fpscr.disableFlushMode();
+  const auto guest = UpdateGuestCalls(ctx, base);
+  ctx.r3.u64 = cp::CollisionObjectCollide(base, ctx.r3.u32, ctx.r1.u32 - 128, guest);
+}
+void NativeCollideAll(PPCContext& ctx, uint8_t* base) {
+  ctx.fpscr.disableFlushMode();
+  const auto guest = UpdateGuestCalls(ctx, base);
+  ctx.r3.u64 = cp::CollisionWorldCollideAll(base, ctx.r1.u32 - 96, ctx.r3.u32, guest);
+}
+void NativeSolvePairs(PPCContext& ctx, uint8_t* base) {
+  ctx.fpscr.disableFlushMode();
+  const auto guest = UpdateGuestCalls(ctx, base);
+  ctx.r3.u64 =
+      cp::CollisionWorldSolvePairs(base, ctx.f1.f64, ctx.r1.u32 - 208, ctx.r3.u32, guest);
+}
+void NativeUpdate(PPCContext& ctx, uint8_t* base) {
+  ctx.fpscr.disableFlushMode();
+  const auto guest = UpdateGuestCalls(ctx, base);
+  ctx.r3.u64 = cp::CollisionWorldUpdate(base, ctx.f1.f64, ctx.r1.u32 - 176, ctx.r3.u32, guest);
+}
+
+// The update's region (its own, from the layer): the fake world, its
+// objects and pairs (BuildWorld's layout, 0 to 0x800), then the contacts,
+// the query records, a body per object, four track positions and the
+// boxes (four per object: the template, the two copies, the +20 shape).
+constexpr uint32_t kUpdateRegionBytes = 0x3800;
+constexpr uint32_t kUContacts = 0x800;   // up to 8, 80 bytes each
+constexpr uint32_t kURecords = 0xB00;    // up to 8, 80 bytes each
+constexpr uint32_t kUBodies = 0xE00;     // 4, 0x220 apart
+constexpr uint32_t kUPositions = 0x1700; // 4, 32 bytes each
+constexpr uint32_t kUFlag = 0x17F0;
+constexpr uint32_t kUBoxes = 0x1800;     // 16, 0x200 apart
+constexpr uint32_t kQueryPointers = 0x826C2D78;
+constexpr uint32_t kSurfaceGlobals = 0x826C2DF0, kSurfaceBytes = 64;
+constexpr uint32_t kClockGlobals = 0x826C2D80;  // the clock and the step
+constexpr uint32_t kWord60 = 0x820B8C90;  // CollisionWorld::Word60: the query count
+
+uint32_t UObject(uint32_t region, uint32_t i) {
+  return region + kObjects + 320 * i;
+}
+uint32_t UBox(uint32_t region, uint32_t i, uint32_t k) {
+  return region + kUBoxes + 0x200 * (4 * i + k);
+}
+
+// The world for the update's cases: BuildWorld's objects and pairs, each
+// object (active or free) with its body, its +20 shape and its shape record
+// of three real boxes (the template lowered or not), its masks and flags;
+// the contacts (0 to 8, 0 to all used), the query records (2 x 0 to 4; the
+// hits' surface bits and ids such that some merge), the boxes' cache words
+// the track positions (their last heights far below: GroundHits finds no
+// hit without the mesh), the queries' pointers CollisionWorld::Word60 (the
+// hit count, the records as they are) or, with `ground`, the second one
+// TrackCollision::GroundHits.
+void BuildUpdateWorld(Context& h, uint32_t region, Random& r, Group group, bool ground) {
+  uint8_t* base = h.base;
+  auto word = [group](Random& x) { return group == kNaNs ? AnyWord(x) : NumberWord(x); };
+  BuildWorld(h, region, r, group, false);
+  const uint32_t world = region + kWorld;
+  for (uint32_t i = kUContacts; i < kUBoxes; i += 4) {
+    guest::StoreU32(base, region + i, word(r));
+  }
+  const uint32_t contacts = r.Below(9);
+  guest::StoreU32(base, world + 44, contacts);
+  guest::StoreU32(base, world + 48, region + kUContacts);
+  guest::StoreU32(base, world + 52, r.Below(contacts + 1));
+  guest::StoreU32(base, world + 56, r.Below(2));
+  const uint32_t queries = r.Below(5);
+  guest::StoreU32(base, world + 60, queries);
+  guest::StoreU32(base, world + 64, region + kURecords);
+  guest::StoreU32(base, world + 68, region + kURecords + 80 * queries);
+  for (uint32_t i = 0; i < 8; i++) {
+    const uint32_t record = region + kURecords + 80 * i;
+    guest::StoreU32(base, record + 56,
+                    (r.Below(8) << 24) | r.Below(4) | (r.Below(4) == 0 ? 0x80000000u : 0));
+    guest::StoreU32(base, record + 60, r.Below(3));
+  }
+  for (uint32_t i = 0; i < 4; i++) {
+    guest::StoreFloat(base, region + kUPositions + 32 * i + 20, -1e7f);
+  }
+  // All four slots (those past the world's count are in no list).
+  for (uint32_t i = 0; i < 4; i++) {
+    const uint32_t o = UObject(region, i);
+    const uint32_t body = region + kUBodies + 0x220 * i;
+    for (uint32_t at = 0; at < 528; at += 4) {
+      guest::StoreU32(base, body + at, word(r));
+    }
+    guest::StoreU32(base, body + 0, r.Below(4) == 0 ? 0x01000000u : 0);
+    guest::StoreU32(base, body + 12, r.Below(4));
+    guest::StoreU32(base, body + 516, r.Below(4));
+    for (uint32_t k = 0; k < 4; k++) {
+      const uint32_t box = UBox(region, i, k);
+      BuildBox(h, box, r, group);
+      for (uint32_t c = 0; c < 4; c++) {
+        guest::StoreU32(base, box + 160 + 4 * c, region + kUPositions + 32 * r.Below(4));
+      }
+    }
+    guest::StoreU32(base, o + 16, body);
+    guest::StoreU32(base, o + 20, UBox(region, i, 3));
+    guest::StoreU32(base, o + 32, UBox(region, i, 0));
+    guest::StoreU32(base, o + 36, UBox(region, i, 1));
+    guest::StoreU32(base, o + 40, UBox(region, i, 2));
+    if (r.Below(2) == 0) {
+      guest::StoreU32(base, o + 32 + 112, 0);
+    }
+    guest::StoreU32(base, o + 192, r.Below(3) == 0 ? 0 : r.Below(4));
+    guest::StoreU32(base, o + 240, r.Below(2) == 0 ? 0 : region + kUContacts);
+    guest::StoreU32(base, o + 256, (r.Below(8) << 24) | r.Below(4));
+    guest::StoreU32(base, o + 260, (r.Below(8) << 24) | r.Below(4));
+    guest::StoreU32(base, o + 272, r.Below(5) == 0 ? 1 : 0);
+    guest::StoreU32(base, o + 276, r.Below(5) == 0 ? 1 : 0);
+    guest::StoreU32(base, o + 280, r.Below(3) == 0 ? 1 : 0);
+    guest::StoreU32(base, o + 284, r.Below(4) == 0 ? 1 : 0);
+    guest::StoreU32(base, o + 288, r.Below(3) == 0 ? 1 : 0);
+  }
+  for (uint32_t i = 0; i < kSurfaceBytes; i += 4) {
+    guest::StoreU32(base, kSurfaceGlobals + i, word(r));
+  }
+  guest::StoreU32(base, kClockGlobals, word(r));
+  guest::StoreU32(base, kClockGlobals + 4, word(r));
+  guest::StoreU32(base, kQueryPointers, kWord60);
+  guest::StoreU32(base, kQueryPointers + 4, ground ? 0x820FEBD0u : kWord60);
+}
+
+// What the update's functions write: the world (exactly), the objects, the
+// bodies (+0, +12, +516 exactly), the boxes, the pairs (+28 a float), the
+// contacts (+16 to +67 floats), the query records (+56, +60 exactly), the
+// clock and the step.
+void UpdateWorldOutputs(Outputs& out, uint8_t* base, uint32_t region) {
+  const Blocks none;
+  for (uint32_t i = 0; i < 72; i += 4) {
+    out.Word(guest::LoadU32(base, region + kWorld + i));
+  }
+  for (uint32_t i = 0; i < 4; i++) {
+    ObjectOutputs(out, base, UObject(region, i), none);
+    const uint32_t body = region + kUBodies + 0x220 * i;
+    for (uint32_t at = 0; at < 528; at += 4) {
+      const uint32_t w = guest::LoadU32(base, body + at);
+      (at == 0 || at == 12 || at == 516) ? out.Word(w) : out.Float(w);
+    }
+    for (uint32_t k = 0; k < 4; k++) {
+      BoxOutputs(out, base, UBox(region, i, k), none);
+    }
+  }
+  for (uint32_t i = kPairs; i < kWorldEnd; i += 4) {
+    const uint32_t w = guest::LoadU32(base, region + i);
+    ((i - kPairs) % 32 == 28) ? out.Float(w) : out.Word(w);
+  }
+  for (uint32_t i = 0; i < 8 * 80; i += 4) {
+    const uint32_t w = guest::LoadU32(base, region + kUContacts + i);
+    (i % 80 >= 16 && i % 80 < 68) ? out.Float(w) : out.Word(w);
+  }
+  for (uint32_t i = 0; i < 8 * 80; i += 4) {
+    const uint32_t w = guest::LoadU32(base, region + kURecords + i);
+    (i % 80 >= 56) ? out.Word(w) : out.Float(w);
+  }
+  out.Floats(base, kClockGlobals, 2);
+}
+
+// The update's cases: Respond (on an object of the fake world, the query
+// records, 0 to the query count of them, the flag 0 or 1), Collide (an
+// object, the queries' pointers Word60, or GroundHits for the second),
+// CollideAll, SolvePairs and Update (the step 0.0 some of the time). Each
+// function's own temporaries compared (its frame from + 80; Respond's
+// linkage area, where pow stores), with the world, and r3. The surface
+// settings, the queries' pointers and the clock put back after.
+void WorldUpdateCases(Context& h) {
+  enum Kind { kRespond, kCollide, kCollideAll, kSolvePairs, kUpdate };
+  const struct {
+    const char* name;
+    GuestFunction recompiled, native;
+    Kind kind;
+    uint32_t frame;
+  } functions[] = {
+      {"CollisionObject::Respond (sub_820B81C8)", Original<__imp__sub_820B81C8>, NativeRespond,
+       kRespond, 416},
+      {"CollisionObject::Collide (sub_820B8548)", Original<__imp__sub_820B8548>, NativeCollide,
+       kCollide, 128},
+      {"CollisionWorld::CollideAll (sub_820B89F0)", Original<__imp__sub_820B89F0>,
+       NativeCollideAll, kCollideAll, 96},
+      {"CollisionWorld::SolvePairs (sub_820B87B0)", Original<__imp__sub_820B87B0>,
+       NativeSolvePairs, kSolvePairs, 208},
+      {"CollisionWorld::Update (sub_820B92C8)", Original<__imp__sub_820B92C8>, NativeUpdate,
+       kUpdate, 176},
+  };
+  const uint32_t region = memory::Alloc(kUpdateRegionBytes, 0);
+  uint8_t saved[kSurfaceBytes + 16];
+  std::memcpy(saved, h.base + kSurfaceGlobals, kSurfaceBytes);
+  std::memcpy(saved + kSurfaceBytes, h.base + kQueryPointers, 16);
+  for (const auto& f : functions) {
+    for (Group group : {kNumbers, kNaNs}) {
+      Results results(std::string(f.name) + kGroupNames[group]);
+      for (uint64_t seed = 0; seed < 150; seed++) {
+        Outputs out[2];
+        for (int v = 0; v < 2; v++) {
+          Random r(seed * 59 + 7 + 1000 * uint64_t(f.kind) + 100000 * uint64_t(group));
+          const bool ground = group == kNumbers && (f.kind == kCollide ||
+                                                    f.kind == kCollideAll) && r.Below(3) == 0;
+          BuildUpdateWorld(h, region, r, group, ground);
+          FillStack(h, r);
+          const uint32_t world = region + kWorld;
+          const uint32_t objects = guest::LoadU32(h.base, world + 12);
+          PPCContext t = CallContext(h);
+          t.fpscr.disableFlushModeUnconditional();
+          t.r3.u64 = uint32_t(r.Next());
+          if (f.kind == kRespond || f.kind == kCollide) {
+            t.r3.u64 = UObject(region, r.Below(objects));
+          }
+          if (f.kind == kRespond) {
+            const uint32_t queries = guest::LoadU32(h.base, world + 60);
+            guest::StoreU32(h.base, region + kUFlag, r.Below(2));
+            t.r4.u64 = region + kURecords;
+            t.r5.u64 = r.Below(queries + 1);
+            t.r6.u64 = region + kUFlag;
+          }
+          if (f.kind == kSolvePairs || f.kind == kUpdate) {
+            const uint32_t dt = r.Below(4) == 0 ? 0 : (group == kNaNs ? AnyWord(r) : NumberWord(r));
+            t.f1.f64 = double(std::bit_cast<float>(dt));
+          }
+          (v == 0 ? f.recompiled : f.native)(t, h.base);
+          Outputs& o = out[v];
+          UpdateWorldOutputs(o, h.base, region);
+          const uint32_t frame = CallContext(h).r1.u32 - f.frame;
+          switch (f.kind) {
+            case kRespond:
+              o.Bytes(Read(h.base, frame + 16, 16));
+              o.Floats(h.base, frame + 80, (184 - 80) / 4);
+              o.Word(guest::LoadU32(h.base, frame + 184));
+              o.Word(guest::LoadU32(h.base, frame + 188));
+              o.Floats(h.base, frame + 192, (272 - 192) / 4);
+              break;
+            case kCollide:
+              o.Word(guest::LoadU32(h.base, frame + 80));
+              break;
+            case kCollideAll:
+              break;
+            case kSolvePairs:
+              o.Floats(h.base, frame + 80, 12);
+              break;
+            case kUpdate:
+              o.Word(guest::LoadU32(h.base, frame + 80));
+              o.Word(guest::LoadU32(h.base, frame + 84));
+              o.Floats(h.base, frame + 96, 8);
+              break;
+          }
+          o.Word(t.r3.u32);
+          guest::StoreU32(h.base, kWorldPointer, region + kWorld);
+        }
+        results.Check(out[0], out[1], fmt::format("seed {}", seed));
+      }
+      results.Report();
+    }
+  }
+  std::memcpy(h.base + kSurfaceGlobals, saved, kSurfaceBytes);
+  std::memcpy(h.base + kQueryPointers, saved + kSurfaceBytes, 16);
+  memory::Free(region);
+}
+
 }  // namespace
 
 void CarPhysicsObjects(Context& h) {
@@ -1292,6 +1595,7 @@ void CarPhysicsObjects(Context& h) {
   const uint32_t vehicle_region = memory::Alloc(kVehicleRegionBytes, 0);
   VehicleGroundCases(h, region, vehicle_region);
   PhysicsStepCases(h, region, vehicle_region);
+  WorldUpdateCases(h);
   if (hooks::NativeHeapActive()) {
     SetUpCases(h, region, vehicle_region, false);
     SetUpCases(h, region, vehicle_region, true);
