@@ -635,4 +635,62 @@ bool VehicleSetupFromCar(uint8_t* base, uint32_t data, uint32_t car, uint32_t fr
 // +2624 = 0.
 void VehicleConstruct(uint8_t* base, uint32_t vehicle, uint32_t frame, double* f1);
 
+// --- The vehicle's physics objects (src/car_physics/vehicle_physics.cpp):
+// its collision object in the world, the world's ground callback, its
+// teardown. Those that allocate or free guest memory (operator new and
+// delete through the C runtime's heap over the allocation layer) are called
+// only while --native_heap routes the game's heap to the layer (the
+// adapters' condition). ---
+
+// sub_8259D5A8 (RigidBody::SetFloat48): +48 = the float at `from` (lfs then
+// stfs: its bits).
+void RigidBodySetFloat48(uint8_t* base, uint32_t body, uint32_t from);
+// CollisionWorld::Callback (sub_820B8798): a tail call to the function at
+// the collision world's +8 (`[0x826C2D88]` + 8) with r3 to r5 passed on;
+// natively only for TrackCollision::GroundCallback (0x820FEAB0, the only
+// one set in play; its frame from `r1`, the caller's stack pointer).
+// False, with nothing done, for any other: the original makes the call.
+// `r3`: what the callback returns (1).
+bool CollisionWorldCallbackKnown(uint8_t* base);
+bool CollisionWorldCallback(uint8_t* base, uint32_t result, uint32_t point, uint32_t position,
+                            uint32_t r1, uint32_t* r3);
+// Whether CollisionWorld::RemoveObject's pair removals are all native (the
+// pairs' array below the physical views and in one view, so a moved pair's
+// memcpy is the native one: CollisionWorldRemovePair).
+bool CollisionWorldPairsMovable(uint8_t* base);
+// CollisionObject::ResetTransform (sub_820B7998): +288 = 1, then
+// CollisionShape::Place (the shape record +32) by the body's matrix
+// (RigidBody::Matrix of +16) twice. False, with nothing done, where a Place
+// wouldn't be native (the record's template or copies not boxes, or the
+// lowered template's stack copy not native). `frame`: the original's 112
+// bytes (Place's 608 below it). r3 comes back as the record (+32).
+bool CollisionObjectResetTransform(uint8_t* base, uint32_t object, uint32_t frame);
+// Whether CollisionShape::SetUp runs natively for an object's record (its
+// template a box, its copies deletable, the clones' allocation not
+// operator new's error path): CollisionObject::Init's and AddObject's check.
+bool CollisionObjectInitFits(uint8_t* base, uint32_t object, uint32_t shape, uint32_t memory);
+// CollisionObject::Init (sub_820B7A00): +16 = the body, +20 = the shape,
+// +244 = the groups; CollisionShape::SetUp(+32, the shape, the body's
+// matrix, `memory`) (its frame below `frame`, the original's 112 bytes);
+// +248 to +260 = -1; +160, +176, +304 = the zero vector; +192, +236, +240,
+// +264 to +288 = 0; +208 = (1, 1, 1, its w kept), +224 = 1.0. Only where
+// CollisionObjectInitFits.
+void CollisionObjectInit(uint8_t* base, uint32_t object, uint32_t body, uint32_t shape,
+                         uint32_t groups, uint32_t memory, uint32_t frame);
+// CollisionWorld::AddObject (sub_820B9570): the first free object (+24)
+// moved to the active list (+20), +28 up, CollisionObject::Init (with the
+// world's +0; its frame below `frame`, the original's 128 bytes), its pairs
+// made (AddPairs with its +248). Returns the object; false, with nothing
+// done, with no free object or where Init wouldn't be native.
+bool CollisionWorldAddObject(uint8_t* base, uint32_t body, uint32_t shape, uint32_t groups,
+                             uint32_t frame, uint32_t* object);
+// Vehicle::DestroyPhysics (sub_820B0E70): the collision object (+340) back
+// to the world (RemoveObject), the +344 shape deleted through its slot 0
+// (Shape::DeletingDestructor, r4 = 1), the rigid body (+336) destroyed
+// (the empty destructor) and freed (operator delete), each zeroed. False,
+// with nothing done, where one of those wouldn't be native (the pairs'
+// moves, a shape that isn't a box, a block the layer didn't give). `r3`:
+// what the original leaves (the body, or with none the old +344).
+bool VehicleDestroyPhysics(uint8_t* base, uint32_t vehicle, uint32_t* r3);
+
 }  // namespace car_physics

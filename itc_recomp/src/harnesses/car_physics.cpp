@@ -428,6 +428,8 @@ void CarPhysicsCarDataDerive(Context& h);
 void CarPhysicsCarDataApplySettings(Context& h);
 void CarPhysicsVehicleApplyTuning(Context& h);
 void CarPhysicsVehicleSetupFromCar(Context& h);
+// The vehicle's physics objects (src/harnesses/car_physics_objects.cpp).
+void CarPhysicsObjects(Context& h);
 // Vehicle::SetupFromCar's cases, shared with race_setup's Car::SetupVehicle
 // cases (src/harnesses/race_setup.cpp): whether they fit (its memcpy native
 // and the table read), one case's inputs (the car data at `data`, 1,856
@@ -625,6 +627,7 @@ void CarPhysics(Context& h) {
   CarPhysicsCarDataApplySettings(h);
   CarPhysicsVehicleApplyTuning(h);
   CarPhysicsVehicleSetupFromCar(h);
+  CarPhysicsObjects(h);
 }
 
 namespace {

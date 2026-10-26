@@ -8,6 +8,7 @@
 
 #include "base/flags.h"
 #include "car_physics/car_physics.h"
+#include "hooks/heap.h"
 
 ITC_FLAG_BOOL(native_car_physics, true, "ITC",
               "Run the car physics (docs/functions/car-physics.md: the rigid body, sub_820B6A38 "
@@ -24,7 +25,7 @@ ITC_FLAG_BOOL(native_car_physics, true, "ITC",
               "sub_820B8BA8, sub_820B8AF8, and the collision objects' groups, sub_820B7CC8, "
               "sub_820B7CF0, and their translation, sub_820B7B60; the vehicle's forces applied, sub_820B2CC0; the car data and the "
               "vehicle's constructor, sub_820AEF80 with sub_820AECB8, sub_820AEE98, "
-              "sub_820AF018, sub_820AF1C0, sub_820B42C8; the car's settings and tuning, sub_820C05C8, sub_820C0D28; the car loader, sub_820C27E8) natively instead of through the translated code "
+              "sub_820AF018, sub_820AF1C0, sub_820B42C8; the car's settings and tuning, sub_820C05C8, sub_820C0D28; the car loader, sub_820C27E8; the vehicle's physics objects, sub_8259D5A8, sub_820B8798 (the ground callback only), sub_820B7998, sub_820B9570 with sub_820B7A00, sub_820B0E70 (these two only while --native_heap routes the game's heap to the allocation layer)) natively instead of through the translated code "
               "(the same words, bit for bit; checked by --run_harnesses=car_physics)");
 
 // Defines an adapter: `body` uses `ctx` and `base`. Flush-to-zero off for
@@ -450,4 +451,81 @@ extern "C" REX_FUNC(sub_820B42C8) {
   double f1 = 0.0;
   VehicleConstruct(base, ctx.r3.u32, ctx.r1.u32 - 112, &f1);
   ctx.f1.f64 = f1;
+}
+
+// --- The vehicle's physics objects (src/car_physics/vehicle_physics.cpp) ---
+
+namespace {
+
+// The ones allocating or freeing guest memory: only while the game's heap
+// is the allocation layer's.
+bool NativeLifetime() {
+  return ITC_FLAG(native_car_physics) && hooks::NativeHeapActive();
+}
+
+}  // namespace
+
+// r3 = the body, r4 = the float (r3 left as it is).
+ITC_CAR_PHYSICS(8259D5A8, RigidBodySetFloat48(base, ctx.r3.u32, ctx.r4.u32))
+// r3 = the result, r4 = the point, r5 = the track position; r3 comes back
+// as the callback's. A callback other than the ground's: the original.
+extern "C" REX_FUNC(sub_820B8798) {
+  REX_FUNC_PROLOGUE();
+  if (!ITC_FLAG(native_car_physics) || !CollisionWorldCallbackKnown(base)) {
+    __imp__sub_820B8798(ctx, base);
+    return;
+  }
+  ctx.fpscr.disableFlushMode();
+  uint32_t r3 = 0;
+  CollisionWorldCallback(base, ctx.r3.u32, ctx.r4.u32, ctx.r5.u32, ctx.r1.u32, &r3);
+  ctx.r3.u64 = r3;
+}
+// r3 = the collision object; r3 comes back as its shape record (+32).
+extern "C" REX_FUNC(sub_820B7998) {
+  REX_FUNC_PROLOGUE();
+  if (!ITC_FLAG(native_car_physics)) {
+    __imp__sub_820B7998(ctx, base);
+    return;
+  }
+  ctx.fpscr.disableFlushMode();
+  const uint32_t object = ctx.r3.u32;
+  if (!CollisionObjectResetTransform(base, object, ctx.r1.u32 - 112)) {
+    __imp__sub_820B7998(ctx, base);
+    return;
+  }
+  ctx.r3.u64 = object + 32;
+}
+// CollisionObject::Init (sub_820B7A00) has no adapter: its only caller,
+// CollisionWorld::AddObject, is native.
+// r3 = the body, r4 = the shape, r5 = the groups; r3 comes back as the
+// object.
+extern "C" REX_FUNC(sub_820B9570) {
+  REX_FUNC_PROLOGUE();
+  if (!NativeLifetime()) {
+    __imp__sub_820B9570(ctx, base);
+    return;
+  }
+  ctx.fpscr.disableFlushMode();
+  uint32_t object = 0;
+  if (!CollisionWorldAddObject(base, ctx.r3.u32, ctx.r4.u32, ctx.r5.u32, ctx.r1.u32 - 128,
+                               &object)) {
+    __imp__sub_820B9570(ctx, base);
+    return;
+  }
+  ctx.r3.u64 = object;
+}
+// r3 = the vehicle.
+extern "C" REX_FUNC(sub_820B0E70) {
+  REX_FUNC_PROLOGUE();
+  if (!NativeLifetime()) {
+    __imp__sub_820B0E70(ctx, base);
+    return;
+  }
+  ctx.fpscr.disableFlushMode();
+  uint32_t r3 = 0;
+  if (!VehicleDestroyPhysics(base, ctx.r3.u32, &r3)) {
+    __imp__sub_820B0E70(ctx, base);
+    return;
+  }
+  ctx.r3.u64 = r3;
 }
