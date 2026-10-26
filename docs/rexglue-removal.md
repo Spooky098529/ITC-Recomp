@@ -2592,6 +2592,7 @@ B7. **The game logic inside**: everything else, subsystem by subsystem,
 | 2026-10-25 | The scenery lists (the course set's six model lists: release, the draw picks by race data, course layout and mode, `PointList::Draw`; the scenery model's and the shared model draws: `IsShapeVisible`, `RecordObject` inside its interpolation wrapper, `RecordSceneLights`, the depth draws, `Model::DrawShape` and `RecordShape`; the texture provider's slots 2 and 4; `models.md`'s accessors) | `scenery-lists.md` | 25 of 27, and 6 in `models.md` (two migrations; 1 adapter removed, 2 Native with none, 3 Merged) | `--native_scenery_lists`, `--native_models` |
 | 2026-10-25 | The shader objects and what they unblocked (the shader creates and inits, the memory blocks' makers and put-off frees under the host lock, `XMemCpy`, the relocations, `XPR::Create`, `Mesh::LoadShaders`, `Mesh::Parse`, `Model::Load`; then `DataFile::GetEntry`, the scenery lists' loads, the course set's parsers, pool objects, collect and draw, `Strings::Get`, `FormatV` and `Format`) | `shader-objects.md`, with `models.md`, `c-runtime.md`, `files-and-saves.md`, `scenery-lists.md`, `course-scenery.md`, `strings-and-font.md` | 7 of 7, and 38 in the other files (three migrations; 15 adapters removed) | `--native_shader_objects`, `--native_data_files` and the files' flags |
 | 2026-10-26 | The race's set-up (`Race::SetUp`, `SetUpRival`, the race data's reset and constructor, the course route table `CourseRoutes::Get`, the racers' adds and start positions, the stage list and routes, the car object's set-up `Car::Init`, `Clear`, `SetModel`, `FromBuild` and its parts' resets, `RacerRecord::Init`; then `Vehicle::SetupFromCar` with `CarData::Derive`, `ApplySettings` and `Vehicle::ApplyTuning`) | `race-setup.md`, with `vehicle-accessors.md`, `car-physics.md` | 52 of 52, and 1 in `vehicle-accessors.md` and 4 in `car-physics.md` (three migrations; 27 adapters removed) | `--native_race_setup`, `--native_car_physics` |
+| 2026-10-26 | The car physics' ready groups (no mapping, not counted: `Vehicle::PhysicsStep`, `SetUpPhysics`, `ResetPhysics`, `DestroyPhysics`, `ProbeGround`, `Unflip`, `RefreshFromBody`, the collision objects' init and add, `CollisionWorld::Setup`, `Create`, `SetQueryCapacity` and `Update` with its pairs, collide and respond) | `car-physics.md`, with `vehicle-accessors.md`, `matrix-math.md`, `collision.md` | 134 of 134 (two migrations; 84 adapters removed, 7 Native with none) | `--native_car_physics` |
 
     The first run (2026-10-22, branch `b7-loop-test`): every harness at 0 differing, attract races at 20-21 s with no errors,
     and a race the user drove looked right. Ours went from 162 to 335 (work
@@ -3574,3 +3575,17 @@ boundary unchanged: 449 functions (916 pairs): overridden 69, Native 5,
 Dropped 23, never called 70, live 282. Imports: 186 called, 62 with a
 live caller. B7 (`b7_status.py`): ours 2,209, work left 4,242 (Wrapped
 104, with a row 535, no row yet 3,603), from 4,299.
+
+**2026-10-26, the car physics' ready groups (branch
+`b7-loop-25-10-26-4`):** a lead without mapping, after the race's
+set-up: the rest of `car-physics.md` made native in two migrations,
+the vehicle's physics step, set-up, reset and destroy, the ground
+probe, and the collision world's set-up and update (134 of 134 ours;
+84 adapters removed). The translated `ble` is "not greater", so a NaN
+keeps the value so far (`car-physics.md`'s intro); callees refusing on
+paths never seen run their original in the caller's frame; the
+allocating ones run natively only under `--native_heap`. The boundary
+unchanged: 449 functions (916 pairs): overridden 69, Native 5, Dropped
+23, never called 70, live 282. Imports: 186 called, 62 with a live
+caller. B7 (`b7_status.py`): ours 2,230, work left 4,222 (Wrapped 104,
+with a row 516, no row yet 3,602), from 4,242.

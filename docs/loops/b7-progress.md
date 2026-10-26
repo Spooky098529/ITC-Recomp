@@ -67,10 +67,19 @@ file's history. What's left to see in a drive, from every run:
   queries in play, `WallHits` and `GroundHits`, called natively; 10
   adapters removed; 23 s, 0 errors, every harness 0 differing; frame
   dumps the same as the fallback). `car-physics.md` 134 of 134 ours.
-  Step: validation agent 2 running.
+  Validated (`itc_1946`: 15 of 15 harness lines, 4 ran in the attract
+  race, 11 in the replay `itc_1947`, ok; nothing to drive). Finished.
+- Subsystem 2 of 3: the vehicle code above the physics (`sub_820BFD30`,
+  `sub_820C3020`, `sub_820C3608`, `sub_820C3150`, `sub_820C33B8`,
+  `sub_820C0118`, `sub_820C21E0`, `sub_820C20E0`, `sub_820C30D8`),
+  picked as closest to ready (5 of its 9 roots ready since the car
+  physics). Step: mapping agent running.
 
 ## Done
 
+- The car physics' ready groups (no mapping; f8a45a7..bd3e362):
+  `car-physics.md` 134 of 134 ours, 84 adapters removed in four files;
+  validated (`itc_1939`, `itc_1946`); `--native_car_physics`.
 - The race's set-up (`race-setup.md`, mapped in 7d2acaa; 52 rows): 52
   ours, and `RacerRecord::Init` and 4 in `car-physics.md`, in three
   migrations (2e9d8eb..2f54d5a), 27 adapters removed; validated
@@ -106,6 +115,9 @@ This run's groups: `expected-differences.md` (the "23:42 run" lines).
 - After the race's set-up's validation 2: race 24 s (`itc_1890`), 0
   errors, every harness 0 differing but the expected group; replay
   127 s (`itc_1891`), 0 errors.
+- After the car physics' validation 2: race 23 s (`itc_1946`), 0
+  errors, every harness 0 differing but the expected groups; replay
+  127 s (`itc_1947`), 0 errors.
 - After the car physics' migration 2: ours 2230, work left 4222
   (wrapped 104, known 516, unknown 3602).
 - After the car physics' validation: race 23 s (`itc_1939`), 0 errors,
