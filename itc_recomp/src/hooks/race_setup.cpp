@@ -17,7 +17,8 @@ ITC_FLAG_BOOL(native_race_setup, true, "ITC",
               "Car::FromBuild sub_820CDCE0; the race data's pieces sub_82101630, "
               "Race::AddStage sub_82101828, Stages::AddRacer sub_820FFAB8, RaceData::RaceData "
               "sub_821021B8 (its entries' sub_82101D20 through the array helper, without an "
-              "adapter), sub_820FF558, RunningMean::Add sub_82101698, Time::Pack sub_82101700, "
+              "adapter), sub_820FF558 (no adapter: from sub_82101EB0 and CourseRecord::Reset), "
+              "RunningMean::Add sub_82101698, Time::Pack sub_82101700, "
               "sub_82110AC0; RaceEvent::FirstOwned sub_821430A0, RaceEvent::Current "
               "sub_821434E8, RaceEvent::Count sub_821434F8, RaceEvent::CurrentFirstOwned "
               "sub_821434C8; sub_82101EB0 and CourseRecord::Reset sub_82105C90) natively instead of "
@@ -146,7 +147,8 @@ void RaceSetupRaceDataEntryConstruct(PPCContext& ctx, uint8_t* base) {
 // Car::ResetDecals40, Car::ResetDecals6, Car::ResetSettings and sub_820CCC70
 // have no adapters: only Car::Clear calls them, and its plain C++ calls
 // theirs (the flag switches Car::Clear); nor CarTuning::Reset (from
-// Car::Clear and Car::SetModel) or CarDecal::FromBuild (from Car::FromBuild).
+// Car::Clear and Car::SetModel), CarDecal::FromBuild (from Car::FromBuild) or
+// sub_820FF558 (from sub_82101EB0 and CourseRecord::Reset).
 
 // Defines an adapter: the flag, else the original.
 #define ITC_RACE_SETUP(address, step)     \
@@ -167,7 +169,6 @@ ITC_RACE_SETUP(82101630, RaceSetupRivalLocation)
 ITC_RACE_SETUP(82101828, RaceSetupAddStage)
 ITC_RACE_SETUP(820FFAB8, RaceSetupStagesAddRacer)
 ITC_RACE_SETUP(821021B8, RaceSetupRaceDataConstruct)
-ITC_RACE_SETUP(820FF558, RaceSetupLapRecordReset)
 ITC_RACE_SETUP(82101698, RaceSetupRunningMeanAdd)
 ITC_RACE_SETUP(82101700, RaceSetupTimePack)
 ITC_RACE_SETUP(82110AC0, RaceSetupCountRace)
