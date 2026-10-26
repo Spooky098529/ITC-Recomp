@@ -174,6 +174,30 @@ void NativePhysicsStep(PPCContext& ctx, uint8_t* base) {
   };
   ctx.r3.u64 = cp::VehiclePhysicsStep(base, vehicle, ctx.f1.f64, frame, original);
 }
+void NativeSetUpPhysics(PPCContext& ctx, uint8_t* base) {
+  ctx.fpscr.disableFlushMode();
+  double f1 = 0.0;
+  uint32_t r3 = 0;
+  if (!cp::VehicleSetUpPhysics(base, ctx.r3.u32, ctx.r4.u32, ctx.r5.u32, ctx.r6.u32,
+                               ctx.r1.u32 - 208, &f1, &r3)) {
+    __imp__sub_820B5670(ctx, base);
+    return;
+  }
+  ctx.f1.f64 = f1;
+  ctx.r3.u64 = r3;
+}
+void NativeResetPhysics(PPCContext& ctx, uint8_t* base) {
+  ctx.fpscr.disableFlushMode();
+  double f1 = 0.0;
+  uint32_t r3 = 0;
+  if (!cp::VehicleResetPhysics(base, ctx.r3.u32, ctx.r4.u32, ctx.r5.u32, ctx.r1.u32 - 208, &f1,
+                               &r3)) {
+    __imp__sub_820B5B08(ctx, base);
+    return;
+  }
+  ctx.f1.f64 = f1;
+  ctx.r3.u64 = r3;
+}
 void NativeDestroyPhysics(PPCContext& ctx, uint8_t* base) {
   ctx.fpscr.disableFlushMode();
   uint32_t r3 = 0;
@@ -636,9 +660,10 @@ void DestroyPhysicsCases(Context& h, uint32_t region) {
 // The vehicle's region (allocated from the layer): the vehicle (6,272
 // bytes), its car data, rigid body, surface records and track positions
 // (one per wheel and one for the body's center).
-constexpr uint32_t kVehicleRegionBytes = 0x3000;
+constexpr uint32_t kVehicleRegionBytes = 0x3400;
 constexpr uint32_t kCarData = 0x1900, kVehicleBody = 0x2000, kSurfaces = 0x2280,
-                   kPositions = 0x2380, kStepObject = 0x2800, kStepContacts = 0x2980;
+                   kPositions = 0x2380, kStepObject = 0x2800, kStepContacts = 0x2980,
+                   kSetUpData = 0x2A80;  // 0x780 bytes
 constexpr uint32_t kPositionBytes = 0x80;
 
 uint32_t WheelOf(uint32_t vehicle, uint32_t w) {
@@ -972,6 +997,128 @@ void PhysicsStepCases(Context& h, uint32_t region, uint32_t vehicle_region) {
   }
 }
 
+// SetUpPhysics' and ResetPhysics' cases: the fake world (one object free
+// at least), the vehicle's region with its car data at kSetUpData (the
+// gear count 1 to 7), for ResetPhysics the body kept at kVehicleBody, the
+// old collision object 0 or an active one, the old shape 0 or a box from
+// the layer. Compared: the vehicle (its integer words exactly, the rest as
+// floats), the car data (not written), the body (the layer's for
+// SetUpPhysics), the new shape, which given blocks were freed, the world
+// (objects as ObjectOutputs, the rest exactly), the frame's vectors (+80
+// to +111), r3 and f1; heap blocks by their number.
+void SetUpCases(Context& h, uint32_t region, uint32_t vehicle_region, bool reset) {
+  const char* name = reset ? "Vehicle::ResetPhysics (sub_820B5B08)"
+                           : "Vehicle::SetUpPhysics (sub_820B5670)";
+  auto exact_word = [](uint32_t i) {
+    static const uint32_t kExact[] = {272, 276, 336, 340, 344, 2248, 2376, 2624, 3132};
+    for (uint32_t e : kExact) {
+      if (i == e) {
+        return true;
+      }
+    }
+    if (i >= 2144 && i < 2176) {
+      return true;
+    }
+    if (i >= 416 && i < 416 + 4 * 368) {
+      const uint32_t at = (i - 416) % 368;
+      return at == 16 || at == 20 || at == 176 || at == 204;
+    }
+    return false;
+  };
+  const uint32_t r1 = CallContext(h).r1.u32;
+  for (Group group : {kNumbers, kNaNs}) {
+    Results results(std::string(name) + kGroupNames[group]);
+    for (uint64_t seed = 0; seed < 150; seed++) {
+      Outputs out[2];
+      for (int v = 0; v < 2; v++) {
+        Random r(seed * 67 + 29 + 1000 * uint64_t(group) + (reset ? 500 : 0));
+        BuildWorld(h, region, r, kNumbers, true);
+        FillVehicleRegion(h.base, vehicle_region, r, group);
+        const uint32_t vehicle = vehicle_region;
+        const uint32_t data = vehicle_region + kSetUpData;
+        guest::StoreU32(h.base, data + 1268, 1 + r.Below(7));
+        if (r.Below(3) == 0) {
+          guest::StoreU32(h.base, data + 1268, 1);
+        }
+        Blocks blocks;
+        if (reset) {
+          guest::StoreU32(h.base, vehicle + 336, vehicle_region + kVehicleBody);
+          const uint32_t active = guest::LoadU32(h.base, region + kWorld + 20);
+          guest::StoreU32(h.base, vehicle + 340, active != 0 && r.Below(3) != 0 ? active : 0);
+          uint32_t shape = 0;
+          if (r.Below(4) != 0) {
+            shape = memory::Alloc(496, 0);
+            BuildBox(h, shape, r, kNumbers);
+            blocks.given.push_back(shape);
+          }
+          guest::StoreU32(h.base, vehicle + 344, shape);
+        }
+        FillStack(h, r);
+        PPCContext t = CallContext(h);
+        t.fpscr.disableFlushModeUnconditional();
+        t.r3.u64 = vehicle;
+        t.r4.u64 = data;
+        const uint32_t groups = r.Below(16) | (r.Below(3) == 0 ? 0x00F00000 : 0);
+        if (reset) {
+          t.r5.u64 = groups;
+          (v == 0 ? Original<__imp__sub_820B5B08> : NativeResetPhysics)(t, h.base);
+        } else {
+          t.r5.u64 = r.Below(2);
+          t.r6.u64 = groups;
+          (v == 0 ? Original<__imp__sub_820B5670> : NativeSetUpPhysics)(t, h.base);
+        }
+        const uint32_t body = guest::LoadU32(h.base, vehicle + 336);
+        const uint32_t shape = guest::LoadU32(h.base, vehicle + 344);
+        blocks.Note(body);
+        blocks.Note(shape);
+        // The new collision object's record copies (the world's object).
+        const uint32_t object = guest::LoadU32(h.base, vehicle + 340);
+        if (object != 0) {
+          blocks.Note(guest::LoadU32(h.base, object + 36));
+          blocks.Note(guest::LoadU32(h.base, object + 40));
+        }
+        Outputs& o = out[v];
+        for (uint32_t i = 0; i < kCarData; i += 4) {
+          const uint32_t w = guest::LoadU32(h.base, vehicle + i);
+          exact_word(i) ? o.Word(blocks.Name(w)) : o.Float(w);
+        }
+        o.Bytes(Read(h.base, data, 0x780));
+        const uint32_t body_at = reset ? vehicle_region + kVehicleBody : body;
+        if (body_at != 0) {
+          for (uint32_t i = 0; i < 528; i += 4) {
+            const uint32_t w = guest::LoadU32(h.base, body_at + i);
+            (i == 0 || i == 12 || i == 516) ? o.Word(blocks.Name(w)) : o.Float(w);
+          }
+        }
+        if (shape != 0) {
+          BoxOutputs(o, h.base, shape, blocks);
+        }
+        for (uint32_t b : blocks.given) {
+          o.Word(memory::IsHeapBlock(b) ? 1 : 0);
+        }
+        for (uint32_t b : blocks.made) {
+          o.Word(memory::Size(b));
+        }
+        for (uint32_t i = kWorld; i < kObjects; i += 4) {
+          o.Word(blocks.Name(guest::LoadU32(h.base, region + i)));
+        }
+        for (uint32_t i = 0; i < 4; i++) {
+          ObjectOutputs(o, h.base, region + kObjects + 320 * i, blocks);
+        }
+        for (uint32_t i = kPairs; i < kWorldEnd; i += 4) {
+          o.Word(blocks.Name(guest::LoadU32(h.base, region + i)));
+        }
+        o.Floats(h.base, r1 - 208 + 80, 8);
+        o.Word(t.r3.u32);
+        o.Double(t.f1.u64);
+        blocks.FreeAll();
+      }
+      results.Check(out[0], out[1], fmt::format("seed {}", seed));
+    }
+    results.Report();
+  }
+}
+
 }  // namespace
 
 void CarPhysicsObjects(Context& h) {
@@ -983,6 +1130,10 @@ void CarPhysicsObjects(Context& h) {
   const uint32_t vehicle_region = memory::Alloc(kVehicleRegionBytes, 0);
   VehicleGroundCases(h, region, vehicle_region);
   PhysicsStepCases(h, region, vehicle_region);
+  if (hooks::NativeHeapActive()) {
+    SetUpCases(h, region, vehicle_region, false);
+    SetUpCases(h, region, vehicle_region, true);
+  }
   memory::Free(vehicle_region);
   if (hooks::NativeHeapActive()) {
     AddObjectCases(h, region, true);

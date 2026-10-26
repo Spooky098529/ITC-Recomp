@@ -25,7 +25,7 @@ ITC_FLAG_BOOL(native_car_physics, true, "ITC",
               "sub_820B8BA8, sub_820B8AF8, and the collision objects' groups, sub_820B7CC8, "
               "sub_820B7CF0, and their translation, sub_820B7B60; the vehicle's forces applied, sub_820B2CC0; the car data and the "
               "vehicle's constructor, sub_820AEF80 with sub_820AECB8, sub_820AEE98, "
-              "sub_820AF018, sub_820AF1C0, sub_820B42C8; the car's settings and tuning, sub_820C05C8, sub_820C0D28; the car loader, sub_820C27E8; the vehicle's physics objects, sub_8259D5A8, sub_820B8798 (no adapter; the ground callback only), sub_820B7998, sub_820B9570 with sub_820B7A00, sub_820B0E70 (these two only while --native_heap routes the game's heap to the allocation layer), the ground probe sub_820B4420, sub_820AFE90, sub_820B62E8; the physics step, sub_820B6498) natively instead of through the translated code "
+              "sub_820AF018, sub_820AF1C0, sub_820B42C8; the car's settings and tuning, sub_820C05C8, sub_820C0D28; the car loader, sub_820C27E8; the vehicle's physics objects, sub_8259D5A8, sub_820B8798 (no adapter; the ground callback only), sub_820B7998, sub_820B9570 with sub_820B7A00, sub_820B0E70 (these two only while --native_heap routes the game's heap to the allocation layer), the ground probe sub_820B4420, sub_820AFE90, sub_820B62E8; the physics step, sub_820B6498; the physics' set-up and reset, sub_820B5670, sub_820B5B08 (only while --native_heap routes the game's heap to the allocation layer)) natively instead of through the translated code "
               "(the same words, bit for bit; checked by --run_harnesses=car_physics)");
 
 // Defines an adapter: `body` uses `ctx` and `base`. Flush-to-zero off for
@@ -501,4 +501,42 @@ extern "C" REX_FUNC(sub_820B6498) {
     ctx.fpscr.disableFlushMode();
   };
   ctx.r3.u64 = VehiclePhysicsStep(base, vehicle, ctx.f1.f64, frame, original);
+}
+// r3 = the vehicle, r4 = the car data, r5 = the byte, r6 = the groups; f1
+// and r3 come back as ProbeGround's. Where a step wouldn't be native, the
+// original.
+extern "C" REX_FUNC(sub_820B5670) {
+  REX_FUNC_PROLOGUE();
+  if (!NativeLifetime()) {
+    __imp__sub_820B5670(ctx, base);
+    return;
+  }
+  ctx.fpscr.disableFlushMode();
+  double f1 = 0.0;
+  uint32_t r3 = 0;
+  if (!VehicleSetUpPhysics(base, ctx.r3.u32, ctx.r4.u32, ctx.r5.u32, ctx.r6.u32,
+                           ctx.r1.u32 - 208, &f1, &r3)) {
+    __imp__sub_820B5670(ctx, base);
+    return;
+  }
+  ctx.f1.f64 = f1;
+  ctx.r3.u64 = r3;
+}
+// r3 = the vehicle, r4 = the car data, r5 = the groups; as SetUpPhysics.
+extern "C" REX_FUNC(sub_820B5B08) {
+  REX_FUNC_PROLOGUE();
+  if (!NativeLifetime()) {
+    __imp__sub_820B5B08(ctx, base);
+    return;
+  }
+  ctx.fpscr.disableFlushMode();
+  double f1 = 0.0;
+  uint32_t r3 = 0;
+  if (!VehicleResetPhysics(base, ctx.r3.u32, ctx.r4.u32, ctx.r5.u32, ctx.r1.u32 - 208, &f1,
+                           &r3)) {
+    __imp__sub_820B5B08(ctx, base);
+    return;
+  }
+  ctx.f1.f64 = f1;
+  ctx.r3.u64 = r3;
 }

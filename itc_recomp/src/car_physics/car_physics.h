@@ -739,5 +739,29 @@ uint32_t VehicleRefreshFromBody(uint8_t* base, uint32_t vehicle, uint32_t frame)
 // r3 (Unflip's).
 uint32_t VehiclePhysicsStep(uint8_t* base, uint32_t vehicle, double dt, uint32_t frame,
                             const std::function<void(uint32_t address)>& original);
+// Vehicle::SetUpPhysics (sub_820B5670) and Vehicle::ResetPhysics
+// (sub_820B5B08): the vehicle's physics set up from its car data (their
+// rows): Vehicle::Reset, the wheels cleared, the wheels' pointers, the
+// mass; a new 528-byte rigid body (SetUpPhysics; ResetPhysics keeps +336)
+// reset and given its mass, inertia, center of mass, +48, +112 and gravity;
+// ResetPhysics' old collision object back to the world and old shape
+// deleted (slot 0); a new 496-byte box (+344) from the car data's corners
+// with its four values; a collision object from the world (AddObject) with
+// its size, +224, groups (`groups` | 0x07000000) and masks; the fields and
+// records cleared (ResetPhysics' +352 and +384 the zero vector too), the
+// wheels' +228, the gauges +2968 to +2980, byte +2249 (`byte`;
+// ResetPhysics' 1), SetUpGearing, SyncFromBody, ProbeGround, the drive and
+// the torque split, the gear values with one gear. Operator new and delete
+// through the C runtime's heap over the allocation layer (the adapters'
+// condition: --native_heap). False, with nothing done, where a step
+// wouldn't be native (the callback not the ground's, no process heap, no
+// free collision object or its record's copies not deletable, the pairs'
+// moves, the old shape not a box the layer gave). `frame`: the original's
+// 208 bytes (the callees' below). `f1` gets ProbeGround's; `r3` what the
+// original leaves (`frame` - 144).
+bool VehicleSetUpPhysics(uint8_t* base, uint32_t vehicle, uint32_t data, uint32_t byte,
+                         uint32_t groups, uint32_t frame, double* f1, uint32_t* r3);
+bool VehicleResetPhysics(uint8_t* base, uint32_t vehicle, uint32_t data, uint32_t groups,
+                         uint32_t frame, double* f1, uint32_t* r3);
 
 }  // namespace car_physics
