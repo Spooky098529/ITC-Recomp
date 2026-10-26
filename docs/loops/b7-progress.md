@@ -51,8 +51,16 @@ file's history. What's left to see in a drive, from every run:
   left in `car-physics.md` (`sub_820B0E70`, `sub_820B7998`,
   `sub_820B7A00`, `sub_820B9570`, `sub_820B8798`, `sub_8259D5A8` and
   what they unblock under `sub_820B62E8`, `sub_820B5670`,
-  `sub_820B5B08`, `sub_820B6498`), picked as closest to ready. Step:
-  migration agent running.
+  `sub_820B5B08`, `sub_820B6498`), picked as closest to ready.
+  Migration 1 done after five batches (f8a45a7..b488eb2:
+  `Vehicle::DestroyPhysics`, `ProbeGround`, `Unflip`, `RefreshFromBody`,
+  `PhysicsStep`, `SetUpPhysics`, `ResetPhysics`, the collision objects'
+  init and add, `CollisionWorld::Setup`, `Create`, `SetQueryCapacity`;
+  74 adapters removed in four files, 3 Native with none; no new flag;
+  23 s, 0 errors, every harness 0 differing; frame dumps matched the
+  fallback). `car-physics.md` 129 of 134 ours. Left ready:
+  `CollisionWorld::Update` `sub_820B92C8` (5 functions, 774 lines).
+  Step: validation agent running.
 
 ## Done
 
@@ -91,6 +99,8 @@ This run's groups: `expected-differences.md` (the "23:42 run" lines).
 - After the race's set-up's validation 2: race 24 s (`itc_1890`), 0
   errors, every harness 0 differing but the expected group; replay
   127 s (`itc_1891`), 0 errors.
+- After the car physics' migration 1: ours 2224, work left 4227
+  (wrapped 104, known 521, unknown 3602).
 - After the race's set-up's validation 3: race 24 s (`itc_1909`), 0
   errors, every harness 0 differing but the expected groups; replay
   127 s (`itc_1911`), 0 errors.

@@ -57,6 +57,21 @@ When the user has reviewed a run's section, its heading gets
   `sub_820B6A38` set to Native; `race-setup.md`'s `sub_820CD5C8`
   Overridden. `SetupFromCar`'s and `SetupVehicle`'s adapters stay
   (recompiled callers in play).
+- The car physics' ready groups (no mapping; f8a45a7..b488eb2): rows in
+  `car-physics.md` (52, one new: `sub_8259D5A8`), `vehicle-accessors.md`
+  (28), `matrix-math.md` (2), `collision.md` (2); 74 adapters removed
+  after a first-call probe showed none called in an attract race.
+  Learned: the translated `ble` is "not greater", so a NaN keeps the
+  value so far (`ProbeGround`'s speed clamp, the step's travel minimum;
+  in `car-physics.md`'s intro). `PhysicsStep`'s callees that refuse on
+  paths never seen (`UpdateSteering`'s tan error, `UpdateTorqueSplit`'s
+  mode 2) run their original in the step's frame through a
+  `std::function`, as the mode tick's draws. The allocating functions
+  run natively only under `--native_heap`. Not ported: `Create`'s and
+  `SetQueryCapacity`'s passed-in buffer branches (refuse, run the
+  original); `RemoveObject`'s branch in `DestroyPhysics` ported.
+  Removable adapters outside the area left: `sub_820FF938`,
+  `sub_820FF9F8`, `sub_820FFAB0`.
 
 ## Run 2026-10-25 16:38 (`b7-loop-25-10-26-3`)
 
