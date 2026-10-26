@@ -96,12 +96,8 @@ ITC_CAR_PHYSICS(820B77D0, RigidBodyReset(base, ctx.r3.u32, ctx.r1.u32 - 176);
                 ctx.r3.u64 = ctx.r3.u32 + 96)
 // r3 comes back as the body.
 ITC_CAR_PHYSICS(820B7928, RigidBodyConstruct(base, ctx.r3.u32, ctx.r1.u32 - 96))
-// r4 = out (3 floats), r5 = the point; f1 = the last dot product, r3 its
-// temporary (the frame's +192).
-ITC_CAR_PHYSICS(820B6A38,
-                ctx.f1.f64 = RigidBodyEffectiveMassAt(base, ctx.r3.u32, ctx.r4.u32, ctx.r5.u32,
-                                                      ctx.r1.u32 - 272);
-                ctx.r3.u64 = ctx.r1.u32 - 272 + 192)
+// RigidBody::EffectiveMassAt (sub_820B6A38) has no adapter: its only
+// caller, CarData::Derive, is native.
 // r4 = the point, r5 = the normal; f1 = the impulse.
 extern "C" REX_FUNC(sub_820B6C78) {
   REX_FUNC_PROLOGUE();
@@ -420,35 +416,10 @@ extern "C" REX_FUNC(sub_820B7CF0) {
 // CarData::CarData, is native.
 // r3 = the car data (left as it is).
 ITC_CAR_PHYSICS(820AEF80, CarDataConstruct(base, ctx.r3.u32, ctx.r1.u32 - 96))
-// r3 = the car data, r4 = the source, r5 = the byte.
-ITC_CAR_PHYSICS(820AEE98, CarDataFillAxle(base, ctx.r3.u32, ctx.r4.u32, ctx.r5.u32))
-// f1 comes back as +812's new value.
-ITC_CAR_PHYSICS(820AF018, ctx.f1.f64 = CarDataConvertUnits(base, ctx.r3.u32))
-// r3 = the car data; f1 comes back as the second sqrtf, r3 as the
-// temporary body (the frame's +352).
-ITC_CAR_PHYSICS(820AF1C0, ctx.f1.f64 = CarDataDerive(base, ctx.r3.u32, ctx.r1.u32 - 1008);
-                ctx.r3.u64 = ctx.r1.u32 - 1008 + 352)
-// r3 = the car data, r4 = the car object, r5 = its spec's block 2 (car
-// +1888); f1 comes back as the last pow's. r3 is left as it is: the
-// original leaves pow's, which its only caller (Vehicle::SetupFromCar)
-// doesn't read.
-ITC_CAR_PHYSICS(820C05C8, ctx.f1.f64 = CarDataApplySettings(base, ctx.r3.u32, ctx.r4.u32,
-                                                            ctx.r5.u32, ctx.r1.u32 - 192))
-// r3 = the car data, r4 = the car object; r3 and f1 come back as the
-// original leaves them. Where its memcpy isn't copied natively (ranges that
-// may share memory), the original.
-extern "C" REX_FUNC(sub_820C0D28) {
-  REX_FUNC_PROLOGUE();
-  const uint32_t frame = ctx.r1.u32 - 480;
-  if (!ITC_FLAG(native_car_physics) || !VehicleApplyTuningCopyFits(ctx.r4.u32, frame)) {
-    __imp__sub_820C0D28(ctx, base);
-    return;
-  }
-  ctx.fpscr.disableFlushMode();
-  double f1 = 0.0;
-  ctx.r3.u64 = VehicleApplyTuning(base, ctx.r3.u32, ctx.r4.u32, frame, &f1);
-  ctx.f1.f64 = f1;
-}
+// CarData::FillAxle, ConvertUnits and Derive, sub_820C05C8
+// (CarData::ApplySettings) and Vehicle::ApplyTuning (sub_820AEE98,
+// sub_820AF018, sub_820AF1C0, sub_820C05C8, sub_820C0D28) have no adapters:
+// their only caller, Vehicle::SetupFromCar, is native.
 // r3 = the car data, r4 = the car object; f1 comes back as CarData::Derive's,
 // r3 as its temporary body (r1 - 368 - 1008 + 352). Where ApplyTuning's
 // memcpy wouldn't be copied natively, the original.
