@@ -150,6 +150,30 @@ void NativeRefreshFromBody(PPCContext& ctx, uint8_t* base) {
   }
   ctx.r3.u64 = cp::VehicleRefreshFromBody(base, ctx.r3.u32, ctx.r1.u32 - 96);
 }
+// As the adapter: UpdateSteering's and UpdateTorqueSplit's originals where
+// they refuse.
+void NativePhysicsStep(PPCContext& ctx, uint8_t* base) {
+  ctx.fpscr.disableFlushMode();
+  if (!cp::CollisionWorldCallbackKnown(base)) {
+    __imp__sub_820B6498(ctx, base);
+    return;
+  }
+  const uint32_t vehicle = ctx.r3.u32;
+  const uint32_t frame = ctx.r1.u32 - 112;
+  auto original = [&](uint32_t address) {
+    const uint64_t r1 = ctx.r1.u64;
+    ctx.r1.u64 = frame;
+    ctx.r3.u64 = vehicle;
+    if (address == 0x820B18B8) {
+      __imp__sub_820B18B8(ctx, base);
+    } else {
+      __imp__sub_820B2100(ctx, base);
+    }
+    ctx.r1.u64 = r1;
+    ctx.fpscr.disableFlushMode();
+  };
+  ctx.r3.u64 = cp::VehiclePhysicsStep(base, vehicle, ctx.f1.f64, frame, original);
+}
 void NativeDestroyPhysics(PPCContext& ctx, uint8_t* base) {
   ctx.fpscr.disableFlushMode();
   uint32_t r3 = 0;
@@ -612,9 +636,9 @@ void DestroyPhysicsCases(Context& h, uint32_t region) {
 // The vehicle's region (allocated from the layer): the vehicle (6,272
 // bytes), its car data, rigid body, surface records and track positions
 // (one per wheel and one for the body's center).
-constexpr uint32_t kVehicleRegionBytes = 0x2800;
+constexpr uint32_t kVehicleRegionBytes = 0x3000;
 constexpr uint32_t kCarData = 0x1900, kVehicleBody = 0x2000, kSurfaces = 0x2280,
-                   kPositions = 0x2380;
+                   kPositions = 0x2380, kStepObject = 0x2800, kStepContacts = 0x2980;
 constexpr uint32_t kPositionBytes = 0x80;
 
 uint32_t WheelOf(uint32_t vehicle, uint32_t w) {
@@ -791,6 +815,163 @@ void VehicleGroundCases(Context& h, uint32_t region, uint32_t vehicle_region) {
   }
 }
 
+// The physics step's inputs beyond FillVehicleRegion's, as the vehicle
+// harness's (src/harnesses/car_physics.cpp, FillVehicle): the wheels' bytes
+// +17 and +204, the collision object (+340) and its contacts, the bytes and
+// counters the updates branch on, the gear count (car data +1268) and the
+// substeps (+2368). The wheels' track positions and the body's 0 (the body
+// moves before Unflip, and SyncFromBody moves the wheels' points).
+void FillStepInputs(uint8_t* base, uint32_t region, Random& r) {
+  const uint32_t v = region;
+  const uint32_t data = region + kCarData;
+  for (uint32_t w = 0; w < 4; w++) {
+    const uint32_t wheel = WheelOf(v, w);
+    guest::StoreU8(base, wheel + 17, uint8_t(r.Below(4) != 0));
+    guest::StoreU32(base, wheel + 204, r.Below(100));
+    guest::StoreU32(base, wheel + 20, 0);
+  }
+  guest::StoreU32(base, v + 2984, 0);
+  guest::StoreU32(base, v + 348, r.Below(5));
+  guest::StoreU32(base, v + 340, region + kStepObject);
+  const uint32_t object = region + kStepObject;
+  guest::StoreU32(base, object + 240, r.Below(4) == 0 ? 0 : region + kStepContacts);
+  for (uint32_t c = 0; c < 2; c++) {
+    const uint32_t contact = region + kStepContacts + 128 * c;
+    constexpr uint32_t kFlags[] = {0x01000000, 0x02000000, 0x04000000, 0x00000001};
+    guest::StoreU32(base, contact + 4, kFlags[r.Below(4)]);
+    guest::StoreU32(base, contact + 68, c == 0 && r.Below(2) == 0 ? contact + 128 : 0);
+  }
+  guest::StoreU8(base, v + 2384, uint8_t(r.Below(4) == 0));
+  if (r.Below(2) == 0) {
+    guest::StoreU32(base, v + 2340, std::bit_cast<uint32_t>(float(r.Below(1200)) / 1000.0f));
+  }
+  guest::StoreU32(base, v + 2344, r.Below(3) == 0 ? uint32_t(r.Next()) : r.Below(6));
+  guest::StoreU8(base, v + 2386, uint8_t(r.Below(3) != 0));
+  guest::StoreU32(base, v + 3156, r.Below(1000));
+  guest::StoreU32(base, v + 2252, uint32_t(int32_t(r.Below(8)) - 1));
+  if (r.Below(2) == 0) {
+    guest::StoreU32(base, v + 2392, r.Below(40));
+  }
+  guest::StoreU32(base, v + 2256, uint32_t(int32_t(r.Below(8)) - 1));
+  guest::StoreU8(base, v + 2424, uint8_t(r.Below(2)));
+  guest::StoreU8(base, v + 2512, uint8_t(r.Below(4) != 0));
+  guest::StoreU8(base, v + 3240, uint8_t(r.Below(2)));
+  guest::StoreU8(base, v + 2281, uint8_t(r.Below(2)));
+  if (r.Below(2) == 0) {
+    guest::StoreU32(base, v + 2524, r.Below(4000));
+  }
+  guest::StoreU32(base, v + 2496, r.Below(4));
+  guest::StoreU8(base, v + 2625, uint8_t(r.Below(2)));
+  guest::StoreU8(base, v + 2383, uint8_t(r.Below(2)));
+  guest::StoreU8(base, v + 276, uint8_t(r.Below(2)));
+  guest::StoreU32(base, v + 2376, r.Below(7));
+  guest::StoreU8(base, data + 1604, uint8_t(r.Below(3) != 0));
+  guest::StoreU8(base, data + 1605, uint8_t(r.Below(2)));
+  if (r.Below(2) == 0) {
+    guest::StoreU32(base, v + 2268, 0);
+  }
+  if (r.Below(2) == 0) {
+    guest::StoreU32(base, v + 2228, std::bit_cast<uint32_t>(float(r.Below(1100)) / 1000.0f));
+  }
+  if (r.Below(2) == 0) {
+    guest::StoreU32(base, v + 296, 0);
+  }
+  switch (r.Below(3)) {
+    case 0:
+      guest::StoreU32(base, v + 2264, 0x3F800000);
+      break;
+    case 1:
+      guest::StoreU32(base, v + 2264, 0);
+      break;
+  }
+  guest::StoreU32(base, data + 1268, 1 + r.Below(7));
+  guest::StoreU32(base, v + 2368, r.Below(8) == 0 ? 0 : 1 + r.Below(4));
+  for (uint32_t at : {2276u, 2277u, 2284u, 2285u, 2286u, 2249u}) {
+    guest::StoreU8(base, v + at, uint8_t(r.Below(3) == 0));
+  }
+  for (uint32_t at : {284u, 288u, 292u}) {
+    if (r.Below(3) == 0) {
+      guest::StoreU32(base, v + at, 0);
+    }
+  }
+  for (uint32_t at : {3132u, 3241u, 2928u}) {
+    guest::StoreU8(base, v + at, uint8_t(r.Below(2)));
+  }
+}
+
+// The step's cases: three groups, numbers only, one NaN word in the vehicle
+// and NaNs and infinities anywhere. Compared: the region, its float words
+// as floats (all but the pointers, counters, gears, modes and bytes set
+// above; of the collision object only +144: NaNs are made from numbers
+// too, 0/0 among them), and r3. dt 1/30 most of the time.
+void PhysicsStepCases(Context& h, uint32_t region, uint32_t vehicle_region) {
+  enum StepGroup { kStepNumbers, kStepOneNaN, kStepNaNs };
+  const char* const kStepGroupNames[] = {"", ", one NaN", ", NaNs and infinities anywhere"};
+  auto exact_word = [](uint32_t i) {
+    static const uint32_t kExact[] = {272,  276,  336,  340,  344,  348,  2248, 2252,
+                                      2256, 2276, 2280, 2284, 2344, 2368, 2376, 2380, 2384,
+                                      2392, 2424, 2444, 2456, 2496, 2512, 2524, 2624, 2664,
+                                      2928, 2984, 3132, 3156, 3240};
+    for (uint32_t e : kExact) {
+      if (i == e) {
+        return true;
+      }
+    }
+    if ((i >= 2144 && i < 2176) || (i >= 2668 && i < 2700) || (i >= 2796 && i < 2828)) {
+      return true;
+    }
+    if (i >= 416 && i < 416 + 4 * 368) {
+      const uint32_t at = (i - 416) % 368;
+      return at == 16 || at == 20 || at == 176 || at == 204;
+    }
+    return false;
+  };
+  for (int group = 0; group < 3; group++) {
+    Results results(std::string("Vehicle::PhysicsStep (sub_820B6498)") + kStepGroupNames[group]);
+    for (uint64_t seed = 0; seed < 200; seed++) {
+      Outputs out[2];
+      for (int v = 0; v < 2; v++) {
+        Random r(seed * 61 + 23 + 1000 * uint64_t(group));
+        BuildWorld(h, region, r, kNumbers, false);
+        FillVehicleRegion(h.base, vehicle_region, r, group == kStepNaNs ? kNaNs : kNumbers);
+        FillStepInputs(h.base, vehicle_region, r);
+        if (group == kStepOneNaN) {
+          guest::StoreU32(h.base, vehicle_region + 4 * r.Below(kCarData / 4),
+                          kOddFloats[r.Below(6)]);
+        }
+        FillStack(h, r);
+        PPCContext t = CallContext(h);
+        t.fpscr.disableFlushModeUnconditional();
+        t.r3.u64 = vehicle_region;
+        t.f1.f64 = r.Below(4) == 0 ? double(std::bit_cast<float>(NumberWord(r)))
+                                    : double(1.0f / 30.0f);
+        (v == 0 ? Original<__imp__sub_820B6498> : NativePhysicsStep)(t, h.base);
+        {
+          for (uint32_t i = 0; i < kCarData; i += 4) {
+            const uint32_t w = guest::LoadU32(h.base, vehicle_region + i);
+            exact_word(i) ? out[v].Word(w) : out[v].Float(w);
+          }
+          out[v].Bytes(Read(h.base, vehicle_region + kCarData, kVehicleBody - kCarData));
+          for (uint32_t i = 0; i < 528; i += 4) {
+            const uint32_t w = guest::LoadU32(h.base, vehicle_region + kVehicleBody + i);
+            (i == 0 || i == 12 || i == 516) ? out[v].Word(w) : out[v].Float(w);
+          }
+          out[v].Bytes(Read(h.base, vehicle_region + kSurfaces, kStepObject - kSurfaces));
+          // The collision object: its +144 (the step's float) as a float.
+          out[v].Bytes(Read(h.base, vehicle_region + kStepObject, 144));
+          out[v].Float(guest::LoadU32(h.base, vehicle_region + kStepObject + 144));
+          out[v].Bytes(Read(h.base, vehicle_region + kStepObject + 148, 320 - 148));
+          out[v].Bytes(Read(h.base, vehicle_region + kStepContacts,
+                            kVehicleRegionBytes - kStepContacts));
+        }
+        out[v].Word(t.r3.u32);
+      }
+      results.Check(out[0], out[1], fmt::format("seed {}", seed));
+    }
+    results.Report();
+  }
+}
+
 }  // namespace
 
 void CarPhysicsObjects(Context& h) {
@@ -801,6 +982,7 @@ void CarPhysicsObjects(Context& h) {
   ResetTransformCases(h, region);
   const uint32_t vehicle_region = memory::Alloc(kVehicleRegionBytes, 0);
   VehicleGroundCases(h, region, vehicle_region);
+  PhysicsStepCases(h, region, vehicle_region);
   memory::Free(vehicle_region);
   if (hooks::NativeHeapActive()) {
     AddObjectCases(h, region, true);

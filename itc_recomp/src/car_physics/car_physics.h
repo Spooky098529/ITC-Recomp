@@ -15,6 +15,7 @@
 #pragma once
 
 #include <cstdint>
+#include <functional>
 
 namespace car_physics {
 
@@ -722,5 +723,21 @@ bool VehicleUnflip(uint8_t* base, uint32_t vehicle, uint32_t frame, uint32_t* r3
 // Only where the callback is the ground's. Returns the original's r3
 // (UpdateWheelAxes').
 uint32_t VehicleRefreshFromBody(uint8_t* base, uint32_t vehicle, uint32_t frame);
+// Vehicle::PhysicsStep (sub_820B6498): the car's physics step (its row:
+// BeginStep with `dt`, the body's state, the ground, the suspension, the
+// collision object's +144 = -min([0x82001BDC], the wheels' +0), the
+// controls and the engine, the +2368 substeps of the tires and the
+// drivetrain, the forces applied, the state and ground again, the wear and
+// Unflip; +2520 = +2516, bytes +2444, +2445 = 0), each callee's plain C++
+// with the vehicle (the original passes it on in r3, which they leave as
+// it is) and its frame below `frame` (the original's 112 bytes) as the
+// original's. Where UpdateSteering or UpdateTorqueSplit would refuse (tan's
+// error path, mode 2: never in play), `original(address)` runs that
+// function's original instead (the adapter's guest call, with r3 the
+// vehicle and r1 `frame`), as the recompiled step's call to its adapter
+// would. Only where the callback is the ground's. Returns the original's
+// r3 (Unflip's).
+uint32_t VehiclePhysicsStep(uint8_t* base, uint32_t vehicle, double dt, uint32_t frame,
+                            const std::function<void(uint32_t address)>& original);
 
 }  // namespace car_physics

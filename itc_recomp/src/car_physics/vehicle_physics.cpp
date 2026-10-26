@@ -272,7 +272,7 @@ uint32_t VehicleProbeGround(uint8_t* base, uint32_t vehicle, uint32_t frame, dou
   Stfs(base, v + 92, zero);
   double speed2 = double(vl::Vec3Dot(base, f + 96, f + 96));
   const double limit = Lfs(base, kSpeedLimit);
-  if (!(speed2 <= limit)) {  // ble: a NaN takes the limit
+  if (speed2 > limit) {  // ble ("not greater"): a NaN stays
     speed2 = limit;
   }
   const double forward = double(vl::Vec3DotOf(base, f + 96, v + 112));
@@ -365,6 +365,87 @@ uint32_t VehicleRefreshFromBody(uint8_t* base, uint32_t vehicle, uint32_t frame)
   double f1 = 0.0;
   VehicleProbeGround(base, vehicle, frame - 304, &f1);
   return VehicleUpdateWheelAxes(base, vehicle, frame - 256);
+}
+
+}  // namespace car_physics
+
+namespace car_physics {
+
+namespace {
+
+constexpr uint32_t kTravelLimit = 0x82001BDC;  // the collision object's +144, at most (negated)
+
+}  // namespace
+
+uint32_t VehiclePhysicsStep(uint8_t* base, uint32_t vehicle, double dt, uint32_t frame,
+                            const std::function<void(uint32_t address)>& original) {
+  ITC_NATIVE_RUNNING("sub_820B6498 Vehicle::PhysicsStep");
+  const uint32_t v = vehicle, f = frame;
+  double f1 = 0.0;
+  VehicleBeginStep(base, v, dt);
+  guest::StoreU8(base, v + 2456, 1);
+  VehicleSyncFromBody(base, v, f - 368);
+  VehicleProbeGround(base, v, f - 304, &f1);
+  VehicleUpdateSuspension(base, v, f - 144, &f1);
+  // The smallest of the wheels' +0 and the limit (ble, "not greater": a
+  // NaN on either side keeps the one so far).
+  double travel = Lfs(base, kTravelLimit);
+  for (uint32_t w = 0; w < 4; w++) {
+    const double wheel_travel = Lfs(base, WheelAt(v, w) + 0);
+    if (travel > wheel_travel) {
+      travel = wheel_travel;
+    }
+  }
+  Stfs(base, guest::LoadU32(base, v + 340) + 144, Fneg(travel));
+  VehicleTractionControl(base, v, f);
+  VehicleShiftGears(base, v, f - 96);
+  if (!VehicleUpdateSteering(base, v, f - 160)) {
+    original(0x820B18B8);
+  }
+  VehicleUpdateWheelAxes(base, v, f - 256);
+  VehicleSuspensionTorques(base, v, f - 256);
+  VehicleWheelLoads(base, v);
+  VehicleUpdateTireGrip(base, v);
+  if (!VehicleUpdateTorqueSplit(base, v)) {
+    original(0x820B2100);
+  }
+  VehicleUpdateEngineTorque(base, v, f - 96);
+  VehicleUpdateTurbo(base, v);
+  VehicleUpdateAtRest(base, v, f - 192);
+  for (uint32_t w = 0; w < 4; w++) {
+    CopyWord(base, kZero, WheelAt(v, w) + 284);
+    CopyWord(base, kZero, WheelAt(v, w) + 288);
+  }
+  for (uint32_t w = 0; w < 4; w++) {
+    guest::StoreU32(base, WheelAt(v, w) + 204, 0);
+  }
+  const uint32_t data = guest::LoadU32(base, v + 272);
+  CopyWord(base, data + 140, v + 2000);
+  CopyWord(base, data + 144, v + 2128);
+  // The substeps (the count read again each time, cmplw: unsigned).
+  for (uint32_t i = 0; i < guest::LoadU32(base, v + 2368); i++) {
+    VehicleAntiLock(base, v);
+    VehicleBrakeTorques(base, v);
+    VehicleUpdateTireForces(base, v, f - 272);
+    VehicleAccumulateTireForces(base, v, f - 192);
+    VehicleRollingResistance(base, v);
+    VehicleUpdateDrivetrain(base, v, f - 176);
+  }
+  VehicleUpdateAero(base, v, f - 240);
+  VehicleApplyForces(base, v, f - 352);
+  VehicleSyncFromBody(base, v, f - 368);
+  VehicleProbeGround(base, v, f - 304, &f1);
+  VehicleUpdateWheelAxes(base, v, f - 256);
+  VehicleUpdateBrakeHeat(base, v);
+  VehicleUpdateBackfire(base, v, f);
+  VehicleUpdateTireWear(base, v, f - 112);
+  VehicleTurnWheels(base, v, f);
+  uint32_t r3 = 0;
+  VehicleUnflip(base, v, f - 384, &r3);
+  CopyWord(base, v + 2516, v + 2520);
+  guest::StoreU8(base, v + 2444, 0);
+  guest::StoreU8(base, v + 2445, 0);
+  return r3;
 }
 
 }  // namespace car_physics
