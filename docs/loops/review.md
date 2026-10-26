@@ -82,6 +82,16 @@ When the user has reviewed a run's section, its heading gets
   position calls the route's functions whatever `--native_track_route`
   says); other query targets and refusing callees run as guest calls.
   `Respond` wasn't reached in the attract race (harness only).
+- The vehicle (map ebba856): `docs/functions/vehicle.md`, 25 new rows
+  (21 in `820BF000`-`820C3C00`, and the engine's power curve
+  `sub_820CE7D8`, `sub_820CE430`, `sub_820CE1D8` and
+  `RoutePosition::Step` `sub_82170F90`); `known-data.md`'s `0x826C2E34`
+  extended, four rows added; 2 leads. For a correction: `Vehicle::Tick`
+  runs `Vehicle::PhysicsStep` twice a tick with f1 = 1/60, where
+  `car-physics.md` says "probably once a tick". Never seen in play: the
+  six under `Vehicle::ApplyInput` (`sub_820B0098`, `sub_820B00A8`,
+  `sub_820B00B8`, `sub_820B03E0`, `sub_820B0428`, `sub_820B6170`) and
+  `sub_820FA8F8`.
 
 ## Run 2026-10-25 16:38 (`b7-loop-25-10-26-3`)
 

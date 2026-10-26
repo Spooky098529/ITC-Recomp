@@ -73,7 +73,10 @@ file's history. What's left to see in a drive, from every run:
   `sub_820C3020`, `sub_820C3608`, `sub_820C3150`, `sub_820C33B8`,
   `sub_820C0118`, `sub_820C21E0`, `sub_820C20E0`, `sub_820C30D8`),
   picked as closest to ready (5 of its 9 roots ready since the car
-  physics). Step: mapping agent running.
+  physics). Mapped as the vehicle (`vehicle.md`, 25 rows, ebba856; 2
+  leads added). Map checked (0 errors, 25 of 25 in play, 15 ready
+  groups, no blockers, no kernel calls). Step: migration agent 1
+  running.
 
 ## Done
 
@@ -115,6 +118,8 @@ This run's groups: `expected-differences.md` (the "23:42 run" lines).
 - After the race's set-up's validation 2: race 24 s (`itc_1890`), 0
   errors, every harness 0 differing but the expected group; replay
   127 s (`itc_1891`), 0 errors.
+- After the vehicle's map: ours 2230, work left 4222 (wrapped 104,
+  known 541, unknown 3577).
 - After the car physics' validation 2: race 23 s (`itc_1946`), 0
   errors, every harness 0 differing but the expected groups; replay
   127 s (`itc_1947`), 0 errors.
