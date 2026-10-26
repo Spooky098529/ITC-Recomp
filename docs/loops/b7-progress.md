@@ -25,7 +25,9 @@ file's history. What's left to see in a drive, from every run:
   `itc_1866`: 22 s, 0 errors, every harness 0 differing). Left ready:
   `Race::StartPosition`, `Route::Set`, `Route::Reset`, `Stages::Reset`;
   `RacerRecord::Init` (`vehicle-accessors.md`) now ready, blocking 10
-  groups. Step: validation agent 1 running.
+  groups. Validated (`itc_1867`: 26 of 26 harness lines, 18 ran in the
+  attract race, 6 in the replay `itc_1868`, ok; 2 to `to-drive.md`).
+  Step: migration agent 2 running.
 
 ## Done
 
@@ -52,6 +54,9 @@ This run's groups: `expected-differences.md` (the "23:42 run" lines).
   104, known 592, unknown 3603).
 - After the race's set-up's migration 1: ours 2183, work left 4268
   (wrapped 104, known 561, unknown 3603).
+- After the race's set-up's validation: race 24 s (`itc_1867`), 0
+  errors, every harness 0 differing; replay 127 s (`itc_1868`), 0
+  errors.
 
 ## Stopped
 
