@@ -714,6 +714,103 @@ void CourseRoutes(Context& h, const Block& block) {
   results.Report();
 }
 
+// A function copying a course route through its own frame (Route::Set,
+// Route::Reset, Race::StartPosition): the frames below the call's r1 (its
+// own, `frame_bytes`, and CourseRoutes::Get's under it) filled with random
+// words as CourseRoutes' cases do; compared: the block, CourseRoutes::Get's
+// frame from +4 to its register saves (+4328), the function's frame from +4
+// to its own saves (`saves` bytes below r1), the caller's frame from r1 to
+// the scratch area, the scratch area, r3 and r1. The back chains aren't
+// compared (not written natively).
+template <typename Args>
+void RouteCase(Context& h, Results& results, const Block& block, uint32_t frame_bytes,
+               uint32_t saves, Args args, GuestFunction recompiled, GuestFunction native,
+               const std::string& what) {
+  const uint32_t r1 = CallContext(h).r1.u32;
+  const uint32_t own = r1 - frame_bytes;
+  const uint32_t routes = own - race_setup::kRoutesFrameBytes;
+  constexpr uint32_t kBelow = 1024;
+  constexpr uint32_t kSaves = race_setup::kRoutesFrameBytes - 152;
+  Outputs out[2];
+  const Random start = h.random;
+  Random after;
+  for (int v = 0; v < 2; v++) {
+    Random random = start;
+    WriteRandom(h.base, routes - kBelow, (h.data + kScratchBytes - (routes - kBelow)) / 4,
+                random);
+    WriteRandom(h.base, block.address, block.bytes / 4, random);
+    after = random;
+    PPCContext t = CallContext(h);
+    args(t);
+    ITC_FLAG(native_race_setup) = v == 1;
+    (v == 0 ? recompiled : native)(t, h.base);
+    ITC_FLAG(native_race_setup) = true;
+    out[v].Bytes(Read(h.base, block.address, block.bytes));
+    out[v].Bytes(Read(h.base, routes + 4, kSaves - 4));
+    out[v].Bytes(Read(h.base, own + 4, frame_bytes - 4 - saves));
+    out[v].Bytes(Read(h.base, r1, h.data - r1));
+    out[v].Bytes(Read(h.base, h.data, kScratchBytes));
+    out[v].Word(t.r3.u32);
+    out[v].Word(uint32_t(t.r3.u64 >> 32));
+    out[v].Word(t.r1.u32);
+  }
+  h.random = after;
+  results.Check(out[0], out[1], what);
+}
+
+// Route::Set (every course route twice, location 48 now and then, r4's high
+// word random), Route::Reset and Race::StartPosition (every location from -2
+// to 50, some random, r3's high word random now and then).
+void Routes(Context& h, const Block& block) {
+  {
+    Results results("Route::Set (sub_82101A10)");
+    for (int c = 0; c < 46; c++) {
+      const uint32_t index = uint32_t(c / 2);
+      const uint32_t at = block.address + 4 * h.random.Below((block.bytes - 16) / 4);
+      const uint32_t location = c % 3 == 0 ? 48u
+                                : c % 3 == 1 ? h.random.Below(50)
+                                             : uint32_t(h.random.Next());
+      const uint64_t high = c % 4 == 3 ? (h.random.Next() << 32) : 0;
+      RouteCase(
+          h, results, block, race_setup::kRouteFrameBytes, 16,
+          [&](PPCContext& t) {
+            t.r3.u64 = at;
+            t.r4.u64 = high | index;
+            t.r5.u64 = high | location;
+          },
+          __imp__sub_82101A10, hooks::RaceSetupRouteSet,
+          fmt::format("case {}: route {}, location {}, at +{:X}", c, index, int32_t(location),
+                      at - block.address));
+    }
+    results.Report();
+  }
+  {
+    Results results("Route::Reset (sub_82101990)");
+    for (int c = 0; c < 16; c++) {
+      const uint32_t at = block.address + 4 * h.random.Below((block.bytes - 16) / 4);
+      RouteCase(
+          h, results, block, race_setup::kRouteFrameBytes, 16,
+          [&](PPCContext& t) { t.r3.u64 = at; }, __imp__sub_82101990,
+          hooks::RaceSetupRouteReset, fmt::format("case {}: at +{:X}", c, at - block.address));
+    }
+    results.Report();
+  }
+  {
+    Results results("Race::StartPosition (sub_82101A98)");
+    for (int c = 0; c < 61; c++) {
+      const uint32_t location =
+          c < 53 ? uint32_t(c - 2) : uint32_t(h.random.Next());
+      const uint64_t high = c % 5 == 4 ? (h.random.Next() << 32) : 0;
+      RouteCase(
+          h, results, block, race_setup::kStartFrameBytes, 8,
+          [&](PPCContext& t) { t.r3.u64 = high | location; }, __imp__sub_82101A98,
+          hooks::RaceSetupStartPosition,
+          fmt::format("case {}: location {}", c, int32_t(location)));
+    }
+    results.Report();
+  }
+}
+
 void RaceSetup(Context& h) {
   const Block block(0x1000);
   if (!block.address) {
@@ -736,6 +833,11 @@ void RaceSetup(Context& h) {
   }
   Leaves(h, leaves);
   CourseRoutes(h, block);
+  Routes(h, block);
+  OnePointer(h, block, "Stages::Reset (sub_82101860)", __imp__sub_82101860,
+             hooks::RaceSetupStagesReset, 1224);
+  OnePointer(h, cars, "RacerRecord::Init (sub_820FF808)", __imp__sub_820FF808,
+             hooks::RaceSetupRacerRecordInit, 3936);
   RaceDataConstructs(h);
 }
 

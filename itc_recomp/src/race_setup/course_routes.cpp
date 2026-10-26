@@ -18,8 +18,10 @@
 #include "race_setup/race_setup.h"
 
 #include "base/log.h"
+#include "c_runtime/strings.h"
 #include "guest.h"
 #include "native/buffers.h"
+#include "vehicle_accessors/vehicle_accessors.h"
 
 namespace race_setup {
 
@@ -519,6 +521,120 @@ bool CourseRoutesGet(uint8_t* base, uint64_t out, uint32_t index, uint32_t frame
             guest::LoadU32(base, frame + kRoutesOutWord + 4);
   *source = uint32_t(loaded_index * kRouteBytes + frame + 80);
   return native::Buffers_Memcpy(base, uint32_t(*result), *source, kRouteBytes, kMemcpyReturn);
+}
+
+namespace {
+
+// A caller's copy of course route `index`: CourseRoutes::Get into the
+// caller's frame at +`out` (its own frame below, frame - 4480), then memcpy
+// (sub_825A7410, from `caller`) of that to the caller's +96. Returns the
+// copy's first word (+96). Only after RouteCopiesNative said yes.
+uint32_t CopyRoute(uint8_t* base, uint32_t frame, uint32_t out, uint32_t index, uint32_t caller) {
+  uint32_t source = 0;
+  uint64_t result = 0;
+  const bool got =
+      CourseRoutesGet(base, frame + out, index, frame - kRoutesFrameBytes, &source, &result);
+  const bool copied =
+      native::Buffers_Memcpy(base, frame + 96, uint32_t(result), kRouteBytes, caller);
+  if (!got || !copied) {
+    ITC_LOG_ERROR("race_setup: a route's copy at {:08X} (route {}) not made natively", frame,
+                  index);
+  }
+  return guest::LoadU32(base, frame + 96);
+}
+
+}  // namespace
+
+bool RouteCopiesNative(uint32_t frame, uint32_t out, uint32_t index) {
+  if (!native::Buffers_NativeMemcpy()) {
+    return false;
+  }
+  const uint32_t table = frame - kRoutesFrameBytes + 80;
+  const uint32_t source = uint32_t(uint64_t(index) * kRouteBytes + table);
+  return !c_runtime::MayShare(frame + out, kRouteBytes, source, kRouteBytes) &&
+         !c_runtime::MayShare(frame + 96, kRouteBytes, frame + out, kRouteBytes);
+}
+
+namespace {
+
+// The route's first and last positions from the copy at frame + 96: +8 =
+// its word +0, +12 = sub_820FFEB0's pair (into frame + 80, then copied by
+// halfwords).
+void RoutePositions(uint8_t* base, uint32_t route, uint32_t frame, uint32_t first) {
+  guest::StoreU32(base, route + 8, first);
+  vehicle_accessors::PairsLast(base, frame + 80, frame + 96);
+  guest::StoreU16(base, route + 12, guest::LoadU16(base, frame + 80));
+  guest::StoreU16(base, route + 14, guest::LoadU16(base, frame + 82));
+}
+
+}  // namespace
+
+bool RouteSet(uint8_t* base, uint32_t route, uint32_t index, uint32_t location, uint32_t frame) {
+  if (!RouteCopiesNative(frame, kRouteFrameOut, index)) {
+    return false;
+  }
+  ITC_NATIVE_RUNNING("sub_82101A10 Route::Set");
+  guest::StoreU32(base, route + 0, index);
+  guest::StoreU32(base, route + 4, int32_t(location) == 48 ? index + 20 : location);
+  const uint32_t first = CopyRoute(base, frame, kRouteFrameOut, index, 0x82101A58);
+  RoutePositions(base, route, frame, first);
+  return true;
+}
+
+bool RouteReset(uint8_t* base, uint32_t route, uint32_t frame) {
+  if (!RouteCopiesNative(frame, kRouteFrameOut, 0)) {
+    return false;
+  }
+  ITC_NATIVE_RUNNING("sub_82101990 Route::Reset");
+  guest::StoreU32(base, route + 0, 0);
+  guest::StoreU32(base, route + 4, 20);
+  const uint32_t first = CopyRoute(base, frame, kRouteFrameOut, 0, 0x821019D0);
+  RoutePositions(base, route, frame, first);
+  return true;
+}
+
+namespace {
+
+// Race::StartPosition's cases (r3 - 1, 0 to 45): a course route's index and
+// where its out goes in the frame, or a fixed pair (out 0).
+struct StartCase {
+  uint16_t index_or_section;
+  uint16_t out_or_slice;
+  bool route;
+};
+
+constexpr StartCase kStartCases[46] = {
+    {132, 0, false},   {292, 0, false},   {229, 0, false},   {130, 0, false},
+    {129, 0, false},   {131, 0, false},   {128, 0, false},   {137, 0, false},
+    {134, 0, false},   {136, 0, false},   {133, 0, false},   {42, 30, false},
+    {68, 50, false},   {11, 4320, true},  {13, 3168, true},  {15, 864, true},
+    {17, 5088, true},  {19, 1248, true},  {21, 3552, true},  {0, 1632, true},
+    {1, 4704, true},   {2, 2016, true},   {3, 3936, true},   {4, 2400, true},
+    {5, 5472, true},   {6, 2784, true},   {7, 288, true},    {8, 480, true},
+    {9, 672, true},    {10, 1056, true},  {11, 1440, true},  {12, 1824, true},
+    {13, 2208, true},  {14, 2592, true},  {15, 2976, true},  {16, 3360, true},
+    {17, 3744, true},  {18, 4128, true},  {19, 4512, true},  {20, 4896, true},
+    {21, 5280, true},  {22, 5664, true},  {0, 10, false},    {0, 0, false},
+    {40, 40, false},   {40, 400, false},
+};
+
+}  // namespace
+
+bool StartPosition(uint8_t* base, uint32_t location, uint32_t frame, uint32_t* result) {
+  const uint32_t which = location - 1;
+  const StartCase c = which <= 45 ? kStartCases[which] : StartCase{135, 0, false};
+  if (c.route && !RouteCopiesNative(frame, c.out_or_slice, c.index_or_section)) {
+    return false;
+  }
+  ITC_NATIVE_RUNNING("sub_82101A98 Race::StartPosition");
+  if (c.route) {
+    *result = CopyRoute(base, frame, c.out_or_slice, c.index_or_section, 0x82101AF8);
+    return true;
+  }
+  guest::StoreU16(base, frame + 80, c.index_or_section);
+  guest::StoreU16(base, frame + 82, c.out_or_slice);
+  *result = guest::LoadU32(base, frame + 80);
+  return true;
 }
 
 }  // namespace race_setup

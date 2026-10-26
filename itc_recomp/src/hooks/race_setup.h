@@ -71,4 +71,17 @@ void RaceSetupCourseRoutesGet(PPCContext& ctx, uint8_t* base);
 // the entry; r3 left.
 void RaceSetupRaceDataEntryConstruct(PPCContext& ctx, uint8_t* base);
 
+// Stages::Reset sub_82101860: r3 = the list; r3 = the list + 812 + 332.
+void RaceSetupStagesReset(PPCContext& ctx, uint8_t* base);
+// RacerRecord::Init sub_820FF808: r3 = the record; r3 = the record + 1568.
+void RaceSetupRacerRecordInit(PPCContext& ctx, uint8_t* base);
+// Route::Set sub_82101A10: r3 = the route, r4 = the course route's index,
+// r5 = the location; Route::Reset sub_82101990: r3 = the route. r3 = their
+// frame + 80 (r1 - 416). The original where a copy wouldn't be native.
+void RaceSetupRouteSet(PPCContext& ctx, uint8_t* base);
+void RaceSetupRouteReset(PPCContext& ctx, uint8_t* base);
+// Race::StartPosition sub_82101A98: r3 = the location; r3 = the position
+// (zero-extended). The original where a copy wouldn't be native.
+void RaceSetupStartPosition(PPCContext& ctx, uint8_t* base);
+
 }  // namespace hooks

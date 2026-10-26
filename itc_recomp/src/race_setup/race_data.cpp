@@ -238,4 +238,40 @@ uint32_t EventCount(uint8_t* base) {
   return guest::LoadU16(base, guest::LoadU32(base, kEvent) + 20);
 }
 
+uint32_t StagesReset(uint8_t* base, uint32_t list) {
+  ITC_NATIVE_RUNNING("sub_82101860 Stages::Reset");
+  // memset (sub_825A71D0) with 0: the same bytes.
+  guest::ForEachHostPart(base, list, 1224, [](uint8_t* host, uint32_t, uint32_t bytes) {
+    std::memset(host, 0, bytes);
+  });
+  for (uint32_t i = 0; i < 10; i++) {
+    const uint32_t stage = list + 80 * i;
+    guest::StoreU32(base, stage + 4, 0);
+    guest::StoreU32(base, stage + 0, 4);
+    guest::StoreU32(base, stage + 8, 0);
+    for (uint32_t slot = 0; slot < 4; slot++) {
+      guest::StoreU32(base, stage + 44 + 8 * slot, 0xFFFFFFFFu);
+      guest::StoreU32(base, stage + 48 + 8 * slot, 2);
+    }
+    guest::StoreU32(base, stage + 76, 0);
+  }
+  guest::StoreU32(base, list + 800, 0);
+  guest::StoreU32(base, list + 804, 0);
+  guest::StoreU32(base, list + 1220, 0);
+  guest::StoreU32(base, list + 808, 0);
+  return CourseRecordReset(base, list + 812);
+}
+
+uint32_t RacerRecordInit(uint8_t* base, uint32_t record) {
+  ITC_NATIVE_RUNNING("sub_820FF808 RacerRecord::Init");
+  const uint32_t r3 = CarInit(base, record);
+  guest::StoreFloat(base, record + 3920, guest::LoadFloat(base, kZero));
+  guest::StoreU32(base, record + 3912, 0xFFFFFFFFu);
+  guest::StoreU32(base, record + 3916, 0xFFFFFFFFu);
+  guest::StoreU16(base, record + 3904, 0xFFFF);
+  guest::StoreU16(base, record + 3906, 0xFFFF);
+  guest::StoreU32(base, record + 3924, 0);
+  return r3;
+}
+
 }  // namespace race_setup

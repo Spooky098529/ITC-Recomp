@@ -176,6 +176,16 @@ uint32_t EventCurrent(uint8_t* base);
 // RaceEvent::Count (sub_821434F8): its halfword +20 (zero-extended).
 uint32_t EventCount(uint8_t* base);
 
+// Stages::Reset (sub_82101860): a 1,224-byte stage list cleared (memset),
+// then ten 80-byte stages: +4 = 0, +0 = 4 (the type), +8 = 0, four slots
+// from +44 of (-1, 2), +76 = 0; +800, +804, +1220, +808 = 0;
+// CourseRecord::Reset(+812). Returns CourseRecord::Reset's r3.
+uint32_t StagesReset(uint8_t* base, uint32_t list);
+// RacerRecord::Init (sub_820FF808): Car::Init, then +3920 = [0x82000A34]
+// (0.0), +3912, +3916 = -1, halfwords +3904, +3906 = -1, +3924 = 0. Returns
+// Car::Init's r3.
+uint32_t RacerRecordInit(uint8_t* base, uint32_t record);
+
 // --- The course routes (src/race_setup/course_routes.cpp) ---
 
 // CourseRoutes::Get (sub_820FFF50)'s frame: 4,480 bytes, the table of 23
@@ -195,5 +205,39 @@ constexpr uint32_t kRoutesIndexWord = 4508;
 // through memcpy.
 bool CourseRoutesGet(uint8_t* base, uint64_t out, uint32_t index, uint32_t frame,
                      uint32_t* source, uint64_t* result);
+
+
+// --- The routes (src/race_setup/course_routes.cpp) ---
+//
+// Route::Set, Route::Reset and Race::StartPosition copy a course route
+// (CourseRoutes::Get into their own frame, then memcpy of it to their frame
+// + 96), leaving both copies in their frame as the originals do; `frame` is
+// their stack frame (the caller's r1 - 496, or - 5856 for
+// Race::StartPosition), CourseRoutes::Get's frame below it. False, with
+// nothing written, where memcpy's override would run the original
+// (RouteCopiesNative): the adapters run the original then.
+
+// Route::Set's and Route::Reset's frame and where CourseRoutes::Get's out
+// goes in it.
+constexpr uint32_t kRouteFrameBytes = 496;
+constexpr uint32_t kRouteFrameOut = 288;
+constexpr uint32_t kStartFrameBytes = 5856;
+// Whether both copies of course route `index` (CourseRoutes::Get's into
+// frame + out, memcpy's from there into frame + 96) are made natively.
+bool RouteCopiesNative(uint32_t frame, uint32_t out, uint32_t index);
+// Route::Set (sub_82101A10): a 16-byte route: +0 = index, +4 = location
+// (index + 20 when location is 48, signed compare); the course route copied
+// (CourseRoutes::Get(index), memcpy); +8 = its word +0, +12 = its last
+// position (sub_820FFEB0 into frame + 80, copied by halfwords). The
+// original's r3 is frame + 80.
+bool RouteSet(uint8_t* base, uint32_t route, uint32_t index, uint32_t location, uint32_t frame);
+// Route::Reset (sub_82101990): as Route::Set with index 0 and +4 = 20.
+bool RouteReset(uint8_t* base, uint32_t route, uint32_t frame);
+// Race::StartPosition (sub_82101A98, with the switch piece sub_82101ADC): a
+// location's start position: locations 14 to 46 the first word of a course
+// route (indexes 11, 13, 15, 17, 19, 21, then 0 to 22, each case's out at
+// its own place in the frame); others a fixed pair stored as halfwords at
+// frame + 80 and + 82 and loaded back as a word; outside 1 to 46, (135, 0).
+bool StartPosition(uint8_t* base, uint32_t location, uint32_t frame, uint32_t* result);
 
 }  // namespace race_setup
