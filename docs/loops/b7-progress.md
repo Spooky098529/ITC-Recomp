@@ -44,11 +44,23 @@ file's history. What's left to see in a drive, from every run:
   `Car::SetupVehicle`; 6 adapters removed in `car-physics.md`; 24 s, 0
   errors, every harness 0 differing). Nothing left in `race-setup.md`
   (52 of 52 ours); car physics' other ready groups to a "no mapping"
-  lead. Step: validation agent 3 running.
+  lead. Validated (`itc_1909`: 8 of 8 harness lines, 7 ran in the
+  attract race, `Car::SetupVehicle` in the replay `itc_1911`, ok;
+  nothing to drive). Finished.
+- The "no mapping" lead (not counted): the car physics' ready groups
+  left in `car-physics.md` (`sub_820B0E70`, `sub_820B7998`,
+  `sub_820B7A00`, `sub_820B9570`, `sub_820B8798`, `sub_8259D5A8` and
+  what they unblock under `sub_820B62E8`, `sub_820B5670`,
+  `sub_820B5B08`, `sub_820B6498`), picked as closest to ready. Step:
+  migration agent running.
 
 ## Done
 
-(nothing yet)
+- The race's set-up (`race-setup.md`, mapped in 7d2acaa; 52 rows): 52
+  ours, and `RacerRecord::Init` and 4 in `car-physics.md`, in three
+  migrations (2e9d8eb..2f54d5a), 27 adapters removed; validated
+  (`itc_1867`, `itc_1890`, `itc_1909`); `--native_race_setup`. One
+  expected group for review (`Race::SetUp`'s traffic records).
 
 ## Rows to review
 
@@ -79,6 +91,9 @@ This run's groups: `expected-differences.md` (the "23:42 run" lines).
 - After the race's set-up's validation 2: race 24 s (`itc_1890`), 0
   errors, every harness 0 differing but the expected group; replay
   127 s (`itc_1891`), 0 errors.
+- After the race's set-up's validation 3: race 24 s (`itc_1909`), 0
+  errors, every harness 0 differing but the expected groups; replay
+  127 s (`itc_1911`), 0 errors.
 - After the race's set-up's migration 3: ours 2209, work left 4242
   (wrapped 104, known 535, unknown 3603).
 
