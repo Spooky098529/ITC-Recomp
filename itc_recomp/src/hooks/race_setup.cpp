@@ -338,8 +338,11 @@ void RaceSetupPlaceRacers(PPCContext& ctx, uint8_t* base) {
 // Car::Clear and Car::SetModel), CarDecal::FromBuild (from Car::FromBuild) or
 // sub_820FF558 (from sub_82101EB0 and CourseRecord::Reset); nor sub_82101EB0
 // (from sub_82101F68), Route::Set (from Race::SetRoute and Stages::SetRoute)
-// or Racers::Add (from Race::AddRacer): their register steps stay for the
-// harness.
+// or Racers::Add (from Race::AddRacer); nor Racers::SetStart (from
+// Race::PlaceRacers), Race::StartPosition (from Racers::SetStart),
+// Racers::Reset (from RaceData::Reset), Route::Reset (from sub_82101F68 and
+// RaceData::Reset) or RaceData::Reset (from RaceData::ResetGlobal): their
+// register steps stay for the harness.
 
 // Defines an adapter: the flag, else the original.
 #define ITC_RACE_SETUP(address, step)     \
@@ -371,16 +374,11 @@ ITC_RACE_SETUP(82105C90, RaceSetupCourseRecordReset)
 ITC_RACE_SETUP(820FFF50, RaceSetupCourseRoutesGet)
 ITC_RACE_SETUP(82101860, RaceSetupStagesReset)
 ITC_RACE_SETUP(820FF808, RaceSetupRacerRecordInit)
-ITC_RACE_SETUP(82101990, RaceSetupRouteReset)
-ITC_RACE_SETUP(82101A98, RaceSetupStartPosition)
-ITC_RACE_SETUP(820FF978, RaceSetupRacersReset)
 ITC_RACE_SETUP(821017C0, RaceSetupAddRacer)
 ITC_RACE_SETUP(82101F68, RaceSetupRecordReset)
 ITC_RACE_SETUP(82101D38, RaceSetupRaceSetRoute)
 ITC_RACE_SETUP(82101E90, RaceSetupStagesSetRoute)
-ITC_RACE_SETUP(821020F0, RaceSetupRaceDataReset)
 ITC_RACE_SETUP(821021A8, RaceSetupRaceDataResetGlobal)
-ITC_RACE_SETUP(82101D50, RaceSetupSetStart)
 ITC_RACE_SETUP(82102048, RaceSetupPlaceRacers)
 // sub_82101FD0 has no adapter: only RaceData::Reset calls it.
 // sub_82101ADC (a case of Race::StartPosition's switch, in its frame) needs
