@@ -103,4 +103,14 @@ void RaceSetupRecordReset(PPCContext& ctx, uint8_t* base);
 void RaceSetupRaceSetRoute(PPCContext& ctx, uint8_t* base);
 void RaceSetupStagesSetRoute(PPCContext& ctx, uint8_t* base);
 
+// RaceData::Reset sub_821020F0, RaceData::ResetGlobal sub_821021A8: r3 =
+// the last sub_82101F68's (r1 - 768), f1 = 0.0. Racers::SetStart
+// sub_82101D50: r3 = the records, r4 = the location, r5 = the stage's type;
+// Race::PlaceRacers sub_82102048: r3 = 1 for both. The originals where a copy
+// wouldn't be native (and Race::PlaceRacers' save data branch).
+void RaceSetupRaceDataReset(PPCContext& ctx, uint8_t* base);
+void RaceSetupRaceDataResetGlobal(PPCContext& ctx, uint8_t* base);
+void RaceSetupSetStart(PPCContext& ctx, uint8_t* base);
+void RaceSetupPlaceRacers(PPCContext& ctx, uint8_t* base);
+
 }  // namespace hooks

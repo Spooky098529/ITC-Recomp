@@ -244,6 +244,8 @@ bool RouteReset(uint8_t* base, uint32_t route, uint32_t frame);
 // its own place in the frame); others a fixed pair stored as halfwords at
 // frame + 80 and + 82 and loaded back as a word; outside 1 to 46, (135, 0).
 bool StartPosition(uint8_t* base, uint32_t location, uint32_t frame, uint32_t* result);
+// Whether Race::StartPosition at `frame` would be native.
+bool StartPositionNative(uint32_t location, uint32_t frame);
 
 
 // --- The racers and the records (src/race_setup/race_data.cpp) ---
@@ -282,5 +284,51 @@ bool RaceSetRoute(uint8_t* base, uint32_t index, uint32_t location, uint32_t fra
 // +804) + 24, index, location), a tail call.
 bool StagesSetRoute(uint8_t* base, uint32_t list, uint32_t index, uint32_t location,
                     uint32_t stage, uint32_t frame);
+
+
+// --- The race data's reset and the start (src/race_setup/race_data.cpp) ---
+
+// RaceData::Reset (sub_821020F0; `frame` its frame, the caller's r1 - 112;
+// r3 isn't read): the race data from [0x826C5B2C] loaded again before each
+// step: Route::Reset(+4) (its frame below), +28, +32, +20, +24 = 0;
+// Racers::Reset(+48); Stages::Reset(+0x59620); sub_82101FD0(+0x59AE8) (its
+// frame below, 112 bytes); +0xA3AD0 = 1, +0xA3AD4 to +0xA3AE0 = 0,
+// +0xA3AE4 to +0xA3AEC = 0, +0xA3AF0 = 7, +0xA3AF4 = 2. False, with nothing
+// written, where a route's copies wouldn't be native (RaceDataResetNative).
+bool RaceDataResetNative(uint32_t frame);
+bool RaceDataReset(uint8_t* base, uint32_t frame);
+// RaceData::ResetGlobal (sub_821021A8): RaceData::Reset, a tail call (the
+// same frame).
+bool RaceDataResetGlobal(uint8_t* base, uint32_t frame);
+// sub_82101FD0: the race data's 77 records (`frame` its frame): cleared
+// (memset, 0x49FE8 bytes), +0x49FE0 and +0x49FE4 = 0, then sub_82101F68 on
+// each (3,936 bytes apart; their frames below). Only after
+// RaceDataResetNative said yes.
+void RecordsReset(uint8_t* base, uint32_t records, uint32_t frame);
+
+// Car::Refresh as the original, where its plain C++ refuses (a guest call
+// the adapter makes, with the car in r3).
+using GuestRefresh = void (*)(void* user, uint32_t car);
+// Racers::SetStart (sub_82101D50; `frame` its 4,096-byte frame): the
+// position = Race::StartPosition(location) (its frame below); with the
+// records' +0x595E8 (the traffic's flag) not 0, 16 cars (ids 55 to 70) built
+// in a record at frame + 80 (RacerRecord::Init, Car::SetModel, flags |= 4,
+// Car::Refresh, +3908 = [0x8200692C], halfwords +3904, +3906 = 0) each copied
+// (memcpy) to the record at the count, the count up; then each record below
+// the count (loaded again each time, signed) with flag 0x1 or 0x80 gets +3904
+// = the position and +3908 = 0.0 for types 2 and 3 (signed), else
+// [0x8200692C]; with flag 0x2 only +3908. Returns 1. Only after
+// SetStartNative said yes.
+bool SetStartNative(uint8_t* base, uint32_t records, uint32_t location, uint32_t frame);
+uint32_t SetStart(uint8_t* base, uint32_t records, uint32_t location, uint32_t type,
+                  uint32_t frame, GuestRefresh refresh, void* user);
+// Race::PlaceRacers (sub_82102048; `frame` its 128-byte frame):
+// Racers::SetStart(the race data + 48, its +8, the current stage's type)
+// (its frame below). False from PlaceRacersNative where the race data's
+// +0xA3AF4 is 0 or 4 (the save data's course record copied first,
+// sub_82105BF8: never seen in play, the original runs) or Racers::SetStart
+// wouldn't be native. Returns Racers::SetStart's 1.
+bool PlaceRacersNative(uint8_t* base, uint32_t frame);
+uint32_t PlaceRacers(uint8_t* base, uint32_t frame, GuestRefresh refresh, void* user);
 
 }  // namespace race_setup

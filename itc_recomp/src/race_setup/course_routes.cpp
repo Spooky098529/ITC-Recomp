@@ -620,6 +620,12 @@ constexpr StartCase kStartCases[46] = {
 
 }  // namespace
 
+bool StartPositionNative(uint32_t location, uint32_t frame) {
+  const uint32_t which = location - 1;
+  const StartCase c = which <= 45 ? kStartCases[which] : StartCase{135, 0, false};
+  return !c.route || RouteCopiesNative(frame, c.out_or_slice, c.index_or_section);
+}
+
 bool StartPosition(uint8_t* base, uint32_t location, uint32_t frame, uint32_t* result) {
   const uint32_t which = location - 1;
   const StartCase c = which <= 45 ? kStartCases[which] : StartCase{135, 0, false};
