@@ -29,6 +29,14 @@ ITC_FLAG_DECLARE(bool, native_race_setup);
 
 namespace harness {
 
+// Vehicle::SetupFromCar's cases' helpers (src/harnesses/car_physics.cpp).
+bool SetupFromCarFits(uint8_t* base, uint32_t car, uint32_t r1);
+void WriteSetupFromCarCase(uint8_t* base, uint32_t data, uint32_t car, uint32_t r1,
+                           uint32_t stack_end, uint64_t seed, int group);
+void RecordSetupFromCar(Outputs& out, uint8_t* base, uint32_t data, uint32_t car, uint32_t r1,
+                        uint32_t stack_end, const PPCContext& t);
+void RunSetupFromCarOriginal(GuestFunction recompiled, PPCContext& ctx, uint8_t* base);
+
 namespace {
 
 // A block of guest memory for the cases, freed at the end.
@@ -1387,6 +1395,51 @@ void SetUps(Context& h) {
   leftovers.Report();
 }
 
+// Car::SetupVehicle's cases: Vehicle::SetupFromCar's (src/harnesses/
+// car_physics.cpp: the same inputs and what's compared) with the car in r3
+// and the car data in r4, the original run with its callees' native flags
+// off.
+void SetupVehicles(Context& h) {
+  const Block block(0x1800);
+  if (!block.address) {
+    ITC_LOG_ERROR("harness: race_setup: no block from the allocation layer");
+    return;
+  }
+  const uint32_t data = block.address, car = block.address + 0x800;
+  const uint32_t r1 = CallContext(h).r1.u32;
+  if (!SetupFromCarFits(h.base, car, r1)) {
+    Results skipped("Car::SetupVehicle (sub_820CD5C8): the copy or the table doesn't fit");
+    skipped.Check(std::vector<uint8_t>{0}, std::vector<uint8_t>{1}, "copy");
+    skipped.Report();
+    return;
+  }
+  const char* const kGroupNames[] = {"", ", one NaN", ", NaNs and infinities anywhere"};
+  for (int group = 0; group < 3; group++) {
+    Results results(std::string("Car::SetupVehicle (sub_820CD5C8)") + kGroupNames[group]);
+    for (uint64_t seed = 0; seed < 100; seed++) {
+      Outputs out[2];
+      for (int v = 0; v < 2; v++) {
+        WriteSetupFromCarCase(h.base, data, car, r1, h.data + kScratchBytes, seed * 3 + 1000,
+                              group);
+        PPCContext t = CallContext(h);
+        t.fpscr.disableFlushModeUnconditional();
+        t.r3.u64 = car;
+        t.r4.u64 = data;
+        if (v == 0) {
+          ITC_FLAG(native_race_setup) = false;
+          RunSetupFromCarOriginal(__imp__sub_820CD5C8, t, h.base);
+          ITC_FLAG(native_race_setup) = true;
+        } else {
+          hooks::RaceSetupSetupVehicle(t, h.base);
+        }
+        RecordSetupFromCar(out[v], h.base, data, car, r1, h.data, t);
+      }
+      results.Check(out[0], out[1], fmt::format("seed {}", seed));
+    }
+    results.Report();
+  }
+}
+
 void RaceSetup(Context& h) {
   const Block block(0x1000);
   if (!block.address) {
@@ -1422,6 +1475,7 @@ void RaceSetup(Context& h) {
   Rivals(h);
   SetUps(h);
   RaceDataConstructs(h);
+  SetupVehicles(h);
 }
 
 }  // namespace harness

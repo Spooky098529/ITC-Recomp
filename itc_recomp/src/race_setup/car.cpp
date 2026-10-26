@@ -4,6 +4,7 @@
 #include "race_setup/race_setup.h"
 
 #include "base/log.h"
+#include "car_physics/car_physics.h"
 #include "car_physics/float_ops.h"
 #include "car_specs/car_specs.h"
 #include "guest.h"
@@ -206,6 +207,11 @@ uint32_t CarInit(uint8_t* base, uint32_t car) {
   guest::StoreU32(base, car + 3888, 0);
   guest::StoreU32(base, car + 3892, 1);
   return r3;
+}
+
+bool CarSetupVehicle(uint8_t* base, uint32_t car, uint32_t data, uint32_t frame, double* f1) {
+  ITC_NATIVE_RUNNING("sub_820CD5C8 Car::SetupVehicle");
+  return car_physics::VehicleSetupFromCar(base, data, car, frame, f1);
 }
 
 uint32_t SetModel(uint8_t* base, uint32_t car, uint32_t id) {

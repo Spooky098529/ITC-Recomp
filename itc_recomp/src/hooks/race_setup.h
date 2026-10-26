@@ -25,6 +25,10 @@ void RaceSetupDecalFromBuild(PPCContext& ctx, uint8_t* base);
 // + 1568.
 void RaceSetupCarClear(PPCContext& ctx, uint8_t* base);
 void RaceSetupCarInit(PPCContext& ctx, uint8_t* base);
+// Car::SetupVehicle sub_820CD5C8: r3 = the car, r4 = the car data; r3 and f1
+// as Vehicle::SetupFromCar leaves them. Its original (r3 and r4 swapped, the
+// tail call) where --native_car_physics is off or it refuses.
+void RaceSetupSetupVehicle(PPCContext& ctx, uint8_t* base);
 // Car::SetModel sub_820CD8A8: r3 = the car, r4 = the id; r3 = the last
 // rand() (0 without the parameters).
 void RaceSetupSetModel(PPCContext& ctx, uint8_t* base);

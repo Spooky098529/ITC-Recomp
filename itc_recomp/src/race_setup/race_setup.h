@@ -81,6 +81,12 @@ uint32_t CarClear(uint8_t* base, uint32_t car);
 // Car::Init (sub_820CD5D8): Car::Clear, then +3888 = 0 (the flags), +3892 =
 // 1. Returns Car::Clear's r3.
 uint32_t CarInit(uint8_t* base, uint32_t car);
+// Car::SetupVehicle (sub_820CD5C8): Vehicle::SetupFromCar(data, car), a tail
+// call (`frame` is SetupFromCar's 368-byte frame under the caller's r1;
+// car_physics::VehicleSetupFromCar). False, with nothing written, where it
+// refuses (its ApplyTuning's memcpy): the original runs there. `f1` gets
+// what it leaves; r3 comes back as `frame` - 1008 + 352.
+bool CarSetupVehicle(uint8_t* base, uint32_t car, uint32_t data, uint32_t frame, double* f1);
 
 // Car::SetModel (sub_820CD8A8): +12 = the car id; unless Params::Exists is
 // 0 (then returns 0), from its spec (Params::GetCarSpec): CarTuning::Reset(

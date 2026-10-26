@@ -8,13 +8,15 @@
 #include "base/log.h"
 #include "race_setup/race_setup.h"
 
+ITC_FLAG_DECLARE(bool, native_car_physics);
+
 ITC_FLAG_BOOL(native_race_setup, true, "ITC",
               "Run the race's set-up (docs/functions/race-setup.md: the car object's parts "
               "Car::ResetDecals40 sub_820CC4A0, Car::ResetDecals6 sub_820CCBF0, "
               "Car::ResetSettings sub_820CD760, sub_820CCC70 (these four without adapters: "
               "reached from Car::Clear), CarTuning::Reset sub_820CD618 (no adapter: from Car::Clear "
               "and Car::SetModel), CarDecal::FromBuild sub_820CDC18 (no adapter: from "
-              "Car::FromBuild; with its setters sub_820CC450 to sub_820CC478 merged), Car::Clear sub_820CD7F0, Car::Init sub_820CD5D8, Car::SetModel sub_820CD8A8, "
+              "Car::FromBuild; with its setters sub_820CC450 to sub_820CC478 merged), Car::Clear sub_820CD7F0, Car::Init sub_820CD5D8, Car::SetupVehicle sub_820CD5C8 (Vehicle::SetupFromCar's plain C++ under --native_car_physics), Car::SetModel sub_820CD8A8, "
               "Car::FromBuild sub_820CDCE0; the race data's pieces sub_82101630, "
               "Race::AddStage sub_82101828, Stages::AddRacer sub_820FFAB8, RaceData::RaceData "
               "sub_821021B8 (its entries' sub_82101D20 through the array helper, without an "
@@ -75,6 +77,24 @@ void RaceSetupCarClear(PPCContext& ctx, uint8_t* base) {
 void RaceSetupCarInit(PPCContext& ctx, uint8_t* base) {
   ctx.fpscr.disableFlushMode();
   ctx.r3.u64 = rs::CarInit(base, ctx.r3.u32);
+}
+
+void RaceSetupSetupVehicle(PPCContext& ctx, uint8_t* base) {
+  const uint32_t frame = ctx.r1.u32 - 368;  // SetupFromCar's, from the same r1
+  double f1 = 0.0;
+  if (ITC_FLAG(native_car_physics)) {
+    ctx.fpscr.disableFlushMode();
+    if (rs::CarSetupVehicle(base, ctx.r3.u32, ctx.r4.u32, frame, &f1)) {
+      ctx.f1.f64 = f1;
+      ctx.r3.u64 = frame - 1008 + 352;
+      return;
+    }
+  }
+  const uint64_t car = ctx.r3.u64;
+  ctx.r11.u64 = car;
+  ctx.r3.u64 = ctx.r4.u64;
+  ctx.r4.u64 = car;
+  __imp__sub_820C27E8(ctx, base);
 }
 
 void RaceSetupSetModel(PPCContext& ctx, uint8_t* base) {
@@ -441,6 +461,7 @@ void RaceSetupStagesClear(PPCContext& ctx, uint8_t* base) {
 
 ITC_RACE_SETUP(820CD7F0, RaceSetupCarClear)
 ITC_RACE_SETUP(820CD5D8, RaceSetupCarInit)
+ITC_RACE_SETUP(820CD5C8, RaceSetupSetupVehicle)
 ITC_RACE_SETUP(820CD8A8, RaceSetupSetModel)
 ITC_RACE_SETUP(820CDCE0, RaceSetupFromBuild)
 ITC_RACE_SETUP(82101828, RaceSetupAddStage)
