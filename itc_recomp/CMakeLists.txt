@@ -194,6 +194,7 @@ set(ITC_SOURCES
     src/race_hud/race_hud.cpp
     src/hooks/race_setup.cpp
     src/race_setup/car.cpp
+    src/race_setup/race_data.cpp
     src/hooks/screen_objects.cpp
     src/screen_objects/uv_trees.cpp
     src/screen_objects/screen_objects.cpp
@@ -398,7 +399,7 @@ set_source_files_properties(src/c_runtime/math.cpp src/ui_movies/keys.cpp
     src/track_route/track_route.cpp src/ai_drivers/ai_drivers.cpp
     src/screen_objects/screen_objects.cpp src/scenery_lists/model_draws.cpp
     src/models/model_load.cpp src/course_scenery/collect.cpp
-    src/race_setup/car.cpp PROPERTIES
+    src/race_setup/car.cpp src/race_setup/race_data.cpp PROPERTIES
     COMPILE_OPTIONS "-ffp-model=strict;-ffp-contract=off"
     SKIP_PRECOMPILE_HEADERS ON)
 

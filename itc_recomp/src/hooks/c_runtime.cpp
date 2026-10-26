@@ -622,8 +622,9 @@ struct ArrayCall {
   uint32_t return_address;  // after the original's bctrl
 };
 
-// An element's function the native code doesn't know (sub_82101D20, the
-// race data's records, in play), called through its pointer from a frame
+// An element's function the native code doesn't know (none in play since
+// sub_82101D20, the race data's records', is native), called through its
+// pointer from a frame
 // like the original's (128 bytes, its back chain written), r3 = the element.
 void CallElement(void* user, uint64_t function, uint64_t element) {
   auto& call = *static_cast<ArrayCall*>(user);

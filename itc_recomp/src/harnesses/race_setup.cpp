@@ -12,6 +12,7 @@
 #include "base/flags.h"
 #include "base/log.h"
 #include "car_specs/car_specs.h"
+#include "data_tables/data_tables.h"
 #include "hooks/race_setup.h"
 #include "race_setup/race_setup.h"
 #include "memory/heap.h"
@@ -343,6 +344,288 @@ void FromBuilds(Context& h, const Block& block) {
   results.Report();
 }
 
+// --- The race data's small pieces ---
+
+constexpr uint32_t kSaveDataPointer = 0x826C5B58;  // SaveData::Of's table (player 0)
+
+// One case through both versions with the globals `globals` (words) kept,
+// compared after each side and put back; the block, the scratch area and r3
+// as Case's (`floats` the block's float fields).
+template <typename Setup, typename Args>
+void GlobalsCase(Context& h, Results& results, const Block& block,
+                 const std::vector<uint32_t>& globals, Setup setup, Args args,
+                 GuestFunction recompiled, GuestFunction native,
+                 const std::vector<uint32_t>& floats, const std::string& what) {
+  std::vector<uint32_t> saved;
+  for (uint32_t global : globals) {
+    saved.push_back(guest::LoadU32(h.base, global));
+  }
+  Outputs out[2];
+  const Random start = h.random;
+  Random after;
+  for (int v = 0; v < 2; v++) {
+    Random random = start;
+    WriteRandom(h.base, h.data, kScratchBytes / 4, random);
+    WriteRandom(h.base, block.address, block.bytes / 4, random);
+    setup(random);
+    after = random;
+    PPCContext t = CallContext(h);
+    args(t);
+    ITC_FLAG(native_race_setup) = v == 1;
+    (v == 0 ? recompiled : native)(t, h.base);
+    ITC_FLAG(native_race_setup) = true;
+    Record(out[v], h.base, block, floats);
+    out[v].Bytes(Read(h.base, h.data, kScratchBytes));
+    for (size_t i = 0; i < globals.size(); i++) {
+      out[v].Word(guest::LoadU32(h.base, globals[i]));
+      guest::StoreU32(h.base, globals[i], saved[i]);
+    }
+    out[v].Word(t.r3.u32);
+    out[v].Word(uint32_t(t.r3.u64 >> 32));
+    out[v].Double(t.f1.u64);
+  }
+  h.random = after;
+  results.Check(out[0], out[1], what);
+}
+
+void Leaves(Context& h, const Block& block) {
+  {
+    Results results("sub_82101630");
+    for (int c = 0; c < 64; c++) {
+      const int32_t location = int32_t(h.random.Below(28)) - 2;
+      const uint64_t value = c % 4 == 0 ? h.random.Next() : h.random.Below(10);
+      GlobalsCase(
+          h, results, block, {}, [](Random&) {},
+          [&](PPCContext& t) {
+            t.r3.u64 = uint64_t(int64_t(location)) ^ (uint64_t(c % 3) << 40);
+            t.r4.u64 = value;
+          },
+          __imp__sub_82101630, hooks::RaceSetupRivalLocation, {},
+          fmt::format("case {}: location {}", c, location));
+    }
+    results.Report();
+  }
+  {
+    // The race data's global pointed so its stage list (+0x59620) is the
+    // block's start.
+    Results results("Race::AddStage (sub_82101828)");
+    for (int c = 0; c < 64; c++) {
+      const uint32_t type = c % 5 == 0 ? uint32_t(h.random.Next()) : h.random.Below(6);
+      GlobalsCase(
+          h, results, block, {race_setup::kRaceData},
+          [&](Random& r) {
+            guest::StoreU32(h.base, race_setup::kRaceData, block.address - race_setup::kStageList);
+            guest::StoreU32(h.base, block.address + 800, r.Below(11));
+          },
+          [&](PPCContext& t) { t.r3.u64 = type; }, __imp__sub_82101828,
+          hooks::RaceSetupAddStage, {}, fmt::format("case {}: type {:X}", c, type));
+    }
+    results.Report();
+  }
+  {
+    Results results("Stages::AddRacer (sub_820FFAB8)");
+    for (int c = 0; c < 128; c++) {
+      const int32_t stage = c % 2 == 0 ? -1 : int32_t(h.random.Below(10));
+      const uint32_t racer = h.random.Below(100);
+      const uint32_t word = c % 3 == 0 ? uint32_t(h.random.Next()) : 2;
+      GlobalsCase(
+          h, results, block, {},
+          [&](Random& r) {
+            guest::StoreU32(h.base, block.address + 800, r.Below(10));
+            for (uint32_t i = 0; i < 10; i++) {
+              guest::StoreU32(h.base, block.address + 80 * i + 76, r.Below(5));
+            }
+          },
+          [&](PPCContext& t) {
+            t.r3.u64 = block.address;
+            t.r4.u64 = racer;
+            t.r5.u64 = word;
+            t.r6.s64 = stage;
+          },
+          __imp__sub_820FFAB8, hooks::RaceSetupStagesAddRacer, {},
+          fmt::format("case {}: stage {}", c, stage));
+    }
+    results.Report();
+  }
+  {
+    Results results("sub_820FF558");
+    for (int c = 0; c < 32; c++) {
+      const uint32_t at = block.address + 4 * h.random.Below(256);
+      GlobalsCase(
+          h, results, block, {}, [](Random&) {}, [&](PPCContext& t) { t.r3.u64 = at; },
+          __imp__sub_820FF558, hooks::RaceSetupLapRecordReset, {}, fmt::format("case {}", c));
+    }
+    results.Report();
+  }
+  {
+    Results results("sub_82101D20");
+    for (int c = 0; c < 32; c++) {
+      const uint32_t at = block.address + 4 * h.random.Below(256);
+      GlobalsCase(
+          h, results, block, {}, [](Random&) {}, [&](PPCContext& t) { t.r3.u64 = at; },
+          __imp__sub_82101D20, hooks::RaceSetupRaceDataEntryConstruct, {},
+          fmt::format("case {}", c));
+    }
+    results.Report();
+  }
+  {
+    // The mean (+0x100: a float, then the count) with random floats, NaNs
+    // and infinities among them; the weight 0, 1, -1, the count's negative
+    // (a new count of 0) or random; f1 a random float's value.
+    Results results("RunningMean::Add (sub_82101698)");
+    for (int c = 0; c < 200; c++) {
+      uint32_t weight = 0;
+      uint32_t value = 0;
+      GlobalsCase(
+          h, results, block, {},
+          [&](Random& r) {
+            guest::StoreU32(h.base, block.address + 0x100, RandomFloat(r));
+            const uint32_t count = r.Below(3) == 0 ? uint32_t(r.Next()) : r.Below(100);
+            guest::StoreU32(h.base, block.address + 0x104, count);
+            static constexpr uint32_t kWeights[] = {0, 1, 0xFFFFFFFF};
+            switch (r.Below(4)) {
+              case 0:
+                weight = uint32_t(r.Next());
+                break;
+              case 1:
+                weight = 0u - count;
+                break;
+              default:
+                weight = kWeights[r.Below(3)];
+                break;
+            }
+            value = RandomFloat(r);
+          },
+          [&](PPCContext& t) {
+            t.r3.u64 = block.address + 0x100;
+            t.r5.u64 = weight;
+            t.f1.f64 = double(std::bit_cast<float>(value));
+          },
+          __imp__sub_82101698, hooks::RaceSetupRunningMeanAdd, {0x100},
+          fmt::format("case {}: weight {:X}", c, weight));
+    }
+    results.Report();
+  }
+  {
+    Results results("Time::Pack (sub_82101700)");
+    for (int c = 0; c < 200; c++) {
+      uint64_t ms = 0;
+      switch (c % 5) {
+        case 0:
+          ms = h.random.Next();
+          break;
+        case 1:
+          ms = uint64_t(int64_t(int32_t(h.random.Below(20000000)) - 10000000));
+          break;
+        case 2:
+          ms = uint64_t(int32_t(0x80000000u + h.random.Below(3))) ^ (h.random.Next() << 32);
+          break;
+        default:
+          ms = h.random.Below(600000);
+          break;
+      }
+      GlobalsCase(
+          h, results, block, {}, [](Random&) {}, [&](PPCContext& t) { t.r3.u64 = ms; },
+          __imp__sub_82101700, hooks::RaceSetupTimePack, {},
+          fmt::format("case {}: {:X}", c, ms));
+    }
+    results.Report();
+  }
+  {
+    // The save data's +48 at the block's start; modes 0 to 15, the counts
+    // near 9999, +6008 the mode half the time.
+    Results results("sub_82110AC0");
+    for (int c = 0; c < 128; c++) {
+      const uint32_t mode = h.random.Below(16);
+      GlobalsCase(
+          h, results, block, {},
+          [&](Random& r) {
+            const uint32_t count = block.address + (mode + 414) * 14;
+            guest::StoreU16(h.base, count, uint16_t(r.Below(3) == 0 ? r.Next() : 9997 + r.Below(4)));
+            guest::StoreU32(h.base, block.address + 6008, r.Below(2) ? mode : uint32_t(r.Next()));
+            guest::StoreU16(h.base, block.address + 6012,
+                            uint16_t(r.Below(3) == 0 ? r.Next() : 9997 + r.Below(4)));
+          },
+          [&](PPCContext& t) {
+            t.r3.u64 = block.address;
+            t.r4.u64 = mode;
+          },
+          __imp__sub_82110AC0, hooks::RaceSetupCountRace, {},
+          fmt::format("case {}: mode {}", c, mode));
+    }
+    results.Report();
+  }
+  {
+    // The event at +0 (its list at +0x100), the items at +0x1000 + 3008 x id
+    // (ids 0 to 3: the tables' object at +0x300), the save data's records
+    // at +0x400 (+0x199F8 from the save data).
+    Results first("RaceEvent::FirstOwned (sub_821430A0)");
+    Results current("RaceEvent::Current (sub_821434E8)");
+    Results count("RaceEvent::Count (sub_821434F8)");
+    const std::vector<uint32_t> globals = {race_setup::kEvent, data_tables::kTables,
+                                           kSaveDataPointer};
+    for (int c = 0; c < 200; c++) {
+      auto setup = [&](Random& r) {
+        const uint32_t event = block.address;
+        guest::StoreU32(h.base, race_setup::kEvent, event);
+        guest::StoreU16(h.base, event + 20, uint16_t(int16_t(int32_t(r.Below(9)) - 1)));
+        guest::StoreU32(h.base, event + 156, block.address + 0x100);
+        for (uint32_t i = 0; i < 8; i++) {
+          const uint32_t entry = block.address + 0x100 + 12 * i;
+          guest::StoreU32(h.base, entry + 0, r.Below(4));
+          guest::StoreU32(h.base, entry + 8, r.Below(3) == 0 ? 0 : uint32_t(r.Next()));
+        }
+        guest::StoreU32(h.base, data_tables::kTables, block.address + 0x300);
+        guest::StoreU32(h.base, block.address + 0x300 + 16, block.address + 0x1000);
+        for (uint32_t id = 0; id < 4; id++) {
+          const uint32_t item = block.address + 0x1000 + 3008 * id;
+          guest::StoreU16(h.base, item, uint16_t(int16_t(int32_t(r.Below(9)) - 1)));
+          guest::StoreU8(h.base, item + 91, r.Below(3) == 0 ? uint8_t(r.Next()) : 1);
+        }
+        guest::StoreU32(h.base, kSaveDataPointer, block.address + 0x400 - 0x199F8);
+        for (uint32_t i = 0; i < 12; i++) {
+          const uint32_t record = block.address + 0x400 - 12 + 12 * i;
+          for (uint32_t k = 0; k < 3; k++) {
+            guest::StoreU16(h.base, record + 2 * k,
+                            uint16_t(r.Below(2) == 0 ? r.Next() : int32_t(r.Below(5)) - 2));
+          }
+        }
+      };
+      GlobalsCase(
+          h, first, block, globals, setup, [&](PPCContext& t) { t.r3.u64 = block.address; },
+          __imp__sub_821430A0, hooks::RaceSetupEventFirstOwned, {}, fmt::format("case {}", c));
+      if (c < 16) {
+        GlobalsCase(
+            h, current, block, globals, setup, [](PPCContext&) {}, __imp__sub_821434E8,
+            hooks::RaceSetupEventCurrent, {}, fmt::format("case {}", c));
+        GlobalsCase(
+            h, count, block, globals, setup, [](PPCContext&) {}, __imp__sub_821434F8,
+            hooks::RaceSetupEventCount, {}, fmt::format("case {}", c));
+      }
+    }
+    first.Report();
+    current.Report();
+    count.Report();
+  }
+}
+
+// RaceData::RaceData on a block as big as the race data (a few cases: the
+// whole of it compared).
+void RaceDataConstructs(Context& h) {
+  const Block data(0xA4000);
+  if (!data.address) {
+    ITC_LOG_ERROR("harness: race_setup: no block for the race data");
+    return;
+  }
+  Results results("RaceData::RaceData (sub_821021B8)");
+  for (int c = 0; c < 3; c++) {
+    GlobalsCase(
+        h, results, data, {}, [](Random&) {}, [&](PPCContext& t) { t.r3.u64 = data.address; },
+        __imp__sub_821021B8, hooks::RaceSetupRaceDataConstruct, {}, fmt::format("case {}", c));
+  }
+  results.Report();
+}
+
 }  // namespace
 
 void RaceSetup(Context& h) {
@@ -360,6 +643,13 @@ void RaceSetup(Context& h) {
   }
   SetModels(h, cars);
   FromBuilds(h, cars);
+  const Block leaves(0x4000);
+  if (!leaves.address) {
+    ITC_LOG_ERROR("harness: race_setup: no block from the allocation layer");
+    return;
+  }
+  Leaves(h, leaves);
+  RaceDataConstructs(h);
 }
 
 }  // namespace harness

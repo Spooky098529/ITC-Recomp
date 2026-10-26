@@ -32,4 +32,32 @@ void RaceSetupSetModel(PPCContext& ctx, uint8_t* base);
 // Params::FirstWheelOfModel.
 void RaceSetupFromBuild(PPCContext& ctx, uint8_t* base);
 
+// sub_82101630: r3 = a location, r4 = a byte; r3 the location.
+void RaceSetupRivalLocation(PPCContext& ctx, uint8_t* base);
+// Race::AddStage sub_82101828: r3 = the type; r3 left.
+void RaceSetupAddStage(PPCContext& ctx, uint8_t* base);
+// Stages::AddRacer sub_820FFAB8: r3 = the list, r4 = the racer, r5 = the
+// word, r6 = the stage or -1; r3 left.
+void RaceSetupStagesAddRacer(PPCContext& ctx, uint8_t* base);
+// RaceData::RaceData sub_821021B8: r3 = the race data; r3 left.
+void RaceSetupRaceDataConstruct(PPCContext& ctx, uint8_t* base);
+// sub_820FF558: r3 = the record; r3 left.
+void RaceSetupLapRecordReset(PPCContext& ctx, uint8_t* base);
+// RunningMean::Add sub_82101698: r3 = the mean, f1 = the value, r5 = the
+// weight; r3 left.
+void RaceSetupRunningMeanAdd(PPCContext& ctx, uint8_t* base);
+// Time::Pack sub_82101700: r3 = milliseconds; r3 the packed time.
+void RaceSetupTimePack(PPCContext& ctx, uint8_t* base);
+// sub_82110AC0: r3 = save data +48, r4 = the mode; r3 left.
+void RaceSetupCountRace(PPCContext& ctx, uint8_t* base);
+// RaceEvent::FirstOwned sub_821430A0: r3 = the event; r3 = the id or -1
+// (sign-extended).
+void RaceSetupEventFirstOwned(PPCContext& ctx, uint8_t* base);
+// RaceEvent::Current sub_821434E8, RaceEvent::Count sub_821434F8.
+void RaceSetupEventCurrent(PPCContext& ctx, uint8_t* base);
+void RaceSetupEventCount(PPCContext& ctx, uint8_t* base);
+// sub_82101D20 (no adapter: the array helper's plain C++ calls it): r3 =
+// the entry; r3 left.
+void RaceSetupRaceDataEntryConstruct(PPCContext& ctx, uint8_t* base);
+
 }  // namespace hooks

@@ -35,6 +35,10 @@ constexpr uint32_t kGearScale = 0x82002204;    // not read
 
 // The game's rand seed (race_overlays::Rand).
 constexpr uint32_t kRandSeed = 0x82638188;
+// The race data's global, its stage list's offset, and the event's global.
+constexpr uint32_t kRaceData = 0x826C5B2C;
+constexpr uint32_t kStageList = 0x59620;
+constexpr uint32_t kEvent = 0x826C6078;
 
 // --- The car object's parts (src/race_setup/car.cpp) ---
 
@@ -107,5 +111,53 @@ uint32_t SetModel(uint8_t* base, uint32_t car, uint32_t id);
 // +240), +1732, +1740 = +236, +244. Returns the last FirstWheelOfModel (the
 // original's r3).
 uint32_t FromBuild(uint8_t* base, uint32_t car, uint32_t build);
+
+// --- The race data's small pieces (src/race_setup/race_data.cpp) ---
+
+// sub_82101630: r3 = a location, `value` (r4, a byte of the item): value +
+// 11, 13, 15, 17, 19 or 21 for locations 14 to 19 (the 64-bit sum), else 8.
+uint64_t RivalLocation(int32_t location, uint64_t value);
+// Race::AddStage (sub_82101828): unless `type` is 4, the race data's stage
+// list's stage at its count (+800) gets +0 = type, and the count up.
+void AddStage(uint8_t* base, uint32_t type);
+// Stages::AddRacer (sub_820FFAB8): stage `stage` of the list (-1: the one at
+// its count +800): its slot at +76 gets +44 + 8 x slot = racer, +48 + 8 x
+// slot = word, and +76 up (each index loaded again after each store, as the
+// original).
+void StagesAddRacer(uint8_t* base, uint32_t list, uint32_t racer, uint32_t word, int32_t stage);
+// sub_82101D20: a 972-byte entry's +792 = 0.0, +796 = 0 (the race data's
+// records' element constructor; c_runtime::VectorConstruct calls this).
+void RaceDataEntryConstruct(uint8_t* base, uint32_t entry);
+// RaceData::RaceData (sub_821021B8): the 77 records' four 972-byte entries
+// each (from +0x59AEC, 3,936 apart) constructed by the array helper
+// (c_runtime::VectorConstruct with sub_82101D20). Returns the race data.
+uint32_t RaceDataConstruct(uint8_t* base, uint32_t data);
+// sub_820FF558: a 76-byte record cleared (memset of 64 bytes, then +60, +64,
+// +72, +68 = 0). Returns the record (memset's r3).
+uint32_t LapRecordReset(uint8_t* base, uint32_t record);
+// RunningMean::Add (sub_82101698): {+0 a float mean, +4 a count}: the count
+// += weight; unless that's 0, mean = fdivs(fmadds(old count, mean,
+// fmuls(weight, value)), new count) (the counts converted to single).
+void RunningMeanAdd(uint8_t* base, uint32_t mean, double value, uint32_t weight);
+// Time::Pack (sub_82101700): milliseconds (r3, all 64 bits as the original
+// computes with them) packed: the sign in bit 31, minutes in bits 16-30,
+// seconds in 10-15, milliseconds in 0-9. Its stack word (the original's r11
+// starts from r1 - 16) leaves nothing in the result.
+uint64_t TimePack(uint64_t milliseconds);
+// sub_82110AC0: r3 = save data +48, mode: halfword +5796 + 14 x mode up
+// (below 9999); when +6008 isn't the mode, +6008 = mode and halfword +6012 =
+// 1, else +6012 up (below 9999).
+void CountRace(uint8_t* base, uint32_t stats, uint32_t mode);
+// RaceEvent::FirstOwned (sub_821430A0): the id (halfword +0, sign-extended)
+// of the first item of the event's list (+156, halfword +20 entries of 12
+// bytes) with +8 nonzero, byte +91 1 and a save data record (SaveData::Of(0)
+// + 0x199F8 + 12 x id: halfwords +0, +4, +2 summed, to 16 bits) of 0 or
+// below (the mapped row had it above 0: the original returns at `ble`);
+// else -1.
+int32_t EventFirstOwned(uint8_t* base, uint32_t event);
+// RaceEvent::Current (sub_821434E8): [0x826C6078].
+uint32_t EventCurrent(uint8_t* base);
+// RaceEvent::Count (sub_821434F8): its halfword +20 (zero-extended).
+uint32_t EventCount(uint8_t* base);
 
 }  // namespace race_setup
