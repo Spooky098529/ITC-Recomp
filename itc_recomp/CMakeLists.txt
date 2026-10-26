@@ -192,6 +192,8 @@ set(ITC_SOURCES
     src/shader_objects/shader_objects.cpp
     src/hooks/race_hud.cpp
     src/race_hud/race_hud.cpp
+    src/hooks/race_setup.cpp
+    src/race_setup/car.cpp
     src/hooks/screen_objects.cpp
     src/screen_objects/uv_trees.cpp
     src/screen_objects/screen_objects.cpp
@@ -286,6 +288,7 @@ set(ITC_SOURCES
     src/harnesses/shader_objects.cpp
     src/harnesses/data_file.cpp
     src/harnesses/race_hud.cpp
+    src/harnesses/race_setup.cpp
     src/harnesses/ui_movie_objects.cpp
     src/harnesses/models.cpp
     src/harnesses/action_mappers.cpp
@@ -374,7 +377,8 @@ set(ITC_SOURCES
 # objects (src/screen_objects/, docs/functions/screen-objects.md) and the
 # model draws (src/scenery_lists/model_draws.cpp,
 # docs/functions/scenery-lists.md) and the model's load (its weights,
-# src/models/model_load.cpp, docs/functions/models.md).
+# src/models/model_load.cpp, docs/functions/models.md) and the race's set-up
+# (src/race_setup/, docs/functions/race-setup.md).
 set_source_files_properties(src/c_runtime/math.cpp src/ui_movies/keys.cpp
     src/ui_movies/animation.cpp
     src/ui_movies/draw.cpp src/ui_movies/texts.cpp src/ui_movies/update.cpp
@@ -393,7 +397,8 @@ set_source_files_properties(src/c_runtime/math.cpp src/ui_movies/keys.cpp
     src/strings_and_font/strings_and_font.cpp src/strings_and_font/font.cpp
     src/track_route/track_route.cpp src/ai_drivers/ai_drivers.cpp
     src/screen_objects/screen_objects.cpp src/scenery_lists/model_draws.cpp
-    src/models/model_load.cpp src/course_scenery/collect.cpp PROPERTIES
+    src/models/model_load.cpp src/course_scenery/collect.cpp
+    src/race_setup/car.cpp PROPERTIES
     COMPILE_OPTIONS "-ffp-model=strict;-ffp-contract=off"
     SKIP_PRECOMPILE_HEADERS ON)
 
