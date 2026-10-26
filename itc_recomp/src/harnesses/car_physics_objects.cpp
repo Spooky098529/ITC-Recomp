@@ -123,6 +123,33 @@ void NativeAddObject(PPCContext& ctx, uint8_t* base) {
   }
   ctx.r3.u64 = object;
 }
+void NativeProbeGround(PPCContext& ctx, uint8_t* base) {
+  ctx.fpscr.disableFlushMode();
+  if (!cp::CollisionWorldCallbackKnown(base)) {
+    __imp__sub_820B4420(ctx, base);
+    return;
+  }
+  double f1 = 0.0;
+  ctx.r3.u64 = cp::VehicleProbeGround(base, ctx.r3.u32, ctx.r1.u32 - 304, &f1);
+  ctx.f1.f64 = f1;
+}
+void NativeUnflip(PPCContext& ctx, uint8_t* base) {
+  ctx.fpscr.disableFlushMode();
+  uint32_t r3 = 0;
+  if (!cp::VehicleUnflip(base, ctx.r3.u32, ctx.r1.u32 - 384, &r3)) {
+    __imp__sub_820AFE90(ctx, base);
+    return;
+  }
+  ctx.r3.u64 = r3;
+}
+void NativeRefreshFromBody(PPCContext& ctx, uint8_t* base) {
+  ctx.fpscr.disableFlushMode();
+  if (!cp::CollisionWorldCallbackKnown(base)) {
+    __imp__sub_820B62E8(ctx, base);
+    return;
+  }
+  ctx.r3.u64 = cp::VehicleRefreshFromBody(base, ctx.r3.u32, ctx.r1.u32 - 96);
+}
 void NativeDestroyPhysics(PPCContext& ctx, uint8_t* base) {
   ctx.fpscr.disableFlushMode();
   uint32_t r3 = 0;
@@ -582,6 +609,188 @@ void DestroyPhysicsCases(Context& h, uint32_t region) {
   results.Report();
 }
 
+// The vehicle's region (allocated from the layer): the vehicle (6,272
+// bytes), its car data, rigid body, surface records and track positions
+// (one per wheel and one for the body's center).
+constexpr uint32_t kVehicleRegionBytes = 0x2800;
+constexpr uint32_t kCarData = 0x1900, kVehicleBody = 0x2000, kSurfaces = 0x2280,
+                   kPositions = 0x2380;
+constexpr uint32_t kPositionBytes = 0x80;
+
+uint32_t WheelOf(uint32_t vehicle, uint32_t w) {
+  return vehicle + 416 + 368 * w;
+}
+
+// A track position whose last point (+16, +24) is the point's x and z, its
+// kind (+80) one the surfaces' tables cover (0 to 7) or below 0.
+void SetPosition(uint8_t* base, uint32_t position, uint32_t point, Random& r) {
+  guest::StoreU32(base, position + 16, guest::LoadU32(base, point + 0));
+  guest::StoreU32(base, position + 24, guest::LoadU32(base, point + 8));
+  const uint16_t kinds[] = {0, 1, 4, 7, 0xFFFF, 0x8001};
+  guest::StoreU16(base, position + 80, kinds[r.Below(std::size(kinds))]);
+}
+
+// The vehicle's inputs: words by the group, the pointers, the points' x and
+// z numbers (a NaN would take the mesh's path), the wheels' track positions
+// 0 or at their +80, the body's at its +16 (+2984), the surface tables
+// (+2668 and +2796, by the byte +2664) and +48 below 2.0 some of the time.
+void FillVehicleRegion(uint8_t* base, uint32_t region, Random& r, Group group) {
+  auto word = [group](Random& x) { return group == kNaNs ? AnyWord(x) : NumberWord(x); };
+  for (uint32_t i = 0; i < kVehicleRegionBytes; i += 4) {
+    guest::StoreU32(base, region + i, word(r));
+  }
+  const uint32_t v = region;
+  const uint32_t body = region + kVehicleBody;
+  guest::StoreU32(base, v + 272, region + kCarData);
+  guest::StoreU32(base, v + 336, body);
+  guest::StoreU8(base, v + 2664, uint8_t(r.Below(4) != 0));
+  for (uint32_t k = 0; k < 8; k++) {
+    for (uint32_t table : {2668u, 2796u}) {
+      guest::StoreU32(base, v + table + 4 * k,
+                      r.Below(4) == 0 ? 0 : region + kSurfaces + 32 * r.Below(8));
+    }
+  }
+  for (uint32_t w = 0; w < 4; w++) {
+    const uint32_t wheel = WheelOf(v, w);
+    guest::StoreU32(base, v + 2144 + 4 * w, v + (w < 2 ? 1888 : 2016));
+    guest::StoreU32(base, v + 2160 + 4 * w, region + kCarData + (w < 2 ? 336 : 608));
+    guest::StoreU32(base, wheel + 80, NumberWord(r));
+    guest::StoreU32(base, wheel + 88, NumberWord(r));
+    const uint32_t position = region + kPositions + kPositionBytes * w;
+    SetPosition(base, position, wheel + 80, r);
+    guest::StoreU32(base, wheel + 20, r.Below(4) == 0 ? 0 : position);
+    guest::StoreU32(base, wheel + 176, r.Below(8));
+  }
+  guest::StoreU32(base, body + 16, NumberWord(r));
+  guest::StoreU32(base, body + 24, NumberWord(r));
+  const uint32_t position = region + kPositions + kPositionBytes * 4;
+  SetPosition(base, position, body + 16, r);
+  guest::StoreU32(base, v + 2984, r.Below(4) == 0 ? 0 : position);
+  if (r.Below(2) == 0) {
+    guest::StoreU32(base, v + 48, 0);
+  }
+  if (r.Below(2) == 0) {
+    // +16 . +96 below the threshold: +96 against +16.
+    for (uint32_t i = 0; i < 12; i += 4) {
+      guest::StoreFloat(base, v + 96 + i, -guest::LoadFloat(base, v + 16 + i));
+    }
+  }
+  guest::StoreU8(base, body + 0, uint8_t(r.Below(4) == 0));
+}
+
+// The region compared: the vehicle's integer words (the pointers, the
+// wheel records' pointers +2144 to +2175, the tables, the wheels'
+// positions, surfaces and bytes +16, the bytes +2664 and +3132, +2984) exactly and the rest as floats; the body's +0, +12 and
+// +516 exactly; the positions' +80 exactly; the car data and the surface
+// records (not written) exactly.
+void VehicleRegionOutputs(Outputs& out, uint8_t* base, uint32_t region) {
+  auto exact_in_vehicle = [](uint32_t i) {
+    if (i == 272 || i == 336 || i == 340 || i == 344 || i == 2664 || i == 3132 || i == 2984) {
+      return true;
+    }
+    if (i >= 2144 && i < 2176) {
+      return true;
+    }
+    if ((i >= 2668 && i < 2700) || (i >= 2796 && i < 2828)) {
+      return true;
+    }
+    if (i >= 416 && i < 416 + 4 * 368) {
+      const uint32_t at = (i - 416) % 368;
+      return at == 16 || at == 20 || at == 176;
+    }
+    return false;
+  };
+  for (uint32_t i = 0; i < kCarData; i += 4) {
+    const uint32_t w = guest::LoadU32(base, region + i);
+    exact_in_vehicle(i) ? out.Word(w) : out.Float(w);
+  }
+  out.Bytes(Read(base, region + kCarData, kVehicleBody - kCarData));
+  for (uint32_t i = 0; i < 528; i += 4) {
+    const uint32_t w = guest::LoadU32(base, region + kVehicleBody + i);
+    (i == 0 || i == 12 || i == 516) ? out.Word(w) : out.Float(w);
+  }
+  out.Bytes(Read(base, region + kSurfaces, kPositions - kSurfaces));
+  for (uint32_t i = kPositions; i < kPositions + 5 * kPositionBytes; i += 4) {
+    const uint32_t w = guest::LoadU32(base, region + i);
+    ((i - kPositions) % kPositionBytes == 80) ? out.Word(w) : out.Float(w);
+  }
+}
+
+// A ground result on the stack (64 bytes): floats but its words +48, +52.
+void ResultOutputs(Outputs& out, uint8_t* base, uint32_t result) {
+  out.Floats(base, result, 12);
+  out.Word(guest::LoadU32(base, result + 48));
+  out.Word(guest::LoadU32(base, result + 52));
+  out.Floats(base, result + 56, 2);
+}
+
+// ProbeGround's, Unflip's and RefreshFromBody's cases on the vehicle's
+// region with the fake world (its +8 the ground callback). Compared: the
+// region, the temporaries of the frame (ProbeGround's from +80 to its
+// register saves at +240, the result at +176; Unflip's from +80 to +352,
+// the result at +288), the ground's raised point (its frame + 80), r3 and,
+// for ProbeGround, f1.
+void VehicleGroundCases(Context& h, uint32_t region, uint32_t vehicle_region) {
+  enum Kind { kProbe, kUnflip, kRefresh };
+  const struct {
+    const char* name;
+    GuestFunction recompiled, native;
+    Kind kind;
+  } functions[] = {
+      {"Vehicle::ProbeGround (sub_820B4420)", Original<__imp__sub_820B4420>, NativeProbeGround,
+       kProbe},
+      {"Vehicle::Unflip (sub_820AFE90)", Original<__imp__sub_820AFE90>, NativeUnflip, kUnflip},
+      {"Vehicle::RefreshFromBody (sub_820B62E8)", Original<__imp__sub_820B62E8>,
+       NativeRefreshFromBody, kRefresh},
+  };
+  const uint32_t r1 = CallContext(h).r1.u32;
+  for (const auto& f : functions) {
+    for (Group group : {kNumbers, kNaNs}) {
+      Results results(std::string(f.name) + kGroupNames[group]);
+      for (uint64_t seed = 0; seed < 200; seed++) {
+        Outputs out[2];
+        for (int v = 0; v < 2; v++) {
+          Random r(seed * 59 + 19 + 1000 * uint64_t(group) + 100000 * uint64_t(f.kind));
+          BuildWorld(h, region, r, kNumbers, false);
+          FillVehicleRegion(h.base, vehicle_region, r, group);
+          if (f.kind == kRefresh) {
+            // SyncFromBody moves the wheels' points first, so a position
+            // at them would send the ground to the mesh (none here): the
+            // wheels' positions 0.
+            for (uint32_t w = 0; w < 4; w++) {
+              guest::StoreU32(h.base, WheelOf(vehicle_region, w) + 20, 0);
+            }
+          }
+          FillStack(h, r);
+          PPCContext t = CallContext(h);
+          t.fpscr.disableFlushModeUnconditional();
+          t.r3.u64 = vehicle_region;
+          (v == 0 ? f.recompiled : f.native)(t, h.base);
+          VehicleRegionOutputs(out[v], h.base, vehicle_region);
+          if (f.kind == kProbe) {
+            const uint32_t frame = r1 - 304;
+            out[v].Floats(h.base, frame + 80, (176 - 80) / 4);
+            ResultOutputs(out[v], h.base, frame + 176);
+            // (The ground's temporaries aren't compared here: the
+            // original's later callees' frames, such as
+            // Matrix::InverseRotate's transposed rows, which the native ones
+            // don't write, are over them.)
+            out[v].Double(t.f1.u64);
+          } else if (f.kind == kUnflip) {
+            const uint32_t frame = r1 - 384;
+            out[v].Floats(h.base, frame + 80, (288 - 80) / 4);
+            ResultOutputs(out[v], h.base, frame + 288);
+            out[v].Floats(h.base, frame - 96 - 144 + 80, 4);
+          }
+          out[v].Word(t.r3.u32);
+        }
+        results.Check(out[0], out[1], fmt::format("seed {}", seed));
+      }
+      results.Report();
+    }
+  }
+}
+
 }  // namespace
 
 void CarPhysicsObjects(Context& h) {
@@ -590,6 +799,9 @@ void CarPhysicsObjects(Context& h) {
   SetFloat48Cases(h, region);
   CallbackCases(h, region);
   ResetTransformCases(h, region);
+  const uint32_t vehicle_region = memory::Alloc(kVehicleRegionBytes, 0);
+  VehicleGroundCases(h, region, vehicle_region);
+  memory::Free(vehicle_region);
   if (hooks::NativeHeapActive()) {
     AddObjectCases(h, region, true);
     AddObjectCases(h, region, false);

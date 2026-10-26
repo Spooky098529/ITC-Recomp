@@ -8,8 +8,10 @@
 
 #include "base/log.h"
 #include "c_runtime/arrays.h"
+#include "c_runtime/math.h"
 #include "c_runtime/strings.h"
 #include "collision/collision.h"
+#include "matrix_math/matrix_math.h"
 #include "memory/c_runtime_heap.h"
 #include "track_collision/track_collision.h"
 #include "vehicle_accessors/vectors.h"
@@ -180,6 +182,189 @@ bool VehicleDestroyPhysics(uint8_t* base, uint32_t vehicle, uint32_t* r3) {
     *r3 = body;
   }
   return true;
+}
+
+}  // namespace car_physics
+
+namespace car_physics {
+
+namespace {
+
+constexpr uint32_t kHalf = 0x82001BE4;          // 0.5
+constexpr uint32_t kSpeedLimit = 0x82001FD8;    // the slip term's speed squared, at most
+constexpr uint32_t kSlipRatio = 0x8200296C;     // side over forward below this ratio: divided
+constexpr uint32_t kSlipScale = 0x820029F8;     // the slip term's scale
+constexpr uint32_t kUnflipSpeed = 0x820021E8;   // +48 below it (2.0)
+constexpr uint32_t kUnflipUp = 0x820029C8;      // +16 . +96 below it
+
+uint32_t WheelAt(uint32_t vehicle, uint32_t w) {
+  return vehicle + 416 + 368 * w;
+}
+
+// Three words copied (lfs then stfs: their bits) and a fourth from `w`.
+void CopyXyz(uint8_t* base, uint32_t from, uint32_t to, uint32_t w) {
+  CopyWord(base, from + 0, to + 0);
+  CopyWord(base, from + 4, to + 4);
+  CopyWord(base, from + 8, to + 8);
+  CopyWord(base, w, to + 12);
+}
+
+}  // namespace
+
+uint32_t VehicleProbeGround(uint8_t* base, uint32_t vehicle, uint32_t frame, double* f1) {
+  ITC_NATIVE_RUNNING("sub_820B4420 Vehicle::ProbeGround");
+  const uint32_t v = vehicle, f = frame;
+  const uint32_t up = v + 96;
+  // +96 = 0.0 three times, its w loaded first and stored back.
+  const uint32_t up_w = guest::LoadU32(base, up + 12);
+  CopyWord(base, kZero, up + 0);
+  CopyWord(base, kZero, up + 4);
+  CopyWord(base, kZero, up + 8);
+  guest::StoreU32(base, up + 12, up_w);
+  for (uint32_t w = 0; w < 4; w++) {
+    const uint32_t wheel = WheelAt(v, w);
+    CopyWord(base, kZero, f + 204);
+    CopyWord(base, kZero, f + 220);
+    uint32_t r3 = 0;
+    CollisionWorldCallback(base, f + 176, wheel + 80, guest::LoadU32(base, wheel + 20), f, &r3);
+    Stfs(base, wheel + 96, Fmuls(Lfs(base, f + 196), Lfs(base, f + 176)));
+    vl::Vec4Copy(base, wheel + 112, f + 192);
+    const uint32_t next = guest::LoadU32(base, f + 228);
+    const uint32_t surface = guest::LoadU32(base, f + 224);
+    guest::StoreU32(base, wheel + 20, next);
+    guest::StoreU32(base, wheel + 176, surface);
+    const double offset = VehicleSurfaceValue(base, v, w);
+    Stfs(base, wheel + 96, Fadds(Lfs(base, wheel + 96), offset));
+    vl::Vec4Copy(base, wheel + 160, wheel + 64);
+    Stfs(base, wheel + 164, Fsubs(Lfs(base, wheel + 164), Lfs(base, wheel + 96)));
+    vl::Vec3AddTo(base, up, wheel + 112);
+  }
+  // The axles' midpoints.
+  const double half = Lfs(base, kHalf);
+  vl::Vec3Sum(base, f + 160, v + 576, v + 944);
+  vl::Vec4Scaled(base, f + 80, f + 160, half);
+  vl::Vec4Copy(base, v + 1904, f + 80);
+  vl::Vec3Sum(base, f + 80, v + 1312, v + 1680);
+  vl::Vec4Scaled(base, f + 160, f + 80, half);
+  vl::Vec4Copy(base, v + 2032, f + 160);
+  // The ground frame.
+  vl::Vec3NormalizeSelf(base, up);
+  vl::Vec3Cross(base, f + 80, up, v + 32);
+  vl::Vec4Copy(base, v + 112, f + 80);
+  vl::Vec3NormalizeSelf(base, v + 112);
+  vl::Vec3Cross(base, f + 80, v + 112, up);
+  vl::Vec4Copy(base, v + 128, f + 80);
+  vl::Vec3NormalizeSelf(base, v + 128);
+  // The rows with w 1.0 through the stack (the x, y, w, z stores' order is
+  // the original's; nothing overlaps).
+  CopyXyz(base, v + 112, f + 112, kOne);
+  vl::Vec4Copy(base, v + 144, f + 112);
+  CopyXyz(base, up, f + 128, kOne);
+  vl::Vec4Copy(base, v + 160, f + 128);
+  CopyXyz(base, v + 128, f + 144, kOne);
+  vl::Vec4Copy(base, v + 176, f + 144);
+  // The slip term: the velocity copied (ld, std: its bits), +92 = 0.0 first.
+  const uint32_t velocity = va::RigidBodyVelocity(guest::LoadU32(base, v + 336));
+  for (uint32_t i = 0; i < 16; i += 4) {
+    guest::StoreU32(base, f + 96 + i, guest::LoadU32(base, velocity + i));
+  }
+  const double zero = Lfs(base, kZero);
+  Stfs(base, v + 92, zero);
+  double speed2 = double(vl::Vec3Dot(base, f + 96, f + 96));
+  const double limit = Lfs(base, kSpeedLimit);
+  if (!(speed2 <= limit)) {  // ble: a NaN takes the limit
+    speed2 = limit;
+  }
+  const double forward = double(vl::Vec3DotOf(base, f + 96, v + 112));
+  const double side = double(vl::Vec3DotOf(base, f + 96, v + 128));
+  const double forward_size = Fabs(forward);
+  const double bound = Fmuls(forward_size, Lfs(base, kSlipRatio));
+  double ratio;
+  if (Fabs(side) < bound) {
+    ratio = Fdivs(side, forward_size);
+  } else {
+    ratio = double(float(c_runtime::Atan2(side, forward_size)));
+  }
+  Stfs(base, v + 92, Fmuls(Fmuls(ratio, speed2), Lfs(base, kSlipScale)));
+  Stfs(base, v + 3112, double(vl::Vec3DotOf(base, v + 64, up)));
+  va::RigidBodyPointVelocity(base, f + 80, guest::LoadU32(base, v + 336), v + 1888);
+  vl::Vec4Copy(base, v + 1968, f + 80);
+  va::RigidBodyPointVelocity(base, f + 80, guest::LoadU32(base, v + 336), v + 2016);
+  vl::Vec4Copy(base, v + 2096, f + 80);
+  matrix_math::InverseRotate(base, f + 80, v + 144,
+                             va::RigidBodyVelocity(guest::LoadU32(base, v + 336)));
+  vl::Vec4Copy(base, v + 384, f + 80);
+  vl::Vec3Cross(base, f + 160, up, v + 16);
+  const double roll = double(vl::Vec3DotOf(base, f + 160, v + 112));
+  Stfs(base, v + 88, roll);
+  *f1 = roll;
+  return f + 160;
+}
+
+bool VehicleUnflip(uint8_t* base, uint32_t vehicle, uint32_t frame, uint32_t* r3) {
+  const uint32_t v = vehicle, f = frame;
+  if (!(Lfs(base, v + 48) < Lfs(base, kUnflipSpeed))) {  // bge: NaNs return
+    ITC_NATIVE_RUNNING("sub_820AFE90 Vehicle::Unflip");
+    *r3 = v;
+    return true;
+  }
+  const double tilt = double(vl::Vec3DotOf(base, v + 16, v + 96));
+  if (!(tilt < Lfs(base, kUnflipUp))) {
+    ITC_NATIVE_RUNNING("sub_820AFE90 Vehicle::Unflip");
+    *r3 = v + 16;  // Vec3::Dot leaves r3 as its first vector
+    return true;
+  }
+  if (!CollisionWorldCallbackKnown(base)) {
+    return false;
+  }
+  ITC_NATIVE_RUNNING("sub_820AFE90 Vehicle::Unflip");
+  CopyWord(base, kZero, f + 316);
+  CopyWord(base, kZero, f + 332);
+  uint32_t ignored = 0;
+  CollisionWorldCallback(base, f + 288, va::ContactPosition(guest::LoadU32(base, v + 336)),
+                         guest::LoadU32(base, v + 2984), f, &ignored);
+  matrix_math::SetIdentity(base, f + 192);
+  // Row 1: the normal (w 1.0).
+  CopyXyz(base, f + 304, f + 96, kOne);
+  vl::Vec4Copy(base, f + 208, f + 96);
+  // Row 2: normalized(row 1 x +2528), through the stack (w 0.0, then 1.0).
+  CopyXyz(base, f + 208, f + 160, kZero);
+  vl::Vec3Cross(base, f + 256, f + 160, v + 2528);
+  CopyXyz(base, f + 256, f + 144, kOne);
+  vl::Vec4Copy(base, f + 224, f + 144);
+  vl::Vec3NormalizeSelf(base, f + 224);
+  // Row 0: normalized(row 2 x row 2), the zero vector's (the game's).
+  CopyXyz(base, f + 224, f + 112, kZero);
+  CopyXyz(base, f + 224, f + 128, kZero);
+  vl::Vec3Cross(base, f + 256, f + 128, f + 112);
+  CopyXyz(base, f + 256, f + 80, kOne);
+  vl::Vec4Copy(base, f + 192, f + 80);
+  vl::Vec3NormalizeSelf(base, f + 192);
+  matrix_math::QuaternionFromMatrix(base, f + 272, f + 192);
+  // The body's position lowered by the distance (its 16 bytes copied by
+  // ld, std: their bits).
+  const uint32_t position = va::ContactPosition(guest::LoadU32(base, v + 336));
+  const uint32_t data = guest::LoadU32(base, v + 272);
+  const double distance = Lfs(base, f + 288);
+  for (uint32_t i = 0; i < 16; i += 4) {
+    guest::StoreU32(base, f + 176 + i, guest::LoadU32(base, position + i));
+  }
+  Stfs(base, f + 180, Fsubs(Lfs(base, f + 180), distance));
+  va::RigidBodySetCenterOfMass(base, guest::LoadU32(base, v + 336), data + 96);
+  RigidBodySetCenterOfMassPosition(base, guest::LoadU32(base, v + 336), f + 176, f - 96);
+  const uint32_t body = guest::LoadU32(base, v + 336);
+  RigidBodySetOrientation(base, body, f + 272, f - 96);
+  guest::StoreU8(base, v + 3132, 0);
+  *r3 = body + 336;  // SetOrientation's (UpdateOrigin's)
+  return true;
+}
+
+uint32_t VehicleRefreshFromBody(uint8_t* base, uint32_t vehicle, uint32_t frame) {
+  ITC_NATIVE_RUNNING("sub_820B62E8 Vehicle::RefreshFromBody");
+  VehicleSyncFromBody(base, vehicle, frame - 368);
+  double f1 = 0.0;
+  VehicleProbeGround(base, vehicle, frame - 304, &f1);
+  return VehicleUpdateWheelAxes(base, vehicle, frame - 256);
 }
 
 }  // namespace car_physics

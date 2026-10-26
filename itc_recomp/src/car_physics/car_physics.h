@@ -692,5 +692,35 @@ bool CollisionWorldAddObject(uint8_t* base, uint32_t body, uint32_t shape, uint3
 // moves, a shape that isn't a box, a block the layer didn't give). `r3`:
 // what the original leaves (the body, or with none the old +344).
 bool VehicleDestroyPhysics(uint8_t* base, uint32_t vehicle, uint32_t* r3);
+// Vehicle::ProbeGround (sub_820B4420): per wheel the ground below its +80
+// (CollisionWorld::Callback with its track position, the wheel's word +20,
+// into a result at `frame` + 176): +96 the distance plus the surface's +0
+// (Vehicle::SurfaceValue), +112 the normal, +20 the next position, +176 the
+// surface, +160 the contact point; the vehicle's +96 the normals' sum; the
+// axles' midpoints +1904, +2032; the ground frame +96 up, +112 forward,
+// +128 side, +144 to +176 (w 1.0); +92 the slip term (side over forward,
+// or atan2, times the speed squared clamped), +3112 the yaw rate, the
+// axles' velocities +1968, +2096, the velocity in the ground frame +384,
+// +88 the roll. Only where the callback is the ground's
+// (CollisionWorldCallbackKnown). `frame`: the original's 304 bytes (the
+// callback's from it). `f1` gets the last dot product (+88); returns the
+// original's r3 (`frame` + 160).
+uint32_t VehicleProbeGround(uint8_t* base, uint32_t vehicle, uint32_t frame, double* f1);
+// Vehicle::Unflip (sub_820AFE90): with +48 below 2.0 and +16 . +96 below
+// [0x820029C8], the ground under the body's center (the callback, r5 =
+// +2984, into `frame` + 288), a matrix from its normal (row 1), row 2 the
+// normal x +2528 normalized and row 0 row 2 x row 2 normalized (a zero
+// vector: the game's), its quaternion; the body's center of mass set from
+// the car data's +96, its position lowered by the distance, its
+// orientation the quaternion; byte +3132 = 0. False, with nothing done,
+// where the callback isn't the ground's (CollisionWorldCallbackKnown).
+// `frame`: the original's 384 bytes. `r3`: what the original leaves there
+// (the vehicle, +16, or the body's +336).
+bool VehicleUnflip(uint8_t* base, uint32_t vehicle, uint32_t frame, uint32_t* r3);
+// Vehicle::RefreshFromBody (sub_820B62E8): SyncFromBody, ProbeGround,
+// UpdateWheelAxes (their frames below `frame`, the original's 96 bytes).
+// Only where the callback is the ground's. Returns the original's r3
+// (UpdateWheelAxes').
+uint32_t VehicleRefreshFromBody(uint8_t* base, uint32_t vehicle, uint32_t frame);
 
 }  // namespace car_physics

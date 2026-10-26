@@ -25,7 +25,7 @@ ITC_FLAG_BOOL(native_car_physics, true, "ITC",
               "sub_820B8BA8, sub_820B8AF8, and the collision objects' groups, sub_820B7CC8, "
               "sub_820B7CF0, and their translation, sub_820B7B60; the vehicle's forces applied, sub_820B2CC0; the car data and the "
               "vehicle's constructor, sub_820AEF80 with sub_820AECB8, sub_820AEE98, "
-              "sub_820AF018, sub_820AF1C0, sub_820B42C8; the car's settings and tuning, sub_820C05C8, sub_820C0D28; the car loader, sub_820C27E8; the vehicle's physics objects, sub_8259D5A8, sub_820B8798 (the ground callback only), sub_820B7998, sub_820B9570 with sub_820B7A00, sub_820B0E70 (these two only while --native_heap routes the game's heap to the allocation layer)) natively instead of through the translated code "
+              "sub_820AF018, sub_820AF1C0, sub_820B42C8; the car's settings and tuning, sub_820C05C8, sub_820C0D28; the car loader, sub_820C27E8; the vehicle's physics objects, sub_8259D5A8, sub_820B8798 (no adapter; the ground callback only), sub_820B7998, sub_820B9570 with sub_820B7A00, sub_820B0E70 (these two only while --native_heap routes the game's heap to the allocation layer), the ground probe sub_820B4420, sub_820AFE90, sub_820B62E8) natively instead of through the translated code "
               "(the same words, bit for bit; checked by --run_harnesses=car_physics)");
 
 // Defines an adapter: `body` uses `ctx` and `base`. Flush-to-zero off for
@@ -143,10 +143,9 @@ extern "C" REX_FUNC(sub_820B72C8) {
 // f1 = dt (left as it is).
 ITC_CAR_PHYSICS(820AFAE8, ctx.r3.u64 = VehicleBeginStep(base, ctx.r3.u32, ctx.f1.f64))
 ITC_CAR_PHYSICS(820AFD30, VehicleWheelLoads(base, ctx.r3.u32))
-// r4 = the wheel; f1 = the value. SurfaceValue20, SurfaceValue12 and
-// SurfaceValue16 (sub_820B0560, sub_820B05B8, sub_820B0610) have no
+// Vehicle::SurfaceValue, SurfaceValue20, SurfaceValue12 and SurfaceValue16
+// (sub_820B0508, sub_820B0560, sub_820B05B8, sub_820B0610) have no
 // adapters: their callers in play are native.
-ITC_CAR_PHYSICS(820B0508, ctx.f1.f64 = VehicleSurfaceValue(base, ctx.r3.u32, ctx.r4.u32))
 ITC_CAR_PHYSICS(820B0908,
                 ctx.r3.u64 = VehicleAccumulateTireForces(base, ctx.r3.u32, ctx.r1.u32 - 192))
 ITC_CAR_PHYSICS(820B2748, VehicleRollingResistance(base, ctx.r3.u32))
@@ -467,19 +466,8 @@ bool NativeLifetime() {
 
 // r3 = the body, r4 = the float (r3 left as it is).
 ITC_CAR_PHYSICS(8259D5A8, RigidBodySetFloat48(base, ctx.r3.u32, ctx.r4.u32))
-// r3 = the result, r4 = the point, r5 = the track position; r3 comes back
-// as the callback's. A callback other than the ground's: the original.
-extern "C" REX_FUNC(sub_820B8798) {
-  REX_FUNC_PROLOGUE();
-  if (!ITC_FLAG(native_car_physics) || !CollisionWorldCallbackKnown(base)) {
-    __imp__sub_820B8798(ctx, base);
-    return;
-  }
-  ctx.fpscr.disableFlushMode();
-  uint32_t r3 = 0;
-  CollisionWorldCallback(base, ctx.r3.u32, ctx.r4.u32, ctx.r5.u32, ctx.r1.u32, &r3);
-  ctx.r3.u64 = r3;
-}
+// CollisionWorld::Callback (sub_820B8798) has no adapter: its callers in
+// play, Vehicle::ProbeGround and Unflip, are native.
 // r3 = the collision object; r3 comes back as its shape record (+32).
 extern "C" REX_FUNC(sub_820B7998) {
   REX_FUNC_PROLOGUE();
@@ -528,4 +516,42 @@ extern "C" REX_FUNC(sub_820B0E70) {
     return;
   }
   ctx.r3.u64 = r3;
+}
+// r3 = the vehicle; f1 comes back as the last dot product (+88), r3 as
+// r1 - 304 + 160. A callback other than the ground's: the original.
+extern "C" REX_FUNC(sub_820B4420) {
+  REX_FUNC_PROLOGUE();
+  if (!ITC_FLAG(native_car_physics) || !CollisionWorldCallbackKnown(base)) {
+    __imp__sub_820B4420(ctx, base);
+    return;
+  }
+  ctx.fpscr.disableFlushMode();
+  double f1 = 0.0;
+  ctx.r3.u64 = VehicleProbeGround(base, ctx.r3.u32, ctx.r1.u32 - 304, &f1);
+  ctx.f1.f64 = f1;
+}
+// r3 = the vehicle; r3 comes back as the original leaves it.
+extern "C" REX_FUNC(sub_820AFE90) {
+  REX_FUNC_PROLOGUE();
+  if (!ITC_FLAG(native_car_physics)) {
+    __imp__sub_820AFE90(ctx, base);
+    return;
+  }
+  ctx.fpscr.disableFlushMode();
+  uint32_t r3 = 0;
+  if (!VehicleUnflip(base, ctx.r3.u32, ctx.r1.u32 - 384, &r3)) {
+    __imp__sub_820AFE90(ctx, base);
+    return;
+  }
+  ctx.r3.u64 = r3;
+}
+// r3 = the vehicle; r3 comes back as UpdateWheelAxes'.
+extern "C" REX_FUNC(sub_820B62E8) {
+  REX_FUNC_PROLOGUE();
+  if (!ITC_FLAG(native_car_physics) || !CollisionWorldCallbackKnown(base)) {
+    __imp__sub_820B62E8(ctx, base);
+    return;
+  }
+  ctx.fpscr.disableFlushMode();
+  ctx.r3.u64 = VehicleRefreshFromBody(base, ctx.r3.u32, ctx.r1.u32 - 96);
 }
