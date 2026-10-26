@@ -57,6 +57,12 @@ using namespace car_physics;
 
 // --- The rigid body: r3 = the body ---
 
+// RigidBody::RigidBody, Reset and SetInertia (sub_820B7928, sub_820B77D0,
+// sub_820B7280), and Vehicle::Reset and SetUpGearing (sub_820B0EE8,
+// sub_820B4AA8) have no adapters: their callers in play (the vehicle's
+// physics set-up and reset, CarData::Derive) are native. Nor have
+// CollisionObject::AddGroups and RemoveGroups (sub_820B7CC8, sub_820B7CF0).
+
 // RigidBody::UpdateOrigin, UpdateVelocity, UpdateAngularVelocity and
 // UpdateOrientation (sub_820B6E70, sub_820B70C8, sub_820B7478,
 // sub_820B6F38) have no adapters: their callers in play are native.
@@ -80,11 +86,6 @@ ITC_CAR_PHYSICS(820B7500,
                 ctx.f1.f64 = RigidBodySetAngularVelocity(base, ctx.r3.u32, ctx.r4.u32,
                                                          ctx.r1.u32 - 160);
                 ctx.r3.u64 = ctx.r3.u32 + 96)
-// r4 = the inertia; UpdateOrientation is a tail call (its frame from this
-// r1); r3 comes back as +416.
-ITC_CAR_PHYSICS_VECTOR(820B7280,
-                       RigidBodySetInertia(base, ctx.r3.u32, ctx.r4.u32, ctx.r1.u32 - 320);
-                       ctx.r3.u64 = ctx.r3.u32 + 416)
 // f1 = dt. r3 comes back as the body when it's fixed, else as
 // UpdateVelocity leaves it.
 ITC_CAR_PHYSICS(820B75B8, ctx.r3.u64 = RigidBodyApplyImpulses(base, ctx.r3.u32, ctx.f1.f64,
@@ -92,11 +93,6 @@ ITC_CAR_PHYSICS(820B75B8, ctx.r3.u64 = RigidBodyApplyImpulses(base, ctx.r3.u32, 
 // f1 = dt; r3 comes back as the body when it's fixed, else +336.
 ITC_CAR_PHYSICS(820B7658, ctx.r3.u64 = RigidBodyIntegrate(base, ctx.r3.u32, ctx.f1.f64,
                                                           ctx.r1.u32 - 208))
-// r3 comes back as +96 (SetAngularVelocity's).
-ITC_CAR_PHYSICS(820B77D0, RigidBodyReset(base, ctx.r3.u32, ctx.r1.u32 - 176);
-                ctx.r3.u64 = ctx.r3.u32 + 96)
-// r3 comes back as the body.
-ITC_CAR_PHYSICS(820B7928, RigidBodyConstruct(base, ctx.r3.u32, ctx.r1.u32 - 96))
 // RigidBody::EffectiveMassAt (sub_820B6A38) has no adapter: its only
 // caller, CarData::Derive, is native.
 // r4 = the point, r5 = the normal; f1 = the impulse.
@@ -199,21 +195,6 @@ ITC_CAR_PHYSICS(820B13C8,
 ITC_CAR_PHYSICS(820B0A50, WheelCopy(base, ctx.r3.u32, ctx.r4.u32))
 ITC_CAR_PHYSICS(820B0CC0, WheelRecord2Copy(base, ctx.r3.u32, ctx.r4.u32))
 
-// f1 comes back as the last Quaternion::FromAxisAngle's, r3 as +3312
-// (memcpy's).
-extern "C" REX_FUNC(sub_820B0EE8) {
-  REX_FUNC_PROLOGUE();
-  if (!ITC_FLAG(native_car_physics)) {
-    __imp__sub_820B0EE8(ctx, base);
-    return;
-  }
-  ctx.fpscr.disableFlushMode();
-  double f1 = 0.0;
-  VehicleReset(base, ctx.r3.u32, ctx.r1.u32 - 240, &f1);
-  ctx.f1.f64 = f1;
-  ctx.r3.u64 = ctx.r3.u32 + 3312;
-}
-ITC_CAR_PHYSICS(820B4AA8, VehicleSetUpGearing(base, ctx.r3.u32, ctx.r1.u32 - 176))
 // f1 = the input; f1 comes back as the second sin's.
 ITC_CAR_PHYSICS(820B3D10, ctx.f1.f64 = VehicleSetSteering(base, ctx.r3.u32, ctx.f1.f64))
 // SteerRecord::Fill and SteerRecord::Curve (sub_820B0668, sub_820B3E98) have
@@ -323,25 +304,6 @@ extern "C" REX_FUNC(sub_820B9448) {
   }
   ctx.r3.u64 = r3;
 }
-// r3 = the object, r4 = the bits.
-ITC_CAR_PHYSICS(820B7CC8, ctx.r3.u64 = CollisionObjectAddGroups(base, ctx.r3.u32, ctx.r4.u32))
-extern "C" REX_FUNC(sub_820B7CF0) {
-  REX_FUNC_PROLOGUE();
-  if (!ITC_FLAG(native_car_physics)) {
-    __imp__sub_820B7CF0(ctx, base);
-    return;
-  }
-  const uint32_t object = ctx.r3.u32;
-  uint32_t groups = 0, r3 = 0;
-  if (!CollisionObjectRemoveGroups(base, object, ctx.r4.u32, &groups, &r3)) {
-    // RemovePairsByGroups is the original's tail call (its frame here).
-    ctx.r3.u64 = object;
-    ctx.r4.u64 = groups;
-    __imp__sub_820B8AF8(ctx, base);
-    return;
-  }
-  ctx.r3.u64 = r3;
-}
 
 // --- The car data and the vehicle's constructor ---
 
@@ -387,6 +349,11 @@ extern "C" REX_FUNC(sub_820B42C8) {
 
 // --- The vehicle's physics objects (src/car_physics/vehicle_physics.cpp) ---
 
+// RigidBody::SetFloat48, CollisionWorld::AddObject (with
+// CollisionObject::Init) and Vehicle::ProbeGround (sub_8259D5A8,
+// sub_820B9570, sub_820B7A00, sub_820B4420) have no adapters: their callers
+// in play, the physics' set-up, reset, step and RefreshFromBody, are native.
+
 namespace {
 
 // The ones allocating or freeing guest memory: only while the game's heap
@@ -397,8 +364,6 @@ bool NativeLifetime() {
 
 }  // namespace
 
-// r3 = the body, r4 = the float (r3 left as it is).
-ITC_CAR_PHYSICS(8259D5A8, RigidBodySetFloat48(base, ctx.r3.u32, ctx.r4.u32))
 // CollisionWorld::Callback (sub_820B8798) has no adapter: its callers in
 // play, Vehicle::ProbeGround and Unflip, are native.
 // r3 = the collision object; r3 comes back as its shape record (+32).
@@ -416,25 +381,6 @@ extern "C" REX_FUNC(sub_820B7998) {
   }
   ctx.r3.u64 = object + 32;
 }
-// CollisionObject::Init (sub_820B7A00) has no adapter: its only caller,
-// CollisionWorld::AddObject, is native.
-// r3 = the body, r4 = the shape, r5 = the groups; r3 comes back as the
-// object.
-extern "C" REX_FUNC(sub_820B9570) {
-  REX_FUNC_PROLOGUE();
-  if (!NativeLifetime()) {
-    __imp__sub_820B9570(ctx, base);
-    return;
-  }
-  ctx.fpscr.disableFlushMode();
-  uint32_t object = 0;
-  if (!CollisionWorldAddObject(base, ctx.r3.u32, ctx.r4.u32, ctx.r5.u32, ctx.r1.u32 - 128,
-                               &object)) {
-    __imp__sub_820B9570(ctx, base);
-    return;
-  }
-  ctx.r3.u64 = object;
-}
 // r3 = the vehicle.
 extern "C" REX_FUNC(sub_820B0E70) {
   REX_FUNC_PROLOGUE();
@@ -449,19 +395,6 @@ extern "C" REX_FUNC(sub_820B0E70) {
     return;
   }
   ctx.r3.u64 = r3;
-}
-// r3 = the vehicle; f1 comes back as the last dot product (+88), r3 as
-// r1 - 304 + 160. A callback other than the ground's: the original.
-extern "C" REX_FUNC(sub_820B4420) {
-  REX_FUNC_PROLOGUE();
-  if (!ITC_FLAG(native_car_physics) || !CollisionWorldCallbackKnown(base)) {
-    __imp__sub_820B4420(ctx, base);
-    return;
-  }
-  ctx.fpscr.disableFlushMode();
-  double f1 = 0.0;
-  ctx.r3.u64 = VehicleProbeGround(base, ctx.r3.u32, ctx.r1.u32 - 304, &f1);
-  ctx.f1.f64 = f1;
 }
 // r3 = the vehicle; r3 comes back as UpdateWheelAxes'.
 extern "C" REX_FUNC(sub_820B62E8) {

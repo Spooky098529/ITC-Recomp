@@ -92,10 +92,11 @@ ITC_COLLISION(822BE2C8, ctx.r3.u64 = WordAt8(base, ctx.r3.u32))
 // --- The constructors and the placement ---
 
 // Shape::Shape, its copy, BoxShape's copy and SetCorners (sub_820BB020,
-// sub_820BAB48, sub_820BB688, sub_820B99D0) have no adapters: their callers
-// in play are native.
-// r4 = the min corner, r5 = the max corner; r3 comes back as the box.
-ITC_COLLISION(820BB188, BoxConstruct(base, ctx.r3.u32, ctx.r4.u32, ctx.r5.u32, ctx.r1.u32 - 112))
+// sub_820BAB48, sub_820BB688, sub_820B99D0) and BoxShape::BoxShape
+// (sub_820BB188) have no adapters: their callers in play are native
+// (BoxShape::BoxShape's: the vehicle's physics set-up and reset).
+// CollisionShape::SetUp (sub_820BB580) has none either: its caller in play,
+// CollisionObject::Init, is native.
 // Slot 9: r4 = the matrix, r5 = the template; r3 comes back as the box +
 // 96. A template that isn't a box: the original.
 extern "C" REX_FUNC(sub_820B9C40) {
@@ -258,18 +259,4 @@ extern "C" REX_FUNC(sub_820BB218) {
     return;
   }
   ctx.r3.u64 = copy;
-}
-// r4 = the template, r5 = the matrix, r6 = memory for the clones or 0; r3
-// comes back as the record.
-extern "C" REX_FUNC(sub_820BB580) {
-  REX_FUNC_PROLOGUE();
-  if (!NativeLifetime()) {
-    __imp__sub_820BB580(ctx, base);
-    return;
-  }
-  ctx.fpscr.disableFlushMode();
-  if (!CollisionShapeSetUp(base, ctx.r3.u32, ctx.r4.u32, ctx.r5.u32, ctx.r6.u32,
-                           ctx.r1.u32 - 128)) {
-    __imp__sub_820BB580(ctx, base);
-  }
 }
