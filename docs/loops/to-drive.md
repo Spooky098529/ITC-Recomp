@@ -18,6 +18,9 @@ here loses its heading.
 - The race's set-up's migration 1 (attract race `itc_1867`, replay
   `itc_1868`, ok): `sub_82101630`, `sub_82101700` Time::Pack
   (`race-setup.md`)
+- The race's set-up's migration 2 (attract race `itc_1890`, replay
+  `itc_1891`, ok): `sub_82101E90` Stages::SetRoute, `sub_82112DB0`
+  Race::SetUpRival (`race-setup.md`; `sub_82101630` again, above)
 
 ## Run 2026-10-25 16:38 (`b7-loop-25-10-26-3`)
 

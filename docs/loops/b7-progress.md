@@ -35,8 +35,10 @@ file's history. What's left to see in a drive, from every run:
   group, `Race::SetUp`'s traffic records' unwritten bytes; `itc_1889`:
   24 s, 0 errors, every other harness 0 differing). Left ready:
   `Vehicle::SetupFromCar` `sub_820C27E8` (`car-physics.md`, 4,148
-  lines, to split), blocking `Car::SetupVehicle`. Step: validation
-  agent 2 running.
+  lines, to split), blocking `Car::SetupVehicle`. Validated
+  (`itc_1890`: 24 of 24 harness lines, 17 ran in the attract race, 4 in
+  the replay `itc_1891`, ok; 2 more to `to-drive.md`). Step: migration
+  agent 3 running (`Vehicle::SetupFromCar`, `Car::SetupVehicle`).
 
 ## Done
 
@@ -68,6 +70,9 @@ This run's groups: `expected-differences.md` (the "23:42 run" lines).
   errors.
 - After the race's set-up's migration 2: ours 2204, work left 4247
   (wrapped 104, known 540, unknown 3603).
+- After the race's set-up's validation 2: race 24 s (`itc_1890`), 0
+  errors, every harness 0 differing but the expected group; replay
+  127 s (`itc_1891`), 0 errors.
 
 ## Stopped
 
