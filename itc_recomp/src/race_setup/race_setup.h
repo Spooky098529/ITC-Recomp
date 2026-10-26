@@ -176,4 +176,24 @@ uint32_t EventCurrent(uint8_t* base);
 // RaceEvent::Count (sub_821434F8): its halfword +20 (zero-extended).
 uint32_t EventCount(uint8_t* base);
 
+// --- The course routes (src/race_setup/course_routes.cpp) ---
+
+// CourseRoutes::Get (sub_820FFF50)'s frame: 4,480 bytes, the table of 23
+// kRouteBytes entries from +80, the out pointer's doubleword at +4312, the
+// index word at +4508 (in the caller's frame).
+constexpr uint32_t kRoutesFrameBytes = 4480;
+constexpr uint32_t kRouteBytes = 184;
+constexpr uint32_t kRoutesOutWord = 4312;
+constexpr uint32_t kRoutesIndexWord = 4508;
+// CourseRoutes::Get (sub_820FFF50): the original's table of 23 routes written
+// into its stack frame `frame` (the caller's r1 - 4480) store by store, the
+// index and `out` (r3, all 64 bits) stored in it, then entry `index` (not
+// checked) copied to `out` by memcpy's native copy (native::Buffers_Memcpy).
+// `source` gets the entry's address, `result` the original's r3 (out, loaded
+// back from the frame). False, with the table written but nothing copied,
+// where memcpy's override would run the original: the adapter makes the copy
+// through memcpy.
+bool CourseRoutesGet(uint8_t* base, uint64_t out, uint32_t index, uint32_t frame,
+                     uint32_t* source, uint64_t* result);
+
 }  // namespace race_setup

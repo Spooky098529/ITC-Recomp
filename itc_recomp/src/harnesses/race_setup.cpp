@@ -655,6 +655,65 @@ void RaceDataConstructs(Context& h) {
 
 }  // namespace
 
+// CourseRoutes::Get: out at a random place in the block (r3's high word
+// random in some cases), every index 0 to 22 and three below 0 whose entry
+// lies below the frame (filled the same on both sides; -1 would read the
+// back chain, 23 and above the register saves, which the native side doesn't
+// write). The frame (the call's r1 - 4480) up to the scratch area filled
+// with random words; compared: the block, the frame from +4 to the register
+// saves (+4328: r14 to r31 and lr at r1 - 152 to r1 - 4), the caller's frame
+// from r1 (the index word at r1 + 28) to the scratch area, the scratch area,
+// and r3.
+void CourseRoutes(Context& h, const Block& block) {
+  Results results("CourseRoutes::Get (sub_820FFF50)");
+  const uint32_t r1 = CallContext(h).r1.u32;
+  const uint32_t frame = r1 - race_setup::kRoutesFrameBytes;
+  constexpr uint32_t kBelow = 1024;  // filled below the frame
+  constexpr uint32_t kSaves = race_setup::kRoutesFrameBytes - 152;
+  std::vector<uint32_t> indexes;
+  for (uint32_t i = 0; i < 23; i++) {
+    indexes.push_back(i);
+    indexes.push_back(i);
+  }
+  for (uint32_t i : {0xFFFFFFFEu, 0xFFFFFFFDu, 0xFFFFFFFBu}) {
+    indexes.push_back(i);
+  }
+  int c = 0;
+  for (uint32_t index : indexes) {
+    const uint32_t at =
+        block.address + 4 * h.random.Below((block.bytes - race_setup::kRouteBytes) / 4);
+    const uint64_t high = c % 3 == 2 ? (h.random.Next() << 32) : 0;
+    const uint64_t index_high = h.random.Next() << 32;
+    Outputs out[2];
+    const Random start = h.random;
+    Random after;
+    for (int v = 0; v < 2; v++) {
+      Random random = start;
+      WriteRandom(h.base, frame - kBelow, (h.data + kScratchBytes - (frame - kBelow)) / 4, random);
+      WriteRandom(h.base, block.address, block.bytes / 4, random);
+      after = random;
+      PPCContext t = CallContext(h);
+      t.r3.u64 = high | at;
+      t.r4.u64 = index_high | index;
+      ITC_FLAG(native_race_setup) = v == 1;
+      (v == 0 ? GuestFunction(__imp__sub_820FFF50) : hooks::RaceSetupCourseRoutesGet)(t, h.base);
+      ITC_FLAG(native_race_setup) = true;
+      out[v].Bytes(Read(h.base, block.address, block.bytes));
+      out[v].Bytes(Read(h.base, frame + 4, kSaves - 4));
+      out[v].Bytes(Read(h.base, r1, h.data - r1));
+      out[v].Bytes(Read(h.base, h.data, kScratchBytes));
+      out[v].Word(t.r3.u32);
+      out[v].Word(uint32_t(t.r3.u64 >> 32));
+      out[v].Word(t.r1.u32);
+    }
+    h.random = after;
+    results.Check(out[0], out[1], fmt::format("case {}: index {}, out +{:X}", c, int32_t(index),
+                                              at - block.address));
+    c++;
+  }
+  results.Report();
+}
+
 void RaceSetup(Context& h) {
   const Block block(0x1000);
   if (!block.address) {
@@ -676,6 +735,7 @@ void RaceSetup(Context& h) {
     return;
   }
   Leaves(h, leaves);
+  CourseRoutes(h, block);
   RaceDataConstructs(h);
 }
 

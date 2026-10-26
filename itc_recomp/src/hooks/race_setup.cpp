@@ -21,7 +21,8 @@ ITC_FLAG_BOOL(native_race_setup, true, "ITC",
               "RunningMean::Add sub_82101698, Time::Pack sub_82101700, "
               "sub_82110AC0; RaceEvent::FirstOwned sub_821430A0, RaceEvent::Current "
               "sub_821434E8, RaceEvent::Count sub_821434F8, RaceEvent::CurrentFirstOwned "
-              "sub_821434C8; sub_82101EB0 and CourseRecord::Reset sub_82105C90) natively instead of "
+              "sub_821434C8; sub_82101EB0 and CourseRecord::Reset sub_82105C90; CourseRoutes::Get sub_820FFF50, "
+              "its table written into its stack frame) natively instead of "
               "through the translated code (the same writes; checked by "
               "--run_harnesses=race_setup)");
 
@@ -137,6 +138,26 @@ void RaceSetupEventCount(PPCContext& ctx, uint8_t* base) {
   ctx.r3.u64 = rs::EventCount(base);
 }
 
+void RaceSetupCourseRoutesGet(PPCContext& ctx, uint8_t* base) {
+  ctx.fpscr.disableFlushMode();
+  uint32_t source = 0;
+  uint64_t result = 0;
+  if (!rs::CourseRoutesGet(base, ctx.r3.u64, ctx.r4.u32, ctx.r1.u32 - rs::kRoutesFrameBytes,
+                           &source, &result)) {
+    // memcpy's override (its original copy, or its records) from the
+    // original's frame.
+    const uint32_t r1 = ctx.r1.u32;
+    ctx.r1.u64 = r1 - rs::kRoutesFrameBytes;
+    ctx.r3.u64 = result;
+    ctx.r4.u64 = source;
+    ctx.r5.u64 = rs::kRouteBytes;
+    ctx.lr = 0x82101624;
+    sub_825A7410(ctx, base);
+    ctx.r1.u64 = r1;
+  }
+  ctx.r3.u64 = result;
+}
+
 void RaceSetupRaceDataEntryConstruct(PPCContext& ctx, uint8_t* base) {
   ctx.fpscr.disableFlushMode();
   rs::RaceDataEntryConstruct(base, ctx.r3.u32);
@@ -178,6 +199,7 @@ ITC_RACE_SETUP(821434F8, RaceSetupEventCount)
 ITC_RACE_SETUP(821434C8, RaceSetupEventCurrentFirstOwned)
 ITC_RACE_SETUP(82101EB0, RaceSetupEntryReset)
 ITC_RACE_SETUP(82105C90, RaceSetupCourseRecordReset)
+ITC_RACE_SETUP(820FFF50, RaceSetupCourseRoutesGet)
 // sub_82101D20 has no adapter: the array helper's plain C++
 // (c_runtime::VectorConstruct, --native_c_runtime) calls its plain C++ when
 // handed its address, as RaceData::RaceData's does.

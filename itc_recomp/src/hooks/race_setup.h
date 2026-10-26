@@ -64,6 +64,9 @@ void RaceSetupCourseRecordReset(PPCContext& ctx, uint8_t* base);
 // RaceEvent::Current sub_821434E8, RaceEvent::Count sub_821434F8.
 void RaceSetupEventCurrent(PPCContext& ctx, uint8_t* base);
 void RaceSetupEventCount(PPCContext& ctx, uint8_t* base);
+// CourseRoutes::Get sub_820FFF50: r3 = out, r4 = the index; r3 = out (in the
+// original's stack frame, the caller's r1 - 4480).
+void RaceSetupCourseRoutesGet(PPCContext& ctx, uint8_t* base);
 // sub_82101D20 (no adapter: the array helper's plain C++ calls it): r3 =
 // the entry; r3 left.
 void RaceSetupRaceDataEntryConstruct(PPCContext& ctx, uint8_t* base);
