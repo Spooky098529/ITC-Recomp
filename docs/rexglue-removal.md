@@ -52,7 +52,7 @@ goes in `src/` as overrides), American English.
   the leftovers above (the movie player, Voice::Init skipped as high as
   is safe), or the main thread's performance leads
   (`sub_821298C0`, `sub_8209C6E0`, in `docs/native-renderer.md`).
-- **B7 in progress (2026-10-25):** its measure is `b7_status.py`
+- **B7 in progress (2026-10-27):** its measure is `b7_status.py`
   (`docs/coverage.md`), and the B7 loop (`docs/loops/b7-loop.md`, a
   `/loop` session handing each subsystem to a mapping agent, then
   migration agents) did its first run on the branch `b7-loop-test` (merged 2026-10-22): five
@@ -118,7 +118,10 @@ goes in `src/` as overrides), American English.
   race HUD's movie picker (two leads without mapping), the scenery
   lists and the model draws, and the shader objects up to `Model::Load`
   with the course set and string table it unblocked native as far as
-  they were ready (ours 2,152). The
+  they were ready (ours 2,152); its seventeenth run (branch
+  `b7-loop-25-10-26-4`, 2 subsystems by the user's call) made the
+  race's set-up, the rest of the car physics (a lead without mapping)
+  and the vehicle code above it native in full (ours 2,255). The
   runs' rows wait for the user's review (`docs/loops/review.md`). See
   "B7's loop runs" under B7, and `docs/loops/b7-progress.md`. Guest
   allocation is no longer a block (`docs/native-memory.md`); what the
@@ -2591,6 +2594,9 @@ B7. **The game logic inside**: everything else, subsystem by subsystem,
 | 2026-10-25 | The UI movies' ready groups (no mapping, not counted: the movie's vectors, `UiMovie::UiMovie` and `~UiMovie`, the texts freed, `GetText` and the six text setters over it, the named animations' set-up, the HUD's mirror effect `sub_8211BEE8`) | `ui-movies-game.md` | 26 rows (19 with plain C++, 7 Merged; no adapter removable yet) | `--native_ui_movies_game` |
 | 2026-10-25 | The scenery lists (the course set's six model lists: release, the draw picks by race data, course layout and mode, `PointList::Draw`; the scenery model's and the shared model draws: `IsShapeVisible`, `RecordObject` inside its interpolation wrapper, `RecordSceneLights`, the depth draws, `Model::DrawShape` and `RecordShape`; the texture provider's slots 2 and 4; `models.md`'s accessors) | `scenery-lists.md` | 25 of 27, and 6 in `models.md` (two migrations; 1 adapter removed, 2 Native with none, 3 Merged) | `--native_scenery_lists`, `--native_models` |
 | 2026-10-25 | The shader objects and what they unblocked (the shader creates and inits, the memory blocks' makers and put-off frees under the host lock, `XMemCpy`, the relocations, `XPR::Create`, `Mesh::LoadShaders`, `Mesh::Parse`, `Model::Load`; then `DataFile::GetEntry`, the scenery lists' loads, the course set's parsers, pool objects, collect and draw, `Strings::Get`, `FormatV` and `Format`) | `shader-objects.md`, with `models.md`, `c-runtime.md`, `files-and-saves.md`, `scenery-lists.md`, `course-scenery.md`, `strings-and-font.md` | 7 of 7, and 38 in the other files (three migrations; 15 adapters removed) | `--native_shader_objects`, `--native_data_files` and the files' flags |
+| 2026-10-26 | The race's set-up (`Race::SetUp`, `SetUpRival`, the race data's reset and constructor, the course route table `CourseRoutes::Get`, the racers' adds and start positions, the stage list and routes, the car object's set-up `Car::Init`, `Clear`, `SetModel`, `FromBuild` and its parts' resets, `RacerRecord::Init`; then `Vehicle::SetupFromCar` with `CarData::Derive`, `ApplySettings` and `Vehicle::ApplyTuning`) | `race-setup.md`, with `vehicle-accessors.md`, `car-physics.md` | 52 of 52, and 1 in `vehicle-accessors.md` and 4 in `car-physics.md` (three migrations; 27 adapters removed) | `--native_race_setup`, `--native_car_physics` |
+| 2026-10-26 | The car physics' ready groups (no mapping, not counted: `Vehicle::PhysicsStep`, `SetUpPhysics`, `ResetPhysics`, `DestroyPhysics`, `ProbeGround`, `Unflip`, `RefreshFromBody`, the collision objects' init and add, `CollisionWorld::Setup`, `Create`, `SetQueryCapacity` and `Update` with its pairs, collide and respond) | `car-physics.md`, with `vehicle-accessors.md`, `matrix-math.md`, `collision.md` | 134 of 134 (two migrations; 84 adapters removed, 7 Native with none) | `--native_car_physics` |
+| 2026-10-27 | The vehicle code above the physics (the seven vehicles' create, constructor and destroy, `Vehicle::SetUp` and `ResetForCar`, the surface grip, `Vehicle::Tick` and `ApplyInput`, the track positions, the status record, `PlaceOnRoute`, `Racers::NearestHumanVehicle`; the engine's power curve and `RoutePosition::Step`) | `vehicle.md` | 25 of 25 (two migrations; 5 adapters removed, 1 Native with none, 1 Merged) | `--native_vehicle` |
 
     The first run (2026-10-22, branch `b7-loop-test`): every harness at 0 differing, attract races at 20-21 s with no errors,
     and a race the user drove looked right. Ours went from 162 to 335 (work
@@ -3555,3 +3561,50 @@ live caller. B7 (`b7_status.py`): 6,451 in play, ours 2,152, work left
 4,438 at the run's start). What's left in these files waits on the
 generic critical section wrappers, the video output's events and
 semaphores, `Archive::Load` and the asset's size.
+
+**2026-10-26, the race's set-up (branch `b7-loop-25-10-26-4`):** the
+seventeenth run's first subsystem mapped the race's set-up
+(`race-setup.md`, 52 rows) and made all of it native in three
+migrations (`--native_race_setup`): the car object's set-up and parts,
+the race data, the course route table (its 1,175 constant stores
+replayed into the original's frame), the racers and stages, up to
+`Race::SetUp` and `Race::SetUpRival`; then `RacerRecord::Init`
+(`vehicle-accessors.md`) and `Vehicle::SetupFromCar` with its car data
+derivation (`car-physics.md`, under `--native_car_physics`). Native
+callees run in the frame the original's call gives them, frame
+leftovers written as the original leaves them; register saves aren't,
+so `Race::SetUp`'s traffic records carry 42 bytes a record the
+original fills from them (an expected harness group, for review). The
+boundary unchanged: 449 functions (916 pairs): overridden 69, Native 5,
+Dropped 23, never called 70, live 282. Imports: 186 called, 62 with a
+live caller. B7 (`b7_status.py`): ours 2,209, work left 4,242 (Wrapped
+104, with a row 535, no row yet 3,603), from 4,299.
+
+**2026-10-26, the car physics' ready groups (branch
+`b7-loop-25-10-26-4`):** a lead without mapping, after the race's
+set-up: the rest of `car-physics.md` made native in two migrations,
+the vehicle's physics step, set-up, reset and destroy, the ground
+probe, and the collision world's set-up and update (134 of 134 ours;
+84 adapters removed). The translated `ble` is "not greater", so a NaN
+keeps the value so far (`car-physics.md`'s intro); callees refusing on
+paths never seen run their original in the caller's frame; the
+allocating ones run natively only under `--native_heap`. The boundary
+unchanged: 449 functions (916 pairs): overridden 69, Native 5, Dropped
+23, never called 70, live 282. Imports: 186 called, 62 with a live
+caller. B7 (`b7_status.py`): ours 2,230, work left 4,222 (Wrapped 104,
+with a row 516, no row yet 3,602), from 4,242.
+
+**2026-10-27, the vehicle code above the physics (branch
+`b7-loop-25-10-26-4`):** the seventeenth run's second and last
+subsystem (the user's limit for it) mapped the vehicle code
+(`vehicle.md`, 25 rows) and made all of it native in two migrations
+(`--native_vehicle`): the seven vehicles' lifetime, the set-ups from a
+car object, the tick (two physics steps of 1/60 a tick, the step read
+from guest memory), the input, the track positions and status, the
+engine's power curve and `PlaceOnRoute`. Never-seen callees (six under
+`ApplyInput`, `sub_820FA8F8` under `PlaceOnRoute`) run the whole
+original, decided before anything is written. The boundary unchanged:
+449 functions (916 pairs): overridden 69, Native 5, Dropped 23, never
+called 70, live 282. Imports: 186 called, 62 with a live caller. B7
+(`b7_status.py`): ours 2,255, work left 4,197 (Wrapped 104, with a row
+516, no row yet 3,577), from 4,222 (from 4,299 at the run's start).

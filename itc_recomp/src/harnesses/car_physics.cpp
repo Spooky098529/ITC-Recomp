@@ -17,6 +17,7 @@
 #include "harness.h"
 
 #include "base/flags.h"
+#include "base/log.h"
 #include "car_physics/car_physics.h"
 
 #include <fmt/format.h>
@@ -423,6 +424,24 @@ enum Shape {
 void CarPhysicsVehicle(Context& h);
 void CarPhysicsCollision(Context& h);
 void CarPhysicsPairs(Context& h);
+void CarPhysicsCarDataDerive(Context& h);
+void CarPhysicsCarDataApplySettings(Context& h);
+void CarPhysicsVehicleApplyTuning(Context& h);
+void CarPhysicsVehicleSetupFromCar(Context& h);
+// The vehicle's physics objects (src/harnesses/car_physics_objects.cpp).
+void CarPhysicsObjects(Context& h);
+// Vehicle::SetupFromCar's cases, shared with race_setup's Car::SetupVehicle
+// cases (src/harnesses/race_setup.cpp): whether they fit (its memcpy native
+// and the table read), one case's inputs (the car data at `data`, 1,856
+// bytes, the car object at `car`, 4,096 bytes; the stack from below the
+// callees' frames under r1 to `stack_end` filled), what's compared, and
+// the original run with the native flags of its callees off.
+bool SetupFromCarFits(uint8_t* base, uint32_t car, uint32_t r1);
+void WriteSetupFromCarCase(uint8_t* base, uint32_t data, uint32_t car, uint32_t r1,
+                           uint32_t stack_end, uint64_t seed, int group);
+void RecordSetupFromCar(Outputs& out, uint8_t* base, uint32_t data, uint32_t car, uint32_t r1,
+                        uint32_t stack_end, const PPCContext& t);
+void RunSetupFromCarOriginal(GuestFunction recompiled, PPCContext& ctx, uint8_t* base);
 
 void CarPhysics(Context& h) {
   // The block 16-byte aligned, as the game's bodies are.
@@ -604,6 +623,11 @@ void CarPhysics(Context& h) {
   CarPhysicsVehicle(h);
   CarPhysicsCollision(h);
   CarPhysicsPairs(h);
+  CarPhysicsCarDataDerive(h);
+  CarPhysicsCarDataApplySettings(h);
+  CarPhysicsVehicleApplyTuning(h);
+  CarPhysicsVehicleSetupFromCar(h);
+  CarPhysicsObjects(h);
 }
 
 namespace {
@@ -1374,6 +1398,681 @@ void CarPhysicsPairs(Context& h) {
   }
   std::memcpy(h.base + kSurfaceGlobals, saved_surfaces, kSurfaceBytes);
   guest::StoreU32(h.base, kWorldPointer, saved_world);
+}
+
+
+namespace {
+
+// CarData::Derive's cases: a car data record (1,820 bytes) further down
+// (below the pairs' region) filled with float words, the call's frame (the
+// original's 1008 bytes, with its callees' below it) filled with random
+// words. Three groups, as the others here: numbers only, one NaN word in
+// the car data, and anything anywhere (NaNs and infinities too). Shapes the
+// branches take, some of the time: an axle's radius (+388, +660) 0.0, the
+// aero factors (+1800, +1804) 0.0, the cambers (+540, +812) 0.0, and the
+// axles' x equal with no offset (+80's x 0.0), so the distances from the
+// center and the wheelbase are 0.0. Compared (harness::Outputs): the car
+// data as floats (it only writes floats with stfs, and the quaternions'
+// bits; what it doesn't write is the same on both sides), the frame from
+// +4 to the register saves (+888) as floats except the temporary body's
+// integer words (+352: +0, +12, +516, exact), the caller's frame from r1
+// to the scratch area, r3, r1 and f1.
+constexpr uint32_t kDeriveArea = 0x1C000;
+constexpr uint32_t kDeriveBytes = 0x720;
+constexpr uint32_t kDeriveFrame = 1008, kDeriveSaves = 888;
+
+ITC_NATIVE_STEP(NativeCarDataDerive,
+                ctx.f1.f64 = cp::CarDataDerive(base, ctx.r3.u32, ctx.r1.u32 - 1008);
+                ctx.r3.u64 = ctx.r1.u32 - 1008 + 352)
+
+uint32_t SmallWord(Random& r) {
+  return std::bit_cast<uint32_t>(float(int32_t(r.Below(1 << 12)) - (1 << 11)) / 64.0f);
+}
+
+}  // namespace
+
+void CarPhysicsCarDataDerive(Context& h) {
+  const uint32_t data = (h.data - kDeriveArea) & ~0xFu;
+  const uint32_t r1 = CallContext(h).r1.u32;
+  const uint32_t frame = r1 - kDeriveFrame;
+  constexpr uint32_t kBelow = 1024;  // the callees' frames
+  enum Group { kNumbers, kOneNaN, kNaNs };
+  const char* const kGroupNames[] = {"", ", one NaN", ", NaNs and infinities anywhere"};
+  constexpr uint32_t kNaNWords[] = {0x7FC00000, 0x7F800001, 0xFFC00001, 0xFF800001};
+  for (Group group : {kNumbers, kOneNaN, kNaNs}) {
+    Results results(std::string("CarData::Derive (sub_820AF1C0)") + kGroupNames[group]);
+    for (uint64_t seed = 0; seed < 200; seed++) {
+      Random pick = Seeded(seed * 29 + 13 * uint64_t(group) + 9);
+      auto word = [group](Random& r) { return group == kNaNs ? FloatWord(r) : NumberWord(r); };
+      const bool zero_front_radius = pick.Below(4) == 0;
+      const bool zero_rear_radius = pick.Below(4) == 0;
+      const bool zero_aero = pick.Below(3) == 0;
+      const bool zero_length = pick.Below(3) == 0;
+      const bool zero_cambers = pick.Below(3) == 0;
+      const bool same_x = pick.Below(4) == 0;
+      const uint32_t x = SmallWord(pick);
+      const uint32_t nan_word = kNaNWords[pick.Below(std::size(kNaNWords))];
+      const uint32_t nan_at = pick.Below(kDeriveBytes / 4);
+      Outputs out[2];
+      for (int v = 0; v < 2; v++) {
+        Random fill = Seeded(seed * 31 + 17 * uint64_t(group) + 11);
+        for (uint32_t i = 0; i < kDeriveBytes; i += 4) {
+          guest::StoreU32(h.base, data + i, word(fill));
+        }
+        for (uint32_t at = frame - kBelow; at < h.data + kScratchBytes; at += 4) {
+          guest::StoreU32(h.base, at, uint32_t(fill.Next()));
+        }
+        if (zero_front_radius) {
+          guest::StoreU32(h.base, data + 388, 0);
+        }
+        if (zero_rear_radius) {
+          guest::StoreU32(h.base, data + 660, 0);
+        }
+        if (zero_aero) {
+          guest::StoreU32(h.base, data + 1800, 0);
+        }
+        if (zero_length) {
+          guest::StoreU32(h.base, data + 1804, 0);
+        }
+        if (zero_cambers) {
+          guest::StoreU32(h.base, data + 540, 0);
+          guest::StoreU32(h.base, data + 812, 0);
+        }
+        if (same_x) {
+          guest::StoreU32(h.base, data + 336, x);
+          guest::StoreU32(h.base, data + 608, x);
+          guest::StoreU32(h.base, data + 80, 0);
+        }
+        if (group == kOneNaN) {
+          guest::StoreU32(h.base, data + 4 * nan_at, nan_word);
+        }
+        PPCContext t = CallContext(h);
+        t.fpscr.disableFlushModeUnconditional();
+        t.r3.u64 = data;
+        (v == 0 ? GuestFunction(Original<__imp__sub_820AF1C0>) : NativeCarDataDerive)(t, h.base);
+        out[v].Floats(h.base, data, kDeriveBytes / 4);
+        out[v].Bytes(Read(h.base, frame + 4, 76));
+        out[v].Floats(h.base, frame + 80, (352 - 80) / 4);
+        const uint32_t body = frame + 352;
+        out[v].Word(guest::LoadU32(h.base, body + 0));
+        out[v].Floats(h.base, body + 4, 2);
+        out[v].Word(guest::LoadU32(h.base, body + 12));
+        out[v].Floats(h.base, body + 16, (516 - 16) / 4);
+        out[v].Word(guest::LoadU32(h.base, body + 516));
+        out[v].Floats(h.base, body + 520, 2);
+        out[v].Bytes(Read(h.base, frame + 880, kDeriveSaves - 880));
+        out[v].Bytes(Read(h.base, r1, h.data - r1));
+        out[v].Word(t.r3.u32);
+        out[v].Word(t.r1.u32);
+        out[v].Double(t.f1.u64);
+      }
+      results.Check(out[0], out[1], fmt::format("seed {}", seed));
+    }
+    results.Report();
+  }
+}
+
+namespace {
+
+// sub_820C05C8's (CarData::ApplySettings, the name ours) cases: a car data
+// record (1,820 bytes) where Derive's goes, a car object (1,792 bytes) and
+// its spec's block 2 (320 bytes) above it, filled with float words; the
+// call's frame (the original's 192 bytes, its callees' below it) filled with
+// random words. Three groups, as Derive's: numbers only, one NaN word in the
+// car data, and anything anywhere (NaNs and infinities too). The car's
+// setting bytes (+72 to +94) random signed bytes, each at an extreme (-128,
+// -1, 0, 1, 127) some of the time; the tuning +1756 above 0 or not, +1700
+// 0, 1 or another, +1704 0, negative, or 1 to 5 (the table's index: 4 and 5
+// read the frame's leftovers at +96 and +100, the same on both sides; past
+// them the original's register saves); the car data's +172 0, 1 or another,
+// +176 1 or not, setting byte 76 0 or not; a radius (+388, +660) 0.0 some of
+// the time (asin of an infinity). Compared (harness::Outputs): the car data
+// as floats (it only writes floats with stfs), the car object and the spec
+// exactly (not written), the frame from +4 to the register saves (+104)
+// exactly (pow's stfd of x and y at +16 and +24, the setting bytes' std and
+// the table at +80), the caller's frame from r1 to the scratch area, r1 and
+// f1. Not r3: the original leaves pow's there, which its only caller
+// doesn't read, and the adapter leaves r3 as it was.
+constexpr uint32_t kSettingsFrame = 192, kSettingsSaves = 104;
+constexpr uint32_t kSettingsCar = 0x800, kSettingsCarBytes = 0x700;
+constexpr uint32_t kSettingsSpec = 0x1000, kSettingsSpecBytes = 0x140;
+
+ITC_NATIVE_STEP(NativeCarDataApplySettings,
+                ctx.f1.f64 = cp::CarDataApplySettings(base, ctx.r3.u32, ctx.r4.u32, ctx.r5.u32,
+                                                      ctx.r1.u32 - 192))
+
+}  // namespace
+
+void CarPhysicsCarDataApplySettings(Context& h) {
+  const uint32_t data = (h.data - kDeriveArea) & ~0xFu;
+  const uint32_t car = data + kSettingsCar, spec = data + kSettingsSpec;
+  const uint32_t r1 = CallContext(h).r1.u32;
+  const uint32_t frame = r1 - kSettingsFrame;
+  constexpr uint32_t kBelow = 1024;  // the callees' frames
+  enum Group { kNumbers, kOneNaN, kNaNs };
+  const char* const kGroupNames[] = {"", ", one NaN", ", NaNs and infinities anywhere"};
+  constexpr uint32_t kNaNWords[] = {0x7FC00000, 0x7F800001, 0xFFC00001, 0xFF800001};
+  constexpr int8_t kExtremes[] = {-128, -1, 0, 1, 127};
+  for (Group group : {kNumbers, kOneNaN, kNaNs}) {
+    Results results(std::string("CarData::ApplySettings (sub_820C05C8)") + kGroupNames[group]);
+    for (uint64_t seed = 0; seed < 300; seed++) {
+      Random pick = Seeded(seed * 37 + 19 * uint64_t(group) + 5);
+      auto word = [group](Random& r) { return group == kNaNs ? FloatWord(r) : NumberWord(r); };
+      uint8_t settings[23];
+      for (uint8_t& b : settings) {
+        b = pick.Below(3) == 0 ? uint8_t(kExtremes[pick.Below(std::size(kExtremes))])
+                               : uint8_t(pick.Next());
+      }
+      const uint32_t all_at = pick.Below(4);  // 1: every byte -128, 2: every byte 127
+      const uint32_t tuning_1756 = pick.Below(2) ? 1 + pick.Below(4) : -pick.Below(3);
+      const uint32_t picks[] = {0, 1, 2, uint32_t(pick.Next())};
+      const uint32_t tuning_1700 = picks[pick.Below(4)];
+      const uint32_t indices[] = {0, uint32_t(-1 - int32_t(pick.Below(4))), 1, 2, 3, 4, 5};
+      const uint32_t tuning_1704 = indices[pick.Below(std::size(indices))];
+      const uint32_t kinds[] = {0, 1, 2, uint32_t(pick.Next())};
+      const uint32_t kind = kinds[pick.Below(4)];
+      const uint32_t v176 = pick.Below(2) ? 1 : uint32_t(pick.Next());
+      const bool byte76_zero = pick.Below(4) == 0;
+      const bool zero_front_radius = pick.Below(6) == 0;
+      const bool zero_rear_radius = pick.Below(6) == 0;
+      const uint32_t nan_word = kNaNWords[pick.Below(std::size(kNaNWords))];
+      const uint32_t nan_at = pick.Below(kDeriveBytes / 4);
+      Outputs out[2];
+      for (int v = 0; v < 2; v++) {
+        Random fill = Seeded(seed * 41 + 23 * uint64_t(group) + 7);
+        for (uint32_t i = 0; i < kDeriveBytes; i += 4) {
+          guest::StoreU32(h.base, data + i, word(fill));
+        }
+        for (uint32_t i = 0; i < kSettingsCarBytes; i += 4) {
+          guest::StoreU32(h.base, car + i, word(fill));
+        }
+        for (uint32_t i = 0; i < kSettingsSpecBytes; i += 4) {
+          guest::StoreU32(h.base, spec + i, word(fill));
+        }
+        for (uint32_t at = frame - kBelow; at < h.data + kScratchBytes; at += 4) {
+          guest::StoreU32(h.base, at, uint32_t(fill.Next()));
+        }
+        for (uint32_t i = 0; i < std::size(settings); i++) {
+          const uint8_t b = all_at == 1 ? 0x80 : all_at == 2 ? 0x7F : settings[i];
+          guest::StoreU8(h.base, car + 72 + i, b);
+        }
+        if (byte76_zero) {
+          guest::StoreU8(h.base, car + 92, 0);
+        }
+        guest::StoreU32(h.base, car + 1756, tuning_1756);
+        guest::StoreU32(h.base, car + 1700, tuning_1700);
+        guest::StoreU32(h.base, car + 1704, tuning_1704);
+        guest::StoreU32(h.base, data + 172, kind);
+        guest::StoreU32(h.base, data + 176, v176);
+        if (zero_front_radius) {
+          guest::StoreU32(h.base, data + 388, 0);
+        }
+        if (zero_rear_radius) {
+          guest::StoreU32(h.base, data + 660, 0);
+        }
+        if (group == kOneNaN) {
+          guest::StoreU32(h.base, data + 4 * nan_at, nan_word);
+        }
+        PPCContext t = CallContext(h);
+        t.fpscr.disableFlushModeUnconditional();
+        t.r3.u64 = data;
+        t.r4.u64 = car;
+        t.r5.u64 = spec;
+        (v == 0 ? GuestFunction(Original<__imp__sub_820C05C8>) : NativeCarDataApplySettings)(
+            t, h.base);
+        out[v].Floats(h.base, data, kDeriveBytes / 4);
+        out[v].Bytes(Read(h.base, car, kSettingsCarBytes));
+        out[v].Bytes(Read(h.base, spec, kSettingsSpecBytes));
+        out[v].Bytes(Read(h.base, frame + 4, kSettingsSaves - 4));
+        out[v].Bytes(Read(h.base, r1, h.data - r1));
+        out[v].Word(t.r1.u32);
+        out[v].Double(t.f1.u64);
+      }
+      results.Check(out[0], out[1], fmt::format("seed {}", seed));
+    }
+    results.Report();
+  }
+}
+
+namespace {
+
+// sub_820C0D28's (Vehicle::ApplyTuning) cases: a car data record (1,856
+// bytes compared, to +1832's word) where Derive's goes and a car object
+// (4,096 bytes) above it, filled with float words; the call's frame (the
+// original's 480 bytes, its callees' below it) filled with random words.
+// Three groups, as Derive's: numbers only, one NaN word in the car data, and
+// anything anywhere. The tuning levels (car +1648 on) 0, negative or
+// positive, each up to the largest level whose table read stays below the
+// original's register saves (frame +256: the levels reading the table at
+// +208 up to 11, +1672 (its largest table +160) up to 23, +1676 (read
+// unchecked at +96) from -23 to 39; past them the reads land on the saves,
+// which the native version doesn't make), so out-of-range levels read the
+// frame's leftovers as the original does; block 2's +68 (the cylinder
+// code) 0 to 9, +69 (turbo) 0 or not, +131 (not a road car) 0 or not; the
+// wheel numbers +1728, +1736 0, negative or positive, the inch-ups +1732,
+// +1740 small; +1756 -1 some of the time, +1784 and +1800 0 or not; the
+// copied aero record's flags (car +3864) every pair of bits; the torque
+// curve (+1292) with a 1.0 and falling points some of the time. Compared
+// (harness::Outputs): the car data as floats (it only writes floats with
+// stfs), the car exactly (not written), the frame from +4 to the register
+// saves (+256) exactly (the tables are the game's constants, the levels'
+// std at +80, the words at +96 to +112, the copied record), the caller's
+// frame from r1 to the scratch area, r1, r3 and f1.
+constexpr uint32_t kTuningFrame = 480, kTuningSaves = 256;
+constexpr uint32_t kTuningCar = 0x800, kTuningCarBytes = 0x1000;
+constexpr uint32_t kTuningDataBytes = 0x740;
+
+void NativeVehicleApplyTuning(PPCContext& ctx, uint8_t* base) {
+  ctx.fpscr.disableFlushMode();
+  double f1 = 0.0;
+  ctx.r3.u64 = cp::VehicleApplyTuning(base, ctx.r3.u32, ctx.r4.u32, ctx.r1.u32 - 480, &f1);
+  ctx.f1.f64 = f1;
+}
+
+}  // namespace
+
+void CarPhysicsVehicleApplyTuning(Context& h) {
+  const uint32_t data = (h.data - kDeriveArea) & ~0xFu;
+  const uint32_t car = data + kTuningCar;
+  const uint32_t r1 = CallContext(h).r1.u32;
+  const uint32_t frame = r1 - kTuningFrame;
+  constexpr uint32_t kBelow = 1024;  // the callees' frames
+  if (!cp::VehicleApplyTuningCopyFits(car, frame)) {
+    Results skipped("Vehicle::ApplyTuning (sub_820C0D28): the copy doesn't fit");
+    skipped.Check(std::vector<uint8_t>{0}, std::vector<uint8_t>{1}, "copy");
+    skipped.Report();
+    return;
+  }
+  enum Group { kNumbers, kOneNaN, kNaNs };
+  const char* const kGroupNames[] = {"", ", one NaN", ", NaNs and infinities anywhere"};
+  constexpr uint32_t kNaNWords[] = {0x7FC00000, 0x7F800001, 0xFFC00001, 0xFF800001};
+  // The levels read as table indices (their offsets from car + 1648) and
+  // the largest each may be.
+  struct Level {
+    uint32_t offset;
+    int32_t lowest, highest;
+  };
+  constexpr Level kLevels[] = {{8, -3, 11},  {16, -3, 11}, {24, -3, 23}, {28, -23, 39},
+                               {32, -3, 11}, {36, -3, 11}, {40, -3, 11}, {48, -3, 11},
+                               {60, -3, 11}};
+  for (Group group : {kNumbers, kOneNaN, kNaNs}) {
+    Results results(std::string("Vehicle::ApplyTuning (sub_820C0D28)") + kGroupNames[group]);
+    for (uint64_t seed = 0; seed < 400; seed++) {
+      Random pick = Seeded(seed * 43 + 29 * uint64_t(group) + 3);
+      auto word = [group](Random& r) { return group == kNaNs ? FloatWord(r) : NumberWord(r); };
+      int32_t levels[std::size(kLevels)];
+      for (size_t i = 0; i < std::size(kLevels); i++) {
+        const Level& l = kLevels[i];
+        switch (pick.Below(4)) {
+          case 0: levels[i] = 0; break;
+          case 1: levels[i] = l.lowest + int32_t(pick.Below(uint32_t(-l.lowest))); break;
+          case 2: levels[i] = 1 + int32_t(pick.Below(6)); break;  // in range
+          default: levels[i] = 1 + int32_t(pick.Below(uint32_t(l.highest))); break;
+        }
+      }
+      const uint32_t cylinders = pick.Below(10);
+      const uint32_t turbo = pick.Below(2) ? 0 : 1 + pick.Below(255);
+      const uint32_t not_road = pick.Below(3) == 0 ? 1 + pick.Below(255) : 0;
+      auto signed_word = [&pick]() {
+        switch (pick.Below(3)) {
+          case 0: return 0u;
+          case 1: return uint32_t(-1 - int32_t(pick.Below(4)));
+          default: return 1 + pick.Below(8);
+        }
+      };
+      const uint32_t front_wheel = signed_word(), rear_wheel = signed_word();
+      const uint32_t front_inch = uint32_t(int32_t(pick.Below(9)) - 2);
+      const uint32_t rear_inch = uint32_t(int32_t(pick.Below(9)) - 2);
+      const uint32_t aero_77 = pick.Below(3) == 0 ? 0xFFFFFFFFu : pick.Below(4);
+      const uint32_t flagged = pick.Below(2) ? 0 : 1 + pick.Below(4);
+      const uint32_t level_152 = pick.Below(2) ? 0 : 1 + pick.Below(4);
+      const uint32_t record_flags = pick.Below(4) | (pick.Below(4) == 0 ? (pick.Next() & ~3u) : 0);
+      const uint32_t curve_mode = pick.Below(3);  // 0 random, 1 a peak and falling, 2 no 1.0
+      const uint32_t peak = pick.Below(32);
+      const uint32_t nan_word = kNaNWords[pick.Below(std::size(kNaNWords))];
+      const uint32_t nan_at = pick.Below(kTuningDataBytes / 4);
+      Outputs out[2];
+      for (int v = 0; v < 2; v++) {
+        Random fill = Seeded(seed * 47 + 31 * uint64_t(group) + 13);
+        for (uint32_t i = 0; i < kTuningDataBytes; i += 4) {
+          guest::StoreU32(h.base, data + i, word(fill));
+        }
+        for (uint32_t i = 0; i < kTuningCarBytes; i += 4) {
+          guest::StoreU32(h.base, car + i, word(fill));
+        }
+        for (uint32_t at = frame - kBelow; at < h.data + kScratchBytes; at += 4) {
+          guest::StoreU32(h.base, at, uint32_t(fill.Next()));
+        }
+        if (curve_mode != 0) {
+          // Points from 1.0 falling by random steps (0.9 to 1.0 apart, some
+          // below 0.975 x the one before), with or without the 1.0.
+          float point = curve_mode == 1 ? 1.0f : 0.99f;
+          for (uint32_t i = 0; i < 32; i++) {
+            const float value = i == peak && curve_mode == 1 ? 1.0f
+                                : i < peak                   ? 0.5f + 0.01f * float(i)
+                                                             : point;
+            guest::StoreU32(h.base, data + 1292 + 4 * i, std::bit_cast<uint32_t>(value));
+            if (i >= peak) {
+              point *= 0.9f + 0.1f * float(fill.Below(100)) / 100.0f;
+            }
+          }
+        }
+        for (size_t i = 0; i < std::size(kLevels); i++) {
+          guest::StoreU32(h.base, car + 1648 + kLevels[i].offset, uint32_t(levels[i]));
+        }
+        guest::StoreU8(h.base, car + 1888 + 68, uint8_t(cylinders));
+        guest::StoreU8(h.base, car + 1888 + 69, uint8_t(turbo));
+        guest::StoreU8(h.base, car + 1888 + 131, uint8_t(not_road));
+        guest::StoreU32(h.base, car + 1728, front_wheel);
+        guest::StoreU32(h.base, car + 1732, front_inch);
+        guest::StoreU32(h.base, car + 1736, rear_wheel);
+        guest::StoreU32(h.base, car + 1740, rear_inch);
+        guest::StoreU32(h.base, car + 1756, aero_77);
+        guest::StoreU32(h.base, car + 1784, flagged);
+        guest::StoreU32(h.base, car + 1800, level_152);
+        guest::StoreU32(h.base, car + 3636 + 204 + 24, record_flags);
+        if (group == kOneNaN) {
+          guest::StoreU32(h.base, data + 4 * nan_at, nan_word);
+        }
+        PPCContext t = CallContext(h);
+        t.fpscr.disableFlushModeUnconditional();
+        t.r3.u64 = data;
+        t.r4.u64 = car;
+        (v == 0 ? GuestFunction(Original<__imp__sub_820C0D28>) : NativeVehicleApplyTuning)(
+            t, h.base);
+        out[v].Floats(h.base, data, kTuningDataBytes / 4);
+        out[v].Bytes(Read(h.base, car, kTuningCarBytes));
+        out[v].Bytes(Read(h.base, frame + 4, kTuningSaves - 4));
+        out[v].Bytes(Read(h.base, r1, h.data - r1));
+        out[v].Word(t.r1.u32);
+        out[v].Word(t.r3.u32);
+        out[v].Word(uint32_t(t.r3.u64 >> 32));
+        out[v].Double(t.f1.u64);
+      }
+      results.Check(out[0], out[1], fmt::format("seed {}", seed));
+    }
+    results.Report();
+  }
+}
+
+namespace {
+
+// sub_820C27E8's (Vehicle::SetupFromCar) cases: a car data record (1,856
+// bytes compared) where Derive's goes and a car object (4,096 bytes) above
+// it, filled with float words; the call's frame (the original's 368 bytes)
+// and its callees' frames below it (ApplyTuning's 480, ApplySettings' 192
+// and Derive's 1008 bytes, theirs below) filled with random words. Three
+// groups, as Derive's: numbers only, one NaN word in the car's copied parts
+// (+2240 to +3260) or the car data, and anything anywhere. Shapes the
+// branches take, some of the time: block 1's +356 (the car data's +172) 0,
+// 1, 2 or another, +360 (+176, the table 0x8260181C's index) each index
+// whose record is in the game's data; the engine's +20 (+1280) giving the
+// torque curve's second copy -1 to 40 points (or a NaN: none), its 32
+// points from +28 falling from a 1.0 as ApplyTuning's cases; the tires'
+// radii (+44) 0.0; the setting bytes (car +72 to +94, +80 and +81 the
+// camber settings) and the tuning levels as ApplySettings' and
+// ApplyTuning's cases (in their tables' ranges); the flag +3888's bit 1;
+// block 2's +68, +69, +131. Compared (harness::Outputs): the car data as
+// floats (written with stfs, its words +172, +176, +1268 and +1564 to
+// +1600 copied by lwz and stw among them: the same on both sides when the
+// floats are), the car exactly (not written), the frame from +4 to +96
+// exactly (+80: the stack conversions) and from +96 to its register saves
+// (+288) as floats (the axles' vectors and the tires' copies), Derive's
+// frame as Derive's cases compare it (its temporaries, and what
+// ApplyTuning's and ApplySettings' left under it), the caller's frame from
+// r1 to the scratch area, r1, r3 and f1.
+constexpr uint32_t kSetupFrame = 368;
+constexpr uint32_t kSetupCar = 0x800, kSetupCarBytes = 0x1000;
+constexpr uint32_t kSetupDataBytes = 0x740;
+constexpr uint32_t kSetupAxleTable = 0x8260181C;
+
+void NativeVehicleSetupFromCar(PPCContext& ctx, uint8_t* base) {
+  ctx.fpscr.disableFlushMode();
+  const uint32_t frame = ctx.r1.u32 - 368;
+  double f1 = 0.0;
+  if (!cp::VehicleSetupFromCar(base, ctx.r3.u32, ctx.r4.u32, frame, &f1)) {
+    __imp__sub_820C27E8(ctx, base);
+    return;
+  }
+  ctx.f1.f64 = f1;
+  ctx.r3.u64 = frame - 1008 + 352;
+}
+
+}  // namespace
+
+// The table's indices whose records are in the game's data.
+std::vector<uint32_t> SetupFromCarIndices(uint8_t* base) {
+  std::vector<uint32_t> indices;
+  for (uint32_t i = 0; i < 8; i++) {
+    const uint32_t record = guest::LoadU32(base, kSetupAxleTable + 4 * i);
+    if (record >= 0x82000000u && record < 0x83000000u) {
+      indices.push_back(i);
+    }
+  }
+  return indices;
+}
+
+bool SetupFromCarFits(uint8_t* base, uint32_t car, uint32_t r1) {
+  return cp::VehicleApplyTuningCopyFits(car, r1 - kSetupFrame - 480) &&
+         !SetupFromCarIndices(base).empty();
+}
+
+void WriteSetupFromCarCase(uint8_t* base, uint32_t data, uint32_t car, uint32_t r1,
+                           uint32_t stack_end, uint64_t seed, int group_number) {
+  enum Group { kNumbers, kOneNaN, kNaNs };
+  const Group group = Group(group_number);
+  const uint32_t block2 = car + 1888, block1 = car + 2240, engine = car + 2880;
+  const uint32_t derive = r1 - kSetupFrame - 1008;
+  constexpr uint32_t kBelow = 1024;  // Derive's callees' frames
+  const std::vector<uint32_t> indices = SetupFromCarIndices(base);
+  const double curve_scale = double(guest::LoadFloat(base, 0x82002CE8));
+  constexpr uint32_t kNaNWords[] = {0x7FC00000, 0x7F800001, 0xFFC00001, 0xFF800001};
+  constexpr int8_t kExtremes[] = {-128, -1, 0, 1, 127};
+  struct Level {
+    uint32_t offset;
+    int32_t lowest, highest;
+  };
+  // ApplyTuning's levels and their ranges (its cases').
+  constexpr Level kLevels[] = {{8, -3, 11},  {16, -3, 11}, {24, -3, 23}, {28, -23, 39},
+                               {32, -3, 11}, {36, -3, 11}, {40, -3, 11}, {48, -3, 11},
+                               {60, -3, 11}};
+  Random pick = Seeded(seed * 53 + 37 * uint64_t(group) + 17);
+  auto word = [group](Random& r) { return group == kNaNs ? FloatWord(r) : NumberWord(r); };
+  const uint32_t kinds[] = {0, 1, 2, uint32_t(pick.Next())};
+  const uint32_t kind = kinds[pick.Below(4)];
+  const uint32_t index = indices[pick.Below(uint32_t(indices.size()))];
+  const int32_t points = pick.Below(8) == 0 ? -1 : int32_t(pick.Below(41));
+  const bool no_points = pick.Below(10) == 0;  // a NaN: INT_MIN
+  const uint32_t curve_mode = pick.Below(3);
+  const uint32_t peak = pick.Below(32);
+  const bool zero_front_radius = pick.Below(6) == 0;
+  const bool zero_rear_radius = pick.Below(6) == 0;
+  uint8_t settings[23];
+  for (uint8_t& b : settings) {
+    b = pick.Below(3) == 0 ? uint8_t(kExtremes[pick.Below(std::size(kExtremes))])
+                           : uint8_t(pick.Next());
+  }
+  const bool front_camber = pick.Below(3) != 0, rear_camber = pick.Below(3) != 0;
+  const uint32_t picks[] = {0, 1, 2, uint32_t(pick.Next())};
+  const uint32_t tuning_1700 = picks[pick.Below(4)];
+  // ApplySettings' table index: up to 3 (4 and 5 read its frame's +96 and
+  // +100, here what ApplyTuning's register saves left, which the native
+  // version doesn't make).
+  const uint32_t settings_indices[] = {0, uint32_t(-1 - int32_t(pick.Below(4))), 1, 2, 3};
+  const uint32_t tuning_1704 = settings_indices[pick.Below(std::size(settings_indices))];
+  const uint32_t tunings_1756[] = {0xFFFFFFFFu, 0, 1 + pick.Below(4),
+                                   uint32_t(-2 - int32_t(pick.Below(3)))};
+  const uint32_t tuning_1756 = tunings_1756[pick.Below(4)];
+  int32_t levels[std::size(kLevels)];
+  for (size_t i = 0; i < std::size(kLevels); i++) {
+    const Level& l = kLevels[i];
+    switch (pick.Below(4)) {
+      case 0: levels[i] = 0; break;
+      case 1: levels[i] = l.lowest + int32_t(pick.Below(uint32_t(-l.lowest))); break;
+      case 2: levels[i] = 1 + int32_t(pick.Below(6)); break;
+      default: levels[i] = 1 + int32_t(pick.Below(uint32_t(l.highest))); break;
+    }
+  }
+  const uint32_t cylinders = pick.Below(10);
+  const uint32_t turbo = pick.Below(2) ? 0 : 1 + pick.Below(255);
+  const uint32_t not_road = pick.Below(3) == 0 ? 1 + pick.Below(255) : 0;
+  auto signed_word = [&pick]() {
+    switch (pick.Below(3)) {
+      case 0: return 0u;
+      case 1: return uint32_t(-1 - int32_t(pick.Below(4)));
+      default: return 1 + pick.Below(8);
+    }
+  };
+  const uint32_t front_wheel = signed_word(), rear_wheel = signed_word();
+  const uint32_t front_inch = uint32_t(int32_t(pick.Below(9)) - 2);
+  const uint32_t rear_inch = uint32_t(int32_t(pick.Below(9)) - 2);
+  const uint32_t flagged = pick.Below(2) ? 0 : 1 + pick.Below(4);
+  const uint32_t level_152 = pick.Below(2) ? 0 : 1 + pick.Below(4);
+  const uint32_t record_flags = pick.Below(4) | (pick.Below(4) == 0 ? (pick.Next() & ~3u) : 0);
+  const uint32_t flags_3888 = uint32_t(pick.Next());
+  const uint32_t nan_word = kNaNWords[pick.Below(std::size(kNaNWords))];
+  const bool nan_in_car = pick.Below(2) == 0;
+  // Not block 1's +356 and +360 (words 89 and 90: the integers kind and
+  // index set below).
+  uint32_t nan_at = nan_in_car ? pick.Below((3260 - 2240) / 4) : pick.Below(kSetupDataBytes / 4);
+  if (nan_in_car && (nan_at == 89 || nan_at == 90)) {
+    nan_at += 2;
+  }
+
+  Random fill = Seeded(seed * 59 + 41 * uint64_t(group) + 19);
+  for (uint32_t i = 0; i < kSetupDataBytes; i += 4) {
+    guest::StoreU32(base, data + i, word(fill));
+  }
+  for (uint32_t i = 0; i < kSetupCarBytes; i += 4) {
+    guest::StoreU32(base, car + i, word(fill));
+  }
+  for (uint32_t at = derive - kBelow; at < stack_end; at += 4) {
+    guest::StoreU32(base, at, uint32_t(fill.Next()));
+  }
+  guest::StoreU32(base, block1 + 356, kind);
+  guest::StoreU32(base, block1 + 360, index);
+  const float count = no_points ? std::bit_cast<float>(0x7FC00000u)
+                                : float((double(points) + 0.5) / curve_scale);
+  guest::StoreU32(base, engine + 20, std::bit_cast<uint32_t>(count));
+  if (curve_mode != 0) {
+    float point = curve_mode == 1 ? 1.0f : 0.99f;
+    for (uint32_t i = 0; i < 32; i++) {
+      const float value = i == peak && curve_mode == 1 ? 1.0f
+                          : i < peak                   ? 0.5f + 0.01f * float(i)
+                                                       : point;
+      guest::StoreU32(base, engine + 28 + 4 * i, std::bit_cast<uint32_t>(value));
+      if (i >= peak) {
+        point *= 0.9f + 0.1f * float(fill.Below(100)) / 100.0f;
+      }
+    }
+  }
+  if (zero_front_radius) {
+    guest::StoreU32(base, car + 3084 + 44, 0);
+  }
+  if (zero_rear_radius) {
+    guest::StoreU32(base, car + 3176 + 44, 0);
+  }
+  for (uint32_t i = 0; i < std::size(settings); i++) {
+    guest::StoreU8(base, car + 72 + i, settings[i]);
+  }
+  if (!front_camber) {
+    guest::StoreU8(base, car + 80, 0);
+  }
+  if (!rear_camber) {
+    guest::StoreU8(base, car + 81, 0);
+  }
+  guest::StoreU32(base, car + 1700, tuning_1700);
+  guest::StoreU32(base, car + 1704, tuning_1704);
+  for (size_t i = 0; i < std::size(kLevels); i++) {
+    guest::StoreU32(base, car + 1648 + kLevels[i].offset, uint32_t(levels[i]));
+  }
+  guest::StoreU8(base, block2 + 68, uint8_t(cylinders));
+  guest::StoreU8(base, block2 + 69, uint8_t(turbo));
+  guest::StoreU8(base, block2 + 131, uint8_t(not_road));
+  guest::StoreU32(base, car + 1728, front_wheel);
+  guest::StoreU32(base, car + 1732, front_inch);
+  guest::StoreU32(base, car + 1736, rear_wheel);
+  guest::StoreU32(base, car + 1740, rear_inch);
+  guest::StoreU32(base, car + 1756, tuning_1756);
+  guest::StoreU32(base, car + 1784, flagged);
+  guest::StoreU32(base, car + 1800, level_152);
+  guest::StoreU32(base, car + 3636 + 204 + 24, record_flags);
+  guest::StoreU32(base, car + 3888, flags_3888);
+  if (group == kOneNaN) {
+    guest::StoreU32(base, (nan_in_car ? block1 : data) + 4 * nan_at, nan_word);
+  }
+}
+
+void RecordSetupFromCar(Outputs& out, uint8_t* base, uint32_t data, uint32_t car, uint32_t r1,
+                        uint32_t stack_end, const PPCContext& t) {
+  const uint32_t frame = r1 - kSetupFrame;
+  const uint32_t derive = frame - 1008;
+  out.Floats(base, data, kSetupDataBytes / 4);
+  out.Bytes(Read(base, car, kSetupCarBytes));
+  out.Bytes(Read(base, frame + 4, 92));
+  out.Floats(base, frame + 96, (288 - 96) / 4);
+  out.Bytes(Read(base, derive + 4, 76));
+  out.Floats(base, derive + 80, (352 - 80) / 4);
+  const uint32_t body = derive + 352;
+  out.Word(guest::LoadU32(base, body + 0));
+  out.Floats(base, body + 4, 2);
+  out.Word(guest::LoadU32(base, body + 12));
+  out.Floats(base, body + 16, (516 - 16) / 4);
+  out.Word(guest::LoadU32(base, body + 516));
+  out.Floats(base, body + 520, 2);
+  out.Bytes(Read(base, r1, stack_end - r1));
+  out.Word(t.r1.u32);
+  out.Word(t.r3.u32);
+  out.Double(t.f1.u64);
+}
+
+void RunSetupFromCarOriginal(GuestFunction recompiled, PPCContext& ctx, uint8_t* base) {
+  bool* flags[] = {&ITC_FLAG(native_car_physics), &ITC_FLAG(native_matrix_math),
+                   &ITC_FLAG(native_vector_library), &ITC_FLAG(native_vehicle_accessors),
+                   &ITC_FLAG(native_math)};
+  bool saved[std::size(flags)];
+  for (size_t i = 0; i < std::size(flags); i++) {
+    saved[i] = *flags[i];
+    *flags[i] = false;
+  }
+  recompiled(ctx, base);
+  for (size_t i = 0; i < std::size(flags); i++) {
+    *flags[i] = saved[i];
+  }
+}
+
+void CarPhysicsVehicleSetupFromCar(Context& h) {
+  const uint32_t data = (h.data - kDeriveArea) & ~0xFu;
+  const uint32_t car = data + kSetupCar;
+  const uint32_t r1 = CallContext(h).r1.u32;
+  if (!SetupFromCarFits(h.base, car, r1)) {
+    Results skipped("Vehicle::SetupFromCar (sub_820C27E8): the copy or the table doesn't fit");
+    skipped.Check(std::vector<uint8_t>{0}, std::vector<uint8_t>{1}, "copy");
+    skipped.Report();
+    return;
+  }
+  const char* const kGroupNames[] = {"", ", one NaN", ", NaNs and infinities anywhere"};
+  for (int group = 0; group < 3; group++) {
+    Results results(std::string("Vehicle::SetupFromCar (sub_820C27E8)") + kGroupNames[group]);
+    for (uint64_t seed = 0; seed < 300; seed++) {
+      Outputs out[2];
+      for (int v = 0; v < 2; v++) {
+        WriteSetupFromCarCase(h.base, data, car, r1, h.data + kScratchBytes, seed, group);
+        PPCContext t = CallContext(h);
+        t.fpscr.disableFlushModeUnconditional();
+        t.r3.u64 = data;
+        t.r4.u64 = car;
+        if (v == 0) {
+          RunSetupFromCarOriginal(__imp__sub_820C27E8, t, h.base);
+        } else {
+          NativeVehicleSetupFromCar(t, h.base);
+        }
+        RecordSetupFromCar(out[v], h.base, data, car, r1, h.data, t);
+      }
+      results.Check(out[0], out[1], fmt::format("seed {}", seed));
+    }
+    results.Report();
+  }
 }
 
 }  // namespace harness

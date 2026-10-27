@@ -13,6 +13,15 @@ function goes from this list when a log shows its `native running
 (game):` line (say which log in the commit). A run with nothing left
 here loses its heading.
 
+## Run 2026-10-25 23:42 (`b7-loop-25-10-26-4`)
+
+- The race's set-up's migration 1 (attract race `itc_1867`, replay
+  `itc_1868`, ok): `sub_82101630`, `sub_82101700` Time::Pack
+  (`race-setup.md`)
+- The race's set-up's migration 2 (attract race `itc_1890`, replay
+  `itc_1891`, ok): `sub_82101E90` Stages::SetRoute, `sub_82112DB0`
+  Race::SetUpRival (`race-setup.md`; `sub_82101630` again, above)
+
 ## Run 2026-10-25 16:38 (`b7-loop-25-10-26-3`)
 
 - The DrawTexts lead's migration 2 (attract race `itc_1729`, replay

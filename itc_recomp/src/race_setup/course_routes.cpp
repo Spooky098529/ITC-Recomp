@@ -1,0 +1,667 @@
+// CourseRoutes::Get (sub_820FFF50, docs/functions/race-setup.md) as plain
+// C++; see race_setup.h. The original is straight-line: it writes a table of
+// 23 184-byte entries into its own 4,480-byte stack frame (from frame + 80;
+// every byte of it written, no byte twice) with ~1,175 halfword, word and
+// float stores of constants, then copies entry `index` to `out` with memcpy
+// (sub_825A7410). The stores are replayed here into the same frame in the
+// original's order, as the original leaves them (B7 changes no behavior;
+// RaceOverlaysMachine::Init's precedent): kStores below was read off the
+// generated code (itc_recomp/generated/, sub_820FFF50) by a script, register
+// values followed through its li/lis/ori/addi. The floats are copied from
+// their image address at run time as its lfs and stfs move them. Also
+// written as the original does: the index (its stw r4,4508(r1), a word in
+// the caller's frame) and the out pointer's doubleword (its std r18,4312(r1)),
+// both loaded back for the copy as the original does. Not written: its
+// register saves (__savegprlr_14, below the caller's stack pointer), its
+// stack probe (a load) and the back chain at frame + 0.
+
+#include "race_setup/race_setup.h"
+
+#include "base/log.h"
+#include "c_runtime/strings.h"
+#include "guest.h"
+#include "native/buffers.h"
+#include "vehicle_accessors/vehicle_accessors.h"
+
+namespace race_setup {
+
+namespace {
+
+enum class Kind : uint8_t { kHalf, kWord, kFloat, kIndex, kOut };
+
+// One store: the frame offset, its kind, and the value (kHalf, kWord) or the
+// float's image address (kFloat).
+struct Store {
+  uint16_t offset;
+  Kind kind;
+  uint32_t value;
+};
+
+// Read off the generated code (see the top of the file), in its order.
+constexpr Store kStores[] = {
+    {4508, Kind::kIndex, 0x0}, {80, Kind::kHalf, 0xF8}, {94, Kind::kHalf, 0xAB},
+    {86, Kind::kHalf, 0x4F}, {82, Kind::kHalf, 0x0}, {100, Kind::kWord, 0x87},
+    {260, Kind::kFloat, 0x82006968}, {88, Kind::kHalf, 0x10D}, {92, Kind::kHalf, 0x116},
+    {84, Kind::kHalf, 0x102}, {104, Kind::kWord, 0x102}, {264, Kind::kHalf, 0xB6},
+    {90, Kind::kHalf, 0x84}, {96, Kind::kHalf, 0xF7}, {98, Kind::kHalf, 0x0},
+    {108, Kind::kWord, 0x10D}, {112, Kind::kWord, 0x116}, {116, Kind::kWord, 0xF7},
+    {120, Kind::kWord, 0xFFFFFFFF}, {124, Kind::kWord, 0xFFFFFFFF}, {128, Kind::kWord, 0xFFFFFFFF},
+    {132, Kind::kWord, 0xFFFFFFFF}, {136, Kind::kWord, 0xFFFFFFFF}, {140, Kind::kWord, 0xFFFFFFFF},
+    {144, Kind::kWord, 0xFFFFFFFF}, {148, Kind::kWord, 0xFFFFFFFF}, {152, Kind::kWord, 0xFFFFFFFF},
+    {156, Kind::kWord, 0xFFFFFFFF}, {160, Kind::kWord, 0xFFFFFFFF}, {164, Kind::kWord, 0xFFFFFFFF},
+    {168, Kind::kWord, 0xFFFFFFFF}, {172, Kind::kWord, 0xFFFFFFFF}, {176, Kind::kWord, 0xFFFFFFFF},
+    {180, Kind::kWord, 0xFFFFFFFF}, {184, Kind::kWord, 0xFFFFFFFF}, {188, Kind::kWord, 0xFFFFFFFF},
+    {192, Kind::kWord, 0xFFFFFFFF}, {196, Kind::kWord, 0xFFFFFFFF}, {200, Kind::kWord, 0xFFFFFFFF},
+    {204, Kind::kWord, 0xFFFFFFFF}, {208, Kind::kWord, 0xFFFFFFFF}, {212, Kind::kWord, 0xFFFFFFFF},
+    {216, Kind::kWord, 0xFFFFFFFF}, {220, Kind::kWord, 0xFFFFFFFF}, {224, Kind::kWord, 0xFFFFFFFF},
+    {228, Kind::kWord, 0xFFFFFFFF}, {232, Kind::kWord, 0xFFFFFFFF}, {236, Kind::kWord, 0xFFFFFFFF},
+    {240, Kind::kWord, 0xFFFFFFFF}, {244, Kind::kWord, 0xFFFFFFFF}, {248, Kind::kWord, 0xFFFFFFFF},
+    {252, Kind::kWord, 0xFFFFFFFF}, {256, Kind::kWord, 0xFFFFFFFF}, {266, Kind::kHalf, 0x0},
+    {268, Kind::kHalf, 0xD8}, {270, Kind::kHalf, 0x43}, {272, Kind::kHalf, 0xCC},
+    {274, Kind::kHalf, 0xF4}, {276, Kind::kHalf, 0xBB}, {278, Kind::kHalf, 0x4},
+    {444, Kind::kFloat, 0x82006968}, {284, Kind::kWord, 0x84}, {288, Kind::kWord, 0xD8},
+    {292, Kind::kWord, 0xCC}, {296, Kind::kWord, 0xBB}, {280, Kind::kHalf, 0xB5},
+    {300, Kind::kWord, 0xB5}, {462, Kind::kHalf, 0x6}, {282, Kind::kHalf, 0x58},
+    {304, Kind::kWord, 0xFFFFFFFF}, {308, Kind::kWord, 0xFFFFFFFF}, {466, Kind::kHalf, 0x128},
+    {628, Kind::kFloat, 0x82002810}, {312, Kind::kWord, 0xFFFFFFFF},
+    {316, Kind::kWord, 0xFFFFFFFF}, {320, Kind::kWord, 0xFFFFFFFF}, {448, Kind::kHalf, 0x72},
+    {324, Kind::kWord, 0xFFFFFFFF}, {328, Kind::kWord, 0xFFFFFFFF}, {332, Kind::kWord, 0xFFFFFFFF},
+    {336, Kind::kWord, 0xFFFFFFFF}, {458, Kind::kHalf, 0x46}, {340, Kind::kWord, 0xFFFFFFFF},
+    {344, Kind::kWord, 0xFFFFFFFF}, {348, Kind::kWord, 0xFFFFFFFF}, {352, Kind::kWord, 0xFFFFFFFF},
+    {356, Kind::kWord, 0xFFFFFFFF}, {360, Kind::kWord, 0xFFFFFFFF}, {364, Kind::kWord, 0xFFFFFFFF},
+    {368, Kind::kWord, 0xFFFFFFFF}, {372, Kind::kWord, 0xFFFFFFFF}, {376, Kind::kWord, 0xFFFFFFFF},
+    {380, Kind::kWord, 0xFFFFFFFF}, {384, Kind::kWord, 0xFFFFFFFF}, {388, Kind::kWord, 0xFFFFFFFF},
+    {392, Kind::kWord, 0xFFFFFFFF}, {396, Kind::kWord, 0xFFFFFFFF}, {400, Kind::kWord, 0xFFFFFFFF},
+    {404, Kind::kWord, 0xFFFFFFFF}, {408, Kind::kWord, 0xFFFFFFFF}, {412, Kind::kWord, 0xFFFFFFFF},
+    {416, Kind::kWord, 0xFFFFFFFF}, {420, Kind::kWord, 0xFFFFFFFF}, {424, Kind::kWord, 0xFFFFFFFF},
+    {428, Kind::kWord, 0xFFFFFFFF}, {432, Kind::kWord, 0xFFFFFFFF}, {436, Kind::kWord, 0xFFFFFFFF},
+    {440, Kind::kWord, 0xFFFFFFFF}, {450, Kind::kHalf, 0x0}, {452, Kind::kHalf, 0xD8},
+    {454, Kind::kHalf, 0x8}, {456, Kind::kHalf, 0x4}, {460, Kind::kHalf, 0x8B},
+    {464, Kind::kHalf, 0x70}, {468, Kind::kWord, 0x82}, {472, Kind::kWord, 0xD8},
+    {476, Kind::kWord, 0x4}, {480, Kind::kWord, 0x8B}, {484, Kind::kWord, 0x70},
+    {488, Kind::kWord, 0xFFFFFFFF}, {492, Kind::kWord, 0xFFFFFFFF}, {496, Kind::kWord, 0xFFFFFFFF},
+    {500, Kind::kWord, 0xFFFFFFFF}, {504, Kind::kWord, 0xFFFFFFFF}, {508, Kind::kWord, 0xFFFFFFFF},
+    {512, Kind::kWord, 0xFFFFFFFF}, {516, Kind::kWord, 0xFFFFFFFF}, {520, Kind::kWord, 0xFFFFFFFF},
+    {524, Kind::kWord, 0xFFFFFFFF}, {812, Kind::kFloat, 0x82002810},
+    {528, Kind::kWord, 0xFFFFFFFF}, {532, Kind::kWord, 0xFFFFFFFF}, {536, Kind::kWord, 0xFFFFFFFF},
+    {540, Kind::kWord, 0xFFFFFFFF}, {638, Kind::kHalf, 0xA9}, {544, Kind::kWord, 0xFFFFFFFF},
+    {548, Kind::kWord, 0xFFFFFFFF}, {552, Kind::kWord, 0xFFFFFFFF}, {556, Kind::kWord, 0xFFFFFFFF},
+    {642, Kind::kHalf, 0x2E}, {560, Kind::kWord, 0xFFFFFFFF}, {564, Kind::kWord, 0xFFFFFFFF},
+    {568, Kind::kWord, 0xFFFFFFFF}, {572, Kind::kWord, 0xFFFFFFFF}, {646, Kind::kHalf, 0x6D},
+    {576, Kind::kWord, 0xFFFFFFFF}, {580, Kind::kWord, 0xFFFFFFFF}, {584, Kind::kWord, 0xFFFFFFFF},
+    {588, Kind::kWord, 0xFFFFFFFF}, {650, Kind::kHalf, 0x98}, {592, Kind::kWord, 0xFFFFFFFF},
+    {596, Kind::kWord, 0xFFFFFFFF}, {600, Kind::kWord, 0xFFFFFFFF}, {604, Kind::kWord, 0xFFFFFFFF},
+    {608, Kind::kWord, 0xFFFFFFFF}, {612, Kind::kWord, 0xFFFFFFFF}, {616, Kind::kWord, 0xFFFFFFFF},
+    {620, Kind::kWord, 0xFFFFFFFF}, {624, Kind::kWord, 0xFFFFFFFF}, {632, Kind::kHalf, 0x6B},
+    {634, Kind::kHalf, 0x0}, {636, Kind::kHalf, 0x5C}, {640, Kind::kHalf, 0xD},
+    {644, Kind::kHalf, 0x116}, {648, Kind::kHalf, 0x69}, {652, Kind::kWord, 0x81},
+    {656, Kind::kWord, 0x5C}, {660, Kind::kWord, 0xD}, {664, Kind::kWord, 0x116},
+    {668, Kind::kWord, 0x69}, {672, Kind::kWord, 0xFFFFFFFF}, {676, Kind::kWord, 0xFFFFFFFF},
+    {680, Kind::kWord, 0xFFFFFFFF}, {684, Kind::kWord, 0xFFFFFFFF}, {688, Kind::kWord, 0xFFFFFFFF},
+    {692, Kind::kWord, 0xFFFFFFFF}, {696, Kind::kWord, 0xFFFFFFFF}, {700, Kind::kWord, 0xFFFFFFFF},
+    {704, Kind::kWord, 0xFFFFFFFF}, {708, Kind::kWord, 0xFFFFFFFF}, {712, Kind::kWord, 0xFFFFFFFF},
+    {716, Kind::kWord, 0xFFFFFFFF}, {720, Kind::kWord, 0xFFFFFFFF}, {724, Kind::kWord, 0xFFFFFFFF},
+    {728, Kind::kWord, 0xFFFFFFFF}, {732, Kind::kWord, 0xFFFFFFFF}, {736, Kind::kWord, 0xFFFFFFFF},
+    {740, Kind::kWord, 0xFFFFFFFF}, {744, Kind::kWord, 0xFFFFFFFF}, {748, Kind::kWord, 0xFFFFFFFF},
+    {752, Kind::kWord, 0xFFFFFFFF}, {756, Kind::kWord, 0xFFFFFFFF}, {760, Kind::kWord, 0xFFFFFFFF},
+    {764, Kind::kWord, 0xFFFFFFFF}, {768, Kind::kWord, 0xFFFFFFFF}, {772, Kind::kWord, 0xFFFFFFFF},
+    {776, Kind::kWord, 0xFFFFFFFF}, {780, Kind::kWord, 0xFFFFFFFF}, {784, Kind::kWord, 0xFFFFFFFF},
+    {788, Kind::kWord, 0xFFFFFFFF}, {792, Kind::kWord, 0xFFFFFFFF}, {796, Kind::kWord, 0xFFFFFFFF},
+    {800, Kind::kWord, 0xFFFFFFFF}, {804, Kind::kWord, 0xFFFFFFFF}, {808, Kind::kWord, 0xFFFFFFFF},
+    {818, Kind::kHalf, 0x0}, {822, Kind::kHalf, 0xAA}, {834, Kind::kHalf, 0x16},
+    {830, Kind::kHalf, 0x170}, {820, Kind::kHalf, 0x1E}, {828, Kind::kHalf, 0x2D},
+    {824, Kind::kHalf, 0x1F}, {844, Kind::kWord, 0x1F}, {836, Kind::kWord, 0x86},
+    {816, Kind::kHalf, 0xC7}, {826, Kind::kHalf, 0x10}, {832, Kind::kHalf, 0xC1},
+    {996, Kind::kFloat, 0x82006964}, {840, Kind::kWord, 0x1E}, {1180, Kind::kFloat, 0x82006964},
+    {848, Kind::kWord, 0x2D}, {852, Kind::kWord, 0xC1}, {856, Kind::kWord, 0xFFFFFFFF},
+    {1006, Kind::kHalf, 0x1EA}, {860, Kind::kWord, 0xFFFFFFFF}, {864, Kind::kWord, 0xFFFFFFFF},
+    {868, Kind::kWord, 0xFFFFFFFF}, {872, Kind::kWord, 0xFFFFFFFF}, {1010, Kind::kHalf, 0x3E},
+    {876, Kind::kWord, 0xFFFFFFFF}, {880, Kind::kWord, 0xFFFFFFFF}, {884, Kind::kWord, 0xFFFFFFFF},
+    {888, Kind::kWord, 0xFFFFFFFF}, {892, Kind::kWord, 0xFFFFFFFF}, {896, Kind::kWord, 0xFFFFFFFF},
+    {900, Kind::kWord, 0xFFFFFFFF}, {904, Kind::kWord, 0xFFFFFFFF}, {908, Kind::kWord, 0xFFFFFFFF},
+    {912, Kind::kWord, 0xFFFFFFFF}, {916, Kind::kWord, 0xFFFFFFFF}, {920, Kind::kWord, 0xFFFFFFFF},
+    {924, Kind::kWord, 0xFFFFFFFF}, {928, Kind::kWord, 0xFFFFFFFF}, {932, Kind::kWord, 0xFFFFFFFF},
+    {936, Kind::kWord, 0xFFFFFFFF}, {940, Kind::kWord, 0xFFFFFFFF}, {944, Kind::kWord, 0xFFFFFFFF},
+    {948, Kind::kWord, 0xFFFFFFFF}, {952, Kind::kWord, 0xFFFFFFFF}, {956, Kind::kWord, 0xFFFFFFFF},
+    {960, Kind::kWord, 0xFFFFFFFF}, {964, Kind::kWord, 0xFFFFFFFF}, {968, Kind::kWord, 0xFFFFFFFF},
+    {972, Kind::kWord, 0xFFFFFFFF}, {976, Kind::kWord, 0xFFFFFFFF}, {980, Kind::kWord, 0xFFFFFFFF},
+    {984, Kind::kWord, 0xFFFFFFFF}, {988, Kind::kWord, 0xFFFFFFFF}, {992, Kind::kWord, 0xFFFFFFFF},
+    {1000, Kind::kHalf, 0xBB}, {1002, Kind::kHalf, 0x0}, {1004, Kind::kHalf, 0x37},
+    {1008, Kind::kHalf, 0x42}, {1012, Kind::kHalf, 0x4B}, {1014, Kind::kHalf, 0x140},
+    {1028, Kind::kWord, 0x42}, {1024, Kind::kWord, 0x37}, {1032, Kind::kWord, 0x4B},
+    {1040, Kind::kWord, 0xFFFFFFFF}, {1016, Kind::kHalf, 0xBA}, {1036, Kind::kWord, 0xBA},
+    {1018, Kind::kHalf, 0x20}, {1190, Kind::kHalf, 0x4C}, {1044, Kind::kWord, 0xFFFFFFFF},
+    {1048, Kind::kWord, 0xFFFFFFFF}, {1184, Kind::kHalf, 0x99}, {1020, Kind::kWord, 0x85},
+    {1198, Kind::kHalf, 0x9C}, {1052, Kind::kWord, 0xFFFFFFFF}, {1056, Kind::kWord, 0xFFFFFFFF},
+    {1188, Kind::kHalf, 0xFB}, {1208, Kind::kWord, 0xFB}, {1060, Kind::kWord, 0xFFFFFFFF},
+    {1064, Kind::kWord, 0xFFFFFFFF}, {1068, Kind::kWord, 0xFFFFFFFF},
+    {1072, Kind::kWord, 0xFFFFFFFF}, {1076, Kind::kWord, 0xFFFFFFFF},
+    {1364, Kind::kFloat, 0x82006960}, {1080, Kind::kWord, 0xFFFFFFFF},
+    {1084, Kind::kWord, 0xFFFFFFFF}, {1088, Kind::kWord, 0xFFFFFFFF},
+    {1092, Kind::kWord, 0xFFFFFFFF}, {1096, Kind::kWord, 0xFFFFFFFF},
+    {1100, Kind::kWord, 0xFFFFFFFF}, {1104, Kind::kWord, 0xFFFFFFFF},
+    {1108, Kind::kWord, 0xFFFFFFFF}, {1112, Kind::kWord, 0xFFFFFFFF},
+    {1116, Kind::kWord, 0xFFFFFFFF}, {1120, Kind::kWord, 0xFFFFFFFF},
+    {1124, Kind::kWord, 0xFFFFFFFF}, {1128, Kind::kWord, 0xFFFFFFFF},
+    {1132, Kind::kWord, 0xFFFFFFFF}, {1136, Kind::kWord, 0xFFFFFFFF},
+    {1140, Kind::kWord, 0xFFFFFFFF}, {1144, Kind::kWord, 0xFFFFFFFF},
+    {1148, Kind::kWord, 0xFFFFFFFF}, {1152, Kind::kWord, 0xFFFFFFFF},
+    {1156, Kind::kWord, 0xFFFFFFFF}, {1160, Kind::kWord, 0xFFFFFFFF},
+    {1164, Kind::kWord, 0xFFFFFFFF}, {1168, Kind::kWord, 0xFFFFFFFF},
+    {1172, Kind::kWord, 0xFFFFFFFF}, {1176, Kind::kWord, 0xFFFFFFFF}, {1186, Kind::kHalf, 0x0},
+    {1192, Kind::kHalf, 0x4B}, {1194, Kind::kHalf, 0x90}, {1196, Kind::kHalf, 0x2D},
+    {1200, Kind::kHalf, 0x97}, {1202, Kind::kHalf, 0x10}, {1204, Kind::kWord, 0x83},
+    {1212, Kind::kWord, 0x4B}, {1216, Kind::kWord, 0x2D}, {1220, Kind::kWord, 0x97},
+    {1224, Kind::kWord, 0xFFFFFFFF}, {1228, Kind::kWord, 0xFFFFFFFF},
+    {1232, Kind::kWord, 0xFFFFFFFF}, {1236, Kind::kWord, 0xFFFFFFFF},
+    {1240, Kind::kWord, 0xFFFFFFFF}, {1244, Kind::kWord, 0xFFFFFFFF},
+    {1248, Kind::kWord, 0xFFFFFFFF}, {1252, Kind::kWord, 0xFFFFFFFF},
+    {1256, Kind::kWord, 0xFFFFFFFF}, {1260, Kind::kWord, 0xFFFFFFFF}, {1368, Kind::kHalf, 0xD},
+    {1264, Kind::kWord, 0xFFFFFFFF}, {1268, Kind::kWord, 0xFFFFFFFF},
+    {1272, Kind::kWord, 0xFFFFFFFF}, {1276, Kind::kWord, 0xFFFFFFFF}, {1374, Kind::kHalf, 0x8E},
+    {1382, Kind::kHalf, 0x3A}, {1280, Kind::kWord, 0xFFFFFFFF}, {1284, Kind::kWord, 0xFFFFFFFF},
+    {1288, Kind::kWord, 0xFFFFFFFF}, {1378, Kind::kHalf, 0xE}, {1386, Kind::kHalf, 0xC2},
+    {1292, Kind::kWord, 0xFFFFFFFF}, {1296, Kind::kWord, 0xFFFFFFFF},
+    {1300, Kind::kWord, 0xFFFFFFFF}, {1304, Kind::kWord, 0xFFFFFFFF},
+    {1308, Kind::kWord, 0xFFFFFFFF}, {1312, Kind::kWord, 0xFFFFFFFF},
+    {1316, Kind::kWord, 0xFFFFFFFF}, {1320, Kind::kWord, 0xFFFFFFFF},
+    {1324, Kind::kWord, 0xFFFFFFFF}, {1328, Kind::kWord, 0xFFFFFFFF},
+    {1332, Kind::kWord, 0xFFFFFFFF}, {1336, Kind::kWord, 0xFFFFFFFF},
+    {1340, Kind::kWord, 0xFFFFFFFF}, {1344, Kind::kWord, 0xFFFFFFFF},
+    {1348, Kind::kWord, 0xFFFFFFFF}, {1352, Kind::kWord, 0xFFFFFFFF},
+    {1356, Kind::kWord, 0xFFFFFFFF}, {1360, Kind::kWord, 0xFFFFFFFF}, {1370, Kind::kHalf, 0x0},
+    {1372, Kind::kHalf, 0x2D}, {1376, Kind::kHalf, 0x3D}, {1380, Kind::kHalf, 0xE0},
+    {1384, Kind::kHalf, 0xC}, {1388, Kind::kWord, 0x80}, {1392, Kind::kWord, 0x2D},
+    {1396, Kind::kWord, 0x3D}, {1400, Kind::kWord, 0xE0}, {1404, Kind::kWord, 0xC},
+    {1408, Kind::kWord, 0xFFFFFFFF}, {1412, Kind::kWord, 0xFFFFFFFF},
+    {1416, Kind::kWord, 0xFFFFFFFF}, {1420, Kind::kWord, 0xFFFFFFFF},
+    {1424, Kind::kWord, 0xFFFFFFFF}, {1428, Kind::kWord, 0xFFFFFFFF},
+    {1432, Kind::kWord, 0xFFFFFFFF}, {1436, Kind::kWord, 0xFFFFFFFF},
+    {1440, Kind::kWord, 0xFFFFFFFF}, {1444, Kind::kWord, 0xFFFFFFFF},
+    {1448, Kind::kWord, 0xFFFFFFFF}, {1452, Kind::kWord, 0xFFFFFFFF},
+    {1456, Kind::kWord, 0xFFFFFFFF}, {1460, Kind::kWord, 0xFFFFFFFF},
+    {1464, Kind::kWord, 0xFFFFFFFF}, {1468, Kind::kWord, 0xFFFFFFFF},
+    {1472, Kind::kWord, 0xFFFFFFFF}, {1476, Kind::kWord, 0xFFFFFFFF},
+    {1480, Kind::kWord, 0xFFFFFFFF}, {1484, Kind::kWord, 0xFFFFFFFF},
+    {1488, Kind::kWord, 0xFFFFFFFF}, {1492, Kind::kWord, 0xFFFFFFFF},
+    {1496, Kind::kWord, 0xFFFFFFFF}, {1500, Kind::kWord, 0xFFFFFFFF},
+    {1504, Kind::kWord, 0xFFFFFFFF}, {1508, Kind::kWord, 0xFFFFFFFF},
+    {1512, Kind::kWord, 0xFFFFFFFF}, {1516, Kind::kWord, 0xFFFFFFFF},
+    {1520, Kind::kWord, 0xFFFFFFFF}, {1524, Kind::kWord, 0xFFFFFFFF},
+    {1528, Kind::kWord, 0xFFFFFFFF}, {1532, Kind::kWord, 0xFFFFFFFF},
+    {1536, Kind::kWord, 0xFFFFFFFF}, {1548, Kind::kFloat, 0x82006960}, {1742, Kind::kHalf, 0x1E},
+    {1540, Kind::kWord, 0xFFFFFFFF}, {1544, Kind::kWord, 0xFFFFFFFF}, {1552, Kind::kHalf, 0x0},
+    {1732, Kind::kFloat, 0x82001FD4}, {1556, Kind::kHalf, 0x0}, {1558, Kind::kHalf, 0x5A},
+    {1560, Kind::kHalf, 0x0}, {1554, Kind::kHalf, 0xA}, {1562, Kind::kHalf, 0xD2},
+    {1564, Kind::kHalf, 0x2}, {1566, Kind::kHalf, 0xF4}, {1568, Kind::kHalf, 0x0},
+    {1570, Kind::kHalf, 0xA}, {1572, Kind::kWord, 0xFFFFFFFF}, {1576, Kind::kWord, 0xFFFFFFFF},
+    {1580, Kind::kWord, 0xFFFFFFFF}, {1584, Kind::kWord, 0xFFFFFFFF},
+    {1588, Kind::kWord, 0xFFFFFFFF}, {1592, Kind::kWord, 0xFFFFFFFF},
+    {1596, Kind::kWord, 0xFFFFFFFF}, {1600, Kind::kWord, 0xFFFFFFFF},
+    {1604, Kind::kWord, 0xFFFFFFFF}, {1608, Kind::kWord, 0xFFFFFFFF},
+    {1612, Kind::kWord, 0xFFFFFFFF}, {1616, Kind::kWord, 0xFFFFFFFF},
+    {1620, Kind::kWord, 0xFFFFFFFF}, {1624, Kind::kWord, 0xFFFFFFFF},
+    {1628, Kind::kWord, 0xFFFFFFFF}, {1632, Kind::kWord, 0xFFFFFFFF},
+    {1636, Kind::kWord, 0xFFFFFFFF}, {1640, Kind::kWord, 0xFFFFFFFF},
+    {1644, Kind::kWord, 0xFFFFFFFF}, {1648, Kind::kWord, 0xFFFFFFFF},
+    {1652, Kind::kWord, 0xFFFFFFFF}, {1656, Kind::kWord, 0xFFFFFFFF},
+    {1660, Kind::kWord, 0xFFFFFFFF}, {1664, Kind::kWord, 0xFFFFFFFF},
+    {1668, Kind::kWord, 0xFFFFFFFF}, {1672, Kind::kWord, 0xFFFFFFFF},
+    {1676, Kind::kWord, 0xFFFFFFFF}, {1680, Kind::kWord, 0xFFFFFFFF},
+    {1684, Kind::kWord, 0xFFFFFFFF}, {1688, Kind::kWord, 0xFFFFFFFF},
+    {1692, Kind::kWord, 0xFFFFFFFF}, {1696, Kind::kWord, 0xFFFFFFFF},
+    {1700, Kind::kWord, 0xFFFFFFFF}, {1704, Kind::kWord, 0xFFFFFFFF},
+    {1708, Kind::kWord, 0xFFFFFFFF}, {1712, Kind::kWord, 0xFFFFFFFF},
+    {1716, Kind::kWord, 0xFFFFFFFF}, {1720, Kind::kWord, 0xFFFFFFFF},
+    {1724, Kind::kWord, 0xFFFFFFFF}, {1728, Kind::kWord, 0xFFFFFFFF}, {1736, Kind::kHalf, 0x0},
+    {1738, Kind::kHalf, 0xA}, {1740, Kind::kHalf, 0x0}, {1744, Kind::kHalf, 0x0},
+    {1746, Kind::kHalf, 0x32}, {1748, Kind::kHalf, 0x0}, {1750, Kind::kHalf, 0x46},
+    {1752, Kind::kHalf, 0x0}, {1754, Kind::kHalf, 0x5A}, {1756, Kind::kWord, 0xFFFFFFFF},
+    {1760, Kind::kWord, 0xFFFFFFFF}, {1764, Kind::kWord, 0xFFFFFFFF},
+    {1768, Kind::kWord, 0xFFFFFFFF}, {1772, Kind::kWord, 0xFFFFFFFF},
+    {1776, Kind::kWord, 0xFFFFFFFF}, {1780, Kind::kWord, 0xFFFFFFFF},
+    {1784, Kind::kWord, 0xFFFFFFFF}, {1788, Kind::kWord, 0xFFFFFFFF}, {1930, Kind::kHalf, 0x5A},
+    {1916, Kind::kFloat, 0x82001FD4}, {1792, Kind::kWord, 0xFFFFFFFF},
+    {2100, Kind::kFloat, 0x82001FD4}, {1796, Kind::kWord, 0xFFFFFFFF},
+    {1800, Kind::kWord, 0xFFFFFFFF}, {1804, Kind::kWord, 0xFFFFFFFF},
+    {1808, Kind::kWord, 0xFFFFFFFF}, {1812, Kind::kWord, 0xFFFFFFFF},
+    {1816, Kind::kWord, 0xFFFFFFFF}, {1820, Kind::kWord, 0xFFFFFFFF},
+    {1824, Kind::kWord, 0xFFFFFFFF}, {1828, Kind::kWord, 0xFFFFFFFF},
+    {1832, Kind::kWord, 0xFFFFFFFF}, {1836, Kind::kWord, 0xFFFFFFFF},
+    {1840, Kind::kWord, 0xFFFFFFFF}, {1844, Kind::kWord, 0xFFFFFFFF},
+    {1848, Kind::kWord, 0xFFFFFFFF}, {1852, Kind::kWord, 0xFFFFFFFF},
+    {1856, Kind::kWord, 0xFFFFFFFF}, {1860, Kind::kWord, 0xFFFFFFFF},
+    {1864, Kind::kWord, 0xFFFFFFFF}, {1868, Kind::kWord, 0xFFFFFFFF},
+    {1872, Kind::kWord, 0xFFFFFFFF}, {1876, Kind::kWord, 0xFFFFFFFF},
+    {1880, Kind::kWord, 0xFFFFFFFF}, {1884, Kind::kWord, 0xFFFFFFFF},
+    {1888, Kind::kWord, 0xFFFFFFFF}, {1892, Kind::kWord, 0xFFFFFFFF},
+    {1896, Kind::kWord, 0xFFFFFFFF}, {1900, Kind::kWord, 0xFFFFFFFF},
+    {1904, Kind::kWord, 0xFFFFFFFF}, {1908, Kind::kWord, 0xFFFFFFFF},
+    {1912, Kind::kWord, 0xFFFFFFFF}, {1920, Kind::kHalf, 0x0}, {1922, Kind::kHalf, 0xA},
+    {1924, Kind::kHalf, 0x0}, {1926, Kind::kHalf, 0x32}, {1928, Kind::kHalf, 0x0},
+    {1932, Kind::kHalf, 0x0}, {1934, Kind::kHalf, 0x96}, {1936, Kind::kHalf, 0x0},
+    {1938, Kind::kHalf, 0xD2}, {1940, Kind::kWord, 0xFFFFFFFF}, {1944, Kind::kWord, 0xFFFFFFFF},
+    {1948, Kind::kWord, 0xFFFFFFFF}, {1952, Kind::kWord, 0xFFFFFFFF},
+    {1956, Kind::kWord, 0xFFFFFFFF}, {1960, Kind::kWord, 0xFFFFFFFF},
+    {1964, Kind::kWord, 0xFFFFFFFF}, {1968, Kind::kWord, 0xFFFFFFFF},
+    {1972, Kind::kWord, 0xFFFFFFFF}, {1976, Kind::kWord, 0xFFFFFFFF},
+    {1980, Kind::kWord, 0xFFFFFFFF}, {1984, Kind::kWord, 0xFFFFFFFF},
+    {1988, Kind::kWord, 0xFFFFFFFF}, {1992, Kind::kWord, 0xFFFFFFFF},
+    {1996, Kind::kWord, 0xFFFFFFFF}, {2000, Kind::kWord, 0xFFFFFFFF},
+    {2004, Kind::kWord, 0xFFFFFFFF}, {2008, Kind::kWord, 0xFFFFFFFF},
+    {2012, Kind::kWord, 0xFFFFFFFF}, {2016, Kind::kWord, 0xFFFFFFFF},
+    {2020, Kind::kWord, 0xFFFFFFFF}, {2024, Kind::kWord, 0xFFFFFFFF},
+    {2028, Kind::kWord, 0xFFFFFFFF}, {2032, Kind::kWord, 0xFFFFFFFF},
+    {2036, Kind::kWord, 0xFFFFFFFF}, {2040, Kind::kWord, 0xFFFFFFFF},
+    {2044, Kind::kWord, 0xFFFFFFFF}, {2048, Kind::kWord, 0xFFFFFFFF},
+    {2052, Kind::kWord, 0xFFFFFFFF}, {2056, Kind::kWord, 0xFFFFFFFF},
+    {2060, Kind::kWord, 0xFFFFFFFF}, {2064, Kind::kWord, 0xFFFFFFFF},
+    {2068, Kind::kWord, 0xFFFFFFFF}, {2072, Kind::kWord, 0xFFFFFFFF},
+    {2076, Kind::kWord, 0xFFFFFFFF}, {2080, Kind::kWord, 0xFFFFFFFF},
+    {2084, Kind::kWord, 0xFFFFFFFF}, {2156, Kind::kWord, 0xF7}, {4312, Kind::kOut, 0x0},
+    {2284, Kind::kFloat, 0x82001FD4}, {2088, Kind::kWord, 0xFFFFFFFF},
+    {2092, Kind::kWord, 0xFFFFFFFF}, {2108, Kind::kHalf, 0xFA}, {2160, Kind::kWord, 0xF8},
+    {2096, Kind::kWord, 0xFFFFFFFF}, {2104, Kind::kHalf, 0x126}, {2106, Kind::kHalf, 0xA},
+    {2110, Kind::kHalf, 0x3}, {2164, Kind::kWord, 0xF9}, {2112, Kind::kHalf, 0xFFFF},
+    {2114, Kind::kHalf, 0xFFFF}, {2116, Kind::kHalf, 0xFFFF}, {2128, Kind::kWord, 0x11E},
+    {2168, Kind::kWord, 0xFA}, {2118, Kind::kHalf, 0xFFFF}, {2120, Kind::kHalf, 0xFFFF},
+    {2122, Kind::kHalf, 0xFFFF}, {2136, Kind::kWord, 0x120}, {2124, Kind::kWord, 0x126},
+    {2132, Kind::kWord, 0x11F}, {2172, Kind::kWord, 0xFFFFFFFF}, {2176, Kind::kWord, 0xFFFFFFFF},
+    {2140, Kind::kWord, 0x121}, {2180, Kind::kWord, 0xFFFFFFFF}, {2184, Kind::kWord, 0xFFFFFFFF},
+    {2188, Kind::kWord, 0xFFFFFFFF}, {2192, Kind::kWord, 0xFFFFFFFF}, {2144, Kind::kWord, 0x122},
+    {2196, Kind::kWord, 0xFFFFFFFF}, {2200, Kind::kWord, 0xFFFFFFFF},
+    {2204, Kind::kWord, 0xFFFFFFFF}, {2208, Kind::kWord, 0xFFFFFFFF}, {2148, Kind::kWord, 0x123},
+    {2212, Kind::kWord, 0xFFFFFFFF}, {2216, Kind::kWord, 0xFFFFFFFF},
+    {2220, Kind::kWord, 0xFFFFFFFF}, {2224, Kind::kWord, 0xFFFFFFFF}, {2152, Kind::kWord, 0xF6},
+    {2228, Kind::kWord, 0xFFFFFFFF}, {2232, Kind::kWord, 0xFFFFFFFF},
+    {2236, Kind::kWord, 0xFFFFFFFF}, {2240, Kind::kWord, 0xFFFFFFFF},
+    {2244, Kind::kWord, 0xFFFFFFFF}, {2248, Kind::kWord, 0xFFFFFFFF},
+    {2252, Kind::kWord, 0xFFFFFFFF}, {2256, Kind::kWord, 0xFFFFFFFF},
+    {2260, Kind::kWord, 0xFFFFFFFF}, {2264, Kind::kWord, 0xFFFFFFFF},
+    {2268, Kind::kWord, 0xFFFFFFFF}, {2272, Kind::kWord, 0xFFFFFFFF},
+    {2276, Kind::kWord, 0xFFFFFFFF}, {2280, Kind::kWord, 0xFFFFFFFF}, {2288, Kind::kHalf, 0x126},
+    {2290, Kind::kHalf, 0xA}, {2292, Kind::kHalf, 0x6C}, {2294, Kind::kHalf, 0x107},
+    {2296, Kind::kHalf, 0xFFFF}, {2298, Kind::kHalf, 0xFFFF}, {2300, Kind::kHalf, 0xFFFF},
+    {2302, Kind::kHalf, 0xFFFF}, {2304, Kind::kHalf, 0xFFFF}, {2306, Kind::kHalf, 0xFFFF},
+    {2308, Kind::kWord, 0x126}, {2324, Kind::kWord, 0xF4}, {2316, Kind::kWord, 0x11F},
+    {2468, Kind::kFloat, 0x82001FD4}, {2652, Kind::kFloat, 0x82001FD4}, {2364, Kind::kWord, 0x69},
+    {2372, Kind::kWord, 0x6B}, {2312, Kind::kWord, 0x11E}, {2478, Kind::kHalf, 0x2B},
+    {2376, Kind::kWord, 0x6C}, {2380, Kind::kWord, 0xFFFFFFFF}, {2384, Kind::kWord, 0xFFFFFFFF},
+    {2320, Kind::kWord, 0xF3}, {2496, Kind::kWord, 0xD3}, {2388, Kind::kWord, 0xFFFFFFFF},
+    {2392, Kind::kWord, 0xFFFFFFFF}, {2396, Kind::kWord, 0xFFFFFFFF}, {2328, Kind::kWord, 0xF5},
+    {2500, Kind::kWord, 0xCE}, {2400, Kind::kWord, 0xFFFFFFFF}, {2404, Kind::kWord, 0xFFFFFFFF},
+    {2408, Kind::kWord, 0xFFFFFFFF}, {2332, Kind::kWord, 0x5E}, {2504, Kind::kWord, 0xCF},
+    {2412, Kind::kWord, 0xFFFFFFFF}, {2416, Kind::kWord, 0xFFFFFFFF},
+    {2420, Kind::kWord, 0xFFFFFFFF}, {2336, Kind::kWord, 0x5F}, {2508, Kind::kWord, 0xD0},
+    {2424, Kind::kWord, 0xFFFFFFFF}, {2428, Kind::kWord, 0xFFFFFFFF},
+    {2432, Kind::kWord, 0xFFFFFFFF}, {2340, Kind::kWord, 0x61}, {2512, Kind::kWord, 0xD1},
+    {2436, Kind::kWord, 0xFFFFFFFF}, {2440, Kind::kWord, 0xFFFFFFFF},
+    {2444, Kind::kWord, 0xFFFFFFFF}, {2344, Kind::kWord, 0x63}, {2448, Kind::kWord, 0xFFFFFFFF},
+    {2452, Kind::kWord, 0xFFFFFFFF}, {2456, Kind::kWord, 0xFFFFFFFF},
+    {2460, Kind::kWord, 0xFFFFFFFF}, {2348, Kind::kWord, 0x65}, {2464, Kind::kWord, 0xFFFFFFFF},
+    {2474, Kind::kHalf, 0x30}, {2476, Kind::kHalf, 0xC1}, {2480, Kind::kHalf, 0xFFFF},
+    {2352, Kind::kWord, 0x66}, {2482, Kind::kHalf, 0xFFFF}, {2484, Kind::kHalf, 0xFFFF},
+    {2486, Kind::kHalf, 0xFFFF}, {2488, Kind::kHalf, 0xFFFF}, {2356, Kind::kWord, 0x67},
+    {2490, Kind::kHalf, 0xFFFF}, {2516, Kind::kWord, 0xCC}, {2520, Kind::kWord, 0xCD},
+    {2524, Kind::kWord, 0xC7}, {2360, Kind::kWord, 0x68}, {2368, Kind::kWord, 0x6A},
+    {2472, Kind::kHalf, 0xE7}, {2492, Kind::kWord, 0xE7}, {2656, Kind::kHalf, 0xE7},
+    {2676, Kind::kWord, 0xE7}, {2836, Kind::kFloat, 0x82001FD4}, {2560, Kind::kWord, 0xC1},
+    {2564, Kind::kWord, 0xFFFFFFFF}, {2528, Kind::kWord, 0xC8}, {2680, Kind::kWord, 0xD3},
+    {2568, Kind::kWord, 0xFFFFFFFF}, {2556, Kind::kWord, 0xC6}, {2572, Kind::kWord, 0xFFFFFFFF},
+    {2532, Kind::kWord, 0xC9}, {2684, Kind::kWord, 0xCE}, {2576, Kind::kWord, 0xFFFFFFFF},
+    {2580, Kind::kWord, 0xFFFFFFFF}, {2584, Kind::kWord, 0xFFFFFFFF}, {2536, Kind::kWord, 0xCA},
+    {2688, Kind::kWord, 0xCF}, {2588, Kind::kWord, 0xFFFFFFFF}, {2592, Kind::kWord, 0xFFFFFFFF},
+    {2596, Kind::kWord, 0xFFFFFFFF}, {2540, Kind::kWord, 0xCB}, {2692, Kind::kWord, 0xA9},
+    {2600, Kind::kWord, 0xFFFFFFFF}, {2604, Kind::kWord, 0xFFFFFFFF},
+    {2608, Kind::kWord, 0xFFFFFFFF}, {2544, Kind::kWord, 0xC3}, {2696, Kind::kWord, 0xAA},
+    {2612, Kind::kWord, 0xFFFFFFFF}, {2616, Kind::kWord, 0xFFFFFFFF},
+    {2620, Kind::kWord, 0xFFFFFFFF}, {2548, Kind::kWord, 0xC4}, {2704, Kind::kWord, 0xA6},
+    {2624, Kind::kWord, 0xFFFFFFFF}, {2628, Kind::kWord, 0xFFFFFFFF},
+    {2632, Kind::kWord, 0xFFFFFFFF}, {2552, Kind::kWord, 0xC5}, {2708, Kind::kWord, 0x3},
+    {2636, Kind::kWord, 0xFFFFFFFF}, {2640, Kind::kWord, 0xFFFFFFFF},
+    {2644, Kind::kWord, 0xFFFFFFFF}, {2648, Kind::kWord, 0xFFFFFFFF}, {2716, Kind::kWord, 0x5},
+    {2658, Kind::kHalf, 0x30}, {2660, Kind::kHalf, 0x9A}, {2662, Kind::kHalf, 0x1},
+    {2664, Kind::kHalf, 0xFFFF}, {2724, Kind::kWord, 0x7}, {2666, Kind::kHalf, 0xFFFF},
+    {2668, Kind::kHalf, 0xFFFF}, {2670, Kind::kHalf, 0xFFFF}, {2672, Kind::kHalf, 0xFFFF},
+    {2736, Kind::kWord, 0x98}, {2674, Kind::kHalf, 0xFFFF}, {2700, Kind::kWord, 0x1},
+    {2712, Kind::kWord, 0x4}, {2720, Kind::kWord, 0x0}, {2728, Kind::kWord, 0x8},
+    {2732, Kind::kWord, 0x97}, {2740, Kind::kWord, 0x99}, {2744, Kind::kWord, 0x9A},
+    {2864, Kind::kWord, 0x90}, {2748, Kind::kWord, 0xFFFFFFFF}, {2752, Kind::kWord, 0xFFFFFFFF},
+    {2756, Kind::kWord, 0xFFFFFFFF}, {2760, Kind::kWord, 0xFFFFFFFF}, {2868, Kind::kWord, 0x91},
+    {2764, Kind::kWord, 0xFFFFFFFF}, {2768, Kind::kWord, 0xFFFFFFFF},
+    {2772, Kind::kWord, 0xFFFFFFFF}, {2776, Kind::kWord, 0xFFFFFFFF}, {2872, Kind::kWord, 0x92},
+    {2780, Kind::kWord, 0xFFFFFFFF}, {2784, Kind::kWord, 0xFFFFFFFF},
+    {2788, Kind::kWord, 0xFFFFFFFF}, {2792, Kind::kWord, 0xFFFFFFFF}, {2876, Kind::kWord, 0x6E},
+    {2796, Kind::kWord, 0xFFFFFFFF}, {2800, Kind::kWord, 0xFFFFFFFF},
+    {2804, Kind::kWord, 0xFFFFFFFF}, {2808, Kind::kWord, 0xFFFFFFFF}, {2880, Kind::kWord, 0x6F},
+    {2812, Kind::kWord, 0xFFFFFFFF}, {2816, Kind::kWord, 0xFFFFFFFF},
+    {2820, Kind::kWord, 0xFFFFFFFF}, {2824, Kind::kWord, 0xFFFFFFFF}, {2888, Kind::kWord, 0x71},
+    {2828, Kind::kWord, 0xFFFFFFFF}, {2832, Kind::kWord, 0xFFFFFFFF}, {2840, Kind::kHalf, 0x9D},
+    {2842, Kind::kHalf, 0x2}, {2892, Kind::kWord, 0x72}, {2844, Kind::kHalf, 0xF6},
+    {2846, Kind::kHalf, 0x78}, {2848, Kind::kHalf, 0xFFFF}, {2850, Kind::kHalf, 0xFFFF},
+    {2896, Kind::kWord, 0x73}, {2852, Kind::kHalf, 0xFFFF}, {2854, Kind::kHalf, 0xFFFF},
+    {2856, Kind::kHalf, 0xFFFF}, {2858, Kind::kHalf, 0xFFFF}, {2900, Kind::kWord, 0x74},
+    {2860, Kind::kWord, 0x9D}, {2884, Kind::kWord, 0x70}, {2916, Kind::kWord, 0x78},
+    {2936, Kind::kWord, 0xF6}, {2904, Kind::kWord, 0x75}, {2940, Kind::kWord, 0xFFFFFFFF},
+    {2944, Kind::kWord, 0xFFFFFFFF}, {2948, Kind::kWord, 0xFFFFFFFF},
+    {2952, Kind::kWord, 0xFFFFFFFF}, {2908, Kind::kWord, 0x76}, {2956, Kind::kWord, 0xFFFFFFFF},
+    {2960, Kind::kWord, 0xFFFFFFFF}, {2964, Kind::kWord, 0xFFFFFFFF},
+    {2968, Kind::kWord, 0xFFFFFFFF}, {2912, Kind::kWord, 0x77}, {2972, Kind::kWord, 0xFFFFFFFF},
+    {2976, Kind::kWord, 0xFFFFFFFF}, {2980, Kind::kWord, 0xFFFFFFFF},
+    {2984, Kind::kWord, 0xFFFFFFFF}, {2920, Kind::kWord, 0x7D}, {2924, Kind::kWord, 0x7E},
+    {2928, Kind::kWord, 0x7F}, {2932, Kind::kWord, 0x123}, {3020, Kind::kFloat, 0x82001FD4},
+    {3204, Kind::kFloat, 0x82001FD4}, {2988, Kind::kWord, 0xFFFFFFFF},
+    {2992, Kind::kWord, 0xFFFFFFFF}, {2996, Kind::kWord, 0xFFFFFFFF},
+    {3000, Kind::kWord, 0xFFFFFFFF}, {3030, Kind::kHalf, 0x1D}, {3004, Kind::kWord, 0xFFFFFFFF},
+    {3008, Kind::kWord, 0xFFFFFFFF}, {3012, Kind::kWord, 0xFFFFFFFF},
+    {3016, Kind::kWord, 0xFFFFFFFF}, {3048, Kind::kWord, 0x90}, {3024, Kind::kHalf, 0x9D},
+    {3026, Kind::kHalf, 0x2}, {3028, Kind::kHalf, 0xD8}, {3032, Kind::kHalf, 0xFFFF},
+    {3052, Kind::kWord, 0x91}, {3034, Kind::kHalf, 0xFFFF}, {3036, Kind::kHalf, 0xFFFF},
+    {3038, Kind::kHalf, 0xFFFF}, {3040, Kind::kHalf, 0xFFFF}, {3056, Kind::kWord, 0x92},
+    {3042, Kind::kHalf, 0xFFFF}, {3044, Kind::kWord, 0x9D}, {3068, Kind::kWord, 0x70},
+    {3100, Kind::kWord, 0x78}, {3060, Kind::kWord, 0x6E}, {3148, Kind::kWord, 0xD8},
+    {3152, Kind::kWord, 0xFFFFFFFF}, {3156, Kind::kWord, 0xFFFFFFFF},
+    {3160, Kind::kWord, 0xFFFFFFFF}, {3064, Kind::kWord, 0x6F}, {3164, Kind::kWord, 0xFFFFFFFF},
+    {3168, Kind::kWord, 0xFFFFFFFF}, {3172, Kind::kWord, 0xFFFFFFFF},
+    {3176, Kind::kWord, 0xFFFFFFFF}, {3072, Kind::kWord, 0x71}, {3180, Kind::kWord, 0xFFFFFFFF},
+    {3184, Kind::kWord, 0xFFFFFFFF}, {3188, Kind::kWord, 0xFFFFFFFF}, {3076, Kind::kWord, 0x72},
+    {3080, Kind::kWord, 0x73}, {3084, Kind::kWord, 0x74}, {3088, Kind::kWord, 0x75},
+    {3092, Kind::kWord, 0x76}, {3096, Kind::kWord, 0x77}, {3104, Kind::kWord, 0x7A},
+    {3108, Kind::kWord, 0x7B}, {3112, Kind::kWord, 0x7C}, {3116, Kind::kWord, 0xE4},
+    {3120, Kind::kWord, 0xDB}, {3124, Kind::kWord, 0xDC}, {3128, Kind::kWord, 0xDD},
+    {3132, Kind::kWord, 0xDF}, {3136, Kind::kWord, 0xD4}, {3140, Kind::kWord, 0xD5},
+    {3144, Kind::kWord, 0xD7}, {3388, Kind::kFloat, 0x82001FD4}, {3572, Kind::kFloat, 0x82001FD4},
+    {3192, Kind::kWord, 0xFFFFFFFF}, {3196, Kind::kWord, 0xFFFFFFFF},
+    {3200, Kind::kWord, 0xFFFFFFFF}, {3214, Kind::kHalf, 0x47}, {3248, Kind::kWord, 0x1B},
+    {3210, Kind::kHalf, 0x12}, {3232, Kind::kWord, 0x12}, {3394, Kind::kHalf, 0x12},
+    {3236, Kind::kWord, 0x13}, {3252, Kind::kWord, 0x1C}, {3416, Kind::kWord, 0x12},
+    {3208, Kind::kHalf, 0x15}, {3212, Kind::kHalf, 0x114}, {3216, Kind::kHalf, 0xFFFF},
+    {3218, Kind::kHalf, 0xFFFF}, {3220, Kind::kHalf, 0xFFFF}, {3222, Kind::kHalf, 0xFFFF},
+    {3224, Kind::kHalf, 0xFFFF}, {3226, Kind::kHalf, 0xFFFF}, {3228, Kind::kWord, 0x15},
+    {3240, Kind::kWord, 0x19}, {3244, Kind::kWord, 0x1A}, {3256, Kind::kWord, 0x113},
+    {3260, Kind::kWord, 0x114}, {3264, Kind::kWord, 0xFFFFFFFF}, {3268, Kind::kWord, 0xFFFFFFFF},
+    {3272, Kind::kWord, 0xFFFFFFFF}, {3276, Kind::kWord, 0xFFFFFFFF},
+    {3280, Kind::kWord, 0xFFFFFFFF}, {3284, Kind::kWord, 0xFFFFFFFF},
+    {3288, Kind::kWord, 0xFFFFFFFF}, {3292, Kind::kWord, 0xFFFFFFFF},
+    {3296, Kind::kWord, 0xFFFFFFFF}, {3300, Kind::kWord, 0xFFFFFFFF},
+    {3304, Kind::kWord, 0xFFFFFFFF}, {3308, Kind::kWord, 0xFFFFFFFF},
+    {3312, Kind::kWord, 0xFFFFFFFF}, {3316, Kind::kWord, 0xFFFFFFFF},
+    {3320, Kind::kWord, 0xFFFFFFFF}, {3324, Kind::kWord, 0xFFFFFFFF},
+    {3328, Kind::kWord, 0xFFFFFFFF}, {3332, Kind::kWord, 0xFFFFFFFF},
+    {3336, Kind::kWord, 0xFFFFFFFF}, {3340, Kind::kWord, 0xFFFFFFFF},
+    {3344, Kind::kWord, 0xFFFFFFFF}, {3348, Kind::kWord, 0xFFFFFFFF},
+    {3352, Kind::kWord, 0xFFFFFFFF}, {3356, Kind::kWord, 0xFFFFFFFF},
+    {3360, Kind::kWord, 0xFFFFFFFF}, {3364, Kind::kWord, 0xFFFFFFFF},
+    {3368, Kind::kWord, 0xFFFFFFFF}, {3372, Kind::kWord, 0xFFFFFFFF},
+    {3376, Kind::kWord, 0xFFFFFFFF}, {3380, Kind::kWord, 0xFFFFFFFF},
+    {3384, Kind::kWord, 0xFFFFFFFF}, {3392, Kind::kHalf, 0x15}, {3396, Kind::kHalf, 0xC1},
+    {3398, Kind::kHalf, 0x2B}, {3400, Kind::kHalf, 0xFFFF}, {3402, Kind::kHalf, 0xFFFF},
+    {3404, Kind::kHalf, 0xFFFF}, {3406, Kind::kHalf, 0xFFFF}, {3408, Kind::kHalf, 0xFFFF},
+    {3410, Kind::kHalf, 0xFFFF}, {3412, Kind::kWord, 0x15}, {3420, Kind::kWord, 0x13},
+    {3424, Kind::kWord, 0x19}, {3428, Kind::kWord, 0x1A}, {3440, Kind::kWord, 0xCC},
+    {3484, Kind::kWord, 0xC1}, {3624, Kind::kWord, 0x30}, {3636, Kind::kWord, 0xC1},
+    {3432, Kind::kWord, 0x17}, {3756, Kind::kFloat, 0x82001FD4}, {3480, Kind::kWord, 0xC6},
+    {3488, Kind::kWord, 0xFFFFFFFF}, {3492, Kind::kWord, 0xFFFFFFFF}, {3436, Kind::kWord, 0x18},
+    {3496, Kind::kWord, 0xFFFFFFFF}, {3500, Kind::kWord, 0xFFFFFFFF},
+    {3504, Kind::kWord, 0xFFFFFFFF}, {3508, Kind::kWord, 0xFFFFFFFF}, {3444, Kind::kWord, 0xCD},
+    {3512, Kind::kWord, 0xFFFFFFFF}, {3516, Kind::kWord, 0xFFFFFFFF},
+    {3520, Kind::kWord, 0xFFFFFFFF}, {3524, Kind::kWord, 0xFFFFFFFF}, {3448, Kind::kWord, 0xC7},
+    {3528, Kind::kWord, 0xFFFFFFFF}, {3532, Kind::kWord, 0xFFFFFFFF},
+    {3536, Kind::kWord, 0xFFFFFFFF}, {3540, Kind::kWord, 0xFFFFFFFF}, {3452, Kind::kWord, 0xC8},
+    {3544, Kind::kWord, 0xFFFFFFFF}, {3548, Kind::kWord, 0xFFFFFFFF},
+    {3552, Kind::kWord, 0xFFFFFFFF}, {3556, Kind::kWord, 0xFFFFFFFF}, {3456, Kind::kWord, 0xC9},
+    {3560, Kind::kWord, 0xFFFFFFFF}, {3564, Kind::kWord, 0xFFFFFFFF},
+    {3568, Kind::kWord, 0xFFFFFFFF}, {3578, Kind::kHalf, 0xA}, {3460, Kind::kWord, 0xCA},
+    {3580, Kind::kHalf, 0xBB}, {3582, Kind::kHalf, 0x0}, {3584, Kind::kHalf, 0xFFFF},
+    {3586, Kind::kHalf, 0xFFFF}, {3464, Kind::kWord, 0xCB}, {3588, Kind::kHalf, 0xFFFF},
+    {3590, Kind::kHalf, 0xFFFF}, {3592, Kind::kHalf, 0xFFFF}, {3594, Kind::kHalf, 0xFFFF},
+    {3468, Kind::kWord, 0xC3}, {3600, Kind::kWord, 0x26}, {3604, Kind::kWord, 0x2A},
+    {3608, Kind::kWord, 0x2C}, {3612, Kind::kWord, 0x2D}, {3472, Kind::kWord, 0xC4},
+    {3616, Kind::kWord, 0x2E}, {3620, Kind::kWord, 0x32}, {3628, Kind::kWord, 0x31},
+    {3632, Kind::kWord, 0xC6}, {3476, Kind::kWord, 0xC5}, {3640, Kind::kWord, 0xC2},
+    {3644, Kind::kWord, 0xBB}, {3648, Kind::kWord, 0xFFFFFFFF}, {3652, Kind::kWord, 0xFFFFFFFF},
+    {3576, Kind::kHalf, 0x28}, {3596, Kind::kWord, 0x28}, {3656, Kind::kWord, 0xFFFFFFFF},
+    {3796, Kind::kWord, 0x2D}, {3880, Kind::kWord, 0x0}, {3784, Kind::kWord, 0x26},
+    {3788, Kind::kWord, 0x2A}, {3792, Kind::kWord, 0x2C}, {3808, Kind::kWord, 0x33},
+    {3804, Kind::kWord, 0x32}, {3884, Kind::kWord, 0x7}, {3940, Kind::kFloat, 0x82001FD4},
+    {4124, Kind::kFloat, 0x82001FD4}, {3812, Kind::kWord, 0x34}, {3660, Kind::kWord, 0xFFFFFFFF},
+    {3664, Kind::kWord, 0xFFFFFFFF}, {3668, Kind::kWord, 0xFFFFFFFF},
+    {3672, Kind::kWord, 0xFFFFFFFF}, {3852, Kind::kWord, 0xE9}, {3676, Kind::kWord, 0xFFFFFFFF},
+    {3680, Kind::kWord, 0xFFFFFFFF}, {3684, Kind::kWord, 0xFFFFFFFF},
+    {3688, Kind::kWord, 0xFFFFFFFF}, {3856, Kind::kWord, 0xEA}, {3692, Kind::kWord, 0xFFFFFFFF},
+    {3696, Kind::kWord, 0xFFFFFFFF}, {3700, Kind::kWord, 0xFFFFFFFF},
+    {3704, Kind::kWord, 0xFFFFFFFF}, {3868, Kind::kWord, 0x3}, {3708, Kind::kWord, 0xFFFFFFFF},
+    {3712, Kind::kWord, 0xFFFFFFFF}, {3716, Kind::kWord, 0xFFFFFFFF},
+    {3720, Kind::kWord, 0xFFFFFFFF}, {3724, Kind::kWord, 0xFFFFFFFF},
+    {3728, Kind::kWord, 0xFFFFFFFF}, {3732, Kind::kWord, 0xFFFFFFFF},
+    {3736, Kind::kWord, 0xFFFFFFFF}, {3740, Kind::kWord, 0xFFFFFFFF},
+    {3744, Kind::kWord, 0xFFFFFFFF}, {3748, Kind::kWord, 0xFFFFFFFF},
+    {3752, Kind::kWord, 0xFFFFFFFF}, {3760, Kind::kHalf, 0x28}, {3762, Kind::kHalf, 0xA},
+    {3764, Kind::kHalf, 0x9A}, {3766, Kind::kHalf, 0x1}, {3768, Kind::kHalf, 0xFFFF},
+    {3770, Kind::kHalf, 0xFFFF}, {3772, Kind::kHalf, 0xFFFF}, {3774, Kind::kHalf, 0xFFFF},
+    {3776, Kind::kHalf, 0xFFFF}, {3778, Kind::kHalf, 0xFFFF}, {3780, Kind::kWord, 0x28},
+    {3800, Kind::kWord, 0x2E}, {3816, Kind::kWord, 0x108}, {3820, Kind::kWord, 0x109},
+    {3824, Kind::kWord, 0x10A}, {3828, Kind::kWord, 0x10B}, {3832, Kind::kWord, 0x10C},
+    {3836, Kind::kWord, 0x10D}, {3840, Kind::kWord, 0x10E}, {3844, Kind::kWord, 0x10F},
+    {3848, Kind::kWord, 0xE8}, {3860, Kind::kWord, 0x1}, {3864, Kind::kWord, 0x2},
+    {3872, Kind::kWord, 0x4}, {3876, Kind::kWord, 0x5}, {3888, Kind::kWord, 0x8},
+    {3892, Kind::kWord, 0x97}, {3950, Kind::kHalf, 0xA}, {3904, Kind::kWord, 0x9A},
+    {3908, Kind::kWord, 0xFFFFFFFF}, {3912, Kind::kWord, 0xFFFFFFFF},
+    {3916, Kind::kWord, 0xFFFFFFFF}, {3980, Kind::kWord, 0x50}, {3896, Kind::kWord, 0x98},
+    {3920, Kind::kWord, 0xFFFFFFFF}, {3924, Kind::kWord, 0xFFFFFFFF},
+    {3928, Kind::kWord, 0xFFFFFFFF}, {3984, Kind::kWord, 0x51}, {3900, Kind::kWord, 0x99},
+    {3932, Kind::kWord, 0xFFFFFFFF}, {3936, Kind::kWord, 0xFFFFFFFF}, {3946, Kind::kHalf, 0xC},
+    {3988, Kind::kWord, 0x52}, {3944, Kind::kHalf, 0x4E}, {3948, Kind::kHalf, 0x6B},
+    {3952, Kind::kHalf, 0xFFFF}, {3954, Kind::kHalf, 0xFFFF}, {3992, Kind::kWord, 0xC0},
+    {3956, Kind::kHalf, 0xFFFF}, {3958, Kind::kHalf, 0xFFFF}, {3960, Kind::kHalf, 0xFFFF},
+    {3962, Kind::kHalf, 0xFFFF}, {3996, Kind::kWord, 0xBA}, {3964, Kind::kWord, 0x4E},
+    {3968, Kind::kWord, 0x4B}, {3972, Kind::kWord, 0x4C}, {3976, Kind::kWord, 0x53},
+    {4000, Kind::kWord, 0xB7}, {4068, Kind::kWord, 0x69}, {4076, Kind::kWord, 0x6B},
+    {4080, Kind::kWord, 0xFFFFFFFF}, {4084, Kind::kWord, 0xFFFFFFFF}, {4004, Kind::kWord, 0xB8},
+    {4088, Kind::kWord, 0xFFFFFFFF}, {4008, Kind::kWord, 0xB9}, {4012, Kind::kWord, 0xB5},
+    {4016, Kind::kWord, 0xB6}, {4020, Kind::kWord, 0xE0}, {4024, Kind::kWord, 0xE1},
+    {4028, Kind::kWord, 0xB3}, {4032, Kind::kWord, 0xB4}, {4036, Kind::kWord, 0x5E},
+    {4040, Kind::kWord, 0x5F}, {4044, Kind::kWord, 0x61}, {4048, Kind::kWord, 0x63},
+    {4052, Kind::kWord, 0x65}, {4056, Kind::kWord, 0x66}, {4060, Kind::kWord, 0x67},
+    {4064, Kind::kWord, 0x68}, {4072, Kind::kWord, 0x6A}, {4128, Kind::kHalf, 0x4E},
+    {4148, Kind::kWord, 0x4E}, {4308, Kind::kFloat, 0x82001FD4}, {4152, Kind::kWord, 0x4B},
+    {4134, Kind::kHalf, 0xE}, {4092, Kind::kWord, 0xFFFFFFFF}, {4096, Kind::kWord, 0xFFFFFFFF},
+    {4100, Kind::kWord, 0xFFFFFFFF}, {4104, Kind::kWord, 0xFFFFFFFF},
+    {4108, Kind::kWord, 0xFFFFFFFF}, {4112, Kind::kWord, 0xFFFFFFFF},
+    {4116, Kind::kWord, 0xFFFFFFFF}, {4120, Kind::kWord, 0xFFFFFFFF}, {4130, Kind::kHalf, 0xC},
+    {4132, Kind::kHalf, 0x114}, {4136, Kind::kHalf, 0xFFFF}, {4138, Kind::kHalf, 0xFFFF},
+    {4140, Kind::kHalf, 0xFFFF}, {4142, Kind::kHalf, 0xFFFF}, {4164, Kind::kWord, 0x54},
+    {4144, Kind::kHalf, 0xFFFF}, {4146, Kind::kHalf, 0xFFFF}, {4156, Kind::kWord, 0x4C},
+    {4160, Kind::kWord, 0x53}, {4168, Kind::kWord, 0x55}, {4204, Kind::kWord, 0x108},
+    {4208, Kind::kWord, 0x109}, {4212, Kind::kWord, 0x10A}, {4216, Kind::kWord, 0x10B},
+    {4172, Kind::kWord, 0x56}, {4220, Kind::kWord, 0x10C}, {4224, Kind::kWord, 0x10D},
+    {4228, Kind::kWord, 0x10E}, {4232, Kind::kWord, 0x10F}, {4176, Kind::kWord, 0x101},
+    {4236, Kind::kWord, 0xE8}, {4248, Kind::kWord, 0x113}, {4252, Kind::kWord, 0x114},
+    {4256, Kind::kWord, 0xFFFFFFFF}, {4180, Kind::kWord, 0x102}, {4260, Kind::kWord, 0xFFFFFFFF},
+    {4264, Kind::kWord, 0xFFFFFFFF}, {4268, Kind::kWord, 0xFFFFFFFF},
+    {4272, Kind::kWord, 0xFFFFFFFF}, {4184, Kind::kWord, 0x103}, {4276, Kind::kWord, 0xFFFFFFFF},
+    {4280, Kind::kWord, 0xFFFFFFFF}, {4284, Kind::kWord, 0xFFFFFFFF},
+    {4288, Kind::kWord, 0xFFFFFFFF}, {4188, Kind::kWord, 0x104}, {4292, Kind::kWord, 0xFFFFFFFF},
+    {4296, Kind::kWord, 0xFFFFFFFF}, {4300, Kind::kWord, 0xFFFFFFFF},
+    {4304, Kind::kWord, 0xFFFFFFFF}, {4192, Kind::kWord, 0xEB}, {4196, Kind::kWord, 0x106},
+    {4200, Kind::kWord, 0x107}, {4240, Kind::kWord, 0x111}, {4244, Kind::kWord, 0x112},
+};
+
+// memcpy's call's return address (the original's lr), for its logs.
+constexpr uint32_t kMemcpyReturn = 0x82101624;
+
+}  // namespace
+
+bool CourseRoutesGet(uint8_t* base, uint64_t out, uint32_t index, uint32_t frame,
+                     uint32_t* source, uint64_t* result) {
+  ITC_NATIVE_RUNNING("sub_820FFF50 CourseRoutes::Get");
+  for (const Store& store : kStores) {
+    const uint32_t at = frame + store.offset;
+    switch (store.kind) {
+      case Kind::kHalf:
+        guest::StoreU16(base, at, uint16_t(store.value));
+        break;
+      case Kind::kWord:
+        guest::StoreU32(base, at, store.value);
+        break;
+      case Kind::kFloat:
+        guest::StoreFloat(base, at, float(double(guest::LoadFloat(base, store.value))));
+        break;
+      case Kind::kIndex:
+        guest::StoreU32(base, at, index);
+        break;
+      case Kind::kOut:
+        guest::StoreU32(base, at, uint32_t(out >> 32));
+        guest::StoreU32(base, at + 4, uint32_t(out));
+        break;
+    }
+  }
+  const uint64_t loaded_index = guest::LoadU32(base, frame + kRoutesIndexWord);
+  *result = uint64_t(guest::LoadU32(base, frame + kRoutesOutWord)) << 32 |
+            guest::LoadU32(base, frame + kRoutesOutWord + 4);
+  *source = uint32_t(loaded_index * kRouteBytes + frame + 80);
+  return native::Buffers_Memcpy(base, uint32_t(*result), *source, kRouteBytes, kMemcpyReturn);
+}
+
+namespace {
+
+// A caller's copy of course route `index`: CourseRoutes::Get into the
+// caller's frame at +`out` (its own frame below, frame - 4480), then memcpy
+// (sub_825A7410, from `caller`) of that to the caller's +96. Returns the
+// copy's first word (+96). Only after RouteCopiesNative said yes.
+uint32_t CopyRoute(uint8_t* base, uint32_t frame, uint32_t out, uint32_t index, uint32_t caller) {
+  uint32_t source = 0;
+  uint64_t result = 0;
+  const bool got =
+      CourseRoutesGet(base, frame + out, index, frame - kRoutesFrameBytes, &source, &result);
+  const bool copied =
+      native::Buffers_Memcpy(base, frame + 96, uint32_t(result), kRouteBytes, caller);
+  if (!got || !copied) {
+    ITC_LOG_ERROR("race_setup: a route's copy at {:08X} (route {}) not made natively", frame,
+                  index);
+  }
+  return guest::LoadU32(base, frame + 96);
+}
+
+}  // namespace
+
+bool RouteCopiesNative(uint32_t frame, uint32_t out, uint32_t index) {
+  if (!native::Buffers_NativeMemcpy()) {
+    return false;
+  }
+  const uint32_t table = frame - kRoutesFrameBytes + 80;
+  const uint32_t source = uint32_t(uint64_t(index) * kRouteBytes + table);
+  return !c_runtime::MayShare(frame + out, kRouteBytes, source, kRouteBytes) &&
+         !c_runtime::MayShare(frame + 96, kRouteBytes, frame + out, kRouteBytes);
+}
+
+namespace {
+
+// The route's first and last positions from the copy at frame + 96: +8 =
+// its word +0, +12 = sub_820FFEB0's pair (into frame + 80, then copied by
+// halfwords).
+void RoutePositions(uint8_t* base, uint32_t route, uint32_t frame, uint32_t first) {
+  guest::StoreU32(base, route + 8, first);
+  vehicle_accessors::PairsLast(base, frame + 80, frame + 96);
+  guest::StoreU16(base, route + 12, guest::LoadU16(base, frame + 80));
+  guest::StoreU16(base, route + 14, guest::LoadU16(base, frame + 82));
+}
+
+}  // namespace
+
+bool RouteSet(uint8_t* base, uint32_t route, uint32_t index, uint32_t location, uint32_t frame) {
+  if (!RouteCopiesNative(frame, kRouteFrameOut, index)) {
+    return false;
+  }
+  ITC_NATIVE_RUNNING("sub_82101A10 Route::Set");
+  guest::StoreU32(base, route + 0, index);
+  guest::StoreU32(base, route + 4, int32_t(location) == 48 ? index + 20 : location);
+  const uint32_t first = CopyRoute(base, frame, kRouteFrameOut, index, 0x82101A58);
+  RoutePositions(base, route, frame, first);
+  return true;
+}
+
+bool RouteReset(uint8_t* base, uint32_t route, uint32_t frame) {
+  if (!RouteCopiesNative(frame, kRouteFrameOut, 0)) {
+    return false;
+  }
+  ITC_NATIVE_RUNNING("sub_82101990 Route::Reset");
+  guest::StoreU32(base, route + 0, 0);
+  guest::StoreU32(base, route + 4, 20);
+  const uint32_t first = CopyRoute(base, frame, kRouteFrameOut, 0, 0x821019D0);
+  RoutePositions(base, route, frame, first);
+  return true;
+}
+
+namespace {
+
+// Race::StartPosition's cases (r3 - 1, 0 to 45): a course route's index and
+// where its out goes in the frame, or a fixed pair (out 0).
+struct StartCase {
+  uint16_t index_or_section;
+  uint16_t out_or_slice;
+  bool route;
+};
+
+constexpr StartCase kStartCases[46] = {
+    {132, 0, false},   {292, 0, false},   {229, 0, false},   {130, 0, false},
+    {129, 0, false},   {131, 0, false},   {128, 0, false},   {137, 0, false},
+    {134, 0, false},   {136, 0, false},   {133, 0, false},   {42, 30, false},
+    {68, 50, false},   {11, 4320, true},  {13, 3168, true},  {15, 864, true},
+    {17, 5088, true},  {19, 1248, true},  {21, 3552, true},  {0, 1632, true},
+    {1, 4704, true},   {2, 2016, true},   {3, 3936, true},   {4, 2400, true},
+    {5, 5472, true},   {6, 2784, true},   {7, 288, true},    {8, 480, true},
+    {9, 672, true},    {10, 1056, true},  {11, 1440, true},  {12, 1824, true},
+    {13, 2208, true},  {14, 2592, true},  {15, 2976, true},  {16, 3360, true},
+    {17, 3744, true},  {18, 4128, true},  {19, 4512, true},  {20, 4896, true},
+    {21, 5280, true},  {22, 5664, true},  {0, 10, false},    {0, 0, false},
+    {40, 40, false},   {40, 400, false},
+};
+
+}  // namespace
+
+bool StartPositionNative(uint32_t location, uint32_t frame) {
+  const uint32_t which = location - 1;
+  const StartCase c = which <= 45 ? kStartCases[which] : StartCase{135, 0, false};
+  return !c.route || RouteCopiesNative(frame, c.out_or_slice, c.index_or_section);
+}
+
+bool StartPosition(uint8_t* base, uint32_t location, uint32_t frame, uint32_t* result) {
+  const uint32_t which = location - 1;
+  const StartCase c = which <= 45 ? kStartCases[which] : StartCase{135, 0, false};
+  if (c.route && !RouteCopiesNative(frame, c.out_or_slice, c.index_or_section)) {
+    return false;
+  }
+  ITC_NATIVE_RUNNING("sub_82101A98 Race::StartPosition");
+  if (c.route) {
+    *result = CopyRoute(base, frame, c.out_or_slice, c.index_or_section, 0x82101AF8);
+    return true;
+  }
+  guest::StoreU16(base, frame + 80, c.index_or_section);
+  guest::StoreU16(base, frame + 82, c.out_or_slice);
+  *result = guest::LoadU32(base, frame + 80);
+  return true;
+}
+
+bool RaceSetRoute(uint8_t* base, uint32_t index, uint32_t location, uint32_t frame) {
+  // (A tail call: Route::Set's frame is this one's caller's.)
+  if (!RouteCopiesNative(frame, kRouteFrameOut, index)) {
+    return false;
+  }
+  ITC_NATIVE_RUNNING("sub_82101D38 Race::SetRoute");
+  return RouteSet(base, guest::LoadU32(base, kRaceData) + 4, index, location, frame);
+}
+
+bool StagesSetRoute(uint8_t* base, uint32_t list, uint32_t index, uint32_t location,
+                    uint32_t stage, uint32_t frame) {
+  if (!RouteCopiesNative(frame, kRouteFrameOut, index)) {
+    return false;
+  }
+  ITC_NATIVE_RUNNING("sub_82101E90 Stages::SetRoute");
+  if (int32_t(stage) == -1) {
+    stage = guest::LoadU32(base, list + 804);
+  }
+  return RouteSet(base, stage * 80 + list + 24, index, location, frame);
+}
+
+}  // namespace race_setup

@@ -135,6 +135,10 @@ set(ITC_SOURCES
     src/car_physics/vehicle_state.cpp
     src/car_physics/collision_world.cpp
     src/car_physics/car_data.cpp
+    src/car_physics/car_setup.cpp
+    src/car_physics/vehicle_physics.cpp
+    src/hooks/vehicle_native.cpp
+    src/vehicle/vehicle.cpp
     src/hooks/collision.cpp
     src/collision/shapes.cpp
     src/collision/boxes.cpp
@@ -192,6 +196,11 @@ set(ITC_SOURCES
     src/shader_objects/shader_objects.cpp
     src/hooks/race_hud.cpp
     src/race_hud/race_hud.cpp
+    src/hooks/race_setup.cpp
+    src/race_setup/car.cpp
+    src/race_setup/race_data.cpp
+    src/race_setup/course_routes.cpp
+    src/race_setup/set_up.cpp
     src/hooks/screen_objects.cpp
     src/screen_objects/uv_trees.cpp
     src/screen_objects/screen_objects.cpp
@@ -263,6 +272,8 @@ set(ITC_SOURCES
     src/harnesses/vehicle_accessors.cpp
     src/harnesses/matrix_math.cpp
     src/harnesses/car_physics.cpp
+    src/harnesses/car_physics_objects.cpp
+    src/harnesses/vehicle.cpp
     src/harnesses/collision.cpp
     src/harnesses/collision_world.cpp
     src/harnesses/collision_world_walls.cpp
@@ -286,6 +297,7 @@ set(ITC_SOURCES
     src/harnesses/shader_objects.cpp
     src/harnesses/data_file.cpp
     src/harnesses/race_hud.cpp
+    src/harnesses/race_setup.cpp
     src/harnesses/ui_movie_objects.cpp
     src/harnesses/models.cpp
     src/harnesses/action_mappers.cpp
@@ -374,7 +386,9 @@ set(ITC_SOURCES
 # objects (src/screen_objects/, docs/functions/screen-objects.md) and the
 # model draws (src/scenery_lists/model_draws.cpp,
 # docs/functions/scenery-lists.md) and the model's load (its weights,
-# src/models/model_load.cpp, docs/functions/models.md).
+# src/models/model_load.cpp, docs/functions/models.md) and the race's set-up
+# (src/race_setup/, docs/functions/race-setup.md) and the vehicle above the
+# car physics (src/vehicle/, docs/functions/vehicle.md).
 set_source_files_properties(src/c_runtime/math.cpp src/ui_movies/keys.cpp
     src/ui_movies/animation.cpp
     src/ui_movies/draw.cpp src/ui_movies/texts.cpp src/ui_movies/update.cpp
@@ -382,7 +396,8 @@ set_source_files_properties(src/c_runtime/math.cpp src/ui_movies/keys.cpp
     src/matrix_math/matrix_math.cpp src/car_physics/rigid_body.cpp
     src/car_physics/vehicle_step.cpp src/car_physics/vehicle_update.cpp
     src/car_physics/vehicle_state.cpp src/car_physics/collision_world.cpp
-    src/car_physics/car_data.cpp src/collision/shapes.cpp
+    src/car_physics/car_data.cpp src/car_physics/car_setup.cpp
+    src/car_physics/vehicle_physics.cpp src/collision/shapes.cpp
     src/collision/boxes.cpp src/collision/shape_record.cpp
     src/collision/box_box.cpp src/collision/impacts.cpp src/collision/pairs.cpp
     src/track_collision/track_world.cpp src/track_collision/track_mesh.cpp
@@ -393,7 +408,9 @@ set_source_files_properties(src/c_runtime/math.cpp src/ui_movies/keys.cpp
     src/strings_and_font/strings_and_font.cpp src/strings_and_font/font.cpp
     src/track_route/track_route.cpp src/ai_drivers/ai_drivers.cpp
     src/screen_objects/screen_objects.cpp src/scenery_lists/model_draws.cpp
-    src/models/model_load.cpp src/course_scenery/collect.cpp PROPERTIES
+    src/models/model_load.cpp src/course_scenery/collect.cpp
+    src/race_setup/car.cpp src/race_setup/race_data.cpp src/race_setup/course_routes.cpp
+    src/race_setup/set_up.cpp src/vehicle/vehicle.cpp PROPERTIES
     COMPILE_OPTIONS "-ffp-model=strict;-ffp-contract=off"
     SKIP_PRECOMPILE_HEADERS ON)
 

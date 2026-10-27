@@ -1453,6 +1453,29 @@ void WallCases(Context& h, uint32_t area) {
 
 }  // namespace
 
+// For the vehicle's harness (src/harnesses/vehicle.cpp): the ground's mesh
+// and the course's route over it (the TrackPosition::Update and Init cases'
+// course, numbers only), built in `area` and installed as the game's (the
+// mesh at 0x826C5B1C, the route at 0x826C5B10: the caller saves and puts
+// them back). Points over it: x within -10 to 10, z within 0 to 60, the
+// ground's height 0 to 1; two route sections of 6 slices (5 apart along z,
+// section 1 from z = 30). `table`: 65,536 words, filled once.
+uint32_t TestCourseBytes() {
+  return kRouteP + kRouteBytes;
+}
+void FillTestCourseTable(uint8_t* base, uint32_t area, uint32_t table) {
+  for (uint32_t i = 0; i < 0x10000; i++) {
+    guest::StoreU32(base, table + 4 * i, area + kRouteSectionP + kRouteSectionBytes * (i % 2));
+  }
+}
+void BuildTestCourse(uint8_t* base, uint32_t area, uint32_t table, Random& r) {
+  std::vector<uint32_t> triangles, quads;
+  BuildMesh(base, area, r, triangles, quads, false);
+  std::memcpy(base + tc::kMesh, base + area + kMeshP, 12);
+  BuildRoute(base, area, table, r);
+  guest::StoreU32(base, kRoute, area + kRouteFileP);
+}
+
 // The wall query's cases (collision_world_walls.cpp).
 void CollisionWorldWalls(Context& h, uint32_t area);
 

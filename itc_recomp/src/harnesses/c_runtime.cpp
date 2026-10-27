@@ -2155,7 +2155,7 @@ void CRuntime(Context& h) {
   }
 
   // The array helpers: each kind of element function the game passes (the
-  // native SetWsToOne and Particle::Particle, the translated sub_82101D20,
+  // native SetWsToOne, Particle::Particle and sub_82101D20 (race_setup's),
   // the empty destructor) and Vec3::SwapXZ, whose swaps over overlapping
   // elements show the order; the game's sizes and small overlapping ones,
   // counts of none, below none, one and many (some with bits above the low

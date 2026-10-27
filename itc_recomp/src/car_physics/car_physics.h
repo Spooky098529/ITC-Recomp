@@ -15,6 +15,7 @@
 #pragma once
 
 #include <cstdint>
+#include <functional>
 
 namespace car_physics {
 
@@ -573,10 +574,290 @@ void CarDataFillAxle(uint8_t* base, uint32_t data, uint32_t source, uint32_t is_
 // CarData::ConvertUnits (sub_820AF018): the file's units converted. Returns
 // what the original leaves in f1 (+812's new value).
 double CarDataConvertUnits(uint8_t* base, uint32_t data);
+// CarData::Derive (sub_820AF1C0): the parameters derived from the loaded
+// ones (its row): the axles' points, the four wheel set-up records (+880),
+// the center of mass and the inertia, the axles' weight shares, a
+// temporary rigid body (at `frame` + 352) for the effective masses, the
+// suspension sub-records, +1800, +1804 and the 9 reciprocals at +1668.
+// `frame`: the original's 1008 bytes (the callees' below it; temporaries
+// at its offsets). Returns what the original leaves in f1 (the second
+// sqrtf); r3 comes back as `frame` + 352.
+double CarDataDerive(uint8_t* base, uint32_t data, uint32_t frame);
+// sub_820C05C8 (the name ours: CarData::ApplySettings): the car object's
+// signed setting bytes (car +72 to +94) and tuning (+1700, +1704, +1756)
+// applied to the car data (its row), with the spec's block 2 (`spec`, car
+// +1888) for the ride heights. `frame`: the original's 192 bytes (each
+// setting byte converted through its +80, the tuning's table at +80 to +92;
+// pow's x and y at +16 and +24 as the recompiled pow stores them). Returns
+// what the original leaves in f1 (its last pow); r3 isn't kept (pow's).
+double CarDataApplySettings(uint8_t* base, uint32_t data, uint32_t car, uint32_t spec,
+                            uint32_t frame);
+// Whether Vehicle::ApplyTuning's memcpy (36 bytes of the car's aero parts,
+// car +3804 or +3840, to `frame` + 208) is copied natively
+// (c_runtime::Memcpy's ranges, as the C runtime's other native callers
+// check): callers check it before writing anything, and run the original
+// where it isn't.
+bool VehicleApplyTuningCopyFits(uint32_t car, uint32_t frame);
+// Vehicle::ApplyTuning (sub_820C0D28): the car object's tuning levels (car
+// +1648 on) applied to the car data (its row), through multiplier tables
+// the original builds on its stack, the cylinder count from the spec's
+// block 2 (car +1888) and the aero parts (car +3636). `frame`: the
+// original's 480 bytes (the tables at +96 to +244, read at the level x 4
+// unchecked, the levels' std at +80, the copied aero record at +208, a
+// last unused array at +96 to +112; its register saves from +256 not
+// reproduced). Call only where VehicleApplyTuningCopyFits. Returns r3 as
+// the original leaves it (the last of a constant's base, 0x82000000
+// sign-extended, memcpy's and Object::Record1888's); f1 comes back as the
+// float at 0x8200256C (0.04; `*f1`).
+uint64_t VehicleApplyTuning(uint8_t* base, uint32_t data, uint32_t car, uint32_t frame,
+                            double* f1);
+// Vehicle::SetupFromCar (sub_820C27E8): the car loader, the car data
+// filled from the car object (`car`; its copies of its spec: block 2 at
+// +1888, block 1 +2240, the engine stage +2880, the tires +3084 and +3176;
+// its row): the copies, the gear ratios' magnitudes, the torque curve
+// (copied again for fctiwz(+1280 x [0x82002CE8]) points, counted through
+// `frame` + 80), the axles (CarData::FillAxle from the tires' copies at
+// `frame` + 128 and + 208), the record by +176 from the table at
+// 0x8260181C (unchecked), Vehicle::ApplyTuning, CarData::ApplySettings, the
+// flag +3888, the axles' positions (built at `frame` + 112 and + 96, the
+// camber settings' widening by sin), CarData::ConvertUnits and
+// CarData::Derive. `frame`: the original's 368 bytes (its register saves
+// from +288 not reproduced); the callees' frames below it at the
+// original's offsets (ApplyTuning 480, ApplySettings 192, Derive 1008
+// bytes). False, with nothing written, where ApplyTuning's copy wouldn't be
+// native (VehicleApplyTuningCopyFits): the original runs there. Otherwise
+// `f1` gets what the original leaves (Derive's), and r3 comes back as
+// `frame` - 1008 + 352 (Derive's temporary body).
+bool VehicleSetupFromCar(uint8_t* base, uint32_t data, uint32_t car, uint32_t frame,
+                         double* f1);
 // Vehicle::Vehicle (sub_820B42C8): the w of its vectors 0.0, +3260 to
 // +3372 (every 16) 1.0, +336, +340, +344 = 0, Vehicle::Reset (its frame
 // below `frame`, the original's 112 bytes; `f1` what it leaves), byte
 // +2624 = 0.
 void VehicleConstruct(uint8_t* base, uint32_t vehicle, uint32_t frame, double* f1);
+
+// --- The vehicle's physics objects (src/car_physics/vehicle_physics.cpp):
+// its collision object in the world, the world's ground callback, its
+// teardown. Those that allocate or free guest memory (operator new and
+// delete through the C runtime's heap over the allocation layer) are called
+// only while --native_heap routes the game's heap to the layer (the
+// adapters' condition). ---
+
+// sub_8259D5A8 (RigidBody::SetFloat48): +48 = the float at `from` (lfs then
+// stfs: its bits).
+void RigidBodySetFloat48(uint8_t* base, uint32_t body, uint32_t from);
+// CollisionWorld::Callback (sub_820B8798): a tail call to the function at
+// the collision world's +8 (`[0x826C2D88]` + 8) with r3 to r5 passed on;
+// natively only for TrackCollision::GroundCallback (0x820FEAB0, the only
+// one set in play; its frame from `r1`, the caller's stack pointer).
+// False, with nothing done, for any other: the original makes the call.
+// `r3`: what the callback returns (1).
+bool CollisionWorldCallbackKnown(uint8_t* base);
+bool CollisionWorldCallback(uint8_t* base, uint32_t result, uint32_t point, uint32_t position,
+                            uint32_t r1, uint32_t* r3);
+// Whether CollisionWorld::RemoveObject's pair removals are all native (the
+// pairs' array below the physical views and in one view, so a moved pair's
+// memcpy is the native one: CollisionWorldRemovePair).
+bool CollisionWorldPairsMovable(uint8_t* base);
+// CollisionObject::ResetTransform (sub_820B7998): +288 = 1, then
+// CollisionShape::Place (the shape record +32) by the body's matrix
+// (RigidBody::Matrix of +16) twice. False, with nothing done, where a Place
+// wouldn't be native (the record's template or copies not boxes, or the
+// lowered template's stack copy not native). `frame`: the original's 112
+// bytes (Place's 608 below it). r3 comes back as the record (+32).
+bool CollisionObjectResetTransform(uint8_t* base, uint32_t object, uint32_t frame);
+// Whether CollisionShape::SetUp runs natively for an object's record (its
+// template a box, its copies deletable, the clones' allocation not
+// operator new's error path): CollisionObject::Init's and AddObject's check.
+bool CollisionObjectInitFits(uint8_t* base, uint32_t object, uint32_t shape, uint32_t memory);
+// CollisionObject::Init (sub_820B7A00): +16 = the body, +20 = the shape,
+// +244 = the groups; CollisionShape::SetUp(+32, the shape, the body's
+// matrix, `memory`) (its frame below `frame`, the original's 112 bytes);
+// +248 to +260 = -1; +160, +176, +304 = the zero vector; +192, +236, +240,
+// +264 to +288 = 0; +208 = (1, 1, 1, its w kept), +224 = 1.0. Only where
+// CollisionObjectInitFits.
+void CollisionObjectInit(uint8_t* base, uint32_t object, uint32_t body, uint32_t shape,
+                         uint32_t groups, uint32_t memory, uint32_t frame);
+// CollisionWorld::AddObject (sub_820B9570): the first free object (+24)
+// moved to the active list (+20), +28 up, CollisionObject::Init (with the
+// world's +0; its frame below `frame`, the original's 128 bytes), its pairs
+// made (AddPairs with its +248). Returns the object; false, with nothing
+// done, with no free object or where Init wouldn't be native.
+bool CollisionWorldAddObject(uint8_t* base, uint32_t body, uint32_t shape, uint32_t groups,
+                             uint32_t frame, uint32_t* object);
+// Vehicle::DestroyPhysics (sub_820B0E70): the collision object (+340) back
+// to the world (RemoveObject), the +344 shape deleted through its slot 0
+// (Shape::DeletingDestructor, r4 = 1), the rigid body (+336) destroyed
+// (the empty destructor) and freed (operator delete), each zeroed. False,
+// with nothing done, where one of those wouldn't be native (the pairs'
+// moves, a shape that isn't a box, a block the layer didn't give). `r3`:
+// what the original leaves (the body, or with none the old +344).
+bool VehicleDestroyPhysics(uint8_t* base, uint32_t vehicle, uint32_t* r3);
+// Vehicle::ProbeGround (sub_820B4420): per wheel the ground below its +80
+// (CollisionWorld::Callback with its track position, the wheel's word +20,
+// into a result at `frame` + 176): +96 the distance plus the surface's +0
+// (Vehicle::SurfaceValue), +112 the normal, +20 the next position, +176 the
+// surface, +160 the contact point; the vehicle's +96 the normals' sum; the
+// axles' midpoints +1904, +2032; the ground frame +96 up, +112 forward,
+// +128 side, +144 to +176 (w 1.0); +92 the slip term (side over forward,
+// or atan2, times the speed squared clamped), +3112 the yaw rate, the
+// axles' velocities +1968, +2096, the velocity in the ground frame +384,
+// +88 the roll. Only where the callback is the ground's
+// (CollisionWorldCallbackKnown). `frame`: the original's 304 bytes (the
+// callback's from it). `f1` gets the last dot product (+88); returns the
+// original's r3 (`frame` + 160).
+uint32_t VehicleProbeGround(uint8_t* base, uint32_t vehicle, uint32_t frame, double* f1);
+// Vehicle::Unflip (sub_820AFE90): with +48 below 2.0 and +16 . +96 below
+// [0x820029C8], the ground under the body's center (the callback, r5 =
+// +2984, into `frame` + 288), a matrix from its normal (row 1), row 2 the
+// normal x +2528 normalized and row 0 row 2 x row 2 normalized (a zero
+// vector: the game's), its quaternion; the body's center of mass set from
+// the car data's +96, its position lowered by the distance, its
+// orientation the quaternion; byte +3132 = 0. False, with nothing done,
+// where the callback isn't the ground's (CollisionWorldCallbackKnown).
+// `frame`: the original's 384 bytes. `r3`: what the original leaves there
+// (the vehicle, +16, or the body's +336).
+bool VehicleUnflip(uint8_t* base, uint32_t vehicle, uint32_t frame, uint32_t* r3);
+// Vehicle::RefreshFromBody (sub_820B62E8): SyncFromBody, ProbeGround,
+// UpdateWheelAxes (their frames below `frame`, the original's 96 bytes).
+// Only where the callback is the ground's. Returns the original's r3
+// (UpdateWheelAxes').
+uint32_t VehicleRefreshFromBody(uint8_t* base, uint32_t vehicle, uint32_t frame);
+// Vehicle::PhysicsStep (sub_820B6498): the car's physics step (its row:
+// BeginStep with `dt`, the body's state, the ground, the suspension, the
+// collision object's +144 = -min([0x82001BDC], the wheels' +0), the
+// controls and the engine, the +2368 substeps of the tires and the
+// drivetrain, the forces applied, the state and ground again, the wear and
+// Unflip; +2520 = +2516, bytes +2444, +2445 = 0), each callee's plain C++
+// with the vehicle (the original passes it on in r3, which they leave as
+// it is) and its frame below `frame` (the original's 112 bytes) as the
+// original's. Where UpdateSteering or UpdateTorqueSplit would refuse (tan's
+// error path, mode 2: never in play), `original(address)` runs that
+// function's original instead (the adapter's guest call, with r3 the
+// vehicle and r1 `frame`), as the recompiled step's call to its adapter
+// would. Only where the callback is the ground's. Returns the original's
+// r3 (Unflip's).
+uint32_t VehiclePhysicsStep(uint8_t* base, uint32_t vehicle, double dt, uint32_t frame,
+                            const std::function<void(uint32_t address)>& original);
+// Vehicle::SetUpPhysics (sub_820B5670) and Vehicle::ResetPhysics
+// (sub_820B5B08): the vehicle's physics set up from its car data (their
+// rows): Vehicle::Reset, the wheels cleared, the wheels' pointers, the
+// mass; a new 528-byte rigid body (SetUpPhysics; ResetPhysics keeps +336)
+// reset and given its mass, inertia, center of mass, +48, +112 and gravity;
+// ResetPhysics' old collision object back to the world and old shape
+// deleted (slot 0); a new 496-byte box (+344) from the car data's corners
+// with its four values; a collision object from the world (AddObject) with
+// its size, +224, groups (`groups` | 0x07000000) and masks; the fields and
+// records cleared (ResetPhysics' +352 and +384 the zero vector too), the
+// wheels' +228, the gauges +2968 to +2980, byte +2249 (`byte`;
+// ResetPhysics' 1), SetUpGearing, SyncFromBody, ProbeGround, the drive and
+// the torque split, the gear values with one gear. Operator new and delete
+// through the C runtime's heap over the allocation layer (the adapters'
+// condition: --native_heap). False, with nothing done, where a step
+// wouldn't be native (the callback not the ground's, no process heap, no
+// free collision object or its record's copies not deletable, the pairs'
+// moves, the old shape not a box the layer gave). `frame`: the original's
+// 208 bytes (the callees' below). `f1` gets ProbeGround's; `r3` what the
+// original leaves (`frame` - 144).
+bool VehicleSetUpPhysics(uint8_t* base, uint32_t vehicle, uint32_t data, uint32_t byte,
+                         uint32_t groups, uint32_t frame, double* f1, uint32_t* r3);
+bool VehicleResetPhysics(uint8_t* base, uint32_t vehicle, uint32_t data, uint32_t groups,
+                         uint32_t frame, double* f1, uint32_t* r3);
+
+// --- The collision world's set-up (src/car_physics/collision_world.cpp),
+// over the C runtime's heap on the allocation layer (the adapter's
+// condition: --native_heap) ---
+
+// CollisionWorld::Create (sub_820B8D30) with no buffer (the only case in
+// play; the buffer's paths stay the original's): a 72-byte world into
+// 0x826C2D88 (+0 = 0, +56 = 0, +60 = 32, +12 = `objects`), +16 = that many
+// 320-byte collision objects (operator new[] with a count header, each
+// CollisionObject::CollisionObject; 0 when the allocation gives 0), +20 =
+// 0, +24 the free list of all of them (+228 next, +232 previous), +28 = 0,
+// +32 = `pairs`, +36 = that many 32-byte pairs, +40 = 0, +64 = 64 80-byte
+// query records (their w zeroed), +68 = +64 + 80 x +60, +44 = `contacts`,
+// +48 = that many 80-byte contacts (their w zeroed), +52 = 0, +4 = 1/30;
+// CollisionWorld::ResetSurfaces; the default callbacks (0x826C2D78 =
+// 0x825C8388, 0x826C2D7C = 0x820BC828, +8 = 0x820BC4D0). False, with
+// nothing done, with no process heap or a size operator new[] would refuse
+// (its error path). Returns the original's r3 (ResetSurfaces').
+bool CollisionWorldCreate(uint8_t* base, uint32_t objects, uint32_t pairs, uint32_t contacts,
+                          uint32_t* r3);
+// CollisionWorld::SetQueryCapacity (sub_820B9198) with no buffer (+0 0):
+// +60 = n, the old records (+64) freed (operator delete[]), +64 = 2n
+// 80-byte records (their w zeroed; 0 when the allocation gives 0), +68 =
+// +64 + 80n. False, with nothing done, where the old block isn't the
+// layer's, the world has a buffer, or the size would take operator new[]'s
+// error path. `r3`: what the original leaves (the new block).
+bool CollisionWorldSetQueryCapacity(uint8_t* base, uint32_t n, uint32_t* r3);
+// CollisionWorld::Setup (sub_820FF250): Create(50, 1000, 100, no buffer),
+// the queries' function pointers (0x820FF1B0, 0x820FEBD0), the world's +8
+// = TrackCollision::GroundCallback (0x820FEAB0), SetQueryCapacity(32) and
+// the surface settings (C 0.0 for the three bits, D 0.0, 1.0, 1.0, A 0.0,
+// 0.5, [0x82002968], B 0.0). False, with nothing done, where Create
+// wouldn't be native. `r3`: what the original leaves (the query block).
+bool CollisionWorldSetup(uint8_t* base, uint32_t* r3);
+
+// --- The collision world's update (src/car_physics/collision_world.cpp) ---
+
+// A guest call from the update's plain C++ (which stays without ctx): the
+// function at `address` with r3 to r6, r1 and lr as given; returns the r3
+// it leaves. The adapter's: the originals where a native callee refuses
+// (CollisionShape::Place 0x820BB758, CollisionPair::Solve 0x820BBE30,
+// CollisionObject::Respond 0x820B81C8), and the queries' targets other than
+// TrackCollision::WallHits and GroundHits (called through the pointers).
+using CollisionGuestCall = std::function<uint32_t(uint32_t address, uint32_t r3, uint32_t r4,
+                                                  uint32_t r5, uint32_t r6, uint32_t r1,
+                                                  uint32_t lr)>;
+// CollisionObject::Respond (sub_820B81C8): the `count` hits merged into the
+// world's +68 with a summary (CollisionRecords::Merge), the object pushed
+// out by the summary (CollisionObject::Translate) when its +260 meets the
+// summary's surface bits, and for each hit whose bits meet +256 (unless the
+// first query's skip case: `flag`'s word set, body word +516 bits 0x1 and
+// 0x2, |body +160| below [0x820021F8] and the summary's normal against body
+// +144 above 0.5) the restitution and friction impulses, the surface's
+// torque and a contact on +240. The 0x02000000 branch's Vec3::SubFrom
+// (sub_82294330, never seen in play) as Vec3::Sub(v, v, b). False, with
+// nothing done, where the record's current copy (+40) isn't a box
+// (CollisionObject::Translate wouldn't be native). `frame`: the original's
+// 416 bytes (pow's stores into its linkage area, +16 and +24, made). `r3`:
+// what the original leaves there.
+bool CollisionObjectRespond(uint8_t* base, uint32_t object, uint32_t hits, uint32_t count,
+                            uint32_t flag, uint32_t frame, uint32_t* r3);
+// CollisionObject::Collide (sub_820B8548): the world's query records (+64)
+// filled by the queries through 0x826C2D78 (the shape record) and
+// 0x826C2D7C (its current copy), r5 the object's +248; with hits, Respond
+// (the flag 1, then 0, at `frame` + 80). TrackCollision::WallHits and
+// GroundHits natively (whatever --native_collision_world says), other
+// targets and their refusals by `guest`; Respond's refusals by `guest`.
+// `frame`: the original's 128 bytes. Returns the original's r3.
+uint32_t CollisionObjectCollide(uint8_t* base, uint32_t object, uint32_t frame,
+                                const CollisionGuestCall& guest);
+// CollisionWorld::CollideAll (sub_820B89F0): Collide for each active object
+// whose +272 is 0. `frame`: the original's 96 bytes; `r3` the r3 it came
+// with. Returns the original's r3.
+uint32_t CollisionWorldCollideAll(uint8_t* base, uint32_t frame, uint32_t r3,
+                                  const CollisionGuestCall& guest);
+// CollisionWorld::SolvePairs (sub_820B87B0): the clock 0x826C2D80 += dt
+// (wrapped by [0x82002AA0] with each pair's +28), 0x826C2D84 = dt; two
+// passes: each active object's +304 = zero; each pair with a moved object
+// (+288) or due: +28 = CollisionPair::NextCheckTime, and within the step
+// the bodies' centers saved (`frame` + 80, + 96), CollisionPair::Solve
+// (refusals by `guest`), and when it hits both objects Collide'd and their
+// centers put back; after a hit, each object's +304 scaled by +208 and its
+// body's center moved by it (the second pass only after hits). `frame`: the
+// original's 208 bytes; `r3` the r3 it came with. Returns the original's r3.
+uint32_t CollisionWorldSolvePairs(uint8_t* base, double dt, uint32_t frame, uint32_t r3,
+                                  const CollisionGuestCall& guest);
+// CollisionWorld::Update (sub_820B92C8): +52 = 0, +56 = 1; each active
+// object's shape record placed by its body's matrix (CollisionShape::Place,
+// refusals by `guest`) unless +284 is set, +240 = 0; SolvePairs unless dt
+// is 0.0; CollideAll; each object with contacts and pushes (+192): the body's
+// force += +160, its torque += +176 / +192 x +224, ApplyImpulses(1.0); then
+// +288 = 0, and with pushes +160, +176 = zero, +192 = 0; +56 = 0. `frame`:
+// the original's 176 bytes; `r3` the r3 it came with. Returns the
+// original's r3.
+uint32_t CollisionWorldUpdate(uint8_t* base, double dt, uint32_t frame, uint32_t r3,
+                              const CollisionGuestCall& guest);
 
 }  // namespace car_physics

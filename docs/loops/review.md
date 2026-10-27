@@ -11,6 +11,111 @@ functions to check in a drive in the progress file.
 When the user has reviewed a run's section, its heading gets
 "(reviewed <date>)"; the section stays for the record.
 
+## Run 2026-10-25 23:42 (`b7-loop-25-10-26-4`)
+
+- The race's set-up (map 7d2acaa): `docs/functions/race-setup.md`, 52
+  new rows (none moved); shared rows left in `vehicle-accessors.md`
+  (`RacerRecord::Init`), `car-physics.md` and others; `known-data.md`'s
+  race data, stage list, racer records (the race data's 77 records at
+  +0x59AE8), `0x826C6078`, save data, item and car object rows extended,
+  four rows added (course route, route, course record, 972-byte entry);
+  3 leads added, 6 extended. Never seen in play: `sub_82105BF8`,
+  `sub_820FFA88`, `sub_820CC450`.
+- The race's set-up, migration 1 (2e9d8eb..357f247): 31 rows changed in
+  `race-setup.md`, one note in `c-runtime.md` (the array helper calls
+  `sub_82101D20`'s plain C++). Corrections to the map:
+  `RaceEvent::FirstOwned` `sub_821430A0` returns the first item whose
+  save record sums to 0 or below (the map had it reversed; the name may
+  be wrong); `CourseRoutes::Get` loads a fifth float at `0x82001FD4`.
+  `CourseRoutes::Get` replays the original's 1,175 constant stores into
+  its frame (`r1 - 4480`) on every call, with the index and out words.
+  Not reproduced (following earlier ports): register saves and scratch
+  below the stack pointer (`CarTuning::Reset`'s red zone, the
+  `fctiwz`/`fcfid` conversions, `sub_82101EB0`'s running mean); copied:
+  `Car::SetModel`'s +72 twice and +73 left.
+- The race's set-up, migration 2 (9b93272..482c90c): 25 rows in
+  `race-setup.md` and `RacerRecord::Init` `sub_820FF808` in
+  `vehicle-accessors.md` (now under `--native_race_setup`). Each native
+  callee runs in the frame the original's call gives it, the frame
+  leftovers (route copies, stack-built records) written as the original
+  leaves them; register saves not written (as migration 1). Paths left
+  on the original from the same frame through a guest-call callback: a
+  memcpy its override wouldn't make natively, `Car::Refresh` refusing,
+  the never-seen branches (`sub_82105BF8`, `Race::PlaceRacers`'
+  +0xA3AF4 = 0 or 4; `sub_820FFA88`, `Race::SetUpRival`'s kind 1). f1
+  not handed back after `Car::FromBuild` (as its adapter). The harness
+  builds made-up specs, items, save data and an event (the game's
+  parameters aren't loaded when harnesses run). For a decision: one new
+  expected group, `Race::SetUp`'s traffic records' 42 unwritten bytes a
+  record, copied into the race data from register saves the native
+  callees don't write (`expected-differences.md`, "Unwritten stack bytes
+  copied"; whether the game reads them isn't known).
+- The race's set-up, migration 3 (62e7b9a..2f54d5a, four parts by
+  subagents): `car-physics.md`'s `sub_820AF1C0`, `sub_820C05C8` (named
+  `CarData::ApplySettings`, our name), `sub_820C0D28`, `sub_820C27E8`
+  rewritten from a full read; `sub_820AEE98`, `sub_820AF018`,
+  `sub_820B6A38` set to Native; `race-setup.md`'s `sub_820CD5C8`
+  Overridden. `SetupFromCar`'s and `SetupVehicle`'s adapters stay
+  (recompiled callers in play).
+- The car physics' ready groups (no mapping; f8a45a7..b488eb2): rows in
+  `car-physics.md` (52, one new: `sub_8259D5A8`), `vehicle-accessors.md`
+  (28), `matrix-math.md` (2), `collision.md` (2); 74 adapters removed
+  after a first-call probe showed none called in an attract race.
+  Learned: the translated `ble` is "not greater", so a NaN keeps the
+  value so far (`ProbeGround`'s speed clamp, the step's travel minimum;
+  in `car-physics.md`'s intro). `PhysicsStep`'s callees that refuse on
+  paths never seen (`UpdateSteering`'s tan error, `UpdateTorqueSplit`'s
+  mode 2) run their original in the step's frame through a
+  `std::function`, as the mode tick's draws. The allocating functions
+  run natively only under `--native_heap`. Not ported: `Create`'s and
+  `SetQueryCapacity`'s passed-in buffer branches (refuse, run the
+  original); `RemoveObject`'s branch in `DestroyPhysics` ported.
+  Removable adapters outside the area left: `sub_820FF938`,
+  `sub_820FF9F8`, `sub_820FFAB0`.
+- The car physics, migration 2 (3a5e3bd, bd3e362): `CollisionWorld::Update`
+  Overridden, its four callees Native with no adapter, 10 more Native;
+  `sub_82294330` `Vec3::SubFrom` a new Merged row in
+  `vehicle-accessors.md` (not seen in play, done inside `Respond`);
+  `collision-world.md`'s `sub_820FF1B0`, `sub_820FEBD0` notes. The two
+  queries in play (`TrackCollision::WallHits`, `GroundHits`) called
+  natively whatever `--native_collision_world` says (as the track
+  position calls the route's functions whatever `--native_track_route`
+  says); other query targets and refusing callees run as guest calls.
+  `Respond` wasn't reached in the attract race (harness only).
+- The vehicle (map ebba856): `docs/functions/vehicle.md`, 25 new rows
+  (21 in `820BF000`-`820C3C00`, and the engine's power curve
+  `sub_820CE7D8`, `sub_820CE430`, `sub_820CE1D8` and
+  `RoutePosition::Step` `sub_82170F90`); `known-data.md`'s `0x826C2E34`
+  extended, four rows added; 2 leads. Corrected since: `Vehicle::Tick`
+  runs `Vehicle::PhysicsStep` twice a tick with f1 = 1/60, where
+  `car-physics.md` said "probably once a tick" (its intro and row
+  fixed before the merge). Never seen in play: the
+  six under `Vehicle::ApplyInput` (`sub_820B0098`, `sub_820B00A8`,
+  `sub_820B00B8`, `sub_820B03E0`, `sub_820B0428`, `sub_820B6170`) and
+  `sub_820FA8F8`.
+- The vehicle, migration 1 (3aa0018..b46632a): 24 rows in `vehicle.md`
+  and a "Native so far" paragraph in its intro. `ApplyInput` runs the
+  whole original when one of its six never-seen callees would run
+  (decided before anything is written); refusing callees
+  (`SetupFromCar`, `Set/ResetPhysics`, `LinkTrackPositions`,
+  `SteerTowards`, the physics step, the status copy) run their
+  original in the caller's frame; `Create`, `Destroy`,
+  `RemoveFromWorld` and the physics set-up run natively only under
+  `--native_heap` (as the car physics). The mapping notes kept
+  (`Vehicles::Create`'s memset, the sort's quirk, `ShiftPeak`'s stores
+  below r1, `TrackPosition::Copy`'s +8 to +15, the 1/60 and tables read
+  from guest memory). Harness: 207 of 300 `SetUp` and 198 of 300
+  `ResetForCar` cases left out and counted (random car data sends
+  `EngineTorque`'s curve index outside guest memory, crashing the
+  original too); helpers shared from `collision_world.cpp` and
+  `car_physics_objects.cpp`.
+- The vehicle, migration 2 (0133cf6): `Vehicle::PlaceOnRoute`
+  `sub_820C3608` Overridden; a nonzero offset across the road (NaN
+  included) runs the whole original, for the never-seen
+  `sub_820FA8F8` (as `ApplyInput`); refusing `ResetTransform` and
+  memcpy run their originals in its frame; the orientation's vector
+  math copied op for op with flush-to-zero.
+
 ## Run 2026-10-25 16:38 (`b7-loop-25-10-26-3`)
 
 - For later (the user's call, 2026-10-25: debug when the code is

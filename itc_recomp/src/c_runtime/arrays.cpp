@@ -6,6 +6,7 @@
 #include "base/log.h"
 #include "matrix_math/matrix_math.h"
 #include "race_overlays/race_overlays.h"
+#include "race_setup/race_setup.h"
 
 namespace c_runtime {
 
@@ -14,6 +15,7 @@ namespace {
 // The elements' functions the game passes (docs/functions/c-runtime.md).
 constexpr uint32_t kSetWsToOne = 0x8209B038;         // Minimap::Draw's
 constexpr uint32_t kParticleConstruct = 0x8212B3D0;  // ParticlesB::ParticlesB's
+constexpr uint32_t kRaceDataEntry = 0x82101D20;      // RaceData::RaceData's
 constexpr uint32_t kEmptyDestructor = 0x82106540;    // every destructor caller's: blr
 
 // The callees use r3's low 32 bits as the element's address.
@@ -25,6 +27,9 @@ void Construct(uint8_t* base, uint64_t constructor, uint64_t element, ElementCal
       break;
     case kParticleConstruct:
       race_overlays::ParticleConstruct(base, uint32_t(element));
+      break;
+    case kRaceDataEntry:
+      race_setup::RaceDataEntryConstruct(base, uint32_t(element));
       break;
     default:
       call(user, constructor, element);

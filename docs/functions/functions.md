@@ -283,6 +283,18 @@ Rows not yet moved stay in the table below. So far:
 - [`race-hud.md`](race-hud.md): the race HUD's movie picker (a UI
   movie run by the HUD's state) and the rival intro's logo draw (B7;
   the HUD's set-up, update and teardown aren't in it).
+- [`race-setup.md`](race-setup.md): the race's set-up (the race data
+  reset, its route and the course routes' table, the racers made from
+  the garage, the rival's items and the traffic, their start positions,
+  the stage list by the rival's race kind), the car object's set-up
+  (its parts' resets, from a car spec and from a car build), the race
+  data's other records and the event's accessors (B7).
+- [`vehicle.md`](vehicle.md): the vehicle code above the car physics:
+  the seven vehicles made and destroyed, a vehicle set up from a car
+  object, its tick (the car input applied to the controls, two physics
+  steps, the track positions, the status record: speed, place on the
+  route, wrong way, distance, temperatures), its placement on the route,
+  the engine's power curve and a few queries (B7).
 
 These files hold functions only. What used to follow the table here moved
 out on 2026-10-20: how frame interpolation works, its options and what
