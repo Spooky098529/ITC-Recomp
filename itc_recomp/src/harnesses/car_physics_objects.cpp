@@ -1586,6 +1586,42 @@ void WorldUpdateCases(Context& h) {
 
 }  // namespace
 
+// For the vehicle's harness (src/harnesses/vehicle.cpp): the fake world
+// (numbers only, no object kept free; installed at 0x826C2D88: the caller
+// puts it back), real boxes, the vehicle's region (its body at +0x2000, the
+// wheels' track positions at +0x2380, numbers only or NaNs and infinities
+// anywhere), its outputs, the physics step's inputs, the stack below the
+// call's filled.
+namespace car_objects {
+uint32_t WorldBytes() {
+  return kRegionBytes;
+}
+uint32_t WorldActiveObject(uint8_t* base, uint32_t region) {
+  return guest::LoadU32(base, region + kWorld + 20);
+}
+uint32_t VehicleRegionBytes() {
+  return kVehicleRegionBytes;
+}
+void BuildWorld(Context& h, uint32_t region, Random& r) {
+  harness::BuildWorld(h, region, r, kNumbers, false);
+}
+void BuildBox(Context& h, uint32_t box, Random& r) {
+  harness::BuildBox(h, box, r, kNumbers);
+}
+void FillVehicleRegion(uint8_t* base, uint32_t region, Random& r, bool nans) {
+  harness::FillVehicleRegion(base, region, r, nans ? kNaNs : kNumbers);
+}
+void FillStepInputs(uint8_t* base, uint32_t region, Random& r) {
+  harness::FillStepInputs(base, region, r);
+}
+void VehicleRegionOutputs(Outputs& out, uint8_t* base, uint32_t region) {
+  harness::VehicleRegionOutputs(out, base, region);
+}
+void FillStack(Context& h, Random& r) {
+  harness::FillStack(h, r);
+}
+}  // namespace car_objects
+
 void CarPhysicsObjects(Context& h) {
   const uint32_t region = memory::Alloc(kRegionBytes, 0);
   const uint32_t saved_world = guest::LoadU32(h.base, kWorldPointer);
