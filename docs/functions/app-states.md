@@ -1,0 +1,175 @@
+# Known functions: the app's update and its state stack
+
+The **app's update** (`App::Update`, `sub_82093DC0`: the run loop's tick
+handler 8, which the app's constructor `sub_82094590` registers; every
+pass) and what it runs: the app's own four handler maps (+28, +40,
++52, +64, Dinkumware `std::map`s of delegates by key like the run
+loop's in `framework.md`), the requests that add and remove their
+handlers (a vector at +96, applied at the end of each pass, as the run
+loop's), its message queue (a vector of words at +76, delivered to the
+listeners in +64), and a toggle flipped by player 1's Start (byte +112;
+message 0 when it's set, 2 when it's cleared; Back, held or repeating
+while it's set, sends 1 and sets +113 for one pass). Which of the maps
++28 and +40 runs follows the toggle: +28 while +112 is clear or a step
+(+113) was asked, +40 while it's set; +52 every pass. Probably a debug
+pause left in the game: the title's Start sets it, so in a race the +40
+map is the one running (as `../frame-interpolation.md` measured), and
+the only state's slots for the messages are empty, so nothing in play
+behaves differently either way.
+
+And the **state stack** at app + 116 (`AppStates::`, 12 bytes, vtable
+`0x820028F8`; made in the app's constructor through `AppStates::Create`):
+a tree of 48-byte **layers** (`StateLayer::`, vtables `0x820028E0` at +0
+and `0x820028B0` at +4), each holding a stack of **states** (objects
+with the state interface, whose base vtable is `0x82002880`: 0 the
+deleting destructor `sub_820ACCF0`, 1 OnEnter, 2 OnExit, 3 the toggle
+set (message 0), 4 a step (message 1), 5 the toggle cleared (message
+2), 6 OnCovered, 7 OnUncovered, 8 Update, 9 the toggled update, 10 Tick,
+11 IsEmpty (`sub_825C8390`, 1, in the base); every slot but 0 gets r4 =
+the layer), its child layers (a layer's +4 is a state too, which
+forwards each slot to its own states and children), and a queue of
+operations applied after its update (add a child layer, pop, push,
+replace). The stack registers three handlers with the app: key 8 in
++28 (`StateLayer::Update` on the root), key 2 in +40
+(`StateLayer::UpdateToggled`) and listener 9 (the messages). In play
+the tree is the root (no states) and one child layer holding one state,
+the game modes' holder (`Modes::Modes`, `game-modes.md`, vtable
+`0x82006AF0`: slots 1 to 9 empty, slot 10 `Modes::Tick`), pushed by
+`App::Start` at boot (`Framework::Start`'s target, `framework.md`) and
+never popped: `Modes::Tick` runs from slot 10 on every pass, and the
+app's answer to `Framework::OnTick` (`App::IsRunning`) stays 1 while the
+root isn't empty. Only the push ran in play (the add-child, pop and
+replace operations, the step, the teardown messages 5 and 6 and the
+destructors never did). The fields are in `../known-data.md` ("app",
+"app state stack", "state layer").
+
+Also here, the containers this code instantiates: the layers'
+operation list (a `std::list` of 8-byte values in 16-byte nodes:
+`OpList::`), the generic list clear and `std::for_each` over a list of
+pointers (shared across the game), the erase of the list of pointers
+(`PtrList::Erase`; the rest of `PtrList::` is in `input.md`), the app's
+message vector (`MessageVector::`: `std::vector<unsigned>`), and the
+delegate's clone (vtable `0x82002850`, slot 1 `Delegate::Invoke` in
+`functions.md`; the base vtable `0x82000ABC`, slot 0 the destructor
+`sub_82094D20`, never ran).
+
+Shared with other files, which keep their rows: `Modes::Modes`,
+`Modes::Tick` (`game-modes.md`); `Framework::Start`,
+`Framework::OnTick`, `HandlerMap::Insert` (`sub_82093740`),
+`RequestVector::Clear` (`sub_8209A080`, the app's request vector is
+the same type), `HandlerMap::Iterator::operator++` (`sub_82099B18`)
+and the framework's getter `sub_82090830` (`framework.md`); `PtrList::PtrList`,
+`PtrList::Insert`, `InputManager::GetProcessor` and the button tests
+`sub_8258CEB0`, `sub_8258CEE0` (`input.md`); `operator new`, `operator
+delete` (`heap.md`); `Delegate::Invoke` (`functions.md`); the empty
+`sub_82106540` (`audio.md`); the getter `sub_822BE2C8` (the layer's
++0 slot 1, its +8: `collision.md`). Not here: the app's constructor and
+start-up (`sub_82094590`, `sub_82106548`, `../loops/leads.md`), the
+app's other interface slots (the removes, slots +20, +24, +28, +32,
+never ran) and the functions near this code at `820AC998`-`820ACC08` (the
+worker pool makers' objects, a lead). One function here is a piece of
+a switch the recompiler split off (`sub_82093C2C`): it runs in its
+parent's frame and goes with it.
+
+Status:
+
+- **Native**: plain C++ in `itc_recomp/src/` that doesn't use the
+  PowerPC context (`ctx`): normal arguments and host structs (it may
+  still read and write guest memory through `src/guest.h` while
+  recompiled code shares the data). The game reaches it without `ctx`,
+  from native or overridden callers, and the recompiled original is no
+  longer called (except behind a fallback flag or to check against it).
+  No `REX_FUNC` override of it exists, not even an adapter kept only for
+  a harness (that's Overridden until the adapter goes).
+  The end state for every function.
+- **Overridden**: an `extern "C" REX_FUNC(sub_XXXXXXXX)` override in
+  `itc_recomp/src/` (or a macro defining one) does the work instead of
+  the original: a thin adapter in front of native code, or a body that
+  still uses `ctx` (calling guest code, reading registers). It may call
+  the original when its flag is off, or to check itself against it.
+- **Wrapped**: an override that does something of its own (skipping
+  render-only passes, logging, timing) and still calls the original
+  (`__imp__sub_XXXXXXXX`) for the work.
+- **Dropped**: its work isn't needed on PC (hardware set-up, kernel calls
+  the SDK already stubbed), so it no longer runs: an override in
+  `itc_recomp/src/` replaces it with nothing (or a fixed return value), or
+  its callers, made native, leave the call out (no override then; the row
+  says which caller). Logs, a harness or the renderer's frame dumps have
+  shown that nothing reads what it did. The original is no longer called,
+  except behind a fallback flag while the drop is being checked. A
+  function the game never calls in the first place isn't Dropped: its
+  status stays blank and its row says it's never called.
+- **Merged**: its work is done inside a native caller's plain C++ (a
+  few lines only that caller needs), so it has no function or override of
+  its own in `itc_recomp/src/`. The row names the caller(s) and the
+  harness that covers the work. The original is no longer called, except
+  behind the caller's fallback flag.
+- **Patched**: the generated code was edited in place (search for
+  `PATCH:`).
+
+A function usually moves from recompiled or Wrapped to Overridden to
+Native as the `ctx` edge moves up through its callers, or straight to
+Dropped when its work isn't needed.
+`itc_recomp/tools/check_function_statuses.py` checks this column, in
+every file of the tables, against `src/` (an override marked Native, a
+status with no override, an override with no row, a row in two files);
+run it after changing either, on any branch.
+
+| Address | Name | Status | Notes |
+|---|---|---|---|
+| `sub_82093DC0` | `App::Update` | | First tick handler: polls input, then walks listener lists that run both game logic and the draw step (see "Separating drawing from the game tick" in `../frame-interpolation.md`). Tests player 1's input itself, on every pass: processor 0's pressed bits (`sub_8258CEB0`) and held-or-repeating bits (`sub_8258CEE0`), read from the input manager in guest memory ("Who reads the input manager" in `docs/pause-menu-fix.md`). Read (B7 loop, 2026-10-27): the run loop's tick handler 8 (registered by the app's constructor `sub_82094590`), r3 = the app. Processor 0 from the framework's +36 interface at +24 (its slot 1, the input manager, then `InputManager::GetProcessor` with 0). When the byte +112 is clear: Start (`0x100000`) pressed sends message 0 (`App::SendMessage`, the +20 interface's slot +40) and sets +112. When it's set: Start pressed sends 2 and clears it; then Back (`0x200000`) held or repeating sends 1 and sets +113. Then the handler map +40 when +112 is set and +113 isn't, else +28 (and +113 cleared); then +52 (`HandlerMap::ForEach` with `App::RunHandler` each); the messages queued at +76 delivered (`App::ForEachMessage` with `App::DeliverMessage`) and cleared (`MessageVector::Clear`); the requests at +96 applied (`App::ForEachRequest` with `App::ApplyRequest`) and cleared (`RequestVector::Clear`, `framework.md`). 144-byte frame. |
+| `sub_82092BF0` | `HandlerMap::ForEach` | | Probably `std::for_each` over a handler map with a member functor: r4 / r5 the range (map iterators, 8 bytes each: the map and a node), r6 / r7 the functor (function, object, adjustment); calls it with each node's key and delegate (+12, +16) and steps with `HandlerMap::Iterator::operator++` (`sub_82099B18`, `framework.md`); returns the functor at r3. From `App::Update` (the maps +28 or +40, then +52), `App::DeliverMessage` (+64), `Renderer::DrawFrame` (`sub_82091E58`, `functions.md`: its draw listeners) and `sub_82091D28` (never ran). |
+| `sub_82092968` | `App::RunHandler` | Wrapped | Runs the app's component lists (r4's low word a component; its vtable slot 1); named for `--find_menu_selection`. Read (B7 loop, 2026-10-27): `HandlerMap::ForEach`'s functor from `App::Update`, r3 = the app: the delegate (the node's value) gets its slot 1 (`Delegate::Invoke`) with r4 = the app's +20 interface (0 for no app). |
+| `sub_82092CD0` | `App::ForEachMessage` | | Probably `std::for_each` over the message vector with a member functor: r4 / r5 the range (4-byte steps), r6 / r7 the functor; calls it with each word in r4; returns the functor at r3. From `App::Update`. |
+| `sub_82092D50` | `App::DeliverMessage` | | `App::ForEachMessage`'s functor, r3 = the app, r4 = the message: +92 = the message, then `HandlerMap::ForEach` over the listener map (+64) with `App::RunListener`. |
+| `sub_820929B0` | `App::RunListener` | | As `App::RunHandler` with r5 = the message's address (the app + 92): the listener's delegate's slot 1 (`Delegate::Invoke`), r4 = the app's +20 interface. From `App::DeliverMessage`. |
+| `sub_82092F98` | `MessageVector::Clear` | | r3 = the vector (+4 first, +8 last): erases [first, last) (`MessageVector::Erase`). Every pass, from `App::Update` (the app's +76). |
+| `sub_82092E70` | `MessageVector::Erase` | | Probably `std::vector<unsigned>::erase(first, last)`: r4 = the vector, the two iterators on the stack (the vector and a pointer each, checked): the words after `last` moved down to `first`, +8 (last) moved back. Leaf. From `MessageVector::Clear`. |
+| `sub_82091C48` | `App::ForEachRequest` | | As `ForEachRequest` (`sub_82099EE8`, `framework.md`) over the app's request vector (12-byte requests): calls the functor with each request's type and key in r4 and its delegate in r5. From `App::Update`. |
+| `sub_82093BE0` | `App::ApplyRequest` | | `App::ForEachRequest`'s functor, r3 = the app, the request in r4 / r5: a jump table on the type (`0x82000D98`, 0 to 7): 0, 2, 4 and 6 insert the delegate under the key (`HandlerMap::Insert`, `framework.md`) in the maps +28, +40, +52 and +64; 1, 3, 5 and 7 find the key (`sub_82091F58`), release the delegate (`sub_82090380`) and erase the node (`sub_82093000`) (never ran: no handler was removed in play). As `RunLoop::ApplyRequest` (`sub_8209A458`, `framework.md`) with four maps. |
+| `sub_82093C2C` | | | A piece of `App::ApplyRequest`'s switch the recompiler split off: type 0, the insert into the map +28. Runs in its parent's frame. |
+| `sub_820944E0` | `MessageVector::PushBack` | | Probably `std::vector<unsigned>::push_back`: r3 = the vector (+4 first, +8 last, +12 end), r4 = the word's address: stored at the end when there's room, else `MessageVector::Insert` at the end. From `App::SendMessage`. |
+| `sub_82094110` | `MessageVector::Insert` | | Probably `std::vector<unsigned>::insert(where, value)`: r3 = the result, r4 = the vector, r5 = the value's address, the iterator on the stack: its index kept, `MessageVector::InsertN` with a count of 1, and the iterator to the new word returned. Ran in play (the vector's first growth). Not read in detail. |
+| `sub_820938C0` | `MessageVector::InsertN` | | Probably `std::vector<unsigned>::_Insert_n`: grows the vector when it's full (`MessageVector::Allocate`; `sub_820A92D0`, never ran, probably the length error) and copies the old words and r5 copies of the value. 266 lines. From `MessageVector::Insert`. Not read in detail. |
+| `sub_82092B78` | `MessageVector::Allocate` | | Probably the allocator of a `std::vector` of words: r3 = a count: count × 4 bytes from `operator new`; above `0x3FFFFFFF` a `bad_alloc` built on the stack (`sub_82091200`, never ran). Shared with `sub_820A93E8` and `sub_821193C0` (`sound-cues.md`). |
+| `sub_82094AB0` | `App::SendMessage` | | The app's +20 interface's slot +40: r4 = the message's address: `MessageVector::PushBack` on the app's +76 (this + 56). From `App::Update` (messages 0, 1 and 2). |
+| `sub_82094830` | `App::AddHandler` | | The +20 interface's slot +16: r4 = the key's address, r5 = a delegate: queues the request {0, key, the delegate's copy (its slot 2)} on the app's +96 (`RequestVector::PushBack`, `framework.md`): a handler in the map +28. From `AppStates::AppStates` (key 8). |
+| `sub_820948D0` | `App::AddToggledHandler` | | The +20 interface's slot +12: as `App::AddHandler` with request type 2: a handler in the map +40 (run while the toggle +112 is set). From `AppStates::AppStates` (key 2). |
+| `sub_82094970` | `App::AddAlwaysHandler` | | The +20 interface's slot +8: as `App::AddHandler` with request type 4: a handler in the map +52 (run every pass). Ran in play; its callers not looked for. |
+| `sub_82094A10` | `App::AddListener` | | The +20 interface's slot +4: as `App::AddHandler` with request type 6: a listener in the map +64 (given the app's messages). From `AppStates::AppStates` (listener 9). |
+| `sub_82092878` | `App::Start` | | The +20 interface's slot +36, `Framework::Start`'s target (`framework.md`), once at boot: the boot movies' table at `0x826C5BAC` set (10, 11, 11, 11, 11, 4, 0; its index `0x826C5BC8` = 0; `Boot::StartMovie`, `functions.md`), the modes' holder made (8 bytes, `operator new`, `Modes::Modes` with 3, `game-modes.md`) and pushed on the state stack (the app's +116, `AppStates::AddLayer`), then `0x826364EC` = 2 (its readers not looked for). |
+| `sub_82092928` | `App::IsRunning` | | The +20 interface's slot +44, asked by `Framework::OnTick` every pass (`framework.md`): 1 while the state stack (the app's +116) isn't empty (`AppStates::IsEmpty` gives 0), else 0, which ends the run loop. |
+| `sub_820AE498` | `AppStates::Create` | | r3 = the set-up block (+0 the app): 12 bytes from `operator new`, built by `AppStates::AppStates`; returns it, or 0. From the app's constructor `sub_82094590`, once at boot, kept at the app's +116. |
+| `sub_820AE348` | `AppStates::AppStates` | | r3 = it, r4 = the block: vtable `0x820028F8` (slots 0 `sub_820AE2F8`, the deleting destructor, never ran; 1 `AppStates::AddLayer`; 2 `sub_820AE198`, the states in the tree counted (`sub_820AD228`), never ran; 3 `AppStates::IsEmpty`); +4 = the app (the block's +0); +8 = the root layer (48 bytes, `operator new`, `StateLayer::StateLayer` with the app's slot 2, the interface at app + 16). Then through the app's slot 1 (the interface at app + 20) three delegates on itself (vtable `0x82002850`): `App::AddHandler` key 8 (`AppStates::OnUpdate`), `App::AddToggledHandler` key 2 (`AppStates::OnUpdateToggled`) and `App::AddListener` 9 (`AppStates::OnMessage`). Returns r3. Once at boot. |
+| `sub_820AE130` | `AppStates::AddLayer` | | Slot 1: r4 = a state: a 48-byte layer (`operator new`, `StateLayer::StateLayer(state)` with the app's slot 2, the interface at app + 16) added to the root (+8) as a child (`StateLayer::AddChild`; 0 added when there's no memory). Once at boot, from `App::Start` (the modes' holder). |
+| `sub_820AE1A0` | `AppStates::IsEmpty` | | Slot 3: tail-calls the root's (+8) state slot 11 (`StateLayer::IsEmpty`, through its +4). Every pass, from `App::IsRunning`. |
+| `sub_820AE1B8` | `AppStates::OnUpdate` | | The delegate's target for key 8 (the app's map +28): `StateLayer::Update` on the root (+8). Every pass while the toggle is clear (at boot, before the title's Start, and while the game is paused by Start in a race, probably). |
+| `sub_820AE1C0` | `AppStates::OnUpdateToggled` | | The delegate's target for key 2 (the app's map +40): `StateLayer::UpdateToggled` on the root (+8). Every pass while the toggle is set (in races, as measured in `../frame-interpolation.md`). |
+| `sub_820AE1C8` | `AppStates::OnMessage` | | Listener 9's target: r4 = the app's +20 interface, r5 = the message's address: 0 `StateLayer::OnToggleOn` on the root, 1 `sub_820AD5B0` (the states' slot 4 and the children's, never ran), 2 `StateLayer::OnToggleOff`, 5 `sub_820AD8D0` (the teardown: a functor over the states, `sub_820ACEC8`, and over the children, `sub_820AD808` with `sub_820ACE80`, not read, then the children list cleared; never ran), 6 the same, then its three handlers removed (r4's slots +32, +28, +20: keys 8, 2 and 9; never ran); 3, 4 and others nothing. |
+| `sub_820AD118` | `StateLayer::StateLayer` | | r3 = a layer (48 bytes), r4 = the app's interface at app + 16: vtables `0x820028E0` at +0 (0 `sub_820AD350`, the deleting destructor over `sub_820AD190`, never ran; 1 `sub_822BE2C8`, its +8, `collision.md`; 2 `sub_820ADB80`, queue an added child, 3 `StateLayer::Push`, 4 `sub_820ADB28`, queue a replace, 5 `sub_820ADA70`, queue a pop: 2, 4 and 5 never ran) and `0x820028B0` at +4 (its state: 0 `sub_820AD188`, 1 and 10 empty, 2 `sub_820ADA00` the teardown, 3 `sub_820AD750`, 4 `sub_820AD758`, 5 `sub_820AD760`, 6 `sub_820AD2B0` and 7 `sub_820AD300` (its top state's slots 6 and 7), 8 `sub_820AE120`, 9 `sub_820AE128`, 11 `StateLayer::IsEmpty`; the base `0x82002880` stored first); +8 = r4; +12 the children (`PtrList::PtrList`, `input.md`), +24 the states (the same; the top at the front), +36 the operations (`OpList::OpList`). Returns r3. From `AppStates::AppStates` (the root). |
+| `sub_820ADBD8` | `StateLayer::StateLayer(state)` | | As `StateLayer::StateLayer` with r5 = a first state, queued as a push (`StateLayer::Push`), so the state enters at the end of the layer's first update. From `AppStates::AddLayer` and `StateLayer::ApplyOp` (type 0, never ran). |
+| `sub_820ADAD0` | `StateLayer::Push` | | The layer's slot 3: r4 = a state: the operation {2, state} appended to the queue at +36 (`OpList::BuyNode` before the head, `OpList::IncSize` with 1, linked in). From `StateLayer::StateLayer(state)` in play. |
+| `sub_820ADA08` | `StateLayer::AddChild` | | r3 = the layer, r4 = a child layer: the child's state (+4) slot 1 (OnEnter, empty for a layer) with r4 = the layer, then the child appended to +12 (`PtrList::Insert` before the head). From `AppStates::AddLayer` (once at boot) and `StateLayer::ApplyOp` (type 0). |
+| `sub_820ADF00` | `StateLayer::Update` | | r3 = the layer: with a state, the top's slot 8 (Update) and then the top's slot 10 (Tick), r4 = the layer; then each child's state slots 8 and 10 (`PtrList::ForEach` with `sub_820ACD80`), then `StateLayer::ApplyOps`. From `AppStates::OnUpdate` on the root and a child's slot 8 (`sub_820AE120`). |
+| `sub_820AE010` | `StateLayer::UpdateToggled` | | As `StateLayer::Update` with slot 9 for 8 (the children through `sub_820ACDE8`). In play the child layer's top is the modes' holder, so this runs `Modes::Tick` (slot 10). From `AppStates::OnUpdateToggled` on the root and a child's slot 9 (`sub_820AE128`). Its ~5-function subtree waits on `OpList::OpList` (`sub_820AD0B8`, through `sub_820ACF10`) by `b7_groups.py`. |
+| `sub_820ADE68` | `StateLayer::ApplyOps` | | r3 = the layer: each operation queued at +36 applied in order (`OpList::ForEach` with `StateLayer::ApplyOp`), then the queue cleared (`List::Clear`). From `StateLayer::Update` and `UpdateToggled`, every pass. |
+| `sub_820ADC60` | `StateLayer::ApplyOp` | | r3 = the layer, r4 = an operation (8 bytes: the type, then a state): 0 a new layer with the state (`operator new`, `StateLayer::StateLayer(state)` with +8) added as a child (`StateLayer::AddChild`); 1 pop: the top erased (`PtrList::Erase`), its slot 2 (OnExit), the pointer released (`sub_82090380`, never ran, probably its destruction), then the new top's slot 7 (OnUncovered) if any; 2 push: the top's slot 6 (OnCovered) if any, the state put at the front (`PtrList::Insert`) and its slot 1 (OnEnter); 3 replace: as 1 without the slot 7, then as 2 without the slot 6. r4 = the layer for each slot. In play only 2 ran (the modes' holder pushed once at boot). 128-byte frame. |
+| `sub_820AD4E0` | `StateLayer::OnToggleOn` | | r3 = the layer: with a state, the top's slot 3 (r4 = the layer); then each child's (`PtrList::ForEach` with `sub_820ACD38`). From `AppStates::OnMessage` (message 0) and its own children's. The modes' holder's slot 3 is empty. |
+| `sub_820AD680` | `StateLayer::OnToggleOff` | | As `StateLayer::OnToggleOn` with the top's slot 5, the children through their state's slot 5 (`sub_820ACD60`, `sub_820AD760`). From `AppStates::OnMessage` (message 2). |
+| `sub_820ACE50` | `StateLayer::IsEmpty` | | The layer's state slot 11, r3 = the layer + 4: 1 when it holds no states (+32 the states' count) and no children (+20 the children's), else 0. Leaf. From `AppStates::IsEmpty`. |
+| `sub_820AE120` | | | The layer's state slot 8: this − 4, then `StateLayer::Update`. From a parent's update (`sub_820ACD80`). |
+| `sub_820AE128` | | | The layer's state slot 9: this − 4, then `StateLayer::UpdateToggled`. From `sub_820ACDE8`. |
+| `sub_820AD760` | | | The layer's state slot 5: this − 4, then `StateLayer::OnToggleOff`. From `sub_820ACD60`. |
+| `sub_820ACD80` | | | `StateLayer::Update`'s functor: r3 = the layer, r4 = a child: the child's state (+4) slot 8, then its slot 10 (empty for a layer), r4 = the layer. |
+| `sub_820ACDE8` | | | As `sub_820ACD80` with slot 9: `StateLayer::UpdateToggled`'s functor. |
+| `sub_820ACD38` | | | `StateLayer::OnToggleOn`'s functor: `StateLayer::OnToggleOn` on the child (r4). |
+| `sub_820ACD60` | | | `StateLayer::OnToggleOff`'s functor: the child's (r4) state slot 5 with r4 = the layer. |
+| `sub_820AD0B8` | `OpList::OpList` | | Probably `std::list`'s constructor for 8-byte values (16-byte nodes: +0 next, +4 previous, +8 and +12 the value): r3 = the list: a head node (`OpList::AllocateNodes` with 1) pointing to itself at +4, size (+8) 0. Returns r3. From `StateLayer::StateLayer` and `StateLayer::StateLayer(state)`. As `PtrList::PtrList` (`input.md`) for these nodes. |
+| `sub_820ACF10` | `OpList::AllocateNodes` | | r3 = a count: count × 16 bytes from `operator new`; above `0x0FFFFFFF` a `bad_alloc` built on the stack first (`sub_82091200`, never ran). From `OpList::OpList` and `OpList::BuyNode`. |
+| `sub_820ACFF8` | `OpList::BuyNode` | | Probably `std::list::_Buynode`: r4 = the next node, r5 = the previous, r6 = the value's address: a node (`OpList::AllocateNodes` with 1) with +0, +4 and the 8-byte value at +8 set. Returns it. From `StateLayer::Push` (and the other queue slots, never ran). |
+| `sub_820AD768` | `OpList::IncSize` | | Probably `std::list`'s `_Incsize`: r3 = the list, r4 = a count: +8 += count; when that would pass `0x1FFFFFFF`, a "list<T> too long" `std::string` (`sub_825931D0`, `std-string.md`) and a `length_error` thrown (`sub_820919B8`, `sub_820915F8`; never ran). From `StateLayer::Push` (and the other queue slots). As `PtrList::IncSize` (`sub_820958B8`, `input.md`). |
+| `sub_820ACF88` | `List::Clear` | | Probably `std::list::clear`, for any node size: r3 = the list: the head linked to itself, the size (+8) 0, then each old node freed (`operator delete`). From `StateLayer::ApplyOps` (the operations) and 11 call sites across the game (`sub_82094D68`, `sub_82095370`, `sub_82095DF8`, `sub_82098F30`, `sub_82118C70`, `sub_82119018`, `sub_82119278`, `sub_825DB2E0`, not read; the layers' destructor `sub_820AD190` and teardown, never ran). |
+| `sub_820AD3A0` | `PtrList::ForEach` | | Probably `std::for_each` over a list of pointers with a member functor: r4 / r5 the range (list iterators, 8 bytes: the list and a node), r6 / r7 the functor (function, object, adjustment): calls it with each node's value (+8) in r4; returns the functor at r3. From the layers' updates and messages (their children, the teardown's states) and `sub_82119018` (not read). |
+| `sub_820AD440` | `OpList::ForEach` | | As `PtrList::ForEach` over an operation list: each node's 8-byte value (+8) passed in r4. From `StateLayer::ApplyOps`. |
+| `sub_82098E80` | `PtrList::Erase` | | Probably `std::list<void*>::erase(where)`: r3 = the result iterator, r4 = the list, the iterator on the stack (the list and a node, checked: a trap for no list or the head): the node unlinked and freed (`operator delete`), the size (+8) less 1; returns the iterator to the next node. Calls only `operator delete`. Ran in play from other callers: `StateLayer::ApplyOp`'s (types 1 and 3) never ran; the others are `sub_82094E30`, `sub_82095298`, `sub_82095370`, `sub_820954F8`, `sub_820956F0` (not read), the worker loop `sub_82095AF0` (`functions.md`), `sub_82118790` (not read) and `sub_82118850` (`sound-cues.md`). The rest of `PtrList::` is in `input.md`. Not read in detail. |
+| `sub_820ACA48` | `Delegate::Clone` | | Slot 2 of the delegate's vtable `0x82002850` (slot 1 `Delegate::Invoke`, `functions.md`; 3 `sub_820AC9E8`, the deleting destructor, never ran): a 12-byte copy (`operator new`): the vtable, +4 the object and +8 the function copied; or 0. From the handler requests (`App::AddHandler` and the like, `RunLoop::AddTickHandler` and `AddListener` in `framework.md`): every delegate registered in the game. |

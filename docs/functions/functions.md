@@ -295,6 +295,12 @@ Rows not yet moved stay in the table below. So far:
   steps, the track positions, the status record: speed, place on the
   route, wrong way, distance, temperatures), its placement on the route,
   the engine's power curve and a few queries (B7).
+- [`app-states.md`](app-states.md): the app's update (its four handler
+  maps, their requests, its message queue and the toggle player 1's
+  Start flips) and the state stack at the app's +116: a tree of layers,
+  each with a stack of states (the game modes' holder the only one in
+  play), its children and its queued operations, with the lists and
+  vector it instantiates (B7).
 
 These files hold functions only. What used to follow the table here moved
 out on 2026-10-20: how frame interpolation works, its options and what
@@ -326,7 +332,6 @@ old performance notes to the end of `../native-renderer.md`.
 | `sub_822956F0` | `GetTickCount` | Overridden | Returned the word at `[0x82000854]` + 16: the kernel's `KeTimeStampBundle` (a variable import; the SDK sets +16 to its uptime in milliseconds every 1 ms), the game's only reader of it. Leaf. 25 callers, 5 seen in play: XACT's clock (`sub_825BFE28`) and `sub_825CBD10` ([`xact.md`](xact.md)), `sub_8214F6E8` ([`system-services.md`](system-services.md)), `824CF448`, `824CF840`. Ours (2026-10-23, the user's call): the adapter in `src/hooks/clock.cpp` returns `helpers::TickCount()` (`src/helpers/clock.cpp`), milliseconds since start from the host's steady clock, wrapping at 2^32; native callers call it directly, so both share one clock. No flag (a fallback would split the callers between two clocks). Harness `clock` (the advance over sleeps, within 3 ms of the SDK's). |
 | `sub_8220BC28` | `MenuList::GetPreviousSelection` (probably) | Overridden | Returns the word at +20: the menu list's previous selection ("The menu list" in `../pause-menu-fix.md`). A one-instruction getter the linker folded, so XACT's `sub_825C8440` ([`xact.md`](xact.md)) calls it for an entry accessor's play offset (+20). 52 callers, 7 seen in play: the menus' `8220C7B8`, `8220D898`, `8220DD98`, `8220E1F8`, `82218788`, `82222E88`, and XACT's. Leaf. Native in `src/xact/xact.cpp` (`WaveEntryGetPlayOffset`) behind `--native_xact` (adapter in `src/hooks/xact.cpp`, harness `xact`, its wave entries and lookups group): one load, so the override gives every caller, the menus' too, the same result. Runs in attract races. |
 | `sub_820C0128` | `Vehicle::GetSpeedKmh` | Overridden | Returns the float at vehicle+48 (m/s) times 3.6. The plain C++ (`Vehicle_GetSpeedKmh`, `src/hooks/vehicle.h`) is also called directly by the native `OverlayView::SpeedKmh` (`sub_821268C0`, [`race-overlays.md`](race-overlays.md)); the adapter also tells the state capture (`--capture_dir`) about the vehicle. Checked against the original by the `race_overlays` harness. |
-| `sub_82093DC0` | | | First tick handler: polls input, then walks listener lists that run both game logic and the draw step (see "Separating drawing from the game tick" in `../frame-interpolation.md`). Tests player 1's input itself, on every pass: processor 0's pressed bits (`sub_8258CEB0`) and held-or-repeating bits (`sub_8258CEE0`), read from the input manager in guest memory ("Who reads the input manager" in `docs/pause-menu-fix.md`). |
 | `sub_8215B4F8` | `Race::DrawStep` | Wrapped | The race's draw step (Draw message). Its running marks the pass as in a race. |
 | `sub_8258FD48` | `Command::SetShaderConstants` | Wrapped | Render thread, command 7: r3 = payload, r4 = register count, r5 = stage << 24 \| type << 16 \| start << 8 \| count. Interpolation substitutes blended values here. |
 | `sub_8210EDB0` | | | Wind sound; scales with speed. |
@@ -488,7 +493,6 @@ old performance notes to the end of `../native-renderer.md`.
 | `sub_825BDDA0` | `EndVertices` | Wrapped | Same file: an inline vertex draw noted, then handed to the native renderer (in commands 15 and 19). |
 | `sub_8258F5C0` | | Wrapped | Same file: the single-command items' command 15 (the helper object's draw), marked as command 15 so the native renderer draws its inline vertices. |
 | `sub_822AFA58` | `Device::Resolve` | Wrapped | Same file: resolves made outside command 25 (command 33's, one per tile) passed to the native renderer. |
-| `sub_82092968` | | Wrapped | Runs the app's component lists (r4's low word a component; its vtable slot 1); named for `--find_menu_selection`. |
 | `sub_8220C1E0` | `MenuList::Update` | Wrapped | Logged for `--log_pause_menu` (`src/debug/pause_menu_log.cpp`). `sub_8210C370` reads logical pad `j`'s values 0-7 (sticks, triggers) through the pointer at mapper +2880 (= input manager +44 + 196j) and the buttons through the listener object at mapper +2464 (seen by the read watch, 2026-10-19). |
 | `sub_821BE5A8` | | Wrapped | The pause sub-menus' calls on their UI movie (setting animation targets and the children's +80 flags, starting animations, switching sub-screens); logged for `--log_pause_movie` (`src/debug/pause_movie_log.cpp`). |
 | `sub_8220D040` | | Wrapped | The pause sub-menus' calls on their UI movie (setting animation targets and the children's +80 flags, starting animations, switching sub-screens); logged for `--log_pause_movie` (`src/debug/pause_movie_log.cpp`). |
