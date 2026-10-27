@@ -78,7 +78,14 @@ file's history. What's left to see in a drive, from every run:
   leads added). Map checked (0 errors, 25 of 25 in play, 15 ready
   groups, no blockers, no kernel calls). Step: migration agent 1
   running (stopped by the API spend limit before committing anything,
-  resumed 2026-10-27).
+  resumed 2026-10-27). Migration 1 done after five batches
+  (3aa0018..b46632a: the leaves, track positions, refresh, lifetime,
+  `ApplyInput`, the power curve, the status record, `SetUp`,
+  `ResetForCar`, `Vehicle::Tick`; 5 adapters removed, 1 Native with
+  none, 1 Merged; `--native_vehicle`; 23 s, 0 errors, every harness 0
+  differing; frame dumps the same as the fallback). Left ready:
+  `Vehicle::PlaceOnRoute` `sub_820C3608`. Step: validation agent 1
+  running.
 
 ## Done
 
@@ -120,6 +127,8 @@ This run's groups: `expected-differences.md` (the "23:42 run" lines).
 - After the race's set-up's validation 2: race 24 s (`itc_1890`), 0
   errors, every harness 0 differing but the expected group; replay
   127 s (`itc_1891`), 0 errors.
+- After the vehicle's migration 1: ours 2254, work left 4198 (wrapped
+  104, known 517, unknown 3577).
 - After the vehicle's map: ours 2230, work left 4222 (wrapped 104,
   known 541, unknown 3577).
 - After the car physics' validation 2: race 23 s (`itc_1946`), 0

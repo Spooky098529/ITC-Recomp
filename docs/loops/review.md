@@ -92,6 +92,22 @@ When the user has reviewed a run's section, its heading gets
   six under `Vehicle::ApplyInput` (`sub_820B0098`, `sub_820B00A8`,
   `sub_820B00B8`, `sub_820B03E0`, `sub_820B0428`, `sub_820B6170`) and
   `sub_820FA8F8`.
+- The vehicle, migration 1 (3aa0018..b46632a): 24 rows in `vehicle.md`
+  and a "Native so far" paragraph in its intro. `ApplyInput` runs the
+  whole original when one of its six never-seen callees would run
+  (decided before anything is written); refusing callees
+  (`SetupFromCar`, `Set/ResetPhysics`, `LinkTrackPositions`,
+  `SteerTowards`, the physics step, the status copy) run their
+  original in the caller's frame; `Create`, `Destroy`,
+  `RemoveFromWorld` and the physics set-up run natively only under
+  `--native_heap` (as the car physics). The mapping notes kept
+  (`Vehicles::Create`'s memset, the sort's quirk, `ShiftPeak`'s stores
+  below r1, `TrackPosition::Copy`'s +8 to +15, the 1/60 and tables read
+  from guest memory). Harness: 207 of 300 `SetUp` and 198 of 300
+  `ResetForCar` cases left out and counted (random car data sends
+  `EngineTorque`'s curve index outside guest memory, crashing the
+  original too); helpers shared from `collision_world.cpp` and
+  `car_physics_objects.cpp`.
 
 ## Run 2026-10-25 16:38 (`b7-loop-25-10-26-3`)
 
