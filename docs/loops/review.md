@@ -11,6 +11,10 @@ functions to check in a drive in the progress file.
 When the user has reviewed a run's section, its heading gets
 "(reviewed <date>)"; the section stays for the record.
 
+## Run 2026-10-27 22:31 (`b7-loop-27-10-26`)
+
+- Nothing yet.
+
 ## Run 2026-10-25 23:42 (`b7-loop-25-10-26-4`)
 
 - The race's set-up (map 7d2acaa): `docs/functions/race-setup.md`, 52
