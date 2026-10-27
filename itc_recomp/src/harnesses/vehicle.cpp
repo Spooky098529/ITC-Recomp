@@ -541,6 +541,190 @@ void Lifetime(Context& h, uint32_t world) {
   }
 }
 
+// --- The input and the queries ---
+
+// ApplyInput: the car physics' vehicle region (numbers, or NaNs and
+// infinities anywhere), a car input record in the scratch area (the kinds
+// 0 and 2 mostly; the flags that send it to callees never seen in play now
+// and then: the original then runs on both sides). Compared: the region,
+// the bytes +2424 and +2249, the frame's +80 to +95, r3, f1.
+void Inputs(Context& h, uint32_t region) {
+  const uint32_t frame = CallContext(h).r1.u32 - 176;
+  const uint8_t kinds[] = {0, 0, 0, 2, 2, 2, 3, 0xFF, 1};
+  const int16_t values[] = {0, 32767, -32767, 1, -1, 16000, -32768};
+  for (int group = 0; group < 2; group++) {
+    Results results(std::string("Vehicle::ApplyInput (sub_820BFD30)") +
+                    (group == 1 ? ", NaNs and infinities anywhere" : ""));
+    for (uint64_t seed = 0; seed < 300; seed++) {
+      Outputs out[2];
+      for (int v = 0; v < 2; v++) {
+        Random r(seed * 73 + 43 + 1000 * uint64_t(group));
+        car_objects::FillVehicleRegion(h.base, region, r, group == 1);
+        car_objects::FillStack(h, r);
+        WriteRandom(h.base, h.data, kScratchBytes, r);
+        const uint32_t input = h.data + 4 * r.Below(128);
+        uint32_t flags = 0;
+        for (uint32_t bit : {0x02000000u, 0x80000000u, 0x200u, 0x10000u, 0x2000u, 0x1u, 0x2u,
+                             0x20000000u, 0x08000000u}) {
+          const bool rare = bit == 0x2000u || bit == 0x1u || bit == 0x2u || bit == 0x20000000u ||
+                            bit == 0x08000000u;
+          if (r.Below(rare ? 16 : 2) == 0) {
+            flags |= bit;
+          }
+        }
+        flags |= uint32_t(r.Next()) & 0x0040F000u;  // other bits now and then
+        guest::StoreU32(h.base, input + 0, flags);
+        for (uint32_t at : {4u, 6u, 8u, 10u}) {
+          guest::StoreU16(h.base, input + at,
+                          uint16_t(r.Below(2) == 0 ? values[r.Below(7)] : int16_t(r.Next())));
+        }
+        guest::StoreU8(h.base, input + 17, kinds[r.Below(sizeof(kinds))]);
+        guest::StoreU8(h.base, region + 2249, uint8_t(r.Below(4) == 0));
+        guest::StoreU8(h.base, region + 2424, uint8_t(r.Below(2)));
+        if (r.Below(2) == 0) {
+          guest::StoreU32(h.base, region + 2420, r.Below(2) == 0 ? 0 : 0x43C30000u);
+        }
+        PPCContext t = CallContext(h);
+        t.fpscr.disableFlushModeUnconditional();
+        t.r3.u64 = region;
+        t.r4.u64 = input;
+        (v == 0 ? Original<__imp__sub_820BFD30> : hooks::VehicleApplyInput)(t, h.base);
+        car_objects::VehicleRegionOutputs(out[v], h.base, region);
+        out[v].Word(guest::LoadU8(h.base, region + 2424));
+        out[v].Word(guest::LoadU8(h.base, region + 2249));
+        out[v].Bytes(Read(h.base, frame + 80, 16));
+        out[v].Bytes(Read(h.base, h.data, kScratchBytes));
+        out[v].Word(t.r3.u32);
+        out[v].Double(t.f1.u64);
+      }
+      results.Check(out[0], out[1], fmt::format("seed {}", seed));
+    }
+    results.Report();
+  }
+}
+
+// SlipWheelValue: the vehicle region, the wheels on the ground now and
+// then, the threshold's flag and value (0x826C2E3C, 0x826C2E38; put back
+// after). Compared: the region, the two globals, the frame's +80 to +159,
+// f1.
+void Slips(Context& h, uint32_t region) {
+  constexpr uint32_t kFlag = 0x826C2E3C, kThreshold = 0x826C2E38;
+  const uint32_t saved_flag = guest::LoadU32(h.base, kFlag);
+  const uint32_t saved_threshold = guest::LoadU32(h.base, kThreshold);
+  const uint32_t frame = CallContext(h).r1.u32 - 240;
+  for (int group = 0; group < 2; group++) {
+    Results results(std::string("Vehicle::SlipWheelValue (sub_820C0310)") +
+                    (group == 1 ? ", NaNs and infinities anywhere" : ""));
+    for (uint64_t seed = 0; seed < 300; seed++) {
+      Outputs out[2];
+      for (int v = 0; v < 2; v++) {
+        Random r(seed * 79 + 47 + 1000 * uint64_t(group));
+        car_objects::FillVehicleRegion(h.base, region, r, group == 1);
+        car_objects::FillStack(h, r);
+        for (uint32_t w = 0; w < 4; w++) {
+          guest::StoreU8(h.base, region + 433 + 368 * w, uint8_t(r.Below(3) != 0));
+        }
+        guest::StoreU32(h.base, kFlag, uint32_t(r.Next()) & ~1u | uint32_t(r.Below(2)));
+        guest::StoreU32(h.base, kThreshold,
+                        r.Below(4) == 0 ? 0 : std::bit_cast<uint32_t>(float(r.Below(300)) / 100.0f));
+        PPCContext t = CallContext(h);
+        t.fpscr.disableFlushModeUnconditional();
+        t.r3.u64 = region;
+        t.f1.f64 = group == 1 && r.Below(8) == 0 ? double(std::bit_cast<float>(RandomFloat(r)))
+                                                : double(r.Below(200)) / 10.0;
+        (v == 0 ? Original<__imp__sub_820C0310> : hooks::VehicleSlipWheelValue)(t, h.base);
+        car_objects::VehicleRegionOutputs(out[v], h.base, region);
+        out[v].Word(guest::LoadU32(h.base, kFlag));
+        out[v].Float(guest::LoadU32(h.base, kThreshold));
+        out[v].Floats(h.base, frame + 80, 20);
+        out[v].Double(t.f1.u64);
+        guest::StoreU32(h.base, kFlag, saved_flag);
+        guest::StoreU32(h.base, kThreshold, saved_threshold);
+      }
+      results.Check(out[0], out[1], fmt::format("seed {}", seed));
+    }
+    results.Report();
+  }
+}
+
+// NearestHumanVehicle: a fake race manager (0x826D82F4: the racer count at
+// +2364, the racers' records at +2308, each record's +20 its vehicle's
+// index) and the vehicles' block (0x826C2E34: each +6148 flags 0, 0x1,
+// 0x80, 0x81 or 0x2, +336 a body with its position +208); both put back
+// after. Compared: the frame's +80 to +223 (the point, the pairs' floats,
+// the vectors as floats, the racers exactly), r3 by the vehicle's index.
+void Nearest(Context& h) {
+  constexpr uint32_t kManager = 0x826D82F4;
+  const Block vehicles(vh::kVehiclesBytes);
+  const Block manager(0x1000);
+  const Block bodies(7 * 528);
+  if (!vehicles.address || !manager.address || !bodies.address) {
+    ITC_LOG_ERROR("harness: vehicle: no block from the allocation layer");
+    return;
+  }
+  const uint32_t saved_manager = guest::LoadU32(h.base, kManager);
+  const uint32_t saved_vehicles = guest::LoadU32(h.base, vh::kVehicles);
+  const uint32_t frame = CallContext(h).r1.u32 - 304;
+  const uint32_t kinds[] = {0, 0x1, 0x80, 0x81, 0x2};
+  for (int group = 0; group < 2; group++) {
+    Results results(std::string("Racers::NearestHumanVehicle (sub_820C2248)") +
+                    (group == 1 ? ", NaNs and infinities anywhere" : ""));
+    for (uint64_t seed = 0; seed < 300; seed++) {
+      Outputs out[2];
+      for (int v = 0; v < 2; v++) {
+        Random r(seed * 83 + 53 + 1000 * uint64_t(group));
+        car_objects::FillStack(h, r);
+        WriteRandom(h.base, h.data, kScratchBytes, r);
+        WriteRandom(h.base, manager.address, manager.bytes, r);
+        const uint32_t count = r.Below(8);
+        guest::StoreU32(h.base, manager.address + 2364, count);
+        for (uint32_t k = 0; k < 7; k++) {
+          const uint32_t record = manager.address + 0xA00 + 32 * k;
+          guest::StoreU32(h.base, manager.address + 4 * (577 + k), record);
+          guest::StoreU32(h.base, record + 20, r.Below(7));
+          const uint32_t vehicle = vehicles.address + vh::kVehicleBytes * k;
+          const uint32_t body = bodies.address + 528 * k;
+          guest::StoreU32(h.base, vehicle + 6148, kinds[r.Below(5)]);
+          guest::StoreU32(h.base, vehicle + 336, body);
+          for (uint32_t i = 0; i < 3; i++) {
+            guest::StoreU32(h.base, body + 208 + 4 * i,
+                            group == 1 ? RandomFloat(r, 100.0f)
+                                       : std::bit_cast<uint32_t>(
+                                             float(int32_t(r.Below(20001)) - 10000) / 100.0f));
+          }
+          guest::StoreU32(h.base, body + 220, uint32_t(r.Next()));
+        }
+        guest::StoreU32(h.base, kManager, manager.address);
+        guest::StoreU32(h.base, vh::kVehicles, vehicles.address);
+        const uint32_t point = h.data + 16 * r.Below(64);
+        for (uint32_t i = 0; i < 4; i++) {
+          guest::StoreU32(h.base, point + 4 * i,
+                          group == 1 ? RandomFloat(r, 100.0f)
+                                     : std::bit_cast<uint32_t>(
+                                           float(int32_t(r.Below(20001)) - 10000) / 100.0f));
+        }
+        PPCContext t = CallContext(h);
+        t.fpscr.disableFlushModeUnconditional();
+        t.r3.u64 = point;
+        t.r4.u64 = r.Below(8) == 0 ? r.Below(7) : r.Below(std::max(count, 1u));
+        (v == 0 ? Original<__imp__sub_820C2248> : hooks::VehicleNearestHuman)(t, h.base);
+        out[v].Floats(h.base, frame + 80, 4);
+        for (uint32_t k = 0; k < 8; k++) {
+          out[v].Float(guest::LoadU32(h.base, frame + 96 + 8 * k));
+          out[v].Word(guest::LoadU32(h.base, frame + 100 + 8 * k));
+        }
+        out[v].Bytes(Read(h.base, frame + 160, 32));
+        out[v].Floats(h.base, frame + 192, 8);
+        out[v].Word(t.r3.u32 - vehicles.address);
+        guest::StoreU32(h.base, kManager, saved_manager);
+        guest::StoreU32(h.base, vh::kVehicles, saved_vehicles);
+      }
+      results.Check(out[0], out[1], fmt::format("seed {}", seed));
+    }
+    results.Report();
+  }
+}
+
 }  // namespace
 
 void Vehicle(Context& h) {
@@ -556,6 +740,9 @@ void Vehicle(Context& h) {
     return;
   }
   Refreshes(h, world.address, region.address);
+  Inputs(h, region.address);
+  Slips(h, region.address);
+  Nearest(h);
   if (hooks::NativeHeapActive()) {
     Removals(h, world.address);
     Lifetime(h, world.address);

@@ -17,6 +17,7 @@
 #pragma once
 
 #include <cstdint>
+#include <functional>
 #include <optional>
 
 namespace vehicle {
@@ -97,5 +98,39 @@ std::optional<uint32_t> VehiclesCreate(uint8_t* base, uint32_t frame);
 // DestroyPhysics or the block's delete wouldn't be native. Only while
 // --native_heap routes the game's heap to the layer.
 bool VehiclesDestroy(uint8_t* base);
+
+// --- The vehicle's input and queries ---
+
+// Vehicle::SteerTowards' original (sub_820B5FD8) in the caller's frame,
+// with f1 to f3 and r4, r5 as given, where its plain C++ refuses.
+using SteerOriginal =
+    std::function<void(double target, double dt, double f3, uint32_t left, uint32_t right)>;
+// Vehicle::ApplyInput (sub_820BFD30): the car input record's steering (by
+// its kind, byte +17: the pad's through SteerTowards, an AI driver's
+// through SetSteering), brake, throttle and handbrake (their curves), the
+// reverse throttle's ramp and the nitrous' toggle (byte +2424). The
+// integers converted through `frame` + 80 and + 88 as the original (its
+// 176 bytes). False, with nothing done, where a callee never seen in play
+// would run (a wheel's steering sub_820B6170, the digital brake and
+// throttle ramps sub_820B03E0 and sub_820B0428, the shift and digital
+// setters sub_820B0098, sub_820B00A8, sub_820B00B8): then the original
+// runs. Leaves r3 the vehicle and f1 dt (RampReverseThrottle's).
+bool VehicleApplyInput(uint8_t* base, uint32_t vehicle, uint32_t input, uint32_t frame,
+                       const SteerOriginal& steer_original);
+// Vehicle::SlipWheelValue (sub_820C0310): once (bit 0x1 of [0x826C2E3C]),
+// the threshold [0x826C2E38] = speed x 1/3.6; for each wheel on the
+// ground, its slip (the point velocity along its forward and side axes
+// against the spin x radius, through `frame` + 80 to + 159 as the original:
+// its 240 bytes); the +684 of the one slipping most above the threshold
+// (0.0 when none). Returns it (the original's f1).
+double VehicleSlipWheelValue(uint8_t* base, uint32_t vehicle, double speed, uint32_t frame);
+// Racers::NearestHumanVehicle (sub_820C2248): the racers whose vehicles'
+// +6148 have 0x1 or 0x80, with their squared distances to the point, in a
+// table of seven (0.0, 0) pairs at `frame` + 96 (the point at + 80, the
+// racers found at + 160, the differences at + 192 and + 208: its 304
+// bytes), selection-sorted as the original (passes for the racers found,
+// each over the racer count); returns Race::RacerVehicle of pair n's
+// racer.
+uint32_t RacersNearestHumanVehicle(uint8_t* base, uint32_t point, uint32_t n, uint32_t frame);
 
 }  // namespace vehicle

@@ -37,4 +37,16 @@ void VehicleRemoveFromWorld(PPCContext& ctx, uint8_t* base);
 void VehiclesCreate(PPCContext& ctx, uint8_t* base);
 void VehiclesDestroy(PPCContext& ctx, uint8_t* base);
 
+// Vehicle::ApplyInput sub_820BFD30: r3 = the vehicle, r4 = the input; r3
+// the vehicle, f1 dt. SteerTowards' original in its frame where its plain
+// C++ refuses; the whole original where a callee never seen in play would
+// run.
+void VehicleApplyInput(PPCContext& ctx, uint8_t* base);
+// Vehicle::SlipWheelValue sub_820C0310: r3 = the vehicle, f1 = the speed;
+// f1 = the value.
+void VehicleSlipWheelValue(PPCContext& ctx, uint8_t* base);
+// Racers::NearestHumanVehicle sub_820C2248: r3 = the point, r4 = n; r3 =
+// the vehicle.
+void VehicleNearestHuman(PPCContext& ctx, uint8_t* base);
+
 }  // namespace hooks

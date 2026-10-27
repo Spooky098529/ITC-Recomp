@@ -11,9 +11,11 @@
 #include "base/log.h"
 #include "c_runtime/arrays.h"
 #include "collision/collision.h"
+#include "minimap/minimap.h"
 #include "memory/c_runtime_heap.h"
 #include "track_collision/track_collision.h"
 #include "track_route/track_route.h"
+#include "vehicle_accessors/vectors.h"
 #include "vehicle_accessors/vehicle_accessors.h"
 
 #include <cstring>
@@ -25,6 +27,7 @@ namespace cp = car_physics;
 namespace co = collision;
 namespace tc = track_collision;
 namespace va = vehicle_accessors;
+namespace vl = vector_library;
 
 namespace {
 
@@ -241,6 +244,204 @@ bool VehiclesDestroy(uint8_t* base) {
   }
   guest::StoreU32(base, kVehicles, 0);
   return true;
+}
+
+// --- The vehicle's input and queries ---
+
+namespace {
+
+constexpr uint32_t kTwentieth = 0x82002204;    // 0.05
+constexpr uint32_t kInputScale = 0x82002BD4;   // 1/32,767
+constexpr uint32_t kOneAndHalf = 0x820027A8;   // 1.5
+constexpr uint32_t kHalf = 0x82002BC0;         // 0.5
+constexpr uint32_t kFour = 0x820021F8;         // the handbrake ramp's rate
+constexpr uint32_t kSlipFlag = 0x826C2E3C, kSlipThreshold = 0x826C2E38;
+constexpr uint32_t kPerKmh = 0x82002BD8;       // 1/3.6
+
+// std then lfd then fcfid then frsp: a 64-bit integer through the stack
+// (its doubleword written) to a single.
+double IntThroughStack(uint8_t* base, uint32_t at, uint64_t value) {
+  guest::StoreU32(base, at, uint32_t(value >> 32));
+  guest::StoreU32(base, at + 4, uint32_t(value));
+  return double(float(double(int64_t(value))));
+}
+// extsb, addi 10, clrldi 32: a rate byte's word.
+uint64_t RateOf(uint8_t byte) {
+  return uint32_t(int32_t(int8_t(byte)) + 10);
+}
+// The brake's and throttle's curve: x = the input / 32,767, x^2 + (x - x^2
+// + x - x^2) x (rate x 0.05) (as fmadds).
+double PedalCurve(uint8_t* base, uint32_t input, uint32_t at, uint32_t byte, uint32_t frame) {
+  const double x0 = IntThroughStack(base, frame + 88,
+                                    uint64_t(int64_t(int16_t(guest::LoadU16(base, input + at)))));
+  const double rate = IntThroughStack(base, frame + 80, RateOf(guest::LoadU8(base, input + byte)));
+  const double x = Fmuls(x0, Lfs(base, kInputScale));
+  const double k = Fmuls(rate, Lfs(base, kTwentieth));
+  const double x2 = Fmuls(x, x);
+  const double a = Fsubs(x, x2);
+  const double b = Fsubs(Fadds(a, x), x2);
+  return Fmadds(b, k, x2);
+}
+
+}  // namespace
+
+bool VehicleApplyInput(uint8_t* base, uint32_t vehicle, uint32_t input, uint32_t frame,
+                       const SteerOriginal& steer_original) {
+  const uint32_t v = vehicle;
+  const uint32_t kind = uint32_t(int32_t(int8_t(guest::LoadU8(base, input + 17))));
+  const uint32_t flags = guest::LoadU32(base, input + 0);
+  // The callees never seen in play: decided first (the setters before them
+  // don't write the flags or +2249).
+  const bool shifts = guest::LoadU8(base, v + 2249) != 0 ? (flags & 0x2000) != 0
+                                                          : (flags & 0x3) != 0;
+  if (kind == 1 || (flags & 0x20000000) != 0 || (flags & 0x08000000) != 0 || shifts) {
+    return false;
+  }
+  ITC_NATIVE_RUNNING("sub_820BFD30 Vehicle::ApplyInput");
+  const double dt = Lfs(base, kStepSeconds);
+  const double zero = Lfs(base, kZero);
+  const double one = Lfs(base, kOne);
+  const double twentieth = Lfs(base, kTwentieth);
+  const double scale = Lfs(base, kInputScale);
+  if (kind == 0) {
+    // The pad: SteerTowards with a rate from byte +16.
+    const double rate = IntThroughStack(base, frame + 88, RateOf(guest::LoadU8(base, input + 16)));
+    const double f3 = Fmadds(Fnmsubs(rate, twentieth, one), Lfs(base, kOneAndHalf), Lfs(base, kHalf));
+    const int32_t steer = int16_t(guest::LoadU16(base, input + 8));
+    double target = zero;
+    uint32_t left = 0, right = 0;
+    if ((flags & 0x02000000) != 0) {
+      if (steer == -32767) {
+        left = 1;
+      } else if (steer == 32767) {
+        right = 1;
+      }
+    } else {
+      target = Fmuls(IntThroughStack(base, frame + 88, uint64_t(int64_t(steer))), scale);
+    }
+    double f1 = 0.0;
+    if (!cp::VehicleSteerTowards(base, v, target, dt, f3, left, right, &f1)) {
+      steer_original(target, dt, f3, left, right);
+    }
+  } else if (kind == 2) {
+    // An AI driver's.
+    const int64_t steer = int16_t(guest::LoadU16(base, input + 8));
+    cp::VehicleSetSteering(base, v, Fmuls(IntThroughStack(base, frame + 80, uint64_t(steer)), scale));
+  }
+  cp::VehicleSetBrake(base, v, PedalCurve(base, input, 6, 15, frame));
+  cp::VehicleSetThrottle(base, v, PedalCurve(base, input, 4, 14, frame));
+  if ((flags & 0x80000000) != 0) {
+    const uint32_t on = guest::LoadU16(base, input + 10) == 32767 ? 1 : 0;
+    cp::VehicleRampHandbrake(base, v, on, Fmuls(dt, Lfs(base, kFour)));
+  } else {
+    const int64_t value = int16_t(guest::LoadU16(base, input + 10));
+    cp::VehicleSetHandbrake(base, v, IntThroughStack(base, frame + 88, uint64_t(value)));
+  }
+  cp::VehicleRampReverseThrottle(base, v, (flags & 0x200) != 0 ? 1 : 0, dt);
+  if ((flags & 0x10000) != 0) {
+    uint8_t on = 0;
+    if (guest::LoadU8(base, v + 2424) == 0 && Lfs(base, v + 2420) > zero) {
+      on = 1;
+    }
+    guest::StoreU8(base, v + 2424, on);
+  }
+  return true;
+}
+
+double VehicleSlipWheelValue(uint8_t* base, uint32_t vehicle, double speed, uint32_t frame) {
+  ITC_NATIVE_RUNNING("sub_820C0310 Vehicle::SlipWheelValue");
+  const uint32_t v = vehicle, f = frame;
+  const uint32_t once = guest::LoadU32(base, kSlipFlag);
+  if ((once & 1) == 0) {
+    guest::StoreU32(base, kSlipFlag, once | 1);
+    Stfs(base, kSlipThreshold, Fmuls(speed, Lfs(base, kPerKmh)));
+  }
+  const double zero = Lfs(base, kZero);
+  double best = zero, most = zero;
+  for (uint32_t i = 0; i < 4; i++) {
+    const uint32_t w = v + 368 * i;  // the wheel's fields at w + 433 to + 684
+    if (guest::LoadU8(base, w + 433) == 0) {
+      continue;
+    }
+    const uint32_t data = guest::LoadU32(base, v + 2160 + 4 * i);
+    Stfs(base, f + 124, zero);
+    Stfs(base, f + 92, zero);
+    Stfs(base, f + 108, zero);
+    const double spin = Lfs(base, w + 664);
+    const uint32_t body = guest::LoadU32(base, v + 336);
+    const double rolled = Fmuls(Lfs(base, data + 52), spin);
+    Stfs(base, f + 84, zero);
+    Stfs(base, f + 80, rolled);
+    Stfs(base, f + 88, zero);
+    va::RigidBodyPointVelocity(base, f + 144, body, w + 480);
+    vl::Vec4Copy(base, f + 112, f + 144);
+    Stfs(base, f + 96, double(vl::Vec3DotOf(base, f + 112, w + 560)));
+    Stfs(base, f + 100, zero);
+    Stfs(base, f + 104, double(vl::Vec3DotOf(base, f + 112, w + 544)));
+    vl::Vec3Difference(base, f + 128, f + 96, f + 80);
+    const double slip = double(vl::Sqrtf(double(vl::Vec3DotOf(base, f + 128, f + 128))));
+    // bge on both: on only when the threshold and the most so far are below
+    // it (a NaN keeps the wheel so far).
+    if (Lfs(base, kSlipThreshold) < slip && most < slip) {
+      best = Lfs(base, w + 684);
+      most = slip;
+    }
+  }
+  return best;
+}
+
+uint32_t RacersNearestHumanVehicle(uint8_t* base, uint32_t point, uint32_t n, uint32_t frame) {
+  ITC_NATIVE_RUNNING("sub_820C2248 Racers::NearestHumanVehicle");
+  const uint32_t f = frame;
+  const int32_t count = int32_t(tc::RaceRacerCount(base));
+  const double zero = Lfs(base, kZero);
+  for (uint32_t k = 0; k < 7; k++) {
+    Stfs(base, f + 96 + 8 * k, zero);
+    guest::StoreU32(base, f + 100 + 8 * k, 0);
+  }
+  Stfs(base, f + 92, zero);
+  CopyWord(base, point + 8, f + 88);
+  CopyWord(base, point + 0, f + 80);
+  CopyWord(base, point + 4, f + 84);
+  uint32_t found = 0;
+  for (int32_t racer = 0; racer < count; racer++) {
+    const uint32_t flags = guest::LoadU32(base, minimap::RaceRacerVehicle(base, racer) + 6148);
+    if ((flags & 0x1) != 0 || (flags & 0x80) != 0) {
+      guest::StoreU32(base, f + 160 + 4 * found, uint32_t(racer));
+      found++;
+    }
+  }
+  for (uint32_t j = 0; j < found; j++) {
+    const uint32_t racer = guest::LoadU32(base, f + 160 + 4 * j);
+    const uint32_t vehicle = minimap::RaceRacerVehicle(base, racer);
+    const uint32_t body = guest::LoadU32(base, vehicle + 336);
+    vl::Vec3Difference(base, f + 208, f + 80, va::RigidBodyPosition(body));
+    vl::Vec3Difference(base, f + 192, f + 80,
+                       va::RigidBodyPosition(guest::LoadU32(base, vehicle + 336)));
+    Stfs(base, f + 96 + 8 * j, double(vl::Vec3DotOf(base, f + 192, f + 208)));
+    guest::StoreU32(base, f + 100 + 8 * j, racer);
+  }
+  // The selection sort: a pass per racer found, each over the racer count.
+  int32_t next = 1;
+  for (uint32_t pass = 0, at = f + 96; pass < found; pass++, at += 8, next++) {
+    uint32_t least = at;
+    if (next < count) {
+      uint32_t other = at + 8;
+      for (int32_t k = count - next; k > 0; k--, other += 8) {
+        if (Lfs(base, least) > Lfs(base, other)) {
+          least = other;
+        }
+      }
+    }
+    const uint32_t a0 = guest::LoadU32(base, at);
+    const uint32_t m0 = guest::LoadU32(base, least), m1 = guest::LoadU32(base, least + 4);
+    guest::StoreU32(base, least, a0);
+    guest::StoreU32(base, least + 4, guest::LoadU32(base, at + 4));
+    guest::StoreU32(base, at, m0);
+    guest::StoreU32(base, at + 4, m1);
+  }
+  const uint32_t racer = guest::LoadU32(base, f + 100 + ((n << 3) & 0xFFFFFFF8u));
+  return minimap::RaceRacerVehicle(base, racer);
 }
 
 }  // namespace vehicle

@@ -19,7 +19,10 @@ ITC_FLAG_BOOL(native_vehicle, true, "ITC",
               "sub_820C20E0, Vehicles::Create sub_820C3BD0 with Vehicle::Construct "
               "sub_820C30D8, Vehicles::Destroy sub_820C3B78 with Vehicles::DestroyAll "
               "sub_820C21E0 (these only while --native_heap routes the game's heap to the "
-              "allocation layer)) natively instead of through the translated code (the same "
+              "allocation layer); Vehicle::ApplyInput sub_820BFD30 (its callees never seen in "
+              "play, sub_820B6170, sub_820B03E0, sub_820B0428, sub_820B0098, sub_820B00A8, "
+              "sub_820B00B8, by the original), Vehicle::SlipWheelValue sub_820C0310, "
+              "Racers::NearestHumanVehicle sub_820C2248) natively instead of through the translated code (the same "
               "words, bit for bit; checked by --run_harnesses=vehicle)");
 
 namespace hooks {
@@ -103,6 +106,41 @@ void VehiclesDestroy(PPCContext& ctx, uint8_t* base) {
   // its own r3 without a block; its callers don't read it.
 }
 
+void VehicleApplyInput(PPCContext& ctx, uint8_t* base) {
+  ctx.fpscr.disableFlushMode();
+  const uint32_t vehicle = ctx.r3.u32;
+  const uint32_t frame = ctx.r1.u32 - 176;
+  auto steer = [&](double target, double dt, double f3, uint32_t left, uint32_t right) {
+    const uint64_t r1 = ctx.r1.u64;
+    ctx.r1.u64 = frame;
+    ctx.r3.u64 = vehicle;
+    ctx.f1.f64 = target;
+    ctx.f2.f64 = dt;
+    ctx.f3.f64 = f3;
+    ctx.r4.u64 = left;
+    ctx.r5.u64 = right;
+    __imp__sub_820B5FD8(ctx, base);
+    ctx.r1.u64 = r1;
+    ctx.fpscr.disableFlushMode();
+  };
+  if (!vh::VehicleApplyInput(base, vehicle, ctx.r4.u32, frame, steer)) {
+    __imp__sub_820BFD30(ctx, base);
+    return;
+  }
+  ctx.r3.u64 = vehicle;
+  ctx.f1.f64 = double(guest::LoadFloat(base, vh::kStepSeconds));
+}
+
+void VehicleSlipWheelValue(PPCContext& ctx, uint8_t* base) {
+  ctx.fpscr.disableFlushMode();
+  ctx.f1.f64 = vh::VehicleSlipWheelValue(base, ctx.r3.u32, ctx.f1.f64, ctx.r1.u32 - 240);
+}
+
+void VehicleNearestHuman(PPCContext& ctx, uint8_t* base) {
+  ctx.fpscr.disableFlushMode();
+  ctx.r3.u64 = vh::RacersNearestHumanVehicle(base, ctx.r3.u32, ctx.r4.u32, ctx.r1.u32 - 304);
+}
+
 }  // namespace hooks
 
 // Defines an adapter: the flag, else the original.
@@ -126,5 +164,8 @@ ITC_VEHICLE(820C0118, VehicleRefresh)
 ITC_VEHICLE(820C20E0, VehicleRemoveFromWorld)
 ITC_VEHICLE(820C3BD0, VehiclesCreate)
 ITC_VEHICLE(820C3B78, VehiclesDestroy)
+ITC_VEHICLE(820BFD30, VehicleApplyInput)
+ITC_VEHICLE(820C0310, VehicleSlipWheelValue)
+ITC_VEHICLE(820C2248, VehicleNearestHuman)
 // Vehicle::Construct (sub_820C30D8) and Vehicles::DestroyAll (sub_820C21E0)
 // have no adapters: their only callers are Vehicles::Create and Destroy.
