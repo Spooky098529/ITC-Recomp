@@ -194,5 +194,6 @@ void SceneryLists(Context& h);
 void ShaderObjects(Context& h);
 void RaceSetup(Context& h);
 void Vehicle(Context& h);
+void AppStates(Context& h);
 
 }  // namespace harness

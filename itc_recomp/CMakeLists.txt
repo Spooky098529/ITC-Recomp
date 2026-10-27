@@ -139,6 +139,8 @@ set(ITC_SOURCES
     src/car_physics/vehicle_physics.cpp
     src/hooks/vehicle_native.cpp
     src/vehicle/vehicle.cpp
+    src/hooks/app_states.cpp
+    src/app_states/containers.cpp
     src/hooks/collision.cpp
     src/collision/shapes.cpp
     src/collision/boxes.cpp
@@ -274,6 +276,7 @@ set(ITC_SOURCES
     src/harnesses/car_physics.cpp
     src/harnesses/car_physics_objects.cpp
     src/harnesses/vehicle.cpp
+    src/harnesses/app_states.cpp
     src/harnesses/collision.cpp
     src/harnesses/collision_world.cpp
     src/harnesses/collision_world_walls.cpp
