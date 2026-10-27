@@ -25,6 +25,18 @@ When the user has reviewed a run's section, its heading gets
   map's reading of `App::Update`'s player 1 Start toggle as probably a
   debug pause (it picks handler map +28 or +40; both reach
   `Modes::Tick`).
+- The app states, migration 1 (7bb4dfd..b29697d): 31 rows in
+  `app-states.md`. `App::RunHandler` `sub_82092968` was Wrapped by
+  `src/debug/menu_selection_scan.cpp` (`--find_menu_selection`): the
+  wrap moved into its adapter in `src/hooks/app_states.cpp`, so the
+  row is Overridden. Map correction: `OpList::OpList` links the head to
+  itself at +0 and +4. Kept as the originals: traps logged with a
+  warning and execution goes on (as `main_loop.cpp`); each walk's
+  functor-adjustment word keeps the frame's stack word in its low half
+  (dead stack); `App::Update` calls the button tests `sub_8258CEB0` and
+  `sub_8258CEE0` as guest calls. Handed to the originals (never in
+  play): odd `ApplyRequest` types, `length_error`, `bad_alloc`.
+  `std_list::Erase` added in `src/std_list/ptr_list.{h,cpp}`.
 
 ## Run 2026-10-25 23:42 (`b7-loop-25-10-26-4`)
 

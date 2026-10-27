@@ -17,8 +17,15 @@ file's history. What's left to see in a drive, from every run:
   Mapped as the app's update and its state stack (`app-states.md`, 56
   rows: 2 moved from `functions.md`, 54 new; ac92c3b; 1 lead added).
   Map checked (0 errors, 56 of 56 in play, 26 ready groups, no
-  blockers outside it, no kernel calls). Step: migration agent 1
-  running.
+  blockers outside it, no kernel calls). Migration 1 done after five
+  batches (7bb4dfd..b29697d: the containers, the operation list, the
+  layer's push, the message vector, `App::IsRunning`, the walks,
+  handlers, requests and add slots, `App::Update`; 5 adapters removed,
+  4 Native with none, 1 Merged; `--native_app_states`; `itc_1995`: 23
+  s, 0 errors, every harness 0 differing but the expected groups;
+  frame dumps the same as the fallback). Left ready: `App::Start`,
+  `AppStates::Create` and the state-layer tree's ready groups. Step:
+  validation agent 1 running.
 
 ## Done
 
@@ -41,5 +48,7 @@ This run's groups: `expected-differences.md` (the "22:31 run" lines).
   `sub_82108018`'s row says never called, but it ran (not this run's).
 - After the app states' map: ours 2255, work left 4197 (wrapped 104,
   known 570, unknown 3523).
+- After the app states' migration 1: ours 2286, work left 4166
+  (wrapped 103, known 540, unknown 3523).
 
 ## Stopped
