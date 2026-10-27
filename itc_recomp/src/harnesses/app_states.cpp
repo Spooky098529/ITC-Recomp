@@ -20,6 +20,7 @@
 
 #include <fmt/format.h>
 
+#include <algorithm>
 #include <optional>
 #include <string>
 #include <vector>
@@ -46,19 +47,21 @@ void Store(uint8_t* base, uint32_t address, uint32_t value) {
 // The heap blocks a case made or met, numbered in the order added.
 struct Blocks {
   std::vector<uint32_t> list;
+  std::vector<uint32_t> sizes;  // as allocated (a word past the end counts)
   uint32_t Add(uint32_t block) {
     list.push_back(block);
+    sizes.push_back(block != 0 && memory::IsHeapBlock(block) ? memory::Size(block) : 4);
     return block;
   }
   uint32_t New(uint8_t* base, uint32_t bytes) {
     const auto block = memory::crt::OperatorNew(base, bytes);
     return Add(block ? *block : 0);
   }
-  // A word into a block as 0xB1000000 + 0x1000 x its number + the offset;
-  // others as they are.
+  // A word into a block (or just past its end) as 0xB1000000 + 0x1000 x its
+  // number + the offset; others as they are.
   uint32_t Of(uint32_t word) const {
     for (uint32_t i = 0; i < list.size(); i++) {
-      if (list[i] != 0 && word >= list[i] && word - list[i] < 0x400) {
+      if (list[i] != 0 && word >= list[i] && word - list[i] <= sizes[i]) {
         return 0xB1000000u + 0x1000 * i + (word - list[i]);
       }
     }
@@ -400,6 +403,320 @@ void Small(Context& h) {
   }
 }
 
+// --- The operation list and the layer's push ---
+
+// The nodes reachable from `head` (by +0 and +4) not yet in `blocks` added
+// to it.
+void MeetNodes(uint8_t* base, Blocks& blocks, uint32_t head) {
+  std::vector<uint32_t> queue = {head};
+  std::vector<uint32_t> seen;
+  while (!queue.empty()) {
+    const uint32_t node = queue.back();
+    queue.pop_back();
+    if (node == 0 || !memory::IsHeapBlock(node) ||
+        std::find(seen.begin(), seen.end(), node) != seen.end()) {
+      continue;
+    }
+    seen.push_back(node);
+    if (std::find(blocks.list.begin(), blocks.list.end(), node) == blocks.list.end()) {
+      blocks.Add(node);
+    }
+    queue.push_back(Load(base, node + as::kNodeNext));
+    queue.push_back(Load(base, node + as::kNodePrevious));
+  }
+}
+
+void OpLists(Context& h) {
+  {
+    Results results("OpList::OpList (sub_820AD0B8)");
+    for (int c = 0; c < 30; c++) {
+      Case(
+          h, results, [&](Blocks&) {}, [&](PPCContext& t) { t.r3.u64 = h.data; },
+          __imp__sub_820AD0B8, hooks::AppOpConstruct,
+          [&](Outputs& out, const PPCContext& t, Blocks& blocks) {
+            blocks.Add(Load(h.base, h.data + as::kListHead));
+            blocks.Words(h.base, out, h.data, 64);
+            blocks.Words(h.base, out, blocks.list[0], 8);  // +8 to +15 never set
+            out.Word(t.r3.u32);
+            blocks.Out(out);
+          },
+          fmt::format("case {}", c));
+    }
+    results.Report();
+  }
+  {
+    Results results("OpList::BuyNode (sub_820ACFF8)");
+    for (int c = 0; c < 50; c++) {
+      Case(
+          h, results,
+          [&](Blocks&) {
+            for (uint32_t at = 0; at < 128; at += 4) {
+              Store(h.base, h.data + at, uint32_t(h.random.Next()));
+            }
+          },
+          [&](PPCContext& t) {
+            t.r4.u64 = Load(h.base, h.data + 0);
+            t.r5.u64 = Load(h.base, h.data + 4);
+            t.r6.u64 = h.data + 64;
+          },
+          __imp__sub_820ACFF8, hooks::AppOpBuyNode,
+          [&](Outputs& out, const PPCContext& t, Blocks& blocks) {
+            blocks.Add(t.r3.u32);
+            out.Word(blocks.Of(t.r3.u32));
+            if (t.r3.u32 != 0) {
+              out.Bytes(Read(h.base, t.r3.u32, 16));
+            }
+            out.Bytes(Read(h.base, h.data, 128));
+            blocks.Out(out);
+          },
+          fmt::format("case {}", c));
+    }
+    results.Report();
+  }
+  {
+    // A layer at data (48 bytes, random words), its operation list (+36)
+    // holding 0 to 6 operations.
+    Results results("StateLayer::Push (sub_820ADAD0)");
+    for (int c = 0; c < 100; c++) {
+      Case(
+          h, results,
+          [&](Blocks& blocks) {
+            for (uint32_t at = 0; at < 64; at += 4) {
+              Store(h.base, h.data + at, uint32_t(h.random.Next()));
+            }
+            BuildList(h, blocks, h.data + as::kLayerOps, h.random.Below(7), as::kOpNodeBytes);
+          },
+          [&](PPCContext& t) {
+            t.r3.u64 = h.data;
+            t.r4.u64 = uint32_t(h.random.Next());
+          },
+          __imp__sub_820ADAD0, hooks::AppLayerPush,
+          [&](Outputs& out, const PPCContext& t, Blocks& blocks) {
+            MeetNodes(h.base, blocks, Load(h.base, h.data + as::kLayerOps + as::kListHead));
+            blocks.Words(h.base, out, h.data, 64);
+            LiveBlocks(h.base, out, blocks, as::kOpNodeBytes);
+            out.Word(t.r3.u32);
+            blocks.Out(out);
+          },
+          fmt::format("case {}", c));
+    }
+    results.Report();
+  }
+}
+
+// --- The message vector's growth ---
+
+void MessageGrowth(Context& h) {
+  const uint32_t vector = h.data;
+  const uint32_t result = h.data + 16;
+  const uint32_t value = h.data + 32;
+  // A vector of `size` random words in a heap block with room for `spare`
+  // more (none when both are 0, half the time); returns the element at
+  // `index` (clamped to the size).
+  auto build = [&](Blocks& blocks, uint32_t size, uint32_t spare, uint32_t index) {
+    uint32_t block = 0;
+    if (size + spare != 0 || h.random.Below(2) != 0) {
+      block = blocks.New(h.base, 4 * (size + spare));
+      for (uint32_t i = 0; i < size + spare; i++) {
+        Store(h.base, block + 4 * i, uint32_t(h.random.Next()));
+      }
+    }
+    Store(h.base, vector + as::kVectorFirst, block);
+    Store(h.base, vector + as::kVectorLast, block + 4 * size);
+    Store(h.base, vector + as::kVectorEnd, block + 4 * (size + spare));
+    Store(h.base, value, uint32_t(h.random.Next()));
+    return block + 4 * std::min(index, size);
+  };
+  // The vector by number, its block's words to its end, the blocks' state.
+  auto collect = [&](Outputs& out, Blocks& blocks) {
+    const uint32_t first = Load(h.base, vector + as::kVectorFirst);
+    const uint32_t end = Load(h.base, vector + as::kVectorEnd);
+    if (first != 0 && memory::IsHeapBlock(first)) {
+      bool known = false;
+      for (uint32_t b : blocks.list) {
+        known = known || b == first;
+      }
+      if (!known) {
+        blocks.Add(first);
+      }
+      if (end >= first && end - first <= 0x400) {
+        // Only the words up to last are set (the rest heap leftovers).
+        const uint32_t last = Load(h.base, vector + as::kVectorLast);
+        blocks.Words(h.base, out, first, std::min(last, end) - first);
+      }
+    }
+    blocks.Words(h.base, out, h.data, 48);
+    blocks.Out(out);
+  };
+  {
+    Results results("MessageVector::InsertN (sub_820938C0)");
+    for (int c = 0; c < 300; c++) {
+      uint32_t where = 0, count = 0;
+      Case(
+          h, results,
+          [&](Blocks& blocks) {
+            const uint32_t size = h.random.Below(c % 3 == 0 ? 3 : 20);
+            count = h.random.Below(c % 4 == 0 ? 30 : 6);
+            where = build(blocks, size, h.random.Below(c % 2 == 0 ? 4 : 40),
+                          h.random.Below(size + 1));
+          },
+          [&](PPCContext& t) {
+            Fill(h.base, t.r1.u32 + 24, 8);
+            t.r3.u64 = vector;
+            t.r4.u64 = (uint64_t(vector) << 32) | where;
+            t.r5.u64 = count;
+            t.r6.u64 = value;
+          },
+          __imp__sub_820938C0, hooks::AppMessagesInsertN,
+          [&](Outputs& out, const PPCContext& t, Blocks& blocks) {
+            out.Bytes(Read(h.base, t.r1.u32 + 24, 8));
+            collect(out, blocks);
+          },
+          fmt::format("count {} case {}", count, c));
+    }
+    results.Report();
+  }
+  {
+    Results results("MessageVector::Insert (sub_82094110)");
+    for (int c = 0; c < 200; c++) {
+      uint32_t where = 0;
+      Case(
+          h, results,
+          [&](Blocks& blocks) {
+            const uint32_t size = h.random.Below(20);
+            where = build(blocks, size, h.random.Below(3), h.random.Below(size + 1));
+          },
+          [&](PPCContext& t) {
+            t.r3.u64 = result;
+            t.r4.u64 = vector;
+            t.r5.u64 = (uint64_t(vector) << 32) | where;
+            t.r6.u64 = value;
+          },
+          __imp__sub_82094110, hooks::AppMessagesInsert,
+          [&](Outputs& out, const PPCContext& t, Blocks& blocks) {
+            out.Word(t.r3.u32);
+            collect(out, blocks);
+          },
+          fmt::format("case {}", c));
+    }
+    results.Report();
+  }
+  {
+    Results results("MessageVector::PushBack (sub_820944E0)");
+    for (int c = 0; c < 200; c++) {
+      Case(
+          h, results,
+          [&](Blocks& blocks) {
+            const uint32_t size = h.random.Below(20);
+            build(blocks, size, h.random.Below(3), 0);
+          },
+          [&](PPCContext& t) {
+            t.r3.u64 = vector;
+            t.r4.u64 = value;
+          },
+          __imp__sub_820944E0, hooks::AppMessagesPushBack,
+          [&](Outputs& out, const PPCContext& t, Blocks& blocks) {
+            out.Word(t.r3.u32 - t.r1.u32);
+            collect(out, blocks);
+          },
+          fmt::format("case {}", c));
+    }
+    results.Report();
+  }
+  {
+    // The app's +20 interface at data - 56 + 0 (its message vector at +56 is
+    // the vector at data).
+    Results results("App::SendMessage (sub_82094AB0)");
+    for (int c = 0; c < 100; c++) {
+      Case(
+          h, results,
+          [&](Blocks& blocks) {
+            const uint32_t size = h.random.Below(20);
+            build(blocks, size, h.random.Below(3), 0);
+          },
+          [&](PPCContext& t) {
+            t.r3.u64 = vector - as::kInterfaceMessages;
+            t.r4.u64 = value;
+          },
+          __imp__sub_82094AB0, hooks::AppSendMessage,
+          [&](Outputs& out, const PPCContext& t, Blocks& blocks) {
+            out.Word(t.r3.u32 - t.r1.u32);
+            collect(out, blocks);
+          },
+          fmt::format("case {}", c));
+    }
+    results.Report();
+  }
+}
+
+// --- The app's running test ---
+//
+// The interface at data, its state stack at data + 256 (vtable at + 320),
+// the root layer at data + 512 (its state's vtable at + 640), random words
+// elsewhere. The slots are the game's in play (AppStates::IsEmpty,
+// StateLayer::IsEmpty) or guest getters (sub_82090760, the byte +133;
+// sub_82090770, the word +60) for the guest calls.
+
+constexpr uint32_t kByte133 = 0x82090760;
+constexpr uint32_t kWord60 = 0x82090770;
+
+void Running(Context& h) {
+  const uint32_t interface = h.data;
+  const uint32_t states = h.data + 256;
+  const uint32_t root = h.data + 512;
+  auto build = [&](int c) {
+    for (uint32_t at = 0; at < 1024; at += 4) {
+      Store(h.base, h.data + at, uint32_t(h.random.Next()));
+    }
+    const uint32_t pick[] = {kByte133, kWord60};
+    Store(h.base, interface + as::kInterfaceStates, states);
+    Store(h.base, states + 0, states + 64);
+    Store(h.base, states + 64 + 12, c % 4 == 3 ? pick[h.random.Below(2)] : as::kAppStatesIsEmpty);
+    Store(h.base, states + as::kStatesRoot, root);
+    Store(h.base, root + 4, root + 128);
+    Store(h.base, root + 128 + 44, c % 3 == 2 ? pick[h.random.Below(2)] : as::kLayerIsEmpty);
+    // The counts (the root's +20 and +32): 0 or not; the getters' byte and
+    // word: 0 or not.
+    Store(h.base, root + 20, h.random.Below(2) ? 0 : 1 + h.random.Below(3));
+    Store(h.base, root + 32, h.random.Below(2) ? 0 : 1 + h.random.Below(3));
+    guest::StoreU8(h.base, root + 4 + 133, h.random.Below(2) ? 0 : uint8_t(h.random.Next()));
+    guest::StoreU8(h.base, states + 133, h.random.Below(2) ? 0 : uint8_t(h.random.Next()));
+    if (h.random.Below(2)) {
+      Store(h.base, root + 4 + 60, Load(h.base, root + 4 + 60) & 0xFFFFFF00);
+      Store(h.base, states + 60, Load(h.base, states + 60) & 0xFFFFFF00);
+    }
+  };
+  {
+    Results results("AppStates::IsEmpty (sub_820AE1A0)");
+    for (int c = 0; c < 100; c++) {
+      Case(
+          h, results, [&](Blocks&) { build(c); }, [&](PPCContext& t) { t.r3.u64 = states; },
+          __imp__sub_820AE1A0, hooks::AppStatesIsEmpty,
+          [&](Outputs& out, const PPCContext& t, const Blocks&) {
+            out.Word(t.r3.u32);
+            out.Bytes(Read(h.base, h.data, 1024));
+          },
+          fmt::format("case {}", c));
+    }
+    results.Report();
+  }
+  {
+    Results results("App::IsRunning (sub_82092928)");
+    for (int c = 0; c < 100; c++) {
+      Case(
+          h, results, [&](Blocks&) { build(c); }, [&](PPCContext& t) { t.r3.u64 = interface; },
+          __imp__sub_82092928, hooks::AppIsRunning,
+          [&](Outputs& out, const PPCContext& t, const Blocks&) {
+            out.Word(t.r3.u32);
+            out.Word(t.r11.u32);
+            out.Bytes(Read(h.base, h.data, 1024));
+          },
+          fmt::format("case {}", c));
+    }
+    results.Report();
+  }
+}
+
 }  // namespace
 
 void AppStates(Context& h) {
@@ -408,6 +725,9 @@ void AppStates(Context& h) {
   IncSize(h);
   Lists(h);
   Small(h);
+  OpLists(h);
+  MessageGrowth(h);
+  Running(h);
 }
 
 }  // namespace harness

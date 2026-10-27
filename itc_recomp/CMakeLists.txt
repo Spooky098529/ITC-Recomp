@@ -141,6 +141,7 @@ set(ITC_SOURCES
     src/vehicle/vehicle.cpp
     src/hooks/app_states.cpp
     src/app_states/containers.cpp
+    src/app_states/app.cpp
     src/hooks/collision.cpp
     src/collision/shapes.cpp
     src/collision/boxes.cpp

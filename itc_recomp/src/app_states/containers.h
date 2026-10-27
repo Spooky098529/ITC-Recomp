@@ -64,6 +64,39 @@ std::optional<uint32_t> OpAllocateNodes(uint8_t* base, uint32_t count);
 // original's length_error).
 bool OpIncSize(uint8_t* base, uint32_t list, uint32_t count);
 
+// sub_820AD0B8 OpList::OpList: a head node (OpList::AllocateNodes with 1)
+// linked to itself (+0 and +4) at +4, the size 0. False, with nothing done,
+// where the original must run (no heap, or operator new failing).
+bool OpConstruct(uint8_t* base, uint32_t list);
+// sub_820ACFF8 OpList::BuyNode (_Buynode): a node with +0 `next`, +4
+// `previous` and the operation (`type`, `state`) at +8. The node (0 when
+// operator new answers 0), or nullopt where the original must run.
+std::optional<uint32_t> OpBuyNode(uint8_t* base, uint32_t next, uint32_t previous, uint32_t type,
+                                  uint32_t state);
+// sub_820ADAD0 StateLayer::Push (the layer's slot 3): the operation {2,
+// `state`} appended to the layer's queue (+36). False, with nothing done,
+// where the original must run (IncSize's length_error, no heap).
+bool LayerPush(uint8_t* base, uint32_t layer, uint32_t state);
+constexpr uint32_t kLayerOps = 36;
+
+// sub_820938C0 MessageVector::InsertN (_Insert_n): `count` copies of
+// `value` inserted before the element `where` (a new block from
+// MessageVector::Allocate when it doesn't fit, the old one freed). False,
+// with nothing done, for the length_error (sub_820A92D0) and an allocation
+// the heap can't give.
+bool MessagesInsertN(uint8_t* base, uint32_t vector, uint32_t where, uint32_t count,
+                     uint32_t value);
+// sub_82094110 MessageVector::Insert (insert(where, value)): InsertN of
+// one, then the new element's address (the result iterator's). nullopt
+// where the original traps (the iterator's vector `where_vector` not the
+// vector, first past last, the result out of range) or InsertN hands back.
+std::optional<uint32_t> MessagesInsert(uint8_t* base, uint32_t vector, uint32_t where_vector,
+                                       uint32_t where, uint32_t value);
+// sub_820944E0 MessageVector::PushBack: the word at `value` stored at the
+// end, or Insert at the end when full. Whether it took Insert (the
+// original's r3 differs), or nullopt where it traps or Insert hands back.
+std::optional<bool> MessagesPushBack(uint8_t* base, uint32_t vector, uint32_t value);
+
 // sub_820ACF88 List::Clear (any node size): the head linked to itself, the
 // size 0, then each old node freed. Returns the head (r3 as the original
 // leaves it).
