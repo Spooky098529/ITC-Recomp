@@ -26,7 +26,8 @@ ITC_FLAG_BOOL(native_vehicle, true, "ITC",
               "sub_820CE1D8, Build sub_820CE430, FromEngine sub_820CE7D8, and "
               "VehicleStatus::Reset sub_820BFC48; Vehicle::SetUpSurfaceGrip sub_820C1E00, "
               "Vehicle::SetUp sub_820C3150 and ResetForCar sub_820C33B8 (their physics' set-up "
-              "natively only while --native_heap routes the game's heap to the layer)) natively instead of through the translated code (the same "
+              "natively only while --native_heap routes the game's heap to the layer); "
+              "VehicleStatus::Update sub_820C23E8 and Vehicle::Tick sub_820C3020) natively instead of through the translated code (the same "
               "words, bit for bit; checked by --run_harnesses=vehicle)");
 
 namespace hooks {
@@ -215,6 +216,54 @@ void VehicleResetForCar(PPCContext& ctx, uint8_t* base) {
   SetUpStep(ctx, base, true);
 }
 
+void VehicleStatusUpdate(PPCContext& ctx, uint8_t* base) {
+  ctx.fpscr.disableFlushMode();
+  if (!vh::VehicleStatusUpdate(base, ctx.r3.u32, ctx.r4.u32, ctx.r5.u32, ctx.r6.u32,
+                               ctx.r1.u32 - 384)) {
+    __imp__sub_820C23E8(ctx, base);
+  }
+}
+
+void VehicleTick(PPCContext& ctx, uint8_t* base) {
+  ctx.fpscr.disableFlushMode();
+  auto call = [&](uint32_t address, uint32_t r1, const vh::GuestRegisters& r) {
+    const uint64_t saved = ctx.r1.u64;
+    ctx.r1.u64 = r1;
+    ctx.r3.u64 = r.r3;
+    ctx.r4.u64 = r.r4;
+    ctx.r5.u64 = r.r5;
+    ctx.r6.u64 = r.r6;
+    ctx.f1.f64 = r.f1;
+    ctx.f2.f64 = r.f2;
+    ctx.f3.f64 = r.f3;
+    switch (address) {
+      case 0x820B5FD8:
+        __imp__sub_820B5FD8(ctx, base);
+        break;
+      case 0x820BFD30:
+        __imp__sub_820BFD30(ctx, base);
+        break;
+      case 0x820B6498:
+        __imp__sub_820B6498(ctx, base);
+        break;
+      case 0x820B18B8:
+        ctx.lr = 0x820B6514;
+        __imp__sub_820B18B8(ctx, base);
+        break;
+      case 0x820B2100:
+        ctx.lr = 0x820B6538;
+        __imp__sub_820B2100(ctx, base);
+        break;
+      default:
+        __imp__sub_820C23E8(ctx, base);
+        break;
+    }
+    ctx.r1.u64 = saved;
+    ctx.fpscr.disableFlushMode();
+  };
+  vh::VehicleTick(base, ctx.r3.u32, ctx.r4.u32, ctx.r5.u32, ctx.r6.u32, ctx.r1.u32 - 144, call);
+}
+
 }  // namespace hooks
 
 // Defines an adapter: the flag, else the original.
@@ -248,5 +297,7 @@ ITC_VEHICLE(820BFC48, VehicleStatusReset)
 ITC_VEHICLE(820C1E00, VehicleSurfaceGrip)
 ITC_VEHICLE(820C3150, VehicleSetUp)
 ITC_VEHICLE(820C33B8, VehicleResetForCar)
+ITC_VEHICLE(820C23E8, VehicleStatusUpdate)
+ITC_VEHICLE(820C3020, VehicleTick)
 // Vehicle::Construct (sub_820C30D8) and Vehicles::DestroyAll (sub_820C21E0)
 // have no adapters: their only callers are Vehicles::Create and Destroy.

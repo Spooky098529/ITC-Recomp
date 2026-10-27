@@ -10,8 +10,10 @@
 #include "ai_drivers/ai_drivers.h"
 #include "base/log.h"
 #include "c_runtime/arrays.h"
+#include "c_runtime/math.h"
 #include "c_runtime/strings.h"
 #include "collision/collision.h"
+#include "matrix_math/matrix_math.h"
 #include "minimap/minimap.h"
 #include "strings_and_font/steps.h"
 #include "memory/c_runtime_heap.h"
@@ -848,6 +850,206 @@ uint32_t VehicleSetUp(uint8_t* base, uint32_t vehicle, uint32_t car, uint32_t fr
     va::ObjectSetHalf112(base, box, half & 0xFFFF);
   }
   return box;
+}
+
+// --- The vehicle's tick ---
+
+namespace {
+
+constexpr uint32_t kKmh = 0x820029E0;     // 3.6
+constexpr uint32_t kInputs = 0x826C5B30;  // the racers' car input records
+
+}  // namespace
+
+bool VehicleStatusUpdate(uint8_t* base, uint32_t status, uint32_t vehicle, uint32_t car,
+                         uint32_t flag, uint32_t frame) {
+  const uint32_t s = status, v = vehicle, f = frame;
+  if (!c_runtime::Memcpy(base, f + 208, v + 5232, 96)) {
+    return false;
+  }
+  ITC_NATIVE_RUNNING("sub_820C23E8 VehicleStatus::Update");
+  guest::StoreU32(base, f + 80, guest::LoadU32(base, f + 212));
+  const uint32_t body = guest::LoadU32(base, v + 336);
+  const uint32_t position = va::RigidBodyPosition(body);
+  for (uint32_t i = 0; i < 16; i += 4) {
+    guest::StoreU32(base, f + 128 + i, guest::LoadU32(base, position + i));
+  }
+  RoutePositionStep(base, f + 80, 1, 0xFFFFFFFFu, f - 112);
+  auto lha = [&](uint32_t at) { return uint32_t(int32_t(int16_t(guest::LoadU16(base, at)))); };
+  track_route::SlicePoint(base, f + 112, 0, lha(f + 212), lha(f + 214));
+  track_route::SlicePoint(base, f + 176, 0, lha(f + 80), lha(f + 82));
+  const double zero = Lfs(base, kZero);
+  Stfs(base, f + 132, zero);
+  Stfs(base, f + 116, zero);
+  Stfs(base, f + 180, zero);
+  vl::Vec3Sub(base, f + 160, f + 176, f + 112);
+  const uint32_t direction = s + 32;
+  const double length = double(vl::Vec3Normalize(base, direction, f + 160));
+  vl::Vec3Sub(base, f + 192, f + 128, f + 112);
+  if (length == zero) {
+    Stfs(base, s + 68, zero);
+  } else {
+    Stfs(base, s + 68, Fdivs(double(vl::Vec3Dot(base, f + 160, f + 192)), length));
+  }
+  const uint32_t point = s + 48;
+  vl::Vec4ScaleTo(base, point, direction, Lfs(base, s + 68));
+  vl::Vec3Add(base, point, point, f + 112);
+  Stfs(base, s + 64, double(vl::Vec3Direction(base, f + 96, point, f + 128)));
+  vl::Vec3CrossW1(base, f + 96, f + 160, f + 192);
+  if (Lfs(base, f + 100) < zero) {
+    Stfs(base, s + 64, Fmuls(Lfs(base, s + 64), Lfs(base, 0x82001BE0)));
+  }
+  const uint32_t axis = s + 16;
+  matrix_math::QuaternionXAxis(base, axis, va::RigidBodyField80(guest::LoadU32(base, v + 336)),
+                               f - 96);
+  Stfs(base, s + 20, zero);
+  vl::Vec3Normalize(base, axis, axis);
+  const double along = double(vl::Vec3Dot(base, axis, direction));
+  // Probably wrong way, with hysteresis.
+  if (guest::LoadU32(base, s + 8) != 0) {
+    const double limit = Fneg(double(float(c_runtime::Cos(
+        std::bit_cast<double>((uint64_t(guest::LoadU32(base, 0x82002CE0)) << 32) |
+                              guest::LoadU32(base, 0x82002CE4))))));
+    if (along > limit) {
+      guest::StoreU32(base, s + 8, 0);
+    }
+  } else {
+    const double limit = Fneg(double(float(c_runtime::Cos(
+        std::bit_cast<double>((uint64_t(guest::LoadU32(base, 0x82002CD8)) << 32) |
+                              guest::LoadU32(base, 0x82002CDC))))));
+    if (along < limit) {  // bge: a NaN leaves it
+      guest::StoreU32(base, s + 8, 1);
+    }
+  }
+  const double per_tick = Lfs(base, 0x820029EC);  // 1/30
+  if (flag != 0) {
+    const double moved = Fmuls(Fmuls(Lfs(base, v + 48), per_tick), Lfs(base, 0x820029D8));
+    const double trip = Lfs(base, s + 84);
+    Stfs(base, s + 88, Fadds(Lfs(base, s + 88), moved));
+    Stfs(base, s + 84, Fadds(trip, moved));
+  }
+  const double hundredth = Lfs(base, kHundredth);
+  if (car != 0) {
+    // The engine's temperatures (probably), eased toward targets.
+    const int64_t stage = int32_t(guest::LoadU32(base, car + 1656));
+    const double top = Lfs(base, v + 4648);
+    const int64_t part = int32_t(guest::LoadU32(base, car + 1664));
+    const double rpm = Lfs(base, v + 2224);
+    const double ratio = Fdivs(rpm, top);
+    const double water = Lfs(base, s + 92);
+    const double oil = Lfs(base, s + 96);
+    guest::StoreU32(base, f + 144, uint32_t(uint64_t(stage) >> 32));
+    guest::StoreU32(base, f + 148, uint32_t(uint64_t(stage)));
+    const double f9a = Lfs(base, 0x8200257C);
+    guest::StoreU32(base, f + 96, uint32_t(uint64_t(part) >> 32));
+    guest::StoreU32(base, f + 100, uint32_t(uint64_t(part)));
+    const double part_f = double(float(double(part)));
+    const double eighty = Lfs(base, 0x82001E8C);
+    const double f7a = Lfs(base, 0x82002CD0);
+    const double f6a = Lfs(base, 0x82002CCC);
+    const double stage_d = double(stage);
+    double x = Fmuls(ratio, Lfs(base, kHundred));
+    const double stage_f = double(float(stage_d));
+    x = Fmuls(x, x);
+    const double level = Fsubs(stage_f, part_f);
+    double load = Fmuls(x, hundredth);
+    const double level2 = Fadds(level, Lfs(base, 0x82002CAC));
+    const double f10b = Lfs(base, 0x82002578);
+    load = Fmuls(load, hundredth);
+    const double rate_a = Fmadds(level2, f7a, f10b);
+    const double rate_b = Fmadds(level2, f6a, f10b);
+    const double f12c = Lfs(base, 0x82002A20);
+    const double target_a = Fmadds(load, f9a, f12c);
+    const double target_b = Fmadds(load, eighty, f12c);
+    const double da = Fmuls(Fsubs(target_a, water), rate_a);
+    const double db = Fmuls(Fsubs(target_b, oil), rate_b);
+    Stfs(base, s + 92, Fmadds(da, per_tick, water));
+    Stfs(base, s + 96, Fmadds(db, per_tick, oil));
+    const double rpm2 = Lfs(base, v + 2228);
+    const double curve = Fadds(Fnmsubs(rpm2, rpm2, rpm2), rpm2);
+    const double root = double(float(std::sqrt(Fmuls(curve, Lfs(base, 0x82002814)))));
+    const double torque = cp::VehicleEngineTorque(base, v, rpm2, f);
+    const double heat = Fsubs(Lfs(base, 0x820027A4), Lfs(base, s + 96));
+    const double ratio2 = double(float(std::sqrt(Fdivs(torque, Lfs(base, s + 104)))));
+    double value = Fmuls(Fmuls(ratio2, root), Lfs(base, 0x82002BA4));
+    value = Fmuls(Fmuls(value, heat), hundredth);
+    Stfs(base, s + 100, value);
+  }
+  // The brakes' efficiency (+2432) and +2428, lowered.
+  const double speed = Fmuls(Lfs(base, v + 48), per_tick);
+  const double a = Lfs(base, v + 3544);
+  const double fade = Fsubs(Lfs(base, v + 3540), a);
+  const double brake = Lfs(base, v + 292);
+  const double efficiency = Lfs(base, v + 2432);
+  double lowered = Fmuls(Fmuls(Fmuls(fade, hundredth), Lfs(base, 0x82002A44)), speed);
+  const double least = Lfs(base, kHalf);
+  lowered = Fsubs(efficiency, Fmuls(Fmuls(lowered, brake), hundredth));
+  if (lowered < least) {
+    lowered = least;
+  }
+  Stfs(base, v + 2432, lowered);
+  double wear = Fmuls(Lfs(base, s + 96), Lfs(base, 0x82002CC8));
+  wear = Fsubs(Lfs(base, v + 2428), Fmuls(wear, hundredth));
+  const double floor = Lfs(base, 0x82002A3C);
+  if (wear < floor) {
+    wear = floor;
+  }
+  Stfs(base, v + 2428, wear);
+  return true;
+}
+
+void VehicleTick(uint8_t* base, uint32_t vehicle, uint32_t racer, uint32_t car, uint32_t flag,
+                 uint32_t frame, const GuestCall& call) {
+  ITC_NATIVE_RUNNING("sub_820C3020 Vehicle::Tick");
+  const uint32_t v = vehicle, f = frame;
+  const uint32_t s = v + 6160;
+  const double kmh = Fmuls(Lfs(base, v + 48), Lfs(base, kKmh));
+  const uint32_t input = guest::LoadU32(base, kInputs + ((racer << 2) & 0x3FCu));
+  Stfs(base, s + 0, kmh);
+  guest::StoreU16(base, s + 4, guest::LoadU16(base, v + 5236));
+  guest::StoreU16(base, s + 6, guest::LoadU16(base, v + 5238));
+  for (int step = 0; step < 2; step++) {
+    const uint32_t input_frame = f - 176;
+    auto steer = [&](double target, double dt, double f3, uint32_t left, uint32_t right) {
+      GuestRegisters r;
+      r.r3 = v;
+      r.r4 = left;
+      r.r5 = right;
+      r.f1 = target;
+      r.f2 = dt;
+      r.f3 = f3;
+      call(0x820B5FD8, input_frame, r);
+    };
+    if (!VehicleApplyInput(base, v, input, input_frame, steer)) {
+      GuestRegisters r;
+      r.r3 = v;
+      r.r4 = input;
+      call(0x820BFD30, f, r);
+    }
+    guest::StoreU32(base, input, guest::LoadU32(base, input) & 0xFFFFFFFCu & ~0x10000u);
+    const double dt = Lfs(base, kStepSeconds);
+    if (cp::CollisionWorldCallbackKnown(base)) {
+      cp::VehiclePhysicsStep(base, v, dt, f - 112, [&](uint32_t address) {
+        GuestRegisters r;
+        r.r3 = v;
+        call(address, f - 112, r);
+      });
+    } else {
+      GuestRegisters r;
+      r.r3 = v;
+      r.f1 = dt;
+      call(0x820B6498, f, r);
+    }
+    VehicleUpdateTrackPositions(base, v, f - 112);
+  }
+  if (!VehicleStatusUpdate(base, s, v, car, flag, f - 384)) {
+    GuestRegisters r;
+    r.r3 = s;
+    r.r4 = v;
+    r.r5 = car;
+    r.r6 = flag;
+    call(0x820C23E8, f, r);
+  }
 }
 
 }  // namespace vehicle

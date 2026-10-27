@@ -189,4 +189,39 @@ using CalleeOriginal =
 uint32_t VehicleSetUp(uint8_t* base, uint32_t vehicle, uint32_t car, uint32_t frame, bool reset,
                       bool native_heap, const CalleeOriginal& original, double* f1);
 
+// --- The vehicle's tick ---
+
+// VehicleStatus::Update (sub_820C23E8): the status record from the car's
+// track position (copied to `frame` + 208 with memcpy, its route position
+// one slice on through `frame` + 80), the slice's direction (+32), how far
+// along it (+68), the point on it (+48), the distance across (+64, signed
+// by the cross product's y), the body's x axis (+16; probably the wrong
+// way flag +8 with hysteresis against cos(pi/4) and cos(pi/3)), with
+// `flag` the trip (+84, +88), with a car object the engine's temperatures
+// (+92, +96) and +100, then the brakes' (+2432) and +2428 of the vehicle.
+// The temporaries in `frame` (the original's 384 bytes) as the original.
+// False, with nothing done, where the car's track position's copy wouldn't
+// be memcpy's native one (the original runs).
+bool VehicleStatusUpdate(uint8_t* base, uint32_t status, uint32_t vehicle, uint32_t car,
+                         uint32_t flag, uint32_t frame);
+
+// A guest function's original in the caller's frame, with the registers
+// given (`r1` the stack pointer it runs with).
+struct GuestRegisters {
+  uint64_t r3 = 0, r4 = 0, r5 = 0, r6 = 0;
+  double f1 = 0.0, f2 = 0.0, f3 = 0.0;
+};
+using GuestCall = std::function<void(uint32_t address, uint32_t r1, const GuestRegisters&)>;
+// Vehicle::Tick (sub_820C3020): the status record's speed (km/h) and route
+// position, then twice: ApplyInput with the racer's car input record
+// ([0x826C5B30 + 4 x the index's low byte]), its flags' 0x1, 0x2 and
+// 0x10000 cleared, the physics step with the float at 0x82601838,
+// UpdateTrackPositions; then VehicleStatus::Update with `car` and `flag`.
+// The callees that refuse (ApplyInput's never-seen paths, SteerTowards',
+// the physics step's: its callback not the ground's, UpdateSteering's and
+// UpdateTorqueSplit's) and the status update's copy run their originals
+// through `call`. `frame`: the original's 144 bytes.
+void VehicleTick(uint8_t* base, uint32_t vehicle, uint32_t racer, uint32_t car, uint32_t flag,
+                 uint32_t frame, const GuestCall& call);
+
 }  // namespace vehicle

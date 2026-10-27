@@ -67,4 +67,11 @@ void VehicleSurfaceGrip(PPCContext& ctx, uint8_t* base);
 void VehicleSetUp(PPCContext& ctx, uint8_t* base);
 void VehicleResetForCar(PPCContext& ctx, uint8_t* base);
 
+// VehicleStatus::Update sub_820C23E8: r3 = the status record, r4 = the
+// vehicle, r5 = a car or 0, r6 = the flag (r3 not kept: Vehicle::Tick's
+// caller doesn't read it). Vehicle::Tick sub_820C3020: r3 = the vehicle, r4
+// = the racer, r5 = a car or 0, r6 = the flag.
+void VehicleStatusUpdate(PPCContext& ctx, uint8_t* base);
+void VehicleTick(PPCContext& ctx, uint8_t* base);
+
 }  // namespace hooks
