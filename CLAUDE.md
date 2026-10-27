@@ -291,6 +291,15 @@ is left to investigate later; one replay with the menus unpaced under
 (`docs/loops/review.md`). The rest waits on the generic critical
 section wrappers, the video output's events and semaphores and the
 archive.
+Its seventeenth run (`b7-loop-25-10-26-4`, 2026-10-25 to 27, not yet
+merged; summary `docs/loops/b7-loop-2026-10-25-2342.md`; 2 subsystems,
+the user's limit for it) made the race's set-up (`race-setup.md`,
+`--native_race_setup`, 52 of 52), the rest of the car physics (a lead
+without mapping, `car-physics.md` 134 of 134) and the vehicle code
+above it (`vehicle.md`, `--native_vehicle`, 25 of 25) native (ours
+2,152 -> 2,255); one harness group is for the user's review
+(`Race::SetUp`'s traffic records' unwritten bytes,
+`docs/loops/expected-differences.md`).
 Harness runs use `attract_race.sh 40` (the user's call,
 2026-10-23); a race short only because the harnesses took longer is
 no halt.

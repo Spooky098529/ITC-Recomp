@@ -89,11 +89,15 @@ file's history. What's left to see in a drive, from every run:
   `itc_1973`, ok; nothing to drive). Migration 2 done (0133cf6:
   `Vehicle::PlaceOnRoute`, its never-seen `sub_820FA8F8` branch on the
   whole original; no adapter removable; 23 s, 0 errors, every harness 0
-  differing). `vehicle.md` 25 of 25 ours. Step: validation agent 2
-  running.
+  differing). `vehicle.md` 25 of 25 ours. Validated (`itc_1981`: 1 of
+  1 harness line, ran in the attract race). Finished.
 
 ## Done
 
+- The vehicle (`vehicle.md`, mapped in ebba856; 25 rows): 25 ours in
+  two migrations (3aa0018..0133cf6), 5 adapters removed, 1 Native with
+  none, 1 Merged; validated (`itc_1972`, `itc_1981`);
+  `--native_vehicle`.
 - The car physics' ready groups (no mapping; f8a45a7..bd3e362):
   `car-physics.md` 134 of 134 ours, 84 adapters removed in four files;
   validated (`itc_1939`, `itc_1946`); `--native_car_physics`.
@@ -132,6 +136,9 @@ This run's groups: `expected-differences.md` (the "23:42 run" lines).
 - After the race's set-up's validation 2: race 24 s (`itc_1890`), 0
   errors, every harness 0 differing but the expected group; replay
   127 s (`itc_1891`), 0 errors.
+- At the end (after the vehicle's validation 2, `itc_1981`: race 23 s,
+  0 errors, every harness 0 differing but the expected groups): ours
+  2255, work left 4197 (wrapped 104, known 516, unknown 3577).
 - After the vehicle's migration 2: ours 2255, work left 4197 (wrapped
   104, known 516, unknown 3577).
 - After the vehicle's validation: race 23 s (`itc_1972`), 0 errors,
@@ -159,4 +166,8 @@ This run's groups: `expected-differences.md` (the "23:42 run" lines).
 
 ## Stopped
 
-(running)
+2026-10-27, at the run's limit: 2 subsystems (the user's call,
+2026-10-27: the race's set-up, the vehicle; the car physics' ready
+groups, without mapping, not counted). `check_function_statuses.py`: 0
+errors. The vehicle's migration 1 was cut off once by the API spend
+limit before committing anything, and resumed.
