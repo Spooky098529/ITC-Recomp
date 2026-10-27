@@ -281,23 +281,25 @@ ITC_VEHICLE(820BFBB8, VehicleMatrixFromRows)
 ITC_VEHICLE(820C2150, VehicleTrackPositionCopy)
 ITC_VEHICLE(820BFCE8, VehicleCameraCurveLoad)
 ITC_VEHICLE(82170F90, VehicleRoutePositionStep)
-ITC_VEHICLE(820C1D78, VehicleUpdateTrackPositions)
 ITC_VEHICLE(820C1D08, VehicleLinkTrackPositions)
 ITC_VEHICLE(820C0118, VehicleRefresh)
 ITC_VEHICLE(820C20E0, VehicleRemoveFromWorld)
 ITC_VEHICLE(820C3BD0, VehiclesCreate)
 ITC_VEHICLE(820C3B78, VehiclesDestroy)
-ITC_VEHICLE(820BFD30, VehicleApplyInput)
 ITC_VEHICLE(820C0310, VehicleSlipWheelValue)
 ITC_VEHICLE(820C2248, VehicleNearestHuman)
 ITC_VEHICLE(820CE1D8, VehicleShiftPeak)
-ITC_VEHICLE(820CE430, VehicleBuildCurve)
 ITC_VEHICLE(820CE7D8, VehicleCurveFromEngine)
-ITC_VEHICLE(820BFC48, VehicleStatusReset)
-ITC_VEHICLE(820C1E00, VehicleSurfaceGrip)
 ITC_VEHICLE(820C3150, VehicleSetUp)
 ITC_VEHICLE(820C33B8, VehicleResetForCar)
 ITC_VEHICLE(820C23E8, VehicleStatusUpdate)
 ITC_VEHICLE(820C3020, VehicleTick)
 // Vehicle::Construct (sub_820C30D8) and Vehicles::DestroyAll (sub_820C21E0)
 // have no adapters: their only callers are Vehicles::Create and Destroy.
+// Vehicle::SetUpSurfaceGrip (sub_820C1E00) and VehicleStatus::Reset
+// (sub_820BFC48), PowerCurve::Build (sub_820CE430), Vehicle::ApplyInput
+// (sub_820BFD30) and Vehicle::UpdateTrackPositions (sub_820C1D78) have no
+// adapters: their callers in play (Vehicle::SetUp and ResetForCar,
+// PowerCurve::FromEngine, Vehicle::Tick) are native and call their plain
+// C++; --native_vehicle switches those callers. Their register steps stay
+// for the harness.
