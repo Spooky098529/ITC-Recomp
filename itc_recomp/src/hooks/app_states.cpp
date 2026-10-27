@@ -19,8 +19,8 @@
 
 ITC_FLAG_BOOL(native_app_states, true, "ITC",
               "Run the app's update and its state stack (docs/functions/app-states.md): the "
-              "message vector's Clear sub_82092F98 (with Erase sub_82092E70, no adapter: only "
-              "Clear calls it) and Allocate sub_82092B78, the operation list's AllocateNodes "
+              "message vector's Clear sub_82092F98 (with Erase sub_82092E70; no adapters: only "
+              "App::Update's plain C++ calls them in play) and Allocate sub_82092B78, the operation list's AllocateNodes "
               "sub_820ACF10 and IncSize sub_820AD768 (no adapters: only the plain C++ below "
               "calls them in play), List::Clear sub_820ACF88, PtrList::Erase "
               "sub_82098E80, Delegate::Clone sub_820ACA48 (those that allocate or free only "
@@ -32,7 +32,8 @@ ITC_FLAG_BOOL(native_app_states, true, "ITC",
               "InsertN sub_820938C0, no adapters: only SendMessage reaches them); "
               "AppStates::IsEmpty sub_820AE1A0 and App::IsRunning sub_82092928, their virtual "
               "calls guest calls where the target isn't ours; HandlerMap::ForEach sub_82092BF0, "
-              "App::ForEachMessage sub_82092CD0 and ForEachRequest sub_82091C48, "
+              "App::ForEachMessage sub_82092CD0 (no adapter: only App::Update's plain C++ calls it "
+              "in play) and ForEachRequest sub_82091C48, "
               "App::RunHandler sub_82092968 and RunListener sub_820929B0, App::DeliverMessage "
               "sub_82092D50, their functors and slots guest calls; with --native_heap "
               "App::ApplyRequest sub_82093BE0 (its split-off type 0 piece sub_82093C2C merged) "
@@ -411,7 +412,8 @@ void AppIsRunning(PPCContext& ctx, uint8_t* base) {
 // Insert and InsertN, reached only from App::SendMessage's plain C++, nor
 // OpList::AllocateNodes, BuyNode and IncSize (removed 2026-10-27: in play
 // only OpList::OpList's and StateLayer::Push's plain C++ call them; the
-// flag switches those).
+// flag switches those), nor MessageVector::Clear and App::ForEachMessage
+// (removed 2026-10-27: in play only App::Update's plain C++ calls them).
 
 #define ITC_APP_STATES_ADAPTER(address, step) \
   extern "C" REX_FUNC(sub_##address) {        \
@@ -423,7 +425,6 @@ void AppIsRunning(PPCContext& ctx, uint8_t* base) {
     hooks::step(ctx, base);                   \
   }
 
-ITC_APP_STATES_ADAPTER(82092F98, AppMessagesClear)
 ITC_APP_STATES_ADAPTER(82092B78, AppMessagesAllocate)
 ITC_APP_STATES_ADAPTER(820ACF88, AppListClear)
 ITC_APP_STATES_ADAPTER(82098E80, AppPtrListErase)
@@ -435,7 +436,6 @@ ITC_APP_STATES_ADAPTER(82094AB0, AppSendMessage)
 ITC_APP_STATES_ADAPTER(820AE1A0, AppStatesIsEmpty)
 ITC_APP_STATES_ADAPTER(82092928, AppIsRunning)
 ITC_APP_STATES_ADAPTER(82092BF0, AppHandlerMapForEach)
-ITC_APP_STATES_ADAPTER(82092CD0, AppForEachMessage)
 ITC_APP_STATES_ADAPTER(82091C48, AppForEachRequest)
 ITC_APP_STATES_ADAPTER(820929B0, AppRunListener)
 ITC_APP_STATES_ADAPTER(82092D50, AppDeliverMessage)
