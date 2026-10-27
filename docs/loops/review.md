@@ -37,6 +37,10 @@ When the user has reviewed a run's section, its heading gets
   `sub_8258CEE0` as guest calls. Handed to the originals (never in
   play): odd `ApplyRequest` types, `length_error`, `bad_alloc`.
   `std_list::Erase` added in `src/std_list/ptr_list.{h,cpp}`.
+  Validation 1 noted that in `sub_82093BE0`, `sub_820944E0`,
+  `sub_820938C0` and a few others the print comes after an early check
+  that hands the call back to the recompiled code (some print at more
+  than one site), not as the first statement; left as written.
 
 ## Run 2026-10-25 23:42 (`b7-loop-25-10-26-4`)
 

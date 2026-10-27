@@ -24,8 +24,10 @@ file's history. What's left to see in a drive, from every run:
   4 Native with none, 1 Merged; `--native_app_states`; `itc_1995`: 23
   s, 0 errors, every harness 0 differing but the expected groups;
   frame dumps the same as the fallback). Left ready: `App::Start`,
-  `AppStates::Create` and the state-layer tree's ready groups. Step:
-  validation agent 1 running.
+  `AppStates::Create` and the state-layer tree's ready groups.
+  Validated (`itc_1996`: 30 of 30 harness lines, 24 ran in the attract
+  race, 6 in the replay `itc_1997`, ok; nothing to drive). Step:
+  migration agent 2 running.
 
 ## Done
 
@@ -50,5 +52,8 @@ This run's groups: `expected-differences.md` (the "22:31 run" lines).
   known 570, unknown 3523).
 - After the app states' migration 1: ours 2286, work left 4166
   (wrapped 103, known 540, unknown 3523).
+- After the app states' validation: race 23 s (`itc_1996`), 0 errors,
+  every harness 0 differing but the expected groups; replay 127 s
+  (`itc_1997`), 0 errors.
 
 ## Stopped
