@@ -8,6 +8,7 @@
 #include "app_states/containers.h"
 #include "app_states/layers.h"
 #include "base/flags.h"
+#include "base/log.h"
 #include "debug/menu_selection_scan.h"
 #include "framework/run_loop.h"
 #include "hooks/guest_call.h"
@@ -27,9 +28,11 @@ ITC_FLAG_BOOL(native_app_states, true, "ITC",
               "calls them in play), List::Clear sub_820ACF88, PtrList::Erase "
               "sub_82098E80, Delegate::Clone sub_820ACA48 (those that allocate or free only "
               "while --native_heap routes the game's heap to the allocation layer) and "
-              "StateLayer::IsEmpty sub_820ACE50; with --native_heap, OpList::OpList sub_820AD0B8, "
+              "StateLayer::IsEmpty sub_820ACE50; with --native_heap, OpList::OpList sub_820AD0B8 (no adapter: "
+              "only the layers' constructors' plain C++ call it in play), "
               "OpList::BuyNode sub_820ACFF8 (no adapter: only Push's plain C++ calls it in play), "
-              "StateLayer::Push sub_820ADAD0 and App::SendMessage "
+              "StateLayer::Push sub_820ADAD0 (no adapter: only StateLayer::StateLayer(state)'s plain C++ "
+              "calls it in play) and App::SendMessage "
               "sub_82094AB0 (with MessageVector::PushBack sub_820944E0, Insert sub_82094110 and "
               "InsertN sub_820938C0, no adapters: only SendMessage reaches them); "
               "AppStates::IsEmpty sub_820AE1A0 and App::IsRunning sub_82092928, their virtual "
@@ -42,8 +45,9 @@ ITC_FLAG_BOOL(native_app_states, true, "ITC",
               "and the +20 interface's add slots sub_82094830, sub_820948D0, sub_82094970 and "
               "sub_82094A10; App::Update sub_82093DC0, the run loop's tick handler 8, its virtual "
               "calls, button tests and functors guest calls; with --native_heap the state stack's "
-              "set-up: AppStates::Create sub_820AE498, AppStates::AppStates sub_820AE348, "
-              "StateLayer::StateLayer sub_820AD118 and sub_820ADBD8, StateLayer::AddChild "
+              "set-up: AppStates::Create sub_820AE498, AppStates::AppStates sub_820AE348 (no adapter: only "
+              "Create's plain C++ calls it in play), StateLayer::StateLayer sub_820AD118 (no adapter: "
+              "only AppStates::AppStates's plain C++ calls it in play) and sub_820ADBD8, StateLayer::AddChild "
               "sub_820ADA08, AppStates::AddLayer sub_820AE130 and App::Start sub_82092878, their "
               "virtual calls guest calls) natively instead of through the translated code "
               "(the same results; checked by --run_harnesses=app_states)");
@@ -525,7 +529,11 @@ void AppStart(PPCContext& ctx, uint8_t* base) {
 // OpList::AllocateNodes, BuyNode and IncSize (removed 2026-10-27: in play
 // only OpList::OpList's and StateLayer::Push's plain C++ call them; the
 // flag switches those), nor MessageVector::Clear and App::ForEachMessage
-// (removed 2026-10-27: in play only App::Update's plain C++ calls them).
+// (removed 2026-10-27: in play only App::Update's plain C++ calls them),
+// nor OpList::OpList, StateLayer::Push, StateLayer::StateLayer and
+// AppStates::AppStates (removed 2026-10-27: in play only the layers'
+// constructors', StateLayer::StateLayer(state)'s and AppStates::Create's
+// plain C++ call them).
 
 #define ITC_APP_STATES_ADAPTER(address, step) \
   extern "C" REX_FUNC(sub_##address) {        \
@@ -542,8 +550,6 @@ ITC_APP_STATES_ADAPTER(820ACF88, AppListClear)
 ITC_APP_STATES_ADAPTER(82098E80, AppPtrListErase)
 ITC_APP_STATES_ADAPTER(820ACA48, AppDelegateClone)
 ITC_APP_STATES_ADAPTER(820ACE50, AppLayerIsEmpty)
-ITC_APP_STATES_ADAPTER(820AD0B8, AppOpConstruct)
-ITC_APP_STATES_ADAPTER(820ADAD0, AppLayerPush)
 ITC_APP_STATES_ADAPTER(82094AB0, AppSendMessage)
 ITC_APP_STATES_ADAPTER(820AE1A0, AppStatesIsEmpty)
 ITC_APP_STATES_ADAPTER(82092928, AppIsRunning)
@@ -557,11 +563,9 @@ ITC_APP_STATES_ADAPTER(820948D0, AppAddToggledHandler)
 ITC_APP_STATES_ADAPTER(82094970, AppAddAlwaysHandler)
 ITC_APP_STATES_ADAPTER(82094A10, AppAddListener)
 ITC_APP_STATES_ADAPTER(82093DC0, AppUpdate)
-ITC_APP_STATES_ADAPTER(820AD118, AppLayerConstruct)
 ITC_APP_STATES_ADAPTER(820ADBD8, AppLayerConstructWithState)
 ITC_APP_STATES_ADAPTER(820ADA08, AppLayerAddChild)
 ITC_APP_STATES_ADAPTER(820AE130, AppStatesAddLayer)
-ITC_APP_STATES_ADAPTER(820AE348, AppStatesConstruct)
 ITC_APP_STATES_ADAPTER(820AE498, AppStatesCreate)
 ITC_APP_STATES_ADAPTER(82092878, AppStart)
 
