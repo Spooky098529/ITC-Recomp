@@ -49,4 +49,14 @@ void VehicleSlipWheelValue(PPCContext& ctx, uint8_t* base);
 // the vehicle.
 void VehicleNearestHuman(PPCContext& ctx, uint8_t* base);
 
+// PowerCurve::ShiftPeak sub_820CE1D8 (r3 = the curve, r4 = the shift),
+// PowerCurve::Build sub_820CE430 (r4 = the points), PowerCurve::FromEngine
+// sub_820CE7D8 (r4 = the car data + 1268): r3 left (the curve).
+void VehicleShiftPeak(PPCContext& ctx, uint8_t* base);
+void VehicleBuildCurve(PPCContext& ctx, uint8_t* base);
+void VehicleCurveFromEngine(PPCContext& ctx, uint8_t* base);
+// VehicleStatus::Reset sub_820BFC48: r3 = the status record, r4 = the
+// vehicle; r3 = its curve on the stack.
+void VehicleStatusReset(PPCContext& ctx, uint8_t* base);
+
 }  // namespace hooks

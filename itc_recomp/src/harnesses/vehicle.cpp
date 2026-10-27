@@ -725,6 +725,167 @@ void Nearest(Context& h) {
   }
 }
 
+// --- The power curve ---
+
+// A curve's 1,064 bytes: the tables' and range's words as floats, the
+// peak, count and limits (+1024 to +1039) exactly.
+void CurveOutputs(Outputs& out, uint8_t* base, uint32_t curve) {
+  out.Floats(base, curve, 256);
+  out.Bytes(Read(base, curve + 1024, 16));
+  out.Floats(base, curve + 1040, 6);
+}
+
+// The stack below `r1` that ShiftPeak writes: its doublewords (r1 - 576 to
+// r1 - 537) exactly, the remapped table (r1 - 528 to r1 - 17) as floats.
+void ShiftStackOutputs(Outputs& out, uint8_t* base, uint32_t r1) {
+  out.Bytes(Read(base, r1 - 576, 40));
+  out.Floats(base, r1 - 528, (528 - 16) / 4);
+}
+
+// A curve as Build leaves them (rpm rising by 400, torques and powers),
+// with its peak and count, now and then odd: a peak past the count, a count
+// of 0 or 1, a NaN or an infinity in a torque or an rpm.
+void RandomCurve(uint8_t* base, uint32_t curve, Random& r, bool nans) {
+  WriteRandom(base, curve, 1064, r);
+  const uint32_t count = r.Below(4) == 0 ? r.Below(3) : 1 + r.Below(32);
+  for (uint32_t i = 0; i < 32; i++) {
+    const uint32_t e = curve + 16 * i;
+    guest::StoreFloat(base, e + 0, 400.0f * float(i + 1));
+    guest::StoreFloat(base, e + 4, float(r.Below(5000)) / 10.0f);
+    guest::StoreFloat(base, e + 8, float(r.Below(5000)) / 10.0f);
+    if (nans && r.Below(16) == 0) {
+      guest::StoreU32(base, e + 4 * r.Below(2), RandomFloat(r));
+    }
+  }
+  guest::StoreU32(base, curve + 1024, r.Below(8) == 0 ? r.Below(34) : r.Below(std::max(count, 1u)));
+  guest::StoreU32(base, curve + 1028, count);
+  guest::StoreFloat(base, curve + 1040, 800.0f);
+  guest::StoreFloat(base, curve + 1044, 4000.0f + float(r.Below(80)) * 100.0f);
+  if (nans && r.Below(8) == 0) {
+    guest::StoreU32(base, curve + 1040 + 4 * r.Below(2), RandomFloat(r));
+  }
+}
+
+// The 33 points Build reads (32 torques of 0 to 1, now and then below
+// 0.01, and the scale at +128).
+void RandomPoints(uint8_t* base, uint32_t points, Random& r, bool nans) {
+  for (uint32_t i = 0; i < 32; i++) {
+    const uint32_t k = r.Below(8);
+    const float value = k == 0 ? 0.0f : k == 1 ? 0.005f : float(r.Below(1000)) / 1000.0f;
+    guest::StoreU32(base, points + 4 * i,
+                    nans && r.Below(16) == 0 ? RandomFloat(r) : std::bit_cast<uint32_t>(value));
+  }
+  guest::StoreFloat(base, points + 128, 100.0f + float(r.Below(4000)) / 10.0f);
+}
+
+void Curves(Context& h) {
+  const Block block(0x2000);  // the curve at +0x40, a vehicle's car data
+  if (!block.address) {
+    ITC_LOG_ERROR("harness: vehicle: no block from the allocation layer");
+    return;
+  }
+  const uint32_t curve = block.address + 0x40;
+  const uint32_t r1 = CallContext(h).r1.u32;
+  for (int group = 0; group < 2; group++) {
+    const std::string suffix = group == 1 ? ", NaNs and infinities" : "";
+    {
+      Results results("PowerCurve::ShiftPeak (sub_820CE1D8)" + suffix);
+      for (uint64_t seed = 0; seed < 300; seed++) {
+        Outputs out[2];
+        for (int v = 0; v < 2; v++) {
+          Random r(seed * 89 + 59 + 1000 * uint64_t(group));
+          car_objects::FillStack(h, r);
+          RandomCurve(h.base, curve, r, group == 1);
+          PPCContext t = CallContext(h);
+          t.r3.u64 = curve;
+          t.r4.u64 = r.Below(8) == 0 ? r.Next() : uint64_t(int64_t(int32_t(r.Below(51)) - 25));
+          (v == 0 ? Original<__imp__sub_820CE1D8> : hooks::VehicleShiftPeak)(t, h.base);
+          CurveOutputs(out[v], h.base, curve);
+          ShiftStackOutputs(out[v], h.base, r1);
+          out[v].Word(t.r3.u32);
+        }
+        results.Check(out[0], out[1], fmt::format("seed {}", seed));
+      }
+      results.Report();
+    }
+    for (int from_engine = 0; from_engine < 2; from_engine++) {
+      Results results(std::string(from_engine ? "PowerCurve::FromEngine (sub_820CE7D8)"
+                                              : "PowerCurve::Build (sub_820CE430)") +
+                      suffix);
+      for (uint64_t seed = 0; seed < 300; seed++) {
+        Outputs out[2];
+        for (int v = 0; v < 2; v++) {
+          Random r(seed * 97 + 61 + 1000 * uint64_t(group) + 100000 * uint64_t(from_engine));
+          car_objects::FillStack(h, r);
+          WriteRandom(h.base, block.address, block.bytes, r);
+          RandomCurve(h.base, curve, r, group == 1);
+          // Build leaves +1024 as it was when no torque is above 0.0: a
+          // peak within the table.
+          guest::StoreU32(h.base, curve + 1024, r.Below(32));
+          const uint32_t engine = block.address + 0x600;
+          RandomPoints(h.base, engine + 24, r, group == 1);
+          guest::StoreFloat(h.base, engine + 12, 4000.0f + float(r.Below(80)) * 100.0f);
+          PPCContext t = CallContext(h);
+          t.r3.u64 = curve;
+          t.r4.u64 = from_engine ? engine : engine + 24;
+          (v == 0 ? (from_engine ? Original<__imp__sub_820CE7D8> : Original<__imp__sub_820CE430>)
+                  : (from_engine ? hooks::VehicleCurveFromEngine : hooks::VehicleBuildCurve))(
+              t, h.base);
+          CurveOutputs(out[v], h.base, curve);
+          out[v].Bytes(Read(h.base, r1 - 112 + 80, 16));
+          ShiftStackOutputs(out[v], h.base, r1 - 112);
+          out[v].Word(t.r3.u32);
+        }
+        results.Check(out[0], out[1], fmt::format("seed {}", seed));
+      }
+      results.Report();
+    }
+    {
+      // Reset: the status record in the block, the vehicle's car data
+      // +1268 (vehicle + 4644) with its points.
+      Results results("VehicleStatus::Reset (sub_820BFC48)" + suffix);
+      for (uint64_t seed = 0; seed < 200; seed++) {
+        Outputs out[2];
+        for (int v = 0; v < 2; v++) {
+          Random r(seed * 101 + 67 + 1000 * uint64_t(group));
+          car_objects::FillStack(h, r);
+          WriteRandom(h.base, block.address, block.bytes, r);
+          const uint32_t vehicle = block.address + 0x100 - 4644;  // its +4644 in the block
+          const uint32_t engine = vehicle + 4644;
+          RandomPoints(h.base, engine + 24, r, group == 1);
+          guest::StoreFloat(h.base, engine + 12, 4000.0f + float(r.Below(80)) * 100.0f);
+          const uint32_t status = block.address + 0x400;
+          const uint32_t frame = r1 - 1168;
+          // The curve on the stack: its +1024 within the table (see Build).
+          guest::StoreU32(h.base, frame + 80 + 1024, r.Below(32));
+          PPCContext t = CallContext(h);
+          t.r3.u64 = status;
+          t.r4.u64 = vehicle;
+          (v == 0 ? Original<__imp__sub_820BFC48> : hooks::VehicleStatusReset)(t, h.base);
+          out[v].Float(guest::LoadU32(h.base, status + 0));
+          out[v].Bytes(Read(h.base, status + 4, 72));
+          out[v].Float(guest::LoadU32(h.base, status + 76));
+          out[v].Word(guest::LoadU32(h.base, status + 80));
+          out[v].Floats(h.base, status + 84, 6);
+          CurveOutputs(out[v], h.base, frame + 80);
+          // The outer ShiftPeak's stack, but for the words its table
+          // doesn't reach that Build's call left: Build's back chain
+          // (frame - 112) and its ShiftPeak's register saves (frame - 128 to
+          // frame - 113), not written by the plain C++.
+          out[v].Bytes(Read(h.base, frame - 576, 40));
+          out[v].Floats(h.base, frame - 528, (528 - 128) / 4);
+          out[v].Floats(h.base, frame - 108, (108 - 16) / 4);
+          ShiftStackOutputs(out[v], h.base, frame - 112);
+          out[v].Bytes(Read(h.base, frame - 112 + 80, 16));
+          out[v].Word(t.r3.u32);
+        }
+        results.Check(out[0], out[1], fmt::format("seed {}", seed));
+      }
+      results.Report();
+    }
+  }
+}
+
 }  // namespace
 
 void Vehicle(Context& h) {
@@ -732,6 +893,7 @@ void Vehicle(Context& h) {
   Steps(h);
   TrackPositions(h);
   Links(h);
+  Curves(h);
   const uint32_t saved_world = guest::LoadU32(h.base, kWorldPointer);
   const Block world(car_objects::WorldBytes());
   const Block region(car_objects::VehicleRegionBytes());

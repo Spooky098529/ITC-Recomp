@@ -12,6 +12,7 @@
 #include "c_runtime/arrays.h"
 #include "collision/collision.h"
 #include "minimap/minimap.h"
+#include "strings_and_font/steps.h"
 #include "memory/c_runtime_heap.h"
 #include "track_collision/track_collision.h"
 #include "track_route/track_route.h"
@@ -442,6 +443,207 @@ uint32_t RacersNearestHumanVehicle(uint8_t* base, uint32_t point, uint32_t n, ui
   }
   const uint32_t racer = guest::LoadU32(base, f + 100 + ((n << 3) & 0xFFFFFFF8u));
   return minimap::RaceRacerVehicle(base, racer);
+}
+
+// --- The engine's power curve ---
+
+namespace {
+
+constexpr uint32_t kRpmStep = 0x82003314;     // 400.0
+constexpr uint32_t kHundred = 0x82002A0C;     // 100.0
+constexpr uint32_t kPowerScale = 0x82003380;  // torque x rpm to power
+constexpr uint32_t kTopRpm = 0x82003384;      // 800.0 (the range's start)
+constexpr uint32_t kTwo = 0x820021E8;         // 2.0
+constexpr uint32_t kHundredth = 0x8200222C;   // 0.01
+
+}  // namespace
+
+void PowerCurveShiftPeak(uint8_t* base, uint32_t curve, uint32_t shift, uint32_t r1) {
+  ITC_NATIVE_RUNNING("sub_820CE1D8 PowerCurve::ShiftPeak");
+  const uint32_t c = curve;
+  const uint32_t peak = guest::LoadU32(base, c + 1024);
+  double low = Lfs(base, c + 1040);
+  const double step = Lfs(base, kRpmStep);
+  const double shifted = IntThroughStack(base, r1 - 576, uint64_t(int64_t(int32_t(shift))));
+  const double by = Fmuls(shifted, Lfs(base, kHundred));
+  const double index =
+      IntThroughStack(base, r1 - 576, uint64_t(int64_t(int32_t(peak + 1))));
+  double rpm = Fmadds(index, step, by);
+  Stfs(base, c + 1052, rpm);
+  if (rpm < low) {
+    rpm = low;
+  } else {
+    const double high = Lfs(base, c + 1044);
+    if (rpm > high) {
+      rpm = high;
+    }
+  }
+  const uint32_t count = guest::LoadU32(base, c + 1028);
+  Stfs(base, c + 1052, rpm);
+  const double top = Fsubs(rpm, step);  // the new peak's entry
+  const double zero = Lfs(base, kZero);
+  Stfs(base, c + 1056, zero);
+  Stfs(base, c + 1060, zero);
+  // The rpm axis remapped below r1: the points below the peak scaled to end
+  // at it, those after stretched from it to the end.
+  const uint32_t table = r1 - 528;
+  if (int32_t(count) > 0) {
+    for (int32_t i = 0; i < int32_t(count); i++) {
+      const uint32_t at = table + 16 * uint32_t(i);
+      if (i < int32_t(peak)) {
+        const double a = IntThroughStack(base, r1 - 576, uint64_t(int64_t(i)));
+        const double b = IntThroughStack(base, r1 - 544, uint64_t(int64_t(int32_t(peak))));
+        Stfs(base, at, Fdivs(Fmuls(a, top), b));
+      } else if (i > int32_t(peak)) {
+        const double n = IntThroughStack(base, r1 - 568, uint64_t(int64_t(int32_t(count))));
+        const double k =
+            IntThroughStack(base, r1 - 560, uint64_t(int64_t(int32_t(uint32_t(i) - peak))));
+        const double rest =
+            IntThroughStack(base, r1 - 552, uint64_t(int64_t(int32_t(count - peak))));
+        Stfs(base, at, Fadds(Fdivs(Fmuls(Fmsubs(n, step, top), k), rest), top));
+      } else {
+        Stfs(base, at, top);
+      }
+      const double remapped = Lfs(base, at);
+      const uint32_t torque = guest::LoadU32(base, c + 4 + 16 * uint32_t(i));
+      Stfs(base, at, Fadds(remapped, step));
+      guest::StoreU32(base, at + 4, torque);  // lfs then stfs: its bits
+    }
+  }
+  // Each point's torque looked up at its rpm on the remapped axis.
+  if (int32_t(count) > 0) {
+    const double scale = Lfs(base, kPowerScale);
+    for (uint32_t j = 0; int32_t(j) < int32_t(guest::LoadU32(base, c + 1028)); j++) {
+      const uint32_t out = c + 516 + 16 * j;
+      const int32_t n = int32_t(guest::LoadU32(base, c + 1028));
+      const double x = Lfs(base, c + 16 * j);
+      double torque = Lfs(base, c + 4 + 16 * j);
+      if (n > 1) {
+        for (int32_t k = 1; k < int32_t(guest::LoadU32(base, c + 1028)); k++) {
+          const uint32_t e = table + 16 * uint32_t(k);
+          if (!(Lfs(base, e - 16) > x) && x < Lfs(base, e)) {
+            const double x0 = Lfs(base, e - 16);
+            const double x1 = Lfs(base, e);
+            const double dx = Fsubs(x, x0);
+            const double span = Fsubs(x1, x0);
+            const double t0 = Lfs(base, e - 12);
+            const double t1 = Lfs(base, e + 4);
+            const double dt = Fsubs(t1, t0);
+            torque = Fmadds(Fdivs(dx, span), dt, t0);
+            break;
+          }
+        }
+      }
+      const double product = Fmuls(torque, x);
+      Stfs(base, out, torque);
+      Stfs(base, out - 4, x);
+      const double power = Fmuls(product, scale);
+      Stfs(base, out + 4, power);
+      if (Lfs(base, c + 1056) < power) {
+        Stfs(base, c + 1056, power);
+        CopyWord(base, out - 4, c + 1060);
+      }
+    }
+  }
+}
+
+void PowerCurveBuild(uint8_t* base, uint32_t curve, uint32_t points, uint32_t frame) {
+  ITC_NATIVE_RUNNING("sub_820CE430 PowerCurve::Build");
+  const uint32_t c = curve;
+  const double zero = Lfs(base, kZero);
+  for (uint32_t i = 0; i < 32; i++) {
+    const uint32_t at = c + 12 + 16 * i;
+    for (uint32_t k = 0; k < 4; k++) {
+      Stfs(base, at + 512 - 4 * k, zero);
+      Stfs(base, at - 4 * k, zero);
+    }
+  }
+  CopyWord(base, points + 128, c + 1048);
+  Stfs(base, c + 1040, Lfs(base, kTopRpm));
+  const double step = Lfs(base, kRpmStep);
+  guest::StoreU32(base, c + 1028, 0);
+  const double scale = Lfs(base, kPowerScale);
+  const double two = Lfs(base, kTwo);
+  const double least = Lfs(base, kHundredth);
+  double most = zero;
+  for (uint32_t i = 0; i < 32; i++) {
+    const uint32_t e = c + 16 * i;
+    const double point = Lfs(base, points + 4 * i);
+    if (point < least) {
+      // From the two entries before it (before the curve for the first).
+      const double t2 = Lfs(base, e - 28);
+      double torque = Fmsubs(Lfs(base, e - 12), two, t2);
+      const double rpm =
+          Fmuls(IntThroughStack(base, frame + 80, uint64_t(int64_t(int32_t(i + 1)))), step);
+      Stfs(base, e + 0, rpm);
+      if (!(torque > zero)) {
+        torque = zero;
+      }
+      const double product = Fmuls(rpm, torque);
+      Stfs(base, e + 4, torque);
+      Stfs(base, e + 8, Fmuls(product, scale));
+    } else {
+      guest::StoreU32(base, c + 1028, guest::LoadU32(base, c + 1028) + 1);
+      const double rpm =
+          Fmuls(IntThroughStack(base, frame + 88, uint64_t(int64_t(int32_t(i + 1)))), step);
+      Stfs(base, e + 0, rpm);
+      const double torque = Fmuls(Lfs(base, c + 1048), Lfs(base, points + 4 * i));
+      Stfs(base, e + 4, torque);
+      Stfs(base, e + 8, Fmuls(Fmuls(torque, rpm), scale));
+      if (most < torque) {
+        most = torque;
+        guest::StoreU32(base, c + 1024, i);
+      }
+    }
+  }
+  const uint32_t peak = (guest::LoadU32(base, c + 1024) << 4) & 0xFFFFFFF0u;
+  const double start = Lfs(base, c + 1040);
+  const double end = Lfs(base, c + 1044);
+  guest::StoreU32(base, c + 1032, uint32_t(strings_and_font::steps::Fctiwz(
+                                      Fmuls(Fsubs(start, Lfs(base, c + peak)), least))));
+  int32_t below = int32_t(guest::LoadU32(base, c + 1032));
+  guest::StoreU32(base, c + 1036, uint32_t(strings_and_font::steps::Fctiwz(
+                                      Fmuls(Fsubs(end, Lfs(base, c + peak)), least))));
+  if (below < -20) {
+    below = -20;
+  }
+  int32_t above = int32_t(guest::LoadU32(base, c + 1036));
+  guest::StoreU32(base, c + 1032, uint32_t(below));
+  if (above > 20) {
+    above = 20;
+  }
+  guest::StoreU32(base, c + 1036, uint32_t(above));
+  PowerCurveShiftPeak(base, c, 0, frame);
+}
+
+void PowerCurveFromEngine(uint8_t* base, uint32_t curve, uint32_t engine, uint32_t frame) {
+  ITC_NATIVE_RUNNING("sub_820CE7D8 PowerCurve::FromEngine");
+  CopyWord(base, engine + 12, curve + 1044);
+  PowerCurveBuild(base, curve, engine + 24, frame);
+}
+
+uint32_t VehicleStatusReset(uint8_t* base, uint32_t status, uint32_t vehicle, uint32_t frame) {
+  ITC_NATIVE_RUNNING("sub_820BFC48 VehicleStatus::Reset");
+  const uint32_t s = status;
+  const double zero = Lfs(base, kZero);
+  Stfs(base, s + 76, zero);
+  Stfs(base, s + 0, zero);
+  guest::StoreU32(base, s + 72, 0);
+  Stfs(base, s + 84, zero);
+  guest::StoreU32(base, s + 80, 0);
+  Stfs(base, s + 88, zero);
+  guest::StoreU32(base, s + 8, 0);
+  const double eighty = Lfs(base, 0x82001E8C);
+  Stfs(base, s + 92, eighty);
+  guest::StoreU32(base, s + 12, 0);
+  Stfs(base, s + 96, eighty);
+  guest::StoreU16(base, s + 4, 0xFFFF);
+  guest::StoreU16(base, s + 6, 0xFFFF);
+  Stfs(base, s + 100, Lfs(base, kOne));
+  PowerCurveFromEngine(base, frame + 80, vehicle + 4644, frame - 112);
+  PowerCurveShiftPeak(base, frame + 80, 0, frame);
+  CopyWord(base, frame + 80 + 1048, s + 104);
+  return frame + 80;
 }
 
 }  // namespace vehicle

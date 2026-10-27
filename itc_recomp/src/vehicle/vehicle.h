@@ -133,4 +133,30 @@ double VehicleSlipWheelValue(uint8_t* base, uint32_t vehicle, double speed, uint
 // racer.
 uint32_t RacersNearestHumanVehicle(uint8_t* base, uint32_t point, uint32_t n, uint32_t frame);
 
+// --- The engine's power curve (1,064 bytes: 32 entries of 16 bytes, +0
+// the rpm, +4 the torque, +8 the power; a second table at +512; +1024 the
+// peak's index, +1028 the count, +1032 and +1036 the peak's limits, +1040
+// and +1044 the rpm range, +1048 the torque's scale, +1052 the peak's rpm,
+// +1056 the most power and +1060 its rpm) ---
+
+// PowerCurve::ShiftPeak (sub_820CE1D8): the peak moved by `shift` 100 rpm
+// steps (clamped to the range), the rpm axis remapped below `r1` (a leaf
+// without a frame: its own stores at r1 - 576 to r1 - 544, the remapped
+// table from r1 - 528, written as the original does), the second table
+// looked up on it, the most power and its rpm.
+void PowerCurveShiftPeak(uint8_t* base, uint32_t curve, uint32_t shift, uint32_t r1);
+// PowerCurve::Build (sub_820CE430): the tables cleared, the 32 points at
+// `points` (and +128 the torque's scale) into rpm, torque and power (a
+// point below 0.01 from the two entries before it), the peak and its
+// limits, then ShiftPeak(0). `frame`: the original's 112 bytes.
+void PowerCurveBuild(uint8_t* base, uint32_t curve, uint32_t points, uint32_t frame);
+// PowerCurve::FromEngine (sub_820CE7D8): +1044 = the car data's +12 (its
+// bits), then Build on its +24 (a tail call: `frame` is Build's).
+void PowerCurveFromEngine(uint8_t* base, uint32_t curve, uint32_t engine, uint32_t frame);
+// VehicleStatus::Reset (sub_820BFC48): the status record's fields reset,
+// a power curve built on its stack (`frame` + 80: the original's 1,168
+// bytes) from the vehicle's car data +1268 and shifted by 0, +104 = its
+// +1048. Returns the original's r3 (`frame` + 80).
+uint32_t VehicleStatusReset(uint8_t* base, uint32_t status, uint32_t vehicle, uint32_t frame);
+
 }  // namespace vehicle

@@ -22,7 +22,9 @@ ITC_FLAG_BOOL(native_vehicle, true, "ITC",
               "allocation layer); Vehicle::ApplyInput sub_820BFD30 (its callees never seen in "
               "play, sub_820B6170, sub_820B03E0, sub_820B0428, sub_820B0098, sub_820B00A8, "
               "sub_820B00B8, by the original), Vehicle::SlipWheelValue sub_820C0310, "
-              "Racers::NearestHumanVehicle sub_820C2248) natively instead of through the translated code (the same "
+              "Racers::NearestHumanVehicle sub_820C2248; the power curve, PowerCurve::ShiftPeak "
+              "sub_820CE1D8, Build sub_820CE430, FromEngine sub_820CE7D8, and "
+              "VehicleStatus::Reset sub_820BFC48) natively instead of through the translated code (the same "
               "words, bit for bit; checked by --run_harnesses=vehicle)");
 
 namespace hooks {
@@ -141,6 +143,26 @@ void VehicleNearestHuman(PPCContext& ctx, uint8_t* base) {
   ctx.r3.u64 = vh::RacersNearestHumanVehicle(base, ctx.r3.u32, ctx.r4.u32, ctx.r1.u32 - 304);
 }
 
+void VehicleShiftPeak(PPCContext& ctx, uint8_t* base) {
+  ctx.fpscr.disableFlushMode();
+  vh::PowerCurveShiftPeak(base, ctx.r3.u32, ctx.r4.u32, ctx.r1.u32);
+}
+
+void VehicleBuildCurve(PPCContext& ctx, uint8_t* base) {
+  ctx.fpscr.disableFlushMode();
+  vh::PowerCurveBuild(base, ctx.r3.u32, ctx.r4.u32, ctx.r1.u32 - 112);
+}
+
+void VehicleCurveFromEngine(PPCContext& ctx, uint8_t* base) {
+  ctx.fpscr.disableFlushMode();
+  vh::PowerCurveFromEngine(base, ctx.r3.u32, ctx.r4.u32, ctx.r1.u32 - 112);
+}
+
+void VehicleStatusReset(PPCContext& ctx, uint8_t* base) {
+  ctx.fpscr.disableFlushMode();
+  ctx.r3.u64 = vh::VehicleStatusReset(base, ctx.r3.u32, ctx.r4.u32, ctx.r1.u32 - 1168);
+}
+
 }  // namespace hooks
 
 // Defines an adapter: the flag, else the original.
@@ -167,5 +189,9 @@ ITC_VEHICLE(820C3B78, VehiclesDestroy)
 ITC_VEHICLE(820BFD30, VehicleApplyInput)
 ITC_VEHICLE(820C0310, VehicleSlipWheelValue)
 ITC_VEHICLE(820C2248, VehicleNearestHuman)
+ITC_VEHICLE(820CE1D8, VehicleShiftPeak)
+ITC_VEHICLE(820CE430, VehicleBuildCurve)
+ITC_VEHICLE(820CE7D8, VehicleCurveFromEngine)
+ITC_VEHICLE(820BFC48, VehicleStatusReset)
 // Vehicle::Construct (sub_820C30D8) and Vehicles::DestroyAll (sub_820C21E0)
 // have no adapters: their only callers are Vehicles::Create and Destroy.
