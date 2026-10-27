@@ -13,7 +13,18 @@ When the user has reviewed a run's section, its heading gets
 
 ## Run 2026-10-27 22:31 (`b7-loop-27-10-26`)
 
-- Nothing yet.
+- The app's update and its state stack (map ac92c3b):
+  `docs/functions/app-states.md`, 56 rows (2 moved from `functions.md`:
+  `App::Update` `sub_82093DC0` and the Wrapped `sub_82092968`; 54 new),
+  with the containers it uses (`PtrList::Erase` `sub_82098E80`, mapped
+  here instead of `input.md`; `OpList::IncSize` `sub_820AD768`, from the
+  containers lead); `game-modes.md`'s `Modes::Tick` row says what calls
+  it; `known-data.md`'s app fields and two new rows (app state stack,
+  state layer); `leads.md`'s app start-up and containers lines brought
+  up to date, one lead added (`820AC998`-`820ACC08`). For review: the
+  map's reading of `App::Update`'s player 1 Start toggle as probably a
+  debug pause (it picks handler map +28 or +40; both reach
+  `Modes::Tick`).
 
 ## Run 2026-10-25 23:42 (`b7-loop-25-10-26-4`)
 
