@@ -159,4 +159,34 @@ void PowerCurveFromEngine(uint8_t* base, uint32_t curve, uint32_t engine, uint32
 // +1048. Returns the original's r3 (`frame` + 80).
 uint32_t VehicleStatusReset(uint8_t* base, uint32_t status, uint32_t vehicle, uint32_t frame);
 
+// --- The vehicle set up from a car ---
+
+// Vehicle::SetUpSurfaceGrip (sub_820C1E00): +2496 from the car's flags;
+// for each axle, the tire type's and grade's factors (the tables at
+// 0x826014A0 and 0x82601560) and nine 24-byte surface records built on the
+// stack (`frame` + 80, from its four tables at + 112, + 160, + 208, + 256;
+// the grade through + 296: the original's 480 bytes) and copied (memcpy)
+// into +5716 + 24 j (front) or +5932 + 24 j (rear), their pointers at
+// +2668 + 4 j and +2796 + 4 j. Returns the original's r3 (the last
+// record's address).
+uint32_t VehicleSetUpSurfaceGrip(uint8_t* base, uint32_t vehicle, uint32_t car, uint32_t frame);
+
+// A callee's original in the caller's frame (r1 = the caller's frame, the
+// registers as given), where its plain C++ refuses or can't run.
+using CalleeOriginal =
+    std::function<void(uint32_t address, uint64_t r3, uint64_t r4, uint64_t r5, uint64_t r6)>;
+// Vehicle::SetUp (sub_820C3150, `reset` false) and Vehicle::ResetForCar
+// (sub_820C33B8, `reset` true): the vehicle set up from the car (its row:
+// Vehicle::SetupFromCar into +3376, VehicleStatus::Reset, the physics set
+// up (SetUpPhysics with 1, 7) or reset (ResetPhysics with 7),
+// LinkTrackPositions, SetValue2388 from the car's +76, the engine's bytes,
+// SetUpSurfaceGrip, the nitrous' values from two tables built in `frame` +
+// 96 and + 128 (the integer through + 80: the original's 224 bytes), the
+// +344 box's halfword +112). The callees that refuse (or, for the physics,
+// without `native_heap`) run their originals through `original`. `f1` gets
+// what the original leaves there (SetValue2388's value); returns its r3
+// (the +344 box, or 0).
+uint32_t VehicleSetUp(uint8_t* base, uint32_t vehicle, uint32_t car, uint32_t frame, bool reset,
+                      bool native_heap, const CalleeOriginal& original, double* f1);
+
 }  // namespace vehicle

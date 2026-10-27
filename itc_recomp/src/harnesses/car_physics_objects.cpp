@@ -1587,8 +1587,8 @@ void WorldUpdateCases(Context& h) {
 }  // namespace
 
 // For the vehicle's harness (src/harnesses/vehicle.cpp): the fake world
-// (numbers only, no object kept free; installed at 0x826C2D88: the caller
-// puts it back), real boxes, the vehicle's region (its body at +0x2000, the
+// (numbers only, one object kept free when asked; installed at
+// 0x826C2D88: the caller puts it back), real boxes, the vehicle's region (its body at +0x2000, the
 // wheels' track positions at +0x2380, numbers only or NaNs and infinities
 // anywhere), its outputs, the physics step's inputs, the stack below the
 // call's filled.
@@ -1602,8 +1602,8 @@ uint32_t WorldActiveObject(uint8_t* base, uint32_t region) {
 uint32_t VehicleRegionBytes() {
   return kVehicleRegionBytes;
 }
-void BuildWorld(Context& h, uint32_t region, Random& r) {
-  harness::BuildWorld(h, region, r, kNumbers, false);
+void BuildWorld(Context& h, uint32_t region, Random& r, bool keep_one_free) {
+  harness::BuildWorld(h, region, r, kNumbers, keep_one_free);
 }
 void BuildBox(Context& h, uint32_t box, Random& r) {
   harness::BuildBox(h, box, r, kNumbers);

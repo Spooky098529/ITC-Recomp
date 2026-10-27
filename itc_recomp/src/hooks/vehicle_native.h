@@ -59,4 +59,12 @@ void VehicleCurveFromEngine(PPCContext& ctx, uint8_t* base);
 // vehicle; r3 = its curve on the stack.
 void VehicleStatusReset(PPCContext& ctx, uint8_t* base);
 
+// Vehicle::SetUpSurfaceGrip sub_820C1E00: r3 = the vehicle, r4 = the car;
+// r3 = the last record.
+void VehicleSurfaceGrip(PPCContext& ctx, uint8_t* base);
+// Vehicle::SetUp sub_820C3150 and Vehicle::ResetForCar sub_820C33B8: r3 =
+// the vehicle, r4 = the car; r3 = the +344 box (or 0), f1 SetValue2388's.
+void VehicleSetUp(PPCContext& ctx, uint8_t* base);
+void VehicleResetForCar(PPCContext& ctx, uint8_t* base);
+
 }  // namespace hooks

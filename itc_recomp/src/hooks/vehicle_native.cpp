@@ -24,7 +24,9 @@ ITC_FLAG_BOOL(native_vehicle, true, "ITC",
               "sub_820B00B8, by the original), Vehicle::SlipWheelValue sub_820C0310, "
               "Racers::NearestHumanVehicle sub_820C2248; the power curve, PowerCurve::ShiftPeak "
               "sub_820CE1D8, Build sub_820CE430, FromEngine sub_820CE7D8, and "
-              "VehicleStatus::Reset sub_820BFC48) natively instead of through the translated code (the same "
+              "VehicleStatus::Reset sub_820BFC48; Vehicle::SetUpSurfaceGrip sub_820C1E00, "
+              "Vehicle::SetUp sub_820C3150 and ResetForCar sub_820C33B8 (their physics' set-up "
+              "natively only while --native_heap routes the game's heap to the layer)) natively instead of through the translated code (the same "
               "words, bit for bit; checked by --run_harnesses=vehicle)");
 
 namespace hooks {
@@ -163,6 +165,56 @@ void VehicleStatusReset(PPCContext& ctx, uint8_t* base) {
   ctx.r3.u64 = vh::VehicleStatusReset(base, ctx.r3.u32, ctx.r4.u32, ctx.r1.u32 - 1168);
 }
 
+void VehicleSurfaceGrip(PPCContext& ctx, uint8_t* base) {
+  ctx.fpscr.disableFlushMode();
+  ctx.r3.u64 = vh::VehicleSetUpSurfaceGrip(base, ctx.r3.u32, ctx.r4.u32, ctx.r1.u32 - 480);
+}
+
+namespace {
+
+void SetUpStep(PPCContext& ctx, uint8_t* base, bool reset) {
+  ctx.fpscr.disableFlushMode();
+  const uint32_t frame = ctx.r1.u32 - 224;
+  auto original = [&](uint32_t address, uint64_t r3, uint64_t r4, uint64_t r5, uint64_t r6) {
+    const uint64_t r1 = ctx.r1.u64;
+    ctx.r1.u64 = frame;
+    ctx.r3.u64 = r3;
+    ctx.r4.u64 = r4;
+    ctx.r5.u64 = r5;
+    ctx.r6.u64 = r6;
+    switch (address) {
+      case 0x820C27E8:
+        __imp__sub_820C27E8(ctx, base);
+        break;
+      case 0x820B5B08:
+        __imp__sub_820B5B08(ctx, base);
+        break;
+      case 0x820B5670:
+        __imp__sub_820B5670(ctx, base);
+        break;
+      default:
+        __imp__sub_820C1D08(ctx, base);
+        break;
+    }
+    ctx.r1.u64 = r1;
+    ctx.fpscr.disableFlushMode();
+  };
+  double f1 = 0.0;
+  ctx.r3.u64 = vh::VehicleSetUp(base, ctx.r3.u32, ctx.r4.u32, frame, reset, NativeHeapActive(),
+                                original, &f1);
+  ctx.f1.f64 = f1;
+}
+
+}  // namespace
+
+void VehicleSetUp(PPCContext& ctx, uint8_t* base) {
+  SetUpStep(ctx, base, false);
+}
+
+void VehicleResetForCar(PPCContext& ctx, uint8_t* base) {
+  SetUpStep(ctx, base, true);
+}
+
 }  // namespace hooks
 
 // Defines an adapter: the flag, else the original.
@@ -193,5 +245,8 @@ ITC_VEHICLE(820CE1D8, VehicleShiftPeak)
 ITC_VEHICLE(820CE430, VehicleBuildCurve)
 ITC_VEHICLE(820CE7D8, VehicleCurveFromEngine)
 ITC_VEHICLE(820BFC48, VehicleStatusReset)
+ITC_VEHICLE(820C1E00, VehicleSurfaceGrip)
+ITC_VEHICLE(820C3150, VehicleSetUp)
+ITC_VEHICLE(820C33B8, VehicleResetForCar)
 // Vehicle::Construct (sub_820C30D8) and Vehicles::DestroyAll (sub_820C21E0)
 // have no adapters: their only callers are Vehicles::Create and Destroy.

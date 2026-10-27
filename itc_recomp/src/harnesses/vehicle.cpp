@@ -14,6 +14,7 @@
 
 #include "base/flags.h"
 #include "base/log.h"
+#include "car_physics/car_physics.h"
 #include "collision/collision.h"
 #include "harnesses/test_route.h"
 #include "hooks/heap.h"
@@ -27,6 +28,7 @@
 
 #include <algorithm>
 #include <bit>
+#include <cmath>
 #include <cstring>
 #include <string>
 #include <vector>
@@ -46,13 +48,18 @@ namespace car_objects {
 uint32_t WorldBytes();
 uint32_t WorldActiveObject(uint8_t* base, uint32_t region);
 uint32_t VehicleRegionBytes();
-void BuildWorld(Context& h, uint32_t region, Random& r);
+void BuildWorld(Context& h, uint32_t region, Random& r, bool keep_one_free = false);
 void BuildBox(Context& h, uint32_t box, Random& r);
 void FillVehicleRegion(uint8_t* base, uint32_t region, Random& r, bool nans);
 void FillStepInputs(uint8_t* base, uint32_t region, Random& r);
 void VehicleRegionOutputs(Outputs& out, uint8_t* base, uint32_t region);
 void FillStack(Context& h, Random& r);
 }  // namespace car_objects
+
+// Vehicle::SetupFromCar's cases' writer (src/harnesses/car_physics.cpp).
+bool SetupFromCarFits(uint8_t* base, uint32_t car, uint32_t r1);
+void WriteSetupFromCarCase(uint8_t* base, uint32_t data, uint32_t car, uint32_t r1,
+                           uint32_t stack_end, uint64_t seed, int group);
 
 namespace {
 
@@ -106,18 +113,36 @@ uint32_t RandomFloat(Random& r, float range = 10.0f) {
 // Heap blocks named by their place in `given` (the two sides allocate at
 // different addresses).
 struct Blocks {
-  std::vector<uint32_t> given;
+  std::vector<uint32_t> given, made;
   uint32_t Name(uint32_t w) const {
     for (size_t i = 0; i < given.size(); i++) {
       if (w == given[i] && w != 0) {
         return uint32_t(0xB10C0000u + i);
       }
     }
+    for (size_t i = 0; i < made.size(); i++) {
+      if (w == made[i]) {
+        return uint32_t(0x0E550000u + i);
+      }
+    }
     return w;
+  }
+  // A block the call made (a heap block not given).
+  void Note(uint32_t w) {
+    if (w != 0 && memory::IsHeapBlock(w) &&
+        std::find(given.begin(), given.end(), w) == given.end() &&
+        std::find(made.begin(), made.end(), w) == made.end()) {
+      made.push_back(w);
+    }
   }
   void FreeAll() {
     for (uint32_t b : given) {
       if (b != 0 && memory::IsHeapBlock(b)) {
+        memory::Free(b);
+      }
+    }
+    for (uint32_t b : made) {
+      if (memory::IsHeapBlock(b)) {
         memory::Free(b);
       }
     }
@@ -886,6 +911,266 @@ void Curves(Context& h) {
   }
 }
 
+// --- The vehicle set up from a car ---
+
+// SetUpSurfaceGrip: a vehicle and a car of random words, the car's flags,
+// tire types (0 to 3, the tables' types) and grades (0 to 4, now and then
+// any). Compared: the vehicle (the records as floats, the pointers and
+// +2496 exactly), the frame's temporaries (+80 to +299; the grade's
+// doubleword at +296 exactly), r3.
+void Grips(Context& h) {
+  const Block block(vh::kVehicleBytes + 0x1000);
+  if (!block.address) {
+    ITC_LOG_ERROR("harness: vehicle: no block from the allocation layer");
+    return;
+  }
+  const uint32_t v_ = block.address, car = block.address + vh::kVehicleBytes;
+  const uint32_t frame = CallContext(h).r1.u32 - 480;
+  for (int group = 0; group < 2; group++) {
+    Results results(std::string("Vehicle::SetUpSurfaceGrip (sub_820C1E00)") +
+                    (group == 1 ? ", odd grades" : ""));
+    for (uint64_t seed = 0; seed < 200; seed++) {
+      Outputs out[2];
+      for (int v = 0; v < 2; v++) {
+        Random r(seed * 103 + 71 + 1000 * uint64_t(group));
+        car_objects::FillStack(h, r);
+        WriteRandom(h.base, block.address, block.bytes, r);
+        guest::StoreU32(h.base, car + 3888, uint32_t(r.Next()) & ~0x6u | (r.Below(4) << 1));
+        for (uint32_t at : {1712u, 1720u}) {
+          guest::StoreU32(h.base, car + at, r.Below(4));
+          guest::StoreU32(h.base, car + at + 4,
+                          group == 1 && r.Below(2) == 0 ? uint32_t(r.Next()) : r.Below(5));
+        }
+        PPCContext t = CallContext(h);
+        t.r3.u64 = v_;
+        t.r4.u64 = car;
+        (v == 0 ? Original<__imp__sub_820C1E00> : hooks::VehicleSurfaceGrip)(t, h.base);
+        out[v].Word(guest::LoadU32(h.base, v_ + 2496));
+        out[v].Bytes(Read(h.base, v_ + 2668, 36));
+        out[v].Bytes(Read(h.base, v_ + 2796, 36));
+        out[v].Floats(h.base, v_ + 5716, (6148 - 5716) / 4);
+        out[v].Floats(h.base, frame + 80, (296 - 80) / 4);
+        out[v].Bytes(Read(h.base, frame + 296, 8));
+        out[v].Word(t.r3.u32);
+      }
+      results.Check(out[0], out[1], fmt::format("seed {}", seed));
+    }
+    results.Report();
+  }
+}
+
+// SetUp and ResetForCar: the fake world (one object free), the car physics'
+// vehicle region, the car and the car data (v + 3376) by SetupFromCar's
+// cases' writer (its groups: numbers only, one NaN, anything anywhere),
+// then the fields SetUp reads (the nitrous' level 0 to 6, the tire types
+// and grades, +3892), for ResetForCar the old collision object and shape.
+// Compared: the vehicle (pointers by their number, the rest as floats),
+// the new body and box, which blocks were freed, the world, the frames'
+// temporaries (SetUp's +80 to +155, SurfaceGrip's), r3 and f1.
+// Whether the car data keeps the physics' set-up within guest memory: the
+// gearing's speed steps call EngineTorque, which reads its curve at an
+// index from max(x, the idle floor +1628), so the floor must be a number
+// from 0.0 to 4.0 (random data sends it out of guest memory, where the
+// game's own data doesn't), with 1 to 7 gears and the curve's numbers.
+bool GearingSane(uint8_t* base, uint32_t data) {
+  auto number = [&](uint32_t at, float low, float high) {
+    const float x = guest::LoadFloat(base, at);
+    return std::isfinite(x) && x >= low && x < high;
+  };
+  const uint32_t gears = guest::LoadU32(base, data + 1268);
+  if (gears < 1 || gears > 7 || !number(data + 1628, 0.0f, 4.0f)) {
+    return false;
+  }
+  for (uint32_t i = 0; i < 34; i++) {
+    if (!number(data + 1292 + 4 * i, -1e6f, 1e6f)) {
+      return false;
+    }
+  }
+  return true;
+}
+
+void SetUps(Context& h, uint32_t world, uint32_t region) {
+  const Block cars(0x1000);
+  if (!cars.address) {
+    ITC_LOG_ERROR("harness: vehicle: no block from the allocation layer");
+    return;
+  }
+  const uint32_t car = cars.address;
+  const uint32_t r1 = CallContext(h).r1.u32;
+  const uint32_t frame = r1 - 224;
+  // The ground probe's mesh: the collision world harness's course (put back
+  // after).
+  const Block course(TestCourseBytes());
+  const Block table(4 * 0x10000);
+  if (!course.address || !table.address) {
+    ITC_LOG_ERROR("harness: vehicle: no block from the allocation layer");
+    return;
+  }
+  FillTestCourseTable(h.base, course.address, table.address);
+  const uint32_t saved_route = guest::LoadU32(h.base, track_route::kRoute);
+  uint8_t saved_mesh[12], saved_tried[kLinkedTriedBytes];
+  std::memcpy(saved_mesh, h.base + track_collision::kMesh, sizeof(saved_mesh));
+  std::memcpy(saved_tried, h.base + kLinkedTried, kLinkedTriedBytes);
+  // One group: the car's numbers kept moderate (the gearing's tables).
+  const char* const kGroups[] = {""};
+  for (int reset = 0; reset < 2; reset++) {
+    for (int group = 0; group < 1; group++) {
+      Results results(std::string(reset ? "Vehicle::ResetForCar (sub_820C33B8)"
+                                        : "Vehicle::SetUp (sub_820C3150)") +
+                      kGroups[group]);
+      uint32_t left_out = 0;
+      for (uint64_t seed = 0; seed < 300; seed++) {
+        Outputs out[2];
+        bool skip = false;
+        for (int v = -1; v < 2 && !skip; v++) {
+          Random r(seed * 107 + 73 + 1000 * uint64_t(group) + 100000 * uint64_t(reset));
+          WriteRandom(h.base, course.address, course.bytes, r);
+          BuildTestCourse(h.base, course.address, table.address, r);
+          car_objects::BuildWorld(h, world, r, true);
+          car_objects::FillVehicleRegion(h.base, region, r, false);
+          car_objects::FillStack(h, r);
+          const uint32_t v_ = region;
+          WriteSetupFromCarCase(h.base, v_ + 3376, car, frame, r1, seed * 7 + 5, 0);
+          // The car's copied parts (block 1, +2240 to +3260: the gearbox,
+          // engine and tires) and the car data the loader derives from as
+          // positive numbers where the writer left a value outside 0.001
+          // to 10,000 (the gearing's set-up reads its tables at indices
+          // from them: see GearingSane), but for the integers (block 1's
+          // +356, +360, +368; the car data's +172, +176, +1268).
+          auto moderate = [&](uint32_t at) {
+            const float x = guest::LoadFloat(h.base, at);
+            if (!(std::isfinite(x) && x >= 1e-3f && x < 1e4f)) {
+              guest::StoreFloat(h.base, at, 0.1f + float(r.Below(1900)) / 1000.0f);
+            }
+          };
+          for (uint32_t i = 0; i < 1020; i += 4) {
+            if (i != 356 && i != 360 && i != 368) {
+              moderate(car + 2240 + i);
+            }
+          }
+          for (uint32_t i = 0; i < 0x740; i += 4) {
+            if (i != 172 && i != 176 && i != 1268) {
+              moderate(v_ + 3376 + i);
+            }
+          }
+          // The gear count (the car data's +1268, copied from block 1's
+          // +368, the car's +2608): 1 to 7, as the physics' set-up's cases.
+          guest::StoreU32(h.base, car + 2608, 1 + r.Below(7));
+          guest::StoreU32(h.base, car + 1676, r.Below(7));
+          // The physics' ground probe after its sync moves the wheels: their
+          // track positions and the body's 0 (no mesh here), as the car
+          // physics' RefreshFromBody cases.
+          for (uint32_t w = 0; w < 4; w++) {
+            guest::StoreU32(h.base, v_ + 416 + 368 * w + 20, 0);
+          }
+          guest::StoreU32(h.base, v_ + 2984, 0);
+          // VehicleStatus::Reset's curve on the stack: its +1024 within the
+          // table (Build leaves it when no torque is above 0.0, and the
+          // random torques may all be).
+          guest::StoreU32(h.base, frame - 1168 + 80 + 1024, r.Below(32));
+          for (uint32_t at : {1712u, 1720u}) {
+            guest::StoreU32(h.base, car + at, r.Below(4));
+            guest::StoreU32(h.base, car + at + 4, r.Below(5));
+          }
+          guest::StoreU32(h.base, car + 3892, r.Below(2));
+          guest::StoreU32(h.base, car + 1656, r.Below(12));
+          if (r.Below(3) == 0) {
+            guest::StoreU8(h.base, car + 76, 0);
+          }
+          Blocks blocks;
+          if (reset) {
+            const uint32_t active = car_objects::WorldActiveObject(h.base, world);
+            guest::StoreU32(h.base, v_ + 340, active != 0 && r.Below(3) != 0 ? active : 0);
+            uint32_t shape = 0;
+            if (r.Below(4) != 0) {
+              shape = memory::Alloc(496, 0);
+              car_objects::BuildBox(h, shape, r);
+              blocks.given.push_back(shape);
+            }
+            guest::StoreU32(h.base, v_ + 344, shape);
+          }
+          if (v < 0) {
+            // A first run of the car loader (its plain C++, as both sides
+            // run it) to see the car data the physics' set-up will read.
+            double ignored = 0.0;
+            const bool sane = car_physics::VehicleSetupFromCar(h.base, v_ + 3376, car, frame - 368,
+                                                               &ignored) &&
+                              GearingSane(h.base, v_ + 3376);
+            blocks.FreeAll();
+            if (!sane) {
+              skip = true;
+              left_out++;
+            }
+            continue;
+          }
+          PPCContext t = CallContext(h);
+          t.fpscr.disableFlushModeUnconditional();
+          t.r3.u64 = v_;
+          t.r4.u64 = car;
+          if (reset) {
+            (v == 0 ? Original<__imp__sub_820C33B8> : hooks::VehicleResetForCar)(t, h.base);
+          } else {
+            (v == 0 ? Original<__imp__sub_820C3150> : hooks::VehicleSetUp)(t, h.base);
+          }
+          const uint32_t body = guest::LoadU32(h.base, v_ + 336);
+          const uint32_t shape = guest::LoadU32(h.base, v_ + 344);
+          blocks.Note(body);
+          blocks.Note(shape);
+          const uint32_t object = guest::LoadU32(h.base, v_ + 340);
+          if (object != 0) {
+            blocks.Note(guest::LoadU32(h.base, object + 36));
+            blocks.Note(guest::LoadU32(h.base, object + 40));
+          }
+          Outputs& o = out[v];
+          for (uint32_t i = 0; i < vh::kVehicleBytes; i += 4) {
+            const uint32_t w = guest::LoadU32(h.base, v_ + i);
+            const bool pointer = i == 272 || i == 336 || i == 340 || i == 344 || i == 5712 ||
+                                 i == 2984 || (i >= 2668 && i < 2704) || (i >= 2796 && i < 2832);
+            pointer ? o.Word(blocks.Name(w)) : o.Float(w);
+          }
+          if (body != 0 && body != region + 0x2000) {
+            o.Floats(h.base, body, 528 / 4);
+          }
+          if (shape != 0) {
+            o.Bytes(Read(h.base, shape, 4));
+            o.Floats(h.base, shape + 4, (496 - 4) / 4);
+          }
+          for (uint32_t b : blocks.given) {
+            o.Word(memory::IsHeapBlock(b) ? 1 : 0);
+          }
+          for (uint32_t b : blocks.made) {
+            o.Word(memory::Size(b));
+          }
+          for (uint32_t i = 0; i < car_objects::WorldBytes(); i += 4) {
+            o.Word(blocks.Name(guest::LoadU32(h.base, world + i)));
+          }
+          o.Bytes(Read(h.base, car, 0x1000));
+          o.Bytes(Read(h.base, frame + 80, 48));
+          o.Floats(h.base, frame + 128, 7);
+          o.Floats(h.base, frame - 480 + 80, (296 - 80) / 4);
+          o.Bytes(Read(h.base, frame - 480 + 296, 8));
+          o.Bytes(Read(h.base, kLinkedTried, kLinkedTriedBytes));
+          o.Word(blocks.Name(t.r3.u32));
+          o.Double(t.f1.u64);
+          blocks.FreeAll();
+          std::memcpy(h.base + kLinkedTried, saved_tried, kLinkedTriedBytes);
+          std::memcpy(h.base + track_collision::kMesh, saved_mesh, sizeof(saved_mesh));
+          guest::StoreU32(h.base, track_route::kRoute, saved_route);
+        }
+        if (!skip) {
+          results.Check(out[0], out[1], fmt::format("seed {}", seed));
+        }
+      }
+      results.Report();
+      ITC_LOG_INFO("harness: {}{}: {} cases left out (car data the gearing's set-up would "
+                   "read out of its tables with)",
+                   reset ? "Vehicle::ResetForCar" : "Vehicle::SetUp", kGroups[group], left_out);
+    }
+  }
+  std::memcpy(h.base + track_collision::kMesh, saved_mesh, sizeof(saved_mesh));
+  guest::StoreU32(h.base, track_route::kRoute, saved_route);
+}
+
 }  // namespace
 
 void Vehicle(Context& h) {
@@ -894,6 +1179,7 @@ void Vehicle(Context& h) {
   TrackPositions(h);
   Links(h);
   Curves(h);
+  Grips(h);
   const uint32_t saved_world = guest::LoadU32(h.base, kWorldPointer);
   const Block world(car_objects::WorldBytes());
   const Block region(car_objects::VehicleRegionBytes());
@@ -908,6 +1194,7 @@ void Vehicle(Context& h) {
   if (hooks::NativeHeapActive()) {
     Removals(h, world.address);
     Lifetime(h, world.address);
+    SetUps(h, world.address, region.address);
   } else {
     ITC_LOG_INFO("harness: vehicle: the vehicles' lifetime skipped (--native_heap off)");
   }

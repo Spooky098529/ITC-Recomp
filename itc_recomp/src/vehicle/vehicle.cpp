@@ -10,6 +10,7 @@
 #include "ai_drivers/ai_drivers.h"
 #include "base/log.h"
 #include "c_runtime/arrays.h"
+#include "c_runtime/strings.h"
 #include "collision/collision.h"
 #include "minimap/minimap.h"
 #include "strings_and_font/steps.h"
@@ -644,6 +645,209 @@ uint32_t VehicleStatusReset(uint8_t* base, uint32_t status, uint32_t vehicle, ui
   PowerCurveShiftPeak(base, frame + 80, 0, frame);
   CopyWord(base, frame + 80 + 1048, s + 104);
   return frame + 80;
+}
+
+// --- The vehicle set up from a car ---
+
+namespace {
+
+constexpr uint32_t kGripA = 0x826014A0, kGripB = 0x82601560, kGripRecords = 0x82601580;
+constexpr uint32_t kGripScale = 0x82601488;  // .data
+
+}  // namespace
+
+uint32_t VehicleSetUpSurfaceGrip(uint8_t* base, uint32_t vehicle, uint32_t car, uint32_t frame) {
+  ITC_NATIVE_RUNNING("sub_820C1E00 Vehicle::SetUpSurfaceGrip");
+  const uint32_t v = vehicle, f = frame;
+  const double one = Lfs(base, kOne);
+  // The four stack tables (nine floats each), in the original's order.
+  Stfs(base, f + 112, one);
+  const uint32_t flags = guest::LoadU32(base, car + 3888);
+  Stfs(base, f + 116, one);
+  Stfs(base, f + 120, one);
+  Stfs(base, f + 124, one);
+  const double base_factor = Lfs(base, 0x82001070);
+  Stfs(base, f + 128, base_factor);
+  Stfs(base, f + 144, base_factor);
+  const double a2c = Lfs(base, 0x82002A2C);
+  Stfs(base, f + 132, a2c);
+  Stfs(base, f + 140, a2c);
+  const double a08 = Lfs(base, 0x82002A08);
+  for (uint32_t at = 208; at <= 232; at += 4) {
+    Stfs(base, f + at, a08);
+  }
+  const double bb4 = Lfs(base, 0x82002BB4);
+  const double bbc = Lfs(base, 0x82002BBC);
+  Stfs(base, f + 136, bbc);
+  Stfs(base, f + 240, bb4);
+  Stfs(base, f + 160, bb4);
+  Stfs(base, f + 164, bb4);
+  const double zero = Lfs(base, kZero);
+  for (uint32_t at = 256; at <= 284; at += 4) {
+    Stfs(base, f + at, zero);
+  }
+  Stfs(base, f + 288, Lfs(base, 0x82002CC4));
+  Stfs(base, f + 168, bb4);
+  Stfs(base, f + 172, bb4);
+  Stfs(base, f + 180, bb4);
+  const double cc0 = Lfs(base, 0x82002CC0);
+  Stfs(base, f + 184, bb4);
+  Stfs(base, f + 188, bb4);
+  const double hundredth = Lfs(base, kHundredth);
+  Stfs(base, f + 236, hundredth);
+  const double cbc = Lfs(base, 0x82002CBC);
+  Stfs(base, f + 176, cc0);
+  Stfs(base, f + 192, cbc);
+  guest::StoreU32(base, v + 2496, (flags & 0x2) != 0 || (flags & 0x4) != 0 ? 0 : 1);
+  const double scale = Lfs(base, 0x8200256C);
+  const double quarter = Lfs(base, 0x82002968);
+  uint32_t r3 = 0;
+  for (uint32_t axle = 0; axle < 2; axle++) {
+    const uint32_t type = guest::LoadU32(base, car + (axle == 0 ? 1712 : 1720));
+    uint32_t grade = guest::LoadU32(base, car + (axle == 0 ? 1716 : 1724));
+    if (type == 0) {
+      grade = 0;
+    }
+    const double g =
+        Fmuls(IntThroughStack(base, f + 296, uint64_t(int64_t(int32_t(grade)))), quarter);
+    const uint32_t records = v + (axle == 0 ? 5716 : 5932);
+    const uint32_t pair = (type << 3) & 0xFFFFFFF8u;
+    const double soften = Fadds(g, one);
+    const double a0 = Lfs(base, kGripA + pair), a1 = Lfs(base, kGripA + 4 + pair);
+    const double b0 = Lfs(base, kGripB + pair);
+    const double da = Fsubs(a1, a0);
+    const double b1 = Lfs(base, kGripB + 4 + pair);
+    const double db = Fsubs(b1, b0);
+    const double a = Fmadds(da, g, a0);
+    const double b = Fmadds(db, g, b0);
+    const double first = Fmadds(a, scale, base_factor);
+    const double second = Fmadds(b, scale, base_factor);
+    const uint32_t nine = type * 9;
+    for (uint32_t j = 0; j < 9; j++) {
+      const uint32_t at = ((nine + j) << 2) & 0xFFFFFFFCu;
+      const double factor = (j == 1 || j == 8) ? second : first;
+      const double grip = Fmuls(Fmuls(Lfs(base, kGripRecords + at), factor), Lfs(base, kGripScale));
+      const uint32_t record = records + 24 * j;
+      Stfs(base, f + 92, grip);
+      const double squared = Fmuls(grip, grip);
+      Stfs(base, f + 84, Fmuls(Lfs(base, f + 112 + 4 * j), hundredth));
+      CopyWord(base, f + 160 + 4 * j, f + 80);
+      const double ratio = Fdivs(squared, soften);
+      CopyWord(base, f + 208 + 4 * j, f + 88);
+      CopyWord(base, f + 256 + 4 * j, f + 100);
+      Stfs(base, f + 96, Fmuls(ratio, quarter));
+      if (!c_runtime::Memcpy(base, record, f + 80, 24)) {
+        // A stack range and the vehicle's never share memory.
+        ITC_LOG_ERROR("vehicle: SetUpSurfaceGrip's record copy refused");
+        for (uint32_t i = 0; i < 24; i++) {
+          guest::StoreU8(base, record + i, guest::LoadU8(base, f + 80 + i));
+        }
+      }
+      guest::StoreU32(base, v + 4 * (j + (axle == 0 ? 667 : 699)), record);
+      r3 = record;
+    }
+  }
+  return r3;
+}
+
+uint32_t VehicleSetUp(uint8_t* base, uint32_t vehicle, uint32_t car, uint32_t frame, bool reset,
+                      bool native_heap, const CalleeOriginal& original, double* f1) {
+  if (reset) {
+    ITC_NATIVE_RUNNING("sub_820C33B8 Vehicle::ResetForCar");
+  } else {
+    ITC_NATIVE_RUNNING("sub_820C3150 Vehicle::SetUp");
+  }
+  const uint32_t v = vehicle, f = frame;
+  const uint32_t block2 = va::ObjectRecord1888(car);
+  const uint32_t data = v + 3376;
+  guest::StoreU32(base, v + 6152, 0);
+  const uint32_t flags = guest::LoadU32(base, car + 3888);
+  guest::StoreU32(base, v + 5712, car);
+  guest::StoreU32(base, v + 6148, flags);
+  double ignored = 0.0;
+  if (!cp::VehicleSetupFromCar(base, data, car, f - 368, &ignored)) {
+    original(0x820C27E8, data, car, 0, 0);
+  }
+  VehicleStatusReset(base, v + 6160, v, f - 1168);
+  uint32_t r3 = 0;
+  if (reset) {
+    if (!native_heap || !cp::VehicleResetPhysics(base, v, data, 7, f - 208, &ignored, &r3)) {
+      original(0x820B5B08, v, data, 7, 0);
+    }
+  } else {
+    if (!native_heap || !cp::VehicleSetUpPhysics(base, v, data, 1, 7, f - 208, &ignored, &r3)) {
+      original(0x820B5670, v, data, 1, 7);
+    }
+  }
+  if (!VehicleLinkTrackPositions(base, v, &r3)) {
+    original(0x820C1D08, v, 0, 0, 0);
+  }
+  guest::StoreU8(base, v + 2664, 1);
+  const int8_t extra = int8_t(guest::LoadU8(base, car + 76));
+  double value = 0.0;
+  uint32_t on = 0;
+  if (extra == 0) {
+    value = Lfs(base, kZero);
+  } else {
+    on = 1;
+    value = Fmuls(IntThroughStack(base, f + 80, uint64_t(int64_t(extra))), Lfs(base, 0x82002BBC));
+  }
+  cp::VehicleSetValue2388(base, v, value, on);
+  guest::StoreU8(base, v + 2386, int8_t(guest::LoadU8(base, car + 77)) != 0 ? 1 : 0);
+  uint32_t mode = 0;
+  uint8_t boosted = 0;
+  if (guest::LoadU8(base, block2 + 131) == 1) {
+    mode = 6;
+    boosted = 1;
+  } else {
+    mode = guest::LoadU32(base, car + 1672);
+    boosted = int32_t(mode) >= 3 ? 1 : 0;
+  }
+  guest::StoreU8(base, v + 2512, boosted);
+  guest::StoreU32(base, v + 2524, mode);
+  if (guest::LoadU8(base, block2 + 69) == 1) {
+    if (int32_t(guest::LoadU32(base, car + 1656)) >= 8) {
+      guest::StoreU8(base, data + 1605, 1);
+      if (!reset) {
+        guest::StoreU8(base, v + 2512, 1);
+        guest::StoreU32(base, v + 2524, int32_t(mode) < 3 ? 3 : mode);
+      }
+    } else {
+      guest::StoreU8(base, data + 1605, 0);
+    }
+  }
+  guest::StoreU32(base, v + 2372, guest::LoadU32(base, v + 2372) | 2);
+  guest::StoreU8(base, v + 2249, guest::LoadU32(base, car + 3892) != 0 ? 1 : 0);
+  VehicleSetUpSurfaceGrip(base, v, car, f - 480);
+  guest::StoreU8(base, v + 2380, 1);
+  guest::StoreU8(base, v + 2384, 0);
+  // The nitrous' tables (probably), in the original's order.
+  guest::StoreU32(base, f + 96, 0);
+  const uint32_t box = guest::LoadU32(base, v + 344);
+  Stfs(base, f + 128, Lfs(base, kOne));
+  guest::StoreU32(base, f + 112, 570);
+  Stfs(base, f + 132, Lfs(base, kOneAndHalf));
+  guest::StoreU32(base, f + 116, 630);
+  Stfs(base, f + 136, Lfs(base, 0x82002CF4));
+  guest::StoreU32(base, f + 100, 390);
+  Stfs(base, f + 140, Lfs(base, 0x82002C40));
+  Stfs(base, f + 144, Lfs(base, 0x82002C1C));
+  guest::StoreU32(base, f + 104, 450);
+  guest::StoreU32(base, f + 120, 690);
+  guest::StoreU32(base, f + 108, 510);
+  const uint32_t level = (guest::LoadU32(base, car + 1676) << 2) & 0xFFFFFFFCu;
+  Stfs(base, f + 148, Lfs(base, 0x82002CF0));
+  Stfs(base, f + 152, Lfs(base, 0x82002CEC));
+  CopyWord(base, f + 128 + level, v + 2416);
+  const int64_t extra_rpm = int32_t(guest::LoadU32(base, f + 96 + level));
+  Stfs(base, v + 2420, IntThroughStack(base, f + 80, uint64_t(extra_rpm)));
+  *f1 = value;
+  if (box != 0) {
+    const uint32_t car_flags = guest::LoadU32(base, car + 3888);
+    const uint32_t half = (car_flags & 0x4) != 0 ? 2 : ((car_flags >> 1) & 1);
+    va::ObjectSetHalf112(base, box, half & 0xFFFF);
+  }
+  return box;
 }
 
 }  // namespace vehicle
