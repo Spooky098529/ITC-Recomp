@@ -6,6 +6,7 @@
 
 #include "app_states/app.h"
 #include "app_states/containers.h"
+#include "app_states/layers.h"
 #include "base/flags.h"
 #include "debug/menu_selection_scan.h"
 #include "framework/run_loop.h"
@@ -15,6 +16,7 @@
 
 #include <string>
 #include "hooks/heap.h"
+#include "memory/c_runtime_heap.h"
 #include "std_list/ptr_list.h"
 
 ITC_FLAG_BOOL(native_app_states, true, "ITC",
@@ -39,7 +41,11 @@ ITC_FLAG_BOOL(native_app_states, true, "ITC",
               "App::ApplyRequest sub_82093BE0 (its split-off type 0 piece sub_82093C2C merged) "
               "and the +20 interface's add slots sub_82094830, sub_820948D0, sub_82094970 and "
               "sub_82094A10; App::Update sub_82093DC0, the run loop's tick handler 8, its virtual "
-              "calls, button tests and functors guest calls) natively instead of through the translated code "
+              "calls, button tests and functors guest calls; with --native_heap the state stack's "
+              "set-up: AppStates::Create sub_820AE498, AppStates::AppStates sub_820AE348, "
+              "StateLayer::StateLayer sub_820AD118 and sub_820ADBD8, StateLayer::AddChild "
+              "sub_820ADA08, AppStates::AddLayer sub_820AE130 and App::Start sub_82092878, their "
+              "virtual calls guest calls) natively instead of through the translated code "
               "(the same results; checked by --run_harnesses=app_states)");
 
 namespace hooks {
@@ -404,6 +410,112 @@ void AppIsRunning(PPCContext& ctx, uint8_t* base) {
   ctx.r11.u64 = ctx.r3.u64;
 }
 
+namespace {
+
+// A step over the allocation layer from the original's frame of `bytes`:
+// `body(frame)` gives false where the original must run (nothing done).
+template <typename Body>
+bool InOwnFrame(PPCContext& ctx, uint8_t* base, uint32_t bytes, const as::AppCalls& calls,
+                Body body) {
+  if (!Heap()) {
+    return false;
+  }
+  bool ours = false;
+  calls.in_frame(bytes, uint32_t(ctx.lr), [&](uint32_t frame) { ours = body(frame); });
+  return ours;
+}
+
+void LayerConstructStep(PPCContext& ctx, uint8_t* base, bool with_state,
+                        void (*original)(PPCContext&, uint8_t*)) {
+  const uint32_t layer = ctx.r3.u32, owner = ctx.r4.u32;
+  const std::optional<uint32_t> state =
+      with_state ? std::optional<uint32_t>(ctx.r5.u32) : std::nullopt;
+  const as::AppCalls calls = AppStatesCalls(ctx, base);
+  // The lists' constructors hand back without the process heap.
+  if (!Heap() || memory::crt::GetProcessHeap(base) == 0) {
+    original(ctx, base);
+    return;
+  }
+  calls.in_frame(with_state ? 112 : 96, uint32_t(ctx.lr), [&](uint32_t frame) {
+    as::LayerConstruct(base, layer, owner, state, frame, calls);
+  });
+  ctx.r3.u64 = layer;
+}
+
+}  // namespace
+
+void AppLayerConstruct(PPCContext& ctx, uint8_t* base) {
+  LayerConstructStep(ctx, base, false, __imp__sub_820AD118);
+}
+void AppLayerConstructWithState(PPCContext& ctx, uint8_t* base) {
+  LayerConstructStep(ctx, base, true, __imp__sub_820ADBD8);
+}
+
+void AppLayerAddChild(PPCContext& ctx, uint8_t* base) {
+  const uint32_t layer = ctx.r3.u32, child = ctx.r4.u32;
+  const as::AppCalls calls = AppStatesCalls(ctx, base);
+  if (!InOwnFrame(ctx, base, 112, calls, [&](uint32_t frame) {
+        as::LayerAddChild(base, layer, child, frame, calls);
+        return true;
+      })) {
+    __imp__sub_820ADA08(ctx, base);
+    return;
+  }
+  ctx.r3.u64 = layer + as::kLayerChildren;
+}
+
+void AppStatesAddLayer(PPCContext& ctx, uint8_t* base) {
+  const uint32_t states = ctx.r3.u32, state = ctx.r4.u32;
+  const as::AppCalls calls = AppStatesCalls(ctx, base);
+  if (!InOwnFrame(ctx, base, 112, calls, [&](uint32_t frame) {
+        return as::StatesAddLayer(base, states, state, frame, calls);
+      })) {
+    __imp__sub_820AE130(ctx, base);
+    return;
+  }
+  ctx.r3.u64 = guest::LoadU32(base, states + as::kStatesRoot) + as::kLayerChildren;
+}
+
+void AppStatesConstruct(PPCContext& ctx, uint8_t* base) {
+  const uint32_t states = ctx.r3.u32, setup = ctx.r4.u32;
+  const as::AppCalls calls = AppStatesCalls(ctx, base);
+  if (!InOwnFrame(ctx, base, 176, calls, [&](uint32_t frame) {
+        return as::StatesConstruct(base, states, setup, frame, calls);
+      })) {
+    __imp__sub_820AE348(ctx, base);
+    return;
+  }
+  ctx.r3.u64 = states;
+}
+
+void AppStatesCreate(PPCContext& ctx, uint8_t* base) {
+  const uint32_t setup = ctx.r3.u32;
+  const as::AppCalls calls = AppStatesCalls(ctx, base);
+  std::optional<uint32_t> states;
+  if (!InOwnFrame(ctx, base, 96, calls, [&](uint32_t frame) {
+        states = as::StatesCreate(base, setup, frame, calls);
+        return states.has_value();
+      })) {
+    __imp__sub_820AE498(ctx, base);
+    return;
+  }
+  ctx.r3.u64 = *states;
+}
+
+void AppStart(PPCContext& ctx, uint8_t* base) {
+  const uint32_t interface = ctx.r3.u32;
+  const as::AppCalls calls = AppStatesCalls(ctx, base);
+  std::optional<uint32_t> r3;
+  if (!InOwnFrame(ctx, base, 96, calls, [&](uint32_t frame) {
+        r3 = as::AppStart(base, interface, frame, calls);
+        return r3.has_value();
+      })) {
+    __imp__sub_82092878(ctx, base);
+    return;
+  }
+  ctx.r3.u64 = *r3;
+}
+
 }  // namespace hooks
 
 // The adapters: the register steps above, or the originals with the flag
@@ -445,6 +557,13 @@ ITC_APP_STATES_ADAPTER(820948D0, AppAddToggledHandler)
 ITC_APP_STATES_ADAPTER(82094970, AppAddAlwaysHandler)
 ITC_APP_STATES_ADAPTER(82094A10, AppAddListener)
 ITC_APP_STATES_ADAPTER(82093DC0, AppUpdate)
+ITC_APP_STATES_ADAPTER(820AD118, AppLayerConstruct)
+ITC_APP_STATES_ADAPTER(820ADBD8, AppLayerConstructWithState)
+ITC_APP_STATES_ADAPTER(820ADA08, AppLayerAddChild)
+ITC_APP_STATES_ADAPTER(820AE130, AppStatesAddLayer)
+ITC_APP_STATES_ADAPTER(820AE348, AppStatesConstruct)
+ITC_APP_STATES_ADAPTER(820AE498, AppStatesCreate)
+ITC_APP_STATES_ADAPTER(82092878, AppStart)
 
 // App::RunHandler, with --find_menu_selection's wrap (moved here from
 // src/debug/menu_selection_scan.cpp, as one override per function can

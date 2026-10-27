@@ -98,6 +98,24 @@ void AppAddToggledHandler(PPCContext& ctx, uint8_t* base);
 void AppAddAlwaysHandler(PPCContext& ctx, uint8_t* base);
 void AppAddListener(PPCContext& ctx, uint8_t* base);
 
+// StateLayer::StateLayer sub_820AD118: r3 = the layer, r4 = the app's
+// interface (app + 16); r3 the layer. StateLayer::StateLayer(state)
+// sub_820ADBD8: r5 = the first state too.
+void AppLayerConstruct(PPCContext& ctx, uint8_t* base);
+void AppLayerConstructWithState(PPCContext& ctx, uint8_t* base);
+// StateLayer::AddChild sub_820ADA08: r3 = the layer, r4 = the child; r3 the
+// layer + 12 (PtrList::Insert's).
+void AppLayerAddChild(PPCContext& ctx, uint8_t* base);
+// AppStates::AddLayer sub_820AE130: r3 = the state stack, r4 = a state; r3
+// the root + 12 (AddChild's).
+void AppStatesAddLayer(PPCContext& ctx, uint8_t* base);
+// AppStates::AppStates sub_820AE348: r3 = it, r4 = the set-up block; r3 it.
+void AppStatesConstruct(PPCContext& ctx, uint8_t* base);
+// AppStates::Create sub_820AE498: r3 = the set-up block; r3 the stack or 0.
+void AppStatesCreate(PPCContext& ctx, uint8_t* base);
+// App::Start sub_82092878: r3 = the +20 interface; r3 the stack's slot 1's.
+void AppStart(PPCContext& ctx, uint8_t* base);
+
 // App::Update sub_82093DC0: r3 = the app; r3 the request vector's clear's
 // (in its frame, r1 - 160, when ours).
 void AppUpdate(PPCContext& ctx, uint8_t* base);

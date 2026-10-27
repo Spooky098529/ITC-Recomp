@@ -12,6 +12,7 @@
 #include "harness.h"
 
 #include "app_states/containers.h"
+#include "app_states/layers.h"
 #include "base/flags.h"
 #include "hooks/app_states.h"
 #include "memory/c_runtime_heap.h"
@@ -1223,6 +1224,360 @@ void Update(Context& h) {
   results.Report();
 }
 
+// --- The state stack's set-up ---
+//
+// Layers are walked from a layer: its three lists (children, states,
+// operations) from their heads, every node met numbered, and the children's
+// layers (48-byte heap blocks) walked too. Heads' +8 (never set) isn't
+// compared. The app at data + 1024 has a vtable at data + 3600 whose slots 1
+// and 2 are the getter of its word +60 (the interface at app + 20, so the
+// owner and the interface are the same word); the interface's vtable at
+// data + 3700 has the game's add slots (AddListener +4, AddToggledHandler
+// +12, AddHandler +16; the request vector at app + 96) or the counter.
+
+constexpr uint32_t kLayerLists[] = {12, 24, 36};
+
+void MeetLayer(uint8_t* base, Blocks& blocks, uint32_t layer, std::vector<uint32_t>& layers) {
+  if (layer == 0 || std::find(layers.begin(), layers.end(), layer) != layers.end()) {
+    return;
+  }
+  layers.push_back(layer);
+  if (memory::IsHeapBlock(layer) &&
+      std::find(blocks.list.begin(), blocks.list.end(), layer) == blocks.list.end()) {
+    blocks.Add(layer);
+  }
+  for (uint32_t list : kLayerLists) {
+    const uint32_t head = Load(base, layer + list + 4);
+    uint32_t node = head;
+    for (int i = 0; i < 64 && node != 0 && memory::IsHeapBlock(node); i++) {
+      if (std::find(blocks.list.begin(), blocks.list.end(), node) == blocks.list.end()) {
+        blocks.Add(node);
+      }
+      if (node != head && list == 12) {
+        const uint32_t child = Load(base, node + 8);
+        if (child != 0 && memory::IsHeapBlock(child) && memory::Size(child) == 48) {
+          MeetLayer(base, blocks, child, layers);
+        }
+      }
+      node = Load(base, node + 0);
+      if (node == head) {
+        break;
+      }
+    }
+  }
+}
+
+void LayersOut(uint8_t* base, Outputs& out, const Blocks& blocks,
+               const std::vector<uint32_t>& layers) {
+  for (uint32_t layer : layers) {
+    blocks.Words(base, out, layer, 48);
+    for (uint32_t list : kLayerLists) {
+      const uint32_t head = Load(base, layer + list + 4);
+      uint32_t node = head;
+      for (int i = 0; i < 64 && node != 0 && memory::IsHeapBlock(node); i++) {
+        blocks.Words(base, out, node, 8);
+        if (node != head) {
+          blocks.Words(base, out, node + 8, list == 36 ? 8 : 4);
+        }
+        node = Load(base, node + 0);
+        if (node == head) {
+          break;
+        }
+      }
+    }
+  }
+}
+
+// The request vector at app + 96: its block and the delegates' copies its
+// requests hold, by number.
+void RequestsOut(Context& h, Outputs& out, Blocks& blocks, uint32_t app) {
+  const uint32_t vector = app + as::kAppRequests;
+  const uint32_t first = Load(h.base, vector + 4);
+  const uint32_t last = Load(h.base, vector + 8);
+  if (first != 0 && memory::IsHeapBlock(first) &&
+      std::find(blocks.list.begin(), blocks.list.end(), first) == blocks.list.end()) {
+    blocks.Add(first);
+  }
+  for (uint32_t at = first; first != 0 && at < last && at - first < 0x400; at += 12) {
+    const uint32_t copy = Load(h.base, at + 8);
+    if (copy != 0 && memory::IsHeapBlock(copy) &&
+        std::find(blocks.list.begin(), blocks.list.end(), copy) == blocks.list.end()) {
+      blocks.Add(copy);
+      blocks.Words(h.base, out, copy, 12);
+    }
+  }
+  if (first != 0 && last >= first && last - first < 0x400) {
+    blocks.Words(h.base, out, first, last - first);
+  }
+}
+
+constexpr uint32_t kAddListenerSlot = 0x82094A10;
+constexpr uint32_t kAddToggledSlot = 0x820948D0;
+constexpr uint32_t kAddHandlerSlot = 0x82094830;
+
+// The app (see above); `game` the game's add slots, else the counter. The
+// request vector empty or with room.
+void StackApp(Context& h, Blocks& blocks, bool game) {
+  const uint32_t app = AppAt(h);
+  const uint32_t vtable = h.data + 3600;
+  const uint32_t slots = h.data + 3700;
+  Store(h.base, app, vtable);
+  Store(h.base, vtable + 4, kWord60);
+  Store(h.base, vtable + 8, kWord60);
+  Store(h.base, app + 60, app + as::kAppInterface);
+  Store(h.base, app + as::kAppInterface, slots);
+  Store(h.base, slots + 4, game ? kAddListenerSlot : kCount4);
+  Store(h.base, slots + 12, game ? kAddToggledSlot : kCount4);
+  Store(h.base, slots + 16, game ? kAddHandlerSlot : kCount4);
+  const uint32_t vector = app + as::kAppRequests;
+  const uint32_t size = h.random.Below(3);
+  const uint32_t capacity = h.random.Below(2) ? 0 : size + h.random.Below(5);
+  uint32_t block = 0;
+  if (capacity != 0) {
+    block = blocks.New(h.base, 12 * capacity);
+    for (uint32_t at = 0; at < 12 * capacity; at += 4) {
+      Store(h.base, block + at, uint32_t(h.random.Next()));
+    }
+  }
+  Store(h.base, vector + 4, block);
+  Store(h.base, vector + 8, capacity != 0 ? block + 12 * size : 0);
+  Store(h.base, vector + 12, block + 12 * capacity);
+}
+
+// A layer built by the game's StateLayer::StateLayer in a heap block.
+uint32_t GameLayer(Context& h, Blocks& blocks, uint32_t owner) {
+  const uint32_t layer = blocks.New(h.base, 48);
+  PPCContext t = CallContext(h);
+  t.r3.u64 = layer;
+  t.r4.u64 = owner;
+  FlagOff off;
+  __imp__sub_820AD118(t, h.base);
+  return layer;
+}
+
+void RandomScratch(Context& h, uint32_t bytes) {
+  for (uint32_t at = 0; at < bytes; at += 4) {
+    Store(h.base, h.data + at, uint32_t(h.random.Next()));
+  }
+}
+
+void StackSetUp(Context& h) {
+  for (int with_state = 0; with_state < 2; with_state++) {
+    Results results(with_state ? "StateLayer::StateLayer(state) (sub_820ADBD8)"
+                               : "StateLayer::StateLayer (sub_820AD118)");
+    for (int c = 0; c < 40; c++) {
+      Case(
+          h, results, [&](Blocks&) { RandomScratch(h, 256); },
+          [&](PPCContext& t) {
+            t.r3.u64 = h.data + 64;
+            t.r4.u64 = h.random.Next();
+            t.r5.u64 = h.random.Next();
+          },
+          with_state ? __imp__sub_820ADBD8 : __imp__sub_820AD118,
+          with_state ? hooks::AppLayerConstructWithState : hooks::AppLayerConstruct,
+          [&](Outputs& out, const PPCContext& t, Blocks& blocks) {
+            std::vector<uint32_t> layers;
+            MeetLayer(h.base, blocks, h.data + 64, layers);
+            blocks.Words(h.base, out, h.data, 256);
+            LayersOut(h.base, out, blocks, layers);
+            out.Word(blocks.Of(t.r3.u32));
+            blocks.Out(out);
+          },
+          fmt::format("case {}", c));
+    }
+    results.Report();
+  }
+  {
+    // The layer at data + 64 with 0 to 5 children (12-byte nodes); the
+    // child at data + 512, its state's vtable at data + 640: slot 1 the
+    // counter, the recorder or a layer's (empty).
+    Results results("StateLayer::AddChild (sub_820ADA08)");
+    for (int c = 0; c < 60; c++) {
+      Case(
+          h, results,
+          [&](Blocks& blocks) {
+            RandomScratch(h, 1024);
+            BuildList(h, blocks, h.data + 64 + 12, h.random.Below(6), 12);
+            Store(h.base, h.data + 512 + 4, h.data + 640);
+            const uint32_t slot1[] = {kCount4, kStoreR4At4,
+                                      guest::LoadU32(h.base, as::kLayerStateVtable + 4)};
+            Store(h.base, h.data + 640 + 4, slot1[c % 3]);
+          },
+          [&](PPCContext& t) {
+            Fill(h.base, t.r1.u32 + 24, 8);
+            t.r3.u64 = h.data + 64;
+            t.r4.u64 = h.data + 512;
+          },
+          __imp__sub_820ADA08, hooks::AppLayerAddChild,
+          [&](Outputs& out, const PPCContext& t, Blocks& blocks) {
+            MeetNodes(h.base, blocks, Load(h.base, h.data + 64 + 12 + 4));
+            blocks.Words(h.base, out, t.r1.u32 + 24, 8);
+            blocks.Words(h.base, out, h.data, 1024);
+            LiveBlocks(h.base, out, blocks, 12);
+            out.Word(blocks.Of(t.r3.u32));
+            blocks.Out(out);
+          },
+          fmt::format("slot {} case {}", c % 3, c));
+    }
+    results.Report();
+  }
+  {
+    // The stack at data (+4 the app, +8 a root layer the game built, with
+    // 0 to 2 children already).
+    Results results("AppStates::AddLayer (sub_820AE130)");
+    for (int c = 0; c < 40; c++) {
+      Case(
+          h, results,
+          [&](Blocks& blocks) {
+            RandomScratch(h, 3800);
+            StackApp(h, blocks, false);
+            Store(h.base, h.data + 4, AppAt(h));
+            const uint32_t root = GameLayer(h, blocks, uint32_t(h.random.Next()));
+            Store(h.base, h.data + 8, root);
+            for (uint32_t i = h.random.Below(3); i != 0; i--) {
+              PPCContext t = CallContext(h);
+              t.r3.u64 = root;
+              t.r4.u64 = GameLayer(h, blocks, uint32_t(h.random.Next()));
+              FlagOff off;
+              __imp__sub_820ADA08(t, h.base);
+            }
+          },
+          [&](PPCContext& t) {
+            t.r3.u64 = h.data;
+            t.r4.u64 = h.random.Next();
+          },
+          __imp__sub_820AE130, hooks::AppStatesAddLayer,
+          [&](Outputs& out, const PPCContext& t, Blocks& blocks) {
+            std::vector<uint32_t> layers;
+            MeetLayer(h.base, blocks, Load(h.base, h.data + 8), layers);
+            blocks.Words(h.base, out, h.data, 3800);
+            LayersOut(h.base, out, blocks, layers);
+            out.Word(blocks.Of(t.r3.u32));
+            blocks.Out(out);
+          },
+          fmt::format("case {}", c));
+    }
+    results.Report();
+  }
+  for (int create = 0; create < 2; create++) {
+    // The stack at data (Create: from operator new), the set-up block at
+    // data + 64 (+0 the app).
+    Results results(create ? "AppStates::Create (sub_820AE498)"
+                           : "AppStates::AppStates (sub_820AE348)");
+    for (int c = 0; c < 40; c++) {
+      const bool game = c % 4 != 3;
+      Case(
+          h, results,
+          [&](Blocks& blocks) {
+            RandomScratch(h, 3800);
+            StackApp(h, blocks, game);
+            Store(h.base, h.data + 64, AppAt(h));
+          },
+          [&](PPCContext& t) {
+            if (create) {
+              t.r3.u64 = h.data + 64;
+            } else {
+              t.r3.u64 = h.data;
+              t.r4.u64 = h.data + 64;
+            }
+          },
+          create ? __imp__sub_820AE498 : __imp__sub_820AE348,
+          create ? hooks::AppStatesCreate : hooks::AppStatesConstruct,
+          [&](Outputs& out, const PPCContext& t, Blocks& blocks) {
+            const uint32_t states = t.r3.u32;
+            if (create && states != 0 && memory::IsHeapBlock(states)) {
+              blocks.Add(states);
+              blocks.Words(h.base, out, states, 12);
+            }
+            std::vector<uint32_t> layers;
+            if (states != 0) {
+              MeetLayer(h.base, blocks, Load(h.base, states + 8), layers);
+            }
+            RequestsOut(h, out, blocks, AppAt(h));
+            blocks.Words(h.base, out, h.data, 3800);
+            LayersOut(h.base, out, blocks, layers);
+            out.Word(blocks.Of(t.r3.u32));
+            blocks.Out(out);
+          },
+          fmt::format("{} case {}", game ? "game slots" : "counter", c));
+    }
+    results.Report();
+  }
+  {
+    // App::Start: the interface at app + 20, its +96 the stack at data (its
+    // vtable at data + 128: slot 1 the game's AddLayer over a root layer the
+    // game built, or the recorder). The globals it and Modes::Modes write
+    // filled with random words and put back after each case.
+    struct Region {
+      uint32_t address, bytes;
+    };
+    static constexpr Region kRegions[] = {
+        {0x826C5B80, 0x50}, {0x826364E0, 0x10}, {0x826032D0, 0x20}, {0x826BAB30, 0x50}};
+    Results results("App::Start (sub_82092878)");
+    for (int c = 0; c < 40; c++) {
+      const bool game = c % 4 != 3;
+      std::vector<std::vector<uint8_t>> saved;
+      for (const Region& region : kRegions) {
+        saved.push_back(Read(h.base, region.address, region.bytes));
+      }
+      Case(
+          h, results,
+          [&](Blocks& blocks) {
+            RandomScratch(h, 3800);
+            for (const Region& region : kRegions) {
+              for (uint32_t at = 0; at < region.bytes; at += 4) {
+                Store(h.base, region.address + at, uint32_t(h.random.Next()));
+              }
+            }
+            StackApp(h, blocks, false);
+            Store(h.base, AppAt(h) + 116, h.data);
+            Store(h.base, h.data, h.data + 128);
+            Store(h.base, h.data + 128 + 4, game ? as::kAddLayer : kStoreR4At4);
+            Store(h.base, h.data + 4, AppAt(h));
+            Store(h.base, h.data + 8, GameLayer(h, blocks, uint32_t(h.random.Next())));
+          },
+          [&](PPCContext& t) { t.r3.u64 = AppAt(h) + as::kAppInterface; },
+          __imp__sub_82092878, hooks::AppStart,
+          [&](Outputs& out, const PPCContext& t, Blocks& blocks) {
+            std::vector<uint32_t> layers;
+            MeetLayer(h.base, blocks, Load(h.base, h.data + 8), layers);
+            // The holder: the new layer's first operation's state, or the
+            // recorder's word.
+            for (uint32_t layer : layers) {
+              const uint32_t head = Load(h.base, layer + 36 + 4);
+              const uint32_t node = Load(h.base, head);
+              if (node != head && memory::IsHeapBlock(node)) {
+                const uint32_t holder = Load(h.base, node + 12);
+                if (holder != 0 && memory::IsHeapBlock(holder) &&
+                    std::find(blocks.list.begin(), blocks.list.end(), holder) ==
+                        blocks.list.end()) {
+                  blocks.Add(holder);
+                  blocks.Words(h.base, out, holder, 8);
+                }
+              }
+            }
+            const uint32_t recorded = Load(h.base, h.data + 4);
+            if (!game && recorded != 0 && memory::IsHeapBlock(recorded)) {
+              blocks.Add(recorded);
+              blocks.Words(h.base, out, recorded, 8);
+            }
+            for (const Region& region : kRegions) {
+              out.Bytes(Read(h.base, region.address, region.bytes));
+            }
+            blocks.Words(h.base, out, h.data, 3800);
+            LayersOut(h.base, out, blocks, layers);
+            out.Word(blocks.Of(t.r3.u32));
+            blocks.Out(out);
+          },
+          fmt::format("{} case {}", game ? "AddLayer" : "recorder", c));
+      for (size_t i = 0; i < saved.size(); i++) {
+        Write(h.base, kRegions[i].address, saved[i].data(), kRegions[i].bytes);
+      }
+    }
+    results.Report();
+  }
+}
+
 }  // namespace
 
 void AppStates(Context& h) {
@@ -1237,6 +1592,7 @@ void AppStates(Context& h) {
   Walks(h);
   Handlers(h);
   Update(h);
+  StackSetUp(h);
 }
 
 }  // namespace harness
