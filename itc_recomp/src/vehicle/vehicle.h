@@ -224,4 +224,28 @@ using GuestCall = std::function<void(uint32_t address, uint32_t r1, const GuestR
 void VehicleTick(uint8_t* base, uint32_t vehicle, uint32_t racer, uint32_t car, uint32_t flag,
                  uint32_t frame, const GuestCall& call);
 
+// --- The vehicle placed on the route ---
+
+// Vehicle::PlaceOnRoute (sub_820C3608): route positions one slice back and
+// on from `position` (RoutePosition::Step, in `frame` + 80 and + 144, its
+// own at + 176), the car's track position (+5232) on it (TrackPosition::
+// Init); the frame from the slices' points (TrackRoute::SlicePoint: the
+// centers back and on, the slice's two edge points; each difference
+// reversed when `direction` is 0), its rows normalized and crossed on the
+// vector unit (flush-to-zero on, as the translated code) into a matrix
+// (Matrix::FromRows), its quaternion (Quaternion::FromMatrix) the body's
+// orientation; the velocity forward x `speed` x 1000 / 3600; the position
+// (TrackRoute::LanePoint with a lane, else the slice back's center) 0.3
+// higher; Vehicle::SyncFromBody and CollisionObject::ResetTransform after
+// each; the wheels' track positions copies of the car's (memcpy to `frame`
+// + 352, TrackPosition::Copy); the angular velocity 0. The temporaries in
+// `frame` (the original's 560 bytes) as the original. False, with nothing
+// done, where `offset` (across the road) isn't 0.0: sub_820FA8F8's path,
+// never seen in play, where the whole original runs. ResetTransform and
+// memcpy run their originals through `call` where they refuse. r3 isn't
+// kept (no caller reads it).
+bool VehiclePlaceOnRoute(uint8_t* base, uint32_t vehicle, uint32_t position, double speed,
+                         double offset, int32_t lane, uint32_t direction, uint32_t frame,
+                         const GuestCall& call);
+
 }  // namespace vehicle

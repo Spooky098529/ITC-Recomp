@@ -74,4 +74,10 @@ void VehicleResetForCar(PPCContext& ctx, uint8_t* base);
 void VehicleStatusUpdate(PPCContext& ctx, uint8_t* base);
 void VehicleTick(PPCContext& ctx, uint8_t* base);
 
+// Vehicle::PlaceOnRoute sub_820C3608: r3 = the vehicle, r4 = the route
+// position, f1 = the speed (km/h), f2 = the offset across the road (the
+// whole original where it isn't 0.0), r6 = the lane (-1 none), r7 = the
+// direction (r3 not kept: no caller reads it).
+void VehiclePlaceOnRoute(PPCContext& ctx, uint8_t* base);
+
 }  // namespace hooks

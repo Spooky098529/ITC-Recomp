@@ -1278,6 +1278,136 @@ void Ticks(Context& h, uint32_t world, uint32_t region) {
   }
 }
 
+// --- Vehicle::PlaceOnRoute: the tick's inputs (the course, the race data's
+// flags, the vehicle region), a route position on the course whose slices
+// back and on are on it too (section 0's slices 1 to 5, section 1's 0 to
+// 4: steps across the sections' link included), a collision object of
+// boxes on the vehicle's body (the fake world's objects' records aren't
+// boxes, which ResetTransform's original can't place), the offset 0.0 (its
+// other path, sub_820FA8F8's, never seen in play, is the whole original
+// and gets no cases, as ApplyInput's never-seen callees). Compared: the
+// region, the object and its boxes, the frame's temporaries (+80 to +447:
+// the route positions and the track position's copy exactly, the rest as
+// floats), the searches' tried list. (r3 isn't: no caller reads it.)
+
+void Placements(Context& h, uint32_t world, uint32_t region) {
+  const Block course(TestCourseBytes());
+  const Block table(4 * 0x10000);
+  const Block race(0x40);
+  const Block object_block(0x800);  // the object at +0, its boxes at +0x200, +0x400, +0x600
+  if (!course.address || !table.address || !race.address || !object_block.address) {
+    ITC_LOG_ERROR("harness: vehicle: no block from the allocation layer");
+    return;
+  }
+  FillTestCourseTable(h.base, course.address, table.address);
+  const uint32_t saved_route = guest::LoadU32(h.base, track_route::kRoute);
+  const uint32_t saved_race = guest::LoadU32(h.base, kRaceData);
+  uint8_t saved_mesh[12], saved_tried[kLinkedTriedBytes];
+  std::memcpy(saved_mesh, h.base + track_collision::kMesh, sizeof(saved_mesh));
+  std::memcpy(saved_tried, h.base + kLinkedTried, kLinkedTriedBytes);
+  const uint32_t frame = CallContext(h).r1.u32 - 560;
+  for (int group = 0; group < 2; group++) {
+    Results results(std::string("Vehicle::PlaceOnRoute (sub_820C3608)") +
+                    (group == 1 ? ", NaNs and infinities in the vehicle and the speed" : ""));
+    for (uint64_t seed = 0; seed < 200; seed++) {
+      Outputs out[2];
+      for (int v = 0; v < 2; v++) {
+        Random r(seed * 113 + 83 + 1000 * uint64_t(group));
+        WriteRandom(h.base, course.address, course.bytes, r);
+        BuildTestCourse(h.base, course.address, table.address, r);
+        car_objects::BuildWorld(h, world, r);
+        car_objects::FillVehicleRegion(h.base, region, r, group == 1);
+        car_objects::FillStack(h, r);
+        FillTickInputs(h, region, race.address, r);
+        // The slices' two edge points (the tables after the slice records,
+        // which BuildTestCourse leaves random): 6 m to each side.
+        const uint32_t sections = guest::LoadU32(h.base, guest::LoadU32(h.base, track_route::kRoute) + 12);
+        for (uint32_t k = 0; k < 2; k++) {
+          const uint32_t sec = guest::LoadU32(h.base, sections + 4 * k);
+          const uint32_t count = guest::LoadU16(h.base, sec);
+          for (uint32_t n = 0; n < count; n++) {
+            const uint32_t center = sec + 124 + 84 * n;
+            for (uint32_t side = 0; side < 2; side++) {
+              const uint32_t edge = sec + 124 + count * (side == 0 ? 84 : 96) + 12 * n;
+              guest::StoreFloat(h.base, edge + 0, guest::LoadFloat(h.base, center + 0) +
+                                                      (side == 0 ? -6.0f : 6.0f) +
+                                                      float(r.Below(100)) / 100.0f);
+              guest::StoreFloat(h.base, edge + 4, 0.5f + float(r.Below(100)) / 1000.0f);
+              guest::StoreFloat(h.base, edge + 8, guest::LoadFloat(h.base, center + 8) +
+                                                      float(int32_t(r.Below(100)) - 50) / 100.0f);
+            }
+          }
+        }
+        const uint32_t o = object_block.address;
+        for (uint32_t i = 0; i < object_block.bytes; i += 4) {
+          guest::StoreU32(h.base, o + i, group == 1 ? RandomFloat(r)
+                                                : std::bit_cast<uint32_t>(
+                                                      float(int32_t(r.Below(2001)) - 1000) / 100.0f));
+        }
+        for (uint32_t box = 0x200; box <= 0x600; box += 0x200) {
+          car_objects::BuildBox(h, o + box, r);
+        }
+        guest::StoreU32(h.base, o + 16, guest::LoadU32(h.base, region + 336));
+        guest::StoreU32(h.base, o + 32, o + 0x200);
+        guest::StoreU32(h.base, o + 36, o + 0x400);
+        guest::StoreU32(h.base, o + 40, o + 0x600);
+        if (r.Below(2) == 0) {
+          guest::StoreU32(h.base, o + 32 + 112, 0);
+        }
+        guest::StoreU32(h.base, region + 340, o);
+        WriteRandom(h.base, h.data, kScratchBytes, r);
+        const uint32_t position = h.data + 0x100;
+        const uint32_t section = r.Below(2);
+        guest::StoreU16(h.base, position + 0, uint16_t(section));
+        guest::StoreU16(h.base, position + 2, uint16_t(section == 0 ? 1 + r.Below(5) : r.Below(5)));
+        PPCContext t = CallContext(h);
+        t.fpscr.disableFlushModeUnconditional();
+        t.r3.u64 = region;
+        t.r4.u64 = position;
+        t.f1.f64 = double(std::bit_cast<float>(
+            group == 1 ? RandomFloat(r, 300.0f)
+                       : std::bit_cast<uint32_t>(float(r.Below(3001)) / 10.0f)));
+        t.f2.f64 = r.Below(2) == 0 ? 0.0 : -0.0;
+        t.r6.u64 = uint64_t(int64_t(int32_t(r.Below(8)) - 3));
+        t.r7.u64 = r.Below(2) == 0 ? 0 : (r.Next() | 1);
+        (v == 0 ? Original<__imp__sub_820C3608> : hooks::VehiclePlaceOnRoute)(t, h.base);
+        car_objects::VehicleRegionOutputs(out[v], h.base, region);
+        // The object's and its boxes' words: floats where the code loads and
+        // stores floats (as the car physics' harness's ObjectOutputs and
+        // BoxOutputs), the rest exactly.
+        for (uint32_t i = 0; i < 320; i += 4) {
+          const uint32_t w = guest::LoadU32(h.base, o + i);
+          const bool is_float = (i >= 48 && i < 148) || (i >= 160 && i < 192) ||
+                                (i >= 208 && i < 228) || i >= 304;
+          is_float ? out[v].Float(w) : out[v].Word(w);
+        }
+        out[v].Bytes(Read(h.base, o + 320, 0x200 - 320));
+        for (uint32_t box = 0x200; box <= 0x600; box += 0x200) {
+          for (uint32_t i = 0; i < 496; i += 4) {
+            const uint32_t w = guest::LoadU32(h.base, o + box + i);
+            (i == 0 || i == 112 || (i >= 160 && i < 176)) ? out[v].Word(w) : out[v].Float(w);
+          }
+          out[v].Bytes(Read(h.base, o + box + 496, 16));
+        }
+        out[v].Bytes(Read(h.base, frame + 80, 16));
+        out[v].Floats(h.base, frame + 96, (144 - 96) / 4);
+        out[v].Bytes(Read(h.base, frame + 144, 16));
+        out[v].Floats(h.base, frame + 160, (176 - 160) / 4);
+        out[v].Bytes(Read(h.base, frame + 176, 16));
+        out[v].Floats(h.base, frame + 192, (352 - 192) / 4);
+        out[v].Bytes(Read(h.base, frame + 352, 96));
+        out[v].Bytes(Read(h.base, kLinkedTried, kLinkedTriedBytes));
+        std::memcpy(h.base + kLinkedTried, saved_tried, kLinkedTriedBytes);
+        std::memcpy(h.base + track_collision::kMesh, saved_mesh, sizeof(saved_mesh));
+        guest::StoreU32(h.base, track_route::kRoute, saved_route);
+        guest::StoreU32(h.base, kRaceData, saved_race);
+      }
+      results.Check(out[0], out[1], fmt::format("seed {}", seed));
+    }
+    results.Report();
+  }
+}
+
 }  // namespace
 
 void Vehicle(Context& h) {
@@ -1299,6 +1429,7 @@ void Vehicle(Context& h) {
   Slips(h, region.address);
   Nearest(h);
   Ticks(h, world.address, region.address);
+  Placements(h, world.address, region.address);
   if (hooks::NativeHeapActive()) {
     Removals(h, world.address);
     Lifetime(h, world.address);

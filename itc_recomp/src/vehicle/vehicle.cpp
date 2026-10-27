@@ -22,6 +22,9 @@
 #include "vehicle_accessors/vectors.h"
 #include "vehicle_accessors/vehicle_accessors.h"
 
+#include <rex/platform/fpscr.h>
+#include <simde/x86/sse4.1.h>
+
 #include <cstring>
 
 namespace vehicle {
@@ -1050,6 +1053,272 @@ void VehicleTick(uint8_t* base, uint32_t vehicle, uint32_t racer, uint32_t car, 
     r.r6 = flag;
     call(0x820C23E8, f, r);
   }
+}
+
+// --- The vehicle placed on the route ---
+
+namespace {
+
+using Fpscr = rex::platform::FPSCRPlatform;
+
+constexpr uint32_t kLastRow = 0x826382D0;      // the matrix's fourth row
+constexpr uint32_t kRaise = 0x8200296C;        // 0.3
+constexpr uint32_t kThousand = 0x82001BDC;     // 1000.0
+constexpr uint32_t kPerHour = 0x82002CF8;      // 1/3,600
+
+uint32_t S16At(uint8_t* base, uint32_t address) {
+  return uint32_t(int32_t(int16_t(guest::LoadU16(base, address))));
+}
+
+// lvx128 and stvx as the translation does them: the 16 bytes at the address
+// rounded down, word 0 in the top lane.
+simde__m128 LoadLanes(uint8_t* base, uint32_t address) {
+  const uint32_t a = address & ~0xFu;
+  return simde_mm_castsi128_ps(
+      simde_mm_set_epi32(int(guest::LoadU32(base, a + 0)), int(guest::LoadU32(base, a + 4)),
+                         int(guest::LoadU32(base, a + 8)), int(guest::LoadU32(base, a + 12))));
+}
+void StoreLanes(uint8_t* base, uint32_t address, simde__m128 v) {
+  alignas(16) uint32_t lanes[4];
+  simde_mm_store_si128(reinterpret_cast<simde__m128i*>(lanes), simde_mm_castps_si128(v));
+  const uint32_t a = address & ~0xFu;
+  guest::StoreU32(base, a + 0, lanes[3]);
+  guest::StoreU32(base, a + 4, lanes[2]);
+  guest::StoreU32(base, a + 8, lanes[1]);
+  guest::StoreU32(base, a + 12, lanes[0]);
+}
+
+// The vector unit's part of the orientation (flush-to-zero on, as the
+// translated code), from the forward row at `frame` + 112 and the across
+// row at + 128 (as loaded before any of these is stored): `cross` their
+// cross product (across x forward, as vnmsubfp leaves it), `forward` the
+// forward row normalized, `up` forward x cross normalized and `side` the
+// cross product normalized (each its squared length where that's 0).
+struct Rows {
+  simde__m128 cross, forward, up, side;
+};
+Rows OrientationRows(simde__m128 v13, simde__m128 v0) {
+  const uint32_t csr = Fpscr::getcsr();
+  Fpscr::setcsr(csr | uint32_t(Fpscr::FlushMask));
+  vl::PinInMode(v13, v0);
+  const simde__m128i one = simde_mm_set1_epi32(1);
+  const simde__m128 zero = simde_mm_castsi128_ps(simde_mm_set1_epi32(0));
+  const simde__m128 sign = simde_mm_castsi128_ps(simde_mm_set1_epi32(int(0x80000000)));
+  auto half = [&] {
+    return simde_mm_mul_ps(simde_mm_cvtepi32_ps(one),
+                           simde_mm_castsi128_ps(simde_mm_set1_epi32(int(0x3F000000))));
+  };
+  auto sel = [](simde__m128 a, simde__m128 b, simde__m128 mask) {
+    return simde_mm_castsi128_ps(
+        simde_mm_or_si128(simde_mm_andnot_si128(simde_mm_castps_si128(mask), simde_mm_castps_si128(a)),
+                          simde_mm_and_si128(simde_mm_castps_si128(mask), simde_mm_castps_si128(b))));
+  };
+  auto rsqrte = [](simde__m128 x) { return simde_mm_div_ps(simde_mm_set1_ps(1), simde_mm_sqrt_ps(x)); };
+  auto nmsub = [&](simde__m128 a, simde__m128 b, simde__m128 c) {
+    return simde_mm_xor_ps(simde_mm_sub_ps(simde_mm_mul_ps(a, b), c), sign);
+  };
+  auto madd = [](simde__m128 a, simde__m128 b, simde__m128 c) {
+    return simde_mm_add_ps(simde_mm_mul_ps(a, b), c);
+  };
+  auto perm = [](simde__m128 v, int which) {
+    const simde__m128i i = simde_mm_castps_si128(v);
+    return simde_mm_castsi128_ps(which == 0x78 ? simde_mm_shuffle_epi32(i, 0x78)
+                                               : simde_mm_shuffle_epi32(i, 0x9C));
+  };
+  Rows rows;
+  simde__m128 v12 = simde_mm_dp_ps(v13, v13, 0xEF);
+  simde__m128 v5 = perm(v13, 0x78);
+  simde__m128 v7 = half();
+  simde__m128 v6 = perm(v13, 0x9C);
+  simde__m128 v4 = perm(v0, 0x9C);
+  simde__m128 v3 = perm(v0, 0x78);
+  v0 = simde_mm_mul_ps(v4, v5);
+  simde__m128 v11 = rsqrte(v12);
+  simde__m128 v2 = simde_mm_mul_ps(v12, v7);
+  simde__m128 v8 = simde_mm_cmpeq_ps(v12, zero);
+  v0 = nmsub(v3, v6, v0);
+  v4 = simde_mm_mul_ps(v11, v11);
+  v3 = perm(v0, 0x9C);
+  rows.cross = v0;
+  v7 = nmsub(v2, v4, v7);
+  v4 = perm(v0, 0x78);
+  v6 = simde_mm_mul_ps(v6, v4);
+  v11 = madd(v11, v7, v11);
+  v7 = half();
+  v6 = nmsub(v5, v3, v6);
+  v5 = half();
+  v4 = simde_mm_mul_ps(v13, v11);
+  v11 = simde_mm_dp_ps(v0, v0, 0xEF);
+  v13 = simde_mm_dp_ps(v6, v6, 0xEF);
+  rows.forward = sel(v4, v12, v8);
+  simde__m128 v10 = rsqrte(v11);
+  v3 = simde_mm_mul_ps(v11, v5);
+  v12 = rsqrte(v13);
+  v4 = simde_mm_mul_ps(v13, v7);
+  v8 = simde_mm_cmpeq_ps(v13, zero);
+  simde__m128 v9 = simde_mm_cmpeq_ps(v11, zero);
+  simde__m128 v1 = simde_mm_mul_ps(v10, v10);
+  v2 = simde_mm_mul_ps(v12, v12);
+  v5 = nmsub(v3, v1, v5);
+  v7 = nmsub(v4, v2, v7);
+  v12 = madd(v12, v7, v12);
+  v12 = simde_mm_mul_ps(v6, v12);
+  rows.up = sel(v12, v13, v8);
+  v13 = madd(v10, v5, v10);
+  v0 = simde_mm_mul_ps(v0, v13);
+  rows.side = sel(v0, v11, v9);
+  vl::PinInMode(rows.cross, rows.forward, rows.up, rows.side);
+  Fpscr::setcsr(csr);
+  return rows;
+}
+
+}  // namespace
+
+bool VehiclePlaceOnRoute(uint8_t* base, uint32_t vehicle, uint32_t position, double speed,
+                         double offset, int32_t lane, uint32_t direction, uint32_t frame,
+                         const GuestCall& call) {
+  const double zero = Lfs(base, kZero);
+  if (!(offset == zero)) {
+    return false;
+  }
+  ITC_NATIVE_RUNNING("sub_820C3608 Vehicle::PlaceOnRoute");
+  const uint32_t v = vehicle, f = frame;
+  const uint32_t car = v + 5232;
+  auto reset_transform = [&] {
+    const uint32_t object = guest::LoadU32(base, v + 340);
+    if (!cp::CollisionObjectResetTransform(base, object, f - 112)) {
+      GuestRegisters r;
+      r.r3 = object;
+      call(0x820B7998, f, r);
+    }
+  };
+  // The route positions: back (+80), on (+144) and its own (+176).
+  const uint32_t word = guest::LoadU32(base, position);
+  guest::StoreU32(base, f + 176, word);
+  guest::StoreU32(base, f + 80, word);
+  guest::StoreU32(base, f + 144, word);
+  RoutePositionStep(base, f + 80, uint32_t(-1), uint32_t(-1), f - 112);
+  RoutePositionStep(base, f + 144, 1, uint32_t(-1), f - 112);
+  guest::StoreU16(base, car + 4, guest::LoadU16(base, position + 0));
+  guest::StoreU16(base, car + 6, guest::LoadU16(base, position + 2));
+  tc::TrackPositionInit(base, car, f - 128);
+  // The slices' points: the centers back (+240) and on (+256), the edges
+  // (+192, +208).
+  const double one = Lfs(base, kOne);
+  Stfs(base, f + 252, one);
+  Stfs(base, f + 268, one);
+  Stfs(base, f + 204, one);
+  Stfs(base, f + 220, one);
+  track_route::SlicePoint(base, f + 240, 0, S16At(base, f + 80), S16At(base, f + 82));
+  track_route::SlicePoint(base, f + 256, 0, S16At(base, f + 144), S16At(base, f + 146));
+  const uint32_t slice = S16At(base, f + 178), section = S16At(base, f + 176);
+  track_route::SlicePoint(base, f + 192, 1, section, slice);
+  track_route::SlicePoint(base, f + 208, 2, section, slice);
+  // Forward (+112) and across (+128), each built at +96 or +160 and copied
+  // (ld and std: their bits).
+  Stfs(base, f + 108, one);
+  Stfs(base, f + 172, one);
+  uint32_t forward_at, across_at;
+  if (direction != 0) {
+    Stfs(base, f + 96, Fsubs(Lfs(base, f + 256), Lfs(base, f + 240)));
+    Stfs(base, f + 100, Fsubs(Lfs(base, f + 260), Lfs(base, f + 244)));
+    Stfs(base, f + 104, Fsubs(Lfs(base, f + 264), Lfs(base, f + 248)));
+    Stfs(base, f + 160, Fsubs(Lfs(base, f + 192), Lfs(base, f + 208)));
+    Stfs(base, f + 164, Fsubs(Lfs(base, f + 196), Lfs(base, f + 212)));
+    Stfs(base, f + 168, Fsubs(Lfs(base, f + 200), Lfs(base, f + 216)));
+    forward_at = f + 96;
+    across_at = f + 160;
+  } else {
+    Stfs(base, f + 160, Fsubs(Lfs(base, f + 240), Lfs(base, f + 256)));
+    Stfs(base, f + 164, Fsubs(Lfs(base, f + 244), Lfs(base, f + 260)));
+    Stfs(base, f + 168, Fsubs(Lfs(base, f + 248), Lfs(base, f + 264)));
+    Stfs(base, f + 96, Fsubs(Lfs(base, f + 208), Lfs(base, f + 192)));
+    Stfs(base, f + 100, Fsubs(Lfs(base, f + 212), Lfs(base, f + 196)));
+    Stfs(base, f + 104, Fsubs(Lfs(base, f + 216), Lfs(base, f + 200)));
+    forward_at = f + 160;
+    across_at = f + 96;
+  }
+  for (uint32_t i = 0; i < 16; i += 4) {
+    guest::StoreU32(base, f + 112 + i, guest::LoadU32(base, forward_at + i));
+  }
+  for (uint32_t i = 0; i < 16; i += 4) {
+    guest::StoreU32(base, f + 128 + i, guest::LoadU32(base, across_at + i));
+  }
+  // The rows: +160 forward, +128 up, +112 the side, as the original leaves
+  // its stores (the vector unit's work in between).
+  Stfs(base, f + 124, one);
+  Stfs(base, f + 140, one);
+  Stfs(base, f + 108, one);
+  const Rows rows = OrientationRows(LoadLanes(base, f + 112), LoadLanes(base, f + 128));
+  StoreLanes(base, f + 96, rows.cross);
+  StoreLanes(base, f + 112, rows.forward);
+  Stfs(base, f + 172, Lfs(base, f + 124));
+  const double fx = Lfs(base, f + 112), fy = Lfs(base, f + 116), fz = Lfs(base, f + 120);
+  Stfs(base, f + 160, fx);
+  Stfs(base, f + 164, fy);
+  Stfs(base, f + 168, fz);
+  StoreLanes(base, f + 128, rows.up);
+  Stfs(base, f + 112, Lfs(base, f + 128));
+  Stfs(base, f + 116, Lfs(base, f + 132));
+  Stfs(base, f + 120, Lfs(base, f + 136));
+  Stfs(base, f + 124, Lfs(base, f + 140));
+  StoreLanes(base, f + 96, rows.side);
+  for (uint32_t i = 0; i < 16; i += 4) {
+    Stfs(base, f + 128 + i, Lfs(base, f + 96 + i));
+  }
+  MatrixFromRows(base, f + 352, f + 160, f + 128, f + 112, kLastRow);
+  matrix_math::QuaternionFromMatrix(base, f + 320, f + 352);
+  cp::RigidBodySetOrientation(base, guest::LoadU32(base, v + 336), f + 320, f - 96);
+  cp::VehicleSyncFromBody(base, v, f - 368);
+  reset_transform();
+  // The velocity: forward x the speed x 1000 / 3600.
+  Stfs(base, f + 272, fx);
+  Stfs(base, f + 276, fy);
+  Stfs(base, f + 280, fz);
+  Stfs(base, f + 284, one);
+  vl::Vec4Scaled(base, f + 160, f + 272, speed);
+  vl::Vec4Scaled(base, f + 96, f + 160, Lfs(base, kThousand));
+  vl::Vec4Scaled(base, f + 336, f + 96, Lfs(base, kPerHour));
+  cp::RigidBodySetVelocity(base, guest::LoadU32(base, v + 336), f + 336, f - 112);
+  // The position: the lane's point or the slice back's center, 0.3 higher.
+  Stfs(base, f + 236, zero);
+  if (lane >= 0) {
+    track_route::LanePoint(base, kRoute, f + 224, f + 80, lane);
+  } else {
+    const uint32_t sections = guest::LoadU32(base, guest::LoadU32(base, kRoute) + 12);
+    const uint32_t record =
+        guest::LoadU32(base, (uint32_t(guest::LoadU16(base, f + 80)) << 2) + sections) +
+        S16At(base, f + 82) * 84u;
+    Stfs(base, f + 224, Lfs(base, record + 124));
+    Stfs(base, f + 228, Lfs(base, record + 128));
+    Stfs(base, f + 232, Lfs(base, record + 132));
+    Stfs(base, f + 236, one);
+  }
+  Stfs(base, f + 288, Lfs(base, f + 224));
+  const double y = Lfs(base, f + 228);
+  Stfs(base, f + 300, zero);
+  Stfs(base, f + 292, Fadds(y, Lfs(base, kRaise)));
+  Stfs(base, f + 296, Lfs(base, f + 232));
+  cp::RigidBodySetPosition(base, guest::LoadU32(base, v + 336), f + 288, f - 192);
+  cp::VehicleSyncFromBody(base, v, f - 368);
+  reset_transform();
+  // The wheels' track positions: copies of the car's.
+  for (uint32_t i = 0; i < 4; i++) {
+    if (!c_runtime::Memcpy(base, f + 352, car, 96)) {
+      GuestRegisters r;
+      r.r3 = f + 352;
+      r.r4 = car;
+      r.r5 = 96;
+      call(0x825A7410, f, r);
+    }
+    TrackPositionCopy(base, v + 5328 + 96 * i, f + 352);
+  }
+  Stfs(base, f + 304, zero);
+  Stfs(base, f + 308, zero);
+  Stfs(base, f + 312, zero);
+  Stfs(base, f + 316, zero);
+  cp::RigidBodySetAngularVelocity(base, guest::LoadU32(base, v + 336), f + 304, f - 160);
+  return true;
 }
 
 }  // namespace vehicle

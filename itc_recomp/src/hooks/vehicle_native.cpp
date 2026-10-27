@@ -27,7 +27,10 @@ ITC_FLAG_BOOL(native_vehicle, true, "ITC",
               "VehicleStatus::Reset sub_820BFC48; Vehicle::SetUpSurfaceGrip sub_820C1E00, "
               "Vehicle::SetUp sub_820C3150 and ResetForCar sub_820C33B8 (their physics' set-up "
               "natively only while --native_heap routes the game's heap to the layer); "
-              "VehicleStatus::Update sub_820C23E8 and Vehicle::Tick sub_820C3020) natively instead of through the translated code (the same "
+              "VehicleStatus::Update sub_820C23E8 and Vehicle::Tick sub_820C3020; "
+              "Vehicle::PlaceOnRoute sub_820C3608, with a nonzero offset across the road "
+              "(sub_820FA8F8's path, never seen in play) by the original) natively instead of "
+              "through the translated code (the same "
               "words, bit for bit; checked by --run_harnesses=vehicle)");
 
 namespace hooks {
@@ -264,6 +267,30 @@ void VehicleTick(PPCContext& ctx, uint8_t* base) {
   vh::VehicleTick(base, ctx.r3.u32, ctx.r4.u32, ctx.r5.u32, ctx.r6.u32, ctx.r1.u32 - 144, call);
 }
 
+void VehiclePlaceOnRoute(PPCContext& ctx, uint8_t* base) {
+  ctx.fpscr.disableFlushMode();
+  auto call = [&](uint32_t address, uint32_t r1, const vh::GuestRegisters& r) {
+    const uint64_t saved = ctx.r1.u64;
+    ctx.r1.u64 = r1;
+    ctx.r3.u64 = r.r3;
+    ctx.r4.u64 = r.r4;
+    ctx.r5.u64 = r.r5;
+    if (address == 0x820B7998) {
+      __imp__sub_820B7998(ctx, base);
+    } else {
+      sub_825A7410(ctx, base);  // memcpy, through its override as the original
+    }
+    ctx.r1.u64 = saved;
+    ctx.fpscr.disableFlushMode();
+  };
+  if (!vh::VehiclePlaceOnRoute(base, ctx.r3.u32, ctx.r4.u32, ctx.f1.f64, ctx.f2.f64,
+                               ctx.r6.s32, ctx.r7.u32, ctx.r1.u32 - 560, call)) {
+    __imp__sub_820C3608(ctx, base);
+  }
+  // r3 not set: the original leaves SetAngularVelocity's there; no caller
+  // reads it.
+}
+
 }  // namespace hooks
 
 // Defines an adapter: the flag, else the original.
@@ -294,6 +321,7 @@ ITC_VEHICLE(820C3150, VehicleSetUp)
 ITC_VEHICLE(820C33B8, VehicleResetForCar)
 ITC_VEHICLE(820C23E8, VehicleStatusUpdate)
 ITC_VEHICLE(820C3020, VehicleTick)
+ITC_VEHICLE(820C3608, VehiclePlaceOnRoute)
 // Vehicle::Construct (sub_820C30D8) and Vehicles::DestroyAll (sub_820C21E0)
 // have no adapters: their only callers are Vehicles::Create and Destroy.
 // Vehicle::SetUpSurfaceGrip (sub_820C1E00) and VehicleStatus::Reset
