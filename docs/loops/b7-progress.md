@@ -86,8 +86,11 @@ file's history. What's left to see in a drive, from every run:
   differing; frame dumps the same as the fallback). Left ready:
   `Vehicle::PlaceOnRoute` `sub_820C3608`. Validated (`itc_1972`: 23
   of 23 harness lines, 20 ran in the attract race, 3 in the replay
-  `itc_1973`, ok; nothing to drive). Step: migration agent 2 running
-  (`Vehicle::PlaceOnRoute`).
+  `itc_1973`, ok; nothing to drive). Migration 2 done (0133cf6:
+  `Vehicle::PlaceOnRoute`, its never-seen `sub_820FA8F8` branch on the
+  whole original; no adapter removable; 23 s, 0 errors, every harness 0
+  differing). `vehicle.md` 25 of 25 ours. Step: validation agent 2
+  running.
 
 ## Done
 
@@ -129,6 +132,8 @@ This run's groups: `expected-differences.md` (the "23:42 run" lines).
 - After the race's set-up's validation 2: race 24 s (`itc_1890`), 0
   errors, every harness 0 differing but the expected group; replay
   127 s (`itc_1891`), 0 errors.
+- After the vehicle's migration 2: ours 2255, work left 4197 (wrapped
+  104, known 516, unknown 3577).
 - After the vehicle's validation: race 23 s (`itc_1972`), 0 errors,
   every harness 0 differing but the expected groups; replay 127 s
   (`itc_1973`), 0 errors.

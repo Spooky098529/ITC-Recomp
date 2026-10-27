@@ -108,6 +108,12 @@ When the user has reviewed a run's section, its heading gets
   `EngineTorque`'s curve index outside guest memory, crashing the
   original too); helpers shared from `collision_world.cpp` and
   `car_physics_objects.cpp`.
+- The vehicle, migration 2 (0133cf6): `Vehicle::PlaceOnRoute`
+  `sub_820C3608` Overridden; a nonzero offset across the road (NaN
+  included) runs the whole original, for the never-seen
+  `sub_820FA8F8` (as `ApplyInput`); refusing `ResetTransform` and
+  memcpy run their originals in its frame; the orientation's vector
+  math copied op for op with flush-to-zero.
 
 ## Run 2026-10-25 16:38 (`b7-loop-25-10-26-3`)
 
