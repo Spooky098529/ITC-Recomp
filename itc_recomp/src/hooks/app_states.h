@@ -98,4 +98,8 @@ void AppAddToggledHandler(PPCContext& ctx, uint8_t* base);
 void AppAddAlwaysHandler(PPCContext& ctx, uint8_t* base);
 void AppAddListener(PPCContext& ctx, uint8_t* base);
 
+// App::Update sub_82093DC0: r3 = the app; r3 the request vector's clear's
+// (in its frame, r1 - 160, when ours).
+void AppUpdate(PPCContext& ctx, uint8_t* base);
+
 }  // namespace hooks

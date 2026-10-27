@@ -1129,6 +1129,100 @@ void Handlers(Context& h) {
   }
 }
 
+// --- The app's update ---
+//
+// The app at data + 1024: its +24 source and the manager are objects whose
+// slot 1 is the getter of their word +60 (the manager, then player 1's
+// processor at data + 3072, random words with Start and Back set or not in
+// its pressed and held words); the +20 interface's slot +40 the game's
+// App::SendMessage (the message vector in a heap block); the handler maps
+// with delegates whose slot 1 is the counter; requests to apply (types 0,
+// 2, 4, 6 and 9) in a heap block; the toggle and the step 0 or 1.
+
+void Update(Context& h) {
+  const uint32_t app = AppAt(h);
+  const uint32_t processor = h.data + 3072;
+  const uint32_t source = h.data + 3400;
+  const uint32_t manager = h.data + 3480;
+  const uint32_t vtable = h.data + 3600;
+  Results results("App::Update (sub_82093DC0)");
+  for (int c = 0; c < 200; c++) {
+    Case(
+        h, results,
+        [&](Blocks& blocks) {
+          for (uint32_t at = 0; at < 3800; at += 4) {
+            Store(h.base, h.data + at, uint32_t(h.random.Next()));
+          }
+          Objects(h, 6, kCount4);
+          for (uint32_t at : as::kAppMaps) {
+            BuildHandlerMap(h, app + at, h.random.Below(5), 5);
+          }
+          Store(h.base, app + 24, source);
+          Store(h.base, source, source + 16);
+          Store(h.base, source + 20, 0x82090770);
+          Store(h.base, source + 60, manager);
+          Store(h.base, manager, manager + 16);
+          Store(h.base, manager + 20, 0x82090770);
+          Store(h.base, manager + 60, processor);
+          // Start (0x100000) and Back (0x200000) pressed and held, or not.
+          for (uint32_t at : {264u, 268u, 272u, 276u}) {
+            uint32_t word = uint32_t(h.random.Next()) & ~0x300000u;
+            word |= h.random.Below(2) ? 0x100000 : 0;
+            word |= h.random.Below(2) ? 0x200000 : 0;
+            Store(h.base, processor + at, word);
+          }
+          Store(h.base, app + as::kAppInterface, vtable);
+          Store(h.base, vtable + 40, 0x82094AB0);  // App::SendMessage
+          guest::StoreU8(h.base, app + 112, uint8_t(h.random.Below(2)));
+          guest::StoreU8(h.base, app + 113, uint8_t(h.random.Below(2)));
+          // The message vector: empty, or a few messages with room or not.
+          const uint32_t messages = app + as::kAppMessages;
+          const uint32_t count = h.random.Below(3);
+          const uint32_t capacity = count + h.random.Below(3);
+          const uint32_t block = capacity != 0 ? blocks.New(h.base, 4 * capacity) : 0;
+          for (uint32_t i = 0; i < capacity; i++) {
+            Store(h.base, block + 4 * i, h.random.Below(4));
+          }
+          Store(h.base, messages + 4, block);
+          Store(h.base, messages + 8, block + 4 * count);
+          Store(h.base, messages + 12, block + 4 * capacity);
+          // The requests.
+          const uint32_t requests = app + as::kAppRequests;
+          const uint32_t pending = h.random.Below(4);
+          const uint32_t room = pending + h.random.Below(2);
+          const uint32_t list = room != 0 ? blocks.New(h.base, 12 * room) : 0;
+          const uint32_t types[] = {0, 2, 4, 6, 9};
+          for (uint32_t i = 0; i < room; i++) {
+            Store(h.base, list + 12 * i, types[h.random.Below(5)]);
+            Store(h.base, list + 12 * i + 4, h.random.Below(24));
+            Store(h.base, list + 12 * i + 8, ObjectAt(h, h.random.Below(5)));
+          }
+          Store(h.base, requests + 4, list);
+          Store(h.base, requests + 8, list + 12 * pending);
+          Store(h.base, requests + 12, list + 12 * room);
+        },
+        [&](PPCContext& t) { t.r3.u64 = app; }, __imp__sub_82093DC0, hooks::AppUpdate,
+        [&](Outputs& out, const PPCContext& t, Blocks& blocks) {
+          // The vectors' blocks (old and new) by number, their words to last.
+          for (uint32_t vector : {app + as::kAppMessages, app + as::kAppRequests}) {
+            const uint32_t first = Load(h.base, vector + 4);
+            const uint32_t last = Load(h.base, vector + 8);
+            if (first != 0 && memory::IsHeapBlock(first) &&
+                std::find(blocks.list.begin(), blocks.list.end(), first) == blocks.list.end()) {
+              blocks.Add(first);
+            }
+            if (first != 0 && last >= first && last - first < 0x400) {
+              blocks.Words(h.base, out, first, last - first);
+            }
+          }
+          out.Word(t.r3.u32 - t.r1.u32);
+          AppOut(h, out, blocks, AppMaps(h), 0);
+        },
+        fmt::format("case {}", c));
+  }
+  results.Report();
+}
+
 }  // namespace
 
 void AppStates(Context& h) {
@@ -1142,6 +1236,7 @@ void AppStates(Context& h) {
   Running(h);
   Walks(h);
   Handlers(h);
+  Update(h);
 }
 
 }  // namespace harness

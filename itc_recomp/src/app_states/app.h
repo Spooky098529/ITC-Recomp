@@ -133,4 +133,16 @@ std::optional<bool> AppAddRequest(uint8_t* base, uint32_t interface, uint32_t ty
                                   uint32_t delegate, uint32_t request, uint32_t clone_return,
                                   const AppCalls& calls);
 
+// sub_82093DC0 App::Update (the run loop's tick handler 8): player 1's
+// processor (the app's +24 object's slot 1, then its slot 1 with index 0),
+// the toggle +112 and the step +113 from Start and Back (the button tests
+// sub_8258CEB0 and sub_8258CEE0, and the +20 interface's slot +40 for the
+// messages, as guest calls), the handler map +40 or +28 then +52 walked with
+// App::RunHandler, the messages walked with App::DeliverMessage and cleared,
+// the requests walked with App::ApplyRequest and cleared. `frame` is the
+// original's 144-byte frame (its words stored as the original stores them;
+// r29 to r31 as it keeps them). Whether the request vector's clear was ours
+// (its r3 then in its frame, `frame` - 16; else the original's).
+bool AppUpdate(uint8_t* base, uint32_t app, uint32_t frame, const AppCalls& calls);
+
 }  // namespace app_states

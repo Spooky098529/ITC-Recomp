@@ -241,6 +241,133 @@ std::optional<bool> AppAddRequest(uint8_t* base, uint32_t interface, uint32_t ty
   return framework::RequestsPushBack(base, interface + kInterfaceRequests, request);
 }
 
+namespace {
+
+// App::Update's walk of a handler map with App::RunHandler (`frame` its
+// frame): the words stored as the original's.
+void WalkHandlers(uint8_t* base, uint32_t app, uint32_t map, uint32_t frame,
+                  uint32_t return_address, const AppCalls& calls) {
+  Store(base, frame + 100, 0);
+  Store(base, frame + 104, app);
+  Store(base, frame + 80, map);
+  Store(base, frame + 96, kRunHandler);
+  const uint32_t head = Load(base, map + framework::kMapHead);
+  const uint64_t functor = Load64(base, frame + 96);
+  const uint64_t adjust = Load64(base, frame + 104);  // its low word as the stack holds it
+  Store(base, frame + 96, map);
+  const uint32_t left = Load(base, head + framework::kNodeLeft);
+  Store(base, frame + 100, head);
+  const uint64_t last = Load64(base, frame + 96);
+  Store(base, frame + 84, left);
+  const uint64_t first = Load64(base, frame + 80);
+  calls.in_frame(112, return_address, [&](uint32_t inner) {
+    HandlerMapForEach(base, frame + 96, first, last, functor, adjust, inner, calls);
+  });
+}
+
+// App::Update's walk of a vector (`vector`) with `function`: the words
+// stored as the original's; the range and functor handed to `walk`.
+template <typename Walk>
+void WalkVector(uint8_t* base, uint32_t app, uint32_t vector, uint32_t function, uint32_t frame,
+                Walk walk) {
+  Store(base, frame + 100, 0);
+  Store(base, frame + 88, app);
+  Store(base, frame + 96, function);
+  const uint64_t functor_word = Load64(base, frame + 96);
+  Store64(base, frame + 80, functor_word);
+  if (Load(base, vector + 4) > Load(base, vector + 8)) {
+    Trap("sub_82093DC0");
+  }
+  Store(base, frame + 100, Load(base, vector + 8));
+  const uint32_t first = Load(base, vector + 4);
+  Store(base, frame + 96, vector);
+  if (first > Load(base, vector + 8)) {
+    Trap("sub_82093DC0");
+  }
+  const uint64_t functor = Load64(base, frame + 80);
+  const uint64_t adjust = Load64(base, frame + 88);  // its low word as the stack holds it
+  Store(base, frame + 84, first);
+  Store(base, frame + 80, vector);
+  walk(Load64(base, frame + 80), Load64(base, frame + 96), functor, adjust);
+}
+
+}  // namespace
+
+bool AppUpdate(uint8_t* base, uint32_t app, uint32_t frame, const AppCalls& calls) {
+  ITC_NATIVE_RUNNING("sub_82093DC0 App::Update");
+  calls.set_register(31, app);
+  calls.set_register(29, 0);
+  // Player 1's processor.
+  const uint32_t source = Load(base, app + 24);
+  Store(base, frame + 80, 0);
+  const uint32_t manager =
+      calls.call(VirtualTarget(base, source, 4), source, std::nullopt, std::nullopt, 0x82093DEC);
+  const uint32_t processor = calls.call(VirtualTarget(base, manager, 4), manager,
+                                        uint64_t(frame + 80), std::nullopt, 0x82093E00);
+  calls.set_register(30, processor);
+  // The toggle (Start) and the step (Back held or repeating while it's set).
+  const uint32_t interface = app + kAppInterface;
+  const auto send = [&](uint32_t message, uint32_t return_address) {
+    Store(base, frame + 96, message);
+    calls.call(VirtualTarget(base, interface, 40), interface, uint64_t(frame + 96), std::nullopt,
+               return_address);
+  };
+  Store(base, frame + 96, 0x100000);
+  if (guest::LoadU8(base, app + 112) != 0) {
+    if ((calls.call(0x8258CEB0, processor, uint64_t(frame + 96), std::nullopt, 0x82093E20) &
+         0xFF) != 0) {
+      send(2, 0x82093E48);
+      guest::StoreU8(base, app + 112, 0);
+    }
+    Store(base, frame + 96, 0x200000);
+    if ((calls.call(0x8258CEE0, processor, uint64_t(frame + 96), std::nullopt, 0x82093E60) &
+         0xFF) != 0) {
+      calls.set_register(30, 1);
+      send(1, 0x82093E88);
+      guest::StoreU8(base, app + 113, 1);
+    }
+  } else if ((calls.call(0x8258CEB0, processor, uint64_t(frame + 96), std::nullopt,
+                         0x82093E94) &
+              0xFF) != 0) {
+    send(0, 0x82093EB8);
+    guest::StoreU8(base, app + 112, 1);
+  }
+  // The handler maps.
+  if (guest::LoadU8(base, app + 112) != 0 && guest::LoadU8(base, app + 113) == 0) {
+    WalkHandlers(base, app, app + kAppMaps[1], frame, 0x82093F38, calls);
+  } else {
+    WalkHandlers(base, app, app + kAppMaps[0], frame, 0x82093F9C, calls);
+    guest::StoreU8(base, app + 113, 0);
+  }
+  WalkHandlers(base, app, app + kAppMaps[2], frame, 0x82094000, calls);
+  // The messages.
+  const uint32_t messages = app + kAppMessages;
+  calls.set_register(30, messages);
+  WalkVector(base, app, messages, kDeliverMessage, frame,
+             [&](uint64_t first, uint64_t last, uint64_t functor, uint64_t adjust) {
+               calls.in_frame(128, 0x8209407C, [&](uint32_t inner) {
+                 ForEachMessage(base, frame + 96, first, last, functor, adjust, inner, calls);
+               });
+             });
+  if (!MessagesClear(base, messages)) {
+    calls.call(0x82092F98, messages, std::nullopt, std::nullopt, 0x82094084);
+  }
+  // The requests.
+  const uint32_t requests = app + kAppRequests;
+  calls.set_register(30, requests);
+  WalkVector(base, app, requests, kApplyRequest, frame,
+             [&](uint64_t first, uint64_t last, uint64_t functor, uint64_t adjust) {
+               calls.in_frame(128, 0x82094100, [&](uint32_t inner) {
+                 ForEachRequest(base, frame + 96, first, last, functor, adjust, inner, calls);
+               });
+             });
+  if (framework::RequestsClear(base, requests)) {
+    return true;
+  }
+  calls.call(0x8209A080, requests, std::nullopt, std::nullopt, 0x82094108);
+  return false;
+}
+
 std::optional<bool> AppSendMessage(uint8_t* base, uint32_t interface, uint32_t message) {
   const auto inserted = MessagesPushBack(base, interface + kInterfaceMessages, message);
   if (inserted) {

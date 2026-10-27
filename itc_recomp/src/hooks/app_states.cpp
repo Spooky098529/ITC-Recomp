@@ -37,7 +37,8 @@ ITC_FLAG_BOOL(native_app_states, true, "ITC",
               "sub_82092D50, their functors and slots guest calls; with --native_heap "
               "App::ApplyRequest sub_82093BE0 (its split-off type 0 piece sub_82093C2C merged) "
               "and the +20 interface's add slots sub_82094830, sub_820948D0, sub_82094970 and "
-              "sub_82094A10) natively instead of through the translated code "
+              "sub_82094A10; App::Update sub_82093DC0, the run loop's tick handler 8, its virtual "
+              "calls, button tests and functors guest calls) natively instead of through the translated code "
               "(the same results; checked by --run_harnesses=app_states)");
 
 namespace hooks {
@@ -264,6 +265,16 @@ void AppApplyRequest(PPCContext& ctx, uint8_t* base) {
   }
 }
 
+void AppUpdate(PPCContext& ctx, uint8_t* base) {
+  const uint32_t app = ctx.r3.u32;
+  const as::AppCalls calls = AppStatesCalls(ctx, base);
+  calls.in_frame(144, uint32_t(ctx.lr), [&](uint32_t frame) {
+    if (as::AppUpdate(base, app, frame, calls)) {
+      ctx.r3.u64 = frame - 16;
+    }
+  });
+}
+
 namespace {
 
 // The +20 interface's add slots: r3 = the interface, r4 = the key's
@@ -433,6 +444,7 @@ ITC_APP_STATES_ADAPTER(82094830, AppAddHandler)
 ITC_APP_STATES_ADAPTER(820948D0, AppAddToggledHandler)
 ITC_APP_STATES_ADAPTER(82094970, AppAddAlwaysHandler)
 ITC_APP_STATES_ADAPTER(82094A10, AppAddListener)
+ITC_APP_STATES_ADAPTER(82093DC0, AppUpdate)
 
 // App::RunHandler, with --find_menu_selection's wrap (moved here from
 // src/debug/menu_selection_scan.cpp, as one override per function can
