@@ -10,7 +10,8 @@ file's history. What's left to see in a drive, from every run:
 
 - Run started 2026-10-25 23:42 on `b7-loop-25-10-26-4` (the user's
   branch), from 45b1205; summary `b7-loop-2026-10-25-2342.md`.
-- Limit for this run: 3 subsystems (the default).
+- Limit for this run: 2 subsystems (the user's call, 2026-10-27: end
+  the loop after subsystem 2, the vehicle).
 - Subsystem 1 of 3: `leads.md`'s top lead, `sub_82115D98`,
   `sub_820CD5D8`, `sub_820CD7F0` (the race's set-up and a racer
   record's part set-up; 16 ready groups under them). Mapped as the
@@ -76,7 +77,8 @@ file's history. What's left to see in a drive, from every run:
   physics). Mapped as the vehicle (`vehicle.md`, 25 rows, ebba856; 2
   leads added). Map checked (0 errors, 25 of 25 in play, 15 ready
   groups, no blockers, no kernel calls). Step: migration agent 1
-  running.
+  running (stopped by the API spend limit before committing anything,
+  resumed 2026-10-27).
 
 ## Done
 
