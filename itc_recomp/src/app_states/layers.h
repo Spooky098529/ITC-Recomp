@@ -88,4 +88,40 @@ std::optional<uint32_t> AppStart(uint8_t* base, uint32_t interface, uint32_t fra
 constexpr uint32_t kBootMovies = 0x826C5BAC;
 constexpr uint32_t kStartFlag = 0x826364EC;
 
+// --- The layers' walks ---
+
+// The functors and the operation the walks hand the lists.
+constexpr uint32_t kApplyOp = 0x820ADC60;
+constexpr uint32_t kUpdateChild = 0x820ACD80;
+constexpr uint32_t kUpdateChildToggled = 0x820ACDE8;
+constexpr uint32_t kToggleOffChild = 0x820ACD60;
+
+// sub_820AD3A0 PtrList::ForEach and sub_820AD440 OpList::ForEach
+// (std::for_each over a list with a member functor, unchecked iterators):
+// `first` and `last` the iterators (list, node), `functor` its function
+// (high word) and object, `adjust` its adjustment (high word; the low word
+// as the caller leaves it); each node's value (+8: a word, or the 8-byte
+// operation for `ops`) passed in r4, r3 the object plus the adjustment;
+// the range and functor stored in the caller's frame and re-read as the
+// original does, and the functor's 16 bytes stored at `result`. A functor
+// whose plain C++ is ours (the layers' child functors) runs it in its own
+// frame. `frame` the original's 112 bytes.
+void ListForEach(uint8_t* base, uint32_t result, uint64_t first, uint64_t last, uint64_t functor,
+                 uint64_t adjust, bool ops, uint32_t frame, const AppCalls& calls);
+// sub_820ACD80 and sub_820ACDE8 (StateLayer::Update's and UpdateToggled's
+// functors): the child's state (+4) slot 8 (or 9 when `toggled`), then its
+// slot 10, r4 = the layer. Its r3. `frame` the original's 112 bytes.
+uint32_t UpdateChild(uint8_t* base, uint32_t layer, uint32_t child, bool toggled, uint32_t frame,
+                     const AppCalls& calls);
+// sub_820ACD60 (StateLayer::OnToggleOff's functor): the child's state
+// slot 5 with r4 = the layer, as a tail call (the link register
+// `return_address`, the functor's caller's; 0 to leave it). Its r3.
+uint32_t ToggleOffChild(uint8_t* base, uint32_t layer, uint32_t child, uint32_t return_address,
+                        const AppCalls& calls);
+// sub_820ADE68 StateLayer::ApplyOps: each queued operation (+36) applied
+// with StateLayer::ApplyOp (OpList::ForEach), then the queue cleared
+// (List::Clear, over the allocation layer). r3 as Clear leaves it. `frame`
+// the original's 128 bytes.
+uint32_t LayerApplyOps(uint8_t* base, uint32_t layer, uint32_t frame, const AppCalls& calls);
+
 }  // namespace app_states

@@ -226,4 +226,107 @@ std::optional<uint32_t> AppStart(uint8_t* base, uint32_t interface, uint32_t fra
   return r3;
 }
 
+namespace {
+
+uint64_t Load64(uint8_t* base, uint32_t address) {
+  return (uint64_t(Load(base, address)) << 32) | Load(base, address + 4);
+}
+void Store64(uint8_t* base, uint32_t address, uint64_t value) {
+  Store(base, address, uint32_t(value >> 32));
+  Store(base, address + 4, uint32_t(value));
+}
+
+}  // namespace
+
+void ListForEach(uint8_t* base, uint32_t result, uint64_t first, uint64_t last, uint64_t functor,
+                 uint64_t adjust, bool ops, uint32_t frame, const AppCalls& calls) {
+  if (ops) {
+    ITC_NATIVE_RUNNING("sub_820AD440 OpList::ForEach");
+  } else {
+    ITC_NATIVE_RUNNING("sub_820AD3A0 PtrList::ForEach");
+  }
+  const uint32_t caller = frame + 112;
+  const uint32_t return_address = ops ? 0x820AD4A4 : 0x820AD404;
+  Store64(base, caller + 24, first);
+  calls.set_register(30, result);
+  Store64(base, caller + 32, last);
+  Store64(base, caller + 48, functor);
+  Store64(base, caller + 56, adjust);
+  uint32_t node = Load(base, caller + 28);
+  calls.set_register(31, node);
+  while (Load(base, caller + 36) != node) {
+    const uint32_t object = Load(base, caller + 52) + Load(base, caller + 56);
+    const uint32_t function = Load(base, caller + 48);
+    if (ops) {
+      calls.call(function, object, Load64(base, node + 8), std::nullopt, return_address);
+    } else {
+      const uint32_t value = Load(base, node + 8);
+      if (function == kUpdateChild || function == kUpdateChildToggled) {
+        calls.in_frame(112, return_address, [&](uint32_t inner) {
+          UpdateChild(base, object, value, function == kUpdateChildToggled, inner, calls);
+        });
+      } else if (function == kToggleOffChild) {
+        ToggleOffChild(base, object, value, return_address, calls);
+      } else {
+        calls.call(function, object, uint64_t(value), std::nullopt, return_address);
+      }
+    }
+    node = Load(base, node + 0);
+    calls.set_register(31, node);
+  }
+  const uint64_t a = Load64(base, caller + 48), b = Load64(base, caller + 56);
+  Store64(base, result, a);
+  Store64(base, result + 8, b);
+}
+
+uint32_t UpdateChild(uint8_t* base, uint32_t layer, uint32_t child, bool toggled, uint32_t frame,
+                     const AppCalls& calls) {
+  (void)frame;
+  if (toggled) {
+    ITC_NATIVE_RUNNING("sub_820ACDE8 StateLayer::UpdateToggled's functor");
+  } else {
+    ITC_NATIVE_RUNNING("sub_820ACD80 StateLayer::Update's functor");
+  }
+  const uint32_t state = child + 4;
+  calls.set_register(31, state);
+  calls.set_register(30, layer);
+  calls.call(VirtualTarget(base, state, toggled ? 36 : 32), state, uint64_t(layer), std::nullopt,
+             toggled ? 0x820ACE1C : 0x820ACDB4);
+  return calls.call(VirtualTarget(base, state, 40), state, uint64_t(layer), std::nullopt,
+                    toggled ? 0x820ACE34 : 0x820ACDCC);
+}
+
+uint32_t ToggleOffChild(uint8_t* base, uint32_t layer, uint32_t child, uint32_t return_address,
+                        const AppCalls& calls) {
+  ITC_NATIVE_RUNNING("sub_820ACD60 StateLayer::OnToggleOff's functor");
+  const uint32_t state = child + 4;
+  calls.set_register(11, state);
+  return calls.call(VirtualTarget(base, state, 20), state, uint64_t(layer), std::nullopt,
+                    return_address);
+}
+
+uint32_t LayerApplyOps(uint8_t* base, uint32_t layer, uint32_t frame, const AppCalls& calls) {
+  ITC_NATIVE_RUNNING("sub_820ADE68 StateLayer::ApplyOps");
+  const uint32_t list = layer + kLayerOps;
+  calls.set_register(31, list);
+  Store(base, frame + 104, layer);
+  Store(base, frame + 80, kApplyOp);
+  Store(base, frame + 84, 0);
+  const uint64_t function = Load64(base, frame + 80);
+  const uint32_t head = Load(base, list + 4);
+  Store(base, frame + 80, list);
+  Store64(base, frame + 96, function);
+  const uint64_t functor = Load64(base, frame + 96);
+  const uint64_t adjust = Load64(base, frame + 104);  // its low word as the stack holds it
+  Store(base, frame + 96, list);
+  Store(base, frame + 84, head);
+  Store(base, frame + 100, Load(base, head + 0));
+  const uint64_t last = Load64(base, frame + 80);
+  const uint64_t first = Load64(base, frame + 96);
+  calls.in_frame(112, 0x820ADEE0, [&](uint32_t inner) {
+    ListForEach(base, frame + 96, first, last, functor, adjust, true, inner, calls);
+  });
+  return ListClear(base, list);
+}
+
 }  // namespace app_states

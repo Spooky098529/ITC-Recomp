@@ -116,6 +116,19 @@ void AppStatesCreate(PPCContext& ctx, uint8_t* base);
 // App::Start sub_82092878: r3 = the +20 interface; r3 the stack's slot 1's.
 void AppStart(PPCContext& ctx, uint8_t* base);
 
+// PtrList::ForEach sub_820AD3A0 and OpList::ForEach sub_820AD440: r3 = the
+// result, r4 / r5 the range, r6 the functor, r7 its adjustment; r3 the
+// result.
+void AppPtrListForEach(PPCContext& ctx, uint8_t* base);
+void AppOpListForEach(PPCContext& ctx, uint8_t* base);
+// The layers' child functors sub_820ACD80, sub_820ACDE8 and sub_820ACD60:
+// r3 = the layer, r4 = the child; the last slot's r3.
+void AppUpdateChild(PPCContext& ctx, uint8_t* base);
+void AppUpdateChildToggled(PPCContext& ctx, uint8_t* base);
+void AppToggleOffChild(PPCContext& ctx, uint8_t* base);
+// StateLayer::ApplyOps sub_820ADE68: r3 = the layer; r3 List::Clear's.
+void AppLayerApplyOps(PPCContext& ctx, uint8_t* base);
+
 // App::Update sub_82093DC0: r3 = the app; r3 the request vector's clear's
 // (in its frame, r1 - 160, when ours).
 void AppUpdate(PPCContext& ctx, uint8_t* base);

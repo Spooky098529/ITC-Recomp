@@ -49,7 +49,10 @@ ITC_FLAG_BOOL(native_app_states, true, "ITC",
               "Create's plain C++ calls it in play), StateLayer::StateLayer sub_820AD118 (no adapter: "
               "only AppStates::AppStates's plain C++ calls it in play) and sub_820ADBD8, StateLayer::AddChild "
               "sub_820ADA08, AppStates::AddLayer sub_820AE130 and App::Start sub_82092878, their "
-              "virtual calls guest calls) natively instead of through the translated code "
+              "virtual calls guest calls; PtrList::ForEach sub_820AD3A0 and OpList::ForEach "
+              "sub_820AD440, the layers' child functors sub_820ACD80, sub_820ACDE8 and "
+              "sub_820ACD60, and with --native_heap StateLayer::ApplyOps sub_820ADE68, their "
+              "slots and StateLayer::ApplyOp guest calls) natively instead of through the translated code "
               "(the same results; checked by --run_harnesses=app_states)");
 
 namespace hooks {
@@ -520,6 +523,55 @@ void AppStart(PPCContext& ctx, uint8_t* base) {
   ctx.r3.u64 = *r3;
 }
 
+namespace {
+
+void ListForEachStep(PPCContext& ctx, uint8_t* base, bool ops) {
+  const uint32_t result = ctx.r3.u32;
+  const uint64_t first = ctx.r4.u64, last = ctx.r5.u64, functor = ctx.r6.u64,
+                 adjust = ctx.r7.u64;
+  const as::AppCalls calls = AppStatesCalls(ctx, base);
+  calls.in_frame(112, uint32_t(ctx.lr), [&](uint32_t frame) {
+    as::ListForEach(base, result, first, last, functor, adjust, ops, frame, calls);
+  });
+  ctx.r3.u64 = result;
+}
+
+void UpdateChildStep(PPCContext& ctx, uint8_t* base, bool toggled) {
+  const uint32_t layer = ctx.r3.u32, child = ctx.r4.u32;
+  const as::AppCalls calls = AppStatesCalls(ctx, base);
+  uint32_t answer = 0;
+  calls.in_frame(112, uint32_t(ctx.lr), [&](uint32_t frame) {
+    answer = as::UpdateChild(base, layer, child, toggled, frame, calls);
+  });
+  ctx.r3.u64 = answer;
+}
+
+}  // namespace
+
+void AppPtrListForEach(PPCContext& ctx, uint8_t* base) { ListForEachStep(ctx, base, false); }
+void AppOpListForEach(PPCContext& ctx, uint8_t* base) { ListForEachStep(ctx, base, true); }
+void AppUpdateChild(PPCContext& ctx, uint8_t* base) { UpdateChildStep(ctx, base, false); }
+void AppUpdateChildToggled(PPCContext& ctx, uint8_t* base) { UpdateChildStep(ctx, base, true); }
+
+void AppToggleOffChild(PPCContext& ctx, uint8_t* base) {
+  const uint32_t layer = ctx.r3.u32, child = ctx.r4.u32;
+  ctx.r3.u64 = as::ToggleOffChild(base, layer, child, 0, AppStatesCalls(ctx, base));
+}
+
+void AppLayerApplyOps(PPCContext& ctx, uint8_t* base) {
+  if (!Heap()) {
+    __imp__sub_820ADE68(ctx, base);
+    return;
+  }
+  const uint32_t layer = ctx.r3.u32;
+  const as::AppCalls calls = AppStatesCalls(ctx, base);
+  uint32_t answer = 0;
+  calls.in_frame(128, uint32_t(ctx.lr), [&](uint32_t frame) {
+    answer = as::LayerApplyOps(base, layer, frame, calls);
+  });
+  ctx.r3.u64 = answer;
+}
+
 }  // namespace hooks
 
 // The adapters: the register steps above, or the originals with the flag
@@ -568,6 +620,12 @@ ITC_APP_STATES_ADAPTER(820ADA08, AppLayerAddChild)
 ITC_APP_STATES_ADAPTER(820AE130, AppStatesAddLayer)
 ITC_APP_STATES_ADAPTER(820AE498, AppStatesCreate)
 ITC_APP_STATES_ADAPTER(82092878, AppStart)
+ITC_APP_STATES_ADAPTER(820AD3A0, AppPtrListForEach)
+ITC_APP_STATES_ADAPTER(820AD440, AppOpListForEach)
+ITC_APP_STATES_ADAPTER(820ACD80, AppUpdateChild)
+ITC_APP_STATES_ADAPTER(820ACDE8, AppUpdateChildToggled)
+ITC_APP_STATES_ADAPTER(820ACD60, AppToggleOffChild)
+ITC_APP_STATES_ADAPTER(820ADE68, AppLayerApplyOps)
 
 // App::RunHandler, with --find_menu_selection's wrap (moved here from
 // src/debug/menu_selection_scan.cpp, as one override per function can

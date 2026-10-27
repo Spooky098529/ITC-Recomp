@@ -1578,6 +1578,162 @@ void StackSetUp(Context& h) {
   }
 }
 
+// --- The layers' walks ---
+//
+// Children at data + 2048 + 64 x i whose state (+4) vtable at data + 3500
+// has every slot (0 to 11) `target`: the counter adds one to the child's +8,
+// the recorder stores r4 there.
+
+uint32_t ChildAt(const Context& h, uint32_t i) { return h.data + 2048 + 64 * i; }
+void Children(Context& h, uint32_t count, uint32_t target) {
+  const uint32_t vtable = h.data + 3500;
+  for (uint32_t slot = 0; slot < 12; slot++) {
+    Store(h.base, vtable + 4 * slot, target);
+  }
+  for (uint32_t i = 0; i < count; i++) {
+    Store(h.base, ChildAt(h, i) + 4, vtable);
+    Store(h.base, ChildAt(h, i) + 8, 0);
+  }
+}
+
+void LayerWalks(Context& h) {
+  for (int ops = 0; ops < 2; ops++) {
+    Results results(ops ? "OpList::ForEach (sub_820AD440)" : "PtrList::ForEach (sub_820AD3A0)");
+    const uint32_t list = h.data + 128;
+    const uint32_t result = h.data + 64;
+    const int kinds = ops ? 2 : 5;
+    for (int c = 0; c < 150; c++) {
+      // 0: the counter, 1: the recorder, 2 to 4: the layers' child functors.
+      const int kind = c % kinds;
+      uint64_t first = 0, last = 0, functor = 0, adjust = 0;
+      Case(
+          h, results,
+          [&](Blocks& blocks) {
+            RandomScratch(h, 3800);
+            Children(h, 6, h.random.Below(2) ? kCount4 : kStoreR4At4);
+            Store(h.base, ChildAt(h, 5), ChildAt(h, 5) + 8);  // the functor object's vtable
+            for (uint32_t slot = 0; slot < 4; slot++) {
+              Store(h.base, ChildAt(h, 5) + 8 + 4 * slot, kind == 1 ? kStoreR4At4 : kCount4);
+            }
+            std::vector<uint32_t> ring =
+                BuildList(h, blocks, list, h.random.Below(7), ops ? 16 : 12);
+            for (uint32_t node : ring) {
+              if (kind >= 2) {
+                Store(h.base, node + 8, ChildAt(h, h.random.Below(5)));
+              }
+            }
+            ring.push_back(Load(h.base, list + 4));
+            const uint32_t i = h.random.Below(uint32_t(ring.size()));
+            const uint32_t j = i + h.random.Below(uint32_t(ring.size()) - i);
+            first = (uint64_t(list) << 32) | ring[i];
+            last = (uint64_t(list) << 32) | ring[j];
+            const uint32_t functions[] = {kCount4, kStoreR4At4, as::kUpdateChild,
+                                          as::kUpdateChildToggled, as::kToggleOffChild};
+            const uint32_t object = kind >= 2 ? 0 : ChildAt(h, 5);
+            const uint32_t add = kind >= 2 ? h.data + 1024 : 0;
+            functor = (uint64_t(functions[kind]) << 32) | object;
+            adjust = (uint64_t(add) << 32) | uint32_t(h.random.Next());
+          },
+          [&](PPCContext& t) {
+            Fill(h.base, t.r1.u32 + 24, 8);
+            Fill(h.base, t.r1.u32 + 48, 16);
+            t.r3.u64 = result;
+            t.r4.u64 = first;
+            t.r5.u64 = last;
+            t.r6.u64 = functor;
+            t.r7.u64 = adjust;
+          },
+          ops ? __imp__sub_820AD440 : __imp__sub_820AD3A0,
+          ops ? hooks::AppOpListForEach : hooks::AppPtrListForEach,
+          [&](Outputs& out, const PPCContext& t, Blocks& blocks) {
+            blocks.Words(h.base, out, t.r1.u32 + 24, 8);
+            blocks.Words(h.base, out, t.r1.u32 + 48, 16);
+            blocks.Words(h.base, out, h.data, 3800);
+            LiveBlocks(h.base, out, blocks, ops ? 16 : 12);
+            out.Word(blocks.Of(t.r3.u32));
+            blocks.Out(out);
+          },
+          fmt::format("functor {} case {}", kind, c));
+    }
+    results.Report();
+  }
+  struct Functor {
+    const char* name;
+    GuestFunction recompiled;
+    GuestFunction native;
+  };
+  const Functor functors[] = {
+      {"StateLayer::Update's functor (sub_820ACD80)", __imp__sub_820ACD80, hooks::AppUpdateChild},
+      {"StateLayer::UpdateToggled's functor (sub_820ACDE8)", __imp__sub_820ACDE8,
+       hooks::AppUpdateChildToggled},
+      {"StateLayer::OnToggleOff's functor (sub_820ACD60)", __imp__sub_820ACD60,
+       hooks::AppToggleOffChild},
+  };
+  for (const Functor& f : functors) {
+    Results results(f.name);
+    for (int c = 0; c < 60; c++) {
+      Case(
+          h, results,
+          [&](Blocks&) {
+            RandomScratch(h, 3800);
+            Children(h, 1, c % 2 == 0 ? kCount4 : kStoreR4At4);
+          },
+          [&](PPCContext& t) {
+            t.r3.u64 = h.random.Next();
+            t.r4.u64 = ChildAt(h, 0);
+          },
+          f.recompiled, f.native,
+          [&](Outputs& out, const PPCContext& t, const Blocks&) {
+            out.Bytes(Read(h.base, h.data, 3800));
+            out.Word(t.r3.u32);
+          },
+          fmt::format("case {}", c));
+    }
+    results.Report();
+  }
+  {
+    // A layer at data + 64 with 0 to 2 children and states (the states
+    // objects whose slots count) and 0 to 4 operations: adds (0), pushes (2)
+    // and types the game's ApplyOp does nothing with (5, 9), each with one of
+    // the objects.
+    Results results("StateLayer::ApplyOps (sub_820ADE68)");
+    const uint32_t layer = h.data + 64;
+    for (int c = 0; c < 80; c++) {
+      Case(
+          h, results,
+          [&](Blocks& blocks) {
+            RandomScratch(h, 3072);
+            Objects(h, 6, kCount4);
+            BuildList(h, blocks, layer + 12, h.random.Below(3), 12);
+            const std::vector<uint32_t> states =
+                BuildList(h, blocks, layer + 24, h.random.Below(3), 12);
+            for (uint32_t node : states) {
+              Store(h.base, node + 8, ObjectAt(h, h.random.Below(6)));
+            }
+            const std::vector<uint32_t> queued =
+                BuildList(h, blocks, layer + 36, h.random.Below(5), 16);
+            const uint32_t types[] = {0, 2, 2, 5, 9};
+            for (uint32_t node : queued) {
+              Store(h.base, node + 8, types[h.random.Below(5)]);
+              Store(h.base, node + 12, ObjectAt(h, h.random.Below(6)));
+            }
+          },
+          [&](PPCContext& t) { t.r3.u64 = layer; }, __imp__sub_820ADE68,
+          hooks::AppLayerApplyOps,
+          [&](Outputs& out, const PPCContext& t, Blocks& blocks) {
+            std::vector<uint32_t> layers;
+            MeetLayer(h.base, blocks, layer, layers);
+            blocks.Words(h.base, out, h.data, 3072);
+            LayersOut(h.base, out, blocks, layers);
+            out.Word(blocks.Of(t.r3.u32));
+            blocks.Out(out);
+          },
+          fmt::format("case {}", c));
+    }
+    results.Report();
+  }
+}
+
 }  // namespace
 
 void AppStates(Context& h) {
@@ -1593,6 +1749,7 @@ void AppStates(Context& h) {
   Handlers(h);
   Update(h);
   StackSetUp(h);
+  LayerWalks(h);
 }
 
 }  // namespace harness
