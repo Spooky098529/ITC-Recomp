@@ -717,6 +717,418 @@ void Running(Context& h) {
   }
 }
 
+// --- The app's walks, handlers and requests ---
+//
+// Objects in the scratch area whose vtables point at small guest functions:
+// sub_8245F860 adds one to the word at r3 + 4 (a counter), sub_820A70A8
+// stores r4 at r3 + 4 (a recorder), sub_82090770 answers the word at r3 +
+// 60 (a getter). The functors are those, or the game's own (App::RunHandler,
+// RunListener, DeliverMessage, ApplyRequest) over delegates whose slot 1 is
+// the counter. The handler maps are built by the game's HandlerMap::HandlerMap
+// and Insert (sub_82099FB0, sub_82093740) and walked from their heads, every
+// node met numbered.
+
+constexpr uint32_t kCount4 = 0x8245F860;
+constexpr uint32_t kStoreR4At4 = 0x820A70A8;
+
+// The app at data + 1024 (its maps at +28 to +64, its vectors at +76 and
+// +96), objects at data + 2048 + 64 x i (their vtables at their + 32, every
+// slot `target`).
+uint32_t AppAt(const Context& h) { return h.data + 1024; }
+uint32_t ObjectAt(const Context& h, uint32_t i) { return h.data + 2048 + 64 * i; }
+void Objects(Context& h, uint32_t count, uint32_t target) {
+  for (uint32_t i = 0; i < count; i++) {
+    const uint32_t object = ObjectAt(h, i);
+    Store(h.base, object, object + 32);
+    Store(h.base, object + 4, 0);
+    for (uint32_t slot = 0; slot < 8; slot++) {
+      Store(h.base, object + 32 + 4 * slot, target);
+    }
+  }
+}
+
+// A handler map at `map` (the game's functions) with `count` random keys,
+// each with a delegate: one of the objects (`objects` of them) or a random
+// word when 0.
+void BuildHandlerMap(Context& h, uint32_t map, uint32_t count, uint32_t objects) {
+  PPCContext t = CallContext(h);
+  t.r3.u64 = map;
+  __imp__sub_82099FB0(t, h.base);
+  const uint32_t value = h.data + 4000;
+  const uint32_t result = h.data + 4016;
+  const bool small = h.random.Below(2) != 0;
+  for (uint32_t i = 0; i < count; i++) {
+    Store(h.base, value, small ? h.random.Below(24) : uint32_t(h.random.Next()));
+    Store(h.base, value + 4,
+          objects != 0 ? ObjectAt(h, h.random.Below(objects)) : uint32_t(h.random.Next()));
+    t = CallContext(h);
+    t.r3.u64 = result;
+    t.r4.u64 = map;
+    t.r5.u64 = value;
+    __imp__sub_82093740(t, h.base);
+  }
+  Fill(h.base, value, 32);
+}
+
+// A map's nodes in key order (its head last).
+std::vector<uint32_t> MapInOrder(uint8_t* base, uint32_t map) {
+  const uint32_t head = Load(base, map + 4);
+  auto nil = [&](uint32_t node) { return guest::LoadU8(base, node + 21) != 0; };
+  std::vector<uint32_t> nodes, stack;
+  uint32_t node = Load(base, head + 4);
+  while (!nil(node) || !stack.empty()) {
+    while (!nil(node)) {
+      stack.push_back(node);
+      node = Load(base, node + 0);
+    }
+    node = stack.back();
+    stack.pop_back();
+    nodes.push_back(node);
+    node = Load(base, node + 8);
+  }
+  nodes.push_back(head);
+  return nodes;
+}
+
+// The tree's nodes from each map's head (left, parent, right) added to
+// `blocks`.
+void MeetTree(uint8_t* base, Blocks& blocks, const std::vector<uint32_t>& maps) {
+  std::vector<uint32_t> queue;
+  for (uint32_t map : maps) {
+    queue.push_back(Load(base, map + 4));
+  }
+  while (!queue.empty()) {
+    const uint32_t node = queue.back();
+    queue.pop_back();
+    if (node == 0 || !memory::IsHeapBlock(node) ||
+        std::find(blocks.list.begin(), blocks.list.end(), node) != blocks.list.end()) {
+      continue;
+    }
+    blocks.Add(node);
+    for (uint32_t at : {0u, 4u, 8u}) {
+      queue.push_back(Load(base, node + at));
+    }
+  }
+}
+
+// The scratch area's first 3072 bytes by number, the tree nodes' words (24
+// bytes: links, key, delegate; the color and isnil bytes) by number, r3.
+void AppOut(Context& h, Outputs& out, Blocks& blocks, const std::vector<uint32_t>& maps,
+            uint32_t r3) {
+  MeetTree(h.base, blocks, maps);
+  blocks.Words(h.base, out, h.data, 3072);
+  for (uint32_t block : blocks.list) {
+    if (block != 0 && memory::IsHeapBlock(block) && memory::Size(block) == 24) {
+      blocks.Words(h.base, out, block, 12);
+      if (guest::LoadU8(h.base, block + 21) == 0) {
+        blocks.Words(h.base, out, block + 12, 8);
+      }
+      out.Bytes(Read(h.base, block + 20, 2));
+    }
+  }
+  out.Word(blocks.Of(r3));
+  blocks.Out(out);
+}
+
+std::vector<uint32_t> AppMaps(const Context& h) {
+  std::vector<uint32_t> maps;
+  for (uint32_t at : as::kAppMaps) {
+    maps.push_back(AppAt(h) + at);
+  }
+  return maps;
+}
+
+void Walks(Context& h) {
+  const uint32_t app = AppAt(h);
+  const uint32_t result = h.data + 64;
+  {
+    Results results("HandlerMap::ForEach (sub_82092BF0)");
+    for (int c = 0; c < 200; c++) {
+      // 0: the counter, 1: the recorder, 2: App::RunHandler, 3: RunListener.
+      const int kind = c % 4;
+      uint64_t first = 0, last = 0, functor = 0, adjust = 0;
+      Case(
+          h, results,
+          [&](Blocks&) {
+            for (uint32_t at = 0; at < 3072; at += 4) {
+              Store(h.base, h.data + at, uint32_t(h.random.Next()));
+            }
+            Objects(h, 6, kind == 1 ? kStoreR4At4 : kCount4);
+            const uint32_t map = app + as::kAppMaps[h.random.Below(4)];
+            BuildHandlerMap(h, map, h.random.Below(12), kind >= 2 ? 5 : 0);
+            const std::vector<uint32_t> nodes = MapInOrder(h.base, map);
+            const uint32_t i = h.random.Below(uint32_t(nodes.size()));
+            const uint32_t j = i + h.random.Below(uint32_t(nodes.size()) - i);
+            first = (uint64_t(map) << 32) | nodes[i];
+            last = (uint64_t(map) << 32) | nodes[j];
+            const uint32_t function = kind == 0 ? kCount4 : kind == 1 ? kStoreR4At4
+                                      : kind == 2 ? as::kRunHandler : as::kRunListener;
+            // The object and the adjustment: an object, or the app as its
+            // adjustment (the game's functors).
+            const uint32_t object = kind >= 2 ? 0 : ObjectAt(h, 5);
+            const uint32_t add = kind >= 2 ? app : 0;
+            functor = (uint64_t(function) << 32) | object;
+            adjust = (uint64_t(add) << 32) | uint32_t(h.random.Next());
+          },
+          [&](PPCContext& t) {
+            Fill(h.base, t.r1.u32 + 48, 16);
+            t.r3.u64 = result;
+            t.r4.u64 = first;
+            t.r5.u64 = last;
+            t.r6.u64 = functor;
+            t.r7.u64 = adjust;
+          },
+          __imp__sub_82092BF0, hooks::AppHandlerMapForEach,
+          [&](Outputs& out, const PPCContext& t, Blocks& blocks) {
+            MeetTree(h.base, blocks, AppMaps(h));
+            blocks.Words(h.base, out, t.r1.u32 + 48, 16);
+            AppOut(h, out, blocks, AppMaps(h), t.r3.u32);
+          },
+          fmt::format("functor {} case {}", kind, c));
+    }
+    results.Report();
+  }
+  // The vectors' walks: the words (or requests) in the scratch area at data
+  // + 128.
+  struct VectorWalk {
+    const char* name;
+    GuestFunction recompiled;
+    GuestFunction native;
+    uint32_t step;
+    uint32_t game;  // the game's functor
+  };
+  const VectorWalk walks[] = {
+      {"App::ForEachMessage (sub_82092CD0)", __imp__sub_82092CD0, hooks::AppForEachMessage, 4,
+       as::kDeliverMessage},
+      {"App::ForEachRequest (sub_82091C48)", __imp__sub_82091C48, hooks::AppForEachRequest, 12,
+       as::kApplyRequest},
+  };
+  for (const VectorWalk& w : walks) {
+    Results results(w.name);
+    for (int c = 0; c < 150; c++) {
+      const int kind = c % 3;  // 0: the counter, 1: the recorder, 2: the game's
+      uint64_t first = 0, last = 0, functor = 0, adjust = 0;
+      Case(
+          h, results,
+          [&](Blocks&) {
+            for (uint32_t at = 0; at < 3072; at += 4) {
+              Store(h.base, h.data + at, uint32_t(h.random.Next()));
+            }
+            Objects(h, 6, kind == 1 ? kStoreR4At4 : kCount4);
+            for (uint32_t at : as::kAppMaps) {
+              BuildHandlerMap(h, app + at, kind == 2 ? h.random.Below(5) : 0, 5);
+            }
+            const uint32_t count = h.random.Below(10);
+            const uint32_t elements = h.data + 128;
+            for (uint32_t i = 0; i < count; i++) {
+              if (w.step == 12) {
+                // The type: an insert (0, 2, 4, 6) or nothing (above 7).
+                const uint32_t types[] = {0, 2, 4, 6, 9};
+                Store(h.base, elements + 12 * i, types[h.random.Below(5)]);
+                Store(h.base, elements + 12 * i + 4, h.random.Below(24));
+                Store(h.base, elements + 12 * i + 8, ObjectAt(h, h.random.Below(5)));
+              } else {
+                Store(h.base, elements + 4 * i, h.random.Below(8));
+              }
+            }
+            const uint32_t vector = h.data + 112;
+            first = (uint64_t(vector) << 32) | elements;
+            last = (uint64_t(vector) << 32) | (elements + w.step * count);
+            const uint32_t function = kind == 0 ? kCount4 : kind == 1 ? kStoreR4At4 : w.game;
+            const uint32_t object = kind == 2 ? 0 : ObjectAt(h, 5);
+            const uint32_t add = kind == 2 ? app : 0;
+            functor = (uint64_t(function) << 32) | object;
+            adjust = (uint64_t(add) << 32) | uint32_t(h.random.Next());
+          },
+          [&](PPCContext& t) {
+            Fill(h.base, t.r1.u32 + 24, 8);
+            Fill(h.base, t.r1.u32 + 48, 16);
+            t.r3.u64 = result;
+            t.r4.u64 = first;
+            t.r5.u64 = last;
+            t.r6.u64 = functor;
+            t.r7.u64 = adjust;
+          },
+          w.recompiled, w.native,
+          [&](Outputs& out, const PPCContext& t, Blocks& blocks) {
+            MeetTree(h.base, blocks, AppMaps(h));
+            blocks.Words(h.base, out, t.r1.u32 + 24, 8);
+            blocks.Words(h.base, out, t.r1.u32 + 48, 16);
+            AppOut(h, out, blocks, AppMaps(h), t.r3.u32);
+          },
+          fmt::format("functor {} case {}", kind, c));
+    }
+    results.Report();
+  }
+}
+
+void Handlers(Context& h) {
+  const uint32_t app = AppAt(h);
+  struct Runner {
+    const char* name;
+    GuestFunction recompiled;
+    GuestFunction native;
+  };
+  const Runner runners[] = {
+      {"App::RunHandler (sub_82092968)", __imp__sub_82092968, hooks::AppRunHandler},
+      {"App::RunListener (sub_820929B0)", __imp__sub_820929B0, hooks::AppRunListener},
+  };
+  for (const Runner& r : runners) {
+    Results results(r.name);
+    for (int c = 0; c < 60; c++) {
+      Case(
+          h, results,
+          [&](Blocks&) {
+            for (uint32_t at = 0; at < 3072; at += 4) {
+              Store(h.base, h.data + at, uint32_t(h.random.Next()));
+            }
+            Objects(h, 1, c % 2 == 0 ? kCount4 : kStoreR4At4);
+          },
+          [&](PPCContext& t) {
+            Fill(h.base, t.r1.u32 + 24, 8);
+            t.r3.u64 = c % 7 == 6 ? 0 : app;
+            t.r4.u64 = (h.random.Next() << 32) | ObjectAt(h, 0);
+            t.r5.u64 = h.random.Next();
+          },
+          r.recompiled, r.native,
+          [&](Outputs& out, const PPCContext& t, Blocks& blocks) {
+            blocks.Words(h.base, out, t.r1.u32 + 24, 8);
+            out.Word(t.r4.u32);
+            out.Word(t.r5.u32);
+            AppOut(h, out, blocks, {}, t.r3.u32);
+          },
+          fmt::format("case {}", c));
+    }
+    results.Report();
+  }
+  {
+    Results results("App::DeliverMessage (sub_82092D50)");
+    for (int c = 0; c < 60; c++) {
+      Case(
+          h, results,
+          [&](Blocks&) {
+            for (uint32_t at = 0; at < 3072; at += 4) {
+              Store(h.base, h.data + at, uint32_t(h.random.Next()));
+            }
+            Objects(h, 6, kCount4);
+            BuildHandlerMap(h, app + as::kAppMaps[3], h.random.Below(8), 5);
+          },
+          [&](PPCContext& t) {
+            t.r3.u64 = app;
+            t.r4.u64 = h.random.Below(8);
+          },
+          __imp__sub_82092D50, hooks::AppDeliverMessage,
+          [&](Outputs& out, const PPCContext& t, Blocks& blocks) {
+            out.Word(t.r3.u32 - t.r1.u32);
+            AppOut(h, out, blocks, AppMaps(h), 0);
+          },
+          fmt::format("case {}", c));
+    }
+    results.Report();
+  }
+  {
+    Results results("App::ApplyRequest (sub_82093BE0)");
+    for (int c = 0; c < 200; c++) {
+      uint32_t type = 0;
+      Case(
+          h, results,
+          [&](Blocks&) {
+            for (uint32_t at = 0; at < 3072; at += 4) {
+              Store(h.base, h.data + at, uint32_t(h.random.Next()));
+            }
+            for (uint32_t at : as::kAppMaps) {
+              BuildHandlerMap(h, app + at, h.random.Below(6), 0);
+            }
+            const uint32_t types[] = {0, 2, 4, 6, 8, 0xFFFFFFFF};
+            type = types[h.random.Below(6)];
+          },
+          [&](PPCContext& t) {
+            t.r3.u64 = app;
+            t.r4.u64 = (uint64_t(type) << 32) | h.random.Below(24);
+            t.r5.u64 = h.random.Next();
+          },
+          __imp__sub_82093BE0, hooks::AppApplyRequest,
+          [&](Outputs& out, const PPCContext& t, Blocks& blocks) {
+            out.Word(t.r3.u32 - t.r1.u32);
+            AppOut(h, out, blocks, AppMaps(h), 0);
+          },
+          fmt::format("type {} case {}", int32_t(type), c));
+    }
+    results.Report();
+  }
+  // The add slots: the interface at app + 20 (its request vector at +76, in
+  // a heap block), the key at data + 96, the delegate an object whose slot 2
+  // is the game's Delegate::Clone or the getter (a word for a copy).
+  struct Slot {
+    const char* name;
+    GuestFunction recompiled;
+    GuestFunction native;
+  };
+  const Slot slots[] = {
+      {"App::AddHandler (sub_82094830)", __imp__sub_82094830, hooks::AppAddHandler},
+      {"App::AddToggledHandler (sub_820948D0)", __imp__sub_820948D0, hooks::AppAddToggledHandler},
+      {"App::AddAlwaysHandler (sub_82094970)", __imp__sub_82094970, hooks::AppAddAlwaysHandler},
+      {"App::AddListener (sub_82094A10)", __imp__sub_82094A10, hooks::AppAddListener},
+  };
+  for (const Slot& slot : slots) {
+    Results results(slot.name);
+    for (int c = 0; c < 60; c++) {
+      Case(
+          h, results,
+          [&](Blocks& blocks) {
+            for (uint32_t at = 0; at < 3072; at += 4) {
+              Store(h.base, h.data + at, uint32_t(h.random.Next()));
+            }
+            Objects(h, 1, c % 4 == 3 ? 0x82090770 : 0x820ACA48);  // the getter, or Delegate::Clone
+            const uint32_t size = h.random.Below(5);
+            const uint32_t capacity = size + h.random.Below(3);
+            const uint32_t vector = app + as::kAppRequests;
+            uint32_t block = 0;
+            if (capacity != 0) {
+              block = blocks.New(h.base, 12 * capacity);
+              for (uint32_t at = 0; at < 12 * capacity; at += 4) {
+                Store(h.base, block + at, uint32_t(h.random.Next()));
+              }
+            }
+            Store(h.base, vector + 4, block);
+            Store(h.base, vector + 8, block + 12 * size);
+            Store(h.base, vector + 12, block + 12 * capacity);
+          },
+          [&](PPCContext& t) {
+            t.r3.u64 = app + as::kAppInterface;
+            t.r4.u64 = h.data + 96;
+            t.r5.u64 = ObjectAt(h, 0);
+          },
+          slot.recompiled, slot.native,
+          [&](Outputs& out, const PPCContext& t, Blocks& blocks) {
+            const uint32_t vector = app + as::kAppRequests;
+            const uint32_t first = Load(h.base, vector + 4);
+            const uint32_t last = Load(h.base, vector + 8);
+            if (first != 0 && std::find(blocks.list.begin(), blocks.list.end(), first) ==
+                                  blocks.list.end()) {
+              blocks.Add(first);
+            }
+            // The copies (heap blocks of 12 bytes) the requests hold.
+            for (uint32_t at = first; first != 0 && at < last && at - first < 0x400; at += 12) {
+              const uint32_t copy = Load(h.base, at + 8);
+              if (copy != 0 && memory::IsHeapBlock(copy) &&
+                  std::find(blocks.list.begin(), blocks.list.end(), copy) == blocks.list.end()) {
+                blocks.Add(copy);
+                blocks.Words(h.base, out, copy, 12);
+              }
+            }
+            if (first != 0 && last >= first && last - first < 0x400) {
+              blocks.Words(h.base, out, first, last - first);
+            }
+            out.Word(t.r3.u32 == app + as::kAppRequests ? 1 : t.r3.u32 - t.r1.u32);
+            AppOut(h, out, blocks, {}, 0);
+          },
+          fmt::format("case {}", c));
+    }
+    results.Report();
+  }
+}
+
 }  // namespace
 
 void AppStates(Context& h) {
@@ -728,6 +1140,8 @@ void AppStates(Context& h) {
   OpLists(h);
   MessageGrowth(h);
   Running(h);
+  Walks(h);
+  Handlers(h);
 }
 
 }  // namespace harness

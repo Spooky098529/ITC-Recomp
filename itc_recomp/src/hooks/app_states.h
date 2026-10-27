@@ -70,4 +70,32 @@ void AppStatesIsEmpty(PPCContext& ctx, uint8_t* base);
 // App::IsRunning sub_82092928: r3 = the +20 interface; r3 (and r11) 1 or 0.
 void AppIsRunning(PPCContext& ctx, uint8_t* base);
 
+// HandlerMap::ForEach sub_82092BF0: r3 = the result, r4 / r5 the range,
+// r6 the functor (function, object), r7 its adjustment (high word); r3 the
+// result.
+void AppHandlerMapForEach(PPCContext& ctx, uint8_t* base);
+// App::ForEachMessage sub_82092CD0 and ForEachRequest sub_82091C48: as
+// HandlerMap::ForEach over the vectors.
+void AppForEachMessage(PPCContext& ctx, uint8_t* base);
+void AppForEachRequest(PPCContext& ctx, uint8_t* base);
+// App::RunHandler sub_82092968 and RunListener sub_820929B0: r3 = the app,
+// r4 = the key (high word) and the delegate; the slot's r3.
+void AppRunHandler(PPCContext& ctx, uint8_t* base);
+void AppRunListener(PPCContext& ctx, uint8_t* base);
+// App::DeliverMessage sub_82092D50: r3 = the app, r4 = the message; r3 =
+// ForEach's result in its 128-byte frame (r1 - 32).
+void AppDeliverMessage(PPCContext& ctx, uint8_t* base);
+// App::ApplyRequest sub_82093BE0: r3 = the app, r4 = the type (high word)
+// and key, r5 = the delegate (high word), both also stored in the caller's
+// frame (r1 + 32, + 40); r3 HandlerMap::Insert's result in its 128-byte
+// frame (r1 - 32) when it inserted, else left.
+void AppApplyRequest(PPCContext& ctx, uint8_t* base);
+// The +20 interface's add slots (sub_82094830, sub_820948D0, sub_82094970,
+// sub_82094A10): r3 = the interface, r4 = the key's address, r5 = the
+// delegate; r3 as RequestVector::PushBack leaves it.
+void AppAddHandler(PPCContext& ctx, uint8_t* base);
+void AppAddToggledHandler(PPCContext& ctx, uint8_t* base);
+void AppAddAlwaysHandler(PPCContext& ctx, uint8_t* base);
+void AppAddListener(PPCContext& ctx, uint8_t* base);
+
 }  // namespace hooks
