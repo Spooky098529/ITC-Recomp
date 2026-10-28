@@ -210,6 +210,58 @@ uint32_t RaceEventEntry(uint8_t* base, uint32_t index);
 uint32_t PlaceEntry(uint8_t* base, uint32_t event, uint32_t route, uint32_t index,
                     uint32_t position, uint32_t step, uint32_t masks);
 
+// The start placements (src/race_world/race_event.cpp). A group's list is
+// at the event + 12 x (the word at `group` + 3): +0 the count (a signed
+// halfword), +4 the entries (4 bytes each, +2 an index in the event's list);
+// each entry placed with PlaceEntry on the game's route, the masks
+// AiPath::BranchMasksFor of the word at `group`. The originals' r3 isn't
+// kept: no caller reads it.
+
+// RaceEvent::PlaceGroup (sub_82143A40): the halfword `step` at `frame` +
+// 230 (the caller's frame), the position's word copied to `frame` + 80;
+// with the word at `flag` set, the first (count + 2) / 2 placed stepping
+// forward, then the rest from the position again stepping back (the slice
+// less the step, the step negated at + 230); else all forward. `frame`: the
+// original's 192 bytes.
+void PlaceGroup(uint8_t* base, uint32_t event, uint32_t position, uint32_t step, uint32_t group,
+                uint32_t flag, uint32_t frame);
+// RaceEvent::PlaceGroupTwoRows (sub_82143B78): the positions `first` and
+// `second` (words) at `frame` + 188 and + 196 (the caller's frame), each put
+// on the main road (TrackRoute::ToMainRoad, flag 0); the group's even
+// entries placed from the first, the odd from the second, by the halfword
+// at `step`. `frame`: the original's 160 bytes.
+void PlaceGroupTwoRows(uint8_t* base, uint32_t event, uint32_t first, uint32_t second,
+                       uint32_t step, uint32_t group, uint32_t frame);
+// RaceEvent::PlaceGroupSplit (sub_82143920): the position (a word) at
+// `frame` + 204; the first (count + 1) / 2 placed from it, the rest from the
+// section in 0x82008DE8 at the signed halfword at 0x82008E14 + 2 x the word
+// at `row`, slice 0, put on the main road (flag 0). `frame`: the original's
+// 176 bytes.
+void PlaceGroupSplit(uint8_t* base, uint32_t event, uint32_t position, uint32_t step,
+                     uint32_t group, uint32_t row, uint32_t frame);
+// RaceEvent::PlaceGroupFixed (sub_821443B0): group 0 from sections 284 and
+// 218, 1 from 153 and 107 (PlaceGroupTwoRows, slice 0; the positions at
+// `frame` + 80 and + 84), 2 from section 44 and 3 from 66 (PlaceGroup at
+// `frame` + 80 with the flag 1 at + 84); above 3 nothing. `frame`: the
+// original's 96 bytes.
+void PlaceGroupFixed(uint8_t* base, uint32_t event, uint32_t step, uint32_t group,
+                     uint32_t frame);
+// RaceEvent::PlaceStarts (sub_82144798, with sub_82144874, a case of its
+// jump table): the player's position (the word at `player`) copied to
+// `frame` + 92, its slice less fctiwz([0x82008E3C] / the route's slice
+// length) and the step fctiwz([0x82008E34] / the length) (the doublewords
+// at + 96 and + 104, the step's halfword at + 80), put on the main road
+// (flag 1); the kind (the word at `kind`, 0 to 19) picks a row (+84) and a
+// group: the other groups (+88 counts 0 to 3) by PlaceGroupFixed, that one
+// by PlaceGroupSplit (the row's halfword below 0x8000 and
+// SaveData::FirstUnsetFlag of player 0's save above 0) or PlaceGroup (the
+// flag at + 96: 1 with the halfword 0x8000 or more); a kind above 19 places
+// all four by PlaceGroupFixed. `frame`: the original's 176 bytes.
+void PlaceStarts(uint8_t* base, uint32_t event, uint32_t kind, uint32_t player, uint32_t frame);
+// RaceEvent::PlaceStartsCurrent (sub_82144A38): PlaceStarts with the event
+// at [0x826C6078] (a tail call: `sp` the caller's stack pointer).
+void PlaceStartsCurrent(uint8_t* base, uint32_t kind, uint32_t player, uint32_t sp);
+
 // --- The save data ---
 
 // SaveData::AddDistance (sub_82116C38): the garage car picked (the save's

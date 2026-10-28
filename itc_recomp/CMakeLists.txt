@@ -160,6 +160,7 @@ set(ITC_SOURCES
     src/race_world/race_world.cpp
     src/race_world/race_world_init.cpp
     src/race_world/race_world_reset.cpp
+    src/race_world/race_event.cpp
     src/hooks/texture_compression.cpp
     src/texture_compression/dxt_alpha.cpp
     src/texture_compression/dxt_color.cpp
@@ -448,6 +449,7 @@ set_source_files_properties(src/c_runtime/math.cpp src/ui_movies/keys.cpp
     src/race_setup/car.cpp src/race_setup/race_data.cpp src/race_setup/course_routes.cpp
     src/race_setup/set_up.cpp src/vehicle/vehicle.cpp src/race_world/race_world.cpp
     src/race_world/race_world_reset.cpp
+    src/race_world/race_event.cpp
     src/texture_compression/dxt_alpha.cpp src/texture_compression/dxt_color.cpp
     src/texture_compression/dxt45.cpp src/texture_compression/codecs.cpp
     src/texture_compression/blitter.cpp src/texture_compression/compress_surface.cpp

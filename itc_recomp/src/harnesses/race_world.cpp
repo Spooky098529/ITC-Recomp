@@ -475,6 +475,241 @@ void Routes(Context& h) {
   }
 }
 
+// --- The race event's start placements: the course's route (test_route.h)
+// at 0x826C5B10, the race data's flags, the event in the scratch area (its
+// list at +156, 12-byte entries; the groups' lists at the event + 12 x
+// (group + 3), for groups -3 to 5, each with 0 to several 4-byte entries),
+// [0x826C6078] the event and player 0's save ([0x826C5B58]) for
+// SaveData::FirstUnsetFlag; the stack below the scratch area filled the
+// same on both sides, and each function's frame temporaries compared (the
+// originals' register saves and back chains aren't written natively). The
+// originals' r3 isn't compared: no caller reads it. ---
+
+void Placements(Context& h) {
+  namespace tr = test_route;
+  constexpr uint32_t kSaves = 0x826C5B58;  // SaveData::Of's table
+  const Block area(tr::kRouteBytes + 0x100);
+  const Block table(4 * tr::kTableEntries);
+  const Block race(0x40);
+  if (!area.address || !table.address || !race.address) {
+    ITC_LOG_ERROR("harness: race_world: no block from the allocation layer");
+    return;
+  }
+  tr::FillTable(h.base, table.address, area.address);
+  const uint32_t flags[] = {0, 0x4, 0x8, 0x10, 0x20, 0x3C};
+  const uint32_t sp = CallContext(h).r1.u32;
+  const uint32_t event = h.data;
+  const uint32_t list = h.data + 1536;
+  const uint32_t save_word = h.data + 900;  // the save's +6092
+  const uint32_t player = h.data + 904;
+  const uint32_t kind = h.data + 908;
+  const uint32_t step = h.data + 912;
+  const uint32_t group = h.data + 916;
+  const uint32_t flag = h.data + 920;
+  const uint32_t row = h.data + 924;
+  // Everything a case reads, random; the event's groups -3 to 5.
+  const auto set_up = [&](Random& r, tr::Route& route) {
+    WriteRandom(h.base, h.data, kScratchBytes, r);
+    WriteRandom(h.base, sp - 2048, 2048 + 1024, r);
+    WriteRandom(h.base, area.address, area.bytes, r);
+    route = tr::BuildRoute(h.base, area.address, table.address, r);
+    guest::StoreU32(h.base, track_route::kRoute, area.address + tr::kFile);
+    WriteRandom(h.base, race.address, race.bytes, r);
+    guest::StoreU32(h.base, race.address + 20,
+                    r.Below(4) == 0 ? uint32_t(r.Next()) : flags[r.Below(6)]);
+    guest::StoreU32(h.base, rw::kRaceData, race.address);
+    guest::StoreU32(h.base, rw::kRaceEvent, event);
+    guest::StoreU32(h.base, kSaves, save_word - 6092);
+    const uint32_t words[] = {0x3F, 0x3E, 0, 0x1F, 0x7};
+    guest::StoreU32(h.base, save_word,
+                    r.Below(2) == 0 ? uint32_t(r.Next()) : words[r.Below(5)]);
+    guest::StoreU32(h.base, event + 156, list);
+    for (uint32_t slot = 0; slot < 9; slot++) {
+      const uint32_t at = event + 12 * slot;
+      const uint32_t entries = h.data + 256 + 64 * slot;
+      const int32_t count = r.Below(8) == 0 ? int32_t(r.Below(20)) - 4
+                            : r.Below(4) == 0 ? 0
+                                              : int32_t(1 + r.Below(8));
+      guest::StoreU16(h.base, at + 0, uint16_t(count));
+      guest::StoreU32(h.base, at + 4, entries);
+      for (uint32_t i = 0; i < 16; i++) {
+        guest::StoreU16(h.base, entries + 4 * i + 2,
+                        uint16_t(r.Below(6) == 0 ? int32_t(r.Below(20)) - 20
+                                                 : int32_t(r.Below(40))));
+      }
+    }
+    tr::RandomPosition(h.base, player, route, r);
+    guest::StoreU16(h.base, step, uint16_t(r.Below(4) == 0 ? r.Next() : r.Below(8)));
+  };
+  const auto stack = [&](Outputs& out, uint32_t at, uint32_t bytes) {
+    out.Bytes(Read(h.base, at, bytes));
+  };
+  const auto globals = [&] {
+    return Globals(h.base, {track_route::kRoute, rw::kRaceData, rw::kRaceEvent, kSaves});
+  };
+  const auto common = [&](Outputs& out) {
+    out.Bytes(Read(h.base, h.data, kScratchBytes));
+    out.Bytes(Read(h.base, area.address, area.bytes));
+  };
+  // A kind: 0 to 19 in turn, now and then above 19.
+  const auto random_kind = [&](Random& r, uint64_t seed) {
+    return r.Below(8) == 0 ? (r.Below(2) ? 20 + r.Below(20) : uint32_t(r.Next()))
+                           : uint32_t(seed % 20);
+  };
+  {
+    Results results("RaceEvent::PlaceStartsCurrent (sub_82144A38)");
+    for (uint64_t seed = 0; seed < 300; seed++) {
+      Outputs out[2];
+      for (int v = 0; v < 2; v++) {
+        Random r(seed * 89 + 37);
+        auto g = globals();
+        tr::Route route;
+        set_up(r, route);
+        guest::StoreU32(h.base, kind, random_kind(r, seed));
+        PPCContext t = CallContext(h);
+        t.r3.u64 = kind;
+        t.r4.u64 = player;
+        (v == 0 ? Original<__imp__sub_82144A38> : hooks::RaceWorldPlaceStartsCurrent)(t, h.base);
+        common(out[v]);
+        stack(out[v], sp - 176 + 24, 16);
+        stack(out[v], sp - 176 + 80, 32);
+      }
+      results.Check(out[0], out[1], fmt::format("seed {}", seed));
+    }
+    results.Report();
+  }
+  {
+    Results results("RaceEvent::PlaceStarts (sub_82144798)");
+    for (uint64_t seed = 0; seed < 300; seed++) {
+      Outputs out[2];
+      for (int v = 0; v < 2; v++) {
+        Random r(seed * 97 + 41);
+        auto g = globals();
+        tr::Route route;
+        set_up(r, route);
+        guest::StoreU32(h.base, kind, random_kind(r, seed));
+        PPCContext t = CallContext(h);
+        t.r3.u64 = event;
+        t.r4.u64 = kind;
+        t.r5.u64 = player;
+        (v == 0 ? Original<__imp__sub_82144798> : hooks::RaceWorldPlaceStarts)(t, h.base);
+        common(out[v]);
+        stack(out[v], sp - 176 + 24, 16);
+        stack(out[v], sp - 176 + 80, 32);
+      }
+      results.Check(out[0], out[1], fmt::format("seed {} kind {}", seed, seed % 20));
+    }
+    results.Report();
+  }
+  {
+    Results results("RaceEvent::PlaceGroupFixed (sub_821443B0)");
+    const uint32_t groups[] = {0, 1, 2, 3, 0, 1, 2, 3, 4, 5, 0xFFFFFFFF};
+    for (uint64_t seed = 0; seed < 220; seed++) {
+      Outputs out[2];
+      for (int v = 0; v < 2; v++) {
+        Random r(seed * 101 + 43);
+        auto g = globals();
+        tr::Route route;
+        set_up(r, route);
+        guest::StoreU32(h.base, group, groups[seed % 11]);
+        PPCContext t = CallContext(h);
+        t.r3.u64 = event;
+        t.r4.u64 = step;
+        t.r5.u64 = group;
+        (v == 0 ? Original<__imp__sub_821443B0> : hooks::RaceWorldPlaceGroupFixed)(t, h.base);
+        common(out[v]);
+        stack(out[v], sp - 96 + 24, 16);
+        stack(out[v], sp - 96 + 80, 8);
+      }
+      results.Check(out[0], out[1], fmt::format("seed {} group {}", seed, groups[seed % 11]));
+    }
+    results.Report();
+  }
+  {
+    Results results("RaceEvent::PlaceGroup (sub_82143A40)");
+    for (uint64_t seed = 0; seed < 300; seed++) {
+      Outputs out[2];
+      for (int v = 0; v < 2; v++) {
+        Random r(seed * 103 + 47);
+        auto g = globals();
+        tr::Route route;
+        set_up(r, route);
+        const uint32_t position = h.data + 928;
+        tr::RandomPosition(h.base, position, route, r);
+        guest::StoreU32(h.base, group, uint32_t(int32_t(seed % 9) - 3));
+        guest::StoreU32(h.base, flag, r.Below(4) == 0 ? uint32_t(r.Next()) : r.Below(2));
+        PPCContext t = CallContext(h);
+        t.r3.u64 = event;
+        t.r4.u64 = position;
+        t.r5.u64 = r.Below(4) == 0 ? r.Next() : r.Below(8);
+        t.r6.u64 = group;
+        t.r7.u64 = flag;
+        (v == 0 ? Original<__imp__sub_82143A40> : hooks::RaceWorldPlaceGroup)(t, h.base);
+        common(out[v]);
+        stack(out[v], sp - 192 + 80, 4);
+        stack(out[v], sp + 38, 2);
+      }
+      results.Check(out[0], out[1], fmt::format("seed {}", seed));
+    }
+    results.Report();
+  }
+  {
+    Results results("RaceEvent::PlaceGroupTwoRows (sub_82143B78)");
+    for (uint64_t seed = 0; seed < 200; seed++) {
+      Outputs out[2];
+      for (int v = 0; v < 2; v++) {
+        Random r(seed * 107 + 53);
+        auto g = globals();
+        tr::Route route;
+        set_up(r, route);
+        const uint32_t positions = h.data + 928;
+        tr::RandomPosition(h.base, positions, route, r);
+        tr::RandomPosition(h.base, positions + 4, route, r);
+        guest::StoreU32(h.base, group, uint32_t(int32_t(seed % 9) - 3));
+        PPCContext t = CallContext(h);
+        t.r3.u64 = event;
+        t.r4.u64 = guest::LoadU32(h.base, positions);
+        t.r5.u64 = guest::LoadU32(h.base, positions + 4);
+        t.r6.u64 = step;
+        t.r7.u64 = group;
+        (v == 0 ? Original<__imp__sub_82143B78> : hooks::RaceWorldPlaceGroupTwoRows)(t,
+                                                                                     h.base);
+        common(out[v]);
+        stack(out[v], sp + 28, 12);
+      }
+      results.Check(out[0], out[1], fmt::format("seed {}", seed));
+    }
+    results.Report();
+  }
+  {
+    Results results("RaceEvent::PlaceGroupSplit (sub_82143920)");
+    for (uint64_t seed = 0; seed < 200; seed++) {
+      Outputs out[2];
+      for (int v = 0; v < 2; v++) {
+        Random r(seed * 109 + 59);
+        auto g = globals();
+        tr::Route route;
+        set_up(r, route);
+        const uint32_t position = h.data + 928;
+        tr::RandomPosition(h.base, position, route, r);
+        guest::StoreU32(h.base, group, uint32_t(int32_t(seed % 9) - 3));
+        guest::StoreU32(h.base, row, r.Below(6));
+        PPCContext t = CallContext(h);
+        t.r3.u64 = event;
+        t.r4.u64 = guest::LoadU32(h.base, position);
+        t.r5.u64 = step;
+        t.r6.u64 = group;
+        t.r7.u64 = row;
+        (v == 0 ? Original<__imp__sub_82143920> : hooks::RaceWorldPlaceGroupSplit)(t, h.base);
+        common(out[v]);
+        stack(out[v], sp + 28, 4);
+      }
+      results.Check(out[0], out[1], fmt::format("seed {}", seed));
+    }
+    results.Report();
+  }
+}
+
 // A float's bits: now and then NaN (any sign, payload), an infinity or a
 // zero of either sign; else a number in +-range.
 uint32_t RandomFloat(Random& r, float range) {
@@ -1567,6 +1802,7 @@ void RaceWorld(Context& h) {
   SortedLists(h);
   Release(h, manager, vehicles);
   Routes(h);
+  Placements(h);
   Create(h);
   Tables(h, manager, vehicles);
   VehicleLoops(h, manager);

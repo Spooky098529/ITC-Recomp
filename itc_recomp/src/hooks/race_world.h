@@ -84,5 +84,21 @@ void RaceWorldUnload(PPCContext& ctx, uint8_t* base);
 void RaceWorldAddDistance(PPCContext& ctx, uint8_t* base);
 // SaveData::FirstUnsetFlag sub_82112190: r3 = the save data; r3 = 0 to 6.
 void RaceWorldFirstUnsetFlag(PPCContext& ctx, uint8_t* base);
+// The start placements (r3 not kept: no caller reads it).
+// RaceEvent::PlaceStartsCurrent sub_82144A38: r3 = &the kind, r4 = &the
+// player's position. RaceEvent::PlaceStarts sub_82144798: r3 = the event,
+// r4 = &the kind, r5 = &the player's position. RaceEvent::PlaceGroupFixed
+// sub_821443B0: r3 = the event, r4 = &the step, r5 = &the group.
+// RaceEvent::PlaceGroup sub_82143A40: r3 = the event, r4 = &the position, r5
+// = the step, r6 = &the group, r7 = &the flag. RaceEvent::PlaceGroupTwoRows
+// sub_82143B78: r3 = the event, r4, r5 = the positions, r6 = &the step, r7
+// = &the group. RaceEvent::PlaceGroupSplit sub_82143920: r3 = the event, r4
+// = the position, r5 = &the step, r6 = &the group, r7 = &the row.
+void RaceWorldPlaceStartsCurrent(PPCContext& ctx, uint8_t* base);
+void RaceWorldPlaceStarts(PPCContext& ctx, uint8_t* base);
+void RaceWorldPlaceGroupFixed(PPCContext& ctx, uint8_t* base);
+void RaceWorldPlaceGroup(PPCContext& ctx, uint8_t* base);
+void RaceWorldPlaceGroupTwoRows(PPCContext& ctx, uint8_t* base);
+void RaceWorldPlaceGroupSplit(PPCContext& ctx, uint8_t* base);
 
 }  // namespace hooks

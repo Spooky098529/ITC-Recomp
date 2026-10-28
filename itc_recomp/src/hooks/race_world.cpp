@@ -26,7 +26,10 @@ ITC_FLAG_BOOL(native_race_world, true, "ITC",
               "SaveData::AddDistance sub_82116C38; RaceManager::ResetWorld sub_82170668, "
               "ResetVehicles sub_82171718 and RaceWorld::Unload sub_82171250 (only while "
               "--native_heap routes the game's heap to the allocation layer; their callees' "
-              "originals where those refuse) natively instead of through the "
+              "originals where those refuse); RaceEvent::PlaceStartsCurrent sub_82144A38, "
+              "PlaceStarts sub_82144798 with sub_82144874, PlaceGroupFixed sub_821443B0, "
+              "PlaceGroup sub_82143A40, PlaceGroupTwoRows sub_82143B78 and PlaceGroupSplit "
+              "sub_82143920 natively instead of through the "
               "translated code (the same words, bit for bit; checked by "
               "--run_harnesses=race_world)");
 
@@ -244,6 +247,39 @@ void RaceWorldFirstUnsetFlag(PPCContext& ctx, uint8_t* base) {
   ctx.r3.u64 = rw::FirstUnsetFlag(base, ctx.r3.u32);
 }
 
+void RaceWorldPlaceStartsCurrent(PPCContext& ctx, uint8_t* base) {
+  ctx.fpscr.disableFlushMode();
+  rw::PlaceStartsCurrent(base, ctx.r3.u32, ctx.r4.u32, ctx.r1.u32);
+}
+
+void RaceWorldPlaceStarts(PPCContext& ctx, uint8_t* base) {
+  ctx.fpscr.disableFlushMode();
+  rw::PlaceStarts(base, ctx.r3.u32, ctx.r4.u32, ctx.r5.u32, ctx.r1.u32 - 176);
+}
+
+void RaceWorldPlaceGroupFixed(PPCContext& ctx, uint8_t* base) {
+  ctx.fpscr.disableFlushMode();
+  rw::PlaceGroupFixed(base, ctx.r3.u32, ctx.r4.u32, ctx.r5.u32, ctx.r1.u32 - 96);
+}
+
+void RaceWorldPlaceGroup(PPCContext& ctx, uint8_t* base) {
+  ctx.fpscr.disableFlushMode();
+  rw::PlaceGroup(base, ctx.r3.u32, ctx.r4.u32, ctx.r5.u32, ctx.r6.u32, ctx.r7.u32,
+                 ctx.r1.u32 - 192);
+}
+
+void RaceWorldPlaceGroupTwoRows(PPCContext& ctx, uint8_t* base) {
+  ctx.fpscr.disableFlushMode();
+  rw::PlaceGroupTwoRows(base, ctx.r3.u32, ctx.r4.u32, ctx.r5.u32, ctx.r6.u32, ctx.r7.u32,
+                        ctx.r1.u32 - 160);
+}
+
+void RaceWorldPlaceGroupSplit(PPCContext& ctx, uint8_t* base) {
+  ctx.fpscr.disableFlushMode();
+  rw::PlaceGroupSplit(base, ctx.r3.u32, ctx.r4.u32, ctx.r5.u32, ctx.r6.u32, ctx.r7.u32,
+                      ctx.r1.u32 - 176);
+}
+
 }  // namespace hooks
 
 // Defines an adapter: the flag, else the original.
@@ -281,6 +317,12 @@ ITC_RACE_WORLD(82116C38, RaceWorldAddDistance)
 ITC_RACE_WORLD(82170668, RaceWorldResetWorld)
 ITC_RACE_WORLD(82171718, RaceWorldResetVehicles)
 ITC_RACE_WORLD(82171250, RaceWorldUnload)
+ITC_RACE_WORLD(82144A38, RaceWorldPlaceStartsCurrent)
+ITC_RACE_WORLD(82144798, RaceWorldPlaceStarts)
+ITC_RACE_WORLD(821443B0, RaceWorldPlaceGroupFixed)
+ITC_RACE_WORLD(82143A40, RaceWorldPlaceGroup)
+ITC_RACE_WORLD(82143B78, RaceWorldPlaceGroupTwoRows)
+ITC_RACE_WORLD(82143920, RaceWorldPlaceGroupSplit)
 // RaceManager::NearSegment (sub_82170BC0) and RoutePosition::ToMainRoad
 // (sub_82143608) have no adapters: their callers in play
 // (RaceManager::BuildNeighbors, RoutePosition::StepToMainRoad) are native;
@@ -288,3 +330,6 @@ ITC_RACE_WORLD(82171250, RaceWorldUnload)
 // the harness.
 // sub_821708B4 (BranchesMeet's tail) has no adapter: never seen in play, and
 // its only caller is BranchesMeet.
+// sub_82144874 (a case of RaceEvent::PlaceStarts' jump table, split off by
+// the recompiler) has no adapter: its only caller is PlaceStarts, whose
+// plain C++ does its work.
