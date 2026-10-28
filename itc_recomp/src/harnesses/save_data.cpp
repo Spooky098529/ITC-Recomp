@@ -13,6 +13,7 @@
 #include "base/flags.h"
 #include "base/log.h"
 #include "hooks/save_data.h"
+#include "memory/c_runtime_heap.h"
 #include "memory/heap.h"
 #include "save_data/save_data.h"
 
@@ -104,6 +105,52 @@ void Getter(Context& h, const Block& block, const char* name, GuestFunction reco
   results.Report();
 }
 
+// SaveData::Delete on a slot in the scratch area (the player number picked so
+// that the slot's address lands there, so the game's slots aren't touched),
+// holding 0 or a block from operator new's plain C++ (each version its own).
+// The block's address is compared as whether r3 is it, and whether it was
+// freed.
+void Delete(Context& h) {
+  Results results("SaveData::Delete (sub_821055D8)");
+  for (int c = 0; c < 16; c++) {
+    const uint32_t slot = h.data + 4 * h.random.Below(kScratchBytes / 4);
+    const uint32_t player = (slot - save_data::kSlots) >> 2;
+    const bool empty = c % 4 == 0;
+    const uint32_t bytes = 16 + 16 * h.random.Below(64);
+    Outputs out[2];
+    const Random start = h.random;
+    Random after;
+    for (int v = 0; v < 2; v++) {
+      Random random = start;
+      WriteRandom(h.base, h.data, kScratchBytes / 4, random);
+      after = random;
+      uint32_t block = 0;
+      if (!empty) {
+        const auto made = memory::crt::OperatorNew(h.base, bytes);
+        block = made ? *made : 0;
+      }
+      guest::StoreU32(h.base, slot, block);
+      PPCContext t = CallContext(h);
+      t.r3.u64 = player;
+      ITC_FLAG(native_save_data) = v == 1;
+      (v == 0 ? __imp__sub_821055D8 : hooks::SaveDataDelete)(t, h.base);
+      ITC_FLAG(native_save_data) = true;
+      const bool freed = block == 0 || !memory::IsHeapBlock(block);
+      if (!freed) {
+        memory::crt::OperatorDelete(block);
+      }
+      out[v].Bytes(Read(h.base, h.data, kScratchBytes));
+      out[v].Word(t.r3.u32 == block ? 1 : 0);
+      out[v].Word(uint32_t(t.r3.u64 >> 32));
+      out[v].Word(freed ? 1 : 0);
+    }
+    h.random = after;
+    results.Check(out[0], out[1],
+                  fmt::format("case {}: slot +{:X}, {}", c, slot - h.data, empty ? "empty" : "a block"));
+  }
+  results.Report();
+}
+
 }  // namespace
 
 void SaveData(Context& h) {
@@ -132,6 +179,15 @@ void SaveData(Context& h) {
          hooks::SaveDataTable3C24);
   Getter(h, block, "Defaults::Table50E4 (sub_820CCD00)", __imp__sub_820CCD00,
          hooks::SaveDataTable50E4);
+  OnePointer(h, block, "Progress::SetDefaults (sub_82113E60)", __imp__sub_82113E60,
+             hooks::SaveDataProgressSetDefaults, save_data::kProgressBytes, 8);
+  OnePointer(h, block, "ControlMap::SetDefault (sub_821058A8)", __imp__sub_821058A8,
+             hooks::SaveDataControlMapSetDefault, 60, 12);
+  OnePointer(h, block, "Options::SetDefaults (sub_82105940)", __imp__sub_82105940,
+             hooks::SaveDataOptionsSetDefaults, 284, 12);
+  OnePointer(h, block, "CourseRecords::Reset (sub_82105D08)", __imp__sub_82105D08,
+             hooks::SaveDataCourseRecordsReset, 20 + 22 * 408, 12);
+  Delete(h);
 }
 
 }  // namespace harness

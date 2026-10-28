@@ -8,6 +8,7 @@
 #pragma once
 
 #include <cstdint>
+#include <optional>
 
 namespace save_data {
 
@@ -17,6 +18,8 @@ constexpr uint32_t kStats = 48;            // the stats record, 6,044 bytes
 constexpr uint32_t kStatsBytes = 6044;
 constexpr uint32_t kProgressBytes = 0x1D52C;  // what Progress::Clear clears
 constexpr uint32_t kUnlocks = 0x1ACE4;     // BitSet400
+// The play time's frame counter (Progress::SetDefaults copies it to +6088).
+constexpr uint32_t kPlayTimeFrames = 0x826C5B90;
 // The float the set-ups store (0.0, at 0x82000A34 in the xex).
 constexpr uint32_t kZeroFloat = 0x82000A34;
 
@@ -44,6 +47,35 @@ uint32_t StatsReset(uint8_t* base, uint32_t stats);
 uint32_t ProgressClear(uint8_t* base, uint32_t save);
 // sub_821133A8 BitSet400::SetAll: 13 words cleared, then bits 0 to 399 set.
 void BitSet400SetAll(uint8_t* base, uint32_t set);
+
+// sub_82113E60 Progress::SetDefaults: a new game's progress (Progress::Clear,
+// the default tables copied, the unlock bits, the play time). The copies
+// from the tables go through memcpy's plain C++ (native::Buffers_Memcpy);
+// SetDefaultsNative says whether they can (else the adapter runs the
+// original from the start). Returns r3 as the original leaves it: the
+// unlock set (+0x1ACE4).
+bool SetDefaultsNative(uint32_t save);
+uint32_t ProgressSetDefaults(uint8_t* base, uint32_t save);
+
+// sub_821058A8 ControlMap::SetDefault: the 15 default control numbers.
+void ControlMapSetDefault(uint8_t* base, uint32_t map);
+// sub_82105940 Options::SetDefaults: the settings, then the four control
+// maps (+44, +104, +164, +224). Returns r3 as the original leaves it: the
+// last map (+224).
+uint32_t OptionsSetDefaults(uint8_t* base, uint32_t options);
+// sub_82105D08 CourseRecords::Reset: the header, then 22 course records of
+// 408 bytes from +20 (CourseRecord::Reset's plain C++). Returns r3 as the
+// original leaves it: the last CourseRecord::Reset's.
+uint32_t CourseRecordsReset(uint8_t* base, uint32_t records);
+
+// The players' save data slots (SaveData::Of reads them).
+constexpr uint32_t kSlots = 0x826C5B58;
+constexpr uint32_t Slot(uint32_t player) { return kSlots + (player << 2); }
+// sub_821055D8 SaveData::Delete: the slot's block freed (operator delete's
+// plain C++, nothing for 0), the slot 0. Returns r3 as the original leaves
+// it with operator delete's adapter native (the block). nullopt, with
+// nothing done, where the original must run: a block the layer didn't give.
+std::optional<uint32_t> SaveDataDelete(uint8_t* base, uint32_t player);
 
 // The default tables' getters sub_820CCCC0, sub_820CCCD0, sub_820CCCE0,
 // sub_820CCCF0, sub_820CCD00.

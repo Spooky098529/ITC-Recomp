@@ -4,7 +4,12 @@
 #include "save_data/save_data.h"
 
 #include "base/log.h"
+#include "c_runtime/strings.h"
 #include "guest.h"
+#include "memory/c_runtime_heap.h"
+#include "memory/heap.h"
+#include "native/buffers.h"
+#include "race_setup/race_setup.h"
 
 #include <bit>
 #include <cstring>
@@ -191,6 +196,137 @@ void BitSet400SetAll(uint8_t* base, uint32_t set) {
     const uint32_t word = set + 4 * (i >> 5);
     guest::StoreU32(base, word, guest::LoadU32(base, word) | (1u << (i & 31)));
   }
+}
+
+namespace {
+
+// SetDefaults' copies from the tables: {destination offset, bytes, the
+// memcpy call's return address}.
+struct TableCopy {
+  uint32_t offset;
+  uint32_t bytes;
+  uint32_t caller;
+};
+constexpr TableCopy kCopy50A8{0x19930, 60, 0x82113E94};
+constexpr TableCopy kCopy3C24{0x199A8, 28, 0x82113EAC};
+constexpr TableCopy kCopy50E4{0x199C4, 28, 0x82113EC4};
+
+void Copy(uint8_t* base, uint32_t save, uint32_t table, const TableCopy& copy) {
+  if (!native::Buffers_Memcpy(base, save + copy.offset, table, copy.bytes, copy.caller)) {
+    ITC_LOG_ERROR("save_data: Progress::SetDefaults's copy of {:08X} not made natively", table);
+  }
+}
+
+}  // namespace
+
+bool SetDefaultsNative(uint32_t save) {
+  return native::Buffers_NativeMemcpy() &&
+         !c_runtime::MayShare(save + kCopy50A8.offset, kCopy50A8.bytes, kTable50A8, 60) &&
+         !c_runtime::MayShare(save + kCopy3C24.offset, kCopy3C24.bytes, kTable3C24, 28) &&
+         !c_runtime::MayShare(save + kCopy50E4.offset, kCopy50E4.bytes, kTable50E4, 28);
+}
+
+uint32_t ProgressSetDefaults(uint8_t* base, uint32_t s) {
+  ITC_NATIVE_RUNNING("sub_82113E60 Progress::SetDefaults");
+  ProgressClear(base, s);
+  guest::StoreU32(base, s + 0, 1);
+  Copy(base, s, DefaultsTable50A8(), kCopy50A8);
+  Copy(base, s, DefaultsTable3C24(), kCopy3C24);
+  Copy(base, s, DefaultsTable50E4(), kCopy50E4);
+  // Bits set one store at a time: 0x703 at +0x199E0, then +0x199E8 and
+  // +0x199EC cleared and 0xCF0F or'd into +0x199E8.
+  uint32_t bits = 0;
+  guest::StoreU32(base, s + 0x199E0, bits);
+  for (uint32_t bit : {1u, 2u, 0x100u, 0x200u, 0x400u}) {
+    bits |= bit;
+    guest::StoreU32(base, s + 0x199E0, bits);
+  }
+  guest::StoreU32(base, s + 0x199E8, 0);
+  guest::StoreU32(base, s + 0x199EC, 0);
+  bits = guest::LoadU32(base, s + 0x199E8);
+  for (uint32_t bit : {1u, 2u, 4u, 8u, 0x100u, 0x200u, 0x400u, 0x800u, 0x4000u, 0x8000u}) {
+    bits |= bit;
+    guest::StoreU32(base, s + 0x199E8, bits);
+  }
+  // Table3044's 15 words without Table3E34's bits (the original copies the
+  // first to its stack, clears the bits there and copies the stack in).
+  const uint32_t kept = DefaultsTable3044();
+  const uint32_t taken = DefaultsTable3E34();
+  uint32_t words[15];
+  for (uint32_t i = 0; i < 15; i++) {
+    words[i] = guest::LoadU32(base, kept + 4 * i) & ~guest::LoadU32(base, taken + 4 * i);
+  }
+  for (uint32_t i = 0; i < 15; i++) {
+    guest::StoreU32(base, s + 0x1996C + 4 * i, words[i]);
+  }
+  bits = guest::LoadU32(base, s + 0x19924);
+  for (uint32_t bit : {0x1u, 0x2u, 0x10u, 0x20u, 0x40u, 0x80u, 0x100u, 0x400u, 0x800u, 0x1000u,
+                       0x2000u, 0x4000u, 0x8000u, 0x10000u, 0x20000u, 0x80000u, 0x200000u,
+                       0x400000u}) {
+    bits |= bit;
+    guest::StoreU32(base, s + 0x19924, bits);
+  }
+  const uint32_t unlocks = s + kUnlocks;
+  BitSet400SetAll(base, unlocks);
+  for (uint32_t i = 310; i <= 375; i++) {
+    const uint32_t word = unlocks + 4 * (i >> 5);
+    guest::StoreU32(base, word, guest::LoadU32(base, word) & ~(1u << (i & 31)));
+  }
+  guest::StoreU32(base, s + 6088, guest::LoadU32(base, kPlayTimeFrames));
+  return unlocks;
+}
+
+void ControlMapSetDefault(uint8_t* base, uint32_t map) {
+  ITC_NATIVE_RUNNING("sub_821058A8 ControlMap::SetDefault");
+  static constexpr uint32_t kDefaults[15] = {18, 14, 13, 9,  0, 10, 16, 15,
+                                             24, 7,  17, 0, 25, 8,  11};
+  for (uint32_t i = 0; i < 15; i++) {
+    guest::StoreU32(base, map + 4 * i, kDefaults[i]);
+  }
+}
+
+uint32_t OptionsSetDefaults(uint8_t* base, uint32_t o) {
+  ITC_NATIVE_RUNNING("sub_82105940 Options::SetDefaults");
+  for (uint32_t offset : {16u, 0u, 4u, 8u, 20u, 12u}) {
+    guest::StoreU32(base, o + offset, 1);
+  }
+  guest::StoreU32(base, o + 24, 2);
+  for (uint32_t i = 36; i <= 41; i++) {
+    guest::StoreU8(base, o + i, 0);
+  }
+  guest::StoreU8(base, o + 28, 15);
+  guest::StoreU8(base, o + 29, 15);
+  guest::StoreU32(base, o + 32, 0);
+  for (uint32_t offset : {44u, 104u, 164u, 224u}) {
+    ControlMapSetDefault(base, o + offset);
+  }
+  return o + 224;
+}
+
+uint32_t CourseRecordsReset(uint8_t* base, uint32_t c) {
+  ITC_NATIVE_RUNNING("sub_82105D08 CourseRecords::Reset");
+  for (uint32_t offset : {0u, 4u, 8u, 12u}) {
+    guest::StoreU32(base, c + offset, 0);
+  }
+  guest::StoreU16(base, c + 18, 0);
+  guest::StoreU16(base, c + 16, 0);
+  uint32_t r3 = 0;
+  for (uint32_t i = 0; i < 22; i++) {
+    r3 = race_setup::CourseRecordReset(base, c + 20 + 408 * i);
+  }
+  return r3;
+}
+
+std::optional<uint32_t> SaveDataDelete(uint8_t* base, uint32_t player) {
+  ITC_NATIVE_RUNNING("sub_821055D8 SaveData::Delete");
+  const uint32_t slot = Slot(player);
+  const uint32_t block = guest::LoadU32(base, slot);
+  if (block != 0 && !memory::IsHeapBlock(block)) {
+    return std::nullopt;
+  }
+  memory::crt::OperatorDelete(block);
+  guest::StoreU32(base, slot, 0);
+  return block;
 }
 
 uint32_t DefaultsTable50A8() {

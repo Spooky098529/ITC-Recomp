@@ -5,14 +5,18 @@
 #include "hooks/save_data.h"
 
 #include "base/flags.h"
+#include "hooks/heap.h"
 #include "save_data/save_data.h"
 
 ITC_FLAG_BOOL(native_save_data, true, "ITC",
               "Run the players' save data's set-ups (docs/functions/save-data.md: Stats::Stats "
               "sub_821056C0, Stats::ResetRecords sub_821136D8, Stats::Reset sub_82113730, "
-              "Progress::Clear sub_82113BD8, BitSet400::SetAll sub_821133A8 and the default "
+              "Progress::Clear sub_82113BD8, BitSet400::SetAll sub_821133A8, the default "
               "tables' getters sub_820CCCC0, sub_820CCCD0, sub_820CCCE0, sub_820CCCF0 and "
-              "sub_820CCD00) natively instead of through the translated code (the same writes; "
+              "sub_820CCD00, Progress::SetDefaults sub_82113E60 (its copies through memcpy's "
+              "plain C++), ControlMap::SetDefault sub_821058A8, Options::SetDefaults "
+              "sub_82105940, CourseRecords::Reset sub_82105D08 and, with --native_heap, "
+              "SaveData::Delete sub_821055D8) natively instead of through the translated code (the same writes; "
               "checked by --run_harnesses=save_data)");
 
 namespace hooks {
@@ -41,6 +45,38 @@ void SaveDataProgressClear(PPCContext& ctx, uint8_t* base) {
 
 void SaveDataBitSetAll(PPCContext& ctx, uint8_t* base) {
   sd::BitSet400SetAll(base, ctx.r3.u32);
+}
+
+void SaveDataProgressSetDefaults(PPCContext& ctx, uint8_t* base) {
+  if (!sd::SetDefaultsNative(ctx.r3.u32)) {
+    __imp__sub_82113E60(ctx, base);
+    return;
+  }
+  ctx.fpscr.disableFlushMode();
+  ctx.r3.u64 = sd::ProgressSetDefaults(base, ctx.r3.u32);
+}
+
+void SaveDataControlMapSetDefault(PPCContext& ctx, uint8_t* base) {
+  sd::ControlMapSetDefault(base, ctx.r3.u32);
+}
+
+void SaveDataOptionsSetDefaults(PPCContext& ctx, uint8_t* base) {
+  ctx.r7.u64 = ctx.r3.u64;
+  ctx.r3.u64 = sd::OptionsSetDefaults(base, ctx.r3.u32);
+}
+
+void SaveDataCourseRecordsReset(PPCContext& ctx, uint8_t* base) {
+  ctx.r3.u64 = sd::CourseRecordsReset(base, ctx.r3.u32);
+}
+
+void SaveDataDelete(PPCContext& ctx, uint8_t* base) {
+  if (hooks::NativeHeapActive()) {
+    if (const auto block = sd::SaveDataDelete(base, ctx.r3.u32)) {
+      ctx.r3.u64 = *block;
+      return;
+    }
+  }
+  __imp__sub_821055D8(ctx, base);
 }
 
 #define ITC_SAVE_DATA_TABLE(name)                        \
@@ -79,3 +115,8 @@ ITC_SAVE_DATA_ADAPTER(820CCCD0, SaveDataTable3044)
 ITC_SAVE_DATA_ADAPTER(820CCCE0, SaveDataTable3E34)
 ITC_SAVE_DATA_ADAPTER(820CCCF0, SaveDataTable3C24)
 ITC_SAVE_DATA_ADAPTER(820CCD00, SaveDataTable50E4)
+ITC_SAVE_DATA_ADAPTER(82113E60, SaveDataProgressSetDefaults)
+ITC_SAVE_DATA_ADAPTER(821058A8, SaveDataControlMapSetDefault)
+ITC_SAVE_DATA_ADAPTER(82105940, SaveDataOptionsSetDefaults)
+ITC_SAVE_DATA_ADAPTER(82105D08, SaveDataCourseRecordsReset)
+ITC_SAVE_DATA_ADAPTER(821055D8, SaveDataDelete)
