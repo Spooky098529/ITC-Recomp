@@ -278,13 +278,6 @@ extern "C" REX_FUNC(sub_8209DB20) {
   ctx.r3.u64 = archive::Cancel(base, ctx.r3.u32);
 }
 
-// The picker: r3 = the current request, r4 and r5 the finished ones; r3 the
-// next (lwz's).
-extern "C" REX_FUNC(sub_8209D950) {
-  ITC_ARCHIVE_QUEUE_FALLBACK(8209D950)
-  ctx.r3.u64 = archive::PickNext(base, ctx.r3.u32, ctx.r4.u32, ctx.r5.u32);
-}
-
 // The set-up: r3 = the request; r3 read by no caller (the next request sets
 // its own).
 void hooks::ArchiveSetUp(PPCContext& ctx, uint8_t* base) {
