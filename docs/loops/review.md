@@ -32,6 +32,16 @@ When the user has reviewed a run's section, its heading gets
   and recompiled (the loose read `sub_8209DFA8` signals request-done);
   this replaces the 2026-10-24 note that the Semaphore class stays
   recompiled for the archive loader.
+- The archive's migration 1 (47d1ab1..eac2d83, `--native_archive`): 14
+  functions ours (rows in `archive.md` and `files-and-saves.md`). For
+  review: `hooks::VirtualFree` exported from `src/hooks/heap.cpp` for
+  the request finish's decommit (does nothing in the allocation layer);
+  the request finish's callback and `LoaderFunctor::Invoke`'s tail call
+  stay guest calls through `ctx` from their adapters; `Ucl::Unpack`'s
+  stored-block copy goes through `native::Buffers_Memcpy`; the harness
+  takes the game's queue lock (translated `Semaphore::Wait`/`Signal`)
+  around cases touching the live queue; Ucl cases use an NRV2B encoder
+  in the harness and 16 assets from BUILD.DAT.
 
 ## Run 2026-10-28 08:36 (`b7-loop-28-10-26`)
 

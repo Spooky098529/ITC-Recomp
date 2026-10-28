@@ -18,8 +18,13 @@ file's history. What's left to see in a drive, from every run:
   passed. The user's call (2026-10-28): the four become host counting
   semaphores with a readable count, shared by every user, native and
   recompiled (the recompiled loose read reaches them through an
-  adapter); the game's Semaphore class stays recompiled otherwise. Step: migration 1 of the ready groups (agent
-  running).
+  adapter); the game's Semaphore class stays recompiled otherwise. Migration 1 done (47d1ab1..eac2d83): the 14 ready
+  functions ours under `--native_archive` (Toc, AssetSize, the request
+  list, slot lookup, loose files, static set-ups, request finish,
+  `LoaderFunctor::Invoke`, Ucl); 38 s, 0 errors, every harness 0
+  differing; nothing left ready but the semaphore users. Step:
+  validation of migration 1 (agent running), then migration 2 (the
+  semaphores, by the user's call).
 
 ## Done
 
@@ -43,6 +48,8 @@ Nothing yet.
   unknown 3294).
 - After the archive's map: ours 2540, work left 3920 (wrapped 103,
   known 534, unknown 3283).
+- After the archive's migration 1: ours 2554, work left 3906 (wrapped
+  103, known 520, unknown 3283).
 
 ## Stopped
 
