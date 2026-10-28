@@ -40,4 +40,19 @@ void CarSoundsSetUp(PPCContext& ctx, uint8_t* base);  // sub_8210DDC8
 bool CarSoundsGlobalsNative();
 void CarSoundsGlobalsInit(PPCContext& ctx, uint8_t* base);  // sub_82110258
 
+// X3DAudio (car_sounds/x3daudio.h); each turns the host's flush to zero off
+// first, as the original's float instructions do. The vectors: r3 = a,
+// r4 = b, r5 = the out vector (r3 left); Length and Dot into f1.
+void CarSoundsX3DVecSub(PPCContext& ctx, uint8_t* base);     // sub_824819E0
+void CarSoundsX3DVecLength(PPCContext& ctx, uint8_t* base);  // sub_82481998
+void CarSoundsX3DVecDot(PPCContext& ctx, uint8_t* base);     // sub_824819B8
+void CarSoundsX3DVecCross(PPCContext& ctx, uint8_t* base);   // sub_82481A18
+// r3 = the curve, f1 = the scaler, f2 = the distance; f1 (r3 left).
+void CarSoundsX3DEvaluateCurve(PPCContext& ctx, uint8_t* base);  // sub_82480818
+// r3 = the handle, r4 = the emitter, r5 = the flags, r6 = the DSP settings:
+// the original's 128-byte frame below r1 written as it leaves it (the back
+// chain, the saved lr and r31, the default curves); r3 the last curve
+// evaluated, as the original leaves it.
+void CarSoundsX3DCurves(PPCContext& ctx, uint8_t* base);  // sub_82480918
+
 }  // namespace hooks

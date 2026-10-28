@@ -6,6 +6,7 @@
 
 #include "base/flags.h"
 #include "car_sounds/car_sounds.h"
+#include "car_sounds/x3daudio.h"
 #include "hooks/guest_call.h"
 #include "hooks/heap.h"
 #include "hooks/mode_tick.h"
@@ -22,7 +23,10 @@ ITC_FLAG_BOOL(native_car_sounds, true, "ITC",
               "EngineSound::EngineSound sub_8210CBA0 (no adapter: only its plain C++ calls it); CarSounds::Destroy sub_8210DCA8 (operator "
               "delete through its plain C++); CarSound::SetUp sub_8210DDC8 (operator new[] through "
               "its plain C++); SoundGlobals::Init sub_82110258 (with the memory blocks native: "
-              "Memory::AllocPhysicalEx's, Music::Play's and X3DAudioInitialize's plain C++)) natively instead of through the translated code "
+              "Memory::AllocPhysicalEx's, Music::Play's and X3DAudioInitialize's plain C++); X3DAudio's "
+              "X3DVec::Sub sub_824819E0, Length sub_82481998, Dot sub_824819B8 and Cross "
+              "sub_82481A18, X3DAudio::EvaluateCurve sub_82480818 and X3DAudio::Curves "
+              "sub_82480918 (checked by --run_harnesses=x3daudio)) natively instead of through the translated code "
               "(the same reads and writes; XAudio's voice methods stay the game's; checked by "
               "--run_harnesses=car_sounds)");
 
@@ -116,6 +120,46 @@ void CarSoundsGlobalsInit(PPCContext& ctx, uint8_t* base) {
   ctx.r3.u64 = cs::SoundGlobalsInit3D(base);
 }
 
+void CarSoundsX3DVecSub(PPCContext& ctx, uint8_t* base) {
+  ctx.fpscr.disableFlushMode();
+  x3daudio::VecSub(base, ctx.r3.u32, ctx.r4.u32, ctx.r5.u32);
+}
+
+void CarSoundsX3DVecLength(PPCContext& ctx, uint8_t* base) {
+  ctx.fpscr.disableFlushMode();
+  ctx.f1.f64 = double(x3daudio::VecLength(base, ctx.r3.u32));
+}
+
+void CarSoundsX3DVecDot(PPCContext& ctx, uint8_t* base) {
+  ctx.fpscr.disableFlushMode();
+  ctx.f1.f64 = double(x3daudio::VecDot(base, ctx.r3.u32, ctx.r4.u32));
+}
+
+void CarSoundsX3DVecCross(PPCContext& ctx, uint8_t* base) {
+  ctx.fpscr.disableFlushMode();
+  x3daudio::VecCross(base, ctx.r3.u32, ctx.r4.u32, ctx.r5.u32);
+}
+
+void CarSoundsX3DEvaluateCurve(PPCContext& ctx, uint8_t* base) {
+  ctx.fpscr.disableFlushMode();
+  ctx.f1.f64 = double(x3daudio::EvaluateCurve(base, ctx.r3.u32, ctx.f1.f64, ctx.f2.f64));
+}
+
+void CarSoundsX3DCurves(PPCContext& ctx, uint8_t* base) {
+  ctx.fpscr.disableFlushMode();
+  // The original's prologue: lr at r1 - 8, r31 at r1 - 16, the back chain.
+  const uint32_t frame = ctx.r1.u32 - 128;
+  guest::StoreU32(base, ctx.r1.u32 - 8, uint32_t(ctx.lr));
+  REX_STORE_U64(ctx.r1.u32 - 16, ctx.r31.u64);
+  guest::StoreU32(base, frame, ctx.r1.u32);
+  if (const uint32_t r3 = x3daudio::Curves(base, ctx.r4.u32, ctx.r5.u32, ctx.r6.u32, frame)) {
+    ctx.r3.u64 = r3;
+  }
+  // The epilogue's r12 and lr: the saved word.
+  ctx.r12.u64 = uint32_t(ctx.lr);
+  ctx.lr = ctx.r12.u64;
+}
+
 }  // namespace hooks
 
 #define ITC_CAR_SOUNDS_ADAPTER(address, step) \
@@ -140,6 +184,12 @@ ITC_CAR_SOUNDS_ADAPTER(8210CA28, CarSoundsTireSoundAmount)
 ITC_CAR_SOUNDS_ADAPTER(8210CC18, CarSoundsCarSoundConstruct)
 ITC_CAR_SOUNDS_ADAPTER(8210DCA8, CarSoundsDestroy)
 ITC_CAR_SOUNDS_ADAPTER(8210DDC8, CarSoundsSetUp)
+ITC_CAR_SOUNDS_ADAPTER(824819E0, CarSoundsX3DVecSub)
+ITC_CAR_SOUNDS_ADAPTER(82481998, CarSoundsX3DVecLength)
+ITC_CAR_SOUNDS_ADAPTER(824819B8, CarSoundsX3DVecDot)
+ITC_CAR_SOUNDS_ADAPTER(82481A18, CarSoundsX3DVecCross)
+ITC_CAR_SOUNDS_ADAPTER(82480818, CarSoundsX3DEvaluateCurve)
+ITC_CAR_SOUNDS_ADAPTER(82480918, CarSoundsX3DCurves)
 
 extern "C" REX_FUNC(sub_82110258) {
   REX_FUNC_PROLOGUE();
