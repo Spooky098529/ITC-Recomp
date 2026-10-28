@@ -112,4 +112,32 @@ std::optional<uint64_t> GameDataLoad(uint8_t* base, uint32_t player);
 // isn't ours (it only reads).
 std::optional<uint32_t> GameDataCheck(uint8_t* base, uint32_t player);
 
+// sub_822902A0 Replays::Count: `*out` = 0, then on the slot of player 0's
+// controller: 3 for no device (state 2), 4 when not ready or a request is
+// pending; else the enumerated saves whose file name starts with "rep"
+// counted into `*out`, and 7. nullopt where a target isn't ours (the
+// original then runs from the start, writing `*out` again).
+std::optional<uint32_t> ReplaysCount(uint8_t* base, uint32_t out);
+// sub_822900E0 Replays::ReadEntry's checks: 3 for no device, 4 when not
+// ready or pending, 5 when the save's file name doesn't start with "rep".
+// nullopt, with nothing done, for a "rep" save (its parse, by sscanf and
+// wcsncpy_s, never seen in play: the original runs) or a target not ours.
+std::optional<uint32_t> ReplaysReadEntry(uint8_t* base, uint32_t index, uint32_t record,
+                                         uint32_t entry);
+
+// sub_82290378 Replays::BuildList, in its frame at `frame` (the count at
+// +80): Replays::Count; unless that's 7, its answer. The old lists freed
+// (+12 and +16, VirtualFree's plain C++, not cleared), new ones for the
+// count (plus an empty first entry when under 99 and `add_empty`) made
+// (VirtualAlloc's), each enumerated save read (ReadEntry's plain C++, or
+// `read_entry` through the guest where it hands back), and the records
+// sorted (Replays::Sort's plain C++, its copy in Sort's frame below);
+// returns 7, or ReadEntry's 3 or 4. ReplaysBuildListNative says whether it
+// can run natively: the native heap and memcpy's plain C++ on, the old
+// lists 0 or the layer's pages.
+bool ReplaysBuildListNative(uint8_t* base);
+std::optional<uint32_t> ReplaysBuildList(
+    uint8_t* base, uint32_t add_empty, uint32_t frame,
+    const std::function<uint32_t(uint32_t index, uint32_t record, uint32_t entry)>& read_entry);
+
 }  // namespace save_interface

@@ -392,6 +392,44 @@ void SaveBuffers(Context& h) {
   }
 }
 
+// Up to four enumerated saves at `b` + kRecords (308 bytes each: the
+// display name at +8, the file name at +264), named SystemData.bin, "rex",
+// random bytes, or (with `reps`) a replay's name in the game's format with
+// a short display name; every slot's enumeration buffer there, with 0 to 4
+// saves, nothing pending in even cases.
+void Enumerated(uint8_t* base, uint32_t b, uint32_t c, Random& random, bool reps) {
+  for (uint32_t e = 0; e < 4; e++) {
+    const uint32_t save = b + kRecords + 308 * e;
+    const uint32_t pick = random.Below(reps ? 4 : 3);
+    if (pick == 0) {
+      Write(base, save + 264, "SystemData.bin", 15);
+    } else if (pick == 1) {
+      Write(base, save + 264, "rex", 4);
+    } else if (pick == 2) {
+      RandomString(base, save + 264, 20, false, random);
+      guest::StoreU8(base, save + 264, 's');
+    } else {
+      const std::string name = fmt::format("rep_{}_{}_{}_{}_{}_{}_{}_{}_{}_{}_{}_{}", 2006 + random.Below(3),
+                                           1 + random.Below(12), 1 + random.Below(28), random.Below(24),
+                                           random.Below(60), random.Below(60), random.Below(60),
+                                           random.Below(60), random.Below(1000), random.Below(4),
+                                           1 + random.Below(9), random.Below(3));
+      Write(base, save + 264, name.c_str(), uint32_t(name.size() + 1));
+      RandomString(base, save + 8, 20, true, random);
+    }
+  }
+  for (uint32_t s = 0; s < 3; s++) {
+    const uint32_t slot = b + kSlots + 1000 * s;
+    guest::StoreU32(base, slot + 80, b + kRecords);
+    guest::StoreU32(base, slot + 984, random.Below(5));
+    if (c % 2 == 0) {
+      for (uint32_t word = 960; word <= 980; word += 4) {
+        guest::StoreU32(base, slot + word, 0);
+      }
+    }
+  }
+}
+
 }  // namespace
 
 void SaveInterface(Context& h) {
@@ -653,6 +691,98 @@ void SaveInterface(Context& h) {
         },
         false, false, load);
     memory::Free(buffer);
+  }
+  Run(h, block, "Replays::Count (sub_822902A0)", __imp__sub_822902A0,
+      hooks::SaveInterfaceReplaysCount, 32, [&](PPCContext& t, uint32_t b, uint32_t c, Random& random) {
+        Enumerated(h.base, b, c, random, true);
+        t.r3.u64 = data + 0x600;
+      });
+  Run(h, block, "Replays::ReadEntry (sub_822900E0)", __imp__sub_822900E0,
+      hooks::SaveInterfaceReplaysReadEntry, 32,
+      [&](PPCContext& t, uint32_t b, uint32_t c, Random& random) {
+        // No replays' names here: their parse, never seen in play, is the
+        // original's on both sides (BuildList's cases reach it).
+        Enumerated(h.base, b, c, random, false);
+        t.r3.u64 = random.Below(4);
+        t.r4.u64 = data + 0x700;
+        t.r5.u64 = data + 0x780;
+      });
+  {
+    // BuildList over the layer's pages, the save buffers' header in the
+    // scratch area: its old lists made by each version before the call and
+    // its new ones compared (as offsets and bytes) and freed after; the
+    // count it keeps in its frame (r1 - 64). Sort's copy (r1 - 240) isn't
+    // compared here (Sort's cases do): without a swap the original leaves
+    // there the back chain of SaveInterface::SaveCount's frame, which the
+    // plain C++ doesn't make.
+    Results results("Replays::BuildList (sub_82290378)");
+    const uint32_t live = guest::LoadU32(h.base, si::kSaveBuffers);
+    for (int c = 0; c < 24; c++) {
+      Outputs out[2];
+      const Random start = h.random;
+      Random after;
+      for (int v = 0; v < 2; v++) {
+        Random random = start;
+        WriteRandom(h.base, h.data, kScratchBytes / 4, random);
+        WriteRandom(h.base, block.address, kBlockBytes / 4, random);
+        Link(h.base, block.address, random, false);
+        Enumerated(h.base, block.address, uint32_t(c), random, c % 3 == 0);
+        const uint32_t header = data + kHeader;
+        const uint32_t old_records = random.Below(2) ? memory::AllocPages(36 * 4, 4096) : 0;
+        const uint32_t old_entries = random.Below(2) ? memory::AllocPages(304 * 4, 4096) : 0;
+        guest::StoreU32(h.base, header + 12, old_records);
+        guest::StoreU32(h.base, header + 16, old_entries);
+        PPCContext t = CallContext(h);
+        WriteRandom(h.base, t.r1.u32 - 64, 1, random);
+        t.r3.u64 = random.Below(2);
+        after = random;
+        const uint32_t live_interface = guest::LoadU32(h.base, si::kInterfaceGlobal);
+        guest::StoreU32(h.base, si::kInterfaceGlobal, block.address + kInterface);
+        guest::StoreU32(h.base, si::kSaveBuffers, header);
+        ITC_FLAG(native_save_interface) = v == 1;
+        (v == 0 ? __imp__sub_82290378 : hooks::SaveInterfaceReplaysBuildList)(t, h.base);
+        ITC_FLAG(native_save_interface) = true;
+        guest::StoreU32(h.base, si::kSaveBuffers, live);
+        guest::StoreU32(h.base, si::kInterfaceGlobal, live_interface);
+        out[v].Word(t.r3.u32);
+        out[v].Word(uint32_t(t.r3.u64 >> 32));
+        out[v].Word(old_records != 0 && memory::IsPages(old_records) ? 1 : 0);
+        out[v].Word(old_entries != 0 && memory::IsPages(old_entries) ? 1 : 0);
+        const uint32_t records = guest::LoadU32(h.base, header + 12);
+        const uint32_t entries = guest::LoadU32(h.base, header + 16);
+        const uint32_t count = guest::LoadU32(h.base, header + 20);
+        const bool fresh = records != old_records;
+        out[v].Word(fresh ? 1 : 0);
+        out[v].Word(count);
+        if (fresh) {
+          out[v].Word(records != 0 && memory::IsPages(records) ? 1 : 0);
+          out[v].Word(entries != 0 && memory::IsPages(entries) ? 1 : 0);
+          if (records != 0 && count < 8) {
+            out[v].Bytes(Read(h.base, records, 36 * count));
+          }
+          if (entries != 0 && count < 8) {
+            out[v].Bytes(Read(h.base, entries, 304 * count));
+          }
+          if (records != 0) {
+            memory::FreePages(records);
+          }
+          if (entries != 0) {
+            memory::FreePages(entries);
+          }
+        }
+        for (const uint32_t old : {old_records, old_entries}) {
+          if (old != 0 && memory::IsPages(old)) {
+            memory::FreePages(old);
+          }
+        }
+        out[v].Bytes(Read(h.base, t.r1.u32 - 64, 4));
+        out[v].Bytes(Read(h.base, block.address, kBlockBytes));
+        out[v].Bytes(Read(h.base, h.data, kHeader));
+      }
+      h.random = after;
+      results.Check(out[0], out[1], fmt::format("case {}", c));
+    }
+    results.Report();
   }
   Run(h, block, "GameData::Check (sub_8228FC50)", __imp__sub_8228FC50,
       hooks::SaveInterfaceGameDataCheck, 32, [&](PPCContext& t, uint32_t b, uint32_t c, Random& random) {

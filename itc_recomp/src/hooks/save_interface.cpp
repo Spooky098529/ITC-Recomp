@@ -30,7 +30,9 @@ ITC_FLAG_BOOL(native_save_interface, true, "ITC",
               "only Destroy's plain C++ calls it) and Destroy sub_8228F8F8, Replays::Sort "
               "sub_8228F840 (its copies through memcpy's plain C++), the play time's "
               "sub_821109B8 and PlayTime::Update sub_82112838; GameData::Save sub_8228FB00 (GetLocalTime "
-              "through the guest), Load sub_8228FBC0 and the game data's check sub_8228FC50) natively instead of through the "
+              "through the guest), Load sub_8228FBC0 and the game data's check sub_8228FC50; the replays' Count sub_822902A0, "
+              "ReadEntry sub_822900E0 (its parse of a replay's name, never in play, on the translated "
+              "code) and, with --native_heap, BuildList sub_82290378) natively instead of through the "
               "translated code (the same reads and writes; the original where a vtable target "
               "isn't ours; checked by --run_harnesses=save_interface)");
 
@@ -181,6 +183,9 @@ ITC_SAVE_INTERFACE_WRAPPER(8228F9E8, SaveInterfacePlayerSlotState,
 ITC_SAVE_INTERFACE_WRAPPER(8228FA90, SaveInterfacePlayerDevice, si::PlayerDevice(base, ctx.r3.u32))
 ITC_SAVE_INTERFACE_WRAPPER(8228FAC8, SaveInterfacePlayerPending,
                            si::PlayerPending(base, ctx.r3.u32))
+ITC_SAVE_INTERFACE_WRAPPER(822902A0, SaveInterfaceReplaysCount, si::ReplaysCount(base, ctx.r3.u32))
+ITC_SAVE_INTERFACE_WRAPPER(822900E0, SaveInterfaceReplaysReadEntry,
+                           si::ReplaysReadEntry(base, ctx.r3.u32, ctx.r4.u32, ctx.r5.u32))
 ITC_SAVE_INTERFACE_WRAPPER(8228FBC0, SaveInterfaceGameDataLoad, si::GameDataLoad(base, ctx.r3.u32))
 ITC_SAVE_INTERFACE_WRAPPER(8228FC50, SaveInterfaceGameDataCheck,
                            si::GameDataCheck(base, ctx.r3.u32))
@@ -251,6 +256,31 @@ void SaveInterfaceGameDataSave(PPCContext& ctx, uint8_t* base) {
     return;
   }
   __imp__sub_8228FB00(ctx, base);
+}
+
+void SaveInterfaceReplaysBuildList(PPCContext& ctx, uint8_t* base) {
+  if (!si::ReplaysBuildListNative(base)) {
+    __imp__sub_82290378(ctx, base);
+    return;
+  }
+  const uint64_t stack = ctx.r1.u64;
+  const uint32_t frame = ctx.r1.u32 - 144;
+  guest::StoreU32(base, frame, ctx.r1.u32);  // the frame's back chain, as the original's
+  const auto read_entry = [&](uint32_t index, uint32_t record, uint32_t entry) {
+    ctx.r1.u64 = frame;
+    ctx.r3.u64 = index;
+    ctx.r4.u64 = record;
+    ctx.r5.u64 = entry;
+    ctx.lr = 0x822904E0;
+    sub_822900E0(ctx, base);
+    ctx.r1.u64 = stack;
+    return ctx.r3.u32;
+  };
+  if (const auto r3 = si::ReplaysBuildList(base, ctx.r3.u32, frame, read_entry)) {
+    ctx.r3.u64 = *r3;
+    return;
+  }
+  __imp__sub_82290378(ctx, base);
 }
 
 void SaveInterfaceReplaysSort(PPCContext& ctx, uint8_t* base) {
@@ -338,3 +368,6 @@ ITC_SAVE_INTERFACE_ADAPTER(82112838, SaveInterfacePlayTimeUpdate)
 ITC_SAVE_INTERFACE_ADAPTER(8228FB00, SaveInterfaceGameDataSave)
 ITC_SAVE_INTERFACE_ADAPTER(8228FBC0, SaveInterfaceGameDataLoad)
 ITC_SAVE_INTERFACE_ADAPTER(8228FC50, SaveInterfaceGameDataCheck)
+ITC_SAVE_INTERFACE_ADAPTER(822902A0, SaveInterfaceReplaysCount)
+ITC_SAVE_INTERFACE_ADAPTER(822900E0, SaveInterfaceReplaysReadEntry)
+ITC_SAVE_INTERFACE_ADAPTER(82290378, SaveInterfaceReplaysBuildList)

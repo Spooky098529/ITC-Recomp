@@ -82,4 +82,13 @@ void SaveInterfaceGameDataSave(PPCContext& ctx, uint8_t* base);
 void SaveInterfaceGameDataLoad(PPCContext& ctx, uint8_t* base);
 void SaveInterfaceGameDataCheck(PPCContext& ctx, uint8_t* base);
 
+// sub_822902A0 Replays::Count: r3 = the count (out).
+void SaveInterfaceReplaysCount(PPCContext& ctx, uint8_t* base);
+// sub_822900E0 Replays::ReadEntry: r3 = the save's index, r4 = the record,
+// r5 = the list entry; the original for a "rep" save.
+void SaveInterfaceReplaysReadEntry(PPCContext& ctx, uint8_t* base);
+// sub_82290378 Replays::BuildList: r3 = add an empty first entry; its frame
+// r1 - 144 (ReadEntry's original a guest call from it).
+void SaveInterfaceReplaysBuildList(PPCContext& ctx, uint8_t* base);
+
 }  // namespace hooks

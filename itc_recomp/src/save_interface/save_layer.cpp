@@ -354,6 +354,149 @@ std::optional<uint32_t> GameDataCheck(uint8_t* base, uint32_t player) {
   return *free >= size ? 0 : 2;
 }
 
+namespace {
+
+bool StartsWithRep(uint8_t* base, uint32_t name) {
+  return guest::LoadU8(base, name + 0) == 'r' && guest::LoadU8(base, name + 1) == 'e' &&
+         guest::LoadU8(base, name + 2) == 'p';
+}
+
+// Player 0's slot, as the replays' functions find it each time.
+std::optional<uint32_t> ReplaySlot(uint8_t* base) {
+  return SlotOfController(base, ControllerOf(base, 0));
+}
+
+}  // namespace
+
+std::optional<uint32_t> ReplaysCount(uint8_t* base, uint32_t out) {
+  const auto slot = ReplaySlot(base);
+  if (!slot) {
+    return std::nullopt;
+  }
+  const auto state = InterfaceSlotState(base, *slot);
+  const auto count = InterfaceSaveCount(base, *slot);
+  const auto pending = InterfacePending(base, *slot);
+  if (!state || !count || !pending || !InterfaceSaveAt(base, *slot, 0)) {
+    return std::nullopt;
+  }
+  ITC_NATIVE_RUNNING("sub_822902A0 Replays::Count");
+  Store(base, out, 0);
+  if (int32_t(*state) == 2) {
+    return 3;
+  }
+  if (int32_t(*state) != 3 || uint32_t(*pending) != 0) {
+    return 4;
+  }
+  for (int32_t i = 0; i < int32_t(*count); i++) {
+    const uint32_t name = uint32_t(*InterfaceSaveAt(base, *ReplaySlot(base), uint64_t(i)) + 264);
+    if (StartsWithRep(base, name)) {
+      Store(base, out, Load(base, out) + 1);
+    }
+  }
+  return 7;
+}
+
+std::optional<uint32_t> ReplaysReadEntry(uint8_t* base, uint32_t index, uint32_t, uint32_t) {
+  const auto slot = ReplaySlot(base);
+  if (!slot) {
+    return std::nullopt;
+  }
+  const auto state = InterfaceSlotState(base, *slot);
+  const auto pending = InterfacePending(base, *slot);
+  const auto save = InterfaceSaveAt(base, *slot, index);
+  if (!state || !pending || !save) {
+    return std::nullopt;
+  }
+  if (int32_t(*state) == 2) {
+    ITC_NATIVE_RUNNING("sub_822900E0 Replays::ReadEntry");
+    return 3;
+  }
+  if (int32_t(*state) != 3 || uint32_t(*pending) != 0) {
+    ITC_NATIVE_RUNNING("sub_822900E0 Replays::ReadEntry");
+    return 4;
+  }
+  if (StartsWithRep(base, uint32_t(*save + 264))) {
+    return std::nullopt;
+  }
+  ITC_NATIVE_RUNNING("sub_822900E0 Replays::ReadEntry");
+  return 5;
+}
+
+bool ReplaysBuildListNative(uint8_t* base) {
+  if (!hooks::NativeHeapActive() || !native::Buffers_NativeMemcpy()) {
+    return false;
+  }
+  const uint32_t header = Load(base, kSaveBuffers);
+  for (uint32_t offset : {12u, 16u}) {
+    const uint32_t list = Load(base, header + offset);
+    if (list != 0 && !memory::IsPages(list)) {
+      return false;
+    }
+  }
+  return true;
+}
+
+std::optional<uint32_t> ReplaysBuildList(
+    uint8_t* base, uint32_t add_empty, uint32_t frame,
+    const std::function<uint32_t(uint32_t index, uint32_t record, uint32_t entry)>& read_entry) {
+  const auto counted = ReplaysCount(base, frame + 80);
+  if (!counted) {
+    return std::nullopt;
+  }
+  ITC_NATIVE_RUNNING("sub_82290378 Replays::BuildList");
+  if (*counted != 7) {
+    return *counted;
+  }
+  uint32_t header = Load(base, kSaveBuffers);
+  if (const uint32_t records = Load(base, header + 12); records != 0) {
+    memory::FreePages(records);  // VirtualFree(records, 0, MEM_RELEASE)
+    header = Load(base, kSaveBuffers);
+  }
+  if (const uint32_t entries = Load(base, header + 16); entries != 0) {
+    memory::FreePages(entries);
+  }
+  uint32_t count = Load(base, frame + 80);
+  uint32_t records, entries;
+  // VirtualAlloc(0, size, MEM_COMMIT, PAGE_READWRITE) each.
+  if (int32_t(count) < 99 && add_empty != 0) {
+    count++;
+    Store(base, Load(base, kSaveBuffers) + 12, memory::AllocPages(count * 36, 4096));
+    Store(base, Load(base, kSaveBuffers) + 16, memory::AllocPages(count * 304, 4096));
+    Store(base, Load(base, Load(base, kSaveBuffers) + 12) + 28, 0);
+    Store(base, Load(base, Load(base, kSaveBuffers) + 16) + 300, 0);
+    header = Load(base, kSaveBuffers);
+    records = Load(base, header + 12) + 36;
+    entries = Load(base, header + 16) + 304;
+  } else {
+    Store(base, Load(base, kSaveBuffers) + 12, memory::AllocPages(count * 36, 4096));
+    Store(base, Load(base, kSaveBuffers) + 16, memory::AllocPages(count * 304, 4096));
+    header = Load(base, kSaveBuffers);
+    records = Load(base, header + 12);
+    entries = Load(base, header + 16);
+  }
+  Store(base, header + 20, count);
+  const auto saves = [&] { return *InterfaceSaveCount(base, *ReplaySlot(base)); };
+  if (saves() != 0) {
+    uint32_t index = 0;
+    do {
+      const auto native = ReplaysReadEntry(base, index, records, entries);
+      const uint32_t answer = native ? *native : read_entry(index, records, entries);
+      if (int32_t(answer) >= 3) {
+        if (int32_t(answer) <= 4) {
+          return answer;
+        }
+        if (answer == 6) {
+          records += 36;
+          entries += 304;
+        }
+      }
+      index++;
+    } while (index < saves());
+  }
+  ReplaysSort(base, Load(base, Load(base, kSaveBuffers) + 12), frame - 176 + 80);
+  return 7;
+}
+
 uint32_t PlayTimeUpdate(uint8_t* base, uint32_t save, uint32_t out) {
   ITC_NATIVE_RUNNING("sub_82112838 PlayTime::Update");
   PlayTimeAdd(base, out, save + 48);
