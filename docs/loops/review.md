@@ -11,6 +11,10 @@ functions to check in a drive in the progress file.
 When the user has reviewed a run's section, its heading gets
 "(reviewed <date>)"; the section stays for the record.
 
+## Run 2026-10-28 18:45 (`b7-loop-28-10-26-2`)
+
+Nothing yet.
+
 ## Run 2026-10-28 08:36 (`b7-loop-28-10-26`)
 
 - Texture compression (map f1c484c): `docs/functions/texture-compression.md`,
