@@ -238,6 +238,8 @@ void SaveInterfacePlayTimeUpdate(PPCContext& ctx, uint8_t* base) {
 // for the harness) for the display name's copy sub_82295D48. None for
 // SaveBuffers::FreeReplayList sub_8228F7E8 either: its one caller,
 // SaveBuffers::Destroy, is ours (its register step is the harness's).
+// No adapter (removed 2026-10-28: only `SaveSlots::RequestDevice`'s plain C++ calls it in play)
+// for SaveInterface::RequestDevice sub_820A0208.
 
 #define ITC_SAVE_INTERFACE_ADAPTER(address, step) \
   extern "C" REX_FUNC(sub_##address) {            \
@@ -267,7 +269,6 @@ ITC_SAVE_INTERFACE_ADAPTER(820A53E8, SaveInterfaceSlotRequestLoad)
 ITC_SAVE_INTERFACE_ADAPTER(82295C18, SaveInterfaceContentSize)
 ITC_SAVE_INTERFACE_ADAPTER(8209FFB8, SaveInterfaceInit)
 ITC_SAVE_INTERFACE_ADAPTER(820A0018, SaveInterfaceSlotStateOf)
-ITC_SAVE_INTERFACE_ADAPTER(820A0208, SaveInterfaceRequestDevice)
 ITC_SAVE_INTERFACE_ADAPTER(820A02C8, SaveInterfaceSaveCount)
 ITC_SAVE_INTERFACE_ADAPTER(820A0320, SaveInterfaceFreeBytes)
 ITC_SAVE_INTERFACE_ADAPTER(820A0378, SaveInterfacePending)
