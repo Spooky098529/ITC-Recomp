@@ -302,7 +302,6 @@ ITC_RACE_WORLD(82170560, RaceWorldOnPausedTick)
 ITC_RACE_WORLD(82171360, RaceWorldRelease)
 ITC_RACE_WORLD(82170F18, RaceWorldStepToMainRoad)
 ITC_RACE_WORLD(82143508, RaceWorldRaceEventEntry)
-ITC_RACE_WORLD(82143150, RaceWorldPlaceEntry)
 ITC_RACE_WORLD(82112190, RaceWorldFirstUnsetFlag)
 ITC_RACE_WORLD(821715B8, RaceWorldCreate)
 ITC_RACE_WORLD(82172F90, RaceWorldNoteMarkedRacer)
@@ -318,11 +317,6 @@ ITC_RACE_WORLD(82170668, RaceWorldResetWorld)
 ITC_RACE_WORLD(82171718, RaceWorldResetVehicles)
 ITC_RACE_WORLD(82171250, RaceWorldUnload)
 ITC_RACE_WORLD(82144A38, RaceWorldPlaceStartsCurrent)
-ITC_RACE_WORLD(82144798, RaceWorldPlaceStarts)
-ITC_RACE_WORLD(821443B0, RaceWorldPlaceGroupFixed)
-ITC_RACE_WORLD(82143A40, RaceWorldPlaceGroup)
-ITC_RACE_WORLD(82143B78, RaceWorldPlaceGroupTwoRows)
-ITC_RACE_WORLD(82143920, RaceWorldPlaceGroupSplit)
 // RaceManager::NearSegment (sub_82170BC0) and RoutePosition::ToMainRoad
 // (sub_82143608) have no adapters: their callers in play
 // (RaceManager::BuildNeighbors, RoutePosition::StepToMainRoad) are native;
@@ -333,3 +327,9 @@ ITC_RACE_WORLD(82143920, RaceWorldPlaceGroupSplit)
 // sub_82144874 (a case of RaceEvent::PlaceStarts' jump table, split off by
 // the recompiler) has no adapter: its only caller is PlaceStarts, whose
 // plain C++ does its work.
+// RaceEvent::PlaceEntry (sub_82143150), PlaceStarts (sub_82144798),
+// PlaceGroupFixed (sub_821443B0), PlaceGroup (sub_82143A40),
+// PlaceGroupTwoRows (sub_82143B78) and PlaceGroupSplit (sub_82143920) have
+// no adapters: their callers are native (PlaceStartsCurrent's plain C++ and
+// each other's); --native_race_world switches PlaceStartsCurrent. Their
+// register steps stay for the harness.
