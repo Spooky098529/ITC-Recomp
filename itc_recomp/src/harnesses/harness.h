@@ -204,5 +204,6 @@ void CRuntimeFormat(Context& h);
 void RaceWorld(Context& h);
 void RaceStates(Context& h);
 void TextureCompression(Context& h);
+void SaveInterface(Context& h);
 
 }  // namespace harness
