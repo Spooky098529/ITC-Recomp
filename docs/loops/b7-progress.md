@@ -69,8 +69,10 @@ file's history. What's left to see in a drive, from every run:
   differing but the expected groups; frame dumps the same as the
   fallback). `scene-loaders.md` 39 of 78 ours, `car-models.md` 4 of 42,
   `models.md` 42 of 50. Left ready: `ScenePools::CreateA` `sub_820C3FD8`
-  and its callees, and 12 more groups in `scene-loaders.md`. Step:
-  validation agent 1 running.
+  and its callees, and 12 more groups in `scene-loaders.md`. Validated
+  (`itc_2036`: 26 of 26 harness lines, 18 ran in the attract race, 8 in
+  the replay `itc_2037`, ok; nothing to drive). Step: migration agent 2
+  running.
 
 ## Done
 
@@ -121,5 +123,8 @@ This run's groups: `expected-differences.md` (the "22:31 run" lines).
   127 s (`itc_2023`), 0 errors.
 - After the scene loaders' blockers' migration 1: ours 2357, work left
   4095 (wrapped 103, known 547, unknown 3445).
+- After the blockers' validation: race 23 s (`itc_2036`), 0 errors,
+  every harness 0 differing but the expected groups; replay 127 s
+  (`itc_2037`), 0 errors.
 
 ## Stopped
