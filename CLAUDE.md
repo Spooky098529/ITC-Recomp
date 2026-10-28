@@ -300,6 +300,17 @@ above it (`vehicle.md`, `--native_vehicle`, 25 of 25) native (ours
 2,152 -> 2,255); one harness group is for the user's review
 (`Race::SetUp`'s traffic records' unwritten bytes,
 `docs/loops/expected-differences.md`).
+Its eighteenth run (`b7-loop-27-10-26`, 2026-10-27 to 28, not yet
+merged; summary `docs/loops/b7-loop-2026-10-27-2231.md`; 3 subsystems)
+made the app's update and its state stack (`app-states.md`,
+`--native_app_states`, 56 of 56), the scene's loading objects with
+their small blockers in `car-models.md` and `models.md`
+(`scene-loaders.md`, `--native_scene_loaders`, 60 of 78;
+`--native_car_models`; a lead without mapping) and the players' save
+data in memory (`save-data.md`, `--native_save_data`, 19 of 19 in play)
+native (ours 2,255 -> 2,400); the rest of the scene loaders waits on
+the material passes, the accessories, `Skeleton`'s local matrices,
+`XPR::GetTexture` and sprintf.
 Harness runs use `attract_race.sh 40` (the user's call,
 2026-10-23); a race short only because the harnesses took longer is
 no halt.

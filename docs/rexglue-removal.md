@@ -52,7 +52,7 @@ goes in `src/` as overrides), American English.
   the leftovers above (the movie player, Voice::Init skipped as high as
   is safe), or the main thread's performance leads
   (`sub_821298C0`, `sub_8209C6E0`, in `docs/native-renderer.md`).
-- **B7 in progress (2026-10-27):** its measure is `b7_status.py`
+- **B7 in progress (2026-10-28):** its measure is `b7_status.py`
   (`docs/coverage.md`), and the B7 loop (`docs/loops/b7-loop.md`, a
   `/loop` session handing each subsystem to a mapping agent, then
   migration agents) did its first run on the branch `b7-loop-test` (merged 2026-10-22): five
@@ -121,7 +121,13 @@ goes in `src/` as overrides), American English.
   they were ready (ours 2,152); its seventeenth run (branch
   `b7-loop-25-10-26-4`, 2 subsystems by the user's call) made the
   race's set-up, the rest of the car physics (a lead without mapping)
-  and the vehicle code above it native in full (ours 2,255). The
+  and the vehicle code above it native in full (ours 2,255); its
+  eighteenth run (branch `b7-loop-27-10-26`) made the app's update and
+  its state stack native in full (`app-states.md`), the scene's loading
+  objects as far as they were ready with their blockers in
+  `car-models.md` and `models.md` (`scene-loaders.md`, 60 of 78; a lead
+  without mapping) and the players' save data in memory in full
+  (`save-data.md`; ours 2,400). The
   runs' rows wait for the user's review (`docs/loops/review.md`). See
   "B7's loop runs" under B7, and `docs/loops/b7-progress.md`. Guest
   allocation is no longer a block (`docs/native-memory.md`); what the
@@ -2600,6 +2606,7 @@ B7. **The game logic inside**: everything else, subsystem by subsystem,
 | 2026-10-28 | The app's update and its state stack (`App::Update`, `App::Start`, `App::IsRunning`, the handler maps, requests, messages and add slots; the state stack `AppStates` and its 48-byte state layers: their set-up, walks, updates, operations and toggle messages; the containers they use: the message vector, the operation list, `PtrList::Erase` and `ForEach`, the delegate's clone) | `app-states.md` | 56 of 56 (two migrations; 19 adapters removed, 4 Native with none, 1 Merged) | `--native_app_states` |
 | 2026-10-28 | The scene's loading objects (the first scene pool set's seven loading classes: car model, parts, cockpit body, interior, pool 4's model, wheels, traffic body; `ScenePools::MakeA`, the pool node, the classes' load checks, `CarParts::Part`, the XPR name lookups, `CarModelLoads`) | `scene-loaders.md` | 20 of 78 (one migration; 5 Native with no adapter) | `--native_scene_loaders` |
 | 2026-10-28 | The scene loaders' blockers (no mapping, not counted: the load slots, the deferred release, the part model, `CarModel::Release` and `Reset`; then the loading classes' constructors, releases and destructors, `ScenePools::CreateA`, `Interior::OnPartLoaded`, `Skeleton::ResetPose`, `Model::SetVinylTextures`, `SetSharedShaders`) | `scene-loaders.md`, with `car-models.md`, `models.md` | `scene-loaders.md` 60 of 78, `car-models.md` 4 of 42, `models.md` 45 of 50 (two migrations; 27 adapters removed) | `--native_car_models` (new), `--native_scene_loaders`, `--native_models` |
+| 2026-10-28 | The players' save data in memory (`SaveData::Create` and `Delete`, the progress's clear and defaults, the stats record, the course records, the options and control maps, the default tables' getters; `TitleScreen::ResetPlayer`, `MenuList::Init`, `Players::ResetControllers`) | `save-data.md` | 19 of 19 in play (one migration; 11 adapters removed; 4 rows not seen in play) | `--native_save_data` |
 
     The first run (2026-10-22, branch `b7-loop-test`): every harness at 0 differing, attract races at 20-21 s with no errors,
     and a race the user drove looked right. Ours went from 162 to 335 (work
@@ -3661,3 +3668,17 @@ on the material passes, the accessories, `Skeleton`'s local matrices
 called 70, live 282. Imports: 186 called, 62 with a live caller. B7
 (`b7_status.py`): ours 2,381, work left 4,071 (Wrapped 103, with a row
 523, no row yet 3,445), from 4,121.
+
+**2026-10-28, the players' save data (branch `b7-loop-27-10-26`):** the
+eighteenth run's third and last subsystem mapped the save data in
+memory (`save-data.md`, 23 rows, 4 not seen in play) and made all 19 in
+play native in one migration (`--native_save_data`), at boot and the
+title screen: `SaveData::Create` and `Delete`, the progress, stats,
+course records, options and control maps, `TitleScreen::ResetPlayer`
+and `MenuList::Init` (about 75 front-end screens call it, so its
+adapter stays). Scratch below r1 isn't written (as earlier ports). The
+boundary unchanged: 449 functions (916 pairs): overridden 69, Native 5,
+Dropped 23, never called 70, live 282. Imports: 186 called, 62 with a
+live caller. B7 (`b7_status.py`): ours 2,400, work left 4,052 (Wrapped
+103, with a row 522, no row yet 3,427), from 4,071 (from 4,197 at the
+run's start).

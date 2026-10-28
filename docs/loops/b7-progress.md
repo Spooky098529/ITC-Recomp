@@ -101,10 +101,16 @@ file's history. What's left to see in a drive, from every run:
   `Players::ResetControllers`, `TitleScreen::ResetPlayer`; 11 adapters
   removed; `--native_save_data`; `itc_2070`: 23 s, 0 errors, every
   harness 0 differing but the expected groups; all 19 ran in the attract
-  race). `save-data.md` 19 of 19 in play ours. Step: validation agent 1
-  running.
+  race). `save-data.md` 19 of 19 in play ours. Validated (`itc_2071`:
+  19 of 19 harness lines, all 19 ran in the attract race; no replay
+  needed; nothing to drive). Finished.
 
 ## Done
+
+- The players' save data (`save-data.md`, mapped in 8cbdba1 and
+  1fedb13; 23 rows, 19 in play): 19 ours in one migration
+  (0fb0eb9..d585a41), 11 adapters removed; validated (`itc_2071`);
+  `--native_save_data`.
 
 - The scene loaders' blockers (no mapping; e9e8e77..016410c):
   `scene-loaders.md` 60 of 78 ours, `car-models.md` 4 of 42, `models.md`
@@ -171,5 +177,15 @@ This run's groups: `expected-differences.md` (the "22:31 run" lines).
   known 541, unknown 3427).
 - After the save data's migration: ours 2400, work left 4052 (wrapped
   103, known 522, unknown 3427).
+- At the end (after the save data's validation, `itc_2071`: race 23 s,
+  0 errors, every harness 0 differing but the expected groups): ours
+  2400, work left 4052 (wrapped 103, known 522, unknown 3427).
 
 ## Stopped
+
+2026-10-28, at the run's limit: 3 subsystems (the app states, the scene
+loaders, the save data; the scene loaders' blockers, without mapping,
+not counted). `check_function_statuses.py`: 0 errors. Nothing for
+`to-drive.md`. Two finished validation agents were stopped after their
+reports (each said it still had background work; no game process was
+running).
