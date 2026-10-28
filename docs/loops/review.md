@@ -54,6 +54,20 @@ When the user has reviewed a run's section, its heading gets
   `AppStates::Create` (called from the app's constructor
   `sub_82094590`). One commit (be3d047) left three rows' Status blank;
   fixed in the next (a7c59b8).
+- The scene's loading objects (map 2616cc8):
+  `docs/functions/scene-loaders.md`, 78 new rows: the first scene pool
+  set's (`[0x826C2E40]`) seven loading classes (car model, parts,
+  cockpit body, interior, pool 4's model, wheels, traffic body), their
+  embedded loads, `ScenePools::MakeA`, `CreateA`, `ReleaseA`, the
+  `PoolNode` base, the load callbacks (`sub_820D6528` the cockpit's,
+  `sub_820D8430` the traffic body's, `sub_820D7578` the interior's),
+  `XPR::FindByName` and `ModelPoint::Find` `sub_820D02D0`.
+  `known-data.md`: the first set's fields, rows for the pool node,
+  cockpit body, pool 4's object, traffic body and model point; the car
+  model, interior, parts and wheels rows extended. 3 leads added. Noted
+  in the rows: the deleting destructors call `operator delete` on
+  objects `ScenePools::CreateA` takes from `VirtualAlloc` (nothing calls
+  them directly); `sub_820D2270` walks every material and uses nothing.
 
 ## Run 2026-10-25 23:42 (`b7-loop-25-10-26-4`)
 

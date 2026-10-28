@@ -39,7 +39,12 @@ file's history. What's left to see in a drive, from every run:
   `sub_820D6238`, `sub_820D63A0`, `sub_820D7C40`, `sub_820D7CC0`,
   `sub_820D7AB0`, `sub_820D02D0`, `sub_820D6528`, `sub_820D8430`;
   `820D0000`-`820D8908`), picked as closest to ready (31 functions in
-  ready groups of 49 left). Step: mapping agent running.
+  ready groups of 49 left). Mapped as the scene's loading objects
+  (`scene-loaders.md`, 78 new rows; 2616cc8; 3 leads added): the first
+  scene pool set's seven loading classes, not one skeleton class. Map
+  checked (0 errors, 78 of 78 in play, 16 ready groups, no kernel calls:
+  `VirtualAlloc` only through its wrapper, routed to the allocation
+  layer). Step: migration agent 1 running.
 
 ## Done
 
@@ -77,5 +82,7 @@ This run's groups: `expected-differences.md` (the "22:31 run" lines).
 - After the app states' validation 2: race 23 s (`itc_2012`), 0 errors,
   every harness 0 differing but the expected groups; replay 127 s
   (`itc_2013`), 0 errors.
+- After the scene loaders' map: ours 2311, work left 4141 (wrapped
+  103, known 593, unknown 3445).
 
 ## Stopped
