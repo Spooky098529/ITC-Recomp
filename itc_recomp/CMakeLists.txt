@@ -175,6 +175,8 @@ set(ITC_SOURCES
     src/hooks/archive.cpp
     src/archive/archive.cpp
     src/archive/semaphores.cpp
+    src/hooks/file_layer.cpp
+    src/file_layer/file_layer.cpp
     src/hooks/texture_compression.cpp
     src/texture_compression/dxt_alpha.cpp
     src/texture_compression/dxt_color.cpp
@@ -325,6 +327,7 @@ set(ITC_SOURCES
     src/harnesses/race_world.cpp
     src/harnesses/race_states.cpp
     src/harnesses/archive.cpp
+    src/harnesses/file_layer.cpp
     src/harnesses/texture_compression.cpp
     src/harnesses/collision.cpp
     src/harnesses/collision_world.cpp
