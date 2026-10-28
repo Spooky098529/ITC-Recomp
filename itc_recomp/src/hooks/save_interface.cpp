@@ -272,7 +272,7 @@ void SaveInterfaceReplaysBuildList(PPCContext& ctx, uint8_t* base) {
     ctx.r4.u64 = record;
     ctx.r5.u64 = entry;
     ctx.lr = 0x822904E0;
-    sub_822900E0(ctx, base);
+    sub_822900E0(ctx, base);  // the original (no adapter): a "rep" save's parse
     ctx.r1.u64 = stack;
     return ctx.r3.u32;
   };

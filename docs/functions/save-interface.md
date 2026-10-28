@@ -78,6 +78,27 @@ nothing here is its. Mapped 2026-10-28 by the B7 loop from the lead
 full in `generated/` unless it says otherwise (offsets are the slot's
 unless said).
 
+Made native by the B7 loop on 2026-10-28 (`--native_save_interface`,
+plain C++ in `src/save_interface/`, adapters in
+`src/hooks/save_interface.cpp`, harness `save_interface`): every row in
+play. The wrappers reach the save devices and the users through vtables:
+the plain C++ checks each target first (reads only) and hands back to the
+original where one isn't this file's (never in play: the harness checks
+the game's vtables hold them). The save devices' slots, the users' and
+the app's getters stay adapters (reached through vtables), as do
+`SaveInterface::Init` (the app's start-up is recompiled), the save
+buffers' Create and Destroy, `SaveSlots::RequestDevice`, `State`,
+`Device` and `Pending`, `PlayTime::Update` and the play time's
+`sub_821109B8` (front-end callers), `GameData::Save` (GetLocalTime takes
+`ctx`) and `Replays::BuildList` (a replay's parse, never in play, is the
+original's through the guest). What the originals leave in their frames
+as data (GameData::Save's name and time, PlayTime::Update's out,
+Replays::Sort's copy, BuildList's count) is written there too; register
+saves and callees' back chains aren't. The harness never touches the live
+objects: its interface, save devices, slots, users, save data and save
+buffers are copies in harness memory, the globals pointed at them while a
+case runs.
+
 Status:
 
 - **Native**: plain C++ in `itc_recomp/src/` that doesn't use the
