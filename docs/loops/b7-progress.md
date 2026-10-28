@@ -90,8 +90,12 @@ file's history. What's left to see in a drive, from every run:
 - Subsystem 3 of 3: a player's save data made and deleted
   (`sub_821057C8`, `sub_821055D8`, `sub_82221D00`), picked as closest
   to ready in small pieces (24 ready groups; the race mode's state
-  machines, also close, are 2,000-3,000-line functions to split). Step:
-  mapping agent running.
+  machines, also close, are 2,000-3,000-line functions to split).
+  Mapped as the players' save data in memory (`save-data.md`, 23 rows:
+  1 moved, 22 new, 4 of them not seen in play (added in 1fedb13 by the
+  user's call of 2026-10-23); 8cbdba1; 1 lead added). Map checked (0
+  errors, 19 of 19 in play, 13 ready groups, no blockers, no kernel
+  calls). Step: migration agent 1 running.
 
 ## Done
 
@@ -156,5 +160,7 @@ This run's groups: `expected-differences.md` (the "22:31 run" lines).
 - After the blockers' validation 2: race 22 s (`itc_2062`), 0 errors,
   every harness 0 differing but the expected groups; replay 127 s
   (`itc_2063`), 0 errors.
+- After the save data's map: ours 2381, work left 4071 (wrapped 103,
+  known 541, unknown 3427).
 
 ## Stopped

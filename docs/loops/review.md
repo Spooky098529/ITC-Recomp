@@ -115,6 +115,23 @@ When the user has reviewed a run's section, its heading gets
   not investigated: with `--native_scene_loaders=false`, three 256x256
   textures sit at other physical addresses (draws otherwise the same);
   not caused by this migration's adapters, so from the earlier ones.
+- The players' save data (map 8cbdba1, 1fedb13):
+  `docs/functions/save-data.md`, 23 rows (1 moved from `functions.md`,
+  22 new): `SaveData::Create` and `Delete`, the progress, stats, course
+  records, options and control maps, five default tables' getters,
+  `TitleScreen::ResetPlayer` `sub_82221D00`, `MenuList::Init`
+  `sub_8220BAC0` (about 75 front-end screens call it; its neighbors in a
+  new lead) and `Players::ResetControllers` `sub_8209F5E0`; 4 not seen
+  in play (`CourseRecords::Of` `sub_82105BF8`, `sub_82105740`,
+  `sub_82105688`, `Progress::Restart` `sub_82114128`). The mapping agent
+  first left those 4 without rows, following `b7-loop.md`'s "Only
+  functions seen in play get rows"; the lead had them added by the
+  user's later call (2026-10-23, CLAUDE.md). `b7-loop.md`'s line may
+  want updating. Kept as the originals: `Stats::Stats`'s writes are
+  wiped at once by `Progress::Clear`; `SaveData::Create` runs the
+  set-ups even when the allocation fails. `known-data.md`'s
+  `0x826C5B58` row and a new `[0x82814E30]` row; `mode-tick.md`'s
+  `OnModeChange` row.
 
 ## Run 2026-10-25 23:42 (`b7-loop-25-10-26-4`)
 
