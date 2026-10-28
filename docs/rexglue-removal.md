@@ -128,10 +128,11 @@ goes in `src/` as overrides), American English.
   `car-models.md` and `models.md` (`scene-loaders.md`, 60 of 78; a lead
   without mapping) and the players' save data in memory in full
   (`save-data.md`; ours 2,400); its nineteenth run (branch
-  `b7-loop-28-10-26`, stopped by a validation's harness gap) made
+  `b7-loop-28-10-26`, 3 subsystems) made
   texture compression (`texture-compression.md`) and the vinyl sheet
-  above it (`car-models.md`, two leads without mapping) native (ours
-  2,447). The
+  above it (`car-models.md`, two leads without mapping), the race world
+  (`race-world.md`, 49 of 50) and the race's states (`race-states.md`,
+  43 of 63) native (ours 2,540). The
   runs' rows wait for the user's review (`docs/loops/review.md`). See
   "B7's loop runs" under B7, and `docs/loops/b7-progress.md`. Guest
   allocation is no longer a block (`docs/native-memory.md`); what the
@@ -2614,6 +2615,7 @@ B7. **The game logic inside**: everything else, subsystem by subsystem,
 | 2026-10-28 | Texture compression (XGraphics' `XGCompressSurface` over D3DX's image blitter, used in play only by `Vinyl::Compress` for the vinyl sheet, A8R8G8B8 to DXT5 premultiplied: the DXT alpha and color block encoders, the DXT4/5 encoders, the A8R8G8B8 and DXT codecs, `ImageCodec::Create`, the blitter) | `texture-compression.md` | 24 of 24 in play (one migration in five batches; 18 adapters removed; 133 rows not seen in play) | `--native_texture_compression` |
 | 2026-10-28 | The vinyl sheet above texture compression (no mapping, not counted: `Vinyl::Compress`, `Texture::Create` and `Free`; then the decal path under `CarModel::OnDecalLoaded`: the TGA reader, the software rasterizer, `Vinyl::DrawDecal`, `DrawDecals`, `ClearCorner`) | `car-models.md` | 27 of 46 (two migrations; 2 adapters removed, `XGCompressSurface` Native; `ClearCorner`'s harness doesn't reach it) | `--native_car_models` |
 | 2026-10-28 | The race world (the race mode's state machine at +116812: `RaceWorld::Init`, `OnLoaded`, `Tick`, `Unload`, the paused tick; the racers' manager at `[0x826D82F4]`: its tables, `AddRacers`, `ListRacers`, the vehicles streamed to the nearest entries by distance, `Refresh`, `ResetWorld`, `ResetVehicles`; the race event's start placements, `RaceStart::Place` and `PlaceRolling`; the save's distance on unload; with `TrackCollision::Tick`) | `race-world.md` | 49 of 50 in play (three migrations; 25 adapters removed; `OnLoad` waits on the archive) | `--native_race_world` |
+| 2026-10-28 | The race's states (`RaceStates::Init`'s machine at +107168, 87 transitions: the stage's start, the rolling and standing starts, the countdown, `RaceTick`, `OnGo`, quit, the end, the replay's and menu's handlers, free run; the race's progress at `[0x826D82E8]`: its checks for laps, finish, hits, damage, the SP drain, rank and time; the route helpers `StartRoute`, `FollowRoute`, `RouteDistance`, `MapToSection`) | `race-states.md` | 43 of 63 in play (two migrations; 20 Native; the rest waits on the loading screen, the archive's queue, the cars put back, the input recordings, the scene models' load poll, the items and achievements, the race event's lookups, the two-player cameras, the core) | `--native_race_states` |
 
     The first run (2026-10-22, branch `b7-loop-test`): every harness at 0 differing, attract races at 20-21 s with no errors,
     and a race the user drove looked right. Ours went from 162 to 335 (work
@@ -3743,3 +3745,23 @@ boundary unchanged: 449 functions (916 pairs): overridden 69, Native 5,
 Dropped 23, never called 70, live 282. Imports: 186 called, 62 with a
 live caller. B7 (`b7_status.py`): ours 2,497, work left 3,961 (Wrapped
 103, with a row 503, no row yet 3,355), from 4,006.
+
+**2026-10-28, the race's states (branch `b7-loop-28-10-26`):** the
+nineteenth run's third and last subsystem mapped the race's second
+state machine (`race-states.md`, 78 rows, 63 in play: `RaceStates::Init`
+at +107168, 87 transitions, and the race's progress at `[0x826D82E8]`)
+and made 43 native in two migrations (`--native_race_states`), with
+`RaceStates::Init` split in two and its transitions checked against the
+listing. Float compares follow the translated code's `bge` as `!lt` and
+`ble` as `!gt` (a NaN takes them). The System Link case of
+`StandingStartTick` runs the original whole. The attract race reaches
+only `Init`, `RaceProgress::Create`, `Reset` and `Begin`; the replay's
+free-start race most of the rest; 23 functions wait for a drive
+(`docs/loops/to-drive.md`). The rest waits on the loading screen, the
+archive's queue, the cars put back, the input recordings, the scene
+models' load poll, the items and achievements, the race event's
+lookups, the two-player cameras and the core. The boundary unchanged:
+449 functions (916 pairs): overridden 69, Native 5, Dropped 23, never
+called 70, live 282. Imports: 186 called, 62 with a live caller. B7
+(`b7_status.py`): ours 2,540, work left 3,920 (Wrapped 103, with a row
+523, no row yet 3,294), from 3,961 (from 4,052 at the run's start).

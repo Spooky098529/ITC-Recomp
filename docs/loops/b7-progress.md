@@ -112,10 +112,17 @@ file's history. What's left to see in a drive, from every run:
   Left: none ready (the rest waits on the loading screen, the archive's
   queue, the cars put back, the input recordings, the scene models'
   load poll, the player's items and achievements, the race event's
-  lookups, the two-player cameras, the core). Validation agent
-  running.
+  lookups, the two-player cameras, the core). Validated (`itc_2252`,
+  replay `itc_2253` ok: 19 of 19 harness lines, 3 in the attract race,
+  11 in the replay, 2 more to drive; 7 of migration 1's left the drive
+  list). Finished: 43 of 63 in play ours; recorded.
 
 ## Done
+
+- The race's states (`race-states.md`, mapped in 009568e; 78 rows, 63
+  in play): 43 ours in two migrations (edb5487..0af672e), 20 Native;
+  validated (`itc_2235`/`2236`, `itc_2252`/`2253`; 23 to drive);
+  `--native_race_states`.
 
 - The race world (`race-world.md`, mapped in 5b6d76c; 54 rows, 50 in
   play): 49 ours in three migrations (4824fa1..981658f), 25 adapters
@@ -180,17 +187,16 @@ This run's groups: `expected-differences.md` (the "08:36 run" lines).
   (wrapped 103, known 530, unknown 3294).
 - After the race states' migration 2: ours 2540, work left 3920
   (wrapped 103, known 523, unknown 3294).
+- At the end (after the race states' validation, `itc_2252`: race 8
+  s, the harnesses 30 s, 0 errors, every harness 0 differing but the
+  expected groups): ours 2540, work left 3920 (wrapped 103, known 523,
+  unknown 3294).
 
 ## Stopped
 
-(resumed; see "Now") 2026-10-28, by "When to halt": the decal path's validation agent
-reported `Vinyl::ClearCorner` `sub_820D3C80` `missing:` (no `native
-running (harness):` line; it ran in play). `CarModel::OnDecalLoaded`'s
-compress cases (`c % 6 == 1` in `DecalLoadCases`,
-`src/harnesses/car_models.cpp`) give the slots not yet arrived a random
-state with `r.Below(3)`, so a slot is almost always loading and it
-returns before `ClearCorner`. To fix: compress cases with no slot
-loading, or a `ClearCorner` case of its own. 1 subsystem of 3 done
-(texture compression), with two leads without mapping (the vinyl
-sheet). `check_function_statuses.py`: 0 errors. Nothing for
-`to-drive.md`.
+2026-10-28, at the run's limit: 3 subsystems (texture compression, the
+race world, the race's states; the vinyl sheet's two leads without
+mapping not counted). Earlier the same day it stopped at the decal
+path's validation (`Vinyl::ClearCorner` with no harness line) and was
+resumed after the harness fix (9dc3c72) by the user's call.
+`check_function_statuses.py`: 0 errors. To drive: `to-drive.md`.

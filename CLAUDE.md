@@ -312,14 +312,20 @@ native (ours 2,255 -> 2,400); the rest of the scene loaders waits on
 the material passes, the accessories, `Skeleton`'s local matrices,
 `XPR::GetTexture` and sprintf.
 Its nineteenth run (`b7-loop-28-10-26`, 2026-10-28, not yet merged;
-summary `docs/loops/b7-loop-2026-10-28-0836.md`; 1 subsystem, stopped
-by its validation: `Vinyl::ClearCorner` `sub_820D3C80`'s harness
-doesn't reach it) made texture compression (`texture-compression.md`,
-XGraphics' `XGCompressSurface` over D3DX's blitter,
-`--native_texture_compression`, 24 of 24 in play) and the vinyl sheet
-above it (`Vinyl::Compress` and the decal path with its software
+summary `docs/loops/b7-loop-2026-10-28-0836.md`; 3 subsystems; stopped
+once by a harness gap, fixed and resumed) made texture compression
+(`texture-compression.md`, XGraphics' `XGCompressSurface` over D3DX's
+blitter, `--native_texture_compression`, 24 of 24 in play), the vinyl
+sheet above it (`Vinyl::Compress` and the decal path with its software
 rasterizer, two leads without mapping in `car-models.md`, under
-`--native_car_models`) native (ours 2,400 -> 2,447).
+`--native_car_models`), the race world (`race-world.md`,
+`--native_race_world`, 49 of 50: the race mode's state machine, the
+racers' manager and its vehicle streaming, the start placements) and
+the race's states (`race-states.md`, `--native_race_states`, 43 of 63:
+the second state machine and the race's progress) native (ours 2,400
+-> 2,540); the rest waits on the archive, the loading screen, the cars
+put back, the input recordings and the race event's lookups. The
+harnesses now take ~30 s of `attract_race.sh 40`, leaving ~8 s of race.
 Harness runs use `attract_race.sh 40` (the user's call,
 2026-10-23); a race short only because the harnesses took longer is
 no halt.

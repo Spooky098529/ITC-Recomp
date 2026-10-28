@@ -28,14 +28,11 @@ here loses its heading.
   RaceManager::StreamTwoPlayers (`race-world.md`; a restart, other
   race kinds, two players)
 - The race's states' migration 1 (attract race `itc_2235`, replay
-  `itc_2236`, ok; the replay's race takes the free-start path):
-  `race-states.md`: `sub_821649B8` RaceProgress::SetChecks,
-  `sub_82163440` ReleaseRacers, `sub_82162E08` CountTime, `sub_82163140`
-  TickFraction, `sub_82162D80` Rank, `sub_82162F78` RouteSections::Beside,
-  `sub_82162E70` RouteSections::Before, `sub_821622A8`
-  RoutePosition::NotAfter, `sub_82164F08` CountHits, `sub_82164228`
-  Damage, `sub_821650A0` DrainSp, `sub_82163930`
-  RoutePosition::MapToSection, `sub_82164090` CheckLap, `sub_82162230`
+  `itc_2236`, ok; the replay's race takes the free-start path; seven
+  more seen in the replay `itc_2253`): `race-states.md`: `sub_821649B8`
+  RaceProgress::SetChecks, `sub_82163440` ReleaseRacers, `sub_82163140`
+  TickFraction, `sub_82162D80` Rank, `sub_821622A8`
+  RoutePosition::NotAfter, `sub_82164090` CheckLap, `sub_82162230`
   Time::Sub, `sub_82164E18` CheckFinish, `sub_821632C8`
   RaceStates::OnRollingStart, `sub_821643B0` OnStandingStart,
   `sub_82163348` ClearStep, `sub_82163378` OnQuit, `sub_821647B0`
@@ -45,6 +42,10 @@ here loses its heading.
   `sub_821674A0` CountdownTick, `sub_821692C8` StandingStartTick (a
   race with a countdown, racing to the finish, quitting from the pause
   menu, the menu after a race)
+- The race's states' migration 2 (attract race `itc_2252`, replay
+  `itc_2253`, ok): `sub_82163000` (two sections joined by a forward
+  link's side link), `sub_82162330` RaceProgress::RouteDistance
+  (`race-states.md`; `CheckLap`, `CheckFinish`, `Rank` above)
 
 ## Run 2026-10-25 23:42 (`b7-loop-25-10-26-4`)
 
