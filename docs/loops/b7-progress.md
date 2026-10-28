@@ -84,7 +84,15 @@ file's history. What's left to see in a drive, from every run:
   other states (`sub_82166E50`, `sub_82163440`, `sub_821654F8`,
   `sub_82162D80`, `sub_82165AB0`, `sub_82165C78`, `sub_82166F98`,
   `sub_821692C8`; they call `RaceStart::Place`, `Refresh`,
-  `ListRacers`; 18+ ready groups). Mapping agent running.
+  `ListRacers`; 18+ ready groups). Mapped as the race's states
+  (`race-states.md`, 78 rows, all new, 61 in play: `RaceStates::Init`'s
+  machine at +107168, 87 transitions, the race's progress at
+  `[0x826D82E8]`; 009568e; 4 leads added). Map checked (0 errors, 31
+  ready groups, blocked outside by the loading screen, the archive's
+  queue, the cars put back, the input recordings, the scene models'
+  load poll, the player's items, the race event's lookups, the
+  two-player cameras, the achievements check; no kernel calls).
+  Migration agent 1 running.
 
 ## Done
 
@@ -145,6 +153,8 @@ This run's groups: `expected-differences.md` (the "08:36 run" lines).
   (wrapped 103, known 504, unknown 3355).
 - After the race world (finished): ours 2497, work left 3961 (wrapped
   103, known 503, unknown 3355).
+- After the race states' map: ours 2497, work left 3961 (wrapped 103,
+  known 564, unknown 3294).
 
 ## Stopped
 

@@ -131,6 +131,24 @@ When the user has reviewed a run's section, its heading gets
   expected to differ (`AddRacers`, random traffic numbers, 5 of 200:
   stack leftovers). The harnesses now take ~29 s of the 40-second race
   (`race_world`'s 8.3 s), leaving ~9 s of attract race.
+- The race world, migration 3 (981658f): `RaceManager::Refresh`
+  `sub_82171978` (r3 not kept: no caller reads it; stops at the first
+  `GiveVehicle` without a free slot, as the original); a shared
+  `OpponentsCall` helper with `StreamOpponents`' adapter.
+- The race's states (map 009568e): `docs/functions/race-states.md`, 78
+  rows (all new; 61 in play): `RaceStates::Init` `sub_82169920`'s machine
+  at +107168 (87 transitions in the intro: stage set-up, loading, rolling
+  and standing starts, countdown, racing, pause, quit, end, replay, the
+  menu after the race, between stages and the next stage (not seen),
+  free run, a demo, abort), the race's progress at `[0x826D82E8]`
+  (`RaceProgress::`, 7,248 bytes; 972-byte results entries: times, laps,
+  distance, hits, places, SP, probably spirit points), the per-tick
+  checks by stage type, its messages to `RaceWorld`. Not read in detail
+  (rows from their calls): `sub_821635D0`, `sub_82162330`,
+  `sub_82166658`, `sub_821634D8`, `sub_821653E8` and the unseen
+  handlers. Kind 6's System Link branch mentioned once, not mapped.
+  `known-data.md`: `0x826D82E8` expanded, "race states" and the loading
+  screen `0x82815E60` rows; four leads added, three leads' notes.
 
 ## Run 2026-10-27 22:31 (`b7-loop-27-10-26`)
 
