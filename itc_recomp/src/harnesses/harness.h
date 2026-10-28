@@ -198,6 +198,7 @@ void AppStates(Context& h);
 void SceneLoaders(Context& h);
 void CarModels(Context& h);
 void SaveData(Context& h);
+void RaceWorld(Context& h);
 void TextureCompression(Context& h);
 
 }  // namespace harness

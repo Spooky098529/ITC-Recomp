@@ -156,6 +156,8 @@ set(ITC_SOURCES
     src/car_models/decals.cpp
     src/hooks/save_data.cpp
     src/save_data/save_data.cpp
+    src/hooks/race_world.cpp
+    src/race_world/race_world.cpp
     src/hooks/texture_compression.cpp
     src/texture_compression/dxt_alpha.cpp
     src/texture_compression/dxt_color.cpp
@@ -303,6 +305,7 @@ set(ITC_SOURCES
     src/harnesses/scene_loaders.cpp
     src/harnesses/car_models.cpp
     src/harnesses/save_data.cpp
+    src/harnesses/race_world.cpp
     src/harnesses/texture_compression.cpp
     src/harnesses/collision.cpp
     src/harnesses/collision_world.cpp
@@ -441,7 +444,7 @@ set_source_files_properties(src/c_runtime/math.cpp src/ui_movies/keys.cpp
     src/screen_objects/screen_objects.cpp src/scenery_lists/model_draws.cpp
     src/models/model_load.cpp src/course_scenery/collect.cpp
     src/race_setup/car.cpp src/race_setup/race_data.cpp src/race_setup/course_routes.cpp
-    src/race_setup/set_up.cpp src/vehicle/vehicle.cpp
+    src/race_setup/set_up.cpp src/vehicle/vehicle.cpp src/race_world/race_world.cpp
     src/texture_compression/dxt_alpha.cpp src/texture_compression/dxt_color.cpp
     src/texture_compression/dxt45.cpp src/texture_compression/codecs.cpp
     src/texture_compression/blitter.cpp src/texture_compression/compress_surface.cpp
