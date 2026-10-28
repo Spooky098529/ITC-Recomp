@@ -39,7 +39,9 @@ ITC_FLAG_BOOL(native_scene_loaders, true, "ITC",
               "deleting destructors sub_820D5988, sub_820D74C0, sub_820D6798, "
               "TrafficCar::TrafficCar sub_820D8908, Release sub_820D7B90, ~TrafficCar sub_820D7E90 "
               "and its deleting destructor sub_820D89B8) natively instead of through the "
-              "translated code (the same writes; checked by --run_harnesses=scene_loaders)");
+              "translated code (the same writes; checked by --run_harnesses=scene_loaders); "
+              "the ones only these native callers reach (the members' constructors, resets and "
+              "destructors, the destructors under the deleting ones) have no adapters");
 
 namespace hooks {
 
@@ -264,7 +266,11 @@ ITC_SCENE_LOADERS_CONSTRUCT(SceneLoadersTrafficDeletingDestruct, 820D89B8,
 // register steps stay for the harness; nor do CockpitLoads::CockpitLoads
 // (only Cockpit::Cockpit) and WheelsLoads::Reset (only Wheels::Reset); nor,
 // since their callers are native, Pool4Object::Reset, ~Pool4Object,
-// WheelsLoads::WheelsLoads, Wheels::Reset, ~Wheels and ~WheelsLoads.
+// WheelsLoads::WheelsLoads, Wheels::Reset, ~Wheels, ~WheelsLoads,
+// CarModel::Reset, CarModelLoads::CarModelLoads and ~CarModelLoads,
+// ~CarModel, ~CarParts, ~CarPartsLoads, ~Cockpit, ~CockpitLoads,
+// TrafficLoads::TrafficLoads, TrafficCar::Reset, ~TrafficCar and
+// ~TrafficLoads.
 
 #define ITC_SCENE_LOADERS(address, step)   \
   extern "C" REX_FUNC(sub_##address) {     \
@@ -289,19 +295,11 @@ ITC_SCENE_LOADERS(820D6EB8, SceneLoadersPartsWalkMaterials)
 ITC_SCENE_LOADERS(820D7790, SceneLoadersInteriorIsLoaded)
 ITC_SCENE_LOADERS(820CE800, SceneLoadersNameMatches)
 ITC_SCENE_LOADERS(820D09B8, SceneLoadersXprFindByName)
-ITC_SCENE_LOADERS(820D3DE0, SceneLoadersCarModelLoadsConstruct)
-ITC_SCENE_LOADERS(820D3E40, SceneLoadersCarModelLoadsDestruct)
-ITC_SCENE_LOADERS(820D3E98, SceneLoadersCarModelReset)
 ITC_SCENE_LOADERS(820D7428, SceneLoadersCarPartsConstruct)
 ITC_SCENE_LOADERS(820D6D00, SceneLoadersCarPartsRelease)
-ITC_SCENE_LOADERS(820D6FE8, SceneLoadersCarPartsLoadsDestruct)
 ITC_SCENE_LOADERS(820D63A0, SceneLoadersCockpitConstruct)
 ITC_SCENE_LOADERS(820D6238, SceneLoadersCockpitRelease)
-ITC_SCENE_LOADERS(820D6090, SceneLoadersCockpitLoadsDestruct)
 ITC_SCENE_LOADERS(820D78B8, SceneLoadersInteriorConstruct)
-ITC_SCENE_LOADERS(820D7C40, SceneLoadersTrafficLoadsConstruct)
-ITC_SCENE_LOADERS(820D7CC0, SceneLoadersTrafficLoadsDestruct)
-ITC_SCENE_LOADERS(820D7AB0, SceneLoadersTrafficReset)
 ITC_SCENE_LOADERS(820D6A70, SceneLoadersPool4Construct)
 ITC_SCENE_LOADERS(820D6A20, SceneLoadersPool4Release)
 ITC_SCENE_LOADERS(820D6BC0, SceneLoadersPool4DeletingDestruct)
@@ -309,13 +307,9 @@ ITC_SCENE_LOADERS(820D9570, SceneLoadersWheelsConstruct)
 ITC_SCENE_LOADERS(820D8E68, SceneLoadersWheelsRelease)
 ITC_SCENE_LOADERS(820D95E8, SceneLoadersWheelsDeletingDestruct)
 ITC_SCENE_LOADERS(820D5890, SceneLoadersCarModelConstruct)
-ITC_SCENE_LOADERS(820D4750, SceneLoadersCarModelDestruct)
 ITC_SCENE_LOADERS(820D5988, SceneLoadersCarModelDeletingDestruct)
-ITC_SCENE_LOADERS(820D7038, SceneLoadersCarPartsDestruct)
 ITC_SCENE_LOADERS(820D74C0, SceneLoadersCarPartsDeletingDestruct)
-ITC_SCENE_LOADERS(820D64D0, SceneLoadersCockpitDestruct)
 ITC_SCENE_LOADERS(820D6798, SceneLoadersCockpitDeletingDestruct)
 ITC_SCENE_LOADERS(820D8908, SceneLoadersTrafficConstruct)
 ITC_SCENE_LOADERS(820D7B90, SceneLoadersTrafficRelease)
-ITC_SCENE_LOADERS(820D7E90, SceneLoadersTrafficDestruct)
 ITC_SCENE_LOADERS(820D89B8, SceneLoadersTrafficDeletingDestruct)
