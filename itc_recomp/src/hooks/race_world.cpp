@@ -41,7 +41,11 @@ ITC_FLAG_BOOL(native_race_world, true, "ITC",
               "RaceManager::GiveVehicle sub_821706E8's original), StreamTraffic sub_821724F8 "
               "(Vehicle::RemoveFromWorld's and the physics set-up's originals unless --native_heap "
               "routes the game's heap to the allocation layer; its callees' originals where those "
-              "refuse) and MoveUnseen sub_82173E28 natively instead of through the "
+              "refuse) and MoveUnseen sub_82173E28; RaceManager::Stream sub_82174338 (with "
+              "sub_8217437C), StreamNear sub_82172E60, StreamCruise sub_82174200, "
+              "StreamTwoPlayers sub_82172D20 and RaceWorld::Tick sub_82174BC0 (sub_821743A8's "
+              "original; the callees' originals where those refuse) natively instead of "
+              "through the "
               "translated code (the same words, bit for bit; checked by "
               "--run_harnesses=race_world)");
 
@@ -337,6 +341,16 @@ rw::StartCalls StartCalls(PPCContext& ctx, uint8_t* base, uint32_t setup_frame) 
       case 0x820C20E0:
         __imp__sub_820C20E0(ctx, base);
         break;
+      case 0x821706E8:
+        sub_821706E8(ctx, base);  // the original, through the harness's stand-in
+        break;
+      case 0x820C0118:
+        __imp__sub_820C0118(ctx, base);
+        break;
+      case 0x821743A8:
+        ctx.lr = 0x82174CF4;  // as RaceWorld::Tick calls it
+        sub_821743A8(ctx, base);  // the original, through the harness's stand-in
+        break;
     }
     ctx.r1.u64 = r1;
     ctx.fpscr.disableFlushMode();
@@ -449,6 +463,42 @@ void RaceWorldMoveUnseen(PPCContext& ctx, uint8_t* base) {
   rw::MoveUnseen(base, ctx.r3.u32, ctx.r4.u32, ctx.r1.u32 - 272);
 }
 
+namespace {
+
+// The streaming's and the tick's guest calls, made for a set-up frame.
+rw::MakeCalls MakeCalls(PPCContext& ctx, uint8_t* base) {
+  return [&ctx, base](uint32_t setup_frame) { return StartCalls(ctx, base, setup_frame); };
+}
+
+}  // namespace
+
+void RaceWorldStream(PPCContext& ctx, uint8_t* base) {
+  ctx.fpscr.disableFlushMode();
+  rw::Stream(base, ctx.r3.u32, ctx.r1.u32, NativeHeapActive(), MakeCalls(ctx, base));
+}
+
+void RaceWorldStreamNear(PPCContext& ctx, uint8_t* base) {
+  ctx.fpscr.disableFlushMode();
+  rw::StreamNear(base, ctx.r3.u32, ctx.r1.u32, NativeHeapActive(), MakeCalls(ctx, base));
+}
+
+void RaceWorldStreamCruise(PPCContext& ctx, uint8_t* base) {
+  ctx.fpscr.disableFlushMode();
+  rw::StreamCruise(base, ctx.r3.u32, ctx.r1.u32, NativeHeapActive(), MakeCalls(ctx, base));
+}
+
+void RaceWorldStreamTwoPlayers(PPCContext& ctx, uint8_t* base) {
+  ctx.fpscr.disableFlushMode();
+  rw::StreamTwoPlayers(base, ctx.r3.u32, ctx.r1.u32, NativeHeapActive(), MakeCalls(ctx, base));
+}
+
+void RaceWorldTick(PPCContext& ctx, uint8_t* base) {
+  ctx.fpscr.disableFlushMode();
+  rw::Tick(base, ctx.r3.u32, ctx.r1.u32 - 128, NativeHeapActive(), MakeCalls(ctx, base));
+}
+
+RaceWorldStandIn g_recorded_stand_in = nullptr;
+
 }  // namespace hooks
 
 // Defines an adapter: the flag, else the original.
@@ -487,6 +537,24 @@ ITC_RACE_WORLD(821662E0, RaceWorldPlaceRolling)
 ITC_RACE_WORLD(82172118, RaceWorldStreamOpponents)
 ITC_RACE_WORLD(821724F8, RaceWorldStreamTraffic)
 ITC_RACE_WORLD(82173E28, RaceWorldMoveUnseen)
+ITC_RACE_WORLD(82174BC0, RaceWorldTick)
+ITC_RACE_WORLD(82174338, RaceWorldStream)
+ITC_RACE_WORLD(82172E60, RaceWorldStreamNear)
+ITC_RACE_WORLD(82174200, RaceWorldStreamCruise)
+ITC_RACE_WORLD(82172D20, RaceWorldStreamTwoPlayers)
+// sub_8217437C (RaceManager::Stream's case 0, split off: a tail call to
+// StreamNear) has no adapter: its only caller is Stream, whose plain C++
+// does its work.
+// sub_821743A8 (never seen in play, from RaceWorld::Tick): the original, or
+// the harness's stand-in while it's set (hooks::g_recorded_stand_in).
+extern "C" REX_FUNC(sub_821743A8) {
+  REX_FUNC_PROLOGUE();
+  if (hooks::g_recorded_stand_in != nullptr) {
+    hooks::g_recorded_stand_in(ctx, base);
+    return;
+  }
+  __imp__sub_821743A8(ctx, base);
+}
 // RaceManager::GiveVehicle (sub_821706E8, never seen in play): the original,
 // or the harness's stand-in while it's set (hooks::g_give_vehicle_stand_in).
 extern "C" REX_FUNC(sub_821706E8) {

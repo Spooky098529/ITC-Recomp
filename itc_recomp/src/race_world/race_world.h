@@ -481,6 +481,57 @@ void StreamTraffic(uint8_t* base, uint32_t manager, uint32_t player, double inne
 // isn't kept (its caller doesn't read it).
 void MoveUnseen(uint8_t* base, uint32_t manager, uint32_t player, uint32_t frame);
 
+// The guest calls of the streaming and the tick, made for a
+// Vehicle::SetUp's frame (`setup_frame`, StartCalls' setup_original): the
+// callees' originals through `original` (Vehicle::RemoveFromWorld
+// 0x820C20E0, RaceManager::GiveVehicle 0x821706E8, Vehicle::Refresh
+// 0x820C0118, sub_821743A8), the rest as StartCalls says.
+using MakeCalls = std::function<StartCalls(uint32_t setup_frame)>;
+
+// RaceManager::StreamNear (sub_82172E60) and RaceManager::StreamCruise
+// (sub_82174200): the player's entry (the first flagged 0x4,
+// the count +2368 read again each pass; none: its +20 read at 20); from its
+// vehicle's speed (Vehicle::Speed, read four times) the radii, fmadds of
+// the speed: the opponents' speed x [0x820021F4] + [0x82002A28] and +
+// [0x82008914], the traffic's speed x [0x820021E8] plus the same; when the
+// opponents' far one is above [0x82003384], it's that and their near one
+// [0x820099CC], and when the traffic's far one is above that too, it's that
+// and their near one [0x820099C8]. +2364 = 0; StreamOpponents, StreamTraffic
+// (no second player) and, for StreamCruise, MoveUnseen. `sp`: the caller's
+// stack pointer (the original's frame is 160 bytes, nothing kept in it). r3
+// isn't kept (the callers return right after; Stream hands it on, and
+// RaceWorld::Tick doesn't read it).
+void StreamNear(uint8_t* base, uint32_t manager, uint32_t sp, bool heap, const MakeCalls& make);
+void StreamCruise(uint8_t* base, uint32_t manager, uint32_t sp, bool heap,
+                  const MakeCalls& make);
+// RaceManager::StreamTwoPlayers (sub_82172D20): the two players' entries
+// (+4 and +32): the first is ahead unless the race data's flags (+0x59AE4)
+// have 0x20 or 0x40 and [0x826D82E8]'s float +3012 is below its +3984. The
+// radii from the faster's speed (the ahead one's unless the other's is
+// above it), as StreamNear's but with fmuls then fadds; StreamOpponents
+// with the ahead one, StreamTraffic with both. `sp`: the caller's stack
+// pointer (the original's frame is 128 bytes).
+void StreamTwoPlayers(uint8_t* base, uint32_t manager, uint32_t sp, bool heap,
+                      const MakeCalls& make);
+// RaceManager::Stream (sub_82174338): by the race data's kind (+0xA3AF4; a
+// jump table at 0x820099A0): 2 and 3 StreamCruise, 5 StreamTwoPlayers, 0
+// (through sub_8217437C), 1, 4, 6, 7 and 8 StreamNear, above 8 nothing (tail
+// calls: `sp` is the caller's stack pointer).
+void Stream(uint8_t* base, uint32_t manager, uint32_t sp, bool heap, const MakeCalls& make);
+// RaceWorld::Tick (sub_82174BC0): with the world's +9608 set: when the race
+// data's flags (+0x59AE4) have 0x20 and the byte at 0x826C6B0C isn't 255,
+// for each racer record (the count at the race data + 0x59610 read again
+// each pass) whose flags +3888 have 0x1 (byte 0: with [0x826C7824] set,
+// else 0x80), 0x80 (byte 1: with it set, else 0x1) or either (other bytes),
+// the word at [0x826D82E8] + 2,972 + 972 x its entry's +24
+// (RaceManager::EntryOfRecord) = 0; else sub_821743A8 (never seen in play:
+// its original through `original`). Then RaceManager::Stream of
+// [0x826D82F4], AiDrivers::UpdateAll, RaceManager::TickVehicles,
+// TrackCollision::Tick and RaceManager::RefreshVehicles. `frame`: the
+// original's 128 bytes (nothing kept in it). r3 isn't kept (the state
+// machine's handler call doesn't read it).
+void Tick(uint8_t* base, uint32_t world, uint32_t frame, bool heap, const MakeCalls& make);
+
 // --- The save data ---
 
 // SaveData::AddDistance (sub_82116C38): the garage car picked (the save's

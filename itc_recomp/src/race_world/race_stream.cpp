@@ -1,6 +1,8 @@
 // The racers' manager's streaming each tick (docs/functions/race-world.md):
-// RaceManager::StreamOpponents, RaceManager::StreamTraffic and
-// RaceManager::MoveUnseen. See race_world.h.
+// RaceManager::StreamOpponents, RaceManager::StreamTraffic,
+// RaceManager::MoveUnseen, the streaming by the race's kind above them
+// (RaceManager::Stream, StreamNear, StreamCruise, StreamTwoPlayers) and
+// RaceWorld::Tick. See race_world.h.
 
 #include "race_world/race_world.h"
 
@@ -11,6 +13,7 @@
 #include "guest.h"
 #include "hooks/vehicle.h"
 #include "racer_controllers/racer_controllers.h"
+#include "track_collision/track_collision.h"
 #include "track_route/track_route.h"
 #include "vehicle/vehicle.h"
 #include "vehicle_accessors/vectors.h"
@@ -671,6 +674,202 @@ void MoveUnseen(uint8_t* base, uint32_t manager, uint32_t player, uint32_t frame
       break;
     }
   }
+}
+
+// --- The streaming by the race's kind and the tick ---
+
+namespace {
+
+constexpr uint32_t kTrafficScale = 0x820021E8;   // the traffic's radii: the speed x this
+constexpr uint32_t kOpponentScale = 0x820021F4;  // the opponents' radii: the speed x this
+constexpr uint32_t kNearBase = 0x82002A28;       // the near radii's base
+constexpr uint32_t kFarBase = 0x82008914;        // the far radii's base
+constexpr uint32_t kFarCap = 0x82003384;         // the far radii's cap
+constexpr uint32_t kOpponentNearCap = 0x820099CC;  // the opponents' near radius when capped
+constexpr uint32_t kTrafficNearCap = 0x820099C8;   // the traffic's near radius when capped
+constexpr uint32_t kKindOffset = 0xA3AF4;          // the race data's kind
+constexpr uint32_t kRecorded = 0x821743A8;         // sub_821743A8 (never seen in play)
+constexpr uint32_t kStart = 0x826C6B0C;            // a byte: which racers' words are cleared
+constexpr uint32_t kStartObject = 0x826C7824;      // a word: picks 0x1 or 0x80 by the byte
+constexpr uint32_t kRacerData = 0x826D82E8;        // 972-byte records from +2972 (a pointer)
+
+// The callees' originals with RaceManager::RefreshVehicles' signature.
+Original RefreshOriginal(const StartCalls& calls) {
+  return [&calls](uint32_t address, uint32_t sp, uint32_t r3) {
+    calls.original(address, sp, r3, 0, 0);
+  };
+}
+
+// StreamNear, and StreamCruise with `cruise` (MoveUnseen after).
+void StreamAround(uint8_t* base, uint32_t manager, uint32_t sp, bool cruise, bool heap,
+                  const MakeCalls& make) {
+  const uint32_t frame = sp - 160;
+  // The player's entry: the first flagged 0x4, or none (0).
+  uint32_t player = 0;
+  if (int32_t(Load(base, manager + 2368)) > 0) {
+    for (int32_t i = 0;;) {
+      if ((Load(base, manager + 4 + 28 * uint32_t(i)) & 0x4) != 0) {
+        player = manager + 4 + 28 * uint32_t(i);
+        break;
+      }
+      i++;
+      if (!(i < int32_t(Load(base, manager + 2368)))) {
+        break;
+      }
+    }
+  }
+  const uint32_t car = va::VehicleGet(base, Load(base, player + 20));
+  // The radii, each from Vehicle::Speed again.
+  double f31 = Lfs(base, kTrafficScale);
+  double f30 = Lfs(base, kNearBase);
+  double f27 = Fmadds(double(va::VehicleSpeed(base, car)), f31, f30);
+  const double f29 = Lfs(base, kFarBase);
+  double f28 = Fmadds(double(va::VehicleSpeed(base, car)), f31, f29);
+  f31 = Lfs(base, kOpponentScale);
+  f30 = Fmadds(double(va::VehicleSpeed(base, car)), f31, f30);
+  double f2 = Fmadds(double(va::VehicleSpeed(base, car)), f31, f29);
+  const double cap = Lfs(base, kFarCap);
+  if (f2 > cap) {
+    f2 = cap;
+    f30 = Lfs(base, kOpponentNearCap);
+    if (f28 > f30) {
+      f28 = f30;
+      f27 = Lfs(base, kTrafficNearCap);
+    }
+  }
+  Store(base, manager + 2364, 0);
+  StreamOpponents(base, manager, player, f30, f2, frame - 1920, heap,
+                  make(frame - 1920 - 224).original);
+  StreamTraffic(base, manager, player, f27, f28, 0, frame - 464, heap, make(frame - 464 - 224));
+  if (cruise) {
+    MoveUnseen(base, manager, player, frame - 272);
+  }
+}
+
+}  // namespace
+
+void StreamNear(uint8_t* base, uint32_t manager, uint32_t sp, bool heap, const MakeCalls& make) {
+  ITC_NATIVE_RUNNING("sub_82172E60 RaceManager::StreamNear");
+  StreamAround(base, manager, sp, false, heap, make);
+}
+
+void StreamCruise(uint8_t* base, uint32_t manager, uint32_t sp, bool heap,
+                  const MakeCalls& make) {
+  ITC_NATIVE_RUNNING("sub_82174200 RaceManager::StreamCruise");
+  StreamAround(base, manager, sp, true, heap, make);
+}
+
+void StreamTwoPlayers(uint8_t* base, uint32_t manager, uint32_t sp, bool heap,
+                      const MakeCalls& make) {
+  ITC_NATIVE_RUNNING("sub_82172D20 RaceManager::StreamTwoPlayers");
+  const uint32_t frame = sp - 128;
+  // The one ahead: the second entry when the race data's flags have 0x20
+  // or 0x40 and [0x826D82E8]'s +3012 is below its +3984.
+  const uint32_t flags = Load(base, Load(base, kRaceData) + kFlagsOffset);
+  bool second_ahead = false;
+  if ((flags & 0x20) != 0 || (flags & 0x40) != 0) {
+    const uint32_t data = Load(base, kRacerData);
+    second_ahead = Lfs(base, data + 3012) < Lfs(base, data + 3984);
+  }
+  const uint32_t ahead = second_ahead ? manager + 32 : manager + 4;
+  const uint32_t other = second_ahead ? manager + 4 : manager + 32;
+  const double f31 = double(va::VehicleSpeed(base, va::VehicleGet(base, Load(base, ahead + 20))));
+  double f13 = double(va::VehicleSpeed(base, va::VehicleGet(base, Load(base, other + 20))));
+  if (!(f31 < f13)) {
+    f13 = f31;
+  }
+  double f0 = Fmuls(f13, Lfs(base, kOpponentScale));
+  f13 = Fmuls(f13, Lfs(base, kTrafficScale));
+  const double far_base = Lfs(base, kFarBase);
+  double f2 = Fadds(f0, far_base);
+  const double near_base = Lfs(base, kNearBase);
+  double f1 = Fadds(f0, near_base);
+  double f30 = Fadds(f13, near_base);
+  double f31b = Fadds(f13, far_base);
+  f0 = Lfs(base, kFarCap);
+  if (f2 > f0) {
+    f2 = f0;
+    f1 = Lfs(base, kOpponentNearCap);
+    if (f31b > f1) {
+      f31b = f1;
+      f30 = Lfs(base, kTrafficNearCap);
+    }
+  }
+  Store(base, manager + 2364, 0);
+  StreamOpponents(base, manager, ahead, f1, f2, frame - 1920, heap,
+                  make(frame - 1920 - 224).original);
+  StreamTraffic(base, manager, ahead, f30, f31b, other, frame - 464, heap,
+                make(frame - 464 - 224));
+}
+
+void Stream(uint8_t* base, uint32_t manager, uint32_t sp, bool heap, const MakeCalls& make) {
+  ITC_NATIVE_RUNNING("sub_82174338 RaceManager::Stream");
+  const uint32_t kind = Load(base, Load(base, kRaceData) + kKindOffset);
+  switch (kind) {
+    case 2:
+    case 3:
+      StreamCruise(base, manager, sp, heap, make);
+      return;
+    case 5:
+      StreamTwoPlayers(base, manager, sp, heap, make);
+      return;
+    case 0:  // through sub_8217437C, a tail call
+    case 1:
+    case 4:
+    case 6:
+    case 7:
+    case 8:
+      StreamNear(base, manager, sp, heap, make);
+      return;
+    default:
+      return;
+  }
+}
+
+void Tick(uint8_t* base, uint32_t world, uint32_t frame, bool heap, const MakeCalls& make) {
+  ITC_NATIVE_RUNNING("sub_82174BC0 RaceWorld::Tick");
+  const StartCalls calls = make(frame - 224);
+  if (Load(base, world + 9608) != 0) {
+    const uint32_t race = Load(base, kRaceData);
+    const uint32_t start = guest::LoadU8(base, kStart);
+    if ((Load(base, race + kFlagsOffset) & 0x20) == 0 || start == 255) {
+      // sub_821743A8 (never seen in play): its original.
+      calls.original(kRecorded, frame, world, 0, 0);
+    } else {
+      const uint32_t data = Load(base, kRacerData);
+      // The flags a record needs: 0x1 or 0x80 by the byte (and the word at
+      // 0x826C7824), or either.
+      uint32_t want = 0;
+      const bool either = start != 0 && start != 1;
+      if (start == 0) {
+        want = Load(base, kStartObject) != 0 ? 0x1 : 0x80;
+      } else if (start == 1) {
+        want = Load(base, kStartObject) != 0 ? 0x80 : 0x1;
+      }
+      const uint32_t records = race + 48;
+      const uint32_t count = records + 0x595E0;
+      if (int32_t(Load(base, count)) > 0) {
+        for (int32_t i = 0;;) {
+          const uint32_t flags = Load(base, records + 3888 + 3936 * uint32_t(i));
+          const bool match =
+              either ? ((flags & 0x1) != 0 || (flags & 0x80) != 0) : (flags & want) == want;
+          if (match) {
+            const uint32_t entry = EntryOfRecord(base, uint32_t(i));
+            Store(base, Load(base, entry + 24) * 972 + data + 2972, 0);
+          }
+          i++;
+          if (!(i < int32_t(Load(base, count)))) {
+            break;
+          }
+        }
+      }
+    }
+  }
+  Stream(base, Load(base, kManager), frame, heap, make);
+  calls.update_drivers(frame, 0x82174D04);
+  TickVehicles(base, frame - 128, calls.tick);
+  track_collision::TrackCollisionTick(base, frame - 144, calls.collision);
+  RefreshVehicles(base, frame - 112, RefreshOriginal(calls));
 }
 
 }  // namespace race_world

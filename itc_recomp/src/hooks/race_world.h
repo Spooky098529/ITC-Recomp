@@ -131,10 +131,25 @@ void RaceWorldMoveUnseen(PPCContext& ctx, uint8_t* base);
 // reads it).
 void RaceWorldStreamTraffic(PPCContext& ctx, uint8_t* base);
 
+// RaceManager::Stream sub_82174338, StreamNear sub_82172E60, StreamCruise
+// sub_82174200 and StreamTwoPlayers sub_82172D20: r3 = the manager; RaceWorld::Tick
+// sub_82174BC0: r3 = the race world (its callees' originals as StreamOpponents'
+// and StreamTraffic's; sub_821743A8's original). r3 not kept (their callers
+// don't read it).
+void RaceWorldStream(PPCContext& ctx, uint8_t* base);
+void RaceWorldStreamNear(PPCContext& ctx, uint8_t* base);
+void RaceWorldStreamCruise(PPCContext& ctx, uint8_t* base);
+void RaceWorldStreamTwoPlayers(PPCContext& ctx, uint8_t* base);
+void RaceWorldTick(PPCContext& ctx, uint8_t* base);
+
 // For the harness: while set, runs instead of RaceManager::GiveVehicle
 // sub_821706E8 (never seen in play; its override, which StreamOpponents'
 // original and plain C++ both reach), answering with made-up data.
 using RaceWorldStandIn = void (*)(PPCContext&, uint8_t*);
 extern RaceWorldStandIn g_give_vehicle_stand_in;
+// For the harness: while set, runs instead of sub_821743A8 (never seen in
+// play; its override, which RaceWorld::Tick's original and plain C++ both
+// reach).
+extern RaceWorldStandIn g_recorded_stand_in;
 
 }  // namespace hooks
