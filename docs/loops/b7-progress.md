@@ -12,8 +12,8 @@ file's history. What's left to see in a drive, from every run:
   branch), from 26a5119; summary `b7-loop-2026-10-28-2222.md`.
 - Limit for this run: 3 subsystems.
 - Subsystem 1 of 3: the car sounds and X3DAudio (`car-sounds.md`,
-  from the top lead). Map checked (26adc92). Step: migration 1 (agent
-  running).
+  from the top lead). Map checked (26adc92). Migration 1 done (9a0dcc7..3e6c24e,
+  nothing ready left). Step: validation (agent running).
 
 ## Done
 
@@ -37,6 +37,9 @@ Nothing yet.
   unknown 3232).
 - After the car sounds' map: ours 2628, work left 3833 (wrapped 103,
   known 559, unknown 3171).
+- After the car sounds' migration 1 (`itc_2327`: race 38 s, 0 errors,
+  car_sounds and x3daudio 0 differing): ours 2652, work left 3809
+  (wrapped 103, known 535, unknown 3171).
 
 ## Stopped
 

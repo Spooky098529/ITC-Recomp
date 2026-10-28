@@ -26,6 +26,24 @@ When the user has reviewed a run's section, its heading gets
   `CarSound::Update` (`sub_82110048`). `known-data.md`: the car sounds'
   globals `0x826C5C3C`-`0x826C5C90` and fields. One lead added
   (XAudio's voice methods, the subsystem's blockers).
+- The car sounds' migration 1 (9a0dcc7..3e6c24e, `--native_car_sounds`):
+  24 ours (12 adapters removed: `EngineSound::EngineSound` and the eleven
+  X3DAudio functions), `CarSound::Update3D` with all of X3DAudio's math
+  (`src/car_sounds/`; `x3daudio.cpp` and `car_sound_3d.cpp` built with
+  strict floating point). For review: `X3DAudioCalculate` runs the
+  original whole for EmitterAngle (0x40) or Delay (0x2), never asked for
+  in play; `X3DAudio::Pan` calls the game's `tan` when the rounding mode
+  isn't nearest; `SoundGlobals::Init` is native only while the memory
+  blocks are native, and calls `Music::Play` through its register step;
+  `CarSounds::Destroy` frees through operator delete's plain C++, the
+  game's when it refuses; harness gaps: Pan's only 2- and 6-speaker
+  handles (others read guest 0 and fault, natively too), atan2's two link
+  stores into Matrix's frame not written, Curves' f registers left
+  differently (unread), Cone's dead reads skipped. Row corrections:
+  `SetBanks`' table read, `TireSound::Amount` steps only +76,
+  `Update3D`'s listener and emitter, +200 the reverb level and +204 the
+  Doppler factor (`known-data.md` still says unknown: left for the
+  user's OK). The rest waits on XAudio's voice methods.
 
 ## Run 2026-10-28 18:45 (`b7-loop-28-10-26-2`)
 
