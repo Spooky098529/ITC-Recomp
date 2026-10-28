@@ -22,8 +22,11 @@ file's history. What's left to see in a drive, from every run:
   devices' and users' wrappers, and the front end's save layer above
   them (`GameData::Save`, `Load`, the replays); 25 ready groups;
   blocked by two ready rows in `files-and-saves.md` (`sub_82295D48`,
-  `sub_82295C18`). Map check passed. Step: migration 1 (agent
-  running).
+  `sub_82295C18`). Map check passed. Migration 1 done (63d02d8..53423d6):
+  all 41 in play ours under `--native_save_interface` (with the two
+  blockers and the users' two vtable targets); 17 adapters removed;
+  35 s, 0 errors, every harness 0 differing; nothing ready left. Step:
+  validation (agent running).
 
 ## Done
 
@@ -71,6 +74,8 @@ file's history. What's left to see in a drive, from every run:
   0 differing but the expected groups): ours 2582, work left 3879.
 - After the save interface's map: ours 2582, work left 3879 (wrapped
   103, known 544, unknown 3232).
+- After the save interface's migration 1: ours 2628, work left 3833
+  (wrapped 103, known 498, unknown 3232).
 
 ## Stopped
 

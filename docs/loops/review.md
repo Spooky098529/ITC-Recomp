@@ -100,6 +100,23 @@ When the user has reviewed a run's section, its heading gets
   `SaveSlot` steps answer the requests). `known-data.md`:
   `0x826BDC90`, `0x828161F0`, the replay record, the save slot's
   request words. Two leads added.
+- The save interface's migration 1 (63d02d8..53423d6,
+  `--native_save_interface`): all 41 rows in play ours, 17 adapters
+  removed; also taken under this flag: `sub_82295D48`, `sub_82295C18`
+  (`files-and-saves.md`) and the users' vtable targets `sub_820943C8`,
+  `sub_82493700` (`system-services.md`). For review: the plain C++
+  checks each vtable target is ours first and hands back to `__imp__`
+  if not (a "vtable targets" harness group checks the game's vtables);
+  SaveBuffers, BuildList and Sort run natively only with
+  `--native_heap` (and `--native_memcpy`); the harness points the live
+  globals `0x826BDC90`, `0x828161F0` and `0x826C5B58` at harness copies
+  while each case runs, then puts them back (the harnesses run before
+  the race; no live saves touched); two harness spots don't compare
+  stack words that hold the original's register saves or back chains
+  (`PlayTime`'s out inside `GameData::Save`, `Sort`'s copy inside
+  `BuildList`), and `GameData::Save`'s compare leaves out
+  `GetLocalTime`'s seconds (ce1a3bd). `sub_82295C18`'s adapter stays
+  for `hooks/saves.cpp`.
 
 ## Run 2026-10-28 08:36 (`b7-loop-28-10-26`)
 
