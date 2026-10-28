@@ -17,8 +17,16 @@ here loses its heading.
 
 - The race world's migration 1 (attract race `itc_2139`, replay
   `itc_2140`, ok): `sub_82170A88` SortedList::Clear, `sub_821713C0`
-  RaceWorld::ReleaseForStage, `sub_82116C38` SaveData::AddDistance
-  (`race-world.md`; probably at a race's or stage's end)
+  RaceWorld::ReleaseForStage (`race-world.md`; probably at a race's or
+  stage's end; `sub_82116C38` SaveData::AddDistance seen in the replay
+  `itc_2204`)
+- The race world's migration 2 (attract race `itc_2203`, replay
+  `itc_2204`, ok): `sub_82170668` RaceManager::ResetWorld,
+  `sub_82171718` RaceManager::ResetVehicles, `sub_82143920`
+  RaceEvent::PlaceGroupSplit, `sub_82165E20` RaceStart::Place,
+  `sub_821662E0` RaceStart::PlaceRolling, `sub_82172D20`
+  RaceManager::StreamTwoPlayers (`race-world.md`; a restart, other
+  race kinds, two players)
 
 ## Run 2026-10-25 23:42 (`b7-loop-25-10-26-4`)
 

@@ -74,7 +74,9 @@ file's history. What's left to see in a drive, from every run:
   `race_world`'s 8.3 s of it), 0 errors, every harness 0 differing but
   the expected groups (one new); frame dumps the same as the fallback
   (`itc_2197`, `itc_2198`). Left ready: `RaceManager::Refresh`
-  `sub_82171978`. Validation agent running.
+  `sub_82171978`. Validated (`itc_2203`, replay `itc_2204` ok: 33 of
+  33 harness lines, 14 in the attract race, 13 in the replay, 6 to
+  drive). Migration agent 3 running (`Refresh`).
 
 ## Done
 
