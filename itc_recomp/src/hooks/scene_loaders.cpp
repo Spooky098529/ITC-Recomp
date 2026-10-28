@@ -22,8 +22,8 @@ ITC_FLAG_BOOL(native_scene_loaders, true, "ITC",
               "sub_820D7790 (with Accessories::AllLoaded sub_820F07D8, no adapter); NameMatches "
               "sub_820CE800 and XPR::FindByName sub_820D09B8 (with XPR::Count sub_82596F20 and "
               "RecordName sub_82596F40, no adapters); with --native_heap and the memory blocks' host lock "
-              "CarModelLoads::CarModelLoads sub_820D3DE0, ~CarModelLoads sub_820D3E40 and Reset sub_820D3B58, "
-              "CarModel::Reset sub_820D3E98, CarPartsLoads::CarPartsLoads sub_820D6F88 and "
+              "CarModelLoads::CarModelLoads sub_820D3DE0, ~CarModelLoads sub_820D3E40 and Reset sub_820D3B58 (no adapter: only CarModel::Reset calls it), "
+              "CarModel::Reset sub_820D3E98, CarPartsLoads::CarPartsLoads sub_820D6F88 (no adapter: only CarParts::CarParts calls it) and "
               "~CarPartsLoads sub_820D6FE8, CarParts::CarParts sub_820D7428 and Release "
               "sub_820D6D00, Pool4Object::Reset sub_820D6948) natively instead of through the "
               "translated code (the same writes; checked by --run_harnesses=scene_loaders)");
@@ -178,7 +178,9 @@ void SceneLoadersCarPartsConstruct(PPCContext& ctx, uint8_t* base) {
 // The adapters: the register steps above, or the originals with the flag
 // off. CarParts::SlotOf, sub_820D2270, Accessories::AllLoaded, XPR::Count
 // and XPR::RecordName have none: each has one caller, made native here, whose
-// plain C++ calls theirs.
+// plain C++ calls theirs; nor do CarModelLoads::Reset (only CarModel::Reset
+// calls it) and CarPartsLoads::CarPartsLoads (only CarParts::CarParts): their
+// register steps stay for the harness.
 
 #define ITC_SCENE_LOADERS(address, step)   \
   extern "C" REX_FUNC(sub_##address) {     \
@@ -205,9 +207,7 @@ ITC_SCENE_LOADERS(820CE800, SceneLoadersNameMatches)
 ITC_SCENE_LOADERS(820D09B8, SceneLoadersXprFindByName)
 ITC_SCENE_LOADERS(820D3DE0, SceneLoadersCarModelLoadsConstruct)
 ITC_SCENE_LOADERS(820D3E40, SceneLoadersCarModelLoadsDestruct)
-ITC_SCENE_LOADERS(820D3B58, SceneLoadersCarModelLoadsReset)
 ITC_SCENE_LOADERS(820D3E98, SceneLoadersCarModelReset)
-ITC_SCENE_LOADERS(820D6F88, SceneLoadersCarPartsLoadsConstruct)
 ITC_SCENE_LOADERS(820D7428, SceneLoadersCarPartsConstruct)
 ITC_SCENE_LOADERS(820D6D00, SceneLoadersCarPartsRelease)
 ITC_SCENE_LOADERS(820D6FE8, SceneLoadersCarPartsLoadsDestruct)
