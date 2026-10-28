@@ -49,6 +49,9 @@
 // Prepare, DxtCodec::DxtCodec, ImageCodec::Create over all its formats and
 // some it refuses) run on descriptions with random and edge fields; the
 // codecs' bytes are compared with their pointers by block.
+// The blitter (Blitter::Blitter, Release, CopyRows, ConvertRows, Init),
+// XGGetBlockDimensions and XGCompressSurface run end to end over images and
+// surfaces with the heap primed (see "Batch 5" below).
 
 #include "harness.h"
 
@@ -58,12 +61,14 @@
 #include "hooks/texture_compression.h"
 #include "memory/heap.h"
 #include "texture_compression/codecs.h"
+#include "texture_compression/compress_surface.h"
 #include "texture_compression/dxt45.h"
 #include "texture_compression/dxt_alpha.h"
 #include "texture_compression/dxt_color.h"
 
 #include <fmt/format.h>
 
+#include <algorithm>
 #include <array>
 #include <bit>
 #include <cmath>
@@ -1866,6 +1871,795 @@ void Create(Context& h) {
   results.Report();
 }
 
+// Batch 5: the blitter (Blitter::Blitter sub_82368D20, Release sub_82368D30,
+// CopyRows sub_82369860, ConvertRows sub_823699F8, Init sub_8236C630),
+// XGGetBlockDimensions (sub_8236D3C8) and XGCompressSurface (sub_8235AAC0).
+// Each side runs with the heap primed (the blocks it will get made, filled
+// with 0xCD and freed first: the codecs and the DXT codec's cache read
+// bytes nothing wrote) and the stack below the call filled with the same
+// words; after it, the same sizes are asked of the heap again and their
+// addresses compared (the heap left as the original leaves it).
+
+namespace cs = texture_compression::compress;
+
+constexpr uint32_t kA8R8G8B8 = 0x18280086;
+constexpr uint32_t kA32B32G32R32F = 0x1A22AAA6;
+constexpr uint32_t kAlphaReferenceGlobal = 0x8263B7E8;
+
+// A format's storage: bytes a pixel (or a block) and the block's side.
+struct Layout {
+  uint32_t unit;
+  uint32_t side;
+};
+
+Layout LayoutOf(uint32_t format) {
+  switch (format & ~0x100u) {
+    case kA32B32G32R32F:
+      return {16, 1};
+    case 0x1A200052:
+    case 0x1A20007A:
+    case 0x1A20007B:
+      return {8, 4};
+    case 0x1A200053:
+    case 0x1A200054:
+      return {16, 4};
+    case 0x1828004B:
+    case 0x1828004C:
+    case 0x1A20004B:
+    case 0x1A20004C:
+      return {2, 1};
+    default:
+      return {4, 1};
+  }
+}
+
+uint32_t LayoutRowBytes(Layout l, uint32_t width) { return (width + l.side - 1) / l.side * l.unit; }
+uint32_t LayoutRows(Layout l, uint32_t height) { return (height + l.side - 1) / l.side; }
+
+// An image's bytes (in the guest's order): floats for A32B32G32R32F (0 to 1,
+// bytes decoded, or now and then the edges), else bytes random, at the
+// edges (0, 1, 254, 255), or one repeated.
+std::vector<uint8_t> ImageBytes(Random& r, uint32_t format, uint32_t bytes) {
+  std::vector<uint8_t> out(bytes);
+  if ((format & ~0x100u) == kA32B32G32R32F) {
+    const int kind = int(r.Below(4));
+    for (uint32_t i = 0; i + 4 <= bytes; i += 4) {
+      const float f = kind == 3 && r.Below(6) == 0 ? Special(r)
+                      : kind == 2                  ? Byte(r.Below(256), false)
+                                                   : Unit(r);
+      const uint32_t bits = std::bit_cast<uint32_t>(f);
+      out[i] = uint8_t(bits >> 24);
+      out[i + 1] = uint8_t(bits >> 16);
+      out[i + 2] = uint8_t(bits >> 8);
+      out[i + 3] = uint8_t(bits);
+    }
+    return out;
+  }
+  const int kind = int(r.Below(4));
+  const uint8_t one = uint8_t(r.Next());
+  static constexpr uint8_t kEdges[] = {0, 1, 254, 255};
+  for (uint8_t& b : out) {
+    b = kind == 0 ? kEdges[r.Below(4)] : kind == 1 ? one : uint8_t(r.Next());
+  }
+  return out;
+}
+
+// The heap primed with these sizes (each three times, in this order).
+void PrimeHeap(uint8_t* base, const std::vector<uint32_t>& sizes) {
+  std::vector<uint32_t> blocks;
+  for (int k = 0; k < 3; k++) {
+    for (uint32_t size : sizes) {
+      const uint32_t block = memory::Alloc(size, 0);
+      if (block != 0 && size != 0) Fill(base, block, size);
+      blocks.push_back(block);
+    }
+  }
+  for (uint32_t block : blocks) memory::Free(block);
+}
+
+// The heap's state after a run: the addresses these sizes get, then freed.
+void PutHeap(Outputs& out, const std::vector<uint32_t>& sizes) {
+  std::vector<uint32_t> blocks;
+  for (uint32_t size : sizes) {
+    blocks.push_back(memory::Alloc(size, 0));
+    out.Word(blocks.back());
+  }
+  for (uint32_t block : blocks) memory::Free(block);
+}
+
+// The heap sizes a blit asks for, in its order: the destination's codec
+// (256 bytes for DXT, else 128), the source's (128), the source's error row
+// (diffusion), Prepare's row (formats of different kinds), ConvertRows' row,
+// the DXT codec's cache (8 bytes an entry) and its block rows (256 bytes a
+// block column; three, as each is handed on or freed).
+std::vector<uint32_t> BlitSizes(uint32_t destination_codec, uint32_t box_width, bool error_row,
+                                bool prepare_row, uint32_t entries, uint32_t columns) {
+  std::vector<uint32_t> sizes = {destination_codec, 128};
+  if (error_row) sizes.push_back((box_width + 2) * 16);
+  if (prepare_row) sizes.push_back(box_width * 16);
+  sizes.push_back(box_width * 16);
+  sizes.push_back(entries * 8);
+  for (int i = 0; i < 3; i++) sizes.push_back(columns * 256);
+  return sizes;
+}
+
+// A box's block rows and columns (rounded out to 4 x 4 blocks).
+uint32_t BlockSpan(uint32_t start, uint32_t size) {
+  return (((start + size + 3) & ~3u) - (start & ~3u)) / 4;
+}
+
+constexpr uint32_t kStackFill = 16384;  // below the caller's r1, filled the same for both sides
+
+std::vector<uint32_t> StackWords(Random& r) {
+  std::vector<uint32_t> words(kStackFill / 4 + 32);
+  const int kind = int(r.Below(3));
+  for (uint32_t& w : words) {
+    w = kind == 0 ? 0 : kind == 1 ? 0xCDCDCDCD : uint32_t(r.Next());
+  }
+  return words;
+}
+
+void WriteStack(uint8_t* base, uint32_t r1, const std::vector<uint32_t>& words) {
+  for (uint32_t i = 0; i < words.size(); i++) {
+    guest::StoreU32(base, r1 - kStackFill + 4 * i, words[i]);
+  }
+}
+
+// The register steps for the batch's functions are the adapters' (hooks/
+// texture_compression.h).
+
+// XGGetBlockDimensions over the 64 formats (and some wider words), with
+// both, one or no pointers: the two words and r3.
+void BlockDimensions(Context& h) {
+  Results results("XGGetBlockDimensions (sub_8236D3C8)");
+  std::vector<uint32_t> formats;
+  for (uint32_t f = 0; f < 64; f++) formats.push_back(f);
+  for (int i = 0; i < 16; i++) formats.push_back(uint32_t(h.random.Next()));
+  for (uint32_t format : formats) {
+    for (int pointers = 0; pointers < 4; pointers++) {
+      Outputs out[2];
+      for (int v = 0; v < 2; v++) {
+        Fill(h.base, h.data, 16);
+        PPCContext t = CallContext(h);
+        t.r3.u64 = format;
+        t.r4.u64 = (pointers & 1) != 0 ? h.data : 0;
+        t.r5.u64 = (pointers & 2) != 0 ? h.data + 8 : 0;
+        if (v == 0) {
+          __imp__sub_8236D3C8(t, h.base);
+        } else {
+          hooks::TextureCompressionGetBlockDimensions(t, h.base);
+        }
+        out[v].Bytes(Read(h.base, h.data, 16));
+        out[v].Word(t.r3.u32);
+        out[v].Word(uint32_t(t.r3.u64 >> 32));
+      }
+      results.Check(out[0], out[1], fmt::format("format {:08X}, pointers {}", format, pointers));
+    }
+  }
+  results.Report();
+}
+
+// Blitter::Blitter on a blit object in the scratch area: its 16 bytes, r3.
+void BlitterConstruct(Context& h) {
+  Results results("Blitter::Blitter (sub_82368D20)");
+  for (int c = 0; c < 16; c++) {
+    const uint32_t at = h.data + 4 * uint32_t(h.random.Below(8));
+    Outputs out[2];
+    for (int v = 0; v < 2; v++) {
+      Fill(h.base, h.data, 64);
+      PPCContext t = CallContext(h);
+      t.r3.u64 = at;
+      if (v == 0) {
+        __imp__sub_82368D20(t, h.base);
+      } else {
+        hooks::TextureCompressionBlitterConstruct(t, h.base);
+      }
+      out[v].Bytes(Read(h.base, h.data, 64));
+      out[v].Word(t.r3.u32);
+    }
+    results.Check(out[0], out[1], fmt::format("case {}", c));
+  }
+  results.Report();
+}
+
+// An image for the blitter's cases: a description of `format`, `width` x
+// `height`, its box the whole or cut, its data at `data` (the bytes
+// returned), the pitch its rows' bytes and now and then more.
+struct Image {
+  Description d;
+  std::vector<uint8_t> bytes;
+  uint32_t box_width;
+  uint32_t box_height;
+};
+
+Image MakeImage(Random& r, uint32_t format, uint32_t width, uint32_t height, uint32_t data,
+                bool cut) {
+  Image image{};
+  auto& w = image.d.words;
+  const Layout l = LayoutOf(format);
+  const uint32_t pitch = LayoutRowBytes(l, width) + 4 * r.Below(3) * (r.Below(2) == 0 ? 0 : 4);
+  const uint32_t rows = LayoutRows(l, height);
+  w[0] = data;
+  w[1] = format;
+  w[2] = pitch;
+  w[3] = pitch * rows;
+  uint32_t box[6] = {0, 0, width, height, 0, 1};
+  if (cut) {
+    box[0] = r.Below(width);
+    box[2] = box[0] + 1 + r.Below(width - box[0]);
+    box[1] = r.Below(height);
+    box[3] = box[1] + 1 + r.Below(height - box[1]);
+  }
+  const uint32_t extent[6] = {0, 0, width, height, 0, 1};
+  for (int i = 0; i < 6; i++) {
+    w[4 + i] = extent[i];
+    w[10 + i] = box[i];
+  }
+  w[16] = r.Below(3) == 0 ? 1 : 0;  // dither (Init sets the destination's)
+  w[17] = r.Below(4) == 0 ? 1 : 0;  // diffusion (the same)
+  w[18] = 0;                        // sRGB (Init sets both)
+  w[19] = r.Below(10) == 0 ? uint32_t(r.Next()) | 1 : 0;  // the color key
+  w[20] = 0;
+  image.bytes = ImageBytes(r, format, pitch * rows);
+  image.box_width = box[2] - box[0];
+  image.box_height = box[3] - box[1];
+  return image;
+}
+
+constexpr uint32_t kBlitFormats[] = {kA8R8G8B8, kA32B32G32R32F, 0x1A200052, 0x1A200053,
+                                     0x1A200054, 0x1A20007A, 0x1A20007B, kA8R8G8B8 | 0x100,
+                                     0x12345678};
+
+// The blitter's area: the blit object, the two descriptions, the two images.
+constexpr uint32_t kBlit = 0;
+constexpr uint32_t kBlitDestination = 64;
+constexpr uint32_t kBlitSource = 160;
+constexpr uint32_t kBlitDestinationData = 256;
+constexpr uint32_t kBlitImageBytes = 16384;
+constexpr uint32_t kBlitSourceData = kBlitDestinationData + kBlitImageBytes;
+constexpr uint32_t kBlitAreaBytes = kBlitSourceData + kBlitImageBytes;
+
+// A filter for Init: mostly valid (1 to 5, with the dither, diffusion, sRGB
+// and mirror bits), sometimes not (0, 6, 0x800000 and the like).
+uint32_t RandomFilter(Random& r) {
+  const uint32_t k = r.Below(10);
+  if (k == 0) {
+    static constexpr uint32_t kBad[] = {0, 6, 0xFFFF, 0x800004, 0x80000000, 0x10000};
+    return kBad[r.Below(6)];
+  }
+  uint32_t filter = 1 + r.Below(5);
+  if (k < 4) return filter | 0x80000;  // XGCompressSurface's
+  if (r.Below(2) == 0) filter |= 0x80000;
+  if (r.Below(4) == 0) filter |= 0x100000;
+  if (r.Below(6) == 0) filter |= 0x200000;
+  if (r.Below(6) == 0) filter |= 0x400000;
+  if (r.Below(4) == 0) filter |= r.Below(8) << 16;
+  return filter;
+}
+
+// Blitter::Init over pairs of images (formats the same or not, boxes the
+// same size or not, so CopyRows, ConvertRows and the filters each run, and
+// formats Create refuses), with random filters: r3, the area (the blit
+// object, both descriptions, the destination's bytes) and the heap after.
+void BlitterInitCases(Context& h) {
+  Results results("Blitter::Init (sub_8236C630) with CopyRows and ConvertRows (sub_82369860, "
+                  "sub_823699F8)");
+  if (!hooks::NativeHeapActive()) {
+    results.Report();
+    return;
+  }
+  const uint32_t area = memory::Alloc(kBlitAreaBytes, 0);
+  const uint32_t saved_premultiplied = guest::LoadU32(h.base, kPremultiplied);
+  int init_succeeded = 0;
+  for (int c = 0; c < 400; c++) {
+    const uint32_t to_format = kBlitFormats[h.random.Below(std::size(kBlitFormats))];
+    const uint32_t from_format = h.random.Below(3) == 0
+                                     ? to_format
+                                     : kBlitFormats[h.random.Below(std::size(kBlitFormats))];
+    const uint32_t width = 1 + h.random.Below(24);
+    const uint32_t height = 1 + h.random.Below(24);
+    const bool same_size = h.random.Below(3) != 0;
+    const uint32_t from_width = same_size ? width : 1 + h.random.Below(24);
+    const uint32_t from_height = same_size ? height : 1 + h.random.Below(24);
+    const bool cut = h.random.Below(4) == 0;
+    Image to = MakeImage(h.random, to_format, width, height, area + kBlitDestinationData, cut);
+    Image from = MakeImage(h.random, from_format, from_width, from_height,
+                           area + kBlitSourceData, cut && same_size);
+    if (cut && same_size) {  // the same box size on both
+      for (int i = 10; i < 16; i++) from.d.words[i] = to.d.words[i];
+    }
+    // No color key on the destination, and none on the source with sRGB in:
+    // a keyed codec with sRGB has its slot 3 encode through its row (+88),
+    // still 0 then, and the original writes at address 0.
+    to.d.words[19] = 0;
+    uint32_t filter = RandomFilter(h.random);
+    if (from.d.words[19] != 0) filter &= ~0x200000u;
+    const uint32_t premultiplied = h.random.Below(2);
+    const auto stack = StackWords(h.random);
+    const auto sizes = BlitSizes(LayoutOf(to_format).side == 4 ? 256 : 128, to.box_width,
+                                 from.d.words[17] != 0, to_format != from_format,
+                                 BlockSpan(to.d.words[11], to.box_height),
+                                 BlockSpan(to.d.words[10], to.box_width));
+    Outputs out[2];
+    for (int v = 0; v < 2; v++) {
+      Fill(h.base, area, kBlitAreaBytes);
+      WriteDescription(h.base, area + kBlitDestination, to.d);
+      WriteDescription(h.base, area + kBlitSource, from.d);
+      Write(h.base, area + kBlitDestinationData, to.bytes.data(), uint32_t(to.bytes.size()));
+      Write(h.base, area + kBlitSourceData, from.bytes.data(), uint32_t(from.bytes.size()));
+      guest::StoreU32(h.base, kPremultiplied, premultiplied);
+      PPCContext t = CallContext(h);
+      WriteStack(h.base, t.r1.u32, stack);
+      PrimeHeap(h.base, sizes);
+      t.r3.u64 = area + kBlit;
+      t.r4.u64 = area + kBlitDestination;
+      t.r5.u64 = area + kBlitSource;
+      t.r6.u64 = filter;
+      ITC_FLAG(native_texture_compression) = v == 1;
+      if (v == 0) {
+        __imp__sub_8236C630(t, h.base);
+        if (t.r3.u32 == 0) init_succeeded++;
+      } else {
+        hooks::TextureCompressionBlitterInit(t, h.base);
+      }
+      ITC_FLAG(native_texture_compression) = true;
+      out[v].Word(t.r3.u32);
+      out[v].Word(uint32_t(t.r3.u64 >> 32));
+      out[v].Bytes(Read(h.base, area, kBlitAreaBytes));
+      PutHeap(out[v], sizes);
+    }
+    results.Check(out[0], out[1],
+                  fmt::format("case {}: filter {:08X}, premultiplied {}, destination{}, source{}",
+                              c, filter, premultiplied, DescriptionText(to.d),
+                              DescriptionText(from.d)));
+  }
+  guest::StoreU32(h.base, kPremultiplied, saved_premultiplied);
+  memory::Free(area);
+  ITC_LOG_INFO("texture_compression harness: Blitter::Init: {} cases returned 0", init_succeeded);
+  results.Report();
+}
+
+// Blitter::CopyRows and ConvertRows run directly on codecs the recompiled
+// ImageCodec::Create and Prepare made (the flag off, each side its own),
+// then Blitter::Release (sub_82368D30) on them, or on a blit object with
+// one or both codecs null: CopyRows on the same formats (sizes, sRGB or a
+// color key now and then different: E_FAIL; DXT ones go to CopyBlocks),
+// ConvertRows on any pair (the sizes now and then different); each one's
+// r3, the area, the codecs' sRGB words (+16), Release's r3 (by block),
+// which codecs it freed, and the heap after.
+void BlitterRows(Context& h) {
+  Results copy_results("Blitter::CopyRows (sub_82369860) with Release (sub_82368D30)");
+  Results convert_results("Blitter::ConvertRows (sub_823699F8) with Release (sub_82368D30)");
+  if (!hooks::NativeHeapActive()) {
+    copy_results.Report();
+    convert_results.Report();
+    return;
+  }
+  const uint32_t area = memory::Alloc(kBlitAreaBytes, 0);
+  const uint32_t saved_premultiplied = guest::LoadU32(h.base, kPremultiplied);
+  for (int c = 0; c < 600; c++) {
+    const bool copy = c % 2 == 0;
+    // Known formats only (Create makes them all).
+    const uint32_t to_format = kBlitFormats[h.random.Below(std::size(kBlitFormats) - 1)];
+    uint32_t from_format = copy ? (h.random.Below(2) == 0 ? to_format : to_format ^ 0x100)
+                                : kBlitFormats[h.random.Below(std::size(kBlitFormats) - 1)];
+    const uint32_t width = 1 + h.random.Below(24);
+    const uint32_t height = 1 + h.random.Below(24);
+    const bool same_size = h.random.Below(6) != 0;
+    const uint32_t from_width = same_size ? width : 1 + h.random.Below(24);
+    const uint32_t from_height = same_size ? height : 1 + h.random.Below(24);
+    Image to = MakeImage(h.random, to_format, width, height, area + kBlitDestinationData, false);
+    Image from =
+        MakeImage(h.random, from_format, from_width, from_height, area + kBlitSourceData, false);
+    to.d.words[19] = 0;
+    if (h.random.Below(3) != 0) from.d.words[19] = 0;
+    to.d.words[17] = 0;
+    from.d.words[17] = 0;
+    // sRGB on either side now and then (no sRGB out with a color key).
+    if (h.random.Below(6) == 0) to.d.words[18] = 1;
+    if (h.random.Below(6) == 0 && from.d.words[19] == 0) from.d.words[18] = 1;
+    if (from.d.words[19] != 0) from.d.words[18] = 0;
+    const int nulls = int(h.random.Below(8));  // 1: no source codec, 2: no destination's
+    const uint32_t premultiplied = h.random.Below(2);
+    const auto stack = StackWords(h.random);
+    const auto sizes = BlitSizes(LayoutOf(to_format).side == 4 ? 256 : 128, width,
+                                 false, to.d.words[18] != 0 || to_format != from_format,
+                                 BlockSpan(0, height), BlockSpan(0, width));
+    Outputs out[2];
+    for (int v = 0; v < 2; v++) {
+      Fill(h.base, area, kBlitAreaBytes);
+      WriteDescription(h.base, area + kBlitDestination, to.d);
+      WriteDescription(h.base, area + kBlitSource, from.d);
+      Write(h.base, area + kBlitDestinationData, to.bytes.data(), uint32_t(to.bytes.size()));
+      Write(h.base, area + kBlitSourceData, from.bytes.data(), uint32_t(from.bytes.size()));
+      guest::StoreU32(h.base, kPremultiplied, premultiplied);
+      PPCContext t = CallContext(h);
+      WriteStack(h.base, t.r1.u32, stack);
+      PrimeHeap(h.base, sizes);
+      ITC_FLAG(native_texture_compression) = false;
+      t.r3.u64 = area + kBlitDestination;
+      __imp__sub_823F6C60(t, h.base);
+      const uint32_t to_codec = t.r3.u32;
+      t = CallContext(h);
+      t.r3.u64 = area + kBlitSource;
+      __imp__sub_823F6C60(t, h.base);
+      const uint32_t from_codec = t.r3.u32;
+      if (to_codec != 0 && from_codec != 0) {
+        t = CallContext(h);
+        t.r3.u64 = to_codec;
+        t.r4.u64 = from_codec;
+        __imp__sub_823EAA90(t, h.base);
+      }
+      Blocks blocks;
+      blocks.Add(to_codec, 256);
+      blocks.Add(from_codec, 256);
+      guest::StoreU32(h.base, area + kBlit + 0, from_codec);
+      guest::StoreU32(h.base, area + kBlit + 4, to_codec);
+      guest::StoreU32(h.base, area + kBlit + 8, 0x80004);
+      ITC_FLAG(native_texture_compression) = v == 1;
+      if (to_codec != 0 && from_codec != 0) {
+        t = CallContext(h);
+        t.r3.u64 = area + kBlit;
+        if (copy) {
+          (v == 0 ? GuestFunction(__imp__sub_82369860) : hooks::TextureCompressionCopyRows)(
+              t, h.base);
+        } else {
+          (v == 0 ? GuestFunction(__imp__sub_823699F8) : hooks::TextureCompressionConvertRows)(
+              t, h.base);
+        }
+        out[v].Word(t.r3.u32);
+        out[v].Word(uint32_t(t.r3.u64 >> 32));
+        out[v].Word(guest::LoadU32(h.base, to_codec + cf::kSrgb));
+        out[v].Word(guest::LoadU32(h.base, from_codec + cf::kSrgb));
+      }
+      out[v].Bytes(Read(h.base, area + 64, kBlitAreaBytes - 64));
+      // Release, with a codec now and then left out (freed by hand after).
+      std::vector<uint32_t> left_out;
+      if (nulls == 1 && from_codec != 0) {
+        guest::StoreU32(h.base, area + kBlit + 0, 0);
+        left_out.push_back(from_codec);
+      }
+      if (nulls == 2 && to_codec != 0) {
+        guest::StoreU32(h.base, area + kBlit + 4, 0);
+        left_out.push_back(to_codec);
+      }
+      t = CallContext(h);
+      t.r3.u64 = area + kBlit;
+      (v == 0 ? GuestFunction(__imp__sub_82368D30) : hooks::TextureCompressionBlitterRelease)(
+          t, h.base);
+      ITC_FLAG(native_texture_compression) = true;
+      blocks.Put(out[v], t.r3.u32, area, kBlitAreaBytes);
+      out[v].Bytes(Read(h.base, area + kBlit, 12));
+      out[v].Word(to_codec != 0 && memory::IsHeapBlock(to_codec) ? 1 : 0);
+      out[v].Word(from_codec != 0 && memory::IsHeapBlock(from_codec) ? 1 : 0);
+      for (uint32_t codec : left_out) {
+        ITC_FLAG(native_texture_compression) = false;
+        t = CallContext(h);
+        t.r3.u64 = codec;
+        t.r4.u64 = 1;
+        const uint32_t slot0 = guest::LoadU32(h.base, guest::LoadU32(h.base, codec));
+        if (slot0 == 0x823F6BC0) {
+          __imp__sub_823F6BC0(t, h.base);
+        } else {
+          __imp__sub_823F6B70(t, h.base);
+        }
+        ITC_FLAG(native_texture_compression) = true;
+      }
+      PutHeap(out[v], sizes);
+    }
+    (copy ? copy_results : convert_results)
+        .Check(out[0], out[1],
+               fmt::format("case {}: nulls {}, premultiplied {}, destination{}, source{}", c, nulls,
+                           premultiplied, DescriptionText(to.d), DescriptionText(from.d)));
+  }
+  guest::StoreU32(h.base, kPremultiplied, saved_premultiplied);
+  memory::Free(area);
+  copy_results.Report();
+  convert_results.Report();
+}
+
+// One XGCompressSurface case.
+struct CompressCase {
+  uint32_t width = 0;   // r5
+  uint32_t height = 0;  // r6
+  uint32_t pitch = 0;   // r4
+  uint32_t format = 0;  // r7
+  bool point = false;   // r8 set
+  uint32_t point_xy[2] = {0, 0};
+  bool rect = false;  // the caller's +92 set
+  uint32_t rect_ltrb[4] = {0, 0, 0, 0};
+  uint32_t source_format = kA8R8G8B8;  // the caller's +84
+  uint32_t source_pitch = 0;           // r10
+  uint32_t source_rows = 0;
+  uint32_t flags = 1;  // the caller's +100
+  float alpha_reference = 0.0f;
+  uint32_t premultiplied_before = 0;
+  uint32_t alpha_before = 0;
+  std::vector<uint8_t> source;
+  std::vector<uint8_t> destination;
+  std::vector<uint32_t> stack;
+  std::vector<uint32_t> sizes;
+};
+
+std::string CompressText(const CompressCase& c) {
+  return fmt::format(
+      "{} x {}, pitch {}, format {:08X}, point {} ({}, {}), rect {} ({}, {}, {}, {}), source "
+      "{:08X} pitch {}, flags {:X}, alpha reference {:08X}",
+      c.width, c.height, c.pitch, c.format, c.point, c.point_xy[0], c.point_xy[1], c.rect,
+      c.rect_ltrb[0], c.rect_ltrb[1], c.rect_ltrb[2], c.rect_ltrb[3], c.source_format,
+      c.source_pitch, c.flags, std::bit_cast<uint32_t>(c.alpha_reference));
+}
+
+// The case run on both sides (the destination at `area`, the source after
+// it, then the rectangle and the point): r3, the destination's and the
+// source's bytes, XGCompressSurface's locals (its r1 + 112 to + 400: the
+// descriptions, the blit object, the filter, the rectangle and point it
+// makes) and its caller's frame (the words it saves there), the alpha
+// reference (a float) and the premultiplied switch, and the heap after.
+// How many cases' recompiled r3 was 0 (by Init's result), for the log.
+int compress_succeeded = 0;
+
+void RunCompress(Context& h, Results& results, const CompressCase& c, uint32_t area,
+                 const std::string& what) {
+  const uint32_t destination = area;
+  const uint32_t source = area + ((uint32_t(c.destination.size()) + 15) & ~15u);
+  const uint32_t rect = source + ((uint32_t(c.source.size()) + 15) & ~15u);
+  const uint32_t point = rect + 16;
+  Outputs out[2];
+  for (int v = 0; v < 2; v++) {
+    Write(h.base, destination, c.destination.data(), uint32_t(c.destination.size()));
+    Write(h.base, source, c.source.data(), uint32_t(c.source.size()));
+    for (int i = 0; i < 4; i++) guest::StoreU32(h.base, rect + 4 * i, c.rect_ltrb[i]);
+    for (int i = 0; i < 2; i++) guest::StoreU32(h.base, point + 4 * i, c.point_xy[i]);
+    guest::StoreU32(h.base, kPremultiplied, c.premultiplied_before);
+    guest::StoreU32(h.base, kAlphaReferenceGlobal, c.alpha_before);
+    PPCContext t = CallContext(h);
+    const uint32_t r1 = t.r1.u32;
+    WriteStack(h.base, r1, c.stack);
+    guest::StoreU32(h.base, r1 + cs::kSourceFormat, c.source_format);
+    guest::StoreU32(h.base, r1 + cs::kSourceRect, c.rect ? rect : 0);
+    guest::StoreU32(h.base, r1 + cs::kFlags, c.flags);
+    PrimeHeap(h.base, c.sizes);
+    t.r3.u64 = destination;
+    t.r4.u64 = c.pitch;
+    t.r5.u64 = c.width;
+    t.r6.u64 = c.height;
+    t.r7.u64 = c.format;
+    t.r8.u64 = c.point ? point : 0;
+    t.r9.u64 = source;
+    t.r10.u64 = c.source_pitch;
+    t.f1.f64 = double(c.alpha_reference);
+    ITC_FLAG(native_texture_compression) = v == 1;
+    if (v == 0) {
+      __imp__sub_8235AAC0(t, h.base);
+      if (t.r3.u32 == 0) compress_succeeded++;
+    } else {
+      hooks::TextureCompressionCompressSurface(t, h.base);
+    }
+    ITC_FLAG(native_texture_compression) = true;
+    out[v].Word(t.r3.u32);
+    out[v].Word(uint32_t(t.r3.u64 >> 32));
+    out[v].Bytes(Read(h.base, destination, uint32_t(c.destination.size())));
+    out[v].Bytes(Read(h.base, source, uint32_t(c.source.size())));
+    const uint32_t frame = r1 - cs::kFrameBytes;
+    out[v].Bytes(Read(h.base, frame + 112, 400 - 112));
+    out[v].Bytes(Read(h.base, r1, 128));
+    out[v].Float(guest::LoadU32(h.base, kAlphaReferenceGlobal));
+    out[v].Word(guest::LoadU32(h.base, kPremultiplied));
+    PutHeap(out[v], c.sizes);
+  }
+  results.Check(out[0], out[1], what);
+}
+
+// The destination GPU formats: the DXT ones XGCompressSurface maps (their
+// format words 8-in-16, natively), YUV, ones it doesn't map (the stack's
+// word read), and the paths handed back whole: DXN and CTX1, and DXT words
+// not 8-in-16 (swapped after).
+uint32_t DestinationWord(Random& r, int kind) {
+  static constexpr uint32_t kMapped[] = {18, 19, 20, 51, 52, 53, 58, 59};
+  switch (kind) {
+    case 0:
+      return 0x1A200054;  // in play
+    case 1:
+      return 0x1A200040 | kMapped[r.Below(std::size(kMapped))];
+    case 2:
+      return 0x1A200040 | (11 + r.Below(2));  // YUV
+    case 3: {
+      static constexpr uint32_t kOthers[] = {0, 6, 26, 38, 54, 63};
+      return 0x1A200040 | kOthers[r.Below(std::size(kOthers))];
+    }
+    case 4:
+      return 0x1A200000 | (r.Below(2) == 0 ? 49 : 60) | (r.Below(4) << 6);  // DXN, CTX1
+    default:
+      return 0x1A200000 | kMapped[r.Below(std::size(kMapped))] |
+             (r.Below(3) == 0 ? 0 : r.Below(2) == 0 ? 0x80 : 0xC0);  // swapped after
+  }
+}
+
+// The destination's storage for a GPU format (the DXT layouts; YUV 2 bytes
+// a pixel; DXN 16 and CTX1 8 bytes a block; others as DXT5, the format the
+// stack's word is made to hold).
+Layout DestinationLayout(uint32_t word) {
+  switch (word & 0x3F) {
+    case 18:
+    case 51:
+    case 58:
+    case 59:
+    case 60:
+      return {8, 4};
+    case 11:
+    case 12:
+      return {2, 1};
+    default:
+      return {16, 4};
+  }
+}
+
+// The source formats: A8R8G8B8 (in play) and A32B32G32R32F natively; ones
+// copied first (another endian, or channels not in the standard order).
+uint32_t SourceWord(Random& r, int kind) {
+  switch (kind) {
+    case 0:
+      return kA8R8G8B8;
+    case 1:
+      return kA32B32G32R32F;
+    case 2:
+      return (kA8R8G8B8 & ~0xC0u) | (r.Below(2) == 0 ? 0x40 : 0xC0);  // 8-in-16, 16-in-32
+    default: {
+      // Channels from 0 to 5 (4: zero, 5: one) in another order.
+      uint32_t swizzle;
+      do {
+        swizzle = 0;
+        for (int i = 0; i < 4; i++) swizzle |= r.Below(6) << (3 * i);
+      } while (swizzle == 0x60A);
+      return (kA8R8G8B8 & ~(0xFFFu << 18)) | (swizzle << 18);
+    }
+  }
+}
+
+// XGCompressSurface on small surfaces: sizes 1 to 64 (a quarter of them
+// multiples of 4), the destination's pitch its blocks' bytes and now and
+// then more, the destination point and the source rectangle null or set
+// (inside the surfaces), flags 0, 1, 0x10, 0x11, 4, 5 and random, the
+// alpha reference 0, 0.5, 1, 128/255, a NaN or random; A8R8G8B8 to DXT5 (in
+// play) most, the other mapped DXT formats, YUV, unmapped formats (the
+// stack's word: 0, junk or DXT5), and the handed-back paths (DXN, CTX1, a
+// source copied first, a destination swapped after); the stack's leftovers
+// (the source description's dither and diffusion) 0, 1 or random. Then the
+// real vinyl sheet once: 1024 x 1024 A8R8G8B8 to DXT5, flags 1.
+void CompressSurfaceCases(Context& h) {
+  Results results("XGCompressSurface (sub_8235AAC0)");
+  if (!hooks::NativeHeapActive()) {
+    results.Report();
+    return;
+  }
+  constexpr uint32_t kAreaBytes = 160 * 1024;
+  const uint32_t area = memory::Alloc(kAreaBytes, 0);
+  const uint32_t saved_premultiplied = guest::LoadU32(h.base, kPremultiplied);
+  const uint32_t saved_alpha = guest::LoadU32(h.base, kAlphaReferenceGlobal);
+  for (int n = 0; n < 500; n++) {
+    CompressCase c;
+    const uint32_t k = h.random.Below(20);
+    const int destination_kind = k < 9 ? 0 : k < 13 ? 1 : k < 14 ? 2 : k < 16 ? 3 : k < 17 ? 4 : 5;
+    const uint32_t s = h.random.Below(16);
+    const int source_kind = destination_kind >= 4 ? 0 : s < 11 ? 0 : s < 13 ? 1 : s < 14 ? 2 : s < 15 ? 3 : 0;
+    c.format = DestinationWord(h.random, destination_kind);
+    c.source_format = SourceWord(h.random, source_kind);
+    auto size = [&]() {
+      return h.random.Below(4) == 0 ? 4 * (1 + h.random.Below(16)) : 1 + h.random.Below(64);
+    };
+    c.width = size();
+    c.height = size();
+    if (destination_kind == 2) c.width = (c.width + 1) & ~1u;  // YUV: pairs of pixels
+    const Layout dl = DestinationLayout(c.format);
+    c.pitch = LayoutRowBytes(dl, c.width) + (h.random.Below(3) == 0 ? 16 * h.random.Below(3) : 0);
+    // The box (the rectangle's size, the whole surface without one) and
+    // where it goes (the point; 0, 0 without a rectangle, as the box fills
+    // the surface then).
+    c.rect = h.random.Below(3) == 0;
+    c.point = h.random.Below(3) == 0;
+    uint32_t box_width = c.width;
+    uint32_t box_height = c.height;
+    if (c.rect && h.random.Below(2) == 0) {
+      box_width = 1 + h.random.Below(c.width);
+      box_height = 1 + h.random.Below(c.height);
+      if (destination_kind == 2) box_width = std::max(2u, box_width & ~1u);
+    }
+    if (c.point && c.rect) {
+      c.point_xy[0] = h.random.Below(c.width - box_width + 1);
+      c.point_xy[1] = h.random.Below(c.height - box_height + 1);
+      if (destination_kind == 2) c.point_xy[0] &= ~1u;
+    }
+    const uint32_t left = c.rect ? h.random.Below(8) : 0;
+    const uint32_t top = c.rect ? h.random.Below(8) : 0;
+    c.rect_ltrb[0] = left;
+    c.rect_ltrb[1] = top;
+    c.rect_ltrb[2] = left + box_width;
+    c.rect_ltrb[3] = top + box_height;
+    const Layout sl = LayoutOf(source_kind == 1 ? kA32B32G32R32F : kA8R8G8B8);
+    c.source_pitch = LayoutRowBytes(sl, left + box_width) + 4 * h.random.Below(3);
+    c.source_rows = top + box_height;
+    c.source = ImageBytes(h.random, source_kind == 1 ? kA32B32G32R32F : kA8R8G8B8,
+                          c.source_pitch * c.source_rows);
+    c.destination.resize(c.pitch * LayoutRows(dl, c.height));
+    for (uint8_t& b : c.destination) b = uint8_t(h.random.Next());
+    static constexpr uint32_t kFlags[] = {1, 1, 1, 0, 0x10, 0x11, 4, 5};
+    c.flags = h.random.Below(10) == 0 ? uint32_t(h.random.Next())
+                                       : kFlags[h.random.Below(std::size(kFlags))];
+    static constexpr float kReferences[] = {0.0f, 0.5f, 1.0f, 128.0f / 255.0f};
+    const uint32_t ak = h.random.Below(6);
+    c.alpha_reference = ak < 4  ? kReferences[ak]
+                        : ak == 4 ? std::numeric_limits<float>::quiet_NaN()
+                                  : Unit(h.random);
+    c.premultiplied_before = h.random.Below(2);
+    c.alpha_before = uint32_t(h.random.Next());
+    c.stack = StackWords(h.random);
+    // The stack's words the original leaves: the destination's format for an
+    // unmapped one (0, junk or DXT5), the source description's dither and
+    // diffusion (0, 1 or random; diffusion random only where its error row
+    // fits).
+    auto stack_word = [&](uint32_t offset) -> uint32_t& {
+      return c.stack[(kStackFill - cs::kFrameBytes + offset) / 4];
+    };
+    const uint32_t fk = h.random.Below(3);
+    stack_word(cs::kDestination + 4) = fk == 0 ? 0 : fk == 1 ? 0x1A200054 : 0x12345678;
+    const uint32_t dk = h.random.Below(3);
+    stack_word(cs::kSource + 64) = dk == 0 ? 0 : dk == 1 ? 1 : uint32_t(h.random.Next());
+    stack_word(cs::kSource + 68) = h.random.Below(3) == 0 ? 1 : 0;
+    const uint32_t gpu = c.format & 0x3F;
+    const bool dxt = gpu == 18 || gpu == 19 || gpu == 20 || (gpu >= 51 && gpu <= 53) ||
+                     gpu == 58 || gpu == 59 || fk == 1;
+    c.sizes = BlitSizes(dxt ? 256 : 128, box_width, stack_word(cs::kSource + 68) != 0,
+                        source_kind == 1, BlockSpan(c.point_xy[1], box_height),
+                        BlockSpan(c.point_xy[0], box_width));
+    if (source_kind >= 2) c.sizes.insert(c.sizes.begin(), 4 * c.width * c.height);
+    if (destination_kind == 4) {
+      c.sizes.insert(c.sizes.begin(), ((box_width + 3) & ~3u) * ((box_height + 3) & ~3u) * 8);
+    }
+    RunCompress(h, results, c, area, fmt::format("case {}: {}", n, CompressText(c)));
+  }
+  memory::Free(area);
+
+  // The vinyl sheet: 1024 x 1024 A8R8G8B8 to DXT5, flags 1, f1 the game's
+  // (0x82000A34), no point or rectangle; the pixels random bytes, with runs
+  // of one color and of edge values.
+  {
+    CompressCase c;
+    c.width = 1024;
+    c.height = 1024;
+    c.pitch = 256 * 16;
+    c.format = 0x1A200054;
+    c.source_pitch = 4096;
+    c.source_rows = 1024;
+    c.flags = 1;
+    c.alpha_reference = guest::LoadFloat(h.base, 0x82000A34);
+    c.source.resize(4096 * 1024);
+    for (uint32_t i = 0; i < c.source.size(); i += 4) {
+      const uint32_t region = (i / 4096 / 64) * 16 + (i % 4096) / 256;  // 64 x 64 tiles
+      const uint32_t kind = region % 4;
+      const uint32_t word = kind == 0   ? uint32_t(h.random.Next())
+                            : kind == 1 ? 0xFF102030u + region
+                            : kind == 2 ? (h.random.Below(2) == 0 ? 0xFFFFFFFFu : 0x00000000u)
+                                        : (uint32_t(h.random.Below(256)) << 24) | 0x808080u;
+      c.source[i] = uint8_t(word >> 24);
+      c.source[i + 1] = uint8_t(word >> 16);
+      c.source[i + 2] = uint8_t(word >> 8);
+      c.source[i + 3] = uint8_t(word);
+    }
+    c.destination.assign(256 * 16 * 256, 0xCD);
+    c.stack = StackWords(h.random);
+    c.sizes = BlitSizes(256, 1024, false, false, 256, 256);
+    const uint32_t big = memory::Alloc(6 * 1024 * 1024, 0);
+    RunCompress(h, results, c, big, "the vinyl sheet: " + CompressText(c));
+    memory::Free(big);
+  }
+  guest::StoreU32(h.base, kPremultiplied, saved_premultiplied);
+  guest::StoreU32(h.base, kAlphaReferenceGlobal, saved_alpha);
+  ITC_LOG_INFO("texture_compression harness: XGCompressSurface: {} cases returned 0",
+               compress_succeeded);
+  results.Report();
+}
+
 }  // namespace
 
 void TextureCompression(Context& h) {
@@ -1884,6 +2678,11 @@ void TextureCompression(Context& h) {
   Prepare(h);
   DxtCodecConstruct(h);
   Create(h);
+  BlockDimensions(h);
+  BlitterConstruct(h);
+  BlitterInitCases(h);
+  BlitterRows(h);
+  CompressSurfaceCases(h);
 }
 
 }  // namespace harness

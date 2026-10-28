@@ -80,7 +80,7 @@ uint32_t BlockAddress(uint8_t* base, uint32_t codec, uint32_t x, uint32_t y, uin
 uint32_t EncodeBlock(uint8_t* base, uint32_t function, uint32_t block, uint32_t pixels,
                      uint32_t dither, uint32_t frame, const GuestCall& call) {
   if (function != kDxt45EncodeBlock) {
-    return call(function, frame, block, pixels, dither);
+    return call(function, frame, block, pixels, dither, 0);
   }
   float values[16][4];
   for (uint32_t i = 0; i < 16; i++) {
@@ -206,7 +206,7 @@ std::optional<uint32_t> DxtEncodeRow(uint8_t* base, uint32_t codec, uint32_t row
       uint32_t from = BlockAddress(base, codec, x, y, z);  // r28
       if (x < field(codec::kBlockRight)) {
         do {
-          r3 = call(field(codec::kDecodeBlock), frame, to, from, 0);
+          r3 = call(field(codec::kDecodeBlock), frame, to, from, 0, 0);
           x += 4;
           to += 256;
           from += field(codec::kBlockBytes);
@@ -219,13 +219,13 @@ std::optional<uint32_t> DxtEncodeRow(uint8_t* base, uint32_t codec, uint32_t row
       const uint32_t box_left = field(codec::kBoxLeft);
       if (left < box_left && box_left > field(codec::kExtentX0)) {
         r3 = call(field(codec::kDecodeBlock), frame, Load(base, entry + 4),
-                  BlockAddress(base, codec, left, y, z), 0);
+                  BlockAddress(base, codec, left, y, z), 0, 0);
       }
       const uint32_t right = field(codec::kBlockRight);
       const uint32_t box_right = field(codec::kBoxRight);
       if (right > box_right && box_right < field(codec::kExtentX1)) {
         r3 = call(field(codec::kDecodeBlock), frame, Load(base, entry + 4),
-                  BlockAddress(base, codec, right - 4, y, z), 0);
+                  BlockAddress(base, codec, right - 4, y, z), 0, 0);
       }
     }
     for (uint32_t i = 0; i < 4; i++) {
@@ -731,7 +731,7 @@ std::optional<uint32_t> CreateCodec(uint8_t* base, uint32_t description, uint32_
   // +28 (the palette's) is 0 from ImageCodec::ImageCodec: no LoadPalette.
   if (Field(base, codec, codec::kColorKey) != 0) {
     const uint32_t quantize = Load(base, Field(base, codec, codec::kVtable) + 12);
-    call(quantize, stack - kCreateFrameBytes, codec, 0, 0);
+    call(quantize, stack - kCreateFrameBytes, codec, 0, 0, 0);
   }
   return codec;
 }

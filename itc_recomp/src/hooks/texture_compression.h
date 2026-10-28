@@ -33,5 +33,26 @@ void TextureCompressionDxtCodecDelete(PPCContext& ctx, uint8_t* base);
 // C++ refuses, or without the native heap. r3 as the original leaves it.
 void TextureCompressionPrepare(PPCContext& ctx, uint8_t* base);
 void TextureCompressionCreate(PPCContext& ctx, uint8_t* base);
+// Blitter::Blitter sub_82368D20: r3 = the blit object. r3 left.
+void TextureCompressionBlitterConstruct(PPCContext& ctx, uint8_t* base);
+// Blitter::Release sub_82368D30: r3 = the blit object. Blitter::CopyRows
+// sub_82369860 and Blitter::ConvertRows sub_823699F8: r3 = the blit object.
+// Blitter::Init sub_8236C630: r3 = the blit object, r4 = the destination's
+// description, r5 the source's, r6 = the filter. Their callees that never ran
+// in play (the filters, CopyBlocks, the YUV codec's functions) run as guest
+// calls. Each the whole original where the plain C++ refuses, or (all but
+// CopyRows) without the native heap. r3 as the original leaves it.
+void TextureCompressionBlitterRelease(PPCContext& ctx, uint8_t* base);
+void TextureCompressionCopyRows(PPCContext& ctx, uint8_t* base);
+void TextureCompressionConvertRows(PPCContext& ctx, uint8_t* base);
+void TextureCompressionBlitterInit(PPCContext& ctx, uint8_t* base);
+// XGGetBlockDimensions sub_8236D3C8: r3 = a GPU format, r4, r5 = where the
+// block's width and height go (null: not stored). r3 left.
+void TextureCompressionGetBlockDimensions(PPCContext& ctx, uint8_t* base);
+// XGCompressSurface sub_8235AAC0: r3 to r10, the caller's +84, +92 and +100,
+// f1. The whole original for the paths never seen in play (DXN and CTX1
+// destinations, a source copied first, a destination swapped after), or
+// without the native heap. r3 as the original leaves it.
+void TextureCompressionCompressSurface(PPCContext& ctx, uint8_t* base);
 
 }  // namespace hooks

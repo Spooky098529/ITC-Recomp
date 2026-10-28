@@ -96,10 +96,11 @@ constexpr uint32_t kDxt45EncodeBlock = 0x82422A68;
 constexpr uint32_t kApplyColorKey = 0x823EADB0;
 constexpr uint32_t kSrgbToLinear = 0x823EB180;
 
-// A guest function's original (the codec's block functions), run with r1 =
-// `stack` and r3, r4, r5 as given; its r3.
-using GuestCall =
-    std::function<uint32_t(uint32_t address, uint32_t stack, uint32_t r3, uint32_t r4, uint32_t r5)>;
+// A guest function (the codec's block functions, the blitter's callees that
+// never ran in play), run with r1 = `stack` and r3 to r6 as given (r6 0 where
+// the callee takes three); its r3.
+using GuestCall = std::function<uint32_t(uint32_t address, uint32_t stack, uint32_t r3,
+                                         uint32_t r4, uint32_t r5, uint32_t r6)>;
 
 // sub_823F2620 A8R8G8B8Codec::DecodeRow (slot 1 of the A8R8G8B8 vtable):
 // row `row` of slice `slice` (from the data, +32, + row x +96 + slice x
