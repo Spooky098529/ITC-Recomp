@@ -57,14 +57,7 @@ What's ready (`b7_groups.py`, 2026-10-28): the file object's constructor
 and destructor with their bases (`sub_820A6A00` with `sub_82593AC0` and
 `sub_8258C938`; `sub_820A6A40` with `sub_82593B00` and `sub_8258C5F8`),
 the path object's constructor and destructor (`sub_82593C28`,
-`sub_82593C48`) and the path buffer's (`sub_820A6BE0`). Those are native since the B7 loop (2026-10-28, `src/file_layer/`, `--native_file_layer`, harness `file_layer`). `Path::Build`
-waits on sprintf, and with it the open by name, `GamePath::SetGame` and
-the loose read: sprintf reads its variadic arguments from the guest
-stack, so it needs a formatter over guest arguments, as swprintf's
-`_woutput_l` got (`c_runtime::Vswprintf`, `src/c_runtime/wide_format.cpp`,
-a step-by-step translation; the precedent for `_output_l`). The rest of
-the loose read is ours (`std::string`, the `File::` calls, the host
-semaphores of `--native_archive`). The other opens by name, the deleting
+`sub_82593C48`) and the path buffer's (`sub_820A6BE0`). Those are native since the B7 loop (2026-10-28, `src/file_layer/`, `--native_file_layer`, harness `file_layer`). Then (the same run) sprintf with `_output_l`, as swprintf's `_woutput_l` (a step-by-step translation over guest arguments, `src/c_runtime/narrow_format.cpp`, `c-runtime.md`), and with it `Path::Build`, `GamePath::SetGame`, the open by name and the loose read; the formats in play are `"game:\\%s"` (kind 0) and, elsewhere, `"%s%s"`, `"%s%s%d"` and `"data\\audio\\%s.xgs"` (logged 2026-10-28). Left recompiled: the file objects' other users (the debug font, `BankPair::Load`, `TXR_XACT.xgs`'s open, `Movie::Open`). The other opens by name, the deleting
 destructors and the vtable-only methods never ran in play.
 
 Status:
