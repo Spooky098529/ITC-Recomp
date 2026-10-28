@@ -63,7 +63,7 @@ ITC_FLAG_BOOL(native_models, true, "ITC",
               "SkeletonBase::SetUp sub_8259A9E0 (with NodeFile::View sub_825A21A8, no adapter: "
               "only it calls it) and Skeleton::Bind sub_82599A20 (in src/model_animation/), "
               "Memory::AllocPhysical sub_8258E138 (in src/models/memory_blocks.cpp; no adapter: only "
-              "XPR::Create calls it), the shared shaders sub_825896D8 and sub_82589700, the vertex "
+              "XPR::Create calls it), the shared shaders sub_825896D8 and sub_82589700 and their tables' set-up sub_825896C0, the vertex "
               "declaration sub_82589728 (its message for a type pair the tables don't cover, "
               "never seen in play, the original's), Model::RecordShape sub_82595550 (in "
               "src/scenery_lists/model_draws.cpp, adapter in src/hooks/scenery_lists.cpp: the "
@@ -292,6 +292,10 @@ void ModelsSharedVertexShader(PPCContext& ctx, uint8_t* base) {
   ctx.r3.u64 = models::SharedVertexShader(base, ctx.r3.u32);
 }
 
+void ModelsSetSharedShaders(PPCContext& ctx, uint8_t* base) {
+  models::SetSharedShaders(base, ctx.r3.u32, ctx.r4.u32);
+}
+
 void ModelsSharedPixelShader(PPCContext& ctx, uint8_t* base) {
   ctx.r3.u64 = models::SharedPixelShader(base, ctx.r3.u32);
 }
@@ -322,6 +326,7 @@ ITC_MODELS_ACCESSOR(82594AD8, ModelsMaterialCount)
 ITC_MODELS_ACCESSOR(82594B20, ModelsMaterial)
 ITC_MODELS_ACCESSOR(825896D8, ModelsSharedVertexShader)
 ITC_MODELS_ACCESSOR(82589700, ModelsSharedPixelShader)
+ITC_MODELS_ACCESSOR(825896C0, ModelsSetSharedShaders)
 ITC_MODELS_ACCESSOR(82589728, ModelsVertexDeclaration)
 
 // ShaderFile::Parse: r3 = the file, r4 = the record. No return value.

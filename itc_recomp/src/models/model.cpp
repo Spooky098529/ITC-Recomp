@@ -169,6 +169,12 @@ uint32_t SharedVertexShader(uint8_t* base, uint32_t pair) {
   return table == 0 ? 0 : Load(base, (pair << 2) + table);
 }
 
+void SetSharedShaders(uint8_t* base, uint32_t vertex, uint32_t pixel) {
+  ITC_NATIVE_RUNNING("sub_825896C0 SetSharedShaders");
+  Store(base, 0x8296B7B4, vertex);
+  Store(base, 0x8296B7B8, pixel);
+}
+
 uint32_t SharedPixelShader(uint8_t* base, uint32_t pair) {
   ITC_NATIVE_RUNNING("sub_82589700 SharedPixelShader");
   const uint32_t table = Load(base, 0x8296B7B8);

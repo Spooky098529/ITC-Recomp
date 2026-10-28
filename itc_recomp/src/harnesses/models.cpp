@@ -1093,6 +1093,34 @@ void Accessors(Context& h, const Block& block) {
   Write(h.base, kKinds, kinds.data(), kKindsBytes);
 }
 
+// sub_825896C0: the two table words set from random r3 and r4; the words and
+// r3 compared, then put back.
+void SharedShaderSets(Context& h) {
+  Results results("SetSharedShaders (sub_825896C0)");
+  const std::vector<uint8_t> tables = Read(h.base, 0x8296B7B0, 16);
+  for (int c = 0; c < 32; c++) {
+    const uint64_t r3 = h.random.Next(), r4 = h.random.Next();
+    const uint32_t before[4] = {uint32_t(h.random.Next()), uint32_t(h.random.Next()),
+                                uint32_t(h.random.Next()), uint32_t(h.random.Next())};
+    Outputs out[2];
+    for (int v = 0; v < 2; v++) {
+      for (uint32_t i = 0; i < 4; i++) {
+        Store(h.base, 0x8296B7B0 + 4 * i, before[i]);
+      }
+      PPCContext t = CallContext(h);
+      t.r3.u64 = r3;
+      t.r4.u64 = r4;
+      (v == 0 ? __imp__sub_825896C0 : hooks::ModelsSetSharedShaders)(t, h.base);
+      out[v].Bytes(Read(h.base, 0x8296B7B0, 16));
+      out[v].Word(t.r3.u32);
+      out[v].Word(uint32_t(t.r3.u64 >> 32));
+    }
+    results.Check(out[0], out[1], fmt::format("case {}", c));
+  }
+  results.Report();
+  Write(h.base, 0x8296B7B0, tables.data(), 16);
+}
+
 void Models(Context& h) {
   // Fixes the lock's choice before any flag is switched.
   hooks::ModelsHostLock();
@@ -1124,6 +1152,7 @@ void Models(Context& h) {
     ModelReleases(h, block);
     ModelDestructs(h, block);
     Accessors(h, block);
+    SharedShaderSets(h);
     // The car part model (464 bytes): its constructor and destructor over
     // the model's cases, and its clear on random bytes.
     ModelConstructs(h, block,
