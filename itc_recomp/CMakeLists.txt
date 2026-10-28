@@ -155,6 +155,8 @@ set(ITC_SOURCES
     src/hooks/texture_compression.cpp
     src/texture_compression/dxt_alpha.cpp
     src/texture_compression/dxt_color.cpp
+    src/texture_compression/dxt45.cpp
+    src/texture_compression/codecs.cpp
     src/hooks/collision.cpp
     src/collision/shapes.cpp
     src/collision/boxes.cpp
@@ -434,7 +436,8 @@ set_source_files_properties(src/c_runtime/math.cpp src/ui_movies/keys.cpp
     src/models/model_load.cpp src/course_scenery/collect.cpp
     src/race_setup/car.cpp src/race_setup/race_data.cpp src/race_setup/course_routes.cpp
     src/race_setup/set_up.cpp src/vehicle/vehicle.cpp
-    src/texture_compression/dxt_alpha.cpp src/texture_compression/dxt_color.cpp PROPERTIES
+    src/texture_compression/dxt_alpha.cpp src/texture_compression/dxt_color.cpp
+    src/texture_compression/dxt45.cpp src/texture_compression/codecs.cpp PROPERTIES
     COMPILE_OPTIONS "-ffp-model=strict;-ffp-contract=off"
     SKIP_PRECOMPILE_HEADERS ON)
 

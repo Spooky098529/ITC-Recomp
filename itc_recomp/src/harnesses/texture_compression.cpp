@@ -36,13 +36,24 @@
 // 0x80000000) and dither 0, 1, 0x80000000 and random; the stack below the
 // call filled with the same random words for both versions; then blocks
 // found by trying whose FitEndpoints reads a step index from the stack.
+// Dxt45::EncodeBlock (sub_82422A68) and EncodeBlockPremultiplied
+// (sub_82422960) get such blocks with the premultiplied switch 0 and 1;
+// the Rows group compares the recompiled Dxt45::EncodeBlock (flag off) with
+// ours. A8R8G8B8Codec::DecodeRow (sub_823F2620) gets rows of random widths,
+// pitches and bytes, with and without a color key and sRGB. DxtCodec::
+// EncodeRow (sub_823F6298) runs end to end over small surfaces with codecs
+// built by the recompiled DxtCodec::DxtCodec, then the DXT codec's
+// destructors; the plain codecs' destructors run on codecs built by the
+// recompiled ImageCodec::ImageCodec.
 
 #include "harness.h"
 
 #include "base/flags.h"
 #include "base/log.h"
+#include "hooks/heap.h"
 #include "hooks/texture_compression.h"
 #include "memory/heap.h"
+#include "texture_compression/codecs.h"
 #include "texture_compression/dxt_alpha.h"
 #include "texture_compression/dxt_color.h"
 
@@ -53,6 +64,8 @@
 #include <cmath>
 #include <limits>
 #include <string>
+#include <utility>
+#include <vector>
 
 ITC_FLAG_DECLARE(bool, native_texture_compression);
 
@@ -794,10 +807,10 @@ void EncodeColorBlock(Context& h) {
   results.Report();
 }
 
-// Rows of 16 DXT4/5 blocks through the recompiled Dxt45::EncodeBlock on one
-// stack: its alpha and color halves the originals (flag off) or ours.
+// Rows of 16 DXT4/5 blocks on one stack: the recompiled Dxt45::EncodeBlock
+// with its halves the originals (flag off) against ours.
 void Rows(Context& h) {
-  Results results("Dxt45::EncodeBlock rows (sub_82422A68, the alpha and color halves)");
+  Results results("Dxt45::EncodeBlock rows (sub_82422A68)");
   constexpr uint32_t kBlocks = 16;
   const uint32_t area = memory::Alloc(kBlocks * 256 + kBlocks * 16, 0);
   if (area == 0) {
@@ -833,7 +846,11 @@ void Rows(Context& h) {
         t.r3.u64 = output + 16 * b;
         t.r4.u64 = area + 256 * b;
         t.r5.s64 = dither;
-        __imp__sub_82422A68(t, h.base);
+        if (v == 0) {
+          __imp__sub_82422A68(t, h.base);
+        } else {
+          hooks::TextureCompressionEncodeDxt45Block(t, h.base);
+        }
         out[v].Word(t.r3.u32);
       }
       ITC_FLAG(native_texture_compression) = true;
@@ -847,6 +864,476 @@ void Rows(Context& h) {
   results.Report();
 }
 
+
+// Dxt45::EncodeBlock (sub_82422A68, the premultiplied switch 0 and 1) or
+// EncodeBlockPremultiplied (sub_82422960) on single blocks: colors from
+// Pixels() and FarOff(), some premultiplied, alphas from Alphas(), dither 0,
+// 1, 0x80000000 and random; the caller's frame and the stack below the call
+// filled with the same random words for both versions.
+void EncodeDxt45(Context& h, bool premultiplied_only) {
+  Results results(premultiplied_only ? "Dxt45::EncodeBlockPremultiplied (sub_82422960)"
+                                     : "Dxt45::EncodeBlock (sub_82422A68)");
+  constexpr uint32_t kStackBytes = 4096;
+  constexpr uint32_t kFrameBytes = 64;
+  constexpr int kKindsHere = kColorKinds + 1;  // Pixels()'s and FarOff()
+  const uint32_t saved = guest::LoadU32(h.base, kPremultiplied);
+  const int count = premultiplied_only ? 3000 : 6000;
+  for (int c = 0; c < count; c++) {
+    const uint32_t premultiplied = premultiplied_only ? uint32_t(h.random.Below(2)) : uint32_t(c % 2);
+    const int32_t dither = Dither(h.random, (c / 2) % 4);
+    const int kind = (c / 8) % kKindsHere;
+    const Pixels16 colors = kind < kColorKinds ? Pixels(h.random, kind) : FarOff(h.random);
+    const Block16 alphas = Alphas(h.random, int(h.random.Below(kKinds)));
+    const bool scaled = h.random.Below(3) == 0;
+    Pixels4 pixels;
+    for (uint32_t i = 0; i < 16; i++) {
+      const float a = std::isfinite(alphas[i]) ? std::fmin(std::fmax(alphas[i], 0.0f), 1.0f) : 1.0f;
+      for (uint32_t ch = 0; ch < 3; ch++) pixels[i][ch] = scaled ? colors[i][ch] * a : colors[i][ch];
+      pixels[i][3] = alphas[i];
+    }
+    std::array<uint32_t, (kStackBytes + kFrameBytes) / 4> stack;
+    for (uint32_t& word : stack) word = uint32_t(h.random.Next());
+    Outputs out[2];
+    for (int v = 0; v < 2; v++) {
+      Fill(h.base, h.data, kScratchBytes);
+      WritePixels4(h.base, h.data + kPixels, pixels);
+      PPCContext t = CallContext(h);
+      for (uint32_t i = 0; i < stack.size(); i++) {
+        guest::StoreU32(h.base, t.r1.u32 - kStackBytes + 4 * i, stack[i]);
+      }
+      guest::StoreU32(h.base, kPremultiplied, premultiplied);
+      t.r3.u64 = h.data + kBlock;
+      t.r4.u64 = h.data + kPixels;
+      t.r5.s64 = dither;
+      if (v == 0) {
+        ITC_FLAG(native_texture_compression) = false;
+        (premultiplied_only ? __imp__sub_82422960 : __imp__sub_82422A68)(t, h.base);
+        ITC_FLAG(native_texture_compression) = true;
+      } else if (premultiplied_only) {
+        hooks::TextureCompressionEncodeDxt45BlockPremultiplied(t, h.base);
+      } else {
+        hooks::TextureCompressionEncodeDxt45Block(t, h.base);
+      }
+      out[v].Bytes(Read(h.base, h.data, kScratchBytes));
+      out[v].Bytes(Read(h.base, CallContext(h).r1.u32, kFrameBytes));
+      out[v].Word(t.r3.u32);
+      out[v].Word(uint32_t(t.r3.u64 >> 32));
+    }
+    results.Check(out[0], out[1],
+                  fmt::format("case {}: kind {}, premultiplied {}, dither {:X}, scaled {}", c, kind,
+                              premultiplied, uint32_t(dither), scaled));
+  }
+  guest::StoreU32(h.base, kPremultiplied, saved);
+  results.Report();
+}
+
+// The codecs' fields the harness sets (texture_compression/codecs.h).
+namespace cf = texture_compression::codec;
+
+// A8R8G8B8Codec::DecodeRow (sub_823F2620) on rows of random widths (0 to
+// 80), pitches, rows and slices, the bytes random or every value in turn;
+// without a color key or sRGB (in play), and with them (the original's
+// path on both sides).
+void DecodeRow(Context& h) {
+  Results results("A8R8G8B8Codec::DecodeRow (sub_823F2620)");
+  constexpr uint32_t kCodec = 0;
+  constexpr uint32_t kData = 256;
+  constexpr uint32_t kDataBytes = 8192;
+  constexpr uint32_t kOut = kData + kDataBytes;
+  constexpr uint32_t kOutBytes = 80 * 16 + 64;
+  constexpr uint32_t kAreaBytes = kOut + kOutBytes;
+  const uint32_t area = memory::Alloc(kAreaBytes, 0);
+  if (area == 0) {
+    results.Report();
+    return;
+  }
+  for (int c = 0; c < 2000; c++) {
+    const uint32_t width = c % 9 == 0 ? uint32_t(h.random.Below(5)) : 1 + uint32_t(h.random.Below(80));
+    const uint32_t pitch = width * 4 + 4 * uint32_t(h.random.Below(8));
+    const uint32_t rows = 1 + uint32_t(h.random.Below(6));
+    const uint32_t slices = 1 + uint32_t(h.random.Below(3));
+    const uint32_t slice_pitch = pitch * rows + 4 * uint32_t(h.random.Below(4));
+    const uint32_t row = uint32_t(h.random.Below(rows));
+    const uint32_t slice = uint32_t(h.random.Below(slices));
+    std::vector<uint8_t> data(kDataBytes);
+    const bool every = c % 4 == 1;
+    for (uint32_t i = 0; i < kDataBytes; i++) {
+      data[i] = every ? uint8_t(i * 7 + c) : uint8_t(h.random.Next());
+    }
+    const uint32_t from = row * pitch + slice * slice_pitch;
+    // A color key (one of the row's pixels, decoded) on one case in five, sRGB
+    // in on one in seven.
+    const bool keyed = c % 5 == 4 && width != 0;
+    const bool srgb = c % 7 == 6;
+    uint32_t key_bytes[4] = {};
+    if (keyed) {
+      const uint32_t at = from + 4 * uint32_t(h.random.Below(width));
+      for (uint32_t ch = 0; ch < 4; ch++) key_bytes[ch] = data[at + (ch + 1) % 4];
+    }
+    Outputs out[2];
+    for (int v = 0; v < 2; v++) {
+      Fill(h.base, area, kAreaBytes);
+      Fill(h.base, area + kCodec, 128, 0);
+      Write(h.base, area + kData, data.data(), kDataBytes);
+      const uint32_t codec = area + kCodec;
+      guest::StoreU32(h.base, codec + 8, 1);  // the channel kind
+      guest::StoreU32(h.base, codec + cf::kSrgb, srgb ? 1 : 0);
+      guest::StoreU32(h.base, codec + 20, srgb ? uint32_t(c % 2) : 0);
+      guest::StoreU32(h.base, codec + cf::kColorKey, keyed ? 0xFF000000u | uint32_t(c) : 0);
+      for (uint32_t ch = 0; ch < 4; ch++) {
+        guest::StoreFloat(h.base, codec + 36 + 4 * ch, float(key_bytes[ch]) * (1.0f / 255.0f));
+      }
+      guest::StoreU32(h.base, codec + cf::kData, area + kData);
+      guest::StoreU32(h.base, codec + cf::kRowPitch, pitch);
+      guest::StoreU32(h.base, codec + cf::kSlicePitch, slice_pitch);
+      guest::StoreU32(h.base, codec + cf::kWidth, width);
+      PPCContext t = CallContext(h);
+      t.r3.u64 = codec;
+      t.r4.u64 = row;
+      t.r5.u64 = slice;
+      t.r6.u64 = area + kOut;
+      if (v == 0) {
+        ITC_FLAG(native_texture_compression) = false;
+        __imp__sub_823F2620(t, h.base);
+        ITC_FLAG(native_texture_compression) = true;
+      } else {
+        hooks::TextureCompressionDecodeA8R8G8B8Row(t, h.base);
+      }
+      out[v].Bytes(Read(h.base, area, kOut));
+      out[v].Floats(h.base, area + kOut, width * 4);
+      out[v].Bytes(Read(h.base, area + kOut + width * 16, kOutBytes - width * 16));
+      out[v].Word(t.r3.u32 - area);
+      out[v].Word(uint32_t(t.r3.u64 >> 32));
+    }
+    results.Check(out[0], out[1],
+                  fmt::format("case {}: width {}, pitch {}, row {}, slice {}, keyed {}, srgb {}", c,
+                              width, pitch, row, slice, keyed, srgb));
+  }
+  memory::Free(area);
+  results.Report();
+}
+
+// Guest addresses each side made on its own (the cache, its block rows, the
+// codec, its error row), compared by which block and where in it.
+class Blocks {
+ public:
+  void Add(uint32_t address, uint32_t size) {
+    if (address == 0) return;
+    for (const auto& [a, s] : blocks_) {
+      if (a == address) return;
+    }
+    blocks_.emplace_back(address, size);
+  }
+  // Into `out`: 0 for null, the block's number and the offset in it, the
+  // offset in the shared area, or "elsewhere".
+  void Put(Outputs& out, uint32_t address, uint32_t area, uint32_t area_bytes) const {
+    if (address == 0) {
+      out.Word(0);
+      out.Word(0);
+      return;
+    }
+    for (uint32_t i = 0; i < blocks_.size(); i++) {
+      const auto& [a, s] = blocks_[i];
+      if (address >= a && address - a < (s == 0 ? 1 : s)) {
+        out.Word(i + 1);
+        out.Word(address - a);
+        return;
+      }
+    }
+    if (address >= area && address - area < area_bytes) {
+      out.Word(0x1000);
+      out.Word(address - area);
+      return;
+    }
+    out.Word(0x2000);
+    out.Word(0);
+  }
+
+ private:
+  std::vector<std::pair<uint32_t, uint32_t>> blocks_;
+};
+
+// DxtCodec::EncodeRow (sub_823F6298) end to end, with the DXT codec's
+// destructors (sub_823EA770, sub_823F6BC0) after: a codec built by the
+// recompiled DxtCodec::DxtCodec (sub_823F5FA0) for each side from the same
+// description (DXT4/5 mostly, DXT1 and DXT5A whose block encoders go
+// through the guest call; surfaces of 1 to 20 pixels a side and 1 or 2
+// slices, boxes the whole surface or cut anywhere, so the destination's old
+// blocks are decoded; dither 0 or 1; the premultiplied switch 0 or 1; the
+// rows fed in order, all of them or only some), comparing r3 after each row,
+// the destination's bytes, the codec's 256 bytes and its cache (each
+// entry's mask, its block row's float4s; the pointers by which block they
+// are), then the destructor's r3, the vtable it leaves and which blocks it
+// freed.
+void EncodeRow(Context& h) {
+  Results results("DxtCodec::EncodeRow (sub_823F6298) with ~DxtCodec (sub_823EA770, sub_823F6BC0)");
+  if (!hooks::NativeHeapActive()) {
+    ITC_LOG_INFO("texture_compression harness: EncodeRow skipped without the native heap");
+    results.Report();
+    return;
+  }
+  constexpr uint32_t kDescription = 0;  // 84 bytes
+  constexpr uint32_t kDestination = 128;
+  constexpr uint32_t kDestinationBytes = 4096;
+  constexpr uint32_t kRow = kDestination + kDestinationBytes;
+  constexpr uint32_t kRowBytes = 20 * 16 + 64;
+  constexpr uint32_t kAreaBytes = kRow + kRowBytes;
+  const uint32_t area = memory::Alloc(kAreaBytes, 0);
+  if (area == 0) {
+    results.Report();
+    return;
+  }
+  const uint32_t saved = guest::LoadU32(h.base, kPremultiplied);
+  for (int c = 0; c < 600; c++) {
+    const uint32_t format = c % 8 == 7 ? 0x1A200052u : c % 8 == 6 ? 0x1A20007Bu : 0x1A200054u;
+    const uint32_t block_bytes = format == 0x1A200054u ? 16 : 8;
+    const uint32_t width = 1 + uint32_t(h.random.Below(20));
+    const uint32_t height = 1 + uint32_t(h.random.Below(20));
+    const uint32_t depth = h.random.Below(4) == 0 ? 2 : 1;
+    uint32_t box[6] = {0, 0, width, height, 0, depth};
+    if (h.random.Below(3) != 0) {
+      box[0] = uint32_t(h.random.Below(width));
+      box[2] = box[0] + 1 + uint32_t(h.random.Below(width - box[0]));
+      box[1] = uint32_t(h.random.Below(height));
+      box[3] = box[1] + 1 + uint32_t(h.random.Below(height - box[1]));
+      box[4] = uint32_t(h.random.Below(depth));
+      box[5] = box[4] + 1 + uint32_t(h.random.Below(depth - box[4]));
+    }
+    const uint32_t box_width = box[2] - box[0];
+    const uint32_t box_height = box[3] - box[1];
+    const uint32_t across = (width + 3) / 4;
+    const uint32_t down = (height + 3) / 4;
+    const uint32_t pitch = across * block_bytes + 16 * uint32_t(h.random.Below(2));
+    const uint32_t slice_pitch = pitch * down + 64 * uint32_t(h.random.Below(2));
+    const uint32_t dither = h.random.Below(3) == 0 ? 1 : 0;
+    const uint32_t premultiplied = uint32_t(h.random.Below(2));
+    const uint32_t all_rows = box_height * (box[5] - box[4]);
+    const uint32_t fed = h.random.Below(5) == 0 ? uint32_t(h.random.Below(all_rows + 1)) : all_rows;
+    const int destructor = int(h.random.Below(3));
+    std::vector<uint8_t> destination(kDestinationBytes);
+    for (uint8_t& b : destination) b = uint8_t(h.random.Next());
+    std::vector<float> rows(size_t(all_rows) * box_width * 4);
+    const int value_kind = int(h.random.Below(4));
+    for (float& f : rows) {
+      f = value_kind == 3 && h.random.Below(8) == 0 ? Special(h.random)
+          : value_kind == 2                         ? Byte(h.random.Below(256), false)
+                                                    : Unit(h.random);
+    }
+    Outputs out[2];
+    for (int v = 0; v < 2; v++) {
+      Fill(h.base, area, kAreaBytes);
+      Write(h.base, area + kDestination, destination.data(), kDestinationBytes);
+      const uint32_t d = area + kDescription;
+      Fill(h.base, d, 84, 0);
+      guest::StoreU32(h.base, d + 0, area + kDestination);
+      guest::StoreU32(h.base, d + 4, format);
+      guest::StoreU32(h.base, d + 8, pitch);
+      guest::StoreU32(h.base, d + 12, slice_pitch);
+      const uint32_t extent[6] = {0, 0, width, height, 0, depth};
+      for (uint32_t i = 0; i < 6; i++) {
+        guest::StoreU32(h.base, d + 16 + 4 * i, extent[i]);
+        guest::StoreU32(h.base, d + 40 + 4 * i, box[i]);
+      }
+      guest::StoreU32(h.base, d + 64, dither);
+      guest::StoreU32(h.base, kPremultiplied, premultiplied);
+      const uint32_t codec = memory::Alloc(256, 0);
+      Fill(h.base, codec, 256);
+      PPCContext t = CallContext(h);
+      t.r3.u64 = codec;
+      t.r4.u64 = d;
+      __imp__sub_823F5FA0(t, h.base);
+      Blocks blocks;
+      blocks.Add(codec, 256);
+      blocks.Add(guest::LoadU32(h.base, codec + cf::kErrorRow), 1);
+      auto load = [&](uint32_t offset) { return guest::LoadU32(h.base, codec + offset); };
+      const uint32_t entries = load(cf::kBlockRows) * load(cf::kSlices);
+      // The heap blocks the cache and its block rows will get, filled with
+      // 0xCD first as the scratch area is: the original reads float4s of the
+      // right edge's block that nothing wrote (it decodes that block into the
+      // first block's), the heap's leftovers otherwise, which differ between
+      // the two runs. The layer keeps its records off the guest's memory and
+      // takes the first block that fits, so the same sizes made and freed
+      // just before come back in the same order with their bytes.
+      {
+        std::vector<uint32_t> primed;
+        primed.push_back(memory::Alloc(entries * 8, 0));
+        for (uint32_t e = 0; e < entries + 2; e++) {
+          primed.push_back(memory::Alloc(load(cf::kBlockColumns) * 256, 0));
+        }
+        for (uint32_t i = 0; i < primed.size(); i++) {
+          Fill(h.base, primed[i], i == 0 ? entries * 8 : load(cf::kBlockColumns) * 256);
+        }
+        for (uint32_t block : primed) memory::Free(block);
+      }
+      auto note = [&]() {
+        const uint32_t cache = load(cf::kCache);
+        blocks.Add(cache, entries * 8);
+        if (cache != 0) {
+          for (uint32_t e = 0; e < entries; e++) {
+            blocks.Add(guest::LoadU32(h.base, cache + 8 * e + 4), load(cf::kBlockColumns) * 256);
+          }
+        }
+      };
+      ITC_FLAG(native_texture_compression) = v == 1;
+      for (uint32_t k = 0; k < fed; k++) {
+        for (uint32_t i = 0; i < box_width * 4; i++) {
+          guest::StoreFloat(h.base, area + kRow + 4 * i, rows[size_t(k) * box_width * 4 + i]);
+        }
+        PPCContext r = CallContext(h);
+        r.r3.u64 = codec;
+        r.r4.u64 = k % box_height;
+        r.r5.u64 = k / box_height;
+        r.r6.u64 = area + kRow;
+        note();
+        if (v == 0) {
+          __imp__sub_823F6298(r, h.base);
+        } else {
+          hooks::TextureCompressionDxtEncodeRow(r, h.base);
+        }
+        note();
+        blocks.Put(out[v], r.r3.u32, area, kAreaBytes);
+        out[v].Word(uint32_t(r.r3.u64 >> 32));
+      }
+      out[v].Bytes(Read(h.base, area, kAreaBytes));
+      // The codec, its pointers by block.
+      for (uint32_t off = 0; off < 256; off += 4) {
+        if (off == cf::kCache || off == cf::kErrorRow) {
+          blocks.Put(out[v], load(off), area, kAreaBytes);
+        } else {
+          out[v].Word(load(off));
+        }
+      }
+      const uint32_t cache = load(cf::kCache);
+      std::vector<uint32_t> held;
+      if (cache != 0) {
+        for (uint32_t e = 0; e < entries; e++) {
+          const uint32_t pointer = guest::LoadU32(h.base, cache + 8 * e + 4);
+          out[v].Word(guest::LoadU32(h.base, cache + 8 * e));
+          blocks.Put(out[v], pointer, area, kAreaBytes);
+          if (pointer != 0) {
+            out[v].Bytes(Read(h.base, pointer, load(cf::kBlockColumns) * 256));
+            held.push_back(pointer);
+          }
+        }
+      }
+      // The destructor, and which blocks it freed.
+      std::vector<uint32_t> owned = held;
+      owned.push_back(cache);
+      owned.push_back(load(cf::kErrorRow));
+      PPCContext x = CallContext(h);
+      x.r3.u64 = codec;
+      x.r4.u64 = destructor == 0 ? 1 : 2;
+      if (destructor == 2) {
+        (v == 0 ? GuestFunction(__imp__sub_823EA770) : hooks::TextureCompressionDxtCodecDestruct)(
+            x, h.base);
+      } else {
+        (v == 0 ? GuestFunction(__imp__sub_823F6BC0) : hooks::TextureCompressionDxtCodecDelete)(
+            x, h.base);
+      }
+      ITC_FLAG(native_texture_compression) = true;
+      blocks.Put(out[v], x.r3.u32, area, kAreaBytes);
+      for (uint32_t block : owned) {
+        out[v].Word(block != 0 && memory::IsHeapBlock(block) ? 1 : 0);
+      }
+      if (destructor != 0) {
+        out[v].Word(guest::LoadU32(h.base, codec));
+        memory::Free(codec);
+      } else {
+        out[v].Word(memory::IsHeapBlock(codec) ? 1 : 0);
+      }
+    }
+    results.Check(out[0], out[1],
+                  fmt::format("case {}: format {:08X}, {} x {} x {}, box {} {} {} {} {} {}, dither {}, "
+                              "premultiplied {}, rows {} of {}, destructor {}",
+                              c, format, width, height, depth, box[0], box[1], box[2], box[3],
+                              box[4], box[5], dither, premultiplied, fed, all_rows, destructor));
+  }
+  guest::StoreU32(h.base, kPremultiplied, saved);
+  memory::Free(area);
+  results.Report();
+}
+
+// The plain codecs' destructors: ImageCodec::~ImageCodec (sub_823EA070) and
+// the scalar deleting destructor (sub_823F6B70, flags 1 and 0) on A8R8G8B8
+// codecs built by the recompiled ImageCodec::ImageCodec (sub_823EA800), with
+// and without the error row (diffusion), the palette and row blocks (+56,
+// +88) made or not; r3 (by block), the vtable left and which blocks were
+// freed.
+void ImageCodecDestructors(Context& h) {
+  Results results("ImageCodec::~ImageCodec (sub_823EA070, sub_823F6B70)");
+  if (!hooks::NativeHeapActive()) {
+    results.Report();
+    return;
+  }
+  const uint32_t area = memory::Alloc(256, 0);
+  if (area == 0) {
+    results.Report();
+    return;
+  }
+  for (int c = 0; c < 240; c++) {
+    const int destructor = c % 3;
+    const bool diffusion = (c / 3) % 2 == 1;
+    const bool palette = (c / 6) % 2 == 1;
+    const bool row = (c / 12) % 2 == 1;
+    const uint32_t width = 1 + uint32_t(h.random.Below(64));
+    Outputs out[2];
+    for (int v = 0; v < 2; v++) {
+      Fill(h.base, area, 256, 0);
+      guest::StoreU32(h.base, area + 4, 0x18280086);
+      guest::StoreU32(h.base, area + 8, width * 4);
+      guest::StoreU32(h.base, area + 12, width * 4);
+      const uint32_t extent[6] = {0, 0, width, 1, 0, 1};
+      for (uint32_t i = 0; i < 6; i++) {
+        guest::StoreU32(h.base, area + 16 + 4 * i, extent[i]);
+        guest::StoreU32(h.base, area + 40 + 4 * i, extent[i]);
+      }
+      guest::StoreU32(h.base, area + 68, diffusion ? 1 : 0);
+      const uint32_t codec = memory::Alloc(128, 0);
+      Fill(h.base, codec, 128);
+      PPCContext t = CallContext(h);
+      t.r3.u64 = codec;
+      t.r4.u64 = area;
+      t.r5.u64 = 32;
+      t.r6.u64 = 1;
+      __imp__sub_823EA800(t, h.base);
+      guest::StoreU32(h.base, codec, 0x8203B808);
+      if (palette) guest::StoreU32(h.base, codec + cf::kPalette, memory::Alloc(4096, 0));
+      if (row) guest::StoreU32(h.base, codec + cf::kRow, memory::Alloc(width * 16, 0));
+      Blocks blocks;
+      blocks.Add(codec, 128);
+      const uint32_t owned[3] = {guest::LoadU32(h.base, codec + cf::kPalette),
+                                 guest::LoadU32(h.base, codec + cf::kRow),
+                                 guest::LoadU32(h.base, codec + cf::kErrorRow)};
+      for (uint32_t b : owned) blocks.Add(b, 1);
+      PPCContext x = CallContext(h);
+      x.r3.u64 = codec;
+      x.r4.u64 = destructor == 0 ? 1 : 0;
+      ITC_FLAG(native_texture_compression) = v == 1;
+      if (destructor == 2) {
+        (v == 0 ? GuestFunction(__imp__sub_823EA070) : hooks::TextureCompressionImageCodecDestruct)(
+            x, h.base);
+      } else {
+        (v == 0 ? GuestFunction(__imp__sub_823F6B70) : hooks::TextureCompressionImageCodecDelete)(
+            x, h.base);
+      }
+      ITC_FLAG(native_texture_compression) = true;
+      blocks.Put(out[v], x.r3.u32, area, 256);
+      for (uint32_t b : owned) out[v].Word(b != 0 && memory::IsHeapBlock(b) ? 1 : 0);
+      if (destructor != 0) {
+        out[v].Word(guest::LoadU32(h.base, codec));
+        memory::Free(codec);
+      } else {
+        out[v].Word(memory::IsHeapBlock(codec) ? 1 : 0);
+      }
+    }
+    results.Check(out[0], out[1],
+                  fmt::format("case {}: destructor {}, diffusion {}, palette {}, row {}, width {}", c,
+                              destructor, diffusion, palette, row, width));
+  }
+  memory::Free(area);
+  results.Report();
+}
+
 }  // namespace
 
 void TextureCompression(Context& h) {
@@ -855,7 +1342,12 @@ void TextureCompression(Context& h) {
   PackR5G6B5(h);
   FitColorEndpoints(h);
   EncodeColorBlock(h);
+  EncodeDxt45(h, false);
+  EncodeDxt45(h, true);
   Rows(h);
+  DecodeRow(h);
+  EncodeRow(h);
+  ImageCodecDestructors(h);
 }
 
 }  // namespace harness
