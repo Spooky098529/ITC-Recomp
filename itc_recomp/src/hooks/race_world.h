@@ -71,6 +71,14 @@ void RaceWorldInit(PPCContext& ctx, uint8_t* base);
 // RaceWorld::ReleaseForStage sub_821713C0: r3 = the race world (r3 not
 // kept: the state machine's handler call doesn't read it).
 void RaceWorldReleaseForStage(PPCContext& ctx, uint8_t* base);
+// RaceManager::ResetWorld sub_82170668: r3 = the manager. RaceManager::
+// ResetVehicles sub_82171718: r3 = the manager, r4 = the flag.
+// RaceWorld::Unload sub_82171250: r3 = the race world (not read). r3 not
+// kept (their callers don't read it). The originals unless --native_heap
+// routes the game's heap to the allocation layer.
+void RaceWorldResetWorld(PPCContext& ctx, uint8_t* base);
+void RaceWorldResetVehicles(PPCContext& ctx, uint8_t* base);
+void RaceWorldUnload(PPCContext& ctx, uint8_t* base);
 // SaveData::AddDistance sub_82116C38: r3 = the save data, f1 = the
 // distance (r3 left).
 void RaceWorldAddDistance(PPCContext& ctx, uint8_t* base);

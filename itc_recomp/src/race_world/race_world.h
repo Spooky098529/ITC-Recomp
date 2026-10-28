@@ -151,6 +151,39 @@ void TickVehicles(uint8_t* base, uint32_t frame, const vehicle::GuestCall& call)
 // Vehicle::Refresh (its original through `original` where it refuses).
 // `frame`: the original's 112 bytes.
 void RefreshVehicles(uint8_t* base, uint32_t frame, const Original& original);
+
+// --- The racers' vehicles reset and the world unloaded
+// (src/race_world/race_world_reset.cpp; only while --native_heap routes the
+// game's heap to the allocation layer: the adapters check) ---
+
+// RaceManager::ResetWorld (sub_82170668): each of the seven vehicles whose
+// slot word (+2336) is above 0 removed from the world (Vehicle::
+// RemoveFromWorld; its original through `original` where it refuses) and
+// the slot = 0; each index stored at `frame` + 80 and its AI driver reset
+// (AiDriver::Of, AiDriver::Reset); TrackCollision::ResetWorld; the float at
+// 0x826C2D80 = the one at 0x82000A34; +2388 = 0. `frame`: the original's
+// 128 bytes.
+void ResetWorld(uint8_t* base, uint32_t manager, uint32_t frame, const Original& original);
+// RaceManager::ResetVehicles (sub_82171718): +2364, +2372, +2376 = 0; each
+// entry (+2368 of them, the count read again each pass) with a vehicle
+// (+20 not -1), then the three traffic entries (from +2160): Vehicle::SetUp
+// with its record (the race data + 3,936 x its +24 + 48; ResetForCar
+// unless its slot word is -1; their callees' originals through
+// `setup_original`, with r1 = `frame` - 224), flags |= 0x200 with `flag`,
+// the slot = 1, an input record cleared at `frame` + 96 (+128 for traffic)
+// and copied to the racer's ([0x826C5B30 + 4 x the index's low byte]),
+// AiDriver::Setup (&+20, the record + 3960, &1 at `frame` + 80), listed
+// (+2308) and counted (+2364, and +2372 or +2376); +2388 = 0. `frame`: the
+// original's 224 bytes.
+void ResetVehicles(uint8_t* base, uint32_t manager, uint32_t flag, uint32_t frame,
+                   const vehicle::CalleeOriginal& setup_original);
+// RaceWorld::Unload (sub_82171250): with the race data's +0xA3AF0 1 and
+// +0xA3AF4 2 or 3, SaveData::AddDistance (player 0's save, vehicle 0's
+// +6244); Vehicles::Destroy, AiDrivers::Destroy, TrackCollision::Unload,
+// operator delete of the manager (each one's original through `original`,
+// with r1 = `frame`, where its plain C++ refuses) and [0x826D82F4] = 0.
+// `frame`: the original's 112 bytes.
+void Unload(uint8_t* base, uint32_t frame, const Original& original);
 // --- The route positions ---
 
 // RoutePosition::ToMainRoad (sub_82143608): TrackRoute::ToMainRoad on the

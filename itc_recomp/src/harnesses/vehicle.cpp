@@ -989,6 +989,133 @@ bool GearingSane(uint8_t* base, uint32_t data) {
   return true;
 }
 
+// One SetUp or ResetForCar case's outputs (SetUps' cases): the vehicle
+// (pointers by their number), the new body and box, which blocks were
+// freed, the world, the car, the frames' temporaries and the linked
+// triangles tried. The blocks the call made are noted in `blocks`.
+void SetUpCaseOutputs(Outputs& o, Context& h, uint32_t world, uint32_t region, uint32_t car,
+                      uint32_t frame, Blocks& blocks) {
+  const uint32_t v_ = region;
+  const uint32_t body = guest::LoadU32(h.base, v_ + 336);
+  const uint32_t shape = guest::LoadU32(h.base, v_ + 344);
+  blocks.Note(body);
+  blocks.Note(shape);
+  const uint32_t object = guest::LoadU32(h.base, v_ + 340);
+  if (object != 0) {
+    blocks.Note(guest::LoadU32(h.base, object + 36));
+    blocks.Note(guest::LoadU32(h.base, object + 40));
+  }
+  for (uint32_t i = 0; i < vh::kVehicleBytes; i += 4) {
+    const uint32_t w = guest::LoadU32(h.base, v_ + i);
+    const bool pointer = i == 272 || i == 336 || i == 340 || i == 344 || i == 5712 ||
+                         i == 2984 || (i >= 2668 && i < 2704) || (i >= 2796 && i < 2832);
+    pointer ? o.Word(blocks.Name(w)) : o.Float(w);
+  }
+  if (body != 0 && body != region + 0x2000) {
+    o.Floats(h.base, body, 528 / 4);
+  }
+  if (shape != 0) {
+    o.Bytes(Read(h.base, shape, 4));
+    o.Floats(h.base, shape + 4, (496 - 4) / 4);
+  }
+  for (uint32_t b : blocks.given) {
+    o.Word(memory::IsHeapBlock(b) ? 1 : 0);
+  }
+  for (uint32_t b : blocks.made) {
+    o.Word(memory::Size(b));
+  }
+  for (uint32_t i = 0; i < car_objects::WorldBytes(); i += 4) {
+    o.Word(blocks.Name(guest::LoadU32(h.base, world + i)));
+  }
+  o.Bytes(Read(h.base, car, 0x1000));
+  o.Bytes(Read(h.base, frame + 80, 48));
+  o.Floats(h.base, frame + 128, 7);
+  o.Floats(h.base, frame - 480 + 80, (296 - 80) / 4);
+  o.Bytes(Read(h.base, frame - 480 + 296, 8));
+  o.Bytes(Read(h.base, kLinkedTried, kLinkedTriedBytes));
+}
+
+// One SetUp or ResetForCar case's inputs (SetUps' cases; the course
+// already built): the world (one object free), the vehicle region, the car
+// and its car data, the fields SetUp reads and, for ResetForCar, the old
+// collision object and shape (into `given`). `frame`: SetUp's frame (224
+// bytes below `r1`, its caller's stack pointer).
+void FillSetUpCase(Context& h, uint32_t world, uint32_t region, uint32_t car, uint32_t frame,
+                   uint32_t r1, uint64_t seed, bool reset, Random& r,
+                   std::vector<uint32_t>& given) {
+  car_objects::BuildWorld(h, world, r, true);
+  car_objects::FillVehicleRegion(h.base, region, r, false);
+  car_objects::FillStack(h, r);
+  const uint32_t v_ = region;
+  WriteSetupFromCarCase(h.base, v_ + 3376, car, frame, r1, seed * 7 + 5, 0);
+  // The car's copied parts (block 1, +2240 to +3260: the gearbox,
+  // engine and tires) and the car data the loader derives from as
+  // positive numbers where the writer left a value outside 0.001
+  // to 10,000 (the gearing's set-up reads its tables at indices
+  // from them: see GearingSane), but for the integers (block 1's
+  // +356, +360, +368; the car data's +172, +176, +1268).
+  auto moderate = [&](uint32_t at) {
+    const float x = guest::LoadFloat(h.base, at);
+    if (!(std::isfinite(x) && x >= 1e-3f && x < 1e4f)) {
+      guest::StoreFloat(h.base, at, 0.1f + float(r.Below(1900)) / 1000.0f);
+    }
+  };
+  for (uint32_t i = 0; i < 1020; i += 4) {
+    if (i != 356 && i != 360 && i != 368) {
+      moderate(car + 2240 + i);
+    }
+  }
+  for (uint32_t i = 0; i < 0x740; i += 4) {
+    if (i != 172 && i != 176 && i != 1268) {
+      moderate(v_ + 3376 + i);
+    }
+  }
+  // The gear count (the car data's +1268, copied from block 1's
+  // +368, the car's +2608): 1 to 7, as the physics' set-up's cases.
+  guest::StoreU32(h.base, car + 2608, 1 + r.Below(7));
+  guest::StoreU32(h.base, car + 1676, r.Below(7));
+  // The physics' ground probe after its sync moves the wheels: their
+  // track positions and the body's 0 (no mesh here), as the car
+  // physics' RefreshFromBody cases.
+  for (uint32_t w = 0; w < 4; w++) {
+    guest::StoreU32(h.base, v_ + 416 + 368 * w + 20, 0);
+  }
+  guest::StoreU32(h.base, v_ + 2984, 0);
+  // VehicleStatus::Reset's curve on the stack: its +1024 within the
+  // table (Build leaves it when no torque is above 0.0, and the
+  // random torques may all be).
+  guest::StoreU32(h.base, frame - 1168 + 80 + 1024, r.Below(32));
+  for (uint32_t at : {1712u, 1720u}) {
+    guest::StoreU32(h.base, car + at, r.Below(4));
+    guest::StoreU32(h.base, car + at + 4, r.Below(5));
+  }
+  guest::StoreU32(h.base, car + 3892, r.Below(2));
+  guest::StoreU32(h.base, car + 1656, r.Below(12));
+  if (r.Below(3) == 0) {
+    guest::StoreU8(h.base, car + 76, 0);
+  }
+  if (reset) {
+    const uint32_t active = car_objects::WorldActiveObject(h.base, world);
+    guest::StoreU32(h.base, v_ + 340, active != 0 && r.Below(3) != 0 ? active : 0);
+    uint32_t shape = 0;
+    if (r.Below(4) != 0) {
+      shape = memory::Alloc(496, 0);
+      car_objects::BuildBox(h, shape, r);
+      given.push_back(shape);
+    }
+    guest::StoreU32(h.base, v_ + 344, shape);
+  }
+}
+
+// Whether the case's car data keeps the physics' set-up within guest memory
+// (a first run of the car loader, its plain C++, as both sides run it; see
+// GearingSane).
+bool SetUpCaseSane(Context& h, uint32_t region, uint32_t car, uint32_t frame) {
+  double ignored = 0.0;
+  return car_physics::VehicleSetupFromCar(h.base, region + 3376, car, frame - 368, &ignored) &&
+         GearingSane(h.base, region + 3376);
+}
+
 void SetUps(Context& h, uint32_t world, uint32_t region) {
   const Block cars(0x1000);
   if (!cars.address) {
@@ -1026,76 +1153,13 @@ void SetUps(Context& h, uint32_t world, uint32_t region) {
           Random r(seed * 107 + 73 + 1000 * uint64_t(group) + 100000 * uint64_t(reset));
           WriteRandom(h.base, course.address, course.bytes, r);
           BuildTestCourse(h.base, course.address, table.address, r);
-          car_objects::BuildWorld(h, world, r, true);
-          car_objects::FillVehicleRegion(h.base, region, r, false);
-          car_objects::FillStack(h, r);
-          const uint32_t v_ = region;
-          WriteSetupFromCarCase(h.base, v_ + 3376, car, frame, r1, seed * 7 + 5, 0);
-          // The car's copied parts (block 1, +2240 to +3260: the gearbox,
-          // engine and tires) and the car data the loader derives from as
-          // positive numbers where the writer left a value outside 0.001
-          // to 10,000 (the gearing's set-up reads its tables at indices
-          // from them: see GearingSane), but for the integers (block 1's
-          // +356, +360, +368; the car data's +172, +176, +1268).
-          auto moderate = [&](uint32_t at) {
-            const float x = guest::LoadFloat(h.base, at);
-            if (!(std::isfinite(x) && x >= 1e-3f && x < 1e4f)) {
-              guest::StoreFloat(h.base, at, 0.1f + float(r.Below(1900)) / 1000.0f);
-            }
-          };
-          for (uint32_t i = 0; i < 1020; i += 4) {
-            if (i != 356 && i != 360 && i != 368) {
-              moderate(car + 2240 + i);
-            }
-          }
-          for (uint32_t i = 0; i < 0x740; i += 4) {
-            if (i != 172 && i != 176 && i != 1268) {
-              moderate(v_ + 3376 + i);
-            }
-          }
-          // The gear count (the car data's +1268, copied from block 1's
-          // +368, the car's +2608): 1 to 7, as the physics' set-up's cases.
-          guest::StoreU32(h.base, car + 2608, 1 + r.Below(7));
-          guest::StoreU32(h.base, car + 1676, r.Below(7));
-          // The physics' ground probe after its sync moves the wheels: their
-          // track positions and the body's 0 (no mesh here), as the car
-          // physics' RefreshFromBody cases.
-          for (uint32_t w = 0; w < 4; w++) {
-            guest::StoreU32(h.base, v_ + 416 + 368 * w + 20, 0);
-          }
-          guest::StoreU32(h.base, v_ + 2984, 0);
-          // VehicleStatus::Reset's curve on the stack: its +1024 within the
-          // table (Build leaves it when no torque is above 0.0, and the
-          // random torques may all be).
-          guest::StoreU32(h.base, frame - 1168 + 80 + 1024, r.Below(32));
-          for (uint32_t at : {1712u, 1720u}) {
-            guest::StoreU32(h.base, car + at, r.Below(4));
-            guest::StoreU32(h.base, car + at + 4, r.Below(5));
-          }
-          guest::StoreU32(h.base, car + 3892, r.Below(2));
-          guest::StoreU32(h.base, car + 1656, r.Below(12));
-          if (r.Below(3) == 0) {
-            guest::StoreU8(h.base, car + 76, 0);
-          }
           Blocks blocks;
-          if (reset) {
-            const uint32_t active = car_objects::WorldActiveObject(h.base, world);
-            guest::StoreU32(h.base, v_ + 340, active != 0 && r.Below(3) != 0 ? active : 0);
-            uint32_t shape = 0;
-            if (r.Below(4) != 0) {
-              shape = memory::Alloc(496, 0);
-              car_objects::BuildBox(h, shape, r);
-              blocks.given.push_back(shape);
-            }
-            guest::StoreU32(h.base, v_ + 344, shape);
-          }
+          FillSetUpCase(h, world, region, car, frame, r1, seed, reset, r, blocks.given);
+          const uint32_t v_ = region;
           if (v < 0) {
             // A first run of the car loader (its plain C++, as both sides
             // run it) to see the car data the physics' set-up will read.
-            double ignored = 0.0;
-            const bool sane = car_physics::VehicleSetupFromCar(h.base, v_ + 3376, car, frame - 368,
-                                                               &ignored) &&
-                              GearingSane(h.base, v_ + 3376);
+            const bool sane = SetUpCaseSane(h, v_, car, frame);
             blocks.FreeAll();
             if (!sane) {
               skip = true;
@@ -1112,44 +1176,8 @@ void SetUps(Context& h, uint32_t world, uint32_t region) {
           } else {
             (v == 0 ? Original<__imp__sub_820C3150> : hooks::VehicleSetUp)(t, h.base);
           }
-          const uint32_t body = guest::LoadU32(h.base, v_ + 336);
-          const uint32_t shape = guest::LoadU32(h.base, v_ + 344);
-          blocks.Note(body);
-          blocks.Note(shape);
-          const uint32_t object = guest::LoadU32(h.base, v_ + 340);
-          if (object != 0) {
-            blocks.Note(guest::LoadU32(h.base, object + 36));
-            blocks.Note(guest::LoadU32(h.base, object + 40));
-          }
           Outputs& o = out[v];
-          for (uint32_t i = 0; i < vh::kVehicleBytes; i += 4) {
-            const uint32_t w = guest::LoadU32(h.base, v_ + i);
-            const bool pointer = i == 272 || i == 336 || i == 340 || i == 344 || i == 5712 ||
-                                 i == 2984 || (i >= 2668 && i < 2704) || (i >= 2796 && i < 2832);
-            pointer ? o.Word(blocks.Name(w)) : o.Float(w);
-          }
-          if (body != 0 && body != region + 0x2000) {
-            o.Floats(h.base, body, 528 / 4);
-          }
-          if (shape != 0) {
-            o.Bytes(Read(h.base, shape, 4));
-            o.Floats(h.base, shape + 4, (496 - 4) / 4);
-          }
-          for (uint32_t b : blocks.given) {
-            o.Word(memory::IsHeapBlock(b) ? 1 : 0);
-          }
-          for (uint32_t b : blocks.made) {
-            o.Word(memory::Size(b));
-          }
-          for (uint32_t i = 0; i < car_objects::WorldBytes(); i += 4) {
-            o.Word(blocks.Name(guest::LoadU32(h.base, world + i)));
-          }
-          o.Bytes(Read(h.base, car, 0x1000));
-          o.Bytes(Read(h.base, frame + 80, 48));
-          o.Floats(h.base, frame + 128, 7);
-          o.Floats(h.base, frame - 480 + 80, (296 - 80) / 4);
-          o.Bytes(Read(h.base, frame - 480 + 296, 8));
-          o.Bytes(Read(h.base, kLinkedTried, kLinkedTriedBytes));
+          SetUpCaseOutputs(o, h, world, region, car, frame, blocks);
           o.Word(blocks.Name(t.r3.u32));
           o.Double(t.f1.u64);
           blocks.FreeAll();
@@ -1413,6 +1441,26 @@ void Placements(Context& h, uint32_t world, uint32_t region) {
 // For the race world's harness (src/harnesses/race_world.cpp): the tick's
 // inputs on the car physics' vehicle region (see FillTickInputs above).
 namespace vehicle_cases {
+void FillSetUpCase(Context& h, uint32_t world, uint32_t region, uint32_t car, uint32_t frame,
+                   uint32_t r1, uint64_t seed, bool reset, Random& r,
+                   std::vector<uint32_t>& given) {
+  harness::FillSetUpCase(h, world, region, car, frame, r1, seed, reset, r, given);
+}
+bool SetUpCaseSane(Context& h, uint32_t region, uint32_t car, uint32_t frame) {
+  return harness::SetUpCaseSane(h, region, car, frame);
+}
+void SetUpCaseOutputs(Outputs& o, Context& h, uint32_t world, uint32_t region, uint32_t car,
+                      uint32_t frame, const std::vector<uint32_t>& given) {
+  Blocks blocks;
+  blocks.given = given;
+  harness::SetUpCaseOutputs(o, h, world, region, car, frame, blocks);
+  blocks.FreeAll();
+}
+void FreeSetUpCase(const std::vector<uint32_t>& given) {
+  Blocks blocks;
+  blocks.given = given;
+  blocks.FreeAll();
+}
 void FillTickInputs(Context& h, uint32_t region, uint32_t race, Random& r) {
   harness::FillTickInputs(h, region, race, r);
 }

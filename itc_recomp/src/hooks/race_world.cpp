@@ -23,7 +23,10 @@ ITC_FLAG_BOOL(native_race_world, true, "ITC",
               "sub_82170920 and JumpSections sub_821737F8; TickVehicles sub_821714D8 and "
               "RefreshVehicles sub_82171560, their callees' originals where those refuse; "
               "RaceWorld::Init sub_82174D28 and ReleaseForStage sub_821713C0, "
-              "SaveData::AddDistance sub_82116C38) natively instead of through the "
+              "SaveData::AddDistance sub_82116C38; RaceManager::ResetWorld sub_82170668, "
+              "ResetVehicles sub_82171718 and RaceWorld::Unload sub_82171250 (only while "
+              "--native_heap routes the game's heap to the allocation layer; their callees' "
+              "originals where those refuse) natively instead of through the "
               "translated code (the same words, bit for bit; checked by "
               "--run_harnesses=race_world)");
 
@@ -137,8 +140,25 @@ rw::Original Originals(PPCContext& ctx, uint8_t* base) {
     const uint64_t r1 = ctx.r1.u64;
     ctx.r1.u64 = sp;
     ctx.r3.u64 = r3;
-    if (address == 0x820C0118) {
-      __imp__sub_820C0118(ctx, base);
+    switch (address) {
+      case 0x820C0118:
+        __imp__sub_820C0118(ctx, base);
+        break;
+      case 0x820C20E0:
+        __imp__sub_820C20E0(ctx, base);
+        break;
+      case 0x820C3B78:
+        __imp__sub_820C3B78(ctx, base);
+        break;
+      case 0x8213B2B8:
+        __imp__sub_8213B2B8(ctx, base);
+        break;
+      case 0x820FEFB0:
+        __imp__sub_820FEFB0(ctx, base);
+        break;
+      case 0x825A70E8:
+        __imp__sub_825A70E8(ctx, base);
+        break;
     }
     ctx.r1.u64 = r1;
     ctx.fpscr.disableFlushMode();
@@ -185,6 +205,35 @@ void RaceWorldReleaseForStage(PPCContext& ctx, uint8_t* base) {
                       });
 }
 
+void RaceWorldResetWorld(PPCContext& ctx, uint8_t* base) {
+  ctx.fpscr.disableFlushMode();
+  if (!NativeHeapActive()) {
+    __imp__sub_82170668(ctx, base);
+    return;
+  }
+  rw::ResetWorld(base, ctx.r3.u32, ctx.r1.u32 - 128, Originals(ctx, base));
+}
+
+void RaceWorldResetVehicles(PPCContext& ctx, uint8_t* base) {
+  ctx.fpscr.disableFlushMode();
+  if (!NativeHeapActive()) {
+    __imp__sub_82171718(ctx, base);
+    return;
+  }
+  const uint32_t frame = ctx.r1.u32 - 224;
+  rw::ResetVehicles(base, ctx.r3.u32, ctx.r4.u32, frame,
+                    VehicleSetUpOriginals(ctx, base, frame - 224));
+}
+
+void RaceWorldUnload(PPCContext& ctx, uint8_t* base) {
+  ctx.fpscr.disableFlushMode();
+  if (!NativeHeapActive()) {
+    __imp__sub_82171250(ctx, base);
+    return;
+  }
+  rw::Unload(base, ctx.r1.u32 - 112, Originals(ctx, base));
+}
+
 void RaceWorldAddDistance(PPCContext& ctx, uint8_t* base) {
   ctx.fpscr.disableFlushMode();
   rw::AddDistance(base, ctx.r3.u32, ctx.f1.f64);
@@ -229,6 +278,9 @@ ITC_RACE_WORLD(82171560, RaceWorldRefreshVehicles)
 ITC_RACE_WORLD(82174D28, RaceWorldInit)
 ITC_RACE_WORLD(821713C0, RaceWorldReleaseForStage)
 ITC_RACE_WORLD(82116C38, RaceWorldAddDistance)
+ITC_RACE_WORLD(82170668, RaceWorldResetWorld)
+ITC_RACE_WORLD(82171718, RaceWorldResetVehicles)
+ITC_RACE_WORLD(82171250, RaceWorldUnload)
 // RaceManager::NearSegment (sub_82170BC0) and RoutePosition::ToMainRoad
 // (sub_82143608) have no adapters: their callers in play
 // (RaceManager::BuildNeighbors, RoutePosition::StepToMainRoad) are native;
