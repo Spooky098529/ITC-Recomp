@@ -65,7 +65,16 @@ file's history. What's left to see in a drive, from every run:
   placements, `RaceStart::Place`, `AddRacers`, `ListRacers` and the
   big ticks (split). Validated (`itc_2139`, replay `itc_2140` ok: 24
   of 24 harness lines, 13 in the attract race, 8 in the replay, 3 to
-  drive). Migration agent 2 running.
+  drive). Migration 2 done (1be0160..b3013b9, five batches, the tick
+  tree split in three; subagents one at a time): `ResetWorld`,
+  `ResetVehicles`, `Unload`, the event's start placements,
+  `ListRacers`, `AddRacers`, `OnLoaded`, `RaceStart::Place` and
+  `PlaceRolling`, the vehicle streaming and `RaceWorld::Tick`; 48 of
+  50 in play ours, 25 Native; `itc_2202`: 9 s (the harnesses 29 s,
+  `race_world`'s 8.3 s of it), 0 errors, every harness 0 differing but
+  the expected groups (one new); frame dumps the same as the fallback
+  (`itc_2197`, `itc_2198`). Left ready: `RaceManager::Refresh`
+  `sub_82171978`. Validation agent running.
 
 ## Done
 
@@ -116,6 +125,8 @@ This run's groups: `expected-differences.md` (the "08:36 run" lines).
   known 548, unknown 3355).
 - After the race world's migration 1: ours 2472, work left 3982
   (wrapped 103, known 524, unknown 3355).
+- After the race world's migration 2: ours 2496, work left 3962
+  (wrapped 103, known 504, unknown 3355).
 
 ## Stopped
 

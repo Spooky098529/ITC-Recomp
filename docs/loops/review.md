@@ -110,6 +110,27 @@ When the user has reviewed a run's section, its heading gets
   (`hooks::VehicleTickCalls`, `VehicleSetUpOriginals`,
   `CollisionWorldUpdateCalls`, new `src/hooks/car_physics.h`); the
   vehicle and car physics harnesses export set-up helpers.
+- The race world, migration 2 (1be0160..b3013b9): 37 rows in
+  `race-world.md` (25 Native; `sub_82144874`, `sub_8217437C` Merged).
+  Map corrections: `PlaceGroupFixed`'s groups 0 and 1 swapped;
+  `PlaceStarts` places three groups by `PlaceGroupFixed` and one by
+  `Split` or `PlaceGroup`; `RaceStart::Place` ticks 300 times in mode 6
+  with the stage's +0 not 1, else 30; `PlaceRolling`'s "all" is save
+  +6100 equal to 1; `OnLoaded`'s lane is the racer's place mod 2;
+  `MoveUnseen` has no stepping loop (section ranges corrected);
+  `Stream`'s kinds 2 and 3 go to `StreamCruise`, 5 to
+  `StreamTwoPlayers`, the rest to `StreamNear` (attract races stream
+  through `StreamNear`). For review: `StreamTraffic`'s neighbor search
+  left out as dead code (its 0x800 count never goes below 0; a comment
+  and the row say so); `GiveVehicle` `sub_821706E8` and `sub_821743A8`
+  (neither seen in play) got overrides running the original or a
+  harness stand-in while one is set (the time harness's precedent), so
+  their rows are Wrapped; `hooks::AiUpdateAll` with a harness stand-in
+  in `src/hooks/ai_drivers.*`; the vehicle harness's SetUp cases
+  factored into exported helpers (case counts unchanged). One group
+  expected to differ (`AddRacers`, random traffic numbers, 5 of 200:
+  stack leftovers). The harnesses now take ~29 s of the 40-second race
+  (`race_world`'s 8.3 s), leaving ~9 s of attract race.
 
 ## Run 2026-10-27 22:31 (`b7-loop-27-10-26`)
 

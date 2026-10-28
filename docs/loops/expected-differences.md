@@ -271,3 +271,9 @@ were at 0.
 | Function | Group | Differ | Reason | Review |
 |---|---|---|---|---|
 | `sub_820D5750` CarModel::OnDecalLoaded | the TGA headers' unwritten bytes | 16 of 16 | Unwritten header bytes in the frame | for review (08:36 run) |
+
+### `race-world.md`
+
+| Function | Group | Differ | Reason | Review |
+|---|---|---|---|---|
+| `sub_82173050` RaceManager::AddRacers | random traffic numbers | 5 of 200 | Stack leftovers (a negative car number from random +16 words makes `Traffic::PickModel` read below its tables, into earlier calls' register saves; +16 is 0 from `RaceManager::Create` in play) | for review (08:36 run) |
