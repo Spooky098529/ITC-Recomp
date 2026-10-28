@@ -169,6 +169,13 @@ double CursorCurveSample(uint8_t* base, uint32_t keys, uint32_t cursor, uint32_t
 // Skeleton::ApplyAnimation (sub_825998B8): each entry of instance 0's
 // cursor: its node's channels sampled at the node's time into its record.
 void SkeletonApplyAnimation(uint8_t* base, uint32_t skeleton);
+// sub_82599AF0 Skeleton::ResetPose (models.md): with +176, for each node
+// (NodeCount, asked again after each) its 144-byte record (+136) gets the
+// 16 bytes at +88, then +92, then +96 (16 bytes a node each), and with its
+// node record's (+84, 160 bytes) +132 bit 0x40 that record's +64; then
+// Skeleton::ApplyAnimation. Whether it reached ApplyAnimation (the adapter
+// leaves flush-to-zero off then, as ApplyAnimation's).
+bool SkeletonResetPose(uint8_t* base, uint32_t skeleton);
 
 // --- Beside it in the library. ---
 

@@ -762,6 +762,9 @@ void NativePartModelDestruct(PPCContext& t, uint8_t* base) {
     __imp__sub_820CE990(t, base);
   }
 }
+void NativePartModelSetVinylTextures(PPCContext& t, uint8_t* base) {
+  models::PartModelSetVinylTextures(base, t.r3.u32, t.r4.u32, t.r5.u32);
+}
 void NativePartModelClear(PPCContext& t, uint8_t* base) {
   models::PartModelClear(base, t.r3.u32);
 }
@@ -977,6 +980,35 @@ void PartModelClears(Context& h, const Block& block) {
   results.Report();
 }
 
+// sub_820CE9F8 on random bytes: the block and r3.
+void PartModelSetVinylTextureCases(Context& h, const Block& block) {
+  Results results("Model::SetVinylTextures (sub_820CE9F8)");
+  for (int c = 0; c < 16; c++) {
+    const uint32_t model = block.address + 16 * h.random.Below(4);
+    const uint64_t seed = h.random.Next();
+    const uint64_t r4 = h.random.Next(), r5 = h.random.Next();
+    Outputs out[2];
+    for (int v = 0; v < 2; v++) {
+      Random r(seed);
+      for (uint32_t i = 0; i < block.bytes; i += 4) {
+        Store(h.base, block.address + i, uint32_t(r.Next()));
+      }
+      PPCContext t = CallContext(h);
+      t.r3.u64 = model;
+      t.r4.u64 = r4;
+      t.r5.u64 = r5;
+      Side(v, [&] {
+        (v == 0 ? __imp__sub_820CE9F8 : NativePartModelSetVinylTextures)(t, h.base);
+      });
+      out[v].Bytes(Read(h.base, block.address, block.bytes));
+      out[v].Word(t.r3.u32);
+      out[v].Word(uint32_t(t.r3.u64 >> 32));
+    }
+    results.Check(out[0], out[1], fmt::format("case {} (at +{})", c, model - block.address));
+  }
+  results.Report();
+}
+
 }  // namespace
 
 // The materials' and shared shaders' accessors: a model, its shapes and
@@ -1101,6 +1133,7 @@ void Models(Context& h) {
                    {"PartModel::~PartModel (sub_820CE990, on the game's list)",
                     __imp__sub_820CE990, NativePartModelDestruct});
     PartModelClears(h, block);
+    PartModelSetVinylTextureCases(h, block);
   }
 }
 

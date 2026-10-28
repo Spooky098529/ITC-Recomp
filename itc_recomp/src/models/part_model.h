@@ -21,6 +21,10 @@ constexpr uint32_t kPartModelBytes = 464;
 // order).
 void PartModelClear(uint8_t* base, uint32_t model);
 
+// sub_820CE9F8 Model::SetVinylTextures: +444 = `a` (the vinyl sheet), +448 =
+// `b`.
+void PartModelSetVinylTextures(uint8_t* base, uint32_t model, uint32_t a, uint32_t b);
+
 // sub_820CE928 (the part model's constructor): Model::Model, the vtable,
 // then PartModelClear. False, with nothing done, where Model::Model would go
 // to the original.

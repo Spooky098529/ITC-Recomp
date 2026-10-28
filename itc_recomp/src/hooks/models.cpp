@@ -48,7 +48,8 @@ ITC_FLAG_BOOL(native_models, true, "ITC",
               "sub_82594850 and ~TextureProvider sub_825943E0; Model::Model sub_825948C0, "
               "Model::Release sub_82594970 and Model::~Model sub_82594F58, their members' "
               "plain C++ called directly, and the car part model's sub_820CE928 and "
-              "sub_820CE990 over them; the part model's sub_820CE9C8; Model::MaterialCount sub_82594AD8, Model::Material "
+              "sub_820CE990 over them; the part model's sub_820CE9C8 and Model::SetVinylTextures sub_820CE9F8; Skeleton::ResetPose "
+              "sub_82599AF0 (in src/model_animation/); Model::MaterialCount sub_82594AD8, Model::Material "
               "sub_82594B20, ShaderFile::Parse sub_822A8568, VertexShader::CopyHeader sub_822A9FD8 and "
               "PixelShader::CopyHeader sub_822A9EA8 (in src/shader_objects/), "
               "TextureHeader::Relocate sub_8235A990 (with sub_822A5B68; no adapter: only "
@@ -250,6 +251,29 @@ extern "C" REX_FUNC(sub_820CE9C8) {
     return;
   }
   models::PartModelClear(base, ctx.r3.u32);
+}
+
+// Model::SetVinylTextures: r3 = the part model, r4 and r5 the words.
+extern "C" REX_FUNC(sub_820CE9F8) {
+  REX_FUNC_PROLOGUE();
+  if (!ITC_FLAG(native_models)) {
+    __imp__sub_820CE9F8(ctx, base);
+    return;
+  }
+  models::PartModelSetVinylTextures(base, ctx.r3.u32, ctx.r4.u32, ctx.r5.u32);
+}
+
+// Skeleton::ResetPose: r3 = the skeleton (left). Flush-to-zero off after
+// Skeleton::ApplyAnimation, as its adapter leaves it.
+extern "C" REX_FUNC(sub_82599AF0) {
+  REX_FUNC_PROLOGUE();
+  if (!ITC_FLAG(native_models)) {
+    __imp__sub_82599AF0(ctx, base);
+    return;
+  }
+  if (model_animation::SkeletonResetPose(base, ctx.r3.u32)) {
+    ctx.fpscr.disableFlushMode();
+  }
 }
 
 // --- The materials and the shared shaders ---

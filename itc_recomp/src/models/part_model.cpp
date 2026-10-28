@@ -31,6 +31,12 @@ void PartModelClear(uint8_t* base, uint32_t model) {
   Clear(base, model);
 }
 
+void PartModelSetVinylTextures(uint8_t* base, uint32_t model, uint32_t a, uint32_t b) {
+  ITC_NATIVE_RUNNING("sub_820CE9F8 Model::SetVinylTextures");
+  Store(base, model + 444, a);
+  Store(base, model + 448, b);
+}
+
 bool PartModelConstruct(uint8_t* base, uint32_t model) {
   ITC_NATIVE_RUNNING("sub_820CE928 PartModel::PartModel");
   if (!ModelConstruct(base, model)) {

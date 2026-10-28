@@ -900,6 +900,49 @@ double CursorCurveSample(uint8_t* base, uint32_t keys, uint32_t cursor, uint32_t
   }
 }
 
+bool SkeletonResetPose(uint8_t* base, uint32_t skeleton) {
+  ITC_NATIVE_RUNNING("sub_82599AF0 Skeleton::ResetPose");
+  if (Load(base, skeleton + 176) == 0) {
+    return false;
+  }
+  uint32_t a = Load(base, skeleton + 92);
+  uint32_t node = Load(base, skeleton + 84) + 64;
+  uint32_t out = Load(base, skeleton + 136);
+  uint32_t b = Load(base, skeleton + 88);
+  uint32_t c = Load(base, skeleton + 96);
+  // 16 bytes as the original's two doubleword moves.
+  auto copy16 = [&](uint32_t to, uint32_t from) {
+    uint32_t words[4];
+    for (uint32_t k = 0; k < 4; k++) words[k] = Load(base, from + 4 * k);
+    for (uint32_t k = 0; k < 4; k++) Store(base, to + 4 * k, words[k]);
+  };
+  for (int32_t i = 0; i < int32_t(SkeletonNodeCount(base, skeleton)); i++) {
+    const bool extra = (Load(base, node + 68) & 0x40) != 0;
+    // The original loads +88's, +92's and the first half of +96's before
+    // its first stores, then the rest.
+    uint32_t bw[4], aw[4], cw[4];
+    for (uint32_t k = 0; k < 4; k++) bw[k] = Load(base, b + 4 * k);
+    for (uint32_t k = 0; k < 4; k++) aw[k] = Load(base, a + 4 * k);
+    cw[0] = Load(base, c + 0);
+    cw[1] = Load(base, c + 4);
+    for (uint32_t k = 0; k < 4; k++) Store(base, out + 4 * k, bw[k]);
+    cw[2] = Load(base, c + 8);
+    cw[3] = Load(base, c + 12);
+    for (uint32_t k = 0; k < 4; k++) Store(base, out + 16 + 4 * k, aw[k]);
+    for (uint32_t k = 0; k < 4; k++) Store(base, out + 32 + 4 * k, cw[k]);
+    if (extra) {
+      copy16(out + 48, node);
+    }
+    out += 144;
+    node += 160;
+    a += 16;
+    b += 16;
+    c += 16;
+  }
+  SkeletonApplyAnimation(base, skeleton);
+  return true;
+}
+
 void SkeletonApplyAnimation(uint8_t* base, uint32_t skeleton) {
   ITC_NATIVE_RUNNING("sub_825998B8 Skeleton::ApplyAnimation");
   uint32_t cursor = Load(base, skeleton + 128);
