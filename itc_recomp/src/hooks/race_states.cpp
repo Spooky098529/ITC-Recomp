@@ -285,16 +285,7 @@ ITC_RACE_STATES(821698B0, RaceStatesProgressCreate)
 ITC_RACE_STATES(821648E0, RaceStatesProgressReset)
 ITC_RACE_STATES(821649B8, RaceStatesSetChecks)
 ITC_RACE_STATES(82163440, RaceStatesReleaseRacers)
-ITC_RACE_STATES(82162E08, RaceStatesCountTime)
-ITC_RACE_STATES(82162D80, RaceStatesRank)
 ITC_RACE_STATES(82162F78, RaceStatesSectionsBeside)
-ITC_RACE_STATES(82162E70, RaceStatesSectionsBefore)
-ITC_RACE_STATES(82164F08, RaceStatesCountHits)
-ITC_RACE_STATES(82164228, RaceStatesDamage)
-ITC_RACE_STATES(821650A0, RaceStatesDrainSp)
-ITC_RACE_STATES(82164090, RaceStatesCheckLap)
-ITC_RACE_STATES(82164E18, RaceStatesCheckFinish)
-ITC_RACE_STATES(82163930, RaceStatesMapToSection)
 // Time::Sub (sub_82162230, never seen in play) has no adapter: its only
 // caller, RaceProgress::CheckLap, is native; --native_race_states switches
 // it.
@@ -327,3 +318,11 @@ ITC_RACE_STATES(82167610, RaceStatesRaceTick)
 // RaceStates::CountdownTick and StandingStartTick, are native;
 // --native_race_states switches those callers. Their register steps stay
 // for the harness.
+// RouteSections::Before (sub_82162E70) and RoutePosition::MapToSection
+// (sub_82163930) have no adapters: their callers, RaceProgress::FollowRoute,
+// CheckLap and CheckFinish, are native. RaceProgress::CountTime
+// (sub_82162E08), CheckLap (sub_82164090), CheckFinish (sub_82164E18),
+// CountHits (sub_82164F08), Damage (sub_82164228), DrainSp (sub_821650A0)
+// and Rank (sub_82162D80) have none either: their only caller,
+// RaceStates::RaceTick, is native. --native_race_states switches those
+// callers; the register steps stay for the harness.
