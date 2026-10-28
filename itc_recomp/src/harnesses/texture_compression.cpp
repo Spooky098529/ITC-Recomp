@@ -3,8 +3,9 @@
 // Each case writes the same inputs into the scratch area (filled with 0xCD)
 // for both versions, runs the original (with --native_texture_compression
 // off, so its callees are the originals too) or the plain C++ through the
-// register steps (hooks/texture_compression.h for the encoders, Native<Name>
-// below for the helpers whose adapters went), and compares with
+// register steps (hooks/texture_compression.h for the functions whose
+// adapters are kept, Native<Name> below for those whose adapters went), and
+// compares with
 // harness::Outputs: the block's bytes and the scratch area exactly, the
 // fitted ends (stored with stfs) as floats.
 //
@@ -54,6 +55,7 @@
 #include "hooks/texture_compression.h"
 #include "memory/heap.h"
 #include "texture_compression/codecs.h"
+#include "texture_compression/dxt45.h"
 #include "texture_compression/dxt_alpha.h"
 #include "texture_compression/dxt_color.h"
 
@@ -86,9 +88,9 @@ constexpr int kKinds = 16;
 
 namespace tc = texture_compression;
 
-// The register steps of the helpers whose adapters went (they're Native,
-// reached only through the encoders' plain C++): what the adapters did,
-// without the flag.
+// The register steps of the functions whose adapters went (they're Native,
+// reached only through their native callers' plain C++): what the adapters
+// did, without the flag.
 
 // DxtAlpha::FitEndpoints sub_824207D8: r3 = the low end's float, r4 = the
 // high end's, r5 = 16 floats, r6 = the steps (6 or 8; the original for any
@@ -147,6 +149,85 @@ void NativeFitColorEndpoints(PPCContext& ctx, uint8_t* base) {
     guest::StoreFloat(base, ctx.r4.u32 + 4 * c, high[c]);
   }
   ctx.r5.s64 = ctx.r5.s64 + 8;  // the original walks the pixels from r5 + 8
+}
+
+// DxtAlpha::EncodeBlock sub_82422178: r3 = the 8-byte block, r4 = 16 float4
+// pixels (their alphas at +12), r5 = dither (nonzero diffuses the error).
+// r3 = 0.
+void NativeEncodeAlphaBlock(PPCContext& ctx, uint8_t* base) {
+  ctx.fpscr.disableFlushMode();
+  float alphas[16];
+  for (uint32_t i = 0; i < 16; i++) {
+    alphas[i] = guest::LoadFloat(base, ctx.r4.u32 + tc::kPixelBytes * i + tc::kAlphaOffset);
+  }
+  uint8_t block[8];
+  tc::EncodeAlphaBlock(base, alphas, ctx.r5.s32, block);
+  for (uint32_t i = 0; i < 8; i++) {
+    guest::StoreU8(base, ctx.r3.u32 + i, block[i]);
+  }
+  ctx.r3.u64 = 0;
+}
+
+// DxtColor::EncodeBlock sub_82420F50: r3 = the 8-byte block, r4 = 16 float4
+// pixels, r5 = 1-bit alpha (nonzero), r6 = dither (nonzero). r6 and r3 also
+// stored in their slots of the caller's frame (stw r6,1084(r1) and stw
+// r7,1060(r1) past its 1040-byte frame: r1 + 44, r1 + 20) as the original
+// does. r3 = 0.
+void NativeEncodeColorBlock(PPCContext& ctx, uint8_t* base) {
+  ctx.fpscr.disableFlushMode();
+  guest::StoreU32(base, ctx.r1.u32 + 44, ctx.r6.u32);
+  guest::StoreU32(base, ctx.r1.u32 + 20, ctx.r3.u32);
+  float pixels[16][4];
+  for (uint32_t i = 0; i < 16; i++) {
+    for (uint32_t c = 0; c < 4; c++) {
+      pixels[i][c] = guest::LoadFloat(base, ctx.r4.u32 + tc::kPixelBytes * i + 4 * c);
+    }
+  }
+  uint8_t block[8];
+  tc::EncodeColorBlock(base, pixels, ctx.r5.u32 != 0, ctx.r6.s32, ctx.r1.u32, block);
+  for (uint32_t i = 0; i < 8; i++) {
+    guest::StoreU8(base, ctx.r3.u32 + i, block[i]);
+  }
+  ctx.r3.u64 = 0;
+}
+
+// Dxt45::EncodeBlockPremultiplied sub_82422960: r3 = the 16-byte block, r4 =
+// 16 float4 pixels, r5 = dither. r3 = 0.
+void NativeEncodeDxt45BlockPremultiplied(PPCContext& ctx, uint8_t* base) {
+  ctx.fpscr.disableFlushMode();
+  float pixels[16][4];
+  for (uint32_t i = 0; i < 16; i++) {
+    for (uint32_t c = 0; c < 4; c++) {
+      pixels[i][c] = guest::LoadFloat(base, ctx.r4.u32 + tc::kPixelBytes * i + 4 * c);
+    }
+  }
+  uint8_t block[16];
+  tc::EncodeDxt45BlockPremultiplied(base, pixels, ctx.r5.s32, ctx.r1.u32, block);
+  for (uint32_t i = 0; i < 16; i++) {
+    guest::StoreU8(base, ctx.r3.u32 + i, block[i]);
+  }
+  ctx.r3.u64 = 0;
+}
+
+// ImageCodec::~ImageCodec sub_823EA070 and DxtCodec::~DxtCodec sub_823EA770:
+// r3 = the codec; the original where the plain C++ refuses. r3 as the
+// original leaves it.
+void NativeImageCodecDestruct(PPCContext& ctx, uint8_t* base) {
+  const auto r3 = tc::ImageCodecDestruct(base, ctx.r3.u32);
+  if (!r3) {
+    __imp__sub_823EA070(ctx, base);
+    return;
+  }
+  ctx.r3.u64 = *r3;
+}
+
+void NativeDxtCodecDestruct(PPCContext& ctx, uint8_t* base) {
+  const auto r3 = tc::DxtCodecDestruct(base, ctx.r3.u32);
+  if (!r3) {
+    __imp__sub_823EA770(ctx, base);
+    return;
+  }
+  ctx.r3.u64 = *r3;
 }
 
 using Block16 = std::array<float, 16>;
@@ -290,7 +371,7 @@ void EncodeBlock(Context& h) {
         __imp__sub_82422178(t, h.base);
         ITC_FLAG(native_texture_compression) = true;
       } else {
-        hooks::TextureCompressionEncodeAlphaBlock(t, h.base);
+        NativeEncodeAlphaBlock(t, h.base);
       }
       out[v].Bytes(Read(h.base, h.data, kScratchBytes));
       out[v].Word(t.r3.u32);
@@ -744,7 +825,7 @@ void EncodeColorBlock(Context& h) {
         __imp__sub_82420F50(t, h.base);
         ITC_FLAG(native_texture_compression) = true;
       } else {
-        hooks::TextureCompressionEncodeColorBlock(t, h.base);
+        NativeEncodeColorBlock(t, h.base);
       }
       out[v].Bytes(Read(h.base, h.data, kScratchBytes));
       out[v].Bytes(Read(h.base, CallContext(h).r1.u32, kFrameBytes));
@@ -910,7 +991,7 @@ void EncodeDxt45(Context& h, bool premultiplied_only) {
         (premultiplied_only ? __imp__sub_82422960 : __imp__sub_82422A68)(t, h.base);
         ITC_FLAG(native_texture_compression) = true;
       } else if (premultiplied_only) {
-        hooks::TextureCompressionEncodeDxt45BlockPremultiplied(t, h.base);
+        NativeEncodeDxt45BlockPremultiplied(t, h.base);
       } else {
         hooks::TextureCompressionEncodeDxt45Block(t, h.base);
       }
@@ -1224,7 +1305,7 @@ void EncodeRow(Context& h) {
       x.r3.u64 = codec;
       x.r4.u64 = destructor == 0 ? 1 : 2;
       if (destructor == 2) {
-        (v == 0 ? GuestFunction(__imp__sub_823EA770) : hooks::TextureCompressionDxtCodecDestruct)(
+        (v == 0 ? GuestFunction(__imp__sub_823EA770) : NativeDxtCodecDestruct)(
             x, h.base);
       } else {
         (v == 0 ? GuestFunction(__imp__sub_823F6BC0) : hooks::TextureCompressionDxtCodecDelete)(
@@ -1310,7 +1391,7 @@ void ImageCodecDestructors(Context& h) {
       x.r4.u64 = destructor == 0 ? 1 : 0;
       ITC_FLAG(native_texture_compression) = v == 1;
       if (destructor == 2) {
-        (v == 0 ? GuestFunction(__imp__sub_823EA070) : hooks::TextureCompressionImageCodecDestruct)(
+        (v == 0 ? GuestFunction(__imp__sub_823EA070) : NativeImageCodecDestruct)(
             x, h.base);
       } else {
         (v == 0 ? GuestFunction(__imp__sub_823F6B70) : hooks::TextureCompressionImageCodecDelete)(
