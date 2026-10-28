@@ -25,7 +25,8 @@ ITC_FLAG_BOOL(native_app_states, true, "ITC",
               "message vector's Clear sub_82092F98 (with Erase sub_82092E70; no adapters: only "
               "App::Update's plain C++ calls them in play) and Allocate sub_82092B78, the operation list's AllocateNodes "
               "sub_820ACF10 and IncSize sub_820AD768 (no adapters: only the plain C++ below "
-              "calls them in play), List::Clear sub_820ACF88, PtrList::Erase "
+              "calls them in play), List::Clear sub_820ACF88 (no adapter: only ApplyOps's plain C++ calls "
+              "it in play), PtrList::Erase "
               "sub_82098E80, Delegate::Clone sub_820ACA48 (those that allocate or free only "
               "while --native_heap routes the game's heap to the allocation layer) and "
               "StateLayer::IsEmpty sub_820ACE50; with --native_heap, OpList::OpList sub_820AD0B8 (no adapter: "
@@ -50,7 +51,7 @@ ITC_FLAG_BOOL(native_app_states, true, "ITC",
               "only AppStates::AppStates's plain C++ calls it in play) and sub_820ADBD8, StateLayer::AddChild "
               "sub_820ADA08, AppStates::AddLayer sub_820AE130 and App::Start sub_82092878, their "
               "virtual calls guest calls; PtrList::ForEach sub_820AD3A0 and OpList::ForEach "
-              "sub_820AD440, the layers' child functors sub_820ACD80, sub_820ACDE8 and "
+              "sub_820AD440 (no adapter: only ApplyOps's plain C++ calls it in play), the layers' child functors sub_820ACD80, sub_820ACDE8 and "
               "sub_820ACD60, and with --native_heap StateLayer::ApplyOps sub_820ADE68, their "
               "slots and StateLayer::ApplyOp guest calls) natively instead of through the translated code "
               "(the same results; checked by --run_harnesses=app_states)");
@@ -585,7 +586,8 @@ void AppLayerApplyOps(PPCContext& ctx, uint8_t* base) {
 // nor OpList::OpList, StateLayer::Push, StateLayer::StateLayer and
 // AppStates::AppStates (removed 2026-10-27: in play only the layers'
 // constructors', StateLayer::StateLayer(state)'s and AppStates::Create's
-// plain C++ call them).
+// plain C++ call them), nor List::Clear and OpList::ForEach (removed
+// 2026-10-27: in play only StateLayer::ApplyOps's plain C++ calls them).
 
 #define ITC_APP_STATES_ADAPTER(address, step) \
   extern "C" REX_FUNC(sub_##address) {        \
@@ -598,7 +600,6 @@ void AppLayerApplyOps(PPCContext& ctx, uint8_t* base) {
   }
 
 ITC_APP_STATES_ADAPTER(82092B78, AppMessagesAllocate)
-ITC_APP_STATES_ADAPTER(820ACF88, AppListClear)
 ITC_APP_STATES_ADAPTER(82098E80, AppPtrListErase)
 ITC_APP_STATES_ADAPTER(820ACA48, AppDelegateClone)
 ITC_APP_STATES_ADAPTER(820ACE50, AppLayerIsEmpty)
@@ -621,7 +622,6 @@ ITC_APP_STATES_ADAPTER(820AE130, AppStatesAddLayer)
 ITC_APP_STATES_ADAPTER(820AE498, AppStatesCreate)
 ITC_APP_STATES_ADAPTER(82092878, AppStart)
 ITC_APP_STATES_ADAPTER(820AD3A0, AppPtrListForEach)
-ITC_APP_STATES_ADAPTER(820AD440, AppOpListForEach)
 ITC_APP_STATES_ADAPTER(820ACD80, AppUpdateChild)
 ITC_APP_STATES_ADAPTER(820ACDE8, AppUpdateChildToggled)
 ITC_APP_STATES_ADAPTER(820ACD60, AppToggleOffChild)
