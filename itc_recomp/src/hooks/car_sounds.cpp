@@ -13,7 +13,7 @@ ITC_FLAG_BOOL(native_car_sounds, true, "ITC",
               "sub_8210C9D8, Format sub_8210C850, Length sub_8210C920, Data sub_8210C958 and "
               "Entry sub_8210C998 (XMemCpy's plain C++); CarSounds::SetBanks sub_8210CB48; "
               "TireSound::Amount sub_8210CA28; CarSound::CarSound sub_8210CC18 with "
-              "EngineSound::EngineSound sub_8210CBA0; CarSounds::Destroy sub_8210DCA8 (operator "
+              "EngineSound::EngineSound sub_8210CBA0 (no adapter: only its plain C++ calls it); CarSounds::Destroy sub_8210DCA8 (operator "
               "delete through its plain C++)) natively instead of through the translated code "
               "(the same reads and writes; XAudio's voice methods stay the game's; checked by "
               "--run_harnesses=car_sounds)");
@@ -94,6 +94,7 @@ ITC_CAR_SOUNDS_ADAPTER(8210C958, CarSoundsWaveBankData)
 ITC_CAR_SOUNDS_ADAPTER(8210C998, CarSoundsWaveBankEntry)
 ITC_CAR_SOUNDS_ADAPTER(8210CB48, CarSoundsSetBanks)
 ITC_CAR_SOUNDS_ADAPTER(8210CA28, CarSoundsTireSoundAmount)
-ITC_CAR_SOUNDS_ADAPTER(8210CBA0, CarSoundsEngineSoundConstruct)
+// No adapter (removed 2026-10-28: only `CarSound::CarSound`'s plain C++ calls it in play)
+// for EngineSound::EngineSound sub_8210CBA0.
 ITC_CAR_SOUNDS_ADAPTER(8210CC18, CarSoundsCarSoundConstruct)
 ITC_CAR_SOUNDS_ADAPTER(8210DCA8, CarSoundsDestroy)
