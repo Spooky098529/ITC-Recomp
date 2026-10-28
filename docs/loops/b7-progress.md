@@ -22,9 +22,11 @@ file's history. What's left to see in a drive, from every run:
   functions ours under `--native_archive` (Toc, AssetSize, the request
   list, slot lookup, loose files, static set-ups, request finish,
   `LoaderFunctor::Invoke`, Ucl); 38 s, 0 errors, every harness 0
-  differing; nothing left ready but the semaphore users. Step:
-  validation of migration 1 (agent running), then migration 2 (the
-  semaphores, by the user's call).
+  differing; nothing left ready but the semaphore users. Validated
+  (`itc_2262`): 14 of 14 harness lines, all 14 in the attract race; 8
+  s, 0 errors, every harness 0 differing but the expected groups;
+  nothing to drive. Step: migration 2 (the semaphore users, by the
+  user's call; agent running).
 
 ## Done
 
