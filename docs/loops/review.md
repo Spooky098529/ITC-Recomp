@@ -13,7 +13,18 @@ When the user has reviewed a run's section, its heading gets
 
 ## Run 2026-10-28 18:45 (`b7-loop-28-10-26-2`)
 
-Nothing yet.
+- The archive (map a8a12e3): `docs/functions/archive.md`, 27 new rows
+  (the archive's B4 rows stay in `files-and-saves.md`, named shared:
+  `Archive::Init`, `Shutdown`, `Load`, `AssetSize` (`sub_820A0678`,
+  named and read in full), the queueing, slot lookup, picker, set-up,
+  finish, next request, loose read, loader thread, Ucl). Corrections in
+  `files-and-saves.md`: the slot lookup, picker, queueing and
+  `Archive::Shutdown` rows read in full (the slot table starts at
+  `0x826A5168`, not `0x826A5170`). `known-data.md`: the archive's
+  globals `0x826A5100`-`0x826A512C`, the TOC, the 92-byte request
+  slots, the queue at `0x826BAB08`, the four semaphores, the loader
+  thread's parameters at `0x82600B50`. Two leads taken into the map
+  (`sub_8209D7B0`, `sub_82294BA8`), two added.
 
 ## Run 2026-10-28 08:36 (`b7-loop-28-10-26`)
 

@@ -11,8 +11,14 @@ file's history. What's left to see in a drive, from every run:
 - Run started 2026-10-28 18:45 on `b7-loop-28-10-26-2` (the user's
   branch), from 5068523; summary `b7-loop-2026-10-28-1845.md`.
 - Limit for this run: 3 subsystems.
-- Subsystem 1 of 3: the archive's asset sizes (`sub_820A0678`, the top
-  lead). Step: mapping (agent running).
+- Subsystem 1 of 3: the archive (`sub_820A0678`, the top lead).
+  Mapped (a8a12e3): `archive.md`, 27 new rows (the B4 rows stay in
+  `files-and-saves.md`, named shared), 10 ready groups; blocked by the
+  game's Semaphore class (the archive's four semaphores). Map check
+  passed. Asked the user whether the four go over host primitives (the
+  2026-10-24 record kept the Semaphore class recompiled "for the
+  archive loader"). Step: migration 1 of the ready groups (agent
+  running).
 
 ## Done
 
@@ -34,6 +40,8 @@ Nothing yet.
 
 - At the start: ours 2540, work left 3920 (wrapped 103, known 523,
   unknown 3294).
+- After the archive's map: ours 2540, work left 3920 (wrapped 103,
+  known 534, unknown 3283).
 
 ## Stopped
 
