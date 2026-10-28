@@ -7,13 +7,15 @@
 #include "guest.h"
 
 #include "base/flags.h"
+#include "hooks/car_physics.h"
 #include "hooks/heap.h"
 #include "track_collision/track_collision.h"
 
 ITC_FLAG_BOOL(native_collision_world, true, "ITC",
               "Run the collision world's owner and the track's collision "
               "(docs/functions/collision-world.md: sub_8228F090, Race::RacerCount sub_821705F8, "
-              "Racers::CarsCollide sub_820FEFF8, TrackCollision::ResetWorld sub_820FEAF8; the "
+              "Racers::CarsCollide sub_820FEFF8, TrackCollision::ResetWorld sub_820FEAF8, "
+              "TrackCollision::Tick sub_820FF050; the "
               "mesh's and the route's lifetime, sub_820F68E8 with sub_820F6898, sub_820F6940, "
               "sub_820F8600, sub_820F8618, TrackCollision::Unload sub_820FEFB0 with the collision "
               "world's teardown, sub_820B86B8, sub_820B9110, sub_820B7B40 (those allocating or "
@@ -70,6 +72,10 @@ ITC_COLLISION_WORLD(8228F090, ctx.r3.u64 = TimesThreePlus(ctx.r3.u32, ctx.r4.u32
 ITC_COLLISION_WORLD(821705F8, ctx.r3.u64 = RaceRacerCount(base))
 ITC_COLLISION_WORLD(820FEFF8, ctx.r3.u64 = RacersCarsCollide(base, ctx.r3.u32))
 ITC_COLLISION_WORLD(820FEAF8, ctx.r3.u64 = TrackCollisionResetWorld(base))
+// No arguments; r3 not kept (no caller reads it). The update's guest calls
+// as its adapter's.
+ITC_COLLISION_WORLD(820FF050, TrackCollisionTick(base, ctx.r1.u32 - 144,
+                                                 hooks::CollisionWorldUpdateCalls(ctx, base)))
 
 // --- The mesh's and the route's lifetime ---
 

@@ -1410,6 +1410,14 @@ void Placements(Context& h, uint32_t world, uint32_t region) {
 
 }  // namespace
 
+// For the race world's harness (src/harnesses/race_world.cpp): the tick's
+// inputs on the car physics' vehicle region (see FillTickInputs above).
+namespace vehicle_cases {
+void FillTickInputs(Context& h, uint32_t region, uint32_t race, Random& r) {
+  harness::FillTickInputs(h, region, race, r);
+}
+}  // namespace vehicle_cases
+
 void Vehicle(Context& h) {
   Leaves(h);
   Steps(h);

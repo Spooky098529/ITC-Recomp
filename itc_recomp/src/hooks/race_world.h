@@ -61,6 +61,10 @@ void RaceWorldNeighbours(PPCContext& ctx, uint8_t* base);
 // RaceManager::JumpSections sub_821737F8: r3 = the entry, r4 = the player's
 // position, r5 = &the player's branch, r6, r7 = &the flags; r3 not kept.
 void RaceWorldJumpSections(PPCContext& ctx, uint8_t* base);
+// RaceManager::TickVehicles sub_821714D8 and RefreshVehicles sub_82171560:
+// no arguments (r3 not kept: RaceWorld::Tick doesn't read it).
+void RaceWorldTickVehicles(PPCContext& ctx, uint8_t* base);
+void RaceWorldRefreshVehicles(PPCContext& ctx, uint8_t* base);
 // SaveData::FirstUnsetFlag sub_82112190: r3 = the save data; r3 = 0 to 6.
 void RaceWorldFirstUnsetFlag(PPCContext& ctx, uint8_t* base);
 

@@ -21,17 +21,47 @@
 #include "memory/heap.h"
 #include "race_world/race_world.h"
 #include "data_tables/data_tables.h"
+#include "track_collision/track_collision.h"
 #include "track_route/track_route.h"
 
 #include <fmt/format.h>
 
 #include <bit>
+#include <cstring>
 #include <string>
 #include <vector>
 
 ITC_FLAG_DECLARE(bool, native_race_world);
+ITC_FLAG_DECLARE(bool, native_collision_world);
 
 namespace harness {
+
+// The collision world's harness's course (src/harnesses/collision_world.cpp).
+uint32_t TestCourseBytes();
+void FillTestCourseTable(uint8_t* base, uint32_t area, uint32_t table);
+void BuildTestCourse(uint8_t* base, uint32_t area, uint32_t table, Random& r);
+
+// The car physics' harness's world, vehicle and update world
+// (src/harnesses/car_physics_objects.cpp).
+namespace car_objects {
+uint32_t WorldBytes();
+uint32_t VehicleRegionBytes();
+void BuildWorld(Context& h, uint32_t region, Random& r, bool keep_one_free = false);
+void FillVehicleRegion(uint8_t* base, uint32_t region, Random& r, bool nans);
+void FillStepInputs(uint8_t* base, uint32_t region, Random& r);
+void VehicleRegionOutputs(Outputs& out, uint8_t* base, uint32_t region);
+void FillStack(Context& h, Random& r);
+uint32_t UpdateRegionBytes();
+void BuildUpdateWorld(Context& h, uint32_t region, Random& r);
+void UpdateWorldOutputs(Outputs& out, uint8_t* base, uint32_t region);
+uint32_t UpdateObject(uint32_t region, uint32_t i);
+std::vector<std::pair<uint32_t, uint32_t>> UpdateGlobals();
+}  // namespace car_objects
+
+// The vehicle's harness's tick inputs (src/harnesses/vehicle.cpp).
+namespace vehicle_cases {
+void FillTickInputs(Context& h, uint32_t region, uint32_t race, Random& r);
+}  // namespace vehicle_cases
 
 namespace {
 
@@ -717,6 +747,204 @@ void Tables(Context& h, const Block& manager, const Block& vehicles) {
   }
 }
 
+// Guest memory ranges a case changes, put back by the destructor.
+class SavedBytes {
+ public:
+  SavedBytes(uint8_t* base, std::vector<std::pair<uint32_t, uint32_t>> ranges)
+      : base_(base), ranges_(std::move(ranges)) {
+    for (const auto& [address, bytes] : ranges_) {
+      saved_.push_back(Read(base_, address, bytes));
+    }
+  }
+  ~SavedBytes() {
+    for (size_t i = 0; i < ranges_.size(); i++) {
+      std::memcpy(base_ + ranges_[i].first, saved_[i].data(), ranges_[i].second);
+    }
+  }
+
+ private:
+  uint8_t* base_;
+  std::vector<std::pair<uint32_t, uint32_t>> ranges_;
+  std::vector<std::vector<uint8_t>> saved_;
+};
+
+// --- The racers' vehicles each tick: one racer (or none) whose vehicle is
+// the car physics' vehicle region (the seven vehicles' global pointed so
+// that vehicle k is the region), the vehicle harness's tick inputs and
+// course, the racer's record in the race data with its car fields ---
+
+void VehicleLoops(Context& h, const Block& manager) {
+  constexpr uint32_t kInputs = 0x826C5B30, kLinkedTried = 0x826C5B04;
+  const Block world(car_objects::WorldBytes());
+  const Block region(car_objects::VehicleRegionBytes());
+  const Block course(TestCourseBytes());
+  const Block table(4 * 0x10000);
+  const Block race(48 + 3936 * 8);
+  if (!world.address || !region.address || !course.address || !table.address ||
+      !race.address) {
+    ITC_LOG_ERROR("harness: race_world: no block from the allocation layer");
+    return;
+  }
+  FillTestCourseTable(h.base, course.address, table.address);
+  const auto racer_up = [&](Random& r, uint32_t racers, uint32_t k, uint32_t record) {
+    WriteRandom(h.base, manager.address, 4096, r);
+    const uint32_t entry = manager.address + 4 + 28 * r.Below(80);
+    guest::StoreU32(h.base, manager.address + 2364, racers);
+    guest::StoreU32(h.base, manager.address + 2308, entry);
+    guest::StoreU32(h.base, entry + 20, k);
+    guest::StoreU32(h.base, entry + 24, record);
+    guest::StoreU32(h.base, rw::kManager, manager.address);
+    guest::StoreU32(h.base, kVehicles, region.address - 6272 * k);
+  };
+  {
+    Results results("RaceManager::TickVehicles (sub_821714D8)");
+    for (uint64_t seed = 0; seed < 100; seed++) {
+      Outputs out[2];
+      const uint32_t k = uint32_t(seed % 7);
+      for (int v = 0; v < 2; v++) {
+        Random r(seed * 113 + 59);
+        SavedBytes saved(h.base, {{track_collision::kMesh, 12}, {track_route::kRoute, 4},
+                                  {rw::kRaceData, 4}, {0x826C2D88, 4}, {kLinkedTried, 16},
+                                  {kInputs + 4 * k, 4}, {rw::kManager, 4}, {kVehicles, 4}});
+        WriteRandom(h.base, course.address, course.bytes, r);
+        BuildTestCourse(h.base, course.address, table.address, r);
+        car_objects::BuildWorld(h, world.address, r);
+        car_objects::FillVehicleRegion(h.base, region.address, r, false);
+        car_objects::FillStepInputs(h.base, region.address, r);
+        car_objects::FillStack(h, r);
+        WriteRandom(h.base, race.address, race.bytes, r);
+        vehicle_cases::FillTickInputs(h, region.address, race.address, r);
+        const uint32_t record = r.Below(7);
+        const uint32_t car = race.address + 48 + 3936 * record;
+        guest::StoreU32(h.base, car + 1656, r.Below(12));
+        guest::StoreU32(h.base, car + 1664, r.Below(6));
+        WriteRandom(h.base, h.data, kScratchBytes, r);
+        const uint32_t input = h.data + 0x100;
+        guest::StoreU32(h.base, input + 0, uint32_t(r.Next()) & 0x82010200u);
+        guest::StoreU8(h.base, input + 17, uint8_t(r.Below(2) == 0 ? 0 : 2));
+        guest::StoreU8(h.base, region.address + 2249, 0);
+        guest::StoreU32(h.base, kInputs + 4 * k, input);
+        racer_up(r, seed % 10 == 0 ? 0 : 1, k, record);
+        PPCContext t = CallContext(h);
+        t.fpscr.disableFlushModeUnconditional();
+        (v == 0 ? Original<__imp__sub_821714D8> : hooks::RaceWorldTickVehicles)(t, h.base);
+        car_objects::VehicleRegionOutputs(out[v], h.base, region.address);
+        out[v].Word(guest::LoadU32(h.base, region.address + 6160 + 8));
+        out[v].Bytes(Read(h.base, input, 20));
+        out[v].Bytes(Read(h.base, kLinkedTried, 16));
+      }
+      results.Check(out[0], out[1], fmt::format("seed {}: vehicle {}", seed, k));
+    }
+    results.Report();
+  }
+  {
+    Results results("RaceManager::RefreshVehicles (sub_82171560)");
+    for (uint64_t seed = 0; seed < 100; seed++) {
+      Outputs out[2];
+      const uint32_t k = uint32_t(seed % 7);
+      for (int v = 0; v < 2; v++) {
+        Random r(seed * 127 + 61);
+        SavedBytes saved(h.base, {{0x826C2D88, 4}, {rw::kManager, 4}, {kVehicles, 4}});
+        car_objects::BuildWorld(h, world.address, r);
+        car_objects::FillVehicleRegion(h.base, region.address, r, seed % 2 == 1);
+        for (uint32_t w = 0; w < 4; w++) {
+          guest::StoreU32(h.base, region.address + 416 + 368 * w + 20, 0);
+        }
+        car_objects::FillStack(h, r);
+        racer_up(r, seed % 10 == 0 ? 0 : 1, k, 0);
+        PPCContext t = CallContext(h);
+        t.fpscr.disableFlushModeUnconditional();
+        (v == 0 ? Original<__imp__sub_82171560> : hooks::RaceWorldRefreshVehicles)(t, h.base);
+        car_objects::VehicleRegionOutputs(out[v], h.base, region.address);
+      }
+      results.Check(out[0], out[1], fmt::format("seed {}: vehicle {}", seed, k));
+    }
+    results.Report();
+  }
+}
+
+// --- TrackCollision::Tick: the car physics' update world, the course's
+// mesh and route marked loaded (or not), one to three racers whose
+// vehicles (in the seven vehicles' block) have the world's objects, the
+// race data's car count and flags (CarsCollide) ---
+
+void TrackCollisionTicks(Context& h, const Block& manager, const Block& vehicles) {
+  const Block world(car_objects::UpdateRegionBytes());
+  const Block race(0x5A000);
+  if (!world.address || !race.address) {
+    ITC_LOG_ERROR("harness: race_world: no block from the allocation layer");
+    return;
+  }
+  Results results("TrackCollision::Tick (sub_820FF050)");
+  int contacts = 0, landings = 0;
+  for (uint64_t seed = 0; seed < 150; seed++) {
+    Outputs out[2];
+    for (int v = 0; v < 2; v++) {
+      Random r(seed * 131 + 67);
+      auto ranges = car_objects::UpdateGlobals();
+      ranges.insert(ranges.end(), {{track_collision::kMesh, 12}, {track_route::kRoute, 12},
+                                   {rw::kRaceData, 4}, {rw::kManager, 4}, {kVehicles, 4}});
+      SavedBytes saved(h.base, ranges);
+      car_objects::BuildUpdateWorld(h, world.address, r);
+      // The contacts' chains (+68) made to end: each the next record or none
+      // (the update links the ones it makes in front).
+      for (uint32_t i = 0; i < 8; i++) {
+        const uint32_t contact = world.address + 0x800 + 80 * i;
+        guest::StoreU32(h.base, contact + 68, i < 7 && r.Below(2) == 0 ? contact + 80 : 0);
+      }
+      car_objects::FillStack(h, r);
+      guest::StoreU32(h.base, track_collision::kMesh + 8, seed % 16 == 1 ? 1 : 2);
+      guest::StoreU32(h.base, track_route::kRoute + 8, seed % 16 == 2 ? 0 : 2);
+      WriteRandom(h.base, race.address, 48 + 3936 * 4, r);
+      const uint32_t records = race.address + 48;
+      guest::StoreU32(h.base, records + 0x595E0, 1 + r.Below(3));
+      for (uint32_t i = 0; i < 3; i++) {
+        guest::StoreU32(h.base, records + 3888 + 3936 * i,
+                        r.Below(4) == 0 ? 0x8 : uint32_t(r.Next()) & ~0x8u);
+      }
+      guest::StoreU32(h.base, rw::kRaceData, race.address);
+      WriteRandom(h.base, vehicles.address, vehicles.bytes, r);
+      WriteRandom(h.base, manager.address, 4096, r);
+      const uint32_t racers = seed % 10 == 0 ? 0 : 1 + r.Below(3);
+      guest::StoreU32(h.base, manager.address + 2364, racers);
+      for (uint32_t i = 0; i < 3; i++) {
+        const uint32_t entry = manager.address + 4 + 28 * (10 * i + r.Below(10));
+        guest::StoreU32(h.base, manager.address + 2308 + 4 * i, entry);
+        guest::StoreU32(h.base, entry + 20, i);
+        const uint32_t vehicle = vehicles.address + 6272 * i;
+        guest::StoreU32(h.base, vehicle + 340, car_objects::UpdateObject(world.address, r.Below(4)));
+        guest::StoreU32(h.base, vehicle + 348, r.Below(2) == 0 ? 0 : uint32_t(r.Next()));
+        guest::StoreU32(h.base, vehicle + 6240, r.Below(20));
+      }
+      guest::StoreU32(h.base, rw::kManager, manager.address);
+      guest::StoreU32(h.base, kVehicles, vehicles.address);
+      PPCContext t = CallContext(h);
+      t.fpscr.disableFlushModeUnconditional();
+      ITC_FLAG(native_collision_world) = v == 1;
+      (v == 0 ? __imp__sub_820FF050 : sub_820FF050)(t, h.base);
+      ITC_FLAG(native_collision_world) = true;
+      car_objects::UpdateWorldOutputs(out[v], h.base, world.address);
+      for (uint32_t i = 0; i < 3; i++) {
+        const uint32_t vehicle = vehicles.address + 6272 * i;
+        out[v].Word(guest::LoadU32(h.base, vehicle + 6152));
+        contacts += v == 1 && i < racers && (guest::LoadU32(h.base, vehicle + 6152) & 3) ? 1 : 0;
+        landings += v == 1 && i < racers && (guest::LoadU32(h.base, vehicle + 6152) & 4) ? 1 : 0;
+        out[v].Word(guest::LoadU32(h.base, vehicle + 6232));
+        out[v].Float(guest::LoadU32(h.base, vehicle + 6236));
+        out[v].Word(guest::LoadU32(h.base, vehicle + 6240));
+      }
+      const uint32_t frame = CallContext(h).r1.u32 - 144 - 176;  // the update's
+      out[v].Word(guest::LoadU32(h.base, frame + 80));
+      out[v].Word(guest::LoadU32(h.base, frame + 84));
+      out[v].Floats(h.base, frame + 96, 8);
+    }
+    results.Check(out[0], out[1], fmt::format("seed {}", seed));
+  }
+  ITC_LOG_INFO("harness: race_world: TrackCollision::Tick: {} racers with contacts, {} landings",
+               contacts, landings);
+  results.Report();
+}
+
 }  // namespace
 
 void RaceWorld(Context& h) {
@@ -732,6 +960,8 @@ void RaceWorld(Context& h) {
   Routes(h);
   Create(h);
   Tables(h, manager, vehicles);
+  VehicleLoops(h, manager);
+  TrackCollisionTicks(h, manager, vehicles);
 }
 
 }  // namespace harness

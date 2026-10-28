@@ -18,7 +18,10 @@
 #pragma once
 
 #include <cstdint>
+#include <functional>
 #include <optional>
+
+#include "vehicle/vehicle.h"
 
 namespace race_world {
 
@@ -114,6 +117,21 @@ uint32_t Neighbours(uint8_t* base, uint32_t manager, uint32_t index);
 void JumpSections(uint8_t* base, uint32_t entry, uint32_t player, uint32_t branch,
                   uint32_t flag2, uint32_t flag3, uint32_t frame);
 
+// --- The racers' vehicles each tick ---
+
+// A callee's original where its plain C++ refuses, run with r1 = `sp` and
+// r3 = `r3`.
+using Original = std::function<void(uint32_t address, uint32_t sp, uint32_t r3)>;
+
+// RaceManager::TickVehicles (sub_821714D8): each racer's Vehicle::Tick (its
+// vehicle, its +20, its record (the race data + 48 + 3,936 x its +24), 1),
+// the count read again each pass. `frame`: the original's 128 bytes;
+// `call`: Vehicle::Tick's guest calls.
+void TickVehicles(uint8_t* base, uint32_t frame, const vehicle::GuestCall& call);
+// RaceManager::RefreshVehicles (sub_82171560): each racer's
+// Vehicle::Refresh (its original through `original` where it refuses).
+// `frame`: the original's 112 bytes.
+void RefreshVehicles(uint8_t* base, uint32_t frame, const Original& original);
 // --- The route positions ---
 
 // RoutePosition::ToMainRoad (sub_82143608): TrackRoute::ToMainRoad on the

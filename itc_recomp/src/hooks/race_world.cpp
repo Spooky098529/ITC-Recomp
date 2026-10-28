@@ -7,6 +7,7 @@
 #include "base/flags.h"
 #include "base/log.h"
 #include "hooks/heap.h"
+#include "hooks/vehicle_native.h"
 #include "race_world/race_world.h"
 
 ITC_FLAG_BOOL(native_race_world, true, "ITC",
@@ -19,7 +20,8 @@ ITC_FLAG_BOOL(native_race_world, true, "ITC",
               "SaveData::FirstUnsetFlag sub_82112190; RaceManager::Create sub_821715B8 (only while "
               "--native_heap routes the game's heap to the allocation layer), NoteMarkedRacer "
               "sub_82172F90, NearSegment sub_82170BC0, BuildNeighbors sub_82170CB8, Neighbours "
-              "sub_82170920 and JumpSections sub_821737F8) natively instead of through the "
+              "sub_82170920 and JumpSections sub_821737F8; TickVehicles sub_821714D8 and "
+              "RefreshVehicles sub_82171560, their callees' originals where those refuse) natively instead of through the "
               "translated code (the same words, bit for bit; checked by "
               "--run_harnesses=race_world)");
 
@@ -125,6 +127,34 @@ void RaceWorldJumpSections(PPCContext& ctx, uint8_t* base) {
                    ctx.r1.u32 - 176);
 }
 
+namespace {
+
+// The callees' originals the plain C++ hands back, run with r1 = `sp`.
+rw::Original Originals(PPCContext& ctx, uint8_t* base) {
+  return [&ctx, base](uint32_t address, uint32_t sp, uint32_t r3) {
+    const uint64_t r1 = ctx.r1.u64;
+    ctx.r1.u64 = sp;
+    ctx.r3.u64 = r3;
+    if (address == 0x820C0118) {
+      __imp__sub_820C0118(ctx, base);
+    }
+    ctx.r1.u64 = r1;
+    ctx.fpscr.disableFlushMode();
+  };
+}
+
+}  // namespace
+
+void RaceWorldTickVehicles(PPCContext& ctx, uint8_t* base) {
+  ctx.fpscr.disableFlushMode();
+  rw::TickVehicles(base, ctx.r1.u32 - 128, VehicleTickCalls(ctx, base));
+}
+
+void RaceWorldRefreshVehicles(PPCContext& ctx, uint8_t* base) {
+  ctx.fpscr.disableFlushMode();
+  rw::RefreshVehicles(base, ctx.r1.u32 - 112, Originals(ctx, base));
+}
+
 void RaceWorldFirstUnsetFlag(PPCContext& ctx, uint8_t* base) {
   ctx.fpscr.disableFlushMode();
   ctx.r3.u64 = rw::FirstUnsetFlag(base, ctx.r3.u32);
@@ -161,5 +191,7 @@ ITC_RACE_WORLD(82170BC0, RaceWorldNearSegment)
 ITC_RACE_WORLD(82170CB8, RaceWorldBuildNeighbors)
 ITC_RACE_WORLD(82170920, RaceWorldNeighbours)
 ITC_RACE_WORLD(821737F8, RaceWorldJumpSections)
+ITC_RACE_WORLD(821714D8, RaceWorldTickVehicles)
+ITC_RACE_WORLD(82171560, RaceWorldRefreshVehicles)
 // sub_821708B4 (BranchesMeet's tail) has no adapter: never seen in play, and
 // its only caller is BranchesMeet.

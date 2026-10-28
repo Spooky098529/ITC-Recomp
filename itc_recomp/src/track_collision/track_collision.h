@@ -18,6 +18,8 @@
 
 #include <cstdint>
 
+#include "car_physics/car_physics.h"
+
 namespace track_collision {
 
 // The mesh and the route.
@@ -39,6 +41,16 @@ uint32_t RacersCarsCollide(uint8_t* base, uint32_t records);
 // the surface settings for 0x02000000, 0x01000000 and 0x04000000 as
 // CollisionWorld::Setup sets them. Returns the original's r3 (Reset's).
 uint32_t TrackCollisionResetWorld(uint8_t* base);
+// TrackCollision::Tick (sub_820FF050): with the mesh and the route loaded
+// (their +8 = 2), CollisionWorld::Update (the car physics' plain C++, its
+// frame 176 bytes below `frame`, r3 Racers::CarsCollide's answer) with the
+// float at 0x8260327C, or 0.0 when the cars don't collide with each other;
+// then each racer's vehicle: +6152 = 0, bit 0x1 for a contact with another
+// object, else bit 0x2 and +6236 = its strength; +6240 counts the ticks off
+// the ground (+348 0), and on landing after 10 or more, bit 0x4 and +6232 =
+// the count. `frame`: the original's 144 bytes; `guest` the update's guest
+// calls (its adapter's).
+void TrackCollisionTick(uint8_t* base, uint32_t frame, const car_physics::CollisionGuestCall& guest);
 
 // --- The mesh's and the route's lifetime (src/track_collision/track_mesh.cpp).
 // The pages come from the allocation layer (src/memory/heap.h), so the

@@ -6,6 +6,8 @@
 
 #include "guest.h"
 
+#include "hooks/car_physics.h"
+
 #include "base/flags.h"
 #include "car_physics/car_physics.h"
 #include "hooks/heap.h"
@@ -453,15 +455,11 @@ extern "C" REX_FUNC(sub_820FF250) {
 // f1 = the time step; r3 comes back as the original leaves it. The guest
 // calls: the originals where a native callee refuses (Place, Solve,
 // Respond), and the queries' targets other than WallHits and GroundHits.
-extern "C" REX_FUNC(sub_820B92C8) {
-  REX_FUNC_PROLOGUE();
-  if (!ITC_FLAG(native_car_physics)) {
-    __imp__sub_820B92C8(ctx, base);
-    return;
-  }
-  ctx.fpscr.disableFlushMode();
-  auto guest = [&](uint32_t address, uint32_t r3, uint32_t r4, uint32_t r5, uint32_t r6,
-                   uint32_t r1, uint32_t lr) -> uint32_t {
+namespace hooks {
+
+car_physics::CollisionGuestCall CollisionWorldUpdateCalls(PPCContext& ctx, uint8_t* base) {
+  return [&ctx, base](uint32_t address, uint32_t r3, uint32_t r4, uint32_t r5, uint32_t r6,
+                      uint32_t r1, uint32_t lr) -> uint32_t {
     const uint64_t stack = ctx.r1.u64;
     ctx.r3.u64 = r3;
     ctx.r4.u64 = r4;
@@ -487,5 +485,17 @@ extern "C" REX_FUNC(sub_820B92C8) {
     ctx.fpscr.disableFlushMode();
     return ctx.r3.u32;
   };
-  ctx.r3.u64 = CollisionWorldUpdate(base, ctx.f1.f64, ctx.r1.u32 - 176, ctx.r3.u32, guest);
+}
+
+}  // namespace hooks
+
+extern "C" REX_FUNC(sub_820B92C8) {
+  REX_FUNC_PROLOGUE();
+  if (!ITC_FLAG(native_car_physics)) {
+    __imp__sub_820B92C8(ctx, base);
+    return;
+  }
+  ctx.fpscr.disableFlushMode();
+  ctx.r3.u64 = CollisionWorldUpdate(base, ctx.f1.f64, ctx.r1.u32 - 176, ctx.r3.u32,
+                                    hooks::CollisionWorldUpdateCalls(ctx, base));
 }

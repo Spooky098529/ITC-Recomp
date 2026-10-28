@@ -520,6 +520,39 @@ void JumpSections(uint8_t* base, uint32_t entry, uint32_t player, uint32_t branc
   guest::StoreU32(base, flag, 0);
 }
 
+// --- The racers' vehicles each tick and on a reset ---
+
+void TickVehicles(uint8_t* base, uint32_t frame, const vehicle::GuestCall& call) {
+  ITC_NATIVE_RUNNING("sub_821714D8 RaceManager::TickVehicles");
+  uint32_t m = Manager(base);
+  for (int32_t i = 0; i < int32_t(guest::LoadU32(base, m + 2364)); i++) {
+    const uint32_t slot = m + 2308 + 4 * uint32_t(i);
+    const uint32_t index = guest::LoadU32(base, guest::LoadU32(base, slot) + 20);
+    const uint32_t vehicle = va::VehicleGet(base, index);
+    m = Manager(base);
+    const uint32_t record =
+        guest::LoadU32(base, guest::LoadU32(base, m + 2308 + 4 * uint32_t(i)) + 24);
+    const uint32_t car = record * 3936 + guest::LoadU32(base, kRaceData) + 48;
+    vehicle::VehicleTick(base, vehicle, index, car, 1, frame - 144, call);
+    m = Manager(base);
+  }
+}
+
+void RefreshVehicles(uint8_t* base, uint32_t frame, const Original& original) {
+  ITC_NATIVE_RUNNING("sub_82171560 RaceManager::RefreshVehicles");
+  uint32_t m = Manager(base);
+  for (int32_t i = 0; i < int32_t(guest::LoadU32(base, m + 2364)); i++) {
+    const uint32_t racer = guest::LoadU32(base, m + 2308 + 4 * uint32_t(i));
+    const uint32_t vehicle = va::VehicleGet(base, guest::LoadU32(base, racer + 20));
+    double f1 = 0.0;
+    uint32_t r3 = 0;
+    if (!vehicle::VehicleRefresh(base, vehicle, frame - 96, &f1, &r3)) {
+      original(0x820C0118, frame, vehicle);
+    }
+    m = Manager(base);
+  }
+}
+
 // --- The route positions ---
 
 uint32_t RoutePositionToMainRoad(uint8_t* base, uint32_t position, uint32_t flag, uint32_t sp) {
