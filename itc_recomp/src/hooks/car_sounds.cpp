@@ -310,17 +310,17 @@ ITC_CAR_SOUNDS_ADAPTER(8210CA28, CarSoundsTireSoundAmount)
 ITC_CAR_SOUNDS_ADAPTER(8210CC18, CarSoundsCarSoundConstruct)
 ITC_CAR_SOUNDS_ADAPTER(8210DCA8, CarSoundsDestroy)
 ITC_CAR_SOUNDS_ADAPTER(8210DDC8, CarSoundsSetUp)
-ITC_CAR_SOUNDS_ADAPTER(824819E0, CarSoundsX3DVecSub)
-ITC_CAR_SOUNDS_ADAPTER(82481998, CarSoundsX3DVecLength)
-ITC_CAR_SOUNDS_ADAPTER(824819B8, CarSoundsX3DVecDot)
-ITC_CAR_SOUNDS_ADAPTER(82481A18, CarSoundsX3DVecCross)
-ITC_CAR_SOUNDS_ADAPTER(82480818, CarSoundsX3DEvaluateCurve)
-ITC_CAR_SOUNDS_ADAPTER(82480918, CarSoundsX3DCurves)
-ITC_CAR_SOUNDS_ADAPTER(82480F80, CarSoundsX3DPan)
-ITC_CAR_SOUNDS_ADAPTER(82481390, CarSoundsX3DMatrix)
-ITC_CAR_SOUNDS_ADAPTER(82480BA8, CarSoundsX3DCone)
-ITC_CAR_SOUNDS_ADAPTER(82480E90, CarSoundsX3DDoppler)
-ITC_CAR_SOUNDS_ADAPTER(82481880, CarSoundsX3DCalculate)
+// No adapter (removed 2026-10-28: only Cone's, Doppler's, Matrix's and Calculate's plain C++ calls it in play) for X3DVec::Sub sub_824819E0.
+// No adapter (removed 2026-10-28: only Calculate's plain C++ calls it in play) for X3DVec::Length sub_82481998.
+// No adapter (removed 2026-10-28: only Cone's and Doppler's plain C++ calls it in play) for X3DVec::Dot sub_824819B8.
+// No adapter (removed 2026-10-28: only Matrix's plain C++ calls it in play) for X3DVec::Cross sub_82481A18.
+// No adapter (removed 2026-10-28: only Curves' plain C++ calls it in play) for X3DAudio::EvaluateCurve sub_82480818.
+// No adapter (removed 2026-10-28: only Calculate's plain C++ calls it in play) for X3DAudio::Curves sub_82480918.
+// No adapter (removed 2026-10-28: only Matrix's plain C++ calls it in play) for X3DAudio::Pan sub_82480F80.
+// No adapter (removed 2026-10-28: only Calculate's plain C++ calls it in play) for X3DAudio::Matrix sub_82481390.
+// No adapter (removed 2026-10-28: only Calculate's plain C++ calls it in play) for X3DAudio::Cone sub_82480BA8.
+// No adapter (removed 2026-10-28: only Calculate's plain C++ calls it in play) for X3DAudio::Doppler sub_82480E90.
+// No adapter (removed 2026-10-28: only CarSound::Update3D's plain C++ calls it in play) for X3DAudioCalculate sub_82481880.
 ITC_CAR_SOUNDS_ADAPTER(8210F820, CarSoundsUpdate3D)
 
 extern "C" REX_FUNC(sub_82110258) {
