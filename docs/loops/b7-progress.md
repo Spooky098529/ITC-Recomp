@@ -102,7 +102,18 @@ file's history. What's left to see in a drive, from every run:
   `RouteDistance`, `StartRoute`, `FollowRoute`. Validated
   (`itc_2235`, replay `itc_2236` ok, free-start path: 35 of 35 harness
   lines, 2 in the attract race, 5 in the replay, 28 to drive).
-  Migration agent 2 running.
+  Migration 2 done (66b8f50..0af672e; three subagents one at a time):
+  `Begin`, `FollowRoute`, `RaceTick`, `StartRoute` with
+  `RouteDistance`, `OnGo`, `RaceStates::Init` (split in two, its 87
+  transitions checked against the listing); 43 of 63 in play ours,
+  14 more Native; `itc_2251`: 8 s (the harnesses 30 s), 0 errors,
+  every harness 0 differing but the expected groups; no frame dump
+  (only `Init`, `Create`, `Reset`, `Begin` run in the attract race).
+  Left: none ready (the rest waits on the loading screen, the archive's
+  queue, the cars put back, the input recordings, the scene models'
+  load poll, the player's items and achievements, the race event's
+  lookups, the two-player cameras, the core). Validation agent
+  running.
 
 ## Done
 
@@ -167,6 +178,8 @@ This run's groups: `expected-differences.md` (the "08:36 run" lines).
   known 564, unknown 3294).
 - After the race states' migration 1: ours 2532, work left 3927
   (wrapped 103, known 530, unknown 3294).
+- After the race states' migration 2: ours 2540, work left 3920
+  (wrapped 103, known 523, unknown 3294).
 
 ## Stopped
 

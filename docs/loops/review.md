@@ -161,6 +161,18 @@ When the user has reviewed a run's section, its heading gets
   entry); `MapToSection`'s walk described. Exports added:
   `race_setup::CopyCourseRoute`, `RaceWorldOpponentsCall`,
   `RaceWorldStartCalls`, `RaceWorldListRacersOriginal`.
+- The race's states, migration 2 (66b8f50..0af672e): 19 rows in
+  `race-states.md` (14 more Native; `sub_82163000` and `RouteDistance`
+  Native with no adapter). `race_setup::RouteCopiesNative` and
+  `CopyCourseRoute` take an optional `to` offset (default 96; callers
+  unchanged). For review: `RaceTick`'s and `OnGo`'s harness cases give
+  each racer 1 to 3 sections (with an empty list `FollowRoute` writes
+  over the slot's manager entry, in the original too; in play
+  `StartRoute` always lists the start first); `StartRoute`'s harness
+  routes are built, not the game's (the real routes loop on random
+  links); `RaceTick`, `OnGo` and `StartRoute` run the original whole
+  where the course route's memcpy copies aren't native, and `RaceTick`
+  also with +7220's 0x8 (`sub_821653E8`, never seen).
 
 ## Run 2026-10-27 22:31 (`b7-loop-27-10-26`)
 
