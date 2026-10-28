@@ -239,6 +239,12 @@ constexpr uint32_t kStartFrameBytes = 5856;
 // Whether both copies of course route `index` (CourseRoutes::Get's into
 // frame + out, memcpy's from there into frame + 96) are made natively.
 bool RouteCopiesNative(uint32_t frame, uint32_t out, uint32_t index);
+// A caller's copy of course route `index`: CourseRoutes::Get into the
+// caller's frame at +`out` (its own frame below, frame - 4480), then memcpy
+// (from the return address `caller`) of that to the caller's +96. Returns
+// the copy's first word. Only after RouteCopiesNative said yes.
+uint32_t CopyCourseRoute(uint8_t* base, uint32_t frame, uint32_t out, uint32_t index,
+                         uint32_t caller);
 // Route::Set (sub_82101A10): a 16-byte route: +0 = index, +4 = location
 // (index + 20 when location is 48, signed compare); the course route copied
 // (CourseRoutes::Get(index), memcpy); +8 = its word +0, +12 = its last

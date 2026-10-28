@@ -2,6 +2,7 @@
 // (docs/functions/race-states.md).
 
 #include "race_states/race_states.h"
+#include "race_states/steps.h"
 
 #include "ai_drivers/ai_drivers.h"
 #include "base/log.h"
@@ -17,47 +18,13 @@ namespace race_states {
 using namespace car_physics::ops;
 namespace va = vehicle_accessors;
 
+using namespace steps;
+
 namespace {
 
 constexpr uint32_t kProgressBytes = 7248;
-constexpr uint32_t kEntries = 2188;     // the results entries, 972 bytes each
-constexpr uint32_t kEntryBytes = 972;
-constexpr uint32_t kSlotBytes = 536;
 constexpr uint32_t kTickSeconds = 0x826193A4;  // 1/30
 constexpr uint32_t kThousand = 0x82001BDC;     // 1000.0
-
-uint32_t Load(uint8_t* base, uint32_t address) {
-  return guest::LoadU32(base, address);
-}
-void Store(uint8_t* base, uint32_t address, uint32_t value) {
-  guest::StoreU32(base, address, value);
-}
-
-// fctiwz's low word, as the translation leaves it (stfiwx).
-uint32_t FctiwzWord(double value) {
-  if (std::isnan(value)) {
-    return 0x80000000u;
-  }
-  if (value >= double(INT32_MAX)) {
-    return uint32_t(INT32_MAX);
-  }
-  if (value <= -2147483649.0) {
-    return 0x80000000u;
-  }
-  return uint32_t(int32_t(value));
-}
-
-// A route section's record: the route file's table (+12) at the section's
-// low 16 bits (the originals' rlwinm by 2 into bits 14-29).
-uint32_t SectionRecord(uint8_t* base, uint32_t section) {
-  const uint32_t file = Load(base, race_world::kRoute);
-  return Load(base, Load(base, file + 12) + ((section << 2) & 0x3FFFC));
-}
-
-// A section's link `link` (a signed halfword at +28 + 4 x link).
-int32_t Link(uint8_t* base, uint32_t record, uint32_t link) {
-  return int16_t(guest::LoadU16(base, record + ((link + 7) << 2)));
-}
 
 }  // namespace
 
@@ -178,16 +145,7 @@ void TickFraction(uint8_t* base, uint32_t progress, uint32_t index, uint32_t tim
   f = Fmuls(f, Lfs(base, kTickSeconds));
   f = Fmuls(f, Lfs(base, kThousand));
   Store(base, frame + 80, FctiwzWord(f));
-  const uint32_t w = Load(base, time);
-  const uint64_t seconds = std::rotl(w, 22) & 0x3F;
-  const uint64_t minutes = std::rotl(w, 16) & 0x7FFF;
-  uint64_t ms = (minutes * 60 + seconds) * 1000;
-  ms += w & 0x3FF;
-  // subfic, subfe: -1 with the sign bit, else 0; masked to 32 bits less the
-  // low bit, plus one: 0xFFFFFFFF or 1, a factor as mullw takes it.
-  const uint64_t sign = (w & 0x80000000u) != 0 ? 0xFFFFFFFEull + 1 : 1;
-  const int64_t product = int64_t(int32_t(uint32_t(ms))) * int64_t(int32_t(uint32_t(sign)));
-  const uint64_t r3 = uint64_t(product) - uint64_t(Load(base, frame + 80));
+  const uint64_t r3 = uint64_t(Unpack(Load(base, time))) - uint64_t(Load(base, frame + 80));
   Store(base, time, uint32_t(race_setup::TimePack(r3)));
 }
 

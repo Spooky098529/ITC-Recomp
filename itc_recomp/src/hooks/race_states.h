@@ -41,4 +41,18 @@ void RaceStatesSectionsBefore(PPCContext& ctx, uint8_t* base);
 // 1.
 void RaceStatesPositionNotAfter(PPCContext& ctx, uint8_t* base);
 
+// The race's checks: r3 = out, r4 = the progress, r5 = the entry's index
+// (DrainSp: r3 = out, r4 = the progress); r3 = out.
+// RaceProgress::CountHits sub_82164F08, Damage sub_82164228, DrainSp
+// sub_821650A0, CheckLap sub_82164090 (the original where the course
+// route's copies aren't native) and CheckFinish sub_82164E18.
+void RaceStatesCountHits(PPCContext& ctx, uint8_t* base);
+void RaceStatesDamage(PPCContext& ctx, uint8_t* base);
+void RaceStatesDrainSp(PPCContext& ctx, uint8_t* base);
+void RaceStatesCheckLap(PPCContext& ctx, uint8_t* base);
+void RaceStatesCheckFinish(PPCContext& ctx, uint8_t* base);
+// RoutePosition::MapToSection sub_82163930: r3 = a section, r4 = &a
+// position; r3 = 0 or 1.
+void RaceStatesMapToSection(PPCContext& ctx, uint8_t* base);
+
 }  // namespace hooks

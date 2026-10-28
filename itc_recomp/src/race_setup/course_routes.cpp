@@ -545,6 +545,11 @@ uint32_t CopyRoute(uint8_t* base, uint32_t frame, uint32_t out, uint32_t index, 
 
 }  // namespace
 
+uint32_t CopyCourseRoute(uint8_t* base, uint32_t frame, uint32_t out, uint32_t index,
+                         uint32_t caller) {
+  return CopyRoute(base, frame, out, index, caller);
+}
+
 bool RouteCopiesNative(uint32_t frame, uint32_t out, uint32_t index) {
   if (!native::Buffers_NativeMemcpy()) {
     return false;

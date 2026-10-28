@@ -23,6 +23,7 @@
 
 #include <fmt/format.h>
 
+#include <bit>
 #include <vector>
 
 ITC_FLAG_DECLARE(bool, native_race_states);
@@ -420,6 +421,387 @@ void Sections(Context& h) {
   }
 }
 
+// --- The race's checks ---
+
+// Time::Sub has no adapter (its only caller, CheckLap, is native): its
+// register step here.
+void NativeTimeSub(PPCContext& ctx, uint8_t* base) {
+  ctx.fpscr.disableFlushMode();
+  ctx.r3.u64 = rs::TimeSub(base, ctx.r3.u32, ctx.r4.u32);
+}
+
+uint32_t RandomTime(Random& r) {
+  return r.Below(4) == 0 ? uint32_t(r.Next())
+                         : (uint32_t(r.Below(2)) << 31) | (r.Below(30) << 16) |
+                               (r.Below(60) << 10) | r.Below(1000);
+}
+
+// The slots' manager entries in the scratch area (+0 the flags, +20 the
+// vehicle 0 to 6), the vehicles' flags +6148 among 0x1, 0x2, 0x80, 0x81,
+// 0x40 and random.
+void SetUpSlots(Context& h, const Block& progress, const Block& vehicles, Random& r) {
+  guest::StoreU32(h.base, kVehicles, vehicles.address);
+  const uint32_t car_flags[] = {0x1, 0x2, 0x80, 0x81, 0x40, 0x0, 0x3};
+  for (uint32_t i = 0; i < 4; i++) {
+    const uint32_t entry = h.data + 32 * i;
+    guest::StoreU32(h.base, progress.address + 48 + 536 * i, entry);
+    const uint32_t flags[] = {0x4, 0x8, 0x0, 0x41, 0x4004};
+    guest::StoreU32(h.base, entry, r.Below(4) == 0 ? uint32_t(r.Next()) : flags[r.Below(5)]);
+    guest::StoreU32(h.base, entry + 20, r.Below(7));
+  }
+  for (uint32_t k = 0; k < 7; k++) {
+    const uint32_t car = vehicles.address + 6272 * k;
+    guest::StoreU32(h.base, car + 6148,
+                    r.Below(6) == 0 ? uint32_t(r.Next()) : car_flags[r.Below(7)]);
+  }
+}
+
+void Checks(Context& h, const Block& progress, const Block& vehicles) {
+  {
+    Results results("Time::Sub (sub_82162230)");
+    for (uint64_t seed = 0; seed < 64; seed++) {
+      Outputs out[2];
+      for (int v = 0; v < 2; v++) {
+        Random r(seed * 79 + 43);
+        WriteRandom(h.base, h.data, kScratchBytes, r);
+        guest::StoreU32(h.base, h.data, RandomTime(r));
+        guest::StoreU32(h.base, h.data + 4, RandomTime(r));
+        PPCContext t = CallContext(h);
+        t.r3.u64 = h.data;
+        t.r4.u64 = h.data + 4;
+        (v == 0 ? __imp__sub_82162230 : NativeTimeSub)(t, h.base);
+        out[v].Word(t.r3.u32);
+        out[v].Word(uint32_t(t.r3.u64 >> 32));
+      }
+      results.Check(out[0], out[1], fmt::format("seed {}", seed));
+    }
+    results.Report();
+  }
+  {
+    // The vehicle's collision flags +6152 and strength +6160 (around 230,
+    // NaNs among them), the slot's holds (+44, +40) 0 to 2, the checks
+    // +7224 with 0x200, 0x400 or neither, the lap (+6096 set or not, E
+    // +832 0 to 3) and its counts near 999.
+    Results results("RaceProgress::CountHits (sub_82164F08)");
+    for (uint64_t seed = 0; seed < 64; seed++) {
+      Outputs out[2];
+      for (int v = 0; v < 2; v++) {
+        Random r(seed * 83 + 47);
+        Globals globals(h.base, {kVehicles});
+        WriteRandom(h.base, h.data, kScratchBytes, r);
+        WriteRandom(h.base, progress.address, kProgressBytes, r);
+        SetUpSlots(h, progress, vehicles, r);
+        const uint32_t index = r.Below(4);
+        const uint32_t slot = progress.address + 536 * index;
+        const uint32_t e = progress.address + 972 * index;
+        const uint32_t car = vehicles.address +
+                             6272 * guest::LoadU32(h.base, h.data + 32 * index + 20);
+        guest::StoreU32(h.base, car + 6152, r.Below(4) == 0 ? uint32_t(r.Next()) : r.Below(4));
+        const uint32_t strengths[] = {0x43660000, 0x43670000, 0x43650000, 0x7FC00000, 0};
+        guest::StoreU32(h.base, car + 6160,
+                        r.Below(2) == 0 ? strengths[r.Below(5)] : RandomFloat(r, 500.0f));
+        guest::StoreU32(h.base, slot + 44, r.Below(3));
+        guest::StoreU32(h.base, slot + 40, r.Below(3));
+        const uint32_t checks[] = {0x200, 0x400, 0x600, 0x0, 0x417};
+        guest::StoreU32(h.base, progress.address + 7224, checks[r.Below(5)]);
+        guest::StoreU32(h.base, progress.address + 6096, r.Below(2));
+        const uint32_t lap = r.Below(4);
+        guest::StoreU32(h.base, e + 3020, lap);
+        guest::StoreU32(h.base, e + 76 * lap + 2276, r.Below(2) ? 998 + r.Below(3) : r.Below(5));
+        guest::StoreU32(h.base, e + 76 * lap + 2280, r.Below(2) ? 998 + r.Below(3) : r.Below(5));
+        PPCContext t = CallContext(h);
+        t.r3.u64 = h.data + 512;
+        t.r4.u64 = progress.address;
+        t.r5.u64 = index;
+        (v == 0 ? Original<__imp__sub_82164F08> : hooks::RaceStatesCountHits)(t, h.base);
+        out[v].Bytes(Read(h.base, progress.address, kProgressBytes));
+        out[v].Bytes(Read(h.base, h.data + 512, 8));
+        out[v].Word(t.r3.u32);
+      }
+      results.Check(out[0], out[1], fmt::format("seed {}", seed));
+    }
+    results.Report();
+  }
+  {
+    // The vehicle's flags (human or not), its SP (E +784) against a quarter
+    // of its start (+788), its collision object (+340, in the scratch area)
+    // with a contact (+240) or none: the contact's object word (+0) with its
+    // flags' top byte (+4) 0 or not, its strength (+64); the progress's
+    // factors +7232 and +7236.
+    Results results("RaceProgress::Damage (sub_82164228)");
+    for (uint64_t seed = 0; seed < 64; seed++) {
+      Outputs out[2];
+      for (int v = 0; v < 2; v++) {
+        Random r(seed * 89 + 53);
+        Globals globals(h.base, {kVehicles});
+        WriteRandom(h.base, h.data, kScratchBytes, r);
+        WriteRandom(h.base, progress.address, kProgressBytes, r);
+        SetUpSlots(h, progress, vehicles, r);
+        PPCContext t = CallContext(h);
+        const uint32_t frame = t.r1.u32 - 160;
+        WriteRandom(h.base, frame, 160, r);
+        const uint32_t index = r.Below(4);
+        const uint32_t e = progress.address + 972 * index;
+        const uint32_t car = vehicles.address +
+                             6272 * guest::LoadU32(h.base, h.data + 32 * index + 20);
+        const uint32_t sps[] = {12000, 3001, 3000, 2999, 100, 0, 0xFFFFFF00u};
+        guest::StoreU32(h.base, e + 2972, sps[r.Below(7)]);
+        guest::StoreU32(h.base, e + 2976, r.Below(2) ? 12000 : sps[r.Below(7)]);
+        const uint32_t object = h.data + 1024;
+        const uint32_t contact = h.data + 1536;
+        guest::StoreU32(h.base, car + 340, object);
+        guest::StoreU32(h.base, object + 240, r.Below(4) == 0 ? 0 : contact);
+        guest::StoreU32(h.base, contact + 0, r.Below(2) ? 0 : uint32_t(r.Next()) | 1);
+        guest::StoreU32(h.base, contact + 4, r.Below(2) ? r.Below(0x1000000) : uint32_t(r.Next()));
+        guest::StoreU32(h.base, contact + 64, RandomFloat(r, 3000.0f));
+        guest::StoreU32(h.base, progress.address + 7232, RandomFloat(r, 4.0f));
+        guest::StoreU32(h.base, progress.address + 7236, RandomFloat(r, 4.0f));
+        t.r3.u64 = h.data + 512;
+        t.r4.u64 = progress.address;
+        t.r5.u64 = index;
+        (v == 0 ? Original<__imp__sub_82164228> : hooks::RaceStatesDamage)(t, h.base);
+        out[v].Bytes(Read(h.base, progress.address, kProgressBytes));
+        out[v].Bytes(Read(h.base, h.data + 512, 8));
+        out[v].Bytes(Read(h.base, frame + 80, 16));
+        out[v].Word(t.r3.u32);
+      }
+      results.Check(out[0], out[1], fmt::format("seed {}", seed));
+    }
+    results.Report();
+  }
+  {
+    // 0 to 4 entries (now and then below 0): their distances (+824, some
+    // equal, NaNs among them), SP (+784, some at 0 or below), slots' places
+    // (+568) 0 to 5, the slots' entries' flags 0x4 and 0x8, the vehicles'
+    // flags as SetUpSlots.
+    Results results("RaceProgress::DrainSp (sub_821650A0)");
+    for (uint64_t seed = 0; seed < 64; seed++) {
+      Outputs out[2];
+      for (int v = 0; v < 2; v++) {
+        Random r(seed * 97 + 59);
+        Globals globals(h.base, {kVehicles});
+        WriteRandom(h.base, h.data, kScratchBytes, r);
+        WriteRandom(h.base, progress.address, kProgressBytes, r);
+        SetUpSlots(h, progress, vehicles, r);
+        PPCContext t = CallContext(h);
+        const uint32_t frame = t.r1.u32 - 224;
+        WriteRandom(h.base, frame, 224, r);
+        guest::StoreU32(h.base, progress.address + 2184,
+                        seed % 16 == 0 ? uint32_t(-int32_t(r.Below(2))) : r.Below(5));
+        for (uint32_t i = 0; i < 4; i++) {
+          const uint32_t e = progress.address + 2188 + 972 * i;
+          guest::StoreU32(h.base, e + 824,
+                          r.Below(8) == 0 ? RandomFloat(r, 500.0f)
+                                          : std::bit_cast<uint32_t>(float(r.Below(400))));
+          const uint32_t sps[] = {12000, 1, 0, 0xFFFFFFF0u, 500};
+          guest::StoreU32(h.base, e + 784, r.Below(2) ? r.Below(14000) : sps[r.Below(5)]);
+          guest::StoreU32(h.base, progress.address + 40 + 536 * i + 568, r.Below(6));
+        }
+        t.r3.u64 = h.data + 512;
+        t.r4.u64 = progress.address;
+        (v == 0 ? Original<__imp__sub_821650A0> : hooks::RaceStatesDrainSp)(t, h.base);
+        out[v].Bytes(Read(h.base, progress.address, kProgressBytes));
+        out[v].Bytes(Read(h.base, h.data, 128));
+        out[v].Bytes(Read(h.base, h.data + 512, 8));
+        out[v].Bytes(Read(h.base, frame + 72, 12));
+        out[v].Word(t.r3.u32);
+      }
+      results.Check(out[0], out[1], fmt::format("seed {}", seed));
+    }
+    results.Report();
+  }
+}
+
+// A position on the route: one of its sections and a slice within it (the
+// walks of RoutePosition::MapToSection read the slices' centers from the
+// section's end to the slice: a slice past it would walk 65,536 of them).
+void ValidPosition(uint8_t* base, uint32_t address, const tr::Route& route, Random& r) {
+  const uint32_t section = r.Below(route.sections);
+  guest::StoreU16(base, address + 0, uint16_t(section));
+  guest::StoreU16(base, address + 2, uint16_t(r.Below(route.Slices(section))));
+}
+
+// The route checks over a random route: the vehicle's track position (its
+// identity +4) a random position; CheckLap's course route (+6076, 0 to 22,
+// whose sections the route's table maps to the test sections), its lap
+// (+6096 set or not, E +832 0 to 2) with 0 to 5 laps done and their times,
+// the laps' distances (+7160) and E +824 below or above them; CheckFinish's
+// finish (+6088) a random position, +7156 against E +824.
+void RouteChecks(Context& h, const Block& progress, const Block& vehicles) {
+  const Block area(tr::kRouteBytes + 0x100);
+  const Block table(4 * tr::kTableEntries);
+  if (!area.address || !table.address) {
+    ITC_LOG_ERROR("harness: race_states: no block from the allocation layer");
+    return;
+  }
+  tr::FillTable(h.base, table.address, area.address);
+  const auto set_up = [&](Random& r, tr::Route& route) {
+    WriteRandom(h.base, area.address, area.bytes, r);
+    route = tr::BuildRoute(h.base, area.address, table.address, r);
+    guest::StoreU32(h.base, track_route::kRoute, area.address + tr::kFile);
+    WriteRandom(h.base, h.data, kScratchBytes, r);
+    WriteRandom(h.base, progress.address, kProgressBytes, r);
+    SetUpSlots(h, progress, vehicles, r);
+  };
+  {
+    // The position on the section itself, on another of the same kind and
+    // slice count, sharing a back link, or elsewhere (a walk).
+    Results results("RoutePosition::MapToSection (sub_82163930)");
+    for (uint64_t seed = 0; seed < 160; seed++) {
+      Outputs out[2];
+      for (int v = 0; v < 2; v++) {
+        Random r(seed * 101 + 61);
+        Globals globals(h.base, {track_route::kRoute, kVehicles});
+        tr::Route route;
+        set_up(r, route);
+        PPCContext t = CallContext(h);
+        WriteRandom(h.base, t.r1.u32 - 128, 128, r);
+        const uint32_t position = h.data + 2048;
+        ValidPosition(h.base, position, route, r);
+        uint32_t section = r.Below(route.sections);
+        if (r.Below(6) == 0) {
+          section = guest::LoadU16(h.base, position);
+        } else if (r.Below(4) == 0) {
+          section = uint32_t(r.Next());
+        }
+        if (r.Below(3) == 0) {
+          // A back link shared.
+          const uint32_t a = route.Address(section & 0xFFFF);
+          const uint32_t p = route.Address(guest::LoadU16(h.base, position));
+          guest::StoreU16(h.base, p + 28 + 4 * (3 + r.Below(3)),
+                          guest::LoadU16(h.base, a + 28 + 4 * (3 + r.Below(3))));
+        }
+        t.r3.u64 = section;
+        t.r4.u64 = position;
+        (v == 0 ? Original<__imp__sub_82163930> : hooks::RaceStatesMapToSection)(t, h.base);
+        out[v].Word(guest::LoadU32(h.base, position));
+        out[v].Bytes(Read(h.base, t.r1.u32 - 96, 64));
+        out[v].Word(t.r3.u32);
+        out[v].Word(uint32_t(t.r3.u64 >> 32));
+      }
+      results.Check(out[0], out[1], fmt::format("seed {}", seed));
+    }
+    results.Report();
+  }
+  {
+    Results results("RaceProgress::CheckLap (sub_82164090)");
+    uint32_t laps = 0;
+    for (uint64_t seed = 0; seed < 48; seed++) {
+      Outputs out[2];
+      // A first run of the original (v -1, not compared) gives the next
+      // lap's position in the course route's copy; two cases in three then
+      // put the car on it (its slice 0 to 2 past it) and far enough along.
+      uint32_t lap_position = 0xFFFFFFFFu;
+      for (int v = -1; v < 2; v++) {
+        Random r(seed * 103 + 67);
+        Globals globals(h.base, {track_route::kRoute, kVehicles});
+        tr::Route route;
+        set_up(r, route);
+        PPCContext t = CallContext(h);
+        const uint32_t frame = t.r1.u32 - 544;
+        WriteRandom(h.base, frame - 32, 576, r);
+        const uint32_t index = r.Below(4);
+        const uint32_t e = progress.address + 972 * index;
+        const uint32_t car = vehicles.address +
+                             6272 * guest::LoadU32(h.base, h.data + 32 * index + 20);
+        ValidPosition(h.base, car + 5236, route, r);
+        guest::StoreU32(h.base, progress.address + 6076, r.Below(23));
+        const uint32_t by_lap = r.Below(2);
+        guest::StoreU32(h.base, progress.address + 6096, by_lap);
+        const uint32_t lap = by_lap ? r.Below(3) : 0;  // the record the function reads
+        guest::StoreU32(h.base, e + 3020, lap);
+        const uint32_t record = e + 76 * lap + 2208;
+        const uint32_t done = r.Below(8) == 0 ? 4 + r.Below(3) : r.Below(4);
+        guest::StoreU32(h.base, record + 60, done);
+        for (uint32_t k = 0; k < 8; k++) {
+          guest::StoreU32(h.base, record + 4 * k, RandomTime(r));
+        }
+        guest::StoreU32(h.base, e + 2204, RandomTime(r));
+        for (uint32_t k = 0; k < 15; k++) {
+          guest::StoreU32(h.base, progress.address + 7160 + 4 * k,
+                          std::bit_cast<uint32_t>(float(r.Below(4000))));
+        }
+        guest::StoreU32(h.base, e + 3012, r.Below(8) == 0 ? RandomFloat(r, 5000.0f)
+                                                          : std::bit_cast<uint32_t>(
+                                                                float(r.Below(4000))));
+        guest::StoreU32(h.base, car + 48, RandomFloat(r, 90.0f));
+        guest::StoreU32(h.base, car + 6228, RandomFloat(r, 2.0f));
+        const uint32_t past = r.Below(3);
+        if (v >= 0 && seed % 3 != 0 && lap_position != 0xFFFFFFFFu) {
+          guest::StoreU16(h.base, car + 5236, uint16_t(lap_position >> 16));
+          guest::StoreU16(h.base, car + 5238, uint16_t(lap_position + past));
+          guest::StoreU32(h.base, e + 3012, std::bit_cast<uint32_t>(4000.0f));
+        }
+        t.r3.u64 = h.data + 512;
+        t.r4.u64 = progress.address;
+        t.r5.u64 = index;
+        (v <= 0 ? Original<__imp__sub_82164090> : hooks::RaceStatesCheckLap)(t, h.base);
+        if (v < 0) {
+          const uint32_t next = done + 1;
+          lap_position = next < 5 ? guest::LoadU32(h.base, frame + 96 + 4 * next) : 0xFFFFFFFFu;
+          continue;
+        }
+        laps += v == 1 && guest::LoadU32(h.base, record + 60) != done ? 1 : 0;
+        out[v].Bytes(Read(h.base, progress.address, kProgressBytes));
+        out[v].Bytes(Read(h.base, h.data + 512, 8));
+        out[v].Bytes(Read(h.base, frame + 80, 8));
+        out[v].Bytes(Read(h.base, frame + 96, 184));
+        out[v].Bytes(Read(h.base, frame + 288, 184));
+        out[v].Word(t.r3.u32);
+      }
+      results.Check(out[0], out[1], fmt::format("seed {}", seed));
+    }
+    results.Report();
+    ITC_LOG_INFO("harness: race_states: CheckLap recorded a lap in {} of 48 cases", laps);
+  }
+  {
+    Results results("RaceProgress::CheckFinish (sub_82164E18)");
+    uint32_t finished = 0;
+    for (uint64_t seed = 0; seed < 64; seed++) {
+      Outputs out[2];
+      for (int v = 0; v < 2; v++) {
+        Random r(seed * 107 + 71);
+        Globals globals(h.base, {track_route::kRoute, kVehicles});
+        tr::Route route;
+        set_up(r, route);
+        PPCContext t = CallContext(h);
+        const uint32_t frame = t.r1.u32 - 144;
+        WriteRandom(h.base, frame - 32, 176, r);
+        const uint32_t index = r.Below(4);
+        const uint32_t e = progress.address + 972 * index;
+        const uint32_t car = vehicles.address +
+                             6272 * guest::LoadU32(h.base, h.data + 32 * index + 20);
+        ValidPosition(h.base, car + 5236, route, r);
+        if (r.Below(2) == 0) {
+          guest::StoreU32(h.base, progress.address + 6088, guest::LoadU32(h.base, car + 5236));
+        } else {
+          ValidPosition(h.base, progress.address + 6088, route, r);
+        }
+        guest::StoreU32(h.base, progress.address + 7156,
+                        std::bit_cast<uint32_t>(float(r.Below(4000))));
+        guest::StoreU32(h.base, e + 3012, r.Below(8) == 0 ? RandomFloat(r, 5000.0f)
+                                                          : std::bit_cast<uint32_t>(
+                                                                float(r.Below(4000))));
+        guest::StoreU32(h.base, e + 2204, RandomTime(r));
+        guest::StoreU32(h.base, car + 48, RandomFloat(r, 90.0f));
+        guest::StoreU32(h.base, car + 6228, RandomFloat(r, 2.0f));
+        t.r3.u64 = h.data + 512;
+        t.r4.u64 = progress.address;
+        t.r5.u64 = index;
+        (v == 0 ? Original<__imp__sub_82164E18> : hooks::RaceStatesCheckFinish)(t, h.base);
+        finished += v == 1 && guest::LoadU32(h.base, h.data + 512) == 1 ? 1 : 0;
+        out[v].Bytes(Read(h.base, progress.address, kProgressBytes));
+        out[v].Bytes(Read(h.base, h.data + 512, 8));
+        out[v].Bytes(Read(h.base, frame + 80, 4));
+        out[v].Word(t.r3.u32);
+      }
+      results.Check(out[0], out[1], fmt::format("seed {}", seed));
+    }
+    results.Report();
+    ITC_LOG_INFO("harness: race_states: CheckFinish finished {} of 64 cases", finished);
+  }
+}
+
 }  // namespace
 
 void RaceStates(Context& h) {
@@ -432,6 +814,8 @@ void RaceStates(Context& h) {
   }
   Progress(h, progress, vehicles, manager);
   Sections(h);
+  Checks(h, progress, vehicles);
+  RouteChecks(h, progress, vehicles);
 }
 
 }  // namespace harness

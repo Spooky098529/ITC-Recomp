@@ -74,6 +74,37 @@ void TickFraction(uint8_t* base, uint32_t progress, uint32_t index, uint32_t tim
 // the original's 1,728 bytes.
 void Rank(uint8_t* base, uint32_t progress, uint32_t frame);
 
+// --- The race's checks each tick (src/race_states/race_checks.cpp): r3 an
+// out pair (an end and a reason), the progress, a results entry `index`
+// (E = +2188 + 972 i, its slot S = +40 + 536 i); each returns `out` (the
+// original's r3) ---
+
+// Time::Sub (sub_82162230, never seen in play): two packed times (the words
+// at `a` and `b`) unpacked to signed milliseconds, a's less b's packed again
+// (Time::Pack). Returns its r3.
+uint64_t TimeSub(uint8_t* base, uint32_t a, uint32_t b);
+// RaceProgress::CountHits (sub_82164F08): see the row. `frame`: the
+// original's 128 bytes (nothing kept in it).
+uint32_t CountHits(uint8_t* base, uint32_t out, uint32_t progress, uint32_t index);
+// RaceProgress::Damage (sub_82164228): see the row; the temporaries at
+// `frame` + 80 and + 88 as the original leaves them. `frame`: its 160
+// bytes.
+uint32_t Damage(uint8_t* base, uint32_t out, uint32_t progress, uint32_t index, uint32_t frame);
+// RaceProgress::DrainSp (sub_821650A0): see the row; the temporaries at
+// `frame` + 72 and + 80 as the original leaves them (its debug prints, the
+// empty sub_82106540, not made). `frame`: its 224 bytes.
+uint32_t DrainSp(uint8_t* base, uint32_t out, uint32_t progress, uint32_t frame);
+// RaceProgress::CheckLap (sub_82164090): see the row; the course route
+// copied as the original (CourseRoutes::Get at `frame` + 288, memcpy to +
+// 96), the positions at + 80 and + 84. `frame`: its 544 bytes.
+// CheckLapNative says first whether the copies are made natively.
+bool CheckLapNative(uint8_t* base, uint32_t progress, uint32_t frame);
+uint32_t CheckLap(uint8_t* base, uint32_t out, uint32_t progress, uint32_t index, uint32_t frame);
+// RaceProgress::CheckFinish (sub_82164E18): see the row; the position at
+// `frame` + 80. `frame`: its 144 bytes.
+uint32_t CheckFinish(uint8_t* base, uint32_t out, uint32_t progress, uint32_t index,
+                     uint32_t frame);
+
 // --- The route's sections and positions ---
 
 // RouteSections::Beside (sub_82162F78): 1 when `a` and `b` are the same
@@ -89,5 +120,12 @@ int64_t SectionsBefore(uint8_t* base, uint32_t a, uint32_t b, uint32_t sp, bool*
 // RoutePosition::NotAfter (sub_821622A8): 1 when the position at `a`
 // (signed halfwords section, slice) is before or at `b`'s, else 0.
 uint32_t PositionNotAfter(uint8_t* base, uint32_t a, uint32_t b);
+// RoutePosition::MapToSection (sub_82163930): the position at `position`
+// put on `section` where it can be (see the row): 1, or 0 when the two
+// share a back link (3 to 5) and the position's slice is at or past the
+// section's slice count. The original's temporaries below `sp` (-96 to -33,
+// the dot products' at -32 rounded down to 16) as it leaves them (a leaf
+// without a frame; its register saves at -16 and -8 not written).
+uint32_t MapToSection(uint8_t* base, uint32_t section, uint32_t position, uint32_t sp);
 
 }  // namespace race_states
