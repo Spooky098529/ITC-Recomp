@@ -2475,6 +2475,25 @@ std::string CompressText(const CompressCase& c) {
       c.source_pitch, c.flags, std::bit_cast<uint32_t>(c.alpha_reference));
 }
 
+// XGCompressSurface's register steps (its adapter went: Vinyl::Compress,
+// its only caller in play, calls the plain C++): r3 to r10, the caller's
+// +84, +92 and +100, f1; the original whole where the plain C++ hands back
+// (DXN and CTX1 destinations, a source copied first, a destination swapped
+// after). r3 as the original leaves it.
+void NativeCompressSurface(PPCContext& ctx, uint8_t* base) {
+  ctx.fpscr.disableFlushMode();
+  const texture_compression::CompressArguments arguments{
+      ctx.r3.u32, ctx.r4.u32, ctx.r5.u32, ctx.r6.u32, ctx.r7.u32,
+      ctx.r8.u32, ctx.r9.u32, ctx.r10.u32, ctx.f1.f64};
+  const auto r3 = texture_compression::CompressSurface(
+      base, arguments, ctx.r1.u32, hooks::TextureCompressionGuestCall(ctx, base));
+  if (!r3) {
+    __imp__sub_8235AAC0(ctx, base);
+    return;
+  }
+  ctx.r3.s64 = int32_t(*r3);
+}
+
 // The case run on both sides (the destination at `area`, the source after
 // it, then the rectangle and the point): r3, the destination's and the
 // source's bytes, XGCompressSurface's locals (its r1 + 112 to + 400: the
@@ -2519,7 +2538,7 @@ void RunCompress(Context& h, Results& results, const CompressCase& c, uint32_t a
       __imp__sub_8235AAC0(t, h.base);
       if (t.r3.u32 == 0) compress_succeeded++;
     } else {
-      hooks::TextureCompressionCompressSurface(t, h.base);
+      NativeCompressSurface(t, h.base);
     }
     ITC_FLAG(native_texture_compression) = true;
     out[v].Word(t.r3.u32);

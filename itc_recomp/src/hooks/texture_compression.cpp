@@ -3,7 +3,7 @@
 // register steps the harness shares (hooks/texture_compression.h). The
 // codecs are made by ImageCodec::Create and Prepare, called by
 // Blitter::Init's plain C++ (Create calls the constructors' plain C++), which
-// XGCompressSurface's calls (its adapter is what Vinyl::Compress reaches);
+// XGCompressSurface's calls (from Vinyl::Compress's plain C++);
 // the codecs' row functions and destructors are reached through their
 // vtables (from the blitter's plain C++, directly when the slots are ours),
 // the DXT4/5 block's encoder through the DXT codec's +144. The adapters of
@@ -12,10 +12,10 @@
 // EncodeBlock, Dxt45::EncodeBlockPremultiplied, ImageCodec::~ImageCodec,
 // DxtCodec::~DxtCodec, ImageCodec::ImageCodec, DxtCodec::DxtCodec, then
 // ImageCodec::Create, ImageCodec::Prepare, Blitter::Blitter, Release, Init,
-// CopyRows, ConvertRows and XGGetBlockDimensions): their callers' plain C++
-// calls theirs directly. XGCompressSurface's adapter stays (the recompiled
-// Vinyl::Compress calls it), as do those of the functions reached through
-// the codecs' vtables and the DXT codec's +144.
+// CopyRows, ConvertRows, XGGetBlockDimensions and XGCompressSurface, whose
+// only caller in play, Vinyl::Compress, is native in src/car_models/): their
+// callers' plain C++ calls theirs directly. Those of the functions reached
+// through the codecs' vtables and the DXT codec's +144 stay.
 
 #include "hooks/texture_compression.h"
 
@@ -47,8 +47,10 @@ ITC_FLAG_BOOL(native_texture_compression, true, "ITC",
               "(its CopyBlocks the original) and Blitter::ConvertRows sub_823699F8, with "
               "XGGetBlockDimensions sub_8236D3C8 and XGCompressSurface sub_8235AAC0 (its "
               "DXN, CTX1, source copy and destination swap paths, never seen in play, the "
-              "original whole), with the native heap; the functions marked Native there "
-              "are reached only through their native callers, and this switches those) "
+              "original whole; reached only from Vinyl::Compress's plain C++, which "
+              "--native_car_models switches), with the native heap; the functions marked "
+              "Native there are reached only through their native callers, and this "
+              "switches those) "
               "natively instead of through the "
               "translated code (the same block bytes; checked by "
               "--run_harnesses=texture_compression)");
@@ -143,23 +145,6 @@ void TextureCompressionDxtCodecDelete(PPCContext& ctx, uint8_t* base) {
   DeleteWith(ctx, base, tc::DxtCodecDelete, __imp__sub_823F6BC0);
 }
 
-void TextureCompressionCompressSurface(PPCContext& ctx, uint8_t* base) {
-  if (!NativeHeapActive()) {
-    __imp__sub_8235AAC0(ctx, base);
-    return;
-  }
-  ctx.fpscr.disableFlushMode();
-  const tc::CompressArguments arguments{ctx.r3.u32, ctx.r4.u32, ctx.r5.u32,  ctx.r6.u32,
-                                        ctx.r7.u32, ctx.r8.u32, ctx.r9.u32,  ctx.r10.u32,
-                                        ctx.f1.f64};
-  const auto r3 = tc::CompressSurface(base, arguments, ctx.r1.u32, TextureCompressionGuestCall(ctx, base));
-  if (!r3) {
-    __imp__sub_8235AAC0(ctx, base);
-    return;
-  }
-  ctx.r3.s64 = int32_t(*r3);
-}
-
 }  // namespace hooks
 
 #define ITC_TEXTURE_COMPRESSION_ADAPTER(address, step) \
@@ -177,4 +162,3 @@ ITC_TEXTURE_COMPRESSION_ADAPTER(823F2620, TextureCompressionDecodeA8R8G8B8Row)
 ITC_TEXTURE_COMPRESSION_ADAPTER(823F6298, TextureCompressionDxtEncodeRow)
 ITC_TEXTURE_COMPRESSION_ADAPTER(823F6B70, TextureCompressionImageCodecDelete)
 ITC_TEXTURE_COMPRESSION_ADAPTER(823F6BC0, TextureCompressionDxtCodecDelete)
-ITC_TEXTURE_COMPRESSION_ADAPTER(8235AAC0, TextureCompressionCompressSurface)

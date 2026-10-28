@@ -33,10 +33,5 @@ void TextureCompressionDxtEncodeRow(PPCContext& ctx, uint8_t* base);
 // as the original leaves it.
 void TextureCompressionImageCodecDelete(PPCContext& ctx, uint8_t* base);
 void TextureCompressionDxtCodecDelete(PPCContext& ctx, uint8_t* base);
-// XGCompressSurface sub_8235AAC0: r3 to r10, the caller's +84, +92 and +100,
-// f1. The whole original for the paths never seen in play (DXN and CTX1
-// destinations, a source copied first, a destination swapped after), or
-// without the native heap. r3 as the original leaves it.
-void TextureCompressionCompressSurface(PPCContext& ctx, uint8_t* base);
 
 }  // namespace hooks
