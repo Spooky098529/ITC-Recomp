@@ -82,4 +82,10 @@ void CarSoundsX3DDoppler(PPCContext& ctx, uint8_t* base);  // sub_82480E90
 // (EmitterAngle, Delay: never seen in play).
 void CarSoundsX3DCalculate(PPCContext& ctx, uint8_t* base);  // sub_82481880
 
+// r3 = a car sound, r4 = CarSound::Update's case flag, r5 = the vehicle: the
+// original's 288-byte frame (its prologue's saves, the back chain, its
+// locals) and X3DAudioCalculate's below it written as the originals leave
+// them; r3 as the original leaves it (Calculate's).
+void CarSoundsUpdate3D(PPCContext& ctx, uint8_t* base);  // sub_8210F820
+
 }  // namespace hooks

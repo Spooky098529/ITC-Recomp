@@ -6,6 +6,8 @@
 
 #pragma once
 
+#include "car_sounds/x3daudio.h"
+
 #include <cstdint>
 #include <optional>
 
@@ -81,5 +83,34 @@ constexpr uint32_t kMusicName = 0x820080FC;
 constexpr uint32_t kX3DAudioHandle = 0x826C5C90;
 void SoundGlobalsInit(uint8_t* base, uint32_t music_player);
 uint32_t SoundGlobalsInit3D(uint8_t* base);
+
+// sub_8210F820 CarSound::Update3D (car_sound_3d.cpp), every tick from
+// CarSound::Update for each car: r3 = the car sound, r4 = Update's case
+// flag, r5 = the vehicle (all three whole registers). The camera pass
+// (0x826BAC00, or its +592 when the race data's +0xA3AF0 is 4 and
+// [0x826C2CE8]+8 is set): the listener's position (+28, and +384) its +400,
+// its front (+4) its +464 and +472 with y 0; the emitter's position (+80,
+// and +368) the vehicle's rigid body's (+336, RigidBody::Position,
+// Vec4::Copy), or the camera's when the car is the one at the camera (view
+// mode [[0x826C2CE8]]+1860 1 and r4 1; in race mode +0xA3AF4 8 also the
+// vehicle's +6148 bit 0x1 or 0x80 by [0x826C7824]); both velocities (+40,
+// +92) from the old +384 and +368 (vectors, flush to zero on) times
+// [0x82001FD8] and [0x820021E4]; then X3DAudioCalculate's plain C++ (the
+// handle 0x826C5C90, flags 0x3D, the DSP settings +176); the output maps
+// +272 (the matrix times [0x82616C38], or [0x82002A10] times it for the car
+// at the camera) and +224 (+200, the reverb level, times it), their
+// descriptors +320 to +356; +1260 passed close; +1256 = +204. `sp` is the
+// caller's stack pointer: the original's 288-byte frame (its prologue's
+// saves, the back chain, its locals) and Calculate's below it written as
+// the originals leave them. `saves` holds the caller's registers the
+// prologues save. Returns the r3 the original leaves (Calculate's).
+struct Update3DSaves {
+  uint32_t lr;
+  uint64_t r22, r23, r24, r25, r26, r27, r28, r29, r30, r31;
+  uint64_t f23, f24, f25, f26, f27, f28, f29, f30, f31;  // the bits
+  uint8_t v126[16], v127[16];                            // as PPCContext holds them
+};
+uint64_t Update3D(uint8_t* base, uint64_t sound, uint64_t r4, uint64_t vehicle, uint32_t sp,
+                  const Update3DSaves& saves, const x3daudio::TanCall& tan);
 
 }  // namespace car_sounds

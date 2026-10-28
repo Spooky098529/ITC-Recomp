@@ -179,6 +179,7 @@ set(ITC_SOURCES
     src/hooks/car_sounds.cpp
     src/car_sounds/car_sounds.cpp
     src/car_sounds/x3daudio.cpp
+    src/car_sounds/car_sound_3d.cpp
     src/save_interface/save_interface.cpp
     src/save_interface/save_layer.cpp
     src/hooks/file_layer.cpp
@@ -492,7 +493,8 @@ set_source_files_properties(src/c_runtime/math.cpp src/ui_movies/keys.cpp
     src/texture_compression/dxt_alpha.cpp src/texture_compression/dxt_color.cpp
     src/texture_compression/dxt45.cpp src/texture_compression/codecs.cpp
     src/texture_compression/blitter.cpp src/texture_compression/compress_surface.cpp
-    src/car_models/raster.cpp src/car_models/decals.cpp src/car_sounds/x3daudio.cpp PROPERTIES
+    src/car_models/raster.cpp src/car_models/decals.cpp src/car_sounds/x3daudio.cpp
+    src/car_sounds/car_sound_3d.cpp PROPERTIES
     COMPILE_OPTIONS "-ffp-model=strict;-ffp-contract=off"
     SKIP_PRECOMPILE_HEADERS ON)
 
