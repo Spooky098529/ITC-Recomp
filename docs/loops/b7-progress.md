@@ -15,7 +15,9 @@ file's history. What's left to see in a drive, from every run:
   table and boundary log.
 - Subsystem 2 of 3 done: the file layer (below). Recorded in the
   plan's table and boundary log.
-- Subsystem 3 of 3: (next lead being picked).
+- Subsystem 3 of 3: the save system's interface over `[0x826BDC90]`
+  (`sub_8209FFB8`-`sub_820A0620`; the lead with the most ready groups,
+  12). Step: mapping (agent running).
 
 ## Done
 
