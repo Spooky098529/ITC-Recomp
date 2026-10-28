@@ -3574,6 +3574,99 @@ void StartCases(Context& h) {
     results.Report();
     ITC_LOG_INFO("harness: race_world: RollingStartTick placed the racers in {} cases", placed);
   }
+  {
+    // RaceStates::StandingStartTick on the same world, the race object its
+    // machine: its +9616 below or from 900, +9612 (the steps putting the
+    // racers back) 0 to 5, +9636 (settled) 0 or 1, +9628 near 30, +9640
+    // around 900, the fades done or not, the flags random (the mode 0, 1 or
+    // 6 as vary sets it; the System Link case, the mode 6 settled, runs the
+    // original on both sides). Compared as PlaceRolling's, with the ring,
+    // the machine's words, the sign-in watch's words and the stage's copy
+    // (its frame's +80).
+    Results results("RaceStates::StandingStartTick (sub_821692C8)");
+    const Block dispatcher(1024);
+    uint32_t steps[6] = {};
+    uint32_t before = 0;
+    uint32_t next_step = 0;
+    for (uint64_t seed = 0; seed < 48 && dispatcher.address; seed++) {
+      Outputs out[2];
+      bool skip = false;
+      uint32_t count = 0;
+      for (int v = -1; v < 2 && !skip; v++) {
+        Random r(seed * 193 + 127);
+        auto saved = globals();
+        const auto fades = SavedBytes(h.base, {{0x826A50DC, 16}, {0x826BAB3C, 4},
+                                               {0x826BAB5C, 4}, {0x826C6B04, 12}});
+        StartStandIns stand_ins;
+        if (!build(r, seed + 4000, v < 0, &count)) {
+          skip = true;
+          continue;
+        }
+        if (v < 0) {
+          continue;
+        }
+        loaded();
+        vary(r, count);
+        const bool done = r.Below(4) != 0;
+        guest::StoreU32(h.base, 0x826A50DC, done ? 0 : r.Below(2));
+        guest::StoreU32(h.base, 0x826A50E4, done ? 0 : 1);
+        guest::StoreU32(h.base, 0x826BAB3C, r.Below(2));
+        const uint32_t flags = race.address + 0x59AE4;
+        guest::StoreU32(h.base, flags, guest::LoadU32(h.base, flags) ^ (uint32_t(r.Next()) &
+                                                                         0x6101u));
+        WriteRandom(h.base, dispatcher.address, 1024, r);
+        guest::StoreU32(h.base, dispatcher.address + 804, r.Below(50));
+        guest::StoreU32(h.base, dispatcher.address + 808, r.Below(50));
+        const uint32_t m = object.address;
+        const bool putting_back = seed % 2 == 0;
+        // The steps in turn over the cases that build (both sides the same).
+        r.Below(6);
+        const uint32_t step = next_step % 6;
+        guest::StoreU32(h.base, m + 9616, putting_back ? 900 + r.Below(3) : r.Below(900));
+        guest::StoreU32(h.base, m + 9612, step);
+        guest::StoreU32(h.base, m + 9636, r.Below(2));
+        guest::StoreU32(h.base, m + 9628, 28 + r.Below(4));
+        guest::StoreU32(h.base, m + 9632, uint32_t(r.Next()));
+        guest::StoreU32(h.base, m + 9640, 899 + r.Below(4));
+        StartStandIns::Reset();
+        WriteRandom(h.base, sp - 512, 512, r);
+        PPCContext t = CallContext(h);
+        t.fpscr.disableFlushModeUnconditional();
+        t.r3.u64 = m;
+        t.r4.u64 = dispatcher.address;
+        if (v == 0) {
+          ITC_FLAG(native_race_states) = false;
+          __imp__sub_821692C8(t, h.base);
+          ITC_FLAG(native_race_states) = true;
+        } else {
+          hooks::RaceStatesStandingStartTick(t, h.base);
+          if (putting_back) {
+            next_step++;
+            steps[step]++;
+          } else {
+            before++;
+          }
+        }
+        // Place's frame temporaries only where it ran (below the frame,
+        // the other paths' callees leave their register saves).
+        outputs(out[v], count, sp - 2816 - 400, putting_back && step == 2 ? 160 : 0);
+        out[v].Bytes(Read(h.base, sp - 2816 + 80, 80));
+        out[v].Bytes(Read(h.base, dispatcher.address, 1024));
+        out[v].Bytes(Read(h.base, m + 9600, 48));
+        out[v].Word(guest::LoadU32(h.base, 0x826BAB3C));
+        out[v].Word(guest::LoadU32(h.base, 0x826BAB5C));
+        out[v].Bytes(Read(h.base, 0x826A50AC, 64));
+        teardown();
+      }
+      if (!skip) {
+        results.Check(out[0], out[1], fmt::format("seed {}", seed));
+      }
+    }
+    results.Report();
+    ITC_LOG_INFO("harness: race_world: StandingStartTick: {} cases before 900 ticks; steps 0 to "
+                 "5 from 900: {} {} {} {} {} {}",
+                 before, steps[0], steps[1], steps[2], steps[3], steps[4], steps[5]);
+  }
   // RaceManager::StreamOpponents on the loaded world, where
   // RaceManager::GiveVehicle's original (never seen in play) can give a
   // vehicle for real: most cases first take a racer's vehicle away as the

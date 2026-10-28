@@ -215,6 +215,28 @@ void RaceStatesCountdownTick(PPCContext& ctx, uint8_t* base) {
   rs::CountdownTick(base, ctx.r3.u32, ctx.r4.u32, ctx.r1.u32 - 112);
 }
 
+void RaceStatesStandingStartTick(PPCContext& ctx, uint8_t* base) {
+  ctx.fpscr.disableFlushMode();
+  if (!rs::StandingStartTickNative(base, ctx.r3.u32)) {
+    __imp__sub_821692C8(ctx, base);
+    return;
+  }
+  const uint32_t frame = ctx.r1.u32 - 2816;
+  rs::StandingCalls calls;
+  calls.refresh = RaceWorldOpponentsCall(ctx, base);
+  calls.start = RaceWorldStartCalls(ctx, base, frame - 400 - 224);
+  calls.list = RaceWorldListRacersOriginal(ctx, base);
+  calls.all_settled = [&ctx, base](uint32_t sp) {
+    const uint64_t r1 = ctx.r1.u64;
+    ctx.r1.u64 = sp;
+    __imp__sub_8213ADF8(ctx, base);
+    ctx.r1.u64 = r1;
+    ctx.fpscr.disableFlushMode();
+    return ctx.r3.u32;
+  };
+  rs::StandingStartTick(base, ctx.r3.u32, ctx.r4.u32, frame, NativeHeapActive(), calls);
+}
+
 }  // namespace hooks
 
 // Defines an adapter: the flag, else the original.
@@ -262,6 +284,7 @@ ITC_RACE_STATES(82165AB0, RaceStatesRacersNear)
 ITC_RACE_STATES(82165C78, RaceStatesRacersClose)
 ITC_RACE_STATES(82164A90, RaceStatesRacersStill)
 ITC_RACE_STATES(821674A0, RaceStatesCountdownTick)
+ITC_RACE_STATES(821692C8, RaceStatesStandingStartTick)
 // RaceProgress::TickFraction (sub_82163140) and RoutePosition::NotAfter
 // (sub_821622A8) have no adapters: their callers, RaceProgress::CheckLap and
 // CheckFinish, are native; --native_race_states switches those callers.

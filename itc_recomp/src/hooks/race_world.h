@@ -154,6 +154,8 @@ race_world::OriginalCall RaceWorldOpponentsCall(PPCContext& ctx, uint8_t* base);
 // subsystems.
 race_world::StartCalls RaceWorldStartCalls(PPCContext& ctx, uint8_t* base,
                                            uint32_t setup_frame);
+// RaceManager::ListRacers' callees' originals as its adapter makes them.
+race_world::OriginalR3 RaceWorldListRacersOriginal(PPCContext& ctx, uint8_t* base);
 
 // For the harness: while set, runs instead of RaceManager::GiveVehicle
 // sub_821706E8 (never seen in play; its override, which StreamOpponents'

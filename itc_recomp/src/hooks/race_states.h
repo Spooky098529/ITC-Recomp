@@ -88,4 +88,9 @@ void RaceStatesRacersClose(PPCContext& ctx, uint8_t* base);
 void RaceStatesRacersStill(PPCContext& ctx, uint8_t* base);
 void RaceStatesCountdownTick(PPCContext& ctx, uint8_t* base);
 
+// RaceStates::StandingStartTick sub_821692C8: a handler (r3 not kept); the
+// original in the System Link case (StandingStartTickNative); the callees'
+// originals as their adapters make them.
+void RaceStatesStandingStartTick(PPCContext& ctx, uint8_t* base);
+
 }  // namespace hooks

@@ -462,6 +462,14 @@ rw::StartCalls RaceWorldStartCalls(PPCContext& ctx, uint8_t* base, uint32_t setu
   return StartCalls(ctx, base, setup_frame);
 }
 
+rw::OriginalR3 RaceWorldListRacersOriginal(PPCContext& ctx, uint8_t* base) {
+  const rw::Original original = Originals(ctx, base);
+  return [&ctx, original](uint32_t address, uint32_t sp, uint32_t r3) {
+    original(address, sp, r3);
+    return ctx.r3.u64;
+  };
+}
+
 void RaceWorldStreamOpponents(PPCContext& ctx, uint8_t* base) {
   ctx.fpscr.disableFlushMode();
   rw::StreamOpponents(base, ctx.r3.u32, ctx.r4.u32, ctx.f1.f64, ctx.f2.f64, ctx.r1.u32 - 1920,

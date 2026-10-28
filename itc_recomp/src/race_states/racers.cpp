@@ -7,6 +7,7 @@
 #include "ai_drivers/ai_drivers.h"
 #include "base/log.h"
 #include "car_physics/float_ops.h"
+#include "mode_tick/mode_tick.h"
 #include "track_collision/track_collision.h"
 #include "vehicle_accessors/vectors.h"
 #include "vehicle_accessors/vehicle_accessors.h"
@@ -185,6 +186,118 @@ void CountdownTick(uint8_t* base, uint32_t machine, uint32_t dispatcher, uint32_
   Store(base, flags, Load(base, flags) & ~0x1000u);
   Store(base, FlagsAddress(base), Load(base, FlagsAddress(base)) & ~0x2000u);
   ai_drivers::ResetAll(base, frame - 128);
+}
+
+namespace {
+
+constexpr uint32_t kFadeInPasses = 0x82001BEC;   // 5
+constexpr uint32_t kFadeOutPasses = 0x82001BF0;  // 15
+constexpr uint32_t kSignInState = 0x826BAB3C;
+constexpr uint32_t kSignInReason = 0x826BAB5C;
+
+void ChangeFlags(uint8_t* base, uint32_t set, uint32_t clear) {
+  const uint32_t at = FlagsAddress(base);
+  Store(base, at, (Load(base, at) | set) & ~clear);
+}
+
+}  // namespace
+
+bool StandingStartTickNative(uint8_t* base, uint32_t machine) {
+  return !(int32_t(Kind(base)) == 6 && Load(base, machine + 9616) < 900 &&
+           Load(base, machine + 9636) != 0 && Load(base, machine + 9640) <= 900 &&
+           int32_t(va::StagesType(base, Stages(base), 0xFFFFFFFF)) != 1);
+}
+
+void StandingStartTick(uint8_t* base, uint32_t machine, uint32_t dispatcher, uint32_t frame,
+                       bool heap, const StandingCalls& calls) {
+  ITC_NATIVE_RUNNING("sub_821692C8 RaceStates::StandingStartTick");
+  if (RacersNear(base, frame - 208) == 0) {
+    Post(base, dispatcher, 19);
+    ai_drivers::ClearAll(base, frame - 128);
+    return;
+  }
+  if (Load(base, machine + 9616) >= 900) {
+    // The racers put back at the start, step by step.
+    const uint32_t step = Load(base, machine + 9612);
+    if (step == 0) {
+      mode_tick::ScreenFadesFadeOut(base, Load(base, kFadeOutPasses), 0, 0, 0, 0);
+      Store(base, machine + 9612, 1);
+    }
+    if (step <= 1) {
+      if (!FadesDone(base)) {
+        return;
+      }
+      Post(base, dispatcher, 31);
+      ChangeFlags(base, 0x100, 0);
+      ChangeFlags(base, 0x2000, 0);
+      ChangeFlags(base, 0x4000, 0);
+      race_world::Refresh(base, Load(base, race_world::kManager), frame - 1904, heap,
+                          calls.refresh);
+      Store(base, machine + 9612, 2);
+    } else if (step == 2) {
+      race_world::Place(base, machine, 1, 0, frame, calls.start);
+      race_world::ListRacers(base, Load(base, race_world::kManager), frame - 1872, heap,
+                             calls.list);
+      Store(base, machine + 9612, 3);
+    } else if (step == 3) {
+      Post(base, dispatcher, 31);
+      ChangeFlags(base, 0, 0x100);
+      Post(base, dispatcher, 32);
+      ChangeFlags(base, 0, 0x2000);
+      ChangeFlags(base, 0, 0x4000);
+      mode_tick::ScreenFadesFadeIn(base, Load(base, kFadeInPasses), 0, 0, 0, 0);
+      Store(base, machine + 9612, 4);
+    } else if (step == 4) {
+      Store(base, machine + 9616, 0);
+      Store(base, machine + 9612, 0);
+      Store(base, machine + 9628, 0);
+      Store(base, machine + 9632, 0);
+    }
+    return;
+  }
+  const bool linked = int32_t(Kind(base)) == 6;
+  if (!linked) {
+    if (RacersClose(base, frame - 208) == 0) {
+      Store(base, machine + 9616, 900);
+    } else {
+      Store(base, machine + 9616, Load(base, machine + 9616) + 1);
+    }
+  }
+  const uint32_t copy = frame + 80;
+  if (!va::StagesCopy(base, copy, Stages(base), 0xFFFFFFFF)) {
+    calls.start.original(0x820FFD88, frame, copy, Stages(base), 0xFFFFFFFFFFFFFFFFull);
+  }
+  if (Load(base, machine + 9636) == 0) {
+    if (RacersStill(base, machine + 9628) != 1 || !FadesDone(base)) {
+      return;
+    }
+    if (!(int32_t(Kind(base)) == 6 && int32_t(Load(base, copy)) != 1)) {
+      uint32_t settled = 0;
+      if (!ai_drivers::AllSettled(base, frame - 6320, &settled)) {
+        settled = calls.all_settled(frame);
+      }
+      if (int32_t(settled) == 0) {
+        return;
+      }
+    }
+    Store(base, machine + 9636, 1);
+    ChangeFlags(base, 0, 0x1);
+    return;
+  }
+  if (Load(base, machine + 9640) > 900) {
+    if (int32_t(Load(base, kSignInState)) == 0) {
+      Store(base, kSignInState, 1);
+      Store(base, kSignInReason, 6);
+    }
+    return;
+  }
+  // The System Link case (kind 6, the copy's +0 not 1) is the original's
+  // (StandingStartTickNative).
+  Post(base, dispatcher, 26);
+  for (uint32_t at : {9628u, 9632u, 9616u, 9636u, 9640u}) {
+    Store(base, machine + at, 0);
+  }
+  ai_drivers::ClearAll(base, frame - 128);
 }
 
 }  // namespace race_states

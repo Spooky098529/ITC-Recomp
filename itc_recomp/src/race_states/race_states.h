@@ -19,6 +19,7 @@
 #pragma once
 
 #include <cstdint>
+#include <functional>
 #include <optional>
 
 #include "race_world/race_world.h"
@@ -177,6 +178,29 @@ uint32_t RacersStill(uint8_t* base, uint32_t count);
 // 28, +9616, +9620 = 0, the race data's flags lose 0x1000 and 0x2000,
 // AiDrivers::ResetAll. `frame`: its 112 bytes (the callees' below it).
 void CountdownTick(uint8_t* base, uint32_t machine, uint32_t dispatcher, uint32_t frame);
+
+// RaceStates::StandingStartTick (sub_821692C8)'s guest calls: the callees'
+// originals as their adapters make them (RaceManager::Refresh's,
+// RaceStart::Place's with Stages::Copy's through start.original,
+// RaceManager::ListRacers'), and AiDrivers::AllSettled's original where its
+// plain C++ refuses (r1 = `sp`; its r3).
+struct StandingCalls {
+  race_world::OriginalCall refresh;
+  race_world::StartCalls start;
+  race_world::OriginalR3 list;
+  std::function<uint32_t(uint32_t sp)> all_settled;
+};
+// Whether StandingStartTick runs natively: not in the System Link case
+// (the race data's kind +0xA3AF0 6 with the current stage's +0 not 1, the
+// racers settled (+9636) and +9640 at most 900, +9616 below 900), which
+// the original runs (no preserved behavior: the game has no System Link
+// mode).
+bool StandingStartTickNative(uint8_t* base, uint32_t machine);
+// RaceStates::StandingStartTick (sub_821692C8): see the row. `frame`: the
+// original's 2,816 bytes (the stage's copy at +80; the callees' frames
+// below it).
+void StandingStartTick(uint8_t* base, uint32_t machine, uint32_t dispatcher, uint32_t frame,
+                       bool heap, const StandingCalls& calls);
 
 // --- The route's sections and positions ---
 
