@@ -107,21 +107,29 @@ std::optional<uint32_t> ModelRelease(uint8_t* base, uint32_t model) {
   return Release(base, model);
 }
 
+uint32_t ModelReleaseNodes(uint8_t* base, uint32_t model) {
+  return ReleaseNodes(base, model);
+}
+
+bool ModelMembersDestructible(uint8_t* base, uint32_t model) {
+  const uint32_t storage = Load(base, model + kModelTextures + kTextureProviderVector +
+                                          kVectorFirst);
+  return model_animation::TrackSetReleasable(base, model + 384, true) &&
+         model_animation::TrackSetReleasable(base, model + 364, true) &&
+         model_animation::TrackSetReleasable(base, model + 344, false) &&
+         model_animation::TrackSetReleasable(base, model + 324, false) &&
+         model_animation::TrackSetReleasable(base, model + 304, true) &&
+         model_animation::SkeletonDestructible(base, model + kModelSkeleton) &&
+         (storage == 0 || memory::IsHeapBlock(storage));
+}
+
 std::optional<uint32_t> ModelDestruct(uint8_t* base, uint32_t model) {
   ITC_NATIVE_RUNNING("sub_82594F58 Model::~Model");
   // Everything the members' plain C++ would leave to the original, before
   // anything changes. XPR::~XPR frees nothing after the release (its words
   // are 0 then), but checks for its two nodes: counted in ReleaseNodes.
-  const uint32_t storage = Load(base, model + kModelTextures + kTextureProviderVector +
-                                          kVectorFirst);
   if (!PendingFreesHaveRoom(base, ReleaseNodes(base, model)) ||
-      !model_animation::TrackSetReleasable(base, model + 384, true) ||
-      !model_animation::TrackSetReleasable(base, model + 364, true) ||
-      !model_animation::TrackSetReleasable(base, model + 344, false) ||
-      !model_animation::TrackSetReleasable(base, model + 324, false) ||
-      !model_animation::TrackSetReleasable(base, model + 304, true) ||
-      !model_animation::SkeletonDestructible(base, model + kModelSkeleton) ||
-      !(storage == 0 || memory::IsHeapBlock(storage))) {
+      !ModelMembersDestructible(base, model)) {
     return std::nullopt;
   }
   Store(base, model, kModelVtable);
@@ -159,6 +167,12 @@ uint32_t SharedVertexShader(uint8_t* base, uint32_t pair) {
   ITC_NATIVE_RUNNING("sub_825896D8 SharedVertexShader");
   const uint32_t table = Load(base, 0x8296B7B4);
   return table == 0 ? 0 : Load(base, (pair << 2) + table);
+}
+
+void SetSharedShaders(uint8_t* base, uint32_t vertex, uint32_t pixel) {
+  ITC_NATIVE_RUNNING("sub_825896C0 SetSharedShaders");
+  Store(base, 0x8296B7B4, vertex);
+  Store(base, 0x8296B7B8, pixel);
 }
 
 uint32_t SharedPixelShader(uint8_t* base, uint32_t pair) {

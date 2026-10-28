@@ -39,6 +39,14 @@ std::optional<uint32_t> ModelRelease(uint8_t* base, uint32_t model);
 // in reverse. Returns the original's r3 (XPR::~XPR's).
 std::optional<uint32_t> ModelDestruct(uint8_t* base, uint32_t model);
 
+// For native callers checking before they release or destroy several
+// models (nothing changed): the pending frees' nodes ModelRelease (and
+// ModelDestruct) may add for `model` (each block not null, and the XPR's
+// two), and whether ModelDestruct's members would all run natively (its
+// pending frees counted apart: the caller checks the sum).
+uint32_t ModelReleaseNodes(uint8_t* base, uint32_t model);
+bool ModelMembersDestructible(uint8_t* base, uint32_t model);
+
 // --- The materials and the shared shaders (accessors) ---
 
 // Model::MaterialCount (sub_82594AD8): the shape's (544 bytes each from the
@@ -51,6 +59,9 @@ uint32_t Material(uint8_t* base, uint32_t model, uint32_t shape, uint32_t index,
 // `pair` ([0x8296B7B4] and [0x8296B7B8] + 4 x pair), 0 when the table is
 // unset.
 uint32_t SharedVertexShader(uint8_t* base, uint32_t pair);
+// sub_825896C0: the two tables set ([0x8296B7B4] = `vertex`, [0x8296B7B8] =
+// `pixel`).
+void SetSharedShaders(uint8_t* base, uint32_t vertex, uint32_t pixel);
 uint32_t SharedPixelShader(uint8_t* base, uint32_t pair);
 // sub_82589728: the vertex declaration for three stream types, from the
 // tables at 0x8265EC00 and 0x8296B7F4. nullopt for a type pair the tables

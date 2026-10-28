@@ -25,6 +25,7 @@
 #include "models/memory_blocks.h"
 #include "models/model.h"
 #include "models/model_load.h"
+#include "models/part_model.h"
 #include "models/texture_provider.h"
 #include "models/xpr.h"
 #include "model_animation/model_animation.h"
@@ -46,7 +47,9 @@ ITC_FLAG_BOOL(native_models, true, "ITC",
               "adapter: only the constructor calls it), TextureProvider::TextureProvider "
               "sub_82594850 and ~TextureProvider sub_825943E0; Model::Model sub_825948C0, "
               "Model::Release sub_82594970 and Model::~Model sub_82594F58, their members' "
-              "plain C++ called directly; Model::MaterialCount sub_82594AD8, Model::Material "
+              "plain C++ called directly, and the car part model's sub_820CE928 and "
+              "sub_820CE990 over them; the part model's sub_820CE9C8 and Model::SetVinylTextures sub_820CE9F8; Skeleton::ResetPose "
+              "sub_82599AF0 (in src/model_animation/); Model::MaterialCount sub_82594AD8, Model::Material "
               "sub_82594B20, ShaderFile::Parse sub_822A8568, VertexShader::CopyHeader sub_822A9FD8 and "
               "PixelShader::CopyHeader sub_822A9EA8 (in src/shader_objects/), "
               "TextureHeader::Relocate sub_8235A990 (with sub_822A5B68; no adapter: only "
@@ -60,7 +63,7 @@ ITC_FLAG_BOOL(native_models, true, "ITC",
               "SkeletonBase::SetUp sub_8259A9E0 (with NodeFile::View sub_825A21A8, no adapter: "
               "only it calls it) and Skeleton::Bind sub_82599A20 (in src/model_animation/), "
               "Memory::AllocPhysical sub_8258E138 (in src/models/memory_blocks.cpp; no adapter: only "
-              "XPR::Create calls it), the shared shaders sub_825896D8 and sub_82589700, the vertex "
+              "XPR::Create calls it), the shared shaders sub_825896D8 and sub_82589700 and their tables' set-up sub_825896C0, the vertex "
               "declaration sub_82589728 (its message for a type pair the tables don't cover, "
               "never seen in play, the original's), Model::RecordShape sub_82595550 (in "
               "src/scenery_lists/model_draws.cpp, adapter in src/hooks/scenery_lists.cpp: the "
@@ -223,6 +226,56 @@ extern "C" REX_FUNC(sub_825948C0) {
 ITC_MODELS_LIFETIME(82594970, ModelRelease)
 ITC_MODELS_LIFETIME(82594F58, ModelDestruct)
 
+// --- The car part model ---
+
+// The part model's constructor: r3 = the model (left).
+extern "C" REX_FUNC(sub_820CE928) {
+  REX_FUNC_PROLOGUE();
+  if (NativeLifetime()) {
+    ctx.fpscr.disableFlushMode();  // as Model::Model's adapter
+    if (models::PartModelConstruct(base, ctx.r3.u32)) {
+      return;
+    }
+  }
+  __imp__sub_820CE928(ctx, base);
+}
+
+// The part model's destructor: r3 = the model; r3 as Model::~Model leaves it.
+ITC_MODELS_LIFETIME(820CE990, PartModelDestruct)
+
+// sub_820CE9C8: r3 = the model (left).
+extern "C" REX_FUNC(sub_820CE9C8) {
+  REX_FUNC_PROLOGUE();
+  if (!ITC_FLAG(native_models)) {
+    __imp__sub_820CE9C8(ctx, base);
+    return;
+  }
+  models::PartModelClear(base, ctx.r3.u32);
+}
+
+// Model::SetVinylTextures: r3 = the part model, r4 and r5 the words.
+extern "C" REX_FUNC(sub_820CE9F8) {
+  REX_FUNC_PROLOGUE();
+  if (!ITC_FLAG(native_models)) {
+    __imp__sub_820CE9F8(ctx, base);
+    return;
+  }
+  models::PartModelSetVinylTextures(base, ctx.r3.u32, ctx.r4.u32, ctx.r5.u32);
+}
+
+// Skeleton::ResetPose: r3 = the skeleton (left). Flush-to-zero off after
+// Skeleton::ApplyAnimation, as its adapter leaves it.
+extern "C" REX_FUNC(sub_82599AF0) {
+  REX_FUNC_PROLOGUE();
+  if (!ITC_FLAG(native_models)) {
+    __imp__sub_82599AF0(ctx, base);
+    return;
+  }
+  if (model_animation::SkeletonResetPose(base, ctx.r3.u32)) {
+    ctx.fpscr.disableFlushMode();
+  }
+}
+
 // --- The materials and the shared shaders ---
 
 namespace hooks {
@@ -237,6 +290,10 @@ void ModelsMaterial(PPCContext& ctx, uint8_t* base) {
 
 void ModelsSharedVertexShader(PPCContext& ctx, uint8_t* base) {
   ctx.r3.u64 = models::SharedVertexShader(base, ctx.r3.u32);
+}
+
+void ModelsSetSharedShaders(PPCContext& ctx, uint8_t* base) {
+  models::SetSharedShaders(base, ctx.r3.u32, ctx.r4.u32);
 }
 
 void ModelsSharedPixelShader(PPCContext& ctx, uint8_t* base) {
@@ -269,6 +326,7 @@ ITC_MODELS_ACCESSOR(82594AD8, ModelsMaterialCount)
 ITC_MODELS_ACCESSOR(82594B20, ModelsMaterial)
 ITC_MODELS_ACCESSOR(825896D8, ModelsSharedVertexShader)
 ITC_MODELS_ACCESSOR(82589700, ModelsSharedPixelShader)
+ITC_MODELS_ACCESSOR(825896C0, ModelsSetSharedShaders)
 ITC_MODELS_ACCESSOR(82589728, ModelsVertexDeclaration)
 
 // ShaderFile::Parse: r3 = the file, r4 = the record. No return value.

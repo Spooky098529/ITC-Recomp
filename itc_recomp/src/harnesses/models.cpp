@@ -22,6 +22,7 @@
 #include "memory/heap.h"
 #include "models/memory_blocks.h"
 #include "models/model.h"
+#include "models/part_model.h"
 #include "models/texture_provider.h"
 #include "models/xpr.h"
 
@@ -748,13 +749,42 @@ void NativeModelDestruct(PPCContext& t, uint8_t* base) {
     __imp__sub_82594F58(t, base);
   }
 }
+// The car part model's (models/part_model.h).
+void NativePartModelConstruct(PPCContext& t, uint8_t* base) {
+  if (!models::PartModelConstruct(base, t.r3.u32)) {
+    __imp__sub_820CE928(t, base);
+  }
+}
+void NativePartModelDestruct(PPCContext& t, uint8_t* base) {
+  if (const auto r3 = models::PartModelDestruct(base, t.r3.u32)) {
+    t.r3.u64 = *r3;
+  } else {
+    __imp__sub_820CE990(t, base);
+  }
+}
+void NativePartModelSetVinylTextures(PPCContext& t, uint8_t* base) {
+  models::PartModelSetVinylTextures(base, t.r3.u32, t.r4.u32, t.r5.u32);
+}
+void NativePartModelClear(PPCContext& t, uint8_t* base) {
+  models::PartModelClear(base, t.r3.u32);
+}
+
+// The function a constructor's or destructor's cases run: the model's, or
+// the car part model's over it.
+struct Lifetime {
+  const char* name;
+  GuestFunction recompiled;
+  GuestFunction native;
+};
 
 constexpr uint32_t kModelBytes = 432;
-constexpr uint32_t kPairsAt = 432;     // the shader pairs, in the block
+constexpr uint32_t kPairsAt = 896;     // the shader pairs, in the block (past a part model)
 constexpr uint32_t kHeadersAt = 512;   // the blocks' headers, 16 bytes each
 
-void ModelConstructs(Context& h, const Block& block) {
-  Results results("Model::Model (sub_825948C0)");
+void ModelConstructs(Context& h, const Block& block,
+                     const Lifetime& f = {"Model::Model (sub_825948C0)", __imp__sub_825948C0,
+                                          NativeModelConstruct}) {
+  Results results(f.name);
   for (int c = 0; c < 16; c++) {
     const uint32_t model = block.address + 16 * h.random.Below(4);
     Outputs out[2];
@@ -763,7 +793,7 @@ void ModelConstructs(Context& h, const Block& block) {
       Fill(h.base, block.address, block.bytes);
       PPCContext t = CallContext(h);
       t.r3.u64 = model;
-      Side(v, [&] { (v == 0 ? __imp__sub_825948C0 : NativeModelConstruct)(t, h.base); });
+      Side(v, [&] { (v == 0 ? f.recompiled : f.native)(t, h.base); });
       // The texture provider's storage: by its contents, then freed.
       TakeVector(h.base, model + models::kModelTextures + tp::kTextureProviderVector, 0, t,
                  out[v]);
@@ -871,11 +901,13 @@ uint32_t HeapArray(uint32_t bytes, bool header) {
   return header ? block + 16 : block;
 }
 
-void ModelDestructs(Context& h, const Block& block) {
-  Results results("Model::~Model (sub_82594F58, on the game's list)");
+void ModelDestructs(Context& h, const Block& block,
+                    const Lifetime& f = {"Model::~Model (sub_82594F58, on the game's list)",
+                                         __imp__sub_82594F58, NativeModelDestruct}) {
+  Results results(f.name);
   if (!hooks::ModelsHostLock()) {
-    ITC_LOG_WARN("harness: models: --native_models was off at start-up: Model::~Model's "
-                 "cases skipped");
+    ITC_LOG_WARN("harness: models: --native_models was off at start-up: {} cases skipped",
+                 f.name);
     return;
   }
   std::lock_guard<std::recursive_mutex> lock(models::MemoryBlocksMutex());
@@ -911,7 +943,7 @@ void ModelDestructs(Context& h, const Block& block) {
       const ListState was = SaveList(h.base);
       PPCContext t = CallContext(h);
       t.r3.u64 = model;
-      Side(v, [&] { (v == 0 ? __imp__sub_82594F58 : NativeModelDestruct)(t, h.base); });
+      Side(v, [&] { (v == 0 ? f.recompiled : f.native)(t, h.base); });
       TakeAddedNodes(h.base, was, out[v]);
       out[v].Bytes(Read(h.base, block.address, block.bytes));
       out[v].Bytes(Read(h.base, h.data, kScratchBytes));
@@ -920,6 +952,59 @@ void ModelDestructs(Context& h, const Block& block) {
     }
     results.Check(out[0], out[1],
                   fmt::format("case {} ({} pairs, held {:03X})", c, in.pairs, held));
+  }
+  results.Report();
+}
+
+// sub_820CE9C8 on random bytes: the block and r3.
+void PartModelClears(Context& h, const Block& block) {
+  Results results("PartModel::Clear (sub_820CE9C8)");
+  for (int c = 0; c < 16; c++) {
+    const uint32_t model = block.address + 16 * h.random.Below(4);
+    const uint64_t seed = h.random.Next();
+    Outputs out[2];
+    for (int v = 0; v < 2; v++) {
+      Random r(seed);
+      for (uint32_t i = 0; i < block.bytes; i += 4) {
+        Store(h.base, block.address + i, uint32_t(r.Next()));
+      }
+      PPCContext t = CallContext(h);
+      t.r3.u64 = model;
+      Side(v, [&] { (v == 0 ? __imp__sub_820CE9C8 : NativePartModelClear)(t, h.base); });
+      out[v].Bytes(Read(h.base, block.address, block.bytes));
+      out[v].Word(t.r3.u32);
+      out[v].Word(uint32_t(t.r3.u64 >> 32));
+    }
+    results.Check(out[0], out[1], fmt::format("case {} (at +{})", c, model - block.address));
+  }
+  results.Report();
+}
+
+// sub_820CE9F8 on random bytes: the block and r3.
+void PartModelSetVinylTextureCases(Context& h, const Block& block) {
+  Results results("Model::SetVinylTextures (sub_820CE9F8)");
+  for (int c = 0; c < 16; c++) {
+    const uint32_t model = block.address + 16 * h.random.Below(4);
+    const uint64_t seed = h.random.Next();
+    const uint64_t r4 = h.random.Next(), r5 = h.random.Next();
+    Outputs out[2];
+    for (int v = 0; v < 2; v++) {
+      Random r(seed);
+      for (uint32_t i = 0; i < block.bytes; i += 4) {
+        Store(h.base, block.address + i, uint32_t(r.Next()));
+      }
+      PPCContext t = CallContext(h);
+      t.r3.u64 = model;
+      t.r4.u64 = r4;
+      t.r5.u64 = r5;
+      Side(v, [&] {
+        (v == 0 ? __imp__sub_820CE9F8 : NativePartModelSetVinylTextures)(t, h.base);
+      });
+      out[v].Bytes(Read(h.base, block.address, block.bytes));
+      out[v].Word(t.r3.u32);
+      out[v].Word(uint32_t(t.r3.u64 >> 32));
+    }
+    results.Check(out[0], out[1], fmt::format("case {} (at +{})", c, model - block.address));
   }
   results.Report();
 }
@@ -1008,6 +1093,34 @@ void Accessors(Context& h, const Block& block) {
   Write(h.base, kKinds, kinds.data(), kKindsBytes);
 }
 
+// sub_825896C0: the two table words set from random r3 and r4; the words and
+// r3 compared, then put back.
+void SharedShaderSets(Context& h) {
+  Results results("SetSharedShaders (sub_825896C0)");
+  const std::vector<uint8_t> tables = Read(h.base, 0x8296B7B0, 16);
+  for (int c = 0; c < 32; c++) {
+    const uint64_t r3 = h.random.Next(), r4 = h.random.Next();
+    const uint32_t before[4] = {uint32_t(h.random.Next()), uint32_t(h.random.Next()),
+                                uint32_t(h.random.Next()), uint32_t(h.random.Next())};
+    Outputs out[2];
+    for (int v = 0; v < 2; v++) {
+      for (uint32_t i = 0; i < 4; i++) {
+        Store(h.base, 0x8296B7B0 + 4 * i, before[i]);
+      }
+      PPCContext t = CallContext(h);
+      t.r3.u64 = r3;
+      t.r4.u64 = r4;
+      (v == 0 ? __imp__sub_825896C0 : hooks::ModelsSetSharedShaders)(t, h.base);
+      out[v].Bytes(Read(h.base, 0x8296B7B0, 16));
+      out[v].Word(t.r3.u32);
+      out[v].Word(uint32_t(t.r3.u64 >> 32));
+    }
+    results.Check(out[0], out[1], fmt::format("case {}", c));
+  }
+  results.Report();
+  Write(h.base, 0x8296B7B0, tables.data(), 16);
+}
+
 void Models(Context& h) {
   // Fixes the lock's choice before any flag is switched.
   hooks::ModelsHostLock();
@@ -1039,6 +1152,17 @@ void Models(Context& h) {
     ModelReleases(h, block);
     ModelDestructs(h, block);
     Accessors(h, block);
+    SharedShaderSets(h);
+    // The car part model (464 bytes): its constructor and destructor over
+    // the model's cases, and its clear on random bytes.
+    ModelConstructs(h, block,
+                    {"PartModel::PartModel (sub_820CE928)", __imp__sub_820CE928,
+                     NativePartModelConstruct});
+    ModelDestructs(h, block,
+                   {"PartModel::~PartModel (sub_820CE990, on the game's list)",
+                    __imp__sub_820CE990, NativePartModelDestruct});
+    PartModelClears(h, block);
+    PartModelSetVinylTextureCases(h, block);
   }
 }
 

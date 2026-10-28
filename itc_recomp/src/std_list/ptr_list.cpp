@@ -98,4 +98,21 @@ bool Insert(uint8_t* base, uint32_t list, uint32_t where, uint32_t value) {
   return true;
 }
 
+std::optional<uint32_t> Erase(uint8_t* base, uint32_t list, uint32_t iterator_list, uint32_t node) {
+  if (iterator_list == 0 || node == Load(base, iterator_list + kHead)) {
+    return std::nullopt;
+  }
+  ITC_NATIVE_RUNNING("sub_82098E80 PtrList::Erase");
+  const uint32_t next = Load(base, node + kNext);
+  if (node != Load(base, list + kHead)) {
+    Store(base, Load(base, node + kPrevious) + kNext, Load(base, node + kNext));
+    Store(base, Load(base, node + kNext) + kPrevious, Load(base, node + kPrevious));
+    if (!memory::crt::OperatorDelete(node)) {
+      ITC_LOG_ERROR("PtrList::Erase: operator delete refused {:08X}", node);
+    }
+    Store(base, list + kSize, Load(base, list + kSize) - 1);
+  }
+  return next;
+}
+
 }  // namespace std_list

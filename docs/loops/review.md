@@ -11,6 +11,146 @@ functions to check in a drive in the progress file.
 When the user has reviewed a run's section, its heading gets
 "(reviewed <date>)"; the section stays for the record.
 
+## Run 2026-10-27 22:31 (`b7-loop-27-10-26`)
+
+- The app's update and its state stack (map ac92c3b):
+  `docs/functions/app-states.md`, 56 rows (2 moved from `functions.md`:
+  `App::Update` `sub_82093DC0` and the Wrapped `sub_82092968`; 54 new),
+  with the containers it uses (`PtrList::Erase` `sub_82098E80`, mapped
+  here instead of `input.md`; `OpList::IncSize` `sub_820AD768`, from the
+  containers lead); `game-modes.md`'s `Modes::Tick` row says what calls
+  it; `known-data.md`'s app fields and two new rows (app state stack,
+  state layer); `leads.md`'s app start-up and containers lines brought
+  up to date, one lead added (`820AC998`-`820ACC08`). For review: the
+  map's reading of `App::Update`'s player 1 Start toggle as probably a
+  debug pause (it picks handler map +28 or +40; both reach
+  `Modes::Tick`).
+- The app states, migration 1 (7bb4dfd..b29697d): 31 rows in
+  `app-states.md`. `App::RunHandler` `sub_82092968` was Wrapped by
+  `src/debug/menu_selection_scan.cpp` (`--find_menu_selection`): the
+  wrap moved into its adapter in `src/hooks/app_states.cpp`, so the
+  row is Overridden. Map correction: `OpList::OpList` links the head to
+  itself at +0 and +4. Kept as the originals: traps logged with a
+  warning and execution goes on (as `main_loop.cpp`); each walk's
+  functor-adjustment word keeps the frame's stack word in its low half
+  (dead stack); `App::Update` calls the button tests `sub_8258CEB0` and
+  `sub_8258CEE0` as guest calls. Handed to the originals (never in
+  play): odd `ApplyRequest` types, `length_error`, `bad_alloc`.
+  `std_list::Erase` added in `src/std_list/ptr_list.{h,cpp}`.
+  Validation 1 noted that in `sub_82093BE0`, `sub_820944E0`,
+  `sub_820938C0` and a few others the print comes after an early check
+  that hands the call back to the recompiled code (some print at more
+  than one site), not as the first statement; left as written.
+- The app states, migration 2 (4baecb1..30892a7): 28 rows in
+  `app-states.md`, now 56 of 56 ours; new code in
+  `src/app_states/layers.{h,cpp}`; `AppCalls` got a `native_heap`
+  field. Map correction: `StateLayer::Update` `sub_820ADF00` and
+  `UpdateToggled` `sub_820AE010` are reached through slot thunks and
+  delegates, not called directly. Left on the original (never in play):
+  `StateLayer::ApplyOp`'s pop and replace (types 1 and 3),
+  `AppStates::OnMessage`'s messages 1, 5 and 6 (the step and the
+  teardowns), and every failed `operator new`. Adapters kept: those
+  reached through vtables, delegates or function pointers, and
+  `AppStates::Create` (called from the app's constructor
+  `sub_82094590`). One commit (be3d047) left three rows' Status blank;
+  fixed in the next (a7c59b8).
+- The scene's loading objects (map 2616cc8):
+  `docs/functions/scene-loaders.md`, 78 new rows: the first scene pool
+  set's (`[0x826C2E40]`) seven loading classes (car model, parts,
+  cockpit body, interior, pool 4's model, wheels, traffic body), their
+  embedded loads, `ScenePools::MakeA`, `CreateA`, `ReleaseA`, the
+  `PoolNode` base, the load callbacks (`sub_820D6528` the cockpit's,
+  `sub_820D8430` the traffic body's, `sub_820D7578` the interior's),
+  `XPR::FindByName` and `ModelPoint::Find` `sub_820D02D0`.
+  `known-data.md`: the first set's fields, rows for the pool node,
+  cockpit body, pool 4's object, traffic body and model point; the car
+  model, interior, parts and wheels rows extended. 3 leads added. Noted
+  in the rows: the deleting destructors call `operator delete` on
+  objects `ScenePools::CreateA` takes from `VirtualAlloc` (nothing calls
+  them directly); `sub_820D2270` walks every material and uses nothing.
+- The scene loaders, migration 1 (4b47c12, dfbc5a0): 20 rows in
+  `scene-loaders.md`. `CarParts::SlotOf` computes in 64 bits as the
+  original's register adds; `CarParts::Part` returns only 32 bits (its
+  one caller loads r5 and r6 with `lwz` and stores r3 with `stw`).
+  `CarModelLoads`' destructor leaves r3 = loads + 32 (as
+  `Skeleton::~Skeleton`'s adapter). `CarModelLoads`' constructor and
+  destructor run natively only while `hooks::ModelsNativeLifetime()`
+  holds; the destructor checks its members first and runs the original
+  if a check fails. `Pool4Object::SetRecord` hands overlapping copies
+  and physical-view destinations to the original (as
+  `CarModel::SetRecord`). `MakeA` and `sub_820D0960` run natively only
+  over the allocation layer.
+- The scene loaders' blockers (no mapping; e9e8e77..effc3f0): rows in
+  `car-models.md` (`sub_820D0730`, `sub_820D0758`, `sub_820C3F50`,
+  `sub_820D4508`, and a line in its intro), `models.md` (`sub_820CE928`,
+  `sub_820CE990`, `sub_820CE9C8`) and 19 in `scene-loaders.md`; new
+  flag `--native_car_models` (`src/car_models/`); the part model under
+  `--native_models`; `models/model.h` exposes `ModelReleaseNodes` and
+  `ModelMembersDestructible`. Choices: the provider's slot 2 is called
+  natively only when it is `TextureProvider::ClearAll` `sub_82594328`,
+  otherwise the whole function runs the original; matrices the
+  originals build on their stack and copy with memcpy are written
+  straight into place (their frames not written), and a car model at or
+  above the physical views (`0xA0000000`) runs the original so memcpy's
+  override still records the copies for the renderer; a function whose
+  slots would free the same pages twice runs the original. The
+  harnesses' recompiled side runs with all three flags off. Frame dumps
+  after batch 5: 2,414 draws against 2,412 with the flags off, the off
+  run's frame captured a moment later (the same after batch 2).
+- The scene loaders' blockers, migration 2 (ecdb767..016410c): 36 rows
+  in `scene-loaders.md`, 3 in `models.md` (`sub_82599AF0` named
+  `Skeleton::ResetPose`, probably; `sub_820CE9F8`; `sub_825896C0` named
+  `SetSharedShaders`, probably). Choices: the six deleting destructors
+  run natively only with bit 0 of their flags clear (the first set's
+  teardown `sub_820C3CF8` passes r4 = 0); with it set (`operator delete`
+  on `VirtualAlloc` pages, never seen) the original runs.
+  `ScenePools::CreateA` and `Interior::OnPartLoaded` make guest calls to
+  the originals (the constructors; `Model::Load`) from a frame like the
+  original's when a callee's plain C++ declines, as the scenery lists
+  do; no harness case reaches `CreateA`'s fallback. For review:
+  `Skeleton::ResetPose`'s harness doesn't compare r3 (177 cases differed
+  in r3 only): it ends as `ApplyAnimation` leaves it (its adapter leaves
+  the skeleton, its original a loop register; its own cases don't
+  compare r3 either), and all five callers set r3 right after. Open,
+  not investigated: with `--native_scene_loaders=false`, three 256x256
+  textures sit at other physical addresses (draws otherwise the same);
+  not caused by this migration's adapters, so from the earlier ones.
+- The players' save data (map 8cbdba1, 1fedb13):
+  `docs/functions/save-data.md`, 23 rows (1 moved from `functions.md`,
+  22 new): `SaveData::Create` and `Delete`, the progress, stats, course
+  records, options and control maps, five default tables' getters,
+  `TitleScreen::ResetPlayer` `sub_82221D00`, `MenuList::Init`
+  `sub_8220BAC0` (about 75 front-end screens call it; its neighbors in a
+  new lead) and `Players::ResetControllers` `sub_8209F5E0`; 4 not seen
+  in play (`CourseRecords::Of` `sub_82105BF8`, `sub_82105740`,
+  `sub_82105688`, `Progress::Restart` `sub_82114128`). The mapping agent
+  first left those 4 without rows, following `b7-loop.md`'s "Only
+  functions seen in play get rows"; the lead had them added by the
+  user's later call (2026-10-23, CLAUDE.md). `b7-loop.md`'s line may
+  want updating. Kept as the originals: `Stats::Stats`'s writes are
+  wiped at once by `Progress::Clear`; `SaveData::Create` runs the
+  set-ups even when the allocation fails. `known-data.md`'s
+  `0x826C5B58` row and a new `[0x82814E30]` row; `mode-tick.md`'s
+  `OnModeChange` row.
+- The save data, migration 1 (0fb0eb9..d585a41): 19 rows in
+  `save-data.md` and its intro; code in `src/save_data/`. Adapters kept
+  for recompiled callers: `Progress::Clear` and `SetDefaults`
+  (`sub_82221AC0`), the `Table3044` getter (`sub_82110448`),
+  `SaveData::Create` (`sub_82105868`, `sub_8209E7E8`), `Delete`
+  (`sub_8209E7E8`), `ResetPlayer` (`sub_82222B60`), `MenuList::Init`
+  (about 75 screens), `Players::ResetControllers` (`sub_82106548`).
+  Kept as the originals: `Stats::Stats`'s writes; the 0.0 float through
+  float, double, float (`lfs`, `stfs`); the getters' r3 and r11 sign
+  extended; each r3 as the original leaves it. Not written natively
+  (following earlier ports' scratch below r1): `SetDefaults`' stack copy
+  of `Table3044`, `ControlMap`'s stack table, the two stack words
+  `ResetPlayer` passes to `MenuList::Init`. The allocating ones run
+  natively only under `--native_heap`; `SetDefaults`' copies go through
+  `native::Buffers_Memcpy` (the original when `--native_memcpy` is off
+  or the ranges may overlap); `MenuList::Init` runs the original when
+  its old block isn't the allocation layer's; on `operator new`'s
+  nullopt (never seen) `Create`'s adapter runs the original.
+
 ## Run 2026-10-25 23:42 (`b7-loop-25-10-26-4`)
 
 - The race's set-up (map 7d2acaa): `docs/functions/race-setup.md`, 52

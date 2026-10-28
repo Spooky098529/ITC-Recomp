@@ -244,23 +244,5 @@ ITC_MENU_SCAN_WRAP(82118C18)
 #undef ITC_MENU_SCAN_WRAP
 
 // The app's update (tick handler 82093DC0) runs its component lists through
-// this: r4's low word is a component, whose vtable slot 1 it calls (r4 =
-// the app + 20). Logged as "component <address>" with that slot's target
-// (a delegate's, sub_8223A3F0 or sub_82233460, is at +8).
-extern "C" REX_FUNC(sub_82092968) {
-  REX_FUNC_PROLOGUE();
-  if (!debug::MenuSelectionScan_Active()) {
-    __imp__sub_82092968(ctx, base);
-    return;
-  }
-  uint32_t component = ctx.r4.u32;
-  uint32_t update = component ? guest::LoadU32(base, guest::LoadU32(base, component) + 4) : 0;
-  if (update == 0x8223A3F0 || update == 0x82233460) {
-    update = guest::LoadU32(base, component + 8);
-  }
-  debug::MenuSelectionScan_Before(base);
-  __imp__sub_82092968(ctx, base);
-  static thread_local std::string kind;
-  kind = fmt::format("component {:08X}", component);
-  debug::MenuSelectionScan_After(base, kind.c_str(), update);
-}
+// App::RunHandler (sub_82092968), wrapped for this scan in its adapter in
+// src/hooks/app_states.cpp ("component <address>").

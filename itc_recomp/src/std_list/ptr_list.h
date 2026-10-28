@@ -2,7 +2,8 @@
 // across the game) as plain C++ over its guest layout
 // (docs/functions/input.md, "PtrList::"). Shared: the input manager's
 // listener lists, the sound manager's (sound-cues.md) and others, so any
-// native caller can use these. Adapters: src/hooks/input_manager.cpp.
+// native caller can use these. Adapters: src/hooks/input_manager.cpp (Erase's:
+// src/hooks/app_states.cpp).
 //
 // The layout: the list (12 bytes) +4 its head node, +8 its size (+0, the
 // allocator, is empty); a node (12 bytes) +0 the next node, +4 the previous,
@@ -53,5 +54,12 @@ bool Construct(uint8_t* base, uint32_t list);
 // the node `where`, the size up by one. False, with nothing done, where the
 // original must run.
 bool Insert(uint8_t* base, uint32_t list, uint32_t where, uint32_t value);
+
+// PtrList::Erase (sub_82098E80, erase(where), docs/functions/app-states.md):
+// the iterator's node (`node`, of the list `iterator_list`) unlinked and
+// freed and the size down by one, unless it's `list`'s head; returns the
+// next node (the result iterator's). nullopt, with nothing done, where the
+// original traps (a null iterator list, or `node` its head).
+std::optional<uint32_t> Erase(uint8_t* base, uint32_t list, uint32_t iterator_list, uint32_t node);
 
 }  // namespace std_list

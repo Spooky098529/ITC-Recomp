@@ -1,0 +1,190 @@
+// The app's state stack and its layers natively (docs/functions/app-states.md,
+// "AppStates::" and "StateLayer::"): their set-up at boot (AppStates::Create,
+// the layers' constructors, AddLayer, AddChild) and App::Start, which pushes
+// the game modes' holder. Plain C++ over the guest layout, store for store as
+// the recompiled functions; every virtual call a guest call through AppCalls
+// (app.h), and the callees ours where their plain C++ exists (the lists'
+// constructors and insert, the operation list, Push, Modes::Modes), the
+// originals where those hand back. Adapters: src/hooks/app_states.cpp.
+//
+// Each takes `frame`, its own guest frame as the original's (made by the
+// adapter or the native caller with AppCalls::in_frame), and makes its
+// callees' frames the same way. They allocate through operator new's plain
+// C++, so they run only while --native_heap routes the game's heap to the
+// allocation layer (the adapters' condition); where operator new hands back
+// (its new handler), the function returns false with nothing done but stores
+// the original would make again, and the original runs.
+
+#pragma once
+
+#include <cstdint>
+#include <optional>
+
+#include "app_states/app.h"
+
+namespace app_states {
+
+// The vtables a layer's constructors store: its own at +0, its state's at
+// +4 (the state interface's base first), and the state stack's.
+constexpr uint32_t kLayerVtable = 0x820028E0;
+constexpr uint32_t kLayerStateVtable = 0x820028B0;
+constexpr uint32_t kStateBaseVtable = 0x82002880;
+constexpr uint32_t kStatesVtable = 0x820028F8;
+constexpr uint32_t kLayerBytes = 48;
+constexpr uint32_t kStatesBytes = 12;
+// A layer: +8 the app's interface (the app + 16), +12 the children, +24 the
+// states (lists of pointers), +36 the operations.
+constexpr uint32_t kLayerOwner = 8;
+constexpr uint32_t kLayerChildren = 12;
+constexpr uint32_t kLayerStates = 24;
+
+// The targets ours in play.
+constexpr uint32_t kAddLayer = 0x820AE130;
+// The base delegate's vtable (a temporary's, as its destructor leaves it).
+constexpr uint32_t kDelegateBaseVtable = 0x82000ABC;
+// The state stack's three delegates' targets.
+constexpr uint32_t kStatesOnUpdate = 0x820AE1B8;
+constexpr uint32_t kStatesOnUpdateToggled = 0x820AE1C0;
+constexpr uint32_t kStatesOnMessage = 0x820AE1C8;
+
+// sub_820AD118 StateLayer::StateLayer (`state` none) and sub_820ADBD8
+// StateLayer::StateLayer(state) (the state queued as a push): the vtables,
+// +8 = `owner`, the children's and states' lists and the operation list made.
+// `frame` is the original's (96 bytes, or 112 with a state).
+void LayerConstruct(uint8_t* base, uint32_t layer, uint32_t owner, std::optional<uint32_t> state,
+                    uint32_t frame, const AppCalls& calls);
+// sub_820ADA08 StateLayer::AddChild: the child's state (+4) slot 1 (r4 = the
+// layer), then the child appended to the children (+12). `frame` the
+// original's 112 bytes (`child` stored at its caller's r1 + 28).
+void LayerAddChild(uint8_t* base, uint32_t layer, uint32_t child, uint32_t frame,
+                   const AppCalls& calls);
+// sub_820AE130 AppStates::AddLayer (the stack's slot 1): a new layer holding
+// `state` (owner the app's slot 2) added to the root as a child (0 when
+// operator new answers 0). False, with nothing done, where operator new
+// hands back. `frame` the original's 112 bytes.
+bool StatesAddLayer(uint8_t* base, uint32_t states, uint32_t state, uint32_t frame,
+                    const AppCalls& calls);
+// sub_820AE348 AppStates::AppStates: +0 the vtable, +4 the app (`setup`'s
+// +0), +8 a root layer (owner the app's slot 2), then the three delegates
+// handed to the app's slot 1's interface (keys 8 and 2, listener 9). False,
+// with nothing done, where operator new hands back. `frame` the original's
+// 176 bytes.
+bool StatesConstruct(uint8_t* base, uint32_t states, uint32_t setup, uint32_t frame,
+                     const AppCalls& calls);
+// sub_820AE498 AppStates::Create: 12 bytes from operator new built by
+// AppStates::AppStates; the block, 0, or nullopt where operator new hands
+// back (nothing done). `frame` the original's 96 bytes.
+std::optional<uint32_t> StatesCreate(uint8_t* base, uint32_t setup, uint32_t frame,
+                                     const AppCalls& calls);
+
+// sub_82092878 App::Start (the +20 interface's slot +36, from
+// Framework::Start once at boot): the boot movies' table (0x826C5BAC) set,
+// the modes' holder made (Modes::Modes with 3) and pushed on the state stack
+// (its slot 1, AppStates::AddLayer), then 0x826364EC = 2. nullopt, with
+// nothing done, where operator new hands back. `frame` the original's 96
+// bytes. Its r3 (the slot's), or nullopt.
+std::optional<uint32_t> AppStart(uint8_t* base, uint32_t interface, uint32_t frame,
+                                 const AppCalls& calls);
+constexpr uint32_t kBootMovies = 0x826C5BAC;
+constexpr uint32_t kStartFlag = 0x826364EC;
+
+// --- The layers' walks ---
+
+// The functors and the operation the walks hand the lists.
+constexpr uint32_t kApplyOp = 0x820ADC60;
+constexpr uint32_t kUpdateChild = 0x820ACD80;
+constexpr uint32_t kUpdateChildToggled = 0x820ACDE8;
+constexpr uint32_t kToggleOffChild = 0x820ACD60;
+
+// sub_820AD3A0 PtrList::ForEach and sub_820AD440 OpList::ForEach
+// (std::for_each over a list with a member functor, unchecked iterators):
+// `first` and `last` the iterators (list, node), `functor` its function
+// (high word) and object, `adjust` its adjustment (high word; the low word
+// as the caller leaves it); each node's value (+8: a word, or the 8-byte
+// operation for `ops`) passed in r4, r3 the object plus the adjustment;
+// the range and functor stored in the caller's frame and re-read as the
+// original does, and the functor's 16 bytes stored at `result`. A functor
+// whose plain C++ is ours (the layers' child functors) runs it in its own
+// frame. `frame` the original's 112 bytes.
+void ListForEach(uint8_t* base, uint32_t result, uint64_t first, uint64_t last, uint64_t functor,
+                 uint64_t adjust, bool ops, uint32_t frame, const AppCalls& calls);
+// sub_820ACD80 and sub_820ACDE8 (StateLayer::Update's and UpdateToggled's
+// functors): the child's state (+4) slot 8 (or 9 when `toggled`), then its
+// slot 10, r4 = the layer. Its r3. `frame` the original's 112 bytes.
+uint32_t UpdateChild(uint8_t* base, uint32_t layer, uint32_t child, bool toggled, uint32_t frame,
+                     const AppCalls& calls);
+// sub_820ACD60 (StateLayer::OnToggleOff's functor): the child's state
+// slot 5 with r4 = the layer, as a tail call (the link register
+// `return_address`, the functor's caller's; 0 to leave it). Its r3.
+uint32_t ToggleOffChild(uint8_t* base, uint32_t layer, uint32_t child, uint32_t return_address,
+                        const AppCalls& calls);
+// sub_820ADE68 StateLayer::ApplyOps: each queued operation (+36) applied
+// with StateLayer::ApplyOp (OpList::ForEach), then the queue cleared
+// (List::Clear, over the allocation layer). r3 as Clear leaves it. `frame`
+// the original's 128 bytes.
+uint32_t LayerApplyOps(uint8_t* base, uint32_t layer, uint32_t frame, const AppCalls& calls);
+
+// --- The layers' updates ---
+
+// A layer's state slots 8 and 9 (sub_820AE120, sub_820AE128).
+constexpr uint32_t kLayerStateUpdate = 0x820AE120;
+constexpr uint32_t kLayerStateUpdateToggled = 0x820AE128;
+
+// sub_820ADF00 StateLayer::Update and sub_820AE010 UpdateToggled: with
+// states (+32), the top's slot 8 (or 9 when `toggled`) and then its slot
+// 10, r4 = the layer; each child's state slots through PtrList::ForEach with
+// sub_820ACD80 (or sub_820ACDE8); then StateLayer::ApplyOps. r3 as ApplyOps
+// leaves it. The checked iterator's trap (no top while +32 isn't 0) logged
+// with a warning and gone on from, as the recompiled code does. `frame` the
+// original's 144 bytes.
+uint32_t LayerUpdate(uint8_t* base, uint32_t layer, bool toggled, uint32_t frame,
+                     const AppCalls& calls);
+// sub_820AE120 and sub_820AE128 (the layer's state slots 8 and 9): `state`
+// - 4, then LayerUpdate as a tail call (in its frame, `frame`).
+uint32_t LayerStateUpdate(uint8_t* base, uint32_t state, bool toggled, uint32_t frame,
+                          const AppCalls& calls);
+// sub_820AE1B8 AppStates::OnUpdate and sub_820AE1C0 OnUpdateToggled (the
+// delegates' targets for keys 8 and 2): LayerUpdate on the root (+8) as a
+// tail call (in its frame, `frame`).
+uint32_t StatesOnUpdate(uint8_t* base, uint32_t states, bool toggled, uint32_t frame,
+                        const AppCalls& calls);
+
+// --- The operations and the toggle's messages ---
+
+constexpr uint32_t kToggleOnChild = 0x820ACD38;
+// A layer's state slot 5 (sub_820AD760).
+constexpr uint32_t kLayerStateToggleOff = 0x820AD760;
+
+// sub_820ADC60 StateLayer::ApplyOp: `op` the operation (its type in the high
+// word, a state in the low): 0 a new layer with the state (owner the layer's
+// +8) added as a child, 2 the state pushed (the top's slot 6, then the state
+// put at the front of +24 and its slot 1), others above 3 nothing. r3 as the
+// original leaves it, or nullopt with nothing done for the pop and the
+// replace (1 and 3, never seen in play), without --native_heap or where
+// operator new hands back. `frame` the original's 128 bytes (`op` stored at
+// its caller's r1 + 24).
+std::optional<uint32_t> LayerApplyOp(uint8_t* base, uint32_t layer, uint64_t op, uint32_t frame,
+                                     const AppCalls& calls);
+// sub_820AD4E0 StateLayer::OnToggleOn and sub_820AD680 OnToggleOff: with
+// states, the top's slot 3 (or 5 when `off`), r4 = the layer; then the
+// children through PtrList::ForEach with sub_820ACD38 (or sub_820ACD60).
+// r3 the walk's result (`frame` + 96). `frame` the original's 128 bytes.
+uint32_t LayerToggle(uint8_t* base, uint32_t layer, bool off, uint32_t frame,
+                     const AppCalls& calls);
+// sub_820ACD38 (OnToggleOn's functor): OnToggleOn on the child, as a tail
+// call (the link register `return_address`, the walk's).
+uint32_t ToggleOnChild(uint8_t* base, uint32_t child, uint32_t return_address,
+                       const AppCalls& calls);
+// sub_820AD760 (the layer's state slot 5): OnToggleOff on `state` - 4, as a
+// tail call (the link register `return_address`).
+uint32_t LayerStateToggleOff(uint8_t* base, uint32_t state, uint32_t return_address,
+                             const AppCalls& calls);
+// sub_820AE1C8 AppStates::OnMessage (listener 9's target): `message` the
+// message's address: 0 OnToggleOn on the root, 2 OnToggleOff, 3, 4 and above
+// 6 nothing. r3 as the original leaves it, or nullopt with nothing done for
+// 1, 5 and 6 (the step and the teardowns, never seen in play). `frame` the
+// original's 112 bytes.
+std::optional<uint32_t> StatesOnMessage(uint8_t* base, uint32_t states, uint32_t message,
+                                        uint32_t frame, const AppCalls& calls);
+
+}  // namespace app_states

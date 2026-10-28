@@ -73,6 +73,7 @@ ITC_NATIVE_STEP(NativeNodeCount, ctx.r3.u64 = ma::SkeletonNodeCount(base, ctx.r3
 ITC_NATIVE_STEP(NativeLoadNodeValues,
                 ma::SkeletonLoadNodeValues(base, ctx.r3.u32, ctx.r4.u32))
 ITC_NATIVE_STEP(NativeApplyAnimation, ma::SkeletonApplyAnimation(base, ctx.r3.u32))
+ITC_NATIVE_STEP(NativeResetPose, ma::SkeletonResetPose(base, ctx.r3.u32))
 ITC_NATIVE_STEP(NativeCursorCurveSample,
                 ctx.f1.f64 = ma::CursorCurveSample(base, ctx.r4.u32, ctx.r5.u32, ctx.r6.u32,
                                                    ctx.f1.f64))
@@ -677,6 +678,11 @@ void Skeletons(Context& h) {
        NativeUpdateNodeMatrices, Result::kNone, Target::kSkeleton, 0},
       {"sub_825998B8 Skeleton::ApplyAnimation", __imp__sub_825998B8, NativeApplyAnimation,
        Result::kNone, Target::kSkeleton, 0},
+      // r3 isn't compared: it ends as Skeleton::ApplyAnimation leaves it (its
+      // adapter leaves the skeleton, its original a loop's register), and
+      // every caller sets r3 right after.
+      {"sub_82599AF0 Skeleton::ResetPose", __imp__sub_82599AF0, NativeResetPose, Result::kNone,
+       Target::kSkeleton, 0},
   };
   for (const Function& f : functions) {
     Results results(f.name);
@@ -691,6 +697,14 @@ void Skeletons(Context& h) {
           h, results,
           [&] {
             WriteSkeleton(h, l, f.recompiled == __imp__sub_825998B8);
+            if (f.recompiled == __imp__sub_82599AF0) {
+              // ResetPose's three sources (+88, +92, +96: 16 bytes a node),
+              // past the layout's section.
+              for (uint32_t k = 0; k < 3; k++) {
+                const uint32_t source = h.data + 3584 + 128 * k;
+                guest::StoreU32(h.base, l.skeleton + 88 + 4 * k, source);
+              }
+            }
             // LoadNodeValues reads the bound cursor's count unchecked: a
             // section always (as Mesh::Parse passes).
             section = h.random.Below(5) == 0 && f.recompiled != __imp__sub_825997E0 ? 0 : l.section;

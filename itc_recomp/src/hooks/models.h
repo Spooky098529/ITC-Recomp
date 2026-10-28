@@ -37,6 +37,8 @@ void ModelsMaterialCount(PPCContext& ctx, uint8_t* base);
 void ModelsMaterial(PPCContext& ctx, uint8_t* base);
 void ModelsSharedVertexShader(PPCContext& ctx, uint8_t* base);
 void ModelsSharedPixelShader(PPCContext& ctx, uint8_t* base);
+// sub_825896C0 (r3, r4 the tables; r3 left).
+void ModelsSetSharedShaders(PPCContext& ctx, uint8_t* base);
 void ModelsVertexDeclaration(PPCContext& ctx, uint8_t* base);
 
 }  // namespace hooks
