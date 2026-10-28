@@ -16,8 +16,13 @@ file's history. What's left to see in a drive, from every run:
 - Now: a "no mapping" lead, not counted: `Vinyl::Compress`
   `sub_820ED090` (`car-models.md`, 110 lines) with its two ready
   callees `sub_820ECF08`, `sub_820ECFC8` (204 lines in all), then
-  `XGCompressSurface`'s adapter, which only it calls. Migration agent
-  running.
+  `XGCompressSurface`'s adapter, which only it calls. Migration done
+  (689b0c8, 53ea064): the three ours under `--native_car_models`
+  (adapters stay: recompiled callers in play), `XGCompressSurface`
+  Native; `itc_2106`: 19 s, 0 errors, every harness 0 differing but
+  the expected groups; frame dumps the same as the fallback. Left
+  under `CarModel::OnDecalLoaded` `sub_820D5750`: 7 ready groups (the
+  sheet's software rasterizer). Validation agent running.
 
 ## Done
 
@@ -48,6 +53,8 @@ This run's groups: `expected-differences.md` (the "08:36 run" lines).
   4028 (wrapped 103, known 522, unknown 3403).
 - After its validation: race 19 s (`itc_2099`), 0 errors, every
   harness 0 differing but the expected groups; no replay needed.
+- After `Vinyl::Compress`'s migration: ours 2427, work left 4025
+  (wrapped 103, known 520, unknown 3402).
 
 ## Stopped
 

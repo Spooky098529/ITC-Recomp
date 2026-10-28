@@ -50,6 +50,23 @@ When the user has reviewed a run's section, its heading gets
   play the box is the whole surface). The vinyl's detail couldn't be
   judged from the dumps (cars too far); the `XGCompressSurface` harness
   compresses a full 1024x1024 sheet byte for byte.
+- `Vinyl::Compress` without mapping (689b0c8, 53ea064): rows in
+  `car-models.md` for `Vinyl::Compress` `sub_820ED090`,
+  `Texture::Create` `sub_820ECF08`, `Texture::Free` `sub_820ECFC8` (a
+  new row), plain C++ in `src/car_models/vinyl.{h,cpp}` under
+  `--native_car_models` (only with the native heap; `Texture::Free` and
+  `Vinyl::Compress` only with an old header 0 or in the allocation
+  layer's range, VirtualFree's adapter's condition);
+  `XGCompressSurface` Native (`texture-compression.md`'s row and
+  intro), `--native_texture_compression` now switched by
+  `--native_car_models`. Kept as the original: `Resource::Release`
+  `sub_822A67B0` a guest call from a 272-byte frame with the original's
+  return addresses; the frame's words written as the original writes
+  them, except the saved registers (as `XGCompressSurface`). Harness:
+  allocation addresses compared as which allocation plus offset; the
+  comparison of `Texture::Create`'s frame inside `Vinyl::Compress`'s
+  cases removed (the original `XGCompressSurface` saves registers over
+  it, its plain C++ doesn't; `Texture::Create`'s own cases check it).
 
 ## Run 2026-10-27 22:31 (`b7-loop-27-10-26`)
 
