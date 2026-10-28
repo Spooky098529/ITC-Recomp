@@ -132,7 +132,11 @@ goes in `src/` as overrides), American English.
   texture compression (`texture-compression.md`) and the vinyl sheet
   above it (`car-models.md`, two leads without mapping), the race world
   (`race-world.md`, 49 of 50) and the race's states (`race-states.md`,
-  43 of 63) native (ours 2,540). The
+  43 of 63) native (ours 2,540); its twentieth run (branch
+  `b7-loop-28-10-26-2`, merged 2026-10-28, 3 subsystems) made the archive (`archive.md`,
+  its four semaphores host ones by the user's call), the file layer
+  with sprintf (`file-layer.md`) and the save system's interface
+  (`save-interface.md`, 41 of 41) native (ours 2,628). The
   runs' rows wait for the user's review (`docs/loops/review.md`). See
   "B7's loop runs" under B7, and `docs/loops/b7-progress.md`. Guest
   allocation is no longer a block (`docs/native-memory.md`); what the
@@ -2616,6 +2620,9 @@ B7. **The game logic inside**: everything else, subsystem by subsystem,
 | 2026-10-28 | The vinyl sheet above texture compression (no mapping, not counted: `Vinyl::Compress`, `Texture::Create` and `Free`; then the decal path under `CarModel::OnDecalLoaded`: the TGA reader, the software rasterizer, `Vinyl::DrawDecal`, `DrawDecals`, `ClearCorner`) | `car-models.md` | 27 of 46 (two migrations; 2 adapters removed, `XGCompressSurface` Native; `ClearCorner`'s harness doesn't reach it) | `--native_car_models` |
 | 2026-10-28 | The race world (the race mode's state machine at +116812: `RaceWorld::Init`, `OnLoaded`, `Tick`, `Unload`, the paused tick; the racers' manager at `[0x826D82F4]`: its tables, `AddRacers`, `ListRacers`, the vehicles streamed to the nearest entries by distance, `Refresh`, `ResetWorld`, `ResetVehicles`; the race event's start placements, `RaceStart::Place` and `PlaceRolling`; the save's distance on unload; with `TrackCollision::Tick`) | `race-world.md` | 49 of 50 in play (three migrations; 25 adapters removed; `OnLoad` waits on the archive) | `--native_race_world` |
 | 2026-10-28 | The race's states (`RaceStates::Init`'s machine at +107168, 87 transitions: the stage's start, the rolling and standing starts, the countdown, `RaceTick`, `OnGo`, quit, the end, the replay's and menu's handlers, free run; the race's progress at `[0x826D82E8]`: its checks for laps, finish, hits, damage, the SP drain, rank and time; the route helpers `StartRoute`, `FollowRoute`, `RouteDistance`, `MapToSection`) | `race-states.md` | 43 of 63 in play (two migrations; 20 Native; the rest waits on the loading screen, the archive's queue, the cars put back, the input recordings, the scene models' load poll, the items and achievements, the race event's lookups, the two-player cameras, the core) | `--native_race_states` |
+| 2026-10-28 | The archive (`Archive::Toc`, `AssetSize`, `Load`, the request queue and slots, the loader's picker, set-up and next request, WaitIdle, QueueLength, the cancels, the request finish, `LoaderFunctor::Invoke`, loose files, the Ucl/NRV2B unpacker; its four semaphores as host counting semaphores, the user's call) | `archive.md` (with the shared rows in `files-and-saves.md` and `video-output.md`) | 25 (all of `archive.md`'s 11 in play and 14 shared rows; two migrations; 8 adapters removed; the rest waits on the loose read's file object, open by name and sprintf, and the game's `Semaphore::Init`) | `--native_archive` |
+| 2026-10-28 | The file layer (the file object `GameFile` over `AsyncFile` and `File::`, the path objects and `Path::Build`, `GamePath::SetGame`, the open by name; with sprintf, `_vsnprintf`, `_vsnprintf_l` and `_output_l` it unblocked, and the archive's loose read) | `file-layer.md` (with rows in `c-runtime.md` and `files-and-saves.md`) | 17 (all 11 in play of `file-layer.md` with the 6 it unblocked; one migration; 7 adapters removed) | `--native_file_layer` (sprintf under `--native_c_runtime`, the loose read under `--native_archive`) |
+| 2026-10-28 | The save system's interface (the app's interface at `[0x826BDC90]`, its wrappers over the save devices' slots and the users; the front end's save layer: the save buffers, `GameData::Save`, `Load` and `Check`, the replays' list, `PlayTime`) | `save-interface.md` (with rows in `files-and-saves.md`, `system-services.md`) | 41 of 41 in play, with 5 shared rows (one migration; 17 adapters removed) | `--native_save_interface` |
 
     The first run (2026-10-22, branch `b7-loop-test`): every harness at 0 differing, attract races at 20-21 s with no errors,
     and a race the user drove looked right. Ours went from 162 to 335 (work
@@ -3765,3 +3772,58 @@ lookups, the two-player cameras and the core. The boundary unchanged:
 called 70, live 282. Imports: 186 called, 62 with a live caller. B7
 (`b7_status.py`): ours 2,540, work left 3,920 (Wrapped 103, with a row
 523, no row yet 3,294), from 3,961 (from 4,052 at the run's start).
+
+**2026-10-28, the archive (branch `b7-loop-28-10-26-2`):** the
+twentieth run's first subsystem mapped the archive (`archive.md`, 27
+new rows; its B4 rows stay in `files-and-saves.md`) and made 25
+functions native in two migrations (`--native_archive`): the TOC and
+asset sizes, the request list and slots, the queue, the loader's
+picker, set-up and next request, the waits and cancels, the request
+finish and the Ucl unpacker. The loader's four semaphores (queue lock
+`0x826BAAE0`, work `0x826BAAB8`, request-done `0x826BAA68`, idle
+`0x826BAA90`) are host counting semaphores with a readable count, taken
+by every user (the user's call, 2026-10-28): `Semaphore::Wait` and
+`Signal` route those four addresses to them and every other semaphore
+to the game's code. The rest waits on the loose read's file object
+(`sub_820A6A00`, `sub_820A6A40`), the open by name (`sub_820A6AB8`) and
+sprintf, and the game's `Semaphore::Init` for the static set-ups. The
+boundary unchanged: 449 functions (916 pairs): overridden 69, Native 5,
+Dropped 23, never called 70, live 282. Imports: 186 called, 62 with a
+live caller. B7 (`b7_status.py`): ours 2,565, work left 3,896 (Wrapped
+103, with a row 510, no row yet 3,283), from 3,920.
+
+**2026-10-28, the file layer (branch `b7-loop-28-10-26-2`):** the
+twentieth run's second subsystem mapped the game's file layer
+(`file-layer.md`, 21 rows, 11 in play: the file object `GameFile` over
+`AsyncFile`, `File::` and a base stream; the path object and
+`Path::Build`; `GamePath::`, only from the movie library's open) and
+made it native with what it unblocked (`--native_file_layer`): sprintf
+and `_vsnprintf` with `_output_l` (`--native_c_runtime`,
+`src/c_runtime/narrow_format.cpp`, after `_woutput_l`'s precedent: the
+original runs for what the native formatter doesn't do), the open by
+name and the archive's loose read (`--native_archive`), so nothing
+ready is left in the archive or the file layer. The open by name and
+the loose read stay adapters calling B4's `File::` adapters through
+`ctx`. The boundary unchanged: 449 functions (916 pairs): overridden
+69, Native 5, Dropped 23, never called 70, live 282. Imports: 186
+called, 62 with a live caller. B7 (`b7_status.py`): ours 2,582, work
+left 3,879 (Wrapped 103, with a row 504, no row yet 3,272), from 3,896.
+
+**2026-10-28, the save system's interface (branch
+`b7-loop-28-10-26-2`):** the twentieth run's third and last subsystem
+mapped the save system's interface (`save-interface.md`, 62 rows, 41 in
+play: the app's interface at `[0x826BDC90]`, app + 16, with the save
+devices and users behind its slots +12 and +8, the wrappers over the
+save slots' getters and request words, and the front end's save layer
+at `8228F6B0`-`82290640`) and made all 41 native in one migration
+(`--native_save_interface`), with `XContentCalculateSize`, the display
+name's copy and the users' two vtable targets. Nothing in it calls an
+Xbox service: it sets the slots' request words, which B4's `SaveSlot`
+steps answer. The plain C++ checks that each vtable target it calls is
+ours and hands back to the original when one isn't. The replays' list
+(`BuildList`, `Count`, `ReadEntry`, `Sort`) waits for a drive. The
+boundary unchanged: 449 functions (916 pairs): overridden 69, Native 5,
+Dropped 23, never called 70, live 282. Imports: 186 called, 62 with a
+live caller. B7 (`b7_status.py`): ours 2,628, work left 3,833 (Wrapped
+103, with a row 498, no row yet 3,232), from 3,879 (from 3,920 at the
+run's start).

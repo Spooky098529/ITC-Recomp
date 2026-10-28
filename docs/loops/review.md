@@ -11,6 +11,113 @@ functions to check in a drive in the progress file.
 When the user has reviewed a run's section, its heading gets
 "(reviewed <date>)"; the section stays for the record.
 
+## Run 2026-10-28 18:45 (`b7-loop-28-10-26-2`)
+
+- The archive (map a8a12e3): `docs/functions/archive.md`, 27 new rows
+  (the archive's B4 rows stay in `files-and-saves.md`, named shared:
+  `Archive::Init`, `Shutdown`, `Load`, `AssetSize` (`sub_820A0678`,
+  named and read in full), the queueing, slot lookup, picker, set-up,
+  finish, next request, loose read, loader thread, Ucl). Corrections in
+  `files-and-saves.md`: the slot lookup, picker, queueing and
+  `Archive::Shutdown` rows read in full (the slot table starts at
+  `0x826A5168`, not `0x826A5170`). `known-data.md`: the archive's
+  globals `0x826A5100`-`0x826A512C`, the TOC, the 92-byte request
+  slots, the queue at `0x826BAB08`, the four semaphores, the loader
+  thread's parameters at `0x82600B50`. Two leads taken into the map
+  (`sub_8209D7B0`, `sub_82294BA8`), two added.
+- The user's call (2026-10-28): the archive loader's four semaphores
+  (queue lock `0x826BAAE0`, work `0x826BAAB8`, request-done
+  `0x826BAA68`, idle `0x826BAA90`) become host counting semaphores with
+  a readable count (two users read +32), taken by every user, native
+  and recompiled (the loose read `sub_8209DFA8` signals request-done);
+  this replaces the 2026-10-24 note that the Semaphore class stays
+  recompiled for the archive loader.
+- The archive's migration 1 (47d1ab1..eac2d83, `--native_archive`): 14
+  functions ours (rows in `archive.md` and `files-and-saves.md`). For
+  review: `hooks::VirtualFree` exported from `src/hooks/heap.cpp` for
+  the request finish's decommit (does nothing in the allocation layer);
+  the request finish's callback and `LoaderFunctor::Invoke`'s tail call
+  stay guest calls through `ctx` from their adapters; `Ucl::Unpack`'s
+  stored-block copy goes through `native::Buffers_Memcpy`; the harness
+  takes the game's queue lock (translated `Semaphore::Wait`/`Signal`)
+  around cases touching the live queue; Ucl cases use an NRV2B encoder
+  in the harness and 16 assets from BUILD.DAT.
+- The archive's migration 2 (f4b6d09..db11bea, `--native_archive`
+  extended): `Archive::Load`, the queueing (named `Archive::Queue`),
+  WaitIdle, QueueLength, CancelQueued, `Archive::Cancel`, `PickNext`,
+  `SetUp`, `NextRequest`, the loader thread's and `Archive::Init`'s
+  waits; 8 adapters removed. The four semaphores are host counting
+  semaphores by the user's call: `Semaphore::Wait` `sub_82592670` and
+  `Signal` `sub_825926E8` (`video-output.md`) are now Overridden,
+  routing the four addresses to the host ones and every other
+  semaphore to the game's code; the choice is made at start-up (with
+  `--native_archive=false` the four stay the game's, raced 38 s, 0
+  differ). Rows in `archive.md`, `files-and-saves.md`,
+  `video-output.md`, `known-data.md`.
+- The file layer (map f053e6c): `docs/functions/file-layer.md`, 21 new
+  rows (11 in play): the file object `GameFile` (vtable `0x82002270`)
+  over `AsyncFile` (`0x8206CC0C`), `File::` (`0x8206C05C`) and a base
+  stream (`0x8206BFF8`); the path object `Path::` (`0x8206CC3C`,
+  `Path::Build` `sub_82593CA0`, only kind 0 in play); `GamePath::`
+  (`0x820022A0`, only `Movie::Open`, no longer called). Shared rows
+  stay in `files-and-saves.md`, `sound-cues.md`, `movies.md`,
+  `c-runtime.md`. `known-data.md`: the file and path objects; the
+  global strings' addresses corrected (`0x8265EE7C`/`98`, not
+  `0x8266EE7C`/`98`). One lead added (`sub_82593D78`, `sub_82593D88`).
+- The file layer's migration 1 (47a7c1d..edea212,
+  `--native_file_layer`): the file and path objects' constructors and
+  destructors, `Path::Build`, `GamePath::SetGame`, the open by name; 7
+  adapters removed. sprintf `sub_825A93D0`, `_vsnprintf`
+  `sub_825AB010`, `_vsnprintf_l`, `_output_l` (`c-runtime.md`, under
+  `--native_c_runtime`; `src/c_runtime/narrow_format.cpp`, harness
+  `c_runtime_format`), following `_woutput_l`'s precedent: a dry run
+  first, and the original runs for what the native one doesn't do
+  (`%n`, wide text, floats other than `%f`, the heap's buffer, a
+  forced point, no room, a lead byte ending the format, output over
+  its own format or arguments); the native path ran in ~3,500 of 4,870
+  sprintf cases. Format strings in play: `"%s%s"`, `"%s%s%d"`,
+  `"data\audio\%s.xgs"`, `"game:\%s"`. The archive's loose read
+  `sub_8209DFA8` under `--native_archive`; it and the open by name stay
+  adapters calling B4's `File::` adapters and the read-error report
+  through `ctx`.
+- The file layer's validation added `_vsnprintf`'s missing print
+  (a2eadab). In `Sprintf`, `Vsnprintf`, `_output_l` and `Path::Build`
+  the print comes after the checks that hand the call back to the
+  original (it logs only when the native path runs); `Path::Build`
+  has it at two places.
+- The save system's interface (map 3aa9f33):
+  `docs/functions/save-interface.md`, 62 rows (`sub_821109B8` moved
+  from `functions.md`, 61 new; 41 in play): `[0x826BDC90]` is app +
+  16, the app's interface (vtable `0x82000E38`, stored by
+  `SaveInterface::Init` `sub_8209FFB8`, which sets the content root
+  "TXR360"); its slot +12 (`sub_820943B0`) the save devices, +8
+  (`sub_820943C8`, shared in `system-services.md`) the users; the
+  wrappers over the save slots' getters and request setters (+968,
+  +972, +976); the front end's save layer (`8228F6B0`-`82290640`):
+  the save buffers at `0x828161F0`, `GameData::Save` (SystemData.bin,
+  129,400 bytes), `GameData::Load`, the replays (rep_* files,
+  1,231,088 bytes), `PlayTime::Update`. No Xbox service called (B4's
+  `SaveSlot` steps answer the requests). `known-data.md`:
+  `0x826BDC90`, `0x828161F0`, the replay record, the save slot's
+  request words. Two leads added.
+- The save interface's migration 1 (63d02d8..53423d6,
+  `--native_save_interface`): all 41 rows in play ours, 17 adapters
+  removed; also taken under this flag: `sub_82295D48`, `sub_82295C18`
+  (`files-and-saves.md`) and the users' vtable targets `sub_820943C8`,
+  `sub_82493700` (`system-services.md`). For review: the plain C++
+  checks each vtable target is ours first and hands back to `__imp__`
+  if not (a "vtable targets" harness group checks the game's vtables);
+  SaveBuffers, BuildList and Sort run natively only with
+  `--native_heap` (and `--native_memcpy`); the harness points the live
+  globals `0x826BDC90`, `0x828161F0` and `0x826C5B58` at harness copies
+  while each case runs, then puts them back (the harnesses run before
+  the race; no live saves touched); two harness spots don't compare
+  stack words that hold the original's register saves or back chains
+  (`PlayTime`'s out inside `GameData::Save`, `Sort`'s copy inside
+  `BuildList`), and `GameData::Save`'s compare leaves out
+  `GetLocalTime`'s seconds (ce1a3bd). `sub_82295C18`'s adapter stays
+  for `hooks/saves.cpp`.
+
 ## Run 2026-10-28 08:36 (`b7-loop-28-10-26`)
 
 - Texture compression (map f1c484c): `docs/functions/texture-compression.md`,

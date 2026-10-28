@@ -151,6 +151,30 @@ bool Cftof(uint8_t* base, uint64_t bits, uint32_t buffer, uint32_t size, int32_t
 bool Vswprintf(uint8_t* base, uint32_t buffer, uint32_t format, uint32_t args, uint32_t frame,
                int32_t* count);
 
+// sprintf (sub_825A93D0) after its spills, with _output_l (sub_825AF130,
+// narrow_format.cpp): `format` with the arguments at `args` (a va_list:
+// 8-byte slots) into `buffer` through a string stream of INT_MAX bytes, then
+// the terminator; `*count` the characters written. The work in `frame` (the
+// original _output_l's r1, all below the caller's stack pointer): its text
+// buffer at +144, as the original. A dry run first: false, with nothing
+// written to `buffer`, where the original must run: a null buffer or
+// format, %n, a wide character or a wide string's text (wctomb_s), a float
+// conversion other than %f or one needing the heap (a precision above 163)
+// or a forced point, %f's _cftof_l not native for the value, a lead byte
+// ending the format, or output landing on the format, the arguments, a
+// string read, or the frame (the original would read its own writes).
+bool Sprintf(uint8_t* base, uint32_t buffer, uint32_t format, uint32_t args, uint32_t frame,
+             int32_t* count);
+
+// _vsnprintf_l (sub_825AAF18, from _vsnprintf sub_825AB010) with _output_l:
+// as Sprintf, through a string stream of `size` bytes (INT_MAX at most);
+// with no buffer and a size of 0 only counted, with no terminator. False
+// also where the original goes through _flsbuf (the output, or the
+// terminator, doesn't fit) or EINVAL (a null format, or a null buffer with a
+// size).
+bool Vsnprintf(uint8_t* base, uint32_t buffer, uint32_t size, uint32_t format, uint32_t args,
+               uint32_t frame, int32_t* count);
+
 // __iob_func (sub_825AD4C0): the C runtime's stream table (_iob: 32 bytes
 // a stream, stdin, stdout and stderr first).
 constexpr uint32_t kStreams = 0x8266B7D0;

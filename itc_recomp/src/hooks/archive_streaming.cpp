@@ -6,13 +6,16 @@
 // it: the request queue (sub_8209DD98, which also finishes requests and runs
 // their callbacks on this thread), the loose reads (sub_8209DFA8, on the
 // native file class), Ucl::Unpack (sub_82294610) and the loop's locks
-// (sub_82592670 waits, sub_825926E8 signals). See B4 in
+// (sub_82592670 waits, sub_825926E8 signals). With --native_archive the next
+// request is archive::NextRequest and the locks the archive's host
+// semaphores (src/archive/semaphores.h), taken directly. See B4 in
 // docs/rexglue-removal.md.
 
 #include "guest.h"
 #include "guest_call.h"
 
 #include "game_data/game_data.h"
+#include "hooks/archive.h"
 
 #include "base/log.h"
 
@@ -131,6 +134,9 @@ bool ReadWhole(uint8_t* base, uint32_t path, uint32_t buffer, uint32_t size) {
 // 0x82600B50) are the game's.
 extern "C" REX_FUNC(sub_8209E210) {
   REX_FUNC_PROLOGUE();
+  // Whether the archive's semaphores are host ones is settled here, before
+  // anything waits on them (and before the harnesses switch the flag).
+  hooks::ArchiveHostSemaphores();
   const uint32_t object = ctx.r3.u32, extra_size = ctx.r4.u32;
   // A word the recompiled one copies from its own frame without setting it
   // (r1 - 208 + 116): whatever is there.
@@ -188,6 +194,10 @@ extern "C" REX_FUNC(sub_8209E210) {
   for (auto [object_address, return_address] :
        {std::pair{kRequestDone, 0x8209E3A8u}, std::pair{kWork, 0x8209E3B8u},
         std::pair{kIdle, 0x8209E3C8u}}) {
+    if (archive::HostSemaphore* s = hooks::ArchiveSemaphore(object_address)) {
+      s->Wait(base);
+      continue;
+    }
     ctx.r3.u64 = object_address;
     call(return_address, [&] { sub_82592670(ctx, base); });
   }
@@ -225,18 +235,36 @@ extern "C" REX_FUNC(sub_8209E118) {
     InFrame(ctx, base, kFrame, return_address, [&](uint32_t) { function(); });
   };
   auto wait = [&](uint32_t object, uint32_t return_address) {
+    if (archive::HostSemaphore* s = hooks::ArchiveSemaphore(object)) {
+      s->Wait(base);
+      return;
+    }
     ctx.r3.u64 = object;
     call(return_address, [&] { sub_82592670(ctx, base); });
   };
   auto signal = [&](uint32_t object, uint32_t return_address) {
+    if (archive::HostSemaphore* s = hooks::ArchiveSemaphore(object)) {
+      s->Signal(base);
+      return;
+    }
     ctx.r3.u64 = object;
     call(return_address, [&] { sub_825926E8(ctx, base); });
   };
+  // The next request (r3 the current one or 0; r3 the next).
+  auto next = [&](uint32_t current) {
+    ctx.r3.u64 = current;
+    call(0x8209E1E4, [&] {
+      if (hooks::NativeArchiveQueue()) {
+        hooks::ArchiveNextRequest(ctx, base);
+      } else {
+        sub_8209DD98(ctx, base);
+      }
+    });
+    return ctx.r3.u32;
+  };
   for (;;) {
     wait(kWork, 0x8209E148);
-    ctx.r3.u64 = 0;
-    call(0x8209E1E4, [&] { sub_8209DD98(ctx, base); });
-    uint32_t request = ctx.r3.u32;
+    uint32_t request = next(0);
     while (request) {
       const int32_t state = int32_t(guest::LoadU32(base, request + 52));
       if (state > 0 && state <= 2) {
@@ -260,9 +288,7 @@ extern "C" REX_FUNC(sub_8209E118) {
         signal(kRequestDone, 0x8209E1D4);
       }
       wait(kRequestDone, 0x8209E1DC);
-      ctx.r3.u64 = request;
-      call(0x8209E1E4, [&] { sub_8209DD98(ctx, base); });
-      request = ctx.r3.u32;
+      request = next(request);
     }
     if (guest::LoadU32(base, kIdleWanted)) {
       guest::StoreU32(base, kIdleWanted, 0);

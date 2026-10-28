@@ -13,6 +13,24 @@ function goes from this list when a log shows its `native running
 (game):` line (say which log in the commit). A run with nothing left
 here loses its heading.
 
+## Run 2026-10-28 18:45 (`b7-loop-28-10-26-2`)
+
+- The archive's migration 2 (attract race `itc_2276`, replay
+  `itc_2277`, ok): `sub_8209DB90` Archive::CancelQueued, `sub_8209DB20`
+  Archive::Cancel (`files-and-saves.md`, `archive.md`; probably a load
+  cancelled when leaving a screen mid-load)
+- The file layer (attract race `itc_2291`, replay `itc_2293`, ok):
+  `sub_825AB010` _vsnprintf, `sub_825AAF18` _vsnprintf_l
+  (`c-runtime.md`; from `sub_822B8048`); `sub_820A6BE0`
+  GamePath::GamePath, `sub_820A6BF0` GamePath::SetGame
+  (`file-layer.md`; only from `Movie::Open`, which the FFmpeg movies no
+  longer call: probably never runs now)
+- The save interface (attract race `itc_2311`, replay `itc_2312`,
+  ok): `sub_82290378` Replays::BuildList, `sub_822902A0`
+  Replays::Count, `sub_822900E0` Replays::ReadEntry, `sub_8228F840`
+  Replays::Sort (`save-interface.md`; the replays' screen with saved
+  replays)
+
 ## Run 2026-10-28 08:36 (`b7-loop-28-10-26`)
 
 - The race world's migration 1 (attract race `itc_2139`, replay

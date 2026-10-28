@@ -1,0 +1,143 @@
+// The front end's save layer natively (docs/functions/save-interface.md):
+// the save slot of a controller and the slot wrappers by player, the save
+// buffers at [0x828161F0], the replays' sort and the play time's update.
+// Plain C++ over the guest layout as the recompiled functions; adapters in
+// src/hooks/save_interface.cpp (behind --native_save_interface), register
+// steps shared with the harness in src/hooks/save_interface.h.
+
+#pragma once
+
+#include <array>
+#include <cstdint>
+#include <functional>
+#include <optional>
+
+namespace save_interface {
+
+// The player-to-controller table (Players::ResetControllers sets it).
+constexpr uint32_t kControllers = 0x826BABA4;
+// The save buffers' header (24 bytes: +0 the game data's buffer, +4 a
+// replay's, +8 the replay record being saved, +12 the replays' records, +16
+// their list entries, +20 their count).
+constexpr uint32_t kSaveBuffers = 0x828161F0;
+constexpr uint32_t kGameDataBytes = 0x1F978;   // 129,400
+constexpr uint32_t kReplayBytes = 0x12C8F0;    // 1,231,088
+constexpr uint32_t kReplayRecordBytes = 36;
+// The play time's frame counter.
+constexpr uint32_t kPlayTimeFrames = 0x826C5B90;
+
+// sub_8228F780 SaveSlots::OfController: the first i under the users' count
+// (SaveInterface::UserCount) whose signed-in user (UserAt(i)) is
+// `controller` (as int32), else the count. nullopt where the interface's
+// targets aren't ours (nothing read but them).
+std::optional<uint32_t> SlotOfController(uint8_t* base, uint32_t controller);
+// The controller of a player: [0x826BABA4 + 4 x player].
+uint32_t ControllerOf(uint8_t* base, uint32_t player);
+
+// The slot wrappers by player (the slot of the player's controller), each
+// answering r3 as the original leaves it; nullopt where a target isn't ours
+// (nothing done).
+std::optional<uint32_t> PlayerRequestDevice(uint8_t* base, uint32_t player);  // sub_8228F9B0
+std::optional<uint32_t> PlayerSlotState(uint8_t* base, uint32_t player);      // sub_8228F9E8
+std::optional<uint32_t> PlayerDevice(uint8_t* base, uint32_t player);         // sub_8228FA90
+std::optional<uint64_t> PlayerPending(uint8_t* base, uint32_t player);        // sub_8228FAC8
+
+// sub_8228F6B0 SaveBuffers::Create: when [0x828161F0] is 0, the header
+// (VirtualAlloc's plain C++, 24 bytes) stored and cleared, then the game
+// data's, a replay's and the record's buffers. Returns r3 as the original
+// leaves it (the last buffer) when it made them, nullopt (r3 left) when the
+// header was there. Only with the native heap (the adapter checks).
+std::optional<uint32_t> SaveBuffersCreate(uint8_t* base);
+// sub_8228F7E8 SaveBuffers::FreeReplayList: +12 freed (VirtualFree's plain
+// C++) and cleared when not 0. Returns VirtualFree's r3 (1) when it freed,
+// nullopt (r3 left) when not.
+std::optional<uint32_t> SaveBuffersFreeReplayList(uint8_t* base);
+// sub_8228F8F8 SaveBuffers::Destroy: the replays' records, then +0, +4 and
+// +8 freed and cleared when set, the header freed and the global 0. Returns
+// r3 as the original leaves it (the header's VirtualFree: 1).
+// SaveBuffersDestroyNative says whether it can run natively: the native
+// heap on, and the header and every buffer it frees pages the layer gave.
+bool SaveBuffersDestroyNative(uint8_t* base);
+uint32_t SaveBuffersDestroy(uint8_t* base);
+
+// sub_8228F840 Replays::Sort: the records (count at the header's +20)
+// sorted by +28, the pairs swapped through a 36-byte copy at `temp` (the
+// original's frame + 80, left there as it leaves it), each copy by memcpy's
+// plain C++. Returns r3 as the original leaves it: the last copy's
+// destination (memcpy's answer), nullopt (r3 left) when nothing was swapped.
+std::optional<uint32_t> ReplaysSort(uint8_t* base, uint32_t records, uint32_t temp);
+
+// sub_821109B8: the frames since the last update ([0x826C5B90] less the
+// stats' +6040, which is set to it) added to the play time (+6032 hours,
+// +6036 minutes, +6037 seconds, +6038 frames) with the carries; `out` +0 the
+// hours, +4 the word at +6036.
+void PlayTimeAdd(uint8_t* base, uint32_t out, uint32_t stats);
+// sub_82112838 PlayTime::Update: PlayTimeAdd on the save data's stats (+48)
+// into `out` (the original's frame + 80). Returns r3 as the original leaves
+// it (`out`).
+uint32_t PlayTimeUpdate(uint8_t* base, uint32_t save, uint32_t out);
+
+// The game data's file and its place (GameData::Save, Load and the check).
+constexpr uint32_t kGameDataFile = 0x826380E8;   // "SystemData.bin"
+constexpr uint32_t kGameDataPath = 0x82011EC8;   // "TXR360:\TXR_DATA_1"
+constexpr uint32_t kGameDataFormat = 0x82011EDC;  // L"%ls   %d/%d/%d %2d:%02d"
+constexpr uint32_t kGameDataTitle = 0x82011F0C;   // L"GAME DATA"
+constexpr uint32_t kLoadDisplayName = 0x82011F20;  // L" "
+
+// GameData::Save's calls into code that still takes the guest context, from
+// its frame: GetLocalTime (sub_822968B8) into `out`, and swprintf
+// (sub_8210A490) with r3 to r10 where its plain C++ refuses.
+struct GameDataCalls {
+  std::function<void(uint32_t out)> local_time;
+  std::function<void(const std::array<uint64_t, 8>& r3_to_r10)> swprintf;
+};
+
+// sub_8228FB00 GameData::Save, in its frame at `frame` (the original's r1,
+// its 368 bytes): the display name (frame + 96, 256 bytes cleared) from
+// swprintf of the local time (frame + 80), after PlayTime::Update on
+// player 0's save data (its out at frame - 16), then SaveInterface::Save on
+// the slot of player 0's controller. Returns r3 as the original leaves it
+// (Save's answer); nullopt, with nothing done, where a target isn't ours.
+std::optional<uint64_t> GameDataSave(uint8_t* base, uint32_t frame, const GameDataCalls& calls);
+// sub_8228FBC0 GameData::Load: the game data's buffer ([0x828161F0] + 0)
+// cleared, then SaveInterface::Load of SystemData.bin into it on the slot
+// of the player's controller. Returns r3 as the original leaves it; nullopt,
+// with nothing done, where a target isn't ours.
+std::optional<uint64_t> GameDataLoad(uint8_t* base, uint32_t player);
+// sub_8228FC50 GameData::Check: on the slot of the player's controller, 3
+// for no device (state 2), 4 when not ready (not 3) or a request is
+// pending; 1 when SystemData.bin is among the enumerated saves; else 0 when
+// the device's free bytes (the low word) are at least its size
+// (XContentCalculateSize of 129,400 bytes), or 2. nullopt where a target
+// isn't ours (it only reads).
+std::optional<uint32_t> GameDataCheck(uint8_t* base, uint32_t player);
+
+// sub_822902A0 Replays::Count: `*out` = 0, then on the slot of player 0's
+// controller: 3 for no device (state 2), 4 when not ready or a request is
+// pending; else the enumerated saves whose file name starts with "rep"
+// counted into `*out`, and 7. nullopt where a target isn't ours (the
+// original then runs from the start, writing `*out` again).
+std::optional<uint32_t> ReplaysCount(uint8_t* base, uint32_t out);
+// sub_822900E0 Replays::ReadEntry's checks: 3 for no device, 4 when not
+// ready or pending, 5 when the save's file name doesn't start with "rep".
+// nullopt, with nothing done, for a "rep" save (its parse, by sscanf and
+// wcsncpy_s, never seen in play: the original runs) or a target not ours.
+std::optional<uint32_t> ReplaysReadEntry(uint8_t* base, uint32_t index, uint32_t record,
+                                         uint32_t entry);
+
+// sub_82290378 Replays::BuildList, in its frame at `frame` (the count at
+// +80): Replays::Count; unless that's 7, its answer. The old lists freed
+// (+12 and +16, VirtualFree's plain C++, not cleared), new ones for the
+// count (plus an empty first entry when under 99 and `add_empty`) made
+// (VirtualAlloc's), each enumerated save read (ReadEntry's plain C++, or
+// `read_entry` through the guest where it hands back), and the records
+// sorted (Replays::Sort's plain C++, its copy in Sort's frame below);
+// returns 7, or ReadEntry's 3 or 4. ReplaysBuildListNative says whether it
+// can run natively: the native heap and memcpy's plain C++ on, the old
+// lists 0 or the layer's pages.
+bool ReplaysBuildListNative(uint8_t* base);
+std::optional<uint32_t> ReplaysBuildList(
+    uint8_t* base, uint32_t add_empty, uint32_t frame,
+    const std::function<uint32_t(uint32_t index, uint32_t record, uint32_t entry)>& read_entry);
+
+}  // namespace save_interface

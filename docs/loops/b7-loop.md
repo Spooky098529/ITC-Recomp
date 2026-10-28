@@ -501,6 +501,10 @@ Calls so far for decisions the loop meets often:
   `0x8296BD38`, 2026-10-25). The generic wrappers and `ScopedLock` stay
   recompiled for the other critical sections. A device-wide lock over a
   host semaphore: the device lock (2026-10-24).
+- The game's Semaphore objects a subsystem's code uses: host counting
+  semaphores with a readable count, taken by every user, native and
+  recompiled (the archive loader's four, 2026-10-28); the Semaphore
+  class itself stays recompiled for the others.
 - The graphics: native if the renderer needs it, else Dropped (fence
   waits, cache flushes, packets nothing reads).
 - XACT is translated (2026-10-23); libraries replaced wholesale aren't

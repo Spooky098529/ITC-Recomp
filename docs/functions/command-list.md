@@ -40,8 +40,8 @@ delete, when bit 0 of r4 is set; no direct callers); the debug print
 Shared callees in no file yet: `sub_825A6940` (probably `malloc` or
 operator new) and `sub_825A71C0` (probably `free`), the C runtime heap
 (rows in `heap.md`; over the native allocation layer since 2026-10-22). Nearby but not the command list:
-`sub_8258C938` (vtable `0x8206C05C`, +4 = -1, +8 = +12 = 0: probably the
-file class's constructor, `files-and-saves.md`'s area; from
+`sub_8258C938` (vtable `0x8206C05C`, +4 = -1, +8 = +12 = 0: the
+file class's constructor, `File::File` in `file-layer.md`; from
 `sub_82593AC0`) and `sub_8258CE60` (an input processor's constructor,
 vtable `0x8206C0C4`). The rest of the game's functions are in
 [`functions.md`](functions.md).

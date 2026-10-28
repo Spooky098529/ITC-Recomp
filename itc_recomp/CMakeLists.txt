@@ -172,6 +172,14 @@ set(ITC_SOURCES
     src/race_states/follow_route.cpp
     src/race_states/race_states_init.cpp
     src/race_states/route_distance.cpp
+    src/hooks/archive.cpp
+    src/archive/archive.cpp
+    src/archive/semaphores.cpp
+    src/hooks/save_interface.cpp
+    src/save_interface/save_interface.cpp
+    src/save_interface/save_layer.cpp
+    src/hooks/file_layer.cpp
+    src/file_layer/file_layer.cpp
     src/hooks/texture_compression.cpp
     src/texture_compression/dxt_alpha.cpp
     src/texture_compression/dxt_color.cpp
@@ -275,6 +283,7 @@ set(ITC_SOURCES
     src/c_runtime/strings.cpp
     src/c_runtime/format.cpp
     src/c_runtime/wide_format.cpp
+    src/c_runtime/narrow_format.cpp
     src/c_runtime/start_up.cpp
     src/c_runtime/parse.cpp
     src/c_runtime/arrays.cpp
@@ -321,6 +330,10 @@ set(ITC_SOURCES
     src/harnesses/save_data.cpp
     src/harnesses/race_world.cpp
     src/harnesses/race_states.cpp
+    src/harnesses/archive.cpp
+    src/harnesses/save_interface.cpp
+    src/harnesses/file_layer.cpp
+    src/harnesses/c_runtime_format.cpp
     src/harnesses/texture_compression.cpp
     src/harnesses/collision.cpp
     src/harnesses/collision_world.cpp
