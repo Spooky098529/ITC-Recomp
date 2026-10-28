@@ -18,8 +18,8 @@ ITC_FLAG_BOOL(native_save_interface, true, "ITC",
               "sub_820996D8; the save devices' slots sub_820A5750, sub_820A5768, "
               "sub_820A5780, sub_820A5798, sub_820A57B0, sub_820A57F0, sub_820A5808, "
               "SetRootName sub_820A5580, RequestSave sub_820A52E0 and RequestLoad "
-              "sub_820A53E8; the display name's copy sub_82295D48 and XContentCalculateSize "
-              "sub_82295C18) natively instead of through the translated code (the same "
+              "sub_820A53E8; the display name's copy sub_82295D48, no adapter: only their plain C++ "
+              "calls it in play; and XContentCalculateSize sub_82295C18) natively instead of through the translated code (the same "
               "reads and writes; the original where a vtable target isn't ours; checked by "
               "--run_harnesses=save_interface)");
 
@@ -165,6 +165,10 @@ ITC_SAVE_INTERFACE_WRAPPER(820A0620, SaveInterfaceUserAt, si::InterfaceUserAt(ba
 
 }  // namespace hooks
 
+// No adapter (removed 2026-10-28: in play only the request setters' plain
+// C++ calls it; the flag switches them, and the register step above stays
+// for the harness) for the display name's copy sub_82295D48.
+
 #define ITC_SAVE_INTERFACE_ADAPTER(address, step) \
   extern "C" REX_FUNC(sub_##address) {            \
     REX_FUNC_PROLOGUE();                          \
@@ -190,7 +194,6 @@ ITC_SAVE_INTERFACE_ADAPTER(820A5808, SaveInterfaceSlotPending)
 ITC_SAVE_INTERFACE_ADAPTER(820A5580, SaveInterfaceSetRootName)
 ITC_SAVE_INTERFACE_ADAPTER(820A52E0, SaveInterfaceSlotRequestSave)
 ITC_SAVE_INTERFACE_ADAPTER(820A53E8, SaveInterfaceSlotRequestLoad)
-ITC_SAVE_INTERFACE_ADAPTER(82295D48, SaveInterfaceCopyDisplayName)
 ITC_SAVE_INTERFACE_ADAPTER(82295C18, SaveInterfaceContentSize)
 ITC_SAVE_INTERFACE_ADAPTER(8209FFB8, SaveInterfaceInit)
 ITC_SAVE_INTERFACE_ADAPTER(820A0018, SaveInterfaceSlotStateOf)
