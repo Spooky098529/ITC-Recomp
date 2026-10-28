@@ -144,4 +144,14 @@ void SceneLoadersTrafficRelease(PPCContext& ctx, uint8_t* base);
 void SceneLoadersTrafficDestruct(PPCContext& ctx, uint8_t* base);
 void SceneLoadersTrafficDeletingDestruct(PPCContext& ctx, uint8_t* base);
 
+// ScenePools::CreateA sub_820C3FD8 (r3 = the set, r4 = the record; r3 as
+// the original leaves it), only while hooks::ModelsNativeLifetime(): the
+// constructors' originals called from its frame where their plain C++
+// declines.
+void SceneLoadersCreateA(PPCContext& ctx, uint8_t* base);
+// Interior::OnPartLoaded sub_820D7578 (r3 = the request, r6 = the interior;
+// r3 as the original leaves it), only while hooks::ModelsNativeLifetime():
+// Model::Load's original called from its frame where its plain C++ declines.
+void SceneLoadersInteriorOnPartLoaded(PPCContext& ctx, uint8_t* base);
+
 }  // namespace hooks

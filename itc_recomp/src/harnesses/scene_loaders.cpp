@@ -1486,6 +1486,286 @@ void Lifetimes(Context& h, Random& r, uint32_t block) {
   Put(h.base, sl::kFirstSet, saved_set);
 }
 
+// --- ScenePools::CreateA ---
+//
+// A set (its lists empty, or now and then holding nodes in the block) and a
+// record of small counts (now and then negative ones, outside the two that
+// size the records), the first set's pointer random. Each side's objects are
+// found by walking the lists; compared: the block (the set and the record),
+// the records' pages and each object, with the pointers into them made
+// offsets (each side has its own pages), the texture providers by
+// TakeProvider, r3 the same way; then all freed.
+std::vector<uint32_t> PoolProviders(uint32_t pool) {
+  std::vector<uint32_t> at;
+  auto models_from = [&](uint32_t first, uint32_t count) {
+    for (uint32_t i = 0; i < count; i++) {
+      at.push_back(first + sl::kPartModelBytes * i + models::kModelTextures);
+    }
+  };
+  switch (pool) {
+    case 0:
+      for (uint32_t offset : sl::kCarModelMembers.providers) at.push_back(sl::kCarModelLoads + offset);
+      break;
+    case 1:
+      models_from(sl::kPartsModels, sl::kPartsCount);
+      break;
+    case 2:
+      for (uint32_t offset : sl::kCarModelMembers.providers) at.push_back(sl::kCockpitLoads + offset);
+      models_from(sl::kCockpitLoads + sl::kCockpitLoadsParts, 6);
+      break;
+    case 3:
+      models_from(304, 6);
+      break;
+    case 4:
+      models_from(112, 1);
+      break;
+    case 5:
+      for (uint32_t i = 0; i < 2; i++) at.push_back(sl::kWheelsLoads + sl::kWheelsProviders + 20 * i);
+      for (uint32_t offset : {sl::kWheelsTires, sl::kWheelsTires + 464, sl::kWheelsRims,
+                              sl::kWheelsRims + 464, sl::kWheelsCalipers,
+                              sl::kWheelsCalipers + 464}) {
+        at.push_back(sl::kWheelsLoads + offset + models::kModelTextures);
+      }
+      break;
+    default:
+      for (uint32_t offset : sl::kTrafficMembers.providers) at.push_back(sl::kTrafficLoads + offset);
+      models_from(sl::kTrafficLoads + sl::kTrafficLoadsParts, 6);
+      break;
+  }
+  return at;
+}
+
+struct PageRegion {
+  uint32_t start, bytes;
+};
+
+// `bytes` from `start`, the words pointing into a region (or 16 past it)
+// replaced by a marker of the region and the offset.
+std::vector<uint8_t> Normalized(uint8_t* base, const std::vector<PageRegion>& regions,
+                                uint32_t start, uint32_t bytes) {
+  std::vector<uint8_t> data = Read(base, start, bytes);
+  for (uint32_t at = 0; at + 4 <= bytes; at += 4) {
+    const uint32_t word = guest::LoadU32(base, start + at);
+    for (size_t k = 0; k < regions.size(); k++) {
+      if (word >= regions[k].start && word - regions[k].start < regions[k].bytes + 16) {
+        const uint32_t marker = 0xB0000000u + (uint32_t(k) << 20) + (word - regions[k].start);
+        for (int b = 0; b < 4; b++) data[at + b] = uint8_t(marker >> (24 - 8 * b));
+        break;
+      }
+    }
+  }
+  return data;
+}
+
+void CreateCases(Context& h, Random& r, uint32_t block) {
+  if (!hooks::ModelsNativeLifetime()) {
+    ITC_LOG_WARN("harness: scene_loaders: the allocation layer or --native_models is off: "
+                 "ScenePools::CreateA's cases skipped");
+    return;
+  }
+  std::lock_guard<std::recursive_mutex> lock(models::MemoryBlocksMutex());
+  constexpr uint32_t kBytes = 0x400;
+  const uint32_t set = block + 0x100;
+  const uint32_t record = block + 0x200;
+  const uint32_t nodes = block + 0x280;
+  const uint32_t saved_set = guest::LoadU32(h.base, sl::kFirstSet);
+  Results results("ScenePools::CreateA (sub_820C3FD8)");
+  for (int c = 0; c < 16; c++) {
+    const uint64_t seed = r.Next();
+    const uint32_t first_set = uint32_t(r.Next());
+    Outputs out[2];
+    for (int v = 0; v < 2; v++) {
+      Random in(seed);
+      RandomBytes(h.base, block, kBytes, in);
+      Put(h.base, sl::kFirstSet, first_set);
+      Put(h.base, record + 0, RandomModelSet(in));
+      for (uint32_t k = 1; k < 9; k++) {
+        const uint32_t small[] = {0, 0, 1, 1, 2};
+        uint32_t count = small[in.Below(5)];
+        if (k == 2) {
+          count = in.Below(2);  // the car parts: at most one (106,016 bytes)
+        } else if (k != 1 && k != 8 && in.Below(8) == 0) {
+          count = 0x80000000u | in.Below(3);  // negative
+        }
+        Put(h.base, record + 4 * k, count);
+      }
+      for (uint32_t pool = 0; pool < 7; pool++) {
+        const uint32_t list = set + 56 + 12 * pool;
+        MakeList(h.base, list, nodes + 16 * pool, c % 4 == 3 && pool == in.Below(7) ? 1 : 0);
+      }
+      PPCContext t = CallContext(h);
+      t.r1.u64 &= ~0xFull;
+      t.r3.u64 = set;
+      t.r4.u64 = record;
+      RunSide(v, __imp__sub_820C3FD8, hooks::SceneLoadersCreateA, t, h.base);
+      // The objects, pool by pool along the lists (past a node already there).
+      std::vector<PageRegion> regions;
+      std::vector<std::pair<uint32_t, uint32_t>> objects;  // pool, object
+      const uint32_t records = guest::LoadU32(h.base, set + 52);
+      regions.push_back({records, 80 * (guest::LoadU32(h.base, set + 12) +
+                                        guest::LoadU32(h.base, set + 40))});
+      for (uint32_t pool = 0; pool < 7; pool++) {
+        const uint32_t list = set + 56 + 12 * pool;
+        for (uint32_t node = guest::LoadU32(h.base, list + 0); node != 0;
+             node = guest::LoadU32(h.base, node + 8)) {
+          if (memory::IsPages(node)) {
+            objects.push_back({pool, node});
+            regions.push_back({node, sl::kPoolObjectBytes[pool]});
+          }
+          if (objects.size() > 64) break;
+        }
+      }
+      out[v].Word(uint32_t(objects.size()));
+      for (const auto& [pool, object] : objects) {
+        for (uint32_t offset : PoolProviders(pool)) {
+          TakeProvider(h.base, object + offset, out[v]);
+        }
+      }
+      out[v].Bytes(Normalized(h.base, regions, block, kBytes));
+      if (memory::IsPages(records)) {
+        out[v].Bytes(Normalized(h.base, regions, records, regions[0].bytes));
+      }
+      for (const auto& [pool, object] : objects) {
+        out[v].Bytes(Normalized(h.base, regions, object, sl::kPoolObjectBytes[pool]));
+      }
+      const uint32_t r3 = t.r3.u32;
+      std::vector<uint8_t> r3_bytes(4);
+      for (int b = 0; b < 4; b++) r3_bytes[b] = uint8_t(r3 >> (24 - 8 * b));
+      for (size_t k = 0; k < regions.size(); k++) {
+        if (r3 >= regions[k].start && r3 - regions[k].start < regions[k].bytes + 16) {
+          const uint32_t marker = 0xB0000000u + (uint32_t(k) << 20) + (r3 - regions[k].start);
+          for (int b = 0; b < 4; b++) r3_bytes[b] = uint8_t(marker >> (24 - 8 * b));
+          break;
+        }
+      }
+      out[v].Bytes(r3_bytes);
+      out[v].Word(uint32_t(t.r3.u64 >> 32));
+      out[v].Word(guest::LoadU32(h.base, sl::kFirstSet));
+      for (const auto& [pool, object] : objects) {
+        memory::FreePages(object);
+      }
+      if (memory::IsPages(records)) {
+        memory::FreePages(records);
+      }
+    }
+    results.Check(out[0], out[1], fmt::format("case {}", c));
+  }
+  results.Report();
+  Put(h.base, sl::kFirstSet, saved_set);
+}
+
+// --- Interior::OnPartLoaded ---
+//
+// An interior the plain C++ constructor made, its six slots' requests
+// random and distinct; r3 one of them (or none now and then), whose slot's
+// buffer is pages holding a minimal part file (no shapes, shader pairs or
+// skeleton; the wrong version now and then; as the scenery lists' cases),
+// shared now and then. Compared: the pending frees' nodes, whether the
+// buffer's pages are alive, the part models' providers (TakeProvider), the
+// interior's bytes and the model's header copy and vertex data with the
+// pointers into them made offsets, and r3; then the blocks freed.
+void PartLoadedCases(Context& h, Random& r, uint32_t block) {
+  if (!hooks::ModelsNativeLifetime()) {
+    ITC_LOG_WARN("harness: scene_loaders: Model::Load isn't native in this run: "
+                 "Interior::OnPartLoaded's cases skipped");
+    return;
+  }
+  std::lock_guard<std::recursive_mutex> lock(models::MemoryBlocksMutex());
+  constexpr uint32_t kBytes = 0x1400;
+  constexpr uint32_t kFileBytes = 0x5000;
+  constexpr uint32_t kHeader = 0x4000;
+  constexpr uint32_t kVertices = 0x800;
+  const uint32_t interior = block + 0x100;
+  const uint32_t list = block + 0x1000;
+  const uint32_t saved_set = guest::LoadU32(h.base, sl::kFirstSet);
+  Results results("Interior::OnPartLoaded (sub_820D7578)");
+  for (int c = 0; c < 24; c++) {
+    const uint64_t seed = r.Next();
+    const uint32_t first_set = uint32_t(r.Next());
+    Outputs out[2];
+    for (int v = 0; v < 2; v++) {
+      Random in(seed);
+      RandomBytes(h.base, block, kBytes, in);
+      Put(h.base, sl::kFirstSet, first_set);
+      MakeList(h.base, list, list + 0x100, 0);
+      if (!sl::InteriorConstruct(h.base, interior, list)) {
+        ITC_LOG_WARN("harness: scene_loaders: the interior's constructor refused");
+        return;
+      }
+      for (uint32_t i = 0; i < 6; i++) {
+        Put(h.base, interior + 164 + sl::kSlotBytes * i, 0x10000u * (i + 1) + in.Below(0x100));
+      }
+      const uint32_t which = in.Below(7);  // 6: none matches
+      const uint32_t request =
+          which < 6 ? guest::LoadU32(h.base, interior + 164 + sl::kSlotBytes * which) : 0x123;
+      uint32_t pages = 0;
+      if (which < 6) {
+        const uint32_t slot = interior + 160 + sl::kSlotBytes * which;
+        pages = memory::AllocPages(kFileBytes, 4096);
+        std::vector<uint32_t> words(kFileBytes / 4, 0);
+        auto put = [&](uint32_t at, uint32_t value) { words[at / 4] = value; };
+        put(0, in.Below(5) == 0 ? 0x00140000 : 0x00150000);
+        put(4, 7);
+        put(8, 9);
+        put(16, 3);
+        put(20, 0x80);
+        put(24, 0x90);
+        put(28, 0x100);
+        put(32, 0xA0);
+        put(44, 0x2000);
+        put(64, kHeader);
+        put(68, kVertices);
+        put(72, kHeader + kVertices);
+        for (uint32_t k = kHeader; k < kHeader + kVertices; k += 4) {
+          put(k, uint32_t(in.Next()) & 0x0FFFFFFFu);
+        }
+        for (uint32_t k = 0; k < words.size(); k++) {
+          guest::StoreU32(h.base, pages + 4 * k, words[k]);
+        }
+        Put(h.base, slot + 12, in.Below(4) == 0 ? 1 : 0);
+        Put(h.base, slot + 16, pages);
+      }
+      const pending_frees::ListState was = pending_frees::SaveList(h.base);
+      PPCContext t = CallContext(h);
+      t.r1.u64 &= ~0xFull;
+      t.r3.u64 = request;
+      t.r6.u64 = interior;
+      RunSide(v, __imp__sub_820D7578, hooks::SceneLoadersInteriorOnPartLoaded, t, h.base);
+      pending_frees::TakeAddedNodes(h.base, was, out[v]);
+      const bool alive = pages != 0 && memory::IsPages(pages);
+      out[v].Word(alive);
+      for (uint32_t i = 0; i < 6; i++) {
+        TakeProvider(h.base, interior + 304 + sl::kPartModelBytes * i + models::kModelTextures,
+                     out[v]);
+      }
+      std::vector<PageRegion> regions = {{interior, 3104}};
+      uint32_t header = 0, vertices = 0;
+      if (which < 6) {
+        const uint32_t model = interior + 304 + sl::kPartModelBytes * which;
+        header = guest::LoadU32(h.base, model + 16);
+        vertices = guest::LoadU32(h.base, model + 20);
+        if (header != 0) regions.push_back({header, kHeader});
+        if (vertices != 0) regions.push_back({vertices, kVertices});
+      }
+      if (pages != 0) regions.push_back({pages, kFileBytes});
+      out[v].Bytes(Normalized(h.base, regions, block, kBytes));
+      for (size_t k = 1; k < regions.size(); k++) {
+        if (regions[k].start != pages) {
+          out[v].Bytes(Normalized(h.base, regions, regions[k].start, regions[k].bytes));
+        }
+      }
+      out[v].Word(t.r3.u32 == pages && pages != 0 ? 0xB0B0B0B0u : t.r3.u32);
+      out[v].Word(uint32_t(t.r3.u64 >> 32));
+      if (header != 0) memory::FreePages(header - models::kBlockHeaderBytes);
+      if (vertices != 0) memory::FreePhysical(vertices - models::kBlockHeaderBytes);
+      if (alive) memory::FreePages(pages);
+    }
+    results.Check(out[0], out[1], fmt::format("case {}", c));
+  }
+  results.Report();
+  Put(h.base, sl::kFirstSet, saved_set);
+}
+
 }  // namespace
 
 void SceneLoaders(Context& h) {
@@ -1502,6 +1782,8 @@ void SceneLoaders(Context& h) {
   Cockpits(h, r, block);
   WheelsAndTraffic(h, r, block);
   Lifetimes(h, r, block);
+  CreateCases(h, r, block);
+  PartLoadedCases(h, r, block);
   memory::Free(allocation);
 }
 

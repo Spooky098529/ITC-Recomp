@@ -48,6 +48,34 @@ uint32_t MakeA(uint8_t* base);
 // Returns the pages (the original's r3). Only over the allocation layer.
 uint32_t AllocPages(uint8_t* base, uint32_t out, uint32_t size);
 
+// The pools' constructors' originals, for ScenePools::CreateA where a plain
+// C++ constructor declines: `construct(user, pool, object, list)` runs pool
+// `pool`'s constructor (0 the car model to 6 the traffic body) on `object`
+// with r4 = `list`, from a frame as CreateA's.
+struct CreateCalls {
+  void (*construct)(void* user, uint32_t pool, uint32_t object, uint32_t list) = nullptr;
+  void* user = nullptr;
+};
+
+// The pools' objects' sizes (7,264 the car model, 106,016 the car parts,
+// 3,520 the cockpit, 3,104 the interior, 592 pool 4's, 3,280 the wheels,
+// 7,408 the traffic body).
+constexpr uint32_t kPoolObjectBytes[7] = {7264, 106016, 3520, 3104, 592, 3280, 7408};
+
+// ScenePools::CreateA (sub_820C3FD8): r3 = the set, r4 = a 36-byte record.
+// +4 = 3; +8 = rec +0; +12 = rec +4; +16 = rec +8; +20 = rec +12 + rec +16 +
+// rec +32; +24 = rec +16; +28 = rec +20; +32 = rec +24 + rec +32 + rec +28;
+// +36 = rec +32 + rec +28; +40 = rec +32; sub_820D0960 on +52 with 80 x (+12
+// + +40) bytes; each of the 4 x (+12 + +40) records' +16 = 0 (the count read
+// again each time). Then for pools 0-6 (counts +12, +16, +24, +20, +28, +32,
+// +40), each object: VirtualAlloc(0, size, MEM_COMMIT, read-write), its
+// constructor with r4 = the pool's list (+56 + 12 x pool; the plain C++, or
+// calls.construct where it declines), its +20 = the index (at address 20
+// when the allocation fails, as the original). Returns the original's r3:
+// the last object (or 0), else the records' pages. Only over the allocation
+// layer (the adapter's condition).
+uint32_t CreateA(uint8_t* base, uint32_t set, uint32_t record, const CreateCalls& calls);
+
 // --- The pool node ---
 
 // PoolNode::PoolNode (sub_82594050): the vtable, +4 the list, +8 and +12 =

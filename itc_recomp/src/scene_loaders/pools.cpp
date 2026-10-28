@@ -8,6 +8,7 @@
 #include "guest.h"
 #include "memory/heap.h"
 #include "models/model.h"
+#include "scene_loaders/objects.h"
 #include "scene_models/scene_models.h"
 
 namespace scene_loaders {
@@ -60,6 +61,47 @@ uint32_t AllocPages(uint8_t* base, uint32_t out, uint32_t size) {
   const uint32_t pages = memory::AllocPages(size, 4096);
   Store(base, out, pages);
   return pages;
+}
+
+uint32_t CreateA(uint8_t* base, uint32_t set, uint32_t record, const CreateCalls& calls) {
+  ITC_NATIVE_RUNNING("sub_820C3FD8 ScenePools::CreateA");
+  Store(base, set + 4, 3);
+  Store(base, set + 8, Load(base, record + 0));
+  Store(base, set + 12, Load(base, record + 4));
+  const uint32_t pool0 = Load(base, set + 12);
+  Store(base, set + 16, Load(base, record + 8));
+  Store(base, set + 20, Load(base, record + 12) + Load(base, record + 16) + Load(base, record + 32));
+  Store(base, set + 24, Load(base, record + 16));
+  Store(base, set + 28, Load(base, record + 20));
+  Store(base, set + 32, Load(base, record + 24) + Load(base, record + 32) + Load(base, record + 28));
+  Store(base, set + 36, Load(base, record + 32) + Load(base, record + 28));
+  const uint32_t pool6 = Load(base, record + 32);
+  Store(base, set + 40, pool6);
+  uint32_t r3 = AllocPages(base, set + 52, (pool0 + pool6) * 80);
+  auto records = [&] { return int32_t((Load(base, set + 12) + Load(base, set + 40)) << 2); };
+  for (int32_t i = 0; i < records(); i++) {
+    Store(base, Load(base, set + 52) + 20 * uint32_t(i) + 16, 0);
+  }
+  // The counts' offsets in the set, by pool.
+  static constexpr uint32_t kCounts[7] = {12, 16, 24, 20, 28, 32, 40};
+  using Construct = bool (*)(uint8_t*, uint32_t, uint32_t);
+  static constexpr Construct kConstructs[7] = {CarModelConstruct, CarPartsConstruct,
+                                               CockpitConstruct,  InteriorConstruct,
+                                               Pool4Construct,    WheelsConstruct,
+                                               TrafficConstruct};
+  for (uint32_t pool = 0; pool < 7; pool++) {
+    const int32_t count = LoadS(base, set + kCounts[pool]);
+    const uint32_t list = set + 56 + 12 * pool;
+    for (int32_t i = 0; i < count; i++) {
+      const uint32_t object = memory::AllocPages(kPoolObjectBytes[pool], 4096);
+      r3 = object;
+      if (object != 0 && !kConstructs[pool](base, object, list)) {
+        calls.construct(calls.user, pool, object, list);
+      }
+      Store(base, object + 20, uint32_t(i));
+    }
+  }
+  return r3;
 }
 
 // --- The pool node ---

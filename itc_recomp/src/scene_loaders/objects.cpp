@@ -365,6 +365,31 @@ bool InteriorConstruct(uint8_t* base, uint32_t interior, uint32_t list) {
   return true;
 }
 
+std::optional<uint32_t> InteriorOnPartLoaded(uint8_t* base, uint32_t request, uint32_t interior,
+                                             const PartLoadedCalls& calls) {
+  ITC_NATIVE_RUNNING("sub_820D7578 Interior::OnPartLoaded");
+  for (uint32_t i = 0; i < 6; i++) {
+    if (Load(base, interior + 164 + kSlotBytes * i) != request) {
+      continue;
+    }
+    const uint32_t slot = interior + 160 + kSlotBytes * i;
+    uint32_t freed = 0;
+    if (!car_models::LoadSlotReleasable(base, slot, &freed)) {
+      return std::nullopt;
+    }
+    const uint32_t model = interior + 304 + kPartModelBytes * i;
+    const uint32_t file = Load(base, slot + 16);
+    if (!models::ModelLoad(base, model, file, 0, calls.model_load)) {
+      calls.load(calls.user, model, file);
+    }
+    const auto r3 = car_models::LoadSlotReleaseBuffer(base, slot);
+    Require(r3.has_value(), "LoadSlot::ReleaseBuffer");
+    Store(base, slot + 20, 3);
+    return r3;
+  }
+  return request;
+}
+
 // --- The wheels and the traffic body ---
 
 namespace {

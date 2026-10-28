@@ -12,6 +12,8 @@
 #include <cstdint>
 #include <optional>
 
+#include "models/model_load.h"
+
 namespace scene_loaders {
 
 // The car model (7,264 bytes, pool 0): +32 the car record, +3728 the loads
@@ -106,6 +108,25 @@ std::optional<uint32_t> CockpitRelease(uint8_t* base, uint32_t cockpit);
 // (sub_820D3840, +28); +3088 = 0, +3092 = [0x826C2E40]. False, with nothing
 // done, where a callee would go to the original.
 bool InteriorConstruct(uint8_t* base, uint32_t interior, uint32_t list);
+
+// The guest calls Interior::OnPartLoaded makes: Model::Load's own (`model_load`),
+// and Model::Load's original (`load(user, model, file)`, r5 = 0, from a frame
+// as the callback's) where its plain C++ declines.
+struct PartLoadedCalls {
+  models::LoadCalls model_load;
+  void (*load)(void* user, uint32_t model, uint32_t file) = nullptr;
+  void* user = nullptr;
+};
+
+// Interior::OnPartLoaded (sub_820D7578, Archive::Load's callback for
+// CarInterior::LoadParts): r3 = the request, r6 = the interior. The first of
+// the six slots whose request (+164 + 24i) is `request`: Model::Load(+304 +
+// 464i, the slot's buffer +176 + 24i, 0), LoadSlot::ReleaseBuffer (+160 +
+// 24i), state +180 + 24i = 3; nothing when none matches. Returns the
+// original's r3 (ReleaseBuffer's, or `request`); nullopt, with nothing done,
+// where the slot's buffer isn't the layer's pages.
+std::optional<uint32_t> InteriorOnPartLoaded(uint8_t* base, uint32_t request, uint32_t interior,
+                                             const PartLoadedCalls& calls);
 
 // --- The wheels (pool 5) and the traffic body (pool 6) ---
 

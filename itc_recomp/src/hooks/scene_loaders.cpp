@@ -6,6 +6,7 @@
 
 #include "base/flags.h"
 #include "base/log.h"
+#include "hooks/guest_call.h"
 #include "hooks/heap.h"
 #include "hooks/models.h"
 #include "scene_loaders/loads.h"
@@ -38,7 +39,10 @@ ITC_FLAG_BOOL(native_scene_loaders, true, "ITC",
               "~CarModel sub_820D4750, ~CarParts sub_820D7038, ~Cockpit sub_820D64D0 and their "
               "deleting destructors sub_820D5988, sub_820D74C0, sub_820D6798, "
               "TrafficCar::TrafficCar sub_820D8908, Release sub_820D7B90, ~TrafficCar sub_820D7E90 "
-              "and its deleting destructor sub_820D89B8) natively instead of through the "
+              "and its deleting destructor sub_820D89B8, ScenePools::CreateA sub_820C3FD8 (the "
+              "constructors' originals called where their plain C++ declines), "
+              "Interior::OnPartLoaded sub_820D7578 (Model::Load's original where its plain C++ "
+              "declines)) natively instead of through the "
               "translated code (the same writes; checked by --run_harnesses=scene_loaders); "
               "the ones only these native callers reach (the members' constructors, resets and "
               "destructors, the destructors under the deleting ones) have no adapters");
@@ -256,6 +260,90 @@ ITC_SCENE_LOADERS_CONSTRUCT(SceneLoadersTrafficDestruct, 820D7E90,
 ITC_SCENE_LOADERS_CONSTRUCT(SceneLoadersTrafficDeletingDestruct, 820D89B8,
                             TrafficDeletingDestruct(base, ctx.r3.u32, ctx.r4.u32))
 
+namespace {
+
+// ScenePools::CreateA's constructors' originals, from its frame (160 bytes)
+// with each call's return address.
+struct CreateAGuest {
+  PPCContext& ctx;
+  uint8_t* base;
+  static void Construct(void* user, uint32_t pool, uint32_t object, uint32_t list) {
+    using Original = void (*)(PPCContext&, uint8_t*);
+    static constexpr Original kOriginals[7] = {
+        __imp__sub_820D5890, __imp__sub_820D7428, __imp__sub_820D63A0, __imp__sub_820D78B8,
+        __imp__sub_820D6A70, __imp__sub_820D9570, __imp__sub_820D8908};
+    static constexpr uint32_t kReturns[7] = {0x820C42A4, 0x820C4278, 0x820C4248, 0x820C421C,
+                                             0x820C41F0, 0x820C41C4, 0x820C4198};
+    auto& c = *static_cast<CreateAGuest*>(user);
+    guest_call::InFrame(c.ctx, c.base, 160, kReturns[pool], [&](uint32_t) {
+      c.ctx.r3.u64 = object;
+      c.ctx.r4.u64 = list;
+      kOriginals[pool](c.ctx, c.base);
+    });
+  }
+};
+
+}  // namespace
+
+namespace {
+
+// Interior::OnPartLoaded's guest call: Model::Load's original from a frame
+// as the callback's (96 bytes).
+struct PartLoadedGuest {
+  PPCContext& ctx;
+  uint8_t* base;
+  static void Load(void* user, uint32_t model, uint32_t file) {
+    auto& c = *static_cast<PartLoadedGuest*>(user);
+    guest_call::InFrame(c.ctx, c.base, 96, 0x820D75D0, [&](uint32_t) {
+      c.ctx.r3.u64 = model;
+      c.ctx.r4.u64 = file;
+      c.ctx.r5.u64 = 0;
+      __imp__sub_82596920(c.ctx, c.base);
+    });
+  }
+};
+
+}  // namespace
+
+void SceneLoadersInteriorOnPartLoaded(PPCContext& ctx, uint8_t* base) {
+  if (!hooks::ModelsNativeLifetime()) {
+    __imp__sub_820D7578(ctx, base);
+    return;
+  }
+  ctx.fpscr.disableFlushMode();
+  const uint64_t lr = ctx.lr;
+  const uint32_t request = ctx.r3.u32, interior = ctx.r6.u32;
+  PartLoadedGuest guest{ctx, base};
+  hooks::ModelLoadGuest model_guest{ctx, base};
+  sl::PartLoadedCalls calls;
+  calls.model_load = model_guest.Calls();
+  calls.load = &PartLoadedGuest::Load;
+  calls.user = &guest;
+  const auto r3 = sl::InteriorOnPartLoaded(base, request, interior, calls);
+  ctx.lr = lr;
+  if (!r3) {
+    __imp__sub_820D7578(ctx, base);
+    return;
+  }
+  ctx.r3.u64 = *r3;
+}
+
+void SceneLoadersCreateA(PPCContext& ctx, uint8_t* base) {
+  if (!hooks::ModelsNativeLifetime()) {
+    __imp__sub_820C3FD8(ctx, base);
+    return;
+  }
+  ctx.fpscr.disableFlushMode();
+  const uint64_t lr = ctx.lr;
+  CreateAGuest guest{ctx, base};
+  sl::CreateCalls calls;
+  calls.construct = &CreateAGuest::Construct;
+  calls.user = &guest;
+  const uint32_t set = ctx.r3.u32, record = ctx.r4.u32;
+  ctx.r3.u64 = sl::CreateA(base, set, record, calls);
+  ctx.lr = lr;
+}
+
 }  // namespace hooks
 
 // The adapters: the register steps above, or the originals with the flag
@@ -283,6 +371,8 @@ ITC_SCENE_LOADERS_CONSTRUCT(SceneLoadersTrafficDeletingDestruct, 820D89B8,
   }
 
 ITC_SCENE_LOADERS(820C3C40, SceneLoadersMakeA)
+ITC_SCENE_LOADERS(820C3FD8, SceneLoadersCreateA)
+ITC_SCENE_LOADERS(820D7578, SceneLoadersInteriorOnPartLoaded)
 ITC_SCENE_LOADERS(820D0960, SceneLoadersAllocPages)
 ITC_SCENE_LOADERS(82594050, SceneLoadersPoolNodeConstruct)
 ITC_SCENE_LOADERS(825940B0, SceneLoadersPoolNodeDestruct)
