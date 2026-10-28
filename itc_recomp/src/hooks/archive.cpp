@@ -14,6 +14,11 @@
 #include "base/flags.h"
 #include "hooks/c_runtime.h"
 #include "hooks/guest_call.h"
+#include "hooks/heap.h"
+
+#include "base/log.h"
+#include "file_layer/file_layer.h"
+#include "std_string/std_string.h"
 
 
 ITC_FLAG_BOOL(native_archive, true, "ITC",
@@ -28,12 +33,16 @@ ITC_FLAG_BOOL(native_archive, true, "ITC",
               "queueing, sub_8209DC18; Archive::WaitIdle, QueueLength and CancelQueued, "
               "sub_8209D730, sub_8209D7B0 and sub_8209DB90; the cancel of a request, "
               "sub_8209DB20; the loader's next request, sub_8209DD98, with the picker, "
-              "sub_8209D950, and the set-up, sub_8209D490; the loader thread's and "
+              "sub_8209D950, and the set-up, sub_8209D490; the loose read, sub_8209DFA8, with "
+              "--native_std_string and --native_file_layer; the loader thread's and "
               "Archive::Init's waits and signals) natively instead of through the "
               "translated code, the archive's four semaphores (0x826BAAE0, 0x826BAAB8, "
               "0x826BAA68, 0x826BAA90) as host semaphores for every user (read at start-up "
               "only; Semaphore::Wait and Signal, sub_82592670 and sub_825926E8, route them; "
               "same results; checked by --run_harnesses=archive)");
+
+ITC_FLAG_DECLARE(bool, native_std_string);
+ITC_FLAG_DECLARE(bool, native_file_layer);
 
 bool hooks::ArchiveHostSemaphores() {
   static const bool on = ITC_FLAG(native_archive);
@@ -302,4 +311,129 @@ void hooks::ArchiveNextRequest(PPCContext& ctx, uint8_t* base) {
 extern "C" REX_FUNC(sub_8209DD98) {
   ITC_ARCHIVE_QUEUE_FALLBACK(8209DD98)
   hooks::ArchiveNextRequest(ctx, base);
+}
+
+// The loader's loose read: r3 = the request (+20 its path, +64 where to
+// seek, +68 the size, +76 the buffer). Its own frame (240 bytes) as the
+// original's: the file object at +96, the path's strings at +112, +144 and
+// +176, the open's byte at +80 and the seek's words at +84 and +88. The file
+// object, the strings and the request-done signal natively (each string step
+// on the original where its plain C++ declines, which leaves nothing done);
+// the open by name, File::Seek, Read and Close (B4's file class, through
+// ctx) and the read error's report (recompiled) called from the frame with
+// the original's return addresses. r3 the file object (as the original's
+// last call leaves it). The original runs unless --native_archive,
+// --native_std_string over the allocation layer and --native_file_layer are
+// all on.
+extern "C" REX_FUNC(sub_8209DFA8) {
+  REX_FUNC_PROLOGUE();
+  if (!ITC_FLAG(native_archive) || !ITC_FLAG(native_std_string) || !hooks::NativeHeapActive() ||
+      !ITC_FLAG(native_file_layer)) {
+    __imp__sub_8209DFA8(ctx, base);
+    return;
+  }
+  ITC_NATIVE_RUNNING("sub_8209DFA8 Archive::ReadLoose");
+  const uint32_t request = ctx.r3.u32;
+  const uint32_t frame = ctx.r1.u32 - 240;
+  const uint32_t file = frame + 96, path = frame + 112, name = frame + 144, fixed = frame + 176;
+  auto call = [&](uint32_t return_address, auto&& body) {
+    guest_call::InFrame(ctx, base, 240, return_address, [&](uint32_t) { body(); });
+  };
+  auto from_text = [&](uint32_t string, uint32_t text, uint32_t allocator,
+                       uint32_t return_address) {
+    if (!std_string::ConstructFromTextWithAllocator(base, string, text)) {
+      call(return_address, [&] {
+        ctx.r3.u64 = string;
+        ctx.r4.u64 = text;
+        ctx.r5.u64 = allocator;
+        __imp__sub_82593248(ctx, base);
+      });
+    }
+  };
+  auto assign = [&](uint32_t source, uint32_t return_address) {
+    if (!std_string::AssignFrom(base, path, source, 0, 0xFFFFFFFF)) {
+      call(return_address, [&] {
+        ctx.r3.u64 = path;
+        ctx.r4.u64 = source;
+        ctx.r5.u64 = 0;
+        ctx.r6.s64 = -1;
+        __imp__sub_82091720(ctx, base);
+      });
+    }
+  };
+  auto release = [&](uint32_t string, uint32_t return_address) {
+    if (!std_string::Tidy(base, string, true, 0)) {
+      call(return_address, [&] {
+        ctx.r3.u64 = string;
+        ctx.r4.u64 = 1;
+        ctx.r5.u64 = 0;
+        __imp__sub_82091328(ctx, base);
+      });
+    }
+  };
+  file_layer::GameFileConstruct(base, file);
+  std_string::Construct(base, path);
+  from_text(name, guest::LoadU32(base, request + 20), frame + 82, 0x8209DFE4);
+  assign(name, 0x8209DFFC);
+  release(name, 0x8209E00C);
+  // The wildcard replace of "/" (0x82001DE8) by "\\" (0x82001DEC): the text.
+  uint32_t text;
+  if (const auto replaced = std_string::ReplaceAll(base, path, 0x82001DE8, frame - 144)) {
+    text = *replaced;
+  } else {
+    call(0x8209E028, [&] {
+      ctx.r3.u64 = path;
+      ctx.r4.u64 = 0x82001DE8;
+      ctx.r5.u64 = 0x82001DEC;
+      ctx.r6.u64 = 0;
+      __imp__sub_82593088(ctx, base);
+    });
+    text = ctx.r3.u32;
+  }
+  from_text(fixed, text, frame + 83, 0x8209E038);
+  assign(fixed, 0x8209E04C);
+  release(fixed, 0x8209E05C);
+  guest::StoreU8(base, frame + 80, 1);
+  call(0x8209E084, [&] {
+    ctx.r3.u64 = file;
+    ctx.r4.u64 = std_string::Text(base, path);
+    ctx.r5.u64 = frame + 80;
+    sub_820A6AB8(ctx, base);
+  });
+  if ((ctx.r3.u32 & 0xFF) != 0) {
+    guest::StoreU32(base, frame + 84, guest::LoadU32(base, request + 64));
+    guest::StoreU32(base, frame + 88, 0);
+    call(0x8209E0AC, [&] {
+      ctx.r3.u64 = file;
+      ctx.r4.u64 = frame + 84;
+      ctx.r5.u64 = frame + 88;
+      sub_8258C768(ctx, base);
+    });
+    call(0x8209E0BC, [&] {
+      ctx.r3.u64 = file;
+      ctx.r4.u64 = guest::LoadU32(base, request + 76);
+      ctx.r5.u64 = request + 68;
+      sub_8258C820(ctx, base);
+    });
+    if (ctx.r3.u32 == 0) {
+      call(0x8209E0C8, [&] { sub_8209AC78(ctx, base); });
+    }
+    call(0x8209E0D0, [&] {
+      ctx.r3.u64 = file;
+      sub_8258C718(ctx, base);
+    });
+  } else {
+    call(0x8209E0D8, [&] { sub_8209AC78(ctx, base); });
+  }
+  if (archive::HostSemaphore* done = hooks::ArchiveSemaphore(archive::kRequestDone)) {
+    done->Signal(base);
+  } else {
+    call(0x8209E0E4, [&] {
+      ctx.r3.u64 = archive::kRequestDone;
+      sub_825926E8(ctx, base);
+    });
+  }
+  release(path, 0x8209E0F4);
+  file_layer::GameFileDestruct(base, file);
+  ctx.r3.u64 = file;
 }

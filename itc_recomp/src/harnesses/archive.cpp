@@ -38,6 +38,8 @@
 
 #include <algorithm>
 #include <bit>
+#include <cstring>
+#include <iterator>
 #include <chrono>
 #include <mutex>
 #include <optional>
@@ -1323,6 +1325,49 @@ void Queues(Context& h) {
           R3, fmt::format("case {}", i));
     }
     memory::FreePages(loader.pages);
+    results.Report();
+  }
+  {
+    // The loose read on real files (no missing one: the dirty-disc error),
+    // paths with '\\' (no match for the wildcard replace, as in play) and
+    // with '/' (a match: the original's replace), sizes from a few bytes
+    // to 4 KB, seeks of 0 (as in play) and further. Compared: the request
+    // (the scratch area), the buffer, the test request-done count and r3.
+    Results results("sub_8209DFA8 the loader's loose read");
+    const char* paths[] = {"DATA\\DEBUG\\DEBFONT.XPR", "DATA\\BUILD\\TXR\\BUILD_CRS.TOC",
+                           "DATA\\AUDIO\\CAR_SE.XWB", "DATA/DEBUG/DEBFONT.XPR",
+                           "DATA\\AUDIO/CAR_SE.XWB"};
+    const int32_t done_count = test.request_done.Count();
+    const uint32_t buffer = memory::Alloc(8192, 0);
+    const uint32_t request = h.data + 256, path = h.data + 1024;
+    for (int i = 0; i < 60; i++) {
+      const char* p = paths[i % std::size(paths)];
+      const uint32_t size = i < 20 ? 4096 : 1 + h.random.Below(4096);
+      const uint32_t offset = i < 30 ? 0 : h.random.Below(2000);
+      Outputs out[2];
+      for (int v = 0; v < 2; v++) {
+        Fill(h.base, h.data, kScratchBytes);
+        Fill(h.base, buffer, 8192);
+        Write(h.base, path, p, uint32_t(std::strlen(p)) + 1);
+        guest::StoreU32(h.base, request + 20, path);
+        guest::StoreU32(h.base, request + 64, offset);
+        guest::StoreU32(h.base, request + 68, size);
+        guest::StoreU32(h.base, request + 76, buffer);
+        test.request_done.SetCount(h.base, 0);
+        PPCContext t = CallContext(h);
+        t.r3.u64 = request;
+        ITC_FLAG(native_archive) = v == 1;
+        (v == 0 ? __imp__sub_8209DFA8 : sub_8209DFA8)(t, h.base);
+        ITC_FLAG(native_archive) = true;
+        out[v].Word(t.r3.u32);
+        out[v].Word(uint32_t(test.request_done.Count()));
+        out[v].Bytes(Read(h.base, h.data, kScratchBytes));
+        out[v].Bytes(Read(h.base, buffer, 8192));
+      }
+      results.Check(out[0], out[1], fmt::format("\"{}\" size {} at {}", p, size, offset));
+    }
+    test.request_done.SetCount(h.base, done_count);
+    memory::Free(buffer);
     results.Report();
   }
 }
