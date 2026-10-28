@@ -83,9 +83,10 @@ struct DecalArguments {
   double angle;
 };
 
-// Whether Vinyl::DrawDecal's region is one ported here: 0 to 8 (region 9,
-// the whole sheet, is sub_820EE698, never seen in play; above 9 the
-// original's switch leaves its corners' frame words as they were).
+// Whether Vinyl::DrawDecal's region is one ported here: 0 to 9 (region 9,
+// the whole sheet, is the recompiler's split-off sub_820EE698, the same
+// steps; above 9 the original's switch leaves its region's frame words as
+// they were, never in play).
 bool DecalRegionPorted(uint32_t region);
 
 // sub_820EE638 Vinyl::DrawDecal: the decal of the image whose header and

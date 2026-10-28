@@ -11,6 +11,7 @@
 
 #include "base/flags.h"
 #include "base/log.h"
+#include "car_models/decals.h"
 #include "car_models/raster.h"
 #include "car_models/tga.h"
 #include "car_models/vinyl.h"
@@ -826,9 +827,9 @@ void CornerCases(Context& h, uint32_t block) {
 }
 
 // Vinyl::DrawDecal: decals as the game's (an image of 16 to 256 pixels a
-// side, now and then 512 and the 1,024 x 1,024 layer, random ARGB with
-// clear and opaque pixels) into a 1,024 x 1,024 sheet of random pixels: a
-// region 0 to 8, mirrored or not, a scale from 0.25 to 2.25, an offset
+// side, now and then 512 and the 1,024 x 1,024 layer over the whole sheet,
+// region 9, as the game's, random ARGB with clear and opaque pixels) into a
+// 1,024 x 1,024 sheet of random pixels: a region 0 to 9, mirrored or not, a scale from 0.25 to 2.25, an offset
 // around the region, a rotation (now and then far out). The recompiled side
 // with --native_car_models off. The whole sheet, r3, the caller's frame
 // (+32 to +144: the registers spilled), the frame's +80 to +272 and the
@@ -850,7 +851,7 @@ void DecalCases(Context& h) {
       w = 512;
       hh = c == 1 ? 512 : 256;
     }
-    const uint32_t region = c == 0 ? 0 : h.random.Below(9);
+    const uint32_t region = c == 0 ? 9 : h.random.Below(10);
     Outputs out[2];
     for (int v = 0; v < 2; v++) {
       Random r(seed);
@@ -925,6 +926,215 @@ void DecalCases(Context& h) {
   results.Report();
 }
 
+// A TGA file as the archive gives it (the layer's pages): uncompressed 24-
+// or 32-bit, `w` x `h`, its other header bytes and pixels random (alphas 0,
+// 255 and others).
+uint32_t MakeTga(uint8_t* base, uint32_t w, uint32_t hh, uint32_t bits, Random& r,
+                 uint32_t* size) {
+  *size = 18 + w * hh * (bits / 8);
+  const uint32_t buffer = memory::AllocPages(*size, 4096);
+  RandomBytes(base, buffer, (*size + 3) & ~3u, r);
+  guest::StoreU8(base, buffer + 2, 2);
+  guest::StoreU8(base, buffer + 12, uint8_t(w));
+  guest::StoreU8(base, buffer + 13, uint8_t(w >> 8));
+  guest::StoreU8(base, buffer + 14, uint8_t(hh));
+  guest::StoreU8(base, buffer + 15, uint8_t(hh >> 8));
+  guest::StoreU8(base, buffer + 16, uint8_t(bits));
+  if (bits == 32) {
+    for (uint32_t i = 0; i < w * hh; i++) {
+      const uint32_t at = buffer + 18 + 4 * i + 3;
+      const uint32_t pick = r.Below(4);
+      guest::StoreU8(base, at, pick == 0 ? 0 : pick == 1 ? 255 : guest::LoadU8(base, at));
+    }
+  }
+  return buffer;
+}
+
+// CarModel::OnDecalLoaded: a car model's slots and records as the game
+// leaves them (car_models/decals.h): layers and stickers arrived (state 3)
+// or not (0, 1, 2), each arrived one with its TGA (16 to 96 pixels a side,
+// now and then the 1,024 x 1,024 layer), the request's slot asked (1) or
+// loading (2), records with regions 0 to 8, mirrors, offsets, scales and
+// rotations; a second half slot loading now and then (no compression then),
+// else the sheet compressed (a few cases: the recompiled side's compression
+// is slow). The sheet (Texture::Create's plain C++) of random pixels. The
+// recompiled side with --native_car_models and --native_texture_compression
+// off. The car model's 8 KB (its words holding a side's allocations as
+// which allocation), r3, the sheet's pixels or, compressed, the new
+// texture's header and data, whether each file and the sheet are still
+// pages, and DrawDecals' frame (+96 to +272; the pixels' words, freed, as
+// whether set). The TGA headers' +3 and +9 in the frame are in a group of
+// their own, expected to differ: the reader never writes them, so they're
+// whatever the stack held there, and the original callees before them
+// (Vinyl::DrawDecal's, the previous decal's) saved their registers over
+// that stack, which their plain C++ doesn't (the stack leftovers of
+// docs/loops/expected-differences.md). Nothing reads them: DrawDecal reads
+// only the header's width and height.
+void DecalLoadCases(Context& h) {
+  namespace cm = car_models;
+  namespace tc = texture_compression;
+  Results results("CarModel::OnDecalLoaded (sub_820D5750)");
+  constexpr uint32_t kCarBytes = 8192;
+  const uint32_t allocation = memory::Alloc(kCarBytes + 16, 0);
+  const uint32_t car = (allocation + 15) & ~15u;
+  const uint32_t sheet_width = guest::LoadU32(h.base, cm::kVinylSheetWidth);
+  const uint32_t sheet_bytes = TextureBytes(h.base, cm::kSheetFormat, sheet_width, sheet_width);
+  const uint32_t vinyl_bytes = TextureBytes(h.base, cm::kVinylFormat, sheet_width, sheet_width);
+  const uint32_t saved_alpha = guest::LoadU32(h.base, tc::kAlphaReference);
+  const uint32_t saved_premultiplied = guest::LoadU32(h.base, tc::kPremultiplied);
+  Results expected("CarModel::OnDecalLoaded (sub_820D5750), the TGA headers' unwritten bytes "
+                   "(expected to differ)");
+  // The frame's words holding a header's +3 and +9 (the copy at +192 and
+  // the second at +224), and those bytes' masks.
+  static constexpr std::pair<uint32_t, uint32_t> kHeaderLeftovers[] = {
+      {192, 0x000000FFu}, {200, 0x00FF0000u}, {224, 0x000000FFu}, {232, 0x00FF0000u}};
+  for (int c = 0; c < 16; c++) {
+    const uint64_t seed = h.random.Next();
+    const bool compress = c % 6 == 1;
+    Outputs out[2], leftovers[2];
+    for (int v = 0; v < 2; v++) {
+      Random r(seed);
+      RandomBytes(h.base, car, kCarBytes, r);
+      PPCContext t = CallContext(h);
+      const uint32_t s = t.r1.u32;
+      const uint32_t frame = s - cm::kOnDecalLoadedFrameBytes - cm::kDrawDecalsFrameBytes;
+      RandomBytes(h.base, frame - 1024, s + 64 - (frame - 1024), r);
+      std::vector<Known> known;
+      std::vector<uint32_t> files;
+      // The sheet.
+      cm::TextureCreate(h.base, cm::kSheetFormat, sheet_width, sheet_width,
+                        car + cm::kSheetHeader, car + cm::kSheetData, frame);
+      const uint32_t sheet = guest::LoadU32(h.base, car + cm::kSheetHeader);
+      const uint32_t sheet_data = guest::LoadU32(h.base, car + cm::kSheetData);
+      for (uint32_t i = 0; i < sheet_bytes; i += 4) {
+        Put(h.base, sheet_data + i, uint32_t(r.Next()));
+      }
+      known.push_back({sheet, 52});
+      known.push_back({sheet_data, sheet_bytes});
+      known.push_back({sheet_data - 0x40000000u, sheet_bytes});
+      Put(h.base, car + 216, r.Below(9));
+      // The records: offsets, a rotation, a scale; the stickers' region and
+      // mirror.
+      auto record = [&](uint32_t at, bool sticker) {
+        PutFloat(h.base, at + (sticker ? 16 : 0), float(int32_t(r.Below(400)) - 200));
+        PutFloat(h.base, at + (sticker ? 20 : 4), float(int32_t(r.Below(400)) - 200));
+        PutFloat(h.base, at + (sticker ? 32 : 16), float(int32_t(r.Below(700)) - 350) / 100.0f);
+        const float scale = 0.5f + float(r.Below(100)) / 100.0f;
+        PutFloat(h.base, at + (sticker ? 48 : 32), scale);
+        PutFloat(h.base, at + (sticker ? 52 : 36), scale);
+        if (sticker) {
+          Put(h.base, at + 4, r.Below(3) == 0 ? 1 : 0);
+          Put(h.base, at + 8, r.Below(9));
+        }
+      };
+      for (uint32_t i = 0; i < 6; i++) {
+        record(car + 224 + 64 * i, false);
+      }
+      static constexpr uint32_t kGroups[8] = {1360, 976, 1744, 2128, 3280, 2896, 2512, 592};
+      for (uint32_t g = 0; g < 8; g++) {
+        for (uint32_t k = 0; k < 6; k++) {
+          record(car + kGroups[g] + 64 * k, true);
+        }
+      }
+      // The slots.
+      const uint32_t request = uint32_t(r.Next()) | 1;
+      const uint32_t chosen = r.Below(4) == 0 ? r.Below(6) : 6 + r.Below(48);
+      for (uint32_t n = 0; n < 54; n++) {
+        const uint32_t slot =
+            n < 6 ? car + cm::kLayerSlots + 48 * n : car + cm::kStickerSlots + 48 * (n - 6);
+        Put(h.base, slot + 4, n == chosen ? request : uint32_t(r.Next()) & ~1u);
+        Put(h.base, slot + 44, 0);
+        const bool arrived = n == chosen || r.Below(6) == 0;
+        Put(h.base, slot + 20, n == chosen ? 1 + r.Below(2) : arrived ? 3 : r.Below(3));
+        Put(h.base, slot + 12, 0);
+        if (!arrived) {
+          continue;
+        }
+        const bool layer = n < 6 && r.Below(8) == 0;
+        uint32_t size = 0;
+        const uint32_t w = layer ? 1024 : 16 + r.Below(81), hh = layer ? 1024 : 16 + r.Below(81);
+        const uint32_t file = MakeTga(h.base, w, hh, r.Below(2) ? 32 : 24, r, &size);
+        Put(h.base, slot + 8, size);
+        Put(h.base, slot + 16, file);
+        known.push_back({file, size});
+        files.push_back(file);
+      }
+      if (!compress) {
+        const uint32_t n = r.Below(54);
+        const uint32_t slot =
+            n < 6 ? car + cm::kLayerSlots + 48 * n : car + cm::kStickerSlots + 48 * (n - 6);
+        Put(h.base, slot + 44, 2);
+      }
+      Put(h.base, car + 6692, uint32_t(r.Next()));
+      Put(h.base, car + 6696, uint32_t(r.Next()));
+      guest::StoreU32(h.base, tc::kAlphaReference, uint32_t(r.Next()));
+      guest::StoreU32(h.base, tc::kPremultiplied, r.Below(2));
+      t.r3.u64 = request;
+      t.r6.u64 = car;
+      ITC_FLAG(native_car_models) = v == 1;
+      ITC_FLAG(native_texture_compression) = v == 1;
+      (v == 0 ? __imp__sub_820D5750 : hooks::CarModelsOnDecalLoaded)(t, h.base);
+      ITC_FLAG(native_car_models) = true;
+      ITC_FLAG(native_texture_compression) = true;
+      const uint32_t header = guest::LoadU32(h.base, car + cm::kSheetHeader);
+      const uint32_t data = guest::LoadU32(h.base, car + cm::kSheetData);
+      const bool compressed = header != sheet;
+      if (compressed) {
+        known.push_back({header, 52});
+        known.push_back({data, vinyl_bytes});
+      }
+      Address(out[v], t.r3.u32, known);
+      out[v].Word(compressed);
+      Addresses(out[v], h.base, car, kCarBytes, known);
+      if (compressed) {
+        Addresses(out[v], h.base, header, 52, known);
+        out[v].Bytes(Read(h.base, data, vinyl_bytes));
+      } else {
+        out[v].Bytes(Read(h.base, sheet_data, sheet_bytes));
+      }
+      for (uint32_t file : files) {
+        const bool alive = memory::IsPages(file);
+        out[v].Word(alive);
+        if (alive) {
+          memory::FreePages(file);
+        }
+      }
+      out[v].Word(memory::IsPages(sheet));
+      for (uint32_t at = 96; at < 272; at += 4) {
+        uint32_t word = guest::LoadU32(h.base, frame + at);
+        // The TGA headers' +3 and +9 (the reader never writes them: what
+        // the stack held under TGA::CreateImage's frame, where the original
+        // callees before it saved their registers), in their own group.
+        for (const auto& [header, unwritten] : kHeaderLeftovers) {
+          if (at == header) {
+            leftovers[v].Word(word & unwritten);
+            word &= ~unwritten;
+          }
+        }
+        if (at == 116 || at == 144) {
+          out[v].Word(word != 0);
+        } else {
+          Address(out[v], word, known);
+        }
+      }
+      if (compressed) {
+        memory::FreePages(header);
+        memory::FreePhysical(data);
+      } else {
+        memory::FreePages(sheet);
+        memory::FreePhysical(sheet_data);
+      }
+    }
+    results.Check(out[0], out[1], fmt::format("case {}{}", c, compress ? " (compressed)" : ""));
+    expected.Check(leftovers[0], leftovers[1], fmt::format("case {}", c));
+  }
+  guest::StoreU32(h.base, tc::kAlphaReference, saved_alpha);
+  guest::StoreU32(h.base, tc::kPremultiplied, saved_premultiplied);
+  memory::Free(allocation);
+  results.Report();
+  expected.Report();
+}
+
 void Rasterizer(Context& h, uint32_t block) {
   TexelCases(h, block);
   BlendCases(h, block);
@@ -947,6 +1157,7 @@ void Vinyls(Context& h, uint32_t block) {
   TextureCreates(h, block);
   TextureFrees(h, block);
   VinylCompresses(h, block);
+  DecalLoadCases(h);
 }
 
 }  // namespace

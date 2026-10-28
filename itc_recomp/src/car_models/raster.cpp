@@ -438,7 +438,7 @@ void DecalCorner(uint8_t* base, uint32_t out, uint32_t p, uint32_t c, uint32_t s
 }
 
 bool DecalRegionPorted(uint32_t region) {
-  return region <= 8;
+  return region <= 9;
 }
 
 std::optional<uint32_t> DrawDecal(uint8_t* base, const DecalArguments& arguments,

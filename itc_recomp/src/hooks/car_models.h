@@ -45,7 +45,19 @@ void CarModelsTgaCreateImage(PPCContext& ctx, uint8_t* base);
 // Vinyl::DrawDecal sub_820EE638: r3 = the region, r4 = mirrored, r5 to r7
 // the TGA header, r8, r9 the record's +16 to +31, f1 the rotation, the rest
 // in the caller's frame; r3 as the original leaves it. Natively for regions
-// 0 to 8 (car_models::DecalRegionPorted).
+// 0 to 9 (car_models::DecalRegionPorted).
 void CarModelsDrawDecal(PPCContext& ctx, uint8_t* base);
+
+// Vinyl::Compress's register steps from a frame below ctx.r1 (its entry
+// stack), for its native callers: the sheet at `header_in` must be
+// car_models::TextureFreeable. Returns its r3.
+uint32_t CarModelsVinylCompressAt(PPCContext& ctx, uint8_t* base, uint32_t width,
+                                  uint32_t height, uint32_t header_in, uint32_t data_in);
+
+// CarModel::OnDecalLoaded sub_820D5750 (Archive::Load's callback): r3 = the
+// request, r6 = the car model; r3 as the original leaves it. Natively only
+// while --native_heap routes the game's heap to the layer, and where
+// car_models::DecalsNative agrees.
+void CarModelsOnDecalLoaded(PPCContext& ctx, uint8_t* base);
 
 }  // namespace hooks
