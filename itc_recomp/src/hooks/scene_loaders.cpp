@@ -6,6 +6,8 @@
 
 #include "base/flags.h"
 #include "hooks/heap.h"
+#include "hooks/models.h"
+#include "scene_loaders/loads.h"
 #include "scene_loaders/pools.h"
 
 ITC_FLAG_BOOL(native_scene_loaders, true, "ITC",
@@ -17,7 +19,8 @@ ITC_FLAG_BOOL(native_scene_loaders, true, "ITC",
               "WalkMaterials sub_820D6EB8 (with sub_820D2270, no adapter), Interior::IsLoaded "
               "sub_820D7790 (with Accessories::AllLoaded sub_820F07D8, no adapter); NameMatches "
               "sub_820CE800 and XPR::FindByName sub_820D09B8 (with XPR::Count sub_82596F20 and "
-              "RecordName sub_82596F40, no adapters)) natively instead of through the "
+              "RecordName sub_82596F40, no adapters); with --native_heap and the memory blocks' host lock "
+              "CarModelLoads::CarModelLoads sub_820D3DE0 and ~CarModelLoads sub_820D3E40) natively instead of through the "
               "translated code (the same writes; checked by --run_harnesses=scene_loaders)");
 
 namespace hooks {
@@ -108,6 +111,23 @@ void SceneLoadersXprFindByName(PPCContext& ctx, uint8_t* base) {
   ctx.r3.s64 = sl::XprFindByName(base, ctx.r3.u32, ctx.r4.u32);
 }
 
+void SceneLoadersCarModelLoadsConstruct(PPCContext& ctx, uint8_t* base) {
+  if (!hooks::ModelsNativeLifetime() || !sl::CarModelLoadsConstruct(base, ctx.r3.u32)) {
+    __imp__sub_820D3DE0(ctx, base);
+    return;
+  }
+  ctx.fpscr.disableFlushMode();  // as Skeleton::Skeleton leaves it
+}
+
+void SceneLoadersCarModelLoadsDestruct(PPCContext& ctx, uint8_t* base) {
+  if (!hooks::ModelsNativeLifetime() || !sl::CarModelLoadsDestruct(base, ctx.r3.u32)) {
+    __imp__sub_820D3E40(ctx, base);
+    return;
+  }
+  ctx.fpscr.disableFlushMode();
+  ctx.r3.u64 = ctx.r3.u32 + sl::kCarModelLoadsSkeleton;
+}
+
 }  // namespace hooks
 
 // The adapters: the register steps above, or the originals with the flag
@@ -138,3 +158,5 @@ ITC_SCENE_LOADERS(820D6EB8, SceneLoadersPartsWalkMaterials)
 ITC_SCENE_LOADERS(820D7790, SceneLoadersInteriorIsLoaded)
 ITC_SCENE_LOADERS(820CE800, SceneLoadersNameMatches)
 ITC_SCENE_LOADERS(820D09B8, SceneLoadersXprFindByName)
+ITC_SCENE_LOADERS(820D3DE0, SceneLoadersCarModelLoadsConstruct)
+ITC_SCENE_LOADERS(820D3E40, SceneLoadersCarModelLoadsDestruct)

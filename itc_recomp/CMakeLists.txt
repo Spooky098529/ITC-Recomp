@@ -145,6 +145,7 @@ set(ITC_SOURCES
     src/app_states/layers.cpp
     src/hooks/scene_loaders.cpp
     src/scene_loaders/pools.cpp
+    src/scene_loaders/loads.cpp
     src/hooks/collision.cpp
     src/collision/shapes.cpp
     src/collision/boxes.cpp

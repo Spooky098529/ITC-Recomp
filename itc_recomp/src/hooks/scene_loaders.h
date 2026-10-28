@@ -53,4 +53,11 @@ void SceneLoadersXprRecordName(PPCContext& ctx, uint8_t* base);
 // or -1.
 void SceneLoadersXprFindByName(PPCContext& ctx, uint8_t* base);
 
+// CarModelLoads::CarModelLoads sub_820D3DE0 (r3 = the loads, left) and
+// ~CarModelLoads sub_820D3E40 (r3 = the loads; r3 = the skeleton, as
+// Skeleton::~Skeleton's adapter leaves it): only while
+// hooks::ModelsNativeLifetime().
+void SceneLoadersCarModelLoadsConstruct(PPCContext& ctx, uint8_t* base);
+void SceneLoadersCarModelLoadsDestruct(PPCContext& ctx, uint8_t* base);
+
 }  // namespace hooks

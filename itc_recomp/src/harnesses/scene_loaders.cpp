@@ -9,8 +9,12 @@
 
 #include "harness.h"
 
+#include "base/log.h"
 #include "hooks/scene_loaders.h"
+#include "memory/c_runtime_heap.h"
 #include "memory/heap.h"
+#include "models/texture_provider.h"
+#include "scene_loaders/loads.h"
 #include "scene_loaders/pools.h"
 
 #include <fmt/format.h>
@@ -530,6 +534,101 @@ void Names(Context& h, Random& r, uint32_t block) {
   }
 }
 
+// --- The embedded loads ---
+
+// After a case: a provider's vector (at provider + 4: +4 first, +8 last, +12
+// end) as whether its storage is a heap block, its size and capacity and
+// whether its slots are all 0; then its words cleared and the storage freed.
+void TakeProvider(uint8_t* base, uint32_t provider, Outputs& out) {
+  const uint32_t vector = provider + models::kTextureProviderVector;
+  const uint32_t first = guest::LoadU32(base, vector + models::kVectorFirst);
+  const uint32_t last = guest::LoadU32(base, vector + models::kVectorLast);
+  const uint32_t end = guest::LoadU32(base, vector + models::kVectorEnd);
+  const bool heap = first != 0 && memory::IsHeapBlock(first);
+  out.Word(heap);
+  out.Word(last - first);
+  out.Word(end - first);
+  bool zeros = true;
+  for (uint32_t p = first; heap && p != last && last - first <= 4096; p += 4) {
+    zeros = zeros && guest::LoadU32(base, p) == 0;
+  }
+  out.Word(zeros);
+  for (uint32_t offset : {models::kVectorFirst, models::kVectorLast, models::kVectorEnd}) {
+    Put(base, vector + offset, 0);
+  }
+  if (heap) {
+    memory::crt::OperatorDelete(first);
+  }
+}
+
+void Loads(Context& h, Random& r, uint32_t block) {
+  const uint32_t loads = block + 0x100;
+  {
+    Results results("CarModelLoads::CarModelLoads (sub_820D3DE0)");
+    for (int c = 0; c < 16; c++) {
+      RandomBytes(h.base, block, kSmallBytes, r);
+      const std::vector<uint8_t> inputs = Read(h.base, block, kSmallBytes);
+      Outputs out[2];
+      for (int v = 0; v < 2; v++) {
+        Write(h.base, block, inputs.data(), kSmallBytes);
+        PPCContext t = CallContext(h);
+        t.r1.u64 &= ~0xFull;
+        t.r3.u64 = loads;
+        (v == 0 ? __imp__sub_820D3DE0 : hooks::SceneLoadersCarModelLoadsConstruct)(t, h.base);
+        for (uint32_t offset : sl::kCarModelLoadsProviders) {
+          TakeProvider(h.base, loads + offset, out[v]);
+        }
+        out[v].Bytes(Read(h.base, block, kSmallBytes));
+        out[v].Word(t.r3.u32);
+        out[v].Word(uint32_t(t.r3.u64 >> 32));
+      }
+      results.Check(out[0], out[1], fmt::format("case {}", c));
+    }
+    results.Report();
+  }
+  {
+    // Each side makes the loads afresh (the plain C++ constructor, from the
+    // same random bytes), puts random words in the providers' slots, then
+    // destroys them: the storage is freed, so only the words left and r3.
+    Results results("CarModelLoads::~CarModelLoads (sub_820D3E40)");
+    for (int c = 0; c < 16; c++) {
+      RandomBytes(h.base, block, kSmallBytes, r);
+      const std::vector<uint8_t> inputs = Read(h.base, block, kSmallBytes);
+      const uint64_t seed = r.Next();
+      Outputs out[2];
+      for (int v = 0; v < 2; v++) {
+        Write(h.base, block, inputs.data(), kSmallBytes);
+        if (!sl::CarModelLoadsConstruct(h.base, loads)) {
+          ITC_LOG_WARN("harness: scene_loaders: CarModelLoads::CarModelLoads refused");
+          return;
+        }
+        Random slots(seed);
+        uint32_t storage[2];
+        for (int i = 0; i < 2; i++) {
+          const uint32_t vector = loads + sl::kCarModelLoadsProviders[i] +
+                                  models::kTextureProviderVector;
+          storage[i] = guest::LoadU32(h.base, vector + models::kVectorFirst);
+          for (uint32_t s = 0; s < models::kTextureProviderSlots; s++) {
+            Put(h.base, storage[i] + 4 * s, slots.Below(3) == 0 ? 0 : uint32_t(slots.Next()));
+          }
+        }
+        PPCContext t = CallContext(h);
+        t.r1.u64 &= ~0xFull;
+        t.r3.u64 = loads;
+        (v == 0 ? __imp__sub_820D3E40 : hooks::SceneLoadersCarModelLoadsDestruct)(t, h.base);
+        for (int i = 0; i < 2; i++) {
+          out[v].Word(memory::IsHeapBlock(storage[i]));
+        }
+        out[v].Bytes(Read(h.base, block, kSmallBytes));
+        out[v].Word(t.r3.u32);
+        out[v].Word(uint32_t(t.r3.u64 >> 32));
+      }
+      results.Check(out[0], out[1], fmt::format("case {}", c));
+    }
+    results.Report();
+  }
+}
+
 }  // namespace
 
 void SceneLoaders(Context& h) {
@@ -540,6 +639,7 @@ void SceneLoaders(Context& h) {
   PoolNodes(h, r, block);
   Queries(h, r, block);
   Names(h, r, block);
+  Loads(h, r, block);
   memory::Free(allocation);
 }
 
