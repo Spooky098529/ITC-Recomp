@@ -168,11 +168,6 @@ void hooks::ArchiveInvokeFunctor(PPCContext& ctx, uint8_t* base) {
   REX_CALL_INDIRECT_FUNC(target);
 }
 
-extern "C" REX_FUNC(sub_8209D688) {
-  ITC_ARCHIVE_FALLBACK(8209D688)
-  hooks::ArchiveFinishRequest(ctx, base);
-}
-
 extern "C" REX_FUNC(sub_8209DD80) {
   ITC_ARCHIVE_FALLBACK(8209DD80)
   hooks::ArchiveInvokeFunctor(ctx, base);
