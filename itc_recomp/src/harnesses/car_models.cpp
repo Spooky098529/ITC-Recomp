@@ -11,6 +11,7 @@
 
 #include "base/flags.h"
 #include "base/log.h"
+#include "car_models/raster.h"
 #include "car_models/tga.h"
 #include "car_models/vinyl.h"
 #include "graphics/resources.h"
@@ -26,7 +27,9 @@
 
 #include <fmt/format.h>
 
+#include <bit>
 #include <functional>
+#include <limits>
 #include <mutex>
 #include <string>
 #include <vector>
@@ -539,8 +542,403 @@ void TgaCreateImages(Context& h, uint32_t block) {
   results.Report();
 }
 
+// The decals' rasterizer (car_models/raster.h). Its inner functions have no
+// adapters (only their native callers reach them): their register steps are
+// here. Each group's recompiled side runs with --native_car_models off.
+void NativeSampleTexel(PPCContext& ctx, uint8_t* base) {
+  ctx.fpscr.disableFlushMode();
+  ctx.r3.u64 =
+      car_models::SampleTexel(base, ctx.r3.u32, ctx.f1.f64, ctx.f2.f64, ctx.r1.u32 - 80);
+}
+void NativeBlendPixel(PPCContext& ctx, uint8_t* base) {
+  ctx.fpscr.disableFlushMode();
+  car_models::BlendPixel(base, ctx.r3.u32, ctx.r4.u32, ctx.r5.u32, ctx.r6.s32, ctx.r7.s32,
+                         ctx.r8.u32, ctx.r1.u32);
+}
+void NativeDrawSpan(PPCContext& ctx, uint8_t* base) {
+  ctx.fpscr.disableFlushMode();
+  car_models::DrawSpan(base, ctx.r3.u32, ctx.r4.u32, ctx.r5.s32, ctx.r6.s32, ctx.r7.s32,
+                       ctx.r8.u32, ctx.r9.u32, ctx.r10.u32, ctx.r1.u32);
+}
+void NativeDrawTriangle(PPCContext& ctx, uint8_t* base) {
+  ctx.fpscr.disableFlushMode();
+  car_models::DrawTriangle(base, ctx.r3.u32, ctx.r4.u32, ctx.r5.u32, ctx.r6.u32, ctx.r7.u32,
+                           ctx.r8.u32, ctx.r1.u32);
+}
+void NativeDecalCorner(PPCContext& ctx, uint8_t* base) {
+  ctx.fpscr.disableFlushMode();
+  car_models::DecalCorner(base, ctx.r3.u32, ctx.r4.u32, ctx.r5.u32, ctx.r6.u32, ctx.r8.u32,
+                          ctx.f1.f64);
+}
+
+// A float for a texel or a position: mostly within `range`; `odd` ones out
+// of it. Texels (kind 0) also get NaNs, -infinity and negatives (they clamp
+// to the image; +infinity would read past it, as the original would);
+// positions (kind 1) only finite values a little out (an infinite or NaN row
+// would make the triangle's row loops run 2^31 times, in both); anything
+// (kind 2) any value.
+float RasterFloat(Random& r, float range, bool odd, int kind = 0) {
+  if (odd) {
+    switch (kind == 1 ? 3 + r.Below(5) : r.Below(8)) {
+      case 0:
+        return std::numeric_limits<float>::quiet_NaN();
+      case 1:
+        return -std::numeric_limits<float>::infinity();
+      case 2:
+        return kind == 2 ? std::numeric_limits<float>::infinity() : range + 5.5f;
+      case 3:
+        return -float(r.Below(1u << 10)) / 7.0f;
+      case 4:
+        return kind == 2 ? 3.0e9f : range * 3;
+      default:
+        return range * 2 * float(r.Below(1u << 20)) / float(1u << 20) - range / 2;
+    }
+  }
+  return range * float(r.Below(1u << 20)) / float(1u << 20);
+}
+
+void PutFloat(uint8_t* base, uint32_t address, float value) {
+  guest::StoreFloat(base, address, value);
+}
+
+// The small rasterizer cases' layout in the block: the image (16 bytes),
+// the region (12), the canvas word, the texel's floats, the vertices, the
+// image's pixels and the canvas's.
+constexpr uint32_t kImage = 0, kRegion = 16, kCanvas = 32, kUv = 48, kVertices = 64;
+constexpr uint32_t kImagePixels = 0x400, kCanvasPixels = 0x1000;
+
+struct RasterSizes {
+  uint32_t image_w, image_h, image_pitch;
+  uint32_t canvas_w, canvas_h, canvas_pitch;
+};
+
+RasterSizes MakeRasterSizes(Random& r) {
+  RasterSizes z;
+  z.image_w = 1 + r.Below(12);
+  z.image_h = 1 + r.Below(12);
+  z.image_pitch = 4 * (z.image_w + r.Below(4));
+  z.canvas_w = 1 + r.Below(24);
+  z.canvas_h = 1 + r.Below(24);
+  z.canvas_pitch = 4 * (z.canvas_w + r.Below(8));
+  return z;
+}
+
+// The structures written over the block's random bytes. Pixels: random,
+// with alphas of 0, 255 and others.
+void PutRaster(uint8_t* base, uint32_t block, const RasterSizes& z, Random& r) {
+  Put(base, block + kImage + 0, block + kImagePixels);
+  Put(base, block + kImage + 4, z.image_w);
+  Put(base, block + kImage + 8, z.image_h);
+  Put(base, block + kImage + 12, z.image_pitch);
+  Put(base, block + kRegion + 0, z.canvas_w);
+  Put(base, block + kRegion + 4, z.canvas_h);
+  Put(base, block + kRegion + 8, z.canvas_pitch);
+  Put(base, block + kCanvas, block + kCanvasPixels);
+  for (uint32_t i = 0; i < z.image_pitch * z.image_h; i += 4) {
+    uint32_t pixel = uint32_t(r.Next());
+    switch (r.Below(4)) {
+      case 0:
+        pixel &= 0x00FFFFFF;
+        break;
+      case 1:
+        pixel |= 0xFF000000;
+        break;
+      default:
+        break;
+    }
+    Put(base, block + kImagePixels + i, pixel);
+  }
+}
+
+void TexelCases(Context& h, uint32_t block) {
+  Results results("SoftRaster::SampleTexel (sub_820ED2A0)");
+  for (int c = 0; c < 400; c++) {
+    const uint64_t seed = h.random.Next();
+    Outputs out[2];
+    for (int v = 0; v < 2; v++) {
+      Random r(seed);
+      RandomBytes(h.base, block, kBlockBytes, r);
+      const RasterSizes z = MakeRasterSizes(r);
+      PutRaster(h.base, block, z, r);
+      PPCContext t = CallContext(h);
+      RandomBytes(h.base, t.r1.u32 - 80, 16, r);
+      t.r3.u64 = block + kImage;
+      t.f1.f64 = double(RasterFloat(r, float(z.image_w), c % 4 == 3));
+      t.f2.f64 = double(RasterFloat(r, float(z.image_h), c % 4 == 3));
+      ITC_FLAG(native_car_models) = v == 1;
+      (v == 0 ? __imp__sub_820ED2A0 : NativeSampleTexel)(t, h.base);
+      ITC_FLAG(native_car_models) = true;
+      out[v].Word(t.r3.u32);
+      out[v].Bytes(Read(h.base, t.r1.u32 - 80, 16));
+    }
+    results.Check(out[0], out[1], fmt::format("case {}", c));
+  }
+  results.Report();
+}
+
+void BlendCases(Context& h, uint32_t block) {
+  Results results("SoftRaster::BlendPixel (sub_820ED498)");
+  for (int c = 0; c < 200; c++) {
+    const uint64_t seed = h.random.Next();
+    Outputs out[2];
+    for (int v = 0; v < 2; v++) {
+      Random r(seed);
+      RandomBytes(h.base, block, kBlockBytes, r);
+      const RasterSizes z = MakeRasterSizes(r);
+      PutRaster(h.base, block, z, r);
+      PPCContext t = CallContext(h);
+      const uint32_t frame = t.r1.u32 - car_models::kBlendPixelFrameBytes;
+      RandomBytes(h.base, frame - 80, 16, r);
+      PutFloat(h.base, block + kUv, RasterFloat(r, float(z.image_w), c % 8 == 7));
+      PutFloat(h.base, block + kUv + 4, RasterFloat(r, float(z.image_h), c % 8 == 7));
+      t.r3.u64 = block + kImage;
+      t.r4.u64 = block + kCanvas;
+      t.r5.u64 = block + kRegion;
+      t.r6.u64 = r.Below(z.canvas_w);
+      t.r7.u64 = r.Below(z.canvas_h);
+      t.r8.u64 = block + kUv;
+      ITC_FLAG(native_car_models) = v == 1;
+      (v == 0 ? __imp__sub_820ED498 : NativeBlendPixel)(t, h.base);
+      ITC_FLAG(native_car_models) = true;
+      out[v].Bytes(Read(h.base, block, kBlockBytes));
+      out[v].Bytes(Read(h.base, frame - 80, 16));
+    }
+    results.Check(out[0], out[1], fmt::format("case {}", c));
+  }
+  results.Report();
+}
+
+void SpanCases(Context& h, uint32_t block) {
+  namespace cm = car_models;
+  Results results("SoftRaster::DrawSpan (sub_820EDE00)");
+  for (int c = 0; c < 300; c++) {
+    const uint64_t seed = h.random.Next();
+    Outputs out[2];
+    for (int v = 0; v < 2; v++) {
+      Random r(seed);
+      RandomBytes(h.base, block, kBlockBytes, r);
+      const RasterSizes z = MakeRasterSizes(r);
+      PutRaster(h.base, block, z, r);
+      PPCContext t = CallContext(h);
+      const uint32_t frame = t.r1.u32 - cm::kDrawSpanFrameBytes;
+      const uint32_t low = frame - cm::kBlendPixelFrameBytes - 80;
+      RandomBytes(h.base, low, t.r1.u32 + 96 - low, r);
+      const bool odd = c % 8 == 7;
+      for (uint32_t end = 0; end < 2; end++) {
+        PutFloat(h.base, block + kVertices + 16 * end, RasterFloat(r, float(z.image_w), odd));
+        PutFloat(h.base, block + kVertices + 16 * end + 4,
+                 RasterFloat(r, float(z.image_h), odd));
+      }
+      Put(h.base, t.r1.u32 + 84, r.Below(2) ? 0x80000000u : 0);
+      t.r3.u64 = block + kCanvas;
+      t.r4.u64 = block + kRegion;
+      t.r5.u64 = uint32_t(int32_t(r.Below(z.canvas_w + 16)) - 8);
+      t.r6.u64 = uint32_t(int32_t(r.Below(z.canvas_w + 16)) - 8);
+      t.r7.u64 = uint32_t(int32_t(r.Below(z.canvas_h + 4)) - 2);
+      t.r8.u64 = block + kVertices;
+      t.r9.u64 = block + kVertices + 16;
+      t.r10.u64 = block + kImage;
+      ITC_FLAG(native_car_models) = v == 1;
+      (v == 0 ? __imp__sub_820EDE00 : NativeDrawSpan)(t, h.base);
+      ITC_FLAG(native_car_models) = true;
+      out[v].Bytes(Read(h.base, block, kBlockBytes));
+      out[v].Bytes(Read(h.base, frame + 80, 64));
+      out[v].Bytes(Read(h.base, low, 16));
+    }
+    results.Check(out[0], out[1], fmt::format("case {}", c));
+  }
+  results.Report();
+}
+
+void TriangleCases(Context& h, uint32_t block) {
+  namespace cm = car_models;
+  Results results("SoftRaster::DrawTriangle (sub_820EE0C8)");
+  for (int c = 0; c < 300; c++) {
+    const uint64_t seed = h.random.Next();
+    Outputs out[2];
+    for (int v = 0; v < 2; v++) {
+      Random r(seed);
+      RandomBytes(h.base, block, kBlockBytes, r);
+      const RasterSizes z = MakeRasterSizes(r);
+      PutRaster(h.base, block, z, r);
+      PPCContext t = CallContext(h);
+      const uint32_t frame = t.r1.u32 - cm::kDrawTriangleFrameBytes;
+      const uint32_t span = frame - cm::kDrawSpanFrameBytes;
+      const uint32_t low = span - cm::kBlendPixelFrameBytes - 80;
+      RandomBytes(h.base, low, t.r1.u32 - low, r);
+      const bool odd = c % 16 == 15;
+      for (uint32_t i = 0; i < 3; i++) {
+        const uint32_t p = block + kVertices + 16 * i, uv = block + kVertices + 48 + 16 * i;
+        PutFloat(h.base, p, RasterFloat(r, float(z.canvas_w + 8), odd, 1) - 4);
+        PutFloat(h.base, p + 4, RasterFloat(r, float(z.canvas_h + 8), odd, 1) - 4);
+        PutFloat(h.base, uv, RasterFloat(r, float(z.image_w), false));
+        PutFloat(h.base, uv + 4, RasterFloat(r, float(z.image_h), false));
+      }
+      t.r3.u64 = block + kCanvas;
+      t.r4.u64 = block + kRegion;
+      t.r5.u64 = block + kVertices;
+      t.r6.u64 = block + kVertices + 48;
+      t.r7.u64 = block + kImage;
+      t.r8.u64 = r.Below(2) ? uint32_t(r.Next()) : 0;
+      ITC_FLAG(native_car_models) = v == 1;
+      (v == 0 ? __imp__sub_820EE0C8 : NativeDrawTriangle)(t, h.base);
+      ITC_FLAG(native_car_models) = true;
+      out[v].Bytes(Read(h.base, block, kBlockBytes));
+      out[v].Bytes(Read(h.base, frame + 84, 240 - 84));
+      out[v].Bytes(Read(h.base, span + 80, 64));
+      out[v].Bytes(Read(h.base, low, 16));
+    }
+    results.Check(out[0], out[1], fmt::format("case {}", c));
+  }
+  results.Report();
+}
+
+void CornerCases(Context& h, uint32_t block) {
+  Results results("Vinyl::DecalCorner (sub_820ED1E8)");
+  for (int c = 0; c < 200; c++) {
+    const uint64_t seed = h.random.Next();
+    Outputs out[2];
+    for (int v = 0; v < 2; v++) {
+      Random r(seed);
+      RandomBytes(h.base, block, 256, r);
+      PPCContext t = CallContext(h);
+      const bool odd = c % 8 == 7;
+      for (uint32_t i = 0; i < 8; i++) {
+        PutFloat(h.base, block + 4 * i, RasterFloat(r, 512.0f, odd, 2));
+      }
+      const bool same = r.Below(2) != 0;
+      t.r3.u64 = same ? block : block + 64;
+      t.r4.u64 = block;
+      t.r5.u64 = block + 8;
+      t.r6.u64 = block + 16;
+      t.r8.u64 = block + 24;
+      t.f1.f64 = double(odd ? RasterFloat(r, 7.0f, true, 2) : RasterFloat(r, 12.0f, false) - 6);
+      ITC_FLAG(native_car_models) = v == 1;
+      (v == 0 ? __imp__sub_820ED1E8 : NativeDecalCorner)(t, h.base);
+      ITC_FLAG(native_car_models) = true;
+      out[v].Floats(h.base, block, 2);
+      out[v].Floats(h.base, block + 64, 2);
+      out[v].Bytes(Read(h.base, block + 8, 56));
+    }
+    results.Check(out[0], out[1], fmt::format("case {}", c));
+  }
+  results.Report();
+}
+
+// Vinyl::DrawDecal: decals as the game's (an image of 16 to 256 pixels a
+// side, now and then 512 and the 1,024 x 1,024 layer, random ARGB with
+// clear and opaque pixels) into a 1,024 x 1,024 sheet of random pixels: a
+// region 0 to 8, mirrored or not, a scale from 0.25 to 2.25, an offset
+// around the region, a rotation (now and then far out). The recompiled side
+// with --native_car_models off. The whole sheet, r3, the caller's frame
+// (+32 to +144: the registers spilled), the frame's +80 to +272 and the
+// frames under it (the triangle's +84 to +240, the span's +80 to +144, the
+// texel's words).
+void DecalCases(Context& h) {
+  namespace cm = car_models;
+  Results results("Vinyl::DrawDecal (sub_820EE638)");
+  const uint32_t sheet_width = guest::LoadU32(h.base, cm::kVinylSheetWidth);
+  const uint32_t sheet_bytes = sheet_width * sheet_width * 4;
+  const uint32_t sheet = memory::AllocPages(sheet_bytes, 4096);
+  const uint32_t image = memory::AllocPages(1024 * 1024 * 4, 4096);
+  for (int c = 0; c < 32; c++) {
+    const uint64_t seed = h.random.Next();
+    uint32_t w = 16 + h.random.Below(241), hh = 16 + h.random.Below(241);
+    if (c == 0) {
+      w = hh = 1024;
+    } else if (c < 4) {
+      w = 512;
+      hh = c == 1 ? 512 : 256;
+    }
+    const uint32_t region = c == 0 ? 0 : h.random.Below(9);
+    Outputs out[2];
+    for (int v = 0; v < 2; v++) {
+      Random r(seed);
+      for (uint32_t i = 0; i < sheet_bytes; i += 4) {
+        Put(h.base, sheet + i, uint32_t(r.Next()));
+      }
+      for (uint32_t i = 0; i < w * hh * 4; i += 4) {
+        uint32_t pixel = uint32_t(r.Next());
+        pixel = r.Below(3) == 0 ? pixel & 0x00FFFFFF : r.Below(2) ? pixel | 0xFF000000 : pixel;
+        Put(h.base, image + i, pixel);
+      }
+      PPCContext t = CallContext(h);
+      const uint32_t s = t.r1.u32;
+      const uint32_t frame = s - cm::kDrawDecalFrameBytes;
+      const uint32_t triangle = frame - cm::kDrawTriangleFrameBytes;
+      const uint32_t span = triangle - cm::kDrawSpanFrameBytes;
+      const uint32_t low = span - cm::kBlendPixelFrameBytes - 80;
+      RandomBytes(h.base, low, s + 160 - low, r);
+      // The caller's frame: the scale, the pixels and the sheet.
+      const float scale = c == 0 ? 1.0f : 0.25f + float(r.Below(1000)) / 500.0f;
+      PutFloat(h.base, s + 96, scale);
+      PutFloat(h.base, s + 100, r.Below(4) == 0 ? scale * 0.5f : scale);
+      Put(h.base, s + 116, image);
+      Put(h.base, s + 124, 0);
+      Put(h.base, s + 132, sheet);
+      // The TGA header's 20 bytes: the width and height at +14 and +16
+      // (big-endian u16s, as the reader leaves them).
+      uint8_t header[24] = {};
+      for (uint32_t i = 0; i < 20; i++) {
+        header[i] = uint8_t(r.Next());
+      }
+      header[14] = uint8_t(w >> 8);
+      header[15] = uint8_t(w);
+      header[16] = uint8_t(hh >> 8);
+      header[17] = uint8_t(hh);
+      auto word64 = [&](uint32_t at) {
+        uint64_t value = 0;
+        for (uint32_t i = 0; i < 8; i++) {
+          value = value << 8 | header[at + i];
+        }
+        return value;
+      };
+      t.r3.u64 = region;
+      t.r4.u64 = r.Below(2) ? 1 + r.Below(4) : 0;
+      t.r5.u64 = word64(0);
+      t.r6.u64 = word64(8);
+      t.r7.u64 = word64(16) & 0xFFFFFFFF00000000ull;
+      const float offset_x = c == 0 ? 0.0f : float(int32_t(r.Below(600)) - 300);
+      const float offset_y = c == 0 ? 0.0f : float(int32_t(r.Below(600)) - 300);
+      t.r8.u64 = uint64_t(std::bit_cast<uint32_t>(offset_x)) << 32 |
+                 std::bit_cast<uint32_t>(offset_y);
+      t.r9.u64 = r.Next();
+      t.f1.f64 = c == 0 ? 0.0 : double(float(int32_t(r.Below(2000)) - 1000) / 100.0f);
+      if (c % 8 == 7) {
+        t.f1.f64 = double(float(int32_t(r.Below(2000000)) - 1000000));
+      }
+      ITC_FLAG(native_car_models) = v == 1;
+      (v == 0 ? __imp__sub_820EE638 : hooks::CarModelsDrawDecal)(t, h.base);
+      ITC_FLAG(native_car_models) = true;
+      out[v].Word(t.r3.u32);
+      out[v].Bytes(Read(h.base, sheet, sheet_bytes));
+      out[v].Bytes(Read(h.base, s + 32, 112));
+      out[v].Bytes(Read(h.base, frame + 80, 272 - 80));
+      out[v].Bytes(Read(h.base, triangle + 84, 240 - 84));
+      out[v].Bytes(Read(h.base, span + 80, 64));
+      out[v].Bytes(Read(h.base, low, 16));
+    }
+    results.Check(out[0], out[1], fmt::format("case {}: region {}, {} x {}", c, region, w, hh));
+  }
+  memory::FreePages(sheet);
+  memory::FreePages(image);
+  results.Report();
+}
+
+void Rasterizer(Context& h, uint32_t block) {
+  TexelCases(h, block);
+  BlendCases(h, block);
+  SpanCases(h, block);
+  TriangleCases(h, block);
+  CornerCases(h, block);
+  if (hooks::NativeHeapActive()) {
+    DecalCases(h);
+  }
+}
+
 void Vinyls(Context& h, uint32_t block) {
   TgaHeaderClears(h, block);
+  Rasterizer(h, block);
   if (!hooks::NativeHeapActive()) {
     ITC_LOG_WARN("harness: car_models: --native_heap is off: the vinyl's cases skipped");
     return;

@@ -7,6 +7,7 @@
 #include "base/flags.h"
 #include "car_models/car_model.h"
 #include "car_models/load_slots.h"
+#include "car_models/raster.h"
 #include "car_models/tga.h"
 #include "car_models/vinyl.h"
 #include "hooks/guest_call.h"
@@ -22,7 +23,8 @@ ITC_FLAG_BOOL(native_car_models, true, "ITC",
               "Texture::Create sub_820ECF08, Texture::Free sub_820ECFC8 and Vinyl::Compress "
               "sub_820ED090, which calls XGCompressSurface sub_8235AAC0's plain C++; the decals' TGA "
               "header's clear sub_820EEBC0 and, with --native_heap, TGA::CreateImage sub_820ED020 "
-              "with its reader) natively "
+              "with its reader; Vinyl::DrawDecal sub_820EE638 with the software rasterizer under "
+              "it, regions 0 to 8) natively "
               "instead of through the translated code (the same writes; checked by "
               "--run_harnesses=car_models)");
 
@@ -117,6 +119,20 @@ void CarModelsTgaCreateImage(PPCContext& ctx, uint8_t* base) {
   __imp__sub_820ED020(ctx, base);
 }
 
+void CarModelsDrawDecal(PPCContext& ctx, uint8_t* base) {
+  if (!cm::DecalRegionPorted(ctx.r3.u32)) {
+    __imp__sub_820EE638(ctx, base);
+    return;
+  }
+  ctx.fpscr.disableFlushMode();  // as the original's lfs
+  const cm::DecalArguments arguments{ctx.r3.u32,
+                                     ctx.r4.u32,
+                                     {ctx.r5.u64, ctx.r6.u64, ctx.r7.u64},
+                                     {ctx.r8.u64, ctx.r9.u64},
+                                     ctx.f1.f64};
+  ctx.r3.u64 = *cm::DrawDecal(base, arguments, ctx.r1.u32);
+}
+
 }  // namespace hooks
 
 // The adapters: the register steps above, or the originals with the flag
@@ -141,3 +157,4 @@ ITC_CAR_MODELS(820ECFC8, CarModelsTextureFree)
 ITC_CAR_MODELS(820ED090, CarModelsVinylCompress)
 ITC_CAR_MODELS(820EEBC0, CarModelsTgaHeaderClear)
 ITC_CAR_MODELS(820ED020, CarModelsTgaCreateImage)
+ITC_CAR_MODELS(820EE638, CarModelsDrawDecal)
