@@ -350,6 +350,12 @@ Rows not yet moved stay in the table below. So far:
   save layer: the save buffers, the game data's save and load and the
   replays' list, save, load and delete, with the play time update (B7;
   the save slots' steps stay in `files-and-saves.md`).
+- [`car-sounds.md`](car-sounds.md): the car sounds, the game's own
+  sounds for each racer played straight through XAudio's voices (the
+  engine's two layers, the tires, hits, wind, road noise, pass by and
+  others, the in-memory wave banks' reader), their 3D positioning, and
+  X3DAudio, the 3D audio library linked into the game (B7;
+  X3DAudioInitialize stays in `sound-cues.md`).
 
 These files hold functions only. What used to follow the table here moved
 out on 2026-10-20: how frame interpolation works, its options and what
@@ -383,7 +389,6 @@ old performance notes to the end of `../native-renderer.md`.
 | `sub_820C0128` | `Vehicle::GetSpeedKmh` | Overridden | Returns the float at vehicle+48 (m/s) times 3.6. The plain C++ (`Vehicle_GetSpeedKmh`, `src/hooks/vehicle.h`) is also called directly by the native `OverlayView::SpeedKmh` (`sub_821268C0`, [`race-overlays.md`](race-overlays.md)); the adapter also tells the state capture (`--capture_dir`) about the vehicle. Checked against the original by the `race_overlays` harness. |
 | `sub_8215B4F8` | `Race::DrawStep` | Wrapped | The race's draw step (Draw message). Its running marks the pass as in a race. |
 | `sub_8258FD48` | `Command::SetShaderConstants` | Wrapped | Render thread, command 7: r3 = payload, r4 = register count, r5 = stage << 24 \| type << 16 \| start << 8 \| count. Interpolation substitutes blended values here. |
-| `sub_8210EDB0` | | | Wind sound; scales with speed. |
 | `sub_82152CD8` | | | Camera shake; scales with speed. |
 | `sub_82146A38` | | | Finds the animation in set r3 whose texture is r4; -1 if none. |
 | `sub_82107B90` | `Boot::StartMovie` | | Message handler: plays the next boot movie, id from the table at `0x826C5BAC` (index at `0x826C5BC8`), via `Movies::Play` (`sub_820A43A8`, the path table at `0x82600BEC`; `movies.md`). See "The title screen" in `../title-screen.md`. |

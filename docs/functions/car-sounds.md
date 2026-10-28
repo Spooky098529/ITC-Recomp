@@ -1,0 +1,172 @@
+# Known functions: the car sounds and X3DAudio
+
+The **car sounds** (`8210C850`-`82110388`): the game's own sounds for
+the cars, played straight through XAudio's voices (not through XACT and
+the sound manager of `sound-cues.md`), and **X3DAudio**
+(`82480710`-`82481A18`), the 3D positioning library linked into the
+game, whose calculation only they reach in play. `CarSounds::Init`
+(`sub_8210FE00`, from the race mode's set-up `sub_82177378`) makes an
+array of seven 1,264-byte car sound objects at `[0x826C5C3C]` (one a
+racer; `operator new[]` with the count 7 before them) and a six-channel
+48 kHz submix voice at `[0x826C5C44]` that every car's voices play into.
+Each object holds eleven sound parts, each over a small voice holder
+(the 44-byte base, vtable `0x82010B5C`: four XAudio source voices at
++4 to +16, their count at +20, which were playing at +24 to +36): the
+engine at +408 (two layers of four looping waves each, crossfaded and
+pitched by the engine's speed), the tires at +652, the hits at +584 and
+nine others at +736, +792 (a looping roll noise by the speed), +840,
++888, +952, +1016 (the wind, `sub_8210EDB0`), +1072 and +1136 (a pass
+by); its X3DAudio listener at +4, emitter at +52 and DSP settings at
++176 (the matrix, one source and six destination channels). The race
+code above (`821767A8`-`82176E60`, the lead "the readers of the scene
+models' sound slots" in `../loops/leads.md`) gives each racer its two
+wave banks once both files arrived (`CarSounds::SetBanks`, `Start`),
+and every tick runs `CarSounds::Update`, which positions the car's
+sound (`CarSounds::Update3D`: X3DAudioCalculate with the matrix, the
+two low-pass filters, the reverb and Doppler, the listener from the
+camera, the emitter from the car's rigid body) and updates each part:
+it plays one-shot waves on events (hits, gear changes, flags in the
+vehicle's fields) and sets the looping voices' volume and pitch. The
+wave banks are in memory (XWB, read by the game's own small reader,
+`WaveBankView::`, not XACT's). Pause, resume and stop walk the parts;
+`CarSounds::Release` frees everything when the race ends.
+
+`SoundGlobals::Init` (`sub_82110258`, once at boot from the app's
+start-up) keeps the music player, clears the scene models' sound
+picks, makes the two physical buffers bank pair 2 loads into
+(`sound-cues.md`, `BankPair::Load`) and calls X3DAudioInitialize into
+the handle at `0x826C5C90` that the car sounds use.
+
+X3DAudio is a library linked into the game, like XACT, so its math is
+translated as the game's code, not replaced by a host library (the
+user's call for XACT, 2026-10-23, followed as the nearest precedent:
+"Precedent first" in `../loops/b7-loop.md`). Its structures follow the
+360's (older) layout: the listener +0 front, +12 top, +24 position,
++36 velocity, +48 cone; the emitter +0 cone, +4 front, +16 top, +28
+position, +40 velocity, +52 channel count, +56 channel radius, +60
+channel azimuths, +64 volume curve, +68 LFE curve, +72 direct low-pass
+curve, +76 reverb low-pass curve, +80 reverb curve, +84 the curves'
+distance scaler, +88 the Doppler scaler; the DSP settings +0 the
+matrix, +4 delays, +8 source and +12 destination channels, +16 and +20
+the low-pass coefficients, +24 the reverb level, +28 the Doppler
+factor, +32 the emitter's angle, +36 the distance, +40 and +44 the
+velocity components. The names of its functions are the library's
+(probably, from the flags each part runs under). Shared with
+`sound-cues.md`, which keeps its row: X3DAudioInitialize
+(`sub_82480710`, Overridden). The sound manager's own 3D path
+(`sub_8259D160`, the wrapper's, described in `sound-cues.md`'s intro)
+calls X3DAudioCalculate too but never ran.
+
+The car sounds' blockers are XAudio's voice methods (`8245xxxx`: the
+game's recompiled copy of XAudio, each method a call through the
+voice's vtable inside XAudio's critical section; a lead in
+`../loops/leads.md`), and the vehicle's accessors they use are ours
+already (`vehicle-accessors.md`, `vehicle.md`). The fields are in
+`../known-data.md` ("car sounds", `0x826C5C3C`-`0x826C5C90`). Read by
+the B7 loop's mapping agent, 2026-10-28, from the X3DAudio lead; most
+rows are read in part (each part's own logic not in detail).
+
+Status:
+
+- **Native**: plain C++ in `itc_recomp/src/` that doesn't use the
+  PowerPC context (`ctx`): normal arguments and host structs (it may
+  still read and write guest memory through `src/guest.h` while
+  recompiled code shares the data). The game reaches it without `ctx`,
+  from native or overridden callers, and the recompiled original is no
+  longer called (except behind a fallback flag or to check against it).
+  No `REX_FUNC` override of it exists, not even an adapter kept only for
+  a harness (that's Overridden until the adapter goes).
+  The end state for every function.
+- **Overridden**: an `extern "C" REX_FUNC(sub_XXXXXXXX)` override in
+  `itc_recomp/src/` (or a macro defining one) does the work instead of
+  the original: a thin adapter in front of native code, or a body that
+  still uses `ctx` (calling guest code, reading registers). It may call
+  the original when its flag is off, or to check itself against it.
+- **Wrapped**: an override that does something of its own (skipping
+  render-only passes, logging, timing) and still calls the original
+  (`__imp__sub_XXXXXXXX`) for the work.
+- **Dropped**: its work isn't needed on PC (hardware set-up, kernel calls
+  the SDK already stubbed), so it no longer runs: an override in
+  `itc_recomp/src/` replaces it with nothing (or a fixed return value), or
+  its callers, made native, leave the call out (no override then; the row
+  says which caller). Logs, a harness or the renderer's frame dumps have
+  shown that nothing reads what it did. The original is no longer called,
+  except behind a fallback flag while the drop is being checked. A
+  function the game never calls in the first place isn't Dropped: its
+  status stays blank and its row says it's never called.
+- **Merged**: its work is done inside a native caller's plain C++ (a
+  few lines only that caller needs), so it has no function or override of
+  its own in `itc_recomp/src/`. The row names the caller(s) and the
+  harness that covers the work. The original is no longer called, except
+  behind the caller's fallback flag.
+- **Patched**: the generated code was edited in place (search for
+  `PATCH:`).
+
+| Address | Name | Status | Notes |
+|---|---|---|---|
+| `sub_8210FE00` | `CarSounds::Init` | | Makes the car sounds: `operator new` (8,864 bytes: the count 7 at +0, then seven 1,264-byte objects, each made by `CarSound::CarSound`) into `[0x826C5C3C]`, cleared (memset 8,848) and each made again and set up: +1252 = `[0x82007FC8]`, +404 its index (0-6), +400 (the vehicle), +0 and +1248 = 0, then `CarSound::SetUp`. `[0x826C5C40]` = 0. Then a submix voice (`sub_8245A7C8`, probably XAudio's create submix voice: six channels at 48,000 Hz, the channel map built on the stack) into `[0x826C5C44]`, and its slot +32 (`sub_82459E80`, r4 0, r5 1, r6 3, a 48-byte block at `0x82616638`; probably an effect's parameters, the reverb's). From the race mode's state machine set-up `sub_82177378` (a lead). Read in part. |
+| `sub_8210CC18` | `CarSound::CarSound` | | r3 = a 1,264-byte car sound: the engine at +408 (`EngineSound::EngineSound`), then ten voice holders' set-ups inline (vtable `0x82010B5C`, +20 and the eight voice words 0) at +584, +676, +736, +792, +840, +888, +952, +1016, +1072, +1136. Returns r3. From `CarSounds::Init` (14 calls). Read in full. |
+| `sub_8210CBA0` | `EngineSound::EngineSound` | | r3 = the engine part (car sound + 408): two layers of 84 bytes, each vtable `0x82008018` at +0 and a voice holder (vtable `0x82010B5C`, its words 0) at +44 (layers at +0 and +84). From `CarSound::CarSound`. Read in full. |
+| `sub_8210CDE8` | `EngineLayer::~EngineLayer` | | r3 = an engine layer: its vtables put back (`0x82008018`, the holder's `0x82010B5C`), freed (`operator delete`, `sub_825A70E8`) when r4 bit 0. No direct callers (probably the layer's vtable slot 0). Not seen in play. Read in full. |
+| `sub_8210DDC8` | `CarSound::SetUp` | | r3 = a car sound: its X3DAudio listener (+4: front, top, position, velocity) and emitter (+52: channel count +104 = 1, azimuths +112, the curves +116 to +132; the floats from constants), the DSP settings at +176 (the matrix, 24 bytes from `operator new` `sub_825A6940`, +184 one source and +188 six destination channels) and the floats +1196 to +1236, +1244 = 6. From `CarSounds::Init` (7 calls). Read in part (the constants not followed). |
+| `sub_8210C9D8` | `WaveBankView::Init` | | r3 = a 24-byte view, r4 = a wave bank (XWB) in memory: +0 and +8 the bank, +4 0, +12 the bank + its +8 (the bank data), +16 the bank + its +16 (the entries, 24 bytes each), +20 the bank + its +40 (the wave data). r3 = 0. From `sub_82175F20` and `sub_82176188` (the race code, for each racer's two banks). Read in full. |
+| `sub_8210CB48` | `CarSounds::SetBanks` | | r3 = a car sound, r4 and r5 two indices: the word at `[0x82616318 + 16 r4 + 4 r5]` (a pointer, probably the car's sound parameters), stored at +496 and +500 with its first word at +504 and +508, and the same for the pointer + 820 at +412, +416 (its first word at +420, +424); +1248 = 1 (the car sound live). From `sub_82175F20` and `sub_82176188`. Read in full. |
+| `sub_8210E030` | `CarSound::Start` | | r3 = a car sound, r4 = two wave bank views (the engine's two layers), r5 = the effects' bank view: the engine (`EngineSound::Start`, r4 its index +404), the tires (`TireSound::Start`, +652), then each part's bank (r5) and index set (+624, +628, +776, +780, +880, +884, +832, +836, +928, +932, +992, +996, +1056, +1060, +1112, +1116, +1176, +1180), their state words cleared (0 or -1), +944 and +948 = `[0x82001BE0]`, +1004, +1012 and +1256 = `[0x82000A34]`; a looping voice of wave 1 for +792 (`CarSound::AddVoice`, the roll noise). From `sub_82175F20` and `sub_82176188`. Read in full. |
+| `sub_8210D6C0` | `EngineSound::Start` | | r3 = the engine part, r4 the car's index, r5 = two wave bank views: layer +84 from the first (`EngineLayer::Start`), layer +0 from the second; +168 = `[0x82000A34]`, +172 = `[0x82003384]`. From `CarSound::Start`. Read in full. |
+| `sub_8210D410` | `EngineLayer::Start` | | r3 = an engine layer, r5 = a wave bank view: +4 to +16 = 0, +20 cleared (24 bytes, memset), then four looping voices of waves 0-3 into its holder (+44; `CarSound::AddVoice`). From `EngineSound::Start` (twice). Read in full. |
+| `sub_8210D7F8` | `TireSound::Start` | | r3 = the tires' part (car sound + 652), r4 the car's index, r5 a wave bank view: +68 the index, +64 the bank, +72 and +80 = `[0x82000A34]`, +70 and +76 = 0, two looping voices of wave 0 into its holder (+24, `CarSound::AddVoice`); +0, +4, +16 = 0, +12 = 1, bytes +8 to +10 and +20 to +22 = 0. From `CarSound::Start`. Read in full. |
+| `sub_82110048` | `CarSound::Update` | | r3 = a car sound, every tick when its vehicle (+400) is set: r4 = whether the vehicle's +6148 & 0x81 is clear (probably the player's or a live car), `CarSound::Update3D`; +204 clamped to `[0x82001070]`-`[0x820029D4]`; for that case, the submix voice's slot +32 (`sub_82459E80`, as in `CarSounds::Init`) with the block `0x826166F8` when the vehicle's half-word +5314 bit 1 sets (+0 = 1) and `0x82616638` when it clears (+0 = 0): probably the reverb inside a tunnel. Then, when +1248 (live): the engine (`EngineSound::Update`, f1 +204, f2 +1252), the tires (`TireSound::Update`, +652), the hits (`HitSounds::Update`, +584), the pass by (`PassBySound::Update`, +1136, r6 +1260), +952 (`sub_8210F4E8`), and for that case also +736 (`sub_8210EBF0`), +840 (`sub_8210ECF0`), +888 (`sub_8210EEE0`), +792 (`RollSound::Update`), +1016 (`WindSound::Update`) and +1072 (`sub_8210F118`, f1 +204); each with r4 the vehicle and r5 the word +352 (the DSP output, 8 bytes). From `sub_82175F20` and `sub_82176968` (the race code). Read in full. |
+| `sub_8210F820` | `CarSound::Update3D` | | r3 = a car sound, r4 = `CarSound::Update`'s case flag, r5 = the vehicle: the listener (+4) from the camera (`0x826BAC00` or its +592 when `[0x826C2CE8]`+8 is set, its +400 position, when the race data's `0xA3AF0` is 4 or `0xA3AF4` is 8 and the flags allow) or from the car's rigid body (`RigidBody::Position` of the vehicle's +336, `Vec4::Copy`), velocities scaled by `[0x820021E4]`; the emitter (+52) from +368 and +384 (vectors); then X3DAudioCalculate (`0x826C5C90`, the listener, the emitter, flags `0x3D`: matrix, both low-pass filters, reverb, Doppler; the DSP settings at +176). The matrix's six coefficients times `[0x82616C38]` (a volume, 1.0 from `SoundGlobals::Init`) into the output map at +272 (six {channel byte, float} pairs; or a fixed `[0x82002A10]` share for the player's own car in some cases), a second map at +224 from +200, and the descriptors at +320 to +356 (r5 of the parts' updates); +1260 = 1 when the car passed close (the squared distance from +372/+388 under `[0x82002568]` and +204's change over `[0x8200806C]`), +1256 = +204. From `CarSound::Update`. Read in part (837 lines; the camera cases not followed). |
+| `sub_8210E470` | `EngineSound::Update` | | r3 = the engine part, r4 the vehicle (0: +172 rises by `[0x82001FD8]`, back to `[0x82003384]` past `[0x82008048]`), r5 the DSP output, f1, f2: the engine's speed as the vehicle's +2224 (`sub_820C0140`, probably the rpm) over its car spec's (+272) +1280, times a constant; the gear and clutch from +2248, +2252, +2256, +2268, +288; then both layers (`EngineLayer::Update`, `EngineLayer::UpdatePitched`). Read in part. |
+| `sub_8210D718` | `EngineLayer::UpdatePitched` | | r3 = the engine part, f1 the engine's speed, f2-f4, r6: above the threshold `[0x82007FE0]` a curve by `pow` (`sub_825A8ED0`), then `EngineLayer::Update` on layer +84 with the volume and pitch scaled. From `EngineSound::Update`. Not read in detail. |
+| `sub_8210D478` | `EngineLayer::Update` | | r3 = an engine layer, f1 the engine's speed and f2-f5, r7: for its four voices (holder +44), the crossfade between neighboring waves by the speed (volume `sub_8245A2C8`), started when stopped (`sub_8245A168`), pitch by `EngineLayer::SetPitch`, the output map (`sub_82459F48`). From `EngineSound::Update` and `EngineLayer::UpdatePitched`. Not read in detail (368 lines). |
+| `sub_8210D080` | `CarSound::SetPitchScaled` | | r3 = a voice holder, r4 the voice's slot, f1 a pitch, r7: (f1 − `[0x8200801C]`) times two constants, at most `[0x82002A24]` (r7 set) or `[0x82001BE0]`; f1 = 1.0 gives that maximum straight; then the voice's frequency ratio (`sub_8245A340`). From `EngineLayer::Update` and `sub_8210F118`. Read in part. |
+| `sub_8210D158` | `CarSound::SetPitch` | | r3 = a voice holder, r4 the voice's slot, f1 a pitch, r7: (f1 − `[0x8200801C]`) × `[0x82008020]`, at most `[0x82002A24]` (r7 set) or `[0x82001BE0]` (f1 = `[0x82000A34]`: that maximum), then the voice's frequency ratio (`sub_8245A340`, probably SetFrequencyRatio). From `TireLayer::Update`, `RollSound::Update`, `CarSound::PlayOnce`, `sub_8210F4E8`. Read in full. |
+| `sub_8210E5C0` | `TireSound::Update` | | r3 = the tires' part (+652), r4 the vehicle, r5 the DSP output: the slip from `Vehicle::SlipWheelValue` and `Vehicle::MaxWheelSlip` (`sub_820C0310`, `sub_820C0290`), its amount (`TireSound::Amount`), the voices stopped when nothing slips (`sub_82459FA0`, `sub_8245A1B0`), else `TireLayer::Update`. From `CarSound::Update`. Not read in detail. |
+| `sub_8210CA28` | `TireSound::Amount` | | r3 = the tires' part, f1: +80 from +72 (scaled by `[0x82002A60]` below `[0x820067B0]`, at most `[0x82007FC8]`; × `[0x8200295C]` when f1 is 0), and the half-words +70 and +76 stepped toward a target (8192 − 14 × +70 below 7). Leaf. From `TireSound::Update`. Not read in detail. |
+| `sub_8210D890` | `TireLayer::Update` | | r3 = the tires' part: its two voices' volume (+80) and pitch (+76) set (`sub_8245A2C8`, `CarSound::SetPitch`), started or stopped by whether they play (`CarSound::IsPlaying`), the output map (`sub_82459F48`). From `TireSound::Update`. Not read in detail (416 lines). |
+| `sub_8210FD78` | `HitSounds::Update` | | r3 = the hits' part (+584), r4 the vehicle, r5 the DSP output: the scrape (`sub_8210E778`), the hit (`sub_8210E938`) and wave 9 (`sub_8210EB90`), then `CarSound::UpdateVoices`. From `CarSound::Update`. Read in full. |
+| `sub_8210E778` | | | r3 = the hits' part, r4 the vehicle: from the vehicle's +6152 and its collision object (+340, `CollisionObject::FirstContact`, `Contact::Strength`), one-shot waves (`CarSound::PlayOnce`, the wave from a register) by the contact's strength. Probably a hit on a wall or another car. From `HitSounds::Update`. Not read in detail. |
+| `sub_8210E938` | | | r3 = the hits' part, r4 the vehicle: as `sub_8210E778` with the speed (`Vehicle::GetSpeedKmh`): wave 10 (`CarSound::PlayOnce`) and a looping voice's volume (`sub_8245A2C8`) while in contact, stopped after (`sub_8245A1B0`); probably the scrape. From `HitSounds::Update`. Not read in detail (362 lines). |
+| `sub_8210EB90` | | | r3 = the hits' part, r4 the vehicle: wave 9 once (`CarSound::PlayOnce`) on a flag in the vehicle's +6152. From `HitSounds::Update`. Not read in detail. |
+| `sub_8210EBF0` | | | r3 = the part at +736, r4 the vehicle: wave 4 (`CarSound::PlayOnce`) by the vehicle's +2252 (probably the gear), byte +2948, +2952 and +5712; probably the gear change. Then `CarSound::UpdateVoices`. From `CarSound::Update`. Not read in detail. |
+| `sub_8210ECF0` | | | r3 = the part at +840, r4 the vehicle: wave 6 when the vehicle's byte +2504 is set, wave 18 when byte +2960 is set and +45 is 0 (+45 = 2, then down to 0 a tick), at `[0x82007FEC]` with pitch `[0x8200803C]` (`CarSound::PlayOnce`); then `CarSound::UpdateVoices`. From `CarSound::Update`. Read in full. |
+| `sub_8210EEE0` | | | r3 = the part at +888, r4 the vehicle: wave 17 (`CarSound::PlayOnce`) and its volume (`sub_8245A2C8`) by the vehicle's byte +2424, stopped when it clears; then `CarSound::UpdateVoices`. From `CarSound::Update`. Not read in detail. |
+| `sub_8210DB60` | `RollSound::Update` | | r3 = the part at +792 (its looping wave 1 from `CarSound::Start`), r4 the vehicle: the volume from the speed squared (`Vehicle::GetSpeedKmh`, × `[0x82008044]`, at most `[0x82007FC8]`) and the pitch from it (`CarSound::SetPitch`); started or stopped as it rises from or falls to 0; the output map (`sub_82459F48`). Probably the road noise. From `CarSound::Update`. Read in part. |
+| `sub_8210EDB0` | `WindSound::Update` | | Wind sound; scales with speed. B7 loop (2026-10-28): r3 = the part at +1016, r4 the vehicle: wave 5 (`CarSound::PlayOnce`) by the speed (`Vehicle::GetSpeedKmh`) and a half-word at its +0; then `CarSound::UpdateVoices`. From `CarSound::Update`. Not read in detail. |
+| `sub_8210F088` | `PassBySound::Update` | | r3 = the part at +1136, r4 the vehicle, r6 `CarSound::Update3D`'s pass flag (+1260): wave 15 at `[0x82002A10]` with pitch `[0x8200803C]` (`CarSound::PlayOnce`) when set and the vehicle's +6148 & 0x81 is clear; then `CarSound::UpdateVoices`. From `CarSound::Update`. Read in full. |
+| `sub_8210F118` | | | r3 = the part at +1072, r4 the vehicle, f1 the car sound's +204: three one-shot waves (`CarSound::PlayOnce`) by the vehicle's +6148 and +5712, each pitched (`CarSound::SetPitchScaled`) and stopped when done (`CarSound::IsPlaying`, `sub_8245A1B0`); then `CarSound::UpdateVoices`. From `CarSound::Update`. Not read in detail (560 lines). |
+| `sub_8210F4E8` | | | r3 = the part at +952, r4 the vehicle: wave 3 (`CarSound::PlayOnce`) by the vehicle's +2944, its volume and pitch (`sub_8245A2C8`, `CarSound::SetPitch`) while it plays, stopped after; then `CarSound::UpdateVoices`. From `CarSound::Update` (every car). Not read in detail (365 lines). |
+| `sub_8210CE38` | `CarSound::AddVoice` | | r3 = a voice holder, r4 = a wave bank view, r5 = the wave's index, r6 = loop: the first free voice slot of four (+4 + 4i; -1 when none): an XAudio source voice (`sub_8245A768`, probably create source voice) of wave 0's format (`WaveBankView::Format`) sending to the submix voice `[0x826C5C44]` with a six-channel map built on the stack, then the wave's buffer submitted (`sub_8245A050`, probably submit packet: the data from `WaveBankView::Data`, its length from `WaveBankView::Length`; with r6 the loop region from the entry, `WaveBankView::Entry`, in bytes for 8- or 16-bit samples); +20 up by one. Returns the slot. From `EngineLayer::Start`, `TireSound::Start`, `CarSound::Start`, `CarSound::PlayOnce`. Read in full. |
+| `sub_8210E3E8` | `CarSound::PlayOnce` | | r3 = a voice holder, r4 = a wave bank view, r5 = the wave, r8 = loop, f1 = the volume, f2 = the pitch: `CarSound::AddVoice`, then the voice started (`sub_8245A168`), its volume (`sub_8245A2C8`, probably SetVolume) and pitch (`CarSound::SetPitch`). Returns the slot or -1. From the parts' updates (10 callers). Read in full. |
+| `sub_8210D1D8` | `CarSound::IsPlaying` | | r3 = a voice holder, r4 = a slot (-1 gives 0): 1 when the voice exists and its state's bit 0 is set (`sub_82459FA0`, probably get state). From the parts' updates (6 callers). Read in full. |
+| `sub_8210D378` | `CarSound::UpdateVoices` | | r3 = a voice holder: each voice whose state (`sub_82459FA0`) has bit 2 (done) is stopped and destroyed (`sub_8245A1B0`, `sub_82459E18`) and its slot cleared; a playing one (bit 0) gets slot +40 (`sub_82459F48`, r4 = a pointer 24 bytes into the caller's frame: probably the DSP output's map). From 8 of the parts' updates. Read in full. |
+| `sub_8210D240` | `CarSound::Pause` | | r3 = a voice holder: each voice playing (`sub_82459FA0` bit 0) is stopped (`sub_8245A1B0`) and noted (+24 + 4i = 1, else 0). From `CarSound::PauseAll`. Read in full. |
+| `sub_8210D2C0` | `CarSound::Resume` | | r3 = a voice holder: each voice noted as paused (+24 + 4i) is started again (`sub_8245A168`). From `CarSound::ResumeAll`. Read in full. |
+| `sub_8210D320` | `CarSound::Clear` | | r3 = a voice holder: each voice stopped and destroyed (`sub_8245A1B0`, `sub_82459E18`, probably destroy voice), slots cleared, +20 = 0. From `CarSound::Stop` and `CarSound::Release` (12 calls each). Read in full. |
+| `sub_8210E2B8` | `CarSound::PauseAll` | | r3 = a car sound: `CarSound::Pause` on its 12 holders (the engine's two at +452, +536, then +952, +584, +676, +736, +840, +792, +888, +1016, +1072, +1136). From `sub_82175A40`, `sub_82175AE8`, `sub_82175C00` (the race code; probably the pause menu). Read in full. |
+| `sub_8210E350` | `CarSound::ResumeAll` | | r3 = a car sound: `CarSound::Resume` on the same 12 holders. From `sub_82175B80`, `sub_82175C58`. Read in full. |
+| `sub_8210E218` | `CarSound::Stop` | | r3 = a car sound: `CarSound::Clear` on its 12 holders, +1248 = 0. From `CarSounds::StopAll`, `sub_82175F20`, `sub_82176188`. Read in full. |
+| `sub_8210F7C8` | `CarSounds::StopAll` | | `CarSound::Stop` on each of the seven at `[0x826C5C3C]`. From `sub_82175D48`, `sub_82176EC8` (and `sub_82175CA0`, not seen in play). Read in full. |
+| `sub_8210E170` | `CarSound::Release` | | r3 = a car sound: `CarSound::Clear` on its 12 holders, its matrix (+176) freed (`operator delete`, `sub_825A71C0`), +1248 = 0. From `CarSounds::Release`. Read in full. |
+| `sub_8210F750` | `CarSounds::Release` | | `CarSound::Release` on each of the seven, the array destroyed (`CarSounds::Destroy` with 3: the elements' vtables put back and the block freed), and the submix voice `[0x826C5C44]` destroyed (`sub_82459E18`). From `sub_821772D8` (the race code, with the sound bank holders' frees). Read in full. |
+| `sub_8210DCA8` | `CarSounds::Destroy` | | r3 = the array (or one car sound), r4 flags: bit 1 the array (r3 the first element, the count at r3 − 16; each element's 14 vtables put back, from the last), bit 0 freed (`sub_825A71C0` from r3 − 16 for the array, `sub_825A70E8` for one; both `operator delete` in `heap.md`). The compiler's vector deleting destructor. From `CarSounds::Release`. Read in full. |
+| `sub_8210C850` | `WaveBankView::Format` | | r3 = a wave bank view, r4 the wave, r5 = a format out: 1 when the wave is past the count (bank data +4); else from the bank's compact entries (flag `0x20000` in bank data +0: the format at bank data +84) or the wave's entry (+16 + 24 × wave, +4): only PCM (the low 2 bits, the format tag, 0; else 1 is returned): +0 a sample type byte from bit 31 (1 for 16-bit samples, 2 for 8-bit), +8 the sample rate (bits 5-22), +4 the channels (bits 2-4). 0. From `CarSound::AddVoice`. Read in full. |
+| `sub_8210C920` | `WaveBankView::Length` | | r3 = a wave bank view, r4 the wave, r5 out: the entry's +12 (probably the play region's length); 1 when past the count. From `CarSound::AddVoice`. Read in full. |
+| `sub_8210C958` | `WaveBankView::Data` | | r3 = a wave bank view, r4 the wave, r5 out: the entry's +8 plus the wave data's start (+20); 1 when past the count. From `CarSound::AddVoice`. Read in full. |
+| `sub_8210C998` | `WaveBankView::Entry` | | r3 = a wave bank view, r4 the wave, r5 out: the wave's 24-byte entry copied (`XMemCpy`). 0. From `CarSound::AddVoice`. Read in full. |
+| `sub_82110258` | `SoundGlobals::Init` | | r3 = the music player (the app's slot +48's answer, from the app's start-up `sub_82106548` once at boot): kept at `0x826C5C80`; `[0x82000A30]` (1.0) into `0x82616BEC`, `0x82616C34`, `0x82616C38`, `0x82616C3C` (volumes; +C38 read by `CarSound::Update3D`), bytes `0x826C5C84`, `0x826C5C85` = 0; seven words at `0x826C5C64` and seven at `0x826C5C48` cleared (the scene models' sound picks, `../known-data.md`); 512 bytes (`0x826C5C8C`) and 3 MiB aligned to 2,048 (`0x826C5C88`) of physical memory (`Memory::AllocPhysicalEx`, `sub_8258E098`; bank pair 2's buffers, `sound-cues.md`); `Music::Play` with the name at `0x820080FC`; X3DAudioInitialize (`sub_82480710`, `sound-cues.md`) for the mask 63 (5.1) and the speed of sound `[0x820080F8]` into `0x826C5C90`. Read in full. |
+| `sub_82110388` | `SoundGlobals::Shutdown` | | The music player's slot +20 (r4 = a word 0), `0x826C5C80` = 0, the two physical buffers freed (`sub_8258E410`). From `sub_82106678` (not seen in play). Not seen in play. Read in full. |
+| `sub_82481880` | `X3DAudioCalculate` | | X3DAudio (library). r3 = the handle, r4 = the listener, r5 = the emitter, r6 = the flags, r7 = the DSP settings: the emitter-to-listener vector (`X3DVec::Sub`, listener +24 − emitter +28) and its length into +36 (`X3DVec::Length`); then by flag: `0x40` the emitter's angle (`X3DAudio::EmitterAngle`), `0x1D` the curves (`X3DAudio::Curves`; the cone, `X3DAudio::Cone`, when the emitter has one channel and a cone), `0x1` the matrix (`X3DAudio::Matrix`), `0x2` the delays (`X3DAudio::Delay`), `0x20` Doppler (`X3DAudio::Doppler`). In play only from `CarSound::Update3D` (flags `0x3D`); `sub_8259D160` (`sound-cues.md`'s 3D path) never ran. Read in full. |
+| `sub_82480918` | `X3DAudio::Curves` | | X3DAudio (library). r3 the handle, r4 the emitter, r5 the flags, r6 the DSP settings: by flag the direct low-pass (`0x4`, curve +72 into +16), the reverb low-pass (`0x8`, +76 into +20), the reverb (`0x10`, +80 into +24) and with the matrix (`0x1`) the volume curve (+64) into the matrix and, for the channel whose azimuth is `[0x82001FA8]` (probably 2π: LFE), the LFE curve (+68); each `X3DAudio::EvaluateCurve` at the distance (+36) with the scaler (+84), or a default curve built on the stack when the emitter's is null. From `X3DAudioCalculate`. Read in part (425 lines). |
+| `sub_82480818` | `X3DAudio::EvaluateCurve` | | X3DAudio (library). r3 = a curve (+0 the points, 8 bytes each: distance, value; +4 the count), f1 the scaler, f2 the distance: the first point past distance / scaler (searched four at a time), the value linearly between it and the one before; past the last, the last's value. Leaf. From `X3DAudio::Curves`. Read in full. |
+| `sub_82480BA8` | `X3DAudio::Cone` | | X3DAudio (library). r3 the handle, r4 the listener, r5 the emitter, r6 the flags, r7 the DSP settings: probably the angle between the emitter's front and the listener (`X3DVec::Sub`, `X3DVec::Dot`, `cos`), interpolated between the cone's inner and outer values (the cone +0 to +28) into the matrix's volume and the DSP settings' +16, +20, +24. From `X3DAudioCalculate` (with a cone). Not read in detail (495 lines). |
+| `sub_82481390` | `X3DAudio::Matrix` | | X3DAudio (library). r3 the handle, r4 the listener, r5 the emitter, r6 the DSP settings: the emitter's direction in the listener's frame (`X3DVec::Sub`, `X3DVec::Cross`, the listener's front and top) and its azimuth (`atan2`), each emitter channel's azimuth (+56 radius, +60 azimuths, `sin`, `cos`), panned over the speakers (`X3DAudio::Pan`) into the matrix (+0, source +8 by destination +12 channels). From `X3DAudioCalculate`. Not read in detail (522 lines). |
+| `sub_82480F80` | `X3DAudio::Pan` | | X3DAudio (library). r3 the handle, f1 an azimuth and more: probably the gains over the speaker pair either side of the azimuth (constants at `0x82050000`-plus and `0x82020000`-plus, the handle's +0 and +4, `tan`) into the matrix. From `X3DAudio::Matrix`. Not read in detail (603 lines). |
+| `sub_82480E90` | `X3DAudio::Doppler` | | X3DAudio (library). r3 the handle, r4 the listener, r5 the emitter, r6 the DSP settings: the velocities' components along the emitter-to-listener vector (`X3DVec::Sub`, `X3DVec::Dot`, the listener's +36 and the emitter's +40) into +44 and +40, and the Doppler factor from the speed of sound (handle +8) and the emitter's scaler (+88) into +28. From `X3DAudioCalculate`. Not read in detail. |
+| `sub_82480780` | `X3DAudio::EmitterAngle` | | X3DAudio (library). The angle between the emitter's front and the listener (`X3DVec::Sub`, `X3DVec::Dot`, `acos`) into the DSP settings' +32. From `X3DAudioCalculate` with flag `0x40`. Not seen in play (the car sounds don't ask for it). Not read in detail. |
+| `sub_82481708` | `X3DAudio::Delay` | | X3DAudio (library). The delays for each channel (`X3DVec::Cross`, `atan2`, `sin`) into the DSP settings' +4. From `X3DAudioCalculate` with flag `0x2`. Not seen in play. Not read in detail. |
+| `sub_824819E0` | `X3DVec::Sub` | | X3DAudio (library). r5 = r3 − r4 (three floats, each rounded to single). Leaf. From `X3DAudioCalculate`, `Cone`, `Doppler`, `Matrix`, `EmitterAngle`, `Delay`. Read in full. |
+| `sub_82481998` | `X3DVec::Length` | | X3DAudio (library). f1 = the length of the vector r3 (`sqrt` of x² + y² + z² with fused multiply-adds, rounded to single). Leaf. From `X3DAudioCalculate`. Read in full. |
+| `sub_824819B8` | `X3DVec::Dot` | | X3DAudio (library). f1 = r3 · r4 (y first, then z and x fused, each step rounded to single). Leaf. From `Cone`, `Doppler`, `EmitterAngle`. Read in full. |
+| `sub_82481A18` | `X3DVec::Cross` | | X3DAudio (library). r5 = r3 × r4 (each component a fused multiply-subtract, rounded to single). Leaf. From `Matrix`, `Delay`. Read in full. |
