@@ -65,6 +65,15 @@ void RaceWorldJumpSections(PPCContext& ctx, uint8_t* base);
 // no arguments (r3 not kept: RaceWorld::Tick doesn't read it).
 void RaceWorldTickVehicles(PPCContext& ctx, uint8_t* base);
 void RaceWorldRefreshVehicles(PPCContext& ctx, uint8_t* base);
+// RaceWorld::Init sub_82174D28: r3 = the race world; r3 as the last
+// StateMachine::Add leaves it.
+void RaceWorldInit(PPCContext& ctx, uint8_t* base);
+// RaceWorld::ReleaseForStage sub_821713C0: r3 = the race world (r3 not
+// kept: the state machine's handler call doesn't read it).
+void RaceWorldReleaseForStage(PPCContext& ctx, uint8_t* base);
+// SaveData::AddDistance sub_82116C38: r3 = the save data, f1 = the
+// distance (r3 left).
+void RaceWorldAddDistance(PPCContext& ctx, uint8_t* base);
 // SaveData::FirstUnsetFlag sub_82112190: r3 = the save data; r3 = 0 to 6.
 void RaceWorldFirstUnsetFlag(PPCContext& ctx, uint8_t* base);
 

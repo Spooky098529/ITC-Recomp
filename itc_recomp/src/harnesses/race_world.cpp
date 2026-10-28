@@ -21,6 +21,7 @@
 #include "memory/heap.h"
 #include "race_world/race_world.h"
 #include "data_tables/data_tables.h"
+#include "game_modes/game_modes.h"
 #include "track_collision/track_collision.h"
 #include "track_route/track_route.h"
 
@@ -945,6 +946,179 @@ void TrackCollisionTicks(Context& h, const Block& manager, const Block& vehicles
   results.Report();
 }
 
+// --- RaceWorld::Init: an empty state machine or one with random
+// transitions already (fewer than 150, so the 24 fit), the race data's mode
+// 6 with the current stage's +76 of 0 to 3 or another mode; the original's
+// frame filled with the same random words for both (the words it never
+// writes go into the transitions); the machine, the frame (but its back
+// chain and saved registers) and r3 compared ---
+
+void Inits(Context& h) {
+  namespace gm = game_modes;
+  constexpr uint32_t kFrame = 1696;
+  const Block world(0x2600);
+  const Block race(0xA4000);
+  if (!world.address || !race.address) {
+    ITC_LOG_ERROR("harness: race_world: no block from the allocation layer");
+    return;
+  }
+  Results results("RaceWorld::Init (sub_82174D28)");
+  const uint32_t frame = CallContext(h).r1.u32 - kFrame;
+  for (uint64_t seed = 0; seed < 24; seed++) {
+    Outputs out[2];
+    for (int v = 0; v < 2; v++) {
+      Random r(seed * 137 + 71);
+      Globals globals(h.base, {rw::kRaceData});
+      WriteRandom(h.base, h.data, kScratchBytes, r);
+      WriteRandom(h.base, world.address, world.bytes, r);
+      WriteRandom(h.base, frame, kFrame, r);
+      if (seed % 2 == 0) {
+        gm::StateMachineConstruct(h.base, world.address);
+        guest::StoreU32(h.base, world.address + gm::kTransitionCount, 0);
+      } else {
+        guest::StoreU32(h.base, world.address + gm::kTransitionCount, r.Below(150));
+        for (uint32_t i = 0; i < 200; i++) {  // keys of small numbers, some matching
+          for (uint32_t k = 0; k < 4; k++) {
+            guest::StoreU32(h.base, world.address + 48 * i + 4 * k, r.Below(k < 2 ? 60 : 2));
+          }
+        }
+      }
+      const uint32_t stages = race.address + 0x59620;
+      const uint32_t current = r.Below(10);
+      guest::StoreU32(h.base, stages + 804, current);
+      guest::StoreU32(h.base, stages + 80 * current + 76, r.Below(4));
+      guest::StoreU32(h.base, race.address + 0xA3AF0, r.Below(2) == 0 ? 6 : r.Below(8));
+      guest::StoreU32(h.base, rw::kRaceData, race.address);
+      PPCContext t = CallContext(h);
+      t.r3.u64 = world.address;
+      (v == 0 ? Original<__imp__sub_82174D28> : hooks::RaceWorldInit)(t, h.base);
+      out[v].Bytes(Read(h.base, world.address, 9612));
+      out[v].Bytes(Read(h.base, frame + 80, kFrame - 80 - 64));
+      out[v].Bytes(Read(h.base, h.data, kScratchBytes));
+      out[v].Word(t.r3.u32);
+      out[v].Word(uint32_t(t.r3.u64 >> 32));
+    }
+    results.Check(out[0], out[1], fmt::format("seed {}", seed));
+  }
+  results.Report();
+}
+
+// --- RaceWorld::ReleaseForStage: a manager with racers on the seven
+// vehicles and entries for records 0 to 11, the race data's stages (the
+// current one's type, count and racers) and mode ---
+
+void ReleasesForStage(Context& h, const Block& manager, const Block& vehicles) {
+  const Block race(0xA4000);
+  if (!race.address) {
+    ITC_LOG_ERROR("harness: race_world: no block from the allocation layer");
+    return;
+  }
+  Results results("RaceWorld::ReleaseForStage (sub_821713C0)");
+  int held = 0;
+  for (uint64_t seed = 0; seed < 100; seed++) {
+    Outputs out[2];
+    for (int v = 0; v < 2; v++) {
+      Random r(seed * 139 + 73);
+      Globals globals(h.base, {rw::kManager, kVehicles, rw::kRaceData});
+      const uint32_t sp = CallContext(h).r1.u32;
+      WriteRandom(h.base, sp - 1024, 1024, r);
+      WriteRandom(h.base, manager.address, 4096, r);
+      WriteRandom(h.base, vehicles.address, vehicles.bytes, r);
+      guest::StoreU32(h.base, manager.address + 2364, r.Below(8));
+      for (uint32_t i = 0; i < 7; i++) {
+        const uint32_t entry = manager.address + 4 + 28 * r.Below(12);
+        guest::StoreU32(h.base, manager.address + 2308 + 4 * i, entry);
+      }
+      guest::StoreU32(h.base, manager.address + 2368, 12);
+      for (uint32_t i = 0; i < 12; i++) {
+        guest::StoreU32(h.base, manager.address + 4 + 28 * i + 20, r.Below(7));
+        guest::StoreU32(h.base, manager.address + 4 + 28 * i + 24, i);
+      }
+      const uint32_t stages = race.address + 0x59620;
+      WriteRandom(h.base, stages, 820, r);
+      const uint32_t current = r.Below(10);
+      const uint32_t stage = stages + 80 * current;
+      guest::StoreU32(h.base, stages + 804, current);
+      guest::StoreU32(h.base, stage + 0, r.Below(5));
+      guest::StoreU32(h.base, stage + 76, r.Below(5));
+      for (uint32_t k = 0; k < 4; k++) {
+        guest::StoreU32(h.base, stage + 44 + 8 * k, r.Below(12));
+      }
+      guest::StoreU32(h.base, race.address + 0xA3AF0, r.Below(2) == 0 ? 6 : r.Below(8));
+      guest::StoreU32(h.base, rw::kManager, manager.address);
+      guest::StoreU32(h.base, kVehicles, vehicles.address);
+      guest::StoreU32(h.base, rw::kRaceData, race.address);
+      PPCContext t = CallContext(h);
+      t.r3.u64 = h.data;
+      (v == 0 ? Original<__imp__sub_821713C0> : hooks::RaceWorldReleaseForStage)(t, h.base);
+      for (uint32_t i = 0; i < 7; i++) {
+        out[v].Bytes(Read(h.base, vehicles.address + 6272 * i + 2384, 1));
+        held += v == 1 && guest::LoadU8(h.base, vehicles.address + 6272 * i + 2384) == 1 ? 1 : 0;
+      }
+      out[v].Bytes(Read(h.base, vehicles.address, vehicles.bytes));
+      out[v].Bytes(Read(h.base, sp - 192 + 80, 80));  // the stage's copy
+    }
+    results.Check(out[0], out[1], fmt::format("seed {}", seed));
+  }
+  ITC_LOG_INFO("harness: race_world: ReleaseForStage held {} vehicles", held);
+  results.Report();
+}
+
+// --- SaveData::AddDistance: a save data block (the garage list at +6120,
+// its nodes' links and car numbers small, the picked count 0 to 5), the
+// three floats it adds to compared as floats (NaNs and infinities among
+// them), the rest exactly ---
+
+void AddDistances(Context& h) {
+  const Block save(0x20000);
+  if (!save.address) {
+    ITC_LOG_ERROR("harness: race_world: no block from the allocation layer");
+    return;
+  }
+  Results results("SaveData::AddDistance (sub_82116C38)");
+  const uint32_t list = save.address + 6120;
+  const auto car = [&] {
+    uint32_t node = (uint32_t(int32_t(int16_t(guest::LoadU16(h.base, list + 204)))) << 2) + list;
+    for (uint32_t n = guest::LoadU32(h.base, save.address + 0x19920); n != 0; n--) {
+      node = (uint32_t(int32_t(int16_t(guest::LoadU16(h.base, node)))) << 2) + list;
+    }
+    return uint32_t(int32_t(int16_t(guest::LoadU16(h.base, node + 2)))) * 1968 + list;
+  };
+  for (uint64_t seed = 0; seed < 200; seed++) {
+    Outputs out[2];
+    for (int v = 0; v < 2; v++) {
+      Random r(seed * 149 + 79);
+      WriteRandom(h.base, save.address, save.bytes, r);
+      for (uint32_t i = 0; i < 64; i++) {
+        guest::StoreU16(h.base, list + 4 * i, uint16_t(r.Below(64)));
+        guest::StoreU16(h.base, list + 4 * i + 2, uint16_t(r.Below(30)));
+      }
+      guest::StoreU16(h.base, list + 204, uint16_t(r.Below(64)));
+      guest::StoreU32(h.base, save.address + 0x19920, r.Below(6));
+      const uint32_t picked = car() + 2104;
+      const bool wild = seed % 4 == 0;
+      for (uint32_t at : {save.address + 4908, save.address + 6040, picked}) {
+        guest::StoreU32(h.base, at,
+                        wild ? RandomFloat(r, 1e6f) : std::bit_cast<uint32_t>(float(r.Below(100000))));
+      }
+      PPCContext t = CallContext(h);
+      t.r3.u64 = save.address;
+      t.f1.f64 = wild ? double(std::bit_cast<float>(RandomFloat(r, 1e6f)))
+                      : double(r.Below(200000)) / 3.0;
+      (v == 0 ? Original<__imp__sub_82116C38> : hooks::RaceWorldAddDistance)(t, h.base);
+      std::vector<uint8_t> bytes = Read(h.base, save.address, save.bytes);
+      for (uint32_t at : {save.address + 4908, save.address + 6040, picked}) {
+        out[v].Float(guest::LoadU32(h.base, at));
+        std::memset(bytes.data() + (at - save.address), 0, 4);
+      }
+      out[v].Bytes(bytes);
+      out[v].Word(t.r3.u32);
+    }
+    results.Check(out[0], out[1], fmt::format("seed {}", seed));
+  }
+  results.Report();
+}
+
 }  // namespace
 
 void RaceWorld(Context& h) {
@@ -962,6 +1136,9 @@ void RaceWorld(Context& h) {
   Tables(h, manager, vehicles);
   VehicleLoops(h, manager);
   TrackCollisionTicks(h, manager, vehicles);
+  Inits(h);
+  ReleasesForStage(h, manager, vehicles);
+  AddDistances(h);
 }
 
 }  // namespace harness

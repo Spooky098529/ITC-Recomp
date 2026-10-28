@@ -21,7 +21,9 @@ ITC_FLAG_BOOL(native_race_world, true, "ITC",
               "--native_heap routes the game's heap to the allocation layer), NoteMarkedRacer "
               "sub_82172F90, NearSegment sub_82170BC0, BuildNeighbors sub_82170CB8, Neighbours "
               "sub_82170920 and JumpSections sub_821737F8; TickVehicles sub_821714D8 and "
-              "RefreshVehicles sub_82171560, their callees' originals where those refuse) natively instead of through the "
+              "RefreshVehicles sub_82171560, their callees' originals where those refuse; "
+              "RaceWorld::Init sub_82174D28 and ReleaseForStage sub_821713C0, "
+              "SaveData::AddDistance sub_82116C38) natively instead of through the "
               "translated code (the same words, bit for bit; checked by "
               "--run_harnesses=race_world)");
 
@@ -155,6 +157,39 @@ void RaceWorldRefreshVehicles(PPCContext& ctx, uint8_t* base) {
   rw::RefreshVehicles(base, ctx.r1.u32 - 112, Originals(ctx, base));
 }
 
+void RaceWorldInit(PPCContext& ctx, uint8_t* base) {
+  ctx.fpscr.disableFlushMode();
+  const uint64_t machine_r3 = ctx.r3.u64;
+  const uint32_t machine = ctx.r3.u32;
+  bool replaced = false;
+  const uint32_t r3 = rw::Init(base, machine, ctx.r1.u32 - 1696, &replaced);
+  // StateMachine::Add's adapter's r3 (src/hooks/game_modes.cpp): a new
+  // transition's address from the machine's 64-bit r3.
+  ctx.r3.u64 = replaced ? r3 : machine_r3 + (r3 - machine);
+}
+
+void RaceWorldReleaseForStage(PPCContext& ctx, uint8_t* base) {
+  ctx.fpscr.disableFlushMode();
+  rw::ReleaseForStage(base, ctx.r1.u32 - 192,
+                      [&](uint32_t address, uint32_t sp, uint32_t r3, uint32_t r4, uint32_t r5) {
+                        const uint64_t r1 = ctx.r1.u64;
+                        ctx.r1.u64 = sp;
+                        ctx.r3.u64 = r3;
+                        ctx.r4.u64 = r4;
+                        ctx.r5.u64 = int64_t(int32_t(r5));
+                        if (address == 0x820FFD88) {
+                          __imp__sub_820FFD88(ctx, base);
+                        }
+                        ctx.r1.u64 = r1;
+                        ctx.fpscr.disableFlushMode();
+                      });
+}
+
+void RaceWorldAddDistance(PPCContext& ctx, uint8_t* base) {
+  ctx.fpscr.disableFlushMode();
+  rw::AddDistance(base, ctx.r3.u32, ctx.f1.f64);
+}
+
 void RaceWorldFirstUnsetFlag(PPCContext& ctx, uint8_t* base) {
   ctx.fpscr.disableFlushMode();
   ctx.r3.u64 = rw::FirstUnsetFlag(base, ctx.r3.u32);
@@ -191,6 +226,9 @@ ITC_RACE_WORLD(82170920, RaceWorldNeighbours)
 ITC_RACE_WORLD(821737F8, RaceWorldJumpSections)
 ITC_RACE_WORLD(821714D8, RaceWorldTickVehicles)
 ITC_RACE_WORLD(82171560, RaceWorldRefreshVehicles)
+ITC_RACE_WORLD(82174D28, RaceWorldInit)
+ITC_RACE_WORLD(821713C0, RaceWorldReleaseForStage)
+ITC_RACE_WORLD(82116C38, RaceWorldAddDistance)
 // RaceManager::NearSegment (sub_82170BC0) and RoutePosition::ToMainRoad
 // (sub_82143608) have no adapters: their callers in play
 // (RaceManager::BuildNeighbors, RoutePosition::StepToMainRoad) are native;

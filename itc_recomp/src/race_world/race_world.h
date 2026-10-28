@@ -117,6 +117,25 @@ uint32_t Neighbours(uint8_t* base, uint32_t manager, uint32_t index);
 void JumpSections(uint8_t* base, uint32_t entry, uint32_t player, uint32_t branch,
                   uint32_t flag2, uint32_t flag3, uint32_t frame);
 
+// --- The race world's set-up and its handlers ---
+
+// RaceWorld::Init (sub_82174D28, src/race_world/race_world_init.cpp): +9604
+// = 1, +9608 = 0 (1 when the race data's +0xA3AF0 is 6 and the current
+// stage's word +76 is 2 or more), then the 24 transitions added as the
+// original does (its stores and copies replayed in `frame`, its 1,696
+// bytes). Returns the last StateMachine::Add's plain C++'s answer
+// (`replaced` its flag).
+uint32_t Init(uint8_t* base, uint32_t world, uint32_t frame, bool* replaced);
+// RaceWorld::ReleaseForStage (sub_821713C0): as Release, then the current
+// stage copied into `frame` + 80 (Stages::Copy; its original through
+// `original` where it refuses); with the stage of type 2 or 3, or the race
+// data's +0xA3AF0 6 and the copy's +0 not 1: each of the stage's racers'
+// entries' (EntryOfRecord of Stages::Racer) vehicle's +2384 = 1. `frame`:
+// the original's 192 bytes.
+void ReleaseForStage(uint8_t* base, uint32_t frame,
+                     const std::function<void(uint32_t address, uint32_t sp, uint32_t r3,
+                                              uint32_t r4, uint32_t r5)>& original);
+
 // --- The racers' vehicles each tick ---
 
 // A callee's original where its plain C++ refuses, run with r1 = `sp` and
@@ -159,6 +178,12 @@ uint32_t PlaceEntry(uint8_t* base, uint32_t event, uint32_t route, uint32_t inde
                     uint32_t position, uint32_t step, uint32_t masks);
 
 // --- The save data ---
+
+// SaveData::AddDistance (sub_82116C38): the garage car picked (the save's
+// +0x19920-th node of the list at +6120 + 204); the difference between
+// `distance` and the car's float +2104 added to the save's floats +4908 and
+// +6040, and to the car's +2104 (the car found again).
+void AddDistance(uint8_t* base, uint32_t save, double distance);
 
 // SaveData::FirstUnsetFlag (sub_82112190): the first of bits 0 to 5 of the
 // save's word +6092 that's clear, or 6.

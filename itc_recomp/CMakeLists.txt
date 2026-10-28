@@ -158,6 +158,7 @@ set(ITC_SOURCES
     src/save_data/save_data.cpp
     src/hooks/race_world.cpp
     src/race_world/race_world.cpp
+    src/race_world/race_world_init.cpp
     src/hooks/texture_compression.cpp
     src/texture_compression/dxt_alpha.cpp
     src/texture_compression/dxt_color.cpp

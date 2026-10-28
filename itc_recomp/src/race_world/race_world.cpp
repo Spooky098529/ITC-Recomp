@@ -520,6 +520,41 @@ void JumpSections(uint8_t* base, uint32_t entry, uint32_t player, uint32_t branc
   guest::StoreU32(base, flag, 0);
 }
 
+// --- The race world's handlers (continued) ---
+
+void ReleaseForStage(uint8_t* base, uint32_t frame,
+                     const std::function<void(uint32_t address, uint32_t sp, uint32_t r3,
+                                              uint32_t r4, uint32_t r5)>& original) {
+  ITC_NATIVE_RUNNING("sub_821713C0 RaceWorld::ReleaseForStage");
+  uint32_t m = Manager(base);
+  for (int32_t i = 0; i < int32_t(guest::LoadU32(base, m + 2364)); i++) {
+    const uint32_t racer = guest::LoadU32(base, m + 2308 + 4 * uint32_t(i));
+    guest::StoreU8(base, va::VehicleGet(base, guest::LoadU32(base, racer + 20)) + 2384, 0);
+    m = Manager(base);
+  }
+  constexpr uint32_t kStages = 0x59620;
+  constexpr uint32_t kCurrent = 0xFFFFFFFF;
+  const uint32_t copy = frame + 80;
+  if (!va::StagesCopy(base, copy, guest::LoadU32(base, kRaceData) + kStages, kCurrent)) {
+    original(0x820FFD88, frame, copy, guest::LoadU32(base, kRaceData) + kStages, kCurrent);
+  }
+  const uint32_t typed =
+      va::StagesIsType2Or3(base, guest::LoadU32(base, kRaceData) + kStages, kCurrent);
+  const uint32_t race = guest::LoadU32(base, kRaceData);
+  if (typed == 0 && (int32_t(guest::LoadU32(base, race + 0xA3AF0)) != 6 ||
+                     int32_t(guest::LoadU32(base, copy)) == 1)) {
+    return;
+  }
+  for (int32_t i = 0; i < int32_t(va::StagesWord76(base, guest::LoadU32(base, kRaceData) + kStages,
+                                                   kCurrent));
+       i++) {
+    const uint32_t record = va::StagesRacer(base, guest::LoadU32(base, kRaceData) + kStages,
+                                            uint32_t(i), kCurrent);
+    const uint32_t entry = EntryOfRecord(base, record);
+    guest::StoreU8(base, va::VehicleGet(base, guest::LoadU32(base, entry + 20)) + 2384, 1);
+  }
+}
+
 // --- The racers' vehicles each tick and on a reset ---
 
 void TickVehicles(uint8_t* base, uint32_t frame, const vehicle::GuestCall& call) {
@@ -592,6 +627,28 @@ uint32_t PlaceEntry(uint8_t* base, uint32_t event, uint32_t route, uint32_t inde
 }
 
 // --- The save data ---
+
+void AddDistance(uint8_t* base, uint32_t save, double distance) {
+  ITC_NATIVE_RUNNING("sub_82116C38 SaveData::AddDistance");
+  const uint32_t list = save + 6120;
+  const uint32_t picked = save + 0x19920;
+  // The node: the list's first (its +204) walked on the picked count of
+  // times (+0 the next node's index).
+  const auto car = [&] {
+    uint32_t node = (uint32_t(int32_t(int16_t(guest::LoadU16(base, list + 204)))) << 2) + list;
+    for (uint32_t n = guest::LoadU32(base, picked); n != 0; n--) {
+      node = (uint32_t(int32_t(int16_t(guest::LoadU16(base, node)))) << 2) + list;
+    }
+    return uint32_t(int32_t(int16_t(guest::LoadU16(base, node + 2)))) * 1968 + list;
+  };
+  const uint32_t first = car();
+  const double total = Lfs(base, save + 4908);
+  const double added = Fsubs(distance, Lfs(base, first + 2104));
+  Stfs(base, save + 4908, Fadds(total, added));
+  Stfs(base, save + 6040, Fadds(Lfs(base, save + 6040), added));
+  const uint32_t again = car() + 212;
+  Stfs(base, again + 1892, Fadds(added, Lfs(base, again + 1892)));
+}
 
 uint32_t FirstUnsetFlag(uint8_t* base, uint32_t save) {
   ITC_NATIVE_RUNNING("sub_82112190 SaveData::FirstUnsetFlag");
