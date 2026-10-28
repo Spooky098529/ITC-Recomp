@@ -49,6 +49,9 @@ struct AppCalls {
   // slot is Delegate::Clone and the heap allows, else a guest call with the
   // link register `return_address`.
   std::function<uint32_t(uint32_t delegate, uint32_t return_address)> clone;
+  // Whether --native_heap routes the game's heap to the allocation layer
+  // (the plain C++ that allocates or frees runs only then).
+  bool native_heap = false;
 };
 
 // The target of `object`'s vtable slot at byte `offset`.

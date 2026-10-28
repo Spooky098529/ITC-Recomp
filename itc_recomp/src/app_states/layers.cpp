@@ -290,8 +290,16 @@ uint32_t UpdateChild(uint8_t* base, uint32_t layer, uint32_t child, bool toggled
   const uint32_t state = child + 4;
   calls.set_register(31, state);
   calls.set_register(30, layer);
-  calls.call(VirtualTarget(base, state, toggled ? 36 : 32), state, uint64_t(layer), std::nullopt,
-             toggled ? 0x820ACE1C : 0x820ACDB4);
+  const uint32_t target = VirtualTarget(base, state, toggled ? 36 : 32);
+  const uint32_t return_address = toggled ? 0x820ACE1C : 0x820ACDB4;
+  if (calls.native_heap && target == (toggled ? kLayerStateUpdateToggled : kLayerStateUpdate)) {
+    // A child layer's update (a tail call: its frame below this one).
+    calls.in_frame(144, return_address, [&](uint32_t inner) {
+      LayerStateUpdate(base, state, toggled, inner, calls);
+    });
+  } else {
+    calls.call(target, state, uint64_t(layer), std::nullopt, return_address);
+  }
   return calls.call(VirtualTarget(base, state, 40), state, uint64_t(layer), std::nullopt,
                     toggled ? 0x820ACE34 : 0x820ACDCC);
 }
@@ -327,6 +335,79 @@ uint32_t LayerApplyOps(uint8_t* base, uint32_t layer, uint32_t frame, const AppC
     ListForEach(base, frame + 96, first, last, functor, adjust, true, inner, calls);
   });
   return ListClear(base, list);
+}
+
+uint32_t LayerUpdate(uint8_t* base, uint32_t layer, bool toggled, uint32_t frame,
+                     const AppCalls& calls) {
+  if (toggled) {
+    ITC_NATIVE_RUNNING("sub_820AE010 StateLayer::UpdateToggled");
+  } else {
+    ITC_NATIVE_RUNNING("sub_820ADF00 StateLayer::Update");
+  }
+  calls.set_register(31, layer);
+  if (Load(base, layer + 32) != 0) {
+    const uint32_t states = layer + kLayerStates;
+    calls.set_register(30, states);
+    const uint32_t returns[2][2] = {{0x820ADF5C, 0x820ADF8C}, {0x820AE06C, 0x820AE09C}};
+    const uint32_t slots[2] = {toggled ? 36u : 32u, 40u};
+    for (int i = 0; i < 2; i++) {
+      const uint32_t head = Load(base, states + std_list::kHead);
+      const uint32_t top = Load(base, head + std_list::kNext);
+      if (top == head) {
+        ITC_LOG_WARN("{}: tw/td trap hit (type 22)", toggled ? "sub_820AE010" : "sub_820ADF00");
+      }
+      const uint32_t state = Load(base, top + std_list::kValue);
+      calls.call(VirtualTarget(base, state, slots[i]), state, uint64_t(layer), std::nullopt,
+                 returns[toggled][i]);
+    }
+  }
+  const uint32_t list = layer + kLayerChildren;
+  Store(base, frame + 104, layer);
+  Store(base, frame + 84, 0);
+  Store(base, frame + 80, toggled ? kUpdateChildToggled : kUpdateChild);
+  const uint64_t function = Load64(base, frame + 80);
+  Store(base, frame + 80, list);
+  Store64(base, frame + 96, function);
+  const uint32_t head = Load(base, list + std_list::kHead);
+  const uint64_t functor = Load64(base, frame + 96);
+  const uint64_t adjust = Load64(base, frame + 104);  // its low word as the stack holds it
+  Store(base, frame + 96, list);
+  const uint32_t first_node = Load(base, head + std_list::kNext);
+  Store(base, frame + 84, head);
+  const uint64_t last = Load64(base, frame + 80);
+  Store(base, frame + 100, first_node);
+  const uint64_t first = Load64(base, frame + 96);
+  calls.in_frame(112, toggled ? 0x820AE100 : 0x820ADFF0, [&](uint32_t inner) {
+    ListForEach(base, frame + 96, first, last, functor, adjust, false, inner, calls);
+  });
+  const uint32_t return_address = toggled ? 0x820AE108 : 0x820ADFF8;
+  if (!calls.native_heap) {
+    return calls.call(0x820ADE68, layer, std::nullopt, std::nullopt, return_address);
+  }
+  uint32_t answer = 0;
+  calls.in_frame(128, return_address,
+                 [&](uint32_t inner) { answer = LayerApplyOps(base, layer, inner, calls); });
+  return answer;
+}
+
+uint32_t LayerStateUpdate(uint8_t* base, uint32_t state, bool toggled, uint32_t frame,
+                          const AppCalls& calls) {
+  if (toggled) {
+    ITC_NATIVE_RUNNING("sub_820AE128 StateLayer state slot 9");
+  } else {
+    ITC_NATIVE_RUNNING("sub_820AE120 StateLayer state slot 8");
+  }
+  return LayerUpdate(base, state - 4, toggled, frame, calls);
+}
+
+uint32_t StatesOnUpdate(uint8_t* base, uint32_t states, bool toggled, uint32_t frame,
+                        const AppCalls& calls) {
+  if (toggled) {
+    ITC_NATIVE_RUNNING("sub_820AE1C0 AppStates::OnUpdateToggled");
+  } else {
+    ITC_NATIVE_RUNNING("sub_820AE1B8 AppStates::OnUpdate");
+  }
+  return LayerUpdate(base, Load(base, states + kStatesRoot), toggled, frame, calls);
 }
 
 }  // namespace app_states

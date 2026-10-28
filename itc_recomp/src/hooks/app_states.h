@@ -129,6 +129,17 @@ void AppToggleOffChild(PPCContext& ctx, uint8_t* base);
 // StateLayer::ApplyOps sub_820ADE68: r3 = the layer; r3 List::Clear's.
 void AppLayerApplyOps(PPCContext& ctx, uint8_t* base);
 
+// StateLayer::Update sub_820ADF00 and UpdateToggled sub_820AE010: r3 = the
+// layer; the layer's state slots 8 and 9 sub_820AE120 and sub_820AE128: r3
+// = the layer + 4; AppStates::OnUpdate sub_820AE1B8 and OnUpdateToggled
+// sub_820AE1C0: r3 = the stack. r3 ApplyOps's.
+void AppLayerUpdate(PPCContext& ctx, uint8_t* base);
+void AppLayerUpdateToggled(PPCContext& ctx, uint8_t* base);
+void AppLayerStateUpdate(PPCContext& ctx, uint8_t* base);
+void AppLayerStateUpdateToggled(PPCContext& ctx, uint8_t* base);
+void AppStatesOnUpdate(PPCContext& ctx, uint8_t* base);
+void AppStatesOnUpdateToggled(PPCContext& ctx, uint8_t* base);
+
 // App::Update sub_82093DC0: r3 = the app; r3 the request vector's clear's
 // (in its frame, r1 - 160, when ours).
 void AppUpdate(PPCContext& ctx, uint8_t* base);

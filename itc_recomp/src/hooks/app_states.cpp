@@ -53,7 +53,10 @@ ITC_FLAG_BOOL(native_app_states, true, "ITC",
               "virtual calls guest calls; PtrList::ForEach sub_820AD3A0 and OpList::ForEach "
               "sub_820AD440 (no adapter: only ApplyOps's plain C++ calls it in play), the layers' child functors sub_820ACD80, sub_820ACDE8 and "
               "sub_820ACD60, and with --native_heap StateLayer::ApplyOps sub_820ADE68, their "
-              "slots and StateLayer::ApplyOp guest calls) natively instead of through the translated code "
+              "slots and StateLayer::ApplyOp guest calls; StateLayer::Update sub_820ADF00 and "
+              "UpdateToggled sub_820AE010, the layer's state slots 8 and 9 sub_820AE120 and "
+              "sub_820AE128, AppStates::OnUpdate sub_820AE1B8 and OnUpdateToggled sub_820AE1C0, "
+              "the top state's slots guest calls, a child layer's update its plain C++) natively instead of through the translated code "
               "(the same results; checked by --run_harnesses=app_states)");
 
 namespace hooks {
@@ -199,6 +202,7 @@ as::AppCalls AppStatesCalls(PPCContext& ctx, uint8_t* base) {
     REX_CALL_INDIRECT_FUNC(ctx.ctr.u32);
     return ctx.r3.u32;
   };
+  calls.native_heap = Heap();
   return calls;
 }
 
@@ -573,6 +577,52 @@ void AppLayerApplyOps(PPCContext& ctx, uint8_t* base) {
   ctx.r3.u64 = answer;
 }
 
+namespace {
+
+// The updates, from a 144-byte frame (the layer's own, or the one the slot
+// thunks and the stack's targets tail-call into).
+template <typename Update>
+void UpdateStep(PPCContext& ctx, uint8_t* base, Update update) {
+  const uint32_t r3 = ctx.r3.u32;
+  const as::AppCalls calls = AppStatesCalls(ctx, base);
+  uint32_t answer = 0;
+  calls.in_frame(144, uint32_t(ctx.lr), [&](uint32_t frame) { answer = update(r3, frame, calls); });
+  ctx.r3.u64 = answer;
+}
+
+}  // namespace
+
+void AppLayerUpdate(PPCContext& ctx, uint8_t* base) {
+  UpdateStep(ctx, base, [&](uint32_t layer, uint32_t frame, const as::AppCalls& calls) {
+    return as::LayerUpdate(base, layer, false, frame, calls);
+  });
+}
+void AppLayerUpdateToggled(PPCContext& ctx, uint8_t* base) {
+  UpdateStep(ctx, base, [&](uint32_t layer, uint32_t frame, const as::AppCalls& calls) {
+    return as::LayerUpdate(base, layer, true, frame, calls);
+  });
+}
+void AppLayerStateUpdate(PPCContext& ctx, uint8_t* base) {
+  UpdateStep(ctx, base, [&](uint32_t state, uint32_t frame, const as::AppCalls& calls) {
+    return as::LayerStateUpdate(base, state, false, frame, calls);
+  });
+}
+void AppLayerStateUpdateToggled(PPCContext& ctx, uint8_t* base) {
+  UpdateStep(ctx, base, [&](uint32_t state, uint32_t frame, const as::AppCalls& calls) {
+    return as::LayerStateUpdate(base, state, true, frame, calls);
+  });
+}
+void AppStatesOnUpdate(PPCContext& ctx, uint8_t* base) {
+  UpdateStep(ctx, base, [&](uint32_t states, uint32_t frame, const as::AppCalls& calls) {
+    return as::StatesOnUpdate(base, states, false, frame, calls);
+  });
+}
+void AppStatesOnUpdateToggled(PPCContext& ctx, uint8_t* base) {
+  UpdateStep(ctx, base, [&](uint32_t states, uint32_t frame, const as::AppCalls& calls) {
+    return as::StatesOnUpdate(base, states, true, frame, calls);
+  });
+}
+
 }  // namespace hooks
 
 // The adapters: the register steps above, or the originals with the flag
@@ -626,6 +676,12 @@ ITC_APP_STATES_ADAPTER(820ACD80, AppUpdateChild)
 ITC_APP_STATES_ADAPTER(820ACDE8, AppUpdateChildToggled)
 ITC_APP_STATES_ADAPTER(820ACD60, AppToggleOffChild)
 ITC_APP_STATES_ADAPTER(820ADE68, AppLayerApplyOps)
+ITC_APP_STATES_ADAPTER(820ADF00, AppLayerUpdate)
+ITC_APP_STATES_ADAPTER(820AE010, AppLayerUpdateToggled)
+ITC_APP_STATES_ADAPTER(820AE120, AppLayerStateUpdate)
+ITC_APP_STATES_ADAPTER(820AE128, AppLayerStateUpdateToggled)
+ITC_APP_STATES_ADAPTER(820AE1B8, AppStatesOnUpdate)
+ITC_APP_STATES_ADAPTER(820AE1C0, AppStatesOnUpdateToggled)
 
 // App::RunHandler, with --find_menu_selection's wrap (moved here from
 // src/debug/menu_selection_scan.cpp, as one override per function can

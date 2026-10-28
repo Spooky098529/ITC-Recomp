@@ -124,4 +124,29 @@ uint32_t ToggleOffChild(uint8_t* base, uint32_t layer, uint32_t child, uint32_t 
 // the original's 128 bytes.
 uint32_t LayerApplyOps(uint8_t* base, uint32_t layer, uint32_t frame, const AppCalls& calls);
 
+// --- The layers' updates ---
+
+// A layer's state slots 8 and 9 (sub_820AE120, sub_820AE128).
+constexpr uint32_t kLayerStateUpdate = 0x820AE120;
+constexpr uint32_t kLayerStateUpdateToggled = 0x820AE128;
+
+// sub_820ADF00 StateLayer::Update and sub_820AE010 UpdateToggled: with
+// states (+32), the top's slot 8 (or 9 when `toggled`) and then its slot
+// 10, r4 = the layer; each child's state slots through PtrList::ForEach with
+// sub_820ACD80 (or sub_820ACDE8); then StateLayer::ApplyOps. r3 as ApplyOps
+// leaves it. The checked iterator's trap (no top while +32 isn't 0) logged
+// with a warning and gone on from, as the recompiled code does. `frame` the
+// original's 144 bytes.
+uint32_t LayerUpdate(uint8_t* base, uint32_t layer, bool toggled, uint32_t frame,
+                     const AppCalls& calls);
+// sub_820AE120 and sub_820AE128 (the layer's state slots 8 and 9): `state`
+// - 4, then LayerUpdate as a tail call (in its frame, `frame`).
+uint32_t LayerStateUpdate(uint8_t* base, uint32_t state, bool toggled, uint32_t frame,
+                          const AppCalls& calls);
+// sub_820AE1B8 AppStates::OnUpdate and sub_820AE1C0 OnUpdateToggled (the
+// delegates' targets for keys 8 and 2): LayerUpdate on the root (+8) as a
+// tail call (in its frame, `frame`).
+uint32_t StatesOnUpdate(uint8_t* base, uint32_t states, bool toggled, uint32_t frame,
+                        const AppCalls& calls);
+
 }  // namespace app_states

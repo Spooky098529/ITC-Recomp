@@ -1734,6 +1734,73 @@ void LayerWalks(Context& h) {
   }
 }
 
+// --- The layers' updates ---
+//
+// A layer at data + 64: 0 to 2 states (children's +4 at data + 2048 + 64 x
+// i, whose slots count or record), 0 to 3 children (of those, or layers the
+// game built, whose updates run the game's slot 8 or 9), 0 to 2 operations
+// (pushes of those states, or type 5); the stack at data (+8 the layer).
+
+void UpdateCases(Context& h, const char* name, GuestFunction recompiled, GuestFunction native,
+                 uint32_t r3) {
+  const uint32_t layer = h.data + 64;
+  Results results(name);
+  for (int c = 0; c < 80; c++) {
+    Case(
+        h, results,
+        [&](Blocks& blocks) {
+          RandomScratch(h, 3800);
+          Children(h, 6, h.random.Below(2) ? kCount4 : kStoreR4At4);
+          Store(h.base, h.data + 8, layer);
+          const std::vector<uint32_t> states =
+              BuildList(h, blocks, layer + 24, h.random.Below(3), 12);
+          for (uint32_t node : states) {
+            Store(h.base, node + 8, ChildAt(h, h.random.Below(6)) + 4);
+          }
+          const std::vector<uint32_t> children =
+              BuildList(h, blocks, layer + 12, h.random.Below(4), 12);
+          for (uint32_t node : children) {
+            Store(h.base, node + 8,
+                  h.random.Below(2) ? ChildAt(h, h.random.Below(6))
+                                    : GameLayer(h, blocks, uint32_t(h.random.Next())));
+          }
+          const std::vector<uint32_t> queued =
+              BuildList(h, blocks, layer + 36, h.random.Below(3), 16);
+          for (uint32_t node : queued) {
+            Store(h.base, node + 8, h.random.Below(3) ? 2 : 5);
+            Store(h.base, node + 12, ChildAt(h, h.random.Below(6)) + 4);
+          }
+        },
+        [&](PPCContext& t) { t.r3.u64 = r3; }, recompiled, native,
+        [&](Outputs& out, const PPCContext& t, Blocks& blocks) {
+          std::vector<uint32_t> layers;
+          MeetLayer(h.base, blocks, layer, layers);
+          blocks.Words(h.base, out, h.data, 3800);
+          LayersOut(h.base, out, blocks, layers);
+          out.Word(blocks.Of(t.r3.u32));
+          blocks.Out(out);
+        },
+        fmt::format("case {}", c));
+  }
+  results.Report();
+}
+
+void LayerUpdates(Context& h) {
+  const uint32_t layer = h.data + 64;
+  UpdateCases(h, "StateLayer::Update (sub_820ADF00)", __imp__sub_820ADF00, hooks::AppLayerUpdate,
+              layer);
+  UpdateCases(h, "StateLayer::UpdateToggled (sub_820AE010)", __imp__sub_820AE010,
+              hooks::AppLayerUpdateToggled, layer);
+  UpdateCases(h, "StateLayer state slot 8 (sub_820AE120)", __imp__sub_820AE120,
+              hooks::AppLayerStateUpdate, layer + 4);
+  UpdateCases(h, "StateLayer state slot 9 (sub_820AE128)", __imp__sub_820AE128,
+              hooks::AppLayerStateUpdateToggled, layer + 4);
+  UpdateCases(h, "AppStates::OnUpdate (sub_820AE1B8)", __imp__sub_820AE1B8,
+              hooks::AppStatesOnUpdate, h.data);
+  UpdateCases(h, "AppStates::OnUpdateToggled (sub_820AE1C0)", __imp__sub_820AE1C0,
+              hooks::AppStatesOnUpdateToggled, h.data);
+}
+
 }  // namespace
 
 void AppStates(Context& h) {
@@ -1750,6 +1817,7 @@ void AppStates(Context& h) {
   Update(h);
   StackSetUp(h);
   LayerWalks(h);
+  LayerUpdates(h);
 }
 
 }  // namespace harness
