@@ -8,20 +8,30 @@
 // exactly.
 
 #include "harness.h"
+#include "car_model_inputs.h"
+#include "pending_frees.h"
 
+#include "base/flags.h"
 #include "base/log.h"
+#include "hooks/models.h"
 #include "hooks/scene_loaders.h"
 #include "memory/c_runtime_heap.h"
 #include "memory/heap.h"
 #include "models/texture_provider.h"
 #include "scene_loaders/loads.h"
+#include "scene_loaders/objects.h"
+#include "models/memory_blocks.h"
 #include "scene_loaders/pools.h"
 
 #include <fmt/format.h>
 
 #include <functional>
+#include <mutex>
 #include <string>
 #include <vector>
+
+ITC_FLAG_DECLARE(bool, native_scene_loaders);
+ITC_FLAG_DECLARE(bool, native_car_models);
 
 namespace harness {
 
@@ -629,6 +639,77 @@ void Loads(Context& h, Random& r, uint32_t block) {
   }
 }
 
+// --- The resets ---
+
+// The car model's reset and its loads': each case's plan drawn once
+// (car_model_inputs.h), both sides from the same random bytes, the
+// recompiled side with --native_scene_loaders and --native_car_models off
+// (its callees here the originals too). The pending frees' nodes, what each
+// side allocated, the block (with the car model and the scratch its members
+// point into), the first set's word and r3 compared. The matrices and
+// positions are the xex's 0.0 and 1.0 stored back as floats: compared
+// exactly (no NaN can come of them).
+void Resets(Context& h, Random& r, uint32_t block) {
+  namespace cmi = car_model_inputs;
+  if (!hooks::ModelsHostLock()) {
+    ITC_LOG_WARN("harness: scene_loaders: --native_models was off at start-up: the resets' "
+                 "cases skipped");
+    return;
+  }
+  std::lock_guard<std::recursive_mutex> lock(models::MemoryBlocksMutex());
+  constexpr uint32_t kBytes = 0x4000;
+  const uint32_t scratch = block + 0x100;
+  const uint32_t car = block + 0x1000;
+  const uint32_t loads = car + sl::kCarModelLoads;
+  struct Reset {
+    const char* name;
+    GuestFunction recompiled;
+    GuestFunction native;
+    uint32_t r3;
+  };
+  const Reset resets[] = {
+      {"CarModelLoads::Reset (sub_820D3B58, on the game's list)", __imp__sub_820D3B58,
+       hooks::SceneLoadersCarModelLoadsReset, loads},
+      {"CarModel::Reset (sub_820D3E98, on the game's list)", __imp__sub_820D3E98,
+       hooks::SceneLoadersCarModelReset, car},
+  };
+  const uint32_t saved_set = guest::LoadU32(h.base, sl::kFirstSet);
+  for (const Reset& reset : resets) {
+    Results results(reset.name);
+    for (int c = 0; c < 32; c++) {
+      const uint64_t seed = r.Next();
+      const cmi::Plan plan = cmi::MakePlan(r);
+      const uint32_t set = uint32_t(r.Next());
+      Outputs out[2];
+      for (int v = 0; v < 2; v++) {
+        Random bytes(seed);
+        RandomBytes(h.base, block, kBytes, bytes);
+        cmi::Held held;
+        cmi::Write(h.base, loads, scratch, plan, false, held);
+        Put(h.base, sl::kFirstSet, set);
+        const pending_frees::ListState was = pending_frees::SaveList(h.base);
+        PPCContext t = CallContext(h);
+        t.r1.u64 &= ~0xFull;
+        t.r3.u64 = reset.r3;
+        ITC_FLAG(native_scene_loaders) = v == 1;
+        ITC_FLAG(native_car_models) = v == 1;
+        (v == 0 ? reset.recompiled : reset.native)(t, h.base);
+        ITC_FLAG(native_scene_loaders) = true;
+        ITC_FLAG(native_car_models) = true;
+        pending_frees::TakeAddedNodes(h.base, was, out[v]);
+        cmi::Take(h.base, loads, held, out[v]);
+        out[v].Bytes(Read(h.base, block, kBytes));
+        out[v].Word(guest::LoadU32(h.base, sl::kFirstSet));
+        out[v].Word(t.r3.u32);
+        out[v].Word(uint32_t(t.r3.u64 >> 32));
+      }
+      results.Check(out[0], out[1], fmt::format("case {}", c));
+    }
+    results.Report();
+  }
+  Put(h.base, sl::kFirstSet, saved_set);
+}
+
 }  // namespace
 
 void SceneLoaders(Context& h) {
@@ -640,6 +721,7 @@ void SceneLoaders(Context& h) {
   Queries(h, r, block);
   Names(h, r, block);
   Loads(h, r, block);
+  Resets(h, r, block);
   memory::Free(allocation);
 }
 

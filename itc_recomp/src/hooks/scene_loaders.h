@@ -60,4 +60,10 @@ void SceneLoadersXprFindByName(PPCContext& ctx, uint8_t* base);
 void SceneLoadersCarModelLoadsConstruct(PPCContext& ctx, uint8_t* base);
 void SceneLoadersCarModelLoadsDestruct(PPCContext& ctx, uint8_t* base);
 
+// CarModelLoads::Reset sub_820D3B58 (r3 = the loads) and CarModel::Reset
+// sub_820D3E98 (r3 = the car model): r3 as the original leaves it; only
+// while hooks::ModelsNativeLifetime().
+void SceneLoadersCarModelLoadsReset(PPCContext& ctx, uint8_t* base);
+void SceneLoadersCarModelReset(PPCContext& ctx, uint8_t* base);
+
 }  // namespace hooks

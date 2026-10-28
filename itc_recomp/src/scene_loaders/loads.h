@@ -12,6 +12,7 @@
 #pragma once
 
 #include <cstdint>
+#include <optional>
 
 namespace scene_loaders {
 
@@ -33,5 +34,25 @@ bool CarModelLoadsConstruct(uint8_t* base, uint32_t loads);
 // original (a provider's storage or the skeleton's arrays not from the
 // allocation layer, no room in the pending frees for the XPRs' blocks).
 bool CarModelLoadsDestruct(uint8_t* base, uint32_t loads);
+
+// The texture provider's slot 2 (TextureProvider::ClearAll, sub_82594328),
+// the one the loads' resets call through each provider's vtable.
+constexpr uint32_t kTextureProviderClearAll = 0x82594328;
+
+// Whether CarModelLoadsReset runs natively (nothing changed): the skeleton's
+// node values (+32's +176) none or a block the layer gave, room in the
+// pending frees for both XPRs' blocks, and each provider's slot 2
+// TextureProvider::ClearAll.
+bool CarModelLoadsResettable(uint8_t* base, uint32_t loads);
+
+// CarModelLoads::Reset (sub_820D3B58): LoadSlot::Reset on the node file's
+// slot (+0), Skeleton::FreeNodeValues (+32); for the two XPR2s their slot
+// (+224 + 24i) reset, XPR::Release (+272 + 24i) and the provider's (+320 +
+// 20i) slot 2 (ClearAll); +360 = 0; both 24-byte slots of the three layer
+// records (+364 + 48i) and the six sticker records (+652 + 48i) reset;
+// +2956, +2960, +2972 to +2984 = 0. Returns the original's r3 (the last
+// slot, +916); nullopt, with nothing done, where CarModelLoadsResettable
+// says no.
+std::optional<uint32_t> CarModelLoadsReset(uint8_t* base, uint32_t loads);
 
 }  // namespace scene_loaders

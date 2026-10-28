@@ -19,4 +19,8 @@ void CarModelsLoadSlotReleaseBuffer(PPCContext& ctx, uint8_t* base);
 // sub_820C3F50: r3 = the set (left), r4 to r7 the record's words.
 void CarModelsDeferRelease(PPCContext& ctx, uint8_t* base);
 
+// CarModel::Release sub_820D4508: r3 = the car model; r3 as the original
+// leaves it. Natively only while hooks::ModelsNativeLifetime().
+void CarModelsCarModelRelease(PPCContext& ctx, uint8_t* base);
+
 }  // namespace hooks

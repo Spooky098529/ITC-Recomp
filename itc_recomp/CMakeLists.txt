@@ -146,8 +146,10 @@ set(ITC_SOURCES
     src/hooks/scene_loaders.cpp
     src/scene_loaders/pools.cpp
     src/scene_loaders/loads.cpp
+    src/scene_loaders/objects.cpp
     src/hooks/car_models.cpp
     src/car_models/load_slots.cpp
+    src/car_models/car_model.cpp
     src/hooks/collision.cpp
     src/collision/shapes.cpp
     src/collision/boxes.cpp

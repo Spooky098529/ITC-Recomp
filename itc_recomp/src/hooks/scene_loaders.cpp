@@ -8,6 +8,7 @@
 #include "hooks/heap.h"
 #include "hooks/models.h"
 #include "scene_loaders/loads.h"
+#include "scene_loaders/objects.h"
 #include "scene_loaders/pools.h"
 
 ITC_FLAG_BOOL(native_scene_loaders, true, "ITC",
@@ -20,7 +21,8 @@ ITC_FLAG_BOOL(native_scene_loaders, true, "ITC",
               "sub_820D7790 (with Accessories::AllLoaded sub_820F07D8, no adapter); NameMatches "
               "sub_820CE800 and XPR::FindByName sub_820D09B8 (with XPR::Count sub_82596F20 and "
               "RecordName sub_82596F40, no adapters); with --native_heap and the memory blocks' host lock "
-              "CarModelLoads::CarModelLoads sub_820D3DE0 and ~CarModelLoads sub_820D3E40) natively instead of through the "
+              "CarModelLoads::CarModelLoads sub_820D3DE0, ~CarModelLoads sub_820D3E40 and Reset sub_820D3B58, "
+              "CarModel::Reset sub_820D3E98) natively instead of through the "
               "translated code (the same writes; checked by --run_harnesses=scene_loaders)");
 
 namespace hooks {
@@ -128,6 +130,22 @@ void SceneLoadersCarModelLoadsDestruct(PPCContext& ctx, uint8_t* base) {
   ctx.r3.u64 = ctx.r3.u32 + sl::kCarModelLoadsSkeleton;
 }
 
+// The resets that free: the plain C++, or the original where it refuses.
+#define ITC_SCENE_LOADERS_RESET(name, address, function)                  \
+  void name(PPCContext& ctx, uint8_t* base) {                             \
+    if (hooks::ModelsNativeLifetime()) {                                  \
+      ctx.fpscr.disableFlushMode();                                       \
+      if (const auto r3 = sl::function(base, ctx.r3.u32)) {               \
+        ctx.r3.u64 = *r3;                                                 \
+        return;                                                           \
+      }                                                                   \
+    }                                                                     \
+    __imp__sub_##address(ctx, base);                                      \
+  }
+
+ITC_SCENE_LOADERS_RESET(SceneLoadersCarModelLoadsReset, 820D3B58, CarModelLoadsReset)
+ITC_SCENE_LOADERS_RESET(SceneLoadersCarModelReset, 820D3E98, CarModelReset)
+
 }  // namespace hooks
 
 // The adapters: the register steps above, or the originals with the flag
@@ -160,3 +178,5 @@ ITC_SCENE_LOADERS(820CE800, SceneLoadersNameMatches)
 ITC_SCENE_LOADERS(820D09B8, SceneLoadersXprFindByName)
 ITC_SCENE_LOADERS(820D3DE0, SceneLoadersCarModelLoadsConstruct)
 ITC_SCENE_LOADERS(820D3E40, SceneLoadersCarModelLoadsDestruct)
+ITC_SCENE_LOADERS(820D3B58, SceneLoadersCarModelLoadsReset)
+ITC_SCENE_LOADERS(820D3E98, SceneLoadersCarModelReset)
