@@ -42,6 +42,25 @@ void RaceWorldRaceEventEntry(PPCContext& ctx, uint8_t* base);
 // &the index, r6 = &the position, r7 = &the step, r8 = masks; r3 =
 // Normalize's.
 void RaceWorldPlaceEntry(PPCContext& ctx, uint8_t* base);
+// RaceManager::Create sub_821715B8: no arguments; r3 = the manager. The
+// original unless --native_heap routes the game's heap to the allocation
+// layer, or where operator new's plain C++ refuses.
+void RaceWorldCreate(PPCContext& ctx, uint8_t* base);
+// RaceManager::NoteMarkedRacer sub_82172F90: r3 not read (r3 not kept: its
+// caller doesn't read it).
+void RaceWorldNoteMarkedRacer(PPCContext& ctx, uint8_t* base);
+// RaceManager::NearSegment sub_82170BC0: r3 = the segment, r4 = the point,
+// f1 = the distance; r3 = 0 or 1.
+void RaceWorldNearSegment(PPCContext& ctx, uint8_t* base);
+// RaceManager::BuildNeighbors sub_82170CB8: r3 = the table (the manager +
+// 2392); r3 not kept (its caller doesn't read it).
+void RaceWorldBuildNeighbors(PPCContext& ctx, uint8_t* base);
+// RaceManager::Neighbours sub_82170920: r3 = the manager, r4 = &an index; r3
+// = 0 to 3.
+void RaceWorldNeighbours(PPCContext& ctx, uint8_t* base);
+// RaceManager::JumpSections sub_821737F8: r3 = the entry, r4 = the player's
+// position, r5 = &the player's branch, r6, r7 = &the flags; r3 not kept.
+void RaceWorldJumpSections(PPCContext& ctx, uint8_t* base);
 // SaveData::FirstUnsetFlag sub_82112190: r3 = the save data; r3 = 0 to 6.
 void RaceWorldFirstUnsetFlag(PPCContext& ctx, uint8_t* base);
 

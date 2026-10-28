@@ -18,6 +18,7 @@
 #pragma once
 
 #include <cstdint>
+#include <optional>
 
 namespace race_world {
 
@@ -67,6 +68,51 @@ void OnPausedTick();
 // the count (+2364) read again each pass. Returns Vehicle::Get's last r3,
 // or `r3` with no racers (the original's r3).
 uint32_t Release(uint8_t* base, uint32_t r3);
+
+// --- The manager's lifetime and its tables ---
+
+// RaceManager::Create (sub_821715B8): 363,592 bytes from operator new into
+// [0x826D82F4]; when made, +0 = 0, the 80 entries (from +4, 28 bytes: +0 =
+// 0, +4 = -1 (0 for the last three, the traffic), halfwords +8, +10 = -1,
+// +12 = 0.0 (the float at 0x82000A34, as lfs and stfs), +16 = 0, +20, +24 =
+// -1), the 16 words from +2244 = -1, +2364 to +2388 = 0, the 7 words from
+// +2308 and from +2336 = 0 (in the original's order); then the 300 words
+// from +362392 = 0 (at 362392 itself with no block, as the original).
+// Returns the original's r3 (the manager); nullopt, with nothing done,
+// where operator new would take its error path.
+std::optional<uint32_t> Create(uint8_t* base);
+// RaceManager::NoteMarkedRacer (sub_82172F90): `frame` + 92 = 0.0; each
+// racer's body position copied (Vec4::Copy) to `frame` + 80 until one whose
+// record (the race data + 3,936 x its +24, + 48) has flags +3888 0x400:
+// its three floats stored at 0x826C61A4. `frame`: the original's 144 bytes.
+void NoteMarkedRacer(uint8_t* base, uint32_t frame);
+// RaceManager::NearSegment (sub_82170BC0): 1 when the point's projection on
+// the segment (two 16-byte points) lies past its start and short of its
+// length x [0x820021E8], and the point is nearer than `distance` to it;
+// else 0. The vectors at `frame` + 80 to + 159 as the original (its 208
+// bytes).
+uint32_t NearSegment(uint8_t* base, uint32_t segment, uint32_t point, double distance,
+                     uint32_t frame);
+// RaceManager::BuildNeighbors (sub_82170CB8): for each section s of the
+// route, the 1,200-byte record at `table` + 1,200 s (+0 = s, then the
+// sections near it) and its count at `table` + 360,000 + 4 s (see the
+// row). The points at `frame` + 80 to + 207 as the original (its 336
+// bytes).
+void BuildNeighbors(uint8_t* base, uint32_t table, uint32_t frame);
+// RaceManager::Neighbours (sub_82170920): among the manager's other entries
+// (flag 0x1, not 0x20, 0x4 or 0x8) on a section of the same branch as the
+// entry at `index`'s, whether one is ahead (TrackRoute::Distance above 0.0,
+// under [0x82001FC0]) and behind (above [0x82009798]): 0 neither, 1 ahead,
+// 2 behind, 3 both.
+uint32_t Neighbours(uint8_t* base, uint32_t manager, uint32_t index);
+// RaceManager::JumpSections (sub_821737F8): an entry whose item's kind is 3
+// (with the flag at `flag3`) or 2 (with `flag2`), on the sections the
+// original lists and not on the player's branch 12 (or 11), farther than
+// [0x820099D0] (squared, flat) from `player` when on the player's branch
+// (`branch`), is put at section 194 or 252 (201 or 259 for kind 2), slice
+// 0, and the flag cleared. `frame`: the original's 176 bytes.
+void JumpSections(uint8_t* base, uint32_t entry, uint32_t player, uint32_t branch,
+                  uint32_t flag2, uint32_t flag3, uint32_t frame);
 
 // --- The route positions ---
 

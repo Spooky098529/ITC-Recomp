@@ -6,6 +6,7 @@
 
 #include "base/flags.h"
 #include "base/log.h"
+#include "hooks/heap.h"
 #include "race_world/race_world.h"
 
 ITC_FLAG_BOOL(native_race_world, true, "ITC",
@@ -15,7 +16,10 @@ ITC_FLAG_BOOL(native_race_world, true, "ITC",
               "and Clear sub_82170A88, RaceWorld::OnPausedTick sub_82170560 and Release "
               "sub_82171360, RoutePosition::ToMainRoad sub_82143608 and StepToMainRoad "
               "sub_82170F18, RaceEvent::Entry sub_82143508 and PlaceEntry sub_82143150, "
-              "SaveData::FirstUnsetFlag sub_82112190) natively instead of through the "
+              "SaveData::FirstUnsetFlag sub_82112190; RaceManager::Create sub_821715B8 (only while "
+              "--native_heap routes the game's heap to the allocation layer), NoteMarkedRacer "
+              "sub_82172F90, NearSegment sub_82170BC0, BuildNeighbors sub_82170CB8, Neighbours "
+              "sub_82170920 and JumpSections sub_821737F8) natively instead of through the "
               "translated code (the same words, bit for bit; checked by "
               "--run_harnesses=race_world)");
 
@@ -84,6 +88,43 @@ void RaceWorldPlaceEntry(PPCContext& ctx, uint8_t* base) {
                               ctx.r8.u32);
 }
 
+void RaceWorldCreate(PPCContext& ctx, uint8_t* base) {
+  ctx.fpscr.disableFlushMode();
+  const auto r3 = NativeHeapActive() ? rw::Create(base) : std::nullopt;
+  if (!r3) {
+    __imp__sub_821715B8(ctx, base);
+    return;
+  }
+  ctx.r3.u64 = *r3;
+}
+
+void RaceWorldNoteMarkedRacer(PPCContext& ctx, uint8_t* base) {
+  ctx.fpscr.disableFlushMode();
+  rw::NoteMarkedRacer(base, ctx.r1.u32 - 144);
+}
+
+void RaceWorldNearSegment(PPCContext& ctx, uint8_t* base) {
+  ctx.fpscr.disableFlushMode();
+  ctx.r3.u64 =
+      rw::NearSegment(base, ctx.r3.u32, ctx.r4.u32, ctx.f1.f64, ctx.r1.u32 - 208);
+}
+
+void RaceWorldBuildNeighbors(PPCContext& ctx, uint8_t* base) {
+  ctx.fpscr.disableFlushMode();
+  rw::BuildNeighbors(base, ctx.r3.u32, ctx.r1.u32 - 336);
+}
+
+void RaceWorldNeighbours(PPCContext& ctx, uint8_t* base) {
+  ctx.fpscr.disableFlushMode();
+  ctx.r3.u64 = rw::Neighbours(base, ctx.r3.u32, ctx.r4.u32);
+}
+
+void RaceWorldJumpSections(PPCContext& ctx, uint8_t* base) {
+  ctx.fpscr.disableFlushMode();
+  rw::JumpSections(base, ctx.r3.u32, ctx.r4.u32, ctx.r5.u32, ctx.r6.u32, ctx.r7.u32,
+                   ctx.r1.u32 - 176);
+}
+
 void RaceWorldFirstUnsetFlag(PPCContext& ctx, uint8_t* base) {
   ctx.fpscr.disableFlushMode();
   ctx.r3.u64 = rw::FirstUnsetFlag(base, ctx.r3.u32);
@@ -114,5 +155,11 @@ ITC_RACE_WORLD(82170F18, RaceWorldStepToMainRoad)
 ITC_RACE_WORLD(82143508, RaceWorldRaceEventEntry)
 ITC_RACE_WORLD(82143150, RaceWorldPlaceEntry)
 ITC_RACE_WORLD(82112190, RaceWorldFirstUnsetFlag)
+ITC_RACE_WORLD(821715B8, RaceWorldCreate)
+ITC_RACE_WORLD(82172F90, RaceWorldNoteMarkedRacer)
+ITC_RACE_WORLD(82170BC0, RaceWorldNearSegment)
+ITC_RACE_WORLD(82170CB8, RaceWorldBuildNeighbors)
+ITC_RACE_WORLD(82170920, RaceWorldNeighbours)
+ITC_RACE_WORLD(821737F8, RaceWorldJumpSections)
 // sub_821708B4 (BranchesMeet's tail) has no adapter: never seen in play, and
 // its only caller is BranchesMeet.

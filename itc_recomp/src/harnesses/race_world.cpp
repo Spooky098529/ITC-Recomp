@@ -17,8 +17,10 @@
 #include "base/log.h"
 #include "harnesses/test_route.h"
 #include "hooks/race_world.h"
+#include "memory/c_runtime_heap.h"
 #include "memory/heap.h"
 #include "race_world/race_world.h"
+#include "data_tables/data_tables.h"
 #include "track_route/track_route.h"
 
 #include <fmt/format.h>
@@ -36,6 +38,7 @@ namespace {
 namespace rw = race_world;
 
 constexpr uint32_t kVehicles = 0x826C2E34;
+constexpr uint32_t kMarkedRacer = 0x826C61A4;
 constexpr uint32_t kManagerBytes = 0x60000;  // the manager is 363,592 bytes
 constexpr uint32_t kVehiclesBytes = 7 * 6272;
 
@@ -430,6 +433,290 @@ void Routes(Context& h) {
   }
 }
 
+// A float's bits: now and then NaN (any sign, payload), an infinity or a
+// zero of either sign; else a number in +-range.
+uint32_t RandomFloat(Random& r, float range) {
+  return test_route::RandomFloat(r, range);
+}
+
+// --- RaceManager::Create: each side's block compared where it writes, then
+// freed; the global put back ---
+
+void Create(Context& h) {
+  Results results("RaceManager::Create (sub_821715B8)");
+  for (uint64_t seed = 0; seed < 4; seed++) {
+    Outputs out[2];
+    for (int v = 0; v < 2; v++) {
+      Globals globals(h.base, {rw::kManager});
+      PPCContext t = CallContext(h);
+      (v == 0 ? Original<__imp__sub_821715B8> : hooks::RaceWorldCreate)(t, h.base);
+      const uint32_t block = guest::LoadU32(h.base, rw::kManager);
+      out[v].Word(block == t.r3.u32 ? 1 : 0);
+      out[v].Word(block != 0 ? 1 : 0);
+      if (block != 0) {
+        out[v].Bytes(Read(h.base, block, 2392));
+        out[v].Bytes(Read(h.base, block + 362392, 1200));
+        memory::crt::OperatorDelete(block);
+      }
+    }
+    results.Check(out[0], out[1], fmt::format("seed {}", seed));
+  }
+  results.Report();
+}
+
+// --- The manager's tables over a random route (test_route.h): its
+// sections' branch numbers now and then 0, 11, 12 or 29 ---
+
+void Tables(Context& h, const Block& manager, const Block& vehicles) {
+  namespace tr = test_route;
+  const Block area(tr::kRouteBytes + 0x100);
+  const Block table(4 * tr::kTableEntries);
+  const Block race(7 * 3936 + 0x100);
+  const Block items(8 * 3008);
+  if (!area.address || !table.address || !race.address || !items.address) {
+    ITC_LOG_ERROR("harness: race_world: no block from the allocation layer");
+    return;
+  }
+  tr::FillTable(h.base, table.address, area.address);
+  const auto route_up = [&](Random& r, tr::Route& route) {
+    WriteRandom(h.base, area.address, area.bytes, r);
+    route = tr::BuildRoute(h.base, area.address, table.address, r);
+    const uint8_t branches[] = {0, 11, 12, 29, 7, 1};
+    for (uint32_t i = 0; i < 8; i++) {
+      if (r.Below(2) == 0) {
+        guest::StoreU8(h.base, route.address[i] + 3, branches[r.Below(6)]);
+      }
+    }
+    guest::StoreU32(h.base, track_route::kRoute, area.address + tr::kFile);
+  };
+  const auto stack = [&](Random& r) {
+    const uint32_t sp = CallContext(h).r1.u32;
+    WriteRandom(h.base, sp - 2048, 2048, r);
+    return sp;
+  };
+  {
+    // The racers' vehicles' bodies in the scratch area; the records' flags
+    // now and then 0x400.
+    Results results("RaceManager::NoteMarkedRacer (sub_82172F90)");
+    for (uint64_t seed = 0; seed < 64; seed++) {
+      Outputs out[2];
+      for (int v = 0; v < 2; v++) {
+        Random r(seed * 89 + 37);
+        Globals globals(h.base, {rw::kManager, kVehicles, rw::kRaceData, kMarkedRacer,
+                                 kMarkedRacer + 4, kMarkedRacer + 8});
+        WriteRandom(h.base, h.data, kScratchBytes, r);
+        WriteRandom(h.base, manager.address, 4096, r);
+        WriteRandom(h.base, vehicles.address, vehicles.bytes, r);
+        WriteRandom(h.base, race.address, race.bytes, r);
+        const uint32_t sp = stack(r);
+        const uint32_t racers = seed % 8 == 0 ? 0 : 1 + r.Below(7);
+        guest::StoreU32(h.base, manager.address + 2364, racers);
+        for (uint32_t i = 0; i < 7; i++) {
+          const uint32_t entry = manager.address + 4 + 28 * r.Below(80);
+          guest::StoreU32(h.base, entry + 20, r.Below(7));
+          guest::StoreU32(h.base, entry + 24, r.Below(6));
+          guest::StoreU32(h.base, manager.address + 2308 + 4 * i, entry);
+          guest::StoreU32(h.base, vehicles.address + 6272 * i + 336,
+                          h.data + 16 * r.Below(180) - 208 + 1024);
+          const uint32_t record = race.address + 48 + 3936 * i;
+          guest::StoreU32(h.base, record + 3888,
+                          r.Below(3) == 0 ? 0x400 | uint32_t(r.Next()) : uint32_t(r.Next()) & ~0x400u);
+        }
+        for (uint32_t i = 0; i < 512; i++) {
+          guest::StoreU32(h.base, h.data + 1024 + 4 * i, RandomFloat(r, 1000.0f));
+        }
+        guest::StoreU32(h.base, rw::kManager, manager.address);
+        guest::StoreU32(h.base, kVehicles, vehicles.address);
+        guest::StoreU32(h.base, rw::kRaceData, race.address);
+        PPCContext t = CallContext(h);
+        (v == 0 ? Original<__imp__sub_82172F90> : hooks::RaceWorldNoteMarkedRacer)(t, h.base);
+        out[v].Bytes(Read(h.base, kMarkedRacer, 12));
+        out[v].Bytes(Read(h.base, sp - 144 + 80, 16));
+      }
+      results.Check(out[0], out[1], fmt::format("seed {}", seed));
+    }
+    results.Report();
+  }
+  {
+    // Segments and points in the scratch area: near (within 1.0 to 200.0 of
+    // the line), or random floats with NaNs and infinities.
+    Results results("RaceManager::NearSegment (sub_82170BC0)");
+    int hits = 0;
+    for (uint64_t seed = 0; seed < 400; seed++) {
+      Outputs out[2];
+      for (int v = 0; v < 2; v++) {
+        Random r(seed * 97 + 41);
+        WriteRandom(h.base, h.data, kScratchBytes, r);
+        const uint32_t sp = stack(r);
+        const uint32_t segment = h.data + 16 * r.Below(100);
+        const uint32_t point = h.data + 2048 + 16 * r.Below(100);
+        const bool wild = seed % 8 == 0;
+        for (uint32_t i = 0; i < 8; i++) {
+          guest::StoreU32(h.base, segment + 4 * i,
+                          wild ? RandomFloat(r, 500.0f)
+                               : std::bit_cast<uint32_t>(float(int32_t(r.Below(400)) - 200)));
+        }
+        for (uint32_t i = 0; i < 4; i++) {
+          guest::StoreU32(h.base, point + 4 * i,
+                          wild ? RandomFloat(r, 500.0f)
+                               : std::bit_cast<uint32_t>(float(int32_t(r.Below(400)) - 200)));
+        }
+        PPCContext t = CallContext(h);
+        t.r3.u64 = segment;
+        t.r4.u64 = point;
+        t.f1.f64 = r.Below(8) == 0 ? double(std::bit_cast<float>(RandomFloat(r, 300.0f)))
+                                   : double(r.Below(300));
+        (v == 0 ? Original<__imp__sub_82170BC0> : hooks::RaceWorldNearSegment)(t, h.base);
+        hits += v == 1 && t.r3.u32 == 1 ? 1 : 0;
+        out[v].Bytes(Read(h.base, h.data, kScratchBytes));
+        out[v].Floats(h.base, sp - 208 + 80, 20);
+        out[v].Word(t.r3.u32);
+        out[v].Word(uint32_t(t.r3.u64 >> 32));
+      }
+      results.Check(out[0], out[1], fmt::format("seed {}", seed));
+    }
+    ITC_LOG_INFO("harness: race_world: NearSegment answered 1 in {} of 400 cases", hits);
+    results.Report();
+  }
+  {
+    // The table in the manager's block (the records and the counts).
+    Results results("RaceManager::BuildNeighbors (sub_82170CB8)");
+    int neighbors = 0;
+    for (uint64_t seed = 0; seed < 100; seed++) {
+      Outputs out[2];
+      for (int v = 0; v < 2; v++) {
+        Random r(seed * 101 + 43);
+        Globals globals(h.base, {track_route::kRoute});
+        WriteRandom(h.base, h.data, kScratchBytes, r);
+        WriteRandom(h.base, manager.address, 8 * 1200, r);
+        WriteRandom(h.base, manager.address + 360000, 64, r);
+        tr::Route route;
+        route_up(r, route);
+        const uint32_t sp = stack(r);
+        PPCContext t = CallContext(h);
+        t.r3.u64 = manager.address;
+        (v == 0 ? Original<__imp__sub_82170CB8> : hooks::RaceWorldBuildNeighbors)(t, h.base);
+        for (uint32_t i = 0; v == 1 && i < route.sections; i++) {
+          neighbors += guest::LoadU32(h.base, manager.address + 360000 + 4 * i) > 1 ? 1 : 0;
+        }
+        out[v].Bytes(Read(h.base, manager.address, 8 * 1200));
+        out[v].Bytes(Read(h.base, manager.address + 360000, 64));
+        out[v].Bytes(Read(h.base, sp - 336 + 80, 4));
+        out[v].Floats(h.base, sp - 336 + 80, 32);
+      }
+      results.Check(out[0], out[1], fmt::format("seed {}", seed));
+    }
+    ITC_LOG_INFO("harness: race_world: BuildNeighbors found neighbors for {} sections", neighbors);
+    results.Report();
+  }
+  {
+    // The manager's entries on the route, their flags among 0x1, 0x4, 0x8,
+    // 0x20.
+    Results results("RaceManager::Neighbours (sub_82170920)");
+    for (uint64_t seed = 0; seed < 300; seed++) {
+      Outputs out[2];
+      for (int v = 0; v < 2; v++) {
+        Random r(seed * 103 + 47);
+        Globals globals(h.base, {track_route::kRoute});
+        WriteRandom(h.base, h.data, kScratchBytes, r);
+        WriteRandom(h.base, manager.address, 4096, r);
+        tr::Route route;
+        route_up(r, route);
+        const uint32_t count = seed % 16 == 0 ? r.Below(2) : 1 + r.Below(40);
+        guest::StoreU32(h.base, manager.address + 2368, count);
+        const uint32_t flags[] = {0x1, 0x1, 0x1, 0x21, 0x5, 0x9, 0x0, 0x41};
+        for (uint32_t i = 0; i < 41; i++) {
+          const uint32_t entry = manager.address + 4 + 28 * i;
+          guest::StoreU32(h.base, entry, r.Below(8) == 0 ? uint32_t(r.Next()) : flags[r.Below(8)]);
+          tr::RandomPosition(h.base, entry + 8, route, r);
+          if (r.Below(16) == 0) {
+            guest::StoreU16(h.base, entry + 8, uint16_t(0x8000 | r.Below(0x8000)));
+          }
+        }
+        const uint32_t index = h.data + 64;
+        guest::StoreU32(h.base, index, r.Below(count + 1));
+        PPCContext t = CallContext(h);
+        t.r3.u64 = manager.address;
+        t.r4.u64 = index;
+        (v == 0 ? Original<__imp__sub_82170920> : hooks::RaceWorldNeighbours)(t, h.base);
+        out[v].Bytes(Read(h.base, h.data, kScratchBytes));
+        out[v].Word(t.r3.u32);
+        out[v].Word(uint32_t(t.r3.u64 >> 32));
+      }
+      results.Check(out[0], out[1], fmt::format("seed {}", seed));
+    }
+    results.Report();
+  }
+  {
+    // An entry in the manager's block on a section of 0 to 299 (the route's
+    // table maps each to one of its eight), its record in the race data
+    // naming an item of kind 2 or 3 (now and then another, or none), the
+    // player near or far, on its branch or not.
+    Results results("RaceManager::JumpSections (sub_821737F8)");
+    int jumps = 0;
+    for (uint64_t seed = 0; seed < 600; seed++) {
+      Outputs out[2];
+      for (int v = 0; v < 2; v++) {
+        Random r(seed * 107 + 53);
+        Globals globals(h.base, {track_route::kRoute, rw::kRaceData, data_tables::kTables});
+        WriteRandom(h.base, h.data, kScratchBytes, r);
+        WriteRandom(h.base, manager.address, 256, r);
+        WriteRandom(h.base, race.address, race.bytes, r);
+        tr::Route route;
+        route_up(r, route);
+        const uint32_t sp = stack(r);
+        const uint32_t tables = h.data + 3072;
+        guest::StoreU32(h.base, tables + 16, items.address);
+        for (uint32_t i = 0; i < 8; i++) {
+          const uint8_t kinds[] = {2, 3, 2, 3, 0, 1, 0xFE};
+          guest::StoreU8(h.base, items.address + 3008 * i + 36, kinds[r.Below(7)]);
+        }
+        guest::StoreU32(h.base, data_tables::kTables, tables);
+        guest::StoreU32(h.base, rw::kRaceData, race.address);
+        const uint32_t entry = manager.address + 4;
+        const uint32_t racer = r.Below(6);
+        guest::StoreU32(h.base, entry + 24, racer);
+        guest::StoreU32(h.base, race.address + 3936 * racer + 3960,
+                        (uint32_t(r.Next()) & 0xFFFF0000u) |
+                            (r.Below(8) == 0 ? 0xFFFF : r.Below(8)));
+        const uint32_t sections[] = {40, 46, 50, 53, 79, 83, 87, 187, 189, 191, 193, 194, 195,
+                                     197, 199, 201, 203, 204, 251, 254, 256, 258, 262, 263, 266};
+        guest::StoreU16(h.base, entry + 8, uint16_t(r.Below(3) == 0 ? r.Below(300)
+                                                                    : sections[r.Below(25)]));
+        guest::StoreU16(h.base, entry + 10, uint16_t(r.Below(8)));
+        const uint32_t player = h.data + 128;
+        for (uint32_t i = 0; i < 4; i++) {
+          guest::StoreU32(h.base, player + 4 * i, RandomFloat(r, 150.0f));
+        }
+        const uint32_t branch = h.data + 160;
+        const uint32_t its =
+            guest::LoadU8(h.base, route.Address(guest::LoadU16(h.base, entry + 8)) + 3);
+        const uint32_t pick[] = {its, its, 1, 0, 12};
+        guest::StoreU32(h.base, branch, pick[r.Below(5)]);
+        guest::StoreU32(h.base, h.data + 164, r.Below(3) == 0 ? 0 : 1 + r.Below(4));
+        guest::StoreU32(h.base, h.data + 168, r.Below(3) == 0 ? 0 : 1 + r.Below(4));
+        PPCContext t = CallContext(h);
+        t.r3.u64 = entry;
+        t.r4.u64 = player;
+        t.r5.u64 = branch;
+        t.r6.u64 = h.data + 164;
+        t.r7.u64 = h.data + 168;
+        const uint32_t flags = guest::LoadU32(h.base, h.data + 164) | guest::LoadU32(h.base, h.data + 168);
+        (v == 0 ? Original<__imp__sub_821737F8> : hooks::RaceWorldJumpSections)(t, h.base);
+        jumps += v == 1 && flags != (guest::LoadU32(h.base, h.data + 164) |
+                                     guest::LoadU32(h.base, h.data + 168)) ? 1 : 0;
+        out[v].Bytes(Read(h.base, h.data, kScratchBytes));
+        out[v].Bytes(Read(h.base, manager.address, 256));
+        out[v].Bytes(Read(h.base, sp - 176 + 80, 4));
+        out[v].Floats(h.base, sp - 176 + 96, 8);
+      }
+      results.Check(out[0], out[1], fmt::format("seed {}", seed));
+    }
+    ITC_LOG_INFO("harness: race_world: JumpSections moved the entry in {} of 600 cases", jumps);
+    results.Report();
+  }
+}
+
 }  // namespace
 
 void RaceWorld(Context& h) {
@@ -443,6 +730,8 @@ void RaceWorld(Context& h) {
   SortedLists(h);
   Release(h, manager, vehicles);
   Routes(h);
+  Create(h);
+  Tables(h, manager, vehicles);
 }
 
 }  // namespace harness
