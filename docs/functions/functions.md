@@ -333,6 +333,11 @@ Rows not yet moved stay in the table below. So far:
   countdown, the end, the replay and the menu after the race) and the
   race's progress at `[0x826D82E8]`: each racer's time, laps, distance
   along the route, hits, spirit points and place (B7).
+- [`archive.md`](archive.md): the archive streaming's functions not
+  met in B4 (whose rows stay in `files-and-saves.md`): the TOC lookup,
+  the queue's length, wait and cancel, the loader thread's functor, the
+  request queue's list class and the static set-ups and clean-ups of
+  the queue, the request slots and the four semaphores (B7).
 
 These files hold functions only. What used to follow the table here moved
 out on 2026-10-20: how frame interpolation works, its options and what
