@@ -25,6 +25,13 @@ When the user has reviewed a run's section, its heading gets
   slots, the queue at `0x826BAB08`, the four semaphores, the loader
   thread's parameters at `0x82600B50`. Two leads taken into the map
   (`sub_8209D7B0`, `sub_82294BA8`), two added.
+- The user's call (2026-10-28): the archive loader's four semaphores
+  (queue lock `0x826BAAE0`, work `0x826BAAB8`, request-done
+  `0x826BAA68`, idle `0x826BAA90`) become host counting semaphores with
+  a readable count (two users read +32), taken by every user, native
+  and recompiled (the loose read `sub_8209DFA8` signals request-done);
+  this replaces the 2026-10-24 note that the Semaphore class stays
+  recompiled for the archive loader.
 
 ## Run 2026-10-28 08:36 (`b7-loop-28-10-26`)
 

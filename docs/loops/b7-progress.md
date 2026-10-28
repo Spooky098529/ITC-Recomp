@@ -15,9 +15,10 @@ file's history. What's left to see in a drive, from every run:
   Mapped (a8a12e3): `archive.md`, 27 new rows (the B4 rows stay in
   `files-and-saves.md`, named shared), 10 ready groups; blocked by the
   game's Semaphore class (the archive's four semaphores). Map check
-  passed. Asked the user whether the four go over host primitives (the
-  2026-10-24 record kept the Semaphore class recompiled "for the
-  archive loader"). Step: migration 1 of the ready groups (agent
+  passed. The user's call (2026-10-28): the four become host counting
+  semaphores with a readable count, shared by every user, native and
+  recompiled (the recompiled loose read reaches them through an
+  adapter); the game's Semaphore class stays recompiled otherwise. Step: migration 1 of the ready groups (agent
   running).
 
 ## Done
