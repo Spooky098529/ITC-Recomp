@@ -1,0 +1,174 @@
+# Known functions: the race world (the racers' manager)
+
+The **race world**: the race mode's state machine at +116812
+(`RaceWorld::`, set up by `RaceWorld::Init`, `sub_82174D28`, from
+`RaceMode::Init` in `game-modes.md`) that loads and frees what a race
+drives on and with (the collision world and the course's route, the seven
+vehicles, the AI drivers and the racers' manager), places the racers and
+settles them for a second (30 ticks) when the load finishes, and, while
+racing, updates the cars once a tick (the AI drivers, each racer's
+`Vehicle::Tick`, `TrackCollision::Tick`, `Vehicle::Refresh`); and the
+**racers' manager** at `[0x826D82F4]` (`RaceManager::`, 363,592 bytes,
+made by `RaceManager::Create`) that it keeps: up to 80 entries of 28
+bytes, one for each opponent and traffic car the race data lists (77 from
+the racer records, three for traffic), of which only those near the
+player's car get one of the seven vehicles at a time (at most four
+opponents and `+2380` traffic cars): the others move along the course's
+route by themselves, a slice at a time, without physics. The manager
+picks which entries have a vehicle every tick by their distance to the
+player (`RaceManager::Stream`, `RaceManager::StreamTraffic`), lists the
+racers that have one (`+2308`, the list `Race::RacerCount` counts), and
+keeps a table of the sections beside each section of the route (where
+traffic may appear). Also here: the race event's start positions for its
+opponents (`RaceEvent::PlaceStarts`, from the racers' set-up), the
+racers placed on a stage's start (`RaceStart::Place`, from the race's
+other states), and the save data's distance driven, updated when the
+race is left. The names are ours; which state is which is guessed from
+what the handlers do. Read by the B7 loop's mapping agent, 2026-10-28,
+from the race's states lead (`../loops/leads.md`). The fields are in
+`../known-data.md` (`0x826D82F4`, "race world", the race data
+`0x826C5B2C`, the course's route `0x826C5B10`, `0x826C6078`).
+
+The transitions `RaceWorld::Init` adds ((state, message) → next state,
+handler; 0 = stay): (1, 0) → 2 `RaceWorld::OnLoad`; (2, 3)
+`RaceWorld::OnLoaded`; (2, 0) nothing (`sub_82106540`); (2, 4) → 3; (3,
+5) and (3, 46) → 7 `RaceWorld::Release`; (3, 17) → 7
+`RaceWorld::ReleaseForStage`; (3, 42) → 24; (7, 0) `RaceWorld::Tick`;
+(7, 28) `RaceWorld::Release`; (7, 29), (7, 31), (7, 58) → 24; (7, 44) →
+32 `RaceWorld::Abort`; (24, 0) `RaceWorld::OnPausedTick` (added twice);
+(24, 29), (24, 58), (24, 31) → 7; (24, 44) → 32 `RaceWorld::Abort`; (7,
+49) and (24, 49) → 37; (37, 0) nothing; (37, 50) → 35
+`RaceWorld::Unload`. So 2 is probably loading, 3 the start, 7 racing, 24
+paused (its handler is the one `../pause-menu-fix.md` lists while
+paused), 37 the end.
+
+Shared with other files, which keep their rows: `StateMachine::Add`
+(`game-modes.md`); `TrackCollision::Load`, `Unload`, `ResetWorld`,
+`Tick` and `Race::RacerCount` (`collision-world.md`);
+`Race::RacerVehicle` (`minimap.md`); `Vehicles::Create`,
+`Vehicles::Destroy`, `Vehicle::SetUp`, `Vehicle::ResetForCar`,
+`Vehicle::Tick`, `Vehicle::Refresh`, `Vehicle::PlaceOnRoute`,
+`Vehicle::RemoveFromWorld`, `VehicleStatus::Update` and
+`RoutePosition::Step` (`vehicle.md`); `Vehicle::PhysicsStep`,
+`Vehicle::SyncFromBody`, the rigid body's setters and
+`CollisionObject::ResetTransform` (`car-physics.md`); `Vehicle::Get`,
+`Vehicle::Identity`, `Vehicle::Speed`, `Vehicle::GetDistancePerFrame`,
+`sub_820C0590`, `sub_820B6880`, `RigidBody::Position`, `Stages::Copy`,
+`Stages::HasRacer`, `Stages::Racer`, `sub_820FFC30`, `sub_820FFC70`,
+`SaveData::Of`, `Vec3::` and `Vec4::` (`vehicle-accessors.md`);
+`Vehicle::GetSpeedKmh` (`functions.md`); `AiDrivers::Create`,
+`AiDrivers::Destroy`, `AiDrivers::UpdateAll`, `AiDriver::Of`,
+`AiDriver::Reset`, `AiDriver::DriveCar`, `AiPath::BranchMasksFor`,
+`CarInput::Clear` and `RaceTime::FromTicks` (`ai-drivers.md`);
+`AiDriver::Setup` (`racer-controllers.md`); `TrackRoute::SlicePoint`,
+`TrackRoute::Normalize`, `TrackRoute::ToMainRoad`,
+`TrackRoute::ClampPosition` and `TrackRoute::Distance`
+(`track-route.md`); `RaceEvent::Current` (`race-setup.md`);
+`DataTables::Item` (`data-tables.md`); `memcpy` (`c-runtime.md`);
+`operator new` and `delete` (`heap.md`); the empty function
+`sub_82106540` (`audio.md`), which the paused tick and a failed spawn
+call with arguments (400, 400, 0, `0x820099AC`) and (500, 220, 0,
+`0x820099BC`): probably a debug text print compiled out.
+
+Not here: the race's other states that call `RaceStart::Place`,
+`RaceManager::Refresh`, `RaceManager::ListRacers`,
+`RaceManager::ResetVehicles` and `RaceManager::ResetWorld`
+(`sub_82163440`, `sub_821654F8`, `sub_82162D80`, `sub_82165AB0`,
+`sub_82165C78`, `sub_82166E50`, `sub_82166F98`, `sub_821692C8`; never
+seen: `sub_82167D88`, `sub_82168018`, `sub_82168C80`) and the code that
+moves cars back on the road (`sub_821046F8`, `sub_82104898`,
+`sub_82104D40`): leads in `../loops/leads.md`. `sub_821743A8`'s callees
+never ran (`sub_8214AA70` is in `system-services.md`).
+
+Status:
+
+- **Native**: plain C++ in `itc_recomp/src/` that doesn't use the
+  PowerPC context (`ctx`): normal arguments and host structs (it may
+  still read and write guest memory through `src/guest.h` while
+  recompiled code shares the data). The game reaches it without `ctx`,
+  from native or overridden callers, and the recompiled original is no
+  longer called (except behind a fallback flag or to check against it).
+  No `REX_FUNC` override of it exists, not even an adapter kept only for
+  a harness (that's Overridden until the adapter goes).
+  The end state for every function.
+- **Overridden**: an `extern "C" REX_FUNC(sub_XXXXXXXX)` override in
+  `itc_recomp/src/` (or a macro defining one) does the work instead of
+  the original: a thin adapter in front of native code, or a body that
+  still uses `ctx` (calling guest code, reading registers). It may call
+  the original when its flag is off, or to check itself against it.
+- **Wrapped**: an override that does something of its own (skipping
+  render-only passes, logging, timing) and still calls the original
+  (`__imp__sub_XXXXXXXX`) for the work.
+- **Dropped**: its work isn't needed on PC (hardware set-up, kernel calls
+  the SDK already stubbed), so it no longer runs: an override in
+  `itc_recomp/src/` replaces it with nothing (or a fixed return value), or
+  its callers, made native, leave the call out (no override then; the row
+  says which caller). Logs, a harness or the renderer's frame dumps have
+  shown that nothing reads what it did. The original is no longer called,
+  except behind a fallback flag while the drop is being checked. A
+  function the game never calls in the first place isn't Dropped: its
+  status stays blank and its row says it's never called.
+- **Merged**: its work is done inside a native caller's plain C++ (a
+  few lines only that caller needs), so it has no function or override of
+  its own in `itc_recomp/src/`. The row names the caller(s) and the
+  harness that covers the work. The original is no longer called, except
+  behind the caller's fallback flag.
+- **Patched**: the generated code was edited in place (search for
+  `PATCH:`).
+
+| Address | Name | Status | Notes |
+|---|---|---|---|
+| `sub_82174D28` | `RaceWorld::Init` | | r3 = the race world (the race mode + 116812, a state machine). +9604 (the state) = 1, +9608 = 0, set to 1 when the race data's +0xA3AF0 is 6 and the current stage's word +76 (`sub_820FFC70` with -1 on the race data + 0x59620) is 2 or more (probably two human cars). Then 24 transitions through `StateMachine::Add` (the table in the intro), the handlers member functions (functor vtable `0x82011918`, the object r3) or none (`0x820069BC`), keys built on its 1,696-byte frame. From `RaceMode::Init` (`game-modes.md`). Read in full (the table worked out by stepping its stores). |
+| `sub_82170550` | `RaceWorld::OnLoad` | | (1, 0) → 2: `TrackCollision::Load` (tail call) with r3 = `[0x826C5B28]` (not read by it). Read in full. |
+| `sub_82173A90` | `RaceWorld::OnLoaded` | | (2, 3): the race's cars made and settled. The current stage copied (`Stages::Copy`, -1); when it's of type 2 or 3 (`sub_820FFC30`), or the race data's +0xA3AF0 is 6 and the stage's +0 isn't 1: the race data's flags +0x59AE4 \|= 0x2000 (no traffic) and the racers in the stage held below. `Vehicles::Create`; each of the 7 vehicles `Vehicle::SetUp` with the race data's first racer record (+48) then `Vehicle::RemoveFromWorld`; `AiDrivers::Create`; `RaceManager::Create`; `RaceManager::AddRacers`(the manager, the race data + 48); each racer's vehicle `Vehicle::ResetForCar` with its record (the race data + 48 + 3,936 × its +24); then each racer's vehicle: byte +2384 (forced rest) = 1 when held and `Stages::HasRacer`(its record), else 0; its route position (its +8) kept on the route (`TrackRoute::ClampPosition`) and `Vehicle::PlaceOnRoute` with the record's speed (+3956), 0.0 across, the lane (-1 when the race data's +0xA3AF4 is 0 or 1, else the racer's number mod 2) and 1. Then 30 ticks: `AiDrivers::UpdateAll`, each racer's `AiDriver::DriveCar`(…, its vehicle index, 1) copied to its input record (`[0x826C5B30 + 4 × index]`) and `Vehicle::Tick`(vehicle, index, 0, 1), `TrackCollision::Tick`. Then each racer's vehicle +6244 = its record's +3968 (probably the distance driven so far); `RaceManager::ListRacers`; the flags +0x59AE4 \|= 0x200; `RaceManager::NoteMarkedRacer`. Frame 352 bytes. No direct callers. Read in full. |
+| `sub_82171360` | `RaceWorld::Release` | | (3, 5), (3, 46) → 7 and (7, 28): each racer's vehicle (`Vehicle::Get` of its +20) gets byte +2384 (forced rest) = 0; the count read again each pass. No direct callers. Read in full. |
+| `sub_821713C0` | `RaceWorld::ReleaseForStage` | | (3, 17) → 7: as `RaceWorld::Release`, then with the current stage of type 2 or 3, or the race data's +0xA3AF0 6 and the stage's +0 not 1: for each of the stage's racer slots (`sub_820FFC70`, the stage's +76), the entry of `Stages::Racer`'s record (`RaceManager::EntryOfRecord`) has its vehicle's +2384 = 1 (held). No direct callers. Read in full. |
+| `sub_82174BC0` | `RaceWorld::Tick` | | (7, 0), once a tick while racing (an Update handler in `../pause-menu-fix.md`'s race intro and driving lists). When +9608 is set: with the race data's flags +0x59AE4 0x20 and the byte at `0x826C6B0C` not 255, for each racer record whose flags +3888 match (byte 0: `[0x826C7824]` ? 0x1 : 0x80; 1: `[0x826C7824]` ? 0x80 : 0x1; else either), the word +2972 + 972 × (its entry's +24) of `[0x826D82E8]` = 0; otherwise `sub_821743A8` (never seen). Then `RaceManager::Stream` (by the race's kind), `AiDrivers::UpdateAll`, `RaceManager::TickVehicles`, `TrackCollision::Tick`, `RaceManager::RefreshVehicles`. No direct callers. Read in full. |
+| `sub_82170560` | `RaceWorld::OnPausedTick` | | (24, 0), every tick while paused: the empty `sub_82106540` (tail call) with r3 = 400, r4 = 400, r5 = 0, r6 = `0x820099AC` (probably a debug print compiled out): does nothing. No direct callers. Read in full. |
+| `sub_82171308` | `RaceWorld::Abort` | | (7, 44) and (24, 44) → 32: `Vehicles::Destroy`, `AiDrivers::Destroy`, the manager deleted (`operator delete`) and `[0x826D82F4]` = 0, the state +9604 = 2. Not seen in play. Read in full. |
+| `sub_82171250` | `RaceWorld::Unload` | | (37, 50) → 35: when the race data's +0xA3AF0 is 1 and +0xA3AF4 is 2 or 3, `SaveData::AddDistance`(`SaveData::Of(0)`, the race data, vehicle 0's +6244). Then `Vehicles::Destroy`, `AiDrivers::Destroy`, `TrackCollision::Unload`(`[0x826C5B28]`), the manager deleted (`operator delete`) and `[0x826D82F4]` = 0. Frees guest memory. No direct callers. Read in full. |
+| `sub_82116C38` | `SaveData::AddDistance` | | r3 = a player's save data, f1 = a distance (r4 not read): the garage car picked (the save's +0x19920-th node of the list at save +6120 + 204, as in `Race::SetUp`, `race-setup.md`); the difference between f1 and the car's float +2104 (from save +6120 + 1,968 × the node's halfword +2) added to the save's floats +4908 and +6040, and the car's +2104 set to f1 (added the same way). Probably the odometer and two totals. Leaf. Only caller `RaceWorld::Unload`. Read in full. |
+| `sub_821715B8` | `RaceManager::Create` | | No arguments: 363,592 bytes (`operator new`) into `[0x826D82F4]`; when made: +0 = 0; the 80 entries from +4 (28 bytes each): +0 = 0, +4 = -1 (0 for the last three, the traffic), halfwords +8, +10 = -1, +12 = `[0x82000A34]`, +16 = 0, +20 = -1, +24 = -1; the 16 words from +2244 = -1; +2364 to +2388 = 0; the 7 words from +2308 and from +2336 = 0; the 300 words from +362392 = 0. The 360,000 bytes from +2392 aren't touched. Allocates guest memory. Only caller `RaceWorld::OnLoaded`. Read in full. |
+| `sub_82173050` | `RaceManager::AddRacers` | | r3 = the manager, r4 = the race data's racer records (+48). `RaceManager::BuildNeighbors`(+2392). The first record with flags +3888 0x1 (the player) or none; with the race data's +0xA3AF0 1, +0xA3AF4 2 and an event (`RaceEvent::Current`): `RaceEvent::PlaceStarts`(&save +6108, &the player's +3904). For each record i (the count at +0x595E0) with flags 0x83: unless 0x1 or 0x80, its start position (+3904, +3906; the player's when -1) set: in the stage (`Stages::HasRacer`) the player's, stepped forward 1, 2, … (`RoutePosition::Step`) or, with the race data's +0xA3AF0 1 and save +6100 1, back -1, -2, … (`RoutePosition::StepToMainRoad`), by its item's branch kind (byte +36 of `DataTables::Item`(+3912), or -1); else from its event entry (`RaceEvent::Entry`(&+3916)'s +4) when +3912 and +3916 are set, or 30, 60, … slices on; then an entry added (+2368 counts): +24 = i, +4 = the entry's number, +8 the position, +0 = 1, 4 for flag 0x1, 8 for 0x80, \| 0x20 for 0x100. Records with only flag 0x4 (traffic) are listed from +2244 (+2384 counts). Then the entries on compatible branches (`RaceManager::BranchesMeet` with the player's section) sorted by distance (`SortedList::Insert`, on its 1,808-byte frame); the nearest up to four nearer than `[0x8200996C]` get flags \| 0x40, a racer number (+20 = +2364), a place in the racers' list (+2308) and slot word (+2336 = 1), a cleared input record and `AiDriver::Setup`(+20, its record +3960, &1) (+2372 and +2364 count them); the rest lose 0x40. Then traffic: +2380 = min(the race data's +0x59618, 3), +2376 = 0; with both +2380 and +2384 and no flag 0x2000, +2380 traffic entries (+2160 on) spread before the player over the route by the race data's +0xA3AF0 and the route's slice length, each with a model (`Traffic::PickModel`), +0 = 66, +24 its traffic record, a racer number and input record, `AiDriver::Setup`(…, &-1, &1). Frame 2,000 bytes. Only caller `RaceWorld::OnLoaded`. Read, not in detail. |
+| `sub_82170CB8` | `RaceManager::BuildNeighbors` | | r3 = the manager + 2392: for each section s of the course's route (the file `[0x826C5B10]`, its +0 the count, +12 the sections), a 1,200-byte record (+0 = s, then section numbers) and a count (from +360000 + 4s, 1 plus the sections added): every other section j whose branch number (byte +3) isn't 0 or 29, that doesn't link to s (j's 12 links at +28), on another branch than s (11 only with 11, 12 only with 12), and whose first or last slice's point (`TrackRoute::SlicePoint`, y 0.0) lies within `[0x82002568]` of s's (`RaceManager::NearSegment` on both). Sections with branch 0 or 29 get only their own number. No bounds check (300 sections, 299 others). Only caller `RaceManager::AddRacers`. Read in full. |
+| `sub_82170BC0` | `RaceManager::NearSegment` | | r3 = a segment (two 16-byte points), r4 = a point, f1 = a distance: 1 when the point's projection lies on the segment (past its start, short of its length × `[0x820021E8]`) and the point is nearer than f1 to it (`Vec3::Sub`, `Normalize`, `Dot`, `Vec4::ScaleTo`, `Vec3::Add`, `Vec3::Direction`), else 0. Only caller `RaceManager::BuildNeighbors`. Read in full. |
+| `sub_82170860` | `RaceManager::BranchesMeet` | | r3, r4 = two route branch numbers (bytes +3 of two sections): 1 when cars may go from one to the other: never for r4 0 or 29 or the same branch; else by r3 through a jump table (`0x82009980`): 11 and 12 with each other, and pairs among 0-13 (`sub_821708B4`'s part: 3 to 5, 11, 12). Leaf. 5 callers, all here. Read (the table's cases in outline). |
+| `sub_821708B4` | | | A tail of `RaceManager::BranchesMeet` the recompiler split off (r11 the branch): 1 for 3 to 5, 11 and 12. Only caller `RaceManager::BranchesMeet`. Not seen in play. Read in full. |
+| `sub_82170AA0` | `SortedList::Insert` | | r3 = a list (100 nodes of 16 bytes: +0 an item, +4 a key, +8 previous, +12 next; +1600 the first, +1604 the last inserted, +1608 the count), r4 = an item, f1 = its key: the next node filled and linked in ascending key order, searching from the last inserted. No bounds check. Leaf. 5 callers: `RaceManager::AddRacers`, `Stream`, `Refresh`, `ListRacers` and `sub_82162D80`. Read in full. |
+| `sub_82170A88` | `SortedList::Clear` | | r3 = a list: +1600, +1604, +1608 = 0. Leaf. Only caller `sub_82162D80`. Read in full. |
+| `sub_821705A8` | `RaceManager::EntryOfRecord` | | r3 = a racer record's number: the manager's first entry (+4 + 28i, +2368 of them) whose +24 is r3, or 0 (also with no manager). Leaf. 9 callers (`RaceWorld::Tick`, `ReleaseForStage`, `RaceStart::Place`, `RaceStart::PlaceRolling`, `sub_821654F8`, `sub_82165AB0`, `sub_82165C78`; never seen `sub_82167D88`, `sub_82168C80`). Read in full. |
+| `sub_82170F18` | `RoutePosition::StepToMainRoad` | | r3 = a route position (changed), r4 = a step in slices, r5 = a branch kind: masks = `AiPath::BranchMasksFor`(&kind); the slice += r4; `RoutePosition::ToMainRoad`(position, 1); `TrackRoute::Normalize`(`0x826C5B10`, position, masks). 6 callers (`RaceManager::AddRacers`, `StreamTraffic`, `RaceStart::Place`, `RaceStart::PlaceRolling`, `sub_821654F8`; never seen `sub_82167D88`). Read in full. |
+| `sub_82143608` | `RoutePosition::ToMainRoad` | | r3 = a route position, r4 = a flag: `TrackRoute::ToMainRoad`(`0x826C5B10`, r3, r4) (tail call). Only caller `RoutePosition::StepToMainRoad`. Read in full. |
+| `sub_82171070` | `Traffic::PickModel` | | r3 = a number, r4 = a branch number: one of two 42-entry tables of car ids 55 to 70 built on the stack (the second for branches 7, 8, 13 and 14), the entry r3 mod 42, minus 55 (0 to 15: a traffic record's slot from the manager's +2244). Leaf. From `RaceManager::AddRacers` and `StreamTraffic`. Read in full. |
+| `sub_82172F90` | `RaceManager::NoteMarkedRacer` | | r3 not read: the first racer whose record has flags +3888 0x400 has its body's position (`RigidBody::Position` of the vehicle's +336, `Vec4::Copy`) stored as three floats at `0x826C61A4`. Only caller `RaceWorld::OnLoaded`. Read in full. |
+| `sub_821714D8` | `RaceManager::TickVehicles` | | No arguments: each racer's `Vehicle::Tick`(its vehicle, its +20, its record, 1); the count read again each pass. Only caller `RaceWorld::Tick`. Read in full. |
+| `sub_82171560` | `RaceManager::RefreshVehicles` | | No arguments: each racer's vehicle `Vehicle::Refresh`. Only caller `RaceWorld::Tick`. Read in full. |
+| `sub_82174338` | `RaceManager::Stream` | | r3 = the manager: by the race data's +0xA3AF4 (0 to 8, a jump table at `0x820099A0`; nothing above 8): 1 and 2 `RaceManager::StreamCruise`, 4 `RaceManager::StreamTwoPlayers`, else `RaceManager::StreamNear` (tail calls). Only caller `RaceWorld::Tick`. Read in full. |
+| `sub_8217437C` | | | `RaceManager::StreamNear` (tail call): a jump table's case of `RaceManager::Stream` split off. Not seen in play. Read in full. |
+| `sub_821743A0` | | | Empty (`blr`). No direct callers. Not seen in play. |
+| `sub_82174200` | `RaceManager::StreamCruise` | | r3 = the manager: the player's entry (the first with flag 0x4); from its vehicle's speed (`Vehicle::Speed`, read four times) four radii (speed × `[0x820021E8]` or `[0x820021F4]`, plus `[0x82002A28]` or `[0x82008914]`; capped at `[0x82003384]`, and `[0x820099CC]` with `[0x820099C8]`); `StreamOpponents` gets the `[0x820021F4]` pair, `StreamTraffic` the `[0x820021E8]` pair; the racers' count +2364 = 0; then `RaceManager::StreamOpponents`, `RaceManager::StreamTraffic` (0 for the second player), `RaceManager::MoveUnseen`. Runs in attract races (kind 2). Only caller `RaceManager::Stream`. Read in full. |
+| `sub_82172E60` | `RaceManager::StreamNear` | | As `RaceManager::StreamCruise` without `MoveUnseen`. From `RaceManager::Stream` and `sub_8217437C`. Not seen in play. Read in full. |
+| `sub_82172D20` | `RaceManager::StreamTwoPlayers` | | As `RaceManager::StreamNear` for two human cars (entries at +4 and +32): the one ahead picked by the race data's flags +0x59AE4 0x20 or 0x40 and `[0x826D82E8]`'s +3012 against +3984, the radii from the faster's speed, `StreamTraffic` with both. Not seen in play. Read in full. |
+| `sub_82172118` | `RaceManager::StreamOpponents` | | r3 = the manager, r4 = the player's entry, f1 = the spawn radius, f2 = the despawn radius: +2372 = 0; entries flagged 0x20 or 0x80 lose their vehicle; the others sorted (`SortedList::Insert`) by a key: 0.0 for flags 0x4 or 0x8, `[0x8200222C]` for 0x10 or 0x400, else, on a branch that meets the player's (`RaceManager::BranchesMeet`), their flat distance + 1.0; the rest lose theirs. In that order: past the fourth, the vehicle removed; up to four nearer than f1 get one (`RaceManager::GiveVehicle`, then a racer place, input record and `AiDriver::Setup`; when none is free, the empty `sub_82106540` with (500, 220, 0, `0x820099BC`)) or keep theirs; those farther than f2 lose theirs. Removing: flags &= ~0x40, `Vehicle::RemoveFromWorld`, the slot word (+2336 + 4 × vehicle) = 0, +20 = -1. Frame 1,920 bytes. From `StreamCruise`, `StreamNear`, `StreamTwoPlayers`. Read in full. |
+| `sub_821706E8` | `RaceManager::GiveVehicle` | | r3 = the manager, r4 = an entry: the first of the 7 slot words (+2336) that's 0 or -1, or 0 returned. Entry +20 = the vehicle's index; `Vehicle::SetUp` with its record (`ResetForCar` when the slot was -1); placed (`Vehicle::PlaceOnRoute`) at the entry's +8 with `[0x82009974]`, or with flag 0x10 at the record's +3904 with its +3908 (forced rest +2384 = 1 when that's 0.0); input record cleared; `sub_820C0590`, `Vehicle::PhysicsStep` with `[0x826193C8]`, `VehicleStatus::Update`; flags \|= 0x240; the slot = 1; returns 1. From `StreamOpponents`, `Refresh`. Not seen in play. Read in full. |
+| `sub_821724F8` | `RaceManager::StreamTraffic` | | r3 = the manager, r4 = the player's entry, f1, f2 = the near and far radii, r5 = the second player's entry or 0: +2376 = 0. With the race data's flags 0x4000 every traffic car (entries at +2160) removed. Else each traffic entry with a vehicle: its slot word counts its ticks (to 216,000, then 60); farther than f2 from both players, removed; else listed as a racer (+2376 counts; flag 0x800 counted). Then, unless flag 0x2000, with fewer than +2380 and +2388 at 90 or more (ticks since the last; else +2388 + 1): a free traffic entry and vehicle slot; a spot on a neighboring section (`RaceManager::BuildNeighbors`' table) between f1 and f2 away and ahead of the car (its velocity, vehicle +6176, dotted above `[0x82001BE4]`), else on the player's route position stepped by f1 or f2 over the slice length; none taken within `[0x82002568]` of a racer; its model (`Traffic::PickModel`), +0 = 578 (2626 on a neighbor), +24 the traffic record, +16 a number mod 42; the vehicle set up (as `GiveVehicle`, at `[0x82009974]`, lane by the number or the car's +6224), `AiDriver::Setup`(…, &-1, &1), listed as a racer. Frame 464 bytes. From `StreamCruise`, `StreamNear`, `StreamTwoPlayers`. Read, not in detail. |
+| `sub_82173E28` | `RaceManager::MoveUnseen` | | r3 = the manager, r4 = the player's entry: the entries without a vehicle move along the route. With the race data's flags +20 0x10 or 0x20, whether an entry of item kind 3 (sections 187 to 203) or 2 (sections 251 to 261) is already there. Then each entry not flagged 0x20 or 0x80: with a vehicle (0x40), +8 = its track position, +12 = 0.0 and its slot word counts on (to 216,000, then 60); else +12 += 1.0, `RaceManager::JumpSections`, and while +12 reaches the ticks a slice takes (the slice length over the car's distance a frame, or × `[0x820099D4]`, scaled by `RaceManager::Neighbours`' answer: × `[0x820021E8]`, `[0x82001070]` or `[0x820029F0]`), `RoutePosition::Step`(+8, 1, its item's kind) and +12 less that. Only caller `StreamCruise`. Read, not in detail. |
+| `sub_821737F8` | `RaceManager::JumpSections` | | r3 = an entry, r4 = the player's position, r5 = the player's branch, r6, r7 = two flags (cleared when used): an entry whose item kind (byte +36) is 3 or 2, on given section ranges (79-86, 187-194, … for kind 3; 46-52, 192-203, 258-265 … for 2) and not the player's branch 12 or 11, farther than `[0x820099D0]` (squared, flat) from the player, is put at section 194 or 252 (kind 3; 252 when the player's branch is 1) or 201 or 259 (kind 2), slice 0. Probably the rivals moved between parts of the map. Only caller `MoveUnseen`. Read, not in detail. |
+| `sub_82170920` | `RaceManager::Neighbours` | | r3 = the manager, r4 = &an entry's number: among the other entries (flag 0x1, not 0x20, 0x4 or 0x8) on a section of the same branch, the nearest ahead (`TrackRoute::Distance` above 0.0, under `[0x82001FC0]`) and behind (above `[0x82009798]`): 0 neither, 1 ahead, 2 behind, 3 both. Only caller `MoveUnseen`. Read in full. |
+| `sub_82171978` | `RaceManager::Refresh` | | r3 = the manager: as `StreamOpponents` with fixed radii (`[0x8200996C]`, `[0x82009970]`) and the player's section, the counts +2364, +2372, +2376 reset; then traffic removed with the race data's flags 0x4000, else listed. Frame 1,904 bytes. 6 callers: `sub_82163440`, `sub_821654F8`, `sub_82166E50`, `sub_821692C8`; never seen `sub_82167D88`, `sub_82168C80`. Read in full. |
+| `sub_82171E50` | `RaceManager::ListRacers` | | r3 = the manager: the racers' list rebuilt: +2364, +2372 = 0; entries flagged 0x20 or 0x80, or off the player's branches, lose their vehicle; the others sorted by distance (`SortedList::Insert`) and those with a vehicle listed (+2372 counts); then the traffic entries in use (+2376). Frame 1,872 bytes. 9 callers: `RaceWorld::OnLoaded`, `sub_821046F8`, `sub_82104898`, `sub_82104D40`, `sub_82166F98`, `sub_821692C8`; never seen `sub_82167D88`, `sub_82168018`, `sub_82168C80`. Read in full. |
+| `sub_82171718` | `RaceManager::ResetVehicles` | | r3 = the manager, r4 = a flag: the counts reset; every entry with a vehicle (and each of the three traffic entries) set up again (`Vehicle::SetUp`, or `ResetForCar` when its slot was -1), flags \|= 0x200 with r4, slot = 1, input cleared, `AiDriver::Setup`(…, its record +3960, &1), listed; +2388 = 0. From `sub_821046F8`, `sub_82104898`, `sub_82104D40`. Read in full. |
+| `sub_82170668` | `RaceManager::ResetWorld` | | r3 = the manager: each vehicle whose slot word is above 0 removed (`Vehicle::RemoveFromWorld`), the slot = 0, its AI driver reset (`AiDriver::Of`, `AiDriver::Reset`); `TrackCollision::ResetWorld`; `[0x826C2D80]` = `[0x82000A34]`; +2388 = 0. From `sub_821046F8`, `sub_82104898`, `sub_82104D40`. Read in full. |
+| `sub_821743A8` | | | r3 = the race world: 657 lines over `[0x826D82F4]` and `[0x826D82E8]` (`memcpy`, `RaceTime::FromTicks`, the rigid body's position and orientation set, `CollisionObject::ResetTransform`, `Vehicle::SyncFromBody`, `sub_8214AA70`): probably cars put at recorded places (a replay or the second player's). Only caller `RaceWorld::Tick`. Not seen in play. Not read in detail. |
+| `sub_82144A38` | `RaceEvent::PlaceStartsCurrent` | | `RaceEvent::PlaceStarts`(`[0x826C6078]`, r3, r4) (tail call). Only caller `RaceManager::AddRacers`. Read in full. |
+| `sub_82144798` | `RaceEvent::PlaceStarts` | | r3 = the event, r4 = &a kind (0 to 19; save +6108), r5 = &the player's start position: the event's opponents' start positions (each list entry's +4, `RaceEvent::PlaceEntry`). The position stepped back by `[0x82008E3C]` over the route's slice length, a step from `[0x82008E34]` the same way, put on the main road; the kind (a jump table at `0x82008E20`) picks a row of the table at `0x82008E14` and one group placed by `RaceEvent::PlaceGroupFixed`; the other of the four groups by `RaceEvent::PlaceGroupSplit` (the row below 0x8000 and `SaveData::FirstUnsetFlag` above 0) or `RaceEvent::PlaceGroup`. Only caller `RaceEvent::PlaceStartsCurrent`. Read, not in detail. |
+| `sub_82144874` | | | A part of `RaceEvent::PlaceStarts` the recompiler split off (a jump table's case: the groups' loop). Only caller `RaceEvent::PlaceStarts`. Read in full. |
+| `sub_82112190` | `SaveData::FirstUnsetFlag` | | r3 = a player's save data: the first of bits 0 to 5 of the word at +6092 that's clear, or 6. Leaf. Callers `RaceEvent::PlaceStarts`, `sub_821121F8`, `sub_82116588`, `sub_82144A50`. Read in full. |
+| `sub_821443B0` | `RaceEvent::PlaceGroupFixed` | | r3 = the event, r4 = &a step, r5 = &a group (0 to 3): group 0 from sections 153 and 107, 1 from 284 and 218 (`RaceEvent::PlaceGroupTwoRows`), 2 from section 44 and 3 from 66 (`RaceEvent::PlaceGroup` both ways). From `RaceEvent::PlaceStarts`. Read in full. |
+| `sub_82143A40` | `RaceEvent::PlaceGroup` | | r3 = the event, r4 = &a position, r5 = a step (halfword), r6 = &a group (its branch kind too), r7 = &a flag: the group's list (the event + 12 × (group + 3): +0 the count, +4 4-byte entries, +2 an entry's index in the event's list); with the flag, the first half placed stepping forward, then the rest from the start stepping back; else all forward (`RaceEvent::PlaceEntry`, masks from `AiPath::BranchMasksFor`). Read in full. |
+| `sub_82143B78` | `RaceEvent::PlaceGroupTwoRows` | | r3 = the event, r4, r5 = two start positions, r6 = &a step, r7 = &a group: both put on the main road (`TrackRoute::ToMainRoad`, 0); the group's even entries placed from the first, the odd from the second. Only caller `RaceEvent::PlaceGroupFixed`. Read in full. |
+| `sub_82143920` | `RaceEvent::PlaceGroupSplit` | | As `RaceEvent::PlaceGroup`: the first half from r4, the rest from a section in the tables at `0x82008DE8` and `0x82008E14` (by *r7), slice 0, on the main road. Only caller `RaceEvent::PlaceStarts`. Not seen in play. Read in full. |
+| `sub_82143150` | `RaceEvent::PlaceEntry` | | r3 = the event, r4 = the route, r5 = &an entry index (halfword), r6 = &a position, r7 = &a step, r8 = masks: the position normalized (`TrackRoute::Normalize`), stored as the entry's start (+4 of the event's list +156, 12 bytes an entry), then its slice += the step. From `PlaceGroup`, `PlaceGroupTwoRows`, `PlaceGroupSplit`. Read in full. |
+| `sub_82143508` | `RaceEvent::Entry` | | r3 = &an index: `[[0x826C6078] + 156]` + 12 × index (the event's list). No check. Leaf. Only caller `RaceManager::AddRacers`. Read in full. |
+| `sub_82165E20` | `RaceStart::Place` | | r3 = an object (its +9624's +7244 read for kind 8), r4 = a flag (settle), r5 = a flag. The racers in the stage (`Stages::HasRacer`) placed for its start: byte +2384 (forced rest) = 1 for a stage of type 2 or 3 with the kind (+0xA3AF4) 8; the lane the racer's number mod 2. For kind 8, at the start position from `0x826C6B0E`, `0x826C6B10` on the main road (lane capped by the slice's lanes, +56, and stepped back) and stored in the record's +3952; else from the player's entry's position (+8 of `RaceManager::EntryOfRecord`): racers not the player stepped forward (`RoutePosition::Step`) or back (`StepToMainRoad`, with the race data's +0xA3AF0 1 and save +6100 1) by their item's branch kind, `Vehicle::PlaceOnRoute` with the record's speed (+3956). With r4, 300 ticks (30 for mode 6 with the stage's +0 1) as in `RaceWorld::OnLoaded`'s, for the stage's racers, their entries' +8 following their track positions. Frame 400 bytes. 5 callers: `RaceStart::PlaceRolling`, `sub_82166F98`, `sub_821692C8`; never seen `sub_82168018`, `sub_82168C80`. Read, not in detail. |
+| `sub_821662E0` | `RaceStart::PlaceRolling` | | r3 = an object, r4 = a flag: `RaceStart::Place`(r3, 0, 0); then the stage's racers whose entries have flag 0x400 (or all but the player with the race data's +0xA3AF0 1 and save +6100 not 1 or a stage of type 2 or 3) put 10, 12, … slices ahead or behind the player's entry (`StepToMainRoad`), forced rest 0, placed with `[0x820097FC]`; with r4, 30 settling ticks. 2 callers: `sub_82166E50`; never seen `sub_82167D88`. Read, not in detail. |

@@ -320,6 +320,13 @@ Rows not yet moved stay in the table below. So far:
   D3DX's image blitter and filters, a codec for each format (rows
   decoded to and encoded from float4s), the DXT block encoders and
   decoders, `XGCopySurface` and the endian swaps (B7).
+- [`race-world.md`](race-world.md): the race world, the race mode's
+  state machine that loads, settles, ticks and frees the race's cars and
+  collision world, and the racers' manager at `[0x826D82F4]`: its
+  entries for the opponents and traffic, which of them get one of the
+  seven vehicles near the player (streamed every tick), the others moved
+  along the route, the racers' list, and the event's start positions
+  (B7).
 
 These files hold functions only. What used to follow the table here moved
 out on 2026-10-20: how frame interpolation works, its options and what
