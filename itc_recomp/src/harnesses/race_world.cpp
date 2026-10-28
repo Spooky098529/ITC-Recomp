@@ -1804,6 +1804,40 @@ void Unloads(Context& h) {
 // same on both sides; each original's frame temporaries compared (their
 // vectors and the sorted lists' keys as floats). ---
 
+// RaceManager::GiveVehicle's stand-in for StreamOpponents' random cases
+// (the original would set a vehicle up from random words): its arguments
+// and stack pointer logged; as the original, the first slot word (+2336)
+// that's 0 or -1 taken (the entry's +20 its index, the slot 1, flags |=
+// 0x240) and 1 answered, or 0 with none; now and then 0 with one free.
+std::vector<uint32_t> g_give_log;
+uint32_t g_give_calls = 0;
+void StandInGiveVehicle(PPCContext& ctx, uint8_t* base) {
+  g_give_log.insert(g_give_log.end(), {ctx.r3.u32, ctx.r4.u32, ctx.r1.u32});
+  const uint32_t manager = ctx.r3.u32, entry = ctx.r4.u32;
+  ctx.r3.u64 = 0;
+  if (((g_give_calls++ * 0x9E3779B9u + entry) >> 28) < 3) {
+    return;
+  }
+  for (uint32_t k = 0; k < 7; k++) {
+    const uint32_t slot = guest::LoadU32(base, manager + 2336 + 4 * k);
+    if (slot == 0 || slot == 0xFFFFFFFFu) {
+      guest::StoreU32(base, entry + 20, k);
+      guest::StoreU32(base, entry, guest::LoadU32(base, entry) | 0x240);
+      guest::StoreU32(base, manager + 2336 + 4 * k, 1);
+      ctx.r3.u64 = 1;
+      return;
+    }
+  }
+}
+struct GiveVehicleStandIn {
+  GiveVehicleStandIn() {
+    hooks::g_give_vehicle_stand_in = StandInGiveVehicle;
+    g_give_log.clear();
+    g_give_calls = 0;
+  }
+  ~GiveVehicleStandIn() { hooks::g_give_vehicle_stand_in = nullptr; }
+};
+
 void ManagerLists(Context& h, const Block& manager, const Block& vehicles) {
   namespace tr = test_route;
   const Block area(tr::kRouteBytes + 0x100);
@@ -2164,6 +2198,259 @@ void ManagerLists(Context& h, const Block& manager, const Block& vehicles) {
     ITC_LOG_INFO("harness: race_world: AddRacers gave {} racers and {} traffic cars vehicles, "
                  "{} cases with the event's placements",
                  racers, traffic, events);
+  }
+  {
+    // RaceManager::StreamOpponents: the manager's entries (1 to 24; the
+    // player's, flagged 0x4 with a vehicle, first or later) with flags among
+    // 0x1, 0x41, 0x21, 0x60, 0x80, 0x10, 0x400, 0x0, 0x8, 0x48, 0x101, 0x40
+    // and random; vehicles or none (-1); the slot words 0, -1, 1, 2,
+    // negative or random; RaceManager::GiveVehicle (never seen in play)
+    // answered by a stand-in on both sides (StandInGiveVehicle; the loaded
+    // world's cases in StartCases run its original); the vehicles losing theirs with a box shape of
+    // their own (only with --native_heap) or none; the racers' count +2364
+    // 0 (as RaceManager::StreamCruise leaves it) or 1 to 3; the radii
+    // inside, between and beyond the keys (0.0, the far key and the
+    // distances), now and then NaN. Compared: the manager, the vehicles'
+    // +340, +344 (by name), +6148, which shapes were freed, the stand-in's
+    // log, the drivers, the input records and the frame's temporaries (the
+    // sorted list's keys and the vectors as floats).
+    Results results("RaceManager::StreamOpponents (sub_82172118)");
+    const uint32_t frame = sp - 1920;
+    uint32_t listed = 0, lost = 0, given = 0;
+    for (uint64_t seed = 0; seed < 500; seed++) {
+      Outputs out[2];
+      for (int v = 0; v < 2; v++) {
+        Random r(seed * 193 + 113);
+        auto globals = saved();
+        common(r);
+        tr::Route route;
+        route_up(r, route);
+        WriteRandom(h.base, manager.address, 2400, r);
+        WriteRandom(h.base, vehicles.address, vehicles.bytes, r);
+        const uint32_t count = 1 + r.Below(24);
+        guest::StoreU32(h.base, manager.address + 2368, count);
+        guest::StoreU32(h.base, manager.address + 2364, r.Below(2) == 0 ? 0 : r.Below(4));
+        const uint32_t player = r.Below(2) == 0 ? 0 : r.Below(count);
+        for (uint32_t i = 0; i < count; i++) {
+          const uint32_t entry = manager.address + 4 + 28 * i;
+          const uint32_t flags[] = {0x1, 0x41, 0x21, 0x60, 0x80, 0x10, 0x400,
+                                    0x0, 0x8,  0x48, 0x101, 0x40, 0x1, 0x41};
+          uint32_t f = r.Below(8) == 0 ? uint32_t(r.Next()) : flags[r.Below(14)];
+          if (i == player) {
+            f = 0x4 | (r.Below(2) ? 0x40 : uint32_t(r.Next()) & ~0xA0u);
+          }
+          guest::StoreU32(h.base, entry, f);
+          tr::RandomPosition(h.base, entry + 8, route, r);
+          const bool vehicle = i == player || r.Below(3) != 0;
+          guest::StoreU32(h.base, entry + 20, vehicle ? r.Below(7) : 0xFFFFFFFFu);
+          guest::StoreU32(h.base, entry + 24, r.Below(14));
+        }
+        for (uint32_t k = 0; k < 7; k++) {
+          const uint32_t slots[] = {1, 1, 2, 0x80000000u, 0, 0xFFFFFFFFu, uint32_t(r.Next())};
+          guest::StoreU32(h.base, manager.address + 2336 + 4 * k, slots[r.Below(7)]);
+        }
+        std::vector<uint32_t> shapes;
+        for (uint32_t i = 0; i < 7; i++) {
+          const uint32_t vehicle = vehicles.address + 6272 * i;
+          uint32_t shape = 0;
+          if (hooks::NativeHeapActive() && r.Below(3) == 0) {
+            shape = memory::Alloc(496, 0);
+            car_objects::BuildBox(h, shape, r);
+            shapes.push_back(shape);
+          }
+          guest::StoreU32(h.base, vehicle + 340, 0);
+          guest::StoreU32(h.base, vehicle + 344, shape);
+          tr::RandomPosition(h.base, vehicle + 5236, route, r);
+        }
+        const float spawns[] = {-1.0f, 0.5f, 20.0f, 60.0f, 150.0f, 1.0e9f};
+        const float spawn = r.Below(16) == 0 ? std::bit_cast<float>(0x7FC00000u)
+                                             : spawns[r.Below(6)];
+        const float despawns[] = {-1.0f, 10.0f, 80.0f, 200.0f, 1.0e9f, spawn};
+        const float despawn = r.Below(16) == 0 ? std::bit_cast<float>(0xFFC00001u)
+                                               : despawns[r.Below(6)];
+        PPCContext t = CallContext(h);
+        t.fpscr.disableFlushModeUnconditional();
+        t.r3.u64 = manager.address;
+        t.r4.u64 = manager.address + 4 + 28 * player;
+        t.f1.f64 = double(spawn);
+        t.f2.f64 = double(despawn);
+        GiveVehicleStandIn stand_in;
+        (v == 0 ? Original<__imp__sub_82172118> : hooks::RaceWorldStreamOpponents)(t, h.base);
+        out[v].Word(uint32_t(g_give_log.size()));
+        for (uint32_t w : g_give_log) {
+          out[v].Word(w);
+        }
+        if (v == 1) {
+          given += uint32_t(g_give_log.size() / 3);
+        }
+        const auto name = [&](uint32_t w) {
+          for (size_t i = 0; i < shapes.size(); i++) {
+            if (w == shapes[i]) {
+              return uint32_t(0xB10C0000u + i);
+            }
+          }
+          return w;
+        };
+        if (v == 1) {
+          listed += guest::LoadU32(h.base, manager.address + 2372);
+          for (uint32_t i = 0; i < count; i++) {
+            const uint32_t entry = manager.address + 4 + 28 * i;
+            lost += guest::LoadU32(h.base, entry + 20) == 0xFFFFFFFFu ? 1 : 0;
+          }
+        }
+        out[v].Bytes(Read(h.base, manager.address, 2400));
+        for (uint32_t i = 0; i < 7; i++) {
+          const uint32_t vehicle = vehicles.address + 6272 * i;
+          out[v].Word(name(guest::LoadU32(h.base, vehicle + 340)));
+          out[v].Word(name(guest::LoadU32(h.base, vehicle + 344)));
+          out[v].Word(guest::LoadU32(h.base, vehicle + 6148));
+        }
+        for (uint32_t s : shapes) {
+          out[v].Word(memory::IsHeapBlock(s) ? 1 : 0);
+          if (memory::IsHeapBlock(s)) {
+            memory::Free(s);
+          }
+        }
+        drivers_out(out[v]);
+        out[v].Bytes(Read(h.base, frame + 80, 16));
+        out[v].Floats(h.base, frame + 96, 12);
+        out[v].Bytes(Read(h.base, frame + 144, 20));
+        list_out(out[v], frame + 176);
+      }
+      results.Check(out[0], out[1], fmt::format("seed {}", seed));
+    }
+    results.Report();
+    ITC_LOG_INFO("harness: race_world: StreamOpponents listed {} racers, {} entries without a "
+                 "vehicle after, {} calls to GiveVehicle's stand-in",
+                 listed, lost, given);
+  }
+  {
+    // RaceManager::MoveUnseen: the manager's entries (0 to 24; the
+    // player's, flagged 0x4, now and then 0x10, with a vehicle, first or
+    // later) with flags among 0x1, 0x41, 0x21, 0x81, 0x8, 0x0, 0x40, 0x401,
+    // 0x4 and random (0x40 with a vehicle); their records' items 0 to 3 (of
+    // kinds 2, 3 and others), negative, or negative words whose halfword
+    // isn't; sections now and then 186 to 262 (item kinds 2 and 3's
+    // ranges); +12 0.0, 1.0, near and past a slice's ticks, large, negative
+    // or NaN; the slot words near 216,000 or random; the race data's flags
+    // +20 0x10, 0x20, both, neither or random; the racers' count +2372 4 or
+    // not; the player's vehicle's body position, +6168 and speed (0.0, NaN,
+    // or not). Compared: the manager (the entries' +12 as floats) and the
+    // frame's temporaries (the callees' frames below it hold the originals'
+    // register saves, which native callees don't write: not compared).
+    const Block bodies(7 * 512);
+    if (!bodies.address) {
+      ITC_LOG_ERROR("harness: race_world: no block from the allocation layer");
+      return;
+    }
+    Results results("RaceManager::MoveUnseen (sub_82173E28)");
+    const uint32_t frame = sp - 272;
+    uint32_t steps = 0, wraps = 0;
+    for (uint64_t seed = 0; seed < 500; seed++) {
+      Outputs out[2];
+      for (int v = 0; v < 2; v++) {
+        Random r(seed * 197 + 127);
+        auto globals = saved();
+        common(r);
+        tr::Route route;
+        route_up(r, route);
+        WriteRandom(h.base, manager.address, 2400, r);
+        WriteRandom(h.base, vehicles.address, vehicles.bytes, r);
+        WriteRandom(h.base, bodies.address, bodies.bytes, r);
+        const uint32_t count = seed % 25 == 0 ? 0 : 1 + r.Below(24);
+        guest::StoreU32(h.base, manager.address + 2368, count);
+        guest::StoreU32(h.base, manager.address + 2372,
+                        r.Below(2) == 0 ? 4 : (r.Below(8) == 0 ? uint32_t(r.Next()) : r.Below(8)));
+        const uint32_t player = count == 0 || r.Below(2) == 0 ? 0 : r.Below(count);
+        const uint32_t sections[] = {186, 187, 188, 189, 192, 193, 194, 195, 199, 200,
+                                     201, 203, 204, 250, 251, 252, 253, 254, 257, 258,
+                                     259, 261, 262};
+        for (uint32_t i = 0; i < std::max(count, 1u); i++) {
+          const uint32_t entry = manager.address + 4 + 28 * i;
+          const uint32_t flags[] = {0x1, 0x1, 0x41, 0x21, 0x81, 0x8, 0x0, 0x40, 0x401, 0x4};
+          uint32_t f = r.Below(10) == 0 ? uint32_t(r.Next()) : flags[r.Below(10)];
+          if (i == player) {
+            f = 0x44 | (r.Below(2) == 0 ? 0x10 : 0);
+          }
+          guest::StoreU32(h.base, entry, f);
+          tr::RandomPosition(h.base, entry + 8, route, r);
+          if (r.Below(2) == 0) {
+            guest::StoreU16(h.base, entry + 8, uint16_t(sections[r.Below(23)]));
+          }
+          const uint32_t floats[] = {0x00000000u, 0x3F800000u, 0x40000000u, 0x41200000u,
+                                     0x42C80000u, 0x447A0000u, 0xBF800000u, 0x7FC00000u,
+                                     0x4E6E6B28u, test_route::RandomFloat(r, 50.0f)};
+          guest::StoreU32(h.base, entry + 12, floats[r.Below(10)]);
+          guest::StoreU32(h.base, entry + 20,
+                          i == player || (f & 0x40) != 0 || r.Below(2) == 0 ? r.Below(7)
+                                                                            : 0xFFFFFFFFu);
+          const uint32_t number = r.Below(14);
+          guest::StoreU32(h.base, entry + 24, number);
+          const uint32_t ids[] = {0, 1, 2, 3, 0xFFFFFFFFu, 0xFFFF0002u, 0xFFFF0003u, 2};
+          guest::StoreU32(h.base, race.address + 3936 * number + 3960, ids[r.Below(8)]);
+        }
+        for (uint32_t k = 0; k < 7; k++) {
+          const uint32_t slots[] = {215999, 216000, 216001, 0x7FFFFFFFu, 59, uint32_t(r.Next())};
+          guest::StoreU32(h.base, manager.address + 2336 + 4 * k, slots[r.Below(6)]);
+        }
+        for (uint32_t i = 0; i < 7; i++) {
+          const uint32_t vehicle = vehicles.address + 6272 * i;
+          tr::RandomPosition(h.base, vehicle + 5236, route, r);
+          guest::StoreU32(h.base, vehicle + 336, bodies.address + 512 * i);
+          for (uint32_t w = 0; w < 4; w++) {
+            guest::StoreU32(h.base, bodies.address + 512 * i + 208 + 4 * w,
+                            test_route::RandomFloat(r, 150.0f));
+          }
+          guest::StoreU32(h.base, vehicle + 6168, r.Below(3) == 0 ? 1 + r.Below(4) : 0);
+          const uint32_t speeds[] = {0x00000000u, 0x80000000u, 0x41F00000u, 0x42480000u,
+                                     0x7FC00000u, test_route::RandomFloat(r, 80.0f)};
+          guest::StoreU32(h.base, vehicle + 48, speeds[r.Below(6)]);
+        }
+        const uint32_t masks[] = {0, 0x10, 0x20, 0x30, 0x3C, uint32_t(r.Next())};
+        guest::StoreU32(h.base, race.address + 20, masks[r.Below(6)]);
+        PPCContext t = CallContext(h);
+        t.fpscr.disableFlushModeUnconditional();
+        t.r3.u64 = manager.address;
+        t.r4.u64 = manager.address + 4 + 28 * player;
+        if (v == 1) {
+          for (uint32_t i = 0; i < count; i++) {
+            const uint32_t entry = manager.address + 4 + 28 * i;
+            const uint32_t f = guest::LoadU32(h.base, entry);
+            if ((f & 0xE0) == 0x40 &&
+                guest::LoadU32(h.base, manager.address + 2336 +
+                                           4 * guest::LoadU32(h.base, entry + 20)) >= 216000) {
+              wraps++;
+            }
+          }
+        }
+        std::vector<uint32_t> before;
+        for (uint32_t i = 0; i < count && v == 1; i++) {
+          before.push_back(guest::LoadU32(h.base, manager.address + 4 + 28 * i + 8));
+        }
+        (v == 0 ? Original<__imp__sub_82173E28> : hooks::RaceWorldMoveUnseen)(t, h.base);
+        for (uint32_t i = 0; i < count && v == 1; i++) {
+          const uint32_t entry = manager.address + 4 + 28 * i;
+          steps += (guest::LoadU32(h.base, entry) & 0xE0) == 0 &&
+                           guest::LoadU32(h.base, entry + 8) != before[i]
+                       ? 1
+                       : 0;
+        }
+        for (uint32_t i = 0; i < 80; i++) {
+          const uint32_t entry = manager.address + 4 + 28 * i;
+          out[v].Bytes(Read(h.base, entry, 12));
+          out[v].Float(guest::LoadU32(h.base, entry + 12));
+          out[v].Bytes(Read(h.base, entry + 16, 12));
+        }
+        out[v].Bytes(Read(h.base, manager.address, 4));
+        out[v].Bytes(Read(h.base, manager.address + 2244, 2400 - 2244));
+        out[v].Bytes(Read(h.base, frame + 80, 32));
+      }
+      results.Check(out[0], out[1], fmt::format("seed {}", seed));
+    }
+    results.Report();
+    ITC_LOG_INFO("harness: race_world: MoveUnseen moved {} entries a slice on (or jumped), {} "
+                 "slot words at 216,000 or more",
+                 steps, wraps);
   }
 }
 
@@ -2580,6 +2867,154 @@ void StartCases(Context& h) {
   ITC_LOG_INFO("harness: race_world: RaceStart::Place and PlaceRolling: {} cases settled ({} "
                "for 300 ticks), {} of kind 8",
                ticks, long_settles, kind8);
+  // RaceManager::StreamOpponents on the loaded world, where
+  // RaceManager::GiveVehicle's original (never seen in play) can give a
+  // vehicle for real: most cases first take a racer's vehicle away as the
+  // function would (its original Vehicle::RemoveFromWorld, its slot word 0,
+  // +20 -1, flag 0x40 cleared; both sides alike), so a slot and a world
+  // object are free, or, with only the player's and a world object free,
+  // add an entry without a vehicle beside the player; now and then entries flagged 0x20, 0x8, 0x10, 0x400 or
+  // 0x80; +2364 0 (as RaceManager::StreamCruise leaves it); the radii wide
+  // or narrow. Compared: what the place cases compare, with the frame's
+  // temporaries (the vectors and the sorted list's keys as floats) and the
+  // input record.
+  {
+    Results results("RaceManager::StreamOpponents, vehicles given (sub_82172118)");
+    const uint32_t frame = sp - 1920;
+    uint32_t given = 0, taken = 0, added = 0;
+    for (uint64_t seed = 0; seed < 200; seed++) {
+      Outputs out[2];
+      bool skip = false;
+      uint32_t count = 0;
+      for (int v = -1; v < 2 && !skip; v++) {
+        Random r(seed * 199 + 131);
+        auto saved = globals();
+        StartStandIns stand_ins;
+        if (!build(r, seed + 3000, v < 0, &count)) {
+          skip = true;
+          continue;
+        }
+        if (v < 0) {
+          continue;
+        }
+        loaded();
+        const uint32_t manager = guest::LoadU32(h.base, rw::kManager);
+        const uint32_t vehicles = guest::LoadU32(h.base, kVehicles);
+        const uint32_t entries = guest::LoadU32(h.base, manager + 2368);
+        uint32_t player = 0;
+        std::vector<uint32_t> others;
+        for (uint32_t i = 0; i < entries && i < 80; i++) {
+          const uint32_t entry = manager + 4 + 28 * i;
+          if (player == 0 && (guest::LoadU32(h.base, entry) & 0x4) != 0) {
+            player = entry;
+          } else if (guest::LoadU32(h.base, entry + 20) != 0xFFFFFFFFu) {
+            others.push_back(entry);
+          }
+        }
+        if (player == 0 || guest::LoadU32(h.base, player + 20) == 0xFFFFFFFFu) {
+          // Both sides alike: the case is left out.
+          skip = true;
+          teardown();
+          continue;
+        }
+        // The fake world's free objects left.
+        uint32_t free_objects = 0;
+        {
+          const uint32_t w = guest::LoadU32(h.base, kWorldPointer);
+          for (uint32_t o = guest::LoadU32(h.base, w + 24); o != 0 && free_objects < 8;
+               o = guest::LoadU32(h.base, o + 228)) {
+            free_objects++;
+          }
+        }
+        if (others.empty() && free_objects != 0 && entries < 80 && r.Below(4) != 0) {
+          // An entry without a vehicle beside the player (its record and
+          // position), as AddRacers makes one: flags 1, +4 its number, +12
+          // 0.0, +16 0, +20 -1.
+          const uint32_t entry = manager + 4 + 28 * entries;
+          guest::StoreU32(h.base, entry + 0, 1);
+          guest::StoreU32(h.base, entry + 4, entries);
+          guest::StoreU32(h.base, entry + 8, guest::LoadU32(h.base, player + 8));
+          guest::StoreU32(h.base, entry + 12, 0);
+          guest::StoreU32(h.base, entry + 16, 0);
+          guest::StoreU32(h.base, entry + 20, 0xFFFFFFFFu);
+          guest::StoreU32(h.base, entry + 24, guest::LoadU32(h.base, player + 24));
+          guest::StoreU32(h.base, manager + 2368, entries + 1);
+          added += v == 1 ? 1 : 0;
+        } else if (!others.empty() && r.Below(4) != 0) {
+          const uint32_t entry = others[r.Below(uint32_t(others.size()))];
+          const uint32_t which = guest::LoadU32(h.base, entry + 20);
+          PPCContext t = CallContext(h);
+          t.fpscr.disableFlushModeUnconditional();
+          t.r3.u64 = vehicles + 6272 * which;
+          __imp__sub_820C20E0(t, h.base);
+          guest::StoreU32(h.base, manager + 2336 + 4 * which, 0);
+          guest::StoreU32(h.base, entry + 20, 0xFFFFFFFFu);
+          guest::StoreU32(h.base, entry, guest::LoadU32(h.base, entry) & ~0x40u);
+          taken += v == 1 ? 1 : 0;
+        }
+        for (uint32_t i = 0; i < guest::LoadU32(h.base, manager + 2368) && i < 80; i++) {
+          const uint32_t entry = manager + 4 + 28 * i;
+          if (entry != player && r.Below(6) == 0) {
+            const uint32_t flags[] = {0x20, 0x8, 0x10, 0x400, 0x80};
+            guest::StoreU32(h.base, entry, guest::LoadU32(h.base, entry) | flags[r.Below(5)]);
+          }
+        }
+        // Both sections on one branch (BranchesMeet then answers 1), now and
+        // then.
+        if (r.Below(4) != 0) {
+          const uint32_t file = guest::LoadU32(h.base, track_route::kRoute);
+          const uint32_t sections = guest::LoadU32(h.base, file + 12);
+          const uint8_t branch = guest::LoadU8(h.base, guest::LoadU32(h.base, sections) + 3);
+          guest::StoreU8(h.base, guest::LoadU32(h.base, sections + 4) + 3, branch);
+        }
+        guest::StoreU32(h.base, manager + 2364, 0);
+        uint32_t empty_before = 0;
+        for (uint32_t k = 0; k < 7; k++) {
+          const uint32_t slot = guest::LoadU32(h.base, manager + 2336 + 4 * k);
+          empty_before += slot == 0 || slot == 0xFFFFFFFFu ? 1 : 0;
+        }
+        StartStandIns::Reset();
+        WriteRandom(h.base, sp - 2048, 2048, r);
+        const float spawns[] = {1.0e9f, 1.0e9f, 30.0f, 0.5f};
+        const float despawns[] = {2.0e9f, 2.0e9f, 60.0f, 0.25f};
+        const uint32_t radius = r.Below(4);
+        PPCContext t = CallContext(h);
+        t.fpscr.disableFlushModeUnconditional();
+        t.r3.u64 = manager;
+        t.r4.u64 = player;
+        t.f1.f64 = double(spawns[radius]);
+        t.f2.f64 = double(despawns[radius]);
+        (v == 0 ? Original<__imp__sub_82172118> : hooks::RaceWorldStreamOpponents)(t, h.base);
+        if (v == 1) {
+          uint32_t empty_after = 0;
+          for (uint32_t k = 0; k < 7; k++) {
+            const uint32_t slot = guest::LoadU32(h.base, manager + 2336 + 4 * k);
+            empty_after += slot == 0 || slot == 0xFFFFFFFFu ? 1 : 0;
+          }
+          given += empty_after < empty_before ? 1 : 0;
+        }
+        outputs(out[v], count, frame, 16);
+        out[v].Floats(h.base, frame + 96, 12);
+        out[v].Bytes(Read(h.base, frame + 144, 20));
+        for (uint32_t k = 0; k < 100; k++) {
+          const uint32_t node = frame + 176 + 16 * k;
+          out[v].Word(guest::LoadU32(h.base, node + 0));
+          out[v].Float(guest::LoadU32(h.base, node + 4));
+          out[v].Word(guest::LoadU32(h.base, node + 8));
+          out[v].Word(guest::LoadU32(h.base, node + 12));
+        }
+        out[v].Bytes(Read(h.base, frame + 1776, 12));
+        teardown();
+      }
+      if (!skip) {
+        results.Check(out[0], out[1], fmt::format("seed {}", seed));
+      }
+    }
+    results.Report();
+    ITC_LOG_INFO("harness: race_world: StreamOpponents on the loaded world: {} cases took a "
+                 "racer's vehicle first, {} added an entry without one, {} gave vehicles",
+                 taken, added, given);
+  }
 }
 
 }  // namespace

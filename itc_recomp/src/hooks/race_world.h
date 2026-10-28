@@ -115,5 +115,19 @@ void RaceWorldPlaceGroupSplit(PPCContext& ctx, uint8_t* base);
 void RaceWorldOnLoaded(PPCContext& ctx, uint8_t* base);
 void RaceWorldPlace(PPCContext& ctx, uint8_t* base);
 void RaceWorldPlaceRolling(PPCContext& ctx, uint8_t* base);
+// RaceManager::StreamOpponents sub_82172118: r3 = the manager, r4 = the
+// player's entry, f1 = the spawn radius, f2 = the despawn radius
+// (Vehicle::RemoveFromWorld's original unless --native_heap routes the
+// game's heap to the allocation layer; RaceManager::GiveVehicle's
+// original). RaceManager::MoveUnseen sub_82173E28: r3 = the manager, r4 =
+// the player's entry. r3 not kept (their callers don't read it).
+void RaceWorldStreamOpponents(PPCContext& ctx, uint8_t* base);
+void RaceWorldMoveUnseen(PPCContext& ctx, uint8_t* base);
+
+// For the harness: while set, runs instead of RaceManager::GiveVehicle
+// sub_821706E8 (never seen in play; its override, which StreamOpponents'
+// original and plain C++ both reach), answering with made-up data.
+using RaceWorldStandIn = void (*)(PPCContext&, uint8_t*);
+extern RaceWorldStandIn g_give_vehicle_stand_in;
 
 }  // namespace hooks

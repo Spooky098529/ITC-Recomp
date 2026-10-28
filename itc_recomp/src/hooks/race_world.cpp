@@ -36,7 +36,10 @@ ITC_FLAG_BOOL(native_race_world, true, "ITC",
               "and AddRacers sub_82173050; RaceWorld::OnLoaded sub_82173A90 (only while "
               "--native_heap routes the game's heap to the allocation layer), RaceStart::Place "
               "sub_82165E20 and PlaceRolling sub_821662E0 (their callees' originals where those "
-              "refuse) natively instead of through the "
+              "refuse); RaceManager::StreamOpponents sub_82172118 (Vehicle::RemoveFromWorld's "
+              "original unless --native_heap routes the game's heap to the allocation layer; "
+              "RaceManager::GiveVehicle sub_821706E8's original) and MoveUnseen sub_82173E28 "
+              "natively instead of through the "
               "translated code (the same words, bit for bit; checked by "
               "--run_harnesses=race_world)");
 
@@ -409,6 +412,34 @@ void RaceWorldPlaceRolling(PPCContext& ctx, uint8_t* base) {
   rw::PlaceRolling(base, ctx.r3.u32, ctx.r4.u32, frame, StartCalls(ctx, base, frame - 224));
 }
 
+RaceWorldStandIn g_give_vehicle_stand_in = nullptr;
+
+void RaceWorldStreamOpponents(PPCContext& ctx, uint8_t* base) {
+  ctx.fpscr.disableFlushMode();
+  rw::StreamOpponents(
+      base, ctx.r3.u32, ctx.r4.u32, ctx.f1.f64, ctx.f2.f64, ctx.r1.u32 - 1920,
+      NativeHeapActive(),
+      [&ctx, base](uint32_t address, uint32_t sp, uint64_t r3, uint64_t r4, uint64_t) {
+        const uint64_t r1 = ctx.r1.u64;
+        ctx.r1.u64 = sp;
+        ctx.r3.u64 = r3;
+        ctx.r4.u64 = r4;
+        if (address == 0x820C20E0) {
+          __imp__sub_820C20E0(ctx, base);
+        } else if (address == 0x821706E8) {
+          sub_821706E8(ctx, base);  // the original, through the harness's stand-in
+        }
+        ctx.r1.u64 = r1;
+        ctx.fpscr.disableFlushMode();
+        return ctx.r3.u64;
+      });
+}
+
+void RaceWorldMoveUnseen(PPCContext& ctx, uint8_t* base) {
+  ctx.fpscr.disableFlushMode();
+  rw::MoveUnseen(base, ctx.r3.u32, ctx.r4.u32, ctx.r1.u32 - 272);
+}
+
 }  // namespace hooks
 
 // Defines an adapter: the flag, else the original.
@@ -444,6 +475,18 @@ ITC_RACE_WORLD(82171E50, RaceWorldListRacers)
 ITC_RACE_WORLD(82173A90, RaceWorldOnLoaded)
 ITC_RACE_WORLD(82165E20, RaceWorldPlace)
 ITC_RACE_WORLD(821662E0, RaceWorldPlaceRolling)
+ITC_RACE_WORLD(82172118, RaceWorldStreamOpponents)
+ITC_RACE_WORLD(82173E28, RaceWorldMoveUnseen)
+// RaceManager::GiveVehicle (sub_821706E8, never seen in play): the original,
+// or the harness's stand-in while it's set (hooks::g_give_vehicle_stand_in).
+extern "C" REX_FUNC(sub_821706E8) {
+  REX_FUNC_PROLOGUE();
+  if (hooks::g_give_vehicle_stand_in != nullptr) {
+    hooks::g_give_vehicle_stand_in(ctx, base);
+    return;
+  }
+  __imp__sub_821706E8(ctx, base);
+}
 // RaceManager::NearSegment (sub_82170BC0) and RoutePosition::ToMainRoad
 // (sub_82143608) have no adapters: their callers in play
 // (RaceManager::BuildNeighbors, RoutePosition::StepToMainRoad) are native;

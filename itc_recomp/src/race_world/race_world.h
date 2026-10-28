@@ -409,6 +409,53 @@ void Place(uint8_t* base, uint32_t object, uint32_t settle, uint32_t back, uint3
 void PlaceRolling(uint8_t* base, uint32_t object, uint32_t settle, uint32_t frame,
                   const StartCalls& calls);
 
+// --- The manager's streaming each tick (src/race_world/race_stream.cpp) ---
+
+// RaceManager::StreamOpponents (sub_82172118): the player's route position
+// (its vehicle's Vehicle::Identity +4) at `frame` + 80; +2372 = 0 and the
+// sorted list at `frame` + 176 emptied (+1776 to +1784). Each entry (+2368
+// of them, the count read again each pass): flagged 0x20 or 0x80, or on a
+// branch that doesn't meet the player's (BranchesMeet), it loses its vehicle
+// (when its slot word is above 0: flags &= ~0x40, Vehicle::RemoveFromWorld,
+// its original through `original` without `heap` or where it refuses; the
+// slot 0, +20 = -1); else it's inserted by its key: 0.0 for 0x4 or 0x8,
+// [0x8200222C] for 0x10 or 0x400, else the flat distance between its
+// slice's center and the player's (the entry's position at + 84, the
+// vectors at + 96 to + 143) plus 1.0. Then in the list's order: past the
+// fourth, the vehicle removed; then, while +2372 is under 4, those nearer
+// than `spawn` keep theirs or get one (RaceManager::GiveVehicle's
+// original through `original`, never seen in play; none free: nothing, the
+// empty sub_82106540) and are listed (+2308; +2364, +2372 count), the new
+// ones with an input record cleared at + 144 and copied to the racer's
+// ([0x826C5B30 + 4 x the index's low byte]) and AiDriver::Setup (&+20, the
+// record + 3960, &1 at + 80); those beyond `despawn` lose theirs, those
+// between with one are listed; once +2372 is 4, the rest lose theirs.
+// `frame`: the original's 1,920 bytes. r3 isn't kept (its callers don't
+// read it).
+void StreamOpponents(uint8_t* base, uint32_t manager, uint32_t player, double spawn,
+                     double despawn, uint32_t frame, bool heap, const OriginalCall& original);
+// RaceManager::MoveUnseen (sub_82173E28): the player's route position
+// (its vehicle's identity +4) at `frame` + 88, its body's position
+// (RigidBody::Position, 16 bytes) at + 96, its section's branch at + 92,
+// the race data's flags +20 0x20 and 0x10 as words at + 80 and + 84. With
+// either: the entries (+2368, read again each pass) whose record's item
+// (the signed halfword of the race data + 3,936 x +24 + 3,960) is 0 or more
+// and whose flags have none of 0xAC: on sections 187, 188, 193, 194 or 251
+// to 253 with item kind 3, + 80 = 0; on 200 to 203 or 258 to 261 with kind
+// 2, + 84 = 0; the scan stops once both are 0. Then each entry (its index
+// at + 88) not flagged 0x20 or 0x80: with a vehicle (0x40), +8 = its
+// vehicle's track position, +12 = 0.0, its slot word + 1 (above 216,000:
+// 60); else +12 += 1.0, RaceManager::JumpSections (the flags at + 80, + 84),
+// the ticks a slice takes (the slice length over the player's distance a
+// frame when +2372 is 4, the player's entry flagged 0x10 and their
+// branches meet, unless its vehicle's +6168 is set or that distance is 0.0;
+// else the length x [0x820099D4], x [0x820021E8], [0x82001070] or
+// [0x820029F0] for RaceManager::Neighbours' 1, 2 or 3), and once +12
+// reaches them, one RoutePosition::Step(+8, 1, its item's kind) and +12
+// less them (once a tick at most). `frame`: the original's 272 bytes. r3
+// isn't kept (its caller doesn't read it).
+void MoveUnseen(uint8_t* base, uint32_t manager, uint32_t player, uint32_t frame);
+
 // --- The save data ---
 
 // SaveData::AddDistance (sub_82116C38): the garage car picked (the save's
