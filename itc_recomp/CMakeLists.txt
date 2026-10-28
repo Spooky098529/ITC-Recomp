@@ -168,6 +168,7 @@ set(ITC_SOURCES
     src/race_states/race_progress.cpp
     src/race_states/race_checks.cpp
     src/race_states/handlers.cpp
+    src/race_states/racers.cpp
     src/hooks/texture_compression.cpp
     src/texture_compression/dxt_alpha.cpp
     src/texture_compression/dxt_color.cpp
@@ -463,6 +464,7 @@ set_source_files_properties(src/c_runtime/math.cpp src/ui_movies/keys.cpp
     src/race_world/race_stream.cpp
     src/race_states/race_progress.cpp
     src/race_states/race_checks.cpp
+    src/race_states/racers.cpp
     src/texture_compression/dxt_alpha.cpp src/texture_compression/dxt_color.cpp
     src/texture_compression/dxt45.cpp src/texture_compression/codecs.cpp
     src/texture_compression/blitter.cpp src/texture_compression/compress_surface.cpp

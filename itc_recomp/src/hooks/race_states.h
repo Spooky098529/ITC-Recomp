@@ -79,4 +79,13 @@ void RaceStatesQuitTick(PPCContext& ctx, uint8_t* base);
 void RaceStatesAfterRaceTick(PPCContext& ctx, uint8_t* base);
 void RaceStatesRollingStartTick(PPCContext& ctx, uint8_t* base);
 
+// RaceStates::RacersNear sub_82165AB0 and RacersClose sub_82165C78: no
+// arguments; r3 = 0 or 1. RaceStates::RacersStill sub_82164A90: r3 = &the
+// count; r3 = 0 or 1. RaceStates::CountdownTick sub_821674A0: a handler (r3
+// = the machine, r4 = the dispatcher; r3 not kept).
+void RaceStatesRacersNear(PPCContext& ctx, uint8_t* base);
+void RaceStatesRacersClose(PPCContext& ctx, uint8_t* base);
+void RaceStatesRacersStill(PPCContext& ctx, uint8_t* base);
+void RaceStatesCountdownTick(PPCContext& ctx, uint8_t* base);
+
 }  // namespace hooks

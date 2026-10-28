@@ -153,6 +153,31 @@ void RollingStartTick(uint8_t* base, uint32_t machine, uint32_t dispatcher, uint
                       bool heap, const race_world::OriginalCall& refresh,
                       const race_world::StartCalls& calls);
 
+// --- The racers at the start (src/race_states/racers.cpp) ---
+
+// RaceStates::RacersNear (sub_82165AB0): 1 when every racer of the
+// current stage but the player's (record flag 0x1) is on the player's
+// section (its vehicle's track position's) or on a section one of whose
+// links 0 to 9 is it, else 0. The link list (0 to 9, -1) at `frame` + 80 as
+// the original leaves it. `frame`: its 208 bytes.
+uint32_t RacersNear(uint8_t* base, uint32_t frame);
+// RaceStates::RacersClose (sub_82165C78): 0 when a racer of the current
+// stage (not flag 0x1) has its entry's slice center farther than
+// [0x8200257C] (fsqrts of vmsum3fp128) from the player's entry's, else 1.
+// The vectors at `frame` + 80 to + 127 as the original leaves them.
+// `frame`: its 208 bytes.
+uint32_t RacersClose(uint8_t* base, uint32_t frame);
+// RaceStates::RacersStill (sub_82164A90): the count at `count` = 0 when a
+// racer's vehicle has a contact (its collision object's +240) or collision
+// flags (+6152 & 7), else up by one to 30 at most (its debug print, the
+// empty sub_82106540, not made); 1 at 30, else 0.
+uint32_t RacersStill(uint8_t* base, uint32_t count);
+// RaceStates::CountdownTick (sub_821674A0): unless RacersNear: posts 19,
+// +9616, +9620 = 0, AiDrivers::ClearAll; else +9616 up to 120, then posts
+// 28, +9616, +9620 = 0, the race data's flags lose 0x1000 and 0x2000,
+// AiDrivers::ResetAll. `frame`: its 112 bytes (the callees' below it).
+void CountdownTick(uint8_t* base, uint32_t machine, uint32_t dispatcher, uint32_t frame);
+
 // --- The route's sections and positions ---
 
 // RouteSections::Beside (sub_82162F78): 1 when `a` and `b` are the same
