@@ -309,6 +309,11 @@ Rows not yet moved stay in the table below. So far:
   traffic body's load callbacks (skeletons bound and searched by node
   name), their loaded queries and walks, and the XPR name lookup and
   model point search the car code shares (B7).
+- [`save-data.md`](save-data.md): a player's save data in memory, made
+  with its defaults and deleted: the progress (the stats record, the
+  garage list, the item records, the unlock bit sets), the course
+  records, the options and the default control maps, and the title
+  screen's reset that makes player 0's again (B7).
 
 These files hold functions only. What used to follow the table here moved
 out on 2026-10-20: how frame interpolation works, its options and what
@@ -545,7 +550,6 @@ old performance notes to the end of `../native-renderer.md`.
 | `sub_822ADC08` | | Wrapped | The draw's packet writers (r3 the device: shader constants, register blocks, fetch constants, HiZ and surface set-up; `NATIVE_CHECKED_HELPER`, `src/native/draw_packets.cpp`): what they change marked for the native renderer; checked with `--native_renderer_check_draw_writes`. |
 | `sub_825BE300` | `DrawVertices` | Wrapped | Logged when called outside the commands known to make them (`LOG_OUTSIDE_WRAPPER`). |
 | `sub_825BDDC0` | `BeginIndexedVertices` | Wrapped | Logged when called outside the commands known to make them (`LOG_OUTSIDE_WRAPPER`). |
-| `sub_8209F5E0` | | | Resets the player-to-controller table (`826BABA4`, 4 words) to 0-3 and asks for the profile read (`826C7938` = 1). From `sub_82106548` (boot) and `sub_82221D00`. |
 | `sub_8209F6B8` | | | Puts controller r4 on player r3 in `826BABA4` (swapping with the player that had it) and asks for the profile read (`826C7938` = 1). From `sub_8209E698`, `sub_822219E0` and `sub_822221A0`. |
 | `sub_8210BA68` | | Wrapped | The action mappers' read slots (vtable `0x82007F78`; r3 the mapper, r4 the action id 151-180); logged for `--log_pause_menu` (`PAUSE_MENU_READ_SLOT`). |
 | `sub_8210BED8` | | Wrapped | The action mappers' read slots (vtable `0x82007F78`; r3 the mapper, r4 the action id 151-180); logged for `--log_pause_menu` (`PAUSE_MENU_READ_SLOT`). |
