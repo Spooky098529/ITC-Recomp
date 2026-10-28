@@ -54,5 +54,16 @@ void CarSoundsX3DEvaluateCurve(PPCContext& ctx, uint8_t* base);  // sub_82480818
 // chain, the saved lr and r31, the default curves); r3 the last curve
 // evaluated, as the original leaves it.
 void CarSoundsX3DCurves(PPCContext& ctx, uint8_t* base);  // sub_82480918
+// r3 = the handle, r5 = the DSP settings, r6 = the source channel, f1 = the
+// azimuth: the original's 192-byte frame below r1 written as it leaves it
+// (the back chain, the saved lr, r28 to r31 and f31, the azimuth tables);
+// r3 as the original leaves it (tan's when its tangent law ran). tan through
+// its adapter where c_runtime::Tan can't stand in for it.
+void CarSoundsX3DPan(PPCContext& ctx, uint8_t* base);  // sub_82480F80
+// r3 = the handle, r4 = the listener, r5 = the emitter, r6 = the DSP
+// settings: the original's 304-byte frame below r1 (its prologue's saves,
+// the back chain, its locals) and Pan's below that written as the original
+// leaves them; r3 as the original leaves it.
+void CarSoundsX3DMatrix(PPCContext& ctx, uint8_t* base);  // sub_82481390
 
 }  // namespace hooks
