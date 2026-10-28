@@ -176,6 +176,8 @@ set(ITC_SOURCES
     src/archive/archive.cpp
     src/archive/semaphores.cpp
     src/hooks/save_interface.cpp
+    src/hooks/car_sounds.cpp
+    src/car_sounds/car_sounds.cpp
     src/save_interface/save_interface.cpp
     src/save_interface/save_layer.cpp
     src/hooks/file_layer.cpp
@@ -332,6 +334,7 @@ set(ITC_SOURCES
     src/harnesses/race_states.cpp
     src/harnesses/archive.cpp
     src/harnesses/save_interface.cpp
+    src/harnesses/car_sounds.cpp
     src/harnesses/file_layer.cpp
     src/harnesses/c_runtime_format.cpp
     src/harnesses/texture_compression.cpp
