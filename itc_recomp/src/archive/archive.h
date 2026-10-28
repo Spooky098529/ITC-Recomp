@@ -9,6 +9,8 @@
 
 #pragma once
 
+#include "c_runtime/exit.h"
+
 #include <cstdint>
 
 namespace archive {
@@ -27,5 +29,62 @@ uint32_t Toc(uint8_t* base, uint32_t id);
 // id - 23011 + 1 in BUILD_CRS, 16 bytes each) +8, the unpacked size, or +4,
 // the stored size, when that's 0.
 uint32_t AssetSize(uint8_t* base, uint32_t id);
+
+// --- The request queue's list and slots ---
+
+// The request queue (a 20-byte List: +0 the vtable, +4 whether it deletes
+// its nodes, +8 the count, +12 the head, +16 the tail; nodes linked by +4).
+constexpr uint32_t kQueue = 0x826BAB08;
+// The 960 request slots (92 bytes each, ListNodes: +0 the vtable, +4 the
+// link, +8 the serial or -1 when free).
+constexpr uint32_t kSlots = 0x826A5168;
+constexpr uint32_t kSlotCount = 960;
+constexpr uint32_t kSlotBytes = 92;
+// The vtables the static set-ups store.
+constexpr uint32_t kListVtable = 0x820128C8;
+constexpr uint32_t kQueueVtable = 0x82001DD4;
+constexpr uint32_t kNodeVtable = 0x82010B5C;
+constexpr uint32_t kSlotVtable = 0x82001DD8;
+// The clean-ups the static set-ups register (atexit).
+constexpr uint32_t kQueueCleanUp = 0x825DACB8;
+constexpr uint32_t kSlotsCleanUp = 0x825DAD38;
+
+// List::List (sub_82294B80): the vtable 0x820128C8, +4 = `deletes`, the
+// count, head and tail 0.
+void ListConstruct(uint8_t* base, uint32_t list, uint32_t deletes);
+// List::Append (sub_82294BA8): `node` linked after the tail (or as the head
+// when there's no tail), its link 0, the tail it, the count up by one; 1, or
+// 0 for no node.
+uint32_t ListAppend(uint8_t* base, uint32_t list, uint32_t node);
+// List::Remove (sub_82294C00): `node` found from the head by the links and
+// unlinked (the previous node's link, the head and the tail fixed), the count
+// down by one; 1, or 0 when it isn't there (or is 0).
+uint32_t ListRemove(uint8_t* base, uint32_t list, uint32_t node);
+// ListNode::ListNode (sub_82294B68): the vtable 0x82010B5C, the link `link`.
+void NodeConstruct(uint8_t* base, uint32_t node, uint32_t link);
+
+// The slot lookup (sub_8209D818): the first of the 960 slots whose serial
+// (+8) is `serial` (-1 for a free one), or 0.
+uint32_t FindSlot(uint8_t* base, uint32_t serial);
+
+// The static set-ups (_cinit's table, once at start-up); each returns
+// atexit's r3 (c_runtime::AtexitFrom). sub_825D9160: the queue made
+// (List::List(0), then its vtable 0x82001DD4), its clean-up 0x825DACB8
+// registered. sub_825D91B0: the 960 slots made (ListNode::ListNode(0), then
+// the vtable 0x82001DD8), their clean-up 0x825DAD38 registered.
+int32_t QueueStaticInit(uint8_t* base, const c_runtime::AtexitCall& call);
+int32_t SlotsStaticInit(uint8_t* base, const c_runtime::AtexitCall& call);
+
+// --- The loose files ---
+
+// The loose files' tables: (id, path) pairs of 8 bytes, the first for the
+// walk's first 23,011 steps, the second after (as the original picks them by
+// the step, not the id); a path of 0 ends them.
+constexpr uint32_t kLooseFiles = 0x82600AC8;
+constexpr uint32_t kCrsLooseFiles = 0x82678240;
+
+// Archive::FindLooseFile (sub_8209D8D8): the path of the first entry whose id
+// is `id`, or 0 at the first entry with no path.
+uint32_t FindLooseFile(uint8_t* base, uint32_t id);
 
 }  // namespace archive
