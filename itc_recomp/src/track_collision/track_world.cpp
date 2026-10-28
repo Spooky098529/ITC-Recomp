@@ -7,6 +7,7 @@
 #include "car_physics/float_ops.h"
 
 #include "base/log.h"
+#include "vehicle_accessors/vehicle_accessors.h"
 
 namespace track_collision {
 
@@ -35,6 +36,48 @@ uint32_t RacersCarsCollide(uint8_t* base, uint32_t records) {
     }
   }
   return 1;
+}
+
+void TrackCollisionTick(uint8_t* base, uint32_t frame, const cp::CollisionGuestCall& guest) {
+  ITC_NATIVE_RUNNING("sub_820FF050 TrackCollision::Tick");
+  namespace va = vehicle_accessors;
+  const uint32_t records = guest::LoadU32(base, 0x826C5B2C) + 48;
+  double dt = Lfs(base, 0x8260327C);
+  if (guest::LoadU32(base, kMesh + 8) != 2 || guest::LoadU32(base, kRoute + 8) != 2) {
+    return;
+  }
+  const uint32_t collide = RacersCarsCollide(base, records);
+  if (collide == 0) {
+    dt = Lfs(base, kZero);
+  }
+  cp::CollisionWorldUpdate(base, dt, frame - 176, collide, guest);
+  for (int32_t i = 0; i < int32_t(RaceRacerCount(base)); i++) {
+    const uint32_t racer =
+        guest::LoadU32(base, guest::LoadU32(base, 0x826D82F4) + 2308 + 4 * uint32_t(i));
+    const uint32_t vehicle = va::VehicleGet(base, guest::LoadU32(base, racer + 20));
+    uint32_t contact = guest::LoadU32(base, guest::LoadU32(base, vehicle + 340) + 240);
+    guest::StoreU32(base, vehicle + 6152, 0);
+    while (contact != 0) {
+      if (va::ContactObject(base, contact) != 0) {
+        guest::StoreU32(base, vehicle + 6152, guest::LoadU32(base, vehicle + 6152) | 1);
+      } else {
+        va::ContactOtherObject(base, contact);
+        guest::StoreU32(base, vehicle + 6152, guest::LoadU32(base, vehicle + 6152) | 2);
+        Stfs(base, vehicle + 6236, double(va::ContactStrength(base, contact)));
+      }
+      contact = va::ContactNext(base, contact, 0xFFFFFFFF);
+    }
+    const uint32_t off_ground = guest::LoadU32(base, vehicle + 6240);
+    if (guest::LoadU32(base, vehicle + 348) == 0) {
+      guest::StoreU32(base, vehicle + 6240, off_ground + 1);
+      continue;
+    }
+    if (int32_t(off_ground) >= 10) {
+      guest::StoreU32(base, vehicle + 6152, guest::LoadU32(base, vehicle + 6152) | 4);
+      guest::StoreU32(base, vehicle + 6232, guest::LoadU32(base, vehicle + 6240));
+    }
+    guest::StoreU32(base, vehicle + 6240, 0);
+  }
 }
 
 uint32_t TrackCollisionResetWorld(uint8_t* base) {

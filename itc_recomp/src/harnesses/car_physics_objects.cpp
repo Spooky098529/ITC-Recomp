@@ -1620,6 +1620,26 @@ void VehicleRegionOutputs(Outputs& out, uint8_t* base, uint32_t region) {
 void FillStack(Context& h, Random& r) {
   harness::FillStack(h, r);
 }
+// The update's fake world (numbers only, the queries' pointers Word60), for
+// the race world's harness: its bytes, the build (the surface settings, the
+// queries' pointers and the clock written: the caller saves and puts back
+// UpdateGlobalsBytes() at each of UpdateGlobals()), its outputs, its objects.
+uint32_t UpdateRegionBytes() {
+  return kUpdateRegionBytes;
+}
+void BuildUpdateWorld(Context& h, uint32_t region, Random& r) {
+  harness::BuildUpdateWorld(h, region, r, kNumbers, false);
+}
+void UpdateWorldOutputs(Outputs& out, uint8_t* base, uint32_t region) {
+  harness::UpdateWorldOutputs(out, base, region);
+}
+uint32_t UpdateObject(uint32_t region, uint32_t i) {
+  return UObject(region, i);
+}
+std::vector<std::pair<uint32_t, uint32_t>> UpdateGlobals() {
+  return {{kSurfaceGlobals, kSurfaceBytes}, {kQueryPointers, 16}, {kClockGlobals, 8},
+          {kWorldPointer, 4}};
+}
 }  // namespace car_objects
 
 void CarPhysicsObjects(Context& h) {

@@ -221,6 +221,7 @@ using namespace ai_drivers;
 
 hooks::GuestStandIn hooks::g_drive_car_stand_in = nullptr;
 hooks::GuestStandIn hooks::g_update_idle_stand_in = nullptr;
+hooks::GuestStandIn hooks::g_update_all_stand_in = nullptr;
 
 // --- Set-up and clears (r3 kept) ---
 
@@ -355,12 +356,25 @@ uint64_t CallDriverUpdate(void* user, uint64_t driver, uint32_t function) {
 
 // The updates are recompiled code (through the driver's +6148); the
 // original's frame 176 bytes down.
-ITC_AI_DRIVERS(82139628, {
+void hooks::AiUpdateAll(PPCContext& ctx, uint8_t* base) {
+  if (g_update_all_stand_in != nullptr) {
+    g_update_all_stand_in(ctx, base);
+    return;
+  }
+  if (!ITC_FLAG(native_ai_drivers)) {
+    __imp__sub_82139628(ctx, base);
+    return;
+  }
+  ctx.fpscr.disableFlushMode();
   UpdateCall call;
   call.ctx = &ctx;
   call.base = base;
   ctx.r3.u64 = UpdateAll(base, ctx.r1.u32 - 176, CallDriverUpdate, &call);
-})
+}
+extern "C" REX_FUNC(sub_82139628) {
+  REX_FUNC_PROLOGUE();
+  hooks::AiUpdateAll(ctx, base);
+}
 
 // --- The drivers' starts (the originals' frames: 160 and 224 bytes down) ---
 

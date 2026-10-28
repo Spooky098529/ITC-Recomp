@@ -13,6 +13,40 @@ function goes from this list when a log shows its `native running
 (game):` line (say which log in the commit). A run with nothing left
 here loses its heading.
 
+## Run 2026-10-28 08:36 (`b7-loop-28-10-26`)
+
+- The race world's migration 1 (attract race `itc_2139`, replay
+  `itc_2140`, ok): `sub_82170A88` SortedList::Clear, `sub_821713C0`
+  RaceWorld::ReleaseForStage (`race-world.md`; probably at a race's or
+  stage's end; `sub_82116C38` SaveData::AddDistance seen in the replay
+  `itc_2204`)
+- The race world's migration 2 (attract race `itc_2203`, replay
+  `itc_2204`, ok): `sub_82170668` RaceManager::ResetWorld,
+  `sub_82171718` RaceManager::ResetVehicles, `sub_82143920`
+  RaceEvent::PlaceGroupSplit, `sub_82165E20` RaceStart::Place,
+  `sub_821662E0` RaceStart::PlaceRolling, `sub_82172D20`
+  RaceManager::StreamTwoPlayers (`race-world.md`; a restart, other
+  race kinds, two players)
+- The race's states' migration 1 (attract race `itc_2235`, replay
+  `itc_2236`, ok; the replay's race takes the free-start path; seven
+  more seen in the replay `itc_2253`): `race-states.md`: `sub_821649B8`
+  RaceProgress::SetChecks, `sub_82163440` ReleaseRacers, `sub_82163140`
+  TickFraction, `sub_82162D80` Rank, `sub_821622A8`
+  RoutePosition::NotAfter, `sub_82164090` CheckLap, `sub_82162230`
+  Time::Sub, `sub_82164E18` CheckFinish, `sub_821632C8`
+  RaceStates::OnRollingStart, `sub_821643B0` OnStandingStart,
+  `sub_82163348` ClearStep, `sub_82163378` OnQuit, `sub_821647B0`
+  OnReplay, `sub_82168500` QuitTick, `sub_82167970` AfterRaceTick,
+  `sub_82166E50` RollingStartTick, `sub_82165AB0` RacersNear,
+  `sub_82165C78` RacersClose, `sub_82164A90` RacersStill,
+  `sub_821674A0` CountdownTick, `sub_821692C8` StandingStartTick (a
+  race with a countdown, racing to the finish, quitting from the pause
+  menu, the menu after a race)
+- The race's states' migration 2 (attract race `itc_2252`, replay
+  `itc_2253`, ok): `sub_82163000` (two sections joined by a forward
+  link's side link), `sub_82162330` RaceProgress::RouteDistance
+  (`race-states.md`; `CheckLap`, `CheckFinish`, `Rank` above)
+
 ## Run 2026-10-25 23:42 (`b7-loop-25-10-26-4`)
 
 - The race's set-up's migration 1 (attract race `itc_1867`, replay

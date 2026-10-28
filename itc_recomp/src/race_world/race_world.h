@@ -1,0 +1,561 @@
+// The race world and the racers' manager as plain C++ (B7 in
+// docs/rexglue-removal.md; the functions are in
+// docs/functions/race-world.md): the race mode's state machine at +116812
+// (RaceWorld::), the racers' manager at [0x826D82F4] (RaceManager::: 80
+// entries of 28 bytes from +4, the racers' list at +2308, the vehicle slot
+// words at +2336), its sorted lists, the race event's start placements and
+// the save data's distance. The manager, the vehicles and the race data are
+// guest objects shared with the recompiled code, so these work on guest
+// memory, with the originals' loads and stores in their order and their
+// arithmetic step for step (src/car_physics/float_ops.h). The originals'
+// temporaries are on their stack: `frame` is the original's stack frame
+// (its r1 after the stwu) and `sp` the stack pointer it came with; the
+// temporaries go at the same offsets, register saves and back chains
+// aren't written. Flush-to-zero off on entry (the adapters' job). Callees
+// made native earlier are called as plain C++. Adapters:
+// src/hooks/race_world.cpp, behind --native_race_world.
+
+#pragma once
+
+#include <cstdint>
+#include <functional>
+#include <optional>
+
+#include "car_physics/car_physics.h"
+#include "vehicle/vehicle.h"
+
+namespace race_world {
+
+constexpr uint32_t kManager = 0x826D82F4;    // the racers' manager (a pointer)
+constexpr uint32_t kRaceData = 0x826C5B2C;   // the race data (a pointer)
+constexpr uint32_t kRaceEvent = 0x826C6078;  // the race event (a pointer)
+constexpr uint32_t kRoute = 0x826C5B10;      // the course's route
+
+// --- The manager's leaves ---
+
+// RaceManager::EntryOfRecord (sub_821705A8): the manager's first entry (+4
+// + 28 i, +2368 of them) whose +24 is `record`, or 0 (also with no
+// manager).
+uint32_t EntryOfRecord(uint8_t* base, uint32_t record);
+// RaceManager::BranchesMeet (sub_82170860, with its tail sub_821708B4): 1
+// when route branch `b` (the low byte) is 0 or 29 or the same as `a`'s;
+// else by `a` (the low byte; 0 above 29) as its jump table says.
+uint32_t BranchesMeet(uint32_t a, uint32_t b);
+// Traffic::PickModel (sub_82171070): the two 42-entry tables of car ids
+// written below `sp` (-400 and -232, as the original, a leaf without a
+// frame), the second for branches 7, 8, 13 and 14; the entry `number` mod
+// 42 (C's remainder, read through guest memory as the original) minus 55.
+// Returns the original's r3 (64 bits).
+uint64_t PickModel(uint8_t* base, uint32_t number, uint32_t branch, uint32_t sp);
+
+// --- The sorted lists (100 nodes of 16 bytes: +0 the item, +4 the key, +8
+// the previous, +12 the next; +1600 the first, +1604 the last inserted,
+// +1608 the count) ---
+
+// SortedList::Insert (sub_82170AA0): the next node filled (the key as a
+// float) and linked in ascending order, searching from the last inserted
+// (its first comparison with the key's double, as the original).
+void SortedListInsert(uint8_t* base, uint32_t list, uint32_t item, double key);
+// SortedList::Clear (sub_82170A88): +1600, +1604, +1608 = 0.
+void SortedListClear(uint8_t* base, uint32_t list);
+
+// --- The race world's handlers ---
+
+// RaceWorld::OnPausedTick (sub_82170560): the empty sub_82106540 with (400,
+// 400, 0, 0x820099AC), probably a debug print compiled out: nothing to do
+// (the adapter leaves the registers as the original).
+void OnPausedTick();
+
+// --- The racers' vehicles ---
+
+// RaceWorld::Release (sub_82171360): each racer's vehicle's byte +2384 = 0,
+// the count (+2364) read again each pass. Returns Vehicle::Get's last r3,
+// or `r3` with no racers (the original's r3).
+uint32_t Release(uint8_t* base, uint32_t r3);
+
+// --- The manager's lifetime and its tables ---
+
+// RaceManager::Create (sub_821715B8): 363,592 bytes from operator new into
+// [0x826D82F4]; when made, +0 = 0, the 80 entries (from +4, 28 bytes: +0 =
+// 0, +4 = -1 (0 for the last three, the traffic), halfwords +8, +10 = -1,
+// +12 = 0.0 (the float at 0x82000A34, as lfs and stfs), +16 = 0, +20, +24 =
+// -1), the 16 words from +2244 = -1, +2364 to +2388 = 0, the 7 words from
+// +2308 and from +2336 = 0 (in the original's order); then the 300 words
+// from +362392 = 0 (at 362392 itself with no block, as the original).
+// Returns the original's r3 (the manager); nullopt, with nothing done,
+// where operator new would take its error path.
+std::optional<uint32_t> Create(uint8_t* base);
+// RaceManager::NoteMarkedRacer (sub_82172F90): `frame` + 92 = 0.0; each
+// racer's body position copied (Vec4::Copy) to `frame` + 80 until one whose
+// record (the race data + 3,936 x its +24, + 48) has flags +3888 0x400:
+// its three floats stored at 0x826C61A4. `frame`: the original's 144 bytes.
+void NoteMarkedRacer(uint8_t* base, uint32_t frame);
+// RaceManager::NearSegment (sub_82170BC0): 1 when the point's projection on
+// the segment (two 16-byte points) lies past its start and short of its
+// length x [0x820021E8], and the point is nearer than `distance` to it;
+// else 0. The vectors at `frame` + 80 to + 159 as the original (its 208
+// bytes).
+uint32_t NearSegment(uint8_t* base, uint32_t segment, uint32_t point, double distance,
+                     uint32_t frame);
+// RaceManager::BuildNeighbors (sub_82170CB8): for each section s of the
+// route, the 1,200-byte record at `table` + 1,200 s (+0 = s, then the
+// sections near it) and its count at `table` + 360,000 + 4 s (see the
+// row). The points at `frame` + 80 to + 207 as the original (its 336
+// bytes).
+void BuildNeighbors(uint8_t* base, uint32_t table, uint32_t frame);
+// RaceManager::Neighbours (sub_82170920): among the manager's other entries
+// (flag 0x1, not 0x20, 0x4 or 0x8) on a section of the same branch as the
+// entry at `index`'s, whether one is ahead (TrackRoute::Distance above 0.0,
+// under [0x82001FC0]) and behind (above [0x82009798]): 0 neither, 1 ahead,
+// 2 behind, 3 both.
+uint32_t Neighbours(uint8_t* base, uint32_t manager, uint32_t index);
+// RaceManager::JumpSections (sub_821737F8): an entry whose item's kind is 3
+// (with the flag at `flag3`) or 2 (with `flag2`), on the sections the
+// original lists and not on the player's branch 12 (or 11), farther than
+// [0x820099D0] (squared, flat) from `player` when on the player's branch
+// (`branch`), is put at section 194 or 252 (201 or 259 for kind 2), slice
+// 0, and the flag cleared. `frame`: the original's 176 bytes.
+void JumpSections(uint8_t* base, uint32_t entry, uint32_t player, uint32_t branch,
+                  uint32_t flag2, uint32_t flag3, uint32_t frame);
+
+// --- The race world's set-up and its handlers ---
+
+// RaceWorld::Init (sub_82174D28, src/race_world/race_world_init.cpp): +9604
+// = 1, +9608 = 0 (1 when the race data's +0xA3AF0 is 6 and the current
+// stage's word +76 is 2 or more), then the 24 transitions added as the
+// original does (its stores and copies replayed in `frame`, its 1,696
+// bytes). Returns the last StateMachine::Add's plain C++'s answer
+// (`replaced` its flag).
+uint32_t Init(uint8_t* base, uint32_t world, uint32_t frame, bool* replaced);
+// RaceWorld::ReleaseForStage (sub_821713C0): as Release, then the current
+// stage copied into `frame` + 80 (Stages::Copy; its original through
+// `original` where it refuses); with the stage of type 2 or 3, or the race
+// data's +0xA3AF0 6 and the copy's +0 not 1: each of the stage's racers'
+// entries' (EntryOfRecord of Stages::Racer) vehicle's +2384 = 1. `frame`:
+// the original's 192 bytes.
+void ReleaseForStage(uint8_t* base, uint32_t frame,
+                     const std::function<void(uint32_t address, uint32_t sp, uint32_t r3,
+                                              uint32_t r4, uint32_t r5)>& original);
+
+// --- The racers' vehicles each tick ---
+
+// A callee's original where its plain C++ refuses, run with r1 = `sp` and
+// r3 = `r3`.
+using Original = std::function<void(uint32_t address, uint32_t sp, uint32_t r3)>;
+
+// RaceManager::TickVehicles (sub_821714D8): each racer's Vehicle::Tick (its
+// vehicle, its +20, its record (the race data + 48 + 3,936 x its +24), 1),
+// the count read again each pass. `frame`: the original's 128 bytes;
+// `call`: Vehicle::Tick's guest calls.
+void TickVehicles(uint8_t* base, uint32_t frame, const vehicle::GuestCall& call);
+// RaceManager::RefreshVehicles (sub_82171560): each racer's
+// Vehicle::Refresh (its original through `original` where it refuses).
+// `frame`: the original's 112 bytes.
+void RefreshVehicles(uint8_t* base, uint32_t frame, const Original& original);
+
+// --- The racers' vehicles reset and the world unloaded
+// (src/race_world/race_world_reset.cpp; only while --native_heap routes the
+// game's heap to the allocation layer: the adapters check) ---
+
+// RaceManager::ResetWorld (sub_82170668): each of the seven vehicles whose
+// slot word (+2336) is above 0 removed from the world (Vehicle::
+// RemoveFromWorld; its original through `original` where it refuses) and
+// the slot = 0; each index stored at `frame` + 80 and its AI driver reset
+// (AiDriver::Of, AiDriver::Reset); TrackCollision::ResetWorld; the float at
+// 0x826C2D80 = the one at 0x82000A34; +2388 = 0. `frame`: the original's
+// 128 bytes.
+void ResetWorld(uint8_t* base, uint32_t manager, uint32_t frame, const Original& original);
+// RaceManager::ResetVehicles (sub_82171718): +2364, +2372, +2376 = 0; each
+// entry (+2368 of them, the count read again each pass) with a vehicle
+// (+20 not -1), then the three traffic entries (from +2160): Vehicle::SetUp
+// with its record (the race data + 3,936 x its +24 + 48; ResetForCar
+// unless its slot word is -1; their callees' originals through
+// `setup_original`, with r1 = `frame` - 224), flags |= 0x200 with `flag`,
+// the slot = 1, an input record cleared at `frame` + 96 (+128 for traffic)
+// and copied to the racer's ([0x826C5B30 + 4 x the index's low byte]),
+// AiDriver::Setup (&+20, the record + 3960, &1 at `frame` + 80), listed
+// (+2308) and counted (+2364, and +2372 or +2376); +2388 = 0. `frame`: the
+// original's 224 bytes.
+void ResetVehicles(uint8_t* base, uint32_t manager, uint32_t flag, uint32_t frame,
+                   const vehicle::CalleeOriginal& setup_original);
+// RaceWorld::Unload (sub_82171250): with the race data's +0xA3AF0 1 and
+// +0xA3AF4 2 or 3, SaveData::AddDistance (player 0's save, vehicle 0's
+// +6244); Vehicles::Destroy, AiDrivers::Destroy, TrackCollision::Unload,
+// operator delete of the manager (each one's original through `original`,
+// with r1 = `frame`, where its plain C++ refuses) and [0x826D82F4] = 0.
+// `frame`: the original's 112 bytes.
+void Unload(uint8_t* base, uint32_t frame, const Original& original);
+// --- The manager's lists (src/race_world/race_manager.cpp) ---
+
+// A callee's original where its plain C++ refuses, run with r1 = `sp` and
+// r3 = `r3`; returns the r3 it leaves.
+using OriginalR3 = std::function<uint64_t(uint32_t address, uint32_t sp, uint32_t r3)>;
+
+// RaceManager::ListRacers (sub_82171E50): the player's entry (the first
+// flagged 0x4, or none: its +20 read at 20) gives the player's route
+// position (its vehicle's Vehicle::Identity +4, at `frame` + 84) and
+// section; +2364, +2372 = 0 and the sorted list at `frame` + 144 emptied
+// (+1744 to +1752). Each entry (+2368 of them, the count read again each
+// pass): flagged 0x20 or 0x80, or on a branch that doesn't meet the
+// player's (BranchesMeet), it loses its vehicle (when its slot word is above
+// 0: flags &= ~0x40, Vehicle::RemoveFromWorld, its original through
+// `original` without `heap` or where it refuses; the slot 0, +20 = -1);
+// else it's inserted by its key: 0.0 for 0x4, [0x8200222C] for 0x10 or
+// 0x400, else the flat distance between its slice's center and the
+// player's (the vectors at `frame` + 96 to + 140) plus 1.0. Then the listed
+// entries with a vehicle, nearest first, go in the racers' list (+2308;
+// +2364 and +2372 count), and the traffic entries in use (+2160, three;
+// +2376 counts) after them. Returns the original's r3 (64 bits). `frame`:
+// the original's 1,872 bytes.
+uint64_t ListRacers(uint8_t* base, uint32_t manager, uint32_t frame, bool heap,
+                    const OriginalR3& original);
+// RaceManager::AddRacers (sub_82173050): BuildNeighbors (+2392); the
+// player's record (the first of `records`' +0x595E0 with flags +3888 0x1,
+// or none: its position read at 3904); with the race data's +0xA3AF0 1,
+// +0xA3AF4 2 and an event, RaceEvent::PlaceStartsCurrent (player 0's save
+// +6108 at `frame` + 84). Each record with flags 0x83 gets an entry (+2368
+// counts; +24 its number, +4 the entry's, +8 its start position, +0 1, 4
+// for 0x1, 8 for 0x80, | 0x20 for 0x100), its start placed first unless
+// 0x1 or 0x80 (see the row); records with only 0x4 listed from +2244
+// (+2384 counts). The entries not flagged 0x20 on branches meeting the
+// player's sorted by flat distance (the list at `frame` + 208); the nearest
+// four under [0x8200996C] get flags 0x40, a racer number, a place in the
+// racers' list, a slot, an input record and AiDriver::Setup; the rest lose
+// 0x40. Then the traffic (+2380 = min(+0x595E8, 3), +2376 = 0): unless
+// none, no traffic records or the race data's flag 0x2000, that many
+// traffic entries (+2160) placed ahead of the player, each with a model
+// (Traffic::PickModel), its record, a racer number, an input record and
+// AiDriver::Setup. The original's r3 isn't kept (its caller doesn't read
+// it). `frame`: the original's 2,000 bytes.
+void AddRacers(uint8_t* base, uint32_t manager, uint32_t records, uint32_t frame);
+
+// --- The route positions ---
+
+// RoutePosition::ToMainRoad (sub_82143608): TrackRoute::ToMainRoad on the
+// game's route (a tail call: `sp` is the caller's stack pointer). Returns
+// its r3.
+uint32_t RoutePositionToMainRoad(uint8_t* base, uint32_t position, uint32_t flag, uint32_t sp);
+// RoutePosition::StepToMainRoad (sub_82170F18): the kind (a sign-extended
+// halfword) into `frame` + 80, AiPath::BranchMasksFor of it, the slice (+2)
+// += step, ToMainRoad(position, 1), TrackRoute::Normalize on the game's
+// route with the masks. Returns its r3. `frame`: the original's 112 bytes.
+uint32_t StepToMainRoad(uint8_t* base, uint32_t position, uint32_t step, uint32_t kind,
+                        uint32_t frame);
+
+// --- The race event's start placements ---
+
+// RaceEvent::Entry (sub_82143508): [[0x826C6078] + 156] + 12 x the word at
+// `index`.
+uint32_t RaceEventEntry(uint8_t* base, uint32_t index);
+// RaceEvent::PlaceEntry (sub_82143150): TrackRoute::Normalize(route,
+// position, masks); the entry (the event's list +156, 12 bytes, at the
+// sign-extended halfword at `index`) +4, +6 = the position's halfwords;
+// then the position's slice += the halfword at `step`. Returns Normalize's
+// r3.
+uint32_t PlaceEntry(uint8_t* base, uint32_t event, uint32_t route, uint32_t index,
+                    uint32_t position, uint32_t step, uint32_t masks);
+
+// The start placements (src/race_world/race_event.cpp). A group's list is
+// at the event + 12 x (the word at `group` + 3): +0 the count (a signed
+// halfword), +4 the entries (4 bytes each, +2 an index in the event's list);
+// each entry placed with PlaceEntry on the game's route, the masks
+// AiPath::BranchMasksFor of the word at `group`. The originals' r3 isn't
+// kept: no caller reads it.
+
+// RaceEvent::PlaceGroup (sub_82143A40): the halfword `step` at `frame` +
+// 230 (the caller's frame), the position's word copied to `frame` + 80;
+// with the word at `flag` set, the first (count + 2) / 2 placed stepping
+// forward, then the rest from the position again stepping back (the slice
+// less the step, the step negated at + 230); else all forward. `frame`: the
+// original's 192 bytes.
+void PlaceGroup(uint8_t* base, uint32_t event, uint32_t position, uint32_t step, uint32_t group,
+                uint32_t flag, uint32_t frame);
+// RaceEvent::PlaceGroupTwoRows (sub_82143B78): the positions `first` and
+// `second` (words) at `frame` + 188 and + 196 (the caller's frame), each put
+// on the main road (TrackRoute::ToMainRoad, flag 0); the group's even
+// entries placed from the first, the odd from the second, by the halfword
+// at `step`. `frame`: the original's 160 bytes.
+void PlaceGroupTwoRows(uint8_t* base, uint32_t event, uint32_t first, uint32_t second,
+                       uint32_t step, uint32_t group, uint32_t frame);
+// RaceEvent::PlaceGroupSplit (sub_82143920): the position (a word) at
+// `frame` + 204; the first (count + 1) / 2 placed from it, the rest from the
+// section in 0x82008DE8 at the signed halfword at 0x82008E14 + 2 x the word
+// at `row`, slice 0, put on the main road (flag 0). `frame`: the original's
+// 176 bytes.
+void PlaceGroupSplit(uint8_t* base, uint32_t event, uint32_t position, uint32_t step,
+                     uint32_t group, uint32_t row, uint32_t frame);
+// RaceEvent::PlaceGroupFixed (sub_821443B0): group 0 from sections 284 and
+// 218, 1 from 153 and 107 (PlaceGroupTwoRows, slice 0; the positions at
+// `frame` + 80 and + 84), 2 from section 44 and 3 from 66 (PlaceGroup at
+// `frame` + 80 with the flag 1 at + 84); above 3 nothing. `frame`: the
+// original's 96 bytes.
+void PlaceGroupFixed(uint8_t* base, uint32_t event, uint32_t step, uint32_t group,
+                     uint32_t frame);
+// RaceEvent::PlaceStarts (sub_82144798, with sub_82144874, a case of its
+// jump table): the player's position (the word at `player`) copied to
+// `frame` + 92, its slice less fctiwz([0x82008E3C] / the route's slice
+// length) and the step fctiwz([0x82008E34] / the length) (the doublewords
+// at + 96 and + 104, the step's halfword at + 80), put on the main road
+// (flag 1); the kind (the word at `kind`, 0 to 19) picks a row (+84) and a
+// group: the other groups (+88 counts 0 to 3) by PlaceGroupFixed, that one
+// by PlaceGroupSplit (the row's halfword below 0x8000 and
+// SaveData::FirstUnsetFlag of player 0's save above 0) or PlaceGroup (the
+// flag at + 96: 1 with the halfword 0x8000 or more); a kind above 19 places
+// all four by PlaceGroupFixed. `frame`: the original's 176 bytes.
+void PlaceStarts(uint8_t* base, uint32_t event, uint32_t kind, uint32_t player, uint32_t frame);
+// RaceEvent::PlaceStartsCurrent (sub_82144A38): PlaceStarts with the event
+// at [0x826C6078] (a tail call: `sp` the caller's stack pointer).
+void PlaceStartsCurrent(uint8_t* base, uint32_t kind, uint32_t player, uint32_t sp);
+
+// --- The racers made, placed and settled (src/race_world/race_start.cpp) ---
+
+// A callee's original, run with r1 = `sp` and r3 to r5 as given; returns the
+// r3 it leaves.
+using OriginalCall = std::function<uint64_t(uint32_t address, uint32_t sp, uint64_t r3,
+                                            uint64_t r4, uint64_t r5)>;
+// The guest calls the start functions make: the callees' originals where
+// their plain C++ refuses (Stages::Copy 0x820FFD88, Vehicles::Create
+// 0x820C3BD0, AiDrivers::Create 0x8213B1E0, RaceManager::Create 0x821715B8,
+// Vehicle::RemoveFromWorld 0x820C20E0), Vehicle::SetUp's and ResetForCar's
+// callees' (in the set-up's frame, 224 bytes below the caller's),
+// Vehicle::Tick's, Vehicle::PlaceOnRoute's (memcpy, sub_820B7998, and the
+// whole original 0x820C3608 where its plain C++ refuses, r7 = 1),
+// CollisionWorld::Update's (TrackCollision::Tick's), and the AI drivers'
+// update of every racer (AiDrivers::UpdateAll) and AiDriver::DriveCar as
+// their adapters run them (r1 = `sp`, the link register `lr`; DriveCar
+// returns its r3).
+struct StartCalls {
+  OriginalCall original;
+  vehicle::CalleeOriginal setup_original;
+  vehicle::GuestCall tick;
+  vehicle::GuestCall place;
+  car_physics::CollisionGuestCall collision;
+  std::function<void(uint32_t sp, uint32_t lr)> update_drivers;
+  std::function<uint64_t(uint32_t input, uint32_t index, uint32_t flag, uint32_t sp, uint32_t lr)>
+      drive_car;
+};
+
+// RaceWorld::OnLoaded (sub_82173A90): the current stage copied to `frame` +
+// 160 (Stages::Copy); held (and the race data's flags +0x59AE4 |= 0x2000)
+// when the stage is of type 2 or 3, or the mode (+0xA3AF0) is 6 and the
+// copy's +0 isn't 1. Vehicles::Create; each of the seven vehicles
+// Vehicle::SetUp with the first racer record (the race data + 48) and
+// Vehicle::RemoveFromWorld; AiDrivers::Create; RaceManager::Create;
+// RaceManager::AddRacers (the manager, the race data + 48). Each racer
+// (+2364 of them, the count read again each pass): its vehicle
+// Vehicle::ResetForCar with its record (the race data + 48 + 3,936 x its
+// +24). Each racer again: its vehicle's byte +2384 = 1 when held (the mode
+// and the copy read again) and Stages::HasRacer(its record), else 0; its
+// entry's +8 kept on the route (TrackRoute::ClampPosition into `frame` +
+// 80) and Vehicle::PlaceOnRoute with the record's speed (+3956 of the race
+// data + 3,936 x its +24), the float at 0x82000A34 across, the lane (-1
+// when the kind +0xA3AF4 is 0 or 1, else the racer's place in the list mod
+// 2) and 1. Then 30 settling ticks (Settle: every racer, DriveCar's record
+// at `frame` + 128 copied through + 96). Then each racer's vehicle +6244 =
+// the race data's +3968 + 3,936 x its +24 (its record's +3920; lfs, stfs);
+// RaceManager::ListRacers; the flags |=
+// 0x200; RaceManager::NoteMarkedRacer. `frame`: the original's 352 bytes.
+// Only while --native_heap routes the game's heap to the allocation layer
+// (the adapter checks). r3 isn't kept (the state machine's handler call
+// doesn't read it).
+void OnLoaded(uint8_t* base, uint32_t frame, const StartCalls& calls);
+// RaceStart::Place (sub_82165E20): `object` and `settle` stored at `sp` +
+// 20 and + 28 (the caller's frame, as the original), the halfwords at
+// `frame` + 80, + 82 = 0xFFFF; the player's position: the +8 of the entry
+// (RaceManager::EntryOfRecord) of the first record flagged 0x1, or the word
+// at `frame` + 80 with none. Back (the step's sign): `back` set, or the
+// mode 1 with player 0's save +6100 1. Each racer (Race::RacerCount, read
+// again each pass) in the current stage (Stages::HasRacer): the stage
+// copied to `frame` + 160; its vehicle's byte +2384 = 1 for a stage of type
+// 2 or 3 or the kind (+0xA3AF4) 8, else 0; the lane its place among those
+// placed mod 2. Kind 8: the start position ([[[`sp` + 20] + 9624] + 7244]
+// when the word at 0x826C7824 is set, else the halfwords at 0x826C6B0E,
+// 0x826C6B10) at `frame` + 80 put on the main road (TrackRoute::ToMainRoad,
+// 1), the lane capped by the slice's lane count (its byte +56's low four
+// bits; past it, one slice back by RoutePosition::Step(-1, -1) and the
+// count less 1), Vehicle::PlaceOnRoute with the float at 0x82000A34 as the
+// speed and across, the position stored at the race data + 3,952 + 3,936 x
+// the number (its record's start position, +3904). Other kinds (the
+// record's words at the race data + 3,936 x the number + 3,936 on): from
+// the player's position, records not flagged 0x1 stepped by the item's
+// branch kind (the signed byte +36 of DataTables::Item of +3960, -1
+// without one): forward
+// by RoutePosition::Step (the n-th, 1, 2, ...) for a stage of type 2 or 3,
+// or (else) when the stage's +0 is 3 or 1 and not back; else with
+// RoutePosition::StepToMainRoad, back (-1, -2, ...) or forward; then
+// Vehicle::PlaceOnRoute with the record's speed (+3956). With `settle` (the
+// word at `sp` + 28 read again): the stage copied again and 300 ticks (the
+// mode 6 with the copy's +0 not 1) or 30 (Settle: the racers in the stage,
+// DriveCar's record at `frame` + 128 copied through + 96, each entry's +8 =
+// its vehicle's track position's route position). `frame`: the original's
+// 400 bytes (`sp` - 400). r3 isn't kept (its callers don't read it).
+void Place(uint8_t* base, uint32_t object, uint32_t settle, uint32_t back, uint32_t sp,
+           const StartCalls& calls);
+// RaceStart::PlaceRolling (sub_821662E0): RaceStart::Place(`object`, 0, 0)
+// from `frame`; the player's entry (EntryOfRecord of the first record of
+// the race data read before it flagged 0x1, or 0); all (the mode 1 with
+// player 0's save +6100 1 or the current stage of type 2 or 3). Each racer
+// (Race::RacerCount, read again each pass) in the current stage: its
+// vehicle's byte +2384 = 0; unless its record is flagged 0x1, and when its
+// entry has flag 0x400 or all: the entry's +8 = the player's entry's +8
+// (two halfwords), RoutePosition::StepToMainRoad(+8, 10, 12, ... with all,
+// else -10, -12, ..., kind -1), Vehicle::PlaceOnRoute with the float at
+// 0x820097FC as the speed, 0x82000A34 across, the lane its place among
+// those placed mod 2. With `settle`: 30 ticks (Settle: the racers flagged
+// 0x400 in the stage, DriveCar's record at `frame` + 112 copied through +
+// 80, each entry's +8 its vehicle's track position's route position).
+// `frame`: the original's 272 bytes. r3 isn't kept (its callers don't read
+// it).
+void PlaceRolling(uint8_t* base, uint32_t object, uint32_t settle, uint32_t frame,
+                  const StartCalls& calls);
+
+// --- The manager's streaming each tick (src/race_world/race_stream.cpp) ---
+
+// RaceManager::StreamOpponents (sub_82172118): the player's route position
+// (its vehicle's Vehicle::Identity +4) at `frame` + 80; +2372 = 0 and the
+// sorted list at `frame` + 176 emptied (+1776 to +1784). Each entry (+2368
+// of them, the count read again each pass): flagged 0x20 or 0x80, or on a
+// branch that doesn't meet the player's (BranchesMeet), it loses its vehicle
+// (when its slot word is above 0: flags &= ~0x40, Vehicle::RemoveFromWorld,
+// its original through `original` without `heap` or where it refuses; the
+// slot 0, +20 = -1); else it's inserted by its key: 0.0 for 0x4 or 0x8,
+// [0x8200222C] for 0x10 or 0x400, else the flat distance between its
+// slice's center and the player's (the entry's position at + 84, the
+// vectors at + 96 to + 143) plus 1.0. Then in the list's order: past the
+// fourth, the vehicle removed; then, while +2372 is under 4, those nearer
+// than `spawn` keep theirs or get one (RaceManager::GiveVehicle's
+// original through `original`, never seen in play; none free: nothing, the
+// empty sub_82106540) and are listed (+2308; +2364, +2372 count), the new
+// ones with an input record cleared at + 144 and copied to the racer's
+// ([0x826C5B30 + 4 x the index's low byte]) and AiDriver::Setup (&+20, the
+// record + 3960, &1 at + 80); those beyond `despawn` lose theirs, those
+// between with one are listed; once +2372 is 4, the rest lose theirs.
+// `frame`: the original's 1,920 bytes. r3 isn't kept (its callers don't
+// read it).
+void StreamOpponents(uint8_t* base, uint32_t manager, uint32_t player, double spawn,
+                     double despawn, uint32_t frame, bool heap, const OriginalCall& original);
+// RaceManager::Refresh (sub_82171978, from the race's other states after
+// the racers are moved): StreamOpponents with the player's entry found (the
+// first flagged 0x4, the count read again each pass; none: its +20 read at
+// 20) and the radii [0x8200996C] and [0x82009970]; the player's slice's
+// center at `frame` + 112 once before the entries, each entry's position at
+// + 80; +2364, +2372 and +2376 = 0; when RaceManager::GiveVehicle finds no
+// free slot, the rest of the list is left as it is. Then the traffic
+// entries (+2160) in use: with the race data's flags (+0x59AE4) 0x4000 each
+// loses its vehicle (Vehicle::RemoveFromWorld; +0 = 0, the slot word 0, +20
+// = -1), else each is listed (+2364, +2376 count). The callees' originals
+// through `original` as StreamOpponents'. `frame`: the original's 1,904
+// bytes. r3 isn't kept (its callers don't read it).
+void Refresh(uint8_t* base, uint32_t manager, uint32_t frame, bool heap,
+             const OriginalCall& original);
+// RaceManager::StreamTraffic (sub_821724F8): `inner` and `outer` the near and far radii,
+// `second` the second player's entry or 0. The player's route position (its
+// vehicle's identity +4) at `frame` + 84 (and + 80, or the second player's
+// there), its body's position at + 160, its velocity (+6176) at + 176;
+// +2376 = 0. With the race data's flags (+0x59AE4) 0x4000: each traffic
+// entry (the three at +2160) in use (+0 not 0) loses its vehicle
+// (Vehicle::RemoveFromWorld, its original without `heap` or where it
+// refuses; +0 = 0, the slot word 0, +20 = -1); nothing more. Else each in
+// use: its slot word + 1 (above 216,000: 60); its slice's center (+ 144)
+// less each player's (+ 208, + 192; at + 96, y 0.0, Vec3::Normalize): beyond
+// `outer` from both, with its slot word above 0, it loses its vehicle; else
+// it's listed (+2308; +2364, +2376 count). Then, unless flags 0x2000: with
+// +2376 below +2380 and +2388 at 90 or more, +2388 = 0 and the first free
+// entry with a free slot (0 or -1) gets a car on a spot (see the code: the
+// neighbor search the original has never runs), refused when a listed
+// racer of [0x826D82F4] is within [0x82002568]; else +2388 + 1 below 90.
+// The car: Traffic::PickModel, +0 = 578, +24 its record, +16 the number
+// mod 42, Vehicle::SetUp (slot -1) or ResetForCar, PlaceOnRoute,
+// CarInput::Clear at + 224 copied to the racer's, Vehicle::SpeedRecord,
+// PhysicsStep, VehicleStatus::Update, AiDriver::Setup (-1 at + 80, 1 at +
+// 84), listed. The callees' originals through `calls` where their plain C++
+// refuses (SetUp's physics and RemoveFromWorld without `heap`). `frame`:
+// the original's 464 bytes. r3 isn't kept (no caller reads it).
+void StreamTraffic(uint8_t* base, uint32_t manager, uint32_t player, double inner, double outer,
+                   uint32_t second, uint32_t frame, bool heap, const StartCalls& calls);
+// RaceManager::MoveUnseen (sub_82173E28): the player's route position
+// (its vehicle's identity +4) at `frame` + 88, its body's position
+// (RigidBody::Position, 16 bytes) at + 96, its section's branch at + 92,
+// the race data's flags +20 0x20 and 0x10 as words at + 80 and + 84. With
+// either: the entries (+2368, read again each pass) whose record's item
+// (the signed halfword of the race data + 3,936 x +24 + 3,960) is 0 or more
+// and whose flags have none of 0xAC: on sections 187, 188, 193, 194 or 251
+// to 253 with item kind 3, + 80 = 0; on 200 to 203 or 258 to 261 with kind
+// 2, + 84 = 0; the scan stops once both are 0. Then each entry (its index
+// at + 88) not flagged 0x20 or 0x80: with a vehicle (0x40), +8 = its
+// vehicle's track position, +12 = 0.0, its slot word + 1 (above 216,000:
+// 60); else +12 += 1.0, RaceManager::JumpSections (the flags at + 80, + 84),
+// the ticks a slice takes (the slice length over the player's distance a
+// frame when +2372 is 4, the player's entry flagged 0x10 and their
+// branches meet, unless its vehicle's +6168 is set or that distance is 0.0;
+// else the length x [0x820099D4], x [0x820021E8], [0x82001070] or
+// [0x820029F0] for RaceManager::Neighbours' 1, 2 or 3), and once +12
+// reaches them, one RoutePosition::Step(+8, 1, its item's kind) and +12
+// less them (once a tick at most). `frame`: the original's 272 bytes. r3
+// isn't kept (its caller doesn't read it).
+void MoveUnseen(uint8_t* base, uint32_t manager, uint32_t player, uint32_t frame);
+
+// The guest calls of the streaming and the tick, made for a
+// Vehicle::SetUp's frame (`setup_frame`, StartCalls' setup_original): the
+// callees' originals through `original` (Vehicle::RemoveFromWorld
+// 0x820C20E0, RaceManager::GiveVehicle 0x821706E8, Vehicle::Refresh
+// 0x820C0118, sub_821743A8), the rest as StartCalls says.
+using MakeCalls = std::function<StartCalls(uint32_t setup_frame)>;
+
+// RaceManager::StreamNear (sub_82172E60) and RaceManager::StreamCruise
+// (sub_82174200): the player's entry (the first flagged 0x4,
+// the count +2368 read again each pass; none: its +20 read at 20); from its
+// vehicle's speed (Vehicle::Speed, read four times) the radii, fmadds of
+// the speed: the opponents' speed x [0x820021F4] + [0x82002A28] and +
+// [0x82008914], the traffic's speed x [0x820021E8] plus the same; when the
+// opponents' far one is above [0x82003384], it's that and their near one
+// [0x820099CC], and when the traffic's far one is above that too, it's that
+// and their near one [0x820099C8]. +2364 = 0; StreamOpponents, StreamTraffic
+// (no second player) and, for StreamCruise, MoveUnseen. `sp`: the caller's
+// stack pointer (the original's frame is 160 bytes, nothing kept in it). r3
+// isn't kept (the callers return right after; Stream hands it on, and
+// RaceWorld::Tick doesn't read it).
+void StreamNear(uint8_t* base, uint32_t manager, uint32_t sp, bool heap, const MakeCalls& make);
+void StreamCruise(uint8_t* base, uint32_t manager, uint32_t sp, bool heap,
+                  const MakeCalls& make);
+// RaceManager::StreamTwoPlayers (sub_82172D20): the two players' entries
+// (+4 and +32): the first is ahead unless the race data's flags (+0x59AE4)
+// have 0x20 or 0x40 and [0x826D82E8]'s float +3012 is below its +3984. The
+// radii from the faster's speed (the ahead one's unless the other's is
+// above it), as StreamNear's but with fmuls then fadds; StreamOpponents
+// with the ahead one, StreamTraffic with both. `sp`: the caller's stack
+// pointer (the original's frame is 128 bytes).
+void StreamTwoPlayers(uint8_t* base, uint32_t manager, uint32_t sp, bool heap,
+                      const MakeCalls& make);
+// RaceManager::Stream (sub_82174338): by the race data's kind (+0xA3AF4; a
+// jump table at 0x820099A0): 2 and 3 StreamCruise, 5 StreamTwoPlayers, 0
+// (through sub_8217437C), 1, 4, 6, 7 and 8 StreamNear, above 8 nothing (tail
+// calls: `sp` is the caller's stack pointer).
+void Stream(uint8_t* base, uint32_t manager, uint32_t sp, bool heap, const MakeCalls& make);
+// RaceWorld::Tick (sub_82174BC0): with the world's +9608 set: when the race
+// data's flags (+0x59AE4) have 0x20 and the byte at 0x826C6B0C isn't 255,
+// for each racer record (the count at the race data + 0x59610 read again
+// each pass) whose flags +3888 have 0x1 (byte 0: with [0x826C7824] set,
+// else 0x80), 0x80 (byte 1: with it set, else 0x1) or either (other bytes),
+// the word at [0x826D82E8] + 2,972 + 972 x its entry's +24
+// (RaceManager::EntryOfRecord) = 0; else sub_821743A8 (never seen in play:
+// its original through `original`). Then RaceManager::Stream of
+// [0x826D82F4], AiDrivers::UpdateAll, RaceManager::TickVehicles,
+// TrackCollision::Tick and RaceManager::RefreshVehicles. `frame`: the
+// original's 128 bytes (nothing kept in it). r3 isn't kept (the state
+// machine's handler call doesn't read it).
+void Tick(uint8_t* base, uint32_t world, uint32_t frame, bool heap, const MakeCalls& make);
+
+// --- The save data ---
+
+// SaveData::AddDistance (sub_82116C38): the garage car picked (the save's
+// +0x19920-th node of the list at +6120 + 204); the difference between
+// `distance` and the car's float +2104 added to the save's floats +4908 and
+// +6040, and to the car's +2104 (the car found again).
+void AddDistance(uint8_t* base, uint32_t save, double distance);
+
+// SaveData::FirstUnsetFlag (sub_82112190): the first of bits 0 to 5 of the
+// save's word +6092 that's clear, or 6.
+uint32_t FirstUnsetFlag(uint8_t* base, uint32_t save);
+
+}  // namespace race_world

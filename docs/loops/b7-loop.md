@@ -246,12 +246,17 @@ skips Merged rows). Never
    differ)" groups and no explanations of NaN-sign differences (the
    user's call, 2026-10-23). Every other case matches.
 4. Builds (`cmake --build itc_recomp/out/build/linux-amd64-release
-   -j$(nproc)`) and runs `attract_race.sh 40 --run_harnesses=all` (40 s:
-   the harnesses run before the race starts and take longer as they
-   grow; the user's call, 2026-10-23, after 25 and then 30): no new error lines, ~20 seconds at 30 ticks/s (fewer
-   is fine when only the harnesses' growing time took them: the user's
-   call, 2026-10-23), every harness at 0 differing
-   (outside "(expected to differ)" groups); a stalled boot restarted once.
+   -j$(nproc)`) and runs `attract_race.sh 40 --run_harnesses=<list>`
+   with only the harnesses of the subsystem it works on and of any
+   other subsystem whose `src/` files the batch touched (the user's
+   call, 2026-10-28: running them all took ~30 s of the 40 and left
+   ~8 s of race; the validation agent runs them all once, after the
+   migration). The harnesses run before the race starts (40 s: the
+   user's call, 2026-10-23, after 25 and then 30): no new error lines,
+   ~20 seconds at 30 ticks/s (fewer is fine when only the harnesses'
+   time took them: the user's call, 2026-10-23), every harness run at 0
+   differing (outside "(expected to differ)" groups); a stalled boot
+   restarted once.
    If the group runs in the race, a temporary counter override shows it
    was called (removed before committing). For anything drawn, a frame
    dump against one with the fallback flag (attract races put a random
@@ -351,7 +356,8 @@ adapters stay. For each candidate, before removing its adapter:
 Then the adapter is deleted, the row set to Native (saying which native
 callers reach it, and that the fallback flag now switches only them),
 `check_function_statuses.py` run (it refuses Native with an override
-left), and the usual build and `attract_race.sh 40 --run_harnesses=all`.
+left), and the usual build and `attract_race.sh 40 --run_harnesses=<list>`
+(the subsystem's harnesses, and those of the files touched).
 
 It works in batches (a group, or small related groups together, each
 built, raced and committed before the next), one after another in its
@@ -397,7 +403,12 @@ made native, or whose adapter it removed:
    `itc_recomp/src` for the address). Missing ones it adds, in one commit,
    pushed (a print only, no other change).
 2. **Runs** the build and `attract_race.sh 40 --run_harnesses=all` with
-   the default flags, and checks the log has a `native running
+   the default flags (every harness, once a migration: the migration
+   agent runs only its own, so this run is what shows that nothing else
+   was broken; the user's call, 2026-10-28), checks every harness is at
+   0 differing outside "(expected to differ)" groups (one that isn't,
+   in any subsystem, goes in the report's `race:` line, and the lead
+   halts), and checks the log has a `native running
    (harness):` line for each function: its harness ran our code. A
    function with none didn't (a harness calling the adapter, or `__imp__`
    on both sides once its adapter is gone), or its harness doesn't reach

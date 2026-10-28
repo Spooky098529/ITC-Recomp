@@ -8,184 +8,195 @@ file's history. What's left to see in a drive, from every run:
 
 ## Now
 
-- Run started 2026-10-27 22:31 on `b7-loop-27-10-26` (the user's
-  branch), from d7b8a6b; summary `b7-loop-2026-10-27-2231.md`.
+- Run started 2026-10-28 08:36 on `b7-loop-28-10-26` (the user's
+  branch), from 4ffc2cd; summary `b7-loop-2026-10-28-0836.md`.
 - Limit for this run: 3 subsystems.
-- Subsystem 1 of 3: `leads.md`'s top lead, `sub_820AE010`,
-  `sub_820AE348`, `sub_820AE498` (`820AE010`-`820AEC10`, objects made
-  with `sub_825A6880` from `sub_82094590`; 4 ready groups under them).
-  Mapped as the app's update and its state stack (`app-states.md`, 56
-  rows: 2 moved from `functions.md`, 54 new; ac92c3b; 1 lead added).
-  Map checked (0 errors, 56 of 56 in play, 26 ready groups, no
-  blockers outside it, no kernel calls). Migration 1 done after five
-  batches (7bb4dfd..b29697d: the containers, the operation list, the
-  layer's push, the message vector, `App::IsRunning`, the walks,
-  handlers, requests and add slots, `App::Update`; 5 adapters removed,
-  4 Native with none, 1 Merged; `--native_app_states`; `itc_1995`: 23
-  s, 0 errors, every harness 0 differing but the expected groups;
-  frame dumps the same as the fallback). Left ready: `App::Start`,
-  `AppStates::Create` and the state-layer tree's ready groups.
-  Validated (`itc_1996`: 30 of 30 harness lines, 24 ran in the attract
-  race, 6 in the replay `itc_1997`, ok; nothing to drive). Migration 2
-  done (4baecb1..30892a7: the state stack's set-up and `App::Start`,
-  the layers' walks, updates, operations and toggle messages; 14
-  adapters removed; `itc_2011`: 23 s, 0 errors, every harness 0
-  differing but the expected groups; frame dumps the same as the
-  fallback). `app-states.md` 56 of 56 ours. Validated (`itc_2012`: 28
-  of 28 harness lines, 18 ran in the attract race, 10 in the replay
-  `itc_2013`, ok; nothing to drive). Finished.
-- Subsystem 2 of 3: the car code's skeletons (`sub_820D3DE0`,
-  `sub_820D3E40`, `sub_820D3B58`, `sub_820D6010`, `sub_820D6090`,
-  `sub_820D6238`, `sub_820D63A0`, `sub_820D7C40`, `sub_820D7CC0`,
-  `sub_820D7AB0`, `sub_820D02D0`, `sub_820D6528`, `sub_820D8430`;
-  `820D0000`-`820D8908`), picked as closest to ready (31 functions in
-  ready groups of 49 left). Mapped as the scene's loading objects
-  (`scene-loaders.md`, 78 new rows; 2616cc8; 3 leads added): the first
-  scene pool set's seven loading classes, not one skeleton class. Map
-  checked (0 errors, 78 of 78 in play, 16 ready groups, no kernel calls:
-  `VirtualAlloc` only through its wrapper, routed to the allocation
-  layer). Migration 1 done (4b47c12, dfbc5a0: the leaves, `ScenePools::MakeA`,
-  the pool node, the classes' `IsLoaded`, `CarParts::Part`, the XPR
-  name lookups, `CarModelLoads`' constructor and destructor; 5 Native
-  with no adapter, none removable; `--native_scene_loaders`;
-  `itc_2018`: 23 s, 0 errors, every harness 0 differing but the
-  expected groups; draw lists the same as the fallback). Nothing ready
-  left: the rest waits on `LoadSlot::Reset` `sub_820D0730` and
-  `ReleaseBuffer` `sub_820D0758`, the part model's `sub_820CE9C8`,
-  `sub_820CE990`, `sub_820CE928` (`models.md`), the accessories' release
-  and others. Validated (`itc_2022`: 20 of 20 harness lines, 17 ran in
-  the attract race, 3 in the replay `itc_2023`, ok; nothing to drive).
-  Finished.
-- The "no mapping" lead (not counted): the scene loaders' blockers,
-  each ready (`LoadSlot::Reset` `sub_820D0730`, `ReleaseBuffer`
-  `sub_820D0758`, `sub_820C3F50`, `CarModel::Release` `sub_820D4508` in
-  `car-models.md`; `sub_820CE928`, `sub_820CE990`, `sub_820CE9C8` in
-  `models.md`) and what they unblock in `scene-loaders.md`. Migration 1
-  done after five batches (e9e8e77..effc3f0: the load slots, the
-  deferred release, the part model, `CarModel::Release` and `Reset`,
-  and the car parts', pool 4's, cockpit's, interior's, wheels' and
-  traffic body's lifetimes; 2 adapters removed, 2 Native with none;
-  `--native_car_models`; `itc_2033`: 23 s, 0 errors, every harness 0
-  differing but the expected groups; frame dumps the same as the
-  fallback). `scene-loaders.md` 39 of 78 ours, `car-models.md` 4 of 42,
-  `models.md` 42 of 50. Left ready: `ScenePools::CreateA` `sub_820C3FD8`
-  and its callees, and 12 more groups in `scene-loaders.md`. Validated
-  (`itc_2036`: 26 of 26 harness lines, 18 ran in the attract race, 8 in
-  the replay `itc_2037`, ok; nothing to drive). Migration 2 done after
-  five batches (ecdb767..016410c: pool 4's object's, the wheels', the
-  car model's, the car parts', the cockpit's and the traffic body's
-  constructors, releases and destructors, `ScenePools::CreateA`,
-  `Interior::OnPartLoaded`, `Skeleton::ResetPose`,
-  `Model::SetVinylTextures`, `SetSharedShaders`; 25 adapters removed;
-  no new flag; `itc_2060`: 23 s, 0 errors, every harness 0 differing
-  but the expected groups; draw lists the same as the fallback).
-  `scene-loaders.md` 60 of 78 ours, `models.md` 45 of 50. Nothing ready
-  left in `scene-loaders.md`; the rest waits on the material passes, the
-  accessories, `Skeleton`'s local matrices `sub_82599C58`,
-  `XPR::GetTexture`, sprintf and functions with no rows (one lead
-  added). Validated (`itc_2062`: 39 of 39 harness lines, 21 ran in
-  the attract race, 18 in the replay `itc_2063`, ok; nothing to drive).
-  Finished.
+- Subsystem 1 of 3 done: texture compression (below). Recorded in
+  the plan's table and boundary log.
+- Now: a "no mapping" lead, not counted: `Vinyl::Compress`
+  `sub_820ED090` (`car-models.md`, 110 lines) with its two ready
+  callees `sub_820ECF08`, `sub_820ECFC8` (204 lines in all), then
+  `XGCompressSurface`'s adapter, which only it calls. Migration done
+  (689b0c8, 53ea064): the three ours under `--native_car_models`
+  (adapters stay: recompiled callers in play), `XGCompressSurface`
+  Native; `itc_2106`: 19 s, 0 errors, every harness 0 differing but
+  the expected groups; frame dumps the same as the fallback. Left
+  under `CarModel::OnDecalLoaded` `sub_820D5750`: 7 ready groups (the
+  sheet's software rasterizer). Validated (`itc_2107`: 4 of 4
+  harness lines, all 4 in the attract race; nothing to drive).
+- Now: another "no mapping" lead, not counted: the vinyl sheet's
+  decal path under `CarModel::OnDecalLoaded` `sub_820D5750`
+  (`car-models.md`; 19 functions, 2,257 lines, 7 ready groups: the
+  software rasterizer `sub_820EE638` (1,246 lines) and the rest; only
+  `sub_820EED38` and `sub_820EED58` without rows). Migration done in
+  four batches (de91953..c9f00d1): all 19 ours under
+  `--native_car_models`, `Vinyl::Compress` Native; `itc_2121`: 19 s,
+  0 errors, every harness 0 differing but the expected groups (one
+  new, `OnDecalLoaded`'s headers' unwritten bytes); frame dumps the
+  same as the fallback. Validated (`itc_2122`): 19 of 20 harness
+  lines, all 20 in the attract race; `Vinyl::ClearCorner`
+  `sub_820D3C80` missing (its harness doesn't reach it): halted.
 
-- Subsystem 3 of 3: a player's save data made and deleted
-  (`sub_821057C8`, `sub_821055D8`, `sub_82221D00`), picked as closest
-  to ready in small pieces (24 ready groups; the race mode's state
-  machines, also close, are 2,000-3,000-line functions to split).
-  Mapped as the players' save data in memory (`save-data.md`, 23 rows:
-  1 moved, 22 new, 4 of them not seen in play (added in 1fedb13 by the
-  user's call of 2026-10-23); 8cbdba1; 1 lead added). Map checked (0
-  errors, 19 of 19 in play, 13 ready groups, no blockers, no kernel
-  calls). Migration 1 done (0fb0eb9..d585a41: the progress, stats,
-  course records, options, control maps, the default tables' getters,
-  `SaveData::Create` and `Delete`, `MenuList::Init`,
-  `Players::ResetControllers`, `TitleScreen::ResetPlayer`; 11 adapters
-  removed; `--native_save_data`; `itc_2070`: 23 s, 0 errors, every
-  harness 0 differing but the expected groups; all 19 ran in the attract
-  race). `save-data.md` 19 of 19 in play ours. Validated (`itc_2071`:
-  19 of 19 harness lines, all 19 ran in the attract race; no replay
-  needed; nothing to drive). Finished.
+- Resumed 2026-10-28 by the user's call after the stop below: the
+  harness fixed (9dc3c72; `OnDecalLoaded`'s compress cases now reach
+  `ClearCorner` and the compress, 3 of 16 compressing; a double free in
+  the harness's cleanup they exposed fixed; `itc_2126`: 17 s, 0
+  errors, every harness 0 differing but the expected groups, the
+  harnesses ~1 s longer).
+- Subsystem 2 of 3: `leads.md`'s top lead, `sub_82170550`,
+  `sub_82170668`, `sub_82171250`, `sub_82165E20`, `sub_821662E0`,
+  `sub_82173A90`, `sub_82174BC0` (probably the race's states and
+  manager, the callers of `TrackCollision::Load`, `ResetWorld`,
+  `Unload`, `Tick`; 16+ ready groups under them). Mapped as the race
+  world (`race-world.md`, 54 rows, all new, 45 in play: the race
+  mode's state machine at +116812, the racers' manager at
+  `[0x826D82F4]` with its streaming of vehicles by distance, the
+  start placements, the save's distance on unload; 5b6d76c; 1 lead
+  added). Map checked (0 errors, 22 ready groups, blocked outside by
+  `TrackCollision::Tick` `sub_820FF050` (ready) and the archive's
+  `sub_8209DE48`, `sub_820A0678`; no kernel calls). Migration 1 done
+  (4824fa1..1472716, four batches): the leaves, the manager's tables,
+  the vehicles' tick with `TrackCollision::Tick` (`collision-world.md`),
+  `RaceWorld::Init`; 24 ours in `race-world.md`, 2 adapters removed;
+  `--native_race_world`; `itc_2138`: 17 s (the harnesses 21 s), 0
+  errors, every harness 0 differing but the expected groups; frame
+  dumps the same as the fallback (`itc_2133`, `itc_2134`). Left ready:
+  `ResetWorld`, `ResetVehicles`, `Unload`, the event's start
+  placements, `RaceStart::Place`, `AddRacers`, `ListRacers` and the
+  big ticks (split). Validated (`itc_2139`, replay `itc_2140` ok: 24
+  of 24 harness lines, 13 in the attract race, 8 in the replay, 3 to
+  drive). Migration 2 done (1be0160..b3013b9, five batches, the tick
+  tree split in three; subagents one at a time): `ResetWorld`,
+  `ResetVehicles`, `Unload`, the event's start placements,
+  `ListRacers`, `AddRacers`, `OnLoaded`, `RaceStart::Place` and
+  `PlaceRolling`, the vehicle streaming and `RaceWorld::Tick`; 48 of
+  50 in play ours, 25 Native; `itc_2202`: 9 s (the harnesses 29 s,
+  `race_world`'s 8.3 s of it), 0 errors, every harness 0 differing but
+  the expected groups (one new); frame dumps the same as the fallback
+  (`itc_2197`, `itc_2198`). Left ready: `RaceManager::Refresh`
+  `sub_82171978`. Validated (`itc_2203`, replay `itc_2204` ok: 33 of
+  33 harness lines, 14 in the attract race, 13 in the replay, 6 to
+  drive). Migration 3 (981658f): `RaceManager::Refresh`; validated
+  (`itc_2206`, replay `itc_2207`: ran in the replay). Finished: 49 of
+  50 in play ours; recorded in the plan's table and boundary log.
+
+- Subsystem 3 of 3: the lead the race world's map added, the race's
+  other states (`sub_82166E50`, `sub_82163440`, `sub_821654F8`,
+  `sub_82162D80`, `sub_82165AB0`, `sub_82165C78`, `sub_82166F98`,
+  `sub_821692C8`; they call `RaceStart::Place`, `Refresh`,
+  `ListRacers`; 18+ ready groups). Mapped as the race's states
+  (`race-states.md`, 78 rows, all new, 61 in play: `RaceStates::Init`'s
+  machine at +107168, 87 transitions, the race's progress at
+  `[0x826D82E8]`; 009568e; 4 leads added). Map checked (0 errors, 31
+  ready groups, blocked outside by the loading screen, the archive's
+  queue, the cars put back, the input recordings, the scene models'
+  load poll, the player's items, the race event's lookups, the
+  two-player cameras, the achievements check; no kernel calls).
+  Migration 1 done (edb5487..2b3fe33, five batches): the race's
+  progress and checks, the state handlers, the rolling and standing
+  starts, the countdown; 35 ours, 6 Native; `--native_race_states`;
+  `itc_2234`: 8 s (the harnesses 30 s), 0 errors, every harness 0
+  differing but the expected groups; frame dumps identical (the
+  attract race reaches only `RaceProgress::Create` and `Reset`). Left
+  ready: `RaceStates::Init` (2,888 lines, split), `Begin`,
+  `RouteDistance`, `StartRoute`, `FollowRoute`. Validated
+  (`itc_2235`, replay `itc_2236` ok, free-start path: 35 of 35 harness
+  lines, 2 in the attract race, 5 in the replay, 28 to drive).
+  Migration 2 done (66b8f50..0af672e; three subagents one at a time):
+  `Begin`, `FollowRoute`, `RaceTick`, `StartRoute` with
+  `RouteDistance`, `OnGo`, `RaceStates::Init` (split in two, its 87
+  transitions checked against the listing); 43 of 63 in play ours,
+  14 more Native; `itc_2251`: 8 s (the harnesses 30 s), 0 errors,
+  every harness 0 differing but the expected groups; no frame dump
+  (only `Init`, `Create`, `Reset`, `Begin` run in the attract race).
+  Left: none ready (the rest waits on the loading screen, the archive's
+  queue, the cars put back, the input recordings, the scene models'
+  load poll, the player's items and achievements, the race event's
+  lookups, the two-player cameras, the core). Validated (`itc_2252`,
+  replay `itc_2253` ok: 19 of 19 harness lines, 3 in the attract race,
+  11 in the replay, 2 more to drive; 7 of migration 1's left the drive
+  list). Finished: 43 of 63 in play ours; recorded.
 
 ## Done
 
-- The players' save data (`save-data.md`, mapped in 8cbdba1 and
-  1fedb13; 23 rows, 19 in play): 19 ours in one migration
-  (0fb0eb9..d585a41), 11 adapters removed; validated (`itc_2071`);
-  `--native_save_data`.
+- The race's states (`race-states.md`, mapped in 009568e; 78 rows, 63
+  in play): 43 ours in two migrations (edb5487..0af672e), 20 Native;
+  validated (`itc_2235`/`2236`, `itc_2252`/`2253`; 23 to drive);
+  `--native_race_states`.
 
-- The scene loaders' blockers (no mapping; e9e8e77..016410c):
-  `scene-loaders.md` 60 of 78 ours, `car-models.md` 4 of 42, `models.md`
-  45 of 50; 27 adapters removed; validated (`itc_2036`, `itc_2062`);
-  `--native_car_models` (new), `--native_scene_loaders`,
-  `--native_models`.
+- The race world (`race-world.md`, mapped in 5b6d76c; 54 rows, 50 in
+  play): 49 ours in three migrations (4824fa1..981658f), 25 adapters
+  removed; `TrackCollision::Tick` (`collision-world.md`); validated
+  (`itc_2139`/`2140`, `itc_2203`/`2204`, `itc_2206`/`2207`; 8 to
+  drive); `--native_race_world`.
 
-- The scene's loading objects (`scene-loaders.md`, mapped in 2616cc8;
-  78 rows): 20 ours in one migration (4b47c12, dfbc5a0), 5 Native with
-  no adapter; validated (`itc_2022`); `--native_scene_loaders`.
+- The vinyl sheet's decal path (no mapping; de91953..c9f00d1):
+  `car-models.md` 27 of 46 ours under `--native_car_models`,
+  `Vinyl::Compress` Native; validation (`itc_2122`) found
+  `ClearCorner`'s harness gap.
 
-- The app's update and its state stack (`app-states.md`, mapped in
-  ac92c3b; 56 rows): 56 ours in two migrations (7bb4dfd..30892a7), 19
-  adapters removed, 4 Native with none, 1 Merged; validated
-  (`itc_1996`, `itc_2012`); `--native_app_states`.
+- `Vinyl::Compress` (no mapping; 689b0c8, 53ea064): `car-models.md`
+  3 more ours under `--native_car_models`, `XGCompressSurface` Native;
+  validated (`itc_2107`).
+
+- Texture compression (`texture-compression.md`, mapped in f1c484c;
+  157 rows, 24 in play): 24 ours in one migration (cdf8494..af2c1ee),
+  18 adapters removed; validated (`itc_2099`, all 24 in the attract
+  race); `--native_texture_compression`.
 
 ## Rows to review
 
-This run's rows: `review.md` ("Run 2026-10-27 22:31").
+This run's rows: `review.md` ("Run 2026-10-28 08:36").
 
 ## Expected to differ
 
-This run's groups: `expected-differences.md` (the "22:31 run" lines).
+This run's groups: `expected-differences.md` (the "08:36 run" lines).
 
 ## To check in a drive
 
-`to-drive.md` (this run's section, and what's left from earlier runs).
+`to-drive.md` (this run's heading, when it has any).
 
 ## Totals
 
-- Start: ours 2255, work left 4197 (wrapped 104, known 516, unknown 3577).
-  `b7_status.py`'s one check at the start: `movies.md:108`
-  `sub_82108018`'s row says never called, but it ran (not this run's).
-- After the app states' map: ours 2255, work left 4197 (wrapped 104,
-  known 570, unknown 3523).
-- After the app states' migration 1: ours 2286, work left 4166
-  (wrapped 103, known 540, unknown 3523).
-- After the app states' validation: race 23 s (`itc_1996`), 0 errors,
-  every harness 0 differing but the expected groups; replay 127 s
-  (`itc_1997`), 0 errors.
-- After the app states' migration 2: ours 2311, work left 4141
-  (wrapped 103, known 515, unknown 3523).
-- After the app states' validation 2: race 23 s (`itc_2012`), 0 errors,
-  every harness 0 differing but the expected groups; replay 127 s
-  (`itc_2013`), 0 errors.
-- After the scene loaders' map: ours 2311, work left 4141 (wrapped
-  103, known 593, unknown 3445).
-- After the scene loaders' migration 1: ours 2331, work left 4121
-  (wrapped 103, known 573, unknown 3445).
-- After the scene loaders' validation: race 22 s (`itc_2022`), 0
-  errors, every harness 0 differing but the expected groups; replay
-  127 s (`itc_2023`), 0 errors.
-- After the scene loaders' blockers' migration 1: ours 2357, work left
-  4095 (wrapped 103, known 547, unknown 3445).
-- After the blockers' validation: race 23 s (`itc_2036`), 0 errors,
-  every harness 0 differing but the expected groups; replay 127 s
-  (`itc_2037`), 0 errors.
-- After the blockers' migration 2: ours 2381, work left 4071 (wrapped
-  103, known 523, unknown 3445).
-- After the blockers' validation 2: race 22 s (`itc_2062`), 0 errors,
-  every harness 0 differing but the expected groups; replay 127 s
-  (`itc_2063`), 0 errors.
-- After the save data's map: ours 2381, work left 4071 (wrapped 103,
-  known 541, unknown 3427).
-- After the save data's migration: ours 2400, work left 4052 (wrapped
-  103, known 522, unknown 3427).
-- At the end (after the save data's validation, `itc_2071`: race 23 s,
-  0 errors, every harness 0 differing but the expected groups): ours
-  2400, work left 4052 (wrapped 103, known 522, unknown 3427).
+- At the start: ours 2400, work left 4052 (wrapped 103, known 522,
+  unknown 3427).
+- After the texture compression's map: ours 2400, work left 4052
+  (wrapped 103, known 546, unknown 3403).
+- After the texture compression's migration: ours 2424, work left
+  4028 (wrapped 103, known 522, unknown 3403).
+- After its validation: race 19 s (`itc_2099`), 0 errors, every
+  harness 0 differing but the expected groups; no replay needed.
+- After `Vinyl::Compress`'s migration: ours 2427, work left 4025
+  (wrapped 103, known 520, unknown 3402).
+- After the decal path's migration: ours 2447, work left 4006
+  (wrapped 103, known 503, unknown 3400).
+- At the end (after the decal path's validation, `itc_2122`: race 19
+  s, 0 errors, every harness 0 differing but the expected groups):
+  ours 2447, work left 4006 (wrapped 103, known 503, unknown 3400).
+- After the race world's map: ours 2447, work left 4006 (wrapped 103,
+  known 548, unknown 3355).
+- After the race world's migration 1: ours 2472, work left 3982
+  (wrapped 103, known 524, unknown 3355).
+- After the race world's migration 2: ours 2496, work left 3962
+  (wrapped 103, known 504, unknown 3355).
+- After the race world (finished): ours 2497, work left 3961 (wrapped
+  103, known 503, unknown 3355).
+- After the race states' map: ours 2497, work left 3961 (wrapped 103,
+  known 564, unknown 3294).
+- After the race states' migration 1: ours 2532, work left 3927
+  (wrapped 103, known 530, unknown 3294).
+- After the race states' migration 2: ours 2540, work left 3920
+  (wrapped 103, known 523, unknown 3294).
+- At the end (after the race states' validation, `itc_2252`: race 8
+  s, the harnesses 30 s, 0 errors, every harness 0 differing but the
+  expected groups): ours 2540, work left 3920 (wrapped 103, known 523,
+  unknown 3294).
 
 ## Stopped
 
-2026-10-28, at the run's limit: 3 subsystems (the app states, the scene
-loaders, the save data; the scene loaders' blockers, without mapping,
-not counted). `check_function_statuses.py`: 0 errors. Nothing for
-`to-drive.md`. Two finished validation agents were stopped after their
-reports (each said it still had background work; no game process was
-running).
+2026-10-28, at the run's limit: 3 subsystems (texture compression, the
+race world, the race's states; the vinyl sheet's two leads without
+mapping not counted). Earlier the same day it stopped at the decal
+path's validation (`Vinyl::ClearCorner` with no harness line) and was
+resumed after the harness fix (9dc3c72) by the user's call.
+`check_function_statuses.py`: 0 errors. To drive: `to-drive.md`.

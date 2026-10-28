@@ -314,6 +314,25 @@ Rows not yet moved stay in the table below. So far:
   garage list, the item records, the unlock bit sets), the course
   records, the options and the default control maps, and the title
   screen's reset that makes player 0's again (B7).
+- [`texture-compression.md`](texture-compression.md): XGraphics'
+  surface compression and conversion, linked into the game:
+  `XGCompressSurface` (the vinyl sheet to DXT5, its only use in play),
+  D3DX's image blitter and filters, a codec for each format (rows
+  decoded to and encoded from float4s), the DXT block encoders and
+  decoders, `XGCopySurface` and the endian swaps (B7).
+- [`race-world.md`](race-world.md): the race world, the race mode's
+  state machine that loads, settles, ticks and frees the race's cars and
+  collision world, and the racers' manager at `[0x826D82F4]`: its
+  entries for the opponents and traffic, which of them get one of the
+  seven vehicles near the player (streamed every tick), the others moved
+  along the route, the racers' list, and the event's start positions
+  (B7).
+- [`race-states.md`](race-states.md): the race's states, the race
+  mode's state machine that runs a race from start to end (each stage's
+  set-up, the loading screen waits, the rolling and standing starts, the
+  countdown, the end, the replay and the menu after the race) and the
+  race's progress at `[0x826D82E8]`: each racer's time, laps, distance
+  along the route, hits, spirit points and place (B7).
 
 These files hold functions only. What used to follow the table here moved
 out on 2026-10-20: how frame interpolation works, its options and what

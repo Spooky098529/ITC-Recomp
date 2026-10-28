@@ -7,6 +7,7 @@
 #pragma once
 
 #include "guest.h"
+#include "vehicle/vehicle.h"
 
 namespace hooks {
 
@@ -66,6 +67,11 @@ void VehicleSurfaceGrip(PPCContext& ctx, uint8_t* base);
 // the vehicle, r4 = the car; r3 = the +344 box (or 0), f1 SetValue2388's.
 void VehicleSetUp(PPCContext& ctx, uint8_t* base);
 void VehicleResetForCar(PPCContext& ctx, uint8_t* base);
+// The callees' originals Vehicle::SetUp's and ResetForCar's plain C++ hands
+// back (the car loader, the physics' set-up and reset, LinkTrackPositions),
+// run with r1 = `frame` (the set-up's frame); for native callers of the
+// plain C++ too.
+vehicle::CalleeOriginal VehicleSetUpOriginals(PPCContext& ctx, uint8_t* base, uint32_t frame);
 
 // VehicleStatus::Update sub_820C23E8: r3 = the status record, r4 = the
 // vehicle, r5 = a car or 0, r6 = the flag (r3 not kept: Vehicle::Tick's
@@ -73,6 +79,10 @@ void VehicleResetForCar(PPCContext& ctx, uint8_t* base);
 // = the racer, r5 = a car or 0, r6 = the flag.
 void VehicleStatusUpdate(PPCContext& ctx, uint8_t* base);
 void VehicleTick(PPCContext& ctx, uint8_t* base);
+// The guest calls Vehicle::Tick's plain C++ makes where a callee refuses
+// (the originals, in the frame it gives); for native callers of the plain
+// C++ too.
+vehicle::GuestCall VehicleTickCalls(PPCContext& ctx, uint8_t* base);
 
 // Vehicle::PlaceOnRoute sub_820C3608: r3 = the vehicle, r4 = the route
 // position, f1 = the speed (km/h), f2 = the offset across the road (the

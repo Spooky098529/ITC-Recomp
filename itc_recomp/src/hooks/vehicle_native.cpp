@@ -174,12 +174,9 @@ void VehicleSurfaceGrip(PPCContext& ctx, uint8_t* base) {
   ctx.r3.u64 = vh::VehicleSetUpSurfaceGrip(base, ctx.r3.u32, ctx.r4.u32, ctx.r1.u32 - 480);
 }
 
-namespace {
-
-void SetUpStep(PPCContext& ctx, uint8_t* base, bool reset) {
-  ctx.fpscr.disableFlushMode();
-  const uint32_t frame = ctx.r1.u32 - 224;
-  auto original = [&](uint32_t address, uint64_t r3, uint64_t r4, uint64_t r5, uint64_t r6) {
+vehicle::CalleeOriginal VehicleSetUpOriginals(PPCContext& ctx, uint8_t* base, uint32_t frame) {
+  return [&ctx, base, frame](uint32_t address, uint64_t r3, uint64_t r4, uint64_t r5,
+                             uint64_t r6) {
     const uint64_t r1 = ctx.r1.u64;
     ctx.r1.u64 = frame;
     ctx.r3.u64 = r3;
@@ -203,9 +200,16 @@ void SetUpStep(PPCContext& ctx, uint8_t* base, bool reset) {
     ctx.r1.u64 = r1;
     ctx.fpscr.disableFlushMode();
   };
+}
+
+namespace {
+
+void SetUpStep(PPCContext& ctx, uint8_t* base, bool reset) {
+  ctx.fpscr.disableFlushMode();
+  const uint32_t frame = ctx.r1.u32 - 224;
   double f1 = 0.0;
   ctx.r3.u64 = vh::VehicleSetUp(base, ctx.r3.u32, ctx.r4.u32, frame, reset, NativeHeapActive(),
-                                original, &f1);
+                                VehicleSetUpOriginals(ctx, base, frame), &f1);
   ctx.f1.f64 = f1;
 }
 
@@ -227,9 +231,8 @@ void VehicleStatusUpdate(PPCContext& ctx, uint8_t* base) {
   }
 }
 
-void VehicleTick(PPCContext& ctx, uint8_t* base) {
-  ctx.fpscr.disableFlushMode();
-  auto call = [&](uint32_t address, uint32_t r1, const vh::GuestRegisters& r) {
+vehicle::GuestCall VehicleTickCalls(PPCContext& ctx, uint8_t* base) {
+  return [&ctx, base](uint32_t address, uint32_t r1, const vh::GuestRegisters& r) {
     const uint64_t saved = ctx.r1.u64;
     ctx.r1.u64 = r1;
     ctx.r3.u64 = r.r3;
@@ -264,7 +267,12 @@ void VehicleTick(PPCContext& ctx, uint8_t* base) {
     ctx.r1.u64 = saved;
     ctx.fpscr.disableFlushMode();
   };
-  vh::VehicleTick(base, ctx.r3.u32, ctx.r4.u32, ctx.r5.u32, ctx.r6.u32, ctx.r1.u32 - 144, call);
+}
+
+void VehicleTick(PPCContext& ctx, uint8_t* base) {
+  ctx.fpscr.disableFlushMode();
+  vh::VehicleTick(base, ctx.r3.u32, ctx.r4.u32, ctx.r5.u32, ctx.r6.u32, ctx.r1.u32 - 144,
+                  VehicleTickCalls(ctx, base));
 }
 
 void VehiclePlaceOnRoute(PPCContext& ctx, uint8_t* base) {

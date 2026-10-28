@@ -11,6 +11,169 @@ functions to check in a drive in the progress file.
 When the user has reviewed a run's section, its heading gets
 "(reviewed <date>)"; the section stays for the record.
 
+## Run 2026-10-28 08:36 (`b7-loop-28-10-26`)
+
+- Texture compression (map f1c484c): `docs/functions/texture-compression.md`,
+  157 rows (all new; 24 seen in play, the rest "Not seen in play"):
+  XGraphics' `XGCompressSurface` (probably, `sub_8235AAC0`) over D3DX's
+  image blitter (the per-format codecs from `ImageCodec::Create`
+  `sub_823F6C60`, ten blitters and filters), used in play only by
+  `Vinyl::Compress` (A8R8G8B8 -> DXT5, premultiplied). Map correction:
+  the lead had `sub_82368170` as a caller; it's a callee
+  (`XGCopySurface`, probably; never ran). Not part of the HLSL
+  compiler. `known-data.md`: `0x82954660`, `0x8263B7E8`, `0x8263C768`,
+  `0x82001030`, the codec vtables and layout; notes in `heap.md` and
+  `car-models.md`; one lead added (`XGCopySurface`'s 24 per-format
+  routines, none seen in play).
+- Texture compression, migration 1 (cdf8494..af2c1ee): 29 rows in
+  `texture-compression.md` (24 ours, 18 Native; 5 with notes only);
+  map correction in `XGCompressSurface`'s row (the YUV formats
+  `0x1A20004B`/`4C` go with flags 4). Code in
+  `src/texture_compression/` (strict-float options), adapters in
+  `src/hooks/texture_compression.cpp`; allocation through
+  `src/memory/heap.h`, the native path only while the native heap is
+  active. Handed to the originals (never in play): DXN/CTX1
+  destinations, sources copied or swapped first, the YUV formats, the
+  eight filters, `CopyBlocks`, the color key's slot 3, sRGB, DXT block
+  pointers other than DXT4/5's. For review: (1) stack leftovers:
+  `XGCompressSurface` keeps its two descriptions and blit object on
+  the guest stack at the original's offsets, and the color encoder's
+  adapter writes the two words the original stores in its caller's
+  frame; but a few words the original's callees leave below the stack
+  pointer after returning (the color encoder's r6/r3 slots, the
+  premultiplied pixel copy, `EncodeRow`'s 0,0,0,1 padding table) aren't
+  written natively (no caller reads them); (2) `FitEndpoints`' negative
+  index path near a multiple of -2^28 would read into `EncodeBlock`'s
+  frame in the original (pixels hundreds of millions of steps out of
+  range; in the row); (3) `EncodeRow` on a box cut on the right reads
+  leftover heap memory in the original (the harness primes the heap; in
+  play the box is the whole surface). The vinyl's detail couldn't be
+  judged from the dumps (cars too far); the `XGCompressSurface` harness
+  compresses a full 1024x1024 sheet byte for byte.
+- `Vinyl::Compress` without mapping (689b0c8, 53ea064): rows in
+  `car-models.md` for `Vinyl::Compress` `sub_820ED090`,
+  `Texture::Create` `sub_820ECF08`, `Texture::Free` `sub_820ECFC8` (a
+  new row), plain C++ in `src/car_models/vinyl.{h,cpp}` under
+  `--native_car_models` (only with the native heap; `Texture::Free` and
+  `Vinyl::Compress` only with an old header 0 or in the allocation
+  layer's range, VirtualFree's adapter's condition);
+  `XGCompressSurface` Native (`texture-compression.md`'s row and
+  intro), `--native_texture_compression` now switched by
+  `--native_car_models`. Kept as the original: `Resource::Release`
+  `sub_822A67B0` a guest call from a 272-byte frame with the original's
+  return addresses; the frame's words written as the original writes
+  them, except the saved registers (as `XGCompressSurface`). Harness:
+  allocation addresses compared as which allocation plus offset; the
+  comparison of `Texture::Create`'s frame inside `Vinyl::Compress`'s
+  cases removed (the original `XGCompressSurface` saves registers over
+  it, its plain C++ doesn't; `Texture::Create`'s own cases check it).
+- The vinyl sheet's decal path without mapping (de91953..c9f00d1): 21
+  rows in `car-models.md` (two new: `sub_820EED58`, `sub_820EED38`;
+  `sub_820EE698` Merged into `Vinyl::DrawDecal`, the recompiler's split
+  of its switch; `sub_820D4078`, `sub_820D3C80` Native with no adapter;
+  `Vinyl::Compress` Native). Plain C++ in `src/car_models/tga.*`,
+  `raster.*`, `decals.*` (strict-float; float steps in the translated
+  code's operand order), under `--native_car_models`. Handed to the
+  originals: TGAs other than type 2 with 24 or 32 bits (RLE never seen),
+  files or a sheet outside the allocation layer's pages, region numbers
+  above 9. Adapters kept: `sub_820D5750` (`Archive::Load`'s callback),
+  `sub_820EE638`, `sub_820ED020`, `sub_820EEBC0` (recompiled callers
+  outside the lead). One group expected to differ
+  (`expected-differences.md`, "Unwritten header bytes in the frame").
+- The run stopped at the decal path's validation (`ClearCorner` with
+  no harness line); the lead fixed the harness by the user's call
+  (9dc3c72: compress cases with no slot loading, and the cleanup's
+  double free of the new sheet header they exposed) and resumed the
+  run.
+- The race world (map 5b6d76c): `docs/functions/race-world.md`, 54 rows
+  (all new; 45 in play, 9 not seen): the race mode's state machine at
+  +116812 (`RaceWorld::`, 24 transitions; states 1 load, 2 loading, 3
+  start, 7 racing, 24 paused, 37 end), the racers' manager at
+  `[0x826D82F4]` (80 entries of 28 bytes: 77 opponents and 3 traffic;
+  at most 4 opponents and the allowed traffic get one of the 7
+  vehicles, streamed by distance from the car's speed), the race
+  event's start placements (`RaceEvent::Place*`), `RaceStart::Place`
+  and `PlaceRolling`, the save's distance on unload. `known-data.md`:
+  `0x826D82F4` extended, two new rows; `leads.md`: lead 31 deleted (all
+  mapped here), `sub_82174D28` dropped from lead 50, one lead added (the
+  race's other states); `ai-drivers.md`: three notes repointed.
+- The race world, migration 1 (4824fa1..1472716): 25 rows in
+  `race-world.md` (24 ours, 2 Native, `sub_821708B4` Merged) and
+  `TrackCollision::Tick` `sub_820FF050` in `collision-world.md` (under
+  `--native_collision_world`). Code in `src/race_world/`,
+  `src/track_collision/track_world.cpp`. Map corrections:
+  `RaceManager::BranchesMeet` returns 1 when r4 is 0 or 29 or the same
+  branch as r3 (its case table in the row); `ResetVehicles` calls
+  `Vehicle::SetUp` for slot -1 and `ResetForCar` otherwise. Refactors
+  with no behavior change: the guest-call lambdas of the vehicle and
+  car physics adapters moved into shared functions
+  (`hooks::VehicleTickCalls`, `VehicleSetUpOriginals`,
+  `CollisionWorldUpdateCalls`, new `src/hooks/car_physics.h`); the
+  vehicle and car physics harnesses export set-up helpers.
+- The race world, migration 2 (1be0160..b3013b9): 37 rows in
+  `race-world.md` (25 Native; `sub_82144874`, `sub_8217437C` Merged).
+  Map corrections: `PlaceGroupFixed`'s groups 0 and 1 swapped;
+  `PlaceStarts` places three groups by `PlaceGroupFixed` and one by
+  `Split` or `PlaceGroup`; `RaceStart::Place` ticks 300 times in mode 6
+  with the stage's +0 not 1, else 30; `PlaceRolling`'s "all" is save
+  +6100 equal to 1; `OnLoaded`'s lane is the racer's place mod 2;
+  `MoveUnseen` has no stepping loop (section ranges corrected);
+  `Stream`'s kinds 2 and 3 go to `StreamCruise`, 5 to
+  `StreamTwoPlayers`, the rest to `StreamNear` (attract races stream
+  through `StreamNear`). For review: `StreamTraffic`'s neighbor search
+  left out as dead code (its 0x800 count never goes below 0; a comment
+  and the row say so); `GiveVehicle` `sub_821706E8` and `sub_821743A8`
+  (neither seen in play) got overrides running the original or a
+  harness stand-in while one is set (the time harness's precedent), so
+  their rows are Wrapped; `hooks::AiUpdateAll` with a harness stand-in
+  in `src/hooks/ai_drivers.*`; the vehicle harness's SetUp cases
+  factored into exported helpers (case counts unchanged). One group
+  expected to differ (`AddRacers`, random traffic numbers, 5 of 200:
+  stack leftovers). The harnesses now take ~29 s of the 40-second race
+  (`race_world`'s 8.3 s), leaving ~9 s of attract race.
+- The race world, migration 3 (981658f): `RaceManager::Refresh`
+  `sub_82171978` (r3 not kept: no caller reads it; stops at the first
+  `GiveVehicle` without a free slot, as the original); a shared
+  `OpponentsCall` helper with `StreamOpponents`' adapter.
+- The race's states (map 009568e): `docs/functions/race-states.md`, 78
+  rows (all new; 61 in play): `RaceStates::Init` `sub_82169920`'s machine
+  at +107168 (87 transitions in the intro: stage set-up, loading, rolling
+  and standing starts, countdown, racing, pause, quit, end, replay, the
+  menu after the race, between stages and the next stage (not seen),
+  free run, a demo, abort), the race's progress at `[0x826D82E8]`
+  (`RaceProgress::`, 7,248 bytes; 972-byte results entries: times, laps,
+  distance, hits, places, SP, probably spirit points), the per-tick
+  checks by stage type, its messages to `RaceWorld`. Not read in detail
+  (rows from their calls): `sub_821635D0`, `sub_82162330`,
+  `sub_82166658`, `sub_821634D8`, `sub_821653E8` and the unseen
+  handlers. Kind 6's System Link branch mentioned once, not mapped.
+  `known-data.md`: `0x826D82E8` expanded, "race states" and the loading
+  screen `0x82815E60` rows; four leads added, three leads' notes.
+- The race's states, migration 1 (edb5487..2b3fe33): 35 rows in
+  `race-states.md` (6 Native; `Time::Sub` `sub_82162230` Native with
+  no adapter, never seen). Code in `src/race_states/`. The System Link
+  case of `StandingStartTick` runs the original whole (the row says
+  so). Float compares follow the translated code's `bge` as `!lt` and
+  `ble` as `!gt` (a NaN takes them; `src/race_states/steps.h`). Map
+  corrections: `DrainSp`'s side test uses flags 0x1, 0x2 and 0x80 (not
+  0x40); `CheckLap` compares with the next lap's distance
+  (`+7160 + 4 * (R+60 + 1)`); `TickFraction` reads r3 (the slot's
+  entry); `MapToSection`'s walk described. Exports added:
+  `race_setup::CopyCourseRoute`, `RaceWorldOpponentsCall`,
+  `RaceWorldStartCalls`, `RaceWorldListRacersOriginal`.
+- The race's states, migration 2 (66b8f50..0af672e): 19 rows in
+  `race-states.md` (14 more Native; `sub_82163000` and `RouteDistance`
+  Native with no adapter). `race_setup::RouteCopiesNative` and
+  `CopyCourseRoute` take an optional `to` offset (default 96; callers
+  unchanged). For review: `RaceTick`'s and `OnGo`'s harness cases give
+  each racer 1 to 3 sections (with an empty list `FollowRoute` writes
+  over the slot's manager entry, in the original too; in play
+  `StartRoute` always lists the start first); `StartRoute`'s harness
+  routes are built, not the game's (the real routes loop on random
+  links); `RaceTick`, `OnGo` and `StartRoute` run the original whole
+  where the course route's memcpy copies aren't native, and `RaceTick`
+  also with +7220's 0x8 (`sub_821653E8`, never seen).
+
 ## Run 2026-10-27 22:31 (`b7-loop-27-10-26`)
 
 - The app's update and its state stack (map ac92c3b):
