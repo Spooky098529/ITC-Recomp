@@ -172,6 +172,8 @@ set(ITC_SOURCES
     src/race_states/follow_route.cpp
     src/race_states/race_states_init.cpp
     src/race_states/route_distance.cpp
+    src/hooks/archive.cpp
+    src/archive/archive.cpp
     src/hooks/texture_compression.cpp
     src/texture_compression/dxt_alpha.cpp
     src/texture_compression/dxt_color.cpp
@@ -321,6 +323,7 @@ set(ITC_SOURCES
     src/harnesses/save_data.cpp
     src/harnesses/race_world.cpp
     src/harnesses/race_states.cpp
+    src/harnesses/archive.cpp
     src/harnesses/texture_compression.cpp
     src/harnesses/collision.cpp
     src/harnesses/collision_world.cpp
