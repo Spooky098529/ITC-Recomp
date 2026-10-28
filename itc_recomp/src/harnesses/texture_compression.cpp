@@ -3,7 +3,8 @@
 // Each case writes the same inputs into the scratch area (filled with 0xCD)
 // for both versions, runs the original (with --native_texture_compression
 // off, so its callees are the originals too) or the plain C++ through the
-// register steps (hooks/texture_compression.h), and compares with
+// register steps (hooks/texture_compression.h for the encoders, Native<Name>
+// below for the helpers whose adapters went), and compares with
 // harness::Outputs: the block's bytes and the scratch area exactly, the
 // fitted ends (stored with stfs) as floats.
 //
@@ -69,6 +70,71 @@ constexpr uint32_t kHigh = 644;
 constexpr uint32_t kPremultiplied = 0x82954660;
 
 constexpr int kKinds = 16;
+
+namespace tc = texture_compression;
+
+// The register steps of the helpers whose adapters went (they're Native,
+// reached only through the encoders' plain C++): what the adapters did,
+// without the flag.
+
+// DxtAlpha::FitEndpoints sub_824207D8: r3 = the low end's float, r4 = the
+// high end's, r5 = 16 floats, r6 = the steps (6 or 8; the original for any
+// other count). r3 left.
+void NativeFitAlphaEndpoints(PPCContext& ctx, uint8_t* base) {
+  if (ctx.r6.u32 != 6 && ctx.r6.u32 != 8) {
+    __imp__sub_824207D8(ctx, base);
+    return;
+  }
+  ctx.fpscr.disableFlushMode();
+  float values[16];
+  for (uint32_t i = 0; i < 16; i++) {
+    values[i] = guest::LoadFloat(base, ctx.r5.u32 + 4 * i);
+  }
+  float low;
+  float high;
+  tc::FitAlphaEndpoints(base, values, ctx.r6.u32, &low, &high);
+  guest::StoreFloat(base, ctx.r3.u32, low);
+  guest::StoreFloat(base, ctx.r4.u32, high);
+}
+
+// DxtColor::PackR5G6B5 sub_824206E8: r3 = a float4 color (red, green, blue
+// read). r3 = the 5:6:5 color.
+void NativePackR5G6B5(PPCContext& ctx, uint8_t* base) {
+  ctx.fpscr.disableFlushMode();
+  float color[3];
+  for (uint32_t i = 0; i < 3; i++) {
+    color[i] = guest::LoadFloat(base, ctx.r3.u32 + 4 * i);
+  }
+  ctx.r3.u64 = tc::PackR5G6B5(base, color);
+}
+
+// DxtColor::FitEndpoints sub_82420AB8: r3 = the low end's three floats, r4
+// the high end's, r5 = 16 float4 pixels, r6 = the colors (3 or 4; the
+// original for any other count). r3, r4 and r6 left, r5 + 8 (as the
+// original leaves it).
+void NativeFitColorEndpoints(PPCContext& ctx, uint8_t* base) {
+  if (ctx.r6.u32 != 3 && ctx.r6.u32 != 4) {
+    __imp__sub_82420AB8(ctx, base);
+    return;
+  }
+  ctx.fpscr.disableFlushMode();
+  float pixels[16][3];
+  for (uint32_t i = 0; i < 16; i++) {
+    for (uint32_t c = 0; c < 3; c++) {
+      pixels[i][c] = guest::LoadFloat(base, ctx.r5.u32 + tc::kPixelBytes * i + 4 * c);
+    }
+  }
+  float low[3];
+  float high[3];
+  tc::FitColorEndpoints(base, pixels, ctx.r6.u32, ctx.r1.u32, low, high);
+  for (uint32_t c = 0; c < 3; c++) {
+    guest::StoreFloat(base, ctx.r3.u32 + 4 * c, low[c]);
+  }
+  for (uint32_t c = 0; c < 3; c++) {
+    guest::StoreFloat(base, ctx.r4.u32 + 4 * c, high[c]);
+  }
+  ctx.r5.s64 = ctx.r5.s64 + 8;  // the original walks the pixels from r5 + 8
+}
 
 using Block16 = std::array<float, 16>;
 
@@ -257,7 +323,7 @@ void FitEndpoints(Context& h) {
         __imp__sub_824207D8(t, h.base);
         ITC_FLAG(native_texture_compression) = true;
       } else {
-        hooks::TextureCompressionFitAlphaEndpoints(t, h.base);
+        NativeFitAlphaEndpoints(t, h.base);
       }
       out[v].Bytes(Read(h.base, h.data, kLow));
       out[v].Floats(h.base, h.data + kLow, 2);
@@ -325,7 +391,7 @@ void PackR5G6B5(Context& h) {
         __imp__sub_824206E8(t, h.base);
         ITC_FLAG(native_texture_compression) = true;
       } else {
-        hooks::TextureCompressionPackR5G6B5(t, h.base);
+        NativePackR5G6B5(t, h.base);
       }
       out[v].Bytes(Read(h.base, h.data, kScratchBytes));
       out[v].Word(t.r3.u32);
@@ -550,7 +616,7 @@ void FitColorEndpoints(Context& h) {
         __imp__sub_82420AB8(t, h.base);
         ITC_FLAG(native_texture_compression) = true;
       } else {
-        hooks::TextureCompressionFitColorEndpoints(t, h.base);
+        NativeFitColorEndpoints(t, h.base);
       }
       out[v].Bytes(Read(h.base, h.data, kColorLow));
       out[v].Floats(h.base, h.data + kColorLow, 3);
