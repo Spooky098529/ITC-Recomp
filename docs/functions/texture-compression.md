@@ -1,0 +1,274 @@
+# Known functions: texture compression
+
+XGraphics' surface compression and conversion, linked into the game from
+the XDK's graphics library (`8235AAC0`-`82368FFF`, `823EA070`-`823F77FF`
+and `82420640`-`82422AC0`; the shader microcode compiler's strings sit
+beside its own in `.rdata`, but it is not part of the HLSL compiler
+under `sub_822B8F10` that the stored shaders replaced, and not reached
+from it). In play its only user is the vinyl sheet: `Vinyl::Compress`
+(`sub_820ED090`, [`car-models.md`](car-models.md)) converts the car's
+1024 x 1024 A8R8G8B8 sheet (`0x18280086`) to DXT5 (`0x1A200054`) with
+`XGCompressSurface` (probably), once per car load. Its other entry point,
+`XGCopySurface` (probably, `sub_82368170`), is reached only from
+`XGCompressSurface` itself, for DXN and CTX1 destinations, and never ran.
+
+The work is D3DX's image blitter: an image description for each side
+(84 bytes on the stack: +0 the data, +4 the format, +8 the row pitch,
++12 the slice pitch, +16 to +39 the surface's extent (0, 0, width,
+height, 0, depth), +40 to +63 the box (left, top, right, bottom, front, back), +64 dither, +68
+error diffusion, +72 sRGB, +76 a color key, +80 a palette); a codec
+object made for each format by `ImageCodec::Create` (`sub_823F6C60`,
+32 vtables at `0x8203B808`-`0x8203BA04`, 16 bytes each: slot 0 the
+scalar deleting destructor, slot 1 a row decoded to float4 (r4 = the
+row, r5 = the slice, r6 = the buffer), slot 2 a row encoded from float4,
+slot 3 the color key quantized to the format); then the first of ten
+blitters that accepts the pair and the filter (the D3DX filter flags:
+low 16 bits 1 none, 2 point, 3 linear, 4 triangle, 5 box; `0x80000`
+dither, `0x100000` diffusion, `0x200000` sRGB in, `0x400000` sRGB out;
+bits 16-18 the mirror flags). In play the formats differ and the sizes
+match, so `Blitter::ConvertRows` (`sub_823699F8`) runs: each row decoded
+by the A8R8G8B8 codec (`sub_823F2620`) and encoded by the DXT codec
+(`sub_823F6298`), which gathers four rows and encodes each 4 x 4 block
+with the DXT4/5 block encoder (`sub_82422A68`, premultiplied by
+`Vinyl::Compress`'s flag 1).
+
+For B7: `b7_groups.py sub_8235AAC0` counts 11 functions with 8
+indirect calls; those calls reach 13 more functions seen in play (the
+destructors, the A8R8G8B8 decode, the DXT encode and the DXT4/5 block
+encoder's subtree), which run only through the vtables and the DXT
+codec's block pointers, so the static graph doesn't list them. A native
+`XGCompressSurface` covers all 24 (and needs a decision for the unseen
+branches: the other formats, filters and DXN/CTX1). Allocation goes
+through `src/memory/heap.h` (the user's call, 2026-10-22): HeapAlloc
+for the swapped source copy, XMemAlloc for the DXN/CTX1 intermediate,
+operator new for the codecs and rows.
+
+Indirect calls and their targets: the codecs' slot 0 from
+`Blitter::Release` (`sub_82368D30`), `Blitter::Init` (`sub_8236C630`)
+and `ImageCodec::Create`: `sub_823F6B70` (the plain codecs),
+`sub_823F6BC0` (DXT), `sub_823F77B0` (YUV); slots 1 and 2 from the
+blitters (`sub_823699F8` and the filters): the per-format rows below;
+slot 3 from `ImageCodec::Create` when a color key is set:
+`sub_823EACC8` (plain), `sub_823F6170` (DXT), the empty `sub_82106540`
+(YUV, [`audio.md`](audio.md)); the DXT codec's +140 (block decode) and
++144 (block encode), set by `DxtCodec::DxtCodec` (`sub_823F5FA0`) by
+format: DXT1 `sub_82421938` and `sub_82421EB0` (8 bytes a block),
+DXT2/3 `sub_82422A20` and `sub_82422A50`, DXT4/5 `sub_82422A38` and
+`sub_82422A68` (16 bytes), DXT3A `sub_82421BF0` and `sub_82422000`,
+DXT5A `sub_82421C88` and `sub_82422178` (8 bytes); `XGCopySurface`'s
+two calls through the routine `sub_82368030` picks by format and
+`sub_82367700`'s through its r5 (targets in `../loops/leads.md`).
+
+Shared with other files: HeapAlloc, HeapFree, GetProcessHeap, XMemAlloc,
+XMemFree, operator new and delete and `sub_822965D8`
+([`heap.md`](heap.md)); memcpy, memset, ceil, floor and `__ultod`
+([`c-runtime.md`](c-runtime.md)); `GpuFormat::BlockSize` (`sub_822A4410`,
+[`graphics-resources.md`](graphics-resources.md)); OutputDebugStringA
+(`sub_82296270`, [`functions.md`](functions.md)); the empty destructor
+`sub_82106540` ([`audio.md`](audio.md)). Data in `../known-data.md`.
+Mapped 2026-10-28 by the B7 loop's mapping agent; the codecs' formats
+come from following `ImageCodec::Create`'s compares for each format.
+
+Status:
+
+- **Native**: plain C++ in `itc_recomp/src/` that doesn't use the
+  PowerPC context (`ctx`): normal arguments and host structs (it may
+  still read and write guest memory through `src/guest.h` while
+  recompiled code shares the data). The game reaches it without `ctx`,
+  from native or overridden callers, and the recompiled original is no
+  longer called (except behind a fallback flag or to check against it).
+  No `REX_FUNC` override of it exists, not even an adapter kept only for
+  a harness (that's Overridden until the adapter goes).
+  The end state for every function.
+- **Overridden**: an `extern "C" REX_FUNC(sub_XXXXXXXX)` override in
+  `itc_recomp/src/` (or a macro defining one) does the work instead of
+  the original: a thin adapter in front of native code, or a body that
+  still uses `ctx` (calling guest code, reading registers). It may call
+  the original when its flag is off, or to check itself against it.
+- **Wrapped**: an override that does something of its own (skipping
+  render-only passes, logging, timing) and still calls the original
+  (`__imp__sub_XXXXXXXX`) for the work.
+- **Dropped**: its work isn't needed on PC (hardware set-up, kernel calls
+  the SDK already stubbed), so it no longer runs: an override in
+  `itc_recomp/src/` replaces it with nothing (or a fixed return value), or
+  its callers, made native, leave the call out (no override then; the row
+  says which caller). Logs, a harness or the renderer's frame dumps have
+  shown that nothing reads what it did. The original is no longer called,
+  except behind a fallback flag while the drop is being checked. A
+  function the game never calls in the first place isn't Dropped: its
+  status stays blank and its row says it's never called.
+- **Merged**: its work is done inside a native caller's plain C++ (a
+  few lines only that caller needs), so it has no function or override of
+  its own in `itc_recomp/src/`. The row names the caller(s) and the
+  harness that covers the work. The original is no longer called, except
+  behind the caller's fallback flag.
+- **Patched**: the generated code was edited in place (search for
+  `PATCH:`).
+
+A function usually moves from recompiled or Wrapped to Overridden to
+Native as the `ctx` edge moves up through its callers, or straight to
+Dropped when its work isn't needed.
+`itc_recomp/tools/check_function_statuses.py` checks this column, in
+every file of the tables, against `src/` (an override marked Native, a
+status with no override, an override with no row, a row in two files);
+run it after changing either, on any branch.
+
+| Address | Name | Status | Notes |
+|---|---|---|---|
+| `sub_8235AAC0` | `XGCompressSurface` (probably) | | r3 = the destination, r4 its row pitch, r5, r6 = the width and height, r7 the destination format, r8 a destination point (null: 0, 0), r9 = the source, r10 its pitch; on the stack (caller +84, +92, +100) the source format, a source rectangle (null: the whole size) and flags; f1 an alpha reference. Stores f1 at `[0x8263B7E8]` and flags & 1 at `[0x82954660]` (premultiplied alpha for DXT2-5). The filter is triangle with dither (`0x80004`), triangle only (4) with flags `0x10`. The destination's description takes DXT1 (`0x1A200052`) for GPU formats 18 and 51, DXT2/3 (`...53`) for 19 and 52, DXT4/5 (`...54`) for 20 and 53, DXT3A (`...7A`) for 58, DXT5A (`...7B`) for 59, and the YUV formats 11 and 12 (`0x1A20004B`/`4C`, or `0x1828004B`/`4C` with flags 4); other formats leave a stale word there (the codec then fails). The source's is A8R8G8B8 (`0x18280086`) for GPU format 6 (8_8_8_8), else A32B32G32R32F (`0x1A22AAA6`). A source that isn't 8-in-32 endian, or whose channel order isn't the standard one (swizzle `0x60A`, `0x688` for the float formats), is copied first: `HeapAlloc(GetProcessHeap(), 0, ...)`, `XGEndianSwapSurface` (`sub_8236D380`) into it, then each pixel's channels reordered (memcpy and memset per channel), `HeapFree` after the blit. Then `Blitter::Init` (`sub_8236C630`) on the two descriptions, `Blitter::Release`, and a destination that isn't 8-in-16 swapped in place (`XGEndianSwapSurface`). DXN (49) and CTX1 (60) destinations go another way: the source converted to G32R32F (`0x2D22AAA5`) by `XGCopySurface` (`sub_82368170`, twice: probably the 4-aligned area and the edge) into an `XMemAlloc(size, 0x24870000)` buffer, encoded by `DxnEncode` (`sub_82365D88`) or `Ctx1Encode` (`sub_82366458`) and freed (`XMemFree`). Returns `Blitter::Init`'s result, 0, or `E_OUTOFMEMORY` (`0x8007000E`). From `Vinyl::Compress` (`car-models.md`; in play: A8R8G8B8 to DXT5, flags 1, f1 = 0.0, no copy of the source, no swap after) and `XGCopySurface` (not seen in play). |
+| `sub_82368D20` | `Blitter::Blitter` | | r3 = the 12-byte blit object: +0 and +4 = 0. Leaf. From `XGCompressSurface` (its r1 +144). |
+| `sub_82368D30` | `Blitter::Release` | | r3 = the blit object: the codecs at +4 (destination) and +0 (source) deleted through their slot 0 (r4 = 1) when not null. From `XGCompressSurface` (three times: after the blit, after a failed allocation and after DXN/CTX1). |
+| `sub_8236D3C8` | `XGGetBlockDimensions` (probably) | | r3 = a GPU format (6 bits), r4, r5 = where to store the block's width and height (either may be null): `GpuFormat::BlockSize` (`graphics-resources.md`) on the stack, then copied. From `XGCompressSurface` (the destination's, in play: 4 x 4 for DXT5) and `XGCopySurface` (twice). |
+| `sub_8236C630` | `Blitter::Init` | | r3 = the blit object, r4 = the destination's description, r5 the source's, r6 the filter flags. Stores the flags at +8 and clears +0 and +4; refuses a filter (low 16 bits) outside 1-5 or bits `0xFF800000` set ("Invalid image filter" through OutputDebugStringA, `D3DERR_INVALIDCALL` `0x8876086C`). The flags set the source description's +72 (sRGB in, `0x200000`) and the destination's +72 (sRGB out, `0x400000`), +64 (dither, `0x80000`) and +68 (diffusion, `0x100000`). Makes the destination's codec into +4 and the source's into +0 (`ImageCodec::Create`; null: "Unsupported image format", `E_FAIL` `0x80004005`, both codecs deleted through slot 0), then `ImageCodec::Prepare` (`sub_823EAA90`, destination, source), then tries the blitters in order until one returns 0 or more: `Blitter::CopyRows` (`sub_82369860`), `ConvertRows` (`sub_823699F8`), `FilterNone` (`sub_82369B48`), `FilterPoint` (`sub_82369DB8`), `FilterBox2D` (`sub_82369FF8`), `FilterBox3D` (`sub_8236A4F0`), `FilterLinear2D` (`sub_8236AB00`), `FilterLinear3D` (`sub_8236AEA8`), `FilterTriangle2D` (`sub_8236BF40`), `FilterTriangle3D` (`sub_8236B7A0`); none: "No suitable image filter found". Returns the blitter's result (0) or the error. From `XGCompressSurface` (in play: `ConvertRows`). |
+| `sub_823F6C60` | `ImageCodec::Create` | | r3 = an image description: a codec for its format (+4), made with operator new, or null for a format it doesn't take. The plain formats (128 bytes, `ImageCodec::ImageCodec` with their bits per pixel and channel kind, then the format's vtable): A8R8G8B8 `0x18280086`, X8R8G8B8 `0x28280086`, R5G6B5 `0x28280044`, X1R5G5B5 `0x28280043`, A1R5G5B5 `0x18280043`, A4R4G4B4 `0x1828004F`, A8 `0x04900002`, X4R4G4B4 `0x2828004F`, A2B10G10R10 `0x1A2000B6`, A8B8G8R8 `0x1A200086`, X8B8G8R8 `0x2A200086`, G16R16 `0x2D200099`, A2R10G10B10 `0x182800B6`, A16B16G16R16 `0x1A20005A`, L8 `0x28000002`, A8L8 `0x0800004A`, L16 `0x28000058` and `0x1A220058`, V8U8 `0x2D20AA4A`, L6V5U5 `0x2A200A45`, X8L8V8U8 `0x2A200A86`, Q8W8V8U8 `0x1A20AA86`, V16U16 `0x2D20AA99`, A2W10V10U10 `0x1A202AB6`, Q16W16V16U16 `0x1A20AA5A`, R16F `0x2DA2AA5E`, G16R16F `0x2D22AA9F`, A16B16G16R16F `0x1A22AA60`, R32F `0x2DA2AAA4`, G32R32F `0x2D22AAA5`, A32B32G32R32F `0x1A22AAA6` (each also with bit 8, `+0x100`, the tiled form; names probably, from the GPU format, channel order and bits per pixel). DXT1, DXT2/3, DXT4/5, DXT3A and DXT5A (`0x1A200052`-`54`, `7A`, `7B`): 256 bytes, `DxtCodec::DxtCodec`. The YUV formats (`0x1828004B`, `4C`, `0x1A20004B`, `4C`): 176 bytes, `YuvCodec::YuvCodec` (`sub_823F55B0`). Then the palette (`ImageCodec::LoadPalette`, `sub_823EAB58`) when +28 is set (deleted through slot 0 if it fails) and the color key quantized (slot 3) when +24 is set. Names follow the D3D formats; channel kinds (+8): 1 unsigned normalized, 2 signed (bump formats with an unsigned channel), 3 all signed, 4 float. From `Blitter::Init` (twice). |
+| `sub_823EA800` | `ImageCodec::ImageCodec` | | r3 = the codec, r4 the description, r5 bits per pixel (0 for the block formats), r6 the channel kind. Base vtable `0x8203B778` (slot 0 `sub_823F6B70`, slots 1 and 2 the empty `sub_82106540`, slot 3 `sub_823EACC8`). +4 the format without bit 8, +8 the kind, +12 whether bits per pixel isn't 0, +16 the description's sRGB (+72), +20 = 0 (set by `Prepare` when both sides are sRGB), +24 the color key (+76; kept also as four floats at +36, each byte / 255, `[0x82002200]`), +28 and +56 = 0 (the palette), +32 the data, +52 the rounding table (`0x8263C768`: 32 floats of 0.5; with the description's +64, dither, `0x8263C7E8`: a 4 x 4 ordered dither's offsets), +60 to +83 the box, +84, +88 = 0, +96, +100 the pitches, +104, +108, +112 the box's width, height and depth, +116 the row's bytes, +120 bytes per pixel. For a plain format, the data pointer is moved to the box's corner and the box made to start at 0. With the description's +68 (diffusion), +92 = a zeroed error row ((width + 2) x 16 bytes, operator new), else 0. Kind 2 is cleared (+16 = 0) unless the format is `0x2A200B45`, and kind 3 too. From `ImageCodec::Create` (31 times), `DxtCodec::DxtCodec` and `YuvCodec::YuvCodec`. |
+| `sub_823EAA90` | `ImageCodec::Prepare` | | r3 = the destination's codec, r4 the source's: when their channel kinds differ and the destination's isn't float (4), +84 = the source's kind (converted on encode); with that or sRGB (+16), +88 = a float4 row (width x 16 bytes, operator new; null: `E_OUTOFMEMORY`). When both are sRGB, both +20 = 1 (no gamma either way). Returns 0. From `Blitter::Init`. |
+| `sub_82369860` | `Blitter::CopyRows` | | r3 = the blit object: when both formats match (bit 8 aside), there is no color key, the sizes and sRGB flags match (and the palettes, 1,024 bytes compared, when +28 is set): each row's bytes (+116) copied with memcpy, slice by slice; a block format (+12 = 0) goes to `Blitter::CopyBlocks` (`sub_82368D98`). Clears both +16. Returns 0, or `E_FAIL` when it doesn't apply. From `Blitter::Init` (in play: formats differ, so `E_FAIL`). |
+| `sub_82368D98` | `Blitter::CopyBlocks` (probably) | | r3 = the blit object: refuses boxes not 4-aligned on both sides (`E_FAIL`), else copies the blocks' rows with memcpy. Not read in detail. Not seen in play. |
+| `sub_823699F8` | `Blitter::ConvertRows` | | r3 = the blit object: when the two boxes are the same size, a float4 row (width x 16 bytes, operator new), both +16 cleared when both are set, and for each slice and row: the source's slot 1 (decode, r4 = row, r5 = slice, r6 = the row), then the destination's slot 2 (encode, the same arguments); operator delete on the row. Returns 0, or `E_FAIL` when the sizes differ or the row can't be allocated. From `Blitter::Init` (in play: the 1,024 rows of the vinyl sheet, `sub_823F2620` then `sub_823F6298`). |
+| `sub_82369B48` | `Blitter::FilterNone` (probably) | | r3 = the blit object: only with filter 1 (none): rows decoded and encoded over the smaller of the two sizes (operator new for the row, memset for the rest). Not read in detail. Not seen in play. |
+| `sub_82369DB8` | `Blitter::FilterPoint` (probably) | | r3 = the blit object: only with filter 2 (point): two float4 rows, the source's rows and pixels picked by position. Not read in detail. Not seen in play. |
+| `sub_82369FF8` | `Blitter::FilterBox2D` (probably) | | r3 = the blit object: only with filter 5 (box), one slice each and the destination half the source in width and height (or 1): calls the seven 2 x 2 helpers below. Not read in detail. Not seen in play. |
+| `sub_823691D8` | | | One of `FilterBox2D`'s seven helpers (probably a 2 x 2 average of a row pair for one source shape). Not read. Not seen in play. |
+| `sub_823692D0` | | | As `sub_823691D8`. Not read. Not seen in play. |
+| `sub_823693C8` | | | As `sub_823691D8`. Not read. Not seen in play. |
+| `sub_823694C8` | | | As `sub_823691D8`. Not read. Not seen in play. |
+| `sub_823695C0` | | | As `sub_823691D8`. Not read. Not seen in play. |
+| `sub_82369678` | | | As `sub_823691D8`. Not read. Not seen in play. |
+| `sub_82369770` | | | As `sub_823691D8`. Not read. Not seen in play. |
+| `sub_8236A4F0` | `Blitter::FilterBox3D` (probably) | | r3 = the blit object: only with filter 5, the destination half the source in all three sizes. Not read in detail (five indirect calls: the codecs' slots). Not seen in play. |
+| `sub_8236AB00` | `Blitter::FilterLinear2D` (probably) | | r3 = the blit object: only with filter 3 (linear) and one slice: the weights per axis (`sub_8236A9C8`, with the mirror flags), then the rows filtered. Not read in detail. Not seen in play. |
+| `sub_8236A9C8` | `Blitter::LinearWeights` (probably) | | r3, r4 = the source's and destination's size on one axis, r5 = whether to wrap (the inverted mirror bit): a weights table (operator new). Not read in detail. Not seen in play. |
+| `sub_8236AEA8` | `Blitter::FilterLinear3D` (probably) | | r3 = the blit object: only with filter 3: weights for the three axes (`sub_8236A9C8`). Not read in detail. Not seen in play. |
+| `sub_8236BF40` | `Blitter::FilterTriangle2D` (probably) | | r3 = the blit object: one slice each: the triangle weights per axis (`sub_8236B418`), then the rows filtered; frees the weights with `sub_8236B718`. Not read in detail. Not seen in play (in play `ConvertRows` takes the vinyl sheet first). |
+| `sub_8236B418` | `Blitter::TriangleWeights` (probably) | | r3, r4 = the sizes on one axis, r5 = whether to wrap: a list of weights (operator new; floor). Not read in detail. Not seen in play. |
+| `sub_8236B718` | `Blitter::FreeWeights` (probably) | | r3 = a weights list from `sub_8236B418`: operator delete. Not read in detail. Not seen in play. |
+| `sub_8236B7A0` | `Blitter::FilterTriangle3D` (probably) | | r3 = the blit object: weights for three axes (`sub_8236B418`). Not read in detail. Not seen in play. |
+| `sub_823EA070` | `ImageCodec::~ImageCodec` | | r3 = the codec: the base vtable back (`0x8203B778`) and operator delete on +56 (palette), +88 (row) and +92 (error row). From the codecs' destructors (`sub_823F6B70`, `DxtCodec::~DxtCodec`, `sub_823F6C10`). |
+| `sub_823F6B70` | `ImageCodec::scalar deleting destructor` | | Slot 0 of the base and the 30 plain vtables: r3 = the codec, r4 = flags: `~ImageCodec`, then operator delete with bit 0. From `Blitter::Release` and `Blitter::Init` through slot 0. |
+| `sub_823F6BC0` | `DxtCodec::scalar deleting destructor` | | Slot 0 of the DXT vtable (`0x8203B9E8`): `DxtCodec::~DxtCodec`, then operator delete with bit 0. From `Blitter::Release` through slot 0. |
+| `sub_823EA770` | `DxtCodec::~DxtCodec` | | r3 = the DXT codec: its vtable back (`0x8203B9E8`); when +244 (blocks in the cache) isn't 0, frees each cache entry's block row (+4, 8 bytes an entry from +248, over +200 to +208 by +212 to +216); operator delete on +240 and +248; `~ImageCodec`. From `sub_823F6BC0`. |
+| `sub_823EACC8` | `ImageCodec::QuantizeColorKey` | | Slot 3 of the base and plain vtables: r3 = the codec: the color key (+36) encoded into a stack pixel and decoded back (slots 2 and 1 on a one-pixel box, the codec's fields swapped out and restored; `ImageCodec::ConvertRange` first for kinds other than 1 and 4), so it matches what the format holds. From `ImageCodec::Create` through slot 3 (with a color key, never in play). Not seen in play. |
+| `sub_823EAB58` | `ImageCodec::LoadPalette` (probably) | | r3 = the codec, r4 the description: +56 = 4,096 bytes (operator new; `E_OUTOFMEMORY`), the description's +80 palette (256 entries of 4 bytes, each / 255) as float4s. Not read in detail. From `ImageCodec::Create` when +28 is set (nothing seen sets it). Not seen in play. |
+| `sub_823EA0C0` | `ImageCodec::ConvertRange` (probably) | | r3 = the codec, r4 = a float4 row: by the codec's kind (+8) and the other side's (+84), the row's channels moved between unsigned, signed and float ranges and clamped (e.g. to -1.0 to 1.0, `0x82001BE0`, `0x82000A30`) into +88; returns the row to use. Not read in detail. From the plain encodes, the DXT encode and `QuantizeColorKey`. Not seen in play. |
+| `sub_823EAE40` | `ImageCodec::LinearToSrgb` (probably) | | r3 = the codec, r4 = a float4 row: the channels' square roots (`fsqrts`, the color ones or alpha by the kind) into +88, unless +20; returns the row to use. Not read in detail. From the encodes (sRGB out). Not seen in play. |
+| `sub_823EB408` | `ImageCodec::AddDiffusionError` (probably) | | r3 = the codec, r4 = a float4 row: adds the error row (+92) to each pixel's channels, then clears the error row (memset, (width + 2) x 16 bytes). Not read in detail. From the plain encodes. Not seen in play. |
+| `sub_823EADB0` | `ImageCodec::ApplyColorKey` | | r3 = the codec, r4 = a float4 row: pixels equal to the color key (+36 to +48) set to 0.0 (`[0x82000A34]`). Leaf. From the decodes when +24 is set. Not seen in play. |
+| `sub_823EB180` | `ImageCodec::SrgbToLinear` (probably) | | r3 = the codec, r4 = a float4 row (end r4 + width x 16): the channels squared (the color ones or alpha by the kind), unless +20. Not read in detail. From the decodes (sRGB in). Not seen in play. |
+| `sub_823F5FA0` | `DxtCodec::DxtCodec` | | r3 = the 256-byte codec, r4 the description: `ImageCodec::ImageCodec` (0 bits per pixel, kind 1), vtable `0x8203B9E8`; by the format, +144 the block encoder, +140 the block decoder and +136 the block's bytes: DXT1 `sub_82421EB0`, `sub_82421938`, 8; DXT2/3 `sub_82422A50`, `sub_82422A20`, 16; DXT4/5 `sub_82422A68`, `sub_82422A38`, 16; DXT3A `sub_82422000`, `sub_82421BF0`, 8; DXT5A `sub_82422178`, `sub_82421C88`, 8. +148 to +171 the surface's extent (memcpy from the description's +16: 0, 0, width, height, 0, depth), +172 to +192 the box rounded to blocks, +196 to +228 the block columns and rows, +232, +236 = -1, +240, +244, +248 = 0 (the block cache), +252 the description's +64 (dither). From `ImageCodec::Create`. |
+| `sub_823F6298` | `DxtCodec::EncodeRow` | | Slot 2 of the DXT vtable: r3 = the codec, r4 = the row, r5 = the slice, r6 = a float4 row. Keeps a cache of block rows (+248: 8 bytes an entry, a 4-bit mask of rows written and 4 x 4 float4s (256 bytes) a block column, operator new and memset; +244 the count); for blocks the box cuts, the destination's old blocks decoded first (+140). Converts the row (`ConvertRange` with +84, `LinearToSrgb` with +16), stores it in the cache, and once four rows are in, pads blocks past the box's edge by repeating pixels and encodes each block (+144; r3 = the destination block, r4 = the 16 pixels, r5 = 1 with dither or diffusion) into the data, then frees the entry (operator delete). Four indirect calls (+140 three times, +144). From `Blitter::ConvertRows` through slot 2 (in play: DXT5, so `sub_82422A68`). |
+| `sub_823F6858` | `DxtCodec::DecodeRow` (probably) | | Slot 1 of the DXT vtable: a row decoded through +140 block by block (operator new for the block), then `SrgbToLinear`. Not read in detail. Not seen in play. |
+| `sub_823F6170` | `DxtCodec::QuantizeColorKey` | | Slot 3 of the DXT vtable: the color key rounded to R5G6B5 steps (31, 63, 31: `0x8203B7A0`, `0x8203B7A4`) and its alpha to 1/15 steps when +4 is `0x1A200153` (the tiled DXT2/3, which +4 never holds, as `ImageCodec::ImageCodec` clears bit 8), else 1/255; +128, +132 the step and its inverse. Leaf. Not read in detail. Not seen in play. |
+| `sub_823F55B0` | `YuvCodec::YuvCodec` (probably) | | r3 = the 176-byte codec, r4 the description: `ImageCodec::ImageCodec` (0 bits, kind 1), vtable `0x8203B9F8`; the box widened to even columns (+132, +140) and a two-pixel buffer (operator new). For the 4:2:2 formats `0x1828004B`/`4C` and `0x1A20004B`/`4C` (UYVY and YUY2, probably). Not read in detail. Not seen in play. |
+| `sub_823F77B0` | `YuvCodec::scalar deleting destructor` (probably) | | Slot 0 of the YUV vtable: `sub_823F6C10`, then operator delete with bit 0. Not seen in play. |
+| `sub_823F6C10` | `YuvCodec::~YuvCodec` (probably) | | r3 = the codec: writes what's pending (`sub_823F56A0`), `~ImageCodec`, operator delete on its buffer. Not read in detail. Not seen in play. |
+| `sub_823F56A0` | `YuvCodec::Flush` (probably) | | r3 = the codec: the pending pixel pair encoded to the data. 449 lines, not read. Not seen in play. |
+| `sub_823F59C8` | `YuvCodec::ConvertPair` (probably) | | Between RGB and YUV for a pixel pair; calls `sub_823F56A0`. 643 lines, not read. Not seen in play. |
+| `sub_823F5EF0` | `YuvCodec::DecodeRow` (probably) | | Slot 1 of the YUV vtable: calls `sub_823F59C8`, `ApplyColorKey`, `SrgbToLinear`, memcpy. Not read. Not seen in play. |
+| `sub_823F5E30` | `YuvCodec::EncodeRow` (probably) | | Slot 2 of the YUV vtable: calls `ConvertRange`, `LinearToSrgb`, `sub_823F59C8`, memcpy. Not read. Not seen in play. |
+| `sub_823F2620` | `A8R8G8B8Codec::DecodeRow` | | Slot 1 of the A8R8G8B8 vtable (`0x8203B808`, format `0x18280086`): r3 = the codec, r4 = the row, r5 = the slice, r6 = a float4 row: from the data (+32, + row x +96 + slice x +100), each pixel's bytes 1, 2, 3, 0 (red, green, blue, alpha) times 1/255 (`[0x82002200]`) into red, green, blue, alpha; then `ApplyColorKey` with +24 and `SrgbToLinear` with +16. From `Blitter::ConvertRows` through slot 1 (in play: the vinyl sheet's rows). |
+| `sub_823EB4A0` | `A8R8G8B8Codec::EncodeRow` (probably) | | Slot 2 of the A8R8G8B8 vtable: float4s to a row of the format; calls `ConvertRange`, `LinearToSrgb`, `AddDiffusionError` and memset. Not read. Not seen in play. |
+| `sub_823F2730` | `X8R8G8B8Codec::DecodeRow` (probably) | | Slot 1 of the X8R8G8B8 vtable (`0x8203B818`, format `0x28280086`, name probably): a row of the format to float4s; calls `ApplyColorKey` and `SrgbToLinear`. Not read. Not seen in play. |
+| `sub_823EB910` | `X8R8G8B8Codec::EncodeRow` (probably) | | Slot 2 of the X8R8G8B8 vtable: float4s to a row of the format; calls `ConvertRange`, `LinearToSrgb`, `AddDiffusionError` and memset. Not read. Not seen in play. |
+| `sub_823F2830` | `R5G6B5Codec::DecodeRow` (probably) | | Slot 1 of the R5G6B5 vtable (`0x8203B828`, format `0x28280044`, name probably): a row of the format to float4s; calls `ApplyColorKey` and `SrgbToLinear`. Not read. Not seen in play. |
+| `sub_823EBCD0` | `R5G6B5Codec::EncodeRow` (probably) | | Slot 2 of the R5G6B5 vtable: float4s to a row of the format; calls `ConvertRange`, `LinearToSrgb`, `AddDiffusionError` and memset. Not read. Not seen in play. |
+| `sub_823F2948` | `X1R5G5B5Codec::DecodeRow` (probably) | | Slot 1 of the X1R5G5B5 vtable (`0x8203B838`, format `0x28280043`, name probably): a row of the format to float4s; calls `ApplyColorKey` and `SrgbToLinear`. Not read. Not seen in play. |
+| `sub_823EC0A0` | `X1R5G5B5Codec::EncodeRow` (probably) | | Slot 2 of the X1R5G5B5 vtable: float4s to a row of the format; calls `ConvertRange`, `LinearToSrgb`, `AddDiffusionError` and memset. Not read. Not seen in play. |
+| `sub_823F2A58` | `A1R5G5B5Codec::DecodeRow` (probably) | | Slot 1 of the A1R5G5B5 vtable (`0x8203B848`, format `0x18280043`, name probably): a row of the format to float4s; calls `ApplyColorKey` and `SrgbToLinear`. Not read. Not seen in play. |
+| `sub_823EC460` | `A1R5G5B5Codec::EncodeRow` (probably) | | Slot 2 of the A1R5G5B5 vtable: float4s to a row of the format; calls `ConvertRange`, `LinearToSrgb`, `AddDiffusionError` and memset. Not read. Not seen in play. |
+| `sub_823F2B80` | `A4R4G4B4Codec::DecodeRow` (probably) | | Slot 1 of the A4R4G4B4 vtable (`0x8203B858`, format `0x1828004F`, name probably): a row of the format to float4s; calls `ApplyColorKey` and `SrgbToLinear`. Not read. Not seen in play. |
+| `sub_823EC8C8` | `A4R4G4B4Codec::EncodeRow` (probably) | | Slot 2 of the A4R4G4B4 vtable: float4s to a row of the format; calls `ConvertRange`, `LinearToSrgb`, `AddDiffusionError` and memset. Not read. Not seen in play. |
+| `sub_823F3348` | `A8Codec::DecodeRow` (probably) | | Slot 1 of the A8 vtable (`0x8203B868`, format `0x04900002`, name probably): a row of the format to float4s; calls `ApplyColorKey` and `SrgbToLinear`. Not read. Not seen in play. |
+| `sub_823ECD38` | `A8Codec::EncodeRow` (probably) | | Slot 2 of the A8 vtable: float4s to a row of the format; calls `ConvertRange`, `LinearToSrgb`, `AddDiffusionError` and memset. Not read. Not seen in play. |
+| `sub_823F3410` | `X4R4G4B4Codec::DecodeRow` (probably) | | Slot 1 of the X4R4G4B4 vtable (`0x8203B878`, format `0x2828004F`, name probably): a row of the format to float4s; calls `ApplyColorKey` and `SrgbToLinear`. Not read. Not seen in play. |
+| `sub_823ECF68` | `X4R4G4B4Codec::EncodeRow` (probably) | | Slot 2 of the X4R4G4B4 vtable: float4s to a row of the format; calls `ConvertRange`, `LinearToSrgb`, `AddDiffusionError` and memset. Not read. Not seen in play. |
+| `sub_823F2CA8` | `A2B10G10R10Codec::DecodeRow` (probably) | | Slot 1 of the A2B10G10R10 vtable (`0x8203B888`, format `0x1A2000B6`, name probably): a row of the format to float4s; calls `ApplyColorKey` and `SrgbToLinear`. Not read. Not seen in play. |
+| `sub_823ED328` | `A2B10G10R10Codec::EncodeRow` (probably) | | Slot 2 of the A2B10G10R10 vtable: float4s to a row of the format; calls `ConvertRange`, `LinearToSrgb`, `AddDiffusionError` and memset. Not read. Not seen in play. |
+| `sub_823F2DE8` | `A8B8G8R8Codec::DecodeRow` (probably) | | Slot 1 of the A8B8G8R8 vtable (`0x8203B898`, format `0x1A200086`, name probably): a row of the format to float4s; calls `ApplyColorKey` and `SrgbToLinear`. Not read. Not seen in play. |
+| `sub_823ED7A8` | `A8B8G8R8Codec::EncodeRow` (probably) | | Slot 2 of the A8B8G8R8 vtable: float4s to a row of the format; calls `ConvertRange`, `LinearToSrgb`, `AddDiffusionError` and memset. Not read. Not seen in play. |
+| `sub_823F2EF8` | `X8B8G8R8Codec::DecodeRow` (probably) | | Slot 1 of the X8B8G8R8 vtable (`0x8203B8A8`, format `0x2A200086`, name probably): a row of the format to float4s; calls `ApplyColorKey` and `SrgbToLinear`. Not read. Not seen in play. |
+| `sub_823EDC18` | `X8B8G8R8Codec::EncodeRow` (probably) | | Slot 2 of the X8B8G8R8 vtable: float4s to a row of the format; calls `ConvertRange`, `LinearToSrgb`, `AddDiffusionError` and memset. Not read. Not seen in play. |
+| `sub_823F2FF8` | `G16R16Codec::DecodeRow` (probably) | | Slot 1 of the G16R16 vtable (`0x8203B8B8`, format `0x2D200099`, name probably): a row of the format to float4s; calls `ApplyColorKey` and `SrgbToLinear`. Not read. Not seen in play. |
+| `sub_823EDFD8` | `G16R16Codec::EncodeRow` (probably) | | Slot 2 of the G16R16 vtable: float4s to a row of the format; calls `ConvertRange`, `LinearToSrgb`, `AddDiffusionError` and memset. Not read. Not seen in play. |
+| `sub_823F30E8` | `A2R10G10B10Codec::DecodeRow` (probably) | | Slot 1 of the A2R10G10B10 vtable (`0x8203B8C8`, format `0x182800B6`, name probably): a row of the format to float4s; calls `ApplyColorKey` and `SrgbToLinear`. Not read. Not seen in play. |
+| `sub_823EE2D0` | `A2R10G10B10Codec::EncodeRow` (probably) | | Slot 2 of the A2R10G10B10 vtable: float4s to a row of the format; calls `ConvertRange`, `LinearToSrgb`, `AddDiffusionError` and memset. Not read. Not seen in play. |
+| `sub_823F3228` | `A16B16G16R16Codec::DecodeRow` (probably) | | Slot 1 of the A16B16G16R16 vtable (`0x8203B8D8`, format `0x1A20005A`, name probably): a row of the format to float4s; calls `ApplyColorKey` and `SrgbToLinear`. Not read. Not seen in play. |
+| `sub_823EE750` | `A16B16G16R16Codec::EncodeRow` (probably) | | Slot 2 of the A16B16G16R16 vtable: float4s to a row of the format; calls `ConvertRange`, `LinearToSrgb`, `AddDiffusionError` and memset. Not read. Not seen in play. |
+| `sub_823F3520` | `L8Codec::DecodeRow` (probably) | | Slot 1 of the L8 vtable (`0x8203B8E8`, format `0x28000002`, name probably): a row of the format to float4s; calls `ApplyColorKey` and `SrgbToLinear`. Not read. Not seen in play. |
+| `sub_823EEBD8` | `L8Codec::EncodeRow` (probably) | | Slot 2 of the L8 vtable: float4s to a row of the format; calls `ConvertRange`, `LinearToSrgb`, `AddDiffusionError` and memset. Not read. Not seen in play. |
+| `sub_823F35E8` | `A8L8Codec::DecodeRow` (probably) | | Slot 1 of the A8L8 vtable (`0x8203B8F8`, format `0x0800004A`, name probably): a row of the format to float4s; calls `ApplyColorKey` and `SrgbToLinear`. Not read. Not seen in play. |
+| `sub_823EEE50` | `A8L8Codec::EncodeRow` (probably) | | Slot 2 of the A8L8 vtable: float4s to a row of the format; calls `ConvertRange`, `LinearToSrgb`, `AddDiffusionError` and memset. Not read. Not seen in play. |
+| `sub_823F3FF8` | `L16Codec::DecodeRow` (probably) | | Slot 1 of the L16 vtable (`0x8203B908`, format `0x28000058`, name probably): a row of the format to float4s; calls `ApplyColorKey` and `SrgbToLinear`. Not read. Not seen in play. |
+| `sub_823F0C68` | `L16Codec::EncodeRow` (probably) | | Slot 2 of the L16 vtable: float4s to a row of the format; calls `ConvertRange`, `LinearToSrgb`, `AddDiffusionError` and memset. Not read. Not seen in play. |
+| `sub_823F36C8` | `V8U8Codec::DecodeRow` (probably) | | Slot 1 of the V8U8 vtable (`0x8203B918`, format `0x2D20AA4A`, name probably): a row of the format to float4s; calls `ApplyColorKey` and `SrgbToLinear`. Not read. Not seen in play. |
+| `sub_823EF198` | `V8U8Codec::EncodeRow` (probably) | | Slot 2 of the V8U8 vtable: float4s to a row of the format; calls `ConvertRange`, `LinearToSrgb`, `AddDiffusionError` and memset. Not read. Not seen in play. |
+| `sub_823F37E8` | `L6V5U5Codec::DecodeRow` (probably) | | Slot 1 of the L6V5U5 vtable (`0x8203B928`, format `0x2A200A45`, name probably): a row of the format to float4s; calls `ApplyColorKey` and `SrgbToLinear`. Not read. Not seen in play. |
+| `sub_823EF488` | `L6V5U5Codec::EncodeRow` (probably) | | Slot 2 of the L6V5U5 vtable: float4s to a row of the format; calls `ConvertRange`, `LinearToSrgb`, `AddDiffusionError` and memset. Not read. Not seen in play. |
+| `sub_823F3948` | `X8L8V8U8Codec::DecodeRow` (probably) | | Slot 1 of the X8L8V8U8 vtable (`0x8203B938`, format `0x2A200A86`, name probably): a row of the format to float4s; calls `ApplyColorKey` and `SrgbToLinear`. Not read. Not seen in play. |
+| `sub_823EF850` | `X8L8V8U8Codec::EncodeRow` (probably) | | Slot 2 of the X8L8V8U8 vtable: float4s to a row of the format; calls `ConvertRange`, `LinearToSrgb`, `AddDiffusionError` and memset. Not read. Not seen in play. |
+| `sub_823F3A88` | `Q8W8V8U8Codec::DecodeRow` (probably) | | Slot 1 of the Q8W8V8U8 vtable (`0x8203B948`, format `0x1A20AA86`, name probably): a row of the format to float4s; calls `ApplyColorKey` and `SrgbToLinear`. Not read. Not seen in play. |
+| `sub_823EFC18` | `Q8W8V8U8Codec::EncodeRow` (probably) | | Slot 2 of the Q8W8V8U8 vtable: float4s to a row of the format; calls `ConvertRange`, `LinearToSrgb`, `AddDiffusionError` and memset. Not read. Not seen in play. |
+| `sub_823F3BF0` | `V16U16Codec::DecodeRow` (probably) | | Slot 1 of the V16U16 vtable (`0x8203B958`, format `0x2D20AA99`, name probably): a row of the format to float4s; calls `ApplyColorKey` and `SrgbToLinear`. Not read. Not seen in play. |
+| `sub_823F0080` | `V16U16Codec::EncodeRow` (probably) | | Slot 2 of the V16U16 vtable: float4s to a row of the format; calls `ConvertRange`, `LinearToSrgb`, `AddDiffusionError` and memset. Not read. Not seen in play. |
+| `sub_823F3D10` | `A2W10V10U10Codec::DecodeRow` (probably) | | Slot 1 of the A2W10V10U10 vtable (`0x8203B968`, format `0x1A202AB6`, name probably): a row of the format to float4s; calls `ApplyColorKey` and `SrgbToLinear`. Not read. Not seen in play. |
+| `sub_823F0370` | `A2W10V10U10Codec::EncodeRow` (probably) | | Slot 2 of the A2W10V10U10 vtable: float4s to a row of the format; calls `ConvertRange`, `LinearToSrgb`, `AddDiffusionError` and memset. Not read. Not seen in play. |
+| `sub_823F3E90` | `Q16W16V16U16Codec::DecodeRow` (probably) | | Slot 1 of the Q16W16V16U16 vtable (`0x8203B978`, format `0x1A20AA5A`, name probably): a row of the format to float4s; calls `ApplyColorKey` and `SrgbToLinear`. Not read. Not seen in play. |
+| `sub_823F07E8` | `Q16W16V16U16Codec::EncodeRow` (probably) | | Slot 2 of the Q16W16V16U16 vtable: float4s to a row of the format; calls `ConvertRange`, `LinearToSrgb`, `AddDiffusionError` and memset. Not read. Not seen in play. |
+| `sub_823F40C8` | `R16FCodec::DecodeRow` (probably) | | Slot 1 of the R16F vtable (`0x8203B988`, format `0x2DA2AA5E`, name probably): a row of the format to float4s; calls `ApplyColorKey` and `SrgbToLinear`. Not read. Not seen in play. |
+| `sub_823F0EF0` | `R16FCodec::EncodeRow` (probably) | | Slot 2 of the R16F vtable: float4s to a row of the format; calls `LinearToSrgb`. Not read. Not seen in play. |
+| `sub_823F4738` | `G16R16FCodec::DecodeRow` (probably) | | Slot 1 of the G16R16F vtable (`0x8203B998`, format `0x2D22AA9F`, name probably): a row of the format to float4s; calls `ApplyColorKey` and `SrgbToLinear`. Not read. Not seen in play. |
+| `sub_823F1640` | `G16R16FCodec::EncodeRow` (probably) | | Slot 2 of the G16R16F vtable: float4s to a row of the format; calls `LinearToSrgb`. Not read. Not seen in play. |
+| `sub_823F4DA0` | `A16B16G16R16FCodec::DecodeRow` (probably) | | Slot 1 of the A16B16G16R16F vtable (`0x8203B9A8`, format `0x1A22AA60`, name probably): a row of the format to float4s; calls `ApplyColorKey` and `SrgbToLinear`. Not read. Not seen in play. |
+| `sub_823F1D90` | `A16B16G16R16FCodec::EncodeRow` (probably) | | Slot 2 of the A16B16G16R16F vtable: float4s to a row of the format; calls `LinearToSrgb`. Not read. Not seen in play. |
+| `sub_823F53B8` | `R32FCodec::DecodeRow` (probably) | | Slot 1 of the R32F vtable (`0x8203B9B8`, format `0x2DA2AAA4`, name probably): a row of the format to float4s; calls `ApplyColorKey` and `SrgbToLinear`. Not read. Not seen in play. |
+| `sub_823F24A8` | `R32FCodec::EncodeRow` (probably) | | Slot 2 of the R32F vtable: float4s to a row of the format; calls `LinearToSrgb`. Not read. Not seen in play. |
+| `sub_823F5468` | `G32R32FCodec::DecodeRow` (probably) | | Slot 1 of the G32R32F vtable (`0x8203B9C8`, format `0x2D22AAA5`, name probably): a row of the format to float4s; calls `ApplyColorKey` and `SrgbToLinear`. Not read. Not seen in play. |
+| `sub_823F2530` | `G32R32FCodec::EncodeRow` (probably) | | Slot 2 of the G32R32F vtable: float4s to a row of the format; calls `LinearToSrgb`. Not read. Not seen in play. |
+| `sub_823F5520` | `A32B32G32R32FCodec::DecodeRow` (probably) | | Slot 1 of the A32B32G32R32F vtable (`0x8203B9D8`, format `0x1A22AAA6`, name probably): a row of the format to float4s; calls `ApplyColorKey` and `SrgbToLinear` and memcpy. Not read. Not seen in play. |
+| `sub_823F25C0` | `A32B32G32R32FCodec::EncodeRow` (probably) | | Slot 2 of the A32B32G32R32F vtable: float4s to a row of the format; calls `LinearToSrgb` and memcpy. Not read. Not seen in play. |
+| `sub_82422A68` | `Dxt45::EncodeBlock` | | The DXT codec's +144 for DXT4/5: r3 = the 16-byte destination block, r4 = 16 float4 pixels, r5 = dither. With `[0x82954660]` (premultiplied, `XGCompressSurface`'s flags 1) `Dxt45::EncodeBlockPremultiplied` (`sub_82422960`); else `DxtColor::EncodeBlock` (`sub_82420F50`, r3 + 8, r5 = 0, r6 = dither) and, when it returns 0 or more, `DxtAlpha::EncodeBlock` (`sub_82422178`, r3, the pixels, dither). From `DxtCodec::EncodeRow` through +144 (in play: the vinyl sheet's 65,536 blocks a car load, premultiplied). |
+| `sub_82422960` | `Dxt45::EncodeBlockPremultiplied` | | r3, r4, r5 as `sub_82422A68`: the 16 pixels copied to the stack with red, green and blue multiplied by alpha, then `DxtColor::EncodeBlock` (r3 + 8, r5 = 0) and `DxtAlpha::EncodeBlock` on the copy. Returns 0 or the error. From `Dxt45::EncodeBlock`. |
+| `sub_82420F50` | `DxtColor::EncodeBlock` | | The color half of a DXT block (8 bytes): r3 = the destination, r4 = 16 float4 pixels, r5 = 1-bit alpha (DXT1's: with all 16 alphas below the alpha reference `[0x8263B7E8]` the block is written transparent, `0xFFFF`, `0xFFFFFFFF`; three colors with some below), r6 = dither (an error buffer, memset 256 bytes). The two endpoints fitted by `DxtColor::FitEndpoints` (`sub_82420AB8`), packed by `DxtColor::PackR5G6B5` (`sub_824206E8`), then the indices. 1,500 lines, not read in detail. From `Dxt45::EncodeBlock`, `Dxt45::EncodeBlockPremultiplied`, `sub_82421EB0` (DXT1) and `sub_824227F0` (DXT2/3). |
+| `sub_82420AB8` | `DxtColor::FitEndpoints` (probably) | | r5 = the 16 pixels, r6 = 3 or 4 colors (its tables `0x8203EADC`, `0x8203EAD0` or `0x8203EAC0`, `0x8203EAB0` by that): the bounds of the pixels' colors, then the end colors refined along them. 694 lines, not read in detail. From `DxtColor::EncodeBlock`. |
+| `sub_824206E8` | `DxtColor::PackR5G6B5` | | r3 = a float4 color: red, green and blue clamped to 0.0-1.0 (`[0x82000A34]`, `[0x82000A30]`), times 31, 63, 31 (`0x8203B7A0`, `0x8203B7A4`) plus 0.5, truncated and packed into 5:6:5; returns it (16 bits). Leaf. From `DxtColor::EncodeBlock`. |
+| `sub_82422178` | `DxtAlpha::EncodeBlock` | | An alpha block (8 bytes: two endpoints and 16 three-bit indices; DXT4/5's first half and DXT5A): r3 = the destination, r4 = 16 float4 pixels (their alphas, or for DXT5A probably the channel), r5 = dither (an error buffer on the stack). The alphas rounded to 1/255 steps, their range found, the endpoints fitted (`DxtAlpha::FitEndpoints`, `sub_824207D8`, 6 or 8 steps) and the indices written (memset). 861 lines, not read in detail. From `Dxt45::EncodeBlock`, `Dxt45::EncodeBlockPremultiplied` and the DXT codec's +144 for DXT5A. |
+| `sub_824207D8` | `DxtAlpha::FitEndpoints` (probably) | | r5 = 16 floats, r6 = the steps (6, with 0.0 and 1.0 kept, or 8; tables `0x8203EA90` and `0x8203EA78`, or `0x8203EA58` and `0x8203EA38`): the range (the values strictly inside 0-1 for 6), refined in a loop. 456 lines, not read in detail. From `DxtAlpha::EncodeBlock`. |
+| `sub_82421EB0` | `Dxt1::EncodeBlock` (probably) | | The DXT codec's +144 for DXT1: `DxtColor::EncodeBlock` with 1-bit alpha. Not read in detail. Not seen in play. |
+| `sub_82421938` | `DxtColor::DecodeBlock` (probably) | | The DXT codec's +140 for DXT1: an 8-byte color block to 16 float4 pixels. 413 lines, not read. Also from `sub_82422738` and `sub_82422798`. Not seen in play. |
+| `sub_82422A50` | `Dxt23::EncodeBlock` (probably) | | The DXT codec's +144 for DXT2/3: with `[0x82954660]` a tail call to `sub_824228D8`, else to `sub_824227F0`. Not seen in play. |
+| `sub_824227F0` | `Dxt23::EncodeBlockStraight` (probably) | | `DxtColor::EncodeBlock` and `Dxt3A::EncodeBlock` (`sub_82422000`) on a block. Not read in detail. Not seen in play. |
+| `sub_824228D8` | `Dxt23::EncodeBlockPremultiplied` (probably) | | The pixels premultiplied, then `sub_824227F0`. Not read in detail. Not seen in play. |
+| `sub_82422A20` | `Dxt23::DecodeBlock` (probably) | | The DXT codec's +140 for DXT2/3: with `[0x82954660]` a tail call to `sub_82422848` (premultiplied), else to `sub_82422738`. Not seen in play. |
+| `sub_82422738` | `Dxt23::DecodeBlockStraight` (probably) | | `DxtColor::DecodeBlock` and `Dxt3A::DecodeBlock` (`sub_82421BF0`). Not read in detail. Not seen in play. |
+| `sub_82422848` | `Dxt23::DecodeBlockPremultiplied` (probably) | | `sub_82422738`, then `sub_82420640` (probably the colors divided by alpha). Not read in detail. Not seen in play. |
+| `sub_82420640` | `Dxt::Unpremultiply` (probably) | | 16 pixels' colors divided by their alpha (probably). 117 lines, not read. From `sub_82422848` and `sub_82422890`. Not seen in play. |
+| `sub_82422A38` | `Dxt45::DecodeBlock` (probably) | | The DXT codec's +140 for DXT4/5: with `[0x82954660]` a tail call to `sub_82422890`, else to `sub_82422798`. Leaf otherwise. Not seen in play. |
+| `sub_82422798` | `Dxt45::DecodeBlockStraight` (probably) | | `DxtColor::DecodeBlock` and `DxtAlpha::DecodeBlock` (`sub_82421C88`). Not read in detail. Not seen in play. |
+| `sub_82422890` | `Dxt45::DecodeBlockPremultiplied` (probably) | | `sub_82422798`, then `sub_82420640`. Not read in detail. Not seen in play. |
+| `sub_82422000` | `Dxt3A::EncodeBlock` (probably) | | The DXT codec's +144 for DXT3A: 16 alphas as 4 bits each (8 bytes). 221 lines, not read. Also from `sub_824227F0`. Not seen in play. |
+| `sub_82421BF0` | `Dxt3A::DecodeBlock` (probably) | | The DXT codec's +140 for DXT3A. 91 lines, not read. Also from `sub_82422738`. Not seen in play. |
+| `sub_82421C88` | `DxtAlpha::DecodeBlock` (probably) | | The DXT codec's +140 for DXT5A: an alpha block's endpoints and indices to 16 values. 314 lines, not read. Also from `sub_82422798`. Not seen in play. |
+| `sub_82365D88` | `DxnEncode` (probably) | | r3, r4 = the width and height, r5 = the G32R32F source, r6 its pitch, r7 = the destination, r8, r9, r10 the block pitch and the edges: each 4 x 4 block's two channels through `sub_82365AE8` (16 bytes a block). Not read in detail. From `XGCompressSurface` for DXN. Not seen in play. |
+| `sub_82365AE8` | `DxnEncodeChannel` (probably) | | One channel of a DXN block (as a DXT5 alpha block, probably): calls `sub_82365920`, `sub_823659A8` and ceil. 384 lines, not read. From `DxnEncode` (twice). Not seen in play. |
+| `sub_82365920` | | | 70 lines, not read. From `sub_82365AE8`. Not seen in play. |
+| `sub_823659A8` | | | 70 lines, not read. From `sub_82365AE8`. Not seen in play. |
+| `sub_82366458` | `Ctx1Encode` (probably) | | As `DxnEncode` with 8-byte blocks, each through `sub_82365EA8`. Not read in detail. From `XGCompressSurface` for CTX1. Not seen in play. |
+| `sub_82365EA8` | `Ctx1EncodeBlock` (probably) | | 836 lines, not read; calls `sub_82365A28`. From `Ctx1Encode`. Not seen in play. |
+| `sub_82365A28` | | | 102 lines, not read. From `sub_82365EA8`. Not seen in play. |
+| `sub_82368170` | `XGCopySurface` (probably) | | The same arguments as `XGCompressSurface` (r3 the destination, r4 its pitch, r5, r6 the size, r7 its format, r8 a point, r9 the source, r10 its pitch; the stack's source format, rectangle and flags; f1): block sizes of both formats (`XGGetBlockDimensions`); for a compressed destination, the source converted to A32B32G32R32F (`0x1A22AAA6`) by itself into an `XMemAlloc` buffer and passed to `XGCompressSurface`; otherwise pixel by pixel through format routines it picks (`sub_82368030`, `sub_82367918`, `sub_823677D8`, `sub_823668D8`, `sub_82366968`, `sub_82367770`, `sub_82367A58`; two indirect calls through the one from `sub_82368030`), vector conversions (`sub_822AF328`, `sub_82366C90`, `sub_82367700`) and `XGEndianSwapMemory`. 1,666 lines, not read in detail. Only from `XGCompressSurface` (for DXN and CTX1) and itself. Not seen in play. |
+| `sub_82368030` | `XGCopySurface::PickBlockRoutine` (probably) | | r3 = a GPU format, r4 flags: returns a routine's address for the block and YUV formats (11, 12, 18-20, 49, 51-53 and others; `0x82367FC8`, `0x823674A0`, `0x82367538`, `0x823674B0`, `0x823674C0`, `0x823673A8`, `0x82366780`, `0x82367498`, `0x82367F78`, `0x82367448`, `0x82367ED0`, `0x82367F28`, `0x823673B0`, `0x82367400`; two of them aren't function entries in `generated/`). Leaf. Not read in detail. From `XGCopySurface`. Not seen in play. |
+| `sub_82367918` | `XGCopySurface::PickStore` (probably) | | r3 = a format description (+8 the bits per pixel: 8, 16 or 32; +28 to +56 the channels' widths and shifts): returns a routine's address (`0x82367658`, `0x82366858`, `0x823675B0`, `0x823667D8`, `0x82366788`). Leaf. Not read in detail. From `XGCopySurface`. Not seen in play. |
+| `sub_823677D8` | `XGCopySurface::PickLoad` (probably) | | As `sub_82367918`, with `0x82366DE0`, `0x82366618`, `0x82366D50`, `0x823665A8`, `0x82366560`. Leaf. Not read in detail. From `XGCopySurface`. Not seen in play. |
+| `sub_823668D8` | | | r3 = a format's swizzle (fields at bits 18-29): builds a permute vector on the stack (probably the channel order). Not read in detail. From `XGCopySurface`. Not seen in play. |
+| `sub_82366968` | `XGCopySurface::DescribeFormat` (probably) | | r3, r4 and pointers to fill: probably the format's channel widths, shifts and scales (`__ultod`). 471 lines, not read. From `XGCopySurface`. Not seen in play. |
+| `sub_82367770` | | | r4 = a format description: a vector with, for each 1-bit channel, a bias from f1 (probably the alpha reference). Leaf. Not read in detail. From `XGCopySurface`. Not seen in play. |
+| `sub_82367A58` | | | 416 lines (`__ultod`), not read. From `XGCopySurface`. Not seen in play. |
+| `sub_822AF328` | | | Vector code (VMX128, its constants at `0x820142E0` to `0x82014300`): probably a float4 converted for a packed format. Leaf. Not read in detail. From `XGCopySurface` (twice). Not seen in play. |
+| `sub_82366C90` | | | Vector code as `sub_822AF328` (constants at `0x82038410`, `0x82038420`). Leaf. Not read in detail. From `XGCopySurface` (twice). Not seen in play. |
+| `sub_82367700` | `XGCopySurface::StorePixel` (probably) | | A float4 (v1) clamped, scaled, rounded and converted to integers (`vrfin`, `vctuxs`), the destination cleared (memset, r4's +4 bits / 8), then the routine in r5 called with it. From `XGCopySurface` (twice). Not seen in play. |
+| `sub_8236D380` | `XGEndianSwapSurface` (probably) | | r3 = the destination, r4 its pitch, r5 the source, r6 its pitch, r7, r8 the width and height, r9 the format: `XGEndianSwapVolume` (`sub_8236D150`) with one slice. From `XGCompressSurface` (the source's copy, and the destination when it isn't 8-in-16; neither in play). Not seen in play. |
+| `sub_8236D150` | `XGEndianSwapVolume` (probably) | | The pitches, sizes, slices and format: the swap from the format's endian bits (6-7: 8-in-16 `0x00020001`, 8-in-32 `0x00040001`, 16-in-32 `0x00040002`), blocks' rows for the compressed formats (by the bits-per-pixel table `0x82001030`), then `XGEndianSwapMemory` by row, slice or the whole. Not read in detail. From `XGEndianSwapSurface`. Not seen in play. |
+| `sub_8236CFC0` | `XGEndianSwapMemory` (probably) | | r3 = the destination, r4 the source, r5 the swap (element size in the high half), r6 the stride, r7 the count: through `sub_8236C810`, `sub_8236C968`, `sub_8236CCC8` (and `XQueryMemoryProtect`, `heap.md`), backwards when the ranges overlap. Not read in detail. From `XGEndianSwapVolume`, `XGCopySurface`, `sub_82366E70` and `sub_82367008` (near the routines `XGCopySurface` picks, in the lead in `../loops/leads.md`). Not seen in play. |
+| `sub_8236C810` | `XGEndianSwapMemory::One` (probably) | | r3 = the destination, r4 the source, r5 the swap: one element swapped (`stwbrx`, `sthbrx`, by the swap). Not read in detail. From `XGEndianSwapMemory`, `sub_8236C968`, `sub_8236CCC8`. Not seen in play. |
+| `sub_8236C968` | | | A run of elements swapped (probably aligned, with memcpy and `sub_8236C810` at the ends). 497 lines, not read. From `XGEndianSwapMemory`. Not seen in play. |
+| `sub_8236CCC8` | | | As `sub_8236C968` (probably the unaligned case). 435 lines, not read. From `XGEndianSwapMemory`. Not seen in play. |
