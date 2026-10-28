@@ -996,6 +996,7 @@ void DecalLoadCases(Context& h) {
   // the second at +224), and those bytes' masks.
   static constexpr std::pair<uint32_t, uint32_t> kHeaderLeftovers[] = {
       {192, 0x000000FFu}, {200, 0x00FF0000u}, {224, 0x000000FFu}, {232, 0x00FF0000u}};
+  int compressed_cases = 0;
   for (int c = 0; c < 16; c++) {
     const uint64_t seed = h.random.Next();
     const bool compress = c % 6 == 1;
@@ -1053,7 +1054,10 @@ void DecalLoadCases(Context& h) {
         Put(h.base, slot + 4, n == chosen ? request : uint32_t(r.Next()) & ~1u);
         Put(h.base, slot + 44, 0);
         const bool arrived = n == chosen || r.Below(6) == 0;
-        Put(h.base, slot + 20, n == chosen ? 1 + r.Below(2) : arrived ? 3 : r.Below(3));
+        // Compress cases leave no slot loading (state 2), so the call
+        // reaches ClearCorner and the compress.
+        Put(h.base, slot + 20,
+            n == chosen ? 1 + r.Below(2) : arrived ? 3 : r.Below(compress ? 2 : 3));
         Put(h.base, slot + 12, 0);
         if (!arrived) {
           continue;
@@ -1087,6 +1091,7 @@ void DecalLoadCases(Context& h) {
       const uint32_t header = guest::LoadU32(h.base, car + cm::kSheetHeader);
       const uint32_t data = guest::LoadU32(h.base, car + cm::kSheetData);
       const bool compressed = header != sheet;
+      compressed_cases += v == 1 && compressed;
       if (compressed) {
         known.push_back({header, 52});
         known.push_back({data, vinyl_bytes});
@@ -1101,7 +1106,8 @@ void DecalLoadCases(Context& h) {
         out[v].Bytes(Read(h.base, sheet_data, sheet_bytes));
       }
       for (uint32_t file : files) {
-        const bool alive = memory::IsPages(file);
+        // The new sheet's header may take a freed file's pages.
+        const bool alive = memory::IsPages(file) && !(compressed && file == header);
         out[v].Word(alive);
         if (alive) {
           memory::FreePages(file);
@@ -1139,6 +1145,8 @@ void DecalLoadCases(Context& h) {
   guest::StoreU32(h.base, tc::kAlphaReference, saved_alpha);
   guest::StoreU32(h.base, tc::kPremultiplied, saved_premultiplied);
   memory::Free(allocation);
+  ITC_LOG_INFO("harness: car_models: OnDecalLoaded compressed the sheet in {} of 16 cases",
+               compressed_cases);
   results.Report();
   expected.Report();
 }
