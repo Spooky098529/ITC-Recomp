@@ -280,12 +280,14 @@ ITC_RACE_STATES(82168B80, RaceStatesFreeStartTick)
 ITC_RACE_STATES(82168500, RaceStatesQuitTick)
 ITC_RACE_STATES(82167970, RaceStatesAfterRaceTick)
 ITC_RACE_STATES(82166E50, RaceStatesRollingStartTick)
-ITC_RACE_STATES(82165AB0, RaceStatesRacersNear)
-ITC_RACE_STATES(82165C78, RaceStatesRacersClose)
-ITC_RACE_STATES(82164A90, RaceStatesRacersStill)
 ITC_RACE_STATES(821674A0, RaceStatesCountdownTick)
 ITC_RACE_STATES(821692C8, RaceStatesStandingStartTick)
 // RaceProgress::TickFraction (sub_82163140) and RoutePosition::NotAfter
 // (sub_821622A8) have no adapters: their callers, RaceProgress::CheckLap and
 // CheckFinish, are native; --native_race_states switches those callers.
 // Their register steps stay for the harness.
+// RaceStates::RacersNear (sub_82165AB0), RacersClose (sub_82165C78) and
+// RacersStill (sub_82164A90) have no adapters: their callers,
+// RaceStates::CountdownTick and StandingStartTick, are native;
+// --native_race_states switches those callers. Their register steps stay
+// for the harness.
