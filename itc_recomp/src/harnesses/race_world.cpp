@@ -2326,6 +2326,135 @@ void ManagerLists(Context& h, const Block& manager, const Block& vehicles) {
                  listed, lost, given);
   }
   {
+    // RaceManager::Refresh: as StreamOpponents' cases, with the player (the
+    // first flagged 0x4: none of those before it so flagged; it has a
+    // vehicle) first or later, the counts +2364, +2372, +2376 random; the
+    // radii the game's ([0x8200996C], [0x82009970]); the three traffic
+    // entries (+2160) in use (their vehicles 0 to 6) or not; the race data's
+    // flags (+0x59AE4) with 0x4000 or without (the other bits random).
+    // RaceManager::GiveVehicle answered by the stand-in on both sides (now
+    // and then none free, which ends the list's pass). Compared: the
+    // manager, the vehicles' +340, +344 (by name), +6148, which shapes were
+    // freed, the stand-in's log, the drivers, the input records and the
+    // frame's temporaries (the sorted list's keys and the vectors as
+    // floats).
+    Results results("RaceManager::Refresh (sub_82171978)");
+    const uint32_t frame = sp - 1904;
+    uint32_t listed = 0, traffic = 0, removed = 0, given = 0;
+    for (uint64_t seed = 0; seed < 200; seed++) {
+      Outputs out[2];
+      for (int v = 0; v < 2; v++) {
+        Random r(seed * 229 + 151);
+        auto globals = saved();
+        common(r);
+        tr::Route route;
+        route_up(r, route);
+        WriteRandom(h.base, manager.address, 2400, r);
+        WriteRandom(h.base, vehicles.address, vehicles.bytes, r);
+        const uint32_t count = 1 + r.Below(24);
+        guest::StoreU32(h.base, manager.address + 2368, count);
+        const uint32_t player = r.Below(2) == 0 ? 0 : r.Below(count);
+        for (uint32_t i = 0; i < count; i++) {
+          const uint32_t entry = manager.address + 4 + 28 * i;
+          const uint32_t flags[] = {0x1, 0x41, 0x21, 0x60, 0x80, 0x10, 0x400,
+                                    0x0, 0x8,  0x48, 0x101, 0x40, 0x1, 0x41};
+          uint32_t f = r.Below(8) == 0 ? uint32_t(r.Next()) : flags[r.Below(14)];
+          if (i < player) {
+            f &= ~0x4u;
+          } else if (i == player) {
+            f = 0x4 | (r.Below(2) ? 0x40 : uint32_t(r.Next()) & ~0xA0u);
+          }
+          guest::StoreU32(h.base, entry, f);
+          tr::RandomPosition(h.base, entry + 8, route, r);
+          const bool vehicle = i == player || r.Below(3) != 0;
+          guest::StoreU32(h.base, entry + 20, vehicle ? r.Below(7) : 0xFFFFFFFFu);
+          guest::StoreU32(h.base, entry + 24, r.Below(14));
+        }
+        for (uint32_t t = 0; t < 3; t++) {
+          const uint32_t entry = manager.address + 2160 + 28 * t;
+          const uint32_t used[] = {578, 2626, 1, uint32_t(r.Next()) | 1};
+          const bool in_use = r.Below(3) != 0;
+          guest::StoreU32(h.base, entry, in_use ? used[r.Below(4)] : 0);
+          if (in_use) {
+            guest::StoreU32(h.base, entry + 20, r.Below(7));
+          }
+        }
+        for (uint32_t k = 0; k < 7; k++) {
+          const uint32_t slots[] = {1, 1, 2, 0x80000000u, 0, 0xFFFFFFFFu, uint32_t(r.Next())};
+          guest::StoreU32(h.base, manager.address + 2336 + 4 * k, slots[r.Below(7)]);
+        }
+        const uint32_t race_flags =
+            (uint32_t(r.Next()) & ~0x4000u) | (r.Below(3) == 0 ? 0x4000u : 0u);
+        guest::StoreU32(h.base, race.address + 0x59AE4, race_flags);
+        std::vector<uint32_t> shapes;
+        for (uint32_t i = 0; i < 7; i++) {
+          const uint32_t vehicle = vehicles.address + 6272 * i;
+          uint32_t shape = 0;
+          if (hooks::NativeHeapActive() && r.Below(3) == 0) {
+            shape = memory::Alloc(496, 0);
+            car_objects::BuildBox(h, shape, r);
+            shapes.push_back(shape);
+          }
+          guest::StoreU32(h.base, vehicle + 340, 0);
+          guest::StoreU32(h.base, vehicle + 344, shape);
+          tr::RandomPosition(h.base, vehicle + 5236, route, r);
+        }
+        PPCContext t = CallContext(h);
+        t.fpscr.disableFlushModeUnconditional();
+        t.r3.u64 = manager.address;
+        GiveVehicleStandIn stand_in;
+        (v == 0 ? Original<__imp__sub_82171978> : hooks::RaceWorldRefresh)(t, h.base);
+        out[v].Word(uint32_t(g_give_log.size()));
+        for (uint32_t w : g_give_log) {
+          out[v].Word(w);
+        }
+        const auto name = [&](uint32_t w) {
+          for (size_t i = 0; i < shapes.size(); i++) {
+            if (w == shapes[i]) {
+              return uint32_t(0xB10C0000u + i);
+            }
+          }
+          return w;
+        };
+        if (v == 1) {
+          given += uint32_t(g_give_log.size() / 3);
+          listed += guest::LoadU32(h.base, manager.address + 2372);
+          traffic += guest::LoadU32(h.base, manager.address + 2376);
+          for (uint32_t t = 0; t < 3; t++) {
+            removed += (race_flags & 0x4000) != 0 &&
+                               guest::LoadU32(h.base, manager.address + 2160 + 28 * t + 20) ==
+                                   0xFFFFFFFFu
+                           ? 1
+                           : 0;
+          }
+        }
+        out[v].Bytes(Read(h.base, manager.address, 2400));
+        for (uint32_t i = 0; i < 7; i++) {
+          const uint32_t vehicle = vehicles.address + 6272 * i;
+          out[v].Word(name(guest::LoadU32(h.base, vehicle + 340)));
+          out[v].Word(name(guest::LoadU32(h.base, vehicle + 344)));
+          out[v].Word(guest::LoadU32(h.base, vehicle + 6148));
+        }
+        for (uint32_t s : shapes) {
+          out[v].Word(memory::IsHeapBlock(s) ? 1 : 0);
+          if (memory::IsHeapBlock(s)) {
+            memory::Free(s);
+          }
+        }
+        drivers_out(out[v]);
+        out[v].Bytes(Read(h.base, frame + 80, 16));
+        out[v].Floats(h.base, frame + 96, 12);
+        out[v].Bytes(Read(h.base, frame + 144, 20));
+        list_out(out[v], frame + 176);
+      }
+      results.Check(out[0], out[1], fmt::format("seed {}", seed));
+    }
+    results.Report();
+    ITC_LOG_INFO("harness: race_world: Refresh listed {} racers and {} traffic cars, removed {} "
+                 "traffic cars, {} calls to GiveVehicle's stand-in",
+                 listed, traffic, removed, given);
+  }
+  {
     // RaceManager::MoveUnseen: the manager's entries (0 to 24; the
     // player's, flagged 0x4, now and then 0x10, with a vehicle, first or
     // later) with flags among 0x1, 0x41, 0x21, 0x81, 0x8, 0x0, 0x40, 0x401,

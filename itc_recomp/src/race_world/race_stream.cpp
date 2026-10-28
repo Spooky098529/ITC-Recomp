@@ -44,6 +44,8 @@ constexpr uint32_t kSlowFactor = 0x820027A8;   // 1.5: the km/h scaled against t
 constexpr uint32_t kTrafficSpeed = 0x82009974;  // the traffic's speed placed (and its limit)
 constexpr uint32_t kTooNear = 0x82002568;      // 20.0: a racer this near the spot refuses it
 constexpr uint32_t kTrafficStep = 0x826193C8;  // the physics step's time on a new traffic car
+constexpr uint32_t kRefreshSpawn = 0x8200996C;    // Refresh: nearer than this given a vehicle
+constexpr uint32_t kRefreshDespawn = 0x82009970;  // Refresh: beyond this losing it
 
 uint32_t Load(uint8_t* base, uint32_t address) {
   return guest::LoadU32(base, address);
@@ -227,6 +229,157 @@ void StreamOpponents(uint8_t* base, uint32_t manager, uint32_t player, double sp
       Lose(base, manager, entry, frame, heap, original);
     } else if (int32_t(Load(base, entry + 20)) != -1) {
       List(base, manager, entry);
+    }
+  }
+}
+
+void Refresh(uint8_t* base, uint32_t manager, uint32_t frame, bool heap,
+             const OriginalCall& original) {
+  ITC_NATIVE_RUNNING("sub_82171978 RaceManager::Refresh");
+  // The player's entry: the first flagged 0x4 (the count read again each
+  // pass), or none (0: its +20 read at 20).
+  uint32_t player = 0;
+  if (int32_t(Load(base, manager + 2368)) > 0) {
+    for (int32_t i = 0;;) {
+      if ((Load(base, manager + 4 + 28 * uint32_t(i)) & 0x4) != 0) {
+        player = manager + 4 + 28 * uint32_t(i);
+        break;
+      }
+      i++;
+      if (!(i < int32_t(Load(base, manager + 2368)))) {
+        break;
+      }
+    }
+  }
+  // Its route position (its vehicle's identity +4) at + 80, its section's
+  // record and its slice's center at + 112.
+  const uint32_t identity = va::VehicleIdentity(va::VehicleGet(base, Load(base, player + 20)));
+  Store(base, frame + 80, Load(base, identity + 4));
+  const uint32_t player_section = guest::LoadU16(base, frame + 80);
+  const uint32_t player_record = SectionRecord(base, Load(base, kRoute), player_section);
+  const uint32_t player_slice = LoadS16(base, frame + 82);
+  // The sorted list at + 176 emptied and the counts +2364, +2372, +2376 = 0.
+  Store(base, frame + 1776, 0);
+  Store(base, manager + 2364, 0);
+  Store(base, frame + 1780, 0);
+  Store(base, manager + 2372, 0);
+  Store(base, frame + 1784, 0);
+  Store(base, manager + 2376, 0);
+  track_route::SlicePoint(base, frame + 112, 0, S16(player_section), player_slice);
+  const uint32_t list = frame + 176;
+  if (int32_t(Load(base, manager + 2368)) > 0) {
+    const double one = Lfs(base, kOne);
+    const double far_key = Lfs(base, kFarKey);
+    const double zero = Lfs(base, kZero);
+    for (int32_t i = 0;;) {
+      const uint32_t entry = manager + 4 + 28 * uint32_t(i);
+      const uint32_t flags = Load(base, entry);
+      bool lose = (flags & 0x20) != 0 || (flags & 0x80) != 0;
+      double key = 0.0;
+      if (lose) {
+      } else if ((flags & 0x4) != 0 || (flags & 0x8) != 0) {
+        key = zero;
+      } else if ((flags & 0x10) != 0 || (flags & 0x400) != 0) {
+        key = far_key;
+      } else {
+        // The entry's position at + 80 (StreamOpponents': + 84).
+        const uint32_t word = Load(base, entry + 8);
+        const uint32_t now = Load(base, kRoute);
+        const uint32_t a = guest::LoadU8(base, player_record + 3);
+        Store(base, frame + 80, word);
+        const uint32_t section = guest::LoadU16(base, frame + 80);
+        const uint32_t b = guest::LoadU8(base, SectionRecord(base, now, section) + 3);
+        if (BranchesMeet(a, b) == 0) {
+          lose = true;
+        } else {
+          // The entry's slice's center at + 128; the difference from the
+          // player's at + 96, its y = 0.0 and w = 1.0; its length + 1.0.
+          track_route::SlicePoint(base, frame + 128, 0, LoadS16(base, frame + 80),
+                                  LoadS16(base, frame + 82));
+          vl::Vec3Sub(base, frame + 96, frame + 128, frame + 112);
+          Stfs(base, frame + 100, zero);
+          Stfs(base, frame + 108, one);
+          key = Fadds(double(vl::Vec3Normalize(base, frame + 96, frame + 96)), one);
+        }
+      }
+      if (lose) {
+        Lose(base, manager, entry, frame, heap, original);
+      } else {
+        SortedListInsert(base, list, entry, key);
+      }
+      i++;
+      if (!(i < int32_t(Load(base, manager + 2368)))) {
+        break;
+      }
+    }
+  }
+  // Past the fourth, the vehicle removed.
+  uint32_t n = 0;
+  for (uint32_t node = Load(base, frame + 1776); node != 0; node = Load(base, node + 12), n++) {
+    const uint32_t entry = Load(base, node);
+    if (n >= 4) {
+      Lose(base, manager, entry, frame, heap, original);
+    }
+  }
+  // Up to four: nearer than [0x8200996C] given a vehicle (or keeping
+  // theirs), beyond [0x82009970] losing theirs, between keeping theirs.
+  for (uint32_t node = Load(base, frame + 1776); node != 0; node = Load(base, node + 12)) {
+    const uint32_t entry = Load(base, node);
+    if (Load(base, manager + 2372) >= 4) {
+      Lose(base, manager, entry, frame, heap, original);
+      continue;
+    }
+    const double key = Lfs(base, node + 4);
+    if (key < Lfs(base, kRefreshSpawn)) {
+      if (int32_t(Load(base, entry + 20)) != -1) {
+        List(base, manager, entry);
+        continue;
+      }
+      // RaceManager::GiveVehicle (never seen in play): its original. None
+      // free: the rest of the list is left as it is (StreamOpponents goes
+      // on with the next).
+      const uint64_t given = original(kGiveVehicle, frame, manager, entry, 0);
+      if (uint32_t(given) == 0) {
+        break;
+      }
+      List(base, manager, entry);
+      ai_drivers::ClearCarInput(base, frame + 144);
+      const uint32_t to = Load(base, kInputs + ((Load(base, entry + 20) << 2) & 0x3FC));
+      for (uint32_t w = 0; w < 5; w++) {
+        Store(base, to + 4 * w, Load(base, frame + 144 + 4 * w));
+      }
+      const uint32_t number = Load(base, entry + 24);
+      const uint32_t id = number * 3936 + Load(base, kRaceData) + 3960;
+      Store(base, frame + 80, 1);
+      racer_controllers::Setup(base, entry + 20, id, frame + 80, frame);
+    } else if (key > Lfs(base, kRefreshDespawn)) {
+      Lose(base, manager, entry, frame, heap, original);
+    } else if (int32_t(Load(base, entry + 20)) != -1) {
+      List(base, manager, entry);
+    }
+  }
+  // The traffic (the three entries at +2160) in use: with the race data's
+  // flags 0x4000 each loses its vehicle (+0 = 0, the slot word 0, +20 =
+  // -1; no slot word check), else each is listed.
+  if ((Load(base, Load(base, kRaceData) + kFlagsOffset) & 0x4000) != 0) {
+    for (uint32_t t = 0; t < 3; t++) {
+      const uint32_t entry = manager + 2160 + 28 * t;
+      if (Load(base, entry) == 0) {
+        continue;
+      }
+      RemoveFromWorld(base, va::VehicleGet(base, Load(base, entry + 20)), frame, heap,
+                      original);
+      const uint32_t which = Load(base, entry + 20);
+      Store(base, entry, 0);
+      Store(base, manager + ((which + 584) << 2), 0);
+      Store(base, entry + 20, 0xFFFFFFFFu);
+    }
+    return;
+  }
+  for (uint32_t t = 0; t < 3; t++) {
+    const uint32_t entry = manager + 2160 + 28 * t;
+    if (Load(base, entry) != 0) {
+      List(base, manager, entry, 2376);
     }
   }
 }

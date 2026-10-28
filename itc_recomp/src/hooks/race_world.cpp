@@ -44,7 +44,8 @@ ITC_FLAG_BOOL(native_race_world, true, "ITC",
               "refuse) and MoveUnseen sub_82173E28; RaceManager::Stream sub_82174338 (with "
               "sub_8217437C), StreamNear sub_82172E60, StreamCruise sub_82174200, "
               "StreamTwoPlayers sub_82172D20 and RaceWorld::Tick sub_82174BC0 (sub_821743A8's "
-              "original; the callees' originals where those refuse) natively instead of "
+              "original; the callees' originals where those refuse); RaceManager::Refresh "
+              "sub_82171978 (as StreamOpponents) natively instead of "
               "through the "
               "translated code (the same words, bit for bit; checked by "
               "--run_harnesses=race_world)");
@@ -430,25 +431,38 @@ void RaceWorldPlaceRolling(PPCContext& ctx, uint8_t* base) {
 
 RaceWorldStandIn g_give_vehicle_stand_in = nullptr;
 
+namespace {
+
+// StreamOpponents' and Refresh's guest calls: Vehicle::RemoveFromWorld's
+// and RaceManager::GiveVehicle's originals.
+rw::OriginalCall OpponentsCall(PPCContext& ctx, uint8_t* base) {
+  return [&ctx, base](uint32_t address, uint32_t sp, uint64_t r3, uint64_t r4, uint64_t) {
+    const uint64_t r1 = ctx.r1.u64;
+    ctx.r1.u64 = sp;
+    ctx.r3.u64 = r3;
+    ctx.r4.u64 = r4;
+    if (address == 0x820C20E0) {
+      __imp__sub_820C20E0(ctx, base);
+    } else if (address == 0x821706E8) {
+      sub_821706E8(ctx, base);  // the original, through the harness's stand-in
+    }
+    ctx.r1.u64 = r1;
+    ctx.fpscr.disableFlushMode();
+    return ctx.r3.u64;
+  };
+}
+
+}  // namespace
+
 void RaceWorldStreamOpponents(PPCContext& ctx, uint8_t* base) {
   ctx.fpscr.disableFlushMode();
-  rw::StreamOpponents(
-      base, ctx.r3.u32, ctx.r4.u32, ctx.f1.f64, ctx.f2.f64, ctx.r1.u32 - 1920,
-      NativeHeapActive(),
-      [&ctx, base](uint32_t address, uint32_t sp, uint64_t r3, uint64_t r4, uint64_t) {
-        const uint64_t r1 = ctx.r1.u64;
-        ctx.r1.u64 = sp;
-        ctx.r3.u64 = r3;
-        ctx.r4.u64 = r4;
-        if (address == 0x820C20E0) {
-          __imp__sub_820C20E0(ctx, base);
-        } else if (address == 0x821706E8) {
-          sub_821706E8(ctx, base);  // the original, through the harness's stand-in
-        }
-        ctx.r1.u64 = r1;
-        ctx.fpscr.disableFlushMode();
-        return ctx.r3.u64;
-      });
+  rw::StreamOpponents(base, ctx.r3.u32, ctx.r4.u32, ctx.f1.f64, ctx.f2.f64, ctx.r1.u32 - 1920,
+                      NativeHeapActive(), OpponentsCall(ctx, base));
+}
+
+void RaceWorldRefresh(PPCContext& ctx, uint8_t* base) {
+  ctx.fpscr.disableFlushMode();
+  rw::Refresh(base, ctx.r3.u32, ctx.r1.u32 - 1904, NativeHeapActive(), OpponentsCall(ctx, base));
 }
 
 void RaceWorldStreamTraffic(PPCContext& ctx, uint8_t* base) {
@@ -530,6 +544,7 @@ ITC_RACE_WORLD(82173A90, RaceWorldOnLoaded)
 ITC_RACE_WORLD(82165E20, RaceWorldPlace)
 ITC_RACE_WORLD(821662E0, RaceWorldPlaceRolling)
 ITC_RACE_WORLD(82174BC0, RaceWorldTick)
+ITC_RACE_WORLD(82171978, RaceWorldRefresh)
 // RaceManager::Stream (sub_82174338), TickVehicles (sub_821714D8) and
 // RefreshVehicles (sub_82171560) have no adapters: their only caller,
 // RaceWorld::Tick, is native; nor have StreamCruise (sub_82174200),

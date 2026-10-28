@@ -434,6 +434,20 @@ void PlaceRolling(uint8_t* base, uint32_t object, uint32_t settle, uint32_t fram
 // read it).
 void StreamOpponents(uint8_t* base, uint32_t manager, uint32_t player, double spawn,
                      double despawn, uint32_t frame, bool heap, const OriginalCall& original);
+// RaceManager::Refresh (sub_82171978, from the race's other states after
+// the racers are moved): StreamOpponents with the player's entry found (the
+// first flagged 0x4, the count read again each pass; none: its +20 read at
+// 20) and the radii [0x8200996C] and [0x82009970]; the player's slice's
+// center at `frame` + 112 once before the entries, each entry's position at
+// + 80; +2364, +2372 and +2376 = 0; when RaceManager::GiveVehicle finds no
+// free slot, the rest of the list is left as it is. Then the traffic
+// entries (+2160) in use: with the race data's flags (+0x59AE4) 0x4000 each
+// loses its vehicle (Vehicle::RemoveFromWorld; +0 = 0, the slot word 0, +20
+// = -1), else each is listed (+2364, +2376 count). The callees' originals
+// through `original` as StreamOpponents'. `frame`: the original's 1,904
+// bytes. r3 isn't kept (its callers don't read it).
+void Refresh(uint8_t* base, uint32_t manager, uint32_t frame, bool heap,
+             const OriginalCall& original);
 // RaceManager::StreamTraffic (sub_821724F8): `inner` and `outer` the near and far radii,
 // `second` the second player's entry or 0. The player's route position (its
 // vehicle's identity +4) at `frame` + 84 (and + 80, or the second player's

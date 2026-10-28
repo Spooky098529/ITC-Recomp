@@ -122,6 +122,9 @@ void RaceWorldPlaceRolling(PPCContext& ctx, uint8_t* base);
 // original). RaceManager::MoveUnseen sub_82173E28: r3 = the manager, r4 =
 // the player's entry. r3 not kept (their callers don't read it).
 void RaceWorldStreamOpponents(PPCContext& ctx, uint8_t* base);
+// RaceManager::Refresh sub_82171978: r3 = the manager (its callees'
+// originals as StreamOpponents'). r3 not kept (its callers don't read it).
+void RaceWorldRefresh(PPCContext& ctx, uint8_t* base);
 void RaceWorldMoveUnseen(PPCContext& ctx, uint8_t* base);
 // RaceManager::StreamTraffic sub_821724F8: r3 = the manager, r4 = the
 // player's entry, f1, f2 = the near and far radii, r5 = the second player's
