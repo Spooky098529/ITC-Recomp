@@ -123,6 +123,19 @@ uint32_t SectionsJoin(uint8_t* base, uint32_t a, uint32_t b, uint32_t out_a, uin
 uint32_t FollowRoute(uint8_t* base, uint32_t out, uint32_t progress, uint32_t index,
                      uint32_t frame);
 
+// Whether RaceStates::RaceTick runs natively: not with +7220's 0x8
+// (sub_821653E8, never seen in play), nor with +7224's 0x4 where CheckLap's
+// copies of the course route aren't native (CheckLapNative at `frame` -
+// 544): the original then.
+bool RaceTickNative(uint8_t* base, uint32_t machine, uint32_t frame);
+// RaceStates::RaceTick (sub_82167610): see the row. The debug prints'
+// doubles at `frame` + 48 and + 56, Time::Clamp's word at + 20, the out
+// pairs at + 88 to + 135 and the last copied at + 80 as the original leaves
+// them; the callees' frames below (FollowRoute 240, CheckLap 544,
+// CheckFinish 144, Damage 160, DrainSp 224, Rank 1,728, AiDrivers::ClearAll
+// 128 bytes). `frame`: its 208 bytes.
+void RaceTick(uint8_t* base, uint32_t machine, uint32_t dispatcher, uint32_t frame);
+
 // --- The state machine's handlers (src/race_states/handlers.cpp): the
 // machine (the race mode + 107168: +9604 the state, +9608 the pause menu's
 // quit, +9612 a step, +9616 a tick count, +9624 the progress) and the

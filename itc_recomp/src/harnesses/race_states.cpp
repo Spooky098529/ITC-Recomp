@@ -815,7 +815,8 @@ void RouteChecks(Context& h, const Block& progress, const Block& vehicles) {
 // from the car's section, its links and random sections, the start (+7152)
 // the car's section or another; the speeds, the distance a frame and the
 // distance past the slice random floats with NaNs.
-void FollowRouteCases(Context& h, const Block& progress, const Block& vehicles) {
+void FollowRouteCases(Context& h, const Block& progress, const Block& vehicles,
+                      const Block& manager) {
   const Block area(tr::kRouteBytes + 0x100);
   const Block table(4 * tr::kTableEntries);
   if (!area.address || !table.address) {
@@ -967,6 +968,146 @@ void FollowRouteCases(Context& h, const Block& progress, const Block& vehicles) 
     results.Report();
     ITC_LOG_INFO("harness: race_states: FollowRoute off the route in {}, along in {} of 64",
                  off_route, along);
+  }
+  {
+    // RaceTick: 0 to 4 racers (now and then below 0), each with a car on the
+    // route, its list (1 to 3 sections) from its section, its contact (Damage), its lap
+    // record and the laps' distances (CheckLap, CheckFinish); the checks
+    // +7220 and +7224 as SetChecks sets them or random (+7220's 0x8, which
+    // the original runs, left out); the race's ticks and the ring. No AI
+    // drivers (0x826C6074 0) and no racers in the manager: AiDrivers::ClearAll
+    // stops at once (its own harness checks it).
+    Results results("RaceStates::RaceTick (sub_82167610)");
+    const Block machine(10240);
+    const Block dispatcher(1024);
+    if (!machine.address || !dispatcher.address) {
+      ITC_LOG_ERROR("harness: race_states: no block from the allocation layer");
+      return;
+    }
+    std::vector<uint32_t> tick_words = words;
+    tick_words.push_back(rw::kManager);
+    tick_words.push_back(0x826C6074);
+    uint32_t ended = 0;
+    for (uint64_t seed = 0; seed < 48; seed++) {
+      Outputs out[2];
+      for (int v = 0; v < 2; v++) {
+        Random r(seed * 139 + 101);
+        Globals globals(h.base, tick_words);
+        tr::Route route;
+        set_up(r, route);
+        WriteRandom(h.base, manager.address, 2400, r);
+        guest::StoreU32(h.base, manager.address + 2364, 0);
+        guest::StoreU32(h.base, rw::kManager, manager.address);
+        guest::StoreU32(h.base, 0x826C6074, 0);
+        WriteRandom(h.base, machine.address + 9600, 64, r);
+        guest::StoreU32(h.base, machine.address + 9624, progress.address);
+        WriteRandom(h.base, dispatcher.address, 1024, r);
+        guest::StoreU32(h.base, dispatcher.address + 804, r.Below(50));
+        guest::StoreU32(h.base, dispatcher.address + 808, r.Below(50));
+        PPCContext t = CallContext(h);
+        const uint32_t frame = t.r1.u32 - 208;
+        WriteRandom(h.base, frame, 208, r);
+        const uint32_t p = progress.address;
+        guest::StoreU32(h.base, p + 2184, seed % 16 == 0 ? uint32_t(-1) : r.Below(5));
+        const uint32_t checks_a[] = {0x3, 0x11, 0x13, 0x0};
+        const uint32_t checks_b[] = {0x417, 0x481, 0x0, 0x695};
+        guest::StoreU32(h.base, p + 7220,
+                        r.Below(4) == 0 ? uint32_t(r.Next()) & ~0x8u : checks_a[r.Below(4)]);
+        guest::StoreU32(h.base, p + 7224,
+                        r.Below(4) == 0 ? uint32_t(r.Next()) : checks_b[r.Below(4)]);
+        guest::StoreU32(h.base, p + 6076, r.Below(23));
+        guest::StoreU32(h.base, p + 6096, r.Below(2));
+        guest::StoreU32(h.base, p + 6116, r.Below(100000));
+        guest::StoreU16(h.base, p + 7152, uint16_t(r.Below(route.sections)));
+        guest::StoreU16(h.base, p + 7154, uint16_t(r.Below(8)));
+        guest::StoreU32(h.base, p + 7156, std::bit_cast<uint32_t>(float(r.Below(4000))));
+        guest::StoreU32(h.base, p + 7232, RandomFloat(r, 4.0f));
+        guest::StoreU32(h.base, p + 7236, RandomFloat(r, 4.0f));
+        guest::StoreU32(h.base, p + 6632, r.Below(4));
+        for (uint32_t k = 0; k < 15; k++) {
+          guest::StoreU32(h.base, p + 7160 + 4 * k, std::bit_cast<uint32_t>(float(r.Below(4000))));
+        }
+        for (uint32_t i = 0; i < 4; i++) {
+          const uint32_t slot = p + 40 + 536 * i;
+          const uint32_t e = p + 972 * i;
+          const uint32_t car = vehicles.address +
+                               6272 * guest::LoadU32(h.base, h.data + 32 * i + 20);
+          ValidPosition(h.base, car + 5236, route, r);
+          const uint32_t section = guest::LoadU16(h.base, car + 5236);
+          // 1 to 3 sections (StartRoute lists the first before the race:
+          // with none, FollowRoute may write over the slot's manager entry).
+          const uint32_t n = 1 + r.Below(3);
+          guest::StoreU32(h.base, slot + 524, n);
+          uint32_t sec = r.Below(2) ? section : r.Below(route.sections);
+          for (uint32_t k = 0; k < n; k++) {
+            guest::StoreU16(h.base, slot + 12 + 2 * k, uint16_t(sec));
+            sec = near(route, sec, r);
+          }
+          guest::StoreU32(h.base, slot + 40, r.Below(3));
+          guest::StoreU32(h.base, slot + 44, r.Below(3));
+          guest::StoreU32(h.base, slot + 568, r.Below(6));
+          guest::StoreU8(h.base, car + 2424, r.Below(2) ? 0 : uint8_t(r.Next()));
+          guest::StoreU32(h.base, car + 48, RandomFloat(r, 90.0f));
+          guest::StoreU32(h.base, car + 6228, RandomFloat(r, 2.0f));
+          guest::StoreU32(h.base, car + 6152, r.Below(4));
+          guest::StoreU32(h.base, car + 6160, RandomFloat(r, 400.0f));
+          const uint32_t object = h.data + 1280 + 64 * i;
+          const uint32_t contact = h.data + 1536 + 128 * i;
+          guest::StoreU32(h.base, car + 340, object - 240);
+          guest::StoreU32(h.base, object, r.Below(3) == 0 ? 0 : contact);
+          guest::StoreU32(h.base, contact + 0, r.Below(2) ? 0 : uint32_t(r.Next()) | 1);
+          guest::StoreU32(h.base, contact + 4, r.Below(0x1000000));
+          guest::StoreU32(h.base, contact + 64, RandomFloat(r, 3000.0f));
+          const uint32_t sps[] = {12000, 3001, 1, 0, 0xFFFFFF00u};
+          guest::StoreU32(h.base, e + 2972, r.Below(2) ? r.Below(14000) : sps[r.Below(5)]);
+          guest::StoreU32(h.base, e + 2976, 12000);
+          guest::StoreU32(h.base, e + 2980, RandomFloat(r, 200.0f));
+          guest::StoreU32(h.base, e + 2984, r.Below(1000));
+          guest::StoreU32(h.base, e + 2988, RandomFloat(r, 300.0f));
+          guest::StoreU32(h.base, e + 3004, RandomFloat(r, 50.0f));
+          guest::StoreU32(h.base, e + 3020, r.Below(3));
+          for (uint32_t lap = 0; lap < 3; lap++) {
+            const uint32_t record = e + 2208 + 76 * lap;
+            guest::StoreU32(h.base, record + 60, r.Below(4));
+            for (uint32_t k = 0; k < 8; k++) {
+              guest::StoreU32(h.base, record + 4 * k, RandomTime(r));
+            }
+            guest::StoreU32(h.base, record + 68, r.Below(1000));
+            guest::StoreU32(h.base, record + 72, r.Below(1000));
+          }
+          guest::StoreU32(h.base, e + 2204, RandomTime(r));
+          guest::StoreU32(h.base, e + 2200, r.Below(100000));
+        }
+        t.r3.u64 = machine.address;
+        t.r4.u64 = dispatcher.address;
+        (v == 0 ? Original<__imp__sub_82167610> : hooks::RaceStatesRaceTick)(t, h.base);
+        if (v == 1) {
+          ended += guest::LoadU32(h.base, p + 6104) != 0 ? 1 : 0;
+        }
+        uint32_t at = p;
+        for (uint32_t i = 0; i < 4; i++) {
+          const uint32_t e = p + 972 * i;
+          for (uint32_t f : {2980u, 2988u, 3004u, 3012u}) {
+            out[v].Bytes(Read(h.base, at, e + f - at));
+            out[v].Floats(h.base, e + f, 1);
+            at = e + f + 4;
+          }
+        }
+        out[v].Bytes(Read(h.base, at, p + kProgressBytes - at));
+        out[v].Bytes(Read(h.base, h.data, kScratchBytes));
+        out[v].Bytes(Read(h.base, machine.address + 9600, 64));
+        out[v].Bytes(Read(h.base, dispatcher.address, 1024));
+        out[v].Bytes(Read(h.base, frame + 16, 32));
+        for (uint32_t d : {48u, 56u}) {
+          out[v].Double(uint64_t(guest::LoadU32(h.base, frame + d)) << 32 |
+                        guest::LoadU32(h.base, frame + d + 4));
+        }
+        out[v].Bytes(Read(h.base, frame + 64, 72));
+      }
+      results.Check(out[0], out[1], fmt::format("seed {}", seed));
+    }
+    results.Report();
+    ITC_LOG_INFO("harness: race_states: RaceTick ended the race in {} of 48 cases", ended);
   }
 }
 
@@ -1358,7 +1499,7 @@ void RaceStates(Context& h) {
   Sections(h);
   Checks(h, progress, vehicles);
   RouteChecks(h, progress, vehicles);
-  FollowRouteCases(h, progress, vehicles);
+  FollowRouteCases(h, progress, vehicles, manager);
   Handlers(h, progress, vehicles, manager);
   Racers(h, vehicles, manager);
 }

@@ -1,16 +1,20 @@
 // The race's progress along the course's route each tick
-// (docs/functions/race-states.md): RaceProgress::FollowRoute and the
-// section join it falls back to.
+// (docs/functions/race-states.md): RaceProgress::FollowRoute, the section
+// join it falls back to, and RaceStates::RaceTick, which runs it and the
+// race's checks for each racer every tick.
 
 #include "race_states/race_states.h"
 #include "race_states/steps.h"
 
+#include "ai_drivers/ai_drivers.h"
 #include "base/log.h"
 #include "car_physics/float_ops.h"
 #include "hooks/vehicle.h"
 #include "race_setup/race_setup.h"
 #include "track_route/track_route.h"
 #include "vehicle_accessors/vehicle_accessors.h"
+
+#include <bit>
 
 namespace race_states {
 
@@ -261,6 +265,112 @@ uint32_t FollowRoute(uint8_t* base, uint32_t out, uint32_t progress, uint32_t in
     Stfs(base, e + 3012, zero);
   }
   return Out(base, out, 0, 0);
+}
+
+bool RaceTickNative(uint8_t* base, uint32_t machine, uint32_t frame) {
+  const uint32_t progress = Load(base, machine + 9624);
+  if (Load(base, progress + 7220) & 0x8) {
+    return false;  // sub_821653E8 (never seen in play): the original's
+  }
+  return !(Load(base, progress + 7224) & 0x4) || CheckLapNative(base, progress, frame - 544);
+}
+
+void RaceTick(uint8_t* base, uint32_t machine, uint32_t dispatcher, uint32_t frame) {
+  ITC_NATIVE_RUNNING("sub_82167610 RaceStates::RaceTick");
+  const auto progress = [&] { return Load(base, machine + 9624); };
+  // The debug prints (the empty sub_82106540) aren't made; the doubles they
+  // were handed stay in the frame.
+  {
+    const uint32_t p = progress();
+    Store64(base, frame + 56, std::bit_cast<uint64_t>(Lfs(base, p + 7156)));
+    Store64(base, frame + 48, std::bit_cast<uint64_t>(Lfs(base, p + 3012)));
+  }
+  // The laps' times printed: each through Time::Clamp (sub_820FF790), whose
+  // only store is the time at its frame's +132 (this frame's +20).
+  {
+    uint32_t p = progress();
+    if (Load(base, p + 7224) & 0x4) {
+      const uint32_t lap = Load(base, p + 6096) != 0 ? Load(base, p + 3020) : 0;
+      const uint32_t record = lap * 76;
+      if (Load(base, record + p + 2268) != 0) {
+        for (uint32_t k = 0;;) {
+          const uint32_t time = Load(base, p + record + 2208 + 4 * k);
+          Store(base, frame + 80, time);
+          Store(base, frame + 20, time);
+          p = progress();
+          k++;
+          if (!(k < Load(base, record + p + 2268))) {
+            break;
+          }
+        }
+      }
+    }
+  }
+  Store(base, frame + 84, 0);
+  {
+    const uint32_t p = progress();
+    Store(base, p + 6116, Load(base, p + 6116) + 1);
+  }
+  uint32_t end = 0;
+  // An out pair copied to the frame's +80; true when it ends the race.
+  const auto ends = [&](uint32_t out) {
+    Store64(base, frame + 80, Load64(base, out));
+    end = Load(base, frame + 80);
+    return int32_t(end) != 0;
+  };
+  bool done = false;
+  if (int32_t(Load(base, progress() + 2184)) > 0) {
+    for (uint32_t i = 0;;) {
+      FollowRoute(base, frame + 88, progress(), i, frame - 240);
+      if (ends(frame + 88)) {
+        done = true;
+        break;
+      }
+      if (Load(base, progress() + 7224) & 0x1) {
+        CountTime(base, frame + 96, progress(), i);
+      }
+      if (Load(base, progress() + 7224) & 0x4) {
+        CheckLap(base, frame + 104, progress(), i, frame - 544);
+      }
+      const uint32_t checks = Load(base, progress() + 7224);
+      if ((checks & 0x200) || (checks & 0x400) || (checks & 0x800)) {
+        CountHits(base, frame + 112, progress(), i);
+      }
+      if (Load(base, progress() + 7224) & 0x10) {
+        CheckFinish(base, frame + 120, progress(), i, frame - 144);
+        if (ends(frame + 120)) {
+          done = true;
+          break;
+        }
+      }
+      if (Load(base, progress() + 7224) & 0x80) {
+        Damage(base, frame + 128, progress(), i, frame - 160);
+        if (ends(frame + 128)) {
+          done = true;
+          break;
+        }
+      }
+      i++;
+      if (!(int32_t(i) < int32_t(Load(base, progress() + 2184)))) {
+        break;
+      }
+    }
+  }
+  if (!done && (Load(base, progress() + 7220) & 0x2)) {
+    DrainSp(base, frame + 128, progress(), frame - 224);
+    done = ends(frame + 128);
+  }
+  // 0x8 (sub_821653E8): RaceTickNative leaves it to the original.
+  if (!done && (Load(base, progress() + 7220) & 0x10)) {
+    Rank(base, progress(), frame - 1728);
+  }
+  const uint32_t reason = Load(base, frame + 84);
+  Store(base, progress() + 6104, end);
+  Store(base, progress() + 6108, reason);
+  if (int32_t(end) != 0) {
+    Post(base, dispatcher, int32_t(Load(base, progress() + 6104)) == 9 ? 24 : 34);
+    ai_drivers::ClearAll(base, frame - 128);
+  }
 }
 
 }  // namespace race_states

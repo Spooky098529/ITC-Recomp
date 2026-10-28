@@ -97,6 +97,9 @@ void RaceStatesBegin(PPCContext& ctx, uint8_t* base);
 // r3 = 0 or 1 (the harness's).
 void RaceStatesFollowRoute(PPCContext& ctx, uint8_t* base);
 void RaceStatesSectionsJoin(PPCContext& ctx, uint8_t* base);
+// RaceStates::RaceTick sub_82167610: a handler (r3 not kept); the original
+// where RaceTickNative says so.
+void RaceStatesRaceTick(PPCContext& ctx, uint8_t* base);
 
 // RaceStates::StandingStartTick sub_821692C8: a handler (r3 not kept); the
 // original in the System Link case (StandingStartTickNative); the callees'
