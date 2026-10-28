@@ -27,5 +27,16 @@ void TextureCompressionDxtEncodeRow(PPCContext& ctx, uint8_t* base);
 // as the original leaves it.
 void TextureCompressionImageCodecDelete(PPCContext& ctx, uint8_t* base);
 void TextureCompressionDxtCodecDelete(PPCContext& ctx, uint8_t* base);
+// ImageCodec::ImageCodec sub_823EA800: r3 = the codec, r4 = the description,
+// r5 = bits per pixel, r6 = the kind. ImageCodec::Prepare sub_823EAA90: r3 =
+// the destination's codec, r4 = the source's. DxtCodec::DxtCodec
+// sub_823F5FA0: r3 = the codec, r4 = the description. ImageCodec::Create
+// sub_823F6C60: r3 = the description; the color key's slot 3 runs its
+// original. Each the whole original where the plain C++ refuses, or without
+// the native heap. r3 as the original leaves it.
+void TextureCompressionImageCodecConstruct(PPCContext& ctx, uint8_t* base);
+void TextureCompressionPrepare(PPCContext& ctx, uint8_t* base);
+void TextureCompressionDxtCodecConstruct(PPCContext& ctx, uint8_t* base);
+void TextureCompressionCreate(PPCContext& ctx, uint8_t* base);
 
 }  // namespace hooks

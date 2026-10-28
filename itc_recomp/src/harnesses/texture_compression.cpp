@@ -45,7 +45,10 @@
 // EncodeRow (sub_823F6298) runs end to end over small surfaces with codecs
 // built by the recompiled DxtCodec::DxtCodec, then the DXT codec's
 // destructors; the plain codecs' destructors run on codecs built by the
-// recompiled ImageCodec::ImageCodec.
+// recompiled ImageCodec::ImageCodec. The codecs made (ImageCodec::ImageCodec,
+// Prepare, DxtCodec::DxtCodec, ImageCodec::Create over all its formats and
+// some it refuses) run on descriptions with random and edge fields; the
+// codecs' bytes are compared with their pointers by block.
 
 #include "harness.h"
 
@@ -64,6 +67,7 @@
 #include <array>
 #include <bit>
 #include <cmath>
+#include <initializer_list>
 #include <limits>
 #include <string>
 #include <utility>
@@ -1415,6 +1419,427 @@ void ImageCodecDestructors(Context& h) {
   results.Report();
 }
 
+// The codecs made: ImageCodec::ImageCodec (sub_823EA800), ImageCodec::Prepare
+// (sub_823EAA90), DxtCodec::DxtCodec (sub_823F5FA0) and ImageCodec::Create
+// (sub_823F6C60), each side run through its version (the flag off for the
+// recompiled, so its callees are the originals too), on descriptions with
+// random and edge fields.
+
+namespace dd = texture_compression::description;
+
+// ImageCodec::Create's formats (without bit 8; each is taken with it too).
+constexpr uint32_t kCreateFormats[] = {
+    0x04900002, 0x0800004A, 0x18280043, 0x1828004B, 0x1828004C, 0x1828004F, 0x18280086,
+    0x182800B6, 0x1A20004B, 0x1A20004C, 0x1A200052, 0x1A200053, 0x1A200054, 0x1A20005A,
+    0x1A20007A, 0x1A20007B, 0x1A200086, 0x1A2000B6, 0x1A202AB6, 0x1A20AA5A, 0x1A20AA86,
+    0x1A220058, 0x1A22AA60, 0x1A22AAA6, 0x28000002, 0x28000058, 0x28280043, 0x28280044,
+    0x2828004F, 0x28280086, 0x2A200086, 0x2A200A45, 0x2A200A86, 0x2D200099, 0x2D20AA4A,
+    0x2D20AA99, 0x2D22AA9F, 0x2D22AAA5, 0x2DA2AA5E, 0x2DA2AAA4,
+};
+constexpr uint32_t kDxtFormats[] = {0x1A200052, 0x1A200053, 0x1A200054, 0x1A20007A, 0x1A20007B};
+
+bool Known(uint32_t format) {
+  for (uint32_t f : kCreateFormats) {
+    if (f == (format & ~0x100u)) return true;
+  }
+  return false;
+}
+
+struct Description {
+  uint32_t words[21];
+};
+
+// A random value for a flag word: 0, 1 or any.
+uint32_t FlagWord(Random& r) {
+  const uint32_t k = r.Below(4);
+  return k < 2 ? 0 : k == 2 ? 1 : uint32_t(r.Next()) | 1;
+}
+
+// A description: the extent 1 to 300 wide (sometimes 4096 or 70,000, or
+// 0), the box the whole extent, cut anywhere, at its edges, empty, or
+// random words; random pitches and data; dither, diffusion and sRGB 0, 1
+// or any; a color key 0 or random (`keyed`); the palette 0 or random.
+// Diffusion only for boxes up to 4,096 wide (wider ones make the original
+// ask operator new for more than it gives).
+Description RandomDescription(Random& r, uint32_t format, bool keyed, bool sane_box = false) {
+  Description d{};
+  auto& w = d.words;
+  w[0] = r.Below(4) == 0 ? 0 : uint32_t(r.Next());
+  w[1] = format;
+  const uint32_t pk = r.Below(4);
+  w[2] = pk == 0 ? uint32_t(r.Next()) : pk == 1 ? 0 : 4 * (1 + r.Below(1200));
+  w[3] = r.Below(4) == 0 ? uint32_t(r.Next()) : w[2] * (1 + r.Below(300));
+  const uint32_t wk = r.Below(16);
+  const uint32_t width = wk == 0 ? 4096 : wk == 1 && !sane_box ? 70000 : wk == 2 ? 0 : 1 + r.Below(300);
+  const uint32_t height = r.Below(16) == 0 ? 0 : 1 + r.Below(300);
+  const uint32_t depth = r.Below(4) == 0 ? 1 + r.Below(4) : 1;
+  const uint32_t extent[6] = {0, 0, width, height, 0, depth};
+  uint32_t box[6] = {0, 0, width, height, 0, depth};
+  const uint32_t bk = r.Below(8);
+  if (bk == 1 || bk == 2) {  // cut anywhere inside
+    const uint32_t sizes[3] = {width, height, depth};
+    const uint32_t lo[3] = {0, 1, 4};
+    const uint32_t hi[3] = {2, 3, 5};
+    for (int a = 0; a < 3; a++) {
+      if (sizes[a] == 0) continue;
+      box[lo[a]] = r.Below(sizes[a]);
+      box[hi[a]] = box[lo[a]] + 1 + r.Below(sizes[a] - box[lo[a]]);
+    }
+  } else if (bk == 3) {  // at the edges: one pixel at the far corner, or empty
+    box[0] = width == 0 ? 0 : width - 1;
+    box[1] = height == 0 ? 0 : height - 1;
+    if (r.Below(2) == 0) {
+      box[2] = box[0];
+      box[3] = box[1];
+    }
+  } else if (bk == 4 && !sane_box) {  // random words (right below left and the like)
+    for (uint32_t& b : box) b = r.Below(2) == 0 ? uint32_t(r.Next()) : r.Below(400);
+  }
+  for (int i = 0; i < 6; i++) {
+    w[4 + i] = extent[i];
+    w[10 + i] = box[i];
+  }
+  w[16] = FlagWord(r);                                    // dither
+  const uint32_t box_width = box[2] - box[0];
+  w[17] = box_width <= 4096 ? FlagWord(r) : 0;            // diffusion
+  w[18] = FlagWord(r);                                    // sRGB
+  w[19] = keyed && r.Below(2) == 0 ? uint32_t(r.Next()) | 1 : 0;  // the color key
+  w[20] = r.Below(2) == 0 ? 0 : uint32_t(r.Next());       // the palette
+  return d;
+}
+
+void WriteDescription(uint8_t* base, uint32_t address, const Description& d) {
+  for (uint32_t i = 0; i < 21; i++) {
+    guest::StoreU32(base, address + 4 * i, d.words[i]);
+  }
+}
+
+std::string DescriptionText(const Description& d) {
+  std::string text;
+  for (uint32_t v : d.words) text += fmt::format(" {:08X}", v);
+  return text;
+}
+
+// A codec's words into `out`: the pointers at `pointers` by block, the
+// color key's floats (+36 to +48) as floats, the rest exactly.
+void PutCodec(Outputs& out, uint8_t* base, uint32_t codec, uint32_t bytes, const Blocks& blocks,
+              std::initializer_list<uint32_t> pointers, uint32_t area, uint32_t area_bytes) {
+  for (uint32_t off = 0; off < bytes; off += 4) {
+    bool pointer = false;
+    for (uint32_t p : pointers) pointer = pointer || p == off;
+    if (pointer) {
+      blocks.Put(out, guest::LoadU32(base, codec + off), area, area_bytes);
+    } else if (off >= cf::kColorKeyFloats && off < cf::kColorKeyFloats + 16) {
+      out.Float(guest::LoadU32(base, codec + off));
+    } else {
+      out.Word(guest::LoadU32(base, codec + off));
+    }
+  }
+}
+
+// A heap block a codec holds: whether it is one, its size and bytes; then
+// freed.
+void PutAndFree(Outputs& out, uint8_t* base, uint32_t block) {
+  const bool heap = block != 0 && memory::IsHeapBlock(block);
+  out.Word(heap ? 1 : 0);
+  if (heap) {
+    const uint32_t size = memory::Size(block);
+    out.Word(size);
+    out.Bytes(Read(base, block, size));
+    memory::Free(block);
+  }
+}
+
+// ImageCodec::ImageCodec on a codec in the scratch area (filled with 0xCD):
+// bits 0, 8 to 128, or random; kinds 1 to 4 or random; the codec's 128
+// bytes, r3, and the error row (its size and bytes).
+void ImageCodecConstruct(Context& h) {
+  Results results("ImageCodec::ImageCodec (sub_823EA800)");
+  if (!hooks::NativeHeapActive()) {
+    results.Report();
+    return;
+  }
+  constexpr uint32_t kDescription = 0;
+  constexpr uint32_t kCodec = 128;
+  constexpr uint32_t kAreaBytes = 256;
+  const uint32_t area = memory::Alloc(kAreaBytes, 0);
+  if (area == 0) {
+    results.Report();
+    return;
+  }
+  for (int c = 0; c < 1000; c++) {
+    const uint32_t fk = h.random.Below(4);
+    const uint32_t format = fk == 0   ? uint32_t(h.random.Next())
+                            : fk == 1 ? kCreateFormats[h.random.Below(40)] | 0x100
+                                      : kCreateFormats[h.random.Below(40)];
+    const Description d = RandomDescription(h.random, format, true);
+    static constexpr uint32_t kBits[] = {0, 8, 16, 32, 64, 128};
+    const uint32_t bk = h.random.Below(8);
+    const uint32_t bits = bk < 6 ? kBits[bk] : bk == 6 ? h.random.Below(256) : uint32_t(h.random.Next());
+    const uint32_t kind = h.random.Below(5) == 0 ? uint32_t(h.random.Below(7)) : 1 + h.random.Below(4);
+    Outputs out[2];
+    for (int v = 0; v < 2; v++) {
+      Fill(h.base, area, kAreaBytes);
+      WriteDescription(h.base, area + kDescription, d);
+      PPCContext t = CallContext(h);
+      t.r3.u64 = area + kCodec;
+      t.r4.u64 = area + kDescription;
+      t.r5.u64 = bits;
+      t.r6.u64 = kind;
+      ITC_FLAG(native_texture_compression) = v == 1;
+      if (v == 0) {
+        __imp__sub_823EA800(t, h.base);
+      } else {
+        hooks::TextureCompressionImageCodecConstruct(t, h.base);
+      }
+      ITC_FLAG(native_texture_compression) = true;
+      Blocks blocks;
+      const uint32_t error_row = guest::LoadU32(h.base, area + kCodec + cf::kErrorRow);
+      blocks.Add(error_row, 1);
+      blocks.Put(out[v], t.r3.u32, area, kAreaBytes);
+      out[v].Word(uint32_t(t.r3.u64 >> 32));
+      PutCodec(out[v], h.base, area + kCodec, 128, blocks, {cf::kErrorRow}, area, kAreaBytes);
+      out[v].Bytes(Read(h.base, area, kCodec));  // the description, untouched
+      PutAndFree(out[v], h.base, error_row);
+    }
+    results.Check(out[0], out[1],
+                  fmt::format("case {}: bits {}, kind {}, description{}", c, bits, kind,
+                              DescriptionText(d)));
+  }
+  memory::Free(area);
+  results.Report();
+}
+
+// ImageCodec::Prepare over pairs of codecs built by the recompiled
+// ImageCodec::ImageCodec: kinds 1 to 4 on each side (differing or not),
+// sRGB on either, the destination's +84 left 0 or set before; both codecs'
+// 128 bytes (+88 and +92 by block), r3, the row made.
+void Prepare(Context& h) {
+  Results results("ImageCodec::Prepare (sub_823EAA90)");
+  if (!hooks::NativeHeapActive()) {
+    results.Report();
+    return;
+  }
+  constexpr uint32_t kDescriptions = 0;  // two
+  constexpr uint32_t kCodecs = 256;      // two of 128
+  constexpr uint32_t kAreaBytes = 512;
+  const uint32_t area = memory::Alloc(kAreaBytes, 0);
+  if (area == 0) {
+    results.Report();
+    return;
+  }
+  for (int c = 0; c < 800; c++) {
+    Description d[2];
+    uint32_t kind[2];
+    for (int s = 0; s < 2; s++) {
+      d[s] = RandomDescription(h.random, kCreateFormats[h.random.Below(40)], false, true);
+      kind[s] = 1 + h.random.Below(4);
+    }
+    if (h.random.Below(3) == 0) kind[1] = kind[0];
+    const uint32_t convert_from = h.random.Below(4) == 0 ? 1 + h.random.Below(4) : 0;
+    const uint32_t srgb_force = h.random.Below(4);  // 0: as made, 1-3: set on one or both
+    Outputs out[2];
+    for (int v = 0; v < 2; v++) {
+      Fill(h.base, area, kAreaBytes);
+      for (int s = 0; s < 2; s++) {
+        WriteDescription(h.base, area + kDescriptions + 128 * s, d[s]);
+        PPCContext t = CallContext(h);
+        t.r3.u64 = area + kCodecs + 128 * s;
+        t.r4.u64 = area + kDescriptions + 128 * s;
+        t.r5.u64 = 32;
+        t.r6.u64 = kind[s];
+        __imp__sub_823EA800(t, h.base);
+      }
+      const uint32_t destination = area + kCodecs;
+      const uint32_t source = area + kCodecs + 128;
+      if (convert_from != 0) guest::StoreU32(h.base, destination + cf::kConvertFrom, convert_from);
+      if (srgb_force & 1) guest::StoreU32(h.base, destination + cf::kSrgb, 1);
+      if (srgb_force & 2) guest::StoreU32(h.base, source + cf::kSrgb, 1);
+      PPCContext t = CallContext(h);
+      t.r3.u64 = destination;
+      t.r4.u64 = source;
+      ITC_FLAG(native_texture_compression) = v == 1;
+      if (v == 0) {
+        __imp__sub_823EAA90(t, h.base);
+      } else {
+        hooks::TextureCompressionPrepare(t, h.base);
+      }
+      ITC_FLAG(native_texture_compression) = true;
+      Blocks blocks;
+      for (uint32_t codec : {destination, source}) {
+        blocks.Add(guest::LoadU32(h.base, codec + cf::kRow), 1);
+        blocks.Add(guest::LoadU32(h.base, codec + cf::kErrorRow), 1);
+      }
+      out[v].Word(t.r3.u32);
+      out[v].Word(uint32_t(t.r3.u64 >> 32));
+      for (uint32_t codec : {destination, source}) {
+        PutCodec(out[v], h.base, codec, 128, blocks, {cf::kRow, cf::kErrorRow}, area, kAreaBytes);
+      }
+      for (uint32_t codec : {destination, source}) {
+        PutAndFree(out[v], h.base, guest::LoadU32(h.base, codec + cf::kRow));
+        PutAndFree(out[v], h.base, guest::LoadU32(h.base, codec + cf::kErrorRow));
+      }
+    }
+    results.Check(out[0], out[1],
+                  fmt::format("case {}: kinds {} {}, +84 {}, sRGB set {}, destination{}, source{}",
+                              c, kind[0], kind[1], convert_from, srgb_force,
+                              DescriptionText(d[0]), DescriptionText(d[1])));
+  }
+  memory::Free(area);
+  results.Report();
+}
+
+// DxtCodec::DxtCodec over the five DXT formats (with and without bit 8)
+// and now and then another format (its block fields left alone), on
+// descriptions as above; the codec's 256 bytes (+92 by block), r3, the
+// error row.
+void DxtCodecConstruct(Context& h) {
+  Results results("DxtCodec::DxtCodec (sub_823F5FA0)");
+  if (!hooks::NativeHeapActive()) {
+    results.Report();
+    return;
+  }
+  constexpr uint32_t kDescription = 0;
+  constexpr uint32_t kCodec = 128;
+  constexpr uint32_t kAreaBytes = 384;
+  const uint32_t area = memory::Alloc(kAreaBytes, 0);
+  if (area == 0) {
+    results.Report();
+    return;
+  }
+  for (int c = 0; c < 800; c++) {
+    const uint32_t fk = h.random.Below(10);
+    const uint32_t format = fk == 0   ? kCreateFormats[h.random.Below(40)]
+                            : fk == 1 ? uint32_t(h.random.Next())
+                                      : kDxtFormats[h.random.Below(5)] | (fk >= 6 ? 0x100 : 0);
+    const Description d = RandomDescription(h.random, format, true);
+    Outputs out[2];
+    for (int v = 0; v < 2; v++) {
+      Fill(h.base, area, kAreaBytes);
+      WriteDescription(h.base, area + kDescription, d);
+      PPCContext t = CallContext(h);
+      t.r3.u64 = area + kCodec;
+      t.r4.u64 = area + kDescription;
+      ITC_FLAG(native_texture_compression) = v == 1;
+      if (v == 0) {
+        __imp__sub_823F5FA0(t, h.base);
+      } else {
+        hooks::TextureCompressionDxtCodecConstruct(t, h.base);
+      }
+      ITC_FLAG(native_texture_compression) = true;
+      Blocks blocks;
+      const uint32_t error_row = guest::LoadU32(h.base, area + kCodec + cf::kErrorRow);
+      blocks.Add(error_row, 1);
+      blocks.Put(out[v], t.r3.u32, area, kAreaBytes);
+      out[v].Word(uint32_t(t.r3.u64 >> 32));
+      PutCodec(out[v], h.base, area + kCodec, 256, blocks, {cf::kErrorRow}, area, kAreaBytes);
+      out[v].Bytes(Read(h.base, area, kCodec));
+      PutAndFree(out[v], h.base, error_row);
+    }
+    results.Check(out[0], out[1],
+                  fmt::format("case {}: format {:08X}, description{}", c, format,
+                              DescriptionText(d)));
+  }
+  memory::Free(area);
+  results.Report();
+}
+
+// ImageCodec::Create for each of its 80 formats (12 descriptions each) and
+// formats it refuses (beside its own, random, 0): r3 (by block), the
+// codec's size and bytes (+88, +92 and YUV's +128 by block), the blocks
+// it holds, then all freed. A color key comes with sRGB off (with sRGB out,
+// the plain codecs' slot 3 would encode through +88, still 0 then: the
+// original writes at address 0).
+void Create(Context& h) {
+  Results results("ImageCodec::Create (sub_823F6C60)");
+  if (!hooks::NativeHeapActive()) {
+    results.Report();
+    return;
+  }
+  constexpr uint32_t kDescription = 0;
+  constexpr uint32_t kAreaBytes = 128;
+  const uint32_t area = memory::Alloc(kAreaBytes, 0);
+  if (area == 0) {
+    results.Report();
+    return;
+  }
+  std::vector<uint32_t> formats;
+  for (uint32_t f : kCreateFormats) {
+    for (int i = 0; i < 6; i++) {
+      formats.push_back(f);
+      formats.push_back(f | 0x100);
+    }
+  }
+  for (int i = 0; i < 300; i++) {
+    const uint32_t f = kCreateFormats[h.random.Below(40)];
+    const uint32_t k = h.random.Below(6);
+    uint32_t g = k == 0   ? f + 1
+                 : k == 1 ? f - 1
+                 : k == 2 ? f ^ (1u << h.random.Below(32))
+                 : k == 3 ? 0
+                 : k == 4 ? f | 0x200
+                          : uint32_t(h.random.Next());
+    if (!Known(g)) formats.push_back(g);
+  }
+  int c = 0;
+  for (uint32_t format : formats) {
+    // YUV's buffer is the box's width rounded to pairs: a sane box for those
+    // (a right edge left of the left one makes the original ask operator
+    // new for more than it gives).
+    const uint32_t base_format = format & ~0x100u;
+    const bool yuv = base_format == 0x1828004B || base_format == 0x1828004C ||
+                     base_format == 0x1A20004B || base_format == 0x1A20004C;
+    Description d = RandomDescription(h.random, format, true, yuv);
+    if (d.words[19] != 0) d.words[18] = 0;  // no sRGB with a color key
+    Outputs out[2];
+    for (int v = 0; v < 2; v++) {
+      Fill(h.base, area, kAreaBytes);
+      WriteDescription(h.base, area + kDescription, d);
+      PPCContext t = CallContext(h);
+      t.r3.u64 = area + kDescription;
+      ITC_FLAG(native_texture_compression) = v == 1;
+      if (v == 0) {
+        __imp__sub_823F6C60(t, h.base);
+      } else {
+        hooks::TextureCompressionCreate(t, h.base);
+      }
+      ITC_FLAG(native_texture_compression) = true;
+      const uint32_t codec = t.r3.u32;
+      Blocks blocks;
+      blocks.Add(codec, codec == 0 ? 0 : memory::Size(codec));
+      out[v].Word(uint32_t(t.r3.u64 >> 32));
+      if (codec == 0 || !memory::IsHeapBlock(codec)) {
+        out[v].Word(codec);
+      } else {
+        const uint32_t size = memory::Size(codec);
+        const bool yuv_codec = size == 176;
+        uint32_t held[3] = {guest::LoadU32(h.base, codec + cf::kRow),
+                            guest::LoadU32(h.base, codec + cf::kErrorRow),
+                            yuv_codec ? guest::LoadU32(h.base, codec + cf::kYuvBuffer) : 0};
+        for (uint32_t b : held) blocks.Add(b, 1);
+        blocks.Put(out[v], codec, area, kAreaBytes);
+        out[v].Word(size);
+        if (yuv_codec) {
+          PutCodec(out[v], h.base, codec, size, blocks, {cf::kRow, cf::kErrorRow, cf::kYuvBuffer},
+                   area, kAreaBytes);
+        } else {
+          PutCodec(out[v], h.base, codec, size, blocks, {cf::kRow, cf::kErrorRow}, area,
+                   kAreaBytes);
+        }
+        for (uint32_t b : held) PutAndFree(out[v], h.base, b);
+        memory::Free(codec);
+      }
+      out[v].Bytes(Read(h.base, area, kAreaBytes));
+    }
+    results.Check(out[0], out[1],
+                  fmt::format("case {}: format {:08X}, description{}", c, format,
+                              DescriptionText(d)));
+    c++;
+  }
+  memory::Free(area);
+  results.Report();
+}
+
 }  // namespace
 
 void TextureCompression(Context& h) {
@@ -1429,6 +1854,10 @@ void TextureCompression(Context& h) {
   DecodeRow(h);
   EncodeRow(h);
   ImageCodecDestructors(h);
+  ImageCodecConstruct(h);
+  Prepare(h);
+  DxtCodecConstruct(h);
+  Create(h);
 }
 
 }  // namespace harness
