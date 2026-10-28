@@ -31,24 +31,28 @@ void Require(bool done, const char* what) {
 
 }  // namespace
 
-std::optional<uint32_t> CarModelRelease(uint8_t* base, uint32_t car_model) {
-  ITC_NATIVE_RUNNING("sub_820D4508 CarModel::Release");
+bool CarModelReleasable(uint8_t* base, uint32_t car_model) {
   uint32_t freed[3] = {};
   for (uint32_t i = 0; i < 3; i++) {
     const uint32_t slot = car_model + kSlots[i];
     if (!LoadSlotReleasable(base, slot, &freed[i])) {
-      return std::nullopt;
+      return false;
     }
     // Two slots freeing the same pages: the second free would fail.
     for (uint32_t j = 0; j < i; j++) {
       if (freed[i] != 0 && freed[i] == freed[j]) {
-        return std::nullopt;
+        return false;
       }
     }
   }
   // CarModel::Reset's checks hold after the frees as before them (the node
   // values it checks are the ones freed first).
-  if (!scene_loaders::CarModelResettable(base, car_model)) {
+  return scene_loaders::CarModelResettable(base, car_model);
+}
+
+std::optional<uint32_t> CarModelRelease(uint8_t* base, uint32_t car_model) {
+  ITC_NATIVE_RUNNING("sub_820D4508 CarModel::Release");
+  if (!CarModelReleasable(base, car_model)) {
     return std::nullopt;
   }
   Require(LoadSlotReleaseBuffer(base, car_model + kSlots[0]).has_value(),

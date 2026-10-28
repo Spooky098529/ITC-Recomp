@@ -20,5 +20,8 @@ namespace car_models {
 // layer's pages, node values the layer didn't give, CarModel::Reset's
 // checks).
 std::optional<uint32_t> CarModelRelease(uint8_t* base, uint32_t car_model);
+// Whether CarModelRelease runs natively (its checks, nothing changed; the
+// pending frees' room for CarModel::Reset's four nodes included).
+bool CarModelReleasable(uint8_t* base, uint32_t car_model);
 
 }  // namespace car_models

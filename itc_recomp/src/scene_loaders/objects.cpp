@@ -3,6 +3,7 @@
 #include "scene_loaders/objects.h"
 
 #include "base/log.h"
+#include "car_models/car_model.h"
 #include "car_models/load_slots.h"
 #include "guest.h"
 #include "memory/heap.h"
@@ -302,14 +303,24 @@ bool CockpitConstruct(uint8_t* base, uint32_t cockpit, uint32_t list) {
   return true;
 }
 
-std::optional<uint32_t> CockpitRelease(uint8_t* base, uint32_t cockpit) {
-  ITC_NATIVE_RUNNING("sub_820D6238 Cockpit::Release");
+namespace {
+
+// Cockpit::Release's checks (nothing changed), with `extra` nodes more for
+// what follows it.
+bool CockpitReleasable(uint8_t* base, uint32_t cockpit, uint64_t extra) {
   static constexpr uint32_t kSlots[] = {176, 400, 424, 536, 560, 584, 608, 632, 656};
   const uint32_t values = Load(base, cockpit + 208 + 176);
-  if (!AllReleasable(base, cockpit, kSlots) ||
-      (values != 0 && !memory::IsHeapBlock(values)) ||
-      !ProvidersClearAll(base, cockpit + kCockpitLoads, kCarModelMembers) ||
-      !models::PendingFreesHaveRoom(base, 4)) {
+  return AllReleasable(base, cockpit, kSlots) &&
+         (values == 0 || memory::IsHeapBlock(values)) &&
+         ProvidersClearAll(base, cockpit + kCockpitLoads, kCarModelMembers) &&
+         4 + extra <= 0x3FFFFFFFu && models::PendingFreesHaveRoom(base, uint32_t(4 + extra));
+}
+
+}  // namespace
+
+std::optional<uint32_t> CockpitRelease(uint8_t* base, uint32_t cockpit) {
+  ITC_NATIVE_RUNNING("sub_820D6238 Cockpit::Release");
+  if (!CockpitReleasable(base, cockpit, 0)) {
     return std::nullopt;
   }
   Require(car_models::LoadSlotReleaseBuffer(base, cockpit + kCockpitLoads).has_value(),
@@ -400,8 +411,12 @@ std::optional<uint32_t> WheelsReset(uint8_t* base, uint32_t wheels) {
   return r3;
 }
 
-std::optional<uint32_t> TrafficReset(uint8_t* base, uint32_t traffic) {
-  ITC_NATIVE_RUNNING("sub_820D7AB0 TrafficCar::Reset");
+namespace {
+
+// TrafficCar::Reset's pending frees' nodes (the XPRs' four and the six
+// models'), or nullopt where the node values aren't the layer's or a
+// provider's slot 2 isn't ClearAll; nothing changed.
+std::optional<uint64_t> TrafficResetNodes(uint8_t* base, uint32_t traffic) {
   const uint32_t loads = traffic + kTrafficLoads;
   const uint32_t values = Load(base, loads + kTrafficMembers.skeleton + 176);
   uint64_t nodes = 4;
@@ -409,8 +424,19 @@ std::optional<uint32_t> TrafficReset(uint8_t* base, uint32_t traffic) {
     nodes += models::ModelReleaseNodes(base, traffic + 4256 + kPartModelBytes * i);
   }
   if ((values != 0 && !memory::IsHeapBlock(values)) ||
-      !ProvidersClearAll(base, loads, kTrafficMembers) || nodes > 0x3FFFFFFFu ||
-      !models::PendingFreesHaveRoom(base, uint32_t(nodes))) {
+      !ProvidersClearAll(base, loads, kTrafficMembers)) {
+    return std::nullopt;
+  }
+  return nodes;
+}
+
+}  // namespace
+
+std::optional<uint32_t> TrafficReset(uint8_t* base, uint32_t traffic) {
+  ITC_NATIVE_RUNNING("sub_820D7AB0 TrafficCar::Reset");
+  const uint32_t loads = traffic + kTrafficLoads;
+  const auto nodes = TrafficResetNodes(base, traffic);
+  if (!nodes || !Room(base, *nodes)) {
     return std::nullopt;
   }
   Store(base, traffic + 7392, Load(base, kFirstSet));
@@ -606,6 +632,212 @@ bool WheelsDestruct(uint8_t* base, uint32_t wheels) {
 bool WheelsDeletingDestruct(uint8_t* base, uint32_t wheels, uint32_t flags) {
   ITC_NATIVE_RUNNING("sub_820D95E8 Wheels::DeletingDestructor");
   return (flags & 1) == 0 && WheelsDestruct(base, wheels);
+}
+
+// --- The car model, the car parts and the cockpit's destructors ---
+
+namespace {
+
+// The w (+12) of each of a matrix's four rows.
+void MatrixW(uint8_t* base, uint32_t matrix, uint32_t one) {
+  for (uint32_t row = 0; row < 4; row++) {
+    Store(base, matrix + 16 * row + 12, one);
+  }
+}
+
+}  // namespace
+
+bool CarModelConstruct(uint8_t* base, uint32_t car_model, uint32_t list) {
+  ITC_NATIVE_RUNNING("sub_820D5890 CarModel::CarModel");
+  // CarModelLoads::CarModelLoads' check, and CarModel::Reset's on the fresh
+  // loads (no node values, the providers' vtable's slot 2, the XPRs' four
+  // nodes).
+  if (car_model >= kPhysical || kPhysical - car_model < kCarModelBytes ||
+      !models::CanAllocatePointers(base, models::kTextureProviderSlots) ||
+      Load(base, models::kTextureProviderVtable + 8) != kTextureProviderClearAll ||
+      !models::PendingFreesHaveRoom(base, 4)) {
+    return false;
+  }
+  ConstructNode(base, car_model, list, kCarModelVtable);
+  scene_models::CarRecordSetW(base, car_model + kCarModelRecord);
+  Require(CarModelLoadsConstruct(base, car_model + kCarModelLoads),
+          "CarModelLoads::CarModelLoads");
+  const uint32_t one = Load(base, kOne);
+  for (uint32_t i = 0; i < 4; i++) {
+    MatrixW(base, car_model + 6720 + 64 * i, one);
+  }
+  for (uint32_t i = 0; i < 4; i++) {
+    Store(base, car_model + 6976 + 16 * i + 12, one);
+  }
+  for (uint32_t i = 0; i < 2; i++) {
+    MatrixW(base, car_model + 7040 + 64 * i, one);
+  }
+  for (uint32_t i = 0; i < 2; i++) {
+    Store(base, car_model + 7168 + 16 * i + 12, one);
+  }
+  Store(base, car_model + 7228, one);
+  Require(CarModelReset(base, car_model).has_value(), "CarModel::Reset");
+  return true;
+}
+
+bool CarModelDestruct(uint8_t* base, uint32_t car_model) {
+  ITC_NATIVE_RUNNING("sub_820D4750 CarModel::~CarModel");
+  // The release's checks hold for ~CarModelLoads after it (the node values
+  // it checks are freed by the release); the XPRs check for four nodes in
+  // each.
+  if (!car_models::CarModelReleasable(base, car_model) ||
+      !CarModelLoadsDestructible(base, car_model + kCarModelLoads) ||
+      !models::PendingFreesHaveRoom(base, 8)) {
+    return false;
+  }
+  Store(base, car_model + 0, kCarModelVtable);
+  Require(car_models::CarModelRelease(base, car_model).has_value(), "CarModel::Release");
+  Require(CarModelLoadsDestruct(base, car_model + kCarModelLoads), "CarModelLoads::~CarModelLoads");
+  DestructNode(base, car_model);
+  return true;
+}
+
+bool CarModelDeletingDestruct(uint8_t* base, uint32_t car_model, uint32_t flags) {
+  ITC_NATIVE_RUNNING("sub_820D5988 CarModel::DeletingDestructor");
+  return (flags & 1) == 0 && CarModelDestruct(base, car_model);
+}
+
+bool CarPartsDestruct(uint8_t* base, uint32_t parts) {
+  ITC_NATIVE_RUNNING("sub_820D7038 CarParts::~CarParts");
+  // The release's checks, then ~CarPartsLoads' on the released models (their
+  // members untouched, two nodes each).
+  const uint32_t first = parts + kPartsModels;
+  uint64_t nodes = 0;
+  for (uint32_t i = 0; i < kParts; i++) {
+    const uint32_t model = first + kPartModelBytes * i;
+    if (!models::ModelMembersDestructible(base, model)) {
+      return false;
+    }
+    nodes += models::ModelReleaseNodes(base, model);
+  }
+  if (!SlotsReleasable(base, parts + kCarPartsLoads, kParts) ||
+      !Room(base, nodes + kFreshNodes * kParts)) {
+    return false;
+  }
+  Store(base, parts + 0, kCarPartsVtable);
+  Require(CarPartsRelease(base, parts).has_value(), "CarParts::Release");
+  Require(CarPartsLoadsDestruct(base, parts + kCarPartsLoads).has_value(),
+          "CarPartsLoads::~CarPartsLoads");
+  DestructNode(base, parts);
+  return true;
+}
+
+bool CarPartsDeletingDestruct(uint8_t* base, uint32_t parts, uint32_t flags) {
+  ITC_NATIVE_RUNNING("sub_820D74C0 CarParts::DeletingDestructor");
+  return (flags & 1) == 0 && CarPartsDestruct(base, parts);
+}
+
+bool CockpitDestruct(uint8_t* base, uint32_t cockpit) {
+  ITC_NATIVE_RUNNING("sub_820D64D0 Cockpit::~Cockpit");
+  // The release doesn't release the six part models: ~CockpitLoads' nodes
+  // are theirs now, and the XPRs' four.
+  const uint32_t loads = cockpit + kCockpitLoads;
+  uint64_t nodes = 4;
+  for (uint32_t i = 0; i < 6; i++) {
+    nodes += models::ModelReleaseNodes(base, loads + kCockpitLoadsParts + kPartModelBytes * i);
+  }
+  if (!CockpitLoadsMembersDestructible(base, loads) || !CockpitReleasable(base, cockpit, nodes)) {
+    return false;
+  }
+  Store(base, cockpit + 0, kCockpitVtable);
+  Require(CockpitRelease(base, cockpit).has_value(), "Cockpit::Release");
+  Require(CockpitLoadsDestruct(base, loads).has_value(), "CockpitLoads::~CockpitLoads");
+  DestructNode(base, cockpit);
+  return true;
+}
+
+bool CockpitDeletingDestruct(uint8_t* base, uint32_t cockpit, uint32_t flags) {
+  ITC_NATIVE_RUNNING("sub_820D6798 Cockpit::DeletingDestructor");
+  return (flags & 1) == 0 && CockpitDestruct(base, cockpit);
+}
+
+// --- The traffic body's lifetime ---
+
+bool TrafficConstruct(uint8_t* base, uint32_t traffic, uint32_t list) {
+  ITC_NATIVE_RUNNING("sub_820D8908 TrafficCar::TrafficCar");
+  // TrafficLoads::TrafficLoads' check, and TrafficCar::Reset's on the fresh
+  // loads (no node values, the providers' vtable's slot 2, the XPRs' four
+  // nodes and the six fresh models').
+  if (!models::CanAllocatePointers(base, models::kTextureProviderSlots) ||
+      Load(base, models::kTextureProviderVtable + 8) != kTextureProviderClearAll ||
+      !Room(base, 4 + 6 * kFreshNodes)) {
+    return false;
+  }
+  ConstructNode(base, traffic, list, kTrafficVtable);
+  scene_models::CarRecordSetW(base, traffic + 32);
+  Require(TrafficLoadsConstruct(base, traffic + kTrafficLoads), "TrafficLoads::TrafficLoads");
+  const uint32_t one = Load(base, kOne);
+  for (uint32_t i = 0; i < 4; i++) {
+    Store(base, traffic + 7072 + 16 * i + 12, one);
+  }
+  for (uint32_t i = 0; i < 4; i++) {
+    MatrixW(base, traffic + 7136 + 64 * i, one);
+  }
+  Require(TrafficReset(base, traffic).has_value(), "TrafficCar::Reset");
+  return true;
+}
+
+namespace {
+
+// TrafficCar::Release's checks (nothing changed), with `extra` nodes more
+// for what follows it.
+bool TrafficReleasable(uint8_t* base, uint32_t traffic, uint64_t extra) {
+  uint32_t freed = 0;
+  const auto nodes = TrafficResetNodes(base, traffic);
+  return car_models::LoadSlotReleasable(base, traffic + 3744, &freed) && nodes &&
+         Room(base, *nodes + extra);
+}
+
+uint32_t TrafficReleaseWork(uint8_t* base, uint32_t traffic) {
+  for (uint32_t sheet : {3728u, 7040u}) {
+    const uint32_t d = Load(base, traffic + sheet + 12);
+    const uint32_t c = Load(base, traffic + sheet + 8);
+    const uint32_t b = Load(base, traffic + sheet + 4);
+    const uint32_t a = Load(base, traffic + sheet + 0);
+    car_models::DeferRelease(base, Load(base, traffic + 7392), a, b, c, d);
+  }
+  Require(car_models::LoadSlotReleaseBuffer(base, traffic + 3744).has_value(),
+          "LoadSlot::ReleaseBuffer");
+  const auto r3 = TrafficReset(base, traffic);
+  Require(r3.has_value(), "TrafficCar::Reset");
+  return *r3;
+}
+
+}  // namespace
+
+std::optional<uint32_t> TrafficRelease(uint8_t* base, uint32_t traffic) {
+  ITC_NATIVE_RUNNING("sub_820D7B90 TrafficCar::Release");
+  if (!TrafficReleasable(base, traffic, 0)) {
+    return std::nullopt;
+  }
+  return TrafficReleaseWork(base, traffic);
+}
+
+bool TrafficDestruct(uint8_t* base, uint32_t traffic) {
+  ITC_NATIVE_RUNNING("sub_820D7E90 TrafficCar::~TrafficCar");
+  // ~TrafficLoads after the reset: the six released models' two nodes each
+  // and the XPRs' four; the members aren't touched by the release (the node
+  // values are freed by it).
+  if (!TrafficLoadsMembersDestructible(base, traffic + kTrafficLoads) ||
+      !TrafficReleasable(base, traffic, 6 * kFreshNodes + 4)) {
+    return false;
+  }
+  Store(base, traffic + 0, kTrafficVtable);
+  TrafficReleaseWork(base, traffic);
+  Require(TrafficLoadsDestruct(base, traffic + kTrafficLoads).has_value(),
+          "TrafficLoads::~TrafficLoads");
+  DestructNode(base, traffic);
+  return true;
+}
+
+bool TrafficDeletingDestruct(uint8_t* base, uint32_t traffic, uint32_t flags) {
+  ITC_NATIVE_RUNNING("sub_820D89B8 TrafficCar::DeletingDestructor");
+  return (flags & 1) == 0 && TrafficDestruct(base, traffic);
 }
 
 }  // namespace scene_loaders

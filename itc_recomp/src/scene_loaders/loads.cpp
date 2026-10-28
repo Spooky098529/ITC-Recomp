@@ -167,6 +167,16 @@ std::optional<uint32_t> DestructWithParts(uint8_t* base, uint32_t loads, const M
 
 }  // namespace
 
+bool CockpitLoadsMembersDestructible(uint8_t* base, uint32_t loads) {
+  return SixModelsNodes(base, loads + kCockpitLoadsParts).has_value() &&
+         MembersDestructible(base, loads, kCarModelMembers);
+}
+
+bool TrafficLoadsMembersDestructible(uint8_t* base, uint32_t loads) {
+  return SixModelsNodes(base, loads + kTrafficLoadsParts).has_value() &&
+         MembersDestructible(base, loads, kTrafficMembers);
+}
+
 bool CockpitLoadsConstruct(uint8_t* base, uint32_t loads) {
   ITC_NATIVE_RUNNING("sub_820D6010 CockpitLoads::CockpitLoads");
   return ConstructWithParts(base, loads, kCarModelMembers, kCockpitLoadsParts);

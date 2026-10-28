@@ -1237,22 +1237,37 @@ void WheelsAndTraffic(Context& h, Random& r, uint32_t block) {
 // --- The objects' lifetimes ---
 //
 // Table-driven, as the cockpit's cases: each class's object at the block's
-// +0x400, its list at +0x2400, the blocks' headers at +0x2800. The
-// constructors run on random bytes (r4 a list of 0 to 3 nodes); the
-// releases and destructors on an object the plain C++ constructor made on
-// an empty list, with blocks for the releases to put off (the XPRs' and,
-// now and then, one part model's: at most eight nodes), the slots' buffers
-// (pages each side allocates, shared or not) and the skeleton's node values.
+// +0x400, then its list, the blocks' headers and a pool set for the put-off
+// releases. The constructors run on random bytes (r4 a list of 0 to 3
+// nodes); the releases and destructors on an object the plain C++
+// constructor made on an empty list, with blocks for the releases to put
+// off (the XPRs' and, now and then, one part model's: at most eight nodes),
+// the slots' buffers (pages each side allocates, shared or not), the
+// skeleton's node values and, where the release puts textures off, the set
+// it reads (records at random states, as the car model's release's cases).
 // The deleting destructors with flags 0 or 2 (bit 0, operator delete, never
 // seen in play, is left to the original).
 struct ObjectLayout {
+  uint32_t bytes;
   bool (*make)(uint8_t*, uint32_t object, uint32_t list);
   std::vector<uint32_t> providers;  // in the object
   std::vector<uint32_t> xprs;       // in the object
   std::vector<uint32_t> models;     // part models in the object
   std::vector<uint32_t> slots;      // the slots the release frees
-  uint32_t values;                  // the skeleton's node values (0: none)
+  uint32_t values = 0;              // the skeleton's node values (0: none)
+  uint32_t defer_set = 0;           // the word holding the set DeferRelease reads (0: none)
+  uint32_t pages_one_in = 3;        // a slot's buffer one time in
 };
+
+// The loads with a skeleton, two XPRs and two providers (at `m`, in loads at
+// `loads` in the object).
+void AddMembers(ObjectLayout& l, uint32_t loads, const sl::MembersLayout& m) {
+  for (uint32_t i = 0; i < 2; i++) {
+    l.providers.push_back(loads + m.providers[i]);
+    l.xprs.push_back(loads + m.xprs[i]);
+  }
+  l.values = loads + m.skeleton + 176;
+}
 
 void Lifetimes(Context& h, Random& r, uint32_t block) {
   if (!hooks::ModelsHostLock()) {
@@ -1261,13 +1276,10 @@ void Lifetimes(Context& h, Random& r, uint32_t block) {
     return;
   }
   std::lock_guard<std::recursive_mutex> lock(models::MemoryBlocksMutex());
-  constexpr uint32_t kBytes = 0x3000;
   const uint32_t object = block + 0x400;
-  const uint32_t list = block + 0x2400;
-  const uint32_t headers = block + 0x2800;
   const uint32_t saved_set = guest::LoadU32(h.base, sl::kFirstSet);
-  ObjectLayout pool4{sl::Pool4Construct, {}, {}, {112}, {80}, 0};
-  ObjectLayout wheels{sl::WheelsConstruct, {}, {}, {}, {}, 0};
+  ObjectLayout pool4{592, sl::Pool4Construct, {}, {}, {112}, {80}};
+  ObjectLayout wheels{3280, sl::WheelsConstruct};
   for (uint32_t i = 0; i < 2; i++) {
     wheels.providers.push_back(sl::kWheelsLoads + sl::kWheelsProviders + 20 * i);
     wheels.xprs.push_back(sl::kWheelsLoads + sl::kWheelsXprs + 24 * i);
@@ -1277,6 +1289,32 @@ void Lifetimes(Context& h, Random& r, uint32_t block) {
     wheels.models.push_back(sl::kWheelsLoads + offset);
   }
   wheels.slots = {192, 1168, 2144, 2280, 216, 1192, 2168, 2304};
+  ObjectLayout car{sl::kCarModelBytes, sl::CarModelConstruct};
+  AddMembers(car, sl::kCarModelLoads, sl::kCarModelMembers);
+  car.slots = {3728, 3952, 3976};
+  car.defer_set = sl::kCarModelSet;
+  ObjectLayout parts{106016, nullptr};
+  parts.make = [](uint8_t* base, uint32_t at, uint32_t list) {
+    return sl::CarPartsConstruct(base, at, list);
+  };
+  for (uint32_t i = 0; i < sl::kPartsCount; i++) {
+    parts.models.push_back(sl::kPartsModels + sl::kPartModelBytes * i);
+    parts.slots.push_back(sl::kCarPartsLoads + sl::kSlotBytes * i);
+  }
+  parts.pages_one_in = 16;
+  ObjectLayout cockpit{3520, sl::CockpitConstruct};
+  AddMembers(cockpit, sl::kCockpitLoads, sl::kCarModelMembers);
+  for (uint32_t i = 0; i < 6; i++) {
+    cockpit.models.push_back(sl::kCockpitLoads + sl::kCockpitLoadsParts + sl::kPartModelBytes * i);
+  }
+  cockpit.slots = {176, 400, 424, 536, 560, 584, 608, 632, 656};
+  ObjectLayout traffic{7408, sl::TrafficConstruct};
+  AddMembers(traffic, sl::kTrafficLoads, sl::kTrafficMembers);
+  for (uint32_t i = 0; i < 6; i++) {
+    traffic.models.push_back(sl::kTrafficLoads + sl::kTrafficLoadsParts + sl::kPartModelBytes * i);
+  }
+  traffic.slots = {3744};
+  traffic.defer_set = 7392;
   enum Kind { kConstruct, kRelease, kDestruct };
   struct Function {
     const char* name;
@@ -1303,9 +1341,36 @@ void Lifetimes(Context& h, Random& r, uint32_t block) {
        hooks::SceneLoadersWheelsDestruct, kDestruct, &wheels, false},
       {"Wheels' deleting destructor (sub_820D95E8, on the game's list)", __imp__sub_820D95E8,
        hooks::SceneLoadersWheelsDeletingDestruct, kDestruct, &wheels, true},
+      {"CarModel::CarModel (sub_820D5890, on the game's list)", __imp__sub_820D5890,
+       hooks::SceneLoadersCarModelConstruct, kConstruct, &car, false},
+      {"CarModel::~CarModel (sub_820D4750, on the game's list)", __imp__sub_820D4750,
+       hooks::SceneLoadersCarModelDestruct, kDestruct, &car, false},
+      {"CarModel's deleting destructor (sub_820D5988, on the game's list)", __imp__sub_820D5988,
+       hooks::SceneLoadersCarModelDeletingDestruct, kDestruct, &car, true},
+      {"CarParts::~CarParts (sub_820D7038, on the game's list)", __imp__sub_820D7038,
+       hooks::SceneLoadersCarPartsDestruct, kDestruct, &parts, false},
+      {"CarParts' deleting destructor (sub_820D74C0, on the game's list)", __imp__sub_820D74C0,
+       hooks::SceneLoadersCarPartsDeletingDestruct, kDestruct, &parts, true},
+      {"Cockpit::~Cockpit (sub_820D64D0, on the game's list)", __imp__sub_820D64D0,
+       hooks::SceneLoadersCockpitDestruct, kDestruct, &cockpit, false},
+      {"Cockpit's deleting destructor (sub_820D6798, on the game's list)", __imp__sub_820D6798,
+       hooks::SceneLoadersCockpitDeletingDestruct, kDestruct, &cockpit, true},
+      {"TrafficCar::TrafficCar (sub_820D8908, on the game's list)", __imp__sub_820D8908,
+       hooks::SceneLoadersTrafficConstruct, kConstruct, &traffic, false},
+      {"TrafficCar::Release (sub_820D7B90, on the game's list)", __imp__sub_820D7B90,
+       hooks::SceneLoadersTrafficRelease, kRelease, &traffic, false},
+      {"TrafficCar::~TrafficCar (sub_820D7E90, on the game's list)", __imp__sub_820D7E90,
+       hooks::SceneLoadersTrafficDestruct, kDestruct, &traffic, false},
+      {"TrafficCar's deleting destructor (sub_820D89B8, on the game's list)", __imp__sub_820D89B8,
+       hooks::SceneLoadersTrafficDeletingDestruct, kDestruct, &traffic, true},
   };
   for (const Function& f : functions) {
     const ObjectLayout& l = *f.layout;
+    const uint32_t list = (object + l.bytes + 0xFF) & ~0xFFu;
+    const uint32_t headers = list + 0x200;
+    const uint32_t set = headers + 0x400;
+    const uint32_t records = set + 0x100;
+    const uint32_t bytes = records + 0x200 - block;
     std::vector<uint32_t> providers;
     for (const uint32_t offset : l.providers) {
       providers.push_back(object + offset);
@@ -1314,14 +1379,15 @@ void Lifetimes(Context& h, Random& r, uint32_t block) {
       providers.push_back(object + offset + models::kModelTextures);
     }
     Results results(f.name);
-    for (int c = 0; c < 24; c++) {
+    const int cases = &l == &parts ? 8 : 24;
+    for (int c = 0; c < cases; c++) {
       const uint64_t seed = r.Next();
-      const uint32_t set = uint32_t(r.Next());
+      const uint32_t first_set = uint32_t(r.Next());
       Outputs out[2];
       for (int v = 0; v < 2; v++) {
         Random in(seed);
-        RandomBytes(h.base, block, kBytes, in);
-        Put(h.base, sl::kFirstSet, set);
+        RandomBytes(h.base, block, bytes, in);
+        Put(h.base, sl::kFirstSet, first_set);
         std::unordered_set<uint32_t> held;
         std::vector<uint32_t> storages;
         MakeList(h.base, list, list + 0x100, f.kind == kConstruct ? in.Below(4) : 0);
@@ -1350,7 +1416,7 @@ void Lifetimes(Context& h, Random& r, uint32_t block) {
           for (const uint32_t offset : l.slots) {
             Put(h.base, object + offset + 12, in.Below(4) == 0 ? 1 : 0);
             uint32_t pages = 0;
-            if (in.Below(3) == 0) {
+            if (in.Below(l.pages_one_in) == 0) {
               pages = memory::AllocPages(1 + in.Below(0x4000), 4096);
               held.insert(pages);
             }
@@ -1363,6 +1429,16 @@ void Lifetimes(Context& h, Random& r, uint32_t block) {
               held.insert(values);
             }
             Put(h.base, object + l.values, values);
+          }
+          if (l.defer_set != 0) {
+            const uint32_t a = in.Below(3), b = in.Below(3);
+            Put(h.base, object + l.defer_set, set);
+            Put(h.base, set + 40, a);
+            Put(h.base, set + 12, b);
+            Put(h.base, set + 52, records);
+            for (uint32_t i = 0; i < 4 * (a + b); i++) {
+              Put(h.base, records + 20 * i + 16, in.Below(4) == 0 ? 0 : 2);
+            }
           }
         }
         const pending_frees::ListState was = pending_frees::SaveList(h.base);
@@ -1397,8 +1473,8 @@ void Lifetimes(Context& h, Random& r, uint32_t block) {
           }
         }
         held.erase(0);
-        Mark(h.base, block, kBytes, held);
-        out[v].Bytes(Read(h.base, block, kBytes));
+        Mark(h.base, block, bytes, held);
+        out[v].Bytes(Read(h.base, block, bytes));
         out[v].Word(guest::LoadU32(h.base, sl::kFirstSet));
         out[v].Word(t.r3.u32);
         out[v].Word(uint32_t(t.r3.u64 >> 32));

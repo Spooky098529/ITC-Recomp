@@ -124,4 +124,24 @@ void SceneLoadersWheelsRelease(PPCContext& ctx, uint8_t* base);
 void SceneLoadersWheelsDestruct(PPCContext& ctx, uint8_t* base);
 void SceneLoadersWheelsDeletingDestruct(PPCContext& ctx, uint8_t* base);
 
+// CarModel::CarModel sub_820D5890 and TrafficCar::TrafficCar sub_820D8908
+// (r3 = the object, left; r4 = the list); TrafficCar::Release sub_820D7B90
+// (r3 = the traffic body; r3 as the original leaves it); the destructors
+// ~CarModel sub_820D4750, ~CarParts sub_820D7038, ~Cockpit sub_820D64D0,
+// ~TrafficCar sub_820D7E90 (r3 = the object, left) and their deleting
+// destructors sub_820D5988, sub_820D74C0, sub_820D6798, sub_820D89B8 (r3 =
+// the object, left; r4 = the flags: with bit 0 the original); only while
+// hooks::ModelsNativeLifetime().
+void SceneLoadersCarModelConstruct(PPCContext& ctx, uint8_t* base);
+void SceneLoadersCarModelDestruct(PPCContext& ctx, uint8_t* base);
+void SceneLoadersCarModelDeletingDestruct(PPCContext& ctx, uint8_t* base);
+void SceneLoadersCarPartsDestruct(PPCContext& ctx, uint8_t* base);
+void SceneLoadersCarPartsDeletingDestruct(PPCContext& ctx, uint8_t* base);
+void SceneLoadersCockpitDestruct(PPCContext& ctx, uint8_t* base);
+void SceneLoadersCockpitDeletingDestruct(PPCContext& ctx, uint8_t* base);
+void SceneLoadersTrafficConstruct(PPCContext& ctx, uint8_t* base);
+void SceneLoadersTrafficRelease(PPCContext& ctx, uint8_t* base);
+void SceneLoadersTrafficDestruct(PPCContext& ctx, uint8_t* base);
+void SceneLoadersTrafficDeletingDestruct(PPCContext& ctx, uint8_t* base);
+
 }  // namespace hooks

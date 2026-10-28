@@ -77,6 +77,13 @@ constexpr uint32_t kTrafficLoadsParts = 528;
 bool TrafficLoadsConstruct(uint8_t* base, uint32_t loads);
 std::optional<uint32_t> TrafficLoadsDestruct(uint8_t* base, uint32_t loads);
 
+// Whether ~CockpitLoads' and ~TrafficLoads' members run natively (the six
+// part models' members, the providers' storage, the skeleton; the pending
+// frees apart): for the objects' destructors, which check before their
+// releases.
+bool CockpitLoadsMembersDestructible(uint8_t* base, uint32_t loads);
+bool TrafficLoadsMembersDestructible(uint8_t* base, uint32_t loads);
+
 // WheelsLoads (the wheels' +192): for front and rear (+24i, +464i) the
 // tires' slots (+0) and models (+48), the rims' (+976, +1024), the XPR2s'
 // slots (+1952), XPRs (+2000) and providers (+2048, 20 bytes apart), the

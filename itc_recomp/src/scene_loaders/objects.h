@@ -185,4 +185,58 @@ bool WheelsDestruct(uint8_t* base, uint32_t wheels);
 // sub_820D95E8 (the deleting destructor): WheelsDestruct.
 bool WheelsDeletingDestruct(uint8_t* base, uint32_t wheels, uint32_t flags);
 
+constexpr uint32_t kCarModelVtable = 0x82004F94;
+constexpr uint32_t kTrafficVtable = 0x820050B4;
+
+// CarModel::CarModel (sub_820D5890): PoolNode::PoolNode (r4 = the list), +16
+// = 0, the vtable, +20 = -1; sub_820D45B0 on the car record (+32);
+// CarModelLoads::CarModelLoads (+3728); the w of each row of the matrices at
+// +6720 + 64i (four), of the positions +6976 + 16i (four), of the matrices'
+// rows +7040 + 64i (two) and the positions +7168 + 16i (two), and +7228 =
+// the word at 0x82000A30 (1.0); CarModel::Reset. False, with nothing done,
+// where a callee would go to the original (a car model in the physical
+// views included, as CarModel::Reset).
+bool CarModelConstruct(uint8_t* base, uint32_t car_model, uint32_t list);
+// CarModel::~CarModel (sub_820D4750): the vtable, CarModel::Release,
+// CarModelLoads::~CarModelLoads (+3728), the base vtable,
+// PoolNode::~PoolNode. False, with nothing done, where a callee would go to
+// the original.
+bool CarModelDestruct(uint8_t* base, uint32_t car_model);
+// sub_820D5988 (the deleting destructor): CarModelDestruct.
+bool CarModelDeletingDestruct(uint8_t* base, uint32_t car_model, uint32_t flags);
+
+// CarParts::~CarParts (sub_820D7038): the vtable, CarParts::Release,
+// CarPartsLoads::~CarPartsLoads (+96), the base vtable, PoolNode::~PoolNode.
+// False, with nothing done, where a callee would go to the original.
+bool CarPartsDestruct(uint8_t* base, uint32_t parts);
+// sub_820D74C0 (the deleting destructor): CarPartsDestruct.
+bool CarPartsDeletingDestruct(uint8_t* base, uint32_t parts, uint32_t flags);
+
+// Cockpit::~Cockpit (sub_820D64D0): the vtable, Cockpit::Release,
+// CockpitLoads::~CockpitLoads (+176), the base vtable, PoolNode::~PoolNode.
+// False, with nothing done, where a callee would go to the original.
+bool CockpitDestruct(uint8_t* base, uint32_t cockpit);
+// sub_820D6798 (the deleting destructor): CockpitDestruct.
+bool CockpitDeletingDestruct(uint8_t* base, uint32_t cockpit, uint32_t flags);
+
+// TrafficCar::TrafficCar (sub_820D8908): PoolNode::PoolNode (r4 = the list),
+// +16 = 0, the vtable, +20 = -1; sub_820D45B0 on the car record (+32);
+// TrafficLoads::TrafficLoads (+3728); the w of the positions +7072 + 16i
+// (four) and of each row of the matrices +7136 + 64i (four) = the word at
+// 0x82000A30 (1.0); TrafficCar::Reset. False, with nothing done, where a
+// callee would go to the original.
+bool TrafficConstruct(uint8_t* base, uint32_t traffic, uint32_t list);
+// TrafficCar::Release (sub_820D7B90): the two textures' words (+3728 to
+// +3740, +7040 to +7052) put off (DeferRelease on [+7392], read for each),
+// LoadSlot::ReleaseBuffer (+3744), TrafficCar::Reset. Returns the original's
+// r3 (Reset's); nullopt, with nothing done, where a callee would go to the
+// original.
+std::optional<uint32_t> TrafficRelease(uint8_t* base, uint32_t traffic);
+// TrafficCar::~TrafficCar (sub_820D7E90): the vtable, TrafficCar::Release,
+// TrafficLoads::~TrafficLoads (+3728), the base vtable, PoolNode::~PoolNode.
+// False, with nothing done, where a callee would go to the original.
+bool TrafficDestruct(uint8_t* base, uint32_t traffic);
+// sub_820D89B8 (the deleting destructor): TrafficDestruct.
+bool TrafficDeletingDestruct(uint8_t* base, uint32_t traffic, uint32_t flags);
+
 }  // namespace scene_loaders
