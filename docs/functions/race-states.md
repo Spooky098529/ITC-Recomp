@@ -1,0 +1,250 @@
+# Known functions: the race's states (the race's progress)
+
+The **race's states**: the race mode's state machine at +107168
+(`RaceStates::`, set up by `RaceStates::Init`, `sub_82169920`, from
+`RaceMode::Init` in `game-modes.md`), the one that runs a race from its
+start to its end beside the race world's (`race-world.md`, +116812):
+it sets up each stage of a race (which racers, their spirit points and
+the course's route to the finish), shows the loading screen while the
+cars load, places the racers for a rolling or a standing start, counts
+down, keeps the race's progress every tick (each racer's time, laps,
+distance along the route, top speed, hits, spirit points and place),
+ends the race (finished, out of spirit points, off the route, retired
+from the pause menu), records the results, and runs the replay and the
+menu after the race; and the **race's progress** at `[0x826D82E8]`
+(`RaceProgress::`, 7,248 bytes, made by `RaceStates::Init`'s
+`RaceProgress::Create`, freed by `RaceStates::Unload`) that it keeps:
+four racer slots of 536 bytes, the racers' results in the race data's
+record layout (one 972-byte entry a racer), the stage's route and which
+checks run. The game is Tokyo Xtreme Racer's line (Shutokou Battle), so
+"spirit points" (SP) is a guess at what the 12,000 a racer starts with
+and loses behind the leader and in hits is. The names are ours; which
+state is which is guessed from what the handlers do. Read by the B7
+loop's mapping agent, 2026-10-28, from the race's other states lead
+(`../loops/leads.md`). The fields are in `../known-data.md`
+(`0x826D82E8`, "race states", the race data `0x826C5B2C`).
+
+The handlers are called by the race mode's dispatcher (`StateMachine::`,
+`game-modes.md`) with r3 = the machine (+9604 the state) and r4 = the
+dispatcher (the race mode's +36); a handler posts messages to every
+machine by appending to the dispatcher's ring (+204: 50 entries of 12
+bytes, +0 the message, +4 and +8 0; +804 the count, +808 the start;
+written inline, "posts N" below). (state, 0) runs every tick in that
+state. The machine's own words: +9604 the state, +9608 set by the pause
+menu's two quits (0 or 1), +9612 a step within a state, +9616 a tick
+count, +9620, +9628 a count of ticks with no racer touching anything,
++9632, +9636 the racers settled, +9640 ticks after that, +9624
+`[0x826D82E8]` (read once by `RaceStates::Init`). "When the fades are
+done" is the screen fades' in and out counts (`0x826A50DC`,
+`0x826A50E4`, `mode-tick.md`) both 0; "black" is the alpha
+`0x826A50D4` at 255. Fades: in over `[0x82001BEC]` (5) passes, out over
+`[0x82001BF0]` (15). "The flags" are the race data's +0x59AE4
+(`../known-data.md`; 0x1 the racers settled, 0x20 the human cars' input
+recorded, 0x40 replayed, 0x80 a replay, 0x100 frozen, 0x800, 0x1000,
+0x2000 no traffic, 0x4000 traffic removed, 0x20000).
+
+The transitions `RaceStates::Init` adds ((state, message) → next state,
+handler; 0 = stay; 87 in all): (1, 0) → 3 `Begin`; (3, 4) `OnWorldLoaded`;
+(3, 17) → 16 `SetUpStage`; (3, 5) → 5 `FadeInFree`; (3, 42) → 19
+`ClearStep`; (3, 46) → 34 `StartDemo`; (34, 0) `DemoTick`; (34, 48) →
+36; (5, 0) `FreeStartTick`; (5, 7) → 7; (7, 0) `FreeRunTick`; (7, 29) →
+24; (7, 17) → 16 `SetUpStage`; (7, 8) → 8 `QuitFree`; (7, 19) → 20
+`ClearRaceFlags`; (8, 0) `EndWhenFaded`; (8, 49) → 37; (24, 29) → 7;
+(24, 48) → 36 `FadeOut`; (36, 0) `EndWhenFaded`; (36, 49) → 37; (16, 0)
+`StageLoadTick`; (16, 14) → 10 `OnRollingStart`; (16, 27) → 21
+`OnStandingStart`; (16, 19) → 20 `ClearRaceFlags`; (20, 0) `sub_82168620`;
+(20, 7) → 7; (20, 48) → 36 `FadeOut`; (10, 0) `RollingStartTick`; (10,
+15) → 11 `ShowLoading`; (11, 0) `RollingLoadTick`; (11, 16) → 12
+`ShowLoading`; (12, 0) `StandingLoadTick`; (12, 27) → 21
+`OnStandingStart`; (21, 0) `StandingStartTick`; (21, 26) → 22
+`OnCountdown`; (21, 19) → 20 `ClearRaceFlags`; (22, 0) `CountdownTick`;
+(22, 28) → 23 `OnGo`; (22, 19) → 20 `ClearRaceFlags`; (23, 0)
+`RaceTick`; (23, 34) → 26 `OnRaceEnd`; (23, 24) → 13 `OnStageEnd`; (23,
+29) and (23, 58) → 25; (25, 29) and (25, 58) → 23; (25, 20) → 27
+`OnQuit`; (25, 21) → 27 `OnQuit2`; (25, 48) → 36 and (25, 45) → 32
+`FadeOut`; (27, 0) `QuitTick`; (27, 36) → 28 `ClearStep`; (27, 34) → 26
+`OnRaceEnd`; (27, 48) → 36 `FadeOut`; (13, 0) `sub_82167D88`; (13, 22) →
+14 `ShowLoadingStep0`; (14, 0) `sub_82168018`; (14, 25) → 15
+`ShowLoadingStep0`; (15, 0) `sub_821683A8`; (15, 17) → 16 `SetUpStage`;
+(26, 0) `AfterRaceTick`; (26, 42) → 18 `OnReplay`; (26, 36) → 28
+`ClearStep`; (26, 38) → 30 `ShowLoadingStep0`; (28, 0) `AfterReplayTick`;
+(28, 37) → 29 `ShowLoadingStep0`; (29, 0) `MenuLoadTick`; (29, 38) → 30
+`ClearStep`; (30, 0) nothing (`sub_82106540`); (30, 40) `OnContinue`;
+(30, 42) → 18 `OnReplay`; (30, 7) → 7; (30, 41) → 31, (30, 48) → 36 and
+(30, 45) → 32 `FadeOut`; (31, 0) `sub_82168C80`; (31, 17) → 16
+`SetUpStage`; (18, 0) `ReplaySetUpTick`; (18, 43) → 17 `OnReplayStart`;
+(19, 0) `sub_82168858`; (19, 43) → 17 `OnReplayStart`; (17, 0)
+`ReplayLoadTick`; (17, 26) → 22 `OnCountdown`; (32, 0) `AbortTick`;
+(37, 0) nothing (`sub_82106540`); (37, 50) → 35 `Unload`. The
+transitions without a handler are state changes only (functor vtable
+`0x820069BC`). So, probably: 1 the start; 3 waiting for the race world's
+load (message 4, which also moves the race world from 2 to 3); 16 a stage's cars
+loading; 10 and 11 a rolling start (the racers placed moving), 12 and 21
+a standing start (placed at the start, waited on until settled); 22 the
+countdown (120 ticks); 23 racing; 25 paused (29 and 58 from the pause
+menu, as the race world's 7 and 24); 27 quitting from the pause menu;
+13 to 15 between a race's stages (never ran); 26 the race's end; 18, 17
+the replay (19 for kind 5); 28 and 29 back from the replay; 30 the menu
+after the race (message 40 picks what's next); 31 the next stage (never
+ran); 5 and 7 a free run without an end (the race data's kind +0xA3AF4
+2's route links; 8 its quit); 34 a demo for kind 0 (+0xA3AF0; ends on
+two pad buttons or after 60 s; never ran); 32 abort; 36 the end, then 37
+(the race world's 37 too: message 49) and 35 (message 50, the progress
+freed). Messages the handlers post that this machine has no transition
+for (31, 32, 11, 44, 29) are for the others: 31 and 32 around every load
+(probably the race HUD or the overlays hidden and shown), 44 the race
+world's abort ((7, 44) → 32).
+
+Shared with other files, which keep their rows: `StateMachine::Add`
+(`game-modes.md`); `RaceStart::Place`, `RaceStart::PlaceRolling`,
+`RaceManager::Refresh`, `RaceManager::ListRacers`,
+`RaceManager::EntryOfRecord`, `SortedList::Clear`, `SortedList::Insert`
+and `RoutePosition::StepToMainRoad` (`race-world.md`);
+`Race::RacerCount` (`collision-world.md`); `Race::FindPlayerEntry`
+(`minimap.md`); `ScreenFades::FadeIn` and `FadeOut` (`mode-tick.md`);
+`AiDrivers::StartRanked`, `StartGroup`, `ClearAll`, `ResetAll`,
+`AllSettled` and `RaceTime::FromTicks` (`ai-drivers.md`);
+`RecordReset` `sub_82101F68`, `Race::SetUpRival`, `RaceEvent::Current`,
+`Stages::Clear` (`race-setup.md`); the stage list's accessors
+(`Stages::Type`, `Copy`, `HasRacer`, `Racer`, `HasNext`, `sub_820FFC08`,
+`sub_820FFC30`, `sub_820FFC68`, `sub_820FFC70`, `sub_820FFCC8`,
+`sub_820FFD48`, `sub_820FFDD8`), `RacerRecords::At`, `RacerRecords::Add`,
+`Vehicle::Get`, `Vehicle::Identity`, `Vehicle::GetDistancePerFrame`,
+`Time::Pack`, `CourseRoutes::Get` and `SaveData::Of`
+(`vehicle-accessors.md`); `Vehicle::GetSpeedKmh` and `RunningMean::Add`
+(`functions.md`); `TrackRoute::SliceTest` and `TrackRoute::PathDistance`
+(`track-route.md`); `Contact::Object` and `Contact::Strength`
+(`car-physics.md`); `DataTables::Item` (`data-tables.md`); `memcpy`
+(`c-runtime.md`); `operator new` and `delete` (`heap.md`); the empty
+`sub_82106540` (`audio.md`), called with a position, a size and a
+format string (probably a debug text print compiled out).
+
+Not here (leads in `../loops/leads.md`, or already in their own): the
+loading screen (`sub_822478D0`, `sub_82247898`, `sub_82247A60`), the
+achievements after a race (`sub_82290788`), the input recordings saved
+and rewound (`sub_82104F68`, `sub_82104E68`), the code that puts the
+cars back on the road (`sub_82104D40`, `sub_82104898`, `sub_821046F8`),
+the player's items after a cruise (`sub_82115190`), the race event's
+lookups (`sub_821442D8`, `sub_821434A0`), the scene models' load poll
+(`sub_820DA318`), the archive's queue (`sub_8209D7B0`) and the camera
+mode set for two players (`sub_821591F0`). Kind 6 (+0xA3AF0) takes a
+branch in `RaceStates::StandingStartTick` that sends over system link
+(`sub_8214AA70`, `sub_8214AB48` in `system-services.md`, never called);
+it isn't mapped further.
+
+Status:
+
+- **Native**: plain C++ in `itc_recomp/src/` that doesn't use the
+  PowerPC context (`ctx`): normal arguments and host structs (it may
+  still read and write guest memory through `src/guest.h` while
+  recompiled code shares the data). The game reaches it without `ctx`,
+  from native or overridden callers, and the recompiled original is no
+  longer called (except behind a fallback flag or to check against it).
+  No `REX_FUNC` override of it exists, not even an adapter kept only for
+  a harness (that's Overridden until the adapter goes).
+  The end state for every function.
+- **Overridden**: an `extern "C" REX_FUNC(sub_XXXXXXXX)` override in
+  `itc_recomp/src/` (or a macro defining one) does the work instead of
+  the original: a thin adapter in front of native code, or a body that
+  still uses `ctx` (calling guest code, reading registers). It may call
+  the original when its flag is off, or to check itself against it.
+- **Wrapped**: an override that does something of its own (skipping
+  render-only passes, logging, timing) and still calls the original
+  (`__imp__sub_XXXXXXXX`) for the work.
+- **Dropped**: its work isn't needed on PC (hardware set-up, kernel calls
+  the SDK already stubbed), so it no longer runs: an override in
+  `itc_recomp/src/` replaces it with nothing (or a fixed return value), or
+  its callers, made native, leave the call out (no override then; the row
+  says which caller). Logs, a harness or the renderer's frame dumps have
+  shown that nothing reads what it did. The original is no longer called,
+  except behind a fallback flag while the drop is being checked. A
+  function the game never calls in the first place isn't Dropped: its
+  status stays blank and its row says it's never called.
+- **Merged**: its work is done inside a native caller's plain C++ (a
+  few lines only that caller needs), so it has no function or override of
+  its own in `itc_recomp/src/`. The row names the caller(s) and the
+  harness that covers the work. The original is no longer called, except
+  behind the caller's fallback flag.
+- **Patched**: the generated code was edited in place (search for
+  `PATCH:`).
+
+| Address | Name | Status | Notes |
+|---|---|---|---|
+| `sub_82169920` | `RaceStates::Init` | | r3 = the machine (the race mode + 107168). `RaceProgress::Create`; +9624 = `[0x826D82E8]`; `RaceProgress::Reset` on it; +9604 = 1; then the 87 transitions in the intro, each through `StateMachine::Add` (a key of (state, message, 0, 0) on the stack, the functor copied six words with vtable `0x82011918`, the machine and the handler for those with one, else vtable `0x820069BC`, and the next state at the copy's +24). Frame 5,824 bytes, 2,888 lines. Only caller `RaceMode::Init` (`game-modes.md`), once a race mode. Read (its transitions decoded by a script over the listing). |
+| `sub_821698B0` | `RaceProgress::Create` | | No arguments: `operator new`(7,248); with a block, its four 972-byte entries from +2188 get +792 = 0.0 and +796 = 0 (as the race data's records' entries); `[0x826D82E8]` = the block, or 0. Only caller `RaceStates::Init`. Read in full. |
+| `sub_821648E0` | `RaceProgress::Reset` | | r3 = the race's progress: `RecordReset` (`sub_82101F68`, `race-setup.md`) on +2184 (the results record: its count +2184, entries +2188 + 972i with +784 and +788 = 12000); the four slots (+40 + 536i): their +0, +4, +8 (the manager entry) and +524 (the sections' count) = 0, +528 = 2, halfwords +532, +534 = -1; the 256 halfwords from +6120 and from +6636 = -1; +6632 = 0 (the sections' count), +7148 = 0, +7156 = 0.0 (the finish distance), the 15 words from +7160 = 0, +7220, +7224, +7228 = 0, +7240 = -1, +7232 and +7236 = 1.0. Leaf apart from `RecordReset`. Callers: `RaceStates::Init`, `Begin`, `SetUpStage`, `NextMessage`, `sub_82168620`. Read in full. |
+| `sub_82164DC0` | `RaceStates::Begin` | | (1, 0) → 3: +9612, +9616, +9620 = 0, `RaceProgress::Reset`(+9624), +9628 to +9640 = 0. No direct callers. Read in full. |
+| `sub_82168AA8` | `RaceStates::OnWorldLoaded` | | (3, 4), r4 = the dispatcher: the loading screen (`sub_822478D0`(0, 2, 671)); then posts by the race data's kind (+0xA3AF0): 0 → 46 (the demo), 5 → 42 (the replay), else the current stage's type (`Stages::Type`) 4 → 5 (a free run), else 17 (a stage). No direct callers. Read in full. |
+| `sub_821654F8` | `RaceStates::SetUpStage` | | (3, 17), (7, 17), (15, 17), (31, 17) → 16, and from `ReplayLoadTick`. r3 = the machine. The player's entry (`RaceManager::EntryOfRecord` of the first racer record with flag 0x1). Kind 1 (+0xA3AF0) without flag 0x80 and a stage after the first (+804 of the stage list): the last of the 77 records (`RacerRecords::At`(race data + 0x59AE8, -1)): its first entry whose record has flag 0x1 gives its +788 (else 12000). `RaceProgress::Reset`; `RaceProgress::SetChecks`(progress, kind, the stage's type, its word +4); the stage's 16 bytes at +24 (`sub_820FFD48`, the stage's route) to the progress's +6076; its words +0 to +36 = -1. For each racer slot of the current stage (`sub_820FFC70`, `Stages::Racer`): its manager entry gets flag 0x10 (and 0x1000 for a record with 0x800); an entry with 0x20 loses it and starts at the player's entry's position stepped back 2, 4, ... slices (`RoutePosition::StepToMainRoad`, kind -1), copied to the record's start +3904; the progress's slot +48 + 536 × count = the entry; `sub_820FFDD8` adds a results entry (the record's number, its item +3912), its +8 = the slots left; the slot's +568 = the stage's slot word (`sub_820FFCC8`); SP (+784 and +788 of the results entry) = 12000 × (100, or 120, 140, 160, 180, 200 for the record's +3924 at 3, 6, 9, 12, 15 and above) / 100 × (150 for kind +0xA3AF4 8, else 100) / 100; kind 6 with +6100 not 1: +6112 = it; for the player's entry (flag 0x4): kind 5 or flag 0x80 takes the last record's +3928, else after the first stage the lower of it and its × (stage + 3) × 5 / 100 + the saved +788; +6112 = it. Others with an item: flag 0x2000 sets a "none" mark, else an item whose byte +35 isn't 0 lists the record at the progress's next word from +0 (and entry flag 0x400); with the mark the ten words go back to -1. Then `RaceManager::Refresh`; the flags \|= 0x1000 for a stage of type 2 or 3; the flags lose 0x20000; +9612 to +9632 = 0 (not +9624); the loading screen (`sub_822478D0`(0, 2, 671)). Frame 288 bytes. Read. |
+| `sub_82163398` | `RaceStates::FadeInFree` | | (3, 5) → 5: +9612, +9616, +9620 = 0; `ScreenFades::FadeIn`(5, black, layer 0) (tail call). No direct callers. Read in full. |
+| `sub_82168B80` | `RaceStates::FreeStartTick` | | (5, 0), r3 = the machine, r4 = the dispatcher: +9616 counts up to 90; then each racer's vehicle (`Race::RacerCount`, `Vehicle::Get`) with flags +6148 0x81 (the human cars) whose track position (`Vehicle::Identity` +4) `TrackRoute::SliceTest` gives 1 holds it (counted on); else, when the fades are done, posts 7 (→ 7). No direct callers. Read in full. Was in the route users' lead (`TrackRoute::SliceTest`'s caller). |
+| `sub_82169290` | `RaceStates::FreeRunTick` | | (7, 0): with the race data's +0xA3AF4 2, `RaceStates::LinkTick` (tail call); else a debug print (`sub_82106540`(500, 100, 3, `0x820099...`)). No direct callers. Read in full. |
+| `sub_82166658` | `RaceStates::LinkTick` | | r3 = the machine (from `FreeRunTick` with kind 2, every tick): 396 lines over the racers' vehicles (`Race::RacerCount`, `Vehicle::Get`, `Identity`, `GetSpeedKmh` three times, `RigidBody::Position`, `Quaternion::XAxis`, `Vec3::Sub`, `Dot`, `Normalize`, `cos`), the route (`TrackRoute::Link`, `TrackRoute::SpecialSection`, `TrackPosition::Copy`), the save data, the race event (`sub_821434A0`), and a new stage made (`Stages::Clear`, `RaceStates::NewStage`, `Race::SetUpRival`): probably a rival met on the road in the free run (a battle started when the player's car is behind and near one). Not read in detail. Was in the route users' lead. |
+| `sub_821634D8` | `RaceStates::NewStage` | | From `LinkTick`: `Stages::Clear`, `Stages::SetType`, `Stages::AddRacer` twice, `Race::SetUpRival`, `SaveData::Of`, `sub_821116E0`, `sub_821435C8`: probably a battle stage made for the player and the rival met. 82 lines. Not read in detail. Named as setting up later stages in `race-setup.md`. |
+| `sub_821633C8` | `RaceStates::QuitFree` | | (7, 8) → 8: +9612, +9616 = 0; `ScreenFades::FadeOut`(15). Not seen in play. Read in full. |
+| `sub_82168F50` | `RaceStates::EndWhenFaded` | | (8, 0) and (36, 0): when the fades are done, posts 49 (→ 37, and the race world's 37). Not seen in play for state 8; 36 seen. Read in full. |
+| `sub_82162310` | `RaceStates::FadeOut` | | (24, 48), (20, 48), (25, 48), (25, 45), (27, 48), (30, 41), (30, 48), (30, 45): `ScreenFades::FadeOut`(15) (tail call). No direct callers. Read in full. |
+| `sub_82163920` | `RaceStates::Unload` | | (37, 50) → 35: `operator delete`(`[0x826D82E8]`) (tail call; the global left as is). No direct callers. Read in full. |
+| `sub_821633F0` | `RaceStates::StartDemo` | | (3, 46) → 34: `ScreenFades::FadeIn`(5); +9616 = 0. Not seen in play. Read in full. |
+| `sub_82169030` | `RaceStates::DemoTick` | | (34, 0), r4 = the dispatcher: when the fades are done, four input objects (the four words at `0x826BABA4` index the 8-byte table at `0x826BAB80`: +0 an object, +4 a type, type 1 skipped) asked through their slot +40 for buttons 152 and 159; when one is down or after 1,800 ticks (+9616; 60 s): +9616 = 0, `ScreenFades::FadeOut`(15), posts 48 (→ 36). Not seen in play. Read; the input objects' table not worked out. |
+| `sub_82164740` | `RaceStates::ClearRaceFlags` | | (7, 19), (16, 19), (21, 19), (22, 19) → 20: the flags lose 0x40, 0x20, 0x1000 and 0x2000. Leaf. Not seen in play. Read in full. |
+| `sub_82168620` | | | (20, 0), r3 = the machine, r4 = the dispatcher: a debug print; +9616 counts to 30, then posts 48 (→ 36, the end) when the stage list's word +808 (`sub_820FFC68`) isn't 0, else 7 (→ 7, back to the free run), `RaceProgress::ReleaseRacers` and `RaceProgress::Reset` on +9624, +9616 = 0. Probably a battle called off (a racer left behind). Not seen in play. Read in full. |
+| `sub_82163440` | `RaceProgress::ReleaseRacers` | | r3 = the race's progress: each of its four slots' manager entry (+48 + 536i, when there) gets flag 0x20 when it has 0x1000, then loses 0x2000, 0x1000, 0x10, 0x4000 and 0x400; then `RaceManager::Refresh`(`[0x826D82F4]`) (tail call). Callers: `RaceStates::NextMessage`, `sub_82168620`. Read in full. |
+| `sub_82166B40` | `RaceStates::StageLoadTick` | | (16, 0), r3 = the machine, r4 = the dispatcher. Until every racer in the current stage has its car model loaded (`RaceStates::CarsLoaded`): when the screen is black, +9616 counts up with a debug print and from 30 the loading screen runs (`sub_82247898`(-1)). Once loaded: kind 1 (+0xA3AF0) with player 0's save data's +6100 1, or with the progress's first listed record (+0) not -1: posts 14 (→ 10, a rolling start). Else by +9612: 0, when black: while the archive's queue isn't empty (`sub_8209D7B0`) or +9616 is 30 or less, the loading wait above; then `ScreenFades::FadeIn`(5); with the flags' 0x100: posts 31, the flags lose 0x100, posts 32; the loading screen finished (`sub_82247A60`(-1)); kind 6 with the current stage's +0 not 1: `sub_821591F0`(the race mode + 10512, viewport 0's +1860) (the two players' camera modes); +9612 = 1, +9616 = 0; not black: +9612 = 1, +9616 = 0. 1, when the fades are done: posts 27 (→ 21, a standing start), +9616 = 0. No direct callers. Runs while a race loads. Read in full. |
+| `sub_82163218` | `RaceStates::CarsLoaded` | | No arguments read: for each racer (`Race::RacerCount`, the manager's +2308) in the current stage (`Stages::HasRacer`), its record in the race object at `[0x826D82D4]` (+16 + 4,288 × the vehicle index, `../loops/leads.md`): 0 when its +4304 is -1, its model (+32) is 0 or the model's load poll (`sub_820DA318`) says 0; else 1. Callers: `StageLoadTick`, `sub_82168018`. Read in full. |
+| `sub_821632C8` | `RaceStates::OnRollingStart` | | (16, 14) → 10: `ScreenFades::FadeOut`(15) only when the alpha `0x826A50D4` is 0; +9612 = 0. No direct callers. Read in full. |
+| `sub_82166E50` | `RaceStates::RollingStartTick` | | (10, 0), r3 = the machine, r4 = the dispatcher: when the fades are done: without the flags' 0x100, posts 31 and sets it; the flags \|= 0x2000 and 0x4000; `RaceManager::Refresh`; `RaceStart::PlaceRolling`(machine, 1); posts 15 (→ 11); +9612 = 0. No direct callers. Read in full. |
+| `sub_82163328` | `RaceStates::ShowLoading` | | (10, 15) → 11 and (11, 16) → 12: +9616 = 0; the loading screen (`sub_822478D0`(0, 2, 671), tail call). No direct callers. Read in full. |
+| `sub_82166F98` | `RaceStates::RollingLoadTick` | | (11, 0), by +9612: 0: while the archive's queue isn't empty (`sub_8209D7B0`) or +9616 is 30 or less, counts up and from 30 runs the loading screen (`sub_82247898`(-1)); then posts 10, 31, the flags lose 0x100, posts 32, `AiDrivers::StartGroup`, +9612 = 1, the loading screen finished (`sub_82247A60`(-1)), +9616 = 0. 1: counts with a debug print until the flags' 0x1 (the racers settled), cleared then; +9612 = 2. 2, when the fades are done: posts 31, the flags \|= 0x100, `RaceStart::Place`(machine, 1, 0), `RaceManager::ListRacers`; the current stage (`Stages::Copy`) not of type 3: the flags lose 0x2000; they lose 0x4000; `AiDrivers::ClearAll`; posts 11 and 16 (→ 12); +9612 = 0. No direct callers. Read in full. |
+| `sub_821672F0` | `RaceStates::StandingLoadTick` | | (12, 0), by +9612: 0: the loading wait as `RollingLoadTick`'s, then `ScreenFades::FadeIn`(5), posts 31, the flags lose 0x100, posts 32, +9612 = 1, the loading screen finished. 1, when the fades are done: posts 27 (→ 21), +9612 = 0. No direct callers. Read in full. |
+| `sub_821643B0` | `RaceStates::OnStandingStart` | | (16, 27) and (12, 27) → 21: +9620, +9628, +9632, +9612, +9616, +9636, +9640 = 0, `[0x826C6B04]` = 0; `AiDrivers::StartRanked` (tail call). No direct callers. Read in full. |
+| `sub_821692C8` | `RaceStates::StandingStartTick` | | (21, 0), r3 = the machine, r4 = the dispatcher. Unless every racer of the stage is near the player (`RaceStates::RacersNear`): posts 19 (→ 20). Else while +9616 is below 900: unless kind 6 (+0xA3AF0), +9616 counts up while they're all within 50.0 (`RaceStates::RacersClose`), else = 900. The current stage copied (`Stages::Copy`); until settled (+9636): when no racer has touched anything for 30 ticks (`RaceStates::RacersStill` on +9628) and the fades are done, and (unless kind 6 with the stage's +0 not 1) `AiDrivers::AllSettled`: +9636 = 1, the flags lose 0x1. Settled: +9640 above 900 sets the sign-in watch's state `0x826BAB3C` = 1 with reason `0x826BAB5C` = 6 once (a prompt); kind 6 with the stage's +0 not 1 sends over system link (never ran: the intro), counts +9640 and goes on only when `[0x826C6B04]` is 1 (then the byte `0x826C6B0C` = 255); otherwise: posts 26 (→ 22), +9628, +9632, +9616, +9636, +9640 = 0. With +9616 at 900 or more, by +9612 (the racers put back at the start): 0: `ScreenFades::FadeOut`(15), +9612 = 1; 1, when the fades are done: posts 31, the flags \|= 0x100, 0x2000, 0x4000, `RaceManager::Refresh`, +9612 = 2; 2: `RaceStart::Place`(machine, 1, 0), `RaceManager::ListRacers`, +9612 = 3; 3: posts 31 and 32, the flags lose 0x100, 0x2000, 0x4000, `ScreenFades::FadeIn`(5), +9612 = 4; 4: +9616, +9612, +9628, +9632 = 0. After posting 19 or 26: `AiDrivers::ClearAll`. Frame 2,816 bytes. No direct callers. Read in full but the system link branch. |
+| `sub_82165AB0` | `RaceStates::RacersNear` | | No arguments: the player's section (the track position, `Vehicle::Identity` +4, of the vehicle of the entry of the first record with flag 0x1; 0 without one); 1 when every racer (the manager's +2308) in the current stage, but those whose record has flag 0x1, is on that section or one of the sections its own section links to (links 0 to 9, halfword +28 + 4 × link of the route's section, `0x826C5B10`), else 0. Callers: `StandingStartTick`, `CountdownTick`. Read in full. |
+| `sub_82165C78` | `RaceStates::RacersClose` | | No arguments: the player's entry's slice center (its +8, +10 on the route: the section's +124 + 84 × slice); 0 when a racer in the current stage (not flag 0x1) has its entry's slice center farther than `[0x8200257C]` (50.0) from it, else 1. Only caller `StandingStartTick`. Read in full. |
+| `sub_82164A90` | `RaceStates::RacersStill` | | r3 = &a count (the machine's +9628): 0 when a racer's vehicle has a contact (its collision object's +240) or collision flags (+6152 & 7); else +1, at most 30. A debug print (30 - count). Returns 1 at 30, else 0. Only caller `StandingStartTick`. Read in full. |
+| `sub_821643E0` | `RaceStates::OnCountdown` | | (21, 26) and (17, 26) → 22: without the flags' 0x40 (replayed), `sub_82104D40` (the cars put back, `../loops/leads.md`) and the flags \|= 0x20 (record the input); when the progress's +6100 (the stage's type) is 2 or 3, `RaceProgress::StartRoute`; +9616 = 0. No direct callers. Read in full. |
+| `sub_821674A0` | `RaceStates::CountdownTick` | | (22, 0): unless `RaceStates::RacersNear`: posts 19 (→ 20), +9616, +9620 = 0, `AiDrivers::ClearAll`. Else +9616 counts to 120 (4 s), then posts 28 (→ 23), +9616, +9620 = 0, the flags lose 0x1000 and 0x2000, `AiDrivers::ResetAll`. A debug print of the count. No direct callers. Read in full. |
+| `sub_82164458` | `RaceStates::OnGo` | | (22, 28) → 23: unless the progress's +6100 is 2 or 3, `RaceProgress::StartRoute`; then `RaceProgress::FollowRoute` for each results entry (+2184 of them). No direct callers. Read in full. |
+| `sub_82167610` | `RaceStates::RaceTick` | | (23, 0), once a tick while racing, r3 = the machine, r4 = the dispatcher: debug prints (the race time `RaceTime::FromTicks`(+6116), the progress's +7156, entry 0's progress +824 and slot 0's section count; with +7224's 0x4 the laps' times, `sub_820FF790` each); +6116 (the race's ticks) up by 1. For each results entry i: `RaceProgress::FollowRoute`; by the checks in +7224: 0x1 `RaceProgress::CountTime`, 0x4 `RaceProgress::CheckLap`, 0x200, 0x400 or 0x800 `RaceProgress::CountHits`, 0x10 `RaceProgress::CheckFinish`, 0x80 `RaceProgress::Damage`; a check that answers a nonzero end stops the walk. Then by +7220: 0x2 `RaceProgress::DrainSp`, 0x8 `sub_821653E8`, 0x10 `RaceProgress::Rank`. The end's two words go to +6104 and +6108; with one, posts 24 (→ 13, the next stage) for an end of 9 (none of the checks read gives it), else 34 (→ 26), and `AiDrivers::ClearAll`. No direct callers. Read in full. |
+| `sub_821635D0` | `RaceProgress::StartRoute` | | r3 = the machine (from `OnCountdown` for stage types 2 and 3, and `OnGo` for the others): 254 lines over the stage's route (`CourseRoutes::Get` of the progress's +6076, copied with `memcpy`), the racers' vehicles (`Vehicle::Get`, `Identity`), `RaceProgress::RouteDistance` twice, `RouteSections::Beside`, `sub_820FFE98`, and three pieces of its own (`sub_82163694`, `sub_8216381C`, `sub_82163908`): probably the race's length (the progress's +7156, which `CheckFinish` waits for) and the laps' distances (+7160) worked out at the start. Not read in detail. |
+| `sub_82162330` | `RaceProgress::RouteDistance` | | From `RaceProgress::StartRoute` (twice): 777 lines over the course's routes (`CourseRoutes::Get`, `memcpy`, `sub_820FFE98` 9 times, `sub_820FFEB0` 7, `sub_820FFF10` 4, `TrackRoute::PathDistance` 8) and ten pieces of its own (`sub_82162524` to `sub_82162D74`): distances along a route's positions (the route users' lead: "distances along a path"). Not read in detail. |
+| `sub_82163C50` | `RaceProgress::FollowRoute` | | r3 = out (8 bytes: an end and a reason), r4 = the race's progress, r5 = a results entry i (E = +2188 + 972i; its slot S = +40 + 536i, S +8 the manager entry). Every tick for each racer while racing. Its vehicle; its input record (`[0x826C5B30 + 4 × index]`, 20 bytes copied): halfword +6 or +10 nonzero sets E +968 = 1; the vehicle's byte +2424 counts E +780 up; `RunningMean::Add`(E +792, `Vehicle::GetSpeedKmh`, 1); E +800 the top speed; E +816 += `Vehicle::GetDistancePerFrame` × `[0x820029D8]` (0.001: km). Then the sections passed: S +12 + 2k (256 halfwords, S +524 the count) and the race's at +6120 (+6632 the count), followed from the car's section (`Vehicle::Identity` +4) with `RouteSections::Beside`, `RouteSections::Before`, `RoutePosition::MapToSection` and `sub_82163000`; a list full or the car on no section that follows: out = (1, 3) (off the route). Unless still at the start (one section, the progress's +7152, and the slice before it), E +824 (the distance along the route) = the vehicle's +6228 + `TrackRoute::PathDistance`(the route `0x826C5B10`, S +12's first position, the car's, the list, its count), 0.0 below 0; out = (0, 0). Callers: `OnGo`, `RaceTick`. Read; the section walk not in detail. |
+| `sub_82162F78` | `RouteSections::Beside` | | r3, r4 = two of the route's sections: 1 when they're the same or r4 is one of r3's links 6 to 9 (the sections beside it), else 0. Leaf. Callers: `RaceProgress::StartRoute`, `FollowRoute` (3), `CheckLap`, `CheckFinish`. Read in full. |
+| `sub_82162E70` | `RouteSections::Before` | | r3 = a section a, r4 = a section b: a when b is one of a's forward links (0 to 2); else the first of a's links 6 to 9 whose forward link is b; else -1. Leaf. Only caller `FollowRoute` (twice). Read in full. |
+| `sub_82163930` | `RoutePosition::MapToSection` | | r3 = a section, r4 = a route position (changed): 1 at once when it's on that section; for two sections of kinds other than 1 and 4 with the same slice count, the position moved to it (1); when they share a back link (3 to 5), 0 when the position's slice is past the section's slice count, else 1; otherwise the slice found by the distance along the slices' centers (+124 + 84 × slice), position moved, 1. Leaf. Callers: `FollowRoute` (2), `CheckLap`, `CheckFinish`. Read, not in detail. |
+| `sub_82163000` | | | r3, r4 = two sections, r5, r6 = out words: the first pair of a forward link (0 to 2) of r3 and one of that link's beside links (6 to 9) that's a forward link of r4: 1 and the pair, else 0 and (-1, -1). Not seen in play (from `FollowRoute`). Read. |
+| `sub_82162E08` | `RaceProgress::CountTime` | | r3 = out, r4 = the progress, r5 = an entry i: E +12 (ticks) up by 1, E +16 = `RaceTime::FromTicks` of it; out = (0, 0). Check 0x1 of +7224 (every stage type set up so far). Only caller `RaceTick`. Read in full. |
+| `sub_82164090` | `RaceProgress::CheckLap` | | r3 = out, r4 = the progress, r5 = an entry i: the stage's route (`CourseRoutes::Get`(+6076), 184 bytes copied); its lap record R = E +20 + 76 × (E +832 when the progress's +6096 is set, else 0); the next lap's position (`sub_820FFF10`(route, R +60 + 1)); when there is one, the car's section is beside it (`RouteSections::Beside`, `RoutePosition::MapToSection`), the car is at or past it (`RoutePosition::NotAfter`) and E +824 is at least the lap's distance (+7160 + 4 × lap): the lap's time = E +16 less the earlier laps (`Time::Sub` each), `RaceProgress::TickFraction`, stored at R + 4 × R +60, R +60 up. Out = (0, 0). Check 0x4 (stage types 1 and 3). Only caller `RaceTick`. Read. |
+| `sub_82162230` | `Time::Sub` | | r3, r4 = two packed times (`Time::Pack`'s layout): each unpacked to signed milliseconds, r3's less r4's packed again (`Time::Pack`, tail call). Only caller `CheckLap`. Not seen in play. Read in full. |
+| `sub_820FF790` | `Time::Clamp` (probably) | | r3 = a packed time: `[0x82006924]` when `sub_820FF708` says it's past it, `[0x82006928]` when `sub_820FF680` says so, else itself. Only caller `RaceTick` (a debug print of the laps). Not seen in play. Callees not read. |
+| `sub_821622A8` | `RoutePosition::NotAfter` | | r3, r4 = two route positions (halfwords section, slice): 1 when r3's is before or at r4's (section first, then slice), else 0. Leaf. Callers: `CheckLap`, `CheckFinish`. Read in full. |
+| `sub_82163140` | `RaceProgress::TickFraction` | | r3 = the progress (not read), r4 = an entry i, r5 = &a packed time (changed): with the vehicle's distance per frame not 0.0, the time (unpacked to milliseconds) adjusted by the part of the tick past the line: (1.0 - the vehicle's +6228 / its distance per frame) × `[0x826193A4]` (1/30) × `[0x82001BDC]` (1000.0) ms, packed again (`Time::Pack`). Callers: `CheckLap`, `CheckFinish`. Read, not in detail. |
+| `sub_82164E18` | `RaceProgress::CheckFinish` | | r3 = out, r4 = the progress, r5 = an entry i: when the car's section is beside the finish (+6088, the stage route's last position), mapped to it, at or past it, and E +824 is at least +7156: `RaceProgress::TickFraction` on E +16; out = (1, 1) for a car with flag 0x1 (the player), else (1, 2). Otherwise (0, 0). Check 0x10 (stage types 1 and 3). Only caller `RaceTick`. Read in full. |
+| `sub_82164F08` | `RaceProgress::CountHits` | | r3 = out, r4 = the progress, r5 = an entry i: for the vehicle's collision flags +6152 0x2 (the track) and 0x1 (another object), each with its strength +6160 at least `[0x82009814]` (230.0) setting E +804 = 1, a 15-tick hold in the slot's +44 and +40; when a hold runs out with +7224's 0x200 or 0x400, the lap record's +68 (track) or +72 (cars) up (at most 999), copied to E +808 or +812. Out = (0, 0). Checks 0x200, 0x400, 0x800. Only caller `RaceTick`. Read. |
+| `sub_82164228` | `RaceProgress::Damage` | | r3 = out, r4 = the progress, r5 = an entry i: SP (E +784) lost in hits: unless a car without flags 0x81 has less than a quarter of its starting SP (E +788 × 25 / 100 above +784: nothing); with a contact on its collision object (+240): another object (`Contact::Object`) costs the progress's +7236 × `[0x82001FD8]` (10.0; only above 3,000 SP), the track +7232 × `[0x82001FB0]` (40.0), × `Contact::Strength` × `[0x820029D8]` (0.001) where smaller; doubled, at most 500, taken off E +784 (not below 0). Out = (0, 0). Check 0x80 (stage types 0 and 2). Only caller `RaceTick`. Read in full. |
+| `sub_821650A0` | `RaceProgress::DrainSp` | | r3 = out, r4 = the progress: for each pair of entries a, b (b with SP left) where b is ahead (E +824) and one is the player's car (flag 0x1 of the vehicle's +6148) and the other flagged 0x2 or 0x40, a's SP drains by the gap (at most `[0x82009808]` 200.0) beyond `[0x8200257C]` (50.0): ((gap - 50) × 14.0 × 0.00667 + 2.0), × 6, 5, 4, 3 or 2 / 4 by a's slot +568 (0 to 4 and above). Then debug prints of each; the entries with flag 0x4 and 0x8 (the two human cars) give their SP; an entry at 0 SP gets flag 0x4000 (out). Out: the first human car at 0: (1, 3) with the second also at 0, else (1, 2); else the second at 0, or every entry out: (1, 1); else (0, 0). Check 0x2 of +7220 (stage types 0 and 2). Only caller `RaceTick`. Read; the side test not in detail. |
+| `sub_821653E8` | | | r3 = out, r4 = the progress: over the entries' vehicles and their items (`DataTables::Item`) and `sub_821654B0`. Check 0x8 of +7220 (kind 1 with the stage's word +4). Not seen in play. Not read in detail. |
+| `sub_82162D80` | `RaceProgress::Rank` | | r3 = the progress: the entries sorted by +824 (E +824, the distance along the route) on a list in its frame (`SortedList::Clear`, `Insert`), then each entry's +8 = its place from the leader (0 the farthest). Check 0x10 of +7220 (stage types 1 and 3). Only caller `RaceTick`. Read in full. |
+| `sub_821649B8` | `RaceProgress::SetChecks` | | r3 = the progress, r4 = the kind (+0xA3AF0), r5 = the stage's type, r6 = the stage's word +4: +6100 = the type, +7220 and +7224 = 0; types 1 and 3: +7220 = 0x11, +7224 = 0x417 (time, laps, finish, hits, 0x2); types 0 and 2: +7220 = 0x3 (with 0x8 for kind 1 and r6 set), +7224 = 0x481 (time, damage, hits); others nothing. Leaf. Only caller `SetUpStage`. Read in full. |
+| `sub_821644D8` | `RaceStates::OnRaceEnd` | | (23, 34) and (27, 34) → 26, r3 = the machine. Unless a replay (the flags' 0x80): `RacerRecords::Add`(the race data + 0x59AE8, the progress + 2184) (the results kept); by the race data's +0xA3AF4: 0 and 4 a course record made from the results (`sub_82105BC8`, `sub_82105EA0`, `sub_82105F50`, `sub_82105C18` on player 0's save data + 0x1D52C; never ran) then the achievements (`sub_82290788`(1, ...), `sub_82290A30` when it gives 1); 2 and 3 the player's items (`sub_82115190`(save data, race data)) then `sub_82290788`(0, ...); 7 `sub_82290788`(1, ...); 8 the progress's +7244 = the position of vehicle 0 or 1 (by +6108); then `sub_82104F68`(`[0x826C5B50]`, the race data, `[0x826C5B4C]`, player 0's save data for kind 1, 0) (the input recordings). Then the flags lose 0x40, 0x20 and 0x20000. No direct callers. Read; the callees are leads. |
+| `sub_82164700` | `RaceStates::OnStageEnd` | | (23, 24) → 13: +9612 = 0, the flags \|= 0x800, `ScreenFades::FadeOut`(15). Not seen in play. Read in full. |
+| `sub_82167D88` | | | (13, 0), between stages: racers found by id (`Racers::IndexOf`, `sub_820FFA88`), added to a stage (`Stages::AddRacer`), their entries (`RaceManager::EntryOfRecord`) placed (`RoutePosition::StepToMainRoad`), `RaceManager::Refresh`, `RaceStart::PlaceRolling`, `ListRacers`, `DataTables::Item`. Not seen in play. Not read in detail. |
+| `sub_82168018` | | | (14, 0): the loading wait (`sub_8209D7B0`, the loading screen `sub_82247898`, `sub_82247A60`), `RaceStates::CarsLoaded`, `RaceStart::Place`, `RaceManager::ListRacers`. Not seen in play. Not read in detail. |
+| `sub_821683A8` | | | (15, 0): the loading wait (`sub_8209D7B0`, `sub_82247898`, `sub_82247A60`). Not seen in play. Not read in detail. |
+| `sub_82163378` | `RaceStates::OnQuit` | | (25, 20) → 27: +9608 = 0. Leaf. No direct callers. Read in full. |
+| `sub_82163388` | `RaceStates::OnQuit2` | | (25, 21) → 27: +9608 = 1. Leaf. Not seen in play. Read in full. |
+| `sub_82168500` | `RaceStates::QuitTick` | | (27, 0), r4 = the dispatcher: posts 29 (the pause left); the flags lose 0x20000; then kind 5 (+0xA3AF0): posts 48 (→ 36); a replay (0x80): 36 (→ 28); else the progress's +6104 = 3 (retired), +6108 = 1 with +9608 set, else 2, posts 34 (→ 26). No direct callers. Read in full. |
+| `sub_82167970` | `RaceStates::AfterRaceTick` | | (26, 0): a replay (the flags' 0x80): posts 42 (→ 18, the replay again) for kind 5, else 36 (→ 28); else 38 (→ 30, the menu); +9616 = 0. No direct callers. Read in full. |
+| `sub_821647B0` | `RaceStates::OnReplay` | | (26, 42) and (30, 42) → 18: `ScreenFades::FadeOut`(15); +9612, +9628, +9632 = 0; the flags \|= 0x2000. No direct callers. Read in full. |
+| `sub_82168708` | `RaceStates::ReplaySetUpTick` | | (18, 0), r4 = the dispatcher: when the fades are done: the flags lose 0x2000 and 0x4000 and get 0x80 (a replay) and 0x40 (the input replayed); unless kind 5, the input recordings rewound (`sub_82104E68`); posts 31; the flags \|= 0x100; the cars put back (`sub_821046F8`); posts 43 (→ 17). No direct callers. Read in full. |
+| `sub_82168858` | | | (19, 0) (kind 5's replay, from (3, 42)): the flags \|= 0x80 and 0x40, `sub_821046F8`, posts 43 (→ 17). Not seen in play. Read in full. |
+| `sub_82164820` | `RaceStates::OnReplayStart` | | (18, 43) and (19, 43) → 17: +9612, +9616 = 0; the current stage of type 2 or 3, or kind 6 with its +0 not 1: the flags \|= 0x2000; the loading screen (`sub_822478D0`(0, 2, 671)). No direct callers. Read in full. |
+| `sub_82168910` | `RaceStates::ReplayLoadTick` | | (17, 0), r3 = the machine, r4 = the dispatcher: the loading wait (`sub_8209D7B0`, +9616 above 30, else counted with a debug print and the loading screen run from 30); then `ScreenFades::FadeIn`(5), posts 31, the flags lose 0x100, posts 32, +9612 = 1, `RaceStates::SetUpStage` (the stage set up again for the replay), posts 26 (→ 22), the loading screen finished. No direct callers. Read in full. |
+| `sub_82167A40` | `RaceStates::AfterReplayTick` | | (28, 0), by +9612: 0: `ScreenFades::FadeOut`(15), 1; 1, when the fades are done: posts 31, the flags \|= 0x100, 2; 2: the cars put back (`sub_82104898`), the flags lose 0x80, 0x20 and 0x40, posts 37 (→ 29) (+9612 left at 2). No direct callers. Read in full. |
+| `sub_82163348` | `RaceStates::ClearStep` | | (3, 42) → 19, (27, 36) and (26, 36) → 28, (29, 38) → 30: +9612 = 0. Leaf. No direct callers. Read in full. |
+| `sub_82163358` | `RaceStates::ShowLoadingStep0` | | (13, 22), (14, 25), (26, 38), (28, 37): +9612, +9616 = 0; the loading screen (`sub_822478D0`(0, 2, 671), tail call). No direct callers. Read in full. |
+| `sub_82167BE0` | `RaceStates::MenuLoadTick` | | (29, 0), by +9612: 0: the loading wait as `StandingLoadTick`'s, then `ScreenFades::FadeIn`(5), posts 31, the flags lose 0x100, posts 32, 1, the loading screen finished; 1, when the fades are done: posts 38 (→ 30) (+9612 left at 1). No direct callers. Read in full. |
+| `sub_82168FB8` | `RaceStates::OnContinue` | | (30, 40), r4 = the dispatcher: posts `RaceStates::NextMessage`'s answer. No direct callers. Read in full. |
+| `sub_82164B50` | `RaceStates::NextMessage` | | r3 = the machine: what follows the menu: 41 (→ 31, a next stage), 48 (→ 36, the end) or 7 (→ 7, back to the free run). With another stage (`Stages::HasNext`): kind 6 counts the 77 records' +3924 of 1 and 2 (with +3920 set) against (the stage count - 3) / 2: 41 when neither reaches it, else 48; other kinds 41 when the last record's +3924 is 1. Else the stage list's +808 set: 48; else kind 1: the event's next rival from the player's entry (`Race::FindPlayerEntry`, `RaceEvent::Current`, `sub_821442D8`): set up (`Race::SetUpRival`(`sub_820FF958`, it, 0)) and 41; without one, with the last record's +3924 1, an owned item (save data + 4 × (id + 8746), halfword 1) of byte +35 3, 4 or 5 in any of its entries: 48; else 7. Then `RaceProgress::ReleaseRacers` and `RaceProgress::Reset` on +9624. Frame 3,184 bytes (an item copied, `memcpy`). Only caller `OnContinue`. Read. |
+| `sub_82168C80` | | | (31, 0), the next stage: the stage's racers (`sub_820FFC70`, `Stages::Racer`), their entries (`RaceManager::EntryOfRecord`) placed (`RoutePosition::Step`), `sub_82101940`, `RaceManager::Refresh`, `RaceStart::Place`, `ListRacers`. Not seen in play. Not read in detail. |
+| `sub_821665F0` | `RaceStates::AbortTick` | | (32, 0), r4 = the dispatcher: once the screen is black, posts 44 (the race world's abort) and the state +9604 = 3. Leaf. Not seen in play. Read in full. |

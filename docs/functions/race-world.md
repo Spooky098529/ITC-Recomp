@@ -78,7 +78,7 @@ default), checked by the harness `race_world`
 vehicles and the random route of `test_route.h` in blocks of the
 allocation layer, the game's globals put back after each side).
 
-Not here: the race's other states that call `RaceStart::Place`,
+Not here: the race's other states (since 2026-10-28 in `race-states.md`, the state machine at +107168) that call `RaceStart::Place`,
 `RaceManager::Refresh`, `RaceManager::ListRacers`,
 `RaceManager::ResetVehicles` and `RaceManager::ResetWorld`
 (`sub_82163440`, `sub_821654F8`, `sub_82162D80`, `sub_82165AB0`,
