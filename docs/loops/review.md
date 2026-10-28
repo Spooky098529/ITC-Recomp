@@ -13,7 +13,19 @@ When the user has reviewed a run's section, its heading gets
 
 ## Run 2026-10-28 22:22 (`b7-loop-28-10-26-3`)
 
-Nothing yet.
+- The car sounds and X3DAudio (map 26adc92): `docs/functions/car-sounds.md`,
+  66 rows (1 moved from `functions.md`, 65 new; 4 not seen in play):
+  the seven 1,264-byte per-racer car sound objects at `[0x826C5C3C]`
+  (eleven parts each: engine, tires, hits, wind, road noise, pass-by),
+  played straight through XAudio voices into a submix, not through
+  XACT; the game's in-memory wave bank reader (`WaveBankView::`); and
+  X3DAudio (13 rows; the range holds 14 functions, not ~40 as the lead
+  guessed), translated as the game's code by the XACT precedent
+  (2026-10-23). X3DAudioInitialize keeps its row in `sound-cues.md`.
+  `sub_82110080` in the lead was a return address inside
+  `CarSound::Update` (`sub_82110048`). `known-data.md`: the car sounds'
+  globals `0x826C5C3C`-`0x826C5C90` and fields. One lead added
+  (XAudio's voice methods, the subsystem's blockers).
 
 ## Run 2026-10-28 18:45 (`b7-loop-28-10-26-2`)
 

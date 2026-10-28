@@ -11,8 +11,8 @@ file's history. What's left to see in a drive, from every run:
 - Run started 2026-10-28 22:22 on `b7-loop-28-10-26-3` (the user's
   branch), from 26a5119; summary `b7-loop-2026-10-28-2222.md`.
 - Limit for this run: 3 subsystems.
-- Subsystem 1 of 3: X3DAudio and the engine sounds (`sub_82481880`,
-  `sub_8210F820`, `sub_82110258`, the top lead). Step: mapping (agent
+- Subsystem 1 of 3: the car sounds and X3DAudio (`car-sounds.md`,
+  from the top lead). Map checked (26adc92). Step: migration 1 (agent
   running).
 
 ## Done
@@ -35,6 +35,8 @@ Nothing yet.
 
 - At the start: ours 2628, work left 3833 (wrapped 103, known 498,
   unknown 3232).
+- After the car sounds' map: ours 2628, work left 3833 (wrapped 103,
+  known 559, unknown 3171).
 
 ## Stopped
 
