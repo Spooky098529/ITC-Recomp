@@ -7,6 +7,7 @@
 #include "base/flags.h"
 #include "car_models/car_model.h"
 #include "car_models/load_slots.h"
+#include "car_models/tga.h"
 #include "car_models/vinyl.h"
 #include "hooks/guest_call.h"
 #include "hooks/heap.h"
@@ -19,7 +20,9 @@ ITC_FLAG_BOOL(native_car_models, true, "ITC",
               "deferred release sub_820C3F50; with --native_heap and the memory blocks' host lock "
               "CarModel::Release sub_820D4508; with --native_heap the vinyl sheet's texture, "
               "Texture::Create sub_820ECF08, Texture::Free sub_820ECFC8 and Vinyl::Compress "
-              "sub_820ED090, which calls XGCompressSurface sub_8235AAC0's plain C++) natively "
+              "sub_820ED090, which calls XGCompressSurface sub_8235AAC0's plain C++; the decals' TGA "
+              "header's clear sub_820EEBC0 and, with --native_heap, TGA::CreateImage sub_820ED020 "
+              "with its reader) natively "
               "instead of through the translated code (the same writes; checked by "
               "--run_harnesses=car_models)");
 
@@ -98,6 +101,22 @@ void CarModelsVinylCompress(PPCContext& ctx, uint8_t* base) {
   ctx.r3.u64 = *r3;  // the checks above are VinylCompress's
 }
 
+void CarModelsTgaHeaderClear(PPCContext& ctx, uint8_t* base) {
+  cm::TgaHeaderClear(base, ctx.r3.u32);
+  ctx.r11.u64 = 0;
+}
+
+void CarModelsTgaCreateImage(PPCContext& ctx, uint8_t* base) {
+  if (hooks::NativeHeapActive()) {
+    if (const auto r3 = cm::TgaCreateImage(base, ctx.r3.u32, ctx.r4.u32, ctx.r5.u32,
+                                           ctx.r6.u32, ctx.r1.u32)) {
+      ctx.r3.u64 = *r3;
+      return;
+    }
+  }
+  __imp__sub_820ED020(ctx, base);
+}
+
 }  // namespace hooks
 
 // The adapters: the register steps above, or the originals with the flag
@@ -120,3 +139,5 @@ ITC_CAR_MODELS(820D4508, CarModelsCarModelRelease)
 ITC_CAR_MODELS(820ECF08, CarModelsTextureCreate)
 ITC_CAR_MODELS(820ECFC8, CarModelsTextureFree)
 ITC_CAR_MODELS(820ED090, CarModelsVinylCompress)
+ITC_CAR_MODELS(820EEBC0, CarModelsTgaHeaderClear)
+ITC_CAR_MODELS(820ED020, CarModelsTgaCreateImage)

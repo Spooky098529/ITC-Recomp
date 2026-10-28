@@ -11,6 +11,7 @@
 
 #include "base/flags.h"
 #include "base/log.h"
+#include "car_models/tga.h"
 #include "car_models/vinyl.h"
 #include "graphics/resources.h"
 #include "hooks/car_models.h"
@@ -438,11 +439,113 @@ void VinylCompresses(Context& h, uint32_t block) {
   results.Report();
 }
 
+// The decals' TGA header's clear: a header anywhere in the block.
+void TgaHeaderClears(Context& h, uint32_t block) {
+  Results results("TgaHeader::Clear (sub_820EEBC0)");
+  for (int c = 0; c < 16; c++) {
+    Case(
+        h, results, block, h.random.Next(),
+        [&](int, PPCContext& t, Random& r) { t.r3.u64 = block + r.Below(0x200); }, nullptr,
+        __imp__sub_820EEBC0, hooks::CarModelsTgaHeaderClear, fmt::format("case {}", c));
+  }
+  results.Report();
+}
+
+// TGA::CreateImage: a file (the layer's pages, as the archive's loads give
+// them) of an uncompressed 24- or 32-bit image, its header's other bytes and
+// its pixels random; sizes 0 to 128 mostly, a 1,024 x 1,024 layer of each
+// depth and decal sizes (256 and 512). The header out, the buffer's word
+// and the pixels' word apart in the block's first 256 bytes. The
+// recompiled side with --native_car_models off. The block (the words as
+// allocations), r3, the ARGB pixels, whether they're still pages, whether
+// the file is, and the frame's +80 to +160 (the reader; the addresses as
+// allocations, with the frame's own).
+void TgaCreateImages(Context& h, uint32_t block) {
+  namespace cm = car_models;
+  Results results("TGA::CreateImage (sub_820ED020)");
+  for (int c = 0; c < 40; c++) {
+    const uint64_t seed = h.random.Next();
+    const uint32_t bits = c % 2 == 0 ? 32 : 24;
+    uint32_t width = 1 + h.random.Below(64), height = 1 + h.random.Below(64);
+    if (c < 2) {
+      width = height = 1024;
+    } else if (c < 6) {
+      width = c < 4 ? 256 : 512;
+      height = h.random.Below(2) ? width : width / 2;
+    } else if (c == 6) {
+      width = 0;
+    } else if (c == 7) {
+      height = 0;
+    } else if (c % 5 == 0) {
+      width = 1 + h.random.Below(128);
+      height = 1 + h.random.Below(128);
+    }
+    const uint32_t size = 18 + width * height * (bits / 8);
+    const uint32_t buffer = memory::AllocPages(size, 4096);
+    {
+      Random r(seed ^ 0x5447);
+      RandomBytes(h.base, buffer, (size + 3) & ~3u, r);
+    }
+    guest::StoreU8(h.base, buffer + 2, 2);
+    guest::StoreU8(h.base, buffer + 12, uint8_t(width));
+    guest::StoreU8(h.base, buffer + 13, uint8_t(width >> 8));
+    guest::StoreU8(h.base, buffer + 14, uint8_t(height));
+    guest::StoreU8(h.base, buffer + 15, uint8_t(height >> 8));
+    guest::StoreU8(h.base, buffer + 16, uint8_t(bits));
+    const uint32_t header_out = block + 128 + h.random.Below(128 - 20);
+    const uint32_t buffer_at = block + 4 * h.random.Below(32);
+    uint32_t pixels_out = block + 4 * h.random.Below(32);
+    while (pixels_out == buffer_at) {
+      pixels_out = block + 4 * h.random.Below(32);
+    }
+    Outputs out[2];
+    for (int v = 0; v < 2; v++) {
+      Random r(seed);
+      RandomBytes(h.base, block, kBlockBytes, r);
+      PPCContext t = CallContext(h);
+      const uint32_t frame = t.r1.u32 - cm::kTgaCreateImageFrameBytes;
+      RandomBytes(h.base, frame, cm::kTgaCreateImageFrameBytes, r);
+      Put(h.base, buffer_at, buffer);
+      t.r3.u64 = header_out;
+      t.r4.u64 = size;
+      t.r5.u64 = buffer_at;
+      t.r6.u64 = pixels_out;
+      ITC_FLAG(native_car_models) = v == 1;
+      (v == 0 ? __imp__sub_820ED020 : hooks::CarModelsTgaCreateImage)(t, h.base);
+      ITC_FLAG(native_car_models) = true;
+      const uint32_t pixels = guest::LoadU32(h.base, pixels_out);
+      const uint32_t bytes = width * height * 4;
+      const std::vector<Known> known = {{pixels, bytes ? bytes : 1}, {buffer, size},
+                                        {frame, cm::kTgaCreateImageFrameBytes}};
+      out[v].Word(t.r3.u32);
+      out[v].Word(uint32_t(t.r3.u64 >> 32));
+      Addresses(out[v], h.base, block, 256, known);
+      out[v].Bytes(Read(h.base, block + 256, kBlockBytes - 256));
+      if (bytes != 0) {
+        out[v].Bytes(Read(h.base, pixels, bytes));
+      }
+      Addresses(out[v], h.base, frame + 80, 80, known);
+      const bool alive = pixels != 0 && memory::IsPages(pixels);
+      out[v].Word(alive);
+      out[v].Word(memory::IsPages(buffer));
+      if (alive) {
+        memory::FreePages(pixels);
+      }
+    }
+    memory::FreePages(buffer);
+    results.Check(out[0], out[1], fmt::format("case {}: {} bits, {} x {}", c, bits, width,
+                                              height));
+  }
+  results.Report();
+}
+
 void Vinyls(Context& h, uint32_t block) {
+  TgaHeaderClears(h, block);
   if (!hooks::NativeHeapActive()) {
     ITC_LOG_WARN("harness: car_models: --native_heap is off: the vinyl's cases skipped");
     return;
   }
+  TgaCreateImages(h, block);
   TextureCreates(h, block);
   TextureFrees(h, block);
   VinylCompresses(h, block);

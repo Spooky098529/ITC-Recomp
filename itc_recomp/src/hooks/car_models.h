@@ -34,4 +34,12 @@ void CarModelsTextureCreate(PPCContext& ctx, uint8_t* base);
 void CarModelsTextureFree(PPCContext& ctx, uint8_t* base);
 void CarModelsVinylCompress(PPCContext& ctx, uint8_t* base);
 
+// The decals' TGA header's clear sub_820EEBC0: r3 = the header (left), r11
+// = 0. TGA::CreateImage sub_820ED020: r3 = the header out, r4 = the size,
+// r5 = where the file's buffer is, r6 = where the pixels go; r3 = 1.
+// Natively only while --native_heap routes the game's heap to the layer,
+// and for the files car_models::TgaDecodable takes.
+void CarModelsTgaHeaderClear(PPCContext& ctx, uint8_t* base);
+void CarModelsTgaCreateImage(PPCContext& ctx, uint8_t* base);
+
 }  // namespace hooks
