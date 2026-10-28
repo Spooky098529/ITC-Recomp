@@ -94,6 +94,12 @@ void RaceWorldFirstUnsetFlag(PPCContext& ctx, uint8_t* base);
 // sub_82143B78: r3 = the event, r4, r5 = the positions, r6 = &the step, r7
 // = &the group. RaceEvent::PlaceGroupSplit sub_82143920: r3 = the event, r4
 // = the position, r5 = &the step, r6 = &the group, r7 = &the row.
+// RaceManager::ListRacers sub_82171E50: r3 = the manager; r3 as the
+// original leaves it (callers that return right after hand it on).
+// RaceManager::AddRacers sub_82173050: r3 = the manager, r4 = the race
+// data's racer records (r3 not kept: RaceWorld::OnLoaded doesn't read it).
+void RaceWorldListRacers(PPCContext& ctx, uint8_t* base);
+void RaceWorldAddRacers(PPCContext& ctx, uint8_t* base);
 void RaceWorldPlaceStartsCurrent(PPCContext& ctx, uint8_t* base);
 void RaceWorldPlaceStarts(PPCContext& ctx, uint8_t* base);
 void RaceWorldPlaceGroupFixed(PPCContext& ctx, uint8_t* base);

@@ -29,7 +29,9 @@ ITC_FLAG_BOOL(native_race_world, true, "ITC",
               "originals where those refuse); RaceEvent::PlaceStartsCurrent sub_82144A38, "
               "PlaceStarts sub_82144798 with sub_82144874, PlaceGroupFixed sub_821443B0, "
               "PlaceGroup sub_82143A40, PlaceGroupTwoRows sub_82143B78 and PlaceGroupSplit "
-              "sub_82143920 natively instead of through the "
+              "sub_82143920; RaceManager::ListRacers sub_82171E50 (Vehicle::RemoveFromWorld's "
+              "original unless --native_heap routes the game's heap to the allocation layer) "
+              "and AddRacers sub_82173050 natively instead of through the "
               "translated code (the same words, bit for bit; checked by "
               "--run_harnesses=race_world)");
 
@@ -247,6 +249,21 @@ void RaceWorldFirstUnsetFlag(PPCContext& ctx, uint8_t* base) {
   ctx.r3.u64 = rw::FirstUnsetFlag(base, ctx.r3.u32);
 }
 
+void RaceWorldListRacers(PPCContext& ctx, uint8_t* base) {
+  ctx.fpscr.disableFlushMode();
+  const rw::Original original = Originals(ctx, base);
+  ctx.r3.u64 = rw::ListRacers(base, ctx.r3.u32, ctx.r1.u32 - 1872, NativeHeapActive(),
+                              [&](uint32_t address, uint32_t sp, uint32_t r3) {
+                                original(address, sp, r3);
+                                return ctx.r3.u64;
+                              });
+}
+
+void RaceWorldAddRacers(PPCContext& ctx, uint8_t* base) {
+  ctx.fpscr.disableFlushMode();
+  rw::AddRacers(base, ctx.r3.u32, ctx.r4.u32, ctx.r1.u32 - 2000);
+}
+
 void RaceWorldPlaceStartsCurrent(PPCContext& ctx, uint8_t* base) {
   ctx.fpscr.disableFlushMode();
   rw::PlaceStartsCurrent(base, ctx.r3.u32, ctx.r4.u32, ctx.r1.u32);
@@ -317,6 +334,8 @@ ITC_RACE_WORLD(82170668, RaceWorldResetWorld)
 ITC_RACE_WORLD(82171718, RaceWorldResetVehicles)
 ITC_RACE_WORLD(82171250, RaceWorldUnload)
 ITC_RACE_WORLD(82144A38, RaceWorldPlaceStartsCurrent)
+ITC_RACE_WORLD(82171E50, RaceWorldListRacers)
+ITC_RACE_WORLD(82173050, RaceWorldAddRacers)
 // RaceManager::NearSegment (sub_82170BC0) and RoutePosition::ToMainRoad
 // (sub_82143608) have no adapters: their callers in play
 // (RaceManager::BuildNeighbors, RoutePosition::StepToMainRoad) are native;

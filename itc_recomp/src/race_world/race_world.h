@@ -184,6 +184,50 @@ void ResetVehicles(uint8_t* base, uint32_t manager, uint32_t flag, uint32_t fram
 // with r1 = `frame`, where its plain C++ refuses) and [0x826D82F4] = 0.
 // `frame`: the original's 112 bytes.
 void Unload(uint8_t* base, uint32_t frame, const Original& original);
+// --- The manager's lists (src/race_world/race_manager.cpp) ---
+
+// A callee's original where its plain C++ refuses, run with r1 = `sp` and
+// r3 = `r3`; returns the r3 it leaves.
+using OriginalR3 = std::function<uint64_t(uint32_t address, uint32_t sp, uint32_t r3)>;
+
+// RaceManager::ListRacers (sub_82171E50): the player's entry (the first
+// flagged 0x4, or none: its +20 read at 20) gives the player's route
+// position (its vehicle's Vehicle::Identity +4, at `frame` + 84) and
+// section; +2364, +2372 = 0 and the sorted list at `frame` + 144 emptied
+// (+1744 to +1752). Each entry (+2368 of them, the count read again each
+// pass): flagged 0x20 or 0x80, or on a branch that doesn't meet the
+// player's (BranchesMeet), it loses its vehicle (when its slot word is above
+// 0: flags &= ~0x40, Vehicle::RemoveFromWorld, its original through
+// `original` without `heap` or where it refuses; the slot 0, +20 = -1);
+// else it's inserted by its key: 0.0 for 0x4, [0x8200222C] for 0x10 or
+// 0x400, else the flat distance between its slice's center and the
+// player's (the vectors at `frame` + 96 to + 140) plus 1.0. Then the listed
+// entries with a vehicle, nearest first, go in the racers' list (+2308;
+// +2364 and +2372 count), and the traffic entries in use (+2160, three;
+// +2376 counts) after them. Returns the original's r3 (64 bits). `frame`:
+// the original's 1,872 bytes.
+uint64_t ListRacers(uint8_t* base, uint32_t manager, uint32_t frame, bool heap,
+                    const OriginalR3& original);
+// RaceManager::AddRacers (sub_82173050): BuildNeighbors (+2392); the
+// player's record (the first of `records`' +0x595E0 with flags +3888 0x1,
+// or none: its position read at 3904); with the race data's +0xA3AF0 1,
+// +0xA3AF4 2 and an event, RaceEvent::PlaceStartsCurrent (player 0's save
+// +6108 at `frame` + 84). Each record with flags 0x83 gets an entry (+2368
+// counts; +24 its number, +4 the entry's, +8 its start position, +0 1, 4
+// for 0x1, 8 for 0x80, | 0x20 for 0x100), its start placed first unless
+// 0x1 or 0x80 (see the row); records with only 0x4 listed from +2244
+// (+2384 counts). The entries not flagged 0x20 on branches meeting the
+// player's sorted by flat distance (the list at `frame` + 208); the nearest
+// four under [0x8200996C] get flags 0x40, a racer number, a place in the
+// racers' list, a slot, an input record and AiDriver::Setup; the rest lose
+// 0x40. Then the traffic (+2380 = min(+0x595E8, 3), +2376 = 0): unless
+// none, no traffic records or the race data's flag 0x2000, that many
+// traffic entries (+2160) placed ahead of the player, each with a model
+// (Traffic::PickModel), its record, a racer number, an input record and
+// AiDriver::Setup. The original's r3 isn't kept (its caller doesn't read
+// it). `frame`: the original's 2,000 bytes.
+void AddRacers(uint8_t* base, uint32_t manager, uint32_t records, uint32_t frame);
+
 // --- The route positions ---
 
 // RoutePosition::ToMainRoad (sub_82143608): TrackRoute::ToMainRoad on the
