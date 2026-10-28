@@ -239,6 +239,8 @@ void SaveInterfacePlayTimeUpdate(PPCContext& ctx, uint8_t* base) {
 // SaveBuffers::FreeReplayList sub_8228F7E8 either: its one caller,
 // SaveBuffers::Destroy, is ours (its register step is the harness's).
 // No adapter (removed 2026-10-28: only `SaveSlots::OfController`'s plain C++ calls it in play)
+// for SaveInterface::UserAt sub_820A0620.
+// No adapter (removed 2026-10-28: only `SaveSlots::OfController`'s plain C++ calls it in play)
 // for SaveInterface::UserCount sub_820A05D8.
 // No adapter (removed 2026-10-28: only `SaveSlots::Device`'s plain C++ calls it in play)
 // for SaveInterface::Device sub_820A03D0.
@@ -279,7 +281,6 @@ ITC_SAVE_INTERFACE_ADAPTER(820A0378, SaveInterfacePending)
 ITC_SAVE_INTERFACE_ADAPTER(820A0428, SaveInterfaceSaveAt)
 ITC_SAVE_INTERFACE_ADAPTER(820A0490, SaveInterfaceSave)
 ITC_SAVE_INTERFACE_ADAPTER(820A0510, SaveInterfaceLoad)
-ITC_SAVE_INTERFACE_ADAPTER(820A0620, SaveInterfaceUserAt)
 ITC_SAVE_INTERFACE_ADAPTER(8228F780, SaveInterfaceSlotOfController)
 ITC_SAVE_INTERFACE_ADAPTER(8228F9B0, SaveInterfacePlayerRequestDevice)
 ITC_SAVE_INTERFACE_ADAPTER(8228F9E8, SaveInterfacePlayerSlotState)
