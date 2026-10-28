@@ -514,17 +514,12 @@ RaceWorldStandIn g_recorded_stand_in = nullptr;
 
 ITC_RACE_WORLD(821705A8, RaceWorldEntryOfRecord)
 ITC_RACE_WORLD(82170860, RaceWorldBranchesMeet)
-ITC_RACE_WORLD(82171070, RaceWorldPickModel)
 ITC_RACE_WORLD(82170AA0, RaceWorldSortedListInsert)
 ITC_RACE_WORLD(82170A88, RaceWorldSortedListClear)
 ITC_RACE_WORLD(82170560, RaceWorldOnPausedTick)
 ITC_RACE_WORLD(82171360, RaceWorldRelease)
 ITC_RACE_WORLD(82170F18, RaceWorldStepToMainRoad)
 ITC_RACE_WORLD(82112190, RaceWorldFirstUnsetFlag)
-ITC_RACE_WORLD(82170920, RaceWorldNeighbours)
-ITC_RACE_WORLD(821737F8, RaceWorldJumpSections)
-ITC_RACE_WORLD(821714D8, RaceWorldTickVehicles)
-ITC_RACE_WORLD(82171560, RaceWorldRefreshVehicles)
 ITC_RACE_WORLD(82174D28, RaceWorldInit)
 ITC_RACE_WORLD(821713C0, RaceWorldReleaseForStage)
 ITC_RACE_WORLD(82170668, RaceWorldResetWorld)
@@ -534,14 +529,18 @@ ITC_RACE_WORLD(82171E50, RaceWorldListRacers)
 ITC_RACE_WORLD(82173A90, RaceWorldOnLoaded)
 ITC_RACE_WORLD(82165E20, RaceWorldPlace)
 ITC_RACE_WORLD(821662E0, RaceWorldPlaceRolling)
-ITC_RACE_WORLD(82172118, RaceWorldStreamOpponents)
-ITC_RACE_WORLD(821724F8, RaceWorldStreamTraffic)
-ITC_RACE_WORLD(82173E28, RaceWorldMoveUnseen)
 ITC_RACE_WORLD(82174BC0, RaceWorldTick)
-ITC_RACE_WORLD(82174338, RaceWorldStream)
-ITC_RACE_WORLD(82172E60, RaceWorldStreamNear)
-ITC_RACE_WORLD(82174200, RaceWorldStreamCruise)
-ITC_RACE_WORLD(82172D20, RaceWorldStreamTwoPlayers)
+// RaceManager::Stream (sub_82174338), TickVehicles (sub_821714D8) and
+// RefreshVehicles (sub_82171560) have no adapters: their only caller,
+// RaceWorld::Tick, is native; nor have StreamCruise (sub_82174200),
+// StreamNear (sub_82172E60) and StreamTwoPlayers (sub_82172D20), whose only
+// caller is Stream, StreamOpponents (sub_82172118) and StreamTraffic
+// (sub_821724F8), whose callers are those three, MoveUnseen (sub_82173E28),
+// from StreamCruise, JumpSections (sub_821737F8) and Neighbours
+// (sub_82170920), from MoveUnseen, and Traffic::PickModel (sub_82171070),
+// from StreamTraffic and RaceManager::AddRacers. --native_race_world
+// switches RaceWorld::Tick (and RaceWorld::OnLoaded for AddRacers). Their
+// register steps stay for the harness.
 // sub_8217437C (RaceManager::Stream's case 0, split off: a tail call to
 // StreamNear) has no adapter: its only caller is Stream, whose plain C++
 // does its work.
