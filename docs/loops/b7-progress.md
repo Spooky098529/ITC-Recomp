@@ -87,6 +87,12 @@ file's history. What's left to see in a drive, from every run:
   the attract race, 18 in the replay `itc_2063`, ok; nothing to drive).
   Finished.
 
+- Subsystem 3 of 3: a player's save data made and deleted
+  (`sub_821057C8`, `sub_821055D8`, `sub_82221D00`), picked as closest
+  to ready in small pieces (24 ready groups; the race mode's state
+  machines, also close, are 2,000-3,000-line functions to split). Step:
+  mapping agent running.
+
 ## Done
 
 - The scene loaders' blockers (no mapping; e9e8e77..016410c):
