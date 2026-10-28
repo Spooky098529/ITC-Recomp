@@ -108,4 +108,20 @@ void SceneLoadersTrafficLoadsConstruct(PPCContext& ctx, uint8_t* base);
 void SceneLoadersTrafficLoadsDestruct(PPCContext& ctx, uint8_t* base);
 void SceneLoadersTrafficReset(PPCContext& ctx, uint8_t* base);
 
+// The lifetimes, only while hooks::ModelsNativeLifetime():
+// Pool4Object::Pool4Object sub_820D6A70 and Wheels::Wheels sub_820D9570 (r3
+// = the object, left; r4 = the list); Pool4Object::Release sub_820D6A20 and
+// Wheels::Release sub_820D8E68 (r3 = the object; r3 as the original leaves
+// it); ~Pool4Object sub_820D6AD0 and ~Wheels sub_820D90B8 (r3 = the object,
+// left); the deleting destructors sub_820D6BC0 and sub_820D95E8 (r3 = the
+// object, left; r4 = the flags: with bit 0 the original).
+void SceneLoadersPool4Construct(PPCContext& ctx, uint8_t* base);
+void SceneLoadersPool4Release(PPCContext& ctx, uint8_t* base);
+void SceneLoadersPool4Destruct(PPCContext& ctx, uint8_t* base);
+void SceneLoadersPool4DeletingDestruct(PPCContext& ctx, uint8_t* base);
+void SceneLoadersWheelsConstruct(PPCContext& ctx, uint8_t* base);
+void SceneLoadersWheelsRelease(PPCContext& ctx, uint8_t* base);
+void SceneLoadersWheelsDestruct(PPCContext& ctx, uint8_t* base);
+void SceneLoadersWheelsDeletingDestruct(PPCContext& ctx, uint8_t* base);
+
 }  // namespace hooks

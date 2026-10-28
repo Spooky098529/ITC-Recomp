@@ -31,7 +31,10 @@ ITC_FLAG_BOOL(native_scene_loaders, true, "ITC",
               "sub_820D78B8, WheelsLoads::WheelsLoads sub_820D8F60, Reset sub_820D8AA8 (no "
               "adapter: only Wheels::Reset calls it) and ~WheelsLoads sub_820D9010, Wheels::Reset "
               "sub_820D8B58, TrafficLoads::TrafficLoads sub_820D7C40 and ~TrafficLoads "
-              "sub_820D7CC0, TrafficCar::Reset sub_820D7AB0) natively instead of through the "
+              "sub_820D7CC0, TrafficCar::Reset sub_820D7AB0, Pool4Object::Pool4Object sub_820D6A70, Release "
+              "sub_820D6A20, ~Pool4Object sub_820D6AD0 and its deleting destructor sub_820D6BC0, "
+              "Wheels::Wheels sub_820D9570, Release sub_820D8E68, ~Wheels sub_820D90B8 and its "
+              "deleting destructor sub_820D95E8) natively instead of through the "
               "translated code (the same writes; checked by --run_harnesses=scene_loaders)");
 
 namespace hooks {
@@ -212,6 +215,19 @@ ITC_SCENE_LOADERS_RESET(SceneLoadersWheelsReset, 820D8B58, WheelsReset)
 ITC_SCENE_LOADERS_RESET(SceneLoadersTrafficLoadsDestruct, 820D7CC0, TrafficLoadsDestruct)
 ITC_SCENE_LOADERS_RESET(SceneLoadersTrafficReset, 820D7AB0, TrafficReset)
 
+ITC_SCENE_LOADERS_CONSTRUCT(SceneLoadersPool4Construct, 820D6A70,
+                            Pool4Construct(base, ctx.r3.u32, ctx.r4.u32))
+ITC_SCENE_LOADERS_RESET(SceneLoadersPool4Release, 820D6A20, Pool4Release)
+ITC_SCENE_LOADERS_CONSTRUCT(SceneLoadersPool4Destruct, 820D6AD0, Pool4Destruct(base, ctx.r3.u32))
+ITC_SCENE_LOADERS_CONSTRUCT(SceneLoadersPool4DeletingDestruct, 820D6BC0,
+                            Pool4DeletingDestruct(base, ctx.r3.u32, ctx.r4.u32))
+ITC_SCENE_LOADERS_CONSTRUCT(SceneLoadersWheelsConstruct, 820D9570,
+                            WheelsConstruct(base, ctx.r3.u32, ctx.r4.u32))
+ITC_SCENE_LOADERS_RESET(SceneLoadersWheelsRelease, 820D8E68, WheelsRelease)
+ITC_SCENE_LOADERS_CONSTRUCT(SceneLoadersWheelsDestruct, 820D90B8, WheelsDestruct(base, ctx.r3.u32))
+ITC_SCENE_LOADERS_CONSTRUCT(SceneLoadersWheelsDeletingDestruct, 820D95E8,
+                            WheelsDeletingDestruct(base, ctx.r3.u32, ctx.r4.u32))
+
 }  // namespace hooks
 
 // The adapters: the register steps above, or the originals with the flag
@@ -262,3 +278,11 @@ ITC_SCENE_LOADERS(820D8B58, SceneLoadersWheelsReset)
 ITC_SCENE_LOADERS(820D7C40, SceneLoadersTrafficLoadsConstruct)
 ITC_SCENE_LOADERS(820D7CC0, SceneLoadersTrafficLoadsDestruct)
 ITC_SCENE_LOADERS(820D7AB0, SceneLoadersTrafficReset)
+ITC_SCENE_LOADERS(820D6A70, SceneLoadersPool4Construct)
+ITC_SCENE_LOADERS(820D6A20, SceneLoadersPool4Release)
+ITC_SCENE_LOADERS(820D6AD0, SceneLoadersPool4Destruct)
+ITC_SCENE_LOADERS(820D6BC0, SceneLoadersPool4DeletingDestruct)
+ITC_SCENE_LOADERS(820D9570, SceneLoadersWheelsConstruct)
+ITC_SCENE_LOADERS(820D8E68, SceneLoadersWheelsRelease)
+ITC_SCENE_LOADERS(820D90B8, SceneLoadersWheelsDestruct)
+ITC_SCENE_LOADERS(820D95E8, SceneLoadersWheelsDeletingDestruct)

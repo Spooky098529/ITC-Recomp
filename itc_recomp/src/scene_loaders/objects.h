@@ -137,4 +137,52 @@ std::optional<uint32_t> TrafficReset(uint8_t* base, uint32_t traffic);
 // Model::Release would go to the original.
 std::optional<uint32_t> Pool4Reset(uint8_t* base, uint32_t object);
 
+// --- The lifetimes: constructors, releases, destructors ---
+//
+// The destructors leave r3 the object (as PoolNode::~PoolNode leaves it).
+// The deleting destructors (each class's vtable slot 0; ScenePools' teardown
+// calls it with flags 0 before freeing the pages) run the destructor; with
+// bit 0 of the flags (operator delete after it, never seen in play) they
+// return false with nothing done, and the original runs.
+
+// The pool objects' base vtable, set before PoolNode::~PoolNode.
+constexpr uint32_t kPoolObjectVtable = 0x82004F90;
+constexpr uint32_t kPool4Vtable = 0x82005064;
+constexpr uint32_t kWheelsVtable = 0x82005100;
+
+// Pool4Object::Pool4Object (sub_820D6A70): PoolNode::PoolNode (r4 = the
+// list), +16 = 0, the vtable, +20 = -1; the part model (PartModel::PartModel,
+// +112); Pool4Object::Reset. False, with nothing done, where a callee would
+// go to the original.
+bool Pool4Construct(uint8_t* base, uint32_t object, uint32_t list);
+// Pool4Object::Release (sub_820D6A20): LoadSlot::ReleaseBuffer (+80),
+// Model::Release (+112), Pool4Object::Reset. Returns the original's r3
+// (Reset's); nullopt, with nothing done, where a callee would go to the
+// original.
+std::optional<uint32_t> Pool4Release(uint8_t* base, uint32_t object);
+// Pool4Object::~Pool4Object (sub_820D6AD0): the vtable, ReleaseBuffer (+80),
+// Model::Release (+112), Pool4Object::Reset, PartModel::~PartModel (+112),
+// the base vtable, PoolNode::~PoolNode. False, with nothing done, where a
+// callee would go to the original.
+bool Pool4Destruct(uint8_t* base, uint32_t object);
+// sub_820D6BC0 (the deleting destructor): Pool4Destruct (see above).
+bool Pool4DeletingDestruct(uint8_t* base, uint32_t object, uint32_t flags);
+
+// Wheels::Wheels (sub_820D9570): PoolNode::PoolNode (r4 = the list), +16 =
+// 0, the vtable, +20 = -1; sub_820D3B38 on +72 and +84 (the record's +44 and
+// +56); WheelsLoads::WheelsLoads (+192); Wheels::Reset. False, with nothing
+// done, where a callee would go to the original.
+bool WheelsConstruct(uint8_t* base, uint32_t wheels, uint32_t list);
+// Wheels::Release (sub_820D8E68): LoadSlot::ReleaseBuffer on +192, +1168,
+// +2144, +2280, then the same + 24; Wheels::Reset. Returns the original's r3
+// (Reset's); nullopt, with nothing done, where a callee would go to the
+// original (two slots freeing the same pages included).
+std::optional<uint32_t> WheelsRelease(uint8_t* base, uint32_t wheels);
+// Wheels::~Wheels (sub_820D90B8): the vtable, Wheels::Release,
+// WheelsLoads::~WheelsLoads (+192), the base vtable, PoolNode::~PoolNode.
+// False, with nothing done, where a callee would go to the original.
+bool WheelsDestruct(uint8_t* base, uint32_t wheels);
+// sub_820D95E8 (the deleting destructor): WheelsDestruct.
+bool WheelsDeletingDestruct(uint8_t* base, uint32_t wheels, uint32_t flags);
+
 }  // namespace scene_loaders

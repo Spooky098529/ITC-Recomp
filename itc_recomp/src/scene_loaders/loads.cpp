@@ -260,6 +260,16 @@ std::optional<uint32_t> WheelsLoadsReset(uint8_t* base, uint32_t loads) {
   return r3;
 }
 
+bool WheelsLoadsMembersDestructible(uint8_t* base, uint32_t loads) {
+  for (uint32_t offset : kWheelsModels) {
+    if (!models::ModelMembersDestructible(base, loads + offset)) {
+      return false;
+    }
+  }
+  return ProviderDestructible(base, loads + kWheelsProviders) &&
+         ProviderDestructible(base, loads + kWheelsProviders + 20);
+}
+
 std::optional<uint32_t> WheelsLoadsDestruct(uint8_t* base, uint32_t loads) {
   ITC_NATIVE_RUNNING("sub_820D9010 WheelsLoads::~WheelsLoads");
   uint64_t nodes = 4;

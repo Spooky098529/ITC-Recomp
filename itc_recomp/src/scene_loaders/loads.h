@@ -105,6 +105,11 @@ std::optional<uint32_t> WheelsLoadsReset(uint8_t* base, uint32_t loads);
 // destructor would go to the original.
 std::optional<uint32_t> WheelsLoadsDestruct(uint8_t* base, uint32_t loads);
 
+// Whether WheelsLoadsDestruct's members run natively (the six part models'
+// members and the two providers' storage; the pending frees apart): for the
+// wheels' destructor, which checks before its release.
+bool WheelsLoadsMembersDestructible(uint8_t* base, uint32_t loads);
+
 // The texture provider's slot 2 (TextureProvider::ClearAll, sub_82594328),
 // the one the loads' resets call through each provider's vtable.
 constexpr uint32_t kTextureProviderClearAll = 0x82594328;

@@ -1234,6 +1234,182 @@ void WheelsAndTraffic(Context& h, Random& r, uint32_t block) {
   Put(h.base, sl::kFirstSet, saved_set);
 }
 
+// --- The objects' lifetimes ---
+//
+// Table-driven, as the cockpit's cases: each class's object at the block's
+// +0x400, its list at +0x2400, the blocks' headers at +0x2800. The
+// constructors run on random bytes (r4 a list of 0 to 3 nodes); the
+// releases and destructors on an object the plain C++ constructor made on
+// an empty list, with blocks for the releases to put off (the XPRs' and,
+// now and then, one part model's: at most eight nodes), the slots' buffers
+// (pages each side allocates, shared or not) and the skeleton's node values.
+// The deleting destructors with flags 0 or 2 (bit 0, operator delete, never
+// seen in play, is left to the original).
+struct ObjectLayout {
+  bool (*make)(uint8_t*, uint32_t object, uint32_t list);
+  std::vector<uint32_t> providers;  // in the object
+  std::vector<uint32_t> xprs;       // in the object
+  std::vector<uint32_t> models;     // part models in the object
+  std::vector<uint32_t> slots;      // the slots the release frees
+  uint32_t values;                  // the skeleton's node values (0: none)
+};
+
+void Lifetimes(Context& h, Random& r, uint32_t block) {
+  if (!hooks::ModelsHostLock()) {
+    ITC_LOG_WARN("harness: scene_loaders: --native_models was off at start-up: the lifetimes' "
+                 "cases skipped");
+    return;
+  }
+  std::lock_guard<std::recursive_mutex> lock(models::MemoryBlocksMutex());
+  constexpr uint32_t kBytes = 0x3000;
+  const uint32_t object = block + 0x400;
+  const uint32_t list = block + 0x2400;
+  const uint32_t headers = block + 0x2800;
+  const uint32_t saved_set = guest::LoadU32(h.base, sl::kFirstSet);
+  ObjectLayout pool4{sl::Pool4Construct, {}, {}, {112}, {80}, 0};
+  ObjectLayout wheels{sl::WheelsConstruct, {}, {}, {}, {}, 0};
+  for (uint32_t i = 0; i < 2; i++) {
+    wheels.providers.push_back(sl::kWheelsLoads + sl::kWheelsProviders + 20 * i);
+    wheels.xprs.push_back(sl::kWheelsLoads + sl::kWheelsXprs + 24 * i);
+  }
+  for (uint32_t offset : {sl::kWheelsTires, sl::kWheelsTires + 464, sl::kWheelsRims,
+                          sl::kWheelsRims + 464, sl::kWheelsCalipers, sl::kWheelsCalipers + 464}) {
+    wheels.models.push_back(sl::kWheelsLoads + offset);
+  }
+  wheels.slots = {192, 1168, 2144, 2280, 216, 1192, 2168, 2304};
+  enum Kind { kConstruct, kRelease, kDestruct };
+  struct Function {
+    const char* name;
+    GuestFunction recompiled;
+    GuestFunction native;
+    Kind kind;
+    const ObjectLayout* layout;
+    bool deleting;
+  };
+  const Function functions[] = {
+      {"Pool4Object::Pool4Object (sub_820D6A70, on the game's list)", __imp__sub_820D6A70,
+       hooks::SceneLoadersPool4Construct, kConstruct, &pool4, false},
+      {"Pool4Object::Release (sub_820D6A20, on the game's list)", __imp__sub_820D6A20,
+       hooks::SceneLoadersPool4Release, kRelease, &pool4, false},
+      {"Pool4Object::~Pool4Object (sub_820D6AD0, on the game's list)", __imp__sub_820D6AD0,
+       hooks::SceneLoadersPool4Destruct, kDestruct, &pool4, false},
+      {"Pool4Object's deleting destructor (sub_820D6BC0, on the game's list)", __imp__sub_820D6BC0,
+       hooks::SceneLoadersPool4DeletingDestruct, kDestruct, &pool4, true},
+      {"Wheels::Wheels (sub_820D9570, on the game's list)", __imp__sub_820D9570,
+       hooks::SceneLoadersWheelsConstruct, kConstruct, &wheels, false},
+      {"Wheels::Release (sub_820D8E68, on the game's list)", __imp__sub_820D8E68,
+       hooks::SceneLoadersWheelsRelease, kRelease, &wheels, false},
+      {"Wheels::~Wheels (sub_820D90B8, on the game's list)", __imp__sub_820D90B8,
+       hooks::SceneLoadersWheelsDestruct, kDestruct, &wheels, false},
+      {"Wheels' deleting destructor (sub_820D95E8, on the game's list)", __imp__sub_820D95E8,
+       hooks::SceneLoadersWheelsDeletingDestruct, kDestruct, &wheels, true},
+  };
+  for (const Function& f : functions) {
+    const ObjectLayout& l = *f.layout;
+    std::vector<uint32_t> providers;
+    for (const uint32_t offset : l.providers) {
+      providers.push_back(object + offset);
+    }
+    for (const uint32_t offset : l.models) {
+      providers.push_back(object + offset + models::kModelTextures);
+    }
+    Results results(f.name);
+    for (int c = 0; c < 24; c++) {
+      const uint64_t seed = r.Next();
+      const uint32_t set = uint32_t(r.Next());
+      Outputs out[2];
+      for (int v = 0; v < 2; v++) {
+        Random in(seed);
+        RandomBytes(h.base, block, kBytes, in);
+        Put(h.base, sl::kFirstSet, set);
+        std::unordered_set<uint32_t> held;
+        std::vector<uint32_t> storages;
+        MakeList(h.base, list, list + 0x100, f.kind == kConstruct ? in.Below(4) : 0);
+        if (f.kind != kConstruct) {
+          if (!l.make(h.base, object, list)) {
+            ITC_LOG_WARN("harness: scene_loaders: an object's constructor refused");
+            return;
+          }
+          for (const uint32_t provider : providers) {
+            storages.push_back(guest::LoadU32(
+                h.base, provider + models::kTextureProviderVector + models::kVectorFirst));
+          }
+          for (uint32_t i = 0; i < l.xprs.size(); i++) {
+            for (uint32_t b = 0; b < 2; b++) {
+              const uint32_t words[3] = {uint32_t(in.Next()), uint32_t(in.Next()),
+                                         uint32_t(in.Next())};
+              Put(h.base, object + l.xprs[i] + 8 * b,
+                  pending_frees::WriteBlock(h.base, in.Below(3), headers + 32 * i + 16 * b,
+                                            words));
+            }
+          }
+          if (!l.models.empty() && in.Below(2) == 0) {
+            PutBlocks(h.base, object + l.models[in.Below(uint32_t(l.models.size()))],
+                      headers + 0x100, in);
+          }
+          for (const uint32_t offset : l.slots) {
+            Put(h.base, object + offset + 12, in.Below(4) == 0 ? 1 : 0);
+            uint32_t pages = 0;
+            if (in.Below(3) == 0) {
+              pages = memory::AllocPages(1 + in.Below(0x4000), 4096);
+              held.insert(pages);
+            }
+            Put(h.base, object + offset + 16, pages);
+          }
+          if (l.values != 0) {
+            uint32_t values = 0;
+            if (in.Below(2) == 0) {
+              values = memory::Alloc(48, 0);
+              held.insert(values);
+            }
+            Put(h.base, object + l.values, values);
+          }
+        }
+        const pending_frees::ListState was = pending_frees::SaveList(h.base);
+        PPCContext t = CallContext(h);
+        t.r1.u64 &= ~0xFull;
+        t.r3.u64 = object;
+        t.r4.u64 = f.deleting ? 2 * in.Below(2) : list;
+        RunSide(v, f.recompiled, f.native, t, h.base);
+        pending_frees::TakeAddedNodes(h.base, was, out[v]);
+        for (const uint32_t address : held) {
+          const bool pages = memory::IsPages(address);
+          const bool alive = pages || memory::IsHeapBlock(address);
+          out[v].Word(alive);
+          if (pages) {
+            memory::FreePages(address);
+          } else if (alive) {
+            memory::Free(address);
+          }
+        }
+        if (f.kind == kDestruct) {
+          for (const uint32_t storage : storages) {
+            const bool alive = storage != 0 && memory::IsHeapBlock(storage);
+            out[v].Word(alive);
+            if (alive) {
+              memory::crt::OperatorDelete(storage);
+            }
+            held.insert(storage);
+          }
+        } else {
+          for (const uint32_t provider : providers) {
+            TakeProvider(h.base, provider, out[v]);
+          }
+        }
+        held.erase(0);
+        Mark(h.base, block, kBytes, held);
+        out[v].Bytes(Read(h.base, block, kBytes));
+        out[v].Word(guest::LoadU32(h.base, sl::kFirstSet));
+        out[v].Word(t.r3.u32);
+        out[v].Word(uint32_t(t.r3.u64 >> 32));
+      }
+      results.Check(out[0], out[1], fmt::format("case {}", c));
+    }
+    results.Report();
+  }
+  Put(h.base, sl::kFirstSet, saved_set);
+}
+
 }  // namespace
 
 void SceneLoaders(Context& h) {
@@ -1249,6 +1425,7 @@ void SceneLoaders(Context& h) {
   Parts(h, r, block);
   Cockpits(h, r, block);
   WheelsAndTraffic(h, r, block);
+  Lifetimes(h, r, block);
   memory::Free(allocation);
 }
 

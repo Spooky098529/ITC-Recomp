@@ -356,11 +356,13 @@ bool InteriorConstruct(uint8_t* base, uint32_t interior, uint32_t list) {
 
 // --- The wheels and the traffic body ---
 
-std::optional<uint32_t> WheelsReset(uint8_t* base, uint32_t wheels) {
-  ITC_NATIVE_RUNNING("sub_820D8B58 Wheels::Reset");
+namespace {
+
+// WheelsLoads::Reset's pending frees' nodes (the XPRs' four and the six
+// models'), or nullopt where a provider's slot 2 isn't ClearAll; nothing
+// changed.
+std::optional<uint64_t> WheelsResetNodes(uint8_t* base, uint32_t wheels) {
   const uint32_t loads = wheels + kWheelsLoads;
-  // WheelsLoads::Reset's checks, before anything changes (the record's
-  // defaults don't touch what they read).
   uint64_t nodes = 4;
   for (uint32_t offset : {kWheelsTires, kWheelsTires + 464, kWheelsRims, kWheelsRims + 464,
                           kWheelsCalipers, kWheelsCalipers + 464}) {
@@ -372,7 +374,22 @@ std::optional<uint32_t> WheelsReset(uint8_t* base, uint32_t wheels) {
       return std::nullopt;
     }
   }
-  if (nodes > 0x3FFFFFFFu || !models::PendingFreesHaveRoom(base, uint32_t(nodes))) {
+  return nodes;
+}
+
+bool Room(uint8_t* base, uint64_t nodes) {
+  return nodes <= 0x3FFFFFFFu && models::PendingFreesHaveRoom(base, uint32_t(nodes));
+}
+
+}  // namespace
+
+std::optional<uint32_t> WheelsReset(uint8_t* base, uint32_t wheels) {
+  ITC_NATIVE_RUNNING("sub_820D8B58 Wheels::Reset");
+  const uint32_t loads = wheels + kWheelsLoads;
+  // WheelsLoads::Reset's checks, before anything changes (the record's
+  // defaults don't touch what they read).
+  const auto nodes = WheelsResetNodes(base, wheels);
+  if (!nodes || !Room(base, *nodes)) {
     return std::nullopt;
   }
   Store(base, wheels + 24, 0);
@@ -430,6 +447,165 @@ std::optional<uint32_t> Pool4Reset(uint8_t* base, uint32_t object) {
   models::PartModelClear(base, model);
   Store(base, object + 576, Load(base, kFirstSet));
   return model;
+}
+
+// --- The lifetimes ---
+
+namespace {
+
+// The pool node's part of a constructor: PoolNode::PoolNode, then +16 = 0,
+// the vtable, +20 = -1 (the originals' order).
+void ConstructNode(uint8_t* base, uint32_t object, uint32_t list, uint32_t vtable) {
+  PoolNodeConstruct(base, object, list);
+  Store(base, object + 16, 0);
+  Store(base, object + 0, vtable);
+  Store(base, object + 20, 0xFFFFFFFFu);
+}
+
+// The end of every destructor: the base vtable, PoolNode::~PoolNode.
+void DestructNode(uint8_t* base, uint32_t object) {
+  Store(base, object + 0, kPoolObjectVtable);
+  PoolNodeDestruct(base, object);
+}
+
+// A fresh part model's Model::Release (after its constructor): the XPR's two
+// nodes, the blocks all 0.
+constexpr uint64_t kFreshNodes = 2;
+
+// The wheels' eight slots in Wheels::Release's order.
+constexpr uint32_t kWheelsSlots[] = {192, 1168, 2144, 2280, 216, 1192, 2168, 2304};
+
+}  // namespace
+
+bool Pool4Construct(uint8_t* base, uint32_t object, uint32_t list) {
+  ITC_NATIVE_RUNNING("sub_820D6A70 Pool4Object::Pool4Object");
+  if (!models::CanAllocatePointers(base, models::kTextureProviderSlots) ||
+      !Room(base, kFreshNodes)) {
+    return false;
+  }
+  ConstructNode(base, object, list, kPool4Vtable);
+  Require(models::PartModelConstruct(base, object + 112), "PartModel::PartModel");
+  Require(Pool4Reset(base, object).has_value(), "Pool4Object::Reset");
+  return true;
+}
+
+namespace {
+
+// Pool4Object::Release's checks (nothing changed), with `extra` nodes more
+// for what follows it: the slot's buffer, then room for Model::Release's
+// nodes and Pool4Object::Reset's (a released model's two).
+bool Pool4Releasable(uint8_t* base, uint32_t object, uint64_t extra) {
+  uint32_t freed = 0;
+  return car_models::LoadSlotReleasable(base, object + 80, &freed) &&
+         Room(base, models::ModelReleaseNodes(base, object + 112) + kFreshNodes + extra);
+}
+
+// Pool4Object::Release's work, its checks made.
+uint32_t Pool4ReleaseWork(uint8_t* base, uint32_t object) {
+  Require(car_models::LoadSlotReleaseBuffer(base, object + 80).has_value(),
+          "LoadSlot::ReleaseBuffer");
+  Require(models::ModelRelease(base, object + 112).has_value(), "Model::Release");
+  const auto r3 = Pool4Reset(base, object);
+  Require(r3.has_value(), "Pool4Object::Reset");
+  return *r3;
+}
+
+}  // namespace
+
+std::optional<uint32_t> Pool4Release(uint8_t* base, uint32_t object) {
+  ITC_NATIVE_RUNNING("sub_820D6A20 Pool4Object::Release");
+  if (!Pool4Releasable(base, object, 0)) {
+    return std::nullopt;
+  }
+  return Pool4ReleaseWork(base, object);
+}
+
+bool Pool4Destruct(uint8_t* base, uint32_t object) {
+  ITC_NATIVE_RUNNING("sub_820D6AD0 Pool4Object::~Pool4Object");
+  // The model's members aren't touched by its release; ~Model releases a
+  // released model again (two nodes).
+  if (!models::ModelMembersDestructible(base, object + 112) ||
+      !Pool4Releasable(base, object, kFreshNodes)) {
+    return false;
+  }
+  Store(base, object + 0, kPool4Vtable);
+  Pool4ReleaseWork(base, object);
+  Require(models::PartModelDestruct(base, object + 112).has_value(), "PartModel::~PartModel");
+  DestructNode(base, object);
+  return true;
+}
+
+bool Pool4DeletingDestruct(uint8_t* base, uint32_t object, uint32_t flags) {
+  ITC_NATIVE_RUNNING("sub_820D6BC0 Pool4Object::DeletingDestructor");
+  return (flags & 1) == 0 && Pool4Destruct(base, object);
+}
+
+bool WheelsConstruct(uint8_t* base, uint32_t wheels, uint32_t list) {
+  ITC_NATIVE_RUNNING("sub_820D9570 Wheels::Wheels");
+  // WheelsLoads::WheelsLoads' check, and Wheels::Reset's on the fresh loads
+  // (the providers' vtable's slot 2, the XPRs' four nodes and the six fresh
+  // models').
+  if (!models::CanAllocatePointers(base, models::kTextureProviderSlots) ||
+      Load(base, models::kTextureProviderVtable + 8) != kTextureProviderClearAll ||
+      !Room(base, 4 + 6 * kFreshNodes)) {
+    return false;
+  }
+  ConstructNode(base, wheels, list, kWheelsVtable);
+  scene_models::Record12Reset(base, wheels + 28 + 44);
+  scene_models::Record12Reset(base, wheels + 28 + 56);
+  Require(WheelsLoadsConstruct(base, wheels + kWheelsLoads), "WheelsLoads::WheelsLoads");
+  Require(WheelsReset(base, wheels).has_value(), "Wheels::Reset");
+  return true;
+}
+
+namespace {
+
+// Wheels::Release's checks (nothing changed), with `extra` nodes more for
+// what follows it.
+bool WheelsReleasable(uint8_t* base, uint32_t wheels, uint64_t extra) {
+  const auto nodes = WheelsResetNodes(base, wheels);
+  return AllReleasable(base, wheels, kWheelsSlots) && nodes && Room(base, *nodes + extra);
+}
+
+uint32_t WheelsReleaseWork(uint8_t* base, uint32_t wheels) {
+  for (uint32_t offset : kWheelsSlots) {
+    Require(car_models::LoadSlotReleaseBuffer(base, wheels + offset).has_value(),
+            "LoadSlot::ReleaseBuffer");
+  }
+  const auto r3 = WheelsReset(base, wheels);
+  Require(r3.has_value(), "Wheels::Reset");
+  return *r3;
+}
+
+}  // namespace
+
+std::optional<uint32_t> WheelsRelease(uint8_t* base, uint32_t wheels) {
+  ITC_NATIVE_RUNNING("sub_820D8E68 Wheels::Release");
+  if (!WheelsReleasable(base, wheels, 0)) {
+    return std::nullopt;
+  }
+  return WheelsReleaseWork(base, wheels);
+}
+
+bool WheelsDestruct(uint8_t* base, uint32_t wheels) {
+  ITC_NATIVE_RUNNING("sub_820D90B8 Wheels::~Wheels");
+  // ~WheelsLoads after the reset: the XPRs' four nodes and the six released
+  // models' two each; the members aren't touched by the release.
+  if (!WheelsLoadsMembersDestructible(base, wheels + kWheelsLoads) ||
+      !WheelsReleasable(base, wheels, 4 + 6 * kFreshNodes)) {
+    return false;
+  }
+  Store(base, wheels + 0, kWheelsVtable);
+  WheelsReleaseWork(base, wheels);
+  Require(WheelsLoadsDestruct(base, wheels + kWheelsLoads).has_value(),
+          "WheelsLoads::~WheelsLoads");
+  DestructNode(base, wheels);
+  return true;
+}
+
+bool WheelsDeletingDestruct(uint8_t* base, uint32_t wheels, uint32_t flags) {
+  ITC_NATIVE_RUNNING("sub_820D95E8 Wheels::DeletingDestructor");
+  return (flags & 1) == 0 && WheelsDestruct(base, wheels);
 }
 
 }  // namespace scene_loaders
