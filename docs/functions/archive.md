@@ -62,6 +62,21 @@ object (`sub_820A6A00`, `sub_820A6A40`, a lead), the open by name
 indirectly from the loader thread (`sub_8209D688`): about 20 of the
 loads' own functions, some already ours (`car-specs.md`).
 
+Native so far (`src/archive/`, adapters in `src/hooks/archive.cpp`,
+`--native_archive`, harness `archive`; B7's twentieth loop run): the TOC
+lookups, the request list's append and remove, the slot lookup, the loose
+files' lookup, the queue's and the slots' static set-ups, the request
+finish (its callback and `LoaderFunctor::Invoke`'s target called through
+`ctx`), and `Ucl::Unpack` with its NRV2B block decoder (checked on
+compressed assets read from `BUILD.DAT` too). Left recompiled, waiting on
+how the four semaphores go (a call pending with the user): `Archive::Load`
+and the queueing, `WaitIdle`, `QueueLength`, `CancelQueued`, `sub_8209DB20`,
+the picker, the set-up, the next request and the loose read (the
+`Semaphore` class, `sub_82592670` and `sub_825926E8`, with its events and
+critical sections under it). The harness takes the game's queue lock
+(through the translated `Semaphore` functions) around the cases that read
+or write the game's queue and slots.
+
 Status:
 
 - **Native**: plain C++ in `itc_recomp/src/` that doesn't use the
