@@ -127,7 +127,11 @@ goes in `src/` as overrides), American English.
   objects as far as they were ready with their blockers in
   `car-models.md` and `models.md` (`scene-loaders.md`, 60 of 78; a lead
   without mapping) and the players' save data in memory in full
-  (`save-data.md`; ours 2,400). The
+  (`save-data.md`; ours 2,400); its nineteenth run (branch
+  `b7-loop-28-10-26`, stopped by a validation's harness gap) made
+  texture compression (`texture-compression.md`) and the vinyl sheet
+  above it (`car-models.md`, two leads without mapping) native (ours
+  2,447). The
   runs' rows wait for the user's review (`docs/loops/review.md`). See
   "B7's loop runs" under B7, and `docs/loops/b7-progress.md`. Guest
   allocation is no longer a block (`docs/native-memory.md`); what the
@@ -2608,6 +2612,7 @@ B7. **The game logic inside**: everything else, subsystem by subsystem,
 | 2026-10-28 | The scene loaders' blockers (no mapping, not counted: the load slots, the deferred release, the part model, `CarModel::Release` and `Reset`; then the loading classes' constructors, releases and destructors, `ScenePools::CreateA`, `Interior::OnPartLoaded`, `Skeleton::ResetPose`, `Model::SetVinylTextures`, `SetSharedShaders`) | `scene-loaders.md`, with `car-models.md`, `models.md` | `scene-loaders.md` 60 of 78, `car-models.md` 4 of 42, `models.md` 45 of 50 (two migrations; 27 adapters removed) | `--native_car_models` (new), `--native_scene_loaders`, `--native_models` |
 | 2026-10-28 | The players' save data in memory (`SaveData::Create` and `Delete`, the progress's clear and defaults, the stats record, the course records, the options and control maps, the default tables' getters; `TitleScreen::ResetPlayer`, `MenuList::Init`, `Players::ResetControllers`) | `save-data.md` | 19 of 19 in play (one migration; 11 adapters removed; 4 rows not seen in play) | `--native_save_data` |
 | 2026-10-28 | Texture compression (XGraphics' `XGCompressSurface` over D3DX's image blitter, used in play only by `Vinyl::Compress` for the vinyl sheet, A8R8G8B8 to DXT5 premultiplied: the DXT alpha and color block encoders, the DXT4/5 encoders, the A8R8G8B8 and DXT codecs, `ImageCodec::Create`, the blitter) | `texture-compression.md` | 24 of 24 in play (one migration in five batches; 18 adapters removed; 133 rows not seen in play) | `--native_texture_compression` |
+| 2026-10-28 | The vinyl sheet above texture compression (no mapping, not counted: `Vinyl::Compress`, `Texture::Create` and `Free`; then the decal path under `CarModel::OnDecalLoaded`: the TGA reader, the software rasterizer, `Vinyl::DrawDecal`, `DrawDecals`, `ClearCorner`) | `car-models.md` | 27 of 46 (two migrations; 2 adapters removed, `XGCompressSurface` Native; `ClearCorner`'s harness doesn't reach it) | `--native_car_models` |
 
     The first run (2026-10-22, branch `b7-loop-test`): every harness at 0 differing, attract races at 20-21 s with no errors,
     and a race the user drove looked right. Ours went from 162 to 335 (work
@@ -3701,3 +3706,20 @@ waits on two small ready groups). The boundary unchanged: 449 functions
 282. Imports: 186 called, 62 with a live caller. B7 (`b7_status.py`):
 ours 2,424, work left 4,028 (Wrapped 103, with a row 522, no row yet
 3,403), from 4,052.
+
+**2026-10-28, the vinyl sheet (branch `b7-loop-28-10-26`):** two leads
+without mapping in `car-models.md` made `Vinyl::Compress` with
+`Texture::Create` and `Free`, then the decal path under
+`CarModel::OnDecalLoaded` (the TGA reader, the CPU's software
+rasterizer, `Vinyl::DrawDecal` and `DrawDecals`) native under
+`--native_car_models` (`car-models.md` 27 of 46 ours; `XGCompressSurface`
+and `Vinyl::Compress` Native). Paths never seen (RLE TGAs, region
+numbers above 9, memory outside the allocation layer) go to the
+originals. The TGA headers' two unwritten bytes in `DrawDecals`' frame
+differ in the harness (expected to differ, for review). The run
+stopped at the validation: `Vinyl::ClearCorner` `sub_820D3C80` ran in
+play but its harness never reaches it. The boundary unchanged: 449
+functions (916 pairs): overridden 69, Native 5, Dropped 23, never called
+70, live 282. Imports: 186 called, 62 with a live caller. B7
+(`b7_status.py`): ours 2,447, work left 4,006 (Wrapped 103, with a row
+503, no row yet 3,400), from 4,028 (from 4,052 at the run's start).

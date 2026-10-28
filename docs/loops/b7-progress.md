@@ -33,9 +33,16 @@ file's history. What's left to see in a drive, from every run:
   `--native_car_models`, `Vinyl::Compress` Native; `itc_2121`: 19 s,
   0 errors, every harness 0 differing but the expected groups (one
   new, `OnDecalLoaded`'s headers' unwritten bytes); frame dumps the
-  same as the fallback. Validation agent running.
+  same as the fallback. Validated (`itc_2122`): 19 of 20 harness
+  lines, all 20 in the attract race; `Vinyl::ClearCorner`
+  `sub_820D3C80` missing (its harness doesn't reach it): halted.
 
 ## Done
+
+- The vinyl sheet's decal path (no mapping; de91953..c9f00d1):
+  `car-models.md` 27 of 46 ours under `--native_car_models`,
+  `Vinyl::Compress` Native; validation (`itc_2122`) found
+  `ClearCorner`'s harness gap.
 
 - `Vinyl::Compress` (no mapping; 689b0c8, 53ea064): `car-models.md`
   3 more ours under `--native_car_models`, `XGCompressSurface` Native;
@@ -72,7 +79,20 @@ This run's groups: `expected-differences.md` (the "08:36 run" lines).
   (wrapped 103, known 520, unknown 3402).
 - After the decal path's migration: ours 2447, work left 4006
   (wrapped 103, known 503, unknown 3400).
+- At the end (after the decal path's validation, `itc_2122`: race 19
+  s, 0 errors, every harness 0 differing but the expected groups):
+  ours 2447, work left 4006 (wrapped 103, known 503, unknown 3400).
 
 ## Stopped
 
-(not stopped)
+2026-10-28, by "When to halt": the decal path's validation agent
+reported `Vinyl::ClearCorner` `sub_820D3C80` `missing:` (no `native
+running (harness):` line; it ran in play). `CarModel::OnDecalLoaded`'s
+compress cases (`c % 6 == 1` in `DecalLoadCases`,
+`src/harnesses/car_models.cpp`) give the slots not yet arrived a random
+state with `r.Below(3)`, so a slot is almost always loading and it
+returns before `ClearCorner`. To fix: compress cases with no slot
+loading, or a `ClearCorner` case of its own. 1 subsystem of 3 done
+(texture compression), with two leads without mapping (the vinyl
+sheet). `check_function_statuses.py`: 0 errors. Nothing for
+`to-drive.md`.

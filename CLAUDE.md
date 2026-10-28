@@ -311,6 +311,15 @@ data in memory (`save-data.md`, `--native_save_data`, 19 of 19 in play)
 native (ours 2,255 -> 2,400); the rest of the scene loaders waits on
 the material passes, the accessories, `Skeleton`'s local matrices,
 `XPR::GetTexture` and sprintf.
+Its nineteenth run (`b7-loop-28-10-26`, 2026-10-28, not yet merged;
+summary `docs/loops/b7-loop-2026-10-28-0836.md`; 1 subsystem, stopped
+by its validation: `Vinyl::ClearCorner` `sub_820D3C80`'s harness
+doesn't reach it) made texture compression (`texture-compression.md`,
+XGraphics' `XGCompressSurface` over D3DX's blitter,
+`--native_texture_compression`, 24 of 24 in play) and the vinyl sheet
+above it (`Vinyl::Compress` and the decal path with its software
+rasterizer, two leads without mapping in `car-models.md`, under
+`--native_car_models`) native (ours 2,400 -> 2,447).
 Harness runs use `attract_race.sh 40` (the user's call,
 2026-10-23); a race short only because the harnesses took longer is
 no halt.
