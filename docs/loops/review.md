@@ -80,6 +80,23 @@ When the user has reviewed a run's section, its heading gets
   and physical-view destinations to the original (as
   `CarModel::SetRecord`). `MakeA` and `sub_820D0960` run natively only
   over the allocation layer.
+- The scene loaders' blockers (no mapping; e9e8e77..effc3f0): rows in
+  `car-models.md` (`sub_820D0730`, `sub_820D0758`, `sub_820C3F50`,
+  `sub_820D4508`, and a line in its intro), `models.md` (`sub_820CE928`,
+  `sub_820CE990`, `sub_820CE9C8`) and 19 in `scene-loaders.md`; new
+  flag `--native_car_models` (`src/car_models/`); the part model under
+  `--native_models`; `models/model.h` exposes `ModelReleaseNodes` and
+  `ModelMembersDestructible`. Choices: the provider's slot 2 is called
+  natively only when it is `TextureProvider::ClearAll` `sub_82594328`,
+  otherwise the whole function runs the original; matrices the
+  originals build on their stack and copy with memcpy are written
+  straight into place (their frames not written), and a car model at or
+  above the physical views (`0xA0000000`) runs the original so memcpy's
+  override still records the copies for the renderer; a function whose
+  slots would free the same pages twice runs the original. The
+  harnesses' recompiled side runs with all three flags off. Frame dumps
+  after batch 5: 2,414 draws against 2,412 with the flags off, the off
+  run's frame captured a moment later (the same after batch 2).
 
 ## Run 2026-10-25 23:42 (`b7-loop-25-10-26-4`)
 

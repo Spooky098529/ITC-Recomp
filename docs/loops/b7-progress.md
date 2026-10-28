@@ -60,8 +60,17 @@ file's history. What's left to see in a drive, from every run:
   each ready (`LoadSlot::Reset` `sub_820D0730`, `ReleaseBuffer`
   `sub_820D0758`, `sub_820C3F50`, `CarModel::Release` `sub_820D4508` in
   `car-models.md`; `sub_820CE928`, `sub_820CE990`, `sub_820CE9C8` in
-  `models.md`) and what they unblock in `scene-loaders.md`. Step:
-  migration agent 1 running.
+  `models.md`) and what they unblock in `scene-loaders.md`. Migration 1
+  done after five batches (e9e8e77..effc3f0: the load slots, the
+  deferred release, the part model, `CarModel::Release` and `Reset`,
+  and the car parts', pool 4's, cockpit's, interior's, wheels' and
+  traffic body's lifetimes; 2 adapters removed, 2 Native with none;
+  `--native_car_models`; `itc_2033`: 23 s, 0 errors, every harness 0
+  differing but the expected groups; frame dumps the same as the
+  fallback). `scene-loaders.md` 39 of 78 ours, `car-models.md` 4 of 42,
+  `models.md` 42 of 50. Left ready: `ScenePools::CreateA` `sub_820C3FD8`
+  and its callees, and 12 more groups in `scene-loaders.md`. Step:
+  validation agent 1 running.
 
 ## Done
 
@@ -110,5 +119,7 @@ This run's groups: `expected-differences.md` (the "22:31 run" lines).
 - After the scene loaders' validation: race 22 s (`itc_2022`), 0
   errors, every harness 0 differing but the expected groups; replay
   127 s (`itc_2023`), 0 errors.
+- After the scene loaders' blockers' migration 1: ours 2357, work left
+  4095 (wrapped 103, known 547, unknown 3445).
 
 ## Stopped
