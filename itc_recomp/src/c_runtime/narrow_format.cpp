@@ -537,6 +537,7 @@ bool Vsnprintf(uint8_t* base, uint32_t buffer, uint32_t size, uint32_t format, u
   if (!Format(base, buffer, room, format, args, frame, count)) {
     return false;
   }
+  ITC_NATIVE_RUNNING("sub_825AB010 _vsnprintf");
   ITC_NATIVE_RUNNING("sub_825AAF18 _vsnprintf_l");
   return true;
 }
