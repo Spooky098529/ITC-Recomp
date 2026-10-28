@@ -54,8 +54,16 @@ file's history. What's left to see in a drive, from every run:
   start placements, the save's distance on unload; 5b6d76c; 1 lead
   added). Map checked (0 errors, 22 ready groups, blocked outside by
   `TrackCollision::Tick` `sub_820FF050` (ready) and the archive's
-  `sub_8209DE48`, `sub_820A0678`; no kernel calls). Migration agent 1
-  running.
+  `sub_8209DE48`, `sub_820A0678`; no kernel calls). Migration 1 done
+  (4824fa1..1472716, four batches): the leaves, the manager's tables,
+  the vehicles' tick with `TrackCollision::Tick` (`collision-world.md`),
+  `RaceWorld::Init`; 24 ours in `race-world.md`, 2 adapters removed;
+  `--native_race_world`; `itc_2138`: 17 s (the harnesses 21 s), 0
+  errors, every harness 0 differing but the expected groups; frame
+  dumps the same as the fallback (`itc_2133`, `itc_2134`). Left ready:
+  `ResetWorld`, `ResetVehicles`, `Unload`, the event's start
+  placements, `RaceStart::Place`, `AddRacers`, `ListRacers` and the
+  big ticks (split). Validation agent running.
 
 ## Done
 
@@ -104,6 +112,8 @@ This run's groups: `expected-differences.md` (the "08:36 run" lines).
   ours 2447, work left 4006 (wrapped 103, known 503, unknown 3400).
 - After the race world's map: ours 2447, work left 4006 (wrapped 103,
   known 548, unknown 3355).
+- After the race world's migration 1: ours 2472, work left 3982
+  (wrapped 103, known 524, unknown 3355).
 
 ## Stopped
 

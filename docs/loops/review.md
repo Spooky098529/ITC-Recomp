@@ -97,6 +97,19 @@ When the user has reviewed a run's section, its heading gets
   `0x826D82F4` extended, two new rows; `leads.md`: lead 31 deleted (all
   mapped here), `sub_82174D28` dropped from lead 50, one lead added (the
   race's other states); `ai-drivers.md`: three notes repointed.
+- The race world, migration 1 (4824fa1..1472716): 25 rows in
+  `race-world.md` (24 ours, 2 Native, `sub_821708B4` Merged) and
+  `TrackCollision::Tick` `sub_820FF050` in `collision-world.md` (under
+  `--native_collision_world`). Code in `src/race_world/`,
+  `src/track_collision/track_world.cpp`. Map corrections:
+  `RaceManager::BranchesMeet` returns 1 when r4 is 0 or 29 or the same
+  branch as r3 (its case table in the row); `ResetVehicles` calls
+  `Vehicle::SetUp` for slot -1 and `ResetForCar` otherwise. Refactors
+  with no behavior change: the guest-call lambdas of the vehicle and
+  car physics adapters moved into shared functions
+  (`hooks::VehicleTickCalls`, `VehicleSetUpOriginals`,
+  `CollisionWorldUpdateCalls`, new `src/hooks/car_physics.h`); the
+  vehicle and car physics harnesses export set-up helpers.
 
 ## Run 2026-10-27 22:31 (`b7-loop-27-10-26`)
 
