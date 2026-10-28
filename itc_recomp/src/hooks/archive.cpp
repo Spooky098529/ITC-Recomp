@@ -254,16 +254,6 @@ extern "C" REX_FUNC(sub_8209DE48) {
                                                          ctx.r8.u32)));
 }
 
-// The queueing: r3 = the 40-byte request; r3 the serial or -1.
-extern "C" REX_FUNC(sub_8209DC18) {
-  ITC_ARCHIVE_QUEUE_FALLBACK(8209DC18)
-  archive::LoadRequest request;
-  for (uint32_t i = 0; i < 40; i++) {
-    request[i] = guest::LoadU8(base, ctx.r3.u32 + i);
-  }
-  SetSerial(ctx, archive::Queue(base, request));
-}
-
 // Archive::WaitIdle, Archive::CancelQueued (r3 = whether to wait): r3 read by
 // no caller.
 extern "C" REX_FUNC(sub_8209D730) {
