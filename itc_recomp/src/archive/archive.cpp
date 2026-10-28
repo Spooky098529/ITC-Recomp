@@ -4,6 +4,7 @@
 
 #include "base/log.h"
 #include "guest.h"
+#include "hooks/heap.h"
 
 namespace archive {
 
@@ -126,6 +127,40 @@ uint32_t FindLooseFile(uint8_t* base, uint32_t id) {
       return path;
     }
   }
+}
+
+// --- The loader thread's pieces ---
+
+std::optional<uint32_t> FinishRequest(uint8_t* base, uint32_t request,
+                                      const FinishCalls& calls) {
+  ITC_NATIVE_RUNNING("sub_8209D688 Archive::FinishRequest");
+  uint32_t flags = LoadU32(base, request + 12);
+  if ((flags & 0x100) && !(flags & 0x8)) {
+    StoreU32(base, kStagingInUse, LoadU32(base, request + 76));
+    StoreU32(base, request + 76, LoadU32(base, request + 88));
+  }
+  if (LoadU32(base, request + 12) & 0x2000) {
+    const uint32_t serial = LoadU32(base, request + 8);
+    StoreU32(base, kCallbackSerial, serial);
+    calls.callback(calls.user, LoadU32(base, request + 48), serial, LoadU32(base, request + 76),
+                   LoadU32(base, request + 32), LoadU32(base, request + 44));
+  }
+  flags = LoadU32(base, request + 12);
+  if ((flags & 0x2) && !(flags & 0x1000)) {
+    constexpr uint32_t kMemDecommit = 0x4000;
+    const uint32_t data = LoadU32(base, request + 76);
+    auto r3 = hooks::VirtualFree(data, 0, kMemDecommit, 0x8209D71C);
+    if (!r3) {
+      calls.guest_free(calls.user, data, 0, kMemDecommit);
+    }
+    return r3;
+  }
+  return std::nullopt;
+}
+
+uint32_t LoaderFunctorTarget(uint8_t* base, uint32_t functor) {
+  ITC_NATIVE_RUNNING("sub_8209DD80 LoaderFunctor::Invoke");
+  return LoadU32(base, functor + 4);
 }
 
 }  // namespace archive

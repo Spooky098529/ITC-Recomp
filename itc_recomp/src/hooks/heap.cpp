@@ -152,20 +152,28 @@ extern "C" REX_FUNC(sub_82295398) {
 
 // VirtualFree: r3 = address, r4 = size, r5 = type; returns whether it was
 // freed.
+std::optional<uint32_t> hooks::VirtualFree(uint32_t address, uint32_t size, uint32_t type,
+                                           uint32_t caller) {
+  if (!hooks::Native() || !memory::InRange(address)) {
+    return std::nullopt;
+  }
+  if (size != 0 || type != hooks::kMemRelease) {
+    // The layer's pages stay as they are (a decommit: the archive's request
+    // finish, sub_8209D688, frees its data with MEM_DECOMMIT).
+    hooks::LogOnce(3, type, "VirtualFree type (nothing done)", caller);
+    return 1;
+  }
+  return memory::FreePages(address) ? 1 : 0;
+}
+
 extern "C" REX_FUNC(sub_82295330) {
   REX_FUNC_PROLOGUE();
-  const uint32_t address = ctx.r3.u32;
-  if (!hooks::Native() || !memory::InRange(address)) {
+  auto r3 = hooks::VirtualFree(ctx.r3.u32, ctx.r4.u32, ctx.r5.u32, uint32_t(ctx.lr));
+  if (!r3) {
     __imp__sub_82295330(ctx, base);
     return;
   }
-  if (ctx.r4.u32 != 0 || ctx.r5.u32 != hooks::kMemRelease) {
-    // Never seen; the layer's pages stay as they are.
-    hooks::LogOnce(3, ctx.r5.u32, "VirtualFree type (nothing done)", uint32_t(ctx.lr));
-    ctx.r3.u64 = 1;
-    return;
-  }
-  ctx.r3.u64 = memory::FreePages(address) ? 1 : 0;
+  ctx.r3.u64 = *r3;
 }
 
 // XPhysicalAlloc: r3 = size, r4 = physical address (-1 for any), r5 =

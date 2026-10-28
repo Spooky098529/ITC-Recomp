@@ -8,7 +8,14 @@
 // 0x826BAAE0, waited and signaled through the translated code, as the
 // queueing and the picker take it), so no request is queued or picked
 // meanwhile; the set-ups' clean-ups are taken back off the exit table
-// (exit_table.h). The originals run with --native_archive off, so their
+// (exit_table.h). The request finish runs on requests in the scratch area
+// with ListNode::ListNode (0x82294B68, a leaf storing r4 at r3 + 4) as the
+// callback, its serial a scratch address, so the call shows; the staging
+// half in use (0x826A511C, the loader thread's) is only ever written with
+// its own value, and the callback serial (0x82600AA4, written only by the
+// finish) put back after each side; the data it decommits are pages of the
+// allocation layer (a decommit there does nothing). LoaderFunctor::Invoke
+// calls the same leaf. The originals run with --native_archive off, so their
 // callees are the recompiled code too.
 
 #include "harness.h"
@@ -17,7 +24,9 @@
 #include "archive/archive.h"
 #include "base/flags.h"
 #include "base/log.h"
+#include "hooks/archive.h"
 #include "hooks/c_runtime.h"
+#include "memory/heap.h"
 
 #include <fmt/format.h>
 
@@ -402,6 +411,82 @@ void StaticInits(Context& h) {
   }
 }
 
+void Finishes(Context& h) {
+  Results results("sub_8209D688 Archive::FinishRequest");
+  const uint32_t pages = memory::AllocPages(4096, 4096);
+  constexpr uint32_t kLeaf = 0x82294B68;
+  const uint32_t request = h.data + 256;
+  const uint32_t serial_area = h.data + 2048;
+  for (int i = 0; i < 300; i++) {
+    const uint32_t saved_serial = guest::LoadU32(h.base, archive::kCallbackSerial);
+    const uint32_t staging = guest::LoadU32(h.base, archive::kStagingInUse);
+    // The flags the finish reads, each on or off, over random bits.
+    uint32_t flags = uint32_t(h.random.Next()) & ~0x310Au & ~0x2000u;
+    for (uint32_t bit : {0x100u, 0x8u, 0x2000u, 0x2u, 0x1000u}) {
+      if (h.random.Below(2)) {
+        flags |= bit;
+      }
+    }
+    if (i < 32) {  // every combination first
+      flags = (flags & ~0x310Au & ~0x2000u) | ((i & 1) ? 0x100u : 0) | ((i & 2) ? 0x8u : 0) |
+              ((i & 4) ? 0x2000u : 0) | ((i & 8) ? 0x2u : 0) | ((i & 16) ? 0x1000u : 0);
+    }
+    const bool restages = (flags & 0x100) && !(flags & 0x8);
+    const uint32_t serial = serial_area + 8 * h.random.Below(64);
+    Case(
+        h, results,
+        [&] {
+          for (uint32_t w = 0; w < 23; w++) {
+            guest::StoreU32(h.base, request + 4 * w, uint32_t(h.random.Next()));
+          }
+          guest::StoreU32(h.base, request + 8, serial);
+          guest::StoreU32(h.base, request + 12, flags);
+          guest::StoreU32(h.base, request + 48, kLeaf);
+          // The data: the staging half in use when the finish restages it
+          // (so the global keeps its value), the destination the pages.
+          guest::StoreU32(h.base, request + 76, restages ? staging : pages);
+          guest::StoreU32(h.base, request + 88, pages);
+        },
+        [&](PPCContext& t) { t.r3.u64 = request; }, __imp__sub_8209D688,
+        hooks::ArchiveFinishRequest,
+        [&](const PPCContext&, Outputs& out) {
+          out.Bytes(Read(h.base, h.data, kScratchBytes));
+          out.Word(guest::LoadU32(h.base, archive::kCallbackSerial));
+          out.Word(guest::LoadU32(h.base, archive::kStagingInUse));
+          guest::StoreU32(h.base, archive::kCallbackSerial, saved_serial);
+        },
+        fmt::format("case {} (flags {:08X})", i, flags));
+  }
+  memory::FreePages(pages);
+  results.Report();
+}
+
+void Invokes(Context& h) {
+  Results results("sub_8209DD80 LoaderFunctor::Invoke");
+  for (int i = 0; i < 60; i++) {
+    const uint32_t functor = h.data + 8 * h.random.Below(16);
+    const uint32_t argument = h.data + 512 + 8 * h.random.Below(64);
+    Case(
+        h, results,
+        [&] {
+          guest::StoreU32(h.base, functor, uint32_t(h.random.Next()));
+          guest::StoreU32(h.base, functor + 4, 0x82294B68);
+        },
+        [&](PPCContext& t) {
+          t.r3.u64 = functor;
+          t.r4.u64 = argument;
+        },
+        __imp__sub_8209DD80, hooks::ArchiveInvokeFunctor,
+        [&](const PPCContext& t, Outputs& out) {
+          out.Bytes(Read(h.base, h.data, kScratchBytes));
+          out.Word(t.r11.u32);
+          out.Word(t.ctr.u32);
+        },
+        fmt::format("case {}", i));
+  }
+  results.Report();
+}
+
 }  // namespace
 
 void Archive(Context& h) {
@@ -410,6 +495,8 @@ void Archive(Context& h) {
   Slots(h);
   LooseFiles(h);
   StaticInits(h);
+  Finishes(h);
+  Invokes(h);
 }
 
 }  // namespace harness

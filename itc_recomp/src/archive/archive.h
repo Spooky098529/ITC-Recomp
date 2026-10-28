@@ -12,6 +12,7 @@
 #include "c_runtime/exit.h"
 
 #include <cstdint>
+#include <optional>
 
 namespace archive {
 
@@ -86,5 +87,39 @@ constexpr uint32_t kCrsLooseFiles = 0x82678240;
 // Archive::FindLooseFile (sub_8209D8D8): the path of the first entry whose id
 // is `id`, or 0 at the first entry with no path.
 uint32_t FindLooseFile(uint8_t* base, uint32_t id);
+
+// --- The loader thread's pieces ---
+
+// The staging ring's half a compressed request read into (put back by the
+// finish), and the serial of the request whose callback runs last.
+constexpr uint32_t kStagingInUse = 0x826A511C;
+constexpr uint32_t kCallbackSerial = 0x82600AA4;
+
+// A request's finish's calls into the translated code: the request's
+// callback (+48, Archive::Load's function pointer: about 20 of the loads'
+// functions, some ours), with r3 to r6; and VirtualFree where the native one
+// can't (hooks::VirtualFree's nullopt). The adapter makes them.
+struct FinishCalls {
+  void (*callback)(void* user, uint32_t function, uint32_t serial, uint32_t data, uint32_t size,
+                   uint32_t context) = nullptr;
+  void (*guest_free)(void* user, uint32_t address, uint32_t size, uint32_t type) = nullptr;
+  void* user = nullptr;
+};
+
+// The request finish (sub_8209D688), on the loader thread: with flag 0x100
+// and not 0x8 (+12), the staging half in use (0x826A511C) = the data (+76),
+// and the data = the destination (+88); with flag 0x2000, the serial (+8)
+// stored at 0x82600AA4 and the callback (+48) called as callback(serial,
+// data, size +32, context +44); with flag 0x2 and not 0x1000,
+// VirtualFree(data, 0, MEM_DECOMMIT). The flags are read again before each
+// step, as the original does (the callback may change them). Returns
+// VirtualFree's r3 when the native one freed (the original's r3 then), else
+// nothing (r3 is the callback's or guest_free's, or the request).
+std::optional<uint32_t> FinishRequest(uint8_t* base, uint32_t request, const FinishCalls& calls);
+
+// LoaderFunctor::Invoke (sub_8209DD80): the function the functor calls (its
+// +4), which the adapter tail-calls with the argument as r3. Its one functor
+// (0x82600B68) holds the loader thread (0x8209E118).
+uint32_t LoaderFunctorTarget(uint8_t* base, uint32_t functor);
 
 }  // namespace archive
