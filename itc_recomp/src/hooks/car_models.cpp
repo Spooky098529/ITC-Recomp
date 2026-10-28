@@ -21,12 +21,12 @@ ITC_FLAG_BOOL(native_car_models, true, "ITC",
               "sub_820D0730, with --native_heap LoadSlot::ReleaseBuffer sub_820D0758, and the "
               "deferred release sub_820C3F50; with --native_heap and the memory blocks' host lock "
               "CarModel::Release sub_820D4508; with --native_heap the vinyl sheet's texture, "
-              "Texture::Create sub_820ECF08, Texture::Free sub_820ECFC8 and Vinyl::Compress "
-              "sub_820ED090, which calls XGCompressSurface sub_8235AAC0's plain C++; the decals' TGA "
+              "Texture::Create sub_820ECF08 and Texture::Free sub_820ECFC8; the decals' TGA "
               "header's clear sub_820EEBC0 and, with --native_heap, TGA::CreateImage sub_820ED020 "
               "with its reader; Vinyl::DrawDecal sub_820EE638 with the software rasterizer under "
               "it; with --native_heap CarModel::OnDecalLoaded sub_820D5750 with Vinyl::DrawDecals "
-              "sub_820D4078 and Vinyl::ClearCorner sub_820D3C80) natively "
+              "sub_820D4078, Vinyl::ClearCorner sub_820D3C80 and Vinyl::Compress sub_820ED090, which "
+              "calls XGCompressSurface sub_8235AAC0's plain C++) natively "
               "instead of through the translated code (the same writes; checked by "
               "--run_harnesses=car_models)");
 
@@ -97,15 +97,6 @@ uint32_t CarModelsVinylCompressAt(PPCContext& ctx, uint8_t* base, uint32_t width
   });
   ctx.lr = lr;
   return *r3;  // the callers checked TextureFreeable
-}
-
-void CarModelsVinylCompress(PPCContext& ctx, uint8_t* base) {
-  if (!hooks::NativeHeapActive() || !cm::TextureFreeable(base, ctx.r5.u32)) {
-    __imp__sub_820ED090(ctx, base);
-    return;
-  }
-  ctx.fpscr.disableFlushMode();  // as the original's lfs
-  ctx.r3.u64 = CarModelsVinylCompressAt(ctx, base, ctx.r3.u32, ctx.r4.u32, ctx.r5.u32, ctx.r6.u32);
 }
 
 void CarModelsOnDecalLoaded(PPCContext& ctx, uint8_t* base) {
@@ -183,7 +174,6 @@ ITC_CAR_MODELS(820C3F50, CarModelsDeferRelease)
 ITC_CAR_MODELS(820D4508, CarModelsCarModelRelease)
 ITC_CAR_MODELS(820ECF08, CarModelsTextureCreate)
 ITC_CAR_MODELS(820ECFC8, CarModelsTextureFree)
-ITC_CAR_MODELS(820ED090, CarModelsVinylCompress)
 ITC_CAR_MODELS(820EEBC0, CarModelsTgaHeaderClear)
 ITC_CAR_MODELS(820ED020, CarModelsTgaCreateImage)
 ITC_CAR_MODELS(820EE638, CarModelsDrawDecal)

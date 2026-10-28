@@ -365,6 +365,14 @@ void TextureFrees(Context& h, uint32_t block) {
   results.Report();
 }
 
+// Vinyl::Compress's register steps (its adapter is gone: only
+// CarModel::OnDecalLoaded's native version calls it).
+void NativeVinylCompress(PPCContext& ctx, uint8_t* base) {
+  ctx.fpscr.disableFlushMode();
+  ctx.r3.u64 = hooks::CarModelsVinylCompressAt(ctx, base, ctx.r3.u32, ctx.r4.u32, ctx.r5.u32,
+                                               ctx.r6.u32);
+}
+
 // Vinyl::Compress: a sheet (Texture::Create's plain C++, A8R8G8B8, its data
 // random bytes) of sizes 1 to 512, and once the game's 1,024 x 1,024; its
 // two words anywhere in the block. The recompiled side with
@@ -412,7 +420,7 @@ void VinylCompresses(Context& h, uint32_t block) {
       t.r6.u64 = data_in;
       ITC_FLAG(native_car_models) = v == 1;
       ITC_FLAG(native_texture_compression) = v == 1;
-      (v == 0 ? __imp__sub_820ED090 : hooks::CarModelsVinylCompress)(t, h.base);
+      (v == 0 ? __imp__sub_820ED090 : NativeVinylCompress)(t, h.base);
       ITC_FLAG(native_car_models) = true;
       ITC_FLAG(native_texture_compression) = true;
       const uint32_t header = guest::LoadU32(h.base, header_in);
