@@ -92,8 +92,6 @@ ITC_ARCHIVE_WORD(8209D868, archive::Toc(base, ctx.r3.u32))
 // Archive::AssetSize: r3 = an asset id. Its r31 is restored and r11 read by
 // no caller.
 ITC_ARCHIVE_WORD(820A0678, archive::AssetSize(base, ctx.r3.u32))
-// Archive::FindLooseFile: r3 = an asset id; r3 its path or 0.
-ITC_ARCHIVE_WORD(8209D8D8, archive::FindLooseFile(base, ctx.r3.u32))
 
 // The static set-ups: no arguments; r3 = atexit's. The original runs when
 // the native atexit can't (c_runtime's flags), as SignInWatch::StaticInit's.
