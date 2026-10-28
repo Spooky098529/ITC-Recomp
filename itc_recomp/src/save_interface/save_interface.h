@@ -116,6 +116,10 @@ std::optional<uint32_t> InterfaceDevice(uint8_t* base, uint32_t slot);          
 std::optional<uint64_t> InterfaceSaveAt(uint8_t* base, uint32_t slot, uint64_t index);  // sub_820A0428
 std::optional<uint64_t> InterfaceSave(uint8_t* base, uint32_t slot, const Request& request);  // sub_820A0490
 std::optional<uint64_t> InterfaceLoad(uint8_t* base, uint32_t slot, const Request& request);  // sub_820A0510
+// Whether SaveInterface::Save (`load` false) or Load would run natively:
+// the interface's targets and the save devices' request setter and +28 are
+// this file's (reads only, for callers that write before they call it).
+bool InterfaceRequestReady(uint8_t* base, bool load);
 std::optional<uint32_t> InterfaceUserCount(uint8_t* base);                      // sub_820A05D8
 std::optional<uint64_t> InterfaceUserAt(uint8_t* base, uint32_t index);         // sub_820A0620
 

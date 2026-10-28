@@ -74,4 +74,12 @@ void SaveInterfacePlayTimeAdd(PPCContext& ctx, uint8_t* base);
 // original makes, r1 - 96 + 80).
 void SaveInterfacePlayTimeUpdate(PPCContext& ctx, uint8_t* base);
 
+// sub_8228FB00 GameData::Save (no arguments; its frame r1 - 368, the guest
+// calls GetLocalTime and, where its plain C++ refuses, swprintf from it).
+void SaveInterfaceGameDataSave(PPCContext& ctx, uint8_t* base);
+// sub_8228FBC0 GameData::Load and sub_8228FC50 GameData::Check: r3 = a
+// player.
+void SaveInterfaceGameDataLoad(PPCContext& ctx, uint8_t* base);
+void SaveInterfaceGameDataCheck(PPCContext& ctx, uint8_t* base);
+
 }  // namespace hooks

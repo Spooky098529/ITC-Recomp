@@ -29,7 +29,8 @@ ITC_FLAG_BOOL(native_save_interface, true, "ITC",
               "the save buffers' Create sub_8228F6B0, FreeReplayList sub_8228F7E8 (no adapter: "
               "only Destroy's plain C++ calls it) and Destroy sub_8228F8F8, Replays::Sort "
               "sub_8228F840 (its copies through memcpy's plain C++), the play time's "
-              "sub_821109B8 and PlayTime::Update sub_82112838) natively instead of through the "
+              "sub_821109B8 and PlayTime::Update sub_82112838; GameData::Save sub_8228FB00 (GetLocalTime "
+              "through the guest), Load sub_8228FBC0 and the game data's check sub_8228FC50) natively instead of through the "
               "translated code (the same reads and writes; the original where a vtable target "
               "isn't ours; checked by --run_harnesses=save_interface)");
 
@@ -180,6 +181,9 @@ ITC_SAVE_INTERFACE_WRAPPER(8228F9E8, SaveInterfacePlayerSlotState,
 ITC_SAVE_INTERFACE_WRAPPER(8228FA90, SaveInterfacePlayerDevice, si::PlayerDevice(base, ctx.r3.u32))
 ITC_SAVE_INTERFACE_WRAPPER(8228FAC8, SaveInterfacePlayerPending,
                            si::PlayerPending(base, ctx.r3.u32))
+ITC_SAVE_INTERFACE_WRAPPER(8228FBC0, SaveInterfaceGameDataLoad, si::GameDataLoad(base, ctx.r3.u32))
+ITC_SAVE_INTERFACE_WRAPPER(8228FC50, SaveInterfaceGameDataCheck,
+                           si::GameDataCheck(base, ctx.r3.u32))
 
 #undef ITC_SAVE_INTERFACE_WRAPPER
 
@@ -210,6 +214,43 @@ void SaveInterfaceBuffersDestroy(PPCContext& ctx, uint8_t* base) {
     return;
   }
   ctx.r3.u64 = si::SaveBuffersDestroy(base);
+}
+
+void SaveInterfaceGameDataSave(PPCContext& ctx, uint8_t* base) {
+  const uint64_t stack = ctx.r1.u64;
+  const uint32_t frame = ctx.r1.u32 - 368;
+  guest::StoreU32(base, frame, ctx.r1.u32);  // the frame's back chain, as the original's
+  const auto in_frame = [&](uint32_t lr, auto call) {
+    ctx.r1.u64 = frame;
+    ctx.lr = lr;
+    call();
+    ctx.r1.u64 = stack;
+  };
+  si::GameDataCalls calls;
+  calls.local_time = [&](uint32_t out) {
+    in_frame(0x8228FB34, [&] {
+      ctx.r3.u64 = out;
+      sub_822968B8(ctx, base);
+    });
+  };
+  calls.swprintf = [&](const std::array<uint64_t, 8>& regs) {
+    in_frame(0x8228FB60, [&] {
+      ctx.r3.u64 = regs[0];
+      ctx.r4.u64 = regs[1];
+      ctx.r5.u64 = regs[2];
+      ctx.r6.u64 = regs[3];
+      ctx.r7.u64 = regs[4];
+      ctx.r8.u64 = regs[5];
+      ctx.r9.u64 = regs[6];
+      ctx.r10.u64 = regs[7];
+      sub_8210A490(ctx, base);
+    });
+  };
+  if (const auto r3 = si::GameDataSave(base, frame, calls)) {
+    ctx.r3.u64 = *r3;
+    return;
+  }
+  __imp__sub_8228FB00(ctx, base);
 }
 
 void SaveInterfaceReplaysSort(PPCContext& ctx, uint8_t* base) {
@@ -291,3 +332,6 @@ ITC_SAVE_INTERFACE_ADAPTER(8228F8F8, SaveInterfaceBuffersDestroy)
 ITC_SAVE_INTERFACE_ADAPTER(8228F840, SaveInterfaceReplaysSort)
 ITC_SAVE_INTERFACE_ADAPTER(821109B8, SaveInterfacePlayTimeAdd)
 ITC_SAVE_INTERFACE_ADAPTER(82112838, SaveInterfacePlayTimeUpdate)
+ITC_SAVE_INTERFACE_ADAPTER(8228FB00, SaveInterfaceGameDataSave)
+ITC_SAVE_INTERFACE_ADAPTER(8228FBC0, SaveInterfaceGameDataLoad)
+ITC_SAVE_INTERFACE_ADAPTER(8228FC50, SaveInterfaceGameDataCheck)

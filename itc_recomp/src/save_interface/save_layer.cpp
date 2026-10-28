@@ -8,7 +8,11 @@
 #include "hooks/heap.h"
 #include "memory/heap.h"
 #include "native/buffers.h"
+#include "strings_and_font/strings_and_font.h"
+#include "vehicle_accessors/vehicle_accessors.h"
 #include "save_interface/save_interface.h"
+
+#include <cstring>
 
 namespace save_interface {
 
@@ -29,6 +33,12 @@ void Copy(uint8_t* base, uint32_t destination, uint32_t source, uint32_t size) {
   for (uint32_t i = 0; i < size; i++) {
     guest::StoreU8(base, destination + i, guest::LoadU8(base, source + i));
   }
+}
+
+// memset (sub_825A71D0) with 0: the same bytes.
+void Clear(uint8_t* base, uint32_t address, uint32_t bytes) {
+  guest::ForEachHostPart(base, address, bytes,
+                         [](uint8_t* host, uint32_t, uint32_t n) { std::memset(host, 0, n); });
 }
 
 template <typename Call>
@@ -232,6 +242,116 @@ void PlayTimeAdd(uint8_t* base, uint32_t out, uint32_t stats) {
   Store(base, stats + 6032, h);
   Store(base, out + 0, h);
   Store(base, out + 4, word);
+}
+
+std::optional<uint64_t> GameDataSave(uint8_t* base, uint32_t frame, const GameDataCalls& calls) {
+  const auto slot = SlotOfController(base, ControllerOf(base, 0));
+  if (!slot || !InterfaceRequestReady(base, false)) {
+    return std::nullopt;
+  }
+  ITC_NATIVE_RUNNING("sub_8228FB00 GameData::Save");
+  const uint32_t name = frame + 96;
+  const uint32_t time = frame + 80;
+  Clear(base, name, 256);
+  PlayTimeUpdate(base, vehicle_accessors::SaveDataOf(base, 0), frame - 96 + 80);
+  calls.local_time(time);
+  // swprintf(name, format, L"GAME DATA", year, month, day, hour, minute):
+  // r5 to r10 in the caller's parameter area (frame + 32), as the
+  // original's stores them.
+  const std::array<uint64_t, 8> regs = {
+      name,
+      uint64_t(int64_t(int32_t(kGameDataFormat))),
+      uint64_t(int64_t(int32_t(kGameDataTitle))),
+      guest::LoadU16(base, time + 0),
+      guest::LoadU16(base, time + 2),
+      guest::LoadU16(base, time + 6),
+      guest::LoadU16(base, time + 8),
+      guest::LoadU16(base, time + 10)};
+  for (uint32_t k = 0; k < 6; k++) {
+    guest::StoreU32(base, frame + 32 + 8 * k, uint32_t(regs[2 + k] >> 32));
+    guest::StoreU32(base, frame + 36 + 8 * k, uint32_t(regs[2 + k]));
+  }
+  int32_t count = 0;
+  if (!strings_and_font::Swprintf(base, name, kGameDataFormat, frame + 32,
+                                  frame - 96 - 144 - 2336, &count)) {
+    calls.swprintf(regs);
+  }
+  const uint32_t save = vehicle_accessors::SaveDataOf(base, 0);
+  return InterfaceSave(base, *slot,
+                       Request{name, kGameDataFile, kGameDataPath, save, kGameDataBytes, 0, 0});
+}
+
+std::optional<uint64_t> GameDataLoad(uint8_t* base, uint32_t player) {
+  const auto slot = SlotOfController(base, ControllerOf(base, player));
+  if (!slot || !InterfaceRequestReady(base, true)) {
+    return std::nullopt;
+  }
+  ITC_NATIVE_RUNNING("sub_8228FBC0 GameData::Load");
+  Clear(base, Load(base, Load(base, kSaveBuffers) + 0), kGameDataBytes);
+  const uint32_t buffer = Load(base, Load(base, kSaveBuffers) + 0);
+  return InterfaceLoad(base, *slot,
+                       Request{kLoadDisplayName, kGameDataFile, kGameDataPath, buffer,
+                               kGameDataBytes, 0, 0});
+}
+
+std::optional<uint32_t> GameDataCheck(uint8_t* base, uint32_t player) {
+  const auto slot = SlotOfController(base, ControllerOf(base, player));
+  if (!slot) {
+    return std::nullopt;
+  }
+  const auto count = InterfaceSaveCount(base, *slot);
+  const auto state = InterfaceSlotState(base, *slot);
+  if (!count || !state) {
+    return std::nullopt;
+  }
+  if (int32_t(*state) == 2) {
+    ITC_NATIVE_RUNNING("sub_8228FC50 GameData::Check");
+    return 3;
+  }
+  if (int32_t(*state) != 3) {
+    ITC_NATIVE_RUNNING("sub_8228FC50 GameData::Check");
+    return 4;
+  }
+  const auto pending = InterfacePending(base, *slot);
+  if (!pending) {
+    return std::nullopt;
+  }
+  if (uint32_t(*pending) != 0) {
+    ITC_NATIVE_RUNNING("sub_8228FC50 GameData::Check");
+    return 4;
+  }
+  const auto free = InterfaceFreeBytes(base, *slot);
+  if (!free) {
+    return std::nullopt;
+  }
+  const uint32_t size = uint32_t(ContentSize(kGameDataBytes, 0));
+  for (int32_t i = 0; i < int32_t(*count); i++) {
+    const auto entry = InterfaceSaveAt(base, *slot, uint64_t(i));
+    if (!entry) {
+      return std::nullopt;
+    }
+    // strcmp of the file name (XCONTENT_DATA +264) with "SystemData.bin".
+    uint32_t a = uint32_t(*entry + 264), b = kGameDataFile;
+    int32_t diff;
+    for (;;) {
+      const uint32_t c = guest::LoadU8(base, a);
+      diff = int32_t(c - guest::LoadU8(base, b));
+      if (c == 0) {
+        break;
+      }
+      a++;
+      b++;
+      if (diff != 0) {
+        break;
+      }
+    }
+    if (diff == 0) {
+      ITC_NATIVE_RUNNING("sub_8228FC50 GameData::Check");
+      return 1;
+    }
+  }
+  ITC_NATIVE_RUNNING("sub_8228FC50 GameData::Check");
+  return *free >= size ? 0 : 2;
 }
 
 uint32_t PlayTimeUpdate(uint8_t* base, uint32_t save, uint32_t out) {

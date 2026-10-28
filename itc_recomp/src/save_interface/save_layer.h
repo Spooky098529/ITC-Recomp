@@ -7,7 +7,9 @@
 
 #pragma once
 
+#include <array>
 #include <cstdint>
+#include <functional>
 #include <optional>
 
 namespace save_interface {
@@ -74,5 +76,40 @@ void PlayTimeAdd(uint8_t* base, uint32_t out, uint32_t stats);
 // into `out` (the original's frame + 80). Returns r3 as the original leaves
 // it (`out`).
 uint32_t PlayTimeUpdate(uint8_t* base, uint32_t save, uint32_t out);
+
+// The game data's file and its place (GameData::Save, Load and the check).
+constexpr uint32_t kGameDataFile = 0x826380E8;   // "SystemData.bin"
+constexpr uint32_t kGameDataPath = 0x82011EC8;   // "TXR360:\TXR_DATA_1"
+constexpr uint32_t kGameDataFormat = 0x82011EDC;  // L"%ls   %d/%d/%d %2d:%02d"
+constexpr uint32_t kGameDataTitle = 0x82011F0C;   // L"GAME DATA"
+constexpr uint32_t kLoadDisplayName = 0x82011F20;  // L" "
+
+// GameData::Save's calls into code that still takes the guest context, from
+// its frame: GetLocalTime (sub_822968B8) into `out`, and swprintf
+// (sub_8210A490) with r3 to r10 where its plain C++ refuses.
+struct GameDataCalls {
+  std::function<void(uint32_t out)> local_time;
+  std::function<void(const std::array<uint64_t, 8>& r3_to_r10)> swprintf;
+};
+
+// sub_8228FB00 GameData::Save, in its frame at `frame` (the original's r1,
+// its 368 bytes): the display name (frame + 96, 256 bytes cleared) from
+// swprintf of the local time (frame + 80), after PlayTime::Update on
+// player 0's save data (its out at frame - 16), then SaveInterface::Save on
+// the slot of player 0's controller. Returns r3 as the original leaves it
+// (Save's answer); nullopt, with nothing done, where a target isn't ours.
+std::optional<uint64_t> GameDataSave(uint8_t* base, uint32_t frame, const GameDataCalls& calls);
+// sub_8228FBC0 GameData::Load: the game data's buffer ([0x828161F0] + 0)
+// cleared, then SaveInterface::Load of SystemData.bin into it on the slot
+// of the player's controller. Returns r3 as the original leaves it; nullopt,
+// with nothing done, where a target isn't ours.
+std::optional<uint64_t> GameDataLoad(uint8_t* base, uint32_t player);
+// sub_8228FC50 GameData::Check: on the slot of the player's controller, 3
+// for no device (state 2), 4 when not ready (not 3) or a request is
+// pending; 1 when SystemData.bin is among the enumerated saves; else 0 when
+// the device's free bytes (the low word) are at least its size
+// (XContentCalculateSize of 129,400 bytes), or 2. nullopt where a target
+// isn't ours (it only reads).
+std::optional<uint32_t> GameDataCheck(uint8_t* base, uint32_t player);
 
 }  // namespace save_interface

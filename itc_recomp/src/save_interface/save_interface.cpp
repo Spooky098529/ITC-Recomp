@@ -305,6 +305,12 @@ std::optional<uint64_t> InterfaceLoad(uint8_t* base, uint32_t slot, const Reques
   return SlotRequestLoad(base, *devices, slot, request);
 }
 
+bool InterfaceRequestReady(uint8_t* base, bool load) {
+  const auto devices =
+      DevicesWith(base, load ? 64 : 60, load ? kSlotRequestLoad : kSlotRequestSave);
+  return devices && VirtualTarget(base, *devices, 28) == kSlotState;
+}
+
 std::optional<uint32_t> InterfaceUserCount(uint8_t* base) {
   const auto users = Users(base);
   if (!users || VirtualTarget(base, *users, 4) != kUsersCount) {

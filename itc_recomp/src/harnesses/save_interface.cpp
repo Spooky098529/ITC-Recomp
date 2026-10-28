@@ -42,6 +42,8 @@ constexpr uint32_t kUsers = 0x200;
 constexpr uint32_t kFakeVtable = 0x300;  // a vtable copy for the fallback cases
 constexpr uint32_t kSlots = 0x800;       // three slots, to 0x13B8
 
+constexpr uint32_t kSaveDataSlot = 0x826C5B58;  // player 0's save data (SaveData::Of)
+
 constexpr uint32_t kInterfaceVtable = 0x82000E38;
 constexpr uint32_t kObject36Vtable = 0x82000AFC;
 constexpr uint32_t kDevicesVtable = 0x82002198;
@@ -134,6 +136,15 @@ struct CaseSetup {
   // with random words first, compared after): from r1 - stack_below.
   uint32_t stack_below = 0;
   uint32_t stack_bytes = 0;
+  // A second such range.
+  uint32_t stack2_below = 0;
+  uint32_t stack2_bytes = 0;
+  // When not 0, player 0's save data slot ([0x826C5B58]) points here while
+  // the case runs (put back after).
+  uint32_t save_data = 0;
+  // When not 0, `extra_bytes` there are compared too.
+  uint32_t extra = 0;
+  uint32_t extra_bytes = 0;
 };
 
 // One case through both versions: the block and the scratch area filled from
@@ -147,6 +158,7 @@ void Case(Context& h, Results& results, const Block& block, const CaseSetup& set
   Random after;
   const uint32_t live = guest::LoadU32(h.base, si::kInterfaceGlobal);
   const uint32_t live_buffers = guest::LoadU32(h.base, si::kSaveBuffers);
+  const uint32_t live_save = guest::LoadU32(h.base, kSaveDataSlot);
   for (int v = 0; v < 2; v++) {
     Random random = start;
     WriteRandom(h.base, h.data, kScratchBytes / 4, random);
@@ -160,11 +172,19 @@ void Case(Context& h, Results& results, const Block& block, const CaseSetup& set
     PPCContext t = CallContext(h);
     const uint32_t stack = t.r1.u32 - setup.stack_below;
     WriteRandom(h.base, stack, setup.stack_bytes / 4, random);
+    const uint32_t stack2 = t.r1.u32 - setup.stack2_below;
+    WriteRandom(h.base, stack2, setup.stack2_bytes / 4, random);
+    if (setup.extra != 0) {
+      WriteRandom(h.base, setup.extra, setup.extra_bytes / 4, random);
+    }
     args(t, block.address, random);
     after = random;
     guest::StoreU32(h.base, si::kInterfaceGlobal, block.address + kInterface);
     if (setup.save_buffers != 0) {
       guest::StoreU32(h.base, si::kSaveBuffers, setup.save_buffers);
+    }
+    if (setup.save_data != 0) {
+      guest::StoreU32(h.base, kSaveDataSlot, setup.save_data);
     }
     ITC_FLAG(native_save_interface) = v == 1;
     (v == 0 ? recompiled : native)(t, h.base);
@@ -175,7 +195,15 @@ void Case(Context& h, Results& results, const Block& block, const CaseSetup& set
       out[v].Word(guest::LoadU32(h.base, si::kSaveBuffers) - setup.save_buffers);
       guest::StoreU32(h.base, si::kSaveBuffers, live_buffers);
     }
+    if (setup.save_data != 0) {
+      out[v].Word(guest::LoadU32(h.base, kSaveDataSlot) - setup.save_data);
+      guest::StoreU32(h.base, kSaveDataSlot, live_save);
+    }
     out[v].Bytes(Read(h.base, stack, setup.stack_bytes));
+    out[v].Bytes(Read(h.base, stack2, setup.stack2_bytes));
+    if (setup.extra != 0) {
+      out[v].Bytes(Read(h.base, setup.extra, setup.extra_bytes));
+    }
     out[v].Bytes(Read(h.base, block.address, kBlockBytes));
     out[v].Bytes(Read(h.base, h.data, kScratchBytes));
     out[v].Word(t.r3.u32);
@@ -577,6 +605,77 @@ void SaveInterface(Context& h) {
         },
         false, false, update);
   }
+
+  // The game data's save, load and check.
+  {
+    // Save: its frame r1 - 368; the name (+96), the time (+80) and the
+    // parameter area (+32) from r1 - 368 to r1 - 16 (the saved r31 and lr
+    // above are the prologue's). PlayTime::Update's out below it (r1 - 384)
+    // isn't compared: the original's SaveSlots::OfController saves its
+    // registers over it afterwards (r31 there), which the plain C++ doesn't.
+    CaseSetup save;
+    save.stack_below = 368;
+    save.stack_bytes = 352;
+    save.save_data = block.address + 0x400;
+    Run(
+        h, block, "GameData::Save (sub_8228FB00)", __imp__sub_8228FB00,
+        hooks::SaveInterfaceGameDataSave, 12,
+        [&](PPCContext&, uint32_t b, uint32_t, Random& random) {
+          const uint32_t stats = b + 0x400 + 48;
+          guest::StoreU8(h.base, stats + 6036, uint8_t(random.Below(60)));
+          guest::StoreU8(h.base, stats + 6037, uint8_t(random.Below(60)));
+          guest::StoreU8(h.base, stats + 6038, uint8_t(random.Below(30)));
+          guest::StoreU32(h.base, stats + 6040,
+                          guest::LoadU32(h.base, si::kPlayTimeFrames) - random.Below(500000));
+        },
+        false, false, save);
+  }
+  {
+    const uint32_t buffer = memory::Alloc(si::kGameDataBytes, 0);
+    CaseSetup load;
+    load.save_buffers = data + kHeader;
+    load.extra = buffer;
+    load.extra_bytes = si::kGameDataBytes;
+    Run(
+        h, block, "GameData::Load (sub_8228FBC0)", __imp__sub_8228FBC0,
+        hooks::SaveInterfaceGameDataLoad, 12,
+        [&](PPCContext& t, uint32_t, uint32_t, Random& random) {
+          guest::StoreU32(h.base, data + kHeader + 0, buffer);
+          t.r3.u64 = PlayerAt(h.base, data + 0x400 + 4 * random.Below(16), random);
+        },
+        false, false, load);
+    memory::Free(buffer);
+  }
+  Run(h, block, "GameData::Check (sub_8228FC50)", __imp__sub_8228FC50,
+      hooks::SaveInterfaceGameDataCheck, 32, [&](PPCContext& t, uint32_t b, uint32_t c, Random& random) {
+        // Up to four enumerated saves at b + kRecords, each named SystemData.bin,
+        // a replay's name, a prefix of it or random bytes; the free bytes
+        // around the size (188,416).
+        static constexpr char kNames[][16] = {"SystemData.bin", "rep_1_2_3", "SystemData.bi",
+                                              "SystemData.binx"};
+        for (uint32_t e = 0; e < 4; e++) {
+          const uint32_t name = b + kRecords + 308 * e + 264;
+          const uint32_t pick = random.Below(6);
+          if (pick < 4) {
+            Write(h.base, name, kNames[pick], 16);
+          } else {
+            RandomString(h.base, name, 20, false, random);
+          }
+        }
+        for (uint32_t s = 0; s < 3; s++) {
+          const uint32_t slot = b + kSlots + 1000 * s;
+          guest::StoreU32(h.base, slot + 80, b + kRecords);
+          guest::StoreU32(h.base, slot + 984, random.Below(5));
+          guest::StoreU32(h.base, slot + 40, uint32_t(random.Next()));
+          guest::StoreU32(h.base, slot + 44, 188416 - 4096 + random.Below(8192));
+          if (c % 2 == 0) {  // nothing pending half the time
+            for (uint32_t word = 960; word <= 980; word += 4) {
+              guest::StoreU32(h.base, slot + word, 0);
+            }
+          }
+        }
+        t.r3.u64 = PlayerAt(h.base, data + 0x400 + 4 * random.Below(16), random);
+      });
 }
 
 }  // namespace harness
