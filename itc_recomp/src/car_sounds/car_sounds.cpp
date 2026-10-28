@@ -5,6 +5,8 @@
 #include "base/log.h"
 #include "c_runtime/strings.h"
 #include "guest.h"
+#include "models/memory_blocks.h"
+#include "sound_cues/sound_cues.h"
 
 #include <climits>
 #include <cmath>
@@ -240,6 +242,98 @@ Destroyed CarSoundsDestroy(uint8_t* base, uint32_t sound, uint32_t flags) {
   Store(base, sound + 408, kLayerVtable);
   Store(base, sound + 452, kHolderVtable);
   return {sound, (flags & 1) != 0 ? sound : 0, false};
+}
+
+uint32_t SetUp(uint8_t* base, uint32_t sound, uint32_t matrix) {
+  ITC_NATIVE_RUNNING("sub_8210DDC8 CarSound::SetUp");
+  // The floats move as lfs and stfs move them.
+  const auto copy = [&](uint32_t to, uint32_t from) { StoreF(base, to, LoadF(base, from)); };
+  const auto a = [&](uint32_t offset) { copy(sound + offset, 0x82000A34); };
+  const auto b = [&](uint32_t offset) { copy(sound + offset, 0x82007FC8); };
+  // The listener's front, top, position and velocity; the emitter's start.
+  a(40), a(44), a(4), a(48), a(8), a(80);
+  b(12);
+  a(84), a(16);
+  Store(base, sound + 52, sound + 144);
+  b(20);
+  a(88), a(24), a(92), a(28), a(96), a(32), a(100);
+  copy(sound + 36, 0x8200277C);
+  a(56), a(60);
+  b(64);
+  a(68);
+  b(72);
+  a(76);
+  // The cone at +144, through the emitter's pointer (+52).
+  copy(sound + 144, 0x82000A34);
+  const auto cone = [&](uint32_t offset, uint32_t from) {
+    copy(Load(base, sound + 52) + offset, from);
+  };
+  cone(4, 0x82000A34), cone(8, 0x82000A34), cone(12, 0x82007FC8), cone(16, 0x82000A34);
+  cone(20, 0x82007FC8), cone(24, 0x82000A34), cone(28, 0x82007FC8);
+  b(1196);
+  copy(sound + 1200, 0x82002208);
+  b(1204);
+  Store(base, sound + 1244, 6);
+  copy(sound + 1208, 0x82002A10);
+  Store(base, sound + 104, 1);
+  copy(sound + 1212, 0x82002C50);
+  Store(base, sound + 120, 0);
+  copy(sound + 1216, 0x82007FD4);
+  Store(base, sound + 124, 0);
+  copy(sound + 1220, 0x82002208);
+  Store(base, sound + 128, 0);
+  copy(sound + 1224, 0x82001070);
+  Store(base, sound + 132, 0);
+  copy(sound + 1228, 0x82001FBC);
+  Store(base, sound + 112, 0x826C5C38);
+  b(1232);
+  Store(base, sound + 184, 1);
+  a(1236);
+  Store(base, sound + 188, 6);
+  a(108);
+  Store(base, sound + 1240, sound + 1192);
+  copy(sound + 136, 0x82002A20);
+  Store(base, sound + 116, sound + 1240);
+  b(140);
+  a(1192);
+  Store(base, sound + 176, matrix);
+  // The two vectors (x, y, z, w): +368 all [0x82000A34], +384 the same
+  // with z [0x8200277C]; stvx stores at the address rounded down to 16.
+  const uint32_t one = guest::LoadU32(base, 0x82000A34);
+  const uint32_t z = guest::LoadU32(base, 0x8200277C);
+  const uint32_t first = (sound + 368) & ~15u;
+  const uint32_t second = (sound + 384) & ~15u;
+  for (uint32_t i = 0; i < 4; i++) {
+    Store(base, first + 4 * i, one);
+  }
+  for (uint32_t i = 0; i < 4; i++) {
+    Store(base, second + 4 * i, i == 2 ? z : one);
+  }
+  return matrix;
+}
+
+void SoundGlobalsInit(uint8_t* base, uint32_t music_player) {
+  ITC_NATIVE_RUNNING("sub_82110258 SoundGlobals::Init");
+  const auto volume = [&](uint32_t address) { StoreF(base, address, LoadF(base, 0x82000A30)); };
+  volume(0x82616BEC);
+  Store(base, 0x826C5C80, music_player);
+  volume(0x82616C34);
+  guest::StoreU8(base, 0x826C5C84, 0);
+  volume(0x82616C38);
+  volume(0x82616C3C);
+  guest::StoreU8(base, 0x826C5C85, 0);
+  for (uint32_t i = 0; i < 7; i++) {
+    Store(base, 0x826C5C64 + 4 * i, 0);
+  }
+  for (uint32_t i = 0; i < 7; i++) {
+    Store(base, 0x826C5C48 + 4 * i, 0);
+  }
+  Store(base, 0x826C5C8C, models::AllocPhysicalEx(base, 512, 0, 0xFFFFFFFFu, 0, 4));
+  Store(base, 0x826C5C88, models::AllocPhysicalEx(base, 3145728, 0, 0xFFFFFFFFu, 2048, 4));
+}
+
+uint32_t SoundGlobalsInit3D(uint8_t* base) {
+  return sound_cues::X3DAudioInitialize(base, 63, LoadF(base, 0x820080F8), kX3DAudioHandle);
 }
 
 }  // namespace car_sounds

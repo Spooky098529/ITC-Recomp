@@ -15,6 +15,7 @@
 #include "hooks/car_sounds.h"
 #include "memory/c_runtime_heap.h"
 #include "memory/heap.h"
+#include "models/memory_blocks.h"
 
 #include <fmt/format.h>
 
@@ -310,6 +311,99 @@ void Objects(Context& h, uint32_t block) {
   }
 }
 
+// --- The set-ups ---
+
+void SetUps(Context& h, uint32_t block) {
+  {
+    // The car sound at any word's alignment (stvx rounds the vectors'
+    // addresses down to 16); the matrix from operator new[] differs between
+    // the versions: r3 is checked against +176, then both are left out.
+    Results results("CarSound::SetUp (sub_8210DDC8)");
+    for (int c = 0; c < 8; c++) {
+      const Random start = h.random;
+      Random random = start;
+      Outputs out[2];
+      for (int v = 0; v < 2; v++) {
+        random = start;
+        for (uint32_t i = 0; i < kBlockBytes; i += 4) {
+          Store(h.base, block + i, uint32_t(random.Next()));
+        }
+        const uint32_t sound = block + 4 * random.Below(64);
+        PPCContext t = CallContext(h);
+        t.r3.u64 = sound;
+        ITC_FLAG(native_car_sounds) = v == 1;
+        (v == 0 ? __imp__sub_8210DDC8 : hooks::CarSoundsSetUp)(t, h.base);
+        ITC_FLAG(native_car_sounds) = true;
+        const uint32_t matrix = t.r3.u32;
+        out[v].Word(matrix != 0 && guest::LoadU32(h.base, sound + 176) == matrix);
+        Store(h.base, sound + 176, 0);
+        BlockOutputs(out[v], h.base, block, {});
+        memory::crt::OperatorDeleteArray(matrix);
+      }
+      h.random = random;
+      results.Check(out[0], out[1], fmt::format("case {}", c));
+    }
+    results.Report();
+  }
+  {
+    // On the game's globals (0x82616BEC, 0x82616C34 to 0x82616C3F,
+    // 0x826C5C48 to 0x826C5C9F), saved and put back after each version, with
+    // a music player of the case's whose slot 4 is an empty function
+    // (sub_82106540). The two physical buffers are compared by their
+    // headers and freed.
+    Results results("SoundGlobals::Init (sub_82110258)");
+    if (!hooks::CarSoundsGlobalsNative()) {
+      ITC_LOG_WARN("harness: car_sounds: the memory blocks aren't native; SoundGlobals::Init skipped");
+      return;
+    }
+    const struct {
+      uint32_t address, bytes;
+    } ranges[] = {{0x82616BEC, 4}, {0x82616C34, 12}, {0x826C5C48, 0x58}};
+    for (int c = 0; c < 2; c++) {
+      Outputs out[2];
+      for (int v = 0; v < 2; v++) {
+        std::vector<uint8_t> saved[3];
+        for (int r = 0; r < 3; r++) {
+          saved[r] = Read(h.base, ranges[r].address, ranges[r].bytes);
+          Fill(h.base, ranges[r].address, ranges[r].bytes, uint8_t(0xA5 + c));
+        }
+        const uint32_t player = block + 0x100 + 16 * uint32_t(c);
+        Store(h.base, player, block + 0x200);
+        Store(h.base, block + 0x200 + 16, 0x82106540);
+        PPCContext t = CallContext(h);
+        t.r3.u64 = player;
+        ITC_FLAG(native_car_sounds) = v == 1;
+        (v == 0 ? __imp__sub_82110258 : hooks::CarSoundsGlobalsInit)(t, h.base);
+        ITC_FLAG(native_car_sounds) = true;
+        out[v].Word(t.r3.u32);
+        const uint32_t buffers[] = {guest::LoadU32(h.base, 0x826C5C8C),
+                                    guest::LoadU32(h.base, 0x826C5C88)};
+        for (const uint32_t buffer : buffers) {
+          out[v].Word(buffer != 0);
+          if (buffer != 0) {
+            const uint32_t header = buffer - models::kBlockHeaderBytes;
+            out[v].Word(header % 2048);
+            out[v].Bytes(Read(h.base, header, 16));
+          }
+        }
+        Store(h.base, 0x826C5C8C, 0);
+        Store(h.base, 0x826C5C88, 0);
+        for (int r = 0; r < 3; r++) {
+          out[v].Bytes(Read(h.base, ranges[r].address, ranges[r].bytes));
+          Write(h.base, ranges[r].address, saved[r].data(), ranges[r].bytes);
+        }
+        for (const uint32_t buffer : buffers) {
+          if (buffer != 0) {
+            memory::FreePhysical(buffer - models::kBlockHeaderBytes);
+          }
+        }
+      }
+      results.Check(out[0], out[1], fmt::format("case {}", c));
+    }
+    results.Report();
+  }
+}
+
 }  // namespace
 
 void CarSounds(Context& h) {
@@ -320,6 +414,7 @@ void CarSounds(Context& h) {
   }
   WaveBankViews(h, block.address);
   Objects(h, block.address);
+  SetUps(h, block.address);
 }
 
 }  // namespace harness

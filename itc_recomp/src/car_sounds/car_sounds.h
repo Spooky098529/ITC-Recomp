@@ -63,4 +63,23 @@ struct Destroyed {
 };
 Destroyed CarSoundsDestroy(uint8_t* base, uint32_t sound, uint32_t flags);
 
+// sub_8210DDC8 CarSound::SetUp: the car sound's X3DAudio listener (+4),
+// emitter (+52, its curves and channel azimuths), DSP settings (+176 the
+// matrix `matrix`, 24 bytes from operator new[] that the adapter makes
+// first; one source and six destination channels) and the floats +1192 to
+// +1244 from the game's constants; the vectors +368 and +384 stored as stvx
+// does (at their addresses rounded down to 16). Returns the matrix (r3).
+uint32_t SetUp(uint8_t* base, uint32_t sound, uint32_t matrix);
+
+// sub_82110258 SoundGlobals::Init, in two parts around its call to
+// Music::Play (the adapter's guest call): the music player kept, the
+// volumes and the scene models' sound picks set, and bank pair 2's two
+// physical buffers made (Memory::AllocPhysicalEx's plain C++, so only while
+// the memory blocks are native); then X3DAudioInitialize's plain C++ for
+// 5.1 into the handle at 0x826C5C90, whose r3 it returns.
+constexpr uint32_t kMusicName = 0x820080FC;
+constexpr uint32_t kX3DAudioHandle = 0x826C5C90;
+void SoundGlobalsInit(uint8_t* base, uint32_t music_player);
+uint32_t SoundGlobalsInit3D(uint8_t* base);
+
 }  // namespace car_sounds

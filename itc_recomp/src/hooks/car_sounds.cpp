@@ -6,7 +6,13 @@
 
 #include "base/flags.h"
 #include "car_sounds/car_sounds.h"
+#include "hooks/guest_call.h"
+#include "hooks/heap.h"
+#include "hooks/mode_tick.h"
+#include "hooks/models.h"
 #include "memory/c_runtime_heap.h"
+
+ITC_FLAG_DECLARE(bool, native_shader_objects);
 
 ITC_FLAG_BOOL(native_car_sounds, true, "ITC",
               "Run the car sounds (docs/functions/car-sounds.md: the wave bank views' Init "
@@ -14,7 +20,9 @@ ITC_FLAG_BOOL(native_car_sounds, true, "ITC",
               "Entry sub_8210C998 (XMemCpy's plain C++); CarSounds::SetBanks sub_8210CB48; "
               "TireSound::Amount sub_8210CA28; CarSound::CarSound sub_8210CC18 with "
               "EngineSound::EngineSound sub_8210CBA0 (no adapter: only its plain C++ calls it); CarSounds::Destroy sub_8210DCA8 (operator "
-              "delete through its plain C++)) natively instead of through the translated code "
+              "delete through its plain C++); CarSound::SetUp sub_8210DDC8 (operator new[] through "
+              "its plain C++); SoundGlobals::Init sub_82110258 (with the memory blocks native: "
+              "Memory::AllocPhysicalEx's, Music::Play's and X3DAudioInitialize's plain C++)) natively instead of through the translated code "
               "(the same reads and writes; XAudio's voice methods stay the game's; checked by "
               "--run_harnesses=car_sounds)");
 
@@ -75,6 +83,39 @@ void CarSoundsDestroy(PPCContext& ctx, uint8_t* base) {
   ctx.r3.u64 = done.r3;
 }
 
+void CarSoundsSetUp(PPCContext& ctx, uint8_t* base) {
+  const uint32_t sound = ctx.r3.u32;
+  uint32_t matrix;
+  if (const auto made = memory::crt::OperatorNewArray(base, 24)) {
+    matrix = *made;
+  } else {
+    ctx.r3.u64 = 24;
+    sub_825A6940(ctx, base);
+    matrix = ctx.r3.u32;
+  }
+  ctx.r3.u64 = cs::SetUp(base, sound, matrix);
+}
+
+bool CarSoundsGlobalsNative() {
+  // The memory blocks' native path, as Memory::AllocPhysicalEx's adapter
+  // (src/hooks/shader_objects.cpp) takes it.
+  return ITC_FLAG(native_shader_objects) && NativeHeapActive() && ModelsHostLock();
+}
+
+void CarSoundsGlobalsInit(PPCContext& ctx, uint8_t* base) {
+  cs::SoundGlobalsInit(base, ctx.r3.u32);
+  // Music::Play(r3 = a word 0 at +84, r4 = the name, r5 = a byte 0 at +80).
+  guest_call::InFrame(ctx, base, 112, 0x82110358, [&](uint32_t frame) {
+    guest::StoreU8(base, frame + 80, 0);
+    guest::StoreU32(base, frame + 84, 0);
+    ctx.r3.u64 = frame + 84;
+    ctx.r4.u64 = cs::kMusicName;
+    ctx.r5.u64 = frame + 80;
+    ModeTickMusicPlay(ctx, base);
+  });
+  ctx.r3.u64 = cs::SoundGlobalsInit3D(base);
+}
+
 }  // namespace hooks
 
 #define ITC_CAR_SOUNDS_ADAPTER(address, step) \
@@ -98,3 +139,13 @@ ITC_CAR_SOUNDS_ADAPTER(8210CA28, CarSoundsTireSoundAmount)
 // for EngineSound::EngineSound sub_8210CBA0.
 ITC_CAR_SOUNDS_ADAPTER(8210CC18, CarSoundsCarSoundConstruct)
 ITC_CAR_SOUNDS_ADAPTER(8210DCA8, CarSoundsDestroy)
+ITC_CAR_SOUNDS_ADAPTER(8210DDC8, CarSoundsSetUp)
+
+extern "C" REX_FUNC(sub_82110258) {
+  REX_FUNC_PROLOGUE();
+  if (!ITC_FLAG(native_car_sounds) || !hooks::CarSoundsGlobalsNative()) {
+    __imp__sub_82110258(ctx, base);
+    return;
+  }
+  hooks::CarSoundsGlobalsInit(ctx, base);
+}

@@ -31,4 +31,13 @@ void CarSoundsCarSoundConstruct(PPCContext& ctx, uint8_t* base);  // sub_8210CC1
 // plain C++ (the guest's where that refuses).
 void CarSoundsDestroy(PPCContext& ctx, uint8_t* base);  // sub_8210DCA8
 
+// r3 = a car sound; returns the matrix from operator new[] (its plain C++,
+// the guest's where that refuses).
+void CarSoundsSetUp(PPCContext& ctx, uint8_t* base);  // sub_8210DDC8
+// r3 = the music player; r3 = X3DAudioInitialize's. Music::Play through its
+// register step from a 112-byte frame like the original's. Only while the
+// memory blocks are native (CarSoundsGlobalsNative), else the original.
+bool CarSoundsGlobalsNative();
+void CarSoundsGlobalsInit(PPCContext& ctx, uint8_t* base);  // sub_82110258
+
 }  // namespace hooks
