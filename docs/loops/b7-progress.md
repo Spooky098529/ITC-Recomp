@@ -71,8 +71,19 @@ file's history. What's left to see in a drive, from every run:
   `models.md` 42 of 50. Left ready: `ScenePools::CreateA` `sub_820C3FD8`
   and its callees, and 12 more groups in `scene-loaders.md`. Validated
   (`itc_2036`: 26 of 26 harness lines, 18 ran in the attract race, 8 in
-  the replay `itc_2037`, ok; nothing to drive). Step: migration agent 2
-  running.
+  the replay `itc_2037`, ok; nothing to drive). Migration 2 done after
+  five batches (ecdb767..016410c: pool 4's object's, the wheels', the
+  car model's, the car parts', the cockpit's and the traffic body's
+  constructors, releases and destructors, `ScenePools::CreateA`,
+  `Interior::OnPartLoaded`, `Skeleton::ResetPose`,
+  `Model::SetVinylTextures`, `SetSharedShaders`; 25 adapters removed;
+  no new flag; `itc_2060`: 23 s, 0 errors, every harness 0 differing
+  but the expected groups; draw lists the same as the fallback).
+  `scene-loaders.md` 60 of 78 ours, `models.md` 45 of 50. Nothing ready
+  left in `scene-loaders.md`; the rest waits on the material passes, the
+  accessories, `Skeleton`'s local matrices `sub_82599C58`,
+  `XPR::GetTexture`, sprintf and functions with no rows (one lead
+  added). Step: validation agent 2 running.
 
 ## Done
 
@@ -126,5 +137,7 @@ This run's groups: `expected-differences.md` (the "22:31 run" lines).
 - After the blockers' validation: race 23 s (`itc_2036`), 0 errors,
   every harness 0 differing but the expected groups; replay 127 s
   (`itc_2037`), 0 errors.
+- After the blockers' migration 2: ours 2381, work left 4071 (wrapped
+  103, known 523, unknown 3445).
 
 ## Stopped

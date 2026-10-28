@@ -97,6 +97,24 @@ When the user has reviewed a run's section, its heading gets
   harnesses' recompiled side runs with all three flags off. Frame dumps
   after batch 5: 2,414 draws against 2,412 with the flags off, the off
   run's frame captured a moment later (the same after batch 2).
+- The scene loaders' blockers, migration 2 (ecdb767..016410c): 36 rows
+  in `scene-loaders.md`, 3 in `models.md` (`sub_82599AF0` named
+  `Skeleton::ResetPose`, probably; `sub_820CE9F8`; `sub_825896C0` named
+  `SetSharedShaders`, probably). Choices: the six deleting destructors
+  run natively only with bit 0 of their flags clear (the first set's
+  teardown `sub_820C3CF8` passes r4 = 0); with it set (`operator delete`
+  on `VirtualAlloc` pages, never seen) the original runs.
+  `ScenePools::CreateA` and `Interior::OnPartLoaded` make guest calls to
+  the originals (the constructors; `Model::Load`) from a frame like the
+  original's when a callee's plain C++ declines, as the scenery lists
+  do; no harness case reaches `CreateA`'s fallback. For review:
+  `Skeleton::ResetPose`'s harness doesn't compare r3 (177 cases differed
+  in r3 only): it ends as `ApplyAnimation` leaves it (its adapter leaves
+  the skeleton, its original a loop register; its own cases don't
+  compare r3 either), and all five callers set r3 right after. Open,
+  not investigated: with `--native_scene_loaders=false`, three 256x256
+  textures sit at other physical addresses (draws otherwise the same);
+  not caused by this migration's adapters, so from the earlier ones.
 
 ## Run 2026-10-25 23:42 (`b7-loop-25-10-26-4`)
 
