@@ -92,4 +92,20 @@ void SceneLoadersCockpitRelease(PPCContext& ctx, uint8_t* base);
 void SceneLoadersCockpitLoadsDestruct(PPCContext& ctx, uint8_t* base);
 void SceneLoadersInteriorConstruct(PPCContext& ctx, uint8_t* base);
 
+// The wheels' and the traffic body's lifetimes, only while
+// hooks::ModelsNativeLifetime(): WheelsLoads::WheelsLoads sub_820D8F60 and
+// TrafficLoads::TrafficLoads sub_820D7C40 (r3 = the loads, left);
+// WheelsLoads::Reset sub_820D8AA8 (r3 = the loads; no adapter: only
+// Wheels::Reset calls it), ~WheelsLoads sub_820D9010 and ~TrafficLoads
+// sub_820D7CC0 (r3 = the loads), Wheels::Reset sub_820D8B58 (r3 = the
+// wheels) and TrafficCar::Reset sub_820D7AB0 (r3 = the traffic body): r3 as
+// the original leaves it.
+void SceneLoadersWheelsLoadsConstruct(PPCContext& ctx, uint8_t* base);
+void SceneLoadersWheelsLoadsReset(PPCContext& ctx, uint8_t* base);
+void SceneLoadersWheelsLoadsDestruct(PPCContext& ctx, uint8_t* base);
+void SceneLoadersWheelsReset(PPCContext& ctx, uint8_t* base);
+void SceneLoadersTrafficLoadsConstruct(PPCContext& ctx, uint8_t* base);
+void SceneLoadersTrafficLoadsDestruct(PPCContext& ctx, uint8_t* base);
+void SceneLoadersTrafficReset(PPCContext& ctx, uint8_t* base);
+
 }  // namespace hooks

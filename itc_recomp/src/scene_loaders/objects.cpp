@@ -308,7 +308,7 @@ std::optional<uint32_t> CockpitRelease(uint8_t* base, uint32_t cockpit) {
   const uint32_t values = Load(base, cockpit + 208 + 176);
   if (!AllReleasable(base, cockpit, kSlots) ||
       (values != 0 && !memory::IsHeapBlock(values)) ||
-      !ProvidersClearAll(base, cockpit + kCockpitLoads) ||
+      !ProvidersClearAll(base, cockpit + kCockpitLoads, kCarModelMembers) ||
       !models::PendingFreesHaveRoom(base, 4)) {
     return std::nullopt;
   }
@@ -352,6 +352,67 @@ bool InteriorConstruct(uint8_t* base, uint32_t interior, uint32_t list) {
   Store(base, interior + 3088, 0);
   Store(base, interior + 3092, set);
   return true;
+}
+
+// --- The wheels and the traffic body ---
+
+std::optional<uint32_t> WheelsReset(uint8_t* base, uint32_t wheels) {
+  ITC_NATIVE_RUNNING("sub_820D8B58 Wheels::Reset");
+  const uint32_t loads = wheels + kWheelsLoads;
+  // WheelsLoads::Reset's checks, before anything changes (the record's
+  // defaults don't touch what they read).
+  uint64_t nodes = 4;
+  for (uint32_t offset : {kWheelsTires, kWheelsTires + 464, kWheelsRims, kWheelsRims + 464,
+                          kWheelsCalipers, kWheelsCalipers + 464}) {
+    nodes += models::ModelReleaseNodes(base, loads + offset);
+  }
+  for (uint32_t i = 0; i < 2; i++) {
+    if (Load(base, Load(base, loads + kWheelsProviders + 20 * i) + 8) !=
+        kTextureProviderClearAll) {
+      return std::nullopt;
+    }
+  }
+  if (nodes > 0x3FFFFFFFu || !models::PendingFreesHaveRoom(base, uint32_t(nodes))) {
+    return std::nullopt;
+  }
+  Store(base, wheels + 24, 0);
+  Store(base, wheels + 3268, Load(base, kFirstSet));
+  scene_models::WheelsRecordReset(base, wheels + 28);
+  const auto r3 = WheelsLoadsReset(base, loads);
+  Require(r3.has_value(), "WheelsLoads::Reset");
+  return r3;
+}
+
+std::optional<uint32_t> TrafficReset(uint8_t* base, uint32_t traffic) {
+  ITC_NATIVE_RUNNING("sub_820D7AB0 TrafficCar::Reset");
+  const uint32_t loads = traffic + kTrafficLoads;
+  const uint32_t values = Load(base, loads + kTrafficMembers.skeleton + 176);
+  uint64_t nodes = 4;
+  for (uint32_t i = 0; i < 6; i++) {
+    nodes += models::ModelReleaseNodes(base, traffic + 4256 + kPartModelBytes * i);
+  }
+  if ((values != 0 && !memory::IsHeapBlock(values)) ||
+      !ProvidersClearAll(base, loads, kTrafficMembers) || nodes > 0x3FFFFFFFu ||
+      !models::PendingFreesHaveRoom(base, uint32_t(nodes))) {
+    return std::nullopt;
+  }
+  Store(base, traffic + 7392, Load(base, kFirstSet));
+  scene_models::CarRecordReset(base, traffic + 32);
+  Store(base, traffic + 7056, 0xFFFFFFFFu);
+  car_models::LoadSlotReset(base, traffic + 3744);
+  Require(model_animation::SkeletonFreeNodeValues(base, loads + kTrafficMembers.skeleton),
+          "Skeleton::FreeNodeValues");
+  for (uint32_t i = 0; i < 2; i++) {
+    car_models::LoadSlotReset(base, traffic + 3968 + kSlotBytes * i);
+    Require(models::XprRelease(base, loads + kTrafficMembers.xprs[i]).has_value(),
+            "XPR::Release");
+    scenery_lists::TextureProviderClearAll(base, loads + kTrafficMembers.providers[i]);
+  }
+  for (uint32_t offset : {3728u, 3732u, 3736u, 3740u, 7040u, 7044u, 7048u, 7052u}) {
+    Store(base, traffic + offset, 0);
+  }
+  ResetParts(base, traffic + 4104, traffic + 4256);
+  return traffic + 4256 + kPartModelBytes * 5;
 }
 
 // --- Pool 4's object ---

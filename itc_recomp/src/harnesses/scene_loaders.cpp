@@ -1075,6 +1075,165 @@ void Cockpits(Context& h, Random& r, uint32_t block) {
   Put(h.base, sl::kFirstSet, saved_set);
 }
 
+// --- The wheels and the traffic body ---
+//
+// As the cockpit's cases, table-driven: each function's object (the wheels
+// or the traffic body at the block's +0x400), its loads, their providers,
+// XPRs and part models; constructors run on random bytes, resets and
+// destructors on loads the plain C++ constructor made (with blocks for the
+// releases to put off: the XPRs' and, now and then, one part model's).
+void WheelsAndTraffic(Context& h, Random& r, uint32_t block) {
+  if (!hooks::ModelsHostLock()) {
+    ITC_LOG_WARN("harness: scene_loaders: --native_models was off at start-up: the wheels' "
+                 "cases skipped");
+    return;
+  }
+  std::lock_guard<std::recursive_mutex> lock(models::MemoryBlocksMutex());
+  constexpr uint32_t kBytes = 0x3000;
+  const uint32_t object = block + 0x400;
+  const uint32_t headers = block + 0x2800;
+  const uint32_t saved_set = guest::LoadU32(h.base, sl::kFirstSet);
+  enum Kind { kConstruct, kReset, kDestruct };
+  struct Layout {
+    uint32_t loads;  // in the object
+    std::vector<uint32_t> providers, xprs, models;  // in the loads
+    bool (*make)(uint8_t*, uint32_t);
+    uint32_t values;  // the skeleton's node values in the loads (0: none)
+  };
+  const Layout wheels{sl::kWheelsLoads,
+                      {sl::kWheelsProviders, sl::kWheelsProviders + 20},
+                      {sl::kWheelsXprs, sl::kWheelsXprs + 24},
+                      {sl::kWheelsTires, sl::kWheelsTires + 464, sl::kWheelsRims,
+                       sl::kWheelsRims + 464, sl::kWheelsCalipers, sl::kWheelsCalipers + 464},
+                      sl::WheelsLoadsConstruct,
+                      0};
+  Layout traffic{sl::kTrafficLoads,
+                 {sl::kTrafficMembers.providers[0], sl::kTrafficMembers.providers[1]},
+                 {sl::kTrafficMembers.xprs[0], sl::kTrafficMembers.xprs[1]},
+                 {},
+                 sl::TrafficLoadsConstruct,
+                 sl::kTrafficMembers.skeleton + 176};
+  for (uint32_t i = 0; i < 6; i++) {
+    traffic.models.push_back(sl::kTrafficLoadsParts + sl::kPartModelBytes * i);
+  }
+  struct Function {
+    const char* name;
+    GuestFunction recompiled;
+    GuestFunction native;
+    Kind kind;
+    const Layout* layout;
+    bool on_object;  // r3 the object (else its loads)
+  };
+  const Function functions[] = {
+      {"WheelsLoads::WheelsLoads (sub_820D8F60)", __imp__sub_820D8F60,
+       hooks::SceneLoadersWheelsLoadsConstruct, kConstruct, &wheels, false},
+      {"WheelsLoads::Reset (sub_820D8AA8, on the game's list)", __imp__sub_820D8AA8,
+       hooks::SceneLoadersWheelsLoadsReset, kReset, &wheels, false},
+      {"Wheels::Reset (sub_820D8B58, on the game's list)", __imp__sub_820D8B58,
+       hooks::SceneLoadersWheelsReset, kReset, &wheels, true},
+      {"WheelsLoads::~WheelsLoads (sub_820D9010, on the game's list)", __imp__sub_820D9010,
+       hooks::SceneLoadersWheelsLoadsDestruct, kDestruct, &wheels, false},
+      {"TrafficLoads::TrafficLoads (sub_820D7C40)", __imp__sub_820D7C40,
+       hooks::SceneLoadersTrafficLoadsConstruct, kConstruct, &traffic, false},
+      {"TrafficCar::Reset (sub_820D7AB0, on the game's list)", __imp__sub_820D7AB0,
+       hooks::SceneLoadersTrafficReset, kReset, &traffic, true},
+      {"TrafficLoads::~TrafficLoads (sub_820D7CC0, on the game's list)", __imp__sub_820D7CC0,
+       hooks::SceneLoadersTrafficLoadsDestruct, kDestruct, &traffic, false},
+  };
+  for (const Function& f : functions) {
+    const Layout& l = *f.layout;
+    const uint32_t loads = object + l.loads;
+    const uint32_t bytes = f.layout == &traffic ? 0x6000 + kBytes : kBytes;
+    std::vector<uint32_t> providers;
+    for (const uint32_t offset : l.providers) {
+      providers.push_back(loads + offset);
+    }
+    for (const uint32_t offset : l.models) {
+      providers.push_back(loads + offset + models::kModelTextures);
+    }
+    Results results(f.name);
+    for (int c = 0; c < 24; c++) {
+      const uint64_t seed = r.Next();
+      const uint32_t set = uint32_t(r.Next());
+      Outputs out[2];
+      for (int v = 0; v < 2; v++) {
+        Random in(seed);
+        RandomBytes(h.base, block, bytes, in);
+        Put(h.base, sl::kFirstSet, set);
+        std::unordered_set<uint32_t> held;
+        std::vector<uint32_t> storages;
+        const uint32_t blocks_at = f.layout == &traffic ? block + 0x6000 + 0x2800 : headers;
+        if (f.kind != kConstruct) {
+          if (!l.make(h.base, loads)) {
+            ITC_LOG_WARN("harness: scene_loaders: a loads' constructor refused");
+            return;
+          }
+          for (const uint32_t provider : providers) {
+            storages.push_back(guest::LoadU32(
+                h.base, provider + models::kTextureProviderVector + models::kVectorFirst));
+          }
+          for (uint32_t i = 0; i < 2; i++) {
+            for (uint32_t b = 0; b < 2; b++) {
+              const uint32_t words[3] = {uint32_t(in.Next()), uint32_t(in.Next()),
+                                         uint32_t(in.Next())};
+              Put(h.base, loads + l.xprs[i] + 8 * b,
+                  pending_frees::WriteBlock(h.base, in.Below(3), blocks_at + 32 * i + 16 * b,
+                                            words));
+            }
+          }
+          if (in.Below(2) == 0) {
+            PutBlocks(h.base, loads + l.models[in.Below(6)], blocks_at + 0x100, in);
+          }
+          if (l.values != 0) {
+            uint32_t values = 0;
+            if (in.Below(2) == 0) {
+              values = memory::Alloc(48, 0);
+              held.insert(values);
+            }
+            Put(h.base, loads + l.values, values);
+          }
+        }
+        const pending_frees::ListState was = pending_frees::SaveList(h.base);
+        PPCContext t = CallContext(h);
+        t.r1.u64 &= ~0xFull;
+        t.r3.u64 = f.on_object ? object : loads;
+        RunSide(v, f.recompiled, f.native, t, h.base);
+        pending_frees::TakeAddedNodes(h.base, was, out[v]);
+        for (const uint32_t address : held) {
+          const bool alive = memory::IsHeapBlock(address);
+          out[v].Word(alive);
+          if (alive) {
+            memory::Free(address);
+          }
+        }
+        if (f.kind == kDestruct) {
+          for (const uint32_t storage : storages) {
+            const bool alive = storage != 0 && memory::IsHeapBlock(storage);
+            out[v].Word(alive);
+            if (alive) {
+              memory::crt::OperatorDelete(storage);
+            }
+            held.insert(storage);
+          }
+        } else {
+          for (const uint32_t provider : providers) {
+            TakeProvider(h.base, provider, out[v]);
+          }
+        }
+        held.erase(0);
+        Mark(h.base, block, bytes, held);
+        out[v].Bytes(Read(h.base, block, bytes));
+        out[v].Word(guest::LoadU32(h.base, sl::kFirstSet));
+        out[v].Word(t.r3.u32);
+        out[v].Word(uint32_t(t.r3.u64 >> 32));
+      }
+      results.Check(out[0], out[1], fmt::format("case {}", c));
+    }
+    results.Report();
+  }
+  Put(h.base, sl::kFirstSet, saved_set);
+}
+
 }  // namespace
 
 void SceneLoaders(Context& h) {
@@ -1089,6 +1248,7 @@ void SceneLoaders(Context& h) {
   Resets(h, r, block);
   Parts(h, r, block);
   Cockpits(h, r, block);
+  WheelsAndTraffic(h, r, block);
   memory::Free(allocation);
 }
 

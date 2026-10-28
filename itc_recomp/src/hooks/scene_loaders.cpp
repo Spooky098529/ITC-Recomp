@@ -28,7 +28,10 @@ ITC_FLAG_BOOL(native_scene_loaders, true, "ITC",
               "sub_820D6D00, Pool4Object::Reset sub_820D6948, CockpitLoads::CockpitLoads sub_820D6010 (no "
               "adapter: only Cockpit::Cockpit calls it) and ~CockpitLoads sub_820D6090, "
               "Cockpit::Cockpit sub_820D63A0 and Release sub_820D6238, Interior::Interior "
-              "sub_820D78B8) natively instead of through the "
+              "sub_820D78B8, WheelsLoads::WheelsLoads sub_820D8F60, Reset sub_820D8AA8 (no "
+              "adapter: only Wheels::Reset calls it) and ~WheelsLoads sub_820D9010, Wheels::Reset "
+              "sub_820D8B58, TrafficLoads::TrafficLoads sub_820D7C40 and ~TrafficLoads "
+              "sub_820D7CC0, TrafficCar::Reset sub_820D7AB0) natively instead of through the "
               "translated code (the same writes; checked by --run_harnesses=scene_loaders)");
 
 namespace hooks {
@@ -199,6 +202,16 @@ ITC_SCENE_LOADERS_CONSTRUCT(SceneLoadersCockpitConstruct, 820D63A0,
 ITC_SCENE_LOADERS_CONSTRUCT(SceneLoadersInteriorConstruct, 820D78B8,
                             InteriorConstruct(base, ctx.r3.u32, ctx.r4.u32))
 
+ITC_SCENE_LOADERS_CONSTRUCT(SceneLoadersWheelsLoadsConstruct, 820D8F60,
+                            WheelsLoadsConstruct(base, ctx.r3.u32))
+ITC_SCENE_LOADERS_CONSTRUCT(SceneLoadersTrafficLoadsConstruct, 820D7C40,
+                            TrafficLoadsConstruct(base, ctx.r3.u32))
+ITC_SCENE_LOADERS_RESET(SceneLoadersWheelsLoadsReset, 820D8AA8, WheelsLoadsReset)
+ITC_SCENE_LOADERS_RESET(SceneLoadersWheelsLoadsDestruct, 820D9010, WheelsLoadsDestruct)
+ITC_SCENE_LOADERS_RESET(SceneLoadersWheelsReset, 820D8B58, WheelsReset)
+ITC_SCENE_LOADERS_RESET(SceneLoadersTrafficLoadsDestruct, 820D7CC0, TrafficLoadsDestruct)
+ITC_SCENE_LOADERS_RESET(SceneLoadersTrafficReset, 820D7AB0, TrafficReset)
+
 }  // namespace hooks
 
 // The adapters: the register steps above, or the originals with the flag
@@ -206,8 +219,8 @@ ITC_SCENE_LOADERS_CONSTRUCT(SceneLoadersInteriorConstruct, 820D78B8,
 // and XPR::RecordName have none: each has one caller, made native here, whose
 // plain C++ calls theirs; nor do CarModelLoads::Reset (only CarModel::Reset
 // calls it) and CarPartsLoads::CarPartsLoads (only CarParts::CarParts): their
-// register steps stay for the harness; nor does CockpitLoads::CockpitLoads
-// (only Cockpit::Cockpit).
+// register steps stay for the harness; nor do CockpitLoads::CockpitLoads
+// (only Cockpit::Cockpit) and WheelsLoads::Reset (only Wheels::Reset).
 
 #define ITC_SCENE_LOADERS(address, step)   \
   extern "C" REX_FUNC(sub_##address) {     \
@@ -243,3 +256,9 @@ ITC_SCENE_LOADERS(820D63A0, SceneLoadersCockpitConstruct)
 ITC_SCENE_LOADERS(820D6238, SceneLoadersCockpitRelease)
 ITC_SCENE_LOADERS(820D6090, SceneLoadersCockpitLoadsDestruct)
 ITC_SCENE_LOADERS(820D78B8, SceneLoadersInteriorConstruct)
+ITC_SCENE_LOADERS(820D8F60, SceneLoadersWheelsLoadsConstruct)
+ITC_SCENE_LOADERS(820D9010, SceneLoadersWheelsLoadsDestruct)
+ITC_SCENE_LOADERS(820D8B58, SceneLoadersWheelsReset)
+ITC_SCENE_LOADERS(820D7C40, SceneLoadersTrafficLoadsConstruct)
+ITC_SCENE_LOADERS(820D7CC0, SceneLoadersTrafficLoadsDestruct)
+ITC_SCENE_LOADERS(820D7AB0, SceneLoadersTrafficReset)

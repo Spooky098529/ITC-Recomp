@@ -107,6 +107,27 @@ std::optional<uint32_t> CockpitRelease(uint8_t* base, uint32_t cockpit);
 // done, where a callee would go to the original.
 bool InteriorConstruct(uint8_t* base, uint32_t interior, uint32_t list);
 
+// --- The wheels (pool 5) and the traffic body (pool 6) ---
+
+constexpr uint32_t kWheelsLoads = 192;
+constexpr uint32_t kTrafficLoads = 3728;
+
+// Wheels::Reset (sub_820D8B58): +24 = 0, +3268 = [0x826C2E40], the wheels
+// record's defaults (sub_820D3900, +28), WheelsLoads::Reset (+192). Returns
+// the original's r3 (WheelsLoads::Reset's); nullopt, with nothing done,
+// where that would go to the original.
+std::optional<uint32_t> WheelsReset(uint8_t* base, uint32_t wheels);
+
+// TrafficCar::Reset (sub_820D7AB0): +7392 = [0x826C2E40]; CarRecord::Reset
+// (+32); +7056 = -1; the node file's slot (+3744) reset,
+// Skeleton::FreeNodeValues (+3776); the two XPR2s' slots (+3968 + 24i)
+// reset, XPR::Release (+4016 + 24i), the providers' (+4064 + 20i) slot 2;
+// +3728 to +3740 and +7040 to +7052 = 0; the six slots (+4104 + 24i) reset,
+// Model::Release and PartModel::Clear (+4256 + 464i). Returns the
+// original's r3 (the last model, +6576); nullopt, with nothing done, where a
+// callee would go to the original.
+std::optional<uint32_t> TrafficReset(uint8_t* base, uint32_t traffic);
+
 // --- Pool 4's object ---
 
 // Pool4Object::Reset (sub_820D6948): +24 = 0; the record's defaults
