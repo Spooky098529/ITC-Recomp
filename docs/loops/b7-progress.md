@@ -15,21 +15,17 @@ file's history. What's left to see in a drive, from every run:
   table and boundary log.
 - Subsystem 2 of 3 done: the file layer (below). Recorded in the
   plan's table and boundary log.
-- Subsystem 3 of 3: the save system's interface over `[0x826BDC90]`
-  (`sub_8209FFB8`-`sub_820A0620`; the lead with the most ready groups,
-  12). Mapped (3aa9f33): `save-interface.md`, 62 rows (1 moved, 61
-  new; 41 in play): the app's interface at `[0x826BDC90]`, its save
-  devices' and users' wrappers, and the front end's save layer above
-  them (`GameData::Save`, `Load`, the replays); 25 ready groups;
-  blocked by two ready rows in `files-and-saves.md` (`sub_82295D48`,
-  `sub_82295C18`). Map check passed. Migration 1 done (63d02d8..53423d6):
-  all 41 in play ours under `--native_save_interface` (with the two
-  blockers and the users' two vtable targets); 17 adapters removed;
-  35 s, 0 errors, every harness 0 differing; nothing ready left. Step:
-  validation (agent running).
+- Subsystem 3 of 3 done: the save system's interface (below).
+  Recorded in the plan's table and boundary log. The run's limit
+  reached: stopped (below).
 
 ## Done
 
+- The save system's interface: `save-interface.md` (with rows in
+  `files-and-saves.md`, `system-services.md`), 41 of 41 in play native
+  in one migration, 17 adapters removed; `--native_save_interface`;
+  3aa9f33, 63d02d8..53423d6. Validated (`itc_2311`, `itc_2312`): 46 of
+  46 harness lines; the replays' list (4) to drive.
 - The file layer: `file-layer.md` (with rows in `c-runtime.md`,
   `files-and-saves.md`), 17 native in one migration (with sprintf and
   the archive's loose read), 7 adapters removed;
@@ -76,7 +72,15 @@ file's history. What's left to see in a drive, from every run:
   103, known 544, unknown 3232).
 - After the save interface's migration 1: ours 2628, work left 3833
   (wrapped 103, known 498, unknown 3232).
+- At the end (after the save interface's validation, `itc_2311`: race
+  8 s, the harnesses ~30 s, 0 errors, every harness 0 differing but
+  the expected groups): ours 2628, work left 3833 (wrapped 103, known
+  498, unknown 3232).
 
 ## Stopped
 
-Not stopped.
+2026-10-28, at the run's limit: 3 subsystems (the archive, the file
+layer, the save system's interface). One user's call on the way (the
+archive's four semaphores host counting semaphores). Every map,
+migration and validation passed its checks.
+`check_function_statuses.py`: 0 errors. To drive: `to-drive.md`.

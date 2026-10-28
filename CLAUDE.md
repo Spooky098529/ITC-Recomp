@@ -327,6 +327,17 @@ the second state machine and the race's progress) native (ours 2,400
 -> 2,540); the rest waits on the archive, the loading screen, the cars
 put back, the input recordings and the race event's lookups. The
 harnesses now take ~30 s of `attract_race.sh 40`, leaving ~8 s of race.
+Its twentieth run (`b7-loop-28-10-26-2`, 2026-10-28, not yet merged;
+summary `docs/loops/b7-loop-2026-10-28-1845.md`; 3 subsystems) made
+the archive (`archive.md`, `--native_archive`: the TOC, `Archive::Load`,
+the queue and the loader; its four semaphores host counting semaphores,
+the user's call, routed by `Semaphore::Wait` and `Signal`), the file
+layer with sprintf and the loose read it unblocked (`file-layer.md`,
+`--native_file_layer`; sprintf under `--native_c_runtime`) and the save
+system's interface (`save-interface.md`, `--native_save_interface`, 41
+of 41 in play) native (ours 2,540 -> 2,628); the rest waits on the
+loose read's and opens' guest calls to B4's `File::` adapters, the
+game's `Semaphore::Init` and the leads in `docs/loops/leads.md`.
 Harness runs use `attract_race.sh 40` (the user's call,
 2026-10-23); a race short only because the harnesses took longer is
 no halt. B7 loop migration agents run only their subsystem's harnesses

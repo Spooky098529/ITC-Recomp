@@ -25,6 +25,11 @@ here loses its heading.
   GamePath::GamePath, `sub_820A6BF0` GamePath::SetGame
   (`file-layer.md`; only from `Movie::Open`, which the FFmpeg movies no
   longer call: probably never runs now)
+- The save interface (attract race `itc_2311`, replay `itc_2312`,
+  ok): `sub_82290378` Replays::BuildList, `sub_822902A0`
+  Replays::Count, `sub_822900E0` Replays::ReadEntry, `sub_8228F840`
+  Replays::Sort (`save-interface.md`; the replays' screen with saved
+  replays)
 
 ## Run 2026-10-28 08:36 (`b7-loop-28-10-26`)
 
