@@ -25,8 +25,15 @@ file's history. What's left to see in a drive, from every run:
   differing; nothing left ready but the semaphore users. Validated
   (`itc_2262`): 14 of 14 harness lines, all 14 in the attract race; 8
   s, 0 errors, every harness 0 differing but the expected groups;
-  nothing to drive. Step: migration 2 (the semaphore users, by the
-  user's call; agent running).
+  nothing to drive. Migration 2 done (f4b6d09..db11bea): `Archive::Load`,
+  the queue, WaitIdle, QueueLength, the cancels, the picker, the
+  set-up, the next request and the loader thread's and `Archive::Init`'s
+  waits ours, the four semaphores host ones (`Semaphore::Wait` and
+  `Signal` route them); 8 adapters removed (Native); 38 s, 0 errors,
+  every harness 0 differing. Left: the loose read `sub_8209DFA8` (the
+  file object, open by name, sprintf) and the static set-ups (the
+  game's `Semaphore::Init`). Step: validation of migration 2 (agent
+  running).
 
 ## Done
 
@@ -52,6 +59,8 @@ Nothing yet.
   known 534, unknown 3283).
 - After the archive's migration 1: ours 2554, work left 3906 (wrapped
   103, known 520, unknown 3283).
+- After the archive's migration 2: ours 2565, work left 3896 (wrapped
+  103, known 510, unknown 3283).
 
 ## Stopped
 

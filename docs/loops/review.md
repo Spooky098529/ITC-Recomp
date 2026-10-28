@@ -42,6 +42,18 @@ When the user has reviewed a run's section, its heading gets
   takes the game's queue lock (translated `Semaphore::Wait`/`Signal`)
   around cases touching the live queue; Ucl cases use an NRV2B encoder
   in the harness and 16 assets from BUILD.DAT.
+- The archive's migration 2 (f4b6d09..db11bea, `--native_archive`
+  extended): `Archive::Load`, the queueing (named `Archive::Queue`),
+  WaitIdle, QueueLength, CancelQueued, `Archive::Cancel`, `PickNext`,
+  `SetUp`, `NextRequest`, the loader thread's and `Archive::Init`'s
+  waits; 8 adapters removed. The four semaphores are host counting
+  semaphores by the user's call: `Semaphore::Wait` `sub_82592670` and
+  `Signal` `sub_825926E8` (`video-output.md`) are now Overridden,
+  routing the four addresses to the host ones and every other
+  semaphore to the game's code; the choice is made at start-up (with
+  `--native_archive=false` the four stay the game's, raced 38 s, 0
+  differ). Rows in `archive.md`, `files-and-saves.md`,
+  `video-output.md`, `known-data.md`.
 
 ## Run 2026-10-28 08:36 (`b7-loop-28-10-26`)
 
