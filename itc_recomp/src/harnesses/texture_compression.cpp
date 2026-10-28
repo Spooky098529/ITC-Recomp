@@ -60,6 +60,7 @@
 #include "hooks/heap.h"
 #include "hooks/texture_compression.h"
 #include "memory/heap.h"
+#include "texture_compression/blitter.h"
 #include "texture_compression/codecs.h"
 #include "texture_compression/compress_surface.h"
 #include "texture_compression/dxt45.h"
@@ -216,6 +217,90 @@ void NativeEncodeDxt45BlockPremultiplied(PPCContext& ctx, uint8_t* base) {
     guest::StoreU8(base, ctx.r3.u32 + i, block[i]);
   }
   ctx.r3.u64 = 0;
+}
+
+// The register steps of ImageCodec::Prepare sub_823EAA90 (r3 = the
+// destination's codec, r4 = the source's), ImageCodec::Create sub_823F6C60
+// (r3 = the description), Blitter::Blitter sub_82368D20, Release
+// sub_82368D30, CopyRows sub_82369860 and ConvertRows sub_823699F8 (r3 = the
+// blit object), Blitter::Init sub_8236C630 (r3 = the blit object, r4, r5 the
+// descriptions, r6 the filter) and XGGetBlockDimensions sub_8236D3C8 (r3 =
+// the format, r4, r5 the outputs), as their adapters did them: the original
+// where the plain C++ refuses or without the native heap. r3 as the original
+// leaves it.
+void NativePrepare(PPCContext& ctx, uint8_t* base) {
+  const auto r3 =
+      hooks::NativeHeapActive() ? tc::PrepareCodecs(base, ctx.r3.u32, ctx.r4.u32) : std::nullopt;
+  if (!r3) {
+    __imp__sub_823EAA90(ctx, base);
+    return;
+  }
+  ctx.r3.u64 = *r3;
+}
+
+void NativeCreate(PPCContext& ctx, uint8_t* base) {
+  if (!hooks::NativeHeapActive()) {
+    __imp__sub_823F6C60(ctx, base);
+    return;
+  }
+  ctx.fpscr.disableFlushMode();
+  const auto r3 =
+      tc::CreateCodec(base, ctx.r3.u32, ctx.r1.u32, hooks::TextureCompressionGuestCall(ctx, base));
+  if (!r3) {
+    __imp__sub_823F6C60(ctx, base);
+    return;
+  }
+  ctx.r3.u64 = *r3;
+}
+
+void NativeBlitterConstruct(PPCContext& ctx, uint8_t* base) {
+  tc::BlitterConstruct(base, ctx.r3.u32);  // r3 left
+}
+
+void NativeBlitterRelease(PPCContext& ctx, uint8_t* base) {
+  if (!hooks::NativeHeapActive()) {
+    __imp__sub_82368D30(ctx, base);
+    return;
+  }
+  ctx.fpscr.disableFlushMode();
+  ctx.r3.u64 =
+      tc::BlitterRelease(base, ctx.r3.u32, ctx.r1.u32, hooks::TextureCompressionGuestCall(ctx, base));
+}
+
+void NativeCopyRows(PPCContext& ctx, uint8_t* base) {
+  // Its results are made by lis (sign-extended), as are Init's and
+  // XGCompressSurface's.
+  ctx.r3.s64 = int32_t(
+      tc::BlitterCopyRows(base, ctx.r3.u32, ctx.r1.u32, hooks::TextureCompressionGuestCall(ctx, base)));
+}
+
+void NativeConvertRows(PPCContext& ctx, uint8_t* base) {
+  if (!hooks::NativeHeapActive()) {
+    __imp__sub_823699F8(ctx, base);
+    return;
+  }
+  ctx.fpscr.disableFlushMode();
+  const auto r3 = tc::BlitterConvertRows(base, ctx.r3.u32, ctx.r1.u32,
+                                         hooks::TextureCompressionGuestCall(ctx, base));
+  if (!r3) {
+    __imp__sub_823699F8(ctx, base);
+    return;
+  }
+  ctx.r3.s64 = int32_t(*r3);
+}
+
+void NativeBlitterInit(PPCContext& ctx, uint8_t* base) {
+  if (!hooks::NativeHeapActive()) {
+    __imp__sub_8236C630(ctx, base);
+    return;
+  }
+  ctx.fpscr.disableFlushMode();
+  ctx.r3.s64 = int32_t(tc::BlitterInit(base, ctx.r3.u32, ctx.r4.u32, ctx.r5.u32, ctx.r6.u32,
+                                       ctx.r1.u32, hooks::TextureCompressionGuestCall(ctx, base)));
+}
+
+void NativeGetBlockDimensions(PPCContext& ctx, uint8_t* base) {
+  tc::GetBlockDimensions(base, ctx.r3.u32, ctx.r4.u32, ctx.r5.u32);  // r3 left
 }
 
 // ImageCodec::~ImageCodec sub_823EA070 and DxtCodec::~DxtCodec sub_823EA770:
@@ -1693,7 +1778,7 @@ void Prepare(Context& h) {
       if (v == 0) {
         __imp__sub_823EAA90(t, h.base);
       } else {
-        hooks::TextureCompressionPrepare(t, h.base);
+        NativePrepare(t, h.base);
       }
       ITC_FLAG(native_texture_compression) = true;
       Blocks blocks;
@@ -1832,7 +1917,7 @@ void Create(Context& h) {
       if (v == 0) {
         __imp__sub_823F6C60(t, h.base);
       } else {
-        hooks::TextureCompressionCreate(t, h.base);
+        NativeCreate(t, h.base);
       }
       ITC_FLAG(native_texture_compression) = true;
       const uint32_t codec = t.r3.u32;
@@ -2027,7 +2112,7 @@ void BlockDimensions(Context& h) {
         if (v == 0) {
           __imp__sub_8236D3C8(t, h.base);
         } else {
-          hooks::TextureCompressionGetBlockDimensions(t, h.base);
+          NativeGetBlockDimensions(t, h.base);
         }
         out[v].Bytes(Read(h.base, h.data, 16));
         out[v].Word(t.r3.u32);
@@ -2052,7 +2137,7 @@ void BlitterConstruct(Context& h) {
       if (v == 0) {
         __imp__sub_82368D20(t, h.base);
       } else {
-        hooks::TextureCompressionBlitterConstruct(t, h.base);
+        NativeBlitterConstruct(t, h.base);
       }
       out[v].Bytes(Read(h.base, h.data, 64));
       out[v].Word(t.r3.u32);
@@ -2200,7 +2285,7 @@ void BlitterInitCases(Context& h) {
         __imp__sub_8236C630(t, h.base);
         if (t.r3.u32 == 0) init_succeeded++;
       } else {
-        hooks::TextureCompressionBlitterInit(t, h.base);
+        NativeBlitterInit(t, h.base);
       }
       ITC_FLAG(native_texture_compression) = true;
       out[v].Word(t.r3.u32);
@@ -2301,10 +2386,10 @@ void BlitterRows(Context& h) {
         t = CallContext(h);
         t.r3.u64 = area + kBlit;
         if (copy) {
-          (v == 0 ? GuestFunction(__imp__sub_82369860) : hooks::TextureCompressionCopyRows)(
+          (v == 0 ? GuestFunction(__imp__sub_82369860) : NativeCopyRows)(
               t, h.base);
         } else {
-          (v == 0 ? GuestFunction(__imp__sub_823699F8) : hooks::TextureCompressionConvertRows)(
+          (v == 0 ? GuestFunction(__imp__sub_823699F8) : NativeConvertRows)(
               t, h.base);
         }
         out[v].Word(t.r3.u32);
@@ -2325,7 +2410,7 @@ void BlitterRows(Context& h) {
       }
       t = CallContext(h);
       t.r3.u64 = area + kBlit;
-      (v == 0 ? GuestFunction(__imp__sub_82368D30) : hooks::TextureCompressionBlitterRelease)(
+      (v == 0 ? GuestFunction(__imp__sub_82368D30) : NativeBlitterRelease)(
           t, h.base);
       ITC_FLAG(native_texture_compression) = true;
       blocks.Put(out[v], t.r3.u32, area, kBlitAreaBytes);

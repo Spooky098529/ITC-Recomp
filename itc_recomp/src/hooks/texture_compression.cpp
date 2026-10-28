@@ -10,8 +10,12 @@
 // the functions reached only from native callers went (DxtAlpha::
 // FitEndpoints and EncodeBlock, DxtColor::PackR5G6B5, FitEndpoints and
 // EncodeBlock, Dxt45::EncodeBlockPremultiplied, ImageCodec::~ImageCodec,
-// DxtCodec::~DxtCodec, ImageCodec::ImageCodec, DxtCodec::DxtCodec): their
-// callers' plain C++ calls theirs directly.
+// DxtCodec::~DxtCodec, ImageCodec::ImageCodec, DxtCodec::DxtCodec, then
+// ImageCodec::Create, ImageCodec::Prepare, Blitter::Blitter, Release, Init,
+// CopyRows, ConvertRows and XGGetBlockDimensions): their callers' plain C++
+// calls theirs directly. XGCompressSurface's adapter stays (the recompiled
+// Vinyl::Compress calls it), as do those of the functions reached through
+// the codecs' vtables and the DXT codec's +144.
 
 #include "hooks/texture_compression.h"
 
@@ -80,10 +84,8 @@ void TextureCompressionDecodeA8R8G8B8Row(PPCContext& ctx, uint8_t* base) {
   ctx.r3.u64 = *r3;
 }
 
-namespace {
-
 // A guest function called as the originals call through ctr, at `stack`.
-tc::GuestCall CallThroughCtr(PPCContext& ctx, uint8_t* base) {
+tc::GuestCall TextureCompressionGuestCall(PPCContext& ctx, uint8_t* base) {
   return [&ctx, base](uint32_t function, uint32_t stack, uint32_t r3, uint32_t r4, uint32_t r5,
                       uint32_t r6) -> uint32_t {
     const uint64_t saved = ctx.r1.u64;
@@ -100,8 +102,6 @@ tc::GuestCall CallThroughCtr(PPCContext& ctx, uint8_t* base) {
   };
 }
 
-}  // namespace
-
 void TextureCompressionDxtEncodeRow(PPCContext& ctx, uint8_t* base) {
   if (!NativeHeapActive()) {
     __imp__sub_823F6298(ctx, base);
@@ -110,7 +110,7 @@ void TextureCompressionDxtEncodeRow(PPCContext& ctx, uint8_t* base) {
   ctx.fpscr.disableFlushMode();
   // The codec's block functions (+140, +144) as the original calls them
   // through ctr.
-  const tc::GuestCall call = CallThroughCtr(ctx, base);
+  const tc::GuestCall call = TextureCompressionGuestCall(ctx, base);
   const auto r3 = tc::DxtEncodeRow(base, ctx.r3.u32, ctx.r4.u32, ctx.r5.u32, ctx.r6.u32,
                                    ctx.r1.u32, call);
   if (!r3) {
@@ -143,77 +143,6 @@ void TextureCompressionDxtCodecDelete(PPCContext& ctx, uint8_t* base) {
   DeleteWith(ctx, base, tc::DxtCodecDelete, __imp__sub_823F6BC0);
 }
 
-void TextureCompressionPrepare(PPCContext& ctx, uint8_t* base) {
-  const auto r3 =
-      NativeHeapActive() ? tc::PrepareCodecs(base, ctx.r3.u32, ctx.r4.u32) : std::nullopt;
-  if (!r3) {
-    __imp__sub_823EAA90(ctx, base);
-    return;
-  }
-  ctx.r3.u64 = *r3;
-}
-
-void TextureCompressionCreate(PPCContext& ctx, uint8_t* base) {
-  if (!NativeHeapActive()) {
-    __imp__sub_823F6C60(ctx, base);
-    return;
-  }
-  ctx.fpscr.disableFlushMode();
-  const auto r3 = tc::CreateCodec(base, ctx.r3.u32, ctx.r1.u32, CallThroughCtr(ctx, base));
-  if (!r3) {
-    __imp__sub_823F6C60(ctx, base);
-    return;
-  }
-  ctx.r3.u64 = *r3;
-}
-
-void TextureCompressionBlitterConstruct(PPCContext& ctx, uint8_t* base) {
-  tc::BlitterConstruct(base, ctx.r3.u32);  // r3 left
-}
-
-void TextureCompressionBlitterRelease(PPCContext& ctx, uint8_t* base) {
-  if (!NativeHeapActive()) {
-    __imp__sub_82368D30(ctx, base);
-    return;
-  }
-  ctx.fpscr.disableFlushMode();
-  ctx.r3.u64 = tc::BlitterRelease(base, ctx.r3.u32, ctx.r1.u32, CallThroughCtr(ctx, base));
-}
-
-void TextureCompressionCopyRows(PPCContext& ctx, uint8_t* base) {
-  // Its results are made by lis (sign-extended), as are Init's and
-  // XGCompressSurface's.
-  ctx.r3.s64 = int32_t(tc::BlitterCopyRows(base, ctx.r3.u32, ctx.r1.u32, CallThroughCtr(ctx, base)));
-}
-
-void TextureCompressionConvertRows(PPCContext& ctx, uint8_t* base) {
-  if (!NativeHeapActive()) {
-    __imp__sub_823699F8(ctx, base);
-    return;
-  }
-  ctx.fpscr.disableFlushMode();
-  const auto r3 = tc::BlitterConvertRows(base, ctx.r3.u32, ctx.r1.u32, CallThroughCtr(ctx, base));
-  if (!r3) {
-    __imp__sub_823699F8(ctx, base);
-    return;
-  }
-  ctx.r3.s64 = int32_t(*r3);
-}
-
-void TextureCompressionBlitterInit(PPCContext& ctx, uint8_t* base) {
-  if (!NativeHeapActive()) {
-    __imp__sub_8236C630(ctx, base);
-    return;
-  }
-  ctx.fpscr.disableFlushMode();
-  ctx.r3.s64 = int32_t(tc::BlitterInit(base, ctx.r3.u32, ctx.r4.u32, ctx.r5.u32, ctx.r6.u32,
-                                       ctx.r1.u32, CallThroughCtr(ctx, base)));
-}
-
-void TextureCompressionGetBlockDimensions(PPCContext& ctx, uint8_t* base) {
-  tc::GetBlockDimensions(base, ctx.r3.u32, ctx.r4.u32, ctx.r5.u32);  // r3 left
-}
-
 void TextureCompressionCompressSurface(PPCContext& ctx, uint8_t* base) {
   if (!NativeHeapActive()) {
     __imp__sub_8235AAC0(ctx, base);
@@ -223,7 +152,7 @@ void TextureCompressionCompressSurface(PPCContext& ctx, uint8_t* base) {
   const tc::CompressArguments arguments{ctx.r3.u32, ctx.r4.u32, ctx.r5.u32,  ctx.r6.u32,
                                         ctx.r7.u32, ctx.r8.u32, ctx.r9.u32,  ctx.r10.u32,
                                         ctx.f1.f64};
-  const auto r3 = tc::CompressSurface(base, arguments, ctx.r1.u32, CallThroughCtr(ctx, base));
+  const auto r3 = tc::CompressSurface(base, arguments, ctx.r1.u32, TextureCompressionGuestCall(ctx, base));
   if (!r3) {
     __imp__sub_8235AAC0(ctx, base);
     return;
@@ -248,12 +177,4 @@ ITC_TEXTURE_COMPRESSION_ADAPTER(823F2620, TextureCompressionDecodeA8R8G8B8Row)
 ITC_TEXTURE_COMPRESSION_ADAPTER(823F6298, TextureCompressionDxtEncodeRow)
 ITC_TEXTURE_COMPRESSION_ADAPTER(823F6B70, TextureCompressionImageCodecDelete)
 ITC_TEXTURE_COMPRESSION_ADAPTER(823F6BC0, TextureCompressionDxtCodecDelete)
-ITC_TEXTURE_COMPRESSION_ADAPTER(823EAA90, TextureCompressionPrepare)
-ITC_TEXTURE_COMPRESSION_ADAPTER(823F6C60, TextureCompressionCreate)
-ITC_TEXTURE_COMPRESSION_ADAPTER(82368D20, TextureCompressionBlitterConstruct)
-ITC_TEXTURE_COMPRESSION_ADAPTER(82368D30, TextureCompressionBlitterRelease)
-ITC_TEXTURE_COMPRESSION_ADAPTER(82369860, TextureCompressionCopyRows)
-ITC_TEXTURE_COMPRESSION_ADAPTER(823699F8, TextureCompressionConvertRows)
-ITC_TEXTURE_COMPRESSION_ADAPTER(8236C630, TextureCompressionBlitterInit)
-ITC_TEXTURE_COMPRESSION_ADAPTER(8236D3C8, TextureCompressionGetBlockDimensions)
 ITC_TEXTURE_COMPRESSION_ADAPTER(8235AAC0, TextureCompressionCompressSurface)
