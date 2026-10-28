@@ -83,9 +83,17 @@ file's history. What's left to see in a drive, from every run:
   left in `scene-loaders.md`; the rest waits on the material passes, the
   accessories, `Skeleton`'s local matrices `sub_82599C58`,
   `XPR::GetTexture`, sprintf and functions with no rows (one lead
-  added). Step: validation agent 2 running.
+  added). Validated (`itc_2062`: 39 of 39 harness lines, 21 ran in
+  the attract race, 18 in the replay `itc_2063`, ok; nothing to drive).
+  Finished.
 
 ## Done
+
+- The scene loaders' blockers (no mapping; e9e8e77..016410c):
+  `scene-loaders.md` 60 of 78 ours, `car-models.md` 4 of 42, `models.md`
+  45 of 50; 27 adapters removed; validated (`itc_2036`, `itc_2062`);
+  `--native_car_models` (new), `--native_scene_loaders`,
+  `--native_models`.
 
 - The scene's loading objects (`scene-loaders.md`, mapped in 2616cc8;
   78 rows): 20 ours in one migration (4b47c12, dfbc5a0), 5 Native with
@@ -139,5 +147,8 @@ This run's groups: `expected-differences.md` (the "22:31 run" lines).
   (`itc_2037`), 0 errors.
 - After the blockers' migration 2: ours 2381, work left 4071 (wrapped
   103, known 523, unknown 3445).
+- After the blockers' validation 2: race 22 s (`itc_2062`), 0 errors,
+  every harness 0 differing but the expected groups; replay 127 s
+  (`itc_2063`), 0 errors.
 
 ## Stopped
