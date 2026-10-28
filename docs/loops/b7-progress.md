@@ -26,8 +26,13 @@ file's history. What's left to see in a drive, from every run:
   frame dumps the same as the fallback). Left ready: `App::Start`,
   `AppStates::Create` and the state-layer tree's ready groups.
   Validated (`itc_1996`: 30 of 30 harness lines, 24 ran in the attract
-  race, 6 in the replay `itc_1997`, ok; nothing to drive). Step:
-  migration agent 2 running.
+  race, 6 in the replay `itc_1997`, ok; nothing to drive). Migration 2
+  done (4baecb1..30892a7: the state stack's set-up and `App::Start`,
+  the layers' walks, updates, operations and toggle messages; 14
+  adapters removed; `itc_2011`: 23 s, 0 errors, every harness 0
+  differing but the expected groups; frame dumps the same as the
+  fallback). `app-states.md` 56 of 56 ours. Step: validation agent 2
+  running.
 
 ## Done
 
@@ -55,5 +60,7 @@ This run's groups: `expected-differences.md` (the "22:31 run" lines).
 - After the app states' validation: race 23 s (`itc_1996`), 0 errors,
   every harness 0 differing but the expected groups; replay 127 s
   (`itc_1997`), 0 errors.
+- After the app states' migration 2: ours 2311, work left 4141
+  (wrapped 103, known 515, unknown 3523).
 
 ## Stopped

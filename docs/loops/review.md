@@ -41,6 +41,19 @@ When the user has reviewed a run's section, its heading gets
   `sub_820938C0` and a few others the print comes after an early check
   that hands the call back to the recompiled code (some print at more
   than one site), not as the first statement; left as written.
+- The app states, migration 2 (4baecb1..30892a7): 28 rows in
+  `app-states.md`, now 56 of 56 ours; new code in
+  `src/app_states/layers.{h,cpp}`; `AppCalls` got a `native_heap`
+  field. Map correction: `StateLayer::Update` `sub_820ADF00` and
+  `UpdateToggled` `sub_820AE010` are reached through slot thunks and
+  delegates, not called directly. Left on the original (never in play):
+  `StateLayer::ApplyOp`'s pop and replace (types 1 and 3),
+  `AppStates::OnMessage`'s messages 1, 5 and 6 (the step and the
+  teardowns), and every failed `operator new`. Adapters kept: those
+  reached through vtables, delegates or function pointers, and
+  `AppStates::Create` (called from the app's constructor
+  `sub_82094590`). One commit (be3d047) left three rows' Status blank;
+  fixed in the next (a7c59b8).
 
 ## Run 2026-10-25 23:42 (`b7-loop-25-10-26-4`)
 
