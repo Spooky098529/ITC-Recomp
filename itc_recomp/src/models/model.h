@@ -39,6 +39,14 @@ std::optional<uint32_t> ModelRelease(uint8_t* base, uint32_t model);
 // in reverse. Returns the original's r3 (XPR::~XPR's).
 std::optional<uint32_t> ModelDestruct(uint8_t* base, uint32_t model);
 
+// For native callers checking before they release or destroy several
+// models (nothing changed): the pending frees' nodes ModelRelease (and
+// ModelDestruct) may add for `model` (each block not null, and the XPR's
+// two), and whether ModelDestruct's members would all run natively (its
+// pending frees counted apart: the caller checks the sum).
+uint32_t ModelReleaseNodes(uint8_t* base, uint32_t model);
+bool ModelMembersDestructible(uint8_t* base, uint32_t model);
+
 // --- The materials and the shared shaders (accessors) ---
 
 // Model::MaterialCount (sub_82594AD8): the shape's (544 bytes each from the

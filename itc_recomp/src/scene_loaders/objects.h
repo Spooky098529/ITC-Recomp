@@ -37,4 +37,47 @@ bool CarModelResettable(uint8_t* base, uint32_t car_model);
 // says no.
 std::optional<uint32_t> CarModelReset(uint8_t* base, uint32_t car_model);
 
+// --- The car parts (pool 1) ---
+
+// The car parts (106,016 bytes): +96 the loads (216 slots, then the part
+// models at the loads' +5184, the parts' +5280), +28 the parts record,
+// +106000 the first pool set.
+constexpr uint32_t kCarPartsVtable = 0x82005094;
+constexpr uint32_t kCarPartsLoads = 96;
+
+// CarPartsLoads::CarPartsLoads (sub_820D6F88): the 216 part models
+// (PartModel::PartModel, +5184 + 464i), then the 30 words at +105436 + 16i
+// = the word at 0x82000A30 (1.0, as the original loads it). False, with
+// nothing done, where a part model's constructor would go to the original.
+bool CarPartsLoadsConstruct(uint8_t* base, uint32_t loads);
+
+// CarParts::CarParts (sub_820D7428): PoolNode::PoolNode (r4 = the list),
+// +20 = -1, the vtable, +16 = 0; CarPartsLoads::CarPartsLoads (+96); +24 =
+// 0; for the 216 parts the slot (+96 + 24i) reset, Model::Release and
+// PartModel::Clear on the model (+5280 + 464i); the parts record's defaults
+// (sub_820D3558, +28); +106000 = [0x826C2E40]. False, with nothing done,
+// where a callee would go to the original.
+bool CarPartsConstruct(uint8_t* base, uint32_t parts, uint32_t list);
+
+// CarParts::Release (sub_820D6D00): for the 216 parts,
+// LoadSlot::ReleaseBuffer (+96 + 24i), Model::Release and PartModel::Clear
+// (+5280 + 464i). Returns the original's r3 (the last model); nullopt, with
+// nothing done, where a callee would go to the original.
+std::optional<uint32_t> CarPartsRelease(uint8_t* base, uint32_t parts);
+
+// CarPartsLoads::~CarPartsLoads (sub_820D6FE8): PartModel::~PartModel on
+// the 216 part models, last first. Returns the original's r3 (the last
+// destructor's); nullopt, with nothing done, where one would go to the
+// original.
+std::optional<uint32_t> CarPartsLoadsDestruct(uint8_t* base, uint32_t loads);
+
+// --- Pool 4's object ---
+
+// Pool4Object::Reset (sub_820D6948): +24 = 0; the record's defaults
+// (sub_820D34E0, +28); the slot (+80) reset; Model::Release and
+// PartModel::Clear on the model (+112); +576 = [0x826C2E40]. Returns the
+// original's r3 (the model); nullopt, with nothing done, where
+// Model::Release would go to the original.
+std::optional<uint32_t> Pool4Reset(uint8_t* base, uint32_t object);
+
 }  // namespace scene_loaders

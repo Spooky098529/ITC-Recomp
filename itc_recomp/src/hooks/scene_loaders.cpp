@@ -5,6 +5,7 @@
 #include "hooks/scene_loaders.h"
 
 #include "base/flags.h"
+#include "base/log.h"
 #include "hooks/heap.h"
 #include "hooks/models.h"
 #include "scene_loaders/loads.h"
@@ -22,7 +23,9 @@ ITC_FLAG_BOOL(native_scene_loaders, true, "ITC",
               "sub_820CE800 and XPR::FindByName sub_820D09B8 (with XPR::Count sub_82596F20 and "
               "RecordName sub_82596F40, no adapters); with --native_heap and the memory blocks' host lock "
               "CarModelLoads::CarModelLoads sub_820D3DE0, ~CarModelLoads sub_820D3E40 and Reset sub_820D3B58, "
-              "CarModel::Reset sub_820D3E98) natively instead of through the "
+              "CarModel::Reset sub_820D3E98, CarPartsLoads::CarPartsLoads sub_820D6F88 and "
+              "~CarPartsLoads sub_820D6FE8, CarParts::CarParts sub_820D7428 and Release "
+              "sub_820D6D00, Pool4Object::Reset sub_820D6948) natively instead of through the "
               "translated code (the same writes; checked by --run_harnesses=scene_loaders)");
 
 namespace hooks {
@@ -146,6 +149,30 @@ void SceneLoadersCarModelLoadsDestruct(PPCContext& ctx, uint8_t* base) {
 ITC_SCENE_LOADERS_RESET(SceneLoadersCarModelLoadsReset, 820D3B58, CarModelLoadsReset)
 ITC_SCENE_LOADERS_RESET(SceneLoadersCarModelReset, 820D3E98, CarModelReset)
 
+ITC_SCENE_LOADERS_RESET(SceneLoadersCarPartsRelease, 820D6D00, CarPartsRelease)
+ITC_SCENE_LOADERS_RESET(SceneLoadersCarPartsLoadsDestruct, 820D6FE8, CarPartsLoadsDestruct)
+ITC_SCENE_LOADERS_RESET(SceneLoadersPool4Reset, 820D6948, Pool4Reset)
+
+void SceneLoadersCarPartsLoadsConstruct(PPCContext& ctx, uint8_t* base) {
+  if (hooks::ModelsNativeLifetime()) {
+    ctx.fpscr.disableFlushMode();
+    if (sl::CarPartsLoadsConstruct(base, ctx.r3.u32)) {
+      return;
+    }
+  }
+  __imp__sub_820D6F88(ctx, base);
+}
+
+void SceneLoadersCarPartsConstruct(PPCContext& ctx, uint8_t* base) {
+  if (hooks::ModelsNativeLifetime()) {
+    ctx.fpscr.disableFlushMode();
+    if (sl::CarPartsConstruct(base, ctx.r3.u32, ctx.r4.u32)) {
+      return;
+    }
+  }
+  __imp__sub_820D7428(ctx, base);
+}
+
 }  // namespace hooks
 
 // The adapters: the register steps above, or the originals with the flag
@@ -180,3 +207,8 @@ ITC_SCENE_LOADERS(820D3DE0, SceneLoadersCarModelLoadsConstruct)
 ITC_SCENE_LOADERS(820D3E40, SceneLoadersCarModelLoadsDestruct)
 ITC_SCENE_LOADERS(820D3B58, SceneLoadersCarModelLoadsReset)
 ITC_SCENE_LOADERS(820D3E98, SceneLoadersCarModelReset)
+ITC_SCENE_LOADERS(820D6F88, SceneLoadersCarPartsLoadsConstruct)
+ITC_SCENE_LOADERS(820D7428, SceneLoadersCarPartsConstruct)
+ITC_SCENE_LOADERS(820D6D00, SceneLoadersCarPartsRelease)
+ITC_SCENE_LOADERS(820D6FE8, SceneLoadersCarPartsLoadsDestruct)
+ITC_SCENE_LOADERS(820D6948, SceneLoadersPool4Reset)

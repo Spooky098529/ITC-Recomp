@@ -51,6 +51,12 @@ std::optional<uint32_t> LoadSlotReleaseBuffer(uint8_t* base, uint32_t slot) {
   return r3;
 }
 
+bool LoadSlotReleasable(uint8_t* base, uint32_t slot, uint32_t* freed) {
+  const uint32_t buffer = Load(base, slot + 16);
+  *freed = Load(base, slot + 12) == 0 ? buffer : 0;
+  return *freed == 0 || memory::IsPages(buffer);
+}
+
 void DeferRelease(uint8_t* base, uint32_t set, uint32_t a, uint32_t b, uint32_t c, uint32_t d) {
   ITC_NATIVE_RUNNING("sub_820C3F50 DeferRelease");
   const int32_t count = int32_t((Load(base, set + 40) + Load(base, set + 12)) << 2);

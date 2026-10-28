@@ -66,4 +66,17 @@ void SceneLoadersCarModelLoadsDestruct(PPCContext& ctx, uint8_t* base);
 void SceneLoadersCarModelLoadsReset(PPCContext& ctx, uint8_t* base);
 void SceneLoadersCarModelReset(PPCContext& ctx, uint8_t* base);
 
+// The car parts' and pool 4's lifetimes, only while
+// hooks::ModelsNativeLifetime(): CarPartsLoads::CarPartsLoads sub_820D6F88
+// (r3 = the loads, left), CarParts::CarParts sub_820D7428 (r3 = the parts,
+// left; r4 = the list), CarParts::Release sub_820D6D00 (r3 = the parts),
+// CarPartsLoads::~CarPartsLoads sub_820D6FE8 (r3 = the loads) and
+// Pool4Object::Reset sub_820D6948 (r3 = the object): r3 as the original
+// leaves it.
+void SceneLoadersCarPartsLoadsConstruct(PPCContext& ctx, uint8_t* base);
+void SceneLoadersCarPartsConstruct(PPCContext& ctx, uint8_t* base);
+void SceneLoadersCarPartsRelease(PPCContext& ctx, uint8_t* base);
+void SceneLoadersCarPartsLoadsDestruct(PPCContext& ctx, uint8_t* base);
+void SceneLoadersPool4Reset(PPCContext& ctx, uint8_t* base);
+
 }  // namespace hooks

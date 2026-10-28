@@ -21,17 +21,22 @@
 #include "scene_loaders/loads.h"
 #include "scene_loaders/objects.h"
 #include "models/memory_blocks.h"
+#include "models/model.h"
+#include "models/part_model.h"
+#include "models/xpr.h"
 #include "scene_loaders/pools.h"
 
 #include <fmt/format.h>
 
 #include <functional>
 #include <mutex>
+#include <unordered_set>
 #include <string>
 #include <vector>
 
 ITC_FLAG_DECLARE(bool, native_scene_loaders);
 ITC_FLAG_DECLARE(bool, native_car_models);
+ITC_FLAG_DECLARE(bool, native_models);
 
 namespace harness {
 
@@ -710,6 +715,209 @@ void Resets(Context& h, Random& r, uint32_t block) {
   Put(h.base, sl::kFirstSet, saved_set);
 }
 
+// --- The car parts and pool 4's object ---
+//
+// Each side builds its objects with the plain C++ constructors where the
+// function under test needs them made (from the same random bytes), puts
+// blocks for the releases to put off in a few models (headers in the
+// block, at most eight nodes, all kept by TakeAddedNodes), runs, and is
+// compared by the pending frees' nodes, the providers' storage (by its
+// contents, then freed), the pages and storage each side allocated (by
+// whether they're alive; words still pointing at them marked) and the
+// block. The recompiled side runs with --native_scene_loaders,
+// --native_car_models and --native_models off (its callees the originals).
+
+constexpr uint32_t kMarked = 0x4D41524B;  // 'MARK': a side's own allocation
+
+// Words in [from, from + bytes) equal to one of `held` marked.
+void Mark(uint8_t* base, uint32_t from, uint32_t bytes, const std::unordered_set<uint32_t>& held) {
+  for (uint32_t i = 0; i < bytes; i += 4) {
+    if (held.count(guest::LoadU32(base, from + i)) != 0) {
+      Put(base, from + i, kMarked);
+    }
+  }
+}
+
+// Runs one side of a lifetime case: the flags off for the recompiled side.
+void RunSide(int v, GuestFunction recompiled, GuestFunction native, PPCContext& t, uint8_t* base) {
+  ITC_FLAG(native_scene_loaders) = v == 1;
+  ITC_FLAG(native_car_models) = v == 1;
+  ITC_FLAG(native_models) = v == 1;
+  (v == 0 ? recompiled : native)(t, base);
+  ITC_FLAG(native_scene_loaders) = true;
+  ITC_FLAG(native_car_models) = true;
+  ITC_FLAG(native_models) = true;
+}
+
+// Blocks for Model::Release to put off in model `model`: +16, +20 and the
+// XPR's header and data, each none, untagged or tagged (headers at
+// `headers`, 16 bytes each, four for the model).
+void PutBlocks(uint8_t* base, uint32_t model, uint32_t headers, Random& r) {
+  const uint32_t at[] = {model + 16, model + 20, model + models::kModelXpr + models::kXprHeader,
+                         model + models::kModelXpr + models::kXprData};
+  for (uint32_t i = 0; i < 4; i++) {
+    const uint32_t words[3] = {uint32_t(r.Next()), uint32_t(r.Next()), uint32_t(r.Next())};
+    Put(base, at[i], pending_frees::WriteBlock(base, r.Below(3), headers + 16 * i, words));
+  }
+}
+
+void Parts(Context& h, Random& r, uint32_t block) {
+  if (!hooks::ModelsHostLock()) {
+    ITC_LOG_WARN("harness: scene_loaders: --native_models was off at start-up: the car parts' "
+                 "cases skipped");
+    return;
+  }
+  std::lock_guard<std::recursive_mutex> lock(models::MemoryBlocksMutex());
+  constexpr uint32_t kBytes = 0x1C000;
+  const uint32_t parts = block + 0x400;
+  const uint32_t loads = parts + sl::kCarPartsLoads;
+  const uint32_t list = block + 0x1A400;
+  const uint32_t headers = block + 0x1B000;
+  const uint32_t saved_set = guest::LoadU32(h.base, sl::kFirstSet);
+  auto model_of = [&](uint32_t i) { return parts + sl::kPartsModels + sl::kPartModelBytes * i; };
+  enum Kind { kLoadsConstruct, kConstruct, kRelease, kLoadsDestruct };
+  struct Function {
+    const char* name;
+    GuestFunction recompiled;
+    GuestFunction native;
+    Kind kind;
+  };
+  const Function functions[] = {
+      {"CarPartsLoads::CarPartsLoads (sub_820D6F88)", __imp__sub_820D6F88,
+       hooks::SceneLoadersCarPartsLoadsConstruct, kLoadsConstruct},
+      {"CarParts::CarParts (sub_820D7428, on the game's list)", __imp__sub_820D7428,
+       hooks::SceneLoadersCarPartsConstruct, kConstruct},
+      {"CarParts::Release (sub_820D6D00, on the game's list)", __imp__sub_820D6D00,
+       hooks::SceneLoadersCarPartsRelease, kRelease},
+      {"CarPartsLoads::~CarPartsLoads (sub_820D6FE8, on the game's list)", __imp__sub_820D6FE8,
+       hooks::SceneLoadersCarPartsLoadsDestruct, kLoadsDestruct},
+  };
+  for (const Function& f : functions) {
+    Results results(f.name);
+    for (int c = 0; c < 6; c++) {
+      const uint64_t seed = r.Next();
+      const uint32_t set = uint32_t(r.Next());
+      Outputs out[2];
+      for (int v = 0; v < 2; v++) {
+        Random in(seed);
+        RandomBytes(h.base, block, kBytes, in);
+        Put(h.base, sl::kFirstSet, set);  // before the constructors read it
+        std::unordered_set<uint32_t> held;
+        std::vector<uint32_t> storages;
+        if (f.kind == kConstruct) {
+          MakeList(h.base, list, list + 0x100, in.Below(4));
+        }
+        if (f.kind == kRelease || f.kind == kLoadsDestruct) {
+          if (f.kind == kRelease) {
+            MakeList(h.base, list, list + 0x100, 0);  // the pool node's list
+          }
+          const bool made = f.kind == kRelease
+                                ? sl::CarPartsConstruct(h.base, parts, list)
+                                : sl::CarPartsLoadsConstruct(h.base, loads);
+          if (!made) {
+            ITC_LOG_WARN("harness: scene_loaders: the car parts' constructor refused");
+            return;
+          }
+          for (uint32_t i = 0; i < sl::kPartsCount; i++) {
+            storages.push_back(guest::LoadU32(
+                h.base, model_of(i) + models::kModelTextures + models::kTextureProviderVector +
+                            models::kVectorFirst));
+          }
+          // Two models with blocks to put off (at most eight nodes).
+          for (uint32_t k = 0; k < 2; k++) {
+            PutBlocks(h.base, model_of(in.Below(sl::kPartsCount)), headers + 64 * k, in);
+          }
+        }
+        if (f.kind == kRelease) {
+          for (uint32_t i = 0; i < sl::kPartsCount; i++) {
+            const uint32_t slot = loads + sl::kSlotBytes * i;
+            Put(h.base, slot + 12, in.Below(4) == 0 ? 1 : 0);
+            uint32_t pages = 0;
+            if (in.Below(16) == 0) {
+              pages = memory::AllocPages(1 + in.Below(0x4000), 4096);
+              held.insert(pages);
+            }
+            Put(h.base, slot + 16, pages);
+          }
+        }
+        const pending_frees::ListState was = pending_frees::SaveList(h.base);
+        PPCContext t = CallContext(h);
+        t.r1.u64 &= ~0xFull;
+        t.r3.u64 = f.kind == kLoadsConstruct || f.kind == kLoadsDestruct ? loads : parts;
+        t.r4.u64 = list;
+        RunSide(v, f.recompiled, f.native, t, h.base);
+        pending_frees::TakeAddedNodes(h.base, was, out[v]);
+        for (const uint32_t pages : held) {
+          const bool alive = memory::IsPages(pages);
+          out[v].Word(alive);
+          if (alive) {
+            memory::FreePages(pages);
+          }
+        }
+        if (f.kind == kLoadsDestruct) {
+          for (const uint32_t storage : storages) {
+            const bool alive = storage != 0 && memory::IsHeapBlock(storage);
+            out[v].Word(alive);
+            if (alive) {
+              memory::crt::OperatorDelete(storage);
+            }
+            held.insert(storage);
+          }
+        } else {
+          for (uint32_t i = 0; i < sl::kPartsCount; i++) {
+            TakeProvider(h.base, model_of(i) + models::kModelTextures, out[v]);
+          }
+        }
+        held.erase(0);
+        Mark(h.base, block, kBytes, held);
+        out[v].Bytes(Read(h.base, block, kBytes));
+        out[v].Word(guest::LoadU32(h.base, sl::kFirstSet));
+        out[v].Word(t.r3.u32);
+        out[v].Word(uint32_t(t.r3.u64 >> 32));
+      }
+      results.Check(out[0], out[1], fmt::format("case {}", c));
+    }
+    results.Report();
+  }
+  {
+    // Pool4Object::Reset on a part model made with the plain C++.
+    Results results("Pool4Object::Reset (sub_820D6948, on the game's list)");
+    const uint32_t object = block + 0x400;
+    for (int c = 0; c < 16; c++) {
+      const uint64_t seed = r.Next();
+      const uint32_t set = uint32_t(r.Next());
+      Outputs out[2];
+      for (int v = 0; v < 2; v++) {
+        Random in(seed);
+        RandomBytes(h.base, block, kSmallBytes, in);
+        Put(h.base, sl::kFirstSet, set);
+        if (!models::PartModelConstruct(h.base, object + 112)) {
+          ITC_LOG_WARN("harness: scene_loaders: the part model's constructor refused");
+          return;
+        }
+        if (in.Below(2) == 0) {
+          PutBlocks(h.base, object + 112, block + 0x1000, in);
+        }
+        Put(h.base, sl::kFirstSet, set);
+        const pending_frees::ListState was = pending_frees::SaveList(h.base);
+        PPCContext t = CallContext(h);
+        t.r1.u64 &= ~0xFull;
+        t.r3.u64 = object;
+        RunSide(v, __imp__sub_820D6948, hooks::SceneLoadersPool4Reset, t, h.base);
+        pending_frees::TakeAddedNodes(h.base, was, out[v]);
+        TakeProvider(h.base, object + 112 + models::kModelTextures, out[v]);
+        out[v].Bytes(Read(h.base, block, kSmallBytes));
+        out[v].Word(guest::LoadU32(h.base, sl::kFirstSet));
+        out[v].Word(t.r3.u32);
+        out[v].Word(uint32_t(t.r3.u64 >> 32));
+      }
+      results.Check(out[0], out[1], fmt::format("case {}", c));
+    }
+    results.Report();
+  }
+  Put(h.base, sl::kFirstSet, saved_set);
+}
+
 }  // namespace
 
 void SceneLoaders(Context& h) {
@@ -722,6 +930,7 @@ void SceneLoaders(Context& h) {
   Names(h, r, block);
   Loads(h, r, block);
   Resets(h, r, block);
+  Parts(h, r, block);
   memory::Free(allocation);
 }
 

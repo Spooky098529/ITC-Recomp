@@ -6,7 +6,6 @@
 #include "base/log.h"
 #include "car_models/load_slots.h"
 #include "guest.h"
-#include "memory/heap.h"
 #include "model_animation/model_animation.h"
 #include "scene_loaders/objects.h"
 
@@ -30,12 +29,6 @@ void Require(bool done, const char* what) {
   }
 }
 
-// Whether LoadSlot::ReleaseBuffer frees the slot's buffer natively.
-bool Releasable(uint8_t* base, uint32_t slot) {
-  const uint32_t buffer = Load(base, slot + 16);
-  return Load(base, slot + 12) != 0 || buffer == 0 || memory::IsPages(buffer);
-}
-
 }  // namespace
 
 std::optional<uint32_t> CarModelRelease(uint8_t* base, uint32_t car_model) {
@@ -43,11 +36,10 @@ std::optional<uint32_t> CarModelRelease(uint8_t* base, uint32_t car_model) {
   uint32_t freed[3] = {};
   for (uint32_t i = 0; i < 3; i++) {
     const uint32_t slot = car_model + kSlots[i];
-    if (!Releasable(base, slot)) {
+    if (!LoadSlotReleasable(base, slot, &freed[i])) {
       return std::nullopt;
     }
     // Two slots freeing the same pages: the second free would fail.
-    freed[i] = Load(base, slot + 12) == 0 ? Load(base, slot + 16) : 0;
     for (uint32_t j = 0; j < i; j++) {
       if (freed[i] != 0 && freed[i] == freed[j]) {
         return std::nullopt;

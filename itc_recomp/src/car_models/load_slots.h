@@ -25,6 +25,12 @@ void LoadSlotReset(uint8_t* base, uint32_t slot);
 // the layer: the adapter's condition).
 std::optional<uint32_t> LoadSlotReleaseBuffer(uint8_t* base, uint32_t slot);
 
+// Whether LoadSlotReleaseBuffer runs natively on `slot` (nothing changed):
+// shared, no buffer, or the layer's pages. `*freed` = the pages it would
+// free (0 for none), for callers releasing several slots: two slots with the
+// same pages would fail the second free.
+bool LoadSlotReleasable(uint8_t* base, uint32_t slot, uint32_t* freed);
+
 // sub_820C3F50 (a release put off): the four words and state 2 in the first
 // record of the set's +52 whose +16 is 0, among 4 x (+40 + +12) (nothing
 // when none is free).
