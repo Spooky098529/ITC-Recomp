@@ -92,12 +92,6 @@ ITC_ARCHIVE_WORD(8209D868, archive::Toc(base, ctx.r3.u32))
 // Archive::AssetSize: r3 = an asset id. Its r31 is restored and r11 read by
 // no caller.
 ITC_ARCHIVE_WORD(820A0678, archive::AssetSize(base, ctx.r3.u32))
-// The slot lookup: r3 = a serial (-1 for a free slot); r3 the slot,
-// sign-extended (the original adds to the table's address from lis), or 0.
-extern "C" REX_FUNC(sub_8209D818) {
-  ITC_ARCHIVE_FALLBACK(8209D818)
-  ctx.r3.s64 = int32_t(archive::FindSlot(base, ctx.r3.u32));
-}
 // Archive::FindLooseFile: r3 = an asset id; r3 its path or 0.
 ITC_ARCHIVE_WORD(8209D8D8, archive::FindLooseFile(base, ctx.r3.u32))
 
