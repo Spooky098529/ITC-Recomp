@@ -57,7 +57,12 @@ ITC_FLAG_BOOL(native_app_states, true, "ITC",
               "slots and StateLayer::ApplyOp guest calls; StateLayer::Update sub_820ADF00 and "
               "UpdateToggled sub_820AE010 (no adapters: only the plain C++ below calls them in play), the layer's state slots 8 and 9 sub_820AE120 and "
               "sub_820AE128, AppStates::OnUpdate sub_820AE1B8 and OnUpdateToggled sub_820AE1C0, "
-              "the top state's slots guest calls, a child layer's update its plain C++) natively instead of through the translated code "
+              "the top state's slots guest calls, a child layer's update its plain C++; "
+              "StateLayer::ApplyOp sub_820ADC60 (adds and pushes, with --native_heap; the pop and the "
+              "replace, never seen in play, the original), OnToggleOn sub_820AD4E0 and OnToggleOff "
+              "sub_820AD680, their functor sub_820ACD38 and the state slot 5 sub_820AD760, and "
+              "AppStates::OnMessage sub_820AE1C8 (messages 0 and 2 and the ignored ones; 1, 5 and 6 "
+              "the original)) natively instead of through the translated code "
               "(the same results; checked by --run_harnesses=app_states)");
 
 namespace hooks {
@@ -561,7 +566,8 @@ void AppUpdateChildToggled(PPCContext& ctx, uint8_t* base) { UpdateChildStep(ctx
 
 void AppToggleOffChild(PPCContext& ctx, uint8_t* base) {
   const uint32_t layer = ctx.r3.u32, child = ctx.r4.u32;
-  ctx.r3.u64 = as::ToggleOffChild(base, layer, child, 0, AppStatesCalls(ctx, base));
+  ctx.r3.u64 =
+      as::ToggleOffChild(base, layer, child, uint32_t(ctx.lr), AppStatesCalls(ctx, base));
 }
 
 void AppLayerApplyOps(PPCContext& ctx, uint8_t* base) {
@@ -624,6 +630,65 @@ void AppStatesOnUpdateToggled(PPCContext& ctx, uint8_t* base) {
   });
 }
 
+void AppLayerApplyOp(PPCContext& ctx, uint8_t* base) {
+  const uint32_t layer = ctx.r3.u32;
+  const uint64_t op = ctx.r4.u64;
+  const as::AppCalls calls = AppStatesCalls(ctx, base);
+  std::optional<uint32_t> answer;
+  calls.in_frame(128, uint32_t(ctx.lr),
+                 [&](uint32_t frame) { answer = as::LayerApplyOp(base, layer, op, frame, calls); });
+  if (!answer) {
+    ctx.r4.u64 = op;
+    __imp__sub_820ADC60(ctx, base);
+    return;
+  }
+  ctx.r3.u64 = *answer;
+}
+
+namespace {
+
+void ToggleStep(PPCContext& ctx, uint8_t* base, bool off) {
+  const uint32_t layer = ctx.r3.u32;
+  const as::AppCalls calls = AppStatesCalls(ctx, base);
+  uint32_t answer = 0;
+  calls.in_frame(128, uint32_t(ctx.lr),
+                 [&](uint32_t frame) { answer = as::LayerToggle(base, layer, off, frame, calls); });
+  ctx.r3.u64 = answer;
+}
+
+}  // namespace
+
+void AppLayerToggleOn(PPCContext& ctx, uint8_t* base) { ToggleStep(ctx, base, false); }
+void AppLayerToggleOff(PPCContext& ctx, uint8_t* base) { ToggleStep(ctx, base, true); }
+
+void AppToggleOnChild(PPCContext& ctx, uint8_t* base) {
+  const uint32_t child = ctx.r4.u32;
+  ctx.r3.u64 = as::ToggleOnChild(base, child, uint32_t(ctx.lr), AppStatesCalls(ctx, base));
+}
+
+void AppLayerStateToggleOff(PPCContext& ctx, uint8_t* base) {
+  const uint32_t state = ctx.r3.u32;
+  ctx.r3.u64 = as::LayerStateToggleOff(base, state, uint32_t(ctx.lr), AppStatesCalls(ctx, base));
+}
+
+void AppStatesOnMessage(PPCContext& ctx, uint8_t* base) {
+  const uint32_t states = ctx.r3.u32, message = ctx.r5.u32;
+  const uint64_t r4 = ctx.r4.u64;
+  const as::AppCalls calls = AppStatesCalls(ctx, base);
+  std::optional<uint32_t> answer;
+  calls.in_frame(112, uint32_t(ctx.lr), [&](uint32_t frame) {
+    answer = as::StatesOnMessage(base, states, message, frame, calls);
+  });
+  if (!answer) {
+    ctx.r3.u64 = states;
+    ctx.r4.u64 = r4;
+    ctx.r5.u64 = message;
+    __imp__sub_820AE1C8(ctx, base);
+    return;
+  }
+  ctx.r3.u64 = *answer;
+}
+
 }  // namespace hooks
 
 // The adapters: the register steps above, or the originals with the flag
@@ -683,6 +748,12 @@ ITC_APP_STATES_ADAPTER(820AE120, AppLayerStateUpdate)
 ITC_APP_STATES_ADAPTER(820AE128, AppLayerStateUpdateToggled)
 ITC_APP_STATES_ADAPTER(820AE1B8, AppStatesOnUpdate)
 ITC_APP_STATES_ADAPTER(820AE1C0, AppStatesOnUpdateToggled)
+ITC_APP_STATES_ADAPTER(820ADC60, AppLayerApplyOp)
+ITC_APP_STATES_ADAPTER(820AD4E0, AppLayerToggleOn)
+ITC_APP_STATES_ADAPTER(820AD680, AppLayerToggleOff)
+ITC_APP_STATES_ADAPTER(820ACD38, AppToggleOnChild)
+ITC_APP_STATES_ADAPTER(820AD760, AppLayerStateToggleOff)
+ITC_APP_STATES_ADAPTER(820AE1C8, AppStatesOnMessage)
 
 // App::RunHandler, with --find_menu_selection's wrap (moved here from
 // src/debug/menu_selection_scan.cpp, as one override per function can

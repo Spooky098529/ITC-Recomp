@@ -1801,6 +1801,145 @@ void LayerUpdates(Context& h) {
               hooks::AppStatesOnUpdateToggled, h.data);
 }
 
+// --- The operations and the toggle's messages ---
+
+// A layer the game built, with a state pushed (the game's ApplyOp) or not.
+uint32_t GameLayerWithState(Context& h, Blocks& blocks) {
+  const uint32_t layer = GameLayer(h, blocks, uint32_t(h.random.Next()));
+  if (h.random.Below(2)) {
+    PPCContext t = CallContext(h);
+    t.r3.u64 = layer;
+    t.r4.u64 = (uint64_t(2) << 32) | (ChildAt(h, h.random.Below(6)) + 4);
+    FlagOff off;
+    __imp__sub_820ADC60(t, h.base);
+  }
+  return layer;
+}
+
+// The layer at data + 64 (as UpdateCases'), its children layers the game
+// built (or, with `objects`, the children objects too); no operations.
+void ToggleTree(Context& h, Blocks& blocks, bool objects) {
+  const uint32_t layer = h.data + 64;
+  RandomScratch(h, 3800);
+  Children(h, 6, h.random.Below(2) ? kCount4 : kStoreR4At4);
+  Store(h.base, h.data + 8, layer);
+  const std::vector<uint32_t> states = BuildList(h, blocks, layer + 24, h.random.Below(3), 12);
+  for (uint32_t node : states) {
+    Store(h.base, node + 8, ChildAt(h, h.random.Below(6)) + 4);
+  }
+  const std::vector<uint32_t> children =
+      BuildList(h, blocks, layer + 12, h.random.Below(4), 12);
+  for (uint32_t node : children) {
+    Store(h.base, node + 8,
+          objects && h.random.Below(2) ? ChildAt(h, h.random.Below(6))
+                                       : GameLayerWithState(h, blocks));
+  }
+  BuildList(h, blocks, layer + 36, 0, 16);
+}
+
+void TreeOut(Context& h, Outputs& out, Blocks& blocks, const PPCContext& t) {
+  std::vector<uint32_t> layers;
+  MeetLayer(h.base, blocks, h.data + 64, layers);
+  blocks.Words(h.base, out, t.r1.u32 + 24, 8);
+  blocks.Words(h.base, out, h.data, 3800);
+  LayersOut(h.base, out, blocks, layers);
+  out.Word(blocks.Of(t.r3.u32));
+  blocks.Out(out);
+}
+
+void OpsAndToggles(Context& h) {
+  const uint32_t layer = h.data + 64;
+  {
+    Results results("StateLayer::ApplyOp (sub_820ADC60)");
+    for (int c = 0; c < 120; c++) {
+      const uint32_t types[] = {0, 2, 2, 4, 7, 0xFFFFFFFF};
+      const uint32_t type = types[c % 6];
+      Case(
+          h, results, [&](Blocks& blocks) { ToggleTree(h, blocks, true); },
+          [&](PPCContext& t) {
+            Fill(h.base, t.r1.u32 + 24, 8);
+            t.r3.u64 = layer;
+            t.r4.u64 = (uint64_t(type) << 32) | (ChildAt(h, h.random.Below(6)) + 4);
+          },
+          __imp__sub_820ADC60, hooks::AppLayerApplyOp,
+          [&](Outputs& out, const PPCContext& t, Blocks& blocks) { TreeOut(h, out, blocks, t); },
+          fmt::format("type {} case {}", int32_t(type), c));
+    }
+    results.Report();
+  }
+  for (int off = 0; off < 2; off++) {
+    Results results(off ? "StateLayer::OnToggleOff (sub_820AD680)"
+                        : "StateLayer::OnToggleOn (sub_820AD4E0)");
+    for (int c = 0; c < 80; c++) {
+      Case(
+          h, results, [&](Blocks& blocks) { ToggleTree(h, blocks, off != 0); },
+          [&](PPCContext& t) {
+            Fill(h.base, t.r1.u32 + 24, 8);
+            t.r3.u64 = layer;
+          },
+          off ? __imp__sub_820AD680 : __imp__sub_820AD4E0,
+          off ? hooks::AppLayerToggleOff : hooks::AppLayerToggleOn,
+          [&](Outputs& out, const PPCContext& t, Blocks& blocks) {
+            out.Word(t.r3.u32 - t.r1.u32);
+            TreeOut(h, out, blocks, t);
+          },
+          fmt::format("case {}", c));
+    }
+    results.Report();
+  }
+  for (int off = 0; off < 2; off++) {
+    // The layer at data + 64 handed as a child (sub_820ACD38's r4) or as a
+    // state (sub_820AD760's r3, the layer + 4).
+    Results results(off ? "StateLayer state slot 5 (sub_820AD760)"
+                        : "StateLayer::OnToggleOn's functor (sub_820ACD38)");
+    for (int c = 0; c < 60; c++) {
+      Case(
+          h, results, [&](Blocks& blocks) { ToggleTree(h, blocks, off != 0); },
+          [&](PPCContext& t) {
+            Fill(h.base, t.r1.u32 + 24, 8);
+            t.r3.u64 = off ? layer + 4 : uint32_t(h.random.Next());
+            t.r4.u64 = off ? uint32_t(h.random.Next()) : layer;
+          },
+          off ? __imp__sub_820AD760 : __imp__sub_820ACD38,
+          off ? hooks::AppLayerStateToggleOff : hooks::AppToggleOnChild,
+          [&](Outputs& out, const PPCContext& t, Blocks& blocks) {
+            out.Word(t.r3.u32 - t.r1.u32);
+            TreeOut(h, out, blocks, t);
+          },
+          fmt::format("case {}", c));
+    }
+    results.Report();
+  }
+  {
+    // The stack at data (+8 the layer at data + 64), the message at data +
+    // 32: 0, 2, or one it ignores (3, 4, 7).
+    Results results("AppStates::OnMessage (sub_820AE1C8)");
+    for (int c = 0; c < 100; c++) {
+      const uint32_t messages[] = {0, 2, 0, 2, 3, 4, 7};
+      const uint32_t message = messages[c % 7];
+      Case(
+          h, results,
+          [&](Blocks& blocks) {
+            ToggleTree(h, blocks, message == 2);
+            Store(h.base, h.data + 32, message);
+          },
+          [&](PPCContext& t) {
+            Fill(h.base, t.r1.u32 + 24, 8);
+            t.r3.u64 = h.data;
+            t.r4.u64 = h.random.Next();
+            t.r5.u64 = h.data + 32;
+          },
+          __imp__sub_820AE1C8, hooks::AppStatesOnMessage,
+          [&](Outputs& out, const PPCContext& t, Blocks& blocks) {
+            out.Word(t.r3.u32 - t.r1.u32);
+            TreeOut(h, out, blocks, t);
+          },
+          fmt::format("message {} case {}", message, c));
+    }
+    results.Report();
+  }
+}
+
 }  // namespace
 
 void AppStates(Context& h) {
@@ -1818,6 +1957,7 @@ void AppStates(Context& h) {
   StackSetUp(h);
   LayerWalks(h);
   LayerUpdates(h);
+  OpsAndToggles(h);
 }
 
 }  // namespace harness

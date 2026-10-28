@@ -140,6 +140,21 @@ void AppLayerStateUpdateToggled(PPCContext& ctx, uint8_t* base);
 void AppStatesOnUpdate(PPCContext& ctx, uint8_t* base);
 void AppStatesOnUpdateToggled(PPCContext& ctx, uint8_t* base);
 
+// StateLayer::ApplyOp sub_820ADC60: r3 = the layer, r4 = the operation
+// (stored at the caller's r1 + 24); r3 as the original leaves it.
+void AppLayerApplyOp(PPCContext& ctx, uint8_t* base);
+// StateLayer::OnToggleOn sub_820AD4E0 and OnToggleOff sub_820AD680: r3 = the
+// layer; r3 the walk's result.
+void AppLayerToggleOn(PPCContext& ctx, uint8_t* base);
+void AppLayerToggleOff(PPCContext& ctx, uint8_t* base);
+// sub_820ACD38 (r4 = the child) and sub_820AD760 (r3 = the layer + 4): the
+// toggles as tail calls.
+void AppToggleOnChild(PPCContext& ctx, uint8_t* base);
+void AppLayerStateToggleOff(PPCContext& ctx, uint8_t* base);
+// AppStates::OnMessage sub_820AE1C8: r3 = the stack, r4 = the app's +20
+// interface, r5 = the message's address.
+void AppStatesOnMessage(PPCContext& ctx, uint8_t* base);
+
 // App::Update sub_82093DC0: r3 = the app; r3 the request vector's clear's
 // (in its frame, r1 - 160, when ours).
 void AppUpdate(PPCContext& ctx, uint8_t* base);

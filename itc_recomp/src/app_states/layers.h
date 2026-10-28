@@ -149,4 +149,42 @@ uint32_t LayerStateUpdate(uint8_t* base, uint32_t state, bool toggled, uint32_t 
 uint32_t StatesOnUpdate(uint8_t* base, uint32_t states, bool toggled, uint32_t frame,
                         const AppCalls& calls);
 
+// --- The operations and the toggle's messages ---
+
+constexpr uint32_t kToggleOnChild = 0x820ACD38;
+// A layer's state slot 5 (sub_820AD760).
+constexpr uint32_t kLayerStateToggleOff = 0x820AD760;
+
+// sub_820ADC60 StateLayer::ApplyOp: `op` the operation (its type in the high
+// word, a state in the low): 0 a new layer with the state (owner the layer's
+// +8) added as a child, 2 the state pushed (the top's slot 6, then the state
+// put at the front of +24 and its slot 1), others above 3 nothing. r3 as the
+// original leaves it, or nullopt with nothing done for the pop and the
+// replace (1 and 3, never seen in play), without --native_heap or where
+// operator new hands back. `frame` the original's 128 bytes (`op` stored at
+// its caller's r1 + 24).
+std::optional<uint32_t> LayerApplyOp(uint8_t* base, uint32_t layer, uint64_t op, uint32_t frame,
+                                     const AppCalls& calls);
+// sub_820AD4E0 StateLayer::OnToggleOn and sub_820AD680 OnToggleOff: with
+// states, the top's slot 3 (or 5 when `off`), r4 = the layer; then the
+// children through PtrList::ForEach with sub_820ACD38 (or sub_820ACD60).
+// r3 the walk's result (`frame` + 96). `frame` the original's 128 bytes.
+uint32_t LayerToggle(uint8_t* base, uint32_t layer, bool off, uint32_t frame,
+                     const AppCalls& calls);
+// sub_820ACD38 (OnToggleOn's functor): OnToggleOn on the child, as a tail
+// call (the link register `return_address`, the walk's).
+uint32_t ToggleOnChild(uint8_t* base, uint32_t child, uint32_t return_address,
+                       const AppCalls& calls);
+// sub_820AD760 (the layer's state slot 5): OnToggleOff on `state` - 4, as a
+// tail call (the link register `return_address`).
+uint32_t LayerStateToggleOff(uint8_t* base, uint32_t state, uint32_t return_address,
+                             const AppCalls& calls);
+// sub_820AE1C8 AppStates::OnMessage (listener 9's target): `message` the
+// message's address: 0 OnToggleOn on the root, 2 OnToggleOff, 3, 4 and above
+// 6 nothing. r3 as the original leaves it, or nullopt with nothing done for
+// 1, 5 and 6 (the step and the teardowns, never seen in play). `frame` the
+// original's 112 bytes.
+std::optional<uint32_t> StatesOnMessage(uint8_t* base, uint32_t states, uint32_t message,
+                                        uint32_t frame, const AppCalls& calls);
+
 }  // namespace app_states
