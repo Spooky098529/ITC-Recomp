@@ -64,6 +64,22 @@ When the user has reviewed a run's section, its heading gets
   `c-runtime.md`. `known-data.md`: the file and path objects; the
   global strings' addresses corrected (`0x8265EE7C`/`98`, not
   `0x8266EE7C`/`98`). One lead added (`sub_82593D78`, `sub_82593D88`).
+- The file layer's migration 1 (47a7c1d..edea212,
+  `--native_file_layer`): the file and path objects' constructors and
+  destructors, `Path::Build`, `GamePath::SetGame`, the open by name; 7
+  adapters removed. sprintf `sub_825A93D0`, `_vsnprintf`
+  `sub_825AB010`, `_vsnprintf_l`, `_output_l` (`c-runtime.md`, under
+  `--native_c_runtime`; `src/c_runtime/narrow_format.cpp`, harness
+  `c_runtime_format`), following `_woutput_l`'s precedent: a dry run
+  first, and the original runs for what the native one doesn't do
+  (`%n`, wide text, floats other than `%f`, the heap's buffer, a
+  forced point, no room, a lead byte ending the format, output over
+  its own format or arguments); the native path ran in ~3,500 of 4,870
+  sprintf cases. Format strings in play: `"%s%s"`, `"%s%s%d"`,
+  `"data\audio\%s.xgs"`, `"game:\%s"`. The archive's loose read
+  `sub_8209DFA8` under `--native_archive`; it and the open by name stay
+  adapters calling B4's `File::` adapters and the read-error report
+  through `ctx`.
 
 ## Run 2026-10-28 08:36 (`b7-loop-28-10-26`)
 

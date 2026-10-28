@@ -20,8 +20,14 @@ file's history. What's left to see in a drive, from every run:
   new rows (11 in play; shared rows stay in `files-and-saves.md`,
   `sound-cues.md`, `movies.md`, `c-runtime.md`), 5 ready groups;
   blocked by sprintf (to follow swprintf's precedent,
-  `src/c_runtime/wide_format.cpp`). Map check passed. Step: migration
-  1 (agent running).
+  `src/c_runtime/wide_format.cpp`). Map check passed. Migration 1
+  done (47a7c1d..edea212): the file and path objects, `Path::Build`,
+  `GamePath::SetGame`, the open by name under `--native_file_layer`;
+  sprintf, `_vsnprintf`, `_vsnprintf_l`, `_output_l` under
+  `--native_c_runtime`; the archive's loose read under
+  `--native_archive`; 7 adapters removed; 38 s, 0 errors, every
+  harness 0 differing; nothing ready left. Step: validation (agent
+  running).
 
 ## Done
 
@@ -58,6 +64,8 @@ file's history. What's left to see in a drive, from every run:
   2565, work left 3896.
 - After the file layer's map: ours 2565, work left 3896 (wrapped 103,
   known 521, unknown 3272).
+- After the file layer's migration 1: ours 2582, work left 3879
+  (wrapped 103, known 504, unknown 3272).
 
 ## Stopped
 
