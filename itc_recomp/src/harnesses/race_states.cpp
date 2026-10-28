@@ -13,6 +13,7 @@
 
 #include "base/flags.h"
 #include "base/log.h"
+#include "game_modes/game_modes.h"
 #include "harnesses/test_route.h"
 #include "hooks/heap.h"
 #include "hooks/race_states.h"
@@ -2031,6 +2032,87 @@ void Racers(Context& h, const Block& vehicles, const Block& manager) {
   }
 }
 
+// --- RaceStates::Init: an empty state machine or one with random
+// transitions already (fewer than 100, so the 87 fit), some with the keys
+// Init adds (the last, (37, 50), among them: its r3 is then the index); the
+// original's frame filled with the same random words for both (the words it
+// never writes go into the transitions), and the progress block operator new
+// gives filled the same (a probe block of its size filled and freed first:
+// the layer is first fit, so both sides get it); the machine, the progress
+// (its pointer at +9624 and 0x826D82E8 as the block, its 7,248 bytes), the
+// frame (but its back chain and saved registers) and r3 compared ---
+
+void Inits(Context& h) {
+  namespace gm = game_modes;
+  constexpr uint32_t kFrame = 5824;
+  constexpr uint32_t kSaves = 152;  // __savegprlr_14: r14 at -152, lr at -8
+  const Block machine(0x2600);
+  if (!machine.address) {
+    ITC_LOG_ERROR("harness: race_states: no block from the allocation layer");
+    return;
+  }
+  Results results("RaceStates::Init (sub_82169920)");
+  const uint32_t frame = CallContext(h).r1.u32 - kFrame;
+  // Keys Init adds, planted in the odd cases.
+  constexpr uint32_t kPlanted[][2] = {{1, 0}, {23, 29}, {30, 7}, {37, 50}};
+  for (uint64_t seed = 0; seed < 8; seed++) {
+    Outputs out[2];
+    for (int v = 0; v < 2; v++) {
+      Random r(seed * 149 + 83);
+      Globals globals(h.base, {rs::kProgress});
+      WriteRandom(h.base, h.data, kScratchBytes, r);
+      WriteRandom(h.base, machine.address, machine.bytes, r);
+      WriteRandom(h.base, frame, kFrame, r);
+      if (seed % 2 == 0) {
+        gm::StateMachineConstruct(h.base, machine.address);
+        guest::StoreU32(h.base, machine.address + gm::kTransitionCount, 0);
+      } else {
+        const uint32_t count = 8 + r.Below(92);
+        guest::StoreU32(h.base, machine.address + gm::kTransitionCount, count);
+        for (uint32_t i = 0; i < 200; i++) {  // keys of small numbers, some matching
+          for (uint32_t k = 0; k < 4; k++) {
+            guest::StoreU32(h.base, machine.address + 48 * i + 4 * k, r.Below(k < 2 ? 60 : 2));
+          }
+        }
+        for (const auto& key : kPlanted) {
+          if (seed % 4 == 1 && key[0] == 37) {
+            continue;  // seeds 1 and 5: the last Add makes a new transition
+          }
+          const uint32_t at = machine.address + 48 * r.Below(count);
+          guest::StoreU32(h.base, at, key[0]);
+          guest::StoreU32(h.base, at + 4, key[1]);
+          guest::StoreU32(h.base, at + 8, 0);
+          guest::StoreU32(h.base, at + 12, 0);
+        }
+      }
+      uint32_t probe = 0;
+      if (const auto block = memory::crt::OperatorNew(h.base, kProgressBytes)) {
+        probe = *block;
+        WriteRandom(h.base, probe, kProgressBytes, r);
+        memory::crt::OperatorDelete(probe);
+      }
+      PPCContext t = CallContext(h);
+      t.r3.u64 = machine.address;
+      (v == 0 ? Original<__imp__sub_82169920> : hooks::RaceStatesInit)(t, h.base);
+      const uint32_t block = guest::LoadU32(h.base, rs::kProgress);
+      out[v].Word(block != 0 && block == probe ? 1 : 0);
+      out[v].Word(guest::LoadU32(h.base, machine.address + 9624) == block ? 1 : 0);
+      out[v].Bytes(Read(h.base, machine.address, 9624));
+      out[v].Bytes(Read(h.base, machine.address + 9628, machine.bytes - 9628));
+      if (block != 0) {
+        out[v].Bytes(Read(h.base, block, kProgressBytes));
+        memory::crt::OperatorDelete(block);
+      }
+      out[v].Bytes(Read(h.base, frame + 80, kFrame - 80 - kSaves));
+      out[v].Bytes(Read(h.base, h.data, kScratchBytes));
+      out[v].Word(t.r3.u32);
+      out[v].Word(uint32_t(t.r3.u64 >> 32));
+    }
+    results.Check(out[0], out[1], fmt::format("seed {}", seed));
+  }
+  results.Report();
+}
+
 }  // namespace
 
 void RaceStates(Context& h) {
@@ -2049,6 +2131,7 @@ void RaceStates(Context& h) {
   RouteStart(h, progress, vehicles);
   Handlers(h, progress, vehicles, manager);
   Racers(h, vehicles, manager);
+  Inits(h);
 }
 
 }  // namespace harness

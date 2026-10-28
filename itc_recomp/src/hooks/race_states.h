@@ -117,4 +117,12 @@ void RaceStatesOnGo(PPCContext& ctx, uint8_t* base);
 // originals as their adapters make them.
 void RaceStatesStandingStartTick(PPCContext& ctx, uint8_t* base);
 
+// RaceStates::Init sub_82169920: r3 = the machine; r3 as the last
+// StateMachine::Add leaves it (its adapter's: a new transition's address
+// from the machine's 64-bit r3, or a replaced one's index). The original
+// where RaceProgress::Create's plain C++ would refuse (--native_heap not
+// routing the game's heap, or operator new refusing) or Reset's copies
+// aren't native.
+void RaceStatesInit(PPCContext& ctx, uint8_t* base);
+
 }  // namespace hooks

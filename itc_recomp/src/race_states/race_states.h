@@ -75,6 +75,18 @@ void TickFraction(uint8_t* base, uint32_t progress, uint32_t index, uint32_t tim
 // the original's 1,728 bytes.
 void Rank(uint8_t* base, uint32_t progress, uint32_t frame);
 
+// --- The race's states set up (src/race_states/race_states_init.cpp) ---
+
+// RaceStates::Init (sub_82169920): RaceProgress::Create; `machine` +9624 =
+// [0x826D82E8]; RaceProgress::Reset of it (its frame `frame` - 96); +9604 =
+// 1; then the 87 transitions added as the original does (its stores and
+// copies replayed in `frame`, its 5,824 bytes; the words it never writes go
+// into the transitions as the stack held them). Returns the last
+// StateMachine::Add's plain C++'s answer (`replaced` its flag); nullopt,
+// with nothing done, where Reset's copies aren't native or Create's
+// operator new refuses (the original then).
+std::optional<uint32_t> Init(uint8_t* base, uint32_t machine, uint32_t frame, bool* replaced);
+
 // --- The race's checks each tick (src/race_states/race_checks.cpp): r3 an
 // out pair (an end and a reason), the progress, a results entry `index`
 // (E = +2188 + 972 i, its slot S = +40 + 536 i); each returns `out` (the

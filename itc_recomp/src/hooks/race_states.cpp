@@ -300,6 +300,23 @@ void RaceStatesOnGo(PPCContext& ctx, uint8_t* base) {
   rs::OnGo(base, ctx.r3.u32, frame);
 }
 
+void RaceStatesInit(PPCContext& ctx, uint8_t* base) {
+  ctx.fpscr.disableFlushMode();
+  const uint64_t machine_r3 = ctx.r3.u64;
+  const uint32_t machine = ctx.r3.u32;
+  bool replaced = false;
+  const auto r3 = NativeHeapActive()
+                      ? rs::Init(base, machine, ctx.r1.u32 - 5824, &replaced)
+                      : std::nullopt;
+  if (!r3) {
+    __imp__sub_82169920(ctx, base);
+    return;
+  }
+  // StateMachine::Add's adapter's r3 (src/hooks/game_modes.cpp): a new
+  // transition's address from the machine's 64-bit r3.
+  ctx.r3.u64 = replaced ? *r3 : machine_r3 + (*r3 - machine);
+}
+
 }  // namespace hooks
 
 // Defines an adapter: the flag, else the original.
