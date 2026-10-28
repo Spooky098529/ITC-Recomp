@@ -285,11 +285,6 @@ void hooks::ArchiveSetUp(PPCContext& ctx, uint8_t* base) {
   archive::SetUp(base, ctx.r3.u32, calls.Calls());
 }
 
-extern "C" REX_FUNC(sub_8209D490) {
-  ITC_ARCHIVE_QUEUE_FALLBACK(8209D490)
-  hooks::ArchiveSetUp(ctx, base);
-}
-
 // The loader's next request: r3 = the current request or 0; r3 the next. Its
 // calls from inside a frame as the original's (112 bytes), the finish's and
 // the set-up's own below it.
