@@ -16,7 +16,12 @@ file's history. What's left to see in a drive, from every run:
 - Subsystem 2 of 3: the file layer (two leads taken together: the
   file object `sub_820A6A00`, `sub_820A6A40` and the path objects
   `sub_82593C28`, `sub_82593C48`, `sub_82593CA0`; ready, and blocking
-  the archive's loose read). Step: mapping (agent running).
+  the archive's loose read). Mapped (f053e6c): `file-layer.md`, 21
+  new rows (11 in play; shared rows stay in `files-and-saves.md`,
+  `sound-cues.md`, `movies.md`, `c-runtime.md`), 5 ready groups;
+  blocked by sprintf (to follow swprintf's precedent,
+  `src/c_runtime/wide_format.cpp`). Map check passed. Step: migration
+  1 (agent running).
 
 ## Done
 
@@ -51,6 +56,8 @@ file's history. What's left to see in a drive, from every run:
 - After its validation (`itc_2276`: race 8 s, the harnesses ~30 s, 0
   errors, every harness 0 differing but the expected groups): ours
   2565, work left 3896.
+- After the file layer's map: ours 2565, work left 3896 (wrapped 103,
+  known 521, unknown 3272).
 
 ## Stopped
 

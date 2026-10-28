@@ -54,6 +54,16 @@ When the user has reviewed a run's section, its heading gets
   `--native_archive=false` the four stay the game's, raced 38 s, 0
   differ). Rows in `archive.md`, `files-and-saves.md`,
   `video-output.md`, `known-data.md`.
+- The file layer (map f053e6c): `docs/functions/file-layer.md`, 21 new
+  rows (11 in play): the file object `GameFile` (vtable `0x82002270`)
+  over `AsyncFile` (`0x8206CC0C`), `File::` (`0x8206C05C`) and a base
+  stream (`0x8206BFF8`); the path object `Path::` (`0x8206CC3C`,
+  `Path::Build` `sub_82593CA0`, only kind 0 in play); `GamePath::`
+  (`0x820022A0`, only `Movie::Open`, no longer called). Shared rows
+  stay in `files-and-saves.md`, `sound-cues.md`, `movies.md`,
+  `c-runtime.md`. `known-data.md`: the file and path objects; the
+  global strings' addresses corrected (`0x8265EE7C`/`98`, not
+  `0x8266EE7C`/`98`). One lead added (`sub_82593D78`, `sub_82593D88`).
 
 ## Run 2026-10-28 08:36 (`b7-loop-28-10-26`)
 
