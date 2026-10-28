@@ -318,22 +318,18 @@ ITC_RACE_WORLD(82170A88, RaceWorldSortedListClear)
 ITC_RACE_WORLD(82170560, RaceWorldOnPausedTick)
 ITC_RACE_WORLD(82171360, RaceWorldRelease)
 ITC_RACE_WORLD(82170F18, RaceWorldStepToMainRoad)
-ITC_RACE_WORLD(82143508, RaceWorldRaceEventEntry)
 ITC_RACE_WORLD(82112190, RaceWorldFirstUnsetFlag)
 ITC_RACE_WORLD(821715B8, RaceWorldCreate)
 ITC_RACE_WORLD(82172F90, RaceWorldNoteMarkedRacer)
-ITC_RACE_WORLD(82170CB8, RaceWorldBuildNeighbors)
 ITC_RACE_WORLD(82170920, RaceWorldNeighbours)
 ITC_RACE_WORLD(821737F8, RaceWorldJumpSections)
 ITC_RACE_WORLD(821714D8, RaceWorldTickVehicles)
 ITC_RACE_WORLD(82171560, RaceWorldRefreshVehicles)
 ITC_RACE_WORLD(82174D28, RaceWorldInit)
 ITC_RACE_WORLD(821713C0, RaceWorldReleaseForStage)
-ITC_RACE_WORLD(82116C38, RaceWorldAddDistance)
 ITC_RACE_WORLD(82170668, RaceWorldResetWorld)
 ITC_RACE_WORLD(82171718, RaceWorldResetVehicles)
 ITC_RACE_WORLD(82171250, RaceWorldUnload)
-ITC_RACE_WORLD(82144A38, RaceWorldPlaceStartsCurrent)
 ITC_RACE_WORLD(82171E50, RaceWorldListRacers)
 ITC_RACE_WORLD(82173050, RaceWorldAddRacers)
 // RaceManager::NearSegment (sub_82170BC0) and RoutePosition::ToMainRoad
@@ -352,3 +348,9 @@ ITC_RACE_WORLD(82173050, RaceWorldAddRacers)
 // no adapters: their callers are native (PlaceStartsCurrent's plain C++ and
 // each other's); --native_race_world switches PlaceStartsCurrent. Their
 // register steps stay for the harness.
+// RaceManager::BuildNeighbors (sub_82170CB8), RaceEvent::PlaceStartsCurrent
+// (sub_82144A38) and RaceEvent::Entry (sub_82143508) have no adapters: their
+// only caller, RaceManager::AddRacers, is native; SaveData::AddDistance
+// (sub_82116C38) has none either: its only caller, RaceWorld::Unload, is
+// native (its original only without --native_heap). --native_race_world
+// switches those callers. Their register steps stay for the harness.
