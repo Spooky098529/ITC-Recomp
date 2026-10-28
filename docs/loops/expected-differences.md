@@ -78,6 +78,14 @@ NaN groups below stay as recorded.
   finds the bytes by running the callees natively over two fills and
   compares them in their own group; every other output matches.
   Whether the game reads those bytes isn't known.
+- **Unwritten header bytes in the frame:** a function reads a record
+  into its own stack frame and its callee leaves some of its bytes
+  unwritten; in the original they hold what earlier calls left there
+  (their register saves), which native callees don't write on the guest
+  stack. Nothing reads them, and nothing copies them out. Here:
+  `CarModel::OnDecalLoaded`'s TGA headers (the reader never writes +3
+  and +9; in `Vinyl::DrawDecals`' frame at +192 and +224), `DrawDecal`
+  reading only the width and height.
 - **Constant order:** the HLSL compiler (`sub_822B8F10`) places the HSV
   gradient's literal constants (1 to 6, source `82071528`) in another
   order when it compiles during a race than at boot, where every compile
@@ -257,3 +265,9 @@ were at 0.
 | Function | Group | Differ | Reason | Review |
 |---|---|---|---|---|
 | `sub_82115D98` Race::SetUp | the traffic records' unwritten bytes | 46 of 48 (45 or 46 from run to run) | Unwritten stack bytes copied | for review (23:42 run) |
+
+### `car-models.md`
+
+| Function | Group | Differ | Reason | Review |
+|---|---|---|---|---|
+| `sub_820D5750` CarModel::OnDecalLoaded | the TGA headers' unwritten bytes | 16 of 16 | Unwritten header bytes in the frame | for review (08:36 run) |

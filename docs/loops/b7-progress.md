@@ -28,8 +28,12 @@ file's history. What's left to see in a drive, from every run:
   decal path under `CarModel::OnDecalLoaded` `sub_820D5750`
   (`car-models.md`; 19 functions, 2,257 lines, 7 ready groups: the
   software rasterizer `sub_820EE638` (1,246 lines) and the rest; only
-  `sub_820EED38` and `sub_820EED58` without rows). Migration agent
-  running.
+  `sub_820EED38` and `sub_820EED58` without rows). Migration done in
+  four batches (de91953..c9f00d1): all 19 ours under
+  `--native_car_models`, `Vinyl::Compress` Native; `itc_2121`: 19 s,
+  0 errors, every harness 0 differing but the expected groups (one
+  new, `OnDecalLoaded`'s headers' unwritten bytes); frame dumps the
+  same as the fallback. Validation agent running.
 
 ## Done
 
@@ -66,6 +70,8 @@ This run's groups: `expected-differences.md` (the "08:36 run" lines).
   harness 0 differing but the expected groups; no replay needed.
 - After `Vinyl::Compress`'s migration: ours 2427, work left 4025
   (wrapped 103, known 520, unknown 3402).
+- After the decal path's migration: ours 2447, work left 4006
+  (wrapped 103, known 503, unknown 3400).
 
 ## Stopped
 

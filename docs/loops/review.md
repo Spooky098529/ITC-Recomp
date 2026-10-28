@@ -67,6 +67,19 @@ When the user has reviewed a run's section, its heading gets
   comparison of `Texture::Create`'s frame inside `Vinyl::Compress`'s
   cases removed (the original `XGCompressSurface` saves registers over
   it, its plain C++ doesn't; `Texture::Create`'s own cases check it).
+- The vinyl sheet's decal path without mapping (de91953..c9f00d1): 21
+  rows in `car-models.md` (two new: `sub_820EED58`, `sub_820EED38`;
+  `sub_820EE698` Merged into `Vinyl::DrawDecal`, the recompiler's split
+  of its switch; `sub_820D4078`, `sub_820D3C80` Native with no adapter;
+  `Vinyl::Compress` Native). Plain C++ in `src/car_models/tga.*`,
+  `raster.*`, `decals.*` (strict-float; float steps in the translated
+  code's operand order), under `--native_car_models`. Handed to the
+  originals: TGAs other than type 2 with 24 or 32 bits (RLE never seen),
+  files or a sheet outside the allocation layer's pages, region numbers
+  above 9. Adapters kept: `sub_820D5750` (`Archive::Load`'s callback),
+  `sub_820EE638`, `sub_820ED020`, `sub_820EEBC0` (recompiled callers
+  outside the lead). One group expected to differ
+  (`expected-differences.md`, "Unwritten header bytes in the frame").
 
 ## Run 2026-10-27 22:31 (`b7-loop-27-10-26`)
 
