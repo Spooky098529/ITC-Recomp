@@ -301,6 +301,14 @@ Rows not yet moved stay in the table below. So far:
   each with a stack of states (the game modes' holder the only one in
   play), its children and its queued operations, with the lists and
   vector it instantiates (B7).
+- [`scene-loaders.md`](scene-loaders.md): the first set of the scene's
+  object pools and its seven loading classes (the car model, parts,
+  cockpit body, interior, pool 4's model, wheels and traffic body): the
+  set made and filled, each class's constructor, reset, release and
+  destructors with the loads it embeds, the cockpit's, interior's and
+  traffic body's load callbacks (skeletons bound and searched by node
+  name), their loaded queries and walks, and the XPR name lookup and
+  model point search the car code shares (B7).
 
 These files hold functions only. What used to follow the table here moved
 out on 2026-10-20: how frame interpolation works, its options and what
