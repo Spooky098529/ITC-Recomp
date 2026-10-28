@@ -343,6 +343,13 @@ Rows not yet moved stay in the table below. So far:
   overlapped file over `File::`), the path objects that build a full
   path with sprintf and the game's path buffer (B7; the `File::` class
   and the open for read by name stay in `files-and-saves.md`).
+- [`save-interface.md`](save-interface.md): the save system's
+  interface between the front end and the save devices: the interface
+  over the app at `0x826BDC90` and the save devices' and users' slots it
+  reaches (the slots' request setters and getters), and the front end's
+  save layer: the save buffers, the game data's save and load and the
+  replays' list, save, load and delete, with the play time update (B7;
+  the save slots' steps stay in `files-and-saves.md`).
 
 These files hold functions only. What used to follow the table here moved
 out on 2026-10-20: how frame interpolation works, its options and what
@@ -379,7 +386,6 @@ old performance notes to the end of `../native-renderer.md`.
 | `sub_8210EDB0` | | | Wind sound; scales with speed. |
 | `sub_82152CD8` | | | Camera shake; scales with speed. |
 | `sub_82146A38` | | | Finds the animation in set r3 whose texture is r4; -1 if none. |
-| `sub_821109B8` | | | Turns the play time frame counter into hours, minutes and seconds (30, 1800, 108000 frames). |
 | `sub_82107B90` | `Boot::StartMovie` | | Message handler: plays the next boot movie, id from the table at `0x826C5BAC` (index at `0x826C5BC8`), via `Movies::Play` (`sub_820A43A8`, the path table at `0x82600BEC`; `movies.md`). See "The title screen" in `../title-screen.md`. |
 | `sub_82107C58` | `Boot::WaitForMovie` | Wrapped | Message handler, every tick while a boot movie plays; ends the step on a button press if skippable (`0x826C5BC4`) or when the movie has finished. The movie started (`Movies::Start`) when its state (`Movies::State`, twice a tick) is 1 with +9608 = 0 (then 1); finished when the state is 1 again with +9608 = 1. `--skip_intro` makes it finish at once. |
 | `sub_82107BF8` | `Boot::EndMovie` | | Message handler: stops the movie (`Movies::Stop`, `Movies::Release`, then `sub_825895A0`); the front end (Genki logo, title) follows. |
