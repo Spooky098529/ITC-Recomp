@@ -1,9 +1,9 @@
 // The DXT color block's helpers (DXT1's block and the color half of DXT2-5),
 // from XGraphics' surface compression (docs/functions/texture-compression.md).
 // Plain C++ over host arrays; the game's constants and tables are read from
-// guest memory as the original reads them. The color block's encoder itself
-// (DxtColor::EncodeBlock sub_82420F50) is still recompiled and reaches these
-// through the adapters (src/hooks/texture_compression.cpp).
+// guest memory as the original reads them. The color block's encoder
+// (DxtColor::EncodeBlock sub_82420F50) calls the helpers directly; recompiled
+// callers reach each through its adapter (src/hooks/texture_compression.cpp).
 
 #pragma once
 
@@ -38,5 +38,25 @@ void FitColorEndpoints(uint8_t* base, const float pixels[16][3], uint32_t colors
 // How many step indices FitColorEndpoints has read from the stack so far
 // (for the harness's log: whether its cases reach that path).
 uint64_t FitColorEndpointsStackReads();
+
+// DxtColor::EncodeBlock's stack frame (stwu r1,-1040(r1)): FitColorEndpoints
+// gets `stack` - kColorFrameBytes as its stack pointer.
+constexpr uint32_t kColorFrameBytes = 1040;
+
+// sub_82420F50 DxtColor::EncodeBlock: the color half of a DXT block (8
+// bytes, the guest's bytes in order: the two 5:6:5 ends, then the 16
+// two-bit indices) from 16 float4 pixels (red, green, blue, alpha).
+// `one_bit_alpha` (DXT1's r5): pixels whose alpha is below the alpha
+// reference at 0x8263B7E8 are transparent (all 16: the transparent block;
+// some: three colors, index 3 for them). `dither` nonzero diffuses each
+// pixel's error over the 4 x 4 block. The pixels are quantized to 5:6:5 and
+// weighted by the color weights at 0x82649B10, the ends fitted
+// (FitColorEndpoints) and packed (PackR5G6B5), the palette made from the
+// packed ends and each pixel's index looked up through the tables at
+// 0x8203EAE8 (4 colors) or 0x8203EAF8 (3). `stack` is the guest stack pointer
+// at the call (the original's r1 on entry), for FitColorEndpoints'
+// negative step indices. The original returns 0.
+void EncodeColorBlock(uint8_t* base, const float pixels[16][4], bool one_bit_alpha, int32_t dither,
+                      uint32_t stack, uint8_t block[8]);
 
 }  // namespace texture_compression

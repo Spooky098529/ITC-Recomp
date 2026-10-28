@@ -27,6 +27,14 @@
 // color generators in Pixels() in both modes (3 and 4 colors), with the stack
 // below the call filled with the same random words for both versions (a
 // pixel far below the low end makes the original read it).
+// DxtColor::EncodeBlock (sub_82420F50) gets blocks of 16 float4 pixels: the
+// colors from Pixels() and FarOff(), some premultiplied (times their
+// alphas), the alphas from Alphas() or around the alpha reference
+// (0x8263B7E8, set to the game's value, 0.5, 0, 1, 128/255 and a NaN in
+// turn, then put back), each with 1-bit alpha off and on (r5 = 1 and
+// 0x80000000) and dither 0, 1, 0x80000000 and random; the stack below the
+// call filled with the same random words for both versions; then blocks
+// found by trying whose FitEndpoints reads a step index from the stack.
 
 #include "harness.h"
 
@@ -589,10 +597,141 @@ void FitColorEndpoints(Context& h) {
   results.Report();
 }
 
+// DxtColor::EncodeBlock's alpha reference (in .data).
+constexpr uint32_t kAlphaReference = 0x8263B7E8;
+
+// 16 alphas around the alpha reference: exactly it, the floats beside it,
+// a little or far below or above, all below, or the generators' kinds.
+Block16 AlphasAround(Random& r, float reference) {
+  Block16 a{};
+  const uint32_t mode = r.Below(4);
+  for (float& v : a) {
+    uint32_t pick = r.Below(6);
+    if (mode == 0) pick = 4;  // all below
+    switch (pick) {
+      case 0: v = reference; break;
+      case 1: v = std::nextafter(reference, -2.0f); break;
+      case 2: v = std::nextafter(reference, 2.0f); break;
+      case 3: v = reference + (Unit(r) - 0.5f) / 64.0f; break;
+      case 4: v = r.Below(2) ? reference - 1.0f - Unit(r) : std::nextafter(reference, -2.0f); break;
+      default: v = Unit(r); break;
+    }
+  }
+  if (mode == 1) a[r.Below(16)] = reference + 1.0f;  // one above among many below
+  return a;
+}
+
+using Pixels4 = std::array<std::array<float, 4>, 16>;
+
+void WritePixels4(uint8_t* base, uint32_t address, const Pixels4& p) {
+  for (uint32_t i = 0; i < 16; i++) {
+    for (uint32_t c = 0; c < 4; c++) guest::StoreFloat(base, address + 16 * i + 4 * c, p[i][c]);
+  }
+}
+
+void EncodeColorBlock(Context& h) {
+  Results results("DxtColor::EncodeBlock (sub_82420F50)");
+  constexpr uint32_t kStackBytes = 4096;  // filled below the call's stack
+  constexpr uint32_t kFrameBytes = 64;    // the caller's frame (r6's and r3's slots)
+  const uint32_t saved = guest::LoadU32(h.base, kAlphaReference);
+  const std::array<uint32_t, 6> references = {saved, 0x3F000000, 0x00000000, 0x3F800000,
+                                              0x3F008081, 0x7FC00000};
+  {
+    std::string tables;
+    for (uint32_t i = 0; i < 7; i++) {
+      tables += fmt::format(" {:X}", guest::LoadU32(h.base, 0x8203EAE8 + 4 * i));
+    }
+    ITC_LOG_INFO("texture_compression harness: alpha reference {:08X}, index tables at 8203EAE8:{}",
+                 saved, tables);
+  }
+  auto run = [&](const Pixels4& pixels, uint32_t one_bit, int32_t dither, const std::string& what) {
+    std::array<uint32_t, kStackBytes / 4> stack;
+    for (uint32_t& word : stack) word = uint32_t(h.random.Next());
+    Outputs out[2];
+    for (int v = 0; v < 2; v++) {
+      Fill(h.base, h.data, kScratchBytes);
+      WritePixels4(h.base, h.data + kPixels, pixels);
+      PPCContext t = CallContext(h);
+      Fill(h.base, t.r1.u32, kFrameBytes);
+      for (uint32_t i = 0; i < stack.size(); i++) {
+        guest::StoreU32(h.base, t.r1.u32 - kStackBytes + 4 * i, stack[i]);
+      }
+      t.r3.u64 = h.data + kBlock;
+      t.r4.u64 = h.data + kPixels;
+      t.r5.u64 = one_bit;
+      t.r6.s64 = dither;
+      if (v == 0) {
+        ITC_FLAG(native_texture_compression) = false;
+        __imp__sub_82420F50(t, h.base);
+        ITC_FLAG(native_texture_compression) = true;
+      } else {
+        hooks::TextureCompressionEncodeColorBlock(t, h.base);
+      }
+      out[v].Bytes(Read(h.base, h.data, kScratchBytes));
+      out[v].Bytes(Read(h.base, CallContext(h).r1.u32, kFrameBytes));
+      out[v].Word(t.r3.u32);
+      out[v].Word(uint32_t(t.r3.u64 >> 32));
+    }
+    results.Check(out[0], out[1], what);
+  };
+  constexpr int kKindsHere = kColorKinds + 1;  // Pixels()'s and FarOff()
+  for (int c = 0; c < 8000; c++) {
+    const uint32_t reference = references[(c / (4 * kKindsHere)) % references.size()];
+    guest::StoreU32(h.base, kAlphaReference, reference);
+    const int kind = c % kKindsHere;
+    const uint32_t one_bit = (c / kKindsHere) % 2 == 0 ? 0 : (c / (2 * kKindsHere)) % 2 == 0 ? 1 : 0x80000000u;
+    const int32_t dither = Dither(h.random, int(h.random.Below(4)));
+    const Pixels16 colors = kind < kColorKinds ? Pixels(h.random, kind) : FarOff(h.random);
+    const Block16 alphas = h.random.Below(2) ? AlphasAround(h.random, std::bit_cast<float>(reference))
+                                             : Alphas(h.random, int(h.random.Below(kKinds)));
+    const bool premultiplied = h.random.Below(3) == 0;
+    Pixels4 pixels;
+    for (uint32_t i = 0; i < 16; i++) {
+      const float a = std::isfinite(alphas[i]) ? std::fmin(std::fmax(alphas[i], 0.0f), 1.0f) : 1.0f;
+      for (uint32_t ch = 0; ch < 3; ch++) pixels[i][ch] = premultiplied ? colors[i][ch] * a : colors[i][ch];
+      pixels[i][3] = alphas[i];
+    }
+    run(pixels, one_bit, dither,
+        fmt::format("case {}: kind {}, 1-bit {:X}, dither {:X}, reference {:08X}, premultiplied {}", c,
+                    kind, one_bit, uint32_t(dither), reference, premultiplied));
+  }
+  // The blocks whose FitEndpoints gets a step index outside the steps: far-off
+  // pixels tried with the plain C++ alone until 64 read the stack (at most
+  // 1,000,000 tries), each then a case.
+  guest::StoreU32(h.base, kAlphaReference, 0x3F000000);
+  uint64_t found = 0;
+  uint32_t tries = 0;
+  for (; tries < 1000000 && found < 64; tries++) {
+    const Pixels16 colors = FarOff(h.random);
+    const bool one_bit = h.random.Below(4) != 0;
+    const int32_t dither = int32_t(h.random.Below(2));
+    Pixels4 pixels;
+    for (uint32_t i = 0; i < 16; i++) {
+      for (uint32_t ch = 0; ch < 3; ch++) pixels[i][ch] = colors[i][ch];
+      pixels[i][3] = 1.0f;
+    }
+    for (uint32_t n = h.random.Below(4); n > 0; n--) pixels[h.random.Below(16)][3] = 0.0f;
+    uint8_t block[8];
+    const uint64_t before = texture_compression::FitColorEndpointsStackReads();
+    texture_compression::EncodeColorBlock(h.base, reinterpret_cast<const float(*)[4]>(pixels.data()),
+                                          one_bit, dither, CallContext(h).r1.u32, block);
+    if (texture_compression::FitColorEndpointsStackReads() != before) {
+      run(pixels, one_bit ? 1 : 0, dither,
+          fmt::format("far off {}: try {}, 1-bit {}, dither {}", found, tries, one_bit, dither));
+      found++;
+    }
+  }
+  ITC_LOG_INFO("texture_compression harness: DxtColor::EncodeBlock: {} of {} far-off tries read "
+               "the stack",
+               found, tries);
+  guest::StoreU32(h.base, kAlphaReference, saved);
+  results.Report();
+}
+
 // Rows of 16 DXT4/5 blocks through the recompiled Dxt45::EncodeBlock on one
-// stack: its alpha half the original (flag off) or ours.
+// stack: its alpha and color halves the originals (flag off) or ours.
 void Rows(Context& h) {
-  Results results("Dxt45::EncodeBlock rows (sub_82422A68, the alpha half and the color helpers)");
+  Results results("Dxt45::EncodeBlock rows (sub_82422A68, the alpha and color halves)");
   constexpr uint32_t kBlocks = 16;
   const uint32_t area = memory::Alloc(kBlocks * 256 + kBlocks * 16, 0);
   if (area == 0) {
@@ -649,6 +788,7 @@ void TextureCompression(Context& h) {
   EncodeBlock(h);
   PackR5G6B5(h);
   FitColorEndpoints(h);
+  EncodeColorBlock(h);
   Rows(h);
 }
 

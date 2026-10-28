@@ -12,7 +12,8 @@ ITC_FLAG_BOOL(native_texture_compression, true, "ITC",
               "Run XGraphics' surface compression (docs/functions/texture-compression.md: "
               "the DXT alpha block's encoder, DxtAlpha::EncodeBlock sub_82422178 with "
               "DxtAlpha::FitEndpoints sub_824207D8; the DXT color block's helpers, "
-              "DxtColor::PackR5G6B5 sub_824206E8 and DxtColor::FitEndpoints sub_82420AB8) "
+              "DxtColor::PackR5G6B5 sub_824206E8 and DxtColor::FitEndpoints sub_82420AB8; "
+              "the DXT color block's encoder, DxtColor::EncodeBlock sub_82420F50) "
               "natively instead of through the "
               "translated code (the same block bytes; checked by "
               "--run_harnesses=texture_compression)");
@@ -85,6 +86,26 @@ void TextureCompressionFitColorEndpoints(PPCContext& ctx, uint8_t* base) {
   ctx.r5.s64 = ctx.r5.s64 + 8;  // the original walks the pixels from r5 + 8
 }
 
+void TextureCompressionEncodeColorBlock(PPCContext& ctx, uint8_t* base) {
+  ctx.fpscr.disableFlushMode();
+  // stw r6,1084(r1) and stw r7,1060(r1) past its 1040-byte frame: the
+  // caller's slots for r6 and r3.
+  guest::StoreU32(base, ctx.r1.u32 + 44, ctx.r6.u32);
+  guest::StoreU32(base, ctx.r1.u32 + 20, ctx.r3.u32);
+  float pixels[16][4];
+  for (uint32_t i = 0; i < 16; i++) {
+    for (uint32_t c = 0; c < 4; c++) {
+      pixels[i][c] = guest::LoadFloat(base, ctx.r4.u32 + tc::kPixelBytes * i + 4 * c);
+    }
+  }
+  uint8_t block[8];
+  tc::EncodeColorBlock(base, pixels, ctx.r5.u32 != 0, ctx.r6.s32, ctx.r1.u32, block);
+  for (uint32_t i = 0; i < 8; i++) {
+    guest::StoreU8(base, ctx.r3.u32 + i, block[i]);
+  }
+  ctx.r3.u64 = 0;
+}
+
 }  // namespace hooks
 
 #define ITC_TEXTURE_COMPRESSION_ADAPTER(address, step) \
@@ -101,3 +122,4 @@ ITC_TEXTURE_COMPRESSION_ADAPTER(824207D8, TextureCompressionFitAlphaEndpoints)
 ITC_TEXTURE_COMPRESSION_ADAPTER(82422178, TextureCompressionEncodeAlphaBlock)
 ITC_TEXTURE_COMPRESSION_ADAPTER(824206E8, TextureCompressionPackR5G6B5)
 ITC_TEXTURE_COMPRESSION_ADAPTER(82420AB8, TextureCompressionFitColorEndpoints)
+ITC_TEXTURE_COMPRESSION_ADAPTER(82420F50, TextureCompressionEncodeColorBlock)

@@ -1,14 +1,19 @@
-// The DXT color block's helpers natively (docs/functions/texture-compression.md):
-// DxtColor::PackR5G6B5 sub_824206E8 and DxtColor::FitEndpoints sub_82420AB8,
-// step for step as the translated code does them (steps.h).
+// The DXT color block natively (docs/functions/texture-compression.md):
+// DxtColor::PackR5G6B5 sub_824206E8, DxtColor::FitEndpoints sub_82420AB8 and
+// DxtColor::EncodeBlock sub_82420F50, step for step as the translated code
+// does them (steps.h).
 
 #include "texture_compression/dxt_color.h"
 
 #include "base/log.h"
 #include "texture_compression/steps.h"
 
+#include <rex/platform/fpscr.h>
+#include <simde/x86/sse.h>
+
 #include <atomic>
 #include <bit>
+#include <cstring>
 #include <utility>
 
 namespace texture_compression {
@@ -314,6 +319,274 @@ void FitColorEndpoints(uint8_t* base, const float pixels[16][3], uint32_t colors
     }
   }
   finish();
+}
+
+namespace {
+
+using Fpscr = rex::platform::FPSCRPlatform;
+
+// EncodeBlock's constants: the alpha reference (in .data, read twice as the
+// original does), the color weights' inverses (0x82649B20, beside the
+// weights at kLowStart), the 5- and 6-bit steps' sizes (probably 1/31 and
+// 1/63), the palette's in-between steps for 4 colors (probably 1/3 and 2/3;
+// 3 colors use kHalf), the error diffusion's weights (right, below left,
+// below, below right: probably 7/16, 3/16, 5/16, 1/16, as the alpha half's)
+// and the step to palette index tables (words).
+constexpr uint32_t kAlphaReference = 0x8263B7E8;
+constexpr uint32_t kInverseWeights = 0x82649B20;
+constexpr uint32_t kStep5 = 0x8203B7A8;
+constexpr uint32_t kStep6 = 0x8203B7AC;
+constexpr uint32_t kThird = 0x82002A38;
+constexpr uint32_t kTwoThirds = 0x82038450;
+constexpr uint32_t kWeightRight = 0x8203EB04;
+constexpr uint32_t kWeightBelowLeft = 0x8203B78C;
+constexpr uint32_t kWeightBelow = 0x8203B790;
+constexpr uint32_t kWeightBelowRight = 0x820093A0;
+constexpr uint32_t kIndices3 = 0x8203EAF8;
+constexpr uint32_t kIndices4 = 0x8203EAE8;
+// Where the original keeps its palette in its frame (r1 + 176, 16 bytes an
+// entry), for a table word past the palette.
+constexpr uint32_t kPaletteInFrame = 176;
+
+// The error diffusion over the 4 x 4 block (error buffer at r1 + 272 in the
+// original): pixel i's error e, each channel to its right, below left,
+// below and below right neighbors (fmadds e, weight, old).
+struct Diffusion {
+  double right;
+  double below_left;
+  double below;
+  double below_right;
+  float error[16][3];
+
+  void Add(uint32_t to, const double e[3], double weight) {
+    for (int c = 0; c < 3; c++) {
+      error[to][c] = float(Fmadds(e[c], weight, error[to][c]));
+    }
+  }
+  void Spread(uint32_t i, const double e[3]) {
+    const uint32_t column = i & 3;
+    if (column != 3) {
+      Add(i + 1, e, right);
+    }
+    if (i < 12) {
+      if (column != 0) {
+        Add(i + 3, e, below_left);
+      }
+      Add(i + 4, e, below);
+      if (column != 3) {
+        Add(i + 5, e, below_right);
+      }
+    }
+  }
+};
+
+// The palette's in-between colors: lvlx/lvrx, vsubfp, vmaddfp (a multiply
+// then an add) with the vector unit's flush-to-zero (inputs and results),
+// as the translated code does them on the host. The fourth lane (the
+// original's leftovers) never reaches the block.
+void Lerp(const float a[3], const float b[3], float t, float out[3]) {
+  const uint32_t csr = Fpscr::getcsr();
+  Fpscr::setcsr(csr | uint32_t(Fpscr::FlushMask));
+  const simde__m128 va = simde_mm_set_ps(0.0f, a[2], a[1], a[0]);
+  const simde__m128 vb = simde_mm_set_ps(0.0f, b[2], b[1], b[0]);
+  const simde__m128 d = simde_mm_sub_ps(vb, va);
+  const simde__m128 r = simde_mm_add_ps(simde_mm_mul_ps(d, simde_mm_set1_ps(t)), va);
+  float lanes[4];
+  simde_mm_storeu_ps(lanes, r);
+  Fpscr::setcsr(csr);
+  out[0] = lanes[0];
+  out[1] = lanes[1];
+  out[2] = lanes[2];
+}
+
+void StoreU16(uint8_t* out, uint32_t v) {
+  out[0] = uint8_t(v >> 8);
+  out[1] = uint8_t(v);
+}
+
+}  // namespace
+
+void EncodeColorBlock(uint8_t* base, const float pixels[16][4], bool one_bit_alpha, int32_t dither,
+                      uint32_t stack, uint8_t block[8]) {
+  ITC_NATIVE_RUNNING("sub_82420F50 DxtColor::EncodeBlock");
+  const uint32_t frame = stack - kColorFrameBytes;  // the original's r1
+
+  // DXT1's 1-bit alpha: the pixels below the reference (a NaN isn't).
+  uint32_t colors = 4;
+  if (one_bit_alpha) {
+    const double reference = Lfs(base, kAlphaReference);
+    uint32_t below = 0;
+    for (int i = 0; i < 16; i++) {
+      if (double(pixels[i][3]) < reference) {
+        below++;
+      }
+    }
+    if (below == 16) {  // sth 0 at +0, sth -1 at +2, stw -1 at +4
+      StoreU16(block, 0);
+      StoreU16(block + 2, 0xFFFF);
+      for (int b = 4; b < 8; b++) block[b] = 0xFF;
+      return;
+    }
+    colors = below != 0 ? 3 : 4;
+  }
+
+  const double w[3] = {Lfs(base, kLowStart), Lfs(base, kLowStart + 4),
+                       Lfs(base, kLowStart + 8)};  // f27, f28, f29
+  const double scale5 = Lfs(base, kScale5);        // f8
+  const double scale6 = Lfs(base, kScale6);        // f7
+  const double step5 = Lfs(base, kStep5);          // f31
+  const double step6 = Lfs(base, kStep6);          // f30
+  const double half = Lfs(base, kHalf);            // f23
+  // Each weighted pixel's fourth float (stfs of 1.0, read back as the
+  // diffused error's factor).
+  const double weighted_alpha = double(float(Lfs(base, kOne)));
+  Diffusion diffusion;
+  diffusion.right = Lfs(base, kWeightRight);           // f22
+  diffusion.below_left = Lfs(base, kWeightBelowLeft);  // f21
+  diffusion.below = Lfs(base, kWeightBelow);           // f20
+  diffusion.below_right = Lfs(base, kWeightBelowRight);  // f19
+
+  // The pixels quantized to 5:6:5 (with the error diffused so far) and
+  // weighted, into r1 + 528.
+  if (dither != 0) {
+    std::memset(diffusion.error, 0, sizeof(diffusion.error));
+  }
+  float weighted[16][3];
+  for (uint32_t i = 0; i < 16; i++) {
+    double r = pixels[i][0];  // f13
+    double g = pixels[i][1];  // f12
+    double b = pixels[i][2];  // f0
+    if (dither != 0) {
+      b = Fadds(diffusion.error[i][2], b);
+      r = Fadds(diffusion.error[i][0], r);
+      g = Fadds(g, diffusion.error[i][1]);
+    }
+    const double qr = Fmuls(IntToSingle(Fctiwz(Fmadds(r, scale5, half))), step5);  // f11
+    const double qg = Fmuls(IntToSingle(Fctiwz(Fmadds(g, scale6, half))), step6);  // f10
+    const double qb = Fmuls(IntToSingle(Fctiwz(Fmadds(b, scale5, half))), step5);  // f9
+    if (dither != 0) {
+      const double e[3] = {Fsubs(r, qr), Fsubs(g, qg), Fsubs(b, qb)};
+      diffusion.Spread(i, e);
+    }
+    weighted[i][0] = float(Fmuls(w[0], qr));
+    weighted[i][1] = float(Fmuls(w[1], qg));
+    weighted[i][2] = float(Fmuls(w[2], qb));
+  }
+
+  // The ends (r1 + 96 and r1 + 240), unweighted and packed.
+  float low[3];
+  float high[3];
+  FitColorEndpoints(base, weighted, colors, frame, low, high);
+  const double inverse[3] = {Lfs(base, kInverseWeights), Lfs(base, kInverseWeights + 4),
+                             Lfs(base, kInverseWeights + 8)};
+  const float low_color[3] = {float(Fmuls(inverse[0], low[0])), float(Fmuls(low[1], inverse[1])),
+                              float(Fmuls(low[2], inverse[2]))};
+  const float high_color[3] = {float(Fmuls(high[0], inverse[0])),
+                               float(Fmuls(high[1], inverse[1])),
+                               float(Fmuls(high[2], inverse[2]))};
+  const uint32_t c0 = PackR5G6B5(base, low_color);   // r7
+  const uint32_t c1 = PackR5G6B5(base, high_color);  // r11
+  if (colors == 4 && c0 == c1) {  // sth c1 at +2, sth c0 at +0, stw 0 at +4
+    StoreU16(block, c0);
+    StoreU16(block + 2, c1);
+    for (int b = 4; b < 8; b++) block[b] = 0;
+    return;
+  }
+
+  // The packed ends decoded and weighted again: the palette's ends.
+  const float end0[3] = {
+      float(Fmuls(w[0], Fmuls(IntToSingle((c0 >> 11) & 0x1F), step5))),
+      float(Fmuls(Fmuls(IntToSingle((c0 >> 5) & 0x3F), step6), w[1])),
+      float(Fmuls(Fmuls(IntToSingle(c0 & 0x1F), step5), w[2])),
+  };
+  const float end1[3] = {
+      float(Fmuls(Fmuls(IntToSingle((c1 >> 11) & 0x1F), step5), w[0])),
+      float(Fmuls(Fmuls(IntToSingle((c1 >> 5) & 0x3F), step6), w[1])),
+      float(Fmuls(Fmuls(IntToSingle(c1 & 0x1F), step5), w[2])),
+  };
+  // DXT1's order: the first end above the second for 4 colors, not above it
+  // for 3.
+  float palette[4][3];
+  const bool in_order = (colors == 3) == (c1 >= c0);
+  const uint32_t first = in_order ? c0 : c1;
+  const uint32_t second = in_order ? c1 : c0;
+  std::memcpy(palette[0], in_order ? end0 : end1, sizeof(palette[0]));
+  std::memcpy(palette[1], in_order ? end1 : end0, sizeof(palette[1]));
+  StoreU16(block, first);
+  StoreU16(block + 2, second);
+  if (colors == 3) {
+    Lerp(palette[0], palette[1], float(half), palette[2]);
+  } else {
+    Lerp(palette[0], palette[1], float(Lfs(base, kThird)), palette[2]);
+    Lerp(palette[0], palette[1], float(Lfs(base, kTwoThirds)), palette[3]);
+  }
+
+  // Each pixel's step along the palette's line.
+  const double p0[3] = {palette[0][0], palette[0][1], palette[0][2]};  // f27, f26, f25
+  const double dr = Fsubs(palette[1][0], p0[0]);                        // f13
+  const double dg = Fsubs(palette[1][1], p0[1]);                        // f12
+  const double db = Fsubs(palette[1][2], p0[2]);                        // f11
+  const double last = IntToSingle(int64_t(colors - 1));                 // f24
+  const double zero = Lfs(base, kZero);                                 // f28
+  const double scale = c0 == c1 ? zero : Fdivs(last, Fmadds(dr, dr, Fmadds(db, db, Fmuls(dg, dg))));
+  const double sr = Fmuls(scale, dr);  // f31
+  const double sg = Fmuls(scale, dg);  // f30
+  const double sb = Fmuls(scale, db);  // f29
+  const uint32_t indices = colors == 3 ? kIndices3 : kIndices4;  // r28
+  const double reference = Lfs(base, kAlphaReference);  // f7, through r1 + 256
+  if (dither != 0) {
+    std::memset(diffusion.error, 0, sizeof(diffusion.error));
+  }
+  uint32_t bits = 0;  // r29: each index shifted in from the top
+  for (uint32_t i = 0; i < 16; i++) {
+    if (colors == 3 && double(pixels[i][3]) < reference) {
+      bits = (bits >> 2) | 0xC0000000u;
+      continue;
+    }
+    double r = Fmuls(pixels[i][0], w[0]);  // f13
+    double g = Fmuls(pixels[i][1], w[1]);  // f12
+    double b = Fmuls(pixels[i][2], w[2]);  // f11
+    if (dither != 0) {
+      r = Fadds(diffusion.error[i][0], r);
+      b = Fadds(diffusion.error[i][2], b);
+      g = Fadds(diffusion.error[i][1], g);
+    }
+    const double t = Fmadds(Fsubs(r, p0[0]), sr, Fmadds(Fsubs(b, p0[2]), sb, Fmuls(Fsubs(g, p0[1]), sg)));
+    uint32_t index;  // r10
+    if (!(t > zero)) {
+      index = 0;
+    } else if (!(t < last)) {
+      index = 1;
+    } else {
+      index = guest::LoadU32(base, (uint32_t(Fctiwz(Fadds(t, half))) << 2) + indices);
+    }
+    bits = (bits >> 2) | ((index & 3) << 30);
+    if (dither != 0) {
+      float entry[3];
+      if (index < colors) {
+        std::memcpy(entry, palette[index], sizeof(entry));
+      } else {
+        // A table word past the palette: the original reads its frame there
+        // (never seen; the frame isn't kept here, so guest memory).
+        static std::atomic<bool> noted{false};
+        if (!noted.exchange(true, std::memory_order_relaxed)) {
+          ITC_LOG_WARN("DxtColor::EncodeBlock: palette index {} of {} colors", index, colors);
+        }
+        const uint32_t at = frame + kPaletteInFrame + (index << 4);
+        for (uint32_t c = 0; c < 3; c++) entry[c] = guest::LoadFloat(base, at + 4 * c);
+      }
+      const double e[3] = {Fmuls(Fsubs(r, entry[0]), weighted_alpha),
+                           Fmuls(Fsubs(g, entry[1]), weighted_alpha),
+                           Fmuls(Fsubs(b, entry[2]), weighted_alpha)};
+      diffusion.Spread(i, e);
+    }
+  }
+  // rotlwi 16: the index word's halfwords swapped, stored big-endian.
+  const uint32_t word = (bits << 16) | (bits >> 16);
+  block[4] = uint8_t(word >> 24);
+  block[5] = uint8_t(word >> 16);
+  block[6] = uint8_t(word >> 8);
+  block[7] = uint8_t(word);
 }
 
 }  // namespace texture_compression
