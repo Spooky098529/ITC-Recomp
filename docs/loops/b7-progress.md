@@ -80,6 +80,12 @@ file's history. What's left to see in a drive, from every run:
   (`itc_2206`, replay `itc_2207`: ran in the replay). Finished: 49 of
   50 in play ours; recorded in the plan's table and boundary log.
 
+- Subsystem 3 of 3: the lead the race world's map added, the race's
+  other states (`sub_82166E50`, `sub_82163440`, `sub_821654F8`,
+  `sub_82162D80`, `sub_82165AB0`, `sub_82165C78`, `sub_82166F98`,
+  `sub_821692C8`; they call `RaceStart::Place`, `Refresh`,
+  `ListRacers`; 18+ ready groups). Mapping agent running.
+
 ## Done
 
 - The race world (`race-world.md`, mapped in 5b6d76c; 54 rows, 50 in
