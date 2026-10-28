@@ -37,8 +37,9 @@ save data made"; every row below was read in full in `generated/`
 (offsets are the save data's unless said). Made native the same day by the B7 loop
 (`src/save_data/`, adapters in `src/hooks/save_data.cpp`, `--native_save_data`,
 harness `save_data`): the 19 functions seen in play; the four not seen keep
-no code of their own (their callers, recompiled, reach the native callees
-through the adapters left).
+no code of their own: run recompiled, they reach the adapters left
+(`Progress::SetDefaults`, `Progress::Clear`, `SaveData::Delete`) or, where
+an adapter was removed, the original (as before).
 
 Status:
 
