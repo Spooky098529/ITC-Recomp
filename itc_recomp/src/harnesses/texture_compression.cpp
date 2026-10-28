@@ -1550,6 +1550,32 @@ void PutAndFree(Outputs& out, uint8_t* base, uint32_t block) {
   }
 }
 
+// The register steps of ImageCodec::ImageCodec sub_823EA800 (r3 = the codec,
+// r4 = the description, r5 = bits per pixel, r6 = the kind) and
+// DxtCodec::DxtCodec sub_823F5FA0 (r3 = the codec, r4 = the description), as
+// their adapters did them: the original where the plain C++ refuses. r3
+// left.
+void NativeImageCodecConstruct(PPCContext& ctx, uint8_t* base) {
+  ctx.fpscr.disableFlushMode();
+  const auto r3 =
+      tc::ImageCodecConstruct(base, ctx.r3.u32, ctx.r4.u32, ctx.r5.u32, ctx.r6.u32);
+  if (!r3) {
+    __imp__sub_823EA800(ctx, base);
+    return;
+  }
+  ctx.r3.u64 = *r3;
+}
+
+void NativeDxtCodecConstruct(PPCContext& ctx, uint8_t* base) {
+  ctx.fpscr.disableFlushMode();
+  const auto r3 = tc::DxtCodecConstruct(base, ctx.r3.u32, ctx.r4.u32);
+  if (!r3) {
+    __imp__sub_823F5FA0(ctx, base);
+    return;
+  }
+  ctx.r3.u64 = *r3;
+}
+
 // ImageCodec::ImageCodec on a codec in the scratch area (filled with 0xCD):
 // bits 0, 8 to 128, or random; kinds 1 to 4 or random; the codec's 128
 // bytes, r3, and the error row (its size and bytes).
@@ -1590,7 +1616,7 @@ void ImageCodecConstruct(Context& h) {
       if (v == 0) {
         __imp__sub_823EA800(t, h.base);
       } else {
-        hooks::TextureCompressionImageCodecConstruct(t, h.base);
+        NativeImageCodecConstruct(t, h.base);
       }
       ITC_FLAG(native_texture_compression) = true;
       Blocks blocks;
@@ -1724,7 +1750,7 @@ void DxtCodecConstruct(Context& h) {
       if (v == 0) {
         __imp__sub_823F5FA0(t, h.base);
       } else {
-        hooks::TextureCompressionDxtCodecConstruct(t, h.base);
+        NativeDxtCodecConstruct(t, h.base);
       }
       ITC_FLAG(native_texture_compression) = true;
       Blocks blocks;

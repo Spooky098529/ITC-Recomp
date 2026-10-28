@@ -1,14 +1,15 @@
 // XGraphics' surface compression natively: adapters in front of
 // src/texture_compression/ (docs/functions/texture-compression.md), with the
 // register steps the harness shares (hooks/texture_compression.h). The
-// codecs are made by ImageCodec::Create, the constructors and Prepare,
-// called by the recompiled Blitter::Init (and Create's by its compare tree);
-// their row functions and destructors are reached through their vtables,
+// codecs are made by ImageCodec::Create and Prepare, called by the
+// recompiled Blitter::Init (Create calls the constructors' plain C++); their
+// row functions and destructors are reached through their vtables,
 // the DXT4/5 block's encoder through the DXT codec's +144. The adapters of
 // the functions reached only from native callers went (DxtAlpha::
 // FitEndpoints and EncodeBlock, DxtColor::PackR5G6B5, FitEndpoints and
 // EncodeBlock, Dxt45::EncodeBlockPremultiplied, ImageCodec::~ImageCodec,
-// DxtCodec::~DxtCodec): their callers' plain C++ calls theirs directly.
+// DxtCodec::~DxtCodec, ImageCodec::ImageCodec, DxtCodec::DxtCodec): their
+// callers' plain C++ calls theirs directly.
 
 #include "hooks/texture_compression.h"
 
@@ -131,37 +132,11 @@ void TextureCompressionDxtCodecDelete(PPCContext& ctx, uint8_t* base) {
   DeleteWith(ctx, base, tc::DxtCodecDelete, __imp__sub_823F6BC0);
 }
 
-void TextureCompressionImageCodecConstruct(PPCContext& ctx, uint8_t* base) {
-  std::optional<uint32_t> r3;
-  if (NativeHeapActive()) {
-    ctx.fpscr.disableFlushMode();
-    r3 = tc::ImageCodecConstruct(base, ctx.r3.u32, ctx.r4.u32, ctx.r5.u32, ctx.r6.u32);
-  }
-  if (!r3) {
-    __imp__sub_823EA800(ctx, base);
-    return;
-  }
-  ctx.r3.u64 = *r3;
-}
-
 void TextureCompressionPrepare(PPCContext& ctx, uint8_t* base) {
   const auto r3 =
       NativeHeapActive() ? tc::PrepareCodecs(base, ctx.r3.u32, ctx.r4.u32) : std::nullopt;
   if (!r3) {
     __imp__sub_823EAA90(ctx, base);
-    return;
-  }
-  ctx.r3.u64 = *r3;
-}
-
-void TextureCompressionDxtCodecConstruct(PPCContext& ctx, uint8_t* base) {
-  std::optional<uint32_t> r3;
-  if (NativeHeapActive()) {
-    ctx.fpscr.disableFlushMode();
-    r3 = tc::DxtCodecConstruct(base, ctx.r3.u32, ctx.r4.u32);
-  }
-  if (!r3) {
-    __imp__sub_823F5FA0(ctx, base);
     return;
   }
   ctx.r3.u64 = *r3;
@@ -198,7 +173,5 @@ ITC_TEXTURE_COMPRESSION_ADAPTER(823F2620, TextureCompressionDecodeA8R8G8B8Row)
 ITC_TEXTURE_COMPRESSION_ADAPTER(823F6298, TextureCompressionDxtEncodeRow)
 ITC_TEXTURE_COMPRESSION_ADAPTER(823F6B70, TextureCompressionImageCodecDelete)
 ITC_TEXTURE_COMPRESSION_ADAPTER(823F6BC0, TextureCompressionDxtCodecDelete)
-ITC_TEXTURE_COMPRESSION_ADAPTER(823EA800, TextureCompressionImageCodecConstruct)
 ITC_TEXTURE_COMPRESSION_ADAPTER(823EAA90, TextureCompressionPrepare)
-ITC_TEXTURE_COMPRESSION_ADAPTER(823F5FA0, TextureCompressionDxtCodecConstruct)
 ITC_TEXTURE_COMPRESSION_ADAPTER(823F6C60, TextureCompressionCreate)
