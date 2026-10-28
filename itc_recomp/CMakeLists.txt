@@ -174,6 +174,7 @@ set(ITC_SOURCES
     src/race_states/route_distance.cpp
     src/hooks/archive.cpp
     src/archive/archive.cpp
+    src/archive/semaphores.cpp
     src/hooks/texture_compression.cpp
     src/texture_compression/dxt_alpha.cpp
     src/texture_compression/dxt_color.cpp

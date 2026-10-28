@@ -4,13 +4,15 @@
 // the request queue's list and slots, the loose files' table, a request's
 // finish and Ucl::Unpack. The archive's globals are guest memory shared with
 // the recompiled code (the queueing, the picker, the loader thread), so these
-// work on guest memory. Adapters: src/hooks/archive.cpp. The functions that
-// wait on, signal or read the archive's four semaphores stay recompiled.
+// work on guest memory. Adapters: src/hooks/archive.cpp. The queue's users
+// take the archive's four semaphores as host ones (semaphores.h: the user's
+// call, 2026-10-28), the ones CurrentSemaphores() gives.
 
 #pragma once
 
 #include "c_runtime/exit.h"
 
+#include <array>
 #include <cstdint>
 #include <optional>
 
@@ -154,5 +156,95 @@ struct UclCalls {
 // one before); else 1 when the output's size is `expected`.
 uint32_t UclUnpack(uint8_t* base, uint32_t dst, uint32_t stream, uint32_t expected,
                    const UclCalls& calls);
+
+// --- The queue and the loader under the four semaphores ---
+
+// The next request's serial, the flag asking the loader to signal idle once
+// the queue is drained (Archive::WaitIdle), the count picking the staging
+// ring's half and the two halves.
+constexpr uint32_t kSerial = 0x826A5104;
+constexpr uint32_t kIdleWanted = 0x826A5108;
+constexpr uint32_t kStagingCount = 0x826A5110;
+constexpr uint32_t kStagingHalves = 0x826A5114;
+
+// The 40-byte request Archive::Load builds on its stack and the queueing
+// copies to a slot's +12 (big-endian words): +0 the flags, +4 the id, +8 the
+// loose file's path, +12 the byte offset (the TOC's start sector x 2,048),
+// +16 r7, +20 the size, +24 the stored size (compressed) or 0, +28 the
+// destination, +32 the callback's context, +36 the callback.
+using LoadRequest = std::array<uint8_t, 40>;
+
+// Archive::Load (sub_8209DE48) up to the queueing: the request for `id`.
+// Flags 0x4024, with 0x100 when the TOC's unpacked size isn't 0 (compressed),
+// 0x200 with a loose file or else 0x800, 0x2000 with a callback, 0x80 with
+// `r7`; the size is the unpacked size (compressed), else `size` when not 0,
+// else the stored size.
+LoadRequest BuildLoad(uint8_t* base, uint32_t id, uint32_t destination, uint32_t callback,
+                      uint32_t context, uint32_t r7, uint32_t size);
+
+// The queueing (sub_8209DC18), under the queue lock: a free slot
+// (FindSlot(-1)); none: -1. When the queue has no head and the work
+// semaphore's count is 0, the work semaphore signaled (still under the
+// lock). The slot's +8 the serial (0x826A5104), the request copied to +12,
+// +52 to +88 cleared, the serial counter up by one (0 at 0x7FFFFFFF), the
+// slot appended to the queue. Returns the serial, or -1.
+int64_t Queue(uint8_t* base, const LoadRequest& request);
+
+// Archive::WaitIdle (sub_8209D730): under the queue lock, 0x826A5108 = 1
+// when the queue has requests; then, when 0x826A5108 is set, the idle
+// semaphore waited on (the loader signals it once the queue is drained).
+void WaitIdle(uint8_t* base);
+// Archive::QueueLength (sub_8209D7B0): the queue's count, under the lock.
+uint32_t QueueLength(uint8_t* base);
+// Archive::CancelQueued (sub_8209DB90): under the lock, every queued request
+// still waiting (+52 0) with flag 0x4000 taken off the queue and its slot
+// freed (+8 = -1); then, with `wait`, Archive::WaitIdle.
+void CancelQueued(uint8_t* base, bool wait);
+// A request's cancel (sub_8209DB20): r3 a serial; under the lock, its slot
+// (FindSlot): none, 1; still waiting (+52 0), taken off the queue and freed,
+// 1; else 0.
+uint32_t Cancel(uint8_t* base, uint32_t serial);
+
+// The picker (sub_8209D950), on the loader thread, under the queue lock:
+// `current` kept as the chained one when it's compressed (0x100 without
+// 0x8); `finished_chained` and `finished_current` (each when not 0) taken
+// off the queue, their +8 = -1, +52 = +12 = 0; the next: `current`'s link
+// (or the queue's head with no current, or when the link's slot is free),
+// none when it and the chained one both have flag 0x1, or when it has 0x4
+// (and isn't compressed without 0x8) and its destination (+40) is the
+// chained one's (+88), the chained one with 0x4 too; the next's +52 = 1 and
+// +56 to +88 cleared (not +68); the chained one's +84 = the next (or itself
+// with no next, then the next) and +52 = 2. With a next and the work
+// semaphore's count not 0, takes it. Returns the next.
+uint32_t PickNext(uint8_t* base, uint32_t current, uint32_t finished_chained,
+                  uint32_t finished_current);
+
+// The set-up's call into the translated code: VirtualAlloc (sub_82295398)
+// with (0, size, MEM_COMMIT, 4) where the native layer isn't on.
+struct SetUpCalls {
+  uint32_t (*guest_alloc)(void* user, uint32_t size) = nullptr;
+  void* user = nullptr;
+};
+
+// A request's set-up (sub_8209D490), on the loader thread, for a request in
+// state 1 (+52; else nothing): under the queue lock its state from the flags
+// (+12; 3, 4, 5 an archive entry, 6, 7 a loose file, 8, or left); then +56 =
+// +24 (0x800), +64 = +28 (0x80), +72 the unpacked size and +68 the stored one
+// (0x100: +32 and +36; else both +32), +60 the sectors; with 0x20 and 0x1 a
+// fresh allocation of the sectors (0 with 0x1000) at +76 and the caller's
+// word +40 points at; with 0x4, +76 = +40; compressed without 0x8, +88 = +76
+// and +76 the staging half (0x826A5114 + 4 x (count & 1)), the count up.
+void SetUp(uint8_t* base, uint32_t request, const SetUpCalls& calls);
+
+// The loader's next request (sub_8209DD98): `current` 0 or the one just
+// read. Its chained one (+84) finished (FinishRequest), and +84 = 0 unless it
+// was itself (then no current); the current one finished too unless it's
+// compressed without 0x8 (kept to unpack); the next picked (PickNext) and,
+// when there is one, set up. Returns the next.
+struct LoaderCalls {
+  FinishCalls finish;
+  SetUpCalls set_up;
+};
+uint32_t NextRequest(uint8_t* base, uint32_t current, const LoaderCalls& calls);
 
 }  // namespace archive

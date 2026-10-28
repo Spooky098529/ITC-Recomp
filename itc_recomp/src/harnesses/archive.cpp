@@ -26,6 +26,7 @@
 #include "exit_table.h"
 
 #include "archive/archive.h"
+#include "archive/semaphores.h"
 #include "base/flags.h"
 #include "base/log.h"
 #include "hooks/archive.h"
@@ -37,8 +38,11 @@
 
 #include <algorithm>
 #include <bit>
+#include <chrono>
 #include <mutex>
+#include <optional>
 #include <string>
+#include <thread>
 #include <vector>
 
 ITC_FLAG_DECLARE(bool, native_archive);
@@ -752,6 +756,577 @@ void UclStreams(Context& h) {
   results.Report();
 }
 
+// --- The semaphores and the queue under them ---
+
+// The host semaphore (what the Semaphore::Wait and Signal adapters do for
+// the archive's four) against the game's Semaphore class on a semaphore of
+// its own (Semaphore::Init, then Wait and Signal through the translated
+// code), on the same counts and steps: Waits only while the count is above 0
+// (neither blocks), the count after each step compared.
+void SemaphoreCounts(Context& h) {
+  Results results("sub_82592670/sub_825926E8 Semaphore::Wait and Signal (the archive's, host)");
+  const uint32_t pages = memory::AllocPages(4096, 4096);
+  const uint32_t guest_semaphore = pages;
+  const uint32_t mirror = pages + 256;
+  {
+    PPCContext t = CallContext(h);
+    t.r3.u64 = guest_semaphore;
+    __imp__sub_825925F0(t, h.base);
+  }
+  for (int c = 0; c < 60; c++) {
+    const int32_t start = c < 10 ? 1 : int32_t(h.random.Below(5)) - (c % 7 == 0 ? 3 : 0);
+    std::vector<bool> waits;
+    int32_t count = start;
+    for (uint32_t n = 1 + h.random.Below(40); n; n--) {
+      const bool wait = count > 0 && h.random.Below(2);
+      waits.push_back(wait);
+      count += wait ? -1 : 1;
+    }
+    Outputs out[2];
+    for (int v = 0; v < 2; v++) {
+      if (v == 0) {
+        guest::StoreU32(h.base, guest_semaphore + archive::kSemaphoreCount, uint32_t(start));
+        for (bool wait : waits) {
+          PPCContext t = CallContext(h);
+          t.r3.u64 = guest_semaphore;
+          (wait ? __imp__sub_82592670 : __imp__sub_825926E8)(t, h.base);
+          out[v].Word(guest::LoadU32(h.base, guest_semaphore + archive::kSemaphoreCount));
+        }
+        out[v].Word(guest::LoadU32(h.base, guest_semaphore + archive::kSemaphoreCount));
+      } else {
+        archive::HostSemaphore s(mirror, start);
+        for (bool wait : waits) {
+          wait ? s.Wait(h.base) : s.Signal(h.base);
+          out[v].Word(guest::LoadU32(h.base, mirror));
+        }
+        out[v].Word(uint32_t(s.Count()));
+      }
+    }
+    results.Check(out[0], out[1], fmt::format("case {} (from {}, {} steps)", c, start, waits.size()));
+  }
+  // Between two threads (the loader's and the main thread's use): every
+  // Signal reaches a waiter, none lost.
+  {
+    archive::HostSemaphore s(0, 0);
+    constexpr int kHandoffs = 20000;
+    std::thread waiter([&] {
+      for (int i = 0; i < kHandoffs; i++) {
+        s.Wait(h.base);
+      }
+    });
+    for (int i = 0; i < kHandoffs; i++) {
+      s.Signal(h.base);
+    }
+    waiter.join();
+    ITC_LOG_INFO("harness: archive: host semaphore: {} signals across two threads, count {} "
+                 "after (0 expected)",
+                 kHandoffs, s.Count());
+  }
+  memory::FreePages(pages);
+  results.Report();
+}
+
+// The live queue's state the cases change, put back after each side: the
+// queue, the 960 slots, the serial counter, the idle flag, the staging count
+// and half in use, and the callback's serial.
+struct QueueState {
+  std::vector<uint8_t> queue, slots;
+  uint32_t words[5] = {};
+  static constexpr uint32_t kWords[5] = {archive::kSerial, archive::kIdleWanted,
+                                         archive::kStagingCount, archive::kStagingInUse,
+                                         archive::kCallbackSerial};
+  void Save(uint8_t* base) {
+    queue = Read(base, archive::kQueue, 20);
+    slots = Read(base, archive::kSlots, archive::kSlotCount * archive::kSlotBytes);
+    for (int i = 0; i < 5; i++) {
+      words[i] = guest::LoadU32(base, kWords[i]);
+    }
+  }
+  void Restore(uint8_t* base) const {
+    Write(base, archive::kQueue, queue.data(), 20);
+    Write(base, archive::kSlots, slots.data(), uint32_t(slots.size()));
+    for (int i = 0; i < 5; i++) {
+      guest::StoreU32(base, kWords[i], words[i]);
+    }
+  }
+};
+
+// The scratch area's layout for the queue's cases: up to 12 requests (92
+// bytes each) from the start, the serials the finish's callback writes
+// through from +2048, a word from +3072.
+constexpr uint32_t kRequests = 12;
+constexpr uint32_t kSerials = 2048;
+constexpr uint32_t kWordAt = 3072;
+uint32_t Request(Context& h, uint32_t i) {
+  return h.data + i * archive::kSlotBytes;
+}
+
+// The flags the queue's functions test, each on or off, over random bits.
+uint32_t RandomFlags(Random& r) {
+  uint32_t flags = uint32_t(r.Next()) & 0xFFFF0000u;
+  for (uint32_t bit = 1; bit <= 0x4000; bit <<= 1) {
+    if (r.Below(2)) {
+      flags |= bit;
+    }
+  }
+  return flags;
+}
+
+// A queue of the scratch requests: `queued` of the `count` made, in a random
+// order, the queue's count word sometimes off; every link a queued request
+// or 0 (the requests not queued link to one, or 0). Returns the requests in
+// the queue's order, then the others.
+std::vector<uint32_t> MakeQueue(Context& h, uint32_t count, uint32_t queued) {
+  std::vector<uint32_t> order;
+  for (uint32_t i = 0; i < count; i++) {
+    order.push_back(Request(h, i));
+  }
+  for (uint32_t i = count; i > 1; i--) {
+    std::swap(order[i - 1], order[h.random.Below(i)]);
+  }
+  for (uint32_t i = 0; i < count; i++) {
+    const uint32_t r = order[i];
+    guest::StoreU32(h.base, r, archive::kSlotVtable);
+    guest::StoreU32(h.base, r + 8,
+                    h.random.Below(6) == 0 ? 0xFFFFFFFFu : h.data + kSerials + 8 * h.random.Below(64));
+    guest::StoreU32(h.base, r + 12, RandomFlags(h.random));
+    static const uint32_t kStates[] = {0, 0, 1, 2, 5, 7, 3};
+    guest::StoreU32(h.base, r + 52, kStates[h.random.Below(7)]);
+    guest::StoreU32(h.base, r + 84, 0);
+    if (h.random.Below(3) == 0 && count > 1) {
+      // A destination shared with another's staging one (the picker's check).
+      guest::StoreU32(h.base, r + 40, guest::LoadU32(h.base, order[h.random.Below(count)] + 88));
+    }
+    uint32_t link = 0;
+    if (i < queued) {
+      link = i + 1 < queued ? order[i + 1] : 0;
+    } else if (queued && h.random.Below(2)) {
+      link = order[h.random.Below(queued)];
+    }
+    guest::StoreU32(h.base, r + 4, link);
+  }
+  guest::StoreU32(h.base, archive::kQueue + 8, h.random.Below(5) ? queued : uint32_t(h.random.Next()));
+  guest::StoreU32(h.base, archive::kQueue + 12, queued ? order[0] : 0);
+  guest::StoreU32(h.base, archive::kQueue + 16, queued ? order[queued - 1] : 0);
+  return order;
+}
+
+// The test semaphores' counts for a case: the queue lock 1 (as it always is
+// outside the lock), the others 0 to 2 (idle at least 1: WaitIdle waits on it
+// with nothing to signal it here).
+void SetCounts(Context& h, archive::Semaphores& test) {
+  test.queue_lock.SetCount(h.base, 1);
+  test.work.SetCount(h.base, int32_t(h.random.Below(3)));
+  test.request_done.SetCount(h.base, int32_t(h.random.Below(3)));
+  test.idle.SetCount(h.base, 1 + int32_t(h.random.Below(2)));
+}
+
+// One case of the queue's functions: the live state put back, the scratch
+// area filled, the counts set, `setup(t)` the inputs and registers, `run(t,
+// native)` one side; compared: `outputs(t, out)`, the scratch area, the queue,
+// the slots, the globals, the four counts and their guest words.
+template <typename Setup, typename Run, typename Out>
+void QueueCase(Context& h, Results& results, archive::Semaphores& test, const QueueState& saved,
+               Setup setup, Run run, Out outputs, const std::string& what) {
+  Outputs out[2];
+  const Random start = h.random;
+  Random after;
+  const bool flag = ITC_FLAG(native_archive);
+  for (int v = 0; v < 2; v++) {
+    h.random = start;
+    saved.Restore(h.base);
+    Fill(h.base, h.data, kScratchBytes);
+    SetCounts(h, test);
+    PPCContext t = CallContext(h);
+    setup(t);
+    ITC_FLAG(native_archive) = v == 1;
+    run(t, v == 1);
+    ITC_FLAG(native_archive) = flag;
+    outputs(t, out[v]);
+    out[v].Bytes(Read(h.base, h.data, kScratchBytes));
+    out[v].Bytes(Read(h.base, archive::kQueue, 20));
+    out[v].Bytes(Read(h.base, archive::kSlots, archive::kSlotCount * archive::kSlotBytes));
+    for (uint32_t word : QueueState::kWords) {
+      out[v].Word(guest::LoadU32(h.base, word));
+    }
+    for (archive::HostSemaphore* s : {&test.queue_lock, &test.work, &test.request_done, &test.idle}) {
+      out[v].Word(uint32_t(s->Count()));
+    }
+    for (uint32_t s : {archive::kQueueLock, archive::kWork, archive::kRequestDone, archive::kIdle}) {
+      out[v].Word(guest::LoadU32(h.base, s + archive::kSemaphoreCount));
+    }
+    after = h.random;
+  }
+  h.random = after;
+  saved.Restore(h.base);
+  results.Check(out[0], out[1], what);
+}
+
+auto R3 = [](const PPCContext& t, Outputs& out) {
+  out.Word(t.r3.u32);
+  out.Word(uint32_t(t.r3.u64 >> 32));
+};
+auto NoR3 = [](const PPCContext&, Outputs&) {};
+
+// A free slot's serial, sometimes the first `k` slots taken (or all of them).
+void TakeSlots(Context& h) {
+  const uint32_t k = h.random.Below(8) == 0 ? archive::kSlotCount : h.random.Below(4) * 37;
+  for (uint32_t i = 0; i < k; i++) {
+    guest::StoreU32(h.base, archive::kSlots + i * archive::kSlotBytes + 8, 0x70000000u + i);
+  }
+}
+
+// The serial counter: random, or an edge of its wrap.
+void SetSerial(Context& h) {
+  static const uint32_t kEdges[] = {0, 1, 0x7FFFFFFD, 0x7FFFFFFE, 0x7FFFFFFF, 0x80000000u,
+                                    0xFFFFFFFFu};
+  guest::StoreU32(h.base, archive::kSerial,
+                  h.random.Below(3) == 0 ? kEdges[h.random.Below(7)] : h.random.Below(100000));
+}
+
+void SetSerialR3(PPCContext& t, int64_t serial) {
+  if (serial < 0) {
+    t.r3.s64 = -1;
+  } else {
+    t.r3.u64 = uint64_t(serial);
+  }
+}
+
+// The loader's frees and the callback: as Finishes' (the leaf
+// ListNode::ListNode as the callback, writing through the serial; the data
+// pages of the allocation layer, which a decommit leaves).
+struct LoaderInputs {
+  uint32_t pages = 0;
+  void Prepare(Context& h, const std::vector<uint32_t>& requests, uint32_t staging_in_use) {
+    for (uint32_t r : requests) {
+      guest::StoreU32(h.base, r + 8, h.data + kSerials + 8 * h.random.Below(64));
+      guest::StoreU32(h.base, r + 48, 0x82294B68);
+      uint32_t flags = guest::LoadU32(h.base, r + 12);
+      if ((flags & 0x21) == 0x21) {
+        flags |= 0x1000;  // no allocation in the set-up (Setups' cases have it)
+      }
+      guest::StoreU32(h.base, r + 12, flags);
+      const bool restages = (flags & 0x100) && !(flags & 0x8);
+      guest::StoreU32(h.base, r + 76, restages ? staging_in_use : pages);
+      guest::StoreU32(h.base, r + 88, pages);
+    }
+  }
+};
+
+void Queues(Context& h) {
+  // The live loader parked: the queue empty and the loader thread waiting on
+  // the work semaphore, held there by the queue lock this holds throughout
+  // (nothing can queue or pick meanwhile); the cases take a set of test
+  // semaphores instead of the live four.
+  std::optional<QueueLock> lock;
+  archive::Semaphores& live = archive::LiveSemaphores();
+  const bool host = live.Used();
+  bool parked = false;
+  for (int tries = 0; tries < 2000 && !parked; tries++) {
+    lock.emplace(h);
+    const bool empty = guest::LoadU32(h.base, archive::kQueue + 8) == 0;
+    parked = empty && (host ? live.work.Count() == 0 && live.work.Waiters() > 0
+                            : guest::LoadU32(h.base, archive::kWork + archive::kSemaphoreCount) == 0);
+    if (!parked) {
+      lock.reset();
+      std::this_thread::sleep_for(std::chrono::milliseconds(10));
+    }
+  }
+  if (!parked) {
+    ITC_LOG_ERROR("harness: archive: the loader thread didn't park in 20 s: the queue's cases "
+                  "skipped");
+    return;
+  }
+  ITC_LOG_INFO("harness: archive: the loader thread parked (host semaphores: {})", host);
+  QueueState saved;
+  saved.Save(h.base);
+  const uint32_t staging_in_use = saved.words[3];
+  archive::ScopedTestSemaphores scope(h.base);
+  archive::Semaphores& test = scope.Set();
+
+  {
+    Results results("sub_8209DE48 Archive::Load");
+    for (int i = 0; i < 300; i++) {
+      QueueCase(
+          h, results, test, saved,
+          [&](PPCContext& t) {
+            MakeQueue(h, kRequests, h.random.Below(kRequests + 1));
+            TakeSlots(h);
+            SetSerial(h);
+            t.r3.u64 = TableId(h.random);
+            t.r4.u64 = h.random.Next();
+            t.r5.u64 = h.random.Below(3) ? h.random.Next() : 0;
+            t.r6.u64 = h.random.Next();
+            t.r7.u64 = h.random.Below(3) ? 0 : h.random.Next();
+            t.r8.u64 = h.random.Below(3) ? 0 : h.random.Next();
+          },
+          [&](PPCContext& t, bool native) {
+            if (!native) {
+              __imp__sub_8209DE48(t, h.base);
+              return;
+            }
+            SetSerialR3(t, archive::Queue(h.base, archive::BuildLoad(h.base, t.r3.u32, t.r4.u32,
+                                                                     t.r5.u32, t.r6.u32,
+                                                                     t.r7.u32, t.r8.u32)));
+          },
+          R3, fmt::format("case {}", i));
+    }
+    results.Report();
+  }
+  {
+    Results results("sub_8209DC18 the queueing");
+    for (int i = 0; i < 200; i++) {
+      QueueCase(
+          h, results, test, saved,
+          [&](PPCContext& t) {
+            MakeQueue(h, kRequests, h.random.Below(kRequests + 1));
+            TakeSlots(h);
+            SetSerial(h);
+            t.r3.u64 = h.data + kWordAt;  // the 40-byte request, the fill's and random
+            for (uint32_t w = 0; w < 10; w++) {
+              if (h.random.Below(2)) {
+                guest::StoreU32(h.base, h.data + kWordAt + 4 * w, uint32_t(h.random.Next()));
+              }
+            }
+          },
+          [&](PPCContext& t, bool native) {
+            if (!native) {
+              __imp__sub_8209DC18(t, h.base);
+              return;
+            }
+            archive::LoadRequest request;
+            for (uint32_t b = 0; b < 40; b++) {
+              request[b] = guest::LoadU8(h.base, t.r3.u32 + b);
+            }
+            SetSerialR3(t, archive::Queue(h.base, request));
+          },
+          R3, fmt::format("case {}", i));
+    }
+    results.Report();
+  }
+  {
+    Results results("sub_8209D730 Archive::WaitIdle");
+    for (int i = 0; i < 100; i++) {
+      QueueCase(
+          h, results, test, saved,
+          [&](PPCContext&) {
+            MakeQueue(h, kRequests, h.random.Below(2) ? 0 : h.random.Below(kRequests + 1));
+            guest::StoreU32(h.base, archive::kIdleWanted, h.random.Below(2));
+          },
+          [&](PPCContext& t, bool native) {
+            native ? archive::WaitIdle(h.base) : __imp__sub_8209D730(t, h.base);
+          },
+          NoR3, fmt::format("case {}", i));
+    }
+    results.Report();
+  }
+  {
+    Results results("sub_8209D7B0 Archive::QueueLength");
+    for (int i = 0; i < 60; i++) {
+      QueueCase(
+          h, results, test, saved,
+          [&](PPCContext&) {
+            MakeQueue(h, kRequests, h.random.Below(kRequests + 1));
+            if (h.random.Below(2)) {
+              guest::StoreU32(h.base, archive::kQueue + 8, uint32_t(h.random.Next()));
+            }
+          },
+          [&](PPCContext& t, bool native) {
+            if (native) {
+              t.r3.u64 = archive::QueueLength(h.base);
+            } else {
+              __imp__sub_8209D7B0(t, h.base);
+            }
+          },
+          R3, fmt::format("case {}", i));
+    }
+    results.Report();
+  }
+  {
+    Results results("sub_8209DB90 Archive::CancelQueued");
+    for (int i = 0; i < 200; i++) {
+      QueueCase(
+          h, results, test, saved,
+          [&](PPCContext& t) {
+            MakeQueue(h, kRequests, h.random.Below(kRequests + 1));
+            guest::StoreU32(h.base, archive::kIdleWanted, h.random.Below(2));
+            t.r3.u64 = h.random.Below(2) ? 0 : (h.random.Next() | 1) << (h.random.Below(2) * 32);
+          },
+          [&](PPCContext& t, bool native) {
+            native ? archive::CancelQueued(h.base, t.r3.s32 != 0) : __imp__sub_8209DB90(t, h.base);
+          },
+          NoR3, fmt::format("case {}", i));
+    }
+    results.Report();
+  }
+  {
+    Results results("sub_8209DB20 the cancel of a request");
+    for (int i = 0; i < 200; i++) {
+      QueueCase(
+          h, results, test, saved,
+          [&](PPCContext& t) {
+            MakeQueue(h, kRequests, h.random.Below(kRequests + 1));
+            // Live slots given serials and states, some put on the queue.
+            std::vector<uint32_t> serials, planted;
+            for (uint32_t n = h.random.Below(6); n; n--) {
+              const uint32_t slot =
+                  archive::kSlots + h.random.Below(archive::kSlotCount) * archive::kSlotBytes;
+              if (std::find(planted.begin(), planted.end(), slot) != planted.end()) {
+                continue;
+              }
+              planted.push_back(slot);
+              const uint32_t serial = h.random.Below(5000);
+              serials.push_back(serial);
+              guest::StoreU32(h.base, slot + 8, serial);
+              guest::StoreU32(h.base, slot + 52, h.random.Below(2) ? 0 : h.random.Below(8));
+              if (h.random.Below(2)) {
+                guest::StoreU32(h.base, slot + 4, 0);
+                const uint32_t tail = guest::LoadU32(h.base, archive::kQueue + 16);
+                if (tail != 0) {
+                  guest::StoreU32(h.base, tail + 4, slot);
+                } else {
+                  guest::StoreU32(h.base, archive::kQueue + 12, slot);
+                }
+                guest::StoreU32(h.base, archive::kQueue + 16, slot);
+              }
+            }
+            const uint32_t pick = h.random.Below(4);
+            t.r3.u64 = pick == 0 || serials.empty() ? h.random.Below(5000)
+                       : pick == 1                   ? 0xFFFFFFFFu
+                                                     : serials[h.random.Below(uint32_t(serials.size()))];
+          },
+          [&](PPCContext& t, bool native) {
+            if (native) {
+              t.r3.u64 = archive::Cancel(h.base, t.r3.u32);
+            } else {
+              __imp__sub_8209DB20(t, h.base);
+            }
+          },
+          R3, fmt::format("case {}", i));
+    }
+    results.Report();
+  }
+  {
+    Results results("sub_8209D950 the picker");
+    for (int i = 0; i < 400; i++) {
+      QueueCase(
+          h, results, test, saved,
+          [&](PPCContext& t) {
+            const uint32_t queued = h.random.Below(kRequests + 1);
+            const auto order = MakeQueue(h, kRequests, queued);
+            auto any = [&] {
+              return h.random.Below(4) == 0 ? 0u : order[h.random.Below(kRequests)];
+            };
+            t.r3.u64 = any();
+            t.r4.u64 = any();
+            t.r5.u64 = h.random.Below(2) ? t.r3.u64 : any();
+          },
+          [&](PPCContext& t, bool native) {
+            if (native) {
+              t.r3.u64 = archive::PickNext(h.base, t.r3.u32, t.r4.u32, t.r5.u32);
+            } else {
+              __imp__sub_8209D950(t, h.base);
+            }
+          },
+          R3, fmt::format("case {}", i));
+    }
+    results.Report();
+  }
+  {
+    // The allocation (flags 0x20 and 0x1, not 0x1000, in state 1) gives each
+    // side its own pages: their address (in the word +40 points at, or +76,
+    // or +88 once restaged; lost with 0x4 and no word) is replaced by a mark
+    // in the scratch area and freed.
+    Results results("sub_8209D490 the set-up");
+    for (int i = 0; i < 400; i++) {
+      const uint32_t request = Request(h, 0);
+      const uint32_t word = h.data + kWordAt;
+      bool allocates = false;
+      QueueCase(
+          h, results, test, saved,
+          [&](PPCContext& t) {
+            const uint32_t state = h.random.Below(5) ? 1 : h.random.Below(4);
+            guest::StoreU32(h.base, request + 52, state);
+            uint32_t flags = RandomFlags(h.random);
+            if (i < 64) {  // the allocation's combinations first
+              flags = (flags & ~0x1025u) | 0x21 | ((i & 1) ? 0x1000 : 0) | ((i & 2) ? 0x4 : 0);
+            }
+            guest::StoreU32(h.base, request + 12, flags);
+            guest::StoreU32(h.base, request + 40, h.random.Below(4) ? word : 0);
+            // Sizes as the game's (any word only where nothing is allocated
+            // from it: the stored size is +36 when compressed).
+            const bool may_allocate = (flags & 0x21) == 0x21 && !(flags & 0x1000);
+            const bool stored_at_36 = flags & 0x100;
+            for (uint32_t at : {32u, 36u}) {
+              const bool sized = may_allocate && (at == 36) == stored_at_36;
+              guest::StoreU32(h.base, request + at,
+                              sized || h.random.Below(2) ? h.random.Below(200000)
+                                                         : uint32_t(h.random.Next()));
+            }
+            guest::StoreU32(h.base, archive::kStagingCount, uint32_t(h.random.Next()));
+            t.r3.u64 = h.random.Below(20) ? request : 0;
+            allocates = t.r3.u32 != 0 && state == 1 && (flags & 0x21) == 0x21 &&
+                        !(flags & 0x1000);
+          },
+          [&](PPCContext& t, bool native) {
+            native ? hooks::ArchiveSetUp(t, h.base) : __imp__sub_8209D490(t, h.base);
+          },
+          [&](const PPCContext&, Outputs& out) {
+            uint32_t allocated = 0;
+            if (allocates) {
+              const uint32_t flags = guest::LoadU32(h.base, request + 12);
+              if (guest::LoadU32(h.base, request + 40) != 0) {
+                allocated = guest::LoadU32(h.base, word);
+              } else if (!(flags & 0x4)) {
+                const bool restaged = (flags & 0x100) && !(flags & 0x8);
+                allocated = guest::LoadU32(h.base, request + (restaged ? 88 : 76));
+              }
+            }
+            out.Word(allocated != 0);
+            if (allocated != 0) {
+              for (uint32_t at = h.data; at < h.data + kScratchBytes; at += 4) {
+                if (guest::LoadU32(h.base, at) == allocated) {
+                  guest::StoreU32(h.base, at, 0xA110CA7Eu);
+                }
+              }
+              memory::FreePages(allocated);
+            }
+          },
+          fmt::format("case {}", i));
+    }
+    results.Report();
+  }
+  {
+    Results results("sub_8209DD98 the loader's next request");
+    LoaderInputs loader;
+    loader.pages = memory::AllocPages(4096, 4096);
+    for (int i = 0; i < 400; i++) {
+      QueueCase(
+          h, results, test, saved,
+          [&](PPCContext& t) {
+            const uint32_t queued = h.random.Below(kRequests + 1);
+            const auto order = MakeQueue(h, kRequests, queued);
+            loader.Prepare(h, order, staging_in_use);
+            const uint32_t current = h.random.Below(5) == 0 ? 0 : order[h.random.Below(kRequests)];
+            if (current != 0) {
+              const uint32_t pick = h.random.Below(4);
+              guest::StoreU32(h.base, current + 84,
+                              pick == 0   ? 0
+                              : pick == 1 ? current
+                                          : order[h.random.Below(kRequests)]);
+            }
+            t.r3.u64 = current;
+          },
+          [&](PPCContext& t, bool native) {
+            native ? hooks::ArchiveNextRequest(t, h.base) : __imp__sub_8209DD98(t, h.base);
+          },
+          R3, fmt::format("case {}", i));
+    }
+    memory::FreePages(loader.pages);
+    results.Report();
+  }
+}
+
 }  // namespace
 
 void Archive(Context& h) {
@@ -764,6 +1339,8 @@ void Archive(Context& h) {
   Invokes(h);
   UclBlocks(h);
   UclStreams(h);
+  SemaphoreCounts(h);
+  Queues(h);
 }
 
 }  // namespace harness

@@ -45,22 +45,36 @@ The sync: the archive has four of the game's semaphores (`Semaphore::`,
 idle one `0x826BAA90` (the last three taken once by `Archive::Init`, so
 they start at 0). Every user of the four is an archive function in this
 file or `files-and-saves.md` (and their static set-ups and clean-ups):
-no other code names their addresses. So the user's call for the device
-lock (2026-10-24: a lock whose users are made native together goes over
-a host semaphore, `video-output.md`; also "Precedent first" in
-`../loops/b7-loop.md`) covers them: each one a host semaphore, taken by
-every user, once those users are ours together. Two users read a
-semaphore's count (+32) directly, not only through `Wait` and `Signal`:
-the queueing (`sub_8209DC18`) wakes the loader only when the queue is
-empty and the work semaphore's count is 0, and the picker
-(`sub_8209D950`) takes the work semaphore again when its count isn't 0
-(so a host semaphore here must keep a count it can read). The loose read
-(`sub_8209DFA8`) signals request-done and is blocked by the file
-object (`sub_820A6A00`, `sub_820A6A40`, a lead), the open by name
+no other code names their addresses. Two users read a semaphore's count
+(+32) directly, not only through `Wait` and `Signal`: the queueing
+(`sub_8209DC18`) wakes the loader only when the queue is empty and the
+work semaphore's count is 0, and the picker (`sub_8209D950`) takes the
+work semaphore again when its count isn't 0. The loose read
+(`sub_8209DFA8`) signals request-done and stays recompiled, blocked by the
+file object (`sub_820A6A00`, `sub_820A6A40`, a lead), the open by name
 (`sub_820A6AB8`, `files-and-saves.md`) and sprintf under it
 (`c-runtime.md`). The callbacks `Archive::Load` is given are called
 indirectly from the loader thread (`sub_8209D688`): about 20 of the
 loads' own functions, some already ours (`car-specs.md`).
+
+How the semaphores go (the user's call, 2026-10-28; "Precedent first" in
+`../loops/b7-loop.md`): with `--native_archive` the four are host counting
+semaphores (`src/archive/semaphores.h`: a mutex, a condition variable and
+a count that can be read), taken by every user. The native functions take
+them directly; the recompiled code still reaching them (the loose read, the
+originals behind the flag, the harness's recompiled sides) goes through
+overrides of `Semaphore::Wait` and `Signal` (`sub_82592670`,
+`sub_825926E8`, `src/hooks/archive.cpp`) that route these four addresses to
+the host ones and leave every other semaphore to the game's class. Each
+host count is written back to its guest +32 whenever it changes, for the
+recompiled readers there. Whether they're host ones is read from the flag
+once, at `Archive::Init` (before anything waits on them), and never
+switches while running: the loader thread and the main thread share them,
+so the native and recompiled paths always take the same objects, and
+`--native_archive=false` at start-up gives the game's own Semaphores
+throughout. The static set-ups still make the guest objects (their event,
+critical section and count 1, which the host ones start from too); their
+clean-ups at exit are the game's (never seen).
 
 Native so far (`src/archive/`, adapters in `src/hooks/archive.cpp`,
 `--native_archive`, harness `archive`; B7's twentieth loop run): the TOC
@@ -68,14 +82,31 @@ lookups, the request list's append and remove, the slot lookup, the loose
 files' lookup, the queue's and the slots' static set-ups, the request
 finish (its callback and `LoaderFunctor::Invoke`'s target called through
 `ctx`), and `Ucl::Unpack` with its NRV2B block decoder (checked on
-compressed assets read from `BUILD.DAT` too). Left recompiled, waiting on
-how the four semaphores go (a call pending with the user): `Archive::Load`
-and the queueing, `WaitIdle`, `QueueLength`, `CancelQueued`, `sub_8209DB20`,
-the picker, the set-up, the next request and the loose read (the
-`Semaphore` class, `sub_82592670` and `sub_825926E8`, with its events and
-critical sections under it). The harness takes the game's queue lock
-(through the translated `Semaphore` functions) around the cases that read
-or write the game's queue and slots.
+compressed assets read from `BUILD.DAT` too); then, over the host
+semaphores, `Archive::Load` and the queueing, `WaitIdle`, `QueueLength`,
+`CancelQueued`, the cancel of one request (`sub_8209DB20`), and the loader's
+next request with the picker and the set-up (the loader thread's override
+calls the native next request and takes the semaphores directly, as
+`Archive::Init`'s waits do). Left recompiled: the loose read (above), the
+`Semaphore` class itself, the list's unseen clear and destructors, the
+functor's clone and the static clean-ups.
+
+The harness: the cases that read or write the game's queue and slots take
+the game's queue lock (migration 1's, through `Semaphore::Wait` and
+`Signal`). The cases of the functions over the semaphores first wait for
+the live loader thread to park (the queue empty, the loader blocked on
+the work semaphore with its count 0), then hold the live queue lock
+throughout, so nothing queues or picks meanwhile, and take a set of test
+semaphores of their own (`archive::ScopedTestSemaphores`, on the harness's
+thread only; the adapters route to them there), so no case can wake or
+block the live loader: their counts are set per case (the idle one at
+least 1, as WaitIdle waits on it), mirrored into the same guest words, and
+the live counts written back after. Each case builds a queue of requests in
+the scratch area in the game's queue's place, and the game's queue, slots,
+serial counter, idle flag, staging count and half and callback serial are
+put back after each side. The host semaphore itself is checked against the
+game's class on a semaphore of its own (counts and steps that don't block),
+and across two threads.
 
 Status:
 
@@ -124,9 +155,9 @@ run it after changing either, on any branch.
 | Address | Name | Status | Notes |
 |---|---|---|---|
 | `sub_8209D868` | `Archive::Toc` | Overridden | Native (`archive::Toc`, `src/archive/archive.cpp`, behind `--native_archive`; harness `archive`), its adapter kept for the recompiled callers. r3 = an asset id: the TOC's address, `[0x826A5120]` (`BUILD.TOC`) for ids below 23011, else `[0x826A5128]` (`BUILD_CRS.TOC`); a leaf. The caller indexes it itself (entry id + 1, or id - 23011 + 1 in `BUILD_CRS`, 16 bytes each). From `Archive::AssetSize` (`sub_820A0678`, `files-and-saves.md`) and 21 more call sites: `Params::Init` and its loads' callbacks (`car-specs.md`, guest calls from their adapters), `DataTables::Init` (`data-tables.md`), and the call sites at `821802F0` and `8217664C` (not mapped). `Archive::Load` (`sub_8209DE48`) has the same two loads inlined. Read in full. |
-| `sub_8209D730` | `Archive::WaitIdle` | | No arguments: under the queue lock (`Semaphore::Wait`, `Signal` on `0x826BAAE0`), when the queue (`0x826BAB08`) has requests (+8), `0x826A5108` = 1 (the loader signals the idle semaphore once it's drained, `sub_8209E118`); then, when `0x826A5108` is set, waits on the idle semaphore `0x826BAA90`. From the app's start-up `sub_82106548`, the front-end screens' loads `sub_82197278` and `sub_8222FD68` (also `Strings::Load` callers, `files-and-saves.md`), `sub_82278058` and `Archive::CancelQueued`. Read in full. |
-| `sub_8209D7B0` | `Archive::QueueLength` | | No arguments: the queue's count (`0x826BAB10`, the queue's +8) read under the queue lock (`0x826BAAE0`). From the course scenery's streaming (`SceneryList::LoadAll`, `Stream`: loads only while it's below 480 or 960, `course-scenery.md`), the race's loading waits (`RaceStates::StageLoadTick`, `RollingLoadTick`, `ReplayLoadTick`, `sub_82168018`, `sub_821683A8`, `race-states.md`) and the call sites at `821515C4`, `82151744`, `82221354` and `822204D0` (not mapped): 13 call sites. Read in full. Was a lead (course scenery, 2026-10-24). |
-| `sub_8209DB90` | `Archive::CancelQueued` | | r3 = wait: under the queue lock, every request in the queue still waiting (state +52 0) with flag 0x4000 (+12; `Archive::Load` sets it on every request) is taken off (`List::Remove`, `sub_82294C00`) and its slot freed (+8 = -1); then with r3 not 0, `Archive::WaitIdle`. Only from `sub_82229678` (not mapped). Read in full. |
+| `sub_8209D730` | `Archive::WaitIdle` | Overridden | Native (`archive::WaitIdle`, behind `--native_archive`, the four semaphores host ones (`src/archive/semaphores.h`, the user's call, 2026-10-28); harness `archive`: 100 cases under test semaphores, the idle one given a count so it doesn't block), its adapter kept for the recompiled callers. No arguments: under the queue lock (`0x826BAAE0`), when the queue (`0x826BAB08`) has requests (+8), `0x826A5108` = 1 (the loader signals the idle semaphore once it's drained, `sub_8209E118`); then, when `0x826A5108` is set, waits on the idle semaphore `0x826BAA90`. r3 read by no caller. From the app's start-up `sub_82106548`, the front-end screens' loads `sub_82197278` and `sub_8222FD68` (also `Strings::Load` callers, `files-and-saves.md`), `sub_82278058` and `Archive::CancelQueued` (its plain C++ calls it directly). Read in full. |
+| `sub_8209D7B0` | `Archive::QueueLength` | Overridden | Native (`archive::QueueLength`, behind `--native_archive`, the four semaphores host ones (`src/archive/semaphores.h`, the user's call, 2026-10-28); harness `archive`: 60 cases), its adapter kept for the recompiled callers. No arguments: the queue's count (`0x826BAB10`, the queue's +8) read under the queue lock (`0x826BAAE0`). From the course scenery's streaming (`SceneryList::LoadAll`, `Stream`: loads only while it's below 480 or 960, `course-scenery.md`), the race's loading waits (`RaceStates::StageLoadTick`, `RollingLoadTick`, `ReplayLoadTick`, `sub_82168018`, `sub_821683A8`, `race-states.md`) and the call sites at `821515C4`, `82151744`, `82221354` and `822204D0` (not mapped): 13 call sites. Read in full. Was a lead (course scenery, 2026-10-24). |
+| `sub_8209DB90` | `Archive::CancelQueued` | Overridden | Native (`archive::CancelQueued`, behind `--native_archive`, the four semaphores host ones (`src/archive/semaphores.h`, the user's call, 2026-10-28); harness `archive`: 200 cases on queues of scratch requests under test semaphores), its adapter kept for the recompiled caller. r3 = wait (its low word tested): under the queue lock, every request in the queue still waiting (state +52 0) with flag 0x4000 (+12; `Archive::Load` sets it on every request) is taken off (`List::Remove`, `sub_82294C00`) and its slot freed (+8 = -1); then with r3 not 0, `Archive::WaitIdle`. r3 read by no caller. Only from `sub_82229678` (not mapped). Read in full. |
 | `sub_8209DD80` | `LoaderFunctor::Invoke` | Overridden | `archive::LoaderFunctorTarget` reads the target; the adapter (`hooks::ArchiveInvokeFunctor`, behind `--native_archive`) tail-calls it through `ctx` (the loader thread, ours: `sub_8209E118`); kept, as it's reached through the vtable. Harness `archive`, with a leaf as the target. Slot 1 of the functor vtable `0x82001DDC` (no direct callers): r3 = the functor, r4 = an argument: a tail call of the functor's +4 with r4 as r3. Its one instance is at `0x82600B68` (inside the loader thread's parameters at `0x82600B50`, +24): +4 = `0x8209E118`, the loader thread, written by `Archive::Init`; so it starts the loader thread (probably from the thread class the streaming object's vtable +4 reaches). Once in play. Read in full. |
 | `sub_8209DF50` | `LoaderFunctor::Clone` | | Slot 2 of the functor vtable `0x82001DDC` (no direct callers): r3 = the functor: an 8-byte copy (`operator new`, `sub_825A6880`) with the vtable and +4; 0 when the allocation fails. Not seen in play. Read in full. |
 | `sub_82094D20` | | | A functor's deleting destructor (r3 = it, r4 = flags): the vtable `0x82000ABC` (the functors' base, probably) and, with bit 0, `operator delete`. Slot 0 of `0x82001DDC` (the loader's functor) and of four other vtables (`0x82000ABC`, `0x82002850`, `0x8200833C`, `0x82018DE0`): shared. Not seen in play. Read in full. |
