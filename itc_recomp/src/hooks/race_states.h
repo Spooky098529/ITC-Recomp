@@ -55,4 +55,28 @@ void RaceStatesCheckFinish(PPCContext& ctx, uint8_t* base);
 // position; r3 = 0 or 1.
 void RaceStatesMapToSection(PPCContext& ctx, uint8_t* base);
 
+// The state machine's handlers: r3 = the machine, r4 = the dispatcher (r3
+// not kept: the handler call doesn't read it; OnStandingStart's r3 as
+// AiDrivers::StartRanked leaves it). RaceStates::FadeInFree sub_82163398,
+// FadeOut sub_82162310, EndWhenFaded sub_82168F50, Unload sub_82163920 (the
+// original unless --native_heap routes the game's heap to the allocation
+// layer), OnRollingStart sub_821632C8, OnStandingStart sub_821643B0,
+// ClearStep sub_82163348, OnQuit sub_82163378, OnReplay sub_821647B0,
+// FreeStartTick sub_82168B80, QuitTick sub_82168500, AfterRaceTick
+// sub_82167970 and RollingStartTick sub_82166E50 (RaceManager::Refresh's and
+// RaceStart::PlaceRolling's callees' originals as their adapters make them).
+void RaceStatesFadeInFree(PPCContext& ctx, uint8_t* base);
+void RaceStatesFadeOut(PPCContext& ctx, uint8_t* base);
+void RaceStatesEndWhenFaded(PPCContext& ctx, uint8_t* base);
+void RaceStatesUnload(PPCContext& ctx, uint8_t* base);
+void RaceStatesOnRollingStart(PPCContext& ctx, uint8_t* base);
+void RaceStatesOnStandingStart(PPCContext& ctx, uint8_t* base);
+void RaceStatesClearStep(PPCContext& ctx, uint8_t* base);
+void RaceStatesOnQuit(PPCContext& ctx, uint8_t* base);
+void RaceStatesOnReplay(PPCContext& ctx, uint8_t* base);
+void RaceStatesFreeStartTick(PPCContext& ctx, uint8_t* base);
+void RaceStatesQuitTick(PPCContext& ctx, uint8_t* base);
+void RaceStatesAfterRaceTick(PPCContext& ctx, uint8_t* base);
+void RaceStatesRollingStartTick(PPCContext& ctx, uint8_t* base);
+
 }  // namespace hooks

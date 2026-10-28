@@ -105,6 +105,54 @@ uint32_t CheckLap(uint8_t* base, uint32_t out, uint32_t progress, uint32_t index
 uint32_t CheckFinish(uint8_t* base, uint32_t out, uint32_t progress, uint32_t index,
                      uint32_t frame);
 
+// --- The state machine's handlers (src/race_states/handlers.cpp): the
+// machine (the race mode + 107168: +9604 the state, +9608 the pause menu's
+// quit, +9612 a step, +9616 a tick count, +9624 the progress) and the
+// dispatcher (the race mode + 36) whose ring they post to. r3 isn't kept:
+// the state machine's handler call doesn't read it ---
+
+// RaceStates::FadeInFree (sub_82163398): +9616, +9620, +9612 = 0;
+// ScreenFades::FadeIn([0x82001BEC], black, layer 0).
+void FadeInFree(uint8_t* base, uint32_t machine);
+// RaceStates::FadeOut (sub_82162310): ScreenFades::FadeOut([0x82001BF0],
+// black, layer 0).
+void FadeOut(uint8_t* base);
+// RaceStates::EndWhenFaded (sub_82168F50): when the fades are done, posts
+// 49.
+void EndWhenFaded(uint8_t* base, uint32_t dispatcher);
+// RaceStates::Unload (sub_82163920): operator delete of [0x826D82E8]. False,
+// with nothing done, where operator delete's plain C++ refuses.
+bool Unload(uint8_t* base);
+// RaceStates::OnRollingStart (sub_821632C8): FadeOut as above when the
+// alpha 0x826A50D4 is 0; +9612 = 0.
+void OnRollingStart(uint8_t* base, uint32_t machine);
+// RaceStates::OnStandingStart (sub_821643B0): +9620, +9628, +9632, +9612,
+// +9616, +9636, +9640 = 0, [0x826C6B04] = 0; AiDrivers::StartRanked (a
+// tail call: its frame `sp` - 224). Returns its r3.
+uint64_t OnStandingStart(uint8_t* base, uint32_t machine, uint32_t sp);
+// RaceStates::ClearStep (sub_82163348): +9612 = 0. RaceStates::OnQuit
+// (sub_82163378): +9608 = 0.
+void ClearStep(uint8_t* base, uint32_t machine);
+void OnQuit(uint8_t* base, uint32_t machine);
+// RaceStates::OnReplay (sub_821647B0): FadeOut as above; +9612, +9628,
+// +9632 = 0; the race data's flags |= 0x2000.
+void OnReplay(uint8_t* base, uint32_t machine);
+// RaceStates::FreeStartTick (sub_82168B80): see the row.
+void FreeStartTick(uint8_t* base, uint32_t machine, uint32_t dispatcher);
+// RaceStates::QuitTick (sub_82168500) and AfterRaceTick (sub_82167970):
+// see the rows.
+void QuitTick(uint8_t* base, uint32_t machine, uint32_t dispatcher);
+void AfterRaceTick(uint8_t* base, uint32_t machine, uint32_t dispatcher);
+// RaceStates::RollingStartTick (sub_82166E50): when the fades are done:
+// without the race data's flag 0x100 posts 31 and sets it; the flags |=
+// 0x2000, 0x4000; RaceManager::Refresh (its frame `frame` - 1904, its
+// callees' originals through `refresh`), RaceStart::PlaceRolling(machine,
+// 1) (its frame `frame` - 272, its calls `calls`); posts 15; +9612 = 0.
+// `frame`: the original's 112 bytes.
+void RollingStartTick(uint8_t* base, uint32_t machine, uint32_t dispatcher, uint32_t frame,
+                      bool heap, const race_world::OriginalCall& refresh,
+                      const race_world::StartCalls& calls);
+
 // --- The route's sections and positions ---
 
 // RouteSections::Beside (sub_82162F78): 1 when `a` and `b` are the same

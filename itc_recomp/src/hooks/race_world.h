@@ -149,6 +149,11 @@ void RaceWorldTick(PPCContext& ctx, uint8_t* base);
 // RaceManager::Refresh's callees' originals as its adapter makes them, for
 // native callers in other subsystems (src/race_states/).
 race_world::OriginalCall RaceWorldOpponentsCall(PPCContext& ctx, uint8_t* base);
+// RaceStart::Place's and PlaceRolling's guest calls as their adapters make
+// them (Vehicle::SetUp's frame `setup_frame`), for native callers in other
+// subsystems.
+race_world::StartCalls RaceWorldStartCalls(PPCContext& ctx, uint8_t* base,
+                                           uint32_t setup_frame);
 
 // For the harness: while set, runs instead of RaceManager::GiveVehicle
 // sub_821706E8 (never seen in play; its override, which StreamOpponents'

@@ -27,7 +27,7 @@ namespace rs = race_states;
 
 void RaceStatesProgressCreate(PPCContext& ctx, uint8_t* base) {
   ctx.fpscr.disableFlushMode();
-  const auto r3 = rs::ProgressCreate(base);
+  const auto r3 = NativeHeapActive() ? rs::ProgressCreate(base) : std::nullopt;
   if (!r3) {
     __imp__sub_821698B0(ctx, base);
     return;
@@ -125,6 +125,76 @@ void RaceStatesMapToSection(PPCContext& ctx, uint8_t* base) {
   ctx.r3.u64 = rs::MapToSection(base, ctx.r3.u32, ctx.r4.u32, ctx.r1.u32);
 }
 
+void RaceStatesFadeInFree(PPCContext& ctx, uint8_t* base) {
+  ctx.fpscr.disableFlushMode();
+  rs::FadeInFree(base, ctx.r3.u32);
+}
+
+void RaceStatesFadeOut(PPCContext& ctx, uint8_t* base) {
+  ctx.fpscr.disableFlushMode();
+  rs::FadeOut(base);
+}
+
+void RaceStatesEndWhenFaded(PPCContext& ctx, uint8_t* base) {
+  ctx.fpscr.disableFlushMode();
+  rs::EndWhenFaded(base, ctx.r4.u32);
+}
+
+void RaceStatesUnload(PPCContext& ctx, uint8_t* base) {
+  ctx.fpscr.disableFlushMode();
+  if (!NativeHeapActive() || !rs::Unload(base)) {
+    __imp__sub_82163920(ctx, base);
+  }
+}
+
+void RaceStatesOnRollingStart(PPCContext& ctx, uint8_t* base) {
+  ctx.fpscr.disableFlushMode();
+  rs::OnRollingStart(base, ctx.r3.u32);
+}
+
+void RaceStatesOnStandingStart(PPCContext& ctx, uint8_t* base) {
+  ctx.fpscr.disableFlushMode();
+  ctx.r3.u64 = rs::OnStandingStart(base, ctx.r3.u32, ctx.r1.u32);
+}
+
+void RaceStatesClearStep(PPCContext& ctx, uint8_t* base) {
+  ctx.fpscr.disableFlushMode();
+  rs::ClearStep(base, ctx.r3.u32);
+}
+
+void RaceStatesOnQuit(PPCContext& ctx, uint8_t* base) {
+  ctx.fpscr.disableFlushMode();
+  rs::OnQuit(base, ctx.r3.u32);
+}
+
+void RaceStatesOnReplay(PPCContext& ctx, uint8_t* base) {
+  ctx.fpscr.disableFlushMode();
+  rs::OnReplay(base, ctx.r3.u32);
+}
+
+void RaceStatesFreeStartTick(PPCContext& ctx, uint8_t* base) {
+  ctx.fpscr.disableFlushMode();
+  rs::FreeStartTick(base, ctx.r3.u32, ctx.r4.u32);
+}
+
+void RaceStatesQuitTick(PPCContext& ctx, uint8_t* base) {
+  ctx.fpscr.disableFlushMode();
+  rs::QuitTick(base, ctx.r3.u32, ctx.r4.u32);
+}
+
+void RaceStatesAfterRaceTick(PPCContext& ctx, uint8_t* base) {
+  ctx.fpscr.disableFlushMode();
+  rs::AfterRaceTick(base, ctx.r3.u32, ctx.r4.u32);
+}
+
+void RaceStatesRollingStartTick(PPCContext& ctx, uint8_t* base) {
+  ctx.fpscr.disableFlushMode();
+  const uint32_t frame = ctx.r1.u32 - 112;
+  rs::RollingStartTick(base, ctx.r3.u32, ctx.r4.u32, frame, NativeHeapActive(),
+                       RaceWorldOpponentsCall(ctx, base),
+                       RaceWorldStartCalls(ctx, base, frame - 272 - 224));
+}
+
 }  // namespace hooks
 
 // Defines an adapter: the flag, else the original.
@@ -155,6 +225,19 @@ ITC_RACE_STATES(82163930, RaceStatesMapToSection)
 // Time::Sub (sub_82162230, never seen in play) has no adapter: its only
 // caller, RaceProgress::CheckLap, is native; --native_race_states switches
 // it.
+ITC_RACE_STATES(82163398, RaceStatesFadeInFree)
+ITC_RACE_STATES(82162310, RaceStatesFadeOut)
+ITC_RACE_STATES(82168F50, RaceStatesEndWhenFaded)
+ITC_RACE_STATES(82163920, RaceStatesUnload)
+ITC_RACE_STATES(821632C8, RaceStatesOnRollingStart)
+ITC_RACE_STATES(821643B0, RaceStatesOnStandingStart)
+ITC_RACE_STATES(82163348, RaceStatesClearStep)
+ITC_RACE_STATES(82163378, RaceStatesOnQuit)
+ITC_RACE_STATES(821647B0, RaceStatesOnReplay)
+ITC_RACE_STATES(82168B80, RaceStatesFreeStartTick)
+ITC_RACE_STATES(82168500, RaceStatesQuitTick)
+ITC_RACE_STATES(82167970, RaceStatesAfterRaceTick)
+ITC_RACE_STATES(82166E50, RaceStatesRollingStartTick)
 // RaceProgress::TickFraction (sub_82163140) and RoutePosition::NotAfter
 // (sub_821622A8) have no adapters: their callers, RaceProgress::CheckLap and
 // CheckFinish, are native; --native_race_states switches those callers.

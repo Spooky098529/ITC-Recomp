@@ -20,6 +20,7 @@
 #include "car_physics/float_ops.h"
 #include "hooks/ai_drivers.h"
 #include "hooks/heap.h"
+#include "hooks/race_states.h"
 #include "hooks/race_world.h"
 #include "memory/c_runtime_heap.h"
 #include "memory/heap.h"
@@ -40,6 +41,7 @@
 
 ITC_FLAG_DECLARE(bool, native_race_world);
 ITC_FLAG_DECLARE(bool, native_collision_world);
+ITC_FLAG_DECLARE(bool, native_race_states);
 
 namespace harness {
 
@@ -3504,6 +3506,74 @@ void StartCases(Context& h) {
   ITC_LOG_INFO("harness: race_world: RaceStart::Place and PlaceRolling: {} cases settled ({} "
                "for 300 ticks), {} of kind 8",
                ticks, long_settles, kind8);
+  {
+    // RaceStates::RollingStartTick (src/race_states/, its own harness's
+    // other cases in harnesses/race_states.cpp) on the same world as
+    // PlaceRolling's cases, the race object its machine: the fades done or
+    // not (their counts at 0x826A50DC and 0x826A50E4, put back after), the
+    // race data's flag 0x100 set or not, the dispatcher's ring (a block of
+    // its own) with a random count and start. Its original with
+    // --native_race_states off; RaceManager::Refresh and
+    // RaceStart::PlaceRolling are their adapters on both sides. Compared as
+    // PlaceRolling's (its frame 112 bytes down, PlaceRolling's below it),
+    // with the ring and the machine's +9612.
+    Results results("RaceStates::RollingStartTick (sub_82166E50)");
+    const Block dispatcher(1024);
+    uint32_t placed = 0;
+    for (uint64_t seed = 0; seed < 20 && dispatcher.address; seed++) {
+      Outputs out[2];
+      bool skip = false;
+      uint32_t count = 0;
+      for (int v = -1; v < 2 && !skip; v++) {
+        Random r(seed * 191 + 113);
+        auto saved = globals();
+        const auto fades = SavedBytes(h.base, {{0x826A50DC, 16}});
+        StartStandIns stand_ins;
+        if (!build(r, seed + 3000, v < 0, &count)) {
+          skip = true;
+          continue;
+        }
+        if (v < 0) {
+          continue;
+        }
+        loaded();
+        vary(r, count);
+        const bool done = r.Below(4) != 0;
+        guest::StoreU32(h.base, 0x826A50DC, done ? 0 : r.Below(2));
+        guest::StoreU32(h.base, 0x826A50E4, done ? 0 : 1);
+        const uint32_t flags = race.address + 0x59AE4;
+        guest::StoreU32(h.base, flags, (guest::LoadU32(h.base, flags) & ~0x100u) |
+                                           (r.Below(2) ? 0x100u : 0u));
+        WriteRandom(h.base, dispatcher.address, 1024, r);
+        guest::StoreU32(h.base, dispatcher.address + 804, r.Below(50));
+        guest::StoreU32(h.base, dispatcher.address + 808, r.Below(50));
+        guest::StoreU32(h.base, object.address + 9612, uint32_t(r.Next()));
+        StartStandIns::Reset();
+        WriteRandom(h.base, sp - 512, 512, r);
+        PPCContext t = CallContext(h);
+        t.fpscr.disableFlushModeUnconditional();
+        t.r3.u64 = object.address;
+        t.r4.u64 = dispatcher.address;
+        if (v == 0) {
+          ITC_FLAG(native_race_states) = false;
+          __imp__sub_82166E50(t, h.base);
+          ITC_FLAG(native_race_states) = true;
+        } else {
+          hooks::RaceStatesRollingStartTick(t, h.base);
+          placed += done ? 1 : 0;
+        }
+        outputs(out[v], count, sp - 112 - 272, 52);
+        out[v].Bytes(Read(h.base, dispatcher.address, 1024));
+        out[v].Word(guest::LoadU32(h.base, object.address + 9612));
+        teardown();
+      }
+      if (!skip) {
+        results.Check(out[0], out[1], fmt::format("seed {}", seed));
+      }
+    }
+    results.Report();
+    ITC_LOG_INFO("harness: race_world: RollingStartTick placed the racers in {} cases", placed);
+  }
   // RaceManager::StreamOpponents on the loaded world, where
   // RaceManager::GiveVehicle's original (never seen in play) can give a
   // vehicle for real: most cases first take a racer's vehicle away as the

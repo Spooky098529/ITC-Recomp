@@ -14,6 +14,7 @@
 #include "base/flags.h"
 #include "base/log.h"
 #include "harnesses/test_route.h"
+#include "hooks/heap.h"
 #include "hooks/race_states.h"
 #include "memory/c_runtime_heap.h"
 #include "memory/heap.h"
@@ -802,6 +803,195 @@ void RouteChecks(Context& h, const Block& progress, const Block& vehicles) {
   }
 }
 
+// --- The state machine's handlers: the machine and the dispatcher in
+// blocks of their own, the race data's flags and kind, the screen fades'
+// words (0x826A50AC to 0x826A50EB) and [0x826C6B04] put back after each
+// side ---
+
+void Handlers(Context& h, const Block& progress, const Block& vehicles, const Block& manager) {
+  const Block machine(10240);
+  const Block dispatcher(1024);
+  const Block race(0xA4000);
+  if (!machine.address || !dispatcher.address || !race.address) {
+    ITC_LOG_ERROR("harness: race_states: no block from the allocation layer");
+    return;
+  }
+  constexpr uint32_t kFades = 0x826A50AC;
+  const std::vector<uint32_t> fade_words = [] {
+    std::vector<uint32_t> words;
+    for (uint32_t a = kFades; a < kFades + 64; a += 4) {
+      words.push_back(a);
+    }
+    words.push_back(0x826C6B04);
+    words.push_back(rw::kRaceData);
+    words.push_back(rw::kManager);
+    words.push_back(kVehicles);
+    words.push_back(rs::kProgress);
+    words.push_back(track_route::kRoute);
+    return words;
+  }();
+  // One case's common inputs: the machine (its +9612 to +9640 random, +9608
+  // 0 or not, +9616 around 90, +9624 the progress), the ring's count and
+  // start, the fades done or not (the alpha 0 or not), the race data's
+  // flags and kind (5 or not).
+  const auto common = [&](Random& r) {
+    WriteRandom(h.base, h.data, kScratchBytes, r);
+    WriteRandom(h.base, machine.address + 9600, 64, r);
+    guest::StoreU32(h.base, machine.address + 9608, r.Below(2) ? 0 : uint32_t(r.Next()));
+    guest::StoreU32(h.base, machine.address + 9616, r.Below(2) ? 89 + r.Below(4) : r.Below(200));
+    guest::StoreU32(h.base, machine.address + 9624, progress.address);
+    WriteRandom(h.base, dispatcher.address, 1024, r);
+    guest::StoreU32(h.base, dispatcher.address + 804, r.Below(50));
+    guest::StoreU32(h.base, dispatcher.address + 808, r.Below(r.Below(4) == 0 ? 1000 : 50));
+    const bool done = r.Below(3) != 0;
+    guest::StoreU32(h.base, kFades + 48, done ? 0 : r.Below(2));    // 0x826A50DC
+    guest::StoreU32(h.base, kFades + 56, done ? 0 : 1);             // 0x826A50E4
+    guest::StoreU32(h.base, kFades + 40, r.Below(2) ? 0 : 255);     // the alpha
+    guest::StoreU32(h.base, race.address + 0x59AE4, uint32_t(r.Next()));
+    guest::StoreU32(h.base, race.address + 0xA3AF0, r.Below(3) == 0 ? 5 : r.Below(8));
+    guest::StoreU32(h.base, rw::kRaceData, race.address);
+    WriteRandom(h.base, progress.address + 6100, 16, r);
+  };
+  const auto outputs = [&](Outputs& o) {
+    o.Bytes(Read(h.base, machine.address + 9600, 64));
+    o.Bytes(Read(h.base, dispatcher.address, 1024));
+    o.Bytes(Read(h.base, kFades, 64));
+    o.Word(guest::LoadU32(h.base, 0x826C6B04));
+    o.Word(guest::LoadU32(h.base, race.address + 0x59AE4));
+    o.Bytes(Read(h.base, progress.address + 6100, 16));
+  };
+  struct Simple {
+    const char* name;
+    GuestFunction original;
+    GuestFunction step;
+  };
+  const Simple simple[] = {
+      {"RaceStates::FadeInFree (sub_82163398)", __imp__sub_82163398, hooks::RaceStatesFadeInFree},
+      {"RaceStates::FadeOut (sub_82162310)", __imp__sub_82162310, hooks::RaceStatesFadeOut},
+      {"RaceStates::EndWhenFaded (sub_82168F50)", __imp__sub_82168F50,
+       hooks::RaceStatesEndWhenFaded},
+      {"RaceStates::OnRollingStart (sub_821632C8)", __imp__sub_821632C8,
+       hooks::RaceStatesOnRollingStart},
+      {"RaceStates::ClearStep (sub_82163348)", __imp__sub_82163348, hooks::RaceStatesClearStep},
+      {"RaceStates::OnQuit (sub_82163378)", __imp__sub_82163378, hooks::RaceStatesOnQuit},
+      {"RaceStates::OnReplay (sub_821647B0)", __imp__sub_821647B0, hooks::RaceStatesOnReplay},
+      {"RaceStates::QuitTick (sub_82168500)", __imp__sub_82168500, hooks::RaceStatesQuitTick},
+      {"RaceStates::AfterRaceTick (sub_82167970)", __imp__sub_82167970,
+       hooks::RaceStatesAfterRaceTick},
+  };
+  for (const Simple& f : simple) {
+    Results results(f.name);
+    for (uint64_t seed = 0; seed < 24; seed++) {
+      Outputs out[2];
+      for (int v = 0; v < 2; v++) {
+        Random r(seed * 109 + 73);
+        Globals globals(h.base, fade_words);
+        common(r);
+        PPCContext t = CallContext(h);
+        t.r3.u64 = machine.address;
+        t.r4.u64 = dispatcher.address;
+        if (v == 0) {
+          ITC_FLAG(native_race_states) = false;
+          f.original(t, h.base);
+          ITC_FLAG(native_race_states) = true;
+        } else {
+          f.step(t, h.base);
+        }
+        outputs(out[v]);
+      }
+      results.Check(out[0], out[1], fmt::format("seed {}", seed));
+    }
+    results.Report();
+  }
+  {
+    // A manager with no racers: AiDrivers::StartRanked lists none.
+    Results results("RaceStates::OnStandingStart (sub_821643B0)");
+    for (uint64_t seed = 0; seed < 8; seed++) {
+      Outputs out[2];
+      for (int v = 0; v < 2; v++) {
+        Random r(seed * 113 + 79);
+        Globals globals(h.base, fade_words);
+        common(r);
+        WriteRandom(h.base, manager.address, 2400, r);
+        guest::StoreU32(h.base, manager.address + 2364, 0);
+        guest::StoreU32(h.base, rw::kManager, manager.address);
+        PPCContext t = CallContext(h);
+        t.r3.u64 = machine.address;
+        (v == 0 ? Original<__imp__sub_821643B0> : hooks::RaceStatesOnStandingStart)(t, h.base);
+        outputs(out[v]);
+        out[v].Word(t.r3.u32);
+      }
+      results.Check(out[0], out[1], fmt::format("seed {}", seed));
+    }
+    results.Report();
+  }
+  {
+    // A progress block from operator new, freed by both sides (the second
+    // gets the same block again).
+    Results results("RaceStates::Unload (sub_82163920)");
+    for (uint64_t seed = 0; seed < 4; seed++) {
+      Outputs out[2];
+      for (int v = 0; v < 2; v++) {
+        Globals globals(h.base, fade_words);
+        const auto block = memory::crt::OperatorNew(h.base, kProgressBytes);
+        const uint32_t p = block ? *block : 0;
+        guest::StoreU32(h.base, rs::kProgress, seed == 0 ? 0 : p);
+        PPCContext t = CallContext(h);
+        t.r3.u64 = machine.address;
+        (v == 0 ? Original<__imp__sub_82163920> : hooks::RaceStatesUnload)(t, h.base);
+        const bool freed = p == 0 || !memory::IsHeapBlock(p);
+        out[v].Word(freed ? 1 : 0);
+        if (!freed) {
+          memory::crt::OperatorDelete(p);
+        }
+      }
+      results.Check(out[0], out[1], fmt::format("seed {}", seed));
+    }
+    results.Report();
+  }
+  {
+    // The racers (the manager's +2364, 0 to 7) on a random route: the
+    // vehicles' flags (0x81 or not), their track positions; +9616 at 90 or
+    // above.
+    Results results("RaceStates::FreeStartTick (sub_82168B80)");
+    const Block area(tr::kRouteBytes + 0x100);
+    const Block table(4 * tr::kTableEntries);
+    if (!area.address || !table.address) {
+      return;
+    }
+    tr::FillTable(h.base, table.address, area.address);
+    for (uint64_t seed = 0; seed < 48; seed++) {
+      Outputs out[2];
+      for (int v = 0; v < 2; v++) {
+        Random r(seed * 127 + 83);
+        Globals globals(h.base, fade_words);
+        common(r);
+        WriteRandom(h.base, area.address, area.bytes, r);
+        const tr::Route route = tr::BuildRoute(h.base, area.address, table.address, r);
+        guest::StoreU32(h.base, track_route::kRoute, area.address + tr::kFile);
+        WriteRandom(h.base, manager.address, 2400, r);
+        guest::StoreU32(h.base, manager.address + 2364, seed % 12 == 0 ? 0 : r.Below(8));
+        guest::StoreU32(h.base, rw::kManager, manager.address);
+        guest::StoreU32(h.base, kVehicles, vehicles.address);
+        guest::StoreU32(h.base, machine.address + 9616, r.Below(4) == 0 ? r.Below(91) : 91 + r.Below(3));
+        for (uint32_t k = 0; k < 7; k++) {
+          const uint32_t car = vehicles.address + 6272 * k;
+          const uint32_t flags[] = {0x1, 0x80, 0x0, 0x40, 0x81};
+          guest::StoreU32(h.base, car + 6148, flags[r.Below(5)]);
+          tr::RandomPosition(h.base, car + 5236, route, r);
+        }
+        PPCContext t = CallContext(h);
+        t.r3.u64 = machine.address;
+        t.r4.u64 = dispatcher.address;
+        (v == 0 ? Original<__imp__sub_82168B80> : hooks::RaceStatesFreeStartTick)(t, h.base);
+        outputs(out[v]);
+      }
+      results.Check(out[0], out[1], fmt::format("seed {}", seed));
+    }
+    results.Report();
+  }
+}
+
 }  // namespace
 
 void RaceStates(Context& h) {
@@ -816,6 +1006,7 @@ void RaceStates(Context& h) {
   Sections(h);
   Checks(h, progress, vehicles);
   RouteChecks(h, progress, vehicles);
+  Handlers(h, progress, vehicles, manager);
 }
 
 }  // namespace harness

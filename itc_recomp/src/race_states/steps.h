@@ -84,4 +84,33 @@ inline int64_t Unpack(uint32_t w) {
   return int64_t(int32_t(uint32_t(ms))) * int64_t(sign);
 }
 
+// The screen fades are done: their in and out counts (0x826A50DC,
+// 0x826A50E4) both 0.
+inline bool FadesDone(uint8_t* base) {
+  return (Load(base, 0x826A50E4) | Load(base, 0x826A50DC)) == 0;
+}
+
+// A message posted to every machine: appended to the dispatcher's ring
+// (+204: 50 entries of 12 bytes, +0 the message, +4 and +8 0; +804 the
+// count, +808 the start), as the handlers write it inline.
+inline void Post(uint8_t* base, uint32_t dispatcher, uint32_t message) {
+  const uint32_t ring = dispatcher + 204;
+  const uint32_t count = Load(base, ring + 600) + 1;
+  const uint32_t at = Load(base, ring + 604) + count - 1;
+  Store(base, ring + 600, count);
+  const uint32_t entry = (at - at / 50 * 50) * 12 + ring;
+  Store(base, entry + 0, message);
+  Store(base, entry + 4, 0);
+  Store(base, entry + 8, 0);
+}
+
+// The race data's flags (+0x59AE4 of [0x826C5B2C]).
+inline uint32_t FlagsAddress(uint8_t* base) {
+  return Load(base, race_world::kRaceData) + 0x59AE4;
+}
+// The race data's kind (+0xA3AF0).
+inline uint32_t Kind(uint8_t* base) {
+  return Load(base, Load(base, race_world::kRaceData) + 0xA3AF0);
+}
+
 }  // namespace race_states::steps

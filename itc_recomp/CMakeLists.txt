@@ -167,6 +167,7 @@ set(ITC_SOURCES
     src/hooks/race_states.cpp
     src/race_states/race_progress.cpp
     src/race_states/race_checks.cpp
+    src/race_states/handlers.cpp
     src/hooks/texture_compression.cpp
     src/texture_compression/dxt_alpha.cpp
     src/texture_compression/dxt_color.cpp
