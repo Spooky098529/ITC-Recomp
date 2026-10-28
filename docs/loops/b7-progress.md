@@ -99,8 +99,10 @@ file's history. What's left to see in a drive, from every run:
   differing but the expected groups; frame dumps identical (the
   attract race reaches only `RaceProgress::Create` and `Reset`). Left
   ready: `RaceStates::Init` (2,888 lines, split), `Begin`,
-  `RouteDistance`, `StartRoute`, `FollowRoute`. Validation agent
-  running.
+  `RouteDistance`, `StartRoute`, `FollowRoute`. Validated
+  (`itc_2235`, replay `itc_2236` ok, free-start path: 35 of 35 harness
+  lines, 2 in the attract race, 5 in the replay, 28 to drive).
+  Migration agent 2 running.
 
 ## Done
 
