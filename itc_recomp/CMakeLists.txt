@@ -143,6 +143,8 @@ set(ITC_SOURCES
     src/app_states/containers.cpp
     src/app_states/app.cpp
     src/app_states/layers.cpp
+    src/hooks/scene_loaders.cpp
+    src/scene_loaders/pools.cpp
     src/hooks/collision.cpp
     src/collision/shapes.cpp
     src/collision/boxes.cpp
@@ -279,6 +281,7 @@ set(ITC_SOURCES
     src/harnesses/car_physics_objects.cpp
     src/harnesses/vehicle.cpp
     src/harnesses/app_states.cpp
+    src/harnesses/scene_loaders.cpp
     src/harnesses/collision.cpp
     src/harnesses/collision_world.cpp
     src/harnesses/collision_world_walls.cpp
