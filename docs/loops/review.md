@@ -13,7 +13,18 @@ When the user has reviewed a run's section, its heading gets
 
 ## Run 2026-10-28 08:36 (`b7-loop-28-10-26`)
 
-(nothing yet)
+- Texture compression (map f1c484c): `docs/functions/texture-compression.md`,
+  157 rows (all new; 24 seen in play, the rest "Not seen in play"):
+  XGraphics' `XGCompressSurface` (probably, `sub_8235AAC0`) over D3DX's
+  image blitter (the per-format codecs from `ImageCodec::Create`
+  `sub_823F6C60`, ten blitters and filters), used in play only by
+  `Vinyl::Compress` (A8R8G8B8 -> DXT5, premultiplied). Map correction:
+  the lead had `sub_82368170` as a caller; it's a callee
+  (`XGCopySurface`, probably; never ran). Not part of the HLSL
+  compiler. `known-data.md`: `0x82954660`, `0x8263B7E8`, `0x8263C768`,
+  `0x82001030`, the codec vtables and layout; notes in `heap.md` and
+  `car-models.md`; one lead added (`XGCopySurface`'s 24 per-format
+  routines, none seen in play).
 
 ## Run 2026-10-27 22:31 (`b7-loop-27-10-26`)
 

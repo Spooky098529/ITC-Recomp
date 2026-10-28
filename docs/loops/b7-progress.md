@@ -13,8 +13,13 @@ file's history. What's left to see in a drive, from every run:
 - Limit for this run: 3 subsystems.
 - Subsystem 1 of 3: `leads.md`'s top lead, `sub_8235AAC0` (probably
   a DXT compressor, from `Vinyl::Compress` `sub_820ED090`; 1 ready
-  group, 11 functions, 2,495 lines: split the migration). Mapping
-  agent running.
+  group, 11 functions, 2,495 lines: split the migration). Mapped as
+  texture compression (`texture-compression.md`, 157 rows, all new,
+  24 seen in play: `XGCompressSurface` and the XGraphics/D3DX
+  blitter, the vinyl sheet's A8R8G8B8 -> DXT5; f1c484c; 1 lead
+  added). Map checked (0 errors, 1 ready group `sub_8235AAC0`, its 8
+  indirect calls reaching 13 more functions seen in play, no
+  blockers outside it, no kernel calls). Migration agent 1 running.
 
 ## Done
 
@@ -36,6 +41,8 @@ This run's groups: `expected-differences.md` (the "08:36 run" lines).
 
 - At the start: ours 2400, work left 4052 (wrapped 103, known 522,
   unknown 3427).
+- After the texture compression's map: ours 2400, work left 4052
+  (wrapped 103, known 546, unknown 3403).
 
 ## Stopped
 
