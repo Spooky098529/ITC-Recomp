@@ -132,6 +132,24 @@ When the user has reviewed a run's section, its heading gets
   set-ups even when the allocation fails. `known-data.md`'s
   `0x826C5B58` row and a new `[0x82814E30]` row; `mode-tick.md`'s
   `OnModeChange` row.
+- The save data, migration 1 (0fb0eb9..d585a41): 19 rows in
+  `save-data.md` and its intro; code in `src/save_data/`. Adapters kept
+  for recompiled callers: `Progress::Clear` and `SetDefaults`
+  (`sub_82221AC0`), the `Table3044` getter (`sub_82110448`),
+  `SaveData::Create` (`sub_82105868`, `sub_8209E7E8`), `Delete`
+  (`sub_8209E7E8`), `ResetPlayer` (`sub_82222B60`), `MenuList::Init`
+  (about 75 screens), `Players::ResetControllers` (`sub_82106548`).
+  Kept as the originals: `Stats::Stats`'s writes; the 0.0 float through
+  float, double, float (`lfs`, `stfs`); the getters' r3 and r11 sign
+  extended; each r3 as the original leaves it. Not written natively
+  (following earlier ports' scratch below r1): `SetDefaults`' stack copy
+  of `Table3044`, `ControlMap`'s stack table, the two stack words
+  `ResetPlayer` passes to `MenuList::Init`. The allocating ones run
+  natively only under `--native_heap`; `SetDefaults`' copies go through
+  `native::Buffers_Memcpy` (the original when `--native_memcpy` is off
+  or the ranges may overlap); `MenuList::Init` runs the original when
+  its old block isn't the allocation layer's; on `operator new`'s
+  nullopt (never seen) `Create`'s adapter runs the original.
 
 ## Run 2026-10-25 23:42 (`b7-loop-25-10-26-4`)
 

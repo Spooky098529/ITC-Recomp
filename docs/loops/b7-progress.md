@@ -95,7 +95,14 @@ file's history. What's left to see in a drive, from every run:
   1 moved, 22 new, 4 of them not seen in play (added in 1fedb13 by the
   user's call of 2026-10-23); 8cbdba1; 1 lead added). Map checked (0
   errors, 19 of 19 in play, 13 ready groups, no blockers, no kernel
-  calls). Step: migration agent 1 running.
+  calls). Migration 1 done (0fb0eb9..d585a41: the progress, stats,
+  course records, options, control maps, the default tables' getters,
+  `SaveData::Create` and `Delete`, `MenuList::Init`,
+  `Players::ResetControllers`, `TitleScreen::ResetPlayer`; 11 adapters
+  removed; `--native_save_data`; `itc_2070`: 23 s, 0 errors, every
+  harness 0 differing but the expected groups; all 19 ran in the attract
+  race). `save-data.md` 19 of 19 in play ours. Step: validation agent 1
+  running.
 
 ## Done
 
@@ -162,5 +169,7 @@ This run's groups: `expected-differences.md` (the "22:31 run" lines).
   (`itc_2063`), 0 errors.
 - After the save data's map: ours 2381, work left 4071 (wrapped 103,
   known 541, unknown 3427).
+- After the save data's migration: ours 2400, work left 4052 (wrapped
+  103, known 522, unknown 3427).
 
 ## Stopped
