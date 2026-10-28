@@ -12,6 +12,7 @@
 #pragma once
 
 #include <cstdint>
+#include <optional>
 
 namespace x3daudio {
 
@@ -108,5 +109,77 @@ uint64_t Pan(uint8_t* base, uint64_t handle, uint32_t dsp, uint32_t channel, dou
 // saves are the adapter's). Returns the r3 the original leaves.
 uint64_t Matrix(uint8_t* base, uint64_t handle, uint32_t listener, uint64_t emitter, uint64_t dsp,
                 uint64_t f31, uint32_t frame, const TanCall& tan);
+
+// --- The cone, Doppler and X3DAudioCalculate ---
+
+// What Cone's prologue saves below its caller's stack pointer: the return
+// address at -8, r29 to r31 at -32 to -16 and f29 to f31 at -56 to -40 (the
+// bits).
+struct ConeSaves {
+  uint32_t lr;
+  uint64_t r29, r30, r31;
+  uint64_t f29, f30, f31;
+};
+
+// sub_82480BA8 X3DAudio::Cone: the emitter's cone (`emitter` + 0: +0 the
+// inner angle, +4 the outer, +8/+12 the inner and outer volumes, +16/+20
+// the low-pass, +24/+28 the reverb) at the listener: the outer values when
+// the outer angle is 0; the inner ones when the inner angle is X3DAUDIO_2PI
+// or the DSP settings' distance (+36) isn't above the float at 0x82006910;
+// else the cosine of the angle (the listener's position less the emitter's,
+// dotted with the emitter's front, over the distance) against cos(inner / 2)
+// and cos(outer / 2) (`cos`): inner within the inner cone, outer outside the
+// outer, linear between. By `flags`: 0x1 the volume times the matrix's
+// first word, 0x4 and 0x8 the low-pass times the DSP settings' +16 and +20,
+// 0x10 the reverb times +24. `sp` is the caller's stack pointer: the
+// original's 160-byte frame below it written as the original leaves it (the
+// back chain, `saves`, the vector at +88). Returns the r3 the original
+// leaves: `handle`, or the frame's +88 when it worked out the angle.
+uint64_t Cone(uint8_t* base, uint64_t handle, uint32_t listener, uint32_t emitter,
+              uint32_t flags, uint32_t dsp, uint32_t sp, const ConeSaves& saves);
+
+// What Doppler's prologue saves: the return address at -8, r28 to r31 at -40
+// to -16 and f31 at -48 (the bits).
+struct DopplerSaves {
+  uint32_t lr;
+  uint64_t r28, r29, r30, r31;
+  uint64_t f31;
+};
+
+// sub_82480E90 X3DAudio::Doppler: when the DSP settings' distance (+36) is
+// above the float at 0x82006910, the listener's (+36) and the emitter's
+// (+40) velocities along the listener's position less the emitter's (over
+// the distance) into +44 and +40, and the Doppler factor (c - vl) / (c -
+// ve), both times the emitter's scaler (+88) and clamped to the handle's +12,
+// with c the handle's +8, into +28; else 1, 0 and 0. `sp` as Cone's (the
+// 144-byte frame, the vector at +80). Returns the r3 the original leaves:
+// `handle`, or the frame's +80.
+uint64_t Doppler(uint8_t* base, uint64_t handle, uint32_t listener, uint32_t emitter,
+                 uint32_t dsp, uint32_t sp, const DopplerSaves& saves);
+
+// X3DAudioCalculate's registers on entry (whole: its callees' prologues save
+// them) and the callee-saved registers its callees' prologues save (r26 and
+// f23 to f31 as the caller has them; r27 to r31 are Calculate's own saves).
+struct CalculateArgs {
+  uint64_t handle, listener, emitter, flags, dsp;  // r3 to r7
+};
+struct CalculateSaves {
+  uint32_t lr;
+  uint64_t r26, r27, r28, r29, r30, r31;
+  uint64_t f23, f24, f25, f26, f27, f28, f29, f30, f31;  // the bits
+};
+
+// sub_82481880 X3DAudioCalculate: the listener's position less the
+// emitter's (VecSub) and its length (VecLength) into the DSP settings' +36;
+// then by the flags (the low word): 0x1D Curves, then Cone when the emitter
+// has one channel (+52) and a cone (+0); 0x1 Matrix; 0x20 Doppler, each
+// through its plain C++ above (from the original's return addresses, with
+// the frames and prologue saves the originals leave below Calculate's
+// 144-byte frame). Empty, with nothing done, when the flags ask for 0x40
+// (X3DAudio::EmitterAngle sub_82480780) or 0x2 (X3DAudio::Delay
+// sub_82481708, both never seen in play): the caller runs the original then.
+// `sp` is the caller's stack pointer. Returns the r3 the original leaves.
+std::optional<uint64_t> Calculate(uint8_t* base, const CalculateArgs& args, uint32_t sp,
+                                  const CalculateSaves& saves, const TanCall& tan);
 
 }  // namespace x3daudio

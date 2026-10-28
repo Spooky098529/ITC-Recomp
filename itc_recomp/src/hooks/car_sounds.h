@@ -66,4 +66,20 @@ void CarSoundsX3DPan(PPCContext& ctx, uint8_t* base);  // sub_82480F80
 // leaves them; r3 as the original leaves it.
 void CarSoundsX3DMatrix(PPCContext& ctx, uint8_t* base);  // sub_82481390
 
+// r3 = the handle, r4 = the listener, r5 = the emitter, r6 = the flags,
+// r7 = the DSP settings: the original's 160-byte frame below r1 (its
+// prologue's saves, the back chain, the vector at +88) written as it leaves
+// it; r3 as the original leaves it.
+void CarSoundsX3DCone(PPCContext& ctx, uint8_t* base);  // sub_82480BA8
+// r3 = the handle, r4 = the listener, r5 = the emitter, r6 = the DSP
+// settings: the original's 144-byte frame below r1 as it leaves it; r3 as
+// the original leaves it.
+void CarSoundsX3DDoppler(PPCContext& ctx, uint8_t* base);  // sub_82480E90
+// r3 = the handle, r4 = the listener, r5 = the emitter, r6 = the flags,
+// r7 = the DSP settings: the original's 144-byte frame and its callees'
+// below it as the originals leave them; r3 as the original leaves it. The
+// original itself (`__imp__`) when the flags ask for 0x40 or 0x2
+// (EmitterAngle, Delay: never seen in play).
+void CarSoundsX3DCalculate(PPCContext& ctx, uint8_t* base);  // sub_82481880
+
 }  // namespace hooks

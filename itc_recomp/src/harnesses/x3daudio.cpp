@@ -1,6 +1,7 @@
 // X3DAudio (src/car_sounds/x3daudio.h, docs/functions/car-sounds.md) against
-// the recompiled functions: the vector helpers, the curve evaluation and the
-// curves. Each case builds its vectors, curves, emitter and DSP settings in
+// the recompiled functions: the vector helpers, the curve evaluation, the
+// curves, Pan, the matrix, the cone, Doppler and X3DAudioCalculate. Each
+// case builds its vectors, curves, emitter and DSP settings in
 // a block from the allocation layer, filled with the same random words for
 // both versions, and runs the original (with --native_car_sounds off, so its
 // callees are the originals too) or the plain C++ through the register steps
@@ -10,7 +11,8 @@
 // pointer exactly (the original's saved registers and default curves); for
 // Pan its 192-byte frame exactly (the saves and the azimuth tables), for
 // Matrix its 304-byte frame and Pan's below it (the words its float
-// instructions store as floats).
+// instructions store as floats); for Cone, Doppler and X3DAudioCalculate
+// their frames (Calculate's with its callees' below it) the same way.
 
 #include "harness.h"
 
@@ -24,6 +26,7 @@
 
 #include <xmmintrin.h>
 
+#include <algorithm>
 #include <bit>
 #include <cmath>
 #include <string>
@@ -629,6 +632,458 @@ void Matrices(Context& h, uint32_t block) {
   results.Report();
 }
 
+// --- The cone, Doppler and X3DAudioCalculate ---
+
+// The layout above (the handle, listener, emitter, azimuths, DSP settings
+// and matrix), with the cone at +0x300, the emitter's five curves at +0x340
+// and their points at +0x400 (0x80 each).
+constexpr uint32_t kCone = 0x300;
+constexpr uint32_t kCxCurves = 0x340;
+constexpr uint32_t kCxPoints = 0x400;
+constexpr uint32_t kConeFrame = 160;
+constexpr uint32_t kDopplerFrame = 144;
+// Calculate's 144-byte frame and the deepest of its callees' below it
+// (Matrix's 304 and Pan's 192).
+constexpr uint32_t kCalculateFrame = 144 + 304 + 192;
+
+// The region below the stack pointer exactly, but the words at `floats`
+// (offsets in it) as floats.
+void FrameOutputs(Outputs& out, uint8_t* base, uint32_t region, uint32_t bytes_count,
+                  const std::vector<uint32_t>& floats) {
+  std::vector<uint8_t> bytes = Read(base, region, bytes_count);
+  for (const uint32_t offset : floats) {
+    for (uint32_t i = 0; i < 4; i++) {
+      bytes[offset + i] = 0;
+    }
+  }
+  out.Bytes(bytes);
+  for (const uint32_t offset : floats) {
+    out.Float(guest::LoadU32(base, region + offset));
+  }
+}
+
+// The DSP settings' words the code stores with stfs, and the matrix's.
+std::vector<uint32_t> DspFloats() {
+  std::vector<uint32_t> floats = MatrixFloats();
+  for (const uint32_t offset : {16u, 20u, 24u, 28u, 36u, 40u, 44u}) {
+    floats.push_back(kMxDsp + offset);
+  }
+  return floats;
+}
+
+float Distance(uint8_t* base, uint32_t a, uint32_t b) {
+  float sum = 0.0f;
+  for (uint32_t i = 0; i < 3; i++) {
+    const float d = std::bit_cast<float>(guest::LoadU32(base, a + 4 * i)) -
+                    std::bit_cast<float>(guest::LoadU32(base, b + 4 * i));
+    sum += d * d;
+  }
+  return std::sqrt(sum);
+}
+
+// The listener (front, top, position, velocity at +0, +12, +24, +36) and
+// the emitter (front +4, top +16, position +28, velocity +40): positions in
+// meters, the emitter near the listener, on it (shape 1) or all but on it
+// (shape 2); velocities toward, away, across or zero (realistic), or any
+// floats. Returns the shape.
+uint32_t Scene(uint8_t* base, Random& random, uint32_t block, bool realistic) {
+  const uint32_t listener = block + kListener;
+  const uint32_t emitter = block + kMxEmitter;
+  Vector(base, random, listener + 0, realistic);
+  Vector(base, random, listener + 12, realistic);
+  for (uint32_t i = 0; i < 3; i++) {
+    Store(base, listener + 24 + 4 * i,
+          realistic || random.Below(3) != 0 ? Bits(Uniform(random, -800.0f, 800.0f))
+                                            : AnyFloat(random));
+  }
+  Vector(base, random, emitter + 4, realistic);
+  Vector(base, random, emitter + 16, realistic);
+  const uint32_t shape = random.Below(10);
+  for (uint32_t i = 0; i < 3; i++) {
+    const float at = std::bit_cast<float>(guest::LoadU32(base, listener + 24 + 4 * i));
+    uint32_t bits;
+    if (shape == 1) {
+      bits = Bits(at);
+    } else if (shape == 2) {
+      bits = Bits(at + Uniform(random, -0.001f, 0.001f));
+    } else if (realistic || random.Below(4) != 0) {
+      bits = Bits(at + Uniform(random, -60.0f, 60.0f));
+    } else {
+      bits = AnyFloat(random);
+    }
+    Store(base, emitter + 28 + 4 * i, bits);
+  }
+  // The velocities: along the line between them (toward or away), any
+  // direction, or zero.
+  for (const uint32_t at : {listener + 36, emitter + 40}) {
+    const uint32_t kind = random.Below(realistic ? 4 : 6);
+    if (kind == 0) {
+      for (uint32_t i = 0; i < 3; i++) {
+        Store(base, at + 4 * i, 0);
+      }
+    } else if (kind == 1 || kind == 2) {
+      const float speed = Uniform(random, 0.0f, 90.0f) * (kind == 1 ? 1.0f : -1.0f);
+      const float length = Distance(base, listener + 24, emitter + 28);
+      for (uint32_t i = 0; i < 3; i++) {
+        const float d = std::bit_cast<float>(guest::LoadU32(base, listener + 24 + 4 * i)) -
+                        std::bit_cast<float>(guest::LoadU32(base, emitter + 28 + 4 * i));
+        Store(base, at + 4 * i, Bits(length > 0.0f ? d / length * speed : 0.0f));
+      }
+    } else if (kind == 3) {
+      for (uint32_t i = 0; i < 3; i++) {
+        Store(base, at + 4 * i, Bits(Uniform(random, -60.0f, 60.0f)));
+      }
+    } else {
+      for (uint32_t i = 0; i < 3; i++) {
+        Store(base, at + 4 * i, AnyFloat(random));
+      }
+    }
+  }
+  return shape;
+}
+
+// The DSP settings' distance (+36): the true one (realistic), or now and
+// then 0 or any float.
+void SceneDistance(uint8_t* base, Random& random, uint32_t block, bool realistic) {
+  uint32_t bits = Bits(Distance(base, block + kListener + 24, block + kMxEmitter + 28));
+  if (!realistic) {
+    switch (random.Below(6)) {
+      case 0:
+        bits = 0;
+        break;
+      case 1:
+        bits = AnyFloat(random);
+        break;
+      default:
+        break;
+    }
+  }
+  Store(base, block + kMxDsp + 36, bits);
+}
+
+// The cone: the angles over [0, 2pi] (inner within outer, realistic), with
+// the edges 0 and X3DAUDIO_2PI and inner beyond outer now and then, or any
+// floats; the six values in [0, 1] or any floats.
+void MakeCone(uint8_t* base, Random& random, uint32_t cone, bool realistic) {
+  const uint32_t two_pi = guest::LoadU32(base, kLfeAzimuth);
+  const float two_pi_f = std::bit_cast<float>(two_pi);
+  float inner = Uniform(random, 0.0f, two_pi_f);
+  float outer = Uniform(random, inner, two_pi_f);
+  uint32_t inner_bits = Bits(inner);
+  uint32_t outer_bits = Bits(outer);
+  switch (random.Below(realistic ? 10 : 8)) {
+    case 0:
+      inner_bits = two_pi;
+      outer_bits = two_pi;
+      break;
+    case 1:
+      outer_bits = 0;
+      break;
+    case 2:
+      inner_bits = 0;
+      break;
+    case 3:
+      outer_bits = two_pi;
+      break;
+    case 4:
+      inner_bits = 0;
+      outer_bits = 0;
+      break;
+    case 5:
+      if (!realistic) {
+        std::swap(inner_bits, outer_bits);
+      }
+      break;
+    case 6:
+      if (!realistic) {
+        inner_bits = AnyFloat(random);
+        outer_bits = AnyFloat(random);
+      }
+      break;
+    default:
+      break;
+  }
+  Store(base, cone + 0, inner_bits);
+  Store(base, cone + 4, outer_bits);
+  for (uint32_t i = 2; i < 8; i++) {
+    Store(base, cone + 4 * i,
+          realistic || random.Below(5) != 0 ? Bits(Uniform(random, 0.0f, 1.0f))
+                                            : AnyFloat(random));
+  }
+}
+
+// The DSP settings' +16 to +44 (the filters, Doppler and the velocities'
+// words): values in [0, 1] or any floats.
+void DspValues(uint8_t* base, Random& random, uint32_t block, bool realistic) {
+  for (uint32_t offset = 16; offset <= 44; offset += 4) {
+    if (offset == 36) {
+      continue;
+    }
+    Store(base, block + kMxDsp + offset,
+          realistic || random.Below(4) != 0 ? Bits(Uniform(random, 0.0f, 1.0f))
+                                            : AnyFloat(random));
+  }
+}
+
+// The flags: every combination of the five the code reads (the subsets of
+// 0x3D) by case, and now and then any word (0x2 and 0x40 cleared where the
+// native path needs them clear).
+uint32_t Flags(Random& random, int c, bool realistic, bool clear_others) {
+  if (realistic) {
+    return 0x3D;
+  }
+  static constexpr uint32_t kBits[] = {0x1, 0x4, 0x8, 0x10, 0x20};
+  uint32_t flags = 0;
+  for (uint32_t i = 0; i < 5; i++) {
+    if ((uint32_t(c) >> i) & 1) {
+      flags |= kBits[i];
+    }
+  }
+  if (random.Below(6) == 0) {
+    flags = uint32_t(random.Next());
+    if (clear_others) {
+      flags &= ~0x42u;
+    }
+  }
+  return flags;
+}
+
+// The callee-saved registers the prologues save.
+void CalleeSaved(Random& random, PPCContext& t) {
+  t.r26.u64 = random.Next();
+  t.r27.u64 = random.Next();
+  t.r28.u64 = random.Next();
+  t.r29.u64 = random.Next();
+  t.r30.u64 = random.Next();
+  t.r31.u64 = random.Next();
+  t.f23.u64 = random.Next();
+  t.f24.u64 = random.Next();
+  t.f25.u64 = random.Next();
+  t.f26.u64 = random.Next();
+  t.f27.u64 = random.Next();
+  t.f28.u64 = random.Next();
+  t.f29.u64 = random.Next();
+  t.f30.u64 = random.Next();
+  t.f31.u64 = random.Next();
+}
+
+void Cones(Context& h, uint32_t block) {
+  Results results("X3DAudio::Cone (sub_82480BA8)");
+  auto frame = [&](Outputs& out, const PPCContext& t) {
+    FrameOutputs(out, h.base, t.r1.u32 - kConeFrame, kConeFrame, {88, 92, 96});
+  };
+  for (int c = 0; c < 2000; c++) {
+    const bool realistic = c >= 1500;
+    auto setup = [&](Random& random, PPCContext& t) {
+      MakeHandle(h.base, random, block + kHandle, realistic);
+      Scene(h.base, random, block, realistic);
+      SceneDistance(h.base, random, block, realistic);
+      MakeCone(h.base, random, block + kCone, realistic);
+      Store(h.base, block + kMxEmitter + 0, block + kCone);
+      MakeDsp(h.base, random, block, 1, 6, realistic);
+      DspValues(h.base, random, block, realistic);
+      t.r3.u64 = block + kHandle;
+      t.r4.u64 = block + kListener;
+      t.r5.u64 = block + kMxEmitter;
+      t.r6.u64 = Flags(random, c, realistic, false);
+      t.r7.u64 = block + kMxDsp;
+      CalleeSaved(random, t);
+    };
+    Case(h, results, block, __imp__sub_82480BA8, hooks::CarSoundsX3DCone, setup, DspFloats(),
+         frame, fmt::format("{} case {}", realistic ? "realistic" : "random", c), kConeFrame);
+  }
+  results.Report();
+}
+
+void Dopplers(Context& h, uint32_t block) {
+  Results results("X3DAudio::Doppler (sub_82480E90)");
+  auto frame = [&](Outputs& out, const PPCContext& t) {
+    FrameOutputs(out, h.base, t.r1.u32 - kDopplerFrame, kDopplerFrame, {80, 84, 88});
+  };
+  for (int c = 0; c < 2000; c++) {
+    const bool realistic = c >= 1500;
+    auto setup = [&](Random& random, PPCContext& t) {
+      const uint32_t handle = block + kHandle;
+      const uint32_t listener = block + kListener;
+      const uint32_t emitter = block + kMxEmitter;
+      MakeHandle(h.base, random, handle, realistic);
+      Scene(h.base, random, block, realistic);
+      SceneDistance(h.base, random, block, realistic);
+      // The emitter's Doppler scaler: 1, 0 or another (any float).
+      uint32_t scaler = Bits(1.0f);
+      switch (random.Below(5)) {
+        case 0:
+          scaler = 0;
+          break;
+        case 1:
+          scaler = Bits(Uniform(random, 0.0f, 4.0f));
+          break;
+        case 2:
+          if (!realistic) {
+            scaler = AnyFloat(random);
+          }
+          break;
+        default:
+          break;
+      }
+      Store(h.base, emitter + 88, scaler);
+      // The speed of sound's edge: a velocity along the line at the
+      // handle's +12 or +8 (or the floats either side), or past them.
+      if (random.Below(4) == 0) {
+        const float length = Distance(h.base, listener + 24, emitter + 28);
+        const uint32_t at = random.Below(2) == 0 ? listener + 36 : emitter + 40;
+        uint32_t edge = guest::LoadU32(h.base, handle + (random.Below(2) == 0 ? 12 : 8));
+        switch (random.Below(4)) {
+          case 0:
+            edge += 1;
+            break;
+          case 1:
+            edge -= 1;
+            break;
+          case 2:
+            edge = Bits(std::bit_cast<float>(edge) * 2.0f);
+            break;
+          default:
+            break;
+        }
+        const float speed = std::bit_cast<float>(edge) * (random.Below(2) == 0 ? 1.0f : -1.0f);
+        for (uint32_t i = 0; i < 3; i++) {
+          const float d = std::bit_cast<float>(guest::LoadU32(h.base, listener + 24 + 4 * i)) -
+                          std::bit_cast<float>(guest::LoadU32(h.base, emitter + 28 + 4 * i));
+          Store(h.base, at + 4 * i, Bits(length > 0.0f ? d / length * speed : 0.0f));
+        }
+        Store(h.base, emitter + 88, Bits(1.0f));
+      }
+      if (!realistic && random.Below(8) == 0) {
+        Store(h.base, handle + 8, AnyFloat(random));
+        Store(h.base, handle + 12, AnyFloat(random));
+      }
+      MakeDsp(h.base, random, block, 1, 6, realistic);
+      DspValues(h.base, random, block, realistic);
+      t.r3.u64 = handle;
+      t.r4.u64 = listener;
+      t.r5.u64 = emitter;
+      t.r6.u64 = block + kMxDsp;
+      CalleeSaved(random, t);
+    };
+    Case(h, results, block, __imp__sub_82480E90, hooks::CarSoundsX3DDoppler, setup, DspFloats(),
+         frame, fmt::format("{} case {}", realistic ? "realistic" : "random", c), kDopplerFrame);
+  }
+  results.Report();
+}
+
+void Calculates(Context& h, uint32_t block) {
+  Results results("X3DAudioCalculate (sub_82481880)");
+  const uint32_t lfe = guest::LoadU32(h.base, kLfeAzimuth);
+  // The words the float instructions store, in the region below the stack
+  // pointer: Calculate's vector, Curves' default curves, Cone's and
+  // Doppler's vectors, Matrix's locals (frames overlap: a word a later
+  // callee saves there is compared as a float too).
+  std::vector<uint32_t> frame_floats;
+  const uint32_t calc = kCalculateFrame - 144;
+  for (const uint32_t o : {80u, 84u, 88u}) {
+    frame_floats.push_back(calc + o);
+  }
+  for (const uint32_t o : {96u, 100u, 104u, 108u}) {
+    frame_floats.push_back(calc - 128 + o);
+  }
+  for (const uint32_t o : {88u, 92u, 96u}) {
+    frame_floats.push_back(calc - 160 + o);
+  }
+  for (const uint32_t o : {80u, 84u, 88u}) {
+    const uint32_t at = calc - 144 + o;
+    if (std::find(frame_floats.begin(), frame_floats.end(), at) == frame_floats.end()) {
+      frame_floats.push_back(at);
+    }
+  }
+  for (const uint32_t o : {104u, 108u, 112u, 120u, 124u, 128u, 136u, 140u, 144u, 152u, 156u, 160u}) {
+    frame_floats.push_back(calc - 304 + o);
+  }
+  auto frame = [&](Outputs& out, const PPCContext& t) {
+    FrameOutputs(out, h.base, t.r1.u32 - kCalculateFrame, kCalculateFrame, frame_floats);
+  };
+  for (int c = 0; c < 3000; c++) {
+    const bool realistic = c >= 2200;
+    auto setup = [&](Random& random, PPCContext& t) {
+      const uint32_t speakers = MakeHandle(h.base, random, block + kHandle, realistic);
+      const uint32_t emitter = block + kMxEmitter;
+      Scene(h.base, random, block, realistic);
+      // Channels: one (with or without a cone) or six (realistic), any
+      // count up to 8.
+      uint32_t channels;
+      if (realistic) {
+        channels = random.Below(2) == 0 ? 1 : 6;
+      } else {
+        static constexpr uint32_t kCounts[] = {0, 1, 1, 1, 2, 3, 4, 5, 6, 6, 8};
+        channels = kCounts[random.Below(sizeof(kCounts) / sizeof(kCounts[0]))];
+      }
+      Store(h.base, emitter + 52, channels);
+      Store(h.base, emitter + 56,
+            realistic || random.Below(3) != 0 ? Bits(Uniform(random, 0.0f, 5.0f))
+                                              : AnyFloat(random));
+      Store(h.base, emitter + 60, block + kMxAzimuths);
+      constexpr float kPi = 3.14159265f;
+      static constexpr float k51[] = {7 * kPi / 4, kPi / 4, 0.0f, 0.0f, 5 * kPi / 4, 3 * kPi / 4};
+      for (uint32_t i = 0; i < kMxMaxChannels; i++) {
+        uint32_t azimuth;
+        if (realistic) {
+          azimuth = i == 3 ? lfe : Bits(i < 6 ? k51[i] : 0.0f);
+        } else {
+          switch (random.Below(5)) {
+            case 0:
+              azimuth = lfe;
+              break;
+            case 1:
+              azimuth = AnyFloat(random);
+              break;
+            default:
+              azimuth = Bits(Uniform(random, -1.0f, 7.0f));
+              break;
+          }
+        }
+        Store(h.base, block + kMxAzimuths + 4 * i, azimuth);
+      }
+      // The cone: null in half the cases.
+      MakeCone(h.base, random, block + kCone, realistic);
+      Store(h.base, emitter + 0, random.Below(2) == 0 ? 0 : block + kCone);
+      // The five curves (null ones take the defaults), the scalers.
+      for (uint32_t k = 0; k < 5; k++) {
+        const uint32_t curve = block + kCxCurves + 8 * k;
+        const uint32_t points = block + kCxPoints + 0x80 * k;
+        const uint32_t count = realistic ? 2 + random.Below(5) : random.Below(13);
+        Store(h.base, curve + 0, points);
+        Store(h.base, curve + 4, count);
+        Points(h.base, random, points, count, realistic);
+        const bool null = random.Below(realistic ? 2 : 3) == 0;
+        Store(h.base, emitter + 64 + 4 * k, null ? 0 : curve);
+      }
+      Store(h.base, emitter + 84,
+            realistic || random.Below(4) != 0 ? Bits(Uniform(random, 1.0f, 50.0f))
+                                              : AnyFloat(random));
+      Store(h.base, emitter + 88,
+            random.Below(5) == 0 ? 0
+            : realistic || random.Below(4) != 0 ? Bits(Uniform(random, 0.0f, 2.0f))
+                                                : AnyFloat(random));
+      const uint32_t sources = channels == 0 ? 1 : channels;
+      const uint32_t destinations =
+          realistic || random.Below(2) == 0 ? (speakers == 0 ? 6 : speakers)
+                                            : random.Below(kMxMaxChannels + 1);
+      MakeDsp(h.base, random, block, sources, destinations, realistic);
+      DspValues(h.base, random, block, realistic);
+      t.r3.u64 = block + kHandle;
+      t.r4.u64 = block + kListener;
+      t.r5.u64 = emitter;
+      t.r6.u64 = Flags(random, c, realistic, true);
+      t.r7.u64 = block + kMxDsp;
+      CalleeSaved(random, t);
+    };
+    Case(h, results, block, __imp__sub_82481880, hooks::CarSoundsX3DCalculate, setup,
+         DspFloats(), frame, fmt::format("{} case {}", realistic ? "realistic" : "random", c),
+         kCalculateFrame);
+  }
+  results.Report();
+}
+
 }  // namespace
 
 void X3DAudioMath(Context& h) {
@@ -642,6 +1097,9 @@ void X3DAudioMath(Context& h) {
   CurveSets(h, block.address);
   Pans(h, block.address);
   Matrices(h, block.address);
+  Cones(h, block.address);
+  Dopplers(h, block.address);
+  Calculates(h, block.address);
 }
 
 }  // namespace harness

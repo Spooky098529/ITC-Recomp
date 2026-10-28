@@ -26,7 +26,7 @@ ITC_FLAG_BOOL(native_car_sounds, true, "ITC",
               "Memory::AllocPhysicalEx's, Music::Play's and X3DAudioInitialize's plain C++); X3DAudio's "
               "X3DVec::Sub sub_824819E0, Length sub_82481998, Dot sub_824819B8 and Cross "
               "sub_82481A18, X3DAudio::EvaluateCurve sub_82480818 and X3DAudio::Curves "
-              "sub_82480918, X3DAudio::Pan sub_82480F80 and X3DAudio::Matrix sub_82481390 (checked by --run_harnesses=x3daudio)) natively instead of through the translated code "
+              "sub_82480918, X3DAudio::Pan sub_82480F80 and X3DAudio::Matrix sub_82481390, X3DAudio::Cone sub_82480BA8, X3DAudio::Doppler sub_82480E90 and X3DAudioCalculate sub_82481880 (the original when its flags ask for EmitterAngle sub_82480780 or Delay sub_82481708) (checked by --run_harnesses=x3daudio)) natively instead of through the translated code "
               "(the same reads and writes; XAudio's voice methods stay the game's; checked by "
               "--run_harnesses=car_sounds)");
 
@@ -226,6 +226,47 @@ void CarSoundsX3DMatrix(PPCContext& ctx, uint8_t* base) {
   ctx.lr = ctx.r12.u64;
 }
 
+void CarSoundsX3DCone(PPCContext& ctx, uint8_t* base) {
+  ctx.fpscr.disableFlushMode();
+  const x3daudio::ConeSaves saves{uint32_t(ctx.lr), ctx.r29.u64, ctx.r30.u64, ctx.r31.u64,
+                                  ctx.f29.u64, ctx.f30.u64, ctx.f31.u64};
+  ctx.r3.u64 = x3daudio::Cone(base, ctx.r3.u64, ctx.r4.u32, ctx.r5.u32, ctx.r6.u32, ctx.r7.u32,
+                              ctx.r1.u32, saves);
+  // The epilogue's r12 and lr: the saved word.
+  ctx.r12.u64 = uint32_t(ctx.lr);
+  ctx.lr = ctx.r12.u64;
+}
+
+void CarSoundsX3DDoppler(PPCContext& ctx, uint8_t* base) {
+  ctx.fpscr.disableFlushMode();
+  const x3daudio::DopplerSaves saves{uint32_t(ctx.lr), ctx.r28.u64, ctx.r29.u64, ctx.r30.u64,
+                                     ctx.r31.u64, ctx.f31.u64};
+  ctx.r3.u64 = x3daudio::Doppler(base, ctx.r3.u64, ctx.r4.u32, ctx.r5.u32, ctx.r6.u32,
+                                 ctx.r1.u32, saves);
+  ctx.r12.u64 = uint32_t(ctx.lr);
+  ctx.lr = ctx.r12.u64;
+}
+
+void CarSoundsX3DCalculate(PPCContext& ctx, uint8_t* base) {
+  ctx.fpscr.disableFlushMode();
+  GuestTanUser user{&ctx, base};
+  const x3daudio::CalculateArgs args{ctx.r3.u64, ctx.r4.u64, ctx.r5.u64, ctx.r6.u64, ctx.r7.u64};
+  const x3daudio::CalculateSaves saves{
+      uint32_t(ctx.lr), ctx.r26.u64, ctx.r27.u64, ctx.r28.u64, ctx.r29.u64, ctx.r30.u64,
+      ctx.r31.u64,      ctx.f23.u64, ctx.f24.u64, ctx.f25.u64, ctx.f26.u64, ctx.f27.u64,
+      ctx.f28.u64,      ctx.f29.u64, ctx.f30.u64, ctx.f31.u64};
+  const auto r3 = x3daudio::Calculate(base, args, ctx.r1.u32, saves, {GuestTan, &user});
+  if (!r3) {
+    // EmitterAngle or Delay asked for: the original, its callees through
+    // their adapters.
+    __imp__sub_82481880(ctx, base);
+    return;
+  }
+  ctx.r3.u64 = *r3;
+  ctx.r12.u64 = uint32_t(ctx.lr);
+  ctx.lr = ctx.r12.u64;
+}
+
 }  // namespace hooks
 
 #define ITC_CAR_SOUNDS_ADAPTER(address, step) \
@@ -258,6 +299,9 @@ ITC_CAR_SOUNDS_ADAPTER(82480818, CarSoundsX3DEvaluateCurve)
 ITC_CAR_SOUNDS_ADAPTER(82480918, CarSoundsX3DCurves)
 ITC_CAR_SOUNDS_ADAPTER(82480F80, CarSoundsX3DPan)
 ITC_CAR_SOUNDS_ADAPTER(82481390, CarSoundsX3DMatrix)
+ITC_CAR_SOUNDS_ADAPTER(82480BA8, CarSoundsX3DCone)
+ITC_CAR_SOUNDS_ADAPTER(82480E90, CarSoundsX3DDoppler)
+ITC_CAR_SOUNDS_ADAPTER(82481880, CarSoundsX3DCalculate)
 
 extern "C" REX_FUNC(sub_82110258) {
   REX_FUNC_PROLOGUE();

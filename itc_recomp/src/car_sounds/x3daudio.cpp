@@ -618,4 +618,216 @@ uint64_t Matrix(uint8_t* base, uint64_t handle, uint32_t listener, uint64_t emit
   return r3;
 }
 
+namespace {
+
+// Cone's constant (lfs): the half the angles are scaled by.
+constexpr uint32_t kHalf = 0x82001BE4;  // 0.5, probably
+
+}  // namespace
+
+uint64_t Cone(uint8_t* base, uint64_t handle, uint32_t listener, uint32_t emitter,
+              uint32_t flags, uint32_t dsp, uint32_t sp, const ConeSaves& saves) {
+  ITC_NATIVE_RUNNING("sub_82480BA8 X3DAudio::Cone");
+  // The prologue: __savegprlr_29, f29 to f31, the back chain.
+  StoreU64(base, sp - 32, saves.r29);
+  StoreU64(base, sp - 24, saves.r30);
+  StoreU64(base, sp - 16, saves.r31);
+  guest::StoreU32(base, sp - 8, saves.lr);
+  StoreU64(base, sp - 56, saves.f29);
+  StoreU64(base, sp - 48, saves.f30);
+  StoreU64(base, sp - 40, saves.f31);
+  const uint32_t frame = sp - 160;
+  guest::StoreU32(base, frame, sp);
+  uint64_t r3 = handle;
+  const bool volume = (flags & 0x1) != 0;
+  const bool lowpass = (flags & 0xC) != 0;
+  const bool reverb = (flags & 0x10) != 0;
+  // The values the stores use (f11 the volume, f12 the low-pass, f0 the
+  // reverb); the original loads its frame's +80 for those the flags don't
+  // ask for, which nothing reads.
+  double f11 = 0.0, f12 = 0.0, f0 = 0.0;
+  // One cone's values at `at` (+8 inner, +12 outer), from the cone `cone`,
+  // or read again from the emitter for each (as the original does after its
+  // calls).
+  auto pick = [&](uint32_t at, uint32_t cone, bool again) {
+    if (volume) {
+      f11 = Lfs(base, (again ? guest::LoadU32(base, emitter + 0) : cone) + at);
+    }
+    if (lowpass) {
+      f12 = Lfs(base, (again ? guest::LoadU32(base, emitter + 0) : cone) + at + 8);
+    }
+    if (reverb) {
+      f0 = Lfs(base, (again ? guest::LoadU32(base, emitter + 0) : cone) + at + 16);
+    }
+  };
+  const uint32_t cone = guest::LoadU32(base, emitter + 0);
+  if (Lfs(base, cone + 4) == Lfs(base, kZero)) {
+    pick(12, cone, false);
+  } else if (Lfs(base, cone + 0) == Lfs(base, kLfeAzimuth) ||
+             !(Lfs(base, dsp + 36) > Lfs(base, kAxisAbove))) {
+    pick(8, cone, false);
+  } else {
+    // The cosine of the listener's angle off the emitter's front.
+    VecSub(base, listener + 24, emitter + 28, frame + 88);
+    const double dot = double(VecDot(base, frame + 88, emitter + 4));
+    r3 = uint64_t(frame) + 88;
+    const uint32_t c = guest::LoadU32(base, emitter + 0);
+    const double distance = Lfs(base, dsp + 36);
+    const double inner = Lfs(base, c + 0);
+    const double f30 = Lfs(base, kHalf);
+    const double f31 = Single(dot / distance);
+    const double f29 = Single(c_runtime::Cos(Single(inner * f30)));
+    if (!(f31 < f29)) {
+      pick(8, 0, true);
+    } else {
+      const double outer = Lfs(base, guest::LoadU32(base, emitter + 0) + 4);
+      const double cos_outer = Single(c_runtime::Cos(Single(outer * f30)));
+      if (!(f31 > cos_outer)) {
+        pick(12, 0, true);
+      } else {
+        // Between the cones: linear from the inner value to the outer.
+        const double f13 = Single(f31 - f29);
+        const double t = Single(f13 / Single(cos_outer - f29));
+        auto lerp = [&](uint32_t c2, uint32_t at) {
+          const double a = Lfs(base, c2 + at);
+          const double b = Lfs(base, c2 + at + 4);
+          return Single(std::fma(Single(b - a), t, a));
+        };
+        if (volume) {
+          f11 = lerp(guest::LoadU32(base, emitter + 0), 8);
+        }
+        if (lowpass) {
+          f12 = lerp(guest::LoadU32(base, emitter + 0), 16);
+        }
+        if (reverb) {
+          f0 = lerp(guest::LoadU32(base, emitter + 0), 24);
+        }
+      }
+    }
+  }
+  if (volume) {
+    const uint32_t matrix = guest::LoadU32(base, dsp + 0);
+    Stfs(base, matrix + 0, Single(Lfs(base, matrix + 0) * f11));
+  }
+  if (flags & 0x4) {
+    Stfs(base, dsp + 16, Single(f12 * Lfs(base, dsp + 16)));
+  }
+  if (flags & 0x8) {
+    Stfs(base, dsp + 20, Single(Lfs(base, dsp + 20) * f12));
+  }
+  if (reverb) {
+    Stfs(base, dsp + 24, Single(Lfs(base, dsp + 24) * f0));
+  }
+  return r3;
+}
+
+uint64_t Doppler(uint8_t* base, uint64_t handle, uint32_t listener, uint32_t emitter,
+                 uint32_t dsp, uint32_t sp, const DopplerSaves& saves) {
+  ITC_NATIVE_RUNNING("sub_82480E90 X3DAudio::Doppler");
+  // The prologue: __savegprlr_28, f31, the back chain.
+  StoreU64(base, sp - 40, saves.r28);
+  StoreU64(base, sp - 32, saves.r29);
+  StoreU64(base, sp - 24, saves.r30);
+  StoreU64(base, sp - 16, saves.r31);
+  guest::StoreU32(base, sp - 8, saves.lr);
+  StoreU64(base, sp - 48, saves.f31);
+  const uint32_t frame = sp - 144;
+  guest::StoreU32(base, frame, sp);
+  const uint32_t h = uint32_t(handle);
+  uint64_t r3 = handle;
+  double f0 = Lfs(base, kOne);
+  double f31 = Lfs(base, kZero);
+  double f10 = f31;
+  if (Lfs(base, dsp + 36) > Lfs(base, kAxisAbove)) {
+    VecSub(base, listener + 24, emitter + 28, frame + 80);
+    double f1 = double(VecDot(base, frame + 80, listener + 36));
+    f31 = Single(f1 / Lfs(base, dsp + 36));
+    f1 = double(VecDot(base, frame + 80, emitter + 40));
+    r3 = uint64_t(frame) + 80;
+    f10 = Single(f1 / Lfs(base, dsp + 36));
+    double f13 = Lfs(base, emitter + 88);
+    double f12 = Single(f13 * f31);
+    f0 = Lfs(base, h + 12);
+    f13 = Single(f13 * f10);
+    // Both clamped to [-c, c] (the negation by its sign bit).
+    const double negated = std::bit_cast<double>(std::bit_cast<uint64_t>(f0) ^ 0x8000000000000000ull);
+    if (f12 > f0) {
+      f12 = f0;
+    } else if (f12 < negated) {
+      f12 = negated;
+    }
+    if (f13 > f0) {
+      f13 = f0;
+    } else if (f13 < negated) {
+      f13 = negated;
+    }
+    f0 = Lfs(base, h + 8);
+    f12 = Single(f0 - f12);
+    f0 = Single(f0 - f13);
+    f0 = Single(f12 / f0);
+  }
+  Stfs(base, dsp + 28, f0);
+  Stfs(base, dsp + 44, f31);
+  Stfs(base, dsp + 40, f10);
+  return r3;
+}
+
+std::optional<uint64_t> Calculate(uint8_t* base, const CalculateArgs& a, uint32_t sp,
+                                  const CalculateSaves& s, const TanCall& tan) {
+  const uint32_t flags = uint32_t(a.flags);
+  if (flags & 0x42) {
+    return std::nullopt;
+  }
+  ITC_NATIVE_RUNNING("sub_82481880 X3DAudioCalculate");
+  // The prologue: __savegprlr_27, the back chain.
+  StoreU64(base, sp - 48, s.r27);
+  StoreU64(base, sp - 40, s.r28);
+  StoreU64(base, sp - 32, s.r29);
+  StoreU64(base, sp - 24, s.r30);
+  StoreU64(base, sp - 16, s.r31);
+  guest::StoreU32(base, sp - 8, s.lr);
+  const uint32_t frame = sp - 144;
+  guest::StoreU32(base, frame, sp);
+  // Its registers from here: r27 the flags, r28 the listener, r29 the
+  // handle, r30 the DSP settings, r31 the emitter (what its callees save).
+  const uint32_t listener = uint32_t(a.listener);
+  const uint32_t emitter = uint32_t(a.emitter);
+  const uint32_t dsp = uint32_t(a.dsp);
+  VecSub(base, listener + 24, emitter + 28, frame + 80);
+  uint64_t r3 = uint64_t(frame) + 80;
+  Stfs(base, dsp + 36, double(VecLength(base, frame + 80)));
+  if (a.flags & 29) {
+    // Curves' prologue: lr, r31, the back chain of its 128-byte frame.
+    guest::StoreU32(base, frame - 8, 0x824818FC);
+    StoreU64(base, frame - 16, a.emitter);
+    guest::StoreU32(base, frame - 128, frame);
+    const uint32_t curve = Curves(base, emitter, flags, dsp, frame - 128);
+    r3 = curve != 0 ? uint64_t(curve) : a.handle;
+    if (guest::LoadU32(base, emitter + 52) == 1 && guest::LoadU32(base, emitter + 0) != 0) {
+      r3 = Cone(base, a.handle, listener, emitter, flags, dsp, frame,
+                {0x8248192C, a.handle, a.dsp, a.emitter, s.f29, s.f30, s.f31});
+    }
+    if (flags & 0x1) {
+      // Matrix's prologue: __savegprlr_26, __savefpr_23, the back chain of
+      // its 304-byte frame.
+      const uint64_t gprs[6] = {s.r26, a.flags, a.listener, a.handle, a.dsp, a.emitter};
+      for (uint32_t i = 0; i < 6; i++) {
+        StoreU64(base, frame - 56 + 8 * i, gprs[i]);
+      }
+      guest::StoreU32(base, frame - 8, 0x8248194C);
+      const uint64_t fprs[9] = {s.f23, s.f24, s.f25, s.f26, s.f27, s.f28, s.f29, s.f30, s.f31};
+      for (uint32_t i = 0; i < 9; i++) {
+        StoreU64(base, frame - 128 + 8 * i, fprs[i]);
+      }
+      guest::StoreU32(base, frame - 304, frame);
+      r3 = Matrix(base, a.handle, listener, a.emitter, a.dsp, s.f31, frame - 304, tan);
+    }
+  }
+  if (flags & 0x20) {
+    r3 = Doppler(base, a.handle, listener, emitter, dsp, frame,
+                 {0x8248198C, a.listener, a.handle, a.dsp, a.emitter, s.f31});
+  }
+  return r3;
+}
+
 }  // namespace x3daudio
