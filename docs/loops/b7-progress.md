@@ -76,9 +76,17 @@ file's history. What's left to see in a drive, from every run:
   (`itc_2197`, `itc_2198`). Left ready: `RaceManager::Refresh`
   `sub_82171978`. Validated (`itc_2203`, replay `itc_2204` ok: 33 of
   33 harness lines, 14 in the attract race, 13 in the replay, 6 to
-  drive). Migration agent 3 running (`Refresh`).
+  drive). Migration 3 (981658f): `RaceManager::Refresh`; validated
+  (`itc_2206`, replay `itc_2207`: ran in the replay). Finished: 49 of
+  50 in play ours; recorded in the plan's table and boundary log.
 
 ## Done
+
+- The race world (`race-world.md`, mapped in 5b6d76c; 54 rows, 50 in
+  play): 49 ours in three migrations (4824fa1..981658f), 25 adapters
+  removed; `TrackCollision::Tick` (`collision-world.md`); validated
+  (`itc_2139`/`2140`, `itc_2203`/`2204`, `itc_2206`/`2207`; 8 to
+  drive); `--native_race_world`.
 
 - The vinyl sheet's decal path (no mapping; de91953..c9f00d1):
   `car-models.md` 27 of 46 ours under `--native_car_models`,
@@ -129,6 +137,8 @@ This run's groups: `expected-differences.md` (the "08:36 run" lines).
   (wrapped 103, known 524, unknown 3355).
 - After the race world's migration 2: ours 2496, work left 3962
   (wrapped 103, known 504, unknown 3355).
+- After the race world (finished): ours 2497, work left 3961 (wrapped
+  103, known 503, unknown 3355).
 
 ## Stopped
 

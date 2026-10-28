@@ -2613,6 +2613,7 @@ B7. **The game logic inside**: everything else, subsystem by subsystem,
 | 2026-10-28 | The players' save data in memory (`SaveData::Create` and `Delete`, the progress's clear and defaults, the stats record, the course records, the options and control maps, the default tables' getters; `TitleScreen::ResetPlayer`, `MenuList::Init`, `Players::ResetControllers`) | `save-data.md` | 19 of 19 in play (one migration; 11 adapters removed; 4 rows not seen in play) | `--native_save_data` |
 | 2026-10-28 | Texture compression (XGraphics' `XGCompressSurface` over D3DX's image blitter, used in play only by `Vinyl::Compress` for the vinyl sheet, A8R8G8B8 to DXT5 premultiplied: the DXT alpha and color block encoders, the DXT4/5 encoders, the A8R8G8B8 and DXT codecs, `ImageCodec::Create`, the blitter) | `texture-compression.md` | 24 of 24 in play (one migration in five batches; 18 adapters removed; 133 rows not seen in play) | `--native_texture_compression` |
 | 2026-10-28 | The vinyl sheet above texture compression (no mapping, not counted: `Vinyl::Compress`, `Texture::Create` and `Free`; then the decal path under `CarModel::OnDecalLoaded`: the TGA reader, the software rasterizer, `Vinyl::DrawDecal`, `DrawDecals`, `ClearCorner`) | `car-models.md` | 27 of 46 (two migrations; 2 adapters removed, `XGCompressSurface` Native; `ClearCorner`'s harness doesn't reach it) | `--native_car_models` |
+| 2026-10-28 | The race world (the race mode's state machine at +116812: `RaceWorld::Init`, `OnLoaded`, `Tick`, `Unload`, the paused tick; the racers' manager at `[0x826D82F4]`: its tables, `AddRacers`, `ListRacers`, the vehicles streamed to the nearest entries by distance, `Refresh`, `ResetWorld`, `ResetVehicles`; the race event's start placements, `RaceStart::Place` and `PlaceRolling`; the save's distance on unload; with `TrackCollision::Tick`) | `race-world.md` | 49 of 50 in play (three migrations; 25 adapters removed; `OnLoad` waits on the archive) | `--native_race_world` |
 
     The first run (2026-10-22, branch `b7-loop-test`): every harness at 0 differing, attract races at 20-21 s with no errors,
     and a race the user drove looked right. Ours went from 162 to 335 (work
@@ -3723,3 +3724,22 @@ functions (916 pairs): overridden 69, Native 5, Dropped 23, never called
 70, live 282. Imports: 186 called, 62 with a live caller. B7
 (`b7_status.py`): ours 2,447, work left 4,006 (Wrapped 103, with a row
 503, no row yet 3,400), from 4,028 (from 4,052 at the run's start).
+
+**2026-10-28, the race world (branch `b7-loop-28-10-26`):** the
+nineteenth run's second subsystem mapped the race's states and manager
+(`race-world.md`, 54 rows, 50 in play) and made 49 native in three
+migrations (`--native_race_world`; `TrackCollision::Tick` under
+`--native_collision_world`): the race mode's state machine, the
+racers' manager (80 entries; at most 4 opponents and the allowed traffic
+given one of the 7 vehicles, streamed by distance each tick), the start
+placements and the save's distance. `StreamTraffic`'s neighbor search
+is left out as dead code (its count never goes below 0); two
+functions never seen got harness stand-in overrides (Wrapped). One
+harness group expected to differ (`AddRacers` with random traffic
+numbers: stack leftovers). `RaceWorld::OnLoad` waits on the archive
+(`sub_8209DE48`, `sub_820A0678`). The harnesses now take ~29 s of
+`attract_race.sh 40` (`race_world`'s ~8 s), leaving ~9 s of race. The
+boundary unchanged: 449 functions (916 pairs): overridden 69, Native 5,
+Dropped 23, never called 70, live 282. Imports: 186 called, 62 with a
+live caller. B7 (`b7_status.py`): ours 2,497, work left 3,961 (Wrapped
+103, with a row 503, no row yet 3,355), from 4,006.
