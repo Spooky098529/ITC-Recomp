@@ -146,6 +146,8 @@ set(ITC_SOURCES
     src/hooks/scene_loaders.cpp
     src/scene_loaders/pools.cpp
     src/scene_loaders/loads.cpp
+    src/hooks/car_models.cpp
+    src/car_models/load_slots.cpp
     src/hooks/collision.cpp
     src/collision/shapes.cpp
     src/collision/boxes.cpp
@@ -198,6 +200,7 @@ set(ITC_SOURCES
     src/models/xpr.cpp
     src/models/texture_provider.cpp
     src/models/model.cpp
+    src/models/part_model.cpp
     src/models/model_load.cpp
     src/hooks/shader_objects.cpp
     src/shader_objects/shader_objects.cpp
@@ -283,6 +286,7 @@ set(ITC_SOURCES
     src/harnesses/vehicle.cpp
     src/harnesses/app_states.cpp
     src/harnesses/scene_loaders.cpp
+    src/harnesses/car_models.cpp
     src/harnesses/collision.cpp
     src/harnesses/collision_world.cpp
     src/harnesses/collision_world_walls.cpp

@@ -25,6 +25,7 @@
 #include "models/memory_blocks.h"
 #include "models/model.h"
 #include "models/model_load.h"
+#include "models/part_model.h"
 #include "models/texture_provider.h"
 #include "models/xpr.h"
 #include "model_animation/model_animation.h"
@@ -46,7 +47,8 @@ ITC_FLAG_BOOL(native_models, true, "ITC",
               "adapter: only the constructor calls it), TextureProvider::TextureProvider "
               "sub_82594850 and ~TextureProvider sub_825943E0; Model::Model sub_825948C0, "
               "Model::Release sub_82594970 and Model::~Model sub_82594F58, their members' "
-              "plain C++ called directly; Model::MaterialCount sub_82594AD8, Model::Material "
+              "plain C++ called directly, and the car part model's sub_820CE928 and "
+              "sub_820CE990 over them; the part model's sub_820CE9C8; Model::MaterialCount sub_82594AD8, Model::Material "
               "sub_82594B20, ShaderFile::Parse sub_822A8568, VertexShader::CopyHeader sub_822A9FD8 and "
               "PixelShader::CopyHeader sub_822A9EA8 (in src/shader_objects/), "
               "TextureHeader::Relocate sub_8235A990 (with sub_822A5B68; no adapter: only "
@@ -222,6 +224,33 @@ extern "C" REX_FUNC(sub_825948C0) {
 // leaves it (XPR::Release's, XPR::~XPR's).
 ITC_MODELS_LIFETIME(82594970, ModelRelease)
 ITC_MODELS_LIFETIME(82594F58, ModelDestruct)
+
+// --- The car part model ---
+
+// The part model's constructor: r3 = the model (left).
+extern "C" REX_FUNC(sub_820CE928) {
+  REX_FUNC_PROLOGUE();
+  if (NativeLifetime()) {
+    ctx.fpscr.disableFlushMode();  // as Model::Model's adapter
+    if (models::PartModelConstruct(base, ctx.r3.u32)) {
+      return;
+    }
+  }
+  __imp__sub_820CE928(ctx, base);
+}
+
+// The part model's destructor: r3 = the model; r3 as Model::~Model leaves it.
+ITC_MODELS_LIFETIME(820CE990, PartModelDestruct)
+
+// sub_820CE9C8: r3 = the model (left).
+extern "C" REX_FUNC(sub_820CE9C8) {
+  REX_FUNC_PROLOGUE();
+  if (!ITC_FLAG(native_models)) {
+    __imp__sub_820CE9C8(ctx, base);
+    return;
+  }
+  models::PartModelClear(base, ctx.r3.u32);
+}
 
 // --- The materials and the shared shaders ---
 
