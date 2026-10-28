@@ -25,6 +25,31 @@ When the user has reviewed a run's section, its heading gets
   `0x82001030`, the codec vtables and layout; notes in `heap.md` and
   `car-models.md`; one lead added (`XGCopySurface`'s 24 per-format
   routines, none seen in play).
+- Texture compression, migration 1 (cdf8494..af2c1ee): 29 rows in
+  `texture-compression.md` (24 ours, 18 Native; 5 with notes only);
+  map correction in `XGCompressSurface`'s row (the YUV formats
+  `0x1A20004B`/`4C` go with flags 4). Code in
+  `src/texture_compression/` (strict-float options), adapters in
+  `src/hooks/texture_compression.cpp`; allocation through
+  `src/memory/heap.h`, the native path only while the native heap is
+  active. Handed to the originals (never in play): DXN/CTX1
+  destinations, sources copied or swapped first, the YUV formats, the
+  eight filters, `CopyBlocks`, the color key's slot 3, sRGB, DXT block
+  pointers other than DXT4/5's. For review: (1) stack leftovers:
+  `XGCompressSurface` keeps its two descriptions and blit object on
+  the guest stack at the original's offsets, and the color encoder's
+  adapter writes the two words the original stores in its caller's
+  frame; but a few words the original's callees leave below the stack
+  pointer after returning (the color encoder's r6/r3 slots, the
+  premultiplied pixel copy, `EncodeRow`'s 0,0,0,1 padding table) aren't
+  written natively (no caller reads them); (2) `FitEndpoints`' negative
+  index path near a multiple of -2^28 would read into `EncodeBlock`'s
+  frame in the original (pixels hundreds of millions of steps out of
+  range; in the row); (3) `EncodeRow` on a box cut on the right reads
+  leftover heap memory in the original (the harness primes the heap; in
+  play the box is the whole surface). The vinyl's detail couldn't be
+  judged from the dumps (cars too far); the `XGCompressSurface` harness
+  compresses a full 1024x1024 sheet byte for byte.
 
 ## Run 2026-10-27 22:31 (`b7-loop-27-10-26`)
 
