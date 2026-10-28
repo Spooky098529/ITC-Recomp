@@ -150,6 +150,7 @@ set(ITC_SOURCES
     src/hooks/car_models.cpp
     src/car_models/load_slots.cpp
     src/car_models/car_model.cpp
+    src/car_models/vinyl.cpp
     src/hooks/save_data.cpp
     src/save_data/save_data.cpp
     src/hooks/texture_compression.cpp
