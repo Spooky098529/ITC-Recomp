@@ -71,6 +71,42 @@ std::optional<uint32_t> CarPartsRelease(uint8_t* base, uint32_t parts);
 // original.
 std::optional<uint32_t> CarPartsLoadsDestruct(uint8_t* base, uint32_t loads);
 
+// --- The cockpit body (pool 2) and the interior (pool 3) ---
+
+constexpr uint32_t kCockpitVtable = 0x82005020;
+constexpr uint32_t kCockpitLoads = 176;
+constexpr uint32_t kInteriorVtable = 0x8200509C;
+
+// Cockpit::Cockpit (sub_820D63A0): PoolNode::PoolNode (r4 = the list), +20
+// = -1, the vtable, +16 = 0; CockpitLoads::CockpitLoads (+176); +3500 = 1.0,
+// +24 = 0, +3508 = [0x826C2E40]; Skeleton::FreeNodeValues (+208); the
+// cockpit record's defaults (sub_820D34B8, +28); +3472 = 0, +3488 = (0, 0,
+// 0, 1), +3504 = 0; the node file's slot (+176) reset; the two XPR2s' slots
+// (+400 + 24i) reset, XPR::Release (+448 + 24i) and the providers' (+496 +
+// 20i) slot 2; the six parts' slots (+536 + 24i) reset, Model::Release and
+// PartModel::Clear (+688 + 464i). The 0.0 and 1.0 the words at 0x82000A34
+// and 0x82000A30. False, with nothing done, where a callee would go to the
+// original (the providers' slot 2 not ClearAll included).
+bool CockpitConstruct(uint8_t* base, uint32_t cockpit, uint32_t list);
+
+// Cockpit::Release (sub_820D6238): the node file's slot (+176)
+// ReleaseBuffer and Reset, Skeleton::FreeNodeValues (+208); the XPR2s'
+// slots (+400 + 24i) released and reset, XPR::Release (+448 + 24i), the
+// providers' (+496 + 20i) slot 2; +3508 = 0, +24 = 0; the record's defaults
+// (+28); +3472 = 0, +3488 = (0, 0, 0, 1), +3504 = 0; the six parts' slots
+// (+536 + 24i) released and reset. Returns the original's r3 (the last
+// slot, +656); nullopt, with nothing done, where a callee would go to the
+// original.
+std::optional<uint32_t> CockpitRelease(uint8_t* base, uint32_t cockpit);
+
+// Interior::Interior (sub_820D78B8): PoolNode::PoolNode (r4 = the list),
+// +16 = 0, the vtable, +20 = -1; six part models (PartModel::PartModel,
+// +304 + 464i); +24 = 0; the six slots (+160 + 24i) reset, Model::Release
+// and PartModel::Clear on the models; the interior record's defaults
+// (sub_820D3840, +28); +3088 = 0, +3092 = [0x826C2E40]. False, with nothing
+// done, where a callee would go to the original.
+bool InteriorConstruct(uint8_t* base, uint32_t interior, uint32_t list);
+
 // --- Pool 4's object ---
 
 // Pool4Object::Reset (sub_820D6948): +24 = 0; the record's defaults

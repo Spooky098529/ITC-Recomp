@@ -918,6 +918,163 @@ void Parts(Context& h, Random& r, uint32_t block) {
   Put(h.base, sl::kFirstSet, saved_set);
 }
 
+// --- The cockpit body and the interior ---
+//
+// As the car parts' cases: the cockpit (or the interior) at the block's
+// +0x400, its list at +0x2000, the blocks' headers at +0x3000.
+void Cockpits(Context& h, Random& r, uint32_t block) {
+  if (!hooks::ModelsHostLock()) {
+    ITC_LOG_WARN("harness: scene_loaders: --native_models was off at start-up: the cockpit's "
+                 "cases skipped");
+    return;
+  }
+  std::lock_guard<std::recursive_mutex> lock(models::MemoryBlocksMutex());
+  constexpr uint32_t kBytes = 0x4000;
+  const uint32_t object = block + 0x400;
+  const uint32_t loads = object + sl::kCockpitLoads;
+  const uint32_t list = block + 0x2000;
+  const uint32_t headers = block + 0x3000;
+  const uint32_t saved_set = guest::LoadU32(h.base, sl::kFirstSet);
+  enum Kind { kLoadsConstruct, kConstruct, kRelease, kLoadsDestruct, kInterior };
+  struct Function {
+    const char* name;
+    GuestFunction recompiled;
+    GuestFunction native;
+    Kind kind;
+  };
+  const Function functions[] = {
+      {"CockpitLoads::CockpitLoads (sub_820D6010)", __imp__sub_820D6010,
+       hooks::SceneLoadersCockpitLoadsConstruct, kLoadsConstruct},
+      {"Cockpit::Cockpit (sub_820D63A0, on the game's list)", __imp__sub_820D63A0,
+       hooks::SceneLoadersCockpitConstruct, kConstruct},
+      {"Cockpit::Release (sub_820D6238, on the game's list)", __imp__sub_820D6238,
+       hooks::SceneLoadersCockpitRelease, kRelease},
+      {"CockpitLoads::~CockpitLoads (sub_820D6090, on the game's list)", __imp__sub_820D6090,
+       hooks::SceneLoadersCockpitLoadsDestruct, kLoadsDestruct},
+      {"Interior::Interior (sub_820D78B8, on the game's list)", __imp__sub_820D78B8,
+       hooks::SceneLoadersInteriorConstruct, kInterior},
+  };
+  // The texture providers the objects hold: the loads' two and each part
+  // model's (the cockpit's at the loads' +512, the interior's at its +304).
+  auto providers = [&](Kind kind) {
+    std::vector<uint32_t> list_of;
+    if (kind == kInterior) {
+      for (uint32_t i = 0; i < 6; i++) {
+        list_of.push_back(object + 304 + sl::kPartModelBytes * i + models::kModelTextures);
+      }
+      return list_of;
+    }
+    for (uint32_t offset : sl::kCarModelLoadsProviders) {
+      list_of.push_back(loads + offset);
+    }
+    for (uint32_t i = 0; i < 6; i++) {
+      list_of.push_back(loads + sl::kCockpitLoadsParts + sl::kPartModelBytes * i +
+                        models::kModelTextures);
+    }
+    return list_of;
+  };
+  for (const Function& f : functions) {
+    Results results(f.name);
+    for (int c = 0; c < 24; c++) {
+      const uint64_t seed = r.Next();
+      const uint32_t set = uint32_t(r.Next());
+      Outputs out[2];
+      for (int v = 0; v < 2; v++) {
+        Random in(seed);
+        RandomBytes(h.base, block, kBytes, in);
+        Put(h.base, sl::kFirstSet, set);
+        std::unordered_set<uint32_t> held;
+        std::vector<uint32_t> storages;
+        MakeList(h.base, list, list + 0x100, f.kind == kRelease ? 0 : in.Below(4));
+        if (f.kind == kRelease || f.kind == kLoadsDestruct) {
+          const bool made = f.kind == kRelease ? sl::CockpitConstruct(h.base, object, list)
+                                               : sl::CockpitLoadsConstruct(h.base, loads);
+          if (!made) {
+            ITC_LOG_WARN("harness: scene_loaders: the cockpit's constructor refused");
+            return;
+          }
+          for (const uint32_t provider : providers(f.kind)) {
+            storages.push_back(guest::LoadU32(
+                h.base, provider + models::kTextureProviderVector + models::kVectorFirst));
+          }
+          // The XPRs' blocks, and one part model's (at most eight nodes).
+          for (uint32_t i = 0; i < 2; i++) {
+            const uint32_t xpr = loads + sl::kCarModelLoadsXprs[i];
+            for (uint32_t b = 0; b < 2; b++) {
+              const uint32_t words[3] = {uint32_t(in.Next()), uint32_t(in.Next()),
+                                         uint32_t(in.Next())};
+              Put(h.base, xpr + 8 * b,
+                  pending_frees::WriteBlock(h.base, in.Below(3), headers + 32 * i + 16 * b,
+                                            words));
+            }
+          }
+          if (f.kind == kLoadsDestruct && in.Below(2) == 0) {
+            PutBlocks(h.base, loads + sl::kCockpitLoadsParts + sl::kPartModelBytes * in.Below(6),
+                      headers + 0x100, in);
+          }
+        }
+        if (f.kind == kRelease) {
+          static constexpr uint32_t kSlots[] = {176, 400, 424, 536, 560, 584, 608, 632, 656};
+          for (const uint32_t offset : kSlots) {
+            Put(h.base, object + offset + 12, in.Below(4) == 0 ? 1 : 0);
+            uint32_t pages = 0;
+            if (in.Below(3) == 0) {
+              pages = memory::AllocPages(1 + in.Below(0x4000), 4096);
+              held.insert(pages);
+            }
+            Put(h.base, object + offset + 16, pages);
+          }
+          uint32_t values = 0;
+          if (in.Below(2) == 0) {
+            values = memory::Alloc(48, 0);
+            held.insert(values);
+          }
+          Put(h.base, object + 208 + 176, values);
+        }
+        const pending_frees::ListState was = pending_frees::SaveList(h.base);
+        PPCContext t = CallContext(h);
+        t.r1.u64 &= ~0xFull;
+        t.r3.u64 = f.kind == kLoadsConstruct || f.kind == kLoadsDestruct ? loads : object;
+        t.r4.u64 = list;
+        RunSide(v, f.recompiled, f.native, t, h.base);
+        pending_frees::TakeAddedNodes(h.base, was, out[v]);
+        for (const uint32_t address : held) {
+          const bool alive = memory::IsPages(address) || memory::IsHeapBlock(address);
+          out[v].Word(alive);
+          if (memory::IsPages(address)) {
+            memory::FreePages(address);
+          } else if (alive) {
+            memory::Free(address);
+          }
+        }
+        if (f.kind == kLoadsDestruct) {
+          for (const uint32_t storage : storages) {
+            const bool alive = storage != 0 && memory::IsHeapBlock(storage);
+            out[v].Word(alive);
+            if (alive) {
+              memory::crt::OperatorDelete(storage);
+            }
+            held.insert(storage);
+          }
+        } else {
+          for (const uint32_t provider : providers(f.kind)) {
+            TakeProvider(h.base, provider, out[v]);
+          }
+        }
+        held.erase(0);
+        Mark(h.base, block, kBytes, held);
+        out[v].Bytes(Read(h.base, block, kBytes));
+        out[v].Word(guest::LoadU32(h.base, sl::kFirstSet));
+        out[v].Word(t.r3.u32);
+        out[v].Word(uint32_t(t.r3.u64 >> 32));
+      }
+      results.Check(out[0], out[1], fmt::format("case {}", c));
+    }
+    results.Report();
+  }
+  Put(h.base, sl::kFirstSet, saved_set);
+}
+
 }  // namespace
 
 void SceneLoaders(Context& h) {
@@ -931,6 +1088,7 @@ void SceneLoaders(Context& h) {
   Loads(h, r, block);
   Resets(h, r, block);
   Parts(h, r, block);
+  Cockpits(h, r, block);
   memory::Free(allocation);
 }
 

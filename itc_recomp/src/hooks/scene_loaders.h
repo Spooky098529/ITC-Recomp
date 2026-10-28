@@ -79,4 +79,17 @@ void SceneLoadersCarPartsRelease(PPCContext& ctx, uint8_t* base);
 void SceneLoadersCarPartsLoadsDestruct(PPCContext& ctx, uint8_t* base);
 void SceneLoadersPool4Reset(PPCContext& ctx, uint8_t* base);
 
+// The cockpit body's and the interior's lifetimes, only while
+// hooks::ModelsNativeLifetime(): CockpitLoads::CockpitLoads sub_820D6010 (r3
+// = the loads, left; no adapter: only Cockpit::Cockpit calls it),
+// Cockpit::Cockpit sub_820D63A0 and Interior::Interior sub_820D78B8 (r3 =
+// the object, left; r4 = the list), Cockpit::Release sub_820D6238 (r3 = the
+// cockpit) and CockpitLoads::~CockpitLoads sub_820D6090 (r3 = the loads): r3
+// as the original leaves it.
+void SceneLoadersCockpitLoadsConstruct(PPCContext& ctx, uint8_t* base);
+void SceneLoadersCockpitConstruct(PPCContext& ctx, uint8_t* base);
+void SceneLoadersCockpitRelease(PPCContext& ctx, uint8_t* base);
+void SceneLoadersCockpitLoadsDestruct(PPCContext& ctx, uint8_t* base);
+void SceneLoadersInteriorConstruct(PPCContext& ctx, uint8_t* base);
+
 }  // namespace hooks

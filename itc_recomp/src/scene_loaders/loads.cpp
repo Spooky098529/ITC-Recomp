@@ -9,6 +9,8 @@
 #include "memory/heap.h"
 #include "model_animation/model_animation.h"
 #include "models/memory_blocks.h"
+#include "models/model.h"
+#include "models/part_model.h"
 #include "models/texture_provider.h"
 #include "models/xpr.h"
 #include "scenery_lists/scenery_lists.h"
@@ -35,6 +37,11 @@ bool ProviderDestructible(uint8_t* base, uint32_t provider) {
   return storage == 0 || memory::IsHeapBlock(storage);
 }
 
+// The members CarModelLoads, CockpitLoads and TrafficLoads share, made and
+// destroyed with their checks made.
+void ConstructMembers(uint8_t* base, uint32_t loads);
+void DestructMembers(uint8_t* base, uint32_t loads);
+
 }  // namespace
 
 bool CarModelLoadsConstruct(uint8_t* base, uint32_t loads) {
@@ -42,6 +49,13 @@ bool CarModelLoadsConstruct(uint8_t* base, uint32_t loads) {
   if (!models::CanAllocatePointers(base, models::kTextureProviderSlots)) {
     return false;
   }
+  ConstructMembers(base, loads);
+  return true;
+}
+
+namespace {
+
+void ConstructMembers(uint8_t* base, uint32_t loads) {
   model_animation::SkeletonConstruct(base, loads + kCarModelLoadsSkeleton);
   for (uint32_t offset : kCarModelLoadsXprs) {
     models::XprConstruct(base, loads + offset);
@@ -50,18 +64,40 @@ bool CarModelLoadsConstruct(uint8_t* base, uint32_t loads) {
     Require(models::TextureProviderConstruct(base, loads + offset, -1).has_value(),
             "TextureProvider::TextureProvider");
   }
+}
+
+}  // namespace
+
+bool CarModelLoadsDestructible(uint8_t* base, uint32_t loads) {
+  // XPR::Release checks for two nodes each time.
+  return ProviderDestructible(base, loads + kCarModelLoadsProviders[0]) &&
+         ProviderDestructible(base, loads + kCarModelLoadsProviders[1]) &&
+         models::PendingFreesHaveRoom(base, 4) &&
+         model_animation::SkeletonDestructible(base, loads + kCarModelLoadsSkeleton);
+}
+
+bool ProvidersClearAll(uint8_t* base, uint32_t loads) {
+  for (uint32_t offset : kCarModelLoadsProviders) {
+    const uint32_t vtable = guest::LoadU32(base, loads + offset);
+    if (guest::LoadU32(base, vtable + 8) != kTextureProviderClearAll) {
+      return false;
+    }
+  }
   return true;
 }
 
 bool CarModelLoadsDestruct(uint8_t* base, uint32_t loads) {
   ITC_NATIVE_RUNNING("sub_820D3E40 CarModelLoads::~CarModelLoads");
-  // XPR::Release checks for two nodes each time.
-  if (!ProviderDestructible(base, loads + kCarModelLoadsProviders[0]) ||
-      !ProviderDestructible(base, loads + kCarModelLoadsProviders[1]) ||
-      !models::PendingFreesHaveRoom(base, 4) ||
-      !model_animation::SkeletonDestructible(base, loads + kCarModelLoadsSkeleton)) {
+  if (!CarModelLoadsDestructible(base, loads)) {
     return false;
   }
+  DestructMembers(base, loads);
+  return true;
+}
+
+namespace {
+
+void DestructMembers(uint8_t* base, uint32_t loads) {
   Require(models::TextureProviderDestruct(base, loads + kCarModelLoadsProviders[1]).has_value(),
           "TextureProvider::~TextureProvider");
   Require(models::TextureProviderDestruct(base, loads + kCarModelLoadsProviders[0]).has_value(),
@@ -70,7 +106,46 @@ bool CarModelLoadsDestruct(uint8_t* base, uint32_t loads) {
   Require(models::XprDestruct(base, loads + kCarModelLoadsXprs[0]).has_value(), "XPR::~XPR");
   Require(model_animation::SkeletonDestruct(base, loads + kCarModelLoadsSkeleton),
           "Skeleton::~Skeleton");
+}
+
+}  // namespace
+
+bool CockpitLoadsConstruct(uint8_t* base, uint32_t loads) {
+  ITC_NATIVE_RUNNING("sub_820D6010 CockpitLoads::CockpitLoads");
+  if (!models::CanAllocatePointers(base, models::kTextureProviderSlots)) {
+    return false;
+  }
+  ConstructMembers(base, loads);
+  for (uint32_t i = 0; i < 6; i++) {
+    Require(models::PartModelConstruct(base, loads + kCockpitLoadsParts +
+                                                 models::kPartModelBytes * i),
+            "PartModel::PartModel");
+  }
   return true;
+}
+
+std::optional<uint32_t> CockpitLoadsDestruct(uint8_t* base, uint32_t loads) {
+  ITC_NATIVE_RUNNING("sub_820D6090 CockpitLoads::~CockpitLoads");
+  uint64_t nodes = 4;  // the XPRs'
+  for (uint32_t i = 0; i < 6; i++) {
+    const uint32_t model = loads + kCockpitLoadsParts + models::kPartModelBytes * i;
+    if (!models::ModelMembersDestructible(base, model)) {
+      return std::nullopt;
+    }
+    nodes += models::ModelReleaseNodes(base, model);
+  }
+  if (nodes > 0x3FFFFFFFu || !models::PendingFreesHaveRoom(base, uint32_t(nodes)) ||
+      !CarModelLoadsDestructible(base, loads)) {
+    return std::nullopt;
+  }
+  for (uint32_t i = 6; i-- > 0;) {
+    Require(models::PartModelDestruct(base, loads + kCockpitLoadsParts +
+                                                models::kPartModelBytes * i)
+                .has_value(),
+            "PartModel::~PartModel");
+  }
+  DestructMembers(base, loads);
+  return loads + kCarModelLoadsSkeleton;
 }
 
 bool CarModelLoadsResettable(uint8_t* base, uint32_t loads) {
@@ -78,13 +153,7 @@ bool CarModelLoadsResettable(uint8_t* base, uint32_t loads) {
   if (values != 0 && !memory::IsHeapBlock(values)) {
     return false;
   }
-  for (uint32_t offset : kCarModelLoadsProviders) {
-    const uint32_t vtable = guest::LoadU32(base, loads + offset);
-    if (guest::LoadU32(base, vtable + 8) != kTextureProviderClearAll) {
-      return false;
-    }
-  }
-  return models::PendingFreesHaveRoom(base, 4);
+  return ProvidersClearAll(base, loads) && models::PendingFreesHaveRoom(base, 4);
 }
 
 std::optional<uint32_t> CarModelLoadsReset(uint8_t* base, uint32_t loads) {

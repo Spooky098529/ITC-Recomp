@@ -25,7 +25,10 @@ ITC_FLAG_BOOL(native_scene_loaders, true, "ITC",
               "CarModelLoads::CarModelLoads sub_820D3DE0, ~CarModelLoads sub_820D3E40 and Reset sub_820D3B58 (no adapter: only CarModel::Reset calls it), "
               "CarModel::Reset sub_820D3E98, CarPartsLoads::CarPartsLoads sub_820D6F88 (no adapter: only CarParts::CarParts calls it) and "
               "~CarPartsLoads sub_820D6FE8, CarParts::CarParts sub_820D7428 and Release "
-              "sub_820D6D00, Pool4Object::Reset sub_820D6948) natively instead of through the "
+              "sub_820D6D00, Pool4Object::Reset sub_820D6948, CockpitLoads::CockpitLoads sub_820D6010 (no "
+              "adapter: only Cockpit::Cockpit calls it) and ~CockpitLoads sub_820D6090, "
+              "Cockpit::Cockpit sub_820D63A0 and Release sub_820D6238, Interior::Interior "
+              "sub_820D78B8) natively instead of through the "
               "translated code (the same writes; checked by --run_harnesses=scene_loaders)");
 
 namespace hooks {
@@ -173,6 +176,29 @@ void SceneLoadersCarPartsConstruct(PPCContext& ctx, uint8_t* base) {
   __imp__sub_820D7428(ctx, base);
 }
 
+ITC_SCENE_LOADERS_RESET(SceneLoadersCockpitRelease, 820D6238, CockpitRelease)
+ITC_SCENE_LOADERS_RESET(SceneLoadersCockpitLoadsDestruct, 820D6090, CockpitLoadsDestruct)
+
+// The constructors: the plain C++ (r3 left), or the original where it
+// refuses.
+#define ITC_SCENE_LOADERS_CONSTRUCT(name, address, call)  \
+  void name(PPCContext& ctx, uint8_t* base) {              \
+    if (hooks::ModelsNativeLifetime()) {                   \
+      ctx.fpscr.disableFlushMode();                        \
+      if (sl::call) {                                      \
+        return;                                            \
+      }                                                    \
+    }                                                      \
+    __imp__sub_##address(ctx, base);                       \
+  }
+
+ITC_SCENE_LOADERS_CONSTRUCT(SceneLoadersCockpitLoadsConstruct, 820D6010,
+                            CockpitLoadsConstruct(base, ctx.r3.u32))
+ITC_SCENE_LOADERS_CONSTRUCT(SceneLoadersCockpitConstruct, 820D63A0,
+                            CockpitConstruct(base, ctx.r3.u32, ctx.r4.u32))
+ITC_SCENE_LOADERS_CONSTRUCT(SceneLoadersInteriorConstruct, 820D78B8,
+                            InteriorConstruct(base, ctx.r3.u32, ctx.r4.u32))
+
 }  // namespace hooks
 
 // The adapters: the register steps above, or the originals with the flag
@@ -180,7 +206,8 @@ void SceneLoadersCarPartsConstruct(PPCContext& ctx, uint8_t* base) {
 // and XPR::RecordName have none: each has one caller, made native here, whose
 // plain C++ calls theirs; nor do CarModelLoads::Reset (only CarModel::Reset
 // calls it) and CarPartsLoads::CarPartsLoads (only CarParts::CarParts): their
-// register steps stay for the harness.
+// register steps stay for the harness; nor does CockpitLoads::CockpitLoads
+// (only Cockpit::Cockpit).
 
 #define ITC_SCENE_LOADERS(address, step)   \
   extern "C" REX_FUNC(sub_##address) {     \
@@ -212,3 +239,7 @@ ITC_SCENE_LOADERS(820D7428, SceneLoadersCarPartsConstruct)
 ITC_SCENE_LOADERS(820D6D00, SceneLoadersCarPartsRelease)
 ITC_SCENE_LOADERS(820D6FE8, SceneLoadersCarPartsLoadsDestruct)
 ITC_SCENE_LOADERS(820D6948, SceneLoadersPool4Reset)
+ITC_SCENE_LOADERS(820D63A0, SceneLoadersCockpitConstruct)
+ITC_SCENE_LOADERS(820D6238, SceneLoadersCockpitRelease)
+ITC_SCENE_LOADERS(820D6090, SceneLoadersCockpitLoadsDestruct)
+ITC_SCENE_LOADERS(820D78B8, SceneLoadersInteriorConstruct)

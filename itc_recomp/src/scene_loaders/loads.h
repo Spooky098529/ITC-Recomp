@@ -34,6 +34,29 @@ bool CarModelLoadsConstruct(uint8_t* base, uint32_t loads);
 // original (a provider's storage or the skeleton's arrays not from the
 // allocation layer, no room in the pending frees for the XPRs' blocks).
 bool CarModelLoadsDestruct(uint8_t* base, uint32_t loads);
+// Whether CarModelLoadsDestruct runs natively (its checks, nothing changed;
+// the pending frees for the XPRs' four nodes included).
+bool CarModelLoadsDestructible(uint8_t* base, uint32_t loads);
+// The same members' release in the cockpit's and the traffic body's loads
+// (the same layout): whether each provider's slot 2 is ClearAll.
+bool ProvidersClearAll(uint8_t* base, uint32_t loads);
+
+// CockpitLoads (the cockpit's +176): CarModelLoads' members at the same
+// offsets, then six part models from +512.
+constexpr uint32_t kCockpitLoadsParts = 512;
+
+// CockpitLoads::CockpitLoads (sub_820D6010): Skeleton::Skeleton (+32),
+// XPR::XPR (+272, +296), TextureProvider::TextureProvider (+320, +340), the
+// six part models (PartModel::PartModel, +512 + 464i). False, with nothing
+// done, where a constructor would go to the original.
+bool CockpitLoadsConstruct(uint8_t* base, uint32_t loads);
+
+// CockpitLoads::~CockpitLoads (sub_820D6090): PartModel::~PartModel on the
+// six part models (last first), the providers' destructors (+340, +320),
+// XPR::~XPR (+296, +272), Skeleton::~Skeleton (+32). Returns the original's
+// r3 (the skeleton, +32); nullopt, with nothing done, where a destructor
+// would go to the original.
+std::optional<uint32_t> CockpitLoadsDestruct(uint8_t* base, uint32_t loads);
 
 // The texture provider's slot 2 (TextureProvider::ClearAll, sub_82594328),
 // the one the loads' resets call through each provider's vtable.
