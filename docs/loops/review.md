@@ -80,6 +80,11 @@ When the user has reviewed a run's section, its heading gets
   `sub_8209DFA8` under `--native_archive`; it and the open by name stay
   adapters calling B4's `File::` adapters and the read-error report
   through `ctx`.
+- The file layer's validation added `_vsnprintf`'s missing print
+  (a2eadab). In `Sprintf`, `Vsnprintf`, `_output_l` and `Path::Build`
+  the print comes after the checks that hand the call back to the
+  original (it logs only when the native path runs); `Path::Build`
+  has it at two places.
 
 ## Run 2026-10-28 08:36 (`b7-loop-28-10-26`)
 

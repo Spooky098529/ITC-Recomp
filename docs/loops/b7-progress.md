@@ -13,24 +13,17 @@ file's history. What's left to see in a drive, from every run:
 - Limit for this run: 3 subsystems.
 - Subsystem 1 of 3 done: the archive (below). Recorded in the plan's
   table and boundary log.
-- Subsystem 2 of 3: the file layer (two leads taken together: the
-  file object `sub_820A6A00`, `sub_820A6A40` and the path objects
-  `sub_82593C28`, `sub_82593C48`, `sub_82593CA0`; ready, and blocking
-  the archive's loose read). Mapped (f053e6c): `file-layer.md`, 21
-  new rows (11 in play; shared rows stay in `files-and-saves.md`,
-  `sound-cues.md`, `movies.md`, `c-runtime.md`), 5 ready groups;
-  blocked by sprintf (to follow swprintf's precedent,
-  `src/c_runtime/wide_format.cpp`). Map check passed. Migration 1
-  done (47a7c1d..edea212): the file and path objects, `Path::Build`,
-  `GamePath::SetGame`, the open by name under `--native_file_layer`;
-  sprintf, `_vsnprintf`, `_vsnprintf_l`, `_output_l` under
-  `--native_c_runtime`; the archive's loose read under
-  `--native_archive`; 7 adapters removed; 38 s, 0 errors, every
-  harness 0 differing; nothing ready left. Step: validation (agent
-  running).
+- Subsystem 2 of 3 done: the file layer (below). Recorded in the
+  plan's table and boundary log.
+- Subsystem 3 of 3: (next lead being picked).
 
 ## Done
 
+- The file layer: `file-layer.md` (with rows in `c-runtime.md`,
+  `files-and-saves.md`), 17 native in one migration (with sprintf and
+  the archive's loose read), 7 adapters removed;
+  `--native_file_layer`; f053e6c, 47a7c1d..edea212, print a2eadab.
+  Validated (`itc_2291`, `itc_2293`): four to drive.
 - The archive: `archive.md` (with shared rows in `files-and-saves.md`,
   `video-output.md`), 25 native in two migrations, 8 adapters removed,
   the four semaphores host ones (the user's call); `--native_archive`;
@@ -66,6 +59,8 @@ file's history. What's left to see in a drive, from every run:
   known 521, unknown 3272).
 - After the file layer's migration 1: ours 2582, work left 3879
   (wrapped 103, known 504, unknown 3272).
+- After its validation (`itc_2291`: race 8 s, 0 errors, every harness
+  0 differing but the expected groups): ours 2582, work left 3879.
 
 ## Stopped
 
