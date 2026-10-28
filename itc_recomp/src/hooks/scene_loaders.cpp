@@ -357,8 +357,8 @@ void SceneLoadersCreateA(PPCContext& ctx, uint8_t* base) {
 // WheelsLoads::WheelsLoads, Wheels::Reset, ~Wheels, ~WheelsLoads,
 // CarModel::Reset, CarModelLoads::CarModelLoads and ~CarModelLoads,
 // ~CarModel, ~CarParts, ~CarPartsLoads, ~Cockpit, ~CockpitLoads,
-// TrafficLoads::TrafficLoads, TrafficCar::Reset, ~TrafficCar and
-// ~TrafficLoads.
+// TrafficLoads::TrafficLoads, TrafficCar::Reset, ~TrafficCar,
+// ~TrafficLoads, and the seven constructors ScenePools::CreateA calls.
 
 #define ITC_SCENE_LOADERS(address, step)   \
   extern "C" REX_FUNC(sub_##address) {     \
@@ -385,21 +385,14 @@ ITC_SCENE_LOADERS(820D6EB8, SceneLoadersPartsWalkMaterials)
 ITC_SCENE_LOADERS(820D7790, SceneLoadersInteriorIsLoaded)
 ITC_SCENE_LOADERS(820CE800, SceneLoadersNameMatches)
 ITC_SCENE_LOADERS(820D09B8, SceneLoadersXprFindByName)
-ITC_SCENE_LOADERS(820D7428, SceneLoadersCarPartsConstruct)
 ITC_SCENE_LOADERS(820D6D00, SceneLoadersCarPartsRelease)
-ITC_SCENE_LOADERS(820D63A0, SceneLoadersCockpitConstruct)
 ITC_SCENE_LOADERS(820D6238, SceneLoadersCockpitRelease)
-ITC_SCENE_LOADERS(820D78B8, SceneLoadersInteriorConstruct)
-ITC_SCENE_LOADERS(820D6A70, SceneLoadersPool4Construct)
 ITC_SCENE_LOADERS(820D6A20, SceneLoadersPool4Release)
 ITC_SCENE_LOADERS(820D6BC0, SceneLoadersPool4DeletingDestruct)
-ITC_SCENE_LOADERS(820D9570, SceneLoadersWheelsConstruct)
 ITC_SCENE_LOADERS(820D8E68, SceneLoadersWheelsRelease)
 ITC_SCENE_LOADERS(820D95E8, SceneLoadersWheelsDeletingDestruct)
-ITC_SCENE_LOADERS(820D5890, SceneLoadersCarModelConstruct)
 ITC_SCENE_LOADERS(820D5988, SceneLoadersCarModelDeletingDestruct)
 ITC_SCENE_LOADERS(820D74C0, SceneLoadersCarPartsDeletingDestruct)
 ITC_SCENE_LOADERS(820D6798, SceneLoadersCockpitDeletingDestruct)
-ITC_SCENE_LOADERS(820D8908, SceneLoadersTrafficConstruct)
 ITC_SCENE_LOADERS(820D7B90, SceneLoadersTrafficRelease)
 ITC_SCENE_LOADERS(820D89B8, SceneLoadersTrafficDeletingDestruct)
