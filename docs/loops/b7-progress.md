@@ -34,6 +34,12 @@ file's history. What's left to see in a drive, from every run:
   fallback). `app-states.md` 56 of 56 ours. Validated (`itc_2012`: 28
   of 28 harness lines, 18 ran in the attract race, 10 in the replay
   `itc_2013`, ok; nothing to drive). Finished.
+- Subsystem 2 of 3: the car code's skeletons (`sub_820D3DE0`,
+  `sub_820D3E40`, `sub_820D3B58`, `sub_820D6010`, `sub_820D6090`,
+  `sub_820D6238`, `sub_820D63A0`, `sub_820D7C40`, `sub_820D7CC0`,
+  `sub_820D7AB0`, `sub_820D02D0`, `sub_820D6528`, `sub_820D8430`;
+  `820D0000`-`820D8908`), picked as closest to ready (31 functions in
+  ready groups of 49 left). Step: mapping agent running.
 
 ## Done
 
