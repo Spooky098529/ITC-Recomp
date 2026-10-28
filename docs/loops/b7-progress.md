@@ -13,7 +13,10 @@ file's history. What's left to see in a drive, from every run:
 - Limit for this run: 3 subsystems.
 - Subsystem 1 of 3 done: the archive (below). Recorded in the plan's
   table and boundary log.
-- Subsystem 2 of 3: (next lead being picked).
+- Subsystem 2 of 3: the file layer (two leads taken together: the
+  file object `sub_820A6A00`, `sub_820A6A40` and the path objects
+  `sub_82593C28`, `sub_82593C48`, `sub_82593CA0`; ready, and blocking
+  the archive's loose read). Step: mapping (agent running).
 
 ## Done
 
