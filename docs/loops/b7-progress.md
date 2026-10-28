@@ -44,7 +44,16 @@ file's history. What's left to see in a drive, from every run:
   scene pool set's seven loading classes, not one skeleton class. Map
   checked (0 errors, 78 of 78 in play, 16 ready groups, no kernel calls:
   `VirtualAlloc` only through its wrapper, routed to the allocation
-  layer). Step: migration agent 1 running.
+  layer). Migration 1 done (4b47c12, dfbc5a0: the leaves, `ScenePools::MakeA`,
+  the pool node, the classes' `IsLoaded`, `CarParts::Part`, the XPR
+  name lookups, `CarModelLoads`' constructor and destructor; 5 Native
+  with no adapter, none removable; `--native_scene_loaders`;
+  `itc_2018`: 23 s, 0 errors, every harness 0 differing but the
+  expected groups; draw lists the same as the fallback). Nothing ready
+  left: the rest waits on `LoadSlot::Reset` `sub_820D0730` and
+  `ReleaseBuffer` `sub_820D0758`, the part model's `sub_820CE9C8`,
+  `sub_820CE990`, `sub_820CE928` (`models.md`), the accessories' release
+  and others. Step: validation agent 1 running.
 
 ## Done
 
@@ -84,5 +93,7 @@ This run's groups: `expected-differences.md` (the "22:31 run" lines).
   (`itc_2013`), 0 errors.
 - After the scene loaders' map: ours 2311, work left 4141 (wrapped
   103, known 593, unknown 3445).
+- After the scene loaders' migration 1: ours 2331, work left 4121
+  (wrapped 103, known 573, unknown 3445).
 
 ## Stopped

@@ -68,6 +68,18 @@ When the user has reviewed a run's section, its heading gets
   in the rows: the deleting destructors call `operator delete` on
   objects `ScenePools::CreateA` takes from `VirtualAlloc` (nothing calls
   them directly); `sub_820D2270` walks every material and uses nothing.
+- The scene loaders, migration 1 (4b47c12, dfbc5a0): 20 rows in
+  `scene-loaders.md`. `CarParts::SlotOf` computes in 64 bits as the
+  original's register adds; `CarParts::Part` returns only 32 bits (its
+  one caller loads r5 and r6 with `lwz` and stores r3 with `stw`).
+  `CarModelLoads`' destructor leaves r3 = loads + 32 (as
+  `Skeleton::~Skeleton`'s adapter). `CarModelLoads`' constructor and
+  destructor run natively only while `hooks::ModelsNativeLifetime()`
+  holds; the destructor checks its members first and runs the original
+  if a check fails. `Pool4Object::SetRecord` hands overlapping copies
+  and physical-view destinations to the original (as
+  `CarModel::SetRecord`). `MakeA` and `sub_820D0960` run natively only
+  over the allocation layer.
 
 ## Run 2026-10-25 23:42 (`b7-loop-25-10-26-4`)
 
