@@ -122,4 +122,37 @@ std::optional<uint32_t> FinishRequest(uint8_t* base, uint32_t request, const Fin
 // (0x82600B68) holds the loader thread (0x8209E118).
 uint32_t LoaderFunctorTarget(uint8_t* base, uint32_t functor);
 
+// --- Ucl::Unpack ---
+
+// One UCL block's unpacking (sub_822947F8, UCL's NRV2B decompressor with
+// 32-bit little-endian bit words, the fast one: no bounds checks): `src_len`
+// bytes at `src` into `dst`. r3 is 0 when the input was used up exactly,
+// -201 when it ran past `src_len`, -205 when it stopped short; `out` the
+// bytes written (what the original stores at its r6), `in` the bytes read.
+struct UclBlockResult {
+  int32_t r3;
+  uint32_t out;
+  uint32_t in;
+};
+UclBlockResult UclBlock(uint8_t* base, uint32_t src, uint32_t src_len, uint32_t dst);
+
+// Ucl::Unpack's call into the translated code: memcpy (sub_825A7410) for a
+// stored block where the native copy can't (native::Buffers_Memcpy's false).
+struct UclCalls {
+  void (*guest_memcpy)(void* user, uint32_t destination, uint32_t source, uint32_t size) =
+      nullptr;
+  void* user = nullptr;
+};
+
+// Ucl::Unpack (sub_82294610): a UCL stream (`uclpack`'s layout: after an
+// 18-byte header, blocks of a big-endian unpacked size, a big-endian stored
+// size and the data, until an unpacked size of 0) unpacked into `dst`: a
+// block stored smaller than its size unpacked (UclBlock, its result not
+// read), else copied as is (memcpy, its copies into the physical views
+// recorded as the memcpy override's). Stops with 0 when the output would
+// pass `expected` (an unpacked block is checked after it's written, a copied
+// one before); else 1 when the output's size is `expected`.
+uint32_t UclUnpack(uint8_t* base, uint32_t dst, uint32_t stream, uint32_t expected,
+                   const UclCalls& calls);
+
 }  // namespace archive

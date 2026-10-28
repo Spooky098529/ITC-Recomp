@@ -19,7 +19,8 @@ ITC_FLAG_BOOL(native_archive, true, "ITC",
               "Archive::FindLooseFile, sub_8209D8D8; the queue's and the slots' static "
               "set-ups, sub_825D9160 and sub_825D91B0, with List::List, sub_82294B80, and "
               "ListNode::ListNode, sub_82294B68; the request finish, sub_8209D688; "
-              "LoaderFunctor::Invoke, sub_8209DD80) natively instead of through "
+              "LoaderFunctor::Invoke, sub_8209DD80; Ucl::Unpack, sub_82294610, with its "
+              "block's NRV2B unpacking, sub_822947F8) natively instead of through "
               "the translated code (same results; checked by --run_harnesses=archive)");
 
 #define ITC_ARCHIVE_FALLBACK(address) \
@@ -138,4 +139,33 @@ extern "C" REX_FUNC(sub_8209D688) {
 extern "C" REX_FUNC(sub_8209DD80) {
   ITC_ARCHIVE_FALLBACK(8209DD80)
   hooks::ArchiveInvokeFunctor(ctx, base);
+}
+
+// Ucl::Unpack: r3 = the destination, r4 = the stream, r5 = the expected
+// size; r3 1 or 0. Its r25 to r31 are restored; the words it leaves in its
+// own frame (its byte swaps' and the block's output size) are read by
+// nothing. memcpy, where the native copy can't, through `ctx` in a frame as
+// the original's (160 bytes).
+void hooks::ArchiveUclUnpack(PPCContext& ctx, uint8_t* base) {
+  struct Guest {
+    PPCContext& ctx;
+    uint8_t* base;
+    static void Memcpy(void* self, uint32_t destination, uint32_t source, uint32_t size) {
+      auto& g = *static_cast<Guest*>(self);
+      PPCContext& ctx = g.ctx;
+      guest_call::InFrame(ctx, g.base, 160, 0x822946E4, [&](uint32_t) {
+        ctx.r3.u64 = destination;
+        ctx.r4.u64 = source;
+        ctx.r5.u64 = size;
+        sub_825A7410(ctx, g.base);
+      });
+    }
+  } guest{ctx, base};
+  ctx.r3.u64 =
+      archive::UclUnpack(base, ctx.r3.u32, ctx.r4.u32, ctx.r5.u32, {&Guest::Memcpy, &guest});
+}
+
+extern "C" REX_FUNC(sub_82294610) {
+  ITC_ARCHIVE_FALLBACK(82294610)
+  hooks::ArchiveUclUnpack(ctx, base);
 }

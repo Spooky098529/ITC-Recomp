@@ -15,7 +15,11 @@
 // its own value, and the callback serial (0x82600AA4, written only by the
 // finish) put back after each side; the data it decommits are pages of the
 // allocation layer (a decommit there does nothing). LoaderFunctor::Invoke
-// calls the same leaf. The originals run with --native_archive off, so their
+// calls the same leaf. Ucl::Unpack and its block's unpacking run on streams
+// made by an NRV2B encoder here (literals, matches near and far, the last
+// offset reused, long lengths; stored blocks; sizes that stop it early) and
+// on compressed assets read from BUILD.DAT, in pages of the allocation
+// layer. The originals run with --native_archive off, so their
 // callees are the recompiled code too.
 
 #include "harness.h"
@@ -26,10 +30,13 @@
 #include "base/log.h"
 #include "hooks/archive.h"
 #include "hooks/c_runtime.h"
+#include "game_data/game_data.h"
 #include "memory/heap.h"
 
 #include <fmt/format.h>
 
+#include <algorithm>
+#include <bit>
 #include <mutex>
 #include <string>
 #include <vector>
@@ -487,6 +494,264 @@ void Invokes(Context& h) {
   results.Report();
 }
 
+// --- Ucl::Unpack ---
+
+// UCL's NRV2B stream, as the decoder reads it: bits in 32-bit little-endian
+// words (taken where the decoder needs its next bit), bytes in between.
+class Nrv2b {
+ public:
+  void Bit(uint32_t b) {
+    if (count_ == 0) {
+      word_at_ = out.size();
+      out.resize(out.size() + 4, 0);
+      count_ = 32;
+    }
+    count_--;
+    if (b) {
+      out[word_at_ + (count_ >> 3)] |= uint8_t(1u << (count_ & 7));
+    }
+  }
+  void Byte(uint8_t b) { out.push_back(b); }
+  // A number of 2 or more: each bit below the top one, then 1 after the
+  // last and 0 after the others.
+  void Gamma(uint32_t v) {
+    const int top = 31 - std::countl_zero(v);
+    for (int i = top - 1; i >= 0; i--) {
+      Bit((v >> i) & 1);
+      Bit(i == 0 ? 1 : 0);
+    }
+  }
+  std::vector<uint8_t> out;
+
+ private:
+  size_t word_at_ = 0;
+  int count_ = 0;
+};
+
+// A random block: its stream and the bytes it unpacks to (counted only).
+std::vector<uint8_t> RandomBlock(Random& r, uint32_t target, uint32_t* unpacked) {
+  Nrv2b w;
+  uint32_t olen = 0, last = 1;
+  const bool far = r.Below(2);
+  while (olen < target) {
+    if (olen == 0 || r.Below(3) == 0) {
+      for (uint32_t n = 1 + r.Below(8); n; n--) {
+        w.Bit(1);
+        w.Byte(uint8_t(r.Next()));
+        olen++;
+      }
+      continue;
+    }
+    w.Bit(0);
+    uint32_t off;
+    if (r.Below(5) == 0) {
+      off = last;
+      w.Gamma(2);
+    } else {
+      const uint32_t most = std::min(olen, far ? 0x3000u : 0x400u);
+      off = 1 + r.Below(most);
+      const uint32_t x = off - 1;
+      w.Gamma((x >> 8) + 3);
+      w.Byte(uint8_t(x & 0xFF));
+      last = off;
+    }
+    const uint32_t bonus = off > 0xD00 ? 1 : 0;
+    uint32_t length = 2 + bonus + r.Below(r.Below(6) == 0 ? 300 : 12);
+    const uint32_t m_len = length - 1 - bonus;
+    if (m_len <= 3) {
+      w.Bit(m_len >> 1);
+      w.Bit(m_len & 1);
+    } else {
+      w.Bit(0);
+      w.Bit(0);
+      w.Gamma(m_len - 2);
+    }
+    olen += length;
+  }
+  w.Bit(0);
+  w.Gamma(0x1000002);
+  w.Byte(0xFF);
+  *unpacked = olen;
+  return w.out;
+}
+
+void PutBe32(std::vector<uint8_t>& v, uint32_t word) {
+  for (int i = 0; i < 4; i++) {
+    v.push_back(uint8_t(word >> (24 - 8 * i)));
+  }
+}
+
+// The block's native step: its r3 as the original leaves it (-201 from li,
+// sign-extended; -205 from a word rlwinm cleared the upper half of), its
+// output size stored at r6.
+void NativeUclBlock(PPCContext& ctx, uint8_t* base) {
+  const auto result = archive::UclBlock(base, ctx.r3.u32, ctx.r4.u32, ctx.r5.u32);
+  guest::StoreU32(base, ctx.r6.u32, result.out);
+  ctx.r3.u64 = result.r3 == -205 ? uint64_t(uint32_t(-205)) : uint64_t(int64_t(result.r3));
+}
+
+// Runs one Unpack or block case on pages: the source copied in, the
+// destination filled, each side run, the destination (and r3) compared.
+struct UclPages {
+  uint32_t src = 0, dst = 0, src_bytes = 0, dst_bytes = 0;
+  void Make(uint32_t s, uint32_t d) {
+    src_bytes = s;
+    dst_bytes = d;
+    src = memory::AllocPages(s, 4096);
+    dst = memory::AllocPages(d, 4096);
+  }
+  void Free() {
+    memory::FreePages(src);
+    memory::FreePages(dst);
+  }
+};
+
+// How many cases' recompiled side returned 0 (a block: the input used up
+// exactly; Unpack: 1, its output as expected), for the log: the streams made
+// here have to be ones the game's decoder reads as meant.
+int g_ucl_whole = 0;
+
+void UclCase(Context& h, Results& results, const std::vector<uint8_t>& stream, uint32_t out_bytes,
+             bool block, uint32_t r4, uint32_t r5, const std::string& what) {
+  UclPages pages;
+  pages.Make(uint32_t(stream.size()) + 64, out_bytes + 4096);
+  Write(h.base, pages.src, stream.data(), uint32_t(stream.size()));
+  Outputs out[2];
+  for (int v = 0; v < 2; v++) {
+    Fill(h.base, pages.dst, pages.dst_bytes, 0xA5);
+    Fill(h.base, h.data, 64);
+    PPCContext t = CallContext(h);
+    if (block) {
+      t.r3.u64 = pages.src;
+      t.r4.u64 = r4;
+      t.r5.u64 = pages.dst;
+      t.r6.u64 = h.data;
+      t.r7.u64 = 0;
+    } else {
+      t.r3.u64 = pages.dst;
+      t.r4.u64 = pages.src;
+      t.r5.u64 = r5;
+    }
+    ITC_FLAG(native_archive) = v == 1;
+    if (block) {
+      (v == 0 ? __imp__sub_822947F8 : NativeUclBlock)(t, h.base);
+    } else {
+      (v == 0 ? __imp__sub_82294610 : hooks::ArchiveUclUnpack)(t, h.base);
+    }
+    ITC_FLAG(native_archive) = true;
+    out[v].Word(t.r3.u32);
+    out[v].Word(uint32_t(t.r3.u64 >> 32));
+    if (v == 0 && t.r3.u32 == (block ? 0u : 1u)) {
+      g_ucl_whole++;
+    }
+    if (block) {
+      out[v].Word(guest::LoadU32(h.base, h.data));
+    }
+    out[v].Bytes(Read(h.base, pages.dst, pages.dst_bytes));
+  }
+  pages.Free();
+  results.Check(out[0], out[1], what);
+}
+
+void UclBlocks(Context& h) {
+  Results results("sub_822947F8 Ucl::UnpackBlock");
+  g_ucl_whole = 0;
+  for (int i = 0; i < 80; i++) {
+    uint32_t unpacked;
+    const auto stream = RandomBlock(h.random, 1 + h.random.Below(i < 40 ? 600 : 20000), &unpacked);
+    // The input's length as given, or a little off (r3 -201, -205).
+    uint32_t length = uint32_t(stream.size());
+    if (i % 4 == 1) {
+      length += 1 + h.random.Below(8);
+    } else if (i % 4 == 2) {
+      length -= 1 + h.random.Below(std::min<uint32_t>(length - 1, 8));
+    }
+    UclCase(h, results, stream, unpacked, true, length, 0,
+            fmt::format("case {} ({} bytes to {})", i, stream.size(), unpacked));
+  }
+  ITC_LOG_INFO("harness: archive: {} of 80 blocks read to their end exactly (40 expected)",
+               g_ucl_whole);
+  results.Report();
+}
+
+void UclStreams(Context& h) {
+  Results results("sub_82294610 Ucl::Unpack");
+  g_ucl_whole = 0;
+  for (int i = 0; i < 60; i++) {
+    std::vector<uint8_t> stream;
+    for (int b = 0; b < 18; b++) {
+      stream.push_back(uint8_t(h.random.Next()));
+    }
+    uint32_t total = 0;
+    for (uint32_t blocks = 1 + h.random.Below(5); blocks; blocks--) {
+      if (h.random.Below(3) == 0) {
+        // Stored as is: as many bytes as its size, or more (copied all).
+        const uint32_t size = 1 + h.random.Below(3000);
+        const uint32_t stored = size + (h.random.Below(3) == 0 ? h.random.Below(64) : 0);
+        PutBe32(stream, size);
+        PutBe32(stream, stored);
+        for (uint32_t n = 0; n < stored; n++) {
+          stream.push_back(uint8_t(h.random.Next()));
+        }
+        total += stored;
+      } else {
+        uint32_t unpacked;
+        auto block = RandomBlock(h.random, 1 + h.random.Below(8000), &unpacked);
+        if (block.size() >= unpacked) {
+          // Not smaller: it would be copied; make it a stored block of its
+          // own bytes instead.
+          PutBe32(stream, uint32_t(block.size()));
+          PutBe32(stream, uint32_t(block.size()));
+          total += uint32_t(block.size());
+        } else {
+          PutBe32(stream, unpacked);
+          PutBe32(stream, uint32_t(block.size()));
+          total += unpacked;
+        }
+        stream.insert(stream.end(), block.begin(), block.end());
+      }
+    }
+    PutBe32(stream, 0);
+    // The expected size: the total, or less (stops early: 0), or more (0).
+    uint32_t expected = total;
+    if (i % 5 == 3) {
+      expected = total - h.random.Below(total);
+    } else if (i % 5 == 4) {
+      expected = total + 1 + h.random.Below(100);
+    }
+    UclCase(h, results, stream, std::max(total, expected), false, 0, expected,
+            fmt::format("case {} ({} bytes to {}, expected {})", i, stream.size(), total,
+                        expected));
+  }
+  // Compressed assets from BUILD.DAT (the TOC's +8 not 0), under 256 KiB
+  // stored.
+  const uint32_t handle = guest::LoadU32(h.base, 0x82600A9C);
+  const uint32_t toc = guest::LoadU32(h.base, archive::kBuildToc);
+  int found = 0;
+  for (int tries = 0; tries < 4000 && found < 16 && game_data::IsHandle(handle); tries++) {
+    const uint32_t id = h.random.Below(archive::kFirstCrsId);
+    const uint32_t entry = toc + (id + 1) * 16;
+    const uint32_t sector = guest::LoadU32(h.base, entry);
+    const uint32_t stored = guest::LoadU32(h.base, entry + 4);
+    const uint32_t unpacked = guest::LoadU32(h.base, entry + 8);
+    if (unpacked == 0 || stored == 0 || stored > 256 * 1024 || unpacked > 4 * 1024 * 1024) {
+      continue;
+    }
+    std::vector<uint8_t> stream(stored);
+    auto read = game_data::ReadAt(handle, uint64_t(sector) * 2048, stream.data(), stored);
+    if (!read || *read != stored) {
+      continue;
+    }
+    found++;
+    UclCase(h, results, stream, unpacked, false, 0, unpacked,
+            fmt::format("asset {} ({} bytes to {})", id, stored, unpacked));
+  }
+  ITC_LOG_INFO("harness: archive: {} compressed assets from BUILD.DAT; {} of {} streams unpacked "
+               "to their expected size (36 made + the assets expected)",
+               found, g_ucl_whole, 60 + found);
+  results.Report();
+}
+
 }  // namespace
 
 void Archive(Context& h) {
@@ -497,6 +762,8 @@ void Archive(Context& h) {
   StaticInits(h);
   Finishes(h);
   Invokes(h);
+  UclBlocks(h);
+  UclStreams(h);
 }
 
 }  // namespace harness

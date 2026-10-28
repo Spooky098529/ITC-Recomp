@@ -13,5 +13,8 @@ void ArchiveFinishRequest(PPCContext& ctx, uint8_t* base);
 // LoaderFunctor::Invoke (sub_8209DD80) without its flag: the functor's +4
 // called with r4 as r3.
 void ArchiveInvokeFunctor(PPCContext& ctx, uint8_t* base);
+// Ucl::Unpack (sub_82294610) without its flag: archive::UclUnpack with
+// memcpy's fallback called through `ctx`.
+void ArchiveUclUnpack(PPCContext& ctx, uint8_t* base);
 
 }  // namespace hooks

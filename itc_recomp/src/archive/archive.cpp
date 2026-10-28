@@ -5,6 +5,7 @@
 #include "base/log.h"
 #include "guest.h"
 #include "hooks/heap.h"
+#include "native/buffers.h"
 
 namespace archive {
 
@@ -161,6 +162,92 @@ std::optional<uint32_t> FinishRequest(uint8_t* base, uint32_t request,
 uint32_t LoaderFunctorTarget(uint8_t* base, uint32_t functor) {
   ITC_NATIVE_RUNNING("sub_8209DD80 LoaderFunctor::Invoke");
   return LoadU32(base, functor + 4);
+}
+
+// --- Ucl::Unpack ---
+
+UclBlockResult UclBlock(uint8_t* base, uint32_t src, uint32_t src_len, uint32_t dst) {
+  ITC_NATIVE_RUNNING("sub_822947F8 Ucl::UnpackBlock");
+  uint32_t ilen = 0, olen = 0, last_m_off = 1;
+  uint32_t bits = 0, count = 0;
+  auto bit = [&]() -> uint32_t {
+    if (count != 0) {
+      count--;
+      return (bits >> count) & 1;
+    }
+    const uint32_t at = src + ilen;
+    bits = uint32_t(guest::LoadU8(base, at)) | uint32_t(guest::LoadU8(base, at + 1)) << 8 |
+           uint32_t(guest::LoadU8(base, at + 2)) << 16 |
+           uint32_t(guest::LoadU8(base, at + 3)) << 24;
+    ilen += 4;
+    count = 31;
+    return bits >> 31;
+  };
+  auto byte = [&]() -> uint32_t { return guest::LoadU8(base, src + ilen++); };
+  for (;;) {
+    while (bit()) {
+      guest::StoreU8(base, dst + olen++, uint8_t(byte()));
+    }
+    uint32_t m_off = 1;
+    do {
+      m_off = m_off * 2 + bit();
+    } while (!bit());
+    if (m_off != 2) {
+      m_off = ((m_off - 3) << 8) + byte();
+      if (m_off == 0xFFFFFFFFu) {
+        break;
+      }
+      last_m_off = m_off + 1;
+    }
+    uint32_t m_len = bit();
+    m_len = m_len * 2 + bit();
+    if (m_len == 0) {
+      m_len = 1;
+      do {
+        m_len = m_len * 2 + bit();
+      } while (!bit());
+      m_len += 2;
+    }
+    m_len += last_m_off > 0xD00 ? 1 : 0;
+    uint32_t from = dst + olen - last_m_off;
+    guest::StoreU8(base, dst + olen++, guest::LoadU8(base, from++));
+    do {
+      guest::StoreU8(base, dst + olen++, guest::LoadU8(base, from++));
+    } while (--m_len != 0);
+  }
+  const int32_t r3 = ilen == src_len ? 0 : (ilen < src_len ? -205 : -201);
+  return {r3, olen, ilen};
+}
+
+uint32_t UclUnpack(uint8_t* base, uint32_t dst, uint32_t stream, uint32_t expected,
+                   const UclCalls& calls) {
+  ITC_NATIVE_RUNNING("sub_82294610 Ucl::Unpack");
+  uint32_t written = 0;
+  uint32_t at = 22;  // the first block's stored size
+  uint32_t size = LoadU32(base, stream + 18);
+  while (size != 0) {
+    const uint32_t stored = LoadU32(base, stream + at);
+    const uint32_t data = at + 4;
+    if (stored < size) {
+      UclBlock(base, stream + data, stored, dst + written);
+      written += size;
+      if (expected < written) {
+        return 0;
+      }
+    } else {
+      if (expected < stored + written) {
+        return 0;
+      }
+      if (!native::Buffers_Memcpy(base, dst + written, stream + data, stored, 0x822946E4)) {
+        calls.guest_memcpy(calls.user, dst + written, stream + data, stored);
+      }
+      written += stored;
+    }
+    at = data + stored;
+    size = LoadU32(base, stream + at);
+    at += 4;
+  }
+  return written == expected ? 1 : 0;
 }
 
 }  // namespace archive
