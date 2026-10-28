@@ -338,6 +338,11 @@ Rows not yet moved stay in the table below. So far:
   the queue's length, wait and cancel, the loader thread's functor, the
   request queue's list class and the static set-ups and clean-ups of
   the queue, the request slots and the four semaphores (B7).
+- [`file-layer.md`](file-layer.md): the file layer above the file
+  calls: the file objects' class chain (the game's file over an
+  overlapped file over `File::`), the path objects that build a full
+  path with sprintf and the game's path buffer (B7; the `File::` class
+  and the open for read by name stay in `files-and-saves.md`).
 
 These files hold functions only. What used to follow the table here moved
 out on 2026-10-20: how frame interpolation works, its options and what

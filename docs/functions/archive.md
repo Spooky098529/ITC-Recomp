@@ -51,9 +51,9 @@ no other code names their addresses. Two users read a semaphore's count
 work semaphore's count is 0, and the picker (`sub_8209D950`) takes the
 work semaphore again when its count isn't 0. The loose read
 (`sub_8209DFA8`) signals request-done and stays recompiled, blocked by the
-file object (`sub_820A6A00`, `sub_820A6A40`, a lead), the open by name
-(`sub_820A6AB8`, `files-and-saves.md`) and sprintf under it
-(`c-runtime.md`). The callbacks `Archive::Load` is given are called
+file object (`sub_820A6A00`, `sub_820A6A40`, `file-layer.md`), the open by name
+(`sub_820A6AB8`, `files-and-saves.md`) and sprintf under its path
+object (`Path::Build`, `file-layer.md`; `c-runtime.md`). The callbacks `Archive::Load` is given are called
 indirectly from the loader thread (`sub_8209D688`): about 20 of the
 loads' own functions, some already ours (`car-specs.md`).
 
