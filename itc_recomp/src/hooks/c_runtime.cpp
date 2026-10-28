@@ -38,7 +38,8 @@ ITC_FLAG_BOOL(native_c_runtime, true, "ITC",
               "sub_825B36B8, sub_825B7F10); _fltout2 and $I10_OUTPUT (sub_825B6458, sub_825B8B48); %f's "
               "_cfltcvt_l, _cftof_l, _cftof2_l and _fptostr (sub_825AEB20, sub_825AE8E0, sub_825AE708, "
               "sub_825B61E8); write_char "
-              "(sub_825AF000), write_multi_char (sub_825AF098), the wide write_char and _putwc_nolock "
+              "(sub_825AF000), write_multi_char (sub_825AF098), sprintf and _vsnprintf (sub_825A93D0, "
+              "sub_825AB010) with _vsnprintf_l and _output_l (sub_825AAF18, sub_825AF130), the wide write_char and _putwc_nolock "
               "(sub_825B1368, sub_825B7A80); __iob_func (sub_825AD4C0); the start-up's _cfltcvt_init (sub_825A6DB0, "
               "sub_825A6E48), _init_pointers (sub_825AA398) with its setters (sub_825AD140, "
               "sub_825AEE18, sub_825AFCB8, sub_825B3560, sub_825B3548: no adapters of their own), the empty "
@@ -52,12 +53,12 @@ ITC_FLAG_BOOL(native_c_runtime, true, "ITC",
               "atexit (sub_825A7068) and _onexit (sub_825A6F60) over the game's table, and "
               "the table's set-up __onexitinit (sub_825A6F00) by the native calloc "
               "(checked by "
-              "--run_harnesses=c_runtime). Those reached only from native callers have no "
+              "--run_harnesses=c_runtime and c_runtime_format). Those reached only from native callers have no "
               "adapters, and the flag switches their callers: wcslen, wcscmp, mbtowc, the wide write_char, "
               "strcpy_s, __ascii_strnicmp, "
               "strtoxl, ___dtold, _ld12tod, _atof_l, _fltin2, __strgtold12_l, __mtold12, $I10_OUTPUT, "
-              "_fltout2, _cftof_l, _cftof2_l, _fptostr, _putwc_nolock, _cfltcvt_init, setSBCS "
-              "and _onexit");
+              "_fltout2, _cftof_l, _cftof2_l, _fptostr, _putwc_nolock, _cfltcvt_init, setSBCS, "
+              "_onexit, _vsnprintf_l and _output_l");
 
 ITC_FLAG_BOOL(native_memcpy, true, "ITC",
               "Copy natively in the C runtime's memcpy (sub_825A7410), inside its override in "
@@ -550,6 +551,50 @@ extern "C" REX_FUNC(sub_825AF098) {
   if (last >= 0) {
     ctx.r3.u64 = uint32_t(last);
   }
+}
+
+// sprintf: r3 = the buffer, r4 = the format, r5 to r10 and the stack the
+// arguments: stored into the caller's parameter area (r1 + 32 to + 72) as
+// the original does, the va_list from there; _output_l's frame where the
+// original's would be (144 and 1,328 bytes down). r3 the count
+// (zero-extended, as the original's lwz leaves it). Where the native
+// version declines (format.h), the original runs.
+extern "C" REX_FUNC(sub_825A93D0) {
+  REX_FUNC_PROLOGUE();
+  if (!ITC_FLAG(native_c_runtime)) {
+    __imp__sub_825A93D0(ctx, base);
+    return;
+  }
+  const uint64_t registers[6] = {ctx.r5.u64, ctx.r6.u64, ctx.r7.u64,
+                                 ctx.r8.u64, ctx.r9.u64, ctx.r10.u64};
+  for (uint32_t i = 0; i < 6; i++) {
+    guest::StoreU32(base, ctx.r1.u32 + 32 + 8 * i, uint32_t(registers[i] >> 32));
+    guest::StoreU32(base, ctx.r1.u32 + 36 + 8 * i, uint32_t(registers[i]));
+  }
+  int32_t count;
+  if (!c_runtime::Sprintf(base, ctx.r3.u32, ctx.r4.u32, ctx.r1.u32 + 32,
+                          ctx.r1.u32 - 144 - 1328, &count)) {
+    __imp__sub_825A93D0(ctx, base);
+    return;
+  }
+  ctx.r3.u64 = uint32_t(count);
+}
+
+// _vsnprintf: r3 = the buffer, r4 = the count, r5 = the format, r6 = the
+// va_list: _vsnprintf_l's work with no locale (it tail-calls it, so
+// _output_l's frame is 144 and 1,328 bytes down). r3 the count
+// (zero-extended). Where the native version declines (format.h), the
+// original runs.
+extern "C" REX_FUNC(sub_825AB010) {
+  REX_FUNC_PROLOGUE();
+  int32_t count;
+  if (!ITC_FLAG(native_c_runtime) ||
+      !c_runtime::Vsnprintf(base, ctx.r3.u32, ctx.r4.u32, ctx.r5.u32, ctx.r6.u32,
+                            ctx.r1.u32 - 144 - 1328, &count)) {
+    __imp__sub_825AB010(ctx, base);
+    return;
+  }
+  ctx.r3.u64 = uint32_t(count);
 }
 
 // __iob_func: returns the stream table (sign-extended, as the original's

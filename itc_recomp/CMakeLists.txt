@@ -280,6 +280,7 @@ set(ITC_SOURCES
     src/c_runtime/strings.cpp
     src/c_runtime/format.cpp
     src/c_runtime/wide_format.cpp
+    src/c_runtime/narrow_format.cpp
     src/c_runtime/start_up.cpp
     src/c_runtime/parse.cpp
     src/c_runtime/arrays.cpp
@@ -328,6 +329,7 @@ set(ITC_SOURCES
     src/harnesses/race_states.cpp
     src/harnesses/archive.cpp
     src/harnesses/file_layer.cpp
+    src/harnesses/c_runtime_format.cpp
     src/harnesses/texture_compression.cpp
     src/harnesses/collision.cpp
     src/harnesses/collision_world.cpp
