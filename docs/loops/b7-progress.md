@@ -22,9 +22,20 @@ file's history. What's left to see in a drive, from every run:
   Native; `itc_2106`: 19 s, 0 errors, every harness 0 differing but
   the expected groups; frame dumps the same as the fallback. Left
   under `CarModel::OnDecalLoaded` `sub_820D5750`: 7 ready groups (the
-  sheet's software rasterizer). Validation agent running.
+  sheet's software rasterizer). Validated (`itc_2107`: 4 of 4
+  harness lines, all 4 in the attract race; nothing to drive).
+- Now: another "no mapping" lead, not counted: the vinyl sheet's
+  decal path under `CarModel::OnDecalLoaded` `sub_820D5750`
+  (`car-models.md`; 19 functions, 2,257 lines, 7 ready groups: the
+  software rasterizer `sub_820EE638` (1,246 lines) and the rest; only
+  `sub_820EED38` and `sub_820EED58` without rows). Migration agent
+  running.
 
 ## Done
+
+- `Vinyl::Compress` (no mapping; 689b0c8, 53ea064): `car-models.md`
+  3 more ours under `--native_car_models`, `XGCompressSurface` Native;
+  validated (`itc_2107`).
 
 - Texture compression (`texture-compression.md`, mapped in f1c484c;
   157 rows, 24 in play): 24 ours in one migration (cdf8494..af2c1ee),
