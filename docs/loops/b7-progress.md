@@ -63,7 +63,9 @@ file's history. What's left to see in a drive, from every run:
   dumps the same as the fallback (`itc_2133`, `itc_2134`). Left ready:
   `ResetWorld`, `ResetVehicles`, `Unload`, the event's start
   placements, `RaceStart::Place`, `AddRacers`, `ListRacers` and the
-  big ticks (split). Validation agent running.
+  big ticks (split). Validated (`itc_2139`, replay `itc_2140` ok: 24
+  of 24 harness lines, 13 in the attract race, 8 in the replay, 3 to
+  drive). Migration agent 2 running.
 
 ## Done
 
