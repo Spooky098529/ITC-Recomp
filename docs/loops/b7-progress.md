@@ -31,10 +31,16 @@ file's history. What's left to see in a drive, from every run:
   the layers' walks, updates, operations and toggle messages; 14
   adapters removed; `itc_2011`: 23 s, 0 errors, every harness 0
   differing but the expected groups; frame dumps the same as the
-  fallback). `app-states.md` 56 of 56 ours. Step: validation agent 2
-  running.
+  fallback). `app-states.md` 56 of 56 ours. Validated (`itc_2012`: 28
+  of 28 harness lines, 18 ran in the attract race, 10 in the replay
+  `itc_2013`, ok; nothing to drive). Finished.
 
 ## Done
+
+- The app's update and its state stack (`app-states.md`, mapped in
+  ac92c3b; 56 rows): 56 ours in two migrations (7bb4dfd..30892a7), 19
+  adapters removed, 4 Native with none, 1 Merged; validated
+  (`itc_1996`, `itc_2012`); `--native_app_states`.
 
 ## Rows to review
 
@@ -62,5 +68,8 @@ This run's groups: `expected-differences.md` (the "22:31 run" lines).
   (`itc_1997`), 0 errors.
 - After the app states' migration 2: ours 2311, work left 4141
   (wrapped 103, known 515, unknown 3523).
+- After the app states' validation 2: race 23 s (`itc_2012`), 0 errors,
+  every harness 0 differing but the expected groups; replay 127 s
+  (`itc_2013`), 0 errors.
 
 ## Stopped

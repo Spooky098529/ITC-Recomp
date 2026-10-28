@@ -2597,6 +2597,7 @@ B7. **The game logic inside**: everything else, subsystem by subsystem,
 | 2026-10-26 | The race's set-up (`Race::SetUp`, `SetUpRival`, the race data's reset and constructor, the course route table `CourseRoutes::Get`, the racers' adds and start positions, the stage list and routes, the car object's set-up `Car::Init`, `Clear`, `SetModel`, `FromBuild` and its parts' resets, `RacerRecord::Init`; then `Vehicle::SetupFromCar` with `CarData::Derive`, `ApplySettings` and `Vehicle::ApplyTuning`) | `race-setup.md`, with `vehicle-accessors.md`, `car-physics.md` | 52 of 52, and 1 in `vehicle-accessors.md` and 4 in `car-physics.md` (three migrations; 27 adapters removed) | `--native_race_setup`, `--native_car_physics` |
 | 2026-10-26 | The car physics' ready groups (no mapping, not counted: `Vehicle::PhysicsStep`, `SetUpPhysics`, `ResetPhysics`, `DestroyPhysics`, `ProbeGround`, `Unflip`, `RefreshFromBody`, the collision objects' init and add, `CollisionWorld::Setup`, `Create`, `SetQueryCapacity` and `Update` with its pairs, collide and respond) | `car-physics.md`, with `vehicle-accessors.md`, `matrix-math.md`, `collision.md` | 134 of 134 (two migrations; 84 adapters removed, 7 Native with none) | `--native_car_physics` |
 | 2026-10-27 | The vehicle code above the physics (the seven vehicles' create, constructor and destroy, `Vehicle::SetUp` and `ResetForCar`, the surface grip, `Vehicle::Tick` and `ApplyInput`, the track positions, the status record, `PlaceOnRoute`, `Racers::NearestHumanVehicle`; the engine's power curve and `RoutePosition::Step`) | `vehicle.md` | 25 of 25 (two migrations; 5 adapters removed, 1 Native with none, 1 Merged) | `--native_vehicle` |
+| 2026-10-28 | The app's update and its state stack (`App::Update`, `App::Start`, `App::IsRunning`, the handler maps, requests, messages and add slots; the state stack `AppStates` and its 48-byte state layers: their set-up, walks, updates, operations and toggle messages; the containers they use: the message vector, the operation list, `PtrList::Erase` and `ForEach`, the delegate's clone) | `app-states.md` | 56 of 56 (two migrations; 19 adapters removed, 4 Native with none, 1 Merged) | `--native_app_states` |
 
     The first run (2026-10-22, branch `b7-loop-test`): every harness at 0 differing, attract races at 20-21 s with no errors,
     and a race the user drove looked right. Ours went from 162 to 335 (work
@@ -3608,3 +3609,18 @@ original, decided before anything is written. The boundary unchanged:
 called 70, live 282. Imports: 186 called, 62 with a live caller. B7
 (`b7_status.py`): ours 2,255, work left 4,197 (Wrapped 104, with a row
 516, no row yet 3,577), from 4,222 (from 4,299 at the run's start).
+
+**2026-10-28, the app's update and its state stack (branch
+`b7-loop-27-10-26`):** the eighteenth run's first subsystem mapped the
+app's update and its state stack (`app-states.md`, 56 rows: the lead
+`820AE010`-`820AEC10` turned out to be the state stack's layers) and
+made all of it native in two migrations (`--native_app_states`): the
+app's update with its handler maps, requests and messages, `App::Start`
+(which pushes the game modes' holder, whose slot 10 is how `Modes::Tick`
+runs every pass), the state layers and the containers they use. Paths
+never seen in play (`StateLayer::ApplyOp`'s pop and replace,
+`AppStates::OnMessage`'s step and teardowns, failed allocations) run the
+original. The boundary unchanged: 449 functions (916 pairs): overridden
+69, Native 5, Dropped 23, never called 70, live 282. Imports: 186
+called, 62 with a live caller. B7 (`b7_status.py`): ours 2,311, work
+left 4,141 (Wrapped 103, with a row 515, no row yet 3,523), from 4,197.
