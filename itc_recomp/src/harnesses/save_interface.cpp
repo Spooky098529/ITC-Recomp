@@ -145,6 +145,10 @@ struct CaseSetup {
   // When not 0, `extra_bytes` there are compared too.
   uint32_t extra = 0;
   uint32_t extra_bytes = 0;
+  // When not 0, 4 bytes at r1 - clock_below left out of the compare (set to
+  // 0 after the call): GetLocalTime's seconds and milliseconds, which differ
+  // between the two calls.
+  uint32_t clock_below = 0;
 };
 
 // One case through both versions: the block and the scratch area filled from
@@ -198,6 +202,9 @@ void Case(Context& h, Results& results, const Block& block, const CaseSetup& set
     if (setup.save_data != 0) {
       out[v].Word(guest::LoadU32(h.base, kSaveDataSlot) - setup.save_data);
       guest::StoreU32(h.base, kSaveDataSlot, live_save);
+    }
+    if (setup.clock_below != 0) {
+      guest::StoreU32(h.base, t.r1.u32 - setup.clock_below, 0);
     }
     out[v].Bytes(Read(h.base, stack, setup.stack_bytes));
     out[v].Bytes(Read(h.base, stack2, setup.stack2_bytes));
@@ -616,6 +623,7 @@ void SaveInterface(Context& h) {
     CaseSetup save;
     save.stack_below = 368;
     save.stack_bytes = 352;
+    save.clock_below = 368 - 92;  // the SYSTEMTIME's wSecond and wMilliseconds
     save.save_data = block.address + 0x400;
     Run(
         h, block, "GameData::Save (sub_8228FB00)", __imp__sub_8228FB00,
