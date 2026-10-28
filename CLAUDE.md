@@ -311,7 +311,8 @@ data in memory (`save-data.md`, `--native_save_data`, 19 of 19 in play)
 native (ours 2,255 -> 2,400); the rest of the scene loaders waits on
 the material passes, the accessories, `Skeleton`'s local matrices,
 `XPR::GetTexture` and sprintf.
-Its nineteenth run (`b7-loop-28-10-26`, 2026-10-28, not yet merged;
+Its nineteenth run (`b7-loop-28-10-26`, 2026-10-28, merged into
+`rexglue-removal-project` the same day before a drive;
 summary `docs/loops/b7-loop-2026-10-28-0836.md`; 3 subsystems; stopped
 once by a harness gap, fixed and resumed) made texture compression
 (`texture-compression.md`, XGraphics' `XGCompressSurface` over D3DX's

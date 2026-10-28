@@ -128,7 +128,7 @@ goes in `src/` as overrides), American English.
   `car-models.md` and `models.md` (`scene-loaders.md`, 60 of 78; a lead
   without mapping) and the players' save data in memory in full
   (`save-data.md`; ours 2,400); its nineteenth run (branch
-  `b7-loop-28-10-26`, 3 subsystems) made
+  `b7-loop-28-10-26`, merged 2026-10-28, 3 subsystems) made
   texture compression (`texture-compression.md`) and the vinyl sheet
   above it (`car-models.md`, two leads without mapping), the race world
   (`race-world.md`, 49 of 50) and the race's states (`race-states.md`,
