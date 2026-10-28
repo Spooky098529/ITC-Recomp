@@ -300,8 +300,8 @@ above it (`vehicle.md`, `--native_vehicle`, 25 of 25) native (ours
 2,152 -> 2,255); one harness group is for the user's review
 (`Race::SetUp`'s traffic records' unwritten bytes,
 `docs/loops/expected-differences.md`).
-Its eighteenth run (`b7-loop-27-10-26`, 2026-10-27 to 28, not yet
-merged; summary `docs/loops/b7-loop-2026-10-27-2231.md`; 3 subsystems)
+Its eighteenth run (`b7-loop-27-10-26`, 2026-10-27 to 28, merged
+into `rexglue-removal-project` 2026-10-28 before a drive; summary `docs/loops/b7-loop-2026-10-27-2231.md`; 3 subsystems)
 made the app's update and its state stack (`app-states.md`,
 `--native_app_states`, 56 of 56), the scene's loading objects with
 their small blockers in `car-models.md` and `models.md`

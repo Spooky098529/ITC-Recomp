@@ -122,7 +122,7 @@ goes in `src/` as overrides), American English.
   `b7-loop-25-10-26-4`, 2 subsystems by the user's call) made the
   race's set-up, the rest of the car physics (a lead without mapping)
   and the vehicle code above it native in full (ours 2,255); its
-  eighteenth run (branch `b7-loop-27-10-26`) made the app's update and
+  eighteenth run (branch `b7-loop-27-10-26`, merged 2026-10-28) made the app's update and
   its state stack native in full (`app-states.md`), the scene's loading
   objects as far as they were ready with their blockers in
   `car-models.md` and `models.md` (`scene-loaders.md`, 60 of 78; a lead

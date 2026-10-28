@@ -162,7 +162,9 @@ code, no builds, no game runs):
   cover it, the Status definitions copied from the top of `functions.md`
   word for word, then the table (`| Address | Name | Status | Notes |`,
   one function a row, in the order that reads best; no sorting required).
-  Only functions seen in play get rows. Notes say how much is known ("Not
+  Functions not seen in play get rows too, marked "Not seen in play"
+  (the user's call, 2026-10-23: a session may not have taken their
+  path). Notes say how much is known ("Not
   read", "Not read in detail", "probably" for guesses), as the other files
   do. Fields and globals worked out go in `docs/known-data.md`.
 - **Moves rows, never copies them:** a function already in `functions.md`
