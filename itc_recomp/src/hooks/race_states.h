@@ -108,6 +108,9 @@ void RaceStatesRouteDistance(PPCContext& ctx, uint8_t* base);
 // RaceStates::RaceTick sub_82167610: a handler (r3 not kept); the original
 // where RaceTickNative says so.
 void RaceStatesRaceTick(PPCContext& ctx, uint8_t* base);
+// RaceStates::OnGo sub_82164458: a handler (r3 = the machine; r3 not kept);
+// the original where OnGoNative says so.
+void RaceStatesOnGo(PPCContext& ctx, uint8_t* base);
 
 // RaceStates::StandingStartTick sub_821692C8: a handler (r3 not kept); the
 // original in the System Link case (StandingStartTickNative); the callees'

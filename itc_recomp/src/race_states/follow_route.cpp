@@ -373,4 +373,26 @@ void RaceTick(uint8_t* base, uint32_t machine, uint32_t dispatcher, uint32_t fra
   }
 }
 
+bool OnGoNative(uint8_t* base, uint32_t machine, uint32_t frame) {
+  const int32_t type = int32_t(Load(base, Load(base, machine + 9624) + 6100));
+  return type == 3 || type == 2 || StartRouteNative(base, machine, frame - 496);
+}
+
+void OnGo(uint8_t* base, uint32_t machine, uint32_t frame) {
+  ITC_NATIVE_RUNNING("sub_82164458 RaceStates::OnGo");
+  const int32_t type = int32_t(Load(base, Load(base, machine + 9624) + 6100));
+  if (type != 3 && type != 2) {
+    StartRoute(base, machine, frame - 496);
+  }
+  if (int32_t(Load(base, Load(base, machine + 9624) + 2184)) > 0) {
+    for (uint32_t i = 0;;) {
+      FollowRoute(base, frame + 80, Load(base, machine + 9624), i, frame - 240);
+      i++;
+      if (!(int32_t(i) < int32_t(Load(base, Load(base, machine + 9624) + 2184)))) {
+        break;
+      }
+    }
+  }
+}
+
 }  // namespace race_states

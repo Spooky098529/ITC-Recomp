@@ -19,7 +19,7 @@ ITC_FLAG_BOOL(native_race_states, true, "ITC",
               "sub_82164228, DrainSp sub_821650A0, CheckLap sub_82164090 (with Time::Sub "
               "sub_82162230; the original where memcpy's copies of the course route aren't "
               "native) and CheckFinish sub_82164E18, RoutePosition::MapToSection sub_82163930; RaceStates::Begin sub_82164DC0, "
-              "RaceProgress::FollowRoute sub_82163C50 with sub_82163000, RaceTick sub_82167610; "
+              "RaceProgress::FollowRoute sub_82163C50 with sub_82163000, RaceTick sub_82167610, OnGo sub_82164458; "
               "RaceProgress::StartRoute sub_821635D0 with RouteDistance sub_82162330, the "
               "original where memcpy's copies of the course route aren't native) natively instead of through the translated "
               "code (the same words, bit for bit; checked by --run_harnesses=race_states)");
@@ -290,6 +290,16 @@ void RaceStatesRaceTick(PPCContext& ctx, uint8_t* base) {
   rs::RaceTick(base, ctx.r3.u32, ctx.r4.u32, frame);
 }
 
+void RaceStatesOnGo(PPCContext& ctx, uint8_t* base) {
+  ctx.fpscr.disableFlushMode();
+  const uint32_t frame = ctx.r1.u32 - 112;
+  if (!rs::OnGoNative(base, ctx.r3.u32, frame)) {
+    __imp__sub_82164458(ctx, base);
+    return;
+  }
+  rs::OnGo(base, ctx.r3.u32, frame);
+}
+
 }  // namespace hooks
 
 // Defines an adapter: the flag, else the original.
@@ -329,6 +339,7 @@ ITC_RACE_STATES(821692C8, RaceStatesStandingStartTick)
 ITC_RACE_STATES(82164DC0, RaceStatesBegin)
 ITC_RACE_STATES(82163C50, RaceStatesFollowRoute)
 ITC_RACE_STATES(82167610, RaceStatesRaceTick)
+ITC_RACE_STATES(82164458, RaceStatesOnGo)
 ITC_RACE_STATES(821635D0, RaceStatesStartRoute)
 // RaceProgress::RouteDistance (sub_82162330) has no adapter: its only
 // caller, RaceProgress::StartRoute, is native; --native_race_states switches

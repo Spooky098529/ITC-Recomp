@@ -123,6 +123,13 @@ uint32_t SectionsJoin(uint8_t* base, uint32_t a, uint32_t b, uint32_t out_a, uin
 uint32_t FollowRoute(uint8_t* base, uint32_t out, uint32_t progress, uint32_t index,
                      uint32_t frame);
 
+// RaceStates::OnGo (sub_82164458): unless the progress's +6100 is 2 or 3,
+// RaceProgress::StartRoute (its frame `frame` - 496); then FollowRoute for
+// each results entry (+2184 of them, read again each pass; out at `frame` +
+// 80, its frame `frame` - 240). `frame`: its 112 bytes. OnGoNative says
+// first whether StartRoute's copies, when it runs, are native.
+bool OnGoNative(uint8_t* base, uint32_t machine, uint32_t frame);
+void OnGo(uint8_t* base, uint32_t machine, uint32_t frame);
 // Whether RaceStates::RaceTick runs natively: not with +7220's 0x8
 // (sub_821653E8, never seen in play), nor with +7224's 0x4 where CheckLap's
 // copies of the course route aren't native (CheckLapNative at `frame` -
