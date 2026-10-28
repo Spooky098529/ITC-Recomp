@@ -53,9 +53,21 @@ file's history. What's left to see in a drive, from every run:
   left: the rest waits on `LoadSlot::Reset` `sub_820D0730` and
   `ReleaseBuffer` `sub_820D0758`, the part model's `sub_820CE9C8`,
   `sub_820CE990`, `sub_820CE928` (`models.md`), the accessories' release
-  and others. Step: validation agent 1 running.
+  and others. Validated (`itc_2022`: 20 of 20 harness lines, 17 ran in
+  the attract race, 3 in the replay `itc_2023`, ok; nothing to drive).
+  Finished.
+- The "no mapping" lead (not counted): the scene loaders' blockers,
+  each ready (`LoadSlot::Reset` `sub_820D0730`, `ReleaseBuffer`
+  `sub_820D0758`, `sub_820C3F50`, `CarModel::Release` `sub_820D4508` in
+  `car-models.md`; `sub_820CE928`, `sub_820CE990`, `sub_820CE9C8` in
+  `models.md`) and what they unblock in `scene-loaders.md`. Step:
+  migration agent 1 running.
 
 ## Done
+
+- The scene's loading objects (`scene-loaders.md`, mapped in 2616cc8;
+  78 rows): 20 ours in one migration (4b47c12, dfbc5a0), 5 Native with
+  no adapter; validated (`itc_2022`); `--native_scene_loaders`.
 
 - The app's update and its state stack (`app-states.md`, mapped in
   ac92c3b; 56 rows): 56 ours in two migrations (7bb4dfd..30892a7), 19
@@ -95,5 +107,8 @@ This run's groups: `expected-differences.md` (the "22:31 run" lines).
   103, known 593, unknown 3445).
 - After the scene loaders' migration 1: ours 2331, work left 4121
   (wrapped 103, known 573, unknown 3445).
+- After the scene loaders' validation: race 22 s (`itc_2022`), 0
+  errors, every harness 0 differing but the expected groups; replay
+  127 s (`itc_2023`), 0 errors.
 
 ## Stopped

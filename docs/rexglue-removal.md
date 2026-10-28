@@ -2598,6 +2598,7 @@ B7. **The game logic inside**: everything else, subsystem by subsystem,
 | 2026-10-26 | The car physics' ready groups (no mapping, not counted: `Vehicle::PhysicsStep`, `SetUpPhysics`, `ResetPhysics`, `DestroyPhysics`, `ProbeGround`, `Unflip`, `RefreshFromBody`, the collision objects' init and add, `CollisionWorld::Setup`, `Create`, `SetQueryCapacity` and `Update` with its pairs, collide and respond) | `car-physics.md`, with `vehicle-accessors.md`, `matrix-math.md`, `collision.md` | 134 of 134 (two migrations; 84 adapters removed, 7 Native with none) | `--native_car_physics` |
 | 2026-10-27 | The vehicle code above the physics (the seven vehicles' create, constructor and destroy, `Vehicle::SetUp` and `ResetForCar`, the surface grip, `Vehicle::Tick` and `ApplyInput`, the track positions, the status record, `PlaceOnRoute`, `Racers::NearestHumanVehicle`; the engine's power curve and `RoutePosition::Step`) | `vehicle.md` | 25 of 25 (two migrations; 5 adapters removed, 1 Native with none, 1 Merged) | `--native_vehicle` |
 | 2026-10-28 | The app's update and its state stack (`App::Update`, `App::Start`, `App::IsRunning`, the handler maps, requests, messages and add slots; the state stack `AppStates` and its 48-byte state layers: their set-up, walks, updates, operations and toggle messages; the containers they use: the message vector, the operation list, `PtrList::Erase` and `ForEach`, the delegate's clone) | `app-states.md` | 56 of 56 (two migrations; 19 adapters removed, 4 Native with none, 1 Merged) | `--native_app_states` |
+| 2026-10-28 | The scene's loading objects (the first scene pool set's seven loading classes: car model, parts, cockpit body, interior, pool 4's model, wheels, traffic body; `ScenePools::MakeA`, the pool node, the classes' load checks, `CarParts::Part`, the XPR name lookups, `CarModelLoads`) | `scene-loaders.md` | 20 of 78 (one migration; 5 Native with no adapter) | `--native_scene_loaders` |
 
     The first run (2026-10-22, branch `b7-loop-test`): every harness at 0 differing, attract races at 20-21 s with no errors,
     and a race the user drove looked right. Ours went from 162 to 335 (work
@@ -3624,3 +3625,20 @@ original. The boundary unchanged: 449 functions (916 pairs): overridden
 69, Native 5, Dropped 23, never called 70, live 282. Imports: 186
 called, 62 with a live caller. B7 (`b7_status.py`): ours 2,311, work
 left 4,141 (Wrapped 103, with a row 515, no row yet 3,523), from 4,197.
+
+**2026-10-28, the scene's loading objects (branch `b7-loop-27-10-26`):**
+the eighteenth run's second subsystem mapped the lead taken for the car
+code's skeletons as the first scene pool set's seven loading classes
+(`scene-loaders.md`, 78 rows) and made 20 native in one migration
+(`--native_scene_loaders`): the leaves, `ScenePools::MakeA` (over the
+allocation layer only), the pool node, the load checks, the XPR name
+lookups and `CarModelLoads`. The rest waits on functions in other
+files, each small and ready: `LoadSlot::Reset` `sub_820D0730` and
+`ReleaseBuffer` `sub_820D0758`, the deferred release `sub_820C3F50`
+and `CarModel::Release` `sub_820D4508` (`car-models.md`), the part
+model's `sub_820CE928`, `sub_820CE990`, `sub_820CE9C8` (`models.md`),
+the accessories' release; taken next as a "no mapping" lead. The
+boundary unchanged: 449 functions (916 pairs): overridden 69, Native 5,
+Dropped 23, never called 70, live 282. Imports: 186 called, 62 with a
+live caller. B7 (`b7_status.py`): ours 2,331, work left 4,121 (Wrapped
+103, with a row 573, no row yet 3,445), from 4,141.
