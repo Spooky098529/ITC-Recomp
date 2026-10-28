@@ -85,6 +85,18 @@ When the user has reviewed a run's section, its heading gets
   (9dc3c72: compress cases with no slot loading, and the cleanup's
   double free of the new sheet header they exposed) and resumed the
   run.
+- The race world (map 5b6d76c): `docs/functions/race-world.md`, 54 rows
+  (all new; 45 in play, 9 not seen): the race mode's state machine at
+  +116812 (`RaceWorld::`, 24 transitions; states 1 load, 2 loading, 3
+  start, 7 racing, 24 paused, 37 end), the racers' manager at
+  `[0x826D82F4]` (80 entries of 28 bytes: 77 opponents and 3 traffic;
+  at most 4 opponents and the allowed traffic get one of the 7
+  vehicles, streamed by distance from the car's speed), the race
+  event's start placements (`RaceEvent::Place*`), `RaceStart::Place`
+  and `PlaceRolling`, the save's distance on unload. `known-data.md`:
+  `0x826D82F4` extended, two new rows; `leads.md`: lead 31 deleted (all
+  mapped here), `sub_82174D28` dropped from lead 50, one lead added (the
+  race's other states); `ai-drivers.md`: three notes repointed.
 
 ## Run 2026-10-27 22:31 (`b7-loop-27-10-26`)
 

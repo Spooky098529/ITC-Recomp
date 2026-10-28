@@ -47,7 +47,14 @@ file's history. What's left to see in a drive, from every run:
   `sub_82170668`, `sub_82171250`, `sub_82165E20`, `sub_821662E0`,
   `sub_82173A90`, `sub_82174BC0` (probably the race's states and
   manager, the callers of `TrackCollision::Load`, `ResetWorld`,
-  `Unload`, `Tick`; 16+ ready groups under them). Mapping agent
+  `Unload`, `Tick`; 16+ ready groups under them). Mapped as the race
+  world (`race-world.md`, 54 rows, all new, 45 in play: the race
+  mode's state machine at +116812, the racers' manager at
+  `[0x826D82F4]` with its streaming of vehicles by distance, the
+  start placements, the save's distance on unload; 5b6d76c; 1 lead
+  added). Map checked (0 errors, 22 ready groups, blocked outside by
+  `TrackCollision::Tick` `sub_820FF050` (ready) and the archive's
+  `sub_8209DE48`, `sub_820A0678`; no kernel calls). Migration agent 1
   running.
 
 ## Done
@@ -95,6 +102,8 @@ This run's groups: `expected-differences.md` (the "08:36 run" lines).
 - At the end (after the decal path's validation, `itc_2122`: race 19
   s, 0 errors, every harness 0 differing but the expected groups):
   ours 2447, work left 4006 (wrapped 103, known 503, unknown 3400).
+- After the race world's map: ours 2447, work left 4006 (wrapped 103,
+  known 548, unknown 3355).
 
 ## Stopped
 
