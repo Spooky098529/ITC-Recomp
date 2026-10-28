@@ -527,37 +527,38 @@ namespace {
 
 // A caller's copy of course route `index`: CourseRoutes::Get into the
 // caller's frame at +`out` (its own frame below, frame - 4480), then memcpy
-// (sub_825A7410, from `caller`) of that to the caller's +96. Returns the
-// copy's first word (+96). Only after RouteCopiesNative said yes.
-uint32_t CopyRoute(uint8_t* base, uint32_t frame, uint32_t out, uint32_t index, uint32_t caller) {
+// (sub_825A7410, from `caller`) of that to the caller's +`to`. Returns the
+// copy's first word (+`to`). Only after RouteCopiesNative said yes.
+uint32_t CopyRoute(uint8_t* base, uint32_t frame, uint32_t out, uint32_t index, uint32_t caller,
+                   uint32_t to = 96) {
   uint32_t source = 0;
   uint64_t result = 0;
   const bool got =
       CourseRoutesGet(base, frame + out, index, frame - kRoutesFrameBytes, &source, &result);
   const bool copied =
-      native::Buffers_Memcpy(base, frame + 96, uint32_t(result), kRouteBytes, caller);
+      native::Buffers_Memcpy(base, frame + to, uint32_t(result), kRouteBytes, caller);
   if (!got || !copied) {
     ITC_LOG_ERROR("race_setup: a route's copy at {:08X} (route {}) not made natively", frame,
                   index);
   }
-  return guest::LoadU32(base, frame + 96);
+  return guest::LoadU32(base, frame + to);
 }
 
 }  // namespace
 
 uint32_t CopyCourseRoute(uint8_t* base, uint32_t frame, uint32_t out, uint32_t index,
-                         uint32_t caller) {
-  return CopyRoute(base, frame, out, index, caller);
+                         uint32_t caller, uint32_t to) {
+  return CopyRoute(base, frame, out, index, caller, to);
 }
 
-bool RouteCopiesNative(uint32_t frame, uint32_t out, uint32_t index) {
+bool RouteCopiesNative(uint32_t frame, uint32_t out, uint32_t index, uint32_t to) {
   if (!native::Buffers_NativeMemcpy()) {
     return false;
   }
   const uint32_t table = frame - kRoutesFrameBytes + 80;
   const uint32_t source = uint32_t(uint64_t(index) * kRouteBytes + table);
   return !c_runtime::MayShare(frame + out, kRouteBytes, source, kRouteBytes) &&
-         !c_runtime::MayShare(frame + 96, kRouteBytes, frame + out, kRouteBytes);
+         !c_runtime::MayShare(frame + to, kRouteBytes, frame + out, kRouteBytes);
 }
 
 namespace {

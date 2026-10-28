@@ -136,6 +136,38 @@ bool RaceTickNative(uint8_t* base, uint32_t machine, uint32_t frame);
 // 128 bytes). `frame`: its 208 bytes.
 void RaceTick(uint8_t* base, uint32_t machine, uint32_t dispatcher, uint32_t frame);
 
+// --- The race's route at its start (src/race_states/route_distance.cpp) ---
+
+// RaceProgress::RouteDistance (sub_82162330): the stage's course route
+// `index` (CourseRoutes::Get at `frame` + 368, memcpy to + 176) walked from
+// its first section to its last into the progress's path (+6636, halfwords;
+// +7148 the count), by the route's kind (0 to 5, 6 and 7: rows of the
+// sections' bytes +3 at `frame` + 96; 8: first forward links; 9 and 10: the
+// start alone; 11 on: the copy's list of sections); then +7156 (the race's
+// length) and +7164 on (the laps' distances, until a lap position whose
+// section is 0xFFFF) by TrackRoute::PathDistance along the path (its frame
+// `frame` - 288). The link lists at + 128 and + 144 and the positions at
+// + 80 to + 171 as the original leaves them; the copy's word list changed
+// where a side link replaced a section, as the original. `frame`: its 656
+// bytes. RouteDistanceNative says first whether the copies are native.
+bool RouteDistanceNative(uint32_t index, uint32_t frame);
+void RouteDistance(uint8_t* base, uint32_t progress, uint32_t index, uint32_t frame);
+// RaceProgress::StartRoute (sub_821635D0): `machine` the race's states
+// (+9624 the progress, read again each time as the original). For the stage
+// types other than 1 and 3: the start (+7152) the first racer's (manager
+// entry flag 0x4) track position, each results entry's slot start (+572)
+// from it, and the start appended to each slot's list (S +12, S +524 the
+// count; 256 at most) and the race's (+6120, +6632). For 1 and 3: the start
+// the course route's first position (its copy at `frame` + 96,
+// CourseRoutes::Get at + 288), RouteDistance (its frame `frame` - 656), then
+// the path's sections up to the first racer's section or one beside it
+// (RouteSections::Beside, its link list at `frame` - 32) appended to each
+// slot's list and the race's. The word at + 80 as the original leaves it.
+// `frame`: its 496 bytes. StartRouteNative says first whether the copies
+// (its and RouteDistance's) are native.
+bool StartRouteNative(uint8_t* base, uint32_t machine, uint32_t frame);
+void StartRoute(uint8_t* base, uint32_t machine, uint32_t frame);
+
 // --- The state machine's handlers (src/race_states/handlers.cpp): the
 // machine (the race mode + 107168: +9604 the state, +9608 the pause menu's
 // quit, +9612 a step, +9616 a tick count, +9624 the progress) and the

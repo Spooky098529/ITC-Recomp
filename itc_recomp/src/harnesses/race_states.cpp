@@ -1111,6 +1111,435 @@ void FollowRouteCases(Context& h, const Block& progress, const Block& vehicles,
   }
 }
 
+// --- The race's route at its start ---
+
+// RouteDistance walks the stage's course route (CourseRoutes::Get's, 0 to
+// 22: their sections are the game's numbers, their positions' slices up to
+// 490) until it reaches the route's last section, and only stops there:
+// the cases shape a route it walks to its end. Every section the case names
+// gets its own record of 512 slices (a block of 48, the slices' centers
+// random floats, filled once), the file's count 0x7FFF (every section on the
+// route for TrackRoute::Normalize), other numbers a record with no links.
+// The path's records are linked as each kind of route walks them (the rows'
+// bytes +3 and kinds for 0 to 7, the first forward link for 8, the copy's
+// list for 11 on, now and then through a side link), with -1 and sections
+// that don't fit before and after the link taken, and each a link back (3 to
+// 5) to the one before (PathDistance's slice steps); the links' slices 0 to
+// 63.
+class StartRoutes {
+ public:
+  static constexpr uint32_t kSlices = 512;
+  static constexpr uint32_t kStride = 124 + 108 * kSlices + 4;  // 55,424
+  static constexpr uint32_t kRecords = 48;
+  static constexpr uint32_t kHeader = 0x100;
+  static constexpr uint32_t kBytes = kHeader + kStride * kRecords;
+
+  struct Course {
+    int32_t pairs[5][2] = {};
+    std::vector<int32_t> words;  // from +20, up to -1
+  };
+
+  StartRoutes(Context& h, uint32_t area, uint32_t table) : h_(h), area_(area), table_(table) {
+    Random fill(0x5354525455u);
+    for (uint32_t s = 0; s < kRecords; s++) {
+      const uint32_t at = Record(s);
+      for (uint32_t i = 124; i + 4 <= kStride; i += 4) {
+        const float unit = float(fill.Below(1u << 24)) / float(1u << 24);
+        guest::StoreU32(h_.base, at + i, std::bit_cast<uint32_t>((unit * 2.0f - 1.0f) * 100.0f));
+      }
+    }
+    Header(Record(kRecords - 1), fill);
+    guest::StoreU8(h_.base, Record(kRecords - 1) + 3, 0);
+    for (uint32_t i = 0; i < tr::kTableEntries; i++) {
+      guest::StoreU32(h_.base, table_ + 4 * i, Record(kRecords - 1));
+    }
+    guest::StoreU32(h_.base, area_ + tr::kFile + 0, 0x7FFF);
+    guest::StoreU32(h_.base, area_ + tr::kFile + 4, 0x10);
+    guest::StoreU32(h_.base, area_ + tr::kFile + 8, std::bit_cast<uint32_t>(2.0f));
+    guest::StoreU32(h_.base, area_ + tr::kFile + 12, table_);
+    // The course routes as CourseRoutes::Get gives them.
+    for (uint32_t index = 0; index < 23; index++) {
+      PPCContext t = CallContext(h_);
+      const uint32_t out = h_.data + 3584;
+      t.r3.u64 = out;
+      t.r4.u64 = index;
+      __imp__sub_820FFF50(t, h_.base);
+      Course& c = courses_[index];
+      for (uint32_t k = 0; k < 5; k++) {
+        c.pairs[k][0] = int16_t(guest::LoadU16(h_.base, out + 4 * k));
+        c.pairs[k][1] = int16_t(guest::LoadU16(h_.base, out + 4 * k + 2));
+      }
+      for (uint32_t k = 0; k < 41; k++) {
+        const int32_t w = int32_t(guest::LoadU32(h_.base, out + 20 + 4 * k));
+        if (w == -1) {
+          break;
+        }
+        c.words.push_back(w);
+      }
+    }
+  }
+
+  // The case's route for course route `index` (see the class); its path as
+  // RouteDistance should walk it into `path`. False when it can't be
+  // shaped (nothing set: the case runs nothing).
+  bool Shape(uint32_t index, Random& r, std::vector<int32_t>* path) {
+    Reset();
+    guest::StoreU32(h_.base, track_route::kRoute, area_ + tr::kFile);
+    const Course& c = courses_[index];
+    const int32_t start = c.pairs[0][0];
+    int32_t last = c.pairs[4][0];
+    for (uint32_t k = 0; k < 5; k++) {
+      if ((c.pairs[k][0] & 0xFFFF) == 0xFFFF) {
+        last = c.pairs[k - 1][0];
+        break;
+      }
+    }
+    used_.clear();
+    for (const auto& p : c.pairs) {
+      used_.push_back(p[0] & 0xFFFF);
+    }
+    for (int32_t w : c.words) {
+      used_.push_back(uint32_t(w) & 0xFFFF);
+    }
+    path->assign(1, start);
+    overflow_ = false;
+    Map(uint32_t(start), r);
+    for (uint32_t k = 1; k < 5; k++) {
+      if ((c.pairs[k][0] & 0xFFFF) != 0xFFFF) {
+        Map(uint32_t(c.pairs[k][0]), r);
+      }
+    }
+    for (uint32_t& d : decoys_) {
+      d = Fresh(r);
+      Map(d, r);
+    }
+    if (index == 9 || index == 10) {
+      return true;
+    }
+    if (index > 10) {
+      if (c.words.size() < 2 || c.words.back() != last) {
+        ITC_LOG_ERROR("harness: race_states: course route {} has no list to its end", index);
+        return false;
+      }
+      int32_t current = start;
+      for (size_t k = 1; k < c.words.size(); k++) {
+        const int32_t wanted = c.words[k];
+        const uint32_t w = Map(uint32_t(current), r);
+        const bool side =
+            r.Below(4) == 0 && next_ + uint32_t(c.words.size() - k) + 2 < kRecords - 1;
+        int32_t before = current;
+        if (!side) {
+          const uint32_t p = r.Below(3);
+          for (uint32_t q = 0; q < 3; q++) {
+            SetLink(w, q, q == p ? wanted : Other(r), r);
+          }
+          for (uint32_t q = 6; q < 10; q++) {
+            SetLink(w, q, Other(r), r);
+          }
+        } else {
+          const int32_t s = int32_t(Fresh(r));
+          const uint32_t sr = Map(uint32_t(s), r);
+          for (uint32_t q = 0; q < 3; q++) {
+            SetLink(w, q, Other(r), r);
+          }
+          const uint32_t p = 6 + r.Below(4);
+          for (uint32_t q = 6; q < 10; q++) {
+            SetLink(w, q, q == p ? s : q < p ? Other(r) : (r.Below(2) ? Other(r) : -1), r);
+          }
+          const uint32_t f = r.Below(3);
+          for (uint32_t q = 0; q < 3; q++) {
+            SetLink(sr, q, q == f ? wanted : q < f ? -1 : Other(r), r);
+          }
+          path->back() = s;
+          before = s;
+        }
+        SetLink(Map(uint32_t(wanted), r), 3 + r.Below(3), before, r);
+        path->push_back(wanted);
+        current = wanted;
+      }
+      return !overflow_;
+    }
+    // Routes 0 to 8: a chain from the start to the last through 0 to 3
+    // sections of the case's own.
+    std::vector<int32_t> chain = {start};
+    const uint32_t between = r.Below(4);
+    for (uint32_t k = 0; k < between; k++) {
+      chain.push_back(int32_t(Fresh(r)));
+    }
+    chain.push_back(last);
+    static const uint8_t kRowsA[24] = {2, 6, 255, 1,  5, 255, 4,  5, 14, 3, 6, 13,
+                                       11, 1, 255, 12, 1, 255, 4, 5, 1,  3, 6, 2};
+    static const uint8_t kRowsB[28] = {14, 4, 2, 12, 12, 2, 11, 11, 2, 4, 14, 255, 255, 255,
+                                       3,  1, 11, 11, 1, 12, 12, 1, 3, 3, 13, 8,   3,   255};
+    int32_t place = 0;
+    static const uint32_t kOrder[7] = {0, 1, 2, 6, 7, 8, 9};
+    for (size_t i = 0; i + 1 < chain.size(); i++) {
+      const uint32_t w = Map(uint32_t(chain[i]), r);
+      const uint32_t t = Map(uint32_t(chain[i + 1]), r);
+      if (index == 8) {
+        // The first forward link not -1.
+        const uint32_t p = r.Below(3);
+        for (uint32_t q = 0; q < 3; q++) {
+          SetLink(w, q, q == p ? chain[i + 1] : q < p ? -1 : Other(r), r);
+        }
+      } else {
+        uint32_t wanted;
+        if (index < 6) {
+          wanted = kRowsA[index * 3 + r.Below(3)];
+        } else {
+          const uint8_t* row = kRowsB + 14 * (index - 6);
+          const int32_t next = place + 1;
+          const int32_t pick = next < 14 ? next : 13;
+          if (r.Below(3) != 0 || row[place] == row[pick]) {
+            wanted = row[pick];
+            if (pick == next) {
+              place = pick;
+            }
+          } else {
+            wanted = row[place];
+          }
+        }
+        guest::StoreU8(h_.base, t + 2, uint8_t((r.Below(16) << 4) | (r.Below(2) ? 0 : 5)));
+        guest::StoreU8(h_.base, t + 3, uint8_t(wanted));
+        const uint32_t p = r.Below(4) ? r.Below(3) : 3 + r.Below(4);
+        for (uint32_t q = 0; q < 7; q++) {
+          SetLink(w, kOrder[q], q == p ? chain[i + 1] : Other(r), r);
+        }
+      }
+      SetLink(t, 3 + r.Below(3), chain[i], r);
+      if (i > 0) {
+        path->push_back(chain[i]);
+      }
+    }
+    path->push_back(last);
+    return !overflow_;
+  }
+
+  // A section beside `section` (a side link 6 to 9 of its own record names
+  // it), for RouteSections::Beside.
+  uint32_t Beside(int32_t section, Random& r) {
+    const uint32_t s = Fresh(r);
+    SetLink(Map(s, r), 6 + r.Below(4), section, r);
+    return s;
+  }
+  uint32_t Fresh(Random& r) {
+    for (;;) {
+      const uint32_t s = 1000 + r.Below(30000);
+      if (std::find(used_.begin(), used_.end(), s) == used_.end()) {
+        used_.push_back(s);
+        return s;
+      }
+    }
+  }
+  // The table's entries back to the record with no links.
+  void Reset() {
+    for (uint32_t s : mapped_) {
+      guest::StoreU32(h_.base, table_ + 4 * s, Record(kRecords - 1));
+    }
+    mapped_.clear();
+    next_ = 0;
+  }
+
+ private:
+  uint32_t Record(uint32_t slot) const { return area_ + kHeader + kStride * slot; }
+  // A record's first 124 bytes: 512 slices, a kind, a byte +3 no row has, its
+  // bounds, no links (slices 0 to 63), its lanes.
+  void Header(uint32_t at, Random& r) {
+    guest::StoreU16(h_.base, at + 0, uint16_t(kSlices));
+    guest::StoreU8(h_.base, at + 2, uint8_t(r.Below(256)));
+    const uint8_t others[] = {0, 7, 9, 10};
+    guest::StoreU8(h_.base, at + 3, others[r.Below(4)]);
+    for (uint32_t i = 0; i < 6; i++) {
+      guest::StoreU32(h_.base, at + 4 + 4 * i, tr::RandomFloat(r, 200.0f));
+    }
+    for (uint32_t i = 0; i < 12; i++) {
+      guest::StoreU16(h_.base, at + 28 + 4 * i, 0xFFFF);
+      guest::StoreU16(h_.base, at + 30 + 4 * i, uint16_t(r.Below(64)));
+    }
+    for (uint32_t i = 0; i < 48; i++) {
+      guest::StoreU8(h_.base, at + 76 + i, uint8_t(r.Below(4) == 0 ? 0xFF : r.Below(8)));
+    }
+  }
+  // Section `section`'s record, given one (with Header) the first time.
+  uint32_t Map(uint32_t section, Random& r) {
+    const uint32_t number = section & 0xFFFF;
+    const uint32_t entry = guest::LoadU32(h_.base, table_ + 4 * number);
+    if (entry != Record(kRecords - 1)) {
+      return entry;
+    }
+    if (next_ >= kRecords - 1) {
+      if (!overflow_) {
+        ITC_LOG_ERROR("harness: race_states: StartRoutes ran out of records");
+      }
+      overflow_ = true;
+      return Record(kRecords - 1);
+    }
+    const uint32_t at = Record(next_++);
+    Header(at, r);
+    guest::StoreU32(h_.base, table_ + 4 * number, at);
+    mapped_.push_back(number);
+    return at;
+  }
+  // -1, or now and then one of the case's four sections whose records fit
+  // no row and have no links.
+  int32_t Other(Random& r) {
+    return r.Below(3) != 0 ? -1 : int32_t(decoys_[r.Below(4)]);
+  }
+  void SetLink(uint32_t record, uint32_t link, int32_t section, Random& r) {
+    if (record == Record(kRecords - 1)) {
+      return;  // out of records: the case isn't run
+    }
+    guest::StoreU16(h_.base, record + 28 + 4 * link, uint16_t(section));
+    guest::StoreU16(h_.base, record + 30 + 4 * link, uint16_t(r.Below(64)));
+  }
+
+  Context& h_;
+  uint32_t area_;
+  uint32_t table_;
+  Course courses_[23];
+  std::vector<uint32_t> mapped_;
+  std::vector<uint32_t> used_;
+  uint32_t decoys_[4] = {};
+  uint32_t next_ = 0;
+  bool overflow_ = false;
+};
+
+// The progress's words with its floats (+7156 the race's length, +7164 the
+// laps' 4 distances) as floats.
+void ProgressOutputs(Outputs& out, uint8_t* base, uint32_t p) {
+  out.Bytes(Read(base, p, 7156));
+  out.Floats(base, p + 7156, 1);
+  out.Bytes(Read(base, p + 7160, 4));
+  out.Floats(base, p + 7164, 4);
+  out.Bytes(Read(base, p + 7180, kProgressBytes - 7180));
+}
+
+// RaceProgress::RouteDistance on each course route (the seed's modulo 23)
+// shaped as StartRoutes says; RaceProgress::StartRoute with the stage's
+// type 1 or 3 (the route walked), 0, 2 or random, the racers' slots and
+// cars as SetUpSlots makes them, their track position on the path, beside a
+// section of it or elsewhere, 0 to 4 results entries and the lists' counts
+// 0 to 3, 255 or 256.
+void RouteStart(Context& h, const Block& progress, const Block& vehicles) {
+  const Block area(StartRoutes::kBytes);
+  const Block table(4 * tr::kTableEntries);
+  const Block machine(10240);
+  if (!area.address || !table.address || !machine.address) {
+    ITC_LOG_ERROR("harness: race_states: no block from the allocation layer");
+    return;
+  }
+  StartRoutes routes(h, area.address, table.address);
+  {
+    Results results("RaceProgress::RouteDistance (sub_82162330)");
+    uint32_t sides = 0;
+    for (uint64_t seed = 0; seed < 64; seed++) {
+      Outputs out[2];
+      bool shaped = true;
+      for (int v = 0; v < 2 && shaped; v++) {
+        Random r(seed * 149 + 103);
+        Globals globals(h.base, {track_route::kRoute});
+        const uint32_t index = uint32_t(seed % 23);
+        std::vector<int32_t> path;
+        shaped = routes.Shape(index, r, &path);
+        if (!shaped) {
+          break;
+        }
+        WriteRandom(h.base, h.data, kScratchBytes, r);
+        WriteRandom(h.base, progress.address, kProgressBytes, r);
+        PPCContext t = CallContext(h);
+        const uint32_t frame = t.r1.u32 - 656;
+        WriteRandom(h.base, frame, 656, r);
+        t.r3.u64 = progress.address;
+        t.r4.u64 = index;
+        (v == 0 ? Original<__imp__sub_82162330> : hooks::RaceStatesRouteDistance)(t, h.base);
+        if (v == 1 && index > 10 && int32_t(path.size()) > 1) {
+          // A side link taken: the path's section isn't the copy's.
+          for (size_t k = 1; k + 1 < path.size(); k++) {
+            sides += uint32_t(path[k]) >= 1000 ? 1 : 0;
+          }
+        }
+        ProgressOutputs(out[v], h.base, progress.address);
+        out[v].Bytes(Read(h.base, frame + 80, 472));
+      }
+      routes.Reset();
+      if (shaped) {
+        results.Check(out[0], out[1], fmt::format("seed {} (course route {})", seed, seed % 23));
+      }
+    }
+    results.Report();
+    ITC_LOG_INFO("harness: race_states: RouteDistance took {} side links", sides);
+  }
+  {
+    Results results("RaceProgress::StartRoute (sub_821635D0)");
+    uint32_t walked = 0, matched = 0;
+    for (uint64_t seed = 0; seed < 48; seed++) {
+      Outputs out[2];
+      bool shaped = true;
+      for (int v = 0; v < 2 && shaped; v++) {
+        Random r(seed * 151 + 107);
+        Globals globals(h.base, {track_route::kRoute, kVehicles});
+        const uint32_t types[] = {1, 3, 1, 3, 1, 3, 0, 2};
+        const uint32_t type = r.Below(8) == 0 ? uint32_t(r.Next()) & ~0x2u : types[r.Below(8)];
+        const uint32_t index = r.Below(23);
+        std::vector<int32_t> path;
+        shaped = routes.Shape(index, r, &path);
+        if (!shaped) {
+          break;
+        }
+        WriteRandom(h.base, h.data, kScratchBytes, r);
+        WriteRandom(h.base, progress.address, kProgressBytes, r);
+        WriteRandom(h.base, vehicles.address, vehicles.bytes, r);
+        SetUpSlots(h, progress, vehicles, r);
+        const uint32_t p = progress.address;
+        guest::StoreU32(h.base, p + 6100, type);
+        guest::StoreU32(h.base, p + 6076, index);
+        guest::StoreU32(h.base, p + 2184, r.Below(5));
+        const uint32_t counts[] = {0, 1, 2, 3, 255, 256};
+        for (uint32_t i = 0; i < 4; i++) {
+          guest::StoreU32(h.base, p + 40 + 536 * i + 524, counts[r.Below(6)]);
+          if (r.Below(4) == 0) {
+            guest::StoreU32(h.base, p + 48 + 536 * i, 0);
+          }
+        }
+        guest::StoreU32(h.base, p + 6632, counts[r.Below(6)]);
+        // The racers' track position: on the path, beside a section of it,
+        // or elsewhere.
+        const uint32_t pick = r.Below(4);
+        const int32_t on = path[r.Below(uint32_t(path.size()))];
+        const uint32_t section = pick < 2    ? uint32_t(on)
+                                 : pick == 2 ? routes.Beside(on, r)
+                                             : routes.Fresh(r);
+        for (uint32_t k = 0; k < 7; k++) {
+          guest::StoreU16(h.base, vehicles.address + 6272 * k + 5236, uint16_t(section));
+          guest::StoreU16(h.base, vehicles.address + 6272 * k + 5238, uint16_t(r.Below(64)));
+        }
+        WriteRandom(h.base, machine.address + 9600, 64, r);
+        guest::StoreU32(h.base, machine.address + 9624, p);
+        PPCContext t = CallContext(h);
+        const uint32_t frame = t.r1.u32 - 496;
+        WriteRandom(h.base, frame - 656, 656 + 496, r);
+        t.r3.u64 = machine.address;
+        (v == 0 ? Original<__imp__sub_821635D0> : hooks::RaceStatesStartRoute)(t, h.base);
+        if (v == 1 && (type == 1 || type == 3)) {
+          walked++;
+          matched += pick < 3 ? 1 : 0;
+        }
+        ProgressOutputs(out[v], h.base, p);
+        out[v].Bytes(Read(h.base, frame + 80, 392));
+        out[v].Bytes(Read(h.base, frame - 656 + 80, 472));
+      }
+      routes.Reset();
+      if (shaped) {
+        results.Check(out[0], out[1], fmt::format("seed {}", seed));
+      }
+    }
+    results.Report();
+    ITC_LOG_INFO("harness: race_states: StartRoute walked the route in {} of 48 cases, the "
+                 "racers on or beside it in {}",
+                 walked, matched);
+  }
+}
+
 // --- The state machine's handlers: the machine and the dispatcher in
 // blocks of their own, the race data's flags and kind, the screen fades'
 // words (0x826A50AC to 0x826A50EB) and [0x826C6B04] put back after each
@@ -1500,6 +1929,7 @@ void RaceStates(Context& h) {
   Checks(h, progress, vehicles);
   RouteChecks(h, progress, vehicles);
   FollowRouteCases(h, progress, vehicles, manager);
+  RouteStart(h, progress, vehicles);
   Handlers(h, progress, vehicles, manager);
   Racers(h, vehicles, manager);
 }

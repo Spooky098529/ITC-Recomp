@@ -97,6 +97,14 @@ void RaceStatesBegin(PPCContext& ctx, uint8_t* base);
 // r3 = 0 or 1 (the harness's).
 void RaceStatesFollowRoute(PPCContext& ctx, uint8_t* base);
 void RaceStatesSectionsJoin(PPCContext& ctx, uint8_t* base);
+// RaceProgress::StartRoute sub_821635D0: r3 = the race's states (r3 not
+// kept: neither caller reads it); the original where StartRouteNative says
+// the course route's copies aren't native. RaceProgress::RouteDistance
+// sub_82162330 (no adapter: its only caller, StartRoute, is native): r3 =
+// the progress, r4 = the course route's index (r3 not kept; the original
+// where RouteDistanceNative says no; the harness's).
+void RaceStatesStartRoute(PPCContext& ctx, uint8_t* base);
+void RaceStatesRouteDistance(PPCContext& ctx, uint8_t* base);
 // RaceStates::RaceTick sub_82167610: a handler (r3 not kept); the original
 // where RaceTickNative says so.
 void RaceStatesRaceTick(PPCContext& ctx, uint8_t* base);
