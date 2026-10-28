@@ -106,5 +106,14 @@ void RaceWorldPlaceGroupFixed(PPCContext& ctx, uint8_t* base);
 void RaceWorldPlaceGroup(PPCContext& ctx, uint8_t* base);
 void RaceWorldPlaceGroupTwoRows(PPCContext& ctx, uint8_t* base);
 void RaceWorldPlaceGroupSplit(PPCContext& ctx, uint8_t* base);
+// RaceWorld::OnLoaded sub_82173A90: r3 = the race world (not read; r3 not
+// kept: the state machine's handler call doesn't read it); the original
+// unless --native_heap routes the game's heap to the allocation layer.
+// RaceStart::Place sub_82165E20: r3 = the object, r4 = the settle flag, r5
+// = the back flag. RaceStart::PlaceRolling sub_821662E0: r3 = the object,
+// r4 = the settle flag. r3 not kept (their callers don't read it).
+void RaceWorldOnLoaded(PPCContext& ctx, uint8_t* base);
+void RaceWorldPlace(PPCContext& ctx, uint8_t* base);
+void RaceWorldPlaceRolling(PPCContext& ctx, uint8_t* base);
 
 }  // namespace hooks

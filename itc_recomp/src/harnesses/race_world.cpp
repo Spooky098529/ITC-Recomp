@@ -17,6 +17,7 @@
 #include "base/log.h"
 #include "harnesses/test_route.h"
 #include "ai_drivers/ai_drivers.h"
+#include "hooks/ai_drivers.h"
 #include "hooks/heap.h"
 #include "hooks/race_world.h"
 #include "memory/c_runtime_heap.h"
@@ -26,9 +27,11 @@
 #include "game_modes/game_modes.h"
 #include "track_collision/track_collision.h"
 #include "track_route/track_route.h"
+#include "vehicle/vehicle.h"
 
 #include <fmt/format.h>
 
+#include <algorithm>
 #include <bit>
 #include <cstring>
 #include <string>
@@ -2164,6 +2167,421 @@ void ManagerLists(Context& h, const Block& manager, const Block& vehicles) {
   }
 }
 
+// --- The racers made, placed and settled: RaceWorld::OnLoaded,
+// RaceStart::Place and PlaceRolling over a race's start world built from the
+// existing cases' pieces: the course (the collision world harness's mesh and
+// route, the route not marked loaded, so TrackCollision::Tick skips the
+// world's update and only reads the racers' contacts), the car physics'
+// fake world (its free objects the most racers a case gives vehicles to),
+// the racer records' car as the vehicle harness's Vehicle::SetUp cases make
+// it (vehicle_cases::FillSetUpCase; record 0's copied to the others; cases
+// whose car data the gearing's set-up would read out of its tables with
+// are left out, as there, by a first run of the car loader on a zeroed
+// vehicle), the race data (zeroed: no traffic, no event; the stages, mode,
+// kind, flags and the records' flags, start positions, speeds, items and
+// distances), player 0's save, the data tables' items and the racers' input
+// records. The seven vehicles, the AI drivers and the manager are made by
+// the functions themselves (Vehicles::Create, AiDrivers::Create,
+// RaceManager::Create through the allocation layer: each side frees them
+// after, so the other gets the same blocks). AiDriver::DriveCar and
+// AiDrivers::UpdateAll answer through stand-ins on both sides (their own
+// harnesses check them): the calls' arguments, stack pointers and return
+// addresses logged and compared, DriveCar's record filled with words from
+// them. Vehicle::SetUp, ResetForCar, PlaceOnRoute, Vehicle::Tick,
+// TrackCollision::Tick, AddRacers, ListRacers and NoteMarkedRacer run for
+// real. Place's and PlaceRolling's cases start from the world OnLoaded's
+// original leaves, then change the stage, mode, kind, items, the save and
+// the start's globals, and flag entries 0x400. Compared exactly: the
+// vehicles, their bodies and shapes, the fake world, the manager, the
+// drivers, the input records, the records' fields, the race data's flags,
+// the marked racer, the stand-ins' log and the frames' temporaries. ---
+
+std::vector<uint32_t> g_start_log;
+uint32_t g_start_calls = 0;
+uint32_t StartMix(uint32_t x) {
+  x ^= x >> 16;
+  x *= 0x7FEB352Du;
+  x ^= x >> 15;
+  x *= 0x846CA68Bu;
+  return x ^ (x >> 16);
+}
+void StartDriveCar(PPCContext& ctx, uint8_t* base) {
+  g_start_log.insert(g_start_log.end(), {0xD0000000u, ctx.r3.u32, ctx.r4.u32, ctx.r5.u32,
+                                         ctx.r1.u32, uint32_t(ctx.lr)});
+  // Moderate inputs: the steering, brake and throttle words small, the kind
+  // byte +17 2 (an AI driver's), as DriveCar leaves it.
+  for (uint32_t i = 0; i < 5; i++) {
+    guest::StoreU32(base, ctx.r3.u32 + 4 * i,
+                    StartMix(g_start_calls * 7 + i + ctx.r4.u32 * 131 + ctx.r5.u32 * 977) &
+                        0x3E00003Fu);
+  }
+  guest::StoreU8(base, ctx.r3.u32 + 17, 2);
+  ctx.f1.f64 = double(g_start_calls);
+  g_start_calls++;
+}
+void StartUpdateAll(PPCContext& ctx, uint8_t* base) {
+  g_start_log.insert(g_start_log.end(), {0xD2000000u, ctx.r1.u32, uint32_t(ctx.lr)});
+  ctx.r3.u64 = StartMix(g_start_calls++);
+}
+// While alive, the stand-ins answer and the log starts empty.
+struct StartStandIns {
+  StartStandIns() {
+    hooks::g_drive_car_stand_in = StartDriveCar;
+    hooks::g_update_all_stand_in = StartUpdateAll;
+    Reset();
+  }
+  ~StartStandIns() {
+    hooks::g_drive_car_stand_in = nullptr;
+    hooks::g_update_all_stand_in = nullptr;
+  }
+  static void Reset() {
+    g_start_log.clear();
+    g_start_calls = 0;
+  }
+};
+
+void StartCases(Context& h) {
+  constexpr uint32_t kStartObject = 0x826C7820, kStartPosition = 0x826C6B0C;
+  const Block world(car_objects::WorldBytes());
+  const Block region(car_objects::VehicleRegionBytes());
+  const Block course(TestCourseBytes());
+  const Block table(4 * 0x10000);
+  const Block race(0xA4000);
+  const Block tables(0x40 + 4 * 3008);
+  const Block save(8192);
+  const Block inputs(8 * 32);
+  const Block object(0x4000);
+  if (!world.address || !region.address || !course.address || !table.address ||
+      !race.address || !tables.address || !save.address || !inputs.address || !object.address) {
+    ITC_LOG_ERROR("harness: race_world: no block from the allocation layer");
+    return;
+  }
+  FillTestCourseTable(h.base, course.address, table.address);
+  const uint32_t sp = CallContext(h).r1.u32;
+  const uint32_t loaded_frame = sp - 352;
+  const uint32_t setup_frame = loaded_frame - 224;
+  const uint32_t items = tables.address + 0x40;
+  const uint32_t records = race.address + 48;
+  const uint32_t stages = race.address + 0x59620;
+  const auto globals = [&] {
+    auto ranges = car_objects::UpdateGlobals();
+    ranges.insert(ranges.end(), {{0x826C2D80, 0x100},
+                                 {0x826C5B00, 0x80},
+                                 {0x826C6070, 0x10},
+                                 {kMarkedRacer, 16},
+                                 {rw::kManager, 4},
+                                 {kStartObject, 8},
+                                 {kStartPosition, 8}});
+    return SavedBytes(h.base, ranges);
+  };
+  // A random position on the course (2 sections of 6 slices).
+  const auto position = [](Random& r) { return (r.Below(2) << 16) | r.Below(6); };
+  // The world for one side; false when the case is left out (`check`: the
+  // loader's first run). `racers` gets the records' count.
+  const auto build = [&](Random& r, uint64_t seed, bool check, uint32_t* count) {
+    WriteRandom(h.base, course.address, course.bytes, r);
+    BuildTestCourse(h.base, course.address, table.address, r);
+    guest::StoreU32(h.base, track_route::kRoute + 8, 0);
+    std::memset(h.base + race.address, 0, race.bytes);
+    std::vector<uint32_t> given;
+    vehicle_cases::FillSetUpCase(h, world.address, region.address, records, setup_frame,
+                                 loaded_frame, seed, false, r, given);
+    if (check) {
+      std::memset(h.base + region.address, 0, region.bytes);
+      const bool sane = vehicle_cases::SetUpCaseSane(h, region.address, records, setup_frame);
+      vehicle_cases::FreeSetUpCase(given);
+      return sane;
+    }
+    vehicle_cases::FreeSetUpCase(given);
+    // The world's free objects: the most racers with vehicles.
+    uint32_t free_objects = 0;
+    const uint32_t w = guest::LoadU32(h.base, kWorldPointer);
+    for (uint32_t o = guest::LoadU32(h.base, w + 24); o != 0 && free_objects < 8;
+         o = guest::LoadU32(h.base, o + 228)) {
+      free_objects++;
+    }
+    const uint32_t n = 1 + r.Below(std::max(1u, std::min(free_objects, 4u)));
+    *count = n;
+    guest::StoreU32(h.base, records + 0x595E0, n);
+    const uint32_t player = r.Below(n);
+    for (uint32_t i = 0; i < n; i++) {
+      const uint32_t record = records + 3936 * i;
+      if (i != 0) {
+        std::memcpy(h.base + record, h.base + records, 3936);
+      }
+      const uint32_t flags[] = {0x2, 0x2, 0x2, 0x80, 0x0, 0x4, 0x102};
+      guest::StoreU32(h.base, record + 3888, i == player ? 0x1 : flags[r.Below(7)]);
+      guest::StoreU32(h.base, record + 3904, position(r));
+      guest::StoreFloat(h.base, record + 3908, float(r.Below(120)) * 0.5f);
+      guest::StoreU32(h.base, record + 3912, r.Below(4) == 0 ? 0xFFFFFFFFu : r.Below(4));
+      guest::StoreU32(h.base, record + 3916, 0xFFFFFFFFu);
+      guest::StoreFloat(h.base, record + 3920, float(r.Below(1000)) * 0.25f);
+    }
+    const uint32_t stage = r.Below(3);
+    guest::StoreU32(h.base, stages + 804, stage);
+    guest::StoreU32(h.base, stages + 800, 3);
+    for (uint32_t s = 0; s < 3; s++) {
+      guest::StoreU32(h.base, stages + 80 * s + 0, r.Below(5));
+      for (uint32_t i = 0; i < 4; i++) {
+        guest::StoreU32(h.base, stages + 80 * s + 44 + 8 * i,
+                        r.Below(4) == 0 ? 0xFFFFFFFFu : r.Below(n));
+      }
+    }
+    const uint32_t modes[] = {0, 1, 6, 6};
+    guest::StoreU32(h.base, race.address + 0xA3AF0, modes[r.Below(4)]);
+    const uint32_t kinds[] = {0, 1, 2, 3, 8};
+    guest::StoreU32(h.base, race.address + 0xA3AF4, kinds[r.Below(5)]);
+    guest::StoreU32(h.base, race.address + 0x59AE4, uint32_t(r.Next()) & ~0x2200u);
+    // The items' branch kinds (+36) and AiDriver::Setup's table (+120).
+    WriteRandom(h.base, tables.address, tables.bytes, r);
+    guest::StoreU32(h.base, tables.address + 16, items);
+    for (uint32_t k = 0; k < 4; k++) {
+      const uint8_t branch[] = {0, 1, 2, 3, 0xFF, 0xFE};
+      guest::StoreU8(h.base, items + 3008 * k + 36, branch[r.Below(6)]);
+      for (uint32_t i = 0; i < 7; i++) {
+        guest::StoreU16(h.base, items + 3008 * k + 120 + 2 * i,
+                        uint16_t(int32_t(r.Below(300)) - 100));
+      }
+    }
+    WriteRandom(h.base, inputs.address, inputs.bytes, r);
+    for (uint32_t k = 0; k < 8; k++) {
+      guest::StoreU32(h.base, kRacerInputs + 4 * k, inputs.address + 32 * k);
+    }
+    WriteRandom(h.base, save.address, save.bytes, r);
+    const uint32_t backs[] = {1, 1, 0, 1000, 2};
+    guest::StoreU32(h.base, save.address + 6100, backs[r.Below(5)]);
+    guest::StoreU32(h.base, kSaves, save.address);
+    guest::StoreU32(h.base, data_tables::kTables, tables.address);
+    guest::StoreU32(h.base, rw::kRaceData, race.address);
+    guest::StoreU32(h.base, rw::kRaceEvent, 0);
+    guest::StoreU32(h.base, rw::kManager, 0);
+    return true;
+  };
+  // What a side leaves.
+  const auto outputs = [&](Outputs& out, uint32_t count, uint32_t frame, uint32_t bytes) {
+    const uint32_t vehicles = guest::LoadU32(h.base, kVehicles);
+    const uint32_t drivers = guest::LoadU32(h.base, ai_drivers::kDrivers);
+    const uint32_t manager = guest::LoadU32(h.base, rw::kManager);
+    out.Word(vehicles);
+    out.Word(drivers);
+    out.Word(manager);
+    if (vehicles != 0) {
+      out.Bytes(Read(h.base, vehicles, kVehiclesBytes));
+      for (uint32_t i = 0; i < 7; i++) {
+        for (uint32_t at : {336u, 340u, 344u}) {
+          const uint32_t p = guest::LoadU32(h.base, vehicles + 6272 * i + at);
+          if (p != 0 && p >= 0x10000) {
+            out.Bytes(Read(h.base, p, 512));
+          }
+        }
+      }
+    }
+    out.Bytes(Read(h.base, world.address, world.bytes));
+    if (manager != 0) {
+      out.Bytes(Read(h.base, manager, 2400 + 2 * 1200));
+      out.Bytes(Read(h.base, manager + 360000, 64));
+    }
+    if (drivers != 0) {
+      out.Bytes(Read(h.base, drivers, kDriversBytes));
+    }
+    out.Bytes(Read(h.base, inputs.address, inputs.bytes));
+    for (uint32_t i = 0; i < count; i++) {
+      out.Bytes(Read(h.base, records + 3936 * i + 3888, 48));
+    }
+    out.Word(guest::LoadU32(h.base, race.address + 0x59AE4));
+    out.Bytes(Read(h.base, kMarkedRacer, 12));
+    out.Bytes(Read(h.base, frame + 80, bytes));
+    out.Word(uint32_t(g_start_log.size()));
+    for (uint32_t w : g_start_log) {
+      out.Word(w);
+    }
+  };
+  // Frees what the functions made.
+  const auto teardown = [&] {
+    PPCContext t = CallContext(h);
+    t.fpscr.disableFlushModeUnconditional();
+    if (guest::LoadU32(h.base, kVehicles) != 0 && !vehicle::VehiclesDestroy(h.base)) {
+      __imp__sub_820C3B78(t, h.base);
+    }
+    uint64_t r3 = 0;
+    t = CallContext(h);
+    if (guest::LoadU32(h.base, ai_drivers::kDrivers) != 0 && !ai_drivers::Destroy(h.base, &r3)) {
+      __imp__sub_8213B2B8(t, h.base);
+    }
+    const uint32_t manager = guest::LoadU32(h.base, rw::kManager);
+    if (manager != 0 && !memory::crt::OperatorDelete(manager)) {
+      t = CallContext(h);
+      t.r3.u64 = manager;
+      __imp__sub_825A70E8(t, h.base);
+    }
+    // The shape records' copies (+36, +40) the fake world's objects took
+    // (AddObject), freed so the other side's blocks come from the same
+    // free ranges.
+    const uint32_t w = guest::LoadU32(h.base, kWorldPointer);
+    for (uint32_t i = 0; i < guest::LoadU32(h.base, w + 12) && i < 8; i++) {
+      const uint32_t o = guest::LoadU32(h.base, w + 16) + 320 * i;
+      for (uint32_t at : {36u, 40u}) {
+        const uint32_t copy = guest::LoadU32(h.base, o + at);
+        if (copy != 0 && memory::IsHeapBlock(copy)) {
+          memory::Free(copy);
+        }
+      }
+    }
+  };
+  // RaceWorld::OnLoaded's original, as the place cases' starting world.
+  const auto loaded = [&] {
+    PPCContext t = CallContext(h);
+    t.fpscr.disableFlushModeUnconditional();
+    t.r3.u64 = h.data;
+    Original<__imp__sub_82173A90>(t, h.base);
+  };
+  uint32_t racers = 0, ticks = 0, kind8 = 0, long_settles = 0;
+  {
+    Results results("RaceWorld::OnLoaded (sub_82173A90)");
+    uint32_t left_out = 0;
+    uint32_t held = 0;
+    for (uint64_t seed = 0; seed < 150; seed++) {
+      Outputs out[2];
+      bool skip = false;
+      uint32_t count = 0;
+      for (int v = -1; v < 2 && !skip; v++) {
+        Random r(seed * 179 + 103);
+        auto saved = globals();
+        StartStandIns stand_ins;
+        if (!build(r, seed, v < 0, &count)) {
+          skip = true;
+          left_out++;
+          continue;
+        }
+        if (v < 0) {
+          continue;
+        }
+        PPCContext t = CallContext(h);
+        t.fpscr.disableFlushModeUnconditional();
+        t.r3.u64 = h.data;
+        (v == 0 ? Original<__imp__sub_82173A90> : hooks::RaceWorldOnLoaded)(t, h.base);
+        if (v == 1) {
+          const uint32_t manager = guest::LoadU32(h.base, rw::kManager);
+          racers += manager != 0 ? guest::LoadU32(h.base, manager + 2364) : 0;
+          held += (guest::LoadU32(h.base, race.address + 0x59AE4) & 0x2000) != 0 ? 1 : 0;
+        }
+        outputs(out[v], count, loaded_frame, 160);
+        teardown();
+      }
+      if (!skip) {
+        results.Check(out[0], out[1], fmt::format("seed {}", seed));
+      }
+    }
+    results.Report();
+    ITC_LOG_INFO("harness: race_world: RaceWorld::OnLoaded: {} racers with vehicles, {} cases "
+                 "held, {} cases left out (car data the gearing's set-up would read out of its "
+                 "tables with)",
+                 racers, held, left_out);
+  }
+  // The changes Place's and PlaceRolling's cases make to the loaded world.
+  const auto vary = [&](Random& r, uint32_t count) {
+    const uint32_t stage = guest::LoadU32(h.base, stages + 804);
+    guest::StoreU32(h.base, stages + 80 * stage + 0, r.Below(5));
+    for (uint32_t i = 0; i < 4; i++) {
+      guest::StoreU32(h.base, stages + 80 * stage + 44 + 8 * i,
+                      r.Below(5) == 0 ? 0xFFFFFFFFu : r.Below(count));
+    }
+    const uint32_t modes[] = {0, 1, 1, 6};
+    guest::StoreU32(h.base, race.address + 0xA3AF0, modes[r.Below(4)]);
+    const uint32_t kinds[] = {0, 1, 2, 3, 8, 8};
+    guest::StoreU32(h.base, race.address + 0xA3AF4, kinds[r.Below(6)]);
+    for (uint32_t i = 0; i < count; i++) {
+      guest::StoreU32(h.base, records + 3936 * i + 3912,
+                      r.Below(4) == 0 ? 0xFFFFFFFFu : r.Below(4));
+    }
+    const uint32_t backs[] = {1, 1, 0, 1000, 2};
+    guest::StoreU32(h.base, save.address + 6100, backs[r.Below(5)]);
+    // The kind 8 start: an object's (+9624, its +7244) or the halfwords.
+    guest::StoreU32(h.base, kStartObject + 4, r.Below(2) == 0 ? 0 : uint32_t(r.Next()) | 1);
+    guest::StoreU32(h.base, object.address + 9624, object.address + 0x200);
+    guest::StoreU32(h.base, object.address + 0x200 + 7244, position(r));
+    guest::StoreU16(h.base, kStartPosition + 2, uint16_t(r.Below(2)));
+    guest::StoreU16(h.base, kStartPosition + 4, uint16_t(r.Below(6)));
+    // Entries flagged 0x400 (the rolling start's).
+    const uint32_t manager = guest::LoadU32(h.base, rw::kManager);
+    for (uint32_t i = 0; i < guest::LoadU32(h.base, manager + 2368) && i < 80; i++) {
+      const uint32_t entry = manager + 4 + 28 * i;
+      if (r.Below(2) == 0) {
+        guest::StoreU32(h.base, entry, guest::LoadU32(h.base, entry) | 0x400);
+      }
+    }
+  };
+  for (const bool rolling : {false, true}) {
+    Results results(rolling ? "RaceStart::PlaceRolling (sub_821662E0)"
+                            : "RaceStart::Place (sub_82165E20)");
+    for (uint64_t seed = 0; seed < 150; seed++) {
+      Outputs out[2];
+      bool skip = false;
+      uint32_t count = 0;
+      for (int v = -1; v < 2 && !skip; v++) {
+        Random r(seed * 181 + 107 + (rolling ? 5000 : 0));
+        auto saved = globals();
+        StartStandIns stand_ins;
+        if (!build(r, seed + 1000, v < 0, &count)) {
+          skip = true;
+          continue;
+        }
+        if (v < 0) {
+          continue;
+        }
+        loaded();
+        vary(r, count);
+        // Place's cases: now and then no player (the record's flag 0x1
+        // cleared; PlaceRolling reads its entry, always there).
+        if (!rolling && r.Below(5) == 0) {
+          for (uint32_t i = 0; i < count; i++) {
+            const uint32_t at = records + 3936 * i + 3888;
+            guest::StoreU32(h.base, at, guest::LoadU32(h.base, at) & ~0x1u);
+          }
+        }
+        const uint32_t settle = r.Below(3) == 0 ? 0 : 1;
+        const uint32_t back = r.Below(3) == 0 ? 1 : 0;
+        StartStandIns::Reset();
+        WriteRandom(h.base, sp - 512, 512, r);
+        PPCContext t = CallContext(h);
+        t.fpscr.disableFlushModeUnconditional();
+        t.r3.u64 = object.address;
+        t.r4.u64 = settle;
+        t.r5.u64 = back;
+        if (rolling) {
+          (v == 0 ? Original<__imp__sub_821662E0> : hooks::RaceWorldPlaceRolling)(t, h.base);
+        } else {
+          (v == 0 ? Original<__imp__sub_82165E20> : hooks::RaceWorldPlace)(t, h.base);
+        }
+        if (v == 1) {
+          ticks += settle;
+          kind8 += guest::LoadU32(h.base, race.address + 0xA3AF4) == 8 ? 1 : 0;
+          long_settles += settle != 0 && guest::LoadU32(h.base, race.address + 0xA3AF0) == 6 &&
+                                  guest::LoadU32(h.base, sp - 400 + 160) != 1 && !rolling
+                              ? 1
+                              : 0;
+        }
+        // Place's frame temporaries (+80 to +240) and the words it stores in
+        // its caller's frame (+20, +28); for PlaceRolling, its own
+        // temporaries (+80 and +112) and Place's words in its frame (Place's
+        // own frame is below it, where PlaceRolling's later callees' frames
+        // go: not compared).
+        const uint32_t place_sp = rolling ? sp - 272 : sp;
+        outputs(out[v], count, rolling ? sp - 272 : sp - 400, rolling ? 52 : 160);
+        out[v].Bytes(Read(h.base, place_sp + 16, 16));
+        teardown();
+      }
+      if (!skip) {
+        results.Check(out[0], out[1], fmt::format("seed {}", seed));
+      }
+    }
+    results.Report();
+  }
+  ITC_LOG_INFO("harness: race_world: RaceStart::Place and PlaceRolling: {} cases settled ({} "
+               "for 300 ticks), {} of kind 8",
+               ticks, long_settles, kind8);
+}
+
 }  // namespace
 
 void RaceWorld(Context& h) {
@@ -2190,8 +2608,10 @@ void RaceWorld(Context& h) {
     ResetWorlds(h, manager, vehicles);
     ResetVehicleCases(h, manager);
     Unloads(h);
+    StartCases(h);
   } else {
-    ITC_LOG_INFO("harness: race_world: the resets and Unload skipped (--native_heap off)");
+    ITC_LOG_INFO("harness: race_world: the resets, Unload and the start skipped (--native_heap "
+                 "off)");
   }
 }
 

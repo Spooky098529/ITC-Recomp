@@ -6,6 +6,8 @@
 
 #include "base/flags.h"
 #include "base/log.h"
+#include "hooks/ai_drivers.h"
+#include "hooks/car_physics.h"
 #include "hooks/heap.h"
 #include "hooks/vehicle_native.h"
 #include "race_world/race_world.h"
@@ -31,7 +33,10 @@ ITC_FLAG_BOOL(native_race_world, true, "ITC",
               "PlaceGroup sub_82143A40, PlaceGroupTwoRows sub_82143B78 and PlaceGroupSplit "
               "sub_82143920; RaceManager::ListRacers sub_82171E50 (Vehicle::RemoveFromWorld's "
               "original unless --native_heap routes the game's heap to the allocation layer) "
-              "and AddRacers sub_82173050 natively instead of through the "
+              "and AddRacers sub_82173050; RaceWorld::OnLoaded sub_82173A90 (only while "
+              "--native_heap routes the game's heap to the allocation layer), RaceStart::Place "
+              "sub_82165E20 and PlaceRolling sub_821662E0 (their callees' originals where those "
+              "refuse) natively instead of through the "
               "translated code (the same words, bit for bit; checked by "
               "--run_harnesses=race_world)");
 
@@ -297,6 +302,113 @@ void RaceWorldPlaceGroupSplit(PPCContext& ctx, uint8_t* base) {
                       ctx.r1.u32 - 176);
 }
 
+namespace {
+
+// The start functions' guest calls (race_world::StartCalls), with
+// Vehicle::SetUp's callees' originals in `setup_frame`.
+rw::StartCalls StartCalls(PPCContext& ctx, uint8_t* base, uint32_t setup_frame) {
+  namespace vh = vehicle;
+  rw::StartCalls calls;
+  calls.original = [&ctx, base](uint32_t address, uint32_t sp, uint64_t r3, uint64_t r4,
+                                uint64_t r5) {
+    const uint64_t r1 = ctx.r1.u64;
+    ctx.r1.u64 = sp;
+    ctx.r3.u64 = r3;
+    ctx.r4.u64 = r4;
+    ctx.r5.u64 = r5;
+    switch (address) {
+      case 0x820FFD88:
+        __imp__sub_820FFD88(ctx, base);
+        break;
+      case 0x820C3BD0:
+        __imp__sub_820C3BD0(ctx, base);
+        break;
+      case 0x8213B1E0:
+        __imp__sub_8213B1E0(ctx, base);
+        break;
+      case 0x821715B8:
+        __imp__sub_821715B8(ctx, base);
+        break;
+      case 0x820C20E0:
+        __imp__sub_820C20E0(ctx, base);
+        break;
+    }
+    ctx.r1.u64 = r1;
+    ctx.fpscr.disableFlushMode();
+    return ctx.r3.u64;
+  };
+  calls.setup_original = VehicleSetUpOriginals(ctx, base, setup_frame);
+  calls.tick = VehicleTickCalls(ctx, base);
+  calls.place = [&ctx, base](uint32_t address, uint32_t r1, const vh::GuestRegisters& r) {
+    const uint64_t saved = ctx.r1.u64;
+    ctx.r1.u64 = r1;
+    ctx.r3.u64 = r.r3;
+    ctx.r4.u64 = r.r4;
+    ctx.r5.u64 = r.r5;
+    if (address == 0x820C3608) {
+      ctx.r6.u64 = r.r6;
+      ctx.r7.u64 = 1;
+      ctx.f1.f64 = r.f1;
+      ctx.f2.f64 = r.f2;
+      __imp__sub_820C3608(ctx, base);
+    } else if (address == 0x820B7998) {
+      __imp__sub_820B7998(ctx, base);
+    } else {
+      sub_825A7410(ctx, base);  // memcpy, through its override as the original
+    }
+    ctx.r1.u64 = saved;
+    ctx.fpscr.disableFlushMode();
+  };
+  calls.collision = CollisionWorldUpdateCalls(ctx, base);
+  calls.update_drivers = [&ctx, base](uint32_t sp, uint32_t lr) {
+    const uint64_t r1 = ctx.r1.u64;
+    ctx.r1.u64 = sp;
+    ctx.lr = lr;
+    AiUpdateAll(ctx, base);
+    ctx.r1.u64 = r1;
+    ctx.fpscr.disableFlushMode();
+  };
+  calls.drive_car = [&ctx, base](uint32_t input, uint32_t index, uint32_t flag, uint32_t sp,
+                                 uint32_t lr) {
+    const uint64_t r1 = ctx.r1.u64;
+    ctx.r1.u64 = sp;
+    ctx.lr = lr;
+    ctx.r3.u64 = input;
+    ctx.r4.u64 = index;
+    ctx.r5.u64 = flag;
+    AiDriveCar(ctx, base);
+    ctx.r1.u64 = r1;
+    ctx.fpscr.disableFlushMode();
+    return ctx.r3.u64;
+  };
+  return calls;
+}
+
+}  // namespace
+
+void RaceWorldOnLoaded(PPCContext& ctx, uint8_t* base) {
+  ctx.fpscr.disableFlushMode();
+  if (!NativeHeapActive()) {
+    __imp__sub_82173A90(ctx, base);
+    return;
+  }
+  const uint32_t frame = ctx.r1.u32 - 352;
+  rw::OnLoaded(base, frame, StartCalls(ctx, base, frame - 224));
+}
+
+void RaceWorldPlace(PPCContext& ctx, uint8_t* base) {
+  ctx.fpscr.disableFlushMode();
+  const uint32_t frame = ctx.r1.u32 - 400;
+  rw::Place(base, ctx.r3.u32, ctx.r4.u32, ctx.r5.u32, ctx.r1.u32,
+            StartCalls(ctx, base, frame - 224));
+}
+
+void RaceWorldPlaceRolling(PPCContext& ctx, uint8_t* base) {
+  ctx.fpscr.disableFlushMode();
+  const uint32_t frame = ctx.r1.u32 - 272;
+  rw::PlaceRolling(base, ctx.r3.u32, ctx.r4.u32, frame, StartCalls(ctx, base, frame - 224));
+}
+
 }  // namespace hooks
 
 // Defines an adapter: the flag, else the original.
@@ -332,6 +444,9 @@ ITC_RACE_WORLD(82171718, RaceWorldResetVehicles)
 ITC_RACE_WORLD(82171250, RaceWorldUnload)
 ITC_RACE_WORLD(82171E50, RaceWorldListRacers)
 ITC_RACE_WORLD(82173050, RaceWorldAddRacers)
+ITC_RACE_WORLD(82173A90, RaceWorldOnLoaded)
+ITC_RACE_WORLD(82165E20, RaceWorldPlace)
+ITC_RACE_WORLD(821662E0, RaceWorldPlaceRolling)
 // RaceManager::NearSegment (sub_82170BC0) and RoutePosition::ToMainRoad
 // (sub_82143608) have no adapters: their callers in play
 // (RaceManager::BuildNeighbors, RoutePosition::StepToMainRoad) are native;

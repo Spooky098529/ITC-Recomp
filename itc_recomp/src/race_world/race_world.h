@@ -21,6 +21,7 @@
 #include <functional>
 #include <optional>
 
+#include "car_physics/car_physics.h"
 #include "vehicle/vehicle.h"
 
 namespace race_world {
@@ -305,6 +306,108 @@ void PlaceStarts(uint8_t* base, uint32_t event, uint32_t kind, uint32_t player, 
 // RaceEvent::PlaceStartsCurrent (sub_82144A38): PlaceStarts with the event
 // at [0x826C6078] (a tail call: `sp` the caller's stack pointer).
 void PlaceStartsCurrent(uint8_t* base, uint32_t kind, uint32_t player, uint32_t sp);
+
+// --- The racers made, placed and settled (src/race_world/race_start.cpp) ---
+
+// A callee's original, run with r1 = `sp` and r3 to r5 as given; returns the
+// r3 it leaves.
+using OriginalCall = std::function<uint64_t(uint32_t address, uint32_t sp, uint64_t r3,
+                                            uint64_t r4, uint64_t r5)>;
+// The guest calls the start functions make: the callees' originals where
+// their plain C++ refuses (Stages::Copy 0x820FFD88, Vehicles::Create
+// 0x820C3BD0, AiDrivers::Create 0x8213B1E0, RaceManager::Create 0x821715B8,
+// Vehicle::RemoveFromWorld 0x820C20E0), Vehicle::SetUp's and ResetForCar's
+// callees' (in the set-up's frame, 224 bytes below the caller's),
+// Vehicle::Tick's, Vehicle::PlaceOnRoute's (memcpy, sub_820B7998, and the
+// whole original 0x820C3608 where its plain C++ refuses, r7 = 1),
+// CollisionWorld::Update's (TrackCollision::Tick's), and the AI drivers'
+// update of every racer (AiDrivers::UpdateAll) and AiDriver::DriveCar as
+// their adapters run them (r1 = `sp`, the link register `lr`; DriveCar
+// returns its r3).
+struct StartCalls {
+  OriginalCall original;
+  vehicle::CalleeOriginal setup_original;
+  vehicle::GuestCall tick;
+  vehicle::GuestCall place;
+  car_physics::CollisionGuestCall collision;
+  std::function<void(uint32_t sp, uint32_t lr)> update_drivers;
+  std::function<uint64_t(uint32_t input, uint32_t index, uint32_t flag, uint32_t sp, uint32_t lr)>
+      drive_car;
+};
+
+// RaceWorld::OnLoaded (sub_82173A90): the current stage copied to `frame` +
+// 160 (Stages::Copy); held (and the race data's flags +0x59AE4 |= 0x2000)
+// when the stage is of type 2 or 3, or the mode (+0xA3AF0) is 6 and the
+// copy's +0 isn't 1. Vehicles::Create; each of the seven vehicles
+// Vehicle::SetUp with the first racer record (the race data + 48) and
+// Vehicle::RemoveFromWorld; AiDrivers::Create; RaceManager::Create;
+// RaceManager::AddRacers (the manager, the race data + 48). Each racer
+// (+2364 of them, the count read again each pass): its vehicle
+// Vehicle::ResetForCar with its record (the race data + 48 + 3,936 x its
+// +24). Each racer again: its vehicle's byte +2384 = 1 when held (the mode
+// and the copy read again) and Stages::HasRacer(its record), else 0; its
+// entry's +8 kept on the route (TrackRoute::ClampPosition into `frame` +
+// 80) and Vehicle::PlaceOnRoute with the record's speed (+3956 of the race
+// data + 3,936 x its +24), the float at 0x82000A34 across, the lane (-1
+// when the kind +0xA3AF4 is 0 or 1, else the racer's place in the list mod
+// 2) and 1. Then 30 settling ticks (Settle: every racer, DriveCar's record
+// at `frame` + 128 copied through + 96). Then each racer's vehicle +6244 =
+// the race data's +3968 + 3,936 x its +24 (its record's +3920; lfs, stfs);
+// RaceManager::ListRacers; the flags |=
+// 0x200; RaceManager::NoteMarkedRacer. `frame`: the original's 352 bytes.
+// Only while --native_heap routes the game's heap to the allocation layer
+// (the adapter checks). r3 isn't kept (the state machine's handler call
+// doesn't read it).
+void OnLoaded(uint8_t* base, uint32_t frame, const StartCalls& calls);
+// RaceStart::Place (sub_82165E20): `object` and `settle` stored at `sp` +
+// 20 and + 28 (the caller's frame, as the original), the halfwords at
+// `frame` + 80, + 82 = 0xFFFF; the player's position: the +8 of the entry
+// (RaceManager::EntryOfRecord) of the first record flagged 0x1, or the word
+// at `frame` + 80 with none. Back (the step's sign): `back` set, or the
+// mode 1 with player 0's save +6100 1. Each racer (Race::RacerCount, read
+// again each pass) in the current stage (Stages::HasRacer): the stage
+// copied to `frame` + 160; its vehicle's byte +2384 = 1 for a stage of type
+// 2 or 3 or the kind (+0xA3AF4) 8, else 0; the lane its place among those
+// placed mod 2. Kind 8: the start position ([[[`sp` + 20] + 9624] + 7244]
+// when the word at 0x826C7824 is set, else the halfwords at 0x826C6B0E,
+// 0x826C6B10) at `frame` + 80 put on the main road (TrackRoute::ToMainRoad,
+// 1), the lane capped by the slice's lane count (its byte +56's low four
+// bits; past it, one slice back by RoutePosition::Step(-1, -1) and the
+// count less 1), Vehicle::PlaceOnRoute with the float at 0x82000A34 as the
+// speed and across, the position stored at the race data + 3,952 + 3,936 x
+// the number (its record's start position, +3904). Other kinds (the
+// record's words at the race data + 3,936 x the number + 3,936 on): from
+// the player's position, records not flagged 0x1 stepped by the item's
+// branch kind (the signed byte +36 of DataTables::Item of +3960, -1
+// without one): forward
+// by RoutePosition::Step (the n-th, 1, 2, ...) for a stage of type 2 or 3,
+// or (else) when the stage's +0 is 3 or 1 and not back; else with
+// RoutePosition::StepToMainRoad, back (-1, -2, ...) or forward; then
+// Vehicle::PlaceOnRoute with the record's speed (+3956). With `settle` (the
+// word at `sp` + 28 read again): the stage copied again and 300 ticks (the
+// mode 6 with the copy's +0 not 1) or 30 (Settle: the racers in the stage,
+// DriveCar's record at `frame` + 128 copied through + 96, each entry's +8 =
+// its vehicle's track position's route position). `frame`: the original's
+// 400 bytes (`sp` - 400). r3 isn't kept (its callers don't read it).
+void Place(uint8_t* base, uint32_t object, uint32_t settle, uint32_t back, uint32_t sp,
+           const StartCalls& calls);
+// RaceStart::PlaceRolling (sub_821662E0): RaceStart::Place(`object`, 0, 0)
+// from `frame`; the player's entry (EntryOfRecord of the first record of
+// the race data read before it flagged 0x1, or 0); all (the mode 1 with
+// player 0's save +6100 1 or the current stage of type 2 or 3). Each racer
+// (Race::RacerCount, read again each pass) in the current stage: its
+// vehicle's byte +2384 = 0; unless its record is flagged 0x1, and when its
+// entry has flag 0x400 or all: the entry's +8 = the player's entry's +8
+// (two halfwords), RoutePosition::StepToMainRoad(+8, 10, 12, ... with all,
+// else -10, -12, ..., kind -1), Vehicle::PlaceOnRoute with the float at
+// 0x820097FC as the speed, 0x82000A34 across, the lane its place among
+// those placed mod 2. With `settle`: 30 ticks (Settle: the racers flagged
+// 0x400 in the stage, DriveCar's record at `frame` + 112 copied through +
+// 80, each entry's +8 its vehicle's track position's route position).
+// `frame`: the original's 272 bytes. r3 isn't kept (its callers don't read
+// it).
+void PlaceRolling(uint8_t* base, uint32_t object, uint32_t settle, uint32_t frame,
+                  const StartCalls& calls);
 
 // --- The save data ---
 
