@@ -80,6 +80,11 @@ When the user has reviewed a run's section, its heading gets
   `sub_820EE638`, `sub_820ED020`, `sub_820EEBC0` (recompiled callers
   outside the lead). One group expected to differ
   (`expected-differences.md`, "Unwritten header bytes in the frame").
+- The run stopped at the decal path's validation (`ClearCorner` with
+  no harness line); the lead fixed the harness by the user's call
+  (9dc3c72: compress cases with no slot loading, and the cleanup's
+  double free of the new sheet header they exposed) and resumed the
+  run.
 
 ## Run 2026-10-27 22:31 (`b7-loop-27-10-26`)
 

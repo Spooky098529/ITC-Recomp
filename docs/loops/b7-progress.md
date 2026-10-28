@@ -37,6 +37,19 @@ file's history. What's left to see in a drive, from every run:
   lines, all 20 in the attract race; `Vinyl::ClearCorner`
   `sub_820D3C80` missing (its harness doesn't reach it): halted.
 
+- Resumed 2026-10-28 by the user's call after the stop below: the
+  harness fixed (9dc3c72; `OnDecalLoaded`'s compress cases now reach
+  `ClearCorner` and the compress, 3 of 16 compressing; a double free in
+  the harness's cleanup they exposed fixed; `itc_2126`: 17 s, 0
+  errors, every harness 0 differing but the expected groups, the
+  harnesses ~1 s longer).
+- Subsystem 2 of 3: `leads.md`'s top lead, `sub_82170550`,
+  `sub_82170668`, `sub_82171250`, `sub_82165E20`, `sub_821662E0`,
+  `sub_82173A90`, `sub_82174BC0` (probably the race's states and
+  manager, the callers of `TrackCollision::Load`, `ResetWorld`,
+  `Unload`, `Tick`; 16+ ready groups under them). Mapping agent
+  running.
+
 ## Done
 
 - The vinyl sheet's decal path (no mapping; de91953..c9f00d1):
@@ -85,7 +98,7 @@ This run's groups: `expected-differences.md` (the "08:36 run" lines).
 
 ## Stopped
 
-2026-10-28, by "When to halt": the decal path's validation agent
+(resumed; see "Now") 2026-10-28, by "When to halt": the decal path's validation agent
 reported `Vinyl::ClearCorner` `sub_820D3C80` `missing:` (no `native
 running (harness):` line; it ran in play). `CarModel::OnDecalLoaded`'s
 compress cases (`c % 6 == 1` in `DecalLoadCases`,
