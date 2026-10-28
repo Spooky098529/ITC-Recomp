@@ -143,11 +143,9 @@ ITC_RACE_STATES(821648E0, RaceStatesProgressReset)
 ITC_RACE_STATES(821649B8, RaceStatesSetChecks)
 ITC_RACE_STATES(82163440, RaceStatesReleaseRacers)
 ITC_RACE_STATES(82162E08, RaceStatesCountTime)
-ITC_RACE_STATES(82163140, RaceStatesTickFraction)
 ITC_RACE_STATES(82162D80, RaceStatesRank)
 ITC_RACE_STATES(82162F78, RaceStatesSectionsBeside)
 ITC_RACE_STATES(82162E70, RaceStatesSectionsBefore)
-ITC_RACE_STATES(821622A8, RaceStatesPositionNotAfter)
 ITC_RACE_STATES(82164F08, RaceStatesCountHits)
 ITC_RACE_STATES(82164228, RaceStatesDamage)
 ITC_RACE_STATES(821650A0, RaceStatesDrainSp)
@@ -157,3 +155,7 @@ ITC_RACE_STATES(82163930, RaceStatesMapToSection)
 // Time::Sub (sub_82162230, never seen in play) has no adapter: its only
 // caller, RaceProgress::CheckLap, is native; --native_race_states switches
 // it.
+// RaceProgress::TickFraction (sub_82163140) and RoutePosition::NotAfter
+// (sub_821622A8) have no adapters: their callers, RaceProgress::CheckLap and
+// CheckFinish, are native; --native_race_states switches those callers.
+// Their register steps stay for the harness.
