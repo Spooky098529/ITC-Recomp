@@ -149,6 +149,18 @@ When the user has reviewed a run's section, its heading gets
   handlers. Kind 6's System Link branch mentioned once, not mapped.
   `known-data.md`: `0x826D82E8` expanded, "race states" and the loading
   screen `0x82815E60` rows; four leads added, three leads' notes.
+- The race's states, migration 1 (edb5487..2b3fe33): 35 rows in
+  `race-states.md` (6 Native; `Time::Sub` `sub_82162230` Native with
+  no adapter, never seen). Code in `src/race_states/`. The System Link
+  case of `StandingStartTick` runs the original whole (the row says
+  so). Float compares follow the translated code's `bge` as `!lt` and
+  `ble` as `!gt` (a NaN takes them; `src/race_states/steps.h`). Map
+  corrections: `DrainSp`'s side test uses flags 0x1, 0x2 and 0x80 (not
+  0x40); `CheckLap` compares with the next lap's distance
+  (`+7160 + 4 * (R+60 + 1)`); `TickFraction` reads r3 (the slot's
+  entry); `MapToSection`'s walk described. Exports added:
+  `race_setup::CopyCourseRoute`, `RaceWorldOpponentsCall`,
+  `RaceWorldStartCalls`, `RaceWorldListRacersOriginal`.
 
 ## Run 2026-10-27 22:31 (`b7-loop-27-10-26`)
 

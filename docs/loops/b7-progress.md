@@ -92,7 +92,15 @@ file's history. What's left to see in a drive, from every run:
   queue, the cars put back, the input recordings, the scene models'
   load poll, the player's items, the race event's lookups, the
   two-player cameras, the achievements check; no kernel calls).
-  Migration agent 1 running.
+  Migration 1 done (edb5487..2b3fe33, five batches): the race's
+  progress and checks, the state handlers, the rolling and standing
+  starts, the countdown; 35 ours, 6 Native; `--native_race_states`;
+  `itc_2234`: 8 s (the harnesses 30 s), 0 errors, every harness 0
+  differing but the expected groups; frame dumps identical (the
+  attract race reaches only `RaceProgress::Create` and `Reset`). Left
+  ready: `RaceStates::Init` (2,888 lines, split), `Begin`,
+  `RouteDistance`, `StartRoute`, `FollowRoute`. Validation agent
+  running.
 
 ## Done
 
@@ -155,6 +163,8 @@ This run's groups: `expected-differences.md` (the "08:36 run" lines).
   103, known 503, unknown 3355).
 - After the race states' map: ours 2497, work left 3961 (wrapped 103,
   known 564, unknown 3294).
+- After the race states' migration 1: ours 2532, work left 3927
+  (wrapped 103, known 530, unknown 3294).
 
 ## Stopped
 
