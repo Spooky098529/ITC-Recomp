@@ -331,7 +331,9 @@ void RaceStatesInit(PPCContext& ctx, uint8_t* base) {
     hooks::step(ctx, base);               \
   }
 
-ITC_RACE_STATES(821698B0, RaceStatesProgressCreate)
+// RaceProgress::Create (sub_821698B0) has no adapter: its only caller,
+// RaceStates::Init, is native; --native_race_states switches it. Its register
+// step stays for the harness.
 ITC_RACE_STATES(821648E0, RaceStatesProgressReset)
 ITC_RACE_STATES(821649B8, RaceStatesSetChecks)
 ITC_RACE_STATES(82163440, RaceStatesReleaseRacers)
