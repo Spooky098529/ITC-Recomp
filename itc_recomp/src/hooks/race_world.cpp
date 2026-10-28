@@ -180,18 +180,21 @@ ITC_RACE_WORLD(82170AA0, RaceWorldSortedListInsert)
 ITC_RACE_WORLD(82170A88, RaceWorldSortedListClear)
 ITC_RACE_WORLD(82170560, RaceWorldOnPausedTick)
 ITC_RACE_WORLD(82171360, RaceWorldRelease)
-ITC_RACE_WORLD(82143608, RaceWorldToMainRoad)
 ITC_RACE_WORLD(82170F18, RaceWorldStepToMainRoad)
 ITC_RACE_WORLD(82143508, RaceWorldRaceEventEntry)
 ITC_RACE_WORLD(82143150, RaceWorldPlaceEntry)
 ITC_RACE_WORLD(82112190, RaceWorldFirstUnsetFlag)
 ITC_RACE_WORLD(821715B8, RaceWorldCreate)
 ITC_RACE_WORLD(82172F90, RaceWorldNoteMarkedRacer)
-ITC_RACE_WORLD(82170BC0, RaceWorldNearSegment)
 ITC_RACE_WORLD(82170CB8, RaceWorldBuildNeighbors)
 ITC_RACE_WORLD(82170920, RaceWorldNeighbours)
 ITC_RACE_WORLD(821737F8, RaceWorldJumpSections)
 ITC_RACE_WORLD(821714D8, RaceWorldTickVehicles)
 ITC_RACE_WORLD(82171560, RaceWorldRefreshVehicles)
+// RaceManager::NearSegment (sub_82170BC0) and RoutePosition::ToMainRoad
+// (sub_82143608) have no adapters: their callers in play
+// (RaceManager::BuildNeighbors, RoutePosition::StepToMainRoad) are native;
+// --native_race_world switches those callers. Their register steps stay for
+// the harness.
 // sub_821708B4 (BranchesMeet's tail) has no adapter: never seen in play, and
 // its only caller is BranchesMeet.
