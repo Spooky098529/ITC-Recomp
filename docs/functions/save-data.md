@@ -26,15 +26,8 @@ calls an Xbox service. Shared, with their rows elsewhere:
 `sub_825A70E8`), `VirtualAlloc` and `VirtualFree` (`sub_82295398`,
 `sub_82295330`, `heap.md`); `memset` and `memcpy` (`sub_825A71D0`,
 `sub_825A7410`, `c-runtime.md`); `SignInWatch::OnModeChange`
-(`sub_8209E7E8`, `mode-tick.md`). Not seen in play, so without rows:
-`sub_82105BF8` (the course record by the course and the traffic, from
-`Race::PlaceRacers` in `race-setup.md`), `sub_82105740` (a 0x3AB74-byte
-block into player 1's slot `0x826C5B5C`: two stats records and two
-progress defaults 0x1D52C apart, then the options at +0x3AA58; probably
-the two-player data), `sub_82105688` (a teardown: `sub_82104F00`,
-`sub_82104F20`, `sub_820FF908`, `SaveData::Delete(0)`, `sub_82116FB0`)
-and `sub_82114128` (another progress reset, from the title menu's
-handler). Not here (leads in `../loops/leads.md`): the player's items over
+(`sub_8209E7E8`, `mode-tick.md`). Four functions not seen in play have rows marked so (`sub_82105BF8`,
+`sub_82105740`, `sub_82105688`, `sub_82114128`). Not here (leads in `../loops/leads.md`): the player's items over
 the save data (`sub_82111780` and the rest, their own lead), the data
 load at boot (`sub_82105868`), and the front end's title menu and menu
 lists (`sub_82222B60`, `sub_82221AC0`, `sub_8220BC20` and the rest, added
@@ -108,3 +101,7 @@ run it after changing either, on any branch.
 | `sub_82221D00` | `TitleScreen::ResetPlayer` | | Probably the title screen's reset, from a front-end screen's handler (`sub_82222B60`, seen in play, no direct callers; and `sub_82222C90`, not seen): `MenuList::Init([0x82814E30], 1, 1, 0, 154, 153, 155, 156, 159, 158)` (a one-item list, the text ids probably), the title screen's idle ticks (`[0x82814E34]` +36, `../title-screen.md`) = 0, the mode's system checks `0x826BAB40` +0 to +12 = 1 (`mode-tick.md`); then player 0's save data deleted and made again (`SaveData::Delete(0)`, `SaveData::Create(0)`) and `Players::ResetControllers`. So the progress goes back to its defaults each time this runs. Read in full. |
 | `sub_8220BAC0` | `MenuList::Init` | | r3 = a front-end menu list, r4 = the item count, r5 = the items shown (+12 = the smaller of r4 and r5), r6 to +64, r7 to r10 and two stack words (caller's +84, +92) to +36 to +56 (probably text ids); +0 = the count, +4, +8, +16, +20, +24, +28 = 0; the old flags block (+68), when set, freed (`VirtualFree(block, 0, MEM_RELEASE)`, `sub_82295330`); a new one of count × 4 bytes (`VirtualAlloc(0, size, MEM_COMMIT, PAGE_READWRITE)`, `sub_82295398`) into +68, each word = 1 (probably each item enabled). About 75 callers, all front-end screens (`sub_82184338` to `sub_8228A560`); its neighbors `sub_8220BC20`, `sub_8220BD50`, `sub_8220BDE0`, `sub_8220C1E0` are the menu lists' lead. Read in full. |
 | `sub_8209F5E0` | `Players::ResetControllers` | | Resets the player-to-controller table (`826BABA4`, 4 words) to 0-3 and asks for the profile read (`826C7938` = 1). From `sub_82106548` (boot) and `sub_82221D00` (`TitleScreen::ResetPlayer`). Moved from `functions.md` (2026-10-28, B7 loop); read in full: a leaf. |
+| `sub_82114128` | `Progress::Restart` | | Not seen in play. Probably a new career that keeps what was earned: r3 = the save data; a 0x1E000-byte frame (`__chkstk`, `sub_825A9934`, `c-runtime.md`); keeps on the stack the 0x18134 bytes from +6120 (the garage, to +0x1991C), the 60 bytes at +0x19930 and the 28 at +0x199A8 and +0x199C4 (`memcpy`), +6116 (probably the money) and +0x19924 to +0x1992C; `Progress::Clear`, `Progress::SetDefaults`; +4 = 1; all of them copied back; then +0x1AD18 \|= 1, 2, 4, 8 (one at a time). Only caller the title menu's handler `sub_82221AC0` (its item 2 path, a lead). Read in full, its meaning not worked out. |
+| `sub_82105740` | | | Not seen in play. Probably the two-player save data: 0x3AB74 bytes from `operator new` (`sub_825A6880`); when not null, `Stats::Stats` at +48 and +48 + 0x1D52C; the block (or 0) into `0x826C5B5C` (player 1's slot); `Progress::SetDefaults` on +0 and +0x1D52C, then `Options::SetDefaults(+0x3AA58)`. No course records or sound bank holder set up. Callers not read. Read in full. |
+| `sub_82105688` | | | Not seen in play. Probably a teardown: `sub_82104F00`, `sub_82104F20`, `sub_820FF908` (not read), `SaveData::Delete(0)`, `sub_82116FB0` (not read). No arguments read. Callers not read. Read in full. |
+| `sub_82105BF8` | `CourseRecords::Of` | | Not seen in play. r3 = the course records (save data + 0x1D52C), r4 = a pair of words {course, traffic}: returns r3 + 20 + 408 × (course × 2 + traffic), the 22 records `CourseRecords::Reset` sets up. Only caller `Race::PlaceRacers` (`race-setup.md`, its race data +0xA3AF4 0 or 4 path). Leaf. Read in full. |
