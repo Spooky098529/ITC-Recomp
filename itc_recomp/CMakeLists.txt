@@ -150,6 +150,8 @@ set(ITC_SOURCES
     src/hooks/car_models.cpp
     src/car_models/load_slots.cpp
     src/car_models/car_model.cpp
+    src/hooks/save_data.cpp
+    src/save_data/save_data.cpp
     src/hooks/collision.cpp
     src/collision/shapes.cpp
     src/collision/boxes.cpp
@@ -289,6 +291,7 @@ set(ITC_SOURCES
     src/harnesses/app_states.cpp
     src/harnesses/scene_loaders.cpp
     src/harnesses/car_models.cpp
+    src/harnesses/save_data.cpp
     src/harnesses/collision.cpp
     src/harnesses/collision_world.cpp
     src/harnesses/collision_world_walls.cpp
