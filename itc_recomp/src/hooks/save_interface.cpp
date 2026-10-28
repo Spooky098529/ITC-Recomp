@@ -309,6 +309,8 @@ void SaveInterfacePlayTimeUpdate(PPCContext& ctx, uint8_t* base) {
 // for the harness) for the display name's copy sub_82295D48. None for
 // SaveBuffers::FreeReplayList sub_8228F7E8 either: its one caller,
 // SaveBuffers::Destroy, is ours (its register step is the harness's).
+// No adapter (removed 2026-10-28: only the plain C++ of `GameData::Check` and the replays' `Count` and `BuildList` calls it in play)
+// for SaveInterface::SaveCount sub_820A02C8.
 // No adapter (removed 2026-10-28: only the plain C++ of `SaveSlots::State`, `GameData::Check` and the replays' `Count` and `ReadEntry` calls it in play)
 // for SaveInterface::SlotState sub_820A0018.
 // No adapter (removed 2026-10-28: only `GameData::Load`'s plain C++ calls it in play)
@@ -353,7 +355,6 @@ ITC_SAVE_INTERFACE_ADAPTER(820A52E0, SaveInterfaceSlotRequestSave)
 ITC_SAVE_INTERFACE_ADAPTER(820A53E8, SaveInterfaceSlotRequestLoad)
 ITC_SAVE_INTERFACE_ADAPTER(82295C18, SaveInterfaceContentSize)
 ITC_SAVE_INTERFACE_ADAPTER(8209FFB8, SaveInterfaceInit)
-ITC_SAVE_INTERFACE_ADAPTER(820A02C8, SaveInterfaceSaveCount)
 ITC_SAVE_INTERFACE_ADAPTER(820A0378, SaveInterfacePending)
 ITC_SAVE_INTERFACE_ADAPTER(820A0428, SaveInterfaceSaveAt)
 ITC_SAVE_INTERFACE_ADAPTER(8228F780, SaveInterfaceSlotOfController)
