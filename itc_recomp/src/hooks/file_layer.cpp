@@ -13,10 +13,10 @@ ITC_FLAG_BOOL(native_file_layer, true, "ITC",
               "GameFile::GameFile and ~GameFile, sub_820A6A00 and sub_820A6A40, with "
               "AsyncFile::AsyncFile and ~AsyncFile, sub_82593AC0 and sub_82593B00, and "
               "File::File and ~File, sub_8258C938 and sub_8258C5F8, called from them; "
-              "Path::Path and ~Path, "
-              "sub_82593C28 and sub_82593C48; GamePath::GamePath, sub_820A6BE0; Path::Build, "
-              "sub_82593CA0, over the native sprintf; GamePath::SetGame, sub_820A6BF0; the open "
-              "for read by name, sub_820A6AB8, calling File::OpenRead's adapter) natively "
+              "GamePath::GamePath, sub_820A6BE0; GamePath::SetGame, sub_820A6BF0, and the open "
+              "for read by name, sub_820A6AB8 (calling File::OpenRead's adapter), with "
+              "Path::Path and ~Path, sub_82593C28 and sub_82593C48, and Path::Build, "
+              "sub_82593CA0, over the native sprintf, called from them) natively "
               "instead of through the translated code (same results; checked by "
               "--run_harnesses=file_layer)");
 
@@ -25,6 +25,9 @@ ITC_FLAG_BOOL(native_file_layer, true, "ITC",
 // read by no caller. AsyncFile's and File's constructors and destructors have
 // no adapters: their only callers in play are GameFile's, whose plain C++
 // calls theirs (the deleting destructors, never run, call the originals).
+// Path's constructor, destructor and Path::Build have none either: their
+// callers in play are the open by name and GamePath::SetGame, whose native
+// code calls theirs.
 #define ITC_FILE_LAYER_OBJECT(address, function) \
   extern "C" REX_FUNC(sub_##address) {          \
     REX_FUNC_PROLOGUE();                        \
@@ -37,22 +40,7 @@ ITC_FLAG_BOOL(native_file_layer, true, "ITC",
 
 ITC_FILE_LAYER_OBJECT(820A6A00, GameFileConstruct)
 ITC_FILE_LAYER_OBJECT(820A6A40, GameFileDestruct)
-ITC_FILE_LAYER_OBJECT(82593C28, PathConstruct)
-ITC_FILE_LAYER_OBJECT(82593C48, PathDestruct)
 ITC_FILE_LAYER_OBJECT(820A6BE0, GamePathConstruct)
-
-// Path::Build: r3 = the path, r4 = the kind, r5 = the name; r3 the text (0
-// for no name). Where the native sprintf declines, the original runs.
-extern "C" REX_FUNC(sub_82593CA0) {
-  REX_FUNC_PROLOGUE();
-  uint32_t result;
-  if (!ITC_FLAG(native_file_layer) ||
-      !file_layer::PathBuild(base, ctx.r3.u32, ctx.r4.u32, ctx.r5.u32, ctx.r1.u32, &result)) {
-    __imp__sub_82593CA0(ctx, base);
-    return;
-  }
-  ctx.r3.u64 = result;
-}
 
 // GamePath::SetGame: r3 = the path buffer, r4 = the name; r3 its text.
 extern "C" REX_FUNC(sub_820A6BF0) {
