@@ -19,6 +19,7 @@
 
 #include <fmt/format.h>
 
+#include <iterator>
 #include <string>
 
 ITC_FLAG_DECLARE(bool, native_save_data);
@@ -151,6 +152,251 @@ void Delete(Context& h) {
   results.Report();
 }
 
+// A block of the save data's size from operator new's plain C++, filled from
+// `random` and freed again: the allocation layer's first fit hands the same
+// address to the next allocation of that size (SaveData::Create's), so each
+// version's unwritten bytes start the same. The address, or 0.
+uint32_t Prefill(Context& h, Random& random) {
+  const auto block = memory::crt::OperatorNew(h.base, save_data::kSaveDataBytes);
+  if (!block || *block == 0) {
+    return 0;
+  }
+  WriteRandom(h.base, *block, save_data::kSaveDataBytes / 4, random);
+  memory::crt::OperatorDelete(*block);
+  return *block;
+}
+
+// SaveData::Create on a slot in the scratch area (as Delete's cases). The
+// new block is compared by its bytes, whether it's the prefilled one, and r3
+// against it; then freed.
+void Create(Context& h) {
+  Results results("SaveData::Create (sub_821057C8)");
+  int reused = 0;
+  for (int c = 0; c < 6; c++) {
+    const uint32_t slot = h.data + 4 * h.random.Below(kScratchBytes / 4);
+    const uint32_t player = (slot - save_data::kSlots) >> 2;
+    Outputs out[2];
+    const Random start = h.random;
+    Random after;
+    for (int v = 0; v < 2; v++) {
+      Random random = start;
+      WriteRandom(h.base, h.data, kScratchBytes / 4, random);
+      const uint32_t prefilled = Prefill(h, random);
+      after = random;
+      PPCContext t = CallContext(h);
+      t.r3.u64 = player;
+      ITC_FLAG(native_save_data) = v == 1;
+      (v == 0 ? __imp__sub_821057C8 : hooks::SaveDataCreate)(t, h.base);
+      ITC_FLAG(native_save_data) = true;
+      const uint32_t block = guest::LoadU32(h.base, slot);
+      out[v].Word(block == prefilled && block != 0 ? 1 : 0);
+      reused += block == prefilled && block != 0;
+      out[v].Bytes(Read(h.base, block, save_data::kSaveDataBytes));
+      guest::StoreU32(h.base, slot, 0);
+      out[v].Bytes(Read(h.base, h.data, kScratchBytes));
+      out[v].Word(t.r3.u32 - block);
+      out[v].Word(uint32_t(t.r3.u64 >> 32));
+      memory::crt::OperatorDelete(block);
+    }
+    h.random = after;
+    results.Check(out[0], out[1], fmt::format("case {}: slot +{:X}", c, slot - h.data));
+  }
+  ITC_LOG_INFO("harness: SaveData::Create: {} of 12 runs got the prefilled block back", reused);
+  results.Report();
+}
+
+// The list's flags block (+68): `old` pages of `old_count` words, or 0.
+uint32_t MakeFlags(uint32_t old_count) {
+  return old_count == 0 ? 0 : memory::AllocPages(old_count * 4, 4096);
+}
+
+// Records a menu list at `list` after MenuList::Init: its words with +68
+// left out, the new block's words (count of them), whether the old block was
+// freed and r3 against the new block; the new block freed.
+void RecordList(Outputs& out, Context& h, uint32_t list, uint32_t old, const PPCContext& t) {
+  const uint32_t flags = guest::LoadU32(h.base, list + 68);
+  const int32_t count = int32_t(guest::LoadU32(h.base, list + 0));
+  out.Word(flags != 0 && memory::IsPages(flags) ? 1 : 0);
+  if (flags != 0 && count > 0) {
+    out.Bytes(Read(h.base, flags, uint32_t(count) * 4));
+  }
+  out.Word(old == 0 || !memory::IsPages(old) ? 1 : 0);
+  out.Word(t.r3.u32 == flags ? 1 : 0);
+  out.Word(uint32_t(t.r3.u64 >> 32));
+  if (old != 0 && memory::IsPages(old)) {
+    memory::FreePages(old);
+  }
+  if (flags != 0 && memory::IsPages(flags)) {
+    memory::FreePages(flags);
+  }
+  guest::StoreU32(h.base, list + 68, 0);
+}
+
+void MenuListInit(Context& h) {
+  Results results("MenuList::Init (sub_8220BAC0)");
+  for (int c = 0; c < 40; c++) {
+    const uint32_t list = h.data + 4 * h.random.Below((kScratchBytes - 72) / 4);
+    const uint32_t old_count = c % 3 == 0 ? 0 : 1 + h.random.Below(2000);
+    const uint32_t count = c % 10 == 1 ? 0 : h.random.Below(c % 5 == 2 ? 3000 : 40);
+    const uint32_t shown = h.random.Below(c % 7 == 3 ? 0xFFFFFFFF : 40);
+    uint32_t ids[7];
+    for (uint32_t& id : ids) {
+      id = uint32_t(h.random.Next());
+    }
+    Outputs out[2];
+    const Random start = h.random;
+    Random after;
+    for (int v = 0; v < 2; v++) {
+      Random random = start;
+      WriteRandom(h.base, h.data, kScratchBytes / 4, random);
+      after = random;
+      const uint32_t old = MakeFlags(old_count);
+      guest::StoreU32(h.base, list + 68, old);
+      PPCContext t = CallContext(h);
+      t.r3.u64 = list;
+      t.r4.u64 = count;
+      t.r5.u64 = shown;
+      t.r6.u64 = ids[0];
+      t.r7.u64 = ids[1];
+      t.r8.u64 = ids[2];
+      t.r9.u64 = ids[3];
+      t.r10.u64 = ids[4];
+      guest::StoreU32(h.base, t.r1.u32 + 84, ids[5]);
+      guest::StoreU32(h.base, t.r1.u32 + 92, ids[6]);
+      ITC_FLAG(native_save_data) = v == 1;
+      (v == 0 ? __imp__sub_8220BAC0 : hooks::SaveDataMenuListInit)(t, h.base);
+      ITC_FLAG(native_save_data) = true;
+      RecordList(out[v], h, list, old, t);
+      out[v].Bytes(Read(h.base, h.data, kScratchBytes));
+    }
+    h.random = after;
+    results.Check(out[0], out[1],
+                  fmt::format("case {}: count {}, shown {}, old {}", c, count, int32_t(shown),
+                              old_count));
+  }
+  results.Report();
+}
+
+// The globals Players::ResetControllers and TitleScreen::ResetPlayer write,
+// kept and put back around each version.
+struct Globals {
+  static constexpr uint32_t kAddresses[] = {
+      save_data::kControllers,      save_data::kControllers + 4,  save_data::kControllers + 8,
+      save_data::kControllers + 12, save_data::kProfileReadAsked, save_data::kModeChecks,
+      save_data::kModeChecks + 4,   save_data::kModeChecks + 8,   save_data::kModeChecks + 12,
+      save_data::kTitleMenuList,    save_data::kTitleScreen,      save_data::kSlots};
+  uint32_t saved[std::size(kAddresses)];
+  uint8_t* base;
+  explicit Globals(uint8_t* base) : base(base) {
+    for (size_t i = 0; i < std::size(kAddresses); i++) {
+      saved[i] = guest::LoadU32(base, kAddresses[i]);
+    }
+  }
+  ~Globals() {
+    for (size_t i = 0; i < std::size(kAddresses); i++) {
+      guest::StoreU32(base, kAddresses[i], saved[i]);
+    }
+  }
+  // The words written, recorded (the slot and the two pointers left out).
+  void Record(Outputs& out) const {
+    for (size_t i = 0; i < 9; i++) {
+      out.Word(guest::LoadU32(base, kAddresses[i]));
+    }
+  }
+  void Randomize(Random& random) const {
+    for (size_t i = 0; i < 9; i++) {
+      guest::StoreU32(base, kAddresses[i], uint32_t(random.Next()));
+    }
+  }
+};
+
+void ResetControllers(Context& h) {
+  Results results("Players::ResetControllers (sub_8209F5E0)");
+  for (int c = 0; c < 4; c++) {
+    Outputs out[2];
+    const Random start = h.random;
+    Random after;
+    for (int v = 0; v < 2; v++) {
+      const Globals globals(h.base);
+      Random random = start;
+      WriteRandom(h.base, h.data, kScratchBytes / 4, random);
+      globals.Randomize(random);
+      after = random;
+      PPCContext t = CallContext(h);
+      t.r3.u64 = random.Next();
+      ITC_FLAG(native_save_data) = v == 1;
+      (v == 0 ? __imp__sub_8209F5E0 : hooks::SaveDataResetControllers)(t, h.base);
+      ITC_FLAG(native_save_data) = true;
+      globals.Record(out[v]);
+      out[v].Bytes(Read(h.base, h.data, kScratchBytes));
+      for (const auto& r : {t.r3, t.r9, t.r10, t.r11}) {
+        out[v].Word(r.u32);
+        out[v].Word(uint32_t(r.u64 >> 32));
+      }
+    }
+    h.random = after;
+    results.Check(out[0], out[1], fmt::format("case {}", c));
+  }
+  results.Report();
+}
+
+// TitleScreen::ResetPlayer with the title's list and screen in the scratch
+// area and player 0's slot holding a block of the test's, the game's put
+// back after each version. The old save data block is a prefilled one, held
+// until Delete frees it, so SaveData::Create gets it back (first fit: no
+// hole below it is big enough, and the list's blocks are smaller); an empty
+// slot isn't tried here (the list's new block could take the hole first),
+// SaveData::Delete's and Create's own cases cover it.
+void ResetPlayer(Context& h) {
+  Results results("TitleScreen::ResetPlayer (sub_82221D00)");
+  int reused = 0;
+  for (int c = 0; c < 6; c++) {
+    const uint32_t list = h.data + 4 * h.random.Below(256);
+    const uint32_t screen = h.data + 2048 + 4 * h.random.Below(256);
+    const uint32_t old_count = c % 2 == 0 ? 0 : 1 + h.random.Below(100);
+    Outputs out[2];
+    const Random start = h.random;
+    Random after;
+    for (int v = 0; v < 2; v++) {
+      const Globals globals(h.base);
+      Random random = start;
+      WriteRandom(h.base, h.data, kScratchBytes / 4, random);
+      globals.Randomize(random);
+      uint32_t prefilled = 0;
+      if (const auto block = memory::crt::OperatorNew(h.base, save_data::kSaveDataBytes)) {
+        prefilled = *block;
+        WriteRandom(h.base, prefilled, save_data::kSaveDataBytes / 4, random);
+      }
+      after = random;
+      const uint32_t old = MakeFlags(old_count);
+      guest::StoreU32(h.base, list + 68, old);
+      guest::StoreU32(h.base, save_data::kTitleMenuList, list);
+      guest::StoreU32(h.base, save_data::kTitleScreen, screen);
+      guest::StoreU32(h.base, save_data::kSlots, prefilled);
+      PPCContext t = CallContext(h);
+      ITC_FLAG(native_save_data) = v == 1;
+      (v == 0 ? __imp__sub_82221D00 : hooks::SaveDataResetPlayer)(t, h.base);
+      ITC_FLAG(native_save_data) = true;
+      const uint32_t block = guest::LoadU32(h.base, save_data::kSlots);
+      globals.Record(out[v]);
+      out[v].Word(block == prefilled && block != 0 ? 1 : 0);
+      reused += block == prefilled && block != 0;
+      out[v].Bytes(Read(h.base, block, save_data::kSaveDataBytes));
+      out[v].Word(t.r3.u32 - block);
+      out[v].Word(uint32_t(t.r3.u64 >> 32));
+      memory::crt::OperatorDelete(block);
+      RecordList(out[v], h, list, old, t);
+      out[v].Bytes(Read(h.base, h.data, kScratchBytes));
+    }
+    h.random = after;
+    results.Check(out[0], out[1],
+                  fmt::format("case {}: old list block {}", c, old_count));
+  }
+  ITC_LOG_INFO("harness: TitleScreen::ResetPlayer: {} of 12 runs got the prefilled block back",
+               reused);
+  results.Report();
+}
+
 }  // namespace
 
 void SaveData(Context& h) {
@@ -188,6 +434,10 @@ void SaveData(Context& h) {
   OnePointer(h, block, "CourseRecords::Reset (sub_82105D08)", __imp__sub_82105D08,
              hooks::SaveDataCourseRecordsReset, 20 + 22 * 408, 12);
   Delete(h);
+  Create(h);
+  MenuListInit(h);
+  ResetControllers(h);
+  ResetPlayer(h);
 }
 
 }  // namespace harness

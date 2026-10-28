@@ -77,6 +77,49 @@ constexpr uint32_t Slot(uint32_t player) { return kSlots + (player << 2); }
 // nothing done, where the original must run: a block the layer didn't give.
 std::optional<uint32_t> SaveDataDelete(uint8_t* base, uint32_t player);
 
+// sub_821057C8 SaveData::Create: a player's save data made (operator new's
+// plain C++), Stats::Stats when not 0, the slot set, then the course
+// records, the progress, the options and the sound bank holder set up from
+// the slot read again. Returns r3 as the original leaves it: the sound bank
+// holder (+0x1F850). nullopt, with nothing done, where the original must
+// run: operator new's error paths (it never answers 0 natively, so the
+// original's set-ups on a null block run only there).
+bool CreateNative();
+std::optional<uint32_t> SaveDataCreate(uint8_t* base, uint32_t player);
+
+// sub_8209F5E0 Players::ResetControllers: the player-to-controller table
+// (0x826BABA4) 0 to 3, the profile read asked for (0x826C7938 = 1).
+void PlayersResetControllers(uint8_t* base);
+
+// sub_8220BAC0 MenuList::Init: a front-end menu list's counts and text ids
+// (r7 to r10, then the caller's stack words +84 and +92 as `id5` and
+// `id6`), its old flags block freed (VirtualFree's plain C++) and a new one
+// of count words, each 1 (VirtualAlloc's). Returns r3 as the original
+// leaves it: the new block. MenuListInitNative says whether the old block
+// can be freed natively (0, or pages the layer gave).
+struct MenuListArgs {
+  uint32_t count, shown, r6, r7, r8, r9, r10, id5, id6;
+};
+bool MenuListInitNative(uint8_t* base, uint32_t list);
+uint32_t MenuListInit(uint8_t* base, uint32_t list, const MenuListArgs& args);
+
+// sub_82221D00 TitleScreen::ResetPlayer: the title's one-item list
+// (MenuList::Init on [0x82814E30]), its idle ticks ([0x82814E34] + 36) 0,
+// the mode's checks (0x826BAB40, four words) 1, player 0's save data
+// deleted and made again, the controllers reset. ResetPlayerNative says
+// whether it can run natively (MenuList::Init's, SaveData::Delete's and
+// SaveData::Create's checks). Returns r3 as the original leaves it
+// (SaveData::Create's), or nullopt where SaveData::Create's plain C++
+// refused after the delete: the adapter then runs SaveData::Create and
+// Players::ResetControllers.
+constexpr uint32_t kTitleMenuList = 0x82814E30;
+constexpr uint32_t kTitleScreen = 0x82814E34;
+constexpr uint32_t kModeChecks = 0x826BAB40;
+constexpr uint32_t kControllers = 0x826BABA4;
+constexpr uint32_t kProfileReadAsked = 0x826C7938;
+bool ResetPlayerNative(uint8_t* base);
+std::optional<uint32_t> TitleScreenResetPlayer(uint8_t* base);
+
 // The default tables' getters sub_820CCCC0, sub_820CCCD0, sub_820CCCE0,
 // sub_820CCCF0, sub_820CCD00.
 uint32_t DefaultsTable50A8();

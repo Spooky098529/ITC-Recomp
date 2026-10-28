@@ -15,8 +15,10 @@ ITC_FLAG_BOOL(native_save_data, true, "ITC",
               "tables' getters sub_820CCCC0, sub_820CCCD0, sub_820CCCE0, sub_820CCCF0 and "
               "sub_820CCD00, Progress::SetDefaults sub_82113E60 (its copies through memcpy's "
               "plain C++), ControlMap::SetDefault sub_821058A8, Options::SetDefaults "
-              "sub_82105940, CourseRecords::Reset sub_82105D08 and, with --native_heap, "
-              "SaveData::Delete sub_821055D8) natively instead of through the translated code (the same writes; "
+              "sub_82105940, CourseRecords::Reset sub_82105D08, Players::ResetControllers "
+              "sub_8209F5E0 and, with --native_heap, SaveData::Delete sub_821055D8, "
+              "SaveData::Create sub_821057C8, MenuList::Init sub_8220BAC0 and "
+              "TitleScreen::ResetPlayer sub_82221D00) natively instead of through the translated code (the same writes; "
               "checked by --run_harnesses=save_data)");
 
 namespace hooks {
@@ -79,6 +81,58 @@ void SaveDataDelete(PPCContext& ctx, uint8_t* base) {
   __imp__sub_821055D8(ctx, base);
 }
 
+void SaveDataCreate(PPCContext& ctx, uint8_t* base) {
+  if (hooks::NativeHeapActive() && sd::CreateNative()) {
+    ctx.fpscr.disableFlushMode();
+    if (const auto holder = sd::SaveDataCreate(base, ctx.r3.u32)) {
+      ctx.r3.u64 = *holder;
+      return;
+    }
+  }
+  __imp__sub_821057C8(ctx, base);
+}
+
+void SaveDataResetControllers(PPCContext& ctx, uint8_t* base) {
+  sd::PlayersResetControllers(base);
+  ctx.r9.u64 = 3;
+  ctx.r10.u64 = 0xFFFFFFFF826C0000ull;
+  ctx.r11.u64 = 1;
+}
+
+void SaveDataMenuListInit(PPCContext& ctx, uint8_t* base) {
+  if (!hooks::NativeHeapActive() || !sd::MenuListInitNative(base, ctx.r3.u32)) {
+    __imp__sub_8220BAC0(ctx, base);
+    return;
+  }
+  const sd::MenuListArgs args{ctx.r4.u32,
+                              ctx.r5.u32,
+                              ctx.r6.u32,
+                              ctx.r7.u32,
+                              ctx.r8.u32,
+                              ctx.r9.u32,
+                              ctx.r10.u32,
+                              guest::LoadU32(base, ctx.r1.u32 + 84),
+                              guest::LoadU32(base, ctx.r1.u32 + 92)};
+  ctx.r3.u64 = sd::MenuListInit(base, ctx.r3.u32, args);
+}
+
+void SaveDataResetPlayer(PPCContext& ctx, uint8_t* base) {
+  if (!hooks::NativeHeapActive() || !sd::ResetPlayerNative(base)) {
+    __imp__sub_82221D00(ctx, base);
+    return;
+  }
+  ctx.fpscr.disableFlushMode();
+  if (const auto r3 = sd::TitleScreenResetPlayer(base)) {
+    ctx.r3.u64 = *r3;
+    return;
+  }
+  // SaveData::Create's plain C++ refused after the delete (operator new's
+  // error paths, never seen): the rest as the original does it.
+  ctx.r3.u64 = 0;
+  sub_821057C8(ctx, base);
+  sub_8209F5E0(ctx, base);
+}
+
 #define ITC_SAVE_DATA_TABLE(name)                        \
   void SaveData##name(PPCContext& ctx, uint8_t*) {       \
     ctx.r11.u64 = 0xFFFFFFFF826C0000ull;                 \
@@ -120,3 +174,7 @@ ITC_SAVE_DATA_ADAPTER(821058A8, SaveDataControlMapSetDefault)
 ITC_SAVE_DATA_ADAPTER(82105940, SaveDataOptionsSetDefaults)
 ITC_SAVE_DATA_ADAPTER(82105D08, SaveDataCourseRecordsReset)
 ITC_SAVE_DATA_ADAPTER(821055D8, SaveDataDelete)
+ITC_SAVE_DATA_ADAPTER(821057C8, SaveDataCreate)
+ITC_SAVE_DATA_ADAPTER(8209F5E0, SaveDataResetControllers)
+ITC_SAVE_DATA_ADAPTER(8220BAC0, SaveDataMenuListInit)
+ITC_SAVE_DATA_ADAPTER(82221D00, SaveDataResetPlayer)

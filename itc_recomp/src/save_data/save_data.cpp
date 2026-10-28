@@ -10,6 +10,7 @@
 #include "memory/heap.h"
 #include "native/buffers.h"
 #include "race_setup/race_setup.h"
+#include "sound_cues/sound_cues.h"
 
 #include <bit>
 #include <cstring>
@@ -327,6 +328,92 @@ std::optional<uint32_t> SaveDataDelete(uint8_t* base, uint32_t player) {
   memory::crt::OperatorDelete(block);
   guest::StoreU32(base, slot, 0);
   return block;
+}
+
+bool CreateNative() { return native::Buffers_NativeMemcpy(); }
+
+std::optional<uint32_t> SaveDataCreate(uint8_t* base, uint32_t player) {
+  ITC_NATIVE_RUNNING("sub_821057C8 SaveData::Create");
+  const auto made = memory::crt::OperatorNew(base, kSaveDataBytes);
+  if (!made) {
+    return std::nullopt;
+  }
+  const uint32_t block = *made;
+  if (block != 0) {
+    StatsConstruct(base, block + kStats);
+  }
+  const uint32_t slot = Slot(player);
+  guest::StoreU32(base, slot, block);
+  CourseRecordsReset(base, block + 0x1D52C);
+  ProgressSetDefaults(base, guest::LoadU32(base, slot));
+  OptionsSetDefaults(base, guest::LoadU32(base, slot) + 0x1F85C);
+  const uint32_t holder = guest::LoadU32(base, slot) + 0x1F850;
+  sound_cues::SoundBankHolderConstruct(base, holder);
+  return holder;
+}
+
+void PlayersResetControllers(uint8_t* base) {
+  ITC_NATIVE_RUNNING("sub_8209F5E0 Players::ResetControllers");
+  for (uint32_t i = 0; i < 4; i++) {
+    guest::StoreU32(base, kControllers + 4 * i, i);
+  }
+  guest::StoreU32(base, kProfileReadAsked, 1);
+}
+
+bool MenuListInitNative(uint8_t* base, uint32_t list) {
+  const uint32_t old = guest::LoadU32(base, list + 68);
+  return old == 0 || memory::IsPages(old);
+}
+
+uint32_t MenuListInit(uint8_t* base, uint32_t list, const MenuListArgs& a) {
+  ITC_NATIVE_RUNNING("sub_8220BAC0 MenuList::Init");
+  guest::StoreU32(base, list + 0, a.count);
+  for (uint32_t offset : {4u, 8u, 16u, 20u}) {
+    guest::StoreU32(base, list + offset, 0);
+  }
+  guest::StoreU32(base, list + 12, int32_t(a.count) < int32_t(a.shown) ? a.count : a.shown);
+  const uint32_t old = guest::LoadU32(base, list + 68);
+  guest::StoreU32(base, list + 36, a.r7);
+  guest::StoreU32(base, list + 40, a.r8);
+  guest::StoreU32(base, list + 44, a.r9);
+  guest::StoreU32(base, list + 48, a.r10);
+  guest::StoreU32(base, list + 52, a.id5);
+  guest::StoreU32(base, list + 56, a.id6);
+  guest::StoreU32(base, list + 64, a.r6);
+  guest::StoreU32(base, list + 24, 0);
+  guest::StoreU32(base, list + 28, 0);
+  if (old != 0) {
+    memory::FreePages(old);  // VirtualFree(old, 0, MEM_RELEASE)
+  }
+  // VirtualAlloc(0, count x 4, MEM_COMMIT, PAGE_READWRITE).
+  const uint32_t flags = memory::AllocPages(guest::LoadU32(base, list + 0) << 2, 4096);
+  guest::StoreU32(base, list + 68, flags);
+  for (int32_t i = 0; i < int32_t(guest::LoadU32(base, list + 0)); i++) {
+    guest::StoreU32(base, guest::LoadU32(base, list + 68) + 4 * uint32_t(i), 1);
+  }
+  return flags;
+}
+
+bool ResetPlayerNative(uint8_t* base) {
+  const uint32_t block = guest::LoadU32(base, Slot(0));
+  return MenuListInitNative(base, guest::LoadU32(base, kTitleMenuList)) &&
+         (block == 0 || memory::IsHeapBlock(block)) && CreateNative();
+}
+
+std::optional<uint32_t> TitleScreenResetPlayer(uint8_t* base) {
+  ITC_NATIVE_RUNNING("sub_82221D00 TitleScreen::ResetPlayer");
+  MenuListInit(base, guest::LoadU32(base, kTitleMenuList), {1, 1, 0, 154, 153, 155, 156, 159, 158});
+  guest::StoreU32(base, guest::LoadU32(base, kTitleScreen) + 36, 0);
+  for (uint32_t i = 0; i < 4; i++) {
+    guest::StoreU32(base, kModeChecks + 4 * i, 1);
+  }
+  SaveDataDelete(base, 0);
+  const auto r3 = SaveDataCreate(base, 0);
+  if (!r3) {
+    return std::nullopt;
+  }
+  PlayersResetControllers(base);
+  return r3;
 }
 
 uint32_t DefaultsTable50A8() {

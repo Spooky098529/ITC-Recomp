@@ -34,6 +34,21 @@ void SaveDataCourseRecordsReset(PPCContext& ctx, uint8_t* base);
 // original unless --native_heap routes the game's heap to the allocation
 // layer, or where the block isn't the layer's.
 void SaveDataDelete(PPCContext& ctx, uint8_t* base);
+// SaveData::Create sub_821057C8: r3 = the player; r3 = the sound bank
+// holder. With --native_heap; the original where memcpy's plain C++ can't
+// copy or operator new's plain C++ refuses.
+void SaveDataCreate(PPCContext& ctx, uint8_t* base);
+// Players::ResetControllers sub_8209F5E0: r3 left; r9 to r11 as the
+// original leaves them.
+void SaveDataResetControllers(PPCContext& ctx, uint8_t* base);
+// MenuList::Init sub_8220BAC0: r3 = the list, r4 = the count, r5 = the items
+// shown, r6 to r10 and the caller's r1 + 84 and + 92; r3 = the new flags
+// block. With --native_heap; the original where the old block isn't pages
+// the layer gave.
+void SaveDataMenuListInit(PPCContext& ctx, uint8_t* base);
+// TitleScreen::ResetPlayer sub_82221D00: r3 = SaveData::Create's. With
+// --native_heap; the original where its callees' checks refuse.
+void SaveDataResetPlayer(PPCContext& ctx, uint8_t* base);
 // The default tables' getters: r3 (and r11, 0x826C0000) the table, sign
 // extended as lis and addi leave them.
 void SaveDataTable50A8(PPCContext& ctx, uint8_t* base);
