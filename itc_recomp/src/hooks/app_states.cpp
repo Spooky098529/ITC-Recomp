@@ -52,9 +52,10 @@ ITC_FLAG_BOOL(native_app_states, true, "ITC",
               "sub_820ADA08, AppStates::AddLayer sub_820AE130 and App::Start sub_82092878, their "
               "virtual calls guest calls; PtrList::ForEach sub_820AD3A0 and OpList::ForEach "
               "sub_820AD440 (no adapter: only ApplyOps's plain C++ calls it in play), the layers' child functors sub_820ACD80, sub_820ACDE8 and "
-              "sub_820ACD60, and with --native_heap StateLayer::ApplyOps sub_820ADE68, their "
+              "sub_820ACD60, and with --native_heap StateLayer::ApplyOps sub_820ADE68 (no adapter: only the "
+              "layers' updates' plain C++ call it in play), their "
               "slots and StateLayer::ApplyOp guest calls; StateLayer::Update sub_820ADF00 and "
-              "UpdateToggled sub_820AE010, the layer's state slots 8 and 9 sub_820AE120 and "
+              "UpdateToggled sub_820AE010 (no adapters: only the plain C++ below calls them in play), the layer's state slots 8 and 9 sub_820AE120 and "
               "sub_820AE128, AppStates::OnUpdate sub_820AE1B8 and OnUpdateToggled sub_820AE1C0, "
               "the top state's slots guest calls, a child layer's update its plain C++) natively instead of through the translated code "
               "(the same results; checked by --run_harnesses=app_states)");
@@ -637,7 +638,10 @@ void AppStatesOnUpdateToggled(PPCContext& ctx, uint8_t* base) {
 // AppStates::AppStates (removed 2026-10-27: in play only the layers'
 // constructors', StateLayer::StateLayer(state)'s and AppStates::Create's
 // plain C++ call them), nor List::Clear and OpList::ForEach (removed
-// 2026-10-27: in play only StateLayer::ApplyOps's plain C++ calls them).
+// 2026-10-27: in play only StateLayer::ApplyOps's plain C++ calls them),
+// nor StateLayer::ApplyOps, Update and UpdateToggled (removed 2026-10-27:
+// in play only the layers' updates' and their callers' plain C++ call
+// them).
 
 #define ITC_APP_STATES_ADAPTER(address, step) \
   extern "C" REX_FUNC(sub_##address) {        \
@@ -675,9 +679,6 @@ ITC_APP_STATES_ADAPTER(820AD3A0, AppPtrListForEach)
 ITC_APP_STATES_ADAPTER(820ACD80, AppUpdateChild)
 ITC_APP_STATES_ADAPTER(820ACDE8, AppUpdateChildToggled)
 ITC_APP_STATES_ADAPTER(820ACD60, AppToggleOffChild)
-ITC_APP_STATES_ADAPTER(820ADE68, AppLayerApplyOps)
-ITC_APP_STATES_ADAPTER(820ADF00, AppLayerUpdate)
-ITC_APP_STATES_ADAPTER(820AE010, AppLayerUpdateToggled)
 ITC_APP_STATES_ADAPTER(820AE120, AppLayerStateUpdate)
 ITC_APP_STATES_ADAPTER(820AE128, AppLayerStateUpdateToggled)
 ITC_APP_STATES_ADAPTER(820AE1B8, AppStatesOnUpdate)
