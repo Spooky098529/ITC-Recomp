@@ -133,7 +133,7 @@ goes in `src/` as overrides), American English.
   above it (`car-models.md`, two leads without mapping), the race world
   (`race-world.md`, 49 of 50) and the race's states (`race-states.md`,
   43 of 63) native (ours 2,540); its twentieth run (branch
-  `b7-loop-28-10-26-2`, 3 subsystems) made the archive (`archive.md`,
+  `b7-loop-28-10-26-2`, merged 2026-10-28, 3 subsystems) made the archive (`archive.md`,
   its four semaphores host ones by the user's call), the file layer
   with sprintf (`file-layer.md`) and the save system's interface
   (`save-interface.md`, 41 of 41) native (ours 2,628). The

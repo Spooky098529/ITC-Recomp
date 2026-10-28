@@ -327,7 +327,8 @@ the second state machine and the race's progress) native (ours 2,400
 -> 2,540); the rest waits on the archive, the loading screen, the cars
 put back, the input recordings and the race event's lookups. The
 harnesses now take ~30 s of `attract_race.sh 40`, leaving ~8 s of race.
-Its twentieth run (`b7-loop-28-10-26-2`, 2026-10-28, not yet merged;
+Its twentieth run (`b7-loop-28-10-26-2`, 2026-10-28, merged into
+`rexglue-removal-project` the same day;
 summary `docs/loops/b7-loop-2026-10-28-1845.md`; 3 subsystems) made
 the archive (`archive.md`, `--native_archive`: the TOC, `Archive::Load`,
 the queue and the loader; its four semaphores host counting semaphores,
