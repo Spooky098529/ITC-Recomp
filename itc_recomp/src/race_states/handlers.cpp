@@ -34,6 +34,18 @@ void SetFlags(uint8_t* base, uint32_t bits) {
 
 }  // namespace
 
+void Begin(uint8_t* base, uint32_t machine, uint32_t frame) {
+  ITC_NATIVE_RUNNING("sub_82164DC0 RaceStates::Begin");
+  const uint32_t progress = Load(base, machine + 9624);
+  Store(base, machine + 9616, 0);
+  Store(base, machine + 9620, 0);
+  Store(base, machine + 9612, 0);
+  ProgressReset(base, progress, frame - 96);
+  for (uint32_t at : {9628u, 9632u, 9636u, 9640u}) {
+    Store(base, machine + at, 0);
+  }
+}
+
 void FadeInFree(uint8_t* base, uint32_t machine) {
   ITC_NATIVE_RUNNING("sub_82163398 RaceStates::FadeInFree");
   Store(base, machine + 9616, 0);

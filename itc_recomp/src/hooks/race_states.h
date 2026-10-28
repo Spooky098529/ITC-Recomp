@@ -88,6 +88,16 @@ void RaceStatesRacersClose(PPCContext& ctx, uint8_t* base);
 void RaceStatesRacersStill(PPCContext& ctx, uint8_t* base);
 void RaceStatesCountdownTick(PPCContext& ctx, uint8_t* base);
 
+// RaceStates::Begin sub_82164DC0: a handler (r3 = the machine; r3 not
+// kept); the original where RaceProgress::Reset's copies aren't native.
+void RaceStatesBegin(PPCContext& ctx, uint8_t* base);
+// RaceProgress::FollowRoute sub_82163C50: r3 = out, r4 = the progress, r5 =
+// the entry's index; r3 = out. sub_82163000 (no adapter: its only caller,
+// FollowRoute, is native): r3, r4 = two sections, r5, r6 = the out words;
+// r3 = 0 or 1 (the harness's).
+void RaceStatesFollowRoute(PPCContext& ctx, uint8_t* base);
+void RaceStatesSectionsJoin(PPCContext& ctx, uint8_t* base);
+
 // RaceStates::StandingStartTick sub_821692C8: a handler (r3 not kept); the
 // original in the System Link case (StandingStartTickNative); the callees'
 // originals as their adapters make them.

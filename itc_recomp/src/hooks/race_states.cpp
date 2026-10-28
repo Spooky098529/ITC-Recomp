@@ -18,7 +18,8 @@ ITC_FLAG_BOOL(native_race_states, true, "ITC",
               "RoutePosition::NotAfter sub_821622A8; RaceProgress::CountHits sub_82164F08, Damage "
               "sub_82164228, DrainSp sub_821650A0, CheckLap sub_82164090 (with Time::Sub "
               "sub_82162230; the original where memcpy's copies of the course route aren't "
-              "native) and CheckFinish sub_82164E18, RoutePosition::MapToSection sub_82163930) natively instead of through the translated "
+              "native) and CheckFinish sub_82164E18, RoutePosition::MapToSection sub_82163930; RaceStates::Begin sub_82164DC0, "
+              "RaceProgress::FollowRoute sub_82163C50 with sub_82163000) natively instead of through the translated "
               "code (the same words, bit for bit; checked by --run_harnesses=race_states)");
 
 namespace hooks {
@@ -237,6 +238,26 @@ void RaceStatesStandingStartTick(PPCContext& ctx, uint8_t* base) {
   rs::StandingStartTick(base, ctx.r3.u32, ctx.r4.u32, frame, NativeHeapActive(), calls);
 }
 
+void RaceStatesBegin(PPCContext& ctx, uint8_t* base) {
+  ctx.fpscr.disableFlushMode();
+  const uint32_t frame = ctx.r1.u32 - 112;
+  if (!rs::ProgressResetNative(frame - 96)) {
+    __imp__sub_82164DC0(ctx, base);
+    return;
+  }
+  rs::Begin(base, ctx.r3.u32, frame);
+}
+
+void RaceStatesFollowRoute(PPCContext& ctx, uint8_t* base) {
+  ctx.fpscr.disableFlushMode();
+  ctx.r3.u64 = rs::FollowRoute(base, ctx.r3.u32, ctx.r4.u32, ctx.r5.u32, ctx.r1.u32 - 240);
+}
+
+void RaceStatesSectionsJoin(PPCContext& ctx, uint8_t* base) {
+  ctx.fpscr.disableFlushMode();
+  ctx.r3.u64 = rs::SectionsJoin(base, ctx.r3.u32, ctx.r4.u32, ctx.r5.u32, ctx.r6.u32, ctx.r1.u32);
+}
+
 }  // namespace hooks
 
 // Defines an adapter: the flag, else the original.
@@ -282,6 +303,10 @@ ITC_RACE_STATES(82167970, RaceStatesAfterRaceTick)
 ITC_RACE_STATES(82166E50, RaceStatesRollingStartTick)
 ITC_RACE_STATES(821674A0, RaceStatesCountdownTick)
 ITC_RACE_STATES(821692C8, RaceStatesStandingStartTick)
+ITC_RACE_STATES(82164DC0, RaceStatesBegin)
+ITC_RACE_STATES(82163C50, RaceStatesFollowRoute)
+// sub_82163000 (never seen in play) has no adapter: its only caller,
+// RaceProgress::FollowRoute, is native; --native_race_states switches it.
 // RaceProgress::TickFraction (sub_82163140) and RoutePosition::NotAfter
 // (sub_821622A8) have no adapters: their callers, RaceProgress::CheckLap and
 // CheckFinish, are native; --native_race_states switches those callers.

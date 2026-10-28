@@ -106,12 +106,33 @@ uint32_t CheckLap(uint8_t* base, uint32_t out, uint32_t progress, uint32_t index
 uint32_t CheckFinish(uint8_t* base, uint32_t out, uint32_t progress, uint32_t index,
                      uint32_t frame);
 
+// --- The race's progress along the route (src/race_states/follow_route.cpp) ---
+
+// sub_82163000 (never seen in play): the first forward link (0 to 2) of
+// section `a` one of whose side links (6 to 9) is, or which itself is, a
+// forward link of `b`: the pair (the forward link, b's link) to the words at
+// `out_a` and `out_b`, 1; else (-1, -1), 0. Its link lists (0, 1, 2, -1 and
+// 6, 7, 8, 9, -1) left at `sp` - 96 and - 80 (a leaf without a frame).
+uint32_t SectionsJoin(uint8_t* base, uint32_t a, uint32_t b, uint32_t out_a, uint32_t out_b,
+                      uint32_t sp);
+// RaceProgress::FollowRoute (sub_82163C50): see the row. The input record's
+// copy at `frame` + 96, the car's position at + 80, the conversions' word at
+// + 88, the start's position at + 84 (and SectionsJoin's pair at + 88 and
+// + 84) as the original leaves them; TrackRoute::PathDistance's frame
+// `frame` - 288. `frame`: its 240 bytes. Returns `out`.
+uint32_t FollowRoute(uint8_t* base, uint32_t out, uint32_t progress, uint32_t index,
+                     uint32_t frame);
+
 // --- The state machine's handlers (src/race_states/handlers.cpp): the
 // machine (the race mode + 107168: +9604 the state, +9608 the pause menu's
 // quit, +9612 a step, +9616 a tick count, +9624 the progress) and the
 // dispatcher (the race mode + 36) whose ring they post to. r3 isn't kept:
 // the state machine's handler call doesn't read it ---
 
+// RaceStates::Begin (sub_82164DC0): +9616, +9620, +9612 = 0;
+// RaceProgress::Reset of +9624 (its frame `frame` - 96: ProgressResetNative
+// of it first); +9628, +9632, +9636, +9640 = 0. `frame`: its 112 bytes.
+void Begin(uint8_t* base, uint32_t machine, uint32_t frame);
 // RaceStates::FadeInFree (sub_82163398): +9616, +9620, +9612 = 0;
 // ScreenFades::FadeIn([0x82001BEC], black, layer 0).
 void FadeInFree(uint8_t* base, uint32_t machine);
