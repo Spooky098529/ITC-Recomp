@@ -2607,6 +2607,7 @@ B7. **The game logic inside**: everything else, subsystem by subsystem,
 | 2026-10-28 | The scene's loading objects (the first scene pool set's seven loading classes: car model, parts, cockpit body, interior, pool 4's model, wheels, traffic body; `ScenePools::MakeA`, the pool node, the classes' load checks, `CarParts::Part`, the XPR name lookups, `CarModelLoads`) | `scene-loaders.md` | 20 of 78 (one migration; 5 Native with no adapter) | `--native_scene_loaders` |
 | 2026-10-28 | The scene loaders' blockers (no mapping, not counted: the load slots, the deferred release, the part model, `CarModel::Release` and `Reset`; then the loading classes' constructors, releases and destructors, `ScenePools::CreateA`, `Interior::OnPartLoaded`, `Skeleton::ResetPose`, `Model::SetVinylTextures`, `SetSharedShaders`) | `scene-loaders.md`, with `car-models.md`, `models.md` | `scene-loaders.md` 60 of 78, `car-models.md` 4 of 42, `models.md` 45 of 50 (two migrations; 27 adapters removed) | `--native_car_models` (new), `--native_scene_loaders`, `--native_models` |
 | 2026-10-28 | The players' save data in memory (`SaveData::Create` and `Delete`, the progress's clear and defaults, the stats record, the course records, the options and control maps, the default tables' getters; `TitleScreen::ResetPlayer`, `MenuList::Init`, `Players::ResetControllers`) | `save-data.md` | 19 of 19 in play (one migration; 11 adapters removed; 4 rows not seen in play) | `--native_save_data` |
+| 2026-10-28 | Texture compression (XGraphics' `XGCompressSurface` over D3DX's image blitter, used in play only by `Vinyl::Compress` for the vinyl sheet, A8R8G8B8 to DXT5 premultiplied: the DXT alpha and color block encoders, the DXT4/5 encoders, the A8R8G8B8 and DXT codecs, `ImageCodec::Create`, the blitter) | `texture-compression.md` | 24 of 24 in play (one migration in five batches; 18 adapters removed; 133 rows not seen in play) | `--native_texture_compression` |
 
     The first run (2026-10-22, branch `b7-loop-test`): every harness at 0 differing, attract races at 20-21 s with no errors,
     and a race the user drove looked right. Ours went from 162 to 335 (work
@@ -3682,3 +3683,21 @@ Dropped 23, never called 70, live 282. Imports: 186 called, 62 with a
 live caller. B7 (`b7_status.py`): ours 2,400, work left 4,052 (Wrapped
 103, with a row 522, no row yet 3,427), from 4,071 (from 4,197 at the
 run's start).
+
+**2026-10-28, texture compression (branch `b7-loop-28-10-26`):** the
+nineteenth run's first subsystem mapped the top lead, `sub_8235AAC0`, as
+XGraphics' `XGCompressSurface` over D3DX's image blitter
+(`texture-compression.md`, 157 rows, 24 seen in play; not part of the
+replaced HLSL compiler), used in play only by `Vinyl::Compress`, and
+made all 24 native in one migration (`--native_texture_compression`,
+built with the strict-float options; six subagents one at a time, the
+color block encoder alone ~1,500 lines). The format paths never seen in
+play (DXN/CTX1, YUV, the filters, sRGB and others) go back to the
+recompiled code; a few words the original's callees leave below r1
+aren't written (as earlier ports). `XGCompressSurface`'s adapter stays
+for its recompiled caller `Vinyl::Compress` (`car-models.md`, which
+waits on two small ready groups). The boundary unchanged: 449 functions
+(916 pairs): overridden 69, Native 5, Dropped 23, never called 70, live
+282. Imports: 186 called, 62 with a live caller. B7 (`b7_status.py`):
+ours 2,424, work left 4,028 (Wrapped 103, with a row 522, no row yet
+3,403), from 4,052.
