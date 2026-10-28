@@ -8,6 +8,7 @@
 #pragma once
 
 #include "guest.h"
+#include "race_world/race_world.h"
 
 namespace hooks {
 
@@ -144,6 +145,10 @@ void RaceWorldStreamNear(PPCContext& ctx, uint8_t* base);
 void RaceWorldStreamCruise(PPCContext& ctx, uint8_t* base);
 void RaceWorldStreamTwoPlayers(PPCContext& ctx, uint8_t* base);
 void RaceWorldTick(PPCContext& ctx, uint8_t* base);
+
+// RaceManager::Refresh's callees' originals as its adapter makes them, for
+// native callers in other subsystems (src/race_states/).
+race_world::OriginalCall RaceWorldOpponentsCall(PPCContext& ctx, uint8_t* base);
 
 // For the harness: while set, runs instead of RaceManager::GiveVehicle
 // sub_821706E8 (never seen in play; its override, which StreamOpponents'

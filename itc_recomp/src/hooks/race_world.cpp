@@ -454,6 +454,10 @@ rw::OriginalCall OpponentsCall(PPCContext& ctx, uint8_t* base) {
 
 }  // namespace
 
+rw::OriginalCall RaceWorldOpponentsCall(PPCContext& ctx, uint8_t* base) {
+  return OpponentsCall(ctx, base);
+}
+
 void RaceWorldStreamOpponents(PPCContext& ctx, uint8_t* base) {
   ctx.fpscr.disableFlushMode();
   rw::StreamOpponents(base, ctx.r3.u32, ctx.r4.u32, ctx.f1.f64, ctx.f2.f64, ctx.r1.u32 - 1920,
