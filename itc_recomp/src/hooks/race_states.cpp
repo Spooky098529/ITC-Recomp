@@ -21,7 +21,8 @@ ITC_FLAG_BOOL(native_race_states, true, "ITC",
               "native) and CheckFinish sub_82164E18, RoutePosition::MapToSection sub_82163930; RaceStates::Begin sub_82164DC0, "
               "RaceProgress::FollowRoute sub_82163C50 with sub_82163000, RaceTick sub_82167610, OnGo sub_82164458; "
               "RaceProgress::StartRoute sub_821635D0 with RouteDistance sub_82162330, the "
-              "original where memcpy's copies of the course route aren't native) natively instead of through the translated "
+              "original where memcpy's copies of the course route aren't native; RaceStates::Init "
+              "sub_82169920) natively instead of through the translated "
               "code (the same words, bit for bit; checked by --run_harnesses=race_states)");
 
 namespace hooks {
@@ -356,6 +357,7 @@ ITC_RACE_STATES(82164DC0, RaceStatesBegin)
 ITC_RACE_STATES(82167610, RaceStatesRaceTick)
 ITC_RACE_STATES(82164458, RaceStatesOnGo)
 ITC_RACE_STATES(821635D0, RaceStatesStartRoute)
+ITC_RACE_STATES(82169920, RaceStatesInit)
 // RaceProgress::RouteDistance (sub_82162330) has no adapter: its only
 // caller, RaceProgress::StartRoute, is native; --native_race_states switches
 // it. Its register step stays for the harness.
