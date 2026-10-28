@@ -53,4 +53,25 @@ void SaveInterfaceLoad(PPCContext& ctx, uint8_t* base);           // sub_820A051
 void SaveInterfaceUserCount(PPCContext& ctx, uint8_t* base);      // sub_820A05D8
 void SaveInterfaceUserAt(PPCContext& ctx, uint8_t* base);         // sub_820A0620
 
+// The front end's save layer (save_interface/save_layer.h).
+// sub_8228F780 SaveSlots::OfController: r3 = a controller.
+void SaveInterfaceSlotOfController(PPCContext& ctx, uint8_t* base);
+// The slot wrappers by player: r3 = a player.
+void SaveInterfacePlayerRequestDevice(PPCContext& ctx, uint8_t* base);  // sub_8228F9B0
+void SaveInterfacePlayerSlotState(PPCContext& ctx, uint8_t* base);      // sub_8228F9E8
+void SaveInterfacePlayerDevice(PPCContext& ctx, uint8_t* base);         // sub_8228FA90
+void SaveInterfacePlayerPending(PPCContext& ctx, uint8_t* base);        // sub_8228FAC8
+// The save buffers (no arguments); the original without the native heap.
+void SaveInterfaceBuffersCreate(PPCContext& ctx, uint8_t* base);          // sub_8228F6B0
+void SaveInterfaceBuffersFreeReplayList(PPCContext& ctx, uint8_t* base);  // sub_8228F7E8
+void SaveInterfaceBuffersDestroy(PPCContext& ctx, uint8_t* base);         // sub_8228F8F8
+// sub_8228F840 Replays::Sort: r3 = the records (the copy in the frame the
+// original makes, r1 - 176 + 80).
+void SaveInterfaceReplaysSort(PPCContext& ctx, uint8_t* base);
+// sub_821109B8: r3 = out, r4 = the stats (r3 left).
+void SaveInterfacePlayTimeAdd(PPCContext& ctx, uint8_t* base);
+// sub_82112838 PlayTime::Update: r3 = the save data (out in the frame the
+// original makes, r1 - 96 + 80).
+void SaveInterfacePlayTimeUpdate(PPCContext& ctx, uint8_t* base);
+
 }  // namespace hooks

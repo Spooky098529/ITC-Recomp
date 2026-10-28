@@ -177,6 +177,7 @@ set(ITC_SOURCES
     src/archive/semaphores.cpp
     src/hooks/save_interface.cpp
     src/save_interface/save_interface.cpp
+    src/save_interface/save_layer.cpp
     src/hooks/file_layer.cpp
     src/file_layer/file_layer.cpp
     src/hooks/texture_compression.cpp

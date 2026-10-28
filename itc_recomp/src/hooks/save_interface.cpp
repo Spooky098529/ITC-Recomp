@@ -5,7 +5,11 @@
 #include "hooks/save_interface.h"
 
 #include "base/flags.h"
+#include "hooks/heap.h"
+#include "memory/heap.h"
+#include "native/buffers.h"
 #include "save_interface/save_interface.h"
+#include "save_interface/save_layer.h"
 
 ITC_FLAG_BOOL(native_save_interface, true, "ITC",
               "Run the save system's interface (docs/functions/save-interface.md: "
@@ -18,10 +22,16 @@ ITC_FLAG_BOOL(native_save_interface, true, "ITC",
               "sub_820996D8; the save devices' slots sub_820A5750, sub_820A5768, "
               "sub_820A5780, sub_820A5798, sub_820A57B0, sub_820A57F0, sub_820A5808, "
               "SetRootName sub_820A5580, RequestSave sub_820A52E0 and RequestLoad "
-              "sub_820A53E8; the display name's copy sub_82295D48, no adapter: only their plain C++ "
-              "calls it in play; and XContentCalculateSize sub_82295C18) natively instead of through the translated code (the same "
-              "reads and writes; the original where a vtable target isn't ours; checked by "
-              "--run_harnesses=save_interface)");
+              "sub_820A53E8; the display name's copy sub_82295D48, no adapter: only their "
+              "plain C++ calls it in play; XContentCalculateSize sub_82295C18; the front end's "
+              "save layer: SaveSlots::OfController sub_8228F780, the slot wrappers by player "
+              "sub_8228F9B0, sub_8228F9E8, sub_8228FA90 and sub_8228FAC8, with --native_heap "
+              "the save buffers' Create sub_8228F6B0, FreeReplayList sub_8228F7E8 (no adapter: "
+              "only Destroy's plain C++ calls it) and Destroy sub_8228F8F8, Replays::Sort "
+              "sub_8228F840 (its copies through memcpy's plain C++), the play time's "
+              "sub_821109B8 and PlayTime::Update sub_82112838) natively instead of through the "
+              "translated code (the same reads and writes; the original where a vtable target "
+              "isn't ours; checked by --run_harnesses=save_interface)");
 
 namespace hooks {
 
@@ -161,13 +171,73 @@ ITC_SAVE_INTERFACE_WRAPPER(820A0510, SaveInterfaceLoad,
 ITC_SAVE_INTERFACE_WRAPPER(820A05D8, SaveInterfaceUserCount, si::InterfaceUserCount(base))
 ITC_SAVE_INTERFACE_WRAPPER(820A0620, SaveInterfaceUserAt, si::InterfaceUserAt(base, ctx.r3.u32))
 
+ITC_SAVE_INTERFACE_WRAPPER(8228F780, SaveInterfaceSlotOfController,
+                           si::SlotOfController(base, ctx.r3.u32))
+ITC_SAVE_INTERFACE_WRAPPER(8228F9B0, SaveInterfacePlayerRequestDevice,
+                           si::PlayerRequestDevice(base, ctx.r3.u32))
+ITC_SAVE_INTERFACE_WRAPPER(8228F9E8, SaveInterfacePlayerSlotState,
+                           si::PlayerSlotState(base, ctx.r3.u32))
+ITC_SAVE_INTERFACE_WRAPPER(8228FA90, SaveInterfacePlayerDevice, si::PlayerDevice(base, ctx.r3.u32))
+ITC_SAVE_INTERFACE_WRAPPER(8228FAC8, SaveInterfacePlayerPending,
+                           si::PlayerPending(base, ctx.r3.u32))
+
 #undef ITC_SAVE_INTERFACE_WRAPPER
+
+void SaveInterfaceBuffersCreate(PPCContext& ctx, uint8_t* base) {
+  if (!hooks::NativeHeapActive()) {
+    __imp__sub_8228F6B0(ctx, base);
+    return;
+  }
+  if (const auto r3 = si::SaveBuffersCreate(base)) {
+    ctx.r3.u64 = *r3;
+  }
+}
+
+void SaveInterfaceBuffersFreeReplayList(PPCContext& ctx, uint8_t* base) {
+  const uint32_t records = guest::LoadU32(base, guest::LoadU32(base, si::kSaveBuffers) + 12);
+  if (!hooks::NativeHeapActive() || (records != 0 && !memory::IsPages(records))) {
+    __imp__sub_8228F7E8(ctx, base);
+    return;
+  }
+  if (const auto r3 = si::SaveBuffersFreeReplayList(base)) {
+    ctx.r3.u64 = *r3;
+  }
+}
+
+void SaveInterfaceBuffersDestroy(PPCContext& ctx, uint8_t* base) {
+  if (!si::SaveBuffersDestroyNative(base)) {
+    __imp__sub_8228F8F8(ctx, base);
+    return;
+  }
+  ctx.r3.u64 = si::SaveBuffersDestroy(base);
+}
+
+void SaveInterfaceReplaysSort(PPCContext& ctx, uint8_t* base) {
+  if (!native::Buffers_NativeMemcpy()) {
+    __imp__sub_8228F840(ctx, base);
+    return;
+  }
+  if (const auto r3 = si::ReplaysSort(base, ctx.r3.u32, ctx.r1.u32 - 176 + 80)) {
+    ctx.r3.u64 = *r3;
+  }
+}
+
+void SaveInterfacePlayTimeAdd(PPCContext& ctx, uint8_t* base) {
+  si::PlayTimeAdd(base, ctx.r3.u32, ctx.r4.u32);
+}
+
+void SaveInterfacePlayTimeUpdate(PPCContext& ctx, uint8_t* base) {
+  ctx.r4.u64 = ctx.r3.u64 + 48;
+  ctx.r3.u64 = si::PlayTimeUpdate(base, ctx.r3.u32, ctx.r1.u32 - 96 + 80);
+}
 
 }  // namespace hooks
 
 // No adapter (removed 2026-10-28: in play only the request setters' plain
 // C++ calls it; the flag switches them, and the register step above stays
-// for the harness) for the display name's copy sub_82295D48.
+// for the harness) for the display name's copy sub_82295D48. None for
+// SaveBuffers::FreeReplayList sub_8228F7E8 either: its one caller,
+// SaveBuffers::Destroy, is ours (its register step is the harness's).
 
 #define ITC_SAVE_INTERFACE_ADAPTER(address, step) \
   extern "C" REX_FUNC(sub_##address) {            \
@@ -207,3 +277,13 @@ ITC_SAVE_INTERFACE_ADAPTER(820A0490, SaveInterfaceSave)
 ITC_SAVE_INTERFACE_ADAPTER(820A0510, SaveInterfaceLoad)
 ITC_SAVE_INTERFACE_ADAPTER(820A05D8, SaveInterfaceUserCount)
 ITC_SAVE_INTERFACE_ADAPTER(820A0620, SaveInterfaceUserAt)
+ITC_SAVE_INTERFACE_ADAPTER(8228F780, SaveInterfaceSlotOfController)
+ITC_SAVE_INTERFACE_ADAPTER(8228F9B0, SaveInterfacePlayerRequestDevice)
+ITC_SAVE_INTERFACE_ADAPTER(8228F9E8, SaveInterfacePlayerSlotState)
+ITC_SAVE_INTERFACE_ADAPTER(8228FA90, SaveInterfacePlayerDevice)
+ITC_SAVE_INTERFACE_ADAPTER(8228FAC8, SaveInterfacePlayerPending)
+ITC_SAVE_INTERFACE_ADAPTER(8228F6B0, SaveInterfaceBuffersCreate)
+ITC_SAVE_INTERFACE_ADAPTER(8228F8F8, SaveInterfaceBuffersDestroy)
+ITC_SAVE_INTERFACE_ADAPTER(8228F840, SaveInterfaceReplaysSort)
+ITC_SAVE_INTERFACE_ADAPTER(821109B8, SaveInterfacePlayTimeAdd)
+ITC_SAVE_INTERFACE_ADAPTER(82112838, SaveInterfacePlayTimeUpdate)

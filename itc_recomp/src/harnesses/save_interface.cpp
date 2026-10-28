@@ -18,6 +18,7 @@
 #include "hooks/save_interface.h"
 #include "memory/heap.h"
 #include "save_interface/save_interface.h"
+#include "save_interface/save_layer.h"
 
 #include <fmt/format.h>
 
@@ -126,6 +127,13 @@ constexpr uint32_t kPath = 0x240;         // up to 120 bytes
 struct CaseSetup {
   bool fallback = false;
   bool strings = false;
+  // When not 0, [0x828161F0] (the save buffers' header) points here while
+  // the case runs (put back after).
+  uint32_t save_buffers = 0;
+  // Bytes below the stack pointer the original leaves in its frame (filled
+  // with random words first, compared after): from r1 - stack_below.
+  uint32_t stack_below = 0;
+  uint32_t stack_bytes = 0;
 };
 
 // One case through both versions: the block and the scratch area filled from
@@ -138,6 +146,7 @@ void Case(Context& h, Results& results, const Block& block, const CaseSetup& set
   const Random start = h.random;
   Random after;
   const uint32_t live = guest::LoadU32(h.base, si::kInterfaceGlobal);
+  const uint32_t live_buffers = guest::LoadU32(h.base, si::kSaveBuffers);
   for (int v = 0; v < 2; v++) {
     Random random = start;
     WriteRandom(h.base, h.data, kScratchBytes / 4, random);
@@ -149,14 +158,24 @@ void Case(Context& h, Results& results, const Block& block, const CaseSetup& set
       RandomString(h.base, h.data + kPath, 120, false, random);
     }
     PPCContext t = CallContext(h);
+    const uint32_t stack = t.r1.u32 - setup.stack_below;
+    WriteRandom(h.base, stack, setup.stack_bytes / 4, random);
     args(t, block.address, random);
     after = random;
     guest::StoreU32(h.base, si::kInterfaceGlobal, block.address + kInterface);
+    if (setup.save_buffers != 0) {
+      guest::StoreU32(h.base, si::kSaveBuffers, setup.save_buffers);
+    }
     ITC_FLAG(native_save_interface) = v == 1;
     (v == 0 ? recompiled : native)(t, h.base);
     ITC_FLAG(native_save_interface) = true;
     out[v].Word(guest::LoadU32(h.base, si::kInterfaceGlobal) - block.address);
     guest::StoreU32(h.base, si::kInterfaceGlobal, live);
+    if (setup.save_buffers != 0) {
+      out[v].Word(guest::LoadU32(h.base, si::kSaveBuffers) - setup.save_buffers);
+      guest::StoreU32(h.base, si::kSaveBuffers, live_buffers);
+    }
+    out[v].Bytes(Read(h.base, stack, setup.stack_bytes));
     out[v].Bytes(Read(h.base, block.address, kBlockBytes));
     out[v].Bytes(Read(h.base, h.data, kScratchBytes));
     out[v].Word(t.r3.u32);
@@ -170,10 +189,10 @@ using Args = std::function<void(PPCContext&, uint32_t block, uint32_t c, Random&
 
 void Run(Context& h, const Block& block, const char* name, GuestFunction recompiled,
          GuestFunction native, int cases, const Args& args, bool strings = false,
-         bool fallbacks = false) {
+         bool fallbacks = false, CaseSetup base_setup = {}) {
   Results results(name);
   for (int c = 0; c < cases; c++) {
-    CaseSetup setup;
+    CaseSetup setup = base_setup;
     setup.strings = strings;
     setup.fallback = fallbacks && c % 4 == 3;
     Case(
@@ -220,6 +239,123 @@ void Vtables(Context& h) {
 }
 
 uint32_t Slot(Random& random) { return random.Below(3); }
+
+// A player whose controller word ([0x826BABA4 + 4 x player]) lands at
+// `word` in the scratch area (so the game's table isn't read or written),
+// that word a controller 0 to 4.
+uint32_t PlayerAt(uint8_t* base, uint32_t word, Random& random) {
+  guest::StoreU32(base, word, random.Below(5));
+  return (word - si::kControllers) >> 2;
+}
+
+constexpr uint32_t kRecords = 0x1400;  // Replays::Sort's records in the block
+constexpr uint32_t kHeader = 0x300;    // a save buffers' header in the scratch area
+
+// The save buffers' Create and Destroy over the layer's pages, the global
+// pointing at the case's header while they run (put back after). Each
+// version's pages are made and freed in the same order, so the layer's first
+// fit gives both the same addresses; the header's words are compared as
+// offsets from it, the buffers by whether they're the layer's pages after.
+void SaveBuffers(Context& h) {
+  const uint32_t live = guest::LoadU32(h.base, si::kSaveBuffers);
+  {
+    Results results("SaveBuffers::Create (sub_8228F6B0)");
+    for (int c = 0; c < 4; c++) {
+      Outputs out[2];
+      for (int v = 0; v < 2; v++) {
+        PPCContext t = CallContext(h);
+        t.r3.u64 = 0x12345678;
+        // Case 3: a header already there (nothing done).
+        guest::StoreU32(h.base, si::kSaveBuffers, c == 3 ? h.data + kHeader : 0);
+        ITC_FLAG(native_save_interface) = v == 1;
+        (v == 0 ? __imp__sub_8228F6B0 : hooks::SaveInterfaceBuffersCreate)(t, h.base);
+        ITC_FLAG(native_save_interface) = true;
+        const uint32_t header = guest::LoadU32(h.base, si::kSaveBuffers);
+        out[v].Word(t.r3.u32 == 0x12345678 ? 1 : 0);
+        if (c == 3) {
+          out[v].Word(header - h.data);
+        } else {
+          out[v].Word(memory::IsPages(header) ? 1 : 0);
+          for (uint32_t offset = 0; offset < 24; offset += 4) {
+            const uint32_t word = guest::LoadU32(h.base, header + offset);
+            out[v].Word(offset < 12 ? (word != 0 && memory::IsPages(word) ? 1 : 0) : word);
+          }
+          const uint32_t sizes[3] = {si::kGameDataBytes, si::kReplayBytes,
+                                     si::kReplayRecordBytes};
+          for (uint32_t i = 0; i < 3; i++) {
+            const uint32_t buffer = guest::LoadU32(h.base, header + 4 * i);
+            out[v].Bytes(Read(h.base, buffer, 64));
+            out[v].Bytes(Read(h.base, buffer + sizes[i] - 4, 4));
+          }
+          out[v].Word(t.r3.u32 == guest::LoadU32(h.base, header + 8) ? 1 : 0);
+          for (uint32_t i = 0; i < 3; i++) {
+            memory::FreePages(guest::LoadU32(h.base, header + 4 * i));
+          }
+          memory::FreePages(header);
+        }
+        guest::StoreU32(h.base, si::kSaveBuffers, live);
+      }
+      results.Check(out[0], out[1], fmt::format("case {}", c));
+    }
+    results.Report();
+  }
+  for (int which = 0; which < 2; which++) {
+    Results results(which == 0 ? "SaveBuffers::FreeReplayList (sub_8228F7E8)"
+                               : "SaveBuffers::Destroy (sub_8228F8F8)");
+    for (int c = 0; c < 12; c++) {
+      Outputs out[2];
+      const Random start = h.random;
+      Random after;
+      for (int v = 0; v < 2; v++) {
+        Random random = start;
+        const uint32_t header = memory::AllocPages(24, 4096);
+        uint32_t buffers[4];
+        for (uint32_t i = 0; i < 4; i++) {
+          buffers[i] = random.Below(3) == 0 ? 0 : memory::AllocPages(1 + random.Below(20000), 4096);
+          guest::StoreU32(h.base, header + 4 * i, buffers[i]);
+        }
+        guest::StoreU32(h.base, header + 16, uint32_t(random.Next()));
+        guest::StoreU32(h.base, header + 20, uint32_t(random.Next()));
+        after = random;
+        PPCContext t = CallContext(h);
+        t.r3.u64 = 0x12345678;
+        guest::StoreU32(h.base, si::kSaveBuffers, header);
+        ITC_FLAG(native_save_interface) = v == 1;
+        if (which == 0) {
+          (v == 0 ? __imp__sub_8228F7E8 : hooks::SaveInterfaceBuffersFreeReplayList)(t, h.base);
+        } else {
+          (v == 0 ? __imp__sub_8228F8F8 : hooks::SaveInterfaceBuffersDestroy)(t, h.base);
+        }
+        ITC_FLAG(native_save_interface) = true;
+        const uint32_t global = guest::LoadU32(h.base, si::kSaveBuffers);
+        out[v].Word(global == header ? 1 : global);
+        out[v].Word(t.r3.u32);
+        out[v].Word(uint32_t(t.r3.u64 >> 32));
+        for (uint32_t i = 0; i < 4; i++) {
+          const bool kept = buffers[i] != 0 && memory::IsPages(buffers[i]);
+          out[v].Word(kept ? 1 : 0);
+          if (kept) {
+            memory::FreePages(buffers[i]);
+          }
+        }
+        const bool header_kept = memory::IsPages(header);
+        out[v].Word(header_kept ? 1 : 0);
+        if (header_kept) {
+          for (uint32_t offset = 0; offset < 16; offset += 4) {
+            const uint32_t word = guest::LoadU32(h.base, header + offset);
+            out[v].Word(word == buffers[offset / 4] ? 1 : word);
+          }
+          out[v].Bytes(Read(h.base, header + 16, 8));
+          memory::FreePages(header);
+        }
+        guest::StoreU32(h.base, si::kSaveBuffers, live);
+      }
+      h.random = after;
+      results.Check(out[0], out[1], fmt::format("case {}", c));
+    }
+    results.Report();
+  }
+}
 
 }  // namespace
 
@@ -381,6 +517,66 @@ void SaveInterface(Context& h) {
   Run(h, block, "SaveInterface::UserAt (sub_820A0620)", __imp__sub_820A0620,
       hooks::SaveInterfaceUserAt, 16,
       [&](PPCContext& t, uint32_t, uint32_t, Random& random) { t.r3.u64 = random.Below(7); });
+
+  // The front end's save layer.
+  Run(h, block, "SaveSlots::OfController (sub_8228F780)", __imp__sub_8228F780,
+      hooks::SaveInterfaceSlotOfController, 24,
+      [&](PPCContext& t, uint32_t, uint32_t, Random& random) { t.r3.u64 = random.Below(6); });
+  const auto player_args = [&](PPCContext& t, uint32_t, uint32_t, Random& random) {
+    t.r3.u64 = PlayerAt(h.base, data + 0x400 + 4 * random.Below(16), random);
+  };
+  Run(h, block, "SaveSlots::RequestDevice (sub_8228F9B0)", __imp__sub_8228F9B0,
+      hooks::SaveInterfacePlayerRequestDevice, 16, player_args);
+  Run(h, block, "SaveSlots::State (sub_8228F9E8)", __imp__sub_8228F9E8,
+      hooks::SaveInterfacePlayerSlotState, 16, player_args);
+  Run(h, block, "SaveSlots::Device (sub_8228FA90)", __imp__sub_8228FA90,
+      hooks::SaveInterfacePlayerDevice, 16, player_args);
+  Run(h, block, "SaveSlots::Pending (sub_8228FAC8)", __imp__sub_8228FAC8,
+      hooks::SaveInterfacePlayerPending, 16, player_args);
+  SaveBuffers(h);
+  {
+    CaseSetup sort;
+    sort.save_buffers = data + kHeader;
+    sort.stack_below = 96;
+    sort.stack_bytes = 36;
+    Run(
+        h, block, "Replays::Sort (sub_8228F840)", __imp__sub_8228F840,
+        hooks::SaveInterfaceReplaysSort, 24,
+        [&](PPCContext& t, uint32_t b, uint32_t c, Random& random) {
+          const uint32_t count = c < 3 ? c : random.Below(13);
+          guest::StoreU32(h.base, data + kHeader + 20, count);
+          for (uint32_t i = 0; i < 12; i++) {  // numbers with ties, some negative
+            guest::StoreU32(h.base, b + kRecords + 36 * i + 28, random.Below(9) - 2);
+          }
+          t.r3.u64 = b + kRecords;
+        },
+        false, false, sort);
+  }
+  Run(h, block, "PlayTime::Add (sub_821109B8)", __imp__sub_821109B8,
+      hooks::SaveInterfacePlayTimeAdd, 24, [&](PPCContext& t, uint32_t b, uint32_t c, Random& random) {
+        const uint32_t stats = b + 0x200 * random.Below(4);
+        if (c % 2 == 0) {  // the play time's fields in range, a short time since
+          guest::StoreU8(h.base, stats + 6036, uint8_t(random.Below(60)));
+          guest::StoreU8(h.base, stats + 6037, uint8_t(random.Below(60)));
+          guest::StoreU8(h.base, stats + 6038, uint8_t(random.Below(30)));
+          guest::StoreU32(h.base, stats + 6040,
+                          guest::LoadU32(h.base, si::kPlayTimeFrames) - random.Below(500000));
+        }
+        t.r3.u64 = data + 0x500;
+        t.r4.u64 = stats;
+      });
+  {
+    CaseSetup update;
+    update.stack_below = 16;
+    update.stack_bytes = 8;
+    Run(
+        h, block, "PlayTime::Update (sub_82112838)", __imp__sub_82112838,
+        hooks::SaveInterfacePlayTimeUpdate, 12,
+        [&](PPCContext& t, uint32_t b, uint32_t, Random& random) {
+          t.r3.u64 = b + 0x100 * random.Below(4);
+        },
+        false, false, update);
+  }
 }
 
 }  // namespace harness
