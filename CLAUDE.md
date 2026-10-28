@@ -328,7 +328,9 @@ put back, the input recordings and the race event's lookups. The
 harnesses now take ~30 s of `attract_race.sh 40`, leaving ~8 s of race.
 Harness runs use `attract_race.sh 40` (the user's call,
 2026-10-23); a race short only because the harnesses took longer is
-no halt.
+no halt. B7 loop migration agents run only their subsystem's harnesses
+(and those of files they touched); the validation agent runs them all
+once after each migration (the user's call, 2026-10-28).
 After each plan item, run `itc_recomp/tools/boundary_status.py` and record
 its output in "The boundary over time" at the end of
 `docs/rexglue-removal.md`. Plan steps are done on their
