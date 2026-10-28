@@ -1,6 +1,6 @@
 // The racers' manager's streaming each tick (docs/functions/race-world.md):
-// RaceManager::StreamOpponents and RaceManager::MoveUnseen. See
-// race_world.h.
+// RaceManager::StreamOpponents, RaceManager::StreamTraffic and
+// RaceManager::MoveUnseen. See race_world.h.
 
 #include "race_world/race_world.h"
 
@@ -9,12 +9,14 @@
 #include "car_physics/float_ops.h"
 #include "data_tables/data_tables.h"
 #include "guest.h"
+#include "hooks/vehicle.h"
 #include "racer_controllers/racer_controllers.h"
 #include "track_route/track_route.h"
 #include "vehicle/vehicle.h"
 #include "vehicle_accessors/vectors.h"
 #include "vehicle_accessors/vehicle_accessors.h"
 
+#include <cmath>
 #include <cstdint>
 
 namespace race_world {
@@ -33,6 +35,12 @@ constexpr uint32_t kBehind = 0x82001070;      // Neighbours 2: one behind
 constexpr uint32_t kBoth = 0x820029F0;        // Neighbours 3: both
 constexpr uint32_t kGiveVehicle = 0x821706E8;
 constexpr uint32_t kRemoveFromWorld = 0x820C20E0;
+constexpr uint32_t kFlagsOffset = 0x59AE4;     // the race data's flags
+constexpr uint32_t kSpacingOffset = 0xA3AE0;   // the race data's traffic numbers' base
+constexpr uint32_t kSlowFactor = 0x820027A8;   // 1.5: the km/h scaled against the speed below
+constexpr uint32_t kTrafficSpeed = 0x82009974;  // the traffic's speed placed (and its limit)
+constexpr uint32_t kTooNear = 0x82002568;      // 20.0: a racer this near the spot refuses it
+constexpr uint32_t kTrafficStep = 0x826193C8;  // the physics step's time on a new traffic car
 
 uint32_t Load(uint8_t* base, uint32_t address) {
   return guest::LoadU32(base, address);
@@ -72,14 +80,38 @@ void Lose(uint8_t* base, uint32_t manager, uint32_t entry, uint32_t frame, bool 
   Store(base, entry + 20, 0xFFFFFFFFu);
 }
 
-// An entry with a vehicle put in the racers' list (+2308): +2364 and +2372
-// count.
-void List(uint8_t* base, uint32_t manager, uint32_t entry) {
+// An entry with a vehicle put in the racers' list (+2308): +2364 and
+// `counter` (+2372 the opponents', +2376 the traffic's) count.
+void List(uint8_t* base, uint32_t manager, uint32_t entry, uint32_t counter = 2372) {
   Store(base, manager + ((Load(base, manager + 2364) + 577) << 2), entry);
   const uint32_t listed = Load(base, manager + 2364);
-  const uint32_t racers = Load(base, manager + 2372);
+  const uint32_t racers = Load(base, manager + counter);
   Store(base, manager + 2364, listed + 1);
-  Store(base, manager + 2372, racers + 1);
+  Store(base, manager + counter, racers + 1);
+}
+
+// fctiwz's low word, as the translation leaves it (stfiwx).
+uint32_t FctiwzWord(double value) {
+  if (std::isnan(value)) {
+    return 0x80000000u;
+  }
+  if (value >= double(INT32_MAX)) {
+    return uint32_t(INT32_MAX);
+  }
+  if (value <= -2147483649.0) {
+    return 0x80000000u;
+  }
+  return uint32_t(int32_t(value));
+}
+
+// Vehicle::RemoveFromWorld: its plain C++ with `heap`, else (or where it
+// refuses) its original with r1 = `frame`.
+void RemoveFromWorld(uint8_t* base, uint32_t car, uint32_t frame, bool heap,
+                     const OriginalCall& original) {
+  uint32_t removed = 0;
+  if (!heap || !vehicle::VehicleRemoveFromWorld(base, car, &removed)) {
+    original(kRemoveFromWorld, frame, car, 0, 0);
+  }
 }
 
 }  // namespace
@@ -194,6 +226,289 @@ void StreamOpponents(uint8_t* base, uint32_t manager, uint32_t player, double sp
       List(base, manager, entry);
     }
   }
+}
+
+void StreamTraffic(uint8_t* base, uint32_t manager, uint32_t player, double inner, double outer,
+                   uint32_t second, uint32_t frame, bool heap, const StartCalls& calls) {
+  ITC_NATIVE_RUNNING("sub_821724F8 RaceManager::StreamTraffic");
+  // The player's route position (its vehicle's identity +4) at + 84, its
+  // body's position at + 160, its velocity (+6176) at + 176; the position
+  // again at + 80, the second player's there when there's one.
+  const uint32_t car = va::VehicleGet(base, Load(base, player + 20));
+  const uint32_t position = Load(base, va::VehicleIdentity(car) + 4);
+  Store(base, frame + 84, position);
+  const uint32_t at = va::RigidBodyPosition(Load(base, car + 336));
+  for (uint32_t w = 0; w < 4; w++) {
+    Store(base, frame + 160 + 4 * w, Load(base, at + 4 * w));
+  }
+  for (uint32_t w = 0; w < 4; w++) {
+    Store(base, frame + 176 + 4 * w, Load(base, car + 6176 + 4 * w));
+  }
+  // Vehicle::Get of the player's +20 again and RigidBody::Position, their
+  // answers unused.
+  Store(base, frame + 80, Load(base, va::VehicleIdentity(car) + 4));
+  const double slice_length = Lfs(base, Load(base, kRoute) + 8);
+  if (second != 0) {
+    const uint32_t other = va::VehicleGet(base, Load(base, second + 20));
+    Store(base, frame + 80, Load(base, va::VehicleIdentity(other) + 4));
+  }
+  Store(base, manager + 2376, 0);
+  // With the race data's flags 0x4000: every traffic car (the entries at
+  // +2160) loses its vehicle.
+  if ((Load(base, Load(base, kRaceData) + kFlagsOffset) & 0x4000) != 0) {
+    for (uint32_t t = 0; t < 3; t++) {
+      const uint32_t entry = manager + 2160 + 28 * t;
+      if (Load(base, entry) == 0) {
+        continue;
+      }
+      RemoveFromWorld(base, va::VehicleGet(base, Load(base, entry + 20)), frame, heap,
+                      calls.original);
+      const uint32_t which = Load(base, entry + 20);
+      Store(base, entry, 0);
+      Store(base, manager + ((which + 584) << 2), 0);
+      Store(base, entry + 20, 0xFFFFFFFFu);
+    }
+    return;
+  }
+  // The players' slices' centers: the player's at + 208, the second's at +
+  // 192.
+  track_route::SlicePoint(base, frame + 208, 0, LoadS16(base, frame + 84),
+                          LoadS16(base, frame + 86));
+  if (second != 0) {
+    track_route::SlicePoint(base, frame + 192, 0, LoadS16(base, frame + 80),
+                            LoadS16(base, frame + 82));
+  }
+  // Each traffic entry with a vehicle: its slot word counts its ticks (to
+  // 216,000, then 60); farther than `outer` from both players (each flat
+  // distance from its slice's center, at + 144, the difference at + 96), it
+  // loses its vehicle when its slot word is above 0; else it's listed.
+  const double zero = Lfs(base, kZero);
+  for (uint32_t t = 0; t < 3; t++) {
+    const uint32_t entry = manager + 2160 + 28 * t;
+    if (Load(base, entry) == 0) {
+      continue;
+    }
+    const uint32_t vehicle = va::VehicleGet(base, Load(base, entry + 20));
+    const uint32_t slot = manager + ((Load(base, entry + 20) + 584) << 2);
+    Store(base, slot, Load(base, slot) + 1);
+    const uint32_t again = manager + ((Load(base, entry + 20) + 584) << 2);
+    if (int32_t(Load(base, again)) > 216000) {
+      Store(base, again, 60);
+    }
+    Store(base, frame + 84, Load(base, va::VehicleIdentity(vehicle) + 4));
+    track_route::SlicePoint(base, frame + 144, 0, LoadS16(base, frame + 84),
+                            LoadS16(base, frame + 86));
+    vl::Vec3Sub(base, frame + 96, frame + 144, frame + 208);
+    Stfs(base, frame + 100, zero);
+    const double first = double(vl::Vec3Normalize(base, frame + 96, frame + 96));
+    double other = first;
+    if (second != 0) {
+      vl::Vec3Sub(base, frame + 96, frame + 144, frame + 192);
+      Stfs(base, frame + 100, zero);
+      other = double(vl::Vec3Normalize(base, frame + 96, frame + 96));
+    }
+    if (first > outer && other > outer &&
+        int32_t(Load(base, manager + ((Load(base, entry + 20) + 584) << 2))) > 0) {
+      RemoveFromWorld(base, vehicle, frame, heap, calls.original);
+      const uint32_t which = Load(base, entry + 20);
+      Store(base, entry, 0);
+      Store(base, manager + ((which + 584) << 2), 0);
+      Store(base, entry + 20, 0xFFFFFFFFu);
+    } else {
+      // (The original also counts the entries flagged 0x800, for the
+      // neighbor search below, which never runs.)
+      List(base, manager, entry, 2376);
+    }
+  }
+  if ((Load(base, Load(base, kRaceData) + kFlagsOffset) & 0x2000) != 0) {
+    return;
+  }
+  // A new traffic car every 90 ticks at most (+2388 counts them), while
+  // there are fewer than +2380.
+  if (!(int32_t(Load(base, manager + 2376)) < int32_t(Load(base, manager + 2380))) ||
+      Load(base, manager + 2388) < 90) {
+    const uint32_t ticks = Load(base, manager + 2388);
+    if (ticks < 90) {
+      Store(base, manager + 2388, ticks + 1);
+    }
+    return;
+  }
+  Store(base, manager + 2388, 0);
+  // The first free traffic entry (+0 0) with a free vehicle slot (its word
+  // 0 or -1; the slots scanned for each free entry).
+  uint32_t t = 0, which = 0xFFFFFFFFu;
+  for (;; t++) {
+    if (t >= 3) {
+      return;
+    }
+    if (Load(base, manager + 2160 + 28 * t) != 0) {
+      continue;
+    }
+    for (uint32_t k = 0; k < 7; k++) {
+      const uint32_t word = Load(base, manager + 2336 + 4 * k);
+      if (word == 0 || word == 0xFFFFFFFFu) {
+        which = k;
+        break;
+      }
+    }
+    if (which != 0xFFFFFFFFu) {
+      break;
+    }
+  }
+  const uint32_t entry = manager + 2160 + 28 * t;
+  // The spot: the original first looks on a section beside the player's
+  // (RaceManager::BuildNeighbors' table, +2392) only while its count of the
+  // listed traffic cars flagged 0x800 is below 0, which never holds (it
+  // counts up from 0), so the spot is always a route position stepped on the
+  // main road (RoutePosition::StepToMainRoad, kind -1) by a number of slices
+  // (fctiwz into + 80, its low halfword): with the player's car's +6168 set,
+  // 1 - `outer` / the slice length from the second player's position (the
+  // player's without one); else, without the race data's flags 0x1000 and
+  // with the car's km/h x [0x820027A8] below [0x82009974], 1 - `inner` / the
+  // slice length from the same; else `inner` / the slice length from the
+  // player's.
+  guest::StoreU16(base, frame + 88, 0xFFFF);
+  guest::StoreU16(base, frame + 90, 0xFFFF);
+  const uint32_t flag6168 = Load(base, car + 6168);
+  Store(base, frame + 88, position);
+  bool less = false;  // the steps 1 - f13
+  double f13 = 0.0;
+  if (flag6168 != 0) {
+    if (second != 0) {
+      Store(base, frame + 88, Load(base, frame + 80));
+    }
+    f13 = Fdivs(outer, slice_length);
+    less = true;
+  } else if ((Load(base, Load(base, kRaceData) + kFlagsOffset) & 0x1000) == 0) {
+    const double kmh = Fmuls(double(Vehicle_GetSpeedKmh(base, car)), Lfs(base, kSlowFactor));
+    if (kmh < Lfs(base, kTrafficSpeed)) {
+      if (second != 0) {
+        Store(base, frame + 88, Load(base, frame + 80));
+      }
+      f13 = Fdivs(inner, slice_length);
+      less = true;
+    }
+  }
+  if (less) {
+    Store(base, frame + 80, FctiwzWord(Fsubs(Lfs(base, kOne), f13)));
+  } else {
+    Store(base, frame + 80, FctiwzWord(Fdivs(inner, slice_length)));
+  }
+  StepToMainRoad(base, frame + 88, LoadS16(base, frame + 82), 0xFFFFFFFFu, frame - 112);
+  // The spot's center at + 128; refused (nothing more) when a listed racer's
+  // body ([0x826D82F4]'s list, its count read again each pass; the position
+  // at + 96, its y 0.0) is nearer than [0x82002568] (Vec3::Direction into +
+  // 256).
+  track_route::SlicePoint(base, frame + 128, 0, LoadS16(base, frame + 88),
+                          LoadS16(base, frame + 90));
+  Stfs(base, frame + 132, zero);
+  {
+    uint32_t global = Load(base, kManager);
+    if (int32_t(Load(base, global + 2364)) > 0) {
+      const double too_near = Lfs(base, kTooNear);
+      for (int32_t i = 0;;) {
+        const uint32_t listed = Load(base, global + 2308 + 4 * uint32_t(i));
+        const uint32_t body = Load(base, va::VehicleGet(base, Load(base, listed + 20)) + 336);
+        const uint32_t point = va::RigidBodyPosition(body);
+        for (uint32_t w = 0; w < 4; w++) {
+          Store(base, frame + 96 + 4 * w, Load(base, point + 4 * w));
+        }
+        Stfs(base, frame + 100, zero);
+        if (double(vl::Vec3Direction(base, frame + 256, frame + 128, frame + 96)) < too_near) {
+          return;
+        }
+        global = Load(base, kManager);
+        i++;
+        if (!(i < int32_t(Load(base, global + 2364)))) {
+          break;
+        }
+      }
+    }
+  }
+  // The entry: its model (Traffic::PickModel of the race data's +0xA3AE0 +
+  // its +16 + its index, and the spot's branch), +0 = 578, +24 the model's
+  // traffic record (+2244), +16 the number (less 42 while above 42); its
+  // lane by the player's car's +6224 (0 below 0.0, else 1).
+  const uint32_t file = Load(base, kRoute);
+  const uint32_t branch =
+      guest::LoadU8(base, SectionRecord(base, file, guest::LoadU16(base, frame + 88)) + 3);
+  const uint32_t number =
+      Load(base, Load(base, kRaceData) + kSpacingOffset) + Load(base, entry + 16) + t;
+  const uint32_t model = uint32_t(PickModel(base, number, branch, frame));
+  const uint32_t record = Load(base, manager + ((model + 561) << 2));
+  Store(base, entry + 4, model);
+  Store(base, entry + 0, 578);
+  Store(base, entry + 24, record);
+  const uint32_t lane = Lfs(base, car + 6224) < zero ? 0 : 1;
+  Store(base, entry + 16, number);
+  for (int32_t n = int32_t(number); n > 42;) {
+    n = int32_t(Load(base, entry + 16)) - 42;
+    Store(base, entry + 16, uint32_t(n));
+  }
+  // Its vehicle: Vehicle::SetUp (slot word -1) or ResetForCar with its
+  // record (the race data + 48 + 3,936 x +24), the slot 1,
+  // Vehicle::PlaceOnRoute on the spot ([0x82009974] the speed, 0.0 across,
+  // the lane, 1), an input record cleared at + 224 and copied to the
+  // racer's, VehicleStatus's speed record (+6160), one physics step
+  // ([0x826193C8]) and VehicleStatus::Update(+6160, it, 0, 1); its driver
+  // (AiDriver::Setup: -1 at + 80, 1 at + 84); listed.
+  Store(base, entry + 20, which);
+  const uint32_t given = va::VehicleGet(base, which);
+  const uint32_t slot = manager + ((which + 584) << 2);
+  const uint32_t car_record = Load(base, kRaceData) + Load(base, entry + 24) * 3936 + 48;
+  double f1 = 0.0;
+  vehicle::VehicleSetUp(base, given, car_record, frame - 224, int32_t(Load(base, slot)) != -1,
+                        heap, calls.setup_original, &f1);
+  Store(base, slot, 1);
+  {
+    const double speed = Lfs(base, kTrafficSpeed);
+    if (!vehicle::VehiclePlaceOnRoute(base, given, frame + 88, speed, zero, int32_t(lane), 1,
+                                      frame - 560, calls.place)) {
+      vehicle::GuestRegisters r;
+      r.r3 = given;
+      r.r4 = frame + 88;
+      r.r6 = lane;
+      r.f1 = speed;
+      r.f2 = zero;
+      calls.place(0x820C3608, frame, r);
+    }
+  }
+  ai_drivers::ClearCarInput(base, frame + 224);
+  {
+    const uint32_t to = Load(base, kInputs + ((Load(base, entry + 20) << 2) & 0x3FC));
+    for (uint32_t w = 0; w < 5; w++) {
+      Store(base, to + 4 * w, Load(base, frame + 224 + 4 * w));
+    }
+  }
+  const uint32_t status = given + 6160;
+  va::VehicleSpeedRecord(base, status, given);
+  {
+    const double dt = Lfs(base, kTrafficStep);
+    if (car_physics::CollisionWorldCallbackKnown(base)) {
+      car_physics::VehiclePhysicsStep(base, given, dt, frame - 112, [&](uint32_t address) {
+        vehicle::GuestRegisters r;
+        r.r3 = given;
+        calls.tick(address, frame - 112, r);
+      });
+    } else {
+      vehicle::GuestRegisters r;
+      r.r3 = given;
+      r.f1 = dt;
+      calls.tick(0x820B6498, frame, r);
+    }
+  }
+  if (!vehicle::VehicleStatusUpdate(base, status, given, 0, 1, frame - 384)) {
+    vehicle::GuestRegisters r;
+    r.r3 = status;
+    r.r4 = given;
+    r.r5 = 0;
+    r.r6 = 1;
+    calls.tick(0x820C23E8, frame, r);
+  }
+  Store(base, frame + 84, 1);
+  Store(base, frame + 80, 0xFFFFFFFFu);
+  racer_controllers::Setup(base, entry + 20, frame + 80, frame + 84, frame);
+  List(base, manager, entry, 2376);
 }
 
 void MoveUnseen(uint8_t* base, uint32_t manager, uint32_t player, uint32_t frame) {

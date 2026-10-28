@@ -123,6 +123,13 @@ void RaceWorldPlaceRolling(PPCContext& ctx, uint8_t* base);
 // the player's entry. r3 not kept (their callers don't read it).
 void RaceWorldStreamOpponents(PPCContext& ctx, uint8_t* base);
 void RaceWorldMoveUnseen(PPCContext& ctx, uint8_t* base);
+// RaceManager::StreamTraffic sub_821724F8: r3 = the manager, r4 = the
+// player's entry, f1, f2 = the near and far radii, r5 = the second player's
+// entry or 0 (Vehicle::RemoveFromWorld's and the physics set-up's originals
+// unless --native_heap routes the game's heap to the allocation layer; the
+// callees' originals where their plain C++ refuses). r3 not kept (no caller
+// reads it).
+void RaceWorldStreamTraffic(PPCContext& ctx, uint8_t* base);
 
 // For the harness: while set, runs instead of RaceManager::GiveVehicle
 // sub_821706E8 (never seen in play; its override, which StreamOpponents'

@@ -434,6 +434,31 @@ void PlaceRolling(uint8_t* base, uint32_t object, uint32_t settle, uint32_t fram
 // read it).
 void StreamOpponents(uint8_t* base, uint32_t manager, uint32_t player, double spawn,
                      double despawn, uint32_t frame, bool heap, const OriginalCall& original);
+// RaceManager::StreamTraffic (sub_821724F8): `inner` and `outer` the near and far radii,
+// `second` the second player's entry or 0. The player's route position (its
+// vehicle's identity +4) at `frame` + 84 (and + 80, or the second player's
+// there), its body's position at + 160, its velocity (+6176) at + 176;
+// +2376 = 0. With the race data's flags (+0x59AE4) 0x4000: each traffic
+// entry (the three at +2160) in use (+0 not 0) loses its vehicle
+// (Vehicle::RemoveFromWorld, its original without `heap` or where it
+// refuses; +0 = 0, the slot word 0, +20 = -1); nothing more. Else each in
+// use: its slot word + 1 (above 216,000: 60); its slice's center (+ 144)
+// less each player's (+ 208, + 192; at + 96, y 0.0, Vec3::Normalize): beyond
+// `outer` from both, with its slot word above 0, it loses its vehicle; else
+// it's listed (+2308; +2364, +2376 count). Then, unless flags 0x2000: with
+// +2376 below +2380 and +2388 at 90 or more, +2388 = 0 and the first free
+// entry with a free slot (0 or -1) gets a car on a spot (see the code: the
+// neighbor search the original has never runs), refused when a listed
+// racer of [0x826D82F4] is within [0x82002568]; else +2388 + 1 below 90.
+// The car: Traffic::PickModel, +0 = 578, +24 its record, +16 the number
+// mod 42, Vehicle::SetUp (slot -1) or ResetForCar, PlaceOnRoute,
+// CarInput::Clear at + 224 copied to the racer's, Vehicle::SpeedRecord,
+// PhysicsStep, VehicleStatus::Update, AiDriver::Setup (-1 at + 80, 1 at +
+// 84), listed. The callees' originals through `calls` where their plain C++
+// refuses (SetUp's physics and RemoveFromWorld without `heap`). `frame`:
+// the original's 464 bytes. r3 isn't kept (no caller reads it).
+void StreamTraffic(uint8_t* base, uint32_t manager, uint32_t player, double inner, double outer,
+                   uint32_t second, uint32_t frame, bool heap, const StartCalls& calls);
 // RaceManager::MoveUnseen (sub_82173E28): the player's route position
 // (its vehicle's identity +4) at `frame` + 88, its body's position
 // (RigidBody::Position, 16 bytes) at + 96, its section's branch at + 92,

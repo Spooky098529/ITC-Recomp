@@ -38,8 +38,10 @@ ITC_FLAG_BOOL(native_race_world, true, "ITC",
               "sub_82165E20 and PlaceRolling sub_821662E0 (their callees' originals where those "
               "refuse); RaceManager::StreamOpponents sub_82172118 (Vehicle::RemoveFromWorld's "
               "original unless --native_heap routes the game's heap to the allocation layer; "
-              "RaceManager::GiveVehicle sub_821706E8's original) and MoveUnseen sub_82173E28 "
-              "natively instead of through the "
+              "RaceManager::GiveVehicle sub_821706E8's original), StreamTraffic sub_821724F8 "
+              "(Vehicle::RemoveFromWorld's and the physics set-up's originals unless --native_heap "
+              "routes the game's heap to the allocation layer; its callees' originals where those "
+              "refuse) and MoveUnseen sub_82173E28 natively instead of through the "
               "translated code (the same words, bit for bit; checked by "
               "--run_harnesses=race_world)");
 
@@ -435,6 +437,13 @@ void RaceWorldStreamOpponents(PPCContext& ctx, uint8_t* base) {
       });
 }
 
+void RaceWorldStreamTraffic(PPCContext& ctx, uint8_t* base) {
+  ctx.fpscr.disableFlushMode();
+  const uint32_t frame = ctx.r1.u32 - 464;
+  rw::StreamTraffic(base, ctx.r3.u32, ctx.r4.u32, ctx.f1.f64, ctx.f2.f64, ctx.r5.u32, frame,
+                    NativeHeapActive(), StartCalls(ctx, base, frame - 224));
+}
+
 void RaceWorldMoveUnseen(PPCContext& ctx, uint8_t* base) {
   ctx.fpscr.disableFlushMode();
   rw::MoveUnseen(base, ctx.r3.u32, ctx.r4.u32, ctx.r1.u32 - 272);
@@ -476,6 +485,7 @@ ITC_RACE_WORLD(82173A90, RaceWorldOnLoaded)
 ITC_RACE_WORLD(82165E20, RaceWorldPlace)
 ITC_RACE_WORLD(821662E0, RaceWorldPlaceRolling)
 ITC_RACE_WORLD(82172118, RaceWorldStreamOpponents)
+ITC_RACE_WORLD(821724F8, RaceWorldStreamTraffic)
 ITC_RACE_WORLD(82173E28, RaceWorldMoveUnseen)
 // RaceManager::GiveVehicle (sub_821706E8, never seen in play): the original,
 // or the harness's stand-in while it's set (hooks::g_give_vehicle_stand_in).
