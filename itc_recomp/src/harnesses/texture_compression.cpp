@@ -16,14 +16,26 @@
 // The last group runs Dxt45::EncodeBlock (sub_82422A68, recompiled, with its
 // color half) over rows of blocks on one stack, premultiplied and not, so a
 // difference in what the alpha half leaves on the stack for the next block's
-// color half would show.
+// color half would show; since batch 2a its color half reaches our
+// DxtColor::FitEndpoints and PackR5G6B5 too.
+//
+// DxtColor::PackR5G6B5 (sub_824206E8) gets colors whose channels are random,
+// bytes decoded, at the 31 and 63 steps' rounding boundaries (and the floats
+// either side), and every edge (0, -0.0, 1 and the floats beside them,
+// negative, above 1, NaNs, infinities, denormals, random bits).
+// DxtColor::FitEndpoints (sub_82420AB8) gets blocks of 16 pixels from the
+// color generators in Pixels() in both modes (3 and 4 colors), with the stack
+// below the call filled with the same random words for both versions (a
+// pixel far below the low end makes the original read it).
 
 #include "harness.h"
 
 #include "base/flags.h"
+#include "base/log.h"
 #include "hooks/texture_compression.h"
 #include "memory/heap.h"
 #include "texture_compression/dxt_alpha.h"
+#include "texture_compression/dxt_color.h"
 
 #include <fmt/format.h>
 
@@ -251,10 +263,336 @@ void FitEndpoints(Context& h) {
   results.Report();
 }
 
+// A color channel at one of PackR5G6B5's rounding boundaries (where
+// v x 31 or 63 + 0.5 reaches a whole number), or a float beside it.
+float Boundary(Random& r) {
+  const float scale = r.Below(2) == 0 ? 31.0f : 63.0f;
+  const float k = float(r.Below(uint32_t(scale) + 1));
+  float v;
+  switch (r.Below(3)) {
+    case 0: v = (k + 0.5f) / scale; break;
+    case 1: v = float((double(k) + 0.5) / double(scale)); break;
+    default: v = (k - 0.5f) / scale; break;
+  }
+  switch (r.Below(3)) {
+    case 0: return v;
+    case 1: return std::nextafter(v, 2.0f);
+    default: return std::nextafter(v, -2.0f);
+  }
+}
+
+float Channel(Random& r, int kind) {
+  switch (kind) {
+    case 0: return Unit(r);
+    case 1: return Byte(r.Below(256), r.Below(2) == 0);
+    case 2: return Boundary(r);
+    case 3: return Special(r);
+    case 4: return Unit(r) * 3.0f - 1.0f;
+    case 5: return std::bit_cast<float>(uint32_t(r.Next()));
+    default: {  // a premultiplied byte
+      return Byte(r.Below(256), false) * Byte(r.Below(256), false);
+    }
+  }
+}
+
+void PackR5G6B5(Context& h) {
+  Results results("DxtColor::PackR5G6B5 (sub_824206E8)");
+  for (int c = 0; c < 4000; c++) {
+    std::array<float, 4> color;
+    const int kind = c % 7;
+    for (float& v : color) {
+      // Mostly the case's kind, some channels from the others.
+      v = Channel(h.random, h.random.Below(4) == 0 ? int(h.random.Below(7)) : kind);
+    }
+    Outputs out[2];
+    for (int v = 0; v < 2; v++) {
+      Fill(h.base, h.data, kScratchBytes);
+      for (uint32_t i = 0; i < 4; i++) {
+        guest::StoreFloat(h.base, h.data + 4 * i, color[i]);
+      }
+      PPCContext t = CallContext(h);
+      t.r3.u64 = h.data;
+      if (v == 0) {
+        ITC_FLAG(native_texture_compression) = false;
+        __imp__sub_824206E8(t, h.base);
+        ITC_FLAG(native_texture_compression) = true;
+      } else {
+        hooks::TextureCompressionPackR5G6B5(t, h.base);
+      }
+      out[v].Bytes(Read(h.base, h.data, kScratchBytes));
+      out[v].Word(t.r3.u32);
+      out[v].Word(uint32_t(t.r3.u64 >> 32));
+    }
+    results.Check(out[0], out[1],
+                  fmt::format("case {}: kind {}, {:08X} {:08X} {:08X}", c, kind,
+                              std::bit_cast<uint32_t>(color[0]), std::bit_cast<uint32_t>(color[1]),
+                              std::bit_cast<uint32_t>(color[2])));
+  }
+  results.Report();
+}
+
+constexpr int kColorKinds = 20;
+
+using Pixels16 = std::array<std::array<float, 3>, 16>;
+
+std::array<float, 3> RandomColor(Random& r) {
+  return {Unit(r), Unit(r), Unit(r)};
+}
+
+std::array<float, 3> ByteColor(Random& r) {
+  return {Byte(r.Below(256), false), Byte(r.Below(256), false), Byte(r.Below(256), false)};
+}
+
+// A block of 16 pixels' colors of the given kind.
+Pixels16 Pixels(Random& r, int kind) {
+  Pixels16 p{};
+  switch (kind) {
+    case 0:  // random in 0-1
+      for (auto& px : p) px = RandomColor(r);
+      break;
+    case 1:  // bytes decoded (k * (1/255) or k / 255)
+    case 2:
+      for (auto& px : p) {
+        for (float& v : px) v = Byte(r.Below(256), kind == 2);
+      }
+      break;
+    case 3: {  // premultiplied: bytes times a byte alpha, often 0 or 1
+      for (auto& px : p) {
+        uint32_t alpha = r.Below(256);
+        if (r.Below(4) == 0) alpha = r.Below(2) * 255;
+        for (float& v : px) v = Byte(r.Below(256), false) * Byte(alpha, false);
+      }
+      break;
+    }
+    case 4: {  // all equal
+      const auto color = r.Below(2) ? RandomColor(r) : ByteColor(r);
+      p.fill(color);
+      break;
+    }
+    case 5: {  // two colors
+      const auto a = r.Below(2) ? RandomColor(r) : ByteColor(r);
+      const auto b = r.Below(2) ? RandomColor(r) : ByteColor(r);
+      for (auto& px : p) px = r.Below(2) ? a : b;
+      break;
+    }
+    case 6: {  // a gray ramp
+      const float start = Unit(r);
+      const float step = (Unit(r) - 0.5f) / 8.0f;
+      for (uint32_t i = 0; i < 16; i++) {
+        const float g = start + step * float(r.Below(2) ? i : r.Below(16));
+        p[i] = {g, g, g};
+      }
+      break;
+    }
+    case 7: {  // one channel varying
+      const auto color = RandomColor(r);
+      const uint32_t channel = r.Below(3);
+      for (auto& px : p) {
+        px = color;
+        px[channel] = r.Below(2) ? Unit(r) : Byte(r.Below(256), false);
+      }
+      break;
+    }
+    case 8: {  // clustered: a few 1/255 steps or less apart
+      const auto center = RandomColor(r);
+      const float spread = float(1 + r.Below(6)) / 255.0f;
+      for (auto& px : p) {
+        for (uint32_t c = 0; c < 3; c++) px[c] = center[c] + (Unit(r) - 0.5f) * spread;
+      }
+      break;
+    }
+    case 9: {  // a gradient between two colors, with noise (a picture's)
+      const auto a = RandomColor(r);
+      const auto b = RandomColor(r);
+      const float noise = float(r.Below(4)) / 64.0f;
+      for (uint32_t i = 0; i < 16; i++) {
+        const float t = float((i & 3) + (i >> 2)) / 6.0f;
+        for (uint32_t c = 0; c < 3; c++) {
+          const float v = a[c] + (b[c] - a[c]) * t + (Unit(r) - 0.5f) * noise;
+          p[i][c] = Byte(uint32_t(std::fmin(std::fmax(v, 0.0f), 1.0f) * 255.0f + 0.5f), false);
+        }
+      }
+      break;
+    }
+    case 10: {  // bytes in a narrow window, often touching 0 or 255
+      const uint32_t width = 1 + r.Below(24);
+      uint32_t low = r.Below(256 - width);
+      if (r.Below(4) == 0) low = 0;
+      if (r.Below(4) == 0) low = 255 - width;
+      for (auto& px : p) {
+        for (float& v : px) v = Byte(low + r.Below(width + 1), false);
+      }
+      break;
+    }
+    case 11:  // NaNs, infinities, denormals, -0.0 among random
+      for (auto& px : p) {
+        for (float& v : px) v = r.Below(4) == 0 ? Special(r) : Unit(r);
+      }
+      break;
+    case 12:  // negative and above 1
+      for (auto& px : p) {
+        for (float& v : px) v = Unit(r) * 3.0f - 1.0f;
+      }
+      break;
+    case 13:  // random bit patterns
+      for (auto& px : p) {
+        for (float& v : px) v = std::bit_cast<float>(uint32_t(r.Next()));
+      }
+      break;
+    case 14: {  // three or four colors
+      std::array<std::array<float, 3>, 4> palette;
+      for (auto& color : palette) color = r.Below(2) ? RandomColor(r) : ByteColor(r);
+      const uint32_t count = 3 + r.Below(2);
+      for (auto& px : p) px = palette[r.Below(count)];
+      break;
+    }
+    case 15:  // large magnitudes
+      for (auto& px : p) {
+        for (float& v : px) v = (Unit(r) - 0.5f) * std::ldexp(1.0f, int(r.Below(140)));
+      }
+      break;
+    case 16:  // the box's corners (0 and 1 in each channel)
+      for (auto& px : p) {
+        for (float& v : px) v = float(r.Below(2));
+      }
+      break;
+    case 17: {  // a cluster with one or two pixels far off
+      const auto center = RandomColor(r);
+      for (auto& px : p) {
+        for (uint32_t c = 0; c < 3; c++) px[c] = center[c] + (Unit(r) - 0.5f) / 32.0f;
+      }
+      for (uint32_t n = 1 + r.Below(2); n > 0; n--) p[r.Below(16)] = RandomColor(r);
+      break;
+    }
+    case 18: {  // most pixels at one end, a few spread toward the other
+      const auto a = RandomColor(r);
+      const auto b = RandomColor(r);
+      for (auto& px : p) {
+        const float t = r.Below(4) == 0 ? Unit(r) : 0.0f;
+        for (uint32_t c = 0; c < 3; c++) px[c] = a[c] + (b[c] - a[c]) * t;
+      }
+      break;
+    }
+    default: {  // tiny ranges near the smallest extents (denormal steps)
+      const auto center = RandomColor(r);
+      const float spread = std::ldexp(1.0f, -int(10 + r.Below(120)));
+      for (auto& px : p) {
+        for (uint32_t c = 0; c < 3; c++) px[c] = center[c] + (Unit(r) - 0.5f) * spread;
+      }
+      break;
+    }
+  }
+  return p;
+}
+
+// A cluster with a few pixels far off in other directions: the blocks where a
+// pixel can end up more than half a step below the low end (a negative step
+// index; rare, mostly with 3 colors).
+Pixels16 FarOff(Random& r) {
+  const auto center = RandomColor(r);
+  const float spread = std::ldexp(1.0f, -int(3 + r.Below(4)));
+  Pixels16 p;
+  for (auto& px : p) {
+    if (r.Below(5) == 0) {
+      px = RandomColor(r);
+    } else {
+      for (uint32_t c = 0; c < 3; c++) px[c] = center[c] + (Unit(r) - 0.5f) * spread;
+    }
+  }
+  return p;
+}
+
+// The pixels as DxtColor::EncodeBlock hands them: each channel times the
+// color weights at 0x82649B10 (fmuls).
+void ApplyWeights(uint8_t* base, Pixels16& p) {
+  for (auto& px : p) {
+    for (uint32_t c = 0; c < 3; c++) px[c] = guest::LoadFloat(base, 0x82649B10 + 4 * c) * px[c];
+  }
+}
+
+void FitColorEndpoints(Context& h) {
+  Results results("DxtColor::FitEndpoints (sub_82420AB8)");
+  constexpr uint32_t kColorLow = 256;
+  constexpr uint32_t kColorHigh = 272;
+  constexpr uint32_t kStackBytes = 2048;  // filled below the call's stack
+  auto run = [&](const Pixels16& pixels, uint32_t colors, const std::string& what) {
+    std::array<float, 16> w;
+    for (float& v : w) v = Unit(h.random);
+    std::array<uint32_t, kStackBytes / 4> stack;
+    for (uint32_t& word : stack) word = uint32_t(h.random.Next());
+    Outputs out[2];
+    for (int v = 0; v < 2; v++) {
+      Fill(h.base, h.data, kScratchBytes);
+      for (uint32_t i = 0; i < 16; i++) {
+        for (uint32_t ch = 0; ch < 3; ch++) {
+          guest::StoreFloat(h.base, h.data + kPixels + 16 * i + 4 * ch, pixels[i][ch]);
+        }
+        guest::StoreFloat(h.base, h.data + kPixels + 16 * i + 12, w[i]);
+      }
+      PPCContext t = CallContext(h);
+      for (uint32_t i = 0; i < stack.size(); i++) {
+        guest::StoreU32(h.base, t.r1.u32 - kStackBytes + 4 * i, stack[i]);
+      }
+      t.r3.u64 = h.data + kColorLow;
+      t.r4.u64 = h.data + kColorHigh;
+      t.r5.u64 = h.data + kPixels;
+      t.r6.u64 = colors;
+      if (v == 0) {
+        ITC_FLAG(native_texture_compression) = false;
+        __imp__sub_82420AB8(t, h.base);
+        ITC_FLAG(native_texture_compression) = true;
+      } else {
+        hooks::TextureCompressionFitColorEndpoints(t, h.base);
+      }
+      out[v].Bytes(Read(h.base, h.data, kColorLow));
+      out[v].Floats(h.base, h.data + kColorLow, 3);
+      out[v].Bytes(Read(h.base, h.data + kColorLow + 12, 4));
+      out[v].Floats(h.base, h.data + kColorHigh, 3);
+      out[v].Bytes(Read(h.base, h.data + kColorHigh + 12, kScratchBytes - kColorHigh - 12));
+      out[v].Word(t.r3.u32);
+      out[v].Word(t.r4.u32);
+      out[v].Word(t.r5.u32);
+      out[v].Word(t.r6.u32);
+    }
+    results.Check(out[0], out[1], what);
+  };
+  for (int c = 0; c < 6000; c++) {
+    const int kind = c % kColorKinds;
+    const uint32_t colors = (c / kColorKinds) % 2 == 0 ? 4 : 3;
+    const bool weighted = (c / (2 * kColorKinds)) % 2 == 0;
+    Pixels16 pixels = Pixels(h.random, kind);
+    if (weighted) ApplyWeights(h.base, pixels);
+    run(pixels, colors, fmt::format("case {}: kind {}, colors {}, weighted {}", c, kind, colors, weighted));
+  }
+  // The blocks with a step index outside the steps: far-off pixels tried with
+  // the plain C++ alone until 64 read the stack (at most 1,000,000 tries), each
+  // then a case.
+  uint64_t found = 0;
+  uint32_t tries = 0;
+  for (; tries < 1000000 && found < 64; tries++) {
+    const uint32_t colors = h.random.Below(4) == 0 ? 4 : 3;
+    Pixels16 pixels = FarOff(h.random);
+    ApplyWeights(h.base, pixels);
+    float low[3];
+    float high[3];
+    const uint64_t before = texture_compression::FitColorEndpointsStackReads();
+    texture_compression::FitColorEndpoints(h.base, reinterpret_cast<const float(*)[3]>(pixels.data()),
+                                           colors, CallContext(h).r1.u32, low, high);
+    if (texture_compression::FitColorEndpointsStackReads() != before) {
+      run(pixels, colors, fmt::format("far off {}: try {}, colors {}", found, tries, colors));
+      found++;
+    }
+  }
+  ITC_LOG_INFO("texture_compression harness: DxtColor::FitEndpoints: {} of {} far-off tries read "
+               "the stack",
+               found, tries);
+  results.Report();
+}
+
 // Rows of 16 DXT4/5 blocks through the recompiled Dxt45::EncodeBlock on one
 // stack: its alpha half the original (flag off) or ours.
 void Rows(Context& h) {
-  Results results("Dxt45::EncodeBlock rows (sub_82422A68, the alpha half)");
+  Results results("Dxt45::EncodeBlock rows (sub_82422A68, the alpha half and the color helpers)");
   constexpr uint32_t kBlocks = 16;
   const uint32_t area = memory::Alloc(kBlocks * 256 + kBlocks * 16, 0);
   if (area == 0) {
@@ -309,6 +647,8 @@ void Rows(Context& h) {
 void TextureCompression(Context& h) {
   FitEndpoints(h);
   EncodeBlock(h);
+  PackR5G6B5(h);
+  FitColorEndpoints(h);
   Rows(h);
 }
 
