@@ -85,6 +85,21 @@ When the user has reviewed a run's section, its heading gets
   the print comes after the checks that hand the call back to the
   original (it logs only when the native path runs); `Path::Build`
   has it at two places.
+- The save system's interface (map 3aa9f33):
+  `docs/functions/save-interface.md`, 62 rows (`sub_821109B8` moved
+  from `functions.md`, 61 new; 41 in play): `[0x826BDC90]` is app +
+  16, the app's interface (vtable `0x82000E38`, stored by
+  `SaveInterface::Init` `sub_8209FFB8`, which sets the content root
+  "TXR360"); its slot +12 (`sub_820943B0`) the save devices, +8
+  (`sub_820943C8`, shared in `system-services.md`) the users; the
+  wrappers over the save slots' getters and request setters (+968,
+  +972, +976); the front end's save layer (`8228F6B0`-`82290640`):
+  the save buffers at `0x828161F0`, `GameData::Save` (SystemData.bin,
+  129,400 bytes), `GameData::Load`, the replays (rep_* files,
+  1,231,088 bytes), `PlayTime::Update`. No Xbox service called (B4's
+  `SaveSlot` steps answer the requests). `known-data.md`:
+  `0x826BDC90`, `0x828161F0`, the replay record, the save slot's
+  request words. Two leads added.
 
 ## Run 2026-10-28 08:36 (`b7-loop-28-10-26`)
 

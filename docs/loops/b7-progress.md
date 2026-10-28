@@ -17,7 +17,13 @@ file's history. What's left to see in a drive, from every run:
   plan's table and boundary log.
 - Subsystem 3 of 3: the save system's interface over `[0x826BDC90]`
   (`sub_8209FFB8`-`sub_820A0620`; the lead with the most ready groups,
-  12). Step: mapping (agent running).
+  12). Mapped (3aa9f33): `save-interface.md`, 62 rows (1 moved, 61
+  new; 41 in play): the app's interface at `[0x826BDC90]`, its save
+  devices' and users' wrappers, and the front end's save layer above
+  them (`GameData::Save`, `Load`, the replays); 25 ready groups;
+  blocked by two ready rows in `files-and-saves.md` (`sub_82295D48`,
+  `sub_82295C18`). Map check passed. Step: migration 1 (agent
+  running).
 
 ## Done
 
@@ -63,6 +69,8 @@ file's history. What's left to see in a drive, from every run:
   (wrapped 103, known 504, unknown 3272).
 - After its validation (`itc_2291`: race 8 s, 0 errors, every harness
   0 differing but the expected groups): ours 2582, work left 3879.
+- After the save interface's map: ours 2582, work left 3879 (wrapped
+  103, known 544, unknown 3232).
 
 ## Stopped
 
