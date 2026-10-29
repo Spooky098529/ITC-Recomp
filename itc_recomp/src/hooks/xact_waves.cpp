@@ -24,7 +24,9 @@ ITC_FLAG_BOOL(native_xact_waves, true, "ITC",
               "and XACTWave::PrepareNext sub_825D2778, XACTInMemoryWave::Update sub_825D3890, XACTWave::Notify sub_825D2030 and SetState "
               "sub_825D24D8, XACTWave::Release sub_825D28D0, ~XACTWave sub_825D29E8, "
               "XACTInMemoryWave's deleting destructor sub_825D3820 (freeing under --native_heap) "
-              "and Stop sub_825D3A28, the voice's methods through their plain "
+              "and Stop sub_825D3A28, XACTInMemoryWave::Prepare sub_825D3B10 and "
+              "XACTWave::AudioUpdate sub_825D2560 with Finish sub_825D1FD8, the voice's methods "
+              "through their plain "
               "C++ while its slots hold them, the owner's and renderer's slots through the "
               "guest call) natively instead "
               "of through the translated code (the same reads and writes; XAudio's locks stay "
@@ -194,7 +196,7 @@ void XactTrackGetPitch(PPCContext& ctx, uint8_t* base) {
 void XactWaveGetStartPosition(PPCContext& ctx, uint8_t* base) {
   if (const auto done = xact::WaveGetStartPosition(base, ctx.r3.u32, ctx.r4.u32, ctx.r5.u32,
                                                    ctx.r6.u32, ctx.r7.u32)) {
-    ctx.r3.u64 = *done;
+    ctx.r3.s64 = int32_t(*done);  // li or lis, as the original's
     return;
   }
   __imp__sub_825D2170(ctx, base);
@@ -250,7 +252,60 @@ void XactInMemoryWaveUpdate(PPCContext& ctx, uint8_t* base) {
   });
 }
 
+void XactInMemoryWavePrepare(PPCContext& ctx, uint8_t* base) {
+  const uint32_t wave = ctx.r3.u32, count = ctx.r4.u32, loops = ctx.r5.u32, ms = ctx.r6.u32;
+  uint64_t r3 = 0;
+  XAudioFramed(ctx, base, 320, [&](const xaudio::GuestCall& call, uint32_t frame) {
+    r3 = xact::InMemoryWavePrepare(base, wave, count, loops, ms, frame, call);
+    return uint32_t(r3);
+  });
+  ctx.r3.u64 = r3;  // in full, as the original leaves it
+}
+
+void XactWaveAudioUpdate(PPCContext& ctx, uint8_t* base) {
+  const uint32_t wave = ctx.r3.u32;
+  const uint64_t r3_in = ctx.r3.u64;
+  uint64_t r3 = 0;
+  XAudioFramed(ctx, base, 128, [&](const xaudio::GuestCall& call, uint32_t frame) {
+    r3 = xact::WaveAudioUpdate(base, wave, r3_in, frame, call);
+    return uint32_t(r3);
+  });
+  ctx.r3.u64 = r3;
+}
+
+namespace {
+
+thread_local std::optional<CreateVoiceStandIn> create_voice_stand_in;
+
+}  // namespace
+
+void SetCreateVoiceForHarness(std::optional<CreateVoiceStandIn> stand_in) {
+  create_voice_stand_in = stand_in;
+}
+
 }  // namespace hooks
+
+// XACTRenderer::CreateVoice (sub_825C31D8, xact.md's row): the original,
+// or, while the xact_waves harness asks on its thread, a stand-in that
+// records r3 to r10 and answers with the harness's voice and r3 (a voice
+// needs the live engine; the waves' Prepare only reads what it hands back).
+extern "C" REX_FUNC(sub_825C31D8) {
+  REX_FUNC_PROLOGUE();
+  if (!hooks::create_voice_stand_in) {
+    __imp__sub_825C31D8(ctx, base);
+    return;
+  }
+  const hooks::CreateVoiceStandIn& s = *hooks::create_voice_stand_in;
+  const PPCRegister* const r[8] = {&ctx.r3, &ctx.r4, &ctx.r5, &ctx.r6,
+                                   &ctx.r7, &ctx.r8, &ctx.r9, &ctx.r10};
+  for (uint32_t i = 0; i < 8; i++) {
+    guest::StoreU32(base, s.record + 4 * i, r[i]->u32);
+  }
+  if (int32_t(s.r3) >= 0) {
+    guest::StoreU32(base, ctx.r10.u32, s.voice);
+  }
+  ctx.r3.s64 = int32_t(s.r3);
+}
 
 // The flag's fallback, then the register step.
 #define ITC_XACT_WAVES_ADAPTER(address, step) \
@@ -309,6 +364,10 @@ ITC_XACT_WAVES_ADAPTER(825D24D8, XactWaveSetState)
 // it in play) for XACTWave::~XACTWave sub_825D29E8.
 ITC_XACT_WAVES_HEAP_ADAPTER(825D3820, XactInMemoryWaveDeletingDestruct)
 ITC_XACT_WAVES_ADAPTER(825D3A28, XactInMemoryWaveStop)
+ITC_XACT_WAVES_ADAPTER(825D3B10, XactInMemoryWavePrepare)
+ITC_XACT_WAVES_ADAPTER(825D2560, XactWaveAudioUpdate)
+// XACTWave::Finish sub_825D1FD8 (never seen in play) has no adapter: its
+// only caller, AudioUpdate, is native.
 
 // XACTEngine::SendNotification is xact.md's: under --native_xact.
 extern "C" REX_FUNC(sub_825C1388) {

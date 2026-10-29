@@ -93,7 +93,7 @@ uint32_t AddStat(uint8_t* base, uint32_t index, uint32_t amount);
 // previous call left, as in the original. `return_address` is the
 // original's. Returns the callee's r3.
 struct Regs {
-  uint64_t r[5] = {};  // r3 to r7
+  uint64_t r[8] = {};  // r3 to r10
   uint8_t count = 0;
   bool f1_set = false;
   double f1 = 0.0;
@@ -112,6 +112,10 @@ using GuestCall = std::function<uint32_t(uint32_t function, uint32_t return_addr
 // plain C++ made the call. Each adapter's frame saves and clears it, and
 // puts it back.
 uint32_t& StackFloor();
+
+// The last guest call's r3 in full (its upper word too), on this thread: for
+// plain C++ returning a callee's r3 as the original leaves it.
+uint64_t& LastCallR3();
 
 // A frame of `bytes` below `frame` with its back chain, the stack floor
 // lowered to it: for plain C++ outside XAudio (the car sounds) calling an

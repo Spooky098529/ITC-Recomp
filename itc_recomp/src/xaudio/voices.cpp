@@ -251,6 +251,11 @@ uint32_t& StackFloor() {
   return floor;
 }
 
+uint64_t& LastCallR3() {
+  thread_local uint64_t r3 = 0;
+  return r3;
+}
+
 uint32_t FrameBelow(uint8_t* base, uint32_t frame, uint32_t bytes) {
   return Below(base, frame, bytes);
 }

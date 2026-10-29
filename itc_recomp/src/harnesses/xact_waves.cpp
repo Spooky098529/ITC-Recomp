@@ -482,6 +482,7 @@ void WaveCase(Context& h, Results& results, uint32_t block, GuestFunction recomp
     ITC_FLAG(native_xact_waves) = true;
     BlockOutputs(out[v], h.base, block, floats);
     out[v].Word(t.r3.u32);
+    out[v].Word(uint32_t(t.r3.u64 >> 32));  // r3's upper word too
     after(out[v], t);
   }
   h.random = random;
@@ -1112,6 +1113,202 @@ void Releases(Context& h, uint32_t block) {
   helpers::SetClocksForHarness(std::nullopt, std::nullopt);
 }
 
+// XACTInMemoryWave::Prepare over CallWorld's wave and a wave bank whose
+// slots +16, +20 and +60 are the real GetEntry, GetSeekTable and
+// GetWaveRegion (its vtable at +0x1E00, the rest AddRef recorders), with
+// four 24-byte entries at +0x1F00 (PCM mostly, XMA one time in three, the
+// other tags now and then; the game's rates, durations and loop regions, a
+// seek table of one to four blocks); the owner's sound's record at
+// +0x1E80 (its reverb flag 0x10 one time in two), its engine for the volume
+// at +0x1200 without settings, the wave's engine's settings (+124) a fake
+// object at +0x1560 (its +8 the reverb). The renderer's CreateVoice
+// (sub_825C31D8) is the harness's stand-in (hooks::SetCreateVoiceForHarness:
+// its registers to +0x1FC0, XACT's voice or the fake one handed back, an
+// error one time in six). Counts 0, small, or 255 (never the
+// GetStartPosition trap); offsets in and past the loops. Compared besides
+// the block: Prepare's frame from +80 to +200 (the start, the reverb, the
+// voice, the format, the entry's accessor, the packet) and the count byte at
+// the caller's +31, and r3 in full.
+//
+// XACTWave::AudioUpdate (and Finish under it) over Releases' world: the
+// request words (+28, +32) 0, 1 or random, every state, the flags (0x4,
+// 0x10, 0x80) now and then, the owner's event flags without 0x08 (Done's
+// helper list, never seen in play); compared besides the block: the voice's
+// state word (the frame's +80), the notifications at Notify's depth (past
+// the saved registers), r3 in full.
+void Prepares(Context& h, uint32_t block) {
+  uint8_t* base = h.base;
+  std::vector<uint32_t> floats;
+  for (uint32_t k = 0; k < kVoiceCount; k++) {
+    floats.push_back(kVoices + kVoiceBytes * k + 112);
+    floats.push_back(kVoices + kVoiceBytes * k + 140);
+  }
+  if (Load(base, 0x8266CDF0) != 0 && Load(base, 0x82971480) == 0 &&
+      Load(base, 0x82971484) == 0) {
+    ITC_LOG_ERROR("harness: xact_waves: XACT's frequency isn't set yet; prepares skipped");
+    return;
+  }
+  const uint32_t wave = block + kWave, bank = block + kWaveBank;
+  const auto clocks = [&](Random& random) {
+    const uint32_t ms = random.Below(100000);
+    helpers::SetClocksForHarness(uint64_t(ms) * 50000 + random.Below(50000), ms);
+  };
+  const auto engine_lists = [&](Random& random) {
+    Store(base, block + kEngine + 16, random.Below(2) == 0 ? 0 : 0x8245F860u);
+    const uint32_t list = block + kEngine + 100;
+    Store(base, list + 4, list);
+    Store(base, list + 8, list);
+  };
+  constexpr uint32_t kBankVtable = 0x1E00, kRecord = 0x1E80, kSoundEngine = 0x1200,
+                     kEntries = 0x1F00, kHeader = 0x1F60, kSegment = 0x1F70,
+                     kStandIn = 0x1FC0, kSettings = 0x1560;
+  const auto prepare_world = [&](Random& random, PPCContext& t) {
+    CallWorld(h, block, random, t, false);
+    clocks(random);
+    engine_lists(random);
+    Store(base, wave + 36, bank);
+    // The bank's vtable and data.
+    for (uint32_t slot = 0; slot < 0x40; slot += 4) {
+      Store(base, block + kBankVtable + slot, 0x8245F860);
+    }
+    Store(base, block + kBankVtable + 16, 0x825C8398);
+    Store(base, block + kBankVtable + 20, 0x825C8580);
+    Store(base, block + kBankVtable + 60, 0x825C8440);
+    Store(base, bank, block + kBankVtable);
+    Store(base, bank + 272, block + kEntries);
+    Store(base, bank + 284, block + kHeader);
+    Store(base, block + kHeader + 4, 4);
+    Store(base, bank + 288, block + kSegment);
+    const uint32_t blocks = 1 + random.Below(4);
+    for (uint32_t i = 0; i < 4; i++) {
+      Store(base, block + kSegment + 4 * i, 0);
+    }
+    const uint32_t table = block + kSegment + 16;
+    Store(base, table, blocks);
+    uint32_t total = 0;
+    for (uint32_t i = 0; i < blocks; i++) {
+      total += 1 + random.Below(400000);
+      Store(base, table + 4 + 4 * i, total);
+    }
+    const uint32_t index = random.Below(4);
+    guest::StoreU16(base, wave + 52, uint16_t(index));
+    const uint32_t entry = block + kEntries + 24 * index;
+    static constexpr uint32_t kRates[] = {48000, 44100, 22050, 32000};
+    const uint32_t pick = random.Below(10);
+    const uint32_t tag = pick < 6 ? 0 : pick < 9 ? 1 : 2 + random.Below(2);
+    const uint32_t channels = 1 + random.Below(6);
+    Store(base, entry + 4,
+          (random.Below(2) << 31) | (kRates[random.Below(4)] << 5) | (channels << 2) | tag);
+    const uint32_t duration =
+        random.Below(4) == 0 ? random.Below(16) : random.Below(2000000);
+    Store(base, entry + 0, (duration << 4) | random.Below(16));
+    const uint32_t loop_start = random.Below(3) == 0 ? 0 : random.Below(duration + 1);
+    const uint32_t loop_length = random.Below(4) == 0 ? 0 : 1 + random.Below(duration + 1);
+    Store(base, entry + 16, loop_start);
+    Store(base, entry + 20, loop_length);
+    // The owner's sound, its record and the volumes' floats.
+    const uint32_t sound = block + kOwner + 0xC0, track = block + kOwner + 0x80;
+    Store(base, sound + 28, block + kRecord);
+    guest::StoreU8(base, block + kRecord, uint8_t(random.Next()));
+    Store(base, sound + 32, block + kSoundEngine);
+    Store(base, block + kSoundEngine + 124, 0);
+    for (const uint32_t at : {track + 40, track + 44, track + 56, track + 60, sound + 8,
+                              sound + 88, sound + 92, sound + 112, sound + 116, sound + 120,
+                              block + kCue + 28}) {
+      guest::StoreFloat(base, at, float(AnyFloat(random)));
+    }
+    FakeObject(base, block, block + kSettings, random);
+    Store(base, block + kEngine + 124, block + kSettings);
+    // CreateVoice's stand-in, the renderer's slot +4 (its own vtable at
+    // +0x1E40, the rest AddRef recorders).
+    for (uint32_t slot = 0; slot < 0x40; slot += 4) {
+      Store(base, block + 0x1E40 + slot, 0x8245F860);
+    }
+    Store(base, block + 0x1E40 + 4, 0x825C31D8);
+    Store(base, block + kRenderer, block + 0x1E40);
+    const uint32_t voice = random.Below(2) == 0 ? block + kXactVoice : block + kFakeVoice;
+    if (voice == block + kXactVoice) {
+      for (const uint32_t at : {348u, 316u, 72u}) {
+        Store(base, block + kCue + at, 0);
+      }
+    }
+    hooks::SetCreateVoiceForHarness(hooks::CreateVoiceStandIn{
+        block + kStandIn, voice, random.Below(6) == 0 ? 0x8007000Eu : 0});
+    // The count, whether it loops, the offset.
+    uint32_t count = Pick(random, {0, 0, 1, 2, 5, 255});
+    const uint32_t loop = loop_length != 0 ? loop_length : duration;
+    if (count == 255 && loop == 0) {
+      count = 3;
+    }
+    t.r3.u64 = wave;
+    t.r4.u64 = (random.Next() & ~0xFFull) | count;
+    t.r5.u64 = Pick(random, {0, 1, uint32_t(random.Next())});
+    t.r6.u64 = random.Below(5) == 0 ? uint32_t(random.Next()) : random.Below(60000);
+  };
+  {
+    Results results("XACTInMemoryWave::Prepare (sub_825D3B10)");
+    for (int c = 0; c < 256; c++) {
+      WaveCase(h, results, block, __imp__sub_825D3B10, hooks::XactInMemoryWavePrepare,
+               prepare_world,
+               [&](Outputs& out, PPCContext& t) {
+                 out.Bytes(Read(base, t.r1.u32 - 320 + 80, 120));
+                 out.Bytes(Read(base, t.r1.u32 + 31, 1));
+               },
+               floats, fmt::format("case {}", c));
+    }
+    results.Report();
+  }
+  hooks::SetCreateVoiceForHarness(std::nullopt);
+  {
+    Results results("XACTWave::AudioUpdate (sub_825D2560)");
+    for (int c = 0; c < 256; c++) {
+      WaveCase(h, results, block, __imp__sub_825D2560, hooks::XactWaveAudioUpdate,
+               [&](Random& random, PPCContext& t) {
+                 CallWorld(h, block, random, t, false);
+                 clocks(random);
+                 engine_lists(random);
+                 Store(base, wave + 36, bank);
+                 // A next wave only with an owner (the hand-off reads the
+                 // owner unchecked; PrepareNext makes one only for an owner).
+                 Store(base, wave + 56,
+                       random.Below(2) == 0 || Load(base, wave + 48) == 0 ? 0
+                                                                         : block + kNewWave);
+                 for (const uint32_t at : {28u, 32u}) {
+                   Store(base, wave + at, Pick(random, {0, 0, 1, 1, uint32_t(random.Next())}));
+                 }
+                 uint8_t flags = guest::LoadU8(base, wave + 25) & ~0x94;
+                 for (const uint8_t bit : {0x4, 0x10, 0x80}) {
+                   if (random.Below(bit == 0x80 ? 3 : 8) == 0) {
+                     flags |= bit;
+                   }
+                 }
+                 guest::StoreU8(base, wave + 25, flags);
+                 Store(base, wave + 40,
+                       random.Below(8) == 0 ? uint32_t(random.Next()) : random.Below(7));
+                 const uint32_t event = block + kOwner;
+                 guest::StoreU8(base, event + 40, guest::LoadU8(base, event + 40) & ~0x08);
+                 if (random.Below(4) == 0) {
+                   Store(base, block + kCue + 296, 0);
+                 }
+                 t.r3.u64 = wave;
+               },
+               [&](Outputs& out, PPCContext& t) {
+                 out.Bytes(Read(base, t.r1.u32 - 128 + 80, 4));
+                 out.Bytes(Read(base, t.r1.u32 - 128 - 160 + 80, 32));
+                 // SendNotification's copy past its first 12 bytes: without a
+                 // notification those hold the saved r31 and lr of XAudio's
+                 // GetState under the voice's (the original's register saves,
+                 // which plain C++ doesn't make); its time and context there
+                 // are SendNotification's own cases'.
+                 out.Bytes(Read(base, t.r1.u32 - 128 - 160 - 112 + 144 + 12, 20));
+               },
+               floats, fmt::format("case {}", c));
+    }
+    results.Report();
+  }
+  helpers::SetClocksForHarness(std::nullopt, std::nullopt);
+}
+
 }  // namespace
 
 void XactWaves(Context& h) {
@@ -1126,6 +1323,7 @@ void XactWaves(Context& h) {
   WaveCalls(h, block.address);
   Notifications(h, block.address);
   Releases(h, block.address);
+  Prepares(h, block.address);
 }
 
 }  // namespace harness

@@ -116,7 +116,8 @@ namespace {
 
 xa::GuestCall Caller(PPCContext& ctx, uint8_t* base) {
   return [&ctx, base](uint32_t function, uint32_t return_address, const xa::Regs& regs) {
-    PPCRegister* const r[5] = {&ctx.r3, &ctx.r4, &ctx.r5, &ctx.r6, &ctx.r7};
+    PPCRegister* const r[8] = {&ctx.r3, &ctx.r4, &ctx.r5, &ctx.r6,
+                               &ctx.r7, &ctx.r8, &ctx.r9, &ctx.r10};
     for (uint32_t i = 0; i < regs.count; i++) {
       r[i]->u64 = regs.r[i];
     }
@@ -162,6 +163,7 @@ xa::GuestCall Caller(PPCContext& ctx, uint8_t* base) {
         break;
     }
     ctx.r1.u64 = sp;
+    xa::LastCallR3() = ctx.r3.u64;
     return ctx.r3.u32;
   };
 }
