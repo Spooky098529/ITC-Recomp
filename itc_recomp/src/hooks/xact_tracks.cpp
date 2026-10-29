@@ -485,7 +485,8 @@ void XactTrackPlay(PPCContext& ctx, uint8_t* base) {
   }
 
 ITC_XACT_TRACKS_ADAPTER(825D57D0, XactTrackInstanceConstruct)
-ITC_XACT_TRACKS_ADAPTER(825D55E0, XactTrackInstanceCheckDone)
+// No adapter (removed 2026-10-29: only XACTEvent::Done's plain C++ calls it in play) for
+// XACTTrackInstance::CheckDone sub_825D55E0.
 // No adapter (removed 2026-10-29: only XACTTrack::SetVolume's and UpdateVolume's plain C++ calls it in
 // play) for XACTTrackInstance::SetVolume sub_825D5678.
 // No adapter (removed 2026-10-29: only XACTTrack::IsBusy's plain C++ calls it in play) for
@@ -498,7 +499,8 @@ ITC_XACT_TRACKS_ADAPTER(825D0590, XactTrackIsBusy)
 // it in play) for XACTEvent::XACTEvent sub_825D1760.
 // No adapter (removed 2026-10-29: only XACTPlayWaveEvent's deleting destructor's plain C++ calls it in
 // play) for XACTEvent::~XACTEvent sub_825D0EF0.
-ITC_XACT_TRACKS_ADAPTER(825D1358, XactEventFire)
+// No adapter (removed 2026-10-29: only XACTPlayWaveEvent::Fire's and XACTSound::ScheduleEvent's
+// plain C++ call it in play) for XACTEvent::Fire sub_825D1358.
 // No adapter (removed 2026-10-29: only XACTEvent::Create's and
 // XACTTrackInstance::PrepareSimple's plain C++ calls it in play) for
 // XACTPlayWaveEvent::XACTPlayWaveEvent sub_825D82E8.
@@ -548,12 +550,15 @@ ITC_XACT_TRACKS_ADAPTER(825D01D8, XactTrackStop)
 // No adapter (removed 2026-10-29: only XACTTrack::Prepare's plain C++ calls it in play;
 // sub_825D0B08 never ran) for XACTTrack::CreateInstance sub_825D02F8.
 ITC_XACT_TRACKS_HEAP_ADAPTER(825D0AA0, XactTrackPrepare)
-ITC_XACT_TRACKS_ADAPTER(825CB0C8, XactSoundScheduleEvent)
+// No adapter (removed 2026-10-29: only XACTEvent::Schedule's plain C++ calls it in play) for
+// XACTSound::ScheduleEvent sub_825CB0C8.
 ITC_XACT_TRACKS_ADAPTER(825D1918, XactEventSchedule)
 ITC_XACT_TRACKS_ADAPTER(825D13F0, XactEventDone)
 ITC_XACT_TRACKS_ADAPTER(825D8378, XactPlayWaveFire)
 ITC_XACT_TRACKS_ADAPTER(825D83F8, XactPlayWaveStop)
-ITC_XACT_TRACKS_ADAPTER(825D5980, XactTrackInstancePlay)
-ITC_XACT_TRACKS_ADAPTER(825D5EB0, XactTrackInstanceAudioUpdate)
+// No adapter (removed 2026-10-29: only XACTTrack::Play's and XACTTrackInstance::AudioUpdate's
+// plain C++ call it in play) for XACTTrackInstance::Play sub_825D5980.
+// No adapter (removed 2026-10-29: only XACTTrack::AudioUpdate's plain C++ calls it in play) for
+// XACTTrackInstance::AudioUpdate sub_825D5EB0.
 ITC_XACT_TRACKS_ADAPTER(825D0D88, XactTrackAudioUpdate)
 ITC_XACT_TRACKS_ADAPTER(825D01D0, XactTrackPlay)
