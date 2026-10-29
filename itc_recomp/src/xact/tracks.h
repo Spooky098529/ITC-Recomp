@@ -344,4 +344,40 @@ uint32_t TrackPrepare(uint8_t* base, uint32_t track, uint32_t key, uint32_t offs
 uint32_t SoundScheduleEvent(uint8_t* base, uint32_t sound, uint32_t event, uint32_t frame,
                             const GuestCall& call);
 
+// --- XACT's clock: scheduling, finishing, firing and stopping events
+// (XACTGetTimeMs's plain C++, xact.h; the original through the guest call
+// where it would trap) ---
+
+// XACTEvent::Schedule (sub_825D1918): the fire time (+20): with the record's
+// 0x20000000 from now (an uncounted event, 0x08) or the instance's start
+// (+28); else from the previous event (+36): its +20 with the record's
+// 0x40000000, its done time (+24) when it's done (0x40), else its end
+// (+28); plus the record's time (bits 5-28 of word +0), less +32 (then 0);
+// with the record's 16-bit +4, plus XACT's random 0 to it (sub_825BF650,
+// never seen in play: through the guest call). +28 = +20 + own slot +12 (the
+// duration; GetDuration's plain C++ while the slot holds it), or 0x7FFFFFFF
+// for that. Then XACTSound::ScheduleEvent's plain C++ on the track's sound.
+// `frame` is this function's (112 bytes). Returns ScheduleEvent's r3.
+uint32_t EventSchedule(uint8_t* base, uint32_t event, bool native_heap, uint32_t frame,
+                       const GuestCall& call);
+// XACTEvent::Done (sub_825D13F0): an uncounted event (0x08) to
+// sub_825D5E08 (never seen in play: through the guest call, its r3
+// returned); else the done bit (0x40), the instance's byte +45 down, +24 =
+// now and the instance's CheckDone. `frame` is this function's (96 bytes).
+// Returns the instance (r3 as CheckDone leaves it).
+uint32_t EventDone(uint8_t* base, uint32_t event, uint32_t frame, const GuestCall& call);
+// XACTPlayWaveEvent::Fire (sub_825D8378, slot +4): XACTEvent::Fire (a frame
+// below), the wave (own slot +56), when there is one, its slot +8 (Play)
+// with 1, 0, 0 through the guest call; +64 = now. `frame` is this
+// function's (96 bytes). Returns now.
+uint32_t PlayWaveFire(uint8_t* base, uint32_t event, uint32_t frame, const GuestCall& call);
+// XACTPlayWaveEvent::Stop (sub_825D83F8, slot +60): +68 = now unless
+// `immediate`; with a wave (own slot +56), its slot +12 (Stop, through the
+// guest call) with the mode (0 when immediate; else 1 with the record's
+// byte +7 bit 0 or when the track has a release RPC, sub_825D05C0, never
+// seen in play: through the guest call; else 0) and that bit. `frame` is
+// this function's (112 bytes). Returns the wave's Stop's r3, or 0.
+uint32_t PlayWaveStop(uint8_t* base, uint32_t event, uint32_t immediate, uint32_t frame,
+                      const GuestCall& call);
+
 }  // namespace xact

@@ -67,5 +67,10 @@ void XactTrackInstancePrepare(PPCContext& ctx, uint8_t* base);  // sub_825D5A48
 void XactTrackCreateInstance(PPCContext& ctx, uint8_t* base);   // sub_825D02F8
 void XactTrackPrepare(PPCContext& ctx, uint8_t* base);          // sub_825D0AA0
 void XactSoundScheduleEvent(PPCContext& ctx, uint8_t* base);    // sub_825CB0C8
+// The third migration: what waited on XACT's clock.
+void XactEventSchedule(PPCContext& ctx, uint8_t* base);  // sub_825D1918
+void XactEventDone(PPCContext& ctx, uint8_t* base);      // sub_825D13F0
+void XactPlayWaveFire(PPCContext& ctx, uint8_t* base);   // sub_825D8378
+void XactPlayWaveStop(PPCContext& ctx, uint8_t* base);   // sub_825D83F8
 
 }  // namespace hooks

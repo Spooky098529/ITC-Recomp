@@ -9,6 +9,7 @@
 #include "base/log.h"
 #include "guest.h"
 #include "memory/c_runtime_heap.h"
+#include "xact/xact.h"
 
 #include <initializer_list>
 
@@ -1235,6 +1236,142 @@ uint32_t SoundScheduleEvent(uint8_t* base, uint32_t sound, uint32_t event, uint3
   Store(base, Load(base, before + 4) + 8, event);
   Store(base, before + 4, event);
   return r3;
+}
+
+// --- XACT's clock: scheduling, finishing, firing and stopping events ---
+
+namespace {
+
+constexpr uint32_t kGetTimeMs = 0x825BFE28;
+constexpr uint32_t kRandom = 0x825BF650;             // XACT's random 0 to r5
+constexpr uint32_t kRemoveHelper = 0x825D5E08;       // never seen in play
+constexpr uint32_t kHasReleaseRpc = 0x825D05C0;      // never seen in play
+constexpr uint32_t kPlayWaveGetDuration = 0x825D8870;  // slot +12
+constexpr uint32_t kScheduleEventFrame = 112;
+constexpr uint32_t kGetDurationFrame = 112;
+constexpr uint32_t kEventFireFrameBelow = 96;
+
+// XACT's clock (XACTGetTimeMs's plain C++, xact.h); where the original traps
+// (no frequency), the original through the guest call, which traps the same.
+uint32_t TimeMs(uint8_t* base, uint32_t return_address, uint32_t frame, const GuestCall& call) {
+  if (const auto ms = GetTimeMs(base)) {
+    return uint32_t(*ms);
+  }
+  return CallAt(call, kGetTimeMs, return_address, Args({}), frame);
+}
+
+// The record's time: bits 5-28 of its word +0 (the original's test for a
+// sign bit above them can never pass).
+uint32_t RecordTime(uint32_t word) { return (word >> 5) & 0xFFFFFF; }
+
+}  // namespace
+
+uint32_t EventSchedule(uint8_t* base, uint32_t event, bool native_heap, uint32_t frame,
+                       const GuestCall& call) {
+  ITC_NATIVE_RUNNING("sub_825D1918 XACTEvent::Schedule");
+  const uint32_t record = Load(base, event + 16);
+  const uint32_t word = Load(base, record);
+  uint32_t fire;
+  if ((word & 0x20000000) != 0) {
+    const uint32_t start = (LoadU8(base, event + 40) & 0x08) != 0
+                               ? TimeMs(base, 0x825D1950, frame, call)
+                               : Load(base, Load(base, event + 44) + 28);
+    const uint32_t time = RecordTime(Load(base, Load(base, event + 16)));
+    fire = time - Load(base, event + 32) + start;
+  } else {
+    const uint32_t previous = Load(base, event + 36);
+    uint32_t from;
+    if ((word & 0x40000000) != 0) {
+      from = Load(base, previous + 20);
+    } else if ((LoadU8(base, previous + 40) & 0x40) != 0) {
+      from = Load(base, previous + 24);
+    } else {
+      from = Load(base, previous + 28);
+    }
+    from -= Load(base, event + 32);
+    Store(base, event + 32, 0);
+    Store(base, event + 20, from);
+    const uint32_t time = RecordTime(Load(base, record));
+    fire = Load(base, event + 20) + time;
+  }
+  Store(base, event + 32, 0);
+  Store(base, event + 20, fire);
+  const uint32_t spread = guest::LoadU16(base, Load(base, event + 16) + 4);
+  if (spread != 0) {
+    const uint32_t extra =
+        CallAt(call, kRandom, 0x825D1A20, Args({Load(base, event + 12), 0, spread}), frame);
+    const uint32_t offset = Load(base, event + 32);
+    Store(base, event + 32, 0);
+    Store(base, event + 20, fire - offset + extra);
+  }
+  const uint32_t method = xa::Method(base, event, 12);
+  uint32_t duration;
+  if (method == kPlayWaveGetDuration) {
+    SetRegs(call, Args({event}));
+    duration = PlayWaveGetDuration(base, event, native_heap,
+                                   xa::FrameBelow(base, frame, kGetDurationFrame), call);
+  } else {
+    duration = CallAt(call, method, 0x825D1A48, Args({event}), frame);
+  }
+  Store(base, event + 28, duration == 0x7FFFFFFF ? 0x7FFFFFFF : Load(base, event + 20) + duration);
+  const uint32_t sound = Load(base, Load(base, Load(base, event + 44) + 16) + 20);
+  SetRegs(call, Args({sound, event}));
+  return SoundScheduleEvent(base, sound, event, xa::FrameBelow(base, frame, kScheduleEventFrame),
+                            call);
+}
+
+uint32_t EventDone(uint8_t* base, uint32_t event, uint32_t frame, const GuestCall& call) {
+  ITC_NATIVE_RUNNING("sub_825D13F0 XACTEvent::Done");
+  const uint8_t flags = LoadU8(base, event + 40);
+  if ((flags & 0x08) != 0) {
+    return CallAt(call, kRemoveHelper, 0x825D1420, Args({Load(base, event + 44), event}), frame);
+  }
+  StoreU8(base, event + 40, uint8_t(flags | 0x40));
+  const uint32_t instance = Load(base, event + 44);
+  StoreU8(base, instance + 45, uint8_t(LoadU8(base, instance + 45) + 255));
+  const uint32_t now = TimeMs(base, 0x825D1450, frame, call);
+  const uint32_t owner = Load(base, event + 44);
+  Store(base, event + 24, now);
+  SetRegs(call, Args({owner}));
+  TrackInstanceCheckDone(base, owner);
+  return owner;
+}
+
+uint32_t PlayWaveFire(uint8_t* base, uint32_t event, uint32_t frame, const GuestCall& call) {
+  ITC_NATIVE_RUNNING("sub_825D8378 XACTPlayWaveEvent::Fire");
+  SetRegs(call, Args({event}));
+  EventFire(base, event, xa::FrameBelow(base, frame, kEventFireFrameBelow), call);
+  if (WaveOf(base, event, 0x825D83A4, frame, call) != 0) {
+    const uint32_t wave = WaveOf(base, event, 0x825D83C0, frame, call);
+    CallAt(call, xa::Method(base, wave, 8), 0x825D83DC, Args({wave, 1, 0, 0}), frame);
+  }
+  const uint32_t now = TimeMs(base, 0x825D83E0, frame, call);
+  Store(base, event + 64, now);
+  return now;
+}
+
+uint32_t PlayWaveStop(uint8_t* base, uint32_t event, uint32_t immediate, uint32_t frame,
+                      const GuestCall& call) {
+  ITC_NATIVE_RUNNING("sub_825D83F8 XACTPlayWaveEvent::Stop");
+  if (immediate == 0) {
+    Store(base, event + 68, TimeMs(base, 0x825D8418, frame, call));
+  }
+  if (WaveOf(base, event, 0x825D8434, frame, call) == 0) {
+    return 0;
+  }
+  const uint32_t release = LoadU8(base, Load(base, event + 16) + 7) & 1;
+  uint32_t mode = 1;
+  if (immediate != 0) {
+    mode = 0;
+  } else if (release == 0) {
+    const uint32_t track = Load(base, Load(base, event + 44) + 16);
+    if (CallAt(call, kHasReleaseRpc, 0x825D8468, Args({track}), frame) == 0) {
+      mode = 0;
+    }
+  }
+  const uint32_t wave = WaveOf(base, event, 0x825D8488, frame, call);
+  return CallAt(call, xa::Method(base, wave, 12), 0x825D84A8,
+                Args({wave, mode, release, 0, 0}), frame);
 }
 
 }  // namespace xact

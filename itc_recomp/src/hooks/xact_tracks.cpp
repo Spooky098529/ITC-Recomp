@@ -33,7 +33,9 @@ ITC_FLAG_BOOL(native_xact_tracks, true, "ITC",
               "sub_825D01D8; XACTEvent::Create sub_825D0F00 (the play-wave types; the others "
               "run the original); XACTTrackInstance::Prepare sub_825D5A48, XACTTrack::CreateInstance "
               "sub_825D02F8 and Prepare sub_825D0AA0 (a complex sound's track; under --native_heap); "
-              "XACTSound::ScheduleEvent sub_825CB0C8; "
+              "XACTSound::ScheduleEvent sub_825CB0C8; XACTEvent::Schedule sub_825D1918 and Done "
+              "sub_825D13F0, XACTPlayWaveEvent::Fire sub_825D8378 and Stop sub_825D83F8 (over "
+              "XACT's clock); "
               "the objects' slots through their plain C++ while they hold it, the waves' and "
               "voices' through the guest call) natively instead of through the translated code "
               "(the same reads and writes; checked by --run_harnesses=xact_tracks)");
@@ -395,6 +397,35 @@ void XactSoundScheduleEvent(PPCContext& ctx, uint8_t* base) {
   });
 }
 
+void XactEventSchedule(PPCContext& ctx, uint8_t* base) {
+  const uint32_t event = ctx.r3.u32;
+  const bool native_heap = NativeHeapActive();
+  Framed(ctx, base, 112, [&](const xaudio::GuestCall& call, uint32_t frame) {
+    return xact::EventSchedule(base, event, native_heap, frame, call);
+  });
+}
+
+void XactEventDone(PPCContext& ctx, uint8_t* base) {
+  const uint32_t event = ctx.r3.u32;
+  Framed(ctx, base, 96, [&](const xaudio::GuestCall& call, uint32_t frame) {
+    return xact::EventDone(base, event, frame, call);
+  });
+}
+
+void XactPlayWaveFire(PPCContext& ctx, uint8_t* base) {
+  const uint32_t event = ctx.r3.u32;
+  Framed(ctx, base, 96, [&](const xaudio::GuestCall& call, uint32_t frame) {
+    return xact::PlayWaveFire(base, event, frame, call);
+  });
+}
+
+void XactPlayWaveStop(PPCContext& ctx, uint8_t* base) {
+  const uint32_t event = ctx.r3.u32, immediate = ctx.r4.u32;
+  Framed(ctx, base, 112, [&](const xaudio::GuestCall& call, uint32_t frame) {
+    return xact::PlayWaveStop(base, event, immediate, frame, call);
+  });
+}
+
 }  // namespace hooks
 
 // The flag's fallback, then the register step.
@@ -485,3 +516,7 @@ ITC_XACT_TRACKS_ADAPTER(825D01D8, XactTrackStop)
 // sub_825D0B08 never ran) for XACTTrack::CreateInstance sub_825D02F8.
 ITC_XACT_TRACKS_HEAP_ADAPTER(825D0AA0, XactTrackPrepare)
 ITC_XACT_TRACKS_ADAPTER(825CB0C8, XactSoundScheduleEvent)
+ITC_XACT_TRACKS_ADAPTER(825D1918, XactEventSchedule)
+ITC_XACT_TRACKS_ADAPTER(825D13F0, XactEventDone)
+ITC_XACT_TRACKS_ADAPTER(825D8378, XactPlayWaveFire)
+ITC_XACT_TRACKS_ADAPTER(825D83F8, XactPlayWaveStop)

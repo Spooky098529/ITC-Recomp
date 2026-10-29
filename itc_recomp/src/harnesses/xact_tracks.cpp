@@ -13,6 +13,7 @@
 #include "base/flags.h"
 #include "base/log.h"
 #include "hooks/heap.h"
+#include "helpers/clock.h"
 #include "hooks/xact_tracks.h"
 #include "memory/c_runtime_heap.h"
 #include "memory/heap.h"
@@ -1064,6 +1065,151 @@ void Batch7(Context& h, uint32_t block) {
   results.Report();
 }
 
+// What waited on XACT's clock: Schedule, Done and the play-wave event's Fire
+// and Stop. Both versions read the same time: the clocks' stand-ins
+// (helpers::SetClocksForHarness, on this thread only) answer a random count
+// set before each case, and XACTGetTimeMs reads the game's flag and
+// frequency as they are. XACT's random generator (sub_825BF650, from
+// Schedule with the record's 16-bit +4; never seen in play) keeps its state
+// at the engine's +172 (in the block) and its shuffle table at 0x8266CE00,
+// put back before each version and after.
+void Batch8(Context& h, uint32_t block) {
+  uint8_t* base = h.base;
+  constexpr uint32_t kShuffle = 0x8266CE00, kShuffleBytes = 512;
+  const std::vector<uint8_t> shuffle = Read(base, kShuffle, kShuffleBytes);
+  const auto restore_shuffle = [&] {
+    for (uint32_t i = 0; i < kShuffleBytes; i++) {
+      guest::StoreU8(base, kShuffle + i, shuffle[i]);
+    }
+  };
+  const uint32_t frequency = Load(base, 0x82971484);
+  if (Load(base, 0x8266CDF0) != 0 && frequency == 0 && Load(base, 0x82971480) == 0) {
+    ITC_LOG_ERROR("harness: xact_tracks: XACT's frequency isn't set yet; its clock's users skipped");
+    return;
+  }
+  // The time in ms below 1,000: the count at 50 MHz, and the tick count.
+  const auto clock = [](Random& random) {
+    const uint32_t ms = random.Below(1000);
+    helpers::SetClocksForHarness(uint64_t(ms) * 50000 + random.Below(50000), ms);
+  };
+  const uint32_t instance = block + kInstance, event = block + kEvent, previous = block + kEvent2;
+  // The event linked to its instance, the track, the sound and the engine,
+  // its times and its previous event's small.
+  const auto event_world = [&](Random& random) {
+    clock(random);
+    restore_shuffle();
+    Store(base, block + kInstance + 36, event);
+    Store(base, block + kTrack + 24, instance);
+    Store(base, event + 12, block + kEngine);
+    Store(base, event + 36, previous);
+    Store(base, event + 32, random.Below(100));
+    Store(base, instance + 28, random.Below(1000));
+    for (const uint32_t at : {previous + 20, previous + 24, previous + 28}) {
+      Store(base, at, random.Below(1000));
+    }
+    guest::StoreU8(base, previous + 40, uint8_t(random.Next()));
+    guest::StoreU8(base, event + 40, uint8_t(random.Next()));
+    if (Load(base, event + 60) == 0) {
+      Store(base, event + 60, block + kWave2);  // SetQueued reads it unchecked
+    }
+    // The record: either base bit, its time below 1,000 and its random
+    // spread 0 two times in three.
+    const uint32_t record = block + kRecord;
+    Store(base, record, (Load(base, record) & 0x9000001Fu) | (random.Below(4) << 29) |
+                            (random.Below(1000) << 5));
+    guest::StoreU16(base, record + 4,
+                    uint16_t(random.Below(3) == 0 ? 1 + random.Below(500) : 0));
+  };
+  {
+    Results results("XACTEvent::Schedule (sub_825D1918)");
+    for (int c = 0; c < 160; c++) {
+      Case(h, results, block, __imp__sub_825D1918, hooks::XactEventSchedule,
+           [&](Random& random, PPCContext& t) {
+             event_world(random);
+             const uint32_t sound = block + kSound;
+             Store(base, block + kEventVtable + 4, Pick(random, {0x825D1358u, kAddRef}));
+             Store(base, block + kEventVtable + 12,
+                   Pick(random, {0x825D8870u, 0x825D8870u, kReturn0, kAddRef}));
+             Store(base, event + 4, event);
+             Store(base, event + 8, event);
+             Store(base, block + kEngine + 24, random.Below(2000));
+             // The sound's queue: 0 to 2 nodes, their times below 2,000.
+             const uint32_t list = sound + 56;
+             uint32_t last = list;
+             const uint32_t nodes[] = {block + kNext, block + kRpcEntries};
+             const uint32_t count = random.Below(3);
+             for (uint32_t i = 0; i < count; i++) {
+               Store(base, nodes[i] + 20, random.Below(2000));
+               Store(base, last + 4, nodes[i]);
+               Store(base, nodes[i] + 8, last);
+               last = nodes[i];
+             }
+             Store(base, last + 4, list);
+             Store(base, list + 8, last);
+             t.r3.u64 = event;
+           },
+           fmt::format("case {}", c));
+    }
+    restore_shuffle();
+    results.Report();
+  }
+  {
+    Results results("XACTEvent::Done (sub_825D13F0)");
+    for (int c = 0; c < 128; c++) {
+      Case(h, results, block, __imp__sub_825D13F0, hooks::XactEventDone,
+           [&](Random& random, PPCContext& t) {
+             event_world(random);
+             // The helper list (+48): empty, or a helper (kNext) holding the
+             // event or another.
+             const uint32_t list = instance + 48;
+             if (random.Below(2) == 0) {
+               Store(base, list + 4, list);
+               Store(base, list + 8, list);
+             } else {
+               const uint32_t helper = block + kNext;
+               Store(base, list + 4, helper);
+               Store(base, list + 8, helper);
+               Store(base, helper + 4, list);
+               Store(base, helper + 8, list);
+               Store(base, helper + 12, random.Below(3) == 0 ? previous : event);
+             }
+             guest::StoreU8(base, instance + 44, uint8_t(random.Below(2)));
+             guest::StoreU8(base, instance + 45, uint8_t(random.Below(3)));
+             t.r3.u64 = event;
+           },
+           fmt::format("case {}", c));
+    }
+    results.Report();
+  }
+  {
+    Results results("XACTPlayWaveEvent::Fire (sub_825D8378)");
+    for (int c = 0; c < 128; c++) {
+      Case(h, results, block, __imp__sub_825D8378, hooks::XactPlayWaveFire,
+           [&](Random& random, PPCContext& t) {
+             event_world(random);
+             t.r3.u64 = event;
+           },
+           fmt::format("case {}", c));
+    }
+    results.Report();
+  }
+  {
+    Results results("XACTPlayWaveEvent::Stop (sub_825D83F8)");
+    for (int c = 0; c < 128; c++) {
+      Case(h, results, block, __imp__sub_825D83F8, hooks::XactPlayWaveStop,
+           [&](Random& random, PPCContext& t) {
+             event_world(random);
+             guest::StoreU8(base, block + kRecord + 7, uint8_t(random.Next()));
+             t.r3.u64 = event;
+             t.r4.u64 = Pick(random, {0, 1, uint32_t(random.Next())});
+           },
+           fmt::format("case {}", c));
+    }
+    results.Report();
+  }
+  helpers::SetClocksForHarness(std::nullopt, std::nullopt);
+}
+
 }  // namespace
 
 void XactTracks(Context& h) {
@@ -1079,6 +1225,7 @@ void XactTracks(Context& h) {
   Batch5(h, block.address);
   Batch6(h, block.address);
   Batch7(h, block.address);
+  Batch8(h, block.address);
 }
 
 }  // namespace harness
