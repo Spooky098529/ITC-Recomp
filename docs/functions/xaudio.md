@@ -7,8 +7,7 @@ file is XAudio's API entry points and its voices: the source voices
 (148 bytes, vtable `0x8204A720`, `XAudioVoice::CreateSource`) and the
 submix voices (80 bytes, vtable `0x8204A870`,
 `XAudioVoice::CreateSubmix`) the game's car sounds (`car-sounds.md`)
-call directly, XACT's voice class (`xact.md`'s intro, the lead
-`sub_825C9C40` in `../loops/leads.md`) calls, and Voice::Init's voice
+call directly, XACT's voice class (`xact-waves.md`) calls, and Voice::Init's voice
 chat (`system-services.md`, `8257xxxx`) and the replaced movie player
 (`movies.md`, `82483xxx`, no longer running) call too. Each API entry
 point (`82459DB0`-`8245A7C8`) takes XAudio's API lock, calls one voice

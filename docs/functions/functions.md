@@ -361,6 +361,14 @@ Rows not yet moved stay in the table below. So far:
   call: create, start, stop, state, volume, pitch, outputs, effects,
   release), their set-up, outputs and mixer passes, and XAudio's three
   locks (B7; XAudioInitialize stays in `sound-cues.md`).
+- [`xact-waves.md`](xact-waves.md): XACT's waves and voices: the voice
+  class over XAudio's source voices (create, state, volume, pitch,
+  packets, start, stop, flush, outputs, release) and the reverb submix,
+  the waves that play a wave bank's entries through them (in-memory and
+  streaming: prepare, play, stop, pause, the game thread's and the audio
+  callback's updates, the notifications), their stream entries and the
+  sound banks' variation tables (B7; the rest of XACT stays in
+  `xact.md`).
 
 These files hold functions only. What used to follow the table here moved
 out on 2026-10-20: how frame interpolation works, its options and what
