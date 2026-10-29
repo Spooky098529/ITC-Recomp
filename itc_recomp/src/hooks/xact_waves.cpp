@@ -21,7 +21,7 @@ ITC_FLAG_BOOL(native_xact_waves, true, "ITC",
               "XACTWave::RequestNext sub_825D1C30; XACTEngine::RequestCommit sub_825D1C78, the "
               "engine's critical section entered as the original does; XACTWave::SetVoice "
               "sub_825D1DF8, XACTInMemoryWave::Play sub_825D3938, XACTWave::Pause sub_825D1ED8 "
-              "and XACTWave::PrepareNext sub_825D2778, the voice's methods through their plain "
+              "and XACTWave::PrepareNext sub_825D2778, XACTInMemoryWave::Update sub_825D3890, the voice's methods through their plain "
               "C++ while its slots hold them, the owner's and renderer's slots through the "
               "guest call) natively instead "
               "of through the translated code (the same reads and writes; XAudio's locks stay "
@@ -187,6 +187,14 @@ void XactWavePrepareNext(PPCContext& ctx, uint8_t* base) {
   });
 }
 
+void XactInMemoryWaveUpdate(PPCContext& ctx, uint8_t* base) {
+  const uint32_t wave = ctx.r3.u32;
+  const bool native_heap = NativeHeapActive();
+  XAudioFramed(ctx, base, 96, [&](const xaudio::GuestCall& call, uint32_t frame) {
+    return xact::InMemoryWaveUpdate(base, wave, native_heap, frame, call);
+  });
+}
+
 }  // namespace hooks
 
 // The flag's fallback, then the register step.
@@ -235,3 +243,4 @@ ITC_XACT_WAVES_ADAPTER(825D1DF8, XactWaveSetVoice)
 ITC_XACT_WAVES_ADAPTER(825D3938, XactInMemoryWavePlay)
 ITC_XACT_WAVES_ADAPTER(825D1ED8, XactWavePause)
 ITC_XACT_WAVES_ADAPTER(825D2778, XactWavePrepareNext)
+ITC_XACT_WAVES_ADAPTER(825D3890, XactInMemoryWaveUpdate)

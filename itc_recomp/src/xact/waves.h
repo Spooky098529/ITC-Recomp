@@ -186,4 +186,13 @@ uint32_t WavePause(uint8_t* base, uint32_t wave, uint32_t pause, const Thread& t
 uint32_t WavePrepareNext(uint8_t* base, uint32_t wave, bool native_heap, uint32_t frame,
                          const GuestCall& call);
 
+// XACTInMemoryWave::Update (sub_825D3890, slot +24): PrepareNext's plain
+// C++ (a frame below), then a finished wave (byte +25 bit 0x10) deletes
+// itself (its slot +0 with 1); else a stopped wave (state 5) with a voice
+// gives the voice back (the renderer's slot +12) and clears it (SetVoice's
+// plain C++ with 0). `frame` is this function's (96 bytes). Returns the
+// last r3.
+uint32_t InMemoryWaveUpdate(uint8_t* base, uint32_t wave, bool native_heap, uint32_t frame,
+                            const GuestCall& call);
+
 }  // namespace xact

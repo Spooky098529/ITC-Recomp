@@ -28,6 +28,7 @@ void XactWaveSetVoice(PPCContext& ctx, uint8_t* base);          // sub_825D1DF8
 void XactInMemoryWavePlay(PPCContext& ctx, uint8_t* base);      // sub_825D3938
 void XactWavePause(PPCContext& ctx, uint8_t* base);             // sub_825D1ED8
 void XactWavePrepareNext(PPCContext& ctx, uint8_t* base);       // sub_825D2778
+void XactInMemoryWaveUpdate(PPCContext& ctx, uint8_t* base);    // sub_825D3890
 // These run the original (`__imp__`) where the plain C++ declines.
 void XactTrackGetVolume(PPCContext& ctx, uint8_t* base);         // sub_825D0268
 void XactWaveGetStartPosition(PPCContext& ctx, uint8_t* base);   // sub_825D2170

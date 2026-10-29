@@ -392,4 +392,22 @@ uint32_t WavePrepareNext(uint8_t* base, uint32_t wave, bool native_heap, uint32_
   return CallAt(call, xa::Method(base, next, 0), 0x825D28B8, Args({next, 1}), frame);
 }
 
+uint32_t InMemoryWaveUpdate(uint8_t* base, uint32_t wave, bool native_heap, uint32_t frame,
+                            const GuestCall& call) {
+  ITC_NATIVE_RUNNING("sub_825D3890 XACTInMemoryWave::Update");
+  SetRegs(call, Args({wave}));
+  uint32_t r3 = WavePrepareNext(base, wave, native_heap, xa::FrameBelow(base, frame, 112), call);
+  if ((guest::LoadU8(base, wave + 25) & 0x10) != 0) {
+    return CallAt(call, xa::Method(base, wave, 0), 0x825D38D0, Args({wave, 1}), frame);
+  }
+  const uint32_t voice = Load(base, wave + 44);
+  if (voice == 0 || int32_t(Load(base, wave + 40)) != 5) {
+    return r3;
+  }
+  const uint32_t renderer = Load(base, Load(base, wave + 20) + 12);
+  CallAt(call, xa::Method(base, renderer, 12), 0x825D3914, Args({renderer, voice}), frame);
+  SetRegs(call, Args({wave, 0}));
+  return WaveSetVoice(base, wave, 0, xa::FrameBelow(base, frame, 112), call);
+}
+
 }  // namespace xact

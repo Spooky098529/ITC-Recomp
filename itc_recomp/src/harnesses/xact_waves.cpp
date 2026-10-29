@@ -807,6 +807,41 @@ void WaveCalls(Context& h, uint32_t block) {
     }
     results.Report();
   }
+  {
+    // The wave's own vtable the fake one (its deleting destructor a
+    // recorder), finished (0x10) or stopped (state 5) now and then; the
+    // stack words PrepareNext reads (its frame 112 bytes below Update's 96)
+    // set as for PrepareNext.
+    Results results("XACTInMemoryWave::Update (sub_825D3890)");
+    for (int c = 0; c < 128; c++) {
+      WaveCase(h, results, block, __imp__sub_825D3890, hooks::XactInMemoryWaveUpdate,
+               [&](Random& random, PPCContext& t) {
+                 CallWorld(h, block, random, t, false);
+                 const uint32_t wave = block + kWave;
+                 Store(h.base, wave, block + kFakeVtable);
+                 if (Load(h.base, wave + 48) == 0) {
+                   Store(h.base, wave + 48, block + kOwner);
+                 }
+                 const uint32_t frame = t.r1.u32 - 96 - 112;
+                 guest::StoreU8(h.base, frame + 80, uint8_t(random.Below(4)));
+                 Store(h.base, frame + 84, block + kNewWave);
+                 uint8_t flags = guest::LoadU8(h.base, wave + 25) & ~0x18;
+                 if (random.Below(4) == 0) {
+                   flags |= 0x8;
+                 }
+                 if (random.Below(4) == 0) {
+                   flags |= 0x10;
+                 }
+                 guest::StoreU8(h.base, wave + 25, flags);
+                 guest::StoreU8(h.base, wave + 24, uint8_t(random.Below(3)));
+                 Store(h.base, wave + 40, random.Below(2) == 0 ? 5 : random.Below(6));
+                 // SetVoice with 0 reads nothing more; the owner's cue flags
+                 // as SetVoice's cases.
+               },
+               none, floats, fmt::format("case {}", c));
+    }
+    results.Report();
+  }
 }
 
 }  // namespace
