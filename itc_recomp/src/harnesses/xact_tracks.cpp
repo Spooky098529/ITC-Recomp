@@ -742,6 +742,52 @@ void Batch4(Context& h, uint32_t block) {
   }
 }
 
+void Batch5(Context& h, uint32_t block) {
+  if (!hooks::NativeHeapActive()) {
+    return;
+  }
+  // Create: the play-wave types (1, 2, 4, 5), 20 (nothing made: [out] as it
+  // was, 0 or not), above 20 (an error) and the stop event (0: the
+  // original's, as both sides run it). Compared: the block with [out]
+  // normalized, the new event (its self links normalized), r3; the event
+  // freed.
+  const uint32_t out_word = block + kEventArray + 64;
+  Results results("XACTEvent::Create (sub_825D0F00)");
+  for (int c = 0; c < 128; c++) {
+    uint32_t type = 0;
+    CaseWith(h, results, block, __imp__sub_825D0F00, hooks::XactEventCreate,
+             [&](Random& random, PPCContext& t) {
+               type = Pick(random, {1, 2, 4, 5, 1, 4, 20, 20, 21, 31, 0});
+               Store(h.base, block + kRecord, (Load(h.base, block + kRecord) & ~0x1Fu) | type);
+               Store(h.base, out_word, random.Below(2) == 0 ? 0 : uint32_t(random.Next()));
+               t.r3.u64 = random.Next();
+               t.r4.u64 = block + kInstance;
+               t.r5.u64 = block + kRecord;
+               t.r6.u64 = random.Below(2) == 0 ? 0 : block + kEvent2;
+               t.r7.u64 = out_word;
+             },
+             [&](Outputs& out, PPCContext&) {
+               const uint32_t event = Load(h.base, out_word);
+               const bool made = type <= 5 || type == 0;
+               out.Word(made ? event != 0 : event);
+               if (made && event != 0) {
+                 std::vector<uint8_t> bytes = Read(h.base, event, type == 0 ? 48 : 72);
+                 for (const uint32_t at : {4u, 8u}) {
+                   out.Word(Into(Load(h.base, event + at), event, 72));
+                   for (uint32_t i = 0; i < 4; i++) {
+                     bytes[at + i] = 0;
+                   }
+                 }
+                 out.Bytes(bytes);
+                 memory::crt::XMemFree(event, type == 0 ? 0x20848013u : xact::kPlayWaveAttributes);
+               }
+               Store(h.base, out_word, 0);
+             },
+             fmt::format("case {}", c));
+  }
+  results.Report();
+}
+
 }  // namespace
 
 void XactTracks(Context& h) {
@@ -754,6 +800,7 @@ void XactTracks(Context& h) {
   Batch2(h, block.address);
   Batch3(h, block.address);
   Batch4(h, block.address);
+  Batch5(h, block.address);
 }
 
 }  // namespace harness

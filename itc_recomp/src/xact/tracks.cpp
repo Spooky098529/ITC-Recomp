@@ -973,4 +973,32 @@ uint32_t TrackStop(uint8_t* base, uint32_t track, uint32_t immediate, uint32_t f
   return r30;
 }
 
+// --- Making events ---
+
+std::optional<uint32_t> EventCreate(uint8_t* base, uint32_t engine, uint32_t instance,
+                                    uint32_t record, uint32_t previous, uint32_t out,
+                                    const GuestCall& call) {
+  const uint32_t type = Load(base, record) & 0x1F;
+  if (type > 20) {
+    ITC_NATIVE_RUNNING("sub_825D0F00 XACTEvent::Create");
+    return 0x8AC70011u;  // XACTENGINE_E_INVALIDEVENTTYPE
+  }
+  const bool play_wave = type == 1 || type == 2 || type == 4 || type == 5;
+  if (!play_wave && type != 20) {
+    return std::nullopt;
+  }
+  ITC_NATIVE_RUNNING("sub_825D0F00 XACTEvent::Create");
+  if (play_wave) {
+    SetRegs(call, Args({72, kPlayWaveAttributes}));
+    uint32_t event = memory::crt::XMemAlloc(base, 72, kPlayWaveAttributes);
+    if (event != 0) {
+      const uint32_t variation = (type == 2 || type == 5) ? Load(base, record + 12) : 0;
+      SetRegs(call, Args({event, engine, instance, record, previous}));
+      event = PlayWaveConstruct(base, event, engine, instance, record, previous, variation);
+    }
+    Store(base, out, event);
+  }
+  return Load(base, out) == 0 ? kOutOfMemory : 0;
+}
+
 }  // namespace xact

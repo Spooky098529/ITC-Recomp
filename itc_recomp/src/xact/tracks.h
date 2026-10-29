@@ -283,4 +283,18 @@ uint32_t TrackInstanceStop(uint8_t* base, uint32_t instance, uint32_t immediate,
 uint32_t TrackStop(uint8_t* base, uint32_t track, uint32_t immediate, uint32_t frame,
                    const GuestCall& call);
 
+// --- Making events ---
+
+// XACTEvent::Create (sub_825D0F00): by the record's type (word +0, low 5
+// bits): the play-wave kinds 1, 4 (no variation) and 2, 5 (the word at the
+// record + 12 as the variation) as 72 bytes (XMemAlloc 0x2084800D) through
+// the play-wave event's constructor's plain C++, the event to [out]; 20
+// makes nothing; above 20 XACTENGINE_E_INVALIDEVENTTYPE (0x8AC70011). Then
+// E_OUTOFMEMORY when [out] is 0, else 0. nullopt, with nothing written, for
+// the other types (never seen in play: the original runs). Allocates through
+// the native layer: call it only while hooks::NativeHeapActive().
+std::optional<uint32_t> EventCreate(uint8_t* base, uint32_t engine, uint32_t instance,
+                                    uint32_t record, uint32_t previous, uint32_t out,
+                                    const GuestCall& call);
+
 }  // namespace xact

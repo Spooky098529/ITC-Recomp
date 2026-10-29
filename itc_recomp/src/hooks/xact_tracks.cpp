@@ -30,7 +30,8 @@ ITC_FLAG_BOOL(native_xact_tracks, true, "ITC",
               "XACTTrackInstance::CancelEvents sub_825D5520 (XACT's lock, the engine's "
               "critical section, entered as the original does), ~XACTTrackInstance sub_825D5838 "
               "and its deleting destructor sub_825D5E58, Stop sub_825D5D18; XACTTrack::Stop "
-              "sub_825D01D8; "
+              "sub_825D01D8; XACTEvent::Create sub_825D0F00 (the play-wave types; the others "
+              "run the original); "
               "the objects' slots through their plain C++ while they hold it, the waves' and "
               "voices' through the guest call) natively instead of through the translated code "
               "(the same reads and writes; checked by --run_harnesses=xact_tracks)");
@@ -349,6 +350,21 @@ void XactTrackStop(PPCContext& ctx, uint8_t* base) {
   });
 }
 
+void XactEventCreate(PPCContext& ctx, uint8_t* base) {
+  const uint32_t engine = ctx.r3.u32, instance = ctx.r4.u32, record = ctx.r5.u32,
+                 previous = ctx.r6.u32, out = ctx.r7.u32;
+  bool declined = false;
+  Framed(ctx, base, 144, [&](const xaudio::GuestCall& call, uint32_t) {
+    const auto r3 = xact::EventCreate(base, engine, instance, record, previous, out, call);
+    declined = !r3;
+    return r3.value_or(0);
+  });
+  if (declined) {
+    ctx.r3.u64 = engine;
+    __imp__sub_825D0F00(ctx, base);
+  }
+}
+
 }  // namespace hooks
 
 // The flag's fallback, then the register step.
@@ -429,3 +445,4 @@ ITC_XACT_TRACKS_HEAP_ADAPTER(825D5E58, XactTrackInstanceDeletingDestruct)
 // No adapter (removed 2026-10-29: only XACTTrack::Stop's plain C++ calls it in
 // play) for XACTTrackInstance::Stop sub_825D5D18.
 ITC_XACT_TRACKS_ADAPTER(825D01D8, XactTrackStop)
+ITC_XACT_TRACKS_HEAP_ADAPTER(825D0F00, XactEventCreate)

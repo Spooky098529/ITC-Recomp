@@ -59,5 +59,8 @@ void XactTrackInstanceDestruct(PPCContext& ctx, uint8_t* base);              // 
 void XactTrackInstanceDeletingDestruct(PPCContext& ctx, uint8_t* base);      // sub_825D5E58
 void XactTrackInstanceStop(PPCContext& ctx, uint8_t* base);                  // sub_825D5D18
 void XactTrackStop(PPCContext& ctx, uint8_t* base);                          // sub_825D01D8
+// Batch 5: making events. Runs the original (`__imp__`) where the plain C++
+// declines.
+void XactEventCreate(PPCContext& ctx, uint8_t* base);  // sub_825D0F00
 
 }  // namespace hooks
