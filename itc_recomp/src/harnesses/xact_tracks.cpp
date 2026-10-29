@@ -12,7 +12,9 @@
 
 #include "base/flags.h"
 #include "base/log.h"
+#include "hooks/heap.h"
 #include "hooks/xact_tracks.h"
+#include "memory/c_runtime_heap.h"
 #include "memory/heap.h"
 #include "xact/tracks.h"
 
@@ -75,11 +77,22 @@ constexpr uint32_t kAddRef = 0x8245F860, kRecordR4 = 0x820CE9F8, kRecordF1 = 0x8
 constexpr uint32_t kInstance = 0x000, kTrack = 0x080, kEvent = 0x100, kEvent2 = 0x180,
                    kWave = 0x400, kWave2 = 0x600, kVoice = 0x800, kRecord = 0x900,
                    kEventVtable = 0x1000, kWaveVtable = 0x1100, kVoiceVtable = 0x1200;
+// Batch 2's: the track's sound (its record, an engine without global
+// settings, so the category's volume is 1.0, and its cue), the cue's sound
+// bank with its cached wave banks, a wave bank (its real vtable) with four
+// entries, a track to construct, an object for the destructors to delete
+// (the wave vtable's slot +0), and RPC entries.
+constexpr uint32_t kSound = 0xA00, kSoundRecord = 0xA80, kEngine = 0xB00, kCue = 0xB80,
+                   kSoundBank = 0xC00, kBankCache = 0xD00, kWaveBank = 0xD80, kEntries = 0xE80,
+                   kTrack2 = 0xF00, kNext = 0x1300, kRpcEntries = 0x1600;
+constexpr uint32_t kWaveBankVtable = 0x82075AE8;
 
 // The block's floats: what kRecordF1 stores at +112 of the objects it's
 // given.
-const std::vector<uint32_t> kFloats = {kEvent + 112, kEvent2 + 112, kWave + 112, kWave2 + 112,
-                                       kVoice + 112};
+// Batch 2's: the track's volume and the constructed track's floats.
+const std::vector<uint32_t> kFloats = {kEvent + 112,  kEvent2 + 112, kWave + 112,  kWave2 + 112,
+                                       kVoice + 112,  kTrack + 40,   kTrack2 + 40, kTrack2 + 44,
+                                       kTrack2 + 56, kTrack2 + 60};
 
 uint32_t Pick(Random& random, std::initializer_list<uint32_t> choices) {
   return *(choices.begin() + random.Below(uint32_t(choices.size())));
@@ -123,9 +136,44 @@ void World(uint8_t* base, uint32_t block, Random& random) {
   Store(base, block + kVoice, block + kVoiceVtable);
   Store(base, block + kInstance + 36, random.Below(4) == 0 ? 0 : block + kEvent);
   Store(base, block + kTrack + 24, random.Below(4) == 0 ? 0 : block + kInstance);
+  // The track, its sound, the cue and the banks.
+  const uint32_t track = block + kTrack, sound = block + kSound;
+  Store(base, block + kInstance, block + kWaveVtable);
+  Store(base, block + kInstance + 16, track);
+  Store(base, track + 20, sound);
+  Store(base, track + 28, random.Below(3) == 0 ? 0 : block + kNext);
+  Store(base, track + 36, 0);  // no transition event (sub_825D0B08 never ran)
+  Store(base, track + 52, random.Below(4) == 0 ? block + kRpcEntries : 0);
+  for (const uint32_t at : {track + 40, track + 56, sound + 8, sound + 88, sound + 112,
+                            block + kCue + 28}) {
+    guest::StoreFloat(base, at, float(AnyFloat(random)));
+  }
+  Store(base, block + kNext, block + kWaveVtable);
+  Store(base, block + kRpcEntries - 4, 1 + random.Below(3));
+  Store(base, block + kRpcEntries + 4, block + kWaveVtable);
+  Store(base, sound + 28, block + kSoundRecord);
+  Store(base, sound + 32, block + kEngine);
+  Store(base, sound + 48, block + kCue);
+  // No RPCs (with them the plain C++ declines to the original).
+  guest::StoreU8(base, block + kSoundRecord, guest::LoadU8(base, block + kSoundRecord) & ~0x4);
+  Store(base, block + kEngine + 124, 0);
+  Store(base, block + kCue + 296, block + kSoundBank);
+  Store(base, block + kSoundBank + 244, block + kBankCache);
+  for (uint32_t i = 0; i < 4; i++) {
+    Store(base, block + kBankCache + 4 * i, block + kWaveBank);
+    // A non-zero rate (bits 5-22 of the entry's format, +4).
+    const uint32_t format = block + kEntries + 24 * i + 4;
+    Store(base, format, (Load(base, format) & ~(0x3FFFFu << 5)) | ((8000 + random.Below(44100)) << 5));
+  }
+  Store(base, block + kWaveBank, kWaveBankVtable);
+  Store(base, block + kWaveBank + 272, block + kEntries);
   // The record's type: the play-wave kinds and the others.
   Store(base, block + kRecord,
         (Load(base, block + kRecord) & ~0x1Fu) | Pick(random, {1, 2, 4, 5, 3, 0, 31}));
+  // Its wave bank byte, loop count (255 forever) and wave index.
+  guest::StoreU8(base, block + kRecord + 10, uint8_t(random.Below(4)));
+  guest::StoreU8(base, block + kRecord + 11, uint8_t(Pick(random, {0, 1, 3, 255, random.Below(256)})));
+  guest::StoreU16(base, block + kRecord + 8, uint16_t(random.Below(4)));
 }
 
 // One case: the block's random words, the world, `setup(random, t)`, then
@@ -265,6 +313,113 @@ void Batch1(Context& h, uint32_t block) {
   }
 }
 
+// The deleting destructors with bit 0: the object from the allocation layer
+// (XMemAlloc with its attributes) for each version, its +0 and links copied
+// from the block's object at `copy`; compared: the block and whether r3 is
+// the object.
+void FreeCases(Context& h, uint32_t block, const char* name, GuestFunction recompiled,
+               GuestFunction native, uint32_t bytes, uint32_t attributes, uint32_t copy) {
+  Results results(name);
+  if (!hooks::NativeHeapActive()) {
+    results.Report();
+    return;
+  }
+  for (int c = 0; c < 48; c++) {
+    const Random start = h.random;
+    Random random = start;
+    Outputs out[2];
+    for (int v = 0; v < 2; v++) {
+      random = start;
+      for (uint32_t i = 0; i < kBlockBytes; i += 4) {
+        Store(h.base, block + i, uint32_t(random.Next()));
+      }
+      PPCContext t = CallContext(h);
+      World(h.base, block, random);
+      const uint32_t object = memory::crt::XMemAlloc(h.base, bytes, attributes);
+      for (uint32_t i = 0; i < bytes; i += 4) {
+        Store(h.base, object + i, Load(h.base, block + copy + i));
+      }
+      t.r3.u64 = object;
+      t.r4.u64 = 1 | (uint32_t(random.Next()) & ~1u);
+      ITC_FLAG(native_xact_tracks) = v == 1;
+      (v == 0 ? recompiled : native)(t, h.base);
+      ITC_FLAG(native_xact_tracks) = true;
+      out[v].Bytes(Read(h.base, block, kBlockBytes));
+      out[v].Word(t.r3.u32 == object);
+    }
+    h.random = random;
+    results.Check(out[0], out[1], fmt::format("case {}", c));
+  }
+  results.Report();
+}
+
+void Batch2(Context& h, uint32_t block) {
+  struct Function {
+    const char* name;
+    GuestFunction recompiled;
+    GuestFunction native;
+    uint32_t object;
+  };
+  const Function functions[] = {
+      {"XACTTrack::SetVolume (sub_825D0BF8)", __imp__sub_825D0BF8, hooks::XactTrackSetVolume,
+       kTrack},
+      {"XACTTrack::UpdateVolume (sub_825D0428)", __imp__sub_825D0428,
+       hooks::XactTrackUpdateVolume, kTrack},
+      {"XACTTrack::CreateRpcs (sub_825D06B8)", __imp__sub_825D06B8, hooks::XactTrackCreateRpcs,
+       kTrack},
+      {"XACTTrack::StartRpcs (sub_825D0800)", __imp__sub_825D0800, hooks::XactTrackStartRpcs,
+       kTrack},
+      {"XACTTrack::XACTTrack (sub_825D0CE0)", __imp__sub_825D0CE0, hooks::XactTrackConstruct,
+       kTrack2},
+      {"XACTTrack::Update (sub_825D0E30)", __imp__sub_825D0E30, hooks::XactTrackUpdate, kTrack},
+      {"XACTTrack::~XACTTrack (sub_825D0110)", __imp__sub_825D0110, hooks::XactTrackDestruct,
+       kTrack},
+      {"XACTTrack::~XACTTrack, deleting, kept (sub_825D0978)", __imp__sub_825D0978,
+       hooks::XactTrackDeletingDestruct, kTrack},
+      {"XACTPlayWaveEvent::~XACTPlayWaveEvent, deleting, kept (sub_825D8660)",
+       __imp__sub_825D8660, hooks::XactPlayWaveDeletingDestruct, kEvent},
+      {"XACTPlayWaveEvent::ApplyVariation (sub_825D7558)", __imp__sub_825D7558,
+       hooks::XactPlayWaveApplyVariation, kEvent},
+      {"XACTPlayWaveEvent::GetDuration (sub_825D8870)", __imp__sub_825D8870,
+       hooks::XactPlayWaveGetDuration, kEvent},
+  };
+  for (const Function& f : functions) {
+    Results results(f.name);
+    const bool deleting = f.recompiled == __imp__sub_825D0978 || f.recompiled == __imp__sub_825D8660;
+    const bool variation = f.recompiled == __imp__sub_825D7558;
+    for (int c = 0; c < 96; c++) {
+      Case(h, results, block, f.recompiled, f.native,
+           [&](Random& random, PPCContext& t) {
+             t.r3.u64 = block + f.object;
+             t.f1.f64 = AnyFloat(random);
+             // The constructor's engine, sound, record (none, or a byte in
+             // the block) and index; the destructors' flags (bit 0 clear:
+             // the block's objects aren't freed).
+             t.r4.u64 = deleting ? uint32_t(random.Next()) & ~1u : uint32_t(random.Next());
+             t.r5.u64 = block + kSound;
+             t.r6.u64 = random.Below(3) == 0 ? 0 : block + random.Below(kBlockBytes);
+             t.r7.u64 = random.Next();
+             if (variation) {
+               // A variation record only through the getter's recorder (0):
+               // sub_825D1478 never ran in play and isn't called here.
+               Store(h.base, block + kEventVtable + 92,
+                     Pick(random, {0x825D8920u, kReturn0}));
+               Store(h.base, block + kRecord,
+                     (Load(h.base, block + kRecord) & ~0x1Fu) | Pick(random, {1, 2, 3, 0, 31}));
+             }
+           },
+           fmt::format("case {}", c));
+    }
+    results.Report();
+  }
+  FreeCases(h, block, "XACTTrack::~XACTTrack, deleting, freed (sub_825D0978)",
+            __imp__sub_825D0978, hooks::XactTrackDeletingDestruct, 64, xact::kTrackAttributes,
+            kTrack);
+  FreeCases(h, block, "XACTPlayWaveEvent::~XACTPlayWaveEvent, deleting, freed (sub_825D8660)",
+            __imp__sub_825D8660, hooks::XactPlayWaveDeletingDestruct, 72,
+            xact::kPlayWaveAttributes, kEvent);
+}
+
 }  // namespace
 
 void XactTracks(Context& h) {
@@ -274,6 +429,7 @@ void XactTracks(Context& h) {
     return;
   }
   Batch1(h, block.address);
+  Batch2(h, block.address);
 }
 
 }  // namespace harness

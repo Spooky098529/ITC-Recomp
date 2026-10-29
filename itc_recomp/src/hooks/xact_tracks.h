@@ -35,4 +35,19 @@ void XactPlayWavePause(PPCContext& ctx, uint8_t* base);  // sub_825D8268
 void XactPlayWaveSetVolume(PPCContext& ctx, uint8_t* base);  // sub_825D7FE0
 void XactWaveSetVolume(PPCContext& ctx, uint8_t* base);  // sub_825D1CC8
 
+// Batch 2: the track's volume, set-up, update and destructors, the play-wave
+// event's destructor, variation and duration. These run the original
+// (`__imp__`) where the plain C++ declines.
+void XactTrackSetVolume(PPCContext& ctx, uint8_t* base);       // sub_825D0BF8
+void XactTrackUpdateVolume(PPCContext& ctx, uint8_t* base);    // sub_825D0428
+void XactTrackCreateRpcs(PPCContext& ctx, uint8_t* base);      // sub_825D06B8
+void XactTrackStartRpcs(PPCContext& ctx, uint8_t* base);       // sub_825D0800
+void XactTrackConstruct(PPCContext& ctx, uint8_t* base);       // sub_825D0CE0
+void XactTrackUpdate(PPCContext& ctx, uint8_t* base);          // sub_825D0E30
+void XactTrackDestruct(PPCContext& ctx, uint8_t* base);        // sub_825D0110
+void XactTrackDeletingDestruct(PPCContext& ctx, uint8_t* base);     // sub_825D0978
+void XactPlayWaveDeletingDestruct(PPCContext& ctx, uint8_t* base);  // sub_825D8660
+void XactPlayWaveApplyVariation(PPCContext& ctx, uint8_t* base);    // sub_825D7558
+void XactPlayWaveGetDuration(PPCContext& ctx, uint8_t* base);       // sub_825D8870
+
 }  // namespace hooks

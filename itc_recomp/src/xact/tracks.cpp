@@ -8,6 +8,7 @@
 
 #include "base/log.h"
 #include "guest.h"
+#include "memory/c_runtime_heap.h"
 
 #include <initializer_list>
 
@@ -357,6 +358,250 @@ uint32_t PlayWaveSetVolume(uint8_t* base, uint32_t event, double volume, uint32_
 uint32_t WaveSetVolume(uint8_t* base, uint32_t wave, double volume, uint32_t sp,
                        const GuestCall& call) {
   return WaveSetVolumeFrom(base, wave, volume, sp, 0, call);
+}
+
+// --- The track's volume, set-up, update and destructors; the play-wave
+// event's destructor, variation and duration ---
+
+namespace {
+
+constexpr uint32_t kZero = 0x82000A34;       // 0.0f
+constexpr uint32_t kOne = 0x82000A30;        // 1.0f
+constexpr uint32_t kGainTable = 0x820761F8;  // 256 floats
+constexpr uint32_t kTrackSetVolume = 0x825D0BF8;
+constexpr uint32_t kTrackSetVolumeFrame = 112;
+constexpr uint32_t kTrackDestructFrame = 96;
+constexpr uint32_t kGetVariationRecord = 0x825D8920;  // slot +92
+constexpr uint32_t kSoundBankGetWaveBank = 0x825C7218;
+constexpr uint32_t kWaveBankGetWaveDurations = 0x825CC380;
+
+double LoadF(uint8_t* base, uint32_t address) { return double(guest::LoadFloat(base, address)); }
+double Single(double value) { return double(float(value)); }
+
+// The sound's volume times the track's factors, to the instance's SetVolume
+// (from `frame`); `track_first` the product's order (SetVolume's f1 x +40,
+// UpdateVolume's +40 x f1).
+std::optional<uint32_t> ApplyVolume(uint8_t* base, uint32_t track, bool track_first,
+                                    uint32_t frame, const GuestCall& call) {
+  const double f31 = LoadF(base, track + 40);
+  const uint32_t sound = Load(base, track + 20);
+  const double f30 = LoadF(base, track + 56);
+  const auto volume = SoundGetVolume(base, sound);
+  if (!volume) {
+    return std::nullopt;
+  }
+  const double f0 = track_first ? Single(f31 * volume->f1) : Single(volume->f1 * f31);
+  const double f1 = Single(f0 * f30);
+  const uint32_t instance = Load(base, track + 24);
+  SetRegs(call, WithF1(Args({instance}), f1));
+  return TrackInstanceSetVolume(base, instance, f1, frame, call);
+}
+
+}  // namespace
+
+std::optional<uint32_t> TrackSetVolume(uint8_t* base, uint32_t track, double volume,
+                                       uint32_t frame, const GuestCall& call) {
+  const double zero = LoadF(base, kZero);
+  guest::StoreFloat(base, track + 40, float(volume < zero ? zero : volume));
+  if (Load(base, track + 24) == 0) {
+    ITC_NATIVE_RUNNING("sub_825D0BF8 XACTTrack::SetVolume");
+    return track;
+  }
+  const auto r3 = ApplyVolume(base, track, false, frame, call);
+  if (r3) {
+    ITC_NATIVE_RUNNING("sub_825D0BF8 XACTTrack::SetVolume");
+  }
+  return r3;
+}
+
+std::optional<uint32_t> TrackUpdateVolume(uint8_t* base, uint32_t track, uint32_t frame,
+                                          const GuestCall& call) {
+  if (Load(base, track + 24) == 0) {
+    ITC_NATIVE_RUNNING("sub_825D0428 XACTTrack::UpdateVolume");
+    return track;
+  }
+  const auto r3 = ApplyVolume(base, track, true, frame, call);
+  if (r3) {
+    ITC_NATIVE_RUNNING("sub_825D0428 XACTTrack::UpdateVolume");
+  }
+  return r3;
+}
+
+uint32_t TrackConstruct(uint8_t* base, uint32_t track, uint32_t engine, uint32_t sound,
+                        uint32_t record, uint32_t index, uint32_t frame, const GuestCall& call) {
+  ITC_NATIVE_RUNNING("sub_825D0CE0 XACTTrack::XACTTrack");
+  const float zero = guest::LoadFloat(base, kZero);
+  guest::StoreFloat(base, track + 44, zero);
+  Store(base, track + 4, track);
+  guest::StoreFloat(base, track + 60, zero);
+  Store(base, track + 8, track);
+  Store(base, track + 12, engine);
+  Store(base, track + 16, record);
+  Store(base, track + 20, sound);
+  Store(base, track + 0, kTrackVtable);
+  double f1 = LoadF(base, kOne);
+  guest::StoreFloat(base, track + 56, float(f1));
+  StoreU8(base, track + 48, uint8_t(index));
+  Store(base, track + 24, 0);
+  Store(base, track + 28, 0);
+  Store(base, track + 36, 0);
+  Store(base, track + 52, 0);
+  StoreU8(base, track + 32, 0);
+  if (record != 0) {
+    f1 = LoadF(base, kGainTable + (uint32_t(LoadU8(base, record)) << 2));
+  }
+  SetRegs(call, WithF1(Args({track}), f1));
+  if (!TrackSetVolume(base, track, f1, xa::FrameBelow(base, frame, kTrackSetVolumeFrame),
+                      call)) {
+    CallAt(call, kTrackSetVolume, 0x825D0D6C, WithF1(Args({track}), f1), frame);
+  }
+  return track;
+}
+
+uint32_t TrackUpdate(uint8_t* base, uint32_t track, uint32_t frame, const GuestCall& call) {
+  ITC_NATIVE_RUNNING("sub_825D0E30 XACTTrack::Update");
+  const uint32_t event = Load(base, track + 36);
+  if (event != 0) {
+    CallAt(call, 0x825D0B08, 0x825D0E54, Args({track, event}), frame);
+    Store(base, track + 36, 0);
+  }
+  // The empty sub_82106540 with the instance: nothing to do.
+  const uint32_t instance = Load(base, track + 24);
+  SetRegs(call, Args({instance}));
+  return instance;
+}
+
+std::optional<uint32_t> TrackCreateRpcs(uint8_t* base, uint32_t track) {
+  const uint32_t sound = Load(base, track + 20);
+  if ((LoadU8(base, Load(base, sound + 28)) & 0x4) != 0) {
+    return std::nullopt;
+  }
+  ITC_NATIVE_RUNNING("sub_825D06B8 XACTTrack::CreateRpcs");
+  return 0;
+}
+
+std::optional<uint32_t> TrackStartRpcs(uint8_t* base, uint32_t track) {
+  const uint32_t sound = Load(base, track + 20);
+  if ((LoadU8(base, Load(base, sound + 28)) & 0x4) != 0) {
+    return std::nullopt;
+  }
+  ITC_NATIVE_RUNNING("sub_825D0800 XACTTrack::StartRpcs");
+  return sound;
+}
+
+uint32_t TrackDestruct(uint8_t* base, uint32_t track, uint32_t frame, const GuestCall& call) {
+  ITC_NATIVE_RUNNING("sub_825D0110 XACTTrack::~XACTTrack");
+  Store(base, track + 0, kTrackVtable);
+  uint32_t r3 = Load(base, track + 28);
+  if (r3 != 0) {
+    r3 = CallAt(call, xa::Method(base, r3, 0), 0x825D0150, Args({r3, 1}), frame);
+  }
+  r3 = Load(base, track + 24);
+  if (r3 != 0) {
+    r3 = CallAt(call, xa::Method(base, r3, 0), 0x825D0170, Args({r3, 1}), frame);
+  }
+  const uint32_t entries = Load(base, track + 52);
+  if (entries != 0) {
+    // The RPC entries (never in play): the counted array's vector deleting
+    // destructor through the first entry's +4 vtable, or operator delete on
+    // the block, as the original.
+    if (int32_t(Load(base, entries - 4)) != 0) {
+      r3 = CallAt(call, xa::Method(base, entries + 4, 0), 0x825D01A4, Args({entries + 4, 3}),
+                  frame);
+    } else {
+      r3 = CallAt(call, 0x825A70E8, 0x825D01AC, Args({entries - 4}), frame);
+    }
+  }
+  Store(base, track + 0, kListBaseVtable);
+  return r3;
+}
+
+uint32_t TrackDeletingDestruct(uint8_t* base, uint32_t track, uint32_t flags, uint32_t frame,
+                               const GuestCall& call) {
+  ITC_NATIVE_RUNNING("sub_825D0978 XACTTrack::~XACTTrack (deleting)");
+  SetRegs(call, Args({track, flags}));
+  TrackDestruct(base, track, xa::FrameBelow(base, frame, kTrackDestructFrame), call);
+  if ((flags & 1) != 0) {
+    SetRegs(call, Args({track, kTrackAttributes}));
+    memory::crt::XMemFree(track, kTrackAttributes);
+  }
+  return track;
+}
+
+uint32_t PlayWaveDeletingDestruct(uint8_t* base, uint32_t event, uint32_t flags,
+                                  uint32_t frame, const GuestCall& call) {
+  ITC_NATIVE_RUNNING("sub_825D8660 XACTPlayWaveEvent::~XACTPlayWaveEvent (deleting)");
+  const uint32_t wave = Load(base, event + 60);
+  Store(base, event + 0, kPlayWaveEventVtable);
+  if (wave != 0) {
+    CallAt(call, xa::Method(base, wave, 0), 0x825D86A8, Args({wave, 1}), frame);
+  }
+  Store(base, event + 0, kWaveEventBaseVtable);
+  SetRegs(call, Args({event}));
+  EventDestruct(base, event);
+  if ((flags & 1) != 0) {
+    SetRegs(call, Args({event, kPlayWaveAttributes}));
+    memory::crt::XMemFree(event, kPlayWaveAttributes);
+  }
+  return event;
+}
+
+uint32_t PlayWaveApplyVariation(uint8_t* base, uint32_t event, uint32_t frame,
+                                const GuestCall& call) {
+  ITC_NATIVE_RUNNING("sub_825D7558 XACTPlayWaveEvent::ApplyVariation");
+  const uint32_t method = xa::Method(base, event, 92);
+  uint32_t record;
+  if (method == kGetVariationRecord) {
+    SetRegs(call, Args({event}));
+    record = PlayWaveGetVariationRecord(base, event);
+  } else {
+    record = CallAt(call, method, 0x825D757C, Args({event}), frame);
+  }
+  if (record == 0) {
+    return 0;
+  }
+  return CallAt(call, 0x825D1478, 0x825D7590, Args({event, record}), frame);
+}
+
+uint32_t PlayWaveGetDuration(uint8_t* base, uint32_t event, bool native_heap, uint32_t frame,
+                             const GuestCall& call) {
+  ITC_NATIVE_RUNNING("sub_825D8870 XACTPlayWaveEvent::GetDuration");
+  // The cue: [[[[event + 44] + 16] + 20] + 48] (instance, track, sound).
+  const uint32_t cue =
+      Load(base, Load(base, Load(base, Load(base, event + 44) + 16) + 20) + 48);
+  const uint32_t sound_bank = Load(base, cue + 296);
+  const uint32_t index = LoadU8(base, Load(base, event + 16) + 10);
+  std::optional<uint32_t> found;
+  if (native_heap) {
+    SetRegs(call, Args({sound_bank, index}));
+    found = SoundBankGetWaveBank(base, sound_bank, index);
+  }
+  const uint32_t bank = found ? *found
+                              : CallAt(call, kSoundBankGetWaveBank, 0x825D88AC,
+                                       Args({sound_bank, index}), frame);
+  if (bank == 0) {
+    return 0;
+  }
+  const uint32_t record = Load(base, event + 16);
+  if (LoadU8(base, record + 11) == 255) {
+    return 0x7FFFFFFF;
+  }
+  const uint32_t wave = guest::LoadU16(base, record + 8);
+  const xa::Regs regs = Args({bank, wave, frame + 84, frame + 80});
+  uint32_t r3;
+  if (const auto durations = WaveBankGetWaveDurations(base, bank, wave)) {
+    SetRegs(call, regs);
+    Store(base, frame + 84, durations->duration_ms);
+    Store(base, frame + 80, durations->loop_length_ms);
+    r3 = 0;
+  } else {
+    r3 = CallAt(call, kWaveBankGetWaveDurations, 0x825D88E0, regs, frame);
+  }
+  if (int32_t(r3) < 0) {
+    return 0;
+  }
+  const uint32_t loops = LoadU8(base, Load(base, event + 16) + 11);
+  return loops * Load(base, frame + 80) + Load(base, frame + 84);
 }
 
 }  // namespace xact

@@ -15,6 +15,7 @@
 #include "xact/waves.h"
 
 #include <cstdint>
+#include <optional>
 
 namespace xact {
 
@@ -124,5 +125,83 @@ uint32_t PlayWaveSetVolume(uint8_t* base, uint32_t event, double volume, uint32_
 // voice.
 uint32_t WaveSetVolume(uint8_t* base, uint32_t wave, double volume, uint32_t sp,
                        const GuestCall& call);
+
+// --- The track (XACTTrack, 64 bytes, vtable 0x820765F8: +4/+8 its node in
+// the sound's track list, +12 the engine, +16 its record, +20 the sound, +24
+// the instance, +28 the next instance, byte +32 the flags, +36 a pending
+// transition event, +40 the volume, +44 the pitch, byte +48 the index, +52
+// the RPC entries, +56 the RPC volume factor, +60 the RPC pitch) ---
+
+constexpr uint32_t kTrackVtable = 0x820765F8;
+constexpr uint32_t kTrackAttributes = 0x20848004;      // XMemAlloc's
+constexpr uint32_t kPlayWaveAttributes = 0x2084800D;   // the play-wave event's
+constexpr uint32_t kWaveEventBaseVtable = 0x82076B58;  // the wave event base's
+
+// XACTTrack::SetVolume (sub_825D0BF8): +40 = `volume` (0.0 below it); with
+// an instance, its SetVolume with XACTSound::GetVolume x +40 x +56, each
+// product rounded to single. `frame` is this function's (112 bytes).
+// Returns the last r3. nullopt, with only +40 written (the original writes
+// it the same), where GetVolume's plain C++ declines.
+std::optional<uint32_t> TrackSetVolume(uint8_t* base, uint32_t track, double volume,
+                                       uint32_t frame, const GuestCall& call);
+// XACTTrack::UpdateVolume (sub_825D0428): with an instance, its SetVolume
+// with +40 x GetVolume x +56. `frame` is this function's (112 bytes). r3 as
+// the original leaves it; nullopt, with nothing written, where GetVolume's
+// plain C++ declines.
+std::optional<uint32_t> TrackUpdateVolume(uint8_t* base, uint32_t track, uint32_t frame,
+                                          const GuestCall& call);
+// XACTTrack::XACTTrack (sub_825D0CE0): the fields set, then SetVolume (a
+// frame below `frame`, this function's 96 bytes; the original through the
+// guest call where its plain C++ declines) with 1.0, or the gain of the
+// record's volume byte (the table at 0x820761F8). Returns the track.
+uint32_t TrackConstruct(uint8_t* base, uint32_t track, uint32_t engine, uint32_t sound,
+                        uint32_t record, uint32_t index, uint32_t frame, const GuestCall& call);
+// XACTTrack::Update (sub_825D0E30): a pending transition event (+36) to
+// sub_825D0B08 (never seen in play: through the guest call) and +36 = 0;
+// then the empty sub_82106540 on the instance (nothing done). `frame` is
+// this function's (96 bytes). Returns the last r3 (the instance).
+uint32_t TrackUpdate(uint8_t* base, uint32_t track, uint32_t frame, const GuestCall& call);
+// XACTTrack::CreateRpcs (sub_825D06B8) and StartRpcs (sub_825D0800): with
+// no RPCs (the sound's record's byte +0 without 0x4) nothing to do: 0, and
+// the sound for StartRpcs (r3 as the originals leave them). nullopt, with
+// nothing written, with RPCs (never in play: the original runs).
+std::optional<uint32_t> TrackCreateRpcs(uint8_t* base, uint32_t track);
+std::optional<uint32_t> TrackStartRpcs(uint8_t* base, uint32_t track);
+// XACTTrack::~XACTTrack (sub_825D0110): the vtable; the next instance (+28)
+// and the instance (+24) deleted (slot +0 with 1, through the guest call);
+// the RPC entries (+52, never in play) let go through the guest call as the
+// original does; XACT's base vtable. `frame` is this function's (96 bytes).
+// Returns the last r3.
+uint32_t TrackDestruct(uint8_t* base, uint32_t track, uint32_t frame, const GuestCall& call);
+// XACTTrack's deleting destructor (sub_825D0978): ~XACTTrack (a frame below
+// `frame`, this function's 112 bytes), then XMemFree(0x20848004) with
+// `flags` bit 0. Returns the track. Frees through the native layer: call it
+// only while hooks::NativeHeapActive().
+uint32_t TrackDeletingDestruct(uint8_t* base, uint32_t track, uint32_t flags, uint32_t frame,
+                               const GuestCall& call);
+
+// XACTPlayWaveEvent's deleting destructor (sub_825D8660, slot +0): the
+// vtable, the wave (+60) deleted (its slot +0 with 1, through the guest
+// call), the wave event base's vtable, ~XACTEvent, and XMemFree(0x2084800D)
+// with `flags` bit 0. `frame` is this function's (112 bytes). Returns the
+// event. Frees through the native layer: call it only while
+// hooks::NativeHeapActive().
+uint32_t PlayWaveDeletingDestruct(uint8_t* base, uint32_t event, uint32_t flags,
+                                  uint32_t frame, const GuestCall& call);
+// ApplyVariation (sub_825D7558, slot +96): own slot +92 (the variation
+// record); with one, sub_825D1478 (never seen in play: through the guest
+// call). `frame` is this function's (96 bytes). Returns the last r3.
+uint32_t PlayWaveApplyVariation(uint8_t* base, uint32_t event, uint32_t frame,
+                                const GuestCall& call);
+// GetDuration (sub_825D8870, slot +12): the cue's sound bank's wave bank of
+// the record's byte +10 (XACTSoundBank::GetWaveBank's plain C++ where it
+// answers and `native_heap`, else through the guest call); 0 without one;
+// 0x7FFFFFFF when the loop count (the record's byte +11) is 255; else the
+// wave's durations (XACTWaveBank::GetWaveDurations's plain C++ where it
+// answers, else through the guest call; to the frame's +84 and +80): the
+// count x the loop length + the duration in ms, or 0 on a failure. `frame`
+// is this function's (112 bytes).
+uint32_t PlayWaveGetDuration(uint8_t* base, uint32_t event, bool native_heap, uint32_t frame,
+                             const GuestCall& call);
 
 }  // namespace xact

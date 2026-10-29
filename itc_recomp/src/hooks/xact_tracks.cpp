@@ -5,6 +5,7 @@
 #include "hooks/xact_tracks.h"
 
 #include "base/flags.h"
+#include "hooks/heap.h"
 #include "hooks/xaudio.h"
 #include "xact/tracks.h"
 
@@ -19,6 +20,11 @@ ITC_FLAG_BOOL(native_xact_tracks, true, "ITC",
               "GetWaveBank sub_825D84C0, IsPrepared sub_825D76A0, IsPlaying sub_825D7708, IsBusy "
               "sub_825D81E8, Pause sub_825D8268, SetVolume sub_825D7FE0; "
               "XACTWaveVariationEvent::SetWave sub_825D7B78; XACTWave::SetVolume sub_825D1CC8; "
+              "XACTTrack::SetVolume sub_825D0BF8, UpdateVolume sub_825D0428, CreateRpcs "
+              "sub_825D06B8 and StartRpcs sub_825D0800 (without RPCs), XACTTrack sub_825D0CE0, "
+              "Update sub_825D0E30, ~XACTTrack sub_825D0110 and its deleting destructor "
+              "sub_825D0978; XACTPlayWaveEvent's deleting destructor sub_825D8660, "
+              "ApplyVariation sub_825D7558, GetDuration sub_825D8870; "
               "the objects' slots through their plain C++ while they hold it, the waves' and "
               "voices' through the guest call) natively instead of through the translated code "
               "(the same reads and writes; checked by --run_harnesses=xact_tracks)");
@@ -180,6 +186,106 @@ void XactWaveSetVolume(PPCContext& ctx, uint8_t* base) {
   });
 }
 
+void XactTrackSetVolume(PPCContext& ctx, uint8_t* base) {
+  ctx.fpscr.disableFlushMode();
+  const uint32_t track = ctx.r3.u32;
+  const double f1 = ctx.f1.f64;
+  bool declined = false;
+  Framed(ctx, base, 112, [&](const xaudio::GuestCall& call, uint32_t frame) {
+    const auto r3 = xact::TrackSetVolume(base, track, f1, frame, call);
+    declined = !r3;
+    return r3.value_or(0);
+  });
+  if (declined) {
+    ctx.r3.u64 = track;
+    ctx.f1.f64 = f1;
+    __imp__sub_825D0BF8(ctx, base);
+  }
+}
+
+void XactTrackUpdateVolume(PPCContext& ctx, uint8_t* base) {
+  ctx.fpscr.disableFlushMode();
+  const uint32_t track = ctx.r3.u32;
+  bool declined = false;
+  Framed(ctx, base, 112, [&](const xaudio::GuestCall& call, uint32_t frame) {
+    const auto r3 = xact::TrackUpdateVolume(base, track, frame, call);
+    declined = !r3;
+    return r3.value_or(0);
+  });
+  if (declined) {
+    ctx.r3.u64 = track;
+    __imp__sub_825D0428(ctx, base);
+  }
+}
+
+void XactTrackCreateRpcs(PPCContext& ctx, uint8_t* base) {
+  if (const auto r3 = xact::TrackCreateRpcs(base, ctx.r3.u32)) {
+    ctx.r3.u64 = *r3;
+    return;
+  }
+  __imp__sub_825D06B8(ctx, base);
+}
+
+void XactTrackStartRpcs(PPCContext& ctx, uint8_t* base) {
+  if (const auto r3 = xact::TrackStartRpcs(base, ctx.r3.u32)) {
+    ctx.r3.u64 = *r3;
+    return;
+  }
+  __imp__sub_825D0800(ctx, base);
+}
+
+void XactTrackConstruct(PPCContext& ctx, uint8_t* base) {
+  ctx.fpscr.disableFlushMode();
+  const uint32_t track = ctx.r3.u32, engine = ctx.r4.u32, sound = ctx.r5.u32,
+                 record = ctx.r6.u32, index = ctx.r7.u32;
+  Framed(ctx, base, 96, [&](const xaudio::GuestCall& call, uint32_t frame) {
+    return xact::TrackConstruct(base, track, engine, sound, record, index, frame, call);
+  });
+}
+
+void XactTrackUpdate(PPCContext& ctx, uint8_t* base) {
+  const uint32_t track = ctx.r3.u32;
+  Framed(ctx, base, 96, [&](const xaudio::GuestCall& call, uint32_t frame) {
+    return xact::TrackUpdate(base, track, frame, call);
+  });
+}
+
+void XactTrackDestruct(PPCContext& ctx, uint8_t* base) {
+  const uint32_t track = ctx.r3.u32;
+  Framed(ctx, base, 96, [&](const xaudio::GuestCall& call, uint32_t frame) {
+    return xact::TrackDestruct(base, track, frame, call);
+  });
+}
+
+void XactTrackDeletingDestruct(PPCContext& ctx, uint8_t* base) {
+  const uint32_t track = ctx.r3.u32, flags = ctx.r4.u32;
+  Framed(ctx, base, 112, [&](const xaudio::GuestCall& call, uint32_t frame) {
+    return xact::TrackDeletingDestruct(base, track, flags, frame, call);
+  });
+}
+
+void XactPlayWaveDeletingDestruct(PPCContext& ctx, uint8_t* base) {
+  const uint32_t event = ctx.r3.u32, flags = ctx.r4.u32;
+  Framed(ctx, base, 112, [&](const xaudio::GuestCall& call, uint32_t frame) {
+    return xact::PlayWaveDeletingDestruct(base, event, flags, frame, call);
+  });
+}
+
+void XactPlayWaveApplyVariation(PPCContext& ctx, uint8_t* base) {
+  const uint32_t event = ctx.r3.u32;
+  Framed(ctx, base, 96, [&](const xaudio::GuestCall& call, uint32_t frame) {
+    return xact::PlayWaveApplyVariation(base, event, frame, call);
+  });
+}
+
+void XactPlayWaveGetDuration(PPCContext& ctx, uint8_t* base) {
+  const uint32_t event = ctx.r3.u32;
+  const bool native_heap = NativeHeapActive();
+  Framed(ctx, base, 112, [&](const xaudio::GuestCall& call, uint32_t frame) {
+    return xact::PlayWaveGetDuration(base, event, native_heap, frame, call);
+  });
+}
+
 }  // namespace hooks
 
 // The flag's fallback, then the register step.
@@ -191,6 +297,18 @@ void XactWaveSetVolume(PPCContext& ctx, uint8_t* base) {
       return;                                  \
     }                                          \
     hooks::step(ctx, base);                    \
+  }
+
+// The same for a function freeing through the native layer: the original
+// unless --native_heap routes the game's heap there.
+#define ITC_XACT_TRACKS_HEAP_ADAPTER(address, step)                    \
+  extern "C" REX_FUNC(sub_##address) {                                 \
+    REX_FUNC_PROLOGUE();                                               \
+    if (!ITC_FLAG(native_xact_tracks) || !hooks::NativeHeapActive()) { \
+      __imp__sub_##address(ctx, base);                                 \
+      return;                                                          \
+    }                                                                  \
+    hooks::step(ctx, base);                                            \
   }
 
 ITC_XACT_TRACKS_ADAPTER(825D57D0, XactTrackInstanceConstruct)
@@ -221,3 +339,14 @@ ITC_XACT_TRACKS_ADAPTER(825D8268, XactPlayWavePause)
 ITC_XACT_TRACKS_ADAPTER(825D7FE0, XactPlayWaveSetVolume)
 // No adapter (removed 2026-10-29: only XACTPlayWaveEvent::SetVolume's plain C++ calls it in
 // play) for XACTWave::SetVolume sub_825D1CC8.
+ITC_XACT_TRACKS_ADAPTER(825D0BF8, XactTrackSetVolume)
+ITC_XACT_TRACKS_ADAPTER(825D0428, XactTrackUpdateVolume)
+ITC_XACT_TRACKS_ADAPTER(825D06B8, XactTrackCreateRpcs)
+ITC_XACT_TRACKS_ADAPTER(825D0800, XactTrackStartRpcs)
+ITC_XACT_TRACKS_ADAPTER(825D0CE0, XactTrackConstruct)
+ITC_XACT_TRACKS_ADAPTER(825D0E30, XactTrackUpdate)
+ITC_XACT_TRACKS_ADAPTER(825D0110, XactTrackDestruct)
+ITC_XACT_TRACKS_HEAP_ADAPTER(825D0978, XactTrackDeletingDestruct)
+ITC_XACT_TRACKS_HEAP_ADAPTER(825D8660, XactPlayWaveDeletingDestruct)
+ITC_XACT_TRACKS_ADAPTER(825D7558, XactPlayWaveApplyVariation)
+ITC_XACT_TRACKS_ADAPTER(825D8870, XactPlayWaveGetDuration)
