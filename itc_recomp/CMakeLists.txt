@@ -286,6 +286,8 @@ set(ITC_SOURCES
     src/hooks/xact_waves.cpp
     src/xact/voices.cpp
     src/xact/waves.cpp
+    src/hooks/xact_tracks.cpp
+    src/xact/tracks.cpp
     src/hooks/command_list.cpp
     src/command_list/command_list.cpp
     src/hooks/c_runtime.cpp
@@ -385,6 +387,7 @@ set(ITC_SOURCES
     src/harnesses/sound_cues.cpp
     src/harnesses/xact.cpp
     src/harnesses/xact_waves.cpp
+    src/harnesses/xact_tracks.cpp
     src/harnesses/input.cpp
     src/harnesses/c_runtime_exit.cpp
     src/helpers/debug_output.cpp
@@ -504,7 +507,8 @@ set_source_files_properties(src/c_runtime/math.cpp src/ui_movies/keys.cpp
     src/texture_compression/blitter.cpp src/texture_compression/compress_surface.cpp
     src/car_models/raster.cpp src/car_models/decals.cpp src/car_sounds/x3daudio.cpp
     src/car_sounds/car_sound_3d.cpp src/car_sounds/car_sound_voices.cpp
-    src/car_sounds/car_sound_parts.cpp src/xact/voices.cpp src/xact/waves.cpp PROPERTIES
+    src/car_sounds/car_sound_parts.cpp src/xact/voices.cpp src/xact/waves.cpp
+    src/xact/tracks.cpp PROPERTIES
     COMPILE_OPTIONS "-ffp-model=strict;-ffp-contract=off"
     SKIP_PRECOMPILE_HEADERS ON)
 
