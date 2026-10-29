@@ -52,7 +52,7 @@ goes in `src/` as overrides), American English.
   the leftovers above (the movie player, Voice::Init skipped as high as
   is safe), or the main thread's performance leads
   (`sub_821298C0`, `sub_8209C6E0`, in `docs/native-renderer.md`).
-- **B7 in progress (2026-10-28):** its measure is `b7_status.py`
+- **B7 in progress (2026-10-29):** its measure is `b7_status.py`
   (`docs/coverage.md`), and the B7 loop (`docs/loops/b7-loop.md`, a
   `/loop` session handing each subsystem to a mapping agent, then
   migration agents) did its first run on the branch `b7-loop-test` (merged 2026-10-22): five
@@ -142,7 +142,14 @@ goes in `src/` as overrides), American English.
   (`car-sounds.md`, 62 of 62), XAudio's voices (`xaudio.md`, 92 of 96;
   its locks the game's, taken as the original does, by the user's
   calls) and XACT's waves and voices (`xact-waves.md`, 22 of 30) native
-  (ours 2,804). The
+  (ours 2,804); its twenty-second run (branch `b7-loop-29-10-26`,
+  2026-10-29, 3 subsystems, not yet merged) made XACT's tracks and
+  events (`xact-tracks.md`, 55 of 55), XAudio's engine and mixer
+  (`xaudio-engine.md`, 47 of 47) and XAudio's factory objects
+  (`xaudio-objects.md`, 78 of 109) native, with QueryPerformanceCounter
+  from the host clock and the rest of XACT's waves (31 of 31) by the
+  user's calls; it stopped at a validation (two destructors with no
+  harness line) (ours 2,999). The
   runs' rows wait for the user's review (`docs/loops/review.md`). See
   "B7's loop runs" under B7, and `docs/loops/b7-progress.md`. Guest
   allocation is no longer a block (`docs/native-memory.md`); what the
@@ -2634,6 +2641,7 @@ B7. **The game logic inside**: everything else, subsystem by subsystem,
 | 2026-10-29 | XACT's waves and voices (XACT's voice class over XAudio's entry points, the waves' constructors, start positions, voices, play, pause, next and update, the tracks' volume and pitch getters; XACT's lock the game's, taken as the original does) | `xact-waves.md` | 22 of 30 in play (one migration; 16 adapters removed, 7 of XAudio's and 5 of `xact.md`'s); 31 of 31 since 2026-10-29 (`b7-loop-29-10-26`: the notifications, the release, Prepare and AudioUpdate, over QueryPerformanceCounter, ours) | `--native_xact_waves` |
 | 2026-10-29 | XACT's tracks and events (the tracks, track instances and events over the sound bank's records: their constructors, prepare, volume, pause, stop, cancel, destructors and RPC set-up; the play-wave event and the wave's slot forwarders; `XACTSound::ScheduleEvent`; XACT's lock the game's, taken as the original does) | `xact-tracks.md` (with a row in `xact.md`) | 55 of 55 in play (three migrations; QueryPerformanceCounter from the host clock and `XACTGetTimeMs` under it, the user's call) | `--native_xact_tracks` |
 | 2026-10-29 | XAudio's engine and mixer (the engine's and factory's making, the processors' set-up, the mastering voice and its render driver, the stages, their callbacks and commit, the allocator; the voice lists' spin lock taken as the original does) | `xaudio-engine.md` | 47 of 47 in play (two migrations; the threads, events and semaphore through the kernel's imports as the original, the user's call) | `--native_xaudio_engine` |
+| 2026-10-29 | XAudio's factory objects (the class tables, the codecs' packet queue and the PCM and XMA codecs' slots the voices call, the output matrices' set and mix, the volume meter, the render driver's set-up, the reverb's small parts; the XMA hardware path left in `audio.md`) | `xaudio-objects.md` (with 4 rows in `xaudio.md`) | 78 of 109 in play (one migration, stopped at its validation: two destructors with no harness line; the resampler and the reverb's core ready, not taken) | `--native_xaudio_objects` |
 
     The first run (2026-10-22, branch `b7-loop-test`): every harness at 0 differing, attract races at 20-21 s with no errors,
     and a race the user drove looked right. Ours went from 162 to 335 (work
@@ -3972,3 +3980,22 @@ live 236. Imports: 186 called, 58 with a live caller (from 62). B7
 (`b7_status.py`): ours 2,919, work left 3,398 (Wrapped 104, with a
 row 503, no row yet 2,791; the user's coverage commit cf7114c took 148
 stale entries out of the list), from 3,572.
+
+**2026-10-29, XAudio's factory objects (branch `b7-loop-29-10-26`):**
+the twenty-second run's third subsystem mapped the objects XAudio's
+factory makes (`xaudio-objects.md`, 121 rows, 109 in play: the class
+tables, the codecs' packet queue, the PCM and XMA codecs, the
+resampler, the output matrices, the reverb, the volume meter; the XAPO
+lead with them) and made 78 native in one migration
+(`--native_xaudio_objects`, `src/xaudio/objects.cpp`), with
+`XAudioRegisterProcessingCallback` and `XAudio::Commit` (`xaudio.md`,
+94 of 96). The run stopped at its validation: the XMA codec's two
+destructors (`sub_8246A918`, `sub_8246AAD0`) ran in play but their
+harness case calls the original release directly. Ready and not taken:
+the resampler (`sub_8246F140` and its kernels, which `PcmCodec::Process`
+waits on) and the reverb's core (`ReverbCore::Process` and its stages,
+3,829 lines, `Init`, `Apply`). The boundary: 449 functions (916 pairs):
+overridden 110, Native 28, Dropped 23, never called 70, live 218.
+Imports: 186 called, 58 with a live caller. B7 (`b7_status.py`): ours
+2,999, work left 3,318 (Wrapped 104, with a row 532, no row yet 2,682),
+from 3,398 (from 3,660 at the run's start).

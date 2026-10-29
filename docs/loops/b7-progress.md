@@ -24,10 +24,16 @@ file's history. What's left to see in a drive, from every run:
 - Subsystem 3 of 3: XAudio's factory objects and codecs (`leads.md`,
   with the XAPO lead). Map a611121 checked (`xaudio-objects.md`, 121
   rows, 109 in play, 86 ready groups). Migration 1 checked (78 of 109
-  ours, 32c197d..4c32e78; `xaudio.md` 94 of 96). Step: validation
-  agent running.
+  ours, 32c197d..4c32e78; `xaudio.md` 94 of 96). Its validation
+  reported two functions missing: stopped (below).
 
 ## Done
+
+- XAudio's factory objects: `xaudio-objects.md`, 78 of 109 in play
+  native in one migration (20 Native from the start), with 4 in
+  `xaudio.md`; `--native_xaudio_objects`; a611121, 32c197d..4c32e78,
+  prints 259d68e, e3708da. Validated (`itc_2518`, `itc_2519`): 80 of 82
+  harness lines; four to drive.
 
 - The continuations: QueryPerformanceCounter (the host clock),
   `XACTGetTimeMs`, XACT's tracks 55 of 55, waves 31 of 31 (`Fire`'s,
@@ -104,3 +110,20 @@ file's history. What's left to see in a drive, from every run:
 - After XAudio's objects' migration 1 (`itc_2514`: race 38 s, 0 errors,
   xaudio, xaudio_engine, xaudio_objects 0 differing): ours 2999, work
   left 3318 (wrapped 104, known 532, unknown 2682).
+- After its validation (`itc_2518`: race 7 s, 0 errors, every harness
+  0 differing but the expected groups): ours 2999, work left 3318.
+
+## Stopped
+
+2026-10-29, at XAudio's objects' validation (subsystem 3 of 3): two
+functions made native have no harness line ("When to halt"):
+`sub_8246A918` (the XMA codec's inner destructor) and `sub_8246AAD0`
+`XmaCodec::~XmaCodec`. Both ran in play (`itc_2518`), but the XMA
+cases of `XAudioCodec::Create` (`src/harnesses/xaudio_objects.cpp`,
+about line 485) release the codec through `__imp__sub_8246A758`, the
+original's release, so `xa::XmaCodecDestroy` never runs under a
+harness. To fix: release through the native path in that case (or add
+cases of their own). Ready and not taken: the resampler and the
+reverb's core. Every harness was at 0 differing. Two user's calls on
+the way (XAudio's kernel objects; QueryPerformanceCounter).
+`check_function_statuses.py`: 0 errors. To drive: `to-drive.md`.

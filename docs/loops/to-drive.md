@@ -23,6 +23,11 @@ here loses its heading.
   region start" twice at a transition ~118 s in, the intermittent pair
   seen before in `itc_1528` and `itc_1719`; it ran to the end):
   `sub_825D1FD8` XACTWave::Finish (`xact-waves.md`)
+- XAudio's objects' migration 1 (attract race `itc_2518`, replay
+  `itc_2519`, ok): `sub_82469E58` CodecBase::SetFormat, `sub_8246D1E0`
+  PcmCodec::SetFrequencyRatio, `sub_8246D320` (the PCM base's
+  SetFrequencyRatio), `sub_8246CFA8` PcmCodec::SetFormat
+  (`xaudio-objects.md`)
 
 ## Run 2026-10-28 22:22 (`b7-loop-28-10-26-3`)
 

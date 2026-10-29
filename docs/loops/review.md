@@ -49,6 +49,11 @@ When the user has reviewed a run's section, its heading gets
   xaudio or xaudio_engine harnesses: 4-7 silence fills in the first
   10 s, also with `--native_xaudio_objects=false` (the harnesses holding
   the mixer's lock). Left: the resampler and the reverb's core (ready).
+  Its validation added a print per address in the reverb's delay line
+  fills (259d68e) and one on `XmaCodec::SubmitRegion`'s E_NOTIMPL return
+  (e3708da), and stopped the run: the XMA codec's destructors
+  `sub_8246A918` and `sub_8246AAD0` have no harness line (the
+  `XAudioCodec::Create` XMA cases release through `__imp__sub_8246A758`).
 - The user's calls (2026-10-29), asked by the lead: XAudio's own
   threads, events, semaphore and title terminate notification are used
   by native code through their imports exactly as the original does

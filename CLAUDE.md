@@ -351,6 +351,20 @@ game's, taken natively as the original does, until every user is
 native (then host recursive locks with a readable depth); the rest
 waits on XAudio's engine and mixer, the codecs, XACT's notifications
 and `QueryPerformanceCounter`.
+Its twenty-second run (`b7-loop-29-10-26`, 2026-10-29, not yet merged;
+summary `docs/loops/b7-loop-2026-10-29-1544.md`; 3 subsystems, stopped
+at a validation: the XMA codec's two destructors had no harness line)
+made XACT's tracks and events (`xact-tracks.md`, `--native_xact_tracks`,
+55 of 55), XAudio's engine and mixer (`xaudio-engine.md`,
+`--native_xaudio_engine`, 47 of 47) and XAudio's factory objects
+(`xaudio-objects.md`, `--native_xaudio_objects`, 78 of 109: the codecs'
+packet queue and slots, the matrices, the meter) native, with XACT's
+waves 31 of 31 (ours 2,804 -> 2,999); by the user's calls (2026-10-29),
+QueryPerformanceCounter is answered from the host clock at 50 MHz (as
+GetTickCount), and XAudio's own threads, events and semaphore are used
+through the kernel's imports as the original does. The rest waits on
+the resampler and the reverb's core (ready, not taken) and XAudio's
+shut-down.
 Harness runs use `attract_race.sh 40` (the user's call,
 2026-10-23); a race short only because the harnesses took longer is
 no halt. B7 loop migration agents run only their subsystem's harnesses
