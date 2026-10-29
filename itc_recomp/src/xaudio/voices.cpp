@@ -229,12 +229,21 @@ Regs At(uint32_t sp, Regs regs) {
 uint32_t Below(uint8_t* base, uint32_t frame, uint32_t bytes) {
   const uint32_t below = frame - bytes;
   guest::StoreU32(base, below, frame);
+  uint32_t& floor = StackFloor();
+  if (floor == 0 || below < floor) {
+    floor = below;
+  }
   return below;
 }
 
 constexpr uint32_t kOne = 0x82000A30;  // 1.0f
 
 }  // namespace
+
+uint32_t& StackFloor() {
+  thread_local uint32_t floor = 0;
+  return floor;
+}
 
 uint32_t Method(uint8_t* base, uint32_t object, uint32_t slot) {
   return guest::LoadU32(base, guest::LoadU32(base, object) + slot);
@@ -503,7 +512,7 @@ std::optional<uint32_t> BufferConstruct(uint8_t* base, uint32_t buffer, uint32_t
 uint32_t BufferCreate(uint8_t* base, uint32_t format, uint32_t allocator, uint32_t out,
                       const GuestCall& call) {
   ITC_NATIVE_RUNNING("sub_8245FA80 XAudioBuffer::Create");
-  const uint32_t memory = call(Method(base, allocator, 20), 0x8245FAB0, Args({allocator, 36}));
+  const uint32_t memory = call(Method(base, allocator, 20), 0x8245FAB0, Args({allocator, 36, out}));
   if (memory == 0) {
     return 0x8007000Eu;  // E_OUTOFMEMORY
   }
@@ -800,6 +809,246 @@ uint32_t ProcessEffect(uint8_t* base, uint32_t entry, uint32_t inout, uint32_t p
   }
   const uint32_t effect = guest::LoadU32(base, entry);
   return call(Method(base, effect, 24), 0x82461788, At(frame, Args({effect, r4, r5})));
+}
+
+// --- Making a voice and its passes (lock-free) ---
+
+namespace {
+
+// memcpy's plain C++, or its original (through the translated code, at
+// `sp`) where that refuses.
+void Copy(uint8_t* base, uint32_t destination, uint32_t source, uint32_t size,
+          uint32_t return_address, uint32_t sp, const GuestCall& call) {
+  if (!c_runtime::Memcpy(base, destination, source, size)) {
+    call(kMemcpy, return_address, At(sp, Args({destination, source, size})));
+  }
+}
+
+// A float word copied through a float register, as lfs and stfs do in the
+// translated code (a signaling NaN comes out quiet).
+void CopyFloat(uint8_t* base, uint32_t destination, uint32_t source) {
+  volatile double value = guest::LoadFloat(base, source);
+  guest::StoreFloat(base, destination, float(value));
+}
+
+// The codec's description (SourceSize's and SourceInit's) at `local`.
+void CodecDescription(uint8_t* base, uint32_t description, uint32_t local,
+                      uint32_t return_address, uint32_t sp, const GuestCall& call) {
+  for (uint32_t i = 0; i < 80; i += 4) {
+    guest::StoreU32(base, local + i, 0);
+  }
+  guest::StoreU8(base, local, 0);
+  guest::StoreU32(base, local + 4, guest::LoadU32(base, description + 88));
+  Copy(base, local + 8, description, 56, return_address, sp, call);
+  CopyFloat(base, local + 64, description + 60);
+  guest::StoreU8(base, local + 68, guest::LoadU8(base, description + 59));
+  guest::StoreU8(base, local + 69, guest::LoadU8(base, description + 64));
+  guest::StoreU32(base, local + 72, guest::LoadU32(base, description + 80));
+  guest::StoreU32(base, local + 76, guest::LoadU32(base, description + 84));
+}
+
+}  // namespace
+
+uint32_t SourceSize(uint8_t* base, uint32_t description, uint32_t out, uint32_t frame,
+                    const GuestCall& call) {
+  ITC_NATIVE_RUNNING("sub_8245E0D8 XAudioSourceVoice::Size");
+  const uint32_t factory = guest::LoadU32(base, guest::LoadU32(base, kEngine) + 60);
+  SourceDescribe(base, description, frame + 96);
+  if (int32_t(OutputsSize(base, frame + 96, frame + 80, Below(base, frame, 144), call)) < 0) {
+    return 0;
+  }
+  CodecDescription(base, description, frame + 128, 0x8245E14C, frame, call);
+  uint32_t function = 0;
+  const uint32_t object = FactorySizeThunk(base, factory, &function);
+  const uint32_t r3 = call(function, 0x8245E184, At(frame, Args({object, frame + 128, frame + 84})));
+  if (int32_t(r3) >= 0) {
+    guest::StoreU32(base, out, guest::LoadU32(base, frame + 84) + guest::LoadU32(base, frame + 80));
+  }
+  return 0;
+}
+
+uint32_t CreateEffects(uint8_t* base, uint32_t voice, uint32_t chain, uint32_t frame,
+                       const GuestCall& call) {
+  ITC_NATIVE_RUNNING("sub_82461600 XAudioVoice::CreateEffects");
+  uint32_t r3 = 0;
+  const uint32_t below = Below(base, frame, 128);
+  for (uint32_t i = 0; i < guest::LoadU8(base, chain); i = (i + 1) & 0xFF) {
+    if (int32_t(r3) < 0) {
+      break;
+    }
+    r3 = CreateObject(base, voice, guest::LoadU32(base, voice + 36) + 8 * i,
+                      guest::LoadU32(base, guest::LoadU32(base, chain + 4) + 4 * i), i, below,
+                      call);
+  }
+  return r3;
+}
+
+uint32_t InitBase(uint8_t* base, uint32_t voice, uint32_t description, uint32_t frame,
+                  const GuestCall& call) {
+  ITC_NATIVE_RUNNING("sub_82461D50 XAudioVoice::InitBase");
+  guest::StoreU32(base, voice + 44, guest::LoadU32(base, description + 16));
+  guest::StoreU32(base, voice + 48, guest::LoadU32(base, description + 20));
+  guest::StoreU32(base, voice + 52, guest::LoadU32(base, description));
+  guest::StoreU32(base, voice + 56, guest::LoadU32(base, description + 4));
+  const uint32_t chain = guest::LoadU32(base, description + 8);
+  guest::StoreU8(base, voice + 60, chain != 0 ? guest::LoadU8(base, chain) : 0);
+  uint32_t r28 = 0;
+  const uint32_t buffer = guest::LoadU32(base, description + 12);
+  if (buffer != 0) {
+    guest::StoreU32(base, voice + 32, buffer);
+    uint32_t function = 0;
+    const uint32_t object = BufferAddRefThunk(base, buffer, &function);
+    call(function, 0x82461DCC, At(frame, Args({object})));
+  } else {
+    // A format of the description's channels at 48 kHz.
+    const uint32_t local = frame + 80;
+    for (uint32_t i = 0; i < 20; i += 4) {
+      guest::StoreU32(base, local + i, 0);
+    }
+    guest::StoreU8(base, local + 5, guest::LoadU8(base, description + 1));
+    guest::StoreU32(base, local + 8, kSampleRate);
+    r28 = BufferCreate(base, local, guest::LoadU32(base, voice + 8), voice + 32, call);
+    if (int32_t(r28) < 0) {
+      return r28;
+    }
+  }
+  const uint32_t effects = guest::LoadU8(base, voice + 60);
+  if (effects == 0) {
+    return r28;
+  }
+  const uint32_t allocator = guest::LoadU32(base, voice + 8);
+  const uint32_t entries =
+      call(Method(base, allocator, 20), 0x82461E3C, At(frame, Args({allocator, effects * 8})));
+  guest::StoreU32(base, voice + 36, entries);
+  if (entries == 0) {
+    return 0x8007000Eu;  // E_OUTOFMEMORY
+  }
+  if (guest::LoadU8(base, voice + 60) == 0) {
+    return 0;
+  }
+  return CreateEffects(base, voice, guest::LoadU32(base, description + 8),
+                       Below(base, frame, 112), call);
+}
+
+uint32_t InitOutputs(uint8_t* base, uint32_t voice, uint32_t description, uint32_t frame,
+                     const GuestCall& call) {
+  ITC_NATIVE_RUNNING("sub_82460880 XAudioVoice::InitOutputs");
+  guest::StoreU8(base, voice + 68, guest::LoadU8(base, description + 24));
+  uint32_t r3 = InitBase(base, voice, description, Below(base, frame, 144), call);
+  if (int32_t(r3) < 0) {
+    return r3;
+  }
+  const uint32_t outputs = guest::LoadU8(base, voice + 68);
+  if (outputs != 0) {
+    const uint32_t allocator = guest::LoadU32(base, voice + 8);
+    const uint32_t slots =
+        call(Method(base, allocator, 20), 0x824608D8, At(frame, Args({allocator, outputs * 12})));
+    guest::StoreU32(base, voice + 72, slots);
+    if (slots == 0) {
+      return 0x8007000Eu;  // E_OUTOFMEMORY
+    }
+    r3 = 0;
+  }
+  if (guest::LoadU8(base, voice + 68) != 0) {
+    // The matrix objects' description: type 1, +4 the voice, +8 the
+    // outputs' channels.
+    const uint32_t local = frame + 80;
+    for (uint32_t i = 0; i < 16; i += 4) {
+      guest::StoreU32(base, local + i, 0);
+    }
+    guest::StoreU8(base, local + 8, guest::LoadU8(base, description + 25));
+    guest::StoreU32(base, local + 4, voice);
+    guest::StoreU8(base, local, 1);
+    const uint32_t below = Below(base, frame, 128);
+    for (uint32_t i = 0; i < guest::LoadU8(base, voice + 68); i++) {
+      if (int32_t(r3) < 0) {
+        return r3;
+      }
+      r3 = CreateObject(base, voice, guest::LoadU32(base, voice + 72) + 12 * i + 4, local, 255,
+                        below, call);
+    }
+  }
+  if (int32_t(r3) < 0) {
+    return r3;
+  }
+  return call(Method(base, voice, 36), 0x8246097C,
+              At(frame, Args({voice, guest::LoadU32(base, description + 28)})));
+}
+
+uint32_t SourceInit(uint8_t* base, uint32_t voice, uint32_t description, uint32_t frame,
+                    const GuestCall& call) {
+  ITC_NATIVE_RUNNING("sub_8245E348 XAudioSourceVoice::Init");
+  Copy(base, voice + 84, description, 56, 0x8245E370, frame, call);
+  guest::StoreU8(base, voice + 144, guest::LoadU8(base, description + 56));
+  SourceDescribe(base, description, frame + 80);
+  const uint32_t r3 = InitOutputs(base, voice, frame + 80, Below(base, frame, 144), call);
+  if (int32_t(r3) < 0) {
+    return r3;
+  }
+  CodecDescription(base, description, frame + 112, 0x8245E3D0, frame, call);
+  return CreateObject(base, voice, voice + 76, frame + 112, 255, Below(base, frame, 128), call);
+}
+
+uint32_t SubmixInit(uint8_t* base, uint32_t voice, uint32_t description, uint32_t frame,
+                    const GuestCall& call) {
+  ITC_NATIVE_RUNNING("sub_8245F230 XAudioSubmixVoice::Init");
+  SubmixDescribe(base, description, frame + 80);
+  const uint32_t r3 = InitOutputs(base, voice, frame + 80, Below(base, frame, 144), call);
+  if (int32_t(r3) >= 0) {
+    const uint32_t buffer = guest::LoadU32(base, voice + 32);
+    if (!BufferClearThunk(base, buffer, 0, 3)) {
+      call(0x8245FA10, 0x8245F27C, At(frame, Args({buffer, 0, 3})));
+    }
+  }
+  return r3;
+}
+
+uint32_t ProcessEffects(uint8_t* base, uint32_t voice, uint32_t inout, uint32_t processor,
+                        uint32_t frame, const GuestCall& call) {
+  ITC_NATIVE_RUNNING("sub_82461E88 XAudioVoice::ProcessEffects");
+  uint32_t r3 = 0;
+  const uint32_t below = Below(base, frame, 96);
+  for (uint32_t i = 0; i < guest::LoadU8(base, voice + 60); i = (i + 1) & 0xFF) {
+    if (int32_t(r3) < 0) {
+      break;
+    }
+    r3 = ProcessEffect(base, guest::LoadU32(base, voice + 36) + 8 * i, inout, processor, below,
+                       call);
+  }
+  return r3;
+}
+
+uint32_t MixToOutputs(uint8_t* base, uint32_t voice, uint32_t inout, uint32_t processor,
+                      uint32_t frame, const GuestCall& call) {
+  ITC_NATIVE_RUNNING("sub_82460CB8 XAudioVoice::MixToOutputs");
+  uint32_t r3 = ProcessEffects(base, voice, inout, processor, Below(base, frame, 112), call);
+  for (uint32_t i = 0; i < guest::LoadU8(base, voice + 69); i++) {
+    if (int32_t(r3) < 0) {
+      break;
+    }
+    const uint32_t slot = guest::LoadU32(base, voice + 72) + 12 * i;
+    const uint32_t target = guest::LoadU32(base, slot);
+    const uint32_t buffer = call(Method(base, target, 72), 0x82460D08, At(frame, Args({target})));
+    const uint32_t matrix = guest::LoadU32(base, guest::LoadU32(base, voice + 72) + 12 * i + 4);
+    r3 = call(Method(base, matrix, 24), 0x82460D30,
+              At(frame, Args({matrix, guest::LoadU32(base, inout), buffer})));
+  }
+  return r3;
+}
+
+uint32_t SubmixPass(uint8_t* base, uint32_t voice, uint32_t frame, const GuestCall& call) {
+  ITC_NATIVE_RUNNING("sub_8245EFA0 XAudioSubmixVoice::Pass");
+  const uint32_t r30 = Pass(base, voice, Below(base, frame, 112), call);
+  if (int32_t(r30) < 0) {
+    return r30;
+  }
+  const uint32_t iface = guest::LoadU32(base, voice + 32);
+  const uint32_t buffer = iface != 0 ? iface - 8 : 0;
+  if (!BufferClear(base, buffer, voice + 52, 3)) {
+    call(0x8245F8E8, 0x8245EFE8, At(frame, Args({buffer, voice + 52, 3})));
+  }
+  AddStat(base, 1, 1);
+  return r30;
 }
 
 }  // namespace xaudio

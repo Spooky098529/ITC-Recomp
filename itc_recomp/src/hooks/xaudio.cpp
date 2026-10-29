@@ -32,7 +32,10 @@ ITC_FLAG_BOOL(native_xaudio, true, "ITC",
               "outputs' ConstructOutputs sub_82460738, OutputsSize sub_824607C8, SetOutput "
               "sub_82460998 and SetOutputVoices sub_82460BF0 (with sub_8245F228), Pass "
               "sub_82461070, Destroy sub_82461240, CreateObject sub_82461308 and ProcessEffect "
-              "sub_82461678; their "
+              "sub_82461678; XAudioSourceVoice::Size sub_8245E0D8 and Init sub_8245E348, "
+              "XAudioVoice::CreateEffects sub_82461600, InitBase sub_82461D50 and InitOutputs "
+              "sub_82460880, XAudioSubmixVoice::Init sub_8245F230 and Pass sub_8245EFA0, "
+              "ProcessEffects sub_82461E88 and MixToOutputs sub_82460CB8; their "
               "calls into the recompiled objects through the translated code) natively "
               "instead of through the translated code (the same reads and writes; XAudio's two "
               "locks stay the game's; checked by --run_harnesses=xaudio)");
@@ -115,6 +118,8 @@ xa::GuestCall Caller(PPCContext& ctx, uint8_t* base) {
     const uint64_t sp = ctx.r1.u64;
     if (regs.sp != 0) {
       ctx.r1.u64 = regs.sp;
+    } else if (xa::StackFloor() != 0 && xa::StackFloor() < ctx.r1.u32) {
+      ctx.r1.u64 = xa::StackFloor();
     }
     REX_CALL_INDIRECT_FUNC(function);
     ctx.r1.u64 = sp;
@@ -127,6 +132,8 @@ template <typename Body>
 void Framed(PPCContext& ctx, uint8_t* base, uint32_t frame_bytes, Body body) {
   const uint64_t lr = ctx.lr;
   uint32_t r3 = 0;
+  const uint32_t floor = xa::StackFloor();
+  xa::StackFloor() = 0;
   guest_call::InFrame(ctx, base, frame_bytes, uint32_t(lr), [&](uint32_t frame) {
     if constexpr (std::is_invocable_v<Body, const xa::GuestCall&, uint32_t>) {
       r3 = body(Caller(ctx, base), frame);
@@ -134,6 +141,7 @@ void Framed(PPCContext& ctx, uint8_t* base, uint32_t frame_bytes, Body body) {
       r3 = body(Caller(ctx, base));
     }
   });
+  xa::StackFloor() = floor;
   ctx.lr = lr;
   ctx.r3.u64 = r3;
 }
@@ -372,6 +380,71 @@ void XAudioProcessEffect(PPCContext& ctx, uint8_t* base) {
   });
 }
 
+void XAudioSourceSize(PPCContext& ctx, uint8_t* base) {
+  const uint32_t r3 = ctx.r3.u32, r4 = ctx.r4.u32;
+  Framed(ctx, base, 240, [&](const xa::GuestCall& call, uint32_t frame) {
+    return xa::SourceSize(base, r3, r4, frame, call);
+  });
+}
+
+void XAudioCreateEffects(PPCContext& ctx, uint8_t* base) {
+  const uint32_t r3 = ctx.r3.u32, r4 = ctx.r4.u32;
+  Framed(ctx, base, 112, [&](const xa::GuestCall& call, uint32_t frame) {
+    return xa::CreateEffects(base, r3, r4, frame, call);
+  });
+}
+
+void XAudioInitBase(PPCContext& ctx, uint8_t* base) {
+  const uint32_t r3 = ctx.r3.u32, r4 = ctx.r4.u32;
+  Framed(ctx, base, 144, [&](const xa::GuestCall& call, uint32_t frame) {
+    return xa::InitBase(base, r3, r4, frame, call);
+  });
+}
+
+void XAudioInitOutputs(PPCContext& ctx, uint8_t* base) {
+  const uint32_t r3 = ctx.r3.u32, r4 = ctx.r4.u32;
+  Framed(ctx, base, 144, [&](const xa::GuestCall& call, uint32_t frame) {
+    return xa::InitOutputs(base, r3, r4, frame, call);
+  });
+}
+
+void XAudioSourceInit(PPCContext& ctx, uint8_t* base) {
+  const uint32_t r3 = ctx.r3.u32, r4 = ctx.r4.u32;
+  Framed(ctx, base, 224, [&](const xa::GuestCall& call, uint32_t frame) {
+    return xa::SourceInit(base, r3, r4, frame, call);
+  });
+}
+
+void XAudioSubmixInit(PPCContext& ctx, uint8_t* base) {
+  const uint32_t r3 = ctx.r3.u32, r4 = ctx.r4.u32;
+  Framed(ctx, base, 144, [&](const xa::GuestCall& call, uint32_t frame) {
+    return xa::SubmixInit(base, r3, r4, frame, call);
+  });
+}
+
+void XAudioProcessEffects(PPCContext& ctx, uint8_t* base) {
+  const uint32_t r3 = ctx.r3.u32, r4 = ctx.r4.u32;
+  const uint32_t processor = guest::LoadU8(base, ctx.r13.u32 + xa::kPcrProcessor);
+  Framed(ctx, base, 112, [&](const xa::GuestCall& call, uint32_t frame) {
+    return xa::ProcessEffects(base, r3, r4, processor, frame, call);
+  });
+}
+
+void XAudioMixToOutputs(PPCContext& ctx, uint8_t* base) {
+  const uint32_t r3 = ctx.r3.u32, r4 = ctx.r4.u32;
+  const uint32_t processor = guest::LoadU8(base, ctx.r13.u32 + xa::kPcrProcessor);
+  Framed(ctx, base, 128, [&](const xa::GuestCall& call, uint32_t frame) {
+    return xa::MixToOutputs(base, r3, r4, processor, frame, call);
+  });
+}
+
+void XAudioSubmixPass(PPCContext& ctx, uint8_t* base) {
+  const uint32_t r3 = ctx.r3.u32;
+  Framed(ctx, base, 112, [&](const xa::GuestCall& call, uint32_t frame) {
+    return xa::SubmixPass(base, r3, frame, call);
+  });
+}
+
 }  // namespace hooks
 
 #define ITC_XAUDIO_ADAPTER(address, step)   \
@@ -416,3 +489,12 @@ ITC_XAUDIO_ADAPTER(82461070, XAudioPass)
 ITC_XAUDIO_ADAPTER(82461240, XAudioDestroy)
 ITC_XAUDIO_ADAPTER(82461308, XAudioCreateObject)
 ITC_XAUDIO_ADAPTER(82461678, XAudioProcessEffect)
+ITC_XAUDIO_ADAPTER(8245E0D8, XAudioSourceSize)
+ITC_XAUDIO_ADAPTER(82461600, XAudioCreateEffects)
+ITC_XAUDIO_ADAPTER(82461D50, XAudioInitBase)
+ITC_XAUDIO_ADAPTER(82460880, XAudioInitOutputs)
+ITC_XAUDIO_ADAPTER(8245E348, XAudioSourceInit)
+ITC_XAUDIO_ADAPTER(8245F230, XAudioSubmixInit)
+ITC_XAUDIO_ADAPTER(82461E88, XAudioProcessEffects)
+ITC_XAUDIO_ADAPTER(82460CB8, XAudioMixToOutputs)
+ITC_XAUDIO_ADAPTER(8245EFA0, XAudioSubmixPass)

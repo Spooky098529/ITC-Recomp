@@ -105,6 +105,14 @@ struct Regs {
 };
 using GuestCall = std::function<uint32_t(uint32_t function, uint32_t return_address, const Regs&)>;
 
+// The lowest frame plain C++ has made below its adapter's on this thread (0:
+// none), lowered by each frame a plain C++ function makes for a plain C++
+// callee. A call without its own stack pointer (Regs::sp 0) runs below it,
+// so a callee's frame never covers a nested function's locals, whichever
+// plain C++ made the call. Each adapter's frame saves and clears it, and
+// puts it back.
+uint32_t& StackFloor();
+
 // The method at `slot` of the vtable of the object at `object`.
 uint32_t Method(uint8_t* base, uint32_t object, uint32_t slot);
 
@@ -328,5 +336,84 @@ uint32_t CreateObject(uint8_t* base, uint32_t voice, uint32_t entry, uint32_t de
 // function's (96 bytes). Returns its r3.
 uint32_t ProcessEffect(uint8_t* base, uint32_t entry, uint32_t inout, uint32_t processor,
                        uint32_t frame, const GuestCall& call);
+
+// --- Making a voice and its passes (lock-free) ---
+
+constexpr uint32_t kMemcpy = 0x825A7410;
+
+// XAudioSourceVoice::Size (sub_8245E0D8): the size of a source voice for the
+// source description at `description` to [out]: the voice's description
+// (SourceDescribe at the frame's +96), its outputs' (OutputsSize, at +80, in
+// its own frame below) and the codec's (the factory's slot +20 for the
+// codec's description at +128: +4 the callback context (+88), +8 the
+// 56-byte format, +64 the float +60, +68 the bytes +59 and +64, +72 the
+// words +80 and +84; the size at +84). `frame` is this function's (240
+// bytes). Returns 0, also on a failure (the original's).
+uint32_t SourceSize(uint8_t* base, uint32_t description, uint32_t out, uint32_t frame,
+                    const GuestCall& call);
+
+// XAudioVoice::CreateEffects (sub_82461600): each of the chain's (count
+// byte +0, +4 the descriptions) effects made into +36 + 8i (CreateObject,
+// the flag its index, in a frame below `frame`, 112 bytes) until one fails.
+// Returns the last r3 (0 with none).
+uint32_t CreateEffects(uint8_t* base, uint32_t voice, uint32_t chain, uint32_t frame,
+                       const GuestCall& call);
+
+// XAudioVoice::InitBase (sub_82461D50): from the voice description at
+// `description`: +44 the callback, +48 its context, +52 the format, +60 the
+// effect count; the output buffer given (+12, AddRef'd through its
+// interface's thunk) or made (XAudioBuffer::Create for a format of the
+// channels at 48 kHz at the frame's +80) into +32; the effects' entries
+// from the allocator's slot +20 into +36 and made (CreateEffects).
+// `frame` is this function's (144 bytes). Returns the last r3, 0, or
+// E_OUTOFMEMORY.
+uint32_t InitBase(uint8_t* base, uint32_t voice, uint32_t description, uint32_t frame,
+                  const GuestCall& call);
+
+// XAudioVoice::InitOutputs (sub_82460880): +68 the output count (+24),
+// InitBase, the outputs' 12-byte slots from the allocator's slot +20 into
+// +72, a matrix object made into each (CreateObject for a description at
+// the frame's +80: type 1, +4 the voice, +8 the channels +25; the flag
+// 255), then the voice's slot +36 (set output voices) with the outputs
+// (+28). `frame` is this function's (144 bytes). Returns the last r3, or
+// E_OUTOFMEMORY.
+uint32_t InitOutputs(uint8_t* base, uint32_t voice, uint32_t description, uint32_t frame,
+                     const GuestCall& call);
+
+// XAudioSourceVoice::Init (sub_8245E348): the 56-byte format to +84, +144
+// the category (+56), the voice's description (SourceDescribe at the
+// frame's +80), InitOutputs, then the codec made into +76 (CreateObject for
+// the codec's description at +112, as SourceSize's; the flag 255).
+// memcpy's plain C++, or its original where that refuses. `frame` is this
+// function's (224 bytes). Returns the last r3.
+uint32_t SourceInit(uint8_t* base, uint32_t voice, uint32_t description, uint32_t frame,
+                    const GuestCall& call);
+
+// XAudioSubmixVoice::Init (sub_8245F230): the voice's description
+// (SubmixDescribe at the frame's +80), InitOutputs, and when that succeeds
+// its buffer cleared (ClearThunk with flags 3, its original where it
+// refuses). `frame` is this function's (144 bytes). Returns InitOutputs'
+// r3.
+uint32_t SubmixInit(uint8_t* base, uint32_t voice, uint32_t description, uint32_t frame,
+                    const GuestCall& call);
+
+// XAudioVoice::ProcessEffects (sub_82461E88): ProcessEffect for each effect
+// (+36 + 8i, +60 of them) over [inout] until one fails. `frame` is this
+// function's (112 bytes). Returns the last r3 (0 with none).
+uint32_t ProcessEffects(uint8_t* base, uint32_t voice, uint32_t inout, uint32_t processor,
+                        uint32_t frame, const GuestCall& call);
+
+// XAudioVoice::MixToOutputs (sub_82460CB8): ProcessEffects, then for each
+// output (+69) until one fails, the target's slot +72 (its input buffer)
+// and the matrix object's slot +24 with [inout] and that buffer. `frame` is
+// this function's (128 bytes). Returns the last r3.
+uint32_t MixToOutputs(uint8_t* base, uint32_t voice, uint32_t inout, uint32_t processor,
+                      uint32_t frame, const GuestCall& call);
+
+// XAudioSubmixVoice::Pass (sub_8245EFA0): Pass; when it succeeds, its
+// buffer (+32, the interface) cleared for its format (+52) with flags 3
+// (its original where the plain C++ refuses) and the counter 1 up
+// (AddStat). `frame` is this function's (112 bytes). Returns Pass' r3.
+uint32_t SubmixPass(uint8_t* base, uint32_t voice, uint32_t frame, const GuestCall& call);
 
 }  // namespace xaudio
