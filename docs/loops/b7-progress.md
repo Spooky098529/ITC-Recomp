@@ -11,40 +11,37 @@ file's history. What's left to see in a drive, from every run:
 - Run started 2026-10-29 15:44 on `b7-loop-29-10-26` (the user's
   branch), from e282f62; summary `b7-loop-2026-10-29-1544.md`.
 - Limit for this run: 3 subsystems.
-- Subsystem 1 of 3 done: XACT's tracks and events (the top of `leads.md`,
-  with the next lead, as it says they read best mapped together).
-  Map a3880fc checked (`xact-tracks.md`, 143 rows, 55 in play, 34
-  ready groups). Migration 1 checked (44 ours,
-  c8ad278..6fc2206). Validated (`itc_2432`,
-  `itc_2433`: 44 of 44 harness lines; one to drive). Done (below); recorded in the plan's table and boundary log.
-- Subsystem 2 of 3 done: XAudio's engine and mixer (`leads.md`). Map
-  610125a checked (`xaudio-engine.md`, 70 rows, 47 in play, 24 ready
-  groups). Done (below); recorded in the plan's table and boundary
-  log. Its 7 left wait on the user's call (asked).
+- Subsystem 1 of 3 done: XACT's tracks and events (below). Recorded in
+  the plan's table and boundary log.
+- Subsystem 2 of 3 done: XAudio's engine and mixer (below). Recorded in
+  the plan's table and boundary log.
 - The user's calls (2026-10-29, now under "Precedent first" in
   `b7-loop.md`): XAudio's threads, events, semaphore and notification
   through their imports as the original does; QueryPerformanceCounter
-  from the host clock at 50 MHz, like GetTickCount. Next: the
-  continuations (not counted toward the limit): QueryPerformanceCounter
-  with `XACTGetTimeMs` and what waits on it in `xact-tracks.md` and
-  `xact-waves.md`: done (be9c0c5..b32d7d2; tracks 55 of 55,
-  waves 28 of 30). Validated (`itc_2472`, `itc_2473`: 20 of 20
-  harness lines, all ran in play). XACT's waves' last two and `Fire`'s
-  r3 done (f1e1ee9..dcdb43e; waves 31 of 31). Validated (`itc_2481`,
-  `itc_2482`: 16 of 16 harness lines; one to drive; the replay logged
-  the intermittent BaseHeap pair). The r3 fix and XAudio's engine's 7
-  done and validated (`itc_2503`, `itc_2504`: 16 of 16). The
-  continuations recorded in the plan's table and boundary log.
+  from the host clock at 50 MHz, like GetTickCount.
+- The continuations (not counted) done (below). Recorded in the plan's
+  table and boundary log.
+- Subsystem 3 of 3: XAudio's factory objects and codecs (`leads.md`).
+  Step: mapping agent running.
+
+## Done
+
+- The continuations: QueryPerformanceCounter (the host clock),
+  `XACTGetTimeMs`, XACT's tracks 55 of 55, waves 31 of 31 (`Fire`'s,
+  `SendNotification`'s, `Notify`'s and `SetState`'s r3 matched in full),
+  XAudio's engine 47 of 47; be9c0c5..12896c8. Validated (`itc_2472`,
+  `itc_2473`; `itc_2481`, `itc_2482`, the replay logged the intermittent
+  BaseHeap pair; `itc_2503`, `itc_2504`): 20, 16 and 16 harness lines;
+  `XACTWave::Finish` to drive.
 - XAudio's engine and mixer: `xaudio-engine.md`, 40 of 47 in play
   native in one migration, 11 adapters removed; `--native_xaudio_engine`;
   610125a, e9d3f21..d17ae9f. Validated (`itc_2458`, `itc_2459`): 40 of
   40 harness lines, all ran in play; nothing to drive.
-
 - XACT's tracks and events: `xact-tracks.md`, 47 of 55 in play native
   in two migrations, 16 adapters removed; `--native_xact_tracks`;
   a3880fc, c8ad278..6fc2206, 84a6ef7..65b3944. Validated (`itc_2432`,
   `itc_2433`; `itc_2443`, `itc_2444`): 44 and 5 harness lines; one to
-  drive. The rest waits on `XACTGetTimeMs` over QueryPerformanceCounter.
+  drive.
 
 ## Rows to review
 
