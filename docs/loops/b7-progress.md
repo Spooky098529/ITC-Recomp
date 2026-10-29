@@ -16,11 +16,15 @@ file's history. What's left to see in a drive, from every run:
   Map a3880fc checked (`xact-tracks.md`, 143 rows, 55 in play, 34
   ready groups). Migration 1 checked (44 ours,
   c8ad278..6fc2206). Validated (`itc_2432`,
-  `itc_2433`: 44 of 44 harness lines; one to drive). Migration 2 checked (47 of 55
-  ours, 84a6ef7..65b3944; nothing ready left). Step: validation agent
-  running.
+  `itc_2433`: 44 of 44 harness lines; one to drive). Done (below); recorded in the plan's table and boundary log.
 
 ## Done
+
+- XACT's tracks and events: `xact-tracks.md`, 47 of 55 in play native
+  in two migrations, 16 adapters removed; `--native_xact_tracks`;
+  a3880fc, c8ad278..6fc2206, 84a6ef7..65b3944. Validated (`itc_2432`,
+  `itc_2433`; `itc_2443`, `itc_2444`): 44 and 5 harness lines; one to
+  drive. The rest waits on `XACTGetTimeMs` over QueryPerformanceCounter.
 
 ## Rows to review
 
@@ -49,3 +53,5 @@ file's history. What's left to see in a drive, from every run:
 - After XACT's tracks' migration 2 (`itc_2442`: race 38 s, 0 errors,
   xact_tracks and xact 0 differing): ours 2852, work left 3612 (wrapped
   103, known 516, unknown 2993).
+- After its validation (`itc_2443`: race 7 s, 0 errors, every harness
+  0 differing but the expected groups): ours 2852, work left 3612.

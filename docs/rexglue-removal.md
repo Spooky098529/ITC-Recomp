@@ -2632,6 +2632,7 @@ B7. **The game logic inside**: everything else, subsystem by subsystem,
 | 2026-10-28 | The car sounds and X3DAudio (the seven per-racer car sound objects at `[0x826C5C3C]`, eleven parts each, played straight through XAudio voices: the wave bank views, `SetBanks`, `TireSound::Amount`, the constructors, `CarSound::SetUp`, `SoundGlobals::Init`, `CarSounds::Destroy`, `CarSound::Update3D`; X3DAudio's math, translated by the XACT precedent: `X3DAudioCalculate` with its vector helpers, curves, pan, matrix, cone and Doppler) | `car-sounds.md` | 62 of 62 in play (three migrations, the last two after XAudio's voices; 53 adapters removed) | `--native_car_sounds` |
 | 2026-10-29 | XAudio's voices (the game's copy of XAudio, translated: the API entry points but the shut-down, the callback's and the commit; the source and submix voices, their outputs, passes, effects and states; the buffers and formats; its API lock the game's critical section and the voice lists' spin lock the game's, taken as the original does, the user's calls) | `xaudio.md` | 92 of 96 in play (two migrations; 37 Native; the rest waits on the engine and mixer) | `--native_xaudio` |
 | 2026-10-29 | XACT's waves and voices (XACT's voice class over XAudio's entry points, the waves' constructors, start positions, voices, play, pause, next and update, the tracks' volume and pitch getters; XACT's lock the game's, taken as the original does) | `xact-waves.md` | 22 of 30 in play (one migration; 16 adapters removed, 7 of XAudio's and 5 of `xact.md`'s; the rest waits on `XACTWave::Notify`'s notifications and clock) | `--native_xact_waves` |
+| 2026-10-29 | XACT's tracks and events (the tracks, track instances and events over the sound bank's records: their constructors, prepare, volume, pause, stop, cancel, destructors and RPC set-up; the play-wave event and the wave's slot forwarders; `XACTSound::ScheduleEvent`; XACT's lock the game's, taken as the original does) | `xact-tracks.md` (with a row in `xact.md`) | 47 of 55 in play (two migrations; 16 adapters removed; the rest waits on `XACTGetTimeMs` over QueryPerformanceCounter) | `--native_xact_tracks` |
 
     The first run (2026-10-22, branch `b7-loop-test`): every harness at 0 differing, attract races at 20-21 s with no errors,
     and a race the user drove looked right. Ours went from 162 to 335 (work
@@ -3904,3 +3905,18 @@ pairs): overridden 85, Native 22, Dropped 23, never called 70, live
 249. Imports: 186 called, 62 with a live caller. B7 (`b7_status.py`):
 ours 2,804, work left 3,660 (Wrapped 103, with a row 509, no row yet
 3,048), from 3,682 (from 3,833 at the run's start).
+
+**2026-10-29, XACT's tracks and events (branch `b7-loop-29-10-26`):**
+the twenty-second run's first subsystem mapped XACT's tracks, track
+instances and events (`xact-tracks.md`, 143 rows, 55 in play; the
+parameter events, none in play, left as a lead) and made 47 native in
+two migrations (`--native_xact_tracks`, `src/xact/tracks.cpp`), with
+16 adapters removed, and `XACTSound::ScheduleEvent` (`xact.md`).
+`XACTTrackInstance::CancelEvents` takes XACT's lock as the original
+does (the 2026-10-29 call). The other 8 in play (the tracks' and
+events' play, schedule, fire, done and audio updates) wait on
+`XACTGetTimeMs` (`sub_825BFE28`) over `QueryPerformanceCounter`, a
+kernel import. The boundary: 449 functions (916 pairs): overridden 85,
+Native 23, Dropped 23, never called 70, live 248. Imports: 186 called,
+62 with a live caller. B7 (`b7_status.py`): ours 2,852, work left 3,612
+(Wrapped 103, with a row 516, no row yet 2,993), from 3,660.
