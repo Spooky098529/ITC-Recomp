@@ -29,7 +29,7 @@ ITC_FLAG_BOOL(native_car_sounds, true, "ITC",
               "Memory::AllocPhysicalEx's, Music::Play's and X3DAudioInitialize's plain C++); X3DAudio's "
               "X3DVec::Sub sub_824819E0, Length sub_82481998, Dot sub_824819B8 and Cross "
               "sub_82481A18, X3DAudio::EvaluateCurve sub_82480818 and X3DAudio::Curves "
-              "sub_82480918, X3DAudio::Pan sub_82480F80 and X3DAudio::Matrix sub_82481390, X3DAudio::Cone sub_82480BA8, X3DAudio::Doppler sub_82480E90 and X3DAudioCalculate sub_82481880 (the original when its flags ask for EmitterAngle sub_82480780 or Delay sub_82481708) (checked by --run_harnesses=x3daudio)); CarSound::Update3D sub_8210F820 (RigidBody::Position's, Vec4::Copy's and X3DAudioCalculate's plain C++); the voice holders' CarSound::SetPitch sub_8210D158, SetPitchScaled sub_8210D080, IsPlaying sub_8210D1D8, UpdateVoices sub_8210D378, Clear sub_8210D320, Pause sub_8210D240 and Resume sub_8210D2C0 (no adapters: only PauseAll's and ResumeAll's plain C++ call them), PauseAll sub_8210E2B8 and ResumeAll sub_8210E350; CarSound::AddVoice sub_8210CE38 and PlayOnce sub_8210E3E8, EngineLayer::Start sub_8210D410, EngineSound::Start sub_8210D6C0, TireSound::Start sub_8210D7F8 and CarSound::Start sub_8210E030; CarSound::Stop sub_8210E218, CarSounds::StopAll sub_8210F7C8, CarSound::Release sub_8210E170 and CarSounds::Release sub_8210F750 (operator delete[]'s plain C++); CarSounds::Init sub_8210FE00 (operator new[]'s plain C++); the parts' updates: HitSounds::Update sub_8210FD78 with its impact sub_8210E778, scrape sub_8210E938 and wave 9 sub_8210EB90 (the collision accessors' and Vehicle::GetSpeedKmh's plain C++), the parts at +736 sub_8210EBF0, +840 sub_8210ECF0 and +888 sub_8210EEE0, WindSound::Update sub_8210EDB0 and PassBySound::Update sub_8210F088 (PlayOnce's, IsPlaying's and UpdateVoices' plain C++); the engine: EngineSound::Update sub_8210E470 with EngineLayer::Update sub_8210D478 and EngineLayer::UpdatePitched sub_8210D718 (Vehicle::Float2224's, pow's and SetPitchScaled's plain C++); the tires: TireSound::Update sub_8210E5C0 with TireLayer::Update sub_8210D890 (Vehicle::SlipWheelValue's, MaxWheelSlip's, TireSound::Amount's, IsPlaying's and SetPitch's plain C++); RollSound::Update sub_8210DB60 (Vehicle::GetSpeedKmh's and SetPitch's plain C++); the horn: HornSound::Update sub_8210F118 (PlayOnce's, SetPitchScaled's, IsPlaying's and UpdateVoices' plain C++); the turbo: TurboSound::Update sub_8210F4E8 (PlayOnce's, IsPlaying's, SetPitch's and UpdateVoices' plain C++); CarSound::Update sub_82110048 (Update3D's, the parts' updates' and SetEffectParameters' plain C++) (XAudio's entry points through their plain C++) natively instead of through the translated code "
+              "sub_82480918, X3DAudio::Pan sub_82480F80 and X3DAudio::Matrix sub_82481390, X3DAudio::Cone sub_82480BA8, X3DAudio::Doppler sub_82480E90 and X3DAudioCalculate sub_82481880 (the original when its flags ask for EmitterAngle sub_82480780 or Delay sub_82481708) (checked by --run_harnesses=x3daudio)); CarSound::Update3D sub_8210F820 (RigidBody::Position's, Vec4::Copy's and X3DAudioCalculate's plain C++); the voice holders' CarSound::SetPitch sub_8210D158, SetPitchScaled sub_8210D080, IsPlaying sub_8210D1D8, UpdateVoices sub_8210D378, Clear sub_8210D320, Pause sub_8210D240 and Resume sub_8210D2C0 (no adapters: only PauseAll's and ResumeAll's plain C++ call them), PauseAll sub_8210E2B8 and ResumeAll sub_8210E350; CarSound::AddVoice sub_8210CE38 and PlayOnce sub_8210E3E8, EngineLayer::Start sub_8210D410, EngineSound::Start sub_8210D6C0, TireSound::Start sub_8210D7F8 and CarSound::Start sub_8210E030; CarSound::Stop sub_8210E218, CarSounds::StopAll sub_8210F7C8, CarSound::Release sub_8210E170 and CarSounds::Release sub_8210F750 (operator delete[]'s plain C++); CarSounds::Init sub_8210FE00 (operator new[]'s plain C++); the parts' updates: HitSounds::Update sub_8210FD78 with its impact sub_8210E778, scrape sub_8210E938 and wave 9 sub_8210EB90 (the collision accessors' and Vehicle::GetSpeedKmh's plain C++), the parts at +736 sub_8210EBF0, +840 sub_8210ECF0 and +888 sub_8210EEE0, WindSound::Update sub_8210EDB0 and PassBySound::Update sub_8210F088 (PlayOnce's, IsPlaying's and UpdateVoices' plain C++); the engine: EngineSound::Update sub_8210E470 with EngineLayer::Update sub_8210D478 and EngineLayer::UpdatePitched sub_8210D718 (Vehicle::Float2224's, pow's and SetPitchScaled's plain C++); the tires: TireSound::Update sub_8210E5C0 with TireLayer::Update sub_8210D890 (Vehicle::SlipWheelValue's, MaxWheelSlip's, TireSound::Amount's, IsPlaying's and SetPitch's plain C++); RollSound::Update sub_8210DB60 (Vehicle::GetSpeedKmh's and SetPitch's plain C++); the horn: HornSound::Update sub_8210F118 (PlayOnce's, SetPitchScaled's, IsPlaying's and UpdateVoices' plain C++); the turbo: TurboSound::Update sub_8210F4E8 (PlayOnce's, IsPlaying's, SetPitch's and UpdateVoices' plain C++); CarSound::Update sub_82110048 (Update3D's, the parts' updates' and SetEffectParameters' plain C++); no adapters (only plain C++ calls them in play) for Update3D, TireSound::Amount, SetPitch, SetPitchScaled, IsPlaying, UpdateVoices, PlayOnce, the parts' updates and the engine's and tires' layers (XAudio's entry points through their plain C++) natively instead of through the translated code "
               "(the same reads and writes; XAudio's locks stay the game's, taken as the original does; checked by "
               "--run_harnesses=car_sounds)");
 
@@ -632,7 +632,7 @@ ITC_CAR_SOUNDS_ADAPTER(8210C9D8, CarSoundsWaveBankViewInit)
 // No adapter (removed 2026-10-29: only CarSound::AddVoice's plain C++ calls it in play) for WaveBankView::Data sub_8210C958.
 // No adapter (removed 2026-10-29: only CarSound::AddVoice's plain C++ calls it in play) for WaveBankView::Entry sub_8210C998.
 ITC_CAR_SOUNDS_ADAPTER(8210CB48, CarSoundsSetBanks)
-ITC_CAR_SOUNDS_ADAPTER(8210CA28, CarSoundsTireSoundAmount)
+// No adapter (removed 2026-10-29: only TireSound::Update's plain C++ calls it in play) for TireSound::Amount sub_8210CA28.
 // No adapter (removed 2026-10-28: only `CarSound::CarSound`'s plain C++ calls it in play)
 // for EngineSound::EngineSound sub_8210CBA0.
 // No adapter (removed 2026-10-29: only CarSounds::Init's plain C++ calls it in play) for CarSound::CarSound sub_8210CC18.
@@ -649,18 +649,18 @@ ITC_CAR_SOUNDS_ADAPTER(8210CA28, CarSoundsTireSoundAmount)
 // No adapter (removed 2026-10-28: only Calculate's plain C++ calls it in play) for X3DAudio::Cone sub_82480BA8.
 // No adapter (removed 2026-10-28: only Calculate's plain C++ calls it in play) for X3DAudio::Doppler sub_82480E90.
 // No adapter (removed 2026-10-28: only CarSound::Update3D's plain C++ calls it in play) for X3DAudioCalculate sub_82481880.
-ITC_CAR_SOUNDS_ADAPTER(8210F820, CarSoundsUpdate3D)
-ITC_CAR_SOUNDS_ADAPTER(8210D158, CarSoundsSetPitch)
-ITC_CAR_SOUNDS_ADAPTER(8210D080, CarSoundsSetPitchScaled)
-ITC_CAR_SOUNDS_ADAPTER(8210D1D8, CarSoundsIsPlaying)
-ITC_CAR_SOUNDS_ADAPTER(8210D378, CarSoundsUpdateVoices)
+// No adapter (removed 2026-10-29: only CarSound::Update's plain C++ calls it in play) for CarSound::Update3D sub_8210F820.
+// No adapter (removed 2026-10-29: only TireLayer::Update's, RollSound::Update's, PlayOnce's and TurboSound::Update's plain C++ calls it in play) for CarSound::SetPitch sub_8210D158.
+// No adapter (removed 2026-10-29: only EngineLayer::Update's and HornSound::Update's plain C++ calls it in play) for CarSound::SetPitchScaled sub_8210D080.
+// No adapter (removed 2026-10-29: only the parts' updates' plain C++ calls it in play) for CarSound::IsPlaying sub_8210D1D8.
+// No adapter (removed 2026-10-29: only the parts' updates' plain C++ calls it in play) for CarSound::UpdateVoices sub_8210D378.
 // No adapter (removed 2026-10-29: only CarSound::Stop's and Release's plain C++ calls it in play) for CarSound::Clear sub_8210D320.
 // No adapter (removed 2026-10-29: only CarSound::PauseAll's plain C++ calls it) for CarSound::Pause sub_8210D240.
 // No adapter (removed 2026-10-29: only CarSound::ResumeAll's plain C++ calls it) for CarSound::Resume sub_8210D2C0.
 ITC_CAR_SOUNDS_ADAPTER(8210E2B8, CarSoundsPauseAll)
 ITC_CAR_SOUNDS_ADAPTER(8210E350, CarSoundsResumeAll)
 // No adapter (removed 2026-10-29: only PlayOnce's and the Starts' plain C++ calls it in play) for CarSound::AddVoice sub_8210CE38.
-ITC_CAR_SOUNDS_ADAPTER(8210E3E8, CarSoundsPlayOnce)
+// No adapter (removed 2026-10-29: only the parts' updates' plain C++ calls it in play) for CarSound::PlayOnce sub_8210E3E8.
 // No adapter (removed 2026-10-29: only EngineSound::Start's plain C++ calls it in play) for EngineLayer::Start sub_8210D410.
 // No adapter (removed 2026-10-29: only CarSound::Start's plain C++ calls it in play) for EngineSound::Start sub_8210D6C0.
 // No adapter (removed 2026-10-29: only CarSound::Start's plain C++ calls it in play) for TireSound::Start sub_8210D7F8.
@@ -673,20 +673,20 @@ ITC_CAR_SOUNDS_ADAPTER(8210FE00, CarSoundsInit)
 // No adapter (removed 2026-10-29: only HitSounds::Update's plain C++ calls it in play) for sub_8210E778 (the impact).
 // No adapter (removed 2026-10-29: only HitSounds::Update's plain C++ calls it in play) for sub_8210E938 (the scrape).
 // No adapter (removed 2026-10-29: only HitSounds::Update's plain C++ calls it in play) for sub_8210EB90 (wave 9).
-ITC_CAR_SOUNDS_ADAPTER(8210FD78, CarSoundsHitSoundsUpdate)
-ITC_CAR_SOUNDS_ADAPTER(8210EBF0, CarSoundsPart736Update)
-ITC_CAR_SOUNDS_ADAPTER(8210ECF0, CarSoundsPart840Update)
-ITC_CAR_SOUNDS_ADAPTER(8210EEE0, CarSoundsPart888Update)
-ITC_CAR_SOUNDS_ADAPTER(8210EDB0, CarSoundsWindSoundUpdate)
-ITC_CAR_SOUNDS_ADAPTER(8210F088, CarSoundsPassBySoundUpdate)
-ITC_CAR_SOUNDS_ADAPTER(8210D478, CarSoundsEngineLayerUpdate)
-ITC_CAR_SOUNDS_ADAPTER(8210D718, CarSoundsEngineLayerUpdatePitched)
-ITC_CAR_SOUNDS_ADAPTER(8210E470, CarSoundsEngineSoundUpdate)
-ITC_CAR_SOUNDS_ADAPTER(8210D890, CarSoundsTireLayerUpdate)
-ITC_CAR_SOUNDS_ADAPTER(8210E5C0, CarSoundsTireSoundUpdate)
-ITC_CAR_SOUNDS_ADAPTER(8210DB60, CarSoundsRollSoundUpdate)
-ITC_CAR_SOUNDS_ADAPTER(8210F118, CarSoundsHornSoundUpdate)
-ITC_CAR_SOUNDS_ADAPTER(8210F4E8, CarSoundsTurboSoundUpdate)
+// No adapter (removed 2026-10-29: only CarSound::Update's plain C++ calls it in play) for HitSounds::Update sub_8210FD78.
+// No adapter (removed 2026-10-29: only CarSound::Update's plain C++ calls it in play) for the part at +736 sub_8210EBF0.
+// No adapter (removed 2026-10-29: only CarSound::Update's plain C++ calls it in play) for the part at +840 sub_8210ECF0.
+// No adapter (removed 2026-10-29: only CarSound::Update's plain C++ calls it in play) for the part at +888 sub_8210EEE0.
+// No adapter (removed 2026-10-29: only CarSound::Update's plain C++ calls it in play) for WindSound::Update sub_8210EDB0.
+// No adapter (removed 2026-10-29: only CarSound::Update's plain C++ calls it in play) for PassBySound::Update sub_8210F088.
+// No adapter (removed 2026-10-29: only EngineSound::Update's and EngineLayer::UpdatePitched's plain C++ calls it in play) for EngineLayer::Update sub_8210D478.
+// No adapter (removed 2026-10-29: only EngineSound::Update's plain C++ calls it in play) for EngineLayer::UpdatePitched sub_8210D718.
+// No adapter (removed 2026-10-29: only CarSound::Update's plain C++ calls it in play) for EngineSound::Update sub_8210E470.
+// No adapter (removed 2026-10-29: only TireSound::Update's plain C++ calls it in play) for TireLayer::Update sub_8210D890.
+// No adapter (removed 2026-10-29: only CarSound::Update's plain C++ calls it in play) for TireSound::Update sub_8210E5C0.
+// No adapter (removed 2026-10-29: only CarSound::Update's plain C++ calls it in play) for RollSound::Update sub_8210DB60.
+// No adapter (removed 2026-10-29: only CarSound::Update's plain C++ calls it in play) for HornSound::Update sub_8210F118.
+// No adapter (removed 2026-10-29: only CarSound::Update's plain C++ calls it in play) for TurboSound::Update sub_8210F4E8.
 ITC_CAR_SOUNDS_ADAPTER(82110048, CarSoundsUpdate)
 
 extern "C" REX_FUNC(sub_82110258) {

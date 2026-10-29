@@ -852,7 +852,7 @@ ITC_XAUDIO_ADAPTER(8245E7A0, XAudioSourceDeletingDestructor)
 ITC_XAUDIO_ADAPTER(8245F3A0, XAudioSubmixDeletingDestructor)
 ITC_XAUDIO_ADAPTER(82459DB0, XAudioApiAddRef)
 ITC_XAUDIO_ADAPTER(82459E18, XAudioApiRelease)
-ITC_XAUDIO_ADAPTER(82459E80, XAudioApiSetEffectParameters)
+// No adapter (removed 2026-10-29: only CarSounds::Init's and CarSound::Update's plain C++ calls it in play) for XAudioVoice::SetEffectParameters, the API's, sub_82459E80.
 ITC_XAUDIO_ADAPTER(82459EF0, XAudioApiSetOutputVoices)
 ITC_XAUDIO_ADAPTER(82459F48, XAudioApiSetOutputMatrix)
 ITC_XAUDIO_ADAPTER(82459FA0, XAudioApiGetState)
