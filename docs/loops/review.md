@@ -11,6 +11,10 @@ functions to check in a drive in the progress file.
 When the user has reviewed a run's section, its heading gets
 "(reviewed <date>)"; the section stays for the record.
 
+## Run 2026-10-29 15:44 (`b7-loop-29-10-26`)
+
+(In progress.)
+
 ## Run 2026-10-28 22:22 (`b7-loop-28-10-26-3`)
 
 - The car sounds and X3DAudio (map 26adc92): `docs/functions/car-sounds.md`,

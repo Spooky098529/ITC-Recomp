@@ -8,41 +8,18 @@ file's history. What's left to see in a drive, from every run:
 
 ## Now
 
-- Run started 2026-10-28 22:22 on `b7-loop-28-10-26-3` (the user's
-  branch), from 26a5119; summary `b7-loop-2026-10-28-2222.md`.
+- Run started 2026-10-29 15:44 on `b7-loop-29-10-26` (the user's
+  branch), from e282f62; summary `b7-loop-2026-10-29-1544.md`.
 - Limit for this run: 3 subsystems.
-- Subsystem 1 of 3 done: the car sounds and X3DAudio (below).
-  Recorded in the plan's table and boundary log.
-- Subsystem 2 of 3 done: XAudio's voices (below). Recorded in the
-  plan's table and boundary log.
-- Subsystem 1's continuation done: the car sounds' migrations 2 and 3
-  (62 of 62). Recorded in the plan's table and boundary log.
-- Subsystem 3 of 3 done: XACT's waves and voices (below). Recorded in
-  the plan's table and boundary log. The run's limit reached: stopped
-  (below).
+- Subsystem 1 of 3: XACT's tracks and events (the top of `leads.md`,
+  with the next lead, as it says they read best mapped together).
+  Step: mapping agent running.
 
 ## Done
 
-- XACT's waves and voices: `xact-waves.md`, 22 of 30 in play native in
-  one migration, 16 adapters removed; `--native_xact_waves`; a950696,
-  bfb4cbc..4c7a053. Validated (`itc_2417`, `itc_2418`): 34 of 34
-  harness lines; nothing to drive.
-- XAudio's voices: `xaudio.md`, 92 of 96 in play native in two
-  migrations, 37 Native; both locks the game's, taken as the original
-  does (the user's calls, 2026-10-29); `--native_xaudio`; e784bc0,
-  29a2e7f..fbcd34f, 19a919f..24cc6ea, print ceb220f. Validated
-  (`itc_2356`, `itc_2357`): 92 of 92 harness lines; nine to drive.
-- The car sounds and X3DAudio: `car-sounds.md`, 62 of 62 in play
-  native in three migrations (the last two after XAudio's voices), 53
-  adapters removed; `--native_car_sounds`; 26adc92, 9a0dcc7..3e6c24e,
-  be59a3f..edce57c, fd88bdf..cfd838d. Migrations 2 and 3 validated
-  (`itc_2382`, `itc_2383`; `itc_2398`): 37 and 23 harness lines;
-  StopAll to drive. Validated (`itc_2328`, `itc_2329`): 24 of
-  24 harness lines, all ran in play or the replay; nothing to drive.
-
 ## Rows to review
 
-`review.md`, "Run 2026-10-28 22:22".
+`review.md`, "Run 2026-10-29 15:44".
 
 ## Expected to differ
 
@@ -54,51 +31,5 @@ file's history. What's left to see in a drive, from every run:
 
 ## Totals
 
-- At the start: ours 2628, work left 3833 (wrapped 103, known 498,
-  unknown 3232).
-- After the car sounds' map: ours 2628, work left 3833 (wrapped 103,
-  known 559, unknown 3171).
-- After the car sounds' migration 1 (`itc_2327`: race 38 s, 0 errors,
-  car_sounds and x3daudio 0 differing): ours 2652, work left 3809
-  (wrapped 103, known 535, unknown 3171).
-- After its validation (`itc_2328`: race 8 s, the harnesses ~30 s, 0
-  errors, every harness 0 differing but the expected groups): ours
-  2652, work left 3809.
-- After XAudio's map: ours 2652, work left 3809 (wrapped 103, known
-  628, unknown 3078).
-- After XAudio's migration 1 (`itc_2337`: race 38 s, 0 errors, xaudio
-  0 differing): ours 2686, work left 3775 (wrapped 103, known 594,
-  unknown 3078).
-- After XAudio's migration 2 (race 38 s, 0 errors, xaudio 0
-  differing): ours 2744, work left 3720 (wrapped 103, known 539,
-  unknown 3078).
-- After its validation (`itc_2356`: race 8 s, the harnesses ~30 s, 0
-  errors, every harness 0 differing but the expected groups): ours
-  2744, work left 3720.
-- After the car sounds' migration 2 (race 38 s, 0 errors, car_sounds,
-  x3daudio and xaudio 0 differing): ours 2773, work left 3691 (wrapped
-  103, known 510, unknown 3078).
-- After its validation (`itc_2382`: race 8 s, 0 errors, every harness
-  0 differing but the expected groups): ours 2773, work left 3691.
-- After the car sounds' migration 3 (`itc_2397`: race 38 s, 0 errors,
-  car_sounds, x3daudio, xaudio 0 differing): ours 2782, work left 3682
-  (wrapped 103, known 501, unknown 3078).
-- After its validation (`itc_2398`: race 8 s, 0 errors, every harness
-  0 differing but the expected groups): ours 2782, work left 3682.
-- After XACT's waves' map: ours 2782, work left 3682 (wrapped 103,
-  known 531, unknown 3048).
-- After XACT's waves' migration 1 (`itc_2416`: race 38 s, 0 errors,
-  xact_waves, xact, xaudio 0 differing): ours 2804, work left 3660
-  (wrapped 103, known 509, unknown 3048).
-- At the end (after XACT's waves' validation, `itc_2417`: race 7 s, the
-  harnesses most of the 40, 0 errors, every harness 0 differing but the
-  expected groups): ours 2804, work left 3660 (wrapped 103, known 509,
+- At the start: ours 2804, work left 3660 (wrapped 103, known 509,
   unknown 3048).
-
-## Stopped
-
-2026-10-29, at the run's limit: 3 subsystems (the car sounds with
-X3DAudio, XAudio's voices, XACT's waves and voices). Two user's calls
-on the way (XAudio's locks). Every map, migration and validation
-passed its checks. `check_function_statuses.py`: 0 errors. To drive:
-`to-drive.md`.
