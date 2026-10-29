@@ -102,4 +102,21 @@ void CarSoundsResume(PPCContext& ctx, uint8_t* base);          // sub_8210D2C0
 void CarSoundsPauseAll(PPCContext& ctx, uint8_t* base);        // sub_8210E2B8
 void CarSoundsResumeAll(PPCContext& ctx, uint8_t* base);       // sub_8210E350
 
+// Making and starting the voices: r3 = the holder or part (the car sound
+// for Start), r4 = the view (the index for the parts' Start), r5 = the wave
+// (the views), r6 (PlayOnce: r8) = loop, f1 and f2 PlayOnce's volume and
+// pitch; XAudioCreateSourceVoice with the native heap's default allocator
+// while --native_heap routes the heap.
+void CarSoundsAddVoice(PPCContext& ctx, uint8_t* base);          // sub_8210CE38
+void CarSoundsPlayOnce(PPCContext& ctx, uint8_t* base);          // sub_8210E3E8
+void CarSoundsEngineLayerStart(PPCContext& ctx, uint8_t* base);  // sub_8210D410
+void CarSoundsEngineSoundStart(PPCContext& ctx, uint8_t* base);  // sub_8210D6C0
+void CarSoundsTireSoundStart(PPCContext& ctx, uint8_t* base);    // sub_8210D7F8
+void CarSoundsCarSoundStart(PPCContext& ctx, uint8_t* base);     // sub_8210E030
+// r3 = the car sound (none for StopAll and CarSounds::Release).
+void CarSoundsStop(PPCContext& ctx, uint8_t* base);              // sub_8210E218
+void CarSoundsStopAll(PPCContext& ctx, uint8_t* base);           // sub_8210F7C8
+void CarSoundsRelease(PPCContext& ctx, uint8_t* base);           // sub_8210E170
+void CarSoundsReleaseAll(PPCContext& ctx, uint8_t* base);        // sub_8210F750
+
 }  // namespace hooks

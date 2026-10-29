@@ -164,4 +164,70 @@ uint32_t PauseAll(uint8_t* base, uint32_t sound, uint32_t frame, const GuestCall
 uint32_t ResumeAll(uint8_t* base, uint32_t sound, const Thread& thread, uint32_t frame,
                    const GuestCall& call);
 
+// --- Making and starting the voices (car_sound_voices.cpp) ---
+
+// What making a voice needs beside the guest call: the thread's words and
+// whether XAudio's default allocator may run natively (the native heap).
+struct Voices {
+  Thread thread;
+  bool native_heap;
+};
+
+// The submix voice every car's voices play into.
+constexpr uint32_t kSubmix = 0x826C5C44;
+// The car sounds' array (the count 7 at [-16]).
+constexpr uint32_t kSounds = 0x826C5C3C;
+
+// sub_8210CE38 CarSound::AddVoice (496 bytes): in the holder's first free
+// slot (none: -1), a source voice of wave 0's format (WaveBankView::Format
+// into the description at the frame's +304, its outputs at +144: the null
+// voice and the submix, each with the six-channel map at +80) made by
+// XAudioCreateSourceVoice, then wave `wave`'s buffer submitted (the packet
+// at +208: the data, the length, with `loop` (r6) the loop region from the
+// entry copied to +176, in bytes for 8- or 16-bit samples); +20 up by one.
+// Returns the slot.
+uint32_t AddVoice(uint8_t* base, uint32_t holder, uint32_t view, uint32_t wave, uint32_t loop,
+                  const Voices& voices, uint32_t frame, const GuestCall& call);
+// sub_8210E3E8 CarSound::PlayOnce (128 bytes): AddVoice (`loop` r8), then
+// the voice started, its volume `volume` (f1) and pitch `pitch` (f2,
+// SetPitch with r7 0). Returns the slot or -1.
+uint32_t PlayOnce(uint8_t* base, uint32_t holder, uint32_t view, uint32_t wave, uint32_t loop,
+                  double volume, double pitch, const Voices& voices, uint32_t frame,
+                  const GuestCall& call);
+// sub_8210D410 EngineLayer::Start (112 bytes): +4 to +16 and the 24 bytes
+// at +20 cleared, four looping voices of waves 0-3 from `view` into the
+// holder at +44.
+uint32_t EngineLayerStart(uint8_t* base, uint32_t layer, uint32_t view, const Voices& voices,
+                          uint32_t frame, const GuestCall& call);
+// sub_8210D6C0 EngineSound::Start (112 bytes): layer +84 from [views],
+// layer +0 from [views + 4] (r4 `index` as the original passes it); +168
+// = [0x82000A34], +172 = [0x82003384].
+uint32_t EngineSoundStart(uint8_t* base, uint32_t engine, uint64_t index, uint32_t views,
+                          const Voices& voices, uint32_t frame, const GuestCall& call);
+// sub_8210D7F8 TireSound::Start (128 bytes): +68 the index's low byte, +64
+// the view, +72 and +80 [0x82000A34], +70 and +76 0, two looping voices of
+// wave 0 into the holder at +24, then its state words.
+uint32_t TireSoundStart(uint8_t* base, uint32_t part, uint32_t index, uint32_t view,
+                        const Voices& voices, uint32_t frame, const GuestCall& call);
+// sub_8210E030 CarSound::Start (128 bytes): the engine (two views at
+// `views`), the tires and each part's bank `view` and index (+404), their
+// state words; the roll noise's looping voice of wave 1 (+792).
+uint32_t CarSoundStart(uint8_t* base, uint32_t sound, uint32_t views, uint32_t view,
+                       const Voices& voices, uint32_t frame, const GuestCall& call);
+
+// sub_8210E218 CarSound::Stop (112 bytes): Clear on the 12 holders, +1248
+// = 0.
+uint32_t Stop(uint8_t* base, uint32_t sound, uint32_t frame, const GuestCall& call);
+// sub_8210F7C8 CarSounds::StopAll (112 bytes): Stop on each of the seven at
+// [0x826C5C3C] (on 0 each time when the array is 0, as the original).
+uint32_t StopAll(uint8_t* base, uint32_t frame, const GuestCall& call);
+// sub_8210E170 CarSound::Release (112 bytes): Clear on the 12 holders, the
+// matrix (+176) freed (operator delete[]'s plain C++, its original through
+// `call` where that refuses), +1248 = 0.
+uint32_t Release(uint8_t* base, uint32_t sound, uint32_t frame, const GuestCall& call);
+// sub_8210F750 CarSounds::Release (112 bytes): Release on each of the
+// seven, the array destroyed (CarSounds::Destroy with 3, its frees through
+// operator delete[]'s plain C++) and the submix voice released.
+uint32_t CarSoundsRelease(uint8_t* base, uint32_t frame, const GuestCall& call);
+
 }  // namespace car_sounds

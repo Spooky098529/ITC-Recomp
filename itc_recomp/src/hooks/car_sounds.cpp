@@ -29,7 +29,7 @@ ITC_FLAG_BOOL(native_car_sounds, true, "ITC",
               "Memory::AllocPhysicalEx's, Music::Play's and X3DAudioInitialize's plain C++); X3DAudio's "
               "X3DVec::Sub sub_824819E0, Length sub_82481998, Dot sub_824819B8 and Cross "
               "sub_82481A18, X3DAudio::EvaluateCurve sub_82480818 and X3DAudio::Curves "
-              "sub_82480918, X3DAudio::Pan sub_82480F80 and X3DAudio::Matrix sub_82481390, X3DAudio::Cone sub_82480BA8, X3DAudio::Doppler sub_82480E90 and X3DAudioCalculate sub_82481880 (the original when its flags ask for EmitterAngle sub_82480780 or Delay sub_82481708) (checked by --run_harnesses=x3daudio)); CarSound::Update3D sub_8210F820 (RigidBody::Position's, Vec4::Copy's and X3DAudioCalculate's plain C++); the voice holders' CarSound::SetPitch sub_8210D158, SetPitchScaled sub_8210D080, IsPlaying sub_8210D1D8, UpdateVoices sub_8210D378, Clear sub_8210D320, Pause sub_8210D240 and Resume sub_8210D2C0 (no adapters: only PauseAll's and ResumeAll's plain C++ call them), PauseAll sub_8210E2B8 and ResumeAll sub_8210E350 (XAudio's entry points through their plain C++) natively instead of through the translated code "
+              "sub_82480918, X3DAudio::Pan sub_82480F80 and X3DAudio::Matrix sub_82481390, X3DAudio::Cone sub_82480BA8, X3DAudio::Doppler sub_82480E90 and X3DAudioCalculate sub_82481880 (the original when its flags ask for EmitterAngle sub_82480780 or Delay sub_82481708) (checked by --run_harnesses=x3daudio)); CarSound::Update3D sub_8210F820 (RigidBody::Position's, Vec4::Copy's and X3DAudioCalculate's plain C++); the voice holders' CarSound::SetPitch sub_8210D158, SetPitchScaled sub_8210D080, IsPlaying sub_8210D1D8, UpdateVoices sub_8210D378, Clear sub_8210D320, Pause sub_8210D240 and Resume sub_8210D2C0 (no adapters: only PauseAll's and ResumeAll's plain C++ call them), PauseAll sub_8210E2B8 and ResumeAll sub_8210E350; CarSound::AddVoice sub_8210CE38 and PlayOnce sub_8210E3E8, EngineLayer::Start sub_8210D410, EngineSound::Start sub_8210D6C0, TireSound::Start sub_8210D7F8 and CarSound::Start sub_8210E030; CarSound::Stop sub_8210E218, CarSounds::StopAll sub_8210F7C8, CarSound::Release sub_8210E170 and CarSounds::Release sub_8210F750 (operator delete[]'s plain C++) (XAudio's entry points through their plain C++) natively instead of through the translated code "
               "(the same reads and writes; XAudio's locks stay the game's, taken as the original does; checked by "
               "--run_harnesses=car_sounds)");
 
@@ -357,6 +357,89 @@ void CarSoundsResumeAll(PPCContext& ctx, uint8_t* base) {
   });
 }
 
+namespace {
+cs::Voices VoicesOf(PPCContext& ctx, uint8_t* base) {
+  return {XAudioThreadOf(ctx, base), NativeHeapActive()};
+}
+}  // namespace
+
+void CarSoundsAddVoice(PPCContext& ctx, uint8_t* base) {
+  const uint32_t holder = ctx.r3.u32, view = ctx.r4.u32, wave = ctx.r5.u32, loop = ctx.r6.u32;
+  const cs::Voices voices = VoicesOf(ctx, base);
+  XAudioFramed(ctx, base, 496, [&](const xaudio::GuestCall& call, uint32_t frame) {
+    return cs::AddVoice(base, holder, view, wave, loop, voices, frame, call);
+  });
+}
+
+void CarSoundsPlayOnce(PPCContext& ctx, uint8_t* base) {
+  ctx.fpscr.disableFlushMode();
+  const uint32_t holder = ctx.r3.u32, view = ctx.r4.u32, wave = ctx.r5.u32, loop = ctx.r8.u32;
+  const double volume = ctx.f1.f64, pitch = ctx.f2.f64;
+  const cs::Voices voices = VoicesOf(ctx, base);
+  XAudioFramed(ctx, base, 128, [&](const xaudio::GuestCall& call, uint32_t frame) {
+    return cs::PlayOnce(base, holder, view, wave, loop, volume, pitch, voices, frame, call);
+  });
+}
+
+void CarSoundsEngineLayerStart(PPCContext& ctx, uint8_t* base) {
+  const uint32_t layer = ctx.r3.u32, view = ctx.r5.u32;
+  const cs::Voices voices = VoicesOf(ctx, base);
+  XAudioFramed(ctx, base, 112, [&](const xaudio::GuestCall& call, uint32_t frame) {
+    return cs::EngineLayerStart(base, layer, view, voices, frame, call);
+  });
+}
+
+void CarSoundsEngineSoundStart(PPCContext& ctx, uint8_t* base) {
+  const uint32_t engine = ctx.r3.u32, views = ctx.r5.u32;
+  const uint64_t index = ctx.r4.u64;
+  const cs::Voices voices = VoicesOf(ctx, base);
+  XAudioFramed(ctx, base, 112, [&](const xaudio::GuestCall& call, uint32_t frame) {
+    return cs::EngineSoundStart(base, engine, index, views, voices, frame, call);
+  });
+}
+
+void CarSoundsTireSoundStart(PPCContext& ctx, uint8_t* base) {
+  const uint32_t part = ctx.r3.u32, index = ctx.r4.u32, view = ctx.r5.u32;
+  const cs::Voices voices = VoicesOf(ctx, base);
+  XAudioFramed(ctx, base, 128, [&](const xaudio::GuestCall& call, uint32_t frame) {
+    return cs::TireSoundStart(base, part, index, view, voices, frame, call);
+  });
+}
+
+void CarSoundsCarSoundStart(PPCContext& ctx, uint8_t* base) {
+  const uint32_t sound = ctx.r3.u32, views = ctx.r4.u32, view = ctx.r5.u32;
+  const cs::Voices voices = VoicesOf(ctx, base);
+  XAudioFramed(ctx, base, 128, [&](const xaudio::GuestCall& call, uint32_t frame) {
+    return cs::CarSoundStart(base, sound, views, view, voices, frame, call);
+  });
+}
+
+void CarSoundsStop(PPCContext& ctx, uint8_t* base) {
+  const uint32_t sound = ctx.r3.u32;
+  XAudioFramed(ctx, base, 112, [&](const xaudio::GuestCall& call, uint32_t frame) {
+    return cs::Stop(base, sound, frame, call);
+  });
+}
+
+void CarSoundsStopAll(PPCContext& ctx, uint8_t* base) {
+  XAudioFramed(ctx, base, 112, [&](const xaudio::GuestCall& call, uint32_t frame) {
+    return cs::StopAll(base, frame, call);
+  });
+}
+
+void CarSoundsRelease(PPCContext& ctx, uint8_t* base) {
+  const uint32_t sound = ctx.r3.u32;
+  XAudioFramed(ctx, base, 112, [&](const xaudio::GuestCall& call, uint32_t frame) {
+    return cs::Release(base, sound, frame, call);
+  });
+}
+
+void CarSoundsReleaseAll(PPCContext& ctx, uint8_t* base) {
+  XAudioFramed(ctx, base, 112, [&](const xaudio::GuestCall& call, uint32_t frame) {
+    return cs::CarSoundsRelease(base, frame, call);
+  });
+}
+
 }  // namespace hooks
 
 #define ITC_CAR_SOUNDS_ADAPTER(address, step) \
@@ -402,6 +485,16 @@ ITC_CAR_SOUNDS_ADAPTER(8210D320, CarSoundsClear)
 // No adapter (removed 2026-10-29: only CarSound::ResumeAll's plain C++ calls it) for CarSound::Resume sub_8210D2C0.
 ITC_CAR_SOUNDS_ADAPTER(8210E2B8, CarSoundsPauseAll)
 ITC_CAR_SOUNDS_ADAPTER(8210E350, CarSoundsResumeAll)
+ITC_CAR_SOUNDS_ADAPTER(8210CE38, CarSoundsAddVoice)
+ITC_CAR_SOUNDS_ADAPTER(8210E3E8, CarSoundsPlayOnce)
+ITC_CAR_SOUNDS_ADAPTER(8210D410, CarSoundsEngineLayerStart)
+ITC_CAR_SOUNDS_ADAPTER(8210D6C0, CarSoundsEngineSoundStart)
+ITC_CAR_SOUNDS_ADAPTER(8210D7F8, CarSoundsTireSoundStart)
+ITC_CAR_SOUNDS_ADAPTER(8210E030, CarSoundsCarSoundStart)
+ITC_CAR_SOUNDS_ADAPTER(8210E218, CarSoundsStop)
+ITC_CAR_SOUNDS_ADAPTER(8210F7C8, CarSoundsStopAll)
+ITC_CAR_SOUNDS_ADAPTER(8210E170, CarSoundsRelease)
+ITC_CAR_SOUNDS_ADAPTER(8210F750, CarSoundsReleaseAll)
 
 extern "C" REX_FUNC(sub_82110258) {
   REX_FUNC_PROLOGUE();
