@@ -8,53 +8,21 @@ file's history. What's left to see in a drive, from every run:
 
 ## Now
 
-- Run started 2026-10-29 15:44 on `b7-loop-29-10-26` (the user's
-  branch), from e282f62; summary `b7-loop-2026-10-29-1544.md`.
+- Run started 2026-10-29 22:22 on `b7-loop-29-10-26-2` (the user's
+  branch), from 6fe366a; summary `b7-loop-2026-10-29-2222.md`.
 - Limit for this run: 3 subsystems.
-- Subsystem 1 of 3 done: XACT's tracks and events (below). Recorded in
-  the plan's table and boundary log.
-- Subsystem 2 of 3 done: XAudio's engine and mixer (below). Recorded in
-  the plan's table and boundary log.
-- The user's calls (2026-10-29, now under "Precedent first" in
-  `b7-loop.md`): XAudio's threads, events, semaphore and notification
-  through their imports as the original does; QueryPerformanceCounter
-  from the host clock at 50 MHz, like GetTickCount.
-- The continuations (not counted) done (below). Recorded in the plan's
-  table and boundary log.
-- Subsystem 3 of 3: XAudio's factory objects and codecs (`leads.md`,
-  with the XAPO lead). Map a611121 checked (`xaudio-objects.md`, 121
-  rows, 109 in play, 86 ready groups). Migration 1 checked (78 of 109
-  ours, 32c197d..4c32e78; `xaudio.md` 94 of 96). Its validation
-  reported two functions missing: stopped (below).
+- First, a cleanup lead without mapping (not counted), the last run's
+  stop: the XMA codec's two destructors' harness (`sub_8246A918`,
+  `sub_8246AAD0`: their case releases the codec through the original),
+  then what's ready in `xaudio-objects.md` (the resampler, the reverb's
+  core). The precedent: the run of 2026-10-24 21:33 began with the
+  previous stop's harness lines as such a lead. Migration agent running.
 
 ## Done
 
-- XAudio's factory objects: `xaudio-objects.md`, 78 of 109 in play
-  native in one migration (20 Native from the start), with 4 in
-  `xaudio.md`; `--native_xaudio_objects`; a611121, 32c197d..4c32e78,
-  prints 259d68e, e3708da. Validated (`itc_2518`, `itc_2519`): 80 of 82
-  harness lines; four to drive.
-
-- The continuations: QueryPerformanceCounter (the host clock),
-  `XACTGetTimeMs`, XACT's tracks 55 of 55, waves 31 of 31 (`Fire`'s,
-  `SendNotification`'s, `Notify`'s and `SetState`'s r3 matched in full),
-  XAudio's engine 47 of 47; be9c0c5..12896c8. Validated (`itc_2472`,
-  `itc_2473`; `itc_2481`, `itc_2482`, the replay logged the intermittent
-  BaseHeap pair; `itc_2503`, `itc_2504`): 20, 16 and 16 harness lines;
-  `XACTWave::Finish` to drive.
-- XAudio's engine and mixer: `xaudio-engine.md`, 40 of 47 in play
-  native in one migration, 11 adapters removed; `--native_xaudio_engine`;
-  610125a, e9d3f21..d17ae9f. Validated (`itc_2458`, `itc_2459`): 40 of
-  40 harness lines, all ran in play; nothing to drive.
-- XACT's tracks and events: `xact-tracks.md`, 47 of 55 in play native
-  in two migrations, 16 adapters removed; `--native_xact_tracks`;
-  a3880fc, c8ad278..6fc2206, 84a6ef7..65b3944. Validated (`itc_2432`,
-  `itc_2433`; `itc_2443`, `itc_2444`): 44 and 5 harness lines; one to
-  drive.
-
 ## Rows to review
 
-`review.md`, "Run 2026-10-29 15:44".
+`review.md`, "Run 2026-10-29 22:22".
 
 ## Expected to differ
 
@@ -66,64 +34,7 @@ file's history. What's left to see in a drive, from every run:
 
 ## Totals
 
-- At the start: ours 2804, work left 3660 (wrapped 103, known 509,
-  unknown 3048).
-- After XACT's tracks' map: ours 2804, work left 3660 (wrapped 103,
-  known 564, unknown 2993).
-- After XACT's tracks' migration 1 (`itc_2431`: race 38 s, 0 errors,
-  xact_tracks 0 differing): ours 2848, work left 3616 (wrapped 103,
-  known 520, unknown 2993).
-- After its validation (`itc_2432`: race 7 s, the harnesses ~33 s, 0
-  errors, every harness 0 differing but the expected groups): ours
-  2848, work left 3616.
-- After XACT's tracks' migration 2 (`itc_2442`: race 38 s, 0 errors,
-  xact_tracks and xact 0 differing): ours 2852, work left 3612 (wrapped
-  103, known 516, unknown 2993).
-- After its validation (`itc_2443`: race 7 s, 0 errors, every harness
-  0 differing but the expected groups): ours 2852, work left 3612.
-- After XAudio's engine's map: ours 2852, work left 3612 (wrapped 103,
-  known 563, unknown 2946).
-- After XAudio's engine's migration 1 (race 37 s, 0 errors,
-  xaudio_engine 0 differing): ours 2892, work left 3572 (wrapped 103,
-  known 523, unknown 2946).
-- After its validation (`itc_2458`: race 8 s, 0 errors, every harness
-  0 differing but the expected groups): ours 2892, work left 3572.
-- After QueryPerformanceCounter and XACT's clock users (`itc_2471`:
-  race 38 s, 0 errors, clock, xact, xact_tracks, xact_waves 0
-  differing; the user's coverage commit cf7114c took 148 stale entries
-  out): ours 2909, work left 3407 (wrapped 103, known 513, unknown
-  2791).
-- After its validation (`itc_2472`: race 7 s, 0 errors, every harness
-  0 differing but the expected groups): ours 2909, work left 3407.
-- After XACT's waves' last two (`itc_2480`: race 38 s, 0 errors,
-  xact_waves, xact_tracks, xact, xaudio 0 differing): ours 2912, work
-  left 3405 (wrapped 104, known 510, unknown 2791).
-- After its validation (`itc_2481`: race 7 s, 0 errors, every harness
-  0 differing but the expected groups): ours 2912, work left 3405.
-- After the r3 fix and XAudio's engine's 7 (race 38 s, 0 errors,
-  xact, xact_waves, xact_tracks, xaudio_engine, xaudio 0 differing):
-  ours 2919, work left 3398 (wrapped 104, known 503, unknown 2791).
-- After its validation (`itc_2503`: race 7 s, 0 errors, every harness
-  0 differing but the expected groups): ours 2919, work left 3398.
-- After XAudio's objects' map: ours 2919, work left 3398 (wrapped 104,
-  known 612, unknown 2682).
-- After XAudio's objects' migration 1 (`itc_2514`: race 38 s, 0 errors,
-  xaudio, xaudio_engine, xaudio_objects 0 differing): ours 2999, work
-  left 3318 (wrapped 104, known 532, unknown 2682).
-- After its validation (`itc_2518`: race 7 s, 0 errors, every harness
-  0 differing but the expected groups): ours 2999, work left 3318.
+- At the start: ours 2999, work left 3318 (wrapped 104, known 532,
+  unknown 2682).
 
 ## Stopped
-
-2026-10-29, at XAudio's objects' validation (subsystem 3 of 3): two
-functions made native have no harness line ("When to halt"):
-`sub_8246A918` (the XMA codec's inner destructor) and `sub_8246AAD0`
-`XmaCodec::~XmaCodec`. Both ran in play (`itc_2518`), but the XMA
-cases of `XAudioCodec::Create` (`src/harnesses/xaudio_objects.cpp`,
-about line 485) release the codec through `__imp__sub_8246A758`, the
-original's release, so `xa::XmaCodecDestroy` never runs under a
-harness. To fix: release through the native path in that case (or add
-cases of their own). Ready and not taken: the resampler and the
-reverb's core. Every harness was at 0 differing. Two user's calls on
-the way (XAudio's kernel objects; QueryPerformanceCounter).
-`check_function_statuses.py`: 0 errors. To drive: `to-drive.md`.
