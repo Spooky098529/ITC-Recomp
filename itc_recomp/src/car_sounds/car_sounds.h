@@ -339,4 +339,44 @@ uint32_t EngineSoundUpdate(uint8_t* base, uint32_t engine, uint32_t vehicle, uin
                            double f1, double f2, const Voices& voices, uint32_t frame,
                            const GuestCall& call);
 
+// --- The tires and the roll (car_sound_parts.cpp), from CarSound::Update ---
+
+// sub_8210D890 TireLayer::Update (160 bytes): r3 = the tires' part (its
+// holder at +24), r4 `layer` (the part itself in play: +0 the slot, +4 the
+// last tick's `active`, the bytes +8 the ticks slipped, +9 the ramp's step,
+// +10 its length), r5 `active`, r7 `output` (the whole register, at the
+// frame's +80 for SetOutputMatrix), f1 `scale`. Active: the voice started
+// unless playing (IsPlaying), its volume +80 x `scale` x [0x82007FEC], its
+// pitch the half-word +76 (through the frame's +80) + [0x82008038]
+// (SetPitch, r7 0), the output; +9 = 0, +8 up by one. Else, while it plays:
+// just stopped (+4 set), the ramp's length +10 from +8 x 10 x
+// [0x820029EC] (fctidz's low byte; under 10 [0x82001FD8], else at most
+// [0x82008034]); while +9 is below +10 the volume +80 x [0x82007FEC] and
+// the pitch half-way from +76 toward +9 x 128 (at most 16383), else the
+// voice stopped and +8, +9 cleared; +9 up by one. +4 = `active`. Returns
+// the last call's r3.
+uint32_t TireLayerUpdate(uint8_t* base, uint32_t part, uint32_t layer, uint32_t active,
+                         uint64_t output, double scale, const Voices& voices, uint32_t frame,
+                         const GuestCall& call);
+// sub_8210E5C0 TireSound::Update (160 bytes): r3 = the tires' part (+652),
+// r4 the vehicle, r5 `output`: the slip (Vehicle::SlipWheelValue with
+// [0x82002BCC], in a 240-byte frame below); with any wheel's +433 set and
+// Vehicle::MaxWheelSlip ([0x82007FF0]) not 0.0, TireSound::Amount with the
+// slip, +70 up by one and +72 by 1.0, active; with none, the voices at +28
+// and +32 stopped when playing (GetState at the frame's +80 and +81); not
+// active and neither slot (+0, +12) playing, +80, +72 = 0.0 and +70, +76
+// = 0. Then TireLayer::Update (r4 the part, f1 [0x82007FC8]). Returns its
+// r3.
+uint32_t TireSoundUpdate(uint8_t* base, uint32_t part, uint32_t vehicle, uint64_t output,
+                         const Voices& voices, uint32_t frame, const GuestCall& call);
+// sub_8210DB60 RollSound::Update (144 bytes): r3 = the part at +792, r4 the
+// vehicle, r5 `output`: the volume (Vehicle::GetSpeedKmh)^2 x [0x82008044]
+// (at most [0x82007FC8]) x [0x82007FEC], and its fctiwz x [0x82008040] at
+// the frame's +88; its voice (+4) stopped when playing and the volume 0.0,
+// started when not and it isn't; then the pitch (the word at +88 as a
+// float + [0x8200803C], SetPitch slot 0, r7 0), the volume x [0x82007FEC]
+// and the output (at the frame's +88). Returns the last call's r3.
+uint32_t RollSoundUpdate(uint8_t* base, uint32_t part, uint32_t vehicle, uint64_t output,
+                         const Voices& voices, uint32_t frame, const GuestCall& call);
+
 }  // namespace car_sounds

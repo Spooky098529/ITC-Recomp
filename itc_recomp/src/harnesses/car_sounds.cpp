@@ -2201,6 +2201,252 @@ void Engine(Context& h, uint32_t block) {
   }
 }
 
+// --- The tires and the roll ---
+//
+// TireSound::Update, TireLayer::Update and RollSound::Update on a part at
+// +0x100 of the block: its holder's slots (the tires' at the part's +28 to
+// +40, the roll's at +4 to +16) fake voices 0-4 of "The voice holders" or 0
+// (with kFakeGetState, so the state is the voice's flags byte, playing or
+// not; their codecs fake voices 5-9 on a vtable of their own, as the
+// engine's), never 0 where the originals would start it (the tires' slot +0
+// while slipping, the roll's voice unless its volume is 0.0); the tires'
+// fields (+0 and +12 the slots, +4 the last tick's active, the bytes +8 to
+// +10, the half-words +70 and +76, the floats +72 and +80) random over their
+// branches; the output at +0x300 as the parts'; a vehicle in a block of its
+// own (the wheels' fields from +0 random floats, their +433 bytes set or not,
+// all four clear one time in five, their data +2160 at its +0x2000, the body
+// +336 at its +0x3000, zeroed with the spins one time in four so nothing
+// slips; the speed +48). SlipWheelValue's once flag [0x826C2E3C] is set and
+// its threshold [0x826C2E38] given per case (both put back after).
+// Compared: the block (the fake voices' +112 and +140 and the tires' +72 and
+// +80 as floats), the vehicle, the two globals, r3, the function's own
+// frame's locals (+80 to +88; +80 to +96 for the roll; for TireSound::Update
+// only its own, as below it TireLayer::Update's locals lie where the
+// originals' register saves for SlipWheelValue and IsPlaying land, which
+// the plain C++ doesn't write) and the 64 bytes above the stack pointer.
+constexpr uint32_t kSlipFlag = 0x826C2E3C, kSlipThreshold = 0x826C2E38;
+
+void TireVoices(uint8_t* base, uint32_t block, Random& random) {
+  FakeVoices(base, block, random);
+  for (uint32_t slot = 0; slot < 0x100; slot += 4) {
+    Store(base, block + kCodecVtable + slot, guest::LoadU32(base, block + kVoiceVtable + slot));
+  }
+  Store(base, block + kVoiceVtable + 48, kFakeGetState);
+  for (uint32_t k = 0; k < kVoiceCount; k++) {
+    if (k >= kSlotVoices) {
+      Store(base, FakeVoice(block, k), block + kCodecVtable);
+    } else {
+      Store(base, FakeVoice(block, k) + 76,
+            FakeVoice(block, kSlotVoices + random.Below(kVoiceCount - kSlotVoices)));
+    }
+  }
+}
+
+// The tires' part, its slots +0 and +12 (when not -1) with a voice each.
+void TirePart(uint8_t* base, uint32_t block, Random& random) {
+  const uint32_t part = block + kPart;
+  Store(base, part + 0, random.Below(4));
+  Store(base, part + 4, random.Below(5) == 0 ? uint32_t(random.Next()) : random.Below(2));
+  guest::StoreU8(base, part + 8, uint8_t(random.Below(3) == 0 ? random.Below(256) : random.Below(30)));
+  guest::StoreU8(base, part + 9, uint8_t(random.Below(4) == 0 ? random.Below(256) : random.Below(20)));
+  guest::StoreU8(base, part + 10, uint8_t(random.Below(3) == 0 ? random.Below(256) : random.Below(40)));
+  Store(base, part + 12, Slot(random, 4));
+  Store(base, part + 16, random.Below(5) == 0 ? uint32_t(random.Next()) : random.Below(2));
+  guest::StoreU8(base, part + 20, uint8_t(random.Below(30)));
+  guest::StoreU8(base, part + 21, uint8_t(random.Below(20)));
+  guest::StoreU8(base, part + 22, uint8_t(random.Below(40)));
+  for (uint32_t i = 0; i < 4; i++) {
+    Store(base, part + 28 + 4 * i,
+          random.Below(4) == 0 ? 0 : FakeVoice(block, random.Below(kSlotVoices)));
+  }
+  for (const uint32_t at : {part + 0, part + 12}) {
+    const uint32_t slot = guest::LoadU32(base, at);
+    if (slot < 4 && guest::LoadU32(base, part + 28 + 4 * slot) == 0) {
+      Store(base, part + 28 + 4 * slot, FakeVoice(block, random.Below(kSlotVoices)));
+    }
+  }
+  guest::StoreU16(base, part + 70,
+                  uint16_t(random.Below(4) == 0 ? random.Next() : random.Below(100)));
+  Store(base, part + 72, FloatBits(float(EngineInput(random, 0.0f, 50.0f))));
+  guest::StoreU16(base, part + 76,
+                  uint16_t(random.Below(4) == 0 ? random.Next() : random.Below(16384)));
+  Store(base, part + 80, FloatBits(float(EngineInput(random, 0.0f, 2.0f))));
+}
+
+// The vehicle's wheels for SlipWheelValue and MaxWheelSlip, and its speed.
+void TireVehicle(uint8_t* base, uint32_t vehicle, Random& random) {
+  for (uint32_t i = 0; i < 0x700; i += 4) {
+    Store(base, vehicle + i,
+          FloatBits(random.Below(50) == 0 ? std::bit_cast<float>(Special(random))
+                                          : Uniform(random, -10.0f, 10.0f)));
+  }
+  const bool none = random.Below(5) == 0;
+  const bool still = random.Below(4) == 0;
+  for (uint32_t i = 0; i < 4; i++) {
+    const uint32_t w = vehicle + 368 * i;
+    guest::StoreU8(base, w + 433,
+                   none || random.Below(3) == 0 ? 0 : uint8_t(1 + random.Below(255)));
+    const uint32_t data = vehicle + 0x2000 + 64 * i;
+    Store(base, vehicle + 2160 + 4 * i, data);
+    Store(base, data + 52, FloatBits(Uniform(random, 0.2f, 0.6f)));
+    Store(base, w + 684, FloatBits(float(EngineInput(random, 0.0f, 3.0f))));
+    if (still) {
+      Store(base, w + 664, 0);
+    }
+  }
+  const uint32_t body = vehicle + 0x3000;
+  Store(base, vehicle + 336, body);
+  for (uint32_t i = 0; i < 0x200; i += 4) {
+    Store(base, body + i, still ? 0 : FloatBits(Uniform(random, -20.0f, 20.0f)));
+  }
+}
+
+template <typename Setup>
+void TireCase(Context& h, Results& results, uint32_t block, uint32_t vehicle,
+              GuestFunction recompiled, GuestFunction native, uint32_t frame_bytes,
+              uint32_t locals, Setup setup, const std::string& what) {
+  std::vector<uint32_t> floats;
+  for (uint32_t k = 0; k < kVoiceCount; k++) {
+    floats.push_back(kVoices + kVoiceBytes * k + 112);
+    floats.push_back(kVoices + kVoiceBytes * k + 140);
+  }
+  floats.push_back(kPart + 72);
+  floats.push_back(kPart + 80);
+  const Random start = h.random;
+  Random random = start;
+  Outputs out[2];
+  for (int v = 0; v < 2; v++) {
+    random = start;
+    for (uint32_t i = 0; i < kBlockBytes; i += 4) {
+      Store(h.base, block + i, uint32_t(random.Next()));
+    }
+    for (uint32_t i = 0; i < kVehicleBytes; i += 4) {
+      Store(h.base, vehicle + i, uint32_t(random.Next()));
+    }
+    PPCContext t = CallContext(h);
+    for (uint32_t i = 0; i < 0x1000; i += 4) {
+      Store(h.base, t.r1.u32 - 0x1000 + i, uint32_t(random.Next()));
+    }
+    for (uint32_t i = 0; i < 64; i += 4) {
+      Store(h.base, t.r1.u32 + i, uint32_t(random.Next()));
+    }
+    TireVoices(h.base, block, random);
+    TirePart(h.base, block, random);
+    TireVehicle(h.base, vehicle, random);
+    Store(h.base, kSlipFlag, guest::LoadU32(h.base, kSlipFlag) | 1);
+    const uint32_t pick = random.Below(6);
+    Store(h.base, kSlipThreshold,
+          pick == 0 ? 0 : pick == 1 ? Special(random) : FloatBits(Uniform(random, 0.0f, 8.0f)));
+    const uint64_t output = PartOutput(h.base, block, random);
+    setup(random, t, output);
+    ITC_FLAG(native_car_sounds) = v == 1;
+    (v == 0 ? recompiled : native)(t, h.base);
+    ITC_FLAG(native_car_sounds) = true;
+    BlockOutputs(out[v], h.base, block, floats);
+    out[v].Bytes(Read(h.base, vehicle, kVehicleBytes));
+    out[v].Word(guest::LoadU32(h.base, kSlipFlag));
+    out[v].Word(guest::LoadU32(h.base, kSlipThreshold));
+    out[v].Word(t.r3.u32);
+    out[v].Bytes(Read(h.base, t.r1.u32 - frame_bytes + 80, locals));
+    out[v].Bytes(Read(h.base, t.r1.u32, 64));
+  }
+  h.random = random;
+  results.Check(out[0], out[1], what);
+}
+
+void Tires(Context& h, uint32_t block) {
+  VehicleBlock vehicle_block;
+  if (!vehicle_block.address) {
+    ITC_LOG_ERROR("harness: car_sounds: no vehicle block from the allocation layer");
+    return;
+  }
+  const uint32_t vehicle = vehicle_block.address;
+  const uint32_t part = block + kPart;
+  const uint32_t saved_flag = guest::LoadU32(h.base, kSlipFlag);
+  const uint32_t saved_threshold = guest::LoadU32(h.base, kSlipThreshold);
+  ITC_LOG_INFO("harness: car_sounds: the tires' and roll's constants: slip speed {}, slip "
+               "threshold {}, volume {}, tire pitch {}, ramp scale {}, short {}, cap {}, roll "
+               "scale {}, roll pitch scale {}, roll pitch {}",
+               Constant(h.base, 0x82002BCC), Constant(h.base, 0x82007FF0),
+               Constant(h.base, 0x82007FEC), Constant(h.base, 0x82008038),
+               Constant(h.base, 0x820029EC), Constant(h.base, 0x82001FD8),
+               Constant(h.base, 0x82008034), Constant(h.base, 0x82008044),
+               Constant(h.base, 0x82008040), Constant(h.base, 0x8200803C));
+  {
+    Results results("TireLayer::Update (sub_8210D890)");
+    for (int c = 0; c < 300; c++) {
+      TireCase(h, results, block, vehicle, __imp__sub_8210D890, hooks::CarSoundsTireLayerUpdate,
+               160, 8,
+               [&](Random& random, PPCContext& t, uint64_t output) {
+                 const uint32_t layer = part + (random.Below(4) == 0 ? 12 : 0);
+                 uint32_t active = random.Below(10) == 0 ? uint32_t(random.Next()) : random.Below(2);
+                 // Active only with a slot that has a voice (the original
+                 // would start the holder's word otherwise).
+                 if (guest::LoadU32(h.base, layer) >= 4) {
+                   active = 0;
+                 }
+                 t.r3.u64 = part;
+                 t.r4.u64 = layer;
+                 t.r5.u64 = active;
+                 t.r7.u64 = random.Below(8) == 0 ? random.Next() : output;
+                 t.f1.f64 = EngineInput(random, 0.0f, 2.0f);
+               },
+               fmt::format("case {}", c));
+    }
+    results.Report();
+  }
+  {
+    Results results("TireSound::Update (sub_8210E5C0)");
+    for (int c = 0; c < 300; c++) {
+      TireCase(h, results, block, vehicle, __imp__sub_8210E5C0, hooks::CarSoundsTireSoundUpdate,
+               160, 8,
+               [&](Random& random, PPCContext& t, uint64_t output) {
+                 t.r3.u64 = part;
+                 t.r4.u64 = vehicle;
+                 t.r5.u64 = random.Below(8) == 0 ? random.Next() : output;
+               },
+               fmt::format("case {}", c));
+    }
+    results.Report();
+  }
+  {
+    Results results("RollSound::Update (sub_8210DB60)");
+    for (int c = 0; c < 300; c++) {
+      TireCase(h, results, block, vehicle, __imp__sub_8210DB60, hooks::CarSoundsRollSoundUpdate,
+               144, 16,
+               [&](Random& random, PPCContext& t, uint64_t output) {
+                 float speed;
+                 switch (random.Below(8)) {
+                   case 0:
+                     speed = std::bit_cast<float>(Special(random));
+                     break;
+                   case 1:
+                     speed = random.Below(2) == 0 ? 0.0f : -0.0f;
+                     break;
+                   case 2:
+                   case 3:
+                     speed = Uniform(random, 0.0f, 5.0f);
+                     break;
+                   default:
+                     speed = Uniform(random, -10.0f, 90.0f);
+                 }
+                 Store(h.base, vehicle + 48, FloatBits(speed));
+                 const bool silent = speed == 0.0f;
+                 Store(h.base, part + 4,
+                       silent && random.Below(2) == 0 ? 0
+                                                      : FakeVoice(block, random.Below(kSlotVoices)));
+                 t.r3.u64 = part;
+                 t.r4.u64 = vehicle;
+                 t.r5.u64 = random.Below(8) == 0 ? random.Next() : output;
+               },
+               fmt::format("case {}", c));
+    }
+    results.Report();
+  }
+  Store(h.base, kSlipFlag, saved_flag);
+  Store(h.base, kSlipThreshold, saved_threshold);
+}
+
 }  // namespace
 
 void CarSounds(Context& h) {
@@ -2219,6 +2465,7 @@ void CarSounds(Context& h) {
   RealVoices(h, block.address);
   Parts(h, block.address);
   Engine(h, block.address);
+  Tires(h, block.address);
 }
 
 }  // namespace harness

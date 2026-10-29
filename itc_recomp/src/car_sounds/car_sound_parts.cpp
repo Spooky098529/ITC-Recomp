@@ -1,6 +1,6 @@
 // The car sounds' parts natively (car_sounds.h, docs/functions/car-sounds.md):
-// the hits, the parts at +736, +840 and +888, the wind, the pass by and the
-// engine with its two layers, each
+// the hits, the parts at +736, +840 and +888, the wind, the pass by, the
+// engine with its two layers, the tires with their layer and the roll, each
 // from CarSound::Update every tick. Their callees' plain C++ called directly
 // (PlayOnce, IsPlaying, UpdateVoices, XAudio's SetVolume and Stop, the
 // vehicle's accessors), each in a frame below the caller's, with the
@@ -13,6 +13,7 @@
 #include "c_runtime/math.h"
 #include "guest.h"
 #include "hooks/vehicle.h"
+#include "vehicle/vehicle.h"
 #include "vehicle_accessors/vehicle_accessors.h"
 
 #include <bit>
@@ -57,6 +58,14 @@ uint32_t FctidzWord(double value) {
     return 0;
   }
   return uint32_t(uint64_t(int64_t(value)));
+}
+// fctidz's whole word, as the translation leaves it (stfd).
+uint64_t Fctidz64(double value) {
+  if (std::isnan(value) || value >= 9223372036854775808.0 ||
+      value < -9223372036854775808.0) {
+    return value > 9223372036854775808.0 ? uint64_t(INT64_MAX) : 0x8000000000000000ull;
+  }
+  return uint64_t(int64_t(value));
 }
 // fctiwz's low word, as the translation leaves it (stfiwx).
 uint32_t FctiwzWord(double value) {
@@ -721,6 +730,245 @@ uint32_t EngineSoundUpdate(uint8_t* base, uint32_t engine, uint32_t vehicle, uin
                                                xa::FrameBelow(base, frame, kPitchedFrame), call);
   StoreF(base, engine + 168, load);
   return r3;
+}
+
+// --- The tires (sub_8210E5C0 with its layer) and the roll (sub_8210DB60) ---
+
+namespace {
+
+constexpr uint32_t kTireLayerFrame = 160;
+constexpr uint32_t kSlipWheelValueFrame = 240;
+constexpr uint32_t kTireVolume = 0x82007FEC;    // the tires' and roll's volume scale
+constexpr uint32_t kTirePitch = 0x82008038;     // added to the tires' pitch word
+constexpr uint32_t kTireRampScale = 0x820029EC; // +8 x 10 to the ramp's length
+constexpr uint32_t kTireRampShort = 0x82001FD8; // the ramp below 10 ticks
+constexpr uint32_t kTireRampMax = 0x82008034;   // the ramp's cap
+constexpr uint32_t kSlipSpeed = 0x82002BCC;     // SlipWheelValue's f1
+constexpr uint32_t kSlipThreshold = 0x82007FF0; // MaxWheelSlip's f1
+constexpr uint32_t kRollScale = 0x82008044;     // the speed squared to the volume
+constexpr uint32_t kRollPitchScale = 0x82008040;
+constexpr uint32_t kRollPitch = 0x8200803C;     // added to the roll's pitch word
+
+// The pitch from a word converted through the frame's +80 (or +88): the
+// 64-bit word stored, fcfid, frsp, then + `add` (fadds).
+double PitchOfWord(uint8_t* base, uint32_t at, int64_t word, uint32_t add) {
+  Store64(base, at, uint64_t(word));
+  return Single(Single(double(word)) + LoadF(base, add));
+}
+
+}  // namespace
+
+uint32_t TireLayerUpdate(uint8_t* base, uint32_t part, uint32_t layer, uint32_t active,
+                         uint64_t output, double scale, const Voices& voices, uint32_t frame,
+                         const GuestCall& call) {
+  ITC_NATIVE_RUNNING("sub_8210D890 TireLayer::Update");
+  const uint32_t holder = part + 24;
+  uint32_t r3;
+  if (active != 0) {  // r26
+    // Playing (started first if not): the volume +80 x f1, the pitch from
+    // the half-word +76, the output; +9 = 0, +8 up by one.
+    const uint32_t playing = Playing(base, holder, Load(base, layer), frame, call);
+    uint32_t voice = VoiceAt(base, holder, Load(base, layer));
+    if (playing == 0) {
+      SetRegs(call, Args({voice, 0}));
+      xa::FrameBelow(base, frame, kApiFrame);
+      xa::ApiStart(base, voice, 0, voices.thread, call);
+      voice = VoiceAt(base, holder, Load(base, layer));
+    }
+    SetVolume(base, voice,
+              Single(Single(LoadF(base, part + 80) * scale) * LoadF(base, kTireVolume)), frame,
+              call);
+    const int64_t word = int16_t(guest::LoadU16(base, part + 76));
+    const double pitch = PitchOfWord(base, frame + 80, word, kTirePitch);
+    const uint32_t slot = Load(base, layer);
+    SetRegs(call, ArgsF1({holder, slot}, pitch));
+    SetPitch(base, holder, slot, pitch, 0, frame, call);
+    voice = VoiceAt(base, holder, Load(base, layer));
+    Store64(base, frame + 80, output);
+    SetRegs(call, Args({voice, frame + 80}));
+    xa::FrameBelow(base, frame, kApiFrame);
+    r3 = xa::ApiSetOutputMatrix(base, voice, frame + 80, 0, 0, 0, call);
+    guest::StoreU8(base, layer + 9, 0);
+    guest::StoreU8(base, layer + 8, uint8_t(guest::LoadU8(base, layer + 8) + 1));
+    Store(base, layer + 4, active);
+    return r3;
+  }
+  r3 = Playing(base, holder, Load(base, layer), frame, call);
+  if (r3 == 0) {
+    Store(base, layer + 4, active);
+    return r3;
+  }
+  if (Load(base, layer + 4) != 0) {
+    // Just stopped slipping: the ramp's length +10 from the ticks it played
+    // (+8 x 10 x [0x820029EC], fctidz's low byte; under 10, [0x82001FD8];
+    // else that byte as a float, at most [0x82008034], fctidz's low byte).
+    const int64_t ticks = int32_t(uint32_t(guest::LoadU8(base, layer + 8)) * 10);
+    Store64(base, frame + 80, uint64_t(ticks));
+    double f0 = Single(Single(double(ticks)) * LoadF(base, kTireRampScale));
+    uint64_t word = Fctidz64(f0);
+    Store64(base, frame + 80, word);
+    const uint8_t length = uint8_t(word);
+    guest::StoreU8(base, layer + 10, length);
+    if (length < 10) {
+      f0 = LoadF(base, kTireRampShort);
+    } else {
+      Store64(base, frame + 80, length);
+      f0 = Single(double(int64_t(length)));
+      const double cap = LoadF(base, kTireRampMax);
+      if (f0 > cap) {
+        f0 = cap;
+      }
+    }
+    word = Fctidz64(f0);
+    Store64(base, frame + 80, word);
+    guest::StoreU8(base, layer + 10, uint8_t(word));
+  }
+  // The ramp: the pitch half-way from +76 toward +9 x 128 (at most 16383),
+  // while +9 is below +10; then stopped, +8 and +9 cleared. +9 up by one.
+  const uint32_t step = guest::LoadU8(base, layer + 9);
+  int32_t target = int32_t(step << 7);
+  if (target > 16383) {
+    target = 16383;
+  }
+  const uint32_t length = guest::LoadU8(base, layer + 10);
+  const uint16_t now = guest::LoadU16(base, part + 76);
+  const int32_t diff = int32_t(uint32_t(int64_t(int16_t(target)) - int64_t(int16_t(now))));
+  const int64_t mid = int16_t(uint16_t(uint32_t(diff / 2) + now));
+  if (step < length) {
+    uint32_t voice = VoiceAt(base, holder, Load(base, layer));
+    SetVolume(base, voice, Single(LoadF(base, part + 80) * LoadF(base, kTireVolume)), frame,
+              call);
+    const uint32_t slot = Load(base, layer);
+    const double pitch = PitchOfWord(base, frame + 80, mid, kTirePitch);
+    SetRegs(call, ArgsF1({holder, slot}, pitch));
+    SetPitch(base, holder, slot, pitch, 0, frame, call);
+    voice = VoiceAt(base, holder, Load(base, layer));
+    Store64(base, frame + 80, output);
+    SetRegs(call, Args({voice, frame + 80}));
+    xa::FrameBelow(base, frame, kApiFrame);
+    r3 = xa::ApiSetOutputMatrix(base, voice, frame + 80, 0, 0, 0, call);
+  } else {
+    r3 = StopVoice(base, VoiceAt(base, holder, Load(base, layer)), frame, call);
+    guest::StoreU8(base, layer + 8, 0);
+    guest::StoreU8(base, layer + 9, 0);
+  }
+  guest::StoreU8(base, layer + 9, uint8_t(guest::LoadU8(base, layer + 9) + 1));
+  Store(base, layer + 4, active);
+  return r3;
+}
+
+uint32_t TireSoundUpdate(uint8_t* base, uint32_t part, uint32_t vehicle, uint64_t output,
+                         const Voices& voices, uint32_t frame, const GuestCall& call) {
+  ITC_NATIVE_RUNNING("sub_8210E5C0 TireSound::Update");
+  const double speed = LoadF(base, kSlipSpeed);
+  SetRegs(call, ArgsF1({vehicle}, speed));
+  const double slip = vehicle::VehicleSlipWheelValue(
+      base, vehicle, speed, xa::FrameBelow(base, frame, kSlipWheelValueFrame));  // f29
+  SetF1(call, slip);
+  uint32_t grounded = 0;  // r9: the wheels whose +433 is set
+  for (uint32_t i = 0; i < 4; i++) {
+    if (guest::LoadU8(base, vehicle + 433 + 368 * i) != 0) {
+      grounded++;
+    }
+  }
+  const double zero = LoadF(base, kZero);  // f31
+  const double one = LoadF(base, kOne);    // f30
+  uint32_t active = 0;                     // r29
+  bool slipping = false;
+  if (grounded != 0) {
+    const double threshold = LoadF(base, kSlipThreshold);
+    SetRegs(call, ArgsF1({vehicle}, threshold));
+    const double most = double(va::VehicleMaxWheelSlip(base, vehicle, threshold));
+    SetF1(call, most);
+    if (most != zero) {  // fcmpu: a NaN slips
+      active = 1;
+      SetRegs(call, ArgsF1({part, vehicle}, slip));
+      TireSoundAmount(base, part, slip);
+      guest::StoreU16(base, part + 70, uint16_t(guest::LoadU16(base, part + 70) + 1));
+      StoreF(base, part + 72, Single(LoadF(base, part + 72) + one));
+      slipping = true;
+    }
+  } else {
+    // No wheel down: both voices (+28, +32) stopped when playing (their
+    // states at the frame's +80 and +81).
+    for (uint32_t i = 0; i < 2; i++) {
+      const uint32_t voice = Load(base, part + 28 + 4 * i);
+      if (voice == 0) {
+        continue;
+      }
+      SetRegs(call, Args({voice, frame + 80 + i}));
+      xa::FrameBelow(base, frame, kApiFrame);
+      xa::ApiGetState(base, voice, frame + 80 + i, 0, 0, 0, call);
+      if ((guest::LoadU8(base, frame + 80 + i) & 1) != 0) {
+        StopVoice(base, Load(base, part + 28 + 4 * i), frame, call);
+      }
+    }
+  }
+  if (!slipping) {
+    // Neither slot (+0, +12) playing: +80, +72 = 0.0, +70, +76 = 0.
+    const uint32_t holder = part + 24;
+    if (Playing(base, holder, Load(base, part + 0), frame, call) == 0 &&
+        Playing(base, holder, Load(base, part + 12), frame, call) == 0) {
+      StoreF(base, part + 80, zero);
+      guest::StoreU16(base, part + 70, uint16_t(active));
+      StoreF(base, part + 72, zero);
+      guest::StoreU16(base, part + 76, uint16_t(active));
+    }
+  }
+  SetRegs(call, ArgsF1({part, part, active}, one));
+  return TireLayerUpdate(base, part, part, active, output, one, voices,
+                         xa::FrameBelow(base, frame, kTireLayerFrame), call);
+}
+
+uint32_t RollSoundUpdate(uint8_t* base, uint32_t part, uint32_t vehicle, uint64_t output,
+                         const Voices& voices, uint32_t frame, const GuestCall& call) {
+  ITC_NATIVE_RUNNING("sub_8210DB60 RollSound::Update");
+  SetRegs(call, Args({vehicle}));
+  const double speed = double(Vehicle_GetSpeedKmh(base, vehicle));
+  SetF1(call, speed);
+  double f0 = Single(Single(speed * speed) * LoadF(base, kRollScale));
+  const double cap = LoadF(base, kOne);
+  if (f0 > cap) {
+    f0 = cap;
+  }
+  const double volume = Single(f0 * LoadF(base, kTireVolume));  // f31
+  Store(base, frame + 88, FctiwzWord(Single(volume * LoadF(base, kRollPitchScale))));
+  const double zero = LoadF(base, kZero);
+  uint32_t voice = Load(base, part + 4);
+  uint32_t r3 = voice;
+  bool playing = false;  // r29
+  if (voice != 0) {
+    SetRegs(call, Args({voice, frame + 80}));
+    xa::FrameBelow(base, frame, kApiFrame);
+    r3 = xa::ApiGetState(base, voice, frame + 80, 0, 0, 0, call);
+    playing = (guest::LoadU8(base, frame + 80) & 1) != 0;
+  }
+  if (playing) {
+    if (volume == zero) {
+      return StopVoice(base, Load(base, part + 4), frame, call);
+    }
+  } else {
+    if (volume == zero) {
+      return r3;
+    }
+    voice = Load(base, part + 4);
+    SetRegs(call, Args({voice, 0}));
+    xa::FrameBelow(base, frame, kApiFrame);
+    xa::ApiStart(base, voice, 0, voices.thread, call);
+  }
+  // The pitch from the word at +88 (as the GetState above may have left it),
+  // then the volume x [0x82007FEC] again and the output.
+  const int64_t word = int32_t(Load(base, frame + 88));
+  const double pitch = PitchOfWord(base, frame + 88, word, kRollPitch);
+  SetRegs(call, ArgsF1({part, 0}, pitch));
+  SetPitch(base, part, 0, pitch, 0, frame, call);
+  voice = Load(base, part + 4);
+  SetVolume(base, voice, Single(volume * LoadF(base, kTireVolume)), frame, call);
+  voice = Load(base, part + 4);
+  Store64(base, frame + 88, output);
+  SetRegs(call, Args({voice, frame + 88}));
+  xa::FrameBelow(base, frame, kApiFrame);
+  return xa::ApiSetOutputMatrix(base, voice, frame + 88, 0, 0, 0, call);
 }
 
 }  // namespace car_sounds

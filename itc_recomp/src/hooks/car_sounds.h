@@ -143,4 +143,11 @@ void CarSoundsEngineLayerUpdate(PPCContext& ctx, uint8_t* base);         // sub_
 void CarSoundsEngineLayerUpdatePitched(PPCContext& ctx, uint8_t* base);  // sub_8210D718
 void CarSoundsEngineSoundUpdate(PPCContext& ctx, uint8_t* base);         // sub_8210E470
 
+// The tires: TireLayer::Update (r3 the part, r4 the layer, r5 active, r7 the
+// output, f1) and TireSound::Update, and RollSound::Update (each r3 the part,
+// r4 the vehicle, r5 the output).
+void CarSoundsTireLayerUpdate(PPCContext& ctx, uint8_t* base);  // sub_8210D890
+void CarSoundsTireSoundUpdate(PPCContext& ctx, uint8_t* base);  // sub_8210E5C0
+void CarSoundsRollSoundUpdate(PPCContext& ctx, uint8_t* base);  // sub_8210DB60
+
 }  // namespace hooks
