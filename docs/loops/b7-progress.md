@@ -23,7 +23,9 @@ file's history. What's left to see in a drive, from every run:
   table and boundary log.
 - Subsystem 3 of 3: XAudio's factory objects and codecs (`leads.md`,
   with the XAPO lead). Map a611121 checked (`xaudio-objects.md`, 121
-  rows, 109 in play, 86 ready groups). Step: migration agent 1 running.
+  rows, 109 in play, 86 ready groups). Migration 1 checked (78 of 109
+  ours, 32c197d..4c32e78; `xaudio.md` 94 of 96). Step: validation
+  agent running.
 
 ## Done
 
@@ -99,3 +101,6 @@ file's history. What's left to see in a drive, from every run:
   0 differing but the expected groups): ours 2919, work left 3398.
 - After XAudio's objects' map: ours 2919, work left 3398 (wrapped 104,
   known 612, unknown 2682).
+- After XAudio's objects' migration 1 (`itc_2514`: race 38 s, 0 errors,
+  xaudio, xaudio_engine, xaudio_objects 0 differing): ours 2999, work
+  left 3318 (wrapped 104, known 532, unknown 2682).

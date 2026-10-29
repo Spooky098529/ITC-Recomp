@@ -29,6 +29,26 @@ When the user has reviewed a run's section, its heading gets
   rows touch the XMA object or registers. Kernel use: the voice lists'
   spin lock only (the 2026-10-29 call); the reverb times its passes with
   QueryPerformanceCounter (ours). `known-data.md`: 10 layouts.
+- XAudio's objects' migration 1 (32c197d..4c32e78, `--native_xaudio_objects`):
+  78 of 109 in play ours (20 Native from the start: only native callers
+  reach them), with `XAudioRegisterProcessingCallback` `sub_8245A5E8` and
+  `XAudio::Commit` `sub_8245A6E8` in `xaudio.md` (94 of 96; its last two,
+  `XAudioShutDown` and the static initializer `sub_825DA0F0`, left
+  recompiled: they release or initialize the live engine and API lock
+  and can't be harnessed). Corrections to the map: `OnSubmit`
+  `sub_82469AF8` releases one lock level per failed check;
+  `SubmitPacket` `sub_82469EF8` takes the first free entry; bit 5 of
+  `RetirePacket`'s flags probably "a free entry available". A fix
+  outside the subsystem: `XAudioBuffer::Clear` and `ClearThunk`'s
+  adapters now sign-extend their error r3 as the original's
+  `lis`/`ori`. Matching notes (in `native-audio.md`): the translated
+  code's `lfs`/`stfs` pairs fold to a bit copy (signaling NaNs kept);
+  its `vmaddfp` is a rounded product then a sum, flush to zero on.
+  Adapters kept though `--removable` listed them: six vtable slots,
+  and `sub_824656B8` (an indirect caller not ruled out). Seen with the
+  xaudio or xaudio_engine harnesses: 4-7 silence fills in the first
+  10 s, also with `--native_xaudio_objects=false` (the harnesses holding
+  the mixer's lock). Left: the resampler and the reverb's core (ready).
 - The user's calls (2026-10-29), asked by the lead: XAudio's own
   threads, events, semaphore and title terminate notification are used
   by native code through their imports exactly as the original does
