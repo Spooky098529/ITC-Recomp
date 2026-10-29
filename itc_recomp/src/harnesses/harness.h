@@ -208,5 +208,6 @@ void SaveInterface(Context& h);
 void CarSounds(Context& h);
 void X3DAudioMath(Context& h);
 void XAudio(Context& h);
+void XactWaves(Context& h);
 
 }  // namespace harness
