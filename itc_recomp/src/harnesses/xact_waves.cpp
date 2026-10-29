@@ -459,11 +459,15 @@ void Creates(Context& h, uint32_t block) {
 //
 // One case over the block (random words, the same for both versions), the
 // inputs from `setup(random, t)`; compared: the block (exactly but the
-// offsets in `floats`), r3, and what `after(out, t)` adds.
+// offsets in `floats`), r3, and what `after(out, t)` adds. With
+// `switch_xact`, --native_xact switched with the version too, so the
+// recompiled version reaches the original XACTEngine::SendNotification
+// rather than its adapter.
 template <typename Setup, typename After>
 void WaveCase(Context& h, Results& results, uint32_t block, GuestFunction recompiled,
               GuestFunction native, Setup setup, After after,
-              const std::vector<uint32_t>& floats, const std::string& what) {
+              const std::vector<uint32_t>& floats, const std::string& what,
+              bool switch_xact = false) {
   const Random start = h.random;
   Random random = start;
   Outputs out[2];
@@ -478,8 +482,12 @@ void WaveCase(Context& h, Results& results, uint32_t block, GuestFunction recomp
     }
     setup(random, t);
     ITC_FLAG(native_xact_waves) = v == 1;
+    if (switch_xact) {
+      ITC_FLAG(native_xact) = v == 1;
+    }
     (v == 0 ? recompiled : native)(t, h.base);
     ITC_FLAG(native_xact_waves) = true;
+    ITC_FLAG(native_xact) = true;
     BlockOutputs(out[v], h.base, block, floats);
     out[v].Word(t.r3.u32);
     out[v].Word(uint32_t(t.r3.u64 >> 32));  // r3's upper word too
@@ -966,7 +974,7 @@ void Notifications(Context& h, uint32_t block) {
                  wave_world(random, t, type);
                  t.r4.u64 = random.Below(4) == 0 ? uint32_t(random.Next()) : type;
                },
-               frames(160), floats, fmt::format("case {}", c));
+               frames(160), floats, fmt::format("case {}", c), true);
     }
     results.Report();
   }
@@ -985,7 +993,7 @@ void Notifications(Context& h, uint32_t block) {
                    t.r3.u64 |= random.Next() << 32;
                  }
                },
-               frames(112 + 160), floats, fmt::format("case {}", c));
+               frames(112 + 160), floats, fmt::format("case {}", c), true);
     }
     results.Report();
   }
