@@ -13,7 +13,8 @@ file's history. What's left to see in a drive, from every run:
 - Limit for this run: 3 subsystems.
 - Subsystem 1 of 3: XACT's tracks and events (the top of `leads.md`,
   with the next lead, as it says they read best mapped together).
-  Step: mapping agent running.
+  Map a3880fc checked (`xact-tracks.md`, 143 rows, 55 in play, 34
+  ready groups). Step: migration agent 1 running.
 
 ## Done
 
@@ -33,3 +34,5 @@ file's history. What's left to see in a drive, from every run:
 
 - At the start: ours 2804, work left 3660 (wrapped 103, known 509,
   unknown 3048).
+- After XACT's tracks' map: ours 2804, work left 3660 (wrapped 103,
+  known 564, unknown 2993).

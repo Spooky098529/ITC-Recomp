@@ -13,7 +13,20 @@ When the user has reviewed a run's section, its heading gets
 
 ## Run 2026-10-29 15:44 (`b7-loop-29-10-26`)
 
-(In progress.)
+- XACT's tracks and events (map a3880fc): `docs/functions/xact-tracks.md`,
+  143 rows (all new; 88 not seen in play): the tracks, track instances
+  and events of `825D0000`-`825D9000`. The lead's "owner's forwarders"
+  at `825D1CC8`-`825D1DD0` are the wave's methods (`XACTWave::SetVolume`,
+  `SetPitch` and the rest, each one slot of the wave's voice at +44).
+  In play only event type 1 (play wave) runs: every sound the game plays
+  is simple, with no RPCs, so the RPC, transition and variation paths
+  never ran. `sub_82483208` (the play-wave event's SetWave) lies in the
+  movie library's range but only XACT reaches it, so it has a row here.
+  Only `XACTTrackInstance::CancelEvents` (`sub_825D5520`) takes XACT's
+  lock (the engine's +144, inline): taken as the original does (the
+  user's call, 2026-10-29). `known-data.md`: the track, track instance,
+  events, event record and two tables. Two leads added (the parameter
+  events, none in play; a static matrix set-up `sub_825D8F88`).
 
 ## Run 2026-10-28 22:22 (`b7-loop-28-10-26-3`)
 
