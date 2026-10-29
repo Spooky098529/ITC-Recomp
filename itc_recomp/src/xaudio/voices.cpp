@@ -1051,4 +1051,248 @@ uint32_t SubmixPass(uint8_t* base, uint32_t voice, uint32_t frame, const GuestCa
   return r30;
 }
 
+// --- The game's locks, taken as the original does ---
+
+void SpinTake(uint8_t* base, uint32_t thread, const GuestCall& call) {
+  const uint32_t irql = call(kKeRaiseIrqlToDpcLevel, 0, Regs{});
+  uint32_t depth = guest::LoadU32(base, kSpinLock + 4);
+  if (depth == 0 || thread != guest::LoadU32(base, kSpinLock + 8)) {
+    call(kKeAcquireSpinLockAtRaisedIrql, 0, Args({kSpinLock}));
+    guest::StoreU32(base, kSpinLock + 8, thread);
+    guest::StoreU8(base, kSpinLock + 12, uint8_t(irql));
+    depth = guest::LoadU32(base, kSpinLock + 4);
+  }
+  guest::StoreU32(base, kSpinLock + 4, depth + 1);
+}
+
+void SpinRelease(uint8_t* base, uint32_t thread, const GuestCall& call) {
+  const uint32_t depth = guest::LoadU32(base, kSpinLock + 4);
+  if (depth == 0 || thread != guest::LoadU32(base, kSpinLock + 8)) {
+    return;
+  }
+  guest::StoreU32(base, kSpinLock + 4, depth - 1);
+  if (depth - 1 != 0) {
+    return;
+  }
+  const uint32_t irql = guest::LoadU8(base, kSpinLock + 12);
+  guest::StoreU8(base, kSpinLock + 12, 0);
+  guest::StoreU32(base, kSpinLock + 8, 0);
+  call(kKeReleaseSpinLockFromRaisedIrql, 0, Args({kSpinLock}));
+  call(kKfLowerIrql, 0, Args({irql}));
+}
+
+namespace {
+
+// The node at `node` added at the end of the list at `list` (+0 next, +4
+// prev), as the voices' inline code does.
+void LinkAtEnd(uint8_t* base, uint32_t list, uint32_t node) {
+  guest::StoreU32(base, node, list);
+  guest::StoreU32(base, node + 4, guest::LoadU32(base, list + 4));
+  guest::StoreU32(base, list + 4, node);
+  guest::StoreU32(base, guest::LoadU32(base, node + 4), node);
+}
+
+// The node at `node` out of its list when it's in one, left pointing at
+// itself.
+void Unlink(uint8_t* base, uint32_t node) {
+  const uint32_t next = guest::LoadU32(base, node);
+  if (next == node) {
+    return;
+  }
+  guest::StoreU32(base, next + 4, guest::LoadU32(base, node + 4));
+  guest::StoreU32(base, guest::LoadU32(base, node + 4), guest::LoadU32(base, node));
+  guest::StoreU32(base, node + 4, node);
+  guest::StoreU32(base, node, node);
+}
+
+}  // namespace
+
+// --- Under the voice lists' spin lock ---
+
+uint32_t SourceGetState(uint8_t* base, uint32_t voice, uint32_t out, uint32_t thread,
+                        uint32_t frame, const GuestCall& call) {
+  ITC_NATIVE_RUNNING("sub_8245DDC8 XAudioSourceVoice::GetState");
+  SpinTake(base, thread, call);
+  const uint32_t codec = guest::LoadU32(base, voice + 76);
+  const uint32_t r3 = call(Method(base, codec, 44), 0x8245DE3C, At(frame, Args({codec, frame + 80})));
+  if (int32_t(r3) >= 0) {
+    guest::StoreU8(base, out, guest::LoadU8(base, voice + 61) | guest::LoadU8(base, frame + 80));
+  }
+  SpinRelease(base, thread, call);
+  return r3;
+}
+
+uint32_t Play(uint8_t* base, uint32_t voice, uint32_t thread, const GuestCall& call) {
+  ITC_NATIVE_RUNNING("sub_82461798 XAudioVoice::Play");
+  vehicle_accessors::DebugSwitchOff();
+  SpinTake(base, thread, call);
+  if ((guest::LoadU8(base, voice + 61) & 1) != 0) {
+    SpinTake(base, thread, call);
+    guest::StoreU8(base, voice + 61, guest::LoadU8(base, voice + 61) & 0xFB);
+    SpinRelease(base, thread, call);
+  } else {
+    SpinTake(base, thread, call);
+    guest::StoreU8(base, voice + 61, (guest::LoadU8(base, voice + 61) & 0xBE) | 1);
+    SpinRelease(base, thread, call);
+    call(Method(base, voice, 76), 0x8246194C, Args({voice}));
+  }
+  SpinRelease(base, thread, call);
+  vehicle_accessors::DebugSwitchOff();
+  return 0;
+}
+
+uint32_t Activate(uint8_t* base, uint32_t voice, uint32_t thread, uint32_t frame,
+                  const GuestCall& call) {
+  ITC_NATIVE_RUNNING("sub_82460EF0 XAudioVoice::Activate");
+  uint32_t r3 = 0;
+  for (uint32_t i = 0; i < guest::LoadU8(base, voice + 69); i++) {
+    if (int32_t(r3) < 0) {
+      return r3;
+    }
+    const uint32_t target = guest::LoadU32(base, guest::LoadU32(base, voice + 72) + 12 * i);
+    guest::StoreU32(base, target + 40, guest::LoadU32(base, target + 40) + 1);
+    r3 = call(Method(base, target, 56), 0x82460F44, At(frame, Args({target})));
+  }
+  if (int32_t(r3) < 0) {
+    return r3;
+  }
+  const uint32_t engine = guest::LoadU32(base, kEngine);
+  call(Method(base, voice, 52), 0x82460F80, At(frame, Args({voice, frame + 80})));
+  const uint8_t type = guest::LoadU8(base, frame + 80);
+  uint32_t lists;
+  if (type == 0) {
+    lists = engine + 80;
+  } else if (type == 1) {
+    lists = guest::LoadU32(base, engine + 124) + 44 * guest::LoadU8(base, voice + 76);
+  } else {
+    return 0;
+  }
+  if (lists == 0) {
+    return 0;
+  }
+  SpinTake(base, thread, call);
+  const uint32_t list = guest::LoadU32(base, lists + 40);
+  LinkAtEnd(base, list, voice + guest::LoadU32(base, list + 8));
+  SpinRelease(base, thread, call);
+  return 0;
+}
+
+uint32_t Deactivate(uint8_t* base, uint32_t voice, uint32_t thread, const GuestCall& call) {
+  ITC_NATIVE_RUNNING("sub_82460D50 XAudioVoice::Deactivate");
+  SpinTake(base, thread, call);
+  Unlink(base, voice + 24);
+  SpinRelease(base, thread, call);
+  uint32_t r3 = 0;
+  for (uint32_t i = 0; i < guest::LoadU8(base, voice + 69); i++) {
+    if (int32_t(r3) < 0) {
+      break;
+    }
+    const uint32_t target = guest::LoadU32(base, guest::LoadU32(base, voice + 72) + 12 * i);
+    const uint32_t uses = guest::LoadU32(base, target + 40) - 1;
+    guest::StoreU32(base, target + 40, uses);
+    r3 = uses != 0 ? 0 : call(Method(base, target, 60), 0x82460E74, Args({target, 0}));
+  }
+  return r3;
+}
+
+uint32_t StartLater(uint8_t* base, uint32_t voice, uint32_t thread, const GuestCall& call) {
+  ITC_NATIVE_RUNNING("sub_8245E7D0 XAudioSourceVoice::StartLater");
+  uint32_t r3 = 0;
+  SpinTake(base, thread, call);
+  const uint8_t flags = guest::LoadU8(base, voice + 61);
+  if ((flags & 1) != 0) {
+    r3 = 0x8000FFFFu;  // E_UNEXPECTED
+  } else if ((flags & 0x40) == 0) {
+    SpinTake(base, thread, call);
+    guest::StoreU8(base, voice + 61, guest::LoadU8(base, voice + 61) | 0x40);
+    SpinRelease(base, thread, call);
+    const uint32_t engine = guest::LoadU32(base, kEngine);
+    SpinTake(base, thread, call);
+    const uint32_t list = engine + 68;
+    LinkAtEnd(base, list, voice + guest::LoadU32(base, list + 8));
+    SpinRelease(base, thread, call);
+  }
+  SpinRelease(base, thread, call);
+  return r3;
+}
+
+void WaitForVoice(uint8_t* base, uint32_t engine, uint32_t voice, uint32_t thread,
+                  uint32_t mixer_thread, uint32_t processor, const GuestCall& call) {
+  ITC_NATIVE_RUNNING("sub_8245AE60 XAudio::WaitForVoice");
+  if (mixer_thread == guest::LoadU32(base, engine + 300) ||
+      mixer_thread == guest::LoadU32(base, engine + 4 * (processor + 83))) {
+    return;
+  }
+  for (;;) {
+    bool working = false;
+    for (uint32_t k = 0; k < 6; k++) {
+      if (voice == guest::LoadU32(base, engine + 144 + 4 * k)) {
+        working = true;
+        break;
+      }
+    }
+    if (!working) {
+      return;
+    }
+    SpinRelease(base, thread, call);
+    const uint32_t count = guest::LoadU32(base, kApiLockObject + 24);
+    for (uint32_t i = 0; i < count; i++) {
+      call(kRtlLeaveCriticalSection, 0, Args({kApiLock}));
+    }
+    for (uint32_t i = 0; i < count; i++) {
+      call(kRtlEnterCriticalSection, 0, Args({kApiLock}));
+    }
+    SpinTake(base, thread, call);
+  }
+}
+
+uint32_t CancelPendingStart(uint8_t* base, uint32_t voice, uint32_t thread,
+                            uint32_t mixer_thread, uint32_t processor, const GuestCall& call) {
+  ITC_NATIVE_RUNNING("sub_8245E428 XAudioSourceVoice::CancelPendingStart");
+  SpinTake(base, thread, call);
+  if ((guest::LoadU8(base, voice + 61) & 0x40) == 0) {
+    SpinRelease(base, thread, call);
+    return 0x80004004u;
+  }
+  WaitForVoice(base, guest::LoadU32(base, kEngine), voice, thread, mixer_thread, processor, call);
+  const uint32_t engine = guest::LoadU32(base, kEngine);
+  SpinTake(base, thread, call);
+  Unlink(base, voice + guest::LoadU32(base, engine + 76));
+  SpinRelease(base, thread, call);
+  SpinTake(base, thread, call);
+  guest::StoreU8(base, voice + 61, guest::LoadU8(base, voice + 61) & 0xBF);
+  SpinRelease(base, thread, call);
+  SpinRelease(base, thread, call);
+  return 0;
+}
+
+uint32_t StopOrTail(uint8_t* base, uint32_t voice, uint32_t flags, uint32_t thread,
+                    uint32_t mixer_thread, uint32_t processor, const GuestCall& call) {
+  ITC_NATIVE_RUNNING("sub_824619B0 XAudioVoice::StopOrTail");
+  vehicle_accessors::DebugSwitchOff();
+  SpinTake(base, thread, call);
+  if ((flags & 1) != 0) {
+    WaitForVoice(base, guest::LoadU32(base, kEngine), voice, thread, mixer_thread, processor,
+                 call);
+    if ((guest::LoadU8(base, voice + 61) & 1) != 0) {
+      SpinTake(base, thread, call);
+      guest::StoreU8(base, voice + 61, guest::LoadU8(base, voice + 61) & 0xBA);
+      SpinRelease(base, thread, call);
+      // r4 still the voice (WaitForVoice's argument; the kernel calls keep it).
+      call(Method(base, voice, 80), 0x82461B44, Args({voice, voice}));
+    }
+    SpinRelease(base, thread, call);
+  } else if ((guest::LoadU8(base, voice + 61) & 1) == 0) {
+    SpinRelease(base, thread, call);
+  } else {
+    SpinTake(base, thread, call);
+    guest::StoreU8(base, voice + 61, guest::LoadU8(base, voice + 61) | 4);
+    SpinRelease(base, thread, call);
+    SpinRelease(base, thread, call);
+    guest::StoreU16(base, voice + 64, guest::LoadU16(base, voice + 62));
+  }
+  vehicle_accessors::DebugSwitchOff();
+  return 0;
+}
+
 }  // namespace xaudio

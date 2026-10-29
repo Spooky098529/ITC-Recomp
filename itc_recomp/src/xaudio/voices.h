@@ -416,4 +416,100 @@ uint32_t MixToOutputs(uint8_t* base, uint32_t voice, uint32_t inout, uint32_t pr
 // (AddStat). `frame` is this function's (112 bytes). Returns Pass' r3.
 uint32_t SubmixPass(uint8_t* base, uint32_t voice, uint32_t frame, const GuestCall& call);
 
+// --- The game's locks, taken as the original does ---
+//
+// The voice lists' spin lock (0x82954F10: +0 the kernel's spin lock word,
+// +4 the depth, +8 the owning thread, r13; +12 the saved IRQL), taken
+// inline by its users, native and recompiled, so native code takes it with
+// the same reads and writes and the same kernel calls the recompiled code
+// makes (the user's call, 2026-10-29). XAudio's API lock, the kernel
+// critical section at 0x8264D518 (its recursion count at +20), likewise
+// until every user of it is native. The kernel calls go through `call` at
+// the imports' guest addresses (the thunks the original's `bl` reaches),
+// which the adapters' callers run as those imports.
+
+constexpr uint32_t kSpinLock = 0x82954F10;
+constexpr uint32_t kApiLockObject = 0x8264D514;
+constexpr uint32_t kApiLock = 0x8264D518;
+constexpr uint32_t kKeRaiseIrqlToDpcLevel = 0x825DBE44;
+constexpr uint32_t kKeAcquireSpinLockAtRaisedIrql = 0x825DB9A4;
+constexpr uint32_t kKeReleaseSpinLockFromRaisedIrql = 0x825DB994;
+constexpr uint32_t kKfLowerIrql = 0x825DBE54;
+constexpr uint32_t kRtlEnterCriticalSection = 0x825DB8E4;
+constexpr uint32_t kRtlLeaveCriticalSection = 0x825DB8D4;
+
+// The spin lock taken by `thread` (r13): the IRQL raised; unless it already
+// owns it, the kernel's spin lock acquired and the owner and saved IRQL
+// set; the depth up by one.
+void SpinTake(uint8_t* base, uint32_t thread, const GuestCall& call);
+// One level released when `thread` owns it: the depth down by one; at 0,
+// the owner and saved IRQL cleared, the kernel's spin lock released and the
+// IRQL lowered to the saved one.
+void SpinRelease(uint8_t* base, uint32_t thread, const GuestCall& call);
+
+// --- Under the voice lists' spin lock ---
+
+// XAudioSourceVoice::GetState (sub_8245DDC8): under the spin lock, the
+// codec's (+76) slot +44 (its state at the frame's +80); when it succeeds,
+// that or'ed with the voice's flags (+61) to [out]. `frame` is this
+// function's (144 bytes). Returns the codec's r3.
+uint32_t SourceGetState(uint8_t* base, uint32_t voice, uint32_t out, uint32_t thread,
+                        uint32_t frame, const GuestCall& call);
+
+// XAudioVoice::Play (sub_82461798): under the spin lock, a playing voice's
+// stopping bit (+61 bit 2) cleared (the lock taken again for it); else bits
+// 0 and 6 cleared and bit 0 set (taken again) and slot +76 (Activate).
+// DebugSwitchOff's plain C++ where the original calls sub_825C8388. Returns
+// 0.
+uint32_t Play(uint8_t* base, uint32_t voice, uint32_t thread, const GuestCall& call);
+
+// XAudioVoice::Activate (sub_82460EF0): each output's target (+72 + 12i,
+// +69 of them) has its use count (+40) raised and its slot +56 called until
+// one fails; then by the voice's type (slot +52, at the frame's +80): 0 the
+// engine's source active list (its +80 + 40), 1 its stage's ([+124] + 44 x
+// +76, + 40), the voice added at its end under the spin lock (its node at
+// the list's +8 offset). `frame` is this function's (144 bytes). Returns 0,
+// or the failing target's r3.
+uint32_t Activate(uint8_t* base, uint32_t voice, uint32_t thread, uint32_t frame,
+                  const GuestCall& call);
+
+// XAudioVoice::Deactivate (sub_82460D50): under the spin lock, the voice
+// out of its active list (the node at +24, left pointing at itself); then
+// each output's target's use count (+40) lowered, its slot +60 with 0 (stop
+// at once) at 0, until one fails. Returns the last r3 (0 when not called).
+uint32_t Deactivate(uint8_t* base, uint32_t voice, uint32_t thread, const GuestCall& call);
+
+// XAudioSourceVoice::StartLater (sub_8245E7D0): under the spin lock:
+// E_UNEXPECTED when playing (+61 bit 0); else unless pending (bit 6), bit 6
+// set and the voice added at the end of the engine's pending list (+68, its
+// node at the list's +8 offset), each under the lock taken again. Returns 0
+// or E_UNEXPECTED.
+uint32_t StartLater(uint8_t* base, uint32_t voice, uint32_t thread, const GuestCall& call);
+
+// XAudio::WaitForVoice (sub_8245AE60): unless the caller is the mixer's
+// thread (the engine's +300, or its +332 + 4 x the processor), while the
+// voice is one of the six the mixer is working on (+144), the spin lock
+// released one level, the API lock left as many times as its recursion
+// count (+20) and entered again as many, the spin lock taken again.
+// `thread` is r13, `mixer_thread` its +256, `processor` its +268.
+void WaitForVoice(uint8_t* base, uint32_t engine, uint32_t voice, uint32_t thread,
+                  uint32_t mixer_thread, uint32_t processor, const GuestCall& call);
+
+// XAudioSourceVoice::CancelPendingStart (sub_8245E428): under the spin
+// lock: 0x80004004 when no start is pending (+61 bit 6 clear); else the
+// mixer waited for (WaitForVoice), the voice out of the pending list (its
+// node at the engine's +76 offset, left pointing at itself) and bit 6
+// cleared, each under the lock taken again. Returns 0 or 0x80004004.
+uint32_t CancelPendingStart(uint8_t* base, uint32_t voice, uint32_t thread,
+                            uint32_t mixer_thread, uint32_t processor, const GuestCall& call);
+
+// XAudioVoice::StopOrTail (sub_824619B0): with `flags` bit 0 (at once),
+// under the spin lock, the mixer waited for; a playing voice's bits 0, 2 and
+// 6 cleared (the lock taken again) and slot +80 (Deactivate). Without, a
+// playing voice's stopping bit (+61 bit 2) set (taken again) and the
+// tail's passes (+64) from +62. DebugSwitchOff's plain C++ where the
+// original calls sub_825C8388. Returns 0.
+uint32_t StopOrTail(uint8_t* base, uint32_t voice, uint32_t flags, uint32_t thread,
+                    uint32_t mixer_thread, uint32_t processor, const GuestCall& call);
+
 }  // namespace xaudio

@@ -1176,6 +1176,234 @@ void Passes(Context& h, uint32_t block) {
   }
 }
 
+// --- Under the voice lists' spin lock ---
+//
+// The live spin lock (0x82954F10) is taken as the game takes it, by this
+// thread. With `hold`, the case holds it around the call (so the function
+// takes it again, and the mixer can't see a voice put in a live list until
+// `after` takes it out), and its depth and owner after the call are
+// compared; without, the function takes it from free (or waits for the
+// mixer).
+template <typename Setup, typename After>
+void LockedCase(Context& h, Results& results, uint32_t block, GuestFunction recompiled,
+                GuestFunction native, bool hold, Setup setup, After after,
+                const std::string& what) {
+  const Random start = h.random;
+  Random random = start;
+  Outputs out[2];
+  for (int v = 0; v < 2; v++) {
+    random = start;
+    for (uint32_t i = 0; i < kBlockBytes; i += 4) {
+      Store(h.base, block + i, uint32_t(random.Next()));
+    }
+    PPCContext t = CallContext(h);
+    for (uint32_t i = 4; i <= 0x400; i += 4) {
+      Store(h.base, t.r1.u32 - i, uint32_t(random.Next()));
+    }
+    setup(random, t);
+    PPCContext lock = t;
+    if (hold) {
+      hooks::XAudioSpinTake(lock, h.base);
+    }
+    (v == 0 ? recompiled : native)(t, h.base);
+    after(out[v]);
+    if (hold) {
+      out[v].Word(guest::LoadU32(h.base, xa::kSpinLock + 4));
+      out[v].Word(guest::LoadU32(h.base, xa::kSpinLock + 8) == t.r13.u32);
+      hooks::XAudioSpinRelease(lock, h.base);
+    }
+    out[v].Bytes(Read(h.base, block, kBlockBytes));
+    out[v].Word(t.r3.u32);
+  }
+  h.random = random;
+  results.Check(out[0], out[1], what);
+}
+
+// A node at `node` taken out of a live list where `list` says it was
+// added at its end (both checked), its words cleared so the versions
+// compare. Under the spin lock (the case holds it).
+void TakeBack(Outputs& out, uint8_t* base, uint32_t list, uint32_t node) {
+  const bool linked = guest::LoadU32(base, node) == list && guest::LoadU32(base, list + 4) == node;
+  out.Word(linked);
+  if (linked) {
+    const uint32_t prev = guest::LoadU32(base, node + 4);
+    guest::StoreU32(base, prev, list);
+    guest::StoreU32(base, list + 4, prev);
+    Store(base, node, 0);
+    Store(base, node + 4, 0);
+  }
+}
+
+// The node at `node` linked alone into a fake list at `head` in the block,
+// or left pointing at itself.
+void FakeList(uint8_t* base, uint32_t head, uint32_t node, bool linked) {
+  if (linked) {
+    Store(base, head, node);
+    Store(base, head + 4, node);
+    Store(base, node, head);
+    Store(base, node + 4, head);
+  } else {
+    Store(base, node, node);
+    Store(base, node + 4, node);
+  }
+}
+
+void Locked(Context& h, uint32_t block) {
+  const uint32_t engine = guest::LoadU32(h.base, xa::kEngine);
+  if (engine == 0) {
+    return;
+  }
+  const auto none = [](Outputs&) {};
+  {
+    Results results("XAudioSourceVoice::GetState (sub_8245DDC8)");
+    for (int i = 0; i < 32; i++) {
+      LockedCase(h, results, block, __imp__sub_8245DDC8, hooks::XAudioSourceGetState, i % 2 == 0,
+                 [&](Random& random, PPCContext& t) {
+                   World(h.base, block, random);
+                   Store(h.base, block + 76, AnyObject(random, block));
+                   t.r3.u64 = block;
+                   t.r4.u64 = block + 0x1F90;
+                 },
+                 none, fmt::format("case {}", i));
+    }
+    results.Report();
+  }
+  {
+    Results results("XAudioVoice::Play (sub_82461798)");
+    for (int i = 0; i < 32; i++) {
+      LockedCase(h, results, block, __imp__sub_82461798, hooks::XAudioPlay, i % 2 == 0,
+                 [&](Random& random, PPCContext& t) {
+                   World(h.base, block, random);
+                   t.r3.u64 = block;
+                 },
+                 none, fmt::format("case {}", i));
+    }
+    results.Report();
+  }
+  {
+    // Slot +52 the real GetType: type 0 (the engine's source active list),
+    // 1 (a stage's, the stage below the engine's count +128) or 2 (none).
+    // The voice is taken back out of the live list before the lock goes.
+    Results results("XAudioVoice::Activate (sub_82460EF0)");
+    const uint32_t stages = guest::LoadU8(h.base, engine + 128);
+    for (int i = 0; i < 48; i++) {
+      uint32_t list = 0;
+      LockedCase(h, results, block, __imp__sub_82460EF0, hooks::XAudioActivate, true,
+                 [&](Random& random, PPCContext& t) {
+                   World(h.base, block, random);
+                   Store(h.base, block + kVtable + 52, 0x8245E318);
+                   uint32_t type = random.Below(3);
+                   if (type == 1 && stages == 0) {
+                     type = 2;
+                   }
+                   guest::StoreU8(h.base, block + 12, uint8_t(type));
+                   guest::StoreU8(h.base, block + 76, uint8_t(stages != 0 ? random.Below(stages) : 0));
+                   list = 0;
+                   if (type == 0) {
+                     list = guest::LoadU32(h.base, engine + 80 + 40);
+                   } else if (type == 1 && stages != 0) {
+                     const uint32_t lists = guest::LoadU32(h.base, engine + 124) +
+                                            44 * guest::LoadU8(h.base, block + 76);
+                     list = guest::LoadU32(h.base, lists + 40);
+                   } else {
+                     guest::StoreU8(h.base, block + 12, 2);
+                   }
+                   t.r3.u64 = block;
+                 },
+                 [&](Outputs& out) {
+                   if (list != 0) {
+                     TakeBack(out, h.base, list, block + guest::LoadU32(h.base, list + 8));
+                   }
+                 },
+                 fmt::format("case {}", i));
+    }
+    results.Report();
+  }
+  {
+    Results results("XAudioVoice::Deactivate (sub_82460D50)");
+    for (int i = 0; i < 32; i++) {
+      LockedCase(h, results, block, __imp__sub_82460D50, hooks::XAudioDeactivate, i % 2 == 0,
+                 [&](Random& random, PPCContext& t) {
+                   World(h.base, block, random);
+                   FakeList(h.base, block + 0x1FC0, block + 24, random.Below(2) == 0);
+                   t.r3.u64 = block;
+                 },
+                 none, fmt::format("case {}", i));
+    }
+    results.Report();
+  }
+  {
+    // The engine's pending list (+68); the voice taken back out of it.
+    Results results("XAudioSourceVoice::StartLater (sub_8245E7D0)");
+    const uint32_t pending = engine + 68;
+    for (int i = 0; i < 32; i++) {
+      LockedCase(h, results, block, __imp__sub_8245E7D0, hooks::XAudioStartLater, true,
+                 [&](Random& random, PPCContext& t) {
+                   World(h.base, block, random);
+                   t.r3.u64 = block;
+                 },
+                 [&](Outputs& out) {
+                   TakeBack(out, h.base, pending, block + guest::LoadU32(h.base, pending + 8));
+                 },
+                 fmt::format("case {}", i));
+    }
+    results.Report();
+  }
+  {
+    // The pending node (at the engine's +76 offset) in a fake list or alone.
+    Results results("XAudioSourceVoice::CancelPendingStart (sub_8245E428)");
+    const uint32_t offset = guest::LoadU32(h.base, engine + 76);
+    for (int i = 0; offset < 0x100 && i < 32; i++) {
+      LockedCase(h, results, block, __imp__sub_8245E428, hooks::XAudioCancelPendingStart,
+                 i % 2 == 0,
+                 [&](Random& random, PPCContext& t) {
+                   World(h.base, block, random);
+                   FakeList(h.base, block + 0x1FC0, block + offset, random.Below(2) == 0);
+                   t.r3.u64 = block;
+                 },
+                 none, fmt::format("case {}", i));
+    }
+    results.Report();
+  }
+  {
+    Results results("XAudioVoice::StopOrTail (sub_824619B0)");
+    for (int i = 0; i < 48; i++) {
+      LockedCase(h, results, block, __imp__sub_824619B0, hooks::XAudioStopOrTail, i % 2 == 0,
+                 [&](Random& random, PPCContext& t) {
+                   World(h.base, block, random);
+                   t.r3.u64 = block;
+                   t.r4.u64 = random.Next();
+                 },
+                 none, fmt::format("case {}", i));
+    }
+    results.Report();
+  }
+  {
+    // A fake engine at +0x1A00, the voice not among its six (the wait
+    // itself, which needs the mixer's thread to move on, is the game's to
+    // run); now and then this thread is the mixer's.
+    Results results("XAudio::WaitForVoice (sub_8245AE60)");
+    for (int i = 0; i < 32; i++) {
+      LockedCase(h, results, block, __imp__sub_8245AE60, hooks::XAudioWaitForVoice, i % 2 == 0,
+                 [&](Random& random, PPCContext& t) {
+                   const uint32_t fake = block + 0x1A00;
+                   const uint32_t mixer = guest::LoadU32(h.base, t.r13.u32 + 256);
+                   const uint32_t processor = guest::LoadU8(h.base, t.r13.u32 + xa::kPcrProcessor);
+                   const uint32_t pick = random.Below(4);
+                   if (pick == 0) {
+                     Store(h.base, fake + 300, mixer);
+                   } else if (pick == 1) {
+                     Store(h.base, fake + 332 + 4 * processor, mixer);
+                   }
+                   t.r3.u64 = fake;
+                   t.r4.u64 = block;
+                 },
+                 none, fmt::format("case {}", i));
+    }
+    results.Report();
+  }
+}
+
 }  // namespace
 
 void XAudio(Context& h) {
@@ -1189,6 +1417,7 @@ void XAudio(Context& h) {
   VoiceOutputs(h, block.address);
   Passes(h, block.address);
   Making(h, block.address);
+  Locked(h, block.address);
 }
 
 }  // namespace harness

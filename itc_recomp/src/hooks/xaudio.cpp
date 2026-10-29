@@ -35,10 +35,14 @@ ITC_FLAG_BOOL(native_xaudio, true, "ITC",
               "sub_82461678; XAudioSourceVoice::Size sub_8245E0D8 and Init sub_8245E348, "
               "XAudioVoice::CreateEffects sub_82461600, InitBase sub_82461D50 and InitOutputs "
               "sub_82460880, XAudioSubmixVoice::Init sub_8245F230 and Pass sub_8245EFA0, "
-              "ProcessEffects sub_82461E88 and MixToOutputs sub_82460CB8; their "
+              "ProcessEffects sub_82461E88 and MixToOutputs sub_82460CB8; under the voice lists' "
+              "spin lock (taken as the original does), XAudioSourceVoice::GetState sub_8245DDC8, "
+              "StartLater sub_8245E7D0 and CancelPendingStart sub_8245E428, XAudioVoice::Play "
+              "sub_82461798, Activate sub_82460EF0, Deactivate sub_82460D50 and StopOrTail "
+              "sub_824619B0, XAudio::WaitForVoice sub_8245AE60; their "
               "calls into the recompiled objects through the translated code) natively "
               "instead of through the translated code (the same reads and writes; XAudio's two "
-              "locks stay the game's; checked by --run_harnesses=xaudio)");
+              "locks are the game's, taken as the original does; checked by --run_harnesses=xaudio)");
 
 namespace hooks {
 
@@ -121,7 +125,30 @@ xa::GuestCall Caller(PPCContext& ctx, uint8_t* base) {
     } else if (xa::StackFloor() != 0 && xa::StackFloor() < ctx.r1.u32) {
       ctx.r1.u64 = xa::StackFloor();
     }
-    REX_CALL_INDIRECT_FUNC(function);
+    switch (function) {
+      // The kernel imports, at their thunks' guest addresses.
+      case xa::kKeRaiseIrqlToDpcLevel:
+        __imp__KeRaiseIrqlToDpcLevel(ctx, base);
+        break;
+      case xa::kKeAcquireSpinLockAtRaisedIrql:
+        __imp__KeAcquireSpinLockAtRaisedIrql(ctx, base);
+        break;
+      case xa::kKeReleaseSpinLockFromRaisedIrql:
+        __imp__KeReleaseSpinLockFromRaisedIrql(ctx, base);
+        break;
+      case xa::kKfLowerIrql:
+        __imp__KfLowerIrql(ctx, base);
+        break;
+      case xa::kRtlEnterCriticalSection:
+        __imp__RtlEnterCriticalSection(ctx, base);
+        break;
+      case xa::kRtlLeaveCriticalSection:
+        __imp__RtlLeaveCriticalSection(ctx, base);
+        break;
+      default:
+        REX_CALL_INDIRECT_FUNC(function);
+        break;
+    }
     ctx.r1.u64 = sp;
     return ctx.r3.u32;
   };
@@ -445,6 +472,90 @@ void XAudioSubmixPass(PPCContext& ctx, uint8_t* base) {
   });
 }
 
+// The thread's r13 (the spin lock's owner), its +256 (the mixer's thread
+// check) and +268 (the processor).
+struct Thread {
+  uint32_t r13, mixer, processor;
+};
+Thread ThreadOf(PPCContext& ctx, uint8_t* base) {
+  return {ctx.r13.u32, guest::LoadU32(base, ctx.r13.u32 + 256),
+          guest::LoadU8(base, ctx.r13.u32 + xa::kPcrProcessor)};
+}
+
+void XAudioSpinTake(PPCContext& ctx, uint8_t* base) {
+  const Thread th = ThreadOf(ctx, base);
+  xa::SpinTake(base, th.r13, Caller(ctx, base));
+}
+
+void XAudioSpinRelease(PPCContext& ctx, uint8_t* base) {
+  const Thread th = ThreadOf(ctx, base);
+  xa::SpinRelease(base, th.r13, Caller(ctx, base));
+}
+
+void XAudioSourceGetState(PPCContext& ctx, uint8_t* base) {
+  const uint32_t voice = ctx.r3.u32, out = ctx.r4.u32;
+  const Thread th = ThreadOf(ctx, base);
+  Framed(ctx, base, 144, [&](const xa::GuestCall& call, uint32_t frame) {
+    return xa::SourceGetState(base, voice, out, th.r13, frame, call);
+  });
+}
+
+void XAudioPlay(PPCContext& ctx, uint8_t* base) {
+  const uint32_t voice = ctx.r3.u32;
+  const Thread th = ThreadOf(ctx, base);
+  Framed(ctx, base, 128,
+         [&](const xa::GuestCall& call) { return xa::Play(base, voice, th.r13, call); });
+}
+
+void XAudioActivate(PPCContext& ctx, uint8_t* base) {
+  const uint32_t voice = ctx.r3.u32;
+  const Thread th = ThreadOf(ctx, base);
+  Framed(ctx, base, 144, [&](const xa::GuestCall& call, uint32_t frame) {
+    return xa::Activate(base, voice, th.r13, frame, call);
+  });
+}
+
+void XAudioDeactivate(PPCContext& ctx, uint8_t* base) {
+  const uint32_t voice = ctx.r3.u32;
+  const Thread th = ThreadOf(ctx, base);
+  Framed(ctx, base, 128,
+         [&](const xa::GuestCall& call) { return xa::Deactivate(base, voice, th.r13, call); });
+}
+
+void XAudioStartLater(PPCContext& ctx, uint8_t* base) {
+  const uint32_t voice = ctx.r3.u32;
+  const Thread th = ThreadOf(ctx, base);
+  Framed(ctx, base, 144,
+         [&](const xa::GuestCall& call) { return xa::StartLater(base, voice, th.r13, call); });
+}
+
+void XAudioWaitForVoice(PPCContext& ctx, uint8_t* base) {
+  // Leaves r3 the engine, as the original's early returns and loop do.
+  const uint32_t engine = ctx.r3.u32, voice = ctx.r4.u32;
+  const Thread th = ThreadOf(ctx, base);
+  Framed(ctx, base, 144, [&](const xa::GuestCall& call) {
+    xa::WaitForVoice(base, engine, voice, th.r13, th.mixer, th.processor, call);
+    return 0u;
+  });
+  ctx.r3.u64 = engine;
+}
+
+void XAudioCancelPendingStart(PPCContext& ctx, uint8_t* base) {
+  const uint32_t voice = ctx.r3.u32;
+  const Thread th = ThreadOf(ctx, base);
+  Framed(ctx, base, 128, [&](const xa::GuestCall& call) {
+    return xa::CancelPendingStart(base, voice, th.r13, th.mixer, th.processor, call);
+  });
+}
+
+void XAudioStopOrTail(PPCContext& ctx, uint8_t* base) {
+  const uint32_t voice = ctx.r3.u32, flags = ctx.r4.u32;
+  const Thread th = ThreadOf(ctx, base);
+  Framed(ctx, base, 128, [&](const xa::GuestCall& call) {
+    return xa::StopOrTail(base, voice, flags, th.r13, th.mixer, th.processor, call);
+  });
+}
+
 }  // namespace hooks
 
 #define ITC_XAUDIO_ADAPTER(address, step)   \
@@ -492,3 +603,11 @@ ITC_XAUDIO_ADAPTER(8245F230, XAudioSubmixInit)
 ITC_XAUDIO_ADAPTER(82461E88, XAudioProcessEffects)
 ITC_XAUDIO_ADAPTER(82460CB8, XAudioMixToOutputs)
 ITC_XAUDIO_ADAPTER(8245EFA0, XAudioSubmixPass)
+ITC_XAUDIO_ADAPTER(8245DDC8, XAudioSourceGetState)
+ITC_XAUDIO_ADAPTER(82461798, XAudioPlay)
+ITC_XAUDIO_ADAPTER(82460EF0, XAudioActivate)
+ITC_XAUDIO_ADAPTER(82460D50, XAudioDeactivate)
+ITC_XAUDIO_ADAPTER(8245E7D0, XAudioStartLater)
+ITC_XAUDIO_ADAPTER(8245AE60, XAudioWaitForVoice)
+ITC_XAUDIO_ADAPTER(8245E428, XAudioCancelPendingStart)
+ITC_XAUDIO_ADAPTER(824619B0, XAudioStopOrTail)

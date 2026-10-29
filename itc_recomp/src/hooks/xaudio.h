@@ -67,4 +67,17 @@ void XAudioProcessEffects(PPCContext& ctx, uint8_t* base);  // sub_82461E88 (r13
 void XAudioMixToOutputs(PPCContext& ctx, uint8_t* base);  // sub_82460CB8 (r13's processor)
 void XAudioSubmixPass(PPCContext& ctx, uint8_t* base);  // sub_8245EFA0
 
+// The voice lists' spin lock taken and released by r13's thread (the
+// harness's).
+void XAudioSpinTake(PPCContext& ctx, uint8_t* base);
+void XAudioSpinRelease(PPCContext& ctx, uint8_t* base);
+void XAudioSourceGetState(PPCContext& ctx, uint8_t* base);      // sub_8245DDC8
+void XAudioPlay(PPCContext& ctx, uint8_t* base);                // sub_82461798
+void XAudioActivate(PPCContext& ctx, uint8_t* base);            // sub_82460EF0
+void XAudioDeactivate(PPCContext& ctx, uint8_t* base);          // sub_82460D50
+void XAudioStartLater(PPCContext& ctx, uint8_t* base);          // sub_8245E7D0
+void XAudioWaitForVoice(PPCContext& ctx, uint8_t* base);        // sub_8245AE60
+void XAudioCancelPendingStart(PPCContext& ctx, uint8_t* base);  // sub_8245E428
+void XAudioStopOrTail(PPCContext& ctx, uint8_t* base);          // sub_824619B0
+
 }  // namespace hooks
