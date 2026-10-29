@@ -1001,4 +1001,194 @@ std::optional<uint32_t> EventCreate(uint8_t* base, uint32_t engine, uint32_t ins
   return Load(base, out) == 0 ? kOutOfMemory : 0;
 }
 
+// --- Preparing a complex sound's track ---
+
+namespace {
+
+constexpr uint32_t kSoundBankFirstEvent = 0x825C7F30;  // the sound bank's slot +24
+constexpr uint32_t kSoundBankNextEvent = 0x825C7F98;   // slot +28
+constexpr uint32_t kEventCreate = 0x825D0F00;
+constexpr uint32_t kSeekBeyondEnd = 0x8AC70019;  // XACTENGINE_E_SEEKTIMEBEYONDCUEEND
+constexpr uint32_t kTrackInstancePrepareFull = 192;
+constexpr uint32_t kCreateInstanceFrame = 128;
+
+// The sound bank's slot +24 (FirstEvent) or +28 (NextEvent) on `iterator`,
+// from `frame`: the plain C++ while the slot holds it and it answers.
+uint32_t SoundBankEvent(uint8_t* base, uint32_t bank, uint32_t slot, uint32_t iterator,
+                        uint32_t frame, uint32_t return_address, const GuestCall& call) {
+  const uint32_t method = xa::Method(base, bank, slot);
+  if (method == (slot == 24 ? kSoundBankFirstEvent : kSoundBankNextEvent)) {
+    const auto record = slot == 24 ? SoundBankFirstEvent(base, bank, iterator)
+                                   : SoundBankNextEvent(base, bank, iterator);
+    if (record) {
+      SetRegs(call, Args({bank, iterator}));
+      return *record;
+    }
+  }
+  return CallAt(call, method, return_address, Args({bank, iterator}), frame);
+}
+
+// An event deleted through its slot +0 with 1, when it's there.
+void DeleteEvent(uint8_t* base, uint32_t event, uint32_t frame, uint32_t return_address,
+                 const GuestCall& call) {
+  if (event != 0) {
+    CallAt(call, xa::Method(base, event, 0), return_address, Args({event, 1}), frame);
+  }
+}
+
+}  // namespace
+
+uint32_t TrackInstancePrepare(uint8_t* base, uint32_t instance, uint32_t key, uint32_t offset,
+                              uint32_t frame, const GuestCall& call) {
+  ITC_NATIVE_RUNNING("sub_825D5A48 XACTTrackInstance::Prepare");
+  const uint32_t cue = Load(base, Load(base, Load(base, instance + 16) + 20) + 48);
+  const uint32_t sound_bank = Load(base, cue + 296);
+  const uint32_t iterator = frame + 88;
+  Store(base, iterator + 0, key);
+  Store(base, iterator + 4, 0);
+  Store(base, iterator + 8, 0);
+  Store(base, instance + 40, 2);
+  uint32_t record = SoundBankEvent(base, sound_bank, 24, iterator, frame, 0x825D5AA8, call);
+  const uint8_t count = LoadU8(base, iterator + 8);
+  StoreU8(base, instance + 24, count);
+  SetRegs(call, Args({uint32_t(count) << 2, kEventArrayAttributes}));
+  const uint32_t array = memory::crt::XMemAlloc(base, uint32_t(count) << 2, kEventArrayAttributes);
+  Store(base, instance + 20, array);
+  uint32_t r29 = array != 0 ? 0 : kOutOfMemory;
+  uint8_t kept = 0;
+  bool beyond = false;
+  while (int32_t(r29) >= 0) {
+    if (record == 0) {
+      if (beyond && kept == 0) {
+        r29 = kSeekBeyondEnd;
+        break;
+      }
+      StoreU8(base, instance + 24, kept);
+      const uint32_t event = Load(base, instance + 36);
+      if (event != 0) {
+        EventSlotIsPrepared(base, event, frame, 0x825D5D04, call);
+      }
+      Store(base, instance + 40, 3);
+      return r29;
+    }
+    const uint32_t previous =
+        (Load(base, record) & 0x20000000) != 0
+            ? 0
+            : Load(base, Load(base, instance + 20) + (uint32_t(LoadU8(base, record + 6)) << 2));
+    const uint32_t out = frame + 80;
+    Store(base, out, 0);
+    const uint32_t engine = Load(base, instance + 12);
+    if (const auto made = EventCreate(base, engine, instance, record, previous, out, call)) {
+      SetRegs(call, Args({engine, instance, record, previous, out}));
+      r29 = *made;
+    } else {
+      r29 = CallAt(call, kEventCreate, 0x825D5B3C,
+                   Args({engine, instance, record, previous, out}), frame);
+    }
+    if (int32_t(r29) < 0) {
+      DeleteEvent(base, Load(base, out), frame, 0x825D5C44, call);
+      break;
+    }
+    bool drop = false;
+    const uint32_t event = Load(base, out);
+    const uint32_t word = Load(base, Load(base, event + 16));
+    if ((word & 0x1F) == 9 &&
+        int32_t(((word >> 5) & 0xFFFFFF) + Load(base, event + 20)) < int32_t(offset)) {
+      drop = true;
+    } else {
+      r29 = EventSlotPrepare(base, event, offset, frame, 0x825D5B94, call);
+      if (int32_t(r29) >= 0) {
+        const uint32_t prepared = Load(base, out);
+        const int32_t type = int32_t(Load(base, Load(base, prepared + 16)) & 0x1F);
+        if (type >= 1 && type <= 6) {
+          Store(base, instance + 36, prepared);
+        }
+        Store(base, Load(base, instance + 20) + (uint32_t(kept) << 2), prepared);
+        kept = uint8_t(kept + 1);
+      }
+      if (r29 == kSeekBeyondEnd) {
+        beyond = true;
+        drop = true;
+        r29 = 0;
+      }
+    }
+    if (int32_t(r29) < 0) {
+      DeleteEvent(base, Load(base, out), frame, 0x825D5C44, call);
+      break;
+    }
+    record = SoundBankEvent(base, sound_bank, 28, iterator, frame, 0x825D5C18, call);
+    if (drop) {
+      DeleteEvent(base, Load(base, out), frame, 0x825D5C44, call);
+    }
+  }
+  // A failure: every kept event deleted, last first, and the array freed.
+  for (uint8_t i = kept; i != 0;) {
+    i = uint8_t(i - 1);
+    DeleteEvent(base, Load(base, Load(base, instance + 20) + (uint32_t(i) << 2)), frame,
+                0x825D5C88, call);
+  }
+  const uint32_t held = Load(base, instance + 20);
+  StoreU8(base, instance + 24, 0);
+  if (held != 0) {
+    SetRegs(call, Args({held, kEventArrayAttributes}));
+    memory::crt::XMemFree(held, kEventArrayAttributes);
+    Store(base, instance + 20, 0);
+  }
+  Store(base, instance + 36, 0);
+  return r29;
+}
+
+uint32_t TrackCreateInstance(uint8_t* base, uint32_t track, uint32_t key, uint32_t out,
+                             uint32_t offset, uint32_t frame, const GuestCall& call) {
+  ITC_NATIVE_RUNNING("sub_825D02F8 XACTTrack::CreateInstance");
+  SetRegs(call, Args({64, kTrackInstanceAttributes}));
+  const uint32_t instance = memory::crt::XMemAlloc(base, 64, kTrackInstanceAttributes);
+  if (instance == 0) {
+    return kOutOfMemory;
+  }
+  const uint32_t engine = Load(base, track + 12);
+  SetRegs(call, Args({instance, engine, track, 0xFFFFFFFFFFFFFFFFull}));
+  TrackInstanceConstruct(base, instance, engine, track);
+  SetRegs(call, Args({instance, key, offset}));
+  const uint32_t r30 = TrackInstancePrepare(
+      base, instance, key, offset, xa::FrameBelow(base, frame, kTrackInstancePrepareFull), call);
+  if (int32_t(r30) >= 0) {
+    Store(base, out, instance);
+    return r30;
+  }
+  CallAt(call, xa::Method(base, instance, 0), 0x825D0370, Args({instance, 1}), frame);
+  return r30;
+}
+
+uint32_t TrackPrepare(uint8_t* base, uint32_t track, uint32_t key, uint32_t offset,
+                      uint32_t frame, const GuestCall& call) {
+  ITC_NATIVE_RUNNING("sub_825D0AA0 XACTTrack::Prepare");
+  uint32_t r3;
+  if (const auto rpcs = TrackCreateRpcs(base, track)) {
+    SetRegs(call, Args({track}));
+    r3 = *rpcs;
+  } else {
+    r3 = CallAt(call, 0x825D06B8, 0x825D0ABC, Args({track}), frame);
+  }
+  const uint32_t out = frame + 80;
+  Store(base, out, 0);
+  if (int32_t(r3) < 0) {
+    return r3;
+  }
+  SetRegs(call, Args({track, key, out, offset}));
+  const uint32_t r30 = TrackCreateInstance(base, track, key, out, offset,
+                                           xa::FrameBelow(base, frame, kCreateInstanceFrame),
+                                           call);
+  if (int32_t(r30) < 0) {
+    return r30;
+  }
+  Store(base, track + 24, Load(base, out));
+  if (TrackStartRpcs(base, track)) {
+    SetRegs(call, Args({track}));
+  } else {
+    CallAt(call, 0x825D0800, 0x825D0AFC, Args({track}), frame);
+  }
+  return r30;
+}
+
 }  // namespace xact

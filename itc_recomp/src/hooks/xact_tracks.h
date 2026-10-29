@@ -62,5 +62,9 @@ void XactTrackStop(PPCContext& ctx, uint8_t* base);                          // 
 // Batch 5: making events. Runs the original (`__imp__`) where the plain C++
 // declines.
 void XactEventCreate(PPCContext& ctx, uint8_t* base);  // sub_825D0F00
+// The second migration: preparing a complex sound's track.
+void XactTrackInstancePrepare(PPCContext& ctx, uint8_t* base);  // sub_825D5A48
+void XactTrackCreateInstance(PPCContext& ctx, uint8_t* base);   // sub_825D02F8
+void XactTrackPrepare(PPCContext& ctx, uint8_t* base);          // sub_825D0AA0
 
 }  // namespace hooks

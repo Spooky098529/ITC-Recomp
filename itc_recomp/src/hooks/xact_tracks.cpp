@@ -31,7 +31,8 @@ ITC_FLAG_BOOL(native_xact_tracks, true, "ITC",
               "critical section, entered as the original does), ~XACTTrackInstance sub_825D5838 "
               "and its deleting destructor sub_825D5E58, Stop sub_825D5D18; XACTTrack::Stop "
               "sub_825D01D8; XACTEvent::Create sub_825D0F00 (the play-wave types; the others "
-              "run the original); "
+              "run the original); XACTTrackInstance::Prepare sub_825D5A48, XACTTrack::CreateInstance "
+              "sub_825D02F8 and Prepare sub_825D0AA0 (a complex sound's track; under --native_heap); "
               "the objects' slots through their plain C++ while they hold it, the waves' and "
               "voices' through the guest call) natively instead of through the translated code "
               "(the same reads and writes; checked by --run_harnesses=xact_tracks)");
@@ -365,6 +366,27 @@ void XactEventCreate(PPCContext& ctx, uint8_t* base) {
   }
 }
 
+void XactTrackInstancePrepare(PPCContext& ctx, uint8_t* base) {
+  const uint32_t instance = ctx.r3.u32, key = ctx.r4.u32, offset = ctx.r5.u32;
+  Framed(ctx, base, 192, [&](const xaudio::GuestCall& call, uint32_t frame) {
+    return xact::TrackInstancePrepare(base, instance, key, offset, frame, call);
+  });
+}
+
+void XactTrackCreateInstance(PPCContext& ctx, uint8_t* base) {
+  const uint32_t track = ctx.r3.u32, key = ctx.r4.u32, out = ctx.r5.u32, offset = ctx.r6.u32;
+  Framed(ctx, base, 128, [&](const xaudio::GuestCall& call, uint32_t frame) {
+    return xact::TrackCreateInstance(base, track, key, out, offset, frame, call);
+  });
+}
+
+void XactTrackPrepare(PPCContext& ctx, uint8_t* base) {
+  const uint32_t track = ctx.r3.u32, key = ctx.r4.u32, offset = ctx.r5.u32;
+  Framed(ctx, base, 128, [&](const xaudio::GuestCall& call, uint32_t frame) {
+    return xact::TrackPrepare(base, track, key, offset, frame, call);
+  });
+}
+
 }  // namespace hooks
 
 // The flag's fallback, then the register step.
@@ -448,3 +470,6 @@ ITC_XACT_TRACKS_HEAP_ADAPTER(825D5E58, XactTrackInstanceDeletingDestruct)
 // play) for XACTTrackInstance::Stop sub_825D5D18.
 ITC_XACT_TRACKS_ADAPTER(825D01D8, XactTrackStop)
 ITC_XACT_TRACKS_HEAP_ADAPTER(825D0F00, XactEventCreate)
+ITC_XACT_TRACKS_HEAP_ADAPTER(825D5A48, XactTrackInstancePrepare)
+ITC_XACT_TRACKS_HEAP_ADAPTER(825D02F8, XactTrackCreateInstance)
+ITC_XACT_TRACKS_HEAP_ADAPTER(825D0AA0, XactTrackPrepare)

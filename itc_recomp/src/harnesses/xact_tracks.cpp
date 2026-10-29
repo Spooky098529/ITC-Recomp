@@ -788,6 +788,237 @@ void Batch5(Context& h, uint32_t block) {
   results.Report();
 }
 
+// The second migration's: a sound bank for the instances' Prepare (its fake
+// vtable: FirstEvent +24, NextEvent +28 and GetHeader +64 the real ones; the
+// cached wave banks the fake bank's), its header with the track's event
+// records, and the out word of CreateInstance.
+constexpr uint32_t kSoundBankVtable2 = 0x1B00, kSoundBank2 = 0x1B80, kHeader = 0x1CA0,
+                   kInstanceOut = 0x1A48;
+
+// The records' sizes by type, as NextEvent steps over them (the types used).
+uint32_t RecordBytes(uint32_t type) {
+  switch (type) {
+    case 0: return 8;
+    case 1: return 12;
+    case 2: return 16;
+    case 4: return 19;
+    case 5: return 23;
+    case 9: return 11;
+    case 12: return 42;
+    case 14: return 13;
+    default: return 48;  // 20 and 31 end the walk (a failure)
+  }
+}
+
+// The track's event records: 1 to 5 at the header's `key` (a count byte, then
+// the records): the play-wave kinds (their Prepare fails on the fake bank:
+// not prepared, or CreateWave's AddRef count one of the errors, the first
+// XACTENGINE_E_SEEKTIMEBEYONDCUEEND one time in three), markers before the
+// offset (dropped), the stop event and types 12 and 14 (the base's Prepare:
+// kept), 20 (nothing made) and 31 (invalid). Chained one time in two: the
+// first record kept and the others' previous event the array's entry 0;
+// else each record has no previous event (bit 0x20000000). Returns the key;
+// `offset` is set at 0x100 or more, after every marker's time.
+uint32_t TrackRecords(uint8_t* base, uint32_t block, Random& random, uint32_t& offset) {
+  const uint32_t bank = block + kSoundBank2, vtable = block + kSoundBankVtable2;
+  for (uint32_t slot = 0; slot < 128; slot += 4) {
+    Store(base, vtable + slot, kAddRef);
+  }
+  Store(base, vtable + 24, 0x825C7F30);
+  Store(base, vtable + 28, 0x825C7F98);
+  Store(base, vtable + 64, 0x825C7AA8);
+  Store(base, bank, vtable);
+  Store(base, bank + 244, block + kBankCache);
+  Store(base, bank + 260, block + kHeader);
+  Store(base, block + kCue + 296, bank);
+  FakeBank(base, block, random, false);
+  Store(base, block + kFakeBank + 4,
+        Pick(random, {0x8AC70018u, 0x8AC70017u, 0x9FFFFFF0u + random.Below(15)}));
+  const bool chained = random.Below(2) == 0;
+  const uint32_t key = random.Below(16);
+  const uint32_t count = 1 + random.Below(5);
+  guest::StoreU8(base, block + kHeader + key, uint8_t(count));
+  uint32_t at = block + kHeader + key + 1;
+  for (uint32_t i = 0; i < count; i++) {
+    const uint32_t type = chained && i == 0
+                              ? Pick(random, {0, 12, 14})
+                              : Pick(random, {1, 2, 4, 5, 1, 9, 9, 0, 12, 14, 12, 14, 20, 31});
+    const uint32_t time = type == 9 ? random.Below(0x100) : random.Below(0x1000000);
+    const bool none = !chained || i == 0 || random.Below(4) == 0;
+    Store(base, at, (uint32_t(random.Next()) & 0xC0000000u) | (none ? 0x20000000u : 0) |
+                        (time << 5) | type);
+    guest::StoreU8(base, at + 6, 0);
+    guest::StoreU16(base, at + 8, uint16_t(Pick(random, {6, 10})));
+    guest::StoreU8(base, at + 10, uint8_t(random.Below(4)));
+    at += RecordBytes(type);
+  }
+  offset = 0x100 + Pick(random, {random.Below(0x100), random.Below(0x1000000),
+                                 uint32_t(random.Next()) & 0x3FFFFFFF});
+  return key;
+}
+
+// An instance's events (the array at +20, byte +24 of them) and the
+// instance compared with their pointers normalized (0; inside the instance;
+// an event of the array; inside the event; else as is), then the events
+// deleted (their real deleting destructors) and the array freed; the
+// instance's +20 and +36 cleared.
+void InstanceOut(Context& h, Outputs& out, uint32_t instance, PPCContext& t) {
+  uint8_t* base = h.base;
+  const uint32_t array = Load(base, instance + 20);
+  const uint32_t count = guest::LoadU8(base, instance + 24);
+  std::vector<uint32_t> events;
+  if (array != 0) {
+    for (uint32_t i = 0; i < count; i++) {
+      events.push_back(Load(base, array + 4 * i));
+    }
+  }
+  const auto norm = [&](uint32_t word, uint32_t self, uint32_t bytes) {
+    if (word == 0) {
+      return 0u;
+    }
+    if (word >= instance && word < instance + 64) {
+      return 0x1000 + word - instance;
+    }
+    for (uint32_t i = 0; i < events.size(); i++) {
+      if (word == events[i]) {
+        return 0x2000 + i;
+      }
+    }
+    if (word >= self && word < self + bytes) {
+      return 0x3000 + word - self;
+    }
+    return word;
+  };
+  out.Word(array != 0);
+  out.Word(count);
+  {
+    std::vector<uint8_t> bytes = Read(base, instance, 64);
+    for (const uint32_t at : {4u, 8u, 20u, 36u, 52u, 56u}) {
+      const uint32_t word = Load(base, instance + at);
+      out.Word(at == 20 ? word != 0 : norm(word, instance, 64));
+      for (uint32_t i = 0; i < 4; i++) {
+        bytes[at + i] = 0;
+      }
+    }
+    out.Bytes(bytes);
+  }
+  for (const uint32_t event : events) {
+    out.Word(event != 0);
+    if (event == 0) {
+      continue;
+    }
+    const uint32_t vtable = Load(base, event);
+    GuestFunction destruct = nullptr;
+    uint32_t bytes = 48;
+    switch (vtable) {
+      case 0x82076CE8: destruct = __imp__sub_825D8660; bytes = 72; break;
+      case 0x82076ADC: destruct = __imp__sub_825D5F80; break;
+      case 0x82076B44: destruct = __imp__sub_825D7148; bytes = 52; break;
+      case 0x82076D68: destruct = __imp__sub_825D8990; break;
+      default: break;
+    }
+    out.Word(vtable);
+    std::vector<uint8_t> data = Read(base, event, bytes);
+    for (const uint32_t at : {4u, 8u, 36u, 44u}) {
+      out.Word(norm(Load(base, event + at), event, bytes));
+      for (uint32_t i = 0; i < 4; i++) {
+        data[at + i] = 0;
+      }
+    }
+    out.Bytes(data);
+    if (destruct != nullptr) {
+      PPCContext d = t;
+      d.r1.u64 = CallContext(h).r1.u64;
+      d.r3.u64 = event;
+      d.r4.u64 = 1;
+      destruct(d, base);
+    }
+  }
+  if (array != 0) {
+    memory::crt::XMemFree(array, xact::kEventArrayAttributes);
+  }
+  Store(base, instance + 20, 0);
+  Store(base, instance + 36, 0);
+}
+
+// XACTTrackInstance::Prepare and the track's CreateInstance and Prepare over
+// it: the records above walked by the real FirstEvent and NextEvent, the
+// events made by the real Create (the play-wave kinds natively, the others
+// the original on both sides). Every play-wave event's Prepare fails here (a
+// new wave needs the real CreateWave: its success path, a play-wave event
+// kept as +36 and IsPrepared at the end, is the attract race's); the kept
+// events are the stop event's and types 12's and 14's.
+void Batch6(Context& h, uint32_t block) {
+  if (!hooks::NativeHeapActive()) {
+    return;
+  }
+  {
+    Results results("XACTTrackInstance::Prepare (sub_825D5A48)");
+    for (int c = 0; c < 128; c++) {
+      CaseWith(h, results, block, __imp__sub_825D5A48, hooks::XactTrackInstancePrepare,
+               [&](Random& random, PPCContext& t) {
+                 uint32_t offset = 0;
+                 t.r4.u64 = TrackRecords(h.base, block, random, offset);
+                 t.r3.u64 = block + kInstance;
+                 t.r5.u64 = offset;
+                 Store(h.base, block + kInstance + 36, random.Below(2) == 0 ? 0 : block + kEvent);
+               },
+               [&](Outputs& out, PPCContext& t) { InstanceOut(h, out, block + kInstance, t); },
+               fmt::format("case {}", c));
+    }
+    results.Report();
+  }
+  // The track's: the instance from the allocation layer (deleted by the
+  // function on a failure, its real destructor taking the engine's critical
+  // section; compared and freed here on a success), [out] or +24.
+  const auto track_cases = [&](const char* name, GuestFunction recompiled, GuestFunction native,
+                               bool create) {
+    Results results(name);
+    for (int c = 0; c < 96; c++) {
+      const uint32_t at = create ? block + kInstanceOut : block + kTrack + 24;
+      uint32_t before = 0;
+      CaseWith(h, results, block, recompiled, native,
+               [&](Random& random, PPCContext& t) {
+                 uint32_t offset = 0;
+                 const uint32_t key = TrackRecords(h.base, block, random, offset);
+                 Store(h.base, block + kTrack + 12, block + kEngine2);
+                 PPCContext c2 = t;
+                 c2.r3.u64 = block + kEngine2 + 144;
+                 __imp__RtlInitializeCriticalSection(c2, h.base);
+                 before = random.Below(2) == 0 ? 0 : uint32_t(random.Next());
+                 Store(h.base, at, before);
+                 t.r3.u64 = block + kTrack;
+                 t.r4.u64 = key;
+                 if (create) {
+                   t.r5.u64 = at;
+                   t.r6.u64 = offset;
+                 } else {
+                   t.r5.u64 = offset;
+                 }
+               },
+               [&](Outputs& out, PPCContext& t) {
+                 out.Bytes(Read(h.base, block + kEngine2 + 144, 28));
+                 const uint32_t instance = Load(h.base, at);
+                 const bool made = int32_t(t.r3.u32) >= 0;
+                 out.Word(made);
+                 if (made) {
+                   InstanceOut(h, out, instance, t);
+                   memory::crt::XMemFree(instance, xact::kTrackInstanceAttributes);
+                 } else {
+                   out.Word(instance == before);
+                 }
+                 Store(h.base, at, 0);
+               },
+               fmt::format("case {}", c));
+    }
+    results.Report();
+  };
+  track_cases("XACTTrack::CreateInstance (sub_825D02F8)", __imp__sub_825D02F8,
+              hooks::XactTrackCreateInstance, true);
+  track_cases("XACTTrack::Prepare (sub_825D0AA0)", __imp__sub_825D0AA0, hooks::XactTrackPrepare,
+              false);
+}
+
 }  // namespace
 
 void XactTracks(Context& h) {
@@ -801,6 +1032,7 @@ void XactTracks(Context& h) {
   Batch3(h, block.address);
   Batch4(h, block.address);
   Batch5(h, block.address);
+  Batch6(h, block.address);
 }
 
 }  // namespace harness

@@ -297,4 +297,39 @@ std::optional<uint32_t> EventCreate(uint8_t* base, uint32_t engine, uint32_t ins
                                     uint32_t record, uint32_t previous, uint32_t out,
                                     const GuestCall& call);
 
+// --- Preparing a complex sound's track ---
+
+// XACTTrackInstance::Prepare (sub_825D5A48): state 2; the track's event
+// records walked through the cue's sound bank's slots +24 (FirstEvent, the
+// iterator at the frame's +88 holding `key`, the count back in its byte +8)
+// and +28 (NextEvent), their plain C++ while the slots hold them; an array
+// of count words (XMemAlloc 0x20840001) at +20; for each record its event
+// (XACTEvent::Create's plain C++, else the original through the guest call;
+// the previous event the array's entry at the record's byte +6, or none
+// with bit 0x20000000); a marker (9) before `offset` dropped, else its slot
+// +8 (Prepare) with `offset`; a play-wave kind (1 to 6) becomes +36; kept
+// events in the array. XACTENGINE_E_SEEKTIMEBEYONDCUEEND drops the event
+// (the result when nothing is kept); any other failure deletes every event
+// (slot +0 with 1, through the guest call), frees the array and clears +36.
+// At the end the play-wave event's slot +20 (IsPrepared) and state 3.
+// `frame` is this function's (192 bytes). Returns the result. Allocates
+// through the native layer: call it only while hooks::NativeHeapActive().
+uint32_t TrackInstancePrepare(uint8_t* base, uint32_t instance, uint32_t key, uint32_t offset,
+                              uint32_t frame, const GuestCall& call);
+// XACTTrack::CreateInstance (sub_825D02F8): an instance (XMemAlloc 64
+// 0x20848008, its constructor's plain C++), its Prepare with `key` and
+// `offset`; on success the instance to [out]; on a failure E_OUTOFMEMORY or
+// Prepare's result, the instance deleted (its slot +0 with 1, through the
+// guest call). `frame` is this function's (128 bytes). Native layer only,
+// as above.
+uint32_t TrackCreateInstance(uint8_t* base, uint32_t track, uint32_t key, uint32_t out,
+                             uint32_t offset, uint32_t frame, const GuestCall& call);
+// XACTTrack::Prepare (sub_825D0AA0): CreateRpcs (its plain C++, else the
+// original through the guest call); when it succeeds, CreateInstance into
+// the frame's +80 (0 first) and on success +24 = the instance and StartRpcs
+// (likewise). `frame` is this function's (128 bytes). Returns CreateRpcs'
+// failure or CreateInstance's result. Native layer only, as above.
+uint32_t TrackPrepare(uint8_t* base, uint32_t track, uint32_t key, uint32_t offset,
+                      uint32_t frame, const GuestCall& call);
+
 }  // namespace xact
