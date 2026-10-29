@@ -45,7 +45,9 @@ ITC_FLAG_BOOL(native_xaudio_objects, true, "ITC",
               "sub_82478E60; ReverbCore::Process sub_82463B90 with its stages, the native ones "
               "reached only from it: sub_82462BC8, sub_82462CF8, sub_82463060 and sub_82463578, "
               "the all-passes sub_82462DC8, sub_82463130, sub_824632A0 and sub_82463410, and the "
-              "crossfading delay lines sub_824624F8 and sub_82463620) natively instead of through the "
+              "crossfading delay lines sub_824624F8 and sub_82463620; Reverb::SetParameters "
+              "sub_82462148 under the voice lists' spin lock, taken as the original does, and "
+              "I3dl2::ToNative sub_82469418) natively instead of through the "
               "translated code (the same reads and writes; checked by "
               "--run_harnesses=xaudio_objects)");
 
@@ -507,6 +509,20 @@ void XAudioFilterCoefficient(PPCContext& ctx, uint8_t* base) {
   xa::FilterCoefficient(base, ctx.r3.u32);
 }
 
+void XAudioReverbSetParameters(PPCContext& ctx, uint8_t* base) {
+  ctx.fpscr.disableFlushMode();
+  const uint32_t reverb = ctx.r3.u32, kind = ctx.r4.u32, data = ctx.r6.u32;
+  const uint32_t thread = Thread(ctx, base);
+  Framed(ctx, base, 240, [&](const xa::GuestCall& call, uint32_t frame) {
+    return xa::ReverbSetParameters(base, reverb, kind, data, thread, frame, call);
+  });
+}
+
+void XAudioI3dl2ToNative(PPCContext& ctx, uint8_t* base) {
+  ctx.fpscr.disableFlushMode();
+  ctx.f1.f64 = xa::I3dl2ToNative(base, ctx.r4.u32, ctx.r5.u32, ctx.r1.u32 - 128);
+}
+
 void XAudioResamplerProcess(PPCContext& ctx, uint8_t* base) {
   const uint32_t state = ctx.r3.u32;
   Framed(ctx, base, 128, [&](const xa::GuestCall& call, uint32_t frame) {
@@ -644,3 +660,5 @@ ITC_XAUDIO_OBJECTS_ADAPTER(8247E188, XAudioResampleMono)
 ITC_XAUDIO_OBJECTS_ADAPTER(8247E260, XAudioResampleStereo)
 ITC_XAUDIO_OBJECTS_ADAPTER(8247F558, XAudioCopyStereo)
 ITC_XAUDIO_OBJECTS_ADAPTER(82463B90, XAudioReverbCoreProcess)
+ITC_XAUDIO_OBJECTS_ADAPTER(82462148, XAudioReverbSetParameters)
+ITC_XAUDIO_OBJECTS_ADAPTER(82469418, XAudioI3dl2ToNative)

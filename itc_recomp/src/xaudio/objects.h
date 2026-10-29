@@ -351,4 +351,31 @@ void FillDelayLine(uint8_t* base, uint32_t line, uint32_t groups);
 // fmadd fused); pow and cos through their plain C++.
 void FilterCoefficient(uint8_t* base, uint32_t filter);
 
+// --- The reverb's parameters ---
+
+// Reverb::SetParameters (sub_82462148; slot +16 of 0x8204AAB0): by `kind`'s
+// low byte, 0: the native parameters at [data] (a word, 12 bytes and 8
+// floats, the last two scaled) read into the 84 bytes at `frame` + 80 over
+// ReverbCore::Defaults, then copied (memcpy) to +68, +205 = 1; 1: the 12
+// I3DL2 parameters at [data] (48 bytes, memcpy) to +152, +206 = 1; 2: the
+// float at `data` x the float at 0x82002A0C to +200, +204 = 1; each under
+// the voice lists' spin lock taken twice and released twice, as the
+// original does; else E_INVALIDARG (nothing taken). Returns 0 or the error
+// (sign-extended, as r3). `frame` is its (240 bytes).
+uint64_t ReverbSetParameters(uint8_t* base, uint32_t reverb, uint32_t kind, uint32_t data,
+                             uint32_t thread, uint32_t frame, const GuestCall& call);
+// I3dl2::ToNative (sub_82469418): the 12 I3DL2 parameters at `in` (room and
+// room HF in millibels, rolloff, decay time, decay HF ratio, reflections,
+// reflections delay, reverb, reverb delay, diffusion, density, HF reference)
+// to the 84-byte native ones at `out`: the levels scaled (the float at
+// 0x8200222C), the decay HF ratio's log10 to a clamped 0-8 step (+32 or +40,
+// the other 8), the delays scaled and clamped to the table words at
+// 0x8204ABFC and 0x8204AC00 (fctidz), the diffusion scaled to +24 and +28,
+// the density and HF reference copied, the rest from the constants at
+// 0x8204AC04-0x8204AC1C; each step rounding as the translated code's, log10
+// through its plain C++. The scratch words at `frame` + 80 (its frame, 128
+// bytes) left as the original leaves them. Returns log10's result (f1 as
+// the original leaves it); r3 is not touched.
+double I3dl2ToNative(uint8_t* base, uint32_t in, uint32_t out, uint32_t frame);
+
 }  // namespace xaudio

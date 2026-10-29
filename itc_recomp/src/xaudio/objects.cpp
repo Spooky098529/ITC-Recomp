@@ -1681,4 +1681,154 @@ void FilterCoefficient(uint8_t* base, uint32_t filter) {
   guest::StoreFloat(base, filter + 28, float(f0));
 }
 
+uint64_t ReverbSetParameters(uint8_t* base, uint32_t reverb, uint32_t kind, uint32_t data,
+                             uint32_t thread, uint32_t frame, const GuestCall& call) {
+  ITC_NATIVE_RUNNING("sub_82462148 Reverb::SetParameters");
+  const uint32_t which = kind & 0xFF;
+  if (which >= 3) {
+    return 0xFFFFFFFF80070057ull;  // E_INVALIDARG
+  }
+  const uint32_t core = reverb + 16;
+  if (which == 2) {
+    const double gain = LoadSingle(base, data);
+    SpinTake(base, thread, call);
+    SpinTake(base, thread, call);
+    guest::StoreFloat(base, reverb + 200,
+                      float(double(float(gain * LoadSingle(base, 0x82002A0C)))));
+    guest::StoreU8(base, reverb + 204, 1);
+  } else if (which == 1) {
+    const uint32_t source = guest::LoadU32(base, data);
+    SpinTake(base, thread, call);
+    SpinTake(base, thread, call);
+    Copy(base, core + 136, source, 48, 0x824622D8, frame, call);
+    guest::StoreU8(base, core + 190, 1);
+  } else {
+    // The native parameters read into the frame over the defaults.
+    const uint32_t source = guest::LoadU32(base, data);
+    const uint32_t local = frame + 80;
+    SetRegs(call, Args({local}));
+    ReverbDefaults(base, local);
+    guest::StoreU32(base, local, guest::LoadU32(base, source));
+    static constexpr uint8_t kBytes[] = {4, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 5};
+    for (uint32_t i = 0; i < 12; i++) {
+      guest::StoreU32(base, local + 4 + 4 * i, guest::LoadU8(base, source + kBytes[i]));
+    }
+    for (uint32_t i = 0; i < 6; i++) {
+      CopyFloat(base, local + 52 + 4 * i, source + 16 + 4 * i);
+    }
+    guest::StoreFloat(base, local + 76,
+                      float(double(float(LoadSingle(base, source + 40) *
+                                         LoadSingle(base, 0x82002A0C)))));
+    guest::StoreFloat(base, local + 80,
+                      float(double(float(LoadSingle(base, source + 44) *
+                                         LoadSingle(base, 0x8204AA80)))));
+    SpinTake(base, thread, call);
+    SpinTake(base, thread, call);
+    Copy(base, core + 52, local, 84, 0x8246244C, frame, call);
+    guest::StoreU8(base, core + 189, 1);
+  }
+  SpinRelease(base, thread, call);
+  SpinRelease(base, thread, call);
+  return 0;
+}
+
+namespace {
+
+// fctiwz as the translated code computes it (the word stfiwx stores).
+uint32_t ToWord(double value) {
+  return std::isnan(value)            ? 0x80000000u
+         : value >= double(INT_MAX) ? uint32_t(INT_MAX)
+                                    : uint32_t(simde_mm_cvttsd_si32(simde_mm_load_sd(&value)));
+}
+
+// The decay HF ratio's log10 times the double at `scale`, by fctiwz through
+// the frame's word at +80, to a step: 0 below -8, the step + 8 below 0,
+// else 8.
+uint32_t DecayStep(uint8_t* base, double log, uint32_t scale, uint32_t frame) {
+  const double product =
+      double(float(log)) * std::bit_cast<double>(uint64_t(REX_LOAD_U64(scale)));
+  guest::StoreU32(base, frame + 80, ToWord(product));
+  const int32_t step = int32_t(guest::LoadU32(base, frame + 80));
+  return step < -8 ? 0u : step < 0 ? uint32_t(step + 8) : 8u;
+}
+
+}  // namespace
+
+double I3dl2ToNative(uint8_t* base, uint32_t in, uint32_t out, uint32_t frame) {
+  ITC_NATIVE_RUNNING("sub_82469418 I3dl2::ToNative");
+  const auto f = [](double x) { return double(float(x)); };
+  // A word through the frame (std, lfd, fcfid) and frsp: `bits` the 64 bits
+  // stored.
+  const auto integer = [&](uint64_t bits) {
+    REX_STORE_U64(frame + 80, bits);
+    return f(double(int64_t(bits)));
+  };
+  const auto level = [&](uint32_t address) {
+    return uint64_t(int64_t(int32_t(guest::LoadU32(base, address))));
+  };
+  guest::StoreU32(base, out + 48, guest::LoadU32(base, 0x8204AC0C));
+  guest::StoreU32(base, out + 8, guest::LoadU32(base, 0x8204AC04));
+  guest::StoreU32(base, out + 12, guest::LoadU32(base, 0x8204AC04));
+  guest::StoreU32(base, out + 16, guest::LoadU32(base, 0x8204AC08));
+  guest::StoreU32(base, out + 20, guest::LoadU32(base, 0x8204AC08));
+  CopyFloat(base, out + 80, 0x8204AC1C);
+  double f0 = integer(level(in));
+  const double f31 = LoadSingle(base, 0x8200222C);
+  guest::StoreFloat(base, out + 56, float(f(f0 * f31)));
+  const uint64_t room_hf = level(in + 4);
+  guest::StoreU32(base, out + 36, 4);
+  guest::StoreU32(base, out + 44, 6);
+  f0 = integer(room_hf);
+  const double f30 = LoadSingle(base, 0x82000A30);
+  guest::StoreFloat(base, out + 60, float(f(f0 * f31)));
+  double f1;
+  if (!(LoadSingle(base, in + 16) < f30)) {
+    guest::StoreU32(base, out + 40, 8);
+    f1 = c_runtime::Log10(LoadSingle(base, in + 16));
+    guest::StoreU32(base, out + 32, DecayStep(base, f1, 0x8204B940, frame));
+    f0 = f(LoadSingle(base, in + 12) * LoadSingle(base, in + 16));
+    guest::StoreFloat(base, out + 72, float(f0));
+  } else {
+    guest::StoreU32(base, out + 32, 8);
+    f1 = c_runtime::Log10(LoadSingle(base, in + 16));
+    guest::StoreU32(base, out + 40, DecayStep(base, f1, 0x8204B938, frame));
+    CopyFloat(base, out + 72, in + 12);
+  }
+  f0 = integer(level(in + 20));
+  guest::StoreFloat(base, out + 64, float(f(f0 * f31)));
+  // The reflections delay, clamped below the table's word less 1 and to at
+  // least 1.
+  const uint32_t reflections_limit = guest::LoadU32(base, 0x8204ABFC);
+  f0 = LoadSingle(base, in + 24);
+  double f13 = integer(reflections_limit);
+  const double f12 = LoadSingle(base, 0x82001BDC);
+  f0 = f(f0 * f12);
+  if (!(f0 < f13)) {
+    f0 = f(f13 - f30);
+  }
+  if (!(f0 > f30)) {
+    f0 = f30;
+  }
+  guest::StoreU32(base, out + 0, uint32_t(ToFixed(f0)));
+  f0 = integer(level(in + 28));
+  guest::StoreFloat(base, out + 68, float(f(f0 * f31)));
+  // The reverb delay, clamped below the table's word less 1 only.
+  const uint32_t reverb_limit = guest::LoadU32(base, 0x8204AC00);
+  f0 = f(LoadSingle(base, in + 32) * f12);
+  f13 = integer(reverb_limit);
+  if (!(f0 < f13)) {
+    f0 = f(f13 - f30);
+  }
+  guest::StoreU32(base, out + 4, uint32_t(ToFixed(f0)));
+  // The diffusion, scaled.
+  f0 = f(LoadSingle(base, in + 36) * LoadSingle(base, 0x82002C4C));
+  guest::StoreU32(base, frame + 80, uint32_t(ToFixed(f0)));
+  const uint32_t diffusion = guest::LoadU32(base, frame + 80);
+  guest::StoreU32(base, out + 24, diffusion);
+  guest::StoreU32(base, out + 28, diffusion);
+  CopyFloat(base, out + 76, in + 40);
+  CopyFloat(base, out + 52, in + 44);
+  return f1;
+}
+
 }  // namespace xaudio

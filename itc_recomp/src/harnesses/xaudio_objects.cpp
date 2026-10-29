@@ -22,7 +22,9 @@
 #include <fmt/format.h>
 
 #include <bit>
+#include <initializer_list>
 #include <string>
+#include <utility>
 #include <vector>
 
 namespace harness {
@@ -601,10 +603,11 @@ constexpr uint32_t kPcmBaseRatio = 0x8246D320;
 // thread. With `hold`, the case holds it around the call (so the function
 // takes it again) and its depth and owner after the call are compared.
 // `after(out)` adds outputs before the block's.
-template <typename Setup, typename After>
-void LockedCase(Context& h, Results& results, uint32_t block, GuestFunction recompiled,
-                GuestFunction native, bool hold, Setup setup, After after,
-                const std::string& what) {
+// `block_out(out)` adds the block's outputs (LockedCase: its bytes).
+template <typename Setup, typename After, typename BlockOut>
+void LockedCaseWith(Context& h, Results& results, uint32_t block, GuestFunction recompiled,
+                    GuestFunction native, bool hold, Setup setup, After after,
+                    BlockOut block_out, const std::string& what) {
   const Random start = h.random;
   Random random = start;
   Outputs out[2];
@@ -630,11 +633,19 @@ void LockedCase(Context& h, Results& results, uint32_t block, GuestFunction reco
     if (hold) {
       hooks::XAudioSpinRelease(lock, h.base);
     }
-    out[v].Bytes(Read(h.base, block, kBlockBytes));
+    block_out(out[v]);
     R3(out[v], t.r3.u64);
   }
   h.random = random;
   results.Check(out[0], out[1], what);
+}
+
+template <typename Setup, typename After>
+void LockedCase(Context& h, Results& results, uint32_t block, GuestFunction recompiled,
+                GuestFunction native, bool hold, Setup setup, After after,
+                const std::string& what) {
+  LockedCaseWith(h, results, block, recompiled, native, hold, setup, after,
+                 [&](Outputs& out) { out.Bytes(Read(h.base, block, kBlockBytes)); }, what);
 }
 
 // A codec at `codec` in the block (the PCM layout: its base at +16, the
@@ -1264,6 +1275,164 @@ void ReverbParts(Context& h, uint32_t block) {
   }
 }
 
+// The block's bytes, with the word ranges in `floats` ({offset, count},
+// in order) as floats.
+void BlockWithFloats(Outputs& out, uint8_t* base, uint32_t block,
+                     std::initializer_list<std::pair<uint32_t, uint32_t>> floats) {
+  uint32_t at = 0;
+  for (const auto& [offset, count] : floats) {
+    out.Bytes(Read(base, block + at, offset - at));
+    out.Floats(base, block + offset, count);
+    at = offset + 4 * count;
+  }
+  out.Bytes(Read(base, block + at, kBlockBytes - at));
+}
+
+// An I3DL2 parameter set at `at`: realistic values (the I3DL2 ranges: room
+// and room HF -10000 to 0, rolloff 0 to 10, decay time 0.1 to 20 s, decay
+// HF ratio 0.1 to 2, reflections -10000 to 1000, reflections delay 0 to 0.3
+// s, reverb -10000 to 2000, reverb delay 0 to 0.1 s, diffusion and density
+// 0 to 100, HF reference 20 to 20000 Hz), or with `edges` each field now
+// and then a random word or an edge float, or out of range.
+void I3dl2Parameters(uint8_t* base, uint32_t at, Random& random, bool edges) {
+  const auto real = [&](double low, double high) {
+    return std::bit_cast<uint32_t>(
+        float(low + (high - low) * double(random.Below(100001)) / 100000.0));
+  };
+  const auto level = [&](int32_t low, int32_t high) {
+    return uint32_t(low + int32_t(random.Below(uint32_t(high - low + 1))));
+  };
+  uint32_t words[12] = {
+      level(-10000, 0),   level(-10000, 0),    real(0, 10),    real(0.1, 20),
+      real(0.1, 2),       level(-10000, 1000), real(0, 0.3),   level(-10000, 2000),
+      real(0, 0.1),       real(0, 100),        real(0, 100),   real(20, 20000)};
+  // The ratio at 1.0 exactly now and then (the branch's edge).
+  if (random.Below(6) == 0) {
+    words[4] = 0x3F800000;
+  }
+  if (edges) {
+    for (uint32_t i = 0; i < 12; i++) {
+      if (random.Below(3) != 0) {
+        continue;
+      }
+      const bool integer = i == 0 || i == 1 || i == 5 || i == 7;
+      switch (random.Below(3)) {
+        case 0:
+          words[i] = uint32_t(random.Next());
+          break;
+        case 1:
+          words[i] = integer ? uint32_t(int32_t(random.Below(40001)) - 20000) : AnyFloat(random);
+          break;
+        default:
+          words[i] = integer ? (random.Below(2) == 0 ? 0x80000000u : 0x7FFFFFFFu)
+                             : std::bit_cast<uint32_t>(float(int32_t(random.Below(2001)) - 1000));
+          break;
+      }
+    }
+  }
+  for (uint32_t i = 0; i < 12; i++) {
+    Store(base, at + 4 * i, words[i]);
+  }
+}
+
+void ReverbParameters(Context& h, uint32_t block) {
+  {
+    // r4 the I3DL2 parameters at +0x400, r5 the native ones at +0x800 (the
+    // block's random words, or the defaults as the callers leave them); the
+    // native floats (+52 to +80) compared as floats, the frame's scratch
+    // words (+80, 8 bytes), f1 (log10's result) and r3 too.
+    Results results("I3dl2::ToNative (sub_82469418)");
+    for (int i = 0; i < 96; i++) {
+      const Random start = h.random;
+      Random random = start;
+      Outputs out[2];
+      for (int v = 0; v < 2; v++) {
+        random = start;
+        for (uint32_t k = 0; k < kBlockBytes; k += 4) {
+          Store(h.base, block + k, uint32_t(random.Next()));
+        }
+        PPCContext t = CallContext(h);
+        for (uint32_t k = 4; k <= 0x400; k += 4) {
+          Store(h.base, t.r1.u32 - k, uint32_t(random.Next()));
+        }
+        I3dl2Parameters(h.base, block + 0x400, random, i >= 48);
+        if (random.Below(2) == 0) {
+          xa::ReverbDefaults(h.base, block + 0x800);
+        }
+        t.r3.u64 = random.Next();
+        t.r4.u64 = block + 0x400;
+        t.r5.u64 = block + 0x800;
+        t.f1.f64 = double(float(random.Below(1001)) / 1000.0f);
+        t.fpscr.loadFromHost();
+        const uint32_t sp = t.r1.u32;
+        (v == 0 ? __imp__sub_82469418 : hooks::XAudioI3dl2ToNative)(t, h.base);
+        out[v].Bytes(Read(h.base, sp - 128 + 80, 8));
+        out[v].Double(t.f1.u64);
+        BlockWithFloats(out[v], h.base, block, {{0x800 + 52, 8}});
+        R3(out[v], t.r3.u64);
+      }
+      h.random = random;
+      results.Check(out[0], out[1], fmt::format("case {}", i));
+    }
+    results.Report();
+  }
+  {
+    // The reverb at the block (its core at +16), r6 the data at +0x1000: for
+    // kind 2 a float (a gain, or an edge float), for 0 and 1 a pointer to the
+    // parameters at +0x400 (the native ones: a delay word, the 12 bytes
+    // small, the floats as the reverb's; or the I3DL2 ones); kinds past 2
+    // (r4's upper bytes random). The spin lock held around the call in half
+    // the cases. +200 and the frame's floats (+132 to +160) compared as
+    // floats, the frame's other words (+80 to +128) exactly.
+    Results results("Reverb::SetParameters (sub_82462148)");
+    for (int i = 0; i < 96; i++) {
+      const uint32_t kind = i < 80 ? uint32_t(i % 3) : 3 + uint32_t(i % 7) * 37;
+      LockedCaseWith(
+          h, results, block, __imp__sub_82462148, hooks::XAudioReverbSetParameters, i % 2 == 0,
+          [&](Random& random, PPCContext& t) {
+            const uint32_t data = block + 0x1000;
+            const bool edges = i >= 40;
+            if (kind == 2) {
+              Store(h.base, data,
+                    edges ? AnyFloat(random)
+                          : std::bit_cast<uint32_t>(float(random.Below(20001)) / 10000.0f));
+            } else {
+              Store(h.base, data, block + 0x400);
+            }
+            if (kind == 1) {
+              I3dl2Parameters(h.base, block + 0x400, random, edges);
+            } else if (kind == 0) {
+              const uint32_t params = block + 0x400;
+              Store(h.base, params, edges ? uint32_t(random.Next()) : random.Below(301));
+              for (uint32_t k = 4; k < 16; k++) {
+                guest::StoreU8(h.base, params + k,
+                               uint8_t(edges ? random.Next() : random.Below(31)));
+              }
+              for (uint32_t k = 16; k < 48; k += 4) {
+                const float value = k < 40 ? float(int32_t(random.Below(20001)) - 10000) / 100.0f
+                                            : float(random.Below(20001)) / 100.0f;
+                Store(h.base, params + k,
+                      edges && random.Below(3) == 0 ? AnyFloat(random)
+                                                    : std::bit_cast<uint32_t>(value));
+              }
+            }
+            t.r3.u64 = block;
+            t.r4.u64 = (random.Next() & ~uint64_t(0xFF)) | kind;
+            t.r5.u64 = random.Next();
+            t.r6.u64 = data;
+            t.fpscr.loadFromHost();
+          },
+          [&](Outputs& out, uint32_t sp) {
+            out.Bytes(Read(h.base, sp - 240 + 80, 52));
+            out.Floats(h.base, sp - 240 + 132, 8);
+          },
+          [&](Outputs& out) { BlockWithFloats(out, h.base, block, {{200, 1}}); },
+          fmt::format("case {} (kind {})", i, kind));
+    }
+    results.Report();
+  }
+}
+
 // --- The resampler ---
 
 // A converter state at `state` in the block: 16-bit input (+0) in the
@@ -1816,6 +1985,7 @@ void XAudioObjects(Context& h) {
   Queue(h, block.address);
   MatrixAndMeter(h, block.address);
   ReverbParts(h, block.address);
+  ReverbParameters(h, block.address);
   Resampler(h, block.address);
   ReverbStages(h);
   ReverbCoreCases(h);
