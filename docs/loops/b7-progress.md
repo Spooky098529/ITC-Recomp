@@ -28,8 +28,9 @@ file's history. What's left to see in a drive, from every run:
   continuations (not counted toward the limit): QueryPerformanceCounter
   with `XACTGetTimeMs` and what waits on it in `xact-tracks.md` and
   `xact-waves.md`: done (be9c0c5..b32d7d2; tracks 55 of 55,
-  waves 28 of 30). Step: validation agent running. Then XACT's waves'
-  last two (with `Fire`'s r3), then XAudio's engine's 7.
+  waves 28 of 30). Validated (`itc_2472`, `itc_2473`: 20 of 20
+  harness lines, all ran in play). Step: migration agent running on
+  XACT's waves' last two (with `Fire`'s r3); then XAudio's engine's 7.
 
 ## Done
 
@@ -85,3 +86,5 @@ file's history. What's left to see in a drive, from every run:
   differing; the user's coverage commit cf7114c took 148 stale entries
   out): ours 2909, work left 3407 (wrapped 103, known 513, unknown
   2791).
+- After its validation (`itc_2472`: race 7 s, 0 errors, every harness
+  0 differing but the expected groups): ours 2909, work left 3407.
