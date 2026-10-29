@@ -21,8 +21,9 @@ file's history. What's left to see in a drive, from every run:
   from the host clock at 50 MHz, like GetTickCount.
 - The continuations (not counted) done (below). Recorded in the plan's
   table and boundary log.
-- Subsystem 3 of 3: XAudio's factory objects and codecs (`leads.md`).
-  Step: mapping agent running.
+- Subsystem 3 of 3: XAudio's factory objects and codecs (`leads.md`,
+  with the XAPO lead). Map a611121 checked (`xaudio-objects.md`, 121
+  rows, 109 in play, 86 ready groups). Step: migration agent 1 running.
 
 ## Done
 
@@ -96,3 +97,5 @@ file's history. What's left to see in a drive, from every run:
   ours 2919, work left 3398 (wrapped 104, known 503, unknown 2791).
 - After its validation (`itc_2503`: race 7 s, 0 errors, every harness
   0 differing but the expected groups): ours 2919, work left 3398.
+- After XAudio's objects' map: ours 2919, work left 3398 (wrapped 104,
+  known 612, unknown 2682).

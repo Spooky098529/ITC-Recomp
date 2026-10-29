@@ -13,6 +13,22 @@ When the user has reviewed a run's section, its heading gets
 
 ## Run 2026-10-29 15:44 (`b7-loop-29-10-26`)
 
+- XAudio's factory objects (map a611121): `docs/functions/xaudio-objects.md`,
+  121 rows (all new; 12 not seen in play), with the XAPO lead: the
+  class tables (XAudio's default at `0x8204A7B0`, ids 0-3; the game's 7
+  at `0x820713E0`: the source codec (PCM for format types 0-3, XMA for
+  4), the output matrix, the render driver, the reverb (probably
+  I3DL2, 309,936 bytes), the volume meter, two effects never seen), the
+  codecs' packet queue, the PCM and XMA codec slots, the resampler and
+  its 6 kernels that ran (the other 94 get no rows), the matrix's set
+  and mix, the reverb (its signal code in outline), the volume meter and
+  the shared Release `sub_8246CE70`. The class table's entries are size
+  at +4 and create at +8 (the "first" and "second" function in
+  `xaudio-engine.md`'s factory rows). XMA's hardware-facing functions
+  keep their rows in `audio.md` (shared); none of the new file's XMA
+  rows touch the XMA object or registers. Kernel use: the voice lists'
+  spin lock only (the 2026-10-29 call); the reverb times its passes with
+  QueryPerformanceCounter (ours). `known-data.md`: 10 layouts.
 - The user's calls (2026-10-29), asked by the lead: XAudio's own
   threads, events, semaphore and title terminate notification are used
   by native code through their imports exactly as the original does
