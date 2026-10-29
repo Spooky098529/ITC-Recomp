@@ -255,7 +255,6 @@ void XAudioBaseSize(PPCContext& ctx, uint8_t* base) {
     hooks::step(ctx, base);                 \
   }
 
-ITC_XAUDIO_ADAPTER(8245DC88, XAudioSourceOutputFormat)
 ITC_XAUDIO_ADAPTER(8245F010, XAudioSubmixDescribe)
 ITC_XAUDIO_ADAPTER(8245EC40, XAudioDefaultMatrix)
 ITC_XAUDIO_ADAPTER(8245FA28, XAudioBufferSize)
