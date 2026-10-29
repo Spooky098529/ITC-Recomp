@@ -19,6 +19,7 @@
 #include "memory/heap.h"
 #include "xact/waves.h"
 #include "xaudio/voices.h"
+#include "xact/xact.h"
 
 #include <fmt/format.h>
 
@@ -450,6 +451,209 @@ void Creates(Context& h, uint32_t block) {
   ITC_LOG_INFO("harness: xact_waves: XACTVoice::Create made {} voices natively", made_voices);
 }
 
+
+// --- The waves ---
+//
+// One case over the block (random words, the same for both versions), the
+// inputs from `setup(random, t)`; compared: the block (exactly but the
+// offsets in `floats`), r3, and what `after(out, t)` adds.
+template <typename Setup, typename After>
+void WaveCase(Context& h, Results& results, uint32_t block, GuestFunction recompiled,
+              GuestFunction native, Setup setup, After after,
+              const std::vector<uint32_t>& floats, const std::string& what) {
+  const Random start = h.random;
+  Random random = start;
+  Outputs out[2];
+  for (int v = 0; v < 2; v++) {
+    random = start;
+    for (uint32_t i = 0; i < kBlockBytes; i += 4) {
+      Store(h.base, block + i, uint32_t(random.Next()));
+    }
+    PPCContext t = CallContext(h);
+    for (uint32_t i = 4; i <= 0x400; i += 4) {
+      Store(h.base, t.r1.u32 - i, uint32_t(random.Next()));
+    }
+    setup(random, t);
+    ITC_FLAG(native_xact_waves) = v == 1;
+    (v == 0 ? recompiled : native)(t, h.base);
+    ITC_FLAG(native_xact_waves) = true;
+    BlockOutputs(out[v], h.base, block, floats);
+    out[v].Word(t.r3.u32);
+    after(out[v], t);
+  }
+  h.random = random;
+  results.Check(out[0], out[1], what);
+}
+
+constexpr uint32_t kWave = 0x400;   // 96 bytes
+constexpr uint32_t kBank = 0x600;   // its +4 interface's vtable at +0x700
+constexpr uint32_t kOwnerBlock = 0x1000;
+
+void Waves(Context& h, uint32_t block) {
+  const auto none = [](Outputs&, PPCContext&) {};
+  // The constructors: the bank's +4 interface's slot +0 a recorder
+  // (sub_820CE9F8, its r4 and r5 to +448 and +452 of the bank) or the real
+  // AddListener (sub_825C8690) over a node pool at the bank's +24
+  // (constructed, its 16 inline nodes free, so nothing is allocated).
+  for (const bool in_memory : {false, true}) {
+    Results results(in_memory ? "XACTInMemoryWave::XACTInMemoryWave (sub_825D37A8)"
+                              : "XACTWave::XACTWave (sub_825D23F0)");
+    for (int c = 0; c < 64; c++) {
+      WaveCase(h, results, block, in_memory ? __imp__sub_825D37A8 : __imp__sub_825D23F0,
+               in_memory ? hooks::XactInMemoryWaveConstruct : hooks::XactWaveConstruct,
+               [&](Random& random, PPCContext& t) {
+                 const uint32_t bank = block + kBank;
+                 Store(h.base, bank + 4, block + 0x700);
+                 const bool real = random.Below(2) == 0 && hooks::NativeHeapActive();
+                 Store(h.base, block + 0x700, real ? xact::kWaveBankAddListener : 0x820CE9F8);
+                 if (real) {
+                   xact::NodePoolConstruct(h.base, bank + 24);
+                 }
+                 t.r3.u64 = block + kWave;
+                 t.r4.u64 = random.Next();
+                 t.r5.u64 = bank;
+                 t.r6.u64 = random.Next();
+                 t.r7.u64 = random.Next();
+               },
+               none, {}, fmt::format("case {}", c));
+    }
+    results.Report();
+  }
+  // The track getters: the track at +0x1000 (its sound at +0x1100, the
+  // sound's record at +0x1200, engine at +0x1300 without global settings,
+  // so the category's volume is 1.0, cue at +0x1400); the floats random
+  // with specials now and then. Compared: f1 and r3 (the block isn't
+  // written).
+  const auto track_floats = [&](Random& random, uint32_t track) {
+    const uint32_t sound = block + 0x1100;
+    for (const uint32_t at : {track + 40, track + 44, track + 56, track + 60, sound + 8,
+                              sound + 88, sound + 92, sound + 112, sound + 120,
+                              block + 0x1400 + 28}) {
+      guest::StoreFloat(h.base, at, float(AnyFloat(random)));
+    }
+    Store(h.base, track + 20, sound);
+    Store(h.base, sound + 28, block + 0x1200);
+    Store(h.base, sound + 32, block + 0x1300);
+    Store(h.base, sound + 48, block + 0x1400);
+    Store(h.base, block + 0x1300 + 124, 0);
+  };
+  const auto f1 = [](Outputs& out, PPCContext& t) { out.Double(t.f1.u64); };
+  {
+    Results results("XACTTrack::GetVolume (sub_825D0268)");
+    for (int c = 0; c < 64; c++) {
+      WaveCase(h, results, block, __imp__sub_825D0268, hooks::XactTrackGetVolume,
+               [&](Random& random, PPCContext& t) {
+                 track_floats(random, block + kOwnerBlock);
+                 t.r3.u64 = block + kOwnerBlock;
+               },
+               f1, {}, fmt::format("case {}", c));
+    }
+    results.Report();
+  }
+  {
+    Results results("XACTTrack::GetPitch (sub_825D02B0)");
+    for (int c = 0; c < 64; c++) {
+      WaveCase(h, results, block, __imp__sub_825D02B0, hooks::XactTrackGetPitch,
+               [&](Random& random, PPCContext& t) {
+                 track_floats(random, block + kOwnerBlock);
+                 t.r3.u64 = block + kOwnerBlock;
+               },
+               f1, {}, fmt::format("case {}", c));
+    }
+    results.Report();
+  }
+  // GetStartPosition: an entry accessor at +0x800 with a rate (+16 bits
+  // 5-22), a duration (+12 >> 4), a loop start (+28) and length (+32, 0 one
+  // time in four: no loop region) of the game's sizes; the wave's byte +25
+  // random (bit 0x20: looping), the count byte 0, 255 or small; offsets in
+  // and past the loops. Never the original's trap (the count 255 with no
+  // loop length and an offset past the loop start).
+  {
+    Results results("XACTWave::GetStartPosition (sub_825D2170)");
+    for (int c = 0; c < 400; c++) {
+      WaveCase(h, results, block, __imp__sub_825D2170, hooks::XactWaveGetStartPosition,
+               [&](Random& random, PPCContext& t) {
+                 const uint32_t entry = block + 0x800;
+                 static constexpr uint32_t kRates[] = {48000, 44100, 22050, 1, 0x3FFFF};
+                 const uint32_t rate = kRates[random.Below(5)];
+                 Store(h.base, entry + 16,
+                       (Load(h.base, entry + 16) & ~(0x3FFFFu << 5)) | (rate << 5));
+                 const uint32_t duration = random.Below(4) == 0 ? random.Below(16)
+                                                                : random.Below(2000000);
+                 Store(h.base, entry + 12, (duration << 4) | (Load(h.base, entry + 12) & 15));
+                 const uint32_t loop_start = random.Below(3) == 0 ? 0 : random.Below(duration + 1);
+                 uint32_t loop_length = random.Below(4) == 0 ? 0
+                                                              : 1 + random.Below(duration + 1);
+                 Store(h.base, entry + 28, loop_start);
+                 Store(h.base, entry + 32, loop_length);
+                 uint8_t count = uint8_t(random.Below(3) == 0 ? 255 : random.Below(3) == 0
+                                                                          ? 0
+                                                                          : random.Below(6));
+                 guest::StoreU8(h.base, block + 0x900, count);
+                 const uint32_t loop = loop_length != 0 ? loop_length : duration;
+                 if (count == 255 && loop == 0) {
+                   guest::StoreU8(h.base, block + 0x900, 3);
+                 }
+                 const uint32_t ms = random.Below(5) == 0 ? uint32_t(random.Next())
+                                                          : random.Below(200000);
+                 t.r3.u64 = block + kWave;
+                 t.r4.u64 = entry;
+                 t.r5.u64 = ms;
+                 t.r6.u64 = block + 0x904;
+                 t.r7.u64 = block + 0x900;
+               },
+               none, {}, fmt::format("case {}", c));
+    }
+    results.Report();
+  }
+  {
+    Results results("XACTWave::RequestNext (sub_825D1C30)");
+    for (int c = 0; c < 32; c++) {
+      WaveCase(h, results, block, __imp__sub_825D1C30, hooks::XactWaveRequestNext,
+               [&](Random& random, PPCContext& t) {
+                 t.r3.u64 = block + kWave;
+                 t.r4.u64 = random.Next();
+                 t.r5.u64 = random.Below(2) == 0 ? random.Below(2) : random.Next();
+               },
+               none, {}, fmt::format("case {}", c));
+    }
+    results.Report();
+  }
+  {
+    // The engine at +0x1800 with a critical section at +144 (initialized for
+    // each version), held by this thread already one time in two (the wave's
+    // Play under XACTCue::Play's lock), then left.
+    Results results("XACTEngine::RequestCommit (sub_825D1C78)");
+    for (int c = 0; c < 16; c++) {
+      bool held = false;
+      WaveCase(h, results, block, __imp__sub_825D1C78, hooks::XactEngineRequestCommit,
+               [&](Random& random, PPCContext& t) {
+                 const uint32_t engine = block + 0x1800;
+                 PPCContext c2 = t;
+                 c2.r3.u64 = engine + 144;
+                 __imp__RtlInitializeCriticalSection(c2, h.base);
+                 held = random.Below(2) == 0;
+                 if (held) {
+                   c2.r3.u64 = engine + 144;
+                   __imp__RtlEnterCriticalSection(c2, h.base);
+                 }
+                 t.r3.u64 = engine;
+               },
+               [&](Outputs& out, PPCContext& t) {
+                 // The lock as left (before the case lets go of it).
+                 out.Bytes(Read(h.base, block + 0x1800 + 144, 28));
+                 if (held) {
+                   PPCContext c2 = t;
+                   c2.r3.u64 = block + 0x1800 + 144;
+                   __imp__RtlLeaveCriticalSection(c2, h.base);
+                 }
+               },
+               {}, fmt::format("case {}", c));
+    }
+    results.Report();
+  }
+}
+
 }  // namespace
 
 void XactWaves(Context& h) {
@@ -460,6 +664,7 @@ void XactWaves(Context& h) {
   }
   VoiceMethods(h, block.address);
   Creates(h, block.address);
+  Waves(h, block.address);
 }
 
 }  // namespace harness

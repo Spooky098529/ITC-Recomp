@@ -14,6 +14,7 @@
 
 #pragma once
 
+#include "xact/xact.h"
 #include "xaudio/voices.h"
 
 #include <cstdint>
@@ -83,5 +84,60 @@ uint32_t VoiceSubmitPacket(uint8_t* base, uint32_t voice, uint32_t packet, uint3
 // hooks::NativeHeapActive().
 uint32_t VoiceDeletingDestruct(uint8_t* base, uint32_t voice, uint32_t flags, uint32_t frame,
                                const GuestCall& call);
+
+// --- The waves (XACTWave: +0 the vtable, +4/+8 the node in the wave
+// bank's wave list (+240), +12 the listener interface, +16 stopped at once,
+// +20 the engine, byte +24 the loop count, byte +25 the flags, +28 and +32
+// the request words, +36 the wave bank, +40 the state, +44 the voice, +48
+// the owner, 16-bit +52 the wave index, +56 the next wave, +60 prepared;
+// the in-memory wave's +64 to +92 its packets' context) ---
+
+constexpr uint32_t kWaveVtable = 0x82076A38;
+constexpr uint32_t kWaveListenerVtable = 0x82076A70;
+constexpr uint32_t kInMemoryWaveVtable = 0x82076A74;
+constexpr uint32_t kListenerBaseVtable = 0x8203DF00;
+constexpr uint32_t kWaveBankAddListener = 0x825C8690;  // the bank's +4 slot +0
+
+// XACTWave::XACTWave (sub_825D23F0): the fields set (byte +25 kept to its
+// 0x20 bit) and the wave registered with the bank's +4 interface (its slot
+// +0, AddListener with the wave's +12): AddListener's plain C++ while the
+// slot holds it and `native_heap`, else through the guest call. `frame` is
+// this function's (112 bytes). Returns the wave.
+uint32_t WaveConstruct(uint8_t* base, uint32_t wave, uint32_t engine, uint32_t bank,
+                       uint32_t index, uint32_t owner, bool native_heap, uint32_t frame,
+                       const GuestCall& call);
+// XACTInMemoryWave::XACTInMemoryWave (sub_825D37A8): the base (a frame
+// below), its vtables, +64 to +92 zeroed, +64 and +80 the wave. `frame` is
+// this function's (96 bytes). Returns the wave.
+uint32_t InMemoryWaveConstruct(uint8_t* base, uint32_t wave, uint32_t engine, uint32_t bank,
+                               uint32_t index, uint32_t owner, bool native_heap, uint32_t frame,
+                               const GuestCall& call);
+// XACTTrack::GetVolume (sub_825D0268): f1 = +56 x +40 x XACTSound::GetVolume
+// of the sound (+20), each product rounded to single; r3 as GetVolume leaves
+// it. nullopt where GetVolume's plain C++ declines (nothing changed).
+std::optional<CategoryVolume> TrackGetVolume(uint8_t* base, uint32_t track);
+// XACTTrack::GetPitch (sub_825D02B0): f1 = +60 + +44 + XACTSound::GetPitch
+// of the sound, each sum rounded to single; r3 the sound.
+CategoryVolume TrackGetPitch(uint8_t* base, uint32_t track);
+// XACTWave::GetStartPosition (sub_825D2170): the start in samples to
+// [start] and the loop count left to the byte at `count` for an offset of
+// `ms` into the wave's entry (the accessor at `entry`); the count is the
+// byte's only while byte +25's bit 0x20 is clear, else 0. A finite count folds
+// an offset inside the loops into one pass, less the passes skipped, one
+// past them lands after them with the count 0, 255 folds it into the loop.
+// Returns 0, or 0x8AC70019 for an offset past the duration ([start] 0).
+// nullopt, with nothing changed, where the original traps (a zero loop
+// length with the count 255 and the offset past the loop start).
+std::optional<uint32_t> WaveGetStartPosition(uint8_t* base, uint32_t wave, uint32_t entry,
+                                             uint32_t ms, uint32_t start, uint32_t count);
+// XACTWave::RequestNext (sub_825D1C30): +32 exchanged with `value`
+// atomically (the original's lwarx/stwcx. loop, as a compare-and-swap on the
+// big-endian word, as XAudio's AddStat does).
+void WaveRequestNext(uint8_t* base, uint32_t wave, uint32_t value);
+// XACTEngine::RequestCommit (sub_825D1C78): the engine's critical section
+// (+144) entered, +184 = 1, left; the game's lock, its imports through the
+// guest call at their thunks (the user's call, 2026-10-29). Returns
+// RtlLeaveCriticalSection's r3.
+uint32_t EngineRequestCommit(uint8_t* base, uint32_t engine, const GuestCall& call);
 
 }  // namespace xact

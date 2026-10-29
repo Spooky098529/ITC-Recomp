@@ -14,7 +14,12 @@ ITC_FLAG_BOOL(native_xact_waves, true, "ITC",
               "XACTVoice::Create sub_825C9C40 with Init sub_825C9B60, GetState sub_825C9DB8, "
               "SetVolume sub_825C9BE8, SetPitch sub_825C9BF0, SubmitPacket sub_825C9E08, Start "
               "sub_825C9BF8, Stop sub_825C9C10, FlushPackets sub_825C9C28 and the deleting "
-              "destructor sub_825CA448, over XAudio's entry points' plain C++) natively instead "
+              "destructor sub_825CA448, over XAudio's entry points' plain C++; XACTWave::XACTWave "
+              "sub_825D23F0 and XACTInMemoryWave::XACTInMemoryWave sub_825D37A8 (the wave bank's "
+              "AddListener's plain C++ while its slot holds it); XACTTrack::GetVolume sub_825D0268 "
+              "and GetPitch sub_825D02B0; XACTWave::GetStartPosition sub_825D2170; "
+              "XACTWave::RequestNext sub_825D1C30; XACTEngine::RequestCommit sub_825D1C78, the "
+              "engine's critical section entered as the original does) natively instead "
               "of through the translated code (the same reads and writes; XAudio's locks stay "
               "the game's, taken as the original does; checked by "
               "--run_harnesses=xact_waves)");
@@ -91,6 +96,62 @@ void XactVoiceDeletingDestruct(PPCContext& ctx, uint8_t* base) {
   });
 }
 
+void XactWaveConstruct(PPCContext& ctx, uint8_t* base) {
+  const uint32_t wave = ctx.r3.u32, engine = ctx.r4.u32, bank = ctx.r5.u32, index = ctx.r6.u32,
+                 owner = ctx.r7.u32;
+  const bool native_heap = NativeHeapActive();
+  XAudioFramed(ctx, base, 112, [&](const xaudio::GuestCall& call, uint32_t frame) {
+    return xact::WaveConstruct(base, wave, engine, bank, index, owner, native_heap, frame, call);
+  });
+}
+
+void XactInMemoryWaveConstruct(PPCContext& ctx, uint8_t* base) {
+  const uint32_t wave = ctx.r3.u32, engine = ctx.r4.u32, bank = ctx.r5.u32, index = ctx.r6.u32,
+                 owner = ctx.r7.u32;
+  const bool native_heap = NativeHeapActive();
+  XAudioFramed(ctx, base, 96, [&](const xaudio::GuestCall& call, uint32_t frame) {
+    return xact::InMemoryWaveConstruct(base, wave, engine, bank, index, owner, native_heap,
+                                       frame, call);
+  });
+}
+
+void XactTrackGetVolume(PPCContext& ctx, uint8_t* base) {
+  ctx.fpscr.disableFlushMode();
+  if (const auto done = xact::TrackGetVolume(base, ctx.r3.u32)) {
+    ctx.f1.f64 = done->f1;
+    ctx.r3.u64 = done->r3;
+    return;
+  }
+  __imp__sub_825D0268(ctx, base);
+}
+
+void XactTrackGetPitch(PPCContext& ctx, uint8_t* base) {
+  ctx.fpscr.disableFlushMode();
+  const xact::CategoryVolume done = xact::TrackGetPitch(base, ctx.r3.u32);
+  ctx.f1.f64 = done.f1;
+  ctx.r3.u64 = done.r3;
+}
+
+void XactWaveGetStartPosition(PPCContext& ctx, uint8_t* base) {
+  if (const auto done = xact::WaveGetStartPosition(base, ctx.r3.u32, ctx.r4.u32, ctx.r5.u32,
+                                                   ctx.r6.u32, ctx.r7.u32)) {
+    ctx.r3.u64 = *done;
+    return;
+  }
+  __imp__sub_825D2170(ctx, base);
+}
+
+void XactWaveRequestNext(PPCContext& ctx, uint8_t* base) {
+  xact::WaveRequestNext(base, ctx.r3.u32, ctx.r5.u32);
+}
+
+void XactEngineRequestCommit(PPCContext& ctx, uint8_t* base) {
+  const uint32_t engine = ctx.r3.u32;
+  XAudioFramed(ctx, base, 112, [&](const xaudio::GuestCall& call, uint32_t) {
+    return xact::EngineRequestCommit(base, engine, call);
+  });
+}
+
 }  // namespace hooks
 
 // The flag's fallback, then the register step.
@@ -127,3 +188,10 @@ ITC_XACT_WAVES_ADAPTER(825C9BF8, XactVoiceStart)
 ITC_XACT_WAVES_ADAPTER(825C9C10, XactVoiceStop)
 ITC_XACT_WAVES_ADAPTER(825C9C28, XactVoiceFlushPackets)
 ITC_XACT_WAVES_HEAP_ADAPTER(825CA448, XactVoiceDeletingDestruct)
+ITC_XACT_WAVES_ADAPTER(825D23F0, XactWaveConstruct)
+ITC_XACT_WAVES_ADAPTER(825D37A8, XactInMemoryWaveConstruct)
+ITC_XACT_WAVES_ADAPTER(825D0268, XactTrackGetVolume)
+ITC_XACT_WAVES_ADAPTER(825D02B0, XactTrackGetPitch)
+ITC_XACT_WAVES_ADAPTER(825D2170, XactWaveGetStartPosition)
+ITC_XACT_WAVES_ADAPTER(825D1C30, XactWaveRequestNext)
+ITC_XACT_WAVES_ADAPTER(825D1C78, XactEngineRequestCommit)
