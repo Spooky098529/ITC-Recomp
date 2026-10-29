@@ -5,6 +5,7 @@
 
 #include "base/log.h"
 #include "guest.h"
+#include "xaudio/ppc_float.h"
 
 #include <rex/platform/fpscr.h>
 #include <simde/x86/sse4.1.h>
@@ -16,22 +17,7 @@ namespace xaudio {
 
 namespace {
 
-using Fpscr = rex::platform::FPSCRPlatform;
-
-// Flush to zero off for the scalar unit's float work, as the translated code
-// sets it; the setting found on entry put back on return.
-class ScalarMode {
- public:
-  ScalarMode() : saved_(Fpscr::getcsr()) {
-    Fpscr::setcsr(saved_ & ~uint32_t(Fpscr::FlushMask));
-  }
-  ~ScalarMode() { Fpscr::setcsr(saved_); }
-  ScalarMode(const ScalarMode&) = delete;
-  ScalarMode& operator=(const ScalarMode&) = delete;
-
- private:
-  uint32_t saved_;
-};
+using namespace ppc_float;
 
 double Load(uint8_t* base, uint32_t address) { return double(guest::LoadFloat(base, address)); }
 void Store(uint8_t* base, uint32_t address, double value) {
@@ -40,9 +26,6 @@ void Store(uint8_t* base, uint32_t address, double value) {
 void CopyFloat(uint8_t* base, uint32_t destination, uint32_t source) {
   guest::StoreU32(base, destination, guest::LoadU32(base, source));
 }
-double Round(double value) { return double(float(value)); }
-// fmadds: a x b + c, rounded once to a float.
-double Fma(double a, double b, double c) { return double(float(std::fma(a, b, c))); }
 
 // The delay lines with three taps (sub_82462CF8, sub_82463060): `index_mask`
 // the byte index's mask, `wrap` the entry index's.

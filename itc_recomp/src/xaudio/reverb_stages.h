@@ -1,6 +1,6 @@
 // Stages of XAudio's reverb core as plain C++ (B7 in docs/rexglue-removal.md;
 // docs/functions/xaudio-objects.md): the leaves ReverbCore::Process
-// (sub_82463B90, still recompiled) runs over its 256-frame blocks. Each works
+// (sub_82463B90, reverb_core.h) runs over its 256-frame blocks. Each works
 // on its stage's guest state and the core's float buffers, in the original's
 // order of loads, stores and roundings (the scalar unit's, flush to zero
 // off; a float stored straight from its load keeps its bits, as the

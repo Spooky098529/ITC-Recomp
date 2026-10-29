@@ -12,6 +12,7 @@
 #include "hooks/xaudio.h"
 #include "xaudio/objects.h"
 #include "xaudio/resampler.h"
+#include "xaudio/reverb_core.h"
 #include "xaudio/reverb_stages.h"
 
 ITC_FLAG_BOOL(native_xaudio_objects, true, "ITC",
@@ -43,7 +44,8 @@ ITC_FLAG_BOOL(native_xaudio_objects, true, "ITC",
               "sub_8246E208 and sub_8246E4C8), sub_82473E48, sub_82474188, sub_8247F558 and "
               "sub_82478E60; the reverb core's stages sub_82462BC8, sub_82462CF8, sub_82463060 and "
               "sub_82463578, and the all-passes sub_82462DC8, sub_82463130, sub_824632A0 and "
-              "sub_82463410, and the crossfading delay lines sub_824624F8 and sub_82463620) natively instead of through the "
+              "sub_82463410, and the crossfading delay lines sub_824624F8 and sub_82463620, and "
+              "ReverbCore::Process sub_82463B90 over them) natively instead of through the "
               "translated code (the same reads and writes; checked by "
               "--run_harnesses=xaudio_objects)");
 
@@ -543,6 +545,11 @@ void XAudioReverbCrossfadeDelay(PPCContext& ctx, uint8_t* base) {
 void XAudioReverbCrossfadeDelay256(PPCContext& ctx, uint8_t* base) {
   xa::ReverbCrossfadeDelay256(base, ctx.r3.u32, ctx.r4.u32, ctx.r5.u32, ctx.r1.u32);
 }
+// The frame below r1 (the original's 17,888 bytes) is written as the
+// original leaves it; r3 as it does.
+void XAudioReverbCoreProcess(PPCContext& ctx, uint8_t* base) {
+  ctx.r3.u64 = xa::ReverbCoreProcess(base, ctx.r3.u64, ctx.r4.u32, ctx.r5.u32, ctx.r1.u32);
+}
 
 #define ITC_XAUDIO_KERNEL_STEP(name, function)                     \
   void name(PPCContext& ctx, uint8_t* base) {                      \
@@ -646,3 +653,4 @@ ITC_XAUDIO_OBJECTS_ADAPTER(824632A0, XAudioReverbAllPass512)
 ITC_XAUDIO_OBJECTS_ADAPTER(82463410, XAudioReverbAllPass512To)
 ITC_XAUDIO_OBJECTS_ADAPTER(824624F8, XAudioReverbCrossfadeDelay)
 ITC_XAUDIO_OBJECTS_ADAPTER(82463620, XAudioReverbCrossfadeDelay256)
+ITC_XAUDIO_OBJECTS_ADAPTER(82463B90, XAudioReverbCoreProcess)

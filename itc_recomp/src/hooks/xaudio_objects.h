@@ -108,4 +108,7 @@ void XAudioReverbAllPass512To(PPCContext& ctx, uint8_t* base);  // sub_82463410
 void XAudioReverbCrossfadeDelay(PPCContext& ctx, uint8_t* base);     // sub_824624F8
 void XAudioReverbCrossfadeDelay256(PPCContext& ctx, uint8_t* base);  // sub_82463620
 
+// The reverb core (src/xaudio/reverb_core.h).
+void XAudioReverbCoreProcess(PPCContext& ctx, uint8_t* base);  // sub_82463B90
+
 }  // namespace hooks

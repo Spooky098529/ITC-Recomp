@@ -10,6 +10,7 @@
 #include "base/log.h"
 #include "c_runtime/math.h"
 #include "guest.h"
+#include "xaudio/ppc_float.h"
 
 #include <rex/platform/fpscr.h>
 #include <rex/ppc/intrinsics.h>
@@ -23,44 +24,9 @@ namespace xaudio {
 
 namespace {
 
-using Fpscr = rex::platform::FPSCRPlatform;
-using Vec = simde__m128i;
+using namespace ppc_float;
 
-// The host's flush to zero (and denormals as zero) as the translated code
-// sets it: on for the vector unit's float operations, off for the scalar
-// unit's; the setting found on entry put back on return.
-class Mode {
- public:
-  Mode() : saved_(Fpscr::getcsr()) {}
-  ~Mode() { Fpscr::setcsr(saved_); }
-  Mode(const Mode&) = delete;
-  Mode& operator=(const Mode&) = delete;
-  void Vector() { Fpscr::setcsr(Fpscr::getcsr() | uint32_t(Fpscr::FlushMask)); }
-  void Scalar() { Fpscr::setcsr(Fpscr::getcsr() & ~uint32_t(Fpscr::FlushMask)); }
-
- private:
-  uint32_t saved_;
-};
-
-// lvx, lvlx and stvx (aligned down, the words byte-swapped, the lanes in the
-// translated code's order) and stvewx (the lane its address selects).
-Vec Lvx(uint8_t* base, uint32_t address) {
-  return simde_mm_shuffle_epi8(
-      simde_mm_load_si128(reinterpret_cast<const Vec*>(REX_RAW_ADDR(address & ~0xFu))),
-      simde_mm_load_si128(reinterpret_cast<const Vec*>(rex::ppc::VectorMaskL)));
-}
-Vec Lvlx(uint8_t* base, uint32_t address) {
-  return simde_mm_shuffle_epi8(
-      simde_mm_load_si128(reinterpret_cast<const Vec*>(REX_RAW_ADDR(address & ~0xFu))),
-      simde_mm_load_si128(
-          reinterpret_cast<const Vec*>(&rex::ppc::VectorMaskL[(address & 0xF) * 16])));
-}
-void Stvx(uint8_t* base, uint32_t address, Vec value) {
-  simde_mm_store_si128(
-      reinterpret_cast<Vec*>(REX_RAW_ADDR(address & ~0xFu)),
-      simde_mm_shuffle_epi8(value,
-                            simde_mm_load_si128(reinterpret_cast<const Vec*>(rex::ppc::VectorMaskL))));
-}
+// stvewx (the lane its address selects).
 void Stvewx(uint8_t* base, uint32_t address, Vec value) {
   const uint32_t ea = address & ~3u;
   alignas(16) uint32_t lanes[4];
@@ -68,17 +34,7 @@ void Stvewx(uint8_t* base, uint32_t address, Vec value) {
   guest::StoreU32(base, ea, lanes[3 - ((ea & 0xF) >> 2)]);
 }
 
-// Each value passed through an empty asm so nothing moves across the
-// control word's changes.
-Vec Pin(Vec value) {
-  asm volatile("" : "+x"(value));
-  return value;
-}
-simde__m128 F(Vec v) { return simde_mm_castsi128_ps(Pin(v)); }
-Vec I(simde__m128 v) { return Pin(simde_mm_castps_si128(v)); }
-
 Vec Zero() { return simde_mm_set1_epi32(0); }
-Vec Splat0(Vec v) { return simde_mm_shuffle_epi32(v, 0xFF); }  // vspltw 0
 Vec AddI(Vec a, Vec b) { return simde_mm_add_epi32(a, b); }
 template <int bytes>
 Vec Sld(Vec a, Vec b) {  // vsldoi, as the translated code does it
@@ -100,10 +56,6 @@ Vec Perm(Vec a, Vec b, Vec c) { return rex::ppc::simde_mm_perm_epi8_(a, b, c); }
 Vec High16(Vec v) { return simde_mm_cvtepi16_epi32(simde_mm_unpackhi_epi64(v, v)); }
 Vec Low16(Vec v) { return simde_mm_cvtepi16_epi32(v); }
 
-Vec Add(Vec a, Vec b) { return I(simde_mm_add_ps(F(a), F(b))); }
-Vec Sub(Vec a, Vec b) { return I(simde_mm_sub_ps(F(a), F(b))); }
-Vec Mul(Vec a, Vec b) { return I(simde_mm_mul_ps(F(a), F(b))); }
-Vec Madd(Vec a, Vec b, Vec c) { return Add(Mul(a, b), c); }  // vmaddfp: a x b, then + c
 Vec Reciprocal(Vec v) { return I(simde_mm_div_ps(simde_mm_set1_ps(1), F(v))); }
 Vec ToFloat(Vec v) { return I(simde_mm_cvtepi32_ps(Pin(v))); }
 // vcfsx and vcfux with a scale (the scale's float bits).

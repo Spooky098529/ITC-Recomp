@@ -1621,6 +1621,191 @@ void ReverbStages(Context& h) {
   CrossfadeDelays(h);
 }
 
+// --- The reverb core ---
+
+// ReverbCore::Process (sub_82463B90) over a real reverb: Reverb::Reverb
+// (sub_82465608: ReverbCore::Init, the I3DL2 defaults, ReverbCore::Defaults)
+// and ReverbCore::Apply (sub_82467A18) on its default parameters, built once
+// by the translated code. Each case starts from it and, the same for both
+// versions, runs a few blocks of random samples through the recompiled core
+// (its lines filled, its indices moved on), then sets the stereo flag (+100:
+// 0, 1, 2 or any), the gain (+92) and, by case, the stages' states at their
+// edges (crossfades mid-fade, write indices and taps at the lines' ends) or
+// edge floats in the inputs; the core, the stack and the buffers kept and
+// put back for each version. The stack pointer moves by 16 from case to case
+// (the frame's 128-aligned buffers fall at each offset). Compared: the
+// reverb object and the buffers as floats (their integer words are indices,
+// counts, flags and pointers, none a NaN's pattern), the frame's first 400
+// bytes (spilled addresses and counters, and floats copied as words) exactly
+// past its back chain, the rest of it (the stages' buffers) as floats up to
+// the register saves, the caller's word at sp + 20, the stages' stack words
+// (sp - 17888 - 176 and - 128) and r3.
+constexpr uint32_t kReverbBytes = 0x4BAB0;
+constexpr uint32_t kCoreStackBytes = 0x8000;
+constexpr uint32_t kCoreStackTop = 0x7000;
+constexpr uint32_t kCoreFrameBytes = 17888;
+constexpr uint32_t kCoreSavesBytes = 296;  // __savegprlr_14 and __savefpr_14
+constexpr uint32_t kCoreIoBytes = 0x2000;
+
+void ReverbCoreCases(Context& h) {
+  const uint32_t reverb_block = memory::Alloc(kReverbBytes + 128, 0);
+  const uint32_t stack = memory::Alloc(kCoreStackBytes, 0);
+  const uint32_t io_block = memory::Alloc(kCoreIoBytes + 128, 0);
+  if (reverb_block == 0 || stack == 0 || io_block == 0) {
+    memory::Free(reverb_block);
+    memory::Free(stack);
+    memory::Free(io_block);
+    return;
+  }
+  const uint32_t reverb = (reverb_block + 127) & ~127u;
+  const uint32_t core = reverb + 16;
+  const uint32_t io = (io_block + 127) & ~127u;
+  // Two inputs and five outputs of 256 floats, then the pointer arrays and
+  // the descriptor Reverb::Reverb reads (+4).
+  const uint32_t in_ptrs = io + 0x1C00, out_ptrs = io + 0x1C10, descriptor = io + 0x1C40;
+  Fill(h.base, reverb, kReverbBytes, 0);
+  Fill(h.base, io, kCoreIoBytes, 0);
+  Fill(h.base, stack, kCoreStackBytes, 0);
+  for (uint32_t k = 0; k < 2; k++) {
+    Store(h.base, in_ptrs + 4 * k, io + 0x400 * k);
+  }
+  for (uint32_t k = 0; k < 5; k++) {
+    Store(h.base, out_ptrs + 4 * k, io + 0x800 + 0x400 * k);
+  }
+  Store(h.base, descriptor + 4, 0x10);
+  {
+    PPCContext t = CallContext(h);
+    t.r1.u64 = stack + kCoreStackTop;
+    t.r3.u64 = reverb;
+    t.r4.u64 = descriptor;
+    t.r5.u64 = 0;
+    t.fpscr.loadFromHost();
+    __imp__sub_82465608(t, h.base);
+    t = CallContext(h);
+    t.r1.u64 = stack + kCoreStackTop;
+    t.r3.u64 = core;
+    t.r4.u64 = core + 52;
+    t.fpscr.loadFromHost();
+    __imp__sub_82467A18(t, h.base);
+  }
+  const std::vector<uint8_t> built = Read(h.base, reverb, kReverbBytes);
+  auto run = [&](GuestFunction function, uint32_t sp) {
+    PPCContext t = CallContext(h);
+    t.r1.u64 = sp;
+    t.r3.u64 = core;
+    t.r4.u64 = in_ptrs;
+    t.r5.u64 = out_ptrs;
+    t.r6.u64 = 256;
+    t.fpscr.loadFromHost();
+    function(t, h.base);
+    return t.r3.u64;
+  };
+  auto inputs = [&](Random& random, bool edges) {
+    for (uint32_t k = 0; k < 0x800; k += 4) {
+      Store(h.base, io + k, edges ? AnyFloat(random) : Sample(random));
+    }
+  };
+  // The stages' states: {offset, entries, the write index's offset, the
+  // taps' offsets (0 for none past the first)}.
+  struct Stage {
+    uint32_t offset, entries, write, taps[3];
+    bool all_pass;
+  };
+  static const Stage kStages[] = {
+      {0x200F0, 512, 36, {0, 12, 24}, false},  {0x247B8, 512, 36, {0, 12, 24}, false},
+      {0x20B34, 2048, 36, {0, 12, 24}, false}, {0x251FC, 2048, 36, {0, 12, 24}, false},
+      {0x23790, 1024, 24, {0, 12, 12}, false}, {0x27E58, 1024, 24, {0, 12, 12}, false},
+      {0x2091C, 128, 16, {0, 0, 0}, true},     {0x24FE4, 128, 16, {0, 0, 0}, true},
+      {0x22B60, 256, 16, {0, 0, 0}, true},     {0x27228, 256, 16, {0, 0, 0}, true},
+      {0x22F78, 512, 16, {0, 0, 0}, true},     {0x27640, 512, 16, {0, 0, 0}, true},
+      {0x49130, 512, 16, {0, 0, 0}, true},     {0x49948, 512, 16, {0, 0, 0}, true},
+      {0x4A160, 512, 16, {0, 0, 0}, true},     {0x4A978, 512, 16, {0, 0, 0}, true},
+  };
+  struct Crossfade {
+    uint32_t offset, entries;
+  };
+  static const Crossfade kCrossfades[] = {
+      {104, 16384}, {0x10088, 16384}, {0x4B190, 256}, {0x4B5B0, 256}};
+  Results results("sub_82463B90 (ReverbCore::Process)");
+  for (int i = 0; i < 24; i++) {
+    const Random start = h.random;
+    Random random = start;
+    // The case's state, made once with the recompiled core.
+    Write(h.base, reverb, built.data(), kReverbBytes);
+    const uint32_t sp = stack + kCoreStackTop - 16 * uint32_t(i % 8);
+    const uint32_t warm = i < 2 ? uint32_t(i) : 1 + random.Below(6);
+    for (uint32_t w = 0; w < warm; w++) {
+      inputs(random, false);
+      Store(h.base, core + 100, random.Below(3));
+      run(__imp__sub_82463B90, sp);
+    }
+    static constexpr uint32_t kFlags[] = {0, 1, 2, 3, 0xFFFFFFFF, 0};
+    Store(h.base, core + 100, i % 6 == 5 ? uint32_t(random.Next()) : kFlags[i % 6]);
+    Store(h.base, core + 92, i % 4 == 3 ? AnyFloat(random) : Sample(random));
+    const int kind = i % 4;
+    if (kind == 1) {
+      // Crossfades under way: the position within (0, 1], the tap asked for
+      // anywhere in the line, the others at the line's ends now and then.
+      for (const Crossfade& c : kCrossfades) {
+        const uint32_t state = core + c.offset;
+        Store(h.base, state + 4,
+              std::bit_cast<uint32_t>(float(1 + random.Below(1000)) / 1000.0f));
+        Store(h.base, state + 16, random.Below(c.entries));
+        Store(h.base, state + 8, random.Below(2) == 0 ? c.entries - 1 : random.Below(c.entries));
+        Store(h.base, state + 12, random.Below(2) == 0 ? 0 : random.Below(c.entries));
+      }
+    } else if (kind == 2) {
+      // The integer states at their edges: write indices at the lines' last
+      // block (the delay lines, as the game moves them on by 256) or last
+      // entry (the all-passes), taps at 0 or the line's last entry.
+      for (const Stage& stage : kStages) {
+        const uint32_t state = core + stage.offset;
+        Store(h.base, state + stage.write,
+              stage.all_pass ? stage.entries - 1 : stage.entries - 256);
+        for (const uint32_t tap : stage.taps) {
+          Store(h.base, state + tap, random.Below(2) == 0 ? 0 : stage.entries - 1);
+        }
+      }
+      for (const Crossfade& c : kCrossfades) {
+        Store(h.base, core + c.offset + 24, c.entries - 256);
+      }
+    }
+    inputs(random, kind == 3);
+    for (uint32_t k = 0x800; k < 0x1C00; k += 4) {
+      Store(h.base, io + k, uint32_t(random.Next()));
+    }
+    for (uint32_t k = 0; k < kCoreStackBytes; k += 4) {
+      Store(h.base, stack + k, uint32_t(random.Next()));
+    }
+    const std::vector<uint8_t> state = Read(h.base, reverb, kReverbBytes);
+    const std::vector<uint8_t> io_state = Read(h.base, io, kCoreIoBytes);
+    const std::vector<uint8_t> stack_state = Read(h.base, stack, kCoreStackBytes);
+    Outputs out[2];
+    const uint32_t r1 = sp - kCoreFrameBytes;
+    for (int v = 0; v < 2; v++) {
+      Write(h.base, reverb, state.data(), kReverbBytes);
+      Write(h.base, io, io_state.data(), kCoreIoBytes);
+      Write(h.base, stack, stack_state.data(), kCoreStackBytes);
+      const uint64_t r3 = run(v == 0 ? __imp__sub_82463B90 : hooks::XAudioReverbCoreProcess, sp);
+      out[v].Floats(h.base, reverb, kReverbBytes / 4);
+      out[v].Floats(h.base, io, 0x1C00 / 4);
+      out[v].Bytes(Read(h.base, io + 0x1C00, kCoreIoBytes - 0x1C00));
+      out[v].Bytes(Read(h.base, r1 + 4, 396));
+      out[v].Floats(h.base, r1 + 400, (kCoreFrameBytes - kCoreSavesBytes - 400) / 4);
+      out[v].Word(guest::LoadU32(h.base, sp + 20));
+      out[v].Word(guest::LoadU32(h.base, r1 - 176));
+      out[v].Word(guest::LoadU32(h.base, r1 - 128));
+      R3(out[v], r3);
+    }
+    h.random = random;
+    results.Check(out[0], out[1], fmt::format("case {} ({} warm-up blocks, kind {})", i, warm, kind));
+  }
+  results.Report();
+  memory::Free(reverb_block);
+  memory::Free(stack);
+  memory::Free(io_block);
+}
+
 }  // namespace
 
 void XAudioObjects(Context& h) {
@@ -1633,6 +1818,7 @@ void XAudioObjects(Context& h) {
   ReverbParts(h, block.address);
   Resampler(h, block.address);
   ReverbStages(h);
+  ReverbCoreCases(h);
 }
 
 }  // namespace harness
