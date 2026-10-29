@@ -419,17 +419,21 @@ ITC_XAUDIO_ENGINE_ADAPTER(82461EF8, XAudioObjectInfo)
 ITC_XAUDIO_ENGINE_ADAPTER(82460288, XAudioAllocatorAlloc)
 ITC_XAUDIO_ENGINE_ADAPTER(8245AAB8, XAudioDeleteObject)
 ITC_XAUDIO_ENGINE_ADAPTER(8245A940, XAudioBarrier)
-ITC_XAUDIO_ENGINE_ADAPTER(8245C098, XAudioEngineConstruct)
+// No adapter (removed 2026-10-29: only XAudioEngine::Create's plain C++ calls it in play) for XAudioEngine::XAudioEngine sub_8245C098.
 // No adapter (removed 2026-10-29: only XAudioFactory::Create's plain C++ calls it in play) for XAudioFactory::XAudioFactory sub_8245DA48.
-ITC_XAUDIO_ENGINE_ADAPTER(8245DC10, XAudioFactoryCreateObject)
+// No adapter (removed 2026-10-29: only XAudioEngine::Init's plain C++ calls it in play) for XAudioFactory::Create sub_8245DC10.
 ITC_XAUDIO_ENGINE_ADAPTER(8245D650, XAudioFactoryCreateSlot)
 ITC_XAUDIO_ENGINE_ADAPTER(8245D6D8, XAudioFactorySizeSlot)
-ITC_XAUDIO_ENGINE_ADAPTER(8245F588, XAudioRegisterStats)
+// No adapter (removed 2026-10-29: only XAudioEngine::Init's plain C++ calls it in play) for XAudio::RegisterStats sub_8245F588.
+// Kept while XAudioEngine::Init's harness runs its original: the stand-in
+// point (xaudio::SetMakingForHarness) its calls reach.
 ITC_XAUDIO_ENGINE_ADAPTER(8245A828, XAudioSetUpProcessors)
-ITC_XAUDIO_ENGINE_ADAPTER(8245B2C0, XAudioEngineSize)
+// No adapter (removed 2026-10-29: only XAudioEngine::Create's plain C++ calls it in play) for XAudioEngine::Size sub_8245B2C0.
 // No adapter (removed 2026-10-29: only XAudioMasteringVoice::Create's plain C++ calls it in play) for XAudioMasteringVoice::Size sub_8245FF68.
 // No adapter (removed 2026-10-29: only XAudioMasteringVoice::Init's plain C++ calls it in play) for AudioRenderDriver::AudioRenderDriver sub_82465938.
 // No adapter (removed 2026-10-29: only XAudioMasteringVoice::Create's plain C++ calls it in play) for XAudioMasteringVoice::Init sub_8245FCA0.
+// Kept as SetUpProcessors' (the harness's stand-in point for Init's
+// original).
 ITC_XAUDIO_ENGINE_ADAPTER(824600F0, XAudioMasteringCreate)
 ITC_XAUDIO_ENGINE_ADAPTER(8245FE20, XAudioMasteringStart)
 ITC_XAUDIO_ENGINE_ADAPTER(8245FDC8, XAudioMasteringPass)
@@ -454,6 +458,6 @@ ITC_XAUDIO_ENGINE_ADAPTER(8245BE08, XAudioMasterThread)
 ITC_XAUDIO_ENGINE_ADAPTER(8245BED0, XAudioWorkerThread)
 // The engine's making (its kernel objects through the imports, as the
 // original).
-ITC_XAUDIO_ENGINE_ADAPTER(8245C198, XAudioEngineInit)
-ITC_XAUDIO_ENGINE_ADAPTER(8245C538, XAudioEngineCreate)
+// No adapter (removed 2026-10-29: only XAudioEngine::Create's plain C++ calls it in play) for XAudioEngine::Init sub_8245C198.
+// No adapter (removed 2026-10-29: only XAudio::CreateEngine's plain C++ calls it in play) for XAudioEngine::Create sub_8245C538.
 ITC_XAUDIO_ENGINE_ADAPTER(82459D60, XAudioCreateEngine)
