@@ -19,7 +19,8 @@ file's history. What's left to see in a drive, from every run:
   (62 of 62). Recorded in the plan's table and boundary log.
 - Subsystem 3 of 3: XACT's voice class (`sub_825C9C40` and four more,
   where XACT meets XAudio; all five roots ready since XAudio's voices).
-  Step: mapping (agent running).
+  Mapped as `xact-waves.md` (a950696, the voice class with the waves);
+  map checked. Step: migration 1 (agent running).
 
 ## Done
 
@@ -81,6 +82,8 @@ file's history. What's left to see in a drive, from every run:
   (wrapped 103, known 501, unknown 3078).
 - After its validation (`itc_2398`: race 8 s, 0 errors, every harness
   0 differing but the expected groups): ours 2782, work left 3682.
+- After XACT's waves' map: ours 2782, work left 3682 (wrapped 103,
+  known 531, unknown 3048).
 
 ## Stopped
 

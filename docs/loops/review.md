@@ -142,6 +142,18 @@ When the user has reviewed a run's section, its heading gets
   one voice; `sub_8210F118` a looping horn (wave 11 + the car's +1796
   byte, input bit 0x20000); `sub_8210F4E8` the turbo whistle from the
   boost at +2944. Sound: the same counters as `--native_car_sounds=false`.
+- XACT's waves and voices (map a950696): `docs/functions/xact-waves.md`,
+  91 new rows (30 seen in play): XACT's voice class (`825C9AF8`-`825CA680`,
+  vtable `0x82075B98`), the reverb submix wrapper (vtable `0x82075BD4`)
+  and its maker `sub_825C3398` (never ran), the waves `825D1C10`-`825D53D8`
+  (base, in-memory and streaming, the stream entries, the variation and
+  transition tables) and the tracks' volume and pitch getters
+  `sub_825D0268`, `sub_825D02B0`. XACT's lock (the engine's critical
+  section, +144, taken inline in 62 functions, entered again on purpose
+  by `sub_825D1C78`) follows the 2026-10-29 call: the game's, taken as
+  the original does, until every user is native. `known-data.md`: the
+  voice, reverb submix, wave, variation table; probable cue and sound
+  fields. The tracks lead narrowed (the tracks go with the events).
 
 ## Run 2026-10-28 18:45 (`b7-loop-28-10-26-2`)
 
