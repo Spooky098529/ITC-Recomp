@@ -40,7 +40,8 @@ ITC_FLAG_BOOL(native_xact, true, "ITC",
               "preset and RPC set-up where nothing is to do, sub_825C27C0 and sub_825C2910; the "
               "wave durations, sub_825CC380; letting go of wave banks without listeners to "
               "tell, sub_825C6A20 and sub_825C7798; the wave region, sub_825C8440, and the "
-              "folded getter it calls, sub_8220BC28 (the menu list's too: the same load)) "
+              "folded getter it calls, sub_8220BC28 (the menu list's too: the same load); XACT's "
+              "clock, sub_825BFE28) "
               "natively "
               "instead of through the translated code (same results; checked by "
               "--run_harnesses=xact)");
@@ -376,3 +377,15 @@ ITC_XACT_OPTIONAL(825C7798, SoundBankOnWaveBankGone(base, ctx.r3.u32, ctx.r4.u32
 ITC_XACT_WORD(8220BC28, WaveEntryGetPlayOffset(base, ctx.r3.u32))
 ITC_XACT_OPTIONAL(825C8440, WaveBankGetWaveRegion(base, ctx.r3.u32, ctx.r4.u32, ctx.r5.u32,
                                                   ctx.r1.u32 - 80))
+
+// XACT's clock: the original where it traps. r3 as the original leaves it
+// (sign-extended from the counter, zero-extended from the tick count).
+extern "C" REX_FUNC(sub_825BFE28) {
+  ITC_XACT_FALLBACK(825BFE28)
+  const auto ms = GetTimeMs(base);
+  if (!ms) {
+    __imp__sub_825BFE28(ctx, base);
+    return;
+  }
+  ctx.r3.u64 = *ms;
+}

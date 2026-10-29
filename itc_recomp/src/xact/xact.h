@@ -438,4 +438,14 @@ uint32_t WaveEntryGetPlayOffset(uint8_t* base, uint32_t entry);
 std::optional<uint32_t> WaveBankGetWaveRegion(uint8_t* base, uint32_t bank, uint32_t index,
                                               uint32_t out, uint32_t accessor);
 
+// --- The clock ---
+
+// XACTGetTimeMs (sub_825BFE28): XACT's clock in milliseconds, as r3. When
+// the word at 0x8266CDF0 is set (1 in the image), QueryPerformanceCounter
+// x 1000 (64 bits, wrapping) / the 64-bit frequency at 0x82971480 (signed),
+// the low word sign-extended; otherwise GetTickCount, zero-extended. Both
+// from src/helpers/clock.h, the clocks recompiled callers read too.
+// nullopt where the original traps (a frequency of 0, or INT64_MIN / -1).
+std::optional<uint64_t> GetTimeMs(uint8_t* base);
+
 }  // namespace xact

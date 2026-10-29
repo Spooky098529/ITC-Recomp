@@ -13,6 +13,7 @@
 
 #include "base/flags.h"
 #include "base/log.h"
+#include "helpers/clock.h"
 #include "hooks/heap.h"
 #include "memory/c_runtime_heap.h"
 #include "xact/xact.h"
@@ -2087,6 +2088,61 @@ void WaveRegions(Context& h) {
   results.Report();
 }
 
+// XACTGetTimeMs over stand-in clocks (helpers::SetClocksForHarness, this
+// thread only), so both versions read the same counter and tick count. The
+// flag at 0x8266CDF0 and the frequency at 0x82971480 are the game's as they
+// are (1 and 50 MHz once XACT is up): XAudio's thread reads them meanwhile,
+// so they aren't changed. Where the original would trap (a frequency of 0,
+// before XACT's start-up), only the native version runs, which must decline.
+void TimeMs(Context& h) {
+  Results results("XACTGetTimeMs (sub_825BFE28)");
+  constexpr uint32_t kFlag = 0x8266CDF0;
+  constexpr uint32_t kFrequency = 0x82971480;
+  const uint32_t flag = guest::LoadU32(h.base, kFlag);
+  const uint64_t frequency =
+      (uint64_t(guest::LoadU32(h.base, kFrequency)) << 32) | guest::LoadU32(h.base, kFrequency + 4);
+  // count * 1000 == INT64_MIN (mod 2^64): 2^60 * 125^-1 (mod 2^61).
+  uint64_t inverse = 1;
+  for (int i = 0; i < 7; i++) {
+    inverse *= 2 - 125 * inverse;
+  }
+  const uint64_t overflow_count = ((uint64_t(1) << 60) * inverse) & ((uint64_t(1) << 61) - 1);
+  auto run = [&](uint64_t counter, uint32_t ticks, const std::string& what) {
+    helpers::SetClocksForHarness(counter, ticks);
+    const int64_t scaled = int64_t(counter * 1000);
+    const bool traps =
+        flag != 0 && (frequency == 0 || (scaled == INT64_MIN && frequency == uint64_t(-1)));
+    Outputs out[2];
+    const auto native = xact::GetTimeMs(h.base);
+    if (traps) {
+      out[0].Word(0);
+      out[1].Word(native ? 1 : 0);
+    } else {
+      PPCContext t = CallContext(h);
+      t.r3.u64 = 0xDEADBEEFDEADBEEFull;
+      __imp__sub_825BFE28(t, h.base);
+      out[0].Word(t.r3.u32);
+      out[0].Word(uint32_t(t.r3.u64 >> 32));
+      out[1].Word(native ? uint32_t(*native) : 0xFFFFFFFFu);
+      out[1].Word(native ? uint32_t(*native >> 32) : 0xFFFFFFFFu);
+    }
+    results.Check(out[0], out[1],
+                  fmt::format("{} (flag {:#x}, frequency {:#x})", what, flag, frequency));
+  };
+  for (uint64_t counter :
+       {uint64_t(0), uint64_t(1), uint64_t(49999), uint64_t(50000), uint64_t(50000000) * 3600,
+        uint64_t(50000000) * 42950, uint64_t(50000000) * 42949673, uint64_t(-1), overflow_count,
+        uint64_t(INT64_MAX), uint64_t(INT64_MIN)}) {
+    run(counter, uint32_t(counter * 7 + 3), fmt::format("counter {:#x}", counter));
+  }
+  for (int i = 0; i < 40; i++) {
+    const uint64_t counter = h.random.Next() >> (i % 8 * 8);
+    run(counter, uint32_t(h.random.Next()), fmt::format("random counter {:#x}", counter));
+  }
+  helpers::SetClocksForHarness(std::nullopt, std::nullopt);
+  results.Report();
+}
+
 }  // namespace
 
 void Xact(Context& h) {
@@ -2106,6 +2162,7 @@ void Xact(Context& h) {
   SettingsLoads(h);
   WaveDurationsAndReleases(h);
   WaveRegions(h);
+  TimeMs(h);
 }
 
 }  // namespace harness

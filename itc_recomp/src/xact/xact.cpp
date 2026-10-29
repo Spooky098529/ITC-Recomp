@@ -4,6 +4,7 @@
 
 #include "base/log.h"
 #include "c_runtime/strings.h"
+#include "helpers/clock.h"
 #include "memory/c_runtime_heap.h"
 
 #include <bit>
@@ -1662,6 +1663,20 @@ std::optional<uint32_t> WaveBankGetWaveRegion(uint8_t* base, uint32_t bank, uint
   const uint32_t bytes = *WaveEntryGetLoopLengthBytes(base, accessor);
   guest::StoreU32(base, out + 16, bytes);
   return bytes;
+}
+
+std::optional<uint64_t> GetTimeMs(uint8_t* base) {
+  ITC_NATIVE_RUNNING("sub_825BFE28 XACTGetTimeMs");
+  if (guest::LoadU32(base, 0x8266CDF0) == 0) {
+    return helpers::TickCount();
+  }
+  const int64_t scaled = int64_t(helpers::PerformanceCounter() * 1000);
+  const int64_t frequency = int64_t((uint64_t(guest::LoadU32(base, 0x82971480)) << 32) |
+                                    guest::LoadU32(base, 0x82971484));
+  if (frequency == 0 || (scaled == INT64_MIN && frequency == -1)) {
+    return std::nullopt;  // the original's divide checks trap
+  }
+  return uint64_t(int64_t(int32_t(scaled / frequency)));
 }
 
 }  // namespace xact
