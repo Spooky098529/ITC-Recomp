@@ -97,6 +97,11 @@ struct Regs {
   uint8_t count = 0;
   bool f1_set = false;
   double f1 = 0.0;
+  // The stack pointer for the call (0: the adapter's frame). Set by plain
+  // C++ called from plain C++, which works in a frame of its own below its
+  // caller's, as the original does, so a callee's frame never covers the
+  // locals it hands out.
+  uint32_t sp = 0;
 };
 using GuestCall = std::function<uint32_t(uint32_t function, uint32_t return_address, const Regs&)>;
 
@@ -247,5 +252,81 @@ uint32_t DefaultAllocator(uint8_t* base, uint32_t attributes, uint32_t size, uin
 std::optional<uint32_t> GetAllocator(uint8_t* base, uint32_t attributes, uint32_t size,
                                      uint32_t inout, uint32_t frame, bool native_heap,
                                      const GuestCall& call);
+
+// --- The voices with outputs (lock-free) ---
+
+constexpr uint32_t kOutputsVtable = 0x8204A998;  // the voice with outputs'
+constexpr uint32_t kDefaultOutput = 0x8204A9F4;  // {0, 0}: the mastering voice, its default matrix
+
+// XAudioVoice::ConstructOutputs (sub_82460738): VoiceConstruct, then the
+// vtable 0x8204A998. Returns the voice.
+uint32_t ConstructOutputs(uint8_t* base, uint32_t voice, uint32_t allocator, uint32_t type,
+                          const GuestCall& call);
+
+// XAudioVoice::OutputsSize (sub_824607C8): for the voice description at
+// `description`, BaseSize (at the frame's +84, its own frame below), plus
+// for each of the +24 outputs 12 bytes and a matrix object's size (the
+// factory's slot +20 for a matrix description at the frame's +96: type 1,
+// +8 the outputs' channels from +25; the size at the frame's +80), to
+// [out]. `frame` is this function's frame (144 bytes). Returns the last
+// call's r3 (on a failure, with nothing written).
+uint32_t OutputsSize(uint8_t* base, uint32_t description, uint32_t out, uint32_t frame,
+                     const GuestCall& call);
+
+// XAudioVoice::SetOutput (sub_82460998): the output entry `entry` (0: the
+// default 0x8204A9F4; +0 the target, 0 the mastering voice the engine's +64;
+// +4 its matrix) into the voice's output slot `slot` (+0 the target,
+// AddRef'd by its slot +4; +4 the matrix object): the matrix object's slot
+// +40 with the entry's matrix, or with none, the default one for the
+// voice's channels (+53) to the target's (its slot +64 at the frame's +80;
+// DefaultMatrix at +88). `frame` is this function's (128 bytes). Returns
+// the last call's r3.
+uint32_t SetOutput(uint8_t* base, uint32_t voice, uint32_t entry, uint32_t slot, uint32_t frame,
+                   const GuestCall& call);
+
+// XAudioVoice::SetOutputVoices (sub_82460BF0, and sub_8245F228 jumps to
+// it): ReleaseOutputs, then each of the outputs' entries (count byte +0,
+// +4 the 8-byte entries) set (SetOutput, in a frame below `frame`) until
+// one fails, and +69 the count; with no outputs (0), the default one when
+// the voice has room (+68) and +69 = 1. `frame` is this function's (144
+// bytes). Returns the last result.
+uint32_t SetOutputVoices(uint8_t* base, uint32_t voice, uint32_t outputs, uint32_t frame,
+                         const GuestCall& call);
+
+// XAudioVoice::Pass (sub_82461070): one mixer pass: the voice's slot +72
+// (its input buffer, kept at the frame's +84), the callback (+44) with its
+// context (+48, at the frame's +80), then when stopping (+61 bit 2) +64
+// counted down, slot +60 with 1 (stop at once) at 0; else slot +84 (the
+// pass) with the frame's +84. DebugSwitchOff's plain C++ (sub_825C8388)
+// where the original calls it. `frame` is this function's (112 bytes).
+// Returns the last method's r3.
+uint32_t Pass(uint8_t* base, uint32_t voice, uint32_t frame, const GuestCall& call);
+
+// XAudioVoice::Destroy (sub_82461240): the base's destructor: vtable
+// 0x8204AA00, each effect (+36 + 8i, +60 of them) released (its slot +4)
+// and cleared, the output buffer (+32) released (its interface's thunk) and
+// cleared, vtable 0x8204A6CC, the allocator (+8) released (its slot +4) and
+// cleared, the root vtable. Returns the allocator's release's r3, or 0.
+uint32_t Destroy(uint8_t* base, uint32_t voice, const GuestCall& call);
+
+// XAudioVoice::CreateObject (sub_82461308): the engine's factory (+60)
+// makes the object described at `description` with the voice's allocator
+// (+8) into [entry] (cleared first); its slot +8 at the frame's +80 (+0 a
+// byte, +2 a halfword size): +4 = `flag`'s low byte, +5 = 1, +6 = the
+// frame's +80, the voice's +62 raised to the size. `frame` is this
+// function's (128 bytes). Returns the last call's r3.
+uint32_t CreateObject(uint8_t* base, uint32_t voice, uint32_t entry, uint32_t description,
+                      uint32_t flag, uint32_t frame, const GuestCall& call);
+
+// XAudioVoice::ProcessEffect (sub_82461678): an effect entry `entry` (+0
+// the object, +5 enabled, +6 flags) over the buffer at [inout]: disabled,
+// 0; else the effect's slot +24 with the buffers its flags (+6) pick: for
+// both bits 1 and 2 the processor's other engine buffer (`processor`, the
+// engine's +12 + 8 x the processor) to [inout] and r4 the old; for bit 0 or
+// 1 the buffer and 0; for bit 2, 0 and the buffer; for none, the word at
+// the frame's +80 for both (a leftover, as the original). `frame` is this
+// function's (96 bytes). Returns its r3.
+uint32_t ProcessEffect(uint8_t* base, uint32_t entry, uint32_t inout, uint32_t processor,
+                       uint32_t frame, const GuestCall& call);
 
 }  // namespace xaudio

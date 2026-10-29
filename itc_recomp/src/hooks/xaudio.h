@@ -49,4 +49,13 @@ void XAudioVoiceConstruct(PPCContext& ctx, uint8_t* base);      // sub_82461500
 void XAudioDefaultAllocator(PPCContext& ctx, uint8_t* base);    // sub_824605E8
 void XAudioGetAllocator(PPCContext& ctx, uint8_t* base);        // sub_82460688
 
+void XAudioConstructOutputs(PPCContext& ctx, uint8_t* base);   // sub_82460738
+void XAudioOutputsSize(PPCContext& ctx, uint8_t* base);        // sub_824607C8
+void XAudioSetOutput(PPCContext& ctx, uint8_t* base);          // sub_82460998
+void XAudioSetOutputVoices(PPCContext& ctx, uint8_t* base);    // sub_82460BF0, sub_8245F228
+void XAudioPass(PPCContext& ctx, uint8_t* base);               // sub_82461070
+void XAudioDestroy(PPCContext& ctx, uint8_t* base);            // sub_82461240
+void XAudioCreateObject(PPCContext& ctx, uint8_t* base);       // sub_82461308
+void XAudioProcessEffect(PPCContext& ctx, uint8_t* base);      // sub_82461678 (r13's processor)
+
 }  // namespace hooks

@@ -597,6 +597,257 @@ void Objects(Context& h, uint32_t block) {
   }
 }
 
+// --- The voices with outputs ---
+
+// As Case, with the stack below r1 (where the frames go) filled with the
+// same random words for both versions: the originals read locals their
+// callees may not write (SetOutput's format, ProcessEffect's leftover).
+template <typename Setup, typename After>
+void FramedCase(Context& h, Results& results, uint32_t block, GuestFunction recompiled,
+                GuestFunction native, Setup setup, After after, const std::string& what) {
+  const Random start = h.random;
+  Random random = start;
+  Outputs out[2];
+  for (int v = 0; v < 2; v++) {
+    random = start;
+    for (uint32_t i = 0; i < kBlockBytes; i += 4) {
+      Store(h.base, block + i, uint32_t(random.Next()));
+    }
+    PPCContext t = CallContext(h);
+    for (uint32_t i = 4; i <= 0x400; i += 4) {
+      Store(h.base, t.r1.u32 - i, uint32_t(random.Next()));
+    }
+    setup(random, t);
+    (v == 0 ? recompiled : native)(t, h.base);
+    after(out[v]);  // before the block's read: it may put back what differs by version
+    out[v].Bytes(Read(h.base, block, kBlockBytes));
+    out[v].Word(t.r3.u32);
+  }
+  h.random = random;
+  results.Check(out[0], out[1], what);
+}
+
+template <typename Setup>
+void FramedCase(Context& h, Results& results, uint32_t block, GuestFunction recompiled,
+                GuestFunction native, Setup setup, const std::string& what) {
+  FramedCase(h, results, block, recompiled, native, setup, [](Outputs&) {}, what);
+}
+
+// The engine's mastering voice (+64), which the default output entry
+// AddRefs: its count put back after each version.
+uint32_t Mastering(uint8_t* base) {
+  return guest::LoadU32(base, guest::LoadU32(base, xa::kEngine) + 64);
+}
+
+void VoiceOutputs(Context& h, uint32_t block) {
+  const bool engine = guest::LoadU32(h.base, xa::kEngine) != 0;
+  {
+    Results results("XAudioVoice::ConstructOutputs (sub_82460738)");
+    for (int i = 0; i < 48; i++) {
+      Case(h, results, block, __imp__sub_82460738, hooks::XAudioConstructOutputs,
+           [&](Random& random, PPCContext& t) {
+             World(h.base, block, random);
+             t.r3.u64 = block;
+             t.r4.u64 = random.Below(4) == 0 ? 0 : AnyObject(random, block);
+             t.r5.u64 = random.Next();
+           },
+           fmt::format("case {}", i));
+    }
+    results.Report();
+  }
+  {
+    // Without effects, as BaseSize's cases; the matrix objects' size from
+    // the live factory (its description only read).
+    Results results("XAudioVoice::OutputsSize (sub_824607C8)");
+    for (int i = 0; engine && i < 48; i++) {
+      FramedCase(h, results, block, __imp__sub_824607C8, hooks::XAudioOutputsSize,
+                 [&](Random& random, PPCContext& t) {
+                   const uint32_t description = block + 0x1A00;
+                   if (random.Below(2) == 0) {
+                     Store(h.base, description + 12, 0);
+                   }
+                   guest::StoreU8(h.base, description + 1, uint8_t(random.Below(7)));
+                   Store(h.base, description + 8, random.Below(4) == 0 ? 0 : block + 0x1B00);
+                   guest::StoreU8(h.base, block + 0x1B00, 0);
+                   guest::StoreU8(h.base, description + 24, uint8_t(random.Below(5)));
+                   guest::StoreU8(h.base, description + 25, uint8_t(1 + random.Below(6)));
+                   t.r3.u64 = description;
+                   t.r4.u64 = block + 0x1C00;
+                 },
+                 fmt::format("case {}", i));
+    }
+    results.Report();
+  }
+  // The output entries at +0x1F80 (8 bytes each: a target or 0, a matrix
+  // or 0); the default entry and target 0 reach the live mastering voice.
+  const auto entries = [&](Random& random, uint32_t count) {
+    for (uint32_t k = 0; k < count; k++) {
+      const uint32_t entry = block + 0x1F80 + 8 * k;
+      Store(h.base, entry, random.Below(8) == 0 ? 0 : AnyObject(random, block));
+      Store(h.base, entry + 4, random.Below(2) == 0 ? 0 : uint32_t(random.Next()));
+    }
+  };
+  {
+    Results results("XAudioVoice::SetOutput (sub_82460998)");
+    for (int i = 0; engine && i < 48; i++) {
+      uint32_t mastering = 0;
+      FramedCase(h, results, block, __imp__sub_82460998, hooks::XAudioSetOutput,
+                 [&](Random& random, PPCContext& t) {
+                   World(h.base, block, random);
+                   entries(random, 1);
+                   t.r3.u64 = block;
+                   t.r4.u64 = random.Below(8) == 0 ? 0 : block + 0x1F80;
+                   t.r5.u64 = block + kOutputs + 12 * random.Below(4);
+                   mastering = Mastering(h.base);
+                   Store(h.base, block + 0x1FF0, guest::LoadU32(h.base, mastering + 4));
+                 },
+                 [&](Outputs&) {
+                   // Put back the count AddRef raised on the mastering voice.
+                   const uint32_t count = guest::LoadU32(h.base, block + 0x1FF0);
+                   if (guest::LoadU32(h.base, mastering + 4) != count) {
+                     Store(h.base, mastering + 4, count);
+                   }
+                 },
+                 fmt::format("case {}", i));
+    }
+    results.Report();
+  }
+  {
+    Results results("XAudioVoice::SetOutputVoices (sub_82460BF0)");
+    for (int i = 0; engine && i < 64; i++) {
+      uint32_t mastering = 0;
+      const bool jump = i % 4 == 3;  // sub_8245F228, the submix's slot +36
+      FramedCase(h, results, block, jump ? __imp__sub_8245F228 : __imp__sub_82460BF0,
+                 hooks::XAudioSetOutputVoices,
+                 [&](Random& random, PPCContext& t) {
+                   World(h.base, block, random);
+                   const uint32_t list = block + 0x1F60;
+                   guest::StoreU8(h.base, list, uint8_t(random.Below(5)));
+                   Store(h.base, list + 4, block + 0x1F80);
+                   entries(random, 4);
+                   guest::StoreU8(h.base, block + 68, uint8_t(random.Below(3)));
+                   t.r3.u64 = block;
+                   t.r4.u64 = random.Below(4) == 0 ? 0 : list;
+                   mastering = Mastering(h.base);
+                   Store(h.base, block + 0x1FF0, guest::LoadU32(h.base, mastering + 4));
+                 },
+                 [&](Outputs&) {
+                   const uint32_t count = guest::LoadU32(h.base, block + 0x1FF0);
+                   if (guest::LoadU32(h.base, mastering + 4) != count) {
+                     Store(h.base, mastering + 4, count);
+                   }
+                 },
+                 fmt::format("case {}{}", i, jump ? " (sub_8245F228)" : ""));
+    }
+    results.Report();
+  }
+  {
+    Results results("XAudioVoice::Pass (sub_82461070)");
+    for (int i = 0; i < 48; i++) {
+      FramedCase(h, results, block, __imp__sub_82461070, hooks::XAudioPass,
+                 [&](Random& random, PPCContext& t) {
+                   World(h.base, block, random);
+                   Store(h.base, block + 44, random.Below(2) == 0 ? 0 : 0x8245F860);
+                   guest::StoreU16(h.base, block + 64, uint16_t(random.Below(3)));
+                   t.r3.u64 = block;
+                 },
+                 fmt::format("case {}", i));
+    }
+    results.Report();
+  }
+  {
+    Results results("XAudioVoice::Destroy (sub_82461240)");
+    for (int i = 0; i < 48; i++) {
+      Case(h, results, block, __imp__sub_82461240, hooks::XAudioDestroy,
+           [&](Random& random, PPCContext& t) {
+             World(h.base, block, random);
+             Store(h.base, block + 32, random.Below(3) == 0 ? 0 : AnyObject(random, block) + 8);
+             if (random.Below(4) == 0) {
+               Store(h.base, block + 8, 0);
+             }
+             // Some effects empty.
+             for (uint32_t k = 0; k < 8; k++) {
+               if (random.Below(3) == 0) {
+                 Store(h.base, block + kEffects + 8 * k, 0);
+               }
+             }
+             t.r3.u64 = block;
+           },
+           fmt::format("case {}", i));
+    }
+    results.Report();
+  }
+  {
+    Results results("XAudioVoice::ProcessEffect (sub_82461678)");
+    const uint32_t engine_address = guest::LoadU32(h.base, xa::kEngine);
+    for (int i = 0; engine && i < 64; i++) {
+      FramedCase(h, results, block, __imp__sub_82461678, hooks::XAudioProcessEffect,
+                 [&](Random& random, PPCContext& t) {
+                   World(h.base, block, random);
+                   const uint32_t entry = block + 0x1F80;
+                   Store(h.base, entry, AnyObject(random, block));
+                   const uint32_t inout = block + 0x1F90;
+                   const uint32_t processor = guest::LoadU8(h.base, t.r13.u32 + xa::kPcrProcessor);
+                   const uint32_t pick = random.Below(4);
+                   Store(h.base, inout,
+                         pick == 0   ? 0
+                         : pick == 3 ? uint32_t(random.Next())
+                                     : guest::LoadU32(h.base, engine_address + 12 + 8 * processor +
+                                                                  4 * (pick - 1)));
+                   t.r3.u64 = block;
+                   t.r4.u64 = entry;
+                   t.r5.u64 = inout;
+                 },
+                 fmt::format("case {}", i));
+    }
+    results.Report();
+  }
+  if (!hooks::NativeHeapActive()) {
+    return;
+  }
+  {
+    // A real default allocator for each version and a matrix object's
+    // description (type 1, as InitOutputs gives), made by the live
+    // factory: the entry's object compared as an offset in the allocator's
+    // block, which is then freed with it.
+    Results results("XAudioVoice::CreateObject (sub_82461308)");
+    for (int i = 0; engine && i < 32; i++) {
+      uint32_t allocator = 0;
+      FramedCase(h, results, block, __imp__sub_82461308, hooks::XAudioCreateObject,
+                 [&](Random& random, PPCContext& t) {
+                   const uint32_t out = block + 0x1FF0;
+                   xa::DefaultAllocator(h.base, 0x61820006, 4096, out);
+                   allocator = guest::LoadU32(h.base, out);
+                   Store(h.base, out, 0);
+                   Store(h.base, block + 8, allocator);
+                   guest::StoreU16(h.base, block + 62, uint16_t(random.Below(64)));
+                   const uint32_t description = block + 0x1F80;
+                   for (uint32_t k = 0; k < 16; k += 4) {
+                     Store(h.base, description + k, 0);
+                   }
+                   guest::StoreU8(h.base, description, 1);
+                   Store(h.base, description + 4, block);
+                   guest::StoreU8(h.base, description + 8, uint8_t(1 + random.Below(6)));
+                   t.r3.u64 = block;
+                   t.r4.u64 = block + 0x1FA0;
+                   t.r5.u64 = description;
+                   t.r6.u64 = random.Next();
+                 },
+                 [&](Outputs& out) {
+                   const uint32_t made = guest::LoadU32(h.base, block + 0x1FA0);
+                   out.Word(made != 0 ? made - allocator : 0);
+                   // The two pointers to the version's own allocator.
+                   Store(h.base, block + 0x1FA0, 0);
+                   out.Word(guest::LoadU32(h.base, block + 8) == allocator);
+                   Store(h.base, block + 8, 0);
+                   AllocatorOutputs(out, h.base, allocator);
+                 },
+                 fmt::format("case {}", i));
+    }
+    results.Report();
+  }
+}
+
 }  // namespace
 
 void XAudio(Context& h) {
@@ -607,6 +858,7 @@ void XAudio(Context& h) {
   Calls(h, block.address);
   Descriptions(h, block.address);
   Objects(h, block.address);
+  VoiceOutputs(h, block.address);
 }
 
 }  // namespace harness

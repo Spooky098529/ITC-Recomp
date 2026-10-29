@@ -28,7 +28,11 @@ ITC_FLAG_BOOL(native_xaudio, true, "ITC",
               "XAudioBuffer::ClearThunk sub_8245FA10 and XAudioVoice::BaseSize sub_82461158; the "
               "buffer's constructor sub_8245F750 and Create sub_8245FA80, XAudioVoice::Construct "
               "sub_82461500, XAudio::DefaultAllocator sub_824605E8 and GetAllocator sub_82460688 "
-              "(both only while --native_heap routes the heap where they allocate); their "
+              "(both only while --native_heap routes the heap where they allocate); the voice with "
+              "outputs' ConstructOutputs sub_82460738, OutputsSize sub_824607C8, SetOutput "
+              "sub_82460998 and SetOutputVoices sub_82460BF0 (with sub_8245F228), Pass "
+              "sub_82461070, Destroy sub_82461240, CreateObject sub_82461308 and ProcessEffect "
+              "sub_82461678; their "
               "calls into the recompiled objects through the translated code) natively "
               "instead of through the translated code (the same reads and writes; XAudio's two "
               "locks stay the game's; checked by --run_harnesses=xaudio)");
@@ -108,7 +112,12 @@ xa::GuestCall Caller(PPCContext& ctx, uint8_t* base) {
     if (return_address != 0) {
       ctx.lr = return_address;
     }
+    const uint64_t sp = ctx.r1.u64;
+    if (regs.sp != 0) {
+      ctx.r1.u64 = regs.sp;
+    }
     REX_CALL_INDIRECT_FUNC(function);
+    ctx.r1.u64 = sp;
     return ctx.r3.u32;
   };
 }
@@ -306,6 +315,63 @@ void XAudioGetAllocator(PPCContext& ctx, uint8_t* base) {
   }
 }
 
+void XAudioConstructOutputs(PPCContext& ctx, uint8_t* base) {
+  const uint32_t voice = ctx.r3.u32, allocator = ctx.r4.u32, type = ctx.r5.u32;
+  Framed(ctx, base, 96, [&](const xa::GuestCall& call) {
+    return xa::ConstructOutputs(base, voice, allocator, type, call);
+  });
+}
+
+void XAudioOutputsSize(PPCContext& ctx, uint8_t* base) {
+  const uint32_t description = ctx.r3.u32, out = ctx.r4.u32;
+  Framed(ctx, base, 144, [&](const xa::GuestCall& call, uint32_t frame) {
+    return xa::OutputsSize(base, description, out, frame, call);
+  });
+}
+
+void XAudioSetOutput(PPCContext& ctx, uint8_t* base) {
+  const uint32_t voice = ctx.r3.u32, entry = ctx.r4.u32, slot = ctx.r5.u32;
+  Framed(ctx, base, 128, [&](const xa::GuestCall& call, uint32_t frame) {
+    return xa::SetOutput(base, voice, entry, slot, frame, call);
+  });
+}
+
+void XAudioSetOutputVoices(PPCContext& ctx, uint8_t* base) {
+  const uint32_t voice = ctx.r3.u32, outputs = ctx.r4.u32;
+  Framed(ctx, base, 144, [&](const xa::GuestCall& call, uint32_t frame) {
+    return xa::SetOutputVoices(base, voice, outputs, frame, call);
+  });
+}
+
+void XAudioPass(PPCContext& ctx, uint8_t* base) {
+  const uint32_t voice = ctx.r3.u32;
+  Framed(ctx, base, 112, [&](const xa::GuestCall& call, uint32_t frame) {
+    return xa::Pass(base, voice, frame, call);
+  });
+}
+
+void XAudioDestroy(PPCContext& ctx, uint8_t* base) {
+  const uint32_t voice = ctx.r3.u32;
+  Framed(ctx, base, 128,
+         [&](const xa::GuestCall& call) { return xa::Destroy(base, voice, call); });
+}
+
+void XAudioCreateObject(PPCContext& ctx, uint8_t* base) {
+  const uint32_t voice = ctx.r3.u32, entry = ctx.r4.u32, description = ctx.r5.u32,
+                 flag = ctx.r6.u32;
+  Framed(ctx, base, 128, [&](const xa::GuestCall& call, uint32_t frame) {
+    return xa::CreateObject(base, voice, entry, description, flag, frame, call);
+  });
+}
+
+void XAudioProcessEffect(PPCContext& ctx, uint8_t* base) {
+  const uint32_t entry = ctx.r4.u32, inout = ctx.r5.u32;
+  const uint32_t processor = guest::LoadU8(base, ctx.r13.u32 + xa::kPcrProcessor);
+  Framed(ctx, base, 96, [&](const xa::GuestCall& call, uint32_t frame) {
+    return xa::ProcessEffect(base, entry, inout, processor, frame, call);
+  });
+}
+
 }  // namespace hooks
 
 #define ITC_XAUDIO_ADAPTER(address, step)   \
@@ -346,3 +412,12 @@ ITC_XAUDIO_ADAPTER(82461158, XAudioBaseSize)
 ITC_XAUDIO_ADAPTER(8245FA80, XAudioBufferCreate)
 ITC_XAUDIO_ADAPTER(82461500, XAudioVoiceConstruct)
 ITC_XAUDIO_ADAPTER(82460688, XAudioGetAllocator)
+ITC_XAUDIO_ADAPTER(82460738, XAudioConstructOutputs)
+ITC_XAUDIO_ADAPTER(824607C8, XAudioOutputsSize)
+ITC_XAUDIO_ADAPTER(82460998, XAudioSetOutput)
+ITC_XAUDIO_ADAPTER(82460BF0, XAudioSetOutputVoices)
+ITC_XAUDIO_ADAPTER(8245F228, XAudioSetOutputVoices)
+ITC_XAUDIO_ADAPTER(82461070, XAudioPass)
+ITC_XAUDIO_ADAPTER(82461240, XAudioDestroy)
+ITC_XAUDIO_ADAPTER(82461308, XAudioCreateObject)
+ITC_XAUDIO_ADAPTER(82461678, XAudioProcessEffect)
