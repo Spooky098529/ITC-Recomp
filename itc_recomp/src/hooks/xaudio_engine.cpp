@@ -383,7 +383,7 @@ ITC_XAUDIO_ENGINE_ADAPTER(8245F8D0, XAudioBufferInterface)
 ITC_XAUDIO_ENGINE_ADAPTER(82460388, XAudioAllocatorRemaining)
 ITC_XAUDIO_ENGINE_ADAPTER(82460370, XAudioInterfaceAddRef)
 ITC_XAUDIO_ENGINE_ADAPTER(82461EF8, XAudioObjectInfo)
-ITC_XAUDIO_ENGINE_ADAPTER(8245F678, XAudioTakeStats)
+// No adapter (removed 2026-10-29: only XAudioEngine::Mix's plain C++ calls it in play) for XAudioEngine::TakeStats sub_8245F678.
 // No adapter (removed 2026-10-29: only the allocators' destructors' plain C++ (sub_824602F8, sub_824603A8) calls it in play) for XAudio::Free sub_8245EF90.
 ITC_XAUDIO_ENGINE_ADAPTER(82460288, XAudioAllocatorAlloc)
 ITC_XAUDIO_ENGINE_ADAPTER(8245AAB8, XAudioDeleteObject)
@@ -404,7 +404,7 @@ ITC_XAUDIO_ENGINE_ADAPTER(8245FE20, XAudioMasteringStart)
 ITC_XAUDIO_ENGINE_ADAPTER(8245FDC8, XAudioMasteringPass)
 ITC_XAUDIO_ENGINE_ADAPTER(8245FB80, XAudioMasteringProcess)
 // No adapter (removed 2026-10-29: only XAudioEngine::SwapStageLists' plain C++ calls it in play) for XAudioStage::Swap sub_8245B208.
-ITC_XAUDIO_ENGINE_ADAPTER(8245B720, XAudioSwapStageLists)
+// No adapter (removed 2026-10-29: only XAudioEngine::Mix's and XAudio::MasterThread's plain C++ call it in play) for XAudioEngine::SwapStageLists sub_8245B720.
 ITC_XAUDIO_ENGINE_ADAPTER(8245B480, XAudioRunStage)
 ITC_XAUDIO_ENGINE_ADAPTER(8245ACE0, XAudioRunCallbacks)
 ITC_XAUDIO_ENGINE_ADAPTER(8245AB60, XAudioRegisterCallback)
@@ -417,7 +417,7 @@ ITC_XAUDIO_ENGINE_ADAPTER(824603A0, XAudioDefaultAllocatorThunk)
 ITC_XAUDIO_ENGINE_ADAPTER(824603A8, XAudioInterfaceFree)
 // The mix and XAudio's threads (their kernel objects through the imports, as
 // the original; the threads' entry points stay these addresses).
-ITC_XAUDIO_ENGINE_ADAPTER(8245BF80, XAudioMix)
+// No adapter (removed 2026-10-29: only XAudio::MixerCallback's plain C++ calls it in play) for XAudioEngine::Mix sub_8245BF80.
 ITC_XAUDIO_ENGINE_ADAPTER(8245FBE0, XAudioMixerCallback)
 ITC_XAUDIO_ENGINE_ADAPTER(8245BE08, XAudioMasterThread)
 ITC_XAUDIO_ENGINE_ADAPTER(8245BED0, XAudioWorkerThread)
