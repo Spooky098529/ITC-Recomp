@@ -132,13 +132,15 @@ Not known yet:
   (`--native_xaudio_objects`, `xaudio-objects.md`: the codecs' packet queue
   and slots, the output matrix's mix, the volume meter, the reverb's set-up
   parts) are native over the game's own objects, its two locks taken as
-  the original does; left recompiled: the PCM codec's pass with the
-  resampler and its kernels, and the reverb's parameters and signal path.
+  the original does, and the resampler with the six kernels that ran in
+  play (`src/xaudio/resampler.cpp`); left recompiled: the PCM codec's pass
+  above it, and the reverb's parameters and signal path.
   Two things the harnesses showed about matching the translated code: its
   `lfs`/`stfs` pairs fold to a plain copy (a signaling NaN is kept, where
   strict host conversions would quiet it), and its `vmaddfp` is a product
   rounded to float, then a sum (not fused), with the vector unit's flush
-  to zero on.
+  to zero on. The kernels' constants are addressed from `lis` 0x82050000
+  (the converter's table at `0x8204CF08`), easy to misread as 0x82040000.
 - **Keep the SDK's XMA decoder** (the user's call, 2026-10-14): it costs
   nothing measurable, so replacing it gains no speed. (Considered:
   converting the XMA wave banks to PCM banks on first launch, decoded once

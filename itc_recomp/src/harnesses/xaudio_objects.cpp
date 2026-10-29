@@ -1264,6 +1264,115 @@ void ReverbParts(Context& h, uint32_t block) {
   }
 }
 
+// --- The resampler ---
+
+// A converter state at `state` in the block: 16-bit input (+0) in the
+// block's random words from +0x200 (aligned, or at a halfword when not
+// `aligned`) with room for its frames (+4), a position (+8) before them,
+// format 1 and `channels`; the output (+20) at +0x1000 (planar, 1,024 bytes
+// a channel; aligned or at a word), 256 frames (+24, or fewer when not
+// aligned) with +28 written (a multiple of 8 when aligned); a volume ramp
+// (+36, +40), a ratio (+44: 1.0, common ones, or 0 to 4), a fraction (+48,
+// mostly in [0, 1), now and then negative) and the kept frame (+52, +56).
+void ConverterState(uint8_t* base, uint32_t block, uint32_t state, Random& random,
+                    uint32_t channels, bool aligned) {
+  const uint32_t input = block + 0x200 + (aligned ? 16 * random.Below(4) : 2 * random.Below(32));
+  const uint32_t room = 0xD00 / (2 * channels);
+  const uint32_t end = random.Below(4) == 0 ? 1 + random.Below(24) : 1 + random.Below(room);
+  Store(base, state + 0, input);
+  Store(base, state + 4, end);
+  Store(base, state + 8, random.Below(end));
+  guest::StoreU8(base, state + 12, 1);
+  guest::StoreU8(base, state + 13, uint8_t(channels));
+  const uint32_t frames = aligned || random.Below(2) == 0 ? 256 : 1 + random.Below(256);
+  Store(base, state + 20, block + 0x1000 + (aligned ? 0 : 4 * random.Below(4)));
+  Store(base, state + 24, frames);
+  Store(base, state + 28, aligned ? 8 * random.Below(frames / 8) : random.Below(frames));
+  Store(base, state + 36, Sample(random));
+  Store(base, state + 40, random.Below(4) == 0 ? guest::LoadU32(base, state + 36) : Sample(random));
+  static constexpr float kRatios[] = {1.0f, 0.91875f, 0.5f, 0.6666667f, 0.459375f, 2.0f};
+  const float ratio = random.Below(3) == 0 ? kRatios[random.Below(6)]
+                                           : float(random.Below(40000)) / 10000.0f;
+  Store(base, state + 44, std::bit_cast<uint32_t>(ratio));
+  const float fraction = random.Below(8) == 0   ? -float(random.Below(10000)) / 10000.0f
+                         : random.Below(8) == 0 ? 0.0f
+                                                : float(random.Below(1u << 24)) / float(1u << 24);
+  Store(base, state + 48, std::bit_cast<uint32_t>(fraction));
+  Store(base, state + 52, Sample(random));
+  Store(base, state + 56, Sample(random));
+}
+
+void Resampler(Context& h, uint32_t block) {
+  const uint32_t state = block + 0x40;
+  struct Kernel {
+    const char* name;
+    GuestFunction recompiled, native;
+    uint32_t channels;
+  };
+  static const Kernel kKernels[] = {
+      {"sub_8247E188 (the mono resampler, with its vector path sub_8246E208 and scalar "
+       "sub_82473E48)",
+       __imp__sub_8247E188, hooks::XAudioResampleMono, 1},
+      {"sub_8247E260 (the stereo resampler, with its vector path sub_8246E4C8 and scalar "
+       "sub_82474188)",
+       __imp__sub_8247E260, hooks::XAudioResampleStereo, 2},
+      {"sub_82473E48 (the mono resampler's scalar path)", __imp__sub_82473E48,
+       hooks::XAudioResampleMonoScalar, 1},
+      {"sub_82474188 (the stereo resampler's scalar path)", __imp__sub_82474188,
+       hooks::XAudioResampleStereoScalar, 2},
+      {"sub_8247F558 (the stereo copy, with its scalar path sub_82478E60)", __imp__sub_8247F558,
+       hooks::XAudioCopyStereo, 2},
+      {"sub_82478E60 (the stereo copy's scalar path)", __imp__sub_82478E60,
+       hooks::XAudioCopyStereoScalar, 2},
+  };
+  for (const Kernel& kernel : kKernels) {
+    Results results(kernel.name);
+    for (int i = 0; i < 96; i++) {
+      Case(h, results, block, kernel.recompiled, kernel.native,
+           [&](Random& random, PPCContext& t) {
+             ConverterState(h.base, block, state, random, kernel.channels, i % 3 != 2);
+             t.r3.u64 = state;
+           },
+           fmt::format("case {}", i));
+    }
+    results.Report();
+  }
+  {
+    // The kernel kept (+80 0, or without its low bits) or picked again from
+    // the rates (+16 to +32, never 2:1 with flags bit 0, whose entries are
+    // past the table's 100) and flags (+84 bits 0 and 7); ours and the
+    // translated ones (the equal-rate mono entries 31 and 106, not seen in
+    // play) both run. Some cases have the input or the output used up.
+    Results results("Resampler::Process (sub_8246F140)");
+    static constexpr uint32_t kMono[] = {0x8247E188, 0x82473E48};
+    static constexpr uint32_t kStereo[] = {0x8247E260, 0x82474188, 0x8247F558, 0x82478E60};
+    static constexpr uint32_t kRates[] = {48000, 44100, 32000, 22050, 16000, 11025};
+    for (int i = 0; i < 96; i++) {
+      Case(h, results, block, __imp__sub_8246F140, hooks::XAudioResamplerProcess,
+           [&](Random& random, PPCContext& t) {
+             const uint32_t channels = 1 + random.Below(2);
+             ConverterState(h.base, block, state, random, channels, i % 3 != 2);
+             Store(h.base, state + 16, kRates[random.Below(6)]);
+             Store(h.base, state + 32, 48000);
+             Store(h.base, state + 76, channels == 1 ? kMono[random.Below(2)]
+                                                     : kStereo[random.Below(4)]);
+             static constexpr uint32_t kChanged[] = {0, 1, 2, 3, 4, 0x10};
+             Store(h.base, state + 80, kChanged[random.Below(6)]);
+             Store(h.base, state + 84, uint32_t(random.Next()) & 0xFFFFFF7Eu |
+                                           (random.Below(2) << 7) | random.Below(2));
+             if (i % 16 == 15) {
+               Store(h.base, state + 8, guest::LoadU32(h.base, state + 4));
+             } else if (i % 16 == 14) {
+               Store(h.base, state + 28, guest::LoadU32(h.base, state + 24));
+             }
+             t.r3.u64 = state;
+           },
+           fmt::format("case {}", i));
+    }
+    results.Report();
+  }
+}
+
 }  // namespace
 
 void XAudioObjects(Context& h) {
@@ -1274,6 +1383,7 @@ void XAudioObjects(Context& h) {
   Queue(h, block.address);
   MatrixAndMeter(h, block.address);
   ReverbParts(h, block.address);
+  Resampler(h, block.address);
 }
 
 }  // namespace harness

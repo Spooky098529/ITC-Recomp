@@ -188,6 +188,7 @@ set(ITC_SOURCES
     src/xaudio/engine.cpp
     src/hooks/xaudio_objects.cpp
     src/xaudio/objects.cpp
+    src/xaudio/resampler.cpp
     src/save_interface/save_interface.cpp
     src/save_interface/save_layer.cpp
     src/hooks/file_layer.cpp
@@ -514,7 +515,7 @@ set_source_files_properties(src/c_runtime/math.cpp src/ui_movies/keys.cpp
     src/car_models/raster.cpp src/car_models/decals.cpp src/car_sounds/x3daudio.cpp
     src/car_sounds/car_sound_3d.cpp src/car_sounds/car_sound_voices.cpp
     src/car_sounds/car_sound_parts.cpp src/xact/voices.cpp src/xact/waves.cpp
-    src/xact/tracks.cpp src/xaudio/objects.cpp PROPERTIES
+    src/xact/tracks.cpp src/xaudio/objects.cpp src/xaudio/resampler.cpp PROPERTIES
     COMPILE_OPTIONS "-ffp-model=strict;-ffp-contract=off"
     SKIP_PRECOMPILE_HEADERS ON)
 

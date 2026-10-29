@@ -11,6 +11,7 @@
 #include "hooks/guest_call.h"
 #include "hooks/xaudio.h"
 #include "xaudio/objects.h"
+#include "xaudio/resampler.h"
 
 ITC_FLAG_BOOL(native_xaudio_objects, true, "ITC",
               "Run the parts of XAudio's factory objects made native "
@@ -36,7 +37,10 @@ ITC_FLAG_BOOL(native_xaudio_objects, true, "ITC",
               "sub_825A6210; the render driver's set-up sub_824657C8; the reverb's destructor "
               "sub_82465410 and sub_824656B8, ReverbCore::Defaults sub_82467538, "
               "LargestPrimeBelow sub_8246DFE8, FilterCoefficient sub_824675B8 and the delay "
-              "lines' fills sub_82467720 to sub_82467990) natively instead of through the "
+              "lines' fills sub_82467720 to sub_82467990; the resampler's Resampler::Process "
+              "sub_8246F140 and its kernels sub_8247E188, sub_8247E260 (with their vector paths "
+              "sub_8246E208 and sub_8246E4C8), sub_82473E48, sub_82474188, sub_8247F558 and "
+              "sub_82478E60) natively instead of through the "
               "translated code (the same reads and writes; checked by "
               "--run_harnesses=xaudio_objects)");
 
@@ -498,6 +502,25 @@ void XAudioFilterCoefficient(PPCContext& ctx, uint8_t* base) {
   xa::FilterCoefficient(base, ctx.r3.u32);
 }
 
+void XAudioResamplerProcess(PPCContext& ctx, uint8_t* base) {
+  const uint32_t state = ctx.r3.u32;
+  Framed(ctx, base, 128, [&](const xa::GuestCall& call, uint32_t frame) {
+    return xa::ResamplerProcess(base, state, frame, call);
+  });
+}
+
+#define ITC_XAUDIO_KERNEL_STEP(name, function)                     \
+  void name(PPCContext& ctx, uint8_t* base) {                      \
+    ctx.r3.u64 = xa::function(base, ctx.r3.u32, ctx.r1.u32);       \
+  }
+ITC_XAUDIO_KERNEL_STEP(XAudioResampleMono, ResampleMono)
+ITC_XAUDIO_KERNEL_STEP(XAudioResampleStereo, ResampleStereo)
+ITC_XAUDIO_KERNEL_STEP(XAudioResampleMonoScalar, ResampleMonoScalar)
+ITC_XAUDIO_KERNEL_STEP(XAudioResampleStereoScalar, ResampleStereoScalar)
+ITC_XAUDIO_KERNEL_STEP(XAudioCopyStereo, CopyStereo)
+ITC_XAUDIO_KERNEL_STEP(XAudioCopyStereoScalar, CopyStereoScalar)
+#undef ITC_XAUDIO_KERNEL_STEP
+
 #define ITC_XAUDIO_FILL_STEP(name, groups)                       \
   void name(PPCContext& ctx, uint8_t* base) {                    \
     xa::FillDelayLine(base, ctx.r3.u32, groups);                 \
@@ -581,3 +604,10 @@ ITC_XAUDIO_OBJECTS_ADAPTER(82467858, XAudioFillDelayLine256)
 ITC_XAUDIO_OBJECTS_ADAPTER(824678C0, XAudioFillDelayLine32)
 ITC_XAUDIO_OBJECTS_ADAPTER(82467928, XAudioFillDelayLine128)
 ITC_XAUDIO_OBJECTS_ADAPTER(82467990, XAudioFillDelayLine512)
+ITC_XAUDIO_OBJECTS_ADAPTER(8246F140, XAudioResamplerProcess)
+ITC_XAUDIO_OBJECTS_ADAPTER(8247E188, XAudioResampleMono)
+ITC_XAUDIO_OBJECTS_ADAPTER(8247E260, XAudioResampleStereo)
+ITC_XAUDIO_OBJECTS_ADAPTER(82473E48, XAudioResampleMonoScalar)
+ITC_XAUDIO_OBJECTS_ADAPTER(82474188, XAudioResampleStereoScalar)
+ITC_XAUDIO_OBJECTS_ADAPTER(8247F558, XAudioCopyStereo)
+ITC_XAUDIO_OBJECTS_ADAPTER(82478E60, XAudioCopyStereoScalar)

@@ -87,4 +87,13 @@ void XAudioFillDelayLine32(PPCContext& ctx, uint8_t* base);     // sub_824678C0
 void XAudioFillDelayLine128(PPCContext& ctx, uint8_t* base);    // sub_82467928
 void XAudioFillDelayLine512(PPCContext& ctx, uint8_t* base);    // sub_82467990
 
+// The resampler (src/xaudio/resampler.h).
+void XAudioResamplerProcess(PPCContext& ctx, uint8_t* base);      // sub_8246F140
+void XAudioResampleMono(PPCContext& ctx, uint8_t* base);          // sub_8247E188
+void XAudioResampleStereo(PPCContext& ctx, uint8_t* base);        // sub_8247E260
+void XAudioResampleMonoScalar(PPCContext& ctx, uint8_t* base);    // sub_82473E48
+void XAudioResampleStereoScalar(PPCContext& ctx, uint8_t* base);  // sub_82474188
+void XAudioCopyStereo(PPCContext& ctx, uint8_t* base);            // sub_8247F558
+void XAudioCopyStereoScalar(PPCContext& ctx, uint8_t* base);      // sub_82478E60
+
 }  // namespace hooks
