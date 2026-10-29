@@ -92,6 +92,25 @@ done, as the car sounds read it).
   it again). No precedent covers a kernel spin lock; a host recursive
   mutex would follow the critical sections' precedent most closely.
 
+**The locks' users, counted by the migration (2026-10-29).** Neither lock
+has a lock or unlock function to route: both are taken inline. The API
+lock is entered with `RtlEnterCriticalSection` called directly in each of
+its 29 users, all in this file (the API entry points, the two waits,
+`XAudioLock`, the static initializer and terminator) plus
+`XAudioInitialize`'s `sub_8245A410` (`sound-cues.md`), so it can be a host
+lock by overriding all of them. The spin lock's take (the depth +4 and
+owner +8 read inline, `KeAcquireSpinLockAtRaisedIrql` only for the word at
++0) is inlined in 57 functions, about 30 of them seen in play outside this
+file's migration: the engine and its mixer (`sub_8245ACE0`, `sub_8245B208`,
+`sub_8245B480`, `sub_8245B638`, `sub_8245B720`, `sub_8245AB60`,
+`sub_82460000`), and the codecs and the XMA voice the factory makes
+(`8246xxxx`, e.g. `sub_82462148`, `sub_82465258`, `sub_8246B480`,
+`XmaVoice::Update` `sub_8246C320`, `sub_8246D860`), which run on our output
+thread. A host lock taken by every user then needs each of those
+overridden, or the kernel imports routed for that address; that's for the
+user's call (the migration's report). Until then only work that takes
+neither lock is native.
+
 Also here: XAudio's statistics counters (`XAudio::AddStat`,
 `sub_8245F640`: atomic adds to `0x82954F24` + 4 × the index; 1 a
 submix pass, 2 a source pass), the default allocator (`sub_82460688`,
