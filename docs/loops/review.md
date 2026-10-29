@@ -106,6 +106,23 @@ When the user has reviewed a run's section, its heading gets
   removable (`sub_82460BF0`, `sub_82461D50`, `sub_82460CB8`,
   `sub_824619B0`); `ProcessEffect` reads an unwritten stack word as the
   original does. Sound: the same counters as `--native_xaudio=false`.
+- The car sounds' migration 2 (be59a3f..edce57c, `--native_car_sounds`):
+  29 more (53 of 62 in play ours; 19 adapters removed, with XAudio's
+  `SubmitPacket`): the voice holders, the voices made and started, stop
+  and release, `CarSounds::Init`, the hits, wind, pass-by and three other
+  parts' updates (part A of `CarSound::Update`'s subtree, by a subagent).
+  For review: the plain C++ calls XAudio's entry points' plain C++
+  directly in frames of the original's size (`xaudio::FrameBelow`; the
+  prologue's saved registers not written, as XAudio's adapters);
+  harnesses with real voices made by the engine (the mixer held out by
+  its lock, voices stopped, unlinked and freed after); `sub_8210EEE0`
+  sets slot +52's volume without checking for a voice, as the original.
+  Row corrections: `SetPitch` clamps to a minimum; `SetPitchScaled` uses
+  r9 and f3; the two hit parts were swapped (`sub_8210E778` the impact,
+  `sub_8210E938` the scrape); `WindSound` reads the vehicle's half-words
+  at +5410 + 96i. Pause, Resume, StopAll and the releases not reached in
+  the attract race. Sound: the same counters as
+  `--native_car_sounds=false`.
 
 ## Run 2026-10-28 18:45 (`b7-loop-28-10-26-2`)
 

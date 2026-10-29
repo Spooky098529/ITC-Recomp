@@ -16,8 +16,10 @@ file's history. What's left to see in a drive, from every run:
 - Subsystem 2 of 3 done: XAudio's voices (below). Recorded in the
   plan's table and boundary log.
 - Subsystem 1's continuation (not counted): the car sounds' migration
-  2, their groups under XAudio's voice methods now ready. Step:
-  migration (agent running).
+  2, their groups under XAudio's voice methods now ready. Migration 2
+  done (be59a3f..edce57c, 29 more, 53 of 62 ours; stopped at five
+  batches, `CarSound::Update`'s other parts ready). Step: validation
+  (agent running); then migration 3.
 
 ## Done
 
@@ -66,6 +68,9 @@ file's history. What's left to see in a drive, from every run:
 - After its validation (`itc_2356`: race 8 s, the harnesses ~30 s, 0
   errors, every harness 0 differing but the expected groups): ours
   2744, work left 3720.
+- After the car sounds' migration 2 (race 38 s, 0 errors, car_sounds,
+  x3daudio and xaudio 0 differing): ours 2773, work left 3691 (wrapped
+  103, known 510, unknown 3078).
 
 ## Stopped
 
