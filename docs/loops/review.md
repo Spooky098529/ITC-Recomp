@@ -13,6 +13,24 @@ When the user has reviewed a run's section, its heading gets
 
 ## Run 2026-10-29 15:44 (`b7-loop-29-10-26`)
 
+- XAudio's engine and mixer (map 610125a): `docs/functions/xaudio-engine.md`,
+  70 rows (all new; 23 not seen in play: the teardown, the factory's
+  id-128 classes, the sizing allocator, the stats callback, the callback
+  unregistration). The mix runs on XAudio's own guest threads
+  (`XAudio::MasterThread` `sub_8245BE08`, `XAudio::WorkerThread`
+  `sub_8245BED0`, made suspended by `XAudioEngine::Init` with
+  `ExCreateThread`, priority 15), woken through two synchronization
+  events (`0x82954EF8` mix now, `0x82954EE8` mix done), a notification
+  event (`0x82954EC4`, title terminating, waited on with mix done by
+  `KeWaitForMultipleObjects`), a kernel semaphore (`0x82954ED4`, count
+  0, limit 6) and a title terminate notification (`0x82954EB4`). None
+  has a precedent (the archive's semaphores are the nearest for the
+  semaphore): for the user's call before the groups using them are
+  migrated. The voice lists' spin lock is taken inline as the original
+  does (2026-10-29); the mixer's own lock `0x8264D4F8` is taken only by
+  the callback and the teardown. `known-data.md`: the engine, stage,
+  factory, mastering voice, render driver, allocator, kernel objects
+  and stats copies.
 - XACT's tracks and events (map a3880fc): `docs/functions/xact-tracks.md`,
   143 rows (all new; 88 not seen in play): the tracks, track instances
   and events of `825D0000`-`825D9000`. The lead's "owner's forwarders"

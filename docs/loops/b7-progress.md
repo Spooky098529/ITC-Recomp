@@ -17,8 +17,10 @@ file's history. What's left to see in a drive, from every run:
   ready groups). Migration 1 checked (44 ours,
   c8ad278..6fc2206). Validated (`itc_2432`,
   `itc_2433`: 44 of 44 harness lines; one to drive). Done (below); recorded in the plan's table and boundary log.
-- Subsystem 2 of 3: XAudio's engine and mixer (`leads.md`). Step:
-  mapping agent running.
+- Subsystem 2 of 3: XAudio's engine and mixer (`leads.md`). Map
+  610125a checked (`xaudio-engine.md`, 70 rows, 47 in play, 24 ready
+  groups). Step: migration agent 1 running (groups without XAudio's
+  threads, events and semaphore, which have no precedent).
 
 ## Done
 
@@ -57,3 +59,5 @@ file's history. What's left to see in a drive, from every run:
   103, known 516, unknown 2993).
 - After its validation (`itc_2443`: race 7 s, 0 errors, every harness
   0 differing but the expected groups): ours 2852, work left 3612.
+- After XAudio's engine's map: ours 2852, work left 3612 (wrapped 103,
+  known 563, unknown 2946).
