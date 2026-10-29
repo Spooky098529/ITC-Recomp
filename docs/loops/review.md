@@ -123,6 +123,25 @@ When the user has reviewed a run's section, its heading gets
   at +5410 + 96i. Pause, Resume, StopAll and the releases not reached in
   the attract race. Sound: the same counters as
   `--native_car_sounds=false`.
+- The car sounds' migration 3 (fd88bdf..cfd838d, `--native_car_sounds`,
+  by four subagents one at a time): `CarSound::Update` and the engine,
+  tire, roll, horn and turbo updates; 22 adapters removed; 62 of 62 in
+  play ours. For review: `CarSound::Update`'s adapter stays (its caller
+  `sub_82175F20` is recompiled); XAudio's `SetOutputVoices`,
+  `MixToOutputs`, `StopOrTail` keep theirs; before plain C++ callees,
+  `xaudio::Regs` sets r3 upward and f1 only, so f2 (before
+  `EngineSound::Update`, `SetPitch`, `SetPitchScaled`) and r7 (before
+  `TireLayer::Update`) aren't left as the original leaves them (the
+  callees take them as arguments; the harnesses match); `CarSound::Update`'s
+  tan through the guest's; harness gaps where nested callees' register
+  saves land on callers' locals. Ported as the game has them:
+  `UpdatePitched`'s pow branch (above 12,000 with the speed capped at
+  8,000) and layer 0's f2 always 1.0. Row corrections: `CarSound::Update`'s
+  r4 is 1 when the vehicle's +6148 & 0x81 is set; `EngineLayer::Update`
+  reads two eight-point curves (volume, pitch); `TireLayer::Update` drives
+  one voice; `sub_8210F118` a looping horn (wave 11 + the car's +1796
+  byte, input bit 0x20000); `sub_8210F4E8` the turbo whistle from the
+  boost at +2944. Sound: the same counters as `--native_car_sounds=false`.
 
 ## Run 2026-10-28 18:45 (`b7-loop-28-10-26-2`)
 

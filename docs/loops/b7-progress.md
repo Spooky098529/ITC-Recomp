@@ -20,7 +20,8 @@ file's history. What's left to see in a drive, from every run:
   done (be59a3f..edce57c, 29 more, 53 of 62 ours; stopped at five
   batches, `CarSound::Update`'s other parts ready). Validated
   (`itc_2382`, `itc_2383`): 37 of 37 harness lines; one to drive.
-  Step: migration 3 (agent running).
+  Migration 3 done (fd88bdf..cfd838d, 62 of 62 in play ours, nothing
+  ready left). Step: validation (agent running).
 
 ## Done
 
@@ -74,6 +75,9 @@ file's history. What's left to see in a drive, from every run:
   103, known 510, unknown 3078).
 - After its validation (`itc_2382`: race 8 s, 0 errors, every harness
   0 differing but the expected groups): ours 2773, work left 3691.
+- After the car sounds' migration 3 (`itc_2397`: race 38 s, 0 errors,
+  car_sounds, x3daudio, xaudio 0 differing): ours 2782, work left 3682
+  (wrapped 103, known 501, unknown 3078).
 
 ## Stopped
 
