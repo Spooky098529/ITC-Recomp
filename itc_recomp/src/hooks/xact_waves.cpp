@@ -303,8 +303,10 @@ ITC_XACT_WAVES_ADAPTER(825D1ED8, XactWavePause)
 ITC_XACT_WAVES_ADAPTER(825D3890, XactInMemoryWaveUpdate)
 ITC_XACT_WAVES_ADAPTER(825D2030, XactWaveNotify)
 ITC_XACT_WAVES_ADAPTER(825D24D8, XactWaveSetState)
-ITC_XACT_WAVES_ADAPTER(825D28D0, XactWaveRelease)
-ITC_XACT_WAVES_ADAPTER(825D29E8, XactWaveDestruct)
+// No adapter (removed 2026-10-29: only ~XACTWave's plain C++ calls it in play) for
+// XACTWave::Release sub_825D28D0.
+// No adapter (removed 2026-10-29: only XACTInMemoryWave's deleting destructor's plain C++ calls
+// it in play) for XACTWave::~XACTWave sub_825D29E8.
 ITC_XACT_WAVES_HEAP_ADAPTER(825D3820, XactInMemoryWaveDeletingDestruct)
 ITC_XACT_WAVES_ADAPTER(825D3A28, XactInMemoryWaveStop)
 
