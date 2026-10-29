@@ -572,4 +572,184 @@ uint32_t MasteringProcess(uint8_t* base, uint32_t voice, uint32_t inout, uint32_
               At(frame, Args({driver, guest::LoadU32(base, inout), 0})));
 }
 
+// --- Under the voice lists' spin lock ---
+
+namespace {
+
+// The node at `node` added at the end of the list at `list` (+0 next, +4
+// prev), as the engine's inline code does.
+void LinkAtEnd(uint8_t* base, uint32_t list, uint32_t node) {
+  guest::StoreU32(base, node, list);
+  guest::StoreU32(base, node + 4, guest::LoadU32(base, list + 4));
+  guest::StoreU32(base, list + 4, node);
+  guest::StoreU32(base, guest::LoadU32(base, node + 4), node);
+}
+
+// The node at `node` out of its list when it's in one, left pointing at
+// itself.
+void Unlink(uint8_t* base, uint32_t node) {
+  const uint32_t next = guest::LoadU32(base, node);
+  if (next == node) {
+    return;
+  }
+  guest::StoreU32(base, next + 4, guest::LoadU32(base, node + 4));
+  guest::StoreU32(base, guest::LoadU32(base, node + 4), guest::LoadU32(base, node));
+  guest::StoreU32(base, node + 4, node);
+  guest::StoreU32(base, node, node);
+}
+
+}  // namespace
+
+void StageSwap(uint8_t* base, uint32_t stage, uint32_t thread, const GuestCall& call) {
+  ITC_NATIVE_RUNNING("sub_8245B208 XAudioStage::Swap");
+  SpinTake(base, thread, call);
+  const uint32_t mix = guest::LoadU32(base, stage + 36);
+  const uint32_t mixed = guest::LoadU32(base, stage + 40);
+  guest::StoreU32(base, stage + 40, mix);
+  guest::StoreU32(base, stage + 36, mixed);
+  SpinRelease(base, thread, call);
+}
+
+void SwapStageLists(uint8_t* base, uint32_t engine, uint32_t thread, const GuestCall& call) {
+  ITC_NATIVE_RUNNING("sub_8245B720 XAudioEngine::SwapStageLists");
+  SpinTake(base, thread, call);
+  SetRegs(call, Args({engine + 80}));
+  StageSwap(base, engine + 80, thread, call);
+  for (uint32_t i = 0, offset = 0; i < guest::LoadU8(base, engine + 128); i++, offset += 44) {
+    const uint32_t stage = guest::LoadU32(base, engine + 124) + offset;
+    SetRegs(call, Args({stage}));
+    StageSwap(base, stage, thread, call);
+  }
+  SpinRelease(base, thread, call);
+}
+
+void RunStage(uint8_t* base, uint32_t engine, uint32_t stage, uint32_t processor,
+              uint32_t thread, const GuestCall& call) {
+  ITC_NATIVE_RUNNING("sub_8245B480 XAudioEngine::RunStage");
+  const uint32_t entry = engine + ((processor + 36) << 2);
+  for (;;) {
+    SpinTake(base, thread, call);
+    const uint32_t list = guest::LoadU32(base, stage + 36);
+    const uint32_t first = guest::LoadU32(base, list);
+    if (first == list) {
+      break;
+    }
+    const uint32_t offset = guest::LoadU32(base, list + 8);
+    const uint32_t voice = first - offset;
+    if (voice == 0) {
+      break;
+    }
+    Unlink(base, offset + voice);
+    const uint32_t mixed = guest::LoadU32(base, stage + 40);
+    LinkAtEnd(base, mixed, guest::LoadU32(base, mixed + 8) + voice);
+    guest::StoreU32(base, entry, voice);
+    SpinRelease(base, thread, call);
+    const uint32_t r3 = call(Method(base, voice, 68), 0x8245B5C4, Args({voice}));
+    if (int32_t(r3) >= 0) {
+      SetRegs(call, Args({0, 1}));
+      AddStat(base, 0, 1);
+    }
+  }
+  SpinRelease(base, thread, call);
+  guest::StoreU32(base, entry, 0);
+}
+
+void RunCallbacks(uint8_t* base, uint32_t engine, uint32_t stage, uint32_t thread,
+                  const GuestCall& call) {
+  ITC_NATIVE_RUNNING("sub_8245ACE0 XAudioEngine::RunCallbacks");
+  SpinTake(base, thread, call);
+  uint32_t slot = engine + ((stage & 0xFF) << 6) + 168;
+  for (uint32_t k = 0; k < 8; k++, slot += 8) {
+    guest::StoreU32(base, engine + 296, slot);
+    if (guest::LoadU32(base, slot) == 0) {
+      continue;
+    }
+    SpinRelease(base, thread, call);
+    const uint32_t context = guest::LoadU32(base, slot + 4);
+    call(guest::LoadU32(base, slot), 0x8245ADB4, Args({context}));
+    SpinTake(base, thread, call);
+  }
+  guest::StoreU32(base, engine + 296, 0);
+  SpinRelease(base, thread, call);
+}
+
+uint32_t RegisterCallback(uint8_t* base, uint32_t engine, uint32_t stage, uint32_t function,
+                          uint32_t context, uint32_t out, uint32_t thread, const GuestCall& call) {
+  ITC_NATIVE_RUNNING("sub_8245AB60 XAudioEngine::RegisterCallback");
+  SpinTake(base, thread, call);
+  const uint32_t index = stage & 0xFF;
+  uint32_t i = 0;
+  for (; i < 8; i++) {
+    if (guest::LoadU32(base, engine + (index << 6) + 168 + 8 * i) == 0) {
+      break;
+    }
+  }
+  const uint32_t slot = i < 8 ? (((index << 3) + i + 21) << 3) + engine : 0;
+  if (slot == 0) {
+    SpinRelease(base, thread, call);
+    return 0x8007000Eu;  // E_OUTOFMEMORY
+  }
+  guest::StoreU32(base, slot, function);
+  guest::StoreU32(base, slot + 4, context);
+  if (out != 0) {
+    guest::StoreU32(base, out, slot);
+  }
+  SpinRelease(base, thread, call);
+  return 0;
+}
+
+uint32_t Commit(uint8_t* base, uint32_t engine, const Thread& thread, const GuestCall& call) {
+  ITC_NATIVE_RUNNING("sub_8245B638 XAudioEngine::Commit");
+  uint32_t r27 = 0;
+  SpinTake(base, thread.r13, call);
+  const uint32_t list = engine + 68;
+  for (;;) {
+    const uint32_t first = guest::LoadU32(base, list);
+    if (first == list) {
+      break;
+    }
+    const uint32_t voice = first - guest::LoadU32(base, list + 8);
+    if (voice == 0) {
+      break;
+    }
+    SetRegs(call, Args({voice, 0}));
+    r27 = SourceStart(base, voice, 0, thread, call);
+    if (int32_t(r27) < 0) {
+      break;
+    }
+  }
+  SpinRelease(base, thread.r13, call);
+  return r27;
+}
+
+uint32_t StageOf(uint8_t* base, uint32_t engine, uint32_t voice, uint32_t frame,
+                 const GuestCall& call) {
+  ITC_NATIVE_RUNNING("sub_8245FBF0 XAudioEngine::StageOf");
+  call(Method(base, voice, 52), 0x8245FC24, At(frame, Args({voice, frame + 80})));
+  const uint32_t type = guest::LoadU8(base, frame + 80);
+  if (type < 1) {
+    return engine + 80;
+  }
+  if (type == 1) {
+    return guest::LoadU8(base, voice + 76) * 44u + guest::LoadU32(base, engine + 124);
+  }
+  return 0;
+}
+
+uint32_t JoinMix(uint8_t* base, uint32_t voice, uint32_t thread, uint32_t frame,
+                 const GuestCall& call) {
+  ITC_NATIVE_RUNNING("sub_82460000 XAudioVoice::JoinMix");
+  const uint32_t engine = guest::LoadU32(base, kEngine);
+  SetRegs(call, Args({engine, voice}));
+  const uint32_t stage = StageOf(base, engine, voice, FrameBelow(base, frame, 112), call);
+  if (stage == 0) {
+    return 0;
+  }
+  SpinTake(base, thread, call);
+  const uint32_t mixed = guest::LoadU32(base, stage + 40);
+  LinkAtEnd(base, mixed, guest::LoadU32(base, mixed + 8) + voice);
+  SpinRelease(base, thread, call);
+  return 0;
+}
+
 }  // namespace xaudio

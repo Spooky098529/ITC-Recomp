@@ -27,7 +27,11 @@ ITC_FLAG_BOOL(native_xaudio_engine, true, "ITC",
               "slots sub_8245D650 and sub_8245D6D8; the engine's set-up, the mixer's callback and "
               "XAudio's processor threads stay recompiled; the mastering voice's Size sub_8245FF68, "
               "Init sub_8245FCA0, Create sub_824600F0, Start sub_8245FE20, Pass sub_8245FDC8 and "
-              "Process sub_8245FB80, the render driver's constructor sub_82465938) natively instead of through the "
+              "Process sub_8245FB80, the render driver's constructor sub_82465938; under the voice "
+              "lists' spin lock (taken as the original does) XAudioStage::Swap sub_8245B208, "
+              "XAudioEngine::SwapStageLists sub_8245B720, RunStage sub_8245B480, RunCallbacks "
+              "sub_8245ACE0, RegisterCallback sub_8245AB60 and Commit sub_8245B638, StageOf "
+              "sub_8245FBF0 and sub_82460000) natively instead of through the "
               "translated code (the same reads and writes; checked by "
               "--run_harnesses=xaudio_engine)");
 
@@ -226,6 +230,77 @@ void XAudioMasteringProcess(PPCContext& ctx, uint8_t* base) {
   });
 }
 
+// The functions under the spin lock whose r3 is what their last kernel call
+// left (none sets it): the body's result is the context's r3 after it.
+void XAudioStageSwap(PPCContext& ctx, uint8_t* base) {
+  const uint32_t stage = ctx.r3.u32;
+  const xa::Thread thread = XAudioThreadOf(ctx, base);
+  XAudioFramed(ctx, base, 128, [&](const xa::GuestCall& call, uint32_t) {
+    xa::StageSwap(base, stage, thread.r13, call);
+    return ctx.r3.u32;
+  });
+}
+
+void XAudioSwapStageLists(PPCContext& ctx, uint8_t* base) {
+  const uint32_t engine = ctx.r3.u32;
+  const xa::Thread thread = XAudioThreadOf(ctx, base);
+  XAudioFramed(ctx, base, 128, [&](const xa::GuestCall& call, uint32_t) {
+    xa::SwapStageLists(base, engine, thread.r13, call);
+    return ctx.r3.u32;
+  });
+}
+
+void XAudioRunStage(PPCContext& ctx, uint8_t* base) {
+  const uint32_t engine = ctx.r3.u32, stage = ctx.r4.u32;
+  const xa::Thread thread = XAudioThreadOf(ctx, base);
+  XAudioFramed(ctx, base, 144, [&](const xa::GuestCall& call, uint32_t) {
+    xa::RunStage(base, engine, stage, thread.processor, thread.r13, call);
+    return ctx.r3.u32;
+  });
+}
+
+void XAudioRunCallbacks(PPCContext& ctx, uint8_t* base) {
+  const uint32_t engine = ctx.r3.u32, stage = ctx.r4.u32;
+  const xa::Thread thread = XAudioThreadOf(ctx, base);
+  XAudioFramed(ctx, base, 144, [&](const xa::GuestCall& call, uint32_t) {
+    xa::RunCallbacks(base, engine, stage, thread.r13, call);
+    return ctx.r3.u32;
+  });
+}
+
+void XAudioRegisterCallback(PPCContext& ctx, uint8_t* base) {
+  const uint32_t engine = ctx.r3.u32, stage = ctx.r4.u32, function = ctx.r5.u32,
+                 context = ctx.r6.u32, out = ctx.r7.u32;
+  const xa::Thread thread = XAudioThreadOf(ctx, base);
+  XAudioFramed(ctx, base, 160, [&](const xa::GuestCall& call, uint32_t) {
+    return xa::RegisterCallback(base, engine, stage, function, context, out, thread.r13, call);
+  });
+  ctx.r3.s64 = int32_t(ctx.r3.u32);  // E_OUTOFMEMORY as the original's lis/ori leave it
+}
+
+void XAudioEngineCommit(PPCContext& ctx, uint8_t* base) {
+  const uint32_t engine = ctx.r3.u32;
+  const xa::Thread thread = XAudioThreadOf(ctx, base);
+  XAudioFramed(ctx, base, 128, [&](const xa::GuestCall& call, uint32_t) {
+    return xa::Commit(base, engine, thread, call);
+  });
+}
+
+void XAudioStageOf(PPCContext& ctx, uint8_t* base) {
+  const uint32_t engine = ctx.r3.u32, voice = ctx.r4.u32;
+  XAudioFramed(ctx, base, 112, [&](const xa::GuestCall& call, uint32_t frame) {
+    return xa::StageOf(base, engine, voice, frame, call);
+  });
+}
+
+void XAudioJoinMix(PPCContext& ctx, uint8_t* base) {
+  const uint32_t voice = ctx.r3.u32;
+  const xa::Thread thread = XAudioThreadOf(ctx, base);
+  XAudioFramed(ctx, base, 128, [&](const xa::GuestCall& call, uint32_t frame) {
+    return xa::JoinMix(base, voice, thread.r13, frame, call);
+  });
+}
+
 }  // namespace hooks
 
 #define ITC_XAUDIO_ENGINE_ADAPTER(address, step) \
@@ -265,3 +340,11 @@ ITC_XAUDIO_ENGINE_ADAPTER(824600F0, XAudioMasteringCreate)
 ITC_XAUDIO_ENGINE_ADAPTER(8245FE20, XAudioMasteringStart)
 ITC_XAUDIO_ENGINE_ADAPTER(8245FDC8, XAudioMasteringPass)
 ITC_XAUDIO_ENGINE_ADAPTER(8245FB80, XAudioMasteringProcess)
+ITC_XAUDIO_ENGINE_ADAPTER(8245B208, XAudioStageSwap)
+ITC_XAUDIO_ENGINE_ADAPTER(8245B720, XAudioSwapStageLists)
+ITC_XAUDIO_ENGINE_ADAPTER(8245B480, XAudioRunStage)
+ITC_XAUDIO_ENGINE_ADAPTER(8245ACE0, XAudioRunCallbacks)
+ITC_XAUDIO_ENGINE_ADAPTER(8245AB60, XAudioRegisterCallback)
+ITC_XAUDIO_ENGINE_ADAPTER(8245B638, XAudioEngineCommit)
+ITC_XAUDIO_ENGINE_ADAPTER(8245FBF0, XAudioStageOf)
+ITC_XAUDIO_ENGINE_ADAPTER(82460000, XAudioJoinMix)

@@ -11,6 +11,7 @@
 
 #include "base/log.h"
 #include "hooks/heap.h"
+#include "hooks/xaudio.h"
 #include "hooks/xaudio_engine.h"
 #include "memory/c_runtime_heap.h"
 #include "memory/heap.h"
@@ -762,6 +763,275 @@ void MasteringVoice(Context& h, uint32_t block) {
   }
 }
 
+// --- Under the voice lists' spin lock ---
+//
+// The live spin lock (0x82954F10) is taken as the game takes it, by this
+// thread. With `hold`, the case holds it around the call (so the function
+// takes it again, and the mixer can't see a voice put in a live list until
+// `after` takes it out), and its depth and owner after the call are
+// compared; without, the function takes it from free (or waits for the
+// mixer). The stack below r1 is filled as StackCase's; r3's low word is
+// compared (these leave what their last kernel call did).
+template <typename Setup, typename After>
+void LockedCase(Context& h, Results& results, uint32_t block, GuestFunction recompiled,
+                GuestFunction native, bool hold, Setup setup, After after,
+                const std::string& what) {
+  const Random start = h.random;
+  Random random = start;
+  Outputs out[2];
+  for (int v = 0; v < 2; v++) {
+    random = start;
+    for (uint32_t i = 0; i < kBlockBytes; i += 4) {
+      Store(h.base, block + i, uint32_t(random.Next()));
+    }
+    PPCContext t = CallContext(h);
+    for (uint32_t i = 4; i <= 0x400; i += 4) {
+      Store(h.base, t.r1.u32 - i, uint32_t(random.Next()));
+    }
+    setup(random, t);
+    PPCContext lock = t;
+    if (hold) {
+      hooks::XAudioSpinTake(lock, h.base);
+    }
+    (v == 0 ? recompiled : native)(t, h.base);
+    after(out[v]);
+    if (hold) {
+      out[v].Word(guest::LoadU32(h.base, xa::kSpinLock + 4));
+      out[v].Word(guest::LoadU32(h.base, xa::kSpinLock + 8) == t.r13.u32);
+      hooks::XAudioSpinRelease(lock, h.base);
+    }
+    out[v].Bytes(Read(h.base, block, kBlockBytes));
+    out[v].Word(t.r3.u32);
+  }
+  h.random = random;
+  results.Check(out[0], out[1], what);
+}
+
+// A list head at `head` (+8 its node offset) with the nodes at `nodes`
+// linked in order (each +0 next, +4 prev).
+void List(uint8_t* base, uint32_t head, uint32_t offset, const std::vector<uint32_t>& nodes) {
+  Store(base, head + 8, offset);
+  uint32_t prev = head;
+  for (const uint32_t node : nodes) {
+    Store(base, prev, node);
+    Store(base, node + 4, prev);
+    prev = node;
+  }
+  Store(base, prev, head);
+  Store(base, head + 4, prev);
+}
+
+// A node at `node` taken out of a live list where `list` says it was added
+// at its end (both checked), its words cleared so the versions compare.
+// Under the spin lock (the case holds it).
+void TakeBack(Outputs& out, uint8_t* base, uint32_t list, uint32_t node) {
+  const bool linked = guest::LoadU32(base, node) == list && guest::LoadU32(base, list + 4) == node;
+  out.Word(linked);
+  if (linked) {
+    const uint32_t prev = guest::LoadU32(base, node + 4);
+    guest::StoreU32(base, prev, list);
+    guest::StoreU32(base, list + 4, prev);
+    Store(base, node, 0);
+    Store(base, node + 4, 0);
+  }
+}
+
+// Voices at +0x400 + 0x200k (k below 4), their vtable the block's.
+uint32_t Voice(uint32_t block, uint32_t k) { return block + 0x400 + 0x200 * k; }
+
+void Locked(Context& h, uint32_t block) {
+  const uint32_t engine = guest::LoadU32(h.base, xa::kEngine);
+  if (engine == 0) {
+    return;
+  }
+  const auto none = [](Outputs&) {};
+  {
+    Results results("XAudioStage::Swap (sub_8245B208)");
+    for (int i = 0; i < 16; i++) {
+      LockedCase(h, results, block, __imp__sub_8245B208, hooks::XAudioStageSwap, i % 2 == 0,
+                 [&](Random&, PPCContext& t) { t.r3.u64 = block + 0x100; }, none,
+                 fmt::format("case {}", i));
+    }
+    results.Report();
+  }
+  {
+    Results results("XAudioEngine::SwapStageLists (sub_8245B720)");
+    for (int i = 0; i < 24; i++) {
+      LockedCase(h, results, block, __imp__sub_8245B720, hooks::XAudioSwapStageLists, i % 2 == 0,
+                 [&](Random& random, PPCContext& t) {
+                   Store(h.base, block + 124, block + 0x300);
+                   guest::StoreU8(h.base, block + 128, uint8_t(random.Below(5)));
+                   t.r3.u64 = block;
+                 },
+                 none, fmt::format("case {}", i));
+    }
+    results.Report();
+  }
+  {
+    // The stage at +0x100: its +36 list (head +0x140, node offset 24) with
+    // 0 to 4 voices, its +40 list (head +0x160, node offset 16) with 0 or
+    // 1; each voice's pass (slot +68) a recorded leaf. Its AddStat adds to
+    // the live counters (debugger statistics), alike for both.
+    Results results("XAudioEngine::RunStage (sub_8245B480)");
+    for (int i = 0; i < 32; i++) {
+      LockedCase(h, results, block, __imp__sub_8245B480, hooks::XAudioRunStage, i % 2 == 0,
+                 [&](Random& random, PPCContext& t) {
+                   MasteringVtable(h.base, block);
+                   Store(h.base, block + kVtable + 68,
+                         random.Below(2) == 0 ? 0x820CE9F8 : 0x8245F860);
+                   const uint32_t stage = block + 0x100;
+                   Store(h.base, stage + 36, block + 0x140);
+                   Store(h.base, stage + 40, block + 0x160);
+                   std::vector<uint32_t> mix, mixed;
+                   const uint32_t count = random.Below(5);
+                   for (uint32_t k = 0; k < 4; k++) {
+                     Store(h.base, Voice(block, k), block + kVtable);
+                     if (k < count) {
+                       mix.push_back(Voice(block, k) + 24);
+                     }
+                   }
+                   if (random.Below(2) == 0) {
+                     mixed.push_back(block + 0x1E00);
+                   }
+                   List(h.base, block + 0x140, 24, mix);
+                   List(h.base, block + 0x160, 16, mixed);
+                   t.r3.u64 = block;
+                   t.r4.u64 = stage;
+                 },
+                 none, fmt::format("case {}", i));
+    }
+    results.Report();
+  }
+  {
+    // The stage's 8 slots each a recorded leaf (r4 and r5 to the context's
+    // +444 and +448; the contexts the voices) or none.
+    Results results("XAudioEngine::RunCallbacks (sub_8245ACE0)");
+    for (int i = 0; i < 32; i++) {
+      LockedCase(h, results, block, __imp__sub_8245ACE0, hooks::XAudioRunCallbacks, i % 2 == 0,
+                 [&](Random& random, PPCContext& t) {
+                   const uint32_t stage = random.Below(2);
+                   for (uint32_t k = 0; k < 8; k++) {
+                     const uint32_t slot = block + 168 + 64 * stage + 8 * k;
+                     Store(h.base, slot, random.Below(3) == 0 ? 0 : 0x820CE9F8);
+                     Store(h.base, slot + 4, Voice(block, random.Below(4)));
+                   }
+                   t.r3.u64 = block;
+                   t.r4.u64 = (random.Next() & ~0xFFull) | stage;
+                   t.r5.u64 = random.Next();
+                 },
+                 none, fmt::format("case {}", i));
+    }
+    results.Report();
+  }
+  {
+    Results results("XAudioEngine::RegisterCallback (sub_8245AB60)");
+    for (int i = 0; i < 32; i++) {
+      LockedCase(h, results, block, __imp__sub_8245AB60, hooks::XAudioRegisterCallback,
+                 i % 2 == 0,
+                 [&](Random& random, PPCContext& t) {
+                   const uint32_t stage = random.Below(2);
+                   const uint32_t full = i % 5 == 4 ? 8 : random.Below(9);
+                   for (uint32_t k = 0; k < 8; k++) {
+                     Store(h.base, block + 168 + 64 * stage + 8 * k,
+                           k < full ? uint32_t(random.Next()) | 1 : 0);
+                   }
+                   t.r3.u64 = block;
+                   t.r4.u64 = (random.Next() & ~0xFFull) | stage;
+                   t.r5.u64 = random.Next();
+                   t.r6.u64 = random.Next();
+                   t.r7.u64 = random.Below(3) == 0 ? 0 : block + 0x1F00;
+                 },
+                 none, fmt::format("case {}", i));
+    }
+    results.Report();
+  }
+  {
+    // The block's engine: its start-pending list (+68, its node offset the
+    // live engine's +76, as XAudioSourceVoice::CancelPendingStart unlinks
+    // by the live one's) with 0 to 3 voices, each pending (+61 bit 6) and
+    // with a codec (+76, an object at +0x1200 + 0x80k... the voices' own
+    // vtable), whose start (slot +48) a recorded leaf.
+    const uint32_t offset = guest::LoadU32(h.base, engine + 76);
+    const bool usable = offset < 0x100 && (offset + 8 <= 60 || offset >= 80);
+    Results results("XAudioEngine::Commit (sub_8245B638)");
+    for (int i = 0; usable && i < 24; i++) {
+      LockedCase(h, results, block, __imp__sub_8245B638, hooks::XAudioEngineCommit, i % 2 == 0,
+                 [&](Random& random, PPCContext& t) {
+                   MasteringVtable(h.base, block);
+                   Store(h.base, block + kVtable + 48,
+                         random.Below(3) == 0 ? 0x820CE9F8 : 0x8245F860);
+                   std::vector<uint32_t> pending;
+                   const uint32_t count = random.Below(4);
+                   for (uint32_t k = 0; k < 4; k++) {
+                     const uint32_t voice = Voice(block, k);
+                     Store(h.base, voice, block + kVtable);
+                     Store(h.base, voice + 76, Voice(block, random.Below(4)));
+                     guest::StoreU8(h.base, voice + 61,
+                                    uint8_t((random.Next() & 0x3F) | (k < count ? 0x40 : 0)));
+                     if (k < count) {
+                       pending.push_back(voice + offset);
+                     }
+                   }
+                   List(h.base, block + 68, offset, pending);
+                   Store(h.base, block + 76, offset);
+                   t.r3.u64 = block;
+                 },
+                 none, fmt::format("case {}", i));
+    }
+    results.Report();
+  }
+  {
+    // Slot +52 the real GetType (the type byte +12, 0 to 3).
+    Results results("XAudioEngine::StageOf (sub_8245FBF0)");
+    for (int i = 0; i < 24; i++) {
+      LockedCase(h, results, block, __imp__sub_8245FBF0, hooks::XAudioStageOf, false,
+                 [&](Random& random, PPCContext& t) {
+                   MasteringVtable(h.base, block);
+                   Store(h.base, block + kVtable + 52, 0x8245E318);
+                   const uint32_t voice = Voice(block, 0);
+                   Store(h.base, voice, block + kVtable);
+                   guest::StoreU8(h.base, voice + 12, uint8_t(random.Below(4)));
+                   t.r3.u64 = block;
+                   t.r4.u64 = voice;
+                 },
+                 none, fmt::format("case {}", i));
+    }
+    results.Report();
+  }
+  {
+    // The live engine's stages: a type 0 voice joins its source voices'
+    // +40 list, a type 1 its first submix stage's (+76 0), the others none;
+    // taken back out under the spin lock the case holds.
+    const uint32_t stages = guest::LoadU8(h.base, engine + 128);
+    Results results("sub_82460000 (a voice joining the mix)");
+    for (int i = 0; i < 24; i++) {
+      const uint32_t type = stages != 0 ? i % 4 : (i % 4 == 1 ? 0 : i % 4);
+      uint32_t list = 0;
+      LockedCase(h, results, block, __imp__sub_82460000, hooks::XAudioJoinMix, true,
+                 [&](Random&, PPCContext& t) {
+                   MasteringVtable(h.base, block);
+                   Store(h.base, block + kVtable + 52, 0x8245E318);
+                   const uint32_t voice = Voice(block, 0);
+                   Store(h.base, voice, block + kVtable);
+                   guest::StoreU8(h.base, voice + 12, uint8_t(type));
+                   guest::StoreU8(h.base, voice + 76, 0);
+                   const uint32_t stage = type == 0   ? engine + 80
+                                          : type == 1 ? guest::LoadU32(h.base, engine + 124)
+                                                      : 0;
+                   list = stage != 0 ? guest::LoadU32(h.base, stage + 40) : 0;
+                   t.r3.u64 = voice;
+                 },
+                 [&](Outputs& out) {
+                   if (list != 0) {
+                     TakeBack(out, h.base, list, Voice(block, 0) + guest::LoadU32(h.base, list + 8));
+                   }
+                 },
+                 fmt::format("type {}", type));
+    }
+    results.Report();
+  }
+}
+
 }  // namespace
 
 void XAudioEngine(Context& h) {
@@ -773,6 +1043,7 @@ void XAudioEngine(Context& h) {
   Barriers(h, block.address);
   Making(h, block.address);
   MasteringVoice(h, block.address);
+  Locked(h, block.address);
 }
 
 }  // namespace harness

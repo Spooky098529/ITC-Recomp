@@ -213,4 +213,63 @@ uint32_t MasteringPass(uint8_t* base, uint32_t voice, uint32_t frame, const Gues
 uint32_t MasteringProcess(uint8_t* base, uint32_t voice, uint32_t inout, uint32_t processor,
                           uint32_t frame, const GuestCall& call);
 
+// --- Under the voice lists' spin lock (taken as the original does) ---
+//
+// Each takes the game's spin lock (voices.h's SpinTake and SpinRelease, the
+// kernel's calls through `call`) as its inline code does; where the
+// original releases with the depth, owner and IRQL it kept in registers
+// from its take, those are the lock's words while it's held, so the release
+// reads them.
+
+// XAudioStage::Swap (sub_8245B208): under the spin lock, the stage's +36
+// (the list to mix) and +40 (the list mixed) swapped.
+void StageSwap(uint8_t* base, uint32_t stage, uint32_t thread, const GuestCall& call);
+
+// XAudioEngine::SwapStageLists (sub_8245B720): under the spin lock,
+// StageSwap on the source voices' stage (+80) and each of the +128 submix
+// stages (+124, 44 bytes each; the count read again each time).
+void SwapStageLists(uint8_t* base, uint32_t engine, uint32_t thread, const GuestCall& call);
+
+// XAudioEngine::RunStage (sub_8245B480): until the stage's +36 list is
+// empty, under the spin lock its first voice (by the list's node offset,
+// +8) moved to the end of +40 and recorded at the engine's +144 + 4 x
+// `processor`; out of it, the voice's slot +68 (its pass) and AddStat(0, 1)
+// on success. Then the processor's entry cleared.
+void RunStage(uint8_t* base, uint32_t engine, uint32_t stage, uint32_t processor,
+              uint32_t thread, const GuestCall& call);
+
+// XAudioEngine::RunCallbacks (sub_8245ACE0): under the spin lock, for each
+// of the stage's (`stage`'s low byte) 8 callback slots (+168 + 64 x the
+// stage + 8i: the function, its context), +296 = the slot; when set, the
+// lock left, the function called with its context, the lock taken again.
+// +296 = 0 at the end.
+void RunCallbacks(uint8_t* base, uint32_t engine, uint32_t stage, uint32_t thread,
+                  const GuestCall& call);
+
+// XAudioEngine::RegisterCallback (sub_8245AB60): under the spin lock, the
+// stage's first free slot of 8 set to `function` and `context`, the slot to
+// [out] (unless 0). Returns 0, or E_OUTOFMEMORY when full.
+uint32_t RegisterCallback(uint8_t* base, uint32_t engine, uint32_t stage, uint32_t function,
+                          uint32_t context, uint32_t out, uint32_t thread, const GuestCall& call);
+
+// XAudioEngine::Commit (sub_8245B638): under the spin lock, while the
+// start-pending list (+68, its node offset at +76) isn't empty,
+// XAudioSourceVoice::Start's plain C++ (flags 0) on its first voice, until
+// one fails. Returns the last result (0 with none).
+uint32_t Commit(uint8_t* base, uint32_t engine, const Thread& thread, const GuestCall& call);
+
+// XAudioEngine::StageOf (sub_8245FBF0): the voice's type (its slot +52, at
+// the frame's +80): 0 the source voices' stage (+80), 1 its submix stage
+// ([+124] + 44 x the voice's +76), else 0. `frame` is this function's (112
+// bytes).
+uint32_t StageOf(uint8_t* base, uint32_t engine, uint32_t voice, uint32_t frame,
+                 const GuestCall& call);
+
+// sub_82460000: the voice's stage in the live engine ([kEngine], StageOf in
+// a frame below); with one, under the spin lock, the voice appended to its
+// +40 list (by the list's node offset). `frame` is this function's (128
+// bytes). Returns 0.
+uint32_t JoinMix(uint8_t* base, uint32_t voice, uint32_t thread, uint32_t frame,
+                 const GuestCall& call);
+
 }  // namespace xaudio
