@@ -27,6 +27,23 @@ When the user has reviewed a run's section, its heading gets
   user's call, 2026-10-29). `known-data.md`: the track, track instance,
   events, event record and two tables. Two leads added (the parameter
   events, none in play; a static matrix set-up `sub_825D8F88`).
+- XACT's tracks' migration 1 (c8ad278..6fc2206, `--native_xact_tracks`):
+  44 of 55 in play ours (13 adapters removed). Corrections to the map:
+  `sub_825D0AA0` was called twice in an attract race, from
+  `XACTComplexSound::Prepare`, so not every sound is simple (the intro
+  says so now); `XACTEvent::Create` and the play-wave constructor pass
+  the word at record + 12 for types 2 and 5, not its address. Harness
+  coverage to look at: both `PrepareSimple`s are tested only on their
+  failure paths (a successful Prepare needs a real wave) and weren't
+  called in the attract races; the helper list is kept empty in the
+  cancel and destructor cases, as in play. Paths never seen in play go
+  through the guest call or decline to the original (the RPC entries,
+  the transition event `sub_825D0B08`, `SetVariation` `sub_825D1478`,
+  `sub_825CA6F0`, `sub_825C1548`, `Create`'s other event types), said in
+  the rows. `tracks.cpp` is built with strict floating point, as
+  `waves.cpp`. Left: `XACTTrackInstance::Prepare` `sub_825D5A48` (ready)
+  and its callers; the rest waits on `XACTGetTimeMs` over
+  QueryPerformanceCounter.
 
 ## Run 2026-10-28 22:22 (`b7-loop-28-10-26-3`)
 
