@@ -405,7 +405,9 @@ ITC_XACT_TRACKS_ADAPTER(825D0590, XactTrackIsBusy)
 // No adapter (removed 2026-10-29: only XACTPlayWaveEvent's deleting destructor's plain C++ calls it in
 // play) for XACTEvent::~XACTEvent sub_825D0EF0.
 ITC_XACT_TRACKS_ADAPTER(825D1358, XactEventFire)
-ITC_XACT_TRACKS_ADAPTER(825D82E8, XactPlayWaveConstruct)
+// No adapter (removed 2026-10-29: only XACTEvent::Create's and
+// XACTTrackInstance::PrepareSimple's plain C++ calls it in play) for
+// XACTPlayWaveEvent::XACTPlayWaveEvent sub_825D82E8.
 ITC_XACT_TRACKS_ADAPTER(825D8530, XactPlayWaveSetQueued)
 ITC_XACT_TRACKS_ADAPTER(825D8358, XactPlayWaveGetLoopCount)
 ITC_XACT_TRACKS_ADAPTER(82483208, XactPlayWaveSetWave)
