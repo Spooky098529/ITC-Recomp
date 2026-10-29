@@ -1,8 +1,8 @@
 // XAudio's engine and mixer natively: adapters in front of
 // src/xaudio/engine.h (docs/functions/xaudio-engine.md), with the register
-// steps the harness shares (hooks/xaudio_engine.h). The engine's set-up, the
-// mixer's callback and XAudio's processor threads stay recompiled (their
-// kernel objects wait on the user's call), and many of these are reached
+// steps the harness shares (hooks/xaudio_engine.h). The engine's set-up
+// (XAudio::CreateEngine, XAudioEngine::Create and Init) stays recompiled, and
+// many of these are reached
 // through vtables, so the adapters stay until their callers are native.
 
 #include "hooks/xaudio_engine.h"
@@ -24,15 +24,19 @@ ITC_FLAG_BOOL(native_xaudio_engine, true, "ITC",
               "sub_8245C098 and Size sub_8245B2C0, XAudio::SetUpProcessors sub_8245A828 (the "
               "kernel's KeGetCurrentProcessType through the translated code) and RegisterStats "
               "sub_8245F588, the factory's constructor sub_8245DA48, Create sub_8245DC10 and its "
-              "slots sub_8245D650 and sub_8245D6D8; the engine's set-up, the mixer's callback and "
-              "XAudio's processor threads stay recompiled; the mastering voice's Size sub_8245FF68, "
+              "slots sub_8245D650 and sub_8245D6D8; the engine's set-up (XAudioEngine::Init and "
+              "its callers) stays recompiled; the mastering voice's Size sub_8245FF68, "
               "Init sub_8245FCA0, Create sub_824600F0, Start sub_8245FE20, Pass sub_8245FDC8 and "
               "Process sub_8245FB80, the render driver's constructor sub_82465938; under the voice "
               "lists' spin lock (taken as the original does) XAudioStage::Swap sub_8245B208, "
               "XAudioEngine::SwapStageLists sub_8245B720, RunStage sub_8245B480, RunCallbacks "
               "sub_8245ACE0, RegisterCallback sub_8245AB60 and Commit sub_8245B638, StageOf "
               "sub_8245FBF0 and sub_82460000; the allocators' destructors sub_824602F8, sub_824604E8 "
-              "and its thunk sub_824603A0, and the interface's free sub_824603A8) natively instead of through the "
+              "and its thunk sub_824603A0, and the interface's free sub_824603A8; XAudioEngine::Mix "
+              "sub_8245BF80 with XAudio::MixerCallback sub_8245FBE0 (the mixer's lock entered as "
+              "the original does), XAudio::MasterThread sub_8245BE08 and WorkerThread "
+              "sub_8245BED0 (their events and semaphore through the kernel's imports, as the "
+              "original)) natively instead of through the "
               "translated code (the same reads and writes; checked by "
               "--run_harnesses=xaudio_engine)");
 
@@ -330,6 +334,36 @@ void XAudioInterfaceFree(PPCContext& ctx, uint8_t* base) {
   });
 }
 
+void XAudioMix(PPCContext& ctx, uint8_t* base) {
+  const uint32_t engine = ctx.r3.u32;
+  const xa::Thread thread = XAudioThreadOf(ctx, base);
+  XAudioFramed(ctx, base, 192, [&](const xa::GuestCall& call, uint32_t frame) {
+    return xa::Mix(base, engine, frame, thread, call);
+  });
+}
+
+void XAudioMixerCallback(PPCContext& ctx, uint8_t* base) {
+  // Mix's frame, made where the callback's caller called it (a tail call).
+  const xa::Thread thread = XAudioThreadOf(ctx, base);
+  XAudioFramed(ctx, base, 192, [&](const xa::GuestCall& call, uint32_t frame) {
+    return xa::MixerCallback(base, frame, thread, call);
+  });
+}
+
+void XAudioMasterThread(PPCContext& ctx, uint8_t* base) {
+  const xa::Thread thread = XAudioThreadOf(ctx, base);
+  XAudioFramed(ctx, base, 128, [&](const xa::GuestCall& call, uint32_t frame) {
+    return xa::MasterThread(base, frame, thread, call);
+  });
+}
+
+void XAudioWorkerThread(PPCContext& ctx, uint8_t* base) {
+  const xa::Thread thread = XAudioThreadOf(ctx, base);
+  XAudioFramed(ctx, base, 112, [&](const xa::GuestCall& call, uint32_t) {
+    return xa::WorkerThread(base, thread, call);
+  });
+}
+
 }  // namespace hooks
 
 #define ITC_XAUDIO_ENGINE_ADAPTER(address, step) \
@@ -381,3 +415,9 @@ ITC_XAUDIO_ENGINE_ADAPTER(82460000, XAudioJoinMix)
 // No adapter (removed 2026-10-29: only sub_824603A0's adapter (its register step) calls it in play) for the default allocator's destructor sub_824604E8.
 ITC_XAUDIO_ENGINE_ADAPTER(824603A0, XAudioDefaultAllocatorThunk)
 ITC_XAUDIO_ENGINE_ADAPTER(824603A8, XAudioInterfaceFree)
+// The mix and XAudio's threads (their kernel objects through the imports, as
+// the original; the threads' entry points stay these addresses).
+ITC_XAUDIO_ENGINE_ADAPTER(8245BF80, XAudioMix)
+ITC_XAUDIO_ENGINE_ADAPTER(8245FBE0, XAudioMixerCallback)
+ITC_XAUDIO_ENGINE_ADAPTER(8245BE08, XAudioMasterThread)
+ITC_XAUDIO_ENGINE_ADAPTER(8245BED0, XAudioWorkerThread)

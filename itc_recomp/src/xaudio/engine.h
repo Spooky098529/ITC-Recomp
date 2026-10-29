@@ -4,9 +4,7 @@
 // (voices.h), translated as the game's code (the user's call for XACT,
 // 2026-10-23, followed for XAudio). The engine, its factory, allocators and
 // mastering voice are guest objects shared with the recompiled code (the
-// engine's set-up, the mixer's callback and XAudio's processor threads,
-// which stay recompiled: they make, set and wait on kernel objects with no
-// precedent of their own), so these work on guest memory. Calls into the
+// engine's set-up, which stays recompiled), so these work on guest memory. Calls into the
 // recompiled objects go through `call` (voices.h's GuestCall). Adapters:
 // src/hooks/xaudio_engine.cpp.
 
@@ -299,5 +297,60 @@ uint32_t DefaultAllocatorDestroy(uint8_t* base, uint32_t allocator, bool native_
 // bytes). Returns the last r3.
 uint32_t InterfaceFree(uint8_t* base, uint32_t iface, bool native_heap, uint32_t frame,
                        const GuestCall& call);
+
+// --- The mix and XAudio's threads ---
+//
+// Their kernel objects (the events and semaphore XAudioEngine::Init makes at
+// fixed addresses) are used through the kernel's imports exactly as the
+// original does, through `call` at the imports' thunks (the user's call,
+// 2026-10-29: host objects later, once every user is native). The mixer's
+// lock, a kernel critical section taken only here and by the engine's
+// teardown (recompiled, never run), is entered through its import as the
+// original does.
+
+constexpr uint32_t kMixerLock = 0x8264D4F8;       // the mixer's critical section
+constexpr uint32_t kMixNow = 0x82954EF8;          // a synchronization event
+constexpr uint32_t kMixDone = 0x82954EE8;         // a synchronization event
+constexpr uint32_t kTerminating = 0x82954EC4;     // a notification event
+constexpr uint32_t kWorkerSemaphore = 0x82954ED4; // the workers' wake-up
+constexpr uint32_t kKeWaitForSingleObject = 0x825DBBB4;
+constexpr uint32_t kKeSetEvent = 0x825DBBD4;
+constexpr uint32_t kKeReleaseSemaphore = 0x825DBE64;
+constexpr uint32_t kKeWaitForMultipleObjects = 0x825DBE94;
+constexpr uint32_t kMixPasses = 0x8245B808;  // audio.md's (an override of its own)
+
+// XAudioEngine::Mix (sub_8245BF80): DebugSwitchOff's plain C++ (sub_825C8388),
+// the mixer's lock entered, +300 = the thread (`thread.mixer`). With
+// processor threads (+304): KeSetEvent(kMixNow, 1, 0), then
+// KeWaitForMultipleObjects on kMixDone and kTerminating (wait any, reason 3,
+// user mode, no timeout; the objects at the frame's +80, the wait block at
+// +96, cleared as memset's 48 bytes); index 1 skips the mastering voice.
+// Without: SwapStageLists' plain C++ (a frame below) and kMixPasses with 1.
+// Then the mastering voice's (+64) slot +68 and AddStat(0, 1) on success; +300
+// = 0; TakeStats; the lock left. `frame` is this function's (192 bytes).
+// Returns 0.
+uint32_t Mix(uint8_t* base, uint32_t engine, uint32_t frame, const Thread& thread,
+             const GuestCall& call);
+
+// XAudio::MixerCallback (sub_8245FBE0): Mix on [kEngine], tail-called (its
+// frame `frame`, at the callback's caller's). Returns 0.
+uint32_t MixerCallback(uint8_t* base, uint32_t frame, const Thread& thread,
+                       const GuestCall& call);
+
+// XAudio::MasterThread (sub_8245BE08): the thread (`thread.mixer`) at
+// [kEngine] + 332 + 4 x its processor; then until the engine's +300 is 0
+// when woken: KeWaitForSingleObject(kMixNow) (reason 3, user mode, no
+// timeout); +300 set: SwapStageLists' plain C++ (a frame below) and
+// kMixPasses with 1 on [kEngine]; else KeReleaseSemaphore(kWorkerSemaphore,
+// 1, +304 - 1) unless that's 0; KeSetEvent(kMixDone, 1, 0) each time. `frame`
+// is this function's (128 bytes). Returns 0 (in play, never).
+uint32_t MasterThread(uint8_t* base, uint32_t frame, const Thread& thread,
+                      const GuestCall& call);
+
+// XAudio::WorkerThread (sub_8245BED0): the thread at [kEngine] + 332 + 4 x
+// its processor; KeWaitForSingleObject(kWorkerSemaphore); while [kEngine]'s
+// +300 is set, kMixPasses with 0 and the wait again. Returns 0 (in play,
+// never).
+uint32_t WorkerThread(uint8_t* base, const Thread& thread, const GuestCall& call);
 
 }  // namespace xaudio

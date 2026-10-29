@@ -55,4 +55,9 @@ void XAudioDefaultAllocatorDestroy(PPCContext& ctx, uint8_t* base);  // sub_8246
 void XAudioDefaultAllocatorThunk(PPCContext& ctx, uint8_t* base);    // sub_824603A0 (a tail call)
 void XAudioInterfaceFree(PPCContext& ctx, uint8_t* base);            // sub_824603A8
 
+void XAudioMix(PPCContext& ctx, uint8_t* base);            // sub_8245BF80 (r13 the thread)
+void XAudioMixerCallback(PPCContext& ctx, uint8_t* base);  // sub_8245FBE0 (a tail call)
+void XAudioMasterThread(PPCContext& ctx, uint8_t* base);   // sub_8245BE08
+void XAudioWorkerThread(PPCContext& ctx, uint8_t* base);   // sub_8245BED0
+
 }  // namespace hooks

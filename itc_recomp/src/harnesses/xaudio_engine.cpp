@@ -17,6 +17,8 @@
 #include "memory/heap.h"
 #include "xaudio/engine.h"
 
+#include <rex/system/xobject.h>
+
 #include <fmt/format.h>
 
 #include <chrono>
@@ -1123,6 +1125,311 @@ void Allocators(Context& h, uint32_t block) {
   }
 }
 
+// --- The mix and XAudio's threads ---
+//
+// Their kernel objects are at fixed addresses (xaudio::kTerminating to
+// kEngine: the terminating event, the workers' semaphore, "mix done" and "mix
+// now"), and the live master and workers wait on them. While the mixer's
+// lock is held with our output thread waiting on it (MixerHeld: the live
+// master then waits on "mix now" and the workers on the semaphore, and
+// nothing else sets them), each version runs over objects of the harness's
+// own there: the live bytes saved, fresh headers written as Init writes them
+// (the SDK makes its objects for them on first use and stashes their handles
+// in them), and after the run their states read (waits with a timeout of 0),
+// their handles closed and the live bytes put back. [kEngine] is the case's
+// engine while it runs (the threads and the passes read it); the statistics
+// counters and their copies are saved and put back around each version. The
+// threads' loops end when woken with the engine's +300 clear: a case clears
+// it from inside the mix (a callback, or a voice's pass, of ViewDesc::Clear
+// sub_82126860, which zeroes the two words at r3) so one mix runs first.
+
+constexpr uint32_t kObjects = xa::kTerminating;
+constexpr uint32_t kObjectsBytes = xa::kEngine - xa::kTerminating;
+constexpr uint32_t kClearTwoWords = 0x82126860;  // ViewDesc::Clear
+constexpr uint32_t kMixEngine = 0x200;           // 372 bytes
+constexpr uint32_t kMaster = 0x600;              // the mastering voice
+
+// A dispatcher header as XAudioEngine::Init writes it inline (`type`, the
+// state, its wait list empty); a semaphore's limit 6 after it.
+void Header(uint8_t* base, uint32_t address, uint8_t type, uint32_t state) {
+  guest::StoreU8(base, address, type);
+  guest::StoreU8(base, address + 1, 0);
+  guest::StoreU8(base, address + 2, 0);
+  guest::StoreU8(base, address + 3, 0);
+  Store(base, address + 4, state);
+  Store(base, address + 8, address + 8);
+  Store(base, address + 12, address + 8);
+  if (type == 5) {
+    Store(base, address + 16, 6);
+  }
+}
+
+// The harness's objects in place of the live ones for one version.
+class OwnObjects {
+ public:
+  OwnObjects(Context& h, uint32_t timeout) : h_(h), timeout_(timeout) {
+    live_ = Read(h.base, kObjects, kObjectsBytes);
+    stats_ = Read(h.base, xa::kStats, 2 * xa::kStatCount * 4);
+    engine_ = guest::LoadU32(h.base, xa::kEngine);
+  }
+  ~OwnObjects() {
+    for (const uint32_t object : {xa::kTerminating, xa::kWorkerSemaphore, xa::kMixDone,
+                                  xa::kMixNow}) {
+      if (guest::LoadU32(h_.base, object + 8) == uint32_t(rex::system::kXObjSignature)) {
+        PPCContext c = CallContext(h_);
+        c.r3.u64 = guest::LoadU32(h_.base, object + 12);
+        __imp__NtClose(c, h_.base);
+      }
+    }
+    Write(h_.base, kObjects, live_.data(), kObjectsBytes);
+    Write(h_.base, xa::kStats, stats_.data(), uint32_t(stats_.size()));
+    guest::StoreU32(h_.base, xa::kEngine, engine_);
+  }
+  OwnObjects(const OwnObjects&) = delete;
+  OwnObjects& operator=(const OwnObjects&) = delete;
+
+  // Whether `object` is signaled (a wait with a timeout of 0; it takes a
+  // synchronization event's signal).
+  bool Signaled(uint32_t object) {
+    PPCContext c = CallContext(h_);
+    c.r3.u64 = object;
+    c.r4.u64 = 3;
+    c.r5.u64 = 1;
+    c.r6.u64 = 0;
+    c.r7.u64 = timeout_;
+    __imp__KeWaitForSingleObject(c, h_.base);
+    return c.r3.u32 == 0;
+  }
+  // The objects' states, then the counters (and their copies).
+  void Outputs(harness::Outputs& out) {
+    out.Word(Signaled(xa::kMixNow));
+    out.Word(Signaled(xa::kMixDone));
+    out.Word(Signaled(xa::kTerminating));
+    uint32_t count = 0;
+    while (count < 8 && Signaled(xa::kWorkerSemaphore)) {
+      count++;
+    }
+    out.Word(count);
+    out.Bytes(Read(h_.base, xa::kStats, 2 * xa::kStatCount * 4));
+  }
+
+ private:
+  Context& h_;
+  uint32_t timeout_;
+  std::vector<uint8_t> live_;
+  std::vector<uint8_t> stats_;
+  uint32_t engine_;
+};
+
+// An empty list head at `head` (its node offset `offset`).
+void EmptyList(uint8_t* base, uint32_t head, uint32_t offset) {
+  Store(base, head, head);
+  Store(base, head + 4, head);
+  Store(base, head + 8, offset);
+}
+
+// The case's engine at kMixEngine: `threads` at +304 (the harness thread's
+// processor `processor` the only one with a handle, so the barriers pass),
+// the source stage's lists (+116, +120) and 0 to 2 submix stages (+124,
+// +128) empty, no callbacks, the barriers clear; the mastering voice (+64)
+// with AddRef (sub_8245F860, its count at +4 random) as its pass (slot +68).
+uint32_t MixEngine(uint8_t* base, uint32_t block, Random& random, uint32_t threads,
+                   uint32_t processor) {
+  const uint32_t engine = block + kMixEngine;
+  Store(base, engine + 304, threads);
+  for (uint32_t i = 0; i < 6; i++) {
+    Store(base, engine + 308 + 4 * i, threads != 0 && i == processor ? 0x1234 : 0);
+  }
+  Store(base, engine + 356, 0);
+  Store(base, engine + 360, 0);
+  Store(base, engine + 364, 0);
+  Store(base, engine + 368, 0);
+  for (uint32_t k = 168; k < 296; k += 4) {
+    Store(base, engine + k, 0);
+  }
+  EmptyList(base, block + 0x1000, 0);
+  EmptyList(base, block + 0x1010, 0);
+  Store(base, engine + 80 + 36, block + 0x1000);
+  Store(base, engine + 80 + 40, block + 0x1010);
+  const uint32_t stages = random.Below(3);
+  guest::StoreU8(base, engine + 128, uint8_t(stages));
+  Store(base, engine + 124, block + 0x1100);
+  for (uint32_t i = 0; i < stages; i++) {
+    EmptyList(base, block + 0x1020 + 0x20 * i, 0);
+    EmptyList(base, block + 0x1030 + 0x20 * i, 0);
+    Store(base, block + 0x1100 + 44 * i + 36, block + 0x1020 + 0x20 * i);
+    Store(base, block + 0x1100 + 44 * i + 40, block + 0x1030 + 0x20 * i);
+  }
+  const uint32_t master = block + kMaster;
+  Store(base, engine + 64, master);
+  Store(base, master, block + kVtable);
+  Store(base, block + kVtable + 68, 0x8245F860);
+  Store(base, master + 4, random.Below(2) == 0 ? random.Below(100) : 0x7FFFFFF0 + random.Below(32));
+  return engine;
+}
+
+// One case over the harness's objects: the block and the stack below r1
+// filled with the same random words for both versions, `setup(random, t,
+// processor)` writes the inputs (and the objects' headers); compared: the
+// block, r3 in full, the objects' states and the counters, and what
+// `after(out, t)` adds.
+template <typename Setup, typename After>
+void ObjectCase(Context& h, Results& results, uint32_t block, uint32_t timeout,
+                GuestFunction recompiled, GuestFunction native, Setup setup, After after,
+                const std::string& what) {
+  const Random start = h.random;
+  Random random = start;
+  harness::Outputs out[2];
+  for (int v = 0; v < 2; v++) {
+    random = start;
+    OwnObjects objects(h, timeout);
+    for (uint32_t i = 0; i < kBlockBytes; i += 4) {
+      Store(h.base, block + i, uint32_t(random.Next()));
+    }
+    PPCContext t = CallContext(h);
+    for (uint32_t i = 4; i <= 0x400; i += 4) {
+      Store(h.base, t.r1.u32 - i, uint32_t(random.Next()));
+    }
+    const uint32_t processor = guest::LoadU8(h.base, t.r13.u32 + xa::kPcrProcessor);
+    setup(random, t, processor);
+    (v == 0 ? recompiled : native)(t, h.base);
+    out[v].Bytes(Read(h.base, block, kBlockBytes));
+    out[v].Word(t.r3.u32);
+    out[v].Word(uint32_t(t.r3.u64 >> 32));
+    after(out[v], t);
+    objects.Outputs(out[v]);
+  }
+  h.random = random;
+  results.Check(out[0], out[1], what);
+}
+
+void MixAndThreads(Context& h, uint32_t block) {
+  if (guest::LoadU32(h.base, xa::kEngine) == 0) {
+    return;
+  }
+  const PPCContext lock = CallContext(h);
+  MixerHeld mixer(h.base, lock);
+  if (!mixer.held) {
+    ITC_LOG_ERROR("harness: xaudio_engine: no mix waited on the mixer's lock; the mix skipped");
+    return;
+  }
+  // The live master and workers back at their waits.
+  std::this_thread::sleep_for(std::chrono::milliseconds(20));
+  const uint32_t timeout = memory::Alloc(8, 0);
+  StoreU64(h.base, timeout, 0);
+  // Mix's frame's locals (the objects at +80, the wait block at +96).
+  const auto frame = [&](harness::Outputs& out, PPCContext& t) {
+    out.Bytes(Read(h.base, t.r1.u32 - 192 + 80, 64));
+  };
+  // Mix's inputs: with threads, "mix done" or "terminating" (or both)
+  // signaled (one of them, or the wait would never return); without, the
+  // passes over the engine's empty stages.
+  const auto mix_world = [&](Random& random, uint32_t processor) {
+    const uint32_t threads = random.Below(3);
+    const uint32_t engine = MixEngine(h.base, block, random, threads, processor);
+    Store(h.base, engine + 300, uint32_t(random.Next()));
+    guest::StoreU32(h.base, xa::kEngine, engine);
+    const uint32_t which = random.Below(3);
+    Header(h.base, xa::kMixNow, 1, random.Below(2));
+    Header(h.base, xa::kMixDone, 1, which != 1 ? 1 : 0);
+    Header(h.base, xa::kTerminating, 0, which != 0 ? 1 : 0);
+    Header(h.base, xa::kWorkerSemaphore, 5, random.Below(3));
+    return engine;
+  };
+  {
+    Results results("XAudioEngine::Mix (sub_8245BF80)");
+    for (int i = 0; i < 48; i++) {
+      ObjectCase(h, results, block, timeout, __imp__sub_8245BF80, hooks::XAudioMix,
+                 [&](Random& random, PPCContext& t, uint32_t processor) {
+                   t.r3.u64 = mix_world(random, processor);
+                 },
+                 frame, fmt::format("case {}", i));
+    }
+    results.Report();
+  }
+  {
+    Results results("XAudio::MixerCallback (sub_8245FBE0)");
+    for (int i = 0; i < 24; i++) {
+      ObjectCase(h, results, block, timeout, __imp__sub_8245FBE0, hooks::XAudioMixerCallback,
+                 [&](Random& random, PPCContext& t, uint32_t processor) {
+                   mix_world(random, processor);
+                   t.r3.u64 = random.Next();
+                 },
+                 frame, fmt::format("case {}", i));
+    }
+    results.Report();
+  }
+  const auto none = [](harness::Outputs&, PPCContext&) {};
+  {
+    // One case in two the engine's +300 clear when woken (the teardown: the
+    // workers released and the loop left); else one mix first, its
+    // callback (stage 0, a random slot) clearing +296 and +300, "mix now" a
+    // notification event so the second wait returns too.
+    Results results("XAudio::MasterThread (sub_8245BE08)");
+    for (int i = 0; i < 32; i++) {
+      ObjectCase(h, results, block, timeout, __imp__sub_8245BE08, hooks::XAudioMasterThread,
+                 [&](Random& random, PPCContext& t, uint32_t processor) {
+                   const uint32_t engine =
+                       MixEngine(h.base, block, random, 1 + random.Below(3), processor);
+                   guest::StoreU32(h.base, xa::kEngine, engine);
+                   const bool mix = i % 2 == 1;
+                   Store(h.base, engine + 300, mix ? 1 + random.Below(0xFFFF) : 0);
+                   if (mix) {
+                     const uint32_t slot = engine + 168 + 8 * random.Below(8);
+                     Store(h.base, slot, kClearTwoWords);
+                     Store(h.base, slot + 4, engine + 296);
+                   }
+                   Header(h.base, xa::kMixNow, mix ? 0 : 1, 1);
+                   Header(h.base, xa::kMixDone, 1, random.Below(2));
+                   Header(h.base, xa::kTerminating, 0, random.Below(2));
+                   Header(h.base, xa::kWorkerSemaphore, 5, random.Below(3));
+                   t.r3.u64 = random.Next();
+                 },
+                 none, fmt::format("case {}", i));
+    }
+    results.Report();
+  }
+  {
+    // One case in two +300 clear when woken; else one pass first, the
+    // source stage's one voice (at the engine's +296, its pass
+    // ViewDesc::Clear) clearing +296 and +300, the semaphore counting 2 or
+    // more so the second wait returns.
+    Results results("XAudio::WorkerThread (sub_8245BED0)");
+    for (int i = 0; i < 32; i++) {
+      ObjectCase(h, results, block, timeout, __imp__sub_8245BED0, hooks::XAudioWorkerThread,
+                 [&](Random& random, PPCContext& t, uint32_t processor) {
+                   const uint32_t engine =
+                       MixEngine(h.base, block, random, 1 + random.Below(3), processor);
+                   guest::StoreU32(h.base, xa::kEngine, engine);
+                   const bool mix = i % 2 == 1;
+                   Store(h.base, engine + 300, mix ? 1 + random.Below(0xFFFF) : 0);
+                   if (mix) {
+                     const uint32_t voice = engine + 296;
+                     const uint32_t node = block + 0x1800;
+                     const uint32_t offset = node - voice;
+                     const uint32_t list = block + 0x1000, mixed = block + 0x1010;
+                     Store(h.base, list, node);
+                     Store(h.base, list + 4, node);
+                     Store(h.base, list + 8, offset);
+                     Store(h.base, node, list);
+                     Store(h.base, node + 4, list);
+                     EmptyList(h.base, mixed, offset);
+                     Store(h.base, voice, block + 0x1D00);
+                     Store(h.base, block + 0x1D00 + 68, kClearTwoWords);
+                   }
+                   Header(h.base, xa::kMixNow, 1, random.Below(2));
+                   Header(h.base, xa::kMixDone, 1, random.Below(2));
+                   Header(h.base, xa::kTerminating, 0, random.Below(2));
+                   Header(h.base, xa::kWorkerSemaphore, 5, (mix ? 2 : 1) + random.Below(3));
+                   t.r3.u64 = random.Next();
+                 },
+                 none, fmt::format("case {}", i));
+    }
+    results.Report();
+  }
+  memory::Free(timeout);
+}
+
 }  // namespace
 
 void XAudioEngine(Context& h) {
@@ -1136,6 +1443,7 @@ void XAudioEngine(Context& h) {
   MasteringVoice(h, block.address);
   Locked(h, block.address);
   Allocators(h, block.address);
+  MixAndThreads(h, block.address);
 }
 
 }  // namespace harness

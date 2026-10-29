@@ -6,6 +6,7 @@
 #include "base/log.h"
 #include "guest.h"
 #include "memory/c_runtime_heap.h"
+#include "vehicle_accessors/vehicle_accessors.h"
 
 #include <atomic>
 
@@ -806,6 +807,111 @@ uint32_t InterfaceFree(uint8_t* base, uint32_t iface, bool native_heap, uint32_t
     r3 = FreeBlock(object, attributes, native_heap, 0x824603F4, frame, call);
   }
   return r3;
+}
+
+// --- The mix and XAudio's threads ---
+
+namespace {
+
+constexpr uint32_t kSwapStageListsFrame = 128;
+
+// The thread's word at the engine's +332 + 4 x its processor.
+void StoreThread(uint8_t* base, const Thread& thread) {
+  const uint32_t engine = guest::LoadU32(base, kEngine);
+  guest::StoreU32(base, engine + ((thread.processor + 83) << 2), thread.mixer);
+}
+
+}  // namespace
+
+uint32_t Mix(uint8_t* base, uint32_t engine, uint32_t frame, const Thread& thread,
+             const GuestCall& call) {
+  ITC_NATIVE_RUNNING("sub_8245BF80 XAudioEngine::Mix");
+  vehicle_accessors::DebugSwitchOff();
+  SetRegs(call, Args({0}));  // its r3
+  call(kRtlEnterCriticalSection, 0x8245BFAC, Args({kMixerLock}));
+  const uint32_t threads = guest::LoadU32(base, engine + 304);
+  guest::StoreU32(base, engine + 300, thread.mixer);
+  bool terminating = false;
+  if (int32_t(threads) != 0) {
+    call(kKeSetEvent, 0x8245BFD4, Args({kMixNow, 1, 0}));
+    guest::StoreU32(base, frame + 96, 0);
+    guest::StoreU32(base, frame + 80, kMixDone);
+    guest::StoreU32(base, frame + 84, kTerminating);
+    // memset (sub_825A71D0) of 44 bytes from +100, its r3 the destination.
+    for (uint32_t i = 0; i < 44; i++) {
+      guest::StoreU8(base, frame + 100 + i, 0);
+    }
+    SetRegs(call, Args({frame + 100}));
+    const uint32_t r3 = call(kKeWaitForMultipleObjects, 0x8245C024,
+                             Args({2, frame + 80, 1, 3, 1, 0, 0, frame + 96}));
+    terminating = int32_t(r3) == 1;
+  } else {
+    SetRegs(call, Args({engine}));
+    FrameBelow(base, frame, kSwapStageListsFrame);
+    SwapStageLists(base, engine, thread.r13, call);
+    call(kMixPasses, 0x8245C048, Args({engine, 1}));
+  }
+  if (!terminating) {
+    const uint32_t master = guest::LoadU32(base, engine + 64);
+    const uint32_t r3 = call(Method(base, master, 68), 0x8245C068, Args({master}));
+    if (int32_t(r3) >= 0) {
+      SetRegs(call, Args({0, 1}));
+      AddStat(base, 0, 1);
+    }
+  }
+  guest::StoreU32(base, engine + 300, 0);
+  TakeStats(base);
+  call(kRtlLeaveCriticalSection, 0x8245C08C, Args({kMixerLock}));
+  return 0;
+}
+
+uint32_t MixerCallback(uint8_t* base, uint32_t frame, const Thread& thread,
+                       const GuestCall& call) {
+  ITC_NATIVE_RUNNING("sub_8245FBE0 XAudio::MixerCallback");
+  const uint32_t engine = guest::LoadU32(base, kEngine);
+  SetRegs(call, Args({engine}));
+  return Mix(base, engine, frame, thread, call);
+}
+
+uint32_t MasterThread(uint8_t* base, uint32_t frame, const Thread& thread,
+                      const GuestCall& call) {
+  ITC_NATIVE_RUNNING("sub_8245BE08 XAudio::MasterThread");
+  StoreThread(base, thread);
+  for (;;) {
+    call(kKeWaitForSingleObject, 0x8245BE60, Args({kMixNow, 3, 1, 0, 0}));
+    const uint32_t engine = guest::LoadU32(base, kEngine);
+    const bool ending = guest::LoadU32(base, engine + 300) == 0;
+    if (ending) {
+      // r5 the count less one, as a 64-bit sum.
+      const uint64_t count = uint64_t(guest::LoadU32(base, engine + 304)) - 1;
+      if (int32_t(count) != 0) {
+        call(kKeReleaseSemaphore, 0x8245BE98, Args({kWorkerSemaphore, 1, count, 0}));
+      }
+    } else {
+      SetRegs(call, Args({engine}));
+      FrameBelow(base, frame, kSwapStageListsFrame);
+      SwapStageLists(base, engine, thread.r13, call);
+      call(kMixPasses, 0x8245BEAC, Args({guest::LoadU32(base, kEngine), 1}));
+    }
+    call(kKeSetEvent, 0x8245BEBC, Args({kMixDone, 1, 0}));
+    if (ending) {
+      return 0;
+    }
+  }
+}
+
+uint32_t WorkerThread(uint8_t* base, const Thread& thread, const GuestCall& call) {
+  ITC_NATIVE_RUNNING("sub_8245BED0 XAudio::WorkerThread");
+  StoreThread(base, thread);
+  call(kKeWaitForSingleObject, 0x8245BF20, Args({kWorkerSemaphore, 3, 1, 0, 0}));
+  for (;;) {
+    const uint32_t engine = guest::LoadU32(base, kEngine);
+    if (guest::LoadU32(base, engine + 300) == 0) {
+      return 0;
+    }
+    call(kMixPasses, 0x8245BF38, Args({engine, 0}));
+    call(kKeWaitForSingleObject, 0x8245BF50, Args({kWorkerSemaphore, 3, 1, 0, 0}));
+  }
 }
 
 }  // namespace xaudio
