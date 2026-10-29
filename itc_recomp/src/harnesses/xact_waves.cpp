@@ -878,7 +878,10 @@ void Notifications(Context& h, uint32_t block) {
   }
   const uint32_t engine = block + kEngine;
   const auto engine_world = [&](Random& random, uint8_t type) {
-    const uint32_t ms = random.Below(100000);
+    // One time in two past 2^31 ms, so the counter's low word (XACTGetTimeMs's
+    // r3, sign-extended) is negative.
+    const uint32_t ms = random.Below(2) == 0 ? random.Below(100000)
+                                             : 0x80000000u + random.Below(0x7FFFFFFF);
     helpers::SetClocksForHarness(uint64_t(ms) * 50000 + random.Below(50000), ms);
     Store(base, engine + 16, random.Below(3) == 0 ? 0 : 0x8245F860u);
     Store(base, engine + 20, uint32_t(random.Next()));
@@ -919,7 +922,9 @@ void Notifications(Context& h, uint32_t block) {
         PPCContext t = CallContext(h);
         const uint8_t type = uint8_t(random.Below(16));
         engine_world(random, type);
-        t.r3.u64 = engine;
+        // r3's upper word one time in four not 0 (returned as given without a
+        // callback, and passed to the matcher).
+        t.r3.u64 = engine | (random.Below(4) == 0 ? random.Next() << 32 : 0);
         t.r4.u64 = (uint64_t(type) << 56) | (random.Next() & 0x00FFFFFFFFFFFFFFull);
         t.r5.u64 = random.Next();
         t.r6.u64 = random.Next();
@@ -929,6 +934,7 @@ void Notifications(Context& h, uint32_t block) {
         ITC_FLAG(native_xact) = true;
         BlockOutputs(out[v], base, block, floats);
         out[v].Word(t.r3.u32);
+        out[v].Word(uint32_t(t.r3.u64 >> 32));  // r3 in full
         out[v].Bytes(Read(base, t.r1.u32 + 32, 32));
       }
       h.random = random;
@@ -973,6 +979,11 @@ void Notifications(Context& h, uint32_t block) {
                  Store(base, block + kWave + 40,
                        random.Below(8) == 0 ? uint32_t(random.Next()) : random.Below(7));
                  t.r4.u64 = random.Below(8) == 0 ? uint32_t(random.Next()) : random.Below(7);
+                 // r3's upper word one time in four not 0 (returned as given
+                 // without a notification).
+                 if (random.Below(4) == 0) {
+                   t.r3.u64 |= random.Next() << 32;
+                 }
                },
                frames(112 + 160), floats, fmt::format("case {}", c));
     }

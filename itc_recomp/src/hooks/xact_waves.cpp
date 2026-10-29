@@ -38,11 +38,14 @@ ITC_FLAG_DECLARE(bool, native_xact);
 namespace hooks {
 
 void XactEngineSendNotification(PPCContext& ctx, uint8_t* base) {
-  const uint32_t engine = ctx.r3.u32;
+  const uint64_t engine = ctx.r3.u64;
   const uint64_t words[4] = {ctx.r4.u64, ctx.r5.u64, ctx.r6.u64, ctx.r7.u64};
+  uint64_t r3 = 0;
   XAudioFramed(ctx, base, 112, [&](const xaudio::GuestCall& call, uint32_t frame) {
-    return xact::EngineSendNotification(base, engine, words, frame, call);
+    r3 = xact::EngineSendNotification(base, engine, words, frame, call);
+    return uint32_t(r3);
   });
+  ctx.r3.u64 = r3;  // in full, as the original leaves it
 }
 
 void XactWaveRelease(PPCContext& ctx, uint8_t* base) {
@@ -75,16 +78,23 @@ void XactInMemoryWaveStop(PPCContext& ctx, uint8_t* base) {
 
 void XactWaveNotify(PPCContext& ctx, uint8_t* base) {
   const uint32_t wave = ctx.r3.u32, type = ctx.r4.u32;
+  uint64_t r3 = 0;
   XAudioFramed(ctx, base, 160, [&](const xaudio::GuestCall& call, uint32_t frame) {
-    return xact::WaveNotify(base, wave, type, frame, call);
+    r3 = xact::WaveNotify(base, wave, type, frame, call);
+    return uint32_t(r3);
   });
+  ctx.r3.u64 = r3;  // in full, as the original leaves it
 }
 
 void XactWaveSetState(PPCContext& ctx, uint8_t* base) {
-  const uint32_t wave = ctx.r3.u32, state = ctx.r4.u32;
+  const uint64_t wave = ctx.r3.u64;
+  const uint32_t state = ctx.r4.u32;
+  uint64_t r3 = 0;
   XAudioFramed(ctx, base, 112, [&](const xaudio::GuestCall& call, uint32_t frame) {
-    return xact::WaveSetState(base, wave, state, frame, call);
+    r3 = xact::WaveSetState(base, wave, state, frame, call);
+    return uint32_t(r3);
   });
+  ctx.r3.u64 = r3;  // in full, as the original leaves it
 }
 
 void XactVoiceCreate(PPCContext& ctx, uint8_t* base) {

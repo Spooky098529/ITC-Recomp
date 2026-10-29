@@ -204,7 +204,7 @@ uint32_t InMemoryWaveUpdate(uint8_t* base, uint32_t wave, bool native_heap, uint
 uint32_t ClockMs(uint8_t* base, uint32_t return_address, uint32_t frame, const GuestCall& call);
 // The same in full (r3 as XACTGetTimeMs leaves it: the counter's low word
 // sign-extended, or GetTickCount zero-extended); where the original traps,
-// the guest call's low word.
+// the guest call's r3 in full.
 uint64_t ClockMsFull(uint8_t* base, uint32_t return_address, uint32_t frame,
                      const GuestCall& call);
 
@@ -218,8 +218,11 @@ uint64_t ClockMsFull(uint8_t* base, uint32_t return_address, uint32_t frame,
 // notification's +5 and, unless persistent (description +1 bit 0), moves to
 // the list +112. With a match: +20 = this thread's id (atomically), the
 // callback with the notification through the guest call, +20 = -1. `frame`
-// is this function's (112 bytes). Returns r3 as the original leaves it.
-uint32_t EngineSendNotification(uint8_t* base, uint32_t engine, const uint64_t words[4],
+// is this function's (112 bytes). `engine_r3` is r3 in full as the caller
+// left it. Returns r3 in full as the original leaves it: `engine_r3` without
+// a callback, the time (ClockMsFull) with no registration, else the last
+// matcher's or the callback's (xaudio::LastCallR3).
+uint64_t EngineSendNotification(uint8_t* base, uint64_t engine_r3, const uint64_t words[4],
                                 uint32_t frame, const GuestCall& call);
 // XACTWave::Notify (sub_825D2030): with a wave bank (+36), the 32-byte
 // notification built in this function's frame as the original builds it
@@ -228,16 +231,17 @@ uint32_t EngineSendNotification(uint8_t* base, uint32_t engine, const uint64_t w
 // and the cue +101; with no owner (+48) -1, 0 and 0; nothing sent when the
 // owner's cue has no sound bank) and sent (SendNotification's plain C++, a
 // frame below) on the engine (+20) with r4 to r7 as the original loads them.
-// `frame` is this function's (160 bytes). Returns r3 as the original leaves
-// it.
-uint32_t WaveNotify(uint8_t* base, uint32_t wave, uint32_t type, uint32_t frame,
+// `frame` is this function's (160 bytes). Returns r3 in full as the original
+// leaves it (memset's, or SendNotification's).
+uint64_t WaveNotify(uint8_t* base, uint32_t wave, uint32_t type, uint32_t frame,
                     const GuestCall& call);
 // XACTWave::SetState (sub_825D24D8): going to 3 from below 3, +40 = 3 and
 // the notification 12; going to 5 from 3 or 4, +40 = 5 and the
 // notification 13 (Notify's plain C++, a frame below); then +40 = `state`.
-// `frame` is this function's (112 bytes). Returns r3 as the original leaves
-// it.
-uint32_t WaveSetState(uint8_t* base, uint32_t wave, uint32_t state, uint32_t frame,
+// `frame` is this function's (112 bytes). `wave_r3` is r3 in full as the
+// caller left it. Returns r3 in full as the original leaves it (`wave_r3`
+// without a notification, else Notify's).
+uint64_t WaveSetState(uint8_t* base, uint64_t wave_r3, uint32_t state, uint32_t frame,
                       const GuestCall& call);
 
 // --- Releasing and stopping waves ---

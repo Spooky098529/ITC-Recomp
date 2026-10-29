@@ -466,36 +466,42 @@ uint64_t ClockMsFull(uint8_t* base, uint32_t return_address, uint32_t frame,
   if (const auto ms = GetTimeMs(base)) {
     return *ms;
   }
-  return CallAt(call, kGetTimeMs, return_address, Args({}), frame);
+  CallAt(call, kGetTimeMs, return_address, Args({}), frame);
+  return xa::LastCallR3();
 }
 
-uint32_t EngineSendNotification(uint8_t* base, uint32_t engine, const uint64_t words[4],
+uint64_t EngineSendNotification(uint8_t* base, uint64_t engine_r3, const uint64_t words[4],
                                 uint32_t frame, const GuestCall& call) {
   ITC_NATIVE_RUNNING("sub_825C1388 XACTEngine::SendNotification");
+  const uint32_t engine = uint32_t(engine_r3);
   const uint32_t notification = frame + 144;
   for (uint32_t i = 0; i < 4; i++) {
     StoreU64(base, notification + 8 * i, words[i]);
   }
   if (Load(base, engine + 16) == 0) {
-    return engine;
+    return engine_r3;  // r3 as the caller left it
   }
-  const uint32_t now = ClockMs(base, 0x825C13C4, frame, call);
+  // r3 in full: XACTGetTimeMs's (the counter's low word sign-extended).
+  const uint64_t now_r3 = ClockMsFull(base, 0x825C13C4, frame, call);
+  const uint32_t now = uint32_t(now_r3);
   StoreU8(base, notification + 4, now);
   StoreU8(base, notification + 1, now >> 24);
   StoreU16(base, notification + 2, now >> 8);
   const uint32_t list = engine + 100;
   uint32_t node = Load(base, engine + 104);
   if (node == list) {
-    return now;
+    return now_r3;
   }
   bool matched = false;
-  uint32_t r3 = now;
+  uint64_t r3 = now_r3;
   do {
     const uint32_t description = node + 16;
     const uint32_t next = Load(base, node + 4);
-    r3 = CallAt(call, kMatchRegistration, 0x825C13FC, Args({engine, notification, description}),
-                frame);
-    if (r3 != 0) {
+    // r3 the engine as the caller left it (the original's mr r3,r31).
+    CallAt(call, kMatchRegistration, 0x825C13FC, Args({engine_r3, notification, description}),
+           frame);
+    r3 = xa::LastCallR3();
+    if (int32_t(r3) != 0) {
       matched = true;
       StoreSplit(base, notification + 5, Load(base, description + 16));
       if ((guest::LoadU8(base, description + 1) & 1) == 0) {
@@ -516,12 +522,13 @@ uint32_t EngineSendNotification(uint8_t* base, uint32_t engine, const uint64_t w
     return r3;
   }
   ExchangeWord(base, engine + 20, graphics::video_output::CurrentThreadId());
-  r3 = CallAt(call, Load(base, engine + 16), 0x825C14E4, Args({notification}), frame);
+  CallAt(call, Load(base, engine + 16), 0x825C14E4, Args({notification}), frame);
+  r3 = xa::LastCallR3();
   ExchangeWord(base, engine + 20, 0xFFFFFFFFu);
   return r3;
 }
 
-uint32_t WaveNotify(uint8_t* base, uint32_t wave, uint32_t type, uint32_t frame,
+uint64_t WaveNotify(uint8_t* base, uint32_t wave, uint32_t type, uint32_t frame,
                     const GuestCall& call) {
   ITC_NATIVE_RUNNING("sub_825D2030 XACTWave::Notify");
   const uint32_t bank = Load(base, wave + 36);
@@ -573,10 +580,11 @@ uint32_t WaveNotify(uint8_t* base, uint32_t wave, uint32_t type, uint32_t frame,
                                 xa::FrameBelow(base, frame, kSendNotificationFrame), call);
 }
 
-uint32_t WaveSetState(uint8_t* base, uint32_t wave, uint32_t state, uint32_t frame,
+uint64_t WaveSetState(uint8_t* base, uint64_t wave_r3, uint32_t state, uint32_t frame,
                       const GuestCall& call) {
   ITC_NATIVE_RUNNING("sub_825D24D8 XACTWave::SetState");
-  uint32_t r3 = wave;
+  const uint32_t wave = uint32_t(wave_r3);
+  uint64_t r3 = wave_r3;  // as the caller left it
   const int32_t now = int32_t(Load(base, wave + 40));
   uint32_t step = 0, type = 0;
   if (int32_t(state) == 3) {
