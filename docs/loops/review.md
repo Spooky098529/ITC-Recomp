@@ -44,6 +44,10 @@ When the user has reviewed a run's section, its heading gets
   `waves.cpp`. Left: `XACTTrackInstance::Prepare` `sub_825D5A48` (ready)
   and its callers; the rest waits on `XACTGetTimeMs` over
   QueryPerformanceCounter.
+  Its validation: three functions (`XACTTrack::SetVolume` `sub_825D0BF8`,
+  `UpdateVolume` `sub_825D0428`, `XACTEvent::Create` `sub_825D0F00`)
+  print on each native return path instead of as their first statement,
+  since they hand some inputs back to the recompiled code.
 
 ## Run 2026-10-28 22:22 (`b7-loop-28-10-26-3`)
 

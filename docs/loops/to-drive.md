@@ -13,6 +13,12 @@ function goes from this list when a log shows its `native running
 (game):` line (say which log in the commit). A run with nothing left
 here loses its heading.
 
+## Run 2026-10-29 15:44 (`b7-loop-29-10-26`)
+
+- XACT's tracks' migration 1 (attract race `itc_2432`, replay
+  `itc_2433`, ok): `sub_825D7B78` XACTWaveVariationEvent::SetWave
+  (`xact-tracks.md`)
+
 ## Run 2026-10-28 22:22 (`b7-loop-28-10-26-3`)
 
 - XAudio's voices (attract race `itc_2356`, replay `itc_2357`, ok):
