@@ -1,7 +1,8 @@
 // The car sounds' parts natively (car_sounds.h, docs/functions/car-sounds.md):
 // the hits, the parts at +736, +840 and +888, the wind, the pass by, the
 // engine with its two layers, the tires with their layer, the roll, the horn
-// and the turbo, each from CarSound::Update every tick. Their callees' plain C++ called directly
+// and the turbo, each from CarSound::Update every tick, and CarSound::Update
+// itself. Their callees' plain C++ called directly
 // (PlayOnce, IsPlaying, UpdateVoices, XAudio's SetVolume and Stop, the
 // vehicle's accessors), each in a frame below the caller's, with the
 // registers set as the original sets them before the call. Strict floating
@@ -1143,6 +1144,160 @@ uint32_t TurboSoundUpdate(uint8_t* base, uint32_t part, uint32_t vehicle, uint64
   }
   StoreF(base, part + 52, boost);
   return Update(base, part, output, frame, call);
+}
+
+// --- The car sound's update (sub_82110048) ---
+
+namespace {
+
+constexpr uint32_t kDopplerMax = 0x820029D4;  // +204 at most
+constexpr uint32_t kDopplerMin = 0x82001070;  // +204 at least
+// The submix's effect parameters (48 bytes each): outside, and inside (its
+// +192; probably a tunnel's reverb).
+constexpr uint32_t kReverbOff = 0x82616638;
+constexpr uint32_t kReverbOn = kReverbOff + 192;
+constexpr uint32_t kReverbBytes = 48;
+constexpr uint32_t kSetEffectFrame = 144;
+constexpr uint32_t kUpdate3DReturn = 0x82110080;
+constexpr uint32_t kCarSoundFrame = 128;
+
+uint64_t Load64(uint8_t* base, uint32_t address) {
+  return (uint64_t(Load(base, address)) << 32) | Load(base, address + 4);
+}
+
+// The submix voice's SetEffectParameters (r4 0, r5 1, r6 3, r7 the frame's
+// +`at`: the block's address, then its size).
+uint32_t SetReverb(uint8_t* base, uint32_t block, uint32_t at, uint32_t frame,
+                   const GuestCall& call) {
+  Store(base, frame + at + 4, 0);
+  Store(base, frame + at, block);
+  Store(base, frame + at + 4, kReverbBytes);
+  const uint32_t submix = Load(base, kSubmix);
+  SetRegs(call, Args({submix, 0, 1, 3, frame + at}));
+  xa::FrameBelow(base, frame, kSetEffectFrame);
+  return xa::ApiSetEffectParameters(base, submix, 0, 1, 3, frame + at, call);
+}
+
+}  // namespace
+
+uint64_t CarSoundUpdate(uint8_t* base, uint64_t sound64, const Update3DSaves& s,
+                        const Voices& voices, uint32_t frame, const GuestCall& call,
+                        const x3daudio::TanCall& tan) {
+  ITC_NATIVE_RUNNING("sub_82110048 CarSound::Update");
+  const uint32_t sound = uint32_t(sound64);
+  // The prologue: __savegprlr_29 (r29 to r31 at sp - 32 to - 16, lr at
+  // - 8), the back chain of the 128-byte frame.
+  const uint32_t sp = frame + kCarSoundFrame;
+  Store64(base, sp - 32, s.r29);
+  Store64(base, sp - 24, s.r30);
+  Store64(base, sp - 16, s.r31);
+  Store(base, sp - 8, s.lr);
+  Store(base, frame, sp);
+  const uint32_t vehicle = Load(base, sound + 400);
+  if (vehicle == 0) {
+    return sound64;
+  }
+  // r29: the vehicle's +6148 has bit 0x1 or 0x80 (the players' cars,
+  // probably).
+  const uint64_t players = (Load(base, vehicle + 6148) & 0x81) != 0 ? 1 : 0;
+  Update3DSaves saves = s;
+  saves.lr = kUpdate3DReturn;
+  saves.r29 = players;
+  saves.r31 = sound64;
+  SetRegs(call, Args({sound64, players, vehicle}));
+  uint64_t r3 = Update3D(base, sound64, players, vehicle, frame, saves, tan);
+
+  // The Doppler factor (+204) clamped (each bound's word stored as is).
+  const double max = LoadF(base, kDopplerMax);
+  if (LoadF(base, sound + 204) > max) {
+    StoreF(base, sound + 204, max);
+  }
+  const double min = LoadF(base, kDopplerMin);
+  if (LoadF(base, sound + 204) < min) {
+    StoreF(base, sound + 204, min);
+  }
+
+  // For the players' cars, the submix's effect switched with the vehicle's
+  // half-word +5314 bit 1 (+0 the state: 1 inside, 0 outside).
+  if (players != 0) {
+    const uint32_t state = Load(base, sound + 0);
+    const bool inside = (guest::LoadU16(base, Load(base, sound + 400) + 5314) & 2) != 0;
+    if (state == 0) {
+      if (inside) {
+        r3 = SetReverb(base, kReverbOn, 80, frame, call);
+        Store(base, sound + 0, 1);
+      }
+    } else if (state == 1 && !inside) {
+      r3 = SetReverb(base, kReverbOff, 88, frame, call);
+      Store(base, sound + 0, 0);
+    }
+  }
+  if (Load(base, sound + 1248) == 0) {
+    return r3;
+  }
+
+  // The parts, each with r4 the vehicle (+400) and r5 the DSP output (+352,
+  // 8 bytes), read again for each.
+  const auto car = [&] { return Load(base, sound + 400); };
+  const auto output = [&] { return Load64(base, sound + 352); };
+  const auto below = [&](uint32_t bytes) { return xa::FrameBelow(base, frame, bytes); };
+  {
+    const double f2 = LoadF(base, sound + 1252);
+    const double f1 = LoadF(base, sound + 204);
+    const uint32_t v = car();
+    const uint64_t out = output();
+    SetRegs(call, ArgsF1({sound64 + 408, v, out}, f1));
+    r3 = EngineSoundUpdate(base, sound + 408, v, out, f1, f2, voices, below(160), call);
+  }
+  {
+    const uint64_t out = output();
+    const uint32_t v = car();
+    SetRegs(call, Args({sound64 + 652, v, out}));
+    r3 = TireSoundUpdate(base, sound + 652, v, out, voices, below(160), call);
+  }
+  {
+    const uint64_t out = output();
+    const uint32_t v = car();
+    SetRegs(call, Args({sound64 + 584, v, out}));
+    r3 = HitSoundsUpdate(base, sound + 584, v, out, voices, below(112), call);
+  }
+  {
+    const uint32_t passed = Load(base, sound + 1260);
+    const uint64_t out = output();
+    const uint32_t v = car();
+    SetRegs(call, Args({sound64 + 1136, v, out, passed}));
+    r3 = PassBySoundUpdate(base, sound + 1136, v, out, passed, voices, below(112), call);
+  }
+  {
+    const uint64_t out = output();
+    const uint32_t v = car();
+    SetRegs(call, Args({sound64 + 952, v, out}));
+    r3 = TurboSoundUpdate(base, sound + 952, v, out, voices, below(144), call);
+  }
+  if (players == 0) {
+    return r3;
+  }
+  // The players' cars' parts.
+  using PartFn = uint32_t (*)(uint8_t*, uint32_t, uint32_t, uint64_t, const Voices&, uint32_t,
+                              const GuestCall&);
+  const struct {
+    uint32_t at;
+    PartFn fn;
+    uint32_t frame_bytes;
+  } parts[] = {{736, Part736Update, 112},  {840, Part840Update, 128},
+               {888, Part888Update, 144},  {792, RollSoundUpdate, 144},
+               {1016, WindSoundUpdate, 128}};
+  for (const auto& p : parts) {
+    const uint64_t out = output();
+    const uint32_t v = car();
+    SetRegs(call, Args({sound64 + p.at, v, out}));
+    r3 = p.fn(base, sound + p.at, v, out, voices, below(p.frame_bytes), call);
+  }
+  const double f1 = LoadF(base, sound + 204);
+  const uint64_t out = output();
+  const uint32_t v = car();
+  SetRegs(call, ArgsF1({sound64 + 1072, v, out}, f1));
+  return HornSoundUpdate(base, sound + 1072, v, out, f1, voices, below(192), call);
 }
 
 }  // namespace car_sounds

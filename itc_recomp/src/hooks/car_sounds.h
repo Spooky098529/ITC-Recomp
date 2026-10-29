@@ -155,4 +155,8 @@ void CarSoundsRollSoundUpdate(PPCContext& ctx, uint8_t* base);  // sub_8210DB60
 void CarSoundsHornSoundUpdate(PPCContext& ctx, uint8_t* base);   // sub_8210F118
 void CarSoundsTurboSoundUpdate(PPCContext& ctx, uint8_t* base);  // sub_8210F4E8
 
+// The car sound's update: r3 the car sound (r3 the last call's, or the car
+// sound without a vehicle).
+void CarSoundsUpdate(PPCContext& ctx, uint8_t* base);  // sub_82110048
+
 }  // namespace hooks

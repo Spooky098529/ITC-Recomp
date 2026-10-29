@@ -408,4 +408,25 @@ uint32_t HornSoundUpdate(uint8_t* base, uint32_t part, uint32_t vehicle, uint64_
 uint32_t TurboSoundUpdate(uint8_t* base, uint32_t part, uint32_t vehicle, uint64_t output,
                           const Voices& voices, uint32_t frame, const GuestCall& call);
 
+// --- The car sound's update (car_sound_parts.cpp), every tick ---
+
+// sub_82110048 CarSound::Update (128 bytes): r3 = `sound` (the whole
+// register); nothing (r3 left) without a vehicle (+400). `players` (r29):
+// the vehicle's +6148 & 0x81 set (the players' cars, probably). Update3D
+// (r4 `players`, r5 the vehicle; `saves` the caller's registers, which its
+// prologue saves with lr, r29 and r31 as the original has them then); +204
+// clamped to [0x82001070]-[0x820029D4]; for the players' cars, the submix's
+// SetEffectParameters (r4 0, r5 1, r6 3) with the block 0x826166F8 (at the
+// frame's +80) when +0 is 0 and the vehicle's half-word +5314 has bit 1 (+0
+// = 1), or 0x82616638 (at +88) when +0 is 1 and it hasn't (+0 = 0). With
+// +1248: the engine (+408, f1 +204, f2 +1252), the tires (+652), the hits
+// (+584), the pass by (+1136, r6 +1260), the turbo (+952); for the players'
+// cars also +736, +840, +888, the roll (+792), the wind (+1016) and the horn
+// (+1072, f1 +204); each with r4 +400 and r5 the 8 bytes at +352. `frame`
+// is its own frame (the prologue's saves of r29 to r31 and lr from `saves`
+// written above it); returns the r3 the original leaves.
+uint64_t CarSoundUpdate(uint8_t* base, uint64_t sound, const Update3DSaves& saves,
+                        const Voices& voices, uint32_t frame, const GuestCall& call,
+                        const x3daudio::TanCall& tan);
+
 }  // namespace car_sounds

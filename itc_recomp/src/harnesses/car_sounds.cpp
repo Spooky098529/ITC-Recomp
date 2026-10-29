@@ -2350,15 +2350,16 @@ void Engine(Context& h, uint32_t block) {
 // the plain C++ doesn't write) and the 64 bytes above the stack pointer.
 constexpr uint32_t kSlipFlag = 0x826C2E3C, kSlipThreshold = 0x826C2E38;
 
-void TireVoices(uint8_t* base, uint32_t block, Random& random) {
+void TireVoices(uint8_t* base, uint32_t block, Random& random,
+                uint32_t codec_vtable = kCodecVtable) {
   FakeVoices(base, block, random);
   for (uint32_t slot = 0; slot < 0x100; slot += 4) {
-    Store(base, block + kCodecVtable + slot, guest::LoadU32(base, block + kVoiceVtable + slot));
+    Store(base, block + codec_vtable + slot, guest::LoadU32(base, block + kVoiceVtable + slot));
   }
   Store(base, block + kVoiceVtable + 48, kFakeGetState);
   for (uint32_t k = 0; k < kVoiceCount; k++) {
     if (k >= kSlotVoices) {
-      Store(base, FakeVoice(block, k), block + kCodecVtable);
+      Store(base, FakeVoice(block, k), block + codec_vtable);
     } else {
       Store(base, FakeVoice(block, k) + 76,
             FakeVoice(block, kSlotVoices + random.Below(kVoiceCount - kSlotVoices)));
@@ -2366,9 +2367,12 @@ void TireVoices(uint8_t* base, uint32_t block, Random& random) {
   }
 }
 
-// The tires' part, its slots +0 and +12 (when not -1) with a voice each.
-void TirePart(uint8_t* base, uint32_t block, Random& random) {
-  const uint32_t part = block + kPart;
+// The tires' part (at the block's +0x100 unless given), its slots +0 and
+// +12 (when not -1) with a voice each.
+void TirePart(uint8_t* base, uint32_t block, Random& random, uint32_t part = 0) {
+  if (part == 0) {
+    part = block + kPart;
+  }
   Store(base, part + 0, random.Below(4));
   Store(base, part + 4, random.Below(5) == 0 ? uint32_t(random.Next()) : random.Below(2));
   guest::StoreU8(base, part + 8, uint8_t(random.Below(3) == 0 ? random.Below(256) : random.Below(30)));
@@ -2571,6 +2575,481 @@ void Tires(Context& h, uint32_t block) {
   Store(h.base, kSlipThreshold, saved_threshold);
 }
 
+
+// --- CarSound::Update ---
+//
+// The whole update (Update3D, the clamp, the submix's effect, every part's
+// update) on a car sound at +0x100 of a block of its own (now and then at a
+// word's alignment; its matrix at +0x800, the race data's two words
+// (+0xA3AF0, +0xA3AF4) at +0x900, the horn's two input records at +0xA00
+// and +0xA20), with the fake voices of "The voice holders" (their GetState
+// kFakeGetState; voices 0-4 in the slots, their codecs 5-9 on a vtable copy
+// at +0x1400 of the main block), the parts' wave bank (+0x1800) and the
+// engine layers' tables (+0x000, +0x300) in the main block, and a vehicle in
+// a block of its own (the parts', the engine's, the tires' and Update3D's
+// fields as their cases set them; its rigid body at +0x3800, the viewports
+// at +0x3300 with viewport 0 at +0x3400). The globals they read (the race
+// data's and the viewports' pointers, the side word, the input records'
+// pointers and the other record, the two camera passes' +400 to +475, the
+// submix word, SlipWheelValue's two) set per case and put back. Each holder's
+// +0 a fake voice (a PlayOnce that finds no free slot gives -1, whose voice
+// is the holder's +0). Two kinds: the submix word 0, some slots free (real
+// voices made for the waves played, as the parts' cases), and the car
+// sound's +0 such that the submix's effect isn't switched (the submix is 0);
+// or the submix a fake voice (its own, below), every slot taken (no voice
+// made), the effect switched either way. Compared: both blocks and the vehicle (pointers into
+// made voices as offsets; the fields stored with stfs as floats), the made
+// voices' blocks, CarSound::Update's own frame (its saves of r29 to r31 and
+// lr, its locals and back chain) and the 64 bytes above the stack pointer,
+// r3, the two SlipWheelValue globals, the mastering voice's count and +40.
+// Below its frame the callees' frames aren't compared: the originals'
+// register saves for their callees land there, which the parts' plain C++
+// doesn't write (their own cases compare what can be).
+constexpr uint32_t kUpdateSound = 0x100, kUpdateMatrix = 0x800, kUpdateRace = 0x900,
+                   kUpdateInputs = 0xA00, kUpdateCodecs = 0x1400, kUpdateSubmixVtable = 0x1500,
+                   kUpdateSubmix = 0x1600;
+constexpr uint32_t kUpdateTables[] = {0x000, 0x300};
+constexpr uint32_t kUpdateBody = 0x3800, kUpdateViewports = 0x3300, kUpdateViewport = 0x3400;
+constexpr uint32_t kUpdateFrame = 128;
+// The holders whose slots the parts' updates fill (not the engine layers'
+// or the tires', which their own set-ups give).
+constexpr uint32_t kUpdateHolders[] = {584, 736, 792, 840, 888, 952, 1016, 1072, 1136};
+
+void CarSoundUpdates(Context& h, uint32_t block) {
+  const uint32_t engine = guest::LoadU32(h.base, xaudio::kEngine);
+  if (engine == 0 || MasteringVoice(h.base) == 0 || !hooks::NativeHeapActive()) {
+    ITC_LOG_INFO("harness: car_sounds: no engine or native heap: CarSound::Update's cases skipped");
+    return;
+  }
+  Block sound_block;
+  VehicleBlock vehicle_block;
+  if (!sound_block.address || !vehicle_block.address) {
+    ITC_LOG_ERROR("harness: car_sounds: no blocks from the allocation layer");
+    return;
+  }
+  const uint32_t sb = sound_block.address;
+  const uint32_t vehicle = vehicle_block.address;
+  const uint32_t source_offset = guest::LoadU32(h.base, engine + 88);
+  const struct {
+    uint32_t address, bytes;
+  } globals[] = {{0x826C5B2C, 4},     {0x826C2CE8, 4},          {0x826C7824, 4},
+                 {0x826C5B30, 8},     {0x826C62CC, 20},         {0x826BAC00 + 400, 76},
+                 {0x826BAC00 + 592 + 400, 76}, {cs::kSubmix, 4}, {kSlipFlag, 4},
+                 {kSlipThreshold, 4}};
+  constexpr uint32_t kGlobals = sizeof(globals) / sizeof(globals[0]);
+  const float level_max = Constant(h.base, 0x820021E8);
+  const uint32_t waves = std::clamp(uint32_t(std::isfinite(level_max) && level_max > 0.0f
+                                                 ? 9.0f + level_max
+                                                 : 9.0f),
+                                    19u, 32u);
+  const uint32_t max_word = guest::LoadU32(h.base, 0x820029D4);
+  const uint32_t min_word = guest::LoadU32(h.base, 0x82001070);
+  const float off = Constant(h.base, 0x82002A2C);
+  const float rest = Constant(h.base, 0x82001BE0);
+  ITC_LOG_INFO("harness: car_sounds: CarSound::Update's constants: Doppler factor {} to {}",
+               std::bit_cast<float>(min_word), std::bit_cast<float>(max_word));
+  // The floats: the main block's fake voices' +112 and +140; the car sound's
+  // (offsets from it) as Update3D's cases list them, both engine layers' +20
+  // to +36, the engine's +168 and +172, the tires' +72 and +80, +888's +56
+  // and +60, the turbo's +52 and +60; the matrix.
+  std::vector<uint32_t> block_floats;
+  for (uint32_t k = 0; k < kVoiceCount; k++) {
+    block_floats.push_back(kVoices + kVoiceBytes * k + 112);
+    block_floats.push_back(kVoices + kVoiceBytes * k + 140);
+  }
+  std::vector<uint32_t> sound_floats = {4,   8,   12,  28,  32,  36,  40,  44,  48,  80,  84,
+                                        88,  92,  96,  100, 368, 372, 376, 384, 388, 392, 1256,
+                                        176 + 16, 176 + 20, 176 + 24, 176 + 28, 176 + 36,
+                                        176 + 40, 176 + 44};
+  for (uint32_t i = 0; i < 6; i++) {
+    sound_floats.push_back(228 + 8 * i);
+    sound_floats.push_back(276 + 8 * i);
+  }
+  for (const uint32_t layer : {408u, 492u}) {
+    for (uint32_t i = 0; i < 5; i++) {
+      sound_floats.push_back(layer + 20 + 4 * i);
+    }
+  }
+  for (const uint32_t o : {576u, 580u, 652u + 72, 652u + 80, 888u + 56, 888u + 60, 952u + 52,
+                           952u + 60}) {
+    sound_floats.push_back(o);
+  }
+  uint32_t no_vehicle = 0, players_cases = 0, live = 0, switched = 0, clamped = 0, made_total = 0;
+  Results results("CarSound::Update (sub_82110048)");
+  for (int c = 0; c < 300; c++) {
+    const bool taken = c % 4 == 3;  // the submix a fake voice, every slot taken
+    const Random start = h.random;
+    Random random = start;
+    Outputs out[2];
+    uint32_t sound = 0;
+    for (int v = 0; v < 2; v++) {
+      random = start;
+      std::vector<uint8_t> saved[kGlobals];
+      for (uint32_t g = 0; g < kGlobals; g++) {
+        saved[g] = Read(h.base, globals[g].address, globals[g].bytes);
+      }
+      for (uint32_t i = 0; i < kBlockBytes; i += 4) {
+        Store(h.base, block + i, uint32_t(random.Next()));
+        Store(h.base, sb + i, uint32_t(random.Next()));
+      }
+      for (uint32_t i = 0; i < kVehicleBytes; i += 4) {
+        Store(h.base, vehicle + i, uint32_t(random.Next()));
+      }
+      PPCContext t = CallContext(h);
+      for (uint32_t i = 0; i < 0x2000; i += 4) {
+        Store(h.base, t.r1.u32 - 0x2000 + i, uint32_t(random.Next()));
+      }
+      for (uint32_t i = 0; i < 64; i += 4) {
+        Store(h.base, t.r1.u32 + i, uint32_t(random.Next()));
+      }
+      // The voices and the bank.
+      TireVoices(h.base, block, random, kUpdateCodecs);
+      PartWaveBank(h.base, block, waves, random);
+      const auto slot_voice = [&] { return FakeVoice(block, random.Below(kSlotVoices)); };
+
+      // The car sound: Update3D's listener, emitter and DSP settings.
+      sound = sb + kUpdateSound + (random.Below(5) == 0 ? 4 * random.Below(4) : 0);
+      cs::SetUp(h.base, sound, sb + kUpdateMatrix);
+      // The engine: both layers and their tables, the load and the speed.
+      std::vector<float> xs;
+      for (uint32_t l = 0; l < 2; l++) {
+        EngineLayer(h.base, block, sound + 408 + kLayerOffsets[l], block + kUpdateTables[l],
+                    random, xs);
+      }
+      Store(h.base, sound + 408 + 168, FloatBits(float(EngineInput(random, -0.5f, 1.5f))));
+      Store(h.base, sound + 408 + 172, FloatBits(float(EngineSpeed(h.base, random, xs))));
+      // The tires (their holder at +24, its view +64).
+      TirePart(h.base, block, random, sound + 652);
+      Store(h.base, sound + 652 + 24, slot_voice());
+      Store(h.base, sound + 652 + 64, block + kRealView);
+      // The other holders: +0 a fake voice, the slots fake voices or free
+      // (all taken for the second kind), +20 a count, +40 the view.
+      for (const uint32_t at : kUpdateHolders) {
+        const uint32_t holder = sound + at;
+        Store(h.base, holder + 0, slot_voice());
+        for (uint32_t i = 0; i < 4; i++) {
+          Store(h.base, holder + 4 + 4 * i,
+                taken || random.Below(2) == 0 ? slot_voice() : 0);
+          Store(h.base, holder + 24 + 4 * i,
+                random.Below(2) == 0 ? 0 : uint32_t(random.Next()));
+        }
+        Store(h.base, holder + 20, random.Below(4));
+        Store(h.base, holder + 40, block + kRealView);
+      }
+      // The roll's voice is started unless its volume is 0.0: always one.
+      Store(h.base, sound + 792 + 4, slot_voice());
+      // The hits.
+      Store(h.base, sound + 584 + 48, random.Below(3) == 0 ? Counter(random) : 0);
+      Store(h.base, sound + 584 + 52, Counter(random));
+      Store(h.base, sound + 584 + 56, Slot(random, 3));
+      Store(h.base, sound + 584 + 64, Counter(random));
+      // +736.
+      Store(h.base, sound + 736 + 48, random.Below(2) == 0 ? 0 : Counter(random));
+      Store(h.base, sound + 736 + 52, Counter(random));
+      // +840.
+      static constexpr uint8_t kLeft[] = {0, 0, 1, 2, 3, 0x7F, 0x80, 0x81, 0xFF};
+      guest::StoreU8(h.base, sound + 840 + 45, kLeft[random.Below(9)]);
+      // +888: the slot +52 always a fake voice (its volume is set without a
+      // check), the fades.
+      {
+        const uint32_t part = sound + 888;
+        Store(h.base, part + 48, random.Below(2) == 0 ? 0 : Counter(random));
+        const uint32_t slot = Slot(random, 0);
+        Store(h.base, part + 52, slot);
+        Store(h.base, part + 4 + 4 * slot, slot_voice());
+        const auto fade = [&] {
+          switch (random.Below(6)) {
+            case 0:
+            case 1:
+              return rest;
+            case 2:
+              return 1.0f;
+            case 3:
+              return 0.0f;
+            default:
+              return Uniform(random, 0.0f, 3.0f);
+          }
+        };
+        Store(h.base, part + 56, FloatBits(fade()));
+        Store(h.base, part + 60, FloatBits(fade()));
+      }
+      // The wind.
+      Store(h.base, sound + 1016 + 48, random.Below(4) == 0 ? Counter(random) : random.Below(2));
+      // The horn: both slots with fake voices, the flags.
+      {
+        const uint32_t part = sound + 1072;
+        for (const uint32_t at : {48u, 52u}) {
+          const uint32_t slot = Slot(random, 0);
+          Store(h.base, part + at, slot);
+          Store(h.base, part + 4 + 4 * slot, slot_voice());
+        }
+        Store(h.base, part + 56, random.Below(2));
+        Store(h.base, part + 60, random.Below(2));
+      }
+      // The turbo.
+      {
+        const uint32_t part = sound + 952;
+        const float last = Near(random, {1.0f, off, 1.5f});
+        Store(h.base, part + 52, FloatBits(last));
+        Store(h.base, vehicle + 2944,
+              FloatBits(random.Below(3) == 0 ? last + Uniform(random, -0.2f, 0.2f)
+                                             : Near(random, {1.0f, off, 1.5f, last})));
+        const uint32_t slot = Slot(random, 6);
+        Store(h.base, part + 48, slot);
+        static constexpr uint16_t kWords[] = {0, 255, 256, 3071, 3072, 3073, 0x8000, 8000};
+        guest::StoreU16(h.base, part + 56, kWords[random.Below(8)]);
+        static constexpr uint8_t kWaits[] = {0, 0, 0, 1, 2, 16};
+        guest::StoreU8(h.base, part + 58, kWaits[random.Below(6)]);
+        guest::StoreU8(h.base, part + 59, uint8_t(random.Below(4)));
+        Store(h.base, part + 60, FloatBits(Near(random, {0.0f, 0.5f, 1.0f})));
+      }
+      // +1248 (live), +1252 (the engine's f2).
+      Store(h.base, sound + 1248,
+            random.Below(6) == 0 ? 0 : (random.Below(2) == 0 ? 1 : uint32_t(random.Next())));
+      Store(h.base, sound + 1252, FloatBits(float(EngineInput(random, 0.0f, 2.0f))));
+
+      // The vehicle: the tires' wheels and body (the body moved to +0x3800,
+      // as the parts' collision object is at +0x3000), the parts' fields,
+      // the engine's.
+      TireVehicle(h.base, vehicle, random);
+      for (uint32_t i = 0; i < 0x200; i += 4) {
+        Store(h.base, vehicle + kUpdateBody + i, guest::LoadU32(h.base, vehicle + 0x3000 + i));
+      }
+      Store(h.base, vehicle + 336, vehicle + kUpdateBody);
+      PartVehicle(h.base, vehicle, random);
+      EngineVehicle(h.base, vehicle, random, xs);
+      guest::StoreU16(h.base, vehicle + 5314, uint16_t(random.Next()));
+      uint32_t flags = uint32_t(random.Next()) & ~0x81u;
+      flags |= random.Below(2) ? 0x1u : 0;
+      flags |= random.Below(2) ? 0x80u : 0;
+      Store(h.base, vehicle + 6148, flags);
+      {
+        const uint32_t specs = guest::LoadU32(h.base, vehicle + 5712);
+        Store(h.base, specs + 1796, (uint32_t(random.Next()) & ~0xFFu) | random.Below(8));
+      }
+      Store(h.base, sound + 400, random.Below(20) == 0 ? 0 : vehicle);
+      // The viewports, the race data, the side word, the input records.
+      Store(h.base, 0x826C2CE8, vehicle + kUpdateViewports);
+      Store(h.base, vehicle + kUpdateViewports + 0, vehicle + kUpdateViewport);
+      Store(h.base, vehicle + kUpdateViewports + 8,
+            random.Below(2) == 0 ? 0 : vehicle + 4 * random.Below(16));
+      static constexpr uint32_t kViewModes[] = {1, 1, 1, 0, 2, 3};
+      Store(h.base, vehicle + kUpdateViewport + 1860, kViewModes[random.Below(6)]);
+      static constexpr uint32_t kKinds[] = {4, 4, 0, 1, 5, 6};
+      static constexpr uint32_t kModes[] = {8, 8, 8, 0, 2, 3, 4, 7};
+      Store(h.base, 0x826C5B2C, sb + kUpdateRace - 0xA3AF0);
+      Store(h.base, sb + kUpdateRace + 0, kKinds[random.Below(6)]);
+      Store(h.base, sb + kUpdateRace + 4, kModes[random.Below(8)]);
+      Store(h.base, 0x826C7824, random.Below(2) == 0 ? 0 : uint32_t(random.Next()) | 1);
+      Store(h.base, 0x826C5B30, sb + kUpdateInputs);
+      Store(h.base, 0x826C5B34, sb + kUpdateInputs + 0x20);
+      for (const uint32_t record : {sb + kUpdateInputs, sb + kUpdateInputs + 0x20, 0x826C62CCu}) {
+        for (uint32_t i = 0; i < 20; i += 4) {
+          Store(h.base, record + i, uint32_t(random.Next()));
+        }
+        const uint32_t word = guest::LoadU32(h.base, record);
+        Store(h.base, record, random.Below(2) == 0 ? (word | 0x20000u) : (word & ~0x20000u));
+      }
+      // The camera passes near the car's body, their fronts; the old
+      // positions a tick's movement back (now and then a fast one, for the
+      // Doppler factor's bounds); the last factor.
+      const uint32_t body = vehicle + kUpdateBody;
+      const float reach = random.Below(3) == 0 ? 5.0f : 40.0f;
+      for (const uint32_t pass : {0x826BAC00u, 0x826BAC00u + 592}) {
+        for (uint32_t i = 0; i < 3; i++) {
+          const float at = guest::LoadFloat(h.base, body + 208 + 4 * i);
+          Store(h.base, pass + 400 + 4 * i,
+                FloatBits((std::isfinite(at) ? at : 0.0f) + Uniform(random, -reach, reach)));
+        }
+        const float angle = Uniform(random, 0.0f, 6.2831853f);
+        Store(h.base, pass + 464, FloatBits(std::sin(angle)));
+        Store(h.base, pass + 468, FloatBits(Uniform(random, -0.2f, 0.2f)));
+        Store(h.base, pass + 472, FloatBits(std::cos(angle)));
+      }
+      const uint32_t pass = 0x826BAC00u + (guest::LoadU32(h.base, sb + kUpdateRace) == 4 &&
+                                                   guest::LoadU32(h.base,
+                                                                  vehicle + kUpdateViewports + 8) != 0
+                                               ? 592
+                                               : 0);
+      const float step = random.Below(4) == 0 ? 60.0f : 3.0f;
+      for (uint32_t i = 0; i < 3; i++) {
+        const float car = guest::LoadFloat(h.base, body + 208 + 4 * i);
+        const float camera = guest::LoadFloat(h.base, pass + 400 + 4 * i);
+        Store(h.base, sound + 368 + 4 * i, FloatBits(car - Uniform(random, -step, step)));
+        Store(h.base, sound + 384 + 4 * i, FloatBits(camera - Uniform(random, -step, step)));
+      }
+      static constexpr float kLast[] = {1.0f, 1.05f, 1.2f, 1.5f, 0.95f, 0.8f, 1.017f, 1.0001f};
+      guest::StoreFloat(h.base, sound + 1256, kLast[random.Below(8)]);
+      if (random.Below(10) == 0) {
+        // A degenerate word in a position, an old position or a front.
+        const uint32_t places[] = {body + 208,  body + 212,  sound + 368, sound + 376,
+                                   sound + 384, sound + 392, pass + 400,  pass + 464};
+        Store(h.base, places[random.Below(8)], Special(random));
+      }
+      // SlipWheelValue's once flag and threshold.
+      Store(h.base, kSlipFlag, guest::LoadU32(h.base, kSlipFlag) | 1);
+      Store(h.base, kSlipThreshold, FloatBits(Uniform(random, 0.0f, 8.0f)));
+      // The submix's effect state (+0): the first kind never switches it
+      // (its submix word is 0); the second either way.
+      const bool players = (flags & 0x81) != 0;
+      const bool inside = (guest::LoadU16(h.base, vehicle + 5314) & 2) != 0;
+      uint32_t state = random.Below(3) == 0 ? uint32_t(random.Next()) : random.Below(2);
+      if (!taken && players && ((state == 0 && inside) || (state == 1 && !inside))) {
+        state = inside ? 1 : 0;
+      }
+      Store(h.base, sound + 0, state);
+      // The second kind's submix: a fake voice of its own (at +0x1600, its
+      // vtable a copy at +0x1500) whose SetEffectParameters (+32) is the
+      // recorder of r4 and r5 (to its +444 and +448): the voice's own
+      // (sub_82461418) takes no float, and f1 at that call is what
+      // X3DAudioCalculate's callees leave in it, which neither Update3D's
+      // plain C++ nor its adapter gives back.
+      if (taken) {
+        const uint32_t submix = block + kUpdateSubmix;
+        for (uint32_t slot = 0; slot < 0x100; slot += 4) {
+          Store(h.base, block + kUpdateSubmixVtable + slot,
+                guest::LoadU32(h.base, block + kVoiceVtable + slot));
+        }
+        Store(h.base, block + kUpdateSubmixVtable + 32, 0x820CE9F8);
+        Store(h.base, submix, block + kUpdateSubmixVtable);
+        Store(h.base, submix + 4, random.Below(3));
+        Store(h.base, submix + 76, FakeVoice(block, kSlotVoices + random.Below(5)));
+        guest::StoreU8(h.base, submix + 61, guest::LoadU8(h.base, submix + 61) & 0xBF);
+      }
+      Store(h.base, cs::kSubmix, taken ? block + kUpdateSubmix : 0);
+      t.r3.u64 = sound;
+      t.r22.u64 = random.Next();
+      t.r23.u64 = random.Next();
+      t.r24.u64 = random.Next();
+      t.r25.u64 = random.Next();
+      t.r26.u64 = random.Next();
+      t.r27.u64 = random.Next();
+      t.r28.u64 = random.Next();
+      t.r29.u64 = random.Next();
+      t.r30.u64 = random.Next();
+      t.r31.u64 = random.Next();
+      t.f23.u64 = random.Next();
+      t.f24.u64 = random.Next();
+      t.f25.u64 = random.Next();
+      t.f26.u64 = random.Next();
+      t.f27.u64 = random.Next();
+      t.f28.u64 = random.Next();
+      t.f29.u64 = random.Next();
+      t.f30.u64 = random.Next();
+      t.f31.u64 = random.Next();
+      for (uint32_t i = 0; i < 16; i += 8) {
+        const uint64_t a = random.Next(), b = random.Next();
+        std::memcpy(t.v126.u8 + i, &a, 8);
+        std::memcpy(t.v127.u8 + i, &b, 8);
+      }
+      CriticalSection(h, kMixLock, true);
+      const uint32_t mastering = MasteringVoice(h.base);
+      const uint32_t count = guest::LoadU32(h.base, mastering + 4);
+      const uint32_t active = guest::LoadU32(h.base, mastering + 40);
+      const uint32_t state_before = guest::LoadU32(h.base, sound + 0);
+      ITC_FLAG(native_car_sounds) = v == 1;
+      (v == 0 ? __imp__sub_82110048 : hooks::CarSoundsUpdate)(t, h.base);
+      ITC_FLAG(native_car_sounds) = true;
+      // The voices made (not the fake ones in the main block).
+      std::vector<RealVoice> made;
+      for (const uint32_t at : kUpdateHolders) {
+        for (uint32_t i = 0; i < 4; i++) {
+          const uint32_t voice = guest::LoadU32(h.base, sound + at + 4 + 4 * i);
+          if (voice == 0 || (voice >= block && voice < block + kBlockBytes)) {
+            continue;
+          }
+          const uint32_t allocator = guest::LoadU32(h.base, voice + 8);
+          made.push_back({voice, allocator, guest::LoadU32(h.base, allocator + 16) + 28});
+        }
+      }
+      if (v == 1) {
+        made_total += uint32_t(made.size());
+        const uint32_t car = guest::LoadU32(h.base, sound + 400);
+        no_vehicle += car == 0;
+        players_cases += car != 0 && players;
+        live += car != 0 && guest::LoadU32(h.base, sound + 1248) != 0;
+        switched += guest::LoadU32(h.base, sound + 0) != state_before;
+        const uint32_t factor = guest::LoadU32(h.base, sound + 204);
+        clamped += car != 0 && (factor == max_word || factor == min_word);
+      }
+      out[v].Word(uint32_t(made.size()));
+      out[v].Word(RelativeWord(t.r3.u32, made));
+      const auto with_floats = [&](uint32_t address, uint32_t bytes,
+                                   const std::vector<uint32_t>& floats) {
+        std::vector<uint8_t> words = Read(h.base, address, bytes);
+        for (uint32_t i = 0; i + 4 <= bytes; i += 4) {
+          const uint32_t word = RelativeWord(guest::LoadU32(h.base, address + i), made);
+          for (uint32_t b = 0; b < 4; b++) {
+            words[i + b] = uint8_t(word >> (24 - 8 * b));
+          }
+        }
+        for (const uint32_t offset : floats) {
+          for (uint32_t b = 0; b < 4; b++) {
+            words[offset + b] = 0;
+          }
+        }
+        out[v].Bytes(words);
+        for (const uint32_t offset : floats) {
+          out[v].Float(guest::LoadU32(h.base, address + offset));
+        }
+      };
+      with_floats(block, kBlockBytes, block_floats);
+      {
+        std::vector<uint32_t> floats;
+        for (const uint32_t o : sound_floats) {
+          floats.push_back(sound - sb + o);
+        }
+        for (uint32_t i = 0; i < 6; i++) {
+          floats.push_back(kUpdateMatrix + 4 * i);
+        }
+        with_floats(sb, kBlockBytes, floats);
+      }
+      Relative(out[v], h.base, vehicle, kVehicleBytes, made);
+      for (const RealVoice& m : made) {
+        Relative(out[v], h.base, m.allocator, m.bytes, made);
+      }
+      Relative(out[v], h.base, t.r1.u32 - kUpdateFrame, kUpdateFrame, made);
+      Relative(out[v], h.base, t.r1.u32, 64, made);
+      out[v].Word(guest::LoadU32(h.base, kSlipFlag));
+      out[v].Word(guest::LoadU32(h.base, kSlipThreshold));
+      for (const RealVoice& m : made) {
+        PPCContext stop = CallContext(h);
+        stop.r3.u64 = m.voice;
+        stop.r4.u64 = 1;
+        hooks::XAudioApiStop(stop, h.base);
+        PPCContext lock = CallContext(h);
+        hooks::XAudioSpinTake(lock, h.base);
+        const uint32_t node = m.voice + source_offset;
+        const uint32_t prev = guest::LoadU32(h.base, node + 4);
+        const uint32_t next = guest::LoadU32(h.base, node);
+        out[v].Word(guest::LoadU32(h.base, prev) == node &&
+                    guest::LoadU32(h.base, next + 4) == node);
+        guest::StoreU32(h.base, prev, next);
+        guest::StoreU32(h.base, next + 4, prev);
+        hooks::XAudioSpinRelease(lock, h.base);
+        memory::crt::XMemFree(m.allocator, 0x61820006);
+      }
+      out[v].Word(guest::LoadU32(h.base, mastering + 4) - count);
+      out[v].Word(guest::LoadU32(h.base, mastering + 40) - active);
+      Store(h.base, mastering + 4, count);
+      Store(h.base, mastering + 40, active);
+      CriticalSection(h, kMixLock, false);
+      for (uint32_t g = 0; g < kGlobals; g++) {
+        Write(h.base, globals[g].address, saved[g].data(), globals[g].bytes);
+      }
+    }
+    h.random = random;
+    results.Check(out[0], out[1],
+                  fmt::format("{} case {} (sound +{})", taken ? "taken" : "free", c,
+                              sound - sb));
+  }
+  ITC_LOG_INFO("harness: car_sounds: CarSound::Update: {} cases without a vehicle, {} the "
+               "players' cars, {} live, {} with the submix's effect switched, {} with the "
+               "Doppler factor at a bound, {} voices made",
+               no_vehicle, players_cases, live, switched, clamped, made_total);
+  results.Report();
+}
+
 }  // namespace
 
 void CarSounds(Context& h) {
@@ -2590,6 +3069,7 @@ void CarSounds(Context& h) {
   Parts(h, block.address);
   Engine(h, block.address);
   Tires(h, block.address);
+  CarSoundUpdates(h, block.address);
 }
 
 }  // namespace harness

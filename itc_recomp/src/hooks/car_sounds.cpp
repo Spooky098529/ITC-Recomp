@@ -29,7 +29,7 @@ ITC_FLAG_BOOL(native_car_sounds, true, "ITC",
               "Memory::AllocPhysicalEx's, Music::Play's and X3DAudioInitialize's plain C++); X3DAudio's "
               "X3DVec::Sub sub_824819E0, Length sub_82481998, Dot sub_824819B8 and Cross "
               "sub_82481A18, X3DAudio::EvaluateCurve sub_82480818 and X3DAudio::Curves "
-              "sub_82480918, X3DAudio::Pan sub_82480F80 and X3DAudio::Matrix sub_82481390, X3DAudio::Cone sub_82480BA8, X3DAudio::Doppler sub_82480E90 and X3DAudioCalculate sub_82481880 (the original when its flags ask for EmitterAngle sub_82480780 or Delay sub_82481708) (checked by --run_harnesses=x3daudio)); CarSound::Update3D sub_8210F820 (RigidBody::Position's, Vec4::Copy's and X3DAudioCalculate's plain C++); the voice holders' CarSound::SetPitch sub_8210D158, SetPitchScaled sub_8210D080, IsPlaying sub_8210D1D8, UpdateVoices sub_8210D378, Clear sub_8210D320, Pause sub_8210D240 and Resume sub_8210D2C0 (no adapters: only PauseAll's and ResumeAll's plain C++ call them), PauseAll sub_8210E2B8 and ResumeAll sub_8210E350; CarSound::AddVoice sub_8210CE38 and PlayOnce sub_8210E3E8, EngineLayer::Start sub_8210D410, EngineSound::Start sub_8210D6C0, TireSound::Start sub_8210D7F8 and CarSound::Start sub_8210E030; CarSound::Stop sub_8210E218, CarSounds::StopAll sub_8210F7C8, CarSound::Release sub_8210E170 and CarSounds::Release sub_8210F750 (operator delete[]'s plain C++); CarSounds::Init sub_8210FE00 (operator new[]'s plain C++); the parts' updates: HitSounds::Update sub_8210FD78 with its impact sub_8210E778, scrape sub_8210E938 and wave 9 sub_8210EB90 (the collision accessors' and Vehicle::GetSpeedKmh's plain C++), the parts at +736 sub_8210EBF0, +840 sub_8210ECF0 and +888 sub_8210EEE0, WindSound::Update sub_8210EDB0 and PassBySound::Update sub_8210F088 (PlayOnce's, IsPlaying's and UpdateVoices' plain C++); the engine: EngineSound::Update sub_8210E470 with EngineLayer::Update sub_8210D478 and EngineLayer::UpdatePitched sub_8210D718 (Vehicle::Float2224's, pow's and SetPitchScaled's plain C++); the tires: TireSound::Update sub_8210E5C0 with TireLayer::Update sub_8210D890 (Vehicle::SlipWheelValue's, MaxWheelSlip's, TireSound::Amount's, IsPlaying's and SetPitch's plain C++); RollSound::Update sub_8210DB60 (Vehicle::GetSpeedKmh's and SetPitch's plain C++); the horn: HornSound::Update sub_8210F118 (PlayOnce's, SetPitchScaled's, IsPlaying's and UpdateVoices' plain C++); the turbo: TurboSound::Update sub_8210F4E8 (PlayOnce's, IsPlaying's, SetPitch's and UpdateVoices' plain C++) (XAudio's entry points through their plain C++) natively instead of through the translated code "
+              "sub_82480918, X3DAudio::Pan sub_82480F80 and X3DAudio::Matrix sub_82481390, X3DAudio::Cone sub_82480BA8, X3DAudio::Doppler sub_82480E90 and X3DAudioCalculate sub_82481880 (the original when its flags ask for EmitterAngle sub_82480780 or Delay sub_82481708) (checked by --run_harnesses=x3daudio)); CarSound::Update3D sub_8210F820 (RigidBody::Position's, Vec4::Copy's and X3DAudioCalculate's plain C++); the voice holders' CarSound::SetPitch sub_8210D158, SetPitchScaled sub_8210D080, IsPlaying sub_8210D1D8, UpdateVoices sub_8210D378, Clear sub_8210D320, Pause sub_8210D240 and Resume sub_8210D2C0 (no adapters: only PauseAll's and ResumeAll's plain C++ call them), PauseAll sub_8210E2B8 and ResumeAll sub_8210E350; CarSound::AddVoice sub_8210CE38 and PlayOnce sub_8210E3E8, EngineLayer::Start sub_8210D410, EngineSound::Start sub_8210D6C0, TireSound::Start sub_8210D7F8 and CarSound::Start sub_8210E030; CarSound::Stop sub_8210E218, CarSounds::StopAll sub_8210F7C8, CarSound::Release sub_8210E170 and CarSounds::Release sub_8210F750 (operator delete[]'s plain C++); CarSounds::Init sub_8210FE00 (operator new[]'s plain C++); the parts' updates: HitSounds::Update sub_8210FD78 with its impact sub_8210E778, scrape sub_8210E938 and wave 9 sub_8210EB90 (the collision accessors' and Vehicle::GetSpeedKmh's plain C++), the parts at +736 sub_8210EBF0, +840 sub_8210ECF0 and +888 sub_8210EEE0, WindSound::Update sub_8210EDB0 and PassBySound::Update sub_8210F088 (PlayOnce's, IsPlaying's and UpdateVoices' plain C++); the engine: EngineSound::Update sub_8210E470 with EngineLayer::Update sub_8210D478 and EngineLayer::UpdatePitched sub_8210D718 (Vehicle::Float2224's, pow's and SetPitchScaled's plain C++); the tires: TireSound::Update sub_8210E5C0 with TireLayer::Update sub_8210D890 (Vehicle::SlipWheelValue's, MaxWheelSlip's, TireSound::Amount's, IsPlaying's and SetPitch's plain C++); RollSound::Update sub_8210DB60 (Vehicle::GetSpeedKmh's and SetPitch's plain C++); the horn: HornSound::Update sub_8210F118 (PlayOnce's, SetPitchScaled's, IsPlaying's and UpdateVoices' plain C++); the turbo: TurboSound::Update sub_8210F4E8 (PlayOnce's, IsPlaying's, SetPitch's and UpdateVoices' plain C++); CarSound::Update sub_82110048 (Update3D's, the parts' updates' and SetEffectParameters' plain C++) (XAudio's entry points through their plain C++) natively instead of through the translated code "
               "(the same reads and writes; XAudio's locks stay the game's, taken as the original does; checked by "
               "--run_harnesses=car_sounds)");
 
@@ -591,6 +591,29 @@ void CarSoundsEngineSoundUpdate(PPCContext& ctx, uint8_t* base) {
   });
 }
 
+void CarSoundsUpdate(PPCContext& ctx, uint8_t* base) {
+  ctx.fpscr.disableFlushMode();
+  GuestTanUser user{&ctx, base};
+  cs::Update3DSaves saves{uint32_t(ctx.lr), ctx.r22.u64, ctx.r23.u64, ctx.r24.u64, ctx.r25.u64,
+                          ctx.r26.u64,      ctx.r27.u64, ctx.r28.u64, ctx.r29.u64, ctx.r30.u64,
+                          ctx.r31.u64,      ctx.f23.u64, ctx.f24.u64, ctx.f25.u64, ctx.f26.u64,
+                          ctx.f27.u64,      ctx.f28.u64, ctx.f29.u64, ctx.f30.u64, ctx.f31.u64,
+                          {},               {}};
+  std::memcpy(saves.v126, ctx.v126.u8, 16);
+  std::memcpy(saves.v127, ctx.v127.u8, 16);
+  const uint64_t sound = ctx.r3.u64;
+  const cs::Voices voices = VoicesOf(ctx, base);
+  uint64_t r3 = 0;
+  XAudioFramed(ctx, base, 128, [&](const xaudio::GuestCall& call, uint32_t frame) {
+    r3 = cs::CarSoundUpdate(base, sound, saves, voices, frame, call, {GuestTan, &user});
+    return uint32_t(r3);
+  });
+  ctx.r3.u64 = r3;
+  // The epilogue's r12 and lr: the saved word.
+  ctx.r12.u64 = uint32_t(ctx.lr);
+  ctx.lr = ctx.r12.u64;
+}
+
 }  // namespace hooks
 
 #define ITC_CAR_SOUNDS_ADAPTER(address, step) \
@@ -664,6 +687,7 @@ ITC_CAR_SOUNDS_ADAPTER(8210E5C0, CarSoundsTireSoundUpdate)
 ITC_CAR_SOUNDS_ADAPTER(8210DB60, CarSoundsRollSoundUpdate)
 ITC_CAR_SOUNDS_ADAPTER(8210F118, CarSoundsHornSoundUpdate)
 ITC_CAR_SOUNDS_ADAPTER(8210F4E8, CarSoundsTurboSoundUpdate)
+ITC_CAR_SOUNDS_ADAPTER(82110048, CarSoundsUpdate)
 
 extern "C" REX_FUNC(sub_82110258) {
   REX_FUNC_PROLOGUE();
