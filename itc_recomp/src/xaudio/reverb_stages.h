@@ -5,8 +5,9 @@
 // order of loads, stores and roundings (the scalar unit's, flush to zero
 // off; a float stored straight from its load keeps its bits, as the
 // translated code's folded lfs/stfs pairs do). Built with strict floating
-// point and no contraction (CMakeLists.txt). Adapters:
-// src/hooks/xaudio_objects.cpp (behind --native_xaudio_objects).
+// point and no contraction (CMakeLists.txt). No adapters: only the native
+// ReverbCore::Process calls them (reverb_core.h); their register steps in
+// src/hooks/xaudio_objects.cpp are the harness's.
 
 #pragma once
 

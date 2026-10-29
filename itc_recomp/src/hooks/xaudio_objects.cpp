@@ -42,10 +42,10 @@ ITC_FLAG_BOOL(native_xaudio_objects, true, "ITC",
               "lines' fills sub_82467720 to sub_82467990; the resampler's Resampler::Process "
               "sub_8246F140 and its kernels sub_8247E188, sub_8247E260 (with their vector paths "
               "sub_8246E208 and sub_8246E4C8), sub_82473E48, sub_82474188, sub_8247F558 and "
-              "sub_82478E60; the reverb core's stages sub_82462BC8, sub_82462CF8, sub_82463060 and "
-              "sub_82463578, and the all-passes sub_82462DC8, sub_82463130, sub_824632A0 and "
-              "sub_82463410, and the crossfading delay lines sub_824624F8 and sub_82463620, and "
-              "ReverbCore::Process sub_82463B90 over them) natively instead of through the "
+              "sub_82478E60; ReverbCore::Process sub_82463B90 with its stages, the native ones "
+              "reached only from it: sub_82462BC8, sub_82462CF8, sub_82463060 and sub_82463578, "
+              "the all-passes sub_82462DC8, sub_82463130, sub_824632A0 and sub_82463410, and the "
+              "crossfading delay lines sub_824624F8 and sub_82463620) natively instead of through the "
               "translated code (the same reads and writes; checked by "
               "--run_harnesses=xaudio_objects)");
 
@@ -643,14 +643,4 @@ ITC_XAUDIO_OBJECTS_ADAPTER(8246F140, XAudioResamplerProcess)
 ITC_XAUDIO_OBJECTS_ADAPTER(8247E188, XAudioResampleMono)
 ITC_XAUDIO_OBJECTS_ADAPTER(8247E260, XAudioResampleStereo)
 ITC_XAUDIO_OBJECTS_ADAPTER(8247F558, XAudioCopyStereo)
-ITC_XAUDIO_OBJECTS_ADAPTER(82462BC8, XAudioReverbLowPass)
-ITC_XAUDIO_OBJECTS_ADAPTER(82462CF8, XAudioReverbDelay512)
-ITC_XAUDIO_OBJECTS_ADAPTER(82463060, XAudioReverbDelay2048)
-ITC_XAUDIO_OBJECTS_ADAPTER(82463578, XAudioReverbDelay1024)
-ITC_XAUDIO_OBJECTS_ADAPTER(82462DC8, XAudioReverbAllPass128)
-ITC_XAUDIO_OBJECTS_ADAPTER(82463130, XAudioReverbAllPass256)
-ITC_XAUDIO_OBJECTS_ADAPTER(824632A0, XAudioReverbAllPass512)
-ITC_XAUDIO_OBJECTS_ADAPTER(82463410, XAudioReverbAllPass512To)
-ITC_XAUDIO_OBJECTS_ADAPTER(824624F8, XAudioReverbCrossfadeDelay)
-ITC_XAUDIO_OBJECTS_ADAPTER(82463620, XAudioReverbCrossfadeDelay256)
 ITC_XAUDIO_OBJECTS_ADAPTER(82463B90, XAudioReverbCoreProcess)
