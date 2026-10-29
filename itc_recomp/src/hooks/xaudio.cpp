@@ -9,6 +9,7 @@
 #include "base/log.h"
 #include "hooks/guest_call.h"
 #include "hooks/heap.h"
+#include "xaudio/engine.h"
 #include "xaudio/voices.h"
 
 #include <type_traits>
@@ -45,7 +46,7 @@ ITC_FLAG_BOOL(native_xaudio, true, "ITC",
               "sub_8245E6A8 and sub_8245F298, destructors sub_82460B50, sub_8245E1B8, "
               "sub_8245E7A0, sub_8245F108 and sub_8245F3A0, XAudioVoice::CreateSource "
               "sub_8245EAA0 and CreateSubmix sub_8245F3D0; the API entry points sub_82459DB0 to "
-              "sub_8245A7C8 but XAudioShutDown, the callback's and the commit (under the API lock, the game's "
+              "sub_8245A7C8 but XAudioShutDown, with the callback's registration sub_8245A5E8 and the commit sub_8245A6E8 (under the API lock, the game's "
               "critical section taken as the original does); their "
               "calls into the recompiled objects through the translated code) natively "
               "instead of through the translated code (the same reads and writes; XAudio's two "
@@ -775,6 +776,25 @@ void XAudioApiSetFrequencyRatio(PPCContext& ctx, uint8_t* base) {
   });
 }
 
+void XAudioApiRegisterCallback(PPCContext& ctx, uint8_t* base) {
+  const uint64_t r3 = ctx.r3.u64, r4 = ctx.r4.u64, r5 = ctx.r5.u64, r6 = ctx.r6.u64;
+  const uint32_t thread = ThreadOf(ctx, base).r13;
+  Framed(ctx, base, 128, [&](const xa::GuestCall& call) {
+    return uint32_t(xa::ApiRegisterCallback(base, r3, r4, r5, r6, thread, call));
+  });
+  ctx.r3.s64 = int32_t(ctx.r3.u32);  // 0, E_FAIL or E_OUTOFMEMORY as lis/ori leave them
+}
+
+void XAudioApiCommit(PPCContext& ctx, uint8_t* base) {
+  const xa::Thread th = ThreadOf(ctx, base);
+  uint64_t r3 = 0;
+  Framed(ctx, base, 112, [&](const xa::GuestCall& call) {
+    r3 = xa::ApiCommit(base, th, call);
+    return uint32_t(r3);
+  });
+  ctx.r3.u64 = r3;
+}
+
 void XAudioApiGetMasteringVoice(PPCContext& ctx, uint8_t* base) {
   const uint32_t out = ctx.r3.u32;
   Framed(ctx, base, 112,
@@ -870,5 +890,7 @@ ITC_XAUDIO_ADAPTER(8245A0B0, XAudioApiReset)
 // No adapter (removed 2026-10-29: only the car sounds' plain C++ (the parts' updates, PlayOnce) and XACTVoice::SetVolume's plain C++ calls it in play) for XAudioSourceVoice::SetVolume sub_8245A2C8.
 // No adapter (removed 2026-10-29: only CarSound::SetPitch's, SetPitchScaled's and XACTVoice::SetPitch's plain C++ calls it in play) for XAudioSourceVoice::SetFrequencyRatio sub_8245A340.
 ITC_XAUDIO_ADAPTER(8245A568, XAudioApiGetMasteringVoice)
+ITC_XAUDIO_ADAPTER(8245A5E8, XAudioApiRegisterCallback)
+ITC_XAUDIO_ADAPTER(8245A6E8, XAudioApiCommit)
 ITC_XAUDIO_ADAPTER(8245A768, XAudioApiCreateSourceVoice)
 ITC_XAUDIO_ADAPTER(8245A7C8, XAudioApiCreateSubmixVoice)

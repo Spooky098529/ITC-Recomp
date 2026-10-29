@@ -1779,6 +1779,59 @@ void Api(Context& h, uint32_t block) {
     }
     results.Report();
   }
+  {
+    // The live engine's start-pending list (empty between the game's
+    // commits, so nothing starts).
+    Results results("XAudio::Commit (sub_8245A6E8)");
+    for (int i = 0; i < 8; i++) {
+      LockedCase(h, results, block, __imp__sub_8245A6E8, hooks::XAudioApiCommit, false,
+                 [&](Random&, PPCContext&) {}, [](Outputs&) {}, fmt::format("case {}", i));
+    }
+    results.Report();
+  }
+  {
+    // Registered in the live engine (stage 0 or 1) as a recompiled AddRef on
+    // a scratch object outside the block (the mixer may run it), the slot
+    // compared as an offset in the engine and cleared again under the spin
+    // lock; the out pointer 0 now and then.
+    Results results("XAudioRegisterProcessingCallback (sub_8245A5E8)");
+    Block scratch;
+    for (int i = 0; i < 16; i++) {
+      LockedCase(h, results, block, __imp__sub_8245A5E8, hooks::XAudioApiRegisterCallback, false,
+                 [&](Random& random, PPCContext& t) {
+                   Store(h.base, block + 0x1F80, 0);
+                   t.r3.u64 = (random.Next() & ~0xFFull) | random.Below(2);
+                   t.r4.u64 = 0x8245F860;
+                   t.r5.u64 = scratch.address;
+                   t.r6.u64 = i % 4 == 3 ? 0 : block + 0x1F80;
+                 },
+                 [&](Outputs& out) {
+                   PPCContext lock = CallContext(h);
+                   hooks::XAudioSpinTake(lock, h.base);
+                   uint32_t slot = 0;
+                   for (uint32_t stage = 0; stage < 2 && slot == 0; stage++) {
+                     for (uint32_t k = 0; k < 8; k++) {
+                       const uint32_t at = engine + (stage << 6) + 168 + 8 * k;
+                       if (guest::LoadU32(h.base, at) == 0x8245F860 &&
+                           guest::LoadU32(h.base, at + 4) == scratch.address) {
+                         slot = at;
+                         break;
+                       }
+                     }
+                   }
+                   out.Word(slot != 0 ? slot - engine : 0);
+                   out.Word(guest::LoadU32(h.base, block + 0x1F80) == slot);
+                   Store(h.base, block + 0x1F80, 0);
+                   if (slot != 0) {
+                     Store(h.base, slot, 0);
+                     Store(h.base, slot + 4, 0);
+                   }
+                   hooks::XAudioSpinRelease(lock, h.base);
+                 },
+                 fmt::format("case {}", i));
+    }
+    results.Report();
+  }
   if (!hooks::NativeHeapActive()) {
     return;
   }

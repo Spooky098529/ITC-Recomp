@@ -429,4 +429,17 @@ struct MakingStandIn {
 };
 void SetMakingForHarness(std::optional<MakingStandIn> stand_in);
 
+// --- The API entry points over the engine (under the API lock, the game's
+// critical section entered and left through the imports as the original
+// does; docs/functions/xaudio.md) ---
+
+// XAudioRegisterProcessingCallback (sub_8245A5E8): under the API lock,
+// E_FAIL without an engine, else RegisterCallback's plain C++ with r3-r6 as
+// the stage, function, context and out. Returns r3 in full (sign-extended).
+uint64_t ApiRegisterCallback(uint8_t* base, uint64_t r3, uint64_t r4, uint64_t r5, uint64_t r6,
+                             uint32_t thread, const GuestCall& call);
+// XAudio::Commit (sub_8245A6E8): under the API lock, E_FAIL without an
+// engine (sign-extended), else Commit's plain C++, whose r3 it returns.
+uint64_t ApiCommit(uint8_t* base, const Thread& thread, const GuestCall& call);
+
 }  // namespace xaudio

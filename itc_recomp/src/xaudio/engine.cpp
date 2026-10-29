@@ -1151,4 +1151,36 @@ uint64_t CreateEngine(uint8_t* base, uint32_t params, uint32_t allocator, bool n
                       FrameBelow(base, frame, kEngineCreateFrame), call);
 }
 
+// --- The API entry points over the engine ---
+
+uint64_t ApiRegisterCallback(uint8_t* base, uint64_t r3, uint64_t r4, uint64_t r5, uint64_t r6,
+                             uint32_t thread, const GuestCall& call) {
+  ITC_NATIVE_RUNNING("sub_8245A5E8 XAudioRegisterProcessingCallback");
+  ApiEnter(base, call);
+  const uint32_t engine = guest::LoadU32(base, kEngine);
+  if (engine == 0) {
+    ApiLeave(base, call);
+    return 0xFFFFFFFF80004005ull;  // E_FAIL
+  }
+  SetRegs(call, Args({engine, r3, r4, r5, r6}));
+  const uint32_t result = RegisterCallback(base, engine, uint32_t(r3), uint32_t(r4),
+                                           uint32_t(r5), uint32_t(r6), thread, call);
+  ApiLeave(base, call);
+  return uint64_t(int64_t(int32_t(result)));  // 0 or E_OUTOFMEMORY as lis/ori leave it
+}
+
+uint64_t ApiCommit(uint8_t* base, const Thread& thread, const GuestCall& call) {
+  ITC_NATIVE_RUNNING("sub_8245A6E8 XAudio::Commit");
+  ApiEnter(base, call);
+  const uint32_t engine = guest::LoadU32(base, kEngine);
+  if (engine == 0) {
+    ApiLeave(base, call);
+    return 0xFFFFFFFF80004005ull;  // E_FAIL
+  }
+  SetRegs(call, Args({engine}));
+  const uint32_t result = Commit(base, engine, thread, call);
+  ApiLeave(base, call);
+  return result;
+}
+
 }  // namespace xaudio
