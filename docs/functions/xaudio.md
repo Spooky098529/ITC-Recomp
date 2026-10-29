@@ -145,10 +145,10 @@ voice), the voices' output buffers (36 bytes, vtable `0x8204A8CC`:
 aligned) and the default output matrices (`0x8204A7B8`, chosen by the
 input and output channel counts, `sub_8245EC40`).
 
-Not here (leads in `../loops/leads.md`): the engine and its mixer
-(XAudioInitialize's engine, the callback's registration, the commit,
-the mixer's callback and passes: `8245A828`-`8245C538` and
-`8245D650`-`82460600`), and the objects the engine's factory makes
+Not here: the engine and its mixer (XAudioInitialize's engine, the
+callback's registration, the commit, the mixer's callback and passes:
+`8245A828`-`8245C538` and `8245D650`-`82460600`), in
+`xaudio-engine.md`; and (leads in `../loops/leads.md`) the objects the engine's factory makes
 (`8246xxxx`: the source voices' PCM and XMA codecs at +76, the output
 matrices, the effects), whose XMA side is partly in `audio.md`. Shared
 rows: XAudioInitialize (`sub_8245A760`, `sub_8245A410`) stay in

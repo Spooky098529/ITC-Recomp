@@ -376,6 +376,13 @@ Rows not yet moved stay in the table below. So far:
   the sound banks' records (the play-wave event that owns each wave,
   the wave-variation, stop and transition events) and the waves'
   forwarders to their voices (B7; the parameter events are a lead).
+- [`xaudio-engine.md`](xaudio-engine.md): XAudio's engine and mixer:
+  the engine's creation and set-up (its size, processors, threads and
+  kernel objects), the object factory, the allocators, the mastering
+  voice and its render driver object, the mixer's callback, the
+  processor threads, the stages' passes and barrier, the processing
+  callbacks and the commit (B7; XAudioInitialize stays in
+  `sound-cues.md`, the category volume in `audio.md`).
 
 These files hold functions only. What used to follow the table here moved
 out on 2026-10-20: how frame interpolation works, its options and what
