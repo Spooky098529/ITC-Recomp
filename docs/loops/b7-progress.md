@@ -30,8 +30,10 @@ file's history. What's left to see in a drive, from every run:
   `xact-waves.md`: done (be9c0c5..b32d7d2; tracks 55 of 55,
   waves 28 of 30). Validated (`itc_2472`, `itc_2473`: 20 of 20
   harness lines, all ran in play). XACT's waves' last two and `Fire`'s
-  r3 done (f1e1ee9..dcdb43e; waves 31 of 31). Step: validation agent
-  running. Then the same r3 fix for `SendNotification`, `Notify`,
+  r3 done (f1e1ee9..dcdb43e; waves 31 of 31). Validated (`itc_2481`,
+  `itc_2482`: 16 of 16 harness lines; one to drive; the replay logged
+  the intermittent BaseHeap pair). Step: migration agent running on
+  the same r3 fix for `SendNotification`, `Notify`,
   `SetState`, and XAudio's engine's 7.
 
 ## Done
@@ -93,3 +95,5 @@ file's history. What's left to see in a drive, from every run:
 - After XACT's waves' last two (`itc_2480`: race 38 s, 0 errors,
   xact_waves, xact_tracks, xact, xaudio 0 differing): ours 2912, work
   left 3405 (wrapped 104, known 510, unknown 2791).
+- After its validation (`itc_2481`: race 7 s, 0 errors, every harness
+  0 differing but the expected groups): ours 2912, work left 3405.

@@ -18,6 +18,11 @@ here loses its heading.
 - XACT's tracks' migration 1 (attract race `itc_2432`, replay
   `itc_2433`, ok): `sub_825D7B78` XACTWaveVariationEvent::SetWave
   (`xact-tracks.md`)
+- XACT's waves' last two (attract race `itc_2481`, replay `itc_2482`,
+  broke: the SDK's "BaseHeap::Release failed because address is not a
+  region start" twice at a transition ~118 s in, the intermittent pair
+  seen before in `itc_1528` and `itc_1719`; it ran to the end):
+  `sub_825D1FD8` XACTWave::Finish (`xact-waves.md`)
 
 ## Run 2026-10-28 22:22 (`b7-loop-28-10-26-3`)
 
