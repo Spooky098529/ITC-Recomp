@@ -31,6 +31,21 @@ When the user has reviewed a run's section, its heading gets
   the callback and the teardown. `known-data.md`: the engine, stage,
   factory, mastering voice, render driver, allocator, kernel objects
   and stats copies.
+- XAudio's engine's migration 1 (e9d3f21..d17ae9f, `--native_xaudio_engine`):
+  40 of 47 in play ours (11 adapters removed): the leaves, the engine's
+  and factory's making, the mastering voice, the stages, callbacks and
+  commit. Choices to look at: where the original releases the voice
+  lists' spin lock with depth, owner and IRQL kept in registers, ours
+  reads the lock's words (the same values while it's held; the
+  `RunStage` row); `KeGetCurrentProcessType` in `SetUpProcessors` is
+  called through its import thunk, as the original does; the engine
+  constructor's and `TakeStats`' harness cases run holding the mixer's
+  lock `0x8264D4F8` (our output thread waits on it) and put the live
+  `[0x82954F08]` back before leaving it. Left for the user's call (the
+  kernel objects above): `XAudio::CreateEngine` `sub_82459D60` with
+  `XAudioEngine::Create` and `Init`, the mixer callback `sub_8245FBE0`
+  with `XAudioEngine::Mix` `sub_8245BF80`, `XAudio::MasterThread` and
+  `WorkerThread`.
 - XACT's tracks and events (map a3880fc): `docs/functions/xact-tracks.md`,
   143 rows (all new; 88 not seen in play): the tracks, track instances
   and events of `825D0000`-`825D9000`. The lead's "owner's forwarders"
