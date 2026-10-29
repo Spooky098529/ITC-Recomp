@@ -1597,7 +1597,15 @@ uint32_t LargestPrimeBelow(uint8_t* base, uint32_t n) {
 }
 
 void FillDelayLine(uint8_t* base, uint32_t line, uint32_t groups) {
-  ITC_NATIVE_RUNNING("sub_82467720 the reverb's delay line fills");
+  switch (groups) {
+    case 2048: ITC_NATIVE_RUNNING("sub_82467720 the reverb's delay line fill (2,048)"); break;
+    case 64: ITC_NATIVE_RUNNING("sub_82467788 the reverb's delay line fill (64)"); break;
+    case 16: ITC_NATIVE_RUNNING("sub_824677F0 the reverb's delay line fill (16)"); break;
+    case 256: ITC_NATIVE_RUNNING("sub_82467858 the reverb's delay line fill (256)"); break;
+    case 32: ITC_NATIVE_RUNNING("sub_824678C0 the reverb's delay line fill (32)"); break;
+    case 128: ITC_NATIVE_RUNNING("sub_82467928 the reverb's delay line fill (128)"); break;
+    case 512: ITC_NATIVE_RUNNING("sub_82467990 the reverb's delay line fill (512)"); break;
+  }
   uint32_t at = line + 12;
   for (uint32_t i = 0; i < groups; i++, at += 32) {
     for (uint32_t k = 0; k < 8; k++) {
