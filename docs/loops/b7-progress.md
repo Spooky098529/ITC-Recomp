@@ -16,7 +16,11 @@ file's history. What's left to see in a drive, from every run:
   `sub_8246AAD0`: their case releases the codec through the original),
   then what's ready in `xaudio-objects.md` (the resampler, the reverb's
   core). The precedent: the run of 2026-10-24 21:33 began with the
-  previous stop's harness lines as such a lead. Migration agent running.
+  previous stop's harness lines as such a lead. Migration 1 checked
+  (3ea5812..01a849c: the destructors' cases, `SetLevels` fixed, the
+  resampler, 10 adapters removed, four reverb stages; 91 of 109 ours).
+  Validation agent running. Ready and left: `PcmCodec::Process`, the
+  reverb core's other stages and its process, set-up and create.
 
 ## Done
 
@@ -35,6 +39,9 @@ file's history. What's left to see in a drive, from every run:
 ## Totals
 
 - At the start: ours 2999, work left 3318 (wrapped 104, known 532,
+  unknown 2682).
+- After the cleanup's migration 1 (race 38 s, 0 errors, xaudio_objects
+  0 differing): ours 3012, work left 3305 (wrapped 104, known 519,
   unknown 2682).
 
 ## Stopped

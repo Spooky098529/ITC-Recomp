@@ -13,7 +13,20 @@ When the user has reviewed a run's section, its heading gets
 
 ## Run 2026-10-29 22:22 (`b7-loop-29-10-26-2`)
 
-- Nothing yet.
+- XAudio's objects, cleanup migration 1 (3ea5812..01a849c,
+  `xaudio-objects.md`): the XMA codec's destructors given harness cases
+  of their own (the last run's stop); `XAudioMatrix::SetLevels`
+  `sub_82466188` changed to copy its levels as words (a signaling NaN
+  kept bit for bit, as the recompiled lfs/stfs pair and `SetMatrix` do;
+  a real difference the new cases' inputs exposed); the resampler and
+  its kernels native (its constants addressed from `0x82050000`,
+  `../native-audio.md`); the resampler's and stages' harness cases sync
+  the host's flush-to-zero into the copied context; the copy kernels'
+  prefetch and cache-line bookkeeping left out (no memory effect). For
+  review: 10 adapters removed from `b7_groups.py --removable`'s list
+  include vtable slots (`RetirePacket` slot +92, `SubmitPacket` and
+  others), uncalled in an attract race by a counter; a recompiled path
+  through the vtable (menus) would run the original.
 
 ## Run 2026-10-29 15:44 (`b7-loop-29-10-26`)
 
