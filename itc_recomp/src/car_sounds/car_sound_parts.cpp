@@ -1,7 +1,7 @@
 // The car sounds' parts natively (car_sounds.h, docs/functions/car-sounds.md):
 // the hits, the parts at +736, +840 and +888, the wind, the pass by, the
-// engine with its two layers, the tires with their layer and the roll, each
-// from CarSound::Update every tick. Their callees' plain C++ called directly
+// engine with its two layers, the tires with their layer, the roll, the horn
+// and the turbo, each from CarSound::Update every tick. Their callees' plain C++ called directly
 // (PlayOnce, IsPlaying, UpdateVoices, XAudio's SetVolume and Stop, the
 // vehicle's accessors), each in a frame below the caller's, with the
 // registers set as the original sets them before the call. Strict floating
@@ -969,6 +969,180 @@ uint32_t RollSoundUpdate(uint8_t* base, uint32_t part, uint32_t vehicle, uint64_
   SetRegs(call, Args({voice, frame + 88}));
   xa::FrameBelow(base, frame, kApiFrame);
   return xa::ApiSetOutputMatrix(base, voice, frame + 88, 0, 0, 0, call);
+}
+
+// --- The horn (sub_8210F118) and the turbo (sub_8210F4E8) ---
+
+namespace {
+
+constexpr uint32_t kRaceData = 0x826C5B2C;     // the race data: its +0xA3AF4 the race mode
+constexpr uint32_t kRaceMode = 0xA3AF4;
+constexpr uint32_t kCarInputs = 0x826C5B30;    // the racers' 20-byte input records' pointers
+constexpr uint32_t kSideWord = 0x826C7824;     // 0 picks input record 1 in mode 8
+constexpr uint32_t kOtherInput = 0x826C62CC;   // the other 20-byte input record (mode 8)
+constexpr uint32_t kHornButton = 0x20000;      // the input word's bit (probably the horn)
+constexpr uint32_t kHornVolume = 0x82007FD8;
+constexpr uint32_t kHornPitchScale = 1600;     // SetPitchScaled's r9
+constexpr uint32_t kTurboStep = 0x82008068;    // +59 x it added to the volume +60
+constexpr uint32_t kTurboVolumeMax = 0x82008064;
+constexpr uint32_t kTurboOff = 0x82002A2C;     // the boost below it stops the voice
+constexpr uint32_t kTurboRise = 0x820021EC;    // the boost's rise to the pitch word
+constexpr uint32_t kTurboRound = 0x820029CC;   // added before fctiwz
+
+// fctiwz's whole 64-bit result as the translation leaves it (stfd): the
+// truncated int32 sign-extended, 0x80000000 for a NaN, INT32_MAX at or above
+// it, INT32_MIN (sign-extended) below its range.
+uint64_t Fctiwz64(double value) {
+  if (std::isnan(value)) {
+    return 0x80000000u;
+  }
+  if (value >= double(INT32_MAX)) {
+    return uint64_t(INT32_MAX);
+  }
+  if (value <= -2147483649.0) {
+    return uint64_t(int64_t(INT32_MIN));
+  }
+  return uint64_t(int64_t(int32_t(value)));
+}
+
+// One horn: the 20-byte input record at `record` copied to the frame's +80;
+// with its first word's button bit, the looping wave 11 + `horn` played
+// (slot at +`slot_at`, +`flag_at` = 1) or kept pitched; without it, the
+// voice stopped when +`flag_at` is 1 and it plays (+`flag_at` = 0).
+void HornUpdate(uint8_t* base, uint32_t part, uint32_t record, uint32_t horn, uint32_t flag_at,
+                uint32_t slot_at, double volume, double pitch, double f3, const Voices& voices,
+                uint32_t frame, const GuestCall& call) {
+  for (uint32_t i = 0; i < 20; i += 4) {
+    Store(base, frame + 80 + i, Load(base, record + i));
+  }
+  const uint32_t flag = Load(base, part + flag_at);
+  if ((Load(base, frame + 80) & kHornButton) != 0) {
+    uint32_t slot;
+    if (flag == 0) {
+      slot = Play(base, part, horn + 11, 1, volume, pitch, voices, frame, call);
+      Store(base, part + slot_at, slot);
+    } else {
+      slot = Load(base, part + slot_at);
+    }
+    SetRegs(call, ArgsF1({part, slot}, pitch));
+    SetPitchScaled(base, part, slot, pitch, f3, 0, kHornPitchScale,
+                   xa::FrameBelow(base, frame, kSetPitchScaledFrame), call);
+    if (flag == 0) {
+      Store(base, part + flag_at, 1);
+    }
+  } else if (flag == 1) {
+    if (Playing(base, part, Load(base, part + slot_at), frame, call) != 0) {
+      StopVoice(base, VoiceAt(base, part, Load(base, part + slot_at)), frame, call);
+      Store(base, part + flag_at, 0);
+    }
+  }
+}
+
+}  // namespace
+
+uint32_t HornSoundUpdate(uint8_t* base, uint32_t part, uint32_t vehicle, uint64_t output,
+                         double f1, const Voices& voices, uint32_t frame, const GuestCall& call) {
+  ITC_NATIVE_RUNNING("sub_8210F118 HornSound::Update");
+  if (vehicle == 0) {
+    return part;
+  }
+  const uint32_t mode = Load(base, Load(base, kRaceData) + kRaceMode);
+  const uint32_t horn = Load(base, Load(base, vehicle + 5712) + 1796) & 0xFF;
+  if (int32_t(mode) == 8) {
+    const double pitch = LoadF(base, kPitch);       // f31
+    const double volume = LoadF(base, kHornVolume);  // f28
+    const uint32_t side = Load(base, kSideWord) == 0 ? 1 : 0;  // r30
+    const uint32_t flags = Load(base, vehicle + 6148);
+    const bool first = (flags & 1) != 0, second = (flags & 0x80) != 0;
+    if (side == 0 ? first : second) {
+      HornUpdate(base, part, Load(base, kCarInputs + 4 * side), horn, 56, 48, volume, pitch, f1,
+                 voices, frame, call);
+    }
+    if (side == 0 ? second : first) {
+      HornUpdate(base, part, kOtherInput, horn, 60, 52, volume, pitch, f1, voices, frame, call);
+    }
+  } else {
+    HornUpdate(base, part, Load(base, kCarInputs), horn, 56, 48, LoadF(base, kHornVolume),
+               LoadF(base, kPitch), f1, voices, frame, call);
+  }
+  return Update(base, part, output, frame, call);
+}
+
+uint32_t TurboSoundUpdate(uint8_t* base, uint32_t part, uint32_t vehicle, uint64_t output,
+                          const Voices& voices, uint32_t frame, const GuestCall& call) {
+  ITC_NATIVE_RUNNING("sub_8210F4E8 TurboSound::Update");
+  const double boost = LoadF(base, vehicle + 2944);  // f30
+  // The volume +60 up by +59 x [0x82008068], at most [0x82008064] (the
+  // byte through the frame's +80).
+  {
+    const uint32_t ramp = guest::LoadU8(base, part + 59);
+    Store64(base, frame + 80, ramp);
+    double f0 = Fmadds(Single(double(int64_t(ramp))), LoadF(base, kTurboStep),
+                       LoadF(base, part + 60));
+    const double max = LoadF(base, kTurboVolumeMax);
+    if (f0 > max) {
+      f0 = max;
+    }
+    StoreF(base, part + 60, f0);
+  }
+  const double one = LoadF(base, kOne);    // f29
+  const double zero = LoadF(base, kZero);  // f31
+  const uint8_t wait = guest::LoadU8(base, part + 58);
+  const auto word_pitch = [&](int64_t word) {
+    Store64(base, frame + 80, uint64_t(word));
+    return Single(double(word));
+  };
+  if (wait != 0) {
+    guest::StoreU8(base, part + 58, uint8_t(wait + 255));
+  } else if (Playing(base, part, Load(base, part + 48), frame, call) == 0 && boost > one &&
+             boost > LoadF(base, part + 52)) {
+    // Spooling up: the looping wave 3 at the volume +60, its pitch from +56.
+    const double pitch = word_pitch(int64_t(int16_t(guest::LoadU16(base, part + 56))) + 8192);
+    const uint32_t slot =
+        Play(base, part, 3, 1, LoadF(base, part + 60), pitch, voices, frame, call);
+    StoreF(base, part + 60, zero);
+    Store(base, part + 48, slot);
+    guest::StoreU8(base, part + 59, 0);
+    guest::StoreU8(base, part + 58, 16);
+  } else if (boost < LoadF(base, kTurboOff)) {
+    if (Playing(base, part, Load(base, part + 48), frame, call) != 0) {
+      StopVoice(base, VoiceAt(base, part, Load(base, part + 48)), frame, call);
+      StoreF(base, part + 60, zero);
+      guest::StoreU8(base, part + 59, 0);
+    }
+  }
+  const uint32_t playing = Playing(base, part, Load(base, part + 48), frame, call);
+  const int32_t word = int16_t(guest::LoadU16(base, part + 56));
+  if (playing != 0) {
+    if (word < 3072) {
+      const double rise = Single(boost - LoadF(base, part + 52));
+      if (!(rise < zero)) {
+        // +56 up by the rise x [0x820021EC] (+ [0x820029CC], fctiwz's low
+        // half-word through the frame's +80), at most 3072.
+        const double now = word_pitch(word);
+        const double f0 =
+            Single(Fmadds(rise, LoadF(base, kTurboRise), now) + LoadF(base, kTurboRound));
+        const uint64_t bits = Fctiwz64(f0);
+        Store64(base, frame + 80, bits);
+        const uint16_t next = uint16_t(bits);
+        guest::StoreU16(base, part + 56, int16_t(next) > 3072 ? 3072 : next);
+      }
+    }
+    const uint32_t slot = Load(base, part + 48);
+    const double pitch =
+        word_pitch(int64_t(int16_t(guest::LoadU16(base, part + 56))) + 8192);
+    SetRegs(call, ArgsF1({part, slot}, pitch));
+    SetPitch(base, part, slot, pitch, 0, frame, call);
+    SetVolume(base, VoiceAt(base, part, Load(base, part + 48)), LoadF(base, part + 60), frame,
+              call);
+    guest::StoreU8(base, part + 59, uint8_t(guest::LoadU8(base, part + 59) + 1));
+  } else {
+    // Not playing: the pitch word +56 back down by 255 a tick, to 0.
+    const int32_t down = word - 255;
+    guest::StoreU16(base, part + 56, down >= 0 ? uint16_t(down) : 0);
+  }
+  StoreF(base, part + 52, boost);
+  return Update(base, part, output, frame, call);
 }
 
 }  // namespace car_sounds

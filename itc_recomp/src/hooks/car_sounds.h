@@ -150,4 +150,9 @@ void CarSoundsTireLayerUpdate(PPCContext& ctx, uint8_t* base);  // sub_8210D890
 void CarSoundsTireSoundUpdate(PPCContext& ctx, uint8_t* base);  // sub_8210E5C0
 void CarSoundsRollSoundUpdate(PPCContext& ctx, uint8_t* base);  // sub_8210DB60
 
+// The horn (r3 the part, r4 the vehicle, r5 the output, f1 the car sound's
+// +204) and the turbo (r3, r4, r5).
+void CarSoundsHornSoundUpdate(PPCContext& ctx, uint8_t* base);   // sub_8210F118
+void CarSoundsTurboSoundUpdate(PPCContext& ctx, uint8_t* base);  // sub_8210F4E8
+
 }  // namespace hooks

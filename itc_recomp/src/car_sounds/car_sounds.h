@@ -379,4 +379,33 @@ uint32_t TireSoundUpdate(uint8_t* base, uint32_t part, uint32_t vehicle, uint64_
 uint32_t RollSoundUpdate(uint8_t* base, uint32_t part, uint32_t vehicle, uint64_t output,
                          const Voices& voices, uint32_t frame, const GuestCall& call);
 
+// --- The horn and the turbo (car_sound_parts.cpp), from CarSound::Update ---
+
+// sub_8210F118 HornSound::Update (probably; 192 bytes): r3 = the part at
+// +1072, r4 the vehicle, r5 `output`, f1 the car sound's +204 (f3 of the
+// pitch). Nothing without a vehicle. The horn's wave 11 + the low byte of
+// the car's (+5712) word +1796. In race mode 8 (the race data's +0xA3AF4):
+// input record [0x826C5B30 + 4 x side] (side 1 when [0x826C7824] is 0) for
+// the vehicle's +6148 bit 0x1 (side 0) or 0x80 (side 1), +56 the flag and
+// +48 the slot; the record at 0x826C62CC for the other bit, +60 and +52.
+// Else record [0x826C5B30], +56 and +48. Each record's 20 bytes copied to
+// the frame's +80; with its first word's bit 0x20000 the looping wave played
+// once (PlayOnce, [0x82007FD8], [0x8200803C]; the flag 1) and pitched each
+// tick (SetPitchScaled: f1 [0x8200803C], r7 0, r9 1600); without it, with
+// the flag 1, stopped when playing (the flag 0). UpdateVoices.
+uint32_t HornSoundUpdate(uint8_t* base, uint32_t part, uint32_t vehicle, uint64_t output,
+                         double f1, const Voices& voices, uint32_t frame, const GuestCall& call);
+// sub_8210F4E8 TurboSound::Update (probably; 144 bytes): r3 = the part at
+// +952, r4 the vehicle, r5 `output`, by the boost (the vehicle's +2944):
+// the volume +60 up by the byte +59 x [0x82008068], at most [0x82008064];
+// while the byte +58 counts down, nothing else; at 0, the looping wave 3
+// played (+48 its slot, +60 0.0, +59 0, +58 16) when not playing and the
+// boost is above 1.0 and the last one (+52), or stopped below [0x82002A2C]
+// (+60 0.0, +59 0). Playing: the pitch word +56 (below 3072) up by the rise
+// x [0x820021EC] + [0x820029CC] (fctiwz, at most 3072), SetPitch with it +
+// 8192 (r7 0), the volume +60, +59 up by one; not playing, +56 down by 255
+// (to 0). +52 = the boost; UpdateVoices. Conversions through the frame's +80.
+uint32_t TurboSoundUpdate(uint8_t* base, uint32_t part, uint32_t vehicle, uint64_t output,
+                          const Voices& voices, uint32_t frame, const GuestCall& call);
+
 }  // namespace car_sounds
