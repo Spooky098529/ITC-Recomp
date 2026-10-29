@@ -33,4 +33,12 @@ void XAudioRegisterStats(PPCContext& ctx, uint8_t* base);         // sub_8245F58
 void XAudioSetUpProcessors(PPCContext& ctx, uint8_t* base);       // sub_8245A828
 void XAudioEngineSize(PPCContext& ctx, uint8_t* base);            // sub_8245B2C0
 
+void XAudioMasteringSize(PPCContext& ctx, uint8_t* base);         // sub_8245FF68
+void XAudioRenderDriverConstruct(PPCContext& ctx, uint8_t* base); // sub_82465938
+void XAudioMasteringInit(PPCContext& ctx, uint8_t* base);         // sub_8245FCA0
+void XAudioMasteringCreate(PPCContext& ctx, uint8_t* base);       // sub_824600F0
+void XAudioMasteringStart(PPCContext& ctx, uint8_t* base);        // sub_8245FE20 (r13 the thread)
+void XAudioMasteringPass(PPCContext& ctx, uint8_t* base);         // sub_8245FDC8
+void XAudioMasteringProcess(PPCContext& ctx, uint8_t* base);      // sub_8245FB80 (r13's processor)
+
 }  // namespace hooks

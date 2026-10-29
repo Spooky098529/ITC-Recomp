@@ -149,4 +149,68 @@ uint32_t SetUpProcessors(uint8_t* base, uint32_t mask, uint32_t out, uint32_t fr
 uint32_t EngineSize(uint8_t* base, uint32_t params, uint32_t out, uint32_t frame,
                     const GuestCall& call);
 
+// --- The mastering voice ---
+
+constexpr uint32_t kMasteringVtable = 0x8204A8E8;
+constexpr uint32_t kMasteringAttributes = 0x61820006;
+constexpr uint32_t kDriverVtable = 0x8204AAEC;
+constexpr uint32_t kDriverVtable2 = 0x8204AAD0;  // its +4 interface
+constexpr uint32_t kDriverVtableFirst = 0x8204AA58;  // +4's first, written over
+constexpr uint32_t kBufferClearThunk = 0x8245FA10;
+
+// XAudioMasteringVoice::Size (sub_8245FF68): the mastering voice's size for
+// the description at `description` (3 words, or 0) to [out]: a 32-byte
+// voice description at the frame's +96 (6 channels at 48,000 Hz, +8, +16
+// and +20 the three words; +24 on left as the stack had them), the base's
+// size (XAudioVoice::BaseSize's plain C++, in a frame below), + 20. `frame`
+// is this function's (144 bytes). Returns BaseSize's r3.
+uint32_t MasteringSize(uint8_t* base, uint32_t description, uint32_t out, uint32_t frame,
+                       const GuestCall& call);
+
+// AudioRenderDriver::AudioRenderDriver (sub_82465938): the 20-byte driver
+// object at `driver` (+0 and +4 the vtables, +8 = 1, +12 the description's
+// +4, the voice). The original leaves r3 as it was.
+void RenderDriverConstruct(uint8_t* base, uint32_t driver, uint32_t description);
+
+// XAudioMasteringVoice::Init (sub_8245FCA0): the voice description as
+// MasteringSize's at the frame's +96, XAudioVoice::InitBase (in a frame
+// below); then a driver description at the frame's +80 (type 2, +4 the
+// voice), 20 bytes from the voice's allocator (+8) slot +20, the driver
+// constructed into +68 (E_OUTOFMEMORY without), its slot +32 (r4 the
+// description, r5 the allocator) and the voice's slot +56 (its start).
+// `frame` is this function's (144 bytes). Returns the last r3.
+uint32_t MasteringInit(uint8_t* base, uint32_t voice, uint32_t description, uint32_t frame,
+                       const GuestCall& call);
+
+// XAudioMasteringVoice::Create (sub_824600F0): the size (MasteringSize, +
+// 72), the allocator (XAudio::GetAllocator's plain C++ with
+// kMasteringAttributes into the frame's +80; its original where that
+// can't), 72 bytes from it (slot +20), the base voice (XAudioVoice::
+// Construct, type 2) with the mastering vtable, MasteringInit; on success the
+// voice to [out], else its slot +12; the allocator released (slot +4).
+// `frame` is this function's (128 bytes); `native_heap` whether the default
+// allocator may run. Returns 0 or the failure.
+uint32_t MasteringCreate(uint8_t* base, uint32_t description, uint32_t out, bool native_heap,
+                         uint32_t frame, const GuestCall& call);
+
+// XAudioMasteringVoice::Start (sub_8245FE20): when not playing (+61 bit 0),
+// its buffer (+32) cleared (XAudioBuffer::ClearThunk, flags 3; its original
+// where the plain C++ refuses), then XAudioVoice::Play's plain C++. `frame`
+// is this function's (96 bytes). Returns 0 (Play's).
+uint32_t MasteringStart(uint8_t* base, uint32_t voice, uint32_t frame, const Thread& thread,
+                        const GuestCall& call);
+
+// XAudioMasteringVoice::Pass (sub_8245FDC8): XAudioVoice::Pass's plain C++
+// (in a frame below), then on success its buffer (+32) cleared as Start's.
+// `frame` is this function's (112 bytes). Returns Pass' r3.
+uint32_t MasteringPass(uint8_t* base, uint32_t voice, uint32_t frame, const GuestCall& call);
+
+// XAudioMasteringVoice::Process (sub_8245FB80): XAudioVoice::
+// ProcessEffects' plain C++ over [inout] (in a frame below; `processor`
+// r13's +268), then the driver's (+68) slot +24 with [inout] and 0 (the
+// frame to our audio output). `frame` is this function's (112 bytes).
+// Returns the last r3.
+uint32_t MasteringProcess(uint8_t* base, uint32_t voice, uint32_t inout, uint32_t processor,
+                          uint32_t frame, const GuestCall& call);
+
 }  // namespace xaudio

@@ -25,7 +25,9 @@ ITC_FLAG_BOOL(native_xaudio_engine, true, "ITC",
               "kernel's KeGetCurrentProcessType through the translated code) and RegisterStats "
               "sub_8245F588, the factory's constructor sub_8245DA48, Create sub_8245DC10 and its "
               "slots sub_8245D650 and sub_8245D6D8; the engine's set-up, the mixer's callback and "
-              "XAudio's processor threads stay recompiled) natively instead of through the "
+              "XAudio's processor threads stay recompiled; the mastering voice's Size sub_8245FF68, "
+              "Init sub_8245FCA0, Create sub_824600F0, Start sub_8245FE20, Pass sub_8245FDC8 and "
+              "Process sub_8245FB80, the render driver's constructor sub_82465938) natively instead of through the "
               "translated code (the same reads and writes; checked by "
               "--run_harnesses=xaudio_engine)");
 
@@ -176,6 +178,54 @@ void XAudioEngineSize(PPCContext& ctx, uint8_t* base) {
   });
 }
 
+void XAudioMasteringSize(PPCContext& ctx, uint8_t* base) {
+  const uint32_t description = ctx.r3.u32, out = ctx.r4.u32;
+  XAudioFramed(ctx, base, 144, [&](const xa::GuestCall& call, uint32_t frame) {
+    return xa::MasteringSize(base, description, out, frame, call);
+  });
+}
+
+void XAudioRenderDriverConstruct(PPCContext& ctx, uint8_t* base) {
+  xa::RenderDriverConstruct(base, ctx.r3.u32, ctx.r4.u32);
+}
+
+void XAudioMasteringInit(PPCContext& ctx, uint8_t* base) {
+  const uint32_t voice = ctx.r3.u32, description = ctx.r4.u32;
+  XAudioFramed(ctx, base, 144, [&](const xa::GuestCall& call, uint32_t frame) {
+    return xa::MasteringInit(base, voice, description, frame, call);
+  });
+}
+
+void XAudioMasteringCreate(PPCContext& ctx, uint8_t* base) {
+  const uint32_t description = ctx.r3.u32, out = ctx.r4.u32;
+  XAudioFramed(ctx, base, 128, [&](const xa::GuestCall& call, uint32_t frame) {
+    return xa::MasteringCreate(base, description, out, NativeHeapActive(), frame, call);
+  });
+}
+
+void XAudioMasteringStart(PPCContext& ctx, uint8_t* base) {
+  const uint32_t voice = ctx.r3.u32;
+  const xa::Thread thread = XAudioThreadOf(ctx, base);
+  XAudioFramed(ctx, base, 96, [&](const xa::GuestCall& call, uint32_t frame) {
+    return xa::MasteringStart(base, voice, frame, thread, call);
+  });
+}
+
+void XAudioMasteringPass(PPCContext& ctx, uint8_t* base) {
+  const uint32_t voice = ctx.r3.u32;
+  XAudioFramed(ctx, base, 112, [&](const xa::GuestCall& call, uint32_t frame) {
+    return xa::MasteringPass(base, voice, frame, call);
+  });
+}
+
+void XAudioMasteringProcess(PPCContext& ctx, uint8_t* base) {
+  const uint32_t voice = ctx.r3.u32, inout = ctx.r4.u32;
+  const uint32_t processor = guest::LoadU8(base, ctx.r13.u32 + xa::kPcrProcessor);
+  XAudioFramed(ctx, base, 112, [&](const xa::GuestCall& call, uint32_t frame) {
+    return xa::MasteringProcess(base, voice, inout, processor, frame, call);
+  });
+}
+
 }  // namespace hooks
 
 #define ITC_XAUDIO_ENGINE_ADAPTER(address, step) \
@@ -208,3 +258,10 @@ ITC_XAUDIO_ENGINE_ADAPTER(8245D6D8, XAudioFactorySizeSlot)
 ITC_XAUDIO_ENGINE_ADAPTER(8245F588, XAudioRegisterStats)
 ITC_XAUDIO_ENGINE_ADAPTER(8245A828, XAudioSetUpProcessors)
 ITC_XAUDIO_ENGINE_ADAPTER(8245B2C0, XAudioEngineSize)
+ITC_XAUDIO_ENGINE_ADAPTER(8245FF68, XAudioMasteringSize)
+ITC_XAUDIO_ENGINE_ADAPTER(82465938, XAudioRenderDriverConstruct)
+ITC_XAUDIO_ENGINE_ADAPTER(8245FCA0, XAudioMasteringInit)
+ITC_XAUDIO_ENGINE_ADAPTER(824600F0, XAudioMasteringCreate)
+ITC_XAUDIO_ENGINE_ADAPTER(8245FE20, XAudioMasteringStart)
+ITC_XAUDIO_ENGINE_ADAPTER(8245FDC8, XAudioMasteringPass)
+ITC_XAUDIO_ENGINE_ADAPTER(8245FB80, XAudioMasteringProcess)

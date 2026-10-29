@@ -400,4 +400,176 @@ uint32_t EngineSize(uint8_t* base, uint32_t params, uint32_t out, uint32_t frame
   return r30;
 }
 
+// --- The mastering voice ---
+
+namespace {
+
+// The 32-byte voice description the mastering voice's Size and Init build
+// at `at`: its first 24 bytes cleared, 6 channels at 48,000 Hz, the
+// description's three words (when given) at +8, +16 and +20; +24 on as the
+// stack had them.
+void MasteringDescription(uint8_t* base, uint32_t at, uint32_t description) {
+  REX_STORE_U64(at, uint64_t(0));
+  REX_STORE_U64(at + 8, uint64_t(0));
+  REX_STORE_U64(at + 16, uint64_t(0));
+  guest::StoreU8(base, at, 0);
+  guest::StoreU8(base, at + 1, 6);
+  guest::StoreU32(base, at + 4, kSampleRate);
+  if (description != 0) {
+    guest::StoreU32(base, at + 8, guest::LoadU32(base, description));
+    guest::StoreU32(base, at + 16, guest::LoadU32(base, description + 4));
+    guest::StoreU32(base, at + 20, guest::LoadU32(base, description + 8));
+  }
+}
+
+// The voice's buffer (+32, an interface) cleared for its own format with
+// flags 3 (ClearThunk's plain C++, its original where that refuses).
+void ClearBuffer(uint8_t* base, uint32_t voice, uint32_t return_address, uint32_t frame,
+                 const GuestCall& call) {
+  const uint32_t iface = guest::LoadU32(base, voice + 32);
+  SetRegs(call, Args({iface, 0, 3}));
+  if (!BufferClearThunk(base, iface, 0, 3)) {
+    call(kBufferClearThunk, return_address, At(frame, Args({iface, 0, 3})));
+  }
+}
+
+}  // namespace
+
+uint32_t MasteringSize(uint8_t* base, uint32_t description, uint32_t out, uint32_t frame,
+                       const GuestCall& call) {
+  ITC_NATIVE_RUNNING("sub_8245FF68 XAudioMasteringVoice::Size");
+  const uint32_t local = frame + 96;
+  MasteringDescription(base, local, description);
+  SetRegs(call, Args({local, frame + 80}));
+  const uint32_t r3 = BaseSize(base, local, frame + 80, FrameBelow(base, frame, 176), call);
+  if (int32_t(r3) >= 0) {
+    guest::StoreU32(base, out, guest::LoadU32(base, frame + 80) + 20);
+  }
+  return r3;
+}
+
+void RenderDriverConstruct(uint8_t* base, uint32_t driver, uint32_t description) {
+  ITC_NATIVE_RUNNING("sub_82465938 AudioRenderDriver::AudioRenderDriver");
+  guest::StoreU32(base, driver + 8, 1);
+  guest::StoreU32(base, driver + 4, kDriverVtableFirst);
+  guest::StoreU32(base, driver + 12, guest::LoadU32(base, description + 4));
+  guest::StoreU32(base, driver, kDriverVtable);
+  guest::StoreU32(base, driver + 4, kDriverVtable2);
+}
+
+uint32_t MasteringInit(uint8_t* base, uint32_t voice, uint32_t description, uint32_t frame,
+                       const GuestCall& call) {
+  ITC_NATIVE_RUNNING("sub_8245FCA0 XAudioMasteringVoice::Init");
+  const uint32_t local = frame + 96;
+  MasteringDescription(base, local, description);
+  SetRegs(call, Args({voice, local}));
+  uint32_t r3 = InitBase(base, voice, local, FrameBelow(base, frame, 144), call);
+  if (int32_t(r3) < 0) {
+    return r3;
+  }
+  // The driver's description: +0 the type (2), +4 the voice, +8 0.
+  const uint32_t driver_description = frame + 80;
+  REX_STORE_U64(driver_description, uint64_t(0));
+  guest::StoreU32(base, driver_description + 8, 0);
+  guest::StoreU32(base, driver_description + 4, voice);
+  guest::StoreU8(base, driver_description, 2);
+  const uint32_t allocator = guest::LoadU32(base, voice + 8);
+  const uint32_t memory =
+      call(Method(base, allocator, 20), 0x8245FD48, At(frame, Args({allocator, 20})));
+  uint32_t driver = 0;
+  if (memory != 0) {
+    SetRegs(call, Args({memory, driver_description, guest::LoadU32(base, voice + 8)}));
+    RenderDriverConstruct(base, memory, driver_description);
+    driver = memory;
+  }
+  guest::StoreU32(base, voice + 68, driver);
+  if (driver == 0) {
+    return 0x8007000Eu;  // E_OUTOFMEMORY
+  }
+  r3 = call(Method(base, driver, 32), 0x8245FD94,
+            At(frame, Args({driver, driver_description, guest::LoadU32(base, voice + 8)})));
+  if (int32_t(r3) < 0) {
+    return r3;
+  }
+  return call(Method(base, voice, 56), 0x8245FDB0, At(frame, Args({voice})));
+}
+
+uint32_t MasteringCreate(uint8_t* base, uint32_t description, uint32_t out, bool native_heap,
+                         uint32_t frame, const GuestCall& call) {
+  ITC_NATIVE_RUNNING("sub_824600F0 XAudioMasteringVoice::Create");
+  const uint32_t slot = frame + 80;  // the allocator
+  guest::StoreU32(base, slot, 0);
+  SetRegs(call, Args({description, frame + 84}));
+  uint32_t r30 = MasteringSize(base, description, frame + 84, FrameBelow(base, frame, 144), call);
+  if (int32_t(r30) >= 0) {
+    const uint32_t size = guest::LoadU32(base, frame + 84) + 72;
+    SetRegs(call, Args({kMasteringAttributes, size, slot}));
+    if (const auto r3 = GetAllocator(base, kMasteringAttributes, size, slot,
+                                     FrameBelow(base, frame, 128), native_heap, call)) {
+      r30 = *r3;
+    } else {
+      r30 = call(kGetAllocator, 0x82460148, At(frame, Args({kMasteringAttributes, size, slot})));
+    }
+    if (int32_t(r30) >= 0) {
+      const uint32_t allocator = guest::LoadU32(base, slot);
+      const uint32_t memory =
+          call(Method(base, allocator, 20), 0x8246016C, At(frame, Args({allocator, 72})));
+      if (memory == 0) {
+        r30 = 0x8007000Eu;  // E_OUTOFMEMORY
+      } else {
+        SetRegs(call, Args({memory, guest::LoadU32(base, slot), 2}));
+        VoiceConstruct(base, memory, guest::LoadU32(base, slot), 2, call);
+        guest::StoreU32(base, memory, kMasteringVtable);
+        SetRegs(call, Args({memory, description}));
+        r30 = MasteringInit(base, memory, description, FrameBelow(base, frame, 144), call);
+        if (int32_t(r30) >= 0) {
+          guest::StoreU32(base, out, memory);
+        } else {
+          call(Method(base, memory, 12), 0x824601D0, At(frame, Args({memory})));
+        }
+      }
+    }
+  }
+  const uint32_t allocator = guest::LoadU32(base, slot);
+  if (allocator != 0) {
+    call(Method(base, allocator, 4), 0x824601EC, At(frame, Args({allocator})));
+  }
+  return r30;
+}
+
+uint32_t MasteringStart(uint8_t* base, uint32_t voice, uint32_t frame, const Thread& thread,
+                        const GuestCall& call) {
+  ITC_NATIVE_RUNNING("sub_8245FE20 XAudioMasteringVoice::Start");
+  if ((guest::LoadU8(base, voice + 61) & 1) != 0) {
+    return 0;
+  }
+  ClearBuffer(base, voice, 0x8245FE6C, frame, call);
+  SetRegs(call, Args({voice}));
+  return Play(base, voice, thread.r13, call);
+}
+
+uint32_t MasteringPass(uint8_t* base, uint32_t voice, uint32_t frame, const GuestCall& call) {
+  ITC_NATIVE_RUNNING("sub_8245FDC8 XAudioMasteringVoice::Pass");
+  SetRegs(call, Args({voice}));
+  const uint32_t r31 = Pass(base, voice, FrameBelow(base, frame, 112), call);
+  if (int32_t(r31) >= 0) {
+    ClearBuffer(base, voice, 0x8245FE00, frame, call);
+  }
+  return r31;
+}
+
+uint32_t MasteringProcess(uint8_t* base, uint32_t voice, uint32_t inout, uint32_t processor,
+                          uint32_t frame, const GuestCall& call) {
+  ITC_NATIVE_RUNNING("sub_8245FB80 XAudioMasteringVoice::Process");
+  SetRegs(call, Args({voice, inout}));
+  const uint32_t r3 =
+      ProcessEffects(base, voice, inout, processor, FrameBelow(base, frame, 112), call);
+  if (int32_t(r3) < 0) {
+    return r3;
+  }
+  const uint32_t driver = guest::LoadU32(base, voice + 68);
+  return call(Method(base, driver, 24), 0x8245FBC4,
+              At(frame, Args({driver, guest::LoadU32(base, inout), 0})));
+}
+
 }  // namespace xaudio

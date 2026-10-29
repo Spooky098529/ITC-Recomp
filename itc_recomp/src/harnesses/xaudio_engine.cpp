@@ -504,6 +504,264 @@ void Making(Context& h, uint32_t block) {
   }
 }
 
+// --- The mastering voice ---
+
+// The words of [address, address + bytes) with those pointing into the
+// allocator's block (`allocator`, `allocator_bytes`) as offsets in it
+// (marked), the rest as they are.
+void Normalized(Outputs& out, uint8_t* base, uint32_t address, uint32_t bytes,
+                uint32_t allocator, uint32_t allocator_bytes) {
+  std::vector<uint8_t> words = Read(base, address, bytes);
+  for (uint32_t i = 0; i + 4 <= bytes; i += 4) {
+    const uint32_t word = guest::LoadU32(base, address + i);
+    if (allocator != 0 && word >= allocator && word < allocator + allocator_bytes) {
+      const uint32_t offset = 0xA110C000u ^ (word - allocator);
+      words[i] = uint8_t(offset >> 24);
+      words[i + 1] = uint8_t(offset >> 16);
+      words[i + 2] = uint8_t(offset >> 8);
+      words[i + 3] = uint8_t(offset);
+    }
+  }
+  out.Bytes(words);
+}
+
+// A case with the stack below r1 (where the frames go) filled with the same
+// random words for both versions, and, with `allocator_bytes`, a real
+// default allocator of that size for each (XAudio::DefaultAllocator's plain
+// C++: its data zeroed by XMemAlloc, as the game's), handed to `setup(random,
+// t, allocator)`. `after(out)` runs before the reads. The block and the
+// allocator's block are compared with pointers into the allocator as
+// offsets, and r3's low word (these pass their callees' results on), then
+// the allocator freed with what was made in it.
+template <typename Setup, typename After>
+void StackCase(Context& h, Results& results, uint32_t block, GuestFunction recompiled,
+               GuestFunction native, uint32_t allocator_bytes, Setup setup, After after,
+               const std::string& what) {
+  const Random start = h.random;
+  Random random = start;
+  Outputs out[2];
+  for (int v = 0; v < 2; v++) {
+    random = start;
+    for (uint32_t i = 0; i < kBlockBytes; i += 4) {
+      Store(h.base, block + i, uint32_t(random.Next()));
+    }
+    PPCContext t = CallContext(h);
+    for (uint32_t i = 4; i <= 0x400; i += 4) {
+      Store(h.base, t.r1.u32 - i, uint32_t(random.Next()));
+    }
+    uint32_t allocator = 0;
+    uint32_t bytes = 0;
+    if (allocator_bytes != 0) {
+      xa::DefaultAllocator(h.base, xa::kMasteringAttributes, allocator_bytes, block + 0x1FFC);
+      allocator = guest::LoadU32(h.base, block + 0x1FFC);
+      Store(h.base, block + 0x1FFC, 0);
+      out[v].Word(allocator != 0);
+      if (allocator == 0) {
+        continue;
+      }
+      bytes = allocator_bytes + 28;
+    }
+    setup(random, t, allocator);
+    (v == 0 ? recompiled : native)(t, h.base);
+    after(out[v]);
+    out[v].Word(t.r3.u32);
+    Normalized(out[v], h.base, block, kBlockBytes, allocator, bytes);
+    if (allocator != 0) {
+      Normalized(out[v], h.base, allocator, bytes, allocator, bytes);
+      memory::crt::XMemFree(allocator, xa::kMasteringAttributes);
+    }
+  }
+  h.random = random;
+  results.Check(out[0], out[1], what);
+}
+
+// The objects' vtable at +0x1C00: slots the mastering voice's methods call,
+// recompiled leaves that leave a trace (sub_820CE9F8: r4 and r5 to the
+// object's +444 and +448; sub_8245F860: +4 up, returned).
+void MasteringVtable(uint8_t* base, uint32_t block) {
+  for (uint32_t slot = 0; slot < 0x100; slot += 4) {
+    Store(base, block + kVtable + slot, 0x8245F860);
+  }
+  for (uint32_t slot : {24u, 60u, 84u}) {
+    Store(base, block + kVtable + slot, 0x820CE9F8);
+  }
+}
+
+// The voice at +0x400 (its vtable the block's), its buffer at +0x800 (+32
+// its interface): 1 or 2 channels at 48 kHz over samples at +0x1000, so its
+// clears stay in the block.
+constexpr uint32_t kVoice = 0x400;
+void MasteringBuffer(uint8_t* base, uint32_t block, Random& random) {
+  const uint32_t buffer = block + 0x800;
+  guest::StoreU8(base, buffer + 12, 0);
+  guest::StoreU8(base, buffer + 13, uint8_t(1 + random.Below(2)));
+  Store(base, buffer + 16, xa::kSampleRate);
+  guest::StoreU8(base, buffer + 20, 0);
+  guest::StoreU8(base, buffer + 21, uint8_t(random.Below(3)));
+  Store(base, buffer + 24, xa::kSampleRate);
+  Store(base, buffer + 28, block + 0x1000);
+  Store(base, block + kVoice + 32, buffer + 8);
+}
+
+void MasteringVoice(Context& h, uint32_t block) {
+  const uint32_t engine = guest::LoadU32(h.base, xa::kEngine);
+  const auto none = [](Outputs&) {};
+  {
+    Results results("XAudioMasteringVoice::Size (sub_8245FF68)");
+    for (int i = 0; engine != 0 && i < 24; i++) {
+      StackCase(h, results, block, __imp__sub_8245FF68, hooks::XAudioMasteringSize, 0,
+                [&](Random& random, PPCContext& t, uint32_t) {
+                  const uint32_t description = block + 0x100;
+                  // No effects: the chain none, or one with none.
+                  Store(h.base, description, random.Below(2) == 0 ? 0 : block + 0x180);
+                  guest::StoreU8(h.base, block + 0x180, 0);
+                  t.r3.u64 = i % 4 == 0 ? 0 : description;
+                  t.r4.u64 = block + 0x300;
+                },
+                none, fmt::format("case {}", i));
+    }
+    results.Report();
+  }
+  {
+    Results results("AudioRenderDriver::AudioRenderDriver (sub_82465938)");
+    for (int i = 0; i < 16; i++) {
+      Case(h, results, block, __imp__sub_82465938, hooks::XAudioRenderDriverConstruct,
+           [&](Random&, PPCContext& t) {
+             t.r3.u64 = block + 0x200;
+             t.r4.u64 = block + 0x300;
+           },
+           fmt::format("case {}", i));
+    }
+    results.Report();
+  }
+  {
+    // A voice in the block with a real allocator: its buffer and driver made
+    // in it (the driver's data zeroed as the game's, so its slot +32, the
+    // real AudioRenderDriver::Register with no callback, has no handle to
+    // unregister); the voice's slot +56 a recorder. Too small an allocator
+    // for the buffer now and then.
+    Results results("XAudioMasteringVoice::Init (sub_8245FCA0)");
+    for (int i = 0; engine != 0 && hooks::NativeHeapActive() && i < 16; i++) {
+      StackCase(h, results, block, __imp__sub_8245FCA0, hooks::XAudioMasteringInit,
+                i % 4 == 3 ? 64 : 0x3000,
+                [&](Random& random, PPCContext& t, uint32_t allocator) {
+                  MasteringVtable(h.base, block);
+                  const uint32_t voice = block + kVoice;
+                  Store(h.base, voice, block + kVtable);
+                  Store(h.base, voice + 4, random.Below(3));
+                  Store(h.base, voice + 8, allocator);
+                  const uint32_t description = block + 0x100;
+                  Store(h.base, description, 0);
+                  t.r3.u64 = voice;
+                  t.r4.u64 = i % 3 == 0 ? 0 : description;
+                },
+                none, fmt::format("case {}", i));
+    }
+    results.Report();
+  }
+  {
+    // Made with its own default allocator (XMemAlloc's, zeroed): the voice
+    // to [+0x1FF0]; its allocator's block compared with pointers into it as
+    // offsets, then freed. Type 2 joins no list (its slot +76,
+    // sub_82460000, finds no stage).
+    Results results("XAudioMasteringVoice::Create (sub_824600F0)");
+    for (int i = 0; engine != 0 && hooks::NativeHeapActive() && i < 8; i++) {
+      StackCase(h, results, block, __imp__sub_824600F0, hooks::XAudioMasteringCreate, 0,
+                [&](Random&, PPCContext& t, uint32_t) {
+                  const uint32_t description = block + 0x100;
+                  Store(h.base, description, 0);
+                  Store(h.base, block + 0x1FF0, 0);
+                  t.r3.u64 = i % 2 == 0 ? 0 : description;
+                  t.r4.u64 = block + 0x1FF0;
+                },
+                [&](Outputs& out) {
+                  const uint32_t voice = guest::LoadU32(h.base, block + 0x1FF0);
+                  out.Word(voice != 0);
+                  if (voice == 0) {
+                    return;
+                  }
+                  const uint32_t allocator = guest::LoadU32(h.base, voice + 8);
+                  const uint32_t bytes = guest::LoadU32(h.base, allocator + 16) + 28;
+                  out.Word(voice - allocator);
+                  out.Word(bytes);
+                  Store(h.base, block + 0x1FF0, 0);
+                  Normalized(out, h.base, allocator, bytes, allocator, bytes);
+                  memory::crt::XMemFree(allocator, xa::kMasteringAttributes);
+                },
+                fmt::format("case {}", i));
+    }
+    results.Report();
+  }
+  {
+    // Playing or not (+61), under the live spin lock (Play's).
+    Results results("XAudioMasteringVoice::Start (sub_8245FE20)");
+    for (int i = 0; engine != 0 && i < 24; i++) {
+      StackCase(h, results, block, __imp__sub_8245FE20, hooks::XAudioMasteringStart, 0,
+                [&](Random& random, PPCContext& t, uint32_t) {
+                  MasteringVtable(h.base, block);
+                  const uint32_t voice = block + kVoice;
+                  Store(h.base, voice, block + kVtable);
+                  Store(h.base, voice + 4, random.Below(3));
+                  MasteringBuffer(h.base, block, random);
+                  t.r3.u64 = voice;
+                },
+                none, fmt::format("case {}", i));
+    }
+    results.Report();
+  }
+  {
+    // The callback (+44) none or a recorder; stopping (+61 bit 2) with its
+    // tail's passes (+64) 0 to 2.
+    Results results("XAudioMasteringVoice::Pass (sub_8245FDC8)");
+    for (int i = 0; i < 32; i++) {
+      StackCase(h, results, block, __imp__sub_8245FDC8, hooks::XAudioMasteringPass, 0,
+                [&](Random& random, PPCContext& t, uint32_t) {
+                  MasteringVtable(h.base, block);
+                  const uint32_t voice = block + kVoice;
+                  Store(h.base, voice, block + kVtable);
+                  Store(h.base, voice + 4, random.Below(3));
+                  Store(h.base, voice + 44, random.Below(2) == 0 ? 0 : 0x8245F860);
+                  guest::StoreU16(h.base, voice + 64, uint16_t(random.Below(3)));
+                  MasteringBuffer(h.base, block, random);
+                  t.r3.u64 = voice;
+                },
+                none, fmt::format("case {}", i));
+    }
+    results.Report();
+  }
+  {
+    // Up to 2 effects (objects at +0x1000 and +0x1200, enabled or not, any
+    // flags: both bits 1 and 2 swap in the live engine's other buffer), the
+    // driver at +0x1400; [inout] at +0x1E00.
+    Results results("XAudioMasteringVoice::Process (sub_8245FB80)");
+    for (int i = 0; engine != 0 && i < 32; i++) {
+      StackCase(h, results, block, __imp__sub_8245FB80, hooks::XAudioMasteringProcess, 0,
+                [&](Random& random, PPCContext& t, uint32_t) {
+                  MasteringVtable(h.base, block);
+                  const uint32_t voice = block + kVoice;
+                  Store(h.base, voice, block + kVtable);
+                  guest::StoreU8(h.base, voice + 60, uint8_t(random.Below(3)));
+                  Store(h.base, voice + 36, block + 0x600);
+                  for (uint32_t k = 0; k < 2; k++) {
+                    const uint32_t entry = block + 0x600 + 8 * k;
+                    const uint32_t object = block + 0x1000 + 0x200 * k;
+                    Store(h.base, entry, object);
+                    guest::StoreU8(h.base, entry + 5, uint8_t(random.Below(2)));
+                    guest::StoreU8(h.base, entry + 6, uint8_t(random.Below(8)));
+                    Store(h.base, object, block + kVtable);
+                  }
+                  const uint32_t driver = block + 0x1400;
+                  Store(h.base, driver, block + kVtable);
+                  Store(h.base, voice + 68, driver);
+                  t.r3.u64 = voice;
+                  t.r4.u64 = block + 0x1E00;
+                },
+                none, fmt::format("case {}", i));
+    }
+    results.Report();
+  }
+}
+
 }  // namespace
 
 void XAudioEngine(Context& h) {
@@ -514,6 +772,7 @@ void XAudioEngine(Context& h) {
   Calls(h, block.address);
   Barriers(h, block.address);
   Making(h, block.address);
+  MasteringVoice(h, block.address);
 }
 
 }  // namespace harness
