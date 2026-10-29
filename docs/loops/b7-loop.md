@@ -510,6 +510,17 @@ Calls so far for decisions the loop meets often:
   native code takes the game's own lock exactly as the original does,
   and it becomes the host lock once every user is native (XAudio's
   voice-list spin lock `0x82954F10`, 2026-10-29).
+- Kernel threads, events, semaphores and notifications a translated
+  library makes and uses itself (XAudio's master and worker threads,
+  its mix events, semaphore and title terminate notification): native
+  code calls their imports (`ExCreateThread`, `KeSetEvent`,
+  `KeWaitFor*`, `KeReleaseSemaphore` and the rest) exactly as the
+  original does; host objects later, once every user is native
+  (2026-10-29).
+- The kernel's clocks a subsystem waits on: answered from the host's
+  steady clock, no flag, recompiled and native callers sharing one
+  clock (GetTickCount, 2026-10-23; QueryPerformanceCounter at the
+  50 MHz timebase recompiled `mftb` reads, 2026-10-29).
 - The game's Semaphore objects a subsystem's code uses: host counting
   semaphores with a readable count, taken by every user, native and
   recompiled (the archive loader's four, 2026-10-28); the Semaphore

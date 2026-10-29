@@ -21,6 +21,13 @@ file's history. What's left to see in a drive, from every run:
   610125a checked (`xaudio-engine.md`, 70 rows, 47 in play, 24 ready
   groups). Done (below); recorded in the plan's table and boundary
   log. Its 7 left wait on the user's call (asked).
+- The user's calls (2026-10-29, now under "Precedent first" in
+  `b7-loop.md`): XAudio's threads, events, semaphore and notification
+  through their imports as the original does; QueryPerformanceCounter
+  from the host clock at 50 MHz, like GetTickCount. Next: the
+  continuations (not counted toward the limit): QueryPerformanceCounter
+  with `XACTGetTimeMs` and what waits on it in `xact-tracks.md` and
+  `xact-waves.md` (migration agent running), then XAudio's engine's 7.
 
 ## Done
 

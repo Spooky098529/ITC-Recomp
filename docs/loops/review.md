@@ -13,6 +13,13 @@ When the user has reviewed a run's section, its heading gets
 
 ## Run 2026-10-29 15:44 (`b7-loop-29-10-26`)
 
+- The user's calls (2026-10-29), asked by the lead: XAudio's own
+  threads, events, semaphore and title terminate notification are used
+  by native code through their imports exactly as the original does
+  (host objects later, once every user is native); QueryPerformanceCounter
+  (`sub_825BA0C8`) is answered from the host steady clock at the 50 MHz
+  timebase, no flag, one clock for recompiled and native callers, as
+  GetTickCount. Both now under "Precedent first" in `b7-loop.md`.
 - XAudio's engine and mixer (map 610125a): `docs/functions/xaudio-engine.md`,
   70 rows (all new; 23 not seen in play: the teardown, the factory's
   id-128 classes, the sizing allocator, the stats callback, the callback
