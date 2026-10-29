@@ -1019,6 +1019,51 @@ void Batch6(Context& h, uint32_t block) {
               false);
 }
 
+// XACTSound::ScheduleEvent: the event (its SetQueued and Fire slots the real
+// ones or a recorder) against the audio time (the engine's +24: before, at
+// or after the event's +20), and the sound's queue (+56) holding up to three
+// events (kEvent2, kNext, kRpcEntries) with times around it.
+void Batch7(Context& h, uint32_t block) {
+  Results results("XACTSound::ScheduleEvent (sub_825CB0C8)");
+  for (int c = 0; c < 128; c++) {
+    Case(h, results, block, __imp__sub_825CB0C8, hooks::XactSoundScheduleEvent,
+         [&](Random& random, PPCContext& t) {
+           uint8_t* base = h.base;
+           const uint32_t sound = block + kSound, event = block + kEvent;
+           Store(base, block + kEventVtable + 4, Pick(random, {0x825D1358u, kAddRef}));
+           Store(base, event + 4, event);
+           Store(base, event + 8, event);
+           if (Load(base, event + 60) == 0) {
+             Store(base, event + 60, block + kWave2);  // SetQueued reads it unchecked
+           }
+           const int32_t time = int32_t(random.Next() % 2001) - 1000;
+           Store(base, event + 20, uint32_t(time));
+           Store(base, block + kEngine + 24,
+                 uint32_t(time + Pick(random, {0, 1, uint32_t(-1), random.Below(100),
+                                               uint32_t(-int32_t(random.Below(100)))})));
+           guest::StoreU8(base, event + 40, uint8_t(random.Next()));
+           // The queue: 0 to 3 nodes, their times near the event's.
+           const uint32_t list = sound + 56;
+           uint32_t last = list;
+           const uint32_t nodes[] = {block + kEvent2, block + kNext, block + kRpcEntries};
+           const uint32_t count = random.Below(4);
+           for (uint32_t i = 0; i < count; i++) {
+             const uint32_t node = nodes[i];
+             Store(base, node + 20, uint32_t(time + int32_t(random.Below(5)) - 2));
+             Store(base, last + 4, node);
+             Store(base, node + 8, last);
+             last = node;
+           }
+           Store(base, last + 4, list);
+           Store(base, list + 8, last);
+           t.r3.u64 = sound;
+           t.r4.u64 = event;
+         },
+         fmt::format("case {}", c));
+  }
+  results.Report();
+}
+
 }  // namespace
 
 void XactTracks(Context& h) {
@@ -1033,6 +1078,7 @@ void XactTracks(Context& h) {
   Batch4(h, block.address);
   Batch5(h, block.address);
   Batch6(h, block.address);
+  Batch7(h, block.address);
 }
 
 }  // namespace harness

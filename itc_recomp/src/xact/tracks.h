@@ -332,4 +332,16 @@ uint32_t TrackCreateInstance(uint8_t* base, uint32_t track, uint32_t key, uint32
 uint32_t TrackPrepare(uint8_t* base, uint32_t track, uint32_t key, uint32_t offset,
                       uint32_t frame, const GuestCall& call);
 
+// --- Scheduling ---
+
+// XACTSound::ScheduleEvent (sub_825CB0C8, xact.md's row): the event's slot
+// +16 (SetQueued) with 1; when its time (+20) is at or before the audio time
+// (the sound's engine +32, its +24), its slot +4 (Fire); else it's linked
+// into the sound's event queue (+56, by +4 and +8) before the first event
+// whose time is later. Each slot runs its plain C++ while it holds it, else
+// the guest call. `frame` is this function's (112 bytes). Returns the last
+// slot's r3.
+uint32_t SoundScheduleEvent(uint8_t* base, uint32_t sound, uint32_t event, uint32_t frame,
+                            const GuestCall& call);
+
 }  // namespace xact

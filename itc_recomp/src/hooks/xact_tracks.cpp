@@ -33,6 +33,7 @@ ITC_FLAG_BOOL(native_xact_tracks, true, "ITC",
               "sub_825D01D8; XACTEvent::Create sub_825D0F00 (the play-wave types; the others "
               "run the original); XACTTrackInstance::Prepare sub_825D5A48, XACTTrack::CreateInstance "
               "sub_825D02F8 and Prepare sub_825D0AA0 (a complex sound's track; under --native_heap); "
+              "XACTSound::ScheduleEvent sub_825CB0C8; "
               "the objects' slots through their plain C++ while they hold it, the waves' and "
               "voices' through the guest call) natively instead of through the translated code "
               "(the same reads and writes; checked by --run_harnesses=xact_tracks)");
@@ -387,6 +388,13 @@ void XactTrackPrepare(PPCContext& ctx, uint8_t* base) {
   });
 }
 
+void XactSoundScheduleEvent(PPCContext& ctx, uint8_t* base) {
+  const uint32_t sound = ctx.r3.u32, event = ctx.r4.u32;
+  Framed(ctx, base, 112, [&](const xaudio::GuestCall& call, uint32_t frame) {
+    return xact::SoundScheduleEvent(base, sound, event, frame, call);
+  });
+}
+
 }  // namespace hooks
 
 // The flag's fallback, then the register step.
@@ -476,3 +484,4 @@ ITC_XACT_TRACKS_ADAPTER(825D01D8, XactTrackStop)
 // No adapter (removed 2026-10-29: only XACTTrack::Prepare's plain C++ calls it in play;
 // sub_825D0B08 never ran) for XACTTrack::CreateInstance sub_825D02F8.
 ITC_XACT_TRACKS_HEAP_ADAPTER(825D0AA0, XactTrackPrepare)
+ITC_XACT_TRACKS_ADAPTER(825CB0C8, XactSoundScheduleEvent)

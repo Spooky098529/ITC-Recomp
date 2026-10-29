@@ -66,5 +66,6 @@ void XactEventCreate(PPCContext& ctx, uint8_t* base);  // sub_825D0F00
 void XactTrackInstancePrepare(PPCContext& ctx, uint8_t* base);  // sub_825D5A48
 void XactTrackCreateInstance(PPCContext& ctx, uint8_t* base);   // sub_825D02F8
 void XactTrackPrepare(PPCContext& ctx, uint8_t* base);          // sub_825D0AA0
+void XactSoundScheduleEvent(PPCContext& ctx, uint8_t* base);    // sub_825CB0C8
 
 }  // namespace hooks

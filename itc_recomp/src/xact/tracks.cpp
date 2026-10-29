@@ -1191,4 +1191,50 @@ uint32_t TrackPrepare(uint8_t* base, uint32_t track, uint32_t key, uint32_t offs
   return r30;
 }
 
+// --- Scheduling ---
+
+namespace {
+
+constexpr uint32_t kEventFire = 0x825D1358;  // the base's slot +4
+constexpr uint32_t kEventFireFrame = 96;
+
+}  // namespace
+
+uint32_t SoundScheduleEvent(uint8_t* base, uint32_t sound, uint32_t event, uint32_t frame,
+                            const GuestCall& call) {
+  ITC_NATIVE_RUNNING("sub_825CB0C8 XACTSound::ScheduleEvent");
+  const uint32_t queued = xa::Method(base, event, 16);
+  uint32_t r3;
+  if (queued == kPlayWaveSetQueued) {
+    SetRegs(call, Args({event, 1}));
+    PlayWaveSetQueued(base, event, 1);
+    r3 = event;
+  } else {
+    r3 = CallAt(call, queued, 0x825CB0FC, Args({event, 1}), frame);
+  }
+  const int32_t time = int32_t(Load(base, event + 20));
+  if (time <= int32_t(Load(base, Load(base, sound + 32) + 24))) {
+    const uint32_t fire = xa::Method(base, event, 4);
+    if (fire == kEventFire) {
+      SetRegs(call, Args({event}));
+      return EventFire(base, event, xa::FrameBelow(base, frame, kEventFireFrame), call);
+    }
+    return CallAt(call, fire, 0x825CB124, Args({event}), frame);
+  }
+  const uint32_t list = sound + 56;
+  uint32_t node = Load(base, sound + 60);
+  while (node != list) {
+    if (int32_t(Load(base, node + 20)) > time) {
+      break;
+    }
+    node = Load(base, node + 4);
+  }
+  const uint32_t before = Load(base, node + 8);
+  Store(base, event + 8, before);
+  Store(base, event + 4, Load(base, before + 4));
+  Store(base, Load(base, before + 4) + 8, event);
+  Store(base, before + 4, event);
+  return r3;
+}
+
 }  // namespace xact
