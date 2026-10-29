@@ -17,15 +17,16 @@ file's history. What's left to see in a drive, from every run:
   plan's table and boundary log.
 - Subsystem 1's continuation done: the car sounds' migrations 2 and 3
   (62 of 62). Recorded in the plan's table and boundary log.
-- Subsystem 3 of 3: XACT's voice class (`sub_825C9C40` and four more,
-  where XACT meets XAudio; all five roots ready since XAudio's voices).
-  Mapped as `xact-waves.md` (a950696, the voice class with the waves);
-  map checked. Migration 1 done (bfb4cbc..4c7a053, 22 of 30 ours,
-  nothing ready left; a lead for its blockers). Step: validation (agent
-  running).
+- Subsystem 3 of 3 done: XACT's waves and voices (below). Recorded in
+  the plan's table and boundary log. The run's limit reached: stopped
+  (below).
 
 ## Done
 
+- XACT's waves and voices: `xact-waves.md`, 22 of 30 in play native in
+  one migration, 16 adapters removed; `--native_xact_waves`; a950696,
+  bfb4cbc..4c7a053. Validated (`itc_2417`, `itc_2418`): 34 of 34
+  harness lines; nothing to drive.
 - XAudio's voices: `xaudio.md`, 92 of 96 in play native in two
   migrations, 37 Native; both locks the game's, taken as the original
   does (the user's calls, 2026-10-29); `--native_xaudio`; e784bc0,
@@ -89,7 +90,15 @@ file's history. What's left to see in a drive, from every run:
 - After XACT's waves' migration 1 (`itc_2416`: race 38 s, 0 errors,
   xact_waves, xact, xaudio 0 differing): ours 2804, work left 3660
   (wrapped 103, known 509, unknown 3048).
+- At the end (after XACT's waves' validation, `itc_2417`: race 7 s, the
+  harnesses most of the 40, 0 errors, every harness 0 differing but the
+  expected groups): ours 2804, work left 3660 (wrapped 103, known 509,
+  unknown 3048).
 
 ## Stopped
 
-Not stopped.
+2026-10-29, at the run's limit: 3 subsystems (the car sounds with
+X3DAudio, XAudio's voices, XACT's waves and voices). Two user's calls
+on the way (XAudio's locks). Every map, migration and validation
+passed its checks. `check_function_statuses.py`: 0 errors. To drive:
+`to-drive.md`.

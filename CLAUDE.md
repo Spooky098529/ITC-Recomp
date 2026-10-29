@@ -339,6 +339,18 @@ system's interface (`save-interface.md`, `--native_save_interface`, 41
 of 41 in play) native (ours 2,540 -> 2,628); the rest waits on the
 loose read's and opens' guest calls to B4's `File::` adapters, the
 game's `Semaphore::Init` and the leads in `docs/loops/leads.md`.
+Its twenty-first run (`b7-loop-28-10-26-3`, 2026-10-28 to 29, not
+yet merged; summary `docs/loops/b7-loop-2026-10-28-2222.md`; 3
+subsystems) made the car sounds with X3DAudio (`car-sounds.md`,
+`--native_car_sounds`, 62 of 62 in play), XAudio's voices (`xaudio.md`,
+`--native_xaudio`, 92 of 96: the game's copy of XAudio, translated) and
+XACT's waves and voices (`xact-waves.md`, `--native_xact_waves`, 22 of
+30) native (ours 2,628 -> 2,804); by the user's calls (2026-10-29),
+XAudio's API lock, its voice lists' spin lock and XACT's lock are the
+game's, taken natively as the original does, until every user is
+native (then host recursive locks with a readable depth); the rest
+waits on XAudio's engine and mixer, the codecs, XACT's notifications
+and `QueryPerformanceCounter`.
 Harness runs use `attract_race.sh 40` (the user's call,
 2026-10-23); a race short only because the harnesses took longer is
 no halt. B7 loop migration agents run only their subsystem's harnesses

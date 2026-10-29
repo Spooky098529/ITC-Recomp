@@ -136,7 +136,13 @@ goes in `src/` as overrides), American English.
   `b7-loop-28-10-26-2`, merged 2026-10-28, 3 subsystems) made the archive (`archive.md`,
   its four semaphores host ones by the user's call), the file layer
   with sprintf (`file-layer.md`) and the save system's interface
-  (`save-interface.md`, 41 of 41) native (ours 2,628). The
+  (`save-interface.md`, 41 of 41) native (ours 2,628); its
+  twenty-first run (branch `b7-loop-28-10-26-3`, 2026-10-28 to 29, 3
+  subsystems, not yet merged) made the car sounds with X3DAudio
+  (`car-sounds.md`, 62 of 62), XAudio's voices (`xaudio.md`, 92 of 96;
+  its locks the game's, taken as the original does, by the user's
+  calls) and XACT's waves and voices (`xact-waves.md`, 22 of 30) native
+  (ours 2,804). The
   runs' rows wait for the user's review (`docs/loops/review.md`). See
   "B7's loop runs" under B7, and `docs/loops/b7-progress.md`. Guest
   allocation is no longer a block (`docs/native-memory.md`); what the
@@ -2625,6 +2631,7 @@ B7. **The game logic inside**: everything else, subsystem by subsystem,
 | 2026-10-28 | The save system's interface (the app's interface at `[0x826BDC90]`, its wrappers over the save devices' slots and the users; the front end's save layer: the save buffers, `GameData::Save`, `Load` and `Check`, the replays' list, `PlayTime`) | `save-interface.md` (with rows in `files-and-saves.md`, `system-services.md`) | 41 of 41 in play, with 5 shared rows (one migration; 17 adapters removed) | `--native_save_interface` |
 | 2026-10-28 | The car sounds and X3DAudio (the seven per-racer car sound objects at `[0x826C5C3C]`, eleven parts each, played straight through XAudio voices: the wave bank views, `SetBanks`, `TireSound::Amount`, the constructors, `CarSound::SetUp`, `SoundGlobals::Init`, `CarSounds::Destroy`, `CarSound::Update3D`; X3DAudio's math, translated by the XACT precedent: `X3DAudioCalculate` with its vector helpers, curves, pan, matrix, cone and Doppler) | `car-sounds.md` | 62 of 62 in play (three migrations, the last two after XAudio's voices; 53 adapters removed) | `--native_car_sounds` |
 | 2026-10-29 | XAudio's voices (the game's copy of XAudio, translated: the API entry points but the shut-down, the callback's and the commit; the source and submix voices, their outputs, passes, effects and states; the buffers and formats; its API lock the game's critical section and the voice lists' spin lock the game's, taken as the original does, the user's calls) | `xaudio.md` | 92 of 96 in play (two migrations; 37 Native; the rest waits on the engine and mixer) | `--native_xaudio` |
+| 2026-10-29 | XACT's waves and voices (XACT's voice class over XAudio's entry points, the waves' constructors, start positions, voices, play, pause, next and update, the tracks' volume and pitch getters; XACT's lock the game's, taken as the original does) | `xact-waves.md` | 22 of 30 in play (one migration; 16 adapters removed, 7 of XAudio's and 5 of `xact.md`'s; the rest waits on `XACTWave::Notify`'s notifications and clock) | `--native_xact_waves` |
 
     The first run (2026-10-22, branch `b7-loop-test`): every harness at 0 differing, attract races at 20-21 s with no errors,
     and a race the user drove looked right. Ours went from 162 to 335 (work
@@ -3880,3 +3887,20 @@ adapter stays for its recompiled caller in the race code
 92, Native 14, Dropped 23, never called 70, live 250. Imports: 186
 called, 62 with a live caller. B7 (`b7_status.py`): ours 2,782, work
 left 3,682 (Wrapped 103, with a row 501, no row yet 3,078), from 3,720.
+
+**2026-10-29, XACT's waves and voices (branch `b7-loop-28-10-26-3`):**
+the twenty-first run's third and last subsystem mapped XACT's voice
+class with the waves (`xact-waves.md`, 91 rows, 30 in play: the voice
+class over XAudio's entry points, the reverb submix wrapper, the base,
+in-memory and streaming waves, the tracks' volume and pitch getters)
+and made 22 native in one migration (`--native_xact_waves`,
+`src/xact/`), with 16 adapters removed (7 of XAudio's entry points, 5
+in `xact.md`). XACT's lock (the engine's critical section, +144, taken
+inline in 62 functions) is the game's, taken as the original does (the
+2026-10-29 call). The rest waits on `XACTWave::Notify`'s
+`XACTEngine::SendNotification` and `XACTGetTimeMs` over
+`QueryPerformanceCounter` (a lead). The boundary: 449 functions (916
+pairs): overridden 85, Native 22, Dropped 23, never called 70, live
+249. Imports: 186 called, 62 with a live caller. B7 (`b7_status.py`):
+ours 2,804, work left 3,660 (Wrapped 103, with a row 509, no row yet
+3,048), from 3,682 (from 3,833 at the run's start).
