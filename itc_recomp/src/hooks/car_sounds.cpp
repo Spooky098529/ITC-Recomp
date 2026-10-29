@@ -29,7 +29,7 @@ ITC_FLAG_BOOL(native_car_sounds, true, "ITC",
               "Memory::AllocPhysicalEx's, Music::Play's and X3DAudioInitialize's plain C++); X3DAudio's "
               "X3DVec::Sub sub_824819E0, Length sub_82481998, Dot sub_824819B8 and Cross "
               "sub_82481A18, X3DAudio::EvaluateCurve sub_82480818 and X3DAudio::Curves "
-              "sub_82480918, X3DAudio::Pan sub_82480F80 and X3DAudio::Matrix sub_82481390, X3DAudio::Cone sub_82480BA8, X3DAudio::Doppler sub_82480E90 and X3DAudioCalculate sub_82481880 (the original when its flags ask for EmitterAngle sub_82480780 or Delay sub_82481708) (checked by --run_harnesses=x3daudio)); CarSound::Update3D sub_8210F820 (RigidBody::Position's, Vec4::Copy's and X3DAudioCalculate's plain C++); the voice holders' CarSound::SetPitch sub_8210D158, SetPitchScaled sub_8210D080, IsPlaying sub_8210D1D8, UpdateVoices sub_8210D378, Clear sub_8210D320, Pause sub_8210D240, Resume sub_8210D2C0, PauseAll sub_8210E2B8 and ResumeAll sub_8210E350 (XAudio's entry points through their plain C++) natively instead of through the translated code "
+              "sub_82480918, X3DAudio::Pan sub_82480F80 and X3DAudio::Matrix sub_82481390, X3DAudio::Cone sub_82480BA8, X3DAudio::Doppler sub_82480E90 and X3DAudioCalculate sub_82481880 (the original when its flags ask for EmitterAngle sub_82480780 or Delay sub_82481708) (checked by --run_harnesses=x3daudio)); CarSound::Update3D sub_8210F820 (RigidBody::Position's, Vec4::Copy's and X3DAudioCalculate's plain C++); the voice holders' CarSound::SetPitch sub_8210D158, SetPitchScaled sub_8210D080, IsPlaying sub_8210D1D8, UpdateVoices sub_8210D378, Clear sub_8210D320, Pause sub_8210D240 and Resume sub_8210D2C0 (no adapters: only PauseAll's and ResumeAll's plain C++ call them), PauseAll sub_8210E2B8 and ResumeAll sub_8210E350 (XAudio's entry points through their plain C++) natively instead of through the translated code "
               "(the same reads and writes; XAudio's locks stay the game's, taken as the original does; checked by "
               "--run_harnesses=car_sounds)");
 
@@ -398,8 +398,8 @@ ITC_CAR_SOUNDS_ADAPTER(8210D080, CarSoundsSetPitchScaled)
 ITC_CAR_SOUNDS_ADAPTER(8210D1D8, CarSoundsIsPlaying)
 ITC_CAR_SOUNDS_ADAPTER(8210D378, CarSoundsUpdateVoices)
 ITC_CAR_SOUNDS_ADAPTER(8210D320, CarSoundsClear)
-ITC_CAR_SOUNDS_ADAPTER(8210D240, CarSoundsPause)
-ITC_CAR_SOUNDS_ADAPTER(8210D2C0, CarSoundsResume)
+// No adapter (removed 2026-10-29: only CarSound::PauseAll's plain C++ calls it) for CarSound::Pause sub_8210D240.
+// No adapter (removed 2026-10-29: only CarSound::ResumeAll's plain C++ calls it) for CarSound::Resume sub_8210D2C0.
 ITC_CAR_SOUNDS_ADAPTER(8210E2B8, CarSoundsPauseAll)
 ITC_CAR_SOUNDS_ADAPTER(8210E350, CarSoundsResumeAll)
 
