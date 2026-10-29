@@ -752,4 +752,60 @@ uint32_t JoinMix(uint8_t* base, uint32_t voice, uint32_t thread, uint32_t frame,
   return 0;
 }
 
+// --- The allocators' destructors ---
+
+namespace {
+
+// XAudio::Free on `block`: its plain C++ while the heap is the native
+// layer's, else the original through `call`.
+uint32_t FreeBlock(uint32_t block, uint32_t attributes, bool native_heap, uint32_t return_address,
+                   uint32_t frame, const GuestCall& call) {
+  SetRegs(call, Args({kFreeHeap, block, attributes}));
+  if (native_heap) {
+    return Free(block, attributes);
+  }
+  return call(kFree, return_address, At(frame, Args({kFreeHeap, block, attributes})));
+}
+
+}  // namespace
+
+uint32_t AllocatorDestroy(uint8_t* base, uint32_t allocator, bool native_heap, uint32_t frame,
+                          const GuestCall& call) {
+  ITC_NATIVE_RUNNING("sub_824602F8 XAudioAllocator::~XAudioAllocator");
+  guest::StoreU32(base, allocator, kAllocatorVtable);
+  guest::StoreU32(base, allocator + 4, kAllocatorBaseVtable);
+  uint32_t r3 = allocator;
+  const uint32_t block = guest::LoadU32(base, allocator + 24);
+  if (block != 0) {
+    r3 = FreeBlock(block, guest::LoadU32(base, allocator + 12), native_heap, 0x82460340, frame,
+                   call);
+    guest::StoreU32(base, allocator + 24, 0);
+  }
+  guest::StoreU32(base, allocator + 4, kRootVtable);
+  return r3;
+}
+
+uint32_t DefaultAllocatorDestroy(uint8_t* base, uint32_t allocator, bool native_heap,
+                                 uint32_t frame, const GuestCall& call) {
+  ITC_NATIVE_RUNNING("sub_824604E8 XAudioDefaultAllocator::~XAudioDefaultAllocator");
+  guest::StoreU32(base, allocator, kAllocatorVtable);
+  guest::StoreU32(base, allocator + 4, kAllocatorVtable2);
+  guest::StoreU32(base, allocator + 24, 0);
+  SetRegs(call, Args({allocator}));
+  AllocatorDestroy(base, allocator, native_heap, FrameBelow(base, frame, 96), call);
+  return allocator;
+}
+
+uint32_t InterfaceFree(uint8_t* base, uint32_t iface, bool native_heap, uint32_t frame,
+                       const GuestCall& call) {
+  ITC_NATIVE_RUNNING("sub_824603A8 XAudioAllocator::Free (interface)");
+  const uint32_t object = iface - 4;
+  const uint32_t attributes = guest::LoadU32(base, iface + 8);
+  uint32_t r3 = call(Method(base, iface, 0), 0x824603D8, At(frame, Args({iface, 1})));
+  if (object != 0) {
+    r3 = FreeBlock(object, attributes, native_heap, 0x824603F4, frame, call);
+  }
+  return r3;
+}
+
 }  // namespace xaudio

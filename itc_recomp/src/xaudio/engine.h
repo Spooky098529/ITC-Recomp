@@ -272,4 +272,32 @@ uint32_t StageOf(uint8_t* base, uint32_t engine, uint32_t voice, uint32_t frame,
 uint32_t JoinMix(uint8_t* base, uint32_t voice, uint32_t thread, uint32_t frame,
                  const GuestCall& call);
 
+// --- The allocators' destructors ---
+
+constexpr uint32_t kAllocatorBaseVtable = 0x8204A940;  // +4 while the base destroys
+constexpr uint32_t kFreeHeap = 0x82954F20;             // XAudio::Free's r3 (unused)
+constexpr uint32_t kFree = 0x8245EF90;
+
+// XAudioAllocator::~XAudioAllocator (sub_824602F8): its vtables
+// (0x8204A954, 0x8204A940); its block (+24) freed (XAudio::Free with the
+// attributes +12; its plain C++ when `native_heap`, else through `call`)
+// and cleared; +4 the root vtable. `frame` is this function's (96 bytes).
+// Returns the free's r3, or the allocator (the original's r3 untouched).
+uint32_t AllocatorDestroy(uint8_t* base, uint32_t allocator, bool native_heap, uint32_t frame,
+                          const GuestCall& call);
+
+// sub_824604E8: the default allocator's destructor: its vtables
+// (0x8204A954, 0x8204A980), +24 = 0 (its block is itself), then
+// AllocatorDestroy (in a frame below). `frame` is this function's (96
+// bytes). Returns the allocator.
+uint32_t DefaultAllocatorDestroy(uint8_t* base, uint32_t allocator, bool native_heap,
+                                 uint32_t frame, const GuestCall& call);
+
+// sub_824603A8: the +4 interface's free: its slot +0 (the destructor, r4 1)
+// through `call`, then the object (`iface` - 4) freed (XAudio::Free with its
+// attributes, `iface` + 8) unless 0. `frame` is this function's (112
+// bytes). Returns the last r3.
+uint32_t InterfaceFree(uint8_t* base, uint32_t iface, bool native_heap, uint32_t frame,
+                       const GuestCall& call);
+
 }  // namespace xaudio

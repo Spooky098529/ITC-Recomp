@@ -31,7 +31,8 @@ ITC_FLAG_BOOL(native_xaudio_engine, true, "ITC",
               "lists' spin lock (taken as the original does) XAudioStage::Swap sub_8245B208, "
               "XAudioEngine::SwapStageLists sub_8245B720, RunStage sub_8245B480, RunCallbacks "
               "sub_8245ACE0, RegisterCallback sub_8245AB60 and Commit sub_8245B638, StageOf "
-              "sub_8245FBF0 and sub_82460000) natively instead of through the "
+              "sub_8245FBF0 and sub_82460000; the allocators' destructors sub_824602F8, sub_824604E8 "
+              "and its thunk sub_824603A0, and the interface's free sub_824603A8) natively instead of through the "
               "translated code (the same reads and writes; checked by "
               "--run_harnesses=xaudio_engine)");
 
@@ -301,6 +302,34 @@ void XAudioJoinMix(PPCContext& ctx, uint8_t* base) {
   });
 }
 
+void XAudioAllocatorDestroy(PPCContext& ctx, uint8_t* base) {
+  const uint32_t allocator = ctx.r3.u32;
+  XAudioFramed(ctx, base, 96, [&](const xa::GuestCall& call, uint32_t frame) {
+    return xa::AllocatorDestroy(base, allocator, NativeHeapActive(), frame, call);
+  });
+}
+
+void XAudioDefaultAllocatorDestroy(PPCContext& ctx, uint8_t* base) {
+  const uint32_t allocator = ctx.r3.u32;
+  XAudioFramed(ctx, base, 96, [&](const xa::GuestCall& call, uint32_t frame) {
+    return xa::DefaultAllocatorDestroy(base, allocator, NativeHeapActive(), frame, call);
+  });
+}
+
+void XAudioDefaultAllocatorThunk(PPCContext& ctx, uint8_t* base) {
+  // this - 4, then the destructor's tail call (its frame at the caller's).
+  ITC_NATIVE_RUNNING("sub_824603A0 XAudioDefaultAllocator::~XAudioDefaultAllocator (thunk)");
+  ctx.r3.s64 = ctx.r3.s64 - 4;
+  XAudioDefaultAllocatorDestroy(ctx, base);
+}
+
+void XAudioInterfaceFree(PPCContext& ctx, uint8_t* base) {
+  const uint32_t iface = ctx.r3.u32;
+  XAudioFramed(ctx, base, 112, [&](const xa::GuestCall& call, uint32_t frame) {
+    return xa::InterfaceFree(base, iface, NativeHeapActive(), frame, call);
+  });
+}
+
 }  // namespace hooks
 
 #define ITC_XAUDIO_ENGINE_ADAPTER(address, step) \
@@ -348,3 +377,7 @@ ITC_XAUDIO_ENGINE_ADAPTER(8245AB60, XAudioRegisterCallback)
 ITC_XAUDIO_ENGINE_ADAPTER(8245B638, XAudioEngineCommit)
 ITC_XAUDIO_ENGINE_ADAPTER(8245FBF0, XAudioStageOf)
 ITC_XAUDIO_ENGINE_ADAPTER(82460000, XAudioJoinMix)
+ITC_XAUDIO_ENGINE_ADAPTER(824602F8, XAudioAllocatorDestroy)
+ITC_XAUDIO_ENGINE_ADAPTER(824604E8, XAudioDefaultAllocatorDestroy)
+ITC_XAUDIO_ENGINE_ADAPTER(824603A0, XAudioDefaultAllocatorThunk)
+ITC_XAUDIO_ENGINE_ADAPTER(824603A8, XAudioInterfaceFree)

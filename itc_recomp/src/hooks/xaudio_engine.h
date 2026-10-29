@@ -50,4 +50,9 @@ void XAudioEngineCommit(PPCContext& ctx, uint8_t* base);          // sub_8245B63
 void XAudioStageOf(PPCContext& ctx, uint8_t* base);               // sub_8245FBF0
 void XAudioJoinMix(PPCContext& ctx, uint8_t* base);               // sub_82460000
 
+void XAudioAllocatorDestroy(PPCContext& ctx, uint8_t* base);         // sub_824602F8
+void XAudioDefaultAllocatorDestroy(PPCContext& ctx, uint8_t* base);  // sub_824604E8
+void XAudioDefaultAllocatorThunk(PPCContext& ctx, uint8_t* base);    // sub_824603A0 (a tail call)
+void XAudioInterfaceFree(PPCContext& ctx, uint8_t* base);            // sub_824603A8
+
 }  // namespace hooks

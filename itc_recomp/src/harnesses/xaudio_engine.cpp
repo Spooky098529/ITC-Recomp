@@ -1032,6 +1032,97 @@ void Locked(Context& h, uint32_t block) {
   }
 }
 
+// --- The allocators' destructors ---
+
+void Allocators(Context& h, uint32_t block) {
+  if (!hooks::NativeHeapActive()) {
+    return;
+  }
+  // r3 as what it is: the freed block (XMemFree's), 0, the allocator, or
+  // something else.
+  const auto r3_of = [](uint32_t r3, uint32_t freed, uint32_t allocator) {
+    return r3 == 0 ? 0u : freed != 0 && r3 == freed ? 1u : r3 == allocator ? 2u : 3u;
+  };
+  {
+    // The allocator at +0x200, its block (+24) a real one of each
+    // version's (XMemAlloc's, freed by it) or none.
+    Results results("XAudioAllocator::~XAudioAllocator (sub_824602F8)");
+    for (int i = 0; i < 16; i++) {
+      const Random start = h.random;
+      Outputs out[2];
+      for (int v = 0; v < 2; v++) {
+        Random random = start;
+        for (uint32_t k = 0; k < kBlockBytes; k += 4) {
+          Store(h.base, block + k, uint32_t(random.Next()));
+        }
+        const uint32_t allocator = block + 0x200;
+        const uint32_t freed =
+            i % 3 == 0 ? 0 : memory::crt::XMemAlloc(h.base, 64 + 16 * i, xa::kMasteringAttributes);
+        Store(h.base, allocator + 12, xa::kMasteringAttributes);
+        Store(h.base, allocator + 24, freed);
+        PPCContext t = CallContext(h);
+        t.r3.u64 = allocator;
+        (v == 0 ? __imp__sub_824602F8 : hooks::XAudioAllocatorDestroy)(t, h.base);
+        out[v].Bytes(Read(h.base, block, kBlockBytes));
+        out[v].Word(r3_of(t.r3.u32, freed, allocator));
+        h.random = random;
+      }
+      results.Check(out[0], out[1], fmt::format("case {}", i));
+    }
+    results.Report();
+  }
+  const struct {
+    const char* name;
+    GuestFunction recompiled;
+    GuestFunction native;
+    uint32_t offset;  // r3 from the allocator
+  } defaults[] = {
+      {"sub_824604E8 (the default allocator's destructor)", __imp__sub_824604E8,
+       hooks::XAudioDefaultAllocatorDestroy, 0},
+      {"sub_824603A0 (its thunk)", __imp__sub_824603A0, hooks::XAudioDefaultAllocatorThunk, 4},
+  };
+  for (const auto& d : defaults) {
+    Results results(d.name);
+    for (int i = 0; i < 16; i++) {
+      Case(h, results, block, d.recompiled, d.native,
+           [&](Random&, PPCContext& t) { t.r3.u64 = block + 0x200 + d.offset; },
+           fmt::format("case {}", i));
+    }
+    results.Report();
+  }
+  {
+    // A real object of each version's (XMemAlloc's, freed by it), its +4
+    // interface's slot +0 a recorded leaf (the block's vtable).
+    Results results("sub_824603A8 (the interface's free)");
+    for (int i = 0; i < 16; i++) {
+      const Random start = h.random;
+      Outputs out[2];
+      for (int v = 0; v < 2; v++) {
+        Random random = start;
+        for (uint32_t k = 0; k < kBlockBytes; k += 4) {
+          Store(h.base, block + k, uint32_t(random.Next()));
+        }
+        Store(h.base, block + kVtable, i % 2 == 0 ? 0x8245F860 : 0x820CE9F8);
+        const uint32_t object = memory::crt::XMemAlloc(h.base, 0x200, xa::kMasteringAttributes);
+        out[v].Word(object != 0);
+        if (object == 0) {
+          continue;
+        }
+        Store(h.base, object + 4, block + kVtable);
+        Store(h.base, object + 12, xa::kMasteringAttributes);
+        PPCContext t = CallContext(h);
+        t.r3.u64 = object + 4;
+        (v == 0 ? __imp__sub_824603A8 : hooks::XAudioInterfaceFree)(t, h.base);
+        out[v].Bytes(Read(h.base, block, kBlockBytes));
+        out[v].Word(r3_of(t.r3.u32, object, object + 4));
+        h.random = random;
+      }
+      results.Check(out[0], out[1], fmt::format("case {}", i));
+    }
+    results.Report();
+  }
+}
+
 }  // namespace
 
 void XAudioEngine(Context& h) {
@@ -1044,6 +1135,7 @@ void XAudioEngine(Context& h) {
   Making(h, block.address);
   MasteringVoice(h, block.address);
   Locked(h, block.address);
+  Allocators(h, block.address);
 }
 
 }  // namespace harness
