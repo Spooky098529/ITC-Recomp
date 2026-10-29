@@ -122,4 +122,17 @@ void CarSoundsReleaseAll(PPCContext& ctx, uint8_t* base);        // sub_8210F750
 // No registers in (r3 SetEffectParameters').
 void CarSoundsInit(PPCContext& ctx, uint8_t* base);  // sub_8210FE00
 
+// The parts' updates: r3 = the part, r4 = the vehicle, r5 = the DSP output
+// (PassBySound: r6 the pass flag); PlayOnce's voices with the native heap's
+// default allocator while --native_heap routes the heap.
+void CarSoundsHitImpact(PPCContext& ctx, uint8_t* base);        // sub_8210E778
+void CarSoundsHitScrape(PPCContext& ctx, uint8_t* base);        // sub_8210E938
+void CarSoundsHitWave9(PPCContext& ctx, uint8_t* base);         // sub_8210EB90
+void CarSoundsHitSoundsUpdate(PPCContext& ctx, uint8_t* base);  // sub_8210FD78
+void CarSoundsPart736Update(PPCContext& ctx, uint8_t* base);    // sub_8210EBF0
+void CarSoundsPart840Update(PPCContext& ctx, uint8_t* base);    // sub_8210ECF0
+void CarSoundsPart888Update(PPCContext& ctx, uint8_t* base);    // sub_8210EEE0
+void CarSoundsWindSoundUpdate(PPCContext& ctx, uint8_t* base);  // sub_8210EDB0
+void CarSoundsPassBySoundUpdate(PPCContext& ctx, uint8_t* base);  // sub_8210F088
+
 }  // namespace hooks

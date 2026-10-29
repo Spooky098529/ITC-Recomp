@@ -244,4 +244,62 @@ uint32_t CarSoundsRelease(uint8_t* base, uint32_t frame, const GuestCall& call);
 uint32_t CarSoundsInit(uint8_t* base, const Voices& voices, uint32_t frame,
                        const GuestCall& call);
 
+// --- The parts' updates (car_sound_parts.cpp), from CarSound::Update ---
+//
+// `part` is the part's holder (r3), `vehicle` the vehicle (r4), `output` the
+// DSP output word (r5, the whole register) UpdateVoices is given; each
+// returns the r3 the original leaves. One-shot waves through PlayOnce with
+// the holder's view (+40).
+
+// sub_8210E778 (144 bytes; probably the impact): with the vehicle's +6152
+// bit 0, the strength of the collision object's (+340) first contact of
+// mask 0xFFFFFF; wave 7 + its level (strength x [0x82008054], at most
+// [0x820021E8], fctidz into the frame's +80) when it passes [0x82002A0C]
+// with +64 -1, or [0x82001FC0] with +64 at least 0; then +48 the ticks,
+// +60 the strength (fctiwz), +64 0.
+uint32_t HitImpact(uint8_t* base, uint32_t part, uint32_t vehicle, const Voices& voices,
+                   uint32_t frame, const GuestCall& call);
+// sub_8210E938 (192 bytes; probably the scrape): in contact (+6152 bit 1
+// without bit 0), the first contact of mask 0xFF000000's strength times the
+// speed; the looping wave 10 (+56 its slot) played or its volume set, and
+// wave 7 + the level above [0x82001FC0]; out of contact, the looping voice
+// stopped after two ticks (+52).
+uint32_t HitScrape(uint8_t* base, uint32_t part, uint32_t vehicle, const Voices& voices,
+                   uint32_t frame, const GuestCall& call);
+// sub_8210EB90 (96 bytes): wave 9 on the vehicle's +6152 bit 2, +48 = 32.
+uint32_t HitWave9(uint8_t* base, uint32_t part, uint32_t vehicle, const Voices& voices,
+                  uint32_t frame, const GuestCall& call);
+// sub_8210FD78 HitSounds::Update (112 bytes): the three above while +48 is 0
+// (else +48 down by one), +64 counted up to 32 (then -1), UpdateVoices.
+uint32_t HitSoundsUpdate(uint8_t* base, uint32_t part, uint64_t vehicle, uint64_t output,
+                         const Voices& voices, uint32_t frame, const GuestCall& call);
+// sub_8210EBF0 (112 bytes; the part at +736): nothing while the vehicle's
+// +2252 is 0; wave 4 when its byte +2948 sets and +48 is 0 (+52 the slot,
+// +48 32 ticks), its volume +2952 by the car's specs (+5712: byte +2019,
+// word +1656); +48 counted down while the byte is clear; UpdateVoices.
+uint32_t Part736Update(uint8_t* base, uint32_t part, uint32_t vehicle, uint64_t output,
+                       const Voices& voices, uint32_t frame, const GuestCall& call);
+// sub_8210ECF0 (128 bytes; the part at +840): wave 6 on the vehicle's byte
+// +2504, wave 18 on +2960 when the byte +45 is 0 (+45 = 2, down to 0 a
+// tick); UpdateVoices.
+uint32_t Part840Update(uint8_t* base, uint32_t part, uint32_t vehicle, uint64_t output,
+                       const Voices& voices, uint32_t frame, const GuestCall& call);
+// sub_8210EEE0 (144 bytes; the part at +888): the looping wave 17 started on
+// the vehicle's byte +2424 (+48 1, +52 the slot), its volume faded in (+60)
+// and out (+56) by [0x82007FC8] a tick, stopped at 0.0; UpdateVoices.
+uint32_t Part888Update(uint8_t* base, uint32_t part, uint32_t vehicle, uint64_t output,
+                       const Voices& voices, uint32_t frame, const GuestCall& call);
+// sub_8210EDB0 WindSound::Update (128 bytes): wave 5 once (+48 1) while a
+// halfword at the vehicle's +5410 + 96i (i 0-3) has bit 0 and the speed
+// passes [0x8200257C], its volume by the speed and the view mode
+// ([[0x826C2CE8]]+1860); +48 back to 0 when none has; UpdateVoices.
+uint32_t WindSoundUpdate(uint8_t* base, uint32_t part, uint32_t vehicle, uint64_t output,
+                         const Voices& voices, uint32_t frame, const GuestCall& call);
+// sub_8210F088 PassBySound::Update (112 bytes): nothing without a vehicle;
+// wave 15 when `passed` (r6) and the vehicle's +6148 & 0x81 is clear;
+// UpdateVoices.
+uint32_t PassBySoundUpdate(uint8_t* base, uint32_t part, uint32_t vehicle, uint64_t output,
+                           uint32_t passed, const Voices& voices, uint32_t frame,
+                           const GuestCall& call);
+
 }  // namespace car_sounds
