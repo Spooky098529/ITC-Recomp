@@ -588,4 +588,121 @@ uint32_t CarSoundsRelease(uint8_t* base, uint32_t frame, const GuestCall& call) 
   return xa::ApiRelease(base, submix, 0, 0, 0, 0, call);
 }
 
+namespace {
+
+// operator new[] (sub_825A6940): its plain C++, the guest's where that
+// refuses.
+uint32_t NewArray(uint8_t* base, uint32_t size, uint32_t return_address, const GuestCall& call) {
+  if (const auto block = memory::crt::OperatorNewArray(base, size)) {
+    return *block;
+  }
+  return call(0x825A6940, return_address, Args({size}));
+}
+
+}  // namespace
+
+uint32_t CarSoundsInit(uint8_t* base, const Voices& voices, uint32_t frame,
+                       const GuestCall& call) {
+  ITC_NATIVE_RUNNING("sub_8210FE00 CarSounds::Init");
+  const uint32_t f = frame;
+  SetRegs(call, Args({8864}));
+  const uint32_t made = NewArray(base, 8864, 0x8210FE18, call);
+  uint32_t array = 0;
+  if (made != 0) {
+    array = made + 16;
+    Store(base, made, 7);
+    for (uint32_t k = 0; k < 7; k++) {
+      SetRegs(call, Args({array + kCarSoundBytes * k}));
+      CarSoundConstruct(base, array + kCarSoundBytes * k);
+    }
+  }
+  Store(base, kSounds, array);
+  // memset (sub_825A71D0) with 0: the same bytes.
+  for (uint32_t i = 0; i < 7 * kCarSoundBytes; i += 4) {
+    Store(base, array + i, 0);
+  }
+  for (uint32_t k = 0; k < 7; k++) {
+    const uint32_t at = Load(base, kSounds);
+    const uint32_t sound = at != 0 ? at + kCarSoundBytes * k : 0;
+    if (sound != 0) {
+      SetRegs(call, Args({sound}));
+      CarSoundConstruct(base, sound);
+    }
+    StoreF(base, sound + 1252, kOne);
+    StoreB(base, sound + 404, uint8_t(k));
+    Store(base, sound + 400, 0);
+    Store(base, sound + 0, 0);
+    Store(base, sound + 1248, 0);
+    SetRegs(call, Args({sound}));
+    const uint32_t matrix = NewArray(base, 24, 0x8210DF88, call);
+    SetUp(base, sound, matrix);
+  }
+  // The submix's map at +208 (six entries at +96: input i to output i,
+  // gain [0x82002208], 0.0 for 2), its outputs at +144 (one, at +256: the
+  // null voice with the map at +160: input 0 to output i, gain 1.0).
+  for (const uint32_t at : {164u, 172u, 180u, 188u, 196u, 204u}) {
+    StoreF(base, f + at, kOne);
+  }
+  Store(base, 0x826C5C40, 0);
+  StoreB(base, f + 160, 0);
+  StoreB(base, f + 161, 0);
+  StoreB(base, f + 168, 0);
+  StoreB(base, f + 169, 1);
+  Store(base, f + 148, f + 256);
+  StoreB(base, f + 176, 0);
+  StoreB(base, f + 177, 2);
+  StoreB(base, f + 184, 0);
+  StoreB(base, f + 185, 3);
+  StoreB(base, f + 192, 0);
+  StoreB(base, f + 193, 4);
+  StoreB(base, f + 200, 0);
+  StoreB(base, f + 201, 5);
+  StoreB(base, f + 144, 1);
+  Store(base, f + 256, 0);
+  Store(base, f + 260, f + 208);
+  // memset (sub_825A71D0) of the description's 27 bytes from +225.
+  for (uint32_t i = 0; i < 27; i++) {
+    StoreB(base, f + 225 + i, 0);
+  }
+  constexpr uint32_t kSubmixGain = 0x82002208;
+  StoreB(base, f + 96, 0);
+  StoreB(base, f + 97, 0);
+  StoreB(base, f + 104, 1);
+  StoreB(base, f + 105, 1);
+  StoreB(base, f + 112, 2);
+  StoreB(base, f + 113, 2);
+  StoreB(base, f + 120, 3);
+  StoreB(base, f + 121, 3);
+  StoreF(base, f + 100, kSubmixGain);
+  StoreF(base, f + 108, kSubmixGain);
+  StoreB(base, f + 128, 4);
+  StoreF(base, f + 124, kSubmixGain);
+  StoreB(base, f + 129, 4);
+  StoreF(base, f + 132, kSubmixGain);
+  StoreB(base, f + 136, 5);
+  StoreB(base, f + 137, 5);
+  StoreF(base, f + 116, kZero);
+  StoreB(base, f + 208, 6);
+  StoreF(base, f + 140, kSubmixGain);
+  Store(base, f + 236, kOne + 72);
+  StoreB(base, f + 233, 6);
+  StoreB(base, f + 224, 0);
+  Store(base, f + 212, f + 96);
+  StoreB(base, f + 225, 1);
+  Store(base, f + 228, 48000);
+  Store(base, f + 240, f + 144);
+  SetRegs(call, Args({f + 224, kSubmix}));
+  xa::ApiCreateSubmixVoice(base, f + 224, kSubmix, voices.native_heap, voices.thread,
+                           xa::FrameBelow(base, f, 128), call);
+  // The effect's parameters: the block 0x82616638, 48 bytes.
+  constexpr uint32_t kReverbOff = 0x82616638;
+  Store(base, f + 84, 0);
+  Store(base, f + 80, kReverbOff);
+  Store(base, f + 84, 48);
+  const uint32_t submix = Load(base, kSubmix);
+  SetRegs(call, Args({submix, 0, 1, 3, f + 80}));
+  xa::FrameBelow(base, f, 144);
+  return xa::ApiSetEffectParameters(base, submix, 0, 1, 3, f + 80, call);
+}
+
 }  // namespace car_sounds

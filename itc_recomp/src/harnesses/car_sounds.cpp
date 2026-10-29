@@ -1337,6 +1337,93 @@ void RealVoices(Context& h, uint32_t block) {
   }
   ITC_LOG_INFO("harness: car_sounds: the real voices' cases made {} voices ({} playing)", real_made,
                real_playing);
+  {
+    // CarSounds::Init with its globals put back after: the array, its
+    // matrices and the submix voice it makes compared (the matrices' words
+    // as whether they're set, the submix's allocator block with pointers
+    // into it as offsets), with its frame's descriptions; then the submix
+    // released (XAudio's Release, as CarSounds::Release does) and the
+    // blocks freed.
+    Results results("CarSounds::Init (sub_8210FE00)");
+    const uint32_t saved[3] = {guest::LoadU32(h.base, cs::kSounds),
+                               guest::LoadU32(h.base, 0x826C5C40),
+                               guest::LoadU32(h.base, cs::kSubmix)};
+    for (int c = 0; c < 4; c++) {
+      const Random start = h.random;
+      Random random = start;
+      Outputs out[2];
+      for (int v = 0; v < 2; v++) {
+        random = start;
+        PPCContext t = CallContext(h);
+        for (uint32_t i = 0; i < 0x1000; i += 4) {
+          Store(h.base, t.r1.u32 - 0x1000 + i, uint32_t(random.Next()));
+        }
+        Store(h.base, 0x826C5C40, uint32_t(random.Next()));
+        Store(h.base, cs::kSubmix, 0);
+        CriticalSection(h, kMixLock, true);
+        const uint32_t mastering = MasteringVoice(h.base);
+        const uint32_t count = guest::LoadU32(h.base, mastering + 4);
+        const uint32_t active = guest::LoadU32(h.base, mastering + 40);
+        ITC_FLAG(native_car_sounds) = v == 1;
+        (v == 0 ? __imp__sub_8210FE00 : hooks::CarSoundsInit)(t, h.base);
+        ITC_FLAG(native_car_sounds) = true;
+        const uint32_t array = guest::LoadU32(h.base, cs::kSounds);
+        const uint32_t submix = guest::LoadU32(h.base, cs::kSubmix);
+        std::vector<RealVoice> made;
+        if (submix != 0) {
+          const uint32_t allocator = guest::LoadU32(h.base, submix + 8);
+          made.push_back({submix, allocator, guest::LoadU32(h.base, allocator + 16) + 28});
+        }
+        out[v].Word(array != 0);
+        out[v].Word(uint32_t(made.size()));
+        out[v].Word(t.r3.u32);
+        out[v].Word(guest::LoadU32(h.base, 0x826C5C40));
+        uint32_t matrices[7] = {};
+        if (array != 0) {
+          out[v].Word(guest::LoadU32(h.base, array - 16));
+          for (uint32_t k = 0; k < 7; k++) {
+            const uint32_t sound = array + cs::kCarSoundBytes * k;
+            matrices[k] = guest::LoadU32(h.base, sound + 176);
+            out[v].Word(matrices[k] != 0);
+            Store(h.base, sound + 176, 0);
+            if (matrices[k] != 0) {
+              out[v].Bytes(Read(h.base, matrices[k], 24));
+            }
+          }
+          Relative(out[v], h.base, array, 7 * cs::kCarSoundBytes, made);
+        }
+        for (const RealVoice& m : made) {
+          Relative(out[v], h.base, m.allocator, m.bytes, made);
+        }
+        Relative(out[v], h.base, t.r1.u32 - 368 + 80, 184, made);
+        if (submix != 0) {
+          PPCContext release = CallContext(h);
+          release.r3.u64 = submix;
+          hooks::XAudioApiRelease(release, h.base);
+          out[v].Word(release.r3.u32);
+        }
+        out[v].Word(guest::LoadU32(h.base, mastering + 4) - count);
+        out[v].Word(guest::LoadU32(h.base, mastering + 40) - active);
+        Store(h.base, mastering + 4, count);
+        Store(h.base, mastering + 40, active);
+        CriticalSection(h, kMixLock, false);
+        for (const uint32_t matrix : matrices) {
+          if (matrix != 0) {
+            memory::crt::OperatorDeleteArray(matrix);
+          }
+        }
+        if (array != 0) {
+          memory::crt::OperatorDeleteArray(array - 16);
+        }
+        Store(h.base, cs::kSounds, saved[0]);
+        Store(h.base, 0x826C5C40, saved[1]);
+        Store(h.base, cs::kSubmix, saved[2]);
+      }
+      h.random = random;
+      results.Check(out[0], out[1], fmt::format("case {}", c));
+    }
+    results.Report();
+  }
 }
 
 }  // namespace

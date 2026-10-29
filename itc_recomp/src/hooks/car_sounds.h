@@ -119,4 +119,7 @@ void CarSoundsStopAll(PPCContext& ctx, uint8_t* base);           // sub_8210F7C8
 void CarSoundsRelease(PPCContext& ctx, uint8_t* base);           // sub_8210E170
 void CarSoundsReleaseAll(PPCContext& ctx, uint8_t* base);        // sub_8210F750
 
+// No registers in (r3 SetEffectParameters').
+void CarSoundsInit(PPCContext& ctx, uint8_t* base);  // sub_8210FE00
+
 }  // namespace hooks

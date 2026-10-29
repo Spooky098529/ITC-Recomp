@@ -230,4 +230,18 @@ uint32_t Release(uint8_t* base, uint32_t sound, uint32_t frame, const GuestCall&
 // operator delete[]'s plain C++) and the submix voice released.
 uint32_t CarSoundsRelease(uint8_t* base, uint32_t frame, const GuestCall& call);
 
+// sub_8210FE00 CarSounds::Init (368 bytes): the seven car sounds (operator
+// new[] of 8,864 bytes, the count 7 at +0, each made by CarSound::CarSound)
+// into [0x826C5C3C], cleared (8,848 bytes) and each made again and set up
+// (+1252 [0x82007FC8], +404 its index, +400, +0 and +1248 0, SetUp with its
+// matrix from operator new[]); [0x826C5C40] = 0; the six-channel 48 kHz
+// submix voice (XAudioCreateSubmixVoice: the description at the frame's
+// +224, its map at +208 and +96, its outputs at +144 and +256) into
+// [0x826C5C44] and its effect parameters (SetEffectParameters r4 0, r5 1,
+// r6 3, the block 0x82616638 at the frame's +80). Operator new[] through
+// its plain C++, the guest's through `call` where that refuses. Returns
+// SetEffectParameters' r3.
+uint32_t CarSoundsInit(uint8_t* base, const Voices& voices, uint32_t frame,
+                       const GuestCall& call);
+
 }  // namespace car_sounds
