@@ -113,6 +113,12 @@ using GuestCall = std::function<uint32_t(uint32_t function, uint32_t return_addr
 // puts it back.
 uint32_t& StackFloor();
 
+// A frame of `bytes` below `frame` with its back chain, the stack floor
+// lowered to it: for plain C++ outside XAudio (the car sounds) calling an
+// entry point's plain C++ from its own frame, as the original's call makes
+// the callee's frame there.
+uint32_t FrameBelow(uint8_t* base, uint32_t frame, uint32_t bytes);
+
 // A call to function 0 only sets the registers given (and the stack
 // pointer is ignored): a plain C++ caller sets them as the original does
 // before calling a function whose plain C++ it runs itself, so the

@@ -11,6 +11,7 @@
 #include "hooks/heap.h"
 #include "hooks/mode_tick.h"
 #include "hooks/models.h"
+#include "hooks/xaudio.h"
 #include "memory/c_runtime_heap.h"
 
 #include <cstring>
@@ -28,8 +29,8 @@ ITC_FLAG_BOOL(native_car_sounds, true, "ITC",
               "Memory::AllocPhysicalEx's, Music::Play's and X3DAudioInitialize's plain C++); X3DAudio's "
               "X3DVec::Sub sub_824819E0, Length sub_82481998, Dot sub_824819B8 and Cross "
               "sub_82481A18, X3DAudio::EvaluateCurve sub_82480818 and X3DAudio::Curves "
-              "sub_82480918, X3DAudio::Pan sub_82480F80 and X3DAudio::Matrix sub_82481390, X3DAudio::Cone sub_82480BA8, X3DAudio::Doppler sub_82480E90 and X3DAudioCalculate sub_82481880 (the original when its flags ask for EmitterAngle sub_82480780 or Delay sub_82481708) (checked by --run_harnesses=x3daudio)); CarSound::Update3D sub_8210F820 (RigidBody::Position's, Vec4::Copy's and X3DAudioCalculate's plain C++) natively instead of through the translated code "
-              "(the same reads and writes; XAudio's voice methods stay the game's; checked by "
+              "sub_82480918, X3DAudio::Pan sub_82480F80 and X3DAudio::Matrix sub_82481390, X3DAudio::Cone sub_82480BA8, X3DAudio::Doppler sub_82480E90 and X3DAudioCalculate sub_82481880 (the original when its flags ask for EmitterAngle sub_82480780 or Delay sub_82481708) (checked by --run_harnesses=x3daudio)); CarSound::Update3D sub_8210F820 (RigidBody::Position's, Vec4::Copy's and X3DAudioCalculate's plain C++); the voice holders' CarSound::SetPitch sub_8210D158, SetPitchScaled sub_8210D080, IsPlaying sub_8210D1D8, UpdateVoices sub_8210D378, Clear sub_8210D320, Pause sub_8210D240, Resume sub_8210D2C0, PauseAll sub_8210E2B8 and ResumeAll sub_8210E350 (XAudio's entry points through their plain C++) natively instead of through the translated code "
+              "(the same reads and writes; XAudio's locks stay the game's, taken as the original does; checked by "
               "--run_harnesses=car_sounds)");
 
 namespace hooks {
@@ -286,6 +287,76 @@ void CarSoundsUpdate3D(PPCContext& ctx, uint8_t* base) {
   ctx.lr = ctx.r12.u64;
 }
 
+void CarSoundsSetPitch(PPCContext& ctx, uint8_t* base) {
+  ctx.fpscr.disableFlushMode();
+  const uint32_t holder = ctx.r3.u32, slot = ctx.r4.u32, r7 = ctx.r7.u32;
+  const double f1 = ctx.f1.f64;
+  XAudioFramed(ctx, base, 0, [&](const xaudio::GuestCall& call, uint32_t sp) {
+    return cs::SetPitch(base, holder, slot, f1, r7, sp, call);
+  });
+}
+
+void CarSoundsSetPitchScaled(PPCContext& ctx, uint8_t* base) {
+  ctx.fpscr.disableFlushMode();
+  const uint32_t holder = ctx.r3.u32, slot = ctx.r4.u32, r7 = ctx.r7.u32, r9 = ctx.r9.u32;
+  const double f1 = ctx.f1.f64, f3 = ctx.f3.f64;
+  XAudioFramed(ctx, base, 96, [&](const xaudio::GuestCall& call, uint32_t frame) {
+    return cs::SetPitchScaled(base, holder, slot, f1, f3, r7, r9, frame, call);
+  });
+}
+
+void CarSoundsIsPlaying(PPCContext& ctx, uint8_t* base) {
+  const uint32_t holder = ctx.r3.u32, slot = ctx.r4.u32;
+  XAudioFramed(ctx, base, 112, [&](const xaudio::GuestCall& call, uint32_t frame) {
+    return cs::IsPlaying(base, holder, slot, frame, call);
+  });
+}
+
+void CarSoundsUpdateVoices(PPCContext& ctx, uint8_t* base) {
+  const uint32_t holder = ctx.r3.u32;
+  const uint64_t output = ctx.r4.u64;
+  XAudioFramed(ctx, base, 112, [&](const xaudio::GuestCall& call, uint32_t frame) {
+    return cs::UpdateVoices(base, holder, output, frame, call);
+  });
+}
+
+void CarSoundsClear(PPCContext& ctx, uint8_t* base) {
+  const uint32_t holder = ctx.r3.u32;
+  XAudioFramed(ctx, base, 128, [&](const xaudio::GuestCall& call, uint32_t frame) {
+    return cs::Clear(base, holder, frame, call);
+  });
+}
+
+void CarSoundsPause(PPCContext& ctx, uint8_t* base) {
+  const uint32_t holder = ctx.r3.u32;
+  XAudioFramed(ctx, base, 112, [&](const xaudio::GuestCall& call, uint32_t frame) {
+    return cs::Pause(base, holder, frame, call);
+  });
+}
+
+void CarSoundsResume(PPCContext& ctx, uint8_t* base) {
+  const uint32_t holder = ctx.r3.u32;
+  const xaudio::Thread thread = XAudioThreadOf(ctx, base);
+  XAudioFramed(ctx, base, 112, [&](const xaudio::GuestCall& call, uint32_t frame) {
+    return cs::Resume(base, holder, thread, frame, call);
+  });
+}
+
+void CarSoundsPauseAll(PPCContext& ctx, uint8_t* base) {
+  const uint32_t sound = ctx.r3.u32;
+  XAudioFramed(ctx, base, 112, [&](const xaudio::GuestCall& call, uint32_t frame) {
+    return cs::PauseAll(base, sound, frame, call);
+  });
+}
+
+void CarSoundsResumeAll(PPCContext& ctx, uint8_t* base) {
+  const uint32_t sound = ctx.r3.u32;
+  const xaudio::Thread thread = XAudioThreadOf(ctx, base);
+  XAudioFramed(ctx, base, 112, [&](const xaudio::GuestCall& call, uint32_t frame) {
+    return cs::ResumeAll(base, sound, thread, frame, call);
+  });
+}
+
 }  // namespace hooks
 
 #define ITC_CAR_SOUNDS_ADAPTER(address, step) \
@@ -322,6 +393,15 @@ ITC_CAR_SOUNDS_ADAPTER(8210DDC8, CarSoundsSetUp)
 // No adapter (removed 2026-10-28: only Calculate's plain C++ calls it in play) for X3DAudio::Doppler sub_82480E90.
 // No adapter (removed 2026-10-28: only CarSound::Update3D's plain C++ calls it in play) for X3DAudioCalculate sub_82481880.
 ITC_CAR_SOUNDS_ADAPTER(8210F820, CarSoundsUpdate3D)
+ITC_CAR_SOUNDS_ADAPTER(8210D158, CarSoundsSetPitch)
+ITC_CAR_SOUNDS_ADAPTER(8210D080, CarSoundsSetPitchScaled)
+ITC_CAR_SOUNDS_ADAPTER(8210D1D8, CarSoundsIsPlaying)
+ITC_CAR_SOUNDS_ADAPTER(8210D378, CarSoundsUpdateVoices)
+ITC_CAR_SOUNDS_ADAPTER(8210D320, CarSoundsClear)
+ITC_CAR_SOUNDS_ADAPTER(8210D240, CarSoundsPause)
+ITC_CAR_SOUNDS_ADAPTER(8210D2C0, CarSoundsResume)
+ITC_CAR_SOUNDS_ADAPTER(8210E2B8, CarSoundsPauseAll)
+ITC_CAR_SOUNDS_ADAPTER(8210E350, CarSoundsResumeAll)
 
 extern "C" REX_FUNC(sub_82110258) {
   REX_FUNC_PROLOGUE();

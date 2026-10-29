@@ -494,6 +494,9 @@ xa::Thread ThreadOf(PPCContext& ctx, uint8_t* base) {
   return thread;
 }
 
+xa::GuestCall XAudioCaller(PPCContext& ctx, uint8_t* base) { return Caller(ctx, base); }
+xa::Thread XAudioThreadOf(PPCContext& ctx, uint8_t* base) { return ThreadOf(ctx, base); }
+
 void XAudioSpinTake(PPCContext& ctx, uint8_t* base) {
   const xa::Thread th = ThreadOf(ctx, base);
   xa::SpinTake(base, th.r13, Caller(ctx, base));

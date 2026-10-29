@@ -88,4 +88,18 @@ void CarSoundsX3DCalculate(PPCContext& ctx, uint8_t* base);  // sub_82481880
 // them; r3 as the original leaves it (Calculate's).
 void CarSoundsUpdate3D(PPCContext& ctx, uint8_t* base);  // sub_8210F820
 
+// The voice holders (car_sounds.h): r3 = the holder (the car sound for
+// PauseAll and ResumeAll), r4 = the slot (UpdateVoices: the output), as the
+// originals take them; XAudio's entry points through their plain C++, in the
+// original's frame (hooks::XAudioFramed).
+void CarSoundsSetPitch(PPCContext& ctx, uint8_t* base);        // sub_8210D158 (f1, r7)
+void CarSoundsSetPitchScaled(PPCContext& ctx, uint8_t* base);  // sub_8210D080 (f1, f3, r7, r9)
+void CarSoundsIsPlaying(PPCContext& ctx, uint8_t* base);       // sub_8210D1D8
+void CarSoundsUpdateVoices(PPCContext& ctx, uint8_t* base);    // sub_8210D378
+void CarSoundsClear(PPCContext& ctx, uint8_t* base);           // sub_8210D320
+void CarSoundsPause(PPCContext& ctx, uint8_t* base);           // sub_8210D240
+void CarSoundsResume(PPCContext& ctx, uint8_t* base);          // sub_8210D2C0
+void CarSoundsPauseAll(PPCContext& ctx, uint8_t* base);        // sub_8210E2B8
+void CarSoundsResumeAll(PPCContext& ctx, uint8_t* base);       // sub_8210E350
+
 }  // namespace hooks

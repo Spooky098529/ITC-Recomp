@@ -13,6 +13,7 @@
 #include "base/log.h"
 #include "car_sounds/car_sounds.h"
 #include "hooks/car_sounds.h"
+#include "hooks/xaudio.h"
 #include "memory/c_runtime_heap.h"
 #include "memory/heap.h"
 #include "models/memory_blocks.h"
@@ -738,6 +739,198 @@ void Update3Ds(Context& h, uint32_t block) {
   results.Report();
 }
 
+// --- The voice holders ---
+//
+// A car sound (or one holder) at +0 of the block; ten fake voices at
+// +0x800 + 0x100 k, each with its vtable at +0x1C00 (64 slots, each one of
+// three leaf recorders: XAudioVoice::AddRef sub_8245F860, the count at +4
+// up and in r3; sub_820CE9F8, r4 and r5 to +444 and +448; sub_820B6950, f1
+// to +112 as a float), its codec (+76) another fake voice and its flags'
+// pending bit (+61 bit 6) clear, so XAudio's Start and Stop stay on the
+// fake objects. The holders' slots are fake voices or 0. The states
+// GetState gives are the stack's random bytes (no recorder writes there),
+// the same for both versions. Compared: the block (the fake voices' +112
+// as floats), r3 and the 64 bytes above the stack pointer (UpdateVoices'
+// output word in the caller's frame).
+constexpr uint32_t kVoices = 0x800;
+constexpr uint32_t kVoiceBytes = 0x100;
+constexpr uint32_t kVoiceCount = 10;
+constexpr uint32_t kVoiceVtable = 0x1C00;
+constexpr uint32_t kVoiceRecorders[] = {0x8245F860, 0x820CE9F8, 0x820B6950};
+constexpr uint32_t kSoundHolders[] = {408 + 44, 408 + 128, 952, 584, 676, 736,
+                                      840,      792,       888, 1016, 1072, 1136};
+
+uint32_t FakeVoice(uint32_t block, uint32_t k) { return block + kVoices + kVoiceBytes * k; }
+
+void FakeVoices(uint8_t* base, uint32_t block, Random& random) {
+  for (uint32_t slot = 0; slot < 0x100; slot += 4) {
+    Store(base, block + kVoiceVtable + slot, kVoiceRecorders[random.Below(3)]);
+  }
+  for (uint32_t k = 0; k < kVoiceCount; k++) {
+    const uint32_t voice = FakeVoice(block, k);
+    Store(base, voice, block + kVoiceVtable);
+    Store(base, voice + 4, random.Below(3));
+    Store(base, voice + 76, FakeVoice(block, random.Below(kVoiceCount)));
+    guest::StoreU8(base, voice + 61, guest::LoadU8(base, voice + 61) & 0xBF);
+  }
+}
+
+// A holder at `holder`: each slot a fake voice, or 0 one time in `empty`.
+void FakeHolder(uint8_t* base, uint32_t block, uint32_t holder, Random& random, uint32_t empty) {
+  for (uint32_t i = 0; i < 4; i++) {
+    Store(base, holder + 4 + 4 * i,
+          random.Below(empty) == 0 ? 0 : FakeVoice(block, random.Below(kVoiceCount)));
+    Store(base, holder + 24 + 4 * i, random.Below(2) == 0 ? 0 : uint32_t(random.Next()));
+  }
+}
+
+template <typename Setup>
+void HolderCase(Context& h, Results& results, uint32_t block, GuestFunction recompiled,
+                GuestFunction native, Setup setup, const std::string& what) {
+  const Random start = h.random;
+  Random random = start;
+  Outputs out[2];
+  std::vector<uint32_t> floats;
+  for (uint32_t k = 0; k < kVoiceCount; k++) {
+    floats.push_back(kVoices + kVoiceBytes * k + 112);
+  }
+  for (int v = 0; v < 2; v++) {
+    random = start;
+    for (uint32_t i = 0; i < kBlockBytes; i += 4) {
+      Store(h.base, block + i, uint32_t(random.Next()));
+    }
+    PPCContext t = CallContext(h);
+    for (uint32_t i = 0; i < 0x400; i += 4) {
+      Store(h.base, t.r1.u32 - 0x400 + i, uint32_t(random.Next()));
+    }
+    for (uint32_t i = 0; i < 64; i += 4) {
+      Store(h.base, t.r1.u32 + i, uint32_t(random.Next()));
+    }
+    FakeVoices(h.base, block, random);
+    setup(random, t);
+    ITC_FLAG(native_car_sounds) = v == 1;
+    (v == 0 ? recompiled : native)(t, h.base);
+    ITC_FLAG(native_car_sounds) = true;
+    BlockOutputs(out[v], h.base, block, floats);
+    out[v].Word(t.r3.u32);
+    out[v].Bytes(Read(h.base, t.r1.u32, 64));
+  }
+  h.random = random;
+  results.Check(out[0], out[1], what);
+}
+
+// A pitch: the 0.0 the code tests for, specials, the game's range and wide.
+double Pitch(Random& random) {
+  switch (random.Below(6)) {
+    case 0:
+      return 0.0;
+    case 1:
+      return double(std::bit_cast<float>(Special(random)));
+    case 2:
+      return double(Uniform(random, -4.0f, 4.0f));
+    case 3:
+      return double(Uniform(random, 0.0f, 2.0f));
+    default:
+      return double(int32_t(random.Next())) / 65536.0;
+  }
+}
+
+void Holders(Context& h, uint32_t block) {
+  const uint32_t holder = block + 0x100;
+  {
+    Results results("CarSound::SetPitch (sub_8210D158)");
+    for (int c = 0; c < 200; c++) {
+      HolderCase(h, results, block, __imp__sub_8210D158, hooks::CarSoundsSetPitch,
+                 [&](Random& random, PPCContext& t) {
+                   FakeHolder(h.base, block, holder, random, 1000000);
+                   t.r3.u64 = holder;
+                   t.r4.u64 = random.Below(4);
+                   t.r7.u64 = random.Below(2) == 0 ? 0 : random.Next();
+                   t.f1.f64 = Pitch(random);
+                 },
+                 fmt::format("case {}", c));
+    }
+    results.Report();
+  }
+  {
+    Results results("CarSound::SetPitchScaled (sub_8210D080)");
+    for (int c = 0; c < 300; c++) {
+      HolderCase(h, results, block, __imp__sub_8210D080, hooks::CarSoundsSetPitchScaled,
+                 [&](Random& random, PPCContext& t) {
+                   FakeHolder(h.base, block, holder, random, 1000000);
+                   t.r3.u64 = holder;
+                   t.r4.u64 = random.Below(4);
+                   t.r7.u64 = random.Below(2) == 0 ? 0 : random.Next();
+                   t.r9.u64 = random.Below(3) == 0 ? random.Next()
+                                                   : uint64_t(int64_t(random.Below(201)) - 100);
+                   t.f1.f64 = Pitch(random);
+                   t.f3.f64 = Pitch(random);
+                 },
+                 fmt::format("case {}", c));
+    }
+    results.Report();
+  }
+  {
+    Results results("CarSound::IsPlaying (sub_8210D1D8)");
+    for (int c = 0; c < 120; c++) {
+      HolderCase(h, results, block, __imp__sub_8210D1D8, hooks::CarSoundsIsPlaying,
+                 [&](Random& random, PPCContext& t) {
+                   FakeHolder(h.base, block, holder, random, 3);
+                   t.r3.u64 = holder;
+                   t.r4.u64 = random.Below(5) == 0 ? 0xFFFFFFFFu : random.Below(4);
+                 },
+                 fmt::format("case {}", c));
+    }
+    results.Report();
+  }
+  {
+    Results results("CarSound::UpdateVoices (sub_8210D378)");
+    for (int c = 0; c < 120; c++) {
+      HolderCase(h, results, block, __imp__sub_8210D378, hooks::CarSoundsUpdateVoices,
+                 [&](Random& random, PPCContext& t) {
+                   FakeHolder(h.base, block, holder, random, 3);
+                   t.r3.u64 = holder;
+                   t.r4.u64 = random.Next();
+                 },
+                 fmt::format("case {}", c));
+    }
+    results.Report();
+  }
+  struct Walk {
+    const char* name;
+    GuestFunction recompiled;
+    GuestFunction native;
+    bool sound;  // the car sound's 12 holders, else one
+  };
+  const Walk walks[] = {
+      {"CarSound::Clear (sub_8210D320)", __imp__sub_8210D320, hooks::CarSoundsClear, false},
+      {"CarSound::Pause (sub_8210D240)", __imp__sub_8210D240, hooks::CarSoundsPause, false},
+      {"CarSound::Resume (sub_8210D2C0)", __imp__sub_8210D2C0, hooks::CarSoundsResume, false},
+      {"CarSound::PauseAll (sub_8210E2B8)", __imp__sub_8210E2B8, hooks::CarSoundsPauseAll, true},
+      {"CarSound::ResumeAll (sub_8210E350)", __imp__sub_8210E350, hooks::CarSoundsResumeAll,
+       true},
+  };
+  for (const Walk& w : walks) {
+    Results results(w.name);
+    for (int c = 0; c < (w.sound ? 40 : 120); c++) {
+      HolderCase(h, results, block, w.recompiled, w.native,
+                 [&](Random& random, PPCContext& t) {
+                   if (w.sound) {
+                     for (const uint32_t offset : kSoundHolders) {
+                       FakeHolder(h.base, block, block + offset, random, 3);
+                     }
+                     t.r3.u64 = block;
+                   } else {
+                     FakeHolder(h.base, block, holder, random, 3);
+                     t.r3.u64 = holder;
+                   }
+                 },
+                 fmt::format("case {}", c));
+    }
+    results.Report();
+  }
+}
+
 }  // namespace
 
 void CarSounds(Context& h) {
@@ -750,6 +943,7 @@ void CarSounds(Context& h) {
   Objects(h, block.address);
   SetUps(h, block.address);
   Update3Ds(h, block.address);
+  Holders(h, block.address);
 }
 
 }  // namespace harness

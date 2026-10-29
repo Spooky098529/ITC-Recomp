@@ -1,12 +1,15 @@
 // The car sounds natively (docs/functions/car-sounds.md): the game's own
 // sounds for the cars over XAudio's voices, their wave bank views and their
 // objects' set-up. Plain C++ over the guest layout; the adapters are in
-// src/hooks/car_sounds.cpp (behind --native_car_sounds). XAudio's voice
-// methods (8245xxxx) stay recompiled.
+// src/hooks/car_sounds.cpp (behind --native_car_sounds). XAudio's entry
+// points are called through their plain C++ (src/xaudio/), each in a frame
+// below the caller's (xaudio::FrameBelow), with the registers set as the
+// original sets them before the call.
 
 #pragma once
 
 #include "car_sounds/x3daudio.h"
+#include "xaudio/voices.h"
 
 #include <cstdint>
 #include <optional>
@@ -112,5 +115,53 @@ struct Update3DSaves {
 };
 uint64_t Update3D(uint8_t* base, uint64_t sound, uint64_t r4, uint64_t vehicle, uint32_t sp,
                   const Update3DSaves& saves, const x3daudio::TanCall& tan);
+
+// --- The voice holders (car_sound_voices.cpp) ---
+//
+// A voice holder (the 44-byte base of every sound part): four XAudio source
+// voices at +4 to +16, their count at +20, which were playing at +24 to +36.
+// `frame` is the function's own frame (the original's size, given with each)
+// and `call` the guest call for XAudio's calls into the recompiled objects
+// and the kernel; each returns the r3 the original leaves.
+using xaudio::GuestCall;
+using xaudio::Thread;
+
+// sub_8210D158 CarSound::SetPitch (a tail call, no frame: `sp` the caller's
+// stack pointer): (f1 - [0x8200801C]) x [0x82008020], at least [0x82002A24]
+// (r7 set) or [0x82001BE0], or that floor straight when f1 is
+// [0x82000A34]; the voice in `slot`'s frequency ratio (XAudio's
+// SetFrequencyRatio) with it.
+uint32_t SetPitch(uint8_t* base, uint32_t holder, uint32_t slot, double f1, uint32_t r7,
+                  uint32_t sp, const GuestCall& call);
+// sub_8210D080 CarSound::SetPitchScaled (96 bytes): as SetPitch with the
+// difference also times r9 (as a float) x [0x82008024], the floor for r7 0
+// that times [0x82001BE0]; then + f3 - [0x82007FC8].
+uint32_t SetPitchScaled(uint8_t* base, uint32_t holder, uint32_t slot, double f1, double f3,
+                        uint32_t r7, uint32_t r9, uint32_t frame, const GuestCall& call);
+// sub_8210D1D8 CarSound::IsPlaying (112 bytes): 1 when the voice in `slot`
+// exists and its state's (GetState, at the frame's +80) first byte has bit
+// 0; 0 for the slot -1.
+uint32_t IsPlaying(uint8_t* base, uint32_t holder, uint32_t slot, uint32_t frame,
+                   const GuestCall& call);
+// sub_8210D378 CarSound::UpdateVoices (112 bytes): `output` (r4, the whole
+// register) stored at the caller's frame's +24 (the frame's +136); each
+// voice whose state has bit 2 stopped, released and cleared, each playing
+// one (bit 0) given the output matrix at the frame's +136.
+uint32_t UpdateVoices(uint8_t* base, uint32_t holder, uint64_t output, uint32_t frame,
+                      const GuestCall& call);
+// sub_8210D320 CarSound::Clear (128 bytes): each voice stopped, released and
+// cleared; +20 = 0.
+uint32_t Clear(uint8_t* base, uint32_t holder, uint32_t frame, const GuestCall& call);
+// sub_8210D240 CarSound::Pause (112 bytes): each playing voice stopped and
+// noted (+24 + 4i = 1, else 0).
+uint32_t Pause(uint8_t* base, uint32_t holder, uint32_t frame, const GuestCall& call);
+// sub_8210D2C0 CarSound::Resume (112 bytes): each voice noted started again.
+uint32_t Resume(uint8_t* base, uint32_t holder, const Thread& thread, uint32_t frame,
+                const GuestCall& call);
+// sub_8210E2B8 CarSound::PauseAll and sub_8210E350 ResumeAll (112 bytes
+// each): Pause or Resume on the car sound's 12 holders.
+uint32_t PauseAll(uint8_t* base, uint32_t sound, uint32_t frame, const GuestCall& call);
+uint32_t ResumeAll(uint8_t* base, uint32_t sound, const Thread& thread, uint32_t frame,
+                   const GuestCall& call);
 
 }  // namespace car_sounds

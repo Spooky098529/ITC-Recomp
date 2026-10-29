@@ -7,8 +7,38 @@
 #pragma once
 
 #include "guest.h"
+#include "hooks/guest_call.h"
+#include "xaudio/voices.h"
+
+#include <type_traits>
 
 namespace hooks {
+
+// For other subsystems' adapters whose plain C++ calls XAudio's: the guest
+// call through `ctx` (the kernel imports at their thunks; the registers not
+// given keep what the previous call left), the thread's words (r13, its +256
+// and +268), and a body run in a frame of the original's size (its back
+// chain, lr the original's; the stack floor saved, cleared and put back),
+// whose result goes to r3. `frame_bytes` 0: no frame (a tail call's), the
+// body given the stack pointer.
+xaudio::GuestCall XAudioCaller(PPCContext& ctx, uint8_t* base);
+xaudio::Thread XAudioThreadOf(PPCContext& ctx, uint8_t* base);
+template <typename Body>
+void XAudioFramed(PPCContext& ctx, uint8_t* base, uint32_t frame_bytes, Body body) {
+  const uint64_t lr = ctx.lr;
+  uint32_t r3 = 0;
+  const uint32_t floor = xaudio::StackFloor();
+  xaudio::StackFloor() = 0;
+  if (frame_bytes == 0) {
+    r3 = body(XAudioCaller(ctx, base), ctx.r1.u32);
+  } else {
+    guest_call::InFrame(ctx, base, frame_bytes, uint32_t(lr),
+                        [&](uint32_t frame) { r3 = body(XAudioCaller(ctx, base), frame); });
+  }
+  xaudio::StackFloor() = floor;
+  ctx.lr = lr;
+  ctx.r3.u64 = r3;
+}
 
 void XAudioSourceOutputFormat(PPCContext& ctx, uint8_t* base);  // sub_8245DC88
 void XAudioSubmixDescribe(PPCContext& ctx, uint8_t* base);      // sub_8245F010

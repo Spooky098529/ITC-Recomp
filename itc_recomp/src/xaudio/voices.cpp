@@ -251,6 +251,10 @@ uint32_t& StackFloor() {
   return floor;
 }
 
+uint32_t FrameBelow(uint8_t* base, uint32_t frame, uint32_t bytes) {
+  return Below(base, frame, bytes);
+}
+
 uint32_t Method(uint8_t* base, uint32_t object, uint32_t slot) {
   return guest::LoadU32(base, guest::LoadU32(base, object) + slot);
 }
