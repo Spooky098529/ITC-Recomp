@@ -17,12 +17,17 @@ file's history. What's left to see in a drive, from every run:
   ready groups). Migration 1 checked (44 ours,
   c8ad278..6fc2206). Validated (`itc_2432`,
   `itc_2433`: 44 of 44 harness lines; one to drive). Done (below); recorded in the plan's table and boundary log.
-- Subsystem 2 of 3: XAudio's engine and mixer (`leads.md`). Map
+- Subsystem 2 of 3 done: XAudio's engine and mixer (`leads.md`). Map
   610125a checked (`xaudio-engine.md`, 70 rows, 47 in play, 24 ready
-  groups). Migration 1 checked (40 of 47 ours,
-  e9d3f21..d17ae9f). Step: validation agent running.
+  groups). Done (below); recorded in the plan's table and boundary
+  log. Its 7 left wait on the user's call (asked).
 
 ## Done
+
+- XAudio's engine and mixer: `xaudio-engine.md`, 40 of 47 in play
+  native in one migration, 11 adapters removed; `--native_xaudio_engine`;
+  610125a, e9d3f21..d17ae9f. Validated (`itc_2458`, `itc_2459`): 40 of
+  40 harness lines, all ran in play; nothing to drive.
 
 - XACT's tracks and events: `xact-tracks.md`, 47 of 55 in play native
   in two migrations, 16 adapters removed; `--native_xact_tracks`;
@@ -64,3 +69,5 @@ file's history. What's left to see in a drive, from every run:
 - After XAudio's engine's migration 1 (race 37 s, 0 errors,
   xaudio_engine 0 differing): ours 2892, work left 3572 (wrapped 103,
   known 523, unknown 2946).
+- After its validation (`itc_2458`: race 8 s, 0 errors, every harness
+  0 differing but the expected groups): ours 2892, work left 3572.

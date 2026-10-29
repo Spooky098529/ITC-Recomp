@@ -2633,6 +2633,7 @@ B7. **The game logic inside**: everything else, subsystem by subsystem,
 | 2026-10-29 | XAudio's voices (the game's copy of XAudio, translated: the API entry points but the shut-down, the callback's and the commit; the source and submix voices, their outputs, passes, effects and states; the buffers and formats; its API lock the game's critical section and the voice lists' spin lock the game's, taken as the original does, the user's calls) | `xaudio.md` | 92 of 96 in play (two migrations; 37 Native; the rest waits on the engine and mixer) | `--native_xaudio` |
 | 2026-10-29 | XACT's waves and voices (XACT's voice class over XAudio's entry points, the waves' constructors, start positions, voices, play, pause, next and update, the tracks' volume and pitch getters; XACT's lock the game's, taken as the original does) | `xact-waves.md` | 22 of 30 in play (one migration; 16 adapters removed, 7 of XAudio's and 5 of `xact.md`'s; the rest waits on `XACTWave::Notify`'s notifications and clock) | `--native_xact_waves` |
 | 2026-10-29 | XACT's tracks and events (the tracks, track instances and events over the sound bank's records: their constructors, prepare, volume, pause, stop, cancel, destructors and RPC set-up; the play-wave event and the wave's slot forwarders; `XACTSound::ScheduleEvent`; XACT's lock the game's, taken as the original does) | `xact-tracks.md` (with a row in `xact.md`) | 47 of 55 in play (two migrations; 16 adapters removed; the rest waits on `XACTGetTimeMs` over QueryPerformanceCounter) | `--native_xact_tracks` |
+| 2026-10-29 | XAudio's engine and mixer (the engine's and factory's making, the processors' set-up, the mastering voice and its render driver, the stages, their callbacks and commit, the allocator; the voice lists' spin lock taken as the original does) | `xaudio-engine.md` | 40 of 47 in play (one migration; 11 adapters removed; the rest waits on the user's call on XAudio's threads, events and semaphore) | `--native_xaudio_engine` |
 
     The first run (2026-10-22, branch `b7-loop-test`): every harness at 0 differing, attract races at 20-21 s with no errors,
     and a race the user drove looked right. Ours went from 162 to 335 (work
@@ -3920,3 +3921,19 @@ kernel import. The boundary: 449 functions (916 pairs): overridden 85,
 Native 23, Dropped 23, never called 70, live 248. Imports: 186 called,
 62 with a live caller. B7 (`b7_status.py`): ours 2,852, work left 3,612
 (Wrapped 103, with a row 516, no row yet 2,993), from 3,660.
+
+**2026-10-29, XAudio's engine and mixer (branch `b7-loop-29-10-26`):**
+the twenty-second run's second subsystem mapped XAudio's engine and
+mixer (`xaudio-engine.md`, 70 rows, 47 in play) and made 40 native in
+one migration (`--native_xaudio_engine`, `src/xaudio/engine.cpp`), with
+11 adapters removed. The other 7 in play (`XAudio::CreateEngine` with
+`XAudioEngine::Create` and `Init`, the mixer callback with
+`XAudioEngine::Mix`, `XAudio::MasterThread` and `WorkerThread`) make,
+set, wait on or release kernel objects no call covers yet: XAudio's
+own guest threads (`ExCreateThread`), the events `0x82954EF8`,
+`0x82954EE8`, `0x82954EC4`, the semaphore `0x82954ED4` and the title
+terminate notification `0x82954EB4`; they wait on the user's call. The
+boundary: 449 functions (916 pairs): overridden 92, Native 24, Dropped
+23, never called 70, live 240. Imports: 186 called, 62 with a live
+caller. B7 (`b7_status.py`): ours 2,892, work left 3,572 (Wrapped 103,
+with a row 523, no row yet 2,946), from 3,612.
