@@ -57,6 +57,31 @@ When the user has reviewed a run's section, its heading gets
   an owner (the original reads the owner unchecked there) and skip the
   first 12 bytes of SendNotification's copy when none is sent (the
   original's saved registers from XAudio's GetState).
+- The r3 fix and XAudio's engine's last 7 (320b782..12896c8):
+  `SendNotification`, `Notify` and `SetState` leave r3 in full as the
+  original does (a revert made 34, 11 and 43 cases differ; the old
+  Notify/SetState cases had both sides on SendNotification's native
+  adapter, now switched with the version). `XAudio::CreateEngine` with
+  `XAudioEngine::Create` and `Init`, the mixer callback with `Mix`,
+  `MasterThread` and `WorkerThread` native (`xaudio-engine.md` 47 of 47;
+  9 more Native): the kernel's imports called at their thunks through
+  the guest call with the original's registers (the user's call); the
+  threads' entry points stay `0x8245BE08` and `0x8245BED0` (now the
+  adapters); the mixer's lock `0x8264D4F8` entered through
+  `RtlEnterCriticalSection` as the original (its only other user, the
+  teardown `sub_8245B940`, never runs; our output thread doesn't take
+  it). Harness approach to look at: while the output thread waits on the
+  mixer's lock, each version runs over fresh kernel object headers the
+  harness writes at the fixed addresses, then their states are read,
+  handles closed and the live bytes put back; Init's cases use
+  stand-ins on the harness's thread (`xaudio::SetMakingForHarness`), so
+  `SetUpProcessors` and `MasteringCreate` keep their adapters as the
+  stand-in point; thread creation isn't in the cases (checked at boot:
+  the live engine's 372 bytes and the objects' headers matched the
+  fallback's but for the handles and +300); Create's path where Init
+  fails (deleting through the real teardown) has no case. Audio: 5-7
+  silence fills in the first 10 s while the harness holds the mixer's
+  lock, then none.
 - XAudio's engine and mixer (map 610125a): `docs/functions/xaudio-engine.md`,
   70 rows (all new; 23 not seen in play: the teardown, the factory's
   id-128 classes, the sizing allocator, the stats callback, the callback
