@@ -13,6 +13,7 @@
 #include "base/flags.h"
 #include "base/log.h"
 #include "hooks/heap.h"
+#include "helpers/clock.h"
 #include "hooks/xact_waves.h"
 #include "hooks/xaudio.h"
 #include "memory/c_runtime_heap.h"
@@ -24,10 +25,12 @@
 #include <fmt/format.h>
 
 #include <bit>
+#include <initializer_list>
 #include <string>
 #include <vector>
 
 ITC_FLAG_DECLARE(bool, native_xact_waves);
+ITC_FLAG_DECLARE(bool, native_xact);
 
 namespace harness {
 
@@ -844,6 +847,139 @@ void WaveCalls(Context& h, uint32_t block) {
   }
 }
 
+// XACT's notifications: XACTEngine::SendNotification (xact.md's, under
+// --native_xact) with the engine's callback (+16) none or a recorder
+// (XAudioVoice::AddRef, the count at the notification's +4 up) and 0 to 2
+// registrations (+100; nodes at +0x1B00 and +0x1B60, their descriptions'
+// types the notification's one time in two, persistent or not; matched by
+// the original sub_825BFCC8, a leaf), the list +112 empty; XACTWave::Notify
+// over CallWorld's wave (its bank none one time in four, the owner's cue's
+// sound bank none one time in four); XACTWave::SetState from every state to
+// every state. Both versions read the same time (the clocks' stand-ins, on
+// this thread only). Compared besides the block: the notifications in the
+// frames (the one built in Notify's frame, +80 to +111, and the one
+// SendNotification stores in its caller's parameter area, its frame +144).
+uint32_t Pick(Random& random, std::initializer_list<uint32_t> choices) {
+  return *(choices.begin() + random.Below(uint32_t(choices.size())));
+}
+
+void Notifications(Context& h, uint32_t block) {
+  uint8_t* base = h.base;
+  std::vector<uint32_t> floats;
+  for (uint32_t k = 0; k < kVoiceCount; k++) {
+    floats.push_back(kVoices + kVoiceBytes * k + 112);
+    floats.push_back(kVoices + kVoiceBytes * k + 140);
+  }
+  if (Load(base, 0x8266CDF0) != 0 && Load(base, 0x82971480) == 0 &&
+      Load(base, 0x82971484) == 0) {
+    ITC_LOG_ERROR("harness: xact_waves: XACT's frequency isn't set yet; notifications skipped");
+    return;
+  }
+  const uint32_t engine = block + kEngine;
+  const auto engine_world = [&](Random& random, uint8_t type) {
+    const uint32_t ms = random.Below(100000);
+    helpers::SetClocksForHarness(uint64_t(ms) * 50000 + random.Below(50000), ms);
+    Store(base, engine + 16, random.Below(3) == 0 ? 0 : 0x8245F860u);
+    Store(base, engine + 20, uint32_t(random.Next()));
+    const uint32_t list = engine + 100, done = engine + 112;
+    Store(base, done + 4, done);
+    Store(base, done + 8, done);
+    uint32_t last = list;
+    const uint32_t count = random.Below(3);
+    for (uint32_t i = 0; i < count; i++) {
+      const uint32_t node = block + 0x1B00 + 0x60 * i;
+      const uint32_t description = node + 16;
+      guest::StoreU8(base, description, random.Below(2) == 0 ? type : uint8_t(random.Below(16)));
+      guest::StoreU8(base, description + 1, uint8_t(random.Next()));
+      // The matcher's ids: 0 (any) one time in two.
+      for (const uint32_t at : {2u, 6u, 10u}) {
+        if (random.Below(2) == 0) {
+          Store(base, description + at, 0);
+        }
+      }
+      Store(base, last + 4, node);
+      Store(base, node + 8, last);
+      last = node;
+    }
+    Store(base, last + 4, list);
+    Store(base, list + 8, last);
+  };
+  {
+    Results results("XACTEngine::SendNotification (sub_825C1388)");
+    for (int c = 0; c < 160; c++) {
+      const Random start = h.random;
+      Random random = start;
+      Outputs out[2];
+      for (int v = 0; v < 2; v++) {
+        random = start;
+        for (uint32_t i = 0; i < kBlockBytes; i += 4) {
+          Store(base, block + i, uint32_t(random.Next()));
+        }
+        PPCContext t = CallContext(h);
+        const uint8_t type = uint8_t(random.Below(16));
+        engine_world(random, type);
+        t.r3.u64 = engine;
+        t.r4.u64 = (uint64_t(type) << 56) | (random.Next() & 0x00FFFFFFFFFFFFFFull);
+        t.r5.u64 = random.Next();
+        t.r6.u64 = random.Next();
+        t.r7.u64 = random.Next();
+        ITC_FLAG(native_xact) = v == 1;
+        (v == 0 ? __imp__sub_825C1388 : hooks::XactEngineSendNotification)(t, base);
+        ITC_FLAG(native_xact) = true;
+        BlockOutputs(out[v], base, block, floats);
+        out[v].Word(t.r3.u32);
+        out[v].Bytes(Read(base, t.r1.u32 + 32, 32));
+      }
+      h.random = random;
+      results.Check(out[0], out[1], fmt::format("case {}", c));
+    }
+    results.Report();
+  }
+  const auto frames = [&](uint32_t notify_frame) {
+    return [&, notify_frame](Outputs& out, PPCContext& t) {
+      out.Bytes(Read(base, t.r1.u32 - notify_frame + 80, 32));
+      out.Bytes(Read(base, t.r1.u32 - notify_frame - 112 + 144, 32));
+    };
+  };
+  const auto wave_world = [&](Random& random, PPCContext& t, uint8_t type) {
+    CallWorld(h, block, random, t, false);
+    engine_world(random, type);
+    const uint32_t wave = block + kWave;
+    Store(base, wave + 36, random.Below(4) == 0 ? 0 : block + kWaveBank);
+    if (random.Below(4) == 0) {
+      Store(base, block + kCue + 296, 0);
+    }
+  };
+  {
+    Results results("XACTWave::Notify (sub_825D2030)");
+    for (int c = 0; c < 160; c++) {
+      WaveCase(h, results, block, __imp__sub_825D2030, hooks::XactWaveNotify,
+               [&](Random& random, PPCContext& t) {
+                 const uint8_t type = uint8_t(Pick(random, {12, 13, random.Below(16)}));
+                 wave_world(random, t, type);
+                 t.r4.u64 = random.Below(4) == 0 ? uint32_t(random.Next()) : type;
+               },
+               frames(160), floats, fmt::format("case {}", c));
+    }
+    results.Report();
+  }
+  {
+    Results results("XACTWave::SetState (sub_825D24D8)");
+    for (int c = 0; c < 160; c++) {
+      WaveCase(h, results, block, __imp__sub_825D24D8, hooks::XactWaveSetState,
+               [&](Random& random, PPCContext& t) {
+                 wave_world(random, t, uint8_t(Pick(random, {12, 13})));
+                 Store(base, block + kWave + 40,
+                       random.Below(8) == 0 ? uint32_t(random.Next()) : random.Below(7));
+                 t.r4.u64 = random.Below(8) == 0 ? uint32_t(random.Next()) : random.Below(7);
+               },
+               frames(112 + 160), floats, fmt::format("case {}", c));
+    }
+    results.Report();
+  }
+  helpers::SetClocksForHarness(std::nullopt, std::nullopt);
+}
+
 }  // namespace
 
 void XactWaves(Context& h) {
@@ -856,6 +992,7 @@ void XactWaves(Context& h) {
   Creates(h, block.address);
   Waves(h, block.address);
   WaveCalls(h, block.address);
+  Notifications(h, block.address);
 }
 
 }  // namespace harness

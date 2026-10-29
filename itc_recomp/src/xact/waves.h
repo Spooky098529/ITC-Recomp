@@ -195,4 +195,44 @@ uint32_t WavePrepareNext(uint8_t* base, uint32_t wave, bool native_heap, uint32_
 uint32_t InMemoryWaveUpdate(uint8_t* base, uint32_t wave, bool native_heap, uint32_t frame,
                             const GuestCall& call);
 
+// --- XACT's clock and notifications ---
+
+// XACT's clock for native callers: XACTGetTimeMs's plain C++ (xact.h), or,
+// where the original traps (no frequency), the original through the guest
+// call from `frame` with `return_address`, which traps the same. Its low
+// word.
+uint32_t ClockMs(uint8_t* base, uint32_t return_address, uint32_t frame, const GuestCall& call);
+
+// XACTEngine::SendNotification (sub_825C1388, xact.md's row; under
+// --native_xact): `words` (r4 to r7, a 32-byte XACT_NOTIFICATION by value)
+// stored at `frame` + 144 (the caller's parameter area); nothing more
+// without a callback (+16). Else the time (ClockMs) at the notification's
+// +1 (big-endian, unaligned); each registration (the list +100, its
+// description at the node + 16) matched by sub_825BFCC8 (never seen in play:
+// through the guest call) gives its context (description + 16) to the
+// notification's +5 and, unless persistent (description +1 bit 0), moves to
+// the list +112. With a match: +20 = this thread's id (atomically), the
+// callback with the notification through the guest call, +20 = -1. `frame`
+// is this function's (112 bytes). Returns r3 as the original leaves it.
+uint32_t EngineSendNotification(uint8_t* base, uint32_t engine, const uint64_t words[4],
+                                uint32_t frame, const GuestCall& call);
+// XACTWave::Notify (sub_825D2030): with a wave bank (+36), the 32-byte
+// notification built in this function's frame as the original builds it
+// (+80: the type `type`, zeros (memset's 28 bytes from +81), the wave bank
+// at +89, the wave index +93, the cue index +95, the cue's sound bank +97
+// and the cue +101; with no owner (+48) -1, 0 and 0; nothing sent when the
+// owner's cue has no sound bank) and sent (SendNotification's plain C++, a
+// frame below) on the engine (+20) with r4 to r7 as the original loads them.
+// `frame` is this function's (160 bytes). Returns r3 as the original leaves
+// it.
+uint32_t WaveNotify(uint8_t* base, uint32_t wave, uint32_t type, uint32_t frame,
+                    const GuestCall& call);
+// XACTWave::SetState (sub_825D24D8): going to 3 from below 3, +40 = 3 and
+// the notification 12; going to 5 from 3 or 4, +40 = 5 and the
+// notification 13 (Notify's plain C++, a frame below); then +40 = `state`.
+// `frame` is this function's (112 bytes). Returns r3 as the original leaves
+// it.
+uint32_t WaveSetState(uint8_t* base, uint32_t wave, uint32_t state, uint32_t frame,
+                      const GuestCall& call);
+
 }  // namespace xact

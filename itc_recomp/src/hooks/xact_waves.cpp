@@ -21,14 +21,39 @@ ITC_FLAG_BOOL(native_xact_waves, true, "ITC",
               "XACTWave::RequestNext sub_825D1C30; XACTEngine::RequestCommit sub_825D1C78, the "
               "engine's critical section entered as the original does; XACTWave::SetVoice "
               "sub_825D1DF8, XACTInMemoryWave::Play sub_825D3938, XACTWave::Pause sub_825D1ED8 "
-              "and XACTWave::PrepareNext sub_825D2778, XACTInMemoryWave::Update sub_825D3890, the voice's methods through their plain "
+              "and XACTWave::PrepareNext sub_825D2778, XACTInMemoryWave::Update sub_825D3890, XACTWave::Notify sub_825D2030 and SetState "
+              "sub_825D24D8, the voice's methods through their plain "
               "C++ while its slots hold them, the owner's and renderer's slots through the "
               "guest call) natively instead "
               "of through the translated code (the same reads and writes; XAudio's locks stay "
               "the game's, taken as the original does; checked by "
               "--run_harnesses=xact_waves)");
 
+ITC_FLAG_DECLARE(bool, native_xact);
+
 namespace hooks {
+
+void XactEngineSendNotification(PPCContext& ctx, uint8_t* base) {
+  const uint32_t engine = ctx.r3.u32;
+  const uint64_t words[4] = {ctx.r4.u64, ctx.r5.u64, ctx.r6.u64, ctx.r7.u64};
+  XAudioFramed(ctx, base, 112, [&](const xaudio::GuestCall& call, uint32_t frame) {
+    return xact::EngineSendNotification(base, engine, words, frame, call);
+  });
+}
+
+void XactWaveNotify(PPCContext& ctx, uint8_t* base) {
+  const uint32_t wave = ctx.r3.u32, type = ctx.r4.u32;
+  XAudioFramed(ctx, base, 160, [&](const xaudio::GuestCall& call, uint32_t frame) {
+    return xact::WaveNotify(base, wave, type, frame, call);
+  });
+}
+
+void XactWaveSetState(PPCContext& ctx, uint8_t* base) {
+  const uint32_t wave = ctx.r3.u32, state = ctx.r4.u32;
+  XAudioFramed(ctx, base, 112, [&](const xaudio::GuestCall& call, uint32_t frame) {
+    return xact::WaveSetState(base, wave, state, frame, call);
+  });
+}
 
 void XactVoiceCreate(PPCContext& ctx, uint8_t* base) {
   const uint32_t description = ctx.r3.u32, holder = ctx.r4.u32, level = ctx.r5.u32,
@@ -246,3 +271,15 @@ ITC_XACT_WAVES_ADAPTER(825D1ED8, XactWavePause)
 // No adapter (removed 2026-10-29: only XACTInMemoryWave::Update's plain C++ calls it in play) for
 // XACTWave::PrepareNext sub_825D2778.
 ITC_XACT_WAVES_ADAPTER(825D3890, XactInMemoryWaveUpdate)
+ITC_XACT_WAVES_ADAPTER(825D2030, XactWaveNotify)
+ITC_XACT_WAVES_ADAPTER(825D24D8, XactWaveSetState)
+
+// XACTEngine::SendNotification is xact.md's: under --native_xact.
+extern "C" REX_FUNC(sub_825C1388) {
+  REX_FUNC_PROLOGUE();
+  if (!ITC_FLAG(native_xact)) {
+    __imp__sub_825C1388(ctx, base);
+    return;
+  }
+  hooks::XactEngineSendNotification(ctx, base);
+}

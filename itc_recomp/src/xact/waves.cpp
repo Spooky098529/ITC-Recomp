@@ -9,6 +9,7 @@
 #include "xact/waves.h"
 
 #include "base/log.h"
+#include "graphics/video_output.h"
 #include "guest.h"
 
 #include <initializer_list>
@@ -408,6 +409,181 @@ uint32_t InMemoryWaveUpdate(uint8_t* base, uint32_t wave, bool native_heap, uint
   CallAt(call, xa::Method(base, renderer, 12), 0x825D3914, Args({renderer, voice}), frame);
   SetRegs(call, Args({wave, 0}));
   return WaveSetVoice(base, wave, 0, xa::FrameBelow(base, frame, 112), call);
+}
+
+// --- XACT's clock and notifications ---
+
+namespace {
+
+constexpr uint32_t kGetTimeMs = 0x825BFE28;
+constexpr uint32_t kMatchRegistration = 0x825BFCC8;  // never seen in play
+constexpr uint32_t kSendNotificationFrame = 112;
+constexpr uint32_t kNotifyFrame = 160;
+
+void StoreU8(uint8_t* base, uint32_t address, uint32_t value) {
+  guest::StoreU8(base, address, uint8_t(value));
+}
+void StoreU16(uint8_t* base, uint32_t address, uint32_t value) {
+  guest::StoreU16(base, address, uint16_t(value));
+}
+void StoreU64(uint8_t* base, uint32_t address, uint64_t value) {
+  Store(base, address, uint32_t(value >> 32));
+  Store(base, address + 4, uint32_t(value));
+}
+uint64_t LoadU64(uint8_t* base, uint32_t address) {
+  return (uint64_t(Load(base, address)) << 32) | Load(base, address + 4);
+}
+// A word at an unaligned place as the original stores it: its top byte,
+// the middle 16 bits, then its low byte.
+void StoreSplit(uint8_t* base, uint32_t address, uint32_t value) {
+  StoreU8(base, address, value >> 24);
+  StoreU16(base, address + 1, value >> 8);
+  StoreU8(base, address + 3, value);
+}
+// The engine's +20 exchanged atomically (the original's lwarx/stwcx. loop).
+void ExchangeWord(uint8_t* base, uint32_t address, uint32_t value) {
+  auto* word = reinterpret_cast<uint32_t*>(REX_RAW_ADDR(address));
+  uint32_t seen = __atomic_load_n(word, __ATOMIC_SEQ_CST);
+  while (!__atomic_compare_exchange_n(word, &seen, __builtin_bswap32(value), false,
+                                      __ATOMIC_SEQ_CST, __ATOMIC_SEQ_CST)) {
+  }
+}
+
+}  // namespace
+
+uint32_t ClockMs(uint8_t* base, uint32_t return_address, uint32_t frame, const GuestCall& call) {
+  if (const auto ms = GetTimeMs(base)) {
+    return uint32_t(*ms);
+  }
+  return CallAt(call, kGetTimeMs, return_address, Args({}), frame);
+}
+
+uint32_t EngineSendNotification(uint8_t* base, uint32_t engine, const uint64_t words[4],
+                                uint32_t frame, const GuestCall& call) {
+  ITC_NATIVE_RUNNING("sub_825C1388 XACTEngine::SendNotification");
+  const uint32_t notification = frame + 144;
+  for (uint32_t i = 0; i < 4; i++) {
+    StoreU64(base, notification + 8 * i, words[i]);
+  }
+  if (Load(base, engine + 16) == 0) {
+    return engine;
+  }
+  const uint32_t now = ClockMs(base, 0x825C13C4, frame, call);
+  StoreU8(base, notification + 4, now);
+  StoreU8(base, notification + 1, now >> 24);
+  StoreU16(base, notification + 2, now >> 8);
+  const uint32_t list = engine + 100;
+  uint32_t node = Load(base, engine + 104);
+  if (node == list) {
+    return now;
+  }
+  bool matched = false;
+  uint32_t r3 = now;
+  do {
+    const uint32_t description = node + 16;
+    const uint32_t next = Load(base, node + 4);
+    r3 = CallAt(call, kMatchRegistration, 0x825C13FC, Args({engine, notification, description}),
+                frame);
+    if (r3 != 0) {
+      matched = true;
+      StoreSplit(base, notification + 5, Load(base, description + 16));
+      if ((guest::LoadU8(base, description + 1) & 1) == 0) {
+        // Moved to the tail of the list +112.
+        const uint32_t done = engine + 112;
+        Store(base, Load(base, node + 4) + 8, Load(base, node + 8));
+        Store(base, Load(base, node + 8) + 4, Load(base, node + 4));
+        Store(base, node + 8, node);
+        Store(base, node + 4, done);
+        Store(base, node + 8, Load(base, done + 8));
+        Store(base, Load(base, done + 8) + 4, node);
+        Store(base, done + 8, node);
+      }
+    }
+    node = next;
+  } while (node != list);
+  if (!matched) {
+    return r3;
+  }
+  ExchangeWord(base, engine + 20, graphics::video_output::CurrentThreadId());
+  r3 = CallAt(call, Load(base, engine + 16), 0x825C14E4, Args({notification}), frame);
+  ExchangeWord(base, engine + 20, 0xFFFFFFFFu);
+  return r3;
+}
+
+uint32_t WaveNotify(uint8_t* base, uint32_t wave, uint32_t type, uint32_t frame,
+                    const GuestCall& call) {
+  ITC_NATIVE_RUNNING("sub_825D2030 XACTWave::Notify");
+  const uint32_t bank = Load(base, wave + 36);
+  StoreU8(base, frame + 80, 0);
+  // memset (sub_825A71D0) of 28 bytes from +81, its r3 the destination.
+  for (uint32_t i = 0; i < 28; i++) {
+    StoreU8(base, frame + 81 + i, 0);
+  }
+  const uint32_t cleared = frame + 81;
+  if (bank == 0) {
+    return cleared;
+  }
+  const uint32_t owner = Load(base, wave + 48);
+  if (owner != 0) {
+    const uint32_t cue = CueOf(base, owner);
+    const uint32_t sound_bank = Load(base, cue + 296);
+    if (sound_bank == 0) {
+      return cleared;
+    }
+    const uint32_t index = guest::LoadU16(base, cue + 304);
+    StoreU8(base, frame + 95, index >> 8);
+    StoreU8(base, frame + 96, index);
+    StoreSplit(base, frame + 97, sound_bank);
+    StoreSplit(base, frame + 101, cue);
+  } else {
+    StoreSplit(base, frame + 97, 0);
+    StoreSplit(base, frame + 101, 0);
+    StoreU8(base, frame + 95, 0xFF);
+    StoreU8(base, frame + 96, 0xFF);
+  }
+  const uint32_t index = guest::LoadU16(base, wave + 52);
+  StoreU8(base, frame + 80, type);
+  StoreU8(base, frame + 92, bank);
+  StoreU8(base, frame + 93, index >> 8);
+  StoreU8(base, frame + 94, index);
+  const uint32_t engine = Load(base, wave + 20);
+  uint64_t words[4];
+  words[0] = LoadU64(base, frame + 80);
+  words[2] = LoadU64(base, frame + 96);
+  // The last word's top five bytes (+104 to +108; the three after them
+  // aren't the notification's).
+  words[3] = (uint64_t(Load(base, frame + 104)) << 32) |
+             (uint64_t(guest::LoadU8(base, frame + 108)) << 24);
+  StoreU8(base, frame + 89, bank >> 24);
+  StoreU16(base, frame + 90, bank >> 8);
+  words[1] = LoadU64(base, frame + 88);
+  SetRegs(call, Args({engine, words[0], words[1], words[2], words[3]}));
+  return EngineSendNotification(base, engine, words,
+                                xa::FrameBelow(base, frame, kSendNotificationFrame), call);
+}
+
+uint32_t WaveSetState(uint8_t* base, uint32_t wave, uint32_t state, uint32_t frame,
+                      const GuestCall& call) {
+  ITC_NATIVE_RUNNING("sub_825D24D8 XACTWave::SetState");
+  uint32_t r3 = wave;
+  const int32_t now = int32_t(Load(base, wave + 40));
+  uint32_t step = 0, type = 0;
+  if (int32_t(state) == 3) {
+    if (now < 3) {
+      step = 3;
+      type = 12;
+    }
+  } else if (int32_t(state) == 5 && now >= 3 && now < 5) {
+    step = 5;
+    type = 13;
+  }
+  if (step != 0) {
+    Store(base, wave + 40, step);
+    SetRegs(call, Args({wave, type}));
+    r3 = WaveNotify(base, wave, type, xa::FrameBelow(base, frame, kNotifyFrame), call);
+  }
+  Store(base, wave + 40, state);
+  return r3;
 }
 
 }  // namespace xact

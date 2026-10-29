@@ -41,7 +41,8 @@ ITC_FLAG_BOOL(native_xact, true, "ITC",
               "wave durations, sub_825CC380; letting go of wave banks without listeners to "
               "tell, sub_825C6A20 and sub_825C7798; the wave region, sub_825C8440, and the "
               "folded getter it calls, sub_8220BC28 (the menu list's too: the same load); XACT's "
-              "clock, sub_825BFE28) "
+              "clock, sub_825BFE28; XACTEngine::SendNotification, sub_825C1388, its adapter in "
+              "hooks/xact_waves.cpp) "
               "natively "
               "instead of through the translated code (same results; checked by "
               "--run_harnesses=xact)");
