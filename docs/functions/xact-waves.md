@@ -112,7 +112,14 @@ the original does, through its imports at their thunks); then the
 wave's `SetVoice`, `Play`, `Pause`, `PrepareNext` and the in-memory
 wave's `Update` (the voice's methods
 through their plain C++ while its slots hold them, the owner's, the
-renderer's and the banks' slots through the guest call). Before, the
+renderer's and the banks' slots through the guest call). What's left
+waits on `QueryPerformanceCounter` (`sub_825BA0C8`, `functions.md`)
+under `XACTGetTimeMs` (`sub_825BFE28`) and `XACTEngine::SendNotification`
+(`sub_825C1388`, `xact.md`), which `XACTWave::Notify` (`sub_825D2030`)
+calls for `SetState`, `Release`, the destructors, `Prepare`, `Stop` and
+`AudioUpdate`; and on `sub_825D55E0` (not mapped: a 19-line check under
+`AudioUpdate`, +40 = 6 when bytes +44 and +45 are 0 and the list at +48
+is empty, probably a track's or event's). Before, the
 voice's methods were ready (XAudio's entry points are ours, `--native_xaudio`);
 the waves call through their owner's vtable (the tracks' and events'
 code, still recompiled), the renderer's slots +4, +12 and +24
