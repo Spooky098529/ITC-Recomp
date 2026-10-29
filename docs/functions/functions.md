@@ -356,6 +356,11 @@ Rows not yet moved stay in the table below. So far:
   others, the in-memory wave banks' reader), their 3D positioning, and
   X3DAudio, the 3D audio library linked into the game (B7;
   X3DAudioInitialize stays in `sound-cues.md`).
+- [`xaudio.md`](xaudio.md): XAudio's API entry points and its voices
+  (the source and submix voices the car sounds, XACT and the voice chat
+  call: create, start, stop, state, volume, pitch, outputs, effects,
+  release), their set-up, outputs and mixer passes, and XAudio's three
+  locks (B7; XAudioInitialize stays in `sound-cues.md`).
 
 These files hold functions only. What used to follow the table here moved
 out on 2026-10-20: how frame interpolation works, its options and what

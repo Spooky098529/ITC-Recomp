@@ -1,0 +1,279 @@
+# Known functions: XAudio's voices
+
+**XAudio**, the Xbox 360's low-level audio library, is linked into the
+game (recompiled guest code, `8245xxxx`-`8246xxxx`), like XACT above it
+(`xact.md`); how the game's audio works is in `../native-audio.md`. This
+file is XAudio's API entry points and its voices: the source voices
+(148 bytes, vtable `0x8204A720`, `XAudioVoice::CreateSource`) and the
+submix voices (80 bytes, vtable `0x8204A870`,
+`XAudioVoice::CreateSubmix`) the game's car sounds (`car-sounds.md`)
+call directly, XACT's voice class (`xact.md`'s intro, the lead
+`sub_825C9C40` in `../loops/leads.md`) calls, and Voice::Init's voice
+chat (`system-services.md`, `8257xxxx`) and the replaced movie player
+(`movies.md`, `82483xxx`, no longer running) call too. Each API entry
+point (`82459DB0`-`8245A7C8`) takes XAudio's API lock, calls one voice
+method (through the voice's vtable, or directly) and leaves it.
+
+XAudio is the game's own copy, linked in like XACT: translated as the
+game's code (the user's call for XACT, 2026-10-23, followed as the
+nearest precedent: "Precedent first" in `../loops/b7-loop.md`). Its
+mixer already runs on our own output's thread (`src/audio/`), so the
+output needs no decision.
+
+The voices' classes, as far as read (the layout in `../known-data.md`):
+a base voice (`XAudioVoice::Construct` `sub_82461500`, its destructor
+`sub_82461240`: the reference count, the allocator, the effect chain,
+the output buffer, the callback, the flags), a voice with outputs over
+it (`sub_82460738`, vtable `0x8204A998`: up to +68 outputs, each a
+target voice with a matrix object), then the source voice (the codec
+object at +76 that decodes its packets, PCM or XMA, made by the
+engine's object factory; its volume and category) or the submix voice
+(its stage in the mix). The source voice's vtable: +0 the deleting
+destructor (`sub_8245E7A0`), +4 AddRef, +8 Release, +12 the scalar
+destructor's caller (`sub_8245AAD8`), +16 the reference count
+(`sub_820911F8`, a shared getter, not seen in play), +20 to +32 the
+effects' get enabled, set enabled, get and set parameters, +36 set
+output voices, +40 set the output matrices, +44 get the callback's
+context (+48), +48 get state, +52 the type byte +12, +56 E_NOTIMPL
+(`sub_822F1218`, a shared stub, not seen in play), +60 stop, +64 get
+the output format, +68 the mixer pass, +72 the input buffer, +76 join
+the active list, +80 leave it, +84 the source's pass, +88 set format,
++92 apply the volume (+72 is the engine's buffer for the current
+processor). The submix voice's has the same slots to +44 (its own
+destructor, +36 a jump to set output voices), then +48 get state (its
+flags), +56 start, +60 stop now or at the tail's end, +68 its pass, +72
+its buffer (`sub_82379D50`, shared with `xact.md`, where it keeps its
+row), +88 set format, +92 a destructor's last step (`sub_8245FB00`).
+
+The voice's flags (byte +61): bit 0 playing, bit 2 stopping (playing
+out the effects' tail: +64 counts the passes down from +62), bit 6 a
+start pending until the next commit (`XAudio::Commit`). `GetState`
+gives the flags or'ed with the codec's state (bit 0 playing, bit 2
+done, as the car sounds read it).
+
+**The locks.** XAudio has three:
+
+- **The API lock**, the kernel critical section at `0x8264D518` (+4 in
+  a small static object at `0x8264D514`, whose +0 is set to
+  `0x8204A868` by `sub_825DB1E0`; the critical section made at start-up
+  by `sub_825DA0F0`; XACT's lead called it `0x8264D514`, the object).
+  Every API entry point here takes it (game threads: the car sounds on
+  the main thread, XACT's voice class from `XACTEngine::DoWork`, and
+  XACT's audio callback on the mixer's thread, our output thread), and
+  so does `XAudioLock` (`sub_8245ED60`, types 0x20001-0x20003, never
+  called in play: the effects' code calls it). Below the API, two
+  waits release it **completely** while the mixer works on a voice:
+  `XAudio::WaitForVoice` (`sub_8245AE60`, seen in play, from a voice's
+  start and stop) and `sub_8245AFA0` (not seen, from the callback's
+  unregister) read the critical section's recursion count (word +20,
+  `[0x8264D514 + 24]`), leave it that many times, retake the spin lock
+  below and the critical section that many times, and loop until the
+  mixer's thread (`[0x82954F08] + 300`) is done with the voice. So the
+  precedent for a kernel critical section (a host `std::mutex`, taken
+  by every user, native and recompiled: `Edram::Alloc`, the memory
+  blocks' lock) fits only if no user ever holds it more than once: the
+  waits need a host lock whose depth can be read (or one that's never
+  re-entered, checked by a log). That's for the user's call before the
+  migration (the map's report).
+- **The mixer's lock**, the critical section at `0x8264D4F8` (in the
+  object at `0x8264D4F4`): taken by the mixer's callback for the whole
+  mix (`sub_8245BF80`, from `sub_8245FBE0`, on our output thread), not
+  by anything in this file.
+- **The voice lists' spin lock** at `0x82954F10` (the "spin lock"
+  XACT's lead named): a recursive lock built by hand over the kernel's
+  spin lock: +0 the spin lock (`KeAcquireSpinLockAtRaisedIrql` after
+  `KeRaiseIrqlToDpcLevel`), +4 the depth, +8 the owning thread (`r13`),
+  +12 the saved IRQL (put back with `KfLowerIrql` when the depth falls
+  to 0). Taken inline (no function of its own) by every function here
+  that touches the engine's voice lists or a voice's flags, on the game
+  threads and on the mixer's thread (the voice's pass and its
+  callbacks), and by `XAudioLock` (types 0x10001-0x10003). It's
+  re-entered on purpose (a voice's stop takes it, then the wait takes
+  it again). No precedent covers a kernel spin lock; a host recursive
+  mutex would follow the critical sections' precedent most closely.
+
+Also here: XAudio's statistics counters (`XAudio::AddStat`,
+`sub_8245F640`: atomic adds to `0x82954F24` + 4 × the index; 1 a
+submix pass, 2 a source pass), the default allocator (`sub_82460688`,
+`sub_824605E8`: one `XMemAlloc` block, attributes `0x61820006`, per
+voice), the voices' output buffers (36 bytes, vtable `0x8204A8CC`:
+256 frames at 48 kHz of the voice's channels in floats, 128-byte
+aligned) and the default output matrices (`0x8204A7B8`, chosen by the
+input and output channel counts, `sub_8245EC40`).
+
+Not here (leads in `../loops/leads.md`): the engine and its mixer
+(XAudioInitialize's engine, the callback's registration, the commit,
+the mixer's callback and passes: `8245A828`-`8245C538` and
+`8245D650`-`82460600`), and the objects the engine's factory makes
+(`8246xxxx`: the source voices' PCM and XMA codecs at +76, the output
+matrices, the effects), whose XMA side is partly in `audio.md`. Shared
+rows: XAudioInitialize (`sub_8245A760`, `sub_8245A410`) stay in
+`sound-cues.md`, `memcpy` (`sub_825A7410`) in `c-runtime.md`, the
+category volume (`sub_8245B808`) in `audio.md`, `sub_825C8388` (a
+profiling stub returning 0, called around the passes) in
+`vehicle-accessors.md`, `XMemAlloc` (`sub_822976F8`) in `heap.md`.
+
+Error codes seen: `0x80004005` (E_FAIL: no engine), `0x8007000E`
+(E_OUTOFMEMORY), `0x80070057` (E_INVALIDARG: an effect index past the
+chain), `0x80004004` (no start was pending), `0x8000FFFF` (start
+pending while playing). Names are ours, from what each function does
+(the 360's XAudio API names where they're clear, "probably"
+otherwise). Read by the B7 loop's mapping agent, 2026-10-29, from the
+car sounds' lead; the voice set-up and the mixer passes are read in
+part.
+
+Status:
+
+- **Native**: plain C++ in `itc_recomp/src/` that doesn't use the
+  PowerPC context (`ctx`): normal arguments and host structs (it may
+  still read and write guest memory through `src/guest.h` while
+  recompiled code shares the data). The game reaches it without `ctx`,
+  from native or overridden callers, and the recompiled original is no
+  longer called (except behind a fallback flag or to check against it).
+  No `REX_FUNC` override of it exists, not even an adapter kept only for
+  a harness (that's Overridden until the adapter goes).
+  The end state for every function.
+- **Overridden**: an `extern "C" REX_FUNC(sub_XXXXXXXX)` override in
+  `itc_recomp/src/` (or a macro defining one) does the work instead of
+  the original: a thin adapter in front of native code, or a body that
+  still uses `ctx` (calling guest code, reading registers). It may call
+  the original when its flag is off, or to check itself against it.
+- **Wrapped**: an override that does something of its own (skipping
+  render-only passes, logging, timing) and still calls the original
+  (`__imp__sub_XXXXXXXX`) for the work.
+- **Dropped**: its work isn't needed on PC (hardware set-up, kernel calls
+  the SDK already stubbed), so it no longer runs: an override in
+  `itc_recomp/src/` replaces it with nothing (or a fixed return value), or
+  its callers, made native, leave the call out (no override then; the row
+  says which caller). Logs, a harness or the renderer's frame dumps have
+  shown that nothing reads what it did. The original is no longer called,
+  except behind a fallback flag while the drop is being checked. A
+  function the game never calls in the first place isn't Dropped: its
+  status stays blank and its row says it's never called.
+- **Merged**: its work is done inside a native caller's plain C++ (a
+  few lines only that caller needs), so it has no function or override of
+  its own in `itc_recomp/src/`. The row names the caller(s) and the
+  harness that covers the work. The original is no longer called, except
+  behind the caller's fallback flag.
+- **Patched**: the generated code was edited in place (search for
+  `PATCH:`).
+
+A function usually moves from recompiled or Wrapped to Overridden to
+Native as the `ctx` edge moves up through its callers, or straight to
+Dropped when its work isn't needed.
+`itc_recomp/tools/check_function_statuses.py` checks this column, in
+every file of the tables, against `src/` (an override marked Native, a
+status with no override, an override with no row, a row in two files);
+run it after changing either, on any branch.
+
+
+| Address | Name | Status | Notes |
+|---|---|---|---|
+| `sub_8245A768` | `XAudioCreateSourceVoice` (probably) | | r3 = the source voice's description, r4 = the voice out. Under the API lock: `XAudioVoice::CreateSource` (r4 0, r5 a stack word), the voice to [r4] on success; returns its result. From `CarSound::AddVoice` (`sub_8210CE38`), XACT's voice class (`sub_825C9B60`), Voice::Init's voice chat (`sub_82579448`, `sub_82579F88`) and the movie player (`sub_82483770`, not seen). Leaf apart from the import calls. |
+| `sub_8245A7C8` | `XAudioCreateSubmixVoice` (probably) | | r3 = the submix voice's description, r4 = the voice out. As `XAudioCreateSourceVoice` over `XAudioVoice::CreateSubmix`. From `CarSounds::Init` (`sub_8210FE00`: six channels at 48 kHz), `sub_82579F88` and `sub_8257EB68` (voice chat), `sub_825CA4B8` (XACT, not seen). |
+| `sub_82459DB0` | `XAudioVoice::AddRef` | | Under the API lock: the voice's slot +4 (`XAudioVoice::AddRef`). From the voice chat's `sub_8257EB68` and `sub_8257E9B8` and the movie player (`sub_824839E8`). Not seen in play. |
+| `sub_82459E18` | `XAudioVoice::Release` | | Under the API lock: the voice's slot +8 (`XAudioVoice::Release`: the voice freed at 0); returns the count. From `CarSound::UpdateVoices`, `CarSound::Clear`, `CarSounds::Release` (`sub_8210D378`, `sub_8210D320`, `sub_8210F750`), XACT's voice class (`sub_825CA448`), the voice chat (`sub_8257EB68`, `sub_8257E9B8`, seen; others not). |
+| `sub_82459E80` | `XAudioVoice::SetEffectParameters` (probably) | | r3 = the voice, r4 = the effect's index, r5-r7 the parameters, their size and a flag (r7 passed on). Under the API lock: slot +32 (`XAudioVoice::SetEffectParameters`). From `CarSounds::Init` and `CarSound::Update` (the submix's reverb, `car-sounds.md`), `sub_8257EAC0` and `sub_825CA560` (not seen). |
+| `sub_82459EF0` | `XAudioVoice::SetOutputVoices` (probably) | | r3 = the voice, r4 = the outputs (count byte +0, +4 an array of 8-byte entries: the target voice, its matrix). Under the API lock: slot +36. From the voice chat (`sub_82579448`, `sub_8257E9B8`) and XACT (`sub_825C9D18`, `sub_825C9ED8`, not seen). Not seen in play. |
+| `sub_82459F48` | `XAudioVoice::SetOutputMatrix` (probably SetVoiceOutputVolume) | | r3 = the voice, r4 = the matrices (count byte +0, +4 an array of 8-byte entries: byte +0 the output's index, +4 its channel matrix). Under the API lock: slot +40 (`XAudioVoice::SetOutputMatrices`). The car sounds' output maps (`EngineLayer::Update`, `TireLayer::Update`, `RollSound::Update`, `CarSound::UpdateVoices`), the voice chat's `sub_8257E8E8`; XACT's callers not seen. |
+| `sub_82459FA0` | `XAudioVoice::GetState` | | r3 = the voice, r4 = the state byte out. Under the API lock: slot +48 (the source's `XAudioSourceVoice::GetState`, the submix's `sub_8245F218`). From the car sounds (`CarSound::IsPlaying`, `UpdateVoices`, `Pause`, the engine, tires and roll parts) and XACT's voice class (`sub_825C9DB8`). |
+| `sub_82459FF8` | `XAudioSourceVoice::SetFormat` (probably) | | r3 = the source voice, r4 = a 56-byte format, r5, r6. Under the API lock: `XAudioSourceVoice::Reformat` (a direct call, sources only). Only from the movie player (`sub_82483958`, not seen); seen in play before the movies moved to our FFmpeg. |
+| `sub_8245A050` | `XAudioSourceVoice::SubmitPacket` (probably) | | r3 = the source voice, r4 = the packet (data, length, loop region), r5. Under the API lock: the codec's (+76) slot +28. From `CarSound::AddVoice`, the voice chat (`sub_82578F00`, `sub_8257AF30`, not seen), the movie player. Not read past the dispatch. |
+| `sub_8245A0B0` | `XAudioSourceVoice::Reset` (probably) | | r3 = the source voice. Under the API lock: `XAudioSourceVoice::StopAndReset` (a direct call). Only from the movie player (`sub_82483BA0`, not seen); seen in play before the FFmpeg movies. |
+| `sub_8245A108` | | | r3 = the source voice, r4, r5. Under the API lock: the codec's (+76) slot +36. From XACT's voice class (`sub_825C9E08`: its submit packet in the XACT lead, probably). Not read past the dispatch. |
+| `sub_8245A168` | `XAudioVoice::Start` | | r3 = the voice, r4 = flags (bit 0: at the next commit). Under the API lock: `XAudioSourceVoice::Start` (a direct call, though the car sounds and XACT call it on source voices only). From the car sounds (`CarSound::Resume`, `PlayOnce`, the engine, tires and roll parts), XACT's voice class (`sub_825C9BF8`), the voice chat and the movie player (not seen). |
+| `sub_8245A1B0` | `XAudioVoice::Stop` | | r3 = the voice, r4 = flags (bit 0: at once; else the effects' tail plays out). Under the API lock: slot +60 (`XAudioSourceVoice::Stop`; the submix's `XAudioVoice::StopOrTail`). From the car sounds (every part, `Pause`, `Clear`, `UpdateVoices`), XACT's voice class (`sub_825C9C10`), the movie player and `sub_82579108` (not seen). |
+| `sub_8245A208` | `XAudioSourceVoice::FlushPackets` (probably) | | r3 = the source voice. Under the API lock: the codec's (+76) slot +56. From XACT's voice class (`sub_825C9C28`); the voice chat and the movie player not seen. Not read past the dispatch. |
+| `sub_8245A270` | | | r3 = the source voice, r4. Under the API lock: the codec's (+76) slot +72. From XACT's `sub_825C9C30` (not seen). Not seen in play. Not read past the dispatch. |
+| `sub_8245A2C8` | `XAudioSourceVoice::SetVolume` | | r3 = the source voice, f1 = the volume: +140 = f1, then slot +92 (`XAudioSourceVoice::ApplyVolume`), under the API lock. From the car sounds (the engine, tires, roll, hits and other parts, `PlayOnce`) and XACT's voice class (`sub_825C9BE8`). |
+| `sub_8245A340` | `XAudioSourceVoice::SetFrequencyRatio` (probably) | | r3 = the source voice, f1 = the pitch as a ratio. Under the API lock: the codec's (+76) slot +96. From `CarSound::SetPitchScaled`, `CarSound::SetPitch` and XACT's voice class (`sub_825C9BF0`). Not read past the dispatch. |
+| `sub_8245A3B8` | `XAudioVoice::GetOutputFormat` (probably) | | r3 = a voice, r4 = an 8-byte format out. Under the API lock: slot +64 (`XAudioVoice::GetFormat`). From `XACTRenderer::StartXAudio` (`sub_825C2BB0`, on the mastering voice from `XAudioGetMasteringVoice`); `sub_825C9EE8` not seen. |
+| `sub_8245A4E8` | `XAudioShutDown` (probably) | | Under the API lock: the engine `[0x82954F08]`'s slot +8 (probably its release), 0 when there's no engine. From `sub_825C2D90` and the movie player (`sub_824838B8`), neither seen in play. Not read further. |
+| `sub_8245A568` | `XAudioGetMasteringVoice` (probably) | | r3 = the voice out. Under the API lock: the engine's +64 (its mastering voice, every voice's default output) to [r3] and 0; E_FAIL without an engine. From `XACTRenderer::StartXAudio` (`sub_825C2BB0`); `sub_825C9EE8` not seen. |
+| `sub_8245A5E8` | `XAudioRegisterProcessingCallback` (probably) | | r3-r6 passed on. Under the API lock: E_FAIL without an engine, else `sub_8245AB60` (not read: the engine's callback list; the XACT intro calls it the audio callback's registration). From `XACTRenderer::StartXAudio`. |
+| `sub_8245A668` | | | r3 = probably the callback. Under the API lock: E_FAIL without an engine, else `sub_8245B3A0` (not read; it waits for the mixer with `sub_8245AFA0`): probably the callback's unregistration. From `sub_825C2D90` (not seen). Not seen in play. |
+| `sub_8245A6E8` | `XAudio::Commit` (probably) | | Under the API lock: E_FAIL without an engine, else `sub_8245B638` (not read: probably starts the voices whose start was pending, the engine's +68 list). From `XACTRenderer::CommitVoices` (`sub_825C3048`, `xact.md`). |
+| `sub_825DA0F0` | | | Static initializer (no direct callers: the C runtime's initializer table): `RtlInitializeCriticalSection` on the API lock (`0x8264D518`), then `atexit` (`sub_825A7068`, `c-runtime.md`) with `sub_825DB1E0`, its terminator. Once at boot. |
+| `sub_825DB1E0` | | | The API lock object's terminator (registered by `sub_825DA0F0`): `[0x8264D514]` = `0x8204A868` (probably its base vtable put back; slot 0 `sub_8245EF28`). Leaf. Not seen in play (the game never exits through the C runtime). |
+| `sub_8245AE60` | `XAudio::WaitForVoice` | | r3 = the engine, r4 = a voice; called with the API lock and the spin lock held. Unless the caller is the mixer's thread (engine +300, or the processor's worker at +332 + 4 × the processor number `[r13 + 268]`): while the voice is among the six the mixer is working on (engine +144 to +164), releases the spin lock one level (all of it, with the IRQL put back, at depth 0), leaves the API lock as many times as its recursion count (`[0x8264D514 + 24]`), takes it back that many times, takes the spin lock again, and checks again. From `XAudioSourceVoice::CancelPendingStart` and `XAudioVoice::StopOrTail`. The reason the API lock needs a readable depth (this file's intro). |
+| `sub_8245AFA0` | | | As `XAudio::WaitForVoice`, but waits while the engine's +296 (the voice being processed) is r4. From `sub_8245B3A0` (not read). Not seen in play. |
+| `sub_8245ED60` | `XAudioLock` (probably) | | r3 = the type: 0x10001 releases the voice lists' spin lock one level, 0x10002 takes it, 0x10003 tries to (`KeTryToAcquireSpinLockAtRaisedIrql`, 0x80004004 when busy); 0x20001 enters the API lock, 0x20002 leaves it, 0x20003 tries to; else E_INVALIDARG. From the effects' code (`sub_825A2250`, `sub_825A22E8`, `sub_825A5790`, `sub_825A5D48`, `sub_825A5E28`, `sub_825A6070`; the XAPO lead). Not seen in play. |
+| `sub_8245EAA0` | `XAudioVoice::CreateSource` | | r3 = the source's description, r4 = an allocator (0: the default), r5 = the voice out. The size (`XAudioSourceVoice::Size`, + the 148-byte voice), the allocator (`XAudio::GetAllocator` with `0x61820006`), 148 bytes from its slot +20, `XAudioSourceVoice::XAudioSourceVoice`, `XAudioSourceVoice::Init`; on failure the voice's slot +12 (free); the allocator's slot +4 (release) at the end. E_OUTOFMEMORY when the allocation fails. From `XAudioCreateSourceVoice`. |
+| `sub_8245F3D0` | `XAudioVoice::CreateSubmix` | | As `XAudioVoice::CreateSource` for a submix voice: the description from `XAudioSubmixVoice::Describe`, the size from `XAudioVoice::OutputsSize` + 80, 80 bytes, `XAudioSubmixVoice::XAudioSubmixVoice`, `XAudioSubmixVoice::Init`. From `XAudioCreateSubmixVoice`. |
+| `sub_8245E0D8` | `XAudioSourceVoice::Size` | | r3 = the source's description, r4 = the size out: the voice's description (`XAudioSourceVoice::Describe`), its outputs' size (`XAudioVoice::OutputsSize`), plus the codec's size from the engine's factory (+60, `XAudioFactory::Size`, with the format: +88 the format's id, +4 the 56-byte format copied, +60 float, +59, +64 bytes, +80, +84). From `XAudioVoice::CreateSource`. |
+| `sub_8245E010` | `XAudioSourceVoice::Describe` | | r3 = the source's description, r4 = a 32-byte voice description out (cleared): +0 the output format (`XAudio::SourceOutputFormat`), +8 the effect chain (+68), +12 the engine's first per-processor buffer (+12 + 8i, six), +16 the callback (+76), +20 its context (+88), +24 the output count (+57, 1 when 0), +25 the outputs' channels (+58, 6 when 0), +28 the outputs (+72). From `XAudioSourceVoice::Size` and `Init`. |
+| `sub_8245DC88` | `XAudio::SourceOutputFormat` | | r3 = a source format, r4 = an 8-byte voice format out: +0 = 0, +1 the channels (for type 4, XMA, the sum of its streams' channels, bytes +12 + 8i for +4 streams; else byte +4), +4 = 48,000. Leaf. From `XAudioSourceVoice::Describe` and `Reformat`. |
+| `sub_8245F010` | `XAudioSubmixVoice::Describe` | | r3 = the submix's description, r4 = a 32-byte voice description out (cleared): +1 the channels (+1), +4 = 48,000, +8 (+12), +16 (+20), +20 (+24), +24 the output count (+8, 1 when 0), +25 the outputs' channels (+9, 6 when 0), +28 the outputs (+16). Leaf. From `XAudioVoice::CreateSubmix` and `XAudioSubmixVoice::Init`. |
+| `sub_824607C8` | `XAudioVoice::OutputsSize` | | r3 = a voice description, r4 = the size out: the base's (`XAudioVoice::BaseSize`) plus, for the +24 outputs, 12 bytes and a matrix object each (the factory's size, `XAudioFactory::Size`, for id 1 with the output channels +25). From `XAudioSourceVoice::Size` and `XAudioVoice::CreateSubmix`. |
+| `sub_82461158` | `XAudioVoice::BaseSize` | | r3 = a voice description, r4 = the size out: the output buffer's when none is given (+12; `XAudioBuffer::Size`), plus each effect's (the factory's size for the chain's ids, +8: count byte, +4 the ids) and 8 bytes each. From `XAudioVoice::OutputsSize`. |
+| `sub_8245FA28` | `XAudioBuffer::Size` | | r3 = an 8-byte voice format (+0 type 0 only), r4 = the size out: (256 / (48,000 / the rate)) × the channels × 4 + 128 + 36. Leaf. From `XAudioVoice::BaseSize` and `sub_8245B2C0` (the engine). |
+| `sub_8245D610` | `XAudioFactory::Size` | | r3 = the factory (an interface 8 bytes in, 0 stays 0): its slot +20, tail call. From `XAudioSourceVoice::Size`, `XAudioVoice::BaseSize`, `XAudioVoice::OutputsSize`. Leaf thunk. |
+| `sub_8245D630` | `XAudioFactory::Create` | | r3 = the factory (interface 8 bytes in): its slot +24, tail call. From `XAudioVoice::CreateObject`. Leaf thunk. |
+| `sub_82460688` | `XAudio::GetAllocator` | | r3 = the attributes (`0x61820006`), r4 = a size, r5 = the allocator in and out: with none, the default one (`XAudio::DefaultAllocator`, r4 > 0) or `sub_82460538` (r4 = 0, not seen); with one, its slots +0 (AddRef), +8 (r4) and +12 (r3). From `XAudioVoice::CreateSource`, `CreateSubmix`, `sub_8245C538` and `sub_824600F0` (the engine). |
+| `sub_824605E8` | `XAudio::DefaultAllocator` | | r3 = the attributes, r4 = the size, r5 = out: one block of size + 28 (`XAudio::Alloc`), E_OUTOFMEMORY when it fails: vtables `0x8204A954` and `0x8204A980` at +0 and +4, +8 = 1 (its count), +12 the attributes, +16 the size, +20 = 0 (used), +24 = +28 (the next free byte). Probably a bump allocator its slot +20 hands out. From `XAudio::GetAllocator`. |
+| `sub_8245EF80` | `XAudio::Alloc` | | r3 unused, r4 = the size, r5 = the attributes: `XMemAlloc` (`sub_822976F8`, `heap.md`), tail call. From `XAudio::DefaultAllocator`; `sub_82460210`, `sub_82460538`, `sub_8245D760` and `XmaObject::Create` (`sub_8245C650`, `audio.md`) not seen in play. Leaf thunk. |
+| `sub_82461500` | `XAudioVoice::Construct` | | r3 = the voice, r4 = the allocator, r5 = a byte: vtable `0x8204A6CC`, then `0x8204AA00`; +4 = 1 (the count), +8 the allocator (its slot +0, AddRef), +12 = r5 (0 a source, 1 a submix), +16 and +24 two empty list nodes, +40 = 0. From `XAudioVoice::ConstructOutputs` and `sub_824600F0` (the engine). |
+| `sub_82460738` | `XAudioVoice::ConstructOutputs` | | `XAudioVoice::Construct`, then vtable `0x8204A998` (a voice with outputs). From `XAudioSourceVoice::XAudioSourceVoice` and `XAudioSubmixVoice::XAudioSubmixVoice`. |
+| `sub_8245E6A8` | `XAudioSourceVoice::XAudioSourceVoice` | | r3 = the voice, r4 = the allocator: `XAudioVoice::ConstructOutputs` (r5 0), vtable `0x8204A720`, +140 = 1.0 (`[0x82000A30]`); under the spin lock, added at the end of the engine's source list (+80, the node at the offset in +88). From `XAudioVoice::CreateSource`. |
+| `sub_8245F298` | `XAudioSubmixVoice::XAudioSubmixVoice` | | r3 = the voice, r4 = the description, r5 = the allocator: `XAudioVoice::ConstructOutputs` (r5 1), vtable `0x8204A870`, +76 = the stage (description +10); under the spin lock, added at the end of that stage's list (the engine's +124 + 44 × the stage). From `XAudioVoice::CreateSubmix`. |
+| `sub_8245E348` | `XAudioSourceVoice::Init` | | r3 = the voice, r4 = the source's description: the 56-byte format copied to +84 (`memcpy`), +144 = its byte +56 (the category, 0 or 1), the voice's description (`XAudioSourceVoice::Describe`), `XAudioVoice::InitOutputs`, then the codec at +76 (`XAudioVoice::CreateObject` with the format's id +88 and the format, r6 255). From `XAudioVoice::CreateSource`. |
+| `sub_8245F230` | `XAudioSubmixVoice::Init` | | r3 = the voice, r4 = the submix's description: `XAudioSubmixVoice::Describe`, `XAudioVoice::InitOutputs`, then its output buffer cleared (`XAudioBuffer::ClearThunk` on +32, flags 3). From `XAudioVoice::CreateSubmix`. |
+| `sub_82460880` | `XAudioVoice::InitOutputs` | | r3 = the voice, r4 = its description: +68 = the output count (+24), `XAudioVoice::InitBase`, an array of 12 bytes an output from the allocator (+8, slot +20) into +72, each output's matrix object (`XAudioVoice::CreateObject`, id 1, the output channels +25), then slot +36 (set output voices) with the description's outputs (+28). E_OUTOFMEMORY when the array fails. From `XAudioSourceVoice::Init` and `XAudioSubmixVoice::Init`. |
+| `sub_82461D50` | `XAudioVoice::InitBase` | | r3 = the voice, r4 = its description: +44 the callback (+16), +48 its context (+20), +52 the 8-byte format (+0), +60 the effect count (the chain +8's byte +0, or 0), +32 the output buffer (+12, AddRef'd through `XAudioBuffer::AddRefThunk`; or a new one, `XAudioBuffer::Create`, for its format), +36 an array of 8 bytes an effect from the allocator, the effects made (`XAudioVoice::CreateEffects`). From `XAudioVoice::InitOutputs` and `sub_8245FCA0` (the engine). |
+| `sub_82461600` | `XAudioVoice::CreateEffects` | | r3 = the voice, r4 = the effect chain (count byte +0, +4 the ids): each effect made into +36 + 8i (`XAudioVoice::CreateObject` with the id, r6 0). From `XAudioVoice::InitBase`. |
+| `sub_82461308` | `XAudioVoice::CreateObject` | | r3 = the voice, r4 = an 8-byte entry out, r5 = a class id, r6 = a byte: the engine's factory (+60) makes the object (`XAudioFactory::Create`, with the voice's allocator +8) into [r4]; its slot +8 gives its info (byte +0, half-word +2 its latency in passes): entry +4 = r6, +5 = 1, +6 = the info byte; +62 (the tail) raised to the latency. From `XAudioVoice::InitOutputs`, `XAudioSourceVoice::Init`, `XAudioVoice::CreateEffects`. |
+| `sub_8245F750` | `XAudioBuffer::XAudioBuffer` | | r3 = the buffer (36 bytes), r4 = an 8-byte format (and +16), r5 = the allocator: vtable `0x8204A8CC`, +4 = 1, +8 the type, +12 the format (8 bytes; none: 0), +24 = 48,000, +32 (r4 +16); for type 0, the samples (256 frames at the rate × the channels, floats, + 128) from the allocator's slot +20, 128-byte aligned, into +28; +20, +21 = 0. From `XAudioBuffer::Create`. |
+| `sub_8245FA80` | `XAudioBuffer::Create` | | r3 = the format, r4 = the allocator, r5 = out: 36 bytes from the allocator's slot +20, `XAudioBuffer::XAudioBuffer`, its slot +20 with r5 (probably its interface to [r5]). E_OUTOFMEMORY when it fails. From `XAudioVoice::InitBase` and `sub_8245C198` (the engine). |
+| `sub_8245F8E8` | `XAudioBuffer::Clear` | | r3 = the buffer, r4 = a format (0: its own, +12), r5 = flags: E_OUTOFMEMORY when the format needs more frames than the buffer holds; with bit 0 clear, E_UNEXPECTED when its +21 channels' frames exceed the format's; with bit 1 set, the samples (+28) zeroed for the format's frames × channels (`memset`, `sub_825A71D0`); +21 = the format's channels. From `XAudioSubmixVoice::Pass`, `XAudioBuffer::ClearThunk`, `sub_8246D860` and `sub_82466440` (the codecs). |
+| `sub_8245FA10` | `XAudioBuffer::ClearThunk` | | The buffer's interface 8 bytes in to the object, tail call to `XAudioBuffer::Clear`. From `XAudioSubmixVoice::Init`, `XmaVoice::Update` (`sub_8246C320`, `audio.md`), `sub_82465428`, `sub_8245FDC8`, `sub_8245FE20`; `XAudioSubmixVoice::SetFormat` not seen. Leaf thunk. |
+| `sub_8245F6B0` | `XAudioBuffer::AddRefThunk` | | The interface 8 bytes in: the object's slot +4, tail call. From `XAudioVoice::InitBase`. Leaf thunk. |
+| `sub_8245F6D0` | `XAudioBuffer::ReleaseThunk` | | The interface 8 bytes in: the object's slot +8, tail call. From `XAudioVoice::Destroy` and `sub_8245B940` (not seen). Leaf thunk. |
+| `sub_8245F860` | `XAudioVoice::AddRef` | | +4 += 1, returns it. Leaf. Slot +4 of the voices' and buffers' vtables (`0x8204A720`, `0x8204A870`, `0x8204A998`, `0x8204AA00`). |
+| `sub_8245F878` | `XAudioVoice::Release` | | +4 -= 1; at 0, slot +12 (the free) and 0; else the count. Slot +8 of the same vtables. |
+| `sub_8245AAD8` | `XAudioObject::Free` | | r3 = the object: keeps its allocator (+8, AddRef'd by its slot +0), calls its own slot +0 with 1 (the deleting destructor), then the allocator's slot +4 (release). Slot +12 of the voices' vtables. |
+| `sub_8245E7A0` | `XAudioSourceVoice::DeletingDestructor` | | `XAudioSourceVoice::~XAudioSourceVoice`; returns the voice (the memory is the allocator's). Slot +0 of `0x8204A720`. |
+| `sub_8245E1B8` | `XAudioSourceVoice::~XAudioSourceVoice` | | Vtable `0x8204A720`; slot +60 (stop, r4 1); on success, the codec's (+76) slot +32 (reset); under the spin lock, out of the engine's source list (+80, offset +88); the codec's slot +4 (release), +76 = 0; `XAudioVoice::~XAudioVoiceOutputs`. From `XAudioSourceVoice::DeletingDestructor`. |
+| `sub_8245F3A0` | `XAudioSubmixVoice::DeletingDestructor` | | `XAudioSubmixVoice::~XAudioSubmixVoice`; returns the voice. Slot +0 of `0x8204A870`. |
+| `sub_8245F108` | `XAudioSubmixVoice::~XAudioSubmixVoice` | | Vtable `0x8204A870`; `XAudioVoice::StopOrTail` (r4 1, at once); under the spin lock, out of its stage's list (the engine's +124 + 44 × +76); `XAudioVoice::~XAudioVoiceOutputs`. From `XAudioSubmixVoice::DeletingDestructor`. |
+| `sub_82460E90` | | | Probably the voice with outputs' deleting destructor (slot +0 of `0x8204A998`). From `sub_82460B50`'s vtable only. Not seen in play. Not read. |
+| `sub_82460B50` | `XAudioVoice::~XAudioVoiceOutputs` | | Vtable `0x8204A998`; `XAudioVoice::StopOrTail` (r4 1); the outputs released (`XAudioVoice::ReleaseOutputs`); each output's matrix object (+72 + 12i + 4) released (slot +4) and cleared; `XAudioVoice::Destroy`. From both voices' destructors and `sub_82460E90` (not seen). |
+| `sub_824615A0` | | | Probably the base voice's deleting destructor (slot +0 of `0x8204AA00`). Not seen in play. Not read. |
+| `sub_82461240` | `XAudioVoice::Destroy` | | The base's destructor: vtable `0x8204AA00`; each effect (+36 + 8i, +60 of them) released (slot +4) and cleared; the output buffer (+32) released (`XAudioBuffer::ReleaseThunk`), 0; vtable `0x8204A6CC`, the allocator (+8) released, 0; vtable `0x8204A6B8`. From `XAudioVoice::~XAudioVoiceOutputs`, `sub_8245FB10` and `sub_824615A0` (not seen). |
+| `sub_8245FB00` | | | Vtable `0x8204A6B8` (the root's) to [r3]. Leaf. Slot +92 of `0x8204A870` (the submix's). |
+| `sub_8245DDC8` | `XAudioSourceVoice::GetState` | | r3 = the voice, r4 = the byte out: under the spin lock, the codec's (+76) slot +44 state (byte) or'ed with the voice's flags (+61). Slot +48 of `0x8204A720`. |
+| `sub_8245F218` | `XAudioSubmixVoice::GetState` | | r4 = the flags byte (+61) out; 0. Leaf. Slot +48 of `0x8204A870`. Not seen in play (the car sounds and XACT never ask a submix). |
+| `sub_8245E308` | `XAudioVoice::GetCallbackContext` (probably) | | [r4] = +48 (the callback's context); 0. Leaf. Slot +44 of both voices' vtables. Not seen in play. |
+| `sub_8245E318` | `XAudioVoice::GetType` | | [r4] = byte +12 (0 a source, 1 a submix); 0. Leaf. Slot +52 of both voices' vtables. |
+| `sub_8245E328` | `XAudioVoice::GetFormat` | | [r4] = the 8-byte format at +52 (+0 type, +1 channels, +4 the rate); 0. Leaf. Slot +64 of both voices' vtables. |
+| `sub_82461140` | `XAudioVoice::SetFormatWords` | | Copies the 8-byte format at r4 to +52. Leaf. From `XAudioVoice::SetFormat`. |
+| `sub_82460778` | `XAudioVoice::SetFormat` | | r3 = the voice, r4 = the 8-byte format, r5 = the outputs: `XAudioVoice::SetFormatWords`, then slot +36 (set output voices) with r5. Slot +88 of `0x8204A720`; from `XAudioSourceVoice::Reformat` and `XAudioSubmixVoice::SetFormat` (not seen). |
+| `sub_8245F090` | `XAudioSubmixVoice::SetFormat` | | r3 = the voice, r4 = the submix's description: a format of its channels (+1) at 48,000 Hz, `XAudioVoice::SetFormat`, then its buffer cleared (`XAudioBuffer::ClearThunk`, flags 3). Slot +88 of `0x8204A870`. Not seen in play. |
+| `sub_8245DCF0` | `XAudioSourceVoice::Reformat` | | r3 = the voice, r4 = a 56-byte format, r5 = the outputs, r6: the format copied to +84, the codec's (+76) slot +112 (r4, r6), then its output format (`XAudio::SourceOutputFormat`) set with r5 (`XAudioVoice::SetFormat`). From `XAudioSourceVoice::SetFormat`. |
+| `sub_8245DD60` | `XAudioSourceVoice::StopAndReset` | | Slot +60 (stop, r4 1); on success the codec's (+76) slot +32 (reset). From `XAudioSourceVoice::Reset`. |
+| `sub_82460BF0` | `XAudioVoice::SetOutputVoices` | | r3 = the voice, r4 = the outputs (count byte +0, +4 8-byte entries; 0 for the default): the current ones released (`XAudioVoice::ReleaseOutputs`), each set (`XAudioVoice::SetOutput` into +72 + 12i), +69 = the count; with r4 0 and +68 > 0, one output to the default. Slot +36 of `0x8204A720`; `sub_8245F228` jumps here for the submix. |
+| `sub_8245F228` | | | `b XAudioVoice::SetOutputVoices`. Slot +36 of `0x8204A870`. Leaf thunk. |
+| `sub_82460998` | `XAudioVoice::SetOutput` | | r3 = the voice, r4 = an output entry (+0 the target, +4 its matrix; 0 picks the default `0x8204A9F4`), r5 = the voice's output slot (12 bytes: +0 the target, +4 the matrix object): with no target, the engine's mastering voice (+64); the target AddRef'd (slot +4) into the slot; the target's format (slot +64), then the matrix (the entry's, or the default for the voice's channels +53 and the target's, `XAudio::DefaultMatrix`) set on the matrix object (slot +40). From `XAudioVoice::SetOutputVoices`. |
+| `sub_8245EC40` | `XAudio::DefaultMatrix` | | r3 = the input channels, r4 = the output channels, r5 = an 8-byte matrix out (+0 the count, +4 the coefficients in the table at `0x8204A7B8`: +48 for N to N or 1 to N up to 6, +96 for N to 1, +144 for 4 to 6, +0 for 2 to 4 or 6 and 1 to 2, 4 or 6); returns r5, or 0 for pairs not covered. Leaf. From `XAudioVoice::SetOutput`. |
+| `sub_82460A58` | `XAudioVoice::ReleaseOutputs` | | Each current output's target (+72 + 12i, +69 of them) released (slot +8); +69 = 0. From `XAudioVoice::SetOutputVoices` and `XAudioVoice::~XAudioVoiceOutputs`. |
+| `sub_82460AB8` | `XAudioVoice::SetOutputMatrices` | | r3 = the voice, r4 = the matrices (count byte +0, +4 8-byte entries: byte +0 the output's index, +4 the matrix): each output's matrix object (+72 + 12 × index + 4) gets its slot +56 with the matrix and whether the voice isn't playing (bit 0 of +61 clear; probably set at once instead of ramped). Slot +40 of both voices' vtables. |
+| `sub_82461490` | `XAudioVoice::GetEffectEnabled` (probably) | | r4 = an effect's index (E_INVALIDARG past +60), r5 = the byte out: entry +5. Leaf. Slot +20 of both voices' vtables. Not seen in play. |
+| `sub_824614C8` | `XAudioVoice::SetEffectEnabled` (probably) | | r4 = an effect's index (E_INVALIDARG past +60), r5 = the byte: entry +5 = r5. Leaf. Slot +24 of both voices' vtables. Not seen in play. |
+| `sub_824613A0` | `XAudioVoice::GetEffectParameters` (probably) | | r4 = an effect's index (E_INVALIDARG past +60), r5-r7: the effect's (+36 + 8i) slot +12. Slot +28 of both voices' vtables. Not seen in play. |
+| `sub_82461418` | `XAudioVoice::SetEffectParameters` | | r4 = an effect's index (E_INVALIDARG past +60), r5-r7: the effect's (+36 + 8i) slot +16 with r5, r6, r7. Slot +32 of both voices' vtables. |
+| `sub_8245EBA0` | `XAudioSourceVoice::Start` | | r3 = the voice, r4 = flags: with bit 0, `XAudioSourceVoice::StartLater`; else the pending start cancelled (`XAudioSourceVoice::CancelPendingStart`), the volume applied (slot +92), the codec's (+76) slot +48 (start), then `XAudioVoice::Play`. From `XAudioVoice::Start` (the API) and `sub_8245B638` (the commit, starting the pending ones). |
+| `sub_8245E7D0` | `XAudioSourceVoice::StartLater` | | Under the spin lock: E_UNEXPECTED (`0x8000FFFF`) when playing (+61 bit 0); else unless pending (bit 6), sets bit 6 and adds the voice at the end of the engine's pending list (+68, the node at the offset in +76). From `XAudioSourceVoice::Start`. |
+| `sub_8245E428` | `XAudioSourceVoice::CancelPendingStart` | | Under the spin lock: `0x80004004` when no start is pending (+61 bit 6 clear); else waits for the mixer (`XAudio::WaitForVoice`), takes the voice out of the pending list (+68, offset +76), clears bit 6; 0. From `XAudioSourceVoice::Start` and `Stop`. |
+| `sub_8245E9F0` | `XAudioSourceVoice::Stop` | | r3 = the voice, r4 = flags: when no start was pending (`XAudioSourceVoice::CancelPendingStart` gives `0x80004004`), the codec's (+76) slot +52 (stop, r4); with bit 0 clear, when the codec isn't playing any more (its slot +44 state's bit 0), `XAudioVoice::StopOrTail` with the flags or 1. Slot +60 of `0x8204A720`. |
+| `sub_82461798` | `XAudioVoice::Play` | | Under the spin lock: when playing, only the stopping bit (+61 bit 2) cleared; else +61's bits 0 and 6 cleared and bit 0 set, and slot +76 (`XAudioVoice::Activate`). `sub_825C8388` (`vehicle-accessors.md`) with 1 around it. From `XAudioSourceVoice::Start` and `sub_8245FE20`; slot +56 of `0x8204A870` (the submix's start). |
+| `sub_824619B0` | `XAudioVoice::StopOrTail` | | r3 = the voice, r4 = flags. With bit 0 (at once): under the spin lock, waits for the mixer (`XAudio::WaitForVoice`); when playing, clears bits 0, 2 and 6 and calls slot +80 (`XAudioVoice::Deactivate`). Without: when playing and not stopping, sets bit 2 and +64 = +62 (the effects' tail, in passes). `sub_825C8388` with 2 around it. From the destructors, `XAudioSourceVoice::Stop`, `XAudioSourceVoice::Pass`, `sub_8245FB10` (not seen); slot +60 of `0x8204A870`. |
+| `sub_82460EF0` | `XAudioVoice::Activate` | | Each output's target (+72 + 12i, +69 of them) has its use count (+40) raised and its slot +56 (start) called; then, by the voice's type (slot +52: 0 the engine's +80 list, 1 its stage's +124 + 44 × +76 list), under the spin lock, the voice added at the end of that list's +40 list. Slot +76 of both voices' vtables. |
+| `sub_82460D50` | `XAudioVoice::Deactivate` | | Under the spin lock, the voice out of its active list (the node at +24); then each output's target's use count (+40) lowered, slot +60 (stop at once) on the targets reaching 0. Slot +80 of both voices' vtables. |
+| `sub_82461070` | `XAudioVoice::Pass` | | One mixer pass for the voice (on the mixer's thread, under the mixer's lock): slot +72 (the input buffer), `sub_825C8388` with 3; the callback (+44) with its context (+48) when set; when stopping (+61 bit 2), +64 counted down, at 0 stop at once (slot +60, r4 1); then slot +84 (the type's pass) with the buffer. From `XAudioSubmixVoice::Pass` and `sub_8245FDC8`; slot +68 of `0x8204A720`. |
+| `sub_8245EFA0` | `XAudioSubmixVoice::Pass` | | `XAudioVoice::Pass`; on success, its buffer (+32 - 8) cleared (`XAudioBuffer::Clear`, the format at +52, flags 3) and the counter 1 up (`XAudio::AddStat`). Slot +68 of `0x8204A870`. |
+| `sub_8245DED0` | `XAudioSourceVoice::Pass` | | r3 = the voice, r4 = the buffer: when the voice's category (+144) is in the engine's changed mask (+140), the volume applied again (slot +92); the codec (the 8-byte entry at +76, made like an effect) run (`XAudioVoice::ProcessEffect`), mixed to the outputs (`XAudioVoice::MixToOutputs`), the counter 2 up (`XAudio::AddStat`); when the codec's state (slot +44) has stopped playing and the voice isn't stopping (+61 bit 2), the tail started (`XAudioVoice::StopOrTail`, r4 0). Slot +84 of `0x8204A720`. |
+| `sub_8245DFC0` | `XAudioSourceVoice::ApplyVolume` | | The category's volume (the engine's +132 + 4 × +144 for categories 0 and 1; else 1.0 from `[0x82000A30]`) × +140, to the codec's (+76) slot +88. Leaf (tail call). Slot +92 of `0x8204A720`. |
+| `sub_8245DEB0` | `XAudioVoice::EngineBuffer` | | The engine's +12 + 8 × the current processor (`[r13 + 268]`): its buffer for that processor. Leaf. Slot +72 of `0x8204A720`. |
+| `sub_82460CB8` | `XAudioVoice::MixToOutputs` | | r3 = the voice, r4 = the buffer (in [r4]): `XAudioVoice::ProcessEffects`; then for each output (+69): its target's slot +72 (the target's input buffer) and the matrix object's (+4) slot +24 with the voice's buffer and the target's. From `XAudioSourceVoice::Pass`; slot +84 of `0x8204A870`. |
+| `sub_82461E88` | `XAudioVoice::ProcessEffects` | | r3 = the voice, r4 = the buffer: `XAudioVoice::ProcessEffect` for each effect (+36 + 8i, +60 of them). From `XAudioVoice::MixToOutputs` and `sub_8245FB80`. |
+| `sub_82461678` | `XAudioVoice::ProcessEffect` | | r3 = the voice, r4 = an effect entry (+0 the object, +5 enabled, +6 its in-place and buffer flags), r5 = the buffer in and out: disabled, nothing (0); else picks the input and output buffers by the flags (for 6, the other of the processor's two engine buffers, +12 + 8 × the processor, and [r5] set to it) and calls the object's slot +24 (process). Not read in detail. From `XAudioSourceVoice::Pass` and `XAudioVoice::ProcessEffects`. |
+| `sub_8245F640` | `XAudio::AddStat` | | r3 = a counter's index, r4 = the amount: atomically added to `0x82954F24` + 4 × r3 (`lwarx`/`stwcx.` with interrupts off); 0. Leaf. From `XAudioSubmixVoice::Pass`, `XAudioSourceVoice::Pass`, `sub_8246D860`, `XmaVoice::Update`, `sub_8245B480` and the mixer's callback `sub_8245BF80` (index 0: its passes). |
