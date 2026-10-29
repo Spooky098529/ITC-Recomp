@@ -350,7 +350,7 @@ ITC_XAUDIO_ENGINE_ADAPTER(82460388, XAudioAllocatorRemaining)
 ITC_XAUDIO_ENGINE_ADAPTER(82460370, XAudioInterfaceAddRef)
 ITC_XAUDIO_ENGINE_ADAPTER(82461EF8, XAudioObjectInfo)
 ITC_XAUDIO_ENGINE_ADAPTER(8245F678, XAudioTakeStats)
-ITC_XAUDIO_ENGINE_ADAPTER(8245EF90, XAudioFree)
+// No adapter (removed 2026-10-29: only the allocators' destructors' plain C++ (sub_824602F8, sub_824603A8) calls it in play) for XAudio::Free sub_8245EF90.
 ITC_XAUDIO_ENGINE_ADAPTER(82460288, XAudioAllocatorAlloc)
 ITC_XAUDIO_ENGINE_ADAPTER(8245AAB8, XAudioDeleteObject)
 ITC_XAUDIO_ENGINE_ADAPTER(8245A940, XAudioBarrier)
@@ -369,15 +369,15 @@ ITC_XAUDIO_ENGINE_ADAPTER(824600F0, XAudioMasteringCreate)
 ITC_XAUDIO_ENGINE_ADAPTER(8245FE20, XAudioMasteringStart)
 ITC_XAUDIO_ENGINE_ADAPTER(8245FDC8, XAudioMasteringPass)
 ITC_XAUDIO_ENGINE_ADAPTER(8245FB80, XAudioMasteringProcess)
-ITC_XAUDIO_ENGINE_ADAPTER(8245B208, XAudioStageSwap)
+// No adapter (removed 2026-10-29: only XAudioEngine::SwapStageLists' plain C++ calls it in play) for XAudioStage::Swap sub_8245B208.
 ITC_XAUDIO_ENGINE_ADAPTER(8245B720, XAudioSwapStageLists)
 ITC_XAUDIO_ENGINE_ADAPTER(8245B480, XAudioRunStage)
 ITC_XAUDIO_ENGINE_ADAPTER(8245ACE0, XAudioRunCallbacks)
 ITC_XAUDIO_ENGINE_ADAPTER(8245AB60, XAudioRegisterCallback)
 ITC_XAUDIO_ENGINE_ADAPTER(8245B638, XAudioEngineCommit)
-ITC_XAUDIO_ENGINE_ADAPTER(8245FBF0, XAudioStageOf)
+// No adapter (removed 2026-10-29: only sub_82460000's plain C++ calls it in play) for XAudioEngine::StageOf sub_8245FBF0.
 ITC_XAUDIO_ENGINE_ADAPTER(82460000, XAudioJoinMix)
-ITC_XAUDIO_ENGINE_ADAPTER(824602F8, XAudioAllocatorDestroy)
-ITC_XAUDIO_ENGINE_ADAPTER(824604E8, XAudioDefaultAllocatorDestroy)
+// No adapter (removed 2026-10-29: only sub_824604E8's plain C++ calls it in play) for XAudioAllocator::~XAudioAllocator sub_824602F8.
+// No adapter (removed 2026-10-29: only sub_824603A0's adapter (its register step) calls it in play) for the default allocator's destructor sub_824604E8.
 ITC_XAUDIO_ENGINE_ADAPTER(824603A0, XAudioDefaultAllocatorThunk)
 ITC_XAUDIO_ENGINE_ADAPTER(824603A8, XAudioInterfaceFree)
