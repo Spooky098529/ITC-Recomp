@@ -13,21 +13,19 @@ file's history. What's left to see in a drive, from every run:
 - Limit for this run: 3 subsystems.
 - Subsystem 1 of 3 done: the car sounds and X3DAudio (below).
   Recorded in the plan's table and boundary log.
-- Subsystem 2 of 3: XAudio's voice methods (`sub_8245A768` and ten
-  more, the car sounds' blockers; the lead closest to ready, 8 of its
-  11 ready). Map checked (e784bc0); its stop (the two locks) put to
-  the user: host recursive locks with a readable depth, taken by every
-  user (the user's call, 2026-10-29). Migration 1 (29a2e7f..fbcd34f,
-  34 ours, what takes neither lock) stopped on the spin lock, taken
-  inline: the user's call, 2026-10-29, the game's own spin lock until
-  its users are native, the API lock a host recursive lock now.
-  Migration 2 (19a919f..24cc6ea, 58 more, 92 of 96 ours; the API lock
-  not switched: 8 of its users wait on the engine lead). Step:
-  validation (agent running); then the car sounds' migration 2 (their
-  groups under the voice methods now ready).
+- Subsystem 2 of 3 done: XAudio's voices (below). Recorded in the
+  plan's table and boundary log.
+- Subsystem 1's continuation (not counted): the car sounds' migration
+  2, their groups under XAudio's voice methods now ready. Step:
+  migration (agent running).
 
 ## Done
 
+- XAudio's voices: `xaudio.md`, 92 of 96 in play native in two
+  migrations, 37 Native; both locks the game's, taken as the original
+  does (the user's calls, 2026-10-29); `--native_xaudio`; e784bc0,
+  29a2e7f..fbcd34f, 19a919f..24cc6ea, print ceb220f. Validated
+  (`itc_2356`, `itc_2357`): 92 of 92 harness lines; nine to drive.
 - The car sounds and X3DAudio: `car-sounds.md`, 24 of 62 in play
   native in one migration, 12 adapters removed; `--native_car_sounds`;
   26adc92, 9a0dcc7..3e6c24e. Validated (`itc_2328`, `itc_2329`): 24 of
@@ -65,6 +63,9 @@ file's history. What's left to see in a drive, from every run:
 - After XAudio's migration 2 (race 38 s, 0 errors, xaudio 0
   differing): ours 2744, work left 3720 (wrapped 103, known 539,
   unknown 3078).
+- After its validation (`itc_2356`: race 8 s, the harnesses ~30 s, 0
+  errors, every harness 0 differing but the expected groups): ours
+  2744, work left 3720.
 
 ## Stopped
 

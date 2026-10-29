@@ -2624,6 +2624,7 @@ B7. **The game logic inside**: everything else, subsystem by subsystem,
 | 2026-10-28 | The file layer (the file object `GameFile` over `AsyncFile` and `File::`, the path objects and `Path::Build`, `GamePath::SetGame`, the open by name; with sprintf, `_vsnprintf`, `_vsnprintf_l` and `_output_l` it unblocked, and the archive's loose read) | `file-layer.md` (with rows in `c-runtime.md` and `files-and-saves.md`) | 17 (all 11 in play of `file-layer.md` with the 6 it unblocked; one migration; 7 adapters removed) | `--native_file_layer` (sprintf under `--native_c_runtime`, the loose read under `--native_archive`) |
 | 2026-10-28 | The save system's interface (the app's interface at `[0x826BDC90]`, its wrappers over the save devices' slots and the users; the front end's save layer: the save buffers, `GameData::Save`, `Load` and `Check`, the replays' list, `PlayTime`) | `save-interface.md` (with rows in `files-and-saves.md`, `system-services.md`) | 41 of 41 in play, with 5 shared rows (one migration; 17 adapters removed) | `--native_save_interface` |
 | 2026-10-28 | The car sounds and X3DAudio (the seven per-racer car sound objects at `[0x826C5C3C]`, eleven parts each, played straight through XAudio voices: the wave bank views, `SetBanks`, `TireSound::Amount`, the constructors, `CarSound::SetUp`, `SoundGlobals::Init`, `CarSounds::Destroy`, `CarSound::Update3D`; X3DAudio's math, translated by the XACT precedent: `X3DAudioCalculate` with its vector helpers, curves, pan, matrix, cone and Doppler) | `car-sounds.md` | 24 of 62 in play (one migration; 12 adapters removed; the rest waits on XAudio's voice methods) | `--native_car_sounds` |
+| 2026-10-29 | XAudio's voices (the game's copy of XAudio, translated: the API entry points but the shut-down, the callback's and the commit; the source and submix voices, their outputs, passes, effects and states; the buffers and formats; its API lock the game's critical section and the voice lists' spin lock the game's, taken as the original does, the user's calls) | `xaudio.md` | 92 of 96 in play (two migrations; 37 Native; the rest waits on the engine and mixer) | `--native_xaudio` |
 
     The first run (2026-10-22, branch `b7-loop-test`): every harness at 0 differing, attract races at 20-21 s with no errors,
     and a race the user drove looked right. Ours went from 162 to 335 (work
@@ -3845,3 +3846,24 @@ The boundary unchanged: 449 functions (916 pairs): overridden 69,
 Native 5, Dropped 23, never called 70, live 282. Imports: 186 called,
 62 with a live caller. B7 (`b7_status.py`): ours 2,652, work left
 3,809 (Wrapped 103, with a row 535, no row yet 3,171), from 3,833.
+
+**2026-10-29, XAudio's voices (branch `b7-loop-28-10-26-3`):** the
+twenty-first run's second subsystem mapped XAudio's voices
+(`xaudio.md`, 108 rows, 93 in play: the game's recompiled copy of
+XAudio, translated by the XACT precedent; its API lock the critical
+section at `0x8264D518`, the mixer's own `0x8264D4F8`, the voice lists'
+recursive spin lock `0x82954F10`) and made 92 of 96 in play native in
+two migrations (`--native_xaudio`, `src/xaudio/`), 37 Native. Two
+user's calls (2026-10-29): locks whose depth the code reads become
+host recursive locks with a readable depth, taken by every user; a lock
+taken inline whose users aren't all ours is taken natively as the
+original does until they are. So both locks are still the game's: the
+spin lock is inlined in 57 functions (the engine, mixer and codecs, a
+lead), and 8 of the API lock's 29 users wait on the engine lead.
+Native code calls the kernel imports through the guest call at their
+thunks. The rest (`XAudioShutDown`, the callback's registration, the
+commit) waits on the engine and mixer. The boundary: 449 functions
+(916 pairs): overridden 94, Native 12, Dropped 23, never called 70,
+live 250 (from overridden 69, Native 5, live 282). Imports: 186
+called, 62 with a live caller. B7 (`b7_status.py`): ours 2,744, work
+left 3,720 (Wrapped 103, with a row 539, no row yet 3,078), from 3,809.

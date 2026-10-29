@@ -13,6 +13,17 @@ function goes from this list when a log shows its `native running
 (game):` line (say which log in the commit). A run with nothing left
 here loses its heading.
 
+## Run 2026-10-28 22:22 (`b7-loop-28-10-26-3`)
+
+- XAudio's voices (attract race `itc_2356`, replay `itc_2357`, ok):
+  `sub_82459DB0` XAudioVoice::AddRef, `sub_82459EF0`
+  XAudioVoice::SetOutputVoices, `sub_82459FF8`
+  XAudioSourceVoice::SetFormat (the API's), `sub_8245A0B0`
+  XAudioSourceVoice::Reset, `sub_8245A270` (the codec's +72),
+  `sub_82461140` XAudioVoice::SetFormatWords, `sub_82460778`
+  XAudioVoice::SetFormat, `sub_8245DCF0` XAudioSourceVoice::Reformat,
+  `sub_8245DD60` XAudioSourceVoice::StopAndReset (`xaudio.md`)
+
 ## Run 2026-10-28 18:45 (`b7-loop-28-10-26-2`)
 
 - The archive's migration 2 (attract race `itc_2276`, replay
