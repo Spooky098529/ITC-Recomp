@@ -39,7 +39,11 @@ ITC_FLAG_BOOL(native_xaudio, true, "ITC",
               "spin lock (taken as the original does), XAudioSourceVoice::GetState sub_8245DDC8, "
               "StartLater sub_8245E7D0 and CancelPendingStart sub_8245E428, XAudioVoice::Play "
               "sub_82461798, Activate sub_82460EF0, Deactivate sub_82460D50 and StopOrTail "
-              "sub_824619B0, XAudio::WaitForVoice sub_8245AE60; their "
+              "sub_824619B0, XAudio::WaitForVoice sub_8245AE60; XAudioSourceVoice::Start "
+              "sub_8245EBA0, Stop sub_8245E9F0 and Pass sub_8245DED0, the voices' constructors "
+              "sub_8245E6A8 and sub_8245F298, destructors sub_82460B50, sub_8245E1B8, "
+              "sub_8245E7A0, sub_8245F108 and sub_8245F3A0, XAudioVoice::CreateSource "
+              "sub_8245EAA0 and CreateSubmix sub_8245F3D0; their "
               "calls into the recompiled objects through the translated code) natively "
               "instead of through the translated code (the same reads and writes; XAudio's two "
               "locks are the game's, taken as the original does; checked by --run_harnesses=xaudio)");
@@ -118,6 +122,11 @@ xa::GuestCall Caller(PPCContext& ctx, uint8_t* base) {
     }
     if (return_address != 0) {
       ctx.lr = return_address;
+    }
+    if (function == 0) {
+      // Only the registers, as the original sets them before calling a
+      // function whose plain C++ the caller runs itself.
+      return ctx.r3.u32;
     }
     const uint64_t sp = ctx.r1.u64;
     if (regs.sp != 0) {
@@ -474,27 +483,27 @@ void XAudioSubmixPass(PPCContext& ctx, uint8_t* base) {
 
 // The thread's r13 (the spin lock's owner), its +256 (the mixer's thread
 // check) and +268 (the processor).
-struct Thread {
-  uint32_t r13, mixer, processor;
-};
-Thread ThreadOf(PPCContext& ctx, uint8_t* base) {
-  return {ctx.r13.u32, guest::LoadU32(base, ctx.r13.u32 + 256),
-          guest::LoadU8(base, ctx.r13.u32 + xa::kPcrProcessor)};
+xa::Thread ThreadOf(PPCContext& ctx, uint8_t* base) {
+  xa::Thread thread;
+  thread.r13 = ctx.r13.u32;
+  thread.mixer = guest::LoadU32(base, ctx.r13.u32 + 256);
+  thread.processor = guest::LoadU8(base, ctx.r13.u32 + xa::kPcrProcessor);
+  return thread;
 }
 
 void XAudioSpinTake(PPCContext& ctx, uint8_t* base) {
-  const Thread th = ThreadOf(ctx, base);
+  const xa::Thread th = ThreadOf(ctx, base);
   xa::SpinTake(base, th.r13, Caller(ctx, base));
 }
 
 void XAudioSpinRelease(PPCContext& ctx, uint8_t* base) {
-  const Thread th = ThreadOf(ctx, base);
+  const xa::Thread th = ThreadOf(ctx, base);
   xa::SpinRelease(base, th.r13, Caller(ctx, base));
 }
 
 void XAudioSourceGetState(PPCContext& ctx, uint8_t* base) {
   const uint32_t voice = ctx.r3.u32, out = ctx.r4.u32;
-  const Thread th = ThreadOf(ctx, base);
+  const xa::Thread th = ThreadOf(ctx, base);
   Framed(ctx, base, 144, [&](const xa::GuestCall& call, uint32_t frame) {
     return xa::SourceGetState(base, voice, out, th.r13, frame, call);
   });
@@ -502,14 +511,14 @@ void XAudioSourceGetState(PPCContext& ctx, uint8_t* base) {
 
 void XAudioPlay(PPCContext& ctx, uint8_t* base) {
   const uint32_t voice = ctx.r3.u32;
-  const Thread th = ThreadOf(ctx, base);
+  const xa::Thread th = ThreadOf(ctx, base);
   Framed(ctx, base, 128,
          [&](const xa::GuestCall& call) { return xa::Play(base, voice, th.r13, call); });
 }
 
 void XAudioActivate(PPCContext& ctx, uint8_t* base) {
   const uint32_t voice = ctx.r3.u32;
-  const Thread th = ThreadOf(ctx, base);
+  const xa::Thread th = ThreadOf(ctx, base);
   Framed(ctx, base, 144, [&](const xa::GuestCall& call, uint32_t frame) {
     return xa::Activate(base, voice, th.r13, frame, call);
   });
@@ -517,14 +526,14 @@ void XAudioActivate(PPCContext& ctx, uint8_t* base) {
 
 void XAudioDeactivate(PPCContext& ctx, uint8_t* base) {
   const uint32_t voice = ctx.r3.u32;
-  const Thread th = ThreadOf(ctx, base);
+  const xa::Thread th = ThreadOf(ctx, base);
   Framed(ctx, base, 128,
          [&](const xa::GuestCall& call) { return xa::Deactivate(base, voice, th.r13, call); });
 }
 
 void XAudioStartLater(PPCContext& ctx, uint8_t* base) {
   const uint32_t voice = ctx.r3.u32;
-  const Thread th = ThreadOf(ctx, base);
+  const xa::Thread th = ThreadOf(ctx, base);
   Framed(ctx, base, 144,
          [&](const xa::GuestCall& call) { return xa::StartLater(base, voice, th.r13, call); });
 }
@@ -532,7 +541,7 @@ void XAudioStartLater(PPCContext& ctx, uint8_t* base) {
 void XAudioWaitForVoice(PPCContext& ctx, uint8_t* base) {
   // Leaves r3 the engine, as the original's early returns and loop do.
   const uint32_t engine = ctx.r3.u32, voice = ctx.r4.u32;
-  const Thread th = ThreadOf(ctx, base);
+  const xa::Thread th = ThreadOf(ctx, base);
   Framed(ctx, base, 144, [&](const xa::GuestCall& call) {
     xa::WaitForVoice(base, engine, voice, th.r13, th.mixer, th.processor, call);
     return 0u;
@@ -542,7 +551,7 @@ void XAudioWaitForVoice(PPCContext& ctx, uint8_t* base) {
 
 void XAudioCancelPendingStart(PPCContext& ctx, uint8_t* base) {
   const uint32_t voice = ctx.r3.u32;
-  const Thread th = ThreadOf(ctx, base);
+  const xa::Thread th = ThreadOf(ctx, base);
   Framed(ctx, base, 128, [&](const xa::GuestCall& call) {
     return xa::CancelPendingStart(base, voice, th.r13, th.mixer, th.processor, call);
   });
@@ -550,9 +559,79 @@ void XAudioCancelPendingStart(PPCContext& ctx, uint8_t* base) {
 
 void XAudioStopOrTail(PPCContext& ctx, uint8_t* base) {
   const uint32_t voice = ctx.r3.u32, flags = ctx.r4.u32;
-  const Thread th = ThreadOf(ctx, base);
+  const xa::Thread th = ThreadOf(ctx, base);
   Framed(ctx, base, 128, [&](const xa::GuestCall& call) {
     return xa::StopOrTail(base, voice, flags, th.r13, th.mixer, th.processor, call);
+  });
+}
+
+void XAudioSourceStart(PPCContext& ctx, uint8_t* base) {
+  const uint32_t voice = ctx.r3.u32, flags = ctx.r4.u32;
+  const xa::Thread th = ThreadOf(ctx, base);
+  Framed(ctx, base, 96,
+         [&](const xa::GuestCall& call) { return xa::SourceStart(base, voice, flags, th, call); });
+}
+
+void XAudioSourceStop(PPCContext& ctx, uint8_t* base) {
+  const uint32_t voice = ctx.r3.u32;
+  const uint64_t flags = ctx.r4.u64;
+  const xa::Thread th = ThreadOf(ctx, base);
+  Framed(ctx, base, 128, [&](const xa::GuestCall& call, uint32_t frame) {
+    return xa::SourceStop(base, voice, flags, th, frame, call);
+  });
+}
+
+void XAudioSourcePass(PPCContext& ctx, uint8_t* base) {
+  const uint32_t voice = ctx.r3.u32, inout = ctx.r4.u32;
+  const xa::Thread th = ThreadOf(ctx, base);
+  Framed(ctx, base, 128, [&](const xa::GuestCall& call, uint32_t frame) {
+    return xa::SourcePass(base, voice, inout, th, frame, call);
+  });
+}
+
+void XAudioSourceConstruct(PPCContext& ctx, uint8_t* base) {
+  const uint32_t voice = ctx.r3.u32, allocator = ctx.r4.u32, type = ctx.r5.u32;
+  const xa::Thread th = ThreadOf(ctx, base);
+  Framed(ctx, base, 128, [&](const xa::GuestCall& call) {
+    return xa::SourceConstruct(base, voice, allocator, type, th, call);
+  });
+}
+
+void XAudioSubmixConstruct(PPCContext& ctx, uint8_t* base) {
+  const uint32_t voice = ctx.r3.u32, description = ctx.r4.u32, allocator = ctx.r5.u32;
+  const xa::Thread th = ThreadOf(ctx, base);
+  Framed(ctx, base, 128, [&](const xa::GuestCall& call) {
+    return xa::SubmixConstruct(base, voice, description, allocator, th, call);
+  });
+}
+
+#define ITC_XAUDIO_VOICE_STEP(name, fn, bytes)                                     \
+  void name(PPCContext& ctx, uint8_t* base) {                                      \
+    const uint32_t voice = ctx.r3.u32;                                             \
+    const xa::Thread th = ThreadOf(ctx, base);                                     \
+    Framed(ctx, base, bytes,                                                       \
+           [&](const xa::GuestCall& call) { return xa::fn(base, voice, th, call); }); \
+  }
+ITC_XAUDIO_VOICE_STEP(XAudioOutputsDestroy, OutputsDestroy, 128)
+ITC_XAUDIO_VOICE_STEP(XAudioSourceDestroy, SourceDestroy, 128)
+ITC_XAUDIO_VOICE_STEP(XAudioSourceDeletingDestructor, SourceDeletingDestructor, 96)
+ITC_XAUDIO_VOICE_STEP(XAudioSubmixDestroy, SubmixDestroy, 128)
+ITC_XAUDIO_VOICE_STEP(XAudioSubmixDeletingDestructor, SubmixDeletingDestructor, 96)
+#undef ITC_XAUDIO_VOICE_STEP
+
+void XAudioCreateSource(PPCContext& ctx, uint8_t* base) {
+  const uint32_t description = ctx.r3.u32, allocator = ctx.r4.u32, out = ctx.r5.u32;
+  const xa::Thread th = ThreadOf(ctx, base);
+  Framed(ctx, base, 128, [&](const xa::GuestCall& call, uint32_t frame) {
+    return xa::CreateSource(base, description, allocator, out, NativeHeapActive(), th, frame, call);
+  });
+}
+
+void XAudioCreateSubmix(PPCContext& ctx, uint8_t* base) {
+  const uint32_t description = ctx.r3.u32, allocator = ctx.r4.u32, out = ctx.r5.u32;
+  const xa::Thread th = ThreadOf(ctx, base);
+  Framed(ctx, base, 176, [&](const xa::GuestCall& call, uint32_t frame) {
+    return xa::CreateSubmix(base, description, allocator, out, NativeHeapActive(), th, frame, call);
   });
 }
 
@@ -611,3 +690,15 @@ ITC_XAUDIO_ADAPTER(8245E7D0, XAudioStartLater)
 ITC_XAUDIO_ADAPTER(8245AE60, XAudioWaitForVoice)
 ITC_XAUDIO_ADAPTER(8245E428, XAudioCancelPendingStart)
 ITC_XAUDIO_ADAPTER(824619B0, XAudioStopOrTail)
+ITC_XAUDIO_ADAPTER(8245EBA0, XAudioSourceStart)
+ITC_XAUDIO_ADAPTER(8245E9F0, XAudioSourceStop)
+ITC_XAUDIO_ADAPTER(8245DED0, XAudioSourcePass)
+ITC_XAUDIO_ADAPTER(8245E6A8, XAudioSourceConstruct)
+ITC_XAUDIO_ADAPTER(8245F298, XAudioSubmixConstruct)
+ITC_XAUDIO_ADAPTER(82460B50, XAudioOutputsDestroy)
+ITC_XAUDIO_ADAPTER(8245E1B8, XAudioSourceDestroy)
+ITC_XAUDIO_ADAPTER(8245E7A0, XAudioSourceDeletingDestructor)
+ITC_XAUDIO_ADAPTER(8245F108, XAudioSubmixDestroy)
+ITC_XAUDIO_ADAPTER(8245F3A0, XAudioSubmixDeletingDestructor)
+ITC_XAUDIO_ADAPTER(8245EAA0, XAudioCreateSource)
+ITC_XAUDIO_ADAPTER(8245F3D0, XAudioCreateSubmix)

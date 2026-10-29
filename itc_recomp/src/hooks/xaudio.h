@@ -79,5 +79,17 @@ void XAudioStartLater(PPCContext& ctx, uint8_t* base);          // sub_8245E7D0
 void XAudioWaitForVoice(PPCContext& ctx, uint8_t* base);        // sub_8245AE60
 void XAudioCancelPendingStart(PPCContext& ctx, uint8_t* base);  // sub_8245E428
 void XAudioStopOrTail(PPCContext& ctx, uint8_t* base);          // sub_824619B0
+void XAudioSourceStart(PPCContext& ctx, uint8_t* base);               // sub_8245EBA0
+void XAudioSourceStop(PPCContext& ctx, uint8_t* base);                // sub_8245E9F0
+void XAudioSourcePass(PPCContext& ctx, uint8_t* base);                // sub_8245DED0
+void XAudioSourceConstruct(PPCContext& ctx, uint8_t* base);           // sub_8245E6A8
+void XAudioSubmixConstruct(PPCContext& ctx, uint8_t* base);           // sub_8245F298
+void XAudioOutputsDestroy(PPCContext& ctx, uint8_t* base);            // sub_82460B50
+void XAudioSourceDestroy(PPCContext& ctx, uint8_t* base);             // sub_8245E1B8
+void XAudioSourceDeletingDestructor(PPCContext& ctx, uint8_t* base);  // sub_8245E7A0
+void XAudioSubmixDestroy(PPCContext& ctx, uint8_t* base);             // sub_8245F108
+void XAudioSubmixDeletingDestructor(PPCContext& ctx, uint8_t* base);  // sub_8245F3A0
+void XAudioCreateSource(PPCContext& ctx, uint8_t* base);              // sub_8245EAA0
+void XAudioCreateSubmix(PPCContext& ctx, uint8_t* base);              // sub_8245F3D0
 
 }  // namespace hooks

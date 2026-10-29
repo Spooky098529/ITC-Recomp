@@ -224,6 +224,10 @@ Regs At(uint32_t sp, Regs regs) {
   return regs;
 }
 
+// The registers the original sets before calling a function whose plain
+// C++ runs here instead.
+void SetRegs(const GuestCall& call, Regs regs) { call(0, 0, regs); }
+
 // A frame of `bytes` below `frame` with its back chain, for a plain C++
 // callee working in its own frame as the original.
 uint32_t Below(uint8_t* base, uint32_t frame, uint32_t bytes) {
@@ -606,6 +610,7 @@ uint32_t ConstructOutputs(uint8_t* base, uint32_t voice, uint32_t allocator, uin
 uint32_t OutputsSize(uint8_t* base, uint32_t description, uint32_t out, uint32_t frame,
                      const GuestCall& call) {
   ITC_NATIVE_RUNNING("sub_824607C8 XAudioVoice::OutputsSize");
+  SetRegs(call, Args({description, frame + 84}));
   uint32_t r3 = BaseSize(base, description, frame + 84, Below(base, frame, 176), call);
   if (int32_t(r3) < 0) {
     return r3;
@@ -672,6 +677,7 @@ uint32_t SetOutputVoices(uint8_t* base, uint32_t voice, uint32_t outputs, uint32
     if (guest::LoadU8(base, voice + 68) == 0) {
       return 0;
     }
+    SetRegs(call, Args({voice, 0, guest::LoadU32(base, voice + 72)}));
     const uint32_t r3 = SetOutput(base, voice, 0, guest::LoadU32(base, voice + 72), below, call);
     if (int32_t(r3) < 0) {
       return r3;
@@ -684,6 +690,8 @@ uint32_t SetOutputVoices(uint8_t* base, uint32_t voice, uint32_t outputs, uint32
     if (int32_t(r26) < 0) {
       return r26;
     }
+    SetRegs(call, Args({voice, guest::LoadU32(base, outputs + 4) + 8 * i,
+                        guest::LoadU32(base, voice + 72) + 12 * i}));
     r26 = SetOutput(base, voice, guest::LoadU32(base, outputs + 4) + 8 * i,
                     guest::LoadU32(base, voice + 72) + 12 * i, below, call);
   }
@@ -819,6 +827,7 @@ namespace {
 // `sp`) where that refuses.
 void Copy(uint8_t* base, uint32_t destination, uint32_t source, uint32_t size,
           uint32_t return_address, uint32_t sp, const GuestCall& call) {
+  SetRegs(call, Args({destination, source, size}));
   if (!c_runtime::Memcpy(base, destination, source, size)) {
     call(kMemcpy, return_address, At(sp, Args({destination, source, size})));
   }
@@ -854,6 +863,7 @@ uint32_t SourceSize(uint8_t* base, uint32_t description, uint32_t out, uint32_t 
   ITC_NATIVE_RUNNING("sub_8245E0D8 XAudioSourceVoice::Size");
   const uint32_t factory = guest::LoadU32(base, guest::LoadU32(base, kEngine) + 60);
   SourceDescribe(base, description, frame + 96);
+  SetRegs(call, Args({frame + 96, frame + 80}));
   if (int32_t(OutputsSize(base, frame + 96, frame + 80, Below(base, frame, 144), call)) < 0) {
     return 0;
   }
@@ -876,6 +886,8 @@ uint32_t CreateEffects(uint8_t* base, uint32_t voice, uint32_t chain, uint32_t f
     if (int32_t(r3) < 0) {
       break;
     }
+    SetRegs(call, Args({voice, guest::LoadU32(base, voice + 36) + 8 * i,
+                        guest::LoadU32(base, guest::LoadU32(base, chain + 4) + 4 * i), i}));
     r3 = CreateObject(base, voice, guest::LoadU32(base, voice + 36) + 8 * i,
                       guest::LoadU32(base, guest::LoadU32(base, chain + 4) + 4 * i), i, below,
                       call);
@@ -907,6 +919,7 @@ uint32_t InitBase(uint8_t* base, uint32_t voice, uint32_t description, uint32_t 
     }
     guest::StoreU8(base, local + 5, guest::LoadU8(base, description + 1));
     guest::StoreU32(base, local + 8, kSampleRate);
+    SetRegs(call, Args({local, guest::LoadU32(base, voice + 8), voice + 32}));
     r28 = BufferCreate(base, local, guest::LoadU32(base, voice + 8), voice + 32, call);
     if (int32_t(r28) < 0) {
       return r28;
@@ -926,6 +939,7 @@ uint32_t InitBase(uint8_t* base, uint32_t voice, uint32_t description, uint32_t 
   if (guest::LoadU8(base, voice + 60) == 0) {
     return 0;
   }
+  SetRegs(call, Args({voice, guest::LoadU32(base, description + 8)}));
   return CreateEffects(base, voice, guest::LoadU32(base, description + 8),
                        Below(base, frame, 112), call);
 }
@@ -934,6 +948,7 @@ uint32_t InitOutputs(uint8_t* base, uint32_t voice, uint32_t description, uint32
                      const GuestCall& call) {
   ITC_NATIVE_RUNNING("sub_82460880 XAudioVoice::InitOutputs");
   guest::StoreU8(base, voice + 68, guest::LoadU8(base, description + 24));
+  SetRegs(call, Args({voice, description}));
   uint32_t r3 = InitBase(base, voice, description, Below(base, frame, 144), call);
   if (int32_t(r3) < 0) {
     return r3;
@@ -964,6 +979,7 @@ uint32_t InitOutputs(uint8_t* base, uint32_t voice, uint32_t description, uint32
       if (int32_t(r3) < 0) {
         return r3;
       }
+      SetRegs(call, Args({voice, guest::LoadU32(base, voice + 72) + 12 * i + 4, local, 255}));
       r3 = CreateObject(base, voice, guest::LoadU32(base, voice + 72) + 12 * i + 4, local, 255,
                         below, call);
     }
@@ -981,11 +997,13 @@ uint32_t SourceInit(uint8_t* base, uint32_t voice, uint32_t description, uint32_
   Copy(base, voice + 84, description, 56, 0x8245E370, frame, call);
   guest::StoreU8(base, voice + 144, guest::LoadU8(base, description + 56));
   SourceDescribe(base, description, frame + 80);
+  SetRegs(call, Args({voice, frame + 80}));
   const uint32_t r3 = InitOutputs(base, voice, frame + 80, Below(base, frame, 144), call);
   if (int32_t(r3) < 0) {
     return r3;
   }
   CodecDescription(base, description, frame + 112, 0x8245E3D0, frame, call);
+  SetRegs(call, Args({voice, voice + 76, frame + 112, 255}));
   return CreateObject(base, voice, voice + 76, frame + 112, 255, Below(base, frame, 128), call);
 }
 
@@ -993,9 +1011,11 @@ uint32_t SubmixInit(uint8_t* base, uint32_t voice, uint32_t description, uint32_
                     const GuestCall& call) {
   ITC_NATIVE_RUNNING("sub_8245F230 XAudioSubmixVoice::Init");
   SubmixDescribe(base, description, frame + 80);
+  SetRegs(call, Args({voice, frame + 80}));
   const uint32_t r3 = InitOutputs(base, voice, frame + 80, Below(base, frame, 144), call);
   if (int32_t(r3) >= 0) {
     const uint32_t buffer = guest::LoadU32(base, voice + 32);
+    SetRegs(call, Args({buffer, 0, 3}));
     if (!BufferClearThunk(base, buffer, 0, 3)) {
       call(0x8245FA10, 0x8245F27C, At(frame, Args({buffer, 0, 3})));
     }
@@ -1012,6 +1032,7 @@ uint32_t ProcessEffects(uint8_t* base, uint32_t voice, uint32_t inout, uint32_t 
     if (int32_t(r3) < 0) {
       break;
     }
+    SetRegs(call, Args({voice, guest::LoadU32(base, voice + 36) + 8 * i, inout}));
     r3 = ProcessEffect(base, guest::LoadU32(base, voice + 36) + 8 * i, inout, processor, below,
                        call);
   }
@@ -1021,6 +1042,7 @@ uint32_t ProcessEffects(uint8_t* base, uint32_t voice, uint32_t inout, uint32_t 
 uint32_t MixToOutputs(uint8_t* base, uint32_t voice, uint32_t inout, uint32_t processor,
                       uint32_t frame, const GuestCall& call) {
   ITC_NATIVE_RUNNING("sub_82460CB8 XAudioVoice::MixToOutputs");
+  SetRegs(call, Args({voice, inout}));
   uint32_t r3 = ProcessEffects(base, voice, inout, processor, Below(base, frame, 112), call);
   for (uint32_t i = 0; i < guest::LoadU8(base, voice + 69); i++) {
     if (int32_t(r3) < 0) {
@@ -1044,9 +1066,11 @@ uint32_t SubmixPass(uint8_t* base, uint32_t voice, uint32_t frame, const GuestCa
   }
   const uint32_t iface = guest::LoadU32(base, voice + 32);
   const uint32_t buffer = iface != 0 ? iface - 8 : 0;
+  SetRegs(call, Args({buffer, voice + 52, 3}));
   if (!BufferClear(base, buffer, voice + 52, 3)) {
     call(0x8245F8E8, 0x8245EFE8, At(frame, Args({buffer, voice + 52, 3})));
   }
+  SetRegs(call, Args({1, 1}));
   AddStat(base, 1, 1);
   return r30;
 }
@@ -1254,6 +1278,7 @@ uint32_t CancelPendingStart(uint8_t* base, uint32_t voice, uint32_t thread,
     SpinRelease(base, thread, call);
     return 0x80004004u;
   }
+  SetRegs(call, Args({guest::LoadU32(base, kEngine), voice}));
   WaitForVoice(base, guest::LoadU32(base, kEngine), voice, thread, mixer_thread, processor, call);
   const uint32_t engine = guest::LoadU32(base, kEngine);
   SpinTake(base, thread, call);
@@ -1272,6 +1297,7 @@ uint32_t StopOrTail(uint8_t* base, uint32_t voice, uint32_t flags, uint32_t thre
   vehicle_accessors::DebugSwitchOff();
   SpinTake(base, thread, call);
   if ((flags & 1) != 0) {
+    SetRegs(call, Args({guest::LoadU32(base, kEngine), voice}));
     WaitForVoice(base, guest::LoadU32(base, kEngine), voice, thread, mixer_thread, processor,
                  call);
     if ((guest::LoadU8(base, voice + 61) & 1) != 0) {
@@ -1293,6 +1319,289 @@ uint32_t StopOrTail(uint8_t* base, uint32_t voice, uint32_t flags, uint32_t thre
   }
   vehicle_accessors::DebugSwitchOff();
   return 0;
+}
+
+// --- Starting, stopping, passes, making and destroying voices ---
+
+uint32_t SourceStart(uint8_t* base, uint32_t voice, uint32_t flags, const Thread& thread,
+                     const GuestCall& call) {
+  ITC_NATIVE_RUNNING("sub_8245EBA0 XAudioSourceVoice::Start");
+  if ((flags & 1) != 0) {
+    return StartLater(base, voice, thread.r13, call);
+  }
+  uint32_t r3 = CancelPendingStart(base, voice, thread.r13, thread.mixer, thread.processor, call);
+  if (r3 != 0x80004004u && int32_t(r3) < 0) {
+    return r3;
+  }
+  call(Method(base, voice, 92), 0x8245EC08, Args({voice}));
+  const uint32_t codec = guest::LoadU32(base, voice + 76);
+  r3 = call(Method(base, codec, 48), 0x8245EC1C, Args({codec}));
+  if (int32_t(r3) < 0) {
+    return r3;
+  }
+  return Play(base, voice, thread.r13, call);
+}
+
+uint32_t SourceStop(uint8_t* base, uint32_t voice, uint64_t flags, const Thread& thread,
+                    uint32_t frame, const GuestCall& call) {
+  ITC_NATIVE_RUNNING("sub_8245E9F0 XAudioSourceVoice::Stop");
+  uint32_t r3 = CancelPendingStart(base, voice, thread.r13, thread.mixer, thread.processor, call);
+  if (r3 != 0x80004004u) {
+    return r3;
+  }
+  uint64_t stop = flags;
+  const uint32_t codec = guest::LoadU32(base, voice + 76);
+  if (codec != 0) {
+    r3 = call(Method(base, codec, 52), 0x8245EA38, At(frame, Args({codec, flags})));
+    if (int32_t(r3) < 0) {
+      return r3;
+    }
+    if ((flags & 1) == 0) {
+      const uint32_t again = guest::LoadU32(base, voice + 76);
+      r3 = call(Method(base, again, 44), 0x8245EA68, At(frame, Args({again, frame + 80})));
+      if (int32_t(r3) < 0) {
+        return r3;
+      }
+      if ((guest::LoadU8(base, frame + 80) & 1) == 0) {
+        stop = (flags & 0xFF) | 1;
+      }
+    }
+  }
+  SetRegs(call, Args({voice, stop}));
+  return StopOrTail(base, voice, uint32_t(stop), thread.r13, thread.mixer, thread.processor, call);
+}
+
+uint32_t SourcePass(uint8_t* base, uint32_t voice, uint32_t inout, const Thread& thread,
+                    uint32_t frame, const GuestCall& call) {
+  ITC_NATIVE_RUNNING("sub_8245DED0 XAudioSourceVoice::Pass");
+  const uint32_t category = guest::LoadU8(base, voice + 144);
+  const uint32_t bit = category < 32 ? 1u << category : 0;  // slw: 0 from 32 up
+  if ((bit & guest::LoadU32(base, guest::LoadU32(base, kEngine) + 140)) != 0) {
+    const uint32_t r3 = call(Method(base, voice, 92), 0x8245DF18, At(frame, Args({voice})));
+    if (int32_t(r3) < 0) {
+      return r3;
+    }
+  }
+  SetRegs(call, Args({voice, voice + 76, inout}));
+  uint32_t r3 = ProcessEffect(base, voice + 76, inout, thread.processor, Below(base, frame, 96), call);
+  if (int32_t(r3) < 0) {
+    return r3;
+  }
+  SetRegs(call, Args({voice, inout}));
+  r3 = MixToOutputs(base, voice, inout, thread.processor, Below(base, frame, 128), call);
+  if (int32_t(r3) < 0) {
+    return r3;
+  }
+  const uint32_t codec = guest::LoadU32(base, voice + 76);
+  const uint32_t state = call(Method(base, codec, 44), 0x8245DF68, At(frame, Args({codec, frame + 80})));
+  if (int32_t(state) < 0) {
+    return state;
+  }
+  SetRegs(call, Args({2, 1}));
+  AddStat(base, 2, 1);
+  if ((guest::LoadU8(base, frame + 80) & 1) != 0 || (guest::LoadU8(base, voice + 61) & 4) != 0) {
+    return state;
+  }
+  SetRegs(call, Args({voice, 0}));
+  return StopOrTail(base, voice, 0, thread.r13, thread.mixer, thread.processor, call);
+}
+
+uint32_t SourceConstruct(uint8_t* base, uint32_t voice, uint32_t allocator, uint32_t type,
+                         const Thread& thread, const GuestCall& call) {
+  ITC_NATIVE_RUNNING("sub_8245E6A8 XAudioSourceVoice::XAudioSourceVoice");
+  ConstructOutputs(base, voice, allocator, type, call);
+  guest::StoreU32(base, voice, kSourceVtable);
+  CopyFloat(base, voice + 140, kOne);
+  const uint32_t list = guest::LoadU32(base, kEngine) + 80;
+  SpinTake(base, thread.r13, call);
+  LinkAtEnd(base, list, voice + guest::LoadU32(base, list + 8));
+  SpinRelease(base, thread.r13, call);
+  return voice;
+}
+
+uint32_t SubmixConstruct(uint8_t* base, uint32_t voice, uint32_t description,
+                         uint32_t allocator, const Thread& thread, const GuestCall& call) {
+  ITC_NATIVE_RUNNING("sub_8245F298 XAudioSubmixVoice::XAudioSubmixVoice");
+  SetRegs(call, Args({voice, allocator, 1}));
+  ConstructOutputs(base, voice, allocator, 1, call);
+  guest::StoreU32(base, voice, kSubmixVtable);
+  const uint8_t stage = guest::LoadU8(base, description + 10);
+  guest::StoreU8(base, voice + 76, stage);
+  const uint32_t list = 44 * stage + guest::LoadU32(base, guest::LoadU32(base, kEngine) + 124);
+  SpinTake(base, thread.r13, call);
+  LinkAtEnd(base, list, voice + guest::LoadU32(base, list + 8));
+  SpinRelease(base, thread.r13, call);
+  return voice;
+}
+
+uint32_t OutputsDestroy(uint8_t* base, uint32_t voice, const Thread& thread,
+                        const GuestCall& call) {
+  ITC_NATIVE_RUNNING("sub_82460B50 XAudioVoice::~XAudioVoiceOutputs");
+  guest::StoreU32(base, voice, kOutputsVtable);
+  SetRegs(call, Args({voice, 1}));
+  StopOrTail(base, voice, 1, thread.r13, thread.mixer, thread.processor, call);
+  SetRegs(call, Args({voice}));
+  ReleaseOutputs(base, voice, call);
+  for (uint32_t i = 0; i < guest::LoadU8(base, voice + 68); i++) {
+    const uint32_t matrix = guest::LoadU32(base, guest::LoadU32(base, voice + 72) + 12 * i + 4);
+    if (matrix == 0) {
+      continue;
+    }
+    call(Method(base, matrix, 4), 0x82460BBC, Args({matrix}));
+    guest::StoreU32(base, guest::LoadU32(base, voice + 72) + 12 * i + 4, 0);
+  }
+  SetRegs(call, Args({voice}));
+  return Destroy(base, voice, call);
+}
+
+uint32_t SourceDestroy(uint8_t* base, uint32_t voice, const Thread& thread,
+                       const GuestCall& call) {
+  ITC_NATIVE_RUNNING("sub_8245E1B8 XAudioSourceVoice::~XAudioSourceVoice");
+  guest::StoreU32(base, voice, kSourceVtable);
+  const uint32_t r3 = call(Method(base, voice, 60), 0x8245E1E4, Args({voice, 1}));
+  if (int32_t(r3) >= 0) {
+    const uint32_t codec = guest::LoadU32(base, voice + 76);
+    if (codec != 0) {
+      call(Method(base, codec, 32), 0x8245E208, Args({codec}));
+    }
+  }
+  const uint32_t engine = guest::LoadU32(base, kEngine);
+  SpinTake(base, thread.r13, call);
+  Unlink(base, voice + guest::LoadU32(base, engine + 88));
+  SpinRelease(base, thread.r13, call);
+  const uint32_t codec = guest::LoadU32(base, voice + 76);
+  if (codec != 0) {
+    call(Method(base, codec, 4), 0x8245E2F0, Args({codec}));
+    guest::StoreU32(base, voice + 76, 0);
+  }
+  SetRegs(call, Args({voice}));
+  return OutputsDestroy(base, voice, thread, call);
+}
+
+uint32_t SourceDeletingDestructor(uint8_t* base, uint32_t voice, const Thread& thread,
+                                  const GuestCall& call) {
+  ITC_NATIVE_RUNNING("sub_8245E7A0 XAudioSourceVoice::DeletingDestructor");
+  SourceDestroy(base, voice, thread, call);
+  return voice;
+}
+
+uint32_t SubmixDeletingDestructor(uint8_t* base, uint32_t voice, const Thread& thread,
+                                  const GuestCall& call) {
+  ITC_NATIVE_RUNNING("sub_8245F3A0 XAudioSubmixVoice::DeletingDestructor");
+  SubmixDestroy(base, voice, thread, call);
+  return voice;
+}
+
+uint32_t SubmixDestroy(uint8_t* base, uint32_t voice, const Thread& thread,
+                       const GuestCall& call) {
+  ITC_NATIVE_RUNNING("sub_8245F108 XAudioSubmixVoice::~XAudioSubmixVoice");
+  guest::StoreU32(base, voice, kSubmixVtable);
+  SetRegs(call, Args({voice, 1}));
+  StopOrTail(base, voice, 1, thread.r13, thread.mixer, thread.processor, call);
+  const uint32_t list = 44 * guest::LoadU8(base, voice + 76) +
+                        guest::LoadU32(base, guest::LoadU32(base, kEngine) + 124);
+  SpinTake(base, thread.r13, call);
+  Unlink(base, voice + guest::LoadU32(base, list + 8));
+  SpinRelease(base, thread.r13, call);
+  SetRegs(call, Args({voice}));
+  return OutputsDestroy(base, voice, thread, call);
+}
+
+namespace {
+
+// The allocator for a new voice of `size` bytes at [inout] (GetAllocator's
+// plain C++, or its original through the translated code where that
+// can't run).
+uint32_t VoiceAllocator(uint8_t* base, uint32_t size, uint32_t inout, bool native_heap,
+                        uint32_t return_address, uint32_t frame, const GuestCall& call) {
+  SetRegs(call, Args({kVoiceAttributes, size, inout}));
+  if (const auto r3 = GetAllocator(base, kVoiceAttributes, size, inout, Below(base, frame, 128),
+                                   native_heap, call)) {
+    return *r3;
+  }
+  return call(kGetAllocator, return_address, At(frame, Args({kVoiceAttributes, size, inout})));
+}
+
+}  // namespace
+
+uint32_t CreateSource(uint8_t* base, uint32_t description, uint32_t allocator, uint32_t out,
+                      bool native_heap, const Thread& thread, uint32_t frame,
+                      const GuestCall& call) {
+  ITC_NATIVE_RUNNING("sub_8245EAA0 XAudioVoice::CreateSource");
+  const uint32_t slot = frame + 156;  // the caller's parameter word
+  guest::StoreU32(base, slot, allocator);
+  SetRegs(call, Args({description, frame + 80}));
+  uint32_t r31 = SourceSize(base, description, frame + 80, Below(base, frame, 240), call);
+  if (int32_t(r31) >= 0) {
+    r31 = VoiceAllocator(base, guest::LoadU32(base, frame + 80) + 148, slot, native_heap,
+                         0x8245EAF4, frame, call);
+  }
+  if (int32_t(r31) >= 0) {
+    const uint32_t owner = guest::LoadU32(base, slot);
+    const uint32_t memory = call(Method(base, owner, 20), 0x8245EB18, At(frame, Args({owner, 148})));
+    uint32_t voice = 0;
+    if (memory != 0) {
+      SetRegs(call, Args({memory, guest::LoadU32(base, slot), 0}));
+      voice = SourceConstruct(base, memory, guest::LoadU32(base, slot), 0, thread, call);
+    }
+    if (voice == 0) {
+      r31 = 0x8007000Eu;  // E_OUTOFMEMORY
+    } else {
+      SetRegs(call, Args({voice, description}));
+      r31 = SourceInit(base, voice, description, Below(base, frame, 224), call);
+      if (int32_t(r31) >= 0) {
+        guest::StoreU32(base, out, voice);
+      } else {
+        call(Method(base, voice, 12), 0x8245EB78, At(frame, Args({voice})));
+      }
+    }
+  }
+  const uint32_t owner = guest::LoadU32(base, slot);
+  if (owner != 0) {
+    call(Method(base, owner, 4), 0x8245EB94, At(frame, Args({owner})));
+  }
+  return r31;
+}
+
+uint32_t CreateSubmix(uint8_t* base, uint32_t description, uint32_t allocator, uint32_t out,
+                      bool native_heap, const Thread& thread, uint32_t frame,
+                      const GuestCall& call) {
+  ITC_NATIVE_RUNNING("sub_8245F3D0 XAudioVoice::CreateSubmix");
+  const uint32_t slot = frame + 204;  // the caller's parameter word
+  guest::StoreU32(base, slot, allocator);
+  SubmixDescribe(base, description, frame + 96);
+  SetRegs(call, Args({frame + 96, frame + 80}));
+  uint32_t r30 = OutputsSize(base, frame + 96, frame + 80, Below(base, frame, 144), call);
+  if (int32_t(r30) >= 0) {
+    guest::StoreU32(base, frame + 80, guest::LoadU32(base, frame + 80) + 80);
+    r30 = VoiceAllocator(base, guest::LoadU32(base, frame + 80), slot, native_heap, 0x8245F430,
+                         frame, call);
+  }
+  if (int32_t(r30) >= 0) {
+    const uint32_t owner = guest::LoadU32(base, slot);
+    const uint32_t memory = call(Method(base, owner, 20), 0x8245F454, At(frame, Args({owner, 80})));
+    uint32_t voice = 0;
+    if (memory != 0) {
+      SetRegs(call, Args({memory, description, guest::LoadU32(base, slot)}));
+      voice = SubmixConstruct(base, memory, description, guest::LoadU32(base, slot), thread, call);
+    }
+    if (voice == 0) {
+      r30 = 0x8007000Eu;  // E_OUTOFMEMORY
+    } else {
+      SetRegs(call, Args({voice, description}));
+      r30 = SubmixInit(base, voice, description, Below(base, frame, 144), call);
+      if (int32_t(r30) >= 0) {
+        guest::StoreU32(base, out, voice);
+      } else {
+        call(Method(base, voice, 12), 0x8245F4B4, At(frame, Args({voice})));
+      }
+    }
+  }
+  const uint32_t owner = guest::LoadU32(base, slot);
+  if (owner != 0) {
+    call(Method(base, owner, 4), 0x8245F4D0, At(frame, Args({owner})));
+  }
+  return r30;
 }
 
 }  // namespace xaudio

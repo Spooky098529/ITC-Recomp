@@ -113,6 +113,11 @@ using GuestCall = std::function<uint32_t(uint32_t function, uint32_t return_addr
 // puts it back.
 uint32_t& StackFloor();
 
+// A call to function 0 only sets the registers given (and the stack
+// pointer is ignored): a plain C++ caller sets them as the original does
+// before calling a function whose plain C++ it runs itself, so the
+// registers that function's calls don't set are the original's.
+
 // The method at `slot` of the vtable of the object at `object`.
 uint32_t Method(uint8_t* base, uint32_t object, uint32_t slot);
 
@@ -511,5 +516,111 @@ uint32_t CancelPendingStart(uint8_t* base, uint32_t voice, uint32_t thread,
 // original calls sub_825C8388. Returns 0.
 uint32_t StopOrTail(uint8_t* base, uint32_t voice, uint32_t flags, uint32_t thread,
                     uint32_t mixer_thread, uint32_t processor, const GuestCall& call);
+
+// --- Starting, stopping, passes, making and destroying voices ---
+
+constexpr uint32_t kSourceVtable = 0x8204A720;
+constexpr uint32_t kSubmixVtable = 0x8204A870;
+constexpr uint32_t kGetAllocator = 0x82460688;
+constexpr uint32_t kVoiceAttributes = 0x61820006;
+
+// The thread a voice method runs on: r13 (the spin lock's owner), its +256
+// (WaitForVoice's mixer check) and +268 (the processor).
+struct Thread {
+  uint32_t r13 = 0;
+  uint32_t mixer = 0;
+  uint32_t processor = 0;
+};
+
+// XAudioSourceVoice::Start (sub_8245EBA0): with `flags` bit 0, StartLater;
+// else the pending start cancelled (CancelPendingStart; any failure but
+// 0x80004004 returned), slot +92 (the volume), the codec's (+76) slot +48
+// (start) and when it succeeds Play. Returns the last r3.
+uint32_t SourceStart(uint8_t* base, uint32_t voice, uint32_t flags, const Thread& thread,
+                     const GuestCall& call);
+
+// XAudioSourceVoice::Stop (sub_8245E9F0): when no start was pending
+// (CancelPendingStart's 0x80004004), the codec's (+76) slot +52 with
+// `flags`; unless it fails, StopOrTail with `flags`, bit 0 added when
+// `flags` hasn't it and the codec's state (slot +44, at the frame's +80)
+// hasn't bit 0 (at once when the codec's done). Else CancelPendingStart's
+// r3. `frame` is this function's (128 bytes).
+uint32_t SourceStop(uint8_t* base, uint32_t voice, uint64_t flags, const Thread& thread,
+                    uint32_t frame, const GuestCall& call);
+
+// XAudioSourceVoice::Pass (sub_8245DED0): the volume applied again (slot
+// +92) when the voice's category (+144) is in the engine's changed mask
+// (+140); the codec as an effect (ProcessEffect on +76) over [inout],
+// MixToOutputs, the codec's state (slot +44, at the frame's +80), the
+// counter 2 up (AddStat); when the codec isn't playing (bit 0) and the
+// voice isn't stopping (+61 bit 2), StopOrTail with 0. `frame` is this
+// function's (128 bytes). Returns the first failure, StopOrTail's r3 or
+// the state's.
+uint32_t SourcePass(uint8_t* base, uint32_t voice, uint32_t inout, const Thread& thread,
+                    uint32_t frame, const GuestCall& call);
+
+// XAudioSourceVoice::XAudioSourceVoice (sub_8245E6A8): ConstructOutputs (the
+// type `type`), the source vtable, +140 = 1.0 (0x82000A30), the voice added
+// at the end of the engine's source list (+80, its node at the list's +8
+// offset) under the spin lock. Returns the voice.
+uint32_t SourceConstruct(uint8_t* base, uint32_t voice, uint32_t allocator, uint32_t type,
+                         const Thread& thread, const GuestCall& call);
+
+// XAudioSubmixVoice::XAudioSubmixVoice (sub_8245F298): ConstructOutputs (type
+// 1), the submix vtable, +76 the stage (the description's +10), the voice
+// added at the end of its stage's list (the engine's [+124] + 44 x the
+// stage) under the spin lock. Returns the voice.
+uint32_t SubmixConstruct(uint8_t* base, uint32_t voice, uint32_t description,
+                         uint32_t allocator, const Thread& thread, const GuestCall& call);
+
+// XAudioVoice::~XAudioVoiceOutputs (sub_82460B50): its vtable, StopOrTail
+// at once, ReleaseOutputs, each output's matrix object (+72 + 12i + 4, +68
+// of them) released (slot +4) and cleared, Destroy. Returns Destroy's r3.
+uint32_t OutputsDestroy(uint8_t* base, uint32_t voice, const Thread& thread,
+                        const GuestCall& call);
+
+// XAudioSourceVoice::~XAudioSourceVoice (sub_8245E1B8): its vtable, slot +60
+// (stop at once); when that succeeds, the codec's (+76) slot +32 (reset);
+// the voice out of the engine's source list (its node at the engine's +88
+// offset) under the spin lock; the codec released (slot +4) and cleared;
+// OutputsDestroy. Returns its r3.
+uint32_t SourceDestroy(uint8_t* base, uint32_t voice, const Thread& thread,
+                       const GuestCall& call);
+
+// XAudioSourceVoice::DeletingDestructor (sub_8245E7A0): SourceDestroy;
+// returns the voice (the memory is the allocator's).
+uint32_t SourceDeletingDestructor(uint8_t* base, uint32_t voice, const Thread& thread,
+                                  const GuestCall& call);
+
+// XAudioSubmixVoice::~XAudioSubmixVoice (sub_8245F108): its vtable,
+// StopOrTail at once, the voice out of its stage's list under the spin
+// lock, OutputsDestroy. Returns its r3.
+uint32_t SubmixDestroy(uint8_t* base, uint32_t voice, const Thread& thread,
+                       const GuestCall& call);
+
+// XAudioSubmixVoice::DeletingDestructor (sub_8245F3A0): SubmixDestroy;
+// returns the voice.
+uint32_t SubmixDeletingDestructor(uint8_t* base, uint32_t voice, const Thread& thread,
+                                  const GuestCall& call);
+
+// XAudioVoice::CreateSource (sub_8245EAA0): the size (SourceSize, + 148),
+// the allocator (GetAllocator with `allocator` at the frame's +156, the
+// caller's parameter word, as the original keeps it; its original where
+// the plain C++ can't), 148 bytes from it (slot +20), the voice
+// constructed and initialized (SourceInit; on a failure freed through its
+// slot +12), the voice to [out]; the allocator released (slot +4). `frame`
+// is this function's (128 bytes); `native_heap` whether GetAllocator's
+// default allocator may run. Returns 0 or the failure.
+uint32_t CreateSource(uint8_t* base, uint32_t description, uint32_t allocator, uint32_t out,
+                      bool native_heap, const Thread& thread, uint32_t frame,
+                      const GuestCall& call);
+
+// XAudioVoice::CreateSubmix (sub_8245F3D0): as CreateSource for a submix
+// voice: SubmixDescribe (the frame's +96), OutputsSize (+80) + 80 bytes,
+// the allocator at the frame's +204, SubmixConstruct and SubmixInit.
+// `frame` is this function's (176 bytes).
+uint32_t CreateSubmix(uint8_t* base, uint32_t description, uint32_t allocator, uint32_t out,
+                      bool native_heap, const Thread& thread, uint32_t frame,
+                      const GuestCall& call);
 
 }  // namespace xaudio
