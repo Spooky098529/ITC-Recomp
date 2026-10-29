@@ -12,6 +12,7 @@
 #pragma once
 
 #include <cstdint>
+#include <functional>
 #include <optional>
 
 namespace xaudio {
@@ -80,5 +81,81 @@ void SetRootVtable(uint8_t* base, uint32_t object);
 // XAudio::AddStat (sub_8245F640): `amount` added atomically to the counter
 // `index` (0x82954F24 + 4 x the index); returns 0.
 uint32_t AddStat(uint8_t* base, uint32_t index, uint32_t amount);
+
+// --- Calls into the recompiled objects ---
+//
+// The voices' methods reach the objects the engine's factory makes (the
+// codecs, matrix objects and effects), the allocators and the voices' own
+// vtables, which stay recompiled. A call sets only the registers given
+// (r3 first, `count` of them, and f1 when asked); the others keep what the
+// previous call left, as in the original. `return_address` is the
+// original's. Returns the callee's r3.
+struct Regs {
+  uint64_t r[5] = {};  // r3 to r7
+  uint8_t count = 0;
+  bool f1_set = false;
+  double f1 = 0.0;
+};
+using GuestCall = std::function<uint32_t(uint32_t function, uint32_t return_address, const Regs&)>;
+
+// The method at `slot` of the vtable of the object at `object`.
+uint32_t Method(uint8_t* base, uint32_t object, uint32_t slot);
+
+// The interface thunks: the object 8 bytes before the interface at `iface`
+// (0 stays 0), whose method they tail-call with the other registers as they
+// are. Each returns the object; its method to `function`.
+// XAudioFactory::Size (sub_8245D610): slot +20.
+uint32_t FactorySizeThunk(uint8_t* base, uint32_t iface, uint32_t* function);
+// XAudioFactory::Create (sub_8245D630): slot +24.
+uint32_t FactoryCreateThunk(uint8_t* base, uint32_t iface, uint32_t* function);
+// XAudioBuffer::AddRefThunk (sub_8245F6B0): slot +4.
+uint32_t BufferAddRefThunk(uint8_t* base, uint32_t iface, uint32_t* function);
+// XAudioBuffer::ReleaseThunk (sub_8245F6D0): slot +8.
+uint32_t BufferReleaseThunk(uint8_t* base, uint32_t iface, uint32_t* function);
+
+// XAudioVoice::Release (sub_8245F878): +4 down by one; at 0 the object's
+// slot +12 (free) and 0, else the count.
+uint32_t Release(uint8_t* base, uint32_t object, const GuestCall& call);
+
+// XAudioObject::Free (sub_8245AAD8): the allocator (+8) AddRef'd (its slot
+// +0), the object's slot +0 with 1 (its deleting destructor), the allocator
+// released (slot +4). Returns the last call's r3.
+uint32_t ObjectFree(uint8_t* base, uint32_t object, const GuestCall& call);
+
+// XAudioSourceVoice::ApplyVolume (sub_8245DFC0): the category's volume
+// (the engine's +132 + 4 x +144 for categories 0 and 1, else 1.0 from
+// 0x82000A30) times +140, to the codec's (+76) slot +88 in f1 (a tail
+// call). Returns its r3.
+uint32_t ApplyVolume(uint8_t* base, uint32_t voice, const GuestCall& call);
+
+// XAudioSourceVoice::StopAndReset (sub_8245DD60): slot +60 with 1; when it
+// succeeds and there's a codec (+76), the codec's slot +32. Returns the
+// last call's r3.
+uint32_t StopAndReset(uint8_t* base, uint32_t voice, const GuestCall& call);
+
+// XAudioVoice::SetEffectParameters (sub_82461418): E_INVALIDARG past the
+// +60 effects; else the effect's (+36 + 8 x the index) slot +16 with
+// `r5`-`r7` as r4-r6. Returns its r3.
+uint32_t SetEffectParameters(uint8_t* base, uint32_t voice, uint32_t index, uint64_t r5,
+                             uint64_t r6, uint64_t r7, const GuestCall& call);
+
+// XAudioVoice::ReleaseOutputs (sub_82460A58): each output's target (+72 +
+// 12i, +69 of them, the count read again each time) released (slot +8);
+// +69 = 0. Returns the last call's r3, or `voice` when there were none (the
+// original's r3 then).
+uint32_t ReleaseOutputs(uint8_t* base, uint32_t voice, const GuestCall& call);
+
+// XAudioVoice::SetOutputMatrices (sub_82460AB8): for each of the matrices'
+// entries (count byte +0, +4 the 8-byte entries) until a call fails, the
+// output's matrix object (+72 + 12 x the index byte, +4) gets its slot +56
+// with the matrix and whether the voice isn't playing. Returns the last
+// call's r3 (0 with no entries).
+uint32_t SetOutputMatrices(uint8_t* base, uint32_t voice, uint32_t matrices,
+                           const GuestCall& call);
+
+// XAudioVoice::SetFormat (sub_82460778): SetFormatWords, then slot +36
+// (set output voices) with `outputs`. Returns its r3.
+uint32_t SetFormat(uint8_t* base, uint32_t voice, uint32_t format, uint32_t outputs,
+                   const GuestCall& call);
 
 }  // namespace xaudio

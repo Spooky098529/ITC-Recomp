@@ -241,6 +241,125 @@ void Accessors(Context& h, uint32_t block) {
   }
 }
 
+// --- Calls into the recompiled objects ---
+//
+// Objects every 0x200 bytes (14 of them), each with the vtable at +0x1C00,
+// whose slots are recompiled leaves that leave a trace: AddRef (+4 up, the
+// count in r3), sub_820CE9F8 (r4 and r5 to +444 and +448, r3 left) and
+// RigidBody::SetFloat112 (f1 to +112). The voice is object 0: its
+// allocator (+8) and codec (+76) other objects or 0, its effects (+36) at
+// +0x1E00 (8 bytes each), its outputs (+72) at +0x1E40 (12 bytes each: the
+// target, the matrix object), the matrices' list at +0x1F00 (entries at
+// +0x1F10).
+constexpr uint32_t kObjectBytes = 0x200;
+constexpr uint32_t kObjects = 14;
+constexpr uint32_t kVtable = 0x1C00;
+constexpr uint32_t kEffects = 0x1E00;
+constexpr uint32_t kOutputs = 0x1E40;
+constexpr uint32_t kMatrices = 0x1F00;
+constexpr uint32_t kRecorders[] = {0x8245F860, 0x820CE9F8, 0x820B6950};
+
+uint32_t Object(uint32_t block, uint32_t k) { return block + kObjectBytes * k; }
+uint32_t AnyObject(Random& random, uint32_t block) {
+  return Object(block, 1 + random.Below(kObjects - 1));
+}
+
+void World(uint8_t* base, uint32_t block, Random& random) {
+  for (uint32_t slot = 0; slot < 0x100; slot += 4) {
+    Store(base, block + kVtable + slot, kRecorders[random.Below(3)]);
+  }
+  for (uint32_t k = 0; k < kObjects; k++) {
+    const uint32_t object = Object(block, k);
+    Store(base, object, block + kVtable);
+    // Small reference counts, so releases reach 0 now and then.
+    Store(base, object + 4, random.Below(3));
+  }
+  const uint32_t voice = Object(block, 0);
+  Store(base, voice + 8, random.Below(4) == 0 ? 0 : AnyObject(random, block));
+  Store(base, voice + 76, random.Below(4) == 0 ? 0 : AnyObject(random, block));
+  Store(base, voice + 36, block + kEffects);
+  guest::StoreU8(base, voice + 60, uint8_t(random.Below(5)));
+  for (uint32_t i = 0; i < 8; i++) {
+    Store(base, block + kEffects + 8 * i, AnyObject(random, block));
+  }
+  Store(base, voice + 72, block + kOutputs);
+  guest::StoreU8(base, voice + 69, uint8_t(random.Below(5)));
+  for (uint32_t i = 0; i < 4; i++) {
+    Store(base, block + kOutputs + 12 * i, AnyObject(random, block));
+    Store(base, block + kOutputs + 12 * i + 4, AnyObject(random, block));
+  }
+  guest::StoreU8(base, block + kMatrices, uint8_t(random.Below(5)));
+  Store(base, block + kMatrices + 4, block + kMatrices + 0x10);
+  for (uint32_t i = 0; i < 4; i++) {
+    guest::StoreU8(base, block + kMatrices + 0x10 + 8 * i, uint8_t(random.Below(4)));
+  }
+  // The volume: a float in [-2, 2); the category 0 to 3.
+  guest::StoreFloat(base, voice + 140, float(int32_t(random.Below(4001)) - 2000) / 1000.0f);
+  guest::StoreU8(base, voice + 144, uint8_t(random.Below(4)));
+}
+
+void Calls(Context& h, uint32_t block) {
+  struct Function {
+    const char* name;
+    GuestFunction recompiled;
+    GuestFunction native;
+    bool interface;  // r3 an object's interface (+8), else the voice
+    bool needs_codec;
+  };
+  const Function functions[] = {
+      {"XAudioFactory::Size (sub_8245D610)", __imp__sub_8245D610, hooks::XAudioFactorySize, true,
+       false},
+      {"XAudioFactory::Create (sub_8245D630)", __imp__sub_8245D630, hooks::XAudioFactoryCreate,
+       true, false},
+      {"XAudioBuffer::AddRefThunk (sub_8245F6B0)", __imp__sub_8245F6B0,
+       hooks::XAudioBufferAddRefThunk, true, false},
+      {"XAudioBuffer::ReleaseThunk (sub_8245F6D0)", __imp__sub_8245F6D0,
+       hooks::XAudioBufferReleaseThunk, true, false},
+      {"XAudioVoice::Release (sub_8245F878)", __imp__sub_8245F878, hooks::XAudioRelease, false,
+       false},
+      {"XAudioObject::Free (sub_8245AAD8)", __imp__sub_8245AAD8, hooks::XAudioObjectFree, false,
+       false},
+      {"XAudioSourceVoice::ApplyVolume (sub_8245DFC0)", __imp__sub_8245DFC0,
+       hooks::XAudioApplyVolume, false, true},
+      {"XAudioSourceVoice::StopAndReset (sub_8245DD60)", __imp__sub_8245DD60,
+       hooks::XAudioStopAndReset, false, false},
+      {"XAudioVoice::SetEffectParameters (sub_82461418)", __imp__sub_82461418,
+       hooks::XAudioSetEffectParameters, false, false},
+      {"XAudioVoice::ReleaseOutputs (sub_82460A58)", __imp__sub_82460A58,
+       hooks::XAudioReleaseOutputs, false, false},
+      {"XAudioVoice::SetOutputMatrices (sub_82460AB8)", __imp__sub_82460AB8,
+       hooks::XAudioSetOutputMatrices, false, false},
+      {"XAudioVoice::SetFormat (sub_82460778)", __imp__sub_82460778, hooks::XAudioSetFormat,
+       false, false},
+  };
+  for (const Function& f : functions) {
+    Results results(f.name);
+    for (int i = 0; i < 48; i++) {
+      Case(h, results, block, f.recompiled, f.native,
+           [&](Random& random, PPCContext& t) {
+             World(h.base, block, random);
+             if (f.needs_codec) {
+               Store(h.base, block + 76, AnyObject(random, block));
+             }
+             t.r3.u64 = f.interface ? Object(block, random.Below(kObjects)) + 8 : block;
+             // Index, matrices, format and parameters: SetEffectParameters
+             // takes an index (sometimes past the chain), the others a
+             // pointer into the block; r5-r7 random words.
+             t.r4.u64 = f.recompiled == __imp__sub_82461418 ? random.Below(6)
+                        : f.recompiled == __imp__sub_82460AB8
+                            ? block + kMatrices
+                            : block + kMatrices + 0x80;
+             t.r5.u64 = random.Next();
+             t.r6.u64 = random.Next();
+             t.r7.u64 = random.Next();
+             t.f1.u64 = random.Next();
+           },
+           fmt::format("case {}", i));
+    }
+    results.Report();
+  }
+}
+
 }  // namespace
 
 void XAudio(Context& h) {
@@ -248,6 +367,7 @@ void XAudio(Context& h) {
   Formats(h, block.address);
   Buffers(h, block.address);
   Accessors(h, block.address);
+  Calls(h, block.address);
 }
 
 }  // namespace harness

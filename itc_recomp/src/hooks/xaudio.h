@@ -23,4 +23,20 @@ void XAudioAddRef(PPCContext& ctx, uint8_t* base);              // sub_8245F860
 void XAudioSetRootVtable(PPCContext& ctx, uint8_t* base);       // sub_8245FB00
 void XAudioAddStat(PPCContext& ctx, uint8_t* base);             // sub_8245F640
 
+// Calls into the recompiled objects go through `ctx` (the registers not
+// given keep what the previous call left), inside a frame of the original's
+// size.
+void XAudioFactorySize(PPCContext& ctx, uint8_t* base);         // sub_8245D610
+void XAudioFactoryCreate(PPCContext& ctx, uint8_t* base);       // sub_8245D630
+void XAudioBufferAddRefThunk(PPCContext& ctx, uint8_t* base);   // sub_8245F6B0
+void XAudioBufferReleaseThunk(PPCContext& ctx, uint8_t* base);  // sub_8245F6D0
+void XAudioRelease(PPCContext& ctx, uint8_t* base);             // sub_8245F878
+void XAudioObjectFree(PPCContext& ctx, uint8_t* base);          // sub_8245AAD8
+void XAudioApplyVolume(PPCContext& ctx, uint8_t* base);         // sub_8245DFC0
+void XAudioStopAndReset(PPCContext& ctx, uint8_t* base);        // sub_8245DD60
+void XAudioSetEffectParameters(PPCContext& ctx, uint8_t* base);  // sub_82461418
+void XAudioReleaseOutputs(PPCContext& ctx, uint8_t* base);      // sub_82460A58
+void XAudioSetOutputMatrices(PPCContext& ctx, uint8_t* base);   // sub_82460AB8
+void XAudioSetFormat(PPCContext& ctx, uint8_t* base);           // sub_82460778
+
 }  // namespace hooks
