@@ -579,9 +579,9 @@ ITC_CAR_SOUNDS_ADAPTER(8210F7C8, CarSoundsStopAll)
 // No adapter (removed 2026-10-29: only CarSounds::Release's plain C++ calls it in play) for CarSound::Release sub_8210E170.
 ITC_CAR_SOUNDS_ADAPTER(8210F750, CarSoundsReleaseAll)
 ITC_CAR_SOUNDS_ADAPTER(8210FE00, CarSoundsInit)
-ITC_CAR_SOUNDS_ADAPTER(8210E778, CarSoundsHitImpact)
-ITC_CAR_SOUNDS_ADAPTER(8210E938, CarSoundsHitScrape)
-ITC_CAR_SOUNDS_ADAPTER(8210EB90, CarSoundsHitWave9)
+// No adapter (removed 2026-10-29: only HitSounds::Update's plain C++ calls it in play) for sub_8210E778 (the impact).
+// No adapter (removed 2026-10-29: only HitSounds::Update's plain C++ calls it in play) for sub_8210E938 (the scrape).
+// No adapter (removed 2026-10-29: only HitSounds::Update's plain C++ calls it in play) for sub_8210EB90 (wave 9).
 ITC_CAR_SOUNDS_ADAPTER(8210FD78, CarSoundsHitSoundsUpdate)
 ITC_CAR_SOUNDS_ADAPTER(8210EBF0, CarSoundsPart736Update)
 ITC_CAR_SOUNDS_ADAPTER(8210ECF0, CarSoundsPart840Update)
