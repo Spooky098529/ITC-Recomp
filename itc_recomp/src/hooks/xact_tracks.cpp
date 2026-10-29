@@ -313,7 +313,8 @@ void XactPlayWaveGetDuration(PPCContext& ctx, uint8_t* base) {
 
 ITC_XACT_TRACKS_ADAPTER(825D57D0, XactTrackInstanceConstruct)
 ITC_XACT_TRACKS_ADAPTER(825D55E0, XactTrackInstanceCheckDone)
-ITC_XACT_TRACKS_ADAPTER(825D5678, XactTrackInstanceSetVolume)
+// No adapter (removed 2026-10-29: only XACTTrack::SetVolume's and UpdateVolume's plain C++ calls it in
+// play) for XACTTrackInstance::SetVolume sub_825D5678.
 // No adapter (removed 2026-10-29: only XACTTrack::IsBusy's plain C++ calls it in play) for
 // XACTTrackInstance::IsBusy sub_825D5780.
 // No adapter (removed 2026-10-29: only XACTTrack::Pause's plain C++ calls it in play) for
@@ -322,7 +323,8 @@ ITC_XACT_TRACKS_ADAPTER(825D05A8, XactTrackPause)
 ITC_XACT_TRACKS_ADAPTER(825D0590, XactTrackIsBusy)
 // No adapter (removed 2026-10-29: only XACTPlayWaveEvent::XACTPlayWaveEvent's plain C++ calls
 // it in play) for XACTEvent::XACTEvent sub_825D1760.
-ITC_XACT_TRACKS_ADAPTER(825D0EF0, XactEventDestruct)
+// No adapter (removed 2026-10-29: only XACTPlayWaveEvent's deleting destructor's plain C++ calls it in
+// play) for XACTEvent::~XACTEvent sub_825D0EF0.
 ITC_XACT_TRACKS_ADAPTER(825D1358, XactEventFire)
 ITC_XACT_TRACKS_ADAPTER(825D82E8, XactPlayWaveConstruct)
 ITC_XACT_TRACKS_ADAPTER(825D8530, XactPlayWaveSetQueued)
@@ -339,13 +341,15 @@ ITC_XACT_TRACKS_ADAPTER(825D8268, XactPlayWavePause)
 ITC_XACT_TRACKS_ADAPTER(825D7FE0, XactPlayWaveSetVolume)
 // No adapter (removed 2026-10-29: only XACTPlayWaveEvent::SetVolume's plain C++ calls it in
 // play) for XACTWave::SetVolume sub_825D1CC8.
-ITC_XACT_TRACKS_ADAPTER(825D0BF8, XactTrackSetVolume)
+// No adapter (removed 2026-10-29: only XACTTrack::XACTTrack's plain C++ calls it in
+// play) for XACTTrack::SetVolume sub_825D0BF8.
 ITC_XACT_TRACKS_ADAPTER(825D0428, XactTrackUpdateVolume)
 ITC_XACT_TRACKS_ADAPTER(825D06B8, XactTrackCreateRpcs)
 ITC_XACT_TRACKS_ADAPTER(825D0800, XactTrackStartRpcs)
 ITC_XACT_TRACKS_ADAPTER(825D0CE0, XactTrackConstruct)
 ITC_XACT_TRACKS_ADAPTER(825D0E30, XactTrackUpdate)
-ITC_XACT_TRACKS_ADAPTER(825D0110, XactTrackDestruct)
+// No adapter (removed 2026-10-29: only its deleting destructor's plain C++ calls it in
+// play) for XACTTrack::~XACTTrack sub_825D0110.
 ITC_XACT_TRACKS_HEAP_ADAPTER(825D0978, XactTrackDeletingDestruct)
 ITC_XACT_TRACKS_HEAP_ADAPTER(825D8660, XactPlayWaveDeletingDestruct)
 ITC_XACT_TRACKS_ADAPTER(825D7558, XactPlayWaveApplyVariation)
