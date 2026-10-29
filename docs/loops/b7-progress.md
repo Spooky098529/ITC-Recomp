@@ -15,13 +15,11 @@ file's history. What's left to see in a drive, from every run:
   Recorded in the plan's table and boundary log.
 - Subsystem 2 of 3 done: XAudio's voices (below). Recorded in the
   plan's table and boundary log.
-- Subsystem 1's continuation (not counted): the car sounds' migration
-  2, their groups under XAudio's voice methods now ready. Migration 2
-  done (be59a3f..edce57c, 29 more, 53 of 62 ours; stopped at five
-  batches, `CarSound::Update`'s other parts ready). Validated
-  (`itc_2382`, `itc_2383`): 37 of 37 harness lines; one to drive.
-  Migration 3 done (fd88bdf..cfd838d, 62 of 62 in play ours, nothing
-  ready left). Step: validation (agent running).
+- Subsystem 1's continuation done: the car sounds' migrations 2 and 3
+  (62 of 62). Recorded in the plan's table and boundary log.
+- Subsystem 3 of 3: XACT's voice class (`sub_825C9C40` and four more,
+  where XACT meets XAudio; all five roots ready since XAudio's voices).
+  Step: mapping (agent running).
 
 ## Done
 
@@ -30,9 +28,12 @@ file's history. What's left to see in a drive, from every run:
   does (the user's calls, 2026-10-29); `--native_xaudio`; e784bc0,
   29a2e7f..fbcd34f, 19a919f..24cc6ea, print ceb220f. Validated
   (`itc_2356`, `itc_2357`): 92 of 92 harness lines; nine to drive.
-- The car sounds and X3DAudio: `car-sounds.md`, 24 of 62 in play
-  native in one migration, 12 adapters removed; `--native_car_sounds`;
-  26adc92, 9a0dcc7..3e6c24e. Validated (`itc_2328`, `itc_2329`): 24 of
+- The car sounds and X3DAudio: `car-sounds.md`, 62 of 62 in play
+  native in three migrations (the last two after XAudio's voices), 53
+  adapters removed; `--native_car_sounds`; 26adc92, 9a0dcc7..3e6c24e,
+  be59a3f..edce57c, fd88bdf..cfd838d. Migrations 2 and 3 validated
+  (`itc_2382`, `itc_2383`; `itc_2398`): 37 and 23 harness lines;
+  StopAll to drive. Validated (`itc_2328`, `itc_2329`): 24 of
   24 harness lines, all ran in play or the replay; nothing to drive.
 
 ## Rows to review
@@ -78,6 +79,8 @@ file's history. What's left to see in a drive, from every run:
 - After the car sounds' migration 3 (`itc_2397`: race 38 s, 0 errors,
   car_sounds, x3daudio, xaudio 0 differing): ours 2782, work left 3682
   (wrapped 103, known 501, unknown 3078).
+- After its validation (`itc_2398`: race 8 s, 0 errors, every harness
+  0 differing but the expected groups): ours 2782, work left 3682.
 
 ## Stopped
 

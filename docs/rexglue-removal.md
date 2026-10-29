@@ -2623,7 +2623,7 @@ B7. **The game logic inside**: everything else, subsystem by subsystem,
 | 2026-10-28 | The archive (`Archive::Toc`, `AssetSize`, `Load`, the request queue and slots, the loader's picker, set-up and next request, WaitIdle, QueueLength, the cancels, the request finish, `LoaderFunctor::Invoke`, loose files, the Ucl/NRV2B unpacker; its four semaphores as host counting semaphores, the user's call) | `archive.md` (with the shared rows in `files-and-saves.md` and `video-output.md`) | 25 (all of `archive.md`'s 11 in play and 14 shared rows; two migrations; 8 adapters removed; the rest waits on the loose read's file object, open by name and sprintf, and the game's `Semaphore::Init`) | `--native_archive` |
 | 2026-10-28 | The file layer (the file object `GameFile` over `AsyncFile` and `File::`, the path objects and `Path::Build`, `GamePath::SetGame`, the open by name; with sprintf, `_vsnprintf`, `_vsnprintf_l` and `_output_l` it unblocked, and the archive's loose read) | `file-layer.md` (with rows in `c-runtime.md` and `files-and-saves.md`) | 17 (all 11 in play of `file-layer.md` with the 6 it unblocked; one migration; 7 adapters removed) | `--native_file_layer` (sprintf under `--native_c_runtime`, the loose read under `--native_archive`) |
 | 2026-10-28 | The save system's interface (the app's interface at `[0x826BDC90]`, its wrappers over the save devices' slots and the users; the front end's save layer: the save buffers, `GameData::Save`, `Load` and `Check`, the replays' list, `PlayTime`) | `save-interface.md` (with rows in `files-and-saves.md`, `system-services.md`) | 41 of 41 in play, with 5 shared rows (one migration; 17 adapters removed) | `--native_save_interface` |
-| 2026-10-28 | The car sounds and X3DAudio (the seven per-racer car sound objects at `[0x826C5C3C]`, eleven parts each, played straight through XAudio voices: the wave bank views, `SetBanks`, `TireSound::Amount`, the constructors, `CarSound::SetUp`, `SoundGlobals::Init`, `CarSounds::Destroy`, `CarSound::Update3D`; X3DAudio's math, translated by the XACT precedent: `X3DAudioCalculate` with its vector helpers, curves, pan, matrix, cone and Doppler) | `car-sounds.md` | 24 of 62 in play (one migration; 12 adapters removed; the rest waits on XAudio's voice methods) | `--native_car_sounds` |
+| 2026-10-28 | The car sounds and X3DAudio (the seven per-racer car sound objects at `[0x826C5C3C]`, eleven parts each, played straight through XAudio voices: the wave bank views, `SetBanks`, `TireSound::Amount`, the constructors, `CarSound::SetUp`, `SoundGlobals::Init`, `CarSounds::Destroy`, `CarSound::Update3D`; X3DAudio's math, translated by the XACT precedent: `X3DAudioCalculate` with its vector helpers, curves, pan, matrix, cone and Doppler) | `car-sounds.md` | 62 of 62 in play (three migrations, the last two after XAudio's voices; 53 adapters removed) | `--native_car_sounds` |
 | 2026-10-29 | XAudio's voices (the game's copy of XAudio, translated: the API entry points but the shut-down, the callback's and the commit; the source and submix voices, their outputs, passes, effects and states; the buffers and formats; its API lock the game's critical section and the voice lists' spin lock the game's, taken as the original does, the user's calls) | `xaudio.md` | 92 of 96 in play (two migrations; 37 Native; the rest waits on the engine and mixer) | `--native_xaudio` |
 
     The first run (2026-10-22, branch `b7-loop-test`): every harness at 0 differing, attract races at 20-21 s with no errors,
@@ -3867,3 +3867,16 @@ commit) waits on the engine and mixer. The boundary: 449 functions
 live 250 (from overridden 69, Native 5, live 282). Imports: 186
 called, 62 with a live caller. B7 (`b7_status.py`): ours 2,744, work
 left 3,720 (Wrapped 103, with a row 539, no row yet 3,078), from 3,809.
+
+**2026-10-29, the car sounds finished (branch `b7-loop-28-10-26-3`):**
+with XAudio's voices native, two more migrations made the rest of the
+car sounds native (`car-sounds.md`, 62 of 62 in play,
+`--native_car_sounds`): the voices made, started, paused and released,
+`CarSounds::Init`, and `CarSound::Update` with every part's update
+(engine, tires, roll, hits, wind, pass-by, horn, turbo); the car
+sounds' plain C++ calls XAudio's plain C++ directly. `CarSound::Update`'s
+adapter stays for its recompiled caller in the race code
+(`sub_82175F20`). The boundary: 449 functions (916 pairs): overridden
+92, Native 14, Dropped 23, never called 70, live 250. Imports: 186
+called, 62 with a live caller. B7 (`b7_status.py`): ours 2,782, work
+left 3,682 (Wrapped 103, with a row 501, no row yet 3,078), from 3,720.
