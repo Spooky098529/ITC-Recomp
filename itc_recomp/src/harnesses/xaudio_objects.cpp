@@ -1377,6 +1377,103 @@ void Resampler(Context& h, uint32_t block) {
   }
 }
 
+// --- The reverb core's stages ---
+
+constexpr uint32_t kStageBytes = 0x3000;
+
+// A region of kStageBytes (from the allocation layer) filled with samples
+// (Sample: mostly in [-1, 1], the edge floats now and then) for both
+// versions, `setup` writing the stage's words over them; the region and r3
+// compared exactly.
+template <typename Setup>
+void StageCase(Context& h, Results& results, uint32_t region, GuestFunction recompiled,
+               GuestFunction native, Setup setup, const std::string& what) {
+  const Random start = h.random;
+  Random random = start;
+  Outputs out[2];
+  for (int v = 0; v < 2; v++) {
+    random = start;
+    for (uint32_t i = 0; i < kStageBytes; i += 4) {
+      Store(h.base, region + i, Sample(random));
+    }
+    PPCContext t = CallContext(h);
+    for (uint32_t i = 4; i <= 0x400; i += 4) {
+      Store(h.base, t.r1.u32 - i, uint32_t(random.Next()));
+    }
+    setup(random, t);
+    t.fpscr.loadFromHost();
+    (v == 0 ? recompiled : native)(t, h.base);
+    out[v].Bytes(Read(h.base, region, kStageBytes));
+    R3(out[v], t.r3.u64);
+  }
+  h.random = random;
+  results.Check(out[0], out[1], what);
+}
+
+void ReverbStages(Context& h) {
+  const uint32_t region = memory::Alloc(kStageBytes, 0);
+  if (region == 0) {
+    return;
+  }
+  // The stage's state at +0 (its line's data after it), the input at
+  // +0x2200, the outputs at +0x2600 and +0x2A00.
+  const uint32_t in = region + 0x2200, out_a = region + 0x2600, out_b = region + 0x2A00;
+  {
+    Results results("sub_82462BC8 (the reverb's low-pass)");
+    for (int i = 0; i < 48; i++) {
+      StageCase(h, results, region, __imp__sub_82462BC8, hooks::XAudioReverbLowPass,
+                [&](Random& random, PPCContext& t) {
+                  static constexpr uint32_t kCounts[] = {0, 1, 2, 3, 4, 5, 7, 8, 13, 255, 257};
+                  t.r3.u64 = region;
+                  t.r4.u64 = in;
+                  t.r5.u64 = out_a;
+                  t.r6.u64 = i < 24 ? 256 : kCounts[random.Below(11)];
+                },
+                fmt::format("case {}", i));
+    }
+    results.Report();
+  }
+  struct Delay {
+    const char* name;
+    GuestFunction recompiled, native;
+    uint32_t entries, write, taps[3];  // the write index's and taps' offsets
+  };
+  static const Delay kDelays[] = {
+      {"sub_82462CF8 (the reverb's 512-entry delay line)", __imp__sub_82462CF8,
+       hooks::XAudioReverbDelay512, 512, 36, {0, 12, 24}},
+      {"sub_82463060 (the reverb's 2,048-entry delay line)", __imp__sub_82463060,
+       hooks::XAudioReverbDelay2048, 2048, 36, {0, 12, 24}},
+      {"sub_82463578 (the reverb's 1,024-entry delay line)", __imp__sub_82463578,
+       hooks::XAudioReverbDelay1024, 1024, 24, {0, 12, 12}},
+  };
+  for (const Delay& delay : kDelays) {
+    Results results(delay.name);
+    for (int i = 0; i < 32; i++) {
+      StageCase(h, results, region, delay.recompiled, delay.native,
+                [&](Random& random, PPCContext& t) {
+                  // The write index a multiple of 256 (as the game's), or
+                  // any index leaving room for the block.
+                  const uint32_t blocks = delay.entries / 256;
+                  Store(h.base, region + delay.write,
+                        i % 4 == 3 ? random.Below(delay.entries - 255)
+                                   : 256 * random.Below(blocks));
+                  for (const uint32_t tap : delay.taps) {
+                    Store(h.base, region + tap,
+                          random.Below(2) == 0 ? random.Below(delay.entries)
+                                               : uint32_t(random.Next()));
+                  }
+                  t.r3.u64 = region;
+                  t.r4.u64 = in;
+                  t.r5.u64 = out_a;
+                  t.r6.u64 = out_b;
+                },
+                fmt::format("case {}", i));
+    }
+    results.Report();
+  }
+  memory::Free(region);
+}
+
 }  // namespace
 
 void XAudioObjects(Context& h) {
@@ -1388,6 +1485,7 @@ void XAudioObjects(Context& h) {
   MatrixAndMeter(h, block.address);
   ReverbParts(h, block.address);
   Resampler(h, block.address);
+  ReverbStages(h);
 }
 
 }  // namespace harness

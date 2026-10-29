@@ -134,7 +134,8 @@ Not known yet:
   parts) are native over the game's own objects, its two locks taken as
   the original does, and the resampler with the six kernels that ran in
   play (`src/xaudio/resampler.cpp`); left recompiled: the PCM codec's pass
-  above it, and the reverb's parameters and signal path.
+  above it, and the reverb's parameters and most of its signal path (four
+  of its core's stages are ours: `src/xaudio/reverb_stages.cpp`).
   Two things the harnesses showed about matching the translated code: its
   `lfs`/`stfs` pairs fold to a plain copy (a signaling NaN is kept, where
   strict host conversions would quiet it), and its `vmaddfp` is a product

@@ -96,4 +96,10 @@ void XAudioResampleStereoScalar(PPCContext& ctx, uint8_t* base);  // sub_8247418
 void XAudioCopyStereo(PPCContext& ctx, uint8_t* base);            // sub_8247F558
 void XAudioCopyStereoScalar(PPCContext& ctx, uint8_t* base);      // sub_82478E60
 
+// The reverb core's stages (src/xaudio/reverb_stages.h).
+void XAudioReverbLowPass(PPCContext& ctx, uint8_t* base);    // sub_82462BC8
+void XAudioReverbDelay512(PPCContext& ctx, uint8_t* base);   // sub_82462CF8
+void XAudioReverbDelay2048(PPCContext& ctx, uint8_t* base);  // sub_82463060
+void XAudioReverbDelay1024(PPCContext& ctx, uint8_t* base);  // sub_82463578
+
 }  // namespace hooks

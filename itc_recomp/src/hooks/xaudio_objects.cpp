@@ -12,6 +12,7 @@
 #include "hooks/xaudio.h"
 #include "xaudio/objects.h"
 #include "xaudio/resampler.h"
+#include "xaudio/reverb_stages.h"
 
 ITC_FLAG_BOOL(native_xaudio_objects, true, "ITC",
               "Run the parts of XAudio's factory objects made native "
@@ -40,7 +41,8 @@ ITC_FLAG_BOOL(native_xaudio_objects, true, "ITC",
               "lines' fills sub_82467720 to sub_82467990; the resampler's Resampler::Process "
               "sub_8246F140 and its kernels sub_8247E188, sub_8247E260 (with their vector paths "
               "sub_8246E208 and sub_8246E4C8), sub_82473E48, sub_82474188, sub_8247F558 and "
-              "sub_82478E60) natively instead of through the "
+              "sub_82478E60; the reverb core's stages sub_82462BC8, sub_82462CF8, sub_82463060 and "
+              "sub_82463578) natively instead of through the "
               "translated code (the same reads and writes; checked by "
               "--run_harnesses=xaudio_objects)");
 
@@ -509,6 +511,19 @@ void XAudioResamplerProcess(PPCContext& ctx, uint8_t* base) {
   });
 }
 
+void XAudioReverbLowPass(PPCContext& ctx, uint8_t* base) {
+  xa::ReverbLowPass(base, ctx.r3.u32, ctx.r4.u32, ctx.r5.u32, ctx.r6.u32);
+}
+
+#define ITC_XAUDIO_DELAY_STEP(name, function)                                      \
+  void name(PPCContext& ctx, uint8_t* base) {                                      \
+    xa::function(base, ctx.r3.u32, ctx.r4.u32, ctx.r5.u32, ctx.r6.u32);            \
+  }
+ITC_XAUDIO_DELAY_STEP(XAudioReverbDelay512, ReverbDelay512)
+ITC_XAUDIO_DELAY_STEP(XAudioReverbDelay2048, ReverbDelay2048)
+ITC_XAUDIO_DELAY_STEP(XAudioReverbDelay1024, ReverbDelay1024)
+#undef ITC_XAUDIO_DELAY_STEP
+
 #define ITC_XAUDIO_KERNEL_STEP(name, function)                     \
   void name(PPCContext& ctx, uint8_t* base) {                      \
     ctx.r3.u64 = xa::function(base, ctx.r3.u32, ctx.r1.u32);       \
@@ -601,3 +616,7 @@ ITC_XAUDIO_OBJECTS_ADAPTER(8246F140, XAudioResamplerProcess)
 ITC_XAUDIO_OBJECTS_ADAPTER(8247E188, XAudioResampleMono)
 ITC_XAUDIO_OBJECTS_ADAPTER(8247E260, XAudioResampleStereo)
 ITC_XAUDIO_OBJECTS_ADAPTER(8247F558, XAudioCopyStereo)
+ITC_XAUDIO_OBJECTS_ADAPTER(82462BC8, XAudioReverbLowPass)
+ITC_XAUDIO_OBJECTS_ADAPTER(82462CF8, XAudioReverbDelay512)
+ITC_XAUDIO_OBJECTS_ADAPTER(82463060, XAudioReverbDelay2048)
+ITC_XAUDIO_OBJECTS_ADAPTER(82463578, XAudioReverbDelay1024)
