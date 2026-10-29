@@ -468,9 +468,9 @@ ITC_CAR_SOUNDS_ADAPTER(8210CB48, CarSoundsSetBanks)
 ITC_CAR_SOUNDS_ADAPTER(8210CA28, CarSoundsTireSoundAmount)
 // No adapter (removed 2026-10-28: only `CarSound::CarSound`'s plain C++ calls it in play)
 // for EngineSound::EngineSound sub_8210CBA0.
-ITC_CAR_SOUNDS_ADAPTER(8210CC18, CarSoundsCarSoundConstruct)
+// No adapter (removed 2026-10-29: only CarSounds::Init's plain C++ calls it in play) for CarSound::CarSound sub_8210CC18.
 // No adapter (removed 2026-10-29: only CarSounds::Release's plain C++ calls it in play) for CarSounds::Destroy sub_8210DCA8.
-ITC_CAR_SOUNDS_ADAPTER(8210DDC8, CarSoundsSetUp)
+// No adapter (removed 2026-10-29: only CarSounds::Init's plain C++ calls it in play) for CarSound::SetUp sub_8210DDC8.
 // No adapter (removed 2026-10-28: only Cone's, Doppler's, Matrix's and Calculate's plain C++ calls it in play) for X3DVec::Sub sub_824819E0.
 // No adapter (removed 2026-10-28: only Calculate's plain C++ calls it in play) for X3DVec::Length sub_82481998.
 // No adapter (removed 2026-10-28: only Cone's and Doppler's plain C++ calls it in play) for X3DVec::Dot sub_824819B8.
