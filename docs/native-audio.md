@@ -126,6 +126,19 @@ Not known yet:
   it, and its mixer runs on our own output's thread, which takes its
   frames (`itc_recomp/src/audio/`, step 1 below). XAudio is the next
   layer to translate the same way; the output itself is already ours.
+  Since 2026-10-29 (B7's loop): its voices (`--native_xaudio`,
+  `docs/functions/xaudio.md`), engine and mixer (`--native_xaudio_engine`,
+  `xaudio-engine.md`) and most of the factory's objects
+  (`--native_xaudio_objects`, `xaudio-objects.md`: the codecs' packet queue
+  and slots, the output matrix's mix, the volume meter, the reverb's set-up
+  parts) are native over the game's own objects, its two locks taken as
+  the original does; left recompiled: the PCM codec's pass with the
+  resampler and its kernels, and the reverb's parameters and signal path.
+  Two things the harnesses showed about matching the translated code: its
+  `lfs`/`stfs` pairs fold to a plain copy (a signaling NaN is kept, where
+  strict host conversions would quiet it), and its `vmaddfp` is a product
+  rounded to float, then a sum (not fused), with the vector unit's flush
+  to zero on.
 - **Keep the SDK's XMA decoder** (the user's call, 2026-10-14): it costs
   nothing measurable, so replacing it gains no speed. (Considered:
   converting the XMA wave banks to PCM banks on first launch, decoded once

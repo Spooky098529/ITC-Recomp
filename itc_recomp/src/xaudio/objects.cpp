@@ -1526,4 +1526,151 @@ uint64_t MeterProcess(uint8_t* base, uint32_t meter, uint32_t buffer, uint32_t f
   return 0;
 }
 
+// --- The render driver's set-up and the reverb's small parts ---
+
+uint32_t RenderDriverSetUpThunk(uint8_t* base, uint32_t driver, uint32_t descriptor, uint32_t* r4) {
+  ITC_NATIVE_RUNNING("sub_824657C8 the render driver's set-up");
+  *r4 = guest::LoadU32(base, descriptor + 8);
+  return Method(base, driver, 28);
+}
+
+void ReverbDestruct(uint8_t* base, uint32_t reverb) {
+  ITC_NATIVE_RUNNING("sub_824656B8 Reverb::Destruct");
+  guest::StoreU32(base, reverb, 0x8204AAB0);
+  guest::StoreU32(base, reverb + 4, 0x8204AA94);
+  const uint32_t offset = guest::LoadU32(base, guest::LoadU32(base, reverb + 16) + 4);
+  guest::StoreU32(base, offset + reverb + 68 - 52, 0x8204AA74);
+  guest::StoreU32(base, reverb + 16 + 192, 0x8204A868);
+  guest::StoreU32(base, reverb + 4, kRootVtable);
+}
+
+void ReverbDefaults(uint8_t* base, uint32_t out) {
+  ITC_NATIVE_RUNNING("sub_82467538 ReverbCore::Defaults");
+  CopyFloat(base, out + 52, 0x8204AC10);
+  guest::StoreU32(base, out + 0, 5);
+  CopyFloat(base, out + 72, 0x8204AC18);
+  guest::StoreU32(base, out + 4, 5);
+  guest::StoreU32(base, out + 8, 6);
+  CopyFloat(base, out + 56, 0x8204AC14);
+  guest::StoreU32(base, out + 12, 6);
+  CopyFloat(base, out + 60, 0x8204AC14);
+  guest::StoreU32(base, out + 48, 5);
+  CopyFloat(base, out + 64, 0x8204AC14);
+  CopyFloat(base, out + 68, 0x8204AC14);
+  guest::StoreU32(base, out + 24, 8);
+  CopyFloat(base, out + 76, 0x8204AC1C);
+  guest::StoreU32(base, out + 28, 8);
+  CopyFloat(base, out + 80, 0x8204AC1C);
+  guest::StoreU32(base, out + 32, 8);
+  guest::StoreU32(base, out + 36, 4);
+  guest::StoreU32(base, out + 40, 8);
+  guest::StoreU32(base, out + 44, 4);
+}
+
+uint32_t LargestPrimeBelow(uint8_t* base, uint32_t n) {
+  ITC_NATIVE_RUNNING("sub_8246DFE8 LargestPrimeBelow");
+  if (n <= 1) {
+    return 1;
+  }
+  if (n >= 9973) {
+    return 9973;
+  }
+  constexpr uint32_t kPrimes = 0x8204BBD0;
+  uint32_t low = 0, high = 1229, middle = 1;
+  for (;;) {
+    const uint32_t previous = middle;
+    middle = (high + low) >> 1;
+    const uint32_t prime = guest::LoadU32(base, kPrimes + 4 * middle);
+    if (prime == n) {
+      break;
+    }
+    if (prime > n) {
+      high = middle - 1;
+    } else {
+      low = middle + 1;
+    }
+    if (middle == previous) {
+      break;
+    }
+  }
+  return guest::LoadU32(base, kPrimes + 4 * middle);
+}
+
+void FillDelayLine(uint8_t* base, uint32_t line, uint32_t groups) {
+  ITC_NATIVE_RUNNING("sub_82467720 the reverb's delay line fills");
+  uint32_t at = line + 12;
+  for (uint32_t i = 0; i < groups; i++, at += 32) {
+    for (uint32_t k = 0; k < 8; k++) {
+      CopyFloat(base, at - 4 + 4 * k, line + 4);
+    }
+  }
+  guest::StoreU32(base, line, 0);
+}
+
+void FilterCoefficient(uint8_t* base, uint32_t filter) {
+  ITC_NATIVE_RUNNING("sub_824675B8 ReverbCore::FilterCoefficient");
+  const auto single = [&](uint32_t address) { return LoadSingle(base, address); };
+  const auto dbl = [&](uint32_t address) {
+    return std::bit_cast<double>(uint64_t(REX_LOAD_U64(address)));
+  };
+  const auto f = [](double x) { return double(float(x)); };
+  double f0 = single(filter + 12);
+  double f13 = single(filter + 8);
+  const double f29 = f(f0 + f13);
+  const double f26 = single(0x8204AC14);
+  f0 = single(0x8204AC18);
+  const double f28 = f29 < f26 ? f(f13 / f29) : f0;
+  double f12 = f(f0 - f28);
+  f13 = single(filter + 4);
+  f0 = f13 * dbl(0x8204B8B8);
+  f13 = single(filter);
+  f12 = f(f12 * f29);
+  double f31 = dbl(0x8200F728);
+  f13 = f0 / f13;
+  f0 = single(0x82001FBC);
+  double f2 = f(f12 * f0);
+  const double f27 = f(f13);
+  double f1 = c_runtime::Pow(f31, f2);
+  f1 = f(f1);
+  const double f30 = dbl(0x820022B8);
+  f1 = c_runtime::Pow(f1, f30);
+  f0 = f1;
+  f12 = f(f28 * f29);
+  f1 = f31;
+  f13 = single(0x82002204);
+  f31 = f(f0);
+  f2 = f(f12 * f13);
+  f1 = c_runtime::Pow(f1, f2);
+  f1 = f(f1);
+  guest::StoreFloat(base, filter + 24, float(f1));
+  f1 = c_runtime::Pow(f1, f30);
+  const double limit = single(0x8204B8B0);
+  f0 = f(f1);
+  guest::StoreFloat(base, filter + 24, float(f0));
+  if (!(f31 < limit)) {
+    guest::StoreFloat(base, filter + 28, float(f26));
+    return;
+  }
+  f1 = c_runtime::Cos(f27);
+  double f11 = f(f31 * f31);
+  const double two = dbl(0x820056D8);
+  f0 = dbl(0x82002250);
+  f13 = f0 - f31;
+  const double f10 = f(f13);
+  f13 = f(f1);
+  double f9 = f(f13 * f13);
+  const double f8 = f(f13 * f31);
+  f13 = f0 - f13;
+  f9 = f0 - f9;
+  f0 = f0 - f8;
+  f13 = f13 * f31;
+  f11 = f9 * f11;
+  f13 = std::fma(f13, two, -f11);
+  f13 = std::sqrt(f13);
+  f0 = f0 - f13;
+  f0 = f(f0);
+  f0 = f(f0 / f10);
+  guest::StoreFloat(base, filter + 28, float(f0));
+}
+
 }  // namespace xaudio

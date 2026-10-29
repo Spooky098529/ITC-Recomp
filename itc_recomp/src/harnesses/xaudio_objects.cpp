@@ -1097,6 +1097,139 @@ void MatrixAndMeter(Context& h, uint32_t block) {
   memory::Free(samples_block);
 }
 
+// --- The render driver's set-up and the reverb's small parts ---
+
+void ReverbParts(Context& h, uint32_t block) {
+  {
+    // The driver's slot +28 a recompiled leaf that leaves a trace
+    // (sub_820CE9F8: r4 and r5 to +444 and +448).
+    Results results("sub_824657C8 (the render driver's set-up)");
+    for (int i = 0; i < 16; i++) {
+      Case(h, results, block, __imp__sub_824657C8, hooks::XAudioRenderDriverSetUp,
+           [&](Random& random, PPCContext& t) {
+             Store(h.base, block, block + 0x1C00);
+             Store(h.base, block + 0x1C00 + 28, 0x820CE9F8);
+             t.r3.u64 = block;
+             t.r4.u64 = block + 0x400 + 4 * random.Below(16);
+             t.r5.u64 = random.Next();
+           },
+           fmt::format("case {}", i));
+    }
+    results.Report();
+  }
+  {
+    // The core's vtable (+16) at +0x1C00, its +4 word the second vtable's
+    // offset (small).
+    Results results("sub_82465410 (Reverb::Destruct sub_824656B8)");
+    for (int i = 0; i < 16; i++) {
+      Case(h, results, block, __imp__sub_82465410, hooks::XAudioReverbInnerDestroy,
+           [&](Random& random, PPCContext& t) {
+             Store(h.base, block + 16, block + 0x1C00);
+             Store(h.base, block + 0x1C04, 4 * random.Below(64));
+             t.r3.u64 = block + 4;
+           },
+           fmt::format("case {}", i));
+    }
+    results.Report();
+  }
+  {
+    Results results("ReverbCore::Defaults (sub_82467538)");
+    for (int i = 0; i < 8; i++) {
+      Case(h, results, block, __imp__sub_82467538, hooks::XAudioReverbDefaults,
+           [&](Random& random, PPCContext& t) { t.r3.u64 = block + 4 * random.Below(64); },
+           fmt::format("case {}", i));
+    }
+    results.Report();
+  }
+  {
+    Results results("LargestPrimeBelow (sub_8246DFE8)");
+    for (int i = 0; i < 96; i++) {
+      Case(h, results, block, __imp__sub_8246DFE8, hooks::XAudioLargestPrimeBelow,
+           [&](Random& random, PPCContext& t) {
+             t.r3.u64 = i < 8 ? uint64_t(i) : i < 16 ? 9970 + i - 8
+                                             : i < 24 ? random.Next() : random.Below(10000);
+           },
+           fmt::format("case {}", i));
+    }
+    results.Report();
+  }
+  {
+    struct Fill {
+      const char* name;
+      GuestFunction recompiled;
+      GuestFunction native;
+      uint32_t groups;
+    };
+    const Fill fills[] = {
+        {"sub_82467720 (a delay line's fill, 2,048)", __imp__sub_82467720,
+         hooks::XAudioFillDelayLine2048, 2048},
+        {"sub_82467788 (64)", __imp__sub_82467788, hooks::XAudioFillDelayLine64, 64},
+        {"sub_824677F0 (16)", __imp__sub_824677F0, hooks::XAudioFillDelayLine16, 16},
+        {"sub_82467858 (256)", __imp__sub_82467858, hooks::XAudioFillDelayLine256, 256},
+        {"sub_824678C0 (32)", __imp__sub_824678C0, hooks::XAudioFillDelayLine32, 32},
+        {"sub_82467928 (128)", __imp__sub_82467928, hooks::XAudioFillDelayLine128, 128},
+        {"sub_82467990 (512)", __imp__sub_82467990, hooks::XAudioFillDelayLine512, 512},
+    };
+    // The line in a region of its size from the allocation layer (2,048 x 32
+    // bytes + 12), its +4 an edge float now and then.
+    const uint32_t region = memory::Alloc(2048 * 32 + 64, 0);
+    for (const Fill& fill : fills) {
+      Results results(fill.name);
+      for (int i = 0; i < 8; i++) {
+        const Random start = h.random;
+        Random random = start;
+        Outputs out[2];
+        for (int v = 0; v < 2; v++) {
+          random = start;
+          harness::Fill(h.base, region, 2048 * 32 + 64);
+          Store(h.base, region + 4, i < 4 ? AnyFloat(random) : Sample(random));
+          PPCContext t = CallContext(h);
+          t.r3.u64 = region;
+          (v == 0 ? fill.recompiled : fill.native)(t, h.base);
+          out[v].Bytes(Read(h.base, region, fill.groups * 32 + 40));
+          R3(out[v], t.r3.u64);
+        }
+        h.random = random;
+        results.Check(out[0], out[1], fmt::format("case {}", i));
+      }
+      results.Report();
+    }
+    memory::Free(region);
+  }
+  {
+    // The filter's four inputs: times and frequencies as the reverb's
+    // parameters give them, and edge floats now and then; +24 and +28
+    // compared as floats.
+    Results results("ReverbCore::FilterCoefficient (sub_824675B8)");
+    for (int i = 0; i < 96; i++) {
+      const Random start = h.random;
+      Random random = start;
+      Outputs out[2];
+      for (int v = 0; v < 2; v++) {
+        random = start;
+        for (uint32_t k = 0; k < 64; k += 4) {
+          Store(h.base, block + k, uint32_t(random.Next()));
+        }
+        for (uint32_t k = 0; k < 16; k += 4) {
+          const float value = k == 0 ? float(8000 + random.Below(40001))
+                              : float(random.Below(20001)) / 1000.0f;
+          Store(h.base, block + k,
+                random.Below(8) == 0 ? AnyFloat(random) : std::bit_cast<uint32_t>(value));
+        }
+        PPCContext t = CallContext(h);
+        t.r3.u64 = block;
+        (v == 0 ? __imp__sub_824675B8 : hooks::XAudioFilterCoefficient)(t, h.base);
+        out[v].Bytes(Read(h.base, block, 24));
+        out[v].Floats(h.base, block + 24, 2);
+        out[v].Bytes(Read(h.base, block + 32, 32));
+      }
+      h.random = random;
+      results.Check(out[0], out[1], fmt::format("case {}", i));
+    }
+    results.Report();
+  }
+}
+
 }  // namespace
 
 void XAudioObjects(Context& h) {
@@ -1106,6 +1239,7 @@ void XAudioObjects(Context& h) {
   Construction(h, block.address);
   Queue(h, block.address);
   MatrixAndMeter(h, block.address);
+  ReverbParts(h, block.address);
 }
 
 }  // namespace harness

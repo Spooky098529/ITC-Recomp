@@ -320,4 +320,35 @@ uint64_t MatrixMix(uint8_t* base, uint32_t matrix, uint32_t source, uint32_t tar
 // bytes).
 uint64_t MeterProcess(uint8_t* base, uint32_t meter, uint32_t buffer, uint32_t frame);
 
+// --- The render driver's set-up and the reverb's small parts ---
+
+// sub_824657C8 (the render driver's slot +32): its slot +28
+// (AudioRenderDriver::Register, audio.md) with the descriptor's +8 in r4, a
+// tail call. Returns the method; `r4` the register's value.
+uint32_t RenderDriverSetUpThunk(uint8_t* base, uint32_t driver, uint32_t descriptor, uint32_t* r4);
+// Reverb::Destruct (sub_824656B8): the vtables put back to the bases'
+// (0x8204AAB0 at +0, 0x8204AA94 at +4; the core's second, at its +16 plus
+// the offset its vtable's +4 holds, 0x8204AA74; +208's 0x8204A868), then
+// the root's (0x8204A6B8) at +4. r3 left as it is.
+void ReverbDestruct(uint8_t* base, uint32_t reverb);
+// ReverbCore::Defaults (sub_82467538): the default native parameters to the
+// 84 bytes at `out` (words 5, 5, 6, 6, 8, 8, 8, 4, 8, 4, 5 at +0 to +48, +16
+// and +20 left; the floats at 0x8204AC10 to 0x8204AC1C from +52). r3 left.
+void ReverbDefaults(uint8_t* base, uint32_t out);
+// LargestPrimeBelow (sub_8246DFE8): 1 for n up to 1, 9,973 from 9,973,
+// else the table's (0x8204BBD0, 1,229 primes) by its binary search: n when
+// it's there, else the entry where the search stops.
+uint32_t LargestPrimeBelow(uint8_t* base, uint32_t n);
+// The delay lines' fills (sub_82467720 2,048 groups, sub_82467788 64,
+// sub_824677F0 16, sub_82467858 256, sub_824678C0 32, sub_82467928 128,
+// sub_82467990 512): `groups` x 8 words from +8 set to +4's (copied as
+// the translated code's lfs/stfs leave it), then +0 = 0. r3 left.
+void FillDelayLine(uint8_t* base, uint32_t line, uint32_t groups);
+// ReverbCore::FilterCoefficient (sub_824675B8): the filter at `filter` (+0,
+// +4, +8 and +12 its inputs) given +24 (through four pows) and +28 (a cos
+// and a square root, or the float at 0x8204AC14), each rounding as the
+// translated code's (its double products and quotients kept double, its
+// fmadd fused); pow and cos through their plain C++.
+void FilterCoefficient(uint8_t* base, uint32_t filter);
+
 }  // namespace xaudio

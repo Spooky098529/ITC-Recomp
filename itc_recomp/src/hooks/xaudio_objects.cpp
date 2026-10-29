@@ -14,21 +14,30 @@
 
 ITC_FLAG_BOOL(native_xaudio_objects, true, "ITC",
               "Run the parts of XAudio's factory objects made native "
-              "(docs/functions/xaudio-objects.md: the class tables' sizes XAudioCodec::Size "
-              "sub_82466B78 with PcmCodec::Size and XmaCodec::Size, XAudioMatrix::Size "
-              "sub_82466840, Reverb::Size sub_82463B78 and VolumeMeter::Size sub_825A60E0; the "
-              "GetInfo slots sub_82466E80, sub_82465BE0 and sub_825A5778, XAudioCodec::GetState "
-              "sub_8246A920, XAudioMatrix::SetOverwrite sub_82465C08, ReverbCore::SetStereo "
-              "sub_824679F8 and XAudioObject::Release sub_8246CE70; the codecs' construction "
-              "XAudioCodec::Create sub_82466BA0 with the PCM and XMA codecs' Create and "
-              "constructors, XAudioCodec::Construct and Init, CodecBase::CodecBase and Init "
-              "sub_82469978 and the packet lists' Init and Alloc; their destruction "
-              "XAudioCodec::Destruct sub_82466EE8, the inner objects' destructors sub_8246CE68, "
-              "sub_8246A918 and sub_82465BD8 with PcmCodec::~PcmCodec, XmaCodec::~XmaCodec (the "
-              "XMA object's release stays the translated code's) and XAudioMatrix::Destruct, "
-              "the packet lists' Clear and Next; XAudioMatrix::Create sub_82466888, "
-              "VolumeMeter::Create sub_825A6460 and Init sub_825A6138) natively instead of through "
-              "the translated code (the same reads and writes; checked by "
+              "(docs/functions/xaudio-objects.md: the class tables' sizes sub_82466B78, "
+              "sub_82466840, sub_82463B78 and sub_825A60E0; the GetInfo slots sub_82466E80, "
+              "sub_82465BE0 and sub_825A5778, XAudioCodec::GetState sub_8246A920, "
+              "XAudioMatrix::SetOverwrite sub_82465C08, ReverbCore::SetStereo sub_824679F8, "
+              "XAudioObject::Release sub_8246CE70; the codecs' construction XAudioCodec::Create "
+              "sub_82466BA0 and CodecBase::Init sub_82469978, their destruction "
+              "XAudioCodec::Destruct sub_82466EE8 and the inner destructors sub_8246CE68, "
+              "sub_8246A918 and sub_82465BD8 (the XMA object's release stays the translated "
+              "code's); XAudioMatrix::Create sub_82466888, VolumeMeter::Create sub_825A6460 and "
+              "Init sub_825A6138; under the voice lists' spin lock (taken as the original does) "
+              "the packet queue's SetFlags sub_82467078, RetirePacket sub_8246A430, "
+              "CompletePacket sub_824674D8, FlushPackets sub_824699E0 (and sub_8246CEC8), "
+              "SetFormat sub_82469E58, SubmitPacket sub_82469EF8 (and sub_8246CEB8) and "
+              "SubmitRegion sub_8246A1C0, the PCM codec's SetFormat sub_8246CFA8, Start "
+              "sub_8246D410, Stop sub_8246D500, SetVolume sub_8246D008, SetPitch sub_8246D0C8 and "
+              "SetFrequencyRatio sub_8246D1E0 (and sub_8246D320), XAudioCodec::EndOfStream "
+              "sub_8246D630, the XMA codec's SubmitRegion sub_8246A860, SetVolume sub_8246AB48 "
+              "and SetPitch sub_8246AC40; the output matrix's Init sub_82465C30, SetMatrix "
+              "sub_82465E50, SetLevels sub_82466188 and Mix sub_82466440; VolumeMeter::Process "
+              "sub_825A6210; the render driver's set-up sub_824657C8; the reverb's destructor "
+              "sub_82465410 and sub_824656B8, ReverbCore::Defaults sub_82467538, "
+              "LargestPrimeBelow sub_8246DFE8, FilterCoefficient sub_824675B8 and the delay "
+              "lines' fills sub_82467720 to sub_82467990) natively instead of through the "
+              "translated code (the same reads and writes; checked by "
               "--run_harnesses=xaudio_objects)");
 
 namespace hooks {
@@ -460,6 +469,49 @@ void XAudioMeterProcess(PPCContext& ctx, uint8_t* base) {
   });
 }
 
+// --- The render driver's set-up and the reverb's small parts ---
+
+void XAudioRenderDriverSetUp(PPCContext& ctx, uint8_t* base) {
+  uint32_t r4 = 0;
+  const uint32_t function = xa::RenderDriverSetUpThunk(base, ctx.r3.u32, ctx.r4.u32, &r4);
+  ctx.r4.u64 = r4;
+  ctx.r11.u64 = function;
+  REX_CALL_INDIRECT_FUNC(function);
+}
+
+void XAudioReverbInnerDestroy(PPCContext& ctx, uint8_t* base) {
+  ITC_NATIVE_RUNNING("sub_82465410 the reverb's inner destructor");
+  ctx.r3.u64 = ctx.r3.u64 - 4;
+  xa::ReverbDestruct(base, ctx.r3.u32);
+}
+
+void XAudioReverbDestruct(PPCContext& ctx, uint8_t* base) { xa::ReverbDestruct(base, ctx.r3.u32); }
+
+void XAudioReverbDefaults(PPCContext& ctx, uint8_t* base) { xa::ReverbDefaults(base, ctx.r3.u32); }
+
+void XAudioLargestPrimeBelow(PPCContext& ctx, uint8_t* base) {
+  ctx.r3.u64 = xa::LargestPrimeBelow(base, ctx.r3.u32);
+}
+
+void XAudioFilterCoefficient(PPCContext& ctx, uint8_t* base) {
+  ctx.fpscr.disableFlushMode();
+  xa::FilterCoefficient(base, ctx.r3.u32);
+}
+
+#define ITC_XAUDIO_FILL_STEP(name, groups)                       \
+  void name(PPCContext& ctx, uint8_t* base) {                    \
+    xa::FillDelayLine(base, ctx.r3.u32, groups);                 \
+    ctx.r11.u64 = 0;                                             \
+  }
+ITC_XAUDIO_FILL_STEP(XAudioFillDelayLine2048, 2048)
+ITC_XAUDIO_FILL_STEP(XAudioFillDelayLine64, 64)
+ITC_XAUDIO_FILL_STEP(XAudioFillDelayLine16, 16)
+ITC_XAUDIO_FILL_STEP(XAudioFillDelayLine256, 256)
+ITC_XAUDIO_FILL_STEP(XAudioFillDelayLine32, 32)
+ITC_XAUDIO_FILL_STEP(XAudioFillDelayLine128, 128)
+ITC_XAUDIO_FILL_STEP(XAudioFillDelayLine512, 512)
+#undef ITC_XAUDIO_FILL_STEP
+
 }  // namespace hooks
 
 #define ITC_XAUDIO_OBJECTS_ADAPTER(address, step) \
@@ -516,3 +568,16 @@ ITC_XAUDIO_OBJECTS_ADAPTER(82465E50, XAudioMatrixSetMatrix)
 ITC_XAUDIO_OBJECTS_ADAPTER(82466188, XAudioMatrixSetLevels)
 ITC_XAUDIO_OBJECTS_ADAPTER(82466440, XAudioMatrixMix)
 ITC_XAUDIO_OBJECTS_ADAPTER(825A6210, XAudioMeterProcess)
+ITC_XAUDIO_OBJECTS_ADAPTER(824657C8, XAudioRenderDriverSetUp)
+ITC_XAUDIO_OBJECTS_ADAPTER(82465410, XAudioReverbInnerDestroy)
+ITC_XAUDIO_OBJECTS_ADAPTER(824656B8, XAudioReverbDestruct)
+ITC_XAUDIO_OBJECTS_ADAPTER(82467538, XAudioReverbDefaults)
+ITC_XAUDIO_OBJECTS_ADAPTER(8246DFE8, XAudioLargestPrimeBelow)
+ITC_XAUDIO_OBJECTS_ADAPTER(824675B8, XAudioFilterCoefficient)
+ITC_XAUDIO_OBJECTS_ADAPTER(82467720, XAudioFillDelayLine2048)
+ITC_XAUDIO_OBJECTS_ADAPTER(82467788, XAudioFillDelayLine64)
+ITC_XAUDIO_OBJECTS_ADAPTER(824677F0, XAudioFillDelayLine16)
+ITC_XAUDIO_OBJECTS_ADAPTER(82467858, XAudioFillDelayLine256)
+ITC_XAUDIO_OBJECTS_ADAPTER(824678C0, XAudioFillDelayLine32)
+ITC_XAUDIO_OBJECTS_ADAPTER(82467928, XAudioFillDelayLine128)
+ITC_XAUDIO_OBJECTS_ADAPTER(82467990, XAudioFillDelayLine512)

@@ -72,4 +72,19 @@ void XAudioMatrixMix(PPCContext& ctx, uint8_t* base);        // sub_82466440
 void XAudioMatrixMixRamp(PPCContext& ctx, uint8_t* base);    // sub_82466310 (harness)
 void XAudioMeterProcess(PPCContext& ctx, uint8_t* base);     // sub_825A6210
 
+// The render driver's set-up and the reverb's small parts.
+void XAudioRenderDriverSetUp(PPCContext& ctx, uint8_t* base);   // sub_824657C8
+void XAudioReverbInnerDestroy(PPCContext& ctx, uint8_t* base);  // sub_82465410
+void XAudioReverbDestruct(PPCContext& ctx, uint8_t* base);      // sub_824656B8
+void XAudioReverbDefaults(PPCContext& ctx, uint8_t* base);      // sub_82467538
+void XAudioLargestPrimeBelow(PPCContext& ctx, uint8_t* base);   // sub_8246DFE8
+void XAudioFilterCoefficient(PPCContext& ctx, uint8_t* base);   // sub_824675B8
+void XAudioFillDelayLine2048(PPCContext& ctx, uint8_t* base);   // sub_82467720
+void XAudioFillDelayLine64(PPCContext& ctx, uint8_t* base);     // sub_82467788
+void XAudioFillDelayLine16(PPCContext& ctx, uint8_t* base);     // sub_824677F0
+void XAudioFillDelayLine256(PPCContext& ctx, uint8_t* base);    // sub_82467858
+void XAudioFillDelayLine32(PPCContext& ctx, uint8_t* base);     // sub_824678C0
+void XAudioFillDelayLine128(PPCContext& ctx, uint8_t* base);    // sub_82467928
+void XAudioFillDelayLine512(PPCContext& ctx, uint8_t* base);    // sub_82467990
+
 }  // namespace hooks
