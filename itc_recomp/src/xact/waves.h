@@ -235,4 +235,39 @@ uint32_t WaveNotify(uint8_t* base, uint32_t wave, uint32_t type, uint32_t frame,
 uint32_t WaveSetState(uint8_t* base, uint32_t wave, uint32_t state, uint32_t frame,
                       const GuestCall& call);
 
+// --- Releasing and stopping waves ---
+
+constexpr uint32_t kInMemoryWaveAttributes = 0x2084801A;  // XMemAlloc's
+
+// XACTWave::Release (sub_825D28D0): byte +25 |= 0x4; unlinked from the
+// bank's wave list (+4/+8, when linked); the next wave (+56) deleted (its
+// slot +0 with 1), the owner's (+48) slot +28 and the renderer's slot +12
+// (ReleaseVoice, the engine +20's +12) with the voice (+44), each through
+// the guest call; a state of 3 or 4 becomes 5 with the notification 13
+// (Notify's plain C++, a frame below); +40 = 5; then the bank's +4
+// interface's slot +4 (RemoveListener) with this + 12 through the guest
+// call. `frame` is this function's (112 bytes). Returns that slot's r3.
+uint32_t WaveRelease(uint8_t* base, uint32_t wave, uint32_t frame, const GuestCall& call);
+// XACTWave::~XACTWave (sub_825D29E8): the base vtables (0x82076A38 and the
+// listener's 0x82076A70 at +12), Release (a frame below) unless released
+// (byte +25 0x4), XACT's base vtable 0x82075344. `frame` is this
+// function's (96 bytes). Returns r3 as the original leaves it.
+uint32_t WaveDestruct(uint8_t* base, uint32_t wave, uint32_t frame, const GuestCall& call);
+// XACTInMemoryWave's deleting destructor (sub_825D3820, slot +0): its
+// vtables, ~XACTWave (a frame below), XMemFree(0x2084801A) with `flags`
+// bit 0. `frame` is this function's (112 bytes). Returns the wave. Frees
+// through the native layer: call it only while hooks::NativeHeapActive().
+uint32_t InMemoryWaveDeletingDestruct(uint8_t* base, uint32_t wave, uint32_t flags,
+                                      uint32_t frame, const GuestCall& call);
+// XACTInMemoryWave::Stop (sub_825D3A28, slot +12): `mode` 0 at once, 1 as
+// authored; nothing when stopped (5), or stopping (4) and stopped at once
+// (+16) or `mode` set. From playing (3) or stopping: mode 0 sets +16 = 1,
+// state 4 and the voice's Stop (slot +20, its plain C++ while the slot
+// holds it) with 1; mode 1 state 4 and, with `exit_loop`, byte +24 = 0 and
+// the voice's slot +52 (through the guest call); other modes nothing. From
+// an earlier state: state 5. SetState through its plain C++, a frame below.
+// `frame` is this function's (112 bytes). Returns the voice call's r3, or 0.
+uint32_t InMemoryWaveStop(uint8_t* base, uint32_t wave, uint32_t mode, uint32_t exit_loop,
+                          uint32_t frame, const GuestCall& call);
+
 }  // namespace xact

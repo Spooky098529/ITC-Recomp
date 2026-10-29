@@ -22,7 +22,9 @@ ITC_FLAG_BOOL(native_xact_waves, true, "ITC",
               "engine's critical section entered as the original does; XACTWave::SetVoice "
               "sub_825D1DF8, XACTInMemoryWave::Play sub_825D3938, XACTWave::Pause sub_825D1ED8 "
               "and XACTWave::PrepareNext sub_825D2778, XACTInMemoryWave::Update sub_825D3890, XACTWave::Notify sub_825D2030 and SetState "
-              "sub_825D24D8, the voice's methods through their plain "
+              "sub_825D24D8, XACTWave::Release sub_825D28D0, ~XACTWave sub_825D29E8, "
+              "XACTInMemoryWave's deleting destructor sub_825D3820 (freeing under --native_heap) "
+              "and Stop sub_825D3A28, the voice's methods through their plain "
               "C++ while its slots hold them, the owner's and renderer's slots through the "
               "guest call) natively instead "
               "of through the translated code (the same reads and writes; XAudio's locks stay "
@@ -38,6 +40,34 @@ void XactEngineSendNotification(PPCContext& ctx, uint8_t* base) {
   const uint64_t words[4] = {ctx.r4.u64, ctx.r5.u64, ctx.r6.u64, ctx.r7.u64};
   XAudioFramed(ctx, base, 112, [&](const xaudio::GuestCall& call, uint32_t frame) {
     return xact::EngineSendNotification(base, engine, words, frame, call);
+  });
+}
+
+void XactWaveRelease(PPCContext& ctx, uint8_t* base) {
+  const uint32_t wave = ctx.r3.u32;
+  XAudioFramed(ctx, base, 112, [&](const xaudio::GuestCall& call, uint32_t frame) {
+    return xact::WaveRelease(base, wave, frame, call);
+  });
+}
+
+void XactWaveDestruct(PPCContext& ctx, uint8_t* base) {
+  const uint32_t wave = ctx.r3.u32;
+  XAudioFramed(ctx, base, 96, [&](const xaudio::GuestCall& call, uint32_t frame) {
+    return xact::WaveDestruct(base, wave, frame, call);
+  });
+}
+
+void XactInMemoryWaveDeletingDestruct(PPCContext& ctx, uint8_t* base) {
+  const uint32_t wave = ctx.r3.u32, flags = ctx.r4.u32;
+  XAudioFramed(ctx, base, 112, [&](const xaudio::GuestCall& call, uint32_t frame) {
+    return xact::InMemoryWaveDeletingDestruct(base, wave, flags, frame, call);
+  });
+}
+
+void XactInMemoryWaveStop(PPCContext& ctx, uint8_t* base) {
+  const uint32_t wave = ctx.r3.u32, mode = ctx.r4.u32, exit_loop = ctx.r5.u32;
+  XAudioFramed(ctx, base, 112, [&](const xaudio::GuestCall& call, uint32_t frame) {
+    return xact::InMemoryWaveStop(base, wave, mode, exit_loop, frame, call);
   });
 }
 
@@ -273,6 +303,10 @@ ITC_XACT_WAVES_ADAPTER(825D1ED8, XactWavePause)
 ITC_XACT_WAVES_ADAPTER(825D3890, XactInMemoryWaveUpdate)
 ITC_XACT_WAVES_ADAPTER(825D2030, XactWaveNotify)
 ITC_XACT_WAVES_ADAPTER(825D24D8, XactWaveSetState)
+ITC_XACT_WAVES_ADAPTER(825D28D0, XactWaveRelease)
+ITC_XACT_WAVES_ADAPTER(825D29E8, XactWaveDestruct)
+ITC_XACT_WAVES_HEAP_ADAPTER(825D3820, XactInMemoryWaveDeletingDestruct)
+ITC_XACT_WAVES_ADAPTER(825D3A28, XactInMemoryWaveStop)
 
 // XACTEngine::SendNotification is xact.md's: under --native_xact.
 extern "C" REX_FUNC(sub_825C1388) {

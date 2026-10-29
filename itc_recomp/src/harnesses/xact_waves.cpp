@@ -980,6 +980,138 @@ void Notifications(Context& h, uint32_t block) {
   helpers::SetClocksForHarness(std::nullopt, std::nullopt);
 }
 
+// Releasing and stopping waves over CallWorld's wave: its bank (never none:
+// Release reads it unchecked) with its +4 interface's vtable the fake one
+// (RemoveListener an AddRef recorder), the next wave (+56) none or the fake
+// one, the wave linked into the bank's list (+240) or to itself, released
+// (+25 0x4) or not, every state; Stop's voice never none (read unchecked),
+// every mode, exit-the-loop set or not. Both versions read the same time.
+// Compared besides the block: the notifications in Notify's frame and its
+// SendNotification's (as Notifications' cases), at their depth below each.
+void Releases(Context& h, uint32_t block) {
+  uint8_t* base = h.base;
+  std::vector<uint32_t> floats;
+  for (uint32_t k = 0; k < kVoiceCount; k++) {
+    floats.push_back(kVoices + kVoiceBytes * k + 112);
+    floats.push_back(kVoices + kVoiceBytes * k + 140);
+  }
+  if (Load(base, 0x8266CDF0) != 0 && Load(base, 0x82971480) == 0 &&
+      Load(base, 0x82971484) == 0) {
+    ITC_LOG_ERROR("harness: xact_waves: XACT's frequency isn't set yet; releases skipped");
+    return;
+  }
+  const uint32_t wave = block + kWave, bank = block + kWaveBank;
+  const auto world = [&](Random& random, PPCContext& t) {
+    CallWorld(h, block, random, t, false);
+    const uint32_t ms = random.Below(100000);
+    helpers::SetClocksForHarness(uint64_t(ms) * 50000 + random.Below(50000), ms);
+    Store(base, block + kEngine + 16, random.Below(2) == 0 ? 0 : 0x8245F860u);
+    const uint32_t list = block + kEngine + 100;
+    Store(base, list + 4, list);
+    Store(base, list + 8, list);
+    Store(base, wave + 36, bank);
+    Store(base, bank + 4, block + kFakeVtable);
+    Store(base, wave + 56, random.Below(2) == 0 ? 0 : block + kNewWave);
+    const uint32_t waves = bank + 240;
+    if (random.Below(2) == 0) {
+      Store(base, wave + 4, wave);
+      Store(base, wave + 8, wave);
+    } else {
+      Store(base, waves + 4, wave);
+      Store(base, waves + 8, wave);
+      Store(base, wave + 4, waves);
+      Store(base, wave + 8, waves);
+    }
+    uint8_t flags = guest::LoadU8(base, wave + 25) & ~0x4;
+    if (random.Below(4) == 0) {
+      flags |= 0x4;
+    }
+    guest::StoreU8(base, wave + 25, flags);
+    Store(base, wave + 40, random.Below(8) == 0 ? uint32_t(random.Next()) : random.Below(7));
+  };
+  const auto frames = [&](uint32_t notify_frame) {
+    return [&, notify_frame](Outputs& out, PPCContext& t) {
+      out.Bytes(Read(base, t.r1.u32 - notify_frame + 80, 32));
+      out.Bytes(Read(base, t.r1.u32 - notify_frame - 112 + 144, 32));
+    };
+  };
+  struct Function {
+    const char* name;
+    GuestFunction recompiled;
+    GuestFunction native;
+    uint32_t notify_frame;  // Notify's frame below the stack pointer
+  };
+  const Function functions[] = {
+      {"XACTWave::Release (sub_825D28D0)", __imp__sub_825D28D0, hooks::XactWaveRelease,
+       112 + 160},
+      {"XACTWave::~XACTWave (sub_825D29E8)", __imp__sub_825D29E8, hooks::XactWaveDestruct,
+       96 + 112 + 160},
+      {"XACTInMemoryWave::~XACTInMemoryWave, deleting, kept (sub_825D3820)", __imp__sub_825D3820,
+       hooks::XactInMemoryWaveDeletingDestruct, 112 + 96 + 112 + 160},
+  };
+  for (const Function& f : functions) {
+    Results results(f.name);
+    for (int c = 0; c < 128; c++) {
+      WaveCase(h, results, block, f.recompiled, f.native,
+               [&](Random& random, PPCContext& t) {
+                 world(random, t);
+                 t.r3.u64 = wave;
+                 t.r4.u64 = uint32_t(random.Next()) & ~1u;  // kept: bit 0 clear
+               },
+               frames(f.notify_frame), floats, fmt::format("case {}", c));
+    }
+    results.Report();
+  }
+  {
+    // Freed: the wave from the allocation layer (XMemAlloc with its
+    // attributes) for each version, a copy of the block's, linked to
+    // itself; compared: the block and whether r3 is the wave.
+    Results results("XACTInMemoryWave::~XACTInMemoryWave, deleting, freed (sub_825D3820)");
+    if (hooks::NativeHeapActive()) {
+      for (int c = 0; c < 48; c++) {
+        WaveCase(h, results, block, __imp__sub_825D3820, hooks::XactInMemoryWaveDeletingDestruct,
+                 [&](Random& random, PPCContext& t) {
+                   world(random, t);
+                   const uint32_t object =
+                       memory::crt::XMemAlloc(base, 96, xact::kInMemoryWaveAttributes);
+                   for (uint32_t i = 0; i < 96; i += 4) {
+                     Store(base, object + i, Load(base, wave + i));
+                   }
+                   Store(base, object + 4, object);
+                   Store(base, object + 8, object);
+                   t.r3.u64 = object;
+                   t.r4.u64 = 1 | (uint32_t(random.Next()) & ~1u);
+                   t.r31.u64 = object;  // kept for the comparison below
+                 },
+                 [&](Outputs& out, PPCContext& t) {
+                   out.Word(t.r3.u32 == t.r31.u32 ? 1 : 0);
+                 },
+                 floats, fmt::format("case {}", c));
+      }
+    }
+    results.Report();
+  }
+  {
+    Results results("XACTInMemoryWave::Stop (sub_825D3A28)");
+    for (int c = 0; c < 192; c++) {
+      WaveCase(h, results, block, __imp__sub_825D3A28, hooks::XactInMemoryWaveStop,
+               [&](Random& random, PPCContext& t) {
+                 world(random, t);
+                 if (Load(base, wave + 44) == 0) {
+                   Store(base, wave + 44, block + kXactVoice);
+                 }
+                 Store(base, wave + 16, random.Below(2) == 0 ? 0 : uint32_t(random.Next()));
+                 t.r3.u64 = wave;
+                 t.r4.u64 = Pick(random, {0, 0, 1, 1, 2, uint32_t(random.Next())});
+                 t.r5.u64 = Pick(random, {0, 1, uint32_t(random.Next())});
+               },
+               frames(112 + 112 + 160), floats, fmt::format("case {}", c));
+    }
+    results.Report();
+  }
+  helpers::SetClocksForHarness(std::nullopt, std::nullopt);
+}
+
 }  // namespace
 
 void XactWaves(Context& h) {
@@ -993,6 +1125,7 @@ void XactWaves(Context& h) {
   Waves(h, block.address);
   WaveCalls(h, block.address);
   Notifications(h, block.address);
+  Releases(h, block.address);
 }
 
 }  // namespace harness

@@ -11,6 +11,7 @@
 #include "base/log.h"
 #include "graphics/video_output.h"
 #include "guest.h"
+#include "memory/c_runtime_heap.h"
 
 #include <initializer_list>
 
@@ -584,6 +585,121 @@ uint32_t WaveSetState(uint8_t* base, uint32_t wave, uint32_t state, uint32_t fra
   }
   Store(base, wave + 40, state);
   return r3;
+}
+
+// --- Releasing and stopping waves ---
+
+namespace {
+
+constexpr uint32_t kReleaseFrame = 112;
+constexpr uint32_t kDestructFrame = 96;
+constexpr uint32_t kSetStateFrame = 112;
+constexpr uint32_t kListBaseVtable = 0x82075344;  // XACT's base vtable
+
+}  // namespace
+
+uint32_t WaveRelease(uint8_t* base, uint32_t wave, uint32_t frame, const GuestCall& call) {
+  ITC_NATIVE_RUNNING("sub_825D28D0 XACTWave::Release");
+  guest::StoreU8(base, wave + 25, uint8_t(guest::LoadU8(base, wave + 25) | 0x4));
+  const uint32_t next_node = Load(base, wave + 4);
+  if (next_node != wave) {
+    const uint32_t previous = Load(base, wave + 8);
+    if (previous != wave) {
+      Store(base, next_node + 8, previous);
+      Store(base, Load(base, wave + 8) + 4, Load(base, wave + 4));
+      Store(base, wave + 4, wave);
+      Store(base, wave + 8, wave);
+    }
+  }
+  const uint32_t next = Load(base, wave + 56);
+  if (next != 0) {
+    CallAt(call, xa::Method(base, next, 0), 0x825D2944, Args({next, 1}), frame);
+  }
+  const uint32_t owner = Load(base, wave + 48);
+  if (owner != 0) {
+    // r4 as the original leaves it (the caller's, or 1 after the next wave).
+    xa::Regs regs;
+    regs.r[regs.count++] = owner;
+    CallAt(call, xa::Method(base, owner, 28), 0x825D2960, regs, frame);
+  }
+  const uint32_t voice = Load(base, wave + 44);
+  if (voice != 0) {
+    const uint32_t renderer = Load(base, Load(base, wave + 20) + 12);
+    CallAt(call, xa::Method(base, renderer, 12), 0x825D2984, Args({renderer, voice}), frame);
+  }
+  const int32_t state = int32_t(Load(base, wave + 40));
+  if (state >= 3 && state < 5) {
+    Store(base, wave + 40, 5);
+    SetRegs(call, Args({wave, 13}));
+    WaveNotify(base, wave, 13, xa::FrameBelow(base, frame, kNotifyFrame), call);
+  }
+  Store(base, wave + 40, 5);
+  const uint32_t listener = Load(base, wave + 36) + 4;
+  return CallAt(call, xa::Method(base, listener, 4), 0x825D29CC, Args({listener, wave + 12}),
+                frame);
+}
+
+uint32_t WaveDestruct(uint8_t* base, uint32_t wave, uint32_t frame, const GuestCall& call) {
+  ITC_NATIVE_RUNNING("sub_825D29E8 XACTWave::~XACTWave");
+  Store(base, wave + 0, kWaveVtable);
+  Store(base, wave + 12, kWaveListenerVtable);
+  uint32_t r3 = wave;
+  if ((guest::LoadU8(base, wave + 25) & 0x4) == 0) {
+    SetRegs(call, Args({wave}));
+    r3 = WaveRelease(base, wave, xa::FrameBelow(base, frame, kReleaseFrame), call);
+  }
+  Store(base, wave + 0, kListBaseVtable);
+  return r3;
+}
+
+uint32_t InMemoryWaveDeletingDestruct(uint8_t* base, uint32_t wave, uint32_t flags,
+                                      uint32_t frame, const GuestCall& call) {
+  ITC_NATIVE_RUNNING("sub_825D3820 XACTInMemoryWave::~XACTInMemoryWave (deleting)");
+  Store(base, wave + 0, kInMemoryWaveVtable);
+  Store(base, wave + 12, kWaveListenerVtable);
+  SetRegs(call, Args({wave}));
+  WaveDestruct(base, wave, xa::FrameBelow(base, frame, kDestructFrame), call);
+  if ((flags & 1) != 0) {
+    SetRegs(call, Args({wave, kInMemoryWaveAttributes}));
+    memory::crt::XMemFree(wave, kInMemoryWaveAttributes);
+  }
+  return wave;
+}
+
+uint32_t InMemoryWaveStop(uint8_t* base, uint32_t wave, uint32_t mode, uint32_t exit_loop,
+                          uint32_t frame, const GuestCall& call) {
+  ITC_NATIVE_RUNNING("sub_825D3A28 XACTInMemoryWave::Stop");
+  const auto set_state = [&](uint32_t state) {
+    SetRegs(call, Args({wave, state}));
+    WaveSetState(base, wave, state, xa::FrameBelow(base, frame, kSetStateFrame), call);
+  };
+  const int32_t state = int32_t(Load(base, wave + 40));
+  if (state == 5) {
+    return 0;
+  }
+  if (state == 4 && (int32_t(Load(base, wave + 16)) != 0 || int32_t(mode) != 0)) {
+    return 0;
+  }
+  if (state != 3 && state != 4) {
+    set_state(5);
+    return 0;
+  }
+  if (mode == 0) {
+    Store(base, wave + 16, 1);
+    set_state(4);
+    const uint32_t voice = Load(base, wave + 44);
+    return VoiceSlotStop(base, voice, 1, frame, 0x825D3B04, call);
+  }
+  if (mode != 1) {
+    return 0;
+  }
+  set_state(4);
+  if (int32_t(exit_loop) == 0) {
+    return 0;
+  }
+  const uint32_t voice = Load(base, wave + 44);
+  guest::StoreU8(base, wave + 24, 0);
+  return CallAt(call, xa::Method(base, voice, 52), 0x825D3AD0, Args({voice}), frame);
 }
 
 }  // namespace xact

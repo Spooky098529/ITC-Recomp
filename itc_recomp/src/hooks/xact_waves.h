@@ -34,6 +34,11 @@ void XactInMemoryWaveUpdate(PPCContext& ctx, uint8_t* base);    // sub_825D3890
 void XactEngineSendNotification(PPCContext& ctx, uint8_t* base);  // sub_825C1388
 void XactWaveNotify(PPCContext& ctx, uint8_t* base);              // sub_825D2030
 void XactWaveSetState(PPCContext& ctx, uint8_t* base);            // sub_825D24D8
+// Releasing and stopping waves.
+void XactWaveRelease(PPCContext& ctx, uint8_t* base);                    // sub_825D28D0
+void XactWaveDestruct(PPCContext& ctx, uint8_t* base);                   // sub_825D29E8
+void XactInMemoryWaveDeletingDestruct(PPCContext& ctx, uint8_t* base);   // sub_825D3820
+void XactInMemoryWaveStop(PPCContext& ctx, uint8_t* base);               // sub_825D3A28
 // These run the original (`__imp__`) where the plain C++ declines.
 void XactTrackGetVolume(PPCContext& ctx, uint8_t* base);         // sub_825D0268
 void XactWaveGetStartPosition(PPCContext& ctx, uint8_t* base);   // sub_825D2170
