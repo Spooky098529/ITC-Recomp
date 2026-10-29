@@ -211,5 +211,6 @@ void XAudio(Context& h);
 void XAudioEngine(Context& h);
 void XactWaves(Context& h);
 void XactTracks(Context& h);
+void XAudioObjects(Context& h);
 
 }  // namespace harness
