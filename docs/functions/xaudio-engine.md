@@ -86,6 +86,25 @@ are read once at boot. The barrier's spin (`db16cyc`) and the threads'
 processor numbers are part of the original's behavior that a migration
 keeps (B7 changes no behavior).
 
+**Native so far** (the B7 loop's migration 1, 2026-10-29,
+`--native_xaudio_engine`, `src/xaudio/engine.cpp` behind
+`src/hooks/xaudio_engine.cpp`, harness `xaudio_engine`): every function
+here that ran in play but the seven that make, set, wait on or register
+the kernel objects above, which stay recompiled for the user's call:
+`XAudio::CreateEngine`, `XAudioEngine::Create` and `Init` (the threads,
+the events, the semaphore and the title terminate notification),
+`XAudio::MixerCallback` and `XAudioEngine::Mix` (the events and the
+mixer's lock), `XAudio::MasterThread` (the events and the semaphore) and
+`XAudio::WorkerThread` (the semaphore). The voice lists' spin lock is taken
+as the original does (`xaudio::SpinTake`, `SpinRelease`). Harness notes:
+`XAudioEngine::XAudioEngine` writes [`0x82954F08`], so its cases run while
+the harness holds the mixer's lock with our output thread waiting on it
+(the callback reads the pointer before `Mix` takes the lock), and put the
+live engine back before leaving it; the mastering voice's driver slot +32
+is `sub_824657C8` (`AudioRenderDriver::Register` with no callback), so its
+cases make the driver over zeroed memory (no handle to unregister), as the
+game's default allocator's is.
+
 Shared rows: XAudioInitialize (`sub_8245A760`, `sub_8245A410`) in
 `sound-cues.md`; the category volume and passes (`sub_8245B808`) and
 the XMA set-up (`sub_8245C638`), the render driver's register, submit
