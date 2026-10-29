@@ -39,6 +39,24 @@ When the user has reviewed a run's section, its heading gets
   precedent); paths never seen in play (the random spread, RemoveHelper,
   HasReleaseRpc, SwitchInstance, the RPC steps, the registration
   matcher) go through the guest call.
+- XACT's waves' last two (f1e1ee9..dcdb43e): `XACTInMemoryWave::Prepare`
+  `sub_825D3B10` and `XACTWave::AudioUpdate` `sub_825D2560` (with
+  `XACTWave::Finish` `sub_825D1FD8`, not seen in play, ported inside it);
+  `xact-waves.md` 31 of 31; 12 adapters removed (5 in `xact.md`, 1 in
+  `xact-tracks.md`, 6 in `xact-waves.md`). `XACTPlayWaveEvent::Fire`'s r3
+  now the full 64-bit time as the original leaves it (the harness
+  compares r3 in full, with times past 2^31 ms). Choices to look at:
+  `xaudio::LastCallR3()` (the last guest call's full r3, per thread) and
+  `xaudio::Regs` widened to r3-r10; `GetStartPosition`'s adapter
+  sign-extends r3 as the original's `li`/`lis`; `CreateVoice`
+  `sub_825C31D8` now Wrapped by a harness-only stand-in (records r3-r10
+  and hands back the harness's voice on the harness's thread, else the
+  original; the stand-in rule in "Checking with a harness"); Prepare's
+  reverb level copied as raw bits (the original keeps a signaling NaN
+  through `lfs`/`stfs`); AudioUpdate's cases give a next wave only with
+  an owner (the original reads the owner unchecked there) and skip the
+  first 12 bytes of SendNotification's copy when none is sent (the
+  original's saved registers from XAudio's GetState).
 - XAudio's engine and mixer (map 610125a): `docs/functions/xaudio-engine.md`,
   70 rows (all new; 23 not seen in play: the teardown, the factory's
   id-128 classes, the sizing allocator, the stats callback, the callback
