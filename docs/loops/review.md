@@ -154,6 +154,24 @@ When the user has reviewed a run's section, its heading gets
   the original does, until every user is native. `known-data.md`: the
   voice, reverb submix, wave, variation table; probable cue and sound
   fields. The tracks lead narrowed (the tracks go with the events).
+- XACT's waves' migration 1 (bfb4cbc..4c7a053, `--native_xact_waves`,
+  `src/xact/`): 22 of 30 in play ours (16 adapters removed, 7 of them
+  XAudio's entry points and 5 in `xact.md`). For review: XACT's voice
+  methods call XAudio's plain C++ directly (the car sounds' convention),
+  with or without `--native_xaudio`; the waves call the voice's Start,
+  Stop and FlushPackets through their plain C++ while its slot holds the
+  native function, through the guest call otherwise (the wave bank's
+  AddListener and `GetWaveBank` alike, with the native heap on); Create,
+  Init and the voice's destructor run the original with the native heap
+  off; XACT's lock taken only by `XACTEngine::RequestCommit`, through the
+  guest call at the imports' thunks (the 2026-10-29 call); harness gaps:
+  frame words compared only for GetState and SubmitPacket, Play and
+  PrepareNext always given a voice and a new wave, deferred starts only
+  on playing voices, Create without a reverb and its failure paths;
+  `sub_82379D50`'s adapter stays (called from XAudioVoice::Pass's
+  recompiled code). Row correction: `GetStartPosition` uses the count
+  byte while +25's bit 0x20 is clear. Sound: the same counters as
+  `--native_xact_waves=false`.
 
 ## Run 2026-10-28 18:45 (`b7-loop-28-10-26-2`)
 
