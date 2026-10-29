@@ -22,6 +22,7 @@
 #include <fmt/format.h>
 
 #include <bit>
+#include <cmath>
 #include <string>
 #include <vector>
 
@@ -487,6 +488,40 @@ void Construction(Context& h, uint32_t block) {
                  __imp__sub_8246A758(release, h.base);
                },
                fmt::format("type {} case {}", type, i));
+    }
+    results.Report();
+  }
+  {
+    // An XMA codec made by the recompiled create in both versions, then
+    // destroyed through its inner's slot +0 (the recompiled one, or ours,
+    // which runs XmaCodec::~XmaCodec): the XMA side's release (sub_8246A758,
+    // recompiled in both) frees the XMA object and zeroes +184. A create
+    // that failed (none seen) destroys a zeroed codec in the block instead.
+    Results results("sub_8246A918 (XmaCodec::~XmaCodec sub_8246AAD0, with the XMA side's "
+                    "release sub_8246A758)");
+    for (int i = 0; i < 24; i++) {
+      RealCase(h, results, block, __imp__sub_8246A918, hooks::XAudioXmaCodecInnerDestroy,
+               [&](Random& random, PPCContext& t, uint32_t allocator) {
+                 CodecDescriptor(h.base, block + 0x1800, random, 4, true);
+                 Store(h.base, block + 0x1F00, 0);
+                 PPCContext create = t;
+                 create.r3.u64 = block + 0x1800;
+                 create.r4.u64 = allocator;
+                 create.r5.u64 = block + 0x1F00;
+                 __imp__sub_82466BA0(create, h.base);
+                 uint32_t codec = guest::LoadU32(h.base, block + 0x1F00);
+                 if (codec == 0) {
+                   codec = block + 0x100;
+                   for (uint32_t k = 0; k < 0x200; k += 4) {
+                     Store(h.base, codec + k, 0);
+                   }
+                 }
+                 t.r3.u64 = codec + 4;
+               },
+               [&](Outputs& out, uint32_t) {
+                 out.Word(guest::LoadU32(h.base, block + 0x1F00) != 0);
+               },
+               fmt::format("case {}", i));
     }
     results.Report();
   }
@@ -998,7 +1033,20 @@ void MatrixAndMeter(Context& h, uint32_t block) {
                    t.r4.u64 = levels;
                    t.r5.u64 = random.Below(2) == 0 ? 0 : random.Next();
                  },
-                 none, fmt::format("case {}", i));
+                 [&](Outputs& out, uint32_t) {
+                   // The entries' levels (+4, +8: lfs and stfs) as floats,
+                   // NaNs then made one value in the block's bytes.
+                   for (uint32_t k = 0; k < 9; k++) {
+                     const uint32_t entry = block + 0x140 + 12 * k;
+                     out.Floats(h.base, entry + 4, 2);
+                     for (uint32_t w = 4; w <= 8; w += 4) {
+                       if (std::isnan(std::bit_cast<float>(guest::LoadU32(h.base, entry + w)))) {
+                         Store(h.base, entry + w, 0x7FC00000);
+                       }
+                     }
+                   }
+                 },
+                 fmt::format("case {}", i));
     }
     results.Report();
   }
