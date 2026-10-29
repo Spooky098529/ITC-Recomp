@@ -654,6 +654,161 @@ void Waves(Context& h, uint32_t block) {
   }
 }
 
+
+// --- The waves' calls over fake objects ---
+//
+// The owner (+0x1300, its cue at +0x1400 through +0x1340, +0x1380 and
+// +0x13C0), the renderer (+0x1600, the engine's +12), the engine (+0x1800,
+// its critical section at +144 initialized for each version), a sound bank
+// (+0x1680, its cached wave banks at +0x1700), a wave bank (+0x1900, its
+// wave list at +240 empty), a new wave (+0x1A00) and a voice (+0x1A40)
+// share one vtable (+0x1D00) of XAudioVoice::AddRef recorders (the count at
+// +4 up and in r3), each count random with a failure (near 0x9FFFFFFF) one
+// time in four. The wave at +0x400 holds the engine, the owner (or none)
+// and a voice: XACT's (+0x100, over the fake XAudio voices: its methods'
+// plain C++), the fake one, or none.
+constexpr uint32_t kOwner = 0x1300, kCue = 0x1400, kRenderer = 0x1600, kSoundBank = 0x1680,
+                   kEngine = 0x1800, kWaveBank = 0x1900, kNewWave = 0x1A00, kFakeVoice = 0x1A40,
+                   kFakeVtable = 0x1D00;
+
+uint32_t Count(Random& random) {
+  return random.Below(4) == 0 ? 0x9FFFFFF0u + random.Below(32) : random.Below(3);
+}
+
+void FakeObject(uint8_t* base, uint32_t block, uint32_t object, Random& random) {
+  Store(base, object, block + kFakeVtable);
+  Store(base, object + 4, Count(random));
+}
+
+void CallWorld(Context& h, uint32_t block, Random& random, PPCContext& t, bool playing) {
+  uint8_t* base = h.base;
+  FakeVoices(base, block, random);
+  if (playing) {
+    // XACT's voice's deferred starts on playing XAudio voices only.
+    for (uint32_t k = 0; k < kVoiceCount; k++) {
+      guest::StoreU8(base, FakeVoice(block, k) + 61, guest::LoadU8(base, FakeVoice(block, k) + 61) | 1);
+    }
+  }
+  FakeXactVoice(base, block, random, 0);
+  for (uint32_t slot = 0; slot < 0x100; slot += 4) {
+    Store(base, block + kFakeVtable + slot, 0x8245F860);
+  }
+  for (const uint32_t at : {kOwner, kOwner + 0x40, kOwner + 0x80, kOwner + 0xC0, kRenderer,
+                            kSoundBank, kWaveBank, kNewWave, kFakeVoice}) {
+    FakeObject(base, block, block + at, random);
+  }
+  Store(base, block + kOwner + 44, block + kOwner + 0x40);
+  Store(base, block + kOwner + 0x40 + 16, block + kOwner + 0x80);
+  Store(base, block + kOwner + 0x80 + 20, block + kOwner + 0xC0);
+  Store(base, block + kOwner + 0xC0 + 48, block + kCue);
+  Store(base, block + kCue + 296, block + kSoundBank);
+  Store(base, block + kSoundBank + 244, block + 0x1700);
+  for (uint32_t i = 0; i < 4; i++) {
+    Store(base, block + 0x1700 + 4 * i, block + kWaveBank);
+  }
+  Store(base, block + kWaveBank + 240, block + kWaveBank + 240);
+  Store(base, block + kWaveBank + 244, block + kWaveBank + 240);
+  Store(base, block + kWaveBank + 248, block + kWaveBank + 240);
+  Store(base, block + kEngine + 12, block + kRenderer);
+  PPCContext c = t;
+  c.r3.u64 = block + kEngine + 144;
+  __imp__RtlInitializeCriticalSection(c, base);
+  const uint32_t wave = block + kWave;
+  Store(base, wave + 20, block + kEngine);
+  Store(base, wave + 48, random.Below(4) == 0 ? 0 : block + kOwner);
+  const uint32_t pick = random.Below(4);
+  Store(base, wave + 44, pick == 0 ? 0 : pick == 1 ? block + kFakeVoice : block + kXactVoice);
+  t.r3.u64 = wave;
+}
+
+void WaveCalls(Context& h, uint32_t block) {
+  std::vector<uint32_t> floats;
+  for (uint32_t k = 0; k < kVoiceCount; k++) {
+    floats.push_back(kVoices + kVoiceBytes * k + 112);
+    floats.push_back(kVoices + kVoiceBytes * k + 140);
+  }
+  const auto none = [](Outputs&, PPCContext&) {};
+  {
+    // The cue's three flags each set or clear; the voice the fake one or
+    // none (XACT's methods at +28, +32 and +48 aren't native).
+    Results results("XACTWave::SetVoice (sub_825D1DF8)");
+    for (int c = 0; c < 96; c++) {
+      WaveCase(h, results, block, __imp__sub_825D1DF8, hooks::XactWaveSetVoice,
+               [&](Random& random, PPCContext& t) {
+                 CallWorld(h, block, random, t, false);
+                 for (const uint32_t at : {348u, 316u, 72u}) {
+                   Store(h.base, block + kCue + at, random.Below(2) == 0 ? 0 : uint32_t(random.Next()));
+                 }
+                 t.r4.u64 = random.Below(4) == 0 ? 0 : block + kFakeVoice;
+               },
+               none, floats, fmt::format("case {}", c));
+    }
+    results.Report();
+  }
+  {
+    Results results("XACTInMemoryWave::Play (sub_825D3938)");
+    for (int c = 0; c < 128; c++) {
+      WaveCase(h, results, block, __imp__sub_825D3938, hooks::XactInMemoryWavePlay,
+               [&](Random& random, PPCContext& t) {
+                 const uint32_t deferred = random.Below(2) == 0 ? 0 : uint32_t(random.Next());
+                 CallWorld(h, block, random, t, deferred != 0);
+                 // Play reads its voice without a check (as in play, where
+                 // Prepare made one): never none here.
+                 if (Load(h.base, block + kWave + 44) == 0) {
+                   Store(h.base, block + kWave + 44, block + kXactVoice);
+                 }
+                 t.r4.u64 = deferred;
+               },
+               none, floats, fmt::format("case {}", c));
+    }
+    results.Report();
+  }
+  {
+    Results results("XACTWave::Pause (sub_825D1ED8)");
+    for (int c = 0; c < 128; c++) {
+      WaveCase(h, results, block, __imp__sub_825D1ED8, hooks::XactWavePause,
+               [&](Random& random, PPCContext& t) {
+                 CallWorld(h, block, random, t, true);
+                 const uint32_t r = random.Below(4);
+                 t.r4.u64 = r == 0 ? 0 : r == 1 ? 1 : random.Next();
+               },
+               none, floats, fmt::format("case {}", c));
+    }
+    results.Report();
+  }
+  {
+    // The owner's bank byte (the frame's +80, small) and the new wave (the
+    // frame's +84, the fake one: the original reads it unchecked once
+    // CreateWave succeeds) from the stack the case fills, as the owner's and
+    // the bank's recorders leave them.
+    Results results("XACTWave::PrepareNext (sub_825D2778)");
+    for (int c = 0; c < 128; c++) {
+      WaveCase(h, results, block, __imp__sub_825D2778, hooks::XactWavePrepareNext,
+               [&](Random& random, PPCContext& t) {
+                 CallWorld(h, block, random, t, false);
+                 if (Load(h.base, block + kWave + 48) == 0) {
+                   Store(h.base, block + kWave + 48, block + kOwner);
+                 }
+                 const uint32_t frame = t.r1.u32 - 112;
+                 guest::StoreU8(h.base, frame + 80, uint8_t(random.Below(4)));
+                 Store(h.base, frame + 84, block + kNewWave);
+                 uint8_t flags = guest::LoadU8(h.base, block + kWave + 25);
+                 if (random.Below(4) != 0) {
+                   flags |= 0x8;
+                 }
+                 guest::StoreU8(h.base, block + kWave + 25, flags);
+                 static constexpr uint8_t kCounts[] = {0, 1, 2, 5, 255};
+                 guest::StoreU8(h.base, block + kWave + 24, kCounts[random.Below(5)]);
+               },
+               [&](Outputs& out, PPCContext& t) {
+                 out.Bytes(Read(h.base, t.r1.u32 - 112 + 80, 8));
+               },
+               floats, fmt::format("case {}", c));
+    }
+    results.Report();
+  }
+}
+
 }  // namespace
 
 void XactWaves(Context& h) {
@@ -665,6 +820,7 @@ void XactWaves(Context& h) {
   VoiceMethods(h, block.address);
   Creates(h, block.address);
   Waves(h, block.address);
+  WaveCalls(h, block.address);
 }
 
 }  // namespace harness

@@ -19,7 +19,11 @@ ITC_FLAG_BOOL(native_xact_waves, true, "ITC",
               "AddListener's plain C++ while its slot holds it); XACTTrack::GetVolume sub_825D0268 "
               "and GetPitch sub_825D02B0; XACTWave::GetStartPosition sub_825D2170; "
               "XACTWave::RequestNext sub_825D1C30; XACTEngine::RequestCommit sub_825D1C78, the "
-              "engine's critical section entered as the original does) natively instead "
+              "engine's critical section entered as the original does; XACTWave::SetVoice "
+              "sub_825D1DF8, XACTInMemoryWave::Play sub_825D3938, XACTWave::Pause sub_825D1ED8 "
+              "and XACTWave::PrepareNext sub_825D2778, the voice's methods through their plain "
+              "C++ while its slots hold them, the owner's and renderer's slots through the "
+              "guest call) natively instead "
               "of through the translated code (the same reads and writes; XAudio's locks stay "
               "the game's, taken as the original does; checked by "
               "--run_harnesses=xact_waves)");
@@ -152,6 +156,37 @@ void XactEngineRequestCommit(PPCContext& ctx, uint8_t* base) {
   });
 }
 
+void XactWaveSetVoice(PPCContext& ctx, uint8_t* base) {
+  const uint32_t wave = ctx.r3.u32, voice = ctx.r4.u32;
+  XAudioFramed(ctx, base, 112, [&](const xaudio::GuestCall& call, uint32_t frame) {
+    return xact::WaveSetVoice(base, wave, voice, frame, call);
+  });
+}
+
+void XactInMemoryWavePlay(PPCContext& ctx, uint8_t* base) {
+  const uint32_t wave = ctx.r3.u32, deferred = ctx.r4.u32;
+  const xaudio::Thread thread = XAudioThreadOf(ctx, base);
+  XAudioFramed(ctx, base, 112, [&](const xaudio::GuestCall& call, uint32_t frame) {
+    return xact::InMemoryWavePlay(base, wave, deferred, thread, frame, call);
+  });
+}
+
+void XactWavePause(PPCContext& ctx, uint8_t* base) {
+  const uint32_t wave = ctx.r3.u32, pause = ctx.r4.u32;
+  const xaudio::Thread thread = XAudioThreadOf(ctx, base);
+  XAudioFramed(ctx, base, 112, [&](const xaudio::GuestCall& call, uint32_t frame) {
+    return xact::WavePause(base, wave, pause, thread, frame, call);
+  });
+}
+
+void XactWavePrepareNext(PPCContext& ctx, uint8_t* base) {
+  const uint32_t wave = ctx.r3.u32;
+  const bool native_heap = NativeHeapActive();
+  XAudioFramed(ctx, base, 112, [&](const xaudio::GuestCall& call, uint32_t frame) {
+    return xact::WavePrepareNext(base, wave, native_heap, frame, call);
+  });
+}
+
 }  // namespace hooks
 
 // The flag's fallback, then the register step.
@@ -196,3 +231,7 @@ ITC_XACT_WAVES_ADAPTER(825D02B0, XactTrackGetPitch)
 ITC_XACT_WAVES_ADAPTER(825D2170, XactWaveGetStartPosition)
 ITC_XACT_WAVES_ADAPTER(825D1C30, XactWaveRequestNext)
 ITC_XACT_WAVES_ADAPTER(825D1C78, XactEngineRequestCommit)
+ITC_XACT_WAVES_ADAPTER(825D1DF8, XactWaveSetVoice)
+ITC_XACT_WAVES_ADAPTER(825D3938, XactInMemoryWavePlay)
+ITC_XACT_WAVES_ADAPTER(825D1ED8, XactWavePause)
+ITC_XACT_WAVES_ADAPTER(825D2778, XactWavePrepareNext)

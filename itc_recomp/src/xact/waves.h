@@ -140,4 +140,50 @@ void WaveRequestNext(uint8_t* base, uint32_t wave, uint32_t value);
 // RtlLeaveCriticalSection's r3.
 uint32_t EngineRequestCommit(uint8_t* base, uint32_t engine, const GuestCall& call);
 
+// The voice's methods these call: the plain C++ while the voice's slot holds
+// the native function (XACTVoice's vtable), else through the guest call.
+constexpr uint32_t kVoiceStart = 0x825C9BF8;         // slot +16
+constexpr uint32_t kVoiceStop = 0x825C9C10;          // slot +20
+constexpr uint32_t kVoiceFlushPackets = 0x825C9C28;  // slot +24
+
+// XACTWave::SetVoice (sub_825D1DF8): +44 = `voice`; with a voice and an
+// owner, the cue's (`[[[[owner + 44] + 16] + 20] + 48]`) outputs: +348 set,
+// the voice's slot +28 with the cue + 340, else +316 set, slot +32 with the
+// cue + 308; then +72 set, the renderer's ([engine + 12]) slot +24 and the
+// voice's slot +48 with the cue's 16-bit +68, that r3's low 16 bits and
+// the cue's +64; all through the guest call. `frame` is this function's
+// (112 bytes). Returns the last r3.
+uint32_t WaveSetVoice(uint8_t* base, uint32_t wave, uint32_t voice, uint32_t frame,
+                      const GuestCall& call);
+// XACTInMemoryWave::Play (sub_825D3938, slot +8): with an owner, its slot
+// +100 (byte +25 bit 0x20 set and a loop count) and +96; unless paused
+// (bit 0x80) the voice's Start with `deferred` (a failure returned at
+// once), RequestCommit when deferred and bit 0x2 set; then bit 0x40 set and
+// the voice's FlushPackets. `frame` is this function's (112 bytes). Returns
+// the last r3.
+uint32_t InMemoryWavePlay(uint8_t* base, uint32_t wave, uint32_t deferred, const Thread& thread,
+                          uint32_t frame, const GuestCall& call);
+// XACTWave::Pause (sub_825D1ED8, slot +36): nothing (0) when the paused bit
+// (byte +25 bit 0x80, as 0 or 1) is `pause` (compared as a word); else the
+// bit set to (`pause` != 0), and with a voice: pausing stops it at once
+// (slot +20 with 1); resuming a started wave (0x2) starts it deferred (slot
+// +16 with 1; a failure returned), RequestCommit, and flushes again (slot
+// +24) when it had been (0x40). `frame` is this function's (112 bytes).
+// Returns 0 or the voice call's r3.
+uint32_t WavePause(uint8_t* base, uint32_t wave, uint32_t pause, const Thread& thread,
+                   uint32_t frame, const GuestCall& call);
+// XACTWave::PrepareNext (sub_825D2778, slot +24): when byte +25 has 0x8
+// (cleared) and the loop count byte +24 isn't 0: the owner's slot +108 (a
+// bank byte at the frame's +80, a 16-bit wave index at +82), the cue's
+// sound bank's (+296) wave bank of that byte (XACTSoundBank::GetWaveBank's
+// plain C++ where it answers and `native_heap`, else through the guest
+// call), its slot +40 (CreateWave, the new wave to the frame's +84), the new
+// wave's slot +4 (Prepare) with the count less one (255 kept), whether any
+// is left, and 0; on success +56 = the new wave, linked at the tail of the
+// bank's wave list (+240); else it's deleted (slot +0 with 1). `frame` is
+// this function's (112 bytes). Returns the last r3 (the wave when nothing
+// is to do).
+uint32_t WavePrepareNext(uint8_t* base, uint32_t wave, bool native_heap, uint32_t frame,
+                         const GuestCall& call);
+
 }  // namespace xact

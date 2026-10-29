@@ -182,4 +182,214 @@ uint32_t EngineRequestCommit(uint8_t* base, uint32_t engine, const GuestCall& ca
   return call(xa::kRtlLeaveCriticalSection, 0x825D1CAC, Args({engine + 144}));
 }
 
+namespace {
+
+constexpr uint32_t kRequestCommitFrame = 112;
+
+// The wave's owner's cue: [[[[owner + 44] + 16] + 20] + 48].
+uint32_t CueOf(uint8_t* base, uint32_t owner) {
+  return Load(base, Load(base, Load(base, Load(base, owner + 44) + 16) + 20) + 48);
+}
+
+// A guest call from `frame` (the caller's own frame).
+uint32_t CallAt(const GuestCall& call, uint32_t function, uint32_t return_address,
+                xa::Regs regs, uint32_t frame) {
+  regs.sp = frame;
+  return call(function, return_address, regs);
+}
+
+// XACTEngine::RequestCommit on the wave's engine, in a frame below `frame`.
+void Commit(uint8_t* base, uint32_t wave, uint32_t frame, const GuestCall& call) {
+  const uint32_t engine = Load(base, wave + 20);
+  SetRegs(call, Args({engine}));
+  xa::FrameBelow(base, frame, kRequestCommitFrame);
+  EngineRequestCommit(base, engine, call);
+}
+
+// The voice's Start (slot +16), Stop (+20) and FlushPackets (+24) from
+// `frame`: the plain C++ while the slot holds it.
+uint32_t VoiceSlotStart(uint8_t* base, uint32_t voice, uint32_t deferred, const Thread& thread,
+                        uint32_t frame, uint32_t return_address, const GuestCall& call) {
+  const uint32_t method = xa::Method(base, voice, 16);
+  if (method == kVoiceStart) {
+    SetRegs(call, Args({voice, deferred}));
+    return VoiceStart(base, voice, deferred, thread, frame, call);
+  }
+  return CallAt(call, method, return_address, Args({voice, deferred}), frame);
+}
+uint32_t VoiceSlotStop(uint8_t* base, uint32_t voice, uint32_t now, uint32_t frame,
+                       uint32_t return_address, const GuestCall& call) {
+  const uint32_t method = xa::Method(base, voice, 20);
+  if (method == kVoiceStop) {
+    SetRegs(call, Args({voice, now}));
+    return VoiceStop(base, voice, now, frame, call);
+  }
+  return CallAt(call, method, return_address, Args({voice, now}), frame);
+}
+uint32_t VoiceSlotFlush(uint8_t* base, uint32_t voice, uint32_t frame, uint32_t return_address,
+                        const GuestCall& call) {
+  const uint32_t method = xa::Method(base, voice, 24);
+  if (method == kVoiceFlushPackets) {
+    SetRegs(call, Args({voice}));
+    return VoiceFlushPackets(base, voice, frame, call);
+  }
+  return CallAt(call, method, return_address, Args({voice}), frame);
+}
+
+}  // namespace
+
+uint32_t WaveSetVoice(uint8_t* base, uint32_t wave, uint32_t voice, uint32_t frame,
+                      const GuestCall& call) {
+  ITC_NATIVE_RUNNING("sub_825D1DF8 XACTWave::SetVoice");
+  Store(base, wave + 44, voice);
+  uint32_t r3 = voice;
+  if (voice == 0) {
+    return r3;
+  }
+  const uint32_t owner = Load(base, wave + 48);
+  if (owner == 0) {
+    return r3;
+  }
+  const uint32_t cue = CueOf(base, owner);
+  if (int32_t(Load(base, cue + 348)) != 0) {
+    if (cue + 340 != 0) {
+      r3 = CallAt(call, xa::Method(base, voice, 28), 0x825D1E78, Args({voice, cue + 340}), frame);
+    }
+  } else if (int32_t(Load(base, cue + 316)) != 0) {
+    if (cue + 308 != 0) {
+      r3 = CallAt(call, xa::Method(base, voice, 32), 0x825D1E78, Args({voice, cue + 308}), frame);
+    }
+  }
+  if (int32_t(Load(base, cue + 72)) == 0) {
+    return r3;
+  }
+  const uint32_t renderer = Load(base, Load(base, wave + 20) + 12);
+  const uint32_t matrix = Load(base, cue + 64);
+  r3 = CallAt(call, xa::Method(base, renderer, 24), 0x825D1EA0, Args({renderer}), frame);
+  const uint32_t now_voice = Load(base, wave + 44);
+  const uint32_t channels = guest::LoadU16(base, cue + 68);
+  if (now_voice == 0) {
+    return r3;
+  }
+  return CallAt(call, xa::Method(base, now_voice, 48), 0x825D1ED0,
+                Args({now_voice, channels, r3 & 0xFFFF, matrix}), frame);
+}
+
+uint32_t InMemoryWavePlay(uint8_t* base, uint32_t wave, uint32_t deferred, const Thread& thread,
+                          uint32_t frame, const GuestCall& call) {
+  ITC_NATIVE_RUNNING("sub_825D3938 XACTInMemoryWave::Play");
+  const uint32_t owner = Load(base, wave + 48);
+  if (owner != 0) {
+    if ((guest::LoadU8(base, wave + 25) & 0x20) != 0 && guest::LoadU8(base, wave + 24) != 0) {
+      CallAt(call, xa::Method(base, owner, 100), 0x825D398C, Args({owner}), frame);
+    }
+    const uint32_t now_owner = Load(base, wave + 48);
+    CallAt(call, xa::Method(base, now_owner, 96), 0x825D39A0, Args({now_owner}), frame);
+  }
+  if ((guest::LoadU8(base, wave + 25) & 0x80) == 0) {
+    const uint32_t voice = Load(base, wave + 44);
+    const uint32_t r3 = VoiceSlotStart(base, voice, deferred, thread, frame, 0x825D39C8, call);
+    if (int32_t(r3) < 0) {
+      return r3;
+    }
+    if (int32_t(deferred) != 0) {
+      Commit(base, wave, frame, call);
+    }
+    guest::StoreU8(base, wave + 25, guest::LoadU8(base, wave + 25) | 0x2);
+  }
+  guest::StoreU8(base, wave + 25, guest::LoadU8(base, wave + 25) | 0x40);
+  return VoiceSlotFlush(base, Load(base, wave + 44), frame, 0x825D3A0C, call);
+}
+
+uint32_t WavePause(uint8_t* base, uint32_t wave, uint32_t pause, const Thread& thread,
+                   uint32_t frame, const GuestCall& call) {
+  ITC_NATIVE_RUNNING("sub_825D1ED8 XACTWave::Pause");
+  const uint8_t flags = guest::LoadU8(base, wave + 25);
+  const int32_t paused = (flags & 0x80) == 0x80 ? 1 : 0;
+  if (int32_t(pause) == paused) {
+    return 0;
+  }
+  const uint8_t now = uint8_t((flags & 0x7F) | (pause != 0 ? 0x80 : 0));
+  const uint32_t voice = Load(base, wave + 44);
+  guest::StoreU8(base, wave + 25, now);
+  if (voice == 0) {
+    return 0;
+  }
+  if (int32_t(pause) != 0) {
+    return VoiceSlotStop(base, voice, 1, frame, 0x825D1F58, call);
+  }
+  if ((now & 0x2) == 0) {
+    return 0;
+  }
+  const uint32_t r30 = VoiceSlotStart(base, voice, 1, thread, frame, 0x825D1F80, call);
+  if (int32_t(r30) < 0) {
+    return r30;
+  }
+  Commit(base, wave, frame, call);
+  if ((guest::LoadU8(base, wave + 25) & 0x40) == 0) {
+    return r30;
+  }
+  return VoiceSlotFlush(base, Load(base, wave + 44), frame, 0x825D1FB8, call);
+}
+
+uint32_t WavePrepareNext(uint8_t* base, uint32_t wave, bool native_heap, uint32_t frame,
+                         const GuestCall& call) {
+  ITC_NATIVE_RUNNING("sub_825D2778 XACTWave::PrepareNext");
+  const uint8_t flags = guest::LoadU8(base, wave + 25);
+  if ((flags & 0x8) == 0) {
+    return wave;
+  }
+  guest::StoreU8(base, wave + 25, flags & 0xF7);
+  if (guest::LoadU8(base, wave + 24) == 0) {
+    return wave;
+  }
+  const uint32_t owner = Load(base, wave + 48);
+  uint32_t r3 = CallAt(call, xa::Method(base, owner, 108), 0x825D27D0,
+                       Args({owner, frame + 82, frame + 80}), frame);
+  if (int32_t(r3) < 0) {
+    return r3;
+  }
+  const uint32_t index = guest::LoadU8(base, frame + 80);
+  const uint32_t sound_bank = Load(base, CueOf(base, Load(base, wave + 48)) + 296);
+  std::optional<uint32_t> found;
+  if (native_heap) {
+    SetRegs(call, Args({sound_bank, index}));
+    found = SoundBankGetWaveBank(base, sound_bank, index);
+  }
+  const uint32_t wave_bank =
+      found ? *found : CallAt(call, 0x825C7218, 0x825D27F8, Args({sound_bank, index}), frame);
+  if (wave_bank == 0) {
+    return 0;
+  }
+  r3 = CallAt(call, xa::Method(base, wave_bank, 40), 0x825D2820,
+              Args({wave_bank, guest::LoadU16(base, frame + 82), Load(base, wave + 48),
+                    frame + 84}),
+              frame);
+  if (int32_t(r3) < 0) {
+    return r3;
+  }
+  uint32_t count = guest::LoadU8(base, wave + 24);
+  if (count != 255) {
+    count = (count + 255) & 0xFF;
+  }
+  uint32_t next = Load(base, frame + 84);
+  r3 = CallAt(call, xa::Method(base, next, 4), 0x825D2868,
+              Args({next, count, count != 0 ? 1u : 0u, 0}), frame);
+  if (int32_t(r3) >= 0) {
+    next = Load(base, frame + 84);
+    const uint32_t list = wave_bank + 240;
+    Store(base, wave + 56, next);
+    Store(base, next + 4, list);
+    Store(base, next + 8, Load(base, list + 8));
+    Store(base, Load(base, list + 8) + 4, next);
+    Store(base, list + 8, next);
+    return r3;
+  }
+  next = Load(base, frame + 84);
+  if (next == 0) {
+    return 0;
+  }
+  return CallAt(call, xa::Method(base, next, 0), 0x825D28B8, Args({next, 1}), frame);
+}
+
 }  // namespace xact
