@@ -166,7 +166,7 @@ extern "C" REX_FUNC(sub_825CED98) {
 }
 // XACTWaveEntry::GetLoopRegion (sub_825CEDF8) has no adapter: its only
 // caller in play, GetWaveRegion, is native.
-ITC_XACT_WORD(825CEE00, WaveEntryGetDuration(base, ctx.r3.u32))
+// No adapter (removed 2026-10-29: only XACTWave::GetStartPosition's plain C++ calls it in play) for XACTWaveEntry::GetDuration sub_825CEE00.
 // XACTWaveEntry::SamplesToMs (sub_825CEE70) has no adapter: its only
 // caller in play, GetWaveDurations, is native.
 ITC_XACT_OPTIONAL(825CF080, WaveEntrySamplesToBytes(base, ctx.r3.u32, ctx.r4.u32, ctx.r5.u32))
@@ -266,17 +266,15 @@ ITC_XACT_OPTIONAL(825C05B0, EngineRemoveInstance(base, ctx.r3.u32, ctx.r4.u32))
 // XACT's; the same results for the game code folded with them), the
 // sound's pitch, the wave banks' listeners and the sound banks' wave bank
 // lookup.
-ITC_XACT_WORD(825CEE10, WaveEntryHasLoopRegion(base, ctx.r3.u32))
+// No adapter (removed 2026-10-29: only XACTWave::GetStartPosition's plain C++ calls it in play) for XACTWaveEntry::HasLoopRegion sub_825CEE10.
 ITC_XACT_WORD(825CEE28, WaveEntryGetFormatTag(base, ctx.r3.u32))
-ITC_XACT_WORD(825CEEA0, WaveEntryMsToSamples(base, ctx.r3.u32, ctx.r4.u32))
+// No adapter (removed 2026-10-29: only XACTWave::GetStartPosition's plain C++ calls it in play) for XACTWaveEntry::MsToSamples sub_825CEEA0.
 // XACTWaveEntry::GetPlayLength (sub_82099BA0, folded) has no adapter: its
 // only caller in play, GetWaveRegion, is native.
-ITC_XACT_WORD(820A8958, WaveEntryGetLoopStart(base, ctx.r3.u32))
+// No adapter (removed 2026-10-29: only XACTWave::GetStartPosition's plain C++ calls it in play) for the folded getter GetLoopStart sub_820A8958.
 ITC_XACT_WORD(82379D50, WaveEntryGetLoopLength(base, ctx.r3.u32))
-extern "C" REX_FUNC(sub_825CAC48) {
-  ITC_XACT_FALLBACK(825CAC48)
-  ctx.f1.f64 = SoundGetPitch(base, ctx.r3.u32);
-}
+// No adapter (removed 2026-10-29: only XACTTrack::GetPitch's plain C++ calls it in play) for
+// XACTSound::GetPitch sub_825CAC48.
 ITC_XACT_HEAP_WORD(825C8690, WaveBankAddListener(base, ctx.r3.u32, ctx.r4.u32))
 ITC_XACT_WORD(825C8540, WaveBankRemoveListener(base, ctx.r3.u32, ctx.r4.u32))
 // XACTEngine::FindWaveBank (sub_825C0360) has no adapter: its only caller,

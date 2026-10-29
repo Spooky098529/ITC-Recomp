@@ -188,7 +188,8 @@ ITC_XACT_WAVES_ADAPTER(825C9BF8, XactVoiceStart)
 ITC_XACT_WAVES_ADAPTER(825C9C10, XactVoiceStop)
 ITC_XACT_WAVES_ADAPTER(825C9C28, XactVoiceFlushPackets)
 ITC_XACT_WAVES_HEAP_ADAPTER(825CA448, XactVoiceDeletingDestruct)
-ITC_XACT_WAVES_ADAPTER(825D23F0, XactWaveConstruct)
+// No adapter (removed 2026-10-29: only XACTInMemoryWave::XACTInMemoryWave's plain C++ calls it
+// in play) for XACTWave::XACTWave sub_825D23F0.
 ITC_XACT_WAVES_ADAPTER(825D37A8, XactInMemoryWaveConstruct)
 ITC_XACT_WAVES_ADAPTER(825D0268, XactTrackGetVolume)
 ITC_XACT_WAVES_ADAPTER(825D02B0, XactTrackGetPitch)
