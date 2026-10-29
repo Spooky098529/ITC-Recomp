@@ -1,0 +1,289 @@
+# Known functions: XAudio's factory objects
+
+**The objects XAudio's factory makes** (the engine's +60, by class id,
+`XAudioFactory::Create` and the factory's slots in `xaudio-engine.md`):
+the source voices' codecs (the object at the source voice's +76 that
+reads its packets, PCM or XMA, and resamples them into the voice's
+buffer), the output matrix objects (one per output of a voice, mixing
+its channels into the target's), the render driver object of the
+mastering voice, and the effects (a reverb, a volume meter and two not
+seen in play). XAudio, the Xbox 360's low-level audio library, is linked
+into the game like XACT above it (`xact.md`); its voices are in
+`xaudio.md`, its engine and mixer in `xaudio-engine.md`, how the game's
+audio works in `../native-audio.md`. Translated as the game's code (the
+user's call for XACT, 2026-10-23, followed for XAudio). Every voice
+method in `xaudio.md` that reaches its codec or matrices calls these
+objects through their vtables, so the voices' migration waits on them.
+Read by the B7 loop's mapping agent, 2026-10-29, from the lead on the
+factory's objects with the XAPO lead beside it; the reverb's and the
+resampler's signal code (vector code, ~5,000 lines) is read in outline
+only.
+
+**The class tables.** XAudio's default (`0x8204A7B0`: a count byte 4,
+the 12-byte entries at `0x8204A780`) has ids 0 to 3; the game passes its
+own to XAudioInitialize (`AudioEngine::StartXAudio`, `sound-cues.md`: a
+count byte 7, the entries at `0x820713E0`), ids 0 to 6. Each entry:
++0 the id byte, +4 the size function, +8 the create function (both
+`(descriptor, allocator or size out, out)`; the factory's slots in
+`xaudio-engine.md` call them; its notes there call +4 the first and +8
+the second function). The descriptor: +0 the class id, +4 the owner
+(probably the voice; copied to the object's +12), +8 on the 56-byte source format
+for a codec (+8 its type: 0-3 PCM, 4 XMA; +12 the channels or XMA
+streams; +16 the rate), +64 a float, +68 the packet count, +69 a byte,
++72 and +76 the callbacks. The ids:
+
+| Id | Class | Size, create | Size in bytes |
+|---|---|---|---|
+| 0 | The source codec: PCM (format type 0-3) or XMA (4) | `sub_82466B78`, `sub_82466BA0` | PCM 272 + 120 × the packets; XMA 284 + 120 × the packets + 88 × the streams |
+| 1 | The output matrix | `sub_82466840`, `sub_82466888` | 28 + 12 × the entries |
+| 2 | The render driver (`AudioRenderDriver`, `audio.md`, `xaudio-engine.md`) | `sub_824658B8`, `sub_82465970` (never called: the mastering voice makes its own) | 20 |
+| 3 | The reverb (probably XAudio's I3DL2 reverb) | `sub_82463B78`, `sub_82465710` | 309,936 (`0x4BAB0`) |
+| 4 | The volume meter (probably) | `sub_825A60E0`, `sub_825A6460` | 52 + 12 × channels × frames |
+| 5 | An effect, not seen in play | `sub_825A5828`, `sub_825A5DB8` | 332 |
+| 6 | An effect, not seen in play | `sub_825A2360`, `sub_825A50E0` | 2,092 |
+
+**The objects' layout.** Each object is an outer interface at +0 (the
+vtable the voices call) over an inner object at +4 (vtable, +8 the
+reference count, +12 the owner; first written `0x8204AA58`, the
+shared base), with the class's own fields after. The outer vtables share
+their first slots: +0 AddRef (`sub_82460370`, `xaudio-engine.md`), +4
+Release (`XAudioObject::Release` `sub_8246CE70`), +8 the info (a
+byte and a half-word: 4 and 10 for a codec, 6 and 0 for a matrix, 6 and
+3,750 for the reverb, `sub_82461EF8` in `xaudio-engine.md`, 1 and 1 for
+the meter), +20 the allocator out (`sub_82465418`, not seen), +24 the
+process (one 256-frame pass). The inner vtables: +0 the destructor,
++12 the deleting call (`sub_8245AAB8`, `xaudio-engine.md`), +16 the
+count (`sub_820911F8`, shared). Vtables: the PCM codec `0x8204BB48`
+(inner `0x8204BB20`, codec base `0x8204BAC0`), the XMA codec
+`0x8204BA40` (`0x8204BA18`, `0x8204B9B8`), the codec base's own
+`0x8204B958` and `0x8204AB70`, the matrix `0x8204AB30` (`0x8204AB14`),
+the reverb `0x8204AAB0` (`0x8204AA94`), the render driver `0x8204AAEC`
+(`0x8204AAD0`), the meter `0x8207229C`. Layouts in `../known-data.md`.
+
+**The codec's slots** (the source voice's calls, `xaudio.md`): +24 the
+process (`PcmCodec::Process`; `XmaVoice::Update` for XMA, `audio.md`),
++28 submit a packet, +32 flush the queue, +36 submit a packet with a
+sample region, +40 flush again (the same function), +44 the state,
++48 start, +52 stop, +56 end of stream, +88 the volume, +96 the pitch
+(in octaves: 2^x), +104 the frequency ratio, +112 the format, +120 (XMA
+only) the set-up (`sub_8246AEE0`, `audio.md`). The codec base (at +16 of
+both codecs) holds the packet queue: two lists (+4 queued, +16 free,
+each a head with the node's offset at +8), 120-byte packet entries, the
+56-byte format at +36, the block size at +92, the state byte at +156
+(bit 0 playing, bit 1 just started, bit 2 stopping: fading out over +158
+passes, 10, halving the volume each pass; bit 3 end of stream, bit 4
+starved, bit 5 queue empty) and the callbacks (+160 a packet done, +164
+a loop end; probably the voice's).
+
+**The resampler.** Both codecs convert their samples to the voice's
+48 kHz float buffer through a 96-byte converter state (the PCM codec's
++184, the XMA codec's per stream; `Resampler::Process` `sub_8246F140`):
+it picks a kernel from the table at `0x8204CF08` (100 entries) by the
+ratio's case (any, equal rates, 2:1; a vector or a scalar set), the
+input format (+12) and the channel count (+13), and calls it. Six
+kernels ran in play (16-bit PCM, mono and stereo, probably); the other
+94 (`82472000`-`82480000`) aren't given rows (not seen in play).
+
+**The locks and the hardware.** Most of these functions take the voice
+lists' spin lock `0x82954F10` inline (`KeRaiseIrqlToDpcLevel`,
+`KeAcquireSpinLockAtRaisedIrql`, `KeReleaseSpinLockFromRaisedIrql`,
+`KfLowerIrql`), on the game threads (the voices' methods) and on the
+mixer's (the passes): covered by the user's call (2026-10-29, "Precedent
+first" in `../loops/b7-loop.md`: native code takes the game's own lock
+exactly as the original does, until every user is native). No other
+kernel object. The reverb's pass reads `QueryPerformanceCounter`
+(`sub_825BA0C8`, already ours: the host's steady clock, the user's call,
+2026-10-29) to time itself into its +0x4BAA0 and +0x4BAA8 (read by
+nothing found). **XMA:** the XMA codec's functions that reach the XMA
+hardware's contexts keep their rows in `audio.md` (shared, named there):
+`XmaVoice::Update` (`sub_8246C320`, slot +24, still recompiled), its
+input and output sides (`sub_8246B480`, `sub_8246BB98`), the set-up and
+release of its XMA object (`sub_8246AEE0`, `sub_8246A758`), its start
+and end (`sub_8246BE20`, `sub_8246BFD8`: the contexts made and
+released), its stop and flush (`sub_8246B0C8`, `sub_8246B1C8`), the
+frame walks (`sub_8246A5F8`, Overridden, and `sub_8246A698`). Below them
+the XMA object's helpers (`8245Cxxx`-`8245Dxxx`, `audio.md`) are already
+replaced or Dropped by B2 (the decoded samples come from our FFmpeg:
+`XmaObject::Unlock` `sub_8245D4D0` Overridden, the hardware wait
+`sub_8245D288` and `XmaObject::IsLocked` `sub_8245D350` Dropped), or
+still recompiled where they only keep the contexts' records. None of the
+XMA rows here touch the XMA object or its registers: they set the
+codec's own fields (the submit mode +266, the streams' volume and rate).
+Porting the XMA side stays under "Not emulating" (CLAUDE.md): the
+contexts' records are data the replaced decoder reads, not hardware to
+imitate.
+
+Not here: the voices (`xaudio.md`), the engine, its factory and
+allocators (`xaudio-engine.md`), the XMA voice's hardware side
+(`audio.md`, above). Shared rows: `memcpy` (`sub_825A7410`), `memset`
+(`sub_825A71D0`), `pow` (`sub_825A8ED0`), `cos` (`sub_825A8978`),
+`log10` (`sub_825A9D80`), `__ultod` (`sub_825A9DB0`), `XMemSet`
+(`sub_822962B0`) and `XMemCpy` (`sub_82295890`) in `c-runtime.md`;
+`XAudioBuffer::GetFormat` and `GetFormatThunk` (`sub_8245F6F0`,
+`sub_8245F718`) in `xaudio-engine.md`; `XAudioBuffer::Clear` and
+`ClearThunk` (`sub_8245F8E8`, `sub_8245FA10`) and `XAudio::AddStat`
+(`sub_8245F640`) in `xaudio.md`; `QueryPerformanceCounter`
+(`sub_825BA0C8`) in `functions.md`. Names are ours, from
+what each function does ("probably" where the 360's names aren't clear).
+
+Status:
+
+- **Native**: plain C++ in `itc_recomp/src/` that doesn't use the
+  PowerPC context (`ctx`): normal arguments and host structs (it may
+  still read and write guest memory through `src/guest.h` while
+  recompiled code shares the data). The game reaches it without `ctx`,
+  from native or overridden callers, and the recompiled original is no
+  longer called (except behind a fallback flag or to check against it).
+  No `REX_FUNC` override of it exists, not even an adapter kept only for
+  a harness (that's Overridden until the adapter goes).
+  The end state for every function.
+- **Overridden**: an `extern "C" REX_FUNC(sub_XXXXXXXX)` override in
+  `itc_recomp/src/` (or a macro defining one) does the work instead of
+  the original: a thin adapter in front of native code, or a body that
+  still uses `ctx` (calling guest code, reading registers). It may call
+  the original when its flag is off, or to check itself against it.
+- **Wrapped**: an override that does something of its own (skipping
+  render-only passes, logging, timing) and still calls the original
+  (`__imp__sub_XXXXXXXX`) for the work.
+- **Dropped**: its work isn't needed on PC (hardware set-up, kernel calls
+  the SDK already stubbed), so it no longer runs: an override in
+  `itc_recomp/src/` replaces it with nothing (or a fixed return value), or
+  its callers, made native, leave the call out (no override then; the row
+  says which caller). Logs, a harness or the renderer's frame dumps have
+  shown that nothing reads what it did. The original is no longer called,
+  except behind a fallback flag while the drop is being checked. A
+  function the game never calls in the first place isn't Dropped: its
+  status stays blank and its row says it's never called.
+- **Merged**: its work is done inside a native caller's plain C++ (a
+  few lines only that caller needs), so it has no function or override of
+  its own in `itc_recomp/src/`. The row names the caller(s) and the
+  harness that covers the work. The original is no longer called, except
+  behind the caller's fallback flag.
+- **Patched**: the generated code was edited in place (search for
+  `PATCH:`).
+
+A function usually moves from recompiled or Wrapped to Overridden to
+
+| Address | Name | Status | Notes |
+|---|---|---|---|
+| `sub_82466B78` | `XAudioCodec::Size` | | Class 0's size (`0x8204A780` +4, the game's `0x820713E0` +4): r3 = the descriptor, r4 = the size out; by the format's type (byte +8): up to 3 `PcmCodec::Size`, 4 `XmaCodec::Size` (tail calls), else 0x80004001 (E_NOTIMPL). Leaf apart from the tail calls. Reached through the factory's size slot (`sub_8245D6D8`, `xaudio-engine.md`), once a source voice made. |
+| `sub_82466BA0` | `XAudioCodec::Create` | | Class 0's create: as `XAudioCodec::Size` over `PcmCodec::Create` and `XmaCodec::Create` (r3 the descriptor, r4 the allocator, r5 out). Reached through the factory's create slot (`sub_8245D650`), from `XAudioVoice::CreateObject` (`xaudio.md`) for each source voice's codec (+76). |
+| `sub_8246D720` | `PcmCodec::Size` | | 272 + 120 × the packet count (descriptor byte +68) to [r4]; 0. Leaf. |
+| `sub_8246DF78` | `PcmCodec::Create` | | 272 bytes from the allocator's slot +20, `PcmCodec::PcmCodec`, the object to [r5]; 0, or E_OUTOFMEMORY (`0x8007000E`) when either fails. |
+| `sub_8246D750` | `PcmCodec::PcmCodec` | | r3 = the object, r4 = the descriptor, r5 = the allocator: `XAudioCodec::Construct` on +4; vtables `0x8204BB48` (+0), `0x8204BB20` (+4), `0x8204BAC0` (+16, the codec base); the converter state (+184, 76 bytes) cleared; `XAudioCodec::Init`; then the converter's input: +196 the format's type (+52), +197 its channels (+56), +200 the rate (+60) × the frequency ratio (+116), +216 48,000, +264 bits 0 and 1 set (changed); +268 the descriptor's +69; +108 the block size (the type's bytes a sample, the table `0x8204BBC0`: 4, 2, 1, 2, × the channels), +110 = 1. Returns the object. |
+| `sub_8246B458` | `XmaCodec::Size` | | 284 + 120 × the packet count (descriptor +68) + 88 × the streams (+12) to [r4]; 0. Leaf. |
+| `sub_8246CDB0` | `XmaCodec::Create` | | 284 bytes from the allocator's slot +20 (the streams and packets come later, from the allocator again), `XmaCodec::XmaCodec`, then its slot +120 (`sub_8246AEE0`, the XMA object's set-up, `audio.md`); the object to [r5], or on failure the inner's slot +12 (freed) and the error; E_OUTOFMEMORY. |
+| `sub_8246C1D0` | `XmaCodec::XmaCodec` | | r3 = the object, r4 = the descriptor, r5 = the allocator: `XAudioCodec::Construct` on +4; vtables `0x8204BA40`, `0x8204BA18` (+4), `0x8204B9B8` (+16); +184 (the XMA object) = 0, +252 the descriptor's +69, +266 (the submit mode) and +268 to +280 cleared; `XAudioCodec::Init`; the streams (+56 of them, 88 bytes each, the first 76 cleared: each one's converter state) from the allocator's slot +20 into +188; +192 from the descriptor's float +64 (2^x, ×16, +15, >>4, at least 1; probably frames); +196 a copy of the 56-byte format (+52; `memcpy`); +108 and +110 = 1. Returns the object. |
+| `sub_82466840` | `XAudioMatrix::Size` | | Class 1's size: 28 + 12 × the entries (descriptor byte +8, at most the default matrix table's count byte at [+12]) to [r4]; 0. Leaf. |
+| `sub_82466888` | `XAudioMatrix::Create` | | Class 1's create: 28 + 12 × entries from the allocator's slot +20, vtables `0x8204AB30` (+0), `0x8204AA58` then `0x8204AB14` (+4), +8 = 1, +12 the descriptor's +4; then its slot +52 (`XAudioMatrix::Init`) with the descriptor and the allocator; the object to [r5], or on failure the inner's slot +12 and the error; E_OUTOFMEMORY. From the factory's create slot, for each output a voice sets (`XAudioVoice::SetOutput`, `xaudio.md`). |
+| `sub_824658B8` | `AudioRenderDriver::Size` | | Class 2's size: 20 to [r4]; 0. Leaf. Never called in play (the coverage list): the mastering voice makes its render driver itself (`AudioRenderDriver::AudioRenderDriver`, `xaudio-engine.md`). Not seen in play. |
+| `sub_82465970` | `AudioRenderDriver::Create` | | Class 2's create: 20 bytes from the allocator's slot +20, vtables `0x8204AAEC` (+0), `0x8204AA58` then `0x8204AAD0` (+4), +8 = 1, +12 the descriptor's +4; its slot +32 (`sub_824657C8`) with the descriptor; the object to [r5], or the inner's slot +12 and the error; E_OUTOFMEMORY. Not seen in play. |
+| `sub_82463B78` | `Reverb::Size` | | Class 3's size: 309,936 (`0x4BAB0`) to [r4]; 0. Leaf. Reached through the factory's size slot. |
+| `sub_82465710` | `Reverb::Create` | | Class 3's create: 309,936 bytes from the allocator's slot +20, `Reverb::Reverb` (r4 the descriptor, r5 the allocator), its slot +28 (not read; `sub_825C8388`, a shared stub returning 0, in the outer vtable `0x8204AAB0`); the object to [r5], or the inner's slot +12 and the error; E_OUTOFMEMORY. From the factory's create slot, for an effect in a voice's chain (`XAudioVoice::CreateEffects`, `xaudio.md`). Seen in play. |
+| `sub_825A60E0` | `VolumeMeter::Size` | | Class 4's size (the game's table only): 12 × (descriptor +8 × +12) + 52 to [r4]; 0. Leaf. From the XAPO lead (beside the graphics library, `825A2238`-`825A6460`). Seen in play. |
+| `sub_825A6460` | `VolumeMeter::Create` | | Class 4's create: 52 bytes from the allocator's slot +20: vtable `0x8207229C`, +4 = 1, +8 to +28, +44 and +48 cleared; its slot +28 (`VolumeMeter::Init`) with the descriptor and the allocator; the object to [r5]; 0 (no out-of-memory check: a failed allocation is written through). Seen in play. |
+| `sub_825A5828` |  | | Class 5's size: 332 to [r4]. Leaf. Not seen in play. |
+| `sub_825A5DB8` |  | | Class 5's create: 332 bytes from the allocator's slot +20, `sub_825A5CC0` (not read) with the descriptor's +4; the object (or 0) to [r5]; 0. Not seen in play. |
+| `sub_825A2360` |  | | Class 6's size: 2,092 to [r4]. Leaf. Not seen in play. |
+| `sub_825A50E0` |  | | Class 6's create: as class 5's, 2,092 bytes over `sub_825A5020` (not read). Not seen in play. |
+| `sub_8246CE70` | `XAudioObject::Release` | | Slot +4 of the factory objects' outer vtables (the codecs, the matrix, the reverb, the render driver) and of the allocators' (`0x8204A958`, `xaudio-engine.md`): the inner's count (+8 of the object) less 1; at 0 the inner's slot +12 (`sub_8245AAB8`: its destructor) and 0; else the count. Seen in play. |
+| `sub_82465418` |  | | Slot +20 of the outer vtables: the owner (+12, the descriptor's +4) to [r4]; 0. Leaf. Not seen in play. |
+| `sub_82465868` |  | | Stores r3 to [r4]. Leaf. Slot +116 of the codecs' vtables, +60 of the matrix's, +4 of the render driver's third (`0x8204AB0C`). Probably a query for the object itself. Not seen in play. |
+| `sub_82466BC8` | `XAudioCodec::Construct` | | r3 = the codec's inner (+4 of the codec), r4 = the descriptor: vtable `0x8204AA58`, +4 = 1, +8 the descriptor's +4 (the owner, probably the voice: the callbacks' first argument); `CodecBase::CodecBase` on +12; vtables `0x8204ABD0` (+0) and `0x8204AB70` (+12). From both codecs' constructors. |
+| `sub_82466960` | `XAudioCodec::Init` | | r3 = the codec's inner, r4 = the descriptor, r5 = the allocator: the codec's +176 and +180 (the codec base's +160 and +164: the packet-done and loop-end callbacks) from the descriptor's +72 and +76; tail call to `CodecBase::Init` on +12 with the format (+8), the packet count (+68), the byte +69 and the allocator. |
+| `sub_82466EE8` | `XAudioCodec::Destruct` | | r3 = the codec's inner: vtables `0x8204ABD0` and `0x8204AB70` (+12); `CodecBase::~CodecBase` on +12; vtable `0x8204A6B8` (the root's). From both codecs' destructors. |
+| `sub_82466E80` | `XAudioCodec::GetInfo` | | Slot +8 of both codecs' vtables (and the base's `0x8204ABEC`): byte 4 and the half-word at `0x8204B950` (10) to [r4]; 0. Leaf. Read by `XAudioVoice::CreateObject` (`xaudio.md`). |
+| `sub_82465BE0` | `XAudioMatrix::GetInfo` | | Slot +8 of the matrix's vtable: byte 6 and half-word 0 to [r4]; 0. Leaf. Read by `XAudioVoice::CreateObject` (`xaudio.md`). |
+| `sub_82469920` | `CodecBase::CodecBase` | | r3 = the codec base: vtable `0x8204B958`, its lists (`PacketLists::Init` on +4). From `XAudioCodec::Construct`. |
+| `sub_82469960` | `CodecBase::~CodecBase` | | Vtable `0x8204B958`, then tail call to `PacketLists::Clear` on +4. From `XAudioCodec::Destruct` and the base's deleting destructor (`sub_82467450`, not seen). |
+| `sub_8246E1E0` | `PacketLists::Init` | | r3 = two list heads (12 bytes each: next, prev, the node's offset): both empty, offsets 0. Leaf. From `CodecBase::CodecBase`. |
+| `sub_8246E0E8` | `PacketLists::Clear` | | `PacketList::Clear` on the second list (+12), then the first. From `CodecBase::~CodecBase` and `sub_82469A88` (not seen). |
+| `sub_8246E060` | `PacketList::Clear` | | Unlinks every node (`PacketList::Next` from the head, each node pointed at itself). From `PacketLists::Clear` and the engine's teardown (`XAudioEngine::~XAudioEngine` `sub_8245B940`, not seen in play). |
+| `sub_82466EA0` | `PacketList::Next` | | r3 = a list head, r4 = an entry (0: the head), r5 = the direction (nonzero next, 0 prev): the neighbor's entry (the node less the head's offset +8), 0 at the head. Leaf. From `PacketList::Clear` and the engine's teardown. |
+| `sub_82469978` | `CodecBase::Init` | | Slot +4 of the codec base's vtables: r3 = the codec base, r4 = the 56-byte format, r5 = the packet count, r6 a byte, r7 = the allocator: the format copied to +36 (`memcpy`), +96 and +100 = 1.0, +156 (the state) = 32 (queue empty), +92 and +94 (the block size) = 1, +152 = 0; `PacketLists::Alloc` on +4. From `XAudioCodec::Init`. |
+| `sub_8246E120` | `PacketLists::Alloc` | | r3 = the lists (the codec base's +4), r4 = the count, r5 = the allocator: count × 120 bytes from its slot +20 into +24, each entry's node (+0) put on the free list (+12). From `CodecBase::Init`. |
+| `sub_82469EF8` | `CodecBase::SubmitPacket` | | Slot +8 of the codec base's vtables; r3 = the codec base, r4 = the packet (XAudio's: +0 the data, +4 its size, +8 the loop count, +12 and +16 the loop's start and length in bytes, +84 the context), r5 = flags. Under the spin lock: the last free entry moved to the queued list (+4); its +112 = the next sequence number (+32, never 0), +117 to +119 cleared, +8 the data, +12 the size in blocks (÷ +92), +16 the loop count; with flags bit 5 the 72 bytes from +12 copied to +40 and +20, +24 cleared, else +20 and +24 the loop's start and end in blocks (the whole packet when the length is 0); +28, +32 = 0, +36 = the context; `CodecBase::OnSubmit`. E_OUTOFMEMORY with no free entry. Seen in play (the car sounds' packets, through the codecs' slot +28). |
+| `sub_8246A1C0` | `CodecBase::SubmitRegion` | | Slot +12: as `CodecBase::SubmitPacket` for an 8-word packet with a region (r4: +0 the data, +4 its size, +8 to +28 copied to the entry's +16 to +36). From the XMA codec's `XmaCodec::SubmitRegion` (and the PCM codec's slot +36, `sub_8246CEC0`, not seen). |
+| `sub_82469AF8` | `CodecBase::OnSubmit` | | r3 = the codec base, r4 = the new entry, r5 = flags; called under the spin lock and releases it once at its end: unless flags bit 4, checks the entry's bounds (+12 the length, +16 the loop count, +20 and +24 the loop, +28 and +32 the play region; +32 defaults to the length); each failed check releases the spin lock and goes on (an assertion's path, probably: nothing returns an error); then slot +84 (`CodecBase::SetFlags`) with mask 24 and 8 when flags bit 0 (end of stream after this packet) else 0, and when the queue was empty, slot +84 with mask 32 (queue empty cleared). Returns 0. |
+| `sub_824699E0` | `CodecBase::FlushPackets` | | Slot +16: when playing (+156 bit 0), `0x8000FFFF` (E_UNEXPECTED); else slot +92 (complete a packet, result `0x80004004`) until it returns 0, slot +84 with mask 24 (end of stream and starved cleared), +152 = 0; 0. From the codecs' slots +32 and +40 (`sub_8246CEC8`) and the XMA stop (`sub_8246B0C8`, `audio.md`). |
+| `sub_82469E58` | `CodecBase::SetFormat` | | Slot +56: r3 = the codec base, r4 = a 56-byte format, r5 a byte: E_UNEXPECTED while playing or with packets queued; else the format to +36 (`memcpy`), +157 = r5, slot +80 (the frequency ratio, `PcmCodec::SetFrequencyRatioBase`) with 1.0. From `PcmCodec::SetFormat` and `sub_8246AB00` (the XMA codec's, not seen). |
+| `sub_82467078` | `CodecBase::SetFlags` | | Slot +84: r3 = the codec base, r4 = a mask, r5 = the bits: under the spin lock, +156 = (+156 & ~mask) | bits. Seen in play (the codecs' start, stop, packets). |
+| `sub_824674D8` | `CodecBase::CompletePacket` | | Slot +92 of the codecs' bases (`0x8204BAC0`, `0x8204B9B8`): `CodecBase::RetirePacket` (r4 the entry or 0 for the first), then when the packet-done callback (+160) is set, it with {the codec's +12 (at −4 of the base), the entry's context +36, r5 the result}; returns the entry. |
+| `sub_8246A430` | `CodecBase::RetirePacket` | | Slot +92 of the plain base (`0x8204B958`): under the spin lock, r4 (or the first queued, 0 when none) moved from the queued list to the free list, +104 (48 bytes: the current packet's state) cleared, its +116 = 0, slot +84 with mask 32 and 32 (queue empty set); returns the entry. |
+| `sub_8246CE68` |  | | Slot +0 of the PCM codec's inner (`0x8204BB20`): this − 4, then `PcmCodec::~PcmCodec`. Seen in play. |
+| `sub_8246CF50` | `PcmCodec::~PcmCodec` | | Vtables `0x8204BB48`, `0x8204BB20` (+4), `0x8204BAC0` (+16); `XAudioCodec::Destruct` on +4. Returns the object (not freed: it lives in the voice's allocator block). |
+| `sub_8246D860` | `PcmCodec::Process` | | Slot +24, one pass (256 frames) on the mixer's thread, from the source voice's pass (`xaudio.md`): r5 = the output buffer's interface (−8). Under the spin lock: the buffer's format (`XAudioBuffer::GetFormat`) and `Clear` with the codec's channels (+56); `XAudio::AddStat` (6, 1); the converter's output (+204 the samples, +208 256 frames, +212 0). While playing and not starved: for the first queued packet (on its first pass +120 = its start +28 and +117 set), the converter's input (+184 the data, +188 the end, +192 at most the packet's region end) and `Resampler::Process`, the position (+120) and total frames (+168) moved on; at the loop's end with loops left (+16; −1 loops forever, else counted down) back to the loop start (+20) and the loop-end callback (+180) with {the owner +12, 0, the context}; with none, the packet completed (slot +92). With bit 1 (just started): the volume (+224) set to +112 at once, bit 1 cleared; with bit 2 (stopping) the volume halved (`0x8204B954`, 0.5) a pass until +174 counts down. The rest of the buffer zeroed (`memset`, a channel every 1,024 bytes); out of packets: at the end of stream (bit 3) its own stop (slot +52, at once), else starved (bit 4). Returns 1 while it played. Not read in detail. |
+| `sub_8246CEB8` |  | | Slot +28 of the PCM codec (submit a packet): `CodecBase::SubmitPacket` on +16 (tail call). From the source voice's submit (`xaudio.md`). |
+| `sub_8246CEC0` |  | | Slot +36 of the PCM codec: `CodecBase::SubmitRegion` on +16. Not seen in play. |
+| `sub_8246CEC8` |  | | Slots +32 and +40 of both codecs (flush): `CodecBase::FlushPackets` on +16 (tail call). |
+| `sub_8246A920` | `XAudioCodec::GetState` | | Slot +44 of both codecs: the state byte (+172, the codec base's +156) to [r4]; 0. Leaf. From the source voice's state (`XAudioVoice::GetState`, `xaudio.md`: or'ed with the voice's flags). |
+| `sub_8246D410` | `PcmCodec::Start` | | Slot +48 (both codecs' +48 is their own; the PCM's): under the spin lock, not playing: `SetFlags` (3, 3: playing, just started); playing and stopping: `SetFlags` (6, 2: the stop undone); 0. |
+| `sub_8246D500` | `PcmCodec::Stop` | | Slot +52: r4 = flags. Under the spin lock, when playing: with bit 0 (at once), or already just started or starved (+156 & 18), `SetFlags` (87, 0: stopped); else unless already stopping, `SetFlags` (4, 4: stopping) and +174 (the codec base's +158) = 10 (`0x8204B950`), the passes of the fade-out. 0. From the source voice's stop and from `PcmCodec::Process` at the end of stream. |
+| `sub_8246D630` | `XAudioCodec::EndOfStream` | | Slot +56 of both codecs: under the spin lock, with packets queued, `SetFlags` (8, 8: end of stream after the last); 0. Probably XAudio's discontinuity. |
+| `sub_8246D008` | `PcmCodec::SetVolume` | | Slot +88: f1 to +112 and +224 (the current volume), under the spin lock; 0. From the source voice's volume (`xaudio.md`). |
+| `sub_8246D0C8` | `PcmCodec::SetPitch` | | Slot +96: f1 = octaves: under the spin lock, +116 (the frequency ratio) = 2^f1 (`pow`, 2.0 from `0x820056D8`); the converter's +196, +197 = the type and channels (+52, +56), +200 = the rate (+60) × the ratio, +264 bit 0 (changed); 0. From the source voice's pitch. |
+| `sub_8246D1E0` | `PcmCodec::SetFrequencyRatio` | | Slot +104: as `PcmCodec::SetPitch` with the ratio f1 itself. Also the codec base's slot +80 (through `sub_8246D320`). |
+| `sub_8246D320` |  | | Slot +80 of the PCM codec base (`0x8204BAC0`): this − 16, then `PcmCodec::SetFrequencyRatio`. From `CodecBase::SetFormat` (1.0). |
+| `sub_8246CFA8` | `PcmCodec::SetFormat` | | Slot +112: `CodecBase::SetFormat` on +16; on success +108 = the type's bytes a sample (`0x8204BBC0`, by +196) × the channels (+197), +110 = 1. From the source voice's format (`xaudio.md`). |
+| `sub_8246A918` |  | | Slot +0 of the XMA codec's inner (`0x8204BA18`): this − 4, then `XmaCodec::~XmaCodec`. Seen in play. |
+| `sub_8246AAD0` | `XmaCodec::~XmaCodec` | | The XMA object released (`sub_8246A758`, `audio.md`: the XMA side's, its contexts); returns the object. From `sub_8246A918` and `sub_8246A900` (the deleting one, not seen). |
+| `sub_8246A7D0` | `XmaCodec::SubmitPacket` | | Slot +28 of the XMA codec: 0x80004001 when +266 (the submit mode) is 2 (regions); else +266 = 1; a loop count (+8) past 255 other than −1 made −1 (forever) on a copy (88 bytes); `CodecBase::SubmitPacket` on +16 with flags | 48. Not seen in play (the game's XMA voices submit regions, through XACT's waves). |
+| `sub_8246A860` | `XmaCodec::SubmitRegion` | | Slot +36: 0x80004001 when +266 is 1; else +266 = 2 (the input side then reads sample positions, `sub_8246B480` in `audio.md`); a loop count (+8) past 255 other than −1 made −1 on a copy (32 bytes); `CodecBase::SubmitRegion` on +16 with flags | 16. Seen in play. |
+| `sub_8246AB48` | `XmaCodec::SetVolume` | | Slot +88: under the spin lock, +112 = f1 and each stream's (+56 of them, 88 bytes at +188) +40 = it; 0. |
+| `sub_8246AC40` | `XmaCodec::SetPitch` | | Slot +96: under the spin lock, +116 = 2^f1 (`pow`); each stream's converter: +12 = 1 (its format), +13 its channels (the byte at +64 + 8i), +16 the rate (+60 + 8i) × the ratio, +80 bit 0 (changed); 0. |
+| `sub_8246F140` | `Resampler::Process` | | r3 = a 96-byte converter state (+0 the input, +4 its end, +8 the position, +12 the format, +13 the channels, +16 the input rate, +20 the output, +24 its frames, +28 those written, +32 the output rate, +36 to +48 the volume ramp and step, +76 the kernel, +80 changed bits, +84 flags): nothing when the input or output is used up; when +80 is set, +44 = the input rate ÷ the output rate and the kernel (+76) chosen from the table `0x8204CF08` by the case (equal rates, 2:1, else; minus 3 with +84 bit 7: the scalar set), the format and a channel code (a jump table by channels 1-6), +80 = 0; calls the kernel; returns the input frames used (+8's change). From `PcmCodec::Process` and `XmaVoice::Update` (`audio.md`). Its indirect call is the only thing it waits on (`b7_groups.py`). |
+| `sub_8247E188` |  | | A converter kernel (the table's entry 81: the vector set, any ratio, format 1 (16-bit), channel code 1; probably mono): when the output is 16-byte aligned and the step stays inside the input, the vector path `sub_8246E208`, else the scalar `sub_82473E48`. From `Resampler::Process` (indirect). |
+| `sub_8247E260` |  | | Entry 82 (format 1, channel code 2; probably stereo): as `sub_8247E188` over `sub_8246E4C8` and `sub_82474188`. |
+| `sub_8247F558` |  | | Entry 107 (equal rates, format 1, channel code 2): a vector copy and conversion with the volume ramp (+36 to +40) when aligned, else `sub_82478E60`. |
+| `sub_8246E208` |  | | The vector path of `sub_8247E188` (16-bit samples to floats, interpolated by a 32.32 fixed-point position, the volume ramp; `__ultod`). Not read in detail. |
+| `sub_8246E4C8` |  | | The vector path of `sub_8247E260` (two channels). Not read in detail. |
+| `sub_82473E48` |  | | Entry 6 (the scalar set, any ratio, format 1, channel code 1): the scalar fallback of `sub_8247E188`. Not read in detail. |
+| `sub_82474188` |  | | Entry 7 (scalar, channel code 2): the fallback of `sub_8247E260`. Not read in detail. |
+| `sub_82478E60` |  | | Entry 32 (scalar, equal rates, channel code 2): the fallback of `sub_8247F558`. Not read in detail. |
+| `sub_82465BD8` |  | | Slot +0 of the matrix's inner (`0x8204AB14`): this − 4, then `XAudioMatrix::Destruct`. Seen in play. |
+| `sub_82466418` | `XAudioMatrix::Destruct` | | Vtables `0x8204AB30` (+0), `0x8204AB14`, then `0x8204A6B8` (+4). Leaf. |
+| `sub_82465C30` | `XAudioMatrix::Init` | | Slot +52: r3 = the matrix, r4 = its descriptor, r5 = the allocator: +24 = the entries allowed (descriptor +8, at most [+12]'s count byte), +20 = 12 × that from the allocator's slot +20; slot +40 (`SetMatrix`) with the descriptor's default matrix (+12), then slot +32 with its byte +9. From `XAudioMatrix::Create`. |
+| `sub_82465C08` | `XAudioMatrix::SetOverwrite` | | Slot +32: +26 = r4 (1: the mix overwrites the target's channels, 0 adds to them); 0. Leaf. |
+| `sub_82465E50` | `XAudioMatrix::SetMatrix` | | Slot +40: r4 = a matrix (count byte +0, +4 8-byte entries: byte +0 the input channel, +1 the output channel, float +4 the level). Under the spin lock: E_INVALIDARG (`0x80070057`) past +24; else +16 = the count, each entry to +20's 12-byte entries (+0, +1 the channels, +4 and +8 the current and target level both the level), +25 = the highest output channel + 1; with none, +16 and +25 = 0. From the voices' `SetOutput` and `SetOutputMatrices` (`xaudio.md`). |
+| `sub_82466188` | `XAudioMatrix::SetLevels` | | Slot +56: r4 = levels (count byte +0, +4 8-byte entries: byte +0 an entry's index, float +4 its level), r5 a byte. Under the spin lock: each entry's target (+8) = the level, and its current (+4) too (r5's two paths write both: not read in detail); E_INVALIDARG for an index past +16. From the voices' output matrices (`xaudio.md`) and the car sounds' panning. |
+| `sub_82466440` | `XAudioMatrix::Mix` | | Slot +24, once a pass a voice output (the voice's `MixToOutputs`, `xaudio.md`): r4 = the source buffer's interface, r5 = the target's. Both formats (`XAudioBuffer::GetFormat`); with +26 = 1, the target cleared for +25 channels (`Clear`). Under the spin lock, for each entry: the input channel's 256 floats (1,024 bytes a channel) into the output channel's, ramped from the current level to the target over the pass (`XAudioMatrix::MixRamp`) or, overwriting, a scaled copy; the current = the target; entries past either buffer's channels skipped (zeroed when overwriting, `XMemSet`). With no entries, each channel copied (`XMemCpy`) or added at 1.0. 0. |
+| `sub_82466310` | `XAudioMatrix::MixRamp` | | r3 = the output, r4 = the input, r5 = the start level (4 floats), r6 = the step (4 floats), r7 = the frames: out += in × the level, the level stepping each frame; vector code, 16 frames a loop, with `dcbt` prefetches. Leaf. From `XAudioMatrix::Mix`. |
+| `sub_824657C8` |  | | Slot +32 of the render driver (`0x8204AAEC`): its slot +28 (`AudioRenderDriver::Register`, `audio.md`) with the descriptor's +8 (tail call). From `AudioRenderDriver::Create` (not seen) and the mastering voice's set-up (`XAudioMasteringVoice::Init`, `xaudio-engine.md`, through the vtable). Seen in play. |
+| `sub_82465608` | `Reverb::Reverb` | | r3 = the object, r4 = the descriptor, r5 = the allocator: vtables `0x8204AAB0` (+0), `0x8204AA58` then `0x8204AA94` (+4), +8 = 1, +12 the descriptor's +4; the reverb's core at +16 (vtable `0x8204AA8C`): `ReverbCore::Init` on +208, `I3dl2Params::I3dl2Params`, the core's second vtable `0x8204AA88`, the default native parameters (`ReverbCore::Defaults` on +68); the timers +0x4BAA0 and +0x4BAA8 cleared. Returns the object. |
+| `sub_82465410` |  | | Slot +0 of the reverb's inner (`0x8204AA94`): this − 4, then `Reverb::Destruct`. Seen in play. |
+| `sub_824656B8` | `Reverb::Destruct` | | The vtables put back to the bases' (`0x8204AAB0`, `0x8204AA94`, the core's `0x8204AA74`, +208's `0x8204A868`, then `0x8204A6B8`). Leaf. |
+| `sub_82465428` | `Reverb::Process` | | Slot +24, once a pass (the effect's `XAudioVoice::ProcessEffect`, `xaudio.md`): r4 = the input buffer, r5 = the output. Both formats (`GetFormatThunk`); the output cleared as 6 channels at 48 kHz (`ClearThunk`, flags 3); input channels 1 or 2 (`ReverbCore::SetStereo`), 0 nothing, more E_INVALIDARG; the channels' pointers (1,024 bytes apart; the output's 0, 1, 2, 4, 5, skipping 3, the LFE); `Reverb::Run`, timed by `QueryPerformanceCounter` into +0x4BAA0 (the sum) and +0x4BAA8 (the count). 0. |
+| `sub_82465258` | `Reverb::Run` | | r3 = the core (+16), r4 = the inputs, r5 = the outputs. Under the spin lock, the changes pending since the last pass: +188 (`ReverbCore::SetGain`, +184), +189 (`ReverbCore::Apply` with the native parameters +52), +190 (`I3dl2::SetParameter` 0 with the I3DL2 parameters +136); the three cleared. Then `ReverbCore::Process` for 256 frames. |
+| `sub_82462148` | `Reverb::SetParameters` | | Slot +16 of `0x8204AAB0` (+44 of the inner): r4 = the kind, r6 = the data. 0: the native parameters (a byte layout read into 21 words and floats, the last two scaled) to the core's +52 (84 bytes), +189 set; 1: the 12 I3DL2 parameters (48 bytes) to +136, +190 set; 2: a float × a constant to +200 (+16's +184), +204 (+188) set; else E_INVALIDARG. The spin lock taken twice around each. From the voice's `SetEffectParameters` (`xaudio.md`). |
+| `sub_82467A00` | `ReverbCore::SetGain` | | +92 = f1 × the float at `0x8200222C`. Leaf. From `Reverb::Run`. Not seen in play. |
+| `sub_824679F8` | `ReverbCore::SetStereo` | | +100 = r4 (0 mono, 1 stereo input). Leaf. From `Reverb::Process`. |
+| `sub_82467538` | `ReverbCore::Defaults` | | r3 = 84 bytes out: the default native parameters (words 5, 5, 6, 6, 8, 8, 8, 4, 8, 4, 5 and floats from `0x8204AC10`-`0x8204AC1C`). Leaf. From `Reverb::Reverb`, `Reverb::SetParameters`, `I3dl2::SetParameter` and `sub_82469728`. |
+| `sub_82467A18` | `ReverbCore::Apply` | | r3 = the core, r4 = the 84-byte native parameters: the reverb's working values from them (908 lines: delay lengths rounded to primes `LargestPrimeBelow`, gains with `pow`, filter coefficients `ReverbCore::FilterCoefficient`, the tables `0x8204B8C0`-`0x8204B91C`); `memcpy`. From `Reverb::Run` and `I3dl2::SetParameter`. Not read in detail. |
+| `sub_824675B8` | `ReverbCore::FilterCoefficient` | | A one-pole filter's coefficient from a frequency and a gain (`cos`, `pow`, the floats at `0x8204AC14`, `0x8204AC18`, `0x8204B8B0`, `0x8204B8B8`). From `ReverbCore::Apply` and `ReverbCore::Init`. Not read in detail. |
+| `sub_8246DFE8` | `LargestPrimeBelow` | | r3 = n: 1 for n ≤ 1, 9,973 for n ≥ 9,973, else the largest prime ≤ n from the table at `0x8204BBD0` (binary search, 1,229 primes). Leaf. From `ReverbCore::Apply`. |
+| `sub_82468848` | `ReverbCore::Init` | | r3 = the core's +208: the delay lines and filters set up (755 lines: their buffers inside the object, `0x8204A868` and the tables `0x8204AC10`-`0x8204AC20`, `0x8204B924`-`0x8204B92C`), each line filled by one of `sub_82467720`-`sub_82467990`; `pow`, `ReverbCore::FilterCoefficient`. From `Reverb::Reverb` and `I3dl2Params::I3dl2Params`. Not read in detail. |
+| `sub_82467720` |  | | Fills a delay line: 2,048 × 8 floats from +12 with the float at +4, +0 = 0. Leaf. From `ReverbCore::Init`. |
+| `sub_82467788` |  | | As `sub_82467720` for another line (its own length). From `ReverbCore::Init`. Not read in detail. |
+| `sub_824677F0` |  | | As `sub_82467720` for another line. From `ReverbCore::Init`. Not read in detail. |
+| `sub_82467858` |  | | As `sub_82467720` for another line. From `ReverbCore::Init`. Not read in detail. |
+| `sub_824678C0` |  | | As `sub_82467720` for another line. From `ReverbCore::Init`. Not read in detail. |
+| `sub_82467928` |  | | As `sub_82467720` for another line. From `ReverbCore::Init`. Not read in detail. |
+| `sub_82467990` |  | | As `sub_82467720` for another line. From `ReverbCore::Init`. Not read in detail. |
+| `sub_82469848` | `I3dl2Params::I3dl2Params` | | r3 = the I3DL2 side (vtable `0x8204B948`; probably the reverb's I3DL2 front): `ReverbCore::Init` on +52, the vtable at its +4's offset `0x8204AA74`; the I3DL2 defaults: room −10000 (+24), room HF and the others from the floats at `0x82000A30`-`0x82002FB0` (+12 to +48), +8 = 0. From `Reverb::Reverb`. |
+| `sub_824696F0` | `I3dl2::SetParameter` | | r3 = the I3DL2 side, r4 = a parameter (0 all 12, 1-12 one: room, room HF, rolloff, decay time, decay HF ratio, reflections, reflections delay, reverb, reverb delay, diffusion, density, HF reference, probably the I3DL2 order), r5 = the value(s): stored (+4 to +48, `memcpy` for 0), then the native parameters made from them (`ReverbCore::Defaults`, `I3dl2::ToNative` with the core's float +88) and applied (`ReverbCore::Apply`). Past 12, nothing. From `Reverb::Run`. |
+| `sub_82469728` |  | | Case 0 of `I3dl2::SetParameter`'s switch, split into a function of its own by the recompiler (its jump table's first target): the 48 bytes copied, then the conversion and apply as the function's tail. Never called directly. Not seen in play (its parent's case 0 ran). |
+| `sub_82469418` | `I3dl2::ToNative` | | r3 = the I3DL2 parameters, r4 (r5 out) = the 84-byte native ones, f1 = a float: the native words and floats from the I3DL2 values (millibels to gains, times to delays; `log10` on the decay ratio, clamped to −8..8). From `I3dl2::SetParameter`. Not read in detail. |
+| `sub_82463B90` | `ReverbCore::Process` | | r3 = the core, r4 = the inputs, r5 = the outputs, r6 = 256 frames: the reverb's signal path (1,458 lines of vector and float code): per input channel, the early reflections and late reverb stages (`sub_824624F8`, `sub_82462BC8`, `sub_82462CF8`, `sub_82462DC8`, `sub_82463060`, `sub_82463130`, `sub_82463410`, `sub_82463578`, twice), four of `sub_824632A0` and two of `sub_82463620`, into the five output channels. From `Reverb::Run`. Not read in detail. |
+| `sub_824624F8` |  | | A stage of `ReverbCore::Process` (435 lines: a filtered delay line, probably the early reflections' taps). Not read in detail. |
+| `sub_82462BC8` |  | | A stage of `ReverbCore::Process`: a one-pole low-pass over r6 frames (four at a time), its state +16 to +28. Not read in detail. |
+| `sub_82462CF8` |  | | A stage of `ReverbCore::Process`: a 256-frame delay line with two taps (+12, +24) and gains (+4, +16, +28), its write index +36. Not read in detail. |
+| `sub_82462DC8` |  | | A stage of `ReverbCore::Process` (166 lines, delay lines). Not read in detail. |
+| `sub_82463060` |  | | A stage of `ReverbCore::Process` (51 lines, a delay line). Not read in detail. |
+| `sub_82463130` |  | | A stage of `ReverbCore::Process` (91 lines). Not read in detail. |
+| `sub_824632A0` |  | | A stage of `ReverbCore::Process` (91 lines; four calls a pass). Not read in detail. |
+| `sub_82463410` |  | | A stage of `ReverbCore::Process` (90 lines). Not read in detail. |
+| `sub_82463578` |  | | A stage of `ReverbCore::Process`: a 256-frame delay line with two taps and gains, its write index +24. Not read in detail. |
+| `sub_82463620` |  | | A stage of `ReverbCore::Process` (341 lines; two calls a pass, probably the late reverb's outputs). Not read in detail. |
+| `sub_825A5778` | `VolumeMeter::GetInfo` | | Slot +8 of the meter's vtable `0x8207229C` and of the vtable at `0x82072264` (an effect not seen): byte 1 and half-word 1 to [r4]; 0. Leaf. From the XAPO lead. |
+| `sub_825A6138` | `VolumeMeter::Init` | | Slot +28: r3 = the meter, r4 = its descriptor (16 bytes to +8: +16 the channels, +20 the history length, probably), r5 = the allocator (+48): three arrays of channels × length floats from its slot +20 into +28, +32, +36, each cleared (`memset`); 0. From `VolumeMeter::Create`. |
+| `sub_825A6210` | `VolumeMeter::Process` | | Slot +24, once a pass: r4 = the buffer (`GetFormatThunk`); for each channel (at most +16): the pass's RMS (sum of squares × 1/256, square root) to +36, the peak to +32 and the count of samples past a threshold (the float at `0x82072298`) to +28, at the history slot +24 mod +20; with 8 meter channels over a 6-channel buffer, two fold-downs (left and right with the center and LFE scaled) as channels 6 and 7; +24 moved on, +44 = 1 when it reaches the length. Not read in detail. |

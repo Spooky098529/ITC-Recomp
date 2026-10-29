@@ -10,7 +10,7 @@ render driver (`audio.md`, our audio output since `--native_audio`,
 engine's processor threads and their passes over the voices' stages.
 The voices call into it only through the commit and the waits
 (`xaudio.md`); the codecs, matrices and effects its factory makes
-(`8246xxxx`) are a lead (`../loops/leads.md`). Translated as the game's
+(`8246xxxx`) are in `xaudio-objects.md`. Translated as the game's
 code (the user's call for XACT, 2026-10-23; followed for XAudio,
 `xaudio.md`). Read by the B7 loop's mapping agent, 2026-10-29, from
 the engine's lead; the engine's teardown (never run: the game never
@@ -261,4 +261,4 @@ run it after changing either, on any branch.
 | `sub_82460368` | | | `this − 4`, then `sub_82460410` (`0x8204A940`'s thunk). Not seen in play. |
 | `sub_82460470` | | | The sizing allocator's destructor (vtables `0x8204A954`, `0x8204A96C`), `XAudioAllocator::~XAudioAllocator`, with r4 bit 0 freed (attributes 1). From `sub_82460398`. Not seen in play. |
 | `sub_82460398` | | | `this − 4`, then `sub_82460470` (`0x8204A96C`'s thunk). Not seen in play. |
-| `sub_82461EF8` |  | Overridden | r4 = 4 bytes out: byte +0 = 6, half-word +2 = 3750; 0. Leaf. Probably a factory object's info slot (+8: the byte and the latency `XAudioVoice::CreateObject` reads, `xaudio.md`), of a class not read. Seen in play; reached only indirectly. Ours (2026-10-29, the B7 loop, migration 1): `xaudio::ObjectInfo`, `--native_xaudio_engine`. Harness `xaudio_engine` (32 cases). |
+| `sub_82461EF8` |  | Overridden | r4 = 4 bytes out: byte +0 = 6, half-word +2 = 3750; 0. Leaf. Probably a factory object's info slot (+8: the byte and the latency `XAudioVoice::CreateObject` reads, `xaudio.md`), of a class not read. It's the reverb's (class 3, slot +8 of `0x8204AAB0`; `xaudio-objects.md`, 2026-10-29). Seen in play; reached only indirectly. Ours (2026-10-29, the B7 loop, migration 1): `xaudio::ObjectInfo`, `--native_xaudio_engine`. Harness `xaudio_engine` (32 cases). |

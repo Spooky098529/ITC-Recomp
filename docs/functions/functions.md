@@ -383,6 +383,12 @@ Rows not yet moved stay in the table below. So far:
   processor threads, the stages' passes and barrier, the processing
   callbacks and the commit (B7; XAudioInitialize stays in
   `sound-cues.md`, the category volume in `audio.md`).
+- [`xaudio-objects.md`](xaudio-objects.md): the objects XAudio's
+  factory makes: the class tables, the source voices' codecs (the packet
+  queue, PCM and XMA: submit, flush, state, start, stop, volume, pitch,
+  format, the pass) and their resampler, the output matrices (set, mix),
+  the reverb and the volume meter (B7; the XMA voice's hardware side
+  stays in `audio.md`).
 
 These files hold functions only. What used to follow the table here moved
 out on 2026-10-20: how frame interpolation works, its options and what
