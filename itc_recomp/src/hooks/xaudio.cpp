@@ -25,7 +25,10 @@ ITC_FLAG_BOOL(native_xaudio, true, "ITC",
               "sub_82460A58, SetOutputMatrices sub_82460AB8 and SetFormat sub_82460778; "
               "XAudioSourceVoice::Describe sub_8245E010 and Reformat sub_8245DCF0, XAudio::Alloc "
               "sub_8245EF80 (XMemAlloc's plain C++ while --native_heap routes the heap), "
-              "XAudioBuffer::ClearThunk sub_8245FA10 and XAudioVoice::BaseSize sub_82461158; their "
+              "XAudioBuffer::ClearThunk sub_8245FA10 and XAudioVoice::BaseSize sub_82461158; the "
+              "buffer's constructor sub_8245F750 and Create sub_8245FA80, XAudioVoice::Construct "
+              "sub_82461500, XAudio::DefaultAllocator sub_824605E8 and GetAllocator sub_82460688 "
+              "(both only while --native_heap routes the heap where they allocate); their "
               "calls into the recompiled objects through the translated code) natively "
               "instead of through the translated code (the same reads and writes; XAudio's two "
               "locks stay the game's; checked by --run_harnesses=xaudio)");
@@ -244,6 +247,65 @@ void XAudioBaseSize(PPCContext& ctx, uint8_t* base) {
   });
 }
 
+void XAudioBufferConstruct(PPCContext& ctx, uint8_t* base) {
+  const uint32_t buffer = ctx.r3.u32, format = ctx.r4.u32, allocator = ctx.r5.u32;
+  bool refused = false;
+  const PPCContext saved = ctx;
+  Framed(ctx, base, 112, [&](const xa::GuestCall& call) {
+    if (const auto r3 = xa::BufferConstruct(base, buffer, format, allocator, call)) {
+      return *r3;
+    }
+    refused = true;
+    return 0u;
+  });
+  if (refused) {
+    ctx = saved;
+    __imp__sub_8245F750(ctx, base);
+  }
+}
+
+void XAudioBufferCreate(PPCContext& ctx, uint8_t* base) {
+  const uint32_t format = ctx.r3.u32, allocator = ctx.r4.u32, out = ctx.r5.u32;
+  Framed(ctx, base, 112, [&](const xa::GuestCall& call) {
+    return xa::BufferCreate(base, format, allocator, out, call);
+  });
+}
+
+void XAudioVoiceConstruct(PPCContext& ctx, uint8_t* base) {
+  const uint32_t voice = ctx.r3.u32, allocator = ctx.r4.u32, type = ctx.r5.u32;
+  Framed(ctx, base, 112, [&](const xa::GuestCall& call) {
+    return xa::VoiceConstruct(base, voice, allocator, type, call);
+  });
+}
+
+void XAudioDefaultAllocator(PPCContext& ctx, uint8_t* base) {
+  // XAudio::Alloc's plain C++ (XMemAlloc's) while the heap is the native
+  // layer's, else the original.
+  if (!NativeHeapActive()) {
+    __imp__sub_824605E8(ctx, base);
+    return;
+  }
+  ctx.r3.u64 = xa::DefaultAllocator(base, ctx.r3.u32, ctx.r4.u32, ctx.r5.u32);
+}
+
+void XAudioGetAllocator(PPCContext& ctx, uint8_t* base) {
+  const uint32_t attributes = ctx.r3.u32, size = ctx.r4.u32, inout = ctx.r5.u32;
+  bool refused = false;
+  const PPCContext saved = ctx;
+  Framed(ctx, base, 128, [&](const xa::GuestCall& call, uint32_t frame) {
+    if (const auto r3 = xa::GetAllocator(base, attributes, size, inout, frame,
+                                         NativeHeapActive(), call)) {
+      return *r3;
+    }
+    refused = true;
+    return 0u;
+  });
+  if (refused) {
+    ctx = saved;
+    __imp__sub_82460688(ctx, base);
+  }
+}
+
 }  // namespace hooks
 
 #define ITC_XAUDIO_ADAPTER(address, step)   \
@@ -282,3 +344,8 @@ ITC_XAUDIO_ADAPTER(8245DCF0, XAudioReformat)
 ITC_XAUDIO_ADAPTER(8245EF80, XAudioAlloc)
 ITC_XAUDIO_ADAPTER(8245FA10, XAudioBufferClearThunk)
 ITC_XAUDIO_ADAPTER(82461158, XAudioBaseSize)
+ITC_XAUDIO_ADAPTER(8245F750, XAudioBufferConstruct)
+ITC_XAUDIO_ADAPTER(8245FA80, XAudioBufferCreate)
+ITC_XAUDIO_ADAPTER(82461500, XAudioVoiceConstruct)
+ITC_XAUDIO_ADAPTER(824605E8, XAudioDefaultAllocator)
+ITC_XAUDIO_ADAPTER(82460688, XAudioGetAllocator)

@@ -43,5 +43,10 @@ void XAudioReformat(PPCContext& ctx, uint8_t* base);            // sub_8245DCF0
 void XAudioAlloc(PPCContext& ctx, uint8_t* base);               // sub_8245EF80
 void XAudioBufferClearThunk(PPCContext& ctx, uint8_t* base);    // sub_8245FA10
 void XAudioBaseSize(PPCContext& ctx, uint8_t* base);            // sub_82461158
+void XAudioBufferConstruct(PPCContext& ctx, uint8_t* base);     // sub_8245F750
+void XAudioBufferCreate(PPCContext& ctx, uint8_t* base);        // sub_8245FA80
+void XAudioVoiceConstruct(PPCContext& ctx, uint8_t* base);      // sub_82461500
+void XAudioDefaultAllocator(PPCContext& ctx, uint8_t* base);    // sub_824605E8
+void XAudioGetAllocator(PPCContext& ctx, uint8_t* base);        // sub_82460688
 
 }  // namespace hooks

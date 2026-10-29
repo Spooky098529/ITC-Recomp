@@ -198,4 +198,54 @@ std::optional<uint32_t> Reformat(uint8_t* base, uint32_t voice, uint32_t format,
 uint32_t BaseSize(uint8_t* base, uint32_t description, uint32_t out, uint32_t frame,
                   const GuestCall& call);
 
+// --- Buffers, allocators and the base voice ---
+
+constexpr uint32_t kBufferVtable = 0x8204A8CC;
+constexpr uint32_t kAllocatorVtable = 0x8204A954;   // +0 of the default allocator
+constexpr uint32_t kAllocatorVtable2 = 0x8204A980;  // its +4
+constexpr uint32_t kVoiceVtable0 = 0x8204A6CC;      // the base voice's first
+constexpr uint32_t kVoiceVtable = 0x8204AA00;       // the base voice's
+constexpr uint32_t kBufferConstruct = 0x8245F750;
+constexpr uint32_t kAllocatorUnseen = 0x82460538;  // GetAllocator's for a size of 0
+
+// XAudioBuffer::XAudioBuffer (sub_8245F750): the 36-byte buffer at
+// `buffer` for `format` (+0 the type; type 0: +5 the channels, +8 the rate,
+// the samples from the allocator's slot +20, 128-byte aligned; else +12 the
+// samples), the allocator `allocator`. Returns the buffer. nullopt, with
+// nothing done, where the original traps (type 0 with a rate of 0 or above
+// 48,000).
+std::optional<uint32_t> BufferConstruct(uint8_t* base, uint32_t buffer, uint32_t format,
+                                        uint32_t allocator, const GuestCall& call);
+
+// XAudioBuffer::Create (sub_8245FA80): 36 bytes from the allocator's slot
+// +20, the buffer constructed (BufferConstruct; its original through `call`
+// where that refuses), its slot +20 with `out`. Returns 0, or E_OUTOFMEMORY
+// when the allocation (or the constructor) gives 0.
+uint32_t BufferCreate(uint8_t* base, uint32_t format, uint32_t allocator, uint32_t out,
+                      const GuestCall& call);
+
+// XAudioVoice::Construct (sub_82461500): the base voice at `voice`: vtable
+// 0x8204A6CC, the count 1, the allocator (+8, AddRef'd by its slot +0 when
+// set), then vtable 0x8204AA00, +12 = `type`'s low byte, the two empty list
+// nodes at +16 and +24, +40 = 0. Returns the voice.
+uint32_t VoiceConstruct(uint8_t* base, uint32_t voice, uint32_t allocator, uint32_t type,
+                        const GuestCall& call);
+
+// XAudio::DefaultAllocator (sub_824605E8): one block of `size` + 28 from
+// XAudio::Alloc's plain C++ with `attributes`, its header written (the
+// vtables, the count 1, the attributes, the size, 0 used, the next free
+// byte +28) and the block to [out]; 0, or E_OUTOFMEMORY. Only while
+// hooks::NativeHeapActive().
+uint32_t DefaultAllocator(uint8_t* base, uint32_t attributes, uint32_t size, uint32_t out);
+
+// XAudio::GetAllocator (sub_82460688): with no allocator in [inout], the
+// default one (DefaultAllocator for a size, `kAllocatorUnseen` through
+// `call` for none, its out at the frame's +80) to [inout] when it succeeds;
+// with one, its slots +0, +8 (with `size`) and +12 (with `attributes`).
+// Returns the last r3. `native_heap`: DefaultAllocator may run (else
+// nullopt, with nothing done, where it would).
+std::optional<uint32_t> GetAllocator(uint8_t* base, uint32_t attributes, uint32_t size,
+                                     uint32_t inout, uint32_t frame, bool native_heap,
+                                     const GuestCall& call);
+
 }  // namespace xaudio

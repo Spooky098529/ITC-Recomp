@@ -447,4 +447,126 @@ uint32_t BaseSize(uint8_t* base, uint32_t description, uint32_t out, uint32_t fr
   return r3;
 }
 
+std::optional<uint32_t> BufferConstruct(uint8_t* base, uint32_t buffer, uint32_t format,
+                                        uint32_t allocator, const GuestCall& call) {
+  ITC_NATIVE_RUNNING("sub_8245F750 XAudioBuffer::XAudioBuffer");
+  const uint8_t type = guest::LoadU8(base, format);
+  uint32_t frames = 0;
+  if (type == 0 && !PassFrames(guest::LoadU32(base, format + 8), &frames)) {
+    return std::nullopt;
+  }
+  guest::StoreU32(base, buffer, kBufferVtable);
+  guest::StoreU32(base, buffer + 4, 1);
+  guest::StoreU8(base, buffer + 8, type);
+  guest::StoreU8(base, buffer + 20, 0);
+  guest::StoreU32(base, buffer + 24, kSampleRate);
+  guest::StoreU32(base, buffer + 32, guest::LoadU32(base, format + 16));
+  if (guest::LoadU8(base, buffer + 8) != 0) {
+    guest::StoreU32(base, buffer + 12, 0);
+    guest::StoreU32(base, buffer + 16, 0);
+    guest::StoreU8(base, buffer + 21, 0);
+    guest::StoreU32(base, buffer + 28, guest::LoadU32(base, format + 12));
+    return buffer;
+  }
+  const uint32_t bytes = ((frames * uint32_t(guest::LoadU8(base, format + 5))) << 2) + 128;
+  const uint32_t samples =
+      (call(Method(base, allocator, 20), 0x8245F7E8, Args({allocator, bytes, allocator})) +
+       127) &
+      0xFFFFFF80u;
+  if (format + 4 == 0) {
+    guest::StoreU32(base, buffer + 12, 0);
+    guest::StoreU32(base, buffer + 16, 0);
+  } else {
+    guest::StoreU32(base, buffer + 12, guest::LoadU32(base, format + 4));
+    guest::StoreU32(base, buffer + 16, guest::LoadU32(base, format + 8));
+  }
+  guest::StoreU32(base, buffer + 28, samples);
+  guest::StoreU8(base, buffer + 21, 0);
+  return buffer;
+}
+
+uint32_t BufferCreate(uint8_t* base, uint32_t format, uint32_t allocator, uint32_t out,
+                      const GuestCall& call) {
+  ITC_NATIVE_RUNNING("sub_8245FA80 XAudioBuffer::Create");
+  const uint32_t memory = call(Method(base, allocator, 20), 0x8245FAB0, Args({allocator, 36}));
+  if (memory == 0) {
+    return 0x8007000Eu;  // E_OUTOFMEMORY
+  }
+  uint32_t buffer;
+  if (const auto made = BufferConstruct(base, memory, format, allocator, call)) {
+    buffer = *made;
+  } else {
+    buffer = call(kBufferConstruct, 0x8245FAC4, Args({memory, format, allocator}));
+  }
+  if (buffer == 0) {
+    return 0x8007000Eu;
+  }
+  Regs regs;
+  regs.r[0] = buffer;
+  regs.r[1] = out;
+  regs.count = 2;
+  call(Method(base, buffer, 20), 0x8245FAE4, regs);
+  return 0;
+}
+
+uint32_t VoiceConstruct(uint8_t* base, uint32_t voice, uint32_t allocator, uint32_t type,
+                        const GuestCall& call) {
+  ITC_NATIVE_RUNNING("sub_82461500 XAudioVoice::Construct");
+  guest::StoreU32(base, voice + 8, allocator);
+  guest::StoreU32(base, voice, kVoiceVtable0);
+  guest::StoreU32(base, voice + 4, 1);
+  if (allocator != 0) {
+    call(Method(base, allocator, 0), 0x82461550, Args({allocator}));
+  }
+  guest::StoreU8(base, voice + 12, uint8_t(type));
+  guest::StoreU32(base, voice, kVoiceVtable);
+  guest::StoreU32(base, voice + 16, voice + 16);
+  guest::StoreU32(base, voice + 20, voice + 16);
+  guest::StoreU32(base, voice + 24, voice + 24);
+  guest::StoreU32(base, voice + 28, voice + 24);
+  guest::StoreU32(base, voice + 40, 0);
+  return voice;
+}
+
+uint32_t DefaultAllocator(uint8_t* base, uint32_t attributes, uint32_t size, uint32_t out) {
+  ITC_NATIVE_RUNNING("sub_824605E8 XAudio::DefaultAllocator");
+  const uint32_t block = Alloc(base, size + 28, attributes);
+  if (block == 0) {
+    return 0x8007000Eu;  // E_OUTOFMEMORY
+  }
+  guest::StoreU32(base, block + 4, kRootVtable);
+  guest::StoreU32(base, block + 8, 1);
+  guest::StoreU32(base, block, kAllocatorVtable);
+  guest::StoreU32(base, block + 4, kAllocatorVtable2);
+  guest::StoreU32(base, block + 12, attributes);
+  guest::StoreU32(base, block + 20, 0);
+  guest::StoreU32(base, block + 16, size);
+  guest::StoreU32(base, block + 24, block + 28);
+  guest::StoreU32(base, out, block);
+  return 0;
+}
+
+std::optional<uint32_t> GetAllocator(uint8_t* base, uint32_t attributes, uint32_t size,
+                                     uint32_t inout, uint32_t frame, bool native_heap,
+                                     const GuestCall& call) {
+  ITC_NATIVE_RUNNING("sub_82460688 XAudio::GetAllocator");
+  const uint32_t allocator = guest::LoadU32(base, inout);
+  if (allocator == 0) {
+    if (size != 0 && !native_heap) {
+      return std::nullopt;
+    }
+    guest::StoreU32(base, frame + 80, 0);
+    const uint32_t r3 = size != 0 ? DefaultAllocator(base, attributes, size, frame + 80)
+                                  : call(kAllocatorUnseen, 0x824606D0, Args({frame + 80}));
+    if (int32_t(r3) < 0) {
+      return r3;
+    }
+    guest::StoreU32(base, inout, guest::LoadU32(base, frame + 80));
+    return r3;
+  }
+  call(Method(base, allocator, 0), 0x824606FC, Args({allocator}));
+  call(Method(base, allocator, 8), 0x82460714, Args({allocator, size}));
+  return call(Method(base, allocator, 12), 0x8246072C, Args({allocator, attributes}));
+}
+
 }  // namespace xaudio

@@ -18,6 +18,7 @@
 #include <fmt/format.h>
 
 #include <string>
+#include <vector>
 
 namespace harness {
 
@@ -467,6 +468,135 @@ void Descriptions(Context& h, uint32_t block) {
   }
 }
 
+// A default allocator's header (28 bytes) with its next free byte (+24) as
+// an offset, then freed.
+void AllocatorOutputs(Outputs& out, uint8_t* base, uint32_t allocator) {
+  out.Word(allocator != 0);
+  if (allocator == 0) {
+    return;
+  }
+  std::vector<uint8_t> header = Read(base, allocator, 24);
+  out.Bytes(header);
+  out.Word(guest::LoadU32(base, allocator + 24) - allocator);
+  memory::crt::XMemFree(allocator, 0x61820006);
+}
+
+void Objects(Context& h, uint32_t block) {
+  {
+    Results results("XAudioBuffer::XAudioBuffer (sub_8245F750)");
+    for (int i = 0; i < 48; i++) {
+      Case(h, results, block, __imp__sub_8245F750, hooks::XAudioBufferConstruct,
+           [&](Random& random, PPCContext& t) {
+             World(h.base, block, random);
+             const uint32_t format = block + 0x1F80;
+             guest::StoreU8(h.base, format, random.Below(4) != 0 ? 0 : uint8_t(random.Next()));
+             guest::StoreU8(h.base, format + 5, uint8_t(random.Below(7)));
+             Store(h.base, format + 8, Rate(random));
+             t.r3.u64 = block + 0x1A00;
+             t.r4.u64 = format;
+             t.r5.u64 = AnyObject(random, block);
+           },
+           fmt::format("case {}", i));
+    }
+    results.Report();
+  }
+  {
+    // The allocator's slot +20 is AddRef, its count set so it hands back
+    // object 5 (or 0, for E_OUTOFMEMORY, now and then); the buffer's own
+    // slot +20 is the game's.
+    Results results("XAudioBuffer::Create (sub_8245FA80)");
+    for (int i = 0; i < 48; i++) {
+      Case(h, results, block, __imp__sub_8245FA80, hooks::XAudioBufferCreate,
+           [&](Random& random, PPCContext& t) {
+             World(h.base, block, random);
+             Store(h.base, block + kVtable + 20, 0x8245F860);
+             const uint32_t allocator = Object(block, 1);
+             Store(h.base, allocator + 4, random.Below(8) == 0 ? 0xFFFFFFFF : Object(block, 5) - 1);
+             const uint32_t format = block + 0x1F80;
+             guest::StoreU8(h.base, format, random.Below(4) != 0 ? 0 : uint8_t(random.Next()));
+             guest::StoreU8(h.base, format + 5, uint8_t(random.Below(7)));
+             Store(h.base, format + 8, Rate(random));
+             t.r3.u64 = format;
+             t.r4.u64 = allocator;
+             t.r5.u64 = block + 0x1F00;
+           },
+           fmt::format("case {}", i));
+    }
+    results.Report();
+  }
+  {
+    Results results("XAudioVoice::Construct (sub_82461500)");
+    for (int i = 0; i < 48; i++) {
+      Case(h, results, block, __imp__sub_82461500, hooks::XAudioVoiceConstruct,
+           [&](Random& random, PPCContext& t) {
+             World(h.base, block, random);
+             t.r3.u64 = block;
+             t.r4.u64 = random.Below(4) == 0 ? 0 : AnyObject(random, block);
+             t.r5.u64 = random.Next();
+           },
+           fmt::format("case {}", i));
+    }
+    results.Report();
+  }
+  if (!hooks::NativeHeapActive()) {
+    return;
+  }
+  {
+    // Real blocks: the header compared with its next free byte as an
+    // offset, then freed.
+    Results results("XAudio::DefaultAllocator (sub_824605E8)");
+    for (int i = 0; i < 16; i++) {
+      Outputs out[2];
+      for (int v = 0; v < 2; v++) {
+        Store(h.base, block, 0);
+        PPCContext t = CallContext(h);
+        t.r3.u64 = 0x61820006;
+        t.r4.u64 = 32 + 96 * i;
+        t.r5.u64 = block;
+        (v == 0 ? __imp__sub_824605E8 : hooks::XAudioDefaultAllocator)(t, h.base);
+        out[v].Word(t.r3.u32);
+        AllocatorOutputs(out[v], h.base, guest::LoadU32(h.base, block));
+      }
+      results.Check(out[0], out[1], fmt::format("{} bytes", 32 + 96 * i));
+    }
+    results.Report();
+  }
+  {
+    Results results("XAudio::GetAllocator (sub_82460688)");
+    for (int i = 0; i < 48; i++) {
+      const bool fresh = i % 3 == 0;  // no allocator yet: a real default one
+      const Random start = h.random;
+      Random random = start;
+      Outputs out[2];
+      for (int v = 0; v < 2; v++) {
+        random = start;
+        for (uint32_t k = 0; k < kBlockBytes; k += 4) {
+          Store(h.base, block + k, uint32_t(random.Next()));
+        }
+        World(h.base, block, random);
+        const uint32_t inout = block + 0x1F00;
+        Store(h.base, inout, fresh ? 0 : AnyObject(random, block));
+        PPCContext t = CallContext(h);
+        // A fresh allocator's attributes as the voices' (the block freed
+        // with them); random words for an existing one's.
+        t.r3.u64 = fresh ? 0x61820006 : random.Next();
+        t.r4.u64 = fresh ? 32 + random.Below(1024) : random.Next();
+        t.r5.u64 = inout;
+        (v == 0 ? __imp__sub_82460688 : hooks::XAudioGetAllocator)(t, h.base);
+        out[v].Word(t.r3.u32);
+        if (fresh) {
+          AllocatorOutputs(out[v], h.base, guest::LoadU32(h.base, inout));
+          Store(h.base, inout, 0);
+        }
+        out[v].Bytes(Read(h.base, block, kBlockBytes));
+      }
+      h.random = random;
+      results.Check(out[0], out[1], fmt::format("case {}{}", i, fresh ? " (fresh)" : ""));
+    }
+    results.Report();
+  }
+}
+
 }  // namespace
 
 void XAudio(Context& h) {
@@ -476,6 +606,7 @@ void XAudio(Context& h) {
   Accessors(h, block.address);
   Calls(h, block.address);
   Descriptions(h, block.address);
+  Objects(h, block.address);
 }
 
 }  // namespace harness
