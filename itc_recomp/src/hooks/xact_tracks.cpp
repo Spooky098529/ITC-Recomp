@@ -469,7 +469,10 @@ ITC_XACT_TRACKS_HEAP_ADAPTER(825D5E58, XactTrackInstanceDeletingDestruct)
 // No adapter (removed 2026-10-29: only XACTTrack::Stop's plain C++ calls it in
 // play) for XACTTrackInstance::Stop sub_825D5D18.
 ITC_XACT_TRACKS_ADAPTER(825D01D8, XactTrackStop)
-ITC_XACT_TRACKS_HEAP_ADAPTER(825D0F00, XactEventCreate)
-ITC_XACT_TRACKS_HEAP_ADAPTER(825D5A48, XactTrackInstancePrepare)
-ITC_XACT_TRACKS_HEAP_ADAPTER(825D02F8, XactTrackCreateInstance)
+// No adapter (removed 2026-10-29: only XACTTrackInstance::Prepare's plain C++ calls it in
+// play) for XACTEvent::Create sub_825D0F00.
+// No adapter (removed 2026-10-29: only XACTTrack::CreateInstance's plain C++ calls it in
+// play) for XACTTrackInstance::Prepare sub_825D5A48.
+// No adapter (removed 2026-10-29: only XACTTrack::Prepare's plain C++ calls it in play;
+// sub_825D0B08 never ran) for XACTTrack::CreateInstance sub_825D02F8.
 ITC_XACT_TRACKS_HEAP_ADAPTER(825D0AA0, XactTrackPrepare)
