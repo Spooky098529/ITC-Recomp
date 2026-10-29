@@ -2631,9 +2631,9 @@ B7. **The game logic inside**: everything else, subsystem by subsystem,
 | 2026-10-28 | The save system's interface (the app's interface at `[0x826BDC90]`, its wrappers over the save devices' slots and the users; the front end's save layer: the save buffers, `GameData::Save`, `Load` and `Check`, the replays' list, `PlayTime`) | `save-interface.md` (with rows in `files-and-saves.md`, `system-services.md`) | 41 of 41 in play, with 5 shared rows (one migration; 17 adapters removed) | `--native_save_interface` |
 | 2026-10-28 | The car sounds and X3DAudio (the seven per-racer car sound objects at `[0x826C5C3C]`, eleven parts each, played straight through XAudio voices: the wave bank views, `SetBanks`, `TireSound::Amount`, the constructors, `CarSound::SetUp`, `SoundGlobals::Init`, `CarSounds::Destroy`, `CarSound::Update3D`; X3DAudio's math, translated by the XACT precedent: `X3DAudioCalculate` with its vector helpers, curves, pan, matrix, cone and Doppler) | `car-sounds.md` | 62 of 62 in play (three migrations, the last two after XAudio's voices; 53 adapters removed) | `--native_car_sounds` |
 | 2026-10-29 | XAudio's voices (the game's copy of XAudio, translated: the API entry points but the shut-down, the callback's and the commit; the source and submix voices, their outputs, passes, effects and states; the buffers and formats; its API lock the game's critical section and the voice lists' spin lock the game's, taken as the original does, the user's calls) | `xaudio.md` | 92 of 96 in play (two migrations; 37 Native; the rest waits on the engine and mixer) | `--native_xaudio` |
-| 2026-10-29 | XACT's waves and voices (XACT's voice class over XAudio's entry points, the waves' constructors, start positions, voices, play, pause, next and update, the tracks' volume and pitch getters; XACT's lock the game's, taken as the original does) | `xact-waves.md` | 22 of 30 in play (one migration; 16 adapters removed, 7 of XAudio's and 5 of `xact.md`'s; the rest waits on `XACTWave::Notify`'s notifications and clock) | `--native_xact_waves` |
-| 2026-10-29 | XACT's tracks and events (the tracks, track instances and events over the sound bank's records: their constructors, prepare, volume, pause, stop, cancel, destructors and RPC set-up; the play-wave event and the wave's slot forwarders; `XACTSound::ScheduleEvent`; XACT's lock the game's, taken as the original does) | `xact-tracks.md` (with a row in `xact.md`) | 47 of 55 in play (two migrations; 16 adapters removed; the rest waits on `XACTGetTimeMs` over QueryPerformanceCounter) | `--native_xact_tracks` |
-| 2026-10-29 | XAudio's engine and mixer (the engine's and factory's making, the processors' set-up, the mastering voice and its render driver, the stages, their callbacks and commit, the allocator; the voice lists' spin lock taken as the original does) | `xaudio-engine.md` | 40 of 47 in play (one migration; 11 adapters removed; the rest waits on the user's call on XAudio's threads, events and semaphore) | `--native_xaudio_engine` |
+| 2026-10-29 | XACT's waves and voices (XACT's voice class over XAudio's entry points, the waves' constructors, start positions, voices, play, pause, next and update, the tracks' volume and pitch getters; XACT's lock the game's, taken as the original does) | `xact-waves.md` | 22 of 30 in play (one migration; 16 adapters removed, 7 of XAudio's and 5 of `xact.md`'s); 31 of 31 since 2026-10-29 (`b7-loop-29-10-26`: the notifications, the release, Prepare and AudioUpdate, over QueryPerformanceCounter, ours) | `--native_xact_waves` |
+| 2026-10-29 | XACT's tracks and events (the tracks, track instances and events over the sound bank's records: their constructors, prepare, volume, pause, stop, cancel, destructors and RPC set-up; the play-wave event and the wave's slot forwarders; `XACTSound::ScheduleEvent`; XACT's lock the game's, taken as the original does) | `xact-tracks.md` (with a row in `xact.md`) | 55 of 55 in play (three migrations; QueryPerformanceCounter from the host clock and `XACTGetTimeMs` under it, the user's call) | `--native_xact_tracks` |
+| 2026-10-29 | XAudio's engine and mixer (the engine's and factory's making, the processors' set-up, the mastering voice and its render driver, the stages, their callbacks and commit, the allocator; the voice lists' spin lock taken as the original does) | `xaudio-engine.md` | 47 of 47 in play (two migrations; the threads, events and semaphore through the kernel's imports as the original, the user's call) | `--native_xaudio_engine` |
 
     The first run (2026-10-22, branch `b7-loop-test`): every harness at 0 differing, attract races at 20-21 s with no errors,
     and a race the user drove looked right. Ours went from 162 to 335 (work
@@ -3952,3 +3952,23 @@ functions (916 pairs): overridden 92, Native 24, Dropped 23, never
 called 70, live 240. Imports: 186 called, 62 with a live caller. B7
 (`b7_status.py`): ours 2,905, work left 3,411 (Wrapped 103, with a row
 510, no row yet 2,798).
+
+**2026-10-29, the continuations: QueryPerformanceCounter, XACT's
+tracks and waves, XAudio's engine finished (branch `b7-loop-29-10-26`):**
+by the user's calls of 2026-10-29, QueryPerformanceCounter
+(`sub_825BA0C8`) is answered from the host's steady clock at 50 MHz
+(`helpers::PerformanceCounter`, no flag, as GetTickCount), and
+XAudio's own threads, events, semaphore and title terminate
+notification are used by native code through the kernel's imports as
+the original does. With them, `XACTGetTimeMs` and the rest of XACT's
+tracks (`xact-tracks.md`, 55 of 55), XACT's waves (`xact-waves.md`, 31
+of 31: the notifications, the release, `InMemoryWave::Prepare`,
+`AudioUpdate`) and XAudio's engine (`xaudio-engine.md`, 47 of 47:
+`CreateEngine`, `Init`, the mixer callback, `Mix`, the master and
+worker threads) are native; register leftovers (r3) matched in full
+where the original sign-extends the time. The boundary: 449 functions
+(916 pairs): overridden 93, Native 27, Dropped 23, never called 70,
+live 236. Imports: 186 called, 58 with a live caller (from 62). B7
+(`b7_status.py`): ours 2,919, work left 3,398 (Wrapped 104, with a
+row 503, no row yet 2,791; the user's coverage commit cf7114c took 148
+stale entries out of the list), from 3,572.

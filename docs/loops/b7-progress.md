@@ -33,8 +33,8 @@ file's history. What's left to see in a drive, from every run:
   r3 done (f1e1ee9..dcdb43e; waves 31 of 31). Validated (`itc_2481`,
   `itc_2482`: 16 of 16 harness lines; one to drive; the replay logged
   the intermittent BaseHeap pair). The r3 fix and XAudio's engine's 7
-  done (320b782..12896c8; engine 47 of 47). Step: validation agent
-  running.
+  done and validated (`itc_2503`, `itc_2504`: 16 of 16). The
+  continuations recorded in the plan's table and boundary log.
 - XAudio's engine and mixer: `xaudio-engine.md`, 40 of 47 in play
   native in one migration, 11 adapters removed; `--native_xaudio_engine`;
   610125a, e9d3f21..d17ae9f. Validated (`itc_2458`, `itc_2459`): 40 of
@@ -97,3 +97,5 @@ file's history. What's left to see in a drive, from every run:
 - After the r3 fix and XAudio's engine's 7 (race 38 s, 0 errors,
   xact, xact_waves, xact_tracks, xaudio_engine, xaudio 0 differing):
   ours 2919, work left 3398 (wrapped 104, known 503, unknown 2791).
+- After its validation (`itc_2503`: race 7 s, 0 errors, every harness
+  0 differing but the expected groups): ours 2919, work left 3398.
