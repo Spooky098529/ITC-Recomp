@@ -1045,6 +1045,7 @@ std::optional<uint64_t> XmaCodecSubmitRegion(uint8_t* base, uint32_t codec, uint
                                              uint32_t flags, uint32_t thread, uint32_t frame,
                                              const GuestCall& call) {
   if (guest::LoadU8(base, codec + 266) == 1) {
+    ITC_NATIVE_RUNNING("sub_8246A860 XmaCodec::SubmitRegion");
     return kENotImpl;
   }
   if (guest::LoadU16(base, codec + 16 + 92) == 0) {
