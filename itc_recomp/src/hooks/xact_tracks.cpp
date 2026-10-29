@@ -418,10 +418,14 @@ ITC_XACT_TRACKS_HEAP_ADAPTER(825D8660, XactPlayWaveDeletingDestruct)
 ITC_XACT_TRACKS_ADAPTER(825D7558, XactPlayWaveApplyVariation)
 ITC_XACT_TRACKS_ADAPTER(825D8870, XactPlayWaveGetDuration)
 ITC_XACT_TRACKS_ADAPTER(825D86F8, XactPlayWavePrepare)
-ITC_XACT_TRACKS_HEAP_ADAPTER(825D53D8, XactTrackInstancePrepareSimple)
+// No adapter (removed 2026-10-29: only XACTTrack::PrepareSimple's plain C++ calls it in
+// play) for XACTTrackInstance::PrepareSimple sub_825D53D8.
 ITC_XACT_TRACKS_HEAP_ADAPTER(825D09D0, XactTrackPrepareSimple)
-ITC_XACT_TRACKS_ADAPTER(825D5520, XactTrackInstanceCancelEvents)
-ITC_XACT_TRACKS_HEAP_ADAPTER(825D5838, XactTrackInstanceDestruct)
+// No adapter (removed 2026-10-29: only ~XACTTrackInstance's and Stop's plain C++ calls it in
+// play) for XACTTrackInstance::CancelEvents sub_825D5520.
+// No adapter (removed 2026-10-29: only its deleting destructor's plain C++ calls it in
+// play) for XACTTrackInstance::~XACTTrackInstance sub_825D5838.
 ITC_XACT_TRACKS_HEAP_ADAPTER(825D5E58, XactTrackInstanceDeletingDestruct)
-ITC_XACT_TRACKS_ADAPTER(825D5D18, XactTrackInstanceStop)
+// No adapter (removed 2026-10-29: only XACTTrack::Stop's plain C++ calls it in
+// play) for XACTTrackInstance::Stop sub_825D5D18.
 ITC_XACT_TRACKS_ADAPTER(825D01D8, XactTrackStop)
