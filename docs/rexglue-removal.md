@@ -3937,3 +3937,18 @@ boundary: 449 functions (916 pairs): overridden 92, Native 24, Dropped
 23, never called 70, live 240. Imports: 186 called, 62 with a live
 caller. B7 (`b7_status.py`): ours 2,892, work left 3,572 (Wrapped 103,
 with a row 523, no row yet 2,946), from 3,612.
+
+**2026-10-29, stale functions out of the coverage list (branch
+`b7-loop-29-10-26`, beside the loop):** a read-only survey of the
+libraries linked into the game (the XEX's static library list names
+only Microsoft's: XAPILIB, D3D9, D3DX9, XGRAPHC, XNET, XAUD, X3DAUD,
+XMEDIA, XONLINE, XHV, XMP, LIBCPMT, XACT; no third-party library found
+in the image's strings or tables) found 148 functions in
+`seen_in_play.txt` that can no longer run: 82 of the movie library's in
+the `.embsec_` sections (`825DC200`-`825FC1B8`, now part of its range)
+and 66 in D3DX's range reached only through the HLSL compiler's
+objects' vtables or the movie library's tables (`docs/coverage.md`). Taken out of the list. The boundary unchanged: 449
+functions (916 pairs): overridden 92, Native 24, Dropped 23, never
+called 70, live 240. Imports: 186 called, 62 with a live caller. B7
+(`b7_status.py`): ours 2,905, work left 3,411 (Wrapped 103, with a row
+510, no row yet 2,798).

@@ -110,6 +110,35 @@ replaced (`--play_movies_with_ffmpeg`, `native-movies.md`): the third
 session's list, with the second's functions that neither are ours nor sit
 in the library's range (`82481A70`-`82575B07`).
 
+Both filters missed some (found 2026-10-29 by a read-only survey of the
+libraries linked into the game): 148 functions from the first session
+stayed in the list that no longer run. They were taken out of the list
+on 2026-10-29 (not a new session; every one without a row: no row yet
+2,946 -> 2,798):
+
+- 82 in the `.embsec_` sections (`825DC200`-`825FC1B8`, 120 functions):
+  the movie library's own code past `.text`, called only from
+  `sub_824D3148`, `sub_8251BB78` and `sub_825169A0` (the library's), and
+  named elsewhere only by the library's table at `0x8264EEC0`; it calls
+  only `memset` (`sub_825A71D0`) and imports nothing.
+- 66 in D3DX's address range (`822B8F10`-`8244FFFF`) reachable only
+  through the HLSL compiler's objects' vtables (the table at
+  `0x82018DE4`, the back end's at `0x8201EAxx`), through `sub_822B8230`'s
+  subtree, or through the movie library's tables: the 2026-10-25 filter
+  followed direct calls only.
+
+How they were found: a static pass from the functions in the list
+outside D3DX's range and the movie library, following direct calls,
+address constants and the function tables those constants point at (the
+`D3DXCompileShader` override reaching only `D3DXCreateBuffer`); then each
+one checked to be in the first session's list (`5fdc020`) and in none of
+the later ones without it. The live functions left in D3DX's range are
+texture compression (`functions/texture-compression.md`), `D3DXCreateBuffer`
+and its vtable, `sub_8235A688`, two start-up initializers and a few
+one-instruction bodies the linker shares with game code
+(`functions/functions.md`). A coverage session would confirm the cut:
+none of the 148 should come back.
+
 ## What's kept, and what isn't
 
 - `itc_recomp/coverage/seen_in_play.txt`: the functions seen in play, one
@@ -221,4 +250,13 @@ replaced): 596 fewer functions left.
 in play (seen, or ours): 6451
   ours 1847, work left 4604 (wrapped 113, known 651, unknown 3840)
 rows: 2824; for functions not seen in play: 213
+```
+
+After the 148 stale functions were taken out (2026-10-29, above; during
+B7's twenty-second loop run, so ours moved too):
+
+```
+in play (seen, or ours): 6316
+  ours 2905, work left 3411 (wrapped 103, known 510, unknown 2798)
+rows: 4123; for functions not seen in play: 605
 ```

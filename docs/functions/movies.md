@@ -10,7 +10,10 @@ start-up keeps at `0x826C1CDC`, from the boot sequence's handlers
 keeps its state at +308 (0 none, 1 loaded or ended, 2 playing, 3 paused)
 and reaches the movie library, linked into the game (`82481A70`-
 `8257FFFF`, ~615 functions seen in play: the player, its threads, the
-WMV and WMA decoders and its own YUV draw), only through slots 0, 3, 4,
+WMV and WMA decoders and its own YUV draw; with the `.embsec_` sections
+`825DC200`-`825FC1B8`, 120 functions of its decoder called only from
+`sub_824D3148`, `sub_8251BB78` and `sub_825169A0`, see
+`../coverage.md`), only through slots 0, 3, 4,
 5, 7 and 8, by an 8-byte wrapper at +8 (`MovieWrapper`, vtable
 `0x8206CC90`: slot 0 opens, 5 returns the player, 6 releases) and the
 player's methods at +80, +88, +92 and +96. The plan to play them through
