@@ -208,6 +208,7 @@ void SaveInterface(Context& h);
 void CarSounds(Context& h);
 void X3DAudioMath(Context& h);
 void XAudio(Context& h);
+void XAudioEngine(Context& h);
 void XactWaves(Context& h);
 void XactTracks(Context& h);
 

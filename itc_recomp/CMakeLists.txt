@@ -184,6 +184,8 @@ set(ITC_SOURCES
     src/car_sounds/car_sound_parts.cpp
     src/hooks/xaudio.cpp
     src/xaudio/voices.cpp
+    src/hooks/xaudio_engine.cpp
+    src/xaudio/engine.cpp
     src/save_interface/save_interface.cpp
     src/save_interface/save_layer.cpp
     src/hooks/file_layer.cpp
@@ -348,6 +350,7 @@ set(ITC_SOURCES
     src/harnesses/car_sounds.cpp
     src/harnesses/x3daudio.cpp
     src/harnesses/xaudio.cpp
+    src/harnesses/xaudio_engine.cpp
     src/harnesses/file_layer.cpp
     src/harnesses/c_runtime_format.cpp
     src/harnesses/texture_compression.cpp
