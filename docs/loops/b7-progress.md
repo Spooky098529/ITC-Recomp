@@ -11,12 +11,14 @@ file's history. What's left to see in a drive, from every run:
 - Run started 2026-10-29 15:44 on `b7-loop-29-10-26` (the user's
   branch), from e282f62; summary `b7-loop-2026-10-29-1544.md`.
 - Limit for this run: 3 subsystems.
-- Subsystem 1 of 3: XACT's tracks and events (the top of `leads.md`,
+- Subsystem 1 of 3 done: XACT's tracks and events (the top of `leads.md`,
   with the next lead, as it says they read best mapped together).
   Map a3880fc checked (`xact-tracks.md`, 143 rows, 55 in play, 34
   ready groups). Migration 1 checked (44 ours,
   c8ad278..6fc2206). Validated (`itc_2432`,
   `itc_2433`: 44 of 44 harness lines; one to drive). Done (below); recorded in the plan's table and boundary log.
+- Subsystem 2 of 3: XAudio's engine and mixer (`leads.md`). Step:
+  mapping agent running.
 
 ## Done
 
