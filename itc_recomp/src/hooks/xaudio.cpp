@@ -855,18 +855,18 @@ ITC_XAUDIO_ADAPTER(82459E18, XAudioApiRelease)
 // No adapter (removed 2026-10-29: only CarSounds::Init's and CarSound::Update's plain C++ calls it in play) for XAudioVoice::SetEffectParameters, the API's, sub_82459E80.
 ITC_XAUDIO_ADAPTER(82459EF0, XAudioApiSetOutputVoices)
 ITC_XAUDIO_ADAPTER(82459F48, XAudioApiSetOutputMatrix)
-ITC_XAUDIO_ADAPTER(82459FA0, XAudioApiGetState)
-ITC_XAUDIO_ADAPTER(8245A1B0, XAudioApiStop)
+// No adapter (removed 2026-10-29: only the car sounds' plain C++ (IsPlaying, Pause, UpdateVoices, EngineLayer::Update, RollSound::Update, TireSound::Update) and XACTVoice::GetState's plain C++ calls it in play) for XAudioVoice::GetState, the API's sub_82459FA0.
+// No adapter (removed 2026-10-29: only the car sounds' plain C++ (Pause, Clear, UpdateVoices, the parts' updates) and XACTVoice::Stop's plain C++ calls it in play) for XAudioVoice::Stop, the API's sub_8245A1B0.
 ITC_XAUDIO_ADAPTER(8245A3B8, XAudioApiGetOutputFormat)
 // No adapter (removed 2026-10-29: only CarSound::AddVoice's plain C++ calls it in play) for XAudioSourceVoice::SubmitPacket sub_8245A050.
-ITC_XAUDIO_ADAPTER(8245A108, XAudioApiCodec36)
-ITC_XAUDIO_ADAPTER(8245A208, XAudioApiFlushPackets)
+// No adapter (removed 2026-10-29: only XACTVoice::SubmitPacket's plain C++ calls it in play) for XAudioSourceVoice, the codec's +36 sub_8245A108.
+// No adapter (removed 2026-10-29: only XACTVoice::FlushPackets' plain C++ calls it in play) for XAudioSourceVoice::FlushPackets sub_8245A208.
 ITC_XAUDIO_ADAPTER(8245A270, XAudioApiCodec72)
 ITC_XAUDIO_ADAPTER(82459FF8, XAudioApiSetFormat)
 ITC_XAUDIO_ADAPTER(8245A0B0, XAudioApiReset)
-ITC_XAUDIO_ADAPTER(8245A168, XAudioApiStart)
-ITC_XAUDIO_ADAPTER(8245A2C8, XAudioApiSetVolume)
-ITC_XAUDIO_ADAPTER(8245A340, XAudioApiSetFrequencyRatio)
+// No adapter (removed 2026-10-29: only the car sounds' plain C++ (Resume, EngineLayer::Update, TireLayer::Update, RollSound::Update, PlayOnce) and XACTVoice::Start's plain C++ calls it in play) for XAudioVoice::Start, the API's sub_8245A168.
+// No adapter (removed 2026-10-29: only the car sounds' plain C++ (the parts' updates, PlayOnce) and XACTVoice::SetVolume's plain C++ calls it in play) for XAudioSourceVoice::SetVolume sub_8245A2C8.
+// No adapter (removed 2026-10-29: only CarSound::SetPitch's, SetPitchScaled's and XACTVoice::SetPitch's plain C++ calls it in play) for XAudioSourceVoice::SetFrequencyRatio sub_8245A340.
 ITC_XAUDIO_ADAPTER(8245A568, XAudioApiGetMasteringVoice)
 ITC_XAUDIO_ADAPTER(8245A768, XAudioApiCreateSourceVoice)
 ITC_XAUDIO_ADAPTER(8245A7C8, XAudioApiCreateSubmixVoice)

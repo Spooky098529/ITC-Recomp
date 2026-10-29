@@ -131,9 +131,9 @@ void FakeXactVoice(uint8_t* base, uint32_t block, Random& random, uint32_t empty
 
 // `r3_of(r3)` gives the r3 compared (the destructor's freed voice as found).
 // The bytes below the stack pointer compared (from sp - 48): GetState's and
-// SubmitPacket's frame words; 0 for the others, whose frames hold only the
-// original's saved registers.
-uint32_t stack_compared = 32;
+// SubmitPacket's frame words; none for the others, whose frames (and the
+// tail-called entry points') hold only saved registers.
+uint32_t stack_compared = 0;
 
 template <typename Setup, typename R3>
 void VoiceCase(Context& h, Results& results, uint32_t block, GuestFunction recompiled,
@@ -178,6 +178,7 @@ void VoiceMethods(Context& h, uint32_t block) {
   const uint32_t voice = block + kXactVoice;
   {
     Results results("XACTVoice::GetState (sub_825C9DB8)");
+    stack_compared = 32;
     for (int c = 0; c < 64; c++) {
       VoiceCase(h, results, block, __imp__sub_825C9DB8, hooks::XactVoiceGetState,
                 [&](Random& random, PPCContext& t) {
@@ -187,6 +188,7 @@ void VoiceMethods(Context& h, uint32_t block) {
                 },
                 fmt::format("case {}", c));
     }
+    stack_compared = 0;
     results.Report();
   }
   {
@@ -219,6 +221,7 @@ void VoiceMethods(Context& h, uint32_t block) {
     // XACT's 40-byte packet at +0x200: random words, the loop count 255 one
     // time in three.
     Results results("XACTVoice::SubmitPacket (sub_825C9E08)");
+    stack_compared = 32;
     for (int c = 0; c < 64; c++) {
       VoiceCase(h, results, block, __imp__sub_825C9E08, hooks::XactVoiceSubmitPacket,
                 [&](Random& random, PPCContext& t) {
@@ -234,6 +237,7 @@ void VoiceMethods(Context& h, uint32_t block) {
                 },
                 fmt::format("case {}", c));
     }
+    stack_compared = 0;
     results.Report();
   }
   {
@@ -288,7 +292,6 @@ void VoiceMethods(Context& h, uint32_t block) {
     // Without bit 0 the voice in the block; with it a voice from XMemAlloc
     // (the block's voice copied in) freed by the call, compared as found.
     Results results("XACTVoice::~XACTVoice, deleting (sub_825CA448)");
-    stack_compared = 0;
     for (int c = 0; c < 64; c++) {
       uint32_t made = 0;
       VoiceCase(h, results, block, __imp__sub_825CA448, hooks::XactVoiceDeletingDestruct,
@@ -308,7 +311,6 @@ void VoiceMethods(Context& h, uint32_t block) {
                 [&](uint32_t r3) { return made != 0 ? (r3 == made ? 1u : 2u) : r3; },
                 fmt::format("case {}", c));
     }
-    stack_compared = 32;
     results.Report();
   }
 }

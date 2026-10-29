@@ -30,15 +30,6 @@ void XactVoiceCreate(PPCContext& ctx, uint8_t* base) {
   });
 }
 
-void XactVoiceInit(PPCContext& ctx, uint8_t* base) {
-  const uint32_t voice = ctx.r3.u32, description = ctx.r4.u32, holder = ctx.r5.u32,
-                 level = ctx.r6.u32, reverb = ctx.r7.u32;
-  const xaudio::Thread thread = XAudioThreadOf(ctx, base);
-  XAudioFramed(ctx, base, 128, [&](const xaudio::GuestCall& call, uint32_t frame) {
-    return xact::VoiceInit(base, voice, description, holder, level, reverb, thread, frame, call);
-  });
-}
-
 void XactVoiceGetState(PPCContext& ctx, uint8_t* base) {
   const uint32_t voice = ctx.r3.u32, out = ctx.r4.u32;
   XAudioFramed(ctx, base, 112, [&](const xaudio::GuestCall& call, uint32_t frame) {
@@ -126,7 +117,8 @@ void XactVoiceDeletingDestruct(PPCContext& ctx, uint8_t* base) {
   }
 
 ITC_XACT_WAVES_HEAP_ADAPTER(825C9C40, XactVoiceCreate)
-ITC_XACT_WAVES_HEAP_ADAPTER(825C9B60, XactVoiceInit)
+// No adapter (removed 2026-10-29: only XACTVoice::Create's plain C++ calls it in play) for
+// XACTVoice::Init sub_825C9B60.
 ITC_XACT_WAVES_ADAPTER(825C9DB8, XactVoiceGetState)
 ITC_XACT_WAVES_ADAPTER(825C9BE8, XactVoiceSetVolume)
 ITC_XACT_WAVES_ADAPTER(825C9BF0, XactVoiceSetPitch)

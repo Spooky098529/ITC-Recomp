@@ -11,7 +11,6 @@
 namespace hooks {
 
 void XactVoiceCreate(PPCContext& ctx, uint8_t* base);         // sub_825C9C40
-void XactVoiceInit(PPCContext& ctx, uint8_t* base);           // sub_825C9B60
 void XactVoiceGetState(PPCContext& ctx, uint8_t* base);       // sub_825C9DB8
 void XactVoiceSetVolume(PPCContext& ctx, uint8_t* base);      // sub_825C9BE8
 void XactVoiceSetPitch(PPCContext& ctx, uint8_t* base);       // sub_825C9BF0
