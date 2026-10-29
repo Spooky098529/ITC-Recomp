@@ -258,9 +258,9 @@ ITC_XAUDIO_ENGINE_ADAPTER(8245D6D8, XAudioFactorySizeSlot)
 ITC_XAUDIO_ENGINE_ADAPTER(8245F588, XAudioRegisterStats)
 ITC_XAUDIO_ENGINE_ADAPTER(8245A828, XAudioSetUpProcessors)
 ITC_XAUDIO_ENGINE_ADAPTER(8245B2C0, XAudioEngineSize)
-ITC_XAUDIO_ENGINE_ADAPTER(8245FF68, XAudioMasteringSize)
-ITC_XAUDIO_ENGINE_ADAPTER(82465938, XAudioRenderDriverConstruct)
-ITC_XAUDIO_ENGINE_ADAPTER(8245FCA0, XAudioMasteringInit)
+// No adapter (removed 2026-10-29: only XAudioMasteringVoice::Create's plain C++ calls it in play) for XAudioMasteringVoice::Size sub_8245FF68.
+// No adapter (removed 2026-10-29: only XAudioMasteringVoice::Init's plain C++ calls it in play) for AudioRenderDriver::AudioRenderDriver sub_82465938.
+// No adapter (removed 2026-10-29: only XAudioMasteringVoice::Create's plain C++ calls it in play) for XAudioMasteringVoice::Init sub_8245FCA0.
 ITC_XAUDIO_ENGINE_ADAPTER(824600F0, XAudioMasteringCreate)
 ITC_XAUDIO_ENGINE_ADAPTER(8245FE20, XAudioMasteringStart)
 ITC_XAUDIO_ENGINE_ADAPTER(8245FDC8, XAudioMasteringPass)
