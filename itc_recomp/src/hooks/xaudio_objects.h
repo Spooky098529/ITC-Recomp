@@ -40,4 +40,28 @@ void XAudioPacketListsAlloc(PPCContext& ctx, uint8_t* base);   // sub_8246E120
 void XAudioPcmCodecConstruct(PPCContext& ctx, uint8_t* base);  // sub_8246D750
 void XAudioXmaCodecConstruct(PPCContext& ctx, uint8_t* base);  // sub_8246C1D0
 
+// The packet queue and the codecs' slots (under the voice lists' spin lock,
+// taken by this thread as the game does).
+void XAudioCodecSetFlags(PPCContext& ctx, uint8_t* base);            // sub_82467078
+void XAudioCodecRetirePacket(PPCContext& ctx, uint8_t* base);        // sub_8246A430
+void XAudioCodecCompletePacket(PPCContext& ctx, uint8_t* base);      // sub_824674D8
+void XAudioCodecFlushPackets(PPCContext& ctx, uint8_t* base);        // sub_824699E0
+void XAudioCodecFlush(PPCContext& ctx, uint8_t* base);               // sub_8246CEC8
+void XAudioCodecBaseSetFormat(PPCContext& ctx, uint8_t* base);       // sub_82469E58
+void XAudioPcmCodecSetFormat(PPCContext& ctx, uint8_t* base);        // sub_8246CFA8
+void XAudioPcmCodecStart(PPCContext& ctx, uint8_t* base);            // sub_8246D410
+void XAudioPcmCodecStop(PPCContext& ctx, uint8_t* base);             // sub_8246D500
+void XAudioCodecEndOfStream(PPCContext& ctx, uint8_t* base);         // sub_8246D630
+void XAudioPcmCodecSetVolume(PPCContext& ctx, uint8_t* base);        // sub_8246D008
+void XAudioPcmCodecSetPitch(PPCContext& ctx, uint8_t* base);         // sub_8246D0C8
+void XAudioPcmCodecSetFrequencyRatio(PPCContext& ctx, uint8_t* base);  // sub_8246D1E0
+void XAudioPcmCodecBaseSetFrequencyRatio(PPCContext& ctx, uint8_t* base);  // sub_8246D320
+void XAudioXmaCodecSetVolume(PPCContext& ctx, uint8_t* base);        // sub_8246AB48
+void XAudioXmaCodecSetPitch(PPCContext& ctx, uint8_t* base);         // sub_8246AC40
+void XAudioCodecSubmitPacket(PPCContext& ctx, uint8_t* base);        // sub_82469EF8
+void XAudioCodecSubmitRegion(PPCContext& ctx, uint8_t* base);        // sub_8246A1C0
+void XAudioPcmCodecSubmitPacket(PPCContext& ctx, uint8_t* base);     // sub_8246CEB8
+void XAudioXmaCodecSubmitRegion(PPCContext& ctx, uint8_t* base);     // sub_8246A860
+void XAudioCodecOnSubmit(PPCContext& ctx, uint8_t* base);            // sub_82469AF8 (harness)
+
 }  // namespace hooks

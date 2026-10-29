@@ -17,6 +17,7 @@
 #include "xaudio/voices.h"
 
 #include <cstdint>
+#include <optional>
 
 namespace xaudio {
 
@@ -176,5 +177,98 @@ uint64_t MeterCreate(uint8_t* base, uint32_t descriptor, uint32_t allocator, uin
 // bytes).
 uint64_t MeterInit(uint8_t* base, uint32_t meter, uint32_t descriptor, uint32_t allocator,
                    uint32_t frame, const GuestCall& call);
+
+// --- The packet queue and the codecs' slots (under the voice lists' spin
+// lock, taken as the original does: SpinTake and SpinRelease with the
+// thread's r13) ---
+
+// CodecBase::SetFlags (sub_82467078): under the spin lock, +156 = (+156 &
+// ~mask) | bits (their low bytes). Returns r3 as the last kernel call left
+// it (LastCallR3). `frame` is its (144 bytes).
+uint64_t CodecSetFlags(uint8_t* base, uint32_t codec_base, uint32_t mask, uint32_t bits,
+                       uint32_t thread, const GuestCall& call);
+// CodecBase::RetirePacket (sub_8246A430): under the spin lock, `entry` (0:
+// the first queued, when there is one; else 0 is returned) moved from the
+// queued list (+4) to the end of the free list (+16), +104 cleared (48
+// bytes), the entry's +116 = 0, slot +84 (32, 32). Returns the entry.
+// `frame` is its (128 bytes).
+uint64_t CodecRetirePacket(uint8_t* base, uint32_t codec_base, uint64_t entry, uint32_t thread,
+                           uint32_t frame, const GuestCall& call);
+// CodecBase::CompletePacket (sub_824674D8): RetirePacket, then the
+// packet-done callback (+160) when there's one and an entry, with a pointer
+// to {the codec's +12 (the base's -4), the entry's +36, `result`} in its
+// frame. Returns the entry. `frame` is its (128 bytes).
+uint64_t CodecCompletePacket(uint8_t* base, uint32_t codec_base, uint64_t entry, uint64_t result,
+                             uint32_t thread, uint32_t frame, const GuestCall& call);
+// CodecBase::FlushPackets (sub_824699E0): E_UNEXPECTED while playing; else
+// slot +92 (0, E_ABORT) until it returns 0, slot +84 (24, 0), +152 = 0; 0.
+// `frame` is its (96 bytes).
+uint64_t CodecFlushPackets(uint8_t* base, uint32_t codec_base, uint32_t frame,
+                           const GuestCall& call);
+// CodecBase::SetFormat (sub_82469E58): E_UNEXPECTED while playing or with
+// packets queued; else the format to +36 (memcpy), +157 = r5, slot +80
+// with f1 = 1.0, whose r3 it returns. `frame` is its (112 bytes).
+uint64_t CodecBaseSetFormat(uint8_t* base, uint32_t codec_base, uint32_t format, uint32_t extra,
+                            uint32_t frame, const GuestCall& call);
+// PcmCodec::SetFormat (sub_8246CFA8): CodecBase::SetFormat on +16; on
+// success +110 = 1 and +108 = the type's bytes a sample x the channels.
+// `frame` is its (96 bytes).
+uint64_t PcmCodecSetFormat(uint8_t* base, uint32_t codec, uint32_t format, uint32_t extra,
+                           uint32_t frame, const GuestCall& call);
+// PcmCodec::Start (sub_8246D410), Stop (sub_8246D500, `flags` r4) and
+// XAudioCodec::EndOfStream (sub_8246D630): the state changes under the
+// spin lock, through slot +84; 0. `frame` is theirs (128 bytes).
+uint64_t PcmCodecStart(uint8_t* base, uint32_t codec, uint32_t thread, uint32_t frame,
+                       const GuestCall& call);
+uint64_t PcmCodecStop(uint8_t* base, uint32_t codec, uint32_t flags, uint32_t thread,
+                      uint32_t frame, const GuestCall& call);
+uint64_t CodecEndOfStream(uint8_t* base, uint32_t codec, uint32_t thread, uint32_t frame,
+                          const GuestCall& call);
+// PcmCodec::SetVolume (sub_8246D008): +112 and +224 = the volume rounded
+// to float, under the spin lock; 0.
+uint64_t PcmCodecSetVolume(uint8_t* base, uint32_t codec, double volume, uint32_t thread,
+                           const GuestCall& call);
+// PcmCodec::SetPitch (sub_8246D0C8, the ratio 2^octaves through pow) and
+// SetFrequencyRatio (sub_8246D1E0): +116 the ratio as float; the
+// converter's +196 and +197 the format's type and channels, +200 the rate
+// x the ratio (the pitch's rounded to float, the ratio's in double) by
+// fctidz, +264 bit 0; 0. `frame` is theirs (144 bytes).
+uint64_t PcmCodecSetPitch(uint8_t* base, uint32_t codec, double octaves, uint32_t thread,
+                          uint32_t frame, const GuestCall& call);
+uint64_t PcmCodecSetFrequencyRatio(uint8_t* base, uint32_t codec, double ratio, uint32_t thread,
+                                   uint32_t frame, const GuestCall& call);
+// XmaCodec::SetVolume (sub_8246AB48) and SetPitch (sub_8246AC40): as the
+// PCM codec's over each stream (+56 of them, 88 bytes from [+188]). `frame`
+// is SetPitch's (144 bytes).
+uint64_t XmaCodecSetVolume(uint8_t* base, uint32_t codec, double volume, uint32_t thread,
+                           const GuestCall& call);
+uint64_t XmaCodecSetPitch(uint8_t* base, uint32_t codec, double octaves, uint32_t thread,
+                          uint32_t frame, const GuestCall& call);
+// CodecBase::OnSubmit (sub_82469AF8): the new entry's bounds checked
+// (unless flags bit 4), each failed check releasing one level of the spin
+// lock as the original does; slot +84 (24, 8 for flags bit 0 else 0); slot
+// +84 (32, 0) when the free list is empty; 0. `frame` is its (128 bytes).
+uint64_t CodecOnSubmit(uint8_t* base, uint32_t codec_base, uint32_t entry, uint32_t flags,
+                       uint32_t thread, uint32_t frame, const GuestCall& call);
+// CodecBase::SubmitPacket (sub_82469EF8) and SubmitRegion (sub_8246A1C0):
+// under the spin lock, the first free entry to the end of the queued list,
+// its fields from the packet (`packet`), OnSubmit; E_OUTOFMEMORY with no
+// free entry (the lock released twice, as the original does). nullopt, with
+// nothing done, when the block size (+92) is 0 (the original traps on its
+// division). `frame` is theirs (144 bytes).
+std::optional<uint64_t> CodecSubmitPacket(uint8_t* base, uint32_t codec_base, uint32_t packet,
+                                          uint32_t flags, uint32_t thread, uint32_t frame,
+                                          const GuestCall& call);
+std::optional<uint64_t> CodecSubmitRegion(uint8_t* base, uint32_t codec_base, uint32_t region,
+                                          uint32_t flags, uint32_t thread, uint32_t frame,
+                                          const GuestCall& call);
+// XmaCodec::SubmitRegion (sub_8246A860): E_NOTIMPL when +266 is 1; else
+// +266 = 2, a loop count above 255 other than -1 made -1 on a copy of the
+// 32 bytes in its frame, CodecBase::SubmitRegion on +16 with flags | 16.
+// nullopt as SubmitRegion's (before anything is written). `frame` is its
+// (128 bytes).
+std::optional<uint64_t> XmaCodecSubmitRegion(uint8_t* base, uint32_t codec, uint32_t region,
+                                             uint32_t flags, uint32_t thread, uint32_t frame,
+                                             const GuestCall& call);
 
 }  // namespace xaudio

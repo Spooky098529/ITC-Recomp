@@ -555,6 +555,329 @@ void Construction(Context& h, uint32_t block) {
   }
 }
 
+// --- The packet queue and the codecs' slots (under the spin lock) ---
+
+constexpr uint32_t kSetFlags = 0x82467078;
+constexpr uint32_t kRetirePacket = 0x8246A430;
+constexpr uint32_t kCompletePacket = 0x824674D8;
+constexpr uint32_t kSetFloat112 = 0x820B6950;  // RigidBody::SetFloat112: f1 to +112 of r3
+constexpr uint32_t kPcmBaseRatio = 0x8246D320;
+
+// The live spin lock (0x82954F10) is taken as the game takes it, by this
+// thread. With `hold`, the case holds it around the call (so the function
+// takes it again) and its depth and owner after the call are compared.
+// `after(out)` adds outputs before the block's.
+template <typename Setup, typename After>
+void LockedCase(Context& h, Results& results, uint32_t block, GuestFunction recompiled,
+                GuestFunction native, bool hold, Setup setup, After after,
+                const std::string& what) {
+  const Random start = h.random;
+  Random random = start;
+  Outputs out[2];
+  for (int v = 0; v < 2; v++) {
+    random = start;
+    for (uint32_t i = 0; i < kBlockBytes; i += 4) {
+      Store(h.base, block + i, uint32_t(random.Next()));
+    }
+    PPCContext t = CallContext(h);
+    for (uint32_t i = 4; i <= 0x400; i += 4) {
+      Store(h.base, t.r1.u32 - i, uint32_t(random.Next()));
+    }
+    setup(random, t);
+    const uint32_t sp = t.r1.u32;
+    PPCContext lock = t;
+    if (hold) {
+      hooks::XAudioSpinTake(lock, h.base);
+    }
+    (v == 0 ? recompiled : native)(t, h.base);
+    after(out[v], sp);
+    out[v].Word(guest::LoadU32(h.base, xa::kSpinLock + 4));
+    out[v].Word(guest::LoadU32(h.base, xa::kSpinLock + 8) == t.r13.u32);
+    if (hold) {
+      hooks::XAudioSpinRelease(lock, h.base);
+    }
+    out[v].Bytes(Read(h.base, block, kBlockBytes));
+    R3(out[v], t.r3.u64);
+  }
+  h.random = random;
+  results.Check(out[0], out[1], what);
+}
+
+// A codec at `codec` in the block (the PCM layout: its base at +16, the
+// queued list at +20 and the free list at +32, their entries from +0x400
+// and +0x800), the base's vtable at +0x1C00 with the game's SetFlags
+// (+84), CompletePacket or RetirePacket (+92) and the PCM base's
+// SetFrequencyRatio or a recorder (+80); the callback (+176) 0 or AddRef;
+// the state byte, the block size (1-8) and the converter's words random.
+void Codec(uint8_t* base, uint32_t block, uint32_t codec, Random& random) {
+  const uint32_t codec_base = codec + 16;
+  Store(base, codec_base, block + 0x1C00);
+  Store(base, block + 0x1C00 + 84, kSetFlags);
+  Store(base, block + 0x1C00 + 92, random.Below(2) == 0 ? kCompletePacket : kRetirePacket);
+  Store(base, block + 0x1C00 + 80, random.Below(2) == 0 ? kPcmBaseRatio : kSetFloat112);
+  MakeList(base, codec_base + 4, 8 * random.Below(3), block + 0x400, random.Below(6));
+  MakeList(base, codec_base + 16, 0, block + 0x800, random.Below(6));
+  Store(base, codec_base + 160, random.Below(3) == 0 ? 0 : kAddRef);
+  guest::StoreU8(base, codec_base + 156, uint8_t(random.Next()));
+  guest::StoreU16(base, codec_base + 92, uint16_t(1 + random.Below(8)));
+}
+
+uint32_t QueuedEntry(uint8_t* base, uint32_t codec, Random& random) {
+  const uint32_t head = codec + 20;
+  const uint32_t next = guest::LoadU32(base, head);
+  if (next == head || random.Below(4) == 0) {
+    return 0;
+  }
+  return next - guest::LoadU32(base, head + 8);
+}
+
+void Queue(Context& h, uint32_t block) {
+  const auto none = [](Outputs&, uint32_t) {};
+  const uint32_t codec = block;
+  {
+    Results results("CodecBase::SetFlags (sub_82467078)");
+    for (int i = 0; i < 32; i++) {
+      LockedCase(h, results, block, __imp__sub_82467078, hooks::XAudioCodecSetFlags, i % 2 == 0,
+                 [&](Random& random, PPCContext& t) {
+                   t.r3.u64 = codec + 16;
+                   t.r4.u64 = random.Next();
+                   t.r5.u64 = random.Next();
+                 },
+                 none, fmt::format("case {}", i));
+    }
+    results.Report();
+  }
+  {
+    Results results("CodecBase::RetirePacket (sub_8246A430)");
+    for (int i = 0; i < 48; i++) {
+      LockedCase(h, results, block, __imp__sub_8246A430, hooks::XAudioCodecRetirePacket,
+                 i % 2 == 0,
+                 [&](Random& random, PPCContext& t) {
+                   Codec(h.base, block, codec, random);
+                   t.r3.u64 = codec + 16;
+                   t.r4.u64 = QueuedEntry(h.base, codec, random);
+                 },
+                 none, fmt::format("case {}", i));
+    }
+    results.Report();
+  }
+  {
+    // The callback's struct in CompletePacket's frame (r1 - 128 + 80)
+    // compared when the callback ran.
+    Results results("CodecBase::CompletePacket (sub_824674D8)");
+    for (int i = 0; i < 48; i++) {
+      LockedCase(h, results, block, __imp__sub_824674D8, hooks::XAudioCodecCompletePacket,
+                 i % 2 == 0,
+                 [&](Random& random, PPCContext& t) {
+                   Codec(h.base, block, codec, random);
+                   t.r3.u64 = codec + 16;
+                   t.r4.u64 = QueuedEntry(h.base, codec, random);
+                   t.r5.u64 = random.Next();
+                 },
+                 [&](Outputs& out, uint32_t sp) { out.Bytes(Read(h.base, sp - 48, 12)); },
+                 fmt::format("case {}", i));
+    }
+    results.Report();
+  }
+  {
+    Results results("CodecBase::FlushPackets (sub_824699E0)");
+    for (int i = 0; i < 32; i++) {
+      LockedCase(h, results, block, __imp__sub_824699E0, hooks::XAudioCodecFlushPackets,
+                 i % 2 == 0,
+                 [&](Random& random, PPCContext& t) {
+                   Codec(h.base, block, codec, random);
+                   Store(h.base, codec + 16 + 160, 0);
+                   if (random.Below(2) == 0) {
+                     guest::StoreU8(h.base, codec + 16 + 156,
+                                    guest::LoadU8(h.base, codec + 16 + 156) & 0xFE);
+                   }
+                   t.r3.u64 = codec + 16;
+                 },
+                 none, fmt::format("case {}", i));
+    }
+    results.Report();
+  }
+  {
+    Results results("sub_8246CEC8 (the codecs' flush)");
+    for (int i = 0; i < 16; i++) {
+      LockedCase(h, results, block, __imp__sub_8246CEC8, hooks::XAudioCodecFlush, i % 2 == 0,
+                 [&](Random& random, PPCContext& t) {
+                   Codec(h.base, block, codec, random);
+                   Store(h.base, codec + 16 + 160, 0);
+                   guest::StoreU8(h.base, codec + 16 + 156,
+                                  guest::LoadU8(h.base, codec + 16 + 156) & 0xFE);
+                   t.r3.u64 = codec;
+                 },
+                 none, fmt::format("case {}", i));
+    }
+    results.Report();
+  }
+  {
+    Results results("CodecBase::SetFormat (sub_82469E58)");
+    for (int i = 0; i < 32; i++) {
+      LockedCase(h, results, block, __imp__sub_82469E58, hooks::XAudioCodecBaseSetFormat,
+                 i % 2 == 0,
+                 [&](Random& random, PPCContext& t) {
+                   Codec(h.base, block, codec, random);
+                   if (random.Below(2) == 0) {
+                     guest::StoreU8(h.base, codec + 16 + 156,
+                                    guest::LoadU8(h.base, codec + 16 + 156) & 0xFE);
+                   }
+                   if (random.Below(2) == 0) {
+                     MakeList(h.base, codec + 20, 0, block + 0x400, 0);
+                   }
+                   t.r3.u64 = codec + 16;
+                   t.r4.u64 = block + 0x1800;
+                   t.r5.u64 = random.Next();
+                 },
+                 none, fmt::format("case {}", i));
+    }
+    results.Report();
+  }
+  {
+    Results results("PcmCodec::SetFormat (sub_8246CFA8)");
+    for (int i = 0; i < 32; i++) {
+      LockedCase(h, results, block, __imp__sub_8246CFA8, hooks::XAudioPcmCodecSetFormat,
+                 i % 2 == 0,
+                 [&](Random& random, PPCContext& t) {
+                   Codec(h.base, block, codec, random);
+                   guest::StoreU8(h.base, codec + 16 + 156,
+                                  guest::LoadU8(h.base, codec + 16 + 156) & 0xFE);
+                   if (random.Below(3) != 0) {
+                     MakeList(h.base, codec + 20, 0, block + 0x400, 0);
+                   }
+                   guest::StoreU8(h.base, block + 0x1800, uint8_t(random.Below(4)));
+                   guest::StoreU8(h.base, block + 0x1804, uint8_t(1 + random.Below(6)));
+                   t.r3.u64 = codec;
+                   t.r4.u64 = block + 0x1800;
+                   t.r5.u64 = random.Next();
+                 },
+                 none, fmt::format("case {}", i));
+    }
+    results.Report();
+  }
+  struct Slot {
+    const char* name;
+    GuestFunction recompiled;
+    GuestFunction native;
+    bool f1;
+  };
+  const Slot slots[] = {
+      {"PcmCodec::Start (sub_8246D410)", __imp__sub_8246D410, hooks::XAudioPcmCodecStart, false},
+      {"PcmCodec::Stop (sub_8246D500)", __imp__sub_8246D500, hooks::XAudioPcmCodecStop, false},
+      {"XAudioCodec::EndOfStream (sub_8246D630)", __imp__sub_8246D630,
+       hooks::XAudioCodecEndOfStream, false},
+      {"PcmCodec::SetVolume (sub_8246D008)", __imp__sub_8246D008, hooks::XAudioPcmCodecSetVolume,
+       true},
+      {"PcmCodec::SetPitch (sub_8246D0C8)", __imp__sub_8246D0C8, hooks::XAudioPcmCodecSetPitch,
+       true},
+      {"PcmCodec::SetFrequencyRatio (sub_8246D1E0)", __imp__sub_8246D1E0,
+       hooks::XAudioPcmCodecSetFrequencyRatio, true},
+      {"sub_8246D320 (the PCM base's SetFrequencyRatio)", __imp__sub_8246D320,
+       hooks::XAudioPcmCodecBaseSetFrequencyRatio, true},
+      {"XmaCodec::SetVolume (sub_8246AB48)", __imp__sub_8246AB48, hooks::XAudioXmaCodecSetVolume,
+       true},
+      {"XmaCodec::SetPitch (sub_8246AC40)", __imp__sub_8246AC40, hooks::XAudioXmaCodecSetPitch,
+       true},
+  };
+  for (const Slot& slot : slots) {
+    Results results(slot.name);
+    for (int i = 0; i < 48; i++) {
+      LockedCase(h, results, block, slot.recompiled, slot.native, i % 2 == 0,
+                 [&](Random& random, PPCContext& t) {
+                   Codec(h.base, block, codec, random);
+                   // The XMA codec's streams (up to 4) at +0x1000.
+                   guest::StoreU8(h.base, codec + 56, uint8_t(random.Below(5)));
+                   Store(h.base, codec + 188, block + 0x1000);
+                   static constexpr uint32_t kRates[] = {48000, 44100, 22050, 8000};
+                   Store(h.base, codec + 60, random.Below(4) != 0 ? kRates[random.Below(4)]
+                                                                  : uint32_t(random.Next()));
+                   for (uint32_t k = 1; k < 4; k++) {
+                     Store(h.base, codec + 60 + 8 * k, kRates[random.Below(4)]);
+                   }
+                   t.r3.u64 = slot.native == hooks::XAudioPcmCodecBaseSetFrequencyRatio
+                                  ? codec + 16
+                                  : codec;
+                   t.r4.u64 = random.Next();
+                   if (slot.f1) {
+                     t.f1.f64 = random.Below(4) == 0
+                                    ? double(std::bit_cast<float>(AnyFloat(random)))
+                                    : random.Below(3) == 0
+                                          ? std::bit_cast<double>(random.Next())
+                                          : double(int32_t(random.Below(8001)) - 4000) / 1000.0;
+                   }
+                 },
+                 none, fmt::format("case {}", i));
+    }
+    results.Report();
+  }
+  {
+    Results results("CodecBase::OnSubmit (sub_82469AF8)");
+    for (int i = 0; i < 64; i++) {
+      LockedCase(h, results, block, __imp__sub_82469AF8, hooks::XAudioCodecOnSubmit, i % 2 == 0,
+                 [&](Random& random, PPCContext& t) {
+                   Codec(h.base, block, codec, random);
+                   const uint32_t entry = block + 0x1400;
+                   for (uint32_t k = 12; k <= 32; k += 4) {
+                     Store(h.base, entry + k, random.Below(3) == 0 ? 0 : random.Below(16));
+                   }
+                   t.r3.u64 = codec + 16;
+                   t.r4.u64 = entry;
+                   t.r5.u64 = random.Next();
+                 },
+                 none, fmt::format("case {}", i));
+    }
+    results.Report();
+  }
+  {
+    // A packet at +0x1800 (+0 the data, +4 its size, +8 the loops, +12 and
+    // +16 the loop's start and length, +84 the context), its sizes small so
+    // the bounds checks pass and fail.
+    const auto packet = [&](Random& random) {
+      const uint32_t at = block + 0x1800;
+      for (uint32_t k = 4; k <= 16; k += 4) {
+        Store(h.base, at + k, random.Below(3) == 0 ? 0 : random.Below(64));
+      }
+      return at;
+    };
+    struct Submit {
+      const char* name;
+      GuestFunction recompiled;
+      GuestFunction native;
+      uint32_t r3;  // the codec's offset in r3: 16 for the base's
+    };
+    const Submit submits[] = {
+        {"CodecBase::SubmitPacket (sub_82469EF8)", __imp__sub_82469EF8,
+         hooks::XAudioCodecSubmitPacket, 16},
+        {"CodecBase::SubmitRegion (sub_8246A1C0)", __imp__sub_8246A1C0,
+         hooks::XAudioCodecSubmitRegion, 16},
+        {"sub_8246CEB8 (the PCM codec's SubmitPacket)", __imp__sub_8246CEB8,
+         hooks::XAudioPcmCodecSubmitPacket, 0},
+        {"XmaCodec::SubmitRegion (sub_8246A860)", __imp__sub_8246A860,
+         hooks::XAudioXmaCodecSubmitRegion, 0},
+    };
+    for (const Submit& submit : submits) {
+      Results results(submit.name);
+      for (int i = 0; i < 64; i++) {
+        LockedCase(h, results, block, submit.recompiled, submit.native, i % 2 == 0,
+                   [&](Random& random, PPCContext& t) {
+                     Codec(h.base, block, codec, random);
+                     guest::StoreU8(h.base, codec + 266, uint8_t(random.Below(3)));
+                     const uint32_t at = packet(random);
+                     if (random.Below(4) == 0) {
+                       Store(h.base, at + 8, random.Below(2) == 0 ? 0xFFFFFFFF : random.Below(1000));
+                     }
+                     t.r3.u64 = codec + submit.r3;
+                     t.r4.u64 = at;
+                     t.r5.u64 = random.Next();
+                   },
+                   none, fmt::format("case {}", i));
+      }
+      results.Report();
+    }
+  }
+}
+
 }  // namespace
 
 void XAudioObjects(Context& h) {
@@ -562,6 +885,7 @@ void XAudioObjects(Context& h) {
   Leaves(h, block.address);
   Lists(h, block.address);
   Construction(h, block.address);
+  Queue(h, block.address);
 }
 
 }  // namespace harness

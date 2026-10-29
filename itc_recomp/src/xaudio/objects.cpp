@@ -7,6 +7,7 @@
 #include "xaudio/objects.h"
 
 #include "base/log.h"
+#include "c_runtime/math.h"
 #include "c_runtime/strings.h"
 #include "guest.h"
 
@@ -14,6 +15,7 @@
 #include <rex/ppc/intrinsics.h>
 #include <simde/x86/sse4.1.h>
 
+#include <bit>
 #include <climits>
 #include <cmath>
 #include <cstring>
@@ -598,6 +600,468 @@ uint64_t MeterInit(uint8_t* base, uint32_t meter, uint32_t descriptor, uint32_t 
     Clear(base, uint32_t(array), bytes);
   }
   return 0;
+}
+
+// --- The packet queue and the codecs' slots ---
+
+namespace {
+
+// The first entry of the list at `list` (its node less the head's offset),
+// 0 when it's empty or the first entry is 0.
+uint64_t FirstEntry(uint8_t* base, uint32_t list) {
+  const uint32_t next = guest::LoadU32(base, list);
+  if (next == list) {
+    return 0;
+  }
+  return uint64_t(next) - uint64_t(guest::LoadU32(base, list + 8));
+}
+
+// The node of `entry` (the list's offset into it) out of its list when it's
+// in one, left pointing at itself.
+void UnlinkEntry(uint8_t* base, uint32_t list, uint64_t entry) {
+  const uint32_t node = uint32_t(guest::LoadU32(base, list + 8) + entry);
+  const uint32_t next = guest::LoadU32(base, node);
+  if (next == node) {
+    return;
+  }
+  guest::StoreU32(base, next + 4, guest::LoadU32(base, node + 4));
+  guest::StoreU32(base, guest::LoadU32(base, node + 4), guest::LoadU32(base, node));
+  guest::StoreU32(base, node + 4, node);
+  guest::StoreU32(base, node, node);
+}
+
+// The node of `entry` added at the end of the list at `list`.
+void LinkEntryAtEnd(uint8_t* base, uint32_t list, uint64_t entry) {
+  const uint32_t node = uint32_t(guest::LoadU32(base, list + 8) + entry);
+  guest::StoreU32(base, node, list);
+  guest::StoreU32(base, node + 4, guest::LoadU32(base, list + 4));
+  guest::StoreU32(base, list + 4, node);
+  guest::StoreU32(base, guest::LoadU32(base, node + 4), node);
+}
+
+uint64_t SetFlagsCall(uint8_t* base, uint32_t codec_base, uint32_t mask, uint32_t bits,
+                      uint32_t return_address, uint32_t sp, const GuestCall& call) {
+  call(Method(base, codec_base, 84), return_address, At(sp, Args({codec_base, mask, bits})));
+  return LastCallR3();
+}
+
+// fctidz of a double, as the translated code computes it.
+int64_t ToFixed(double value) {
+  return std::isnan(value)             ? INT64_MIN
+         : value > double(LLONG_MAX) ? LLONG_MAX
+                                     : simde_mm_cvttsd_si64(simde_mm_load_sd(&value));
+}
+
+// The converter at `converter` given a rate times a ratio (both as the
+// translated code has them: the rate's word through the frame at `frame`
+// + 80, converted and rounded to float, the product rounded to float),
+// stored by fctidz to +16.
+void SetConverterRate(uint8_t* base, uint32_t converter, uint32_t frame, uint32_t rate,
+                      double ratio) {
+  guest::StoreU32(base, frame + 80, 0);
+  guest::StoreU32(base, frame + 84, rate);
+  const double rate_float = double(float(double(int64_t(uint64_t(rate)))));
+  const double product = double(float(rate_float * ratio));
+  guest::StoreU32(base, converter + 16, uint32_t(ToFixed(product)));
+}
+
+double TwoToThe(uint8_t* base, double octaves) {
+  return c_runtime::Pow(std::bit_cast<double>(uint64_t(REX_LOAD_U64(0x820056D8))), octaves);
+}
+
+}  // namespace
+
+uint64_t CodecSetFlags(uint8_t* base, uint32_t codec_base, uint32_t mask, uint32_t bits,
+                       uint32_t thread, const GuestCall& call) {
+  ITC_NATIVE_RUNNING("sub_82467078 CodecBase::SetFlags");
+  SpinTake(base, thread, call);
+  const uint8_t state = guest::LoadU8(base, codec_base + 156);
+  guest::StoreU8(base, codec_base + 156, uint8_t((state & ~(mask & 0xFF)) | (bits & 0xFF)));
+  SpinRelease(base, thread, call);
+  return LastCallR3();
+}
+
+uint64_t CodecRetirePacket(uint8_t* base, uint32_t codec_base, uint64_t entry, uint32_t thread,
+                           uint32_t frame, const GuestCall& call) {
+  ITC_NATIVE_RUNNING("sub_8246A430 CodecBase::RetirePacket");
+  SpinTake(base, thread, call);
+  if (uint32_t(entry) == 0) {
+    entry = FirstEntry(base, codec_base + 4);
+    if (uint32_t(entry) == 0) {
+      SpinRelease(base, thread, call);
+      return 0;
+    }
+  }
+  UnlinkEntry(base, codec_base + 4, entry);
+  LinkEntryAtEnd(base, codec_base + 16, entry);
+  SetRegs(call, Args({codec_base + 104, 0, 48}));
+  Clear(base, codec_base + 104, 48);
+  guest::StoreU8(base, uint32_t(entry) + 116, 0);
+  SetFlagsCall(base, codec_base, 32, 32, 0x8246A5A0, frame, call);
+  SpinRelease(base, thread, call);
+  return entry;
+}
+
+uint64_t CodecCompletePacket(uint8_t* base, uint32_t codec_base, uint64_t entry, uint64_t result,
+                             uint32_t thread, uint32_t frame, const GuestCall& call) {
+  ITC_NATIVE_RUNNING("sub_824674D8 CodecBase::CompletePacket");
+  SetRegs(call, Args({codec_base, entry}));
+  const uint64_t done =
+      CodecRetirePacket(base, codec_base, entry, thread, Below(base, frame, 128), call);
+  const uint32_t callback = guest::LoadU32(base, codec_base + 160);
+  if (uint32_t(done) != 0 && callback != 0) {
+    guest::StoreU32(base, frame + 88, uint32_t(result));
+    guest::StoreU32(base, frame + 80, guest::LoadU32(base, codec_base - 4));
+    guest::StoreU32(base, frame + 84, guest::LoadU32(base, uint32_t(done) + 36));
+    call(callback, 0x82467528, At(frame, Args({frame + 80})));
+  }
+  return done;
+}
+
+uint64_t CodecFlushPackets(uint8_t* base, uint32_t codec_base, uint32_t frame,
+                           const GuestCall& call) {
+  ITC_NATIVE_RUNNING("sub_824699E0 CodecBase::FlushPackets");
+  if ((guest::LoadU8(base, codec_base + 156) & 1) != 0) {
+    return 0xFFFFFFFF8000FFFFull;  // E_UNEXPECTED
+  }
+  while (call(Method(base, codec_base, 92), 0x82469A40,
+              At(frame, Args({codec_base, 0, 0xFFFFFFFF80004004ull}))) != 0) {
+  }
+  SetFlagsCall(base, codec_base, 24, 0, 0x82469A64, frame, call);
+  guest::StoreU32(base, codec_base + 152, 0);
+  return 0;
+}
+
+uint64_t CodecBaseSetFormat(uint8_t* base, uint32_t codec_base, uint32_t format, uint32_t extra,
+                            uint32_t frame, const GuestCall& call) {
+  ITC_NATIVE_RUNNING("sub_82469E58 CodecBase::SetFormat");
+  if ((guest::LoadU8(base, codec_base + 156) & 1) != 0 ||
+      uint32_t(FirstEntry(base, codec_base + 4)) != 0) {
+    return 0xFFFFFFFF8000FFFFull;  // E_UNEXPECTED
+  }
+  Copy(base, codec_base + 36, format, 56, 0x82469EB0, frame, call);
+  guest::StoreU8(base, codec_base + 157, uint8_t(extra));
+  Regs regs = At(frame, Args({codec_base}));
+  regs.f1_set = true;
+  regs.f1 = double(guest::LoadFloat(base, 0x82000A30));
+  call(Method(base, codec_base, 80), 0x82469ED0, regs);
+  return LastCallR3();
+}
+
+uint64_t PcmCodecSetFormat(uint8_t* base, uint32_t codec, uint32_t format, uint32_t extra,
+                           uint32_t frame, const GuestCall& call) {
+  ITC_NATIVE_RUNNING("sub_8246CFA8 PcmCodec::SetFormat");
+  SetRegs(call, Args({codec + 16}));
+  const uint64_t r3 =
+      CodecBaseSetFormat(base, codec + 16, format, extra, Below(base, frame, 112), call);
+  if (int32_t(r3) < 0) {
+    return r3;
+  }
+  const uint32_t type = guest::LoadU8(base, codec + 196);
+  const uint32_t channels = guest::LoadU8(base, codec + 197);
+  const uint32_t bytes = guest::LoadU32(base, kSampleBytes + type * 4);
+  guest::StoreU16(base, codec + 110, 1);
+  guest::StoreU16(base, codec + 108, uint16_t(int64_t(int32_t(bytes)) * int64_t(int32_t(channels))));
+  return r3;
+}
+
+uint64_t PcmCodecStart(uint8_t* base, uint32_t codec, uint32_t thread, uint32_t frame,
+                       const GuestCall& call) {
+  ITC_NATIVE_RUNNING("sub_8246D410 PcmCodec::Start");
+  const uint32_t codec_base = codec + 16;
+  SpinTake(base, thread, call);
+  const uint8_t state = guest::LoadU8(base, codec_base + 156);
+  if ((state & 1) == 0) {
+    SetFlagsCall(base, codec_base, 3, 3, 0x8246D4AC, frame, call);
+  } else if ((state & 4) != 0) {
+    SetFlagsCall(base, codec_base, 6, 2, 0x8246D4AC, frame, call);
+  }
+  SpinRelease(base, thread, call);
+  return 0;
+}
+
+uint64_t PcmCodecStop(uint8_t* base, uint32_t codec, uint32_t flags, uint32_t thread,
+                      uint32_t frame, const GuestCall& call) {
+  ITC_NATIVE_RUNNING("sub_8246D500 PcmCodec::Stop");
+  const uint32_t codec_base = codec + 16;
+  SpinTake(base, thread, call);
+  const uint8_t state = guest::LoadU8(base, codec_base + 156);
+  if ((state & 1) != 0) {
+    if ((flags & 1) != 0 || (state & 18) != 0) {
+      SetFlagsCall(base, codec_base, 87, 0, 0x8246D5D8, frame, call);
+    } else if ((state & 4) == 0) {
+      SetFlagsCall(base, codec_base, 4, 4, 0x8246D5AC, frame, call);
+      guest::StoreU16(base, codec_base + 158, guest::LoadU16(base, kCodecInfoWord));
+    }
+  }
+  SpinRelease(base, thread, call);
+  return 0;
+}
+
+uint64_t CodecEndOfStream(uint8_t* base, uint32_t codec, uint32_t thread, uint32_t frame,
+                          const GuestCall& call) {
+  ITC_NATIVE_RUNNING("sub_8246D630 XAudioCodec::EndOfStream");
+  const uint32_t codec_base = codec + 16;
+  SpinTake(base, thread, call);
+  if (uint32_t(FirstEntry(base, codec_base + 4)) != 0) {
+    SetFlagsCall(base, codec_base, 8, 8, 0x8246D6C8, frame, call);
+  }
+  SpinRelease(base, thread, call);
+  return 0;
+}
+
+uint64_t PcmCodecSetVolume(uint8_t* base, uint32_t codec, double volume, uint32_t thread,
+                           const GuestCall& call) {
+  ITC_NATIVE_RUNNING("sub_8246D008 PcmCodec::SetVolume");
+  SpinTake(base, thread, call);
+  guest::StoreFloat(base, codec + 112, float(volume));
+  guest::StoreFloat(base, codec + 224, float(volume));
+  SpinRelease(base, thread, call);
+  return 0;
+}
+
+uint64_t PcmCodecSetPitch(uint8_t* base, uint32_t codec, double octaves, uint32_t thread,
+                          uint32_t frame, const GuestCall& call) {
+  ITC_NATIVE_RUNNING("sub_8246D0C8 PcmCodec::SetPitch");
+  SpinTake(base, thread, call);
+  const double ratio = double(float(TwoToThe(base, octaves)));
+  const uint32_t rate = guest::LoadU32(base, codec + 60);
+  const uint32_t converter = codec + 184;
+  guest::StoreFloat(base, codec + 116, float(ratio));
+  const uint8_t channels = guest::LoadU8(base, codec + 56);
+  const uint8_t type = guest::LoadU8(base, codec + 52);
+  const uint32_t changed = guest::LoadU32(base, converter + 80);
+  guest::StoreU8(base, converter + 13, channels);
+  guest::StoreU8(base, converter + 12, type);
+  guest::StoreU32(base, converter + 80, changed | 1);
+  SetConverterRate(base, converter, frame, rate, ratio);
+  SpinRelease(base, thread, call);
+  return 0;
+}
+
+uint64_t PcmCodecSetFrequencyRatio(uint8_t* base, uint32_t codec, double ratio, uint32_t thread,
+                                   uint32_t frame, const GuestCall& call) {
+  ITC_NATIVE_RUNNING("sub_8246D1E0 PcmCodec::SetFrequencyRatio");
+  SpinTake(base, thread, call);
+  const uint32_t converter = codec + 184;
+  const uint32_t rate = guest::LoadU32(base, codec + 60);
+  guest::StoreFloat(base, codec + 116, float(ratio));
+  const uint8_t type = guest::LoadU8(base, codec + 52);
+  const uint8_t channels = guest::LoadU8(base, codec + 56);
+  const uint32_t changed = guest::LoadU32(base, converter + 80);
+  guest::StoreU8(base, converter + 12, type);
+  guest::StoreU8(base, converter + 13, channels);
+  guest::StoreU32(base, converter + 80, changed | 1);
+  SetConverterRate(base, converter, frame, rate, ratio);
+  SpinRelease(base, thread, call);
+  return 0;
+}
+
+uint64_t XmaCodecSetVolume(uint8_t* base, uint32_t codec, double volume, uint32_t thread,
+                           const GuestCall& call) {
+  ITC_NATIVE_RUNNING("sub_8246AB48 XmaCodec::SetVolume");
+  SpinTake(base, thread, call);
+  guest::StoreFloat(base, codec + 112, float(volume));
+  for (uint32_t i = 0; i < guest::LoadU8(base, codec + 56); i = (i + 1) & 0xFF) {
+    CopyFloat(base, guest::LoadU32(base, codec + 188) + 88 * i + 40, codec + 112);
+  }
+  SpinRelease(base, thread, call);
+  return 0;
+}
+
+uint64_t XmaCodecSetPitch(uint8_t* base, uint32_t codec, double octaves, uint32_t thread,
+                          uint32_t frame, const GuestCall& call) {
+  ITC_NATIVE_RUNNING("sub_8246AC40 XmaCodec::SetPitch");
+  SpinTake(base, thread, call);
+  guest::StoreFloat(base, codec + 116, float(double(float(TwoToThe(base, octaves)))));
+  for (uint32_t i = 0; i < guest::LoadU8(base, codec + 56); i = (i + 1) & 0xFF) {
+    const double ratio = double(guest::LoadFloat(base, codec + 116));
+    const uint32_t converter = guest::LoadU32(base, codec + 188) + 88 * i;
+    const uint32_t rate = guest::LoadU32(base, codec + 8 * i + 60);
+    const uint32_t changed = guest::LoadU32(base, converter + 80);
+    const uint8_t channels = guest::LoadU8(base, codec + 8 * (i + 8));
+    guest::StoreU8(base, converter + 12, 1);
+    guest::StoreU8(base, converter + 13, channels);
+    guest::StoreU32(base, converter + 80, changed | 1);
+    SetConverterRate(base, converter, frame, rate, ratio);
+  }
+  SpinRelease(base, thread, call);
+  return 0;
+}
+
+uint64_t CodecOnSubmit(uint8_t* base, uint32_t codec_base, uint32_t entry, uint32_t flags,
+                       uint32_t thread, uint32_t frame, const GuestCall& call) {
+  ITC_NATIVE_RUNNING("sub_82469AF8 CodecBase::OnSubmit");
+  const uint32_t mode = flags & 0xFF;
+  const auto word = [&](uint32_t offset) { return guest::LoadU32(base, entry + offset); };
+  // Each failed check releases one level of the spin lock (an assertion's
+  // path, probably) and goes on.
+  const auto fail = [&]() { SpinRelease(base, thread, call); };
+  if ((mode & 0x10) == 0) {
+    if (word(32) == 0) {
+      guest::StoreU32(base, entry + 32, word(12));
+    }
+    if (word(16) != 0) {
+      if (word(20) >= word(12)) {
+        fail();
+      }
+      if (word(24) > word(12)) {
+        fail();
+      }
+    }
+    if (word(28) >= word(12)) {
+      fail();
+    }
+    if (word(32) > word(12)) {
+      fail();
+    }
+  }
+  if (word(16) != 0 && (mode & 0x20) == 0) {
+    if (word(24) <= word(20)) {
+      fail();
+    }
+    if (word(28) >= word(24)) {
+      fail();
+    }
+  }
+  if (word(32) != 0) {
+    const uint32_t limit = word(16) != 0 ? word(20) : word(28);
+    if (word(32) <= limit) {
+      fail();
+    }
+  }
+  SetFlagsCall(base, codec_base, 24, (mode & 1) != 0 ? 8 : 0, 0x82469E10, frame, call);
+  if (uint32_t(FirstEntry(base, codec_base + 16)) == 0) {
+    SetFlagsCall(base, codec_base, 32, 0, 0x82469E4C, frame, call);
+  }
+  return 0;
+}
+
+namespace {
+
+// The first free entry (+16) moved to the end of the queued list (+4) and
+// given the next sequence number (+32, never 0), +117 to +119 cleared; 0
+// when there's none.
+uint32_t TakeFreeEntry(uint8_t* base, uint32_t codec_base) {
+  const uint32_t entry = uint32_t(FirstEntry(base, codec_base + 16));
+  if (entry == 0) {
+    return 0;
+  }
+  UnlinkEntry(base, codec_base + 16, entry);
+  LinkEntryAtEnd(base, codec_base + 4, entry);
+  uint32_t sequence = guest::LoadU32(base, codec_base + 32) + 1;
+  guest::StoreU32(base, codec_base + 32, sequence);
+  guest::StoreU32(base, entry + 112, sequence);
+  if (sequence == 0) {
+    sequence = guest::LoadU32(base, codec_base + 32) + 1;
+    guest::StoreU32(base, codec_base + 32, sequence);
+    guest::StoreU32(base, entry + 112, sequence);
+  }
+  guest::StoreU8(base, entry + 117, 0);
+  guest::StoreU8(base, entry + 118, 0);
+  guest::StoreU8(base, entry + 119, 0);
+  return entry;
+}
+
+// No free entry: two levels of the spin lock released (the original's
+// path), E_OUTOFMEMORY.
+uint64_t NoFreeEntry(uint8_t* base, uint32_t thread, const GuestCall& call) {
+  SpinRelease(base, thread, call);
+  SpinRelease(base, thread, call);
+  return kEOutOfMemory;
+}
+
+}  // namespace
+
+std::optional<uint64_t> CodecSubmitPacket(uint8_t* base, uint32_t codec_base, uint32_t packet,
+                                          uint32_t flags, uint32_t thread, uint32_t frame,
+                                          const GuestCall& call) {
+  if (guest::LoadU16(base, codec_base + 92) == 0) {
+    return std::nullopt;
+  }
+  ITC_NATIVE_RUNNING("sub_82469EF8 CodecBase::SubmitPacket");
+  SpinTake(base, thread, call);
+  const uint32_t entry = TakeFreeEntry(base, codec_base);
+  if (entry == 0) {
+    return NoFreeEntry(base, thread, call);
+  }
+  guest::StoreU32(base, entry + 8, guest::LoadU32(base, packet));
+  const uint32_t block = guest::LoadU16(base, codec_base + 92);
+  guest::StoreU32(base, entry + 12, guest::LoadU32(base, packet + 4) / block);
+  guest::StoreU32(base, entry + 16, guest::LoadU32(base, packet + 8));
+  if ((flags & 0x20) != 0) {
+    guest::StoreU32(base, entry + 20, 0);
+    guest::StoreU32(base, entry + 24, 0);
+    Copy(base, entry + 40, packet + 12, 72, 0x8246A054, frame, call);
+  } else {
+    guest::StoreU32(base, entry + 20,
+                    guest::LoadU32(base, packet + 12) / guest::LoadU16(base, codec_base + 92));
+    const uint32_t length = guest::LoadU32(base, packet + 16);
+    if (length != 0) {
+      const uint32_t blocks = length / guest::LoadU16(base, codec_base + 92);
+      guest::StoreU32(base, entry + 24, blocks + guest::LoadU32(base, entry + 20));
+    } else {
+      guest::StoreU32(base, entry + 24, guest::LoadU32(base, entry + 12));
+    }
+  }
+  guest::StoreU32(base, entry + 28, 0);
+  guest::StoreU32(base, entry + 32, 0);
+  guest::StoreU32(base, entry + 36, guest::LoadU32(base, packet + 84));
+  SetRegs(call, Args({codec_base, entry, flags}));
+  const uint64_t r3 =
+      CodecOnSubmit(base, codec_base, entry, flags, thread, Below(base, frame, 128), call);
+  SpinRelease(base, thread, call);
+  return r3;
+}
+
+std::optional<uint64_t> CodecSubmitRegion(uint8_t* base, uint32_t codec_base, uint32_t region,
+                                          uint32_t flags, uint32_t thread, uint32_t frame,
+                                          const GuestCall& call) {
+  if (guest::LoadU16(base, codec_base + 92) == 0) {
+    return std::nullopt;
+  }
+  ITC_NATIVE_RUNNING("sub_8246A1C0 CodecBase::SubmitRegion");
+  SpinTake(base, thread, call);
+  const uint32_t entry = TakeFreeEntry(base, codec_base);
+  if (entry == 0) {
+    return NoFreeEntry(base, thread, call);
+  }
+  guest::StoreU32(base, entry + 8, guest::LoadU32(base, region));
+  const uint32_t block = guest::LoadU16(base, codec_base + 92);
+  guest::StoreU32(base, entry + 12, guest::LoadU32(base, region + 4) / block);
+  for (uint32_t i = 8; i <= 28; i += 4) {
+    guest::StoreU32(base, entry + 8 + i, guest::LoadU32(base, region + i));
+  }
+  SetRegs(call, Args({codec_base, entry, flags}));
+  const uint64_t r3 =
+      CodecOnSubmit(base, codec_base, entry, flags, thread, Below(base, frame, 128), call);
+  SpinRelease(base, thread, call);
+  return r3;
+}
+
+std::optional<uint64_t> XmaCodecSubmitRegion(uint8_t* base, uint32_t codec, uint32_t region,
+                                             uint32_t flags, uint32_t thread, uint32_t frame,
+                                             const GuestCall& call) {
+  if (guest::LoadU8(base, codec + 266) == 1) {
+    return kENotImpl;
+  }
+  if (guest::LoadU16(base, codec + 16 + 92) == 0) {
+    return std::nullopt;
+  }
+  ITC_NATIVE_RUNNING("sub_8246A860 XmaCodec::SubmitRegion");
+  guest::StoreU8(base, codec + 266, 2);
+  const uint32_t loops = guest::LoadU32(base, region + 8);
+  uint32_t from = region;
+  if (loops > 255 && int32_t(loops) != -1) {
+    for (uint32_t i = 0; i < 32; i += 4) {
+      guest::StoreU32(base, frame + 80 + i, guest::LoadU32(base, region + i));
+    }
+    guest::StoreU32(base, frame + 88, 0xFFFFFFFF);
+    from = frame + 80;
+  }
+  const uint32_t mode = (flags & 0xFF) | 16;
+  SetRegs(call, Args({codec + 16, from, mode}));
+  return CodecSubmitRegion(base, codec + 16, from, mode, thread, Below(base, frame, 144), call);
 }
 
 }  // namespace xaudio
