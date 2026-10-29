@@ -1471,6 +1471,65 @@ void ReverbStages(Context& h) {
     }
     results.Report();
   }
+  {
+    // The all-passes: their state's words +0 (the tap) and +16 (the write
+    // index) compared exactly, the rest of the region (the gains, the last
+    // output, the line and the buffers, all loaded and stored as floats) as
+    // floats.
+    struct AllPass {
+      const char* name;
+      GuestFunction recompiled, native;
+      uint32_t entries;
+      bool to_buffer;
+    };
+    static const AllPass kAllPasses[] = {
+        {"sub_82462DC8 (the reverb's 128-entry all-pass)", __imp__sub_82462DC8,
+         hooks::XAudioReverbAllPass128, 128, false},
+        {"sub_82463130 (the reverb's 256-entry all-pass)", __imp__sub_82463130,
+         hooks::XAudioReverbAllPass256, 256, false},
+        {"sub_824632A0 (the reverb's 512-entry all-pass)", __imp__sub_824632A0,
+         hooks::XAudioReverbAllPass512, 512, false},
+        {"sub_82463410 (the reverb's 512-entry all-pass to a buffer)", __imp__sub_82463410,
+         hooks::XAudioReverbAllPass512To, 512, true},
+    };
+    for (const AllPass& pass : kAllPasses) {
+      Results results(pass.name);
+      for (int i = 0; i < 32; i++) {
+        const Random start = h.random;
+        Random random = start;
+        Outputs out[2];
+        for (int v = 0; v < 2; v++) {
+          random = start;
+          for (uint32_t k = 0; k < kStageBytes; k += 4) {
+            Store(h.base, region + k, Sample(random));
+          }
+          // The tap within the line or any; the write index within the
+          // line (as the game keeps it) or, now and then, at its last entry.
+          Store(h.base, region + 0,
+                random.Below(2) == 0 ? random.Below(pass.entries) : uint32_t(random.Next()));
+          Store(h.base, region + 16,
+                i % 8 == 7 ? pass.entries - 1 : random.Below(pass.entries));
+          PPCContext t = CallContext(h);
+          for (uint32_t k = 4; k <= 0x400; k += 4) {
+            Store(h.base, t.r1.u32 - k, uint32_t(random.Next()));
+          }
+          t.r3.u64 = region;
+          t.r4.u64 = in;
+          t.r5.u64 = out_b;
+          t.fpscr.loadFromHost();
+          (v == 0 ? pass.recompiled : pass.native)(t, h.base);
+          out[v].Word(guest::LoadU32(h.base, region + 0));
+          out[v].Floats(h.base, region + 4, 3);
+          out[v].Word(guest::LoadU32(h.base, region + 16));
+          out[v].Floats(h.base, region + 20, (kStageBytes - 20) / 4);
+          R3(out[v], t.r3.u64);
+        }
+        h.random = random;
+        results.Check(out[0], out[1], fmt::format("case {}", i));
+      }
+      results.Report();
+    }
+  }
   memory::Free(region);
 }
 

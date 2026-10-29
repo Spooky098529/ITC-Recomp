@@ -101,5 +101,9 @@ void XAudioReverbLowPass(PPCContext& ctx, uint8_t* base);    // sub_82462BC8
 void XAudioReverbDelay512(PPCContext& ctx, uint8_t* base);   // sub_82462CF8
 void XAudioReverbDelay2048(PPCContext& ctx, uint8_t* base);  // sub_82463060
 void XAudioReverbDelay1024(PPCContext& ctx, uint8_t* base);  // sub_82463578
+void XAudioReverbAllPass128(PPCContext& ctx, uint8_t* base);    // sub_82462DC8
+void XAudioReverbAllPass256(PPCContext& ctx, uint8_t* base);    // sub_82463130
+void XAudioReverbAllPass512(PPCContext& ctx, uint8_t* base);    // sub_824632A0
+void XAudioReverbAllPass512To(PPCContext& ctx, uint8_t* base);  // sub_82463410
 
 }  // namespace hooks

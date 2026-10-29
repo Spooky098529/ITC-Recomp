@@ -86,6 +86,102 @@ void DelayThreeTaps(uint8_t* base, uint32_t line, uint32_t in, uint32_t out_a, u
   guest::StoreU32(base, line + 36, (write + 256) & wrap);
 }
 
+
+// The all-pass stages (sub_82462DC8, sub_82463130, sub_824632A0,
+// sub_82463410): the state +0 the tap, +4 and +8 the gains, +12 the last
+// output, +16 the write index, the line's data at +24. A block of eight
+// frames a pass, in the original's order of loads and stores: each frame's
+// input x and the line's entry d at the tap (masked to `mask`), v = +8 x d
+// + x written to the line (unmasked, from `write`), and +4 x v + d the
+// output, a frame late (the first the last block's).
+struct AllPass {
+  uint8_t* base;
+  uint32_t data;
+  uint32_t mask;
+  double f0, f13;
+  double Tap(uint32_t r11, int k) const {
+    return Load(base, data + (((r11 + uint32_t(k)) << 2) & mask));
+  }
+};
+
+// The in-place pass (sub_82462DC8's first half, sub_82463130, sub_824632A0):
+// the frames at `p` replaced; r11 the tap's index (+2), `q` the write
+// address (+8). Returns the carried output.
+double AllPassInPlace(const AllPass& a, uint32_t& p, uint32_t& q, uint32_t& r11, double f11,
+                      int passes) {
+  uint8_t* base = a.base;
+  const double f0 = a.f0, f13 = a.f13;
+  for (int pass = 0; pass < passes; pass++) {
+    double f10 = Load(base, p + 0);
+    Store(base, p + 0, f11);
+    double f9 = Load(base, p + 4);
+    const double f8 = Load(base, p + 8);
+    const double f7 = Load(base, p + 12);
+    const double f6 = Load(base, p + 16);
+    const double f5 = Load(base, p + 20);
+    double f12 = a.Tap(r11, -2);
+    f11 = Fma(f0, f12, f10);
+    Store(base, q - 8, f11);
+    f11 = Fma(f13, f11, f12);
+    f12 = a.Tap(r11, -1);
+    Store(base, p + 4, f11);
+    f11 = Fma(f0, f12, f9);
+    Store(base, q - 4, f11);
+    f11 = Fma(f13, f11, f12);
+    f12 = a.Tap(r11, 0);
+    Store(base, p + 8, f11);
+    f11 = Fma(f0, f12, f8);
+    Store(base, q + 0, f11);
+    f9 = Load(base, p + 28);
+    f11 = Fma(f13, f11, f12);
+    f12 = a.Tap(r11, 1);
+    Store(base, p + 12, f11);
+    f11 = Fma(f0, f12, f7);
+    Store(base, q + 4, f11);
+    f11 = Fma(f13, f11, f12);
+    f12 = a.Tap(r11, 2);
+    Store(base, p + 16, f11);
+    f11 = Fma(f0, f12, f6);
+    Store(base, q + 8, f11);
+    f10 = Fma(f13, f11, f12);
+    f12 = a.Tap(r11, 3);
+    f11 = Fma(f0, f12, f5);
+    Store(base, q + 12, f11);
+    Store(base, p + 20, f10);
+    f10 = Load(base, p + 24);
+    f11 = Fma(f13, f11, f12);
+    f12 = a.Tap(r11, 4);
+    Store(base, p + 24, f11);
+    f11 = Fma(f0, f12, f10);
+    Store(base, q + 16, f11);
+    f11 = Fma(f13, f11, f12);
+    f12 = a.Tap(r11, 5);
+    Store(base, p + 28, f11);
+    f11 = Fma(f0, f12, f9);
+    Store(base, q + 20, f11);
+    q += 32;
+    p += 32;
+    r11 += 8;
+    f11 = Fma(f13, f11, f12);
+  }
+  return f11;
+}
+
+// sub_82463130 (256 entries) and sub_824632A0 (512): one in-place pass of
+// 256 frames, the write index kept by `wrap`.
+void AllPassBlock(uint8_t* base, uint32_t state, uint32_t p, uint32_t mask, uint32_t wrap) {
+  ScalarMode mode;
+  const uint32_t write = guest::LoadU32(base, state + 16);
+  const uint32_t tap = guest::LoadU32(base, state + 0);
+  const AllPass a{base, state + 24, mask, Load(base, state + 8), Load(base, state + 4)};
+  const double f11 = Load(base, state + 12);
+  uint32_t r11 = write - tap + 2;
+  uint32_t q = ((write + 2) << 2) + a.data;
+  const double last = AllPassInPlace(a, p, q, r11, f11, 32);
+  Store(base, state + 12, last);
+  Store(base, p + 0, last);
+  guest::StoreU32(base, state + 16, (write + 256) & wrap);
+}
 }  // namespace
 
 void ReverbLowPass(uint8_t* base, uint32_t state, uint32_t in, uint32_t out, uint32_t count) {
@@ -216,6 +312,163 @@ void ReverbDelay1024(uint8_t* base, uint32_t line, uint32_t in, uint32_t out_a, 
   Store(base, line + 8, f0);
   Store(base, line + 20, f13);
   guest::StoreU32(base, line + 24, (write + 256) & 0x3FF);
+}
+
+}  // namespace xaudio
+
+namespace xaudio {
+
+void ReverbAllPass128(uint8_t* base, uint32_t state, uint32_t p) {
+  ITC_NATIVE_RUNNING("sub_82462DC8 the reverb's 128-entry all-pass");
+  ScalarMode mode;
+  const uint32_t write = guest::LoadU32(base, state + 16);
+  const uint32_t tap = guest::LoadU32(base, state + 0);
+  const AllPass a{base, state + 24, 0x1FC, Load(base, state + 8), Load(base, state + 4)};
+  double f11 = Load(base, state + 12);
+  uint32_t r10 = write - tap + 2;
+  uint32_t r9 = ((write + 2) << 2) + a.data;
+  // The first 128 frames written from the write index, as the passes above.
+  double f12 = AllPassInPlace(a, p, r9, r10, f11, 16);
+  // The second 128 written from the line's start (the index 2 - the tap),
+  // its loads in the original's second order.
+  const double f0 = a.f0, f13 = a.f13;
+  uint32_t r9b = 2 - tap;
+  uint32_t r10b = a.data + 8;
+  for (int pass = 0; pass < 16; pass++) {
+    double f10 = Load(base, p + 0);
+    Store(base, p + 0, f12);
+    double f9 = Load(base, p + 4);
+    const double f8 = Load(base, p + 8);
+    const double f7 = Load(base, p + 12);
+    f11 = a.Tap(r9b, -2);
+    f12 = Fma(f0, f11, f10);
+    Store(base, r10b - 8, f12);
+    const double f6 = Load(base, p + 16);
+    const double f5 = Load(base, p + 20);
+    f11 = Fma(f13, f12, f11);
+    f12 = a.Tap(r9b, -1);
+    Store(base, p + 4, f11);
+    f11 = Fma(f0, f12, f9);
+    Store(base, r10b - 4, f11);
+    f9 = Load(base, p + 28);
+    f11 = Fma(f13, f11, f12);
+    f12 = a.Tap(r9b, 0);
+    Store(base, p + 8, f11);
+    f11 = Fma(f0, f12, f8);
+    Store(base, r10b + 0, f11);
+    f11 = Fma(f13, f11, f12);
+    f12 = a.Tap(r9b, 1);
+    Store(base, p + 12, f11);
+    f11 = Fma(f0, f12, f7);
+    Store(base, r10b + 4, f11);
+    f11 = Fma(f13, f11, f12);
+    f12 = a.Tap(r9b, 2);
+    Store(base, p + 16, f11);
+    f11 = Fma(f0, f12, f6);
+    Store(base, r10b + 8, f11);
+    f10 = Fma(f13, f11, f12);
+    f12 = a.Tap(r9b, 3);
+    f11 = Fma(f0, f12, f5);
+    Store(base, r10b + 12, f11);
+    Store(base, p + 20, f10);
+    f10 = Load(base, p + 24);
+    f11 = Fma(f13, f11, f12);
+    f12 = a.Tap(r9b, 4);
+    Store(base, p + 24, f11);
+    f11 = Fma(f0, f12, f10);
+    Store(base, r10b + 16, f11);
+    f11 = Fma(f13, f11, f12);
+    f12 = a.Tap(r9b, 5);
+    Store(base, p + 28, f11);
+    f11 = Fma(f0, f12, f9);
+    Store(base, r10b + 20, f11);
+    p += 32;
+    r9b += 8;
+    r10b += 32;
+    f12 = Fma(f13, f11, f12);
+  }
+  Store(base, state + 12, f12);
+  Store(base, p + 0, f12);
+  guest::StoreU32(base, state + 16, 0);
+}
+
+void ReverbAllPass256(uint8_t* base, uint32_t state, uint32_t p) {
+  ITC_NATIVE_RUNNING("sub_82463130 the reverb's 256-entry all-pass");
+  AllPassBlock(base, state, p, 0x3FC, 0xFF);
+}
+
+void ReverbAllPass512(uint8_t* base, uint32_t state, uint32_t p) {
+  ITC_NATIVE_RUNNING("sub_824632A0 the reverb's 512-entry all-pass");
+  AllPassBlock(base, state, p, 0x7FC, 0x1FF);
+}
+
+void ReverbAllPass512To(uint8_t* base, uint32_t state, uint32_t in, uint32_t out) {
+  ITC_NATIVE_RUNNING("sub_82463410 the reverb's 512-entry all-pass to a buffer");
+  ScalarMode mode;
+  const uint32_t write = guest::LoadU32(base, state + 16);
+  const uint32_t tap = guest::LoadU32(base, state + 0);
+  const AllPass a{base, state + 24, 0x7FC, Load(base, state + 8), Load(base, state + 4)};
+  const double f0 = a.f0, f13 = a.f13;
+  double f11 = Load(base, state + 12);
+  uint32_t r11 = write - tap + 2;
+  uint32_t q = ((write + 2) << 2) + a.data;
+  for (int pass = 0; pass < 32; pass++) {
+    double f10 = Load(base, in + 0);
+    Store(base, out + 0, f11);
+    double f9 = Load(base, in + 4);
+    const double f8 = Load(base, in + 8);
+    const double f7 = Load(base, in + 12);
+    const double f6 = Load(base, in + 16);
+    const double f5 = Load(base, in + 20);
+    double f12 = a.Tap(r11, -2);
+    f11 = Fma(f0, f12, f10);
+    Store(base, q - 8, f11);
+    f10 = Load(base, in + 24);
+    f11 = Fma(f13, f11, f12);
+    f12 = a.Tap(r11, -1);
+    Store(base, out + 4, f11);
+    f11 = Fma(f0, f12, f9);
+    Store(base, q - 4, f11);
+    f9 = Load(base, in + 28);
+    in += 32;
+    f11 = Fma(f13, f11, f12);
+    f12 = a.Tap(r11, 0);
+    Store(base, out + 8, f11);
+    f11 = Fma(f0, f12, f8);
+    Store(base, q + 0, f11);
+    f11 = Fma(f13, f11, f12);
+    f12 = a.Tap(r11, 1);
+    Store(base, out + 12, f11);
+    f11 = Fma(f0, f12, f7);
+    Store(base, q + 4, f11);
+    f11 = Fma(f13, f11, f12);
+    f12 = a.Tap(r11, 2);
+    Store(base, out + 16, f11);
+    f11 = Fma(f0, f12, f6);
+    Store(base, q + 8, f11);
+    f11 = Fma(f13, f11, f12);
+    f12 = a.Tap(r11, 3);
+    Store(base, out + 20, f11);
+    f11 = Fma(f0, f12, f5);
+    Store(base, q + 12, f11);
+    f11 = Fma(f13, f11, f12);
+    f12 = a.Tap(r11, 4);
+    Store(base, out + 24, f11);
+    f11 = Fma(f0, f12, f10);
+    Store(base, q + 16, f11);
+    f11 = Fma(f13, f11, f12);
+    f12 = a.Tap(r11, 5);
+    Store(base, out + 28, f11);
+    f11 = Fma(f0, f12, f9);
+    Store(base, q + 20, f11);
+    out += 32;
+    q += 32;
+    r11 += 8;
+    f11 = Fma(f13, f11, f12);
+  }
+  Store(base, state + 12, f11);
+  Store(base, in + 0, f11);
+  guest::StoreU32(base, state + 16, (write + 256) & 0x1FF);
 }
 
 }  // namespace xaudio

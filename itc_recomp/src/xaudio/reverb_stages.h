@@ -33,4 +33,21 @@ void ReverbDelay2048(uint8_t* base, uint32_t line, uint32_t in, uint32_t out_a, 
 // last block's (+8 and +20).
 void ReverbDelay1024(uint8_t* base, uint32_t line, uint32_t in, uint32_t out_a, uint32_t out_b);
 
+// The all-pass stages: the state +0 the tap, +4 and +8 the gains, +12 the
+// last output, +16 the write index, the line at +24. Over a block of 256
+// frames from `in`: per frame x, the line's entry d at the write index less
+// the tap (masked to the line), v = +8 x d + x written at the write index
+// (not masked), and +4 x v + d the output, a frame late (the first is +12,
+// the block's last kept in +12 and also stored one past the block's end).
+// sub_82462DC8 (128 entries, in place): the first 128 written from the
+// write index, the second from the line's start; the write index 0 after.
+void ReverbAllPass128(uint8_t* base, uint32_t state, uint32_t in);
+// sub_82463130 (256 entries) and sub_824632A0 (512), in place: the write
+// index wrapped at 0xFF and 0x1FF (so kept).
+void ReverbAllPass256(uint8_t* base, uint32_t state, uint32_t in);
+void ReverbAllPass512(uint8_t* base, uint32_t state, uint32_t in);
+// sub_82463410 (512 entries): the outputs to `out`, the block's last also
+// stored one past `in`'s end.
+void ReverbAllPass512To(uint8_t* base, uint32_t state, uint32_t in, uint32_t out);
+
 }  // namespace xaudio
