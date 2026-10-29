@@ -49,5 +49,9 @@ void XactTrackDeletingDestruct(PPCContext& ctx, uint8_t* base);     // sub_825D0
 void XactPlayWaveDeletingDestruct(PPCContext& ctx, uint8_t* base);  // sub_825D8660
 void XactPlayWaveApplyVariation(PPCContext& ctx, uint8_t* base);    // sub_825D7558
 void XactPlayWaveGetDuration(PPCContext& ctx, uint8_t* base);       // sub_825D8870
+// Batch 3: preparing.
+void XactPlayWavePrepare(PPCContext& ctx, uint8_t* base);            // sub_825D86F8
+void XactTrackInstancePrepareSimple(PPCContext& ctx, uint8_t* base);  // sub_825D53D8
+void XactTrackPrepareSimple(PPCContext& ctx, uint8_t* base);          // sub_825D09D0
 
 }  // namespace hooks

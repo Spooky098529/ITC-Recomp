@@ -86,6 +86,16 @@ constexpr uint32_t kSound = 0xA00, kSoundRecord = 0xA80, kEngine = 0xB00, kCue =
                    kSoundBank = 0xC00, kBankCache = 0xD00, kWaveBank = 0xD80, kEntries = 0xE80,
                    kTrack2 = 0xF00, kNext = 0x1300, kRpcEntries = 0x1600;
 constexpr uint32_t kWaveBankVtable = 0x82075AE8;
+// Batch 3's: a fake wave bank (its vtable all AddRef but CreateWave, +40:
+// sub_82425450, the new wave at [r6] = r4 x 128 + r5, the owner event, so
+// the record's wave index 6 or 10 makes it kWave or kWave2 from kEvent; or
+// AddRef, its count at +4 making r3 a failure), and an engine with
+// its critical section at +144 for the instances' destructor.
+constexpr uint32_t kFakeBankVtable = 0x1280, kFakeBank = 0x1800, kEngine2 = 0x1900;
+constexpr uint32_t kCreateWaveAt = 0x82425450;
+// The waves' Prepare recorder: sub_820A8420 (r4's low byte to +320, r5 to
+// +332, r6 to +336; r3 the wave).
+constexpr uint32_t kRecordR4R6 = 0x820A8420;
 
 // The block's floats: what kRecordF1 stores at +112 of the objects it's
 // given.
@@ -177,10 +187,11 @@ void World(uint8_t* base, uint32_t block, Random& random) {
 }
 
 // One case: the block's random words, the world, `setup(random, t)`, then
-// the version; compared: the block (the floats as floats) and r3.
-template <typename Setup>
-void Case(Context& h, Results& results, uint32_t block, GuestFunction recompiled,
-          GuestFunction native, Setup setup, const std::string& what) {
+// the version; compared: what `after(out, t)` adds, the block (the floats as
+// floats) and r3.
+template <typename Setup, typename After>
+void CaseWith(Context& h, Results& results, uint32_t block, GuestFunction recompiled,
+              GuestFunction native, Setup setup, After after, const std::string& what) {
   const Random start = h.random;
   Random random = start;
   Outputs out[2];
@@ -195,6 +206,9 @@ void Case(Context& h, Results& results, uint32_t block, GuestFunction recompiled
     ITC_FLAG(native_xact_tracks) = v == 1;
     (v == 0 ? recompiled : native)(t, h.base);
     ITC_FLAG(native_xact_tracks) = true;
+    // `after` adds its outputs first, and may normalize the block (pointers
+    // to allocations) before it's read.
+    after(out[v], t);
     std::vector<uint8_t> bytes = Read(h.base, block, kBlockBytes);
     for (const uint32_t offset : kFloats) {
       for (uint32_t i = 0; i < 4; i++) {
@@ -209,6 +223,12 @@ void Case(Context& h, Results& results, uint32_t block, GuestFunction recompiled
   }
   h.random = random;
   results.Check(out[0], out[1], what);
+}
+
+template <typename Setup>
+void Case(Context& h, Results& results, uint32_t block, GuestFunction recompiled,
+          GuestFunction native, Setup setup, const std::string& what) {
+  CaseWith(h, results, block, recompiled, native, setup, [](Outputs&, PPCContext&) {}, what);
 }
 
 struct Entry {
@@ -420,6 +440,135 @@ void Batch2(Context& h, uint32_t block) {
             xact::kPlayWaveAttributes, kEvent);
 }
 
+// The fake wave bank for the cue's sound bank's four cached banks: prepared
+// or not (+252), its list (+240) empty, CreateWave the placing recorder or
+// AddRef (`placing` false: always AddRef, its count making r3 a failure).
+void FakeBank(uint8_t* base, uint32_t block, Random& random, bool placing) {
+  const uint32_t bank = block + kFakeBank;
+  for (uint32_t slot = 0; slot < 128; slot += 4) {
+    Store(base, block + kFakeBankVtable + slot, kAddRef);
+  }
+  const bool place = placing && random.Below(4) != 0;
+  Store(base, block + kFakeBankVtable + 40, place ? kCreateWaveAt : kAddRef);
+  Store(base, bank, block + kFakeBankVtable);
+  // AddRef as CreateWave always fails (it leaves no wave).
+  Store(base, bank + 4, 0x9FFFFFF0u + random.Below(15));
+  Store(base, bank + 252, Pick(random, {0, 1, 1, uint32_t(random.Next())}));
+  Store(base, bank + 244, bank + 240);
+  Store(base, bank + 248, bank + 240);
+  for (uint32_t i = 0; i < 4; i++) {
+    Store(base, block + kBankCache + 4 * i, bank);
+  }
+  // The waves' Prepare: the recorder or AddRef (their counts random).
+  Store(base, block + kWaveVtable + 4, Pick(random, {kRecordR4R6, kRecordR4R6, kAddRef}));
+  Store(base, block + kEventVtable + 48, Pick(random, {0x825D8358u, kAddRef}));
+  guest::StoreU16(base, block + kRecord + 8, uint16_t(Pick(random, {6, 10})));
+}
+
+// A pointer word normalized: 1 + its offset into `object` when inside it, 0
+// for 0, else 0xFFFFFFFF.
+uint32_t Into(uint32_t word, uint32_t object, uint32_t bytes) {
+  if (word == 0) {
+    return 0;
+  }
+  return word >= object && word < object + bytes ? 1 + word - object : 0xFFFFFFFFu;
+}
+
+void Batch3(Context& h, uint32_t block) {
+  {
+    // The record's time against offsets before, at and after it.
+    Results results("XACTPlayWaveEvent::Prepare (sub_825D86F8)");
+    for (int c = 0; c < 128; c++) {
+      CaseWith(h, results, block, __imp__sub_825D86F8, hooks::XactPlayWavePrepare,
+               [&](Random& random, PPCContext& t) {
+                 FakeBank(h.base, block, random, true);
+                 const uint32_t time = (Load(h.base, block + kRecord) >> 5) & 0xFFFFFF;
+                 t.r3.u64 = block + kEvent;
+                 t.r4.u64 = Pick(random, {time, time + 1 + random.Below(5000),
+                                          time - random.Below(5000), uint32_t(random.Next()), 0});
+               },
+               [&](Outputs& out, PPCContext& t) {
+                 out.Word(Load(h.base, t.r1.u32 - 128 + 80));  // the new wave
+               },
+               fmt::format("case {}", c));
+    }
+    results.Report();
+  }
+  if (!hooks::NativeHeapActive()) {
+    return;
+  }
+  {
+    // A new event's Prepare (its real slots) on the fake bank: not prepared
+    // or CreateWave failing (a new wave needs the real CreateWave: the
+    // success path is the attract race's). Compared: the instance (its
+    // array and event normalized), the array and the event (its self links
+    // normalized); then both freed (the failure keeps them, as the original
+    // does).
+    Results results("XACTTrackInstance::PrepareSimple (sub_825D53D8)");
+    for (int c = 0; c < 64; c++) {
+      CaseWith(h, results, block, __imp__sub_825D53D8, hooks::XactTrackInstancePrepareSimple,
+               [&](Random& random, PPCContext& t) {
+                 FakeBank(h.base, block, random, false);
+                 t.r3.u64 = block + kInstance;
+                 t.r4.u64 = block + kRecord;
+                 t.r5.u64 = random.Below(2) == 0 ? 0 : uint32_t(random.Next());
+               },
+               [&](Outputs& out, PPCContext&) {
+                 const uint32_t instance = block + kInstance;
+                 const uint32_t array = Load(h.base, instance + 20);
+                 const uint32_t event = array != 0 ? Load(h.base, array) : 0;
+                 out.Word(array != 0);
+                 out.Word(event != 0);
+                 out.Word(Into(Load(h.base, instance + 36), event, 72));
+                 Store(h.base, instance + 20, 0);
+                 Store(h.base, instance + 36, 0);
+                 if (event != 0) {
+                   std::vector<uint8_t> bytes = Read(h.base, event, 72);
+                   for (const uint32_t at : {4u, 8u}) {
+                     out.Word(Into(Load(h.base, event + at), event, 72));
+                     for (uint32_t i = 0; i < 4; i++) {
+                       bytes[at + i] = 0;
+                     }
+                   }
+                   out.Bytes(bytes);
+                   memory::crt::XMemFree(event, xact::kPlayWaveAttributes);
+                 }
+                 if (array != 0) {
+                   memory::crt::XMemFree(array, xact::kEventArrayAttributes);
+                 }
+               },
+               fmt::format("case {}", c));
+    }
+    results.Report();
+  }
+  {
+    // As above through the track: the instance made, its prepare failing,
+    // and the instance deleted again (its real destructor, the engine's
+    // critical section initialized for each version).
+    Results results("XACTTrack::PrepareSimple (sub_825D09D0)");
+    for (int c = 0; c < 64; c++) {
+      CaseWith(h, results, block, __imp__sub_825D09D0, hooks::XactTrackPrepareSimple,
+               [&](Random& random, PPCContext& t) {
+                 FakeBank(h.base, block, random, false);
+                 Store(h.base, block + kTrack + 12, block + kEngine2);
+                 PPCContext c2 = t;
+                 c2.r3.u64 = block + kEngine2 + 144;
+                 __imp__RtlInitializeCriticalSection(c2, h.base);
+                 t.r3.u64 = block + kTrack;
+                 t.r4.u64 = block + kRecord;
+                 t.r5.u64 = random.Below(2) == 0 ? 0 : uint32_t(random.Next());
+               },
+               [&](Outputs& out, PPCContext&) {
+                 // The critical section's words as left (its owner and
+                 // counts; nothing holds it after).
+                 out.Bytes(Read(h.base, block + kEngine2 + 144, 28));
+               },
+               fmt::format("case {}", c));
+    }
+    results.Report();
+  }
+}
+
 }  // namespace
 
 void XactTracks(Context& h) {
@@ -430,6 +579,7 @@ void XactTracks(Context& h) {
   }
   Batch1(h, block.address);
   Batch2(h, block.address);
+  Batch3(h, block.address);
 }
 
 }  // namespace harness

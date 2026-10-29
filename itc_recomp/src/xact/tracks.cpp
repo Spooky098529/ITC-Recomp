@@ -604,4 +604,207 @@ uint32_t PlayWaveGetDuration(uint8_t* base, uint32_t event, bool native_heap, ui
   return loops * Load(base, frame + 80) + Load(base, frame + 84);
 }
 
+// --- Preparing ---
+
+namespace {
+
+constexpr uint32_t kPlayWaveGetLoopCount = 0x825D8358;  // slot +48
+constexpr uint32_t kPlayWavePrepare = 0x825D86F8;       // slot +8
+constexpr uint32_t kPlayWaveIsPrepared = 0x825D76A0;    // slot +20
+constexpr uint32_t kPlayWavePrepareFrame = 128;
+constexpr uint32_t kTrackInstancePrepareFrame = 128;
+constexpr uint32_t kNoWaveBank = 0x8AC70013;        // XACTENGINE_E_NOWAVEBANK
+constexpr uint32_t kWaveBankNotPrepared = 0x8AC70016;
+constexpr uint32_t kOutOfMemory = 0x8007000E;       // E_OUTOFMEMORY
+
+// The event's slots +8 (Prepare) and +20 (IsPrepared) from `frame`: the
+// plain C++ while they hold it.
+uint32_t EventSlotPrepare(uint8_t* base, uint32_t event, uint32_t offset, uint32_t frame,
+                          uint32_t return_address, const GuestCall& call) {
+  const uint32_t method = xa::Method(base, event, 8);
+  if (method == kPlayWavePrepare) {
+    SetRegs(call, Args({event, offset}));
+    return PlayWavePrepare(base, event, offset, true,
+                           xa::FrameBelow(base, frame, kPlayWavePrepareFrame), call);
+  }
+  return CallAt(call, method, return_address, Args({event, offset}), frame);
+}
+uint32_t EventSlotIsPrepared(uint8_t* base, uint32_t event, uint32_t frame,
+                             uint32_t return_address, const GuestCall& call) {
+  const uint32_t method = xa::Method(base, event, 20);
+  if (method == kPlayWaveIsPrepared) {
+    SetRegs(call, Args({event}));
+    return PlayWaveIsPrepared(base, event, xa::FrameBelow(base, frame, kPlayWaveSmallFrame),
+                              call);
+  }
+  return CallAt(call, method, return_address, Args({event}), frame);
+}
+
+}  // namespace
+
+uint32_t PlayWavePrepare(uint8_t* base, uint32_t event, uint32_t offset, bool native_heap,
+                         uint32_t frame, const GuestCall& call) {
+  ITC_NATIVE_RUNNING("sub_825D86F8 XACTPlayWaveEvent::Prepare");
+  const uint32_t record = Load(base, event + 16);
+  const uint32_t time = (Load(base, record) >> 5) & 0xFFFFFF;
+  uint32_t seek = 0;
+  if (int32_t(time) > int32_t(offset)) {
+    Store(base, event + 32, offset);
+  } else {
+    seek = offset - time;
+    Store(base, event + 32, time);
+  }
+  const uint32_t cue =
+      Load(base, Load(base, Load(base, Load(base, event + 44) + 16) + 20) + 48);
+  const uint32_t sound_bank = Load(base, cue + 296);
+  const uint32_t index = LoadU8(base, record + 10);
+  std::optional<uint32_t> found;
+  if (native_heap) {
+    SetRegs(call, Args({sound_bank, index}));
+    found = SoundBankGetWaveBank(base, sound_bank, index);
+  }
+  const uint32_t bank = found ? *found
+                              : CallAt(call, kSoundBankGetWaveBank, 0x825D8750,
+                                       Args({sound_bank, index}), frame);
+  uint32_t r30 = 0;
+  if (bank == 0) {
+    r30 = kNoWaveBank;
+  } else if (int32_t(Load(base, bank + 252)) == 0) {
+    r30 = kWaveBankNotPrepared;
+  }
+  Store(base, frame + 80, 0);
+  if (int32_t(r30) < 0) {
+    return r30;
+  }
+  r30 = CallAt(call, xa::Method(base, bank, 40), 0x825D87B0,
+               Args({bank, guest::LoadU16(base, Load(base, event + 16) + 8), event, frame + 80}),
+               frame);
+  if (int32_t(r30) >= 0) {
+    const uint32_t count_method = xa::Method(base, event, 48);
+    uint32_t loops;
+    if (count_method == kPlayWaveGetLoopCount) {
+      SetRegs(call, Args({event}));
+      loops = PlayWaveGetLoopCount(base, event);
+    } else {
+      loops = CallAt(call, count_method, 0x825D87D0, Args({event}), frame);
+    }
+    const uint32_t wave = Load(base, frame + 80);
+    r30 = CallAt(call, xa::Method(base, wave, 4), 0x825D87F0, Args({wave, loops, 0, seek}),
+                 frame);
+    if (int32_t(r30) >= 0) {
+      const uint32_t set_method = xa::Method(base, event, 104);
+      const uint32_t now_wave = Load(base, frame + 80);
+      if (set_method == kPlayWaveSetWave) {
+        SetRegs(call, Args({event, now_wave}));
+        PlayWaveSetWave(base, event, now_wave);
+      } else {
+        CallAt(call, set_method, 0x825D8814, Args({event, now_wave}), frame);
+      }
+      const uint32_t linked = Load(base, frame + 80);
+      const uint32_t list = bank + 240;
+      Store(base, linked + 4, list);
+      Store(base, linked + 8, Load(base, list + 8));
+      Store(base, Load(base, list + 8) + 4, linked);
+      Store(base, list + 8, linked);
+      return r30;
+    }
+  }
+  const uint32_t wave = Load(base, frame + 80);
+  if (wave != 0) {
+    CallAt(call, xa::Method(base, wave, 0), 0x825D8860, Args({wave, 1}), frame);
+  }
+  return r30;
+}
+
+uint32_t TrackInstancePrepareSimple(uint8_t* base, uint32_t instance, uint32_t record,
+                                    uint32_t offset, uint32_t frame, const GuestCall& call) {
+  ITC_NATIVE_RUNNING("sub_825D53D8 XACTTrackInstance::PrepareSimple");
+  Store(base, instance + 40, 2);
+  StoreU8(base, instance + 24, 1);
+  SetRegs(call, Args({4, kEventArrayAttributes}));
+  const uint32_t array = memory::crt::XMemAlloc(base, 4, kEventArrayAttributes);
+  Store(base, instance + 20, array);
+  if (array != 0) {
+    SetRegs(call, Args({72, kPlayWaveAttributes}));
+    uint32_t event = memory::crt::XMemAlloc(base, 72, kPlayWaveAttributes);
+    if (event != 0) {
+      const uint32_t engine = Load(base, instance + 12);
+      SetRegs(call, Args({event, engine, instance, record, 0}));
+      PlayWaveConstruct(base, event, engine, instance, record, 0, 0);
+    }
+    Store(base, Load(base, instance + 20), event);
+    event = Load(base, Load(base, instance + 20));
+    if (event != 0) {
+      Store(base, instance + 36, event);
+      const uint32_t r30 = EventSlotPrepare(base, event, offset, frame, 0x825D5490, call);
+      if (int32_t(r30) < 0) {
+        return r30;
+      }
+      const uint32_t prepared =
+          EventSlotIsPrepared(base, Load(base, instance + 36), frame, 0x825D54B0, call);
+      if (int32_t(prepared) != 0) {
+        Store(base, instance + 40, 3);
+      }
+      return r30;
+    }
+  }
+  // Out of memory.
+  const uint32_t held = Load(base, instance + 20);
+  StoreU8(base, instance + 24, 0);
+  if (held == 0) {
+    return kOutOfMemory;
+  }
+  const uint32_t event = Load(base, held);
+  if (event != 0) {
+    CallAt(call, xa::Method(base, event, 0), 0x825D5500, Args({event, 1}), frame);
+  }
+  const uint32_t now = Load(base, instance + 20);
+  SetRegs(call, Args({now, kEventArrayAttributes}));
+  memory::crt::XMemFree(now, kEventArrayAttributes);
+  Store(base, instance + 20, 0);
+  return kOutOfMemory;
+}
+
+uint32_t TrackPrepareSimple(uint8_t* base, uint32_t track, uint32_t record, uint32_t offset,
+                            uint32_t frame, const GuestCall& call) {
+  ITC_NATIVE_RUNNING("sub_825D09D0 XACTTrack::PrepareSimple");
+  uint32_t r30;
+  if (const auto rpcs = TrackCreateRpcs(base, track)) {
+    SetRegs(call, Args({track}));
+    r30 = *rpcs;
+  } else {
+    r30 = CallAt(call, 0x825D06B8, 0x825D09EC, Args({track}), frame);
+  }
+  SetRegs(call, Args({64, kTrackInstanceAttributes}));
+  uint32_t instance = memory::crt::XMemAlloc(base, 64, kTrackInstanceAttributes);
+  if (instance != 0) {
+    const uint32_t engine = Load(base, track + 12);
+    SetRegs(call, Args({instance, engine, track, 0xFFFFFFFFFFFFFFFFull}));
+    TrackInstanceConstruct(base, instance, engine, track);
+  }
+  Store(base, track + 24, instance);
+  if (instance == 0) {
+    r30 = kOutOfMemory;
+  } else if (int32_t(r30) >= 0) {
+    SetRegs(call, Args({instance, record, offset}));
+    r30 = TrackInstancePrepareSimple(base, instance, record, offset,
+                                     xa::FrameBelow(base, frame, kTrackInstancePrepareFrame),
+                                     call);
+    if (int32_t(r30) >= 0) {
+      if (const auto started = TrackStartRpcs(base, track)) {
+        SetRegs(call, Args({track}));
+      } else {
+        CallAt(call, 0x825D0800, 0x825D0A90, Args({track}), frame);
+      }
+      return r30;
+    }
+  }
+  instance = Load(base, track + 24);
+  if (instance != 0) {
+    CallAt(call, xa::Method(base, instance, 0), 0x825D0A54, Args({instance, 1}), frame);
+  }
+  Store(base, track + 24, 0);
+  return r30;
+}
+
 }  // namespace xact

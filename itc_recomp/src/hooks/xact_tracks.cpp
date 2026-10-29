@@ -24,7 +24,9 @@ ITC_FLAG_BOOL(native_xact_tracks, true, "ITC",
               "sub_825D06B8 and StartRpcs sub_825D0800 (without RPCs), XACTTrack sub_825D0CE0, "
               "Update sub_825D0E30, ~XACTTrack sub_825D0110 and its deleting destructor "
               "sub_825D0978; XACTPlayWaveEvent's deleting destructor sub_825D8660, "
-              "ApplyVariation sub_825D7558, GetDuration sub_825D8870; "
+              "ApplyVariation sub_825D7558, GetDuration sub_825D8870, Prepare sub_825D86F8; "
+              "XACTTrackInstance::PrepareSimple sub_825D53D8 and XACTTrack::PrepareSimple "
+              "sub_825D09D0 (allocating through the native layer under --native_heap); "
               "the objects' slots through their plain C++ while they hold it, the waves' and "
               "voices' through the guest call) natively instead of through the translated code "
               "(the same reads and writes; checked by --run_harnesses=xact_tracks)");
@@ -286,6 +288,28 @@ void XactPlayWaveGetDuration(PPCContext& ctx, uint8_t* base) {
   });
 }
 
+void XactPlayWavePrepare(PPCContext& ctx, uint8_t* base) {
+  const uint32_t event = ctx.r3.u32, offset = ctx.r4.u32;
+  const bool native_heap = NativeHeapActive();
+  Framed(ctx, base, 128, [&](const xaudio::GuestCall& call, uint32_t frame) {
+    return xact::PlayWavePrepare(base, event, offset, native_heap, frame, call);
+  });
+}
+
+void XactTrackInstancePrepareSimple(PPCContext& ctx, uint8_t* base) {
+  const uint32_t instance = ctx.r3.u32, record = ctx.r4.u32, offset = ctx.r5.u32;
+  Framed(ctx, base, 128, [&](const xaudio::GuestCall& call, uint32_t frame) {
+    return xact::TrackInstancePrepareSimple(base, instance, record, offset, frame, call);
+  });
+}
+
+void XactTrackPrepareSimple(PPCContext& ctx, uint8_t* base) {
+  const uint32_t track = ctx.r3.u32, record = ctx.r4.u32, offset = ctx.r5.u32;
+  Framed(ctx, base, 128, [&](const xaudio::GuestCall& call, uint32_t frame) {
+    return xact::TrackPrepareSimple(base, track, record, offset, frame, call);
+  });
+}
+
 }  // namespace hooks
 
 // The flag's fallback, then the register step.
@@ -354,3 +378,6 @@ ITC_XACT_TRACKS_HEAP_ADAPTER(825D0978, XactTrackDeletingDestruct)
 ITC_XACT_TRACKS_HEAP_ADAPTER(825D8660, XactPlayWaveDeletingDestruct)
 ITC_XACT_TRACKS_ADAPTER(825D7558, XactPlayWaveApplyVariation)
 ITC_XACT_TRACKS_ADAPTER(825D8870, XactPlayWaveGetDuration)
+ITC_XACT_TRACKS_ADAPTER(825D86F8, XactPlayWavePrepare)
+ITC_XACT_TRACKS_HEAP_ADAPTER(825D53D8, XactTrackInstancePrepareSimple)
+ITC_XACT_TRACKS_HEAP_ADAPTER(825D09D0, XactTrackPrepareSimple)

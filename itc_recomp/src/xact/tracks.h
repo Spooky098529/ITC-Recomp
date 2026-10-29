@@ -204,4 +204,42 @@ uint32_t PlayWaveApplyVariation(uint8_t* base, uint32_t event, uint32_t frame,
 uint32_t PlayWaveGetDuration(uint8_t* base, uint32_t event, bool native_heap, uint32_t frame,
                              const GuestCall& call);
 
+// --- Preparing: the play-wave event's Prepare, the simple sounds' one-track
+// prepare ---
+
+constexpr uint32_t kTrackInstanceAttributes = 0x20848008;  // XMemAlloc's
+constexpr uint32_t kEventArrayAttributes = 0x20840001;     // the instance's events
+
+// XACTPlayWaveEvent::Prepare (sub_825D86F8, slot +8): the record's time
+// (bits 5-28 of word +0) against `offset`: +32 the offset (no seek) when
+// it's later, else the time (the seek the rest); the cue's sound bank's wave
+// bank (as GetDuration; none: XACTENGINE_E_NOWAVEBANK, not prepared:
+// 0x8AC70016); its slot +40 (CreateWave, the wave to the frame's +80, 0
+// first), the wave's slot +4 (Prepare) with own slot +48 (the loop count),
+// 0 and the seek, own slot +104 (SetWave), the wave linked at the tail of
+// the bank's list (+240). A failure deletes the wave (its slot +0 with 1).
+// `frame` is this function's (128 bytes). Returns the last result.
+uint32_t PlayWavePrepare(uint8_t* base, uint32_t event, uint32_t offset, bool native_heap,
+                         uint32_t frame, const GuestCall& call);
+// XACTTrackInstance::PrepareSimple (sub_825D53D8): state 2, one event: a
+// 4-byte array (XMemAlloc 0x20840001) at +20, a play-wave event (72 bytes,
+// 0x2084800D, its constructor's plain C++) in it and at +36, its slot +8
+// (Prepare) with `offset` and, on success, its slot +20 (IsPrepared): state
+// 3 when prepared. Without memory: the count 0, the event deleted (its slot
+// +0), the array freed, E_OUTOFMEMORY. `frame` is this function's (128
+// bytes). Returns the result. Allocates through the native layer: call it
+// only while hooks::NativeHeapActive().
+uint32_t TrackInstancePrepareSimple(uint8_t* base, uint32_t instance, uint32_t record,
+                                    uint32_t offset, uint32_t frame, const GuestCall& call);
+// XACTTrack::PrepareSimple (sub_825D09D0): CreateRpcs (its plain C++, else
+// the original through the guest call), an instance (XMemAlloc 64
+// 0x20848008, its constructor's plain C++) at +24 (E_OUTOFMEMORY without
+// one); unless the RPCs failed, the instance's PrepareSimple and on success
+// StartRpcs (likewise); on a failure the instance deleted (its slot +0 with
+// 1, through the guest call) and +24 = 0. `frame` is this function's (128
+// bytes). Returns the result. Allocates through the native layer: call it
+// only while hooks::NativeHeapActive().
+uint32_t TrackPrepareSimple(uint8_t* base, uint32_t track, uint32_t record, uint32_t offset,
+                            uint32_t frame, const GuestCall& call);
+
 }  // namespace xact
