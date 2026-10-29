@@ -11,13 +11,18 @@ file's history. What's left to see in a drive, from every run:
 - Run started 2026-10-28 22:22 on `b7-loop-28-10-26-3` (the user's
   branch), from 26a5119; summary `b7-loop-2026-10-28-2222.md`.
 - Limit for this run: 3 subsystems.
-- Subsystem 1 of 3: the car sounds and X3DAudio (`car-sounds.md`,
-  from the top lead). Map checked (26adc92). Migration 1 done (9a0dcc7..3e6c24e,
-  nothing ready left). Step: validation (agent running).
+- Subsystem 1 of 3 done: the car sounds and X3DAudio (below).
+  Recorded in the plan's table and boundary log.
+- Subsystem 2 of 3: XAudio's voice methods (`sub_8245A768` and ten
+  more, the car sounds' blockers; the lead closest to ready, 8 of its
+  11 ready). Step: mapping (agent running).
 
 ## Done
 
-Nothing yet.
+- The car sounds and X3DAudio: `car-sounds.md`, 24 of 62 in play
+  native in one migration, 12 adapters removed; `--native_car_sounds`;
+  26adc92, 9a0dcc7..3e6c24e. Validated (`itc_2328`, `itc_2329`): 24 of
+  24 harness lines, all ran in play or the replay; nothing to drive.
 
 ## Rows to review
 
@@ -40,6 +45,9 @@ Nothing yet.
 - After the car sounds' migration 1 (`itc_2327`: race 38 s, 0 errors,
   car_sounds and x3daudio 0 differing): ours 2652, work left 3809
   (wrapped 103, known 535, unknown 3171).
+- After its validation (`itc_2328`: race 8 s, the harnesses ~30 s, 0
+  errors, every harness 0 differing but the expected groups): ours
+  2652, work left 3809.
 
 ## Stopped
 
