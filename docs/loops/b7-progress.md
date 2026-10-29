@@ -16,8 +16,9 @@ file's history. What's left to see in a drive, from every run:
   Map a3880fc checked (`xact-tracks.md`, 143 rows, 55 in play, 34
   ready groups). Migration 1 checked (44 ours,
   c8ad278..6fc2206). Validated (`itc_2432`,
-  `itc_2433`: 44 of 44 harness lines; one to drive). Step: migration
-  agent 2 running (`XACTTrackInstance::Prepare` and above).
+  `itc_2433`: 44 of 44 harness lines; one to drive). Migration 2 checked (47 of 55
+  ours, 84a6ef7..65b3944; nothing ready left). Step: validation agent
+  running.
 
 ## Done
 
@@ -45,3 +46,6 @@ file's history. What's left to see in a drive, from every run:
 - After its validation (`itc_2432`: race 7 s, the harnesses ~33 s, 0
   errors, every harness 0 differing but the expected groups): ours
   2848, work left 3616.
+- After XACT's tracks' migration 2 (`itc_2442`: race 38 s, 0 errors,
+  xact_tracks and xact 0 differing): ours 2852, work left 3612 (wrapped
+  103, known 516, unknown 2993).

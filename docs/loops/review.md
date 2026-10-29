@@ -48,6 +48,17 @@ When the user has reviewed a run's section, its heading gets
   `UpdateVolume` `sub_825D0428`, `XACTEvent::Create` `sub_825D0F00`)
   print on each native return path instead of as their first statement,
   since they hand some inputs back to the recompiled code.
+- XACT's tracks' migration 2 (84a6ef7..65b3944, same flag): `XACTTrack::Prepare`
+  `sub_825D0AA0`, `CreateInstance` `sub_825D02F8` and
+  `XACTTrackInstance::Prepare` `sub_825D5A48` (the last two and
+  `XACTEvent::Create` now Native), and `XACTSound::ScheduleEvent`
+  `sub_825CB0C8` (row in `xact.md`, code beside the events; its adapter
+  stays for `XACTEvent::Schedule`, recompiled). Harness coverage to look
+  at: every new play-wave event's Prepare fails in the harness (its fake
+  bank can't make a real wave), so the success path keeping a play-wave
+  event is checked only by the attract race (two calls from
+  `825CCB98`). 47 of 55 ours; the other 8 wait on `XACTGetTimeMs` over
+  QueryPerformanceCounter.
 
 ## Run 2026-10-28 22:22 (`b7-loop-28-10-26-3`)
 
