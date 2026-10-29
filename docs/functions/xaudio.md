@@ -121,8 +121,8 @@ call at the imports' thunk addresses. The API lock stays the game's
 critical section (`xaudio::ApiEnter`, `ApiLeave`; `WaitForVoice` leaves
 and enters it by its recursion count, `[0x8264D514 + 24]`) until every user
 is ours, when it becomes a host recursive lock whose depth can be read.
-After the second migration 20 of its 29 users are native; the rest, all
-recompiled, block the switch: `XAudioInitialize`'s `sub_8245A410`
+After the second migration 21 of its 29 users (with `sub_8245A410`) are native; the rest,
+all recompiled, block the switch: `XAudioInitialize`'s `sub_8245A410`
 (`sound-cues.md`), `XAudioShutDown` (`sub_8245A4E8`, no harness: it
 releases the live engine), the callback's registration `sub_8245A5E8` (with
 the engine's `sub_8245AB60`) and `sub_8245A668`, the commit
