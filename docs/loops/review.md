@@ -83,6 +83,29 @@ When the user has reviewed a run's section, its heading gets
   are native, then it becomes a host recursive lock; the API lock
   `0x8264D518` becomes the host recursive lock now (its users are all in
   `xaudio.md`, with `sub_8245A410` in `sound-cues.md`).
+- XAudio's migration 2 (19a919f..24cc6ea, `--native_xaudio`): 58 more
+  (92 of 96 in play ours, 37 Native): the voices with outputs, the voice
+  making and passes, the methods under the spin lock, the source voices'
+  start, stop and pass, the constructors and destructors, and the API
+  entry points but `XAudioShutDown`, the callback's and the commit. The
+  locks by the user's calls: the spin lock the game's, taken with the
+  original's inline reads and writes and the same kernel imports
+  (through the guest call at the imports' thunk addresses); the API lock
+  still the game's critical section, not switched: 21 of its 29 users
+  are ours, the 8 left (`sub_8245A410`, `XAudioShutDown`, `sub_8245A5E8`,
+  `sub_8245A668`, `sub_8245A6E8`, `sub_8245AFA0`, `sub_8245ED60`,
+  `sub_825DA0F0`) wait on the engine lead or have no harness possible.
+  For review: `XAudioShutDown` left recompiled (its harness would release
+  the live engine); nested plain C++ in frames of the original's size
+  below the caller's, and callers setting the registers the original
+  sets before a plain C++ callee (`xaudio.md`'s intro); harnesses
+  against the live engine (list inserts under the spin lock, voices made
+  with the real allocators and freed; one small native-XMA handle per
+  XMA codec made in `SourceInit`/`CreateSource` cases isn't freed;
+  `WaitForVoice`'s wait loop not harnessed); adapters kept though listed
+  removable (`sub_82460BF0`, `sub_82461D50`, `sub_82460CB8`,
+  `sub_824619B0`); `ProcessEffect` reads an unwritten stack word as the
+  original does. Sound: the same counters as `--native_xaudio=false`.
 
 ## Run 2026-10-28 18:45 (`b7-loop-28-10-26-2`)
 
