@@ -21,6 +21,16 @@ Regs Args(std::initializer_list<uint64_t> r) {
   return regs;
 }
 
+// The call made at `sp` (a plain C++ function's own frame).
+Regs At(uint32_t sp, Regs regs) {
+  regs.sp = sp;
+  return regs;
+}
+
+// The registers the original sets before calling a function whose plain
+// C++ runs here instead.
+void SetRegs(const GuestCall& call, Regs regs) { call(0, 0, regs); }
+
 }  // namespace
 
 // --- Leaves ---
@@ -157,6 +167,237 @@ void Barrier(uint8_t* base, uint32_t engine, uint32_t barrier, uint32_t processo
     }
   }
   REX_STORE_U64(barrier, uint64_t(0));
+}
+
+// --- The engine's making ---
+
+uint32_t EngineConstruct(uint8_t* base, uint32_t engine, uint32_t allocator,
+                         const GuestCall& call) {
+  ITC_NATIVE_RUNNING("sub_8245C098 XAudioEngine::XAudioEngine");
+  guest::StoreU32(base, engine + 8, allocator);
+  guest::StoreU32(base, engine, kEngineVtable0);
+  guest::StoreU32(base, engine + 4, 1);
+  if (allocator != 0) {
+    call(Method(base, allocator, 0), 0x8245C0E0, Args({allocator}));
+  }
+  guest::StoreU32(base, engine, kEngineVtable);
+  // The start-pending list (+68, its node offset 24 at +76).
+  const uint32_t pending = engine + 68;
+  guest::StoreU32(base, pending, pending);
+  guest::StoreU32(base, pending + 8, 24);
+  guest::StoreU32(base, pending + 4, pending);
+  // The source voices' stage (+80: its list, node offset 16; the two lists
+  // at +92 and +104, node offset 24; +116 and +120 pointing at them).
+  const uint32_t stage = engine + 80;
+  const uint32_t active = stage + 12, next = stage + 24;
+  guest::StoreU32(base, stage + 8, 16);
+  guest::StoreU32(base, stage, stage);
+  guest::StoreU32(base, stage + 4, stage);
+  guest::StoreU32(base, active + 8, 24);
+  guest::StoreU32(base, active, active);
+  guest::StoreU32(base, active + 4, active);
+  guest::StoreU32(base, next + 8, 24);
+  guest::StoreU32(base, next, next);
+  guest::StoreU32(base, next + 4, next);
+  guest::StoreU32(base, stage + 36, active);
+  guest::StoreU32(base, stage + 40, next);
+  guest::StoreU32(base, engine + 132, kOneFloatBits);
+  guest::StoreU32(base, engine + 136, kOneFloatBits);
+  guest::StoreU32(base, kEngine, engine);
+  return engine;
+}
+
+uint32_t FactoryConstruct(uint8_t* base, uint32_t factory, uint32_t table, uint32_t allocator,
+                          uint32_t frame, const GuestCall& call) {
+  ITC_NATIVE_RUNNING("sub_8245DA48 XAudioFactory::XAudioFactory");
+  guest::StoreU32(base, factory, kFactoryVtable);
+  guest::StoreU32(base, factory + 4, 1);
+  uint32_t classes = guest::LoadU32(base, table);
+  uint32_t count = guest::LoadU8(base, classes);
+  uint32_t ids = 0;
+  if (count != 0) {
+    uint32_t entry = guest::LoadU32(base, classes + 4);
+    for (; count != 0; count--, entry += 12) {
+      const uint32_t id = guest::LoadU8(base, entry) + 1u;
+      if (id > ids) {
+        ids = id;
+      }
+    }
+  }
+  guest::StoreU32(base, factory + 8, ids);
+  if (ids != 0) {
+    const uint32_t entries =
+        call(Method(base, allocator, 20), 0x8245DAD8, At(frame, Args({allocator, ids << 3})));
+    guest::StoreU32(base, factory + 12, entries);
+  }
+  // Each class's functions at its id's entry, the table read again each
+  // time, as the original does.
+  classes = guest::LoadU32(base, table);
+  if (guest::LoadU8(base, classes) != 0) {
+    uint32_t offset = 0;
+    uint32_t i = 0;
+    do {
+      const uint32_t entry = guest::LoadU32(base, classes + 4) + offset;
+      i++;
+      const uint32_t at = uint32_t(guest::LoadU8(base, entry)) << 3;
+      guest::StoreU32(base, guest::LoadU32(base, factory + 12) + at,
+                      guest::LoadU32(base, entry + 4));
+      const uint32_t again = guest::LoadU32(base, table);
+      const uint32_t to = guest::LoadU32(base, factory + 12) + at;
+      const uint32_t second = guest::LoadU32(base, guest::LoadU32(base, again + 4) + offset + 8);
+      offset += 12;
+      guest::StoreU32(base, to + 4, second);
+      classes = guest::LoadU32(base, table);
+    } while (i < guest::LoadU8(base, classes));
+  }
+  return factory;
+}
+
+uint32_t FactoryCreate(uint8_t* base, uint32_t table, uint32_t allocator, uint32_t out,
+                       uint32_t frame, const GuestCall& call) {
+  ITC_NATIVE_RUNNING("sub_8245DC10 XAudioFactory::Create");
+  const uint32_t memory =
+      call(Method(base, allocator, 20), 0x8245DC40, At(frame, Args({allocator, 24})));
+  if (memory != 0) {
+    SetRegs(call, Args({memory, table, allocator}));
+    const uint32_t factory =
+        FactoryConstruct(base, memory, table, allocator, FrameBelow(base, frame, 112), call);
+    if (factory != 0) {
+      guest::StoreU32(base, out, factory + 8);
+      return 0;
+    }
+  }
+  return 0x8007000Eu;  // E_OUTOFMEMORY
+}
+
+uint32_t FactoryEntry(uint8_t* base, uint32_t factory, uint32_t descriptor, uint32_t which,
+                      uint32_t* function) {
+  if (which == 0) {
+    ITC_NATIVE_RUNNING("sub_8245D650 XAudioFactory::CreateObject");
+  } else {
+    ITC_NATIVE_RUNNING("sub_8245D6D8 XAudioFactory::SizeObject");
+  }
+  *function = 0;
+  uint32_t id = guest::LoadU8(base, descriptor);
+  uint32_t entries;
+  if (id <= 127) {
+    if (id >= guest::LoadU32(base, factory + 8)) {
+      return 0x80004001u;
+    }
+    entries = guest::LoadU32(base, factory + 12);
+  } else {
+    id -= 128;
+    if (id >= guest::LoadU32(base, factory + 16)) {
+      return 0x80004001u;
+    }
+    entries = guest::LoadU32(base, factory + 20);
+  }
+  const uint32_t entry = (id << 3) + entries;
+  if (guest::LoadU32(base, entry + 4) == 0 || guest::LoadU32(base, entry) == 0) {
+    return 0x80004001u;  // E_NOTIMPL
+  }
+  *function = guest::LoadU32(base, entry + 4 * which);
+  return 0;
+}
+
+uint32_t RegisterStats(uint8_t* base, uint32_t frame, const GuestCall& call) {
+  ITC_NATIVE_RUNNING("sub_8245F588 XAudio::RegisterStats");
+  guest::StoreU32(base, frame + 80, 4);
+  guest::StoreU32(base, frame + 84, kStatsCallback);
+  const uint32_t monitor = guest::LoadU32(base, guest::LoadU32(base, kDebugMonitor));
+  if (monitor != 0) {
+    call(guest::LoadU32(base, monitor + 24), 0x8245F5D0, At(frame, Args({47, frame + 80})));
+  }
+  return 0;
+}
+
+uint32_t SetUpProcessors(uint8_t* base, uint32_t mask, uint32_t out, uint32_t frame,
+                         const GuestCall& call) {
+  ITC_NATIVE_RUNNING("sub_8245A828 XAudio::SetUpProcessors");
+  mask &= 0x3F;
+  for (uint32_t i = 0; i < 8; i++) {
+    guest::StoreU8(base, out + i, 0);
+  }
+  // The registers as the original's call leaves them (r3 the mask, r4 out).
+  const uint32_t type = call(kKeGetCurrentProcessType, 0x8245A864, At(frame, Regs{}));
+  if (int32_t(type) != 1) {
+    guest::StoreU8(base, out + 1, 1);
+    guest::StoreU8(base, out + 6, 4);
+    return type;
+  }
+  if ((mask & 0xFF) == 0) {
+    mask = 16;
+  }
+  mask &= 0xFF;
+  for (uint32_t i = 0, bits = mask; i < 6; i++, bits >>= 1) {
+    if ((bits & 1) != 0) {
+      guest::StoreU8(base, out + 2 + i, 2);
+      guest::StoreU8(base, out, uint8_t(guest::LoadU8(base, out) + 1));
+      guest::StoreU8(base, out + 1, uint8_t(guest::LoadU8(base, out + 1) + 1));
+    }
+  }
+  if ((mask & 0x10) != 0) {
+    guest::StoreU8(base, out + 6, 1);
+    return type;
+  }
+  for (int i = 5; i >= 0; i--) {
+    if (guest::LoadU8(base, out + 2 + uint32_t(i)) != 0) {
+      guest::StoreU8(base, out + 2 + uint32_t(i), 1);
+      return type;
+    }
+  }
+  return type;
+}
+
+uint32_t EngineSize(uint8_t* base, uint32_t params, uint32_t out, uint32_t frame,
+                    const GuestCall& call) {
+  ITC_NATIVE_RUNNING("sub_8245B2C0 XAudioEngine::Size");
+  uint32_t classes = guest::LoadU32(base, params + 4);
+  if (classes == 0) {
+    classes = kDefaultClasses;
+  }
+  guest::StoreU32(base, frame + 80, classes);
+  SetRegs(call, Args({frame + 80, frame + 88}));
+  const uint32_t factory = FactorySizeOf(base, frame + 80, frame + 88);
+  if (int32_t(factory) < 0) {
+    return factory;
+  }
+  // The output buffer's format (20 bytes at +112): type 0, max(+0, 6)
+  // channels, 48,000 Hz.
+  const uint32_t format = frame + 112;
+  REX_STORE_U64(format, uint64_t(0));
+  REX_STORE_U64(format + 8, uint64_t(0));
+  guest::StoreU32(base, format + 16, 0);
+  guest::StoreU8(base, format, 0);
+  guest::StoreU8(base, format + 4, 0);
+  uint32_t channels = guest::LoadU8(base, params);
+  if (channels <= 6) {
+    channels = 6;
+  }
+  guest::StoreU8(base, format + 5, uint8_t(channels));
+  guest::StoreU32(base, format + 8, kSampleRate);
+  SetRegs(call, Args({format, frame + 84}));
+  uint32_t r30;
+  if (const auto r3 = BufferSize(base, format, frame + 84)) {
+    r30 = *r3;
+  } else {
+    r30 = call(kBufferSize, 0x8245B348, At(frame, Args({format, frame + 84})));
+  }
+  if (int32_t(r30) < 0) {
+    return r30;
+  }
+  const uint32_t mask = guest::LoadU8(base, params + 2);
+  SetRegs(call, Args({mask, frame + 96}));
+  SetUpProcessors(base, mask, frame + 96, FrameBelow(base, frame, 112), call);
+  const uint32_t processors = guest::LoadU8(base, frame + 97);
+  uint32_t size = (processors * guest::LoadU32(base, frame + 84)) << 1;
+  size += guest::LoadU32(base, frame + 88);
+  const uint32_t stages = guest::LoadU8(base, params + 1);
+  if (stages != 0) {
+    size += stages * 44 + 4;
+  }
+  guest::StoreU32(base, out, size);
+  return r30;
 }
 
 }  // namespace xaudio

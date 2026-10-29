@@ -80,4 +80,73 @@ void DeleteObject(uint8_t* base, uint32_t object, uint32_t* function);
 // another processor has cleared it.
 void Barrier(uint8_t* base, uint32_t engine, uint32_t barrier, uint32_t processor);
 
+// --- The engine's making (its parts that use no kernel object) ---
+
+constexpr uint32_t kEngineVtable0 = 0x8204A6CC;  // the base's
+constexpr uint32_t kEngineVtable = 0x8204A6E0;
+constexpr uint32_t kFactoryVtable = 0x8204A6F4;
+constexpr uint32_t kDefaultClasses = 0x8204A7B0;  // the factory's class table
+constexpr uint32_t kDebugMonitor = 0x820007F0;    // the debug monitor's data
+constexpr uint32_t kStatsCallback = 0x8245F4E0;
+constexpr uint32_t kKeGetCurrentProcessType = 0x825DB934;
+constexpr uint32_t kBufferSize = 0x8245FA28;
+constexpr uint32_t kOneFloatBits = 0x3F800000;   // 1.0f
+
+// XAudioEngine::XAudioEngine (sub_8245C098): the 372-byte engine at `engine`
+// with the allocator `allocator` (AddRef'd, its slot +0, when set): the
+// vtables, the count, the start-pending list (+68), the source voices'
+// stage (+80, its two lists at +92 and +104), the categories' volumes (+132,
+// +136, 1.0); then [kEngine] = the engine. Returns the engine.
+uint32_t EngineConstruct(uint8_t* base, uint32_t engine, uint32_t allocator,
+                         const GuestCall& call);
+
+// XAudioFactory::XAudioFactory (sub_8245DA48): the 24-byte factory at
+// `factory` for the class table at [table], its entries (8 bytes an id, the
+// largest id + 1 of them, at +8) from the allocator's slot +20 into +12, each
+// class's two functions (its table entry's +4, +8) at its id's. `frame` is
+// this function's (112 bytes). Returns the factory.
+uint32_t FactoryConstruct(uint8_t* base, uint32_t factory, uint32_t table, uint32_t allocator,
+                          uint32_t frame, const GuestCall& call);
+
+// XAudioFactory::Create (sub_8245DC10): 24 bytes from the allocator's slot
+// +20, FactoryConstruct (in a frame below `frame`), the factory's interface
+// (+8) to [out]. `frame` is this function's (112 bytes). Returns 0 or
+// E_OUTOFMEMORY.
+uint32_t FactoryCreate(uint8_t* base, uint32_t table, uint32_t allocator, uint32_t out,
+                       uint32_t frame, const GuestCall& call);
+
+// The factory's create (sub_8245D650) and size (sub_8245D6D8) slots: the
+// class entry of the descriptor's id (byte +0: below 128 in +8/+12, from
+// 128 in +16/+20), its first (`which` 0) or second (`which` 1) function to
+// `function`, tail-called by the adapter; E_NOTIMPL (0x80004001), and no
+// function, when the id has no entry.
+uint32_t FactoryEntry(uint8_t* base, uint32_t factory, uint32_t descriptor, uint32_t which,
+                      uint32_t* function);
+
+// XAudio::RegisterStats (sub_8245F588): the request (4 and the callback
+// kStatsCallback at the frame's +80) handed to the debug monitor's
+// ([[kDebugMonitor]]) slot +24 with 47, when there is one. `frame` is this
+// function's (96 bytes). Returns 0.
+uint32_t RegisterStats(uint8_t* base, uint32_t frame, const GuestCall& call);
+
+// XAudio::SetUpProcessors (sub_8245A828): the 8 bytes at `out` from the
+// processor mask `mask` (its low 6 bits; 0 means 16) and the kernel's
+// KeGetCurrentProcessType (through `call` at its import's thunk): for the
+// title's process (1), each masked hardware thread's byte (+2 + i) 2 and
+// +0, +1 counted up, then the main one 1 (thread 4 when masked, else the
+// highest); otherwise +1 = 1, +6 = 4. `frame` is this function's (112
+// bytes). Returns the kernel's answer (the original's r3).
+uint32_t SetUpProcessors(uint8_t* base, uint32_t mask, uint32_t out, uint32_t frame,
+                     const GuestCall& call);
+
+// XAudioEngine::Size (sub_8245B2C0): the engine's size for the parameters
+// at `params` to [out]: the factory's (FactorySizeOf), an output buffer's
+// for max(+0, 6) channels at 48 kHz (XAudioBuffer::Size's plain C++, its
+// original where that refuses) times the processors (SetUpProcessors with
+// +2, in a frame below) times 2, + 44 x the stage count (+1) + 4 when there
+// are stages. `frame` is this function's (176 bytes). Returns the buffer
+// size's r3 (nothing written on a failure).
+uint32_t EngineSize(uint8_t* base, uint32_t params, uint32_t out, uint32_t frame,
+                    const GuestCall& call);
+
 }  // namespace xaudio

@@ -24,4 +24,13 @@ void XAudioAllocatorAlloc(PPCContext& ctx, uint8_t* base);        // sub_8246028
 void XAudioDeleteObject(PPCContext& ctx, uint8_t* base);          // sub_8245AAB8
 void XAudioBarrier(PPCContext& ctx, uint8_t* base);               // sub_8245A940 (r13's processor)
 
+void XAudioEngineConstruct(PPCContext& ctx, uint8_t* base);       // sub_8245C098
+void XAudioFactoryConstruct(PPCContext& ctx, uint8_t* base);      // sub_8245DA48
+void XAudioFactoryCreateObject(PPCContext& ctx, uint8_t* base);   // sub_8245DC10
+void XAudioFactoryCreateSlot(PPCContext& ctx, uint8_t* base);     // sub_8245D650 (a tail call)
+void XAudioFactorySizeSlot(PPCContext& ctx, uint8_t* base);       // sub_8245D6D8 (a tail call)
+void XAudioRegisterStats(PPCContext& ctx, uint8_t* base);         // sub_8245F588
+void XAudioSetUpProcessors(PPCContext& ctx, uint8_t* base);       // sub_8245A828
+void XAudioEngineSize(PPCContext& ctx, uint8_t* base);            // sub_8245B2C0
+
 }  // namespace hooks
