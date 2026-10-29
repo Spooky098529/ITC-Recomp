@@ -187,8 +187,8 @@ void XAudioEngineSize(PPCContext& ctx, uint8_t* base) {
     hooks::step(ctx, base);                      \
   }
 
-ITC_XAUDIO_ENGINE_ADAPTER(8245D9E8, XAudioFactoryTableSize)
-ITC_XAUDIO_ENGINE_ADAPTER(8245DBD0, XAudioFactorySizeOf)
+// No adapter (removed 2026-10-29: only XAudioFactory::SizeOf's plain C++ calls it in play) for XAudioFactory::TableSize sub_8245D9E8.
+// No adapter (removed 2026-10-29: only XAudioEngine::Size's plain C++ calls it in play) for XAudioFactory::SizeOf sub_8245DBD0.
 ITC_XAUDIO_ENGINE_ADAPTER(8245F6F0, XAudioBufferGetFormat)
 ITC_XAUDIO_ENGINE_ADAPTER(8245F718, XAudioBufferGetFormatThunk)
 ITC_XAUDIO_ENGINE_ADAPTER(8245F8D0, XAudioBufferInterface)
@@ -201,7 +201,7 @@ ITC_XAUDIO_ENGINE_ADAPTER(82460288, XAudioAllocatorAlloc)
 ITC_XAUDIO_ENGINE_ADAPTER(8245AAB8, XAudioDeleteObject)
 ITC_XAUDIO_ENGINE_ADAPTER(8245A940, XAudioBarrier)
 ITC_XAUDIO_ENGINE_ADAPTER(8245C098, XAudioEngineConstruct)
-ITC_XAUDIO_ENGINE_ADAPTER(8245DA48, XAudioFactoryConstruct)
+// No adapter (removed 2026-10-29: only XAudioFactory::Create's plain C++ calls it in play) for XAudioFactory::XAudioFactory sub_8245DA48.
 ITC_XAUDIO_ENGINE_ADAPTER(8245DC10, XAudioFactoryCreateObject)
 ITC_XAUDIO_ENGINE_ADAPTER(8245D650, XAudioFactoryCreateSlot)
 ITC_XAUDIO_ENGINE_ADAPTER(8245D6D8, XAudioFactorySizeSlot)
