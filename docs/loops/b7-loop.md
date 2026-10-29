@@ -501,6 +501,12 @@ Calls so far for decisions the loop meets often:
   `0x8296BD38`, 2026-10-25). The generic wrappers and `ScopedLock` stay
   recompiled for the other critical sections. A device-wide lock over a
   host semaphore: the device lock (2026-10-24).
+- A kernel critical section or a game-built recursive spin lock whose
+  depth the code reads, or which is entered again on purpose: a host
+  recursive lock whose depth can be read, taken by every user, native
+  and recompiled, left and re-entered by the count as the original does
+  (XAudio's API lock `0x8264D518` and voice-list spin lock `0x82954F10`,
+  2026-10-29).
 - The game's Semaphore objects a subsystem's code uses: host counting
   semaphores with a readable count, taken by every user, native and
   recompiled (the archive loader's four, 2026-10-28); the Semaphore

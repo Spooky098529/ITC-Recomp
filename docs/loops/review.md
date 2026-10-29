@@ -44,6 +44,22 @@ When the user has reviewed a run's section, its heading gets
   `Update3D`'s listener and emitter, +200 the reverb level and +204 the
   Doppler factor (`known-data.md` still says unknown: left for the
   user's OK). The rest waits on XAudio's voice methods.
+- XAudio's voices (map e784bc0): `docs/functions/xaudio.md`, 108 new
+  rows (15 not seen in play): the API entry points `82459DB0`-`8245A7C8`
+  and what's below them seen in play; the API lock is the critical
+  section at `0x8264D518` (+4 of a static object with vtable
+  `0x8204A868` at `0x8264D514`), the mixer's own lock `0x8264D4F8`, the
+  voice lists' recursive spin lock `0x82954F10` (+0 the kernel spin
+  lock, +4 depth, +8 owner, +12 saved IRQL). Shared rows stay in
+  `sound-cues.md`, `c-runtime.md`, `audio.md`, `vehicle-accessors.md`,
+  `xact.md`, `heap.md`. Two leads added (the engine and mixer; the
+  factory's codec, matrix and effect objects).
+- The user's call (2026-10-29), asked because `XAudio::WaitForVoice`
+  (`sub_8245AE60`) reads the API lock's recursion count, leaves it that
+  many times and takes it back: XAudio's API lock and voice-list spin
+  lock become host recursive locks whose depth can be read, taken by
+  every user, native and recompiled (added to "Precedent first" in
+  `b7-loop.md`).
 
 ## Run 2026-10-28 18:45 (`b7-loop-28-10-26-2`)
 

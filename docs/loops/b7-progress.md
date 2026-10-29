@@ -15,7 +15,10 @@ file's history. What's left to see in a drive, from every run:
   Recorded in the plan's table and boundary log.
 - Subsystem 2 of 3: XAudio's voice methods (`sub_8245A768` and ten
   more, the car sounds' blockers; the lead closest to ready, 8 of its
-  11 ready). Step: mapping (agent running).
+  11 ready). Map checked (e784bc0); its stop (the two locks) put to
+  the user: host recursive locks with a readable depth, taken by every
+  user (the user's call, 2026-10-29). Step: migration 1 (agent
+  running).
 
 ## Done
 
@@ -48,6 +51,8 @@ file's history. What's left to see in a drive, from every run:
 - After its validation (`itc_2328`: race 8 s, the harnesses ~30 s, 0
   errors, every harness 0 differing but the expected groups): ours
   2652, work left 3809.
+- After XAudio's map: ours 2652, work left 3809 (wrapped 103, known
+  628, unknown 3078).
 
 ## Stopped
 
