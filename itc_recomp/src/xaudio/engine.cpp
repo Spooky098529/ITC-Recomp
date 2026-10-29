@@ -32,7 +32,15 @@ Regs At(uint32_t sp, Regs regs) {
 // C++ runs here instead.
 void SetRegs(const GuestCall& call, Regs regs) { call(0, 0, regs); }
 
+thread_local std::optional<MakingStandIn> making_stand_in;
+
+const MakingStandIn* MakingStandInOf() {
+  return making_stand_in ? &*making_stand_in : nullptr;
+}
+
 }  // namespace
+
+void SetMakingForHarness(std::optional<MakingStandIn> stand_in) { making_stand_in = stand_in; }
 
 // --- Leaves ---
 
@@ -315,6 +323,12 @@ uint32_t RegisterStats(uint8_t* base, uint32_t frame, const GuestCall& call) {
 uint32_t SetUpProcessors(uint8_t* base, uint32_t mask, uint32_t out, uint32_t frame,
                          const GuestCall& call) {
   ITC_NATIVE_RUNNING("sub_8245A828 XAudio::SetUpProcessors");
+  if (const auto* stand_in = MakingStandInOf()) {
+    for (uint32_t i = 0; i < 8; i++) {
+      guest::StoreU8(base, out + i, stand_in->processors[i]);
+    }
+    return 1;
+  }
   mask &= 0x3F;
   for (uint32_t i = 0; i < 8; i++) {
     guest::StoreU8(base, out + i, 0);
@@ -498,6 +512,12 @@ uint32_t MasteringInit(uint8_t* base, uint32_t voice, uint32_t description, uint
 uint32_t MasteringCreate(uint8_t* base, uint32_t description, uint32_t out, bool native_heap,
                          uint32_t frame, const GuestCall& call) {
   ITC_NATIVE_RUNNING("sub_824600F0 XAudioMasteringVoice::Create");
+  if (const auto* stand_in = MakingStandInOf()) {
+    if (int32_t(stand_in->mastering_r3) >= 0) {
+      guest::StoreU32(base, out, stand_in->mastering_voice);
+    }
+    return stand_in->mastering_r3;
+  }
   const uint32_t slot = frame + 80;  // the allocator
   guest::StoreU32(base, slot, 0);
   SetRegs(call, Args({description, frame + 84}));
@@ -912,6 +932,223 @@ uint32_t WorkerThread(uint8_t* base, const Thread& thread, const GuestCall& call
     call(kMixPasses, 0x8245BF38, Args({engine, 0}));
     call(kKeWaitForSingleObject, 0x8245BF50, Args({kWorkerSemaphore, 3, 1, 0, 0}));
   }
+}
+
+// --- The engine's making ---
+
+namespace {
+
+constexpr uint64_t kOutOfMemory = 0xFFFFFFFF8007000Eull;  // E_OUTOFMEMORY, as li/ori leave it
+constexpr uint32_t kRegisterStatsFrame = 96;
+constexpr uint32_t kFactoryCreateFrame = 112;
+constexpr uint32_t kSetUpProcessorsFrame = 112;
+constexpr uint32_t kBufferCreateFrame = 112;
+constexpr uint32_t kMasteringCreateFrame = 128;
+constexpr uint32_t kEngineSizeFrame = 176;
+constexpr uint32_t kEngineConstructFrame = 96;
+constexpr uint32_t kEngineInitFrame = 208;
+constexpr uint32_t kEngineCreateFrame = 128;
+
+// A guest call from `frame`, r3 in full as the callee leaves it.
+uint64_t CallFull(const GuestCall& call, uint32_t function, uint32_t return_address, Regs regs,
+                  uint32_t frame) {
+  regs.sp = frame;
+  call(function, return_address, regs);
+  return LastCallR3();
+}
+
+// A dispatcher header as Init writes it inline: the type, not signaled,
+// its wait list empty.
+void InlineHeader(uint8_t* base, uint32_t address, uint8_t type) {
+  guest::StoreU8(base, address, type);
+  guest::StoreU32(base, address + 4, 0);
+  guest::StoreU32(base, address + 8, address + 8);
+  guest::StoreU32(base, address + 12, address + 8);
+}
+
+}  // namespace
+
+uint64_t EngineInit(uint8_t* base, uint32_t engine, uint32_t params, bool native_heap,
+                    uint32_t frame, const GuestCall& call) {
+  ITC_NATIVE_RUNNING("sub_8245C198 XAudioEngine::Init");
+  SetRegs(call, Args({engine, params}));
+  RegisterStats(base, FrameBelow(base, frame, kRegisterStatsFrame), call);
+  const uint32_t count = guest::LoadU8(base, params + 1);
+  guest::StoreU8(base, engine + 128, uint8_t(count));
+  if (count != 0) {
+    const uint32_t bytes = count * 44;
+    const uint64_t size = count > 0x5D1745Du || bytes > 0xFFFFFFFBu ? ~0ull : uint64_t(bytes) + 4;
+    const uint32_t allocator = guest::LoadU32(base, engine + 8);
+    const uint32_t memory =
+        call(Method(base, allocator, 20), 0x8245C204, At(frame, Args({allocator, size})));
+    uint32_t stages = 0;
+    if (memory != 0) {
+      guest::StoreU32(base, memory, count);
+      stages = memory + 4;
+      for (uint32_t i = 0; i < count; i++) {
+        const uint32_t stage = stages + 44 * i;
+        guest::StoreU32(base, stage + 0, stage);
+        guest::StoreU32(base, stage + 4, stage);
+        guest::StoreU32(base, stage + 8, 16);
+        guest::StoreU32(base, stage + 12, stage + 12);
+        guest::StoreU32(base, stage + 16, stage + 12);
+        guest::StoreU32(base, stage + 20, 24);
+        guest::StoreU32(base, stage + 24, stage + 24);
+        guest::StoreU32(base, stage + 28, stage + 24);
+        guest::StoreU32(base, stage + 32, 24);
+        guest::StoreU32(base, stage + 36, stage + 12);
+        guest::StoreU32(base, stage + 40, stage + 24);
+      }
+    }
+    guest::StoreU32(base, engine + 124, stages);
+    if (stages == 0) {
+      return kOutOfMemory;
+    }
+  }
+  uint32_t table = guest::LoadU32(base, params + 4);
+  if (table == 0) {
+    table = kDefaultClasses;
+  }
+  guest::StoreU32(base, frame + 88, table);
+  const uint32_t allocator = guest::LoadU32(base, engine + 8);
+  SetRegs(call, Args({frame + 88, allocator, engine + 60}));
+  const uint32_t factory = FactoryCreate(base, frame + 88, allocator, engine + 60,
+                                         FrameBelow(base, frame, kFactoryCreateFrame), call);
+  // Sign-extended, as its adapter leaves r3 (E_OUTOFMEMORY as lis/ori do).
+  uint64_t r25 = uint64_t(int64_t(int32_t(factory)));
+  if (int32_t(factory) < 0) {
+    return r25;
+  }
+  InlineHeader(base, kMixNow, 1);
+  InlineHeader(base, kMixDone, 1);
+  call(kKeInitializeSemaphore, 0x8245C340, At(frame, Args({kWorkerSemaphore, 0, 6})));
+  InlineHeader(base, kTerminating, 0);
+  guest::StoreU32(base, kTerminateRegistration, kTerminateRoutine);
+  guest::StoreU32(base, kTerminateRegistration + 4, kTerminatePriority);
+  call(kExRegisterTitleTerminateNotification, 0x8245C388,
+       At(frame, Args({kTerminateRegistration, 1})));
+  guest::StoreU32(base, engine + 304, 0);
+  const uint32_t processors = frame + 96;
+  SetRegs(call, Args({guest::LoadU8(base, params + 2), processors}));
+  SetUpProcessors(base, guest::LoadU8(base, params + 2), processors,
+                  FrameBelow(base, frame, kSetUpProcessorsFrame), call);
+  for (uint32_t i = 0; i < 6; i++) {
+    guest::StoreU32(base, frame + 84, 0);
+    const uint32_t kind = guest::LoadU8(base, processors + 2 + i);
+    if ((kind & 3) != 0) {
+      const uint32_t entry = kind == 1 ? kMasterEntry : kWorkerEntry;
+      // Suspended (bit 0), on hardware thread i (the top byte's bit i).
+      const uint32_t flags = ((1u << i) << 24) | 1u;
+      const uint32_t r3 = call(kExCreateThread, 0x8245C3F8,
+                               At(frame, Args({frame + 84, 0, 0, 0, entry, 0, flags})));
+      if (int32_t(r3) < 0) {
+        return kOutOfMemory;
+      }
+      call(kObReferenceObjectByHandle, 0x8245C410,
+           At(frame, Args({guest::LoadU32(base, frame + 84), guest::LoadU32(base, kThreadType),
+                           frame + 80})));
+      const uint32_t thread = guest::LoadU32(base, frame + 80);
+      call(kKeSetBasePriorityThread, 0x8245C41C, At(frame, Args({thread, 15})));
+      call(kKeResumeThread, 0x8245C424, At(frame, Args({guest::LoadU32(base, frame + 80)})));
+      call(kObDereferenceObject, 0x8245C42C, At(frame, Args({guest::LoadU32(base, frame + 80)})));
+      guest::StoreU32(base, engine + 304, guest::LoadU32(base, engine + 304) + 1);
+    }
+    guest::StoreU32(base, engine + 308 + 4 * i, guest::LoadU32(base, frame + 84));
+  }
+  // The output buffers' format at the frame's +112 (20 bytes).
+  const uint32_t format = frame + 112;
+  for (uint32_t k = 0; k < 20; k += 4) {
+    guest::StoreU32(base, format + k, 0);
+  }
+  uint32_t channels = guest::LoadU8(base, params + 0);
+  if (channels <= 6) {
+    channels = 6;
+  }
+  guest::StoreU8(base, format + 5, uint8_t(channels));
+  guest::StoreU32(base, format + 8, kSampleRate);
+  for (uint32_t i = 0; i < 6; i++) {
+    if (guest::LoadU8(base, processors + 2 + i) == 0) {
+      continue;
+    }
+    for (uint32_t j = 0; j < 2 && int32_t(r25) >= 0; j++) {
+      const uint32_t out = engine + ((3 + 2 * i + j) << 2);
+      const uint32_t owner = guest::LoadU32(base, engine + 8);
+      SetRegs(call, Args({format, owner, out}));
+      FrameBelow(base, frame, kBufferCreateFrame);
+      r25 = BufferCreate(base, format, owner, out, call);
+    }
+  }
+  if (int32_t(r25) < 0) {
+    return r25;
+  }
+  const uint32_t description = guest::LoadU32(base, params + 8);
+  SetRegs(call, Args({description, engine + 64}));
+  const uint32_t r3 = MasteringCreate(base, description, engine + 64, native_heap,
+                                      FrameBelow(base, frame, kMasteringCreateFrame), call);
+  if (int32_t(r3) < 0) {
+    return r3;
+  }
+  const uint32_t driver = guest::LoadU32(base, guest::LoadU32(base, engine + 64) + 68);
+  return CallFull(call, Method(base, driver, 28), 0x8245C524, Args({driver, kMixerCallback}),
+                  frame);
+}
+
+uint64_t EngineCreate(uint8_t* base, uint32_t params, uint32_t allocator, uint32_t out,
+                      bool native_heap, uint32_t frame, const GuestCall& call) {
+  ITC_NATIVE_RUNNING("sub_8245C538 XAudioEngine::Create");
+  const uint32_t slot = frame + 156;  // the caller's parameter word
+  guest::StoreU32(base, slot, allocator);
+  SetRegs(call, Args({params, frame + 80}));
+  uint64_t r31 = EngineSize(base, params, frame + 80, FrameBelow(base, frame, kEngineSizeFrame),
+                            call);
+  const uint32_t size_word = guest::LoadU32(base, frame + 80);
+  const uint32_t size = int32_t(r31) >= 0 ? size_word + 372 : size_word;
+  if (int32_t(r31) >= 0) {
+    SetRegs(call, Args({kEngineAttributes, size, slot}));
+    if (const auto r3 = GetAllocator(base, kEngineAttributes, size, slot,
+                                     FrameBelow(base, frame, 128), native_heap, call)) {
+      r31 = *r3;
+    } else {
+      r31 = CallFull(call, kGetAllocator, 0x8245C58C, Args({kEngineAttributes, size, slot}),
+                     frame);
+    }
+  }
+  if (int32_t(r31) >= 0) {
+    const uint32_t owner = guest::LoadU32(base, slot);
+    const uint32_t memory =
+        call(Method(base, owner, 20), 0x8245C5B0, At(frame, Args({owner, 372})));
+    uint32_t engine = 0;
+    if (memory != 0) {
+      SetRegs(call, Args({memory, guest::LoadU32(base, slot)}));
+      FrameBelow(base, frame, kEngineConstructFrame);
+      engine = EngineConstruct(base, memory, guest::LoadU32(base, slot), call);
+    }
+    if (engine == 0) {
+      r31 = kOutOfMemory;
+    } else {
+      SetRegs(call, Args({engine, params}));
+      r31 = EngineInit(base, engine, params, native_heap, FrameBelow(base, frame, kEngineInitFrame),
+                       call);
+      if (int32_t(r31) >= 0) {
+        guest::StoreU32(base, out, engine);
+      } else {
+        call(Method(base, engine, 12), 0x8245C60C, At(frame, Args({engine})));
+      }
+    }
+  }
+  const uint32_t owner = guest::LoadU32(base, slot);
+  if (owner != 0) {
+    call(Method(base, owner, 4), 0x8245C628, At(frame, Args({owner})));
+  }
+  return r31;
+}
+
+uint64_t CreateEngine(uint8_t* base, uint32_t params, uint32_t allocator, bool native_heap,
+                      uint32_t frame, const GuestCall& call) {
+  ITC_NATIVE_RUNNING("sub_82459D60 XAudio::CreateEngine");
+  SetRegs(call, Args({params, allocator, kEngine}));
+  return EngineCreate(base, params, allocator, kEngine, native_heap,
+                      FrameBelow(base, frame, kEngineCreateFrame), call);
 }
 
 }  // namespace xaudio

@@ -13,6 +13,7 @@
 #include "xaudio/voices.h"
 
 #include <cstdint>
+#include <optional>
 
 namespace xaudio {
 
@@ -352,5 +353,80 @@ uint32_t MasterThread(uint8_t* base, uint32_t frame, const Thread& thread,
 // +300 is set, kMixPasses with 0 and the wait again. Returns 0 (in play,
 // never).
 uint32_t WorkerThread(uint8_t* base, const Thread& thread, const GuestCall& call);
+
+// --- The engine's making ---
+//
+// Its kernel objects through the kernel's imports at their thunks, exactly
+// as the original (the user's call, 2026-10-29): the events' headers built
+// inline, the semaphore, the title terminate notification and the
+// processor threads, whose entry points stay MasterThread's and
+// WorkerThread's guest addresses.
+
+constexpr uint32_t kTerminateRegistration = 0x82954EB4;
+constexpr uint32_t kTerminateRoutine = 0x8245B0D0;
+constexpr uint32_t kTerminatePriority = 0x7D800000;
+constexpr uint32_t kThreadType = 0x820007FC;  // [it]: probably PsThreadObjectType
+constexpr uint32_t kMasterEntry = 0x8245BE08;
+constexpr uint32_t kWorkerEntry = 0x8245BED0;
+constexpr uint32_t kMixerCallback = 0x8245FBE0;
+constexpr uint32_t kEngineAttributes = 0x61820005;
+constexpr uint32_t kObDereferenceObject = 0x825DB884;
+constexpr uint32_t kKeSetBasePriorityThread = 0x825DB894;
+constexpr uint32_t kObReferenceObjectByHandle = 0x825DB8A4;
+constexpr uint32_t kExRegisterTitleTerminateNotification = 0x825DBA84;
+constexpr uint32_t kExCreateThread = 0x825DBBE4;
+constexpr uint32_t kKeResumeThread = 0x825DBEA4;
+constexpr uint32_t kKeInitializeSemaphore = 0x825DBEB4;
+
+// XAudioEngine::Init (sub_8245C198): RegisterStats; +128 the stage count
+// (`params` +1) and +124 its stages (a count word, then 44 bytes a stage,
+// each its three lists' heads and node offsets) from the allocator's (+8)
+// slot +20 (E_OUTOFMEMORY without); FactoryCreate (the class table +4 or
+// kDefaultClasses at the frame's +88) into +60; the events' headers
+// (kMixNow, kMixDone synchronization, kTerminating notification) written
+// inline, KeInitializeSemaphore(kWorkerSemaphore, 0, 6), the registration
+// (kTerminateRoutine, kTerminatePriority) at kTerminateRegistration
+// registered; +304 = 0; SetUpProcessors (+2, the frame's +96); for each
+// processor byte with its low bits set, ExCreateThread (suspended, on that
+// hardware thread; MasterThread for 1, WorkerThread else),
+// ObReferenceObjectByHandle with [kThreadType], KeSetBasePriorityThread 15,
+// KeResumeThread, ObDereferenceObject, +304 counted (E_OUTOFMEMORY when the
+// create fails), its handle at +308 + 4i (0 for the others); for each
+// nonzero byte two output buffers (BufferCreate, max(+0, 6) channels at
+// 48,000 Hz) at +12 + 8i and +16 + 8i; MasteringCreate (+8) into +64; its
+// driver's (+68) slot +28 with kMixerCallback. `frame` is this function's
+// (208 bytes); `native_heap` whether the default allocators may run.
+// Returns r3 in full as the original leaves it.
+uint64_t EngineInit(uint8_t* base, uint32_t engine, uint32_t params, bool native_heap,
+                    uint32_t frame, const GuestCall& call);
+
+// XAudioEngine::Create (sub_8245C538): EngineSize (the frame's +80), the
+// allocator (GetAllocator with kEngineAttributes and the size + 372, or the
+// size word alone when that failed, `allocator` at the frame's +156, the
+// caller's parameter word; its original where the plain C++ can't), 372
+// bytes from it (slot +20), EngineConstruct, EngineInit; on success the
+// engine to [out], else its slot +12; E_OUTOFMEMORY without memory or an
+// engine; the allocator released (slot +4). `frame` is this function's (128
+// bytes). Returns r3 in full as the original leaves it.
+uint64_t EngineCreate(uint8_t* base, uint32_t params, uint32_t allocator, uint32_t out,
+                      bool native_heap, uint32_t frame, const GuestCall& call);
+
+// XAudio::CreateEngine (sub_82459D60): the XMA set-up (sub_8245C638,
+// Dropped: nothing), then EngineCreate (`params`, `allocator`, kEngine).
+// `frame` is this function's (112 bytes). Returns its r3.
+uint64_t CreateEngine(uint8_t* base, uint32_t params, uint32_t allocator, bool native_heap,
+                      uint32_t frame, const GuestCall& call);
+
+// The harness's stand-ins for the engine's making, on its thread only
+// (nullopt: none): SetUpProcessors' answer (the 8 bytes; r3 1), and
+// MasteringCreate's (`mastering_voice` to [out] when `mastering_r3` isn't
+// an error; r3 `mastering_r3`), so a case makes no thread and registers no
+// render driver.
+struct MakingStandIn {
+  uint8_t processors[8] = {};
+  uint32_t mastering_voice = 0;
+  uint32_t mastering_r3 = 0;
+};
+void SetMakingForHarness(std::optional<MakingStandIn> stand_in);
 
 }  // namespace xaudio

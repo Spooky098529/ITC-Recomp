@@ -1,8 +1,6 @@
 // XAudio's engine and mixer natively: adapters in front of
 // src/xaudio/engine.h (docs/functions/xaudio-engine.md), with the register
-// steps the harness shares (hooks/xaudio_engine.h). The engine's set-up
-// (XAudio::CreateEngine, XAudioEngine::Create and Init) stays recompiled, and
-// many of these are reached
+// steps the harness shares (hooks/xaudio_engine.h). Many of these are reached
 // through vtables, so the adapters stay until their callers are native.
 
 #include "hooks/xaudio_engine.h"
@@ -24,8 +22,9 @@ ITC_FLAG_BOOL(native_xaudio_engine, true, "ITC",
               "sub_8245C098 and Size sub_8245B2C0, XAudio::SetUpProcessors sub_8245A828 (the "
               "kernel's KeGetCurrentProcessType through the translated code) and RegisterStats "
               "sub_8245F588, the factory's constructor sub_8245DA48, Create sub_8245DC10 and its "
-              "slots sub_8245D650 and sub_8245D6D8; the engine's set-up (XAudioEngine::Init and "
-              "its callers) stays recompiled; the mastering voice's Size sub_8245FF68, "
+              "slots sub_8245D650 and sub_8245D6D8; XAudio::CreateEngine sub_82459D60 with "
+              "XAudioEngine::Create sub_8245C538 and Init sub_8245C198 (its kernel objects and "
+              "threads through the kernel's imports, as the original); the mastering voice's Size sub_8245FF68, "
               "Init sub_8245FCA0, Create sub_824600F0, Start sub_8245FE20, Pass sub_8245FDC8 and "
               "Process sub_8245FB80, the render driver's constructor sub_82465938; under the voice "
               "lists' spin lock (taken as the original does) XAudioStage::Swap sub_8245B208, "
@@ -364,6 +363,38 @@ void XAudioWorkerThread(PPCContext& ctx, uint8_t* base) {
   });
 }
 
+// The engine's making: r3 in full, as the original leaves it.
+template <typename Body>
+void FramedFull(PPCContext& ctx, uint8_t* base, uint32_t frame_bytes, Body body) {
+  uint64_t r3 = 0;
+  XAudioFramed(ctx, base, frame_bytes, [&](const xa::GuestCall& call, uint32_t frame) {
+    r3 = body(call, frame);
+    return uint32_t(r3);
+  });
+  ctx.r3.u64 = r3;
+}
+
+void XAudioEngineInit(PPCContext& ctx, uint8_t* base) {
+  const uint32_t engine = ctx.r3.u32, params = ctx.r4.u32;
+  FramedFull(ctx, base, 208, [&](const xa::GuestCall& call, uint32_t frame) {
+    return xa::EngineInit(base, engine, params, NativeHeapActive(), frame, call);
+  });
+}
+
+void XAudioEngineCreate(PPCContext& ctx, uint8_t* base) {
+  const uint32_t params = ctx.r3.u32, allocator = ctx.r4.u32, out = ctx.r5.u32;
+  FramedFull(ctx, base, 128, [&](const xa::GuestCall& call, uint32_t frame) {
+    return xa::EngineCreate(base, params, allocator, out, NativeHeapActive(), frame, call);
+  });
+}
+
+void XAudioCreateEngine(PPCContext& ctx, uint8_t* base) {
+  const uint32_t params = ctx.r5.u32, allocator = ctx.r6.u32;
+  FramedFull(ctx, base, 112, [&](const xa::GuestCall& call, uint32_t frame) {
+    return xa::CreateEngine(base, params, allocator, NativeHeapActive(), frame, call);
+  });
+}
+
 }  // namespace hooks
 
 #define ITC_XAUDIO_ENGINE_ADAPTER(address, step) \
@@ -421,3 +452,8 @@ ITC_XAUDIO_ENGINE_ADAPTER(824603A8, XAudioInterfaceFree)
 ITC_XAUDIO_ENGINE_ADAPTER(8245FBE0, XAudioMixerCallback)
 ITC_XAUDIO_ENGINE_ADAPTER(8245BE08, XAudioMasterThread)
 ITC_XAUDIO_ENGINE_ADAPTER(8245BED0, XAudioWorkerThread)
+// The engine's making (its kernel objects through the imports, as the
+// original).
+ITC_XAUDIO_ENGINE_ADAPTER(8245C198, XAudioEngineInit)
+ITC_XAUDIO_ENGINE_ADAPTER(8245C538, XAudioEngineCreate)
+ITC_XAUDIO_ENGINE_ADAPTER(82459D60, XAudioCreateEngine)

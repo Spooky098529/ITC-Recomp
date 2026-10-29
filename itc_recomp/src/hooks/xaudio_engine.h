@@ -59,5 +59,8 @@ void XAudioMix(PPCContext& ctx, uint8_t* base);            // sub_8245BF80 (r13 
 void XAudioMixerCallback(PPCContext& ctx, uint8_t* base);  // sub_8245FBE0 (a tail call)
 void XAudioMasterThread(PPCContext& ctx, uint8_t* base);   // sub_8245BE08
 void XAudioWorkerThread(PPCContext& ctx, uint8_t* base);   // sub_8245BED0
+void XAudioEngineInit(PPCContext& ctx, uint8_t* base);     // sub_8245C198 (r3 in full)
+void XAudioEngineCreate(PPCContext& ctx, uint8_t* base);   // sub_8245C538 (r3 in full)
+void XAudioCreateEngine(PPCContext& ctx, uint8_t* base);   // sub_82459D60 (r3 in full)
 
 }  // namespace hooks

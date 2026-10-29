@@ -1167,8 +1167,9 @@ void Header(uint8_t* base, uint32_t address, uint8_t type, uint32_t state) {
 // The harness's objects in place of the live ones for one version.
 class OwnObjects {
  public:
-  OwnObjects(Context& h, uint32_t timeout) : h_(h), timeout_(timeout) {
-    live_ = Read(h.base, kObjects, kObjectsBytes);
+  OwnObjects(Context& h, uint32_t timeout, uint32_t start = kObjects)
+      : h_(h), timeout_(timeout), start_(start) {
+    live_ = Read(h.base, start_, xa::kEngine - start_);
     stats_ = Read(h.base, xa::kStats, 2 * xa::kStatCount * 4);
     engine_ = guest::LoadU32(h.base, xa::kEngine);
   }
@@ -1181,7 +1182,7 @@ class OwnObjects {
         __imp__NtClose(c, h_.base);
       }
     }
-    Write(h_.base, kObjects, live_.data(), kObjectsBytes);
+    Write(h_.base, start_, live_.data(), xa::kEngine - start_);
     Write(h_.base, xa::kStats, stats_.data(), uint32_t(stats_.size()));
     guest::StoreU32(h_.base, xa::kEngine, engine_);
   }
@@ -1216,6 +1217,7 @@ class OwnObjects {
  private:
   Context& h_;
   uint32_t timeout_;
+  uint32_t start_;
   std::vector<uint8_t> live_;
   std::vector<uint8_t> stats_;
   uint32_t engine_;
@@ -1430,6 +1432,260 @@ void MixAndThreads(Context& h, uint32_t block) {
   memory::Free(timeout);
 }
 
+// --- The engine's making ---
+//
+// XAudioEngine::Init's original makes and starts the processor threads and
+// registers the render driver's callback with our audio output, so each
+// case runs with the harness's stand-ins on its thread (xaudio::
+// SetMakingForHarness): SetUpProcessors answers processor bytes without a
+// thread (their low bits clear; nonzero ones still get their two buffers),
+// and MasteringCreate a voice of the harness's whose driver's slot +28 is a
+// recorder (AddRef, sub_8245F860). The thread loop's kernel calls
+// (ExCreateThread and the rest) are checked by the boot alone. Init's
+// headers, semaphore and title terminate registration go to the harness's
+// objects (OwnObjects from the registration at 0x82954EB4), and a
+// registration a version made is removed after it (the first one with the
+// routine goes: the live one, the same words). The engine's constructor
+// writes [kEngine] (put back by OwnObjects). The allocator: the harness's
+// bump allocator over an arena of its own (big enough, or one too small
+// for the first allocation: a failure between the factory's two
+// allocations makes the original write through 0, and inside Create, Init
+// never fails, as its failure deletes the engine through the real
+// teardown), or, with r4 0 under --native_heap, the
+// default one (XMemAlloc's block, compared with its pointers as offsets,
+// then freed).
+
+constexpr uint32_t kArenaBytes = 0x30000;
+constexpr uint32_t kParams = 0x100;
+constexpr uint32_t kFakeVoice = 0x1E00;   // its driver at +0x1E80, vtable +0x1F00
+
+// The words of the objects' headers (from `start`) with stashed handles
+// (after the SDK's signature) as 0.
+std::vector<uint8_t> ObjectBytes(uint8_t* base, uint32_t start) {
+  std::vector<uint8_t> bytes = Read(base, start, xa::kEngine - start);
+  for (const uint32_t object : {xa::kTerminating, xa::kWorkerSemaphore, xa::kMixDone,
+                                xa::kMixNow}) {
+    if (object >= start &&
+        guest::LoadU32(base, object + 8) == uint32_t(rex::system::kXObjSignature)) {
+      for (uint32_t k = 12; k < 16; k++) {
+        bytes[object - start + k] = 0;
+      }
+    }
+  }
+  return bytes;
+}
+
+void MakingAllocator(uint8_t* base, uint32_t block, uint32_t arena, uint32_t size) {
+  const uint32_t allocator = block + kAllocator;
+  Store(base, allocator, block + kVtable);
+  for (const uint32_t slot : {0u, 4u, 8u, 12u}) {
+    Store(base, block + kVtable + slot, 0x8245F860);
+  }
+  Store(base, block + kVtable + 16, 0x82460388);
+  Store(base, block + kVtable + 20, 0x82460288);
+  Store(base, allocator + 16, size);
+  Store(base, allocator + 20, 0);
+  Store(base, allocator + 24, arena);
+}
+
+// The parameters at kParams: the channels, 0 to 3 submix stages, a mask,
+// the default class table or one of the block's, a description word.
+uint32_t MakingParams(uint8_t* base, uint32_t block, Random& random) {
+  const uint32_t params = block + kParams;
+  guest::StoreU8(base, params, uint8_t(random.Below(10)));
+  guest::StoreU8(base, params + 1, uint8_t(random.Below(4)));
+  guest::StoreU8(base, params + 2, uint8_t(random.Next()));
+  if (random.Below(2) == 0) {
+    Store(base, params + 4, 0);
+  } else {
+    Classes(base, block + 0x1A00, random, random.Below(8));
+    Store(base, params + 4, guest::LoadU32(base, block + 0x1A00));
+  }
+  Store(base, params + 8, uint32_t(random.Next()));
+  return params;
+}
+
+// The stand-ins: processor bytes without thread bits (0, 4 or 8; +1 their
+// count, as SetUpProcessors counts them), the
+// harness's mastering voice (its result an error one time in `fail`).
+xa::MakingStandIn MakingStandIns(uint8_t* base, uint32_t block, Random& random, uint32_t fail) {
+  xa::MakingStandIn stand_in;
+  // +1 the count EngineSize sizes the buffers by: the nonzero bytes'.
+  uint8_t count = 0;
+  for (uint32_t i = 2; i < 8; i++) {
+    stand_in.processors[i] = uint8_t(4 * random.Below(3));
+    count = uint8_t(count + (stand_in.processors[i] != 0 ? 1 : 0));
+  }
+  stand_in.processors[0] = uint8_t(random.Below(7));
+  stand_in.processors[1] = count;
+  const uint32_t voice = block + kFakeVoice, driver = block + 0x1E80;
+  Store(base, voice + 68, driver);
+  Store(base, driver, block + 0x1F00);
+  Store(base, block + 0x1F00 + 28, 0x8245F860);
+  // The recorder's result (the count at the driver's +4 up): an error only
+  // where Init may fail (`fail`).
+  if (fail == 0) {
+    Store(base, driver + 4, random.Below(100));
+  }
+  stand_in.mastering_voice = voice;
+  stand_in.mastering_r3 = fail != 0 && random.Below(fail) == 0 ? 0x80004005u : 0;
+  return stand_in;
+}
+
+// One case: the block, the arena and the stack below r1 the same random
+// words for both versions; `setup(random, t, arena)` returns the stand-ins
+// and whether the default allocator is asked for. Compared: the block, the
+// arena (or the default allocator's block, pointers into it as offsets), r3
+// in full, the objects' headers (their stashed handles out) and states,
+// [kEngine] (as an offset where it's the default allocator's), the
+// counters.
+template <typename Setup>
+void MakingCase(Context& h, Results& results, uint32_t block, uint32_t arena, uint32_t timeout,
+                GuestFunction recompiled, GuestFunction native, Setup setup,
+                const std::string& what) {
+  const Random start = h.random;
+  Random random = start;
+  harness::Outputs out[2];
+  for (int v = 0; v < 2; v++) {
+    random = start;
+    OwnObjects objects(h, timeout, xa::kTerminateRegistration);
+    for (uint32_t i = 0; i < kBlockBytes; i += 4) {
+      Store(h.base, block + i, uint32_t(random.Next()));
+    }
+    for (uint32_t i = 0; i < kArenaBytes; i += 4) {
+      Store(h.base, arena + i, uint32_t(random.Next()));
+    }
+    for (uint32_t a = xa::kTerminateRegistration; a < xa::kEngine; a += 4) {
+      Store(h.base, a, 0);
+    }
+    PPCContext t = CallContext(h);
+    for (uint32_t i = 4; i <= 0x400; i += 4) {
+      Store(h.base, t.r1.u32 - i, uint32_t(random.Next()));
+    }
+    bool default_allocator = false;
+    const xa::MakingStandIn stand_in = setup(random, t, default_allocator);
+    xa::SetMakingForHarness(stand_in);
+    (v == 0 ? recompiled : native)(t, h.base);
+    xa::SetMakingForHarness(std::nullopt);
+    // The default allocator: the engine's +8 (an engine was made only on
+    // success).
+    const uint32_t made = guest::LoadU32(h.base, xa::kEngine);
+    uint32_t allocator = 0, allocator_bytes = 0;
+    if (default_allocator && int32_t(t.r3.u32) >= 0) {
+      allocator = guest::LoadU32(h.base, made + 8);
+      allocator_bytes = guest::LoadU32(h.base, allocator + 16) + 28;
+    }
+    Normalized(out[v], h.base, block, kBlockBytes, allocator, allocator_bytes);
+    if (allocator != 0) {
+      Normalized(out[v], h.base, allocator, allocator_bytes, allocator, allocator_bytes);
+    } else {
+      out[v].Bytes(Read(h.base, arena, kArenaBytes));
+    }
+    out[v].Word(t.r3.u32);
+    out[v].Word(uint32_t(t.r3.u64 >> 32));
+    out[v].Word(allocator != 0 && made >= allocator ? made - allocator : made);
+    out[v].Bytes(ObjectBytes(h.base, xa::kTerminateRegistration));
+    if (guest::LoadU32(h.base, xa::kTerminateRegistration) == xa::kTerminateRoutine) {
+      PPCContext c = CallContext(h);
+      c.r3.u64 = xa::kTerminateRegistration;
+      c.r4.u64 = 0;
+      __imp__ExRegisterTitleTerminateNotification(c, h.base);
+    }
+    objects.Outputs(out[v]);
+    if (allocator != 0) {
+      memory::crt::XMemFree(allocator, xa::kEngineAttributes);
+    }
+  }
+  h.random = random;
+  results.Check(out[0], out[1], what);
+}
+
+void Making2(Context& h, uint32_t block) {
+  if (guest::LoadU32(h.base, xa::kEngine) == 0) {
+    return;
+  }
+  const PPCContext lock = CallContext(h);
+  MixerHeld mixer(h.base, lock);
+  if (!mixer.held) {
+    ITC_LOG_ERROR("harness: xaudio_engine: no mix waited on the mixer's lock; the making skipped");
+    return;
+  }
+  std::this_thread::sleep_for(std::chrono::milliseconds(20));
+  const uint32_t timeout = memory::Alloc(8, 0);
+  StoreU64(h.base, timeout, 0);
+  const uint32_t arena = memory::Alloc(kArenaBytes, 0);
+  {
+    // The engine at +0x200 with the harness's allocator (big, or too small
+    // for some of what Init makes).
+    Results results("XAudioEngine::Init (sub_8245C198)");
+    for (int i = 0; i < 32; i++) {
+      MakingCase(h, results, block, arena, timeout, __imp__sub_8245C198, hooks::XAudioEngineInit,
+                 [&](Random& random, PPCContext& t, bool&) {
+                   // Too small for the first allocation one time in three
+                   // (a failure between the factory's two allocations
+                   // makes the original write through 0).
+                   const uint32_t size = random.Below(3) == 0 ? random.Below(24) : kArenaBytes;
+                   MakingAllocator(h.base, block, arena, size);
+                   const uint32_t engine = block + 0x200;
+                   Store(h.base, engine + 8, block + kAllocator);
+                   t.r3.u64 = engine;
+                   t.r4.u64 = MakingParams(h.base, block, random);
+                   return MakingStandIns(h.base, block, random, 4);
+                 },
+                 fmt::format("case {}", i));
+    }
+    results.Report();
+  }
+  const auto create_world = [&](Random& random, bool& default_allocator, uint32_t& params,
+                                uint32_t& allocator) {
+    params = MakingParams(h.base, block, random);
+    default_allocator = hooks::NativeHeapActive() && random.Below(4) == 0;
+    const uint32_t size = random.Below(3) == 0 ? random.Below(372) : kArenaBytes;
+    MakingAllocator(h.base, block, arena, size);
+    allocator = default_allocator ? 0 : block + kAllocator;
+    return MakingStandIns(h.base, block, random, 0);
+  };
+  {
+    Results results("XAudioEngine::Create (sub_8245C538)");
+    for (int i = 0; i < 24; i++) {
+      MakingCase(h, results, block, arena, timeout, __imp__sub_8245C538,
+                 hooks::XAudioEngineCreate,
+                 [&](Random& random, PPCContext& t, bool& default_allocator) {
+                   uint32_t params = 0, allocator = 0;
+                   const xa::MakingStandIn stand_in =
+                       create_world(random, default_allocator, params, allocator);
+                   t.r3.u64 = params;
+                   t.r4.u64 = allocator;
+                   t.r5.u64 = xa::kEngine;
+                   return stand_in;
+                 },
+                 fmt::format("case {}", i));
+    }
+    results.Report();
+  }
+  {
+    Results results("XAudio::CreateEngine (sub_82459D60)");
+    for (int i = 0; i < 16; i++) {
+      MakingCase(h, results, block, arena, timeout, __imp__sub_82459D60,
+                 hooks::XAudioCreateEngine,
+                 [&](Random& random, PPCContext& t, bool& default_allocator) {
+                   uint32_t params = 0, allocator = 0;
+                   const xa::MakingStandIn stand_in =
+                       create_world(random, default_allocator, params, allocator);
+                   t.r3.u64 = random.Next();
+                   t.r4.u64 = random.Next();
+                   t.r5.u64 = params;
+                   t.r6.u64 = allocator;
+                   return stand_in;
+                 },
+                 fmt::format("case {}", i));
+    }
+    results.Report();
+  }
+  memory::Free(arena);
+  memory::Free(timeout);
+}
+
 }  // namespace
 
 void XAudioEngine(Context& h) {
@@ -1444,6 +1700,7 @@ void XAudioEngine(Context& h) {
   Locked(h, block.address);
   Allocators(h, block.address);
   MixAndThreads(h, block.address);
+  Making2(h, block.address);
 }
 
 }  // namespace harness
