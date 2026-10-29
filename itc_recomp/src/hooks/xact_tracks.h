@@ -72,5 +72,9 @@ void XactEventSchedule(PPCContext& ctx, uint8_t* base);  // sub_825D1918
 void XactEventDone(PPCContext& ctx, uint8_t* base);      // sub_825D13F0
 void XactPlayWaveFire(PPCContext& ctx, uint8_t* base);   // sub_825D8378
 void XactPlayWaveStop(PPCContext& ctx, uint8_t* base);   // sub_825D83F8
+void XactTrackInstancePlay(PPCContext& ctx, uint8_t* base);         // sub_825D5980
+void XactTrackInstanceAudioUpdate(PPCContext& ctx, uint8_t* base);  // sub_825D5EB0
+void XactTrackAudioUpdate(PPCContext& ctx, uint8_t* base);          // sub_825D0D88
+void XactTrackPlay(PPCContext& ctx, uint8_t* base);                 // sub_825D01D0
 
 }  // namespace hooks

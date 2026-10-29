@@ -1210,6 +1210,127 @@ void Batch8(Context& h, uint32_t block) {
   helpers::SetClocksForHarness(std::nullopt, std::nullopt);
 }
 
+// Playing and the audio callback's updates: the instance (its events array,
+// kEvent and kEvent2, each scheduled or handed to the sound's pending list),
+// its state, flags and play-wave event; the track's next instance (kNext)
+// and flags. The clocks and XACT's random state as in Batch8.
+void Batch9(Context& h, uint32_t block) {
+  uint8_t* base = h.base;
+  constexpr uint32_t kShuffle = 0x8266CE00, kShuffleBytes = 512;
+  const std::vector<uint8_t> shuffle = Read(base, kShuffle, kShuffleBytes);
+  const auto restore_shuffle = [&] {
+    for (uint32_t i = 0; i < kShuffleBytes; i++) {
+      guest::StoreU8(base, kShuffle + i, shuffle[i]);
+    }
+  };
+  if (Load(base, 0x8266CDF0) != 0 && Load(base, 0x82971480) == 0 &&
+      Load(base, 0x82971484) == 0) {
+    ITC_LOG_ERROR("harness: xact_tracks: XACT's frequency isn't set yet; Play skipped");
+    return;
+  }
+  const uint32_t instance = block + kInstance, track = block + kTrack, sound = block + kSound;
+  const auto world = [&](Random& random, PPCContext& t) {
+    const uint32_t ms = random.Below(1000);
+    helpers::SetClocksForHarness(uint64_t(ms) * 50000 + random.Below(50000), ms);
+    restore_shuffle();
+    Store(base, track + 24, instance);
+    Store(base, instance + 16, track);
+    Store(base, instance + 36, random.Below(4) == 0 ? 0 : block + kEvent);
+    Store(base, instance + 40, Pick(random, {1, 2, 3, 3, 3, 4, random.Below(8)}));
+    guest::StoreU8(base, instance + 32, uint8_t(random.Next()));
+    Store(base, instance + 28, random.Below(1000));
+    Store(base, block + kEventVtable + 4, Pick(random, {0x825D1358u, kAddRef}));
+    Store(base, block + kEventVtable + 12,
+          Pick(random, {0x825D8870u, 0x825D8870u, kReturn0, kAddRef}));
+    Store(base, block + kEventVtable + 20, Pick(random, {0x825D76A0u, 0x825D76A0u, kAddRef,
+                                                        kReturn0}));
+    Store(base, block + kEngine + 24, random.Below(2000));
+    // The sound's queue (+56) and pending list (+68) empty.
+    for (const uint32_t list : {sound + 56, sound + 68}) {
+      Store(base, list + 4, list);
+      Store(base, list + 8, list);
+    }
+    const uint32_t events[] = {block + kEvent, block + kEvent2};
+    const uint32_t count = random.Below(3);
+    guest::StoreU8(base, instance + 24, uint8_t(count));
+    Store(base, instance + 20, block + kEventArray);
+    for (uint32_t i = 0; i < 2; i++) {
+      const uint32_t event = events[i], record = block + kRecord + 16 * i;
+      Store(base, block + kEventArray + 4 * i, event);
+      Store(base, event, block + kEventVtable);
+      Store(base, event + 4, event);
+      Store(base, event + 8, event);
+      Store(base, event + 12, block + kEngine);
+      Store(base, event + 16, record);
+      Store(base, event + 36, events[1 - i]);
+      Store(base, event + 44, instance);
+      Store(base, event + 32, random.Below(100));
+      for (const uint32_t at : {event + 20, event + 24, event + 28}) {
+        Store(base, at, random.Below(1000));
+      }
+      guest::StoreU8(base, event + 40, uint8_t(random.Next()));
+      if (Load(base, event + 60) == 0) {
+        Store(base, event + 60, block + kWave2);  // SetQueued reads it unchecked
+      }
+      Store(base, record, (Load(base, record) & 0x9000001Fu) | (random.Below(4) << 29) |
+                              (random.Below(1000) << 5));
+      guest::StoreU16(base, record + 4,
+                      uint16_t(random.Below(3) == 0 ? 1 + random.Below(500) : 0));
+      // GetDuration's wave bank byte, loop count and wave index, as World's.
+      if (i == 1) {
+        guest::StoreU8(base, record + 10, uint8_t(random.Below(4)));
+        guest::StoreU8(base, record + 11, uint8_t(Pick(random, {0, 1, 3, 255})));
+        guest::StoreU16(base, record + 8, uint16_t(random.Below(4)));
+      }
+    }
+    // The track: its flags, and the next instance (kNext) prepared or not,
+    // without events (SwitchInstance, sub_825D0B70, plays it), the old one
+    // handed to the engine's list (kEngine2's, with its lock, as Batch4's).
+    guest::StoreU8(base, track + 32, uint8_t(random.Next()));
+    const uint32_t next = block + kNext;
+    Store(base, track + 28, random.Below(4) == 0 ? 0 : next);
+    Store(base, next + 40, Pick(random, {2, 3, 3, 4}));
+    guest::StoreU8(base, next + 24, 0);
+    Store(base, next + 20, block + kEventArray);
+    const uint32_t engine = block + kEngine2;
+    Store(base, track + 12, engine);
+    PPCContext c2 = t;
+    c2.r3.u64 = engine + 144;
+    __imp__RtlInitializeCriticalSection(c2, base);
+    Store(base, engine + 80, engine + 76);
+    Store(base, engine + 84, engine + 76);
+  };
+  struct Function {
+    const char* name;
+    GuestFunction recompiled;
+    GuestFunction native;
+    uint32_t object;
+  };
+  const Function functions[] = {
+      {"XACTTrackInstance::Play (sub_825D5980)", __imp__sub_825D5980,
+       hooks::XactTrackInstancePlay, kInstance},
+      {"XACTTrackInstance::AudioUpdate (sub_825D5EB0)", __imp__sub_825D5EB0,
+       hooks::XactTrackInstanceAudioUpdate, kInstance},
+      {"XACTTrack::AudioUpdate (sub_825D0D88)", __imp__sub_825D0D88, hooks::XactTrackAudioUpdate,
+       kTrack},
+      {"XACTTrack::Play (sub_825D01D0)", __imp__sub_825D01D0, hooks::XactTrackPlay, kTrack},
+  };
+  for (const Function& f : functions) {
+    Results results(f.name);
+    for (int c = 0; c < 160; c++) {
+      Case(h, results, block, f.recompiled, f.native,
+           [&](Random& random, PPCContext& t) {
+             world(random, t);
+             t.r3.u64 = block + f.object;
+           },
+           fmt::format("case {}", c));
+    }
+    restore_shuffle();
+    results.Report();
+  }
+  helpers::SetClocksForHarness(std::nullopt, std::nullopt);
+}
+
 }  // namespace
 
 void XactTracks(Context& h) {
@@ -1226,6 +1347,7 @@ void XactTracks(Context& h) {
   Batch6(h, block.address);
   Batch7(h, block.address);
   Batch8(h, block.address);
+  Batch9(h, block.address);
 }
 
 }  // namespace harness

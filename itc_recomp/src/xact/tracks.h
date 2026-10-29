@@ -380,4 +380,36 @@ uint32_t PlayWaveFire(uint8_t* base, uint32_t event, uint32_t frame, const Guest
 uint32_t PlayWaveStop(uint8_t* base, uint32_t event, uint32_t immediate, uint32_t frame,
                       const GuestCall& call);
 
+// --- Playing and the audio callback's updates ---
+
+// XACTTrackInstance::Play (sub_825D5980): when prepared (state 3), +28 =
+// now, state 4, byte +44 = the event count, and each event whose record has
+// 0x20000000 scheduled now (Schedule's plain C++, a frame below), the
+// others handed to the sound's pending list (sub_825CB188, never seen in
+// play: through the guest call); otherwise byte +32 |= 0x40 (play once
+// prepared). `frame` is this function's (112 bytes). Returns 0.
+uint32_t TrackInstancePlay(uint8_t* base, uint32_t instance, bool native_heap, uint32_t frame,
+                           const GuestCall& call);
+// XACTTrackInstance::AudioUpdate (sub_825D5EB0): preparing (2) with a
+// play-wave event (+36) whose slot +20 (IsPrepared; its plain C++ while the
+// slot holds it) answers: state 3. Then a pending play (byte +32 0x40) on a
+// prepared instance clears the bit and plays it (Play's plain C++, a frame
+// below). `frame` is this function's (96 bytes). Returns r3 as the original
+// leaves it.
+uint32_t TrackInstanceAudioUpdate(uint8_t* base, uint32_t instance, bool native_heap,
+                                  uint32_t frame, const GuestCall& call);
+// XACTTrack::AudioUpdate (sub_825D0D88): with RPCs (the sound's record's
+// byte +0 0x4; never in play) sub_825CB348 and sub_825C9558 on each entry
+// through the guest call; the instance's (+24, unchecked) AudioUpdate; then,
+// with byte +32's 0x80 and a prepared next instance (+28), the bit cleared
+// and sub_825D0B70 (SwitchInstance, never seen in play: through the guest
+// call). `frame` is this function's (112 bytes). Returns r3 as the original
+// leaves it.
+uint32_t TrackAudioUpdate(uint8_t* base, uint32_t track, bool native_heap, uint32_t frame,
+                          const GuestCall& call);
+// XACTTrack::Play (sub_825D01D0): the instance's (+24, unchecked) Play, a
+// tail call from `sp`. Returns 0.
+uint32_t TrackPlay(uint8_t* base, uint32_t track, bool native_heap, uint32_t sp,
+                   const GuestCall& call);
+
 }  // namespace xact

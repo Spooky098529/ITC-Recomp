@@ -35,7 +35,8 @@ ITC_FLAG_BOOL(native_xact_tracks, true, "ITC",
               "sub_825D02F8 and Prepare sub_825D0AA0 (a complex sound's track; under --native_heap); "
               "XACTSound::ScheduleEvent sub_825CB0C8; XACTEvent::Schedule sub_825D1918 and Done "
               "sub_825D13F0, XACTPlayWaveEvent::Fire sub_825D8378 and Stop sub_825D83F8 (over "
-              "XACT's clock); "
+              "XACT's clock); XACTTrackInstance::Play sub_825D5980 and AudioUpdate sub_825D5EB0, "
+              "XACTTrack::AudioUpdate sub_825D0D88 and Play sub_825D01D0; "
               "the objects' slots through their plain C++ while they hold it, the waves' and "
               "voices' through the guest call) natively instead of through the translated code "
               "(the same reads and writes; checked by --run_harnesses=xact_tracks)");
@@ -426,6 +427,38 @@ void XactPlayWaveStop(PPCContext& ctx, uint8_t* base) {
   });
 }
 
+void XactTrackInstancePlay(PPCContext& ctx, uint8_t* base) {
+  const uint32_t instance = ctx.r3.u32;
+  const bool native_heap = NativeHeapActive();
+  Framed(ctx, base, 112, [&](const xaudio::GuestCall& call, uint32_t frame) {
+    return xact::TrackInstancePlay(base, instance, native_heap, frame, call);
+  });
+}
+
+void XactTrackInstanceAudioUpdate(PPCContext& ctx, uint8_t* base) {
+  const uint32_t instance = ctx.r3.u32;
+  const bool native_heap = NativeHeapActive();
+  Framed(ctx, base, 96, [&](const xaudio::GuestCall& call, uint32_t frame) {
+    return xact::TrackInstanceAudioUpdate(base, instance, native_heap, frame, call);
+  });
+}
+
+void XactTrackAudioUpdate(PPCContext& ctx, uint8_t* base) {
+  const uint32_t track = ctx.r3.u32;
+  const bool native_heap = NativeHeapActive();
+  Framed(ctx, base, 112, [&](const xaudio::GuestCall& call, uint32_t frame) {
+    return xact::TrackAudioUpdate(base, track, native_heap, frame, call);
+  });
+}
+
+void XactTrackPlay(PPCContext& ctx, uint8_t* base) {
+  const uint32_t track = ctx.r3.u32;
+  const bool native_heap = NativeHeapActive();
+  Framed(ctx, base, 0, [&](const xaudio::GuestCall& call, uint32_t sp) {
+    return xact::TrackPlay(base, track, native_heap, sp, call);
+  });
+}
+
 }  // namespace hooks
 
 // The flag's fallback, then the register step.
@@ -520,3 +553,7 @@ ITC_XACT_TRACKS_ADAPTER(825D1918, XactEventSchedule)
 ITC_XACT_TRACKS_ADAPTER(825D13F0, XactEventDone)
 ITC_XACT_TRACKS_ADAPTER(825D8378, XactPlayWaveFire)
 ITC_XACT_TRACKS_ADAPTER(825D83F8, XactPlayWaveStop)
+ITC_XACT_TRACKS_ADAPTER(825D5980, XactTrackInstancePlay)
+ITC_XACT_TRACKS_ADAPTER(825D5EB0, XactTrackInstanceAudioUpdate)
+ITC_XACT_TRACKS_ADAPTER(825D0D88, XactTrackAudioUpdate)
+ITC_XACT_TRACKS_ADAPTER(825D01D0, XactTrackPlay)

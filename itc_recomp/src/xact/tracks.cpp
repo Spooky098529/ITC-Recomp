@@ -1374,4 +1374,110 @@ uint32_t PlayWaveStop(uint8_t* base, uint32_t event, uint32_t immediate, uint32_
                 Args({wave, mode, release, 0, 0}), frame);
 }
 
+// --- Playing and the audio callback's updates ---
+
+namespace {
+
+constexpr uint32_t kAddPending = 0x825CB188;       // the sound's pending list; never seen in play
+constexpr uint32_t kRpcCount = 0x825CB348;         // never seen in play
+constexpr uint32_t kRpcAudioUpdate = 0x825C9558;   // never seen in play
+constexpr uint32_t kSwitchInstance = 0x825D0B70;   // never seen in play
+constexpr uint32_t kEventScheduleFrame = 112;
+constexpr uint32_t kTrackInstancePlayFrame = 112;
+constexpr uint32_t kTrackInstanceAudioUpdateFrame = 96;
+
+}  // namespace
+
+uint32_t TrackInstancePlay(uint8_t* base, uint32_t instance, bool native_heap, uint32_t frame,
+                           const GuestCall& call) {
+  ITC_NATIVE_RUNNING("sub_825D5980 XACTTrackInstance::Play");
+  if (int32_t(Load(base, instance + 40)) != 3) {
+    StoreU8(base, instance + 32, uint8_t(LoadU8(base, instance + 32) | 0x40));
+    return 0;
+  }
+  const uint32_t now = TimeMs(base, 0x825D59A8, frame, call);
+  Store(base, instance + 28, now);
+  Store(base, instance + 40, 4);
+  const uint8_t count = LoadU8(base, instance + 24);
+  StoreU8(base, instance + 44, count);
+  if (count == 0) {
+    return 0;
+  }
+  uint32_t i = 0;
+  do {
+    const uint32_t event = Load(base, Load(base, instance + 20) + 4 * i);
+    if ((Load(base, Load(base, event + 16)) & 0x20000000) != 0) {
+      SetRegs(call, Args({event}));
+      EventSchedule(base, event, native_heap, xa::FrameBelow(base, frame, kEventScheduleFrame),
+                    call);
+    } else {
+      const uint32_t sound = Load(base, Load(base, instance + 16) + 20);
+      CallAt(call, kAddPending, 0x825D5A04, Args({sound, event}), frame);
+    }
+    i = (i + 1) & 0xFF;
+  } while (i < LoadU8(base, instance + 24));
+  return 0;
+}
+
+uint32_t TrackInstanceAudioUpdate(uint8_t* base, uint32_t instance, bool native_heap,
+                                  uint32_t frame, const GuestCall& call) {
+  ITC_NATIVE_RUNNING("sub_825D5EB0 XACTTrackInstance::AudioUpdate");
+  uint32_t r3 = instance;
+  if (int32_t(Load(base, instance + 40)) == 2) {
+    const uint32_t event = Load(base, instance + 36);
+    r3 = event;
+    if (event != 0) {
+      r3 = EventSlotIsPrepared(base, event, frame, 0x825D5EEC, call);
+      if (r3 != 0) {
+        Store(base, instance + 40, 3);
+      }
+    }
+  }
+  const uint8_t flags = LoadU8(base, instance + 32);
+  if ((flags & 0x40) != 0 && int32_t(Load(base, instance + 40)) == 3) {
+    StoreU8(base, instance + 32, uint8_t(flags & 0xBF));
+    SetRegs(call, Args({instance}));
+    r3 = TrackInstancePlay(base, instance, native_heap,
+                           xa::FrameBelow(base, frame, kTrackInstancePlayFrame), call);
+  }
+  return r3;
+}
+
+uint32_t TrackAudioUpdate(uint8_t* base, uint32_t track, bool native_heap, uint32_t frame,
+                          const GuestCall& call) {
+  ITC_NATIVE_RUNNING("sub_825D0D88 XACTTrack::AudioUpdate");
+  const uint32_t sound = Load(base, track + 20);
+  if ((LoadU8(base, Load(base, sound + 28)) & 0x4) != 0) {
+    const uint32_t count =
+        CallAt(call, kRpcCount, 0x825D0DB8, Args({sound, LoadU8(base, track + 48)}), frame) &
+        0xFF;
+    for (uint32_t i = 0; i < count; i = (i + 1) & 0xFF) {
+      CallAt(call, kRpcAudioUpdate, 0x825D0DD8, Args({Load(base, track + 52) + 44 * i}), frame);
+    }
+  }
+  const uint32_t instance = Load(base, track + 24);
+  SetRegs(call, Args({instance}));
+  uint32_t r3 = TrackInstanceAudioUpdate(
+      base, instance, native_heap, xa::FrameBelow(base, frame, kTrackInstanceAudioUpdateFrame),
+      call);
+  const uint8_t flags = LoadU8(base, track + 32);
+  if ((flags & 0x80) != 0) {
+    const uint32_t next = Load(base, track + 28);
+    if (next != 0 && int32_t(Load(base, next + 40)) == 3) {
+      StoreU8(base, track + 32, uint8_t(flags & 0x7F));
+      r3 = CallAt(call, kSwitchInstance, 0x825D0E28, Args({track}), frame);
+    }
+  }
+  return r3;
+}
+
+uint32_t TrackPlay(uint8_t* base, uint32_t track, bool native_heap, uint32_t sp,
+                   const GuestCall& call) {
+  ITC_NATIVE_RUNNING("sub_825D01D0 XACTTrack::Play");
+  const uint32_t instance = Load(base, track + 24);
+  SetRegs(call, Args({instance}));
+  return TrackInstancePlay(base, instance, native_heap,
+                           xa::FrameBelow(base, sp, kTrackInstancePlayFrame), call);
+}
+
 }  // namespace xact
