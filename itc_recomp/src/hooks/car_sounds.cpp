@@ -453,16 +453,16 @@ void CarSoundsReleaseAll(PPCContext& ctx, uint8_t* base) {
   }
 
 ITC_CAR_SOUNDS_ADAPTER(8210C9D8, CarSoundsWaveBankViewInit)
-ITC_CAR_SOUNDS_ADAPTER(8210C850, CarSoundsWaveBankFormat)
-ITC_CAR_SOUNDS_ADAPTER(8210C920, CarSoundsWaveBankLength)
-ITC_CAR_SOUNDS_ADAPTER(8210C958, CarSoundsWaveBankData)
-ITC_CAR_SOUNDS_ADAPTER(8210C998, CarSoundsWaveBankEntry)
+// No adapter (removed 2026-10-29: only CarSound::AddVoice's plain C++ calls it in play) for WaveBankView::Format sub_8210C850.
+// No adapter (removed 2026-10-29: only CarSound::AddVoice's plain C++ calls it in play) for WaveBankView::Length sub_8210C920.
+// No adapter (removed 2026-10-29: only CarSound::AddVoice's plain C++ calls it in play) for WaveBankView::Data sub_8210C958.
+// No adapter (removed 2026-10-29: only CarSound::AddVoice's plain C++ calls it in play) for WaveBankView::Entry sub_8210C998.
 ITC_CAR_SOUNDS_ADAPTER(8210CB48, CarSoundsSetBanks)
 ITC_CAR_SOUNDS_ADAPTER(8210CA28, CarSoundsTireSoundAmount)
 // No adapter (removed 2026-10-28: only `CarSound::CarSound`'s plain C++ calls it in play)
 // for EngineSound::EngineSound sub_8210CBA0.
 ITC_CAR_SOUNDS_ADAPTER(8210CC18, CarSoundsCarSoundConstruct)
-ITC_CAR_SOUNDS_ADAPTER(8210DCA8, CarSoundsDestroy)
+// No adapter (removed 2026-10-29: only CarSounds::Release's plain C++ calls it in play) for CarSounds::Destroy sub_8210DCA8.
 ITC_CAR_SOUNDS_ADAPTER(8210DDC8, CarSoundsSetUp)
 // No adapter (removed 2026-10-28: only Cone's, Doppler's, Matrix's and Calculate's plain C++ calls it in play) for X3DVec::Sub sub_824819E0.
 // No adapter (removed 2026-10-28: only Calculate's plain C++ calls it in play) for X3DVec::Length sub_82481998.
@@ -480,20 +480,20 @@ ITC_CAR_SOUNDS_ADAPTER(8210D158, CarSoundsSetPitch)
 ITC_CAR_SOUNDS_ADAPTER(8210D080, CarSoundsSetPitchScaled)
 ITC_CAR_SOUNDS_ADAPTER(8210D1D8, CarSoundsIsPlaying)
 ITC_CAR_SOUNDS_ADAPTER(8210D378, CarSoundsUpdateVoices)
-ITC_CAR_SOUNDS_ADAPTER(8210D320, CarSoundsClear)
+// No adapter (removed 2026-10-29: only CarSound::Stop's and Release's plain C++ calls it in play) for CarSound::Clear sub_8210D320.
 // No adapter (removed 2026-10-29: only CarSound::PauseAll's plain C++ calls it) for CarSound::Pause sub_8210D240.
 // No adapter (removed 2026-10-29: only CarSound::ResumeAll's plain C++ calls it) for CarSound::Resume sub_8210D2C0.
 ITC_CAR_SOUNDS_ADAPTER(8210E2B8, CarSoundsPauseAll)
 ITC_CAR_SOUNDS_ADAPTER(8210E350, CarSoundsResumeAll)
-ITC_CAR_SOUNDS_ADAPTER(8210CE38, CarSoundsAddVoice)
+// No adapter (removed 2026-10-29: only PlayOnce's and the Starts' plain C++ calls it in play) for CarSound::AddVoice sub_8210CE38.
 ITC_CAR_SOUNDS_ADAPTER(8210E3E8, CarSoundsPlayOnce)
-ITC_CAR_SOUNDS_ADAPTER(8210D410, CarSoundsEngineLayerStart)
-ITC_CAR_SOUNDS_ADAPTER(8210D6C0, CarSoundsEngineSoundStart)
-ITC_CAR_SOUNDS_ADAPTER(8210D7F8, CarSoundsTireSoundStart)
+// No adapter (removed 2026-10-29: only EngineSound::Start's plain C++ calls it in play) for EngineLayer::Start sub_8210D410.
+// No adapter (removed 2026-10-29: only CarSound::Start's plain C++ calls it in play) for EngineSound::Start sub_8210D6C0.
+// No adapter (removed 2026-10-29: only CarSound::Start's plain C++ calls it in play) for TireSound::Start sub_8210D7F8.
 ITC_CAR_SOUNDS_ADAPTER(8210E030, CarSoundsCarSoundStart)
 ITC_CAR_SOUNDS_ADAPTER(8210E218, CarSoundsStop)
 ITC_CAR_SOUNDS_ADAPTER(8210F7C8, CarSoundsStopAll)
-ITC_CAR_SOUNDS_ADAPTER(8210E170, CarSoundsRelease)
+// No adapter (removed 2026-10-29: only CarSounds::Release's plain C++ calls it in play) for CarSound::Release sub_8210E170.
 ITC_CAR_SOUNDS_ADAPTER(8210F750, CarSoundsReleaseAll)
 
 extern "C" REX_FUNC(sub_82110258) {

@@ -858,7 +858,7 @@ ITC_XAUDIO_ADAPTER(82459F48, XAudioApiSetOutputMatrix)
 ITC_XAUDIO_ADAPTER(82459FA0, XAudioApiGetState)
 ITC_XAUDIO_ADAPTER(8245A1B0, XAudioApiStop)
 ITC_XAUDIO_ADAPTER(8245A3B8, XAudioApiGetOutputFormat)
-ITC_XAUDIO_ADAPTER(8245A050, XAudioApiSubmitPacket)
+// No adapter (removed 2026-10-29: only CarSound::AddVoice's plain C++ calls it in play) for XAudioSourceVoice::SubmitPacket sub_8245A050.
 ITC_XAUDIO_ADAPTER(8245A108, XAudioApiCodec36)
 ITC_XAUDIO_ADAPTER(8245A208, XAudioApiFlushPackets)
 ITC_XAUDIO_ADAPTER(8245A270, XAudioApiCodec72)
