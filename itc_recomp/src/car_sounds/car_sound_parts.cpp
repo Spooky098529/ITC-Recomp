@@ -1,5 +1,6 @@
 // The car sounds' parts natively (car_sounds.h, docs/functions/car-sounds.md):
-// the hits, the parts at +736, +840 and +888, the wind and the pass by, each
+// the hits, the parts at +736, +840 and +888, the wind, the pass by and the
+// engine with its two layers, each
 // from CarSound::Update every tick. Their callees' plain C++ called directly
 // (PlayOnce, IsPlaying, UpdateVoices, XAudio's SetVolume and Stop, the
 // vehicle's accessors), each in a frame below the caller's, with the
@@ -9,10 +10,12 @@
 #include "car_sounds/car_sounds.h"
 
 #include "base/log.h"
+#include "c_runtime/math.h"
 #include "guest.h"
 #include "hooks/vehicle.h"
 #include "vehicle_accessors/vehicle_accessors.h"
 
+#include <bit>
 #include <cmath>
 #include <cstdint>
 #include <initializer_list>
@@ -480,6 +483,244 @@ uint32_t PassBySoundUpdate(uint8_t* base, uint32_t part, uint32_t vehicle, uint6
     Play(base, part, 15, 0, LoadF(base, 0x82002A10), LoadF(base, kPitch), voices, frame, call);
   }
   return Update(base, part, output, frame, call);
+}
+
+// --- The engine (sub_8210E470 and its two layers) ---
+
+namespace {
+
+constexpr uint32_t kLayerUpdateFrame = 272;
+constexpr uint32_t kPitchedFrame = 144;
+constexpr uint32_t kSetPitchScaledFrame = 96;
+
+constexpr uint32_t kSpeedCap = 0x82007FC4;     // the engine's speed's cap
+constexpr uint32_t kCurveEnd = 0x82001BE0;     // a curve's end (x at most it)
+constexpr uint32_t kLayerVolume = 0x82008028;  // the table's word to a volume
+constexpr uint32_t kLayerGain = 0x82007FD4;
+constexpr uint32_t kEngineRest = 0x82003384;  // the engine's +172 without a vehicle
+
+double LoadDouble(uint8_t* base, uint32_t address) {
+  const uint64_t bits = (uint64_t(Load(base, address)) << 32) | Load(base, address + 4);
+  return std::bit_cast<double>(bits);
+}
+
+}  // namespace
+
+uint32_t EngineLayerUpdate(uint8_t* base, uint32_t layer, double speed, double volume,
+                           double pitch, double gain, uint64_t output, const Voices& voices,
+                           uint32_t frame, const GuestCall& call) {
+  ITC_NATIVE_RUNNING("sub_8210D478 EngineLayer::Update");
+  const uint32_t table = Load(base, layer + 4);  // r25
+  uint32_t out = layer + 20;                     // r22
+  if (table == 0) {
+    return 0;
+  }
+  {
+    const double cap = LoadF(base, kSpeedCap);
+    if (speed > cap) {
+      speed = cap;
+    }
+  }
+  uint32_t entry = table + 4;  // r29
+  if (!(int32_t(Load(base, entry)) > -1)) {
+    return 0;
+  }
+  const uint32_t holder = layer + 44;          // r26
+  uint32_t slot_at = layer + 48;               // r30
+  const double scale = LoadF(base, kLayerVolume);  // f26
+  const double end = LoadF(base, kCurveEnd);       // f29
+  const double zero = LoadF(base, kZero);          // f27
+  uint32_t slot = 0;                               // r28
+  do {
+    const uint32_t second = entry + 72;  // r31
+    double amount = zero;                // f31
+    double rate = zero;                  // f30
+    // The first curve (entry + 8): the volume's amount at the speed, stored
+    // at the layer's next float.
+    {
+      uint32_t r11 = second - 64, r10 = r11;
+      bool found = false;
+      for (;;) {
+        const double x = LoadF(base, r11);
+        if (!(x > end)) {
+          break;
+        }
+        if (!(speed > x)) {
+          found = true;
+          break;
+        }
+        r10 = r11;
+        r11 += 8;
+      }
+      if (found) {
+        if (r11 == r10) {
+          amount = LoadF(base, r11 + 4);
+        } else {
+          const double x0 = LoadF(base, r10), x1 = LoadF(base, r11);
+          const double dx = Single(speed - x0);
+          const double span = Single(x1 - x0);
+          const double y0 = LoadF(base, r10 + 4), y1 = LoadF(base, r11 + 4);
+          const double dy = Single(y1 - y0);
+          amount = Fmadds(Single(dx / span), dy, y0);
+        }
+        StoreF(base, out, amount);
+        out += 4;
+      }
+      if (!(LoadF(base, r11) > end)) {
+        amount = LoadF(base, r11 - 4);
+        StoreF(base, out, amount);
+        out += 4;
+      }
+    }
+    // The second curve (entry + 72): the pitch at the speed.
+    {
+      uint32_t r11 = second, r10 = second;
+      double x = LoadF(base, second);
+      bool found = false;
+      while (x > end) {
+        if (!(speed > x)) {
+          found = true;
+          break;
+        }
+        r10 = r11;
+        r11 += 8;
+        x = LoadF(base, r11);
+      }
+      if (found) {
+        if (r11 == r10) {
+          rate = LoadF(base, r11 + 4);
+        } else {
+          const double x0 = LoadF(base, r10), x1 = LoadF(base, r11);
+          const double dx = Single(speed - x0);
+          const double span = Single(x1 - x0);
+          const double y0 = LoadF(base, r10 + 4), y1 = LoadF(base, r11 + 4);
+          const double dy = Single(y1 - y0);
+          rate = Fmadds(Single(dx / span), dy, y0);
+        }
+      }
+      if (!(LoadF(base, r11) > end)) {
+        rate = LoadF(base, r11 - 4);
+      }
+    }
+    // Started when it has an amount and isn't playing.
+    uint32_t voice = Load(base, slot_at);
+    SetRegs(call, Args({voice, frame + 80}));
+    xa::FrameBelow(base, frame, kApiFrame);
+    xa::ApiGetState(base, voice, frame + 80, 0, 0, 0, call);
+    if (amount > zero && (guest::LoadU8(base, frame + 80) & 1) == 0) {
+      voice = Load(base, slot_at);
+      SetRegs(call, Args({voice, 0}));
+      xa::FrameBelow(base, frame, kApiFrame);
+      xa::ApiStart(base, voice, 0, voices.thread, call);
+    }
+    // The volume: the table's word (as fcfid gives it, through the frame's
+    // +88) times the scale, the amount, f2, f5 and the gain.
+    const uint32_t word = Load(base, table);
+    voice = Load(base, slot_at);
+    Store64(base, frame + 88, word);
+    double level = Single(double(int64_t(uint64_t(word))));
+    level = Single(level * scale);
+    level = Single(level * amount);
+    level = Single(level * volume);
+    level = Single(Single(level * gain) * LoadF(base, kLayerGain));
+    SetVolume(base, voice, level, frame, call);
+    // The pitch (SetPitchScaled: r7 0, r9 the entry's +4, f3 `pitch`; the
+    // original's f2, [0x8200295C], isn't read by it).
+    SetRegs(call, ArgsF1({holder, slot}, rate));
+    SetPitchScaled(base, holder, slot, rate, pitch, 0, Load(base, entry + 4),
+                   xa::FrameBelow(base, frame, kSetPitchScaledFrame), call);
+    // The output map: the whole r7 at the frame's +96.
+    voice = Load(base, slot_at);
+    Store64(base, frame + 96, output);
+    SetRegs(call, Args({voice, frame + 96}));
+    xa::FrameBelow(base, frame, kApiFrame);
+    xa::ApiSetOutputMatrix(base, voice, frame + 96, 0, 0, 0, call);
+    entry += 136;
+    slot++;
+    slot_at += 4;
+  } while (int32_t(Load(base, entry)) > -1);
+  return 0;
+}
+
+uint32_t EngineLayerUpdatePitched(uint8_t* base, uint32_t engine, double speed, double f2,
+                                  double f3, double f4, uint64_t output, const Voices& voices,
+                                  uint32_t frame, const GuestCall& call) {
+  ITC_NATIVE_RUNNING("sub_8210D718 EngineLayer::UpdatePitched");
+  constexpr uint32_t k = 0x82007FC4;  // r31: the constants from it
+  const double threshold = LoadF(base, k + 28);
+  double f0;
+  if (speed > threshold) {
+    f0 = LoadF(base, k + 0);
+    if (!(speed > f0)) {
+      f0 = speed;
+    }
+    const double x = Single(Single(f0 - threshold) * LoadF(base, 0x82008030));
+    const double y = LoadDouble(base, 0x820056D8);
+    const double curve = Single(c_runtime::Pow(x, y));
+    f0 = Single(-std::fma(curve, LoadF(base, k + 36), -LoadF(base, k + 28)));
+    const double cap = LoadF(base, k + 0);
+    if (f0 > cap) {
+      f0 = cap;
+    }
+  } else {
+    f0 = speed;
+  }
+  const double scaled = Single(f0 * LoadF(base, 0x8200802C));
+  const double mix = Fmadds(f2, LoadF(base, 0x82002A3C), LoadF(base, k + 20));
+  const double volume = Single(scaled * mix);
+  const uint32_t layer = engine + 84;
+  SetRegs(call, ArgsF1({layer}, speed));
+  return EngineLayerUpdate(base, layer, speed, volume, f3, f4, output, voices,
+                           xa::FrameBelow(base, frame, kLayerUpdateFrame), call);
+}
+
+uint32_t EngineSoundUpdate(uint8_t* base, uint32_t engine, uint32_t vehicle, uint64_t output,
+                           double f1, double f2, const Voices& voices, uint32_t frame,
+                           const GuestCall& call) {
+  ITC_NATIVE_RUNNING("sub_8210E470 EngineSound::Update");
+  constexpr uint32_t k = 0x82007FC8;  // r29
+  double speed;                       // f30
+  if (vehicle != 0) {
+    const double top = LoadF(base, Load(base, vehicle + 272) + 1280);
+    SetRegs(call, Args({vehicle}));
+    const double value = double(va::VehicleFloat2224(base, vehicle));
+    SetF1(call, value);
+    speed = Single(Single(value / top) * LoadF(base, k - 4));
+  } else {
+    const double rise = Single(LoadF(base, engine + 172) + LoadF(base, 0x82001FD8));
+    StoreF(base, engine + 172, rise);
+    if (rise > LoadF(base, 0x82008048)) {
+      StoreF(base, engine + 172, LoadF(base, kEngineRest));
+    }
+    speed = LoadF(base, engine + 172);
+  }
+  const double one = LoadF(base, k);       // f10
+  const double zero = LoadF(base, kZero);  // f11
+  double load;                             // f31
+  if (vehicle != 0) {
+    double target;  // f12
+    if (guest::LoadU8(base, vehicle + 2248) != 0) {
+      target = zero;
+    } else if (LoadF(base, vehicle + 2268) > zero && int32_t(Load(base, vehicle + 2256)) != 0) {
+      target = zero;
+    } else if (int32_t(Load(base, vehicle + 2252)) == -1) {
+      target = LoadF(base, vehicle + 288);
+    } else {
+      target = LoadF(base, vehicle + 284);
+    }
+    const double last = LoadF(base, engine + 168);
+    load = Fmadds(Single(target - last), LoadF(base, 0x82002968), last);
+  } else {
+    load = one;
+  }
+  SetRegs(call, ArgsF1({engine}, speed));
+  EngineLayerUpdate(base, engine, speed, Fmadds(load, zero, one), f1, f2, output, voices,
+                    xa::FrameBelow(base, frame, kLayerUpdateFrame), call);
+  SetRegs(call, ArgsF1({engine}, speed));
+  const uint32_t r3 = EngineLayerUpdatePitched(base, engine, speed, load, f1, f2, output, voices,
+                                               xa::FrameBelow(base, frame, kPitchedFrame), call);
+  StoreF(base, engine + 168, load);
+  return r3;
 }
 
 }  // namespace car_sounds

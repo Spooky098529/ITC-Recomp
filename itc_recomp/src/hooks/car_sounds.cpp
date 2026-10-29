@@ -29,7 +29,7 @@ ITC_FLAG_BOOL(native_car_sounds, true, "ITC",
               "Memory::AllocPhysicalEx's, Music::Play's and X3DAudioInitialize's plain C++); X3DAudio's "
               "X3DVec::Sub sub_824819E0, Length sub_82481998, Dot sub_824819B8 and Cross "
               "sub_82481A18, X3DAudio::EvaluateCurve sub_82480818 and X3DAudio::Curves "
-              "sub_82480918, X3DAudio::Pan sub_82480F80 and X3DAudio::Matrix sub_82481390, X3DAudio::Cone sub_82480BA8, X3DAudio::Doppler sub_82480E90 and X3DAudioCalculate sub_82481880 (the original when its flags ask for EmitterAngle sub_82480780 or Delay sub_82481708) (checked by --run_harnesses=x3daudio)); CarSound::Update3D sub_8210F820 (RigidBody::Position's, Vec4::Copy's and X3DAudioCalculate's plain C++); the voice holders' CarSound::SetPitch sub_8210D158, SetPitchScaled sub_8210D080, IsPlaying sub_8210D1D8, UpdateVoices sub_8210D378, Clear sub_8210D320, Pause sub_8210D240 and Resume sub_8210D2C0 (no adapters: only PauseAll's and ResumeAll's plain C++ call them), PauseAll sub_8210E2B8 and ResumeAll sub_8210E350; CarSound::AddVoice sub_8210CE38 and PlayOnce sub_8210E3E8, EngineLayer::Start sub_8210D410, EngineSound::Start sub_8210D6C0, TireSound::Start sub_8210D7F8 and CarSound::Start sub_8210E030; CarSound::Stop sub_8210E218, CarSounds::StopAll sub_8210F7C8, CarSound::Release sub_8210E170 and CarSounds::Release sub_8210F750 (operator delete[]'s plain C++); CarSounds::Init sub_8210FE00 (operator new[]'s plain C++); the parts' updates: HitSounds::Update sub_8210FD78 with its impact sub_8210E778, scrape sub_8210E938 and wave 9 sub_8210EB90 (the collision accessors' and Vehicle::GetSpeedKmh's plain C++), the parts at +736 sub_8210EBF0, +840 sub_8210ECF0 and +888 sub_8210EEE0, WindSound::Update sub_8210EDB0 and PassBySound::Update sub_8210F088 (PlayOnce's, IsPlaying's and UpdateVoices' plain C++) (XAudio's entry points through their plain C++) natively instead of through the translated code "
+              "sub_82480918, X3DAudio::Pan sub_82480F80 and X3DAudio::Matrix sub_82481390, X3DAudio::Cone sub_82480BA8, X3DAudio::Doppler sub_82480E90 and X3DAudioCalculate sub_82481880 (the original when its flags ask for EmitterAngle sub_82480780 or Delay sub_82481708) (checked by --run_harnesses=x3daudio)); CarSound::Update3D sub_8210F820 (RigidBody::Position's, Vec4::Copy's and X3DAudioCalculate's plain C++); the voice holders' CarSound::SetPitch sub_8210D158, SetPitchScaled sub_8210D080, IsPlaying sub_8210D1D8, UpdateVoices sub_8210D378, Clear sub_8210D320, Pause sub_8210D240 and Resume sub_8210D2C0 (no adapters: only PauseAll's and ResumeAll's plain C++ call them), PauseAll sub_8210E2B8 and ResumeAll sub_8210E350; CarSound::AddVoice sub_8210CE38 and PlayOnce sub_8210E3E8, EngineLayer::Start sub_8210D410, EngineSound::Start sub_8210D6C0, TireSound::Start sub_8210D7F8 and CarSound::Start sub_8210E030; CarSound::Stop sub_8210E218, CarSounds::StopAll sub_8210F7C8, CarSound::Release sub_8210E170 and CarSounds::Release sub_8210F750 (operator delete[]'s plain C++); CarSounds::Init sub_8210FE00 (operator new[]'s plain C++); the parts' updates: HitSounds::Update sub_8210FD78 with its impact sub_8210E778, scrape sub_8210E938 and wave 9 sub_8210EB90 (the collision accessors' and Vehicle::GetSpeedKmh's plain C++), the parts at +736 sub_8210EBF0, +840 sub_8210ECF0 and +888 sub_8210EEE0, WindSound::Update sub_8210EDB0 and PassBySound::Update sub_8210F088 (PlayOnce's, IsPlaying's and UpdateVoices' plain C++); the engine: EngineSound::Update sub_8210E470 with EngineLayer::Update sub_8210D478 and EngineLayer::UpdatePitched sub_8210D718 (Vehicle::Float2224's, pow's and SetPitchScaled's plain C++) (XAudio's entry points through their plain C++) natively instead of through the translated code "
               "(the same reads and writes; XAudio's locks stay the game's, taken as the original does; checked by "
               "--run_harnesses=car_sounds)");
 
@@ -523,6 +523,40 @@ void CarSoundsPassBySoundUpdate(PPCContext& ctx, uint8_t* base) {
   });
 }
 
+void CarSoundsEngineLayerUpdate(PPCContext& ctx, uint8_t* base) {
+  ctx.fpscr.disableFlushMode();
+  const uint32_t layer = ctx.r3.u32;
+  const uint64_t output = ctx.r7.u64;
+  const double f1 = ctx.f1.f64, f2 = ctx.f2.f64, f4 = ctx.f4.f64, f5 = ctx.f5.f64;
+  const cs::Voices voices = VoicesOf(ctx, base);
+  XAudioFramed(ctx, base, 272, [&](const xaudio::GuestCall& call, uint32_t frame) {
+    return cs::EngineLayerUpdate(base, layer, f1, f2, f4, f5, output, voices, frame, call);
+  });
+}
+
+void CarSoundsEngineLayerUpdatePitched(PPCContext& ctx, uint8_t* base) {
+  ctx.fpscr.disableFlushMode();
+  const uint32_t engine = ctx.r3.u32;
+  const uint64_t output = ctx.r6.u64;
+  const double f1 = ctx.f1.f64, f2 = ctx.f2.f64, f3 = ctx.f3.f64, f4 = ctx.f4.f64;
+  const cs::Voices voices = VoicesOf(ctx, base);
+  XAudioFramed(ctx, base, 144, [&](const xaudio::GuestCall& call, uint32_t frame) {
+    return cs::EngineLayerUpdatePitched(base, engine, f1, f2, f3, f4, output, voices, frame,
+                                        call);
+  });
+}
+
+void CarSoundsEngineSoundUpdate(PPCContext& ctx, uint8_t* base) {
+  ctx.fpscr.disableFlushMode();
+  const uint32_t engine = ctx.r3.u32, vehicle = ctx.r4.u32;
+  const uint64_t output = ctx.r5.u64;
+  const double f1 = ctx.f1.f64, f2 = ctx.f2.f64;
+  const cs::Voices voices = VoicesOf(ctx, base);
+  XAudioFramed(ctx, base, 160, [&](const xaudio::GuestCall& call, uint32_t frame) {
+    return cs::EngineSoundUpdate(base, engine, vehicle, output, f1, f2, voices, frame, call);
+  });
+}
+
 }  // namespace hooks
 
 #define ITC_CAR_SOUNDS_ADAPTER(address, step) \
@@ -588,6 +622,9 @@ ITC_CAR_SOUNDS_ADAPTER(8210ECF0, CarSoundsPart840Update)
 ITC_CAR_SOUNDS_ADAPTER(8210EEE0, CarSoundsPart888Update)
 ITC_CAR_SOUNDS_ADAPTER(8210EDB0, CarSoundsWindSoundUpdate)
 ITC_CAR_SOUNDS_ADAPTER(8210F088, CarSoundsPassBySoundUpdate)
+ITC_CAR_SOUNDS_ADAPTER(8210D478, CarSoundsEngineLayerUpdate)
+ITC_CAR_SOUNDS_ADAPTER(8210D718, CarSoundsEngineLayerUpdatePitched)
+ITC_CAR_SOUNDS_ADAPTER(8210E470, CarSoundsEngineSoundUpdate)
 
 extern "C" REX_FUNC(sub_82110258) {
   REX_FUNC_PROLOGUE();

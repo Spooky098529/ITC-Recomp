@@ -1932,6 +1932,275 @@ void Parts(Context& h, uint32_t block) {
   ITC_LOG_INFO("harness: car_sounds: the parts' cases made {} voices", real_made - made_before);
 }
 
+// --- The engine ---
+//
+// EngineSound::Update and its two layers' updates on an engine part at
+// +0x100 of the block (layer 0 at +0x100, layer 1 at +0x154), each layer's
+// slots (+48 to +60) fake voices of "The voice holders" (their GetState
+// kFakeGetState, so the state is the voice's flags byte, playing or not),
+// each layer's table (+4) at +0x1500 and +0x1780 (+0 the volume word, then
+// up to four 136-byte entries from +4: the word above -1, +4 SetPitchScaled's
+// r9, two curves of eight x and y pairs at +8 and +72, ended by an x at most
+// [0x82001BE0] at a random point, the x's rising by random steps, now and
+// then a repeat or a special; the entries after the last a word -1 or
+// below), the output at +0x300 as the parts', and a vehicle in a block of
+// its own (its specs +272 at +0x2000). Compared: the block (the fake
+// voices' +112 and +140, both layers' +20 to +36 and the engine's +168 and
+// +172 as floats), the vehicle, r3, the last layer update's frame's locals
+// (+80 to +104: the state, the fcfid word, the output word; for
+// EngineSound::Update the second call's, as the original's register saves
+// for it land on the first's) and the 64 bytes above the stack pointer.
+constexpr uint32_t kEnginePart = 0x100;
+constexpr uint32_t kLayerTables[] = {0x1500, 0x1780};
+constexpr uint32_t kLayerOffsets[] = {0, 84};
+constexpr uint32_t kCurveEnd = 0x82001BE0;
+constexpr uint32_t kCodecVtable = 0x1A00;
+constexpr uint32_t kSlotVoices = 5;
+
+// One curve of eight points at `at`: x's rising from above the end, ended at
+// a random point (the end itself, or below it).
+void EngineCurve(uint8_t* base, uint32_t at, Random& random, std::vector<float>& xs) {
+  const float end = Constant(base, kCurveEnd);
+  const uint32_t stop = random.Below(5) == 0 ? random.Below(8) : 3 + random.Below(5);
+  float x = std::isfinite(end) ? end : 0.0f;
+  for (uint32_t i = 0; i < 8; i++) {
+    const uint32_t point = at + 8 * i;
+    float y = random.Below(10) == 0 ? std::bit_cast<float>(Special(random))
+                                    : Uniform(random, -0.5f, 2.0f);
+    if (i >= stop) {
+      Store(base, point, FloatBits(random.Below(2) == 0 ? end : end - Uniform(random, 0.0f, 2.0f)));
+      Store(base, point + 4, FloatBits(y));
+      continue;
+    }
+    switch (random.Below(12)) {
+      case 0:
+        break;  // a repeat (a zero span)
+      case 1:
+        x = std::bit_cast<float>(Special(random));
+        break;
+      default:
+        x = (std::isfinite(x) ? x : end) + Uniform(random, 0.01f, 0.5f);
+    }
+    xs.push_back(x);
+    Store(base, point, FloatBits(x));
+    Store(base, point + 4, FloatBits(y));
+  }
+}
+
+// A layer: its table and four slots of fake voices.
+void EngineLayer(uint8_t* base, uint32_t block, uint32_t layer, uint32_t table, Random& random,
+                 std::vector<float>& xs) {
+  Store(base, layer + 4, random.Below(30) == 0 ? 0 : table);
+  for (uint32_t i = 0; i < 4; i++) {
+    Store(base, layer + 48 + 4 * i, FakeVoice(block, random.Below(kSlotVoices)));
+  }
+  Store(base, table, random.Below(4) == 0 ? uint32_t(random.Next()) : random.Below(5));
+  const uint32_t entries = random.Below(6) == 0 ? random.Below(4) : 4;
+  for (uint32_t e = 0; e < 4; e++) {
+    const uint32_t entry = table + 4 + 136 * e;
+    Store(base, entry, random.Below(3) == 0 ? uint32_t(random.Next()) & 0x7FFFFFFFu
+                                            : random.Below(3));
+    Store(base, entry + 4, random.Below(3) == 0 ? uint32_t(random.Next())
+                                                : uint32_t(int32_t(random.Below(201)) - 100));
+    EngineCurve(base, entry + 8, random, xs);
+    EngineCurve(base, entry + 72, random, xs);
+  }
+  const uint32_t after = table + 4 + 136 * entries;
+  Store(base, after, random.Below(2) == 0 ? 0xFFFFFFFFu : (uint32_t(random.Next()) | 0x80000000u));
+}
+
+// A speed near the curves' x's (or one exactly, a special, or wide).
+double EngineSpeed(uint8_t* base, Random& random, const std::vector<float>& xs) {
+  const uint32_t pick = random.Below(8);
+  if (pick == 0 || xs.empty()) {
+    return double(std::bit_cast<float>(Special(random)));
+  }
+  if (pick == 1) {
+    return double(Uniform(random, -1.0f, 3.0f));
+  }
+  if (pick == 2) {
+    return double(Constant(base, 0x82007FC4)) * double(Uniform(random, 0.5f, 1.5f));
+  }
+  const float x = xs[random.Below(uint32_t(xs.size()))];
+  return pick == 3 ? double(x) : double(x + Uniform(random, -0.3f, 0.3f));
+}
+
+// A float input: specials now and then, else in [low, high].
+double EngineInput(Random& random, float low, float high) {
+  return random.Below(10) == 0 ? double(std::bit_cast<float>(Special(random)))
+                               : double(Uniform(random, low, high));
+}
+
+// The vehicle's fields EngineSound::Update reads.
+void EngineVehicle(uint8_t* base, uint32_t vehicle, Random& random, const std::vector<float>& xs) {
+  const uint32_t specs = vehicle + 0x2000;
+  Store(base, vehicle + 272, specs);
+  const float top = random.Below(10) == 0 ? std::bit_cast<float>(Special(random))
+                                          : Uniform(random, 3000.0f, 9000.0f);
+  Store(base, specs + 1280, FloatBits(top));
+  const float cap = Constant(base, 0x82007FC4);
+  float rpm = Uniform(random, 0.0f, 1.2f) * top;
+  if (random.Below(2) == 0 && !xs.empty() && cap != 0.0f) {
+    rpm = xs[random.Below(uint32_t(xs.size()))] / cap * top;
+  } else if (random.Below(10) == 0) {
+    rpm = std::bit_cast<float>(Special(random));
+  }
+  Store(base, vehicle + 2224, FloatBits(rpm));
+  guest::StoreU8(base, vehicle + 2248, random.Below(3) == 0 ? uint8_t(1 + random.Below(255)) : 0);
+  Store(base, vehicle + 2268, FloatBits(float(EngineInput(random, -1.0f, 1.0f))));
+  Store(base, vehicle + 2256, random.Below(2) == 0 ? 0 : uint32_t(random.Next()));
+  Store(base, vehicle + 2252, random.Below(2) == 0 ? 0xFFFFFFFFu : random.Below(7));
+  Store(base, vehicle + 284, FloatBits(float(EngineInput(random, 0.0f, 1.0f))));
+  Store(base, vehicle + 288, FloatBits(float(EngineInput(random, 0.0f, 1.0f))));
+}
+
+template <typename Setup>
+void EngineCase(Context& h, Results& results, uint32_t block, uint32_t vehicle,
+                GuestFunction recompiled, GuestFunction native,
+                std::initializer_list<uint32_t> layer_frames, Setup setup,
+                const std::string& what) {
+  std::vector<uint32_t> floats;
+  for (uint32_t k = 0; k < kVoiceCount; k++) {
+    floats.push_back(kVoices + kVoiceBytes * k + 112);
+    floats.push_back(kVoices + kVoiceBytes * k + 140);
+  }
+  for (const uint32_t layer : kLayerOffsets) {
+    for (uint32_t i = 0; i < 5; i++) {
+      floats.push_back(kEnginePart + layer + 20 + 4 * i);
+    }
+  }
+  floats.push_back(kEnginePart + 168);
+  floats.push_back(kEnginePart + 172);
+  const Random start = h.random;
+  Random random = start;
+  Outputs out[2];
+  for (int v = 0; v < 2; v++) {
+    random = start;
+    for (uint32_t i = 0; i < kBlockBytes; i += 4) {
+      Store(h.base, block + i, uint32_t(random.Next()));
+    }
+    for (uint32_t i = 0; i < kVehicleBytes; i += 4) {
+      Store(h.base, vehicle + i, uint32_t(random.Next()));
+    }
+    PPCContext t = CallContext(h);
+    for (uint32_t i = 0; i < 0x1000; i += 4) {
+      Store(h.base, t.r1.u32 - 0x1000 + i, uint32_t(random.Next()));
+    }
+    for (uint32_t i = 0; i < 64; i += 4) {
+      Store(h.base, t.r1.u32 + i, uint32_t(random.Next()));
+    }
+    FakeVoices(h.base, block, random);
+    // The codecs (fake voices 5-9) on a copy of the recorders' vtable, so
+    // Start's codec call (+48) stays a recorder; the slots' voices (0-4)
+    // with kFakeGetState and one of them as their codec.
+    for (uint32_t slot = 0; slot < 0x100; slot += 4) {
+      Store(h.base, block + kCodecVtable + slot,
+            guest::LoadU32(h.base, block + kVoiceVtable + slot));
+    }
+    Store(h.base, block + kVoiceVtable + 48, kFakeGetState);
+    for (uint32_t k = 0; k < kVoiceCount; k++) {
+      if (k >= kSlotVoices) {
+        Store(h.base, FakeVoice(block, k), block + kCodecVtable);
+      } else {
+        Store(h.base, FakeVoice(block, k) + 76,
+              FakeVoice(block, kSlotVoices + random.Below(kVoiceCount - kSlotVoices)));
+      }
+    }
+    std::vector<float> xs;
+    for (uint32_t l = 0; l < 2; l++) {
+      EngineLayer(h.base, block, block + kEnginePart + kLayerOffsets[l], block + kLayerTables[l],
+                  random, xs);
+    }
+    Store(h.base, block + kEnginePart + 168, FloatBits(float(EngineInput(random, -0.5f, 1.5f))));
+    Store(h.base, block + kEnginePart + 172, FloatBits(float(EngineSpeed(h.base, random, xs))));
+    EngineVehicle(h.base, vehicle, random, xs);
+    const uint64_t output = PartOutput(h.base, block, random);
+    setup(random, t, xs, output);
+    ITC_FLAG(native_car_sounds) = v == 1;
+    (v == 0 ? recompiled : native)(t, h.base);
+    ITC_FLAG(native_car_sounds) = true;
+    BlockOutputs(out[v], h.base, block, floats);
+    out[v].Bytes(Read(h.base, vehicle, kVehicleBytes));
+    out[v].Word(t.r3.u32);
+    for (const uint32_t below : layer_frames) {
+      out[v].Bytes(Read(h.base, t.r1.u32 - below + 80, 24));
+    }
+    out[v].Bytes(Read(h.base, t.r1.u32, 64));
+  }
+  h.random = random;
+  results.Check(out[0], out[1], what);
+}
+
+void Engine(Context& h, uint32_t block) {
+  VehicleBlock vehicle_block;
+  if (!vehicle_block.address) {
+    ITC_LOG_ERROR("harness: car_sounds: no vehicle block from the allocation layer");
+    return;
+  }
+  const uint32_t vehicle = vehicle_block.address;
+  const uint32_t engine = block + kEnginePart;
+  ITC_LOG_INFO("harness: car_sounds: the engine's constants: speed cap {}, curve end {}, pitched "
+               "from {}, volume scale {}, gain {}, ease {}, idle step {} up to {}, rest {}",
+               Constant(h.base, 0x82007FC4), Constant(h.base, kCurveEnd),
+               Constant(h.base, 0x82007FE0), Constant(h.base, 0x82008028),
+               Constant(h.base, 0x82007FD4), Constant(h.base, 0x82002968),
+               Constant(h.base, 0x82001FD8), Constant(h.base, 0x82008048),
+               Constant(h.base, 0x82003384));
+  {
+    Results results("EngineLayer::Update (sub_8210D478)");
+    for (int c = 0; c < 300; c++) {
+      EngineCase(h, results, block, vehicle, __imp__sub_8210D478, hooks::CarSoundsEngineLayerUpdate,
+                 {272},
+                 [&](Random& random, PPCContext& t, const std::vector<float>& xs, uint64_t output) {
+                   t.r3.u64 = engine + kLayerOffsets[random.Below(2)];
+                   t.r7.u64 = random.Below(8) == 0 ? random.Next() : output;
+                   t.f1.f64 = EngineSpeed(h.base, random, xs);
+                   t.f2.f64 = EngineInput(random, 0.0f, 2.0f);
+                   t.f4.f64 = EngineInput(random, -1.0f, 2.0f);
+                   t.f5.f64 = EngineInput(random, 0.0f, 2.0f);
+                 },
+                 fmt::format("case {}", c));
+    }
+    results.Report();
+  }
+  {
+    Results results("EngineLayer::UpdatePitched (sub_8210D718)");
+    const float threshold = Constant(h.base, 0x82007FE0), cap = Constant(h.base, 0x82007FC4);
+    for (int c = 0; c < 200; c++) {
+      EngineCase(h, results, block, vehicle, __imp__sub_8210D718,
+                 hooks::CarSoundsEngineLayerUpdatePitched, {144 + 272},
+                 [&](Random& random, PPCContext& t, const std::vector<float>& xs, uint64_t output) {
+                   t.r3.u64 = engine;
+                   t.r6.u64 = output;
+                   t.f1.f64 = random.Below(2) == 0
+                                  ? double(Near(random, {threshold, cap, (threshold + cap) / 2}))
+                                  : EngineSpeed(h.base, random, xs);
+                   t.f2.f64 = EngineInput(random, -0.5f, 1.5f);
+                   t.f3.f64 = EngineInput(random, -1.0f, 2.0f);
+                   t.f4.f64 = EngineInput(random, 0.0f, 2.0f);
+                 },
+                 fmt::format("case {}", c));
+    }
+    results.Report();
+  }
+  {
+    Results results("EngineSound::Update (sub_8210E470)");
+    for (int c = 0; c < 200; c++) {
+      EngineCase(h, results, block, vehicle, __imp__sub_8210E470, hooks::CarSoundsEngineSoundUpdate,
+                 {160 + 144 + 272},
+                 [&](Random& random, PPCContext& t, const std::vector<float>&, uint64_t output) {
+                   t.r3.u64 = engine;
+                   t.r4.u64 = random.Below(5) == 0 ? 0 : vehicle;
+                   t.r5.u64 = output;
+                   t.f1.f64 = EngineInput(random, -1.0f, 2.0f);
+                   t.f2.f64 = EngineInput(random, 0.0f, 2.0f);
+                 },
+                 fmt::format("case {}", c));
+    }
+    results.Report();
+  }
+}
+
 }  // namespace
 
 void CarSounds(Context& h) {
@@ -1949,6 +2218,7 @@ void CarSounds(Context& h) {
   AllSounds(h, block.address);
   RealVoices(h, block.address);
   Parts(h, block.address);
+  Engine(h, block.address);
 }
 
 }  // namespace harness

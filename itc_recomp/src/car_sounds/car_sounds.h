@@ -302,4 +302,41 @@ uint32_t PassBySoundUpdate(uint8_t* base, uint32_t part, uint32_t vehicle, uint6
                            uint32_t passed, const Voices& voices, uint32_t frame,
                            const GuestCall& call);
 
+// --- The engine (car_sound_parts.cpp), from CarSound::Update ---
+
+// sub_8210D478 EngineLayer::Update (272 bytes): r3 = an engine layer, f1 the
+// engine's speed (capped at [0x82007FC4]), f2 `volume`, f4 `pitch`, f5
+// `gain`, r7 `output` (the whole register, stored at the frame's +96 for
+// SetOutputMatrix). For each entry of the layer's table (+4; 136 bytes from
+// its +4, while the entry's word is above -1; one voice each, the holder at
+// +44): the amount from the entry's first curve (+8, x and y pairs, ended by
+// an x at most [0x82001BE0]) stored at the layer's next float from +20, the
+// pitch from its second (+72); GetState (the frame's +80) and Start when
+// the amount is above 0.0 and it isn't playing; the volume: the table's
+// first word (fcfid through the frame's +88) times [0x82008028], the amount,
+// `volume`, `gain` and [0x82007FD4]; SetPitchScaled (r7 0, r9 the entry's
+// +4, f3 `pitch`); SetOutputMatrix. Returns 0.
+uint32_t EngineLayerUpdate(uint8_t* base, uint32_t layer, double speed, double volume,
+                           double pitch, double gain, uint64_t output, const Voices& voices,
+                           uint32_t frame, const GuestCall& call);
+// sub_8210D718 EngineLayer::UpdatePitched (144 bytes): r3 = the engine part,
+// f1 the speed, f2-f4, r6 `output`: above [0x82007FE0] the speed (capped)
+// through pow (sub_825A8ED0's plain C++) into a curve, then EngineLayer::
+// Update on layer +84 with the volume that times ([0x82002A3C] f2 +
+// [0x82007FD8]) x [0x8200802C], f4 f3 and f5 f4. Returns its r3.
+uint32_t EngineLayerUpdatePitched(uint8_t* base, uint32_t engine, double speed, double f2,
+                                  double f3, double f4, uint64_t output, const Voices& voices,
+                                  uint32_t frame, const GuestCall& call);
+// sub_8210E470 EngineSound::Update (160 bytes): r3 = the engine part, r4 the
+// vehicle, r5 `output`, f1 and f2: the speed the vehicle's +2224 (sub_820C0140's
+// plain C++) over its specs' (+272) +1280, times [0x82007FC4] (no vehicle:
+// +172 up by [0x82001FD8], back to [0x82003384] past [0x82008048]); the load
+// (+168 eased toward 0.0, +288 or +284 by the gear and clutch words +2248,
+// +2252, +2256 and +2268, by [0x82002968]; 1.0 without a vehicle); layer +0
+// (f2 = load x 0.0 + 1.0, f4 f1, f5 f2) and UpdatePitched; +168 = the load.
+// Returns UpdatePitched's r3.
+uint32_t EngineSoundUpdate(uint8_t* base, uint32_t engine, uint32_t vehicle, uint64_t output,
+                           double f1, double f2, const Voices& voices, uint32_t frame,
+                           const GuestCall& call);
+
 }  // namespace car_sounds

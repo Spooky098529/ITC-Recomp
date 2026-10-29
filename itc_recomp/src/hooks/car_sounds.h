@@ -135,4 +135,12 @@ void CarSoundsPart888Update(PPCContext& ctx, uint8_t* base);    // sub_8210EEE0
 void CarSoundsWindSoundUpdate(PPCContext& ctx, uint8_t* base);  // sub_8210EDB0
 void CarSoundsPassBySoundUpdate(PPCContext& ctx, uint8_t* base);  // sub_8210F088
 
+// The engine: EngineLayer::Update (r3 the layer, f1, f2, f4, f5, r7 the
+// output), UpdatePitched (r3 the engine part, f1-f4, r6 the output) and
+// EngineSound::Update (r3 the engine part, r4 the vehicle, r5 the output,
+// f1, f2).
+void CarSoundsEngineLayerUpdate(PPCContext& ctx, uint8_t* base);         // sub_8210D478
+void CarSoundsEngineLayerUpdatePitched(PPCContext& ctx, uint8_t* base);  // sub_8210D718
+void CarSoundsEngineSoundUpdate(PPCContext& ctx, uint8_t* base);         // sub_8210E470
+
 }  // namespace hooks
