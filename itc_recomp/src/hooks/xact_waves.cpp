@@ -238,9 +238,11 @@ ITC_XACT_WAVES_ADAPTER(825D0268, XactTrackGetVolume)
 ITC_XACT_WAVES_ADAPTER(825D02B0, XactTrackGetPitch)
 ITC_XACT_WAVES_ADAPTER(825D2170, XactWaveGetStartPosition)
 ITC_XACT_WAVES_ADAPTER(825D1C30, XactWaveRequestNext)
-ITC_XACT_WAVES_ADAPTER(825D1C78, XactEngineRequestCommit)
+// No adapter (removed 2026-10-29: only XACTInMemoryWave::Play's and XACTWave::Pause's plain C++
+// calls it in play) for XACTEngine::RequestCommit sub_825D1C78.
 ITC_XACT_WAVES_ADAPTER(825D1DF8, XactWaveSetVoice)
 ITC_XACT_WAVES_ADAPTER(825D3938, XactInMemoryWavePlay)
 ITC_XACT_WAVES_ADAPTER(825D1ED8, XactWavePause)
-ITC_XACT_WAVES_ADAPTER(825D2778, XactWavePrepareNext)
+// No adapter (removed 2026-10-29: only XACTInMemoryWave::Update's plain C++ calls it in play) for
+// XACTWave::PrepareNext sub_825D2778.
 ITC_XACT_WAVES_ADAPTER(825D3890, XactInMemoryWaveUpdate)
