@@ -105,5 +105,7 @@ void XAudioReverbAllPass128(PPCContext& ctx, uint8_t* base);    // sub_82462DC8
 void XAudioReverbAllPass256(PPCContext& ctx, uint8_t* base);    // sub_82463130
 void XAudioReverbAllPass512(PPCContext& ctx, uint8_t* base);    // sub_824632A0
 void XAudioReverbAllPass512To(PPCContext& ctx, uint8_t* base);  // sub_82463410
+void XAudioReverbCrossfadeDelay(PPCContext& ctx, uint8_t* base);     // sub_824624F8
+void XAudioReverbCrossfadeDelay256(PPCContext& ctx, uint8_t* base);  // sub_82463620
 
 }  // namespace hooks

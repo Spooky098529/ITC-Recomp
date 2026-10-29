@@ -7,7 +7,9 @@
 #include "guest.h"
 
 #include <rex/platform/fpscr.h>
+#include <simde/x86/sse4.1.h>
 
+#include <climits>
 #include <cmath>
 
 namespace xaudio {
@@ -469,6 +471,557 @@ void ReverbAllPass512To(uint8_t* base, uint32_t state, uint32_t in, uint32_t out
   Store(base, state + 12, f11);
   Store(base, in + 0, f11);
   guest::StoreU32(base, state + 16, (write + 256) & 0x1FF);
+}
+
+}  // namespace xaudio
+
+// The crossfading delay lines (sub_824624F8, sub_82463620): the state +4
+// the crossfade's position (1.0 down to 0.0), +8 the tap faded to, +12 the
+// tap faded from, +16 the tap asked for, +20 the last output, +24 the write
+// index, the line at +32. Translated in the original's order of loads and
+// stores (the callers pass outputs that overlap the inputs).
+namespace xaudio {
+
+namespace {
+
+constexpr uint32_t kFadeScale = 0x82002814;  // the frames a crossfade takes, x +4
+constexpr uint32_t kOne = 0x82000A30;
+constexpr uint32_t kZero = 0x82000A34;
+constexpr uint32_t kFadeStep = 0x82002CC4;
+constexpr uint32_t kFadeEnd = 0x8204AA84;
+
+int64_t ToInt64(double x) {
+  return std::isnan(x)           ? int64_t(0x8000000000000000ull)
+         : x > double(LLONG_MAX) ? LLONG_MAX
+                                 : simde_mm_cvttsd_si64(simde_mm_load_sd(&x));
+}
+
+uint32_t Word(uint8_t* base, uint32_t address) { return guest::LoadU32(base, address); }
+void SetWord(uint8_t* base, uint32_t address, uint32_t value) {
+  guest::StoreU32(base, address, value);
+}
+
+// The two lines' shared steps, `kMask` the line's byte index mask, `kWrap`
+// the write index's.
+template <uint32_t kMask, uint32_t kWrap>
+struct Crossfade {
+  uint8_t* base;
+  uint32_t s, in, out;
+  uint32_t r11;  // the line
+  double f0, f11, f12, f13;
+  // r3 as the original leaves it (sub_824624F8 uses it as a scratch
+  // register in its frame-at-a-time and steady passes; sub_82463620 doesn't).
+  bool sets_r3 = false;
+  uint64_t r3 = 0;
+
+  double Tap(uint32_t index) const { return Load(base, ((index << 2) & kMask) + r11); }
+
+  // Four frames a pass, crossfading from the tap at r30 to the one at r30 +
+  // the taps' difference (r24): the fade's first pass (r30, r31, r6 the
+  // write index less the taps, r8 the write address, r10 the output, r7 the
+  // input + 8).
+  void FourFrames(uint32_t r29, uint32_t r30, uint32_t r31, uint32_t r6, uint32_t r8,
+                  uint32_t r10, uint32_t r7, uint32_t r24) {
+    const uint32_t r25 = in - out;
+    do {
+      uint32_t r27 = r30;
+      double f10 = f12;
+      uint32_t r19 = r6 - 1;
+      f12 = Round(f12 - f0);
+      const uint32_t r15 = r27;
+      const uint32_t w9 = Word(base, r7 - 8);
+      uint32_t r26 = r30 + r24;
+      const uint32_t w8 = Word(base, r7 - 4);
+      r27 = r19;
+      const uint32_t w7 = Word(base, r7 + 0);
+      const uint32_t r19b = r26;
+      const uint32_t w6 = Word(base, r25 + r10);
+      const uint32_t r18 = r31 - 1;
+      double f4 = Tap(r15);
+      r26 = r31;
+      f4 = Round(f4 * f13);
+      f13 = Round(f13 + f0);
+      const uint32_t r17 = r6 + 1;
+      const double f3 = Tap(r19b);
+      const uint32_t r19c = r27;
+      SetWord(base, r8 - 8, w9);
+      double f5 = f12;
+      f12 = Round(f12 - f0);
+      r27 = r6;
+      const uint32_t r16 = r31 + 1;
+      r29 -= 1;
+      double f9 = Tap(r19c);
+      const uint32_t r19d = r27;
+      const uint32_t r27b = r17;
+      r30 += 4;
+      f10 = Fma(f3, f10, f4);
+      f4 = Tap(r18);
+      f9 = Round(f9 * f13);
+      SetWord(base, r8 - 4, w8);
+      f13 = Round(f13 + f0);
+      double f8 = Tap(r19d);
+      Store(base, r10 - 8, f10);
+      const uint32_t r18b = r26;
+      f10 = f12;
+      const uint32_t r26b = r16;
+      f12 = Round(f12 - f0);
+      r7 += 16;
+      r6 += 4;
+      r31 += 4;
+      f9 = Fma(f4, f5, f9);
+      f5 = Tap(r18b);
+      f8 = Round(f8 * f13);
+      SetWord(base, r8 + 0, w7);
+      f13 = Round(f13 + f0);
+      Store(base, r10 - 4, f9);
+      f9 = f12;
+      f12 = Round(f12 - f0);
+      f10 = Fma(f5, f10, f8);
+      Store(base, r10 + 0, f10);
+      f10 = Tap(r27b);
+      f10 = Round(f10 * f13);
+      f8 = Tap(r26b);
+      SetWord(base, r8 + 4, w6);
+      f13 = Round(f13 + f0);
+      r8 += 16;
+      f10 = Fma(f8, f9, f10);
+      Store(base, r10 + 4, f10);
+      r10 += 16;
+    } while (r29 != 0);
+    Store(base, s + 4, f12);
+  }
+
+  // The fade's second four-frame pass (after the taps moved on): the same
+  // steps, the input read from r7 - 12 and r10 + r25, the outputs at r10 - 4.
+  void FourFramesAfter(uint32_t r29, uint32_t r30, uint32_t r31, uint32_t r6, uint32_t r8,
+                       uint32_t r10, uint32_t r7, uint32_t r24) {
+    const uint32_t r25 = in - out;
+    do {
+      uint32_t r28 = r30;
+      f11 = f12;
+      uint32_t r23 = r6 - 1;
+      f12 = Round(f12 - f0);
+      const uint32_t r16 = r28;
+      const uint32_t w10 = Word(base, r7 - 12);
+      uint32_t r27 = r30 + r24;
+      const uint32_t w9 = Word(base, r7 - 8);
+      r28 = r23;
+      const uint32_t w8 = Word(base, r10 + r25);
+      const uint32_t r23b = r27;
+      const uint32_t w7 = Word(base, r7 + 0);
+      const uint32_t r19 = r31 - 1;
+      double f5 = Tap(r16);
+      r27 = r31;
+      f5 = Round(f5 * f13);
+      f13 = Round(f13 + f0);
+      const uint32_t r18 = r6 + 1;
+      const double f4 = Tap(r23b);
+      const uint32_t r23c = r28;
+      SetWord(base, r8 - 8, w10);
+      double f6 = f12;
+      f12 = Round(f12 - f0);
+      r28 = r6;
+      const uint32_t r17 = r31 + 1;
+      r29 -= 1;
+      double f10 = Tap(r23c);
+      const uint32_t r23d = r28;
+      const uint32_t r28b = r18;
+      r30 += 4;
+      f11 = Fma(f4, f11, f5);
+      f5 = Tap(r19);
+      f10 = Round(f10 * f13);
+      SetWord(base, r8 - 4, w9);
+      f13 = Round(f13 + f0);
+      double f9 = Tap(r23d);
+      Store(base, r10 - 4, f11);
+      const uint32_t r19b = r27;
+      f11 = f12;
+      const uint32_t r27b = r17;
+      f12 = Round(f12 - f0);
+      r7 += 16;
+      r6 += 4;
+      r31 += 4;
+      f10 = Fma(f5, f6, f10);
+      f6 = Tap(r19b);
+      f9 = Round(f9 * f13);
+      SetWord(base, r8 + 0, w8);
+      f13 = Round(f13 + f0);
+      Store(base, r10 + 0, f10);
+      f10 = f12;
+      f12 = Round(f12 - f0);
+      f11 = Fma(f6, f11, f9);
+      Store(base, r10 + 4, f11);
+      f11 = Tap(r28b);
+      f11 = Round(f11 * f13);
+      f9 = Tap(r27b);
+      SetWord(base, r8 + 4, w7);
+      f13 = Round(f13 + f0);
+      r8 += 16;
+      f11 = Fma(f9, f10, f11);
+      Store(base, r10 + 8, f11);
+      r10 += 16;
+    } while (r29 != 0);
+    Store(base, s + 4, f12);
+  }
+
+  // A frame at a time from frame `first` to 256 (the fade's tail after the
+  // taps moved on): returns the write index moved on.
+  uint32_t OneAtATime(uint32_t first, uint32_t r9) {
+    uint32_t r7 = first << 2;
+    const uint32_t r31 = Word(base, s + 8);
+    uint32_t r10 = r9 << 2;
+    uint32_t r30 = Word(base, s + 12);
+    const uint32_t start = r7 + out;
+    f12 = Load(base, s + 4);
+    uint32_t r8 = 256 - first;
+    uint32_t r6 = r10 + r11;
+    r10 = r9 - r31;
+    r7 = r7 + in;
+    uint32_t r4 = start + 4;
+    r30 = r31 - r30;
+    r9 = r8 + r9;
+    do {
+      double f11b = f12;
+      const uint32_t r31b = r30 + r10;
+      const uint32_t w10 = Word(base, r7 + 0);
+      const uint32_t r3b = r10;
+      if (sets_r3) {
+        r3 = (r3b << 2) & kMask;
+      }
+      f12 = Round(f12 - f0);
+      r8 -= 1;
+      r10 += 1;
+      r7 += 4;
+      double f9 = Tap(r3b);
+      f9 = Round(f9 * f13);
+      const double f8 = Tap(r31b);
+      SetWord(base, r6 + 0, w10);
+      f13 = Round(f13 + f0);
+      r6 += 4;
+      f11b = Fma(f8, f11b, f9);
+      Store(base, r4 + 0, f11b);
+      r4 += 4;
+    } while (r8 != 0);
+    Store(base, s + 4, f12);
+    return r9;
+  }
+
+  // The rest of the fade once the taps moved on (from frame r28), then the
+  // last output and the write index stored.
+  void Finish(uint32_t r28, uint32_t r9) {
+    const uint32_t r24 = Word(base, s + 16);
+    const uint32_t r10 = Word(base, s + 8);
+    f12 = r24 == r10 ? Load(base, kZero) : f11;
+    const uint32_t r8 = 256 - r28;
+    Store(base, s + 4, f12);
+    f13 = Round(f11 - f12);
+    uint32_t r26 = r28;
+    WriteTaps(r10, r24);
+    if (int32_t(r8) >= 4) {
+      const uint32_t r27 = Word(base, s + 12);
+      const uint32_t r29 = ((252 - r28) >> 2) + 1;
+      const uint32_t r26c = r29 << 2;
+      const uint32_t r30 = r9 - r24;
+      const uint32_t r31 = r9 - r27;
+      const uint32_t w8 = ((r9 + 2) << 2) + r11;
+      const uint32_t r7 = ((r28 + 3) << 2) + in;
+      const uint32_t r10b = ((r28 + 2) << 2) + out;
+      r9 = r26c + r9;
+      r26 = r26c + r28;
+      FourFramesAfter(r29, r30, r31 + 2, r30 + 2, w8, r10b, r7, r24 - r27);
+    }
+    if (r26 < 256) {
+      r9 = OneAtATime(r26, r9);
+    }
+    const uint32_t last = Word(base, out + 1024);
+    SetWord(base, s + 20, last);
+    SetWord(base, s + 24, r9 & kWrap);
+    SetWord(base, s + 24, r9 & kWrap);
+  }
+
+  // The taps moved on (+12 the one faded to, +8 the one asked for): in each
+  // original's order.
+  bool taps_8_first = false;
+  void WriteTaps(uint32_t from, uint32_t to) {
+    if (taps_8_first) {
+      SetWord(base, s + 8, to);
+      SetWord(base, s + 12, from);
+    } else {
+      SetWord(base, s + 12, from);
+      SetWord(base, s + 8, to);
+    }
+  }
+
+  // No crossfade (the position past 256 frames): the line written and
+  // read at the tap faded to... (the original's two gains, f0 and f13).
+  void Steady(uint32_t r9, uint32_t r10, uint32_t r23) {
+    const uint32_t r6 = s + 32;
+    uint32_t r8 = (r9 << 2) + r6;
+    uint32_t r7 = out + 4;
+    double g0 = Load(base, kOne);
+    uint32_t r11b = r9 - r10;
+    double g13 = Round(g0 - f12);
+    g0 = f12;
+    const double g12 = Load(base, kFadeStep);
+    const uint32_t end = r9 + 256;
+    uint32_t r4 = in;
+    for (int k = 0; k < 256; k++) {
+      const uint32_t r3i = r11b + r23;
+      if (sets_r3) {
+        r3 = (r3i << 2) & kMask;
+      }
+      const uint32_t w9 = Word(base, r4 + 0);
+      const uint32_t r31 = r11b;
+      r11b += 1;
+      r4 += 4;
+      double f11b = Load(base, ((r31 << 2) & kMask) + r6);
+      double f10 = Load(base, ((r3i << 2) & kMask) + r6);
+      f11b = Round(f11b * g13);
+      f10 = Round(f10 * g0);
+      SetWord(base, r8 + 0, w9);
+      g0 = Round(g0 - g12);
+      r8 += 4;
+      g13 = Round(g13 + g12);
+      f11b = Round(f11b + f10);
+      Store(base, r7 + 0, f11b);
+      r7 += 4;
+    }
+    Store(base, s + 4, g0);
+    const uint32_t last = Word(base, out + 1024);
+    SetWord(base, s + 20, last);
+    SetWord(base, s + 24, end & kWrap);
+  }
+};
+
+}  // namespace
+
+uint64_t ReverbCrossfadeDelay(uint8_t* base, uint64_t r3_in, uint32_t in, uint32_t out,
+                              uint32_t sp) {
+  const uint32_t s = uint32_t(r3_in);
+  ITC_NATIVE_RUNNING("sub_824624F8 the reverb's crossfading 16,384-entry delay line");
+  ScalarMode mode;
+  Crossfade<0xFFFC, 0x3FFF> c{base, s, in, out, 0, 0, 0, 0, 0};
+  c.taps_8_first = false;
+  c.sets_r3 = true;
+  c.r3 = r3_in;
+  uint32_t r8 = Word(base, s + 12);
+  uint32_t r10 = Word(base, s + 8);
+  const uint32_t r23 = r10 - r8;
+  CopyFloat(base, out + 0, s + 20);
+  const bool r6 = r23 > 4 || r8 - r10 > 4;
+  double f0 = Load(base, kFadeScale);
+  c.f12 = Load(base, s + 4);
+  f0 = Round(c.f12 * f0);
+  uint32_t r9 = Word(base, s + 24);
+  SetWord(base, sp - 176, uint32_t(uint64_t(ToInt64(f0))));
+  const uint32_t r28 = Word(base, sp - 176) >> 1;
+  if (r28 < 256) {
+    uint32_t r24 = 1;
+    c.f11 = Load(base, kOne);
+    c.r11 = s + 32;
+    c.f0 = Load(base, kFadeStep);
+    c.f13 = Round(c.f11 - c.f12);
+    if (int32_t(r28) >= 4) {
+      const uint32_t r29 = r28 >> 2;
+      const uint32_t r30 = r9 - r10;
+      const uint32_t r31 = r9 - r8 + 2;
+      const uint32_t w8 = ((r9 + 2) << 2) + c.r11;
+      const uint32_t r27 = r29 << 2;
+      c.FourFrames(r29, r30, r31, r30 + 2, w8, out + 12, in + 8, r23);
+      r9 = r27 + r9;
+      r24 = r27 + 1;
+    }
+    if (!(r24 > r28)) {
+      // One frame at a time to frame r28.
+      uint32_t r7 = r24 << 2;
+      const uint32_t r30 = Word(base, s + 8);
+      uint32_t r10b = r28 - r24;
+      const uint32_t r27 = Word(base, s + 12);
+      uint32_t r8b = r9 << 2;
+      c.f12 = Load(base, s + 4);
+      r10b += 1;
+      const uint32_t r29 = r7 + in;
+      uint32_t r6b = r8b + c.r11;
+      r8b = r9 - r30;
+      uint32_t r31 = r7 + out;
+      r7 = r29 - 4;
+      const uint32_t r30b = r30 - r27;
+      r9 = r10b + r9;
+      do {
+        double f10 = c.f12;
+        const uint32_t r27b = r30b + r8b;
+        const uint32_t w9 = Word(base, r7 + 0);
+        const uint32_t r29b = r8b;
+        c.f12 = Round(c.f12 - c.f0);
+        r10b -= 1;
+        r8b += 1;
+        r7 += 4;
+        double f8 = c.Tap(r29b);
+        f8 = Round(f8 * c.f13);
+        const double f7 = c.Tap(r27b);
+        SetWord(base, r6b + 0, w9);
+        c.f13 = Round(c.f13 + c.f0);
+        r6b += 4;
+        f10 = Fma(f7, f10, f8);
+        Store(base, r31 + 0, f10);
+        r31 += 4;
+      } while (r10b != 0);
+      Store(base, s + 4, c.f12);
+    }
+    c.Finish(r28, r9);
+    return c.r3;
+  }
+  // The crossfade is over: a plain copy when the line doesn't wrap in this
+  // block and the taps are as asked, else the steady path.
+  const uint32_t r31 = r9 + 256;
+  const uint32_t r7 = r9 - r8;
+  const uint32_t r11 = r9 - r10;
+  if (r31 < 16384 && r7 + 256 < 16384 && r11 + 256 < 16384 && int32_t(r7) >= 0 &&
+      int32_t(r11) >= 0) {
+    uint32_t line = ((r9 + 8) << 2) + s;
+    if (!r6) {
+      // 65 copies of 16 bytes: the input into the line and the line at the
+      // tap faded from into the output (+4), each pair's loads first.
+      uint32_t from = line - (r8 << 2);
+      uint32_t to = out + 4;
+      uint32_t src = in;
+      uint64_t r3 = r3_in;
+      for (int k = 0; k < 65; k++) {
+        // r3 = the line's address as a 64-bit sum with the incoming r3.
+        r3 = uint64_t(uint32_t((r9 + 8) << 2)) + r3_in + 16 * uint64_t(k);
+        uint8_t a[16], b[16];
+        for (int i = 0; i < 16; i++) {
+          a[i] = guest::LoadU8(base, src + i);
+          b[i] = guest::LoadU8(base, from + i);
+        }
+        for (int i = 0; i < 16; i++) {
+          guest::StoreU8(base, line + i, a[i]);
+        }
+        for (int i = 0; i < 16; i++) {
+          guest::StoreU8(base, to + i, b[i]);
+        }
+        line += 16;
+        from += 16;
+        src += 16;
+        to += 16;
+      }
+      SetWord(base, s + 24, r31);
+      double f0b = Load(base, kFadeEnd);
+      f0b = Round(c.f12 - f0b);
+      Store(base, s + 4, f0b);
+      CopyFloat(base, s + 20, out + 1024);
+      return r3;
+    }
+    // The taps differ by more than 4: crossfade from +8's to +12's.
+    uint32_t r7b = r10 << 2;
+    const uint32_t r6b = r8 << 2;
+    uint32_t r8b = out + 4;
+    double f0b = Load(base, kOne);
+    uint32_t r10b = line - r7b;
+    r7b = r7b - r6b;
+    f0b = Round(f0b - c.f12);
+    const double f13 = Load(base, kFadeStep);
+    uint32_t src = in;
+    for (int k = 0; k < 256; k++) {
+      double f11 = Load(base, r10b + 0);
+      const double f10 = c.f12;
+      f11 = Round(f11 * f0b);
+      const double f9 = Load(base, r7b + r10b);
+      const uint32_t w8 = Word(base, src + 0);
+      SetWord(base, line + 0, w8);
+      c.f12 = Round(c.f12 - f13);
+      f0b = Round(f0b + f13);
+      line += 4;
+      r10b += 4;
+      src += 4;
+      f11 = Fma(f9, f10, f11);
+      Store(base, r8b + 0, f11);
+      r8b += 4;
+    }
+    const uint32_t last = Word(base, out + 1024);
+    SetWord(base, s + 24, r31);
+    Store(base, s + 4, c.f12);
+    SetWord(base, s + 20, last);
+    return r3_in;
+  }
+  c.Steady(r9, r10, r23);
+  return c.r3;
+}
+
+void ReverbCrossfadeDelay256(uint8_t* base, uint32_t s, uint32_t in, uint32_t out, uint32_t sp) {
+  ITC_NATIVE_RUNNING("sub_82463620 the reverb's crossfading 256-entry delay line");
+  ScalarMode mode;
+  Crossfade<0x3FC, 0xFF> c{base, s, in, out, 0, 0, 0, 0, 0};
+  c.taps_8_first = true;
+  CopyFloat(base, out + 0, s + 20);
+  c.f12 = Load(base, s + 4);
+  uint32_t r10 = Word(base, s + 24);
+  double f0 = Load(base, kFadeScale);
+  f0 = Round(c.f12 * f0);
+  SetWord(base, sp - 128, uint32_t(uint64_t(ToInt64(f0))));
+  const uint32_t r28 = Word(base, sp - 128) >> 1;
+  if (r28 < 256) {
+    uint32_t r23 = 1;
+    c.f11 = Load(base, kOne);
+    c.r11 = s + 32;
+    c.f0 = Load(base, kFadeStep);
+    c.f13 = Round(c.f11 - c.f12);
+    if (int32_t(r28) >= 4) {
+      const uint32_t r6 = Word(base, s + 8);
+      const uint32_t r31 = Word(base, s + 12);
+      const uint32_t r29 = r28 >> 2;
+      const uint32_t w8 = ((r10 + 2) << 2) + c.r11;
+      const uint32_t r30 = r10 - r6;
+      const uint32_t r27 = r29 << 2;
+      const uint32_t r26 = r10 - r31;
+      c.FourFrames(r29, r30, r26 + 2, r30 + 2, w8, out + 12, in + 8, r6 - r31);
+      r10 = r27 + r10;
+      r23 = r27 + 1;
+    }
+    if (!(r23 > r28)) {
+      // One frame at a time to frame r28 (the gains' roles as the original
+      // has them: the position on the tap faded from, the rest on the other).
+      uint32_t r7 = r23 << 2;
+      const uint32_t r30 = Word(base, s + 8);
+      uint32_t r9 = r28 - r23;
+      uint32_t r27 = Word(base, s + 12);
+      uint32_t r8 = r10 << 2;
+      c.f12 = Load(base, s + 4);
+      r9 += 1;
+      const uint32_t r29 = r7 + in;
+      uint32_t r6 = r8 + c.r11;
+      r8 = r10 - r30;
+      uint32_t r31 = r7 + out;
+      r7 = r29 - 4;
+      r27 = r30 - r27;
+      r10 = r9 + r10;
+      do {
+        const uint32_t r29b = r27 + r8;
+        double f10 = c.f13;
+        const uint32_t r30b = r8;
+        const uint32_t w9 = Word(base, r7 + 0);
+        c.f13 = Round(c.f13 + c.f0);
+        r9 -= 1;
+        r8 += 1;
+        r7 += 4;
+        double f7 = c.Tap(r29b);
+        f7 = Round(f7 * c.f12);
+        const double f8 = c.Tap(r30b);
+        SetWord(base, r6 + 0, w9);
+        c.f12 = Round(c.f12 - c.f0);
+        r6 += 4;
+        f10 = Fma(f8, f10, f7);
+        Store(base, r31 + 0, f10);
+        r31 += 4;
+      } while (r9 != 0);
+      Store(base, s + 4, c.f12);
+    }
+    c.Finish(r28, r10);
+    return;
+  }
+  const uint32_t r31 = Word(base, s + 8);
+  const uint32_t r30 = Word(base, s + 12);
+  c.Steady(r10, r31, r31 - r30);
 }
 
 }  // namespace xaudio

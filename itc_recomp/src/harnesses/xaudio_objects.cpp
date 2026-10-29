@@ -1410,6 +1410,93 @@ void StageCase(Context& h, Results& results, uint32_t region, GuestFunction reco
   results.Check(out[0], out[1], what);
 }
 
+// The crossfading delay lines (sub_824624F8: 16,384 entries; sub_82463620:
+// 256) in a region of kCrossfadeBytes: the state at +0 (its line from +32),
+// the input at +0x10C00 and the output at +0x11200, or (as the core calls
+// sub_82463620) at the input less 8. The state's words +0, +8 to +16 (the
+// taps), +24 (the write index) and +28 and the stack word the original
+// writes compared exactly; the rest of the region (+4 the position, +20 the
+// last output, the line and the buffers, loaded and stored as floats) as
+// floats.
+constexpr uint32_t kCrossfadeBytes = 0x11800;
+
+void CrossfadeDelays(Context& h) {
+  const uint32_t region = memory::Alloc(kCrossfadeBytes, 0);
+  if (region == 0) {
+    return;
+  }
+  const uint32_t in = region + 0x10C00;
+  struct Line {
+    const char* name;
+    GuestFunction recompiled, native;
+    uint32_t entries, stack;
+    bool overlap;
+  };
+  static const Line kLines[] = {
+      {"sub_824624F8 (the reverb's crossfading 16,384-entry delay line)", __imp__sub_824624F8,
+       hooks::XAudioReverbCrossfadeDelay, 16384, 176, false},
+      {"sub_82463620 (the reverb's crossfading 256-entry delay line)", __imp__sub_82463620,
+       hooks::XAudioReverbCrossfadeDelay256, 256, 128, true},
+  };
+  for (const Line& line : kLines) {
+    Results results(line.name);
+    for (int i = 0; i < 96; i++) {
+      const Random start = h.random;
+      Random random = start;
+      Outputs out[2];
+      const uint32_t output = line.overlap && i % 2 == 0 ? in - 8 : region + 0x11200;
+      for (int v = 0; v < 2; v++) {
+        random = start;
+        for (uint32_t k = 0; k < kCrossfadeBytes; k += 4) {
+          Store(h.base, region + k, Sample(random));
+        }
+        // The position: mid-fade (a block or less left, or a few frames),
+        // past the fade (1.0 and over), or any float.
+        const uint32_t kind = random.Below(8);
+        const float position = kind < 3   ? float(random.Below(1001)) / 1000.0f
+                               : kind < 4 ? float(random.Below(16)) / 512.0f
+                               : kind < 6 ? 1.0f + float(random.Below(4))
+                                          : 0.0f;
+        Store(h.base, region + 4, kind == 7 ? AnyFloat(random) : std::bit_cast<uint32_t>(position));
+        // The write index a multiple of 256 (as the game keeps it) or any in
+        // the line; the taps up to it (so the copy path is taken), within 4 of
+        // each other now and then, +16 the same as +8 now and then.
+        const uint32_t blocks = line.entries / 256;
+        const uint32_t write = i % 8 == 7 ? random.Below(line.entries) : 256 * random.Below(blocks);
+        Store(h.base, region + 24, write);
+        const uint32_t tap8 = random.Below(2) == 0 ? random.Below(write + 1) : random.Below(line.entries);
+        const uint32_t tap12 = random.Below(2) == 0 ? tap8 + random.Below(9) - 4
+                                                    : random.Below(line.entries);
+        Store(h.base, region + 8, tap8);
+        Store(h.base, region + 12, tap12);
+        Store(h.base, region + 16, random.Below(2) == 0 ? tap8 : random.Below(line.entries));
+        PPCContext t = CallContext(h);
+        for (uint32_t k = 4; k <= 0x400; k += 4) {
+          Store(h.base, t.r1.u32 - k, uint32_t(random.Next()));
+        }
+        t.r3.u64 = region;
+        t.r4.u64 = in;
+        t.r5.u64 = output;
+        t.fpscr.loadFromHost();
+        const uint32_t sp = t.r1.u32;
+        (v == 0 ? line.recompiled : line.native)(t, h.base);
+        out[v].Word(guest::LoadU32(h.base, sp - line.stack));
+        out[v].Word(guest::LoadU32(h.base, region + 0));
+        out[v].Floats(h.base, region + 4, 1);
+        out[v].Bytes(Read(h.base, region + 8, 12));
+        out[v].Floats(h.base, region + 20, 1);
+        out[v].Bytes(Read(h.base, region + 24, 8));
+        out[v].Floats(h.base, region + 32, (kCrossfadeBytes - 32) / 4);
+        R3(out[v], t.r3.u64);
+      }
+      h.random = random;
+      results.Check(out[0], out[1], fmt::format("case {}", i));
+    }
+    results.Report();
+  }
+  memory::Free(region);
+}
+
 void ReverbStages(Context& h) {
   const uint32_t region = memory::Alloc(kStageBytes, 0);
   if (region == 0) {
@@ -1531,6 +1618,7 @@ void ReverbStages(Context& h) {
     }
   }
   memory::Free(region);
+  CrossfadeDelays(h);
 }
 
 }  // namespace
