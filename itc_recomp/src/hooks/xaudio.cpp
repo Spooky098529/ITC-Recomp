@@ -43,7 +43,9 @@ ITC_FLAG_BOOL(native_xaudio, true, "ITC",
               "sub_8245EBA0, Stop sub_8245E9F0 and Pass sub_8245DED0, the voices' constructors "
               "sub_8245E6A8 and sub_8245F298, destructors sub_82460B50, sub_8245E1B8, "
               "sub_8245E7A0, sub_8245F108 and sub_8245F3A0, XAudioVoice::CreateSource "
-              "sub_8245EAA0 and CreateSubmix sub_8245F3D0; their "
+              "sub_8245EAA0 and CreateSubmix sub_8245F3D0; the API entry points sub_82459DB0 to "
+              "sub_8245A7C8 but XAudioShutDown, the callback's and the commit (under the API lock, the game's "
+              "critical section taken as the original does); their "
               "calls into the recompiled objects through the translated code) natively "
               "instead of through the translated code (the same reads and writes; XAudio's two "
               "locks are the game's, taken as the original does; checked by --run_harnesses=xaudio)");
@@ -635,6 +637,160 @@ void XAudioCreateSubmix(PPCContext& ctx, uint8_t* base) {
   });
 }
 
+void XAudioApiAddRef(PPCContext& ctx, uint8_t* base) {
+  const uint32_t voice = ctx.r3.u32;
+  const uint64_t r4 = ctx.r4.u64, r5 = ctx.r5.u64, r6 = ctx.r6.u64, r7 = ctx.r7.u64;
+  Framed(ctx, base, 112, [&](const xa::GuestCall& call) {
+    return xa::ApiAddRef(base, voice, r4, r5, r6, r7, call);
+  });
+}
+
+void XAudioApiRelease(PPCContext& ctx, uint8_t* base) {
+  const uint32_t voice = ctx.r3.u32;
+  const uint64_t r4 = ctx.r4.u64, r5 = ctx.r5.u64, r6 = ctx.r6.u64, r7 = ctx.r7.u64;
+  Framed(ctx, base, 112, [&](const xa::GuestCall& call) {
+    return xa::ApiRelease(base, voice, r4, r5, r6, r7, call);
+  });
+}
+
+void XAudioApiSetEffectParameters(PPCContext& ctx, uint8_t* base) {
+  const uint32_t voice = ctx.r3.u32;
+  const uint64_t r4 = ctx.r4.u64, r5 = ctx.r5.u64, r6 = ctx.r6.u64, r7 = ctx.r7.u64;
+  Framed(ctx, base, 144, [&](const xa::GuestCall& call) {
+    return xa::ApiSetEffectParameters(base, voice, r4, r5, r6, r7, call);
+  });
+}
+
+void XAudioApiSetOutputVoices(PPCContext& ctx, uint8_t* base) {
+  const uint32_t voice = ctx.r3.u32;
+  const uint64_t r4 = ctx.r4.u64, r5 = ctx.r5.u64, r6 = ctx.r6.u64, r7 = ctx.r7.u64;
+  Framed(ctx, base, 112, [&](const xa::GuestCall& call) {
+    return xa::ApiSetOutputVoices(base, voice, r4, r5, r6, r7, call);
+  });
+}
+
+void XAudioApiSetOutputMatrix(PPCContext& ctx, uint8_t* base) {
+  const uint32_t voice = ctx.r3.u32;
+  const uint64_t r4 = ctx.r4.u64, r5 = ctx.r5.u64, r6 = ctx.r6.u64, r7 = ctx.r7.u64;
+  Framed(ctx, base, 112, [&](const xa::GuestCall& call) {
+    return xa::ApiSetOutputMatrix(base, voice, r4, r5, r6, r7, call);
+  });
+}
+
+void XAudioApiGetState(PPCContext& ctx, uint8_t* base) {
+  const uint32_t voice = ctx.r3.u32;
+  const uint64_t r4 = ctx.r4.u64, r5 = ctx.r5.u64, r6 = ctx.r6.u64, r7 = ctx.r7.u64;
+  Framed(ctx, base, 112, [&](const xa::GuestCall& call) {
+    return xa::ApiGetState(base, voice, r4, r5, r6, r7, call);
+  });
+}
+
+void XAudioApiStop(PPCContext& ctx, uint8_t* base) {
+  const uint32_t voice = ctx.r3.u32;
+  const uint64_t r4 = ctx.r4.u64, r5 = ctx.r5.u64, r6 = ctx.r6.u64, r7 = ctx.r7.u64;
+  Framed(ctx, base, 112, [&](const xa::GuestCall& call) {
+    return xa::ApiStop(base, voice, r4, r5, r6, r7, call);
+  });
+}
+
+void XAudioApiGetOutputFormat(PPCContext& ctx, uint8_t* base) {
+  const uint32_t voice = ctx.r3.u32;
+  const uint64_t r4 = ctx.r4.u64, r5 = ctx.r5.u64, r6 = ctx.r6.u64, r7 = ctx.r7.u64;
+  Framed(ctx, base, 112, [&](const xa::GuestCall& call) {
+    return xa::ApiGetOutputFormat(base, voice, r4, r5, r6, r7, call);
+  });
+}
+
+void XAudioApiSubmitPacket(PPCContext& ctx, uint8_t* base) {
+  const uint32_t voice = ctx.r3.u32;
+  const uint64_t r4 = ctx.r4.u64, r5 = ctx.r5.u64, r6 = ctx.r6.u64, r7 = ctx.r7.u64;
+  Framed(ctx, base, 128, [&](const xa::GuestCall& call) {
+    return xa::ApiSubmitPacket(base, voice, r4, r5, r6, r7, call);
+  });
+}
+
+void XAudioApiCodec36(PPCContext& ctx, uint8_t* base) {
+  const uint32_t voice = ctx.r3.u32;
+  const uint64_t r4 = ctx.r4.u64, r5 = ctx.r5.u64, r6 = ctx.r6.u64, r7 = ctx.r7.u64;
+  Framed(ctx, base, 128, [&](const xa::GuestCall& call) {
+    return xa::ApiCodec36(base, voice, r4, r5, r6, r7, call);
+  });
+}
+
+void XAudioApiFlushPackets(PPCContext& ctx, uint8_t* base) {
+  const uint32_t voice = ctx.r3.u32;
+  const uint64_t r4 = ctx.r4.u64, r5 = ctx.r5.u64, r6 = ctx.r6.u64, r7 = ctx.r7.u64;
+  Framed(ctx, base, 112, [&](const xa::GuestCall& call) {
+    return xa::ApiFlushPackets(base, voice, r4, r5, r6, r7, call);
+  });
+}
+
+void XAudioApiCodec72(PPCContext& ctx, uint8_t* base) {
+  const uint32_t voice = ctx.r3.u32;
+  const uint64_t r4 = ctx.r4.u64, r5 = ctx.r5.u64, r6 = ctx.r6.u64, r7 = ctx.r7.u64;
+  Framed(ctx, base, 112, [&](const xa::GuestCall& call) {
+    return xa::ApiCodec72(base, voice, r4, r5, r6, r7, call);
+  });
+}
+
+void XAudioApiSetFormat(PPCContext& ctx, uint8_t* base) {
+  const uint32_t voice = ctx.r3.u32, format = ctx.r4.u32, outputs = ctx.r5.u32;
+  const uint64_t r6 = ctx.r6.u64;
+  Framed(ctx, base, 128, [&](const xa::GuestCall& call, uint32_t frame) {
+    return xa::ApiSetFormat(base, voice, format, outputs, r6, frame, call);
+  });
+}
+
+void XAudioApiReset(PPCContext& ctx, uint8_t* base) {
+  const uint32_t voice = ctx.r3.u32;
+  Framed(ctx, base, 112, [&](const xa::GuestCall& call) { return xa::ApiReset(base, voice, call); });
+}
+
+void XAudioApiStart(PPCContext& ctx, uint8_t* base) {
+  const uint32_t voice = ctx.r3.u32, flags = ctx.r4.u32;
+  const xa::Thread th = ThreadOf(ctx, base);
+  Framed(ctx, base, 112,
+         [&](const xa::GuestCall& call) { return xa::ApiStart(base, voice, flags, th, call); });
+}
+
+void XAudioApiSetVolume(PPCContext& ctx, uint8_t* base) {
+  ctx.fpscr.disableFlushMode();
+  const uint32_t voice = ctx.r3.u32;
+  const double volume = ctx.f1.f64;
+  Framed(ctx, base, 112,
+         [&](const xa::GuestCall& call) { return xa::ApiSetVolume(base, voice, volume, call); });
+}
+
+void XAudioApiSetFrequencyRatio(PPCContext& ctx, uint8_t* base) {
+  const uint32_t voice = ctx.r3.u32;
+  const double ratio = ctx.f1.f64;
+  Framed(ctx, base, 112, [&](const xa::GuestCall& call) {
+    return xa::ApiSetFrequencyRatio(base, voice, ratio, call);
+  });
+}
+
+void XAudioApiGetMasteringVoice(PPCContext& ctx, uint8_t* base) {
+  const uint32_t out = ctx.r3.u32;
+  Framed(ctx, base, 112,
+         [&](const xa::GuestCall& call) { return xa::ApiGetMasteringVoice(base, out, call); });
+}
+
+void XAudioApiCreateSourceVoice(PPCContext& ctx, uint8_t* base) {
+  const uint32_t description = ctx.r3.u32, out = ctx.r4.u32;
+  const xa::Thread th = ThreadOf(ctx, base);
+  Framed(ctx, base, 128, [&](const xa::GuestCall& call, uint32_t frame) {
+    return xa::ApiCreateSourceVoice(base, description, out, NativeHeapActive(), th, frame, call);
+  });
+}
+
+void XAudioApiCreateSubmixVoice(PPCContext& ctx, uint8_t* base) {
+  const uint32_t description = ctx.r3.u32, out = ctx.r4.u32;
+  const xa::Thread th = ThreadOf(ctx, base);
+  Framed(ctx, base, 128, [&](const xa::GuestCall& call, uint32_t frame) {
+    return xa::ApiCreateSubmixVoice(base, description, out, NativeHeapActive(), th, frame, call);
+  });
+}
+
 }  // namespace hooks
 
 #define ITC_XAUDIO_ADAPTER(address, step)   \
@@ -685,3 +841,23 @@ ITC_XAUDIO_ADAPTER(8245E7A0, XAudioSourceDeletingDestructor)
 ITC_XAUDIO_ADAPTER(8245F3A0, XAudioSubmixDeletingDestructor)
 ITC_XAUDIO_ADAPTER(8245EAA0, XAudioCreateSource)
 ITC_XAUDIO_ADAPTER(8245F3D0, XAudioCreateSubmix)
+ITC_XAUDIO_ADAPTER(82459DB0, XAudioApiAddRef)
+ITC_XAUDIO_ADAPTER(82459E18, XAudioApiRelease)
+ITC_XAUDIO_ADAPTER(82459E80, XAudioApiSetEffectParameters)
+ITC_XAUDIO_ADAPTER(82459EF0, XAudioApiSetOutputVoices)
+ITC_XAUDIO_ADAPTER(82459F48, XAudioApiSetOutputMatrix)
+ITC_XAUDIO_ADAPTER(82459FA0, XAudioApiGetState)
+ITC_XAUDIO_ADAPTER(8245A1B0, XAudioApiStop)
+ITC_XAUDIO_ADAPTER(8245A3B8, XAudioApiGetOutputFormat)
+ITC_XAUDIO_ADAPTER(8245A050, XAudioApiSubmitPacket)
+ITC_XAUDIO_ADAPTER(8245A108, XAudioApiCodec36)
+ITC_XAUDIO_ADAPTER(8245A208, XAudioApiFlushPackets)
+ITC_XAUDIO_ADAPTER(8245A270, XAudioApiCodec72)
+ITC_XAUDIO_ADAPTER(82459FF8, XAudioApiSetFormat)
+ITC_XAUDIO_ADAPTER(8245A0B0, XAudioApiReset)
+ITC_XAUDIO_ADAPTER(8245A168, XAudioApiStart)
+ITC_XAUDIO_ADAPTER(8245A2C8, XAudioApiSetVolume)
+ITC_XAUDIO_ADAPTER(8245A340, XAudioApiSetFrequencyRatio)
+ITC_XAUDIO_ADAPTER(8245A568, XAudioApiGetMasteringVoice)
+ITC_XAUDIO_ADAPTER(8245A768, XAudioApiCreateSourceVoice)
+ITC_XAUDIO_ADAPTER(8245A7C8, XAudioApiCreateSubmixVoice)

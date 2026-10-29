@@ -8,7 +8,9 @@
 #include "memory/c_runtime_heap.h"
 #include "guest.h"
 
+#include <atomic>
 #include <cstring>
+#include <iterator>
 
 namespace xaudio {
 
@@ -1602,6 +1604,205 @@ uint32_t CreateSubmix(uint8_t* base, uint32_t description, uint32_t allocator, u
     call(Method(base, owner, 4), 0x8245F4D0, At(frame, Args({owner})));
   }
   return r30;
+}
+
+// --- The API entry points (under the API lock) ---
+
+void ApiEnter(uint8_t* base, const GuestCall& call) {
+  (void)base;
+  call(kRtlEnterCriticalSection, 0, Args({kApiLock}));
+}
+
+void ApiLeave(uint8_t* base, const GuestCall& call) {
+  (void)base;
+  call(kRtlLeaveCriticalSection, 0, Args({kApiLock}));
+}
+
+namespace {
+
+// One method of the voice (or its codec, +76) at `slot` under the API lock,
+// with `count` registers of `args` (r3 the object).
+uint32_t ApiMethodCall(uint8_t* base, uint32_t voice, bool codec, uint32_t slot,
+                       uint32_t return_address, uint8_t count, const uint64_t (&args)[4],
+                       const GuestCall& call) {
+  ApiEnter(base, call);
+  const uint32_t object = codec ? guest::LoadU32(base, voice + 76) : voice;
+  Regs regs = Args({object, args[0], args[1], args[2], args[3]});
+  regs.count = count;
+  const uint32_t r3 = call(Method(base, object, slot), return_address, regs);
+  ApiLeave(base, call);
+  return r3;
+}
+
+}  // namespace
+
+uint32_t ApiAddRef(uint8_t* base, uint32_t voice, uint64_t r4, uint64_t r5, uint64_t r6,
+                 uint64_t r7, const GuestCall& call) {
+  ITC_NATIVE_RUNNING("sub_82459DB0 XAudioVoice::AddRef (the API's)");
+  return ApiMethodCall(base, voice, false, 4, 0x82459DEC, 1, {r4, r5, r6, r7}, call);
+}
+
+uint32_t ApiRelease(uint8_t* base, uint32_t voice, uint64_t r4, uint64_t r5, uint64_t r6,
+                 uint64_t r7, const GuestCall& call) {
+  ITC_NATIVE_RUNNING("sub_82459E18 XAudioVoice::Release (the API's)");
+  return ApiMethodCall(base, voice, false, 8, 0x82459E54, 1, {r4, r5, r6, r7}, call);
+}
+
+uint32_t ApiSetEffectParameters(uint8_t* base, uint32_t voice, uint64_t r4, uint64_t r5, uint64_t r6,
+                 uint64_t r7, const GuestCall& call) {
+  ITC_NATIVE_RUNNING("sub_82459E80 XAudioVoice::SetEffectParameters (the API's)");
+  return ApiMethodCall(base, voice, false, 32, 0x82459ED4, 5, {r4, r5, r6, r7}, call);
+}
+
+uint32_t ApiSetOutputVoices(uint8_t* base, uint32_t voice, uint64_t r4, uint64_t r5, uint64_t r6,
+                 uint64_t r7, const GuestCall& call) {
+  ITC_NATIVE_RUNNING("sub_82459EF0 XAudioVoice::SetOutputVoices (the API's)");
+  return ApiMethodCall(base, voice, false, 36, 0x82459F2C, 2, {r4, r5, r6, r7}, call);
+}
+
+uint32_t ApiSetOutputMatrix(uint8_t* base, uint32_t voice, uint64_t r4, uint64_t r5, uint64_t r6,
+                 uint64_t r7, const GuestCall& call) {
+  ITC_NATIVE_RUNNING("sub_82459F48 XAudioVoice::SetOutputMatrix");
+  return ApiMethodCall(base, voice, false, 40, 0x82459F84, 2, {r4, r5, r6, r7}, call);
+}
+
+uint32_t ApiGetState(uint8_t* base, uint32_t voice, uint64_t r4, uint64_t r5, uint64_t r6,
+                 uint64_t r7, const GuestCall& call) {
+  ITC_NATIVE_RUNNING("sub_82459FA0 XAudioVoice::GetState (the API's)");
+  return ApiMethodCall(base, voice, false, 48, 0x82459FDC, 2, {r4, r5, r6, r7}, call);
+}
+
+uint32_t ApiStop(uint8_t* base, uint32_t voice, uint64_t r4, uint64_t r5, uint64_t r6,
+                 uint64_t r7, const GuestCall& call) {
+  ITC_NATIVE_RUNNING("sub_8245A1B0 XAudioVoice::Stop (the API's)");
+  return ApiMethodCall(base, voice, false, 60, 0x8245A1EC, 2, {r4, r5, r6, r7}, call);
+}
+
+uint32_t ApiGetOutputFormat(uint8_t* base, uint32_t voice, uint64_t r4, uint64_t r5, uint64_t r6,
+                 uint64_t r7, const GuestCall& call) {
+  ITC_NATIVE_RUNNING("sub_8245A3B8 XAudioVoice::GetOutputFormat");
+  return ApiMethodCall(base, voice, false, 64, 0x8245A3F4, 2, {r4, r5, r6, r7}, call);
+}
+
+uint32_t ApiSubmitPacket(uint8_t* base, uint32_t voice, uint64_t r4, uint64_t r5, uint64_t r6,
+                 uint64_t r7, const GuestCall& call) {
+  ITC_NATIVE_RUNNING("sub_8245A050 XAudioSourceVoice::SubmitPacket");
+  return ApiMethodCall(base, voice, true, 28, 0x8245A094, 3, {r4, r5, r6, r7}, call);
+}
+
+uint32_t ApiCodec36(uint8_t* base, uint32_t voice, uint64_t r4, uint64_t r5, uint64_t r6,
+                 uint64_t r7, const GuestCall& call) {
+  ITC_NATIVE_RUNNING("sub_8245A108 XAudioSourceVoice (the codec's slot +36)");
+  return ApiMethodCall(base, voice, true, 36, 0x8245A14C, 3, {r4, r5, r6, r7}, call);
+}
+
+uint32_t ApiFlushPackets(uint8_t* base, uint32_t voice, uint64_t r4, uint64_t r5, uint64_t r6,
+                 uint64_t r7, const GuestCall& call) {
+  ITC_NATIVE_RUNNING("sub_8245A208 XAudioSourceVoice::FlushPackets");
+  return ApiMethodCall(base, voice, true, 56, 0x8245A244, 1, {r4, r5, r6, r7}, call);
+}
+
+uint32_t ApiCodec72(uint8_t* base, uint32_t voice, uint64_t r4, uint64_t r5, uint64_t r6,
+                 uint64_t r7, const GuestCall& call) {
+  ITC_NATIVE_RUNNING("sub_8245A270 XAudioSourceVoice (the codec's slot +72)");
+  return ApiMethodCall(base, voice, true, 72, 0x8245A2AC, 2, {r4, r5, r6, r7}, call);
+}
+
+uint32_t ApiSetFormat(uint8_t* base, uint32_t voice, uint32_t format, uint32_t outputs,
+                      uint64_t r6, uint32_t frame, const GuestCall& call) {
+  ITC_NATIVE_RUNNING("sub_82459FF8 XAudioSourceVoice::SetFormat");
+  ApiEnter(base, call);
+  SetRegs(call, Args({voice, format, outputs, r6}));
+  uint32_t r3;
+  if (const auto done = Reformat(base, voice, format, outputs, r6, Below(base, frame, 128), call)) {
+    r3 = *done;
+  } else {
+    r3 = call(0x8245DCF0, 0x8245A038, At(frame, Args({voice, format, outputs, r6})));
+  }
+  ApiLeave(base, call);
+  return r3;
+}
+
+uint32_t ApiReset(uint8_t* base, uint32_t voice, const GuestCall& call) {
+  ITC_NATIVE_RUNNING("sub_8245A0B0 XAudioSourceVoice::Reset");
+  ApiEnter(base, call);
+  SetRegs(call, Args({voice}));
+  const uint32_t r3 = StopAndReset(base, voice, call);
+  ApiLeave(base, call);
+  return r3;
+}
+
+uint32_t ApiStart(uint8_t* base, uint32_t voice, uint32_t flags, const Thread& thread,
+                  const GuestCall& call) {
+  ITC_NATIVE_RUNNING("sub_8245A168 XAudioVoice::Start (the API's)");
+  ApiEnter(base, call);
+  SetRegs(call, Args({voice, flags}));
+  const uint32_t r3 = SourceStart(base, voice, flags, thread, call);
+  ApiLeave(base, call);
+  return r3;
+}
+
+uint32_t ApiSetVolume(uint8_t* base, uint32_t voice, double volume, const GuestCall& call) {
+  ITC_NATIVE_RUNNING("sub_8245A2C8 XAudioSourceVoice::SetVolume");
+  ApiEnter(base, call);
+  guest::StoreFloat(base, voice + 140, float(volume));
+  const uint32_t r3 = call(Method(base, voice, 92), 0x8245A310, Args({voice}));
+  ApiLeave(base, call);
+  return r3;
+}
+
+uint32_t ApiSetFrequencyRatio(uint8_t* base, uint32_t voice, double ratio, const GuestCall& call) {
+  ITC_NATIVE_RUNNING("sub_8245A340 XAudioSourceVoice::SetFrequencyRatio");
+  ApiEnter(base, call);
+  const uint32_t codec = guest::LoadU32(base, voice + 76);
+  Regs regs = Args({codec});
+  regs.f1_set = true;
+  regs.f1 = ratio;
+  const uint32_t r3 = call(Method(base, codec, 96), 0x8245A388, regs);
+  ApiLeave(base, call);
+  return r3;
+}
+
+uint32_t ApiGetMasteringVoice(uint8_t* base, uint32_t out, const GuestCall& call) {
+  ITC_NATIVE_RUNNING("sub_8245A568 XAudioGetMasteringVoice");
+  ApiEnter(base, call);
+  const uint32_t engine = guest::LoadU32(base, kEngine);
+  const uint32_t mastering = engine != 0 ? guest::LoadU32(base, engine + 64) : 0;
+  if (mastering != 0) {
+    guest::StoreU32(base, out, mastering);
+  }
+  ApiLeave(base, call);
+  return mastering != 0 ? 0 : 0x80004005u;  // E_FAIL
+}
+
+uint32_t ApiCreateSourceVoice(uint8_t* base, uint32_t description, uint32_t out,
+                              bool native_heap, const Thread& thread, uint32_t frame,
+                              const GuestCall& call) {
+  ITC_NATIVE_RUNNING("sub_8245A768 XAudioCreateSourceVoice");
+  ApiEnter(base, call);
+  SetRegs(call, Args({description, 0, frame + 80}));
+  const uint32_t r3 = CreateSource(base, description, 0, frame + 80, native_heap, thread,
+                                   Below(base, frame, 128), call);
+  if (int32_t(r3) >= 0) {
+    guest::StoreU32(base, out, guest::LoadU32(base, frame + 80));
+  }
+  ApiLeave(base, call);
+  return r3;
+}
+
+uint32_t ApiCreateSubmixVoice(uint8_t* base, uint32_t description, uint32_t out,
+                              bool native_heap, const Thread& thread, uint32_t frame,
+                              const GuestCall& call) {
+  ITC_NATIVE_RUNNING("sub_8245A7C8 XAudioCreateSubmixVoice");
+  ApiEnter(base, call);
+  SetRegs(call, Args({description, 0, frame + 80}));
+  const uint32_t r3 = CreateSubmix(base, description, 0, frame + 80, native_heap, thread,
+                                   Below(base, frame, 176), call);
+  if (int32_t(r3) >= 0) {
+    guest::StoreU32(base, out, guest::LoadU32(base, frame + 80));
+  }
+  ApiLeave(base, call);
+  return r3;
 }
 
 }  // namespace xaudio

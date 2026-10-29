@@ -92,4 +92,26 @@ void XAudioSubmixDeletingDestructor(PPCContext& ctx, uint8_t* base);  // sub_824
 void XAudioCreateSource(PPCContext& ctx, uint8_t* base);              // sub_8245EAA0
 void XAudioCreateSubmix(PPCContext& ctx, uint8_t* base);              // sub_8245F3D0
 
+// The API entry points.
+void XAudioApiAddRef(PPCContext& ctx, uint8_t* base);  // sub_82459DB0
+void XAudioApiRelease(PPCContext& ctx, uint8_t* base);  // sub_82459E18
+void XAudioApiSetEffectParameters(PPCContext& ctx, uint8_t* base);  // sub_82459E80
+void XAudioApiSetOutputVoices(PPCContext& ctx, uint8_t* base);  // sub_82459EF0
+void XAudioApiSetOutputMatrix(PPCContext& ctx, uint8_t* base);  // sub_82459F48
+void XAudioApiGetState(PPCContext& ctx, uint8_t* base);  // sub_82459FA0
+void XAudioApiStop(PPCContext& ctx, uint8_t* base);  // sub_8245A1B0
+void XAudioApiGetOutputFormat(PPCContext& ctx, uint8_t* base);  // sub_8245A3B8
+void XAudioApiSubmitPacket(PPCContext& ctx, uint8_t* base);  // sub_8245A050
+void XAudioApiCodec36(PPCContext& ctx, uint8_t* base);  // sub_8245A108
+void XAudioApiFlushPackets(PPCContext& ctx, uint8_t* base);  // sub_8245A208
+void XAudioApiCodec72(PPCContext& ctx, uint8_t* base);  // sub_8245A270
+void XAudioApiSetFormat(PPCContext& ctx, uint8_t* base);  // sub_82459FF8
+void XAudioApiReset(PPCContext& ctx, uint8_t* base);  // sub_8245A0B0
+void XAudioApiStart(PPCContext& ctx, uint8_t* base);  // sub_8245A168
+void XAudioApiSetVolume(PPCContext& ctx, uint8_t* base);  // sub_8245A2C8
+void XAudioApiSetFrequencyRatio(PPCContext& ctx, uint8_t* base);  // sub_8245A340
+void XAudioApiGetMasteringVoice(PPCContext& ctx, uint8_t* base);  // sub_8245A568
+void XAudioApiCreateSourceVoice(PPCContext& ctx, uint8_t* base);  // sub_8245A768
+void XAudioApiCreateSubmixVoice(PPCContext& ctx, uint8_t* base);  // sub_8245A7C8
+
 }  // namespace hooks

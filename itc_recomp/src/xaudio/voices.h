@@ -623,4 +623,78 @@ uint32_t CreateSubmix(uint8_t* base, uint32_t description, uint32_t allocator, u
                       bool native_heap, const Thread& thread, uint32_t frame,
                       const GuestCall& call);
 
+// --- The API entry points (under the API lock) ---
+//
+// Each enters XAudio's API lock, makes one call and leaves it. The lock is
+// the game's critical section (its imports through `call`) until every
+// user of it is native.
+
+// The API lock entered and left as the entry points do.
+void ApiEnter(uint8_t* base, const GuestCall& call);
+void ApiLeave(uint8_t* base, const GuestCall& call);
+
+// The entry points that call one of the voice's methods (the slot of its
+// vtable) or its codec's (+76) with r4-r7 as given (as many as the
+// original passes; r3 the object), under the API lock; each returns the
+// method's r3. XAudioVoice::AddRef (sub_82459DB0, +4), Release
+// (sub_82459E18, +8), SetEffectParameters (sub_82459E80, +32, r4-r7),
+// SetOutputVoices (sub_82459EF0, +36, r4), SetOutputMatrix (sub_82459F48,
+// +40, r4), GetState (sub_82459FA0, +48, r4), Stop (sub_8245A1B0, +60, r4),
+// GetOutputFormat (sub_8245A3B8, +64, r4); the codec's: SubmitPacket
+// (sub_8245A050, +28, r4-r5), sub_8245A108 (+36, r4-r5), FlushPackets
+// (sub_8245A208, +56), sub_8245A270 (+72, r4).
+uint32_t ApiAddRef(uint8_t* base, uint32_t voice, uint64_t r4, uint64_t r5, uint64_t r6,
+                 uint64_t r7, const GuestCall& call);
+uint32_t ApiRelease(uint8_t* base, uint32_t voice, uint64_t r4, uint64_t r5, uint64_t r6,
+                 uint64_t r7, const GuestCall& call);
+uint32_t ApiSetEffectParameters(uint8_t* base, uint32_t voice, uint64_t r4, uint64_t r5, uint64_t r6,
+                 uint64_t r7, const GuestCall& call);
+uint32_t ApiSetOutputVoices(uint8_t* base, uint32_t voice, uint64_t r4, uint64_t r5, uint64_t r6,
+                 uint64_t r7, const GuestCall& call);
+uint32_t ApiSetOutputMatrix(uint8_t* base, uint32_t voice, uint64_t r4, uint64_t r5, uint64_t r6,
+                 uint64_t r7, const GuestCall& call);
+uint32_t ApiGetState(uint8_t* base, uint32_t voice, uint64_t r4, uint64_t r5, uint64_t r6,
+                 uint64_t r7, const GuestCall& call);
+uint32_t ApiStop(uint8_t* base, uint32_t voice, uint64_t r4, uint64_t r5, uint64_t r6,
+                 uint64_t r7, const GuestCall& call);
+uint32_t ApiGetOutputFormat(uint8_t* base, uint32_t voice, uint64_t r4, uint64_t r5, uint64_t r6,
+                 uint64_t r7, const GuestCall& call);
+uint32_t ApiSubmitPacket(uint8_t* base, uint32_t voice, uint64_t r4, uint64_t r5, uint64_t r6,
+                 uint64_t r7, const GuestCall& call);
+uint32_t ApiCodec36(uint8_t* base, uint32_t voice, uint64_t r4, uint64_t r5, uint64_t r6,
+                 uint64_t r7, const GuestCall& call);
+uint32_t ApiFlushPackets(uint8_t* base, uint32_t voice, uint64_t r4, uint64_t r5, uint64_t r6,
+                 uint64_t r7, const GuestCall& call);
+uint32_t ApiCodec72(uint8_t* base, uint32_t voice, uint64_t r4, uint64_t r5, uint64_t r6,
+                 uint64_t r7, const GuestCall& call);
+
+// XAudioSourceVoice::SetFormat (sub_82459FF8): Reformat (its own frame
+// below `frame`, 128 bytes; its original where the plain C++ refuses).
+uint32_t ApiSetFormat(uint8_t* base, uint32_t voice, uint32_t format, uint32_t outputs,
+                      uint64_t r6, uint32_t frame, const GuestCall& call);
+// XAudioSourceVoice::Reset (sub_8245A0B0): StopAndReset.
+uint32_t ApiReset(uint8_t* base, uint32_t voice, const GuestCall& call);
+// XAudioVoice::Start (sub_8245A168): XAudioSourceVoice::Start.
+uint32_t ApiStart(uint8_t* base, uint32_t voice, uint32_t flags, const Thread& thread,
+                  const GuestCall& call);
+// XAudioSourceVoice::SetVolume (sub_8245A2C8): +140 = `volume` (as a
+// float), then slot +92 (the volume applied; f1 still `volume`).
+uint32_t ApiSetVolume(uint8_t* base, uint32_t voice, double volume, const GuestCall& call);
+// XAudioSourceVoice::SetFrequencyRatio (sub_8245A340): the codec's (+76)
+// slot +96 with f1 `ratio`.
+uint32_t ApiSetFrequencyRatio(uint8_t* base, uint32_t voice, double ratio, const GuestCall& call);
+// XAudioGetMasteringVoice (sub_8245A568): the engine's +64 to [out] and 0;
+// E_FAIL (0x80004005) without an engine or one.
+uint32_t ApiGetMasteringVoice(uint8_t* base, uint32_t out, const GuestCall& call);
+// XAudioCreateSourceVoice (sub_8245A768) and XAudioCreateSubmixVoice
+// (sub_8245A7C8): CreateSource or CreateSubmix with no allocator (in a
+// frame below `frame`, 128 bytes), the voice (at the frame's +80) to [out]
+// when it succeeds.
+uint32_t ApiCreateSourceVoice(uint8_t* base, uint32_t description, uint32_t out,
+                              bool native_heap, const Thread& thread, uint32_t frame,
+                              const GuestCall& call);
+uint32_t ApiCreateSubmixVoice(uint8_t* base, uint32_t description, uint32_t out,
+                              bool native_heap, const Thread& thread, uint32_t frame,
+                              const GuestCall& call);
+
 }  // namespace xaudio

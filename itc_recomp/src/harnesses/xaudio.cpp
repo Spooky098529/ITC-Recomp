@@ -1670,6 +1670,184 @@ void Lifecycle(Context& h, uint32_t block) {
   }
 }
 
+// --- The API entry points ---
+
+// The API lock (the game's critical section) entered or left by this
+// thread, as the game does.
+void ApiLock(uint8_t* base, const PPCContext& t, bool enter) {
+  PPCContext c = t;
+  c.r3.u64 = xa::kApiLock;
+  if (enter) {
+    __imp__RtlEnterCriticalSection(c, base);
+  } else {
+    __imp__RtlLeaveCriticalSection(c, base);
+  }
+}
+
+void Api(Context& h, uint32_t block) {
+  const uint32_t engine = guest::LoadU32(h.base, xa::kEngine);
+  if (engine == 0) {
+    return;
+  }
+  const auto none = [](Outputs&) {};
+  struct Method {
+    const char* name;
+    GuestFunction recompiled;
+    GuestFunction native;
+    bool codec;
+  };
+  const Method methods[] = {
+      {"XAudioVoice::AddRef, the API's (sub_82459DB0)", __imp__sub_82459DB0, hooks::XAudioApiAddRef, false},
+      {"XAudioVoice::Release, the API's (sub_82459E18)", __imp__sub_82459E18, hooks::XAudioApiRelease, false},
+      {"XAudioVoice::SetEffectParameters, the API's (sub_82459E80)", __imp__sub_82459E80,
+       hooks::XAudioApiSetEffectParameters, false},
+      {"XAudioVoice::SetOutputVoices, the API's (sub_82459EF0)", __imp__sub_82459EF0,
+       hooks::XAudioApiSetOutputVoices, false},
+      {"XAudioVoice::SetOutputMatrix (sub_82459F48)", __imp__sub_82459F48, hooks::XAudioApiSetOutputMatrix, false},
+      {"XAudioVoice::GetState, the API's (sub_82459FA0)", __imp__sub_82459FA0, hooks::XAudioApiGetState, false},
+      {"XAudioVoice::Stop, the API's (sub_8245A1B0)", __imp__sub_8245A1B0, hooks::XAudioApiStop, false},
+      {"XAudioVoice::GetOutputFormat (sub_8245A3B8)", __imp__sub_8245A3B8, hooks::XAudioApiGetOutputFormat, false},
+      {"XAudioSourceVoice::SubmitPacket (sub_8245A050)", __imp__sub_8245A050, hooks::XAudioApiSubmitPacket, true},
+      {"XAudioSourceVoice, the codec's +36 (sub_8245A108)", __imp__sub_8245A108, hooks::XAudioApiCodec36, true},
+      {"XAudioSourceVoice::FlushPackets (sub_8245A208)", __imp__sub_8245A208, hooks::XAudioApiFlushPackets, true},
+      {"XAudioSourceVoice, the codec's +72 (sub_8245A270)", __imp__sub_8245A270, hooks::XAudioApiCodec72, true},
+      {"XAudioSourceVoice::Reset (sub_8245A0B0)", __imp__sub_8245A0B0, hooks::XAudioApiReset, false},
+      {"XAudioSourceVoice::SetVolume (sub_8245A2C8)", __imp__sub_8245A2C8, hooks::XAudioApiSetVolume, false},
+      {"XAudioSourceVoice::SetFrequencyRatio (sub_8245A340)", __imp__sub_8245A340,
+       hooks::XAudioApiSetFrequencyRatio, true},
+      {"XAudioSourceVoice::SetFormat (sub_82459FF8)", __imp__sub_82459FF8, hooks::XAudioApiSetFormat, true},
+  };
+  for (const Method& m : methods) {
+    Results results(m.name);
+    for (int i = 0; i < 32; i++) {
+      LockedCase(h, results, block, m.recompiled, m.native, false,
+                 [&](Random& random, PPCContext& t) {
+                   World(h.base, block, random);
+                   if (m.codec) {
+                     Store(h.base, block + 76, AnyObject(random, block));
+                   }
+                   t.r3.u64 = block;
+                   // SetFormat's format and outputs; the others' words.
+                   t.r4.u64 = m.recompiled == __imp__sub_82459FF8 ? block + 0x1F80 : random.Next();
+                   t.r5.u64 = m.recompiled == __imp__sub_82459FF8
+                                  ? (random.Below(2) == 0 ? 0 : block + kOutputs)
+                                  : random.Next();
+                   t.r6.u64 = random.Next();
+                   t.r7.u64 = random.Next();
+                   t.f1.f64 = double(int32_t(random.Below(4001)) - 2000) / 997.0;
+                 },
+                 none, fmt::format("case {}", i));
+    }
+    results.Report();
+  }
+  {
+    // The API lock entered before the spin lock (the game's order); the
+    // pending list taken back.
+    Results results("XAudioVoice::Start, the API's (sub_8245A168)");
+    const uint32_t pending_offset = guest::LoadU32(h.base, engine + 76);
+    for (int i = 0; pending_offset < 0x100 && i < 32; i++) {
+      LockedCase(h, results, block, __imp__sub_8245A168, hooks::XAudioApiStart, true,
+                 [&](Random& random, PPCContext& t) {
+                   World(h.base, block, random);
+                   FakeList(h.base, block + 0x1FC8, block + pending_offset, random.Below(2) == 0);
+                   Store(h.base, block + 76, AnyObject(random, block));
+                   t.r3.u64 = block;
+                   t.r4.u64 = random.Next();
+                   ApiLock(h.base, t, true);
+                 },
+                 [&](Outputs& out) {
+                   TakeBack(out, h.base, engine + 68, block + pending_offset);
+                 },
+                 fmt::format("case {}", i));
+      PPCContext t = CallContext(h);
+      ApiLock(h.base, t, false);
+      ApiLock(h.base, t, false);
+    }
+    results.Report();
+  }
+  {
+    Results results("XAudioGetMasteringVoice (sub_8245A568)");
+    for (int i = 0; i < 8; i++) {
+      LockedCase(h, results, block, __imp__sub_8245A568, hooks::XAudioApiGetMasteringVoice, false,
+                 [&](Random&, PPCContext& t) { t.r3.u64 = block + 0x1F80; },
+                 [&](Outputs& out) {
+                   // The live mastering voice compared as found, not as an address.
+                   out.Word(guest::LoadU32(h.base, block + 0x1F80) == Mastering(h.base));
+                   Store(h.base, block + 0x1F80, 0);
+                 },
+                 fmt::format("case {}", i));
+    }
+    results.Report();
+  }
+  if (!hooks::NativeHeapActive()) {
+    return;
+  }
+  const uint32_t stages = guest::LoadU8(h.base, engine + 128);
+  const uint32_t source_offset = guest::LoadU32(h.base, engine + 88);
+  const uint32_t node = guest::LoadU32(h.base, engine + 80);
+  const uint32_t live = node != engine + 80 && node != 0 ? node - source_offset : 0;
+  {
+    // The API lock entered before the spin lock the case holds.
+    Results results("XAudioCreateSourceVoice (sub_8245A768)");
+    for (int i = 0; live != 0 && i < 8; i++) {
+      RealCase(h, results, block, __imp__sub_8245A768, hooks::XAudioApiCreateSourceVoice, true,
+               [&](Random& random, PPCContext& t, uint32_t) {
+                 const uint32_t description = block + 0x1E80;
+                 for (uint32_t k = 0; k < 92; k += 4) {
+                   Store(h.base, description + k, 0);
+                 }
+                 for (uint32_t k = 0; k < 56; k += 4) {
+                   Store(h.base, description + k, guest::LoadU32(h.base, live + 84 + k));
+                 }
+                 guest::StoreU8(h.base, description + 57, uint8_t(random.Below(3)));
+                 guest::StoreFloat(h.base, description + 60, 1.0f);
+                 Store(h.base, block + 0x1FF4, 0);
+                 t.r3.u64 = description;
+                 t.r4.u64 = block + 0x1FF4;
+                 ApiLock(h.base, t, true);
+               },
+               [&](Outputs& out) {
+                 MadeVoice(out, h.base, block + 0x1FF4,
+                           [&](uint32_t voice) { return std::pair{engine + 80, voice + source_offset}; });
+               },
+               fmt::format("case {}", i));
+      ApiLock(h.base, CallContext(h), false);
+      ApiLock(h.base, CallContext(h), false);
+    }
+    results.Report();
+  }
+  {
+    Results results("XAudioCreateSubmixVoice (sub_8245A7C8)");
+    for (int i = 0; stages != 0 && i < 8; i++) {
+      uint32_t list = 0;
+      RealCase(h, results, block, __imp__sub_8245A7C8, hooks::XAudioApiCreateSubmixVoice, true,
+               [&](Random& random, PPCContext& t, uint32_t) {
+                 const uint32_t description = block + 0x1E80;
+                 for (uint32_t k = 0; k < 32; k += 4) {
+                   Store(h.base, description + k, 0);
+                 }
+                 guest::StoreU8(h.base, description + 1, uint8_t(1 + random.Below(6)));
+                 const uint32_t stage = random.Below(stages);
+                 guest::StoreU8(h.base, description + 10, uint8_t(stage));
+                 list = guest::LoadU32(h.base, engine + 124) + 44 * stage;
+                 Store(h.base, block + 0x1FF4, 0);
+                 t.r3.u64 = description;
+                 t.r4.u64 = block + 0x1FF4;
+                 ApiLock(h.base, t, true);
+               },
+               [&](Outputs& out) {
+                 MadeVoice(out, h.base, block + 0x1FF4, [&](uint32_t voice) {
+                   return std::pair{list, voice + guest::LoadU32(h.base, list + 8)};
+                 });
+               },
+               fmt::format("case {}", i));
+      ApiLock(h.base, CallContext(h), false);
+      ApiLock(h.base, CallContext(h), false);
+    }
+    results.Report();
+  }
+}
+
 }  // namespace
 
 void XAudio(Context& h) {
@@ -1685,6 +1863,7 @@ void XAudio(Context& h) {
   Making(h, block.address);
   Locked(h, block.address);
   Lifecycle(h, block.address);
+  Api(h, block.address);
 }
 
 }  // namespace harness
