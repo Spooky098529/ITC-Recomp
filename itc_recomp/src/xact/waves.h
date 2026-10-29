@@ -202,6 +202,11 @@ uint32_t InMemoryWaveUpdate(uint8_t* base, uint32_t wave, bool native_heap, uint
 // call from `frame` with `return_address`, which traps the same. Its low
 // word.
 uint32_t ClockMs(uint8_t* base, uint32_t return_address, uint32_t frame, const GuestCall& call);
+// The same in full (r3 as XACTGetTimeMs leaves it: the counter's low word
+// sign-extended, or GetTickCount zero-extended); where the original traps,
+// the guest call's low word.
+uint64_t ClockMsFull(uint8_t* base, uint32_t return_address, uint32_t frame,
+                     const GuestCall& call);
 
 // XACTEngine::SendNotification (sub_825C1388, xact.md's row; under
 // --native_xact): `words` (r4 to r7, a 32-byte XACT_NOTIFICATION by value)

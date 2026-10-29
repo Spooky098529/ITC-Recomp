@@ -459,6 +459,14 @@ uint32_t ClockMs(uint8_t* base, uint32_t return_address, uint32_t frame, const G
   return CallAt(call, kGetTimeMs, return_address, Args({}), frame);
 }
 
+uint64_t ClockMsFull(uint8_t* base, uint32_t return_address, uint32_t frame,
+                     const GuestCall& call) {
+  if (const auto ms = GetTimeMs(base)) {
+    return *ms;
+  }
+  return CallAt(call, kGetTimeMs, return_address, Args({}), frame);
+}
+
 uint32_t EngineSendNotification(uint8_t* base, uint32_t engine, const uint64_t words[4],
                                 uint32_t frame, const GuestCall& call) {
   ITC_NATIVE_RUNNING("sub_825C1388 XACTEngine::SendNotification");

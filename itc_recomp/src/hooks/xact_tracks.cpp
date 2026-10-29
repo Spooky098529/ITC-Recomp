@@ -415,9 +415,12 @@ void XactEventDone(PPCContext& ctx, uint8_t* base) {
 
 void XactPlayWaveFire(PPCContext& ctx, uint8_t* base) {
   const uint32_t event = ctx.r3.u32;
+  uint64_t r3 = 0;
   Framed(ctx, base, 96, [&](const xaudio::GuestCall& call, uint32_t frame) {
-    return xact::PlayWaveFire(base, event, frame, call);
+    r3 = xact::PlayWaveFire(base, event, frame, call);
+    return uint32_t(r3);
   });
+  ctx.r3.u64 = r3;  // in full: the time sign-extended, as the original leaves it
 }
 
 void XactPlayWaveStop(PPCContext& ctx, uint8_t* base) {

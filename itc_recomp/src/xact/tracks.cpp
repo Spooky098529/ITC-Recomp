@@ -1327,7 +1327,7 @@ uint32_t EventDone(uint8_t* base, uint32_t event, uint32_t frame, const GuestCal
   return owner;
 }
 
-uint32_t PlayWaveFire(uint8_t* base, uint32_t event, uint32_t frame, const GuestCall& call) {
+uint64_t PlayWaveFire(uint8_t* base, uint32_t event, uint32_t frame, const GuestCall& call) {
   ITC_NATIVE_RUNNING("sub_825D8378 XACTPlayWaveEvent::Fire");
   SetRegs(call, Args({event}));
   EventFire(base, event, xa::FrameBelow(base, frame, kEventFireFrameBelow), call);
@@ -1335,8 +1335,10 @@ uint32_t PlayWaveFire(uint8_t* base, uint32_t event, uint32_t frame, const Guest
     const uint32_t wave = WaveOf(base, event, 0x825D83C0, frame, call);
     CallAt(call, xa::Method(base, wave, 8), 0x825D83DC, Args({wave, 1, 0, 0}), frame);
   }
-  const uint32_t now = ClockMs(base, 0x825D83E0, frame, call);
-  Store(base, event + 64, now);
+  // r3 in full, as XACTGetTimeMs leaves it (the counter's low word
+  // sign-extended).
+  const uint64_t now = ClockMsFull(base, 0x825D83E0, frame, call);
+  Store(base, event + 64, uint32_t(now));
   return now;
 }
 

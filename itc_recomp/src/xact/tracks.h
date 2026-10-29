@@ -369,8 +369,9 @@ uint32_t EventDone(uint8_t* base, uint32_t event, uint32_t frame, const GuestCal
 // XACTPlayWaveEvent::Fire (sub_825D8378, slot +4): XACTEvent::Fire (a frame
 // below), the wave (own slot +56), when there is one, its slot +8 (Play)
 // with 1, 0, 0 through the guest call; +64 = now. `frame` is this
-// function's (96 bytes). Returns now.
-uint32_t PlayWaveFire(uint8_t* base, uint32_t event, uint32_t frame, const GuestCall& call);
+// function's (96 bytes). Returns now, r3 in full as XACTGetTimeMs leaves it
+// (ClockMsFull).
+uint64_t PlayWaveFire(uint8_t* base, uint32_t event, uint32_t frame, const GuestCall& call);
 // XACTPlayWaveEvent::Stop (sub_825D83F8, slot +60): +68 = now unless
 // `immediate`; with a wave (own slot +56), its slot +12 (Stop, through the
 // guest call) with the mode (0 when immediate; else 1 with the record's

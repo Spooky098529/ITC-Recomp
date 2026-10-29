@@ -1184,12 +1184,21 @@ void Batch8(Context& h, uint32_t block) {
   {
     Results results("XACTPlayWaveEvent::Fire (sub_825D8378)");
     for (int c = 0; c < 128; c++) {
-      Case(h, results, block, __imp__sub_825D8378, hooks::XactPlayWaveFire,
-           [&](Random& random, PPCContext& t) {
-             event_world(random);
-             t.r3.u64 = event;
-           },
-           fmt::format("case {}", c));
+      // r3 in full (its upper word too: the time sign-extended). One time in
+      // two a time past 2^31 ms, so the counter's low word is negative.
+      CaseWith(h, results, block, __imp__sub_825D8378, hooks::XactPlayWaveFire,
+               [&](Random& random, PPCContext& t) {
+                 event_world(random);
+                 if (random.Below(2) == 0) {
+                   const uint64_t hz = (uint64_t(Load(base, 0x82971480)) << 32) |
+                                       Load(base, 0x82971484);
+                   const uint32_t ms = 0x80000000u + random.Below(0x7FFFFFFF);
+                   helpers::SetClocksForHarness(uint64_t(ms) * (hz / 1000), ms);
+                 }
+                 t.r3.u64 = event;
+               },
+               [](Outputs& out, PPCContext& t) { out.Word(uint32_t(t.r3.u64 >> 32)); },
+               fmt::format("case {}", c));
     }
     results.Report();
   }
