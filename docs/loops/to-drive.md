@@ -23,6 +23,8 @@ here loses its heading.
   `sub_82461140` XAudioVoice::SetFormatWords, `sub_82460778`
   XAudioVoice::SetFormat, `sub_8245DCF0` XAudioSourceVoice::Reformat,
   `sub_8245DD60` XAudioSourceVoice::StopAndReset (`xaudio.md`)
+- The car sounds' migration 2 (attract race `itc_2382`, replay
+  `itc_2383`, ok): `sub_8210F7C8` CarSounds::StopAll (`car-sounds.md`)
 
 ## Run 2026-10-28 18:45 (`b7-loop-28-10-26-2`)
 
