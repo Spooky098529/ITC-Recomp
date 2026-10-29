@@ -19,7 +19,8 @@ file's history. What's left to see in a drive, from every run:
   previous stop's harness lines as such a lead. Migration 1 checked
   (3ea5812..01a849c: the destructors' cases, `SetLevels` fixed, the
   resampler, 10 adapters removed, four reverb stages; 91 of 109 ours).
-  Validation agent running. Ready and left: `PcmCodec::Process`, the
+  Validated (`itc_2529`, `itc_2530`): 23 of 23 harness lines; two to
+  drive. Migration 2 running. Ready and left: `PcmCodec::Process`, the
   reverb core's other stages and its process, set-up and create.
 
 ## Done
@@ -43,5 +44,7 @@ file's history. What's left to see in a drive, from every run:
 - After the cleanup's migration 1 (race 38 s, 0 errors, xaudio_objects
   0 differing): ours 3012, work left 3305 (wrapped 104, known 519,
   unknown 2682).
+- After its validation (`itc_2529`: race 7 s, 0 errors, every harness
+  0 differing but the expected groups): ours 3012, work left 3305.
 
 ## Stopped

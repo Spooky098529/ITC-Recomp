@@ -13,6 +13,14 @@ function goes from this list when a log shows its `native running
 (game):` line (say which log in the commit). A run with nothing left
 here loses its heading.
 
+## Run 2026-10-29 22:22 (`b7-loop-29-10-26-2`)
+
+- XAudio's objects' cleanup migration 1 (attract race `itc_2529`,
+  replay `itc_2530`, ok): `sub_8247F558` (the resampler's stereo copy,
+  entry 107), `sub_82478E60` (its scalar path, entry 32)
+  (`xaudio-objects.md`); `sub_82469E58` and `sub_8246D1E0`, still
+  unseen, are under the last run.
+
 ## Run 2026-10-29 15:44 (`b7-loop-29-10-26`)
 
 - XACT's tracks' migration 1 (attract race `itc_2432`, replay
