@@ -1332,6 +1332,9 @@ void Resampler(Context& h, uint32_t block) {
            [&](Random& random, PPCContext& t) {
              ConverterState(h.base, block, state, random, kernel.channels, i % 3 != 2);
              t.r3.u64 = state;
+             // The context's flush setting as the host's (in the game they
+             // agree; a translated kernel before may leave flush on).
+             t.fpscr.loadFromHost();
            },
            fmt::format("case {}", i));
     }
@@ -1366,6 +1369,7 @@ void Resampler(Context& h, uint32_t block) {
                Store(h.base, state + 28, guest::LoadU32(h.base, state + 24));
              }
              t.r3.u64 = state;
+             t.fpscr.loadFromHost();
            },
            fmt::format("case {}", i));
     }
