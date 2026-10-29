@@ -54,7 +54,7 @@ frames: `itc_recomp/src/audio/`, `docs/native-audio.md`):
   renderer's slot +20 (`sub_825C3048`) starts the deferred voices
   (`sub_8245A6E8`). The voices themselves are a 24-byte class
   (vtable `0x82075B98`, `825C9B60`-`825CA448`, `xact-waves.md`), driven from the
-  tracks (`825D0000`-`825D1C10`, a lead) and the waves (`825D1C10`-`825D53D8`, `xact-waves.md`), each method one
+  tracks (`825D0000`-`825D1C10` and the events to `825D9000`, `xact-tracks.md`) and the waves (`825D1C10`-`825D53D8`, `xact-waves.md`), each method one
   XAudio call: create source voice `sub_8245A768`, state
   `sub_82459FA0`, volume `sub_8245A2C8`, pitch `sub_8245A340`, submit
   packet `sub_8245A108` (pointers into the in-memory wave bank: XMA
@@ -83,9 +83,9 @@ getter of +20 folded with the menus' code) in `functions.md`.
 `sub_825CED88` is also called by the movie player and `sub_8259A140`.
 Three more folded getters (`sub_82099BA0`, `sub_820A8958`,
 `sub_82379D50`: +24, +28, +32) have their rows here, as only XACT
-calls them in play. The rest of XACT seen in play (the tracks at
-`825D0000`-`825D1C10` and the events above them to `825D9000`) is in
-`../loops/leads.md`; the voice class (`825C9AF8`-`825CA680`) and the
+calls them in play. The tracks at `825D0000`-`825D1C10` and the
+events above them to `825D9000` are in `xact-tracks.md` (2026-10-29;
+its parameter events, never seen in play, in `../loops/leads.md`); the voice class (`825C9AF8`-`825CA680`) and the
 waves (`825D1C10`-`825D53D8`) are in `xact-waves.md` (2026-10-29); everything else at `825BF5C8`-`825D0000` seen
 in play has a row here. Objects, fields, file layouts and tables are in
 `../known-data.md`. The rows were drafted by the B7 loop's mapping

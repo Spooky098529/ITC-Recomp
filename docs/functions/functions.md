@@ -369,6 +369,13 @@ Rows not yet moved stay in the table below. So far:
   callback's updates, the notifications), their stream entries and the
   sound banks' variation tables (B7; the rest of XACT stays in
   `xact.md`).
+- [`xact-tracks.md`](xact-tracks.md): XACT's tracks and events: the
+  sounds' tracks (volume, pitch, outputs, play, stop, pause, the game
+  thread's and the audio callback's updates, the RPC hooks), their
+  instances (one play of a track's events), the clip events made from
+  the sound banks' records (the play-wave event that owns each wave,
+  the wave-variation, stop and transition events) and the waves'
+  forwarders to their voices (B7; the parameter events are a lead).
 
 These files hold functions only. What used to follow the table here moved
 out on 2026-10-20: how frame interpolation works, its options and what

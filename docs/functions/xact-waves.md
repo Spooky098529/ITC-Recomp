@@ -19,7 +19,7 @@ works is in `../native-audio.md`. This file is three small classes:
   `825D23F0`-`825D3B10`): one play of one wave bank entry. A wave holds
   its wave bank and entry index, its owner (the play-wave event of a
   sound's track, probably: `825D0000`-`825D1C10` and the events at
-  `825D53D8`-`825D9000`, in `../loops/leads.md`), a state (1 preparing,
+  `825D53D8`-`825D9000`, in `xact-tracks.md`: the play-wave event), a state (1 preparing,
   2 prepared, 3 playing, 4 stopping, 5 stopped) and a voice. The game's
   banks are in memory, so every wave in play is the **in-memory wave**
   (96 bytes, vtable `0x82076A74`, made by `XACTWaveBank::CreateWave`
