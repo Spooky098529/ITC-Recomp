@@ -1209,10 +1209,9 @@ uint64_t MatrixSetLevels(uint8_t* base, uint32_t matrix, uint32_t levels, uint32
       }
       const uint32_t level = guest::LoadU32(base, levels + 4) + 8 * i;
       const uint32_t entry = guest::LoadU32(base, matrix + 20) + 12 * guest::LoadU8(base, level);
-      const double value = LoadSingle(base, level + 4);
-      guest::StoreFloat(base, entry + 8, float(value));
+      CopyFloat(base, entry + 8, level + 4);
       if ((now & 0xFF) != 0) {
-        guest::StoreFloat(base, entry + 4, float(value));
+        CopyFloat(base, entry + 4, level + 4);
       }
     }
   }

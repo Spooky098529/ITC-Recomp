@@ -22,7 +22,6 @@
 #include <fmt/format.h>
 
 #include <bit>
-#include <cmath>
 #include <string>
 #include <vector>
 
@@ -1033,20 +1032,7 @@ void MatrixAndMeter(Context& h, uint32_t block) {
                    t.r4.u64 = levels;
                    t.r5.u64 = random.Below(2) == 0 ? 0 : random.Next();
                  },
-                 [&](Outputs& out, uint32_t) {
-                   // The entries' levels (+4, +8: lfs and stfs) as floats,
-                   // NaNs then made one value in the block's bytes.
-                   for (uint32_t k = 0; k < 9; k++) {
-                     const uint32_t entry = block + 0x140 + 12 * k;
-                     out.Floats(h.base, entry + 4, 2);
-                     for (uint32_t w = 4; w <= 8; w += 4) {
-                       if (std::isnan(std::bit_cast<float>(guest::LoadU32(h.base, entry + w)))) {
-                         Store(h.base, entry + w, 0x7FC00000);
-                       }
-                     }
-                   }
-                 },
-                 fmt::format("case {}", i));
+                 none, fmt::format("case {}", i));
     }
     results.Report();
   }
