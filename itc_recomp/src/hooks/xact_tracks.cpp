@@ -556,7 +556,8 @@ ITC_XACT_TRACKS_HEAP_ADAPTER(825D0AA0, XactTrackPrepare)
 // No adapter (removed 2026-10-29: only XACTEvent::Schedule's plain C++ calls it in play) for
 // XACTSound::ScheduleEvent sub_825CB0C8.
 ITC_XACT_TRACKS_ADAPTER(825D1918, XactEventSchedule)
-ITC_XACT_TRACKS_ADAPTER(825D13F0, XactEventDone)
+// No adapter (removed 2026-10-29: only XACTWave::AudioUpdate's plain C++ calls it in play) for
+// XACTEvent::Done sub_825D13F0.
 ITC_XACT_TRACKS_ADAPTER(825D8378, XactPlayWaveFire)
 ITC_XACT_TRACKS_ADAPTER(825D83F8, XactPlayWaveStop)
 // No adapter (removed 2026-10-29: only XACTTrack::Play's and XACTTrackInstance::AudioUpdate's

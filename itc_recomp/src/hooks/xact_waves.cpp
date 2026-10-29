@@ -344,20 +344,23 @@ ITC_XACT_WAVES_HEAP_ADAPTER(825CA448, XactVoiceDeletingDestruct)
 // No adapter (removed 2026-10-29: only XACTInMemoryWave::XACTInMemoryWave's plain C++ calls it
 // in play) for XACTWave::XACTWave sub_825D23F0.
 ITC_XACT_WAVES_ADAPTER(825D37A8, XactInMemoryWaveConstruct)
-ITC_XACT_WAVES_ADAPTER(825D0268, XactTrackGetVolume)
-ITC_XACT_WAVES_ADAPTER(825D02B0, XactTrackGetPitch)
-ITC_XACT_WAVES_ADAPTER(825D2170, XactWaveGetStartPosition)
+// No adapter (removed 2026-10-29: only XACTInMemoryWave::Prepare's plain C++ calls it in play) for XACTTrack::GetVolume sub_825D0268.
+// No adapter (removed 2026-10-29: only XACTInMemoryWave::Prepare's plain C++ calls it in play) for XACTTrack::GetPitch sub_825D02B0.
+// No adapter (removed 2026-10-29: only XACTInMemoryWave::Prepare's plain C++ calls it in play) for XACTWave::GetStartPosition sub_825D2170.
 ITC_XACT_WAVES_ADAPTER(825D1C30, XactWaveRequestNext)
 // No adapter (removed 2026-10-29: only XACTInMemoryWave::Play's and XACTWave::Pause's plain C++
 // calls it in play) for XACTEngine::RequestCommit sub_825D1C78.
-ITC_XACT_WAVES_ADAPTER(825D1DF8, XactWaveSetVoice)
+// No adapter (removed 2026-10-29: only XACTInMemoryWave::Prepare's and Update's plain C++ call it in
+// play) for XACTWave::SetVoice sub_825D1DF8.
 ITC_XACT_WAVES_ADAPTER(825D3938, XactInMemoryWavePlay)
 ITC_XACT_WAVES_ADAPTER(825D1ED8, XactWavePause)
 // No adapter (removed 2026-10-29: only XACTInMemoryWave::Update's plain C++ calls it in play) for
 // XACTWave::PrepareNext sub_825D2778.
 ITC_XACT_WAVES_ADAPTER(825D3890, XactInMemoryWaveUpdate)
-ITC_XACT_WAVES_ADAPTER(825D2030, XactWaveNotify)
-ITC_XACT_WAVES_ADAPTER(825D24D8, XactWaveSetState)
+// No adapter (removed 2026-10-29: only XACTWave::SetState's, AudioUpdate's and Release's plain C++
+// call it in play) for XACTWave::Notify sub_825D2030.
+// No adapter (removed 2026-10-29: only XACTInMemoryWave::Prepare's and Stop's plain C++ call it in
+// play) for XACTWave::SetState sub_825D24D8.
 // No adapter (removed 2026-10-29: only ~XACTWave's plain C++ calls it in play) for
 // XACTWave::Release sub_825D28D0.
 // No adapter (removed 2026-10-29: only XACTInMemoryWave's deleting destructor's plain C++ calls

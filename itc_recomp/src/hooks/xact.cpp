@@ -157,21 +157,15 @@ extern "C" REX_FUNC(sub_825CC320) {
 
 // The wave entry accessors. XACTWaveEntry::FindXmaBlock (sub_825CEF50) has
 // no adapter: its only caller, SamplesToBytes, is native.
-ITC_XACT_VOID(825CED88, WaveEntryConstruct(base, ctx.r3.u32), ctx.r3.u32)
-extern "C" REX_FUNC(sub_825CED98) {
-  ITC_XACT_FALLBACK(825CED98)
-  if (!WaveEntrySet(base, ctx.r3.u32, ctx.r4.u32, ctx.r5.u32)) {
-    __imp__sub_825CED98(ctx, base);
-    return;
-  }
-  ctx.r3.u64 = ctx.r3.u32 + 12;  // memcpy's r3, the destination
-}
+// No adapter (removed 2026-10-29: only XACTInMemoryWave::Prepare's plain C++ calls it in play) for XACTWaveEntry::XACTWaveEntry sub_825CED88
+// (folded: its callers outside XACT never run in play).
+// No adapter (removed 2026-10-29: only XACTInMemoryWave::Prepare's plain C++ calls it in play) for XACTWaveEntry::Set sub_825CED98.
 // XACTWaveEntry::GetLoopRegion (sub_825CEDF8) has no adapter: its only
 // caller in play, GetWaveRegion, is native.
 // No adapter (removed 2026-10-29: only XACTWave::GetStartPosition's plain C++ calls it in play) for XACTWaveEntry::GetDuration sub_825CEE00.
 // XACTWaveEntry::SamplesToMs (sub_825CEE70) has no adapter: its only
 // caller in play, GetWaveDurations, is native.
-ITC_XACT_OPTIONAL(825CF080, WaveEntrySamplesToBytes(base, ctx.r3.u32, ctx.r4.u32, ctx.r5.u32))
+// No adapter (removed 2026-10-29: only XACTInMemoryWave::Prepare's plain C++ calls it in play) for XACTWaveEntry::SamplesToBytes sub_825CF080.
 
 ITC_XACT_WORD(825C4D90, CueGetStateInternal(base, ctx.r3.u32))
 // XACTSoundBank::ForgetWaveBank (sub_825C72B0) has no adapter: its only
@@ -256,7 +250,7 @@ ITC_XACT_OPTIONAL(825C2618, SettingsGetCategoryFlag(base, ctx.r3.u32, ctx.r4.u32
 ITC_XACT_OPTIONAL(825C3548, SettingsIsInCategory(base, ctx.r3.u32, ctx.r4.u32, ctx.r5.u32))
 ITC_XACT_OPTIONAL(825C4070,
                   SettingsSetCategoryVolume(base, ctx.r3.u32, ctx.r4.u32, ctx.f1.f64))
-ITC_XACT_OPTIONAL(825C0708, EngineGetCategoryFlag(base, ctx.r3.u32, ctx.r4.u32))
+// No adapter (removed 2026-10-29: only XACTInMemoryWave::Prepare's plain C++ calls it in play) for XACTEngine::GetCategoryFlag sub_825C0708.
 ITC_XACT_OPTIONAL(825C0598, EngineAddInstance(base, ctx.r3.u32, ctx.r4.u32))
 ITC_XACT_OPTIONAL(825C05B0, EngineRemoveInstance(base, ctx.r3.u32, ctx.r4.u32))
 // sub_825C0748 (a variable's record) has no adapter: its only caller,
@@ -269,7 +263,7 @@ ITC_XACT_OPTIONAL(825C05B0, EngineRemoveInstance(base, ctx.r3.u32, ctx.r4.u32))
 // sound's pitch, the wave banks' listeners and the sound banks' wave bank
 // lookup.
 // No adapter (removed 2026-10-29: only XACTWave::GetStartPosition's plain C++ calls it in play) for XACTWaveEntry::HasLoopRegion sub_825CEE10.
-ITC_XACT_WORD(825CEE28, WaveEntryGetFormatTag(base, ctx.r3.u32))
+// No adapter (removed 2026-10-29: only XACTInMemoryWave::Prepare's plain C++ calls it in play) for XACTWaveEntry::GetFormatTag sub_825CEE28.
 // No adapter (removed 2026-10-29: only XACTWave::GetStartPosition's plain C++ calls it in play) for XACTWaveEntry::MsToSamples sub_825CEEA0.
 // XACTWaveEntry::GetPlayLength (sub_82099BA0, folded) has no adapter: its
 // only caller in play, GetWaveRegion, is native.
