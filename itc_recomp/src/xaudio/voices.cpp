@@ -3,6 +3,8 @@
 #include "xaudio/voices.h"
 
 #include "base/log.h"
+#include "c_runtime/strings.h"
+#include "memory/c_runtime_heap.h"
 #include "guest.h"
 
 #include <cstring>
@@ -109,7 +111,7 @@ std::optional<uint32_t> BufferSize(uint8_t* base, uint32_t format, uint32_t out)
   uint32_t size = 0;
   if (guest::LoadU8(base, format) == 0) {
     uint32_t frames;
-    if (!PassFrames(guest::LoadU32(base, format + 4), &frames)) {
+    if (!PassFrames(guest::LoadU32(base, format + 8), &frames)) {
       return std::nullopt;
     }
     size = (frames * uint32_t(guest::LoadU8(base, format + 5)) + 32) * 4;
@@ -349,7 +351,100 @@ uint32_t SetFormat(uint8_t* base, uint32_t voice, uint32_t format, uint32_t outp
                    const GuestCall& call) {
   ITC_NATIVE_RUNNING("sub_82460778 XAudioVoice::SetFormat");
   SetFormatWords(base, voice, format);
-  return call(Method(base, voice, 36), 0x824607B0, Args({voice, outputs}));
+  // r5 still `outputs` (the original's own r5, kept across SetFormatWords).
+  return call(Method(base, voice, 36), 0x824607B0, Args({voice, outputs, outputs}));
+}
+
+uint32_t Alloc(uint8_t* base, uint32_t size, uint32_t attributes) {
+  ITC_NATIVE_RUNNING("sub_8245EF80 XAudio::Alloc");
+  return memory::crt::XMemAlloc(base, size, attributes);
+}
+
+std::optional<uint32_t> BufferClearThunk(uint8_t* base, uint32_t iface, uint32_t format,
+                                         uint32_t flags) {
+  ITC_NATIVE_RUNNING("sub_8245FA10 XAudioBuffer::ClearThunk");
+  return BufferClear(base, iface != 0 ? iface - 8 : 0, format, flags);
+}
+
+void SourceDescribe(uint8_t* base, uint32_t description, uint32_t out) {
+  ITC_NATIVE_RUNNING("sub_8245E010 XAudioSourceVoice::Describe");
+  for (uint32_t i = 0; i < 32; i += 4) {
+    guest::StoreU32(base, out + i, 0);
+  }
+  SourceOutputFormat(base, description, out);
+  guest::StoreU32(base, out + 8, guest::LoadU32(base, description + 68));
+  const uint32_t engine = guest::LoadU32(base, kEngine);
+  uint32_t buffer = 0;
+  for (uint32_t i = 0; i < 6; i++) {
+    if (guest::LoadU32(base, engine + 12 + 8 * i) != 0) {
+      buffer = guest::LoadU32(base, engine + 12 + 8 * i);
+      break;
+    }
+  }
+  guest::StoreU32(base, out + 12, buffer);
+  guest::StoreU32(base, out + 16, guest::LoadU32(base, description + 76));
+  guest::StoreU32(base, out + 20, guest::LoadU32(base, description + 88));
+  const uint8_t count = guest::LoadU8(base, description + 57);
+  guest::StoreU8(base, out + 24, count != 0 ? count : 1);
+  const uint8_t channels = guest::LoadU8(base, description + 58);
+  guest::StoreU8(base, out + 25, channels != 0 ? channels : 6);
+  guest::StoreU32(base, out + 28, guest::LoadU32(base, description + 72));
+}
+
+std::optional<uint32_t> Reformat(uint8_t* base, uint32_t voice, uint32_t format,
+                                 uint32_t outputs, uint64_t r6, uint32_t frame,
+                                 const GuestCall& call) {
+  ITC_NATIVE_RUNNING("sub_8245DCF0 XAudioSourceVoice::Reformat");
+  if (!c_runtime::Memcpy(base, voice + 84, format, 56)) {
+    return std::nullopt;
+  }
+  const uint32_t codec = guest::LoadU32(base, voice + 76);
+  const uint32_t r3 = call(Method(base, codec, 112), 0x8245DD34, Args({codec, format, r6}));
+  if (int32_t(r3) < 0) {
+    return r3;
+  }
+  SourceOutputFormat(base, format, frame + 80);
+  return SetFormat(base, voice, frame + 80, outputs, call);
+}
+
+uint32_t BaseSize(uint8_t* base, uint32_t description, uint32_t out, uint32_t frame,
+                  const GuestCall& call) {
+  ITC_NATIVE_RUNNING("sub_82461158 XAudioVoice::BaseSize");
+  uint32_t r3 = 0;
+  uint32_t size = 0;
+  if (guest::LoadU32(base, description + 12) == 0) {
+    // A format of the description's channels at 48 kHz, at the frame's +96.
+    const uint32_t local = frame + 96;
+    for (uint32_t i = 0; i < 20; i += 4) {
+      guest::StoreU32(base, local + i, 0);
+    }
+    guest::StoreU8(base, local + 5, guest::LoadU8(base, description + 1));
+    guest::StoreU32(base, local + 8, kSampleRate);
+    // BufferSize can't refuse a rate of 48,000.
+    r3 = *BufferSize(base, local, frame + 80);
+    size = guest::LoadU32(base, frame + 80);
+  }
+  uint32_t effects = 0;
+  const uint32_t chain = guest::LoadU32(base, description + 8);
+  if (chain != 0 && guest::LoadU8(base, chain) != 0) {
+    for (uint32_t offset = 0; effects < guest::LoadU8(base, guest::LoadU32(base, description + 8));
+         offset += 4) {
+      const uint32_t id =
+          guest::LoadU32(base, guest::LoadU32(base, guest::LoadU32(base, description + 8) + 4) +
+                                   offset);
+      const uint32_t factory = guest::LoadU32(base, guest::LoadU32(base, kEngine) + 60);
+      uint32_t function = 0;
+      const uint32_t object = FactorySizeThunk(base, factory, &function);
+      r3 = call(function, 0x82461200, Args({object, id, frame + 80}));
+      if (int32_t(r3) < 0) {
+        return r3;
+      }
+      effects++;
+      size += guest::LoadU32(base, frame + 80);
+    }
+  }
+  guest::StoreU32(base, out, (effects << 3) + size);
+  return r3;
 }
 
 }  // namespace xaudio

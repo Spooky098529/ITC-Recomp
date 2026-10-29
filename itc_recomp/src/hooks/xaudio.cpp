@@ -7,7 +7,10 @@
 
 #include "base/flags.h"
 #include "hooks/guest_call.h"
+#include "hooks/heap.h"
 #include "xaudio/voices.h"
+
+#include <type_traits>
 
 ITC_FLAG_BOOL(native_xaudio, true, "ITC",
               "Run the parts of XAudio's voices made native (docs/functions/xaudio.md: "
@@ -19,7 +22,10 @@ ITC_FLAG_BOOL(native_xaudio, true, "ITC",
               "thunks sub_8245D610, sub_8245D630, sub_8245F6B0 and sub_8245F6D0, Release "
               "sub_8245F878, XAudioObject::Free sub_8245AAD8, ApplyVolume sub_8245DFC0, "
               "StopAndReset sub_8245DD60, SetEffectParameters sub_82461418, ReleaseOutputs "
-              "sub_82460A58, SetOutputMatrices sub_82460AB8 and SetFormat sub_82460778, their "
+              "sub_82460A58, SetOutputMatrices sub_82460AB8 and SetFormat sub_82460778; "
+              "XAudioSourceVoice::Describe sub_8245E010 and Reformat sub_8245DCF0, XAudio::Alloc "
+              "sub_8245EF80 (XMemAlloc's plain C++ while --native_heap routes the heap), "
+              "XAudioBuffer::ClearThunk sub_8245FA10 and XAudioVoice::BaseSize sub_82461158; their "
               "calls into the recompiled objects through the translated code) natively "
               "instead of through the translated code (the same reads and writes; XAudio's two "
               "locks stay the game's; checked by --run_harnesses=xaudio)");
@@ -109,8 +115,13 @@ template <typename Body>
 void Framed(PPCContext& ctx, uint8_t* base, uint32_t frame_bytes, Body body) {
   const uint64_t lr = ctx.lr;
   uint32_t r3 = 0;
-  guest_call::InFrame(ctx, base, frame_bytes, uint32_t(lr),
-                      [&](uint32_t) { r3 = body(Caller(ctx, base)); });
+  guest_call::InFrame(ctx, base, frame_bytes, uint32_t(lr), [&](uint32_t frame) {
+    if constexpr (std::is_invocable_v<Body, const xa::GuestCall&, uint32_t>) {
+      r3 = body(Caller(ctx, base), frame);
+    } else {
+      r3 = body(Caller(ctx, base));
+    }
+  });
   ctx.lr = lr;
   ctx.r3.u64 = r3;
 }
@@ -186,6 +197,53 @@ void XAudioSetFormat(PPCContext& ctx, uint8_t* base) {
   });
 }
 
+void XAudioSourceDescribe(PPCContext& ctx, uint8_t* base) {
+  xa::SourceDescribe(base, ctx.r3.u32, ctx.r4.u32);
+}
+
+void XAudioReformat(PPCContext& ctx, uint8_t* base) {
+  const uint32_t voice = ctx.r3.u32, format = ctx.r4.u32, outputs = ctx.r5.u32;
+  const uint64_t r6 = ctx.r6.u64;
+  bool refused = false;
+  const PPCContext saved = ctx;
+  Framed(ctx, base, 128, [&](const xa::GuestCall& call, uint32_t frame) {
+    if (const auto r3 = xa::Reformat(base, voice, format, outputs, r6, frame, call)) {
+      return *r3;
+    }
+    refused = true;
+    return 0u;
+  });
+  if (refused) {
+    ctx = saved;
+    __imp__sub_8245DCF0(ctx, base);
+  }
+}
+
+void XAudioAlloc(PPCContext& ctx, uint8_t* base) {
+  // XMemAlloc (sub_822976F8)'s plain C++ while the heap is the native
+  // layer's, else the original (a tail call to XMemAlloc's adapter).
+  if (NativeHeapActive()) {
+    ctx.r3.u64 = xa::Alloc(base, ctx.r4.u32, ctx.r5.u32);
+    return;
+  }
+  __imp__sub_8245EF80(ctx, base);
+}
+
+void XAudioBufferClearThunk(PPCContext& ctx, uint8_t* base) {
+  if (const auto r3 = xa::BufferClearThunk(base, ctx.r3.u32, ctx.r4.u32, ctx.r5.u32)) {
+    ctx.r3.u64 = *r3;
+    return;
+  }
+  __imp__sub_8245FA10(ctx, base);
+}
+
+void XAudioBaseSize(PPCContext& ctx, uint8_t* base) {
+  const uint32_t description = ctx.r3.u32, out = ctx.r4.u32;
+  Framed(ctx, base, 176, [&](const xa::GuestCall& call, uint32_t frame) {
+    return xa::BaseSize(base, description, out, frame, call);
+  });
+}
+
 }  // namespace hooks
 
 #define ITC_XAUDIO_ADAPTER(address, step)   \
@@ -220,3 +278,8 @@ ITC_XAUDIO_ADAPTER(82461418, XAudioSetEffectParameters)
 ITC_XAUDIO_ADAPTER(82460A58, XAudioReleaseOutputs)
 ITC_XAUDIO_ADAPTER(82460AB8, XAudioSetOutputMatrices)
 ITC_XAUDIO_ADAPTER(82460778, XAudioSetFormat)
+ITC_XAUDIO_ADAPTER(8245E010, XAudioSourceDescribe)
+ITC_XAUDIO_ADAPTER(8245DCF0, XAudioReformat)
+ITC_XAUDIO_ADAPTER(8245EF80, XAudioAlloc)
+ITC_XAUDIO_ADAPTER(8245FA10, XAudioBufferClearThunk)
+ITC_XAUDIO_ADAPTER(82461158, XAudioBaseSize)

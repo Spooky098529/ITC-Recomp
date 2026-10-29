@@ -9,7 +9,9 @@
 #include "harness.h"
 
 #include "base/log.h"
+#include "hooks/heap.h"
 #include "hooks/xaudio.h"
+#include "memory/c_runtime_heap.h"
 #include "memory/heap.h"
 #include "xaudio/voices.h"
 
@@ -146,7 +148,8 @@ void Buffers(Context& h, uint32_t block) {
            [&](Random& random, PPCContext& t) {
              // Type 0 most of the time (the only one with samples).
              guest::StoreU8(h.base, block, random.Below(4) != 0 ? 0 : uint8_t(random.Next()));
-             Store(h.base, block + 4, Rate(random));
+             guest::StoreU8(h.base, block + 5, uint8_t(random.Below(7)));
+             Store(h.base, block + 8, Rate(random));
              t.r3.u64 = block;
              t.r4.u64 = block + 0x100;
            },
@@ -360,6 +363,110 @@ void Calls(Context& h, uint32_t block) {
   }
 }
 
+void Descriptions(Context& h, uint32_t block) {
+  const bool engine = guest::LoadU32(h.base, xa::kEngine) != 0;
+  {
+    Results results("XAudioSourceVoice::Describe (sub_8245E010)");
+    for (int i = 0; engine && i < 48; i++) {
+      Case(h, results, block, __imp__sub_8245E010, hooks::XAudioSourceDescribe,
+           [&](Random& random, PPCContext& t) {
+             if (random.Below(2) == 0) {
+               guest::StoreU8(h.base, block, 4);
+               guest::StoreU8(h.base, block + 4, uint8_t(random.Below(9)));
+             }
+             if (random.Below(3) == 0) {
+               guest::StoreU8(h.base, block + 57, 0);
+             }
+             if (random.Below(3) == 0) {
+               guest::StoreU8(h.base, block + 58, 0);
+             }
+             t.r3.u64 = block;
+             t.r4.u64 = block + 0x1000;
+           },
+           fmt::format("case {}", i));
+    }
+    results.Report();
+  }
+  {
+    Results results("XAudioSourceVoice::Reformat (sub_8245DCF0)");
+    for (int i = 0; i < 48; i++) {
+      Case(h, results, block, __imp__sub_8245DCF0, hooks::XAudioReformat,
+           [&](Random& random, PPCContext& t) {
+             World(h.base, block, random);
+             Store(h.base, block + 76, AnyObject(random, block));
+             t.r3.u64 = block;
+             t.r4.u64 = block + 0x1F80;
+             t.r5.u64 = random.Below(2) == 0 ? 0 : block + kOutputs;
+             t.r6.u64 = random.Next();
+           },
+           fmt::format("case {}", i));
+    }
+    results.Report();
+  }
+  {
+    Results results("XAudioBuffer::ClearThunk (sub_8245FA10)");
+    for (int i = 0; i < 48; i++) {
+      Case(h, results, block, __imp__sub_8245FA10, hooks::XAudioBufferClearThunk,
+           [&](Random& random, PPCContext& t) {
+             guest::StoreU8(h.base, block + 13, uint8_t(1 + random.Below(6)));
+             Store(h.base, block + 16, Rate(random));
+             Store(h.base, block + 24, Rate(random));
+             guest::StoreU8(h.base, block + 21, uint8_t(random.Below(7)));
+             Store(h.base, block + 28, block + 0x400);
+             guest::StoreU8(h.base, block + 0x101, uint8_t(random.Below(8)));
+             Store(h.base, block + 0x104, Rate(random));
+             t.r3.u64 = block + 8;
+             t.r4.u64 = random.Below(3) == 0 ? 0 : block + 0x100;
+             t.r5.u64 = random.Next();
+           },
+           fmt::format("case {}", i));
+    }
+    results.Report();
+  }
+  {
+    // Without effects: the effects' sizes come from the live engine's
+    // factory, whose methods take other arguments by id (the matrix
+    // object's, id 1, reads r5 as its parameters), so its path is left to
+    // the game (the car sounds' submix has a reverb).
+    Results results("XAudioVoice::BaseSize (sub_82461158)");
+    for (int i = 0; engine && i < 48; i++) {
+      Case(h, results, block, __imp__sub_82461158, hooks::XAudioBaseSize,
+           [&](Random& random, PPCContext& t) {
+             const uint32_t description = block + 0x1A00;
+             if (random.Below(2) == 0) {
+               Store(h.base, description + 12, 0);
+             }
+             guest::StoreU8(h.base, description + 1, uint8_t(random.Below(7)));
+             Store(h.base, description + 8, random.Below(4) == 0 ? 0 : block + 0x1B00);
+             guest::StoreU8(h.base, block + 0x1B00, 0);
+             t.r3.u64 = description;
+             t.r4.u64 = block + 0x1C00;
+           },
+           fmt::format("case {}", i));
+    }
+    results.Report();
+  }
+  {
+    // Two allocations can't match: whether each gave a block, then freed.
+    Results results("XAudio::Alloc (sub_8245EF80)");
+    for (int i = 0; hooks::NativeHeapActive() && i < 8; i++) {
+      Outputs out[2];
+      for (int v = 0; v < 2; v++) {
+        PPCContext t = CallContext(h);
+        t.r4.u64 = 64 + 64 * i;
+        t.r5.u64 = 0x61820006;
+        (v == 0 ? __imp__sub_8245EF80 : hooks::XAudioAlloc)(t, h.base);
+        out[v].Word(t.r3.u32 != 0);
+        if (t.r3.u32 != 0) {
+          memory::crt::XMemFree(t.r3.u32, 0x61820006);
+        }
+      }
+      results.Check(out[0], out[1], fmt::format("{} bytes", 64 + 64 * i));
+    }
+    results.Report();
+  }
+}
+
 }  // namespace
 
 void XAudio(Context& h) {
@@ -368,6 +475,7 @@ void XAudio(Context& h) {
   Buffers(h, block.address);
   Accessors(h, block.address);
   Calls(h, block.address);
+  Descriptions(h, block.address);
 }
 
 }  // namespace harness

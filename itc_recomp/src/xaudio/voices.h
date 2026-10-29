@@ -44,10 +44,12 @@ void SubmixDescribe(uint8_t* base, uint32_t description, uint32_t out);
 // `out`, or 0 (nothing written) for pairs it doesn't cover.
 uint32_t DefaultMatrix(uint8_t* base, uint32_t inputs, uint32_t outputs, uint32_t out);
 
-// XAudioBuffer::Size (sub_8245FA28): the size of a buffer for the 8-byte
-// voice format at `format` to [out]; returns 0. nullopt, with nothing
-// written, when the format's rate is 0 or above 48,000 (the original
-// traps on its divisions).
+// XAudioBuffer::Size (sub_8245FA28): the size of a buffer to [out] for
+// `format` (+0 a type byte, then an 8-byte voice format at +4: +5 the
+// channels, +8 the rate), (256 / (48,000 / the rate)) x the channels x 4 +
+// 128 + 36 for type 0, else 36; returns 0. nullopt, with nothing written,
+// when the rate is 0 or above 48,000 (the original traps on its
+// divisions).
 std::optional<uint32_t> BufferSize(uint8_t* base, uint32_t format, uint32_t out);
 
 // XAudioBuffer::Clear (sub_8245F8E8): checks the format at `format` (0: the
@@ -157,5 +159,43 @@ uint32_t SetOutputMatrices(uint8_t* base, uint32_t voice, uint32_t matrices,
 // (set output voices) with `outputs`. Returns its r3.
 uint32_t SetFormat(uint8_t* base, uint32_t voice, uint32_t format, uint32_t outputs,
                    const GuestCall& call);
+
+// XAudio::Alloc (sub_8245EF80): XMemAlloc (sub_822976F8)'s plain C++ with
+// `size` and `attributes`. Only while hooks::NativeHeapActive().
+uint32_t Alloc(uint8_t* base, uint32_t size, uint32_t attributes);
+
+// XAudioBuffer::ClearThunk (sub_8245FA10): BufferClear on the object 8 bytes
+// before the interface at `iface` (0 stays 0); nullopt where it refuses.
+std::optional<uint32_t> BufferClearThunk(uint8_t* base, uint32_t iface, uint32_t format,
+                                         uint32_t flags);
+
+// XAudioSourceVoice::Describe (sub_8245E010): the 32-byte voice
+// description at `out` (cleared) for the source description at
+// `description`: +0 the output format (SourceOutputFormat), +8 the effect
+// chain (+68), +12 the engine's first buffer of the six (+12 + 8i) that's
+// set, +16 the callback (+76), +20 its context (+88), +24 the output count
+// (+57, 1 when 0), +25 the outputs' channels (+58, 6 when 0), +28 the
+// outputs (+72).
+void SourceDescribe(uint8_t* base, uint32_t description, uint32_t out);
+
+// XAudioSourceVoice::Reformat (sub_8245DCF0): the 56-byte format at
+// `format` copied to +84, the codec's (+76) slot +112 with the format and
+// `r6`; when that succeeds, its output format (SourceOutputFormat, at the
+// frame's +80) set with `outputs` (SetFormat). Returns the last call's r3.
+// nullopt, with nothing done, where memcpy's plain C++ refuses the copy.
+std::optional<uint32_t> Reformat(uint8_t* base, uint32_t voice, uint32_t format,
+                                 uint32_t outputs, uint64_t r6, uint32_t frame,
+                                 const GuestCall& call);
+
+// XAudioVoice::BaseSize (sub_82461158): the size of a voice's base part for
+// the voice description at `description` to [out]: an output buffer's
+// (XAudioBuffer::Size for a format of its +1 channels at 48 kHz, at the
+// frame's +96) when none is given (+12), plus each of the effect chain's
+// (+8: count byte +0, +4 the ids) objects' sizes from the engine's factory
+// (its slot +20 through XAudioFactory::Size's thunk, the size at the
+// frame's +80) and 8 bytes each. Returns the last call's r3 (on a failure,
+// with nothing written).
+uint32_t BaseSize(uint8_t* base, uint32_t description, uint32_t out, uint32_t frame,
+                  const GuestCall& call);
 
 }  // namespace xaudio
