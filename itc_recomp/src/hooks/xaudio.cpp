@@ -6,6 +6,7 @@
 #include "hooks/xaudio.h"
 
 #include "base/flags.h"
+#include "base/log.h"
 #include "hooks/guest_call.h"
 #include "hooks/heap.h"
 #include "xaudio/voices.h"
@@ -821,7 +822,16 @@ ITC_XAUDIO_ADAPTER(8245FA80, XAudioBufferCreate)
 ITC_XAUDIO_ADAPTER(82461500, XAudioVoiceConstruct)
 ITC_XAUDIO_ADAPTER(82460688, XAudioGetAllocator)
 ITC_XAUDIO_ADAPTER(82460BF0, XAudioSetOutputVoices)
-ITC_XAUDIO_ADAPTER(8245F228, XAudioSetOutputVoices)
+// sub_8245F228 is only a jump to SetOutputVoices, with no plain C++ of its
+// own: its print is here.
+extern "C" REX_FUNC(sub_8245F228) {
+  if (!ITC_FLAG(native_xaudio)) {
+    __imp__sub_8245F228(ctx, base);
+    return;
+  }
+  ITC_NATIVE_RUNNING("sub_8245F228 XAudioSubmixVoice::SetOutputVoices (jump)");
+  hooks::XAudioSetOutputVoices(ctx, base);
+}
 ITC_XAUDIO_ADAPTER(82461070, XAudioPass)
 ITC_XAUDIO_ADAPTER(82461D50, XAudioInitBase)
 ITC_XAUDIO_ADAPTER(82461E88, XAudioProcessEffects)
