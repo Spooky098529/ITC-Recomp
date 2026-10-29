@@ -878,6 +878,225 @@ void Queue(Context& h, uint32_t block) {
   }
 }
 
+// --- The output matrix and the volume meter ---
+
+constexpr uint32_t kSamplesBytes = 0x3000;
+
+// A sample worth mixing: mostly in [-1, 1], with the edge floats now and
+// then.
+uint32_t Sample(Random& random) {
+  if (random.Below(32) == 0) {
+    return AnyFloat(random);
+  }
+  return std::bit_cast<uint32_t>(float(int32_t(random.Below(20001)) - 10000) / 10000.0f);
+}
+
+// The block and a samples region (16-aligned, from the allocation layer)
+// filled with the same random words and samples for both versions, the
+// stack below the call too; the block, the samples (their floats compared
+// as floats), the spin lock's depth and owner and r3 compared.
+template <typename Setup>
+void SamplesCase(Context& h, Results& results, uint32_t block, uint32_t samples,
+                 GuestFunction recompiled, GuestFunction native, Setup setup,
+                 const std::string& what) {
+  const Random start = h.random;
+  Random random = start;
+  Outputs out[2];
+  for (int v = 0; v < 2; v++) {
+    random = start;
+    for (uint32_t i = 0; i < kBlockBytes; i += 4) {
+      Store(h.base, block + i, uint32_t(random.Next()));
+    }
+    for (uint32_t i = 0; i < kSamplesBytes; i += 4) {
+      Store(h.base, samples + i, Sample(random));
+    }
+    PPCContext t = CallContext(h);
+    for (uint32_t i = 4; i <= 0x400; i += 4) {
+      Store(h.base, t.r1.u32 - i, uint32_t(random.Next()));
+    }
+    setup(random, t);
+    (v == 0 ? recompiled : native)(t, h.base);
+    out[v].Word(guest::LoadU32(h.base, xa::kSpinLock + 4));
+    out[v].Word(guest::LoadU32(h.base, xa::kSpinLock + 8) == t.r13.u32);
+    out[v].Bytes(Read(h.base, block, kBlockBytes));
+    out[v].Floats(h.base, samples, kSamplesBytes / 4);
+    R3(out[v], t.r3.u64);
+  }
+  h.random = random;
+  results.Check(out[0], out[1], what);
+}
+
+// A matrix object at `matrix` (+16 its count of entries at +20, +24 the
+// entries allowed, +25 the highest output channel + 1, +26 overwrite).
+void Matrix(uint8_t* base, uint32_t matrix, uint32_t entries, Random& random,
+            uint32_t in_channels, uint32_t out_channels) {
+  guest::StoreU8(base, matrix + 16, uint8_t(random.Below(7)));
+  Store(base, matrix + 20, entries);
+  guest::StoreU8(base, matrix + 24, 8);
+  guest::StoreU8(base, matrix + 25, uint8_t(random.Below(6) == 0 ? 4 + random.Below(4) : random.Below(4)));
+  guest::StoreU8(base, matrix + 26, uint8_t(random.Below(8) == 0 ? 2 : random.Below(2)));
+  for (uint32_t k = 0; k < 8; k++) {
+    guest::StoreU8(base, entries + 12 * k, uint8_t(random.Below(in_channels)));
+    guest::StoreU8(base, entries + 12 * k + 1, uint8_t(random.Below(out_channels)));
+    Store(base, entries + 12 * k + 4, random.Below(4) == 0 ? AnyFloat(random) : Sample(random));
+    Store(base, entries + 12 * k + 8, random.Below(4) == 0 ? AnyFloat(random) : Sample(random));
+  }
+}
+
+// A buffer object at `buffer` (its interface at +8) over `samples`: +12
+// its own format (3 channels of capacity at 48 kHz), +20 the current one
+// (`channels` at 48 kHz), +28 the samples.
+void Buffer(uint8_t* base, uint32_t buffer, uint32_t samples, uint32_t channels) {
+  guest::StoreU8(base, buffer + 12, 0);
+  guest::StoreU8(base, buffer + 13, 3);
+  Store(base, buffer + 16, 48000);
+  guest::StoreU8(base, buffer + 20, 0);
+  guest::StoreU8(base, buffer + 21, uint8_t(channels));
+  Store(base, buffer + 24, 48000);
+  Store(base, buffer + 28, samples);
+}
+
+void MatrixAndMeter(Context& h, uint32_t block) {
+  const auto none = [](Outputs&, uint32_t) {};
+  {
+    Results results("XAudioMatrix::SetMatrix (sub_82465E50)");
+    for (int i = 0; i < 48; i++) {
+      LockedCase(h, results, block, __imp__sub_82465E50, hooks::XAudioMatrixSetMatrix,
+                 i % 2 == 0,
+                 [&](Random& random, PPCContext& t) {
+                   const uint32_t matrix = block + 0x100, levels = block + 0x200;
+                   Store(h.base, matrix + 20, block + 0x140);
+                   guest::StoreU8(h.base, matrix + 24, uint8_t(random.Below(9)));
+                   guest::StoreU8(h.base, levels, uint8_t(random.Below(10)));
+                   Store(h.base, levels + 4, levels + 0x10);
+                   for (uint32_t k = 0; k < 10; k++) {
+                     Store(h.base, levels + 0x14 + 8 * k, AnyFloat(random));
+                   }
+                   t.r3.u64 = matrix;
+                   t.r4.u64 = i % 8 == 7 ? 0 : levels;
+                 },
+                 none, fmt::format("case {}", i));
+    }
+    results.Report();
+  }
+  {
+    Results results("XAudioMatrix::SetLevels (sub_82466188)");
+    for (int i = 0; i < 48; i++) {
+      LockedCase(h, results, block, __imp__sub_82466188, hooks::XAudioMatrixSetLevels,
+                 i % 2 == 0,
+                 [&](Random& random, PPCContext& t) {
+                   const uint32_t matrix = block + 0x100, levels = block + 0x200;
+                   Store(h.base, matrix + 20, block + 0x140);
+                   guest::StoreU8(h.base, matrix + 16, uint8_t(random.Below(9)));
+                   guest::StoreU8(h.base, levels, uint8_t(random.Below(8)));
+                   Store(h.base, levels + 4, levels + 0x10);
+                   for (uint32_t k = 0; k < 8; k++) {
+                     guest::StoreU8(h.base, levels + 0x10 + 8 * k, uint8_t(random.Below(9)));
+                     Store(h.base, levels + 0x14 + 8 * k, AnyFloat(random));
+                   }
+                   t.r3.u64 = matrix;
+                   t.r4.u64 = levels;
+                   t.r5.u64 = random.Below(2) == 0 ? 0 : random.Next();
+                 },
+                 none, fmt::format("case {}", i));
+    }
+    results.Report();
+  }
+  {
+    // The matrix's slots +40 and +32 the game's SetMatrix and SetOverwrite.
+    Results results("XAudioMatrix::Init (sub_82465C30)");
+    for (int i = 0; i < 32; i++) {
+      RealCase(h, results, block, __imp__sub_82465C30, hooks::XAudioMatrixInit,
+               [&](Random& random, PPCContext& t, uint32_t allocator) {
+                 const uint32_t matrix = block + 0x100, descriptor = block + 0x1800;
+                 Store(h.base, matrix, block + 0x1C00);
+                 Store(h.base, block + 0x1C00 + 40, 0x82465E50);
+                 Store(h.base, block + 0x1C00 + 32, 0x82465C08);
+                 guest::StoreU8(h.base, descriptor + 8, uint8_t(random.Below(8)));
+                 guest::StoreU8(h.base, descriptor + 9, uint8_t(random.Below(3)));
+                 const uint32_t levels = block + 0x200;
+                 Store(h.base, descriptor + 12, i % 8 == 7 ? 0 : levels);
+                 guest::StoreU8(h.base, levels, uint8_t(random.Below(9)));
+                 Store(h.base, levels + 4, levels + 0x10);
+                 t.r3.u64 = matrix;
+                 t.r4.u64 = descriptor;
+                 t.r5.u64 = allocator;
+               },
+               none, fmt::format("case {}", i));
+    }
+    results.Report();
+  }
+  const uint32_t samples_block = memory::Alloc(kSamplesBytes + 16, 0);
+  const uint32_t samples = (samples_block + 15) & ~15u;
+  {
+    Results results("XAudioMatrix::MixRamp (sub_82466310)");
+    for (int i = 0; i < 48; i++) {
+      SamplesCase(h, results, block, samples, __imp__sub_82466310, hooks::XAudioMatrixMixRamp,
+                  [&](Random& random, PPCContext& t) {
+                    for (uint32_t k = 0; k < 8; k++) {
+                      Store(h.base, block + 0x100 + 4 * k,
+                            random.Below(4) == 0 ? AnyFloat(random) : Sample(random));
+                    }
+                    t.r3.u64 = samples + 0x1000 + 16 * random.Below(4);
+                    t.r4.u64 = samples + 4 * random.Below(8);
+                    t.r5.u64 = block + 0x100 + 4 * random.Below(2);
+                    t.r6.u64 = block + 0x110;
+                    t.r7.u64 = i < 8 ? 256 : random.Below(257);
+                  },
+                  fmt::format("case {}", i));
+    }
+    results.Report();
+  }
+  {
+    // Sources of 1-2 channels at +0x400, targets of 1-3 at +0x500 (their
+    // interfaces at +8), the matrix at +0x100 with up to 6 entries over
+    // channels 0-2 in and 0-3 out; the same buffer as both now and then (no
+    // entries: nothing).
+    Results results("XAudioMatrix::Mix (sub_82466440)");
+    for (int i = 0; i < 96; i++) {
+      SamplesCase(h, results, block, samples, __imp__sub_82466440, hooks::XAudioMatrixMix,
+                  [&](Random& random, PPCContext& t) {
+                    const uint32_t matrix = block + 0x100;
+                    Matrix(h.base, matrix, block + 0x140, random, 3, 4);
+                    if (i % 4 == 0) {
+                      guest::StoreU8(h.base, matrix + 16, 0);
+                    }
+                    Buffer(h.base, block + 0x400, samples, 1 + random.Below(2));
+                    Buffer(h.base, block + 0x500, samples + 0x1000, 1 + random.Below(3));
+                    t.r3.u64 = matrix;
+                    t.r4.u64 = block + 0x408;
+                    t.r5.u64 = i % 16 == 15 ? block + 0x408 : block + 0x508;
+                  },
+                  fmt::format("case {}", i));
+    }
+    results.Report();
+  }
+  {
+    // 1-8 meter channels over buffers of 1-8 (8 over 6 for the
+    // fold-downs), a history of 0-4 slots.
+    Results results("VolumeMeter::Process (sub_825A6210)");
+    for (int i = 0; i < 48; i++) {
+      SamplesCase(h, results, block, samples, __imp__sub_825A6210, hooks::XAudioMeterProcess,
+                  [&](Random& random, PPCContext& t) {
+                    const uint32_t meter = block + 0x100;
+                    const bool fold = i % 3 == 0;
+                    Store(h.base, meter + 16, fold ? 8 : 1 + random.Below(8));
+                    Store(h.base, meter + 20, random.Below(5));
+                    Store(h.base, meter + 24, random.Below(11));
+                    Store(h.base, meter + 28, block + 0x800);
+                    Store(h.base, meter + 32, block + 0xC00);
+                    Store(h.base, meter + 36, block + 0x1000);
+                    Buffer(h.base, block + 0x400, samples, fold ? 6 : 1 + random.Below(8));
+                    t.r3.u64 = meter;
+                    t.r4.u64 = block + 0x408;
+                  },
+                  fmt::format("case {}", i));
+    }
+    results.Report();
+  }
+  memory::Free(samples_block);
+}
+
 }  // namespace
 
 void XAudioObjects(Context& h) {
@@ -886,6 +1105,7 @@ void XAudioObjects(Context& h) {
   Lists(h, block.address);
   Construction(h, block.address);
   Queue(h, block.address);
+  MatrixAndMeter(h, block.address);
 }
 
 }  // namespace harness

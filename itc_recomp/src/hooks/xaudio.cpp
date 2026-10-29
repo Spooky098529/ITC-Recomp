@@ -78,7 +78,7 @@ void XAudioBufferSize(PPCContext& ctx, uint8_t* base) {
 
 void XAudioBufferClear(PPCContext& ctx, uint8_t* base) {
   if (const auto r3 = xa::BufferClear(base, ctx.r3.u32, ctx.r4.u32, ctx.r5.u32)) {
-    ctx.r3.u64 = *r3;
+    ctx.r3.s64 = int32_t(*r3);  // the errors as the original's lis/ori leave them
     return;
   }
   __imp__sub_8245F8E8(ctx, base);
@@ -293,7 +293,7 @@ void XAudioAlloc(PPCContext& ctx, uint8_t* base) {
 
 void XAudioBufferClearThunk(PPCContext& ctx, uint8_t* base) {
   if (const auto r3 = xa::BufferClearThunk(base, ctx.r3.u32, ctx.r4.u32, ctx.r5.u32)) {
-    ctx.r3.u64 = *r3;
+    ctx.r3.s64 = int32_t(*r3);  // the errors as the original's lis/ori leave them
     return;
   }
   __imp__sub_8245FA10(ctx, base);

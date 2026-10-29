@@ -271,4 +271,53 @@ std::optional<uint64_t> XmaCodecSubmitRegion(uint8_t* base, uint32_t codec, uint
                                              uint32_t flags, uint32_t thread, uint32_t frame,
                                              const GuestCall& call);
 
+// --- The output matrix (under the voice lists' spin lock) ---
+
+// XAudioMatrix::Init (sub_82465C30): +24 the entries (the larger of the
+// descriptor's +8 and its default matrix's count byte), +20 their 12-byte
+// entries from the allocator's slot +20 (when there are any), slot +40
+// (SetMatrix) with the default matrix, then on success slot +32
+// (SetOverwrite) with the descriptor's +9. Returns the last call's r3.
+// `frame` is its (112 bytes).
+uint64_t MatrixInit(uint8_t* base, uint32_t matrix, uint32_t descriptor, uint32_t allocator,
+                    uint32_t frame, const GuestCall& call);
+// XAudioMatrix::SetMatrix (sub_82465E50): under the spin lock, the entries
+// from `levels` (0: none), +25 the highest output channel + 1; 0, or
+// E_INVALIDARG past +24.
+uint64_t MatrixSetMatrix(uint8_t* base, uint32_t matrix, uint32_t levels, uint32_t thread,
+                         const GuestCall& call);
+// XAudioMatrix::SetLevels (sub_82466188): under the spin lock, each given
+// entry's target level, and its current one too when `now`'s low byte
+// isn't 0; E_INVALIDARG at the first index past +16 (the entries before it
+// set).
+uint64_t MatrixSetLevels(uint8_t* base, uint32_t matrix, uint32_t levels, uint32_t now,
+                         uint32_t thread, const GuestCall& call);
+// XAudioMatrix::MixRamp (sub_82466310): out += in x the level, 16 frames a
+// loop of 4-frame vectors (aligned down, as lvx and stvx), the level from
+// `start` stepping by `step` (4 floats each) every 4 frames; vmaddfp as
+// the translated code computes it (a product, then a sum), with the vector
+// unit's flush to zero on. Returns r3 as the original leaves it (the last
+// loop's input less 32 bytes, or `out` with no loop).
+uint64_t MatrixMixRamp(uint8_t* base, uint64_t out, uint64_t in, uint32_t start, uint32_t step,
+                       uint32_t frames);
+// XAudioMatrix::Mix (sub_82466440): the source's channels into the
+// target's by the entries (each ramped from its current level to its
+// target over the pass, then current = target), or with none each channel
+// as it is; overwriting (+26) clears the target first and stores instead
+// of adding. Under the spin lock; its locals in its frame as the original
+// (`frame`, 288 bytes). Returns 0, or a format's or the clear's error.
+uint64_t MatrixMix(uint8_t* base, uint32_t matrix, uint32_t source, uint32_t target,
+                   uint32_t thread, uint32_t frame, const GuestCall& call);
+
+// --- The volume meter ---
+
+// VolumeMeter::Process (sub_825A6210): for each of its channels (+16), the
+// pass's RMS, peak and the threshold sum (a sample past the float at
+// 0x82072298 adds it) to the history slot ((+24 mod +20) x +16 + the
+// channel) of +36, +32 and +28; with 8 meter channels over a 6-channel
+// buffer, the two fold-downs to slots 6 and 7 of the arrays' first words;
+// +24 up by one, +44 = 1 when it reaches +16; 0. `frame` is its (112
+// bytes).
+uint64_t MeterProcess(uint8_t* base, uint32_t meter, uint32_t buffer, uint32_t frame);
+
 }  // namespace xaudio

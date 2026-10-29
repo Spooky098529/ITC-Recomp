@@ -64,4 +64,12 @@ void XAudioPcmCodecSubmitPacket(PPCContext& ctx, uint8_t* base);     // sub_8246
 void XAudioXmaCodecSubmitRegion(PPCContext& ctx, uint8_t* base);     // sub_8246A860
 void XAudioCodecOnSubmit(PPCContext& ctx, uint8_t* base);            // sub_82469AF8 (harness)
 
+// The output matrix and the volume meter.
+void XAudioMatrixInit(PPCContext& ctx, uint8_t* base);       // sub_82465C30
+void XAudioMatrixSetMatrix(PPCContext& ctx, uint8_t* base);  // sub_82465E50
+void XAudioMatrixSetLevels(PPCContext& ctx, uint8_t* base);  // sub_82466188
+void XAudioMatrixMix(PPCContext& ctx, uint8_t* base);        // sub_82466440
+void XAudioMatrixMixRamp(PPCContext& ctx, uint8_t* base);    // sub_82466310 (harness)
+void XAudioMeterProcess(PPCContext& ctx, uint8_t* base);     // sub_825A6210
+
 }  // namespace hooks

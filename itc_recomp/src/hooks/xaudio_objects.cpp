@@ -411,6 +411,55 @@ void XAudioXmaCodecSubmitRegion(PPCContext& ctx, uint8_t* base) {
            });
 }
 
+// --- The output matrix and the volume meter ---
+
+void XAudioMatrixInit(PPCContext& ctx, uint8_t* base) {
+  const uint32_t matrix = ctx.r3.u32, descriptor = ctx.r4.u32, allocator = ctx.r5.u32;
+  Framed(ctx, base, 112, [&](const xa::GuestCall& call, uint32_t frame) {
+    return xa::MatrixInit(base, matrix, descriptor, allocator, frame, call);
+  });
+}
+
+void XAudioMatrixSetMatrix(PPCContext& ctx, uint8_t* base) {
+  ctx.fpscr.disableFlushMode();
+  const uint32_t matrix = ctx.r3.u32, levels = ctx.r4.u32;
+  const uint32_t thread = Thread(ctx, base);
+  Framed(ctx, base, 128, [&](const xa::GuestCall& call, uint32_t) {
+    return xa::MatrixSetMatrix(base, matrix, levels, thread, call);
+  });
+}
+
+void XAudioMatrixSetLevels(PPCContext& ctx, uint8_t* base) {
+  ctx.fpscr.disableFlushMode();
+  const uint32_t matrix = ctx.r3.u32, levels = ctx.r4.u32, now = ctx.r5.u32;
+  const uint32_t thread = Thread(ctx, base);
+  Framed(ctx, base, 144, [&](const xa::GuestCall& call, uint32_t) {
+    return xa::MatrixSetLevels(base, matrix, levels, now, thread, call);
+  });
+}
+
+void XAudioMatrixMix(PPCContext& ctx, uint8_t* base) {
+  ctx.fpscr.disableFlushMode();
+  const uint32_t matrix = ctx.r3.u32, source = ctx.r4.u32, target = ctx.r5.u32;
+  const uint32_t thread = Thread(ctx, base);
+  Framed(ctx, base, 288, [&](const xa::GuestCall& call, uint32_t frame) {
+    return xa::MatrixMix(base, matrix, source, target, thread, frame, call);
+  });
+}
+
+void XAudioMatrixMixRamp(PPCContext& ctx, uint8_t* base) {
+  ctx.fpscr.disableFlushMode();
+  ctx.r3.u64 = xa::MatrixMixRamp(base, ctx.r3.u64, ctx.r4.u64, ctx.r5.u32, ctx.r6.u32, ctx.r7.u32);
+}
+
+void XAudioMeterProcess(PPCContext& ctx, uint8_t* base) {
+  ctx.fpscr.disableFlushMode();
+  const uint32_t meter = ctx.r3.u32, buffer = ctx.r4.u32;
+  Framed(ctx, base, 112, [&](const xa::GuestCall&, uint32_t frame) {
+    return xa::MeterProcess(base, meter, buffer, frame);
+  });
+}
+
 }  // namespace hooks
 
 #define ITC_XAUDIO_OBJECTS_ADAPTER(address, step) \
@@ -462,3 +511,8 @@ ITC_XAUDIO_OBJECTS_ADAPTER(82469EF8, XAudioCodecSubmitPacket)
 ITC_XAUDIO_OBJECTS_ADAPTER(8246A1C0, XAudioCodecSubmitRegion)
 ITC_XAUDIO_OBJECTS_ADAPTER(8246CEB8, XAudioPcmCodecSubmitPacket)
 ITC_XAUDIO_OBJECTS_ADAPTER(8246A860, XAudioXmaCodecSubmitRegion)
+ITC_XAUDIO_OBJECTS_ADAPTER(82465C30, XAudioMatrixInit)
+ITC_XAUDIO_OBJECTS_ADAPTER(82465E50, XAudioMatrixSetMatrix)
+ITC_XAUDIO_OBJECTS_ADAPTER(82466188, XAudioMatrixSetLevels)
+ITC_XAUDIO_OBJECTS_ADAPTER(82466440, XAudioMatrixMix)
+ITC_XAUDIO_OBJECTS_ADAPTER(825A6210, XAudioMeterProcess)

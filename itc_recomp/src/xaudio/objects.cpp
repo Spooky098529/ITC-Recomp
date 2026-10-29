@@ -10,6 +10,7 @@
 #include "c_runtime/math.h"
 #include "c_runtime/strings.h"
 #include "guest.h"
+#include "xaudio/engine.h"
 
 #include <rex/platform/fpscr.h>
 #include <rex/ppc/intrinsics.h>
@@ -71,10 +72,11 @@ void Copy(uint8_t* base, uint32_t destination, uint32_t source, uint32_t size,
   }
 }
 
-// A float word copied through a float register (lfs, then stfs).
+// A float word copied through a float register (lfs, then stfs): its bits,
+// as the translated code leaves them (its conversions there fold away, a
+// signaling NaN kept, seen in SetMatrix's harness cases).
 void CopyFloat(uint8_t* base, uint32_t destination, uint32_t source) {
-  volatile double value = guest::LoadFloat(base, source);
-  guest::StoreFloat(base, destination, float(value));
+  guest::StoreU32(base, destination, guest::LoadU32(base, source));
 }
 
 }  // namespace
@@ -1062,6 +1064,466 @@ std::optional<uint64_t> XmaCodecSubmitRegion(uint8_t* base, uint32_t codec, uint
   const uint32_t mode = (flags & 0xFF) | 16;
   SetRegs(call, Args({codec + 16, from, mode}));
   return CodecSubmitRegion(base, codec + 16, from, mode, thread, Below(base, frame, 144), call);
+}
+
+// --- The output matrix ---
+
+namespace {
+
+using Vec = simde__m128i;
+
+// lvx and stvx (aligned down, the words byte-swapped and the lanes in the
+// translated code's order) and lvlx, as the translated code does them.
+Vec LoadAligned(uint8_t* base, uint32_t address) {
+  return simde_mm_shuffle_epi8(
+      simde_mm_load_si128(reinterpret_cast<const Vec*>(REX_RAW_ADDR(address & ~0xFu))),
+      simde_mm_load_si128(reinterpret_cast<const Vec*>(rex::ppc::VectorMaskL)));
+}
+Vec LoadLeft(uint8_t* base, uint32_t address) {
+  return simde_mm_shuffle_epi8(
+      simde_mm_load_si128(reinterpret_cast<const Vec*>(REX_RAW_ADDR(address & ~0xFu))),
+      simde_mm_load_si128(
+          reinterpret_cast<const Vec*>(&rex::ppc::VectorMaskL[(address & 0xF) * 16])));
+}
+void StoreAligned(uint8_t* base, uint32_t address, Vec value) {
+  simde_mm_store_si128(
+      reinterpret_cast<Vec*>(REX_RAW_ADDR(address & ~0xFu)),
+      simde_mm_shuffle_epi8(value,
+                            simde_mm_load_si128(reinterpret_cast<const Vec*>(rex::ppc::VectorMaskL))));
+}
+// vspltw of the first lane.
+Vec SplatFirst(Vec value) { return simde_mm_shuffle_epi32(value, 0xFF); }
+
+// The vector unit's float operations with flush to zero on (the translated
+// code's enableFlushMode before them); the operands in its order, each
+// passed through an empty asm so nothing moves across the control word.
+struct FlushToZero {
+  FlushToZero() : csr(Fpscr::getcsr()) { Fpscr::setcsr(csr | uint32_t(Fpscr::FlushMask)); }
+  ~FlushToZero() { Fpscr::setcsr(csr); }
+  uint32_t csr;
+};
+Vec Pin(Vec value) {
+  asm volatile("" : "+x"(value));
+  return value;
+}
+Vec Add(Vec a, Vec b) {
+  return Pin(simde_mm_castps_si128(
+      simde_mm_add_ps(simde_mm_castsi128_ps(Pin(a)), simde_mm_castsi128_ps(Pin(b)))));
+}
+Vec Mul(Vec a, Vec b) {
+  return Pin(simde_mm_castps_si128(
+      simde_mm_mul_ps(simde_mm_castsi128_ps(Pin(a)), simde_mm_castsi128_ps(Pin(b)))));
+}
+// vmaddfp as the translated code computes it: a x b, then + c.
+Vec Madd(Vec a, Vec b, Vec c) { return Add(Mul(a, b), c); }
+
+// The float word at `address` as lfs loads it.
+double LoadSingle(uint8_t* base, uint32_t address) {
+  return double(guest::LoadFloat(base, address));
+}
+
+}  // namespace
+
+uint64_t MatrixInit(uint8_t* base, uint32_t matrix, uint32_t descriptor, uint32_t allocator,
+                    uint32_t frame, const GuestCall& call) {
+  ITC_NATIVE_RUNNING("sub_82465C30 XAudioMatrix::Init");
+  const uint32_t levels = guest::LoadU32(base, descriptor + 12);
+  uint32_t entries = guest::LoadU8(base, descriptor + 8);
+  if (levels != 0) {
+    const uint32_t count = guest::LoadU8(base, levels);
+    if (entries <= count) {
+      entries = count;
+    }
+  }
+  guest::StoreU8(base, matrix + 24, uint8_t(entries));
+  if (entries != 0) {
+    const uint64_t array = Allocate(base, allocator, entries * 12, 0x82465CA4, frame, call);
+    guest::StoreU32(base, matrix + 20, uint32_t(array));
+  }
+  call(Method(base, matrix, 40), 0x82465CC0,
+       At(frame, Args({matrix, guest::LoadU32(base, descriptor + 12)})));
+  if (int32_t(LastCallR3()) < 0) {
+    return LastCallR3();
+  }
+  call(Method(base, matrix, 32), 0x82465CE0,
+       At(frame, Args({matrix, guest::LoadU8(base, descriptor + 9)})));
+  return LastCallR3();
+}
+
+uint64_t MatrixSetMatrix(uint8_t* base, uint32_t matrix, uint32_t levels, uint32_t thread,
+                         const GuestCall& call) {
+  ITC_NATIVE_RUNNING("sub_82465E50 XAudioMatrix::SetMatrix");
+  SpinTake(base, thread, call);
+  if (levels == 0) {
+    guest::StoreU8(base, matrix + 16, 0);
+    guest::StoreU8(base, matrix + 25, 0);
+    SpinRelease(base, thread, call);
+    return 0;
+  }
+  const uint8_t count = guest::LoadU8(base, levels);
+  if (count > guest::LoadU8(base, matrix + 24)) {
+    SpinRelease(base, thread, call);
+    return 0xFFFFFFFF80070057ull;  // E_INVALIDARG
+  }
+  guest::StoreU8(base, matrix + 16, count);
+  if (count != 0) {
+    for (uint32_t i = 0; i < guest::LoadU8(base, matrix + 16); i++) {
+      const uint32_t in = guest::LoadU32(base, levels + 4) + 8 * i;
+      const uint32_t out = guest::LoadU32(base, matrix + 20) + 12 * i;
+      guest::StoreU8(base, out, guest::LoadU8(base, in));
+      guest::StoreU8(base, guest::LoadU32(base, matrix + 20) + 12 * i + 1,
+                     guest::LoadU8(base, guest::LoadU32(base, levels + 4) + 8 * i + 1));
+      CopyFloat(base, guest::LoadU32(base, matrix + 20) + 12 * i + 4,
+                guest::LoadU32(base, levels + 4) + 8 * i + 4);
+      CopyFloat(base, guest::LoadU32(base, matrix + 20) + 12 * i + 8,
+                guest::LoadU32(base, levels + 4) + 8 * i + 4);
+    }
+  }
+  uint32_t highest = 0;
+  const uint32_t set = guest::LoadU8(base, matrix + 16);
+  if (set != 0) {
+    const uint32_t entries = guest::LoadU32(base, matrix + 20);
+    for (uint32_t i = 0; i < set; i++) {
+      const uint32_t channel = guest::LoadU8(base, entries + 12 * i + 1) + 1u;
+      if (channel > highest) {
+        highest = channel;
+      }
+    }
+  }
+  guest::StoreU8(base, matrix + 25, uint8_t(highest));
+  SpinRelease(base, thread, call);
+  return 0;
+}
+
+uint64_t MatrixSetLevels(uint8_t* base, uint32_t matrix, uint32_t levels, uint32_t now,
+                         uint32_t thread, const GuestCall& call) {
+  ITC_NATIVE_RUNNING("sub_82466188 XAudioMatrix::SetLevels");
+  SpinTake(base, thread, call);
+  if (guest::LoadU8(base, levels) != 0) {
+    for (uint32_t i = 0; i < guest::LoadU8(base, levels); i = (i + 1) & 0xFF) {
+      const uint32_t index = guest::LoadU8(base, guest::LoadU32(base, levels + 4) + 8 * i);
+      if (index >= guest::LoadU8(base, matrix + 16)) {
+        SpinRelease(base, thread, call);
+        return 0xFFFFFFFF80070057ull;  // E_INVALIDARG
+      }
+      const uint32_t level = guest::LoadU32(base, levels + 4) + 8 * i;
+      const uint32_t entry = guest::LoadU32(base, matrix + 20) + 12 * guest::LoadU8(base, level);
+      const double value = LoadSingle(base, level + 4);
+      guest::StoreFloat(base, entry + 8, float(value));
+      if ((now & 0xFF) != 0) {
+        guest::StoreFloat(base, entry + 4, float(value));
+      }
+    }
+  }
+  SpinRelease(base, thread, call);
+  return 0;
+}
+
+uint64_t MatrixMixRamp(uint8_t* base, uint64_t out, uint64_t in, uint32_t start, uint32_t step,
+                       uint32_t frames) {
+  ITC_NATIVE_RUNNING("sub_82466310 XAudioMatrix::MixRamp");
+  Vec v0 = LoadAligned(base, step);
+  const uint32_t vectors = frames >> 2;
+  FlushToZero flush;
+  Vec v11 = Add(v0, v0);
+  Vec v13 = LoadAligned(base, start);
+  Vec v12 = Add(v13, v0);
+  Vec v10 = Add(v11, v0);
+  v0 = Add(v11, v11);
+  v11 = Add(v13, v11);
+  v10 = Add(v13, v10);
+  if (vectors == 0) {
+    return out;
+  }
+  uint32_t loops = ((vectors - 1) >> 2) + 1;
+  uint32_t r10 = uint32_t(out) + 48;
+  uint64_t r11 = in + 32;  // r3 is left at its last value less 32, in full
+  const uint32_t r5 = uint32_t(out) - uint32_t(in);
+  uint64_t r3_left = out;
+  while (loops-- != 0) {
+    const uint32_t r4 = uint32_t(r11) + 16;
+    const Vec v1 = v10, v31 = v13, v30 = v12, v29 = v11;
+    r3_left = r11 - 32;
+    const uint32_t r8 = r10 - 48, r3 = uint32_t(r3_left), r7 = r10 - 32,
+                   r6 = r5 + uint32_t(r11), r31 = uint32_t(r11) - 16;
+    Vec v9 = LoadAligned(base, r10);
+    Vec v7 = LoadAligned(base, r4);
+    const Vec v4 = LoadAligned(base, r8);
+    v9 = Madd(v7, v1, v9);
+    Vec v6 = LoadAligned(base, r3);
+    Vec v8 = LoadAligned(base, uint32_t(r11));
+    v7 = Madd(v6, v31, v4);
+    const Vec v3 = LoadAligned(base, r7);
+    r11 += 64;
+    const Vec v2 = LoadAligned(base, r6);
+    v13 = Add(v13, v0);
+    const Vec v5 = LoadAligned(base, r31);
+    v8 = Madd(v8, v29, v2);
+    v6 = Madd(v5, v30, v3);
+    v12 = Add(v12, v0);
+    v11 = Add(v11, v0);
+    v10 = Add(v10, v0);
+    StoreAligned(base, r10, v9);
+    r10 += 64;
+    StoreAligned(base, r8, v7);
+    StoreAligned(base, r6, v8);
+    StoreAligned(base, r7, v6);
+  }
+  return r3_left;
+}
+
+namespace {
+
+// The 4-float ramp vectors at the frame's +128 (the start: `first` x the
+// constants at +160 + `level`) and +144 (the step, splatted), from the
+// words at the frame's +84, +80 and +88, as the translated code makes them
+// (the step's first splat stored at +144 and the level's at +128 before
+// they're overwritten).
+Vec RampVectors(uint8_t* base, uint32_t frame) {
+  const Vec constants = LoadAligned(base, frame + 160);
+  Vec v0 = SplatFirst(LoadLeft(base, frame + 84));
+  StoreAligned(base, frame + 144, v0);
+  const Vec v13 = SplatFirst(LoadLeft(base, frame + 80));
+  {
+    FlushToZero flush;
+    v0 = Madd(v0, constants, v13);
+  }
+  StoreAligned(base, frame + 128, v13);
+  StoreAligned(base, frame + 128, v0);
+  StoreAligned(base, frame + 144, SplatFirst(LoadLeft(base, frame + 88)));
+  return v0;
+}
+
+// The four constants (0x82000A34, 0x82000A30, 0x820021E8, 0x820021E4: the
+// lanes' frame offsets 0 to 3, probably) to the frame's +160.
+void RampConstants(uint8_t* base, uint32_t frame) {
+  CopyFloat(base, frame + 160, 0x82000A34);
+  CopyFloat(base, frame + 164, 0x82000A30);
+  CopyFloat(base, frame + 168, 0x820021E8);
+  CopyFloat(base, frame + 172, 0x820021E4);
+}
+
+void XMemSetCall(uint8_t* base, uint32_t destination, uint32_t bytes, uint32_t return_address,
+                 uint32_t sp, const GuestCall& call) {
+  SetRegs(call, Args({destination, 0, bytes}));
+  c_runtime::XMemSet(base, destination, 0, bytes);
+  (void)return_address;
+  (void)sp;
+}
+
+void XMemCpyCall(uint8_t* base, uint32_t destination, uint32_t source, uint32_t bytes,
+                 uint32_t return_address, uint32_t sp, const GuestCall& call) {
+  SetRegs(call, Args({destination, source, bytes}));
+  if (!c_runtime::XMemCpy(base, destination, source, bytes)) {
+    call(0x82295890, return_address, At(sp, Args({destination, source, bytes})));
+  }
+}
+
+}  // namespace
+
+uint64_t MatrixMix(uint8_t* base, uint32_t matrix, uint32_t source, uint32_t target,
+                   uint32_t thread, uint32_t frame, const GuestCall& call) {
+  ITC_NATIVE_RUNNING("sub_82466440 XAudioMatrix::Mix");
+  const uint32_t source_format = frame + 112, target_format = frame + 96;
+  SetRegs(call, Args({source != 0 ? source - 8 : 0, source_format}));
+  BufferGetFormat(base, source != 0 ? source - 8 : 0, source_format);
+  const uint32_t target_buffer = target != 0 ? target - 8 : 0;
+  SetRegs(call, Args({target_buffer, target_format}));
+  BufferGetFormat(base, target_buffer, target_format);
+  if (guest::LoadU8(base, matrix + 26) == 1) {
+    guest::StoreU8(base, frame + 97, guest::LoadU8(base, matrix + 25));
+    SetRegs(call, Args({target_buffer, target_format, 1}));
+    uint64_t r3;
+    if (const auto cleared = BufferClear(base, target_buffer, target_format, 1)) {
+      r3 = uint64_t(int64_t(int32_t(*cleared)));  // as lis/ori leave the errors
+    } else {
+      call(0x8245F8E8, 0x824664C8, At(frame, Args({target_buffer, target_format, 1})));
+      r3 = LastCallR3();
+    }
+    if (int32_t(r3) < 0) {
+      return r3;
+    }
+  }
+  SpinTake(base, thread, call);
+  const uint32_t entries = guest::LoadU8(base, matrix + 16);
+  if (entries != 0) {
+    for (uint32_t i = 0; i < guest::LoadU8(base, matrix + 16); i++) {
+      const uint32_t entry = guest::LoadU32(base, matrix + 20) + 12 * i;
+      const uint32_t target_samples = guest::LoadU32(base, frame + 104);
+      const uint32_t target_channels = guest::LoadU8(base, frame + 97);
+      const uint32_t source_channels = guest::LoadU8(base, frame + 113);
+      const uint32_t out_channel = guest::LoadU8(base, entry + 1);
+      const double goal = LoadSingle(base, entry + 8);
+      const uint32_t in_channel = guest::LoadU8(base, entry);
+      const uint32_t out = (out_channel << 10) + target_samples;
+      const uint32_t in = (in_channel << 10) + guest::LoadU32(base, frame + 120);
+      if (out_channel >= target_channels) {
+        continue;
+      }
+      if (in_channel >= source_channels) {
+        if (guest::LoadU8(base, matrix + 26) != 0) {
+          XMemSetCall(base, out, 1024, 0x824666A4, frame, call);
+        }
+        continue;
+      }
+      const double level = LoadSingle(base, entry + 4);
+      guest::StoreFloat(base, frame + 80, float(level));
+      const double difference = double(float(goal - level));
+      RampConstants(base, frame);
+      const bool overwrite = guest::LoadU8(base, matrix + 26) != 0;
+      const double first = double(float(difference * LoadSingle(base, 0x82008058)));
+      guest::StoreFloat(base, frame + 84, float(first));
+      const double each = double(float(first * LoadSingle(base, 0x820021F8)));
+      guest::StoreFloat(base, frame + 88, float(each));
+      Vec v0 = RampVectors(base, frame);
+      if (!overwrite) {
+        SetRegs(call, Args({out, in, frame + 128, frame + 144, 256}));
+        MatrixMixRamp(base, out, in, frame + 128, frame + 144, 256);
+        guest::StoreFloat(base, entry + 4, float(goal));
+        continue;
+      }
+      {
+        FlushToZero flush;
+        for (uint32_t k = 0; k < 64; k++) {
+          const Vec v12 = v0;
+          Vec v13 = LoadAligned(base, in + 16 * k);
+          v13 = Mul(v13, v12);
+          const Vec v11 = LoadAligned(base, frame + 144);
+          v0 = Add(v0, v11);
+          StoreAligned(base, out + 16 * k, v13);
+        }
+      }
+      guest::StoreFloat(base, entry + 4, float(goal));
+      StoreAligned(base, frame + 128, v0);
+    }
+  } else if (source != target && guest::LoadU8(base, frame + 97) != 0) {
+    uint32_t offset = 0;
+    for (uint32_t i = 0; i < guest::LoadU8(base, frame + 97); i++, offset += 1024) {
+      const uint32_t out = offset + guest::LoadU32(base, frame + 104);
+      const uint32_t in = offset + guest::LoadU32(base, frame + 120);
+      const bool overwrite = guest::LoadU8(base, matrix + 26) != 0;
+      if (i >= guest::LoadU8(base, frame + 113)) {
+        if (overwrite) {
+          XMemSetCall(base, out, 1024, 0x824667B8, frame, call);
+          continue;
+        }
+        break;
+      }
+      if (overwrite) {
+        XMemCpyCall(base, out, in, 1024, 0x824667A0, frame, call);
+        continue;
+      }
+      // A ramp from 1.0 by 0: each channel added as it is.
+      RampConstants(base, frame);
+      CopyFloat(base, frame + 88, 0x82000A30);
+      CopyFloat(base, frame + 84, 0x82000A34);
+      CopyFloat(base, frame + 80, 0x82000A34);
+      const Vec constants = LoadAligned(base, frame + 160);
+      Vec v0 = SplatFirst(LoadLeft(base, frame + 84));
+      StoreAligned(base, frame + 144, v0);
+      const Vec v13 = SplatFirst(LoadLeft(base, frame + 88));
+      {
+        FlushToZero flush;
+        v0 = Madd(v0, constants, v13);
+      }
+      StoreAligned(base, frame + 128, v13);
+      StoreAligned(base, frame + 128, v0);
+      StoreAligned(base, frame + 144, SplatFirst(LoadLeft(base, frame + 80)));
+      SetRegs(call, Args({out, in, frame + 128, frame + 144, 256}));
+      MatrixMixRamp(base, out, in, frame + 128, frame + 144, 256);
+    }
+  }
+  SpinRelease(base, thread, call);
+  return 0;
+}
+
+// --- The volume meter ---
+
+uint64_t MeterProcess(uint8_t* base, uint32_t meter, uint32_t buffer, uint32_t frame) {
+  ITC_NATIVE_RUNNING("sub_825A6210 VolumeMeter::Process");
+  BufferGetFormatThunk(base, buffer, frame + 80);
+  const uint32_t meter_channels = guest::LoadU32(base, meter + 16);
+  uint32_t channels = guest::LoadU8(base, frame + 81);
+  if (channels >= meter_channels) {
+    channels = meter_channels;
+  }
+  const double zero = LoadSingle(base, 0x82000A34);
+  const double threshold = LoadSingle(base, 0x82072298);
+  double counted = zero;  // f10: also the second fold-down's sum
+  uint32_t sample = 0;    // r8: runs on across the channels
+  if (meter_channels != 0) {
+    const double scale = LoadSingle(base, 0x82008058);
+    for (uint32_t c = 0; c < guest::LoadU32(base, meter + 16); c = (c + 1) & 0xFF) {
+      const uint32_t history = guest::LoadU32(base, meter + 24);
+      const uint32_t length = guest::LoadU32(base, meter + 20);
+      double peak = counted, sum = counted, squares = counted;
+      const uint32_t quotient = length != 0 ? history / length : 0;
+      const uint32_t slot = history - uint32_t(int64_t(int32_t(quotient)) * int64_t(int32_t(length)));
+      const uint32_t index =
+          uint32_t(int64_t(int32_t(slot)) * int64_t(int32_t(guest::LoadU32(base, meter + 16)))) + c;
+      if (c < channels) {
+        const uint32_t samples = guest::LoadU32(base, frame + 88);
+        for (uint32_t k = 0; k < 256; k++) {
+          const uint32_t at = (sample & 0xFFFF) * 4 + samples;
+          const double x = LoadSingle(base, at);
+          const double magnitude = std::bit_cast<double>(std::bit_cast<uint64_t>(x) & ~(1ull << 63));
+          squares = double(float(std::fma(x, x, squares)));
+          if (!(peak > magnitude)) {
+            peak = magnitude;
+          }
+          const double again = std::bit_cast<double>(
+              std::bit_cast<uint64_t>(LoadSingle(base, at)) & ~(1ull << 63));
+          sample = (sample + 1) & 0xFFFF;
+          if (again > threshold) {
+            sum = double(float(sum + threshold));
+          }
+        }
+        squares = double(float(std::sqrt(double(float(squares * scale)))));
+      }
+      guest::StoreFloat(base, guest::LoadU32(base, meter + 36) + index * 4, float(squares));
+      guest::StoreFloat(base, index * 4 + guest::LoadU32(base, meter + 28), float(sum));
+      guest::StoreFloat(base, index * 4 + guest::LoadU32(base, meter + 32), float(peak));
+    }
+  }
+  if (guest::LoadU32(base, meter + 16) == 8 && channels == 6) {
+    const uint32_t samples = guest::LoadU32(base, frame + 88);
+    double peak_left = counted, peak_right = counted, sum_left = counted;
+    const double side = LoadSingle(base, 0x82001BE4);
+    const double center = LoadSingle(base, 0x8200295C);
+    const auto at = [&](uint32_t k) { return LoadSingle(base, samples + 4 * k); };
+    const auto magnitude = [](double x) {
+      return std::bit_cast<double>(std::bit_cast<uint64_t>(x) & ~(1ull << 63));
+    };
+    for (uint32_t i = 0; i < 256; i++) {
+      const double c = double(float(at(i + 512) * center));
+      double left = double(float(std::fma(at(i + 1024), side, at(i))));
+      double right = double(float(std::fma(at(i + 1280), side, at(i + 256))));
+      left = double(float(left + c));
+      right = double(float(right + c));
+      if (!(peak_left > magnitude(left))) {
+        peak_left = magnitude(left);
+      }
+      if (!(peak_right > magnitude(right))) {
+        peak_right = magnitude(right);
+      }
+      if (magnitude(left) > threshold) {
+        sum_left = double(float(sum_left + threshold));
+      }
+      if (magnitude(right) > threshold) {
+        counted = double(float(counted + threshold));
+      }
+    }
+    guest::StoreFloat(base, guest::LoadU32(base, meter + 28) + 24, float(sum_left));
+    guest::StoreFloat(base, guest::LoadU32(base, meter + 28) + 28, float(counted));
+    guest::StoreFloat(base, guest::LoadU32(base, meter + 32) + 24, float(peak_left));
+    guest::StoreFloat(base, guest::LoadU32(base, meter + 32) + 28, float(peak_right));
+  }
+  const uint32_t history = guest::LoadU32(base, meter + 24) + 1;
+  guest::StoreU32(base, meter + 24, history);
+  if (history == guest::LoadU32(base, meter + 16)) {
+    guest::StoreU32(base, meter + 44, 1);
+  }
+  return 0;
 }
 
 }  // namespace xaudio
