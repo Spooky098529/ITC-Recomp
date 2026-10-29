@@ -196,11 +196,14 @@ void XactWaveSetVolume(PPCContext& ctx, uint8_t* base) {
 ITC_XACT_TRACKS_ADAPTER(825D57D0, XactTrackInstanceConstruct)
 ITC_XACT_TRACKS_ADAPTER(825D55E0, XactTrackInstanceCheckDone)
 ITC_XACT_TRACKS_ADAPTER(825D5678, XactTrackInstanceSetVolume)
-ITC_XACT_TRACKS_ADAPTER(825D5780, XactTrackInstanceIsBusy)
-ITC_XACT_TRACKS_ADAPTER(825D57A8, XactTrackInstancePause)
+// No adapter (removed 2026-10-29: only XACTTrack::IsBusy's plain C++ calls it in play) for
+// XACTTrackInstance::IsBusy sub_825D5780.
+// No adapter (removed 2026-10-29: only XACTTrack::Pause's plain C++ calls it in play) for
+// XACTTrackInstance::Pause sub_825D57A8.
 ITC_XACT_TRACKS_ADAPTER(825D05A8, XactTrackPause)
 ITC_XACT_TRACKS_ADAPTER(825D0590, XactTrackIsBusy)
-ITC_XACT_TRACKS_ADAPTER(825D1760, XactEventConstruct)
+// No adapter (removed 2026-10-29: only XACTPlayWaveEvent::XACTPlayWaveEvent's plain C++ calls
+// it in play) for XACTEvent::XACTEvent sub_825D1760.
 ITC_XACT_TRACKS_ADAPTER(825D0EF0, XactEventDestruct)
 ITC_XACT_TRACKS_ADAPTER(825D1358, XactEventFire)
 ITC_XACT_TRACKS_ADAPTER(825D82E8, XactPlayWaveConstruct)
@@ -216,4 +219,5 @@ ITC_XACT_TRACKS_ADAPTER(825D7708, XactPlayWaveIsPlaying)
 ITC_XACT_TRACKS_ADAPTER(825D81E8, XactPlayWaveIsBusy)
 ITC_XACT_TRACKS_ADAPTER(825D8268, XactPlayWavePause)
 ITC_XACT_TRACKS_ADAPTER(825D7FE0, XactPlayWaveSetVolume)
-ITC_XACT_TRACKS_ADAPTER(825D1CC8, XactWaveSetVolume)
+// No adapter (removed 2026-10-29: only XACTPlayWaveEvent::SetVolume's plain C++ calls it in
+// play) for XACTWave::SetVolume sub_825D1CC8.
