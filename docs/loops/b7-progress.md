@@ -20,8 +20,11 @@ file's history. What's left to see in a drive, from every run:
   user (the user's call, 2026-10-29). Migration 1 (29a2e7f..fbcd34f,
   34 ours, what takes neither lock) stopped on the spin lock, taken
   inline: the user's call, 2026-10-29, the game's own spin lock until
-  its users are native, the API lock a host recursive lock now. Step:
-  migration 2 (agent running).
+  its users are native, the API lock a host recursive lock now.
+  Migration 2 (19a919f..24cc6ea, 58 more, 92 of 96 ours; the API lock
+  not switched: 8 of its users wait on the engine lead). Step:
+  validation (agent running); then the car sounds' migration 2 (their
+  groups under the voice methods now ready).
 
 ## Done
 
@@ -58,6 +61,9 @@ file's history. What's left to see in a drive, from every run:
   628, unknown 3078).
 - After XAudio's migration 1 (`itc_2337`: race 38 s, 0 errors, xaudio
   0 differing): ours 2686, work left 3775 (wrapped 103, known 594,
+  unknown 3078).
+- After XAudio's migration 2 (race 38 s, 0 errors, xaudio 0
+  differing): ours 2744, work left 3720 (wrapped 103, known 539,
   unknown 3078).
 
 ## Stopped
