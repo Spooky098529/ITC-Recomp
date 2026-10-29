@@ -17,8 +17,11 @@ file's history. What's left to see in a drive, from every run:
   more, the car sounds' blockers; the lead closest to ready, 8 of its
   11 ready). Map checked (e784bc0); its stop (the two locks) put to
   the user: host recursive locks with a readable depth, taken by every
-  user (the user's call, 2026-10-29). Step: migration 1 (agent
-  running).
+  user (the user's call, 2026-10-29). Migration 1 (29a2e7f..fbcd34f,
+  34 ours, what takes neither lock) stopped on the spin lock, taken
+  inline: the user's call, 2026-10-29, the game's own spin lock until
+  its users are native, the API lock a host recursive lock now. Step:
+  migration 2 (agent running).
 
 ## Done
 
@@ -53,6 +56,9 @@ file's history. What's left to see in a drive, from every run:
   2652, work left 3809.
 - After XAudio's map: ours 2652, work left 3809 (wrapped 103, known
   628, unknown 3078).
+- After XAudio's migration 1 (`itc_2337`: race 38 s, 0 errors, xaudio
+  0 differing): ours 2686, work left 3775 (wrapped 103, known 594,
+  unknown 3078).
 
 ## Stopped
 

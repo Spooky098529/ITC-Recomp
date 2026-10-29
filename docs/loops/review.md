@@ -60,6 +60,29 @@ When the user has reviewed a run's section, its heading gets
   lock become host recursive locks whose depth can be read, taken by
   every user, native and recompiled (added to "Precedent first" in
   `b7-loop.md`).
+- XAudio's migration 1 (29a2e7f..fbcd34f, `--native_xaudio`): 34 ours,
+  only what takes neither lock (5 adapters removed). For review: calls
+  into the recompiled objects (codecs, matrix objects, effects,
+  allocators, the voices' vtables) go through a guest call built over
+  `ctx` in a frame of the original's size, setting only the registers
+  the original sets (SetFormat's r5, Reformat's r6/r7 left by memcpy's
+  plain C++); paths left to the original: the trapping rates (0 or above
+  48,000) in `XAudioBuffer::Size`, `Clear` and the constructor,
+  memcpy's refusals in `Reformat`, `GetAllocator`'s size-0 allocator;
+  `Alloc`, `DefaultAllocator` and `GetAllocator` native only with
+  `--native_heap`; `SetFormat` keeps its adapter (slot +88 of the source
+  voice's vtable). Harness gaps: `BaseSize`'s effect path and the
+  factory thunks' real targets. Map correction: `XAudioBuffer::Size`
+  reads +0 type, +5 channels, +8 rate. Sound checked by the output's
+  counters (frames played, silence fills) against a
+  `--native_xaudio=false` run: the same.
+- The user's call (2026-10-29), asked because the voice lists' spin
+  lock `0x82954F10` is taken inline in 57 functions (about 30 in play
+  outside the subsystem: the engine, mixer, codecs): native code takes
+  the game's own spin lock exactly as the original does until its users
+  are native, then it becomes a host recursive lock; the API lock
+  `0x8264D518` becomes the host recursive lock now (its users are all in
+  `xaudio.md`, with `sub_8245A410` in `sound-cues.md`).
 
 ## Run 2026-10-28 18:45 (`b7-loop-28-10-26-2`)
 

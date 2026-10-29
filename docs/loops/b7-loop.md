@@ -505,8 +505,11 @@ Calls so far for decisions the loop meets often:
   depth the code reads, or which is entered again on purpose: a host
   recursive lock whose depth can be read, taken by every user, native
   and recompiled, left and re-entered by the count as the original does
-  (XAudio's API lock `0x8264D518` and voice-list spin lock `0x82954F10`,
-  2026-10-29).
+  (XAudio's API lock `0x8264D518`, 2026-10-29). A lock taken inline
+  (no lock or unlock function to route) whose users aren't all ours:
+  native code takes the game's own lock exactly as the original does,
+  and it becomes the host lock once every user is native (XAudio's
+  voice-list spin lock `0x82954F10`, 2026-10-29).
 - The game's Semaphore objects a subsystem's code uses: host counting
   semaphores with a readable count, taken by every user, native and
   recompiled (the archive loader's four, 2026-10-28); the Semaphore
