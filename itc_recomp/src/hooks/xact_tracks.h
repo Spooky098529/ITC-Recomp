@@ -53,5 +53,11 @@ void XactPlayWaveGetDuration(PPCContext& ctx, uint8_t* base);       // sub_825D8
 void XactPlayWavePrepare(PPCContext& ctx, uint8_t* base);            // sub_825D86F8
 void XactTrackInstancePrepareSimple(PPCContext& ctx, uint8_t* base);  // sub_825D53D8
 void XactTrackPrepareSimple(PPCContext& ctx, uint8_t* base);          // sub_825D09D0
+// Batch 4: cancelling, stopping and deleting instances.
+void XactTrackInstanceCancelEvents(PPCContext& ctx, uint8_t* base);          // sub_825D5520
+void XactTrackInstanceDestruct(PPCContext& ctx, uint8_t* base);              // sub_825D5838
+void XactTrackInstanceDeletingDestruct(PPCContext& ctx, uint8_t* base);      // sub_825D5E58
+void XactTrackInstanceStop(PPCContext& ctx, uint8_t* base);                  // sub_825D5D18
+void XactTrackStop(PPCContext& ctx, uint8_t* base);                          // sub_825D01D8
 
 }  // namespace hooks

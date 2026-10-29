@@ -807,4 +807,170 @@ uint32_t TrackPrepareSimple(uint8_t* base, uint32_t track, uint32_t record, uint
   return r30;
 }
 
+// --- Cancelling, stopping and deleting instances ---
+
+namespace {
+
+constexpr uint32_t kCancelFrame = 112;
+constexpr uint32_t kInstanceDestructFrame = 112;
+constexpr uint32_t kInstanceStopFrame = 112;
+constexpr uint32_t kSoundCancel = 0x825CA6F0;
+constexpr uint32_t kPlayWaveIsPlaying = 0x825D7708;  // slot +24
+
+// The play-wave event's IsPlaying (slot +24) from `frame`.
+uint32_t EventSlotIsPlaying(uint8_t* base, uint32_t event, uint32_t frame,
+                            uint32_t return_address, const GuestCall& call) {
+  const uint32_t method = xa::Method(base, event, 24);
+  if (method == kPlayWaveIsPlaying) {
+    SetRegs(call, Args({event}));
+    return PlayWaveIsPlaying(base, event, xa::FrameBelow(base, frame, kPlayWaveSmallFrame),
+                             call);
+  }
+  return CallAt(call, method, return_address, Args({event}), frame);
+}
+
+// The sound of the instance's track.
+uint32_t SoundOf(uint8_t* base, uint32_t instance) {
+  return Load(base, Load(base, instance + 16) + 20);
+}
+
+}  // namespace
+
+uint32_t TrackInstanceCancelEvents(uint8_t* base, uint32_t instance, uint32_t frame,
+                                   const GuestCall& call) {
+  ITC_NATIVE_RUNNING("sub_825D5520 XACTTrackInstance::CancelEvents");
+  uint32_t count = 0;
+  CallAt(call, xa::kRtlEnterCriticalSection, 0x825D5540,
+         Args({uint64_t(Load(base, instance + 12) + 144)}), frame);
+  for (uint32_t i = 0; i < LoadU8(base, instance + 24); i = (i + 1) & 0xFF) {
+    const uint32_t event = Load(base, Load(base, instance + 20) + 4 * i);
+    if ((LoadU8(base, event + 40) & 0x20) == 0) {
+      continue;
+    }
+    CallAt(call, kSoundCancel, 0x825D557C, Args({SoundOf(base, instance), event}), frame);
+    count++;
+  }
+  const uint32_t list = instance + 48;
+  while (Load(base, list + 4) != list && Load(base, list + 8) != list) {
+    const uint32_t helper = Load(base, Load(base, instance + 52) + 12);
+    CallAt(call, kSoundCancel, 0x825D55C4, Args({SoundOf(base, instance), helper}), frame);
+  }
+  CallAt(call, xa::kRtlLeaveCriticalSection, 0x825D55D4,
+         Args({uint64_t(Load(base, instance + 12) + 144)}), frame);
+  return count;
+}
+
+uint32_t TrackInstanceDestruct(uint8_t* base, uint32_t instance, uint32_t frame,
+                               const GuestCall& call) {
+  ITC_NATIVE_RUNNING("sub_825D5838 XACTTrackInstance::~XACTTrackInstance");
+  Store(base, instance + 0, kTrackInstanceVtable);
+  uint32_t r3 = instance;
+  const uint32_t next = Load(base, instance + 4);
+  if (next != instance) {
+    const uint32_t prev = Load(base, instance + 8);
+    if (prev != instance) {
+      Store(base, next + 8, prev);
+      Store(base, Load(base, instance + 8) + 4, Load(base, instance + 4));
+      Store(base, instance + 4, instance);
+      Store(base, instance + 8, instance);
+    }
+  }
+  if (Load(base, instance + 20) != 0) {
+    SetRegs(call, Args({instance}));
+    r3 = TrackInstanceCancelEvents(base, instance, xa::FrameBelow(base, frame, kCancelFrame),
+                                   call);
+    for (uint32_t i = 0; i < LoadU8(base, instance + 24); i = (i + 1) & 0xFF) {
+      r3 = Load(base, Load(base, instance + 20) + 4 * i);
+      if (r3 != 0) {
+        r3 = CallAt(call, xa::Method(base, r3, 0), 0x825D58D8, Args({r3, 1}), frame);
+      }
+    }
+    const uint32_t events = Load(base, instance + 20);
+    SetRegs(call, Args({events, kEventArrayAttributes}));
+    r3 = memory::crt::XMemFree(events, kEventArrayAttributes);
+  }
+  const uint32_t list = instance + 48;
+  while (Load(base, list + 4) != list && Load(base, list + 8) != list) {
+    r3 = Load(base, instance + 52);
+    if (r3 != 0) {
+      r3 = CallAt(call, xa::Method(base, r3, 0), 0x825D5938, Args({r3, 1}), frame);
+    }
+  }
+  const int32_t state = int32_t(Load(base, instance + 40));
+  if (state == 4 || state == 5) {
+    Store(base, instance + 40, 6);
+  }
+  Store(base, list + 0, kListBaseVtable);
+  Store(base, instance + 0, kListBaseVtable);
+  return r3;
+}
+
+uint32_t TrackInstanceDeletingDestruct(uint8_t* base, uint32_t instance, uint32_t flags,
+                                       uint32_t frame, const GuestCall& call) {
+  ITC_NATIVE_RUNNING("sub_825D5E58 XACTTrackInstance::~XACTTrackInstance (deleting)");
+  SetRegs(call, Args({instance, flags}));
+  TrackInstanceDestruct(base, instance, xa::FrameBelow(base, frame, kInstanceDestructFrame),
+                        call);
+  if ((flags & 1) != 0) {
+    SetRegs(call, Args({instance, kTrackInstanceAttributes}));
+    memory::crt::XMemFree(instance, kTrackInstanceAttributes);
+  }
+  return instance;
+}
+
+uint32_t TrackInstanceStop(uint8_t* base, uint32_t instance, uint32_t immediate, uint32_t frame,
+                           const GuestCall& call) {
+  ITC_NATIVE_RUNNING("sub_825D5D18 XACTTrackInstance::Stop");
+  const int32_t state = int32_t(Load(base, instance + 40));
+  if (state == 6) {
+    return 0;
+  }
+  if (state == 5 && (int32_t(Load(base, instance + 60)) != 0 || int32_t(immediate) == 0)) {
+    return 0;
+  }
+  Store(base, instance + 40, 5);
+  uint32_t cancelled = 0;
+  if (int32_t(immediate) != 0) {
+    Store(base, instance + 60, 1);
+    SetRegs(call, Args({instance}));
+    cancelled = TrackInstanceCancelEvents(base, instance,
+                                          xa::FrameBelow(base, frame, kCancelFrame), call);
+  }
+  const uint32_t event = Load(base, instance + 36);
+  if (event != 0 && int32_t(EventSlotIsPlaying(base, event, frame, 0x825D5D98, call)) != 0) {
+    const uint32_t now = Load(base, instance + 36);
+    CallAt(call, xa::Method(base, now, 60), 0x825D5DB8, Args({now, immediate}), frame);
+  }
+  if (int32_t(immediate) != 0 && int32_t(cancelled) == 0) {
+    Store(base, instance + 40, 6);
+  }
+  return 0;
+}
+
+uint32_t TrackStop(uint8_t* base, uint32_t track, uint32_t immediate, uint32_t frame,
+                   const GuestCall& call) {
+  ITC_NATIVE_RUNNING("sub_825D01D8 XACTTrack::Stop");
+  uint32_t r30 = 0;
+  const uint32_t instance = Load(base, track + 24);
+  if (instance != 0) {
+    uint32_t now = immediate;
+    if (int32_t(now) == 0) {
+      const uint32_t event = Load(base, instance + 36);
+      if (event == 0 || int32_t(EventSlotIsPlaying(base, event, frame, 0x825D0220, call)) == 0) {
+        now = 1;
+      }
+    }
+    const uint32_t stopped = Load(base, track + 24);
+    SetRegs(call, Args({stopped, now}));
+    r30 = TrackInstanceStop(base, stopped, now,
+                            xa::FrameBelow(base, frame, kInstanceStopFrame), call);
+  }
+  const uint32_t next = Load(base, track + 28);
+  if (next != 0) {
+    CallAt(call, 0x825C1548, 0x825D0250, Args({Load(base, track + 12), next}), frame);
+    Store(base, track + 28, 0);
+  }
+  return r30;
+}
+
 }  // namespace xact

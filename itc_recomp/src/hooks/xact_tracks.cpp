@@ -27,6 +27,10 @@ ITC_FLAG_BOOL(native_xact_tracks, true, "ITC",
               "ApplyVariation sub_825D7558, GetDuration sub_825D8870, Prepare sub_825D86F8; "
               "XACTTrackInstance::PrepareSimple sub_825D53D8 and XACTTrack::PrepareSimple "
               "sub_825D09D0 (allocating through the native layer under --native_heap); "
+              "XACTTrackInstance::CancelEvents sub_825D5520 (XACT's lock, the engine's "
+              "critical section, entered as the original does), ~XACTTrackInstance sub_825D5838 "
+              "and its deleting destructor sub_825D5E58, Stop sub_825D5D18; XACTTrack::Stop "
+              "sub_825D01D8; "
               "the objects' slots through their plain C++ while they hold it, the waves' and "
               "voices' through the guest call) natively instead of through the translated code "
               "(the same reads and writes; checked by --run_harnesses=xact_tracks)");
@@ -310,6 +314,41 @@ void XactTrackPrepareSimple(PPCContext& ctx, uint8_t* base) {
   });
 }
 
+void XactTrackInstanceCancelEvents(PPCContext& ctx, uint8_t* base) {
+  const uint32_t instance = ctx.r3.u32;
+  Framed(ctx, base, 112, [&](const xaudio::GuestCall& call, uint32_t frame) {
+    return xact::TrackInstanceCancelEvents(base, instance, frame, call);
+  });
+}
+
+void XactTrackInstanceDestruct(PPCContext& ctx, uint8_t* base) {
+  const uint32_t instance = ctx.r3.u32;
+  Framed(ctx, base, 112, [&](const xaudio::GuestCall& call, uint32_t frame) {
+    return xact::TrackInstanceDestruct(base, instance, frame, call);
+  });
+}
+
+void XactTrackInstanceDeletingDestruct(PPCContext& ctx, uint8_t* base) {
+  const uint32_t instance = ctx.r3.u32, flags = ctx.r4.u32;
+  Framed(ctx, base, 112, [&](const xaudio::GuestCall& call, uint32_t frame) {
+    return xact::TrackInstanceDeletingDestruct(base, instance, flags, frame, call);
+  });
+}
+
+void XactTrackInstanceStop(PPCContext& ctx, uint8_t* base) {
+  const uint32_t instance = ctx.r3.u32, immediate = ctx.r4.u32;
+  Framed(ctx, base, 112, [&](const xaudio::GuestCall& call, uint32_t frame) {
+    return xact::TrackInstanceStop(base, instance, immediate, frame, call);
+  });
+}
+
+void XactTrackStop(PPCContext& ctx, uint8_t* base) {
+  const uint32_t track = ctx.r3.u32, immediate = ctx.r4.u32;
+  Framed(ctx, base, 112, [&](const xaudio::GuestCall& call, uint32_t frame) {
+    return xact::TrackStop(base, track, immediate, frame, call);
+  });
+}
+
 }  // namespace hooks
 
 // The flag's fallback, then the register step.
@@ -381,3 +420,8 @@ ITC_XACT_TRACKS_ADAPTER(825D8870, XactPlayWaveGetDuration)
 ITC_XACT_TRACKS_ADAPTER(825D86F8, XactPlayWavePrepare)
 ITC_XACT_TRACKS_HEAP_ADAPTER(825D53D8, XactTrackInstancePrepareSimple)
 ITC_XACT_TRACKS_HEAP_ADAPTER(825D09D0, XactTrackPrepareSimple)
+ITC_XACT_TRACKS_ADAPTER(825D5520, XactTrackInstanceCancelEvents)
+ITC_XACT_TRACKS_HEAP_ADAPTER(825D5838, XactTrackInstanceDestruct)
+ITC_XACT_TRACKS_HEAP_ADAPTER(825D5E58, XactTrackInstanceDeletingDestruct)
+ITC_XACT_TRACKS_ADAPTER(825D5D18, XactTrackInstanceStop)
+ITC_XACT_TRACKS_ADAPTER(825D01D8, XactTrackStop)

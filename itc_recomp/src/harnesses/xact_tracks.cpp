@@ -93,6 +93,8 @@ constexpr uint32_t kWaveBankVtable = 0x82075AE8;
 // its critical section at +144 for the instances' destructor.
 constexpr uint32_t kFakeBankVtable = 0x1280, kFakeBank = 0x1800, kEngine2 = 0x1900;
 constexpr uint32_t kCreateWaveAt = 0x82425450;
+// Batch 4's: the instance's events array when it isn't freed.
+constexpr uint32_t kEventArray = 0x1A00;
 // The waves' Prepare recorder: sub_820A8420 (r4's low byte to +320, r5 to
 // +332, r6 to +336; r3 the wave).
 constexpr uint32_t kRecordR4R6 = 0x820A8420;
@@ -569,6 +571,177 @@ void Batch3(Context& h, uint32_t block) {
   }
 }
 
+// The world for the instances' cancelling, stopping and deleting: the
+// engine (kEngine2) with its critical section initialized for each version
+// and its +76 list empty; the instance's helper list empty (a helper never
+// was in play; a recorder wouldn't take it off, and the original would spin);
+// its node linked to itself or between kNext and kTrack2; up to three events
+// (kEvent, kEvent2, kWave2 as a third), each linked to itself, queued or
+// not, in `array` (the block's, or one from the allocation layer); the
+// event vtable's slot +0 a recorder (the block's events aren't freed) and
+// +60 (Stop) a recorder.
+void InstanceWorld(Context& h, uint32_t block, Random& random, PPCContext& t, uint32_t array) {
+  uint8_t* base = h.base;
+  const uint32_t instance = block + kInstance, engine = block + kEngine2;
+  Store(base, instance + 12, engine);
+  PPCContext c2 = t;
+  c2.r3.u64 = engine + 144;
+  __imp__RtlInitializeCriticalSection(c2, base);
+  Store(base, engine + 80, engine + 76);
+  Store(base, engine + 84, engine + 76);
+  Store(base, instance + 52, instance + 48);
+  Store(base, instance + 56, instance + 48);
+  if (random.Below(2) == 0) {
+    Store(base, instance + 4, instance);
+    Store(base, instance + 8, instance);
+  } else {
+    Store(base, instance + 4, block + kNext);
+    Store(base, instance + 8, block + kTrack2);
+  }
+  Store(base, block + kEventVtable + 0, Pick(random, {kAddRef, kRecordR4}));
+  Store(base, block + kEventVtable + 60, Pick(random, {kAddRef, kRecordR4}));
+  Store(base, block + kEventVtable + 24, Pick(random, {0x825D7708u, kAddRef}));
+  const uint32_t count = random.Below(4);
+  guest::StoreU8(base, instance + 24, uint8_t(count));
+  Store(base, instance + 20, array);
+  if (array == 0) {
+    return;
+  }
+  for (uint32_t i = 0; i < count; i++) {
+    const uint32_t event = block + Pick(random, {kEvent, kEvent2, kWave2});
+    Store(base, event, block + kEventVtable);
+    Store(base, event + 4, event);
+    Store(base, event + 8, event);
+    Store(base, event + 44, instance);
+    Store(base, event + 60, block + kWave);  // SetQueued reads it unchecked
+    guest::StoreU8(base, event + 40, uint8_t(random.Next()));
+    // Never 0: CancelEvents reads each entry's flags unchecked.
+    Store(base, array + 4 * i, event);
+  }
+}
+
+void Batch4(Context& h, uint32_t block) {
+  const auto lock = [&](Outputs& out, PPCContext&) {
+    out.Bytes(Read(h.base, block + kEngine2 + 144, 28));
+  };
+  {
+    Results results("XACTTrackInstance::CancelEvents (sub_825D5520)");
+    for (int c = 0; c < 96; c++) {
+      CaseWith(h, results, block, __imp__sub_825D5520, hooks::XactTrackInstanceCancelEvents,
+               [&](Random& random, PPCContext& t) {
+                 InstanceWorld(h, block, random, t, block + kEventArray);
+                 t.r3.u64 = block + kInstance;
+               },
+               lock, fmt::format("case {}", c));
+    }
+    results.Report();
+  }
+  {
+    // Stop: every state, the first immediate stop or not, immediate or not.
+    Results results("XACTTrackInstance::Stop (sub_825D5D18)");
+    for (int c = 0; c < 128; c++) {
+      CaseWith(h, results, block, __imp__sub_825D5D18, hooks::XactTrackInstanceStop,
+               [&](Random& random, PPCContext& t) {
+                 InstanceWorld(h, block, random, t, block + kEventArray);
+                 Store(h.base, block + kInstance + 40, random.Below(8));
+                 Store(h.base, block + kInstance + 60, Pick(random, {0, 1, uint32_t(random.Next())}));
+                 t.r3.u64 = block + kInstance;
+                 t.r4.u64 = Pick(random, {0, 1, uint32_t(random.Next())});
+               },
+               lock, fmt::format("case {}", c));
+    }
+    results.Report();
+  }
+  {
+    // The track's Stop over the instance (or none) and a next instance
+    // (kNext, or none) linked into the engine's list.
+    Results results("XACTTrack::Stop (sub_825D01D8)");
+    for (int c = 0; c < 128; c++) {
+      CaseWith(h, results, block, __imp__sub_825D01D8, hooks::XactTrackStop,
+               [&](Random& random, PPCContext& t) {
+                 InstanceWorld(h, block, random, t, block + kEventArray);
+                 Store(h.base, block + kInstance + 40, random.Below(8));
+                 Store(h.base, block + kInstance + 60, random.Below(2));
+                 Store(h.base, block + kTrack + 12, block + kEngine2);
+                 Store(h.base, block + kTrack + 24,
+                       random.Below(4) == 0 ? 0 : block + kInstance);
+                 t.r3.u64 = block + kTrack;
+                 t.r4.u64 = Pick(random, {0, 0, 1, uint32_t(random.Next())});
+               },
+               lock, fmt::format("case {}", c));
+    }
+    results.Report();
+  }
+  if (!hooks::NativeHeapActive()) {
+    return;
+  }
+  // The destructors: the events array from the allocation layer (freed by
+  // them; none one time in four), r3 normalized (XMemFree's, the array or
+  // 0).
+  const auto destruct = [&](const char* name, GuestFunction recompiled, GuestFunction native,
+                            bool deleting) {
+    Results results(name);
+    for (int c = 0; c < 96; c++) {
+      uint32_t array = 0;
+      CaseWith(h, results, block, recompiled, native,
+               [&](Random& random, PPCContext& t) {
+                 array = random.Below(4) == 0
+                             ? 0
+                             : memory::crt::XMemAlloc(h.base, 16, xact::kEventArrayAttributes);
+                 InstanceWorld(h, block, random, t, array);
+                 Store(h.base, block + kInstance + 40, random.Below(8));
+                 t.r3.u64 = block + kInstance;
+                 t.r4.u64 = deleting ? uint32_t(random.Next()) & ~1u : random.Next();
+               },
+               [&](Outputs& out, PPCContext& t) {
+                 lock(out, t);
+                 out.Word(array != 0 && t.r3.u32 == array ? 1 : t.r3.u32);
+                 t.r3.u64 = 0;
+               },
+               fmt::format("case {}", c));
+    }
+    results.Report();
+  };
+  destruct("XACTTrackInstance::~XACTTrackInstance (sub_825D5838)", __imp__sub_825D5838,
+           hooks::XactTrackInstanceDestruct, false);
+  destruct("XACTTrackInstance::~XACTTrackInstance, deleting, kept (sub_825D5E58)",
+           __imp__sub_825D5E58, hooks::XactTrackInstanceDeletingDestruct, true);
+  {
+    // Deleting with bit 0: the instance from the allocation layer (no
+    // events, its node and helper list linked to itself), freed.
+    Results results("XACTTrackInstance::~XACTTrackInstance, deleting, freed (sub_825D5E58)");
+    for (int c = 0; c < 32; c++) {
+      const Random start = h.random;
+      Random random = start;
+      Outputs out[2];
+      for (int v = 0; v < 2; v++) {
+        random = start;
+        PPCContext t = CallContext(h);
+        const uint32_t instance =
+            memory::crt::XMemAlloc(h.base, 64, xact::kTrackInstanceAttributes);
+        for (uint32_t i = 0; i < 64; i += 4) {
+          Store(h.base, instance + i, uint32_t(random.Next()));
+        }
+        Store(h.base, instance + 4, instance);
+        Store(h.base, instance + 8, instance);
+        Store(h.base, instance + 20, 0);
+        Store(h.base, instance + 52, instance + 48);
+        Store(h.base, instance + 56, instance + 48);
+        Store(h.base, instance + 40, random.Below(8));
+        t.r3.u64 = instance;
+        t.r4.u64 = 1 | (uint32_t(random.Next()) & ~1u);
+        ITC_FLAG(native_xact_tracks) = v == 1;
+        (v == 0 ? __imp__sub_825D5E58 : hooks::XactTrackInstanceDeletingDestruct)(t, h.base);
+        ITC_FLAG(native_xact_tracks) = true;
+        out[v].Word(t.r3.u32 == instance);
+      }
+      h.random = random;
+      results.Check(out[0], out[1], fmt::format("case {}", c));
+    }
+    results.Report();
+  }
+}
+
 }  // namespace
 
 void XactTracks(Context& h) {
@@ -580,6 +753,7 @@ void XactTracks(Context& h) {
   Batch1(h, block.address);
   Batch2(h, block.address);
   Batch3(h, block.address);
+  Batch4(h, block.address);
 }
 
 }  // namespace harness

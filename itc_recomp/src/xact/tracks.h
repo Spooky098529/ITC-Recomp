@@ -242,4 +242,45 @@ uint32_t TrackInstancePrepareSimple(uint8_t* base, uint32_t instance, uint32_t r
 uint32_t TrackPrepareSimple(uint8_t* base, uint32_t track, uint32_t record, uint32_t offset,
                             uint32_t frame, const GuestCall& call);
 
+// --- Cancelling, stopping and deleting instances ---
+
+// XACTTrackInstance::CancelEvents (sub_825D5520): under XACT's lock (the
+// engine's +12 critical section at +144, entered and left through its
+// imports as the original does: the user's call, 2026-10-29), each queued
+// event (byte +40 bit 0x20) and then each helper (the list +48, until it's
+// empty) handed to the sound's sub_825CA6F0 (never seen in play: through the
+// guest call). `frame` is this function's (112 bytes). Returns the queued
+// events' count.
+uint32_t TrackInstanceCancelEvents(uint8_t* base, uint32_t instance, uint32_t frame,
+                                   const GuestCall& call);
+// XACTTrackInstance::~XACTTrackInstance (sub_825D5838): the vtable, its
+// node unlinked; with events, CancelEvents (a frame below), each deleted
+// (slot +0 with 1, through the guest call) and the array freed (XMemFree
+// 0x20840001); the helpers deleted until the list is empty; state 4 or 5
+// becomes 6; XACT's base vtable at +48 and +0. `frame` is this function's
+// (112 bytes). Returns the last r3. Frees through the native layer: call it
+// only while hooks::NativeHeapActive().
+uint32_t TrackInstanceDestruct(uint8_t* base, uint32_t instance, uint32_t frame,
+                               const GuestCall& call);
+// Its deleting destructor (sub_825D5E58, slot +0): the above (a frame below
+// `frame`, this function's 112 bytes), XMemFree(0x20848008) with `flags`
+// bit 0. Returns the instance. Native layer only, as above.
+uint32_t TrackInstanceDeletingDestruct(uint8_t* base, uint32_t instance, uint32_t flags,
+                                       uint32_t frame, const GuestCall& call);
+// XACTTrackInstance::Stop (sub_825D5D18): nothing when done (6), or stopping
+// (5) unless this is the first immediate stop; state 5, an immediate stop
+// +60 = 1 and CancelEvents; a playing play-wave event (its slot +24) gets
+// its slot +60 (Stop) with `immediate` (through the guest call); an
+// immediate stop that cancelled nothing ends in state 6. `frame` is this
+// function's (112 bytes). Returns 0.
+uint32_t TrackInstanceStop(uint8_t* base, uint32_t instance, uint32_t immediate, uint32_t frame,
+                           const GuestCall& call);
+// XACTTrack::Stop (sub_825D01D8): with an instance, immediate when asked or
+// when its play-wave event is missing or not playing, the instance's Stop;
+// a next instance (+28) to sub_825C1548 with the engine (never seen in
+// play: through the guest call) and +28 = 0. `frame` is this function's
+// (112 bytes). Returns Stop's result (0 without an instance).
+uint32_t TrackStop(uint8_t* base, uint32_t track, uint32_t immediate, uint32_t frame,
+                   const GuestCall& call);
+
 }  // namespace xact
