@@ -20,6 +20,25 @@ When the user has reviewed a run's section, its heading gets
   (`sub_825BA0C8`) is answered from the host steady clock at the 50 MHz
   timebase, no flag, one clock for recompiled and native callers, as
   GetTickCount. Both now under "Precedent first" in `b7-loop.md`.
+- QueryPerformanceCounter and what it unblocked (be9c0c5..b32d7d2, by the
+  call above): `helpers::PerformanceCounter()` (`src/helpers/clock.cpp`,
+  50 MHz host steady clock from process start, the original's second read
+  when the low word is 0 kept; no flag), `XACTGetTimeMs` (`--native_xact`),
+  the tracks' and events' play, schedule, fire, done and audio updates
+  (`xact-tracks.md` 55 of 55), `XACTEngine::SendNotification` (row in
+  `xact.md`, code in `src/xact/waves.cpp` beside `Notify`), `XACTWave::Notify`,
+  `SetState`, `Release`, the destructors and `InMemoryWave::Stop`
+  (`xact-waves.md` 28 of 30); 7 more adapters removed. Choices to look
+  at: `helpers::SetClocksForHarness` gives the harness's two versions
+  the same clock readings (thread-local); XACT's clock flag
+  `[0x8266CDF0]` and frequency `[0x82971480]` are left as the game's
+  (XAudio's thread reads them), so the trap paths aren't in the cases
+  and go through the guest call; `XACTPlayWaveEvent::Fire` left r3 the
+  time's low word zero-extended where the original sign-extends it
+  (to be matched in the next migration, by the no-behavior-change
+  precedent); paths never seen in play (the random spread, RemoveHelper,
+  HasReleaseRpc, SwitchInstance, the RPC steps, the registration
+  matcher) go through the guest call.
 - XAudio's engine and mixer (map 610125a): `docs/functions/xaudio-engine.md`,
   70 rows (all new; 23 not seen in play: the teardown, the factory's
   id-128 classes, the sizing allocator, the stats callback, the callback

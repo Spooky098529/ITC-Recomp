@@ -27,7 +27,9 @@ file's history. What's left to see in a drive, from every run:
   from the host clock at 50 MHz, like GetTickCount. Next: the
   continuations (not counted toward the limit): QueryPerformanceCounter
   with `XACTGetTimeMs` and what waits on it in `xact-tracks.md` and
-  `xact-waves.md` (migration agent running), then XAudio's engine's 7.
+  `xact-waves.md`: done (be9c0c5..b32d7d2; tracks 55 of 55,
+  waves 28 of 30). Step: validation agent running. Then XACT's waves'
+  last two (with `Fire`'s r3), then XAudio's engine's 7.
 
 ## Done
 
@@ -78,3 +80,8 @@ file's history. What's left to see in a drive, from every run:
   known 523, unknown 2946).
 - After its validation (`itc_2458`: race 8 s, 0 errors, every harness
   0 differing but the expected groups): ours 2892, work left 3572.
+- After QueryPerformanceCounter and XACT's clock users (`itc_2471`:
+  race 38 s, 0 errors, clock, xact, xact_tracks, xact_waves 0
+  differing; the user's coverage commit cf7114c took 148 stale entries
+  out): ours 2909, work left 3407 (wrapped 103, known 513, unknown
+  2791).
