@@ -28,9 +28,10 @@ class RaceEventGuest {
   race_event::Guest guest_;
 };
 
-// The functions with adapters (their recompiled callers): RaceEvent::Make
-// sub_82144E58 (r3 = &the mode, r4 = &the location, r5 = the out word),
-// RaceEvent::Destroy sub_82144DF0, RaceEvent::PlaceUnlockedCurrent
+// RaceEvent::Make sub_82144E58 (r3 = &the mode, r4 = &the location, r5 =
+// the out word): no adapter (only Career::SetUpEvent's plain C++ calls it);
+// the harness's step. The functions with adapters (their recompiled
+// callers): RaceEvent::Destroy sub_82144DF0, RaceEvent::PlaceUnlockedCurrent
 // sub_821442D8 (r3 = &the position, r4 = &the flag), RaceEvent::
 // SectionRivalCurrent sub_821434A0 (r3 = &the position), Items::Available
 // sub_821435C8 (r3 = the id), RaceEvent::GroupItem sub_821431C0 (r3 = the

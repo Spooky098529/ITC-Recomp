@@ -21,6 +21,8 @@ void CareerCarSpecWord744(PPCContext& ctx, uint8_t* base);
 void CareerPickFromCar(PPCContext& ctx, uint8_t* base);
 void CareerRunningMeanMerge(PPCContext& ctx, uint8_t* base);
 void CareerStageOf(PPCContext& ctx, uint8_t* base);
+// Entry56::Allows sub_82111BA8: no adapter (only native callers); the
+// harness's step.
 void CareerEntry56Allows(PPCContext& ctx, uint8_t* base);
 void CareerAnyWonKind3Stage1(PPCContext& ctx, uint8_t* base);
 // ItemRecords::AddWin sub_82114B88, ItemRecords::AddLoss sub_82114B08: r3 =
@@ -39,7 +41,7 @@ void CareerStatsStartDay(PPCContext& ctx, uint8_t* base);
 void CareerGarageInsertCar(PPCContext& ctx, uint8_t* base);
 // Condition::Test sub_82112950: r3 = the condition, r4 = the location, r5 =
 // the kinds' mask; r3 = 0 or 1 (the original where the items' copies aren't
-// native).
+// native). No adapter (only native callers); the harness's step.
 void CareerConditionTest(PPCContext& ctx, uint8_t* base);
 // Rewards::Grant sub_82114C08: r3 = the save data, r4 = the entry's index,
 // r5 = the kind, r6 = the value; r3 left.

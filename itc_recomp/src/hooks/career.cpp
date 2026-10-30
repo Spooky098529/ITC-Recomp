@@ -36,7 +36,8 @@ ITC_FLAG_BOOL(native_career, true, "ITC",
               "Unlock2 sub_82111D98 (no adapters); Career::NextDay sub_82116AF0 with "
               "Stats::CloseDay sub_82113898 (no adapter); no adapters either for RunningMean::Merge, "
               "Items::AnyWonKind3Stage1, ItemRecords::AddWin and AddLoss, Results::Push, "
-              "Stats::StartDay and Rewards::Grant: only native callers reach them in play; "
+              "Stats::StartDay, Rewards::Grant, Entry56::Allows and Condition::Test: only native "
+              "callers reach them in play; "
               "Career::EventQuery sub_82111638 and Career::EventLocation sub_82111650 over the "
               "race event's plain C++ (src/race_event/), DayBlock::BestStreak sub_82110588 with "
               "no adapter: from the race event's EventCondition::SectionRival; Career::SetUpEvent "
@@ -273,9 +274,7 @@ CAREER_ADAPTER(82112860, CareerItemFlagsSet)
 CAREER_ADAPTER(821104B0, CareerCarSpecWord744)
 CAREER_ADAPTER(82115CC0, CareerPickFromCar)
 CAREER_ADAPTER(821121F8, CareerStageOf)
-CAREER_ADAPTER(82111BA8, CareerEntry56Allows)
 CAREER_ADAPTER(821154E0, CareerGarageInsertCar)
-CAREER_ADAPTER(82112950, CareerConditionTest)
 CAREER_ADAPTER(82115190, CareerAddRaceResult)
 CAREER_ADAPTER(821159B0, CareerPickNext)
 CAREER_ADAPTER(82116588, CareerAfterRace)

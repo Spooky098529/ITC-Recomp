@@ -10,7 +10,8 @@
 #include "race_event/race_event.h"
 
 ITC_FLAG_BOOL(native_race_event, true, "ITC",
-              "Run the race event (docs/functions/race-event.md: RaceEvent::Make sub_82144E58 "
+              "Run the race event (docs/functions/race-event.md: RaceEvent::Make sub_82144E58 (no "
+              "adapter: only --native_career's Career::SetUpEvent calls it, its plain C++) "
               "with RaceEvent::RaceEvent sub_82142F20, Init sub_82144A50, SetMode sub_82142F68, "
               "Alloc sub_82143620, Free sub_821436C8, EventGroup::Alloc and Free sub_821433A8 "
               "and sub_82143358, the pools' AddItem sub_82144950, AddRivals sub_82144458, "
@@ -323,7 +324,6 @@ void RaceEventPlaceUnlocked(PPCContext& ctx, uint8_t* base) {
     hooks::step(ctx, base);                \
   }
 
-RACE_EVENT_ADAPTER(82144E58, RaceEventMake)
 RACE_EVENT_ADAPTER(82144DF0, RaceEventDestroy)
 RACE_EVENT_ADAPTER(821442D8, RaceEventPlaceUnlockedCurrent)
 RACE_EVENT_ADAPTER(821434A0, RaceEventSectionRivalCurrent)
