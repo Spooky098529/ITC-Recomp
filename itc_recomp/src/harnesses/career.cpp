@@ -692,6 +692,111 @@ void Unlocks(Context& h, const World& w) {
       __imp__sub_82114C08, hooks::CareerRewardsGrant);
 }
 
+// --- A race's result ---
+
+// A float now and then 0, else a number of either sign.
+uint32_t SomeFloat(Random& r) {
+  if (r.Below(6) == 0) {
+    return 0;
+  }
+  return std::bit_cast<uint32_t>(float(int32_t(r.Below(200001)) - 100000) / 64.0f);
+}
+
+void NativeMergeTwo(PPCContext& t, uint8_t* base) {
+  t.fpscr.disableFlushMode();
+  t.r3.u64 = cr::RunningMeanMergeTwo(base, t.r3.u32, t.r4.u64, t.r1.u32);
+}
+
+// The save data's running means and bests the result goes into (floats
+// and small counts), and the race data's last result.
+void ShapeRaceResult(uint8_t* base, const World& w, Random& r) {
+  const uint32_t save = w.save.address;
+  for (uint32_t at : {5928u, 5936u, 5944u, 5960u, 5968u, 4936u, 4940u, 5952u}) {
+    guest::StoreU32(base, save + at, SomeFloat(r));
+    guest::StoreU32(base, save + at + 4, r.Below(4) == 0 ? 0 : r.Below(100));
+  }
+  for (uint32_t at : {6024u, 6028u, 6032u, 6036u}) {
+    guest::StoreU32(base, save + at, SomeFloat(r));
+  }
+  guest::StoreU32(base, save + 6104, r.Below(5));
+  guest::StoreU32(base, save + 4996, r.Below(16));
+  ShapeResults(base, w, r);
+  const uint32_t race = w.race.address;
+  const uint32_t modes[] = {2, 3, 2, 3, 0, 1, 4, 0xFFFFFFFFu};
+  guest::StoreU32(base, race + 0xA3AF4, modes[r.Below(8)]);
+  const uint32_t result =
+      race + kResults + 3936 * (guest::LoadU32(base, race + kResultCount) - 1);
+  for (uint32_t k = 0; k < 4; k++) {
+    guest::StoreU32(base, result + 8 + 972 * k, r.Below(3) == 0 ? 0xFFFFFFFFu : r.Below(kItems));
+  }
+  guest::StoreU32(base, result + 3924, r.Below(4));
+  guest::StoreU32(base, result + 3920, r.Below(5));
+  guest::StoreU32(base, result + 784, r.Below(2));
+  for (uint32_t at : {788u, 808u, 812u, 816u}) {
+    guest::StoreU32(base, result + at,
+                    r.Below(5) == 0 ? uint32_t(-int32_t(r.Below(50))) : r.Below(5000));
+  }
+  guest::StoreU32(base, result + 796, SomeFloat(r));
+  guest::StoreU32(base, result + 800, r.Below(4) == 0 ? 0 : r.Below(20));
+  for (uint32_t at : {804u, 820u, 828u}) {
+    guest::StoreU32(base, result + at, SomeFloat(r));
+  }
+  // The stage list (+0x59620): the current stage (+804) and its type.
+  const uint32_t stages = race + 0x59620;
+  const uint32_t current = r.Below(10);
+  guest::StoreU32(base, stages + 804, current);
+  guest::StoreU32(base, stages + 80 * current, r.Below(3) == 0 ? 1 : 0);
+  ShapeItems(base, w, r);
+}
+
+void RaceResult(Context& h, const World& w) {
+  uint8_t* const base = h.base;
+  const SetupFn none = [](Random&, const World&) {};
+  Group(
+      h, w, "RunningMean::MergeTwo (sub_82112148)", 48, none,
+      [base](PPCContext& t, Random& r, const World& w) {
+        const uint32_t stats = w.save.address + cr::kStats;
+        for (uint32_t at : {4892u, 5904u}) {
+          guest::StoreU32(base, stats + at, SomeFloat(r));
+          guest::StoreU32(base, stats + at + 4, r.Below(4) == 0 ? 0 : r.Below(100));
+        }
+        t.r3.u64 = stats;
+        t.r4.u64 = (uint64_t(SomeFloat(r)) << 32) | (r.Below(4) == 0 ? 0 : r.Below(100));
+      },
+      __imp__sub_82112148, NativeMergeTwo,
+      {.save_floats = {48 + 4892, 48 + 5904},
+       .frame_ranges = {{-int32_t(cr::kMergeTwoFrame) + 24, 8}}});
+  const int32_t frame = -int32_t(cr::kAddRaceResultFrame);
+  Group(
+      h, w, "Stats::AddRaceResult (sub_82115190)", 160,
+      [base](Random& r, const World& w) { ShapeRaceResult(base, w, r); },
+      [](PPCContext& t, Random&, const World& w) {
+        t.r3.u64 = w.save.address;
+        t.r4.u64 = w.race.address;
+      },
+      __imp__sub_82115190, hooks::CareerAddRaceResult,
+      {.save_floats = {4936, 4940, 5928, 5936, 5944, 5952, 5960, 5968, 6024, 6028, 6032, 6036},
+       .frame_ranges = {{frame + 24, 8},
+                        {frame + 80, 16},
+                        {frame + 96, 3008},
+                        {frame - int32_t(cr::kMergeTwoFrame) + 24, 8},
+                        {frame - int32_t(cr::kItemRecordsFrame) + 80, 12}}});
+  Group(
+      h, w, "Career::PickNext (sub_821159B0, its gate)", 48, none,
+      [base](PPCContext& t, Random& r, const World& w) {
+        const uint32_t save = w.save.address;
+        t.r3.u64 = save;
+        t.r4.u64 = r.Below(2);
+        if (r.Below(2) == 0) {
+          guest::StoreU16(base, save + 70, uint16_t(int16_t(int32_t(r.Below(20)) - 5)));
+        } else {
+          guest::StoreU16(base, save + 70, uint16_t(15 + r.Below(500)));
+          guest::StoreU32(base, save + 6100, uint32_t(2 - int32_t(r.Below(1000))));
+        }
+      },
+      __imp__sub_821159B0, hooks::CareerPickNext);
+}
+
 }  // namespace
 
 void Career(Context& h) {
@@ -714,6 +819,7 @@ void Career(Context& h) {
   LastResults(h, w);
   Garage(h, w);
   Unlocks(h, w);
+  RaceResult(h, w);
 }
 
 }  // namespace harness

@@ -25,7 +25,9 @@ ITC_FLAG_BOOL(native_career, true, "ITC",
               "Stats::StartDay sub_82112088 with DayLog::Push sub_82112028; Garage::InsertCar "
               "sub_821154E0 with GarageList::Insert sub_82113468; Condition::Test sub_82112950 "
               "with its case sub_821129E0 merged; Rewards::Grant sub_82114C08 with its case "
-              "sub_82114C7C merged) natively instead of through the translated code (the same writes; "
+              "sub_82114C7C merged; Stats::AddRaceResult sub_82115190 with RunningMean::MergeTwo "
+              "sub_82112148 (no adapter); Career::PickNext sub_821159B0's gate (past it, never "
+              "seen in play, the original)) natively instead of through the translated code (the same writes; "
               "checked by --run_harnesses=career)");
 
 namespace hooks {
@@ -129,6 +131,21 @@ void CareerRewardsGrant(PPCContext& ctx, uint8_t* base) {
   ctx.r3.u64 = cr::RewardsGrant(base, ctx.r3.u32, ctx.r4.u32, ctx.r5.u32, ctx.r6.u32);
 }
 
+void CareerAddRaceResult(PPCContext& ctx, uint8_t* base) {
+  ctx.fpscr.disableFlushMode();
+  if (!cr::AddRaceResultNative(base, ctx.r3.u32, ctx.r4.u32, ctx.r1.u32)) {
+    __imp__sub_82115190(ctx, base);
+    return;
+  }
+  ctx.r3.u64 = cr::StatsAddRaceResult(base, ctx.r3.u32, ctx.r4.u32, ctx.r1.u32);
+}
+
+void CareerPickNext(PPCContext& ctx, uint8_t* base) {
+  if (!cr::PickNextSkips(base, ctx.r3.u32)) {
+    __imp__sub_821159B0(ctx, base);
+  }
+}
+
 }  // namespace hooks
 
 #define CAREER_ADAPTER(address, step)   \
@@ -161,3 +178,5 @@ CAREER_ADAPTER(82112088, CareerStatsStartDay)
 CAREER_ADAPTER(821154E0, CareerGarageInsertCar)
 CAREER_ADAPTER(82112950, CareerConditionTest)
 CAREER_ADAPTER(82114C08, CareerRewardsGrant)
+CAREER_ADAPTER(82115190, CareerAddRaceResult)
+CAREER_ADAPTER(821159B0, CareerPickNext)

@@ -43,5 +43,12 @@ void CareerConditionTest(PPCContext& ctx, uint8_t* base);
 // Rewards::Grant sub_82114C08: r3 = the save data, r4 = the entry's index,
 // r5 = the kind, r6 = the value; r3 left.
 void CareerRewardsGrant(PPCContext& ctx, uint8_t* base);
+// Stats::AddRaceResult sub_82115190: r3 = the save data, r4 = the race
+// data; r3 as the original leaves it (the original where a copy isn't
+// native).
+void CareerAddRaceResult(PPCContext& ctx, uint8_t* base);
+// Career::PickNext sub_821159B0: r3 = the save data, r4 = the flag; nothing
+// natively below its gate, the original past it.
+void CareerPickNext(PPCContext& ctx, uint8_t* base);
 
 }  // namespace hooks

@@ -173,4 +173,29 @@ std::optional<uint32_t> ConditionTest(uint8_t* base, uint32_t condition, uint32_
 uint32_t RewardsGrant(uint8_t* base, uint32_t save, uint32_t index, uint32_t kind,
                       uint32_t value);
 
+// --- A race's result ---
+
+// sub_82112148 RunningMean::MergeTwo: RunningMean::Merge(stats +4892) and
+// (+5904) from its 112-byte frame below `sp`. Returns stats + 5904.
+constexpr uint32_t kMergeTwoFrame = 112;
+uint32_t RunningMeanMergeTwo(uint8_t* base, uint32_t stats, uint64_t packed, uint32_t sp);
+// sub_82115190 Stats::AddRaceResult: the player's last result (the race
+// data's RacerRecords::At(+0x59AE8, -1)) into the stats record for the race
+// modes 2 and 3 (+0xA3AF4): the week's sums, the bests, the running means
+// (on its 3,184-byte frame below `sp`, +80, with the conversions at +88, as
+// the original), Results::Push, the stage's means; then each opponent's item
+// record by the outcome (ItemRecords::AddWin, the item copied to frame +96
+// and save +6048 = 1 for its byte +35 of 5; AddOutcome3; AddLoss, with the
+// stats' +18 and the mode's +8 for +3920 of 3). AddRaceResultNative: whether
+// its copies are memcpy's plain C++ (else the original runs; nothing
+// written). Returns r3 as the original leaves it.
+constexpr uint32_t kAddRaceResultFrame = 3184;
+bool AddRaceResultNative(uint8_t* base, uint32_t save, uint32_t race, uint32_t sp);
+uint32_t StatsAddRaceResult(uint8_t* base, uint32_t save, uint32_t race, uint32_t sp);
+
+// sub_821159B0 Career::PickNext's gate: true when it does nothing (the stats'
+// races +70 below 15, or the day +6100 below 3); past it (never seen in
+// play) the original runs.
+bool PickNextSkips(uint8_t* base, uint32_t save);
+
 }  // namespace career
