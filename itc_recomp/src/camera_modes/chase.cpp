@@ -831,4 +831,72 @@ void View2Update(uint8_t* base, uint32_t camera, uint32_t frame,
   LookPoint(base, camera, f, one);
 }
 
+// --- The garage camera (the front end's) ---
+
+namespace {
+
+constexpr uint32_t kGarageRadians = 0x82002948;  // pi / 180
+constexpr uint32_t kPassZero = 0x826BAC00;       // camera pass 0
+
+// GarageUpdate's tan argument: the field of view (+224) in radians.
+double GarageAngle(uint8_t* base, uint32_t camera) {
+  return Fmuls(Lfs(base, camera + 224), Lfs(base, kGarageRadians));
+}
+
+}  // namespace
+
+bool GarageReady(uint8_t* base, uint32_t camera) {
+  double t;
+  return (Fpscr::getcsr() & Fpscr::RoundMaskVal) == 0 &&
+         c_runtime::Tan(GarageAngle(base, camera), &t);
+}
+
+void GarageUpdate(uint8_t* base, uint32_t camera, uint32_t frame, const GarageCalls& calls) {
+  ITC_NATIVE_RUNNING("sub_8217BE98 GarageCamera::Update");
+  const uint32_t f = frame;
+  const auto [queue, list] = calls.queue_and_list(f);
+  Store(base, 0x8296B918, list);
+  Store(base, 0x8296B91C, queue);
+  CopyWords(base, 0x8296B8F4, kZero, 1);
+  // The target (+32) at f + 96 and the eye's start (+16) at f + 80, read
+  // before they're written (the viewport loaded between).
+  const uint64_t target0 = Load64(base, camera + 32), target1 = Load64(base, camera + 40);
+  const uint32_t viewport = Load(base, Load(base, kViewports));
+  const uint64_t eye0 = Load64(base, camera + 16), eye1 = Load64(base, camera + 24);
+  Store64(base, f + 96, target0);
+  Store64(base, f + 104, target1);
+  Store64(base, f + 80, eye0);
+  Store64(base, f + 88, eye1);
+  // The orbit: a = +100, b = +176, the distance +180.
+  Stfs(base, f + 84, Fmuls(Single(c_runtime::Sin(Lfs(base, camera + 100))),
+                           Lfs(base, camera + 180)));
+  Stfs(base, f + 88, Fmuls(Single(c_runtime::Cos(Lfs(base, camera + 100))),
+                           Lfs(base, camera + 180)));
+  Stfs(base, f + 80, Fmuls(Single(c_runtime::Sin(Lfs(base, camera + 176))), Lfs(base, f + 88)));
+  const double cos_b = c_runtime::Cos(Lfs(base, camera + 176));
+  const double angle = GarageAngle(base, camera);
+  Stfs(base, f + 88, Fmuls(Single(cos_b), Lfs(base, f + 88)));
+  // tan as its adapter gives it with nearest rounding set (GarageReady
+  // checked it stands in).
+  double tangent = 0.0;
+  c_runtime::Tan(angle, &tangent);
+  const double zoom = Fdivs(Lfs(base, 0x82009EB8), Single(tangent));
+  Stfs(base, camera + 108, zoom);
+  cameras::ViewportSetZoom(base, viewport, zoom);
+  cameras::SetNear(base, Lfs(base, 0x8200222C));
+  cameras::ViewportSetRoll(base, viewport, Lfs(base, camera + 248));
+  // The identity at f + 112, copied to f + 176 (ld/std), its translation
+  // row (f + 224 to + 232) = +256 to +264.
+  StoreIdentity(base, f + 112);
+  CopyDoublewords(base, f + 176, f + 112, 8);
+  CopyWords(base, f + 224, camera + 256, 3);
+  matrix_math::Vec4Transform(base, f + 80, f + 176, f + 80);
+  matrix_math::Vec4Transform(base, f + 96, f + 176, f + 96);
+  cameras::ViewportLookAt(base, viewport, f + 80, f + 96);
+  cameras::FromViewport(base, kPassZero, 0, 0);
+  calls.pass_update(kPassZero, f);
+  cameras::Enable(base, kPassZero);
+  CopyDoublewords(base, 0x8265ECE0, f + 80, 2);
+}
+
 }  // namespace camera_modes

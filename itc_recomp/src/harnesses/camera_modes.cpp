@@ -17,6 +17,7 @@
 #include "base/log.h"
 #include "camera_modes/camera_modes.h"
 #include "c_runtime/exit.h"
+#include "command_list/command_list.h"
 #include "hooks/archive.h"
 #include "hooks/c_runtime.h"
 #include "hooks/camera_modes.h"
@@ -35,6 +36,7 @@
 
 #include <bit>
 #include <cmath>
+#include <cstring>
 #include <limits>
 #include <mutex>
 #include <string>
@@ -3587,6 +3589,139 @@ void TvSteps(Context& h, Random& r) {
   memory::Free(area);
 }
 
+// --- The garage camera ---
+
+// GarageCamera::Update on a camera block of the case's: the viewports
+// pointer at a block of the case's (viewport 0 random, its vectors floats),
+// the app interface [0x826BABA0] at a stand-in scene (its slot 8 and the
+// manager's slots 1 and 2 the game's getters, sub_8248CA78 and
+// sub_82379320, answering the manager, the case's command list and render
+// queue, as the cameras harness's FakeScene). The globals it writes (camera
+// pass 0, 0x8296B8F4 to 0x8296B91F, 0x8265ECE0, the open chunks' count)
+// saved and put back. The camera's angles mostly ordinary radians, its
+// field of view mostly ordinary degrees, now and then any float (where tan
+// can't stand in, both run the original).
+void GarageCameras(Context& h, Random& r) {
+  Results results("GarageCamera::Update (sub_8217BE98)");
+  constexpr uint32_t kPass0 = 0x826BAC00, kPassBytes = 592;
+  constexpr uint32_t kSceneGlobal = 0x826BABA0;
+  constexpr uint32_t kOuts = 0x8296B8F4, kOutsBytes = 0x2C, kEyeOut = 0x8265ECE0;
+  constexpr uint32_t kCameraBytes = 272, kSceneBytes = 4096;
+  // The stand-in scene's layout (FakeScene's in harnesses/cameras.cpp).
+  constexpr uint32_t kSceneVtable = 320, kManager = 400, kManagerVtable = 720, kQueue = 760,
+                     kQueueVtable = 800, kList = 840, kSlots = 2048;
+  Saved viewports_word(h.base, cm::kViewports, 4);
+  Saved scene_word(h.base, kSceneGlobal, 4);
+  Saved open_chunks(h.base, command_list::kOpenChunks, 4);
+  Saved pass(h.base, kPass0, kPassBytes);
+  Saved outs(h.base, kOuts, kOutsBytes);
+  Saved eye_out(h.base, kEyeOut, 16);
+  Block camera(kCameraBytes), block(16), viewport(kViewportBytes), scene(kSceneBytes);
+  for (int c = 0; c < 300; c++) {
+    // The camera.
+    RandomBytes(h.base, camera.address, kCameraBytes, r);
+    RandomFloats(h.base, camera.address + 16, 63, r);
+    for (uint32_t at : {100u, 176u}) {
+      guest::StoreU32(h.base, camera.address + at, r.Below(8) ? OrdinaryFloat(r, 7.0)
+                                                              : ViewFloat(r));
+    }
+    guest::StoreU32(h.base, camera.address + 180, r.Below(8) ? OrdinaryFloat(r, 20.0)
+                                                             : ViewFloat(r));
+    guest::StoreU32(h.base, camera.address + 224, r.Below(8) ? OrdinaryFloat(r, 170.0)
+                                                             : RandomFloat(r));
+    guest::StoreU32(h.base, camera.address + 248, r.Below(8) ? OrdinaryFloat(r, 3.0)
+                                                             : ViewFloat(r));
+    const auto camera_in = Read(h.base, camera.address, kCameraBytes);
+    // Viewport 0 (the block's +4 and +8 random).
+    RandomBytes(h.base, viewport.address, kViewportBytes, r);
+    RandomFloats(h.base, viewport.address + 1600, 48, r);
+    guest::StoreU32(h.base, viewport.address + 1856, OrdinaryFloat(r, 4.0));
+    guest::StoreU32(h.base, viewport.address + 1860, r.Below(4));
+    const auto viewport_in = Read(h.base, viewport.address, kViewportBytes);
+    RandomBytes(h.base, block.address, 16, r);
+    guest::StoreU32(h.base, block.address, viewport.address);
+    const auto block_in = Read(h.base, block.address, 16);
+    // Camera pass 0 as the cameras harness's FromViewport cases make it.
+    std::vector<uint8_t> pass_in(kPassBytes);
+    for (uint32_t i = 0; i < kPassBytes; i += 4) {
+      const uint32_t word = uint32_t(r.Next());
+      std::memcpy(pass_in.data() + i, &word, 4);
+    }
+    const uint32_t type = r.Below(22);
+    const uint32_t used = r.Below(1000);
+    const uint32_t outs_seed = uint32_t(r.Next());
+    Outputs out[2];
+    for (int v = 0; v < 2; v++) {
+      Write(h.base, camera.address, camera_in.data(), kCameraBytes);
+      Write(h.base, viewport.address, viewport_in.data(), kViewportBytes);
+      Write(h.base, block.address, block_in.data(), 16);
+      guest::StoreU32(h.base, cm::kViewports, block.address);
+      Write(h.base, kPass0, pass_in.data(), kPassBytes);
+      guest::StoreU32(h.base, kPass0, 0x82001EC0);
+      guest::StoreU32(h.base, kPass0 + 584, type);
+      guest::StoreU32(h.base, kPass0 + 504, 1280);
+      guest::StoreU32(h.base, kPass0 + 508, 720);
+      for (uint32_t i = 0; i < kOutsBytes; i += 4) {
+        guest::StoreU32(h.base, kOuts + i, outs_seed + i);
+      }
+      // The stand-in scene, cleared.
+      const uint32_t d = scene.address;
+      for (uint32_t i = 0; i < kSceneBytes; i += 4) {
+        guest::StoreU32(h.base, d + i, 0);
+      }
+      guest::StoreU32(h.base, d, d + kSceneVtable);
+      guest::StoreU32(h.base, d + kSceneVtable + 32, 0x8248CA78);
+      guest::StoreU32(h.base, d + 284, d + kManager);
+      guest::StoreU32(h.base, d + kManager, d + kManagerVtable);
+      guest::StoreU32(h.base, d + kManagerVtable + 4, 0x8248CA78);
+      guest::StoreU32(h.base, d + kManagerVtable + 8, 0x82379320);
+      guest::StoreU32(h.base, d + kManager + 284, d + kList);
+      guest::StoreU32(h.base, d + kManager + 124, d + kQueue);
+      guest::StoreU32(h.base, d + kQueue, d + kQueueVtable);
+      guest::StoreU32(h.base, d + kQueueVtable + 16, 0x8209F5C8);
+      guest::StoreU32(h.base, d + kList + 8, used + 1000);
+      guest::StoreU32(h.base, d + kList + 12, used);
+      guest::StoreU32(h.base, d + kList + 32, d + kSlots);
+      guest::StoreU32(h.base, command_list::kOpenChunks, 0);
+      guest::StoreU32(h.base, kSceneGlobal, d);
+      PPCContext t = AlignedContext(h);
+      FillStackBytes(h.base, t.r1.u32, uint64_t(c) + 1, 2048);
+      const uint32_t frame = t.r1.u32 - 272;
+      t.r3.u64 = camera.address;
+      (v == 0 ? Original<__imp__sub_8217BE98> : hooks::CameraModesStep8217BE98)(t, h.base);
+      out[v].Bytes(Read(h.base, camera.address, 108));
+      out[v].Float(guest::LoadU32(h.base, camera.address + 108));
+      out[v].Bytes(Read(h.base, camera.address + 112, kCameraBytes - 112));
+      out[v].Bytes(Read(h.base, viewport.address, 1600));
+      out[v].Floats(h.base, viewport.address + 1600, 48);
+      out[v].Bytes(Read(h.base, viewport.address + 1792, kViewportBytes - 1792));
+      out[v].Bytes(Read(h.base, kPass0, 16));
+      out[v].Floats(h.base, kPass0 + 16, 48);
+      out[v].Bytes(Read(h.base, kPass0 + 208, 160));
+      out[v].Floats(h.base, kPass0 + 368, 7);
+      out[v].Bytes(Read(h.base, kPass0 + 396, 68));
+      out[v].Floats(h.base, kPass0 + 464, 8);
+      out[v].Bytes(Read(h.base, kPass0 + 496, kPassBytes - 496));
+      out[v].Float(guest::LoadU32(h.base, kOuts));
+      out[v].Bytes(Read(h.base, kOuts + 4, kOutsBytes - 4));
+      out[v].Bytes(Read(h.base, kEyeOut, 16));
+      out[v].Bytes(Read(h.base, scene.address, kSceneBytes));
+      out[v].Word(guest::LoadU32(h.base, command_list::kOpenChunks));
+      // Its frame from +80: the eye and target, the identity and its copy.
+      out[v].Bytes(Read(h.base, frame + 80, 160));
+      out[v].Word(t.r3.u32);
+      viewports_word.Restore();
+      scene_word.Restore();
+      open_chunks.Restore();
+      pass.Restore();
+      outs.Restore();
+      eye_out.Restore();
+    }
+    results.Check(out[0], out[1], fmt::format("case {} type {} used {}", c, type, used));
+  }
+  results.Report();
+}
+
 }  // namespace
 
 void CameraModes(Context& h) {
@@ -3614,6 +3749,7 @@ void CameraModes(Context& h) {
   CutsceneSteps(h, r);
   TvConstructs(h, r);
   TvSteps(h, r);
+  GarageCameras(h, r);
 }
 
 }  // namespace harness

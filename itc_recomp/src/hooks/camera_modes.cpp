@@ -69,7 +69,7 @@ ITC_FLAG_BOOL(native_camera_modes, true, "ITC",
               "through its override, sub_82211A28); the TV camera's TvCamera::TvCamera sub_82155288 "
               "(with native atexit), TvCamera::Update sub_821593D8 with Step sub_821562F8 (no "
               "adapter: only Update's plain C++ calls it; with native atexit; the attract race's color "
-              "filter by rand)) natively instead of "
+              "filter by rand); the front end's GarageCamera::Update sub_8217BE98) natively instead of "
               "through the translated code (the same writes; checked by "
               "--run_harnesses=camera_modes)");
 
@@ -1236,3 +1236,56 @@ void CameraModesStep821593D8(PPCContext& ctx, uint8_t* base) {
 }  // namespace hooks
 
 ITC_CAMERA_MODES(821593D8)
+
+// --- The garage camera ---
+
+namespace hooks {
+
+// GarageCamera::Update (its one caller, the front end's car draw
+// sub_8217FE60, reads neither r3 nor f1 after): r3 = the camera; lr put
+// back, r3 = camera pass 0 (as CameraPass::Enable leaves it). The app
+// interface's four slot calls from its 272-byte frame with the original's
+// return addresses; CameraPass::Update from FromViewport's 112-byte frame
+// below it, as FromViewport's adapter makes it. The original with a stack
+// pointer not 16-byte aligned (the vector loads and stores on its frame) or
+// where tan's native form can't stand in.
+void CameraModesStep8217BE98(PPCContext& ctx, uint8_t* base) {
+  if ((ctx.r1.u32 & 0xF) != 0 || !cm::GarageReady(base, ctx.r3.u32)) {
+    __imp__sub_8217BE98(ctx, base);
+    return;
+  }
+  ctx.fpscr.disableFlushMode();
+  const uint64_t lr = ctx.lr;
+  const uint32_t frame = ctx.r1.u32 - 272;
+  cm::GarageCalls calls;
+  calls.queue_and_list = [&ctx, base](uint32_t f) {
+    std::pair<uint32_t, uint32_t> answer;
+    CallFrom(ctx, base, f, 272, 0x8217BEC8, [&] {
+      const auto slot = [&](uint32_t object, uint32_t offset, uint32_t back) {
+        ctx.r3.u64 = object;
+        ctx.ctr.u64 = guest::LoadU32(base, guest::LoadU32(base, object) + offset);
+        ctx.lr = back;
+        REX_CALL_INDIRECT_FUNC(ctx.ctr.u32);
+        return ctx.r3.u32;
+      };
+      const uint32_t scene = slot(guest::LoadU32(base, 0x826BABA0), 32, 0x8217BEC8);
+      answer.first = slot(scene, 8, 0x8217BED8);
+      const uint32_t again = slot(guest::LoadU32(base, 0x826BABA0), 32, 0x8217BEF4);
+      answer.second = slot(again, 4, 0x8217BF04);
+    });
+    return answer;
+  };
+  calls.pass_update = [&ctx, base](uint32_t pass, uint32_t f) {
+    CallFrom(ctx, base, f - 112, 112, 0x820AA534, [&] {
+      ctx.r3.u64 = pass;
+      sub_820A3978(ctx, base);
+    });
+  };
+  cm::GarageUpdate(base, ctx.r3.u32, frame, calls);
+  ctx.r3.u64 = 0x826BAC00;
+  ctx.lr = lr;
+}
+
+}  // namespace hooks
+
+ITC_CAMERA_MODES(8217BE98)

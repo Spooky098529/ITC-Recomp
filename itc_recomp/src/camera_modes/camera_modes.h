@@ -15,6 +15,7 @@
 #include <cstdint>
 #include <functional>
 #include <optional>
+#include <utility>
 
 #include "archive/archive.h"
 #include "c_runtime/exit.h"
@@ -552,6 +553,32 @@ uint32_t View2Construct(uint8_t* base, uint32_t camera, uint32_t viewport, uint3
 // the look point (+1648 = the eye + the unit direction). `frame`: 240 bytes.
 void View2Update(uint8_t* base, uint32_t camera, uint32_t frame,
                  const VideoOutputCall& video_output);
+
+// The garage camera's guest calls: the scene's render queue and command
+// list (the app interface [0x826BABA0]'s slot 8, then that object's slot
+// 2; slot 8 again, then slot 1: four guest calls from the garage camera's
+// `frame` with its return addresses), and CameraPass::Update on `pass` as
+// CameraPass::FromViewport's tail (from FromViewport's 112-byte frame below
+// `frame`, through the wrapper that keeps its diagnostics).
+struct GarageCalls {
+  std::function<std::pair<uint32_t, uint32_t>(uint32_t frame)> queue_and_list;
+  std::function<void(uint32_t pass, uint32_t frame)> pass_update;
+};
+// Whether GarageUpdate's tan (of the camera's +224 times pi/180, the float
+// at 0x82002948) stands in: nearest rounding and c_runtime::Tan's checks.
+bool GarageReady(uint8_t* base, uint32_t camera);
+// sub_8217BE98 GarageCamera::Update (probably; from the front end's car
+// draw sub_8217FE60, r3 its object's +112): 0x8296B918 = the command list,
+// 0x8296B91C = the render queue, 0x8296B8F4 = 0.0; the eye (`frame` + 80)
+// = (sin b cos a d, sin a d, cos b cos a d, +28) with a = +100, b = +176,
+// d = +180 (an orbit), the target (`frame` + 96) = +32; +108 = 640.0
+// (0x82009EB8) / tan(+224, degrees, in radians), Viewport::SetZoom(viewport 0,
+// that), CameraPasses::SetNear(0.01), Viewport::SetRoll(+248); the eye and
+// target through the identity with +256 to +264 as its translation
+// (Vec4::Transform), Viewport::LookAt; CameraPass::FromViewport(pass 0,
+// 0, 0) and CameraPass::Enable(pass 0); 0x8265ECE0 = the eye. `frame` is
+// the original's r1 after its stwu (272 bytes, 16-byte aligned).
+void GarageUpdate(uint8_t* base, uint32_t camera, uint32_t frame, const GarageCalls& calls);
 
 // --- The TV camera's route and paths (src/camera_modes/paths.cpp) ---
 // `sp` is the caller's r1: each function's frame is below it by the
