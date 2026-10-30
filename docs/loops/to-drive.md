@@ -151,6 +151,33 @@ here loses its heading.
   `sub_8222EC08` LocationScreen::UpdatePage,
   `sub_8222F258` LocationScreen::InitStates
 
+- The parking area, migration 2 (attract race `itc_2796`, replay
+  `itc_2797`, ok; `location-screen.md`; its 4 adapter removals already
+  listed above):
+  `sub_822280D8` LocationScreen::Page9,
+  `sub_82228138` LocationScreen::Page11,
+  `sub_82227430` LocationScreen::NextOpponentText,
+  `sub_8222C270` LocationScreen::LoadPicture,
+  `sub_82228438` Picture::Free,
+  `sub_82228498` LocationScreen::FreePictures,
+  `sub_8222CD60` LocationScreen::ResetMovie,
+  `sub_8222CFF0` LocationScreen::Transition29,
+  `sub_8222A978` LocationScreen::ShowUnlockEntry,
+  `sub_8222D1A8` LocationScreen::Transition25,
+  `sub_8222B048` LocationScreen::ShowListEntry,
+  `sub_8222D610` LocationScreen::Transition2,
+  `sub_8222E6E0` LocationScreen::Transition14,
+  `sub_8222E8D8` LocationScreen::Transition16,
+  `sub_8222A470` LocationScreen::Transition23,
+  `sub_8222A718` LocationScreen::Transition33,
+  `sub_8222AE00` LocationScreen::Transition7,
+  `sub_8222B200` LocationScreen::ShowOpponentPictures,
+  `sub_82227E20` LocationScreen::UpdateView,
+  `sub_8222B438` LocationScreen::ShowOpponentInfo,
+  `sub_8222B8A8` LocationScreen::Transition12,
+  `sub_8222BBD0` LocationScreen::ShowCard,
+  `sub_8222EAD0` LocationScreen::Transition17
+
 ## Run 2026-10-30 01:06 (`b7-loop-29-10-26-2`)
 
 - The app's start-up, migration 3 (attract race `itc_2629`, replay
