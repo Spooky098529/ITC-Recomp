@@ -22,6 +22,8 @@
 #include "hooks/camera_modes.h"
 #include "hooks/guest_call.h"
 #include "hooks/heap.h"
+#include "hooks/ui_movies_game.h"
+#include "memory/c_runtime_heap.h"
 #include "memory/heap.h"
 #include "mode_tick/mode_tick.h"
 #include "post_effects/post_effects.h"
@@ -2793,6 +2795,168 @@ void IntroUpdates(Context& h, Random& r) {
   results.Report();
 }
 
+// --- The rival logo's open and close (the second migration) ---
+
+// The movie table swapped for an array of the case's (ids 10 to 12 and the
+// case's `id` with `movie` when `with_id`), put back by `saved`.
+uint32_t LogoTable(uint8_t* base, uint32_t id, bool with_id, uint32_t movie) {
+  const uint32_t array = memory::crt::OperatorNewArray(base, 64).value_or(0);
+  uint32_t count = 0;
+  for (uint32_t k = 0; k < 3; k++, count++) {
+    guest::StoreU32(base, array + 8 * k, 10 + k);
+    guest::StoreU32(base, array + 8 * k + 4, 0x40000000 + k);
+  }
+  if (with_id) {
+    guest::StoreU32(base, array + 8 * count, id);
+    guest::StoreU32(base, array + 8 * count + 4, movie);
+    count++;
+  }
+  guest::StoreU32(base, ui_movies::kMovieTable + 0, array);
+  guest::StoreU32(base, ui_movies::kMovieTable + 4, 8);
+  guest::StoreU32(base, ui_movies::kMovieTable + 8, count);
+  return array;
+}
+
+// The table after a case (its pairs, `movie` as 1), with the movies the
+// case made deleted and the array freed.
+void LogoTableOut(uint8_t* base, uint32_t movie, Outputs& out) {
+  const uint32_t array = guest::LoadU32(base, ui_movies::kMovieTable);
+  const uint32_t count = guest::LoadU32(base, ui_movies::kMovieTable + 8);
+  out.Word(count);
+  for (uint32_t k = 0; k < count; k++) {
+    out.Word(guest::LoadU32(base, array + 8 * k));
+    const uint32_t value = guest::LoadU32(base, array + 8 * k + 4);
+    if (value != 0 && value == movie) {
+      out.Word(1);
+    } else if (value != 0 && memory::IsHeapBlock(value)) {
+      out.Word(2);  // a movie Open made
+      ui_movies::DestroyMovie(base, value);
+      memory::crt::OperatorDelete(value);
+    } else {
+      out.Word(value);
+    }
+  }
+  memory::crt::OperatorDeleteArray(array);
+}
+
+void RivalLogoOpenClose(Context& h, Random& r) {
+  if (!ui_movies_game_hooks::OpenNative()) {
+    ITC_LOG_WARN("harness: camera_modes: RivalLogo::Open and Close need the UI movies' Open "
+                 "native (--native_heap, --native_c_runtime_heap, the archive's queue)");
+    return;
+  }
+  {
+    // The logo -1 or 0 to 3 (its record's movie in the table or not), +4's
+    // bits random; the loads recorded (the pages freed, the entry as 1).
+    Results results("RivalLogo::Open (sub_822118E0)");
+    for (int c = 0; c < 60; c++) {
+      const uint32_t logo = r.Below(6) == 0 ? 0xFFFFFFFFu : r.Below(4);
+      const uint32_t flags = r.Below(4) ? (uint32_t(r.Next()) | 2) : uint32_t(r.Next());
+      const uint32_t texture = r.Below(4);
+      const bool there = r.Below(3) == 0;
+      const uint32_t id = logo < 4 ? guest::LoadU32(h.base, 0x8200CD70 + 12 * logo) : 0;
+      const uint64_t seed = r.Next();
+      Outputs out[2];
+      for (int v = 0; v < 2; v++) {
+        Saved table(h.base, ui_movies::kMovieTable, 12);
+        Fill(h.base, h.data, kScratchBytes);
+        Random fill(seed);
+        const uint32_t entry = h.data + 0x100;
+        RandomBytes(h.base, entry, 96, fill);
+        guest::StoreU32(h.base, entry + 4, flags);
+        guest::StoreU32(h.base, entry + 24, 0);
+        LogoTable(h.base, id, there, 0x12345678);
+        ArchiveLoads loads({int64_t(c), int64_t(c + 1)});
+        PPCContext t = CallContext(h);
+        t.r3.u64 = entry;
+        t.r4.u64 = logo;
+        t.r5.u64 = texture;
+        (v == 0 ? Original<__imp__sub_822118E0> : hooks::CameraModesStep822118E0)(t, h.base);
+        out[v].Bytes(Read(h.base, entry, 96));
+        out[v].Word(t.r3.u32 == entry ? 1 : t.r3.u32);
+        const std::vector<uint32_t>& calls = loads.calls();
+        out[v].Word(uint32_t(calls.size()));
+        for (size_t k = 0; k < calls.size(); k++) {
+          // The movie's pages are the case's; LoadXpr's destination
+          // ([0x826A5134]) is the game's buffer, compared as it is.
+          if (k % 6 == 1 && calls[k] != 0 && calls[k] != guest::LoadU32(h.base, 0x826A5134) &&
+              memory::IsPages(calls[k])) {
+            out[v].Word(1);
+            memory::FreePages(calls[k]);
+          } else if (k % 6 == 3 && memory::IsHeapBlock(calls[k])) {
+            out[v].Word(2);
+          } else {
+            out[v].Word(k % 6 == 3 && calls[k] == entry + 20 ? 3 : calls[k]);
+          }
+        }
+        LogoTableOut(h.base, 0x12345678, out[v]);
+      }
+      results.Check(out[0], out[1],
+                    fmt::format("case {}: logo {:X} flags {:X} there {}", c, logo, flags, there));
+    }
+    results.Report();
+  }
+  {
+    // A movie built natively (no animations, textures or texts) in the
+    // table or not, +4's bits random, the logo 0 to 2, the XPR slot 0: the
+    // entry, r3 (the table as 0, the empty entry as 1), the frame's +80,
+    // whether the movie was freed, the table.
+    Results results("RivalLogo::Close (sub_82211980)");
+    Saved none(h.base, ui_movies::kMovieTable + 16, 4);
+    for (int c = 0; c < 60; c++) {
+      const uint32_t flags = r.Below(4) ? (uint32_t(r.Next()) | 8) : uint32_t(r.Next());
+      const uint32_t logo = r.Below(3);
+      const bool there = r.Below(4) != 0;
+      const uint64_t seed = r.Next();
+      Outputs out[2];
+      for (int v = 0; v < 2; v++) {
+        Saved table(h.base, ui_movies::kMovieTable, 12);
+        Fill(h.base, h.data, kScratchBytes);
+        Random fill(seed);
+        const uint32_t entry = h.data + 0x100;
+        RandomBytes(h.base, entry, 96, fill);
+        guest::StoreU32(h.base, entry + 0, logo);
+        guest::StoreU32(h.base, entry + 4, flags);
+        guest::StoreU32(h.base, entry + 8, 20);
+        guest::StoreU32(h.base, entry + 24, 0);
+        guest::StoreU32(h.base, entry + 84, fill.Below(4));
+        guest::StoreU32(h.base, entry + 88, fill.Below(4));
+        const uint32_t movie = memory::crt::OperatorNew(h.base, 0xA010).value_or(0);
+        ui_movies::ConstructMovie(h.base, movie);
+        ui_movies::InitAnimationLists(h.base, movie);
+        guest::StoreU32(h.base, movie + 0x9FD4, 20);
+        LogoTable(h.base, 20, there, movie);
+        // The word an id not in the table reads as its movie: the case's.
+        guest::StoreU32(h.base, ui_movies::kMovieTable + 16, movie);
+        PPCContext t = CallContext(h);
+        t.r3.u64 = entry;
+        (v == 0 ? Original<__imp__sub_82211980> : hooks::CameraModesStep82211980)(t, h.base);
+        const uint32_t array = guest::LoadU32(h.base, ui_movies::kMovieTable);
+        const uint32_t r3 = t.r3.u32;
+        out[v].Bytes(Read(h.base, entry, 96));
+        out[v].Word(r3 == ui_movies::kMovieTable          ? 0
+                    : r3 == 0x826C5CDC                    ? 1
+                    : r3 >= array && r3 < array + 64      ? 0x100 + (r3 - array)
+                                                          : r3);
+        out[v].Word(guest::LoadU32(h.base, t.r1.u32 - 128 + 80));
+        const bool freed = !memory::IsHeapBlock(movie);
+        out[v].Word(freed);
+        if (!freed) {
+          out[v].Bytes(Read(h.base, guest::LoadU32(h.base, movie + 28), 16));
+        }
+        LogoTableOut(h.base, movie, out[v]);
+        if (!freed) {
+          ui_movies::DestroyMovie(h.base, movie);
+          memory::crt::OperatorDelete(movie);
+        }
+      }
+      results.Check(out[0], out[1],
+                    fmt::format("case {}: logo {} flags {:X} there {}", c, logo, flags, there));
+    }
+    results.Report();
+  }
+}
+
 }  // namespace
 
 void CameraModes(Context& h) {
@@ -2816,6 +2980,7 @@ void CameraModes(Context& h) {
   ChaseCameras(h, r);
   ViewCameras(h, r);
   IntroUpdates(h, r);
+  RivalLogoOpenClose(h, r);
 }
 
 }  // namespace harness

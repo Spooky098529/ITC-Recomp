@@ -561,4 +561,55 @@ uint32_t RivalLogoPlay(uint8_t* base, uint32_t entry, uint32_t key_slot) {
   return r3;
 }
 
+uint32_t RivalLogoOpen(uint8_t* base, uint32_t entry, uint32_t logo, uint32_t texture,
+                       const std::function<uint32_t(uint32_t, uint32_t)>& open,
+                       const std::function<uint32_t(uint32_t, uint32_t)>& load_xpr) {
+  ITC_NATIVE_RUNNING("sub_822118E0 RivalLogo::Open");
+  if (int32_t(logo) == -1) {
+    guest::StoreU32(base, entry + 4, 1);
+    return entry;
+  }
+  if ((guest::LoadU32(base, entry + 4) & 0x2) == 0) {
+    return entry;
+  }
+  constexpr uint32_t kTextures = 0x8200CEA0;
+  const uint32_t record = kTextures - 304 + logo * 12;
+  guest::StoreU32(base, entry + 0, logo);
+  guest::StoreU32(base, entry + 4, guest::LoadU32(base, entry + 4) | 4);
+  guest::StoreU32(base, entry + 8, guest::LoadU32(base, record + 0));
+  guest::StoreU32(base, entry + 12, guest::LoadU32(base, record + 4));
+  const uint32_t asset = guest::LoadU32(base, record + 8);
+  guest::StoreU32(base, entry + 16, asset);
+  uint32_t r3 = open(guest::LoadU32(base, entry + 8), asset);
+  if (guest::LoadU32(base, entry + 0) == 0) {
+    r3 = load_xpr(entry + 20, guest::LoadU32(base, kTextures + (texture << 2)));
+  }
+  return r3;
+}
+
+uint32_t RivalLogoClose(uint8_t* base, uint32_t entry, uint32_t frame,
+                        const RivalLogoCloseCalls& calls) {
+  ITC_NATIVE_RUNNING("sub_82211980 RivalLogo::Close");
+  guest::StoreU32(base, frame + 80, guest::LoadU32(base, entry + 8));
+  uint32_t r3 = ui_movies::PairsFind(base, ui_movies::kMovieTable, frame + 80);
+  const uint32_t movie = guest::LoadU32(base, r3);
+  if ((guest::LoadU32(base, entry + 4) & 0x8) != 0) {
+    calls.finish_all(movie);
+    if (guest::LoadU32(base, entry + 0) == 0) {
+      for (uint32_t i = 0; i < 2; i++) {
+        ui_movies::SwapTexture(base, movie, guest::LoadU32(base, entry + 84 + 4 * i),
+                               guest::LoadU32(base, entry + 76 + 4 * i));
+      }
+      calls.release_xpr(entry + 20);
+    }
+    r3 = calls.remove(guest::LoadU32(base, entry + 8));
+  }
+  guest::StoreU32(base, entry + 8, 0);
+  guest::StoreU32(base, entry + 0, 0xFFFFFFFFu);
+  guest::StoreU32(base, entry + 4, 1);
+  guest::StoreU32(base, entry + 12, 0);
+  guest::StoreU32(base, entry + 16, 0);
+  return r3;
+}
+
 }  // namespace camera_modes

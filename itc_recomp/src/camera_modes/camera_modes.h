@@ -271,6 +271,30 @@ void RivalLogoConstruct(uint8_t* base, uint32_t entry);
 // r3: the entry when the bit is off, IsLoaded's answer when it waits, else
 // PlayNamed's.
 uint32_t RivalLogoPlay(uint8_t* base, uint32_t entry, uint32_t key_slot);
+// sub_822118E0 RivalLogo::Open: logo -1 sets +4 = 1 only; else, with +4's
+// bit 0x2, +0 = the logo, +4 |= 0x4, +8, +12, +16 = its 12-byte record
+// (0x8200CD70 + 12 x logo: the movie's id, its name, its asset), then
+// open(+8, +16) (UiMovies::Open); for logo 0 (+0 read again) load_xpr(the
+// holder +20, the word at 0x8200CEA0 + 4 x texture) (RivalLogo::LoadXpr,
+// never run in play). Returns r3 as the original leaves it (the entry, or
+// the last call's).
+uint32_t RivalLogoOpen(uint8_t* base, uint32_t entry, uint32_t logo, uint32_t texture,
+                       const std::function<uint32_t(uint32_t id, uint32_t asset)>& open,
+                       const std::function<uint32_t(uint32_t holder, uint32_t id)>& load_xpr);
+// sub_82211980 RivalLogo::Close: +8 stored at the frame's +80 (`frame`, the
+// original's r1, 128 bytes) and its movie found (UiMovies::Find); with +4's
+// bit 0x8: finish_all(the movie) (UiMovie::FinishAll), for logo 0 the two
+// textures put back (UiMovie::SwapTexture(movie, [+84 + 4i], [+76 + 4i]))
+// and release_xpr(+20) (RivalLogo::ReleaseXpr, never run in play), then
+// remove(+8) (UiMovies::Delete). Then +8 = 0, +0 = -1, +4 = 1, +12, +16 = 0.
+// Returns r3 as the original leaves it (Find's, or Delete's).
+struct RivalLogoCloseCalls {
+  std::function<void(uint32_t movie)> finish_all;
+  std::function<void(uint32_t holder)> release_xpr;
+  std::function<uint32_t(uint32_t id)> remove;
+};
+uint32_t RivalLogoClose(uint8_t* base, uint32_t entry, uint32_t frame,
+                        const RivalLogoCloseCalls& calls);
 
 // --- The views (src/camera_modes/views.cpp) ---
 

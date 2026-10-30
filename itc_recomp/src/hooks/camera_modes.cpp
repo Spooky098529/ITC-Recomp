@@ -14,6 +14,7 @@
 #include "hooks/cameras.h"
 #include "hooks/guest_call.h"
 #include "hooks/heap.h"
+#include "hooks/ui_movies_game.h"
 #include "game_modes/game_modes.h"
 #include "cameras/cameras.h"
 
@@ -58,7 +59,9 @@ ITC_FLAG_BOOL(native_camera_modes, true, "ITC",
               "sub_82153640 (no adapters), ChaseCamera::Update sub_82154808, "
               "ViewCamera1::ViewCamera1 sub_82154A48 and ViewCamera2::ViewCamera2 sub_82154D38 "
               "(with native atexit), ViewCamera1::Update sub_82153A50 and ViewCamera2::Update "
-              "sub_82153E58; IntroCamera::Update sub_82155E58) natively instead of "
+              "sub_82153E58; IntroCamera::Update sub_82155E58; RivalLogo::Open sub_822118E0 and Close "
+              "sub_82211980 (the UI movies' Open and Delete natively where their adapters "
+              "would)) natively instead of "
               "through the translated code (the same writes; checked by "
               "--run_harnesses=camera_modes)");
 
@@ -952,3 +955,69 @@ ITC_CAMERA_MODES(82153A50)
 ITC_CAMERA_MODES(82154D38)
 ITC_CAMERA_MODES(82153E58)
 ITC_CAMERA_MODES(82155E58)
+
+// --- The rival logo's open and close ---
+
+namespace hooks {
+
+// RivalLogo::Open: r3 = the entry, r4 = the logo, r5 = the texture; r3 as
+// the original leaves it. UiMovies::Open natively where its adapter would,
+// else its adapter, and RivalLogo::LoadXpr (never run in play) through the
+// translated code, from frames like the original's (112 bytes).
+void CameraModesStep822118E0(PPCContext& ctx, uint8_t* base) {
+  const uint32_t sp = ctx.r1.u32 - 112;
+  ctx.r3.u64 = cm::RivalLogoOpen(
+      base, ctx.r3.u32, ctx.r4.u32, ctx.r5.u32,
+      [&](uint32_t id, uint32_t asset) -> uint32_t {
+        if (ui_movies_game_hooks::OpenNative()) {
+          return ui_movies::OpenMovie(base, id, asset, sp - 128, hooks::NativeArchiveLoad(base),
+                                      ui_movies_game_hooks::OpenCalls(ctx, base, sp));
+        }
+        guest_call::InFrame(ctx, base, 112, 0x8221195C, [&](uint32_t) {
+          ctx.r3.u64 = id;
+          ctx.r4.u64 = asset;
+          sub_8211E808(ctx, base);
+        });
+        return ctx.r3.u32;
+      },
+      [&](uint32_t holder, uint32_t id) -> uint32_t {
+        guest_call::InFrame(ctx, base, 112, 0x82211978, [&](uint32_t) {
+          ctx.r3.u64 = holder;
+          ctx.r4.u64 = id;
+          sub_82211878(ctx, base);
+        });
+        return ctx.r3.u32;
+      });
+}
+
+// RivalLogo::Close: r3 = the entry; r3 as the original leaves it.
+// UiMovie::FinishAll through its adapter and RivalLogo::ReleaseXpr (never
+// run in play) through the translated code, UiMovies::Delete natively where
+// its adapter would, else its adapter, from frames like the original's (128
+// bytes).
+void CameraModesStep82211980(PPCContext& ctx, uint8_t* base) {
+  const uint32_t sp = ctx.r1.u32 - 128;
+  auto call = [&](uint32_t back, void (*function)(PPCContext&, uint8_t*), uint32_t r3) {
+    guest_call::InFrame(ctx, base, 128, back, [&](uint32_t) {
+      ctx.r3.u64 = r3;
+      function(ctx, base);
+    });
+    return ctx.r3.u32;
+  };
+  cm::RivalLogoCloseCalls calls;
+  calls.finish_all = [&](uint32_t movie) { call(0x822119C0, sub_8211DFF8, movie); };
+  calls.release_xpr = [&](uint32_t holder) { call(0x822119F8, sub_82211768, holder); };
+  calls.remove = [&](uint32_t id) -> uint32_t {
+    if (ui_movies_game_hooks::DeleteNative()) {
+      return ui_movies::DeleteMovie(base, id, sp - 128,
+                                    ui_movies_game_hooks::DeleteCalls(ctx, base, sp));
+    }
+    return call(0x82211A00, sub_8211E258, id);
+  };
+  ctx.r3.u64 = cm::RivalLogoClose(base, ctx.r3.u32, sp, calls);
+}
+
+}  // namespace hooks
+
+ITC_CAMERA_MODES(822118E0)
+ITC_CAMERA_MODES(82211980)
