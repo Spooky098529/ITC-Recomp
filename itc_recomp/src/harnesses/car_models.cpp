@@ -14,6 +14,7 @@
 #include "car_models/car_model.h"
 #include "car_models/decals.h"
 #include "car_models/load_slots.h"
+#include "car_models/parts.h"
 #include "car_models/raster.h"
 #include "car_models/tga.h"
 #include "car_models/vinyl.h"
@@ -1239,6 +1240,21 @@ std::vector<int64_t> Serials(Random& r) {
 
 void DecalRecords(uint8_t* base, uint32_t records, Random& r, bool none);
 
+// The wheels' fields the rims and brakes read: the car's block ([+24] +
+// 32: -3 to 50, now and then any), the wheel numbers (+44, +60: -1 or 0 to
+// 40), traffic (+28 = 3 now and then) with its wheel ([[+3264]]: 0 to 30).
+// `fields` is where +28 to +63 go (the wheels, or the set-up copied there).
+void WheelFields(uint8_t* base, uint32_t wheels, uint32_t fields, uint32_t car, uint32_t traffic,
+                 Random& r) {
+  Put(base, wheels + 24, car);
+  Put(base, car + 32, r.Below(8) == 0 ? uint32_t(r.Next()) : uint32_t(int32_t(r.Below(54)) - 3));
+  Put(base, fields + 0, r.Below(4) == 0 ? 3 : r.Below(5));
+  Put(base, fields + 16, r.Below(2) ? 0xFFFFFFFFu : r.Below(41));
+  Put(base, fields + 32, r.Below(2) ? 0xFFFFFFFFu : r.Below(41));
+  Put(base, wheels + 3264, traffic);
+  Put(base, traffic, r.Below(31));
+}
+
 // CarModel::LoadSetA and LoadSetB's register steps (their adapters removed:
 // their only caller, LoadExterior, is native): r3 = the car model; r3 as
 // the original leaves it.
@@ -1330,6 +1346,44 @@ void Loads(Context& h, uint32_t block) {
           t.r3.u64 = scene_model;
         },
         {}, "vinyl textures");
+    results.Report();
+  }
+  {
+    Results rims("Wheels::Rims (sub_820D8BA8)");
+    Results brakes("Wheels::Brakes (sub_820D8C50)");
+    for (int c = 0; c < 64; c++) {
+      Case(
+          h, c % 2 ? brakes : rims, block, h.random.Next(),
+          [&](int, PPCContext& t, Random& r) {
+            WheelFields(h.base, block, block + 28, block + 0x3E00, block + 0x3D00, r);
+            t.r3.u64 = block;
+          },
+          nullptr, c % 2 ? __imp__sub_820D8C50 : __imp__sub_820D8BA8,
+          c % 2 ? hooks::CarModelsWheelsBrakes : hooks::CarModelsWheelsRims,
+          fmt::format("case {}", c));
+    }
+    rims.Report();
+    brakes.Report();
+  }
+  {
+    // The set-up (random, the fields above and the tires' +144, +148 in it)
+    // copied over the wheels; rims or brakes by [[+3268] + 8].
+    Results results("Wheels::SetUp (sub_820D9110)");
+    const uint32_t wheels = block + 0x100;
+    const uint32_t setup = block + 0x3000;
+    run(results, 32, __imp__sub_820D9110, hooks::CarModelsWheelsSetUp,
+        [&](PPCContext& t, Random& r) {
+          WheelFields(h.base, wheels, setup, block + 0x3E00, block + 0x3D00, r);
+          Put(h.base, setup + 116, r.Below(2) ? 0 : r.Below(3));
+          Put(h.base, setup + 120, r.Below(2) ? 0 : r.Below(3));
+          Put(h.base, wheels + 3268, block + 0x3F00);
+          Put(h.base, block + 0x3F08, r.Below(2) ? 0 : 1 + r.Below(3));
+          guest::StoreU32(h.base, set + car_models::kSharedBufferSize,
+                          r.Below(4) == 0 ? r.Below(0x10000) : 0x200000);
+          t.r3.u64 = wheels;
+          t.r4.u64 = setup;
+        },
+        {}, "wheels");
     results.Report();
   }
   if (!hooks::NativeHeapActive()) {

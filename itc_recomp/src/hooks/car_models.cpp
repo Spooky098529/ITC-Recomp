@@ -8,6 +8,7 @@
 #include "car_models/car_model.h"
 #include "car_models/decals.h"
 #include "car_models/load_slots.h"
+#include "car_models/parts.h"
 #include "car_models/raster.h"
 #include "car_models/tga.h"
 #include "car_models/vinyl.h"
@@ -23,7 +24,8 @@ ITC_FLAG_BOOL(native_car_models, true, "ITC",
               "sub_820D07C8 and CarModel::LoadExterior sub_820D5EC8 (with LoadSetA sub_820D59D8 and "
               "LoadSetB sub_820D5AC0), the team "
               "emblem sub_820D3CF8, CarModel::LoadDecals sub_820D5B50 and SetVinylTextures "
-              "sub_820D5F88, with --native_heap LoadSlot::ReleaseBuffer sub_820D0758, and the "
+              "sub_820D5F88, the wheels' set-up sub_820D9110 with the rims sub_820D8BA8 and brakes "
+              "sub_820D8C50, with --native_heap LoadSlot::ReleaseBuffer sub_820D0758, and the "
               "deferred release sub_820C3F50; with --native_heap and the memory blocks' host lock "
               "CarModel::Release sub_820D4508; with --native_heap the vinyl sheet's texture, "
               "Texture::Create sub_820ECF08 and Texture::Free sub_820ECFC8; the decals' TGA "
@@ -95,6 +97,21 @@ void CarModelsLoadExterior(PPCContext& ctx, uint8_t* base) {
 
 void CarModelsSetVinylTextures(PPCContext& ctx, uint8_t* base) {
   ctx.r3.u64 = cm::CarModelSetVinylTextures(base, ctx.r3.u32);
+}
+
+void CarModelsWheelsRims(PPCContext& ctx, uint8_t* base) { cm::WheelsRims(base, ctx.r3.u32); }
+
+void CarModelsWheelsBrakes(PPCContext& ctx, uint8_t* base) {
+  cm::WheelsBrakes(base, ctx.r3.u32);
+}
+
+void CarModelsWheelsSetUp(PPCContext& ctx, uint8_t* base) {
+  if (const auto r3 =
+          cm::WheelsSetUp(base, ctx.r3.u32, ctx.r4.u32, hooks::NativeArchiveLoad(base))) {
+    ctx.r3.u64 = *r3;
+    return;
+  }
+  __imp__sub_820D9110(ctx, base);
 }
 
 void CarModelsDeferRelease(PPCContext& ctx, uint8_t* base) {
@@ -226,6 +243,9 @@ ITC_CAR_MODELS(820D3CF8, CarModelsTeamEmblem)
 ITC_CAR_MODELS(820D5B50, CarModelsLoadDecals)
 ITC_CAR_MODELS(820D5EC8, CarModelsLoadExterior)
 ITC_CAR_MODELS(820D5F88, CarModelsSetVinylTextures)
+ITC_CAR_MODELS(820D8BA8, CarModelsWheelsRims)
+ITC_CAR_MODELS(820D8C50, CarModelsWheelsBrakes)
+ITC_CAR_MODELS(820D9110, CarModelsWheelsSetUp)
 ITC_CAR_MODELS(820D4508, CarModelsCarModelRelease)
 ITC_CAR_MODELS(820ECF08, CarModelsTextureCreate)
 ITC_CAR_MODELS(820ECFC8, CarModelsTextureFree)
