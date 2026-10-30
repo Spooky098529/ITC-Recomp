@@ -26,6 +26,7 @@
 #include "models/memory_blocks.h"
 #include "scene_loaders/objects.h"
 #include "scene_loaders/pools.h"
+#include "scene_models/scene_models.h"
 #include "memory/heap.h"
 #include "texture_compression/compress_surface.h"
 #include "texture_compression/dxt45.h"
@@ -128,6 +129,37 @@ void Slots(Context& h, uint32_t block) {
             }
           },
           __imp__sub_820D0758, hooks::CarModelsLoadSlotReleaseBuffer, fmt::format("case {}", c));
+    }
+    results.Report();
+  }
+  {
+    // sub_820C3CE0: the word at r4 pages the allocation layer gives each
+    // side (compared as a marker while it still holds them, and whether
+    // they're still pages), or 0 now and then; r3 random (not read).
+    Results results("FreePagesAt (sub_820C3CE0)");
+    for (int c = 0; c < 16; c++) {
+      uint32_t pages[2] = {0, 0};
+      uint32_t at = 0;
+      Case(
+          h, results, block, h.random.Next(),
+          [&](int v, PPCContext& t, Random& r) {
+            at = block + 4 * r.Below(64);
+            pages[v] = c % 8 == 7 ? 0 : memory::AllocPages(1 + r.Below(0x8000), 4096);
+            Put(h.base, at, pages[v]);
+            t.r3.u64 = uint32_t(r.Next());
+            t.r4.u64 = at;
+          },
+          [&](int v, Outputs& out) {
+            if (pages[v] != 0 && guest::LoadU32(h.base, at) == pages[v]) {
+              Put(h.base, at, kMarker);
+            }
+            const bool still = pages[v] != 0 && memory::IsPages(pages[v]);
+            out.Word(still);
+            if (still) {
+              memory::FreePages(pages[v]);
+            }
+          },
+          __imp__sub_820C3CE0, hooks::CarModelsFreePagesAt, fmt::format("case {}", c));
     }
     results.Report();
   }
@@ -1466,6 +1498,39 @@ void Loads(Context& h, uint32_t block) {
                           r.Below(4) == 0 ? r.Below(0x10000) : 0x200000);
         },
         {}, "interior parts");
+    results.Report();
+  }
+  {
+    // CarInterior::Load: the model set 0, 1 or another, the cockpit flag
+    // set or not; the accessories' set ([0x826C5510]) a stand-in in the
+    // block whose slot +4 is sub_822A8C18 (r4, r5 stored at r3 + 60, + 64,
+    // r3 left: the stand-in, whose +808 the set a calls clear).
+    SavedWord accessories(h.base, scene_models::kAccessories);
+    Results results("CarInterior::Load (sub_820D79B0)");
+    const uint32_t object = block + 0x100;
+    const uint32_t setup = block + 0x3000;
+    const uint32_t stand_in = block + 0x3800;
+    int c = 0;
+    run(results, 32, __imp__sub_820D79B0, hooks::CarModelsInteriorLoad,
+        [&](PPCContext& t, Random& r) {
+          guest::StoreU32(h.base, scene_models::kAccessories, stand_in);
+          Put(h.base, stand_in, block + 0x3C00);
+          Put(h.base, block + 0x3C04, 0x822A8C18);
+          Put(h.base, object + 24, block + 0x3E00);
+          Put(h.base, block + 0x3E20,
+              r.Below(6) == 0 ? uint32_t(r.Next()) : r.Below(45));
+          Put(h.base, object + 3092, block + 0x3E40);
+          const uint32_t k = (c++ / 2) % 4;  // the setup runs once a side
+          Put(h.base, block + 0x3E48, k < 2 ? k : k == 2 ? 2 + r.Below(4) : uint32_t(r.Next()));
+          if (r.Below(2) == 0) {
+            Put(h.base, object + 3088, 0);
+          }
+          guest::StoreU32(h.base, set + car_models::kSharedBufferSize,
+                          r.Below(4) == 0 ? r.Below(0x10000) : 0x200000);
+          t.r3.u64 = object;
+          t.r4.u64 = setup;
+        },
+        {}, "interior");
     results.Report();
   }
   const uint32_t car = block + 0x100;

@@ -8,6 +8,7 @@
 #include "car_models/load_slots.h"
 #include "guest.h"
 #include "native/buffers.h"
+#include "scene_models/scene_models.h"
 
 namespace car_models {
 
@@ -144,6 +145,38 @@ uint32_t InteriorLoadParts(uint8_t* base, uint32_t object, uint32_t first, uint3
   for (uint32_t i = 0; i < 6; i++) {
     r3 = LoadSlotLoadShared(base, object + 160 + 24 * i, id + i, object, kOnInteriorPartLoaded,
                             load);
+  }
+  return r3;
+}
+
+std::optional<uint32_t> InteriorLoad(uint8_t* base, uint32_t object, uint32_t setup,
+                                     const archive::LoadCall& load,
+                                     const AccessoryLoadCall& accessory_load) {
+  ITC_NATIVE_RUNNING("sub_820D79B0 CarInterior::Load");
+  const uint32_t accessories = scene_models::Accessories(base);
+  if (!native::Buffers_Memcpy(base, object + 28, setup, 120, 0x820D79E0)) {
+    return std::nullopt;
+  }
+  uint32_t r3 = object + 28;  // memcpy's answer
+  const uint32_t set = Load(base, Load(base, object + 3092) + 8);
+  const bool cockpit = Load(base, object + 3088) != 0;
+  if (set == 1) {
+    if (cockpit) {
+      InteriorLoadParts(base, object, 19926, 55, 49, load);
+    } else {
+      InteriorLoadParts(base, object, 11061, 197, 190, load);
+    }
+    r3 = accessory_load(accessories, Load(base, object + 140), Load(base, object + 144), 0);
+  } else if (set == 0) {
+    if (cockpit) {
+      InteriorLoadParts(base, object, 19926, 55, 49, load);
+    } else {
+      InteriorLoadParts(base, object, 891, 226, 219, load);
+    }
+    for (uint32_t i = 0; i < 3; i++) {
+      r3 = accessory_load(accessories, i, 0, 1);
+      Store(base, r3 + 808, 0);
+    }
   }
   return r3;
 }

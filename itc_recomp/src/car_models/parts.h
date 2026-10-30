@@ -10,6 +10,7 @@
 #include "archive/archive.h"
 
 #include <cstdint>
+#include <functional>
 #include <optional>
 
 namespace car_models {
@@ -67,5 +68,25 @@ std::optional<uint32_t> CockpitLoadSetC(uint8_t* base, uint32_t object, uint32_t
 // kOnInteriorPartLoaded. Returns the last LoadShared's r3.
 uint32_t InteriorLoadParts(uint8_t* base, uint32_t object, uint32_t first, uint32_t stride,
                            uint32_t offset, const archive::LoadCall& load);
+
+// The accessories' set's vtable slot +4 (sub_820F0EB8, probably
+// Accessories::Load; recompiled): r3 = the set, r4, r5; returns its r3.
+// `which` is the call site: 0 set b's (returning to 0x820D7A40), 1 set a's
+// and the cockpit's (0x820D7A94).
+using AccessoryLoadCall =
+    std::function<uint32_t(uint32_t set, uint32_t r4, uint32_t r5, int which)>;
+
+// CarInterior::Load (sub_820D79B0): the accessories' set (sub_820F0E50,
+// read first), the 120-byte set-up copied to +28 (memcpy,
+// native::Buffers_Memcpy); by the model set s = [[+3092] + 8] and the
+// cockpit flag +3088: s = 1 InteriorLoadParts(11061, 197, 190), or (19926,
+// 55, 49) with the cockpit, then the set's slot +4 with [+140], [+144]; s = 0
+// (891, 226, 219) or the cockpit's, then the slot +4 with (i, 0) for i 0 to
+// 2, each answer's +808 = 0; other sets nothing. Returns the last slot +4
+// call's r3 (memcpy's, the destination, for other sets); nullopt, with
+// nothing done, where the copy can't be native (the original runs).
+std::optional<uint32_t> InteriorLoad(uint8_t* base, uint32_t object, uint32_t setup,
+                                     const archive::LoadCall& load,
+                                     const AccessoryLoadCall& accessory_load);
 
 }  // namespace car_models

@@ -60,4 +60,10 @@ uint32_t LoadSlotLoad(uint8_t* base, uint32_t slot, uint32_t id, uint32_t contex
 // when none is free).
 void DeferRelease(uint8_t* base, uint32_t set, uint32_t a, uint32_t b, uint32_t c, uint32_t d);
 
+// sub_820C3CE0 (a buffer's release): VirtualFree([at], 0, MEM_RELEASE), a
+// tail call; returns VirtualFree's 1. nullopt, with nothing done, where the
+// word isn't pages the allocation layer gave (VirtualFree's adapter would go
+// to the original; only over the layer: the adapter's condition).
+std::optional<uint32_t> FreePagesAt(uint8_t* base, uint32_t at);
+
 }  // namespace car_models

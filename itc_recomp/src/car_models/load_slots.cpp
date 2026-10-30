@@ -118,4 +118,14 @@ void DeferRelease(uint8_t* base, uint32_t set, uint32_t a, uint32_t b, uint32_t 
   }
 }
 
+std::optional<uint32_t> FreePagesAt(uint8_t* base, uint32_t at) {
+  ITC_NATIVE_RUNNING("sub_820C3CE0 FreePagesAt");
+  const uint32_t buffer = Load(base, at);
+  if (buffer == 0 || !memory::IsPages(buffer)) {
+    return std::nullopt;
+  }
+  memory::FreePages(buffer);
+  return 1;
+}
+
 }  // namespace car_models

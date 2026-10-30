@@ -45,6 +45,15 @@ void CarModelsWheelsSetUp(PPCContext& ctx, uint8_t* base);
 // r5 = the stride, r6 = the offset; r3 the last LoadShared's.
 void CarModelsCockpitLoadSetC(PPCContext& ctx, uint8_t* base);
 void CarModelsInteriorLoadParts(PPCContext& ctx, uint8_t* base);
+// CarInterior::Load sub_820D79B0: r3 = the object, r4 = its set-up; r3 the
+// last accessories' slot +4 call's (memcpy's for other sets). The slot +4
+// calls are guest calls, from a 112-byte frame as the original's; the
+// original where memcpy's copy can't be native.
+void CarModelsInteriorLoad(PPCContext& ctx, uint8_t* base);
+// sub_820C3CE0: r4 = where the buffer's address is; r3 VirtualFree's (r4 =
+// 0, r5 = MEM_RELEASE as the original leaves them). Natively only while
+// --native_heap routes VirtualFree to the layer and the buffer is its pages.
+void CarModelsFreePagesAt(PPCContext& ctx, uint8_t* base);
 // sub_820C3F50: r3 = the set (left), r4 to r7 the record's words.
 void CarModelsDeferRelease(PPCContext& ctx, uint8_t* base);
 
