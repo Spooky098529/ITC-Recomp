@@ -421,6 +421,51 @@ struct SetModeCalls {
 // address into +68528 (+68532). Returns r3 as the original leaves it.
 uint32_t DirectorSetMode(uint8_t* base, uint32_t director, uint32_t view, uint32_t frame,
                          const SetModeCalls& calls);
+// sub_821596B0 CameraDirector::OnRaceStart (a handler): with the race's kind
+// 4 the viewports' +8 = 1 (split screen); with kind 6 and the current
+// stage's copy (Stages::Copy into `frame` + 80; `frame` the original's r1,
+// 224 bytes; `stages_copy` its original where the plain C++ refuses) not
+// starting with 1, the followed player (+9636, +77408) = 1 when
+// [0x826C7824] is 0, else 0. The view (+9624) from the save data's camera
+// setting (0 gives 2, 1 gives 1, 2 gives 0, else 0), or 2 in split screen
+// (both viewports' +1860); viewport 0's +1860 = it; `set_mode(view)`
+// (SetMode); +9632 = +9624.
+void DirectorOnRaceStart(uint8_t* base, uint32_t director, uint32_t frame,
+                         const StagesCopyCall& stages_copy,
+                         const std::function<void(uint32_t view)>& set_mode);
+// sub_821597F0 CameraDirector::Resume (a handler): the followed player as
+// OnRaceStart picks it, else 0 (`frame` 240 bytes); with the race's kind 4
+// split screen on, both viewports' +1860 = 2 and `set_mode(2)`, else
+// viewport 0's +1860 = +9632; then the color filter (PostEffects::Get(2))
+// back to neutral: Set8112 [0x82000A34], SetColor0 [0x82000A30] x3,
+// Set8116 [0x82000A34]. DirectorResumeReady: whether the filter's three
+// slots are the ones done natively (else the original runs).
+bool DirectorResumeReady(uint8_t* base);
+void DirectorResume(uint8_t* base, uint32_t director, uint32_t frame,
+                    const StagesCopyCall& stages_copy,
+                    const std::function<void(uint32_t view)>& set_mode);
+// CameraDirector::Update's guest calls: TvCamera::Track (the TV camera, the
+// position), SetMode, and a camera object's vtable slot 0 (its update;
+// `which` 0 for +68528's, 1 for +68532's).
+struct DirectorUpdateCalls {
+  std::function<void(uint32_t camera, uint32_t position)> track;
+  std::function<void(uint32_t view)> set_mode;
+  std::function<void(uint32_t camera, uint32_t which)> slot0;
+};
+// sub_821594B8 CameraDirector::Update (a handler, wrapped by
+// --redraw_rival_logo): the followed player's car input record (five words
+// from [0x826C5B30 + 4 x the low byte of +77408]) copied to `frame` + 96
+// (`frame` the original's r1, 176 bytes); on its flag 0x40 viewport 0's
+// view mode cycles (with the race data's flag 0x80 at +0x59AE4: 0 to 4, 4
+// to 1, 1 to 2, 2 to 0; without it and not in split screen 0 to 1 to 2 to
+// 0); with that race flag and a view mode other than 4, `track` (+13360,
+// [+68528] + 260); a view mode other than +9628: `set_mode`; on the
+// input's flag 0x80 in view 0, +13356 = 1; in view 1, +12960 = the input's
+// +12 halfword (through a doubleword at +80) x [0x82002BD4] x
+// [0x820093CC]; `slot0` of +68528 and, in split screen, of +68532 (when
+// not 0); Viewport::Update on viewport 0 and, in split screen, viewport 1.
+void DirectorUpdate(uint8_t* base, uint32_t director, uint32_t frame,
+                    const DirectorUpdateCalls& calls);
 
 // CutsceneShot::Init's guest calls: the copies List16::Copy32 and
 // Insert32 refuse (memcpy), and CameraAnims::Load of the asset id.

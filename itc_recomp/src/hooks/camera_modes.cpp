@@ -70,7 +70,7 @@ ITC_FLAG_BOOL(native_camera_modes, true, "ITC",
               "(with native atexit), TvCamera::Update sub_821593D8 with Step sub_821562F8 (no "
               "adapter: only Update's plain C++ calls it; with native atexit; the attract race's color "
               "filter by rand); the front end's GarageCamera::Update sub_8217BE98; the director's "
-              "CameraDirector::InitStates sub_82159950 and SetMode sub_821591F0; the cutscene's Cutscene::Cutscene sub_82156CC0 "
+              "CameraDirector::InitStates sub_82159950, SetMode sub_821591F0, OnRaceStart sub_821596B0, Resume sub_821597F0 and Update sub_821594B8 (through --redraw_rival_logo's wrapper); the cutscene's Cutscene::Cutscene sub_82156CC0 "
               "with its scripts' cues and shots and the rival logo's open) natively instead of "
               "through the translated code (the same writes; checked by "
               "--run_harnesses=camera_modes)");
@@ -1315,14 +1315,11 @@ void CameraModesStep82159950(PPCContext& ctx, uint8_t* base) {
 }
 
 
-// CameraDirector::SetMode: r3 = the director, r4 = the view; r3 as the
-// original leaves it. The view's camera object made through its adapter's
-// step (which falls back to its original itself) from the original's frame
-// (176 bytes) with the call site's return address; lr put back.
-void CameraModesStep821591F0(PPCContext& ctx, uint8_t* base) {
-  ctx.fpscr.disableFlushMode();
-  const uint64_t lr = ctx.lr;
-  const uint32_t frame = ctx.r1.u32 - 176;
+// SetMode's constructor calls from its frame at `frame` (the original's r1,
+// 176 bytes): the view's camera object made through its adapter's step
+// (which falls back to its original itself) with the call site's return
+// address, or the harness's stand-in.
+cm::SetModeCalls SetModeCallsAt(PPCContext& ctx, uint8_t* base, uint32_t frame) {
   cm::SetModeCalls calls;
   calls.construct = [&ctx, base, frame](uint32_t view, uint32_t object, uint32_t viewport,
                                         uint32_t vehicle, uint32_t back) -> uint32_t {
@@ -1342,15 +1339,125 @@ void CameraModesStep821591F0(PPCContext& ctx, uint8_t* base) {
     ctx.lr = back;
     kSteps[view](ctx, base);
     ctx.r1.u64 = stack;
+    ctx.fpscr.disableFlushMode();
     return ctx.r3.u32;
   };
-  ctx.r3.u64 = cm::DirectorSetMode(base, ctx.r3.u32, ctx.r4.u32, frame, calls);
+  return calls;
+}
+
+// SetMode natively from a handler's frame at `frame` (its 176 bytes below).
+std::function<void(uint32_t)> SetModeFrom(PPCContext& ctx, uint8_t* base, uint32_t director,
+                                          uint32_t frame) {
+  return [&ctx, base, director, frame](uint32_t view) {
+    cm::DirectorSetMode(base, director, view, frame - 176,
+                        SetModeCallsAt(ctx, base, frame - 176));
+  };
+}
+
+// Stages::Copy's original from a handler's frame (`frame_bytes`) with the
+// return address `back`, where its plain C++ refuses.
+cm::StagesCopyCall StagesCopyFrom(PPCContext& ctx, uint8_t* base, uint32_t frame,
+                                  uint32_t frame_bytes, uint32_t back) {
+  return [&ctx, base, frame, frame_bytes, back](uint32_t out, uint32_t stages, uint32_t stage) {
+    CallFrom(ctx, base, frame, frame_bytes, back, [&] {
+      ctx.r3.u64 = out;
+      ctx.r4.u64 = stages;
+      ctx.r5.u64 = int64_t(int32_t(stage));
+      __imp__sub_820FFD88(ctx, base);
+    });
+  };
+}
+
+// CameraDirector::SetMode: r3 = the director, r4 = the view; r3 as the
+// original leaves it; lr put back.
+void CameraModesStep821591F0(PPCContext& ctx, uint8_t* base) {
+  ctx.fpscr.disableFlushMode();
+  const uint64_t lr = ctx.lr;
+  const uint32_t frame = ctx.r1.u32 - 176;
+  ctx.r3.u64 =
+      cm::DirectorSetMode(base, ctx.r3.u32, ctx.r4.u32, frame, SetModeCallsAt(ctx, base, frame));
   ctx.lr = lr;
 }
+
+// CameraDirector::OnRaceStart (a handler; r3 not kept: the state machine's
+// handler call doesn't read it): r3 = the director; lr put back. SetMode
+// natively from its 224-byte frame.
+void CameraModesStep821596B0(PPCContext& ctx, uint8_t* base) {
+  ctx.fpscr.disableFlushMode();
+  const uint64_t lr = ctx.lr;
+  const uint32_t frame = ctx.r1.u32 - 224;
+  const uint32_t director = ctx.r3.u32;
+  cm::DirectorOnRaceStart(base, director, frame,
+                          StagesCopyFrom(ctx, base, frame, 224, 0x82159730),
+                          SetModeFrom(ctx, base, director, frame));
+  ctx.lr = lr;
+}
+
+// CameraDirector::Resume (a handler; r3 and f1 not kept): r3 = the
+// director; lr put back. The original where the color filter's slots aren't
+// the ones done natively.
+void CameraModesStep821597F0(PPCContext& ctx, uint8_t* base) {
+  if (!cm::DirectorResumeReady(base)) {
+    __imp__sub_821597F0(ctx, base);
+    return;
+  }
+  ctx.fpscr.disableFlushMode();
+  const uint64_t lr = ctx.lr;
+  const uint32_t frame = ctx.r1.u32 - 240;
+  const uint32_t director = ctx.r3.u32;
+  cm::DirectorResume(base, director, frame, StagesCopyFrom(ctx, base, frame, 240, 0x82159848),
+                     SetModeFrom(ctx, base, director, frame));
+  ctx.lr = lr;
+}
+
+// CameraDirector::Update (a handler, through frame interpolation's wrapper,
+// src/frame_pacing/per_frame_logic.cpp, on logic passes; r3 not kept): r3 =
+// the director; lr put back. TvCamera::Track through its step and the
+// camera objects' slot 0 through the translated code (their adapters), from
+// its 176-byte frame with the original's return addresses; SetMode
+// natively.
+void CameraModesStep821594B8(PPCContext& ctx, uint8_t* base) {
+  ctx.fpscr.disableFlushMode();
+  const uint64_t lr = ctx.lr;
+  const uint32_t frame = ctx.r1.u32 - 176;
+  const uint32_t director = ctx.r3.u32;
+  cm::DirectorUpdateCalls calls;
+  calls.track = [&ctx, base, frame](uint32_t camera, uint32_t position) {
+    CallFrom(ctx, base, frame, 176, 0x82159594, [&] {
+      ctx.r3.u64 = camera;
+      ctx.r4.u64 = position;
+      CameraModesStep82156980(ctx, base);
+    });
+  };
+  calls.set_mode = SetModeFrom(ctx, base, director, frame);
+  calls.slot0 = [&ctx, base, frame](uint32_t camera, uint32_t which) {
+    const uint32_t back = which == 0 ? 0x82159614 : 0x82159648;
+    CallFrom(ctx, base, frame, 176, back, [&] {
+      ctx.r3.u64 = camera;
+      ctx.ctr.u64 = guest::LoadU32(base, guest::LoadU32(base, camera));
+      REX_CALL_INDIRECT_FUNC(ctx.ctr.u32);
+    });
+  };
+  cm::DirectorUpdate(base, director, frame, calls);
+  ctx.lr = lr;
+}
+
+// The director's update as frame interpolation's wrapper runs it on logic
+// passes: natively with --native_camera_modes, else the original.
+void CameraModesUpdate(PPCContext& ctx, uint8_t* base) {
+  if (!ITC_FLAG(native_camera_modes)) {
+    __imp__sub_821594B8(ctx, base);
+    return;
+  }
+  CameraModesStep821594B8(ctx, base);
+}
+
 }  // namespace hooks
 
 ITC_CAMERA_MODES(82159950)
 ITC_CAMERA_MODES(821591F0)
+ITC_CAMERA_MODES(821596B0)
+ITC_CAMERA_MODES(821597F0)
 
 // --- The garage camera ---
 

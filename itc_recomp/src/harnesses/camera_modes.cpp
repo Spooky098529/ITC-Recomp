@@ -4059,11 +4059,19 @@ struct ConstructCall {
   uint32_t words[6];
 };
 std::vector<ConstructCall>* g_construct_calls = nullptr;
+// The stand-in's answers when not 0 (the handlers' harness: camera objects
+// whose slot 0 its Update then calls), the first call's then the second's.
+uint32_t g_construct_answers[2] = {0, 0};
 
 uint32_t RecordConstruct(uint32_t function, uint32_t r3, uint32_t r4, uint32_t r5, uint32_t r1,
                          uint32_t lr) {
+  size_t n = 0;
   if (g_construct_calls) {
+    n = g_construct_calls->size();
     g_construct_calls->push_back({{function, r3, r4, r5, r1, lr}});
+  }
+  if (g_construct_answers[0] != 0) {
+    return g_construct_answers[n == 0 ? 0 : 1];
   }
   return (r3 & 1) ? 0 : r3 ^ 0x13579BDF;
 }
@@ -4136,6 +4144,161 @@ void DirectorSetModes(Context& h, Random& r) {
   results.Report();
 }
 
+// --- The director's handlers OnRaceStart, Resume and Update: a world of
+// the director, both viewports (split screen or not), the race data's kind
+// (4, 6 or another) and TV flag (+0x59AE4 bit 0x80), its current stage's
+// first word (1 or not), [0x826C7824], the save data's camera setting, the
+// color filter (there or not), the players' car input records (the buttons
+// 0x40 and 0x80, the stick halfword) and the two racers for SetMode; the
+// views' constructors answered by SetMode's stand-in, the camera objects'
+// slot 0 the empty sub_82106540 and the TV camera with no route ranges (so
+// TvCamera::Track only writes its frame); the director's words, both
+// viewports, the color filter's words, the frames' words and the stand-in's
+// calls compared ---
+
+void DirectorHandlers(Context& h, Random& r) {
+  constexpr uint32_t kManager = 0x826D82F4;
+  constexpr uint32_t kVehicleArray = 0x826C2E34;
+  constexpr uint32_t kSaveData = 0x826C5B58;
+  constexpr uint32_t kTwoPlayer = 0x826C7824;
+  constexpr uint32_t kInputs = 0x826C5B30;
+  Saved saved_viewports(h.base, cm::kViewports, 4);
+  Saved saved_manager(h.base, kManager, 4);
+  Saved saved_vehicles(h.base, kVehicleArray, 4);
+  Saved saved_race(h.base, cm::kRaceData, 4);
+  Saved saved_save(h.base, kSaveData, 4);
+  Saved saved_two(h.base, kTwoPlayer, 4);
+  Saved saved_inputs(h.base, kInputs, 16);
+  Saved saved_filter(h.base, post_effects::kEffects + 8, 4);
+  Block director(kDirectorBytes), holder(12), first(kViewportBytes), second(kViewportBytes),
+      manager(2400), racers(64), vehicles(7 * 6272), race(kRaceBytes), save(0x1F900),
+      filter(8200), vtable(64), inputs(4 * 32), camera_vtable(8), cameras(64);
+  for (uint32_t i = 0; i < 16; i++) {
+    guest::StoreU32(h.base, vtable.address + 4 * i, 0);
+  }
+  guest::StoreU32(h.base, vtable.address + 16, 0x821350F8);
+  guest::StoreU32(h.base, vtable.address + 24, 0x82135138);
+  guest::StoreU32(h.base, vtable.address + 28, 0x82135140);
+  guest::StoreU32(h.base, camera_vtable.address, 0x82106540);
+  guest::StoreU32(h.base, camera_vtable.address + 4, 0x82106540);
+  guest::StoreU32(h.base, cameras.address, camera_vtable.address);
+  guest::StoreU32(h.base, cameras.address + 32, camera_vtable.address);
+  hooks::SetCameraConstructStandIn(RecordConstruct);
+  g_construct_answers[0] = cameras.address;
+  g_construct_answers[1] = cameras.address + 32;
+  // The world for one case, from the case's random generator.
+  auto world = [&](Random& w) {
+    RandomBytes(h.base, director.address + cm::kView - 16, 32, w);
+    guest::StoreU32(h.base, director.address + cm::kView, w.Below(8) ? w.Below(6) : w.Below(9));
+    guest::StoreU32(h.base, director.address + cm::kViewKept, w.Below(6));
+    RandomBytes(h.base, director.address + 12960, 4, w);
+    RandomBytes(h.base, director.address + 13356, 4, w);
+    guest::StoreU32(h.base, director.address + 13360 + 452, 0);  // no route ranges
+    guest::StoreU32(h.base, director.address + cm::kCurrentCamera, cameras.address);
+    guest::StoreU32(h.base, director.address + cm::kCurrentCamera2,
+                    w.Below(2) ? cameras.address + 32 : 0);
+    guest::StoreU32(h.base, director.address + cm::kFollowed, w.Below(2));
+    guest::StoreU32(h.base, director.address + cm::kFollowedInput,
+                    (uint32_t(w.Next()) & ~0xFFu) | w.Below(4));
+    RandomBytes(h.base, first.address, kViewportBytes, w);
+    RandomBytes(h.base, second.address, kViewportBytes, w);
+    RandomFloats(h.base, first.address + 1600, 48, w);
+    RandomFloats(h.base, second.address + 1600, 48, w);
+    // The view modes 0-5 only (a view past 5 would leave Update a null camera
+    // to call, in the original too).
+    guest::StoreU32(h.base, first.address + 1860, w.Below(6));
+    guest::StoreU32(h.base, holder.address + 0, first.address);
+    guest::StoreU32(h.base, holder.address + 4, second.address);
+    guest::StoreU32(h.base, holder.address + 8, w.Below(3) ? 0 : 1);
+    guest::StoreU32(h.base, cm::kViewports, holder.address);
+    for (uint32_t i = 0; i < 2; i++) {
+      const uint32_t racer = racers.address + 32 * i;
+      guest::StoreU32(h.base, manager.address + (577 + i) * 4, w.Below(6) ? racer : 0);
+      guest::StoreU32(h.base, racer, uint32_t(w.Next()) | 0x40u);
+      guest::StoreU32(h.base, racer + 20, w.Below(7));
+    }
+    guest::StoreU32(h.base, kManager, manager.address);
+    guest::StoreU32(h.base, kVehicleArray, vehicles.address);
+    const uint32_t kinds[] = {4, 6, 6, 1, 2, 3};
+    guest::StoreU32(h.base, race.address + 0xA3AF0, kinds[w.Below(6)]);
+    guest::StoreU32(h.base, race.address + 0x59AE4, uint32_t(w.Next()));
+    const uint32_t stages = race.address + 0x59620;
+    const uint32_t stage = w.Below(4);
+    guest::StoreU32(h.base, stages + 804, stage);
+    RandomBytes(h.base, stages + 80 * stage, 80, w);
+    guest::StoreU32(h.base, stages + 80 * stage, w.Below(2) ? 1 : w.Below(4));
+    guest::StoreU32(h.base, cm::kRaceData, race.address);
+    guest::StoreU32(h.base, save.address + 0x1F85C + 24, w.Below(5) ? w.Below(4) : uint32_t(w.Next()));
+    guest::StoreU32(h.base, kSaveData, save.address);
+    guest::StoreU32(h.base, kTwoPlayer, w.Below(2) ? 0 : uint32_t(w.Next()));
+    RandomBytes(h.base, filter.address + 8064, 64, w);
+    guest::StoreU32(h.base, filter.address, vtable.address);
+    guest::StoreU32(h.base, post_effects::kEffects + 8, w.Below(5) ? filter.address : 0);
+    for (uint32_t p = 0; p < 4; p++) {
+      const uint32_t input = inputs.address + 32 * p;
+      RandomBytes(h.base, input, 32, w);
+      guest::StoreU32(h.base, kInputs + 4 * p, input);
+    }
+  };
+  auto outputs = [&](Outputs& out, uint32_t frame, uint32_t frame_bytes) {
+    out.Bytes(Read(h.base, director.address + cm::kView - 16, 32));
+    out.Floats(h.base, director.address + 12960, 1);
+    out.Bytes(Read(h.base, director.address + 13356, 4));
+    out.Bytes(Read(h.base, director.address + cm::kCurrentCamera, 8));
+    out.Bytes(Read(h.base, director.address + cm::kFollowedInput, 4));
+    out.Bytes(Read(h.base, first.address, kViewportBytes));
+    out.Bytes(Read(h.base, second.address, kViewportBytes));
+    out.Word(guest::LoadU32(h.base, holder.address + 8));
+    out.Floats(h.base, filter.address + 8064, 16);
+    out.Bytes(Read(h.base, frame + 80, frame_bytes - 80));
+  };
+  struct Handler {
+    const char* name;
+    void (*original)(PPCContext&, uint8_t*);
+    void (*native)(PPCContext&, uint8_t*);
+    uint32_t frame;    // the original's frame
+    uint32_t compared; // the frame's bytes compared (up to its saved registers)
+  };
+  const Handler handlers[] = {
+      {"CameraDirector::OnRaceStart (sub_821596B0)", Original<__imp__sub_821596B0>,
+       hooks::CameraModesStep821596B0, 224, 160},
+      {"CameraDirector::Resume (sub_821597F0)", Original<__imp__sub_821597F0>,
+       hooks::CameraModesStep821597F0, 240, 160},
+      {"CameraDirector::Update (sub_821594B8)", Original<__imp__sub_821594B8>,
+       hooks::CameraModesStep821594B8, 176, 120},
+  };
+  for (const Handler& handler : handlers) {
+    Results results(handler.name);
+    const uint32_t frame = CallContext(h).r1.u32 - handler.frame;
+    for (int c = 0; c < 300; c++) {
+      const uint64_t seed = r.Next();
+      Outputs out[2];
+      for (int v = 0; v < 2; v++) {
+        Random w(seed);
+        world(w);
+        RandomBytes(h.base, frame, handler.frame, w);
+        std::vector<ConstructCall> calls;
+        g_construct_calls = &calls;
+        PPCContext t = CallContext(h);
+        t.r3.u64 = director.address;
+        (v == 0 ? handler.original : handler.native)(t, h.base);
+        g_construct_calls = nullptr;
+        outputs(out[v], frame, handler.compared);
+        out[v].Word(uint32_t(calls.size()));
+        for (const ConstructCall& call : calls) {
+          for (uint32_t word : call.words) {
+            out[v].Word(word);
+          }
+        }
+      }
+      results.Check(out[0], out[1], fmt::format("case {}", c));
+    }
+    results.Report();
+  }
+  hooks::SetCameraConstructStandIn(nullptr);
+  g_construct_answers[0] = g_construct_answers[1] = 0;
+}
+
 }  // namespace
 
 void CameraModes(Context& h) {
@@ -4166,6 +4329,7 @@ void CameraModes(Context& h) {
   GarageCameras(h, r);
   DirectorInitStates(h, r);
   DirectorSetModes(h, r);
+  DirectorHandlers(h, r);
   CutsceneConstructs(h, r);
 }
 

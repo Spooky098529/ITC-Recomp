@@ -69,6 +69,13 @@ void CameraModesStep821593D8(PPCContext& ctx, uint8_t* base);
 void CameraModesStep8217BE98(PPCContext& ctx, uint8_t* base);
 void CameraModesStep82159950(PPCContext& ctx, uint8_t* base);
 void CameraModesStep821591F0(PPCContext& ctx, uint8_t* base);
+void CameraModesStep821596B0(PPCContext& ctx, uint8_t* base);
+void CameraModesStep821597F0(PPCContext& ctx, uint8_t* base);
+void CameraModesStep821594B8(PPCContext& ctx, uint8_t* base);
+// CameraDirector::Update (sub_821594B8) as frame interpolation's wrapper
+// runs it on logic passes: the step with --native_camera_modes, else the
+// original.
+void CameraModesUpdate(PPCContext& ctx, uint8_t* base);
 
 // The views' camera constructors' stand-in for the SetMode harness: while
 // set, the six constructors' adapters (and SetMode's native calls) answer

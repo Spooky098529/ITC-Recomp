@@ -11,6 +11,7 @@
 #include "course_scenery/course_scenery.h"
 #include "debug/frame_state_diff.h"
 #include "debug/pause_movie_log.h"
+#include "hooks/camera_modes.h"
 #include "hooks/cameras.h"
 #include "hooks/race_hud.h"
 #include "hooks/ui_movies.h"
@@ -495,7 +496,8 @@ extern "C" REX_FUNC(sub_821594B8) {
   if (!frame_pacing::GameMessages_IsRenderOnlyPass()) {
     g_rival_logo = 0;
     g_in_rival_cutscene = true;
-    __imp__sub_821594B8(ctx, base);
+    // Natively with --native_camera_modes (src/hooks/camera_modes.cpp).
+    hooks::CameraModesUpdate(ctx, base);
     g_in_rival_cutscene = false;
     return;
   }
