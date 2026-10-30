@@ -24,7 +24,7 @@ ITC_FLAG_BOOL(native_camera_modes, true, "ITC",
               "Camera::ZoomFromFov sub_82152548, Quat::Rotate sub_821525F8, Matrix::FromQuat "
               "sub_82152698 (no adapter: only CameraTarget::Track's plain C++ calls it), Matrix::FromFloats sub_82090000; the lists' List40::Link "
               "sub_82153228 (no adapter: only List40::Insert's plain C++ calls it), "
-              "List40::Insert sub_821544E0, List16::Insert20 sub_82154458, "
+              "List40::Insert sub_821544E0, List16::Insert20 sub_82154458 (no adapter: only IntroCamera::IntroCamera's plain C++ calls it), "
               "Insert32 sub_82154378, Insert608 sub_821543E8 and Copy32 sub_82154300; "
               "CameraAnims::Clear sub_82150078 and Find sub_82150300; ColorFilter::SetStyle "
               "sub_82152108 and FadeCue::Step sub_82152290; with --native_heap the camera "
@@ -184,6 +184,8 @@ void CameraModesStep82153228(PPCContext& ctx, uint8_t* base) {
 void CameraModesStep821544E0(PPCContext& ctx, uint8_t* base) {
   cm::List40Insert(base, ctx.r3.u32, guest::LoadU32(base, ctx.r4.u32), ctx.r5.u32);
 }
+// List16::Insert20 (no adapter: only IntroCamera::IntroCamera's plain C++ calls it; the
+// step kept for the harness).
 // List16::Insert20: r4 = the record, r5 = the position.
 void CameraModesStep82154458(PPCContext& ctx, uint8_t* base) {
   cm::List16Insert20(base, ctx.r3.u32, ctx.r4.u32, ctx.r5.u32);
@@ -602,7 +604,6 @@ ITC_CAMERA_MODES(82152548)
 ITC_CAMERA_MODES(821525F8)
 ITC_CAMERA_MODES(82090000)
 ITC_CAMERA_MODES(821544E0)
-ITC_CAMERA_MODES(82154458)
 ITC_CAMERA_MODES(82154378)
 ITC_CAMERA_MODES(821543E8)
 ITC_CAMERA_MODES(82154300)
