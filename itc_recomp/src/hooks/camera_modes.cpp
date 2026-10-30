@@ -33,7 +33,7 @@ ITC_FLAG_BOOL(native_camera_modes, true, "ITC",
               "FreeAll sub_821507D8 with CameraAnim::Free sub_82150098 and CameraAnimBlock::Free "
               "sub_8214FFF0 (no adapters); CameraAnims::Evaluate sub_82150960 with "
               "CameraAnim::EvalCamera sub_82150350 and EvalTarget sub_821504E0 (no adapters), "
-              "Duration sub_82150A98, ObjectMatrix sub_82150A10 with CameraAnim::Matrix "
+              "Duration sub_82150A98 (no adapter: only CutsceneShot::Step's plain C++ calls it), ObjectMatrix sub_82150A10 with CameraAnim::Matrix "
               "sub_82150590 (no adapter); with --native_heap and the archive's queue native "
               "CameraPath::Request sub_82152E08 with Load sub_82152D80 (no adapter); "
               "CameraPath::OnLoaded sub_82152078 with FixKeys sub_820AC000, FixKey sub_820ABF80, "
@@ -325,6 +325,8 @@ void CameraModesStep82150960(PPCContext& ctx, uint8_t* base) {
   ctx.r3.u64 = r3;
 }
 
+// CameraAnims::Duration (no adapter: only CutsceneShot::Step's plain C++ calls it; the
+// step kept for the harness).
 // CameraAnims::Duration: r3 = the id; f1 = the duration, r3 the objects'
 // slot the original stopped at.
 void CameraModesStep82150A98(PPCContext& ctx, uint8_t* base) {
@@ -617,7 +619,6 @@ ITC_CAMERA_MODES(82150B10)
 ITC_CAMERA_MODES(82150878)
 ITC_CAMERA_MODES(821507D8)
 ITC_CAMERA_MODES(82150960)
-ITC_CAMERA_MODES(82150A98)
 ITC_CAMERA_MODES(82150A10)
 ITC_CAMERA_MODES(82152E08)
 ITC_CAMERA_MODES(82152078)
