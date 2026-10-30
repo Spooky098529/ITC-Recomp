@@ -85,6 +85,40 @@ uint32_t SceneTargetConstruct(uint8_t* base, uint32_t target, uint32_t frame,
 std::optional<uint32_t> SceneTargetCreate(uint8_t* base, uint32_t interface, uint32_t frame,
                                           const VideoOutputCall& video_output);
 
+// --- The light billboards' shaders ---
+
+// The guest calls Billboards::Init makes (the adapter's), each with the
+// original's return address: the HLSL compile (D3DXCompileShader through its
+// override, the stored shaders: `source`, `length`, the entry and profile
+// strings, the shader buffer out; with r1 = `frame`, whose +84 and +92 are
+// its errors and constant table outs), a buffer's slot 3 (its data) and slot
+// 2 (Release), the video output (`at` 0 to 5: the three locks and unlocks),
+// and VertexShader::Create and PixelShader::Create through their overrides.
+struct BillboardCalls {
+  std::function<uint32_t(int which, uint32_t source, uint32_t length, uint32_t entry,
+                         uint32_t profile, uint32_t out)>
+      compile;
+  std::function<uint32_t(int which, uint32_t buffer)> buffer_data;
+  std::function<void(int which, uint32_t buffer)> release;
+  std::function<uint32_t(int at)> video_output;
+  std::function<uint32_t(uint32_t data)> vertex_shader;
+  std::function<uint32_t(uint32_t data)> pixel_shader;
+  MemcpyCall memcpy_call;
+};
+
+// sub_8209BE88 Billboards::Init: the ring flipped (0x826A5098 = 1 when it
+// was 0, else 0; 0x826A509C = 0); the vertex shader's source
+// ([0x82600A54], "main", "vs_3_0") compiled into `frame` + 96 (the errors
+// to `frame` + 104, released when the compile fails and they're set) and
+// made under the device lock (`frame` + 108) into 0x826A50A0, its buffer
+// released; the pixel shader's ([0x82600A60], "ps_3_0", `frame` + 100,
+// errors + 112, lock + 116) into 0x826A50A4; the vertex declaration
+// (CreateVertexDeclaration(0x82600A64), lock + 116) into 0x826A50A8;
+// 0x8266D090 = the word at 0x82000A34 (0.0). `frame` is the original's
+// 160-byte frame. Needs --native_heap (CreateVertexDeclaration) and the
+// device lock native (the adapter checks).
+void BillboardsInit(uint8_t* base, uint32_t frame, const BillboardCalls& calls);
+
 // --- The network manager's set-up (system-services.md) ---
 
 constexpr uint32_t kNetworkManager = 0x826C74A0;

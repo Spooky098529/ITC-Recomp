@@ -466,6 +466,67 @@ void SceneTargetCases(Context& h) {
   results.Report();
 }
 
+// --- The light billboards' shaders ---
+
+// Billboards::Init on the game's globals (saved and put back), both
+// versions with the stored shaders; the recompiled run with
+// --native_app_start_up off (its CreateVertexDeclaration the original too).
+// Compared: the ring's two words, the glow word, the declaration's bytes
+// (freed), and each shader object's being made and its first word (the
+// objects hold their microcode's addresses, which differ by allocation;
+// their bytes are the shader objects' harness's: left made, a few KiB).
+void BillboardsInitCases(Context& h) {
+  if (!hooks::NativeHeapActive()) {
+    return;
+  }
+  Results results("Billboards::Init (sub_8209BE88)");
+  constexpr uint32_t kGlobals = 0x826A5098, kWords = 5, kGlow = 0x8266D090;
+  uint32_t saved[kWords];
+  for (uint32_t i = 0; i < kWords; i++) {
+    saved[i] = guest::LoadU32(h.base, kGlobals + 4 * i);
+  }
+  const uint32_t saved_glow = guest::LoadU32(h.base, kGlow);
+  for (int c = 0; c < 4; c++) {
+    const uint32_t ring = c % 2 == 0 ? 0 : 1 + h.random.Below(3);
+    Outputs out[2];
+    for (int v = 0; v < 2; v++) {
+      guest::StoreU32(h.base, kGlobals + 0, ring);
+      guest::StoreU32(h.base, kGlobals + 4, 0x1234 + c);
+      guest::StoreU32(h.base, kGlow, 0xA5A5A5A5);
+      PPCContext t = CallContext(h);
+      if (v == 0) {
+        const bool flag = ITC_FLAG(native_app_start_up);
+        ITC_FLAG(native_app_start_up) = false;
+        __imp__sub_8209BE88(t, h.base);
+        ITC_FLAG(native_app_start_up) = flag;
+      } else {
+        sub_8209BE88(t, h.base);
+      }
+      out[v].Word(t.r3.u32);
+      out[v].Word(guest::LoadU32(h.base, kGlobals + 0));
+      out[v].Word(guest::LoadU32(h.base, kGlobals + 4));
+      out[v].Word(guest::LoadU32(h.base, kGlow));
+      for (const uint32_t at : {kGlobals + 8, kGlobals + 12}) {
+        const uint32_t object = guest::LoadU32(h.base, at);
+        out[v].Word(object != 0);
+        out[v].Word(object != 0 ? guest::LoadU32(h.base, object) : 0);
+      }
+      const uint32_t declaration = guest::LoadU32(h.base, kGlobals + 16);
+      out[v].Word(declaration != 0);
+      if (declaration != 0) {
+        out[v].Bytes(Read(h.base, declaration, 56 + 12 * guest::LoadU32(h.base, declaration + 24)));
+        memory::crt::XMemFree(declaration, 0x24800000);
+      }
+    }
+    results.Check(out[0], out[1], fmt::format("case {}: ring {}", c, ring));
+  }
+  for (uint32_t i = 0; i < kWords; i++) {
+    guest::StoreU32(h.base, kGlobals + 4 * i, saved[i]);
+  }
+  guest::StoreU32(h.base, kGlow, saved_glow);
+  results.Report();
+}
+
 }  // namespace
 
 void AppStartUp(Context& h) {
@@ -480,6 +541,7 @@ void AppStartUp(Context& h) {
   CreateVertexDeclaration(h);
   NetworkSetUp(h);
   SceneTargetCases(h);
+  BillboardsInitCases(h);
 }
 
 }  // namespace harness
