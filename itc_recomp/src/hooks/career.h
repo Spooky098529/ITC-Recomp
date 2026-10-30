@@ -65,4 +65,10 @@ void CareerNextDay(PPCContext& ctx, uint8_t* base);
 void CareerEventQuery(PPCContext& ctx, uint8_t* base);
 void CareerEventLocation(PPCContext& ctx, uint8_t* base);
 
+// Career::SetUpEvent sub_82114268: r3 = the save data, r4 = the mode, r5 =
+// the location; r3 as the original leaves it (the original where a copy
+// isn't native; RaceEvent::Make's original from its frame where the plain
+// C++ refuses).
+void CareerSetUpEvent(PPCContext& ctx, uint8_t* base);
+
 }  // namespace hooks

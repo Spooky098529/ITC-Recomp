@@ -39,7 +39,9 @@ ITC_FLAG_BOOL(native_career, true, "ITC",
               "Stats::StartDay and Rewards::Grant: only native callers reach them in play; "
               "Career::EventQuery sub_82111638 and Career::EventLocation sub_82111650 over the "
               "race event's plain C++ (src/race_event/), DayBlock::BestStreak sub_82110588 with "
-              "no adapter: from the race event's EventCondition::SectionRival) natively instead of through the translated code (the same writes; "
+              "no adapter: from the race event's EventCondition::SectionRival; Career::SetUpEvent "
+              "sub_82114268 over the race event's RaceEvent::Make plain C++, its cases in "
+              "--run_harnesses=race_event) natively instead of through the translated code (the same writes; "
               "checked by --run_harnesses=career)");
 
 namespace hooks {
@@ -210,6 +212,45 @@ void CareerEventLocation(PPCContext& ctx, uint8_t* base) {
   cr::EventLocation(base, save, guest.get());
 }
 
+namespace {
+
+struct GuestMake {
+  PPCContext& ctx;
+  uint8_t* base;
+  uint32_t sp;
+};
+
+// RaceEvent::Make's original from Career::SetUpEvent's frame, where its
+// plain C++ refuses (r3 = &the mode, r4 = &the location in the caller's
+// frame, r5 = the frame's locations).
+uint64_t MakeThrough(void* user, uint32_t) {
+  auto& guest = *static_cast<GuestMake*>(user);
+  PPCContext& ctx = guest.ctx;
+  guest_call::InFrame(ctx, guest.base, cr::kSetUpEventFrame, 0x82114A7C, [&](uint32_t frame) {
+    ctx.r3.u64 = guest.sp + 28;
+    ctx.r4.u64 = guest.sp + 36;
+    ctx.r5.u64 = frame + 80;
+    __imp__sub_82144E58(ctx, guest.base);
+  });
+  ctx.fpscr.disableFlushMode();
+  return ctx.r3.u64;
+}
+
+}  // namespace
+
+void CareerSetUpEvent(PPCContext& ctx, uint8_t* base) {
+  ctx.fpscr.disableFlushMode();
+  const uint32_t save = ctx.r3.u32, mode = ctx.r4.u32, location = ctx.r5.u32;
+  const uint32_t sp = ctx.r1.u32;
+  if (!cr::SetUpEventNative(base, sp)) {
+    __imp__sub_82114268(ctx, base);
+    return;
+  }
+  RaceEventGuest guest(ctx, base);
+  GuestMake make{ctx, base, sp};
+  ctx.r3.u64 = cr::SetUpEvent(base, save, mode, location, sp, guest.get(), MakeThrough, &make);
+}
+
 }  // namespace hooks
 
 #define CAREER_ADAPTER(address, step)   \
@@ -241,3 +282,4 @@ CAREER_ADAPTER(82116588, CareerAfterRace)
 CAREER_ADAPTER(82116AF0, CareerNextDay)
 CAREER_ADAPTER(82111638, CareerEventQuery)
 CAREER_ADAPTER(82111650, CareerEventLocation)
+CAREER_ADAPTER(82114268, CareerSetUpEvent)

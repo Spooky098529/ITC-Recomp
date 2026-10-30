@@ -258,4 +258,25 @@ uint64_t EventQuery(uint8_t* base, uint32_t flag, const race_event::Guest& guest
 // original).
 void EventLocation(uint8_t* base, uint32_t save, const race_event::Guest& guest);
 
+// --- The day's offers and the race event (src/career/event_setup.cpp) ---
+
+// sub_82114268 Career::SetUpEvent: r3 = the save data, the mode, the
+// location, from its 121,200-byte frame below `sp` (the original's: the
+// locations' bit set at +80, the caps at +96, the counts at +160, the picks
+// at +480, the entries at +1280; mode and location stored at sp + 28 and
+// sp + 36, the caller's frame). The mode, the location and 48 into the save
+// data, RaceData::ResetGlobal; unless the day is 1, table 0's unlocks (for a
+// location 14 to 19), tables 1 to 7's entries collected by kind and
+// location, up to 8 picked a location into the offers (+0x1AD20), then
+// RaceEvent::Make (its plain C++; `make(user, frame)` runs the original from
+// the frame where the plain C++ refuses). Returns r3 as the original leaves
+// it. SetUpEventNative: whether Condition::Test's copies and
+// RaceData::ResetGlobal's are native from the frame (else the original runs;
+// nothing written).
+constexpr uint32_t kSetUpEventFrame = 121200;
+using MakeCall = uint64_t (*)(void* user, uint32_t frame);
+bool SetUpEventNative(uint8_t* base, uint32_t sp);
+uint64_t SetUpEvent(uint8_t* base, uint32_t save, uint32_t mode, uint32_t location, uint32_t sp,
+                    const race_event::Guest& guest, MakeCall make, void* user);
+
 }  // namespace career

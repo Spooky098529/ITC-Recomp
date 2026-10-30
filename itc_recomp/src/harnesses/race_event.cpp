@@ -1,6 +1,6 @@
 // The race event (src/race_event/, docs/functions/race-event.md) against the
 // recompiled functions, with the career's calls into it
-// (Career::EventQuery, EventLocation, DayBlock::BestStreak). Each case points
+// (Career::EventQuery, EventLocation, DayBlock::BestStreak, SetUpEvent). Each case points
 // the game's globals at blocks of its own (a save data block in the players'
 // slots, the data tables' items, the car specs, the race data, the event,
 // the racers' manager, a course's route), shapes the fields the functions
@@ -885,6 +885,138 @@ void Placing(Context& h, World& w) {
       Original<__imp__sub_821442D8>, hooks::RaceEventPlaceUnlockedCurrent, misc);
 }
 
+// Career::SetUpEvent: tables 0 to 7 of 56-byte entries in a block of their
+// own (up to 12 entries each, then the end), the save data's table words,
+// table 0's done bits and list, the offers; the race data reset by
+// RaceData::ResetGlobal; the event made as in RaceEvent::Make's cases. Its
+// frame (below r1, 121,200 bytes) filled at random before each run and
+// compared from +80 to its entries' end; below it (its callees' frames,
+// where the originals save registers and Condition::Test copies items) not.
+constexpr uint32_t kTableBytes = 0x400;  // a table's entries
+
+// Returns table 0's entries.
+uint32_t ShapeSetUpTables(uint8_t* base, uint32_t tables, Random& r) {
+  uint32_t entries0 = 0;
+  for (uint32_t t = 0; t < 8; t++) {
+    const uint32_t table = tables + kTableBytes * t;
+    const uint32_t n = r.Below(4) == 0 ? 0 : r.Below(13);
+    for (uint32_t i = 0; i < n; i++) {
+      const uint32_t e = table + 56 * i;
+      WriteRandom(base, e, 56, r);
+      guest::StoreU32(base, e + 0, r.Below(4) == 0 ? r.Below(13) : r.Below(6));
+      uint32_t mask = uint32_t(r.Next());
+      switch (r.Below(4)) {
+        case 0:
+          mask &= 0x40;  // the stage bits only: table 0's skip
+          break;
+        case 1:
+          mask &= ~0x7F80u;  // no mode or stage bits
+          break;
+        case 2:
+          mask |= 0x7FFFu;
+          break;
+        default:
+          break;
+      }
+      guest::StoreU32(base, e + 4, mask);
+      guest::StoreU32(base, e + 20, r.Below(2));
+      for (uint32_t k = 0; k < 3; k++) {
+        const uint32_t c = e + 24 + 8 * k;
+        // Kinds 7 to 9 (Condition::Test's item counts) rare: each copies
+        // the 400 items.
+        uint32_t kind = r.Below(40) == 0 ? 7 + r.Below(3) : r.Below(7);
+        if (r.Below(5) == 0) {
+          kind = 0xFFFFFFFFu;
+        }
+        guest::StoreU32(base, c, kind);
+        guest::StoreU32(base, c + 4,
+                        r.Below(10) == 0 ? 0xFFFFFFFFu : r.Below(kind == 5 || kind == 6 ? 60 : 9));
+      }
+    }
+    guest::StoreU32(base, table + 56 * n, 0xFFFFFFFFu);
+    if (t == 0) {
+      entries0 = n;
+    }
+  }
+  return entries0;
+}
+
+void SetUpEvents(Context& h, World& w) {
+  uint8_t* const base = h.base;
+  const Block tables(8 * kTableBytes);
+  if (!tables.address) {
+    ITC_LOG_ERROR("harness: race_event: no block for the tables");
+    return;
+  }
+  const uint32_t frame_bytes = career::kSetUpEventFrame;
+  const uint32_t compared = 1280 + 13 * 6 * 192 * 8 - 80;
+  uint64_t runs = 0;
+  Group(
+      h, w, "Career::SetUpEvent (sub_82114268)", 64,
+      [&h, base, &tables, frame_bytes, &runs](Random& shared, const World& w, PPCContext& t) {
+        // A generator of the case's own (the same for its two runs): the
+        // cases' streams are the shared one's shifted, and fall into step
+        // when their draws' counts differ.
+        const uint64_t c = runs++ / 2;
+        Random r((shared.Next() ^ (c * 0x9E3779B97F4A7C15ull)) * 0x2545F4914F6CDD1Dull + c);
+        const uint32_t save = w.save.address;
+        const uint32_t entries0 = ShapeSetUpTables(base, tables.address, r);
+        for (uint32_t k = 0; k < 8; k++) {
+          guest::StoreU32(base, w.tables.address + 20 + 4 * k, tables.address + kTableBytes * k);
+        }
+        for (uint32_t i = 0; i < 0x600 / 4; i++) {
+          const uint32_t k = r.Below(6);
+          guest::StoreU32(base, save + 0x1B278 + 4 * i, k < 3 ? k : k == 3 ? 2 : uint32_t(r.Next()));
+        }
+        // Table 0's done bits only over its entries: the walk skips a done
+        // entry without testing for the end, so past the end it would read
+        // whatever follows the table (as the original would).
+        const uint64_t done = (uint64_t(r.Next()) & uint64_t(r.Next())) &
+                              ((uint64_t(1) << entries0) - 1);
+        guest::StoreU32(base, save + 0x1CA7C, uint32_t(done));
+        guest::StoreU32(base, save + 0x1CA7C + 4, uint32_t(done >> 32));
+        guest::StoreU32(base, save + 0x1C778 + 768, r.Below(20));
+        for (uint32_t l = 0; l < 6; l++) {
+          guest::StoreU32(base, save + 0x1AD20 + 100 * l + 96, r.Below(8));
+        }
+        const uint32_t days[] = {1, 1, 0, 2, 7, 1000};
+        guest::StoreU32(base, save + re::kDay, r.Below(2) == 0 ? days[r.Below(6)] : r.Below(400));
+        guest::StoreU32(base, save + 6092, (1u << r.Below(8)) - 1);
+        const uint32_t locations[] = {14, 15, 16, 17, 18, 19, 48, 5, 20, 0xFFFFFFFFu};
+        // The event as in RaceEvent::Make's cases.
+        PagedEvent(base, w.event(), r);
+        if (r.Below(2) == 0) {
+          guest::StoreU32(base, re::kEvent, 0);
+        }
+        const uint32_t sp = t.r1.u32;
+        WriteRandom(base, sp - frame_bytes, frame_bytes, r);
+        WriteRandom(base, sp, h.data - sp, r);
+        t.r3.u64 = save;
+        t.r4.u64 = r.Below(8) == 0 ? r.Below(8) : r.Below(4);
+        t.r5.u64 = r.Below(4) == 0 ? locations[6 + r.Below(4)] : locations[r.Below(6)];
+      },
+      Original<__imp__sub_82114268>, hooks::CareerSetUpEvent,
+      [&h, base, frame_bytes, compared](Outputs& out, const World& w, PPCContext&) {
+        const uint32_t e = guest::LoadU32(base, re::kEvent);
+        out.Word(e == 0 ? 0 : e == w.event() ? 1 : 2);
+        if (e != 0) {
+          CaptureEvent(out, base, e);
+          if (e != w.event()) {
+            memory::Free(e);
+          }
+        }
+        if (e != w.event()) {
+          CaptureEvent(out, base, w.event());
+        }
+        out.Bytes(Read(base, w.save.address, w.save.bytes));
+        out.Bytes(Read(base, w.race.address, w.race.bytes));
+        out.Bytes(Read(base, h.data, kScratchBytes));
+        const uint32_t sp = CallContext(h).r1.u32;
+        out.Bytes(Read(base, sp, h.data - sp));
+        out.Bytes(Read(base, sp - frame_bytes + 80, compared));
+      });
+}
+
 }  // namespace
 
 void RaceEvent(Context& h) {
@@ -902,6 +1034,7 @@ void RaceEvent(Context& h) {
   Events(h, w);
   Groups(h, w);
   Placing(h, w);
+  SetUpEvents(h, w);
 }
 
 }  // namespace harness
