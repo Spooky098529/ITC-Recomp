@@ -81,14 +81,17 @@ SDK's XMA decoder isn't set up, and the output's conversion is ours (A6,
 B5's and B6's leftovers are done (merged from `b5-b6-leftovers`,
 2026-10-21; under "Left to do" in each): the functions never called in
 play marked, GlobalMemoryStatus and XShowSigninUI dropped, voice skipped at
-its thread (`src/hooks/voice.cpp`: Voice::Poll no longer runs; Voice::Init
-still makes the engine, used without null checks), SaveDevices::Update
+its thread (Voice::Poll no longer ran; since 2026-10-30, by the user's
+call, the engine isn't made at all: `src/hooks/voice.cpp` drops the
+network manager's voice set-up, and no reader dereferences the null
+engine in play), SaveDevices::Update
 without its notification read (`src/hooks/notify.cpp`), and Network::Update
 stubbed with the data the game reads (`src/hooks/network.cpp`: one
 signed-in local user once, the game's profile read when the front end
 asks; SignIn::Update no longer called). The game has no System Link mode:
 its code is unreachable and not mapped. 63 imports have a live caller;
-outside the core only Voice::Init's (B7), `xstart`'s (never reached:
+outside the core only Voice::Init's (B7; no longer run since
+2026-10-30), `xstart`'s (never reached:
 `main` doesn't return in play, closing the window ends the title) and a
 `DbgPrint` in the movie player's stream set-up.
 B4 (files and saves) is done (merged from `files-and-saves`, 2026-10-21):
