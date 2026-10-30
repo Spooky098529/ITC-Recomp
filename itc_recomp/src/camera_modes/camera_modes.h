@@ -739,4 +739,79 @@ struct TvUpdateCalls {
 void TvUpdate(uint8_t* base, uint32_t camera, uint32_t frame, const TvUpdateCalls& calls,
               const c_runtime::AtexitCall& atexit);
 
+// --- The cutscene's constructor (src/camera_modes/cutscene.cpp,
+// cutscene_scripts.cpp) ---
+
+// The original's stack frame (r1 after its stwu): 1,632 bytes. The racers'
+// records are 8 bytes at +728 (four: +0 the item id's halfword, +2 the
+// item's byte +35, +4 the vehicle), their count at +760.
+constexpr uint32_t kCutsceneFrame = 1632;
+constexpr uint32_t kCutsceneRecords = 728;
+constexpr uint32_t kCutsceneRecordCount = 760;
+// A copy the native layer refuses, made through the guest's memcpy from
+// the list function's frame below the cutscene's, `back` the return
+// address of the original's call site (each List16::Insert32 and
+// Insert608 call has its own): destination, source, bytes, back.
+using SiteCopy = std::function<void(uint32_t, uint32_t, uint32_t, uint32_t)>;
+// The scripts' guest calls: List16::Insert32's (the cues, from the frame's
+// +80 into the list at +120) and Insert608's (the shot at +784 into the
+// cutscene's +952) refused copies, and CutsceneShot::Init's calls (from
+// its frame 192 bytes below the cutscene's).
+struct CutsceneScriptCalls {
+  SiteCopy insert32;
+  SiteCopy insert608;
+  CutsceneCalls shot;
+};
+// Cutscene::Cutscene's guest calls: the video output (from `frame`, back
+// 0x82156D74), CameraAnims::FreeAll (natively where its adapter would; back
+// 0x82156E6C), Stages::Copy's original where its plain C++ refuses (back
+// 0x82156ED0), the scripts' calls, and RivalLogo::Open's (as
+// RivalLogoOpen's `open` and `load_xpr`, from Open's frame 112 bytes below
+// the cutscene's).
+struct CutsceneConstructCalls {
+  VideoOutputCall video_output;
+  std::function<void()> free_all;
+  StagesCopyCall stages_copy;
+  CutsceneScriptCalls scripts;
+  std::function<uint32_t(uint32_t id, uint32_t asset)> open;
+  std::function<uint32_t(uint32_t holder, uint32_t id)> load_xpr;
+};
+// sub_82156CC0 Cutscene::Cutscene (view 5's camera, the director's +56896,
+// made in place by CameraDirector::SetMode): +16, +20 = 0, the tracker's
+// (+32) w words 1.0, vtable 0x82006B3C, the XPR holder at +10780
+// (XprHolder::XprHolder), +16 the vehicle, +20 the viewport; zoom from
+// 0x82009300's angle (55.0) and the video output's width, SetZoom,
+// SetNear(+1868 / +1864 x zoom); CameraTarget::Track; +356, +360 = 0, +352
+// (the script) = -1; the cue list (+364) and shot list (+952) reset;
+// +10756 = 0; CameraAnims::FreeAll and Clear. The stage's racers
+// (Stages::Copy of the race data's +0x59620 at `frame` + 1392; Stage::Of's
+// answer at +720) whose record has +3936's bit 0x2: each one's record (the
+// item id +3960's halfword, its item's byte +35, the vehicle of the
+// racers' manager's racer with the same id) appended at +728, those
+// flagged 0x400 whose item's halfword +88 is 1 or 3 put first (+724 the
+// last item's +88). The script (+352) from the first record's id (the
+// event: 376 to 399, 27, 28, 181, 182, -1), else from its byte (0, 1, 2:
+// scripts 0, 2, 1); none (-1): nothing more. Scripts 0 to 29: their cues
+// and shots (CutsceneScripts). Then the rival logo (+10760,
+// RivalLogo::RivalLogo) opened (RivalLogo::Open) with the script's logo:
+// script 1 logo 0 with the event's texture (0 to 45), 2 to 28 their
+// logos, 0, 3 to 5 and 29 none (-1). Returns the cutscene. `frame` is the
+// original's r1 after its stwu (1,632 bytes; the cutscene also kept at
+// +1652, the caller's frame, as the original keeps it). Needs ChaseReady
+// (the zoom's tan, the same angle).
+uint32_t CutsceneConstruct(uint8_t* base, uint32_t cutscene, uint32_t viewport, uint32_t vehicle,
+                           uint32_t frame, const CutsceneConstructCalls& calls);
+// Cutscene::Cutscene's scripts (the switch over the jump table 0x82009340,
+// from 0x821572A4 to 0x82158B48): for `script` (0 to 29; +352), its cues
+// (32-byte FadeCue records built at `frame` + 80, added to a 16-slot list
+// at `frame` + 120 with List16::Insert32) and shots (a script entry at
+// `frame` + 112: +0 the kind, +4 the vehicle, the cue list from +8, made
+// into a shot at `frame` + 784 by CutsceneShot::Init and added to the
+// cutscene's +952 with List16::Insert608). `vehicle` is the first record's
+// vehicle (the original's r9; the others are read from the frame's +740,
+// +748 and +756). Returns the cutscene as the original's r23 leaves it
+// (read back from `frame` + 1652 on scripts 4, 5 and 19).
+uint32_t CutsceneScripts(uint8_t* base, uint32_t cutscene, uint32_t script, uint32_t vehicle,
+                         uint32_t frame, const CutsceneScriptCalls& calls);
+
 }  // namespace camera_modes
