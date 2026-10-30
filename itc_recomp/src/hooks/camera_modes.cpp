@@ -22,7 +22,7 @@ ITC_FLAG_BOOL(native_camera_modes, true, "ITC",
               "handlers CameraDirector::ToView4 sub_82152400, ToView5 sub_821524B8, ToView3 "
               "sub_821524D8 and ToView3IfCourse sub_82153160; Viewports::ResetRoll sub_821524F0, "
               "Camera::ZoomFromFov sub_82152548, Quat::Rotate sub_821525F8, Matrix::FromQuat "
-              "sub_82152698, Matrix::FromFloats sub_82090000; the lists' List40::Link "
+              "sub_82152698 (no adapter: only CameraTarget::Track's plain C++ calls it), Matrix::FromFloats sub_82090000; the lists' List40::Link "
               "sub_82153228 (no adapter: only List40::Insert's plain C++ calls it), "
               "List40::Insert sub_821544E0, List16::Insert20 sub_82154458, "
               "Insert32 sub_82154378, Insert608 sub_821543E8 and Copy32 sub_82154300; "
@@ -140,6 +140,8 @@ void CameraModesStep821525F8(PPCContext& ctx, uint8_t* base) {
   cm::QuatRotate(base, ctx.r3.u32, ctx.r4.u32, ctx.r5.u32);
 }
 
+// Matrix::FromQuat (no adapter: only CameraTarget::Track's plain C++ calls it; the step kept
+// for the harness).
 // Matrix::FromQuat: r3 = the matrix, the quaternion in r4 and r5 (stored to
 // the caller's r1 + 32 to + 47 as the original does; its vector load reads
 // them back from there, so a stack pointer not 16-byte aligned runs the
@@ -598,7 +600,6 @@ ITC_CAMERA_MODES(82153160)
 ITC_CAMERA_MODES(821524F0)
 ITC_CAMERA_MODES(82152548)
 ITC_CAMERA_MODES(821525F8)
-ITC_CAMERA_MODES(82152698)
 ITC_CAMERA_MODES(82090000)
 ITC_CAMERA_MODES(821544E0)
 ITC_CAMERA_MODES(82154458)
