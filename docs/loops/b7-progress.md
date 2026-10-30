@@ -145,3 +145,6 @@ file's history. What's left to see in a drive, from every run:
 - After its validation (`itc_2783`, 60 s: race 12 s, 0 errors, every
   harness 0 differing but the expected groups): ours 3390, work left
   3007.
+- After the parking area's migration 2 (`itc_2795`: race 31 s, 0
+  errors, touched harnesses 0 differing but the expected group):
+  ours 3413, work left 2984 (wrapped 104, known 496, unknown 2384).

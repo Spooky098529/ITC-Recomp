@@ -152,6 +152,22 @@ When the user has reviewed a run's section, its heading gets
   edits reverted with `git checkout` rather than committed first (logs
   only, nothing committed lost). The user's call: the 22 `SetText`
   callers pass 0 for the r7-r10 they don't set.
+- The parking area's migration 2 (1af8d5b..df29d57): a
+  `location_screen::Calls` interface carries the guest calls left (the
+  heap's, memcpy's and the archive's adapters where their plain C++
+  refuses; `UiMovie::Finish`, `FinishNamed`, `FinishAll`, `Run`
+  through their overrides; `Career::EventQuery` and `Race::SetUp`
+  through their register steps; the race event's and `FormatV`'s).
+  The `SetText` callers run natively only while the UI movies' text
+  setters do (`hooks::LocationScreenTextsNative`), else the originals;
+  a setter refusing after that check is a logged abort. Outside the
+  subsystem: `hooks::StartUpRecorded` checks added at the start of
+  `hooks::RaceSetupSetUp` and `hooks::CareerEventQuery`, for the
+  harness to record those calls. The harness caught a porting bug,
+  fixed (`Transition17` writes the confirm menu `0x82814E5C`); row
+  correction: `UpdateView` reads the opponent menu's cursor. The 7
+  adapter removals' counter (`itc_2794`) ran in an attract race,
+  where the screen doesn't run at all.
 
 ## Run 2026-10-30 01:06 (`b7-loop-29-10-26-2`)
 
