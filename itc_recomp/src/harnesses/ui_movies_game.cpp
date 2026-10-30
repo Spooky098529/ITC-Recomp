@@ -9,7 +9,10 @@
 #include "base/flags.h"
 #include "base/log.h"
 #include "c_runtime/strings.h"
+#include "hooks/archive.h"
+#include "hooks/heap.h"
 #include "hooks/strings_and_font.h"
+#include "memory/heap.h"
 #include "hooks/ui_movies.h"
 #include "hooks/ui_movies_game.h"
 #include "strings_and_font/strings_and_font.h"
@@ -1746,7 +1749,59 @@ void FinishCases(Context& h, const Block& block) {
 
 }  // namespace
 
+namespace {
+
+// UiMovie::Load with a random movie and asset ids from the real TOC, the load
+// recorded instead of queued: the call (the file by whether it's pages), r3;
+// the file freed.
+void MovieLoadCases(Context& h) {
+  Results results("UiMovie::Load (sub_8211E798)");
+  if (!hooks::NativeHeapActive() || !hooks::NativeArchiveQueue()) {
+    ITC_LOG_WARN("harness: ui_movies_game: UiMovie::Load needs --native_heap and the archive's "
+                 "queue native");
+    return;
+  }
+  for (int c = 0; c < 16; c++) {
+    static constexpr uint32_t kIds[] = {22575, 22574, 22576, 22560, 22595, 22559};
+    const uint32_t id = c < 6 ? kIds[c] : 1 + h.random.Below(400);
+    const uint32_t movie = uint32_t(h.random.Next());
+    const std::vector<int64_t> serials = {h.random.Below(4) == 0 ? -1
+                                                                 : int64_t(h.random.Below(1000000))};
+    Outputs out[2];
+    for (int v = 0; v < 2; v++) {
+      ArchiveLoads loads(serials);
+      PPCContext t = CallContext(h);
+      t.r3.u64 = movie;
+      t.r4.u64 = id;
+      if (v == 0) {
+        __imp__sub_8211E798(t, h.base);
+      } else {
+        hooks::SetArchiveSerial(t, ui_movies::MovieLoad(h.base, movie, id, loads.Native()));
+      }
+      const std::vector<uint32_t>& calls = loads.calls();
+      out[v].Word(uint32_t(calls.size()));
+      for (size_t k = 0; k < calls.size(); k++) {
+        if (k % 6 == 1) {
+          out[v].Word(calls[k] != 0 && memory::IsPages(calls[k]) ? 1 : calls[k]);
+          if (calls[k] != 0 && memory::IsPages(calls[k])) {
+            memory::FreePages(calls[k]);
+          }
+          continue;
+        }
+        out[v].Word(calls[k]);
+      }
+      out[v].Word(t.r3.u32);
+      out[v].Word(uint32_t(t.r3.u64 >> 32));
+    }
+    results.Check(out[0], out[1], fmt::format("asset {}", id));
+  }
+  results.Report();
+}
+
+}  // namespace
+
 void UiMoviesGame(Context& h) {
+  MovieLoadCases(h);
   auto* memory = rex::system::kernel_state()->memory();
   Block block;
   block.bytes = 0x30000;  // the layers' frames at its top

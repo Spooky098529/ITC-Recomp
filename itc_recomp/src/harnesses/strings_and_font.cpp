@@ -13,6 +13,7 @@
 #include "base/flags.h"
 #include "base/log.h"
 #include "command_list/command_list.h"
+#include "hooks/archive.h"
 #include "hooks/heap.h"
 #include "hooks/models.h"
 #include "hooks/strings_and_font.h"
@@ -1437,8 +1438,205 @@ void XprSlotReleases(Context& h) {
 
 }  // namespace
 
+namespace {
+
+// --- The loads ---
+
+// What a load left in an object's slots: for each slot that was 0 and now
+// holds an allocation (a 28-byte page from operator new, or pages for a
+// file), a label in its place (in the slots and the recorded calls), the
+// page's +24 word, then the allocation freed. `pages` says which slots hold
+// pages (the rest files).
+struct Made {
+  uint32_t address;
+  uint32_t label;
+  bool page;
+};
+struct Watched {
+  uint32_t object;
+  uint32_t bytes;
+  std::vector<uint32_t> slots;
+  std::vector<bool> pages;
+  std::vector<uint32_t> before;
+};
+void LoadOut(Outputs& out, uint8_t* base, const std::vector<Watched>& objects,
+             const ArchiveLoads& loads, const PPCContext& t) {
+  std::vector<Made> made;
+  uint32_t n = 0;
+  for (const Watched& w : objects) {
+    for (size_t k = 0; k < w.slots.size(); k++, n++) {
+      const uint32_t now = guest::LoadU32(base, w.object + w.slots[k]);
+      if (now != w.before[k] && now != 0) {
+        made.push_back({now, 0x7E000000u + n, w.pages[k]});
+      }
+    }
+  }
+  const auto label = [&](uint32_t word) {
+    for (const Made& m : made) {
+      if (word == m.address) {
+        return m.label;
+      }
+    }
+    return word;
+  };
+  for (const Watched& w : objects) {
+    for (uint32_t offset = 0; offset < w.bytes; offset += 4) {
+      out.Word(label(guest::LoadU32(base, w.object + offset)));
+    }
+  }
+  out.Word(uint32_t(loads.calls().size()));
+  for (const uint32_t w : loads.calls()) {
+    out.Word(label(w));
+  }
+  for (const Made& m : made) {
+    if (m.page) {
+      out.Word(guest::LoadU32(base, m.address + 24));
+      memory::crt::OperatorDelete(m.address);
+    } else {
+      out.Word(memory::IsPages(m.address) ? 1 : 0);
+      memory::FreePages(m.address);
+    }
+  }
+  out.Word(t.r3.u32);
+  out.Word(uint32_t(t.r3.u64 >> 32));
+}
+
+void NativeFontLoad(PPCContext& t, uint8_t* base, const archive::LoadCall& load) {
+  const auto result = sf::FontLoad(base, t.r3.u32, t.r4.u32, load);
+  if (result.handed_back) {
+    __imp__sub_82109498(t, base);
+    return;
+  }
+  if (result.last) {
+    hooks::SetArchiveSerial(t, *result.last);
+  }
+}
+
+void NativeStringsLoad(PPCContext& t, uint8_t* base, const archive::LoadCall& load) {
+  if (const auto last = sf::StringsLoad(base, t.r3.u32, t.r4.u32, load)) {
+    hooks::SetArchiveSerial(t, *last);
+  }
+}
+
+std::vector<int64_t> Serials(Random& random) {
+  std::vector<int64_t> serials;
+  for (int i = 0; i < 24; i++) {
+    serials.push_back(random.Below(5) == 0 ? -1 : int64_t(random.Below(0x7FFFFFFF)));
+  }
+  return serials;
+}
+
+// A word for a slot: 0 (to load) half the time, else random.
+uint32_t SlotWord(Random& random) { return random.Below(2) ? 0 : uint32_t(random.Next()) | 1; }
+
+// Font::Load and Strings::Load on objects in a heap block (random words, the
+// slots 0 or not), Text::Load with the globals pointed at them (put back
+// after); the real TOC's sizes, the loads recorded instead of queued.
+void Loads(Context& h) {
+  // Its own generator: the cases after it keep the inputs they had.
+  Random random(0x7E47104Dull);
+  if (!hooks::NativeHeapActive() || !hooks::NativeArchiveQueue()) {
+    ITC_LOG_WARN("harness: strings_and_font: the loads need --native_heap and the archive's "
+                 "queue native");
+    return;
+  }
+  const auto block = memory::crt::OperatorNew(h.base, 8192);
+  if (!block || *block == 0) {
+    return;
+  }
+  const uint32_t font = *block;           // 64 bytes looked at
+  const uint32_t table = *block + 128;    // 4,304 bytes
+  constexpr uint32_t kTableBytes = 4304;
+  std::vector<uint32_t> font_slots, table_slots;
+  std::vector<bool> font_pages, table_pages;
+  for (uint32_t i = 0; i < 4; i++) {
+    font_slots.push_back(20 + 4 * i);
+    font_pages.push_back(true);
+    font_slots.push_back(40 + 4 * i);
+    font_pages.push_back(false);
+  }
+  for (uint32_t i = 0; i < sf::kStringFiles; i++) {
+    table_slots.push_back(4 * i);
+    table_pages.push_back(false);
+  }
+  const uint32_t saved_font = guest::LoadU32(h.base, sf::kFont);
+  const uint32_t saved_strings = guest::LoadU32(h.base, sf::kStrings);
+  for (int which = 0; which < 3; which++) {
+    Results results(which == 0   ? "Font::Load (sub_82109498)"
+                    : which == 1 ? "Strings::Load (sub_8210A8D0)"
+                                 : "Text::Load (sub_8210ADF8)");
+    for (int c = 0; c < 12; c++) {
+      const std::vector<int64_t> serials = Serials(random);
+      std::vector<uint32_t> words;
+      for (uint32_t k = 0; k < (128 + kTableBytes) / 4; k++) {
+        words.push_back(uint32_t(random.Next()));
+      }
+      for (uint32_t i = 0; i < 4; i++) {
+        words[(20 + 4 * i) / 4] = SlotWord(random);
+        words[(40 + 4 * i) / 4] = c == 0 ? 0 : SlotWord(random);
+      }
+      for (uint32_t i = 0; i < sf::kStringFiles; i++) {
+        words[(128 + 4 * i) / 4] = c == 0 ? 0 : SlotWord(random);
+      }
+      const uint32_t mask = c == 0 ? (which == 0 ? 15 : 0x1FFFF) : uint32_t(random.Next());
+      const uint64_t r3_in = random.Next();
+      Outputs out[2];
+      for (int v = 0; v < 2; v++) {
+        for (uint32_t k = 0; k < words.size(); k++) {
+          guest::StoreU32(h.base, *block + 4 * k, words[k]);
+        }
+        std::vector<Watched> watched = {{font, 64, font_slots, font_pages, {}},
+                                        {table, kTableBytes, table_slots, table_pages, {}}};
+        for (Watched& w : watched) {
+          for (const uint32_t slot : w.slots) {
+            w.before.push_back(guest::LoadU32(h.base, w.object + slot));
+          }
+        }
+        guest::StoreU32(h.base, sf::kFont, font);
+        guest::StoreU32(h.base, sf::kStrings, table);
+        ArchiveLoads loads(serials);
+        PPCContext t = CallContext(h);
+        t.r3.u64 = which == 0 ? font : which == 1 ? table : r3_in;
+        t.r4.u64 = mask;
+        if (which == 0) {
+          (v == 0 ? (void)__imp__sub_82109498(t, h.base) : NativeFontLoad(t, h.base, loads.Native()));
+        } else if (which == 1) {
+          if (v == 0) {
+            Run(v, __imp__sub_8210A8D0, nullptr, t, h.base);
+          } else {
+            NativeStringsLoad(t, h.base, loads.Native());
+          }
+        } else {
+          if (v == 0) {
+            // The flag off, so its Strings::Load is the original's too (its
+            // adapter would queue the loads for real).
+            Run(v, __imp__sub_8210ADF8, nullptr, t, h.base);
+          } else {
+            hooks::SetArchiveSerial(
+                t, sf::TextLoad(h.base, loads.Native(), [&](uint32_t f, uint32_t m) {
+                  PPCContext u = CallContext(h);
+                  u.r3.u64 = f;
+                  u.r4.u64 = m;
+                  __imp__sub_82109498(u, h.base);
+                }));
+          }
+        }
+        guest::StoreU32(h.base, sf::kFont, saved_font);
+        guest::StoreU32(h.base, sf::kStrings, saved_strings);
+        LoadOut(out[v], h.base, watched, loads, t);
+      }
+      results.Check(out[0], out[1], fmt::format("case {}: mask {:X}", c, mask));
+    }
+    results.Report();
+  }
+  memory::crt::OperatorDelete(*block);
+}
+
+}  // namespace
+
 void StringsAndFont(Context& h) {
   Init(h);
+  Loads(h);
   OnLoaded(h);
   Release(h);
   Loaded(h);

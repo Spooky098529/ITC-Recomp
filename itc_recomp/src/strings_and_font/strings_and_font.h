@@ -16,7 +16,10 @@
 
 #pragma once
 
+#include "archive/archive.h"
+
 #include <cstdint>
+#include <functional>
 #include <optional>
 
 namespace strings_and_font {
@@ -229,5 +232,42 @@ void FontDrawSetUp(uint8_t* base, uint32_t font, uint32_t params);
 // Text::Draw (sub_8210A758)'s set-up: Font::Draw's on [0x826C5C00]; returns
 // the font.
 uint32_t TextDrawSetUp(uint8_t* base, uint32_t params);
+
+// --- The loads (from Text::Load at boot; Strings::Load from the front end's
+// screens too) ---
+
+constexpr uint32_t kFontPageIds = 0x82007C5C;    // the four pages' asset ids
+constexpr uint32_t kStringFileIds = 0x82007DD0;  // the 17 files' asset ids
+constexpr uint32_t kFontPageLoaded = 0x82109160; // the pages' load callback
+constexpr uint32_t kStringsLoaded = 0x8210A850;  // Strings::OnLoaded
+
+// The last load's serial (r3 as the original leaves it), or nullopt when
+// nothing was loaded (r3 then as it came).
+using LastLoad = std::optional<int64_t>;
+
+// sub_82109498 Font::Load: `mask` ORed into +12; for each page asked for
+// whose file (+40 + 4i) isn't there, a 28-byte page (operator new's plain
+// C++) into +20 + 4i, the asset's size (Archive::AssetSize of [0x82007C5C +
+// 4i]) in pages (VirtualAlloc's, AllocPages) into +40 + 4i, the page's +24
+// (loaded) = 0, and `load(asset, file, 0x82109160, page)`. `handed_back`
+// where operator new's plain C++ can't answer: the pages done so far stay
+// (their files set, so the original, run again, skips them).
+struct FontLoadResult {
+  bool handed_back;
+  LastLoad last;
+};
+FontLoadResult FontLoad(uint8_t* base, uint32_t font, uint32_t mask, const archive::LoadCall& load);
+// sub_8210A8D0 Strings::Load: `mask` ORed into +136; for each file asked for
+// (0 to 16), its count (+4236 + 4i) up by one and, when its buffer (+4i)
+// isn't there, its loaded flag (+68 + 4i) = 0, the asset's size
+// (Archive::AssetSize of [0x82007DD0 + 4i]) in pages into +4i, and
+// `load(asset, buffer, Strings::OnLoaded, the flag's address)`.
+LastLoad StringsLoad(uint8_t* base, uint32_t table, uint32_t mask, const archive::LoadCall& load);
+// sub_8210ADF8 Text::Load: Font::Load([0x826C5C00], 15) (`font_fallback`
+// where it hands back: the original Font::Load) and Strings::Load([0x826C5C34],
+// 0x8001). Returns r3 as the original leaves it: Strings::Load's last serial,
+// else the string table's pointer.
+using FontFallback = std::function<void(uint32_t font, uint32_t mask)>;
+int64_t TextLoad(uint8_t* base, const archive::LoadCall& load, const FontFallback& font_fallback);
 
 }  // namespace strings_and_font

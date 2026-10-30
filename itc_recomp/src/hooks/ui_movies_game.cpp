@@ -8,6 +8,7 @@
 #include "base/flags.h"
 #include "base/log.h"
 #include "c_runtime/strings.h"
+#include "hooks/archive.h"
 #include "hooks/guest_call.h"
 #include "hooks/heap.h"
 #include "hooks/ui_movies_game.h"
@@ -56,7 +57,8 @@ ITC_FLAG_BOOL(native_ui_movies_game, true, "ITC",
               "UiMovie::ScrollText sub_8211C570, sub_8211C5F8, UiMovie::RevealText sub_8211D880 "
               "(sub_8211C930) and sub_8211D8D8 (sub_8211C9C0); "
               "the full-frame effect sub_8211BEE8 (CameraPasses::RenderTarget and sub_8259EBE8 "
-              "through their overrides) "
+              "through their overrides); with --native_heap and the archive's queue native, "
+              "UiMovie::Load sub_8211E798 "
               "(same results; checked by --run_harnesses=ui_movies_game and ui_movie_objects). sub_8211A660, "
               "sub_8211B230, AnimationList::Get, UiMovie::ScrollOffset, sub_8211B7B8, sub_8211B9B8 and "
               "sub_8211B940 have no adapters: only native callers reach "
@@ -799,4 +801,16 @@ extern "C" REX_FUNC(sub_8211D8D8) {
   REX_FUNC_PROLOGUE();
   NATIVE_HEAP_OR_ORIGINAL(8211D8D8,
                           ui_movies::HasMoreText(base, ctx.r3.u32, ctx.r4.u32, ctx.r5.u32));
+}
+
+// UiMovie::Load: r3 = the movie, r4 = the asset id; r3 the serial.
+extern "C" REX_FUNC(sub_8211E798) {
+  REX_FUNC_PROLOGUE();
+  if (!ITC_FLAG(native_ui_movies_game) || !hooks::NativeHeapActive() ||
+      !hooks::NativeArchiveQueue()) {
+    __imp__sub_8211E798(ctx, base);
+    return;
+  }
+  hooks::SetArchiveSerial(
+      ctx, ui_movies::MovieLoad(base, ctx.r3.u32, ctx.r4.u32, hooks::NativeArchiveLoad(base)));
 }

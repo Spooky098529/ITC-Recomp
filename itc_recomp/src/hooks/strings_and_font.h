@@ -20,4 +20,8 @@ void StringsFormatVSteps(PPCContext& ctx, uint8_t* base);
 // Strings::Format (sub_8210ABC0)'s: the same with r6 to r10 the varargs.
 void StringsFormatSteps(PPCContext& ctx, uint8_t* base);
 
+// Text::Load (sub_8210ADF8) without its flag: the loads through the
+// archive's queue (needs --native_heap and hooks::NativeArchiveQueue()).
+void TextLoadSteps(PPCContext& ctx, uint8_t* base);
+
 }  // namespace hooks

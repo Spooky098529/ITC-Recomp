@@ -454,4 +454,66 @@ std::optional<uint32_t> ReleaseXprSlot(uint8_t* base, uint32_t slot) {
   return xpr;
 }
 
+// --- The loads ---
+
+FontLoadResult FontLoad(uint8_t* base, uint32_t font, uint32_t mask,
+                        const archive::LoadCall& load) {
+  ITC_NATIVE_RUNNING("sub_82109498 Font::Load");
+  FontLoadResult result{false, std::nullopt};
+  guest::StoreU32(base, font + 12, mask | guest::LoadU32(base, font + 12));
+  for (uint32_t i = 0; i < 4; i++) {
+    const uint32_t file_slot = font + 40 + 4 * i;
+    if ((mask & (1u << i)) == 0 || guest::LoadU32(base, file_slot) != 0) {
+      continue;
+    }
+    const auto page = memory::crt::OperatorNew(base, 28);
+    if (!page) {
+      result.handed_back = true;
+      return result;
+    }
+    guest::StoreU32(base, font + 20 + 4 * i, *page);
+    const uint32_t asset = guest::LoadU32(base, kFontPageIds + 4 * i);
+    guest::StoreU32(base, file_slot, memory::AllocPages(archive::AssetSize(base, asset), 4096));
+    guest::StoreU32(base, guest::LoadU32(base, font + 20 + 4 * i) + 24, 0);
+    result.last = load(guest::LoadU32(base, kFontPageIds + 4 * i), guest::LoadU32(base, file_slot),
+                       kFontPageLoaded, guest::LoadU32(base, font + 20 + 4 * i));
+  }
+  return result;
+}
+
+LastLoad StringsLoad(uint8_t* base, uint32_t table, uint32_t mask,
+                     const archive::LoadCall& load) {
+  ITC_NATIVE_RUNNING("sub_8210A8D0 Strings::Load");
+  LastLoad last;
+  guest::StoreU32(base, table + 136, mask | guest::LoadU32(base, table + 136));
+  for (uint32_t i = 0; i < kStringFiles; i++) {
+    if ((mask & (1u << i)) == 0) {
+      continue;
+    }
+    const uint32_t flag = table + 68 + 4 * i;
+    guest::StoreU32(base, table + 4236 + 4 * i, guest::LoadU32(base, table + 4236 + 4 * i) + 1);
+    if (guest::LoadU32(base, table + 4 * i) != 0) {
+      continue;
+    }
+    guest::StoreU32(base, flag, 0);
+    const uint32_t buffer = memory::AllocPages(
+        archive::AssetSize(base, guest::LoadU32(base, kStringFileIds + 4 * i)), 4096);
+    guest::StoreU32(base, table + 4 * i, buffer);
+    last = load(guest::LoadU32(base, kStringFileIds + 4 * i), buffer, kStringsLoaded, flag);
+  }
+  return last;
+}
+
+int64_t TextLoad(uint8_t* base, const archive::LoadCall& load,
+                 const FontFallback& font_fallback) {
+  ITC_NATIVE_RUNNING("sub_8210ADF8 Text::Load");
+  const uint32_t font = guest::LoadU32(base, kFont);
+  if (FontLoad(base, font, 15, load).handed_back) {
+    font_fallback(font, 15);
+  }
+  const uint32_t table = guest::LoadU32(base, kStrings);
+  const LastLoad last = StringsLoad(base, table, 0x8001, load);
+  return last ? *last : int64_t(table);
+}
+
 }  // namespace strings_and_font

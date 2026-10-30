@@ -9,6 +9,7 @@
 
 #pragma once
 
+#include "archive/archive.h"
 #include "guest.h"
 
 #include <array>
@@ -473,5 +474,10 @@ std::optional<uint32_t> RevealText(uint8_t* base, uint32_t movie, uint32_t sub_s
 // stored: 1 while there's another page, else 0.
 std::optional<uint32_t> HasMoreText(uint8_t* base, uint32_t movie, uint32_t sub_scene,
                                     uint32_t child);
+
+// sub_8211E798 UiMovie::Load: the asset's size (Archive::AssetSize) in pages
+// (VirtualAlloc's, AllocPages), then load(id, them, sub_8211E500, the movie).
+// Returns the serial (r3).
+int64_t MovieLoad(uint8_t* base, uint32_t movie, uint32_t id, const archive::LoadCall& load);
 
 }  // namespace ui_movies

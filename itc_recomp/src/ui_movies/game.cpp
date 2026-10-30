@@ -1,6 +1,7 @@
 #include "ui_movies/game.h"
 
 #include "base/log.h"
+#include "memory/heap.h"
 
 #include "ui_movies/ui_movies.h"
 
@@ -644,6 +645,12 @@ uint32_t AssignLayers(uint8_t* base, uint32_t stack, uint32_t movie, uint32_t sc
     }
   }
   return result;
+}
+
+int64_t MovieLoad(uint8_t* base, uint32_t movie, uint32_t id, const archive::LoadCall& load) {
+  ITC_NATIVE_RUNNING("sub_8211E798 UiMovie::Load");
+  const uint32_t file = memory::AllocPages(archive::AssetSize(base, id), 4096);
+  return load(id, file, 0x8211E500, movie);
 }
 
 }  // namespace ui_movies

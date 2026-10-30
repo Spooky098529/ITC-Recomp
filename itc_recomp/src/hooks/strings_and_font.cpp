@@ -23,6 +23,7 @@
 #include "guest.h"
 
 #include "base/flags.h"
+#include "hooks/archive.h"
 #include "hooks/guest_call.h"
 #include "hooks/heap.h"
 #include "hooks/models.h"
@@ -51,7 +52,10 @@ ITC_FLAG_BOOL(native_strings_and_font, true, "ITC",
               "Strings::Get sub_8210A800 (no adapter: Strings::FormatV's and Format's plain C++ "
               "call it), Strings::FormatV sub_8210A990 (the font's number sub_82108A70, never in play, a guest call), Strings::Format sub_8210ABC0, and, with --native_models, XPR::Release of a slot "
               "sub_82108860; "
-              "rotated text and the second pass, never in play, on the translated code) "
+              "rotated text and the second pass, never in play, on the translated code; with "
+              "--native_heap and the archive's queue native, Strings::Load sub_8210A8D0 and "
+              "Text::Load sub_8210ADF8 with Font::Load sub_82109498, no adapter of its own: only "
+              "Text::Load's plain C++ calls it) "
               "natively instead of through the translated code (same results; checked by "
               "--run_harnesses=strings_and_font)");
 
@@ -326,4 +330,50 @@ extern "C" REX_FUNC(sub_82108860) {
     }
   }
   __imp__sub_82108860(ctx, base);
+}
+
+// --- The loads ---
+
+namespace {
+
+bool LoadsNative() {
+  return ITC_FLAG(native_strings_and_font) && hooks::NativeHeapActive() &&
+         hooks::NativeArchiveQueue();
+}
+
+}  // namespace
+
+// Strings::Load: r3 = the string table, r4 = the mask; r3 the last load's
+// serial (left as it came when nothing was loaded).
+extern "C" REX_FUNC(sub_8210A8D0) {
+  REX_FUNC_PROLOGUE();
+  if (!LoadsNative()) {
+    __imp__sub_8210A8D0(ctx, base);
+    return;
+  }
+  if (const auto last = StringsLoad(base, ctx.r3.u32, ctx.r4.u32, hooks::NativeArchiveLoad(base))) {
+    hooks::SetArchiveSerial(ctx, *last);
+  }
+}
+
+void hooks::TextLoadSteps(PPCContext& ctx, uint8_t* base) {
+  const int64_t r3 = TextLoad(base, hooks::NativeArchiveLoad(base), [&](uint32_t font,
+                                                                         uint32_t mask) {
+    guest_call::InFrame(ctx, base, 96, 0x8210AE14, [&](uint32_t) {
+      ctx.r3.u64 = font;
+      ctx.r4.u64 = mask;
+      __imp__sub_82109498(ctx, base);  // Font::Load
+    });
+  });
+  hooks::SetArchiveSerial(ctx, r3);
+}
+
+// Text::Load: no arguments; r3 as the original leaves it.
+extern "C" REX_FUNC(sub_8210ADF8) {
+  REX_FUNC_PROLOGUE();
+  if (!LoadsNative()) {
+    __imp__sub_8210ADF8(ctx, base);
+    return;
+  }
+  hooks::TextLoadSteps(ctx, base);
 }
