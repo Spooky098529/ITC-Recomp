@@ -55,8 +55,9 @@ file's history. What's left to see in a drive, from every run:
   shaders, text, font, strings, a UI movie), `BootData::Load` and
   `CreateObjects`, the loading screen's movies; `--native_data_load`;
   frame dumps the same). Validated (`itc_2642`): 26 of 26 harness
-  lines, all ran in play. Migration 2 running (the replay's static
-  set-ups `sub_825D9E60`, `sub_825D9F68`, and what's left).
+  lines, all ran in play. Migration 2 checked (4f4a23f..8689dc1: the
+  replay's static set-ups, `Record5232`'s adapter removed; nothing
+  ready left). Validation agent running.
 
 ## Done
 
