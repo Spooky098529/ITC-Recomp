@@ -105,6 +105,11 @@ here loses its heading.
   `sub_821104D8` Car::SetModelAndClass, `sub_821104B0`
   Car::SpecWord744, `sub_821154E0` Garage::InsertCar
 
+- The camera modes, migration 1 (attract race `itc_2732`, replay
+  `itc_2731`, ok; `camera-modes.md`; the camera animations, the
+  cutscene's shots, the rival logo, views 3 and 5's handlers and the
+  TV camera's tracking, which the replay's race doesn't show): `sub_821524B8`, `sub_821524D8`, `sub_82154378`, `sub_821543E8`, `sub_82154300`, `sub_82150300`, `sub_82152290`, `sub_82150B10`, `sub_82150878`, `sub_82150100`, `sub_82150098`, `sub_8214FFF0`, `sub_82150960`, `sub_82150350`, `sub_821504E0`, `sub_82150A98`, `sub_82150A10`, `sub_82150590`, `sub_82211848`, `sub_82211708`, `sub_82211AB0`, `sub_82156B68`, `sub_82155800`, `sub_82156980`
+
 ## Run 2026-10-30 01:06 (`b7-loop-29-10-26-2`)
 
 - The app's start-up, migration 3 (attract race `itc_2629`, replay

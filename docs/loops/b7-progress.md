@@ -44,8 +44,10 @@ file's history. What's left to see in a drive, from every run:
   play ours). Validation 1 (`itc_2730`, replay `itc_2731` ok): cut off,
   all harnesses now take over 40 s, 11 functions without a harness
   line; asked the user: the validation runs `attract_race.sh 60` from
-  now on (the user's call, 2026-10-30, in `b7-loop.md`). Validation
-  run again. Left: `CameraDirector::InitStates`,
+  now on (the user's call, 2026-10-30, in `b7-loop.md`). Validated
+  again (`itc_2732`, 60 s: race 14 s, 0 errors): 74 of 74 harness
+  lines; 38 ran in play, 12 in the replay, 24 to drive. Migration 2
+  running. Left: `CameraDirector::InitStates`,
   `TvCamera::TvCamera`, `Update` and `Step`, `GarageCamera::Update`;
   then, past `UiMovies::Open` (ready), the cutscene and the director's
   `SetMode`, `Update` (`--redraw_rival_logo`'s split kept).
@@ -92,3 +94,6 @@ file's history. What's left to see in a drive, from every run:
 - After the camera modes' migration 1 (`itc_2729`: race 26 s, 0
   errors, camera_modes 0 differing): ours 3348, work left 3049
   (wrapped 104, known 484, unknown 2461).
+- After its validation (`itc_2732`, 60 s: race 14 s, 0 errors, every
+  harness 0 differing but the expected groups): ours 3348, work left
+  3049.
