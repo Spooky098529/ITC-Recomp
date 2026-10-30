@@ -93,7 +93,9 @@ extern "C" REX_FUNC(sub_822A8980) {
 
 namespace {
 
-// memcpy through the guest from XNet::Configure's frame.
+// memcpy through the guest from XNet::Configure's frame. (SignIn::SetUp,
+// Network::StartUp, XNetStartup and XNet::Configure have no adapters: only
+// Network::SetUp's plain C++ calls them in play.)
 asu::MemcpyCall XNetMemcpy(PPCContext& ctx, uint8_t* base) {
   return [&ctx, base](uint32_t to, uint32_t from, uint32_t size) {
     InFrame(ctx, base, 112, 0x82577580, [&](uint32_t) {
@@ -106,44 +108,6 @@ asu::MemcpyCall XNetMemcpy(PPCContext& ctx, uint8_t* base) {
 }
 
 }  // namespace
-
-extern "C" REX_FUNC(sub_8214F1C0) {
-  REX_FUNC_PROLOGUE();
-  if (!ITC_FLAG(native_app_start_up)) {
-    __imp__sub_8214F1C0(ctx, base);
-    return;
-  }
-  ctx.r3.u64 = asu::SignInSetUp(base, ctx.r3.u32, ctx.r4.u32, ctx.r5.u32, ctx.r6.u32, ctx.r7.u32);
-}
-
-extern "C" REX_FUNC(sub_82577560) {
-  REX_FUNC_PROLOGUE();
-  if (!ITC_FLAG(native_app_start_up)) {
-    __imp__sub_82577560(ctx, base);
-    return;
-  }
-  const uint32_t config = ctx.r3.u32;
-  const uint32_t source = ctx.r4.u32;
-  ctx.r3.u64 = asu::XNetConfigure(base, config, source, XNetMemcpy(ctx, base));
-}
-
-extern "C" REX_FUNC(sub_82575B08) {
-  REX_FUNC_PROLOGUE();
-  if (!ITC_FLAG(native_app_start_up)) {
-    __imp__sub_82575B08(ctx, base);
-    return;
-  }
-  ctx.r3.u64 = asu::XNetStartup(base, XNetMemcpy(ctx, base));
-}
-
-extern "C" REX_FUNC(sub_82148868) {
-  REX_FUNC_PROLOGUE();
-  if (!ITC_FLAG(native_app_start_up)) {
-    __imp__sub_82148868(ctx, base);
-    return;
-  }
-  ctx.r3.u64 = asu::NetworkStartUp(base, ctx.r3.u32, XNetMemcpy(ctx, base));
-}
 
 extern "C" REX_FUNC(sub_8214E190) {
   REX_FUNC_PROLOGUE();

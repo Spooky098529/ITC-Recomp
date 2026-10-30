@@ -228,6 +228,32 @@ void NetworkCase(Context& h, Results& results, NetworkState& state,
   results.Check(out[0], out[1], what);
 }
 
+// The register steps of the functions with no adapter (only
+// Network::SetUp's plain C++ calls them): memcpy through the guest where
+// c_runtime::Memcpy refuses.
+asu::MemcpyCall GuestMemcpy(PPCContext& t, uint8_t* base) {
+  return [&t, base](uint32_t to, uint32_t from, uint32_t size) {
+    t.r3.u64 = to;
+    t.r4.u64 = from;
+    t.r5.u64 = size;
+    sub_825A7410(t, base);
+  };
+}
+void NativeSignInSetUp(PPCContext& t, uint8_t* base) {
+  t.r3.u64 = asu::SignInSetUp(base, t.r3.u32, t.r4.u32, t.r5.u32, t.r6.u32, t.r7.u32);
+}
+void NativeXNetConfigure(PPCContext& t, uint8_t* base) {
+  const uint32_t config = t.r3.u32;
+  const uint32_t source = t.r4.u32;
+  t.r3.u64 = asu::XNetConfigure(base, config, source, GuestMemcpy(t, base));
+}
+void NativeXNetStartup(PPCContext& t, uint8_t* base) {
+  t.r3.u64 = asu::XNetStartup(base, GuestMemcpy(t, base));
+}
+void NativeNetworkStartUp(PPCContext& t, uint8_t* base) {
+  t.r3.u64 = asu::NetworkStartUp(base, t.r3.u32, GuestMemcpy(t, base));
+}
+
 void NetworkSetUp(Context& h) {
   NetworkState state(h.base);
   helpers::SetClocksForHarness(std::nullopt, 0x12345678);
@@ -257,7 +283,7 @@ void NetworkSetUp(Context& h) {
         PPCContext t = CallContext(h);
         t.r3.u64 = h.data;
         t.r4.u64 = h.data + 512;
-        (v == 0 ? __imp__sub_82577560 : sub_82577560)(t, h.base);
+        (v == 0 ? __imp__sub_82577560 : NativeXNetConfigure)(t, h.base);
         out[v].Bytes(Read(h.base, h.data, 1024));
         out[v].Word(t.r3.u32);
       }
@@ -277,7 +303,7 @@ void NetworkSetUp(Context& h) {
       }
       const uint64_t r[5] = {h.random.Next(), h.random.Next(), h.random.Next(), h.random.Next(),
                              c % 4 == 3 ? 0 : h.random.Next()};
-      NetworkCase(h, results, state, before, __imp__sub_8214F1C0, sub_8214F1C0,
+      NetworkCase(h, results, state, before, __imp__sub_8214F1C0, NativeSignInSetUp,
                   [&](PPCContext& t) {
                     t.r3.u64 = r[0];
                     t.r4.u64 = r[1];
@@ -294,7 +320,7 @@ void NetworkSetUp(Context& h) {
     Results results("XNetStartup (sub_82575B08)");
     for (int c = 0; c < 2; c++) {
       auto before = c == 0 ? state.Live() : state.Random(h.random);
-      NetworkCase(h, results, state, before, __imp__sub_82575B08, sub_82575B08,
+      NetworkCase(h, results, state, before, __imp__sub_82575B08, NativeXNetStartup,
                   [](PPCContext&) {}, none, fmt::format("case {}", c));
     }
     results.Report();
@@ -303,7 +329,7 @@ void NetworkSetUp(Context& h) {
     Results results("Network::StartUp (sub_82148868)");
     for (int c = 0; c < 3; c++) {
       auto before = c == 0 ? state.Live() : state.Random(h.random);
-      NetworkCase(h, results, state, before, __imp__sub_82148868, sub_82148868,
+      NetworkCase(h, results, state, before, __imp__sub_82148868, NativeNetworkStartUp,
                   [&](PPCContext& t) { t.r3.u64 = app; }, none, fmt::format("case {}", c));
     }
     results.Report();
