@@ -829,7 +829,7 @@ void XAudioApiCreateSubmixVoice(PPCContext& ctx, uint8_t* base) {
   }
 
 ITC_XAUDIO_ADAPTER(8245FA28, XAudioBufferSize)
-ITC_XAUDIO_ADAPTER(8245F8E8, XAudioBufferClear)
+// No adapter (removed 2026-10-29: only XAudioSubmixVoice::Pass's, XAudioBuffer::ClearThunk's, XAudioMatrix::Mix's and PcmCodec::Process's plain C++ calls it in play) for XAudioBuffer::Clear sub_8245F8E8.
 ITC_XAUDIO_ADAPTER(8245DEB0, XAudioEngineBuffer)
 ITC_XAUDIO_ADAPTER(8245E318, XAudioGetType)
 ITC_XAUDIO_ADAPTER(8245E328, XAudioGetFormat)

@@ -408,7 +408,7 @@ void XAudioCreateEngine(PPCContext& ctx, uint8_t* base) {
 
 // No adapter (removed 2026-10-29: only XAudioFactory::SizeOf's plain C++ calls it in play) for XAudioFactory::TableSize sub_8245D9E8.
 // No adapter (removed 2026-10-29: only XAudioEngine::Size's plain C++ calls it in play) for XAudioFactory::SizeOf sub_8245DBD0.
-ITC_XAUDIO_ENGINE_ADAPTER(8245F6F0, XAudioBufferGetFormat)
+// No adapter (removed 2026-10-29: only XAudioMatrix::Mix's and PcmCodec::Process's plain C++ calls it in play) for XAudioBuffer::GetFormat sub_8245F6F0.
 ITC_XAUDIO_ENGINE_ADAPTER(8245F718, XAudioBufferGetFormatThunk)
 ITC_XAUDIO_ENGINE_ADAPTER(8245F8D0, XAudioBufferInterface)
 ITC_XAUDIO_ENGINE_ADAPTER(82460388, XAudioAllocatorRemaining)
