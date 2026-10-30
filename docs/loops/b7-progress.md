@@ -41,8 +41,11 @@ file's history. What's left to see in a drive, from every run:
   `Edram::Alloc` and the memory blocks' lock; the generic wrapper stays
   recompiled for the others): migration 3 takes it so. Validated
   (`itc_2616`): 15 of 15 harness lines, all ran in play; a print added
-  (b95341e). Migration 3 running (the movie wrapper's lock, `App::App`,
-  `AudioManager::Create`).
+  (b95341e). Migration 3 checked (6e8e860..e4104fe: the movie
+  wrapper's lock a host recursive mutex as the memory blocks' lock,
+  `Movie::Movie`, `AudioManager::Create`, the second camera class,
+  `App::App`, `App::Create` and its getters; nothing ready left).
+  Validation agent running.
 
 ## Done
 
@@ -80,3 +83,6 @@ file's history. What's left to see in a drive, from every run:
   104, known 486, unknown 2657).
 - After its validation (`itc_2616`: race 7 s, 0 errors, every harness
   0 differing but the expected groups): ours 3073, work left 3247.
+- After the start-up's migration 3 (`itc_2628`: race 38 s, 0 errors,
+  touched harnesses 0 differing): ours 3090, work left 3230 (wrapped
+  104, known 479, unknown 2647).

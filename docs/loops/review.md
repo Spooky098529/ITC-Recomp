@@ -60,6 +60,23 @@ When the user has reviewed a run's section, its heading gets
   `Network::SetUp` keep their adapters (reached through guest calls).
   The stop on `App::App`'s movie wrapper lock answered by the host
   mutex precedent (the lead's reading, not asked).
+- The app's start-up, migration 3 (6e8e860..e4104fe; rows also in
+  `movies.md`, `video-output.md`, `sound-cues.md`, `cameras.md`,
+  `framework.md`). For review: the movie wrapper's critical section
+  (+4, users only the wrapper's slots 0 and 2-4 through `ScopedLock`;
+  none runs with the FFmpeg movies) is a host `std::recursive_mutex` by
+  its address, as the memory blocks' lock (`memory_blocks.h`), its 28
+  bytes left as operator new leaves them; `AudioManager::AudioManager`'s
+  +1604 copies a frame word the original never writes (frames placed as
+  the original's); the framework harness's `DispatchObjects` keeps its
+  random words above the allocation layer's range (`App::Run` case 171
+  hit a heap block once the boot allocations moved); seven adapters
+  `--removable` lists kept so the start-up recorder sees their calls
+  (as `Text::Init`'s); the camera class and sound manager cases compare
+  heap bytes nothing writes (they match as both versions get the same
+  block); the getter `sub_82379350` runs only in its harness; two
+  leads deleted (the second camera class, taken; `sub_82593D78` and
+  `sub_82593D88`, the wrapper's slots).
 
 ## Run 2026-10-29 22:22 (`b7-loop-29-10-26-2`)
 
