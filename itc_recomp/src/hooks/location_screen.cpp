@@ -44,7 +44,9 @@ ITC_FLAG_BOOL(native_location_screen, true, "ITC",
               "with the texts' check ShowOpponentInfo sub_8222B438, Transition12 sub_8222B8A8, "
               "ShowCard sub_8222BBD0 and Transition17 sub_8222EAD0) "
               "natively instead of through the translated code (the same writes; checked by "
-              "--run_harnesses=location_screen)");
+              "--run_harnesses=location_screen). PictureA, PictureB, Picture::Free, KindText, "
+              "SetCursor, ShowUnlockEntry and ShowCard have no adapters: only native callers "
+              "reach them, and the flag switches those");
 
 namespace hooks {
 
@@ -424,10 +426,7 @@ void LocationScreenUpdateView(PPCContext& ctx, uint8_t* base) {
   }
 
 LOCATION_SCREEN_ADAPTER(8228F0A0, LocationScreenSceneryConfig)
-LOCATION_SCREEN_ADAPTER(82227690, LocationScreenKindText)
 LOCATION_SCREEN_ADAPTER(822291E8, LocationScreenIsPictureQueued)
-LOCATION_SCREEN_ADAPTER(82229108, LocationScreenPictureA)
-LOCATION_SCREEN_ADAPTER(82229158, LocationScreenPictureB)
 LOCATION_SCREEN_ADAPTER(82227158, LocationScreenOnMessage14)
 LOCATION_SCREEN_ADAPTER(822281D8, LocationScreenHasMoreUnlocks)
 LOCATION_SCREEN_ADAPTER(82227618, LocationScreenNextUnlockEntry)
@@ -436,7 +435,6 @@ LOCATION_SCREEN_ADAPTER(822271F8, LocationScreenNextResultText)
 LOCATION_SCREEN_ADAPTER(8222A060, LocationScreenShowPictures)
 LOCATION_SCREEN_ADAPTER(8222A150, LocationScreenHidePictures)
 LOCATION_SCREEN_ADAPTER(8222AC18, LocationScreenSetCarColor)
-LOCATION_SCREEN_ADAPTER(8222BFE8, LocationScreenSetCursor)
 LOCATION_SCREEN_ADAPTER(8222C058, LocationScreenListNode)
 LOCATION_SCREEN_ADAPTER(8222C0C8, LocationScreenShowArrows)
 LOCATION_SCREEN_ADAPTER(822291A8, LocationScreenRunCardMovie)
@@ -447,15 +445,18 @@ LOCATION_SCREEN_ADAPTER(822279A8, LocationScreenReset)
 LOCATION_SCREEN_ADAPTER(8222C9B0, LocationScreenApplyQueuedPage)
 LOCATION_SCREEN_ADAPTER(8222EC08, LocationScreenUpdatePage)
 LOCATION_SCREEN_ADAPTER(8222F258, LocationScreenInitStates)
+// No adapters (only native callers reach them in play, and the flag switches
+// those; their steps above are the harness's): PictureA sub_82229108 and
+// PictureB sub_82229158, Picture::Free sub_82228438, KindText sub_82227690,
+// SetCursor sub_8222BFE8, ShowUnlockEntry sub_8222A978, ShowCard
+// sub_8222BBD0.
 LOCATION_SCREEN_ADAPTER(822280D8, LocationScreenPage9)
 LOCATION_SCREEN_ADAPTER(82228138, LocationScreenPage11)
 LOCATION_SCREEN_ADAPTER(82227430, LocationScreenNextOpponentText)
 LOCATION_SCREEN_ADAPTER(8222C270, LocationScreenLoadPicture)
-LOCATION_SCREEN_ADAPTER(82228438, LocationScreenPictureFree)
 LOCATION_SCREEN_ADAPTER(82228498, LocationScreenFreePictures)
 LOCATION_SCREEN_ADAPTER(8222CD60, LocationScreenResetMovie)
 LOCATION_SCREEN_ADAPTER(8222CFF0, LocationScreenTransition29)
-LOCATION_SCREEN_ADAPTER(8222A978, LocationScreenShowUnlockEntry)
 LOCATION_SCREEN_ADAPTER(8222D1A8, LocationScreenTransition25)
 LOCATION_SCREEN_ADAPTER(8222B048, LocationScreenShowListEntry)
 LOCATION_SCREEN_ADAPTER(8222D610, LocationScreenTransition2)
@@ -468,5 +469,4 @@ LOCATION_SCREEN_ADAPTER(8222B200, LocationScreenShowOpponentPictures)
 LOCATION_SCREEN_ADAPTER(82227E20, LocationScreenUpdateView)
 LOCATION_SCREEN_ADAPTER(8222B438, LocationScreenShowOpponentInfo)
 LOCATION_SCREEN_ADAPTER(8222B8A8, LocationScreenTransition12)
-LOCATION_SCREEN_ADAPTER(8222BBD0, LocationScreenShowCard)
 LOCATION_SCREEN_ADAPTER(8222EAD0, LocationScreenTransition17)
