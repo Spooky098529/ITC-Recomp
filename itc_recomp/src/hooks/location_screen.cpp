@@ -45,7 +45,8 @@ ITC_FLAG_BOOL(native_location_screen, true, "ITC",
               "ShowCard sub_8222BBD0 and Transition17 sub_8222EAD0; Transition4 sub_8222D828 and "
               "Transition5 sub_8222DA10 over CameraAnims::Evaluate's plain C++, Transition8 "
               "sub_8222DC08, Transition24 sub_8222D2E8, Transition34 sub_8222D108 and Start "
-              "sub_8222F0B0) "
+              "sub_8222F0B0; PoseCar sub_82228588 over the cars' and the matrix math's plain "
+              "C++) "
               "natively instead of through the translated code (the same writes; checked by "
               "--run_harnesses=location_screen). PictureA, PictureB, Picture::Free, KindText, "
               "SetCursor, ShowUnlockEntry, ShowCard, ListNode and ShowListEntry have no "
@@ -403,6 +404,22 @@ void LocationScreenStart(PPCContext& ctx, uint8_t* base) {
   });
 }
 
+void LocationScreenPoseCar(PPCContext& ctx, uint8_t* base) {
+  const uint32_t sp = ctx.r1.u32, model = ctx.r3.u32, index = ctx.r4.u32;
+  const uint64_t r3 = ctx.r3.u64;
+  if (((sp - ls::kPoseCarFrame) & 0xF) != 0) {
+    __imp__sub_82228588(ctx, base);
+    return;
+  }
+  ctx.fpscr.disableFlushMode();
+  {
+    LocationScreenCalls calls(ctx, base);
+    ls::PoseCar(base, sp, model, index, calls.get());
+  }
+  ctx.r3.u64 = r3 + 272;
+  ctx.fpscr.enableFlushMode();
+}
+
 void LocationScreenShowCard(PPCContext& ctx, uint8_t* base) {
   if (!LocationScreenTextsNative(base)) {
     __imp__sub_8222BBD0(ctx, base);
@@ -488,3 +505,4 @@ LOCATION_SCREEN_ADAPTER(8222DC08, LocationScreenTransition8)
 LOCATION_SCREEN_ADAPTER(8222D2E8, LocationScreenTransition24)
 LOCATION_SCREEN_ADAPTER(8222D108, LocationScreenTransition34)
 LOCATION_SCREEN_ADAPTER(8222F0B0, LocationScreenStart)
+LOCATION_SCREEN_ADAPTER(82228588, LocationScreenPoseCar)

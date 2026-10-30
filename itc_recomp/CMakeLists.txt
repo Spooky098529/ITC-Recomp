@@ -238,6 +238,7 @@ set(ITC_SOURCES
     src/location_screen/results.cpp
     src/location_screen/opponents.cpp
     src/location_screen/view.cpp
+    src/location_screen/pose.cpp
     src/save_interface/save_interface.cpp
     src/save_interface/save_layer.cpp
     src/hooks/file_layer.cpp

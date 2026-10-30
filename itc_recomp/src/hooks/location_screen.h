@@ -144,5 +144,8 @@ void LocationScreenTransition8(PPCContext& ctx, uint8_t* base);
 void LocationScreenTransition24(PPCContext& ctx, uint8_t* base);
 void LocationScreenTransition34(PPCContext& ctx, uint8_t* base);
 void LocationScreenStart(PPCContext& ctx, uint8_t* base);
+// sub_82228588 PoseCar: r3 = the model + 4288, r4 = the index; r3 = r3 +
+// 272 (as the last Matrix::RotateZ's adapter leaves it), flush-to-zero on.
+void LocationScreenPoseCar(PPCContext& ctx, uint8_t* base);
 
 }  // namespace hooks

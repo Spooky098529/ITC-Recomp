@@ -435,4 +435,23 @@ uint32_t Transition34(uint8_t* base, uint32_t sp, uint32_t step, const Calls& ca
 // FadeIn leaves it).
 uint32_t Start(uint8_t* base, uint32_t sp, const Calls& calls);
 
+// --- An opponent's car posed (src/location_screen/pose.cpp) ---
+//
+// sub_82228588 LocationScreen::PoseCar (r3 = `model`, an opponent's scene
+// model + 4288; r4 = `index`, the opponent's index in the group), from its
+// 9,424-byte frame below `sp`: the item (RaceEvent::GroupItem of +804 and
+// the index, stored at +80) copied to +6240; model +732 = 1; the car at
+// +2336 built from the item's build (+6400: Car::Init, FromBuild, flags
+// +3888 |= 1, Car::Refresh) and its data at +480 (CarData::CarData,
+// Vehicle::SetupFromCar; the refusals' originals through `calls`); the
+// model's matrix (+16) moved up by half the body's height and turned
+// (RotateZ, RotateY by 0.0; Multiply), its inverse at +416; the four
+// wheels' turns (+336 + 64k: RotateX and RotateY by the data's camber and
+// toe angles, signed by side) and places (+80 + 64k: the axles' offsets,
+// RotateZ by the float at 0x82009EB0, Multiply), then the places turned by
+// it again. False, with nothing done, when the frame isn't 16-byte aligned
+// (the original's vector stores would round): the original runs.
+constexpr uint32_t kPoseCarFrame = 9424;
+bool PoseCar(uint8_t* base, uint32_t sp, uint32_t model, uint32_t index, const Calls& calls);
+
 }  // namespace location_screen

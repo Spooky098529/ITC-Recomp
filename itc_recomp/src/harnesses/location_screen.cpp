@@ -28,6 +28,7 @@
 #include "memory/c_runtime_heap.h"
 #include "memory/heap.h"
 #include "race_event/race_event.h"
+#include "race_setup/race_setup.h"
 #include "ui_movies/game.h"
 
 #include <fmt/format.h>
@@ -136,11 +137,12 @@ struct World {
         texts(kTextsBytes),
         strings(kStringsBytes),
         anims(kAnimsBytes),
-        params(kParamsBytes) {}
+        params(kParamsBytes),
+        model(0x400) {}
   bool ok() const {
     return save.address && tables.address && race.address && screen.address && event.address &&
            movies.address && texts.address && strings.address && anims.address &&
-           params.address;
+           params.address && model.address;
   }
   uint32_t items() const { return tables.address + 0x40; }
   uint32_t item(uint32_t id) const { return items() + kItemBytes * id; }
@@ -158,7 +160,8 @@ struct World {
   Block texts;   // the movies' text records and buffers
   Block strings;  // the string table for the texts' cases
   Block anims;    // the camera animations' objects (Transition4, Transition5)
-  Block params;   // the parameters' object and its specs (Start)
+  Block params;   // the parameters' object and its specs (Start, PoseCar)
+  Block model;    // an opponent's scene model's +4288 on (PoseCar)
 };
 
 struct Spec {
@@ -423,7 +426,8 @@ void Case(Context& h, Results& results, const World& w, uint64_t seed, const Set
                               {0x826A50AC, 0x40},
                               {camera_modes::kAnims, 6 * camera_modes::kAnimBytes},
                               {camera_modes::kAnimCount, 4},
-                              {car_specs::kParams, 4}});
+                              {car_specs::kParams, 4},
+                              {race_setup::kRandSeed, 4}});
     PPCContext t = CallContext(h);
     WriteRandom(h.base, h.data, kScratchBytes, r);
     WriteRandom(h.base, t.r1.u32, h.data - t.r1.u32, r);
@@ -1388,6 +1392,151 @@ void ViewPages(Context& h, const World& w) {
         hooks::LocationScreenStart, texts(128, 0));
 }
 
+// --- PoseCar ---
+
+// Made-up specs and builds the car's set-up digests (the constraints of
+// Vehicle::SetupFromCar's cases in src/harnesses/car_physics.cpp and of
+// Race::SetUp's made-up specs in src/harnesses/race_setup.cpp): the
+// parameters' object (+8 the wheels, +12 the specs, +16 to +48 the parts'
+// tables, all over the specs) and its 4 specs of random words, each with
+// its drive type / set-up kind (+356) 0 to 2 or any, its set-up axle index
+// (+360) one of the table's at 0x8260181C in the game's data, normal
+// floats for +364 and the gear ratios (+372 to +416), cylinders (+708) 0
+// to 9, turbo (+709), the parts flag (+771), +884 to +896 small, the
+// engine's (+980) torque points (+20: up to 40, or a NaN) and curve (+28
+// on), and the tires' (42 from +4244) radii and the rest normal. Items 0
+// to 9's builds (+160): the car id (+2788) a spec, the tuning words (+120
+// to +268) 0 but the wheel numbers (+232, +240: 0 to 3) and their inches
+// (+236, +244: -2 to 6); the groups' lists of items 0 to 9.
+uint32_t NormalWord(Random& r, float typical) {
+  return std::bit_cast<uint32_t>(typical * (0.5f + float(r.Below(1000)) / 1000.0f));
+}
+
+void ShapePose(uint8_t* base, const World& w, Random& r) {
+  constexpr uint32_t kAxleTable = 0x8260181C;
+  std::vector<uint32_t> indices;
+  for (uint32_t i = 0; i < 8; i++) {
+    const uint32_t record = guest::LoadU32(base, kAxleTable + 4 * i);
+    if (record >= 0x82000000u && record < 0x83000000u) {
+      indices.push_back(i);
+    }
+  }
+  const uint32_t params = w.params.address, specs = params + 64;
+  WriteRandom(base, params, w.params.bytes, r);
+  guest::StoreU32(base, params + 8, specs);
+  guest::StoreU32(base, params + 12, specs);
+  for (uint32_t k = 0; k < 9; k++) {
+    guest::StoreU32(base, params + 16 + 4 * k, specs);
+  }
+  const double curve_scale = double(guest::LoadFloat(base, 0x82002CE8));
+  for (uint32_t n = 0; n < kSpecs; n++) {
+    const uint32_t spec = specs + car_specs::kSpecBytes * n;
+    guest::StoreU32(base, spec + 356, r.Below(5) == 0 ? uint32_t(r.Next()) : r.Below(3));
+    guest::StoreU32(base, spec + 360,
+                    indices.empty() ? 0 : indices[r.Below(uint32_t(indices.size()))]);
+    guest::StoreU32(base, spec + 364, NormalWord(r, 0.5f));
+    for (uint32_t offset = 372; offset <= 416; offset += 4) {
+      guest::StoreU32(base, spec + offset, NormalWord(r, 3.0f));
+    }
+    guest::StoreU8(base, spec + 708, uint8_t(r.Below(10)));
+    guest::StoreU8(base, spec + 709, uint8_t(r.Below(2) ? 0 : 1 + r.Below(255)));
+    guest::StoreU8(base, spec + 771, uint8_t(r.Below(3) == 0 ? 1 + r.Below(255) : 0));
+    guest::StoreU32(base, spec + 884, 1 + r.Below(5));
+    guest::StoreU32(base, spec + 888, r.Below(5));
+    guest::StoreU32(base, spec + 892, 1 + r.Below(5));
+    guest::StoreU32(base, spec + 896, r.Below(5));
+    const uint32_t engine = spec + 980;
+    const int32_t points = int32_t(r.Below(41));
+    guest::StoreU32(base, engine + 20,
+                    r.Below(10) == 0 ? 0x7FC00000u
+                                     : std::bit_cast<uint32_t>(
+                                           float((double(points) + 0.5) / curve_scale)));
+    const uint32_t peak = r.Below(32);
+    float point = 1.0f;
+    for (uint32_t i = 0; i < 32; i++) {
+      const float value = i < peak ? 0.5f + 0.01f * float(i) : point;
+      guest::StoreU32(base, engine + 28 + 4 * i, std::bit_cast<uint32_t>(value));
+      if (i >= peak) {
+        point *= 0.9f + 0.1f * float(r.Below(100)) / 100.0f;
+      }
+    }
+    for (uint32_t t = 0; t < 42; t++) {
+      const uint32_t tire = spec + 4244 + 92 * t;
+      guest::StoreU32(base, tire + 44, r.Below(8) == 0 ? 0 : NormalWord(r, 0.3f));
+      guest::StoreU32(base, tire + 48, NormalWord(r, 0.2f));
+      guest::StoreU32(base, tire + 64, NormalWord(r, 1.0f));
+      guest::StoreU32(base, tire + 80, NormalWord(r, 16.0f));
+      guest::StoreU32(base, tire + 84, NormalWord(r, 0.6f));
+    }
+  }
+  guest::StoreU32(base, car_specs::kParams, params);
+  guest::StoreU32(base, race_setup::kRandSeed, uint32_t(r.Next()));
+  for (uint32_t id = 0; id < 10; id++) {
+    const uint32_t build = w.item(id) + 160;
+    guest::StoreU32(base, build + 2788, r.Below(kSpecs));
+    for (uint32_t offset = 120; offset <= 268; offset += 4) {
+      guest::StoreU32(base, build + offset, 0);
+    }
+    guest::StoreU32(base, build + 232, r.Below(4));
+    guest::StoreU32(base, build + 240, r.Below(4));
+    guest::StoreU32(base, build + 236, uint32_t(int32_t(r.Below(9)) - 2));
+    guest::StoreU32(base, build + 244, uint32_t(int32_t(r.Below(9)) - 2));
+  }
+  for (uint32_t k = 0; k < 6; k++) {
+    const uint32_t list = w.event.address + 0x100 + 0x20 * k;
+    for (uint32_t i = 0; i < 8; i++) {
+      guest::StoreU16(base, list + 4 * i, uint16_t(r.Below(10)));
+    }
+  }
+  guest::StoreU32(base, w.screen.address + 804, r.Below(8) == 0 ? uint32_t(r.Next()) : 4 + r.Below(6));
+  // The model: its matrix (+16) and wheels (+80 to +591) floats, NaNs
+  // among them now and then.
+  const uint32_t model = (w.model.address + 15) & ~15u;
+  for (uint32_t i = 0; i < 0x300; i += 4) {
+    guest::StoreU32(base, model + i, AnyFloat(r, 100.0f));
+  }
+}
+
+// PoseCar: its frame (the callees' 2,048 bytes below it, and up to its
+// register saves, 176 bytes below r1) filled and compared, its own float
+// slots (+80, +84, +160 to +223, +288 to +479) and the model's matrices
+// (+16 to +591) as floats; the model's other words exactly; f1 not
+// compared (a volatile register no caller reads: the last RotateZ's).
+void Poses(Context& h, const World& w) {
+  uint8_t* const base = h.base;
+  constexpr int32_t kFrame = int32_t(ls::kPoseCarFrame);
+  const SetupFn pose = [base](Random& r, const World& w) {
+    ShapeScreen(base, w, r);
+    ShapePose(base, w, r);
+  };
+  // Flush-to-zero off for real (the context's record of it may not match
+  // the thread's after an earlier case left it on).
+  const ArgsFn args = [](PPCContext& t, Random& r, const World& w) {
+    t.fpscr.disableFlushModeUnconditional();
+    t.r3.u64 = (w.model.address + 15) & ~15u;
+    t.r4.u64 = r.Below(8) == 0 ? r.Next() : r.Below(7);
+  };
+  Spec spec{{{-kFrame - 2048, 2048 + 9248}}};
+  const uint32_t model_block = w.model.address;
+  spec.after = [base, model_block](PPCContext& t, Outputs& out) {
+    const uint32_t frame = t.r1.u32 - uint32_t(kFrame);
+    auto floats = [&](uint32_t at, uint32_t words) {
+      out.Floats(base, at, words);
+      for (uint32_t i = 0; i < words; i++) {
+        guest::StoreU32(base, at + 4 * i, 0);
+      }
+    };
+    floats(frame + 80, 2);
+    floats(frame + 160, 16);
+    floats(frame + 288, 48);
+    const uint32_t model = (model_block + 15) & ~15u;
+    floats(model + 16, 144);
+    out.Bytes(Read(base, model_block, 0x400));
+  };
+  Group(h, w, "LocationScreen::PoseCar (sub_82228588)", 200, pose, args, __imp__sub_82228588,
+        hooks::LocationScreenPoseCar, spec);
+}
+
 }  // namespace
 
 void LocationScreen(Context& h) {
@@ -1412,6 +1561,7 @@ void LocationScreen(Context& h) {
   AfterRace(h, w);
   OpponentPages(h, w);
   ViewPages(h, w);
+  Poses(h, w);
 }
 
 }  // namespace harness
