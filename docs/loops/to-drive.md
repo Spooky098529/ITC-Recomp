@@ -178,6 +178,18 @@ here loses its heading.
   `sub_8222BBD0` LocationScreen::ShowCard,
   `sub_8222EAD0` LocationScreen::Transition17
 
+- The parking area, migration 3 (attract race `itc_2817`, replay
+  `itc_2818`, ok; its 8 adapter removals already listed above):
+  `sub_8222D828` LocationScreen::Transition4,
+  `sub_8222DA10` LocationScreen::Transition5,
+  `sub_8222DC08` LocationScreen::Transition8,
+  `sub_8222D2E8` LocationScreen::Transition24,
+  `sub_8222D108` LocationScreen::Transition34,
+  `sub_8222F0B0` LocationScreen::Start,
+  `sub_82228588` LocationScreen::PoseCar,
+  `sub_8222C188` LocationScreen::ShowOpponentSpecs,
+  `sub_8222DEE0` LocationScreen::Transition9
+
 ## Run 2026-10-30 01:06 (`b7-loop-29-10-26-2`)
 
 - The app's start-up, migration 3 (attract race `itc_2629`, replay

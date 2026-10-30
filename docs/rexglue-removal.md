@@ -52,7 +52,7 @@ goes in `src/` as overrides), American English.
   the leftovers above (the movie player, Voice::Init skipped as high as
   is safe), or the main thread's performance leads
   (`sub_821298C0`, `sub_8209C6E0`, in `docs/native-renderer.md`).
-- **B7 in progress (2026-10-29):** its measure is `b7_status.py`
+- **B7 in progress (2026-10-30):** its measure is `b7_status.py`
   (`docs/coverage.md`), and the B7 loop (`docs/loops/b7-loop.md`, a
   `/loop` session handing each subsystem to a mapping agent, then
   migration agents) did its first run on the branch `b7-loop-test` (merged 2026-10-22): five
@@ -161,7 +161,11 @@ goes in `src/` as overrides), American English.
   lists compared by role) and made the app's start-up (`app-start-up.md`,
   the voice engine Dropped by the user's call), the data load at boot
   (`data-load.md`) and the career (`career.md`, 49 of 53) native (ours
-  3,167). The runs' rows wait for the user's review (`docs/loops/review.md`). See
+  3,167); its twenty-fifth run (branch `b7-loop-30-10-26`, 3
+  subsystems, not yet merged) made the race event (`race-event.md`,
+  100 of 102, with `Career::SetUpEvent`), the camera modes
+  (`camera-modes.md`, 87 of 90 in play) and the parking area
+  (`location-screen.md`, 57 of 77) native (ours 3,423). The runs' rows wait for the user's review (`docs/loops/review.md`). See
   "B7's loop runs" under B7, and `docs/loops/b7-progress.md`. Guest
   allocation is no longer a block (`docs/native-memory.md`); what the
   rest waits on is in `docs/loops/leads.md` (the archive loader, the
@@ -2659,6 +2663,7 @@ B7. **The game logic inside**: everything else, subsystem by subsystem,
 | 2026-10-30 | The career (the player's items and stats over the save data: the win, loss and outcome records, the results and day logs, the garage list, the conditions and rewards, the race result's stats, the progress after a race and the next day; `Career::PickNext` up to its gate) | `career.md` | 49 of 53 in play (one migration; the rest waits on the race event and the car objects' makers) | `--native_career` |
 | 2026-10-30 | The race event (`RaceEvent::Make` and `Init` with the event pools and groups, `Destroy`, the refreshes for the career's event queries, the placements of opponents unlocked during a race and the section rival, the front end's `GroupItem`, `Items::Available`; `EventCondition::Met` with 60 of its 61 kind tests, the unlock states), with the career's `EventQuery`, `EventLocation` and `DayBlock::BestStreak` | `race-event.md` | 100 of 102 (one migration; `EventCondition::Power`, kind 40, waits on the power curve and is called through a guest call at the original's depth; `sub_82142868` Merged) | `--native_race_event` |
 | 2026-10-30 | The camera modes (the race mode's camera director, its six views' cameras: chase, two in-car, the start's look at the racers, the TV camera of replays and attract races with its path curves, the scripted cutscene with the rival logo; the camera animations, the garage camera), with `UiMovies::Open` and `Delete` | `camera-modes.md` | 87 of 90 in play (three migrations; `CameraDirector::Update` stays Wrapped by `--redraw_rival_logo`, which runs its native form on logic passes; `CourseView::Draw` waits on the scenery) | `--native_camera_modes` (with `--native_ui_movies_game`) |
+| 2026-10-30 | The parking area (the career's front-end screen where the player loads in, picks one of up to 6 opponent cars and races; its state machine, pages and transitions, the opponents' cards and pictures, the cars posed in the scene), with `UiMovie::SetText` and `SetNodeText` | `location-screen.md` | 57 of 77 in play (three migrations; the rest waits on the menu input and sound, the scene and its models, the scenery's set-up and teardown, `XPR::GetTexture`) | `--native_location_screen` (with `--native_ui_movies_game`) |
 
     The first run (2026-10-22, branch `b7-loop-test`): every harness at 0 differing, attract races at 20-21 s with no errors,
     and a race the user drove looked right. Ours went from 162 to 335 (work
@@ -4114,3 +4119,20 @@ so validation runs `attract_race.sh 60`. The boundary: 449 functions
 live 211. Imports: 186 called, 56 with a live caller. B7
 (`b7_status.py`): ours 3,364, work left 3,033 (Wrapped 104, with a row
 468, no row yet 2,461), from 3,123.
+
+**2026-10-30, the parking area (branch `b7-loop-30-10-26`):** the
+twenty-fifth run's third subsystem, mapped and made native in three
+migrations (`location-screen.md`, `--native_location_screen`,
+`src/location_screen/`): the parking area (the user, 2026-10-30), 57
+of the 77 functions seen in play, with `UiMovie::SetText` and
+`SetNodeText` (`ui-movies-game.md`). The user's call: those varargs
+setters' unset arguments are passed as 0 by native callers. None of it
+runs in an attract race or the pad replay: the harnesses are its only
+check so far (the drive list). What blocks the rest: the menu input
+(`sub_82186568`, `sub_821864C8`) and sound (`sub_821103F0`), the scene
+and its models, the scenery's set-up and teardown, `XPR::GetTexture`
+(`sub_82597118`, a lead). The run stopped at its limit. The boundary:
+449 functions (916 pairs): overridden 108, Native 34, Dropped 26, never
+called 70, live 211. Imports: 186 called, 56 with a live caller. B7
+(`b7_status.py`): ours 3,423, work left 2,974 (Wrapped 103, with a row
+487, no row yet 2,384), from 3,033 (from 3,165 at the run's start).

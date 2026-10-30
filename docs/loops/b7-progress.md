@@ -78,6 +78,10 @@ file's history. What's left to see in a drive, from every run:
 
 ## Done
 
+- The parking area (subsystem 3): `location-screen.md`, 57 of 77 in
+  play, three migrations, with `UiMovie::SetText` and `SetNodeText`;
+  `--native_location_screen`; f0ee4da..74c7bf3. Validated
+  (`itc_2783`, `itc_2796`, `itc_2817`).
 - The camera modes (subsystem 2): `camera-modes.md`, 87 of 90 in play,
   three migrations, with `UiMovies::Open` and `Delete`;
   `--native_camera_modes`; 5a1babc..d71eff5. Validated (`itc_2732`,
@@ -154,3 +158,17 @@ file's history. What's left to see in a drive, from every run:
 - After the parking area's migration 3 (`itc_2816`: race 30 s, 0
   errors, location_screen 0 differing): ours 3423, work left 2974
   (wrapped 103, known 487, unknown 2384).
+- After its validation (`itc_2817`, 60 s: race 7 s, 0 errors, every
+  harness 0 differing but the expected groups): ours 3423, work left
+  2974 (wrapped 103, known 487, unknown 2384).
+
+## Stopped
+
+2026-10-30, at the run's limit (3 subsystems: the race event, the
+camera modes, the parking area), after the parking area's validation.
+Every harness 0 differing outside the expected groups; nothing
+uncommitted; `check_function_statuses.py`: 0 errors. Left for the
+user: the run's section in `review.md`, the drive list in
+`to-drive.md`, and the merge. The harnesses now leave ~7 s of race in
+the validation's 60 s. Next in `leads.md`: the car models, then the
+models' loads and the skeleton user.
