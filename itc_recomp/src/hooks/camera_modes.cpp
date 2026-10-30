@@ -25,7 +25,7 @@ ITC_FLAG_BOOL(native_camera_modes, true, "ITC",
               "sub_82152698 (no adapter: only CameraTarget::Track's plain C++ calls it), Matrix::FromFloats sub_82090000; the lists' List40::Link "
               "sub_82153228 (no adapter: only List40::Insert's plain C++ calls it), "
               "List40::Insert sub_821544E0, List16::Insert20 sub_82154458 (no adapter: only IntroCamera::IntroCamera's plain C++ calls it), "
-              "Insert32 sub_82154378, Insert608 sub_821543E8 and Copy32 sub_82154300; "
+              "Insert32 sub_82154378, Insert608 sub_821543E8 and Copy32 sub_82154300 (no adapter: only CutsceneShot::Init's plain C++ calls it); "
               "CameraAnims::Clear sub_82150078 and Find sub_82150300; ColorFilter::SetStyle "
               "sub_82152108 and FadeCue::Step sub_82152290; with --native_heap the camera "
               "animations' CameraAnims::Load sub_82150B10 (with the archive's queue native), "
@@ -206,6 +206,8 @@ void CameraModesStep821543E8(PPCContext& ctx, uint8_t* base) {
   }
   ctx.r3.u64 = to;
 }
+// List16::Copy32 (no adapter: only CutsceneShot::Init's plain C++ calls it; the step kept
+// for the harness).
 // List16::Copy32: r3 = out (returned), r4 = the list, r5 = the position.
 void CameraModesStep82154300(PPCContext& ctx, uint8_t* base) {
   const uint32_t out = ctx.r3.u32;
@@ -606,7 +608,6 @@ ITC_CAMERA_MODES(82090000)
 ITC_CAMERA_MODES(821544E0)
 ITC_CAMERA_MODES(82154378)
 ITC_CAMERA_MODES(821543E8)
-ITC_CAMERA_MODES(82154300)
 ITC_CAMERA_MODES(82150078)
 ITC_CAMERA_MODES(82150300)
 ITC_CAMERA_MODES(82152108)
