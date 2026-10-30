@@ -29,7 +29,7 @@ ITC_FLAG_BOOL(native_app_start_up, true, "ITC",
               "Font::Font sub_82109228 and Font::CreateShaders sub_821088B8, no adapters of their "
               "own; and App::StartUp sub_82106548, its callees through their adapters; with "
               "--native_heap, Movie::Movie sub_820AEA88 and MovieWrapper::MovieWrapper "
-              "sub_82593DC0, the wrapper's critical section a host mutex for every user, "
+              "sub_82593DC0 (no adapter: only Movie::Movie's plain C++ calls it), the wrapper's critical section a host mutex for every user, "
               "through ScopedLock sub_8258E580 and sub_8258E5B8 for that section; AudioManager::Create "
               "sub_82119B38 with AudioManager::AudioManager sub_821197E0 and "
               "AudioEngine::StartXAudio sub_8259CD50, no adapters of their own; the second camera "
@@ -483,15 +483,9 @@ void hooks::MovieWrapperSteps(PPCContext& ctx, uint8_t* base) {
   __imp__sub_82593DC0(ctx, base);
 }
 
-// MovieWrapper::MovieWrapper: r3 = the 8 bytes, from Movie::Movie.
-extern "C" REX_FUNC(sub_82593DC0) {
-  REX_FUNC_PROLOGUE();
-  if (!ITC_FLAG(native_app_start_up) || !hooks::NativeHeapActive()) {
-    __imp__sub_82593DC0(ctx, base);
-    return;
-  }
-  hooks::MovieWrapperSteps(ctx, base);
-}
+// MovieWrapper::MovieWrapper (sub_82593DC0) has no adapter: only Movie::Movie's
+// plain C++ calls it in play (its steps above), the original with the flag
+// off.
 
 void hooks::MovieConstructSteps(PPCContext& ctx, uint8_t* base) {
   const uint32_t movie = ctx.r3.u32;
