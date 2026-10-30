@@ -41,7 +41,11 @@ file's history. What's left to see in a drive, from every run:
   camera animations and paths, the rival logo's pieces, the chase,
   intro and in-car views' cameras, the TV camera's curves; 10 adapters
   removed; `--native_camera_modes`; frame dumps the same; 74 of 90 in
-  play ours). Validation running. Left: `CameraDirector::InitStates`,
+  play ours). Validation 1 (`itc_2730`, replay `itc_2731` ok): cut off,
+  all harnesses now take over 40 s, 11 functions without a harness
+  line; asked the user: the validation runs `attract_race.sh 60` from
+  now on (the user's call, 2026-10-30, in `b7-loop.md`). Validation
+  run again. Left: `CameraDirector::InitStates`,
   `TvCamera::TvCamera`, `Update` and `Step`, `GarageCamera::Update`;
   then, past `UiMovies::Open` (ready), the cutscene and the director's
   `SetMode`, `Update` (`--redraw_rival_logo`'s split kept).

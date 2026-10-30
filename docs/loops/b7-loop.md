@@ -402,10 +402,12 @@ made native, or whose adapter it removed:
 1. **Checks the print** is the first statement of its plain C++ (grep
    `itc_recomp/src` for the address). Missing ones it adds, in one commit,
    pushed (a print only, no other change).
-2. **Runs** the build and `attract_race.sh 40 --run_harnesses=all` with
+2. **Runs** the build and `attract_race.sh 60 --run_harnesses=all` with
    the default flags (every harness, once a migration: the migration
    agent runs only its own, so this run is what shows that nothing else
-   was broken; the user's call, 2026-10-28), checks every harness is at
+   was broken; the user's call, 2026-10-28; 60 s since all of them
+   outgrew 40, the user's call, 2026-10-30; migration agents stay at
+   40), checks every harness is at
    0 differing outside "(expected to differ)" groups (one that isn't,
    in any subsystem, goes in the report's `race:` line, and the lead
    halts), and checks the log has a `native running
@@ -536,6 +538,10 @@ Calls so far for decisions the loop meets often:
   made, their game-level users seen in play skipped natively with what
   they'd read with the feature absent, Status Dropped (the voice
   engine under the app's start-up, 2026-10-30).
+- Harness run times: migration agents `attract_race.sh 40` with their
+  own harnesses; the validation agent `attract_race.sh 60
+  --run_harnesses=all` (2026-10-30, when all of them outgrew 40 s). If
+  they outgrow 60 too, that's a new case for the user.
 - The C runtime's per-thread data over the kernel's TLS (`_mtinit`
   `sub_825AA708`, `_getptd` and the rest in `c-runtime.md`'s "Not
   here"): left for the core, not taken (2026-10-25). Only when it

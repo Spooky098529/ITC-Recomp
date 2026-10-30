@@ -77,6 +77,11 @@ When the user has reviewed a run's section, its heading gets
   it); `RivalLogo::Play` is `PlayNamed`'s first native caller (runs the
   original under `--log_pause_movie`). 10 adapters removed; 25
   functions native with no adapter from the start.
+- The user's call (2026-10-30): all harnesses together outgrew
+  `attract_race.sh 40` (the camera modes' validation, `itc_2730`, cut
+  off in `camera_modes`); the validation agent now runs
+  `attract_race.sh 60 --run_harnesses=all`, migration agents stay at
+  40 (`b7-loop.md`, "Precedent first"; `CLAUDE.md`).
 
 ## Run 2026-10-30 01:06 (`b7-loop-29-10-26-2`)
 
