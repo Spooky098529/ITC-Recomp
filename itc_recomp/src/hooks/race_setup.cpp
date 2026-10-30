@@ -418,6 +418,9 @@ uint64_t SetUpGuestCall(void* user, uint32_t function, const uint64_t args[4], d
 }  // namespace
 
 void RaceSetupSetUp(PPCContext& ctx, uint8_t* base) {
+  if (hooks::StartUpRecorded(ctx, 0x82115D98)) {
+    return;
+  }
   ctx.fpscr.disableFlushMode();
   const uint32_t frame = ctx.r1.u32 - 11984;
   if (!rs::SetUpNative(base, ctx.r3.u32, frame)) {

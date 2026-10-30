@@ -283,7 +283,9 @@ with logs (2026-10-18, `itc_064.log` to `itc_066.log`):
 - Fix (the user's design, `--redraw_rival_logo`, on by default): a native
   override of `sub_821594B8` (`per_frame_logic.cpp`). Render-only passes
   deliver Update to `82159948` too (`game_messages.cpp`, as for the race
-  overlays). On logic passes the override runs the original, and a
+  overlays). On logic passes the override runs the director's update (since
+  2026-10-30 natively with `--native_camera_modes`,
+  `hooks::CameraModesUpdate`, else the original), and a
   pass-through hook on `sub_82211A28` notes the entry it's called with
   during it; on render-only passes it runs nothing of the cutscene, only
   `sub_82211A28` (the game's) on that entry, if the logic pass drew. The

@@ -8,86 +8,93 @@ file's history. What's left to see in a drive, from every run:
 
 ## Now
 
-- Run started 2026-10-30 01:06 on `b7-loop-29-10-26-2` (the user's
-  call, 2026-10-30: this run stays on the last run's branch), from
-  92ffb30; summary `b7-loop-2026-10-30-0106.md`.
+- Run started 2026-10-30 11:39 on `b7-loop-30-10-26`, from e320bad;
+  summary `b7-loop-2026-10-30-1139.md`.
 - Limit for this run: 3 subsystems; 3 taken.
-- First, a cleanup lead without mapping (not counted), the last run's
-  stop: `CarSound::Part840Update`'s harness (`sub_8210ECF0`,
-  `car-sounds.md`), 1 of 80 cases differing once in `itc_2559`
-  (intermittent). The precedent: this run's and the 2026-10-24 21:33
-  run's first leads were the previous stop's harness. Migration
-  checked (d5cfd5c: the mixer swaps XAudio's two source-voice stage
-  lists between a case's versions; the real-voice cases compare them
-  by role, as the XAudio harnesses' `LockWords`; 0 of 80 over 5 runs,
-  `itc_2569`-`itc_2573`; nothing else ready in `car-sounds.md`).
-  Validated (`itc_2574`, `itc_2575`): 56 of 56 harness lines, every
-  harness 0 outside the expected groups; `CarSounds::StopAll` already
-  on the drive list.
-- Subsystem 1 of 3: the app's start-up (`sub_82106548`, the top of
-  `leads.md`). Mapped (d5647db, `app-start-up.md`, 30 rows, 18 ready
-  groups); the map's stop answered: the voice engine (XHV, `Voice::Init` `sub_8257B7A8` under the network manager's `sub_8214F6E8`): not made; its users seen in play (`sub_8214FA78` every frame, the UI's calls through the engine's +52, the release `sub_8214F690`) skipped natively with what they'd read with no headset (no talkers, no data), Status Dropped (the user's call, 2026-10-30, "Map Xbox features, don't port"). Migration 1
-  checked (c9aed90..6292712: the voice skip, the start-up's leaves, the
-  network manager's set-up, the scene target, `Billboards::Init`, 5
-  adapters removed; `--native_app_start_up`; replay ok, `itc_2577`).
-  Validated (`itc_2594`): 15 of 15 harness lines, all ran in play.
-  Migration 2 checked (427db89..a63717c: `App::StartUp` with the text
-  and font set-up, `WordVector::Fill`, `XAudioInitialize`, 6 adapters
-  removed). Its stop (`App::App` waits on the movie wrapper's critical
-  section, `MovieWrapper::MovieWrapper` `sub_82593DC0` +4 through
-  `InitializeCriticalSection`) is covered by a precedent ("Precedent
-  first": a kernel critical section a subsystem's code locks becomes a
-  host `std::mutex` for that lock, taken by every user, as
-  `Edram::Alloc` and the memory blocks' lock; the generic wrapper stays
-  recompiled for the others): migration 3 takes it so. Validated
-  (`itc_2616`): 15 of 15 harness lines, all ran in play; a print added
-  (b95341e). Migration 3 checked (6e8e860..e4104fe: the movie
-  wrapper's lock a host recursive mutex as the memory blocks' lock,
-  `Movie::Movie`, `AudioManager::Create`, the second camera class,
-  `App::App`, `App::Create` and its getters; nothing ready left).
-  Validated (`itc_2629`, `itc_2630`): 17 of 17 harness lines; three to
-  drive. Subsystem 1 finished.
-- Subsystem 2 of 3: the game's data load at boot (`sub_82105868`,
-  `sub_82106618`, the top of `leads.md`; 10 ready groups under it).
-  Mapped (562dc47, `data-load.md`, 25 rows, 10 ready groups, no
-  stop). Migration 1 checked (b810489..f4f201f: the defaults, records
-  and session makers, the shared loads (data tables, car parameters,
-  shaders, text, font, strings, a UI movie), `BootData::Load` and
-  `CreateObjects`, the loading screen's movies; `--native_data_load`;
-  frame dumps the same). Validated (`itc_2642`): 26 of 26 harness
-  lines, all ran in play. Migration 2 checked (4f4a23f..8689dc1: the
-  replay's static set-ups, `Record5232`'s adapter removed; nothing
-  ready left). Validated (`itc_2646`): 3 of 3 harness lines, all ran
-  in play. Subsystem 2 finished.
-- Subsystem 3 of 3: the player's items over the save data
-  (`sub_82111780` and the rest of its lead line, the top of
-  `leads.md`). Mapped (d91b1bb, `career.md`, 76 rows, 21 ready
-  groups, no stop; blocked outside by the race event, the next lead).
-  Migration 1 checked (fd83bca..a3d7ec3: every ready group, 49 of
-  53 in play ours, 7 adapters removed; `--native_career`; nothing ready
-  left, the rest waits on the race event and the car objects' makers).
-  Validated (`itc_2659`, `itc_2660`): 47 of 47 harness lines; 15 ran
-  in the replay, 32 to drive. Subsystem 3 finished: the run's limit.
+- Subsystem 1 of 3: the race event (`sub_82140340`...`sub_82144E58`,
+  the top of `leads.md`). Mapped (84e5334, `race-event.md`, 102 rows,
+  37 in play, 12 ready groups, no stop; nothing outside blocks it).
+  Migration 1 checked (6cf1882: every ready group, 93 Native and 6
+  Overridden of 102, `EventCondition::Met` with 60 of its 61 tests,
+  kind 40 `sub_82141668` left recompiled through a guest call at the
+  original's depth; with the career's `EventQuery`, `EventLocation`,
+  `DayBlock::BestStreak`; `--native_race_event`; nothing ready left,
+  `Career::SetUpEvent` now ready in `career.md`). Validated
+  (`itc_2673`, replay `itc_2676` ok): 103 of 103 harness lines; 26 ran
+  in the replay, 77 to drive. Subsystem 1 finished.
+- Next, a cleanup lead without mapping (not counted): what the race
+  event unblocked in `career.md` (`Career::SetUpEvent` `sub_82114268`).
+  Migration checked (3f8fa4b..8267f2d: `Career::SetUpEvent` over its
+  121,200-byte frame in guest memory, `Garage::Add` and
+  `Car::SetModelAndClass` `sub_821104D8` (ready, from the car objects'
+  makers' lead); 5 adapters removed; no new flag; nothing ready left in
+  `career.md`). Validated (`itc_2692`, replay `itc_2693`, broke on the
+  intermittent SDK heap error, ran to the end): 8 of 8 harness lines; 4
+  ran in the replay, 4 to drive.
+- Subsystem 2 of 3: the game's camera modes (`sub_82152338`...
+  `sub_822282E8`; picked over the front-end menus, as ready (44 ready
+  groups each) and run every frame in a race). Mapped (9ac322c,
+  `camera-modes.md`, 100 rows, 90 in play, 38 ready groups, no stop;
+  blocked outside by `UiMovies::Open`, `Delete` and the scenery's
+  update and draw). Migration 1 checked (5a1babc..4c274ed, 5 batches,
+  4 by subagents one at a time: the director's view handlers, the
+  camera animations and paths, the rival logo's pieces, the chase,
+  intro and in-car views' cameras, the TV camera's curves; 10 adapters
+  removed; `--native_camera_modes`; frame dumps the same; 74 of 90 in
+  play ours). Validation 1 (`itc_2730`, replay `itc_2731` ok): cut off,
+  all harnesses now take over 40 s, 11 functions without a harness
+  line; asked the user: the validation runs `attract_race.sh 60` from
+  now on (the user's call, 2026-10-30, in `b7-loop.md`). Validated
+  again (`itc_2732`, 60 s: race 14 s, 0 errors): 74 of 74 harness
+  lines; 38 ran in play, 12 in the replay, 24 to drive. Migration 2
+  checked (96a281f..27ada48, 5 batches, 3 by subagents one at a time:
+  `UiMovies::Open` and `Delete` under `--native_ui_movies_game`, the
+  rival logo's open and close, the cutscene's step and update (the
+  logo's draw still through `--redraw_rival_logo`'s override), the TV
+  camera, `GarageCamera::Update`; 9 adapters removed; 82 of 90 in play
+  ours). Validated (`itc_2750` at 60 s, replay `itc_2751` ok): 17 of 17
+  harness lines; 10 ran in play, 1 in the replay, 4 more to drive.
+  Migration 3 checked (81d51e9..d71eff5: `CameraDirector::InitStates`,
+  `Cutscene::Cutscene` split over three subagents one at a time,
+  `SetMode`, `OnRaceStart`, `Resume`, `Update` (run on logic passes by
+  `--redraw_rival_logo`'s wrapper, its split kept); 11 adapters
+  removed; 87 of 90 in play ours; nothing ready left, `CourseView::Draw`
+  waits on the scenery). Validated (`itc_2766` at 60 s, replay
+  `itc_2767` ok): 17 of 17 harness lines; 2 more to drive. Subsystem 2
+  finished.
+- Subsystem 3 of 3: the front-end menus (`sub_822271F8`...
+  `sub_8222C300`, the readiness ranking's other top lead, 44 ready
+  groups). Mapped (3bf92d8, `location-screen.md`: the lead was one
+  screen, the parking area (the user, 2026-10-30: the player loads
+  into it, picks one of up to 6 opponent cars and races; the other way
+  to start a race besides driving on the highway); 99 rows, 77 in
+  play, 32 ready groups, no stop; blocked outside by the UI movies'
+  text setters, the menu sound and input, the scene and its models,
+  the scenery's set-up and teardown, `XPR::GetTexture`). Migration 1
+  running. Left: `CameraDirector::InitStates`,
+  `TvCamera::TvCamera`, `Update` and `Step`, `GarageCamera::Update`;
+  then, past `UiMovies::Open` (ready), the cutscene and the director's
+  `SetMode`, `Update` (`--redraw_rival_logo`'s split kept).
 
 ## Done
 
-- The career (subsystem 3): `career.md`, 49 of 53 in play, one
-  migration; `--native_career`; fd83bca..a3d7ec3. Validated
-  (`itc_2659`, `itc_2660`).
-- The data load at boot (subsystem 2): `data-load.md`, every function
-  seen in play, two migrations; `--native_data_load`;
-  b810489..8689dc1. Validated (`itc_2642`, `itc_2646`).
-- The app's start-up (subsystem 1): `app-start-up.md`, every ready
-  group, three migrations, the voice engine Dropped (the user's call);
-  `--native_app_start_up`; c9aed90..e4104fe. Validated (`itc_2594`,
-  `itc_2616`, `itc_2629`, `itc_2630`).
-- The last stop's `CarSound::Part840Update` harness (cleanup lead, not
-  counted): d5cfd5c, a harness fix only (the stage lists compared by
-  role); validated (`itc_2574`, `itc_2575`).
-
+- The parking area (subsystem 3): `location-screen.md`, 57 of 77 in
+  play, three migrations, with `UiMovie::SetText` and `SetNodeText`;
+  `--native_location_screen`; f0ee4da..74c7bf3. Validated
+  (`itc_2783`, `itc_2796`, `itc_2817`).
+- The camera modes (subsystem 2): `camera-modes.md`, 87 of 90 in play,
+  three migrations, with `UiMovies::Open` and `Delete`;
+  `--native_camera_modes`; 5a1babc..d71eff5. Validated (`itc_2732`,
+  `itc_2750`, `itc_2766`).
+- `Career::SetUpEvent` (cleanup lead, not counted): with `Garage::Add`
+  and `sub_821104D8`, 5 adapters removed; `--native_career`;
+  3f8fa4b..8267f2d. Validated (`itc_2692`, `itc_2693`).
+- The race event (subsystem 1): `race-event.md`, 100 of 102, one
+  migration; `--native_race_event`; 6cf1882. Validated (`itc_2673`,
+  `itc_2676`).
 ## Rows to review
 
-`review.md`, "Run 2026-10-30 01:06".
+`review.md`, "Run 2026-10-30 11:39".
 
 ## Expected to differ
 
@@ -99,53 +106,72 @@ file's history. What's left to see in a drive, from every run:
 
 ## Totals
 
-- At the start: ours 3031, work left 3287 (wrapped 104, known 501,
-  unknown 2682).
-- After the cleanup's migration (`itc_2573`: race 38 s, 0 errors,
-  car_sounds 0 differing): ours 3031, work left 3287.
-- After its validation (`itc_2574`: race 7 s, 0 errors, every harness
-  0 differing but the expected groups): ours 3031, work left 3287.
-- After the start-up's migration 1 (`itc_2593`: race 38 s, 0 errors,
-  touched harnesses 0 differing): ours 3064, work left 3256 (wrapped
-  104, known 495, unknown 2657).
-- After its validation (`itc_2594`: race 7 s, 0 errors, every harness
-  0 differing but the expected groups): ours 3064, work left 3256.
-- After the start-up's migration 2 (`itc_2615`: race 38 s, 0 errors,
-  touched harnesses 0 differing): ours 3073, work left 3247 (wrapped
-  104, known 486, unknown 2657).
-- After its validation (`itc_2616`: race 7 s, 0 errors, every harness
-  0 differing but the expected groups): ours 3073, work left 3247.
-- After the start-up's migration 3 (`itc_2628`: race 38 s, 0 errors,
-  touched harnesses 0 differing): ours 3090, work left 3230 (wrapped
-  104, known 479, unknown 2647).
-- After its validation (`itc_2629`: race 7 s, 0 errors, every harness
-  0 differing but the expected groups): ours 3090, work left 3230.
-- After the data load's map: ours 3090, work left 3230 (wrapped 104,
-  known 498, unknown 2628).
-- After the data load's migration 1 (`itc_2639`: race 38 s, 0 errors,
-  touched harnesses 0 differing): ours 3116, work left 3204 (wrapped
-  104, known 472, unknown 2628).
-- After its validation (`itc_2642`: race 7 s, 0 errors, every harness
-  0 differing but the expected groups): ours 3116, work left 3204.
-- After the data load's validation (`itc_2646`: race 7 s, 0 errors,
-  every harness 0 differing but the expected groups): ours 3118, work
-  left 3202 (wrapped 104, known 470, unknown 2628).
-- After the career's migration 1 (`itc_2658`: race 38 s, 0 errors,
-  career 0 differing): ours 3167, work left 3165 (wrapped 104, known
-  474, unknown 2587).
-- After the career's validation (`itc_2659`: race 7 s, 0 errors, every
-  harness 0 differing but the expected groups): ours 3167, work left
-  3165 (wrapped 104, known 474, unknown 2587).
+- At the start: ours 3167, work left 3165 (wrapped 104, known 474,
+  unknown 2587).
+- After the race event's map: ours 3167, work left 3165 (wrapped 104,
+  known 511, unknown 2550).
+- After the race event's migration 1 (`itc_2672`: race 37 s, 0 errors,
+  race_event and career 0 differing): ours 3271, work left 3126
+  (wrapped 104, known 472, unknown 2550).
+- After its validation (`itc_2673`: race 37 s, 0 errors, every harness
+  0 differing but the expected groups): ours 3271, work left 3126.
+- After the cleanup's migration (`itc_2691`: race 37 s, 0 errors,
+  career and race_event 0 differing): ours 3274, work left 3123
+  (wrapped 104, known 470, unknown 2549).
+- After its validation (`itc_2692`: race 5 s after the harnesses, 0
+  errors, every harness 0 differing but the expected groups): ours
+  3274, work left 3123.
+- After the camera modes' map: ours 3274, work left 3123 (wrapped 104,
+  known 558, unknown 2461).
+- After the camera modes' migration 1 (`itc_2729`: race 26 s, 0
+  errors, camera_modes 0 differing): ours 3348, work left 3049
+  (wrapped 104, known 484, unknown 2461).
+- After its validation (`itc_2732`, 60 s: race 14 s, 0 errors, every
+  harness 0 differing but the expected groups): ours 3348, work left
+  3049.
+- After the camera modes' migration 2 (`itc_2749`: race 26 s, 0
+  errors, touched harnesses 0 differing): ours 3359, work left 3038
+  (wrapped 104, known 473, unknown 2461).
+- After its validation (`itc_2750`, 60 s: race 13 s, 0 errors, every
+  harness 0 differing but the expected groups): ours 3359, work left
+  3038.
+- After the camera modes' migration 3 (`itc_2765`: race 26 s, 0
+  errors, camera_modes and cameras 0 differing): ours 3364, work left
+  3033 (wrapped 104, known 468, unknown 2461).
+- After its validation (`itc_2766`, 60 s: race 13 s, 0 errors, every
+  harness 0 differing but the expected groups): ours 3364, work left
+  3033.
+- After the location screen's map: ours 3364, work left 3033 (wrapped
+  104, known 545, unknown 2384).
+- After the parking area's migration 1 (`itc_2782`: race 36 s, 0
+  errors, touched harnesses 0 differing): ours 3390, work left 3007
+  (wrapped 104, known 519, unknown 2384).
+- After its validation (`itc_2783`, 60 s: race 12 s, 0 errors, every
+  harness 0 differing but the expected groups): ours 3390, work left
+  3007.
+- After the parking area's migration 2 (`itc_2795`: race 31 s, 0
+  errors, touched harnesses 0 differing but the expected group):
+  ours 3413, work left 2984 (wrapped 104, known 496, unknown 2384).
+- After its validation (`itc_2796`, 60 s: race 8 s, 0 errors, every
+  harness 0 differing but the expected groups): ours 3413, work left
+  2984.
+- After the parking area's migration 3 (`itc_2816`: race 30 s, 0
+  errors, location_screen 0 differing): ours 3423, work left 2974
+  (wrapped 103, known 487, unknown 2384).
+- After its validation (`itc_2817`, 60 s: race 7 s, 0 errors, every
+  harness 0 differing but the expected groups): ours 3423, work left
+  2974 (wrapped 103, known 487, unknown 2384).
 
 ## Stopped
 
-2026-10-30, at the run's limit (3 subsystems: the app's start-up, the
-data load at boot, the career), after the career's validation. Every
-harness 0 differing outside the expected groups; nothing uncommitted;
-`check_function_statuses.py`: 0 errors. Left for the user: the run's
-section in `review.md` (the voice engine Dropped by the user's call;
-the movie wrapper's lock a host recursive mutex by the lead's reading
-of the precedents), the drive list in `to-drive.md` (35 functions,
-mostly the career's results side), and the merge. Next in `leads.md`:
-the race event (`sub_82140340`...`sub_82144E58`), which blocks the
-career's rest.
+2026-10-30, at the run's limit (3 subsystems: the race event, the
+camera modes, the parking area), after the parking area's validation.
+Every harness 0 differing outside the expected groups; nothing
+uncommitted; `check_function_statuses.py`: 0 errors. Left for the
+user: the run's section in `review.md`, the drive list in
+`to-drive.md`, and the merge. The harnesses now leave ~7 s of race in
+the validation's 60 s. Next in `leads.md`: the car models, then the
+models' loads and the skeleton user.
+
+Driven by the user (`itc_2819`, 2026-10-30: everything worked; 166
+functions off `to-drive.md`) and merged into `rexglue-removal-project`.

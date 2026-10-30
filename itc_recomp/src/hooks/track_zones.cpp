@@ -74,9 +74,10 @@ ITC_TRACK_ZONES(820FE8C8, RangeAddBranch(base, ctx.r3.u32, ctx.r4.u32);
                 ctx.r3.u64 = ctx.r3.u64 + 12)
 
 // RouteRange::Test and Update: r3 = a range, r4 = &a position; each
-// returns its result. Their adapters stay: in attract races, Update is
-// called from the camera modes (sub_821562F8, return address 0x821563C0)
-// and Test from sub_820FE830 (0x820FE854), both recompiled.
+// returns its result. Their adapters stayed for the camera modes' callers
+// (sub_821562F8, return address 0x821563C0; sub_820FE830, 0x820FE854),
+// native since 2026-10-30 and calling the plain C++ directly; with
+// --native_camera_modes off they reach these again.
 ITC_TRACK_ZONES(820FE6F8,
                 ctx.r3.u64 = RangeTest(base, ctx.r3.u32, LoadPosition(base, ctx.r4.u32)))
 ITC_TRACK_ZONES(820FE878,

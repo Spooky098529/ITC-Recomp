@@ -9,6 +9,8 @@
 #include <cstdint>
 #include <optional>
 
+#include "race_event/race_event.h"
+
 namespace career {
 
 // The save data's parts.
@@ -34,6 +36,9 @@ bool CanCopy(uint32_t destination, uint32_t source, uint32_t size);
 void PlayTimeMark(uint8_t* base, uint32_t save);
 // sub_82110580 DayBlock::WinStreak: halfword +4828 of the day block.
 uint32_t DayBlockWinStreak(uint8_t* base, uint32_t block);
+// sub_82110588 DayBlock::BestStreak: halfword +4830 of the day block (no
+// adapter: only EventCondition::SectionRival's plain C++ calls it).
+uint32_t DayBlockBestStreak(uint8_t* base, uint32_t block);
 // sub_82110590 DayBlock::AddWord4832: word +4832 += amount (its low 32 bits).
 void DayBlockAddWord4832(uint8_t* base, uint32_t block, uint64_t amount);
 // sub_821105A0 DayBlock::Word4832: word +4832.
@@ -151,6 +156,25 @@ uint32_t GarageListInsert(uint8_t* base, uint32_t list, uint32_t position);
 bool GarageInsertCar(uint8_t* base, uint32_t garage, uint32_t car, uint32_t position,
                      uint32_t* destination);
 
+// sub_821104D8 Car::SetModelAndClass (probably): r3 = a car object, r4 = a
+// car id: Car::SetModel (its old +1884 kept first), +1648 = the spec's byte
+// +708 as 0 to 3 (0 to 2: 0, 3 and 4: 2, 5 and 6: 1, 7: 3; above 7 the word
+// at its frame's +80, which it never writes, read from `sp` - 128 + 80),
+// +1884 = 3 if it was 3, else spec +748; +1900 = the spec of the car's +12's
+// word +744. Returns that spec (r3 as the original leaves it).
+constexpr uint32_t kSetModelAndClassFrame = 128;
+uint32_t CarSetModelAndClass(uint8_t* base, uint32_t car, uint32_t id, uint32_t sp);
+// sub_82116CE0 Garage::Add: r3 = a player's save data, r4 = a car object:
+// Car::SpecWord744, Garage::InsertCar at the count (memcpy through `copy`
+// where its plain C++ can't copy), then on the new last car (the count less
+// one steps from the head) Car::SetModelAndClass(it, the car's +12) from its
+// 128-byte frame below `sp`; with a nonzero spec word, the new car's +1900 =
+// it when the new car's own differs. Returns r3 as the original leaves it.
+constexpr uint32_t kGarageAddFrame = 128;
+using CopyCall = void (*)(void* user, uint32_t destination, uint32_t car);
+uint32_t GarageAdd(uint8_t* base, uint32_t save, uint32_t car, uint32_t sp, CopyCall copy,
+                   void* user);
+
 // --- The unlocks' conditions and the rewards ---
 
 // sub_82112950 Condition::Test (with its jump table's case sub_821129E0
@@ -242,5 +266,36 @@ constexpr uint32_t kNextDayFrame = 112;
 using PickNextCall = void (*)(void* user, uint32_t save);
 uint32_t CareerNextDay(uint8_t* base, uint32_t save, uint32_t sp, PickNextCall pick_next,
                        void* user);
+
+// --- The race event's refreshes (docs/functions/race-event.md) ---
+
+// sub_82111638 Career::EventQuery: -1 with `flag` set, else
+// RaceEvent::RefreshCurrent (r3 as the original's, 64 bits).
+uint64_t EventQuery(uint8_t* base, uint32_t flag, const race_event::Guest& guest);
+// sub_82111650 Career::EventLocation: the location (+6108; 14 to 19 give 4 to
+// 9, else 4) to RaceEvent::UpdateLocation (from a word on its frame in the
+// original).
+void EventLocation(uint8_t* base, uint32_t save, const race_event::Guest& guest);
+
+// --- The day's offers and the race event (src/career/event_setup.cpp) ---
+
+// sub_82114268 Career::SetUpEvent: r3 = the save data, the mode, the
+// location, from its 121,200-byte frame below `sp` (the original's: the
+// locations' bit set at +80, the caps at +96, the counts at +160, the picks
+// at +480, the entries at +1280; mode and location stored at sp + 28 and
+// sp + 36, the caller's frame). The mode, the location and 48 into the save
+// data, RaceData::ResetGlobal; unless the day is 1, table 0's unlocks (for a
+// location 14 to 19), tables 1 to 7's entries collected by kind and
+// location, up to 8 picked a location into the offers (+0x1AD20), then
+// RaceEvent::Make (its plain C++; `make(user, frame)` runs the original from
+// the frame where the plain C++ refuses). Returns r3 as the original leaves
+// it. SetUpEventNative: whether Condition::Test's copies and
+// RaceData::ResetGlobal's are native from the frame (else the original runs;
+// nothing written).
+constexpr uint32_t kSetUpEventFrame = 121200;
+using MakeCall = uint64_t (*)(void* user, uint32_t frame);
+bool SetUpEventNative(uint8_t* base, uint32_t sp);
+uint64_t SetUpEvent(uint8_t* base, uint32_t save, uint32_t mode, uint32_t location, uint32_t sp,
+                    const race_event::Guest& guest, MakeCall make, void* user);
 
 }  // namespace career

@@ -8,10 +8,112 @@ here, under its run, with the `replay:` line beside it when the replay
 broke. Their harnesses ran our code; this is the validation done by
 playing.
 
+Last drive: 2026-10-30, `itc_2819` (the parking area, a career race,
+the rival intro; 166 functions off the list).
+
 The user drives (menus, a race, a save) with `--log_level=info`; a
 function goes from this list when a log shows its `native running
 (game):` line (say which log in the commit). A run with nothing left
 here loses its heading.
+
+## Run 2026-10-30 11:39 (`b7-loop-30-10-26`)
+
+- The race event, migration 1 (attract race `itc_2673`, replay
+  `itc_2676`, ok; `race-event.md`, and three in `career.md`; mostly
+  `EventCondition::Met`'s kind tests, which the replay's career doesn't
+  meet):
+  `sub_8213FE00` EventCondition::DayDivisible,
+  `sub_8213FE98` EventCondition::RacedAll,
+  `sub_8213FF38` EventCondition::RacedCount,
+  `sub_8213FFC8` EventCondition::WonAll,
+  `sub_82140048` EventCondition::WinCount,
+  `sub_821400C8` EventCondition::LocationCleared,
+  `sub_82140188` EventCondition::RecordWord6,
+  `sub_82140208` EventCondition::ModeStreak,
+  `sub_82140290` EventCondition::SectionRival,
+  `sub_82140400` EventCondition::FloatAtLeast,
+  `sub_82140458` EventCondition::DayAtLeast,
+  `sub_821404D8` EventCondition::Weekday,
+  `sub_82140568` EventCondition::DayDigit,
+  `sub_82140608` EventCondition::DayDigitSum,
+  `sub_821406A8` EventCondition::Money,
+  `sub_82140718` EventCondition::Races22,
+  `sub_82140788` EventCondition::Races20,
+  `sub_821407F8` EventCondition::Wins,
+  `sub_82140868` EventCondition::WonCategoryCount,
+  `sub_82140938` EventCondition::Save6024,
+  `sub_82140980` EventCondition::Save5952,
+  `sub_821409C8` EventCondition::Save6032,
+  `sub_82140A48` EventCondition::BestTime,
+  `sub_82140AC8` EventCondition::WonCategories,
+  `sub_82140B80` EventCondition::Won383To391,
+  `sub_82140D18` EventCondition::FullCategoriesAny,
+  `sub_82140DB8` EventCondition::Table8D94,
+  `sub_82140E58` EventCondition::Save6052,
+  `sub_82140EC8` EventCondition::Save6054,
+  `sub_82140F38` EventCondition::Save5910,
+  `sub_82140FA8` EventCondition::Save4908,
+  `sub_82140FF0` EventCondition::GarageCount,
+  `sub_82141158` EventCondition::CarSpec129,
+  `sub_82141248` EventCondition::Tuning4,
+  `sub_821412E8` EventCondition::EngineType7,
+  `sub_821413A8` EventCondition::CarList1,
+  `sub_82141468` EventCondition::Nineties,
+  `sub_82141528` EventCondition::Spec92,
+  `sub_821415F0` EventCondition::CarFloat,
+  `sub_82141738` EventCondition::StockParts,
+  `sub_82141858` EventCondition::PartsAtLeast,
+  `sub_82141990` EventCondition::Tuning60,
+  `sub_82141A60` EventCondition::Tuning24,
+  `sub_82141B30` EventCondition::Tuning128,
+  `sub_82141BD0` EventCondition::Tuning148,
+  `sub_82141C70` EventCondition::Tuning144,
+  `sub_82141D10` EventCondition::AeroFitted,
+  `sub_82141E10` EventCondition::Tuning108,
+  `sub_82141F08` EventCondition::Tuning64To76,
+  `sub_82141FC8` EventCondition::Tuning80Not88,
+  `sub_82142070` EventCondition::Tuning28,
+  `sub_82142110` EventCondition::Tuning184,
+  `sub_821421D8` EventCondition::Decals,
+  `sub_82142280` EventCondition::Tuning116,
+  `sub_82142328` EventCondition::Car1588,
+  `sub_821423C0` EventCondition::Sticker101,
+  `sub_82142558` EventCondition::CarBytes,
+  `sub_82142648` EventCondition::Setting88,
+  `sub_821426D8` EventCondition::SameCars,
+  `sub_82142CE0` Unlock::Any,
+  `sub_82142E18` Unlock::StateKind5,
+  `sub_82142FC8` RaceEvent::FindRacer,
+  `sub_82143740` RaceEvent::PlaceUnlocked,
+  `sub_82143C70` EventGroup::PromoteFlagged,
+  `sub_821440F8` EventPools::AddRivalsOf,
+  `sub_821442D8` RaceEvent::PlaceUnlockedCurrent,
+  `sub_82144300` RaceEvent::Refresh,
+  `sub_82144720` RaceEvent::RefreshCurrent,
+  `sub_82110588` DayBlock::BestStreak
+
+- `Career::SetUpEvent`'s cleanup (attract race `itc_2692`, replay
+  `itc_2693`: broke, the SDK's "BaseHeap::Release failed because
+  address is not a region start" three times at the race-end
+  transition ~118 s in, the intermittent error seen before; it ran to
+  the end; `career.md`): `sub_82116CE0` Garage::Add,
+  `sub_821104D8` Car::SetModelAndClass, `sub_821104B0`
+  Car::SpecWord744, `sub_821154E0` Garage::InsertCar
+
+- The parking area, migration 1 (attract race `itc_2783`, replay
+  `itc_2784`: broke, the SDK's "BaseHeap::Release failed" twice at the
+  race-end transition ~118 s in, the intermittent error; it ran to the
+  end; `location-screen.md`; neither run goes to a parking area):
+  `sub_82227158` LocationScreen::OnMessage14,
+  `sub_822281D8` LocationScreen::HasMoreUnlocks,
+  `sub_82227618` LocationScreen::NextUnlockEntry,
+  `sub_8222C9B0` LocationScreen::ApplyQueuedPage
+
+- The parking area, migration 2 (attract race `itc_2796`, replay
+  `itc_2797`, ok; `location-screen.md`):
+  `sub_822280D8` LocationScreen::Page9,
+  `sub_8222A978` LocationScreen::ShowUnlockEntry,
+  `sub_8222D1A8` LocationScreen::Transition25
 
 ## Run 2026-10-30 01:06 (`b7-loop-29-10-26-2`)
 
@@ -23,15 +125,8 @@ here loses its heading.
   `--play_movies_with_ffmpeg=false`)
 - The career, migration 1 (attract race `itc_2659`, replay `itc_2660`,
   ok; `career.md`; the replay doesn't reach a career race's results):
-  `sub_82110590` DayBlock::AddWord4832,
-  `sub_82110B18` Stats::AddPoints,
-  `sub_82112860` ItemFlags::Set,
   `sub_821104B0` Car::SpecWord744,
   `sub_82115CC0` Career::PickFromCar,
-  `sub_82114B88` ItemRecords::AddWin,
-  `sub_821139B8` Stats::AddWin,
-  `sub_82111E10` Counter::AddWin,
-  `sub_821134D0` Opponents::AddWin,
   `sub_82114B08` ItemRecords::AddLoss,
   `sub_82113AB8` Stats::AddLoss,
   `sub_82111E80` Counter::AddLoss,
@@ -41,13 +136,9 @@ here loses its heading.
   `sub_82113B50` Stats::AddOutcome3,
   `sub_82111EF0` Counter::AddOutcome3,
   `sub_82113628` Opponents::AddOutcome3,
-  `sub_82111FC8` Results::Push,
-  `sub_82110850` ResultRecord::Fill,
   `sub_821154E0` Garage::InsertCar,
   `sub_82113468` GarageList::Insert,
   `sub_82114C08` Rewards::Grant,
-  `sub_82115190` Stats::AddRaceResult,
-  `sub_82112148` RunningMean::MergeTwo,
   `sub_82111818` Items::AnyWonKind3Stage2,
   `sub_821118B0` Items::AllWonKind3,
   `sub_82111940` Items::AllWonKind4Stage2,
@@ -90,14 +181,10 @@ here loses its heading.
   `sub_82461140` XAudioVoice::SetFormatWords, `sub_82460778`
   XAudioVoice::SetFormat, `sub_8245DCF0` XAudioSourceVoice::Reformat,
   `sub_8245DD60` XAudioSourceVoice::StopAndReset (`xaudio.md`)
-- The car sounds' migration 2 (attract race `itc_2382`, replay
-  `itc_2383`, ok): `sub_8210F7C8` CarSounds::StopAll (`car-sounds.md`)
-
 ## Run 2026-10-28 18:45 (`b7-loop-28-10-26-2`)
 
 - The archive's migration 2 (attract race `itc_2276`, replay
-  `itc_2277`, ok): `sub_8209DB90` Archive::CancelQueued, `sub_8209DB20`
-  Archive::Cancel (`files-and-saves.md`, `archive.md`; probably a load
+  `itc_2277`, ok): `sub_8209DB20` Archive::Cancel (`files-and-saves.md`, `archive.md`; probably a load
   cancelled when leaving a screen mid-load)
 - The file layer (attract race `itc_2291`, replay `itc_2293`, ok):
   `sub_825AB010` _vsnprintf, `sub_825AAF18` _vsnprintf_l
@@ -113,69 +200,30 @@ here loses its heading.
 
 ## Run 2026-10-28 08:36 (`b7-loop-28-10-26`)
 
-- The race world's migration 1 (attract race `itc_2139`, replay
-  `itc_2140`, ok): `sub_82170A88` SortedList::Clear, `sub_821713C0`
-  RaceWorld::ReleaseForStage (`race-world.md`; probably at a race's or
-  stage's end; `sub_82116C38` SaveData::AddDistance seen in the replay
-  `itc_2204`)
 - The race world's migration 2 (attract race `itc_2203`, replay
-  `itc_2204`, ok): `sub_82170668` RaceManager::ResetWorld,
-  `sub_82171718` RaceManager::ResetVehicles, `sub_82143920`
-  RaceEvent::PlaceGroupSplit, `sub_82165E20` RaceStart::Place,
-  `sub_821662E0` RaceStart::PlaceRolling, `sub_82172D20`
-  RaceManager::StreamTwoPlayers (`race-world.md`; a restart, other
+  `itc_2204`, ok): `sub_82143920` RaceEvent::PlaceGroupSplit,
+  `sub_82172D20` RaceManager::StreamTwoPlayers (`race-world.md`; other
   race kinds, two players)
 - The race's states' migration 1 (attract race `itc_2235`, replay
   `itc_2236`, ok; the replay's race takes the free-start path; seven
-  more seen in the replay `itc_2253`): `race-states.md`: `sub_821649B8`
-  RaceProgress::SetChecks, `sub_82163440` ReleaseRacers, `sub_82163140`
-  TickFraction, `sub_82162D80` Rank, `sub_821622A8`
-  RoutePosition::NotAfter, `sub_82164090` CheckLap, `sub_82162230`
-  Time::Sub, `sub_82164E18` CheckFinish, `sub_821632C8`
-  RaceStates::OnRollingStart, `sub_821643B0` OnStandingStart,
-  `sub_82163348` ClearStep, `sub_82163378` OnQuit, `sub_821647B0`
-  OnReplay, `sub_82168500` QuitTick, `sub_82167970` AfterRaceTick,
-  `sub_82166E50` RollingStartTick, `sub_82165AB0` RacersNear,
-  `sub_82165C78` RacersClose, `sub_82164A90` RacersStill,
-  `sub_821674A0` CountdownTick, `sub_821692C8` StandingStartTick (a
-  race with a countdown, racing to the finish, quitting from the pause
-  menu, the menu after a race)
+  more seen in the replay `itc_2253`): `race-states.md`: `sub_82163440`
+  ReleaseRacers, `sub_82162230` Time::Sub
 - The race's states' migration 2 (attract race `itc_2252`, replay
   `itc_2253`, ok): `sub_82163000` (two sections joined by a forward
-  link's side link), `sub_82162330` RaceProgress::RouteDistance
-  (`race-states.md`; `CheckLap`, `CheckFinish`, `Rank` above)
-
-## Run 2026-10-25 23:42 (`b7-loop-25-10-26-4`)
-
-- The race's set-up's migration 1 (attract race `itc_1867`, replay
-  `itc_1868`, ok): `sub_82101630`, `sub_82101700` Time::Pack
-  (`race-setup.md`)
-- The race's set-up's migration 2 (attract race `itc_1890`, replay
-  `itc_1891`, ok): `sub_82101E90` Stages::SetRoute, `sub_82112DB0`
-  Race::SetUpRival (`race-setup.md`; `sub_82101630` again, above)
+  link's side link) (`race-states.md`)
 
 ## Run 2026-10-25 16:38 (`b7-loop-25-10-26-3`)
 
-- The DrawTexts lead's migration 2 (attract race `itc_1729`, replay
-  `itc_1730`, ok): `sub_82211A28` RivalLogo::Draw (`race-hud.md`; runs
-  only with a rival at the race start)
 - The UI movies' ready groups (attract race `itc_1740`, replay
-  `itc_1741`, ok): `sub_8211B160` (the pairs vector's growth),
-  `sub_8211C4F0` (a text's scroll delay and speed), `sub_8211D880`
-  UiMovie::RevealText, `sub_8211D8D8` (whether a text has another
-  page) (`ui-movies-game.md`)
+  `itc_1741`, ok): `sub_8211B160` (the pairs vector's growth)
+  (`ui-movies-game.md`)
 - The scenery lists (attract race `itc_1769`, replay `itc_1770`, ok):
-  `sub_82146BD0` SceneryModel::RecordShape, `sub_82148058`
-  PointList::Draw (`scenery-lists.md`)
+  `sub_82146BD0` SceneryModel::RecordShape (`scenery-lists.md`)
 - The scenery lists' migration 2 (attract race `itc_1777`, replay
   `itc_1778`, ok): `sub_82595550` Model::RecordShape (`models.md`; its
   work runs in play inside `Model::DrawShape`, which calls
   `ModelRecordShapeChecked` past the print; only its own adapter, from
   `sub_820EF790`, never ran)
-- The shader objects' migration 3 (attract race `itc_1852`, replay
-  `itc_1853`, ok): `sub_8210A5C0` Strings::PageCount
-  (`strings-and-font.md`)
-
 ## Run 2026-10-25 03:59 (`b7-loop-25-10-26-2`)
 
 Until d83677c the replay's boot marker was a line gone since the movies
@@ -190,16 +238,13 @@ all ran in the attract race. Left:
 
 - The model class (attract race `itc_1614`): `sub_825A7348` memmove_s
   (`c-runtime.md`)
-- The minimap (attract race `itc_1648`, replay `itc_1649`, ok):
-  `sub_82147D18` SetList::Point (`minimap.md`)
 - The `atexit` step (attract race `itc_1665`, replay `itc_1666`, ok):
-  `sub_820F4BA8` Minimap::DrawPointMarker (`minimap.md`); `sub_825B3430`
+  `sub_825B3430`
   _lock and `sub_825B32D0` _unlock (`c-runtime.md`: their plain C++
   runs only for lock 8, which only the exit path takes, never in play:
   closing the window hard-exits, so probably never in a drive either)
 - The game modes' cleanup (`itc_1624`, `itc_1625`): the modes not
-  entered, `sub_82106F08` ModeType5::ModeType5, `sub_82235E88`
-  ModeType6::ModeType6, `sub_82246340` ModeType7::ModeType7,
+  entered, `sub_82246340` ModeType7::ModeType7,
   `sub_82107088` ModeType10::ModeType10, `sub_82106F88`
   ModeType12::ModeType12 (`game-modes.md`)
 
@@ -243,8 +288,6 @@ Migration 2's, not in the attract race or the replay (`itc_1292`,
 
 Not in the attract race or the replay (`itc_1124`, `itc_1125`, ok):
 
-- `sub_8213C358` AiPath::PreferredSections (`ai-drivers.md`)
-
 (`sub_82145118` PickTarget, `sub_82146220` UpdateState4 and
 `sub_82146388` UpdateState5 were seen in migration 2's replay,
 `itc_1146`; `sub_82101760` RaceTime::FromTicks, `sub_8213ADF8`
@@ -254,8 +297,6 @@ IsSettled in migration 3's, `itc_1170`.)
 Migration 2's, not in the attract race or the replay (`itc_1145`,
 `itc_1146`, ok):
 
-- `sub_82139E40` AiDriver::SetState2or3 (`ai-drivers.md`)
-- `sub_82145F48` AiDriver::UpdateState2 (`ai-drivers.md`)
 - `sub_821462A0` AiDriver::UpdateState6 (never seen in play, no row;
   ported with UpdateState, `ai-drivers.md`'s intro)
 
@@ -273,8 +314,6 @@ Migration 3's, not in the attract race or the replay (`itc_1169`,
 Migration 5's, not in the attract race or the replay (`itc_1203`,
 `itc_1204`, ok):
 
-- `sub_8213A000` AiDrivers::StartGroup (`ai-drivers.md`)
-
 The racer controllers', not in the attract race or the replay
 (`itc_1227`, `itc_1228`, ok):
 
@@ -287,15 +326,10 @@ The racer controllers', not in the attract race or the replay
 
 Not in the attract race or the replay (`itc_1043`, `itc_1044`, ok):
 
-- `sub_8210A5C0` Strings::PageCount (`strings-and-font.md`)
 - `sub_82108810` Font::LineGlyphs (`strings-and-font.md`; never seen in
   play before either)
 
 Not in the attract race or the replay (`itc_1085`, `itc_1086`, ok):
-
-- `sub_820F8C58` TrackRoute::StepAlongPath (`track-route.md`)
-- `sub_820F9F58` TrackRoute::NormalizeForwardPath (`track-route.md`)
-- `sub_820FA0F8` TrackRoute::NormalizePath (`track-route.md`)
 
 Not in the attract race or the replay (`itc_1099`, `itc_1100`, ok);
 never seen in play before either, ported with Follow:
@@ -316,15 +350,10 @@ seen in play before either (the 32-bit and node channel tracks):
 
 Not in the attract race or the replay (`itc_1013`, `itc_1014`, ok):
 
-- `sub_820AAE48` Viewport::Set (`cameras.md`)
-
 ## Run 2026-10-23 11:06 (`b7-loop-23-10-26-2`)
 
 Not in the attract race or two replays (`itc_922`, `itc_924`, both ok);
 their callers are the front end's:
-
-- `sub_821171B0` DataTables::Find20 (`data-tables.md`)
-- `sub_82117210` DataTables::Entry20 (`data-tables.md`)
 
 ## Run 2026-10-22 14:39 (`b7-loop-22-10-26`, the third run)
 

@@ -25,6 +25,11 @@ uint32_t DayBlockWinStreak(uint8_t* base, uint32_t block) {
   return guest::LoadU16(base, block + 4828);
 }
 
+uint32_t DayBlockBestStreak(uint8_t* base, uint32_t block) {
+  ITC_NATIVE_RUNNING("sub_82110588 DayBlock::BestStreak");
+  return guest::LoadU16(base, block + 4830);
+}
+
 void DayBlockAddWord4832(uint8_t* base, uint32_t block, uint64_t amount) {
   ITC_NATIVE_RUNNING("sub_82110590 DayBlock::AddWord4832");
   guest::StoreU32(base, block + 4832, uint32_t(amount) + guest::LoadU32(base, block + 4832));
@@ -195,6 +200,21 @@ uint32_t AnyWonKind3Stage1(uint8_t* base) {
     }
   }
   return 0;
+}
+
+uint64_t EventQuery(uint8_t* base, uint32_t flag, const race_event::Guest& guest) {
+  ITC_NATIVE_RUNNING("sub_82111638 Career::EventQuery");
+  if (flag != 0) {
+    return ~0ull;
+  }
+  return race_event::RefreshCurrent(base, guest);
+}
+
+void EventLocation(uint8_t* base, uint32_t save, const race_event::Guest& guest) {
+  ITC_NATIVE_RUNNING("sub_82111650 Career::EventLocation");
+  const int32_t location = int32_t(guest::LoadU32(base, save + 6108));
+  const int32_t group = location >= 14 && location <= 19 ? location - 10 : 4;
+  race_event::UpdateLocation(base, uint32_t(group), guest.Down(96));
 }
 
 }  // namespace career

@@ -11,6 +11,177 @@ functions to check in a drive in the progress file.
 When the user has reviewed a run's section, its heading gets
 "(reviewed <date>)"; the section stays for the record.
 
+## Run 2026-10-30 11:39 (`b7-loop-30-10-26`)
+
+- The race event's map (84e5334): `functions/race-event.md`, 102 new
+  rows (37 seen in play, 65 not), among them `EventCondition::Met`
+  (`sub_82142820`, a 68-kind jump table) and its 61 kind tests (only
+  kinds 21 and 31 ran in play), its case 1 split off by the recompiler
+  (`sub_82142868`); `known-data.md`'s row for `0x826C6078` rewritten as
+  the event's layout, with rows for the event group, the pools and the
+  20-byte condition; stale "not mapped" notes in `career.md` and
+  `ai-drivers.md` pointed to it; the lead for `sub_821442D8`,
+  `sub_821434A0`, `sub_82140308` folded in.
+- The race event's migration (6cf1882, `--native_race_event`): adapters
+  only on the six entry points recompiled code calls; `Make`, `Init`,
+  `Destroy` native only when the native heap holds the event's pages.
+  Choices for review: `EventCondition::Power` (kind 40, `sub_82141668`)
+  left recompiled and called from native `Met` through a guest call run
+  at the original's stack depth (it reads stack words below it it never
+  writes; native code reaching `generated/`, the user's call of
+  2026-10-25 to look at later); the kind tests' stores to their own
+  frames left out; r3 not compared for the functions returning nothing
+  (as the race world's harnesses); the 58 kind tests never seen in play
+  ported; `Met`'s row corrected (kind 64 tests bit 0x20, not 0x10).
+  `career.md`: `Career::EventQuery`, `EventLocation` Overridden,
+  `DayBlock::BestStreak` Native.
+- The cleanup after it (3f8fa4b..8267f2d, `--native_career`):
+  `Career::SetUpEvent` native over its 121,200-byte frame kept in guest
+  memory where the original has it, calling `race_event::Make`'s plain
+  C++ (the original `Make` from the frame where native refuses);
+  falls back to the original where `Condition::Test`'s or
+  `RaceData::ResetGlobal`'s copies wouldn't be native from that frame;
+  its harness cases in the race_event harness. `Garage::Add` and
+  `sub_821104D8` (new row, `Car::SetModelAndClass`, probably): reads a
+  stack word the original never writes when spec byte +708 > 7, kept
+  as the original. Adapters removed (Native): `Entry56::Allows`,
+  `Condition::Test`, `RaceEvent::Make`, `Car::SpecWord744`,
+  `Garage::InsertCar`. Harness notes: the career harness puts rand's
+  seed back after each case; case seeds of a shared generator shifted
+  repeat (about half of the first 48 cases duplicates), so
+  SetUpEvent's group mixes its own per case (other harnesses probably
+  have the same, not changed); table 0's walk can read past the table
+  as the original does, so the harness keeps done bits inside it.
+- The camera modes' map (9ac322c): `functions/camera-modes.md`, 100
+  rows (2 moved from `functions.md`: `sub_82152CD8`, `sub_821594B8`;
+  98 new; 90 seen in play): the race mode's camera director at +10512
+  (`CameraDirector::InitStates` `sub_82159950`, `SetMode`, `Update`),
+  its six views' camera objects (names "probably": chase, two in-car,
+  the start's look at the racers, the TV camera of replays and attract
+  races with its path files and the attract filter's `rand() % 4`, the
+  scripted cutscene `sub_82156CC0` with the rival logo), the camera
+  animations table `0x826C79B8`, two front-end cameras; vtables read
+  from the image. `known-data.md` rows added; pointers in `cameras.md`,
+  `game-modes.md`, `track-zones.md` and two leads updated. Large
+  functions skimmed, small ones read in full.
+- The camera modes' migration 1 (5a1babc..4c274ed,
+  `--native_camera_modes`): map corrections (the animations' count at
+  `0x826D81B8`, not `0x826D01B8`; `ToView4` sets +9636 = 1 and +77408 =
+  0; `Viewport::Offset` moves only the target; `Duration` reads the
+  first block's +16; the intro camera's flag word is race data
+  +0x59AE4). Choices: `ViewCamera1/2::Update` leave out the original's
+  unused `NearestHumanVehicle` body read; `CameraPath::Evaluate`'s cases
+  avoid mid-curve keys of kind 3+, where `Curve::Evaluate` returns a
+  stack word the original's `SplinePoint` may have left (not taken in
+  1,006 evaluations in a race; `Curve::Evaluate`'s own harness covers
+  it); `RivalLogo::Play` is `PlayNamed`'s first native caller (runs the
+  original under `--log_pause_movie`). 10 adapters removed; 25
+  functions native with no adapter from the start.
+- The user's call (2026-10-30): all harnesses together outgrew
+  `attract_race.sh 40` (the camera modes' validation, `itc_2730`, cut
+  off in `camera_modes`); the validation agent now runs
+  `attract_race.sh 60 --run_harnesses=all`, migration agents stay at
+  40 (`b7-loop.md`, "Precedent first"; `CLAUDE.md`).
+- The camera modes' migration 2 (96a281f..27ada48): `UiMovies::Open`
+  and `Delete` with `UiMovie::Unload` taken into `ui-movies-game.md`'s
+  code (`--native_ui_movies_game`; callees native where their own
+  checks say so, else their originals from frames like the
+  originals'). Row corrections: the attract filter's `rand() % 4` runs
+  on every TV camera update while +43520 is 0 (probably once a camera
+  path), not once; the TV camera's range table holds at most 40, from
+  `0x82618D30`; `RivalLogo::Open`'s record +8 id, +12 name, +16 asset;
+  `Cutscene::Update` sets bit 0 of race data +0x59AE4, not +0x5E6E4.
+  Native `Cutscene::Step` draws the logo through `sub_82211A28`'s
+  override, so `--redraw_rival_logo` is unchanged; a harness-only
+  stand-in (`race_hud_hooks::g_rival_logo_draw_stand_in`, null outside
+  harness runs) is checked in that override. Batch 3's four adapter
+  removals were checked by the absence of a game line instead of a
+  temporary counter (their functions don't run in attract races);
+  batch 4's had the counter (`itc_2746`).
+- The camera modes' migration 3 (81d51e9..d71eff5):
+  `CameraDirector::InitStates` replays its 34 transitions' stores and
+  copies in the original's frame from a table extracted from the
+  generated code (as `RaceWorld::Init`); `Cutscene::Cutscene`'s 30
+  scripts as tables read from the generated code by a script
+  (`src/camera_modes/cutscene_scripts.cpp`), falling back to the
+  original when `ChaseReady` refuses or the stack isn't aligned; the
+  constructor can't choose scripts 3-5, and script 5's body is never
+  checked by a harness. `SetMode` calls the six view constructors
+  through their adapters' steps from the original's frame; its harness
+  answers them with a stand-in (`hooks::SetCameraConstructStandIn`),
+  so those six adapters stay though only `SetMode` calls them.
+  `CameraDirector::Update` stays Wrapped: `--redraw_rival_logo`'s
+  wrapper runs the native form on logic passes
+  (`hooks::CameraModesUpdate`), noted in `frame-interpolation.md`; its
+  harness keeps view modes 0-5 (past 5 the original calls a null
+  camera). `Resume` falls back if the color filter's slots aren't the
+  native ones. `Viewport::LookAt`'s adapter removed (`cameras.md`); the
+  `GarageCamera::Update` harness then compares the viewport as floats
+  but the view mode (+1860), as the cameras harness does (24 cases had
+  differed by NaN sign only).
+- The location screen's map (3bf92d8): `functions/location-screen.md`,
+  99 new rows (77 seen in play): the lead's "front-end menus" are one
+  screen, the parking area (the user's correction, 2026-10-30: the
+  player loads into it, picks one of up to 6 opponent cars and races,
+  the other way to start a race besides the highway; the file's
+  intro updated by the migration agent) (save data +6108, locations
+  14-19): the location's
+  scenery through camera animations, its opponents posed as cars, UI
+  movies 21 and 30, XPR pictures; its state machine at +9640 of a
+  28,940-byte block at a front-end mode's +848 (which mode type isn't
+  known), 19 transitions over 11 states; a page object at `[0x82814E48]`
+  with 16 pages and 36 transitions (pages 9 and 11 call `Race::SetUp`).
+  `known-data.md` rows added (the page object, four menus, the
+  912-byte screen at `0x82814E50`, three save-data fields). Folded in:
+  the course scenery's front-end owners and `sub_822280D8`,
+  `sub_82228138` (their lead lines kept with a note); 3 leads added.
+- The parking area's migration 1 (f0ee4da..a4cfca2,
+  `--native_location_screen`): the file retitled "the parking area"
+  with the user's description (574e514; the file name, flag, `src/`
+  directory and `LocationScreen::` names kept). `UiMovie::SetText`
+  taken under `--native_ui_movies_game`, with `hooks::FormatGuestCalls`
+  added for `Strings::FormatV`'s plain C++; its harness uses its own
+  string table (on the game's, one case never returned from
+  `Strings::Get` for string 0x502 on both sides, not looked into).
+  `UpdatePage`'s harness covers pages -1, 7 and 10 only (the others run
+  the menus' input). `InitStates` replays the original's frame stores
+  from a step table generated from the translated code. Row
+  corrections: `ShowArrows` hides nodes 17 and 18 with one opponent;
+  `ListNode` sets the node's +16 to r3 as a float. The replay doesn't
+  reach the parking area: no frame dump. Slip: two temporary logging
+  edits reverted with `git checkout` rather than committed first (logs
+  only, nothing committed lost). The user's call: the 22 `SetText`
+  callers pass 0 for the r7-r10 they don't set.
+- The parking area's migration 2 (1af8d5b..df29d57): a
+  `location_screen::Calls` interface carries the guest calls left (the
+  heap's, memcpy's and the archive's adapters where their plain C++
+  refuses; `UiMovie::Finish`, `FinishNamed`, `FinishAll`, `Run`
+  through their overrides; `Career::EventQuery` and `Race::SetUp`
+  through their register steps; the race event's and `FormatV`'s).
+  The `SetText` callers run natively only while the UI movies' text
+  setters do (`hooks::LocationScreenTextsNative`), else the originals;
+  a setter refusing after that check is a logged abort. Outside the
+  subsystem: `hooks::StartUpRecorded` checks added at the start of
+  `hooks::RaceSetupSetUp` and `hooks::CareerEventQuery`, for the
+  harness to record those calls. The harness caught a porting bug,
+  fixed (`Transition17` writes the confirm menu `0x82814E5C`); row
+  correction: `UpdateView` reads the opponent menu's cursor. The 7
+  adapter removals' counter (`itc_2794`) ran in an attract race,
+  where the screen doesn't run at all.
+- The parking area's migration 3 (38cc3dc..74c7bf3): `PoseCar` calls
+  the cars' and vehicle's plain C++, its multiplies noted for
+  interpolation with the original call addresses, the original run if
+  the frame isn't 16-byte aligned; its harness inputs are made up (the
+  game's Params and items aren't loaded when harnesses run), shaped
+  like the SetupFromCar and Race::SetUp cases, and its cases force
+  flush-to-zero off at the start (an earlier case's native adapter had
+  left it on), as car_physics does. `UiMovie::SetNodeText` taken under
+  `--native_ui_movies_game` (Wrapped -> Overridden), run from its
+  logging override in `pause_movie_log.cpp` when `--log_pause_movie`
+  is off; its unset varargs passed as 0 (the user's call on
+  `SetText`). `Transition8`'s cases keep sub-scenes' child ranges
+  inside the root's (random trees fault in the original too).
+
 ## Run 2026-10-30 01:06 (`b7-loop-29-10-26-2`)
 
 - Car sounds, cleanup migration (d5cfd5c, `car-sounds.md`, the last

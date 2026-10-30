@@ -36,9 +36,10 @@ state machine, whose members after it are the overlay list at +9608
 (`race-overlays.md`); its transitions name the race's states from the
 overlays' side (0 at set-up, 1 the overlays made, 3, 2 the views bound,
 5 running, 6 probably paused, 7 and 8 the end). The other set-ups are
-leads (`../loops/leads.md`), as are the member at +10512's internals (the
-camera modes' range, `82152028`-`82156CC0`; the constructors, buffer
-frees and destructor the race mode calls there are here).
+leads (`../loops/leads.md`); the member at +10512's internals (the
+camera director, `82152028`-`82159950`) are in `camera-modes.md` since
+2026-10-30 (the constructors, buffer frees and destructor the race mode
+calls there are here).
 
 Shared, with rows in other files: `RaceOverlays::Destroy`
 (`sub_8215E1D0`) and the handler thunks the overlays' state machine

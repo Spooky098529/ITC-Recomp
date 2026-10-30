@@ -213,6 +213,32 @@ set(ITC_SOURCES
     src/career/unlocks.cpp
     src/career/race_result.cpp
     src/career/progress.cpp
+    src/career/event_setup.cpp
+    src/career/garage.cpp
+    src/hooks/race_event.cpp
+    src/race_event/conditions.cpp
+    src/race_event/event.cpp
+    src/hooks/camera_modes.cpp
+    src/camera_modes/camera_modes.cpp
+    src/camera_modes/anims.cpp
+    src/camera_modes/views.cpp
+    src/camera_modes/paths.cpp
+    src/camera_modes/chase.cpp
+    src/camera_modes/director.cpp
+    src/camera_modes/cutscene.cpp
+    src/camera_modes/cutscene_scripts.cpp
+    src/hooks/location_screen.cpp
+    src/location_screen/helpers.cpp
+    src/location_screen/movies.cpp
+    src/location_screen/pages.cpp
+    src/location_screen/init_states.cpp
+    src/location_screen/pictures.cpp
+    src/location_screen/race.cpp
+    src/location_screen/transitions.cpp
+    src/location_screen/results.cpp
+    src/location_screen/opponents.cpp
+    src/location_screen/view.cpp
+    src/location_screen/pose.cpp
     src/save_interface/save_interface.cpp
     src/save_interface/save_layer.cpp
     src/hooks/file_layer.cpp
@@ -378,6 +404,9 @@ set(ITC_SOURCES
     src/harnesses/app_start_up.cpp
     src/harnesses/data_load.cpp
     src/harnesses/career.cpp
+    src/harnesses/race_event.cpp
+    src/harnesses/camera_modes.cpp
+    src/harnesses/location_screen.cpp
     src/harnesses/car_sounds.cpp
     src/harnesses/x3daudio.cpp
     src/harnesses/xaudio.cpp
@@ -504,7 +533,9 @@ set(ITC_SOURCES
 # (src/race_setup/, docs/functions/race-setup.md) and the vehicle above the
 # car physics (src/vehicle/, docs/functions/vehicle.md) and the DXT block
 # encoders (src/texture_compression/, docs/functions/texture-compression.md)
-# and the career (src/career/, docs/functions/career.md).
+# and the career (src/career/, docs/functions/career.md) and the race event
+# (src/race_event/, docs/functions/race-event.md) and the camera modes
+# (src/camera_modes/, docs/functions/camera-modes.md).
 set_source_files_properties(src/c_runtime/math.cpp src/ui_movies/keys.cpp
     src/ui_movies/animation.cpp
     src/ui_movies/draw.cpp src/ui_movies/texts.cpp src/ui_movies/update.cpp
@@ -547,7 +578,13 @@ set_source_files_properties(src/c_runtime/math.cpp src/ui_movies/keys.cpp
     src/xact/tracks.cpp src/xaudio/objects.cpp src/xaudio/resampler.cpp
     src/xaudio/reverb_stages.cpp src/xaudio/reverb_core.cpp src/xaudio/reverb_setup.cpp
     src/career/accessors.cpp src/career/records.cpp src/career/unlocks.cpp
-    src/career/race_result.cpp src/career/progress.cpp PROPERTIES
+    src/career/race_result.cpp src/career/progress.cpp src/career/event_setup.cpp
+    src/career/garage.cpp
+    src/race_event/conditions.cpp
+    src/race_event/event.cpp
+    src/camera_modes/camera_modes.cpp src/camera_modes/anims.cpp src/camera_modes/views.cpp
+    src/camera_modes/paths.cpp src/camera_modes/chase.cpp src/camera_modes/director.cpp
+    src/camera_modes/cutscene.cpp src/camera_modes/cutscene_scripts.cpp PROPERTIES
     COMPILE_OPTIONS "-ffp-model=strict;-ffp-contract=off"
     SKIP_PRECOMPILE_HEADERS ON)
 

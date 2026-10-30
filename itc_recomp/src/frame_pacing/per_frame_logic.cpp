@@ -11,6 +11,7 @@
 #include "course_scenery/course_scenery.h"
 #include "debug/frame_state_diff.h"
 #include "debug/pause_movie_log.h"
+#include "hooks/camera_modes.h"
 #include "hooks/cameras.h"
 #include "hooks/race_hud.h"
 #include "hooks/ui_movies.h"
@@ -476,10 +477,16 @@ bool g_in_rival_cutscene = false;
 uint32_t g_rival_logo = 0;  // the entry the last logic pass drew, or 0
 }  // namespace
 
+void (*race_hud_hooks::g_rival_logo_draw_stand_in)(PPCContext&, uint8_t*) = nullptr;
+
 extern "C" REX_FUNC(sub_82211A28) {
   REX_FUNC_PROLOGUE();
   if (g_in_rival_cutscene) {
     g_rival_logo = ctx.r3.u32;
+  }
+  if (race_hud_hooks::g_rival_logo_draw_stand_in != nullptr) {
+    race_hud_hooks::g_rival_logo_draw_stand_in(ctx, base);
+    return;
   }
   race_hud_hooks::DrawRivalLogo(ctx, base);
 }
@@ -489,7 +496,8 @@ extern "C" REX_FUNC(sub_821594B8) {
   if (!frame_pacing::GameMessages_IsRenderOnlyPass()) {
     g_rival_logo = 0;
     g_in_rival_cutscene = true;
-    __imp__sub_821594B8(ctx, base);
+    // Natively with --native_camera_modes (src/hooks/camera_modes.cpp).
+    hooks::CameraModesUpdate(ctx, base);
     g_in_rival_cutscene = false;
     return;
   }

@@ -49,6 +49,7 @@ constexpr uint32_t kTable0 = 0x1000;   // in the race block: the cases' table 0
 constexpr uint32_t kTable40 = 0x2000;  // and their 40-byte table
 constexpr uint32_t kResults = 0x59AE8;            // the race data's result records
 constexpr uint32_t kResultCount = 0x59AE8 + 0x49FE0;
+constexpr uint32_t kRandSeed = 0x82638188;  // rand's (Car::SetModel's picks)
 
 // A block of guest memory for the cases, freed at the end.
 struct Block {
@@ -158,7 +159,8 @@ void Case(Context& h, Results& results, const World& w, uint64_t seed, const Set
                               {kRaceDataSlot, 4},
                               {data_tables::kTables, 4},
                               {car_specs::kParams, 4},
-                              {cr::kPlayTimeFrames, 4}});
+                              {cr::kPlayTimeFrames, 4},
+                              {kRandSeed, 4}});
     PPCContext t = CallContext(h);
     WriteRandom(h.base, h.data, kScratchBytes, r);
     WriteRandom(h.base, t.r1.u32, h.data - t.r1.u32, r);
@@ -619,6 +621,44 @@ void Garage(Context& h, const World& w) {
         t.r5.u64 = r.Below(count + 1);
       },
       __imp__sub_821154E0, hooks::CareerGarageInsertCar);
+  // Car::SetModelAndClass and Garage::Add: the four specs at random, their
+  // byte +708 0 to 9 (above 7, the frame's word the original reads unwritten:
+  // filled at random above and below r1 alike for both runs).
+  const auto specs = [base](Random& r, const World& w) {
+    WriteRandom(base, w.specs.address + 0x40, 4 * 8432, r);
+    for (uint32_t i = 0; i < 4; i++) {
+      const uint32_t spec = w.specs.address + 0x40 + 8432 * i;
+      guest::StoreU8(base, spec + 708, uint8_t(r.Below(10)));
+    }
+    guest::StoreU32(base, kRandSeed, uint32_t(r.Next()));
+  };
+  Group(
+      h, w, "Car::SetModelAndClass (sub_821104D8)", 48, specs,
+      [base](PPCContext& t, Random& r, const World& w) {
+        t.r3.u64 = w.save.address + cr::kGarage + 212 + 1968 * r.Below(4);
+        t.r4.u64 = r.Below(4);
+        guest::StoreU32(base, t.r3.u32 + 1884, r.Below(3) == 0 ? 3 : r.Below(6));
+      },
+      __imp__sub_821104D8, hooks::CareerCarSetModelAndClass,
+      {.frame_ranges = {{-int32_t(cr::kSetModelAndClassFrame) + 80, 4}}});
+  Group(
+      h, w, "Garage::Add (sub_82116CE0)", 48, specs,
+      [base, data](PPCContext& t, Random& r, const World& w) {
+        const uint32_t save = w.save.address;
+        ShapeGarage(base, save + cr::kGarage, r, r.Below(49));
+        t.r3.u64 = save;
+        t.r4.u64 = data + 16;
+        guest::StoreU32(base, data + 16 + 12, r.Below(4));
+        guest::StoreU32(base, data + 16 + 1884, r.Below(3) == 0 ? 3 : r.Below(6));
+        if (r.Below(3) == 0) {
+          // The spec words +744 alike now and then (no +1900 write).
+          for (uint32_t i = 0; i < 4; i++) {
+            guest::StoreU32(base, w.specs.address + 0x40 + 8432 * i + 744, 7);
+          }
+        }
+      },
+      __imp__sub_82116CE0, hooks::CareerGarageAdd,
+      {.frame_ranges = {{-int32_t(cr::kGarageAddFrame + cr::kSetModelAndClassFrame) + 80, 4}}});
 }
 
 // --- The unlocks' conditions and the rewards ---

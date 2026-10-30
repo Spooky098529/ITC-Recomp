@@ -21,6 +21,8 @@ void CareerCarSpecWord744(PPCContext& ctx, uint8_t* base);
 void CareerPickFromCar(PPCContext& ctx, uint8_t* base);
 void CareerRunningMeanMerge(PPCContext& ctx, uint8_t* base);
 void CareerStageOf(PPCContext& ctx, uint8_t* base);
+// Entry56::Allows sub_82111BA8: no adapter (only native callers); the
+// harness's step.
 void CareerEntry56Allows(PPCContext& ctx, uint8_t* base);
 void CareerAnyWonKind3Stage1(PPCContext& ctx, uint8_t* base);
 // ItemRecords::AddWin sub_82114B88, ItemRecords::AddLoss sub_82114B08: r3 =
@@ -35,11 +37,12 @@ void CareerResultsPush(PPCContext& ctx, uint8_t* base);
 void CareerStatsStartDay(PPCContext& ctx, uint8_t* base);
 // Garage::InsertCar sub_821154E0: r3 = the garage, r4 = the car, r5 = the
 // position; r3 = the slot (memcpy's: through memcpy's adapter where its plain
-// C++ can't copy).
+// C++ can't copy). No adapter (only Garage::Add's plain C++ calls it);
+// the harness's step, as Car::SpecWord744 sub_821104B0's.
 void CareerGarageInsertCar(PPCContext& ctx, uint8_t* base);
 // Condition::Test sub_82112950: r3 = the condition, r4 = the location, r5 =
 // the kinds' mask; r3 = 0 or 1 (the original where the items' copies aren't
-// native).
+// native). No adapter (only native callers); the harness's step.
 void CareerConditionTest(PPCContext& ctx, uint8_t* base);
 // Rewards::Grant sub_82114C08: r3 = the save data, r4 = the entry's index,
 // r5 = the kind, r6 = the value; r3 left.
@@ -58,5 +61,24 @@ void CareerAfterRace(PPCContext& ctx, uint8_t* base);
 // Career::PickNext past its gate through its adapter, from a frame like the
 // original's.
 void CareerNextDay(PPCContext& ctx, uint8_t* base);
+
+// Career::EventQuery sub_82111638: r4 = the flag; r3 = -1 or
+// RaceEvent::RefreshCurrent's. Career::EventLocation sub_82111650: r3 = the
+// save data.
+void CareerEventQuery(PPCContext& ctx, uint8_t* base);
+void CareerEventLocation(PPCContext& ctx, uint8_t* base);
+
+// Career::SetUpEvent sub_82114268: r3 = the save data, r4 = the mode, r5 =
+// the location; r3 as the original leaves it (the original where a copy
+// isn't native; RaceEvent::Make's original from its frame where the plain
+// C++ refuses).
+void CareerSetUpEvent(PPCContext& ctx, uint8_t* base);
+
+// Car::SetModelAndClass sub_821104D8: r3 = a car object, r4 = a car id; r3
+// = the car's spec. Garage::Add sub_82116CE0: r3 = the save data, r4 = a car
+// object; r3 as the original leaves it (memcpy's adapter from a frame like
+// Garage::InsertCar's where its plain C++ can't copy).
+void CareerCarSetModelAndClass(PPCContext& ctx, uint8_t* base);
+void CareerGarageAdd(PPCContext& ctx, uint8_t* base);
 
 }  // namespace hooks

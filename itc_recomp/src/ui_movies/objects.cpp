@@ -431,6 +431,61 @@ std::optional<uint32_t> ClearText(uint8_t* base, uint32_t movie, uint32_t sub_sc
   });
 }
 
+std::optional<uint32_t> SetText(uint8_t* base, const strings_and_font::FormatCalls& calls,
+                                uint32_t stack, uint32_t movie, uint32_t sub_scene,
+                                uint32_t child, uint32_t id, const uint64_t varargs[4]) {
+  constexpr uint32_t kTagTxt = 0x54585400;  // "TXT\0"
+  constexpr uint32_t kStringTable = 0x826C5C34;
+  const uint32_t node = FindNode(base, movie, sub_scene, child);
+  if (Load(base, node) != kTagTxt) {
+    return std::nullopt;
+  }
+  const uint32_t args = stack + 48;
+  for (uint32_t i = 0; i < 4; i++) {
+    Store(base, args + 8 * i, uint32_t(varargs[i] >> 32));
+    Store(base, args + 8 * i + 4, uint32_t(varargs[i]));
+  }
+  const uint32_t id_address = node + 108;
+  const auto record = GetText(base, movie, id_address);
+  if (!record) {
+    return std::nullopt;
+  }
+  ITC_NATIVE_RUNNING("sub_8211C1F8 UiMovie::SetText");
+  Zero(base, Load(base, *record), 4096);
+  Store(base, *record + 20, 0);
+  strings_and_font::StringsFormatV(base, calls, stack - 128, Load(base, kStringTable),
+                                   Load(base, *record), id & 0xFFFF, args);
+  TextMapSetKey(base, movie + kMovieTexts, Load(base, id_address), *record);
+  return movie + kMovieTexts;
+}
+
+std::optional<uint32_t> SetNodeText(uint8_t* base, const strings_and_font::FormatCalls& calls,
+                                    uint32_t stack, uint32_t movie, uint32_t node, uint32_t id,
+                                    const uint64_t varargs[5]) {
+  constexpr uint32_t kTagTxt = 0x54585400;  // "TXT\0"
+  constexpr uint32_t kStringTable = 0x826C5C34;
+  if (Load(base, node) != kTagTxt) {
+    return std::nullopt;
+  }
+  const uint32_t args = stack + 40;
+  for (uint32_t i = 0; i < 5; i++) {
+    Store(base, args + 8 * i, uint32_t(varargs[i] >> 32));
+    Store(base, args + 8 * i + 4, uint32_t(varargs[i]));
+  }
+  const uint32_t id_address = node + 108;
+  const auto record = GetText(base, movie, id_address);
+  if (!record) {
+    return std::nullopt;
+  }
+  ITC_NATIVE_RUNNING("sub_8211C7E8 UiMovie::SetNodeText");
+  Zero(base, Load(base, *record), 4096);
+  Store(base, *record + 20, 0);
+  strings_and_font::StringsFormatV(base, calls, stack - 128, Load(base, kStringTable),
+                                   Load(base, *record), id & 0xFFFF, args);
+  TextMapSetKey(base, movie + kMovieTexts, Load(base, id_address), *record);
+  return movie + kMovieTexts;
+}
+
 std::optional<uint32_t> SetTextScrollSpeed(uint8_t* base, uint32_t movie, uint32_t sub_scene,
                                            uint32_t child, uint32_t delay, double speed) {
   return ChangeText(base, movie, sub_scene, child, [&](uint32_t record) {
@@ -485,6 +540,78 @@ std::optional<uint32_t> HasMoreText(uint8_t* base, uint32_t movie, uint32_t sub_
   }
   ITC_NATIVE_RUNNING("sub_8211D8D8 (whether a text has another page; sub_8211C9C0)");
   return HasNextPage(base, *record) ? 1u : 0u;
+}
+
+// --- The movie table's open and delete ---
+
+uint32_t OpenMovie(uint8_t* base, uint32_t id, uint32_t asset, uint32_t frame,
+                   const archive::LoadCall& load, const OpenCalls& calls) {
+  ITC_NATIVE_RUNNING("sub_8211E808 UiMovies::Open");
+  Store(base, frame + 80, id);
+  if (Load(base, PairsFindKey(base, kMovieTable, id)) != 0) {
+    return 0;
+  }
+  const uint32_t movie = calls.make();
+  Store(base, frame + 80, movie);
+  InitAnimationLists(base, movie);
+  Store(base, movie + 0x9FD4, id);
+  MovieLoad(base, movie, asset, load);
+  Store(base, frame + 84, id);
+  calls.set(frame + 84, frame + 80);
+  return 1;
+}
+
+uint32_t UnloadMovie(uint8_t* base, uint32_t movie, uint32_t frame, const UnloadCalls& calls) {
+  ITC_NATIVE_RUNNING("sub_8211B540 UiMovie::Unload");
+  for (uint32_t i = 0; i < 3; i++) {
+    calls.virtual_free(i, Load(base, movie + 4 * i));
+  }
+  Store(base, movie + 16, 0);
+  Store(base, movie + 20, 0);
+  Store(base, movie + 24, 0);
+  const uint32_t textures = movie + kMovieTextures;
+  while (Load(base, movie + 36) != 0) {
+    const uint32_t count = Load(base, textures + kCount) - 1;
+    Store(base, textures + kCount, count);
+    const uint32_t entry = Load(base, Load(base, textures + kArray) + (count << 2));
+    if (entry != 0) {
+      Store(base, entry + 0, 0);
+      Store(base, entry + 4, 0);
+      Store(base, entry + 8, 0);
+      calls.free(entry);
+    }
+  }
+  const uint32_t items = movie + kMovieTextList;
+  while (Load(base, movie + 48) != 0) {
+    const uint32_t count = Load(base, items + kCount) - 1;
+    const uint32_t item = (count << 7) + Load(base, items + kArray);
+    Store(base, items + kCount, count);
+    calls.copy_item(frame + 80, item);
+    ClearTextItem(base, frame + 80);
+  }
+  const uint32_t xpr = movie + 12;
+  if (Load(base, xpr) != 0) {
+    calls.release_xpr(xpr);
+  }
+  Store(base, xpr, 0);
+  Store(base, movie + kMovieLoaded, 0);
+  return calls.free_texts(movie);
+}
+
+uint32_t DeleteMovie(uint8_t* base, uint32_t id, uint32_t frame, const DeleteCalls& calls) {
+  ITC_NATIVE_RUNNING("sub_8211E258 UiMovies::Delete");
+  Store(base, frame + 80, id);
+  const uint32_t entry = PairsFindKey(base, kMovieTable, id);
+  const uint32_t movie = Load(base, entry);
+  if (movie == 0) {
+    return entry;
+  }
+  UnloadMovie(base, movie, frame - 240, calls.unload);
+  calls.destroy(movie);
+  calls.free(movie);
+  Store(base, frame + 84, id);
+  Store(base, frame + 80, 0);
+  return calls.set(frame + 84, frame + 80);
 }
 
 }  // namespace ui_movies

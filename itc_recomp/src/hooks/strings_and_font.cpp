@@ -160,6 +160,20 @@ uint32_t FormatCall(void* user, uint32_t function, uint32_t r3, uint32_t r4, uin
 
 }  // namespace
 
+namespace hooks {
+
+uint32_t FormatGuestCall(void* user, uint32_t function, uint32_t r3, uint32_t r4, uint64_t r5,
+                         uint32_t frame, uint32_t lr) {
+  auto& calls = *static_cast<FormatGuestCalls*>(user);
+  FormatGuest guest{calls.ctx_, calls.base_};
+  return FormatCall(&guest, function, r3, r4, r5, frame, lr);
+}
+
+FormatGuestCalls::FormatGuestCalls(PPCContext& ctx, uint8_t* base)
+    : ctx_(ctx), base_(base), calls_{this, FormatGuestCall} {}
+
+}  // namespace hooks
+
 void hooks::StringsFormatVSteps(PPCContext& ctx, uint8_t* base) {
   ctx.fpscr.disableFlushMode();
   const uint64_t lr = ctx.lr;

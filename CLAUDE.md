@@ -384,11 +384,29 @@ user's call, 2026-10-30), the data load at boot (`data-load.md`,
 `--native_data_load`) and the career (`career.md`, `--native_career`, 49
 of 53) native (ours 3,031 -> 3,167); the rest waits on the race event
 and the car objects' makers.
+Its twenty-fifth run (`b7-loop-30-10-26`, 2026-10-30, merged into
+`rexglue-removal-project` the same day after a drive (`itc_2819`: the
+parking area and the rival intro seen as native code);
+summary `docs/loops/b7-loop-2026-10-30-1139.md`; 3 subsystems) made
+the race event (`race-event.md`, `--native_race_event`, 100 of 102,
+with `Career::SetUpEvent` it unblocked), the camera modes
+(`camera-modes.md`, `--native_camera_modes`, 87 of 90 in play; the
+director's update stays Wrapped by `--redraw_rival_logo`) and the
+parking area (`location-screen.md`, `--native_location_screen`, 57 of
+77: the career's screen where the player picks one of up to 6
+opponents to race, the user's description) native (ours 3,167 ->
+3,423); by the user's calls (2026-10-30), validation runs
+`attract_race.sh 60`, and native callers pass 0 for the varargs
+`UiMovie::SetText` and `SetNodeText` calls leave unset. The rest waits
+on the menu input and sound, the scene and its models, the scenery's
+set-up and teardown and `XPR::GetTexture`.
 Harness runs use `attract_race.sh 40` (the user's call,
 2026-10-23); a race short only because the harnesses took longer is
 no halt. B7 loop migration agents run only their subsystem's harnesses
 (and those of files they touched); the validation agent runs them all
-once after each migration (the user's call, 2026-10-28).
+once after each migration (the user's call, 2026-10-28), with
+`attract_race.sh 60` since they outgrew 40 s (the user's call,
+2026-10-30).
 After each plan item, run `itc_recomp/tools/boundary_status.py` and record
 its output in "The boundary over time" at the end of
 `docs/rexglue-removal.md`. Plan steps are done on their
