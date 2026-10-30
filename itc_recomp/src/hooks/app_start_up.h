@@ -27,6 +27,11 @@ inline bool StartUpRecorded(PPCContext& ctx, uint32_t address) {
 // from frames like the originals'. Text::Init's and Font::Font's need the
 // device lock native and --native_heap (DeviceUsersNative).
 void AppStartUpSteps(PPCContext& ctx, uint8_t* base);
+// Movie::Movie (sub_820AEA88: r3 the movie, r4 the block) and
+// MovieWrapper::MovieWrapper (sub_82593DC0: r3 the wrapper), each with the
+// original's prologue saves; need --native_heap (the adapters check).
+void MovieConstructSteps(PPCContext& ctx, uint8_t* base);
+void MovieWrapperSteps(PPCContext& ctx, uint8_t* base);
 void TextInitSteps(PPCContext& ctx, uint8_t* base);
 void FontConstructSteps(PPCContext& ctx, uint8_t* base);
 // Whether Text::Init's and Font::Font's native steps can run.

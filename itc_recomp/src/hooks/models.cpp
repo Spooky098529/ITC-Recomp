@@ -17,6 +17,8 @@
 
 #include "guest.h"
 
+#include "app_start_up/start_up.h"
+
 #include "base/flags.h"
 #include "base/log.h"
 #include "hooks/guest_call.h"
@@ -93,8 +95,10 @@ bool NativeLifetime() { return hooks::ModelsNativeLifetime(); }
 //
 // For the critical section at 0x8296BD38 only, whatever --native_models says
 // now (hooks::ModelsHostLock is fixed for the run): every user of it takes
-// the host mutex, the recompiled ones here. Other critical sections go to
-// the originals.
+// the host mutex, the recompiled ones here. The movie wrapper's critical
+// section likewise takes its own host mutex (app_start_up/start_up.h) once
+// the native MovieWrapper::MovieWrapper made it. Other critical sections go
+// to the originals.
 
 // ScopedLock::ScopedLock: r3 = the lock word, r4 = the critical section; r3
 // left as it came.
@@ -102,6 +106,12 @@ extern "C" REX_FUNC(sub_8258E580) {
   REX_FUNC_PROLOGUE();
   if (ctx.r4.u32 == models::kMemoryBlocksLock && hooks::ModelsHostLock()) {
     models::ScopedLockEnter(base, ctx.r3.u32, ctx.r4.u32);
+    return;
+  }
+  // The movie wrapper's critical section, when the native constructor made
+  // it (app_start_up/start_up.h): its host mutex.
+  if (app_start_up::IsMovieWrapperLock(ctx.r4.u32)) {
+    app_start_up::MovieWrapperLockEnter(base, ctx.r3.u32, ctx.r4.u32);
     return;
   }
   __imp__sub_8258E580(ctx, base);
@@ -114,6 +124,10 @@ extern "C" REX_FUNC(sub_8258E5B8) {
   if (hooks::ModelsHostLock() &&
       guest::LoadU32(base, ctx.r3.u32) == models::kMemoryBlocksLock) {
     ctx.r3.u64 = models::ScopedLockLeave(base, ctx.r3.u32);
+    return;
+  }
+  if (app_start_up::IsMovieWrapperLock(guest::LoadU32(base, ctx.r3.u32))) {
+    ctx.r3.u64 = app_start_up::MovieWrapperLockLeave(base, ctx.r3.u32);
     return;
   }
   __imp__sub_8258E5B8(ctx, base);

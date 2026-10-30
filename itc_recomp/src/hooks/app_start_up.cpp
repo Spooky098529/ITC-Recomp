@@ -10,6 +10,8 @@
 #include "hooks/heap.h"
 #include "strings_and_font/strings_and_font.h"
 
+#include <cstddef>
+
 using guest_call::InFrame;
 
 ITC_FLAG_BOOL(native_app_start_up, true, "ITC",
@@ -24,7 +26,10 @@ ITC_FLAG_BOOL(native_app_start_up, true, "ITC",
               "sub_8209B070 and Tiling::LargestTile sub_8209ADD8, and Billboards::Init "
               "sub_8209BE88; with them, Text::Init sub_8210ADD0 with Font::Init sub_82109A00, "
               "Font::Font sub_82109228 and Font::CreateShaders sub_821088B8, no adapters of their "
-              "own; and App::StartUp sub_82106548, its callees through their adapters) "
+              "own; and App::StartUp sub_82106548, its callees through their adapters; with "
+              "--native_heap, Movie::Movie sub_820AEA88 and MovieWrapper::MovieWrapper "
+              "sub_82593DC0, the wrapper's critical section a host mutex for every user, "
+              "through ScopedLock sub_8258E580 and sub_8258E5B8 for that section) "
               "natively instead of through the translated code (the same reads and writes; "
               "checked by --run_harnesses=app_start_up)");
 
@@ -434,4 +439,91 @@ extern "C" REX_FUNC(sub_82106548) {
     return;
   }
   hooks::AppStartUpSteps(ctx, base);
+}
+
+// --- The movie class's construction ---
+
+namespace {
+
+// The original's __savegprlr_N: the link register at r1 - 8 and rN to r31
+// (doublewords) below it, above the frame it's about to make.
+void SaveRegisters(PPCContext& ctx, uint8_t* base, int first) {  // first >= 14
+  // r14 to r31 are consecutive in PPCContext (r3 comes first there).
+  static_assert(offsetof(PPCContext, r31) - offsetof(PPCContext, r14) == 17 * sizeof(PPCRegister));
+  const uint32_t sp = ctx.r1.u32;
+  guest::StoreU32(base, sp - 8, uint32_t(ctx.lr));
+  const PPCRegister* regs = &ctx.r14;
+  for (int n = first; n < 32; n++) {
+    const uint64_t value = regs[n - 14].u64;
+    const uint32_t at = sp - 8 * (32 - n) - 8;
+    guest::StoreU32(base, at, uint32_t(value >> 32));
+    guest::StoreU32(base, at + 4, uint32_t(value));
+  }
+}
+
+}  // namespace
+
+void hooks::MovieWrapperSteps(PPCContext& ctx, uint8_t* base) {
+  const uint32_t wrapper = ctx.r3.u32;
+  // The original's prologue: lr, r30 and r31 above its 112-byte frame.
+  SaveRegisters(ctx, base, 30);
+  if (const auto r3 = asu::MovieWrapperConstruct(base, wrapper)) {
+    ctx.r3.u64 = *r3;
+    return;
+  }
+  __imp__sub_82593DC0(ctx, base);
+}
+
+// MovieWrapper::MovieWrapper: r3 = the 8 bytes, from Movie::Movie.
+extern "C" REX_FUNC(sub_82593DC0) {
+  REX_FUNC_PROLOGUE();
+  if (!ITC_FLAG(native_app_start_up) || !hooks::NativeHeapActive()) {
+    __imp__sub_82593DC0(ctx, base);
+    return;
+  }
+  hooks::MovieWrapperSteps(ctx, base);
+}
+
+void hooks::MovieConstructSteps(PPCContext& ctx, uint8_t* base) {
+  const uint32_t movie = ctx.r3.u32;
+  const uint32_t block = ctx.r4.u32;
+  const uint64_t lr = ctx.lr;
+  // The original's prologue (__savegprlr_28): lr and r28 to r31.
+  SaveRegisters(ctx, base, 28);
+  std::optional<uint32_t> result;
+  InFrame(ctx, base, 160, 0x820AEB10, [&](uint32_t frame) {
+    asu::MovieCalls calls;
+    calls.virtual_call = [&](uint32_t object, uint32_t offset, uint32_t r4, uint32_t r5,
+                             uint32_t return_address) {
+      ctx.r4.u64 = r4;
+      ctx.r5.u64 = r5;
+      return VirtualCall(ctx, base, object, offset, return_address);
+    };
+    calls.wrapper = [&](uint32_t wrapper) {
+      ctx.r3.u64 = wrapper;
+      ctx.lr = 0x820AEB1C;
+      hooks::MovieWrapperSteps(ctx, base);
+      return ctx.r3.u32;
+    };
+    result = asu::MovieConstruct(base, movie, block, frame, calls);
+  });
+  ctx.lr = lr;
+  if (!result) {
+    ctx.r3.u64 = movie;
+    ctx.r4.u64 = block;
+    __imp__sub_820AEA88(ctx, base);
+    return;
+  }
+  ctx.r3.u64 = *result;
+}
+
+// Movie::Movie: r3 = the movie (312 bytes), r4 = the set-up block, from
+// App::App once at boot.
+extern "C" REX_FUNC(sub_820AEA88) {
+  REX_FUNC_PROLOGUE();
+  if (!ITC_FLAG(native_app_start_up) || !hooks::NativeHeapActive()) {
+    __imp__sub_820AEA88(ctx, base);
+    return;
+  }
+  hooks::MovieConstructSteps(ctx, base);
 }

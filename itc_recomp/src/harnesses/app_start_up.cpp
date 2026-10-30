@@ -756,6 +756,190 @@ void AppStartUpCases(Context& h) {
   results.Report();
 }
 
+// --- The movie class's construction ---
+
+// Frees a heap block a case made (the wrapper's, the wrapper).
+void FreeBlock(uint32_t block) {
+  if (block != 0 && memory::IsHeapBlock(block)) {
+    memory::crt::OperatorDelete(block);
+  }
+}
+
+// Runs `f` with --native_app_start_up off (v == 0) or on.
+template <typename F>
+void StartUpSide(int v, F f) {
+  const bool flag = ITC_FLAG(native_app_start_up);
+  ITC_FLAG(native_app_start_up) = v == 1;
+  f();
+  ITC_FLAG(native_app_start_up) = flag;
+}
+
+// The wrapper's lock: ScopedLock on a critical section the recompiled
+// InitializeCriticalSection set up in a heap block (v == 0, the originals)
+// against the host mutex's plain C++ on the same lock word; compared: the
+// scratch area (the lock word) and r3 after each. Then whether the live
+// wrapper's section (the movie class at 0x826C1CDC, +8, +4) is the one
+// routed to the mutex, when the native constructor made it.
+void NativeWrapperLockEnter(PPCContext& t, uint8_t* base) {
+  asu::MovieWrapperLockEnter(base, t.r3.u32, t.r4.u32);
+}
+void NativeWrapperLockLeave(PPCContext& t, uint8_t* base) {
+  t.r3.u64 = asu::MovieWrapperLockLeave(base, t.r3.u32);
+}
+
+void MovieWrapperLockCases(Context& h) {
+  {
+    Results results("ScopedLock (sub_8258E580, sub_8258E5B8, the movie wrapper's critical section)");
+    const uint32_t section = *memory::crt::OperatorNew(h.base, asu::kMovieWrapperBlockBytes);
+    for (int c = 0; c < 16; c++) {
+      const uint32_t lock = h.data + 4 * h.random.Below(64);
+      Outputs out[2];
+      for (int v = 0; v < 2; v++) {
+        Fill(h.base, h.data, kScratchBytes);
+        PPCContext t = CallContext(h);
+        if (v == 0) {
+          t.r3.u64 = section;
+          __imp__sub_8258E548(t, h.base);  // InitializeCriticalSection
+        }
+        t.r3.u64 = lock;
+        t.r4.s64 = int32_t(section);
+        (v == 0 ? __imp__sub_8258E580 : NativeWrapperLockEnter)(t, h.base);
+        out[v].Bytes(Read(h.base, h.data, kScratchBytes));
+        out[v].Word(t.r3.u32);
+        out[v].Word(uint32_t(t.r3.u64 >> 32));
+        t.r3.u64 = lock;
+        (v == 0 ? __imp__sub_8258E5B8 : NativeWrapperLockLeave)(t, h.base);
+        out[v].Bytes(Read(h.base, h.data, kScratchBytes));
+        out[v].Word(t.r3.u32);
+      }
+      results.Check(out[0], out[1], fmt::format("case {} (lock word at +{})", c, lock - h.data));
+    }
+    FreeBlock(section);
+    const uint32_t movie = guest::LoadU32(h.base, asu::kMovieClass);
+    const uint32_t wrapper = movie != 0 ? guest::LoadU32(h.base, movie + 8) : 0;
+    const uint32_t live = wrapper != 0 ? guest::LoadU32(h.base, wrapper + 4) : 0;
+    if (live != 0 && asu::MovieWrapperLock() != 0) {
+      Outputs out[2];
+      out[0].Word(1);
+      out[1].Word(asu::IsMovieWrapperLock(live) ? 1 : 0);
+      results.Check(out[0], out[1], "the live wrapper's section routed");
+    }
+    results.Report();
+  }
+}
+
+// MovieWrapper::MovieWrapper on 8 bytes in the scratch area (the recompiled
+// one with --native_app_start_up off, so its InitializeCriticalSection
+// runs): compared the vtable, whether +4 is set, its block's +28 (the
+// player), r3 and the prologue's saves above the stack pointer. The
+// section's 28 bytes aren't compared (the host mutex in its place: left as
+// operator new leaves them, as Edram::Alloc's). The live lock's address put
+// back; the blocks freed.
+void MovieWrapperCases(Context& h) {
+  Results results("MovieWrapper::MovieWrapper (sub_82593DC0)");
+  const uint32_t saved = asu::MovieWrapperLock();
+  const uint32_t wrapper = h.data + 64;
+  for (int c = 0; c < 8; c++) {
+    const uint64_t r30 = h.random.Next(), r31 = h.random.Next();
+    Outputs out[2];
+    for (int v = 0; v < 2; v++) {
+      Fill(h.base, h.data, kScratchBytes);
+      PPCContext t = CallContext(h);
+      t.r3.u64 = wrapper;
+      t.r30.u64 = r30;
+      t.r31.u64 = r31;
+      t.lr = 0x820AEB1C;
+      const uint32_t stack = t.r1.u32;
+      StartUpSide(v, [&] {
+        (v == 0 ? __imp__sub_82593DC0 : hooks::MovieWrapperSteps)(t, h.base);
+      });
+      const uint32_t block = guest::LoadU32(h.base, wrapper + 4);
+      out[v].Word(guest::LoadU32(h.base, wrapper));
+      out[v].Word(block != 0 ? 1 : 0);
+      out[v].Word(block != 0 ? guest::LoadU32(h.base, block + 28) : 0xFFFFFFFF);
+      out[v].Word(t.r3.u32);
+      out[v].Word(t.r1.u32 - stack);
+      out[v].Bytes(Read(h.base, stack - 24, 24));
+      if (v == 1) {
+        out[v].Word(asu::MovieWrapperLock() == block ? 1 : 0);
+      } else {
+        out[v].Word(1);
+      }
+      FreeBlock(block);
+    }
+    results.Check(out[0], out[1], fmt::format("case {}", c));
+  }
+  asu::SetMovieWrapperLock(saved);
+  results.Report();
+}
+
+// Movie::Movie on 312 bytes in the scratch area, the set-up block's run loop
+// a fake object whose vtable's slot 2 (AddTickHandler) adds one to its +4
+// (sub_8245F860) and slot 1 (AddListener) stores r4 at its +4
+// (sub_820A70A8); the recompiled one with --native_app_start_up off (its
+// wrapper the original's too). Compared: the movie (its +8, the wrapper, as
+// whether it's set), the wrapper's vtable and its block's +28, the run
+// loop's words, r3, the frame's +80 to +119 (the keys and delegates) and
+// the prologue's saves. The blocks freed; the live lock's address put back.
+void MovieConstructCases(Context& h) {
+  constexpr uint32_t kCount4 = 0x8245F860;
+  constexpr uint32_t kStoreR4At4 = 0x820A70A8;
+  Results results("Movie::Movie (sub_820AEA88) with MovieWrapper::MovieWrapper (sub_82593DC0)");
+  const uint32_t saved = asu::MovieWrapperLock();
+  const uint32_t movie = h.data + 512;
+  const uint32_t block = h.data + 128;
+  const uint32_t loop = h.data + 192;
+  const uint32_t vtable = h.data + 256;
+  for (int c = 0; c < 8; c++) {
+    const uint32_t word4 = uint32_t(h.random.Next());
+    const uint64_t r28 = h.random.Next(), r29 = h.random.Next(), r30 = h.random.Next(),
+                   r31 = h.random.Next();
+    Outputs out[2];
+    for (int v = 0; v < 2; v++) {
+      Fill(h.base, h.data, kScratchBytes);
+      guest::StoreU32(h.base, block + 0, loop);
+      guest::StoreU32(h.base, block + 4, word4);
+      guest::StoreU32(h.base, loop, vtable);
+      guest::StoreU32(h.base, loop + 4, 0x100 * c);
+      guest::StoreU32(h.base, vtable + 4, kStoreR4At4);
+      guest::StoreU32(h.base, vtable + 8, kCount4);
+      PPCContext t = CallContext(h);
+      for (uint32_t k = 4; k <= 0x200; k += 4) {
+        guest::StoreU32(h.base, t.r1.u32 - k, 0xC0DE0000u + k);
+      }
+      t.r3.u64 = movie;
+      t.r4.u64 = block;
+      t.r28.u64 = r28;
+      t.r29.u64 = r29;
+      t.r30.u64 = r30;
+      t.r31.u64 = r31;
+      t.lr = 0x820947A0;
+      const uint32_t stack = t.r1.u32;
+      StartUpSide(v, [&] {
+        (v == 0 ? __imp__sub_820AEA88 : hooks::MovieConstructSteps)(t, h.base);
+      });
+      const uint32_t wrapper = guest::LoadU32(h.base, movie + 8);
+      const uint32_t wrapper_block = wrapper != 0 ? guest::LoadU32(h.base, wrapper + 4) : 0;
+      out[v].Bytes(Read(h.base, movie, 8));
+      out[v].Word(wrapper != 0 ? 1 : 0);
+      out[v].Bytes(Read(h.base, movie + 12, 312 - 12));
+      out[v].Word(wrapper != 0 ? guest::LoadU32(h.base, wrapper) : 0);
+      out[v].Word(wrapper_block != 0 ? 1 : 0);
+      out[v].Word(wrapper_block != 0 ? guest::LoadU32(h.base, wrapper_block + 28) : 0);
+      out[v].Bytes(Read(h.base, loop, 8));
+      out[v].Word(t.r3.u32);
+      out[v].Word(t.r1.u32 - stack);
+      out[v].Bytes(Read(h.base, stack - 160 + 80, 40));
+      out[v].Bytes(Read(h.base, stack - 40, 40));
+      FreeBlock(wrapper_block);
+      FreeBlock(wrapper);
+    }
+    results.Check(out[0], out[1], fmt::format("case {}", c));
+  }
+  asu::SetMovieWrapperLock(saved);
+  results.Report();
+}
+
 }  // namespace
 
 void AppStartUp(Context& h) {
@@ -776,6 +960,11 @@ void AppStartUp(Context& h) {
     TextInitCases(h);
   }
   AppStartUpCases(h);
+  if (hooks::NativeHeapActive()) {
+    MovieWrapperLockCases(h);
+    MovieWrapperCases(h);
+    MovieConstructCases(h);
+  }
 }
 
 }  // namespace harness

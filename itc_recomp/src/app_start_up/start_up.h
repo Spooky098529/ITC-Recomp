@@ -5,6 +5,7 @@
 
 #include <cstdint>
 #include <functional>
+#include <mutex>
 #include <optional>
 
 namespace app_start_up {
@@ -202,6 +203,68 @@ struct StartUpCalls {
 // the original leaves it (`frame` + 80, the last GlobalMemoryStatus's
 // buffer).
 uint32_t AppStartUp(uint8_t* base, uint32_t interface, uint32_t frame, const StartUpCalls& calls);
+
+// --- The movie class's construction (movies.md) ---
+
+constexpr uint32_t kMovieVtable = 0x82002910;
+constexpr uint32_t kMovieWrapperVtable = 0x8206CC90;
+constexpr uint32_t kMovieWrapperBlockBytes = 32;  // the critical section, +28 the player
+constexpr uint32_t kDelegateVtable = 0x82002850;  // Delegate (12 bytes)
+
+// The wrapper's critical section (the 32-byte block at its +4): in its
+// place one host mutex (the user's call for a subsystem's critical section,
+// 2026-10-24 and 2026-10-25: Edram::Alloc, the memory blocks' lock),
+// recursive as a critical section is (no user takes it twice; nothing reads
+// its depth). Its users are the wrapper's slot 0 (sub_82593E78, open) and
+// slots 2 to 4 (sub_82593D88, never seen in play), both through ScopedLock
+// (sub_8258E580, sub_8258E5B8), whose adapters (src/hooks/models.cpp) take
+// the mutex for the block the native constructor made (MovieWrapperLock);
+// nothing else enters it (the movie library is given only the wrapper, and
+// with --play_movies_with_ffmpeg none of the wrapper's slots runs).
+std::recursive_mutex& MovieWrapperMutex();
+// The block the native constructor made (0 before, or when the recompiled
+// one made it); the harness saves and puts it back.
+uint32_t MovieWrapperLock();
+void SetMovieWrapperLock(uint32_t critical_section);
+bool IsMovieWrapperLock(uint32_t critical_section);
+// sub_8258E580 ScopedLock::ScopedLock for the wrapper's section: the lock
+// word (+0) = the section, then the mutex taken.
+void MovieWrapperLockEnter(uint8_t* base, uint32_t lock, uint32_t critical_section);
+// sub_8258E5B8 ScopedLock::~ScopedLock for a lock word holding it: the mutex
+// given back; returns the word (the original's r3).
+uint32_t MovieWrapperLockLeave(uint8_t* base, uint32_t lock);
+
+// sub_82593DC0 MovieWrapper::MovieWrapper: +0 the vtable 0x8206CC90, +4 a
+// 32-byte block (operator new; InitializeCriticalSection left out, the host
+// mutex above in its place, the block's first 28 bytes as operator new
+// leaves them) whose +28 (the player) = 0. Returns the wrapper, or nullopt
+// where operator new's plain C++ can't answer (the original runs; the store
+// it made again is the same).
+std::optional<uint32_t> MovieWrapperConstruct(uint8_t* base, uint32_t wrapper);
+
+// The guest calls Movie::Movie makes: `virtual_call` the object's vtable slot
+// at `offset` with r4, r5 and the original's return address; `wrapper`
+// MovieWrapper::MovieWrapper on the 8 bytes (its plain C++, the original
+// where it hands back); each returns r3.
+struct MovieCalls {
+  std::function<uint32_t(uint32_t object, uint32_t offset, uint32_t r4, uint32_t r5,
+                         uint32_t return_address)>
+      virtual_call;
+  std::function<uint32_t(uint32_t wrapper)> wrapper;
+};
+
+// sub_820AEA88 Movie::Movie: r3 the movie (312 bytes), `block` the set-up
+// block (+0 the run loop, +4 a word kept at +4). The vtable, the command at
+// +12 (+12 0x820066DC, +16 0x82002908, +20 to +30, +36 a delegate's vtable,
+// +40, +44), +8 the wrapper (8 bytes, operator new, or 0), the run loop's
+// AddTickHandler (slot 2) and AddListener (slot 1), each key 1 with a
+// 12-byte delegate on `frame` (the original's 160-byte frame: +80 the key,
+// +88 and +104 the delegates; +88 left 0x82000ABC, as the original), +308
+// (the state) = 0. Returns the movie, or nullopt where operator new's plain
+// C++ can't answer (the original runs from the start: the stores it made
+// again are the same).
+std::optional<uint32_t> MovieConstruct(uint8_t* base, uint32_t movie, uint32_t block,
+                                       uint32_t frame, const MovieCalls& calls);
 
 // --- The network manager's set-up (system-services.md) ---
 
