@@ -149,6 +149,8 @@ bool DeviceUsersNative() {
          ITC_FLAG(native_graphics_resources) && hooks::NativeHeapActive();
 }
 
+// (SceneTarget::SceneTarget has no adapter: only SceneTarget::Create's plain
+// C++ calls it in play.)
 asu::VideoOutputCall SceneTargetVideoOutput(PPCContext& ctx, uint8_t* base) {
   return [&ctx, base](int at) {
     return at == 0 ? VideoOutput(ctx, base, 0x8209B0B0, 0x8209B0C0)
@@ -157,22 +159,6 @@ asu::VideoOutputCall SceneTargetVideoOutput(PPCContext& ctx, uint8_t* base) {
 }
 
 }  // namespace
-
-extern "C" REX_FUNC(sub_8209B070) {
-  REX_FUNC_PROLOGUE();
-  if (!DeviceUsersNative()) {
-    __imp__sub_8209B070(ctx, base);
-    return;
-  }
-  const uint32_t target = ctx.r3.u32;
-  const uint64_t lr = ctx.lr;
-  uint32_t result = 0;
-  InFrame(ctx, base, 192, 0x8209B0B0, [&](uint32_t frame) {
-    result = asu::SceneTargetConstruct(base, target, frame, SceneTargetVideoOutput(ctx, base));
-  });
-  ctx.lr = lr;
-  ctx.r3.u64 = result;
-}
 
 extern "C" REX_FUNC(sub_8209B378) {
   REX_FUNC_PROLOGUE();
