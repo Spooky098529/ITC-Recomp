@@ -417,6 +417,11 @@ Rows not yet moved stay in the table below. So far:
   racers, the TV camera with its paths along the route, the scripted
   cutscenes with the rival's logo), the camera animation files and two
   front-end cameras (B7; the viewports below them are in `cameras.md`).
+- [`location-screen.md`](location-screen.md): the career's location
+  screen in the front end: its state machine, the course scenery and the
+  location's opponents posed as cars, the pictures loaded from the
+  archive, its 16 pages (menus, texts, the race's set-up) and 36 page
+  transitions over two UI movies (B7).
 
 These files hold functions only. What used to follow the table here moved
 out on 2026-10-20: how frame interpolation works, its options and what
