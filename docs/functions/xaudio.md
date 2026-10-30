@@ -123,8 +123,8 @@ is ours, when it becomes a host recursive lock whose depth can be read.
 After the second migration 21 of its 29 users (with `sub_8245A410`) are native, and 23 after
 migration 1 of `xaudio-objects.md` (the callback's registration `sub_8245A5E8`
 and the commit `sub_8245A6E8`); the rest,
-all recompiled, block the switch: `XAudioInitialize`'s `sub_8245A410`
-(`sound-cues.md`), `XAudioShutDown` (`sub_8245A4E8`, no harness: it
+all recompiled, block the switch (`XAudioInitialize`'s `sub_8245A410`,
+`sound-cues.md`, is ours since 2026-10-30: 24 of 29): `XAudioShutDown` (`sub_8245A4E8`, no harness: it
 releases the live engine), `sub_8245A668`, `sub_8245AFA0`,
 `XAudioLock` `sub_8245ED60` and the static initializer `sub_825DA0F0`
 (no harness either: it initializes the live API lock and registers an exit

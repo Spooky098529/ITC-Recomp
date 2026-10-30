@@ -143,6 +143,7 @@ void XAudioApiSetFrequencyRatio(PPCContext& ctx, uint8_t* base);  // sub_8245A34
 void XAudioApiGetMasteringVoice(PPCContext& ctx, uint8_t* base);  // sub_8245A568
 void XAudioApiRegisterCallback(PPCContext& ctx, uint8_t* base);   // sub_8245A5E8
 void XAudioApiCommit(PPCContext& ctx, uint8_t* base);             // sub_8245A6E8
+void XAudioApiInitialize(PPCContext& ctx, uint8_t* base);         // sub_8245A760 (sub_8245A410)
 void XAudioApiCreateSourceVoice(PPCContext& ctx, uint8_t* base);  // sub_8245A768
 void XAudioApiCreateSubmixVoice(PPCContext& ctx, uint8_t* base);  // sub_8245A7C8
 

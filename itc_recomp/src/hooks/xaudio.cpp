@@ -46,7 +46,7 @@ ITC_FLAG_BOOL(native_xaudio, true, "ITC",
               "sub_8245E6A8 and sub_8245F298, destructors sub_82460B50, sub_8245E1B8, "
               "sub_8245E7A0, sub_8245F108 and sub_8245F3A0, XAudioVoice::CreateSource "
               "sub_8245EAA0 and CreateSubmix sub_8245F3D0; the API entry points sub_82459DB0 to "
-              "sub_8245A7C8 but XAudioShutDown, with the callback's registration sub_8245A5E8 and the commit sub_8245A6E8 (under the API lock, the game's "
+              "sub_8245A7C8 but XAudioShutDown, with the callback's registration sub_8245A5E8, the commit sub_8245A6E8 and XAudioInitialize sub_8245A760 with sub_8245A410 (no adapter of its own) (under the API lock, the game's "
               "critical section taken as the original does); their "
               "calls into the recompiled objects through the translated code) natively "
               "instead of through the translated code (the same reads and writes; XAudio's two "
@@ -785,6 +785,20 @@ void XAudioApiRegisterCallback(PPCContext& ctx, uint8_t* base) {
   ctx.r3.s64 = int32_t(ctx.r3.u32);  // 0, E_FAIL or E_OUTOFMEMORY as lis/ori leave them
 }
 
+// XAudioInitialize: r3 = the parameters (sub_8245A760 sets r4 = 0 and
+// tail-calls sub_8245A410, which has no adapter: only this one reaches it in
+// play); sub_8245A410's frame below the caller's, lr the caller's.
+void XAudioApiInitialize(PPCContext& ctx, uint8_t* base) {
+  const uint32_t params = ctx.r3.u32;
+  ctx.r4.u64 = 0;
+  uint64_t r3 = 0;
+  Framed(ctx, base, 128, [&](const xa::GuestCall& call, uint32_t frame) {
+    r3 = xa::ApiInitialize(base, params, 0, frame, call);
+    return uint32_t(r3);
+  });
+  ctx.r3.u64 = r3;
+}
+
 void XAudioApiCommit(PPCContext& ctx, uint8_t* base) {
   const xa::Thread th = ThreadOf(ctx, base);
   uint64_t r3 = 0;
@@ -892,5 +906,6 @@ ITC_XAUDIO_ADAPTER(8245A0B0, XAudioApiReset)
 ITC_XAUDIO_ADAPTER(8245A568, XAudioApiGetMasteringVoice)
 ITC_XAUDIO_ADAPTER(8245A5E8, XAudioApiRegisterCallback)
 ITC_XAUDIO_ADAPTER(8245A6E8, XAudioApiCommit)
+ITC_XAUDIO_ADAPTER(8245A760, XAudioApiInitialize)
 ITC_XAUDIO_ADAPTER(8245A768, XAudioApiCreateSourceVoice)
 ITC_XAUDIO_ADAPTER(8245A7C8, XAudioApiCreateSubmixVoice)

@@ -441,5 +441,14 @@ uint64_t ApiRegisterCallback(uint8_t* base, uint64_t r3, uint64_t r4, uint64_t r
 // XAudio::Commit (sub_8245A6E8): under the API lock, E_FAIL without an
 // engine (sign-extended), else Commit's plain C++, whose r3 it returns.
 uint64_t ApiCommit(uint8_t* base, const Thread& thread, const GuestCall& call);
+// XAudioInitialize (sub_8245A760: r4 = 0, a tail call to sub_8245A410):
+// under the API lock, with an engine its slot +4 (AddRef) and 0; without,
+// the creation function at the first nonzero word of the one-word table at
+// 0x826002AC (XAudio::CreateEngine in play), called with r3 that word's
+// address, r4 the table's end, r5 the parameters (a cleared 12-byte block at
+// `frame` + 80 when `params` is 0) and r6 `allocator`; returns its r3 in
+// full. `frame` is sub_8245A410's (128 bytes).
+uint64_t ApiInitialize(uint8_t* base, uint32_t params, uint32_t allocator, uint32_t frame,
+                       const GuestCall& call);
 
 }  // namespace xaudio

@@ -1183,4 +1183,32 @@ uint64_t ApiCommit(uint8_t* base, const Thread& thread, const GuestCall& call) {
   return result;
 }
 
+uint64_t ApiInitialize(uint8_t* base, uint32_t params, uint32_t allocator, uint32_t frame,
+                       const GuestCall& call) {
+  ITC_NATIVE_RUNNING("sub_8245A410 XAudioInitialize");
+  constexpr uint32_t kCreateTable = 0x826002AC, kCreateTableEnd = 0x826002B0;
+  call(kRtlEnterCriticalSection, 0x8245A434, Args({kApiLock}));
+  const uint32_t engine = guest::LoadU32(base, kEngine);
+  if (engine != 0) {
+    call(Method(base, engine, 4), 0x8245A454, Args({engine}));  // AddRef
+    call(kRtlLeaveCriticalSection, 0x8245A45C, Args({kApiLock}));
+    return 0;
+  }
+  if (params == 0) {
+    params = frame + 80;
+    for (uint32_t i = 0; i < 12; i += 4) {
+      guest::StoreU32(base, params + i, 0);
+    }
+  }
+  uint32_t slot = kCreateTable;
+  while (slot < kCreateTableEnd && guest::LoadU32(base, slot) == 0) {
+    slot += 4;
+  }
+  call(guest::LoadU32(base, slot), 0x8245A4CC,
+       Args({slot, kCreateTableEnd, params, allocator}));
+  const uint64_t r3 = LastCallR3();
+  call(kRtlLeaveCriticalSection, 0x8245A4D8, Args({kApiLock}));
+  return r3;
+}
+
 }  // namespace xaudio

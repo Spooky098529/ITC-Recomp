@@ -1686,6 +1686,63 @@ void Making2(Context& h, uint32_t block) {
   memory::Free(timeout);
 }
 
+// XAudioInitialize (sub_8245A760 with sub_8245A410): with the mixer held
+// (MixerHeld: our output thread waits with the live engine's pointer read),
+// [kEngine] made a fake engine in the block (its vtable's slot +4 AddRef,
+// sub_8245F860, which adds one to its +4) or 0, and the creation table's
+// word (0x826002AC) the getter of +108 (sub_82379338: its r3 is the table
+// word's address, so it reads 0x82600318) in place of XAudio::CreateEngine;
+// the parameters a pointer into the block or 0 (then a block cleared on its
+// frame). Compared: the block, r3, sub_8245A410's frame's +80 to +91 and
+// the API lock's 28 bytes after. The live words put back.
+void Initialize(Context& h, uint32_t block) {
+  constexpr uint32_t kCreateTable = 0x826002AC;
+  constexpr uint32_t kApiLockBytes = 28;
+  Results results("XAudioInitialize (sub_8245A760) with sub_8245A410");
+  const PPCContext lock = CallContext(h);
+  MixerHeld mixer(h.base, lock);
+  const uint32_t live = guest::LoadU32(h.base, xa::kEngine);
+  const uint32_t live_create = guest::LoadU32(h.base, kCreateTable);
+  for (int i = 0; mixer.held && live != 0 && i < 16; i++) {
+    const bool engine = i % 2 == 0;
+    const bool params = i % 4 < 2;
+    const Random start = h.random;
+    Random random = start;
+    Outputs out[2];
+    for (int v = 0; v < 2; v++) {
+      random = start;
+      for (uint32_t k = 0; k < kBlockBytes; k += 4) {
+        Store(h.base, block + k, uint32_t(random.Next()));
+      }
+      Store(h.base, block, block + 0x100);
+      Store(h.base, block + 0x104, 0x8245F860);
+      Store(h.base, xa::kEngine, engine ? block : 0);
+      Store(h.base, kCreateTable, 0x82379338);
+      PPCContext t = CallContext(h);
+      for (uint32_t k = 4; k <= 0x200; k += 4) {
+        Store(h.base, t.r1.u32 - k, uint32_t(random.Next()));
+      }
+      t.r3.u64 = params ? block + 0x200 : 0;
+      t.r4.u64 = random.Next();
+      (v == 0 ? __imp__sub_8245A760 : hooks::XAudioApiInitialize)(t, h.base);
+      out[v].Bytes(Read(h.base, block, kBlockBytes));
+      out[v].Word(t.r3.u32);
+      out[v].Word(uint32_t(t.r3.u64 >> 32));
+      out[v].Bytes(Read(h.base, t.r1.u32 - 128 + 80, 12));
+      out[v].Bytes(Read(h.base, xa::kApiLockObject, kApiLockBytes));
+      Store(h.base, xa::kEngine, live);
+      Store(h.base, kCreateTable, live_create);
+    }
+    h.random = random;
+    results.Check(out[0], out[1],
+                  fmt::format("case {}: {}, parameters {}", i, engine ? "an engine" : "no engine",
+                              params ? "given" : "0"));
+  }
+  Store(h.base, xa::kEngine, live);
+  Store(h.base, kCreateTable, live_create);
+  results.Report();
+}
+
 }  // namespace
 
 void XAudioEngine(Context& h) {
@@ -1701,6 +1758,7 @@ void XAudioEngine(Context& h) {
   Allocators(h, block.address);
   MixAndThreads(h, block.address);
   Making2(h, block.address);
+  Initialize(h, block.address);
 }
 
 }  // namespace harness
