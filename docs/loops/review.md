@@ -25,7 +25,9 @@ When the user has reviewed a run's section, its heading gets
   node file is empty) follows the parking area's varargs call (r6-r10
   spilled as 0); `LoadSetA` and the rims not seen in the attract race
   (harness only); no frame dump (`LoadExterior` only makes the sheet and
-  queues loads: the sheet's bytes compared in the harness).
+  queues loads: the sheet's bytes compared in the harness). The
+  validation counted `sub_82295F18` (an adapter with no plain C++ of its
+  own, calling `last_error::Get`) through `sub_82296EC0`'s print.
 
 ## Run 2026-10-30 11:39 (`b7-loop-30-10-26`)
 

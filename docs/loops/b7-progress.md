@@ -23,7 +23,13 @@ file's history. What's left to see in a drive, from every run:
   `functions.md` beside SetLastError's, no flag; 4 adapters removed;
   under `--native_car_models`; left: `CarInterior::Load`,
   `CarModel::ReloadDecals`, unmapped `sub_820ED6D0` and `sub_82599C58`
-  blocking the file-loaded callbacks). Validation 1 running.
+  blocking the file-loaded callbacks). Validated (`itc_2834`, replay
+  `itc_2835` ok): 15 of 15 harness lines (`sub_82295F18`, an adapter
+  with no plain C++, through `GetLastError`'s shared print); 12 ran in
+  the race, 3 in the replay, none to drive. Migration 2 running (ready:
+  `ReloadDecals`, `CarInterior::Load`, `sub_820ED6D0`'s group,
+  `sub_82599C58`, `sub_820C3CE0`, `sub_820C4338`'s group and those under
+  `sub_820C8DE8`).
 
 ## Done
 
@@ -46,5 +52,8 @@ file's history. What's left to see in a drive, from every run:
 - After the car models' migration 1 (`itc_2833`: race 35 s, 0
   errors, car_models and last_error 0 differing): ours 3438, work left
   2959 (wrapped 103, known 472, unknown 2384).
+- After its validation (`itc_2834`, 60 s: race 6 s, 0 errors, every
+  harness 0 differing but the expected groups): ours 3438, work left
+  2959.
 
 ## Stopped
