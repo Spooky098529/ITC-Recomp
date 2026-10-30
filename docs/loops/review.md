@@ -119,6 +119,18 @@ When the user has reviewed a run's section, its heading gets
   `GarageCamera::Update` harness then compares the viewport as floats
   but the view mode (+1860), as the cameras harness does (24 cases had
   differed by NaN sign only).
+- The location screen's map (3bf92d8): `functions/location-screen.md`,
+  99 new rows (77 seen in play): the lead's "front-end menus" are one
+  career screen (save data +6108, locations 14-19): the location's
+  scenery through camera animations, its opponents posed as cars, UI
+  movies 21 and 30, XPR pictures; its state machine at +9640 of a
+  28,940-byte block at a front-end mode's +848 (which mode type isn't
+  known), 19 transitions over 11 states; a page object at `[0x82814E48]`
+  with 16 pages and 36 transitions (pages 9 and 11 call `Race::SetUp`).
+  `known-data.md` rows added (the page object, four menus, the
+  912-byte screen at `0x82814E50`, three save-data fields). Folded in:
+  the course scenery's front-end owners and `sub_822280D8`,
+  `sub_82228138` (their lead lines kept with a note); 3 leads added.
 
 ## Run 2026-10-30 01:06 (`b7-loop-29-10-26-2`)
 

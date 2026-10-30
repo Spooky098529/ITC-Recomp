@@ -64,7 +64,12 @@ file's history. What's left to see in a drive, from every run:
   finished.
 - Subsystem 3 of 3: the front-end menus (`sub_822271F8`...
   `sub_8222C300`, the readiness ranking's other top lead, 44 ready
-  groups). Mapping agent running. Left: `CameraDirector::InitStates`,
+  groups). Mapped (3bf92d8, `location-screen.md`: the lead was one
+  career screen, the player at one of six locations; 99 rows, 77 in
+  play, 32 ready groups, no stop; blocked outside by the UI movies'
+  text setters, the menu sound and input, the scene and its models,
+  the scenery's set-up and teardown, `XPR::GetTexture`). Migration 1
+  running. Left: `CameraDirector::InitStates`,
   `TvCamera::TvCamera`, `Update` and `Step`, `GarageCamera::Update`;
   then, past `UiMovies::Open` (ready), the cutscene and the director's
   `SetMode`, `Update` (`--redraw_rival_logo`'s split kept).
@@ -130,3 +135,5 @@ file's history. What's left to see in a drive, from every run:
 - After its validation (`itc_2766`, 60 s: race 13 s, 0 errors, every
   harness 0 differing but the expected groups): ours 3364, work left
   3033.
+- After the location screen's map: ours 3364, work left 3033 (wrapped
+  104, known 545, unknown 2384).
