@@ -122,6 +122,35 @@ here loses its heading.
   already listed above): `sub_82156CC0` Cutscene::Cutscene,
   `sub_821597F0` CameraDirector::Resume
 
+- The parking area, migration 1 (attract race `itc_2783`, replay
+  `itc_2784`: broke, the SDK's "BaseHeap::Release failed" twice at the
+  race-end transition ~118 s in, the intermittent error; it ran to the
+  end; `location-screen.md`; neither run goes to a parking area):
+  `sub_8228F0A0` LocationScreen::SceneryConfig,
+  `sub_82227690` LocationScreen::KindText,
+  `sub_822291E8` LocationScreen::IsPictureQueued,
+  `sub_82229108` LocationScreen::PictureA,
+  `sub_82229158` LocationScreen::PictureB,
+  `sub_82227158` LocationScreen::OnMessage14,
+  `sub_822281D8` LocationScreen::HasMoreUnlocks,
+  `sub_82227618` LocationScreen::NextUnlockEntry,
+  `sub_82227708` LocationScreen::OpponentHasCard,
+  `sub_822271F8` LocationScreen::NextResultText,
+  `sub_8222A060` LocationScreen::ShowPictures,
+  `sub_8222A150` LocationScreen::HidePictures,
+  `sub_8222AC18` LocationScreen::SetCarColor,
+  `sub_8222BFE8` LocationScreen::SetCursor,
+  `sub_8222C058` LocationScreen::ListNode,
+  `sub_8222C0C8` LocationScreen::ShowArrows,
+  `sub_822291A8` LocationScreen::RunCardMovie,
+  `sub_8222AD50` LocationScreen::Transition1,
+  `sub_8222BE60` LocationScreen::Transition18,
+  `sub_822279A8` LocationScreen::Reset,
+  `sub_82227818` LocationScreen::ResetView,
+  `sub_8222C9B0` LocationScreen::ApplyQueuedPage,
+  `sub_8222EC08` LocationScreen::UpdatePage,
+  `sub_8222F258` LocationScreen::InitStates
+
 ## Run 2026-10-30 01:06 (`b7-loop-29-10-26-2`)
 
 - The app's start-up, migration 3 (attract race `itc_2629`, replay
