@@ -54,7 +54,9 @@ file's history. What's left to see in a drive, from every run:
   and session makers, the shared loads (data tables, car parameters,
   shaders, text, font, strings, a UI movie), `BootData::Load` and
   `CreateObjects`, the loading screen's movies; `--native_data_load`;
-  frame dumps the same). Validation agent running.
+  frame dumps the same). Validated (`itc_2642`): 26 of 26 harness
+  lines, all ran in play. Migration 2 running (the replay's static
+  set-ups `sub_825D9E60`, `sub_825D9F68`, and what's left).
 
 ## Done
 
@@ -106,3 +108,5 @@ file's history. What's left to see in a drive, from every run:
 - After the data load's migration 1 (`itc_2639`: race 38 s, 0 errors,
   touched harnesses 0 differing): ours 3116, work left 3204 (wrapped
   104, known 472, unknown 2628).
+- After its validation (`itc_2642`: race 7 s, 0 errors, every harness
+  0 differing but the expected groups): ours 3116, work left 3204.
