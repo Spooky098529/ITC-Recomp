@@ -2075,6 +2075,40 @@ void ReverbApplyCases(Context& h) {
   memory::Free(params_block);
 }
 
+// ReverbCore::Init (sub_82468848) over a reverb-sized block of random words
+// (the same for both versions), r3 the core's +208; the block compared as
+// floats (Init writes the lines' fills and the filters' floats, and words
+// that are lengths, indices and pointers, none a NaN's pattern) and r3.
+void ReverbInitCases(Context& h) {
+  const uint32_t reverb_block = memory::Alloc(kReverbBytes + 128, 0);
+  if (reverb_block == 0) {
+    return;
+  }
+  const uint32_t reverb = (reverb_block + 127) & ~127u;
+  Results results("ReverbCore::Init (sub_82468848)");
+  for (int i = 0; i < 8; i++) {
+    const Random start = h.random;
+    Random random = start;
+    Outputs out[2];
+    for (int v = 0; v < 2; v++) {
+      random = start;
+      for (uint32_t k = 0; k < kReverbBytes; k += 4) {
+        Store(h.base, reverb + k, i % 2 == 0 ? uint32_t(random.Next()) : AnyFloat(random));
+      }
+      PPCContext t = CallContext(h);
+      t.r3.u64 = reverb + 16 + 208;
+      t.fpscr.loadFromHost();
+      (v == 0 ? __imp__sub_82468848 : hooks::XAudioReverbCoreInit)(t, h.base);
+      out[v].Floats(h.base, reverb, kReverbBytes / 4);
+      R3(out[v], t.r3.u64);
+    }
+    h.random = random;
+    results.Check(out[0], out[1], fmt::format("case {}", i));
+  }
+  results.Report();
+  memory::Free(reverb_block);
+}
+
 // --- The PCM codec's pass ---
 
 // PcmCodec::Process (sub_8246D860) over a PCM codec at the block (as Codec
@@ -2228,6 +2262,7 @@ void XAudioObjects(Context& h) {
   ReverbStages(h);
   ReverbCoreCases(h);
   ReverbApplyCases(h);
+  ReverbInitCases(h);
 }
 
 }  // namespace harness
