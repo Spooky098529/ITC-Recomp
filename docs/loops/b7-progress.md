@@ -11,7 +11,7 @@ file's history. What's left to see in a drive, from every run:
 - Run started 2026-10-30 01:06 on `b7-loop-29-10-26-2` (the user's
   call, 2026-10-30: this run stays on the last run's branch), from
   92ffb30; summary `b7-loop-2026-10-30-0106.md`.
-- Limit for this run: 3 subsystems; 0 taken.
+- Limit for this run: 3 subsystems; 1 taken.
 - First, a cleanup lead without mapping (not counted), the last run's
   stop: `CarSound::Part840Update`'s harness (`sub_8210ECF0`,
   `car-sounds.md`), 1 of 80 cases differing once in `itc_2559`
@@ -45,10 +45,18 @@ file's history. What's left to see in a drive, from every run:
   wrapper's lock a host recursive mutex as the memory blocks' lock,
   `Movie::Movie`, `AudioManager::Create`, the second camera class,
   `App::App`, `App::Create` and its getters; nothing ready left).
-  Validation agent running.
+  Validated (`itc_2629`, `itc_2630`): 17 of 17 harness lines; three to
+  drive. Subsystem 1 finished.
+- Subsystem 2 of 3: the game's data load at boot (`sub_82105868`,
+  `sub_82106618`, the top of `leads.md`; 10 ready groups under it).
+  Mapping agent running.
 
 ## Done
 
+- The app's start-up (subsystem 1): `app-start-up.md`, every ready
+  group, three migrations, the voice engine Dropped (the user's call);
+  `--native_app_start_up`; c9aed90..e4104fe. Validated (`itc_2594`,
+  `itc_2616`, `itc_2629`, `itc_2630`).
 - The last stop's `CarSound::Part840Update` harness (cleanup lead, not
   counted): d5cfd5c, a harness fix only (the stage lists compared by
   role); validated (`itc_2574`, `itc_2575`).
@@ -86,3 +94,5 @@ file's history. What's left to see in a drive, from every run:
 - After the start-up's migration 3 (`itc_2628`: race 38 s, 0 errors,
   touched harnesses 0 differing): ours 3090, work left 3230 (wrapped
   104, known 479, unknown 2647).
+- After its validation (`itc_2629`: race 7 s, 0 errors, every harness
+  0 differing but the expected groups): ours 3090, work left 3230.

@@ -13,6 +13,15 @@ function goes from this list when a log shows its `native running
 (game):` line (say which log in the commit). A run with nothing left
 here loses its heading.
 
+## Run 2026-10-30 01:06 (`b7-loop-29-10-26-2`)
+
+- The app's start-up, migration 3 (attract race `itc_2629`, replay
+  `itc_2630`, ok): `sub_82379350` (the app's +112 getter, no game
+  caller since `Movies::Set` reads the word itself), the `ScopedLock`
+  adapters `sub_8258E580` and `sub_8258E5B8` on the movie wrapper's
+  lock (`video-output.md`; their users run only with
+  `--play_movies_with_ffmpeg=false`)
+
 ## Run 2026-10-29 22:22 (`b7-loop-29-10-26-2`)
 
 - XAudio's objects' cleanup migration 1 (attract race `itc_2529`,

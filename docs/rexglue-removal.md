@@ -2649,6 +2649,7 @@ B7. **The game logic inside**: everything else, subsystem by subsystem,
 | 2026-10-29 | XAudio's engine and mixer (the engine's and factory's making, the processors' set-up, the mastering voice and its render driver, the stages, their callbacks and commit, the allocator; the voice lists' spin lock taken as the original does) | `xaudio-engine.md` | 47 of 47 in play (two migrations; the threads, events and semaphore through the kernel's imports as the original, the user's call) | `--native_xaudio_engine` |
 | 2026-10-29 | XAudio's factory objects (the class tables, the codecs' packet queue and the PCM and XMA codecs' slots the voices call, the output matrices' set and mix, the volume meter, the render driver's set-up, the reverb's small parts; the XMA hardware path left in `audio.md`) | `xaudio-objects.md` (with 4 rows in `xaudio.md`) | 78 of 109 in play (one migration, stopped at its validation: two destructors with no harness line; the resampler and the reverb's core ready, not taken) | `--native_xaudio_objects` |
 | 2026-10-30 | Cleanup lead, no mapping (not counted): the rest of XAudio's factory objects (the XMA codec's destructors' harness, `SetLevels` copying as words, the resampler and its kernels, `PcmCodec::Process`, the reverb's stages, core, set-up, construction and pass) | `xaudio-objects.md` | 110 of 110 in play (three migrations; stopped at the last validation: the car sounds' harness differed once) | `--native_xaudio_objects` |
+| 2026-10-30 | The app's start-up (`App::App` and `App::Create`, `App::StartUp` with the text and font set-up, the network manager's set-up, the scene target, `Billboards::Init`, `Movie::Movie` with the movie wrapper's lock a host recursive mutex, `AudioManager::Create`, `XAudioInitialize`, the second camera class; the voice engine not made, Dropped, the user's call) | `app-start-up.md` (with rows in `system-services.md`, `strings-and-font.md`, `movies.md`, `sound-cues.md`, `cameras.md`, `video-output.md`, `framework.md`) | every ready group in play (three migrations; 59 rows changed or added) | `--native_app_start_up` |
 
     The first run (2026-10-22, branch `b7-loop-test`): every harness at 0 differing, attract races at 20-21 s with no errors,
     and a race the user drove looked right. Ours went from 162 to 335 (work
@@ -4023,3 +4024,21 @@ overridden 108, Native 33, Dropped 23, never called 70, live 215.
 Imports: 186 called, 58 with a live caller. B7 (`b7_status.py`): ours
 3,031, work left 3,287 (Wrapped 104, with a row 501, no row yet 2,682),
 from 3,318.
+
+**2026-10-30, the app's start-up (branch `b7-loop-29-10-26-2`):** the
+twenty-fourth run first fixed the last stop's `CarSound::Part840Update`
+harness (the game's mixer swaps XAudio's two source-voice stage lists
+between a case's versions: compared by role), then mapped and made
+native the app's start-up (`app-start-up.md`, `--native_app_start_up`,
+`src/app_start_up/`): `App::App`, `App::Create`, `App::StartUp` and
+what they build. The voice engine (XHV, under the network manager's
+`sub_8214F6E8`) isn't made, by the user's call (2026-10-30): no reader
+of the engine runs in play once B5's `Network::Update` skips its
+per-frame users, so the set-up alone is Dropped. The movie wrapper's
+critical section is a host recursive mutex by its address, as the
+memory blocks' lock. What's left above it: `Framework::Init`'s
+services (`framework.md`). The boundary: 449 functions (916 pairs):
+overridden 108, Native 34, Dropped 26, never called 70, live 211.
+Imports: 186 called, 56 with a live caller. B7 (`b7_status.py`): ours
+3,090, work left 3,230 (Wrapped 104, with a row 479, no row yet 2,647),
+from 3,287.
