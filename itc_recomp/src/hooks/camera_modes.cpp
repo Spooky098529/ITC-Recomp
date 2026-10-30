@@ -64,7 +64,8 @@ ITC_FLAG_BOOL(native_camera_modes, true, "ITC",
               "sub_82211980 (no adapter: only Cutscene::Step's plain C++ calls it; the UI movies' "
               "Open and Delete natively where their adapters would); Cutscene::Step "
               "sub_82155A28 (no adapter: only Update's plain C++ calls it) and Update sub_821561F8 (the logo's draw "
-              "through its override, sub_82211A28)) natively instead of "
+              "through its override, sub_82211A28); the TV camera's TvCamera::TvCamera sub_82155288 "
+              "(with native atexit)) natively instead of "
               "through the translated code (the same writes; checked by "
               "--run_harnesses=camera_modes)");
 
@@ -868,6 +869,21 @@ void CameraModesStep82154808(PPCContext& ctx, uint8_t* base) {
   cm::ChaseUpdate(base, ctx.r3.u32, ctx.r1.u32 - 144, VideoOutput(ctx, base));
 }
 
+// TvCamera::TvCamera: r3 = the camera, r4 = the viewport, r5 = the vehicle;
+// r3 = the camera. The original where ChaseNative says no or without native
+// atexit (the fallback chase camera's statics).
+void CameraModesStep82155288(PPCContext& ctx, uint8_t* base) {
+  if (!ChaseNative(ctx, base) || !hooks::NativeAtexit()) {
+    __imp__sub_82155288(ctx, base);
+    return;
+  }
+  ctx.fpscr.disableFlushMode();
+  const uint32_t frame = ctx.r1.u32 - 160;
+  ChaseAtexit atexit{ctx, base, frame - 224};
+  ctx.r3.u64 = cm::TvConstruct(base, ctx.r3.u32, ctx.r4.u32, ctx.r5.u32, frame,
+                               VideoOutput(ctx, base), atexit.Call());
+}
+
 }  // namespace hooks
 
 
@@ -976,6 +992,7 @@ ITC_CAMERA_MODES(82153A50)
 ITC_CAMERA_MODES(82154D38)
 ITC_CAMERA_MODES(82153E58)
 ITC_CAMERA_MODES(82155E58)
+ITC_CAMERA_MODES(82155288)
 
 // --- The rival logo's open and close ---
 

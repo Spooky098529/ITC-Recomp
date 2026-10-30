@@ -3155,6 +3155,129 @@ void CutsceneSteps(Context& h, Random& r) {
   g_logo_draws = nullptr;
 }
 
+// --- The TV camera (batch 4 of the second migration) ---
+
+constexpr uint32_t kTvBytes = 43536;
+constexpr uint32_t kPathRecords = 0x82618D30;  // the camera paths' records (40 pointers)
+
+// A TV camera's world: the camera (+43136 its fallback chase camera), and a
+// chase camera's world for the viewport, the vehicle, its body and spec.
+struct TvWorld {
+  Block camera{kTvBytes};
+  ChaseWorld chase;
+  void Out(Outputs& out, uint8_t* base) const {
+    const uint32_t c = camera.address;
+    out.Bytes(Read(base, c, 32));
+    out.Floats(base, c + 32, 56);
+    out.Bytes(Read(base, c + 256, 96));
+    out.Floats(base, c + 352, 2);
+    out.Bytes(Read(base, c + 360, 8));
+    out.Floats(base, c + 368, 18);
+    out.Bytes(Read(base, c + 440, 43136 - 440));
+    const uint32_t s = c + 43136;
+    out.Bytes(Read(base, s, 32));
+    out.Floats(base, s + 32, 56);
+    out.Bytes(Read(base, s + 256, 96));
+    out.Floats(base, s + 352, 5);
+    out.Bytes(Read(base, s + 372, 12));
+    out.Bytes(Read(base, c + 43520, kTvBytes - 43520));
+    const uint32_t v = chase.viewport.address;
+    out.Bytes(Read(base, v, 1600));
+    out.Floats(base, v + 1600, 48);
+    out.Bytes(Read(base, v + 1792, kViewportBytes - 1792));
+    out.Float(guest::LoadU32(base, kPassNear));
+  }
+};
+
+// The camera paths' records for TvCamera::TvCamera's ranges: +4 the start's
+// section, +8 the end's (the route's mostly, now and then any).
+void TvRecords(uint8_t* base, uint32_t records, const test_route::Route& route, Random& r) {
+  for (uint32_t i = 0; i < 40; i++) {
+    const uint32_t record = records + 16 * i;
+    RandomBytes(base, record, 16, r);
+    for (const uint32_t at : {4u, 8u}) {
+      guest::StoreU32(base, record + at, r.Below(8) ? r.Below(route.sections)
+                                                    : uint32_t(r.Next()));
+    }
+    guest::StoreU32(base, kPathRecords + 4 * i, record);
+  }
+}
+
+void TvConstructs(Context& h, Random& r) {
+  if (!hooks::NativeAtexit()) {
+    ITC_LOG_WARN("harness: camera_modes: native atexit off: the TV camera's cases skipped");
+    return;
+  }
+  std::lock_guard<std::recursive_mutex> lock(c_runtime::ExitMutex());
+  const uint32_t area = memory::Alloc(kRouteArea, 0);
+  const uint32_t table = memory::Alloc(4 * test_route::kTableEntries, 0);
+  test_route::FillTable(h.base, table, area);
+  Saved saved_route(h.base, kRouteGlobal, 4);
+  Saved saved_records(h.base, kPathRecords, 160);
+  Saved seed(h.base, kSeed, 4);
+  Saved statics(h.base, kChaseStatics, kChaseStaticsBytes);
+  Saved near(h.base, kPassNear, 4);
+  Block records(40 * 16);
+  TvWorld w;
+  Results results("TvCamera::TvCamera (sub_82155288)");
+  for (int c = 0; c < 120; c++) {
+    const test_route::Route route = PathRoute(h.base, area, table, r);
+    w.chase.Randomize(h.base, r);
+    RandomBytes(h.base, w.camera.address, kTvBytes, r);
+    const uint32_t ranges = c % 10 == 0 ? 0 : c % 3 == 0 ? 29 + r.Below(12) : 1 + r.Below(40);
+    guest::StoreU32(h.base, w.camera.address + 452, ranges);
+    TvRecords(h.base, records.address, route, r);
+    uint32_t chase[kChaseStaticsBytes / 4];
+    for (auto& word : chase) {
+      word = ViewFloat(r);
+    }
+    chase[8] = r.Below(4);  // the guard (0x826D8220): its bits 1 and 2
+    const uint32_t seed_value = uint32_t(r.Next());
+    const auto route_bytes = Read(h.base, area, kRouteArea);
+    const auto camera_in = Read(h.base, w.camera.address, kTvBytes);
+    const auto viewport_in = Read(h.base, w.chase.viewport.address, kViewportBytes);
+    const auto records_in = Read(h.base, records.address, 40 * 16);
+    const auto table_in = Read(h.base, kPathRecords, 160);
+    Outputs out[2];
+    for (int v = 0; v < 2; v++) {
+      Write(h.base, area, route_bytes.data(), kRouteArea);
+      Write(h.base, w.camera.address, camera_in.data(), kTvBytes);
+      Write(h.base, w.chase.viewport.address, viewport_in.data(), kViewportBytes);
+      Write(h.base, records.address, records_in.data(), 40 * 16);
+      Write(h.base, kPathRecords, table_in.data(), 160);
+      guest::StoreU32(h.base, kRouteGlobal, area + test_route::kFile);
+      guest::StoreU32(h.base, kSeed, seed_value);
+      for (uint32_t i = 0; i < kChaseStaticsBytes / 4; i++) {
+        guest::StoreU32(h.base, kChaseStatics + 4 * i, chase[i]);
+      }
+      const uint32_t mark = exit_table::Mark(h.base);
+      PPCContext t = AlignedContext(h);
+      FillStackBytes(h.base, t.r1.u32, uint64_t(c) + 7, 2048);
+      t.r3.u64 = w.camera.address;
+      t.r4.u64 = w.chase.viewport.address;
+      t.r5.u64 = w.chase.vehicle.address;
+      (v == 0 ? Original<__imp__sub_82155288> : hooks::CameraModesStep82155288)(t, h.base);
+      w.Out(out[v], h.base);
+      out[v].Word(guest::LoadU32(h.base, kSeed));
+      out[v].Floats(h.base, kChaseStatics, 8);
+      out[v].Bytes(Read(h.base, kChaseStatics + 32, 4));
+      out[v].Floats(h.base, kChaseStatics + 36, 2);
+      exit_table::Take(h.base, mark, out[v]);
+      out[v].Word(t.r3.u32);
+      out[v].Bytes(Read(h.base, t.r1.u32 - 160 + 80, 8));
+      seed.Restore();
+      statics.Restore();
+      near.Restore();
+      saved_records.Restore();
+    }
+    results.Check(out[0], out[1], fmt::format("case {} ranges {}", c, ranges));
+  }
+  results.Report();
+  saved_route.Restore();
+  memory::Free(table);
+  memory::Free(area);
+}
+
 }  // namespace
 
 void CameraModes(Context& h) {
@@ -3180,6 +3303,7 @@ void CameraModes(Context& h) {
   IntroUpdates(h, r);
   RivalLogoOpenClose(h, r);
   CutsceneSteps(h, r);
+  TvConstructs(h, r);
 }
 
 }  // namespace harness

@@ -629,4 +629,25 @@ void RoutePoint(uint8_t* base, uint32_t out, uint32_t position, uint32_t offset,
 void PathEvaluate(uint8_t* base, uint32_t key, uint32_t out, uint32_t range, uint32_t transform,
                   double t, uint32_t sp, const c_runtime::AtexitCall& atexit);
 
+// --- The TV camera (src/camera_modes/chase.cpp, paths.cpp) ---
+
+// sub_82155288 TvCamera::TvCamera (view 4's camera, made in place by
+// CameraDirector::SetMode): +16, +20 = 0, the tracker's w words 1.0, vtable
+// 0x820093BC, +396, +412, +428 = 1.0; the four path buffers (+43016,
+// 28 bytes apart: vtable 0x82009390, +12 and +16 -1, +20 and +24 0); the
+// fallback chase camera's (+43136) +16, +20 0, its tracker's w words 1.0,
+// vtable 0x82006B24, +364 1.0; +16 the vehicle, +20 the viewport; zoom from
+// 0x82009300's angle, SetZoom, SetNear(+1868 / +1864 x zoom);
+// CameraTarget::Track; +448 = 0, +43508 (the chase camera's +372) = 2;
+// ChaseCamera::ChaseCamera(+43136, its frame 224 bytes below); then the
+// +452 route ranges (+456, 1,064 bytes apart; RouteRange::Init from the
+// camera path's record [0x82618D30 + 4 x i]: its +4 section, slice 0, to
+// its +8 section's last slice, on the stack at `frame` + 80) and twelve of
+// them's forks (RouteRange::AddBranch); +43520 = 0. Returns the camera.
+// `frame` is the original's r1 after its stwu (160 bytes); `atexit` the
+// chase camera's.
+uint32_t TvConstruct(uint8_t* base, uint32_t camera, uint32_t viewport, uint32_t vehicle,
+                     uint32_t frame, const VideoOutputCall& video_output,
+                     const c_runtime::AtexitCall& atexit);
+
 }  // namespace camera_modes

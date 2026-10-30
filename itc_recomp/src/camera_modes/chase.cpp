@@ -19,6 +19,7 @@
 #include "guest.h"
 #include "hooks/vehicle.h"
 #include "matrix_math/matrix_math.h"
+#include "track_zones/track_zones.h"
 #include "vehicle_accessors/vehicle_accessors.h"
 
 namespace camera_modes {
@@ -447,6 +448,113 @@ uint32_t ChaseConstruct(uint8_t* base, uint32_t camera, uint32_t viewport, uint3
   TargetTrack(base, tracker, Load(base, camera + 16), f - 256);
   ChaseFollow(base, camera, Lfs(base, 0x82002CBC), Lfs(base, 0x82001FBC), f - 320, video_output);
   CopyWords(base, camera + 352, Load(base, camera + 20) + 1600, 4);
+  return camera;
+}
+
+// --- The TV camera ---
+
+uint32_t TvConstruct(uint8_t* base, uint32_t camera, uint32_t viewport, uint32_t vehicle,
+                     uint32_t frame, const VideoOutputCall& video_output,
+                     const c_runtime::AtexitCall& atexit) {
+  ITC_NATIVE_RUNNING("sub_82155288 TvCamera::TvCamera");
+  const uint32_t f = frame;
+  const double one = Lfs(base, kOne);
+  Store(base, camera + 16, 0);
+  Store(base, camera + 20, 0);
+  TrackerOnes(base, camera + 32, one);
+  Store(base, camera + 0, 0x820093BC);
+  Stfs(base, camera + 396, one);
+  Stfs(base, camera + 412, one);
+  Stfs(base, camera + 428, one);
+  // The four camera path buffers (+43016, Buffer28s): no path (-1), empty.
+  for (uint32_t k = 0; k < 4; k++) {
+    const uint32_t buffer = camera + 43016 + 28 * k;
+    Store(base, buffer + 12, 0xFFFFFFFF);
+    Store(base, buffer + 0, 0x82009390);
+    Store(base, buffer + 16, 0xFFFFFFFF);
+    Store(base, buffer + 20, 0);
+    Store(base, buffer + 24, 0);
+  }
+  // The fallback chase camera's fields its constructor doesn't set first.
+  const uint32_t chase = camera + 43136;
+  Store(base, chase + 16, 0);
+  Store(base, chase + 20, 0);
+  Stfs(base, chase + 32 + 12, one);
+  Store(base, chase + 0, 0x82006B24);
+  for (uint32_t at = 28; at <= 220; at += 16) {
+    Stfs(base, chase + 32 + at, one);
+  }
+  for (uint32_t at : {252u, 268u, 284u, 300u}) {
+    Stfs(base, chase + 32 + at, one);
+  }
+  Stfs(base, chase + 364, one);
+  Store(base, camera + 16, vehicle);
+  Store(base, camera + 20, viewport);
+  // Zoom and near plane (no roll).
+  const double zoom = Zoom(base, kChaseDegrees, f + 80, f, 0x821553E0, video_output);
+  cameras::ViewportSetZoom(base, Load(base, camera + 20), zoom);
+  {
+    const uint32_t v = Load(base, camera + 20);
+    const double ratio = Fdivs(Lfs(base, v + 1868), Lfs(base, v + 1864));
+    cameras::SetNear(base, Fmuls(ratio, zoom));
+  }
+  TargetTrack(base, camera + 32, vehicle, f - 256);
+  Store(base, camera + 448, 0);
+  Store(base, camera + 43508, 2);  // the chase camera's +372 (its angle)
+  if (chase != 0) {
+    ChaseConstruct(base, chase, viewport, vehicle, f - 224, video_output, atexit);
+  }
+  // The route ranges (+456, 1,064 bytes apart, their count +452): each from
+  // its camera path's record ([0x82618D30 + 4 x i]: +4 the start's section,
+  // +8 the end's, its last slice), on the stack at f + 80; the forks to take
+  // of some of them.
+  static constexpr uint16_t k8[] = {247, 253, 258, 261, 269, 272, 277, 278, 285, 288, 280, 282};
+  static constexpr uint16_t k9[] = {181, 188, 194, 195, 205, 207, 210, 213, 217, 220, 221, 225};
+  static constexpr uint16_t k13[] = {103, 106};
+  static constexpr uint16_t k14[] = {91};
+  static constexpr uint16_t k16[] = {9, 11, 12, 15, 17, 19};
+  static constexpr uint16_t k17[] = {26};
+  static constexpr uint16_t k19[] = {2, 6};
+  static constexpr uint16_t k20[] = {152};
+  static constexpr uint16_t k21[] = {139, 142, 143, 146};
+  static constexpr uint16_t k22[] = {113, 116, 118};
+  static constexpr uint16_t k25[] = {31, 35, 37, 44, 42, 46};
+  static constexpr uint16_t k28[] = {57, 69, 71, 73, 74};
+  struct Branches {
+    uint32_t range;
+    const uint16_t* sections;
+    uint32_t count;
+  };
+  static constexpr Branches kBranches[] = {
+      {8, k8, 12},  {9, k9, 12},   {13, k13, 2}, {14, k14, 1}, {16, k16, 6}, {17, k17, 1},
+      {19, k19, 2}, {20, k20, 1}, {21, k21, 4}, {22, k22, 3}, {25, k25, 6}, {28, k28, 5},
+  };
+  if (Load(base, camera + 452) > 0) {
+    uint32_t i = 0;
+    do {
+      const uint32_t record = Load(base, 0x82618D30 + (i << 2));
+      const uint32_t range = camera + 456 + i * 1064;
+      guest::StoreU16(base, f + 82, 0);
+      guest::StoreU16(base, f + 80, uint16_t(Load(base, record + 4)));
+      guest::StoreU16(base, f + 84, uint16_t(Load(base, record + 8)));
+      const uint32_t end = Load(base, record + 8);
+      const uint32_t table = Load(base, Load(base, 0x826C5B10) + 12);
+      const uint32_t section = Load(base, table + ((end << 2) & 0x3FFFC));
+      guest::StoreU16(base, f + 86, uint16_t(guest::LoadU16(base, section) - 1));
+      track_zones::RangeInit(base, range,
+                             {guest::LoadU16(base, f + 80), guest::LoadU16(base, f + 82)},
+                             {guest::LoadU16(base, f + 84), guest::LoadU16(base, f + 86)});
+      for (const Branches& b : kBranches) {
+        if (b.range == i) {
+          for (uint32_t k = 0; k < b.count; k++) {
+            track_zones::RangeAddBranch(base, range, b.sections[k]);
+          }
+        }
+      }
+      i++;
+    } while (i < Load(base, camera + 452));
+  }
+  Store(base, camera + 43520, 0);
   return camera;
 }
 
