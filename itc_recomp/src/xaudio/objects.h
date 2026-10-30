@@ -378,6 +378,35 @@ uint64_t ReverbSetParameters(uint8_t* base, uint32_t reverb, uint32_t kind, uint
 // the original leaves it); r3 is not touched.
 double I3dl2ToNative(uint8_t* base, uint32_t in, uint32_t out, uint32_t frame);
 
+// --- The reverb's construction ---
+
+// I3dl2Params::I3dl2Params (sub_82469848): the I3DL2 side at `object`
+// (`flag` 0 when built inside Reverb::Reverb; else its vtable 0x8204B948 at
+// +0 first and ReverbCore::Init on +52): the vtable at the offset [+0]'s +4
+// holds set to 0x8204AA74; the I3DL2 defaults (room, reverb and the
+// reflections at -10000: +4, +24, +32; +8 0; the floats at 0x82000A34,
+// 0x82000A30, 0x82001BE4, 0x82002FB0, 0x8200256C, 0x82002A0C twice and
+// 0x82001FCC to +12 to +48, copied as words). `frame` is its (112 bytes):
+// its +80 gets 0. Returns `object`.
+uint64_t I3dl2ParamsConstruct(uint8_t* base, uint32_t object, uint32_t flag, uint32_t frame);
+// Reverb::Reverb (sub_82465608): the reverb at `reverb` for the descriptor
+// at `descriptor`: +4 the shared base 0x8204AA58, +8 1, +12 the
+// descriptor's +4, the vtables 0x8204AAB0 (+0) and 0x8204AA94 (+4), the
+// core (+16) 0x8204AA8C; ReverbCore::Init on +208, I3dl2Params with 0 on
+// the core (in a frame below `frame`), the core's second vtable 0x8204AA88
+// at the offset its vtable's +4 holds, ReverbCore::Defaults on the core's
+// +52; the timers +0x4BAA0 and +0x4BAA8 (64-bit) cleared. `frame` is its
+// (128 bytes): its +80 gets 0. Returns `reverb`.
+uint64_t ReverbConstruct(uint8_t* base, uint32_t reverb, uint32_t descriptor, uint32_t frame);
+// Reverb::Create (sub_82465710): 309,936 bytes from the allocator's slot
+// +20, Reverb::Reverb (in a frame below), the outer vtable's slot +28 with
+// (the reverb, the descriptor, the allocator); on success the reverb to
+// [out] and that slot's r3; on failure the inner's (+4) slot +12 and the
+// error; E_OUTOFMEMORY when nothing was allocated. `frame` is its (128
+// bytes).
+uint64_t ReverbCreate(uint8_t* base, uint32_t descriptor, uint32_t allocator, uint32_t out,
+                      uint32_t frame, const GuestCall& call);
+
 // --- The PCM codec's pass ---
 
 // PcmCodec::Process (sub_8246D860; slot +24 of 0x8204BB48): one 256-frame

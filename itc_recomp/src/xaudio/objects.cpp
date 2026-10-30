@@ -12,6 +12,7 @@
 #include "guest.h"
 #include "xaudio/engine.h"
 #include "xaudio/resampler.h"
+#include "xaudio/reverb_core.h"
 
 #include <rex/platform/fpscr.h>
 #include <rex/ppc/intrinsics.h>
@@ -1830,6 +1831,72 @@ double I3dl2ToNative(uint8_t* base, uint32_t in, uint32_t out, uint32_t frame) {
   CopyFloat(base, out + 76, in + 40);
   CopyFloat(base, out + 52, in + 44);
   return f1;
+}
+
+// --- The reverb's construction ---
+
+uint64_t I3dl2ParamsConstruct(uint8_t* base, uint32_t object, uint32_t flag, uint32_t frame) {
+  ITC_NATIVE_RUNNING("sub_82469848 I3dl2Params::I3dl2Params");
+  guest::StoreU32(base, frame + 80, 0);
+  if (flag != 0) {
+    guest::StoreU32(base, object, 0x8204B948);
+    ReverbCoreInit(base, object + 52);
+  }
+  const uint32_t offset = guest::LoadU32(base, guest::LoadU32(base, object) + 4);
+  guest::StoreU32(base, offset + object, 0x8204AA74);
+  CopyFloat(base, object + 12, 0x82000A34);
+  CopyFloat(base, object + 16, 0x82000A30);
+  guest::StoreU32(base, object + 4, uint32_t(-10000));
+  guest::StoreU32(base, object + 8, 0);
+  guest::StoreU32(base, object + 24, uint32_t(-10000));
+  CopyFloat(base, object + 20, 0x82001BE4);
+  guest::StoreU32(base, object + 32, uint32_t(-10000));
+  CopyFloat(base, object + 28, 0x82002FB0);
+  CopyFloat(base, object + 36, 0x8200256C);
+  CopyFloat(base, object + 40, 0x82002A0C);
+  CopyFloat(base, object + 44, 0x82002A0C);
+  CopyFloat(base, object + 48, 0x82001FCC);
+  return object;
+}
+
+uint64_t ReverbConstruct(uint8_t* base, uint32_t reverb, uint32_t descriptor, uint32_t frame) {
+  ITC_NATIVE_RUNNING("sub_82465608 Reverb::Reverb");
+  const uint32_t core = reverb + 16;
+  guest::StoreU32(base, reverb + 4, kObjectBaseVtable);
+  guest::StoreU32(base, reverb + 8, 1);
+  guest::StoreU32(base, reverb + 12, guest::LoadU32(base, descriptor + 4));
+  guest::StoreU32(base, reverb, 0x8204AAB0);
+  guest::StoreU32(base, reverb + 4, 0x8204AA94);
+  guest::StoreU32(base, frame + 80, 0);
+  guest::StoreU32(base, core, 0x8204AA8C);
+  ReverbCoreInit(base, core + 192);
+  I3dl2ParamsConstruct(base, core, 0, Below(base, frame, 112));
+  const uint32_t offset = guest::LoadU32(base, guest::LoadU32(base, core) + 4);
+  guest::StoreU32(base, offset + core, 0x8204AA88);
+  ReverbDefaults(base, core + 52);
+  REX_STORE_U64(reverb + 0x4BAA0, 0);
+  REX_STORE_U64(reverb + 0x4BAA8, 0);
+  return reverb;
+}
+
+uint64_t ReverbCreate(uint8_t* base, uint32_t descriptor, uint32_t allocator, uint32_t out,
+                      uint32_t frame, const GuestCall& call) {
+  ITC_NATIVE_RUNNING("sub_82465710 Reverb::Create");
+  const uint64_t object = Allocate(base, allocator, 0x4BAB0, 0x82465744, frame, call);
+  if (uint32_t(object) == 0) {
+    return kEOutOfMemory;
+  }
+  // Reverb::Reverb returns its r3 (the allocation's, all 64 bits).
+  ReverbConstruct(base, uint32_t(object), descriptor, Below(base, frame, 128));
+  const uint32_t reverb = uint32_t(object);
+  call(Method(base, reverb, 28), 0x82465790, At(frame, Args({object, descriptor, allocator})));
+  const uint64_t r3 = LastCallR3();
+  if (int32_t(r3) >= 0) {
+    guest::StoreU32(base, out, reverb);
+    return r3;
+  }
+  call(Method(base, reverb + 4, 12), 0x824657BC, At(frame, Args({object + 4})));
+  return r3;
 }
 
 // --- The PCM codec's pass ---

@@ -2109,6 +2109,155 @@ void ReverbInitCases(Context& h) {
   memory::Free(reverb_block);
 }
 
+// The reverb's construction. I3dl2Params::I3dl2Params (sub_82469848) with
+// 0 on an object in a block of random words (its vtable's +4, the offset of
+// its second vtable, anywhere in the block), or with 1 in a reverb-sized
+// block (then ReverbCore::Init on its +52); Reverb::Reverb (sub_82465608) on
+// a reverb-sized block of random words, the descriptor's +4 random;
+// Reverb::Create (sub_82465710) with a real default allocator big enough for
+// the reverb, or too small (E_OUTOFMEMORY). (Its failure path after the
+// outer vtable's slot +28 isn't reached: that slot is a stub returning 0.)
+// Compared: the blocks as floats (the I3DL2 defaults are floats, the rest
+// lengths, indices and pointers, none a NaN's pattern; for Create, exactly
+// with the pointers into the allocator as offsets), the frames' words (the
+// back chains and +80 of each frame) and r3.
+void ReverbConstructionCases(Context& h) {
+  const uint32_t reverb_block = memory::Alloc(kReverbBytes + 128, 0);
+  const uint32_t stack = memory::Alloc(kCoreStackBytes, 0);
+  const uint32_t small = memory::Alloc(0x400, 0);
+  if (reverb_block == 0 || stack == 0 || small == 0) {
+    memory::Free(reverb_block);
+    memory::Free(stack);
+    memory::Free(small);
+    return;
+  }
+  const uint32_t reverb = (reverb_block + 127) & ~127u;
+  const uint32_t sp = stack + kCoreStackTop;
+  const auto fill = [&](Random& random, uint32_t at, uint32_t bytes) {
+    for (uint32_t k = 0; k < bytes; k += 4) {
+      Store(h.base, at + k, uint32_t(random.Next()));
+    }
+  };
+  const auto frame_words = [&](Outputs& out, uint32_t frame) {
+    out.Word(guest::LoadU32(h.base, frame));
+    out.Word(guest::LoadU32(h.base, frame + 80));
+  };
+  {
+    Results results("I3dl2Params::I3dl2Params (sub_82469848)");
+    for (int i = 0; i < 24; i++) {
+      const Random start = h.random;
+      Random random = start;
+      const bool flag = i % 4 == 3;
+      Outputs out[2];
+      for (int v = 0; v < 2; v++) {
+        random = start;
+        fill(random, stack, kCoreStackBytes);
+        uint32_t object;
+        if (flag) {
+          fill(random, reverb, kReverbBytes);
+          object = reverb + 16;
+        } else {
+          fill(random, small, 0x400);
+          object = small + 0x100;
+          Store(h.base, object, small + 0x80);
+          Store(h.base, small + 0x84, 4 * random.Below(0x80));
+        }
+        PPCContext t = CallContext(h);
+        t.r1.u64 = sp;
+        t.r3.u64 = object;
+        t.r4.u64 = flag ? 1 + random.Below(0xFFFF) : 0;
+        t.fpscr.loadFromHost();
+        (v == 0 ? __imp__sub_82469848 : hooks::XAudioI3dl2ParamsConstruct)(t, h.base);
+        if (flag) {
+          out[v].Floats(h.base, reverb, kReverbBytes / 4);
+        } else {
+          out[v].Floats(h.base, small, 0x400 / 4);
+        }
+        frame_words(out[v], sp - 112);
+        R3(out[v], t.r3.u64);
+      }
+      h.random = random;
+      results.Check(out[0], out[1], fmt::format("case {} (flag {})", i, flag ? 1 : 0));
+    }
+    results.Report();
+  }
+  {
+    Results results("Reverb::Reverb (sub_82465608)");
+    for (int i = 0; i < 8; i++) {
+      const Random start = h.random;
+      Random random = start;
+      Outputs out[2];
+      for (int v = 0; v < 2; v++) {
+        random = start;
+        fill(random, stack, kCoreStackBytes);
+        fill(random, reverb, kReverbBytes);
+        fill(random, small, 0x400);
+        PPCContext t = CallContext(h);
+        t.r1.u64 = sp;
+        t.r3.u64 = reverb;
+        t.r4.u64 = small;
+        t.r5.u64 = random.Next();
+        t.fpscr.loadFromHost();
+        (v == 0 ? __imp__sub_82465608 : hooks::XAudioReverbConstruct)(t, h.base);
+        out[v].Floats(h.base, reverb, kReverbBytes / 4);
+        frame_words(out[v], sp - 128);
+        frame_words(out[v], sp - 128 - 112);
+        R3(out[v], t.r3.u64);
+      }
+      h.random = random;
+      results.Check(out[0], out[1], fmt::format("case {}", i));
+    }
+    results.Report();
+  }
+  {
+    Results results("Reverb::Create (sub_82465710), with Reverb::Reverb");
+    for (int i = 0; i < 8; i++) {
+      const Random start = h.random;
+      Random random = start;
+      const uint32_t bytes = i % 4 == 3 ? 0x1000 : kReverbBytes + 0x1000;
+      Outputs out[2];
+      for (int v = 0; v < 2; v++) {
+        random = start;
+        fill(random, stack, kCoreStackBytes);
+        fill(random, small, 0x400);
+        xa::DefaultAllocator(h.base, 0x61820006, bytes, small + 0x3FC);
+        const uint32_t allocator = guest::LoadU32(h.base, small + 0x3FC);
+        Store(h.base, small + 0x3FC, 0);
+        out[v].Word(allocator != 0);
+        if (allocator == 0) {
+          continue;
+        }
+        Fill(h.base, allocator + 28, bytes, 0x5E);
+        const uint32_t out_word = small + 0x200;
+        PPCContext t = CallContext(h);
+        t.r1.u64 = sp;
+        t.r3.u64 = small;
+        t.r4.u64 = allocator;
+        t.r5.u64 = out_word;
+        t.fpscr.loadFromHost();
+        (v == 0 ? __imp__sub_82465710 : hooks::XAudioReverbCreate)(t, h.base);
+        const uint32_t span = bytes + 28;
+        R3(out[v], t.r3.u64);
+        if (i == 0 && v == 0 && guest::LoadU32(h.base, out_word) == 0) {
+          ITC_LOG_WARN("harness: Reverb::Create's case 0 allocated nothing");
+        }
+        frame_words(out[v], sp - 128);
+        frame_words(out[v], sp - 256);
+        frame_words(out[v], sp - 256 - 112);
+        Normalized(out[v], h.base, small, 0x400, allocator, span);
+        Normalized(out[v], h.base, allocator, span, allocator, span);
+        memory::crt::XMemFree(allocator, 0x61820006);
+      }
+      h.random = random;
+      results.Check(out[0], out[1], fmt::format("case {} ({} bytes)", i, bytes));
+    }
+    results.Report();
+  }
+  memory::Free(reverb_block);
+  memory::Free(stack);
+  memory::Free(small);
+}
+
 // --- The PCM codec's pass ---
 
 // PcmCodec::Process (sub_8246D860) over a PCM codec at the block (as Codec
@@ -2263,6 +2412,7 @@ void XAudioObjects(Context& h) {
   ReverbCoreCases(h);
   ReverbApplyCases(h);
   ReverbInitCases(h);
+  ReverbConstructionCases(h);
 }
 
 }  // namespace harness

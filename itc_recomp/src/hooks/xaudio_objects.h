@@ -117,4 +117,9 @@ void XAudioReverbCoreProcess(PPCContext& ctx, uint8_t* base);  // sub_82463B90
 void XAudioReverbCoreApply(PPCContext& ctx, uint8_t* base);    // sub_82467A18
 void XAudioReverbCoreInit(PPCContext& ctx, uint8_t* base);     // sub_82468848
 
+// The reverb's construction (src/xaudio/objects.h).
+void XAudioI3dl2ParamsConstruct(PPCContext& ctx, uint8_t* base);  // sub_82469848
+void XAudioReverbConstruct(PPCContext& ctx, uint8_t* base);       // sub_82465608
+void XAudioReverbCreate(PPCContext& ctx, uint8_t* base);          // sub_82465710
+
 }  // namespace hooks

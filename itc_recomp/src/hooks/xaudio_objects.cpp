@@ -48,7 +48,9 @@ ITC_FLAG_BOOL(native_xaudio_objects, true, "ITC",
               "crossfading delay lines sub_824624F8 and sub_82463620; Reverb::SetParameters "
               "sub_82462148 under the voice lists' spin lock, taken as the original does, and "
               "I3dl2::ToNative sub_82469418; PcmCodec::Process sub_8246D860 under the voice lists' "
-              "spin lock, taken as the original does; ReverbCore::Apply sub_82467A18 and Init sub_82468848) natively instead of through the "
+              "spin lock, taken as the original does; ReverbCore::Apply sub_82467A18 and Init sub_82468848; the reverb's construction "
+              "I3dl2Params::I3dl2Params sub_82469848, Reverb::Reverb sub_82465608 and "
+              "Reverb::Create sub_82465710) natively instead of through the "
               "translated code (the same reads and writes; checked by "
               "--run_harnesses=xaudio_objects)");
 
@@ -593,6 +595,33 @@ void XAudioReverbCoreInit(PPCContext& ctx, uint8_t* base) {
   ctx.r3.u64 = xa::ReverbCoreInit(base, ctx.r3.u32);
 }
 
+// In the original's frames (112, 128 and 128 bytes), with their back chains.
+void XAudioI3dl2ParamsConstruct(PPCContext& ctx, uint8_t* base) {
+  ctx.fpscr.disableFlushMode();
+  const uint32_t object = ctx.r3.u32, flag = ctx.r4.u32;
+  Framed(ctx, base, 112, [&](const xa::GuestCall&, uint32_t frame) {
+    return xa::I3dl2ParamsConstruct(base, object, flag, frame);
+  });
+}
+
+void XAudioReverbConstruct(PPCContext& ctx, uint8_t* base) {
+  ctx.fpscr.disableFlushMode();
+  const uint64_t reverb = ctx.r3.u64;
+  const uint32_t descriptor = ctx.r4.u32;
+  Framed(ctx, base, 128, [&](const xa::GuestCall&, uint32_t frame) {
+    xa::ReverbConstruct(base, uint32_t(reverb), descriptor, frame);
+    return reverb;
+  });
+}
+
+void XAudioReverbCreate(PPCContext& ctx, uint8_t* base) {
+  ctx.fpscr.disableFlushMode();
+  const uint32_t descriptor = ctx.r3.u32, allocator = ctx.r4.u32, out = ctx.r5.u32;
+  Framed(ctx, base, 128, [&](const xa::GuestCall& call, uint32_t frame) {
+    return xa::ReverbCreate(base, descriptor, allocator, out, frame, call);
+  });
+}
+
 #define ITC_XAUDIO_KERNEL_STEP(name, function)                     \
   void name(PPCContext& ctx, uint8_t* base) {                      \
     ctx.r3.u64 = xa::function(base, ctx.r3.u32, ctx.r1.u32);       \
@@ -691,3 +720,6 @@ ITC_XAUDIO_OBJECTS_ADAPTER(82469418, XAudioI3dl2ToNative)
 ITC_XAUDIO_OBJECTS_ADAPTER(8246D860, XAudioPcmCodecProcess)
 ITC_XAUDIO_OBJECTS_ADAPTER(82467A18, XAudioReverbCoreApply)
 ITC_XAUDIO_OBJECTS_ADAPTER(82468848, XAudioReverbCoreInit)
+ITC_XAUDIO_OBJECTS_ADAPTER(82469848, XAudioI3dl2ParamsConstruct)
+ITC_XAUDIO_OBJECTS_ADAPTER(82465608, XAudioReverbConstruct)
+ITC_XAUDIO_OBJECTS_ADAPTER(82465710, XAudioReverbCreate)
