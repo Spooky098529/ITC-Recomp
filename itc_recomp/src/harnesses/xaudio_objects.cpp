@@ -2379,12 +2379,17 @@ void ReverbPassCases(Context& h) {
     h.random = random;
     results.Check(out[0], out[1], fmt::format("case {}{}", i, hold ? " (lock held)" : ""));
   };
-  // The core's frame below a caller's frame at `frame`, as ReverbCore::Process's
-  // own cases compare it.
+  // The core's frame below Reverb::Run's frame at `frame`, as
+  // ReverbCore::Process's own cases compare it, up to where ReverbCore::Apply's
+  // register saves fall when Run applies the parameters first (its frame
+  // 432 bytes below Run's, or below I3dl2::SetParameter's 192: the saves'
+  // 296 bytes at its top, from `frame` - 624 + 136 or - 432 + 136, which the
+  // plain C++ doesn't write and the core's pass leaves).
   const auto core_frame = [&](Outputs& out, uint32_t frame) {
     const uint32_t r1 = frame - kCoreFrameBytes;
     out.Bytes(Read(h.base, r1 + 4, 396));
-    out.Floats(h.base, r1 + 400, (kCoreFrameBytes - kCoreSavesBytes - 400) / 4);
+    const uint32_t saves = frame - 624 + 136;
+    out.Floats(h.base, r1 + 400, (saves - (r1 + 400)) / 4);
     out.Word(guest::LoadU32(h.base, frame + 20));
   };
   {
@@ -2398,8 +2403,9 @@ void ReverbPassCases(Context& h) {
             t.r5.u64 = i3dl2;
           },
           [&](Outputs& out, uint32_t sp) {
+            // (ToNative's +80 isn't compared: ReverbCore::Apply's register
+            // saves, which the plain C++ doesn't write, fall over it.)
             out.Bytes(Read(h.base, sp - 192 + 80, 84));
-            out.Bytes(Read(h.base, sp - 192 - 128 + 80, 8));
             out.Bytes(Read(h.base, sp - 192 - 432 + 80, 48));
           });
     }
