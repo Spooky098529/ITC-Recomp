@@ -40,7 +40,8 @@ ITC_FLAG_BOOL(native_camera_modes, true, "ITC",
               "CameraPath::OnLoaded sub_82152078 with FixKeys sub_820AC000, FixKey sub_820ABF80, "
               "FixGroup sub_820ABED8 and FixTriple sub_820ABE68 (no adapters); "
               "RivalLogo::RivalLogo sub_82211848 with InitXpr sub_82211708 (no adapter) and "
-              "RivalLogo::Play sub_82211AB0 (without --log_pause_movie); CameraTarget::Track "
+              "RivalLogo::Play sub_82211AB0 (no adapter: only Cutscene::Step's plain C++ calls it; "
+              "without --log_pause_movie); CameraTarget::Track "
               "sub_82153290; Camera::Shake sub_82152CD8 (no adapter: only ChaseCamera::Update's "
               "plain C++ calls it) with ShakeRandom sub_82152BD8 and "
               "Viewport::Offset sub_821529B0 (no adapters), Viewport::PullBack sub_82152788 (no adapter: only ChaseCamera::Update's plain C++ calls it); "
@@ -48,7 +49,7 @@ ITC_FLAG_BOOL(native_camera_modes, true, "ITC",
               "calls it), IntroCamera::IntroCamera sub_82158F70 with "
               "MakeShot sub_82154108 (no adapter; with native atexit); CameraDirector::Start "
               "sub_82152338 and Release sub_82153098; CutsceneShot::Init sub_82156B68 and Step "
-              "sub_82155800); the TV camera's RouteRange::CameraAt sub_820FE830, "
+              "sub_82155800 (no adapter: only Cutscene::Step's plain C++ calls it)); the TV camera's RouteRange::CameraAt sub_820FE830, "
               "TrackRoute::SliceFraction sub_820F9B48, TvCamera::Track sub_82156980 and, with "
               "native atexit, CameraPath::Evaluate sub_820AC248 with RouteRange::Advance "
               "sub_820FE598, Curve::Evaluate sub_820AC060, Hermite::Basis sub_82293A48, "
@@ -60,8 +61,9 @@ ITC_FLAG_BOOL(native_camera_modes, true, "ITC",
               "ViewCamera1::ViewCamera1 sub_82154A48 and ViewCamera2::ViewCamera2 sub_82154D38 "
               "(with native atexit), ViewCamera1::Update sub_82153A50 and ViewCamera2::Update "
               "sub_82153E58; IntroCamera::Update sub_82155E58; RivalLogo::Open sub_822118E0 and Close "
-              "sub_82211980 (the UI movies' Open and Delete natively where their adapters "
-              "would); Cutscene::Step sub_82155A28 and Update sub_821561F8 (the logo's draw "
+              "sub_82211980 (no adapter: only Cutscene::Step's plain C++ calls it; the UI movies' "
+              "Open and Delete natively where their adapters would); Cutscene::Step "
+              "sub_82155A28 (no adapter: only Update's plain C++ calls it) and Update sub_821561F8 (the logo's draw "
               "through its override, sub_82211A28)) natively instead of "
               "through the translated code (the same writes; checked by "
               "--run_harnesses=camera_modes)");
@@ -958,13 +960,11 @@ ITC_CAMERA_MODES(82150A10)
 ITC_CAMERA_MODES(82152E08)
 ITC_CAMERA_MODES(82152078)
 ITC_CAMERA_MODES(82211848)
-ITC_CAMERA_MODES(82211AB0)
 ITC_CAMERA_MODES(82153290)
 ITC_CAMERA_MODES(82158F70)
 ITC_CAMERA_MODES(82152338)
 ITC_CAMERA_MODES(82153098)
 ITC_CAMERA_MODES(82156B68)
-ITC_CAMERA_MODES(82155800)
 ITC_CAMERA_MODES(820FE830)
 ITC_CAMERA_MODES(820F9B48)
 ITC_CAMERA_MODES(82156980)
@@ -1123,6 +1123,4 @@ void CameraModesStep821561F8(PPCContext& ctx, uint8_t* base) {
 }  // namespace hooks
 
 ITC_CAMERA_MODES(822118E0)
-ITC_CAMERA_MODES(82211980)
-ITC_CAMERA_MODES(82155A28)
 ITC_CAMERA_MODES(821561F8)
