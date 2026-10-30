@@ -59,6 +59,22 @@ its lead) and `sub_821104D8` (the car object's makers' lead, under
 `Garage::Add`; ready itself). Nothing here needs a call the user hasn't
 made.
 
+Made native 2026-10-30 (the B7 loop's migration, `src/career/`,
+`--native_career`, harness `career`): every function seen in play here but
+`Career::SetUpEvent`, `Career::EventQuery`, `Career::EventLocation` and
+`Garage::Add` (blocked outside: the race event's lead and the car
+object's makers'). Learned on the way: none of it runs in an attract race
+(the front end and a career race's end only). The stack copies of an item
+(3,008 bytes) and the frames' running means are written where the
+originals leave them, but only the last copy of a loop (each overwrites
+the one before); the originals' callees then store their back chains and
+saved registers over parts of those frames, which native code doesn't
+(the harness leaves those words out). `Career::PickNext` is native only up
+to its gate (15 races, day 3): past it, never seen in play, it runs the
+original with its six unread callees. `Rewards::Grant` appends {0, 8,
+index}, not {kind, value, index}. `Stats::CloseDay`'s division by 0 is the
+translated code's logged trap giving 0, kept with a warning.
+
 Status:
 
 - **Native**: plain C++ in `itc_recomp/src/` that doesn't use the
