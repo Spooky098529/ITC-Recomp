@@ -31,7 +31,16 @@ file's history. What's left to see in a drive, from every run:
   network manager's set-up, the scene target, `Billboards::Init`, 5
   adapters removed; `--native_app_start_up`; replay ok, `itc_2577`).
   Validated (`itc_2594`): 15 of 15 harness lines, all ran in play.
-  Migration 2 running (`App::StartUp` and what's ready under it).
+  Migration 2 checked (427db89..a63717c: `App::StartUp` with the text
+  and font set-up, `WordVector::Fill`, `XAudioInitialize`, 6 adapters
+  removed). Its stop (`App::App` waits on the movie wrapper's critical
+  section, `MovieWrapper::MovieWrapper` `sub_82593DC0` +4 through
+  `InitializeCriticalSection`) is covered by a precedent ("Precedent
+  first": a kernel critical section a subsystem's code locks becomes a
+  host `std::mutex` for that lock, taken by every user, as
+  `Edram::Alloc` and the memory blocks' lock; the generic wrapper stays
+  recompiled for the others): migration 3 takes it so. Validation agent
+  running.
 
 ## Done
 
@@ -64,3 +73,6 @@ file's history. What's left to see in a drive, from every run:
   104, known 495, unknown 2657).
 - After its validation (`itc_2594`: race 7 s, 0 errors, every harness
   0 differing but the expected groups): ours 3064, work left 3256.
+- After the start-up's migration 2 (`itc_2615`: race 38 s, 0 errors,
+  touched harnesses 0 differing): ours 3073, work left 3247 (wrapped
+  104, known 486, unknown 2657).

@@ -45,6 +45,21 @@ When the user has reviewed a run's section, its heading gets
   with a thread). The `notify` harness now empties its listener's
   queue before its cases (the SDK's start-up notifications go to the
   first system listener, which was voice's). `sub_82459C10` Merged.
+- The app's start-up, migration 2 (427db89..a63717c; rows also in
+  `strings-and-font.md`, `movies.md`, `sound-cues.md`, `xaudio.md`).
+  For review: `App::StartUp`'s harness adds a recorder hook,
+  `hooks::g_start_up_recorder` (null outside the harness), asked first
+  by the twelve callees' adapters it reaches (in `archive_streaming.cpp`,
+  `action_mappers.cpp`, `cameras.cpp`, `mode_tick.cpp`,
+  `car_sounds.cpp`, `save_interface.cpp`, `save_data.cpp`,
+  `archive.cpp`; the `save_interface` and `save_data` adapters written
+  out instead of by their macros); the font's vertex shader compile
+  given r9 = 0, as the original leaves it after `CreateVertexDeclaration`'s
+  memcpy in play (an r9 of 3 made the stored-shader override compile
+  live); `Text::Init`, `SceneTarget::Create`, `Billboards::Init` and
+  `Network::SetUp` keep their adapters (reached through guest calls).
+  The stop on `App::App`'s movie wrapper lock answered by the host
+  mutex precedent (the lead's reading, not asked).
 
 ## Run 2026-10-29 22:22 (`b7-loop-29-10-26-2`)
 
