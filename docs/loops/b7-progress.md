@@ -10,7 +10,7 @@ file's history. What's left to see in a drive, from every run:
 
 - Run started 2026-10-30 11:39 on `b7-loop-30-10-26`, from e320bad;
   summary `b7-loop-2026-10-30-1139.md`.
-- Limit for this run: 3 subsystems; 2 taken.
+- Limit for this run: 3 subsystems; 3 taken.
 - Subsystem 1 of 3: the race event (`sub_82140340`...`sub_82144E58`,
   the top of `leads.md`). Mapped (84e5334, `race-event.md`, 102 rows,
   37 in play, 12 ready groups, no stop; nothing outside blocks it).
@@ -59,13 +59,22 @@ file's history. What's left to see in a drive, from every run:
   `SetMode`, `OnRaceStart`, `Resume`, `Update` (run on logic passes by
   `--redraw_rival_logo`'s wrapper, its split kept); 11 adapters
   removed; 87 of 90 in play ours; nothing ready left, `CourseView::Draw`
-  waits on the scenery). Validation running. Left: `CameraDirector::InitStates`,
+  waits on the scenery). Validated (`itc_2766` at 60 s, replay
+  `itc_2767` ok): 17 of 17 harness lines; 2 more to drive. Subsystem 2
+  finished.
+- Subsystem 3 of 3: the front-end menus (`sub_822271F8`...
+  `sub_8222C300`, the readiness ranking's other top lead, 44 ready
+  groups). Mapping agent running. Left: `CameraDirector::InitStates`,
   `TvCamera::TvCamera`, `Update` and `Step`, `GarageCamera::Update`;
   then, past `UiMovies::Open` (ready), the cutscene and the director's
   `SetMode`, `Update` (`--redraw_rival_logo`'s split kept).
 
 ## Done
 
+- The camera modes (subsystem 2): `camera-modes.md`, 87 of 90 in play,
+  three migrations, with `UiMovies::Open` and `Delete`;
+  `--native_camera_modes`; 5a1babc..d71eff5. Validated (`itc_2732`,
+  `itc_2750`, `itc_2766`).
 - `Career::SetUpEvent` (cleanup lead, not counted): with `Garage::Add`
   and `sub_821104D8`, 5 adapters removed; `--native_career`;
   3f8fa4b..8267f2d. Validated (`itc_2692`, `itc_2693`).
@@ -118,3 +127,6 @@ file's history. What's left to see in a drive, from every run:
 - After the camera modes' migration 3 (`itc_2765`: race 26 s, 0
   errors, camera_modes and cameras 0 differing): ours 3364, work left
   3033 (wrapped 104, known 468, unknown 2461).
+- After its validation (`itc_2766`, 60 s: race 13 s, 0 errors, every
+  harness 0 differing but the expected groups): ours 3364, work left
+  3033.

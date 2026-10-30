@@ -2658,6 +2658,7 @@ B7. **The game logic inside**: everything else, subsystem by subsystem,
 | 2026-10-30 | The game's data load at boot (`BootData::Load` and `CreateObjects`; the save defaults' bit sets, the race data, input recordings and replay objects with their records and the replay's static set-ups; the loading screen's movies; shared loads under their files' flags: the data tables, car parameters, shaders, text, font, strings, a UI movie) | `data-load.md` (with rows in `data-tables.md`, `car-specs.md`, `models.md`, `strings-and-font.md`, `files-and-saves.md`, `ui-movies-game.md`) | every function seen in play (two migrations) | `--native_data_load` |
 | 2026-10-30 | The career (the player's items and stats over the save data: the win, loss and outcome records, the results and day logs, the garage list, the conditions and rewards, the race result's stats, the progress after a race and the next day; `Career::PickNext` up to its gate) | `career.md` | 49 of 53 in play (one migration; the rest waits on the race event and the car objects' makers) | `--native_career` |
 | 2026-10-30 | The race event (`RaceEvent::Make` and `Init` with the event pools and groups, `Destroy`, the refreshes for the career's event queries, the placements of opponents unlocked during a race and the section rival, the front end's `GroupItem`, `Items::Available`; `EventCondition::Met` with 60 of its 61 kind tests, the unlock states), with the career's `EventQuery`, `EventLocation` and `DayBlock::BestStreak` | `race-event.md` | 100 of 102 (one migration; `EventCondition::Power`, kind 40, waits on the power curve and is called through a guest call at the original's depth; `sub_82142868` Merged) | `--native_race_event` |
+| 2026-10-30 | The camera modes (the race mode's camera director, its six views' cameras: chase, two in-car, the start's look at the racers, the TV camera of replays and attract races with its path curves, the scripted cutscene with the rival logo; the camera animations, the garage camera), with `UiMovies::Open` and `Delete` | `camera-modes.md` | 87 of 90 in play (three migrations; `CameraDirector::Update` stays Wrapped by `--redraw_rival_logo`, which runs its native form on logic passes; `CourseView::Draw` waits on the scenery) | `--native_camera_modes` (with `--native_ui_movies_game`) |
 
     The first run (2026-10-22, branch `b7-loop-test`): every harness at 0 differing, attract races at 20-21 s with no errors,
     and a race the user drove looked right. Ours went from 162 to 335 (work
@@ -4095,3 +4096,21 @@ functions (916 pairs): overridden 108, Native 34, Dropped 26, never
 called 70, live 211. Imports: 186 called, 56 with a live caller. B7
 (`b7_status.py`): ours 3,271, work left 3,126 (Wrapped 104, with a row
 472, no row yet 2,550), from 3,165.
+
+**2026-10-30, the camera modes (branch `b7-loop-30-10-26`):** the
+twenty-fifth run's second subsystem, mapped and made native in three
+migrations (`camera-modes.md`, `--native_camera_modes`,
+`src/camera_modes/`): the camera director at the race mode's +10512
+and its six views' cameras, 87 of the 90 functions seen in play, with
+`UiMovies::Open` and `Delete` (`ui-movies-game.md`). Two of its
+functions were split across subagents (the 4,907-line cutscene
+constructor, whose 30 scripts are tables read from the generated code;
+the TV camera's update). `CameraDirector::Update` stays Wrapped:
+`--redraw_rival_logo`'s wrapper runs the native form on logic passes.
+`CourseView::Draw` (`sub_822282E8`) waits on the course scenery. The
+user's call this subsystem: all harnesses outgrew `attract_race.sh 40`,
+so validation runs `attract_race.sh 60`. The boundary: 449 functions
+(916 pairs): overridden 108, Native 34, Dropped 26, never called 70,
+live 211. Imports: 186 called, 56 with a live caller. B7
+(`b7_status.py`): ours 3,364, work left 3,033 (Wrapped 104, with a row
+468, no row yet 2,461), from 3,123.

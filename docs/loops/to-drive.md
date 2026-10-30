@@ -117,6 +117,11 @@ here loses its heading.
   `sub_82211980` RivalLogo::Close, `sub_821561F8` Cutscene::Update,
   `sub_82155A28` Cutscene::Step
 
+- The camera modes, migration 3 (attract race `itc_2766`, replay
+  `itc_2767`, ok; the rest of this migration's unseen functions are
+  already listed above): `sub_82156CC0` Cutscene::Cutscene,
+  `sub_821597F0` CameraDirector::Resume
+
 ## Run 2026-10-30 01:06 (`b7-loop-29-10-26-2`)
 
 - The app's start-up, migration 3 (attract race `itc_2629`, replay
