@@ -2448,6 +2448,164 @@ void RoutePaths(Context& h, Random& r) {
   memory::Free(area);
 }
 
+// --- The views' cameras (batch 5): the chase camera ---
+
+constexpr uint32_t kChaseStatics = 0x826D8200;  // its two vectors, guard, pull and speed
+constexpr uint32_t kChaseStaticsBytes = 0x2C;
+constexpr uint32_t kPassNear = 0x826BAC00 + 384;
+
+// A chase camera's world: the camera (+16 the vehicle, +20 the viewport),
+// the viewport, the vehicle with its body and spec object.
+struct ChaseWorld {
+  Block camera{512}, viewport{kViewportBytes}, vehicle{6272}, body{512}, object{2048};
+  Block vectors{128};
+  void Randomize(uint8_t* base, Random& r) {
+    RandomFloats(base, camera.address + 32, 88, r);
+    RandomBytes(base, camera.address + 256, 96, r);
+    RandomFloats(base, camera.address + 352, 7, r);
+    guest::StoreU32(base, camera.address + 372, r.Below(6));
+    guest::StoreU32(base, camera.address + 376, uint32_t(r.Next()));
+    guest::StoreU32(base, camera.address + 380, r.Below(2) ? 0 : uint32_t(r.Next()) | 1);
+    RandomBytes(base, viewport.address, kViewportBytes, r);
+    RandomFloats(base, viewport.address + 1600, 48, r);
+    guest::StoreU32(base, viewport.address + 1856, OrdinaryFloat(r, 4.0));
+    guest::StoreU32(base, viewport.address + 1864, r.Below(8) ? OrdinaryFloat(r, 4.0)
+                                                               : RandomFloat(r));
+    guest::StoreU32(base, viewport.address + 1868, r.Below(8) ? OrdinaryFloat(r, 4.0)
+                                                               : RandomFloat(r));
+    RandomFloats(base, vehicle.address + 1216, 4, r);
+    RandomFloats(base, vehicle.address + 1584, 4, r);
+    RandomBytes(base, vehicle.address + 5232, 96, r);
+    guest::StoreU32(base, vehicle.address + 48, r.Below(10) ? OrdinaryFloat(r, 90.0)
+                                                            : RandomFloat(r));
+    guest::StoreU32(base, vehicle.address + 336, body.address);
+    guest::StoreU32(base, vehicle.address + 5712, object.address);
+    // The body's rotation: mostly a unit quaternion near the last one.
+    RandomFloats(base, body.address + 80, 4, r);
+    if (r.Below(4)) {
+      for (uint32_t i = 0; i < 4; i++) {
+        guest::StoreU32(base, body.address + 80 + 4 * i, OrdinaryFloat(r, 1.0));
+      }
+    }
+    RandomFloats(base, body.address + 288, 16, r);
+    const uint32_t spec = object.address + 1888;
+    guest::StoreU32(base, spec + 76, r.Below(8) ? 1500 + r.Below(800) : uint32_t(r.Next()));
+    guest::StoreU32(base, spec + 80, r.Below(8) ? 3500 + r.Below(1500) : uint32_t(r.Next()));
+    RandomFloats(base, vectors.address, 32, r);
+  }
+  void Out(Outputs& out, uint8_t* base) const {
+    out.Bytes(Read(base, camera.address, 32));
+    out.Floats(base, camera.address + 32, 56);
+    out.Bytes(Read(base, camera.address + 256, 96));
+    out.Floats(base, camera.address + 352, 5);
+    out.Bytes(Read(base, camera.address + 372, 12));
+    out.Bytes(Read(base, viewport.address, 1600));
+    out.Floats(base, viewport.address + 1600, 48);
+    out.Bytes(Read(base, viewport.address + 1792, kViewportBytes - 1792));
+    out.Float(guest::LoadU32(base, kPassNear));
+  }
+};
+
+void NativePlace(PPCContext& t, uint8_t* base) { hooks::CameraModesStep82153478(t, base); }
+void NativeFollow(PPCContext& t, uint8_t* base) { hooks::CameraModesStep82153640(t, base); }
+
+void ChaseCameras(Context& h, Random& r) {
+  if (!hooks::NativeAtexit()) {
+    ITC_LOG_WARN("harness: camera_modes: native atexit off: the chase camera's cases skipped");
+    return;
+  }
+  std::lock_guard<std::recursive_mutex> lock(c_runtime::ExitMutex());
+  enum Kind { kPlace, kFollow, kConstruct, kUpdate };
+  const struct {
+    const char* name;
+    GuestFunction recompiled, native;
+    Kind kind;
+  } kFunctions[] = {
+      {"ChaseCamera::Place (sub_82153478)", Original<__imp__sub_82153478>, NativePlace, kPlace},
+      {"ChaseCamera::Follow (sub_82153640)", Original<__imp__sub_82153640>, NativeFollow,
+       kFollow},
+      {"ChaseCamera::ChaseCamera (sub_82154548)", Original<__imp__sub_82154548>,
+       hooks::CameraModesStep82154548, kConstruct},
+      {"ChaseCamera::Update (sub_82154808)", Original<__imp__sub_82154808>,
+       hooks::CameraModesStep82154808, kUpdate},
+  };
+  Saved seed(h.base, kSeed, 4);
+  Saved shake(h.base, kShakeStatics, 8);
+  Saved statics(h.base, kChaseStatics, kChaseStaticsBytes);
+  Saved near(h.base, kPassNear, 4);
+  ChaseWorld w;
+  for (const auto& f : kFunctions) {
+    Results results(f.name);
+    for (int c = 0; c < 200; c++) {
+      w.Randomize(h.base, r);
+      const auto camera_in = Read(h.base, w.camera.address, 512);
+      const auto viewport_in = Read(h.base, w.viewport.address, kViewportBytes);
+      // No vehicle now and then (Place and Follow check; Update's shake reads
+      // it regardless).
+      const uint32_t the_vehicle =
+          c % 20 == 0 && (f.kind == kPlace || f.kind == kFollow) ? 0 : w.vehicle.address;
+      const double rate = r.Below(4) ? 0.07 : double(std::bit_cast<float>(ViewFloat(r)));
+      const double least = r.Below(4) ? 0.1 : double(std::bit_cast<float>(ViewFloat(r)));
+      const uint32_t seed_value = uint32_t(r.Next());
+      const uint32_t shake_step = ViewFloat(r);
+      const uint32_t shake_guard = uint32_t(r.Next());
+      uint32_t chase[kChaseStaticsBytes / 4];
+      for (auto& word : chase) {
+        word = ViewFloat(r);
+      }
+      chase[8] = r.Below(4);  // the guard (0x826D8220): its bits 1 and 2
+      Outputs out[2];
+      for (int v = 0; v < 2; v++) {
+        Write(h.base, w.camera.address, camera_in.data(), 512);
+        Write(h.base, w.viewport.address, viewport_in.data(), kViewportBytes);
+        if (f.kind != kConstruct) {
+          guest::StoreU32(h.base, w.camera.address + 16, the_vehicle);
+          guest::StoreU32(h.base, w.camera.address + 20, w.viewport.address);
+        }
+        guest::StoreU32(h.base, kSeed, seed_value);
+        guest::StoreU32(h.base, kShakeStatics, shake_step);
+        guest::StoreU32(h.base, kShakeStatics + 4, shake_guard);
+        for (uint32_t i = 0; i < kChaseStaticsBytes / 4; i++) {
+          guest::StoreU32(h.base, kChaseStatics + 4 * i, chase[i]);
+        }
+        const uint32_t mark = exit_table::Mark(h.base);
+        PPCContext t = AlignedContext(h);
+        FillStackBytes(h.base, t.r1.u32, uint64_t(c) + 1, 2048);
+        t.r3.u64 = w.camera.address;
+        if (f.kind == kPlace) {
+          t.r4.u64 = w.vectors.address;
+          t.r5.u64 = w.vectors.address + 16;
+          t.r6.u64 = w.vectors.address + 32;
+          t.r7.u64 = w.vectors.address + 48;
+        } else if (f.kind == kFollow) {
+          t.f1.f64 = rate;
+          t.f2.f64 = least;
+        } else if (f.kind == kConstruct) {
+          t.r4.u64 = w.viewport.address;
+          t.r5.u64 = w.vehicle.address;
+        }
+        (v == 0 ? f.recompiled : f.native)(t, h.base);
+        w.Out(out[v], h.base);
+        out[v].Word(guest::LoadU32(h.base, kSeed));
+        out[v].Bytes(Read(h.base, kShakeStatics, 8));
+        out[v].Floats(h.base, kChaseStatics, 8);
+        out[v].Bytes(Read(h.base, kChaseStatics + 32, 4));
+        out[v].Floats(h.base, kChaseStatics + 36, 2);
+        exit_table::Take(h.base, mark, out[v]);
+        if (f.kind == kConstruct) {
+          out[v].Word(t.r3.u32);
+        }
+        seed.Restore();
+        shake.Restore();
+        statics.Restore();
+        near.Restore();
+      }
+      results.Check(out[0], out[1], fmt::format("case {} vehicle {:X}", c, the_vehicle));
+    }
+    results.Report();
+  }
+}
+
 }  // namespace
 
 void CameraModes(Context& h) {
@@ -2468,6 +2626,7 @@ void CameraModes(Context& h) {
   DirectorStartRelease(h, r);
   Cutscenes(h, r);
   RoutePaths(h, r);
+  ChaseCameras(h, r);
 }
 
 }  // namespace harness

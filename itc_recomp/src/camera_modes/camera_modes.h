@@ -380,6 +380,63 @@ void CutsceneInit(uint8_t* base, uint32_t shot, uint32_t entry, uint32_t frame,
 uint32_t CutsceneStep(uint8_t* base, uint32_t shot, uint32_t out, uint32_t frame,
                       const std::function<void(uint32_t object)>& camera_original, double* f1);
 
+// --- The views' cameras (src/camera_modes/chase.cpp) ---
+// `frame` is each original's r1 after its stwu; the callees' frames below
+// it, as the originals make them.
+
+// The video output (the display's width at +296): [0x8266D088]'s vtable
+// slot 7, then that object's slot 3, guest calls the adapter makes from the
+// calling original's `frame` (its r1), with return addresses `back` and
+// `back` + 16.
+using VideoOutputCall = std::function<uint32_t(uint32_t frame, uint32_t back)>;
+
+// Whether Camera::ZoomFromFov's native form stands in for the chase
+// camera's two angles (0x82009300's and 0x82000D44's): its tan's checks.
+bool ChaseReady(uint8_t* base);
+// sub_82153478 ChaseCamera::Place: the viewport's +1680 = `eye`, +1696 =
+// `target`, +1712 = `up`, +1744 and +1664 = `look` (four words each); +368 =
+// 0.0; with a vehicle (+16): CameraTarget::Track, the tracker's rotation
+// (+224) normalized (the vector unit) and kept at +240, the viewport's
+// +1696 = (0, 0, 0, 1) and its y += the float at 0x820029F0 (1.3), the track
+// position's section and slice (+260, +262) into +376 and +378. `frame`:
+// 112 bytes.
+void ChasePlace(uint8_t* base, uint32_t camera, uint32_t eye, uint32_t target, uint32_t up,
+                uint32_t look, uint32_t frame);
+// sub_82153640 ChaseCamera::Follow: with a vehicle (+16): CameraTarget::Track;
+// zoom from 55 degrees (0x82000D44) at the display's width, SetZoom,
+// SetNear(+1868 / +1864 x zoom), SetRoll(0.0); the turn's change since the
+// last update (x through +160 and through +96, their dot product) picks the
+// rate (1.0 or the float at 0x82001BE0 by whether (dot < 0) dot^4 is 0) x
+// `rate`, at least `least`; the rotation (+224) blended by it from the last
+// (+240) and normalized; the eye = the target's offset (+1664) about the
+// tracked point (+64, Matrix::MultiplyTranslation of the turn +96) plus
+// +1680 less +1664 turned by the rotation (Quat::Rotate), w 1.0; the target
+// = +1696 through the same matrix; up (+1632) = +1712, +1648 = the
+// tracker's position. `frame`: 320 bytes.
+void ChaseFollow(uint8_t* base, uint32_t camera, double rate, double least, uint32_t frame,
+                 const VideoOutputCall& video_output);
+// sub_82154548 ChaseCamera::ChaseCamera: the tracker's w words 1.0, vtable
+// 0x82006B24, +364 1.0, +16 the vehicle, +20 the viewport; the eye's and
+// target's offsets from the car's spec block (sub_820C4550 of +5712: its
+// +76 and +80 halved, x the float at 0x820029D8, the angle from the table
+// at 0x8200930C by the word at +372, in degrees: sin and cos) on the stack;
+// the statics (guard 0x826D8220: 0x826D8210 = (0, 1, 0, 1), atexit
+// 0x825DB100; 0x826D8200 = (0x8200295C's, 0x82008290's, 0, 1), atexit
+// 0x825DB0F8); zoom from 0x82009300's angle, SetZoom, SetNear, SetRoll;
+// ChasePlace, CameraTarget::Track, ChaseFollow(0x82002CBC's, 0x82001FBC's);
+// +352 = the eye. Returns the camera. `frame`: 224 bytes.
+uint32_t ChaseConstruct(uint8_t* base, uint32_t camera, uint32_t viewport, uint32_t vehicle,
+                        uint32_t frame, const VideoOutputCall& video_output,
+                        const c_runtime::AtexitCall& atexit);
+// sub_82154808 ChaseCamera::Update (vtable slot 0): ChaseFollow, Camera::Shake;
+// the pull back (0x826D8224) stepped by the speed's change (Vehicle::
+// GetSpeedKmh against 0x826D8228, which keeps it) and clamped,
+// Viewport::PullBack by (0, 0, it); with +380 set, the eye moved along the
+// view's line (by 0x820093B0's and 0x82002CAC's floats) and +380 = 0; +352
+// = the eye. `frame`: 144 bytes.
+void ChaseUpdate(uint8_t* base, uint32_t camera, uint32_t frame,
+                 const VideoOutputCall& video_output);
+
 // --- The TV camera's route and paths (src/camera_modes/paths.cpp) ---
 // `sp` is the caller's r1: each function's frame is below it by the
 // original's size, its locals written there as the original writes them.
