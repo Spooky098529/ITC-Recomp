@@ -242,5 +242,6 @@ void DataLoad(Context& h);
 void Career(Context& h);
 void RaceEvent(Context& h);
 void CameraModes(Context& h);
+void LocationScreen(Context& h);
 
 }  // namespace harness

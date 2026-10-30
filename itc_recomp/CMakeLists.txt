@@ -227,6 +227,8 @@ set(ITC_SOURCES
     src/camera_modes/director.cpp
     src/camera_modes/cutscene.cpp
     src/camera_modes/cutscene_scripts.cpp
+    src/hooks/location_screen.cpp
+    src/location_screen/helpers.cpp
     src/save_interface/save_interface.cpp
     src/save_interface/save_layer.cpp
     src/hooks/file_layer.cpp
@@ -394,6 +396,7 @@ set(ITC_SOURCES
     src/harnesses/career.cpp
     src/harnesses/race_event.cpp
     src/harnesses/camera_modes.cpp
+    src/harnesses/location_screen.cpp
     src/harnesses/car_sounds.cpp
     src/harnesses/x3daudio.cpp
     src/harnesses/xaudio.cpp
