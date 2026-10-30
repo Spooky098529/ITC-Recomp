@@ -25,7 +25,9 @@ file's history. What's left to see in a drive, from every run:
   harness 0 outside the expected groups; `CarSounds::StopAll` already
   on the drive list.
 - Subsystem 1 of 3: the app's start-up (`sub_82106548`, the top of
-  `leads.md`). Mapping agent running.
+  `leads.md`). Mapped (d5647db, `app-start-up.md`, 30 rows, 18 ready
+  groups); the map's stop answered: the voice engine (XHV, `Voice::Init` `sub_8257B7A8` under the network manager's `sub_8214F6E8`): not made; its users seen in play (`sub_8214FA78` every frame, the UI's calls through the engine's +52, the release `sub_8214F690`) skipped natively with what they'd read with no headset (no talkers, no data), Status Dropped (the user's call, 2026-10-30, "Map Xbox features, don't port"). Migration agent
+  running.
 
 ## Done
 

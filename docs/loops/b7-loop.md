@@ -532,6 +532,10 @@ Calls so far for decisions the loop meets often:
 - B7 changes no game behavior: stack leftovers and unwritten words are
   copied as the original leaves them (track zones, the race overlays'
   machine).
+- Xbox features a subsystem sets up for its own use (voice, XHV): not
+  made, their game-level users seen in play skipped natively with what
+  they'd read with the feature absent, Status Dropped (the voice
+  engine under the app's start-up, 2026-10-30).
 - The C runtime's per-thread data over the kernel's TLS (`_mtinit`
   `sub_825AA708`, `_getptd` and the rest in `c-runtime.md`'s "Not
   here"): left for the core, not taken (2026-10-25). Only when it

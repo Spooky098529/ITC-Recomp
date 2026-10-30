@@ -23,6 +23,16 @@ When the user has reviewed a run's section, its heading gets
   pointers as tokens (the call's next list, the other one) instead of
   addresses, following the XAudio harnesses' `LockWords` (fa8dcc1). No
   code change; the row's note says so.
+- The app's start-up, map (d5647db, `app-start-up.md`, 30 rows;
+  `sub_822A8980` moved from `functions.md`; `known-data.md`: the app's
+  interface at `0x8266D088`, `0x826BABA0` and `0x8266D084`, before
+  "probably the scene's render manager", the display's tiling block,
+  the billboards' vertex declaration). For review: `Voice::Init`'s row
+  in `system-services.md` says "per remote talker (none)", but 8 remote
+  talkers are set up at boot (left as it was, noted in `sub_8257F388`'s
+  row); `ActionMappers::Init` is called with r3 = app + 16, which
+  doesn't match its row ("the input manager"), not checked. The call
+  asked: the voice engine (XHV, `Voice::Init` `sub_8257B7A8` under the network manager's `sub_8214F6E8`): not made; its users seen in play (`sub_8214FA78` every frame, the UI's calls through the engine's +52, the release `sub_8214F690`) skipped natively with what they'd read with no headset (no talkers, no data), Status Dropped (the user's call, 2026-10-30, "Map Xbox features, don't port").
 
 ## Run 2026-10-29 22:22 (`b7-loop-29-10-26-2`)
 
