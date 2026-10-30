@@ -27,6 +27,17 @@ When the user has reviewed a run's section, its heading gets
   include vtable slots (`RetirePacket` slot +92, `SubmitPacket` and
   others), uncalled in an attract race by a counter; a recompiled path
   through the vtable (menus) would run the original.
+- XAudio's objects, cleanup migration 2 (187ea5d..ea486dc): the reverb
+  core (`src/xaudio/reverb_core.cpp`; the float helpers shared in
+  `src/xaudio/ppc_float.h`), `Reverb::SetParameters` and
+  `PcmCodec::Process` taking the voice-list spin lock inline (the
+  2026-10-29 call), `PcmCodec::Process` calling the native targets of
+  its vtable calls directly (others and the loop-end callback through
+  guest calls), `I3dl2::ToNative` over `c_runtime::Log10`. For review:
+  the native core doesn't write its 296-byte register-save area or the
+  `stwu` back-chain word below the stack pointer, and the native math
+  doesn't write `log`'s scratch words (as with `FilterCoefficient`'s
+  `pow` and `cos`); the harness doesn't compare them.
 
 ## Run 2026-10-29 15:44 (`b7-loop-29-10-26`)
 
