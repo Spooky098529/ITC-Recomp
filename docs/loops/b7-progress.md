@@ -28,10 +28,15 @@ file's history. What's left to see in a drive, from every run:
   121,200-byte frame in guest memory, `Garage::Add` and
   `Car::SetModelAndClass` `sub_821104D8` (ready, from the car objects'
   makers' lead); 5 adapters removed; no new flag; nothing ready left in
-  `career.md`). Validation running.
+  `career.md`). Validated (`itc_2692`, replay `itc_2693`, broke on the
+  intermittent SDK heap error, ran to the end): 8 of 8 harness lines; 4
+  ran in the replay, 4 to drive.
 
 ## Done
 
+- `Career::SetUpEvent` (cleanup lead, not counted): with `Garage::Add`
+  and `sub_821104D8`, 5 adapters removed; `--native_career`;
+  3f8fa4b..8267f2d. Validated (`itc_2692`, `itc_2693`).
 - The race event (subsystem 1): `race-event.md`, 100 of 102, one
   migration; `--native_race_event`; 6cf1882. Validated (`itc_2673`,
   `itc_2676`).
@@ -61,3 +66,6 @@ file's history. What's left to see in a drive, from every run:
 - After the cleanup's migration (`itc_2691`: race 37 s, 0 errors,
   career and race_event 0 differing): ours 3274, work left 3123
   (wrapped 104, known 470, unknown 2549).
+- After its validation (`itc_2692`: race 5 s after the harnesses, 0
+  errors, every harness 0 differing but the expected groups): ours
+  3274, work left 3123.

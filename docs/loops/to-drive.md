@@ -97,6 +97,14 @@ here loses its heading.
   `sub_82111650` Career::EventLocation,
   `sub_82110588` DayBlock::BestStreak
 
+- `Career::SetUpEvent`'s cleanup (attract race `itc_2692`, replay
+  `itc_2693`: broke, the SDK's "BaseHeap::Release failed because
+  address is not a region start" three times at the race-end
+  transition ~118 s in, the intermittent error seen before; it ran to
+  the end; `career.md`): `sub_82116CE0` Garage::Add,
+  `sub_821104D8` Car::SetModelAndClass, `sub_821104B0`
+  Car::SpecWord744, `sub_821154E0` Garage::InsertCar
+
 ## Run 2026-10-30 01:06 (`b7-loop-29-10-26-2`)
 
 - The app's start-up, migration 3 (attract race `itc_2629`, replay
