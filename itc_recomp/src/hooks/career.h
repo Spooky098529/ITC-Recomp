@@ -1,6 +1,7 @@
 // The career's register steps (src/career/, docs/functions/career.md),
 // shared by the adapters (src/hooks/career.cpp, behind --native_career) and
-// the harness (without the flag). Each leaves r3 as the original does and
+// the harness (without the flag; for the functions whose adapters went, only
+// the harness). Each leaves r3 as the original does and
 // turns flush-to-zero off first where floats are met.
 
 #pragma once

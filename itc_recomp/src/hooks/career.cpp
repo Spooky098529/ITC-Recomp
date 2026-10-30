@@ -33,7 +33,9 @@ ITC_FLAG_BOOL(native_career, true, "ITC",
               "Items::AllWonKind4Stage2 sub_82111940, Items::AllWonKind4Stage3 sub_821119D0, "
               "Items::AllWonKind5 sub_82111A60 and Locations::Unlock sub_82111D20 and "
               "Unlock2 sub_82111D98 (no adapters); Career::NextDay sub_82116AF0 with "
-              "Stats::CloseDay sub_82113898 (no adapter)) natively instead of through the translated code (the same writes; "
+              "Stats::CloseDay sub_82113898 (no adapter); no adapters either for RunningMean::Merge, "
+              "Items::AnyWonKind3Stage1, ItemRecords::AddWin and AddLoss, Results::Push, "
+              "Stats::StartDay and Rewards::Grant: only native callers reach them in play) natively instead of through the translated code (the same writes; "
               "checked by --run_harnesses=career)");
 
 namespace hooks {
@@ -211,17 +213,10 @@ CAREER_ADAPTER(82110B18, CareerStatsAddPoints)
 CAREER_ADAPTER(82112860, CareerItemFlagsSet)
 CAREER_ADAPTER(821104B0, CareerCarSpecWord744)
 CAREER_ADAPTER(82115CC0, CareerPickFromCar)
-CAREER_ADAPTER(82111CB0, CareerRunningMeanMerge)
 CAREER_ADAPTER(821121F8, CareerStageOf)
 CAREER_ADAPTER(82111BA8, CareerEntry56Allows)
-CAREER_ADAPTER(82111780, CareerAnyWonKind3Stage1)
-CAREER_ADAPTER(82114B88, CareerItemRecordsAddWin)
-CAREER_ADAPTER(82114B08, CareerItemRecordsAddLoss)
-CAREER_ADAPTER(82111FC8, CareerResultsPush)
-CAREER_ADAPTER(82112088, CareerStatsStartDay)
 CAREER_ADAPTER(821154E0, CareerGarageInsertCar)
 CAREER_ADAPTER(82112950, CareerConditionTest)
-CAREER_ADAPTER(82114C08, CareerRewardsGrant)
 CAREER_ADAPTER(82115190, CareerAddRaceResult)
 CAREER_ADAPTER(821159B0, CareerPickNext)
 CAREER_ADAPTER(82116588, CareerAfterRace)
