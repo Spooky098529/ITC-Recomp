@@ -195,6 +195,7 @@ set(ITC_SOURCES
     src/hooks/app_start_up.cpp
     src/app_start_up/start_up.cpp
     src/app_start_up/network_set_up.cpp
+    src/app_start_up/scene_target.cpp
     src/save_interface/save_interface.cpp
     src/save_interface/save_layer.cpp
     src/hooks/file_layer.cpp

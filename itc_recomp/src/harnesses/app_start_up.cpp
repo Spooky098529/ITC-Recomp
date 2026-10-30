@@ -9,6 +9,7 @@
 #include "harness.h"
 
 #include "app_start_up/start_up.h"
+#include "base/flags.h"
 #include "base/log.h"
 #include "helpers/clock.h"
 #include "hooks/heap.h"
@@ -18,6 +19,8 @@
 
 #include <string>
 #include <vector>
+
+ITC_FLAG_DECLARE(bool, native_app_start_up);
 
 namespace harness {
 
@@ -356,6 +359,113 @@ void NetworkSetUp(Context& h) {
   helpers::SetClocksForHarness(std::nullopt, std::nullopt);
 }
 
+// --- The scene target ---
+
+// SceneTarget::Create with the display's tiling block a fake in the scratch
+// area (its multisample type 0 to 3, random tiles; the game's pointer put
+// back after), the two globals saved and put back, everything made freed.
+// The recompiled run has --native_app_start_up off (so its SceneTarget is
+// the original too). Compared: r3's being 0, the target's words (+16, +20,
+// +28 exactly; each resource's header with its address's low 12 bits, the
+// texture's data addresses' top 20 bits cleared, as the cameras' cases do),
+// the scratch area's tiling block.
+void SceneTargetCases(Context& h) {
+  if (!hooks::NativeHeapActive()) {
+    return;
+  }
+  Results results("SceneTarget::Create (sub_8209B378) with SceneTarget::SceneTarget and "
+                  "Tiling::LargestTile");
+  const uint32_t saved_app = guest::LoadU32(h.base, asu::kSceneTargetApp);
+  const uint32_t saved_target = guest::LoadU32(h.base, asu::kSceneTarget);
+  const uint32_t saved_tiling = guest::LoadU32(h.base, asu::kDisplayTiling);
+  const uint32_t tiling = h.data;
+  for (int c = 0; c < 12; c++) {
+    const uint32_t type = c < 4 ? uint32_t(c) : h.random.Below(4);
+    const uint32_t tiles = c == 4 ? 0 : 1 + h.random.Below(4);
+    std::vector<uint32_t> words(4 * tiles);
+    for (uint32_t i = 0; i < tiles; i++) {
+      const uint32_t left = h.random.Below(1280), top = h.random.Below(720);
+      words[4 * i + 0] = left;
+      words[4 * i + 1] = top;
+      words[4 * i + 2] = left + 1 + h.random.Below(1280);
+      words[4 * i + 3] = top + 1 + h.random.Below(720);
+    }
+    Outputs out[2];
+    for (int v = 0; v < 2; v++) {
+      Fill(h.base, h.data, 512);
+      guest::StoreU32(h.base, tiling + 0, 1280);
+      guest::StoreU32(h.base, tiling + 4, 720);
+      guest::StoreU32(h.base, tiling + 8, type);
+      guest::StoreU32(h.base, tiling + 12, tiles);
+      for (uint32_t i = 0; i < 4 * tiles; i++) {
+        guest::StoreU32(h.base, tiling + 16 + 4 * i, words[i]);
+      }
+      guest::StoreU32(h.base, asu::kDisplayTiling, tiling);
+      guest::StoreU32(h.base, asu::kSceneTarget, 0x5A5A5A5A);
+      PPCContext t = CallContext(h);
+      // The app's interface: the game's, so the video output's slots are.
+      t.r3.u64 = saved_app;
+      if (v == 0) {
+        const bool flag = ITC_FLAG(native_app_start_up);
+        ITC_FLAG(native_app_start_up) = false;
+        __imp__sub_8209B378(t, h.base);
+        ITC_FLAG(native_app_start_up) = flag;
+      } else {
+        sub_8209B378(t, h.base);
+      }
+      const uint32_t target = t.r3.u32;
+      out[v].Word(target != 0);
+      out[v].Word(guest::LoadU32(h.base, asu::kSceneTargetApp));
+      out[v].Word(guest::LoadU32(h.base, asu::kSceneTarget) == target);
+      out[v].Bytes(Read(h.base, tiling, 16 + 16 * tiles));
+      if (target == 0) {
+        continue;
+      }
+      out[v].Word(guest::LoadU32(h.base, target + 16));
+      out[v].Word(guest::LoadU32(h.base, target + 20));
+      out[v].Word(guest::LoadU32(h.base, target + 28));
+      for (const uint32_t offset : {0u, 4u, 8u, 12u}) {
+        const uint32_t surface = guest::LoadU32(h.base, target + offset);
+        out[v].Word(surface != 0);
+        if (surface == 0) {
+          continue;
+        }
+        out[v].Word(surface & 0xFFF);
+        out[v].Bytes(Read(h.base, surface, 48));
+        memory::crt::XMemFree(surface, 0x24800000);
+      }
+      const uint32_t texture = guest::LoadU32(h.base, target + 24);
+      out[v].Word(texture != 0);
+      if (texture != 0) {
+        out[v].Word(texture & 0xFFF);
+        std::vector<uint8_t> header = Read(h.base, texture, 52);
+        const uint32_t data = guest::LoadU32(h.base, texture + 32) & 0xFFFFF000;
+        const uint32_t mips = guest::LoadU32(h.base, texture + 48) & 0xFFFFF000;
+        out[v].Word(data != 0);
+        out[v].Word(mips != 0);
+        for (int k = 0; k < 3; k++) {
+          header[32 + k] = 0;
+          header[48 + k] = 0;
+        }
+        header[35] &= 0x0F;
+        header[51] &= 0x0F;
+        out[v].Bytes(header);
+        if (mips) {
+          memory::crt::XMemFree(mips, 0xBC800000);
+        }
+        memory::crt::XMemFree(data, 0xBC800000);
+        memory::crt::XMemFree(texture, 0x24800000);
+      }
+      memory::crt::OperatorDelete(target);
+    }
+    results.Check(out[0], out[1], fmt::format("case {}: type {}, {} tiles", c, type, tiles));
+  }
+  guest::StoreU32(h.base, asu::kSceneTargetApp, saved_app);
+  guest::StoreU32(h.base, asu::kSceneTarget, saved_target);
+  guest::StoreU32(h.base, asu::kDisplayTiling, saved_tiling);
+  results.Report();
+}
+
 }  // namespace
 
 void AppStartUp(Context& h) {
@@ -369,6 +479,7 @@ void AppStartUp(Context& h) {
   MoviesSet(h);
   CreateVertexDeclaration(h);
   NetworkSetUp(h);
+  SceneTargetCases(h);
 }
 
 }  // namespace harness

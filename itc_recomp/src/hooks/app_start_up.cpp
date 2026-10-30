@@ -117,3 +117,77 @@ extern "C" REX_FUNC(sub_8214E190) {
   }
   ctx.r3.u64 = asu::NetworkSetUp(base, ctx.r3.u32, ctx.r1.u32 - 144, XNetMemcpy(ctx, base));
 }
+
+// --- The scene target ---
+
+ITC_FLAG_DECLARE(bool, native_video_output);
+ITC_FLAG_DECLARE(bool, native_graphics_resources);
+
+namespace {
+
+// [0x8266D088]'s slot 7, then that object's slot 3: the video output, with
+// the original's return addresses.
+uint32_t VideoOutput(PPCContext& ctx, uint8_t* base, uint32_t first, uint32_t second) {
+  ctx.r3.u64 = guest::LoadU32(base, asu::kSceneTargetApp);
+  ctx.ctr.u64 = guest::LoadU32(base, guest::LoadU32(base, ctx.r3.u32) + 28);
+  ctx.lr = first;
+  REX_CALL_INDIRECT_FUNC(ctx.ctr.u32);
+  ctx.ctr.u64 = guest::LoadU32(base, guest::LoadU32(base, ctx.r3.u32) + 12);
+  ctx.lr = second;
+  REX_CALL_INDIRECT_FUNC(ctx.ctr.u32);
+  return ctx.r3.u32;
+}
+
+// Whether the device's native users can run: the device lock, the surface
+// and texture makers native.
+bool DeviceUsersNative() {
+  return ITC_FLAG(native_app_start_up) && ITC_FLAG(native_video_output) &&
+         ITC_FLAG(native_graphics_resources) && hooks::NativeHeapActive();
+}
+
+asu::VideoOutputCall SceneTargetVideoOutput(PPCContext& ctx, uint8_t* base) {
+  return [&ctx, base](int at) {
+    return at == 0 ? VideoOutput(ctx, base, 0x8209B0B0, 0x8209B0C0)
+                   : VideoOutput(ctx, base, 0x8209B298, 0x8209B2A8);
+  };
+}
+
+}  // namespace
+
+extern "C" REX_FUNC(sub_8209B070) {
+  REX_FUNC_PROLOGUE();
+  if (!DeviceUsersNative()) {
+    __imp__sub_8209B070(ctx, base);
+    return;
+  }
+  const uint32_t target = ctx.r3.u32;
+  const uint64_t lr = ctx.lr;
+  uint32_t result = 0;
+  InFrame(ctx, base, 192, 0x8209B0B0, [&](uint32_t frame) {
+    result = asu::SceneTargetConstruct(base, target, frame, SceneTargetVideoOutput(ctx, base));
+  });
+  ctx.lr = lr;
+  ctx.r3.u64 = result;
+}
+
+extern "C" REX_FUNC(sub_8209B378) {
+  REX_FUNC_PROLOGUE();
+  if (!DeviceUsersNative()) {
+    __imp__sub_8209B378(ctx, base);
+    return;
+  }
+  const uint32_t interface = ctx.r3.u32;
+  const uint64_t lr = ctx.lr;
+  std::optional<uint32_t> result;
+  InFrame(ctx, base, 96, 0x8209B3A4, [&](uint32_t) {
+    InFrame(ctx, base, 192, 0x8209B0B0, [&](uint32_t frame) {
+      result = asu::SceneTargetCreate(base, interface, frame, SceneTargetVideoOutput(ctx, base));
+    });
+  });
+  ctx.lr = lr;
+  if (!result) {
+    __imp__sub_8209B378(ctx, base);
+    return;
+  }
+  ctx.r3.u64 = *result;
+}

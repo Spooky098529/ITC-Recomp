@@ -52,6 +52,39 @@ using MemcpyCall = std::function<void(uint32_t destination, uint32_t source, uin
 std::optional<uint32_t> CreateVertexDeclaration(uint8_t* base, uint32_t elements,
                                                 const MemcpyCall& memcpy_call);
 
+// --- The scene target ---
+
+constexpr uint32_t kSceneTargetApp = 0x8266D088;  // the video output's way in
+constexpr uint32_t kSceneTarget = 0x8266D08C;
+constexpr uint32_t kDisplayTiling = 0x8260034C;  // the display's tiling block (a pointer)
+
+// The guest calls the device's users make: the video output ([0x8266D088]'s
+// vtable slot 7, then that object's slot 3; `at` 0 for the lock, 1 for the
+// unlock picks the original's return addresses).
+using VideoOutputCall = std::function<uint32_t(int at)>;
+
+// sub_8209ADD8 Tiling::LargestTile: the largest width (right - left) and
+// height (bottom - top) of the block's tiles (+12 the count, +16 on 16
+// bytes each) into the two words at `out` (0, 0 with none).
+void TilingLargestTile(uint8_t* base, uint32_t tiling, uint32_t out);
+// sub_8209B070 SceneTarget::SceneTarget: +16 = 1024, +20 = 576, +28 = 0;
+// with the device locked (VideoOutput::LockDevice's plain C++, the device at
+// `frame` + 80, the original's 192-byte frame, with its parameter blocks at
+// +96 and +112): +4, +0 (over +4's EDRAM tiles), +24 (a 1280 x 720
+// texture), and the display's largest tile aligned by its multisample type
+// for +12 and +8 (over +12's tiles). Returns the object. Needs --native_heap,
+// --native_graphics_resources and --native_video_output (the adapter checks).
+uint32_t SceneTargetConstruct(uint8_t* base, uint32_t target, uint32_t frame,
+                              const VideoOutputCall& video_output);
+// sub_8209B378 SceneTarget::Create: `interface` at 0x8266D088, then a
+// 32-byte SceneTarget (operator new) into 0x8266D08C, or 0 there when the
+// allocation fails. `frame` is SceneTarget::SceneTarget's. Returns the
+// target (r3 as the original leaves it: 0 without one), or nullopt where
+// operator new's plain C++ can't answer (the original runs; the store it
+// made again is the same).
+std::optional<uint32_t> SceneTargetCreate(uint8_t* base, uint32_t interface, uint32_t frame,
+                                          const VideoOutputCall& video_output);
+
 // --- The network manager's set-up (system-services.md) ---
 
 constexpr uint32_t kNetworkManager = 0x826C74A0;
