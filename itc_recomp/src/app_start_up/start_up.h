@@ -266,6 +266,55 @@ struct MovieCalls {
 std::optional<uint32_t> MovieConstruct(uint8_t* base, uint32_t movie, uint32_t block,
                                        uint32_t frame, const MovieCalls& calls);
 
+// --- The app's second camera class (cameras.md) ---
+
+constexpr uint32_t kAppCameraBytes = 368;
+constexpr uint32_t kAppCameraCameraBytes = 832;
+
+// The guest calls the camera class's construction makes, each from the
+// stack pointer `sp` with the original's return address: `call` the callee
+// at `target` with r3; `virtual_call` the object's vtable slot at `offset`
+// with r4, r5 and f1 (a float's bits, as lfs loads it) when given, else as
+// they are; `camera` and `list` AppCamera::Camera::Camera and
+// AppCameraList::AppCameraList on a block (their steps); each returns r3.
+struct AppCameraCalls {
+  std::function<uint32_t(uint32_t target, uint32_t sp, uint32_t r3, uint32_t return_address)>
+      call;
+  std::function<uint32_t(uint32_t object, uint32_t offset, uint32_t sp, std::optional<uint32_t> r4,
+                         std::optional<uint32_t> r5, std::optional<uint32_t> f1,
+                         uint32_t return_address)>
+      virtual_call;
+  std::function<uint32_t(uint32_t block)> camera;
+  std::function<uint32_t(uint32_t block)> list;
+};
+
+// sub_820A75E8 (a 16-byte object, vtable 0x82002580, +4 to +12 = 0).
+// Returns it.
+uint32_t AppCameraEntryConstruct(uint8_t* base, uint32_t entry);
+// sub_820A98C0 (8 bytes: vtable 0x82002780, +4 a 16-byte std::vector,
+// operator new, +4 to +12 = 0, then cleared: sub_820A9198 and sub_820A8F80
+// merged). Returns it, or nullopt where operator new's plain C++ can't
+// answer (the original runs; the store it made again is the same).
+std::optional<uint32_t> AppCameraListConstruct(uint8_t* base, uint32_t list);
+// sub_820A9E28 (832 bytes): Camera::Camera (through its adapter, from
+// `frame`, the original's 144-byte frame), the vtable 0x820027B0 and its
+// own fields (+400 to +479, +572 to +692, +804 to +816; their vectors
+// through `frame` + 80 to + 127 as the original's). Returns it.
+uint32_t AppCameraCameraConstruct(uint8_t* base, uint32_t camera, uint32_t frame,
+                                  const AppCameraCalls& calls);
+// sub_820A8B88 (368 bytes; r4 the block {app + 20, app + 4}): the vtables
+// (+0, +8, +12), +4 = 0, +16 the block's +4, 1.0 at +60 and the others,
+// +28 the camera (832 bytes), +32 the list (8), the list's slot 1 with a
+// 16-byte entry, the camera's slot 1 (45.0), +316 to +344, the camera's
+// position (0, -10, -10, 1) and angles (0, 0, 0, 1), its slot 0 with the
+// screen's size (the block's +4 interface's slot 1's object's slot 3: its
+// +296 and +300; f1 0.0) and slot 1 again, three handlers (key 0) on the
+// block's +0 interface (slots 4, 3, 1). `frame` is the original's 224-byte
+// frame. Returns it, or nullopt where operator new's plain C++ can't answer
+// for the camera (the original runs; the stores it made again are the same).
+std::optional<uint32_t> AppCameraConstruct(uint8_t* base, uint32_t object, uint32_t block,
+                                           uint32_t frame, const AppCameraCalls& calls);
+
 // --- The sound manager's construction (sound-cues.md) ---
 
 constexpr uint32_t kAudioManagerBytes = 1624;

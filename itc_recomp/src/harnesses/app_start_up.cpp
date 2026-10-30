@@ -1143,6 +1143,219 @@ void AudioManagerGroup(Context& h) {
   AudioManagerCases(h, live);
 }
 
+// --- The app's second camera class ---
+
+// Numbers the heap blocks a case's objects hold, for comparing them by
+// structure: a word pointing into a known block becomes 0xEF000000 + its
+// index << 16 + the offset.
+struct Blocks {
+  std::vector<std::pair<uint32_t, uint32_t>> list;  // address, bytes
+  void Add(uint32_t address, uint32_t bytes) {
+    if (address != 0) {
+      list.emplace_back(address, bytes);
+    }
+  }
+  uint32_t Of(uint32_t value) const {
+    for (uint32_t i = 0; i < list.size(); i++) {
+      if (value != 0 && value >= list[i].first && value < list[i].first + list[i].second) {
+        return 0xEF000000u + (i << 16) + (value - list[i].first);
+      }
+    }
+    return value;
+  }
+  void Out(uint8_t* base, Outputs& out) const {
+    out.Word(uint32_t(list.size()));
+    for (const auto& [address, bytes] : list) {
+      for (uint32_t at = 0; at < bytes; at += 4) {
+        out.Word(Of(guest::LoadU32(base, address + at)));
+      }
+    }
+  }
+  void Free() const {
+    for (const auto& [address, bytes] : list) {
+      FreeBlock(address);
+    }
+  }
+};
+
+void NativeAppCameraEntry(PPCContext& t, uint8_t* base) {
+  t.r3.u64 = asu::AppCameraEntryConstruct(base, t.r3.u32);
+}
+
+// The second camera class's constructors: the entry (16 bytes) and the list
+// (8 bytes, its vector's block numbered) alone, the camera (832 bytes, over
+// Camera::Camera) alone, then the class (368 bytes) on a fake block in the
+// scratch area: +0 an interface whose slots 4 (sub_820A70A8, r4 to its +4),
+// 3 and 1 (sub_8245F860, its +4 up by one) take the handlers; +4 one whose
+// slot 1 answers (sub_82090770, its +60) an object whose slot 3 answers
+// the same way a screen with random words at +296 and +300. The recompiled
+// ones with --native_app_start_up off. Compared: the objects and the blocks
+// they hold numbered, the fakes' words, r3, the frames' words (the class's
+// +28 and +80 to +159) and the prologues' saves. The blocks freed (their
+// unwritten bytes match as each version gets the same blocks back from the
+// allocation layer).
+void AppCameraCases(Context& h) {
+  constexpr uint32_t kGetter60 = 0x82090770;
+  constexpr uint32_t kCount4 = 0x8245F860;
+  constexpr uint32_t kStoreR4At4 = 0x820A70A8;
+  {
+    Results results("AppCameraEntry::AppCameraEntry (sub_820A75E8)");
+    for (int c = 0; c < 4; c++) {
+      Both(
+          h, results, [] {}, [&](PPCContext& t) { t.r3.u64 = h.data + 16 * c; },
+          __imp__sub_820A75E8, NativeAppCameraEntry, h.data, 128, fmt::format("case {}", c));
+    }
+    results.Report();
+  }
+  {
+    Results results("AppCameraList::AppCameraList (sub_820A98C0) with sub_820A9198 and "
+                     "sub_820A8F80");
+    for (int c = 0; c < 4; c++) {
+      const uint64_t r31 = h.random.Next();
+      Outputs out[2];
+      for (int v = 0; v < 2; v++) {
+        Fill(h.base, h.data, kScratchBytes);
+        PPCContext t = CallContext(h);
+        t.r3.u64 = h.data + 8 * c;
+        t.r31.u64 = r31;
+        t.lr = 0x820A8C64;
+        const uint32_t stack = t.r1.u32;
+        (v == 0 ? __imp__sub_820A98C0 : hooks::AppCameraListConstructSteps)(t, h.base);
+        Blocks blocks;
+        const uint32_t vector = guest::LoadU32(h.base, h.data + 8 * c + 4);
+        blocks.Add(vector, 16);
+        out[v].Word(t.r3.u32);
+        out[v].Word(guest::LoadU32(h.base, h.data + 8 * c));
+        out[v].Word(blocks.Of(vector));
+        if (vector != 0) {
+          // The block's +0 isn't written (operator new's leftover).
+          out[v].Bytes(Read(h.base, vector + 4, 12));
+        }
+        out[v].Bytes(Read(h.base, stack - 16, 16));
+        blocks.Free();
+      }
+      results.Check(out[0], out[1], fmt::format("case {}", c));
+    }
+    results.Report();
+  }
+  {
+    Results results("AppCamera::Camera::Camera (sub_820A9E28)");
+    for (int c = 0; c < 4; c++) {
+      const uint64_t r31 = h.random.Next();
+      const uint32_t fill = uint32_t(h.random.Next());
+      const uint32_t camera = *memory::crt::OperatorNew(h.base, asu::kAppCameraCameraBytes);
+      Outputs out[2];
+      for (int v = 0; v < 2; v++) {
+        Fill(h.base, camera, asu::kAppCameraCameraBytes, uint8_t(fill));
+        PPCContext t = CallContext(h);
+        for (uint32_t k = 4; k <= 0x400; k += 4) {
+          guest::StoreU32(h.base, t.r1.u32 - k, fill + k);
+        }
+        t.r3.u64 = camera;
+        t.r31.u64 = r31;
+        t.lr = 0x820A8C40;
+        const uint32_t stack = t.r1.u32;
+        (v == 0 ? __imp__sub_820A9E28 : hooks::AppCameraCameraConstructSteps)(t, h.base);
+        out[v].Word(t.r3.u32);
+        out[v].Bytes(Read(h.base, camera, asu::kAppCameraCameraBytes));
+        out[v].Bytes(Read(h.base, stack - 144 + 80, 48));
+        out[v].Bytes(Read(h.base, stack - 16, 16));
+      }
+      FreeBlock(camera);
+      results.Check(out[0], out[1], fmt::format("case {}", c));
+    }
+    results.Report();
+  }
+  Results results("AppCamera::AppCamera (sub_820A8B88) with AppCamera::Camera::Camera, "
+                  "AppCameraList::AppCameraList and AppCameraEntry::AppCameraEntry");
+  const uint32_t object = h.data + 1024;
+  const uint32_t block = h.data, i0 = h.data + 16, i0_vtable = h.data + 32, i4 = h.data + 64,
+                 i4_vtable = h.data + 128, service = h.data + 192, service_vtable = h.data + 256,
+                 screen = h.data + 320;
+  for (int c = 0; c < 8; c++) {
+    const uint32_t width = uint32_t(h.random.Next()), height = uint32_t(h.random.Next());
+    const uint32_t word16 = uint32_t(h.random.Next()), fill = uint32_t(h.random.Next());
+    const uint64_t r27 = h.random.Next(), r28 = h.random.Next(), r29 = h.random.Next(),
+                   r30 = h.random.Next(), r31 = h.random.Next();
+    Outputs out[2];
+    for (int v = 0; v < 2; v++) {
+      Fill(h.base, h.data, kScratchBytes);
+      guest::StoreU32(h.base, block + 0, i0);
+      guest::StoreU32(h.base, block + 4, i4);
+      guest::StoreU32(h.base, i0, i0_vtable);
+      guest::StoreU32(h.base, i0 + 4, word16);
+      guest::StoreU32(h.base, i0_vtable + 4, kCount4);
+      guest::StoreU32(h.base, i0_vtable + 12, kCount4);
+      guest::StoreU32(h.base, i0_vtable + 16, kStoreR4At4);
+      guest::StoreU32(h.base, i4, i4_vtable);
+      guest::StoreU32(h.base, i4 + 60, service);
+      guest::StoreU32(h.base, i4_vtable + 4, kGetter60);
+      guest::StoreU32(h.base, service, service_vtable);
+      guest::StoreU32(h.base, service + 60, screen);
+      guest::StoreU32(h.base, service_vtable + 12, kGetter60);
+      guest::StoreU32(h.base, screen + 296, width);
+      guest::StoreU32(h.base, screen + 300, height);
+      PPCContext t = CallContext(h);
+      for (uint32_t k = 4; k <= 0x600; k += 4) {
+        guest::StoreU32(h.base, t.r1.u32 - k, fill + k);
+      }
+      t.r3.u64 = object;
+      t.r4.u64 = block;
+      t.r27.u64 = r27;
+      t.r28.u64 = r28;
+      t.r29.u64 = r29;
+      t.r30.u64 = r30;
+      t.r31.u64 = r31;
+      t.f1.f64 = 3.0;
+      t.f31.f64 = 7.0;
+      t.lr = 0x82094770;
+      const uint32_t stack = t.r1.u32;
+      const uint32_t frame = stack - 224;
+      StartUpSide(v, [&] {
+        (v == 0 ? __imp__sub_820A8B88 : hooks::AppCameraSteps)(t, h.base);
+      });
+      Blocks blocks;
+      const uint32_t camera = guest::LoadU32(h.base, object + 28);
+      const uint32_t list = guest::LoadU32(h.base, object + 32);
+      blocks.Add(camera, asu::kAppCameraCameraBytes);
+      blocks.Add(list, 8);
+      const uint32_t vector = list != 0 ? guest::LoadU32(h.base, list + 4) : 0;
+      blocks.Add(vector, 16);
+      uint32_t entry = 0;
+      if (vector != 0) {
+        const uint32_t first = guest::LoadU32(h.base, vector + 4);
+        const uint32_t end = guest::LoadU32(h.base, vector + 12);
+        blocks.Add(first, end - first < 0x100 ? end - first : 0);
+        if (first != 0) {
+          entry = guest::LoadU32(h.base, first);
+        }
+      }
+      blocks.Add(entry, 16);
+      out[v].Word(t.r3.u32 == object ? 1 : 0);
+      out[v].Word(t.r1.u32 - stack);
+      for (uint32_t at = 0; at < asu::kAppCameraBytes; at += 4) {
+        out[v].Word(blocks.Of(guest::LoadU32(h.base, object + at)));
+      }
+      if (vector != 0) {
+        // The vector's block's +0 isn't written (operator new's leftover).
+        guest::StoreU32(h.base, vector, 0);
+      }
+      blocks.Out(h.base, out[v]);
+      out[v].Bytes(Read(h.base, i0, 8));
+      out[v].Word(blocks.Of(guest::LoadU32(h.base, frame + 28)));
+      for (uint32_t at = frame + 80; at < frame + 160; at += 4) {
+        const uint32_t w = guest::LoadU32(h.base, at);
+        out[v].Word(w == object ? 0xEE000000u : blocks.Of(w));
+      }
+      out[v].Bytes(Read(h.base, stack - 56, 56));
+      out[v].Double(t.f31.u64);
+      blocks.Free();
+    }
+    results.Check(out[0], out[1], fmt::format("case {}", c));
+  }
+  results.Report();
+}
+
 }  // namespace
 
 void AppStartUp(Context& h) {
@@ -1168,6 +1381,7 @@ void AppStartUp(Context& h) {
     MovieWrapperCases(h);
     MovieConstructCases(h);
     AudioManagerGroup(h);
+    AppCameraCases(h);
   }
 }
 

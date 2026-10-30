@@ -39,6 +39,13 @@ void AudioManagerCreateSteps(PPCContext& ctx, uint8_t* base);
 // AudioEngine::StartXAudio (sub_8259CD50: r3 the engine, not read) alone,
 // for the harness (no adapter: only AudioManager's plain C++ calls it).
 void StartXAudioSteps(PPCContext& ctx, uint8_t* base);
+// The second camera class (sub_820A8B88: r3 the object, r4 the block) in a
+// frame like the original's, and for the harness its camera's and list's
+// constructors alone (sub_820A9E28, sub_820A98C0: r3 the block; no
+// adapters); need --native_heap (the adapter checks).
+void AppCameraSteps(PPCContext& ctx, uint8_t* base);
+void AppCameraCameraConstructSteps(PPCContext& ctx, uint8_t* base);
+void AppCameraListConstructSteps(PPCContext& ctx, uint8_t* base);
 void TextInitSteps(PPCContext& ctx, uint8_t* base);
 void FontConstructSteps(PPCContext& ctx, uint8_t* base);
 // Whether Text::Init's and Font::Font's native steps can run.

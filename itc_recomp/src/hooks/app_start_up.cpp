@@ -11,6 +11,7 @@
 #include "strings_and_font/strings_and_font.h"
 
 #include <cstddef>
+#include <cstring>
 
 using guest_call::InFrame;
 
@@ -31,7 +32,9 @@ ITC_FLAG_BOOL(native_app_start_up, true, "ITC",
               "sub_82593DC0, the wrapper's critical section a host mutex for every user, "
               "through ScopedLock sub_8258E580 and sub_8258E5B8 for that section; AudioManager::Create "
               "sub_82119B38 with AudioManager::AudioManager sub_821197E0 and "
-              "AudioEngine::StartXAudio sub_8259CD50, no adapters of their own) "
+              "AudioEngine::StartXAudio sub_8259CD50, no adapters of their own; the second camera "
+              "class sub_820A8B88 with its camera sub_820A9E28, list sub_820A98C0 (sub_820A9198 "
+              "and sub_820A8F80 merged) and entry sub_820A75E8, no adapters of their own) "
               "natively instead of through the translated code (the same reads and writes; "
               "checked by --run_harnesses=app_start_up)");
 
@@ -642,4 +645,141 @@ void hooks::StartXAudioSteps(PPCContext& ctx, uint8_t* base) {
   asu::StartXAudio(base, frame, calls);
   ctx.r1.u64 = sp;
   ctx.lr = lr;
+}
+
+// --- The app's second camera class ---
+
+namespace {
+
+asu::AppCameraCalls AppCameraCallsFor(PPCContext& ctx, uint8_t* base, uint64_t owner);
+
+// The constructors' prologues: lr and r31 (the owner's object, the caller's
+// r31) above their frames.
+uint32_t AppCameraCameraSteps(PPCContext& ctx, uint8_t* base, uint32_t camera, uint64_t owner) {
+  const uint32_t sp = ctx.r1.u32;
+  guest::StoreU32(base, sp - 8, 0x820A8C40);
+  StoreDoubleword(base, sp - 16, owner);
+  const uint32_t frame = sp - 144;
+  guest::StoreU32(base, frame, sp);
+  return asu::AppCameraCameraConstruct(base, camera, frame, AppCameraCallsFor(ctx, base, owner));
+}
+
+uint32_t AppCameraListSteps(PPCContext& ctx, uint8_t* base, uint32_t list, uint64_t owner) {
+  const uint32_t sp = ctx.r1.u32;
+  guest::StoreU32(base, sp - 8, 0x820A8C64);
+  StoreDoubleword(base, sp - 16, owner);
+  if (const auto r3 = asu::AppCameraListConstruct(base, list)) {
+    return *r3;
+  }
+  const uint64_t lr = ctx.lr;
+  ctx.r3.u64 = list;
+  ctx.lr = 0x820A8C64;
+  __imp__sub_820A98C0(ctx, base);
+  ctx.lr = lr;
+  return ctx.r3.u32;
+}
+
+asu::AppCameraCalls AppCameraCallsFor(PPCContext& ctx, uint8_t* base, uint64_t owner) {
+  asu::AppCameraCalls calls;
+  calls.call = [&ctx, base](uint32_t target, uint32_t sp, uint32_t r3, uint32_t return_address) {
+    const uint64_t stack = ctx.r1.u64;
+    ctx.r1.u64 = sp;
+    ctx.r3.u64 = r3;
+    ctx.lr = return_address;
+    REX_CALL_INDIRECT_FUNC(target);
+    ctx.r1.u64 = stack;
+    return ctx.r3.u32;
+  };
+  calls.virtual_call = [&ctx, base](uint32_t object, uint32_t offset, uint32_t sp,
+                                    std::optional<uint32_t> r4, std::optional<uint32_t> r5,
+                                    std::optional<uint32_t> f1, uint32_t return_address) {
+    const uint64_t stack = ctx.r1.u64;
+    ctx.r1.u64 = sp;
+    if (r4) {
+      ctx.r4.u64 = *r4;
+    }
+    if (r5) {
+      ctx.r5.u64 = *r5;
+    }
+    if (f1) {
+      float value;
+      const uint32_t bits = *f1;
+      std::memcpy(&value, &bits, 4);
+      ctx.f1.f64 = double(value);
+    }
+    const uint32_t r3 = VirtualCall(ctx, base, object, offset, return_address);
+    ctx.r1.u64 = stack;
+    return r3;
+  };
+  calls.camera = [&ctx, base, owner](uint32_t block) {
+    return AppCameraCameraSteps(ctx, base, block, owner);
+  };
+  calls.list = [&ctx, base, owner](uint32_t block) {
+    return AppCameraListSteps(ctx, base, block, owner);
+  };
+  return calls;
+}
+
+}  // namespace
+
+void hooks::AppCameraSteps(PPCContext& ctx, uint8_t* base) {
+  const uint32_t object = ctx.r3.u32, block = ctx.r4.u32;
+  const uint64_t entry_r3 = ctx.r3.u64, entry_r4 = ctx.r4.u64;
+  const uint64_t lr = ctx.lr;
+  const uint32_t sp = ctx.r1.u32;
+  // The original's prologue: __savegprlr_27 and f31 at -56.
+  SaveRegisters(ctx, base, 27);
+  StoreDoubleword(base, sp - 56, ctx.f31.u64);
+  const uint32_t frame = sp - 224;
+  guest::StoreU32(base, frame, sp);
+  ctx.r1.u64 = frame;
+  const auto result =
+      asu::AppCameraConstruct(base, object, block, frame, AppCameraCallsFor(ctx, base, entry_r3));
+  ctx.r1.u64 = sp;
+  ctx.lr = lr;
+  if (!result) {
+    ctx.r3.u64 = entry_r3;
+    ctx.r4.u64 = entry_r4;
+    __imp__sub_820A8B88(ctx, base);
+    return;
+  }
+  ctx.r3.u64 = *result;
+}
+
+void hooks::AppCameraCameraConstructSteps(PPCContext& ctx, uint8_t* base) {
+  const uint64_t lr = ctx.lr;
+  const uint32_t sp = ctx.r1.u32;
+  guest::StoreU32(base, sp - 8, uint32_t(lr));
+  StoreDoubleword(base, sp - 16, ctx.r31.u64);
+  const uint32_t frame = sp - 144;
+  guest::StoreU32(base, frame, sp);
+  const uint32_t r3 =
+      asu::AppCameraCameraConstruct(base, ctx.r3.u32, frame, AppCameraCallsFor(ctx, base, ctx.r31.u64));
+  ctx.r1.u64 = sp;
+  ctx.lr = lr;
+  ctx.r3.u64 = r3;
+}
+
+void hooks::AppCameraListConstructSteps(PPCContext& ctx, uint8_t* base) {
+  const uint64_t lr = ctx.lr;
+  guest::StoreU32(base, ctx.r1.u32 - 8, uint32_t(lr));
+  StoreDoubleword(base, ctx.r1.u32 - 16, ctx.r31.u64);
+  if (const auto r3 = asu::AppCameraListConstruct(base, ctx.r3.u32)) {
+    ctx.r3.u64 = *r3;
+    return;
+  }
+  __imp__sub_820A98C0(ctx, base);
+}
+
+// The second camera class: r3 = the object (368 bytes), r4 = the block
+// {app + 20, app + 4}; from App::App once at boot. (Its camera, list and
+// entry constructors, sub_820A9E28, sub_820A98C0 and sub_820A75E8, have no
+// adapters: only its plain C++ calls them in play.)
+extern "C" REX_FUNC(sub_820A8B88) {
+  REX_FUNC_PROLOGUE();
+  if (!ITC_FLAG(native_app_start_up) || !hooks::NativeHeapActive()) {
+    __imp__sub_820A8B88(ctx, base);
+    return;
+  }
+  hooks::AppCameraSteps(ctx, base);
 }
