@@ -106,8 +106,8 @@ cases). Float constants: as noted per row (read from the image).
 `Cutscene::Cutscene` is 4,907 lines: its migration should be split by
 its parts (the set-up, the racers' records, the two small switches, the
 69 shot scripts, the logo). Blocked outside: the UI movies' `Open` and
-`Delete` (`sub_8211E808`, `sub_8211E258`, `ui-movies-game.md`, not
-native) under the logo, and `Scenery::Update` and `Scenery::Draw` under
+`Delete` (`sub_8211E808`, `sub_8211E258`, `ui-movies-game.md`) under the
+logo, native since 2026-10-30 (the second migration), and `Scenery::Update` and `Scenery::Draw` under
 the course view. Nothing here needs a call the user hasn't made.
 
 Status:

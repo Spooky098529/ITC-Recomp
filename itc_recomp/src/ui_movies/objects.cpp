@@ -487,4 +487,76 @@ std::optional<uint32_t> HasMoreText(uint8_t* base, uint32_t movie, uint32_t sub_
   return HasNextPage(base, *record) ? 1u : 0u;
 }
 
+// --- The movie table's open and delete ---
+
+uint32_t OpenMovie(uint8_t* base, uint32_t id, uint32_t asset, uint32_t frame,
+                   const archive::LoadCall& load, const OpenCalls& calls) {
+  ITC_NATIVE_RUNNING("sub_8211E808 UiMovies::Open");
+  Store(base, frame + 80, id);
+  if (Load(base, PairsFindKey(base, kMovieTable, id)) != 0) {
+    return 0;
+  }
+  const uint32_t movie = calls.make();
+  Store(base, frame + 80, movie);
+  InitAnimationLists(base, movie);
+  Store(base, movie + 0x9FD4, id);
+  MovieLoad(base, movie, asset, load);
+  Store(base, frame + 84, id);
+  calls.set(frame + 84, frame + 80);
+  return 1;
+}
+
+uint32_t UnloadMovie(uint8_t* base, uint32_t movie, uint32_t frame, const UnloadCalls& calls) {
+  ITC_NATIVE_RUNNING("sub_8211B540 UiMovie::Unload");
+  for (uint32_t i = 0; i < 3; i++) {
+    calls.virtual_free(i, Load(base, movie + 4 * i));
+  }
+  Store(base, movie + 16, 0);
+  Store(base, movie + 20, 0);
+  Store(base, movie + 24, 0);
+  const uint32_t textures = movie + kMovieTextures;
+  while (Load(base, movie + 36) != 0) {
+    const uint32_t count = Load(base, textures + kCount) - 1;
+    Store(base, textures + kCount, count);
+    const uint32_t entry = Load(base, Load(base, textures + kArray) + (count << 2));
+    if (entry != 0) {
+      Store(base, entry + 0, 0);
+      Store(base, entry + 4, 0);
+      Store(base, entry + 8, 0);
+      calls.free(entry);
+    }
+  }
+  const uint32_t items = movie + kMovieTextList;
+  while (Load(base, movie + 48) != 0) {
+    const uint32_t count = Load(base, items + kCount) - 1;
+    const uint32_t item = (count << 7) + Load(base, items + kArray);
+    Store(base, items + kCount, count);
+    calls.copy_item(frame + 80, item);
+    ClearTextItem(base, frame + 80);
+  }
+  const uint32_t xpr = movie + 12;
+  if (Load(base, xpr) != 0) {
+    calls.release_xpr(xpr);
+  }
+  Store(base, xpr, 0);
+  Store(base, movie + kMovieLoaded, 0);
+  return calls.free_texts(movie);
+}
+
+uint32_t DeleteMovie(uint8_t* base, uint32_t id, uint32_t frame, const DeleteCalls& calls) {
+  ITC_NATIVE_RUNNING("sub_8211E258 UiMovies::Delete");
+  Store(base, frame + 80, id);
+  const uint32_t entry = PairsFindKey(base, kMovieTable, id);
+  const uint32_t movie = Load(base, entry);
+  if (movie == 0) {
+    return entry;
+  }
+  UnloadMovie(base, movie, frame - 240, calls.unload);
+  calls.destroy(movie);
+  calls.free(movie);
+  Store(base, frame + 84, id);
+  Store(base, frame + 80, 0);
+  return calls.set(frame + 84, frame + 80);
+}
+
 }  // namespace ui_movies

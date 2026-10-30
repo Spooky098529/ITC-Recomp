@@ -14,6 +14,7 @@
 
 #include <array>
 #include <cstdint>
+#include <functional>
 #include <optional>
 
 namespace ui_movies {
@@ -479,5 +480,71 @@ std::optional<uint32_t> HasMoreText(uint8_t* base, uint32_t movie, uint32_t sub_
 // (VirtualAlloc's, AllocPages), then load(id, them, sub_8211E500, the movie).
 // Returns the serial (r3).
 int64_t MovieLoad(uint8_t* base, uint32_t movie, uint32_t id, const archive::LoadCall& load);
+
+}  // namespace ui_movies
+
+namespace ui_movies {
+
+// --- The movie table's open and delete (objects.cpp) ---
+//
+// Their callees run natively where their own checks say so; the adapter
+// (src/hooks/ui_movies_game.cpp, hooks::UiMoviesOpenCalls and the rest)
+// hands the others to the originals from frames like the originals'.
+
+// sub_8211E808 UiMovies::Open's calls: `make` is operator new(40,976) and,
+// when it gave a block, UiMovie::UiMovie on it (the movie, or 0); `set` is
+// sub_8211C168 on the movie table with the key at `key_address` and the
+// value at `value_address` (the frame's +84 and +80).
+struct OpenCalls {
+  std::function<uint32_t()> make;
+  std::function<void(uint32_t key_address, uint32_t value_address)> set;
+};
+// sub_8211E808 UiMovies::Open: the movie table's entry for `id` (the key
+// stored at the frame's +80 first; `frame` is the original's r1, 128
+// bytes); when there's a movie, 0. Else the movie made (calls.make; stored
+// at +80), its animation lists set up (InitAnimationLists, passed 0 when
+// the allocation failed, as the original), `id` at its +0x9FD4, `asset`
+// loaded into it (MovieLoad), `id` at +84 and the pair set (calls.set).
+// Returns 1.
+uint32_t OpenMovie(uint8_t* base, uint32_t id, uint32_t asset, uint32_t frame,
+                   const archive::LoadCall& load, const OpenCalls& calls);
+
+// sub_8211B540 UiMovie::Unload's calls (from its 240-byte frame):
+// VirtualFree(address, 0, MEM_RELEASE) (`which` 0-2, the three copies),
+// operator delete, the text item copy sub_8211AED0, XPR::Release of a slot
+// sub_82108860 and the texts freed sub_8211AC90 (its r3 returned).
+struct UnloadCalls {
+  std::function<void(uint32_t which, uint32_t address)> virtual_free;
+  std::function<void(uint32_t block)> free;
+  std::function<void(uint32_t to, uint32_t from)> copy_item;
+  std::function<void(uint32_t slot)> release_xpr;
+  std::function<uint32_t(uint32_t movie)> free_texts;
+};
+// sub_8211B540 UiMovie::Unload: the three file copies (+0, +4, +8) freed,
+// the scenes (+16, +20, +24) cleared; the textures popped (+28: the count
+// decremented first, each entry's three words cleared and the entry freed
+// when not 0); the queued text items popped (+40: each copied to the
+// frame's +80, then ClearTextItem there); the texture set (+12) released
+// when set and cleared, the loaded flag (+0x9FD0) cleared, the texts freed.
+// `frame` is the original's r1. Returns r3 as the original leaves it (the
+// texts' free's).
+uint32_t UnloadMovie(uint8_t* base, uint32_t movie, uint32_t frame, const UnloadCalls& calls);
+
+// sub_8211E258 UiMovies::Delete's calls: Unload's (from its frame below
+// Delete's), UiMovie::~UiMovie, operator delete and the pair set (as
+// OpenCalls::set; its r3 returned).
+struct DeleteCalls {
+  UnloadCalls unload;
+  std::function<void(uint32_t movie)> destroy;
+  std::function<void(uint32_t movie)> free;
+  std::function<uint32_t(uint32_t key_address, uint32_t value_address)> set;
+};
+// sub_8211E258 UiMovies::Delete: the movie table's entry for `id` (the key
+// at the frame's +80; `frame` is the original's r1, 128 bytes); when
+// there's a movie: unloaded (UnloadMovie, its frame 240 bytes below),
+// destroyed, freed, then `id` at +84, 0 at +80 and the pair set to 0.
+// Returns r3 as the original leaves it (the entry's address when there was
+// none, else the set's).
+uint32_t DeleteMovie(uint8_t* base, uint32_t id, uint32_t frame, const DeleteCalls& calls);
 
 }  // namespace ui_movies

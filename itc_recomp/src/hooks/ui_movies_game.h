@@ -5,6 +5,8 @@
 
 #include "guest.h"
 
+#include "ui_movies/game.h"
+
 namespace ui_movies_game_hooks {
 
 // AnimationList::Insert (sub_8211B4D0; r3 = a list, r4 = a 40-byte slot,
@@ -41,5 +43,16 @@ void DrawTexts(PPCContext& ctx, uint8_t* base);
 // UiMovie::ApplyAnimation through its override.
 void Finish(PPCContext& ctx, uint8_t* base);
 void FinishNamed(PPCContext& ctx, uint8_t* base);
+
+// UiMovies::Open (sub_8211E808) and UiMovies::Delete (sub_8211E258) for
+// native callers: whether they run natively (--native_ui_movies_game,
+// --native_c_runtime_heap and --native_heap; Open also the archive's queue
+// native), and their calls (natively where the callees' checks say so,
+// else the originals from frames like Open's and Delete's below `sp`, the
+// stack pointer they're called with).
+bool OpenNative();
+bool DeleteNative();
+ui_movies::OpenCalls OpenCalls(PPCContext& ctx, uint8_t* base, uint32_t sp);
+ui_movies::DeleteCalls DeleteCalls(PPCContext& ctx, uint8_t* base, uint32_t sp);
 
 }  // namespace ui_movies_game_hooks

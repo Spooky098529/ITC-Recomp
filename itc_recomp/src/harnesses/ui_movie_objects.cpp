@@ -9,7 +9,9 @@
 
 #include "base/flags.h"
 #include "base/log.h"
+#include "hooks/archive.h"
 #include "hooks/heap.h"
+#include "hooks/ui_movies_game.h"
 #include "hooks/ui_movies.h"
 #include "memory/c_runtime_heap.h"
 #include "memory/heap.h"
@@ -805,6 +807,296 @@ void SetterCases(Context& h, uint32_t movie) {
   memory::Free(buffers);
 }
 
+// --- The movie table's open and delete ---
+
+// The movie table (0x826C5CCC: array, capacity, count) swapped for a case's
+// own array while alive, then put back.
+class TableSwap {
+ public:
+  explicit TableSwap(uint8_t* base) : base_(base) {
+    for (uint32_t k = 0; k < 3; k++) {
+      saved_[k] = Load(base, ui_movies::kMovieTable + 4 * k);
+    }
+  }
+  ~TableSwap() {
+    for (uint32_t k = 0; k < 3; k++) {
+      Store(base_, ui_movies::kMovieTable + 4 * k, saved_[k]);
+    }
+  }
+
+ private:
+  uint8_t* base_;
+  uint32_t saved_[3];
+};
+
+// A table of the case's: capacity 1 to 4, up to the capacity of pairs with
+// keys 100 + n; `id`'s pair holds `value` when `with_id`. Returns the array.
+uint32_t MakeTable(Random& r, uint8_t* base, uint32_t id, bool with_id, uint32_t value) {
+  const uint32_t capacity = 1 + r.Below(4);
+  const uint32_t array = memory::crt::OperatorNewArray(base, 8 * capacity).value_or(0);
+  RandomFill(r, base, array, 8 * capacity);
+  uint32_t count = r.Below(capacity + 1);
+  if (with_id && count == 0) {
+    count = 1;
+  }
+  const uint32_t at = with_id ? r.Below(count) : count;
+  for (uint32_t k = 0; k < count; k++) {
+    Store(base, array + 8 * k, k == at ? id : 100 + k);
+    Store(base, array + 8 * k + 4, k == at ? value : 0x40000000 + k);
+  }
+  Store(base, ui_movies::kMovieTable, array);
+  Store(base, ui_movies::kMovieTable + 4, capacity);
+  Store(base, ui_movies::kMovieTable + 8, count);
+  return array;
+}
+
+// The table after a case: the array (1 when it's still the case's, else
+// its size), capacity, count and the pairs (`movie` as 1); the array freed.
+void TableOutputs(uint8_t* base, uint32_t array, uint32_t movie, Outputs& out) {
+  const uint32_t now = Load(base, ui_movies::kMovieTable);
+  out.Word(now == array ? 1 : memory::IsHeapBlock(now) ? memory::Size(now) : now);
+  out.Word(Load(base, ui_movies::kMovieTable + 4));
+  const uint32_t count = Load(base, ui_movies::kMovieTable + 8);
+  out.Word(count);
+  for (uint32_t k = 0; k < count; k++) {
+    out.Word(Load(base, now + 8 * k));
+    const uint32_t value = Load(base, now + 8 * k + 4);
+    out.Word(value != 0 && value == movie ? 1 : value);
+  }
+  memory::crt::OperatorDeleteArray(now);
+  if (now != array && memory::IsHeapBlock(array)) {
+    memory::crt::OperatorDeleteArray(array);
+  }
+}
+
+// UiMovies::Open with the table swapped for the case's (the id not there,
+// there with a movie, or there with 0) and the load recorded: r3, the
+// frame's +80 and +84, the table, the movie made (as ConstructCases) and
+// the load's call (the pages as 1, the movie as 1); everything freed after.
+void OpenCases(Context& h) {
+  Results results("UiMovies::Open (sub_8211E808)");
+  if (!hooks::NativeArchiveQueue()) {
+    ITC_LOG_WARN("harness: ui_movie_objects: UiMovies::Open needs the archive's queue native");
+    return;
+  }
+  static constexpr uint32_t kIds[] = {22575, 22574, 22576, 22560, 22595, 22559};
+  for (int i = 0; i < 24; i++) {
+    const uint64_t seed = h.random.Next();
+    const uint32_t id = 7 + h.random.Below(3);
+    const uint32_t asset = kIds[h.random.Below(6)];
+    const uint32_t kind = h.random.Below(3);  // 0 not there, 1 a movie, 2 a 0
+    Outputs out[2];
+    for (int v = 0; v < 2; v++) {
+      Random r(seed);
+      TableSwap swap(h.base);
+      const uint32_t array = MakeTable(r, h.base, id, kind != 0, kind == 1 ? 0x12345678 : 0);
+      ArchiveLoads loads({int64_t(r.Below(1000))});
+      PPCContext t = CallContext(h);
+      t.r3.u64 = id;
+      t.r4.u64 = asset;
+      const uint32_t frame = t.r1.u32 - 128;
+      if (v == 0) {
+        RunRecompiled(__imp__sub_8211E808, t, h.base);
+      } else {
+        t.r3.u64 = ui_movies::OpenMovie(h.base, id, asset, frame, loads.Native(),
+                                        ui_movies_game_hooks::OpenCalls(t, h.base, t.r1.u32));
+      }
+      out[v].Word(t.r3.u32);
+      const uint32_t movie = kind == 1 ? 0 : Load(h.base, frame + 80);
+      out[v].Word(Load(h.base, frame + 80) == movie && movie != 0 ? 1 : Load(h.base, frame + 80));
+      out[v].Word(Load(h.base, frame + 84));
+      TableOutputs(h.base, array, movie, out[v]);
+      const std::vector<uint32_t>& calls = loads.calls();
+      out[v].Word(uint32_t(calls.size()));
+      for (size_t k = 0; k < calls.size(); k++) {
+        if (k % 6 == 1 && calls[k] != 0 && memory::IsPages(calls[k])) {
+          out[v].Word(1);
+          memory::FreePages(calls[k]);
+        } else {
+          out[v].Word(k % 6 == 3 && calls[k] == movie ? 1 : calls[k]);
+        }
+      }
+      if (movie != 0 && memory::IsHeapBlock(movie)) {
+        std::vector<uint32_t> made;
+        const uint32_t textures = Load(h.base, movie + 28);
+        const uint32_t items = Load(h.base, movie + 40);
+        PointerWord(out[v], textures, 0, made);
+        PointerWord(out[v], items == 0 ? 0 : items - 16, 0, made);
+        out[v].Bytes(MovieBytes(h.base, movie, {28, 40}));
+        ui_movies::DestroyMovie(h.base, movie);
+        memory::crt::OperatorDelete(movie);
+      }
+    }
+    results.Check(out[0], out[1], fmt::format("case {}: kind {}, asset {}", i, kind, asset));
+  }
+  results.Report();
+}
+
+// A movie for UiMovie::Unload: random bytes, built natively, then its three
+// file copies (pages or 0), 0 to 4 textures (12-byte blocks or 0), 0 to 3
+// queued text items of random bytes, 0 to 3 texts (a record and its pages)
+// and +12 = 0. The blocks and pages go in `blocks` and `pages`.
+void MakeLoadedMovie(Random& r, uint8_t* base, uint32_t movie, std::vector<uint32_t>& blocks,
+                     std::vector<uint32_t>& pages) {
+  RandomFill(r, base, movie, kMovieBytes);
+  ui_movies::ConstructMovie(base, movie);
+  for (uint32_t k = 0; k < 3; k++) {
+    const uint32_t copy = r.Below(4) == 0 ? 0 : memory::AllocPages(4096 * (1 + r.Below(3)), 4096);
+    Store(base, movie + 4 * k, copy);
+    pages.push_back(copy);
+  }
+  const uint32_t textures = Load(base, movie + 28);
+  const uint32_t n = r.Below(5);
+  for (uint32_t k = 0; k < n; k++) {
+    const uint32_t entry = r.Below(4) == 0 ? 0 : memory::crt::OperatorNew(base, 12).value_or(0);
+    if (entry != 0) {
+      RandomFill(r, base, entry, 12);
+    }
+    Store(base, textures + 4 * k, entry);
+    blocks.push_back(entry);
+  }
+  Store(base, movie + 36, n);
+  const uint32_t m = r.Below(4);
+  RandomFill(r, base, Load(base, movie + 40), 128 * m);
+  Store(base, movie + 48, m);
+  Store(base, movie + 12, 0);
+  const uint32_t texts = r.Below(4);
+  for (uint32_t k = 0; k < texts; k++) {
+    const uint32_t record = memory::crt::OperatorNew(base, 28).value_or(0);
+    const uint32_t buffer = memory::AllocPages(4096, 4096);
+    RandomFill(r, base, record, 28);
+    Store(base, record, buffer);
+    Store(base, movie + 0x9BCC + 8 * k, 200 + k);
+    Store(base, movie + 0x9BCC + 8 * k + 4, record);
+    blocks.push_back(record);
+    pages.push_back(buffer);
+  }
+  Store(base, movie + 0x9FCC, texts);
+}
+
+// What's left of a movie after Unload: which blocks and pages were freed,
+// the movie's bytes (its pointers masked) and its text list's block; then
+// destroyed and whatever's left freed.
+void UnloadedOutputs(uint8_t* base, uint32_t movie, const std::vector<uint32_t>& blocks,
+                     const std::vector<uint32_t>& pages, bool movie_freed, Outputs& out) {
+  for (uint32_t block : blocks) {
+    out.Word(block != 0 && memory::IsHeapBlock(block));
+  }
+  for (uint32_t page : pages) {
+    out.Word(page != 0 && memory::IsPages(page));
+  }
+  if (!movie_freed) {
+    std::vector<uint32_t> masked = {0, 4, 8, 28, 40};
+    for (uint32_t k = 0; k < 3; k++) {
+      masked.push_back(0x9BCC + 8 * k + 4);
+    }
+    out.Bytes(MovieBytes(base, movie, masked));
+    out.Bytes(Read(base, Load(base, movie + 40), 128 * 4));
+    ui_movies::DestroyMovie(base, movie);
+  }
+  for (uint32_t block : blocks) {
+    if (block != 0 && memory::IsHeapBlock(block)) {
+      memory::crt::OperatorDelete(block);
+    }
+  }
+  for (uint32_t page : pages) {
+    if (page != 0 && memory::IsPages(page)) {
+      memory::FreePages(page);
+    }
+  }
+}
+
+// UiMovie::Unload over MakeLoadedMovie's movies: what's freed, the movie,
+// its frame's +80 (the last item copied and cleared), r3 (a text record by
+// its number, the movie as 0).
+void UnloadCases(Context& h, uint32_t movie) {
+  Results results("UiMovie::Unload (sub_8211B540)");
+  for (int i = 0; i < 40; i++) {
+    const uint64_t seed = h.random.Next();
+    Outputs out[2];
+    for (int v = 0; v < 2; v++) {
+      Random r(seed);
+      std::vector<uint32_t> blocks, pages;
+      MakeLoadedMovie(r, h.base, movie, blocks, pages);
+      PPCContext t = CallContext(h);
+      t.r3.u64 = movie;
+      const uint32_t frame = t.r1.u32 - 240;
+      Fill(h.base, frame + 80, 128);
+      if (v == 0) {
+        RunRecompiled(__imp__sub_8211B540, t, h.base);
+      } else {
+        t.r3.u64 = ui_movies::UnloadMovie(
+            h.base, movie, frame,
+            ui_movies_game_hooks::DeleteCalls(t, h.base, t.r1.u32 + 128).unload);
+      }
+      out[v].Bytes(Read(h.base, frame + 80, 128));
+      uint32_t r3 = t.r3.u32 == movie ? 0 : 0xFFFFFFFFu;
+      for (size_t k = 0; k < blocks.size(); k++) {
+        if (blocks[k] != 0 && t.r3.u32 == blocks[k]) {
+          r3 = uint32_t(k) + 1;
+        }
+      }
+      out[v].Word(r3);
+      UnloadedOutputs(h.base, movie, blocks, pages, false, out[v]);
+    }
+    results.Check(out[0], out[1], fmt::format("case {}", i));
+  }
+  results.Report();
+}
+
+// UiMovies::Delete with the table swapped for the case's (the id not there,
+// there with a loaded movie, or there with 0): what's freed, the table, the
+// frame's +80 and +84, r3 (the table as 0, an entry by its offset in the
+// array, the empty entry as 1).
+void DeleteCases(Context& h) {
+  Results results("UiMovies::Delete (sub_8211E258; sub_8211B540)");
+  for (int i = 0; i < 40; i++) {
+    const uint64_t seed = h.random.Next();
+    const uint32_t id = 7 + h.random.Below(3);
+    const uint32_t kind = h.random.Below(4);  // 0 not there, 1 a 0, else a movie
+    Outputs out[2];
+    for (int v = 0; v < 2; v++) {
+      Random r(seed);
+      TableSwap swap(h.base);
+      std::vector<uint32_t> blocks, pages;
+      uint32_t movie = 0;
+      if (kind >= 2) {
+        movie = memory::crt::OperatorNew(h.base, kMovieBytes).value_or(0);
+        MakeLoadedMovie(r, h.base, movie, blocks, pages);
+      }
+      const uint32_t array = MakeTable(r, h.base, id, kind != 0, movie);
+      PPCContext t = CallContext(h);
+      t.r3.u64 = id;
+      const uint32_t frame = t.r1.u32 - 128;
+      if (v == 0) {
+        RunRecompiled(__imp__sub_8211E258, t, h.base);
+      } else {
+        t.r3.u64 = ui_movies::DeleteMovie(h.base, id, frame,
+                                          ui_movies_game_hooks::DeleteCalls(t, h.base, t.r1.u32));
+      }
+      const uint32_t now = Load(h.base, ui_movies::kMovieTable);
+      const uint32_t r3 = t.r3.u32;
+      out[v].Word(r3 == ui_movies::kMovieTable    ? 0
+                  : r3 == 0x826C5CDC              ? 1
+                  : r3 >= now && r3 < now + 64    ? 0x100 + (r3 - now)
+                                                  : r3);
+      out[v].Word(Load(h.base, frame + 80) == movie && movie != 0 ? 1 : Load(h.base, frame + 80));
+      out[v].Word(Load(h.base, frame + 84));
+      const bool freed = movie != 0 && !memory::IsHeapBlock(movie);
+      out[v].Word(freed);
+      TableOutputs(h.base, array, movie, out[v]);
+      if (movie != 0) {
+        UnloadedOutputs(h.base, movie, blocks, pages, freed, out[v]);
+        if (!freed) {
+          memory::crt::OperatorDelete(movie);
+        }
+      }
+    }
+    results.Check(out[0], out[1], fmt::format("case {}: kind {}", i, kind));
+  }
+  results.Report();
+}
+
 }  // namespace
 
 void UiMovieObjects(Context& h) {
@@ -821,7 +1113,10 @@ void UiMovieObjects(Context& h) {
   GetTextCases(h, movie);
   AddNamedAnimationsCases(h, movie);
   SetterCases(h, movie);
+  UnloadCases(h, movie);
   memory::Free(movie);
+  OpenCases(h);
+  DeleteCases(h);
   EffectCases(h);
 }
 
