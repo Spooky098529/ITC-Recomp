@@ -11,6 +11,7 @@
 #include "c_runtime/strings.h"
 #include "guest.h"
 #include "xaudio/engine.h"
+#include "xaudio/resampler.h"
 
 #include <rex/platform/fpscr.h>
 #include <rex/ppc/intrinsics.h>
@@ -1829,6 +1830,221 @@ double I3dl2ToNative(uint8_t* base, uint32_t in, uint32_t out, uint32_t frame) {
   CopyFloat(base, out + 76, in + 40);
   CopyFloat(base, out + 52, in + 44);
   return f1;
+}
+
+// --- The PCM codec's pass ---
+
+namespace {
+
+constexpr uint32_t kSetFlagsFunction = 0x82467078;       // CodecBase::SetFlags
+constexpr uint32_t kCompletePacketFunction = 0x824674D8;  // CodecBase::CompletePacket
+constexpr uint32_t kPcmCodecStopFunction = 0x8246D500;   // PcmCodec::Stop
+constexpr uint32_t kBufferClearFunction = 0x8245F8E8;    // XAudioBuffer::Clear
+constexpr uint32_t kFloatZero = 0x82000A34;              // the f31 constant
+constexpr uint32_t kFadeStep = 0x8204B954;               // 0.5
+
+// The codec base's slot +84 (SetFlags): its plain C++ when it's the game's
+// (in a frame of its own below `frame`), else the function through `call`.
+void ProcessSetFlags(uint8_t* base, uint32_t codec_base, uint32_t mask, uint32_t bits,
+                     uint32_t return_address, uint32_t thread, uint32_t frame,
+                     const GuestCall& call) {
+  const uint32_t target = Method(base, codec_base, 84);
+  if (target == kSetFlagsFunction) {
+    SetRegs(call, Args({codec_base, mask, bits}));
+    Below(base, frame, 144);
+    CodecSetFlags(base, codec_base, mask, bits, thread, call);
+  } else {
+    call(target, return_address, At(frame, Args({codec_base, mask, bits})));
+  }
+}
+
+// The codec's slot +52 (Stop) with 1 (at once): as ProcessSetFlags.
+void ProcessStop(uint8_t* base, uint32_t codec, uint32_t return_address, uint32_t thread,
+                 uint32_t frame, const GuestCall& call) {
+  const uint32_t target = Method(base, codec, 52);
+  if (target == kPcmCodecStopFunction) {
+    SetRegs(call, Args({codec, 1}));
+    PcmCodecStop(base, codec, 1, thread, Below(base, frame, 128), call);
+  } else {
+    call(target, return_address, At(frame, Args({codec, 1})));
+  }
+}
+
+// The rest of the converter's output zeroed (memset a channel every 1,024
+// bytes from the frames written), as the original's loops.
+void ZeroRest(uint8_t* base, uint32_t converter, const GuestCall& call) {
+  const uint32_t written = guest::LoadU32(base, converter + 28);
+  const uint32_t left = guest::LoadU32(base, converter + 24) - written;
+  uint32_t channels = guest::LoadU8(base, converter + 13);
+  if (left == 0 || channels == 0) {
+    return;
+  }
+  const uint32_t bytes = left << 2;
+  uint32_t offset = written << 2;
+  while (channels != 0) {
+    const uint32_t at = guest::LoadU32(base, converter + 20) + offset;
+    SetRegs(call, Args({at, 0, bytes}));
+    Clear(base, at, bytes);
+    channels--;
+    offset += 1024;
+  }
+}
+
+}  // namespace
+
+uint64_t PcmCodecProcess(uint8_t* base, uint32_t codec, uint64_t iface, uint32_t thread,
+                         uint32_t frame, const GuestCall& call) {
+  ITC_NATIVE_RUNNING("sub_8246D860 PcmCodec::Process");
+  const uint32_t codec_base = codec + 16;
+  const uint32_t converter = codec + 184;
+  const uint32_t format = frame + 80;
+  const uint64_t buffer = uint32_t(iface) != 0 ? iface - 8 : 0;
+  SpinTake(base, thread, call);
+  SetRegs(call, Args({buffer, format}));
+  uint64_t r29 = BufferGetFormat(base, uint32_t(buffer), format);
+  if (int32_t(r29) >= 0) {
+    guest::StoreU8(base, frame + 81, guest::LoadU8(base, codec + 56));
+    SetRegs(call, Args({buffer, format, 1}));
+    if (const auto cleared = BufferClear(base, uint32_t(buffer), format, 1)) {
+      r29 = uint64_t(int64_t(int32_t(*cleared)));  // as lis/ori leave the errors
+    } else {
+      call(kBufferClearFunction, 0x8246D904, At(frame, Args({buffer, format, 1})));
+      r29 = LastCallR3();
+    }
+  }
+  if (int32_t(r29) < 0) {
+    SpinRelease(base, thread, call);
+    if (r29 != 0) {
+      return r29;
+    }
+  } else {
+    guest::StoreU32(base, converter + 20, guest::LoadU32(base, frame + 88));
+    guest::StoreU32(base, converter + 24, 256);
+    guest::StoreU32(base, converter + 28, 0);
+    const uint8_t state = guest::LoadU8(base, codec + 172);
+    if ((state & 1) == 0 || (state & 0x10) != 0) {
+      // Not playing, or starved: the output zeroed, 1.
+      ZeroRest(base, converter, call);
+      SpinRelease(base, thread, call);
+      return 1;
+    }
+    if ((state & 2) != 0) {
+      // Just started: the volume at once, the converter's ramp and kept
+      // frames reset, bit 1 cleared.
+      CopyFloat(base, codec + 224, codec + 112);
+      CopyFloat(base, converter + 36, converter + 40);
+      for (uint32_t k = 0; k < 6; k++) {
+        guest::StoreU32(base, converter + 52 + 4 * k, 0);
+      }
+      CopyFloat(base, converter + 48, kFloatZero);
+      ProcessSetFlags(base, codec_base, 2, 0, 0x8246DA7C, thread, frame, call);
+    }
+    if ((guest::LoadU8(base, codec + 172) & 4) != 0) {
+      // Stopping: the volume halved a pass until the count runs out.
+      const double volume = LoadSingle(base, codec + 224);
+      const uint32_t count = (uint32_t(guest::LoadU16(base, codec + 174)) + 0xFFFF) & 0xFFFF;
+      guest::StoreU16(base, codec + 174, uint16_t(count));
+      if (count != 0) {
+        const double f0 = double(float(volume * LoadSingle(base, kFadeStep)));
+        guest::StoreFloat(base, codec + 224, float(f0));
+      } else {
+        CopyFloat(base, codec + 224, kFloatZero);
+      }
+    }
+    SpinRelease(base, thread, call);
+  }
+  SetRegs(call, Args({6, 1}));
+  AddStat(base, 6, 1);
+  uint64_t entry = 0;
+  for (;;) {
+    uint64_t current = entry;
+    if (uint32_t(entry) != 0 &&
+        guest::LoadU32(base, converter + 4) == guest::LoadU32(base, converter + 8)) {
+      // The packet's region played.
+      const uint32_t loops = guest::LoadU32(base, uint32_t(entry) + 16);
+      if (loops == 0) {
+        const uint32_t target = Method(base, codec_base, 92);
+        if (target == kCompletePacketFunction) {
+          SetRegs(call, Args({codec_base, entry, 0}));
+          CodecCompletePacket(base, codec_base, entry, 0, thread, Below(base, frame, 128), call);
+        } else {
+          call(target, 0x8246DBDC, At(frame, Args({codec_base, entry, 0})));
+        }
+        current = 0;
+      } else {
+        if (loops != 0xFFFFFFFFu) {
+          guest::StoreU32(base, uint32_t(entry) + 16, loops - 1);
+        }
+        guest::StoreU32(base, codec + 120, guest::LoadU32(base, uint32_t(entry) + 20));
+        const uint32_t callback = guest::LoadU32(base, codec + 180);
+        if (callback != 0) {
+          guest::StoreU32(base, frame + 88, 0);
+          guest::StoreU32(base, frame + 80, guest::LoadU32(base, codec + 12));
+          guest::StoreU32(base, frame + 84, guest::LoadU32(base, uint32_t(entry) + 36));
+          call(callback, 0x8246D9E4, At(frame, Args({frame + 80})));
+        }
+      }
+    }
+    if (guest::LoadU32(base, converter + 24) == guest::LoadU32(base, converter + 28)) {
+      entry = 0;
+    } else if (uint32_t(current) != 0) {
+      entry = current;
+    } else {
+      // The first queued packet, started on its first pass.
+      SpinTake(base, thread, call);
+      const uint64_t first = FirstEntry(base, codec + 20);
+      if (uint32_t(first) != 0 && guest::LoadU8(base, uint32_t(first) + 117) == 0) {
+        guest::StoreU32(base, codec + 120, guest::LoadU32(base, uint32_t(first) + 28));
+        guest::StoreU8(base, uint32_t(first) + 117, 1);
+      }
+      SpinRelease(base, thread, call);
+      entry = first;
+    }
+    if (uint32_t(entry) == 0) {
+      break;
+    }
+    const uint32_t packet = uint32_t(entry);
+    const uint32_t end = guest::LoadU32(base, packet + 16) != 0
+                             ? guest::LoadU32(base, packet + 24)
+                             : guest::LoadU32(base, packet + 32);
+    const uint32_t data = guest::LoadU32(base, packet + 8);
+    const uint32_t position = guest::LoadU32(base, codec + 120);
+    guest::StoreU32(base, converter + 4, end);
+    guest::StoreU32(base, converter + 0, data);
+    guest::StoreU32(base, converter + 8, position < end ? position : end);
+    SetRegs(call, Args({converter}));
+    const uint64_t used = ResamplerProcess(base, converter, Below(base, frame, 128), call);
+    SpinTake(base, thread, call);
+    if (position == guest::LoadU32(base, codec + 120)) {
+      guest::StoreU32(base, codec + 120, uint32_t(used + position));
+    }
+    guest::StoreU32(base, codec + 168, uint32_t(guest::LoadU32(base, codec + 168) + used));
+    SpinRelease(base, thread, call);
+  }
+  // Out of packets, or the output full: the rest zeroed; out of packets
+  // with nothing queued, the end of stream's stop or starved.
+  SpinTake(base, thread, call);
+  CopyFloat(base, converter + 36, converter + 40);
+  const uint32_t written = guest::LoadU32(base, converter + 28);
+  if (guest::LoadU32(base, converter + 24) - written != 0) {
+    ZeroRest(base, converter, call);
+    if ((guest::LoadU8(base, codec + 172) & 8) == 0) {
+      const uint32_t head = codec + 20;
+      const uint32_t next = guest::LoadU32(base, head);
+      if (next == head || next - guest::LoadU32(base, head + 8) == 0) {
+        ProcessSetFlags(base, codec_base, 16, 16, 0x8246DEC0, thread, frame, call);
+      }
+    } else {
+      ProcessStop(base, codec, 0x8246DEDC, thread, frame, call);
+    }
+  }
+  const uint8_t state = guest::LoadU8(base, codec + 172);
+  if ((state & 4) != 0 &&
+      (guest::LoadU16(base, codec + 174) == 0 || (state & 0x10) != 0)) {
+    ProcessStop(base, codec, 0x8246DF1C, thread, frame, call);
+  }
+  SpinRelease(base, thread, call);
+  return 0;
 }
 
 }  // namespace xaudio

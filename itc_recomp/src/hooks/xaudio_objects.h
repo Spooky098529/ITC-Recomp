@@ -81,6 +81,7 @@ void XAudioLargestPrimeBelow(PPCContext& ctx, uint8_t* base);   // sub_8246DFE8
 void XAudioFilterCoefficient(PPCContext& ctx, uint8_t* base);   // sub_824675B8
 void XAudioReverbSetParameters(PPCContext& ctx, uint8_t* base);  // sub_82462148
 void XAudioI3dl2ToNative(PPCContext& ctx, uint8_t* base);        // sub_82469418
+void XAudioPcmCodecProcess(PPCContext& ctx, uint8_t* base);      // sub_8246D860
 void XAudioFillDelayLine2048(PPCContext& ctx, uint8_t* base);   // sub_82467720
 void XAudioFillDelayLine64(PPCContext& ctx, uint8_t* base);     // sub_82467788
 void XAudioFillDelayLine16(PPCContext& ctx, uint8_t* base);     // sub_824677F0

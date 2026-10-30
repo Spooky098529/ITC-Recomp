@@ -378,4 +378,32 @@ uint64_t ReverbSetParameters(uint8_t* base, uint32_t reverb, uint32_t kind, uint
 // the original leaves it); r3 is not touched.
 double I3dl2ToNative(uint8_t* base, uint32_t in, uint32_t out, uint32_t frame);
 
+// --- The PCM codec's pass ---
+
+// PcmCodec::Process (sub_8246D860; slot +24 of 0x8204BB48): one 256-frame
+// pass into the buffer behind the interface `iface` (r5; the object 8
+// bytes before it, 0 stays 0). Under the voice lists' spin lock (taken as
+// the original does): the buffer's format to `frame` + 80 with the codec's
+// channels (+56) at +81, XAudioBuffer::Clear (its error returned, the lock
+// released); the converter's output (+204 the samples, +208 256, +212 0).
+// Not playing (+172 bit 0) or starved (bit 4): the output zeroed, 1.
+// Else just started (bit 1): +224 = +112, the converter's +220 = +224, its
+// +236 to +256 0, +232 the float at 0x82000A34, slot +84 (2, 0); stopping
+// (bit 2): +174 down by one, +224 halved (0x8204B954) or at 0 the float at
+// 0x82000A34. Then XAudio::AddStat (6, 1), and the queued packets
+// resampled (Resampler::Process) from +120 to their region's end (the loop
+// end +24 while loops +16 are left, else +32): at the end, with loops left
+// (-1 forever) back to the loop start (+20) and the loop-end callback
+// (+180) with {+12, 0, the context +36} at `frame` + 80, else slot +92
+// (complete) of the base; a packet first played from its start (+28,
+// +117 set); +120 and +168 moved on under the lock. Out of packets: the
+// rest zeroed; with output left, the end of stream (bit 3) stops (slot
+// +52, 1), else an empty queue is starved (slot +84, 16, 16); stopping
+// with +174 at 0 or starved stops. Returns 0. The base's slots +84 and
+// +92 and the codec's +52 run their plain C++ when they're the game's
+// (SetFlags, CompletePacket, PcmCodec::Stop), else through `call`.
+// `frame` is its (192 bytes).
+uint64_t PcmCodecProcess(uint8_t* base, uint32_t codec, uint64_t iface, uint32_t thread,
+                         uint32_t frame, const GuestCall& call);
+
 }  // namespace xaudio

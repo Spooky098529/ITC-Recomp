@@ -1975,6 +1975,143 @@ void ReverbCoreCases(Context& h) {
   memory::Free(io_block);
 }
 
+// --- The PCM codec's pass ---
+
+// PcmCodec::Process (sub_8246D860) over a PCM codec at the block (as Codec
+// builds one, its queued list at offset 0: the base's vtable at +0x1C00 with SetFlags at +84 and
+// CompletePacket or RetirePacket at +92; the codec's own at +0x1C80 with
+// PcmCodec::Stop, or AddRef now and then, at +52), its queued packets (0-5
+// at +0x400, each with a play region, a loop region inside it, loops 0-2 or
+// -1, started or not, data in the second region), the converter (+184) set
+// as the codec's set-up leaves it (16-bit, 1 or 2 channels, a game rate and
+// 48 kHz out, the kernel kept or picked again), the loop-end callback
+// (+180) 0 or AddRef, and the buffer at +0x1D00 (its interface in r5, 3
+// channels of capacity) over the second region's first 0x800 bytes. The
+// state byte (+172) and the fade count (+174) set to reach each branch:
+// not playing, starved, Clear's error (4 channels), just started,
+// stopping (at its last pass or not), the end of stream, an empty queue.
+// The spin lock held around the call in half the cases. The block and the
+// second region compared, the volume (+224) and the converter's ramp start
+// (+220) as floats, and the frame's words (+80, 12 bytes: the format, then
+// the loop-end callback's struct). The callees' frames below aren't: their
+// words there are shared with the translated callees' register saves
+// (Resampler::Process's and CompletePacket's own cases compare them).
+void PcmProcess(Context& h, uint32_t block) {
+  constexpr uint32_t kDataBytes = 0x3000;
+  const uint32_t data = memory::Alloc(kDataBytes, 0);
+  const uint32_t codec = block;
+  const uint32_t buffer = block + 0x1D00;
+  static constexpr uint32_t kRates[] = {48000, 44100, 32000, 22050, 16000, 11025};
+  static constexpr uint32_t kMono[] = {0x8247E188, 0x82473E48};
+  static constexpr uint32_t kStereo[] = {0x8247E260, 0x82474188, 0x8247F558, 0x82478E60};
+  Results results("PcmCodec::Process (sub_8246D860)");
+  for (int i = 0; i < 96; i++) {
+    const int kind = i % 12;
+    LockedCaseWith(
+        h, results, block, __imp__sub_8246D860, hooks::XAudioPcmCodecProcess, i % 2 == 0,
+        [&](Random& random, PPCContext& t) {
+          for (uint32_t k = 0; k < kDataBytes; k += 4) {
+            Store(h.base, data + k, uint32_t(random.Next()));
+          }
+          Codec(h.base, block, codec, random);
+          const uint32_t channels = 1 + random.Below(2);
+          Store(h.base, codec, block + 0x1C80);
+          Store(h.base, block + 0x1C80 + 52, random.Below(4) == 0 ? kAddRef : 0x8246D500);
+          guest::StoreU8(h.base, codec + 56, uint8_t(kind == 2 ? 4 : channels));
+          Store(h.base, codec + 112, Sample(random));
+          Store(h.base, codec + 224, Sample(random));
+          Store(h.base, codec + 180, random.Below(3) == 0 ? 0 : kAddRef);
+          // The state: bits 5-7 random, the rest by the case's kind.
+          uint8_t state = uint8_t(random.Next() & 0xE0);
+          uint8_t bits = uint8_t(random.Next() & 0x0E);  // just started, stopping, end
+          switch (kind) {
+            case 0: bits = uint8_t(random.Next() & 0x1E); break;  // not playing
+            case 1: bits = 0x11 | bits; break;                    // starved
+            case 3: bits = 0x03; break;
+            case 4:
+            case 5: bits = 0x05 | (bits & 0x0A); break;
+            case 6: bits = 0x09 | (bits & 0x06); break;
+            case 7: bits = 0x01 | (bits & 0x06); break;
+            default: bits |= 1; break;
+          }
+          state |= bits;
+          guest::StoreU8(h.base, codec + 172, state);
+          guest::StoreU16(h.base, codec + 174,
+                          uint16_t(kind == 4 ? 1 : kind == 5 ? 2 + random.Below(8)
+                                                             : random.Below(4)));
+          // The queued list at offset 0, as the codec's set-up makes it (the
+          // entries' fields from +8 clear of the links).
+          const bool empty =
+              kind == 7 || (kind == 6 && random.Below(2) == 0) || random.Below(10) == 0;
+          MakeList(h.base, codec + 20, 0, block + 0x400, empty ? 0 : 1 + random.Below(5));
+          // The queued packets.
+          const uint32_t head = codec + 20;
+          const uint32_t offset = guest::LoadU32(h.base, head + 8);
+          const uint32_t room = (kDataBytes - 0x800 - 0x80) / (2 * channels);
+          bool first = true;
+          for (uint32_t node = guest::LoadU32(h.base, head); node != head;
+               node = guest::LoadU32(h.base, node)) {
+            const uint32_t entry = node - offset;
+            const uint32_t end = random.Below(4) == 0 ? 1 + random.Below(8)
+                                                      : 1 + random.Below(room < 900 ? room : 900);
+            const uint32_t loop_start = random.Below(end);
+            const uint32_t loop_end = loop_start + 1 + random.Below(end - loop_start);
+            Store(h.base, entry + 8, data + 0x800 + 16 * random.Below(8));
+            const uint32_t loops = random.Below(4) == 0 ? 0xFFFFFFFFu : random.Below(3);
+            Store(h.base, entry + 16, loops);
+            Store(h.base, entry + 20, loop_start);
+            Store(h.base, entry + 24, loop_end);
+            Store(h.base, entry + 28, random.Below(3) == 0 ? 0 : random.Below(end + 1));
+            Store(h.base, entry + 32, end);
+            guest::StoreU8(h.base, entry + 117, uint8_t(random.Below(2)));
+            if (first) {
+              // The position: inside the region, at its end or past it now
+              // and then.
+              const uint32_t limit = loops != 0 ? loop_end : end;
+              Store(h.base, codec + 120, random.Below(6) == 0   ? limit
+                                         : random.Below(8) == 0 ? limit + random.Below(50)
+                                                                : random.Below(limit));
+              first = false;
+            }
+          }
+          // The converter.
+          const uint32_t converter = codec + 184;
+          guest::StoreU8(h.base, converter + 12, 1);
+          guest::StoreU8(h.base, converter + 13, uint8_t(channels));
+          Store(h.base, converter + 16, kRates[random.Below(6)]);
+          Store(h.base, converter + 32, 48000);
+          Store(h.base, converter + 36, Sample(random));
+          Store(h.base, converter + 40, Sample(random));
+          static constexpr float kRatios[] = {1.0f, 0.91875f, 0.5f, 0.6666667f, 0.459375f, 0.2296875f};
+          Store(h.base, converter + 44, std::bit_cast<uint32_t>(kRatios[random.Below(6)]));
+          const float fraction = random.Below(8) == 0 ? 0.0f
+                                                      : float(random.Below(1u << 24)) / float(1u << 24);
+          Store(h.base, converter + 48, std::bit_cast<uint32_t>(fraction));
+          Store(h.base, converter + 52, Sample(random));
+          Store(h.base, converter + 56, Sample(random));
+          Store(h.base, converter + 76, channels == 1 ? kMono[random.Below(2)]
+                                                     : kStereo[random.Below(4)]);
+          Store(h.base, converter + 80, random.Below(2) == 0 ? 3 : 0);
+          Store(h.base, converter + 84, uint32_t(random.Next()) & 0xFFFFFF7Eu |
+                                            (random.Below(4) == 0 ? 0x80 : 0) |
+                                            random.Below(2));
+          Buffer(h.base, buffer, data, channels);
+          t.r3.u64 = codec;
+          t.r4.u64 = random.Next();
+          t.r5.u64 = buffer + 8;
+          t.fpscr.loadFromHost();
+        },
+        [&](Outputs& out, uint32_t sp) {
+          out.Bytes(Read(h.base, sp - 192 + 80, 12));
+          out.Bytes(Read(h.base, data, 0x800));
+        },
+        [&](Outputs& out) { BlockWithFloats(out, h.base, block, {{220, 2}}); },
+        fmt::format("case {} (kind {})", i, kind));
+  }
+  results.Report();
+  memory::Free(data);
+}
+
 }  // namespace
 
 void XAudioObjects(Context& h) {
@@ -1987,6 +2124,7 @@ void XAudioObjects(Context& h) {
   ReverbParts(h, block.address);
   ReverbParameters(h, block.address);
   Resampler(h, block.address);
+  PcmProcess(h, block.address);
   ReverbStages(h);
   ReverbCoreCases(h);
 }

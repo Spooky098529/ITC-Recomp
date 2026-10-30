@@ -47,7 +47,8 @@ ITC_FLAG_BOOL(native_xaudio_objects, true, "ITC",
               "the all-passes sub_82462DC8, sub_82463130, sub_824632A0 and sub_82463410, and the "
               "crossfading delay lines sub_824624F8 and sub_82463620; Reverb::SetParameters "
               "sub_82462148 under the voice lists' spin lock, taken as the original does, and "
-              "I3dl2::ToNative sub_82469418) natively instead of through the "
+              "I3dl2::ToNative sub_82469418; PcmCodec::Process sub_8246D860 under the voice lists' "
+              "spin lock, taken as the original does) natively instead of through the "
               "translated code (the same reads and writes; checked by "
               "--run_harnesses=xaudio_objects)");
 
@@ -523,6 +524,16 @@ void XAudioI3dl2ToNative(PPCContext& ctx, uint8_t* base) {
   ctx.f1.f64 = xa::I3dl2ToNative(base, ctx.r4.u32, ctx.r5.u32, ctx.r1.u32 - 128);
 }
 
+void XAudioPcmCodecProcess(PPCContext& ctx, uint8_t* base) {
+  ctx.fpscr.disableFlushMode();
+  const uint32_t codec = ctx.r3.u32;
+  const uint64_t iface = ctx.r5.u64;
+  const uint32_t thread = Thread(ctx, base);
+  Framed(ctx, base, 192, [&](const xa::GuestCall& call, uint32_t frame) {
+    return xa::PcmCodecProcess(base, codec, iface, thread, frame, call);
+  });
+}
+
 void XAudioResamplerProcess(PPCContext& ctx, uint8_t* base) {
   const uint32_t state = ctx.r3.u32;
   Framed(ctx, base, 128, [&](const xa::GuestCall& call, uint32_t frame) {
@@ -662,3 +673,4 @@ ITC_XAUDIO_OBJECTS_ADAPTER(8247F558, XAudioCopyStereo)
 ITC_XAUDIO_OBJECTS_ADAPTER(82463B90, XAudioReverbCoreProcess)
 ITC_XAUDIO_OBJECTS_ADAPTER(82462148, XAudioReverbSetParameters)
 ITC_XAUDIO_OBJECTS_ADAPTER(82469418, XAudioI3dl2ToNative)
+ITC_XAUDIO_OBJECTS_ADAPTER(8246D860, XAudioPcmCodecProcess)
