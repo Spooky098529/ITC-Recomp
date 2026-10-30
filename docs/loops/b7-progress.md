@@ -52,7 +52,9 @@ file's history. What's left to see in a drive, from every run:
   rival logo's open and close, the cutscene's step and update (the
   logo's draw still through `--redraw_rival_logo`'s override), the TV
   camera, `GarageCamera::Update`; 9 adapters removed; 82 of 90 in play
-  ours). Validation running. Left: `CameraDirector::InitStates`,
+  ours). Validated (`itc_2750` at 60 s, replay `itc_2751` ok): 17 of 17
+  harness lines; 10 ran in play, 1 in the replay, 4 more to drive.
+  Migration 3 running. Left: `CameraDirector::InitStates`,
   `Cutscene::Cutscene` (ready, 2,688 lines) and `SetMode`, then
   `OnRaceStart`, `Resume`, `Update`; `Viewport::LookAt`'s adapter
   removable. Left: `CameraDirector::InitStates`,
@@ -108,3 +110,6 @@ file's history. What's left to see in a drive, from every run:
 - After the camera modes' migration 2 (`itc_2749`: race 26 s, 0
   errors, touched harnesses 0 differing): ours 3359, work left 3038
   (wrapped 104, known 473, unknown 2461).
+- After its validation (`itc_2750`, 60 s: race 13 s, 0 errors, every
+  harness 0 differing but the expected groups): ours 3359, work left
+  3038.

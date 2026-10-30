@@ -110,6 +110,13 @@ here loses its heading.
   cutscene's shots, the rival logo, views 3 and 5's handlers and the
   TV camera's tracking, which the replay's race doesn't show): `sub_821524B8`, `sub_821524D8`, `sub_82154378`, `sub_821543E8`, `sub_82154300`, `sub_82150300`, `sub_82152290`, `sub_82150B10`, `sub_82150878`, `sub_82150100`, `sub_82150098`, `sub_8214FFF0`, `sub_82150960`, `sub_82150350`, `sub_821504E0`, `sub_82150A98`, `sub_82150A10`, `sub_82150590`, `sub_82211848`, `sub_82211708`, `sub_82211AB0`, `sub_82156B68`, `sub_82155800`, `sub_82156980`
 
+- The camera modes, migration 2 (attract race `itc_2750`, replay
+  `itc_2751`, ok; `camera-modes.md`; the rival intro cutscene, which
+  neither run goes through; `CutsceneShot::Step` and `RivalLogo::Play`
+  already listed above): `sub_822118E0` RivalLogo::Open,
+  `sub_82211980` RivalLogo::Close, `sub_821561F8` Cutscene::Update,
+  `sub_82155A28` Cutscene::Step
+
 ## Run 2026-10-30 01:06 (`b7-loop-29-10-26-2`)
 
 - The app's start-up, migration 3 (attract race `itc_2629`, replay
