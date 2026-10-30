@@ -27,7 +27,7 @@ ITC_FLAG_BOOL(native_camera_modes, true, "ITC",
               "List40::Insert sub_821544E0, List16::Insert20 sub_82154458 (no adapter: only IntroCamera::IntroCamera's plain C++ calls it), "
               "Insert32 sub_82154378, Insert608 sub_821543E8 and Copy32 sub_82154300 (no adapter: only CutsceneShot::Init's plain C++ calls it); "
               "CameraAnims::Clear sub_82150078 and Find sub_82150300; ColorFilter::SetStyle "
-              "sub_82152108 and FadeCue::Step sub_82152290; with --native_heap the camera "
+              "sub_82152108 and FadeCue::Step sub_82152290 (no adapter: only CutsceneShot::Step's plain C++ calls it); with --native_heap the camera "
               "animations' CameraAnims::Load sub_82150B10 (with the archive's queue native), "
               "OnLoaded sub_82150878 with CameraAnim::ParseObject sub_82150100 (no adapter), "
               "FreeAll sub_821507D8 with CameraAnim::Free sub_82150098 and CameraAnimBlock::Free "
@@ -239,6 +239,8 @@ void CameraModesStep82152108(PPCContext& ctx, uint8_t* base) {
   }
 }
 
+// FadeCue::Step (no adapter: only CutsceneShot::Step's plain C++ calls it; the step kept
+// for the harness).
 // FadeCue::Step: r3 = the cue (its caller, CutsceneShot::Step, doesn't read
 // r3 after it).
 void CameraModesStep82152290(PPCContext& ctx, uint8_t* base) {
@@ -611,7 +613,6 @@ ITC_CAMERA_MODES(821543E8)
 ITC_CAMERA_MODES(82150078)
 ITC_CAMERA_MODES(82150300)
 ITC_CAMERA_MODES(82152108)
-ITC_CAMERA_MODES(82152290)
 ITC_CAMERA_MODES(82150B10)
 ITC_CAMERA_MODES(82150878)
 ITC_CAMERA_MODES(821507D8)
