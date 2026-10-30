@@ -241,5 +241,6 @@ void AppStartUp(Context& h);
 void DataLoad(Context& h);
 void Career(Context& h);
 void RaceEvent(Context& h);
+void CameraModes(Context& h);
 
 }  // namespace harness

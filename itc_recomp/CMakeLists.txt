@@ -218,6 +218,8 @@ set(ITC_SOURCES
     src/hooks/race_event.cpp
     src/race_event/conditions.cpp
     src/race_event/event.cpp
+    src/hooks/camera_modes.cpp
+    src/camera_modes/camera_modes.cpp
     src/save_interface/save_interface.cpp
     src/save_interface/save_layer.cpp
     src/hooks/file_layer.cpp
@@ -384,6 +386,7 @@ set(ITC_SOURCES
     src/harnesses/data_load.cpp
     src/harnesses/career.cpp
     src/harnesses/race_event.cpp
+    src/harnesses/camera_modes.cpp
     src/harnesses/car_sounds.cpp
     src/harnesses/x3daudio.cpp
     src/harnesses/xaudio.cpp
@@ -511,7 +514,8 @@ set(ITC_SOURCES
 # car physics (src/vehicle/, docs/functions/vehicle.md) and the DXT block
 # encoders (src/texture_compression/, docs/functions/texture-compression.md)
 # and the career (src/career/, docs/functions/career.md) and the race event
-# (src/race_event/, docs/functions/race-event.md).
+# (src/race_event/, docs/functions/race-event.md) and the camera modes
+# (src/camera_modes/, docs/functions/camera-modes.md).
 set_source_files_properties(src/c_runtime/math.cpp src/ui_movies/keys.cpp
     src/ui_movies/animation.cpp
     src/ui_movies/draw.cpp src/ui_movies/texts.cpp src/ui_movies/update.cpp
@@ -557,7 +561,8 @@ set_source_files_properties(src/c_runtime/math.cpp src/ui_movies/keys.cpp
     src/career/race_result.cpp src/career/progress.cpp src/career/event_setup.cpp
     src/career/garage.cpp
     src/race_event/conditions.cpp
-    src/race_event/event.cpp PROPERTIES
+    src/race_event/event.cpp
+    src/camera_modes/camera_modes.cpp PROPERTIES
     COMPILE_OPTIONS "-ffp-model=strict;-ffp-contract=off"
     SKIP_PRECOMPILE_HEADERS ON)
 
