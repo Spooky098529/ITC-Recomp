@@ -18,9 +18,11 @@
 #include "base/log.h"
 #include "data_tables/data_tables.h"
 #include "hooks/location_screen.h"
+#include "hooks/ui_movies.h"
 #include "location_screen/location_screen.h"
 #include "memory/heap.h"
 #include "race_event/race_event.h"
+#include "ui_movies/game.h"
 
 #include <fmt/format.h>
 
@@ -50,6 +52,13 @@ constexpr uint32_t kRecordCount = 0x49FE0;
 constexpr uint32_t kRaceBytes = ls::kRacerRecords + kRecordCount + 16;
 constexpr uint32_t kScreenBytes = 0x1000;  // the screen (912 bytes), then the rest
 constexpr uint32_t kEventBytes = 0x400;    // the event (160 bytes), then its lists
+// The movies' block: movie 21 at +0, movie 30 at +0xA000, the live scene at
+// +0x14000 (0x200), 16 sub-scenes (0x200 each) from +0x14200, 32 leaf
+// nodes (0x80 each) from +0x16200, the movie table's pairs at +0x17400.
+constexpr uint32_t kMoviesBytes = 0x18000;
+constexpr uint32_t kMovie30At = 0xA000, kSceneAt = 0x14000, kSubScenesAt = 0x14200,
+                   kLeavesAt = 0x16200, kPairsAt = 0x17400;
+constexpr uint32_t kMissingMovie = 0x826C5CDC;  // UiMovies::Find's answer when not found
 
 struct Block {
   explicit Block(uint32_t bytes) : bytes(bytes), address(memory::Alloc(bytes, 0)) {}
@@ -98,9 +107,11 @@ struct World {
         tables(0x40 + kItems * kItemBytes + kTables56 * kEntries56 * 56 + kEntries20 * 20),
         race(kRaceBytes),
         screen(kScreenBytes),
-        event(kEventBytes) {}
+        event(kEventBytes),
+        movies(kMoviesBytes) {}
   bool ok() const {
-    return save.address && tables.address && race.address && screen.address && event.address;
+    return save.address && tables.address && race.address && screen.address && event.address &&
+           movies.address;
   }
   uint32_t items() const { return tables.address + 0x40; }
   uint32_t item(uint32_t id) const { return items() + kItemBytes * id; }
@@ -114,6 +125,7 @@ struct World {
   Block race;
   Block screen;
   Block event;
+  Block movies;  // movies 21 and 30, their scene tree, the movie table's pairs
 };
 
 struct Spec {
@@ -121,6 +133,85 @@ struct Spec {
   // frame, compared too.
   std::vector<std::pair<int32_t, uint32_t>> frame_ranges;
 };
+
+// UiMovie::Run's calls (the update it jumps to, sub_8211D2F8), kept and
+// answered with 0 or 1 from the case's generator.
+struct Call {
+  uint32_t function, lr, r1;
+  uint64_t r3, r4;
+};
+std::vector<Call>* g_calls = nullptr;
+Random g_answers;
+
+bool StandIn(uint32_t function, PPCContext& ctx, uint8_t*) {
+  if (g_calls == nullptr || function != 0x8211D2F8) {
+    return false;
+  }
+  g_calls->push_back({function, uint32_t(ctx.lr), ctx.r1.u32, ctx.r3.u64, ctx.r4.u64});
+  ctx.r3.u64 = g_answers.Below(2);
+  return true;
+}
+
+void Record(Outputs& out, const std::vector<Call>& calls) {
+  out.Word(uint32_t(calls.size()));
+  for (const Call& call : calls) {
+    out.Word(call.function);
+    out.Word(call.lr);
+    out.Word(call.r1);
+    out.Word(uint32_t(call.r3 >> 32));
+    out.Word(uint32_t(call.r3));
+    out.Word(uint32_t(call.r4 >> 32));
+    out.Word(uint32_t(call.r4));
+  }
+}
+
+// The movies: both with empty animation lists, live scene the tree's root;
+// the root's and sub-scenes' child index (+108) 0 to 3 and 24 child entries
+// (the root's sub-scenes, the sub-scenes' leaves); the leaves' tags PIC,
+// PRM or other (the sub-scenes' SCE, so SetNodeTexture leaves their index);
+// movie 30's named animation 53 over a leaf (its +12 the length); the movie
+// table at the pairs {21, 30}, or only one (then the missing word names
+// the movie 21).
+void ShapeMovies(uint8_t* base, const World& w, Random& r) {
+  const uint32_t at = w.movies.address;
+  const uint32_t movie21 = at, movie30 = at + kMovie30At;
+  for (uint32_t movie : {movie21, movie30}) {
+    ui_movies::InitAnimationLists(base, movie);
+    guest::StoreU32(base, movie + 16, at + kSceneAt);
+  }
+  auto tree = [&](uint32_t node, uint32_t targets, uint32_t stride, uint32_t count) {
+    const uint32_t index = r.Below(4);
+    guest::StoreU32(base, node + 108, index);
+    for (uint32_t i = 0; i < 24; i++) {
+      guest::StoreU32(base, node + 128 + 8 * (index + i), targets + stride * r.Below(count));
+    }
+  };
+  tree(at + kSceneAt, at + kSubScenesAt, 0x200, 16);
+  for (uint32_t k = 0; k < 16; k++) {
+    const uint32_t sub = at + kSubScenesAt + 0x200 * k;
+    guest::StoreU32(base, sub, 0x53434500);  // "SCE\0"
+    tree(sub, at + kLeavesAt, 0x80, 32);
+  }
+  constexpr uint32_t kTags[] = {0x50494300, 0x50524D00, 0x54585400};  // PIC, PRM, TXT
+  for (uint32_t k = 0; k < 32; k++) {
+    const uint32_t leaf = at + kLeavesAt + 0x80 * k;
+    guest::StoreU32(base, leaf, r.Below(4) == 3 ? uint32_t(r.Next()) : kTags[r.Below(3)]);
+    guest::StoreFloat(base, leaf + 12, float(r.Below(100)) / 4.0f);
+  }
+  const uint32_t named = movie30 + 176 + 36 * 53;
+  guest::StoreU32(base, named + 28, at + kSceneAt);
+  guest::StoreU32(base, named + 32, at + kLeavesAt + 0x80 * r.Below(32));
+  const uint32_t pairs = at + kPairsAt;
+  guest::StoreU32(base, pairs + 0, 21);
+  guest::StoreU32(base, pairs + 4, movie21);
+  guest::StoreU32(base, pairs + 8, 30);
+  guest::StoreU32(base, pairs + 12, movie30);
+  const uint32_t which = r.Below(4);  // 0: only 30 (21 missing), 1: only 21, else both
+  guest::StoreU32(base, ui_movies::kMovieTable, which == 0 ? pairs + 8 : pairs);
+  guest::StoreU32(base, ui_movies::kMovieTable + 4, 8);
+  guest::StoreU32(base, ui_movies::kMovieTable + 8, which < 2 ? 1 : 2);
+  guest::StoreU32(base, kMissingMovie, movie21);
+}
 
 using SetupFn = std::function<void(Random&, const World&)>;
 using ArgsFn = std::function<void(PPCContext&, Random&, const World&)>;
@@ -179,7 +270,10 @@ void Case(Context& h, Results& results, const World& w, uint64_t seed, const Set
                               {data_tables::kTables, 4},
                               {ls::kRaceData, 4},
                               {race_event::kEvent, 4},
-                              {ls::kPages, 24}});
+                              {ls::kPages, 24},
+                              {ui_movies::kMovieTable, 12},
+                              {kMissingMovie, 4},
+                              {0x826A50AC, 0x40}});
     PPCContext t = CallContext(h);
     WriteRandom(h.base, h.data, kScratchBytes, r);
     WriteRandom(h.base, t.r1.u32, h.data - t.r1.u32, r);
@@ -190,12 +284,26 @@ void Case(Context& h, Results& results, const World& w, uint64_t seed, const Set
     WriteRandom(h.base, w.screen.address, w.screen.bytes, r);
     WriteRandom(h.base, w.event.address, w.event.bytes, r);
     WriteRandom(h.base, w.records(), 4 * kRecordBytes, r);
+    WriteRandom(h.base, w.movies.address, w.movies.bytes, r);
     ShapeWorld(h.base, w, r);
+    ShapeMovies(h.base, w, r);
     setup(r, w);
     args(t, r, w);
+    t.lr = 0x82000000 | (r.Below(0x10000) << 2);
+    g_answers = Random(r.Next());
+    std::vector<Call> calls;
+    g_calls = &calls;
+    ui_movies_hooks::g_update_callee_stand_in = StandIn;
     ITC_FLAG(native_location_screen) = v == 1;
     (v == 0 ? recompiled : native)(t, h.base);
     ITC_FLAG(native_location_screen) = true;
+    ui_movies_hooks::g_update_callee_stand_in = nullptr;
+    g_calls = nullptr;
+    out[v].Bytes(Read(h.base, w.movies.address, w.movies.bytes));
+    out[v].Bytes(Read(h.base, 0x826A50AC, 0x40));
+    Record(out[v], calls);
+    out[v].Word(uint32_t(t.lr));
+    out[v].Word(t.r1.u32);
     out[v].Bytes(Read(h.base, w.save.address, w.save.bytes));
     out[v].Bytes(Read(h.base, w.screen.address, w.screen.bytes));
     out[v].Bytes(Read(h.base, w.event.address, w.event.bytes));
@@ -355,6 +463,58 @@ void Lists(Context& h, const World& w) {
         hooks::LocationScreenNextResultText, {{{-int32_t(ls::kItemFrame) + 80, 3008}}});
 }
 
+void Movies(Context& h, const World& w) {
+  uint8_t* const base = h.base;
+  const SetupFn none = [](Random&, const World&) {};
+  const ArgsFn no_args = [](PPCContext&, Random&, const World&) {};
+  // The frame below r1: +80 the movie id (SetCursor and ListNode: the
+  // doubleword); the register saves above it not compared.
+  const Spec frame112{{{-112 + 80, 8}}};
+  const Spec frame96{{{-96 + 80, 8}}};
+  const Spec frame128{{{-128 + 80, 8}}};
+  Group(h, w, "LocationScreen::ShowPictures (sub_8222A060)", 300, none, no_args,
+        __imp__sub_8222A060, hooks::LocationScreenShowPictures, frame112);
+  Group(h, w, "LocationScreen::HidePictures (sub_8222A150)", 300, none, no_args,
+        __imp__sub_8222A150, hooks::LocationScreenHidePictures, frame112);
+  Group(h, w, "LocationScreen::SetCarColor (sub_8222AC18)", 300,
+        [base](Random& r, const World& w) {
+          guest::StoreU32(base, w.screen.address + 892,
+                          r.Below(4) == 0 ? uint32_t(r.Next()) : r.Below(3));
+        },
+        no_args, __imp__sub_8222AC18, hooks::LocationScreenSetCarColor, frame96);
+  const ArgsFn value = [](PPCContext& t, Random& r, const World&) {
+    t.r3.u64 = r.Below(3) == 0 ? r.Next() : r.Below(200);
+  };
+  Group(h, w, "LocationScreen::SetCursor (sub_8222BFE8)", 300, none, value, __imp__sub_8222BFE8,
+        hooks::LocationScreenSetCursor, frame112);
+  Group(h, w, "LocationScreen::ListNode (sub_8222C058)", 300, none, value, __imp__sub_8222C058,
+        hooks::LocationScreenListNode, frame112);
+  Group(h, w, "LocationScreen::ShowArrows (sub_8222C0C8)", 300,
+        [base](Random& r, const World& w) {
+          const uint32_t count = r.Below(5);
+          guest::StoreU32(base, w.screen.address + 808, r.Below(8) == 0 ? uint32_t(r.Next()) : count);
+          guest::StoreU32(base, w.screen.address + 800,
+                          r.Below(8) == 0 ? uint32_t(r.Next()) : r.Below(count + 1));
+        },
+        no_args, __imp__sub_8222C0C8, hooks::LocationScreenShowArrows, frame112);
+  Group(h, w, "LocationScreen::RunCardMovie (sub_822291A8)", 200, none, no_args,
+        __imp__sub_822291A8, hooks::LocationScreenRunCardMovie, frame96);
+  // The step word in the screen block; the fades' words 0 or not.
+  const SetupFn fades = [base](Random& r, const World& w) {
+    guest::StoreU32(base, w.screen.address + 0x700, r.Below(2) == 0 ? 0 : r.Below(3));
+    for (uint32_t k = 0; k < 3; k++) {
+      guest::StoreU32(base, 0x826A50DC + 4 * k, r.Below(2) == 0 ? 0 : uint32_t(r.Next()));
+    }
+  };
+  const ArgsFn step = [](PPCContext& t, Random&, const World& w) {
+    t.r3.u64 = w.screen.address + 0x700;
+  };
+  Group(h, w, "LocationScreen::Transition1 (sub_8222AD50)", 300, fades, step,
+        __imp__sub_8222AD50, hooks::LocationScreenTransition1, frame112);
+  Group(h, w, "LocationScreen::Transition18 (sub_8222BE60)", 300, fades, step,
+        __imp__sub_8222BE60, hooks::LocationScreenTransition18, frame128);
+}
+
 }  // namespace
 
 void LocationScreen(Context& h) {
@@ -369,6 +529,7 @@ void LocationScreen(Context& h) {
   }
   Helpers(h, w);
   Lists(h, w);
+  Movies(h, w);
 }
 
 }  // namespace harness

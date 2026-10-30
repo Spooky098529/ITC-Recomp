@@ -11,6 +11,7 @@
 
 #include "archive/archive.h"
 #include "guest.h"
+#include "strings_and_font/strings_and_font.h"
 
 #include <array>
 #include <cstdint>
@@ -475,6 +476,20 @@ std::optional<uint32_t> RevealText(uint8_t* base, uint32_t movie, uint32_t sub_s
 // stored: 1 while there's another page, else 0.
 std::optional<uint32_t> HasMoreText(uint8_t* base, uint32_t movie, uint32_t sub_scene,
                                     uint32_t child);
+
+// sub_8211C1F8 UiMovie::SetText: the node (FindNode) must be a TXT (else
+// nullopt: the original loops forever there, an assert); `varargs` (its r7
+// to r10) stored in the caller's parameter area (`stack` + 48 to + 79) and
+// the va_list from there; its text record (GetText, which may make one)
+// cleared (its buffer's 4 KB, memset) with +20 = 0, string `id` (16-bit)
+// formatted into the buffer (Strings::FormatV from its 128-byte frame below
+// `stack`, with `calls` for FormatV's guest calls), then the record stored
+// for the node's id (TextMapSetKey). Returns movie + kMovieTexts (the r3
+// TextMap::Set leaves); nullopt, with nothing done but the varargs' stores
+// (the original makes them again), where GetText would run the original.
+std::optional<uint32_t> SetText(uint8_t* base, const strings_and_font::FormatCalls& calls,
+                                uint32_t stack, uint32_t movie, uint32_t sub_scene,
+                                uint32_t child, uint32_t id, const uint64_t varargs[4]);
 
 // sub_8211E798 UiMovie::Load: the asset's size (Archive::AssetSize) in pages
 // (VirtualAlloc's, AllocPages), then load(id, them, sub_8211E500, the movie).

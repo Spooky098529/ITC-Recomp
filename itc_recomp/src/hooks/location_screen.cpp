@@ -5,6 +5,7 @@
 #include "hooks/location_screen.h"
 
 #include "base/flags.h"
+#include "hooks/guest_call.h"
 #include "location_screen/location_screen.h"
 
 ITC_FLAG_BOOL(native_location_screen, true, "ITC",
@@ -12,7 +13,11 @@ ITC_FLAG_BOOL(native_location_screen, true, "ITC",
               "LocationScreen::SceneryConfig sub_8228F0A0, KindText sub_82227690, "
               "IsPictureQueued sub_822291E8, PictureA sub_82229108, PictureB sub_82229158, "
               "OnMessage14 sub_82227158, HasMoreUnlocks sub_822281D8, NextUnlockEntry "
-              "sub_82227618, OpponentHasCard sub_82227708, NextResultText sub_822271F8) "
+              "sub_82227618, OpponentHasCard sub_82227708, NextResultText sub_822271F8, "
+              "ShowPictures sub_8222A060, HidePictures sub_8222A150, SetCarColor sub_8222AC18, "
+              "SetCursor sub_8222BFE8, ListNode sub_8222C058, ShowArrows sub_8222C0C8, "
+              "RunCardMovie sub_822291A8, Transition1 sub_8222AD50, Transition18 sub_8222BE60; "
+              "UiMovie::Run through its override) "
               "natively instead of through the translated code (the same writes; checked by "
               "--run_harnesses=location_screen)");
 
@@ -66,6 +71,85 @@ void LocationScreenNextResultText(PPCContext& ctx, uint8_t* base) {
   __imp__sub_822271F8(ctx, base);
 }
 
+void LocationScreenShowPictures(PPCContext& ctx, uint8_t* base) {
+  ctx.r3.u64 = ls::ShowPictures(base, ctx.r1.u32);
+}
+
+void LocationScreenHidePictures(PPCContext& ctx, uint8_t* base) {
+  ctx.r3.u64 = ls::HidePictures(base, ctx.r1.u32);
+}
+
+void LocationScreenSetCarColor(PPCContext& ctx, uint8_t* base) {
+  ctx.r3.u64 = ls::SetCarColor(base, ctx.r1.u32);
+}
+
+void LocationScreenSetCursor(PPCContext& ctx, uint8_t* base) {
+  ctx.fpscr.disableFlushMode();
+  ctx.r3.u64 = ls::SetCursor(base, ctx.r1.u32, ctx.r3.u32);
+}
+
+void LocationScreenListNode(PPCContext& ctx, uint8_t* base) {
+  ctx.fpscr.disableFlushMode();
+  ctx.r3.u64 = ls::ListNode(base, ctx.r1.u32, ctx.r3.u32);
+}
+
+void LocationScreenShowArrows(PPCContext& ctx, uint8_t* base) {
+  ctx.r3.u64 = ls::ShowArrows(base, ctx.r1.u32);
+}
+
+namespace {
+
+struct GuestRun {
+  PPCContext& ctx;
+  uint8_t* base;
+};
+
+uint64_t RunThrough(void* user, uint32_t movie, uint32_t draw_only, uint32_t frame_bytes,
+                    uint32_t lr) {
+  auto& guest = *static_cast<GuestRun*>(user);
+  PPCContext& ctx = guest.ctx;
+  guest_call::InFrame(ctx, guest.base, frame_bytes, lr, [&](uint32_t) {
+    ctx.r3.u64 = movie;
+    ctx.r4.u64 = draw_only;
+    sub_8211E1B8(ctx, guest.base);
+  });
+  return ctx.r3.u64;
+}
+
+// Runs `step(run)` with UiMovie::Run through this context; lr put back.
+template <typename Step>
+uint64_t WithRun(PPCContext& ctx, uint8_t* base, Step step) {
+  const uint64_t lr = ctx.lr;
+  GuestRun guest{ctx, base};
+  const ls::RunCall run{&guest, RunThrough};
+  const uint64_t r3 = step(run);
+  ctx.lr = lr;
+  return r3;
+}
+
+}  // namespace
+
+void LocationScreenRunCardMovie(PPCContext& ctx, uint8_t* base) {
+  const uint32_t sp = ctx.r1.u32;
+  ctx.r3.u64 = WithRun(ctx, base, [&](const ls::RunCall& run) {
+    return ls::RunCardMovie(base, sp, run);
+  });
+}
+
+void LocationScreenTransition1(PPCContext& ctx, uint8_t* base) {
+  const uint32_t sp = ctx.r1.u32, step = ctx.r3.u32;
+  ctx.r3.u64 = WithRun(ctx, base, [&](const ls::RunCall& run) -> uint64_t {
+    return ls::Transition1(base, sp, step, run);
+  });
+}
+
+void LocationScreenTransition18(PPCContext& ctx, uint8_t* base) {
+  const uint32_t sp = ctx.r1.u32, step = ctx.r3.u32;
+  ctx.r3.u64 = WithRun(ctx, base, [&](const ls::RunCall& run) -> uint64_t {
+    return ls::Transition18(base, sp, step, run);
+  });
+}
+
 }  // namespace hooks
 
 #define LOCATION_SCREEN_ADAPTER(address, step)  \
@@ -88,3 +172,12 @@ LOCATION_SCREEN_ADAPTER(822281D8, LocationScreenHasMoreUnlocks)
 LOCATION_SCREEN_ADAPTER(82227618, LocationScreenNextUnlockEntry)
 LOCATION_SCREEN_ADAPTER(82227708, LocationScreenOpponentHasCard)
 LOCATION_SCREEN_ADAPTER(822271F8, LocationScreenNextResultText)
+LOCATION_SCREEN_ADAPTER(8222A060, LocationScreenShowPictures)
+LOCATION_SCREEN_ADAPTER(8222A150, LocationScreenHidePictures)
+LOCATION_SCREEN_ADAPTER(8222AC18, LocationScreenSetCarColor)
+LOCATION_SCREEN_ADAPTER(8222BFE8, LocationScreenSetCursor)
+LOCATION_SCREEN_ADAPTER(8222C058, LocationScreenListNode)
+LOCATION_SCREEN_ADAPTER(8222C0C8, LocationScreenShowArrows)
+LOCATION_SCREEN_ADAPTER(822291A8, LocationScreenRunCardMovie)
+LOCATION_SCREEN_ADAPTER(8222AD50, LocationScreenTransition1)
+LOCATION_SCREEN_ADAPTER(8222BE60, LocationScreenTransition18)

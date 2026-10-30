@@ -698,6 +698,8 @@ struct SetterFunction {
   GuestFunction native;
 };
 
+constexpr const char* kSetText = "UiMovie::SetText (sub_8211C1F8)";
+
 void SetterCases(Context& h, uint32_t movie) {
   const SetterFunction functions[] = {
       {"UiMovie::ClearText (sub_8211C470)", __imp__sub_8211C470, sub_8211C470},
@@ -707,6 +709,10 @@ void SetterCases(Context& h, uint32_t movie) {
       {"UiMovie::RevealText (sub_8211D880; sub_8211C930)", __imp__sub_8211D880, sub_8211D880},
       {"sub_8211D8D8 (whether a text has another page; sub_8211C9C0)", __imp__sub_8211D8D8,
        sub_8211D8D8},
+      // Its node always a TXT (the original loops forever on others), r6 a
+      // string id (mostly in the table), r7 to r10 its arguments; also
+      // compared: the caller's parameter area (r1 + 48, the varargs).
+      {kSetText, __imp__sub_8211C1F8, sub_8211C1F8},
   };
   constexpr uint32_t kMissing = 0x826C5CD8;
   constexpr uint32_t kOdd[] = {0x7FC00000, 0xFF800001, 0x7F800000, 0x80000000, 0x00000001};
@@ -714,6 +720,52 @@ void SetterCases(Context& h, uint32_t movie) {
   const uint32_t scene = h.data, sub = h.data + 256, nodes = h.data + 512;  // 8 nodes of 128
   const uint32_t records = h.data + 1536;                                   // 8 of 32
   const uint32_t buffers = memory::Alloc(8 * 4096, 0);
+  // SetText's string table (for its cases, put back after): 18 files, each
+  // one container of 8 strings of letters and the int and float controls
+  // (no 0xFFD7: its slot would name a string; FormatV's own cases cover
+  // it), its ids by the files' bounds (0x82007E18) as Strings::Get finds
+  // them; its arguments small ints.
+  constexpr uint32_t kStringTable = 0x826C5C34, kBounds = 0x82007E18;
+  const uint32_t string_table = Load(h.base, kStringTable);
+  struct Strings {
+    uint32_t address = memory::Alloc(1024, 0);
+    ~Strings() { memory::Free(address); }
+  } strings;
+  {
+    Random r(0x53657454657874ull);  // "SetText"
+    const uint32_t container = strings.address + 128, text = strings.address + 200;
+    for (uint32_t k = 0; k < 18; k++) {
+      Store(h.base, strings.address + 4 * k, container);
+    }
+    Store(h.base, container, __builtin_bswap32(8));
+    for (uint32_t k = 0; k < 8; k++) {
+      const uint32_t at = text + 64 * k;
+      Store(h.base, container + 4 + 4 * k, __builtin_bswap32(at - container));
+      const uint32_t length = r.Below(20);
+      for (uint32_t c = 0; c < length; c++) {
+        uint16_t unit;
+        switch (r.Below(6)) {
+          case 0: unit = uint16_t(0xFFEC + r.Below(10)); break;
+          case 1: unit = uint16_t(0xFFE2 + r.Below(10)); break;
+          case 2: unit = uint16_t(0xFFD8 + r.Below(10)); break;
+          case 3: unit = 0xFFD3; break;
+          default: unit = uint16_t('a' + r.Below(26)); break;
+        }
+        guest::StoreU16(h.base, at + 2 * c, unit);
+      }
+      guest::StoreU16(h.base, at + 2 * length, 0);
+    }
+  }
+  auto string_id = [&](Random& r) {
+    const uint32_t k = r.Below(8);
+    for (;;) {
+      const uint32_t file = r.Below(17);
+      const uint32_t bound = Load(h.base, kBounds + 4 * file);
+      if (int32_t(bound + k) < int32_t(Load(h.base, kBounds + 4 * (file + 1)))) {
+        return uint64_t(bound + k) & 0xFFFF;
+      }
+    }
+  };
   for (const SetterFunction& f : functions) {
     Results results(f.name);
     for (int i = 0; i < 200; i++) {
@@ -728,10 +780,16 @@ void SetterCases(Context& h, uint32_t movie) {
         Store(h.base, scene + 108, 0);
         Store(h.base, scene + 128, sub);
         Store(h.base, sub + 108, 0);
+        if (f.name == kSetText) {
+          Store(h.base, sub, 0x54585400);  // child 0 of the scene: a TXT too
+        }
         for (uint32_t k = 0; k < 8; k++) {
           const uint32_t node = nodes + 128 * k;
           RandomFill(r, h.base, node, 128);
           Store(h.base, node + 108, r.Below(3) == 0 ? 0 : 1 + r.Below(6));
+          if (f.name == kSetText) {
+            Store(h.base, node, 0x54585400);  // "TXT\0"
+          }
           Store(h.base, (k < 4 ? scene + 136 : sub + 128) + 8 * (k % 4), node);
         }
         for (uint32_t k = 0; k < 8; k++) {
@@ -767,12 +825,22 @@ void SetterCases(Context& h, uint32_t movie) {
         if (r.Below(8) == 0) {
           t.f1.u64 = r.Next();  // a double that doesn't fit a float
         }
+        if (f.name == kSetText) {
+          t.r6.u64 = (r.Next() & ~0xFFFFull) | string_id(r);
+          Store(h.base, kStringTable, strings.address);
+          t.r7.u64 = r.Below(100);
+          t.r8.u64 = r.Below(100);
+          t.r9.u64 = r.Below(100);
+          t.r10.u64 = r.Below(100);
+          Fill(h.base, t.r1.u32 + 48, 32);
+        }
         if (v == 0) {
           RunRecompiled(f.recompiled, t, h.base);
         } else {
           f.native(t, h.base);
         }
         Store(h.base, kMissing, missing);
+        Store(h.base, kStringTable, string_table);
         out[v].Bytes(Read(h.base, h.data, kScratchBytes));
         out[v].Bytes(Read(h.base, movie, 64));
         for (uint32_t k = 0; k < 8; k++) {
@@ -799,6 +867,9 @@ void SetterCases(Context& h, uint32_t movie) {
         out[v].Bytes(map);
         out[v].Word(t.r3.u32);
         out[v].Double(t.f1.u64);
+        if (f.name == kSetText) {
+          out[v].Bytes(Read(h.base, CallContext(h).r1.u32 + 48, 32));
+        }
       }
       results.Check(out[0], out[1], fmt::format("case {}", i));
     }

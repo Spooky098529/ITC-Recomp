@@ -28,4 +28,22 @@ void LocationScreenNextUnlockEntry(PPCContext& ctx, uint8_t* base);
 void LocationScreenOpponentHasCard(PPCContext& ctx, uint8_t* base);
 void LocationScreenNextResultText(PPCContext& ctx, uint8_t* base);
 
+// The movies' helpers (r3 the node the original leaves): sub_8222A060
+// ShowPictures, sub_8222A150 HidePictures, sub_8222AC18 SetCarColor,
+// sub_8222BFE8 SetCursor and sub_8222C058 ListNode (r3 = the value),
+// sub_8222C0C8 ShowArrows.
+void LocationScreenShowPictures(PPCContext& ctx, uint8_t* base);
+void LocationScreenHidePictures(PPCContext& ctx, uint8_t* base);
+void LocationScreenSetCarColor(PPCContext& ctx, uint8_t* base);
+void LocationScreenSetCursor(PPCContext& ctx, uint8_t* base);
+void LocationScreenListNode(PPCContext& ctx, uint8_t* base);
+void LocationScreenShowArrows(PPCContext& ctx, uint8_t* base);
+// UiMovie::Run's callers, through its override from frames like the
+// originals' (lr put back): sub_822291A8 RunCardMovie (r3 Run's),
+// sub_8222AD50 Transition1 and sub_8222BE60 Transition18 (r3 = the step's
+// address; r3 = 1 when done, else 0).
+void LocationScreenRunCardMovie(PPCContext& ctx, uint8_t* base);
+void LocationScreenTransition1(PPCContext& ctx, uint8_t* base);
+void LocationScreenTransition18(PPCContext& ctx, uint8_t* base);
+
 }  // namespace hooks

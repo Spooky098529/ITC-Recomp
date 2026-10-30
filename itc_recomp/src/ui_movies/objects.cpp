@@ -431,6 +431,34 @@ std::optional<uint32_t> ClearText(uint8_t* base, uint32_t movie, uint32_t sub_sc
   });
 }
 
+std::optional<uint32_t> SetText(uint8_t* base, const strings_and_font::FormatCalls& calls,
+                                uint32_t stack, uint32_t movie, uint32_t sub_scene,
+                                uint32_t child, uint32_t id, const uint64_t varargs[4]) {
+  constexpr uint32_t kTagTxt = 0x54585400;  // "TXT\0"
+  constexpr uint32_t kStringTable = 0x826C5C34;
+  const uint32_t node = FindNode(base, movie, sub_scene, child);
+  if (Load(base, node) != kTagTxt) {
+    return std::nullopt;
+  }
+  const uint32_t args = stack + 48;
+  for (uint32_t i = 0; i < 4; i++) {
+    Store(base, args + 8 * i, uint32_t(varargs[i] >> 32));
+    Store(base, args + 8 * i + 4, uint32_t(varargs[i]));
+  }
+  const uint32_t id_address = node + 108;
+  const auto record = GetText(base, movie, id_address);
+  if (!record) {
+    return std::nullopt;
+  }
+  ITC_NATIVE_RUNNING("sub_8211C1F8 UiMovie::SetText");
+  Zero(base, Load(base, *record), 4096);
+  Store(base, *record + 20, 0);
+  strings_and_font::StringsFormatV(base, calls, stack - 128, Load(base, kStringTable),
+                                   Load(base, *record), id & 0xFFFF, args);
+  TextMapSetKey(base, movie + kMovieTexts, Load(base, id_address), *record);
+  return movie + kMovieTexts;
+}
+
 std::optional<uint32_t> SetTextScrollSpeed(uint8_t* base, uint32_t movie, uint32_t sub_scene,
                                            uint32_t child, uint32_t delay, double speed) {
   return ChangeText(base, movie, sub_scene, child, [&](uint32_t record) {
