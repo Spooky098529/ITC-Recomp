@@ -103,4 +103,21 @@ void LocationScreenLoadPicture(PPCContext& ctx, uint8_t* base);
 void LocationScreenPictureFree(PPCContext& ctx, uint8_t* base);
 void LocationScreenFreePictures(PPCContext& ctx, uint8_t* base);
 
+// Whether the texts' functions run natively: the UI movies' text setters'
+// conditions (--native_ui_movies_game, --native_c_runtime_heap,
+// --native_heap) and the process heap made. The originals otherwise.
+bool LocationScreenTextsNative(uint8_t* base);
+// sub_8222CD60 ResetMovie, sub_8222A978 ShowUnlockEntry, sub_8222B048
+// ShowListEntry (r3 not read); sub_8222CFF0 Transition29, sub_8222D1A8
+// Transition25, sub_8222D610 Transition2, sub_8222E6E0 Transition14,
+// sub_8222E8D8 Transition16 (r3 = the step's address).
+void LocationScreenResetMovie(PPCContext& ctx, uint8_t* base);
+void LocationScreenShowUnlockEntry(PPCContext& ctx, uint8_t* base);
+void LocationScreenShowListEntry(PPCContext& ctx, uint8_t* base);
+void LocationScreenTransition29(PPCContext& ctx, uint8_t* base);
+void LocationScreenTransition25(PPCContext& ctx, uint8_t* base);
+void LocationScreenTransition2(PPCContext& ctx, uint8_t* base);
+void LocationScreenTransition14(PPCContext& ctx, uint8_t* base);
+void LocationScreenTransition16(PPCContext& ctx, uint8_t* base);
+
 }  // namespace hooks

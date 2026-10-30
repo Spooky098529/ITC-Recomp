@@ -253,4 +253,63 @@ uint64_t PictureFree(uint8_t* base, uint32_t sp, uint32_t picture, const Calls& 
 // r3, or the screen.
 uint64_t FreePictures(uint8_t* base, uint32_t sp, uint32_t screen, const Calls& calls);
 
+// --- The transitions that set texts (src/location_screen/transitions.cpp) ---
+//
+// Only while the UI movies' text setters run natively (the adapters'
+// check, hooks::LocationScreenTextsNative); a setter refusing after it is a
+// logged abort. `sp` the caller's stack pointer, `step` the transition's
+// step word (0 on its first call). Each returns the r3 the original leaves.
+//
+// sub_8222CD60 LocationScreen::ResetMovie: movie 21's pose reset
+// (ResetPose, FinishAll), texts (-1, 35) (the location's, 369 on), (-1, 36)
+// (the mode's, 128 on) and node 9's five (5 to 9: 138, 139, 111, 140, 141,
+// a table in its frame), named animation 13 + the location menu's cursor
+// played and looped (not with +892 set and the cursor 2), ShowPictures.
+uint32_t ResetMovie(uint8_t* base, uint32_t sp, const Calls& calls);
+// sub_8222CFF0 LocationScreen::Transition29: first FadeIn(30), Play(-1, 0),
+// HidePictures; whether no fade runs (read before movie 21's run), and then
+// text 573 at (0, 0) scrolling (delay 300, the float at 0x82000A30) and
+// SetCarColor.
+uint32_t Transition29(uint8_t* base, uint32_t sp, uint32_t step, const Calls& calls);
+// sub_8222A978 LocationScreen::ShowUnlockEntry: the unlock list's entry at
+// +868 (save + 0x1C778, 12 bytes each: its +4 and +8 an Entry56, kept at
+// +876 and +872): texts (4, 1) (the entry's +12, 4650 on) and (4, 2) (+8,
+// 6683 on), node 6's pictures (PictureA, PictureB of its +16), +868 up,
+// node (4, 0) shown while (4, 2) has more pages.
+uint32_t ShowUnlockEntry(uint8_t* base, uint32_t sp, const Calls& calls);
+// sub_8222D1A8 LocationScreen::Transition25: first ShowUnlockEntry, named
+// 5 finished, played and looped, FadeIn(60), named 95, HidePictures; 0
+// while a fade runs or movie 21's run isn't done, then page 13 set
+// directly and 1.
+uint32_t Transition25(uint8_t* base, uint32_t sp, uint32_t step, const Calls& calls);
+// sub_8222B048 LocationScreen::ShowListEntry: the location's record (save +
+// 0x1AD20 + 100 x index, copied to its frame's +96): node 10's children 5
+// to 12 and the root's 19 to 34 hidden, then for each of its +96 entries
+// (+4, +8 an Entry56) node (10, 5 + i) and (-1, 27 + i) shown, node 6's
+// pictures for the list menu's cursor, (-1, 19 + i) hidden when its flags
+// word (save + 4 (192 table + index + 27614)) is 2, else shown, and text
+// (10, 5 + i) (the entry's +12, 4650 on).
+uint32_t ShowListEntry(uint8_t* base, uint32_t sp, const Calls& calls);
+// sub_8222D610 LocationScreen::Transition2 (page 0's cursor moved): first
+// named 24 and 23 finished, the cursor's move (SetCursor 160 or 0, or named
+// 24 or 23), named 13 + the old cursor finished, and named 37 and 38 with
+// text 588 (+892 set and the cursor 2) or the cursor's text (573 to 577, a
+// table in its frame) with named 13 + the cursor looped; the scroll reset.
+// Movie 21 run; 1.
+uint32_t Transition2(uint8_t* base, uint32_t sp, uint32_t step, const Calls& calls);
+// sub_8222E6E0 LocationScreen::Transition14 (to the confirm menu): first
+// the menu reset (3 items), node 9's texts 486 to 488 (children 5 to 7),
+// SetCursor(0), named 13 to 17 finished, text 579, the scroll reset, node
+// (9, 6)'s color 2 without a card, Play(-1, 11), ShowPictures; that color
+// again; whether movie 21's run is done, and then named 13 looped and the
+// color again.
+uint32_t Transition14(uint8_t* base, uint32_t sp, uint32_t step, const Calls& calls);
+// sub_8222E8D8 LocationScreen::Transition16 (the confirm menu's cursor
+// moved): first named 23 and 24 finished, the cursor's move (SetCursor 80 or
+// 0, or named 24 or 23), named 13 + the old cursor finished, named 13 + the
+// cursor looped (without a card not for the cursor 1, and the color 2), the
+// cursor's text (579, 580 or 591, 581) and the scroll reset. Movie 21 run;
+// 1.
+uint32_t Transition16(uint8_t* base, uint32_t sp, uint32_t step, const Calls& calls);
+
 }  // namespace location_screen

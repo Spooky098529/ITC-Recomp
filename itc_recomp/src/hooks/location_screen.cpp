@@ -6,11 +6,16 @@
 
 #include "base/flags.h"
 #include "hooks/career.h"
+#include "hooks/heap.h"
 #include "hooks/guest_call.h"
 #include "hooks/race_event.h"
 #include "hooks/race_setup.h"
 #include "hooks/strings_and_font.h"
 #include "location_screen/location_screen.h"
+#include "memory/c_runtime_heap.h"
+
+ITC_FLAG_DECLARE(bool, native_ui_movies_game);
+ITC_FLAG_DECLARE(bool, native_c_runtime_heap);
 
 ITC_FLAG_BOOL(native_location_screen, true, "ITC",
               "Run the career's location screen (docs/functions/location-screen.md: "
@@ -29,7 +34,12 @@ ITC_FLAG_BOOL(native_location_screen, true, "ITC",
               "sub_82228138 over the career's and the race set-up's register steps, "
               "NextOpponentText sub_82227430, LoadPicture sub_8222C270, Picture::Free "
               "sub_82228438 and FreePictures sub_82228498, their heap and archive calls "
-              "through those adapters) "
+              "through those adapters; with the UI movies' heap native (their text setters' "
+              "plain C++), ResetMovie sub_8222CD60, Transition29 sub_8222CFF0, ShowUnlockEntry "
+              "sub_8222A978, Transition25 sub_8222D1A8, ShowListEntry sub_8222B048, "
+              "Transition2 sub_8222D610, Transition14 sub_8222E6E0 and Transition16 "
+              "sub_8222E8D8, UiMovie::Finish, FinishNamed, FinishAll and Run through their "
+              "overrides) "
               "natively instead of through the translated code (the same writes; checked by "
               "--run_harnesses=location_screen)");
 
@@ -308,6 +318,61 @@ void LocationScreenFreePictures(PPCContext& ctx, uint8_t* base) {
   ctx.r3.u64 = ls::FreePictures(base, sp, screen, calls.get());
 }
 
+bool LocationScreenTextsNative(uint8_t* base) {
+  return ITC_FLAG(native_ui_movies_game) && ITC_FLAG(native_c_runtime_heap) &&
+         NativeHeapActive() && memory::crt::GetProcessHeap(base) != 0;
+}
+
+namespace {
+
+// The texts' functions: natively while the UI movies' text setters are, else
+// the original; r3 the plain C++'s.
+template <typename Step>
+void Texts(PPCContext& ctx, uint8_t* base, void (*original)(PPCContext&, uint8_t*), Step step) {
+  if (!LocationScreenTextsNative(base)) {
+    original(ctx, base);
+    return;
+  }
+  ctx.fpscr.disableFlushMode();
+  const uint32_t sp = ctx.r1.u32, r3 = ctx.r3.u32;
+  LocationScreenCalls calls(ctx, base);
+  ctx.r3.u64 = step(sp, r3, calls.get());
+}
+
+}  // namespace
+
+void LocationScreenResetMovie(PPCContext& ctx, uint8_t* base) {
+  Texts(ctx, base, __imp__sub_8222CD60, [&](uint32_t sp, uint32_t, const ls::Calls& calls) {
+    return ls::ResetMovie(base, sp, calls);
+  });
+}
+
+void LocationScreenShowUnlockEntry(PPCContext& ctx, uint8_t* base) {
+  Texts(ctx, base, __imp__sub_8222A978, [&](uint32_t sp, uint32_t, const ls::Calls& calls) {
+    return ls::ShowUnlockEntry(base, sp, calls);
+  });
+}
+
+void LocationScreenShowListEntry(PPCContext& ctx, uint8_t* base) {
+  Texts(ctx, base, __imp__sub_8222B048, [&](uint32_t sp, uint32_t, const ls::Calls& calls) {
+    return ls::ShowListEntry(base, sp, calls);
+  });
+}
+
+#define LOCATION_SCREEN_TRANSITION(address, name)                                     \
+  void LocationScreen##name(PPCContext& ctx, uint8_t* base) {                         \
+    Texts(ctx, base, __imp__sub_##address,                                            \
+          [&](uint32_t sp, uint32_t step, const ls::Calls& calls) {                   \
+            return ls::name(base, sp, step, calls);                                   \
+          });                                                                         \
+  }
+LOCATION_SCREEN_TRANSITION(8222CFF0, Transition29)
+LOCATION_SCREEN_TRANSITION(8222D1A8, Transition25)
+LOCATION_SCREEN_TRANSITION(8222D610, Transition2)
+LOCATION_SCREEN_TRANSITION(8222E6E0, Transition14)
+LOCATION_SCREEN_TRANSITION(8222E8D8, Transition16)
+#undef LOCATION_SCREEN_TRANSITION
+
 }  // namespace hooks
 
 #define LOCATION_SCREEN_ADAPTER(address, step)  \
@@ -350,3 +415,11 @@ LOCATION_SCREEN_ADAPTER(82227430, LocationScreenNextOpponentText)
 LOCATION_SCREEN_ADAPTER(8222C270, LocationScreenLoadPicture)
 LOCATION_SCREEN_ADAPTER(82228438, LocationScreenPictureFree)
 LOCATION_SCREEN_ADAPTER(82228498, LocationScreenFreePictures)
+LOCATION_SCREEN_ADAPTER(8222CD60, LocationScreenResetMovie)
+LOCATION_SCREEN_ADAPTER(8222CFF0, LocationScreenTransition29)
+LOCATION_SCREEN_ADAPTER(8222A978, LocationScreenShowUnlockEntry)
+LOCATION_SCREEN_ADAPTER(8222D1A8, LocationScreenTransition25)
+LOCATION_SCREEN_ADAPTER(8222B048, LocationScreenShowListEntry)
+LOCATION_SCREEN_ADAPTER(8222D610, LocationScreenTransition2)
+LOCATION_SCREEN_ADAPTER(8222E6E0, LocationScreenTransition14)
+LOCATION_SCREEN_ADAPTER(8222E8D8, LocationScreenTransition16)
