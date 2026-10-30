@@ -172,3 +172,6 @@ user: the run's section in `review.md`, the drive list in
 `to-drive.md`, and the merge. The harnesses now leave ~7 s of race in
 the validation's 60 s. Next in `leads.md`: the car models, then the
 models' loads and the skeleton user.
+
+Driven by the user (`itc_2819`, 2026-10-30: everything worked; 166
+functions off `to-drive.md`) and merged into `rexglue-removal-project`.

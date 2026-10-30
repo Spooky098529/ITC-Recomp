@@ -384,7 +384,9 @@ user's call, 2026-10-30), the data load at boot (`data-load.md`,
 `--native_data_load`) and the career (`career.md`, `--native_career`, 49
 of 53) native (ours 3,031 -> 3,167); the rest waits on the race event
 and the car objects' makers.
-Its twenty-fifth run (`b7-loop-30-10-26`, 2026-10-30, not yet merged;
+Its twenty-fifth run (`b7-loop-30-10-26`, 2026-10-30, merged into
+`rexglue-removal-project` the same day after a drive (`itc_2819`: the
+parking area and the rival intro seen as native code);
 summary `docs/loops/b7-loop-2026-10-30-1139.md`; 3 subsystems) made
 the race event (`race-event.md`, `--native_race_event`, 100 of 102,
 with `Career::SetUpEvent` it unblocked), the camera modes

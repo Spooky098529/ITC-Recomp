@@ -162,7 +162,7 @@ goes in `src/` as overrides), American English.
   the voice engine Dropped by the user's call), the data load at boot
   (`data-load.md`) and the career (`career.md`, 49 of 53) native (ours
   3,167); its twenty-fifth run (branch `b7-loop-30-10-26`, 3
-  subsystems, not yet merged) made the race event (`race-event.md`,
+  subsystems, merged 2026-10-30 after a drive) made the race event (`race-event.md`,
   100 of 102, with `Career::SetUpEvent`), the camera modes
   (`camera-modes.md`, 87 of 90 in play) and the parking area
   (`location-screen.md`, 57 of 77) native (ours 3,423). The runs' rows wait for the user's review (`docs/loops/review.md`). See
@@ -4136,3 +4136,10 @@ and its models, the scenery's set-up and teardown, `XPR::GetTexture`
 called 70, live 211. Imports: 186 called, 56 with a live caller. B7
 (`b7_status.py`): ours 3,423, work left 2,974 (Wrapped 103, with a row
 487, no row yet 2,384), from 3,033 (from 3,165 at the run's start).
+
+**2026-10-30, the twenty-fifth run merged (branch `b7-loop-30-10-26`
+into `rexglue-removal-project`):** after a drive (`itc_2819`, the user:
+everything worked): the parking area, a career race and the rival intro
+cutscene ran as native code, 166 functions off the drive list
+(`docs/loops/to-drive.md`), 0 errors and 0 warnings. Totals unchanged
+from the run's end: ours 3,423, work left 2,974.
