@@ -87,6 +87,19 @@ When the user has reviewed a run's section, its heading gets
   `0x826D8520`, `0x82816E50`); `sub_82291328` loads a second set of
   three UI movies whose users never ran in play. One lead added (the
   front end's state machine `sub_822213B0`, `sub_82220C88`).
+- The data load at boot, migration 1 (b810489..f4f201f; rows also in
+  `data-tables.md`, `car-specs.md`, `models.md`, `strings-and-font.md`,
+  `files-and-saves.md`, `ui-movies-game.md`). For review: native loads
+  go through a new `archive::LoadCall`, and `hooks::NativeArchiveLoad`
+  hands each load to a harness's recorder when one is set (a harness
+  had queued a real `Strings::Load` that later wrote into freed
+  memory); `hooks::StartUpRecorded` now asked first by the adapters of
+  `Archive::Load`, `SaveData::Create`, `RaceData::ResetGlobal`,
+  `Params::Init` and the new ones; 12 adapters `--removable` lists kept
+  (the native callers go through them, as `App::StartUp`'s); kept as
+  the original: `Defaults::Init`'s r3 sign-extended,
+  `Shaders::LoadAll`'s r3 = `BootData::Load`'s frame + 80, failed
+  allocations' stores near 0.
 
 ## Run 2026-10-29 22:22 (`b7-loop-29-10-26-2`)
 

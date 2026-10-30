@@ -50,7 +50,11 @@ file's history. What's left to see in a drive, from every run:
 - Subsystem 2 of 3: the game's data load at boot (`sub_82105868`,
   `sub_82106618`, the top of `leads.md`; 10 ready groups under it).
   Mapped (562dc47, `data-load.md`, 25 rows, 10 ready groups, no
-  stop). Migration agent running.
+  stop). Migration 1 checked (b810489..f4f201f: the defaults, records
+  and session makers, the shared loads (data tables, car parameters,
+  shaders, text, font, strings, a UI movie), `BootData::Load` and
+  `CreateObjects`, the loading screen's movies; `--native_data_load`;
+  frame dumps the same). Validation agent running.
 
 ## Done
 
@@ -99,3 +103,6 @@ file's history. What's left to see in a drive, from every run:
   0 differing but the expected groups): ours 3090, work left 3230.
 - After the data load's map: ours 3090, work left 3230 (wrapped 104,
   known 498, unknown 2628).
+- After the data load's migration 1 (`itc_2639`: race 38 s, 0 errors,
+  touched harnesses 0 differing): ours 3116, work left 3204 (wrapped
+  104, known 472, unknown 2628).
