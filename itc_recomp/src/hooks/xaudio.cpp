@@ -788,7 +788,10 @@ void XAudioApiRegisterCallback(PPCContext& ctx, uint8_t* base) {
 // XAudioInitialize: r3 = the parameters (sub_8245A760 sets r4 = 0 and
 // tail-calls sub_8245A410, which has no adapter: only this one reaches it in
 // play); sub_8245A410's frame below the caller's, lr the caller's.
+// sub_8245A760 has no plain C++ of its own (r4 = 0 and the tail call): its
+// print is here.
 void XAudioApiInitialize(PPCContext& ctx, uint8_t* base) {
+  ITC_NATIVE_RUNNING("sub_8245A760 XAudioInitialize (r4 = 0, tail call)");
   const uint32_t params = ctx.r3.u32;
   ctx.r4.u64 = 0;
   uint64_t r3 = 0;
