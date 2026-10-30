@@ -22,6 +22,7 @@
 #include "hooks/camera_modes.h"
 #include "hooks/guest_call.h"
 #include "hooks/heap.h"
+#include "hooks/race_hud.h"
 #include "hooks/ui_movies_game.h"
 #include "memory/c_runtime_heap.h"
 #include "memory/heap.h"
@@ -2957,6 +2958,203 @@ void RivalLogoOpenClose(Context& h, Random& r) {
   }
 }
 
+// --- The cutscene's step and update (the second migration, batch 3) ---
+
+// RivalLogo::Draw's calls while these cases run (its override's stand-in):
+// r3 as an offset from the cutscene, lr, and r1 below the case's.
+std::vector<uint32_t>* g_logo_draws = nullptr;
+uint32_t g_logo_draws_cutscene = 0;
+uint32_t g_logo_draws_r1 = 0;
+void RecordLogoDraw(PPCContext& ctx, uint8_t*) {
+  g_logo_draws->push_back(ctx.r3.u32 - g_logo_draws_cutscene);
+  g_logo_draws->push_back(uint32_t(ctx.lr));
+  g_logo_draws->push_back(g_logo_draws_r1 - ctx.r1.u32);
+}
+
+// The stack below a case's stack pointer (2,048 bytes) as ordinary floats:
+// the frame words CutsceneShot::Step reads as they are (no animation
+// object writes them) become the view's zoom and roll.
+void FillStackFloats(uint8_t* base, uint32_t r1, uint64_t seed) {
+  Random s(seed);
+  for (uint32_t i = 0; i < 2048; i += 4) {
+    guest::StoreU32(base, r1 - 2048 + i, OrdinaryFloat(s, 1000.0));
+  }
+}
+
+// Cutscene::Step and Update on a cutscene of the case's: 16 shots (as
+// CutsceneShot::Step's cases) in a list of 0 to 16, the index anywhere, the
+// busy word now and then set; the logo entry's flags random (Play's bit 0x4
+// with neither the XPR nor the movie loaded, so Play waits: its own cases
+// are RivalLogo's), its movie built natively (Close's cases), in the table
+// or not; the viewport random floats; the race data's word +0x59AE4 one of
+// the case's. The draw is answered by a stand-in that records it (r3, lr,
+// r1). A shot whose roll would keep Viewport::SetRoll's loop from ending
+// (infinite, or too large to take 2 pi off) in a dry run of
+// CutsceneShot::Step is given an animation not loaded. Compared: the
+// cutscene, the logo entry, the viewport, the near plane, the fades, the
+// race word, the draws, the movie table, whether the movie was freed, r3
+// and lr.
+void CutsceneSteps(Context& h, Random& r) {
+  if (!ui_movies_game_hooks::OpenNative()) {
+    ITC_LOG_WARN("harness: camera_modes: Cutscene::Step and Update need the UI movies' Open "
+                 "native (--native_heap, --native_c_runtime_heap, the archive's queue)");
+    return;
+  }
+  constexpr uint32_t kFades = 0x826A50A0;
+  constexpr uint32_t kFadesBytes = 0x60;
+  constexpr uint32_t kLogo = 10760;
+  constexpr uint32_t kCutsceneBytes = kLogo + 96;
+  constexpr uint32_t kDone = 0x59AE4;
+  Saved saved_fades(h.base, kFades, kFadesBytes);
+  Saved saved_table(h.base, cm::kAnims, kTableBytes);
+  Saved saved_near(h.base, kPassNear, 4);
+  Saved saved_race(h.base, cm::kRaceData, 4);
+  Saved saved_none(h.base, ui_movies::kMovieTable + 16, 4);
+  AnimWorld world(h.base);
+  Block cutscene(kCutsceneBytes), viewport(kViewportBytes), vehicle(512), body(512), race(16);
+  std::vector<uint32_t> draws;
+  g_logo_draws = &draws;
+  g_logo_draws_cutscene = cutscene.address;
+  race_hud_hooks::g_rival_logo_draw_stand_in = RecordLogoDraw;
+  const uint32_t list = cutscene.address + 952;
+  for (int which = 0; which < 2; which++) {
+    Results results(which == 0 ? "Cutscene::Step (sub_82155A28)"
+                               : "Cutscene::Update (sub_821561F8)");
+    for (int c = 0; c < 150; c++) {
+      world.Build(r);
+      RandomBytes(h.base, cutscene.address, cutscene.bytes, r);
+      guest::StoreU32(h.base, cutscene.address + 20, viewport.address);
+      RandomFloats(h.base, cutscene.address + 32, 4, r);
+      guest::StoreU32(h.base, cutscene.address + 352, r.Below(5) == 0 ? 0xFFFFFFFFu : r.Below(16));
+      const uint32_t count = r.Below(17);
+      RandomList(h.base, list, 16, count, r);
+      const uint32_t index = r.Below(6) == 0   ? r.Below(40)
+                             : r.Below(3) == 0 ? (count > 0 ? count - 1 : 0)
+                                               : (count > 0 ? r.Below(count) : 0);
+      guest::StoreU32(h.base, cutscene.address + 360, index);
+      guest::StoreU32(h.base, cutscene.address + 10756, r.Below(8) == 0 ? r.Below(3) + 1 : 0);
+      for (uint32_t s = 0; s < 16; s++) {
+        const uint32_t shot = list + 76 + 608 * s;
+        guest::StoreU32(h.base, shot + 4, 22824 + r.Below(world.entries + 2));
+        guest::StoreU32(h.base, shot + 8, vehicle.address);
+        const uint32_t cues = shot + 12;
+        RandomList(h.base, cues, 16, r.Below(5), r);
+        for (uint32_t k = 0; k < 16; k++) {
+          const uint32_t cue = cues + 76 + 32 * k;
+          const int32_t start = int32_t(r.Below(40)) - 5;
+          guest::StoreU32(h.base, cue + 0, uint32_t(start));
+          guest::StoreU32(h.base, cue + 4, uint32_t(start + int32_t(r.Below(40)) - 5));
+          guest::StoreU32(h.base, cue + 8, r.Below(4));
+          guest::StoreU32(h.base, cue + 24, r.Below(3) == 0 ? uint32_t(start) : r.Below(60));
+          guest::StoreU32(h.base, cue + 28, r.Below(4) == 0 ? 1 : 0);
+        }
+        guest::StoreU32(h.base, shot + 600, r.Below(4));
+        guest::StoreU32(h.base, shot + 604, uint32_t(r.Next()));
+      }
+      const uint32_t entry = cutscene.address + kLogo;
+      const uint32_t flags = (uint32_t(r.Next()) & ~0xFu) | r.Below(16);
+      guest::StoreU32(h.base, entry + 0, r.Below(3));
+      guest::StoreU32(h.base, entry + 4, flags);
+      guest::StoreU32(h.base, entry + 8, 20);
+      guest::StoreU32(h.base, entry + 12, 0x80000000u | uint32_t(r.Next()));
+      guest::StoreU32(h.base, entry + 24, 0);
+      guest::StoreU32(h.base, entry + 48, guest::LoadU32(h.base, entry + 48) & ~0x10u);
+      guest::StoreU32(h.base, entry + 84, r.Below(4));
+      guest::StoreU32(h.base, entry + 88, r.Below(4));
+      RandomFloats(h.base, viewport.address, viewport.bytes / 4, r);
+      guest::StoreU32(h.base, vehicle.address + 336, body.address);
+      RandomFloats(h.base, body.address + 288, 16, r);
+      guest::StoreU32(h.base, race.address, uint32_t(r.Next()));
+      const bool there = r.Below(4) != 0;
+      const uint64_t stack_seed = r.Next();
+      const uint32_t case_r1 = AlignedContext(h).r1.u32;
+      const uint32_t step_frame = case_r1 - 192 - (which == 1 ? 96 : 0);
+
+      // The dry run of the shot Step would step, for its roll.
+      if (index < uint32_t(int16_t(guest::LoadU16(h.base, list + 72)))) {
+        uint32_t node = (uint32_t(int16_t(guest::LoadU16(h.base, list + 68))) << 2) + list;
+        for (uint32_t n = index; n != 0; n--) {
+          node = (uint32_t(int16_t(guest::LoadU16(h.base, node))) << 2) + list;
+        }
+        const uint32_t shot =
+            uint32_t(int64_t(int16_t(guest::LoadU16(h.base, node + 2))) * 608) + list + 76;
+        const auto shot_bytes = Read(h.base, shot, 608);
+        FillStackFloats(h.base, case_r1, stack_seed);
+        guest::StoreU32(h.base, step_frame - 144, step_frame);
+        PPCContext d = AlignedContext(h);
+        d.r1.u64 = step_frame;
+        d.r3.u64 = shot;
+        d.r4.u64 = step_frame + 80;
+        hooks::CameraModesStep82155800(d, h.base);
+        const float roll = std::bit_cast<float>(guest::LoadU32(h.base, step_frame + 144));
+        saved_fades.Restore();
+        Write(h.base, shot, shot_bytes.data(), 608);
+        if (std::isinf(roll) || (!std::isnan(roll) && std::fabs(roll) >= 1e5f)) {
+          guest::StoreU32(h.base, shot + 4, 0);
+        }
+      }
+      const auto inputs = Read(h.base, cutscene.address, cutscene.bytes);
+      const auto viewport_inputs = Read(h.base, viewport.address, viewport.bytes);
+      Outputs out[2];
+      for (int v = 0; v < 2; v++) {
+        Saved table(h.base, ui_movies::kMovieTable, 12);
+        Fill(h.base, h.data, kScratchBytes);
+        Write(h.base, cutscene.address, inputs.data(), cutscene.bytes);
+        Write(h.base, viewport.address, viewport_inputs.data(), viewport.bytes);
+        const uint32_t race_word = guest::LoadU32(h.base, race.address);
+        guest::StoreU32(h.base, cm::kRaceData, race.address - kDone);
+        const uint32_t movie = memory::crt::OperatorNew(h.base, 0xA010).value_or(0);
+        ui_movies::ConstructMovie(h.base, movie);
+        ui_movies::InitAnimationLists(h.base, movie);
+        guest::StoreU32(h.base, movie + 0x9FD0, 0);
+        guest::StoreU32(h.base, movie + 0x9FD4, 20);
+        LogoTable(h.base, 20, there, movie);
+        guest::StoreU32(h.base, ui_movies::kMovieTable + 16, movie);
+        PPCContext t = AlignedContext(h);
+        FillStackFloats(h.base, t.r1.u32, stack_seed);
+        t.r3.u64 = cutscene.address;
+        t.lr = which == 0 ? 0x82156214 : 0x82159614;
+        draws.clear();
+        g_logo_draws_r1 = t.r1.u32;
+        if (which == 0) {
+          (v == 0 ? Original<__imp__sub_82155A28> : hooks::CameraModesStep82155A28)(t, h.base);
+        } else {
+          (v == 0 ? Original<__imp__sub_821561F8> : hooks::CameraModesStep821561F8)(t, h.base);
+        }
+        out[v].Bytes(Read(h.base, cutscene.address, kLogo));
+        out[v].Bytes(Read(h.base, entry, 96));
+        out[v].Floats(h.base, viewport.address, viewport.bytes / 4);
+        out[v].Float(guest::LoadU32(h.base, kPassNear));
+        out[v].Bytes(Read(h.base, kFades, kFadesBytes));
+        out[v].Word(guest::LoadU32(h.base, race.address));
+        out[v].Word(uint32_t(draws.size()));
+        for (uint32_t w : draws) {
+          out[v].Word(w);
+        }
+        out[v].Word(t.r3.u32);
+        out[v].Word(uint32_t(t.lr));
+        const bool freed = !memory::IsHeapBlock(movie);
+        out[v].Word(freed);
+        LogoTableOut(h.base, movie, out[v]);
+        if (!freed) {
+          ui_movies::DestroyMovie(h.base, movie);
+          memory::crt::OperatorDelete(movie);
+        }
+        guest::StoreU32(h.base, race.address, race_word);
+        saved_fades.Restore();
+        saved_near.Restore();
+        saved_race.Restore();
+      }
+      results.Check(out[0], out[1],
+                    fmt::format("case {}: count {} index {} flags {:X} there {}", c, count,
+                                index, flags, there));
+    }
+    results.Report();
+  }
+  race_hud_hooks::g_rival_logo_draw_stand_in = nullptr;
+  g_logo_draws = nullptr;
+}
+
 }  // namespace
 
 void CameraModes(Context& h) {
@@ -2981,6 +3179,7 @@ void CameraModes(Context& h) {
   ViewCameras(h, r);
   IntroUpdates(h, r);
   RivalLogoOpenClose(h, r);
+  CutsceneSteps(h, r);
 }
 
 }  // namespace harness

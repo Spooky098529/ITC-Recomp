@@ -61,7 +61,8 @@ ITC_FLAG_BOOL(native_camera_modes, true, "ITC",
               "(with native atexit), ViewCamera1::Update sub_82153A50 and ViewCamera2::Update "
               "sub_82153E58; IntroCamera::Update sub_82155E58; RivalLogo::Open sub_822118E0 and Close "
               "sub_82211980 (the UI movies' Open and Delete natively where their adapters "
-              "would)) natively instead of "
+              "would); Cutscene::Step sub_82155A28 and Update sub_821561F8 (the logo's draw "
+              "through its override, sub_82211A28)) natively instead of "
               "through the translated code (the same writes; checked by "
               "--run_harnesses=camera_modes)");
 
@@ -589,6 +590,36 @@ void CameraModesStep82156B68(PPCContext& ctx, uint8_t* base) {
   cm::CutsceneInit(base, ctx.r3.u32, ctx.r4.u32, ctx.r1.u32 - 192, calls);
 }
 
+}  // namespace hooks
+
+namespace {
+
+// CameraAnim::EvalCamera's original for CutsceneShot::Step (`shot`, its
+// frame at `frame`: the original's r1, 304 bytes) where its native form
+// can't: from frames like Step's and Evaluate's (144 bytes). f1 as it
+// leaves it.
+void ShotCameraOriginal(PPCContext& ctx, uint8_t* base, uint32_t shot, uint32_t frame,
+                        uint32_t object) {
+  const uint32_t time = guest::LoadU32(base, shot + 600);
+  const uint64_t stack = ctx.r1.u64;
+  ctx.r1.u64 = frame + 304;
+  guest_call::InFrame(ctx, base, 304, 0x82155834, [&](uint32_t) {
+    guest_call::InFrame(ctx, base, 144, 0x821509C4, [&](uint32_t) {
+      ctx.r3.u64 = object;
+      ctx.r4.u64 = object;
+      ctx.r5.u64 = frame + 144;
+      ctx.r6.u64 = time;
+      __imp__sub_82150350(ctx, base);
+    });
+  });
+  ctx.r1.u64 = stack;
+  ctx.fpscr.disableFlushMode();
+}
+
+}  // namespace
+
+namespace hooks {
+
 // CutsceneShot::Step: r3 = the shot, r4 = where the view goes; r3 = its
 // +604, f1 the last f1 (Duration's). EvalCamera's original runs from frames
 // like Step's (304 bytes) and Evaluate's (144) where its native form can't.
@@ -600,17 +631,7 @@ void CameraModesStep82155800(PPCContext& ctx, uint8_t* base) {
   const uint32_t r3 = cm::CutsceneStep(
       base, shot, ctx.r4.u32, frame,
       [&](uint32_t object) {
-        const uint32_t time = guest::LoadU32(base, shot + 600);
-        guest_call::InFrame(ctx, base, 304, 0x82155834, [&](uint32_t) {
-          guest_call::InFrame(ctx, base, 144, 0x821509C4, [&](uint32_t) {
-            ctx.r3.u64 = object;
-            ctx.r4.u64 = object;
-            ctx.r5.u64 = frame + 144;
-            ctx.r6.u64 = time;
-            __imp__sub_82150350(ctx, base);
-          });
-        });
-        ctx.fpscr.disableFlushMode();
+        ShotCameraOriginal(ctx, base, shot, frame, object);
         f1 = ctx.f1.f64;
       },
       &f1);
@@ -990,34 +1011,118 @@ void CameraModesStep822118E0(PPCContext& ctx, uint8_t* base) {
       });
 }
 
-// RivalLogo::Close: r3 = the entry; r3 as the original leaves it.
-// UiMovie::FinishAll through its adapter and RivalLogo::ReleaseXpr (never
-// run in play) through the translated code, UiMovies::Delete natively where
-// its adapter would, else its adapter, from frames like the original's (128
-// bytes).
-void CameraModesStep82211980(PPCContext& ctx, uint8_t* base) {
-  const uint32_t sp = ctx.r1.u32 - 128;
-  auto call = [&](uint32_t back, void (*function)(PPCContext&, uint8_t*), uint32_t r3) {
+}  // namespace hooks
+
+namespace {
+
+// RivalLogo::Close's calls from its frame at `sp` (the original's r1, 128
+// bytes): UiMovie::FinishAll through its adapter and RivalLogo::ReleaseXpr
+// (never run in play) through the translated code, UiMovies::Delete
+// natively where its adapter would, else its adapter, from frames like the
+// original's.
+cm::RivalLogoCloseCalls RivalLogoCloseCallsAt(PPCContext& ctx, uint8_t* base, uint32_t sp) {
+  auto call = [&ctx, base, sp](uint32_t back, void (*function)(PPCContext&, uint8_t*),
+                               uint32_t r3) {
+    const uint64_t stack = ctx.r1.u64;
+    ctx.r1.u64 = sp + 128;
     guest_call::InFrame(ctx, base, 128, back, [&](uint32_t) {
       ctx.r3.u64 = r3;
       function(ctx, base);
     });
+    ctx.r1.u64 = stack;
     return ctx.r3.u32;
   };
   cm::RivalLogoCloseCalls calls;
-  calls.finish_all = [&](uint32_t movie) { call(0x822119C0, sub_8211DFF8, movie); };
-  calls.release_xpr = [&](uint32_t holder) { call(0x822119F8, sub_82211768, holder); };
-  calls.remove = [&](uint32_t id) -> uint32_t {
+  calls.finish_all = [call](uint32_t movie) { call(0x822119C0, sub_8211DFF8, movie); };
+  calls.release_xpr = [call](uint32_t holder) { call(0x822119F8, sub_82211768, holder); };
+  calls.remove = [&ctx, base, sp, call](uint32_t id) -> uint32_t {
     if (ui_movies_game_hooks::DeleteNative()) {
       return ui_movies::DeleteMovie(base, id, sp - 128,
                                     ui_movies_game_hooks::DeleteCalls(ctx, base, sp));
     }
     return call(0x82211A00, sub_8211E258, id);
   };
-  ctx.r3.u64 = cm::RivalLogoClose(base, ctx.r3.u32, sp, calls);
+  return calls;
+}
+
+// A guest call from the frame at `frame` (the calling original's r1,
+// `frame_bytes` below its caller's) with the return address `back`.
+template <typename Call>
+void CallFrom(PPCContext& ctx, uint8_t* base, uint32_t frame, uint32_t frame_bytes,
+              uint32_t back, Call call) {
+  const uint64_t stack = ctx.r1.u64;
+  ctx.r1.u64 = frame + frame_bytes;
+  guest_call::InFrame(ctx, base, frame_bytes, back, [&](uint32_t) { call(); });
+  ctx.r1.u64 = stack;
+  ctx.fpscr.disableFlushMode();
+}
+
+// Cutscene::Step's calls from its frame at `frame` (the original's r1, 192
+// bytes): CutsceneShot::Step's frame 304 bytes below it, RivalLogo::Close's
+// 128; RivalLogo::Play's original with --log_pause_movie (as its adapter);
+// RivalLogo::Draw through its override (sub_82211A28, which frame
+// interpolation's --redraw_rival_logo notes) with Step's return address.
+cm::CutsceneTickCalls CutsceneTickCallsAt(PPCContext& ctx, uint8_t* base, uint32_t frame) {
+  cm::CutsceneTickCalls calls;
+  calls.camera_original = [&ctx, base, frame](uint32_t shot, uint32_t object) {
+    ShotCameraOriginal(ctx, base, shot, frame - 304, object);
+  };
+  calls.close = RivalLogoCloseCallsAt(ctx, base, frame - 128);
+  if (ITC_FLAG(log_pause_movie)) {
+    calls.play_original = [&ctx, base, frame](uint32_t entry) {
+      CallFrom(ctx, base, frame, 192, 0x82155A64, [&] {
+        ctx.r3.u64 = entry;
+        __imp__sub_82211AB0(ctx, base);
+      });
+    };
+  }
+  calls.draw = [&ctx, base, frame](uint32_t entry) {
+    CallFrom(ctx, base, frame, 192, 0x82155BE0, [&] {
+      ctx.r3.u64 = entry;
+      sub_82211A28(ctx, base);
+    });
+  };
+  return calls;
+}
+
+}  // namespace
+
+namespace hooks {
+
+// RivalLogo::Close: r3 = the entry; r3 as the original leaves it.
+void CameraModesStep82211980(PPCContext& ctx, uint8_t* base) {
+  const uint32_t sp = ctx.r1.u32 - 128;
+  ctx.r3.u64 = cm::RivalLogoClose(base, ctx.r3.u32, sp, RivalLogoCloseCallsAt(ctx, base, sp));
+}
+
+// Cutscene::Step: r3 = the cutscene; r3 = 1 while running, 0 at its last
+// shot; lr put back as the original's epilogue does (its only caller,
+// Cutscene::Update, reads neither f1 nor the stack after).
+void CameraModesStep82155A28(PPCContext& ctx, uint8_t* base) {
+  ctx.fpscr.disableFlushMode();
+  const uint64_t lr = ctx.lr;
+  const uint32_t frame = ctx.r1.u32 - 192;
+  const uint32_t cutscene = ctx.r3.u32;
+  ctx.r3.u64 = cm::CutsceneTick(base, cutscene, frame, CutsceneTickCallsAt(ctx, base, frame));
+  ctx.lr = lr;
+}
+
+// Cutscene::Update (vtable slot 0; CameraDirector::Update reads neither r3
+// nor f1 after): r3 = the cutscene; r3 as the original leaves it, lr put
+// back. Step's frame (192 bytes) below Update's (96).
+void CameraModesStep821561F8(PPCContext& ctx, uint8_t* base) {
+  ctx.fpscr.disableFlushMode();
+  const uint64_t lr = ctx.lr;
+  const uint32_t frame = ctx.r1.u32 - 96;
+  const uint32_t cutscene = ctx.r3.u32;
+  ctx.r3.u64 =
+      cm::CutsceneUpdate(base, cutscene, frame, CutsceneTickCallsAt(ctx, base, frame - 192));
+  ctx.lr = lr;
 }
 
 }  // namespace hooks
 
 ITC_CAMERA_MODES(822118E0)
 ITC_CAMERA_MODES(82211980)
+ITC_CAMERA_MODES(82155A28)
+ITC_CAMERA_MODES(821561F8)

@@ -12,4 +12,10 @@ namespace race_hud_hooks {
 // --redraw_rival_logo and calls this.
 void DrawRivalLogo(PPCContext& ctx, uint8_t* base);
 
+// For the harnesses only: when set, the draw's override hands each call to
+// it instead of drawing (after noting the entry). Set only while a harness
+// runs, on the game's thread (the camera modes' Cutscene::Step cases record
+// the calls with it).
+extern void (*g_rival_logo_draw_stand_in)(PPCContext& ctx, uint8_t* base);
+
 }  // namespace race_hud_hooks

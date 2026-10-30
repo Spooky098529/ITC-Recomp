@@ -417,6 +417,42 @@ void CutsceneInit(uint8_t* base, uint32_t shot, uint32_t entry, uint32_t frame,
 // stwu (304 bytes).
 uint32_t CutsceneStep(uint8_t* base, uint32_t shot, uint32_t out, uint32_t frame,
                       const std::function<void(uint32_t object)>& camera_original, double* f1);
+// sub_82155A28 Cutscene::Step and sub_821561F8 Cutscene::Update's calls
+// that go through the translated code (the adapter's): EvalCamera's
+// original for the shot's step (as CutsceneStep's `camera_original`, with
+// the shot), RivalLogo::Close's calls, RivalLogo::Play's original when set
+// (else RivalLogoPlay natively) and RivalLogo::Draw (its override, from a
+// frame like Step's with the return address 0x82155BE0, for frame
+// interpolation's noting).
+struct CutsceneTickCalls {
+  std::function<void(uint32_t shot, uint32_t object)> camera_original;
+  RivalLogoCloseCalls close;
+  std::function<void(uint32_t entry)> play_original;
+  std::function<void(uint32_t entry)> draw;
+};
+// sub_82155A28 Cutscene::Step: r3 = the cutscene (the camera director's
+// +56896): 1.0 at the frame's +108, +124 and +140; without +10764's bit 0x1
+// the logo (+10760) played (RivalLogo::Play), returning 1 unless +10764 has
+// 0x8 then. With a shot left (+360 below the count +1024, unsigned) and
+// +10756 0, the shot +360 of the list at +952 stepped
+// (CutsceneShot::Step(shot, frame + 80)); its 0x20 moves +360 on, and at
+// the last the logo is closed (RivalLogo::Close) and 0 returned; unless its
+// 0x4, the viewport (+20) gets the zoom (Viewport::SetZoom, the frame's
+// +148), the near plane (CameraPasses::SetNear: +1868 / +1864 x the zoom),
+// the roll (Viewport::SetRoll, +144), +1600 the frame's +96 (8 words),
+// +1632 its own +1712 (4) and +1648 the cutscene's +32 (4); the logo drawn
+// with +10764's 0x8 (`calls.draw`), +356 counted on. Returns 1 while
+// running, 0 at the last shot. `frame` is the original's r1 after its stwu
+// (192 bytes).
+uint32_t CutsceneTick(uint8_t* base, uint32_t cutscene, uint32_t frame,
+                      const CutsceneTickCalls& calls);
+// sub_821561F8 Cutscene::Update (vtable 0x82006B3C's slot 0): with a shot
+// (+352 not -1) Cutscene::Step (from `frame` - 192), returning its answer
+// when its low byte isn't 0; else the race data's word +0x59AE4 gets bit
+// 0 (the cutscene done, probably). Returns r3 as the original leaves it
+// (Step's, or the cutscene). `frame` is the original's r1 (96 bytes).
+uint32_t CutsceneUpdate(uint8_t* base, uint32_t cutscene, uint32_t frame,
+                        const CutsceneTickCalls& calls);
 
 // --- The views' cameras (src/camera_modes/chase.cpp) ---
 // `frame` is each original's r1 after its stwu; the callees' frames below

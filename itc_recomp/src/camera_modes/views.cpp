@@ -768,4 +768,92 @@ uint32_t CutsceneStep(uint8_t* base, uint32_t shot, uint32_t out, uint32_t frame
   return Load(base, shot + 604);
 }
 
+uint32_t CutsceneTick(uint8_t* base, uint32_t cutscene, uint32_t frame,
+                      const CutsceneTickCalls& calls) {
+  ITC_NATIVE_RUNNING("sub_82155A28 Cutscene::Step");
+  const uint32_t logo = cutscene + 10760;
+  uint32_t r29 = 1;
+  const uint32_t one = Load(base, kOne);
+  const uint32_t flags = Load(base, cutscene + 10764);
+  Store(base, frame + 108, one);
+  Store(base, frame + 124, one);
+  Store(base, frame + 140, one);
+  if ((flags & 1) == 0) {
+    if (calls.play_original) {
+      calls.play_original(logo);
+    } else {
+      // RivalLogo::Play's frame (144 bytes): the back chain its original
+      // leaves there (CutsceneShot::Step's frame reads that word as its
+      // target's x when no animation object writes it).
+      Store(base, frame - 144, frame);
+      RivalLogoPlay(base, logo, frame - 144 + 80);
+    }
+    if ((Load(base, cutscene + 10764) & 8) == 0) {
+      return 1;
+    }
+  }
+  const uint32_t index = Load(base, cutscene + 360);
+  if (!(uint32_t(LoadS16(base, cutscene + 1024)) > index)) {
+    return r29;
+  }
+  if (Load(base, cutscene + 10756) != 0) {
+    return r29;
+  }
+  // The shots: a 16-slot list at +952 of 608-byte shots, its count +1024.
+  const uint32_t list = cutscene + 952;
+  const uint32_t node = Walk16(base, list, index);
+  const uint32_t shot = uint32_t(int64_t(LoadS16(base, node + 2)) * 608) + list + 76;
+  double f1 = 0;
+  const uint32_t r30 = CutsceneStep(
+      base, shot, frame + 80, frame - 304,
+      [&](uint32_t object) { calls.camera_original(shot, object); }, &f1);
+  if ((r30 & 0x20) != 0) {
+    const uint32_t next = Load(base, cutscene + 360) + 1;
+    const uint32_t count = uint32_t(LoadS16(base, cutscene + 1024));
+    Store(base, cutscene + 360, next);
+    if (!(count > next)) {
+      r29 = 0;
+      RivalLogoClose(base, logo, frame - 128, calls.close);
+    }
+  }
+  if ((r30 & 4) != 0) {
+    return r29;
+  }
+  // The viewport (+20): the zoom, the near plane, the roll, then the eye
+  // and target (the frame's +96, 8 words), +1712's four words into +1632,
+  // and the cutscene's +32 into +1648.
+  cameras::ViewportSetZoom(base, Load(base, cutscene + 20), Lfs(base, frame + 148));
+  uint32_t viewport = Load(base, cutscene + 20);
+  const double at1864 = Lfs(base, viewport + 1864);
+  const double at1868 = Lfs(base, viewport + 1868);
+  cameras::SetNear(base, Fmuls(Fdivs(at1868, at1864), Lfs(base, frame + 148)));
+  cameras::ViewportSetRoll(base, Load(base, cutscene + 20), Lfs(base, frame + 144));
+  viewport = Load(base, cutscene + 20);
+  CopyWords(base, viewport + 1600, frame + 96, 8);
+  viewport = Load(base, cutscene + 20);
+  CopyWords(base, viewport + 1632, viewport + 1712, 4);
+  viewport = Load(base, cutscene + 20);
+  CopyWords(base, viewport + 1648, cutscene + 32, 4);
+  if ((Load(base, cutscene + 10764) & 8) != 0) {
+    calls.draw(logo);
+  }
+  Store(base, cutscene + 356, Load(base, cutscene + 356) + 1);
+  return r29;
+}
+
+uint32_t CutsceneUpdate(uint8_t* base, uint32_t cutscene, uint32_t frame,
+                        const CutsceneTickCalls& calls) {
+  ITC_NATIVE_RUNNING("sub_821561F8 Cutscene::Update");
+  uint32_t r3 = cutscene;
+  if (int32_t(Load(base, cutscene + 352)) != -1) {
+    r3 = CutsceneTick(base, cutscene, frame - 192, calls);
+    if ((r3 & 0xFF) != 0) {
+      return r3;
+    }
+  }
+  const uint32_t done = Load(base, kRaceData) + 0x59AE4;
+  Store(base, done, Load(base, done) | 1);
+  return r3;
+}
+
 }  // namespace camera_modes
