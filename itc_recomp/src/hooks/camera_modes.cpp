@@ -40,7 +40,8 @@ ITC_FLAG_BOOL(native_camera_modes, true, "ITC",
               "FixGroup sub_820ABED8 and FixTriple sub_820ABE68 (no adapters); "
               "RivalLogo::RivalLogo sub_82211848 with InitXpr sub_82211708 (no adapter) and "
               "RivalLogo::Play sub_82211AB0 (without --log_pause_movie); CameraTarget::Track "
-              "sub_82153290; Camera::Shake sub_82152CD8 with ShakeRandom sub_82152BD8 and "
+              "sub_82153290; Camera::Shake sub_82152CD8 (no adapter: only ChaseCamera::Update's "
+              "plain C++ calls it) with ShakeRandom sub_82152BD8 and "
               "Viewport::Offset sub_821529B0 (no adapters), Viewport::PullBack sub_82152788; "
               "IntroCamera::StepShot sub_82152E78, IntroCamera::IntroCamera sub_82158F70 with "
               "MakeShot sub_82154108 (no adapter; with native atexit); CameraDirector::Start "
@@ -420,7 +421,9 @@ void CameraModesStep82153290(PPCContext& ctx, uint8_t* base) {
   }
 }
 
-// Camera::Shake: r3 = the camera; r3 = its viewport, as Offset leaves it.
+// Camera::Shake (no adapter: only ChaseCamera::Update's plain C++ calls it; the
+// step kept for the harness): r3 = the camera; r3 = its viewport, as Offset
+// leaves it.
 void CameraModesStep82152CD8(PPCContext& ctx, uint8_t* base) {
   ctx.fpscr.disableFlushMode();
   const uint32_t camera = ctx.r3.u32;
@@ -828,7 +831,6 @@ ITC_CAMERA_MODES(82152078)
 ITC_CAMERA_MODES(82211848)
 ITC_CAMERA_MODES(82211AB0)
 ITC_CAMERA_MODES(82153290)
-ITC_CAMERA_MODES(82152CD8)
 ITC_CAMERA_MODES(82152788)
 ITC_CAMERA_MODES(82152E78)
 ITC_CAMERA_MODES(82158F70)
