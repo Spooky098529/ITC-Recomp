@@ -37,7 +37,8 @@ void CareerResultsPush(PPCContext& ctx, uint8_t* base);
 void CareerStatsStartDay(PPCContext& ctx, uint8_t* base);
 // Garage::InsertCar sub_821154E0: r3 = the garage, r4 = the car, r5 = the
 // position; r3 = the slot (memcpy's: through memcpy's adapter where its plain
-// C++ can't copy).
+// C++ can't copy). No adapter (only Garage::Add's plain C++ calls it);
+// the harness's step, as Car::SpecWord744 sub_821104B0's.
 void CareerGarageInsertCar(PPCContext& ctx, uint8_t* base);
 // Condition::Test sub_82112950: r3 = the condition, r4 = the location, r5 =
 // the kinds' mask; r3 = 0 or 1 (the original where the items' copies aren't
