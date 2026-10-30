@@ -16,6 +16,17 @@ void CarModelsLoadSlotReset(PPCContext& ctx, uint8_t* base);
 // leaves it. Natively only while --native_heap routes VirtualFree to the
 // allocation layer.
 void CarModelsLoadSlotReleaseBuffer(PPCContext& ctx, uint8_t* base);
+// LoadSlot::LoadShared sub_820D0860 and LoadSlot::Load sub_820D07C8: r3 =
+// the slot, r4 = the asset id, r5 = the callback's context, r6 = the
+// callback; r3 1 when loading, else 0. LoadSlot::Load natively only while
+// --native_heap routes VirtualAlloc to the layer.
+void CarModelsLoadSlotLoadShared(PPCContext& ctx, uint8_t* base);
+void CarModelsLoadSlotLoad(PPCContext& ctx, uint8_t* base);
+// CarModel::LoadSetA sub_820D59D8 and LoadSetB sub_820D5AC0: r3 = the car
+// model; r3 as the original leaves it. Natively only while --native_heap
+// routes VirtualAlloc to the layer.
+void CarModelsLoadSetA(PPCContext& ctx, uint8_t* base);
+void CarModelsLoadSetB(PPCContext& ctx, uint8_t* base);
 // sub_820C3F50: r3 = the set (left), r4 to r7 the record's words.
 void CarModelsDeferRelease(PPCContext& ctx, uint8_t* base);
 

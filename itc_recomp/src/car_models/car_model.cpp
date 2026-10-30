@@ -8,6 +8,7 @@
 #include "guest.h"
 #include "model_animation/model_animation.h"
 #include "scene_loaders/objects.h"
+#include "scene_models/scene_models.h"
 
 #include <cstdlib>
 
@@ -73,6 +74,49 @@ std::optional<uint32_t> CarModelRelease(uint8_t* base, uint32_t car_model) {
   const auto r3 = scene_loaders::CarModelReset(base, car_model);
   Require(r3.has_value(), "CarModel::Reset");
   return r3;
+}
+
+int64_t CarModelLoadSetA(uint8_t* base, uint32_t car_model, const archive::LoadCall& load) {
+  ITC_NATIVE_RUNNING("sub_820D59D8 CarModel::LoadSetA");
+  const auto load_u32 = [base](uint32_t address) { return guest::LoadU32(base, address); };
+  const auto store_u32 = [base](uint32_t address, uint32_t value) {
+    guest::StoreU32(base, address, value);
+  };
+  store_u32(car_model + 3728, load_u32(car_model + 32) * 226 + 893);
+  store_u32(car_model + 3736, archive::AssetSize(base, load_u32(car_model + 3728)));
+  int64_t r3 = scene_models::AllocPages(base, car_model + 3744, load_u32(car_model + 3736));
+  if (load_u32(car_model + 3736) > 0) {
+    r3 = load(load_u32(car_model + 3728), load_u32(car_model + 3744), kOnFileLoaded, car_model);
+    store_u32(car_model + 3748, 2);
+    store_u32(car_model + 3732, uint32_t(r3));
+  }
+  store_u32(car_model + 3952, load_u32(car_model + 32) * 226 + 891);
+  store_u32(car_model + 3960, archive::AssetSize(base, load_u32(car_model + 3952)));
+  r3 = scene_models::AllocPages(base, car_model + 3968, load_u32(car_model + 3960));
+  if (load_u32(car_model + 3960) != 0) {
+    r3 = load(load_u32(car_model + 3952), load_u32(car_model + 3968), kOnFileLoaded, car_model);
+    store_u32(car_model + 3972, 2);
+    store_u32(car_model + 3956, uint32_t(r3));
+  } else {
+    store_u32(car_model + 3972, 1);
+  }
+  return r3;
+}
+
+int64_t CarModelLoadSetB(uint8_t* base, uint32_t car_model, uint32_t pcr,
+                          const archive::LoadCall& load) {
+  ITC_NATIVE_RUNNING("sub_820D5AC0 CarModel::LoadSetB");
+  LoadSlotLoad(base, car_model + 3728, guest::LoadU32(base, car_model + 32) * 197 + 11063,
+               car_model, kOnFileLoadedB, pcr, load);
+  const uint32_t block = guest::LoadU32(base, car_model + 32);
+  const uint32_t buffer = guest::LoadU32(base, guest::LoadU32(base, kSceneSet) + kSharedBuffer);
+  const uint32_t id = block * 197 + 11061;
+  guest::StoreU32(base, car_model + 3952, id);
+  guest::StoreU32(base, car_model + 3960, archive::AssetSize(base, id));
+  const int64_t serial = load(id, buffer, kOnFileLoadedB, car_model);
+  guest::StoreU32(base, car_model + 3956, uint32_t(serial));
+  guest::StoreU32(base, car_model + 3972, 2);
+  return serial;
 }
 
 }  // namespace car_models

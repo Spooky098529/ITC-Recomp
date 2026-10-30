@@ -11,7 +11,9 @@
 
 #include "base/flags.h"
 #include "base/log.h"
+#include "car_models/car_model.h"
 #include "car_models/decals.h"
+#include "car_models/load_slots.h"
 #include "car_models/raster.h"
 #include "car_models/tga.h"
 #include "car_models/vinyl.h"
@@ -28,9 +30,11 @@
 
 #include <fmt/format.h>
 
+#include <algorithm>
 #include <bit>
 #include <functional>
 #include <limits>
+#include <optional>
 #include <mutex>
 #include <string>
 #include <vector>
@@ -1162,6 +1166,165 @@ void Rasterizer(Context& h, uint32_t block) {
   }
 }
 
+// A guest word put back when it goes out of scope (the scene's second set,
+// pointed at the case's block).
+class SavedWord {
+ public:
+  SavedWord(uint8_t* base, uint32_t address)
+      : base_(base), address_(address), value_(guest::LoadU32(base, address)) {}
+  ~SavedWord() { guest::StoreU32(base_, address_, value_); }
+  SavedWord(const SavedWord&) = delete;
+  SavedWord& operator=(const SavedWord&) = delete;
+
+ private:
+  uint8_t* base_;
+  uint32_t address_;
+  uint32_t value_;
+};
+
+// An asset id for the loads: the sets' own (a and b, both files, blocks 0 to
+// 44), a decal's, or any below BUILD_CRS's first.
+uint32_t LoadId(Random& r) {
+  const uint32_t block = r.Below(45);
+  switch (r.Below(6)) {
+    case 0: return 893 + 226 * block;
+    case 1: return 891 + 226 * block;
+    case 2: return 11063 + 197 * block;
+    case 3: return 11061 + 197 * block;
+    case 4: return 163 + r.Below(400);
+    default: return r.Below(23011);
+  }
+}
+
+// Pages a load took (the layer's): compared as whether they're pages, then
+// freed; other words exactly. Each word of `addresses` that held pages gets
+// kMarker, and the recorded calls' destinations the same.
+void TakePages(uint8_t* base, const std::vector<uint32_t>& addresses, const ArchiveLoads& loads,
+               Outputs& out) {
+  std::vector<uint32_t> freed;
+  const auto pages = [&](uint32_t value) {
+    return value != 0 && (memory::IsPages(value) ||
+                          std::find(freed.begin(), freed.end(), value) != freed.end());
+  };
+  std::vector<uint32_t> calls = loads.calls();
+  for (uint32_t address : addresses) {
+    const uint32_t value = guest::LoadU32(base, address);
+    if (pages(value)) {
+      for (size_t k = 1; k < calls.size(); k += 6) {
+        if (calls[k] == value) {
+          calls[k] = kMarker;
+        }
+      }
+      if (memory::IsPages(value)) {
+        memory::FreePages(value);
+        freed.push_back(value);
+      }
+      guest::StoreU32(base, address, kMarker);
+    }
+  }
+  out.Word(uint32_t(calls.size()));
+  for (uint32_t word : calls) {
+    out.Word(word);
+  }
+}
+
+std::vector<int64_t> Serials(Random& r) {
+  std::vector<int64_t> serials;
+  for (int i = 0; i < 2; i++) {
+    serials.push_back(r.Below(8) == 0 ? -1 : int64_t(r.Below(0x7FFFFFFF)));
+  }
+  return serials;
+}
+
+// LoadSlot::LoadShared and Load, CarModel::LoadSetA and LoadSetB, with
+// Archive::Load's calls recorded (answered with random serials, -1 now and
+// then) and the scene's second set pointed at the block (its shared buffer
+// and size random, the size now and then below or at the asset's).
+void Loads(Context& h, uint32_t block) {
+  SavedWord scene(h.base, car_models::kSceneSet);
+  const uint32_t set = block + 0x2000 - car_models::kSharedBuffer;
+  const auto run = [&](Results& results, int cases, GuestFunction recompiled,
+                       GuestFunction native,
+                       const std::function<void(PPCContext&, Random&)>& setup,
+                       const std::vector<uint32_t>& page_words, const char* what) {
+    for (int c = 0; c < cases; c++) {
+      const uint64_t seed = h.random.Next();
+      Outputs out[2];
+      for (int v = 0; v < 2; v++) {
+        Random r(seed);
+        RandomBytes(h.base, block, kBlockBytes, r);
+        guest::StoreU32(h.base, car_models::kSceneSet, set);
+        PPCContext t = CallContext(h);
+        setup(t, r);
+        std::optional<ArchiveLoads> loads;
+        loads.emplace(Serials(r));
+        (v == 0 ? recompiled : native)(t, h.base);
+        // r3 may be pages (LoadSetA's last AllocPages): compared as a marker.
+        const uint32_t r3 = t.r3.u32;
+        const bool r3_pages = r3 != 0 && memory::IsPages(r3);
+        TakePages(h.base, page_words, *loads, out[v]);
+        out[v].Bytes(Read(h.base, block, kBlockBytes));
+        out[v].Word(r3_pages ? kMarker : r3);
+        out[v].Word(uint32_t(t.r3.u64 >> 32));
+      }
+      results.Check(out[0], out[1], fmt::format("{} case {}", what, c));
+    }
+  };
+  const uint32_t slot = block + 0x40;
+  const auto shared = [&](PPCContext& t, Random& r) {
+    const uint32_t id = LoadId(r);
+    const uint32_t size = archive::AssetSize(h.base, id);
+    guest::StoreU32(h.base, set + car_models::kSharedBuffer, uint32_t(r.Next()));
+    uint32_t capacity;
+    switch (r.Below(4)) {
+      case 0: capacity = size; break;
+      case 1: capacity = size - 1; break;
+      case 2: capacity = size + 1 + r.Below(0x10000); break;
+      default: capacity = r.Below(2) ? 0x200000 : uint32_t(r.Next()); break;
+    }
+    guest::StoreU32(h.base, set + car_models::kSharedBufferSize, capacity);
+    t.r3.u64 = slot;
+    t.r4.u64 = id;
+    t.r5.u64 = uint32_t(r.Next());
+    t.r6.u64 = uint32_t(r.Next());
+  };
+  {
+    Results results("LoadSlot::LoadShared (sub_820D0860)");
+    run(results, 48, __imp__sub_820D0860, hooks::CarModelsLoadSlotLoadShared, shared, {},
+        "shared");
+    results.Report();
+  }
+  if (!hooks::NativeHeapActive()) {
+    ITC_LOG_WARN("harness: car_models: --native_heap is off: the loads' cases skipped");
+    return;
+  }
+  {
+    Results results("LoadSlot::Load (sub_820D07C8)");
+    run(results, 32, __imp__sub_820D07C8, hooks::CarModelsLoadSlotLoad, shared, {slot + 16},
+        "own");
+    results.Report();
+  }
+  const uint32_t car = block + 0x100;
+  const auto car_model = [&](PPCContext& t, Random& r) {
+    // Blocks 0 to 44 (the game's), now and then a larger one.
+    guest::StoreU32(h.base, car + 32, r.Below(8) == 0 ? 45 + r.Below(200) : r.Below(45));
+    guest::StoreU32(h.base, set + car_models::kSharedBuffer, uint32_t(r.Next()));
+    t.r3.u64 = car;
+  };
+  {
+    Results results("CarModel::LoadSetA (sub_820D59D8)");
+    run(results, 24, __imp__sub_820D59D8, hooks::CarModelsLoadSetA, car_model,
+        {car + 3744, car + 3968}, "set a");
+    results.Report();
+  }
+  {
+    Results results("CarModel::LoadSetB (sub_820D5AC0)");
+    run(results, 24, __imp__sub_820D5AC0, hooks::CarModelsLoadSetB, car_model, {car + 3744},
+        "set b");
+    results.Report();
+  }
+}
+
 void Vinyls(Context& h, uint32_t block) {
   TgaHeaderClears(h, block);
   Rasterizer(h, block);
@@ -1182,6 +1345,7 @@ void CarModels(Context& h) {
   const uint32_t allocation = memory::Alloc(kBlockBytes + 16, 0);
   const uint32_t block = (allocation + 15) & ~15u;
   Slots(h, block);
+  Loads(h, block);
   DeferReleases(h, block);
   Releases(h, block);
   Vinyls(h, block);
