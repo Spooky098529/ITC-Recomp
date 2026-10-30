@@ -11,6 +11,11 @@ functions to check in a drive in the progress file.
 When the user has reviewed a run's section, its heading gets
 "(reviewed <date>)"; the section stays for the record.
 
+## Run 2026-10-30 23:03 (`b7-loop-30-10-26-2`)
+
+- `car-models.md` (already mapped; the map checked by the lead, not
+  remapped).
+
 ## Run 2026-10-30 11:39 (`b7-loop-30-10-26`)
 
 - The race event's map (84e5334): `functions/race-event.md`, 102 new
