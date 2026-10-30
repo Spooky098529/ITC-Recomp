@@ -46,4 +46,15 @@ void LocationScreenRunCardMovie(PPCContext& ctx, uint8_t* base);
 void LocationScreenTransition1(PPCContext& ctx, uint8_t* base);
 void LocationScreenTransition18(PPCContext& ctx, uint8_t* base);
 
+// sub_822895E0 ScreenMachine::Reenter (r3 = a machine; r3 left),
+// sub_822279A8 Reset and sub_82227818 ResetView (r3 = the screen, the view;
+// r3 as memcpy leaves it, the view's +176), sub_8222C9B0 ApplyQueuedPage
+// (r3 HidePictures' or as it came), sub_8222EC08 UpdatePage (r3 = the
+// machine, r4 = the dispatcher; the page's handler through ctx).
+void LocationScreenReenter(PPCContext& ctx, uint8_t* base);
+void LocationScreenReset(PPCContext& ctx, uint8_t* base);
+void LocationScreenResetView(PPCContext& ctx, uint8_t* base);
+void LocationScreenApplyQueuedPage(PPCContext& ctx, uint8_t* base);
+void LocationScreenUpdatePage(PPCContext& ctx, uint8_t* base);
+
 }  // namespace hooks

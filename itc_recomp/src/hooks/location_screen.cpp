@@ -17,7 +17,9 @@ ITC_FLAG_BOOL(native_location_screen, true, "ITC",
               "ShowPictures sub_8222A060, HidePictures sub_8222A150, SetCarColor sub_8222AC18, "
               "SetCursor sub_8222BFE8, ListNode sub_8222C058, ShowArrows sub_8222C0C8, "
               "RunCardMovie sub_822291A8, Transition1 sub_8222AD50, Transition18 sub_8222BE60; "
-              "UiMovie::Run through its override) "
+              "UiMovie::Run through its override; ScreenMachine::Reenter sub_822895E0, Reset "
+              "sub_822279A8 with ResetView sub_82227818, ApplyQueuedPage sub_8222C9B0, "
+              "UpdatePage sub_8222EC08, its page's handler through the guest context) "
               "natively instead of through the translated code (the same writes; checked by "
               "--run_harnesses=location_screen)");
 
@@ -150,6 +152,61 @@ void LocationScreenTransition18(PPCContext& ctx, uint8_t* base) {
   });
 }
 
+void LocationScreenReenter(PPCContext& ctx, uint8_t* base) { ls::Reenter(base, ctx.r3.u32); }
+
+void LocationScreenReset(PPCContext& ctx, uint8_t* base) {
+  const uint32_t screen = ctx.r3.u32;
+  if (!ls::ResetNative(screen)) {
+    __imp__sub_822279A8(ctx, base);
+    return;
+  }
+  ctx.fpscr.disableFlushMode();
+  ls::Reset(base, screen);
+  ctx.r3.u64 = screen + 560 + 176;
+}
+
+void LocationScreenResetView(PPCContext& ctx, uint8_t* base) {
+  const uint32_t view = ctx.r3.u32;
+  if (!ls::ResetNative(view - 560)) {
+    __imp__sub_82227818(ctx, base);
+    return;
+  }
+  ctx.fpscr.disableFlushMode();
+  ls::ResetView(base, view);
+  ctx.r3.u64 = view + 176;
+}
+
+void LocationScreenApplyQueuedPage(PPCContext& ctx, uint8_t* base) {
+  if (const auto r3 = ls::ApplyQueuedPage(base, ctx.r1.u32)) {
+    ctx.r3.u64 = *r3;
+  }
+}
+
+namespace {
+
+void PageThrough(void* user, uint32_t handler, uint32_t dispatcher, uint32_t machine,
+                 uint32_t frame_bytes, uint32_t lr) {
+  auto& guest = *static_cast<GuestRun*>(user);
+  PPCContext& ctx = guest.ctx;
+  uint8_t* base = guest.base;
+  guest_call::InFrame(ctx, base, frame_bytes, lr, [&](uint32_t) {
+    ctx.r3.u64 = dispatcher;
+    ctx.r4.u64 = machine;
+    ctx.ctr.u64 = handler;
+    REX_CALL_INDIRECT_FUNC(handler);
+  });
+}
+
+}  // namespace
+
+void LocationScreenUpdatePage(PPCContext& ctx, uint8_t* base) {
+  const uint64_t lr = ctx.lr;
+  GuestRun guest{ctx, base};
+  const ls::PageCall call{&guest, PageThrough};
+  ls::UpdatePage(base, ctx.r1.u32, ctx.r3.u32, ctx.r4.u32, call);
+  ctx.lr = lr;
+}
+
 }  // namespace hooks
 
 #define LOCATION_SCREEN_ADAPTER(address, step)  \
@@ -181,3 +238,8 @@ LOCATION_SCREEN_ADAPTER(8222C0C8, LocationScreenShowArrows)
 LOCATION_SCREEN_ADAPTER(822291A8, LocationScreenRunCardMovie)
 LOCATION_SCREEN_ADAPTER(8222AD50, LocationScreenTransition1)
 LOCATION_SCREEN_ADAPTER(8222BE60, LocationScreenTransition18)
+LOCATION_SCREEN_ADAPTER(822895E0, LocationScreenReenter)
+LOCATION_SCREEN_ADAPTER(822279A8, LocationScreenReset)
+LOCATION_SCREEN_ADAPTER(82227818, LocationScreenResetView)
+LOCATION_SCREEN_ADAPTER(8222C9B0, LocationScreenApplyQueuedPage)
+LOCATION_SCREEN_ADAPTER(8222EC08, LocationScreenUpdatePage)

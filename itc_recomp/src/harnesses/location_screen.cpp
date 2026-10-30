@@ -515,6 +515,66 @@ void Movies(Context& h, const World& w) {
         __imp__sub_8222BE60, hooks::LocationScreenTransition18, frame128);
 }
 
+// The screen's state: Reenter on a machine (the movies block's start: its
+// +9604 and +9608), Reset and ResetView on the screen, ApplyQueuedPage and
+// UpdatePage on the page object (+0 the page, +4 the next, +12 the
+// transition) with +880 and +884 queued; UpdatePage's pages -1, 7 (it posts
+// message 6 to the dispatcher, in the movies block at +0x17800) or 10 (the
+// empty function), the others not run here (they run the menus' input);
+// its frame's handler table compared.
+void State(Context& h, const World& w) {
+  uint8_t* const base = h.base;
+  const ArgsFn no_args = [](PPCContext&, Random&, const World&) {};
+  auto small_or_none = [](Random& r) {
+    return r.Below(3) == 0 ? 0xFFFFFFFFu : r.Below(4) == 0 ? uint32_t(r.Next()) : r.Below(16);
+  };
+  Group(h, w, "ScreenMachine::Reenter (sub_822895E0)", 200,
+        [base](Random& r, const World& w) {
+          guest::StoreU32(base, w.movies.address + 9608, r.Below(2) == 0 ? 0 : uint32_t(r.Next()));
+        },
+        [](PPCContext& t, Random&, const World& w) { t.r3.u64 = w.movies.address; },
+        __imp__sub_822895E0, hooks::LocationScreenReenter);
+  Group(h, w, "LocationScreen::Reset (sub_822279A8, with sub_82227818)", 100,
+        [](Random&, const World&) {},
+        [](PPCContext& t, Random&, const World& w) { t.r3.u64 = w.screen.address; },
+        __imp__sub_822279A8, hooks::LocationScreenReset);
+  Group(h, w, "LocationScreen::ResetView (sub_82227818)", 100, [](Random&, const World&) {},
+        [](PPCContext& t, Random&, const World& w) { t.r3.u64 = w.screen.address + 560; },
+        __imp__sub_82227818, hooks::LocationScreenResetView);
+  const SetupFn queued = [base, small_or_none](Random& r, const World& w) {
+    const uint32_t screen = w.screen.address;
+    guest::StoreU32(base, screen + 880, r.Below(3) == 0 ? 0 : small_or_none(r));
+    guest::StoreU32(base, screen + 884, small_or_none(r));
+    const uint32_t pages = screen + kPagesAt;
+    guest::StoreU32(base, pages + 0, r.Below(3) == 0 ? guest::LoadU32(base, screen + 880)
+                                                     : small_or_none(r));
+    guest::StoreU32(base, pages + 4, small_or_none(r));
+    guest::StoreU32(base, pages + 12, small_or_none(r));
+  };
+  Group(h, w, "LocationScreen::ApplyQueuedPage (sub_8222C9B0)", 300, queued, no_args,
+        __imp__sub_8222C9B0, hooks::LocationScreenApplyQueuedPage, {{{-96 - 112 + 80, 8}}});
+  Group(h, w, "LocationScreen::UpdatePage (sub_8222EC08)", 300,
+        [base, queued](Random& r, const World& w) {
+          queued(r, w);
+          const uint32_t pages = w.screen.address + kPagesAt;
+          constexpr uint32_t kPages[] = {0xFFFFFFFFu, 7, 10};
+          const uint32_t page = kPages[r.Below(3)];
+          guest::StoreU32(base, pages + 0, page);
+          if (r.Below(2) == 0) {
+            guest::StoreU32(base, pages + 4, page);
+          }
+          guest::StoreU32(base, w.screen.address + 900, r.Below(2) == 0 ? 0 : uint32_t(r.Next()));
+          const uint32_t ring = w.movies.address + 0x17800 + 204;
+          guest::StoreU32(base, ring + 600, r.Below(50));
+          guest::StoreU32(base, ring + 604, r.Below(4) == 0 ? uint32_t(r.Next()) : r.Below(50));
+        },
+        [](PPCContext& t, Random& r, const World& w) {
+          t.r3.u64 = r.Next();
+          t.r4.u64 = w.movies.address + 0x17800;
+        },
+        __imp__sub_8222EC08, hooks::LocationScreenUpdatePage, {{{-240 + 80, 64}}});
+}
+
 }  // namespace
 
 void LocationScreen(Context& h) {
@@ -530,6 +590,7 @@ void LocationScreen(Context& h) {
   Helpers(h, w);
   Lists(h, w);
   Movies(h, w);
+  State(h, w);
 }
 
 }  // namespace harness

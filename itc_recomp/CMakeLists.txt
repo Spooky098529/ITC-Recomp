@@ -230,6 +230,7 @@ set(ITC_SOURCES
     src/hooks/location_screen.cpp
     src/location_screen/helpers.cpp
     src/location_screen/movies.cpp
+    src/location_screen/pages.cpp
     src/save_interface/save_interface.cpp
     src/save_interface/save_layer.cpp
     src/hooks/file_layer.cpp

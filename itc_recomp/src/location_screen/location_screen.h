@@ -120,4 +120,43 @@ uint32_t Transition1(uint8_t* base, uint32_t sp, uint32_t step, const RunCall& r
 // when movie 30's run returns 0, the confirm menu's +24 = 0 and 1, else 0.
 uint32_t Transition18(uint8_t* base, uint32_t sp, uint32_t step, const RunCall& run);
 
+// --- The screen's state (src/location_screen/pages.cpp) ---
+
+// sub_822895E0 ScreenMachine::Reenter: the machine's +9604 (its state) 4
+// when +9608 (the movies loaded) is set, else 1.
+void Reenter(uint8_t* base, uint32_t machine);
+// sub_822279A8 LocationScreen::Reset, with sub_82227818
+// LocationScreen::ResetView on the screen's +560: the screen's fields
+// cleared or set as the original stores them; the view's vectors from the
+// floats at 0x82000A34 and 0x82000A30 (through a float register, as lfs and
+// stfs leave them) and its two identity matrices (+112, +176; memcpy's in
+// the original, from an identity built in its frame, not written here).
+// False, with nothing done, where a matrix's copy would land in the
+// physical views (memcpy's override records those): the original runs.
+bool ResetNative(uint32_t screen);
+void Reset(uint8_t* base, uint32_t screen);
+void ResetView(uint8_t* base, uint32_t view);
+// sub_8222C9B0 LocationScreen::ApplyQueuedPage: HidePictures (from its
+// 96-byte frame) when +880 is 0; the page object set from +880 and +884
+// (a transition when +884 isn't -1), both then -1. Returns HidePictures'
+// r3 when it ran, else nullopt (r3 left as it came).
+std::optional<uint32_t> ApplyQueuedPage(uint8_t* base, uint32_t sp);
+
+// A page's input handler (`handler`, one of the table's 16) called with r3
+// = `dispatcher`, r4 = `machine`, from a frame `frame_bytes` below the
+// caller's r1 with the return address `lr`.
+struct PageCall {
+  void* user;
+  void (*call)(void* user, uint32_t handler, uint32_t dispatcher, uint32_t machine,
+               uint32_t frame_bytes, uint32_t lr);
+};
+// sub_8222EC08 LocationScreen::UpdatePage (r3 = the machine, r4 = the
+// dispatcher): the 16 pages' handlers stored in its 240-byte frame (+80
+// on), and unless the page is -1 the page's (read from there) called;
+// then [0x8265ECE0] = the screen's +592 (16 bytes), and when +900 is set
+// it's cleared and the page object restarted. r3 is the handler's (or as
+// it came).
+void UpdatePage(uint8_t* base, uint32_t sp, uint32_t machine, uint32_t dispatcher,
+                const PageCall& call);
+
 }  // namespace location_screen
