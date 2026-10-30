@@ -13,7 +13,15 @@ When the user has reviewed a run's section, its heading gets
 
 ## Run 2026-10-30 11:39 (`b7-loop-30-10-26`)
 
-(Filled as reports come in.)
+- The race event's map (84e5334): `functions/race-event.md`, 102 new
+  rows (37 seen in play, 65 not), among them `EventCondition::Met`
+  (`sub_82142820`, a 68-kind jump table) and its 61 kind tests (only
+  kinds 21 and 31 ran in play), its case 1 split off by the recompiler
+  (`sub_82142868`); `known-data.md`'s row for `0x826C6078` rewritten as
+  the event's layout, with rows for the event group, the pools and the
+  20-byte condition; stale "not mapped" notes in `career.md` and
+  `ai-drivers.md` pointed to it; the lead for `sub_821442D8`,
+  `sub_821434A0`, `sub_82140308` folded in.
 
 ## Run 2026-10-30 01:06 (`b7-loop-29-10-26-2`)
 

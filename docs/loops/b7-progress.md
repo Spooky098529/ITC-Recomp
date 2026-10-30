@@ -12,7 +12,9 @@ file's history. What's left to see in a drive, from every run:
   summary `b7-loop-2026-10-30-1139.md`.
 - Limit for this run: 3 subsystems; 1 taken.
 - Subsystem 1 of 3: the race event (`sub_82140340`...`sub_82144E58`,
-  the top of `leads.md`). Mapping agent running.
+  the top of `leads.md`). Mapped (84e5334, `race-event.md`, 102 rows,
+  37 in play, 12 ready groups, no stop; nothing outside blocks it).
+  Migration 1 running.
 
 ## Done
 
@@ -32,3 +34,5 @@ file's history. What's left to see in a drive, from every run:
 
 - At the start: ours 3167, work left 3165 (wrapped 104, known 474,
   unknown 2587).
+- After the race event's map: ours 3167, work left 3165 (wrapped 104,
+  known 511, unknown 2550).
