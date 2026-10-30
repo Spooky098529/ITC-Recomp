@@ -1975,6 +1975,106 @@ void ReverbCoreCases(Context& h) {
   memory::Free(io_block);
 }
 
+// ReverbCore::Apply (sub_82467A18) over a real reverb built as for
+// ReverbCore::Process (Reverb::Reverb by the translated code, the same for
+// both versions): the native parameters made by I3dl2::ToNative's plain C++
+// from I3DL2 parameters (realistic, or with edges), then now and then a word
+// or a float changed (the table indices up to 255, as Reverb::SetParameters'
+// bytes allow; the delay word anything; edge floats), and the rate (+88)
+// changed now and then; the parameters either in the block or at the core's
+// +52 (as Reverb::Run passes them: memcpy then copies them over themselves,
+// and its original runs). The stack pointer moves by 16 from case to case.
+// Compared: the reverb object as floats (its integer words are lengths,
+// indices and pointers, none a NaN's pattern), the parameters' copy, the
+// frame's words the original writes (+80 to +124) exactly, and r3.
+void ReverbApplyCases(Context& h) {
+  const uint32_t reverb_block = memory::Alloc(kReverbBytes + 128, 0);
+  const uint32_t stack = memory::Alloc(kCoreStackBytes, 0);
+  const uint32_t params_block = memory::Alloc(0x400, 0);
+  if (reverb_block == 0 || stack == 0 || params_block == 0) {
+    memory::Free(reverb_block);
+    memory::Free(stack);
+    memory::Free(params_block);
+    return;
+  }
+  const uint32_t reverb = (reverb_block + 127) & ~127u;
+  const uint32_t core = reverb + 16;
+  const uint32_t i3dl2 = params_block, native = params_block + 0x100, descriptor = params_block + 0x200;
+  Fill(h.base, reverb, kReverbBytes, 0);
+  Fill(h.base, params_block, 0x400, 0);
+  Fill(h.base, stack, kCoreStackBytes, 0);
+  Store(h.base, descriptor + 4, 0x10);
+  {
+    PPCContext t = CallContext(h);
+    t.r1.u64 = stack + kCoreStackTop;
+    t.r3.u64 = reverb;
+    t.r4.u64 = descriptor;
+    t.r5.u64 = 0;
+    t.fpscr.loadFromHost();
+    __imp__sub_82465608(t, h.base);
+  }
+  const std::vector<uint8_t> built = Read(h.base, reverb, kReverbBytes);
+  Results results("ReverbCore::Apply (sub_82467A18)");
+  for (int i = 0; i < 48; i++) {
+    const Random start = h.random;
+    Random random = start;
+    Write(h.base, reverb, built.data(), kReverbBytes);
+    const bool edges = i >= 24;
+    I3dl2Parameters(h.base, i3dl2, random, edges);
+    xa::ReverbDefaults(h.base, native);
+    xa::I3dl2ToNative(h.base, i3dl2, native, stack + 0x100);
+    if (edges) {
+      for (uint32_t k = 0; k < 4; k++) {
+        const uint32_t field = random.Below(21);
+        if (field == 0) {
+          Store(h.base, native, uint32_t(random.Next()));
+        } else if (field < 13) {
+          Store(h.base, native + 4 * field, random.Below(2) == 0 ? random.Below(16) : random.Below(256));
+        } else {
+          Store(h.base, native + 4 * field, AnyFloat(random));
+        }
+      }
+      if (random.Below(4) == 0) {
+        Store(h.base, core + 88, random.Below(2) == 0 ? AnyFloat(random)
+                                                       : std::bit_cast<uint32_t>(float(8000 + random.Below(40001))));
+      }
+    }
+    const bool in_core = i % 2 == 1;
+    if (in_core) {
+      Write(h.base, core + 52, Read(h.base, native, 84).data(), 84);
+    }
+    const uint32_t params = in_core ? core + 52 : native;
+    for (uint32_t k = 0; k < kCoreStackBytes; k += 4) {
+      Store(h.base, stack + k, uint32_t(random.Next()));
+    }
+    const uint32_t sp = stack + kCoreStackTop - 16 * uint32_t(i % 8);
+    const std::vector<uint8_t> state = Read(h.base, reverb, kReverbBytes);
+    const std::vector<uint8_t> stack_state = Read(h.base, stack, kCoreStackBytes);
+    Outputs out[2];
+    for (int v = 0; v < 2; v++) {
+      Write(h.base, reverb, state.data(), kReverbBytes);
+      Write(h.base, stack, stack_state.data(), kCoreStackBytes);
+      PPCContext t = CallContext(h);
+      t.r1.u64 = sp;
+      t.r3.u64 = core;
+      t.r4.u64 = params;
+      t.fpscr.loadFromHost();
+      (v == 0 ? __imp__sub_82467A18 : hooks::XAudioReverbCoreApply)(t, h.base);
+      out[v].Floats(h.base, reverb, kReverbBytes / 4);
+      out[v].Bytes(Read(h.base, native, 84));
+      out[v].Bytes(Read(h.base, sp - 432 + 80, 48));
+      R3(out[v], t.r3.u64);
+    }
+    h.random = random;
+    results.Check(out[0], out[1], fmt::format("case {} ({}{})", i, edges ? "edges" : "realistic",
+                                              in_core ? ", in the core" : ""));
+  }
+  results.Report();
+  memory::Free(reverb_block);
+  memory::Free(stack);
+  memory::Free(params_block);
+}
+
 // --- The PCM codec's pass ---
 
 // PcmCodec::Process (sub_8246D860) over a PCM codec at the block (as Codec
@@ -2127,6 +2227,7 @@ void XAudioObjects(Context& h) {
   PcmProcess(h, block.address);
   ReverbStages(h);
   ReverbCoreCases(h);
+  ReverbApplyCases(h);
 }
 
 }  // namespace harness

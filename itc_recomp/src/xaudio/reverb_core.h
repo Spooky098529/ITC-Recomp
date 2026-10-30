@@ -5,6 +5,8 @@
 
 #pragma once
 
+#include "xaudio/voices.h"
+
 #include <cstdint>
 
 namespace xaudio {
@@ -27,5 +29,20 @@ namespace xaudio {
 // the inputs, weighted by the gain at +92 (vector work, 256 frames each). Returns r3 as the original leaves it.
 uint64_t ReverbCoreProcess(uint8_t* base, uint64_t core, uint32_t inputs, uint32_t outputs,
                            uint32_t sp);
+
+// The core's set-up (reverb_setup.cpp).
+
+// sub_82467A18: the 84-byte native parameters at `params` applied to the
+// core at `core`: copied to +4 (memcpy; its original, through `call`, where
+// the plain C++ refuses, as for Reverb::Run's +52), then the working values
+// from them: the delay lengths (the parameters times the rate at +88 and the
+// tables at 0x8204B8C0 to 0x8204B91C, fctidz, rounded down to primes by
+// LargestPrimeBelow, clamped) to the lines' states, the gains (five pows)
+// and the filters' inputs, with six FilterCoefficients. `frame` is its
+// frame (432 bytes; the words the original writes there are written, its
+// register saves aren't). Returns r3 as the original leaves it (the second
+// low-pass, +0x200C8).
+uint64_t ReverbCoreApply(uint8_t* base, uint32_t core, uint32_t params, uint32_t frame,
+                         const GuestCall& call);
 
 }  // namespace xaudio

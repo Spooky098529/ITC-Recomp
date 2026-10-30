@@ -48,7 +48,7 @@ ITC_FLAG_BOOL(native_xaudio_objects, true, "ITC",
               "crossfading delay lines sub_824624F8 and sub_82463620; Reverb::SetParameters "
               "sub_82462148 under the voice lists' spin lock, taken as the original does, and "
               "I3dl2::ToNative sub_82469418; PcmCodec::Process sub_8246D860 under the voice lists' "
-              "spin lock, taken as the original does) natively instead of through the "
+              "spin lock, taken as the original does; ReverbCore::Apply sub_82467A18) natively instead of through the "
               "translated code (the same reads and writes; checked by "
               "--run_harnesses=xaudio_objects)");
 
@@ -578,6 +578,16 @@ void XAudioReverbCoreProcess(PPCContext& ctx, uint8_t* base) {
   ctx.r3.u64 = xa::ReverbCoreProcess(base, ctx.r3.u64, ctx.r4.u32, ctx.r5.u32, ctx.r1.u32);
 }
 
+// In the original's frame (432 bytes; memcpy's original, where its plain
+// C++ refuses, runs below it); r3 as the original leaves it.
+void XAudioReverbCoreApply(PPCContext& ctx, uint8_t* base) {
+  ctx.fpscr.disableFlushMode();
+  const uint32_t core = ctx.r3.u32, params = ctx.r4.u32;
+  Framed(ctx, base, 432, [&](const xa::GuestCall& call, uint32_t frame) {
+    return xa::ReverbCoreApply(base, core, params, frame, call);
+  });
+}
+
 #define ITC_XAUDIO_KERNEL_STEP(name, function)                     \
   void name(PPCContext& ctx, uint8_t* base) {                      \
     ctx.r3.u64 = xa::function(base, ctx.r3.u32, ctx.r1.u32);       \
@@ -674,3 +684,4 @@ ITC_XAUDIO_OBJECTS_ADAPTER(82463B90, XAudioReverbCoreProcess)
 ITC_XAUDIO_OBJECTS_ADAPTER(82462148, XAudioReverbSetParameters)
 ITC_XAUDIO_OBJECTS_ADAPTER(82469418, XAudioI3dl2ToNative)
 ITC_XAUDIO_OBJECTS_ADAPTER(8246D860, XAudioPcmCodecProcess)
+ITC_XAUDIO_OBJECTS_ADAPTER(82467A18, XAudioReverbCoreApply)
