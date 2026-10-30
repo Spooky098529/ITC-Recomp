@@ -28,7 +28,7 @@ ITC_FLAG_BOOL(native_camera_modes, true, "ITC",
               "List40::Insert sub_821544E0, List16::Insert20 sub_82154458 (no adapter: only IntroCamera::IntroCamera's plain C++ calls it), "
               "Insert32 sub_82154378, Insert608 sub_821543E8 and Copy32 sub_82154300 (no adapter: only CutsceneShot::Init's plain C++ calls it); "
               "CameraAnims::Clear sub_82150078 and Find sub_82150300; ColorFilter::SetStyle "
-              "sub_82152108 and FadeCue::Step sub_82152290 (no adapter: only CutsceneShot::Step's plain C++ calls it); with --native_heap the camera "
+              "sub_82152108 (no adapter: only TvCamera::Update's plain C++ calls it) and FadeCue::Step sub_82152290 (no adapter: only CutsceneShot::Step's plain C++ calls it); with --native_heap the camera "
               "animations' CameraAnims::Load sub_82150B10 (with the archive's queue native), "
               "OnLoaded sub_82150878 with CameraAnim::ParseObject sub_82150100 (no adapter), "
               "FreeAll sub_821507D8 with CameraAnim::Free sub_82150098 and CameraAnimBlock::Free "
@@ -49,9 +49,11 @@ ITC_FLAG_BOOL(native_camera_modes, true, "ITC",
               "calls it), IntroCamera::IntroCamera sub_82158F70 with "
               "MakeShot sub_82154108 (no adapter; with native atexit); CameraDirector::Start "
               "sub_82152338 and Release sub_82153098; CutsceneShot::Init sub_82156B68 and Step "
-              "sub_82155800 (no adapter: only Cutscene::Step's plain C++ calls it)); the TV camera's RouteRange::CameraAt sub_820FE830, "
-              "TrackRoute::SliceFraction sub_820F9B48, TvCamera::Track sub_82156980 and, with "
-              "native atexit, CameraPath::Evaluate sub_820AC248 with RouteRange::Advance "
+              "sub_82155800 (no adapter: only Cutscene::Step's plain C++ calls it)); the TV camera's RouteRange::CameraAt sub_820FE830 "
+              "and TrackRoute::SliceFraction sub_820F9B48 (no adapters: only TvCamera::Step's plain C++ "
+              "calls them), TvCamera::Track sub_82156980 and, with "
+              "native atexit, CameraPath::Evaluate sub_820AC248 (no adapter: only TvCamera::Step's "
+              "plain C++ calls it) with RouteRange::Advance "
               "sub_820FE598, Curve::Evaluate sub_820AC060, Hermite::Basis sub_82293A48, "
               "Key::Value sub_820AC178, Key::Vec3 sub_820AC1D0, CameraPath::RoutePoint "
               "sub_820ABDA8, TrackRoute::SplinePoint sub_820AB6A0 and Matrix::FromRows3 "
@@ -65,8 +67,9 @@ ITC_FLAG_BOOL(native_camera_modes, true, "ITC",
               "Open and Delete natively where their adapters would); Cutscene::Step "
               "sub_82155A28 (no adapter: only Update's plain C++ calls it) and Update sub_821561F8 (the logo's draw "
               "through its override, sub_82211A28); the TV camera's TvCamera::TvCamera sub_82155288 "
-              "(with native atexit), TvCamera::Update sub_821593D8 with Step sub_821562F8 (with native "
-              "atexit; the attract race's color filter by rand)) natively instead of "
+              "(with native atexit), TvCamera::Update sub_821593D8 with Step sub_821562F8 (no "
+              "adapter: only Update's plain C++ calls it; with native atexit; the attract race's color "
+              "filter by rand)) natively instead of "
               "through the translated code (the same writes; checked by "
               "--run_harnesses=camera_modes)");
 
@@ -277,7 +280,8 @@ void CameraModesStep82150300(PPCContext& ctx, uint8_t* base) {
 
 // --- The color filter and the fade cues ---
 
-// ColorFilter::SetStyle: r3 = &the style. The original runs where the
+// ColorFilter::SetStyle (no adapter: only TvCamera::Update's plain C++ calls
+// it; the step kept for the harness): r3 = &the style. The original runs where the
 // filter's slots aren't its own functions.
 void CameraModesStep82152108(PPCContext& ctx, uint8_t* base) {
   ctx.fpscr.disableFlushMode();
@@ -699,13 +703,15 @@ struct SplineAtexit {
 
 namespace hooks {
 
-// RouteRange::CameraAt: r3 = the range, r4 = &the position; r3 = the
+// RouteRange::CameraAt (no adapter: only TvCamera::Step's plain C++ calls it;
+// the step kept for the harness): r3 = the range, r4 = &the position; r3 = the
 // slices counted (0x82603274's word) or -1.
 void CameraModesStep820FE830(PPCContext& ctx, uint8_t* base) {
   ctx.r3.s64 = cm::RangeCameraAt(base, ctx.r3.u32, ctx.r4.u32);
 }
 
-// TrackRoute::SliceFraction: r3 = &the position, r4 = the point; f1 the
+// TrackRoute::SliceFraction (no adapter: only TvCamera::Step's plain C++
+// calls it; the step kept for the harness): r3 = &the position, r4 = the point; f1 the
 // fraction. Its caller doesn't read r3.
 void CameraModesStep820F9B48(PPCContext& ctx, uint8_t* base) {
   ctx.fpscr.disableFlushMode();
@@ -725,7 +731,8 @@ void CameraModesStep82156980(PPCContext& ctx, uint8_t* base) {
   });
 }
 
-// CameraPath::Evaluate: r3 = the key, r4 = the camera's out, r5 = the
+// CameraPath::Evaluate (no adapter: only TvCamera::Step's plain C++ calls it;
+// the step kept for the harness): r3 = the key, r4 = the camera's out, r5 = the
 // route range, r6 = the transform, f1 = t (its caller reads neither r3 nor
 // f1 after). The original without native atexit (TrackRoute::SplinePoint's
 // static); the atexit's fallback from SplinePoint's frame (272 + 208 + 720
@@ -987,7 +994,6 @@ ITC_CAMERA_MODES(82154378)
 ITC_CAMERA_MODES(821543E8)
 ITC_CAMERA_MODES(82150078)
 ITC_CAMERA_MODES(82150300)
-ITC_CAMERA_MODES(82152108)
 ITC_CAMERA_MODES(82150B10)
 ITC_CAMERA_MODES(82150878)
 ITC_CAMERA_MODES(821507D8)
@@ -1001,10 +1007,7 @@ ITC_CAMERA_MODES(82158F70)
 ITC_CAMERA_MODES(82152338)
 ITC_CAMERA_MODES(82153098)
 ITC_CAMERA_MODES(82156B68)
-ITC_CAMERA_MODES(820FE830)
-ITC_CAMERA_MODES(820F9B48)
 ITC_CAMERA_MODES(82156980)
-ITC_CAMERA_MODES(820AC248)
 ITC_CAMERA_MODES(82154548)
 ITC_CAMERA_MODES(82154808)
 ITC_CAMERA_MODES(82154A48)
@@ -1176,7 +1179,8 @@ cm::TvStepCalls TvStepCallsAt(PPCContext& ctx, uint8_t* base, uint32_t frame,
 
 namespace hooks {
 
-// TvCamera::Step (its only caller is TvCamera::Update): r3 = the TV camera. The original
+// TvCamera::Step (no adapter: only TvCamera::Update's plain C++ calls it; the
+// step kept for the harness): r3 = the TV camera. The original
 // with a stack pointer not 16-byte aligned (CameraTarget::Track's frame) or
 // without native atexit (CameraPath::Evaluate's spline static; its fallback
 // from SplinePoint's frame, 272 + 208 + 720 bytes below Step's).
@@ -1231,5 +1235,4 @@ void CameraModesStep821593D8(PPCContext& ctx, uint8_t* base) {
 
 }  // namespace hooks
 
-ITC_CAMERA_MODES(821562F8)
 ITC_CAMERA_MODES(821593D8)
