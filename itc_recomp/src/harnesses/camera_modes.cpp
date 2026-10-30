@@ -14,10 +14,14 @@
 #include "base/flags.h"
 #include "base/log.h"
 #include "camera_modes/camera_modes.h"
+#include "hooks/archive.h"
 #include "hooks/camera_modes.h"
+#include "hooks/guest_call.h"
+#include "hooks/heap.h"
 #include "memory/heap.h"
 #include "mode_tick/mode_tick.h"
 #include "post_effects/post_effects.h"
+#include "ui_movies/game.h"
 
 #include <fmt/format.h>
 
@@ -29,6 +33,7 @@
 #include <vector>
 
 ITC_FLAG_DECLARE(bool, native_camera_modes);
+ITC_FLAG_DECLARE(bool, log_pause_movie);
 
 namespace harness {
 
@@ -544,6 +549,823 @@ void Filter(Context& h, Random& r) {
   }
 }
 
+// --- The camera animations' files ---
+
+// An animation file's object and its blocks, as the files hold them: an
+// object's +0 kind, +4 its header's size (to its blocks), +8 its blocks'
+// bytes, +12 their count, +16 to +36 words, +40 and +44 floats; a block's
+// +0 kind, +4 its header's size (to its data), +8 the data's bytes, +12 and
+// +16 floats.
+struct FileBlock {
+  uint32_t kind, header, bytes;
+  uint32_t words[2];
+  std::vector<uint8_t> rest;  // the header's bytes after +20, and the data
+};
+struct FileObject {
+  uint32_t kind, header;
+  uint32_t words[9];
+  std::vector<uint8_t> rest;  // the header's bytes after +48
+  std::vector<FileBlock> blocks;
+};
+
+uint32_t FloatOrWord(Random& r) {
+  return r.Below(6) ? OrdinaryFloat(r, 100.0) : RandomFloat(r);
+}
+
+std::vector<FileObject> RandomFile(Random& r, uint32_t objects) {
+  std::vector<FileObject> file(objects + 1);
+  for (uint32_t i = 0; i <= objects; i++) {
+    FileObject& o = file[i];
+    o.kind = i == objects ? 14 : (r.Below(4) == 0 ? r.Below(20) : 1 + r.Below(7));
+    if (o.kind == 14 && i != objects) {
+      o.kind = 6;
+    }
+    o.header = 48 + 4 * r.Below(5);
+    for (uint32_t& w : o.words) {
+      w = uint32_t(r.Next());
+    }
+    o.words[7] = FloatOrWord(r);
+    o.words[8] = FloatOrWord(r);
+    o.rest.resize(o.header - 48);
+    for (uint8_t& b : o.rest) {
+      b = uint8_t(r.Next());
+    }
+    o.blocks.resize(r.Below(5));
+    for (FileBlock& b : o.blocks) {
+      b.kind = r.Below(8);
+      b.header = 20 + 4 * r.Below(4);
+      b.bytes = r.Below(4) == 0 ? r.Below(70) : 4 * r.Below(16);
+      b.words[0] = FloatOrWord(r);
+      b.words[1] = FloatOrWord(r);
+      b.rest.resize(b.header - 20 + b.bytes);
+      for (uint8_t& x : b.rest) {
+        x = uint8_t(r.Next());
+      }
+    }
+  }
+  return file;
+}
+
+uint32_t FileBytes(const std::vector<FileObject>& file) {
+  uint32_t bytes = 0;
+  for (const FileObject& o : file) {
+    bytes += o.header;
+    for (const FileBlock& b : o.blocks) {
+      bytes += b.header + b.bytes;
+    }
+  }
+  return bytes;
+}
+
+void WriteFile(uint8_t* base, uint32_t at, const std::vector<FileObject>& file) {
+  for (const FileObject& o : file) {
+    uint32_t blocks = 0;
+    for (const FileBlock& b : o.blocks) {
+      blocks += b.header + b.bytes;
+    }
+    guest::StoreU32(base, at + 0, o.kind);
+    guest::StoreU32(base, at + 4, o.header);
+    guest::StoreU32(base, at + 8, blocks);
+    guest::StoreU32(base, at + 12, uint32_t(o.blocks.size()));
+    for (uint32_t k = 0; k < 9; k++) {
+      guest::StoreU32(base, at + 16 + 4 * k, o.words[k]);
+    }
+    Write(base, at + 48, o.rest.data(), uint32_t(o.rest.size()));
+    uint32_t b_at = at + o.header;
+    for (const FileBlock& b : o.blocks) {
+      guest::StoreU32(base, b_at + 0, b.kind);
+      guest::StoreU32(base, b_at + 4, b.header);
+      guest::StoreU32(base, b_at + 8, b.bytes);
+      guest::StoreU32(base, b_at + 12, b.words[0]);
+      guest::StoreU32(base, b_at + 16, b.words[1]);
+      Write(base, b_at + 20, b.rest.data(), uint32_t(b.rest.size()));
+      b_at += b.header + b.bytes;
+    }
+    at = b_at;
+  }
+}
+
+void FreeIfPages(uint32_t address) {
+  if (address != 0 && memory::IsPages(address)) {
+    memory::FreePages(address);
+  }
+}
+
+// A parsed object (CameraAnim::ParseObject's copy) into `out` by its
+// contents (its blocks' and their data's, not their addresses), then freed.
+void ParsedOut(Outputs& out, uint8_t* base, uint32_t object) {
+  out.Word(memory::IsPages(object) ? 1 : 0);
+  out.Bytes(Read(base, object, 40));
+  out.Floats(base, object + 40, 2);
+  out.Bytes(Read(base, object + 48, 32));
+  const uint32_t count = guest::LoadU32(base, object + 336);
+  out.Word(count);
+  for (uint32_t i = 0; i < count && i < 64; i++) {
+    const uint32_t block = guest::LoadU32(base, object + 80 + 4 * i);
+    out.Word(memory::IsPages(block) ? 1 : 0);
+    out.Bytes(Read(base, block, 12));
+    out.Floats(base, block + 12, 2);
+    out.Bytes(Read(base, block + 20, 40));
+    const uint32_t data = guest::LoadU32(base, block + 60);
+    const uint32_t bytes = guest::LoadU32(base, block + 8);
+    out.Word(memory::IsPages(data) ? 1 : 0);
+    out.Bytes(Read(base, data, bytes));
+    FreeIfPages(data);
+    FreeIfPages(block);
+  }
+  FreeIfPages(object);
+}
+
+// XMemCpy through the translated code from a frame like ParseObject's.
+cm::GuestCopy GuestXMemCpy(PPCContext& t, uint8_t* base, uint32_t frame, uint32_t back) {
+  return [&t, base, frame, back](uint32_t to, uint32_t from, uint32_t size) {
+    guest_call::InFrame(t, base, frame, back, [&](uint32_t) {
+      t.r3.u64 = to;
+      t.r4.u64 = from;
+      t.r5.u64 = size;
+      sub_82295890(t, base);
+    });
+  };
+}
+cm::GuestCopy GuestMemcpy(PPCContext& t, uint8_t* base, uint32_t frame, uint32_t back) {
+  return [&t, base, frame, back](uint32_t to, uint32_t from, uint32_t size) {
+    guest_call::InFrame(t, base, frame, back, [&](uint32_t) {
+      t.r3.u64 = to;
+      t.r4.u64 = from;
+      t.r5.u64 = size;
+      sub_825A7410(t, base);
+    });
+  };
+}
+
+// CameraAnim::ParseObject (no adapter): r3 = the object; r3 = the copy.
+void NativeParseObject(PPCContext& t, uint8_t* base) {
+  t.fpscr.disableFlushMode();
+  t.r3.u64 = cm::AnimParseObject(base, t.r3.u32, GuestXMemCpy(t, base, 144, 0x821502B8));
+}
+
+constexpr uint32_t kTableBytes = cm::kAnimCount - cm::kAnims + 4;
+
+// The stack below a case's stack pointer, the same for both versions (the
+// unused slots CameraAnims::OnLoaded copies into the entry are its).
+void FillStack(uint8_t* base, uint32_t r1, uint64_t seed) {
+  Random s(seed);
+  for (uint32_t i = 0; i < 1024; i += 4) {
+    guest::StoreU32(base, r1 - 1024 + i, uint32_t(s.Next()));
+  }
+}
+
+void AnimFiles(Context& h, Random& r) {
+  if (!hooks::NativeHeapActive() || !hooks::NativeArchiveQueue()) {
+    ITC_LOG_WARN("harness: camera_modes: the camera animations' files need --native_heap and "
+                 "the archive's queue native");
+    return;
+  }
+  Saved saved(h.base, cm::kAnims, kTableBytes);
+  {
+    Results results("CameraAnim::ParseObject (sub_82150100)");
+    for (int c = 0; c < 60; c++) {
+      const std::vector<FileObject> file = RandomFile(r, 1);
+      const uint32_t bytes = FileBytes(file);
+      Block data(bytes + 16);
+      Outputs out[2];
+      for (int v = 0; v < 2; v++) {
+        WriteFile(h.base, data.address, file);
+        PPCContext t = CallContext(h);
+        t.r3.u64 = data.address;
+        (v == 0 ? Original<__imp__sub_82150100> : NativeParseObject)(t, h.base);
+        ParsedOut(out[v], h.base, t.r3.u32);
+        out[v].Bytes(Read(h.base, data.address, bytes));
+      }
+      results.Check(out[0], out[1], fmt::format("case {}: {} blocks", c, file[0].blocks.size()));
+    }
+    results.Report();
+  }
+  {
+    Results results("CameraAnims::OnLoaded (sub_82150878)");
+    for (int c = 0; c < 60; c++) {
+      const std::vector<FileObject> file = RandomFile(r, r.Below(6));
+      const uint32_t bytes = FileBytes(file);
+      const uint32_t id = 22824 + r.Below(40);
+      const uint32_t count = r.Below(6);
+      const uint64_t seed = r.Next();
+      Outputs out[2];
+      for (int v = 0; v < 2; v++) {
+        const uint32_t data = memory::AllocPages(bytes, 4096);
+        const uint32_t record = memory::AllocPages(4, 4096);
+        WriteFile(h.base, data, file);
+        guest::StoreU32(h.base, record, id);
+        guest::StoreU32(h.base, cm::kAnimCount, count);
+        PPCContext t = CallContext(h);
+        FillStack(h.base, t.r1.u32, seed);
+        t.r3.u64 = 0x1234;
+        t.r4.u64 = data;
+        t.r5.u64 = bytes;
+        t.r6.u64 = record;
+        (v == 0 ? Original<__imp__sub_82150878> : hooks::CameraModesStep82150878)(t, h.base);
+        out[v].Word(guest::LoadU32(h.base, cm::kAnimCount));
+        const uint32_t entry = cm::kAnims + cm::kAnimBytes * count;
+        out[v].Word(guest::LoadU32(h.base, entry));
+        const uint32_t objects = guest::LoadU32(h.base, entry + 260);
+        out[v].Word(objects);
+        out[v].Bytes(Read(h.base, entry + 4 + 4 * objects, 256 - 4 * objects));
+        for (uint32_t i = 0; i < objects; i++) {
+          ParsedOut(out[v], h.base, guest::LoadU32(h.base, entry + 4 + 4 * i));
+        }
+        out[v].Word(memory::IsPages(data) ? 1 : 0);
+        out[v].Word(memory::IsPages(record) ? 1 : 0);
+        out[v].Word(t.r3.u32);
+        saved.Restore();
+      }
+      results.Check(out[0], out[1],
+                    fmt::format("case {}: {} objects, count {}", c, file.size(), count));
+    }
+    results.Report();
+  }
+  {
+    Results results("CameraAnims::Load (sub_82150B10)");
+    for (int c = 0; c < 24; c++) {
+      const uint32_t id = c < 16 ? 22824 + uint32_t(c) : r.Below(23000);
+      std::vector<int64_t> serials;
+      for (int i = 0; i < 4; i++) {
+        serials.push_back(r.Below(5) == 0 ? -1 : int64_t(r.Below(0x7FFFFFFF)));
+      }
+      Outputs out[2];
+      for (int v = 0; v < 2; v++) {
+        ArchiveLoads loads(serials);
+        PPCContext t = CallContext(h);
+        t.r3.u64 = id;
+        (v == 0 ? Original<__imp__sub_82150B10> : hooks::CameraModesStep82150B10)(t, h.base);
+        const std::vector<uint32_t>& calls = loads.calls();
+        out[v].Word(uint32_t(calls.size()));
+        for (size_t i = 0; i + 6 <= calls.size(); i += 6) {
+          out[v].Word(calls[i + 0]);
+          out[v].Word(memory::IsPages(calls[i + 1]) ? 1 : 0);
+          out[v].Word(calls[i + 2]);
+          out[v].Word(memory::IsPages(calls[i + 3]) ? 1 : 0);
+          out[v].Word(guest::LoadU32(h.base, calls[i + 3]));
+          out[v].Word(calls[i + 4]);
+          out[v].Word(calls[i + 5]);
+          FreeIfPages(calls[i + 1]);
+          FreeIfPages(calls[i + 3]);
+        }
+        out[v].Word(t.r3.u32);
+        out[v].Word(uint32_t(t.r3.u64 >> 32));
+      }
+      results.Check(out[0], out[1], fmt::format("id {}", id));
+    }
+    results.Report();
+  }
+}
+
+// An object of `blocks` blocks in pages, each with data pages (or none).
+// Returns the object; `pages` gets every address.
+uint32_t PagesObject(uint8_t* base, Random& r, uint32_t blocks, std::vector<uint32_t>& pages) {
+  const uint32_t object = memory::AllocPages(340, 4096);
+  pages.push_back(object);
+  guest::StoreU32(base, object + 336, blocks);
+  for (uint32_t i = 0; i < blocks; i++) {
+    const uint32_t block = memory::AllocPages(64, 4096);
+    pages.push_back(block);
+    guest::StoreU32(base, object + 80 + 4 * i, block);
+    uint32_t data = 0;
+    if (r.Below(4) != 0) {
+      data = memory::AllocPages(16 + r.Below(64), 4096);
+      pages.push_back(data);
+    }
+    guest::StoreU32(base, block + 60, data);
+  }
+  return object;
+}
+
+void NativeBlockFree(PPCContext& t, uint8_t* base) { cm::BlockFree(base, t.r3.u32); }
+void NativeAnimFree(PPCContext& t, uint8_t* base) { cm::AnimFree(base, t.r3.u32); }
+
+void AnimFrees(Context& h, Random& r) {
+  if (!hooks::NativeHeapActive()) {
+    ITC_LOG_WARN("harness: camera_modes: the camera animations' frees need --native_heap");
+    return;
+  }
+  Saved saved(h.base, cm::kAnims, kTableBytes);
+  {
+    Results results("CameraAnimBlock::Free (sub_8214FFF0)");
+    for (int c = 0; c < 40; c++) {
+      const uint64_t seed = r.Next();
+      Outputs out[2];
+      for (int v = 0; v < 2; v++) {
+        Random s(seed);
+        std::vector<uint32_t> pages;
+        const uint32_t object = PagesObject(h.base, s, 1, pages);
+        const uint32_t block = guest::LoadU32(h.base, object + 80);
+        PPCContext t = CallContext(h);
+        t.r3.u64 = block;
+        (v == 0 ? Original<__imp__sub_8214FFF0> : NativeBlockFree)(t, h.base);
+        out[v].Word(guest::LoadU32(h.base, block + 60));
+        for (const uint32_t p : pages) {
+          out[v].Word(memory::IsPages(p) ? 1 : 0);
+        }
+        for (const uint32_t p : pages) {
+          if (memory::IsPages(p)) {
+            memory::FreePages(p);
+          }
+        }
+      }
+      results.Check(out[0], out[1], fmt::format("case {}", c));
+    }
+    results.Report();
+  }
+  {
+    Results results("CameraAnim::Free (sub_82150098)");
+    for (int c = 0; c < 40; c++) {
+      const uint64_t seed = r.Next();
+      const uint32_t blocks = r.Below(5);
+      Outputs out[2];
+      for (int v = 0; v < 2; v++) {
+        Random s(seed);
+        std::vector<uint32_t> pages;
+        const uint32_t object = PagesObject(h.base, s, blocks, pages);
+        PPCContext t = CallContext(h);
+        t.r3.u64 = object;
+        (v == 0 ? Original<__imp__sub_82150098> : NativeAnimFree)(t, h.base);
+        out[v].Word(guest::LoadU32(h.base, object + 336));
+        for (const uint32_t p : pages) {
+          out[v].Word(memory::IsPages(p) ? 1 : 0);
+        }
+        for (const uint32_t p : pages) {
+          if (memory::IsPages(p)) {
+            memory::FreePages(p);
+          }
+        }
+      }
+      results.Check(out[0], out[1], fmt::format("case {}: {} blocks", c, blocks));
+    }
+    results.Report();
+  }
+  {
+    Results results("CameraAnims::FreeAll (sub_821507D8)");
+    for (int c = 0; c < 40; c++) {
+      const uint64_t seed = r.Next();
+      const uint32_t entries = r.Below(5);
+      Outputs out[2];
+      for (int v = 0; v < 2; v++) {
+        Random s(seed);
+        std::vector<uint32_t> pages;
+        for (uint32_t e = 0; e < entries; e++) {
+          const uint32_t entry = cm::kAnims + cm::kAnimBytes * e;
+          const uint32_t objects = s.Below(4);
+          guest::StoreU32(h.base, entry, 22824 + e);
+          guest::StoreU32(h.base, entry + 260, objects);
+          for (uint32_t i = 0; i < objects; i++) {
+            guest::StoreU32(h.base, entry + 4 + 4 * i, PagesObject(h.base, s, s.Below(4), pages));
+          }
+        }
+        guest::StoreU32(h.base, cm::kAnimCount, entries);
+        PPCContext t = CallContext(h);
+        t.r3.u64 = 0x5678;
+        (v == 0 ? Original<__imp__sub_821507D8> : hooks::CameraModesStep821507D8)(t, h.base);
+        out[v].Word(guest::LoadU32(h.base, cm::kAnimCount));
+        out[v].Word(uint32_t(pages.size()));
+        for (const uint32_t p : pages) {
+          out[v].Word(memory::IsPages(p) ? 1 : 0);
+        }
+        for (const uint32_t p : pages) {
+          if (memory::IsPages(p)) {
+            memory::FreePages(p);
+          }
+        }
+        out[v].Word(t.r3.u32);
+        saved.Restore();
+      }
+      results.Check(out[0], out[1], fmt::format("case {}: {} entries", c, entries));
+    }
+    results.Report();
+  }
+}
+
+// --- The camera animations' evaluation ---
+
+// The table's entries (ids 22824 up) over objects in one block: kinds 1, 6,
+// 7, others and the end (14); blocks of the kinds the evaluations read (0 to
+// 5, 101, 102, 109) and others, their data four frames of floats.
+struct AnimWorld {
+  explicit AnimWorld(uint8_t* base) : memory(0x10000), base(base) {}
+  Block memory;
+  uint8_t* base;
+  uint32_t entries = 0;
+  std::vector<uint32_t> objects;  // every object, for the per-object cases
+
+  void Build(Random& r) {
+    objects.clear();
+    uint32_t at = memory.address;
+    auto take = [&](uint32_t bytes) {
+      const uint32_t a = at;
+      at += (bytes + 15) & ~15u;
+      return a;
+    };
+    entries = 1 + r.Below(4);
+    for (uint32_t e = 0; e < entries; e++) {
+      const uint32_t entry = cm::kAnims + cm::kAnimBytes * e;
+      const uint32_t count = 1 + r.Below(5);
+      guest::StoreU32(base, entry, 22824 + e);
+      guest::StoreU32(base, entry + 260, count);
+      for (uint32_t i = 0; i < count; i++) {
+        static constexpr uint32_t kKinds[] = {1, 6, 7, 3, 6, 7, 1, 14};
+        const uint32_t kind = i + 1 == count && r.Below(2) ? 14 : kKinds[r.Below(8)];
+        const uint32_t object = take(340);
+        objects.push_back(object);
+        guest::StoreU32(base, entry + 4 + 4 * i, object);
+        guest::StoreU32(base, object, kind);
+        // Kinds 1 and 6 always have blocks (CameraAnims::Duration reads the
+        // first one's +16 without a check).
+        const uint32_t blocks = (kind == 1 || kind == 6 ? 1 : 0) + r.Below(10);
+        guest::StoreU32(base, object + 336, blocks);
+        for (uint32_t b = 0; b < blocks; b++) {
+          static constexpr uint32_t kSubs[] = {0, 1, 2, 3, 4, 5, 101, 102, 109, 7, 200, 101, 102};
+          const uint32_t sub = kSubs[r.Below(13)];
+          const uint32_t block = take(64);
+          const uint32_t data = take(16);
+          guest::StoreU32(base, object + 80 + 4 * b, block);
+          guest::StoreU32(base, block, sub);
+          guest::StoreU32(base, block + 16, FloatOrWord(r));
+          guest::StoreU32(base, block + 60, data);
+          for (uint32_t f = 0; f < 4; f++) {
+            uint32_t w = r.Below(6) ? OrdinaryFloat(r, 360.0) : RandomFloat(r);
+            if ((sub == 101 || sub == 102) && r.Below(8)) {
+              w = std::bit_cast<uint32_t>(float(5.0 + double(r.Below(60000)) / 1000.0));
+            }
+            guest::StoreU32(base, data + 4 * f, w);
+          }
+        }
+      }
+    }
+    guest::StoreU32(base, cm::kAnimCount, entries);
+  }
+};
+
+void NativeEvalCamera(PPCContext& t, uint8_t* base) {
+  t.fpscr.disableFlushMode();
+  if (const auto f1 = cm::AnimEvalCamera(base, t.r3.u32, t.r5.u32, t.r6.u32)) {
+    t.f1.f64 = *f1;
+    return;
+  }
+  __imp__sub_82150350(t, base);
+}
+void NativeEvalTarget(PPCContext& t, uint8_t* base) {
+  t.fpscr.disableFlushMode();
+  cm::AnimEvalTarget(base, t.r3.u32, t.r5.u32, t.r6.u32);
+}
+void NativeMatrix(PPCContext& t, uint8_t* base) {
+  t.fpscr.disableFlushMode();
+  cm::AnimMatrix(base, t.r3.u32, t.r5.u32, t.r6.u32, t.r1.u32 - 320,
+                 GuestMemcpy(t, base, 320, 0x82150600));
+}
+
+void AnimEvaluation(Context& h, Random& r) {
+  Saved saved(h.base, cm::kAnims, kTableBytes);
+  AnimWorld world(h.base);
+  enum Kind { kCamera, kTarget, kMatrix, kEvaluate, kDuration, kObjectMatrix };
+  const struct {
+    const char* name;
+    GuestFunction recompiled, native;
+    Kind kind;
+  } kFunctions[] = {
+      {"CameraAnim::EvalCamera (sub_82150350)", Original<__imp__sub_82150350>, NativeEvalCamera,
+       kCamera},
+      {"CameraAnim::EvalTarget (sub_821504E0)", Original<__imp__sub_821504E0>, NativeEvalTarget,
+       kTarget},
+      {"CameraAnim::Matrix (sub_82150590)", Original<__imp__sub_82150590>, NativeMatrix, kMatrix},
+      {"CameraAnims::Evaluate (sub_82150960)", Original<__imp__sub_82150960>,
+       hooks::CameraModesStep82150960, kEvaluate},
+      {"CameraAnims::Duration (sub_82150A98)", Original<__imp__sub_82150A98>,
+       hooks::CameraModesStep82150A98, kDuration},
+      {"CameraAnims::ObjectMatrix (sub_82150A10)", Original<__imp__sub_82150A10>,
+       hooks::CameraModesStep82150A10, kObjectMatrix},
+  };
+  for (const auto& f : kFunctions) {
+    Results results(f.name);
+    for (int c = 0; c < 200; c++) {
+      world.Build(r);
+      const uint32_t object = world.objects[r.Below(uint32_t(world.objects.size()))];
+      const uint32_t id = 22824 + (f.kind == kDuration ? r.Below(world.entries)
+                                                       : r.Below(world.entries + 2));
+      const uint32_t time = r.Below(4);
+      const uint32_t out_at = h.data + 0x100 + (f.kind == kMatrix && r.Below(4) == 0 ? 4 : 0);
+      Outputs out[2];
+      for (int v = 0; v < 2; v++) {
+        Fill(h.base, h.data, kScratchBytes);
+        PPCContext t = AlignedContext(h);
+        t.f1.u64 = 0x4045000000000000ull;
+        switch (f.kind) {
+          case kCamera:
+          case kTarget:
+          case kMatrix:
+            t.r3.u64 = object;
+            t.r4.u64 = object;
+            t.r5.u64 = out_at;
+            t.r6.u64 = time;
+            break;
+          case kDuration:
+            t.r3.u64 = id;
+            break;
+          default:
+            t.r3.u64 = out_at;
+            t.r4.u64 = id;
+            t.r5.u64 = time;
+            break;
+        }
+        (v == 0 ? f.recompiled : f.native)(t, h.base);
+        out[v].Floats(h.base, h.data + 0x100, 20);
+        out[v].Double(t.f1.u64);
+        // r3 as the adapters leave it (the three without adapters leave
+        // theirs to no caller: Evaluate and ObjectMatrix set their own).
+        if (f.kind != kCamera && f.kind != kTarget && f.kind != kMatrix) {
+          out[v].Word(t.r3.u32);
+        }
+      }
+      results.Check(out[0], out[1], fmt::format("case {}: object kind {} id {} time {}", c,
+                                                guest::LoadU32(h.base, object), id, time));
+    }
+    results.Report();
+  }
+}
+
+// --- The camera paths ---
+
+void NativeFixKeys(PPCContext& t, uint8_t* base) {
+  cm::FixKeys(base, t.r3.u32, t.r4.u32, t.r5.u32);
+}
+void NativeFixKey(PPCContext& t, uint8_t* base) { cm::FixKey(base, t.r3.u32, t.r4.u32); }
+void NativeFixGroup(PPCContext& t, uint8_t* base) { cm::FixGroup(base, t.r3.u32, t.r4.u32); }
+void NativeFixTriple(PPCContext& t, uint8_t* base) { cm::FixTriple(base, t.r3.u32, t.r4.u32); }
+
+// A random key's words: the (kind, value) pairs' kinds often 2.
+void RandomKeyWords(uint8_t* base, uint32_t at, uint32_t bytes, Random& r) {
+  for (uint32_t i = 0; i < bytes; i += 8) {
+    static constexpr uint32_t kKinds[] = {0, 1, 2, 2, 2, 3, 0xFFFFFFFEu};
+    guest::StoreU32(base, at + i, r.Below(5) ? kKinds[r.Below(7)] : uint32_t(r.Next()));
+    guest::StoreU32(base, at + i + 4, r.Below(4) ? r.Below(500) : uint32_t(r.Next()));
+  }
+}
+
+void Paths(Context& h, Random& r) {
+  Block memory(0x8000);
+  const uint32_t data = memory.address;
+  {
+    const struct {
+      const char* name;
+      GuestFunction recompiled, native;
+      uint32_t bytes;
+    } kPieces[] = {
+        {"CameraPath::FixTriple (sub_820ABE68)", Original<__imp__sub_820ABE68>,
+         NativeFixTriple, 24},
+        {"CameraPath::FixGroup (sub_820ABED8)", Original<__imp__sub_820ABED8>, NativeFixGroup, 96},
+        {"CameraPath::FixKey (sub_820ABF80)", Original<__imp__sub_820ABF80>, NativeFixKey, 216},
+    };
+    for (const auto& f : kPieces) {
+      Results results(f.name);
+      for (int c = 0; c < 100; c++) {
+        RandomKeyWords(h.base, data, 512, r);
+        const std::vector<uint8_t> inputs = Read(h.base, data, 512);
+        const uint32_t curves = uint32_t(r.Next());
+        Outputs out[2];
+        for (int v = 0; v < 2; v++) {
+          Write(h.base, data, inputs.data(), 512);
+          PPCContext t = CallContext(h);
+          t.r3.u64 = data + 8;
+          t.r4.u64 = curves;
+          (v == 0 ? f.recompiled : f.native)(t, h.base);
+          out[v].Bytes(Read(h.base, data, 512));
+        }
+        results.Check(out[0], out[1], fmt::format("case {}", c));
+      }
+      results.Report();
+    }
+  }
+  // A paths file: +0 the paths' count, +4 the keys', the 20-byte paths
+  // (+8 their key count, +16 their first key's index) at +16, the keys.
+  auto write_file = [&](uint32_t paths, uint32_t keys) {
+    RandomKeyWords(h.base, data, 0x7000, r);
+    guest::StoreU32(h.base, data + 0, paths);
+    guest::StoreU32(h.base, data + 4, keys);
+    uint32_t first = 0;
+    for (uint32_t i = 0; i < paths; i++) {
+      const uint32_t path = data + 16 + 20 * i;
+      const uint32_t count = r.Below(4) == 0 ? 0 : 1 + r.Below(4);
+      const uint32_t at = r.Below(8) == 0 ? r.Below(keys + 1) : first;
+      guest::StoreU32(h.base, path + 0, uint32_t(r.Next()));
+      guest::StoreU32(h.base, path + 4, uint32_t(r.Next()));
+      guest::StoreU32(h.base, path + 8, std::min(count, keys - std::min(at, keys)));
+      guest::StoreU32(h.base, path + 12, uint32_t(r.Next()));
+      guest::StoreU32(h.base, path + 16, at);
+      first = std::min(keys, at + count);
+    }
+  };
+  {
+    Results results("CameraPath::FixKeys (sub_820AC000)");
+    for (int c = 0; c < 100; c++) {
+      write_file(1, 1 + r.Below(12));
+      const std::vector<uint8_t> inputs = Read(h.base, data, 0x7000);
+      const uint32_t keys = data + 16 + 20;
+      const uint32_t curves = uint32_t(r.Next());
+      Outputs out[2];
+      for (int v = 0; v < 2; v++) {
+        Write(h.base, data, inputs.data(), 0x7000);
+        PPCContext t = CallContext(h);
+        t.r3.u64 = data + 16;
+        t.r4.u64 = keys;
+        t.r5.u64 = curves;
+        (v == 0 ? Original<__imp__sub_820AC000> : NativeFixKeys)(t, h.base);
+        out[v].Bytes(Read(h.base, data, 0x7000));
+      }
+      results.Check(out[0], out[1], fmt::format("case {}", c));
+    }
+    results.Report();
+  }
+  {
+    Results results("CameraPath::OnLoaded (sub_82152078)");
+    Block buffer(32);
+    for (int c = 0; c < 100; c++) {
+      const uint32_t paths = c == 0 ? 0 : r.Below(8);
+      write_file(paths, r.Below(40));
+      const std::vector<uint8_t> inputs = Read(h.base, data, 0x7000);
+      RandomBytes(h.base, buffer.address, 32, r);
+      const std::vector<uint8_t> buffer_inputs = Read(h.base, buffer.address, 32);
+      Outputs out[2];
+      for (int v = 0; v < 2; v++) {
+        Write(h.base, data, inputs.data(), 0x7000);
+        Write(h.base, buffer.address, buffer_inputs.data(), 32);
+        PPCContext t = CallContext(h);
+        t.r4.u64 = data;
+        t.r6.u64 = buffer.address;
+        (v == 0 ? Original<__imp__sub_82152078> : hooks::CameraModesStep82152078)(t, h.base);
+        out[v].Bytes(Read(h.base, data, 0x7000));
+        out[v].Bytes(Read(h.base, buffer.address, 32));
+      }
+      results.Check(out[0], out[1], fmt::format("case {}: {} paths", c, paths));
+    }
+    results.Report();
+  }
+  if (!hooks::NativeHeapActive() || !hooks::NativeArchiveQueue()) {
+    ITC_LOG_WARN("harness: camera_modes: CameraPath::Request needs --native_heap and the "
+                 "archive's queue native");
+    return;
+  }
+  {
+    Results results("CameraPath::Request (sub_82152E08)");
+    // The indices whose asset pointer is in the image.
+    std::vector<uint32_t> indices;
+    for (uint32_t i = 0; i < 128; i++) {
+      const uint32_t pointer = guest::LoadU32(h.base, cm::kPathAssets + 4 * i);
+      if (pointer < 0x82000000u || pointer >= 0x83000000u ||
+          guest::LoadU32(h.base, pointer) >= 26000) {
+        break;
+      }
+      indices.push_back(i);
+    }
+    ITC_LOG_INFO("harness: camera_modes: {} camera path assets", indices.size());
+    if (indices.empty()) {
+      ITC_LOG_WARN("harness: camera_modes: no camera path assets found at 0x82618D30");
+      return;
+    }
+    Block buffer(32);
+    for (int c = 0; c < 60; c++) {
+      const uint32_t index =
+          r.Below(6) == 0 ? 0xFFFFFFFFu : indices[r.Below(uint32_t(indices.size()))];
+      const uint32_t state = r.Below(5);
+      const bool block = r.Below(3) != 0;
+      uint32_t words[6];
+      for (uint32_t& w : words) {
+        w = uint32_t(r.Next());
+      }
+      std::vector<int64_t> serials{r.Below(5) == 0 ? -1 : int64_t(r.Below(0x7FFFFFFF))};
+      Outputs out[2];
+      for (int v = 0; v < 2; v++) {
+        const uint32_t old = block ? memory::AllocPages(64, 4096) : 0;
+        for (uint32_t i = 0; i < 5; i++) {
+          guest::StoreU32(h.base, buffer.address + 4 * i, words[i]);
+        }
+        guest::StoreU32(h.base, buffer.address + 20, old);
+        guest::StoreU32(h.base, buffer.address + 24, state);
+        ArchiveLoads loads(serials);
+        PPCContext t = CallContext(h);
+        t.r3.u64 = 0x9ABC;
+        t.r4.u64 = buffer.address;
+        t.r5.u64 = index;
+        (v == 0 ? Original<__imp__sub_82152E08> : hooks::CameraModesStep82152E08)(t, h.base);
+        const uint32_t now = guest::LoadU32(h.base, buffer.address + 20);
+        out[v].Bytes(Read(h.base, buffer.address, 20));
+        out[v].Word(guest::LoadU32(h.base, buffer.address + 24));
+        out[v].Word(now == old ? 1 : 0);
+        out[v].Word(old != 0 && memory::IsPages(old) ? 1 : 0);
+        out[v].Word(now != 0 && memory::IsPages(now) ? 1 : 0);
+        const std::vector<uint32_t>& calls = loads.calls();
+        out[v].Word(uint32_t(calls.size()));
+        for (size_t i = 0; i + 6 <= calls.size(); i += 6) {
+          out[v].Word(calls[i + 0]);
+          out[v].Word(calls[i + 1] == now ? 1 : 0);
+          out[v].Word(calls[i + 2]);
+          out[v].Word(calls[i + 3] == buffer.address ? 1 : 0);
+          out[v].Word(calls[i + 4]);
+          out[v].Word(calls[i + 5]);
+        }
+        out[v].Word(t.r3.u32);
+        out[v].Word(uint32_t(t.r3.u64 >> 32));
+        if (old != 0 && memory::IsPages(old)) {
+          memory::FreePages(old);
+        }
+        if (now != 0 && now != old && memory::IsPages(now)) {
+          memory::FreePages(now);
+        }
+      }
+      results.Check(out[0], out[1], fmt::format("case {}: index {:X} state {} block {}", c,
+                                                index, state, block));
+    }
+    results.Report();
+  }
+}
+
+// --- The rival logo ---
+
+void RivalLogo(Context& h, Random& r) {
+  {
+    Results results("RivalLogo::RivalLogo (sub_82211848)");
+    for (int c = 0; c < 20; c++) {
+      Outputs out[2];
+      for (int v = 0; v < 2; v++) {
+        Fill(h.base, h.data, kScratchBytes, uint8_t(c));
+        PPCContext t = CallContext(h);
+        t.r3.u64 = h.data + 0x100;
+        (v == 0 ? Original<__imp__sub_82211848> : hooks::CameraModesStep82211848)(t, h.base);
+        out[v].Bytes(Read(h.base, h.data + 0x100, 0x80));
+      }
+      results.Check(out[0], out[1], fmt::format("case {}", c));
+    }
+    results.Report();
+  }
+  if (ITC_FLAG(log_pause_movie)) {
+    return;
+  }
+  {
+    // A movie table of four movies (ids 10 to 13, sorted) in one block,
+    // their loaded flags (+0x9FD0) and textures (+28) random; the named
+    // animation negative (PlayNamed's own cases are ui_movies_game's).
+    Results results("RivalLogo::Play (sub_82211AB0)");
+    constexpr uint32_t kMovieBytes = 0xA000;
+    Block movies(4 * kMovieBytes + 0x200);
+    const uint32_t pairs = movies.address + 4 * kMovieBytes;
+    const uint32_t textures = pairs + 0x100;
+    Saved table(h.base, ui_movies::kMovieTable, 20);
+    for (int c = 0; c < 200; c++) {
+      uint32_t loaded[4];
+      for (uint32_t& w : loaded) {
+        w = r.Below(2) ? 0 : uint32_t(r.Next());
+      }
+      uint32_t entry_words[24];
+      for (uint32_t& w : entry_words) {
+        w = uint32_t(r.Next());
+      }
+      entry_words[0] = r.Below(2) ? 0 : r.Below(3);                  // the logo
+      entry_words[1] = r.Below(4) ? (entry_words[1] | 4) : entry_words[1];
+      entry_words[2] = 10 + r.Below(4);                               // the movie
+      entry_words[3] = 0x80000000u | uint32_t(r.Next());              // the named animation
+      entry_words[21] = r.Below(8);                                   // +84, +88: textures
+      entry_words[22] = r.Below(8);
+      Outputs out[2];
+      for (int v = 0; v < 2; v++) {
+        Fill(h.base, h.data, kScratchBytes);
+        for (uint32_t m = 0; m < 4; m++) {
+          const uint32_t movie = movies.address + kMovieBytes * m;
+          guest::StoreU32(h.base, pairs + 8 * m, 10 + m);
+          guest::StoreU32(h.base, pairs + 8 * m + 4, movie);
+          guest::StoreU32(h.base, movie + 28, textures);
+          guest::StoreU32(h.base, movie + 0x9FD0, loaded[m]);
+        }
+        for (uint32_t i = 0; i < 8; i++) {
+          guest::StoreU32(h.base, textures + 4 * i, 0x1000 + i);
+        }
+        guest::StoreU32(h.base, ui_movies::kMovieTable + 0, pairs);
+        guest::StoreU32(h.base, ui_movies::kMovieTable + 4, 4);
+        guest::StoreU32(h.base, ui_movies::kMovieTable + 8, 4);
+        guest::StoreU32(h.base, ui_movies::kMovieTable + 16, movies.address);
+        const uint32_t entry = h.data + 0x100;
+        for (uint32_t i = 0; i < 24; i++) {
+          guest::StoreU32(h.base, entry + 4 * i, entry_words[i]);
+        }
+        PPCContext t = CallContext(h);
+        t.r3.u64 = entry;
+        (v == 0 ? Original<__imp__sub_82211AB0> : hooks::CameraModesStep82211AB0)(t, h.base);
+        out[v].Bytes(Read(h.base, entry, 96));
+        out[v].Bytes(Read(h.base, textures, 32));
+        out[v].Word(t.r3.u32);
+        table.Restore();
+      }
+      results.Check(out[0], out[1], fmt::format("case {}: logo {} flags {:X} movie {}", c,
+                                                entry_words[0], entry_words[1], entry_words[2]));
+    }
+    results.Report();
+  }
+}
+
 }  // namespace
 
 void CameraModes(Context& h) {
@@ -553,6 +1375,11 @@ void CameraModes(Context& h) {
   Lists(h, r);
   Anims(h, r);
   Filter(h, r);
+  AnimFiles(h, r);
+  AnimFrees(h, r);
+  AnimEvaluation(h, r);
+  Paths(h, r);
+  RivalLogo(h, r);
 }
 
 }  // namespace harness

@@ -27,5 +27,15 @@ void CameraModesStep82150078(PPCContext& ctx, uint8_t* base);
 void CameraModesStep82150300(PPCContext& ctx, uint8_t* base);
 void CameraModesStep82152108(PPCContext& ctx, uint8_t* base);
 void CameraModesStep82152290(PPCContext& ctx, uint8_t* base);
+void CameraModesStep82150B10(PPCContext& ctx, uint8_t* base);
+void CameraModesStep82150878(PPCContext& ctx, uint8_t* base);
+void CameraModesStep821507D8(PPCContext& ctx, uint8_t* base);
+void CameraModesStep82150960(PPCContext& ctx, uint8_t* base);
+void CameraModesStep82150A98(PPCContext& ctx, uint8_t* base);
+void CameraModesStep82150A10(PPCContext& ctx, uint8_t* base);
+void CameraModesStep82152E08(PPCContext& ctx, uint8_t* base);
+void CameraModesStep82152078(PPCContext& ctx, uint8_t* base);
+void CameraModesStep82211848(PPCContext& ctx, uint8_t* base);
+void CameraModesStep82211AB0(PPCContext& ctx, uint8_t* base);
 
 }  // namespace hooks
