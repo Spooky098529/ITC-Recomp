@@ -24,7 +24,11 @@ file's history. What's left to see in a drive, from every run:
   in the replay, 77 to drive. Subsystem 1 finished.
 - Next, a cleanup lead without mapping (not counted): what the race
   event unblocked in `career.md` (`Career::SetUpEvent` `sub_82114268`).
-  Migration running.
+  Migration checked (3f8fa4b..8267f2d: `Career::SetUpEvent` over its
+  121,200-byte frame in guest memory, `Garage::Add` and
+  `Car::SetModelAndClass` `sub_821104D8` (ready, from the car objects'
+  makers' lead); 5 adapters removed; no new flag; nothing ready left in
+  `career.md`). Validation running.
 
 ## Done
 
@@ -54,3 +58,6 @@ file's history. What's left to see in a drive, from every run:
   (wrapped 104, known 472, unknown 2550).
 - After its validation (`itc_2673`: race 37 s, 0 errors, every harness
   0 differing but the expected groups): ours 3271, work left 3126.
+- After the cleanup's migration (`itc_2691`: race 37 s, 0 errors,
+  career and race_event 0 differing): ours 3274, work left 3123
+  (wrapped 104, known 470, unknown 2549).

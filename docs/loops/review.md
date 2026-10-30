@@ -35,6 +35,23 @@ When the user has reviewed a run's section, its heading gets
   ported; `Met`'s row corrected (kind 64 tests bit 0x20, not 0x10).
   `career.md`: `Career::EventQuery`, `EventLocation` Overridden,
   `DayBlock::BestStreak` Native.
+- The cleanup after it (3f8fa4b..8267f2d, `--native_career`):
+  `Career::SetUpEvent` native over its 121,200-byte frame kept in guest
+  memory where the original has it, calling `race_event::Make`'s plain
+  C++ (the original `Make` from the frame where native refuses);
+  falls back to the original where `Condition::Test`'s or
+  `RaceData::ResetGlobal`'s copies wouldn't be native from that frame;
+  its harness cases in the race_event harness. `Garage::Add` and
+  `sub_821104D8` (new row, `Car::SetModelAndClass`, probably): reads a
+  stack word the original never writes when spec byte +708 > 7, kept
+  as the original. Adapters removed (Native): `Entry56::Allows`,
+  `Condition::Test`, `RaceEvent::Make`, `Car::SpecWord744`,
+  `Garage::InsertCar`. Harness notes: the career harness puts rand's
+  seed back after each case; case seeds of a shared generator shifted
+  repeat (about half of the first 48 cases duplicates), so
+  SetUpEvent's group mixes its own per case (other harnesses probably
+  have the same, not changed); table 0's walk can read past the table
+  as the original does, so the harness keeps done bits inside it.
 
 ## Run 2026-10-30 01:06 (`b7-loop-29-10-26-2`)
 
