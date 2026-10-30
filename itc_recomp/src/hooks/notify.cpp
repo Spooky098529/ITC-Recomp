@@ -10,16 +10,18 @@
 
 #include "guest.h"
 #include "guest_call.h"
+#include "user/network.h"
 
 using guest_call::InFrame;
 
 namespace {
 
-// What the listener wrapper answers: no listener, but not 0 (the readers test
-// for 0, and the storage devices' update runs only with one). Not an SDK
-// handle (those start at 0xF8000000), so XNotifyGetNext, still called by the
-// readers left recompiled, finds no queue and answers nothing.
-constexpr uint32_t kNoListener = 0x4E4F4C53;
+// What the listener wrapper answers (user::kNoListener): no listener, but
+// not 0 (the readers test for 0, and the storage devices' update runs only
+// with one). Not an SDK handle (those start at 0xF8000000), so
+// XNotifyGetNext, still called by the readers left recompiled, finds no
+// queue and answers nothing.
+constexpr uint32_t kNoListener = user::kNoListener;
 
 bool g_users_built = false;
 

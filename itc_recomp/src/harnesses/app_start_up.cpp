@@ -10,12 +10,14 @@
 
 #include "app_start_up/start_up.h"
 #include "base/log.h"
+#include "helpers/clock.h"
 #include "hooks/heap.h"
 #include "memory/c_runtime_heap.h"
 
 #include <fmt/format.h>
 
 #include <string>
+#include <vector>
 
 namespace harness {
 
@@ -142,6 +144,192 @@ void CreateVertexDeclaration(Context& h) {
   results.Report();
 }
 
+// --- The network manager's set-up ---
+
+// The globals the set-up writes: the network's (0x826C6000 to 0x826C8000,
+// with the manager at 0x826C74A0 and the user table), the sign-in bounds
+// and XNet's block.
+struct Region {
+  uint32_t address;
+  uint32_t bytes;
+};
+constexpr Region kNetworkRegions[] = {
+    {0x826C6000, 0x2000}, {0x82618B78, 16}, {asu::kXNetConfig, 76}};
+// The words the set-up writes, filled with random bytes in some cases.
+constexpr Region kNetworkWritten[] = {
+    {0x826C6650, 60},  {0x826C6080, 28},  {0x826C6AA0, 32},  {0x826C6AD4, 4},
+    {0x826C72FC, 8},   {0x826C7670, 384}, {0x826C7938, 104}, {0x826C74A0 + 444, 16},
+    {0x82618B7C, 8},   {asu::kXNetConfig, 76}};
+
+class NetworkState {
+ public:
+  explicit NetworkState(uint8_t* base) : base_(base) {
+    for (const Region& r : kNetworkRegions) {
+      saved_.push_back(Read(base, r.address, r.bytes));
+    }
+  }
+  ~NetworkState() { Restore(); }
+  void Restore() {
+    for (size_t i = 0; i < saved_.size(); i++) {
+      Write(base_, kNetworkRegions[i].address, saved_[i].data(), uint32_t(saved_[i].size()));
+    }
+  }
+  void Put(const std::vector<std::vector<uint8_t>>& state) {
+    for (size_t i = 0; i < state.size(); i++) {
+      Write(base_, kNetworkRegions[i].address, state[i].data(), uint32_t(state[i].size()));
+    }
+  }
+  std::vector<std::vector<uint8_t>> Random(Random& random) {
+    Restore();
+    for (const Region& r : kNetworkWritten) {
+      for (uint32_t i = 0; i < r.bytes; i++) {
+        guest::StoreU8(base_, r.address + i, uint8_t(random.Next()));
+      }
+    }
+    std::vector<std::vector<uint8_t>> state;
+    for (const Region& r : kNetworkRegions) {
+      state.push_back(Read(base_, r.address, r.bytes));
+    }
+    return state;
+  }
+  std::vector<std::vector<uint8_t>> Live() {
+    Restore();
+    return saved_;
+  }
+  void Out(Outputs& out) {
+    for (const Region& r : kNetworkRegions) {
+      out.Bytes(Read(base_, r.address, r.bytes));
+    }
+  }
+
+ private:
+  uint8_t* base_;
+  std::vector<std::vector<uint8_t>> saved_;
+};
+
+// A network case: `prepare` the state (the random generator for its own
+// words), registers from `args`, both versions from the same state, the
+// regions, r3 and `extra(t)` compared.
+template <typename Args, typename Extra>
+void NetworkCase(Context& h, Results& results, NetworkState& state,
+                 const std::vector<std::vector<uint8_t>>& before, GuestFunction recompiled,
+                 GuestFunction native, Args args, Extra extra, const std::string& what) {
+  Outputs out[2];
+  for (int v = 0; v < 2; v++) {
+    state.Put(before);
+    Fill(h.base, h.data, kScratchBytes);
+    PPCContext t = CallContext(h);
+    args(t);
+    (v == 0 ? recompiled : native)(t, h.base);
+    state.Out(out[v]);
+    out[v].Word(t.r3.u32);
+    extra(t, out[v]);
+  }
+  results.Check(out[0], out[1], what);
+}
+
+void NetworkSetUp(Context& h) {
+  NetworkState state(h.base);
+  helpers::SetClocksForHarness(std::nullopt, 0x12345678);
+  const auto none = [](PPCContext&, Outputs&) {};
+  {
+    Results results("XNet::Configure (sub_82577560)");
+    for (int c = 0; c < 16; c++) {
+      // The header at the scratch area's +512, the block at +0.
+      std::vector<uint32_t> header(11);
+      for (auto& w : header) {
+        w = uint32_t(h.random.Next());
+      }
+      if (c % 4 == 0) {
+        header[2] |= 1;
+      } else {
+        header[2] &= ~1u;
+      }
+      if (c % 4 == 1) {
+        header[9] &= 0xFFFF0000;  // +38 = 0
+      }
+      Outputs out[2];
+      for (int v = 0; v < 2; v++) {
+        Fill(h.base, h.data, kScratchBytes);
+        for (uint32_t i = 0; i < 11; i++) {
+          guest::StoreU32(h.base, h.data + 512 + 4 * i, header[i]);
+        }
+        PPCContext t = CallContext(h);
+        t.r3.u64 = h.data;
+        t.r4.u64 = h.data + 512;
+        (v == 0 ? __imp__sub_82577560 : sub_82577560)(t, h.base);
+        out[v].Bytes(Read(h.base, h.data, 1024));
+        out[v].Word(t.r3.u32);
+      }
+      results.Check(out[0], out[1], fmt::format("header {}", c));
+    }
+    results.Report();
+  }
+  {
+    Results results("SignIn::SetUp (sub_8214F1C0)");
+    for (int c = 0; c < 8; c++) {
+      auto before = c == 0 ? state.Live() : state.Random(h.random);
+      if (c % 2 == 1) {
+        // No listener yet.
+        for (int b = 0; b < 4; b++) {
+          before[0][0x194C + b] = 0;
+        }
+      }
+      const uint64_t r[5] = {h.random.Next(), h.random.Next(), h.random.Next(), h.random.Next(),
+                             c % 4 == 3 ? 0 : h.random.Next()};
+      NetworkCase(h, results, state, before, __imp__sub_8214F1C0, sub_8214F1C0,
+                  [&](PPCContext& t) {
+                    t.r3.u64 = r[0];
+                    t.r4.u64 = r[1];
+                    t.r5.u64 = r[2];
+                    t.r6.u64 = r[3];
+                    t.r7.u64 = r[4];
+                  },
+                  none, fmt::format("case {}", c));
+    }
+    results.Report();
+  }
+  const uint64_t app = 0x40000000u | uint32_t(h.random.Next());
+  {
+    Results results("XNetStartup (sub_82575B08)");
+    for (int c = 0; c < 2; c++) {
+      auto before = c == 0 ? state.Live() : state.Random(h.random);
+      NetworkCase(h, results, state, before, __imp__sub_82575B08, sub_82575B08,
+                  [](PPCContext&) {}, none, fmt::format("case {}", c));
+    }
+    results.Report();
+  }
+  {
+    Results results("Network::StartUp (sub_82148868)");
+    for (int c = 0; c < 3; c++) {
+      auto before = c == 0 ? state.Live() : state.Random(h.random);
+      NetworkCase(h, results, state, before, __imp__sub_82148868, sub_82148868,
+                  [&](PPCContext& t) { t.r3.u64 = app; }, none, fmt::format("case {}", c));
+    }
+    results.Report();
+  }
+  {
+    Results results("Network::SetUp (sub_8214E190)");
+    for (int c = 0; c < 3; c++) {
+      auto before = c == 0 ? state.Live() : state.Random(h.random);
+      if (c == 2) {
+        for (int b = 0; b < 4; b++) {
+          before[0][0x194C + b] = 0;
+        }
+      }
+      NetworkCase(h, results, state, before, __imp__sub_8214E190, sub_8214E190,
+                  [&](PPCContext& t) { t.r3.u64 = app; },
+                  [&](PPCContext& t, Outputs& out) {
+                    // The XNADDR in the original's 144-byte frame.
+                    out.Bytes(Read(h.base, t.r1.u32 - 144 + 80, 36));
+                  },
+                  fmt::format("case {}", c));
+    }
+    results.Report();
+  }
+  helpers::SetClocksForHarness(std::nullopt, std::nullopt);
+}
+
 }  // namespace
 
 void AppStartUp(Context& h) {
@@ -154,6 +342,7 @@ void AppStartUp(Context& h) {
          {asu::kWords8110, asu::kWords8114});
   MoviesSet(h);
   CreateVertexDeclaration(h);
+  NetworkSetUp(h);
 }
 
 }  // namespace harness

@@ -13,7 +13,10 @@ using guest_call::InFrame;
 ITC_FLAG_BOOL(native_app_start_up, true, "ITC",
               "Run the app's start-up (docs/functions/app-start-up.md: ReadError::SetApp "
               "sub_8209AC50, sub_8209AC30, sub_8209F580, sub_8225FB70, Movies::Set "
-              "sub_820A4360 and, with --native_heap, CreateVertexDeclaration sub_822A8980) "
+              "sub_820A4360 and, with --native_heap, CreateVertexDeclaration sub_822A8980; the "
+              "network manager's set-up Network::SetUp sub_8214E190 with SignIn::SetUp "
+              "sub_8214F1C0, Network::StartUp sub_82148868, XNetStartup sub_82575B08 (its "
+              "WSAStartup entry sub_82459C10 merged) and XNet::Configure sub_82577560) "
               "natively instead of through the translated code (the same reads and writes; "
               "checked by --run_harnesses=app_start_up)");
 
@@ -84,4 +87,69 @@ extern "C" REX_FUNC(sub_822A8980) {
     }
   }
   __imp__sub_822A8980(ctx, base);
+}
+
+// --- The network manager's set-up ---
+
+namespace {
+
+// memcpy through the guest from XNet::Configure's frame.
+asu::MemcpyCall XNetMemcpy(PPCContext& ctx, uint8_t* base) {
+  return [&ctx, base](uint32_t to, uint32_t from, uint32_t size) {
+    InFrame(ctx, base, 112, 0x82577580, [&](uint32_t) {
+      ctx.r3.u64 = to;
+      ctx.r4.u64 = from;
+      ctx.r5.u64 = size;
+      sub_825A7410(ctx, base);  // memcpy
+    });
+  };
+}
+
+}  // namespace
+
+extern "C" REX_FUNC(sub_8214F1C0) {
+  REX_FUNC_PROLOGUE();
+  if (!ITC_FLAG(native_app_start_up)) {
+    __imp__sub_8214F1C0(ctx, base);
+    return;
+  }
+  ctx.r3.u64 = asu::SignInSetUp(base, ctx.r3.u32, ctx.r4.u32, ctx.r5.u32, ctx.r6.u32, ctx.r7.u32);
+}
+
+extern "C" REX_FUNC(sub_82577560) {
+  REX_FUNC_PROLOGUE();
+  if (!ITC_FLAG(native_app_start_up)) {
+    __imp__sub_82577560(ctx, base);
+    return;
+  }
+  const uint32_t config = ctx.r3.u32;
+  const uint32_t source = ctx.r4.u32;
+  ctx.r3.u64 = asu::XNetConfigure(base, config, source, XNetMemcpy(ctx, base));
+}
+
+extern "C" REX_FUNC(sub_82575B08) {
+  REX_FUNC_PROLOGUE();
+  if (!ITC_FLAG(native_app_start_up)) {
+    __imp__sub_82575B08(ctx, base);
+    return;
+  }
+  ctx.r3.u64 = asu::XNetStartup(base, XNetMemcpy(ctx, base));
+}
+
+extern "C" REX_FUNC(sub_82148868) {
+  REX_FUNC_PROLOGUE();
+  if (!ITC_FLAG(native_app_start_up)) {
+    __imp__sub_82148868(ctx, base);
+    return;
+  }
+  ctx.r3.u64 = asu::NetworkStartUp(base, ctx.r3.u32, XNetMemcpy(ctx, base));
+}
+
+extern "C" REX_FUNC(sub_8214E190) {
+  REX_FUNC_PROLOGUE();
+  if (!ITC_FLAG(native_app_start_up)) {
+    __imp__sub_8214E190(ctx, base);
+    return;
+  }
+  ctx.r3.u64 = asu::NetworkSetUp(base, ctx.r3.u32, ctx.r1.u32 - 144, XNetMemcpy(ctx, base));
 }

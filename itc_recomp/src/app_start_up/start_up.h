@@ -52,4 +52,43 @@ using MemcpyCall = std::function<void(uint32_t destination, uint32_t source, uin
 std::optional<uint32_t> CreateVertexDeclaration(uint8_t* base, uint32_t elements,
                                                 const MemcpyCall& memcpy_call);
 
+// --- The network manager's set-up (system-services.md) ---
+
+constexpr uint32_t kNetworkManager = 0x826C74A0;
+constexpr uint32_t kUserTable = 0x826C7670;      // the machine id's address too
+constexpr uint32_t kXNetConfig = 0x82957680;     // sub_82577560's block (76 bytes)
+constexpr uint32_t kXNetConfigSource = 0x8265D408;  // its source's address (the word there)
+constexpr uint32_t kSessionState = 0x826C6AA8;
+
+// sub_8214F1C0 SignIn::SetUp: the fewest and most users (0x826C7944,
+// 0x82618B7C), 0x826C7948, 0x82618B80, the app (0x826C799C, when not 0);
+// with no listener yet (0x826C794C), 0x826C7994 and 0x826C7964 = 0 and a
+// listener (mask 3, user::kNoListener). Returns r3 as the original leaves
+// it (the listener when one was made, else `fewest`).
+uint32_t SignInSetUp(uint8_t* base, uint32_t fewest, uint32_t most, uint32_t word7948,
+                     uint32_t word8B80, uint32_t app);
+
+// sub_82577560 XNet::Configure (probably): the 44-byte header at `source`
+// copied to `config` (memcpy), then, unless +8's bit 0 is set (then
+// 0x80004005), the pointers into the data after the header worked out from
+// its sizes (+60 when +38 isn't 0, +44 to +72). Returns 0 or 0x80004005.
+uint32_t XNetConfigure(uint8_t* base, uint32_t config, uint32_t source,
+                       const MemcpyCall& memcpy_call);
+// sub_82575B08 XNetStartup (probably): WSAStartup (0, ours), then
+// XNetConfigure(0x82957680, [0x8265D408]); 0, or 1627 when that fails.
+uint32_t XNetStartup(uint8_t* base, const MemcpyCall& memcpy_call);
+// sub_82148868 Network::StartUp: XNetStartup, two listeners (masks 2 and 1)
+// at 0x826C6AB4 and 0x826C6AB8, 0x826C6AB0 = 0, 0x826C6ABC = -1, 60 bytes
+// at 0x826C6650 and 28 at 0x826C6080 cleared, 0x826C72FC = 0, 0x826C7300 =
+// `app`, the user table (384 bytes at 0x826C7670) cleared. Returns the
+// user table's address (the last memset's r3).
+uint32_t NetworkStartUp(uint8_t* base, uint32_t app, const MemcpyCall& memcpy_call);
+// sub_8214E190 Network::SetUp: SignInSetUp(0, 4, 0, 1, app), NetworkStartUp,
+// the system link socket not made, the title's XNADDR into `frame` + 80 (the
+// original's 144-byte frame; its machine id not answered), the voice set-up
+// without the engine (hooks/voice.h), then 0x826C6AA8, 0x826C6AD4,
+// 0x826C7938, 0x826C793C and 0x826C7940 = 0. Returns the tick count (the
+// voice set-up's r3, left as the original leaves it).
+uint32_t NetworkSetUp(uint8_t* base, uint32_t app, uint32_t frame, const MemcpyCall& memcpy_call);
+
 }  // namespace app_start_up

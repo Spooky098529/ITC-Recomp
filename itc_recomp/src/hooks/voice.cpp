@@ -15,6 +15,8 @@
 // engine: nothing makes the thread. See docs/functions/app-start-up.md and
 // system-services.md, and B5 in docs/rexglue-removal.md.
 
+#include "hooks/voice.h"
+
 #include "guest.h"
 
 #include "base/log.h"
@@ -22,11 +24,11 @@
 
 namespace voice {
 
-// The network manager's voice set-up without the engine: r4 (the machine id,
-// 0 in play) to the manager's +456 and the tick count to +444, as the
-// original stores them around the engine's creation (read only by the chat
-// data read and system link code). Returns the tick count (the original's
-// r3).
+// The network manager's voice set-up without the engine: r4 (where the
+// machine id is, 0x826C7670, the user table's start) to the manager's +456
+// and the tick count to +444, as the original stores them around the
+// engine's creation (read only by the chat data read and system link code).
+// Returns the tick count (the original's r3).
 uint32_t SetUpWithoutEngine(uint8_t* base, uint32_t manager, uint32_t machine_id) {
   ITC_NATIVE_RUNNING("sub_8214F6E8 Network::SetUpVoice (no engine)");
   guest::StoreU32(base, manager + 456, machine_id);
@@ -37,7 +39,7 @@ uint32_t SetUpWithoutEngine(uint8_t* base, uint32_t manager, uint32_t machine_id
 
 }  // namespace voice
 
-// r3 = the network manager (826C74A0), r4 = the machine id. From the
+// r3 = the network manager (826C74A0), r4 = the machine id's address. From the
 // manager's set-up (sub_8214E190) once at boot.
 extern "C" REX_FUNC(sub_8214F6E8) {
   REX_FUNC_PROLOGUE();
