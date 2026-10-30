@@ -119,6 +119,90 @@ struct BillboardCalls {
 // device lock native (the adapter checks).
 void BillboardsInit(uint8_t* base, uint32_t frame, const BillboardCalls& calls);
 
+// --- The text: the font's set-up (strings-and-font.md) ---
+
+constexpr uint32_t kFontBytes = 16592;
+
+// The guest calls the font's set-up makes (Text::Init's adapter's), each
+// with the original's return address: the video output ([0x8266D088]'s
+// slot 7, then that object's slot 3), the render object ([0x826BABA0]'s
+// slot 8, then that object's slot 1 for `which` 0, the command list, or
+// slot 2 for 1, the render queue), the HLSL compile (D3DXCompileShader
+// through its override, r9 = 0; `which` 0 the vertex shader, 1 to 4 the
+// pixel shaders; r1 is the
+// frame, whose +84 and +92 are the errors and constant table outs), a
+// buffer's slot 3 (its data) and slot 2 (Release), VertexShader::Create and
+// PixelShader::Create through their overrides, and Strings::Init (its plain
+// C++ where its adapter's condition holds, else the adapter; its r3).
+struct FontCalls {
+  std::function<uint32_t()> video_output;
+  std::function<uint32_t(int which)> render_object;
+  std::function<uint32_t(int which, uint32_t source, uint32_t length, uint32_t profile,
+                         uint32_t out)>
+      compile;
+  std::function<uint32_t(int which, uint32_t buffer)> buffer_data;
+  std::function<uint32_t(int which, uint32_t buffer)> release;
+  std::function<uint32_t(uint32_t data)> vertex_shader;
+  std::function<uint32_t(int which, uint32_t data)> pixel_shader;
+  MemcpyCall memcpy_call;
+  std::function<uint32_t()> strings_init;
+};
+
+// sub_821088B8 Font::CreateShaders: the vertex declaration
+// (CreateVertexDeclaration(0x826032F8)) into +16560; the vertex shader's
+// source ([0x82603338], "main", "vs_3_0") compiled into `frame` + 96 (the
+// errors to `frame` + 100, never released) and made into +16564; the four
+// pixel shaders from the 12-byte entries at 0x826C5C04 (+0 the source, +4
+// its length; "ps_2_0") into +16568 to +16580; each buffer released. No
+// error checks. `frame` is the original's 160-byte frame. Returns r3 as the
+// last release leaves it.
+uint32_t FontCreateShaders(uint8_t* base, uint32_t font, uint32_t frame, const FontCalls& calls);
+// sub_82109228 Font::Font: +0 the video output, +4 and +8 the command list
+// and render queue; the shaders made (`shaders_frame`) with the device
+// locked (the word at `frame` + 88, the original's 128-byte frame); the
+// pages (+20 to +32) and their files (+40 to +52) cleared; the ten colors
+// at +16528 (five of their bytes through the frame's +80 to +84, as the
+// original); +12 = 0. Returns 14 (r3 as the original leaves it). Needs the
+// device lock native (the adapter checks).
+uint32_t FontConstruct(uint8_t* base, uint32_t font, uint32_t frame, uint32_t shaders_frame,
+                       const FontCalls& calls);
+// sub_8210ADD0 Text::Init: Font::Init (sub_82109A00: 16,592 bytes of pages,
+// the allocation layer's AllocPages as VirtualAlloc's adapter gives them,
+// into 0x826C5C00, then Font::Font on them), then Strings::Init. The frames
+// are Font::Font's and Font::CreateShaders' (below Text::Init's and
+// Font::Init's 96 bytes each). Only with --native_heap (the adapter checks).
+// Returns r3 as Strings::Init leaves it.
+uint32_t TextInit(uint8_t* base, uint32_t font_frame, uint32_t shaders_frame,
+                  const FontCalls& calls);
+
+// --- The app's start-up ---
+
+// The guest calls App::StartUp makes: `call` a guest call of the callee at
+// `target` (its adapter) with r3 and r4 when given (else left as they
+// are) and the original's return address; its r3. `virtual_call` the
+// interface's slot at `offset` (r3 the interface); its r3.
+struct StartUpCalls {
+  std::function<uint32_t(uint32_t target, std::optional<uint32_t> r3,
+                         std::optional<uint32_t> r4, uint32_t return_address)>
+      call;
+  std::function<uint32_t(uint32_t offset, uint32_t return_address)> virtual_call;
+};
+
+// sub_82106548 App::StartUp: `interface` (app + 16) to the four globals
+// (ReadError::SetApp, sub_8209AC30, sub_8209F580's plain C++;
+// SceneTarget::Create through its adapter), Archive::Init(slot +16's
+// answer, 0xC80000), ActionMappers::Init(interface, 1), CameraPasses::Init,
+// ScreenFades::Init, Movies::Set (its plain C++, the adapter where it hands
+// back), Billboards::Init, SoundGlobals::Init(slot +48's answer),
+// SaveInterface::Init(interface), Network::SetUp(interface), Text::Init,
+// sub_8225FB70's plain C++, Players::ResetControllers and
+// Archive::WaitIdle, each callee with r3 as the original leaves it. Both
+// GlobalMemoryStatus calls (sub_82294DA0, Dropped: their buffer is never
+// read) left out. `frame` is the original's 128-byte frame. Returns r3 as
+// the original leaves it (`frame` + 80, the last GlobalMemoryStatus's
+// buffer).
+uint32_t AppStartUp(uint8_t* base, uint32_t interface, uint32_t frame, const StartUpCalls& calls);
+
 // --- The network manager's set-up (system-services.md) ---
 
 constexpr uint32_t kNetworkManager = 0x826C74A0;

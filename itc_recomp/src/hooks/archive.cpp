@@ -12,6 +12,7 @@
 #include "archive/archive.h"
 #include "archive/semaphores.h"
 #include "base/flags.h"
+#include "hooks/app_start_up.h"
 #include "hooks/c_runtime.h"
 #include "hooks/guest_call.h"
 #include "hooks/heap.h"
@@ -267,6 +268,9 @@ extern "C" REX_FUNC(sub_8209DE48) {
 // no caller.
 extern "C" REX_FUNC(sub_8209D730) {
   ITC_ARCHIVE_QUEUE_FALLBACK(8209D730)
+  if (hooks::StartUpRecorded(ctx, 0x8209D730)) {
+    return;
+  }
   archive::WaitIdle(base);
 }
 

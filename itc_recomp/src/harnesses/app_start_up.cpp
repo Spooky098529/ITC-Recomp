@@ -12,8 +12,10 @@
 #include "base/flags.h"
 #include "base/log.h"
 #include "helpers/clock.h"
+#include "hooks/app_start_up.h"
 #include "hooks/heap.h"
 #include "memory/c_runtime_heap.h"
+#include "memory/heap.h"
 
 #include <fmt/format.h>
 
@@ -527,6 +529,217 @@ void BillboardsInitCases(Context& h) {
   results.Report();
 }
 
+// --- The text: the font's set-up ---
+
+constexpr uint32_t kFontPointer = 0x826C5C00;
+constexpr uint32_t kStringsPointer = 0x826C5C34;
+constexpr uint32_t kStringsBytes = 4304;
+
+// A font's outputs: its bytes with the declaration and the five shader
+// objects' words (+16560 to +16583) left out, the declaration's bytes
+// (freed), each shader object's being made and its first word (the objects
+// hold their microcode's addresses, which differ by allocation; left made,
+// as Billboards::Init's).
+void FontOut(Context& h, Outputs& out, uint32_t font) {
+  std::vector<uint8_t> bytes = Read(h.base, font, asu::kFontBytes);
+  std::fill(bytes.begin() + 16560, bytes.begin() + 16584, 0);
+  out.Bytes(bytes);
+  const uint32_t declaration = guest::LoadU32(h.base, font + 16560);
+  out.Word(declaration != 0);
+  if (declaration != 0) {
+    out.Bytes(Read(h.base, declaration, 56 + 12 * guest::LoadU32(h.base, declaration + 24)));
+    memory::crt::XMemFree(declaration, 0x24800000);
+  }
+  for (uint32_t at = 16564; at < 16584; at += 4) {
+    const uint32_t object = guest::LoadU32(h.base, font + at);
+    out.Word(object != 0);
+    out.Word(object != 0 ? guest::LoadU32(h.base, object) : 0);
+  }
+}
+
+// Font::Font on a block of 16,592 bytes (0xCD or random), the recompiled
+// one with --native_app_start_up off (its CreateVertexDeclaration the
+// original too); also its frame's words +80 to +91 (the five color bytes
+// it keeps there and the device lock's word).
+void FontConstructCases(Context& h) {
+  Results results("Font::Font (sub_82109228) with Font::CreateShaders (sub_821088B8)");
+  const uint32_t font = memory::Alloc(asu::kFontBytes, 0);
+  for (int c = 0; c < 4; c++) {
+    std::vector<uint8_t> fill(asu::kFontBytes, 0xCD);
+    if (c % 2 == 1) {
+      for (auto& b : fill) {
+        b = uint8_t(h.random.Next());
+      }
+    }
+    Outputs out[2];
+    for (int v = 0; v < 2; v++) {
+      Write(h.base, font, fill.data(), asu::kFontBytes);
+      PPCContext t = CallContext(h);
+      t.r3.u64 = font;
+      Fill(h.base, t.r1.u32 - 512, 512);
+      if (v == 0) {
+        const bool flag = ITC_FLAG(native_app_start_up);
+        ITC_FLAG(native_app_start_up) = false;
+        __imp__sub_82109228(t, h.base);
+        ITC_FLAG(native_app_start_up) = flag;
+      } else {
+        hooks::FontConstructSteps(t, h.base);
+      }
+      out[v].Word(t.r3.u32);
+      out[v].Bytes(Read(h.base, t.r1.u32 - 128 + 80, 12));
+      FontOut(h, out[v], font);
+    }
+    results.Check(out[0], out[1], fmt::format("case {}: {}", c, c % 2 ? "random" : "0xCD"));
+  }
+  memory::Free(font);
+  results.Report();
+}
+
+// Text::Init on the game's globals (the font's and the string table's
+// pointers saved and put back): the string table there (left) or 0 (made
+// and compared, then freed); the font made each time compared and freed.
+void TextInitCases(Context& h) {
+  Results results("Text::Init (sub_8210ADD0) with Font::Init (sub_82109A00)");
+  const uint32_t saved_font = guest::LoadU32(h.base, kFontPointer);
+  const uint32_t saved_strings = guest::LoadU32(h.base, kStringsPointer);
+  for (int c = 0; c < 4; c++) {
+    const bool strings = c % 2 == 0;
+    Outputs out[2];
+    for (int v = 0; v < 2; v++) {
+      guest::StoreU32(h.base, kFontPointer, 0x5A5A5A5A);
+      guest::StoreU32(h.base, kStringsPointer, strings ? saved_strings : 0);
+      PPCContext t = CallContext(h);
+      t.r3.u64 = h.random.Next();
+      if (v == 0) {
+        const bool flag = ITC_FLAG(native_app_start_up);
+        ITC_FLAG(native_app_start_up) = false;
+        __imp__sub_8210ADD0(t, h.base);
+        ITC_FLAG(native_app_start_up) = flag;
+      } else {
+        hooks::TextInitSteps(t, h.base);
+      }
+      const uint32_t font = guest::LoadU32(h.base, kFontPointer);
+      const uint32_t table = guest::LoadU32(h.base, kStringsPointer);
+      out[v].Word(font != 0 && memory::IsPages(font));
+      out[v].Word(font & 0xFFF);
+      if (strings) {
+        out[v].Word(table == saved_strings);
+        out[v].Word(t.r3.u32);
+      } else {
+        out[v].Word(table != 0 && memory::IsPages(table));
+        out[v].Word(t.r3.u32 == table);
+        if (table != 0) {
+          out[v].Bytes(Read(h.base, table, kStringsBytes));
+          memory::FreePages(table);
+        }
+      }
+      if (font != 0 && memory::IsPages(font)) {
+        FontOut(h, out[v], font);
+        memory::FreePages(font);
+      }
+    }
+    results.Check(out[0], out[1],
+                  fmt::format("case {}: string table {}", c, strings ? "there" : "made"));
+  }
+  guest::StoreU32(h.base, kFontPointer, saved_font);
+  guest::StoreU32(h.base, kStringsPointer, saved_strings);
+  results.Report();
+}
+
+// --- The app's start-up ---
+
+// App::StartUp's callees seen through hooks::g_start_up_recorder: each
+// call's address, r3, r4, link register, stack pointer and r31 logged; r3
+// answered with a number by position.
+std::vector<uint32_t> g_start_up_log;
+bool RecordStartUpCall(PPCContext& ctx, uint32_t address) {
+  g_start_up_log.insert(g_start_up_log.end(), {address, ctx.r3.u32, ctx.r4.u32, uint32_t(ctx.lr),
+                                               ctx.r1.u32, ctx.r31.u32});
+  ctx.r3.u64 = 0x7A000000u + uint32_t(g_start_up_log.size());
+  return true;
+}
+
+// App::StartUp on a fake interface in the scratch area (its vtable at +256,
+// a copy of the app interface's with slot +16 the getter of +112,
+// sub_82379350, slot +48 that of +108, sub_82379338, and slot +44 either
+// the app's, sub_82379350, or the other getter, for Movies::Set's original
+// path), the callees recorded (above); the recompiled one with
+// --native_app_start_up off. Compared: the recorded calls, the six globals
+// its leaves write (saved and put back), r3 (against the stack pointer) and
+// r31.
+void AppStartUpCases(Context& h) {
+  Results results("App::StartUp (sub_82106548)");
+  const std::initializer_list<uint32_t> globals = {asu::kReadErrorApp, asu::kAppInterface84,
+                                                   asu::kRenderApp,    asu::kMovieClass,
+                                                   asu::kWords8110,    asu::kWords8114};
+  std::vector<uint32_t> saved;
+  for (const uint32_t g : globals) {
+    saved.push_back(guest::LoadU32(h.base, g));
+  }
+  const uint32_t interface = h.data;
+  const uint32_t fake = h.data + 256;
+  for (int c = 0; c < 8; c++) {
+    const bool real = c < 6;
+    const uint32_t word108 = uint32_t(h.random.Next());
+    const uint32_t word112 = uint32_t(h.random.Next());
+    const uint64_t r4 = h.random.Next(), r31 = h.random.Next();
+    Outputs out[2];
+    for (int v = 0; v < 2; v++) {
+      Fill(h.base, h.data, kScratchBytes);
+      for (uint32_t k = 0; k < 64; k += 4) {
+        guest::StoreU32(h.base, fake + k, guest::LoadU32(h.base, kAppInterfaceVtable + k));
+      }
+      guest::StoreU32(h.base, fake + 16, 0x82379350);
+      guest::StoreU32(h.base, fake + 44, real ? 0x82379350 : 0x82379338);
+      guest::StoreU32(h.base, fake + 48, 0x82379338);
+      guest::StoreU32(h.base, interface, fake);
+      guest::StoreU32(h.base, interface + 108, word108);
+      guest::StoreU32(h.base, interface + 112, word112);
+      for (const uint32_t g : globals) {
+        guest::StoreU32(h.base, g, 0xA5A5A5A5u + c);
+      }
+      PPCContext t = CallContext(h);
+      t.r3.u64 = interface;
+      t.r4.u64 = r4;
+      t.r31.u64 = r31;
+      const uint32_t stack = t.r1.u32;
+      g_start_up_log.clear();
+      hooks::g_start_up_recorder = RecordStartUpCall;
+      if (v == 0) {
+        const bool flag = ITC_FLAG(native_app_start_up);
+        ITC_FLAG(native_app_start_up) = false;
+        __imp__sub_82106548(t, h.base);
+        ITC_FLAG(native_app_start_up) = flag;
+      } else {
+        hooks::AppStartUpSteps(t, h.base);
+      }
+      hooks::g_start_up_recorder = nullptr;
+      if (c == 0 && v == 1) {
+        ITC_LOG_INFO("harness: app_start_up: App::StartUp's cases record {} calls a run",
+                     g_start_up_log.size() / 6);
+      }
+      for (const uint32_t word : g_start_up_log) {
+        out[v].Word(word);
+      }
+      for (const uint32_t g : globals) {
+        out[v].Word(guest::LoadU32(h.base, g));
+      }
+      out[v].Word(t.r3.u32 - stack);
+      out[v].Word(t.r1.u32 - stack);
+      out[v].Bytes(Read(h.base, stack - 16, 16));
+      out[v].Word(uint32_t(t.r31.u64 >> 32));
+      out[v].Word(t.r31.u32);
+    }
+    results.Check(out[0], out[1],
+                  fmt::format("case {}: {}", c, real ? "the app's slot +44" : "another slot +44"));
+  }
+  size_t i = 0;
+  for (const uint32_t g : globals) {
+    guest::StoreU32(h.base, g, saved[i++]);
+  }
+  results.Report();
+}
+
 }  // namespace
 
 void AppStartUp(Context& h) {
@@ -542,6 +755,11 @@ void AppStartUp(Context& h) {
   NetworkSetUp(h);
   SceneTargetCases(h);
   BillboardsInitCases(h);
+  if (hooks::TextInitNative()) {
+    FontConstructCases(h);
+    TextInitCases(h);
+  }
+  AppStartUpCases(h);
 }
 
 }  // namespace harness

@@ -5,6 +5,7 @@
 #include "hooks/save_interface.h"
 
 #include "base/flags.h"
+#include "hooks/app_start_up.h"
 #include "hooks/heap.h"
 #include "memory/heap.h"
 #include "native/buffers.h"
@@ -366,7 +367,19 @@ ITC_SAVE_INTERFACE_ADAPTER(820A5580, SaveInterfaceSetRootName)
 ITC_SAVE_INTERFACE_ADAPTER(820A52E0, SaveInterfaceSlotRequestSave)
 ITC_SAVE_INTERFACE_ADAPTER(820A53E8, SaveInterfaceSlotRequestLoad)
 ITC_SAVE_INTERFACE_ADAPTER(82295C18, SaveInterfaceContentSize)
-ITC_SAVE_INTERFACE_ADAPTER(8209FFB8, SaveInterfaceInit)
+// SaveInterface::Init's adapter written out: the app_start_up harness's
+// recorder first.
+extern "C" REX_FUNC(sub_8209FFB8) {
+  REX_FUNC_PROLOGUE();
+  if (hooks::StartUpRecorded(ctx, 0x8209FFB8)) {
+    return;
+  }
+  if (!ITC_FLAG(native_save_interface)) {
+    __imp__sub_8209FFB8(ctx, base);
+    return;
+  }
+  hooks::SaveInterfaceInit(ctx, base);
+}
 ITC_SAVE_INTERFACE_ADAPTER(8228F9B0, SaveInterfacePlayerRequestDevice)
 ITC_SAVE_INTERFACE_ADAPTER(8228F9E8, SaveInterfacePlayerSlotState)
 ITC_SAVE_INTERFACE_ADAPTER(8228FA90, SaveInterfacePlayerDevice)

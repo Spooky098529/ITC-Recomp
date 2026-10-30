@@ -15,6 +15,7 @@
 #include "guest_call.h"
 
 #include "game_data/game_data.h"
+#include "hooks/app_start_up.h"
 #include "hooks/archive.h"
 
 #include "base/log.h"
@@ -134,6 +135,9 @@ bool ReadWhole(uint8_t* base, uint32_t path, uint32_t buffer, uint32_t size) {
 // 0x82600B50) are the game's.
 extern "C" REX_FUNC(sub_8209E210) {
   REX_FUNC_PROLOGUE();
+  if (hooks::StartUpRecorded(ctx, 0x8209E210)) {
+    return;
+  }
   // Whether the archive's semaphores are host ones is settled here, before
   // anything waits on them (and before the harnesses switch the flag).
   hooks::ArchiveHostSemaphores();

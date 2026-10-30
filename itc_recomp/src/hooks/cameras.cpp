@@ -15,6 +15,7 @@
 #include "base/flags.h"
 #include "cameras/cameras.h"
 #include "hooks/cameras.h"
+#include "hooks/app_start_up.h"
 #include "hooks/c_runtime.h"
 #include "hooks/guest_call.h"
 #include "hooks/heap.h"
@@ -407,6 +408,9 @@ extern "C" REX_FUNC(sub_820A2F40) {
 // (sub_8209F960) has no adapter: only Init's plain C++ calls it.
 extern "C" REX_FUNC(sub_8209F9B8) {
   ITC_CAMERAS_FALLBACK(8209F9B8)
+  if (hooks::StartUpRecorded(ctx, 0x8209F9B8)) {
+    return;
+  }
   hooks::CameraPassesInit(ctx, base, true);
 }
 

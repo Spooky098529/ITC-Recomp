@@ -5,6 +5,7 @@
 #include "hooks/save_data.h"
 
 #include "base/flags.h"
+#include "hooks/app_start_up.h"
 #include "hooks/heap.h"
 #include "save_data/save_data.h"
 
@@ -177,6 +178,18 @@ ITC_SAVE_DATA_ADAPTER(820CCCD0, SaveDataTable3044)
 ITC_SAVE_DATA_ADAPTER(82113E60, SaveDataProgressSetDefaults)
 ITC_SAVE_DATA_ADAPTER(821055D8, SaveDataDelete)
 ITC_SAVE_DATA_ADAPTER(821057C8, SaveDataCreate)
-ITC_SAVE_DATA_ADAPTER(8209F5E0, SaveDataResetControllers)
+// Players::ResetControllers' adapter written out: the app_start_up
+// harness's recorder first.
+extern "C" REX_FUNC(sub_8209F5E0) {
+  REX_FUNC_PROLOGUE();
+  if (hooks::StartUpRecorded(ctx, 0x8209F5E0)) {
+    return;
+  }
+  if (!ITC_FLAG(native_save_data)) {
+    __imp__sub_8209F5E0(ctx, base);
+    return;
+  }
+  hooks::SaveDataResetControllers(ctx, base);
+}
 ITC_SAVE_DATA_ADAPTER(8220BAC0, SaveDataMenuListInit)
 ITC_SAVE_DATA_ADAPTER(82221D00, SaveDataResetPlayer)

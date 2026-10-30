@@ -1,12 +1,14 @@
 // The app's start-up natively: adapters in front of src/app_start_up/
 // (docs/functions/app-start-up.md).
 
-#include "app_start_up/start_up.h"
+#include "hooks/app_start_up.h"
 
+#include "app_start_up/start_up.h"
 #include "base/flags.h"
 #include "guest.h"
 #include "hooks/guest_call.h"
 #include "hooks/heap.h"
+#include "strings_and_font/strings_and_font.h"
 
 using guest_call::InFrame;
 
@@ -20,11 +22,15 @@ ITC_FLAG_BOOL(native_app_start_up, true, "ITC",
               "--native_video_output, --native_graphics_resources and --native_heap, the "
               "scene target SceneTarget::Create sub_8209B378, SceneTarget::SceneTarget "
               "sub_8209B070 and Tiling::LargestTile sub_8209ADD8, and Billboards::Init "
-              "sub_8209BE88) "
+              "sub_8209BE88; with them, Text::Init sub_8210ADD0 with Font::Init sub_82109A00, "
+              "Font::Font sub_82109228 and Font::CreateShaders sub_821088B8, no adapters of their "
+              "own; and App::StartUp sub_82106548, its callees through their adapters) "
               "natively instead of through the translated code (the same reads and writes; "
               "checked by --run_harnesses=app_start_up)");
 
 namespace asu = app_start_up;
+
+hooks::StartUpRecorder hooks::g_start_up_recorder = nullptr;
 
 extern "C" REX_FUNC(sub_8209AC50) {
   REX_FUNC_PROLOGUE();
@@ -87,6 +93,9 @@ extern "C" REX_FUNC(sub_822A8980) {
         });
     if (declaration) {
       ctx.r3.u64 = *declaration;
+      // r9 as the original's memcpy leaves it in play (0): Font::CreateShaders
+      // hands it to the shader compile as its flags.
+      ctx.r9.u64 = 0;
       return;
     }
   }
@@ -115,6 +124,9 @@ asu::MemcpyCall XNetMemcpy(PPCContext& ctx, uint8_t* base) {
 
 extern "C" REX_FUNC(sub_8214E190) {
   REX_FUNC_PROLOGUE();
+  if (hooks::StartUpRecorded(ctx, 0x8214E190)) {
+    return;
+  }
   if (!ITC_FLAG(native_app_start_up)) {
     __imp__sub_8214E190(ctx, base);
     return;
@@ -162,6 +174,9 @@ asu::VideoOutputCall SceneTargetVideoOutput(PPCContext& ctx, uint8_t* base) {
 
 extern "C" REX_FUNC(sub_8209B378) {
   REX_FUNC_PROLOGUE();
+  if (hooks::StartUpRecorded(ctx, 0x8209B378)) {
+    return;
+  }
   if (!DeviceUsersNative()) {
     __imp__sub_8209B378(ctx, base);
     return;
@@ -199,6 +214,9 @@ uint32_t VirtualCall(PPCContext& ctx, uint8_t* base, uint32_t object, uint32_t o
 
 extern "C" REX_FUNC(sub_8209BE88) {
   REX_FUNC_PROLOGUE();
+  if (hooks::StartUpRecorded(ctx, 0x8209BE88)) {
+    return;
+  }
   if (!DeviceUsersNative()) {
     __imp__sub_8209BE88(ctx, base);
     return;
@@ -256,4 +274,206 @@ extern "C" REX_FUNC(sub_8209BE88) {
     asu::BillboardsInit(base, frame, calls);
   });
   ctx.lr = lr;
+}
+
+// --- The text's set-up ---
+
+ITC_FLAG_DECLARE(bool, native_strings_and_font);
+
+bool hooks::TextInitNative() { return DeviceUsersNative(); }
+
+namespace {
+
+// Runs `call` with r1 at `frame` (the frame the original makes the call
+// from), then puts r1 back.
+template <typename Call>
+uint32_t At(PPCContext& ctx, uint32_t frame, Call call) {
+  const uint64_t stack = ctx.r1.u64;
+  ctx.r1.u64 = frame;
+  const uint32_t r3 = call();
+  ctx.r1.u64 = stack;
+  return r3;
+}
+
+// The font's guest calls: Font::Font's from `font_frame`, Font::CreateShaders'
+// from `shaders_frame`, Strings::Init from `text_frame` (Text::Init's).
+asu::FontCalls FontCallsFor(PPCContext& ctx, uint8_t* base, uint32_t text_frame,
+                            uint32_t font_frame, uint32_t shaders_frame) {
+  asu::FontCalls calls;
+  calls.video_output = [&ctx, base, font_frame] {
+    return At(ctx, font_frame, [&] { return VideoOutput(ctx, base, 0x82109258, 0x82109268); });
+  };
+  calls.render_object = [&ctx, base, font_frame](int which) {
+    return At(ctx, font_frame, [&] {
+      const uint32_t object = VirtualCall(ctx, base, guest::LoadU32(base, asu::kRenderApp), 32,
+                                          which == 0 ? 0x82109284 : 0x821092AC);
+      return VirtualCall(ctx, base, object, which == 0 ? 4 : 8,
+                         which == 0 ? 0x82109294 : 0x821092BC);
+    });
+  };
+  calls.compile = [&ctx, base, shaders_frame](int which, uint32_t source, uint32_t length,
+                                               uint32_t profile, uint32_t out) {
+    return At(ctx, shaders_frame, [&] {
+      ctx.r3.u64 = source;
+      ctx.r4.u64 = length;
+      ctx.r5.u64 = 0;
+      ctx.r6.u64 = 0;
+      ctx.r7.u64 = 0x82001BCC;  // "main"
+      ctx.r8.u64 = profile;
+      // The pixel shaders' r9 is set to 0; the vertex shader's is what
+      // CreateVertexDeclaration leaves (memcpy's last), 0 in play (every
+      // compile's r9 logged 0 with --native_app_start_up off, itc_2597).
+      ctx.r9.u64 = 0;
+      ctx.r10.u64 = out;
+      ctx.lr = which == 0 ? 0x8210893C : 0x821089B8;
+      sub_822B8F10(ctx, base);  // D3DXCompileShader (the stored shaders)
+      return ctx.r3.u32;
+    });
+  };
+  calls.buffer_data = [&ctx, base, shaders_frame](int which, uint32_t buffer) {
+    return At(ctx, shaders_frame, [&] {
+      return VirtualCall(ctx, base, buffer, 12, which == 0 ? 0x82108950 : 0x821089CC);
+    });
+  };
+  calls.release = [&ctx, base, shaders_frame](int which, uint32_t buffer) {
+    return At(ctx, shaders_frame, [&] {
+      return VirtualCall(ctx, base, buffer, 8, which == 0 ? 0x82108970 : 0x821089EC);
+    });
+  };
+  calls.vertex_shader = [&ctx, base, shaders_frame](uint32_t data) {
+    return At(ctx, shaders_frame, [&] {
+      ctx.r3.u64 = data;
+      ctx.lr = 0x82108954;
+      sub_822AA018(ctx, base);  // VertexShader::Create
+      return ctx.r3.u32;
+    });
+  };
+  calls.pixel_shader = [&ctx, base, shaders_frame](int, uint32_t data) {
+    return At(ctx, shaders_frame, [&] {
+      ctx.r3.u64 = data;
+      ctx.lr = 0x821089D0;
+      sub_822A9EE8(ctx, base);  // PixelShader::Create
+      return ctx.r3.u32;
+    });
+  };
+  calls.memcpy_call = [&ctx, base, shaders_frame](uint32_t to, uint32_t from, uint32_t size) {
+    At(ctx, shaders_frame, [&] {
+      InFrame(ctx, base, 160, 0x822A8A54, [&](uint32_t) {
+        ctx.r3.u64 = to;
+        ctx.r4.u64 = from;
+        ctx.r5.u64 = size;
+        sub_825A7410(ctx, base);  // memcpy
+      });
+      return 0u;
+    });
+  };
+  calls.strings_init = [&ctx, base, text_frame] {
+    // Font::Init's r3 (Font::Font's, 14), which Strings::Init leaves when
+    // the table is already there.
+    ctx.r3.u64 = 14;
+    if (ITC_FLAG(native_strings_and_font) && hooks::NativeHeapActive()) {
+      if (const uint32_t table = strings_and_font::StringsInit(base); table != 0) {
+        ctx.r3.u64 = table;
+      }
+      return ctx.r3.u32;
+    }
+    return At(ctx, text_frame, [&] {
+      ctx.lr = 0x8210ADE4;
+      sub_8210A860(ctx, base);  // Strings::Init
+      return ctx.r3.u32;
+    });
+  };
+  return calls;
+}
+
+}  // namespace
+
+void hooks::TextInitSteps(PPCContext& ctx, uint8_t* base) {
+  const uint64_t lr = ctx.lr;
+  uint32_t r3 = 0;
+  InFrame(ctx, base, 96, 0x8210ADE0, [&](uint32_t text_frame) {
+    InFrame(ctx, base, 96, 0x82109A2C, [&](uint32_t init_frame) {
+      const uint32_t font_frame = init_frame - 128;
+      const uint32_t shaders_frame = font_frame - 160;
+      guest::StoreU32(base, font_frame, init_frame);
+      guest::StoreU32(base, shaders_frame, font_frame);
+      r3 = asu::TextInit(base, font_frame, shaders_frame,
+                         FontCallsFor(ctx, base, text_frame, font_frame, shaders_frame));
+    });
+  });
+  ctx.lr = lr;
+  ctx.r3.u64 = r3;
+}
+
+void hooks::FontConstructSteps(PPCContext& ctx, uint8_t* base) {
+  const uint32_t font = ctx.r3.u32;
+  const uint64_t lr = ctx.lr;
+  InFrame(ctx, base, 128, 0x82109258, [&](uint32_t font_frame) {
+    const uint32_t shaders_frame = font_frame - 160;
+    guest::StoreU32(base, shaders_frame, font_frame);
+    asu::FontConstruct(base, font, font_frame, shaders_frame,
+                       FontCallsFor(ctx, base, font_frame, font_frame, shaders_frame));
+  });
+  ctx.lr = lr;
+  ctx.r3.u64 = 14;
+}
+
+// Text::Init: no arguments (Font::Init, Font::Font and Font::CreateShaders
+// have no adapters: only its plain C++ calls them in play).
+extern "C" REX_FUNC(sub_8210ADD0) {
+  REX_FUNC_PROLOGUE();
+  if (hooks::StartUpRecorded(ctx, 0x8210ADD0)) {
+    return;
+  }
+  if (!DeviceUsersNative()) {
+    __imp__sub_8210ADD0(ctx, base);
+    return;
+  }
+  hooks::TextInitSteps(ctx, base);
+}
+
+// --- The app's start-up ---
+
+void hooks::AppStartUpSteps(PPCContext& ctx, uint8_t* base) {
+  const uint32_t interface = ctx.r3.u32;
+  const uint64_t lr = ctx.lr;
+  const uint64_t r31 = ctx.r31.u64;
+  // The original's prologue: the link register and r31 kept above its frame.
+  guest::StoreU32(base, ctx.r1.u32 - 8, uint32_t(lr));
+  guest::StoreU32(base, ctx.r1.u32 - 16, uint32_t(r31 >> 32));
+  guest::StoreU32(base, ctx.r1.u32 - 12, uint32_t(r31));
+  uint32_t r3 = 0;
+  InFrame(ctx, base, 128, 0x82106564, [&](uint32_t frame) {
+    ctx.r31.u64 = interface;
+    asu::StartUpCalls calls;
+    calls.call = [&](uint32_t target, std::optional<uint32_t> a, std::optional<uint32_t> b,
+                     uint32_t return_address) {
+      if (a) {
+        ctx.r3.u64 = *a;
+      }
+      if (b) {
+        ctx.r4.u64 = *b;
+      }
+      ctx.lr = return_address;
+      REX_CALL_INDIRECT_FUNC(target);
+      return ctx.r3.u32;
+    };
+    calls.virtual_call = [&](uint32_t offset, uint32_t return_address) {
+      return VirtualCall(ctx, base, interface, offset, return_address);
+    };
+    r3 = asu::AppStartUp(base, interface, frame, calls);
+  });
+  ctx.r31.u64 = r31;
+  ctx.lr = lr;
+  ctx.r3.u64 = r3;
+}
+
+// App::StartUp: r3 = app + 16, from App::App once at boot.
+extern "C" REX_FUNC(sub_82106548) {
+  REX_FUNC_PROLOGUE();
+  if (!ITC_FLAG(native_app_start_up)) {
+    __imp__sub_82106548(ctx, base);
+    return;
+  }
+  hooks::AppStartUpSteps(ctx, base);
 }

@@ -10,6 +10,7 @@
 #include "base/log.h"
 #include "debug/pause_menu_log.h"
 #include "frame_pacing/game_messages.h"
+#include "hooks/app_start_up.h"
 #include "hooks/guest_call.h"
 #include "hooks/heap.h"
 
@@ -214,6 +215,9 @@ extern "C" REX_FUNC(sub_8210AF08) {
 // operator new gives every block. r3 and f1-f3 are Configure's.
 extern "C" REX_FUNC(sub_8209F430) {
   ITC_MAPPERS_FALLBACK(8209F430)
+  if (hooks::StartUpRecorded(ctx, 0x8209F430)) {
+    return;
+  }
   uint32_t list = 0;
   if (!hooks::NativeHeapActive() || !MapperConstructKnown(base) ||
       !InitCreate(base, ctx.r3.u32, &list)) {

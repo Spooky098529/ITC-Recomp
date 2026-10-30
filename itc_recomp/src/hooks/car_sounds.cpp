@@ -7,6 +7,7 @@
 #include "base/flags.h"
 #include "car_sounds/car_sounds.h"
 #include "car_sounds/x3daudio.h"
+#include "hooks/app_start_up.h"
 #include "hooks/guest_call.h"
 #include "hooks/heap.h"
 #include "hooks/mode_tick.h"
@@ -691,6 +692,9 @@ ITC_CAR_SOUNDS_ADAPTER(82110048, CarSoundsUpdate)
 
 extern "C" REX_FUNC(sub_82110258) {
   REX_FUNC_PROLOGUE();
+  if (hooks::StartUpRecorded(ctx, 0x82110258)) {
+    return;
+  }
   if (!ITC_FLAG(native_car_sounds) || !hooks::CarSoundsGlobalsNative()) {
     __imp__sub_82110258(ctx, base);
     return;

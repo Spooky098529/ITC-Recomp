@@ -7,6 +7,7 @@
 #include "guest.h"
 
 #include "base/flags.h"
+#include "hooks/app_start_up.h"
 #include "hooks/c_runtime.h"
 #include "hooks/guest_call.h"
 #include "hooks/mode_tick.h"
@@ -50,7 +51,7 @@ using namespace mode_tick;
 ITC_MODE_TICK(8209BD18, BillboardsFlipRing(base))
 
 // ScreenFades::Init: no arguments.
-ITC_MODE_TICK(8209CDE8, ScreenFadesInit(base))
+ITC_MODE_TICK(8209CDE8, if (hooks::StartUpRecorded(ctx, 0x8209CDE8)) return; ScreenFadesInit(base))
 
 // ScreenFades::FadeIn and FadeOut: r3 = the passes, r4, r5, r6 = the color,
 // r7 = the layer (r3 left).
