@@ -2,6 +2,7 @@
 
 #include "guest.h"
 
+#include "app_states/containers.h"
 #include "base/log.h"
 #include "memory/c_runtime_heap.h"
 
@@ -344,6 +345,45 @@ uint32_t AudioEngineStart3D(uint8_t* base, uint32_t engine) {
   guest::StoreU32(base, engine + 40, 6);
   for (uint32_t i = 0; i < 6; i++) {
     guest::StoreU32(base, engine + 76 + 4 * i, 0x3F800000u);
+  }
+  return r3;
+}
+
+std::optional<uint32_t> WordVectorAllocate(uint8_t* base, uint32_t vector, uint32_t count) {
+  guest::StoreU32(base, vector + 4, 0);
+  guest::StoreU32(base, vector + 8, 0);
+  guest::StoreU32(base, vector + 12, 0);
+  if (count == 0) {
+    ITC_NATIVE_RUNNING("sub_821193C0 WordVector::Allocate");
+    return 0;
+  }
+  if (count > 0x3FFFFFFF) {
+    return std::nullopt;
+  }
+  const auto block = app_states::MessagesAllocate(base, count);
+  if (!block) {
+    return std::nullopt;
+  }
+  ITC_NATIVE_RUNNING("sub_821193C0 WordVector::Allocate");
+  guest::StoreU32(base, vector + 4, *block);
+  guest::StoreU32(base, vector + 8, *block);
+  guest::StoreU32(base, vector + 12, *block + 4 * count);
+  return 1;
+}
+
+std::optional<uint32_t> WordVectorFill(uint8_t* base, uint32_t vector, uint32_t count,
+                                       uint32_t value) {
+  const auto r3 = WordVectorAllocate(base, vector, count);
+  if (!r3) {
+    return std::nullopt;
+  }
+  ITC_NATIVE_RUNNING("sub_821194A0 WordVector::Fill");
+  if ((*r3 & 0xFF) != 0) {
+    const uint32_t first = guest::LoadU32(base, vector + 4);
+    for (uint32_t i = 0; i < count; i++) {
+      guest::StoreU32(base, first + 4 * i, guest::LoadU32(base, value));
+    }
+    guest::StoreU32(base, vector + 8, first + 4 * count);
   }
   return r3;
 }

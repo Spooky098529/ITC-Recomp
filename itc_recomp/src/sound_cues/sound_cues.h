@@ -11,6 +11,7 @@
 #pragma once
 
 #include <cstdint>
+#include <optional>
 
 namespace sound_cues {
 
@@ -146,5 +147,21 @@ uint32_t X3DAudioInitialize(uint8_t* base, uint32_t speaker_mask, double speed_o
 // settings at +28: the matrix pointer (+76), one source and six destination
 // channels (+36, +40), the matrix six 1.0. Returns 0.
 uint32_t AudioEngineStart3D(uint8_t* base, uint32_t engine);
+
+// --- The manager's bank vector (a std::vector of words) ---
+
+// sub_821193C0 (probably the vector's allocation): +4, +8 and +12 = 0;
+// with a count, operator new(count x 4) (MessageVector::Allocate's plain
+// C++, app-states.md) into +4 and +8, +12 its end; returns 1, or 0 without
+// a count. nullopt (the writes made, which the original makes again) for a
+// count above 0x3FFFFFFF (the original's length error, never ran) or where
+// operator new's plain C++ hands back.
+std::optional<uint32_t> WordVectorAllocate(uint8_t* base, uint32_t vector, uint32_t count);
+// sub_821194A0 (probably the vector's constructor with a count of one
+// value): WordVectorAllocate, then, when it answered 1, `count` copies of
+// the word at `value` from +4 and +8 = its end. Returns its r3. nullopt
+// where WordVectorAllocate hands back.
+std::optional<uint32_t> WordVectorFill(uint8_t* base, uint32_t vector, uint32_t count,
+                                       uint32_t value);
 
 }  // namespace sound_cues

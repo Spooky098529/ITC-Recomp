@@ -495,6 +495,61 @@ void X3DAudio(Context& h) {
   results.Report();
 }
 
+// The bank vector's constructor (sub_821194A0, with sub_821193C0): a vector
+// in the scratch area (16 bytes, its +0 left at the fill) with counts 0 to
+// 12 and one of 300, the value a random word; both versions' blocks
+// (operator new) compared by their bytes and freed. The original runs with
+// --native_sound_cues off.
+void NativeWordVectorFill(PPCContext& ctx, uint8_t* base) {
+  if (const auto r3 = sc::WordVectorFill(base, ctx.r3.u32, ctx.r4.u32, ctx.r5.u32)) {
+    ctx.r3.u64 = *r3;
+    return;
+  }
+  ctx.r3.u64 = 0xDEADDEAD;  // the original's path
+}
+
+void WordVector(Context& h) {
+  if (!hooks::NativeHeapActive()) {
+    return;
+  }
+  Results results("WordVector::Fill (sub_821194A0) with WordVector::Allocate (sub_821193C0)");
+  const uint32_t vector = h.data, value = h.data + 64;
+  for (int c = 0; c < 16; c++) {
+    const uint32_t count = c < 13 ? uint32_t(c) : c == 13 ? 300 : 1 + h.random.Below(40);
+    const uint32_t word = uint32_t(h.random.Next());
+    Outputs out[2];
+    for (int v = 0; v < 2; v++) {
+      Fill(h.base, h.data, 128);
+      guest::StoreU32(h.base, value, word);
+      PPCContext t = CallContext(h);
+      t.r3.u64 = vector;
+      t.r4.u64 = count;
+      t.r5.u64 = value;
+      if (v == 0) {
+        const bool flag = ITC_FLAG(native_sound_cues);
+        ITC_FLAG(native_sound_cues) = false;
+        __imp__sub_821194A0(t, h.base);
+        ITC_FLAG(native_sound_cues) = flag;
+      } else {
+        NativeWordVectorFill(t, h.base);
+      }
+      const uint32_t first = guest::LoadU32(h.base, vector + 4);
+      out[v].Word(t.r3.u32);
+      out[v].Bytes(Read(h.base, vector, 4));
+      out[v].Word(first != 0);
+      out[v].Word(guest::LoadU32(h.base, vector + 8) - first);
+      out[v].Word(guest::LoadU32(h.base, vector + 12) - first);
+      out[v].Bytes(Read(h.base, value, 64));
+      if (first != 0) {
+        out[v].Bytes(Read(h.base, first, 4 * count));
+        memory::crt::OperatorDelete(first);
+      }
+    }
+    results.Check(out[0], out[1], fmt::format("case {}: count {}", c, count));
+  }
+  results.Report();
+}
+
 }  // namespace
 
 void SoundCues(Context& h) {
@@ -504,6 +559,7 @@ void SoundCues(Context& h) {
   CueList(h);
   Holders(h);
   X3DAudio(h);
+  WordVector(h);
 }
 
 }  // namespace harness

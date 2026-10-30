@@ -16,7 +16,7 @@ ITC_FLAG_BOOL(native_sound_cues, true, "ITC",
               "sub_82117EA8; the bank pairs' and the manager's bank slots' accessors, "
               "sub_82117670 to sub_82117770 and sub_82118190 to sub_82118400; the Sounds' "
               "accessors, sub_821173F0 to sub_821175B8; the emitter's and the bank holders' "
-              "constructors, sub_8259C9B0, sub_8259D3D8 and sub_8259D418; AudioManager::IsCuePlaying, sub_82118B58; the delegate clone, sub_82118720; X3DAudioInitialize and AudioEngine::Start3D, sub_82480710 and sub_8259CE10; the bank holders' destructor and deletes, sub_8259D438, sub_82117AD8 and sub_82117B30) natively instead of "
+              "constructors, sub_8259C9B0, sub_8259D3D8 and sub_8259D418; AudioManager::IsCuePlaying, sub_82118B58; the delegate clone, sub_82118720; X3DAudioInitialize and AudioEngine::Start3D, sub_82480710 and sub_8259CE10; the bank holders' destructor and deletes, sub_8259D438, sub_82117AD8 and sub_82117B30; with --native_heap, the bank vector's constructor sub_821194A0 with its allocation sub_821193C0, no adapter of its own) natively instead of "
               "through the translated code (same results; checked by "
               "--run_harnesses=sound_cues)");
 
@@ -105,6 +105,21 @@ extern "C" REX_FUNC(sub_82118720) {
     return;
   }
   ctx.r3.u64 = copy;
+}
+
+// The bank vector's constructor: r3 = the vector, r4 = the count, r5 = the
+// value's address (sub_821193C0, its allocation, has no adapter: only this
+// one's plain C++ calls it in play). The original without --native_heap or
+// where the allocation hands back.
+extern "C" REX_FUNC(sub_821194A0) {
+  ITC_SOUND_FALLBACK(821194A0)
+  if (hooks::NativeHeapActive()) {
+    if (const auto r3 = WordVectorFill(base, ctx.r3.u32, ctx.r4.u32, ctx.r5.u32)) {
+      ctx.r3.u64 = *r3;
+      return;
+    }
+  }
+  __imp__sub_821194A0(ctx, base);
 }
 
 ITC_SOUND_WORD(82480710, X3DAudioInitialize(base, ctx.r3.u32, ctx.f1.f64, ctx.r5.u32))
