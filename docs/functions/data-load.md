@@ -61,7 +61,10 @@ call to `hooks::StartUpRecorded` first, for the harness. A harness running
 a recompiled caller of a native load (`Text::Load`'s `Strings::Load`) turns
 the callee's flag off, or its adapter would queue the load for real (found
 when `Strings::Release`'s cases saw a loaded flag written into freed
-memory).
+memory). The second migration (2026-10-30) made the two static set-ups native (their
+adapters stay: `_cinit`'s table reaches them, as `SignInWatch::StaticInit`'s)
+and removed `Record5232::Record5232`'s adapter; the adapters `BootData::Load`'s
+and `CreateObjects`' calls go through stay for the recorder.
 
 Status:
 
