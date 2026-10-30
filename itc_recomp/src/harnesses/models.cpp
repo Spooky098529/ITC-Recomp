@@ -17,6 +17,8 @@
 
 #include "base/flags.h"
 #include "base/log.h"
+#include "hooks/archive.h"
+#include "hooks/heap.h"
 #include "hooks/models.h"
 #include "memory/c_runtime_heap.h"
 #include "memory/heap.h"
@@ -1093,6 +1095,105 @@ void Accessors(Context& h, const Block& block) {
   Write(h.base, kKinds, kinds.data(), kKindsBytes);
 }
 
+// --- The shader pairs' loads ---
+
+// The recorded loads into `out`: each call's words, the pixel shader's
+// context (a 12-byte block each version allocates) by its words instead of
+// its address, then freed.
+void LoadsOut(Outputs& out, uint8_t* base, const ArchiveLoads& loads) {
+  const std::vector<uint32_t>& calls = loads.calls();
+  out.Word(uint32_t(calls.size()));
+  for (size_t i = 0; i + 6 <= calls.size(); i += 6) {
+    for (size_t k = 0; k < 6; k++) {
+      if (k == 3 && calls[i + 2] == models::kPairLoaded && calls[i + 3] != 0) {
+        out.Bytes(Read(base, calls[i + 3], 12));
+        memory::crt::OperatorDelete(calls[i + 3]);
+        continue;
+      }
+      out.Word(calls[i + k]);
+    }
+  }
+}
+
+void NativeLoadPair(PPCContext& t, uint8_t* base, const archive::LoadCall& load) {
+  if (const auto serial = models::ShadersLoadPair(base, t.r3.u32, t.r4.u32, load)) {
+    hooks::SetArchiveSerial(t, *serial);
+    return;
+  }
+  __imp__sub_820A07F0(t, base);
+}
+
+// Shaders::LoadPair and LoadAll with the buffer's pointer and the cursor
+// random (put back after), the real TOC's sizes, the loads recorded instead
+// of queued (random serials, -1 at times): the calls (the contexts by their
+// words), the two globals, the shared tables' words and r3 compared.
+void ShaderPairs(Context& h) {
+  if (!hooks::NativeHeapActive() || !hooks::NativeArchiveQueue()) {
+    ITC_LOG_WARN("harness: models: the shader pairs' loads need --native_heap and the archive's "
+                 "queue native");
+    return;
+  }
+  const uint32_t cursor = Load(h.base, models::kShaderCursor);
+  const uint32_t buffer = Load(h.base, models::kShaderBuffer);
+  const std::vector<uint8_t> tables = Read(h.base, 0x8296B7B0, 16);
+  for (const bool all : {false, true}) {
+    Results results(all ? "Shaders::LoadAll (sub_820A08A0)" : "Shaders::LoadPair (sub_820A07F0)");
+    for (int c = 0; c < (all ? 4 : 24); c++) {
+      static constexpr uint32_t kFirsts[3] = {3, 22801, 24258};
+      static constexpr uint32_t kCounts[3] = {34, 6, 56};
+      const uint32_t run = h.random.Below(3);
+      const uint32_t asset = kFirsts[run] + 2 * h.random.Below(kCounts[run]);
+      const uint32_t pair = uint32_t(h.random.Next());
+      const uint32_t start = h.random.Below(0x100000);
+      const uint32_t at = 0x40000000u + 16 * h.random.Below(0x100000);
+      std::vector<int64_t> serials;
+      for (int i = 0; i < 200; i++) {
+        serials.push_back(h.random.Below(5) == 0 ? -1 : int64_t(h.random.Below(0x7FFFFFFF)));
+      }
+      Outputs out[2];
+      for (int v = 0; v < 2; v++) {
+        Store(h.base, models::kShaderCursor, start);
+        Store(h.base, models::kShaderBuffer, at);
+        ArchiveLoads loads(serials);
+        PPCContext t = CallContext(h);
+        t.r3.u64 = asset;
+        t.r4.u64 = pair;
+        if (all) {
+          if (v == 0) {
+            __imp__sub_820A08A0(t, h.base);
+          } else {
+            const archive::LoadCall load = loads.Native();
+            t.r3.s64 = int32_t(models::ShadersLoadAll(h.base, [&](uint32_t a, uint32_t p) {
+              PPCContext u = CallContext(h);
+              u.r3.u64 = a;
+              u.r4.u64 = p;
+              NativeLoadPair(u, h.base, load);
+            }));
+          }
+        } else {
+          if (v == 0) {
+            __imp__sub_820A07F0(t, h.base);
+          } else {
+            NativeLoadPair(t, h.base, loads.Native());
+          }
+        }
+        LoadsOut(out[v], h.base, loads);
+        out[v].Word(Load(h.base, models::kShaderCursor));
+        out[v].Word(Load(h.base, models::kShaderBuffer));
+        out[v].Bytes(Read(h.base, 0x8296B7B0, 16));
+        out[v].Word(t.r3.u32);
+        out[v].Word(uint32_t(t.r3.u64 >> 32));
+        Write(h.base, 0x8296B7B0, tables.data(), 16);
+      }
+      results.Check(out[0], out[1], all ? fmt::format("case {}", c)
+                                        : fmt::format("asset {}, pair {}", asset, pair));
+    }
+    results.Report();
+  }
+  Store(h.base, models::kShaderCursor, cursor);
+  Store(h.base, models::kShaderBuffer, buffer);
+}
+
 // sub_825896C0: the two table words set from random r3 and r4; the words and
 // r3 compared, then put back.
 void SharedShaderSets(Context& h) {
@@ -1153,6 +1254,7 @@ void Models(Context& h) {
     ModelDestructs(h, block);
     Accessors(h, block);
     SharedShaderSets(h);
+    ShaderPairs(h);
     // The car part model (464 bytes): its constructor and destructor over
     // the model's cases, and its clear on random bytes.
     ModelConstructs(h, block,

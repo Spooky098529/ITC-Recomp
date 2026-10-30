@@ -5,6 +5,7 @@
 
 #include "guest.h"
 
+#include "archive/archive.h"
 #include "archive/semaphores.h"
 
 namespace hooks {
@@ -37,5 +38,13 @@ void ArchiveInvokeFunctor(PPCContext& ctx, uint8_t* base);
 // Ucl::Unpack (sub_82294610) without its flag: archive::UclUnpack with
 // memcpy's fallback called through `ctx`.
 void ArchiveUclUnpack(PPCContext& ctx, uint8_t* base);
+
+// Archive::Load for native callers (needs NativeArchiveQueue()): the request
+// queued through the archive's plain C++ (Queue(BuildLoad(...)), r7 = r8 =
+// 0).
+archive::LoadCall NativeArchiveLoad(uint8_t* base);
+// r3 as Archive::Load's adapter leaves a serial: lwz's (zero-extended), or -1
+// (li's).
+void SetArchiveSerial(PPCContext& ctx, int64_t serial);
 
 }  // namespace hooks

@@ -7,8 +7,9 @@
 
 #pragma once
 
+#include "archive/archive.h"
+
 #include <cstdint>
-#include <functional>
 #include <optional>
 
 namespace data_tables {
@@ -73,10 +74,7 @@ constexpr uint32_t kTableIds = 0x82616C64;
 // block, never in play).
 std::optional<uint32_t> Init(uint8_t* base);
 
-// Archive::Load (r3 the id, r4 the destination, r5 the callback, r6 its
-// context; r7 and r8 0): the serial or -1.
-using LoadCall = std::function<int64_t(uint32_t id, uint32_t destination, uint32_t callback,
-                                       uint32_t context)>;
+using LoadCall = archive::LoadCall;
 // sub_82117240 DataTables::Load: the twelve loads into the tables Init set
 // (94 into +16 with OnItemsLoaded and the object; 84 into +60 with OnLoaded84
 // and the object; the eight into +20 to +48 with On56Loaded and the table;

@@ -12,7 +12,10 @@
 
 #pragma once
 
+#include "archive/archive.h"
+
 #include <cstdint>
+#include <functional>
 #include <optional>
 
 namespace models {
@@ -63,6 +66,31 @@ uint32_t SharedVertexShader(uint8_t* base, uint32_t pair);
 // `pixel`).
 void SetSharedShaders(uint8_t* base, uint32_t vertex, uint32_t pixel);
 uint32_t SharedPixelShader(uint8_t* base, uint32_t pair);
+
+// --- The shader pairs' loads at boot (src/models/shader_pairs.cpp) ---
+
+constexpr uint32_t kShaderCursor = 0x826C1CD8;  // the bytes placed so far
+constexpr uint32_t kShaderBuffer = 0x826A5134;  // the buffer's pointer
+constexpr uint32_t kSharedVertexTable = 0x826BFCB8;
+constexpr uint32_t kSharedPixelTable = 0x826BDC98;
+constexpr uint32_t kPairLoaded = 0x820A06D0;  // the pixel shader's load callback
+
+// sub_820A07F0 Shaders::LoadPair (probably): the vertex shader `asset` and
+// its pixel shader (`asset` + 1) placed back to back at [0x826A5134] +
+// [0x826C1CD8] (their sizes from Archive::AssetSize; the cursor moves on), a
+// 12-byte context (operator new's plain C++: +0 the vertex file, +4 the
+// pixel file, +8 `pair`), then the two loads (`load`: the vertex shader with
+// no callback, the pixel shader with sub_820A06D0 and the context). Returns
+// the second load's serial (r3), or nullopt where operator new's plain C++
+// can't answer (nothing written yet: the original runs).
+std::optional<int64_t> ShadersLoadPair(uint8_t* base, uint32_t asset, uint32_t pair,
+                                       const archive::LoadCall& load);
+// sub_820A08A0 Shaders::LoadAll: [0x826C1CD8] = 0, then the pairs (`pair`,
+// LoadPair's plain C++ or the original): assets 3 to 69 by twos as pairs 0
+// to 33, 22801 to 22811 as 1000 to 1005, 24258 to 24368 as 2000 to 2055;
+// then SetSharedShaders(0x826BFCB8, 0x826BDC98). Returns r3 as the original
+// leaves it (the vertex table's address).
+uint32_t ShadersLoadAll(uint8_t* base, const std::function<void(uint32_t asset, uint32_t pair)>& pair);
 // sub_82589728: the vertex declaration for three stream types, from the
 // tables at 0x8265EC00 and 0x8296B7F4. nullopt for a type pair the tables
 // don't cover, where the original prints a message (never seen in play)

@@ -11,7 +11,9 @@
 #include "harness.h"
 
 #include "base/flags.h"
+#include "base/log.h"
 #include "car_specs/car_specs.h"
+#include "hooks/archive.h"
 #include "hooks/heap.h"
 #include "memory/c_runtime_heap.h"
 #include "memory/heap.h"
@@ -21,6 +23,7 @@
 #include <bit>
 #include <iterator>
 #include <string>
+#include <vector>
 
 ITC_FLAG_DECLARE(bool, native_car_specs);
 
@@ -946,6 +949,58 @@ void Init(Context& h) {
 
 }  // namespace
 
+namespace {
+
+// Params::Load on an object in the scratch area (random pointers), the loads
+// recorded instead of queued (random serials, -1 at times): the calls, the
+// area and r3 compared.
+void Load(Context& h) {
+  Results results("Params::Load (sub_820CC2A8)");
+  if (!hooks::NativeArchiveQueue()) {
+    ITC_LOG_WARN("harness: car_specs: Params::Load needs the archive's queue native");
+    return;
+  }
+  const uint32_t saved = guest::LoadU32(h.base, cs::kParams);
+  const uint32_t object = h.data + 128;
+  for (int c = 0; c < 16; c++) {
+    std::vector<int64_t> serials;
+    for (int i = 0; i < 12; i++) {
+      serials.push_back(h.random.Below(5) == 0 ? -1 : int64_t(h.random.Below(0x7FFFFFFF)));
+    }
+    std::vector<uint32_t> words;
+    for (int i = 0; i < 16; i++) {
+      words.push_back(uint32_t(h.random.Next()));
+    }
+    Outputs out[2];
+    for (int v = 0; v < 2; v++) {
+      Fill(h.base, h.data, kScratchBytes);
+      for (uint32_t i = 0; i < 16; i++) {
+        guest::StoreU32(h.base, object + 4 * i, words[i]);
+      }
+      guest::StoreU32(h.base, cs::kParams, object);
+      ArchiveLoads loads(serials);
+      PPCContext t = CallContext(h);
+      if (v == 0) {
+        __imp__sub_820CC2A8(t, h.base);
+      } else {
+        hooks::SetArchiveSerial(t, cs::ParamsLoad(h.base, loads.Native()));
+      }
+      guest::StoreU32(h.base, cs::kParams, saved);
+      out[v].Bytes(Read(h.base, h.data, kScratchBytes));
+      out[v].Word(uint32_t(loads.calls().size()));
+      for (const uint32_t w : loads.calls()) {
+        out[v].Word(w);
+      }
+      out[v].Word(t.r3.u32);
+      out[v].Word(uint32_t(t.r3.u64 >> 32));
+    }
+    results.Check(out[0], out[1], fmt::format("case {}", c));
+  }
+  results.Report();
+}
+
+}  // namespace
+
 void CarSpecs(Context& h) {
   Block block(4 * cs::kSpecBytes);
   Leaves(h, block);
@@ -955,6 +1010,7 @@ void CarSpecs(Context& h) {
   AeroParts(h, block);
   Refresh(h, block);
   Init(h);
+  Load(h);
 }
 
 }  // namespace harness

@@ -8,7 +8,6 @@
 
 #include "guest.h"
 
-#include "archive/archive.h"
 #include "base/flags.h"
 #include "data_tables/data_tables.h"
 #include "hooks/archive.h"
@@ -99,14 +98,5 @@ extern "C" REX_FUNC(sub_82117240) {
     __imp__sub_82117240(ctx, base);
     return;
   }
-  const int64_t serial = Load(base, [base](uint32_t id, uint32_t destination, uint32_t callback,
-                                           uint32_t context) {
-    return archive::Queue(base, archive::BuildLoad(base, id, destination, callback, context, 0, 0));
-  });
-  // r3 the serial (lwz's) or -1 (li's), as Archive::Load's adapter leaves it.
-  if (serial < 0) {
-    ctx.r3.s64 = -1;
-  } else {
-    ctx.r3.u64 = uint64_t(serial);
-  }
+  hooks::SetArchiveSerial(ctx, Load(base, hooks::NativeArchiveLoad(base)));
 }

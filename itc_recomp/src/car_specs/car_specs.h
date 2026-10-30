@@ -16,6 +16,8 @@
 
 #pragma once
 
+#include "archive/archive.h"
+
 #include <cstdint>
 
 namespace car_specs {
@@ -140,5 +142,13 @@ bool CarRefresh(uint8_t* base, uint32_t car, uint32_t* r3);
 // allocation would fail or the sizes add up to 0 (the original loops there
 // for good): the original runs there.
 bool ParamsInit(uint8_t* base, const uint32_t tocs[12], uint32_t* r3);
+
+// Params::Load (sub_820CC2A8): assets 72 to 83 loaded (`load`, Archive::Load)
+// into the pointers Params::Init set (72 into +12 with OnCarSpecsLoaded
+// sub_820CC248, 73 into +8 with OnWheelsLoaded sub_820CC0A8, 74 to 82 into
+// +16 to +48 with sub_820C9DF0, 83 into +52 with sub_820CBD90), the object
+// as each one's context (the global read again before each). Returns the last
+// serial (r3).
+int64_t ParamsLoad(uint8_t* base, const archive::LoadCall& load);
 
 }  // namespace car_specs

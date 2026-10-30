@@ -294,6 +294,14 @@ extern "C" REX_FUNC(sub_8209DB20) {
   ctx.r3.u64 = archive::Cancel(base, ctx.r3.u32);
 }
 
+archive::LoadCall hooks::NativeArchiveLoad(uint8_t* base) {
+  return [base](uint32_t id, uint32_t destination, uint32_t callback, uint32_t context) {
+    return archive::Queue(base, archive::BuildLoad(base, id, destination, callback, context, 0, 0));
+  };
+}
+
+void hooks::SetArchiveSerial(PPCContext& ctx, int64_t serial) { SetSerial(ctx, serial); }
+
 // The set-up: r3 = the request; r3 read by no caller (the next request sets
 // its own).
 void hooks::ArchiveSetUp(PPCContext& ctx, uint8_t* base) {

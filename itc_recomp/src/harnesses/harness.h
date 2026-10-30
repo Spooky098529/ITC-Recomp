@@ -15,6 +15,7 @@
 #include "guest.h"
 
 #include <cstdint>
+#include <functional>
 #include <string>
 #include <utility>
 #include <vector>
@@ -122,6 +123,30 @@ void Both(Context& h, Results& results, Setup setup, Args args, GuestFunction re
   }
   results.Check(result[0], result[1], what);
 }
+
+// Archive::Load's calls recorded instead of queued, for harnesses of its
+// callers: while alive, Archive::Load's adapter hands the recompiled
+// version's calls here (through hooks::g_start_up_recorder), and Native()
+// gives the plain C++'s LoadCall that records the same way. Each call's
+// r3 to r8 (the plain C++'s r7 and r8 0) are kept, and each is answered with
+// the next of `serials` (0 once they run out).
+class ArchiveLoads {
+ public:
+  explicit ArchiveLoads(std::vector<int64_t> serials);
+  ~ArchiveLoads();
+  ArchiveLoads(const ArchiveLoads&) = delete;
+  ArchiveLoads& operator=(const ArchiveLoads&) = delete;
+  std::function<int64_t(uint32_t, uint32_t, uint32_t, uint32_t)> Native();
+  const std::vector<uint32_t>& calls() const { return calls_; }
+  int64_t Answer(uint32_t id, uint32_t destination, uint32_t callback, uint32_t context,
+                 uint32_t r7, uint32_t r8);
+
+ private:
+  std::vector<int64_t> serials_;
+  size_t next_ = 0;
+  std::vector<uint32_t> calls_;
+  void* saved_recorder_;
+};
 
 // Runs the harnesses `--run_harnesses` asks for, the first time it's called.
 void RunRequested(PPCContext& ctx, uint8_t* base);

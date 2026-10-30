@@ -12,7 +12,6 @@
 #include "base/flags.h"
 #include "base/log.h"
 #include "data_tables/data_tables.h"
-#include "hooks/app_start_up.h"
 #include "hooks/archive.h"
 #include "hooks/heap.h"
 #include "memory/c_runtime_heap.h"
@@ -443,47 +442,6 @@ void Init(Context& h) {
   results.Report();
 }
 
-// The loads Archive::Load is asked for (both versions'), each answered with
-// the next of `serials`.
-struct LoadRecord {
-  std::vector<uint32_t> calls;
-  std::vector<int64_t> serials;
-  size_t next = 0;
-  int64_t Answer(uint32_t id, uint32_t destination, uint32_t callback, uint32_t context,
-                 uint32_t r7, uint32_t r8) {
-    calls.insert(calls.end(), {id, destination, callback, context, r7, r8});
-    return next < serials.size() ? serials[next++] : 0;
-  }
-};
-LoadRecord* g_loads = nullptr;
-
-// Archive::Load's adapter's recorder (the recompiled version's calls).
-bool RecordLoad(PPCContext& t, uint32_t address) {
-  if (address != 0x8209DE48 || g_loads == nullptr) {
-    return false;
-  }
-  const int64_t serial =
-      g_loads->Answer(t.r3.u32, t.r4.u32, t.r5.u32, t.r6.u32, t.r7.u32, t.r8.u32);
-  if (serial < 0) {
-    t.r3.s64 = -1;
-  } else {
-    t.r3.u64 = uint64_t(serial);
-  }
-  return true;
-}
-
-void NativeLoad(PPCContext& t, uint8_t* base) {
-  const int64_t serial = dt::Load(base, [](uint32_t id, uint32_t destination, uint32_t callback,
-                                           uint32_t context) {
-    return g_loads->Answer(id, destination, callback, context, 0, 0);
-  });
-  if (serial < 0) {
-    t.r3.s64 = -1;
-  } else {
-    t.r3.u64 = uint64_t(serial);
-  }
-}
-
 // DataTables::Load on an object in the scratch area (random table pointers),
 // the loads recorded instead of queued (random serials, -1 at times): the
 // calls, the area and r3 compared.
@@ -493,7 +451,6 @@ void Load(Context& h) {
     ITC_LOG_WARN("harness: data_tables: DataTables::Load needs the archive's queue native");
     return;
   }
-  const auto saved_recorder = hooks::g_start_up_recorder;
   const uint32_t tables_global = guest::LoadU32(h.base, dt::kTables);
   const uint32_t object = h.data + 64;
   for (int c = 0; c < 16; c++) {
@@ -512,22 +469,17 @@ void Load(Context& h) {
         guest::StoreU32(h.base, object + 4 * i, words[i]);
       }
       guest::StoreU32(h.base, dt::kTables, object);
-      LoadRecord loads;
-      loads.serials = serials;
-      g_loads = &loads;
+      ArchiveLoads loads(serials);
       PPCContext t = CallContext(h);
       if (v == 0) {
-        hooks::g_start_up_recorder = RecordLoad;
         __imp__sub_82117240(t, h.base);
-        hooks::g_start_up_recorder = saved_recorder;
       } else {
-        NativeLoad(t, h.base);
+        hooks::SetArchiveSerial(t, dt::Load(h.base, loads.Native()));
       }
-      g_loads = nullptr;
       guest::StoreU32(h.base, dt::kTables, tables_global);
       out[v].Bytes(Read(h.base, h.data, kScratchBytes));
-      out[v].Word(uint32_t(loads.calls.size()));
-      for (const uint32_t w : loads.calls) {
+      out[v].Word(uint32_t(loads.calls().size()));
+      for (const uint32_t w : loads.calls()) {
         out[v].Word(w);
       }
       out[v].Word(t.r3.u32);
@@ -535,7 +487,6 @@ void Load(Context& h) {
     }
     results.Check(out[0], out[1], fmt::format("case {}", c));
   }
-  hooks::g_start_up_recorder = saved_recorder;
   results.Report();
 }
 

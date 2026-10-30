@@ -21,6 +21,7 @@
 
 #include "base/flags.h"
 #include "base/log.h"
+#include "hooks/archive.h"
 #include "hooks/guest_call.h"
 #include "hooks/heap.h"
 #include "hooks/models.h"
@@ -70,7 +71,9 @@ ITC_FLAG_BOOL(native_models, true, "ITC",
               "never seen in play, the original's), Model::RecordShape sub_82595550 (in "
               "src/scenery_lists/model_draws.cpp, adapter in src/hooks/scenery_lists.cpp: the "
               "model's slot 1 and the texture provider's slots 5 and 6 guest calls; the "
-              "material animation, never seen in play, the original's)) natively instead of through the "
+              "material animation, never seen in play, the original's); with --native_heap and the "
+              "archive's queue native, Shaders::LoadAll sub_820A08A0 with Shaders::LoadPair "
+              "sub_820A07F0 (no adapter: only LoadAll's plain C++ calls it)) natively instead of through the "
               "translated code (the same writes; "
               "checked by --run_harnesses=models and, for Model::RecordShape, scenery_lists)");
 
@@ -476,4 +479,29 @@ extern "C" REX_FUNC(sub_82596920) {
     ctx.r5.u64 = xpr;
   }
   __imp__sub_82596920(ctx, base);
+}
+
+// Shaders::LoadAll: no arguments; r3 as the original leaves it (the vertex
+// table's address, sign-extended as lis/addi leave it). Each pair through
+// Shaders::LoadPair's plain C++, the original (from LoadAll's frame) where it
+// hands back.
+extern "C" REX_FUNC(sub_820A08A0) {
+  REX_FUNC_PROLOGUE();
+  if (!ITC_FLAG(native_models) || !hooks::NativeHeapActive() || !hooks::NativeArchiveQueue()) {
+    __imp__sub_820A08A0(ctx, base);
+    return;
+  }
+  const archive::LoadCall load = hooks::NativeArchiveLoad(base);
+  const uint32_t r3 = models::ShadersLoadAll(base, [&](uint32_t asset, uint32_t pair) {
+    if (models::ShadersLoadPair(base, asset, pair, load)) {
+      return;
+    }
+    const uint32_t at = pair < 1000 ? 0x820A08D4 : pair < 2000 ? 0x820A08F8 : 0x820A091C;
+    guest_call::InFrame(ctx, base, 112, at, [&](uint32_t) {
+      ctx.r3.u64 = asset;
+      ctx.r4.u64 = pair;
+      __imp__sub_820A07F0(ctx, base);
+    });
+  });
+  ctx.r3.s64 = int32_t(r3);
 }

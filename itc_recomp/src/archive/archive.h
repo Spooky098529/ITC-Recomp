@@ -14,6 +14,7 @@
 
 #include <array>
 #include <cstdint>
+#include <functional>
 #include <optional>
 
 namespace archive {
@@ -181,6 +182,13 @@ using LoadRequest = std::array<uint8_t, 40>;
 // else the stored size.
 LoadRequest BuildLoad(uint8_t* base, uint32_t id, uint32_t destination, uint32_t callback,
                       uint32_t context, uint32_t r7, uint32_t size);
+
+// Archive::Load as native callers' plain C++ is handed it (r3 the id, r4 the
+// destination, r5 the callback, r6 its context; r7 and r8 0): the serial or
+// -1. The adapters give Queue(BuildLoad(...)) (hooks::NativeArchiveLoad), the
+// harnesses a recorder.
+using LoadCall = std::function<int64_t(uint32_t id, uint32_t destination, uint32_t callback,
+                                       uint32_t context)>;
 
 // The queueing (sub_8209DC18), under the queue lock: a free slot
 // (FindSlot(-1)); none: -1. When the queue has no head and the work

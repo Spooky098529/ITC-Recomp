@@ -711,4 +711,23 @@ bool ParamsInit(uint8_t* base, const uint32_t tocs[12], uint32_t* r3) {
   return true;
 }
 
+int64_t ParamsLoad(uint8_t* base, const archive::LoadCall& load) {
+  ITC_NATIVE_RUNNING("sub_820CC2A8 Params::Load");
+  struct Asset {
+    uint32_t offset;
+    uint32_t callback;
+  };
+  static constexpr Asset kAssets[12] = {
+      {12, 0x820CC248}, {8, 0x820CC0A8},  {16, 0x820C9DF0}, {20, 0x820C9DF0},
+      {24, 0x820C9DF0}, {28, 0x820C9DF0}, {32, 0x820C9DF0}, {36, 0x820C9DF0},
+      {40, 0x820C9DF0}, {44, 0x820C9DF0}, {48, 0x820C9DF0}, {52, 0x820CBD90}};
+  int64_t serial = 0;
+  for (uint32_t k = 0; k < 12; k++) {
+    const uint32_t params = Params(base);
+    serial = load(72 + k, guest::LoadU32(base, params + kAssets[k].offset), kAssets[k].callback,
+                  params);
+  }
+  return serial;
+}
+
 }  // namespace car_specs

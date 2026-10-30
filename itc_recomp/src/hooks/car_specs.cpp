@@ -19,6 +19,7 @@
 
 #include "base/flags.h"
 #include "car_specs/car_specs.h"
+#include "hooks/archive.h"
 #include "hooks/heap.h"
 
 ITC_FLAG_BOOL(native_car_specs, true, "ITC",
@@ -30,7 +31,7 @@ ITC_FLAG_BOOL(native_car_specs, true, "ITC",
               "sub_820C9DD8; the aero parts' getters, sub_820CB848 to sub_820CBC90, their "
               "swaps and sub_820CBD20; Car::Refresh, sub_820C4998, with sub_820C4888, "
               "sub_820C4568 and Tire::InchUp, sub_820C46B8; Params::Init, sub_820C9960, "
-              "with --native_heap) natively "
+              "with --native_heap; Params::Load, sub_820CC2A8, with the archive's queue native) natively "
               "instead of through the translated code (same results; checked by "
               "--run_harnesses=car_specs)");
 
@@ -172,4 +173,15 @@ extern "C" REX_FUNC(sub_820C9960) {
     return;
   }
   ctx.r3.u64 = r3;
+}
+
+// Params::Load: no arguments; r3 the last serial. Natively with the archive's
+// queue native (the loads through its plain C++).
+extern "C" REX_FUNC(sub_820CC2A8) {
+  REX_FUNC_PROLOGUE();
+  if (!ITC_FLAG(native_car_specs) || !hooks::NativeArchiveQueue()) {
+    __imp__sub_820CC2A8(ctx, base);
+    return;
+  }
+  hooks::SetArchiveSerial(ctx, ParamsLoad(base, hooks::NativeArchiveLoad(base)));
 }

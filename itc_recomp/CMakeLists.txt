@@ -269,6 +269,7 @@ set(ITC_SOURCES
     src/models/xpr.cpp
     src/models/texture_provider.cpp
     src/models/model.cpp
+    src/models/shader_pairs.cpp
     src/models/part_model.cpp
     src/models/model_load.cpp
     src/hooks/shader_objects.cpp

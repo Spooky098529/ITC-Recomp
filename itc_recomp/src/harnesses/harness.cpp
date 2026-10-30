@@ -1,5 +1,7 @@
 #include "harness.h"
 
+#include "hooks/app_start_up.h"
+
 #include "base/flags.h"
 #include "base/hash.h"
 #include "base/log.h"
@@ -171,6 +173,47 @@ std::string Hex(const std::vector<uint8_t>& bytes) {
     s += fmt::format("{:02X}", b);
   }
   return s;
+}
+
+namespace {
+ArchiveLoads* g_archive_loads = nullptr;
+bool RecordArchiveLoad(PPCContext& t, uint32_t address) {
+  if (address != 0x8209DE48 || g_archive_loads == nullptr) {
+    return false;
+  }
+  const int64_t serial =
+      g_archive_loads->Answer(t.r3.u32, t.r4.u32, t.r5.u32, t.r6.u32, t.r7.u32, t.r8.u32);
+  if (serial < 0) {
+    t.r3.s64 = -1;
+  } else {
+    t.r3.u64 = uint64_t(serial);
+  }
+  return true;
+}
+}  // namespace
+
+ArchiveLoads::ArchiveLoads(std::vector<int64_t> serials)
+    : serials_(std::move(serials)),
+      saved_recorder_(reinterpret_cast<void*>(hooks::g_start_up_recorder)) {
+  g_archive_loads = this;
+  hooks::g_start_up_recorder = RecordArchiveLoad;
+}
+
+ArchiveLoads::~ArchiveLoads() {
+  g_archive_loads = nullptr;
+  hooks::g_start_up_recorder = reinterpret_cast<hooks::StartUpRecorder>(saved_recorder_);
+}
+
+int64_t ArchiveLoads::Answer(uint32_t id, uint32_t destination, uint32_t callback,
+                             uint32_t context, uint32_t r7, uint32_t r8) {
+  calls_.insert(calls_.end(), {id, destination, callback, context, r7, r8});
+  return next_ < serials_.size() ? serials_[next_++] : 0;
+}
+
+std::function<int64_t(uint32_t, uint32_t, uint32_t, uint32_t)> ArchiveLoads::Native() {
+  return [this](uint32_t id, uint32_t destination, uint32_t callback, uint32_t context) {
+    return Answer(id, destination, callback, context, 0, 0);
+  };
 }
 
 PPCContext CallContext(const Context& h) {
