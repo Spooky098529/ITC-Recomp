@@ -10,7 +10,7 @@ file's history. What's left to see in a drive, from every run:
 
 - Run started 2026-10-30 11:39 on `b7-loop-30-10-26`, from e320bad;
   summary `b7-loop-2026-10-30-1139.md`.
-- Limit for this run: 3 subsystems; 1 taken.
+- Limit for this run: 3 subsystems; 2 taken.
 - Subsystem 1 of 3: the race event (`sub_82140340`...`sub_82144E58`,
   the top of `leads.md`). Mapped (84e5334, `race-event.md`, 102 rows,
   37 in play, 12 ready groups, no stop; nothing outside blocks it).
@@ -31,6 +31,9 @@ file's history. What's left to see in a drive, from every run:
   `career.md`). Validated (`itc_2692`, replay `itc_2693`, broke on the
   intermittent SDK heap error, ran to the end): 8 of 8 harness lines; 4
   ran in the replay, 4 to drive.
+- Subsystem 2 of 3: the game's camera modes (`sub_82152338`...
+  `sub_822282E8`; picked over the front-end menus, as ready (44 ready
+  groups each) and run every frame in a race). Mapping agent running.
 
 ## Done
 
