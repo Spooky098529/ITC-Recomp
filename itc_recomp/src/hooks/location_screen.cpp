@@ -5,7 +5,11 @@
 #include "hooks/location_screen.h"
 
 #include "base/flags.h"
+#include "hooks/career.h"
 #include "hooks/guest_call.h"
+#include "hooks/race_event.h"
+#include "hooks/race_setup.h"
+#include "hooks/strings_and_font.h"
 #include "location_screen/location_screen.h"
 
 ITC_FLAG_BOOL(native_location_screen, true, "ITC",
@@ -21,7 +25,11 @@ ITC_FLAG_BOOL(native_location_screen, true, "ITC",
               "sub_822279A8 with ResetView sub_82227818 (no adapter: only Reset's plain C++ calls it), "
               "ApplyQueuedPage sub_8222C9B0, "
               "UpdatePage sub_8222EC08, its page's handler through the guest context; InitStates "
-              "sub_8222F258 over StateMachine::Add's plain C++) "
+              "sub_8222F258 over StateMachine::Add's plain C++; Page9 sub_822280D8 and Page11 "
+              "sub_82228138 over the career's and the race set-up's register steps, "
+              "NextOpponentText sub_82227430, LoadPicture sub_8222C270, Picture::Free "
+              "sub_82228438 and FreePictures sub_82228498, their heap and archive calls "
+              "through those adapters) "
               "natively instead of through the translated code (the same writes; checked by "
               "--run_harnesses=location_screen)");
 
@@ -218,6 +226,88 @@ void LocationScreenInitStates(PPCContext& ctx, uint8_t* base) {
   ctx.r3.u64 = replaced ? r3 : machine_r3 + (r3 - machine);
 }
 
+
+// --- The second migration's guest calls ---
+
+LocationScreenCalls::LocationScreenCalls(PPCContext& ctx, uint8_t* base)
+    : ctx_(ctx),
+      base_(base),
+      lr_(ctx.lr),
+      event_(std::make_unique<RaceEventGuest>(ctx, base)),
+      format_(std::make_unique<FormatGuestCalls>(ctx, base)),
+      calls_{this, &LocationScreenCalls::Call, ctx.r1.u32, &event_->get(), &format_->get()} {}
+
+LocationScreenCalls::~LocationScreenCalls() { ctx_.lr = lr_; }
+
+uint64_t LocationScreenCalls::Call(void* user, uint32_t function, const uint64_t args[4],
+                                   uint32_t r1, uint32_t lr) {
+  auto& self = *static_cast<LocationScreenCalls*>(user);
+  PPCContext& ctx = self.ctx_;
+  uint8_t* base = self.base_;
+  const uint64_t stack = ctx.r1.u64;
+  ctx.r1.u64 = r1;
+  ctx.r3.u64 = args[0];
+  ctx.r4.u64 = args[1];
+  ctx.r5.u64 = args[2];
+  ctx.r6.u64 = args[3];
+  ctx.lr = lr;
+  switch (function) {
+    case ls::kEventQuery:
+      CareerEventQuery(ctx, base);
+      break;
+    case ls::kRaceSetUp:
+      RaceSetupSetUp(ctx, base);
+      break;
+    case ls::kArchiveLoad:
+      ctx.r7.u64 = 0;
+      ctx.r8.u64 = 0;
+      [[fallthrough]];
+    default:
+      ctx.ctr.u64 = function;
+      REX_CALL_INDIRECT_FUNC(function);
+      break;
+  }
+  ctx.r1.u64 = stack;
+  ctx.fpscr.disableFlushMode();
+  return ctx.r3.u64;
+}
+
+void LocationScreenPage9(PPCContext& ctx, uint8_t* base) {
+  const uint32_t sp = ctx.r1.u32, machine = ctx.r4.u32;
+  LocationScreenCalls calls(ctx, base);
+  ctx.r3.u64 = ls::Page9(base, sp, machine, calls.get());
+}
+
+void LocationScreenPage11(PPCContext& ctx, uint8_t* base) {
+  const uint32_t sp = ctx.r1.u32, machine = ctx.r4.u32;
+  LocationScreenCalls calls(ctx, base);
+  ctx.r3.u64 = ls::Page11(base, sp, machine, calls.get());
+}
+
+void LocationScreenNextOpponentText(PPCContext& ctx, uint8_t* base) {
+  const uint32_t sp = ctx.r1.u32;
+  LocationScreenCalls calls(ctx, base);
+  ctx.r3.u64 = ls::NextOpponentText(base, sp, calls.get());
+}
+
+void LocationScreenLoadPicture(PPCContext& ctx, uint8_t* base) {
+  const uint32_t sp = ctx.r1.u32, screen = ctx.r3.u32, id = ctx.r4.u32, list = ctx.r5.u32;
+  LocationScreenCalls calls(ctx, base);
+  ctx.r3.u64 = ls::LoadPicture(base, sp, screen, id, list, calls.get());
+}
+
+void LocationScreenPictureFree(PPCContext& ctx, uint8_t* base) {
+  const uint32_t sp = ctx.r1.u32, picture = ctx.r3.u32;
+  LocationScreenCalls calls(ctx, base);
+  ctx.r3.u64 = ls::PictureFree(base, sp, picture, calls.get());
+}
+
+void LocationScreenFreePictures(PPCContext& ctx, uint8_t* base) {
+  const uint32_t sp = ctx.r1.u32, screen = ctx.r3.u32;
+  LocationScreenCalls calls(ctx, base);
+  ctx.r3.u64 = ls::FreePictures(base, sp, screen, calls.get());
+}
+
 }  // namespace hooks
 
 #define LOCATION_SCREEN_ADAPTER(address, step)  \
@@ -254,3 +344,9 @@ LOCATION_SCREEN_ADAPTER(822279A8, LocationScreenReset)
 LOCATION_SCREEN_ADAPTER(8222C9B0, LocationScreenApplyQueuedPage)
 LOCATION_SCREEN_ADAPTER(8222EC08, LocationScreenUpdatePage)
 LOCATION_SCREEN_ADAPTER(8222F258, LocationScreenInitStates)
+LOCATION_SCREEN_ADAPTER(822280D8, LocationScreenPage9)
+LOCATION_SCREEN_ADAPTER(82228138, LocationScreenPage11)
+LOCATION_SCREEN_ADAPTER(82227430, LocationScreenNextOpponentText)
+LOCATION_SCREEN_ADAPTER(8222C270, LocationScreenLoadPicture)
+LOCATION_SCREEN_ADAPTER(82228438, LocationScreenPictureFree)
+LOCATION_SCREEN_ADAPTER(82228498, LocationScreenFreePictures)

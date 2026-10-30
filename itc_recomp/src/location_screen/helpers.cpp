@@ -187,4 +187,68 @@ std::optional<uint32_t> NextResultText(uint8_t* base, uint32_t sp) {
   return StepEntry20(base, data_tables::Find20(base, id, k));
 }
 
+uint32_t Copy(uint8_t* base, const Calls& calls, uint32_t r1, uint32_t lr, uint32_t destination,
+              uint32_t source, uint32_t size) {
+  if (!c_runtime::Memcpy(base, destination, source, size)) {
+    calls.Call(kMemcpy, r1, lr, destination, source, size);
+  }
+  return destination;
+}
+
+uint32_t NextOpponentText(uint8_t* base, uint32_t sp, const Calls& calls) {
+  ITC_NATIVE_RUNNING("sub_82227430 LocationScreen::NextOpponentText");
+  const uint32_t frame = sp - kNextOpponentTextFrame;
+  guest::StoreU32(base, frame, sp);
+  const uint32_t save = vehicle_accessors::SaveDataOf(base, 0);
+  vehicle_accessors::RacerRecordsAt(base, guest::LoadU32(base, kRaceData) + kRacerRecords,
+                                    0xFFFFFFFFu);
+  guest::StoreU32(base, frame + 80, guest::LoadU32(base, Screen(base) + 800));
+  const uint32_t event = guest::LoadU32(base, race_event::kEvent);
+  const uint32_t item = race_event::GroupItem(
+      base, event, guest::LoadU32(base, Screen(base) + 804), guest::LoadU32(base, frame + 80));
+  Copy(base, calls, frame, 0x82227498, frame + 96, item, 3008);
+  const int32_t id = int16_t(guest::LoadU16(base, frame + 96));
+  // An item's record: save + 12 id + kItemRecords (+0, +2 and +4 halfwords).
+  auto record = [&](int32_t of) { return save + uint32_t(of) * 12 + kItemRecords; };
+  bool owned_kind3 = false;
+  uint32_t kind;
+  if (race_event::ItemsAvailable(base, uint32_t(id), calls.EventFrom(frame)) == 0) {
+    kind = 9;
+  } else {
+    const bool won = int16_t(guest::LoadU16(base, record(id) + 2)) != 0;
+    if (!won && guest::LoadU16(base, record(id) + 4) == 0 &&
+        guest::LoadU16(base, record(id)) == 0) {
+      kind = 6;
+    } else if (!won) {
+      kind = 7;
+    } else {
+      owned_kind3 = true;
+      kind = 8;
+    }
+  }
+  if (guest::LoadU16(base, frame + 184) == 3 && owned_kind3) {
+    Copy(base, calls, frame, 0x82227550, frame + 3104, frame + 96, 3008);
+    for (;;) {
+      uint32_t i = 0;
+      while (i < 3 && guest::LoadU16(base, frame + 3196 + 2 * i) == 0xFFFF) {
+        i++;
+      }
+      if (i == 3) {
+        break;
+      }
+      const int32_t next = int16_t(guest::LoadU16(base, frame + 3196 + 2 * i));
+      Copy(base, calls, frame, 0x8222759C, frame + 3104, data_tables::Item(base, uint32_t(next)),
+           3008);
+      if (next == -1) {
+        break;
+      }
+      if (guest::LoadU16(base, record(next) + 2) == 0) {
+        kind = 7;
+        break;
+      }
+    }
+  }
+  return StepEntry20(base, data_tables::Find20(base, uint32_t(id), kind));
+}
+
 }  // namespace location_screen

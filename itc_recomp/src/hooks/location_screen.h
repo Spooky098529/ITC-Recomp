@@ -6,6 +6,9 @@
 #pragma once
 
 #include "guest.h"
+#include "location_screen/location_screen.h"
+
+#include <memory>
 
 namespace hooks {
 
@@ -61,5 +64,43 @@ void LocationScreenUpdatePage(PPCContext& ctx, uint8_t* base);
 // sub_8222F258 InitStates: r3 = the machine; r3 as the last
 // StateMachine::Add leaves it.
 void LocationScreenInitStates(PPCContext& ctx, uint8_t* base);
+
+// The second migration's guest calls (location_screen::Calls) through
+// `ctx`: Career::EventQuery and Race::SetUp through their register steps
+// (hooks::CareerEventQuery, RaceSetupSetUp: their plain C++), the others
+// through their overrides; the race event's tests and FormatV's calls
+// through `ctx` too. lr put back when it goes.
+class RaceEventGuest;
+class FormatGuestCalls;
+class LocationScreenCalls {
+ public:
+  LocationScreenCalls(PPCContext& ctx, uint8_t* base);
+  ~LocationScreenCalls();
+  LocationScreenCalls(const LocationScreenCalls&) = delete;
+  LocationScreenCalls& operator=(const LocationScreenCalls&) = delete;
+  const location_screen::Calls& get() const { return calls_; }
+
+ private:
+  static uint64_t Call(void* user, uint32_t function, const uint64_t args[4], uint32_t r1,
+                       uint32_t lr);
+  PPCContext& ctx_;
+  uint8_t* base_;
+  uint64_t lr_;
+  std::unique_ptr<RaceEventGuest> event_;
+  std::unique_ptr<FormatGuestCalls> format_;
+  location_screen::Calls calls_;
+};
+
+// The second migration's (r3 as the originals leave it): sub_822280D8 Page9
+// and sub_82228138 Page11 (r4 = the machine), sub_82227430 NextOpponentText,
+// sub_8222C270 LoadPicture (r3 = the screen, r4 = the id, r5 = the list),
+// sub_82228438 Picture::Free (r3 = the picture), sub_82228498 FreePictures
+// (r3 = the screen).
+void LocationScreenPage9(PPCContext& ctx, uint8_t* base);
+void LocationScreenPage11(PPCContext& ctx, uint8_t* base);
+void LocationScreenNextOpponentText(PPCContext& ctx, uint8_t* base);
+void LocationScreenLoadPicture(PPCContext& ctx, uint8_t* base);
+void LocationScreenPictureFree(PPCContext& ctx, uint8_t* base);
+void LocationScreenFreePictures(PPCContext& ctx, uint8_t* base);
 
 }  // namespace hooks

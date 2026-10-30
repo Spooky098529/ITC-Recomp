@@ -14,13 +14,16 @@
 
 #include "harness.h"
 
+#include "archive/archive.h"
 #include "base/flags.h"
 #include "base/log.h"
 #include "data_tables/data_tables.h"
 #include "game_modes/game_modes.h"
+#include "hooks/app_start_up.h"
 #include "hooks/location_screen.h"
 #include "hooks/ui_movies.h"
 #include "location_screen/location_screen.h"
+#include "memory/c_runtime_heap.h"
 #include "memory/heap.h"
 #include "race_event/race_event.h"
 #include "ui_movies/game.h"
@@ -133,6 +136,9 @@ struct Spec {
   // Ranges below r1 (offsets from r1, negative) the function writes into its
   // frame, compared too.
   std::vector<std::pair<int32_t, uint32_t>> frame_ranges;
+  // Run after the function, before the outputs are read (frees, and words
+  // made comparable), with the case's outputs to add to.
+  std::function<void(PPCContext&, Outputs&)> after;
 };
 
 // UiMovie::Run's calls (the update it jumps to, sub_8211D2F8), kept and
@@ -150,6 +156,33 @@ bool StandIn(uint32_t function, PPCContext& ctx, uint8_t*) {
   }
   g_calls->push_back({function, uint32_t(ctx.lr), ctx.r1.u32, ctx.r3.u64, ctx.r4.u64});
   ctx.r3.u64 = g_answers.Below(2);
+  return true;
+}
+
+// Career::EventQuery's and Race::SetUp's register steps and Archive::Load's
+// adapter (hooks::g_start_up_recorder) kept the same way: answered with a
+// word from the case's generator (Archive::Load with a serial or -1), r5 and
+// r6 kept for Archive::Load (in r4's place: its r4 the pages, freed after).
+struct Load {
+  uint32_t destination, size;
+};
+std::vector<Load>* g_loads = nullptr;
+bool Recorder(PPCContext& ctx, uint32_t function) {
+  if (g_calls == nullptr ||
+      (function != 0x82111638 && function != 0x82115D98 && function != 0x8209DE48)) {
+    return false;
+  }
+  if (function == 0x8209DE48) {
+    g_calls->push_back({function, uint32_t(ctx.lr), ctx.r1.u32, ctx.r3.u64,
+                        uint64_t(ctx.r5.u32) << 32 | ctx.r6.u32});
+    if (g_loads != nullptr) {
+      g_loads->push_back({ctx.r4.u32, 0});
+    }
+    ctx.r3.u64 = g_answers.Below(3) == 0 ? ~0ull : g_answers.Below(100);
+    return true;
+  }
+  g_calls->push_back({function, uint32_t(ctx.lr), ctx.r1.u32, ctx.r3.u64, ctx.r4.u64});
+  ctx.r3.u64 = g_answers.Next();
   return true;
 }
 
@@ -295,11 +328,17 @@ void Case(Context& h, Results& results, const World& w, uint64_t seed, const Set
     std::vector<Call> calls;
     g_calls = &calls;
     ui_movies_hooks::g_update_callee_stand_in = StandIn;
+    const hooks::StartUpRecorder saved_recorder = hooks::g_start_up_recorder;
+    hooks::g_start_up_recorder = Recorder;
     ITC_FLAG(native_location_screen) = v == 1;
     (v == 0 ? recompiled : native)(t, h.base);
     ITC_FLAG(native_location_screen) = true;
+    hooks::g_start_up_recorder = saved_recorder;
     ui_movies_hooks::g_update_callee_stand_in = nullptr;
     g_calls = nullptr;
+    if (spec.after) {
+      spec.after(t, out[v]);
+    }
     out[v].Bytes(Read(h.base, w.movies.address, w.movies.bytes));
     out[v].Bytes(Read(h.base, 0x826A50AC, 0x40));
     Record(out[v], calls);
@@ -309,6 +348,7 @@ void Case(Context& h, Results& results, const World& w, uint64_t seed, const Set
     out[v].Bytes(Read(h.base, w.screen.address, w.screen.bytes));
     out[v].Bytes(Read(h.base, w.event.address, w.event.bytes));
     out[v].Bytes(Read(h.base, w.records(), 4 * kRecordBytes));
+    out[v].Bytes(Read(h.base, w.race.address + 0x59AE0, 8));
     out[v].Bytes(Read(h.base, h.data, kScratchBytes));
     const uint32_t r1 = CallContext(h).r1.u32;
     out[v].Bytes(Read(h.base, r1, h.data - r1));
@@ -599,6 +639,186 @@ void InitStates(Context& h, const World& w) {
         {{{-int32_t(ls::kInitStatesFrame) + 80, 1232}}});
 }
 
+// --- The second migration's ---
+
+// Page9 and Page11 on a machine at the movies block's start (r4), r3 any:
+// Career::EventQuery and Race::SetUp recorded (Recorder); Page11's picked
+// opponent from the event's groups and its item copied to its frame.
+void RacePages(Context& h, const World& w) {
+  uint8_t* const base = h.base;
+  const SetupFn opponent = [base](Random& r, const World& w) {
+    guest::StoreU32(base, w.screen.address + 804, r.Below(8) == 0 ? r.Below(4) : 4 + r.Below(6));
+    guest::StoreU32(base, w.screen.address + 800, r.Below(7));
+  };
+  const ArgsFn machine = [](PPCContext& t, Random& r, const World& w) {
+    t.r3.u64 = r.Next();
+    t.r4.u64 = w.movies.address;
+  };
+  Group(h, w, "LocationScreen::Page9 (sub_822280D8)", 100, opponent, machine,
+        __imp__sub_822280D8, hooks::LocationScreenPage9, {{{-112 + 80, 8}}});
+  Group(h, w, "LocationScreen::Page11 (sub_82228138)", 200, opponent, machine,
+        __imp__sub_82228138, hooks::LocationScreenPage11, {{{-3136 + 80, 3024}}});
+}
+
+// NextOpponentText: the picked opponent's item (+0 its id, 0 to 9; +88 3
+// or not; +92 three halfwords, -1 or ids below the item's index, so the chain
+// ends), the
+// items' availability (+46 2, or a condition of kind 0, 67 or past 67:
+// none of the guest tests), the items' records (+0, +2, +4 0 or 1), +872.
+void Opponents(Context& h, const World& w) {
+  uint8_t* const base = h.base;
+  Group(h, w, "LocationScreen::NextOpponentText (sub_82227430)", 400,
+        [base](Random& r, const World& w) {
+          guest::StoreU32(base, w.screen.address + 804, 4 + r.Below(6));
+          guest::StoreU32(base, w.screen.address + 800, r.Below(6));
+          for (uint32_t id = 0; id < kItems; id++) {
+            const uint32_t item = w.item(id);
+            const uint32_t own = r.Below(10);
+            guest::StoreU16(base, item + 0, uint16_t(own));
+            // Items 0 to 9 name only lower items: the chain ends.
+            const uint32_t limit = id < 10 ? id : 10;
+            guest::StoreU8(base, item + 46, uint8_t(r.Below(4) == 0 ? 2 : r.Below(2)));
+            constexpr uint16_t kKinds[] = {0, 67, 68, 0x8000};
+            guest::StoreU16(base, item + 102, kKinds[r.Below(4)]);
+            guest::StoreU16(base, item + 88, uint16_t(r.Below(2) == 0 ? 3 : r.Below(6)));
+            for (uint32_t k = 0; k < 3; k++) {
+              guest::StoreU16(base, item + 92 + 2 * k,
+                              uint16_t(limit == 0 || r.Below(2) == 0 ? 0xFFFF : r.Below(limit)));
+            }
+          }
+          for (uint32_t id = 0; id < 10; id++) {
+            for (uint32_t k = 0; k < 3; k++) {
+              guest::StoreU16(base, w.save.address + ls::kItemRecords + 12 * id + 2 * k,
+                              uint16_t(r.Below(2)));
+            }
+          }
+          guest::StoreU32(base, w.screen.address + 872, r.Below(4));
+        },
+        [](PPCContext&, Random&, const World&) {}, __imp__sub_82227430,
+        hooks::LocationScreenNextOpponentText,
+        {{{-int32_t(ls::kNextOpponentTextFrame) + 80, 6016}}});
+}
+
+// The pictures. LoadPicture: an asset id of the screen's (22696 on), the
+// list 0, 1 or another; Archive::Load recorded, the pages (VirtualAlloc's)
+// compared (their first 256 bytes, cleared) and freed. Picture::Free: a
+// picture in the screen block with a texture record (operator new(12)) or
+// none, and an XPR slot with a cleared XPR (operator new(24)) or none.
+// FreePictures: both lists with 0 to 4 such pictures (VirtualAlloc's pages);
+// the lists' pointers compared as their indices.
+void Pictures(Context& h, const World& w) {
+  uint8_t* const base = h.base;
+  std::vector<Load> loads;
+  // No locals in these frames: their +80 on hold the saved registers.
+  Spec load_spec{{},
+                 [base, &loads](PPCContext& t, Outputs& out) {
+                   // The pages: the load's destination, or r3 for another list.
+                   uint32_t pages = loads.empty() ? t.r3.u32 : loads.back().destination;
+                   out.Bytes(Read(base, pages, 256));
+                   memory::FreePages(pages);
+                   loads.clear();
+                 }};
+  g_loads = &loads;
+  Group(h, w, "LocationScreen::LoadPicture (sub_8222C270)", 100, [](Random&, const World&) {},
+        [base](PPCContext& t, Random& r, const World& w) {
+          t.r3.u64 = w.screen.address;
+          // An asset of a sensible size (the TOC's: no load is made).
+          uint32_t id;
+          do {
+            id = 22696 + r.Below(90);
+          } while (archive::AssetSize(base, id) - 1 >= 0x400000);
+          t.r4.u64 = id;
+          t.r5.u64 = r.Below(4) == 0 ? r.Next() : r.Below(2);
+        },
+        __imp__sub_8222C270, hooks::LocationScreenLoadPicture, load_spec);
+  g_loads = nullptr;
+
+  // Picture::Free: the picture at the screen block's +0x700 (+8 a record,
+  // +12 an XPR or 0); r3 compared as which block it names.
+  struct Blocks {
+    uint32_t record = 0, xpr = 0;
+  };
+  Blocks blocks;
+  const SetupFn picture = [base, &blocks](Random& r, const World& w) {
+    const uint32_t at = w.screen.address + 0x700;
+    blocks = {};
+    if (r.Below(4) != 0) {
+      blocks.record = memory::crt::OperatorNew(base, 12).value_or(0);
+    }
+    if (r.Below(2) == 0) {
+      blocks.xpr = memory::crt::OperatorNew(base, 24).value_or(0);
+      for (uint32_t i = 0; blocks.xpr != 0 && i < 24; i += 4) {
+        guest::StoreU32(base, blocks.xpr + i, 0);
+      }
+    }
+    guest::StoreU32(base, at + 8, blocks.record);
+    guest::StoreU32(base, at + 12, blocks.xpr);
+  };
+  const auto which = [&blocks](uint64_t r3) -> uint32_t {
+    if (blocks.record != 0 && r3 == blocks.record) {
+      return 1;
+    }
+    if (blocks.xpr != 0 && r3 == blocks.xpr) {
+      return 2;
+    }
+    return 0;
+  };
+  Spec free_spec{{}, [&which](PPCContext& t, Outputs& out) {
+                   const uint32_t kind = which(t.r3.u64);
+                   out.Word(kind);
+                   if (kind != 0) {
+                     t.r3.u64 = 0;
+                   }
+                 }};
+  Group(h, w, "Picture::Free (sub_82228438)", 200, picture,
+        [](PPCContext& t, Random&, const World& w) { t.r3.u64 = w.screen.address + 0x700; },
+        __imp__sub_82228438, hooks::LocationScreenPictureFree, free_spec);
+
+  // FreePictures: each list's pictures (pages) and their blocks.
+  std::vector<uint32_t> pictures;
+  const SetupFn lists = [base, &pictures](Random& r, const World& w) {
+    pictures.clear();
+    for (uint32_t list = 0; list < 2; list++) {
+      const uint32_t at = w.screen.address + (list == 0 ? 8 : 276);
+      const uint32_t count = r.Below(5);
+      guest::StoreU32(base, at + 128, count);
+      for (uint32_t i = 0; i < count; i++) {
+        const uint32_t p = memory::AllocPages(16, 4096);
+        pictures.push_back(p);
+        guest::StoreU32(base, at + 4 * i, p);
+        guest::StoreU32(base, p + 0, 1);
+        guest::StoreU32(base, p + 4, r.Below(10));
+        guest::StoreU32(base, p + 8,
+                        r.Below(4) == 0 ? 0 : memory::crt::OperatorNew(base, 12).value_or(0));
+        uint32_t xpr = 0;
+        if (r.Below(2) == 0) {
+          xpr = memory::crt::OperatorNew(base, 24).value_or(0);
+          for (uint32_t k = 0; xpr != 0 && k < 24; k += 4) {
+            guest::StoreU32(base, xpr + k, 0);
+          }
+        }
+        guest::StoreU32(base, p + 12, xpr);
+      }
+    }
+  };
+  Spec lists_spec{{}, [base, &w, &pictures](PPCContext&, Outputs&) {
+                    for (uint32_t list = 0; list < 2; list++) {
+                      const uint32_t at = w.screen.address + (list == 0 ? 8 : 276);
+                      for (uint32_t i = 0; i < 32; i++) {
+                        const uint32_t word = guest::LoadU32(base, at + 4 * i);
+                        for (uint32_t k = 0; k < pictures.size(); k++) {
+                          if (pictures[k] == word) {
+                            guest::StoreU32(base, at + 4 * i, 0xF00D0000u + k);
+                          }
+                        }
+                      }
+                    }
+                  }};
+  Group(h, w, "LocationScreen::FreePictures (sub_82228498)", 200, lists,
+        [](PPCContext& t, Random&, const World& w) { t.r3.u64 = w.screen.address; },
+        __imp__sub_82228498, hooks::LocationScreenFreePictures, lists_spec);
+}
+
 }  // namespace
 
 void LocationScreen(Context& h) {
@@ -616,6 +836,9 @@ void LocationScreen(Context& h) {
   Movies(h, w);
   State(h, w);
   InitStates(h, w);
+  RacePages(h, w);
+  Opponents(h, w);
+  Pictures(h, w);
 }
 
 }  // namespace harness

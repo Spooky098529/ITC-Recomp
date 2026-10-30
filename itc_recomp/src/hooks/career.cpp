@@ -6,6 +6,7 @@
 
 #include "base/flags.h"
 #include "career/career.h"
+#include "hooks/app_start_up.h"
 #include "hooks/guest_call.h"
 #include "hooks/race_event.h"
 
@@ -201,6 +202,9 @@ void CareerNextDay(PPCContext& ctx, uint8_t* base) {
 }
 
 void CareerEventQuery(PPCContext& ctx, uint8_t* base) {
+  if (hooks::StartUpRecorded(ctx, 0x82111638)) {
+    return;
+  }
   ctx.fpscr.disableFlushMode();
   const uint32_t flag = ctx.r4.u32;
   RaceEventGuest guest(ctx, base);

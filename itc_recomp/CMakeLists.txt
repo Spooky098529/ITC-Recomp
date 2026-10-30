@@ -232,6 +232,8 @@ set(ITC_SOURCES
     src/location_screen/movies.cpp
     src/location_screen/pages.cpp
     src/location_screen/init_states.cpp
+    src/location_screen/pictures.cpp
+    src/location_screen/race.cpp
     src/save_interface/save_interface.cpp
     src/save_interface/save_layer.cpp
     src/hooks/file_layer.cpp
