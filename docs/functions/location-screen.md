@@ -1,9 +1,14 @@
-# Known functions: the location screen
+# Known functions: the parking area
 
 A front-end screen of the career (`82227158`-`8222F258`, the lead's
-"front-end menus"): the **location screen**, where the player is at one
-of the six locations (the save data's +6108, 14 to 19; `career.md`,
-`race-event.md`) and picks what to do there. It shows the location's
+"front-end menus"): the **parking area**, the game's other way to start
+a race besides driving on the highway: the player loads into it, it holds
+up to 6 opponent cars, and the player picks one to race (the user,
+2026-10-30). The player is at one of the six locations (the save data's
++6108, 14 to 19; `career.md`, `race-event.md`). The functions keep the
+names `LocationScreen::` given before that (as do the file,
+`--native_location_screen` and `src/location_screen/`; "the screen" below
+is the parking area). It shows the location's
 course scenery (`Scenery::`, `course-scenery.md`) through a camera
 animation, the location's opponents (the race event's group for the
 location, kinds 4 to 9: `RaceEvent::GroupItem`) as cars posed in the
@@ -39,7 +44,7 @@ agent: the state machine's table, the set-up, the loads, the teardown,
 the small helpers and the page and transition tables in full; the pages
 and transitions skimmed (their calls, constants and the page object's
 writes), marked "Not read in detail". The fields are in
-`../known-data.md` (`0x82814E48`-`0x82814E5C`, "location screen",
+`../known-data.md` (`0x82814E48`-`0x82814E5C`, "parking area",
 "screen picture", `0x82636518`, `0x82602EA0`, and the save data's
 location records and unlock list under `0x826C5B58`).
 
