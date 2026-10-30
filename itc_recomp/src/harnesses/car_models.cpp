@@ -1240,6 +1240,13 @@ std::vector<int64_t> Serials(Random& r) {
 
 void DecalRecords(uint8_t* base, uint32_t records, Random& r, bool none);
 
+// The rims' and brakes' register steps (their adapters removed: their only
+// caller, the wheels' set-up, is native): r3 = the wheels (left).
+void NativeWheelsRims(PPCContext& ctx, uint8_t* base) { car_models::WheelsRims(base, ctx.r3.u32); }
+void NativeWheelsBrakes(PPCContext& ctx, uint8_t* base) {
+  car_models::WheelsBrakes(base, ctx.r3.u32);
+}
+
 // The wheels' fields the rims and brakes read: the car's block ([+24] +
 // 32: -3 to 50, now and then any), the wheel numbers (+44, +60: -1 or 0 to
 // 40), traffic (+28 = 3 now and then) with its wheel ([[+3264]]: 0 to 30).
@@ -1359,7 +1366,7 @@ void Loads(Context& h, uint32_t block) {
             t.r3.u64 = block;
           },
           nullptr, c % 2 ? __imp__sub_820D8C50 : __imp__sub_820D8BA8,
-          c % 2 ? hooks::CarModelsWheelsBrakes : hooks::CarModelsWheelsRims,
+          c % 2 ? NativeWheelsBrakes : NativeWheelsRims,
           fmt::format("case {}", c));
     }
     rims.Report();

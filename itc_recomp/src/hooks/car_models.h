@@ -34,12 +34,9 @@ void CarModelsLoadExterior(PPCContext& ctx, uint8_t* base);
 // CarModel::SetVinylTextures sub_820D5F88: r3 = the scene model; r3 the last
 // part model.
 void CarModelsSetVinylTextures(PPCContext& ctx, uint8_t* base);
-// The rims sub_820D8BA8 and brakes sub_820D8C50: r3 = the wheels (left).
 // The wheels' set-up sub_820D9110: r3 = the wheels, r4 = the set-up; r3 the
 // last LoadSlot::LoadShared's (the original where memcpy's copy can't be
 // native).
-void CarModelsWheelsRims(PPCContext& ctx, uint8_t* base);
-void CarModelsWheelsBrakes(PPCContext& ctx, uint8_t* base);
 void CarModelsWheelsSetUp(PPCContext& ctx, uint8_t* base);
 // sub_820C3F50: r3 = the set (left), r4 to r7 the record's words.
 void CarModelsDeferRelease(PPCContext& ctx, uint8_t* base);
