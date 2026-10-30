@@ -176,6 +176,20 @@ void SkeletonApplyAnimation(uint8_t* base, uint32_t skeleton);
 // Skeleton::ApplyAnimation. Whether it reached ApplyAnimation (the adapter
 // leaves flush-to-zero off then, as ApplyAnimation's).
 bool SkeletonResetPose(uint8_t* base, uint32_t skeleton);
+// sub_82599C58 Skeleton::LocalMatrices (models.md): with +176, for each node
+// (NodeCount, asked again after each) whose node record's (+84, 160 bytes)
+// +132 is 4 or below (signed), its 144-byte record's (+136) angles (+16,
+// +20, +24) wrapped into [-pi, pi] and stored back, and its matrix ([+148] +
+// 64i) = the identity with the scale (+32, +36, +40) on the diagonal, turned
+// by RotX, RotY, RotZ by the angles, times [+104] + 64i (the file's), the
+// translation (+0, +4, +8) in row 3; then the [[+80] + 8] bones from [[+80]
+// + 12]: those whose node record has +132 bit 0x80 get the identity turned
+// by their 144-byte record's (+140) angles, times the file's matrix, and its
+// translation. The frame's words (the original's 320 bytes below `stack`:
+// the angles, their truncated turns, the identity at +144) as it leaves them;
+// the rotations' turns at its - 80. Whether it did float work (the adapter
+// leaves flush-to-zero off then, as the original).
+bool SkeletonLocalMatrices(uint8_t* base, uint32_t skeleton, uint32_t stack);
 
 // --- Beside it in the library. ---
 

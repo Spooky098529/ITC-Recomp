@@ -53,7 +53,7 @@ ITC_FLAG_BOOL(native_models, true, "ITC",
               "Model::Release sub_82594970 and Model::~Model sub_82594F58, their members' "
               "plain C++ called directly, and the car part model's sub_820CE928 and "
               "sub_820CE990 over them; the part model's sub_820CE9C8 and Model::SetVinylTextures sub_820CE9F8; Skeleton::ResetPose "
-              "sub_82599AF0 (in src/model_animation/); Model::MaterialCount sub_82594AD8, Model::Material "
+              "sub_82599AF0 and Skeleton::LocalMatrices sub_82599C58 (in src/model_animation/); Model::MaterialCount sub_82594AD8, Model::Material "
               "sub_82594B20, ShaderFile::Parse sub_822A8568, VertexShader::CopyHeader sub_822A9FD8 and "
               "PixelShader::CopyHeader sub_822A9EA8 (in src/shader_objects/), "
               "TextureHeader::Relocate sub_8235A990 (with sub_822A5B68; no adapter: only "
@@ -291,6 +291,21 @@ extern "C" REX_FUNC(sub_82599AF0) {
   }
   if (model_animation::SkeletonResetPose(base, ctx.r3.u32)) {
     ctx.fpscr.disableFlushMode();
+  }
+}
+
+// Skeleton::LocalMatrices: r3 = the skeleton (r3 left: no caller reads
+// it). Flush-to-zero off when it did float work, as the original leaves it.
+extern "C" REX_FUNC(sub_82599C58) {
+  REX_FUNC_PROLOGUE();
+  if (!ITC_FLAG(native_models)) {
+    __imp__sub_82599C58(ctx, base);
+    return;
+  }
+  const uint32_t mode = ctx.fpscr.csr;
+  ctx.fpscr.disableFlushMode();
+  if (!model_animation::SkeletonLocalMatrices(base, ctx.r3.u32, ctx.r1.u32)) {
+    ctx.fpscr.restoreGuestBits(mode);  // no float work: the mode as it came
   }
 }
 

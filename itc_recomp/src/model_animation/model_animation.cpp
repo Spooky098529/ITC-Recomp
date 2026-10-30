@@ -943,6 +943,171 @@ bool SkeletonResetPose(uint8_t* base, uint32_t skeleton) {
   return true;
 }
 
+namespace {
+
+// sub_82599C58's identity (vupkd3d128's (3.0, 3.0, 0.0, 1.0) shuffled into
+// four rows by vpermwi128: the 1.0 at row i's word i), stored aligned at
+// `at` & ~15 as stvx does.
+void StoreIdentity(uint8_t* base, uint32_t at) {
+  const uint32_t aligned = at & ~0xFu;
+  const uint32_t one = std::bit_cast<uint32_t>(1.0f);
+  for (uint32_t i = 0; i < 16; i++) {
+    Store(base, aligned + 4 * i, i % 5 == 0 ? one : 0);
+  }
+}
+
+// std: a doubleword, big-endian.
+void StoreDoubleword(uint8_t* base, uint32_t at, uint64_t value) {
+  Store(base, at, uint32_t(value >> 32));
+  Store(base, at + 4, uint32_t(value));
+}
+
+// The 64 bytes at `from` to `to`, eight doubleword moves.
+void Copy64(uint8_t* base, uint32_t from, uint32_t to) {
+  for (uint32_t i = 0; i < 8; i++) {
+    const uint32_t hi = Load(base, from + 8 * i);
+    const uint32_t lo = Load(base, from + 8 * i + 4);
+    Store(base, to + 8 * i, hi);
+    Store(base, to + 8 * i + 4, lo);
+  }
+}
+
+// fctiwz: NaN gives INT_MIN, INT_MAX and above INT_MAX, others truncated
+// (INT_MIN below it).
+int32_t Fctiwz(double x) {
+  if (std::isnan(x)) {
+    return INT32_MIN;
+  }
+  if (x >= double(INT32_MAX)) {
+    return INT32_MAX;
+  }
+  if (x <= double(INT32_MIN) - 1.0) {
+    return INT32_MIN;
+  }
+  return int32_t(x);
+}
+
+}  // namespace
+
+bool SkeletonLocalMatrices(uint8_t* base, uint32_t skeleton, uint32_t stack) {
+  ITC_NATIVE_RUNNING("sub_82599C58 Skeleton::LocalMatrices");
+  if (Load(base, skeleton + 176) == 0) {
+    return false;
+  }
+  const uint32_t frame = stack - 320;
+  const uint32_t turn = frame - 80;  // the rotations' own stack (r1 - 80)
+  bool floats = false;
+  uint32_t node = Load(base, skeleton + 136);
+  uint32_t out = Load(base, skeleton + 148);
+  uint32_t file_matrix = Load(base, skeleton + 104);
+  int32_t count = int32_t(SkeletonNodeCount(base, skeleton));
+  if (count > 0) {
+    floats = true;
+    const double two_pi = Lfs(base, 0x82001FA8);
+    const double inverse = Lfs(base, 0x82001FA4);
+    uint32_t record = 0;
+    for (int32_t i = 0; i < count; i++) {
+      if (int32_t(Load(base, Load(base, skeleton + 84) + record + 132)) <= 4) {
+        // The angles into [-pi, pi]: pi with each one's sign (its stored
+        // bits ORed into 0x40490FDB), added, times 1 / (2 pi), truncated,
+        // that many 2 pi taken off.
+        // (An lfs then stfs of one word keeps its bits: CopyWord.)
+        const double a = Lfs(base, node + 16);
+        CopyWord(base, node + 16, frame + 80);
+        const double b = Lfs(base, node + 20);
+        CopyWord(base, node + 20, frame + 92);
+        const double c = Lfs(base, node + 24);
+        CopyWord(base, node + 24, frame + 96);
+        const auto signed_pi = [&](uint32_t at) {
+          return (Load(base, at) & 0x80000000u) | 0x40490FDBu;
+        };
+        Store(base, frame + 100, signed_pi(frame + 80));
+        Store(base, frame + 104, signed_pi(frame + 92));
+        Store(base, frame + 108, signed_pi(frame + 96));
+        double f9 = Fadds(Lfs(base, frame + 108), c);
+        StoreIdentity(base, frame + 144);
+        f9 = Fmuls(f9, inverse);
+        const double f11 = Fmuls(Fadds(Lfs(base, frame + 100), a), inverse);
+        const double f10 = Fmuls(Fadds(Lfs(base, frame + 104), b), inverse);
+        Store(base, frame + 80, uint32_t(Fctiwz(f11)));
+        const int32_t kb = Fctiwz(f10);
+        const int32_t kc = Fctiwz(f9);
+        const int64_t ka = int32_t(Load(base, frame + 80));
+        Store(base, frame + 84, uint32_t(kb));
+        StoreDoubleword(base, frame + 112, uint64_t(ka));
+        const int64_t kb64 = int32_t(Load(base, frame + 84));
+        Store(base, frame + 88, uint32_t(kc));
+        StoreDoubleword(base, frame + 120, uint64_t(kb64));
+        const double a2 = Fnmsubs(double(float(double(ka))), two_pi, a);
+        Stfs(base, node + 16, a2);
+        const int64_t kc64 = int32_t(Load(base, frame + 88));
+        StoreDoubleword(base, frame + 128, uint64_t(kc64));
+        const double b2 = Fnmsubs(double(float(double(kb64))), two_pi, b);
+        Stfs(base, node + 20, b2);
+        const double c2 = Fnmsubs(double(float(double(kc64))), two_pi, c);
+        Stfs(base, node + 24, c2);
+        Copy64(base, frame + 144, out);
+        const uint32_t sx = Load(base, node + 32);
+        const uint32_t sy = Load(base, node + 36);
+        const uint32_t sz = Load(base, node + 40);
+        Stfs(base, frame + 96, a2);
+        Store(base, out + 0, sx);
+        Store(base, out + 20, sy);
+        Store(base, out + 40, sz);
+        matrix_math::RotateX(base, out, out, frame + 96, turn);
+        Stfs(base, frame + 96, b2);
+        matrix_math::RotateY(base, out, out, frame + 96, turn);
+        Stfs(base, frame + 96, c2);
+        matrix_math::RotateZ(base, out, out, frame + 96, turn);
+        Multiply(base, out, out, file_matrix, 0x82599E70);
+        const uint32_t x = Load(base, node + 0);
+        const uint32_t y = Load(base, node + 4);
+        const uint32_t z = Load(base, node + 8);
+        Store(base, out + 48, x);
+        Store(base, out + 52, y);
+        Store(base, out + 56, z);
+      }
+      record += 160;
+      node += 144;
+      out += 64;
+      file_matrix += 64;
+      count = int32_t(SkeletonNodeCount(base, skeleton));
+    }
+  }
+  // The bones (+132 bit 0x80) from the file's first bone ([+80] +12), [+80]
+  // + 8 of them: their 144-byte records from +140, no wrap or scale.
+  const uint32_t file = Load(base, skeleton + 80);
+  const uint32_t first = Load(base, file + 12) << 6;
+  out = Load(base, skeleton + 148) + first;
+  file_matrix = first + Load(base, skeleton + 104);
+  uint32_t bone = Load(base, skeleton + 140);
+  for (int32_t k = 0; k < int32_t(Load(base, Load(base, skeleton + 80) + 8)); k++) {
+    const uint32_t index = Load(base, Load(base, skeleton + 80) + 12) + uint32_t(k);
+    if ((Load(base, index * 160 + Load(base, skeleton + 84) + 132) & 0x80) != 0) {
+      floats = true;
+      StoreIdentity(base, frame + 144);
+      Copy64(base, frame + 144, out);
+      CopyWord(base, bone + 16, frame + 108);
+      matrix_math::RotateX(base, out, out, frame + 108, turn);
+      CopyWord(base, bone + 20, frame + 108);
+      matrix_math::RotateY(base, out, out, frame + 108, turn);
+      CopyWord(base, bone + 24, frame + 108);
+      matrix_math::RotateZ(base, out, out, frame + 108, turn);
+      Multiply(base, out, out, file_matrix, 0x82599FC8);
+      const uint32_t x = Load(base, bone + 0);
+      const uint32_t y = Load(base, bone + 4);
+      const uint32_t z = Load(base, bone + 8);
+      Store(base, out + 48, x);
+      Store(base, out + 52, y);
+      Store(base, out + 56, z);
+    }
+    bone += 144;
+    out += 64;
+    file_matrix += 64;
+  }
+  return floats;
+}
+
 void SkeletonApplyAnimation(uint8_t* base, uint32_t skeleton) {
   ITC_NATIVE_RUNNING("sub_825998B8 Skeleton::ApplyAnimation");
   uint32_t cursor = Load(base, skeleton + 128);
