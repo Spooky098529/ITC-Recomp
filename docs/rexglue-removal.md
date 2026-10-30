@@ -149,7 +149,13 @@ goes in `src/` as overrides), American English.
   (`xaudio-objects.md`, 78 of 109) native, with QueryPerformanceCounter
   from the host clock and the rest of XACT's waves (31 of 31) by the
   user's calls; it stopped at a validation (two destructors with no
-  harness line) (ours 2,999). The
+  harness line) (ours 2,999); its twenty-third run (branch
+  `b7-loop-29-10-26-2`, 2026-10-29 to 30, not yet merged) began with
+  that stop as a cleanup lead (not counted) and made the rest of
+  XAudio's objects native (110 of 110: the destructors' harness, the
+  resampler, the reverb), then stopped at its validation: an
+  intermittent difference in the car sounds' harness
+  (`CarSound::Part840Update`, 1 case of 80) (ours 3,031). The
   runs' rows wait for the user's review (`docs/loops/review.md`). See
   "B7's loop runs" under B7, and `docs/loops/b7-progress.md`. Guest
   allocation is no longer a block (`docs/native-memory.md`); what the
@@ -2642,6 +2648,7 @@ B7. **The game logic inside**: everything else, subsystem by subsystem,
 | 2026-10-29 | XACT's tracks and events (the tracks, track instances and events over the sound bank's records: their constructors, prepare, volume, pause, stop, cancel, destructors and RPC set-up; the play-wave event and the wave's slot forwarders; `XACTSound::ScheduleEvent`; XACT's lock the game's, taken as the original does) | `xact-tracks.md` (with a row in `xact.md`) | 55 of 55 in play (three migrations; QueryPerformanceCounter from the host clock and `XACTGetTimeMs` under it, the user's call) | `--native_xact_tracks` |
 | 2026-10-29 | XAudio's engine and mixer (the engine's and factory's making, the processors' set-up, the mastering voice and its render driver, the stages, their callbacks and commit, the allocator; the voice lists' spin lock taken as the original does) | `xaudio-engine.md` | 47 of 47 in play (two migrations; the threads, events and semaphore through the kernel's imports as the original, the user's call) | `--native_xaudio_engine` |
 | 2026-10-29 | XAudio's factory objects (the class tables, the codecs' packet queue and the PCM and XMA codecs' slots the voices call, the output matrices' set and mix, the volume meter, the render driver's set-up, the reverb's small parts; the XMA hardware path left in `audio.md`) | `xaudio-objects.md` (with 4 rows in `xaudio.md`) | 78 of 109 in play (one migration, stopped at its validation: two destructors with no harness line; the resampler and the reverb's core ready, not taken) | `--native_xaudio_objects` |
+| 2026-10-30 | Cleanup lead, no mapping (not counted): the rest of XAudio's factory objects (the XMA codec's destructors' harness, `SetLevels` copying as words, the resampler and its kernels, `PcmCodec::Process`, the reverb's stages, core, set-up, construction and pass) | `xaudio-objects.md` | 110 of 110 in play (three migrations; stopped at the last validation: the car sounds' harness differed once) | `--native_xaudio_objects` |
 
     The first run (2026-10-22, branch `b7-loop-test`): every harness at 0 differing, attract races at 20-21 s with no errors,
     and a race the user drove looked right. Ours went from 162 to 335 (work
@@ -3999,3 +4006,20 @@ overridden 110, Native 28, Dropped 23, never called 70, live 218.
 Imports: 186 called, 58 with a live caller. B7 (`b7_status.py`): ours
 2,999, work left 3,318 (Wrapped 104, with a row 532, no row yet 2,682),
 from 3,398 (from 3,660 at the run's start).
+
+**2026-10-30, the rest of XAudio's factory objects (branch
+`b7-loop-29-10-26-2`):** the twenty-third run took the last run's stop
+as a cleanup lead: the XMA codec's destructors given harness cases of
+their own, then the resampler and its kernels, `PcmCodec::Process` and
+the reverb (its stages, `ReverbCore::Process`, `Apply`, `Init`, the
+construction and the pass) made native in three migrations
+(`xaudio-objects.md` 110 of 110; `src/xaudio/resampler.cpp`,
+`reverb_stages.cpp`, `reverb_core.cpp`, `reverb_setup.cpp`; the float
+helpers in `ppc_float.h`), 41 adapters removed. It stopped at the third
+validation: `CarSound::Part840Update`'s harness (`car-sounds.md`)
+differed on 1 of 80 cases (two pointer words), after 0 in the run's
+three earlier validations. The boundary: 449 functions (916 pairs):
+overridden 108, Native 33, Dropped 23, never called 70, live 215.
+Imports: 186 called, 58 with a live caller. B7 (`b7_status.py`): ours
+3,031, work left 3,287 (Wrapped 104, with a row 501, no row yet 2,682),
+from 3,318.

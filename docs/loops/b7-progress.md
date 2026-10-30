@@ -26,9 +26,17 @@ file's history. What's left to see in a drive, from every run:
   Validated (`itc_2547`): 16 of 16 harness lines, all ran in play.
   Migration 3 checked (1328597..0522cc6: `ReverbCore::Apply`, `Init`,
   the reverb's construction and pass, 19 adapters removed; 110 of 110
-  ours, nothing ready left). Validation agent running.
+  ours, nothing ready left). Its validation (`itc_2559`): 21 of 21
+  harness lines, all ran in play; a car sounds harness differed:
+  stopped (below).
 
 ## Done
+
+- XAudio's factory objects' rest (cleanup lead, not counted):
+  `xaudio-objects.md` 110 of 110 in play, three migrations, 41 adapters
+  removed; `--native_xaudio_objects`; 3ea5812..0522cc6. Validated
+  (`itc_2529`, `itc_2530`; `itc_2547`; `itc_2559`): 23, 16 and 21
+  harness lines; two to drive.
 
 ## Rows to review
 
@@ -59,5 +67,21 @@ file's history. What's left to see in a drive, from every run:
 - After the cleanup's migration 3 (`itc_2558`: race 38 s, 0 errors,
   xaudio_objects 0 differing): ours 3031, work left 3287 (wrapped 104,
   known 501, unknown 2682).
+- After its validation (`itc_2559`: race 7 s, 0 errors;
+  `CarSound::Part840Update` 1 of 80 differing): ours 3031, work left
+  3287.
 
 ## Stopped
+
+2026-10-30, at the cleanup's third validation (before any counted
+subsystem; 0 of 3 taken): a harness outside the expected groups
+differed ("When to halt"): `CarSound::Part840Update` (`sub_8210ECF0`,
+`car-sounds.md`, the last run but one's subsystem), 1 of 80 cases
+(`itc_2559`: case 33, entry 26, two pointer words at bytes 52-59,
+`0x00A4A674` recompiled against `0x00A4A668` native, 12 bytes apart).
+The same harness was 0 of 80 in `itc_2529`, `itc_2547` and `itc_2548`
+on this run, so it looks intermittent (a pointer into a live list the
+audio thread changes, perhaps, as the spin lock's depth was in
+`XAudioMatrix::MixRamp`'s harness); not investigated. XAudio's
+objects' harnesses all 0. Next in `leads.md`: the app's start-up
+(`sub_82106548`). `check_function_statuses.py`: 0 errors.

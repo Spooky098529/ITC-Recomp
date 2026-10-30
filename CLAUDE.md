@@ -365,6 +365,12 @@ GetTickCount), and XAudio's own threads, events and semaphore are used
 through the kernel's imports as the original does. The rest waits on
 the resampler and the reverb's core (ready, not taken) and XAudio's
 shut-down.
+Its twenty-third run (`b7-loop-29-10-26-2`, 2026-10-29 to 30, not yet
+merged; summary `docs/loops/b7-loop-2026-10-29-2222.md`) took that stop
+as a cleanup lead and made the rest of XAudio's objects native (110 of
+110: the resampler, `PcmCodec::Process`, the reverb; ours 2,999 ->
+3,031), then stopped at its validation: `CarSound::Part840Update`'s
+harness differed once (1 of 80, two pointer words), intermittent so far.
 Harness runs use `attract_race.sh 40` (the user's call,
 2026-10-23); a race short only because the harnesses took longer is
 no halt. B7 loop migration agents run only their subsystem's harnesses
