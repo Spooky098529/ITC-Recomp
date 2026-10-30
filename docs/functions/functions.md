@@ -396,6 +396,12 @@ Rows not yet moved stay in the table below. So far:
   vertex declaration, `CreateVertexDeclaration`, and the voice engine's
   set-up parts that had no rows (its talkers, processing objects and
   XAudio voices; the rest of voice stays in `system-services.md`) (B7).
+- [`data-load.md`](data-load.md): the game's data load at boot and its
+  unload: the objects kept for the session (the race data's, the input
+  recordings' and the kept replay's makers, the 5,232-byte records'
+  constructors), the save defaults' bit sets, the loading screen's and
+  another set of UI movies, and two static copies of the replay (B7;
+  the loads it calls stay in their files).
 
 These files hold functions only. What used to follow the table here moved
 out on 2026-10-20: how frame interpolation works, its options and what
