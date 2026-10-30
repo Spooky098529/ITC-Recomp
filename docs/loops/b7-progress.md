@@ -8,86 +8,17 @@ file's history. What's left to see in a drive, from every run:
 
 ## Now
 
-- Run started 2026-10-30 01:06 on `b7-loop-29-10-26-2` (the user's
-  call, 2026-10-30: this run stays on the last run's branch), from
-  92ffb30; summary `b7-loop-2026-10-30-0106.md`.
-- Limit for this run: 3 subsystems; 3 taken.
-- First, a cleanup lead without mapping (not counted), the last run's
-  stop: `CarSound::Part840Update`'s harness (`sub_8210ECF0`,
-  `car-sounds.md`), 1 of 80 cases differing once in `itc_2559`
-  (intermittent). The precedent: this run's and the 2026-10-24 21:33
-  run's first leads were the previous stop's harness. Migration
-  checked (d5cfd5c: the mixer swaps XAudio's two source-voice stage
-  lists between a case's versions; the real-voice cases compare them
-  by role, as the XAudio harnesses' `LockWords`; 0 of 80 over 5 runs,
-  `itc_2569`-`itc_2573`; nothing else ready in `car-sounds.md`).
-  Validated (`itc_2574`, `itc_2575`): 56 of 56 harness lines, every
-  harness 0 outside the expected groups; `CarSounds::StopAll` already
-  on the drive list.
-- Subsystem 1 of 3: the app's start-up (`sub_82106548`, the top of
-  `leads.md`). Mapped (d5647db, `app-start-up.md`, 30 rows, 18 ready
-  groups); the map's stop answered: the voice engine (XHV, `Voice::Init` `sub_8257B7A8` under the network manager's `sub_8214F6E8`): not made; its users seen in play (`sub_8214FA78` every frame, the UI's calls through the engine's +52, the release `sub_8214F690`) skipped natively with what they'd read with no headset (no talkers, no data), Status Dropped (the user's call, 2026-10-30, "Map Xbox features, don't port"). Migration 1
-  checked (c9aed90..6292712: the voice skip, the start-up's leaves, the
-  network manager's set-up, the scene target, `Billboards::Init`, 5
-  adapters removed; `--native_app_start_up`; replay ok, `itc_2577`).
-  Validated (`itc_2594`): 15 of 15 harness lines, all ran in play.
-  Migration 2 checked (427db89..a63717c: `App::StartUp` with the text
-  and font set-up, `WordVector::Fill`, `XAudioInitialize`, 6 adapters
-  removed). Its stop (`App::App` waits on the movie wrapper's critical
-  section, `MovieWrapper::MovieWrapper` `sub_82593DC0` +4 through
-  `InitializeCriticalSection`) is covered by a precedent ("Precedent
-  first": a kernel critical section a subsystem's code locks becomes a
-  host `std::mutex` for that lock, taken by every user, as
-  `Edram::Alloc` and the memory blocks' lock; the generic wrapper stays
-  recompiled for the others): migration 3 takes it so. Validated
-  (`itc_2616`): 15 of 15 harness lines, all ran in play; a print added
-  (b95341e). Migration 3 checked (6e8e860..e4104fe: the movie
-  wrapper's lock a host recursive mutex as the memory blocks' lock,
-  `Movie::Movie`, `AudioManager::Create`, the second camera class,
-  `App::App`, `App::Create` and its getters; nothing ready left).
-  Validated (`itc_2629`, `itc_2630`): 17 of 17 harness lines; three to
-  drive. Subsystem 1 finished.
-- Subsystem 2 of 3: the game's data load at boot (`sub_82105868`,
-  `sub_82106618`, the top of `leads.md`; 10 ready groups under it).
-  Mapped (562dc47, `data-load.md`, 25 rows, 10 ready groups, no
-  stop). Migration 1 checked (b810489..f4f201f: the defaults, records
-  and session makers, the shared loads (data tables, car parameters,
-  shaders, text, font, strings, a UI movie), `BootData::Load` and
-  `CreateObjects`, the loading screen's movies; `--native_data_load`;
-  frame dumps the same). Validated (`itc_2642`): 26 of 26 harness
-  lines, all ran in play. Migration 2 checked (4f4a23f..8689dc1: the
-  replay's static set-ups, `Record5232`'s adapter removed; nothing
-  ready left). Validated (`itc_2646`): 3 of 3 harness lines, all ran
-  in play. Subsystem 2 finished.
-- Subsystem 3 of 3: the player's items over the save data
-  (`sub_82111780` and the rest of its lead line, the top of
-  `leads.md`). Mapped (d91b1bb, `career.md`, 76 rows, 21 ready
-  groups, no stop; blocked outside by the race event, the next lead).
-  Migration 1 checked (fd83bca..a3d7ec3: every ready group, 49 of
-  53 in play ours, 7 adapters removed; `--native_career`; nothing ready
-  left, the rest waits on the race event and the car objects' makers).
-  Validated (`itc_2659`, `itc_2660`): 47 of 47 harness lines; 15 ran
-  in the replay, 32 to drive. Subsystem 3 finished: the run's limit.
+- Run started 2026-10-30 11:39 on `b7-loop-30-10-26`, from e320bad;
+  summary `b7-loop-2026-10-30-1139.md`.
+- Limit for this run: 3 subsystems; 1 taken.
+- Subsystem 1 of 3: the race event (`sub_82140340`...`sub_82144E58`,
+  the top of `leads.md`). Mapping agent running.
 
 ## Done
 
-- The career (subsystem 3): `career.md`, 49 of 53 in play, one
-  migration; `--native_career`; fd83bca..a3d7ec3. Validated
-  (`itc_2659`, `itc_2660`).
-- The data load at boot (subsystem 2): `data-load.md`, every function
-  seen in play, two migrations; `--native_data_load`;
-  b810489..8689dc1. Validated (`itc_2642`, `itc_2646`).
-- The app's start-up (subsystem 1): `app-start-up.md`, every ready
-  group, three migrations, the voice engine Dropped (the user's call);
-  `--native_app_start_up`; c9aed90..e4104fe. Validated (`itc_2594`,
-  `itc_2616`, `itc_2629`, `itc_2630`).
-- The last stop's `CarSound::Part840Update` harness (cleanup lead, not
-  counted): d5cfd5c, a harness fix only (the stage lists compared by
-  role); validated (`itc_2574`, `itc_2575`).
-
 ## Rows to review
 
-`review.md`, "Run 2026-10-30 01:06".
+`review.md`, "Run 2026-10-30 11:39".
 
 ## Expected to differ
 
@@ -99,53 +30,5 @@ file's history. What's left to see in a drive, from every run:
 
 ## Totals
 
-- At the start: ours 3031, work left 3287 (wrapped 104, known 501,
-  unknown 2682).
-- After the cleanup's migration (`itc_2573`: race 38 s, 0 errors,
-  car_sounds 0 differing): ours 3031, work left 3287.
-- After its validation (`itc_2574`: race 7 s, 0 errors, every harness
-  0 differing but the expected groups): ours 3031, work left 3287.
-- After the start-up's migration 1 (`itc_2593`: race 38 s, 0 errors,
-  touched harnesses 0 differing): ours 3064, work left 3256 (wrapped
-  104, known 495, unknown 2657).
-- After its validation (`itc_2594`: race 7 s, 0 errors, every harness
-  0 differing but the expected groups): ours 3064, work left 3256.
-- After the start-up's migration 2 (`itc_2615`: race 38 s, 0 errors,
-  touched harnesses 0 differing): ours 3073, work left 3247 (wrapped
-  104, known 486, unknown 2657).
-- After its validation (`itc_2616`: race 7 s, 0 errors, every harness
-  0 differing but the expected groups): ours 3073, work left 3247.
-- After the start-up's migration 3 (`itc_2628`: race 38 s, 0 errors,
-  touched harnesses 0 differing): ours 3090, work left 3230 (wrapped
-  104, known 479, unknown 2647).
-- After its validation (`itc_2629`: race 7 s, 0 errors, every harness
-  0 differing but the expected groups): ours 3090, work left 3230.
-- After the data load's map: ours 3090, work left 3230 (wrapped 104,
-  known 498, unknown 2628).
-- After the data load's migration 1 (`itc_2639`: race 38 s, 0 errors,
-  touched harnesses 0 differing): ours 3116, work left 3204 (wrapped
-  104, known 472, unknown 2628).
-- After its validation (`itc_2642`: race 7 s, 0 errors, every harness
-  0 differing but the expected groups): ours 3116, work left 3204.
-- After the data load's validation (`itc_2646`: race 7 s, 0 errors,
-  every harness 0 differing but the expected groups): ours 3118, work
-  left 3202 (wrapped 104, known 470, unknown 2628).
-- After the career's migration 1 (`itc_2658`: race 38 s, 0 errors,
-  career 0 differing): ours 3167, work left 3165 (wrapped 104, known
-  474, unknown 2587).
-- After the career's validation (`itc_2659`: race 7 s, 0 errors, every
-  harness 0 differing but the expected groups): ours 3167, work left
-  3165 (wrapped 104, known 474, unknown 2587).
-
-## Stopped
-
-2026-10-30, at the run's limit (3 subsystems: the app's start-up, the
-data load at boot, the career), after the career's validation. Every
-harness 0 differing outside the expected groups; nothing uncommitted;
-`check_function_statuses.py`: 0 errors. Left for the user: the run's
-section in `review.md` (the voice engine Dropped by the user's call;
-the movie wrapper's lock a host recursive mutex by the lead's reading
-of the precedents), the drive list in `to-drive.md` (35 functions,
-mostly the career's results side), and the merge. Next in `leads.md`:
-the race event (`sub_82140340`...`sub_82144E58`), which blocks the
-career's rest.
+- At the start: ours 3167, work left 3165 (wrapped 104, known 474,
+  unknown 2587).

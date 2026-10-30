@@ -11,6 +11,10 @@ functions to check in a drive in the progress file.
 When the user has reviewed a run's section, its heading gets
 "(reviewed <date>)"; the section stays for the record.
 
+## Run 2026-10-30 11:39 (`b7-loop-30-10-26`)
+
+(Filled as reports come in.)
+
 ## Run 2026-10-30 01:06 (`b7-loop-29-10-26-2`)
 
 - Car sounds, cleanup migration (d5cfd5c, `car-sounds.md`, the last
