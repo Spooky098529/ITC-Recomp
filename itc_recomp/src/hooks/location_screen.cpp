@@ -50,8 +50,10 @@ ITC_FLAG_BOOL(native_location_screen, true, "ITC",
               "Transition9 sub_8222DEE0) "
               "natively instead of through the translated code (the same writes; checked by "
               "--run_harnesses=location_screen). PictureA, PictureB, Picture::Free, KindText, "
-              "SetCursor, ShowUnlockEntry, ShowCard, ListNode and ShowListEntry have no "
-              "adapters: only native callers reach them, and the flag switches those");
+              "SetCursor, ShowUnlockEntry, ShowCard, ListNode, ShowListEntry, HidePictures, "
+              "SetCarColor, ShowArrows, ShowOpponentSpecs, ResetMovie, ShowOpponentPictures and "
+              "ShowOpponentInfo have no adapters: only native callers reach them, and the flag "
+              "switches those");
 
 namespace hooks {
 
@@ -472,9 +474,6 @@ LOCATION_SCREEN_ADAPTER(82227618, LocationScreenNextUnlockEntry)
 LOCATION_SCREEN_ADAPTER(82227708, LocationScreenOpponentHasCard)
 LOCATION_SCREEN_ADAPTER(822271F8, LocationScreenNextResultText)
 LOCATION_SCREEN_ADAPTER(8222A060, LocationScreenShowPictures)
-LOCATION_SCREEN_ADAPTER(8222A150, LocationScreenHidePictures)
-LOCATION_SCREEN_ADAPTER(8222AC18, LocationScreenSetCarColor)
-LOCATION_SCREEN_ADAPTER(8222C0C8, LocationScreenShowArrows)
 LOCATION_SCREEN_ADAPTER(822291A8, LocationScreenRunCardMovie)
 LOCATION_SCREEN_ADAPTER(8222AD50, LocationScreenTransition1)
 LOCATION_SCREEN_ADAPTER(8222BE60, LocationScreenTransition18)
@@ -487,13 +486,15 @@ LOCATION_SCREEN_ADAPTER(8222F258, LocationScreenInitStates)
 // those; their steps above are the harness's): PictureA sub_82229108 and
 // PictureB sub_82229158, Picture::Free sub_82228438, KindText sub_82227690,
 // SetCursor sub_8222BFE8, ShowUnlockEntry sub_8222A978, ShowCard
-// sub_8222BBD0, ListNode sub_8222C058, ShowListEntry sub_8222B048.
+// sub_8222BBD0, ListNode sub_8222C058, ShowListEntry sub_8222B048,
+// HidePictures sub_8222A150, SetCarColor sub_8222AC18, ShowArrows
+// sub_8222C0C8, ShowOpponentSpecs sub_8222C188, ResetMovie sub_8222CD60,
+// ShowOpponentPictures sub_8222B200, ShowOpponentInfo sub_8222B438.
 LOCATION_SCREEN_ADAPTER(822280D8, LocationScreenPage9)
 LOCATION_SCREEN_ADAPTER(82228138, LocationScreenPage11)
 LOCATION_SCREEN_ADAPTER(82227430, LocationScreenNextOpponentText)
 LOCATION_SCREEN_ADAPTER(8222C270, LocationScreenLoadPicture)
 LOCATION_SCREEN_ADAPTER(82228498, LocationScreenFreePictures)
-LOCATION_SCREEN_ADAPTER(8222CD60, LocationScreenResetMovie)
 LOCATION_SCREEN_ADAPTER(8222CFF0, LocationScreenTransition29)
 LOCATION_SCREEN_ADAPTER(8222D1A8, LocationScreenTransition25)
 LOCATION_SCREEN_ADAPTER(8222D610, LocationScreenTransition2)
@@ -502,9 +503,7 @@ LOCATION_SCREEN_ADAPTER(8222E8D8, LocationScreenTransition16)
 LOCATION_SCREEN_ADAPTER(8222A470, LocationScreenTransition23)
 LOCATION_SCREEN_ADAPTER(8222A718, LocationScreenTransition33)
 LOCATION_SCREEN_ADAPTER(8222AE00, LocationScreenTransition7)
-LOCATION_SCREEN_ADAPTER(8222B200, LocationScreenShowOpponentPictures)
 LOCATION_SCREEN_ADAPTER(82227E20, LocationScreenUpdateView)
-LOCATION_SCREEN_ADAPTER(8222B438, LocationScreenShowOpponentInfo)
 LOCATION_SCREEN_ADAPTER(8222B8A8, LocationScreenTransition12)
 LOCATION_SCREEN_ADAPTER(8222EAD0, LocationScreenTransition17)
 LOCATION_SCREEN_ADAPTER(8222D828, LocationScreenTransition4)
@@ -514,5 +513,4 @@ LOCATION_SCREEN_ADAPTER(8222D2E8, LocationScreenTransition24)
 LOCATION_SCREEN_ADAPTER(8222D108, LocationScreenTransition34)
 LOCATION_SCREEN_ADAPTER(8222F0B0, LocationScreenStart)
 LOCATION_SCREEN_ADAPTER(82228588, LocationScreenPoseCar)
-LOCATION_SCREEN_ADAPTER(8222C188, LocationScreenShowOpponentSpecs)
 LOCATION_SCREEN_ADAPTER(8222DEE0, LocationScreenTransition9)
