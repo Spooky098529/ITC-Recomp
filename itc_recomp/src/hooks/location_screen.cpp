@@ -18,7 +18,8 @@ ITC_FLAG_BOOL(native_location_screen, true, "ITC",
               "SetCursor sub_8222BFE8, ListNode sub_8222C058, ShowArrows sub_8222C0C8, "
               "RunCardMovie sub_822291A8, Transition1 sub_8222AD50, Transition18 sub_8222BE60; "
               "UiMovie::Run through its override; ScreenMachine::Reenter sub_822895E0, Reset "
-              "sub_822279A8 with ResetView sub_82227818, ApplyQueuedPage sub_8222C9B0, "
+              "sub_822279A8 with ResetView sub_82227818 (no adapter: only Reset's plain C++ calls it), "
+              "ApplyQueuedPage sub_8222C9B0, "
               "UpdatePage sub_8222EC08, its page's handler through the guest context) "
               "natively instead of through the translated code (the same writes; checked by "
               "--run_harnesses=location_screen)");
@@ -240,6 +241,5 @@ LOCATION_SCREEN_ADAPTER(8222AD50, LocationScreenTransition1)
 LOCATION_SCREEN_ADAPTER(8222BE60, LocationScreenTransition18)
 LOCATION_SCREEN_ADAPTER(822895E0, LocationScreenReenter)
 LOCATION_SCREEN_ADAPTER(822279A8, LocationScreenReset)
-LOCATION_SCREEN_ADAPTER(82227818, LocationScreenResetView)
 LOCATION_SCREEN_ADAPTER(8222C9B0, LocationScreenApplyQueuedPage)
 LOCATION_SCREEN_ADAPTER(8222EC08, LocationScreenUpdatePage)
