@@ -20,7 +20,8 @@ ITC_FLAG_BOOL(native_camera_modes, true, "ITC",
               "sub_821524D8 and ToView3IfCourse sub_82153160; Viewports::ResetRoll sub_821524F0, "
               "Camera::ZoomFromFov sub_82152548, Quat::Rotate sub_821525F8, Matrix::FromQuat "
               "sub_82152698, Matrix::FromFloats sub_82090000; the lists' List40::Link "
-              "sub_82153228, List40::Insert sub_821544E0, List16::Insert20 sub_82154458, "
+              "sub_82153228 (no adapter: only List40::Insert's plain C++ calls it), "
+              "List40::Insert sub_821544E0, List16::Insert20 sub_82154458, "
               "Insert32 sub_82154378, Insert608 sub_821543E8 and Copy32 sub_82154300; "
               "CameraAnims::Clear sub_82150078 and Find sub_82150300; ColorFilter::SetStyle "
               "sub_82152108 and FadeCue::Step sub_82152290; with --native_heap the camera "
@@ -163,6 +164,8 @@ void CameraModesStep82090000(PPCContext& ctx, uint8_t* base) {
 
 // --- The lists: r3 = the list (left, or as memcpy leaves it) ---
 
+// List40::Link (no adapter: only List40::Insert's plain C++ calls it): r3 =
+// the list, r4 = the position; the step kept for the harness.
 void CameraModesStep82153228(PPCContext& ctx, uint8_t* base) {
   cm::List40Link(base, ctx.r3.u32, int16_t(ctx.r4.u16));
 }
@@ -383,7 +386,6 @@ ITC_CAMERA_MODES(82152548)
 ITC_CAMERA_MODES(821525F8)
 ITC_CAMERA_MODES(82152698)
 ITC_CAMERA_MODES(82090000)
-ITC_CAMERA_MODES(82153228)
 ITC_CAMERA_MODES(821544E0)
 ITC_CAMERA_MODES(82154458)
 ITC_CAMERA_MODES(82154378)
