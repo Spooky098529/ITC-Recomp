@@ -221,6 +221,7 @@ set(ITC_SOURCES
     src/hooks/camera_modes.cpp
     src/camera_modes/camera_modes.cpp
     src/camera_modes/anims.cpp
+    src/camera_modes/views.cpp
     src/save_interface/save_interface.cpp
     src/save_interface/save_layer.cpp
     src/hooks/file_layer.cpp
@@ -563,7 +564,7 @@ set_source_files_properties(src/c_runtime/math.cpp src/ui_movies/keys.cpp
     src/career/garage.cpp
     src/race_event/conditions.cpp
     src/race_event/event.cpp
-    src/camera_modes/camera_modes.cpp src/camera_modes/anims.cpp PROPERTIES
+    src/camera_modes/camera_modes.cpp src/camera_modes/anims.cpp src/camera_modes/views.cpp PROPERTIES
     COMPILE_OPTIONS "-ffp-model=strict;-ffp-contract=off"
     SKIP_PRECOMPILE_HEADERS ON)
 

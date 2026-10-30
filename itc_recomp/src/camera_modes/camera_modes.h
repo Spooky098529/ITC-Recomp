@@ -17,6 +17,7 @@
 #include <optional>
 
 #include "archive/archive.h"
+#include "c_runtime/exit.h"
 
 namespace camera_modes {
 
@@ -270,5 +271,113 @@ void RivalLogoConstruct(uint8_t* base, uint32_t entry);
 // r3: the entry when the bit is off, IsLoaded's answer when it waits, else
 // PlayNamed's.
 uint32_t RivalLogoPlay(uint8_t* base, uint32_t entry, uint32_t key_slot);
+
+// --- The views (src/camera_modes/views.cpp) ---
+
+// sub_82153290 CameraTarget::Track: a camera's target tracker (camera + 32)
+// following `vehicle` (nothing when 0): the last values kept (+16 = +0, +48
+// = +32, +128 = the turn +64 (Matrix::Copy, noted for interpolation as the
+// original's call at 0x821532E4), +208 = +192); +0 to +8 the body's
+// position (its matrix's fourth row), +12 1.0; +32 to +40 the mean of the
+// vehicle's +1216 and +1584 (Vec4::Copy), +44 1.0; +192 the body's
+// rotation (+80, a quaternion) and +64 its turn (Matrix::FromQuat over the
+// identity); +224 the vehicle's track position (TrackPosition::Copy of
+// Vehicle::Identity). `frame` is the original's r1 after its stwu (256
+// bytes, 16-byte aligned: FromQuat's scratch below it).
+void TargetTrack(uint8_t* base, uint32_t tracker, uint32_t vehicle, uint32_t frame);
+
+// sub_821529B0 Viewport::Offset and sub_82152788 Viewport::PullBack: the
+// amount clamped to 0-1; the view's axes from the target less the eye and
+// up (0, 1, 0) (the vector unit's cross products and normalizes, through
+// the stack below `sp`, the caller's r1, as the originals'); the offset
+// (+0, +4, +8) times the amount along right, up and forward added to the
+// target (+1616, Offset) or the eye (+1600, PullBack).
+void ViewportOffset(uint8_t* base, uint32_t viewport, double amount, uint32_t offset,
+                    uint32_t sp);
+void ViewportPullBack(uint8_t* base, uint32_t viewport, double amount, uint32_t offset,
+                      uint32_t sp);
+// sub_82152BD8 Camera::ShakeRandom: the step 0x826D81C0 made once (guard bit
+// 1 of 0x826D81C4, from 0x8200939C); the amount clamped to 0-1; the offset
+// (rand() % 100 x the step, rand() % 100 x the step, 0, 1) at `frame` + 96
+// (the original's r1 after its stwu, 160 bytes); Viewport::Offset.
+void ShakeRandom(uint8_t* base, uint32_t viewport, double amount, uint32_t frame);
+// sub_82152CD8 Camera::Shake: (Vehicle::GetSpeedKmh(+16) - the float at
+// 0x82001FB8) x the float at 0x8200222C, ShakeRandom on the viewport (+20).
+// `frame` is the original's r1 after its stwu (96 bytes).
+void Shake(uint8_t* base, uint32_t camera, uint32_t frame);
+
+// sub_82152E78 IntroCamera::StepShot: a 20-byte shot (+0 the viewport, +4
+// the vehicle, +8 its frame count, +16 its phase): the viewport's eye
+// (+1600) and target (+1616) = its +1680 and +1696 turned by the body's
+// matrix (Vec4::Transform), its up (+1632) = +1712, +1664 = +1744; the
+// phase set to 3 once the count reaches 29 (phase 0); then 0 at phase 3,
+// else 1 (the count up by one unless [0x826A50D4] is set). `frame` is the
+// original's r1 after its stwu (272 bytes).
+uint32_t IntroStepShot(uint8_t* base, uint32_t shot, uint32_t frame);
+// sub_82154108 IntroCamera::MakeShot: shot +0 = the viewport, +4 the
+// vehicle, +8, +16 0; the car's spec (sub_820C4550 of its +5712) sizes the
+// viewport's +1680 (an orbit: sin and cos of the double at 0x820093A8) and
+// +1696; +1712 = (0, 1, 0, 1) and +1744 = (0x8200295C's, 0x82008290's, 0,
+// 1), statics made once (guard 0x826D81F0, bits 1 and 2, each with an
+// atexit: 0x825DB150, 0x825DB148); shot +12 = the spec's +88 x the float at
+// 0x82002CCC. `frame` is the original's r1 after its stwu (192 bytes).
+void IntroMakeShot(uint8_t* base, uint32_t shot, uint32_t viewport, uint32_t vehicle,
+                   uint32_t frame, const c_runtime::AtexitCall& atexit);
+// Stages::Copy's original (out, stages, stage), where its plain C++
+// refuses.
+using StagesCopyCall = std::function<void(uint32_t, uint32_t, uint32_t)>;
+// sub_82158F70 IntroCamera::IntroCamera: vtable 0x820093C4, the tracker's
+// w words 1.0, +748 to +756 0, +16 the vehicle, +20 the viewport, its shot
+// list (+352) reset; the stage's racers (Stages::Copy) whose record's
+// +3936 has bit 0x2: their vehicles (Race's racer entries by id) gathered at
+// `frame` + 80 (the count at +96), those flagged 0x400 whose item
+// (DataTables::Item(+3960)) is of kind 1 or 3 moved to the front; a shot
+// made for each (MakeShot) and added (List16::Insert20). Returns the
+// camera. `frame` is the original's r1 after its stwu (368 bytes).
+uint32_t IntroConstruct(uint8_t* base, uint32_t camera, uint32_t viewport, uint32_t vehicle,
+                        uint32_t frame, const StagesCopyCall& stages_copy,
+                        const c_runtime::AtexitCall& atexit);
+
+// sub_82152338 CameraDirector::Start: `viewports_init` (Viewports::Init);
+// for both viewports Viewport::Update, CameraPasses::SetNear(0x8200295C's),
+// Viewport::SetZoom(1.0) and entry 0's far plane (+72) = 0x82001FCC's;
+// +9636 = 0, +13348 = 2, +77408 = 0; CameraAnims::Clear.
+void DirectorStart(uint8_t* base, uint32_t director, const std::function<void()>& viewports_init);
+// sub_82153098 CameraDirector::Release: `free_all` (CameraAnims::FreeAll);
+// with the race's kind 1, 2 or 3 the view (+9628, or +9632 in views 4 and
+// 5) into +9624 and, for views 0-2, the save data's camera setting
+// (SaveData::Of(0) + 0x1F85C + 24: 2, 1, 0); `release_viewports`
+// (Viewports::Release).
+void DirectorRelease(uint8_t* base, uint32_t director, const std::function<void()>& free_all,
+                     const std::function<void()>& release_viewports);
+
+// CutsceneShot::Init's guest calls: the copies List16::Copy32 and
+// Insert32 refuse (memcpy), and CameraAnims::Load of the asset id.
+struct CutsceneCalls {
+  GuestCopy copy32;
+  GuestCopy insert32;
+  std::function<void(uint32_t id)> load;
+};
+// sub_82156B68 CutsceneShot::Init: a 608-byte shot from a script entry: +0
+// its kind, +4 the asset id 22824 + kind (a table of 16 on the stack at
+// `frame` + 80, the original's r1 after its stwu, 192 bytes), +8 its
+// vehicle word; the cue list (+12) reset, +600 = 0, +604 = 1; the entry's
+// cues (+8, count +80) copied in through the stack (Copy32, Insert32); the
+// animation loaded (`calls.load`).
+void CutsceneInit(uint8_t* base, uint32_t shot, uint32_t entry, uint32_t frame,
+                  const CutsceneCalls& calls);
+// sub_82155800 CutsceneShot::Step: the animation (+4) at the time (+600)
+// evaluated at `frame` + 144 (CameraAnims::Evaluate; `camera_original`
+// runs EvalCamera's original where its native form can't): when not loaded
+// +604 = 4; else +604's bits 0x25 off and 0x8 on, the target and eye
+// (z flipped by the float at 0x82001BE0, x and z swapped) turned by the
+// car's body matrix into `out` + 32 and + 16, the roll (degrees) x pi/180
+// into +64, the zoom into +68; the cues stepped (FadeCue::Step); the time
+// on unless +604 has 0x10; +604 = 32 once the time reaches the duration
+// (CameraAnims::Duration). Returns +604; `*f1` = the last f1 (Duration's,
+// or EvalCamera's when not loaded). `frame` is the original's r1 after its
+// stwu (304 bytes).
+uint32_t CutsceneStep(uint8_t* base, uint32_t shot, uint32_t out, uint32_t frame,
+                      const std::function<void(uint32_t object)>& camera_original, double* f1);
 
 }  // namespace camera_modes

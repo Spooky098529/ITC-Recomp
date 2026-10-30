@@ -10,11 +10,14 @@
 // harness::Outputs' float entries; the rest exactly.
 
 #include "harness.h"
+#include "exit_table.h"
 
 #include "base/flags.h"
 #include "base/log.h"
 #include "camera_modes/camera_modes.h"
+#include "c_runtime/exit.h"
 #include "hooks/archive.h"
+#include "hooks/c_runtime.h"
 #include "hooks/camera_modes.h"
 #include "hooks/guest_call.h"
 #include "hooks/heap.h"
@@ -28,6 +31,7 @@
 #include <bit>
 #include <cmath>
 #include <limits>
+#include <mutex>
 #include <string>
 #include <utility>
 #include <vector>
@@ -1366,6 +1370,533 @@ void RivalLogo(Context& h, Random& r) {
   }
 }
 
+// --- The views (batch 3): the target tracker, the shake and the viewports'
+// moves, the intro camera, the director's start and release, the cutscene's
+// shots ---
+
+constexpr uint32_t kSeed = 0x82638188;        // rand's seed
+constexpr uint32_t kShakeStatics = 0x826D81C0;  // the shake's step and its guard
+constexpr uint32_t kShotStatics = 0x826D81D0;   // MakeShot's two vectors and their guard
+constexpr uint32_t kShotStaticsBytes = 0x24;
+
+uint32_t ViewFloat(Random& r) {
+  return r.Below(8) ? OrdinaryFloat(r, 200.0) : RandomFloat(r);
+}
+void RandomFloats(uint8_t* base, uint32_t address, uint32_t words, Random& r) {
+  for (uint32_t i = 0; i < words; i++) {
+    guest::StoreU32(base, address + 4 * i, ViewFloat(r));
+  }
+}
+
+// The three without adapters: their plain C++ as their callers call it.
+void NativeShakeRandom(PPCContext& t, uint8_t* base) {
+  t.fpscr.disableFlushMode();
+  cm::ShakeRandom(base, t.r3.u32, t.f1.f64, t.r1.u32 - 160);
+}
+void NativeOffset(PPCContext& t, uint8_t* base) {
+  t.fpscr.disableFlushMode();
+  cm::ViewportOffset(base, t.r3.u32, t.f1.f64, t.r5.u32, t.r1.u32);
+}
+void NativeMakeShot(PPCContext& t, uint8_t* base) {
+  t.fpscr.disableFlushMode();
+  hooks::GuestAtexit atexit{t, base};
+  cm::IntroMakeShot(base, t.r3.u32, t.r4.u32, t.r5.u32, t.r1.u32 - 192, atexit.Call());
+}
+
+void Track(Context& h, Random& r) {
+  Results results("CameraTarget::Track (sub_82153290)");
+  Block tracker(512), vehicle(6272), body(512);
+  for (int c = 0; c < 200; c++) {
+    RandomFloats(h.base, tracker.address, 56, r);
+    RandomBytes(h.base, tracker.address + 224, 96, r);
+    RandomFloats(h.base, vehicle.address + 1216, 4, r);
+    RandomFloats(h.base, vehicle.address + 1584, 4, r);
+    RandomBytes(h.base, vehicle.address + 5232, 96, r);
+    guest::StoreU32(h.base, vehicle.address + 336, body.address);
+    RandomFloats(h.base, body.address + 80, 4, r);
+    RandomFloats(h.base, body.address + 288, 16, r);
+    const uint32_t the_vehicle = c % 20 == 0 ? 0 : vehicle.address;
+    const auto inputs = Read(h.base, tracker.address, 320);
+    Outputs out[2];
+    for (int v = 0; v < 2; v++) {
+      Write(h.base, tracker.address, inputs.data(), 320);
+      PPCContext t = AlignedContext(h);
+      t.r3.u64 = tracker.address;
+      t.r4.u64 = the_vehicle;
+      (v == 0 ? Original<__imp__sub_82153290> : hooks::CameraModesStep82153290)(t, h.base);
+      out[v].Floats(h.base, tracker.address, 56);
+      out[v].Bytes(Read(h.base, tracker.address + 224, 96));
+      out[v].Word(t.r3.u32);
+    }
+    results.Check(out[0], out[1], fmt::format("case {} vehicle {:X}", c, the_vehicle));
+  }
+  results.Report();
+}
+
+void Shakes(Context& h, Random& r) {
+  enum Kind { kShake, kShakeRandom, kOffset, kPullBack };
+  const struct {
+    const char* name;
+    GuestFunction recompiled, native;
+    Kind kind;
+  } kFunctions[] = {
+      {"Camera::Shake (sub_82152CD8)", Original<__imp__sub_82152CD8>,
+       hooks::CameraModesStep82152CD8, kShake},
+      {"Camera::ShakeRandom (sub_82152BD8)", Original<__imp__sub_82152BD8>, NativeShakeRandom,
+       kShakeRandom},
+      {"Viewport::Offset (sub_821529B0)", Original<__imp__sub_821529B0>, NativeOffset, kOffset},
+      {"Viewport::PullBack (sub_82152788)", Original<__imp__sub_82152788>,
+       hooks::CameraModesStep82152788, kPullBack},
+  };
+  Block viewport(kViewportBytes), camera(64), vehicle(64);
+  Saved seed(h.base, kSeed, 4);
+  Saved statics(h.base, kShakeStatics, 8);
+  for (const auto& f : kFunctions) {
+    Results results(f.name);
+    for (int c = 0; c < 200; c++) {
+      RandomFloats(h.base, viewport.address + 1600, 16, r);
+      if (c % 10 == 1) {  // the eye on the target: a zero-length direction
+        for (uint32_t i = 0; i < 4; i++) {
+          guest::StoreU32(h.base, viewport.address + 1616 + 4 * i,
+                          guest::LoadU32(h.base, viewport.address + 1600 + 4 * i));
+        }
+      }
+      const auto inputs = Read(h.base, viewport.address + 1600, 64);
+      const uint32_t offset[4] = {ViewFloat(r), ViewFloat(r), ViewFloat(r), ViewFloat(r)};
+      const double amount = r.Below(10) ? (double(r.Below(2001)) - 500.0) / 1000.0
+                                        : double(std::bit_cast<float>(RandomFloat(r)));
+      const uint32_t speed = r.Below(10) ? OrdinaryFloat(r, 300.0) : RandomFloat(r);
+      const uint32_t seed_value = uint32_t(r.Next());
+      const uint32_t step = ViewFloat(r);
+      const uint32_t guard = uint32_t(r.Next()) & ~(r.Below(2) ? 1u : 0u);
+      const bool aligned = r.Below(4) != 0;
+      Outputs out[2];
+      for (int v = 0; v < 2; v++) {
+        Fill(h.base, h.data, kScratchBytes);
+        Write(h.base, viewport.address + 1600, inputs.data(), 64);
+        for (uint32_t i = 0; i < 4; i++) {
+          guest::StoreU32(h.base, h.data + 0x100 + 4 * i, offset[i]);
+        }
+        guest::StoreU32(h.base, kSeed, seed_value);
+        guest::StoreU32(h.base, kShakeStatics, step);
+        guest::StoreU32(h.base, kShakeStatics + 4, guard);
+        guest::StoreU32(h.base, vehicle.address + 48, speed);
+        guest::StoreU32(h.base, camera.address + 16, vehicle.address);
+        guest::StoreU32(h.base, camera.address + 20, viewport.address);
+        PPCContext t = aligned ? AlignedContext(h) : CallContext(h);
+        if (!aligned) {
+          t.r1.u64 = (t.r1.u64 & ~0xFull) - 8;
+        }
+        // The stack below: an unaligned frame's vector loads read words the
+        // function didn't write.
+        FillStack(h.base, t.r1.u32, uint64_t(c) + 1);
+        t.r3.u64 = f.kind == kShake ? camera.address : viewport.address;
+        t.f1.f64 = amount;
+        t.r5.u64 = h.data + 0x100;
+        (v == 0 ? f.recompiled : f.native)(t, h.base);
+        out[v].Floats(h.base, viewport.address + 1600, 16);
+        out[v].Word(guest::LoadU32(h.base, kSeed));
+        out[v].Bytes(Read(h.base, kShakeStatics, 8));
+        if (f.kind == kShake || f.kind == kPullBack) {
+          out[v].Word(t.r3.u32);
+        }
+        seed.Restore();
+        statics.Restore();
+      }
+      results.Check(out[0], out[1], fmt::format("case {} amount {} aligned {}", c, amount,
+                                                aligned));
+    }
+    results.Report();
+  }
+}
+
+void IntroShots(Context& h, Random& r) {
+  {
+    Results results("IntroCamera::StepShot (sub_82152E78)");
+    constexpr uint32_t kPaused = 0x826A50D4;
+    Saved paused(h.base, kPaused, 4);
+    Block viewport(kViewportBytes), vehicle(512), body(512);
+    for (int c = 0; c < 200; c++) {
+      RandomFloats(h.base, viewport.address + 1600, 40, r);
+      const auto inputs = Read(h.base, viewport.address + 1600, 160);
+      guest::StoreU32(h.base, vehicle.address + 336, body.address);
+      RandomFloats(h.base, body.address + 288, 16, r);
+      const uint32_t shot[5] = {viewport.address, vehicle.address, r.Below(40),
+                                uint32_t(r.Next()), r.Below(3) ? 0 : r.Below(5)};
+      const uint32_t paused_value = r.Below(4) == 0 ? 1 : 0;
+      Outputs out[2];
+      for (int v = 0; v < 2; v++) {
+        Fill(h.base, h.data, kScratchBytes);
+        Write(h.base, viewport.address + 1600, inputs.data(), 160);
+        for (uint32_t i = 0; i < 5; i++) {
+          guest::StoreU32(h.base, h.data + 4 * i, shot[i]);
+        }
+        guest::StoreU32(h.base, kPaused, paused_value);
+        PPCContext t = CallContext(h);
+        t.r3.u64 = h.data;
+        (v == 0 ? Original<__imp__sub_82152E78> : hooks::CameraModesStep82152E78)(t, h.base);
+        out[v].Bytes(Read(h.base, h.data, 20));
+        out[v].Floats(h.base, viewport.address + 1600, 40);
+        out[v].Word(t.r3.u32);
+        paused.Restore();
+      }
+      results.Check(out[0], out[1], fmt::format("case {} count {} phase {}", c, shot[2],
+                                                shot[4]));
+    }
+    results.Report();
+  }
+  if (!hooks::NativeAtexit()) {
+    ITC_LOG_WARN("harness: camera_modes: native atexit off: IntroCamera's cases skipped");
+    return;
+  }
+  std::lock_guard<std::recursive_mutex> lock(c_runtime::ExitMutex());
+  Saved statics(h.base, kShotStatics, kShotStaticsBytes);
+  // A car's spec: the vehicle's +5712 (an object), its +1888.
+  auto spec_words = [&](uint8_t* base, uint32_t object) {
+    const uint32_t spec = object + 1888;
+    for (uint32_t at : {76u, 80u, 88u}) {
+      const uint32_t w = r.Below(10) ? r.Below(6000) : uint32_t(r.Next());
+      guest::StoreU32(base, spec + at, w);
+    }
+  };
+  {
+    Results results("IntroCamera::MakeShot (sub_82154108)");
+    Block viewport(kViewportBytes), vehicle(6272), object(2048);
+    for (int c = 0; c < 60; c++) {
+      guest::StoreU32(h.base, vehicle.address + 5712, object.address);
+      spec_words(h.base, object.address);
+      RandomFloats(h.base, viewport.address + 1680, 20, r);
+      const auto inputs = Read(h.base, viewport.address + 1680, 80);
+      std::vector<uint8_t> stat = Read(h.base, kShotStatics, kShotStaticsBytes);
+      if (c < 8) {
+        RandomBytes(h.base, kShotStatics, kShotStaticsBytes, r);
+        stat = Read(h.base, kShotStatics, kShotStaticsBytes);
+        stat[0x23] &= uint8_t(~(1u + uint32_t(c % 3 == 0 ? 2 : 0) * uint32_t(c % 2)));
+        if (c == 0) {
+          stat[0x23] &= ~3u;
+        }
+      }
+      const uint32_t word = uint32_t(r.Next());
+      Outputs out[2];
+      for (int v = 0; v < 2; v++) {
+        Fill(h.base, h.data, kScratchBytes);
+        Write(h.base, viewport.address + 1680, inputs.data(), 80);
+        Write(h.base, kShotStatics, stat.data(), kShotStaticsBytes);
+        const uint32_t mark = exit_table::Mark(h.base);
+        PPCContext t = AlignedContext(h);
+        t.r3.u64 = h.data;
+        t.r4.u64 = viewport.address;
+        t.r5.u64 = vehicle.address;
+        (void)word;
+        (v == 0 ? Original<__imp__sub_82154108> : NativeMakeShot)(t, h.base);
+        out[v].Bytes(Read(h.base, h.data, 12));
+        out[v].Floats(h.base, h.data + 12, 1);
+        out[v].Bytes(Read(h.base, h.data + 16, 4));
+        out[v].Floats(h.base, viewport.address + 1680, 20);
+        out[v].Bytes(Read(h.base, kShotStatics, kShotStaticsBytes));
+        exit_table::Take(h.base, mark, out[v]);
+        statics.Restore();
+      }
+      results.Check(out[0], out[1], fmt::format("case {} guard {:X}", c, stat[0x23]));
+    }
+    results.Report();
+  }
+  {
+    Results results("IntroCamera::IntroCamera (sub_82158F70)");
+    constexpr uint32_t kManager = 0x826D82F4;
+    constexpr uint32_t kVehicleArray = 0x826C2E34;
+    constexpr uint32_t kTables = 0x826C5CA0;
+    Saved saved_race(h.base, cm::kRaceData, 4);
+    Saved saved_manager(h.base, kManager, 4);
+    Saved saved_vehicles(h.base, kVehicleArray, 4);
+    Saved saved_tables(h.base, kTables, 4);
+    Block race(kRaceBytes), manager(2400), entries(6 * 32), vehicles(7 * 6272),
+        objects(7 * 2048), tables(32), items(4 * 3008), camera(768), viewport(kViewportBytes);
+    Fill(h.base, race.address, race.bytes, 0);
+    for (int c = 0; c < 120; c++) {
+      // The racers: ids 0-5, their records' flags and items; the race's
+      // racer entries; the stage's list (up to four).
+      for (uint32_t id = 0; id < 6; id++) {
+        const uint32_t record = race.address + (id + 1) * kRecordBytes;
+        guest::StoreU32(h.base, record, r.Below(3) ? (uint32_t(r.Next()) | 2) : 0);
+        guest::StoreU32(h.base, record + 24, r.Below(3) ? r.Below(4) : 0xFFFFFFFFu);
+      }
+      // Every racer has its entry (one without reads vehicle 0's +5712, as
+      // the original does: never in play).
+      const uint32_t racers = 6;
+      guest::StoreU32(h.base, manager.address + 2364, racers);
+      const std::vector<uint32_t> ids = Permutation(r, 6);
+      for (uint32_t n = 0; n < 6; n++) {
+        const uint32_t e = entries.address + 32 * n;
+        guest::StoreU32(h.base, manager.address + 2308 + 4 * n, e);
+        guest::StoreU32(h.base, e + 0, r.Below(2) ? 0x400 : uint32_t(r.Next()) & ~0x400u);
+        guest::StoreU32(h.base, e + 20, r.Below(7));
+        guest::StoreU32(h.base, e + 24, ids[n]);
+      }
+      const uint32_t stages = race.address + 0x59620;
+      const uint32_t stage = r.Below(3);
+      guest::StoreU32(h.base, stages + 804, stage);
+      const uint32_t at = stages + 80 * stage;
+      const uint32_t count = r.Below(5);
+      guest::StoreU32(h.base, at + 76, count);
+      for (uint32_t s = 0; s < 4; s++) {
+        guest::StoreU32(h.base, at + 44 + 8 * s, r.Below(6));
+      }
+      for (uint32_t k = 0; k < 7; k++) {
+        guest::StoreU32(h.base, vehicles.address + 6272 * k + 5712, objects.address + 2048 * k);
+        spec_words(h.base, objects.address + 2048 * k);
+      }
+      guest::StoreU32(h.base, tables.address + 16, items.address);
+      for (uint32_t k = 0; k < 4; k++) {
+        guest::StoreU16(h.base, items.address + 3008 * k + 88, uint16_t(r.Below(5)));
+      }
+      RandomFloats(h.base, viewport.address + 1680, 20, r);
+      const auto inputs = Read(h.base, viewport.address + 1680, 80);
+      Outputs out[2];
+      for (int v = 0; v < 2; v++) {
+        Fill(h.base, h.data, kScratchBytes);
+        Fill(h.base, camera.address, camera.bytes);
+        Write(h.base, viewport.address + 1680, inputs.data(), 80);
+        guest::StoreU32(h.base, cm::kRaceData, race.address);
+        guest::StoreU32(h.base, kManager, manager.address);
+        guest::StoreU32(h.base, kVehicleArray, vehicles.address);
+        guest::StoreU32(h.base, kTables, tables.address);
+        const uint32_t mark = exit_table::Mark(h.base);
+        PPCContext t = AlignedContext(h);
+        t.r3.u64 = camera.address;
+        t.r4.u64 = viewport.address;
+        t.r5.u64 = vehicles.address + 6272;
+        (v == 0 ? Original<__imp__sub_82158F70> : hooks::CameraModesStep82158F70)(t, h.base);
+        out[v].Bytes(Read(h.base, camera.address, 760));
+        out[v].Floats(h.base, viewport.address + 1680, 20);
+        out[v].Bytes(Read(h.base, kShotStatics, kShotStaticsBytes));
+        exit_table::Take(h.base, mark, out[v]);
+        out[v].Word(t.r3.u32);
+        saved_race.Restore();
+        saved_manager.Restore();
+        saved_vehicles.Restore();
+        saved_tables.Restore();
+        statics.Restore();
+      }
+      results.Check(out[0], out[1], fmt::format("case {}: stage {} count {} racers {}", c, stage,
+                                                count, racers));
+    }
+    results.Report();
+  }
+}
+
+void DirectorStartRelease(Context& h, Random& r) {
+  {
+    Results results("CameraDirector::Start (sub_82152338)");
+    if (!hooks::NativeHeapActive() || !hooks::NativeAtexit()) {
+      ITC_LOG_WARN("harness: camera_modes: --native_heap or native atexit off: "
+                   "CameraDirector::Start's cases skipped");
+    } else {
+      std::lock_guard<std::recursive_mutex> lock(c_runtime::ExitMutex());
+      constexpr uint32_t kNear = 0x826BAC00 + 384;
+      Saved saved_viewports(h.base, cm::kViewports, 4);
+      Saved saved_near(h.base, kNear, 4);
+      Saved saved_count(h.base, cm::kAnimCount, 4);
+      // Viewport::Init's three vectors and their guard (0x826C2D20).
+      Saved saved_vectors(h.base, 0x826C2CF0, 0x34);
+      Block director(kDirectorBytes);
+      for (int c = 0; c < 8; c++) {
+        const uint32_t words[3] = {uint32_t(r.Next()), uint32_t(r.Next()), uint32_t(r.Next())};
+        Outputs out[2];
+        for (int v = 0; v < 2; v++) {
+          guest::StoreU32(h.base, director.address + cm::kFollowed, words[0]);
+          guest::StoreU32(h.base, director.address + 13348, words[1]);
+          guest::StoreU32(h.base, director.address + cm::kFollowedInput, words[2]);
+          guest::StoreU32(h.base, cm::kAnimCount, 5);
+          const uint32_t mark = exit_table::Mark(h.base);
+          PPCContext t = CallContext(h);
+          t.r3.u64 = director.address;
+          (v == 0 ? Original<__imp__sub_82152338> : hooks::CameraModesStep82152338)(t, h.base);
+          const uint32_t block = guest::LoadU32(h.base, cm::kViewports);
+          const uint32_t first = guest::LoadU32(h.base, block);
+          const uint32_t second = guest::LoadU32(h.base, block + 4);
+          out[v].Word(guest::LoadU32(h.base, director.address + cm::kFollowed));
+          out[v].Word(guest::LoadU32(h.base, director.address + 13348));
+          out[v].Word(guest::LoadU32(h.base, director.address + cm::kFollowedInput));
+          out[v].Word(guest::LoadU32(h.base, block + 8));
+          out[v].Bytes(Read(h.base, first, kViewportBytes));
+          out[v].Bytes(Read(h.base, second, kViewportBytes));
+          out[v].Word(guest::LoadU32(h.base, kNear));
+          out[v].Word(guest::LoadU32(h.base, cm::kAnimCount));
+          exit_table::Take(h.base, mark, out[v]);
+          memory::FreePages(first);
+          memory::FreePages(second);
+          memory::FreePages(block);
+          saved_viewports.Restore();
+          saved_near.Restore();
+          saved_count.Restore();
+          saved_vectors.Restore();
+        }
+        results.Check(out[0], out[1], fmt::format("case {}", c));
+      }
+    }
+    results.Report();
+  }
+  {
+    Results results("CameraDirector::Release (sub_82153098)");
+    if (!hooks::NativeHeapActive()) {
+      ITC_LOG_WARN("harness: camera_modes: --native_heap off: CameraDirector::Release's cases "
+                   "skipped");
+    } else {
+      constexpr uint32_t kSaveData = 0x826C5B58;
+      Saved saved_viewports(h.base, cm::kViewports, 4);
+      Saved saved_save(h.base, kSaveData, 4);
+      Saved saved_race(h.base, cm::kRaceData, 4);
+      Saved saved_count(h.base, cm::kAnimCount, 4);
+      Block director(kDirectorBytes), save(0x1F900), race(kRaceBytes);
+      for (int c = 0; c < 100; c++) {
+        const uint32_t view = r.Below(7), kept = r.Below(7), saved_view = uint32_t(r.Next());
+        const uint32_t setting = uint32_t(r.Next());
+        const uint32_t kind = r.Below(6);
+        Outputs out[2];
+        for (int v = 0; v < 2; v++) {
+          guest::StoreU32(h.base, director.address + cm::kView, view);
+          guest::StoreU32(h.base, director.address + cm::kViewKept, kept);
+          guest::StoreU32(h.base, director.address + 9624, saved_view);
+          guest::StoreU32(h.base, save.address + 0x1F85C + 24, setting);
+          guest::StoreU32(h.base, race.address + 0xA3AF0, kind);
+          guest::StoreU32(h.base, kSaveData, save.address);
+          guest::StoreU32(h.base, cm::kRaceData, race.address);
+          guest::StoreU32(h.base, cm::kAnimCount, 0);
+          const uint32_t block = memory::AllocPages(12, 4096);
+          guest::StoreU32(h.base, block + 0, memory::AllocPages(kViewportBytes, 4096));
+          guest::StoreU32(h.base, block + 4, memory::AllocPages(kViewportBytes, 4096));
+          guest::StoreU32(h.base, block + 8, 0);
+          guest::StoreU32(h.base, cm::kViewports, block);
+          PPCContext t = CallContext(h);
+          t.r3.u64 = director.address;
+          (v == 0 ? Original<__imp__sub_82153098> : hooks::CameraModesStep82153098)(t, h.base);
+          out[v].Word(guest::LoadU32(h.base, director.address + 9624));
+          out[v].Word(guest::LoadU32(h.base, save.address + 0x1F85C + 24));
+          out[v].Word(guest::LoadU32(h.base, cm::kViewports));
+          out[v].Word(memory::IsPages(block) ? 1 : 0);
+          out[v].Word(t.r3.u32);
+          saved_viewports.Restore();
+          saved_save.Restore();
+          saved_race.Restore();
+          saved_count.Restore();
+        }
+        results.Check(out[0], out[1], fmt::format("case {}: view {} kept {} kind {}", c, view,
+                                                  kept, kind));
+      }
+    }
+    results.Report();
+  }
+}
+
+void Cutscenes(Context& h, Random& r) {
+  if (hooks::NativeHeapActive() && hooks::NativeArchiveQueue()) {
+    Results results("CutsceneShot::Init (sub_82156B68)");
+    Block shot(640), entry(640);
+    for (int c = 0; c < 100; c++) {
+      RandomBytes(h.base, entry.address, entry.bytes, r);
+      const uint32_t kind = r.Below(10) ? r.Below(16) : r.Below(20);
+      guest::StoreU32(h.base, entry.address, kind);
+      RandomList(h.base, entry.address + 8, 16, r.Below(17), r);
+      const auto inputs = Read(h.base, entry.address, entry.bytes);
+      std::vector<int64_t> serials;
+      for (int i = 0; i < 4; i++) {
+        serials.push_back(r.Below(5) == 0 ? -1 : int64_t(r.Below(0x7FFFFFFF)));
+      }
+      Outputs out[2];
+      for (int v = 0; v < 2; v++) {
+        Fill(h.base, h.data, kScratchBytes);
+        Fill(h.base, shot.address, shot.bytes);
+        Write(h.base, entry.address, inputs.data(), entry.bytes);
+        ArchiveLoads loads(serials);
+        PPCContext t = CallContext(h);
+        t.r3.u64 = shot.address;
+        t.r4.u64 = entry.address;
+        (v == 0 ? Original<__imp__sub_82156B68> : hooks::CameraModesStep82156B68)(t, h.base);
+        out[v].Bytes(Read(h.base, shot.address, 608));
+        const std::vector<uint32_t>& calls = loads.calls();
+        out[v].Word(uint32_t(calls.size()));
+        for (size_t i = 0; i + 6 <= calls.size(); i += 6) {
+          out[v].Word(calls[i + 0]);
+          out[v].Word(calls[i + 2]);
+          out[v].Word(guest::LoadU32(h.base, calls[i + 3]));
+          out[v].Word(calls[i + 4]);
+          out[v].Word(calls[i + 5]);
+          FreeIfPages(calls[i + 1]);
+          FreeIfPages(calls[i + 3]);
+        }
+        out[v].Word(t.r3.u32);
+        out[v].Word(uint32_t(t.r3.u64 >> 32));
+      }
+      results.Check(out[0], out[1], fmt::format("case {} kind {}", c, kind));
+    }
+    results.Report();
+  } else {
+    ITC_LOG_WARN("harness: camera_modes: --native_heap or the archive's queue off: "
+                 "CutsceneShot::Init's cases skipped");
+  }
+  {
+    Results results("CutsceneShot::Step (sub_82155800)");
+    constexpr uint32_t kFades = 0x826A50A0;
+    constexpr uint32_t kFadesBytes = 0x60;
+    Saved saved_fades(h.base, kFades, kFadesBytes);
+    Saved saved_table(h.base, cm::kAnims, kTableBytes);
+    AnimWorld world(h.base);
+    Block shot(640), vehicle(512), body(512), out_block(128);
+    for (int c = 0; c < 200; c++) {
+      world.Build(r);
+      RandomBytes(h.base, shot.address, shot.bytes, r);
+      guest::StoreU32(h.base, shot.address + 4, 22824 + r.Below(world.entries + 2));
+      guest::StoreU32(h.base, shot.address + 8, vehicle.address);
+      const uint32_t list = shot.address + 12;
+      RandomList(h.base, list, 16, r.Below(5), r);
+      for (uint32_t s = 0; s < 16; s++) {
+        const uint32_t cue = list + 76 + 32 * s;
+        const int32_t start = int32_t(r.Below(40)) - 5;
+        guest::StoreU32(h.base, cue + 0, uint32_t(start));
+        guest::StoreU32(h.base, cue + 4, uint32_t(start + int32_t(r.Below(40)) - 5));
+        guest::StoreU32(h.base, cue + 8, r.Below(4));
+        guest::StoreU32(h.base, cue + 24, r.Below(3) == 0 ? uint32_t(start) : r.Below(60));
+        guest::StoreU32(h.base, cue + 28, r.Below(4) == 0 ? 1 : 0);
+      }
+      guest::StoreU32(h.base, shot.address + 600, r.Below(4));
+      guest::StoreU32(h.base, shot.address + 604, uint32_t(r.Next()));
+      guest::StoreU32(h.base, vehicle.address + 336, body.address);
+      RandomFloats(h.base, body.address + 288, 16, r);
+      const auto inputs = Read(h.base, shot.address, shot.bytes);
+      Outputs out[2];
+      for (int v = 0; v < 2; v++) {
+        Fill(h.base, h.data, kScratchBytes);
+        Fill(h.base, out_block.address, out_block.bytes);
+        Write(h.base, shot.address, inputs.data(), shot.bytes);
+        PPCContext t = AlignedContext(h);
+        // The stack below: Step's frame words Evaluate doesn't write (no
+        // camera or target object) are read as they are.
+        FillStack(h.base, t.r1.u32, uint64_t(c) + 1);
+        t.r3.u64 = shot.address;
+        t.r4.u64 = out_block.address;
+        t.f1.u64 = 0x4045000000000000ull;
+        (v == 0 ? Original<__imp__sub_82155800> : hooks::CameraModesStep82155800)(t, h.base);
+        out[v].Bytes(Read(h.base, shot.address, 12));
+        out[v].Bytes(Read(h.base, list, 76));
+        for (uint32_t s = 0; s < 16; s++) {
+          out[v].Bytes(Read(h.base, list + 76 + 32 * s, 12));
+          out[v].Bytes(Read(h.base, list + 76 + 32 * s + 24, 8));
+        }
+        out[v].Bytes(Read(h.base, shot.address + 600, 8));
+        out[v].Floats(h.base, out_block.address, 32);
+        out[v].Bytes(Read(h.base, kFades, kFadesBytes));
+        out[v].Double(t.f1.u64);
+        out[v].Word(t.r3.u32);
+        saved_fades.Restore();
+      }
+      results.Check(out[0], out[1], fmt::format("case {} id {}", c,
+                                                guest::LoadU32(h.base, shot.address + 4)));
+    }
+    results.Report();
+  }
+}
+
 }  // namespace
 
 void CameraModes(Context& h) {
@@ -1380,6 +1911,11 @@ void CameraModes(Context& h) {
   AnimEvaluation(h, r);
   Paths(h, r);
   RivalLogo(h, r);
+  Track(h, r);
+  Shakes(h, r);
+  IntroShots(h, r);
+  DirectorStartRelease(h, r);
+  Cutscenes(h, r);
 }
 
 }  // namespace harness
