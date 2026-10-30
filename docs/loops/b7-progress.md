@@ -11,7 +11,7 @@ file's history. What's left to see in a drive, from every run:
 - Run started 2026-10-30 01:06 on `b7-loop-29-10-26-2` (the user's
   call, 2026-10-30: this run stays on the last run's branch), from
   92ffb30; summary `b7-loop-2026-10-30-0106.md`.
-- Limit for this run: 3 subsystems; 1 taken.
+- Limit for this run: 3 subsystems; 2 taken.
 - First, a cleanup lead without mapping (not counted), the last run's
   stop: `CarSound::Part840Update`'s harness (`sub_8210ECF0`,
   `car-sounds.md`), 1 of 80 cases differing once in `itc_2559`
@@ -57,10 +57,17 @@ file's history. What's left to see in a drive, from every run:
   frame dumps the same). Validated (`itc_2642`): 26 of 26 harness
   lines, all ran in play. Migration 2 checked (4f4a23f..8689dc1: the
   replay's static set-ups, `Record5232`'s adapter removed; nothing
-  ready left). Validation agent running.
+  ready left). Validated (`itc_2646`): 3 of 3 harness lines, all ran
+  in play. Subsystem 2 finished.
+- Subsystem 3 of 3: the player's items over the save data
+  (`sub_82111780` and the rest of its lead line, the top of
+  `leads.md`). Mapping agent running.
 
 ## Done
 
+- The data load at boot (subsystem 2): `data-load.md`, every function
+  seen in play, two migrations; `--native_data_load`;
+  b810489..8689dc1. Validated (`itc_2642`, `itc_2646`).
 - The app's start-up (subsystem 1): `app-start-up.md`, every ready
   group, three migrations, the voice engine Dropped (the user's call);
   `--native_app_start_up`; c9aed90..e4104fe. Validated (`itc_2594`,
@@ -111,3 +118,6 @@ file's history. What's left to see in a drive, from every run:
   104, known 472, unknown 2628).
 - After its validation (`itc_2642`: race 7 s, 0 errors, every harness
   0 differing but the expected groups): ours 3116, work left 3204.
+- After the data load's validation (`itc_2646`: race 7 s, 0 errors,
+  every harness 0 differing but the expected groups): ours 3118, work
+  left 3202 (wrapped 104, known 470, unknown 2628).

@@ -2650,6 +2650,7 @@ B7. **The game logic inside**: everything else, subsystem by subsystem,
 | 2026-10-29 | XAudio's factory objects (the class tables, the codecs' packet queue and the PCM and XMA codecs' slots the voices call, the output matrices' set and mix, the volume meter, the render driver's set-up, the reverb's small parts; the XMA hardware path left in `audio.md`) | `xaudio-objects.md` (with 4 rows in `xaudio.md`) | 78 of 109 in play (one migration, stopped at its validation: two destructors with no harness line; the resampler and the reverb's core ready, not taken) | `--native_xaudio_objects` |
 | 2026-10-30 | Cleanup lead, no mapping (not counted): the rest of XAudio's factory objects (the XMA codec's destructors' harness, `SetLevels` copying as words, the resampler and its kernels, `PcmCodec::Process`, the reverb's stages, core, set-up, construction and pass) | `xaudio-objects.md` | 110 of 110 in play (three migrations; stopped at the last validation: the car sounds' harness differed once) | `--native_xaudio_objects` |
 | 2026-10-30 | The app's start-up (`App::App` and `App::Create`, `App::StartUp` with the text and font set-up, the network manager's set-up, the scene target, `Billboards::Init`, `Movie::Movie` with the movie wrapper's lock a host recursive mutex, `AudioManager::Create`, `XAudioInitialize`, the second camera class; the voice engine not made, Dropped, the user's call) | `app-start-up.md` (with rows in `system-services.md`, `strings-and-font.md`, `movies.md`, `sound-cues.md`, `cameras.md`, `video-output.md`, `framework.md`) | every ready group in play (three migrations; 59 rows changed or added) | `--native_app_start_up` |
+| 2026-10-30 | The game's data load at boot (`BootData::Load` and `CreateObjects`; the save defaults' bit sets, the race data, input recordings and replay objects with their records and the replay's static set-ups; the loading screen's movies; shared loads under their files' flags: the data tables, car parameters, shaders, text, font, strings, a UI movie) | `data-load.md` (with rows in `data-tables.md`, `car-specs.md`, `models.md`, `strings-and-font.md`, `files-and-saves.md`, `ui-movies-game.md`) | every function seen in play (two migrations) | `--native_data_load` |
 
     The first run (2026-10-22, branch `b7-loop-test`): every harness at 0 differing, attract races at 20-21 s with no errors,
     and a race the user drove looked right. Ours went from 162 to 335 (work
@@ -4042,3 +4043,17 @@ overridden 108, Native 34, Dropped 26, never called 70, live 211.
 Imports: 186 called, 56 with a live caller. B7 (`b7_status.py`): ours
 3,090, work left 3,230 (Wrapped 104, with a row 479, no row yet 2,647),
 from 3,287.
+
+**2026-10-30, the data load at boot (branch `b7-loop-29-10-26-2`):**
+mapped and made native (`data-load.md`, `--native_data_load`,
+`src/data_load/`): `BootData::Load` (`sub_82106618`) and what it
+loads and builds, every function seen in play, in two migrations, with
+no new call needed. Native loads go through `archive::LoadCall`, and a
+harness's recorder takes them when one is set
+(`hooks::NativeArchiveLoad`), so a harness can't queue a real load.
+What's left above it: the front end's state machine that runs it
+(`sub_82220C88`, a lead). The boundary: 449 functions (916 pairs):
+overridden 108, Native 34, Dropped 26, never called 70, live 211.
+Imports: 186 called, 56 with a live caller. B7 (`b7_status.py`): ours
+3,118, work left 3,202 (Wrapped 104, with a row 470, no row yet 2,628),
+from 3,230.
