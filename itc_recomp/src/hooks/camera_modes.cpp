@@ -21,12 +21,12 @@
 ITC_FLAG_BOOL(native_camera_modes, true, "ITC",
               "Run the camera modes (docs/functions/camera-modes.md: the camera director's "
               "handlers CameraDirector::ToView4 sub_82152400, ToView5 sub_821524B8, ToView3 "
-              "sub_821524D8 and ToView3IfCourse sub_82153160; Viewports::ResetRoll sub_821524F0, "
-              "Camera::ZoomFromFov sub_82152548, Quat::Rotate sub_821525F8 (no adapter: only ChaseCamera::Follow's plain C++ calls it), Matrix::FromQuat "
+              "sub_821524D8 and ToView3IfCourse sub_82153160; Viewports::ResetRoll sub_821524F0 (no adapter: only SetMode's plain C++ calls it), "
+              "Camera::ZoomFromFov sub_82152548 (no adapter: only the views' cameras' plain C++ calls it), Quat::Rotate sub_821525F8 (no adapter: only ChaseCamera::Follow's plain C++ calls it), Matrix::FromQuat "
               "sub_82152698 (no adapter: only CameraTarget::Track's plain C++ calls it), Matrix::FromFloats sub_82090000; the lists' List40::Link "
               "sub_82153228 (no adapter: only List40::Insert's plain C++ calls it), "
-              "List40::Insert sub_821544E0, List16::Insert20 sub_82154458 (no adapter: only IntroCamera::IntroCamera's plain C++ calls it), "
-              "Insert32 sub_82154378, Insert608 sub_821543E8 and Copy32 sub_82154300 (no adapter: only CutsceneShot::Init's plain C++ calls it); "
+              "List40::Insert sub_821544E0 (no adapter: only TvCamera::Track's and Step's plain C++ calls it), List16::Insert20 sub_82154458 (no adapter: only IntroCamera::IntroCamera's plain C++ calls it), "
+              "Insert32 sub_82154378, Insert608 sub_821543E8 (no adapters: only CutsceneShot::Init's and Cutscene::Cutscene's plain C++ calls them) and Copy32 sub_82154300 (no adapter: only CutsceneShot::Init's plain C++ calls it); "
               "CameraAnims::Clear sub_82150078 and Find sub_82150300; ColorFilter::SetStyle "
               "sub_82152108 (no adapter: only TvCamera::Update's plain C++ calls it) and FadeCue::Step sub_82152290 (no adapter: only CutsceneShot::Step's plain C++ calls it); with --native_heap the camera "
               "animations' CameraAnims::Load sub_82150B10 (with the archive's queue native), "
@@ -36,19 +36,19 @@ ITC_FLAG_BOOL(native_camera_modes, true, "ITC",
               "CameraAnim::EvalCamera sub_82150350 and EvalTarget sub_821504E0 (no adapters), "
               "Duration sub_82150A98 (no adapter: only CutsceneShot::Step's plain C++ calls it), ObjectMatrix sub_82150A10 with CameraAnim::Matrix "
               "sub_82150590 (no adapter); with --native_heap and the archive's queue native "
-              "CameraPath::Request sub_82152E08 with Load sub_82152D80 (no adapter); "
+              "CameraPath::Request sub_82152E08 (no adapter: only the TV camera's plain C++ calls it) with Load sub_82152D80 (no adapter); "
               "CameraPath::OnLoaded sub_82152078 with FixKeys sub_820AC000, FixKey sub_820ABF80, "
               "FixGroup sub_820ABED8 and FixTriple sub_820ABE68 (no adapters); "
-              "RivalLogo::RivalLogo sub_82211848 with InitXpr sub_82211708 (no adapter) and "
+              "RivalLogo::RivalLogo sub_82211848 (no adapter: only Cutscene::Cutscene's plain C++ calls it) with InitXpr sub_82211708 (no adapter) and "
               "RivalLogo::Play sub_82211AB0 (no adapter: only Cutscene::Step's plain C++ calls it; "
               "without --log_pause_movie); CameraTarget::Track "
-              "sub_82153290; Camera::Shake sub_82152CD8 (no adapter: only ChaseCamera::Update's "
+              "sub_82153290 (no adapter: only the cameras' plain C++ calls it); Camera::Shake sub_82152CD8 (no adapter: only ChaseCamera::Update's "
               "plain C++ calls it) with ShakeRandom sub_82152BD8 and "
               "Viewport::Offset sub_821529B0 (no adapters), Viewport::PullBack sub_82152788 (no adapter: only ChaseCamera::Update's plain C++ calls it); "
               "IntroCamera::StepShot sub_82152E78 (no adapter: only IntroCamera::Update's plain C++ "
               "calls it), IntroCamera::IntroCamera sub_82158F70 with "
               "MakeShot sub_82154108 (no adapter; with native atexit); CameraDirector::Start "
-              "sub_82152338 and Release sub_82153098; CutsceneShot::Init sub_82156B68 and Step "
+              "sub_82152338 and Release sub_82153098; CutsceneShot::Init sub_82156B68 (no adapter: only Cutscene::Cutscene's plain C++ calls it) and Step "
               "sub_82155800 (no adapter: only Cutscene::Step's plain C++ calls it)); the TV camera's RouteRange::CameraAt sub_820FE830 "
               "and TrackRoute::SliceFraction sub_820F9B48 (no adapters: only TvCamera::Step's plain C++ "
               "calls them), TvCamera::Track sub_82156980 and, with "
@@ -62,7 +62,7 @@ ITC_FLAG_BOOL(native_camera_modes, true, "ITC",
               "sub_82153640 (no adapters), ChaseCamera::Update sub_82154808, "
               "ViewCamera1::ViewCamera1 sub_82154A48 and ViewCamera2::ViewCamera2 sub_82154D38 "
               "(with native atexit), ViewCamera1::Update sub_82153A50 and ViewCamera2::Update "
-              "sub_82153E58; IntroCamera::Update sub_82155E58; RivalLogo::Open sub_822118E0 and Close "
+              "sub_82153E58; IntroCamera::Update sub_82155E58; RivalLogo::Open sub_822118E0 (no adapter: only Cutscene::Cutscene's plain C++ calls it) and Close "
               "sub_82211980 (no adapter: only Cutscene::Step's plain C++ calls it; the UI movies' "
               "Open and Delete natively where their adapters would); Cutscene::Step "
               "sub_82155A28 (no adapter: only Update's plain C++ calls it) and Update sub_821561F8 (the logo's draw "
@@ -1027,16 +1027,19 @@ void CameraModesStep82155E58(PPCContext& ctx, uint8_t* base) {
 
 // --- The adapters ---
 
+// Viewports::ResetRoll sub_821524F0, Camera::ZoomFromFov sub_82152548,
+// CameraTarget::Track sub_82153290, List40::Insert sub_821544E0,
+// CameraPath::Request sub_82152E08, CutsceneShot::Init sub_82156B68,
+// List16::Insert32 sub_82154378, Insert608 sub_821543E8,
+// RivalLogo::RivalLogo sub_82211848 and RivalLogo::Open sub_822118E0 have
+// no adapters (2026-10-30): their callers in play are native and call
+// their plain C++; --native_camera_modes switches those callers. Their
+// steps stay for the harness.
 ITC_CAMERA_MODES(82152400)
 ITC_CAMERA_MODES(821524B8)
 ITC_CAMERA_MODES(821524D8)
 ITC_CAMERA_MODES(82153160)
-ITC_CAMERA_MODES(821524F0)
-ITC_CAMERA_MODES(82152548)
 ITC_CAMERA_MODES(82090000)
-ITC_CAMERA_MODES(821544E0)
-ITC_CAMERA_MODES(82154378)
-ITC_CAMERA_MODES(821543E8)
 ITC_CAMERA_MODES(82150078)
 ITC_CAMERA_MODES(82150300)
 ITC_CAMERA_MODES(82150B10)
@@ -1044,14 +1047,10 @@ ITC_CAMERA_MODES(82150878)
 ITC_CAMERA_MODES(821507D8)
 ITC_CAMERA_MODES(82150960)
 ITC_CAMERA_MODES(82150A10)
-ITC_CAMERA_MODES(82152E08)
 ITC_CAMERA_MODES(82152078)
-ITC_CAMERA_MODES(82211848)
-ITC_CAMERA_MODES(82153290)
 ITC_CAMERA_MODES_CONSTRUCT(82158F70)
 ITC_CAMERA_MODES(82152338)
 ITC_CAMERA_MODES(82153098)
-ITC_CAMERA_MODES(82156B68)
 ITC_CAMERA_MODES(82156980)
 ITC_CAMERA_MODES_CONSTRUCT(82154548)
 ITC_CAMERA_MODES(82154808)
@@ -1210,7 +1209,6 @@ void CameraModesStep821561F8(PPCContext& ctx, uint8_t* base) {
 
 }  // namespace hooks
 
-ITC_CAMERA_MODES(822118E0)
 ITC_CAMERA_MODES(821561F8)
 
 // --- The TV camera's update ---

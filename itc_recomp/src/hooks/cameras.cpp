@@ -37,7 +37,7 @@ ITC_FLAG_BOOL(native_cameras, true, "ITC",
               "sub_820AA430 (with --native_heap), Viewport::SetZoom sub_820AAE90, SetRoll "
               "sub_820AA2D0, UpdateEntries sub_820AA550 (no adapter: only Update's, Set's and LookAt's plain C++ "
               "call it, and the flag switches them), Update sub_820AAE40, Set sub_820AAE48 and "
-              "LookAt sub_820AAF68; CameraPass::Update sub_820A3978, its frame interpolation's notes kept, and "
+              "LookAt sub_820AAF68 (no adapter: only GarageCamera::Update's plain C++ calls it); CameraPass::Update sub_820A3978, its frame interpolation's notes kept, and "
               "CameraPass::RecordViewport sub_820A0978, without the command list's "
               "diagnostics, and CameraPass::FromViewport sub_820AA4A8; RecordClear sub_8209FA38, "
               "without the command list's diagnostics; CameraPasses::RecordBegins sub_8209F8A0 and "
@@ -131,11 +131,9 @@ extern "C" REX_FUNC(sub_820AAE48) {
                                     ctx.r7.u32);
 }
 
-extern "C" REX_FUNC(sub_820AAF68) {
-  ITC_CAMERAS_FALLBACK(820AAF68)
-  ctx.fpscr.disableFlushMode();
-  ctx.r3.u64 = cameras::ViewportLookAt(base, ctx.r3.u32, ctx.r4.u32, ctx.r5.u32);
-}
+// Viewport::LookAt (sub_820AAF68) has no adapter (2026-10-30): its one caller
+// in play, GarageCamera::Update (src/camera_modes/chase.cpp), is native and
+// calls cameras::ViewportLookAt.
 
 // CameraPass::Enable: r3 = the pass.
 extern "C" REX_FUNC(sub_820A0968) {

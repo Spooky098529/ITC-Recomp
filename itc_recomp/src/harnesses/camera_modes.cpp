@@ -3693,9 +3693,12 @@ void GarageCameras(Context& h, Random& r) {
       out[v].Bytes(Read(h.base, camera.address, 108));
       out[v].Float(guest::LoadU32(h.base, camera.address + 108));
       out[v].Bytes(Read(h.base, camera.address + 112, kCameraBytes - 112));
-      out[v].Bytes(Read(h.base, viewport.address, 1600));
-      out[v].Floats(h.base, viewport.address + 1600, 48);
-      out[v].Bytes(Read(h.base, viewport.address + 1792, kViewportBytes - 1792));
+      // The viewport as the cameras harness compares it: everything but the
+      // view mode (+1860) as floats (Viewport::LookAt's entries, which the
+      // recompiled side runs since LookAt's adapter went).
+      out[v].Floats(h.base, viewport.address, 1860 / 4);
+      out[v].Word(guest::LoadU32(h.base, viewport.address + 1860));
+      out[v].Floats(h.base, viewport.address + 1864, (kViewportBytes - 1864) / 4);
       out[v].Bytes(Read(h.base, kPass0, 16));
       out[v].Floats(h.base, kPass0 + 16, 48);
       out[v].Bytes(Read(h.base, kPass0 + 208, 160));
