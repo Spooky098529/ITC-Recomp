@@ -202,6 +202,10 @@ set(ITC_SOURCES
     src/app_start_up/audio_manager.cpp
     src/app_start_up/app_camera.cpp
     src/app_start_up/app.cpp
+    src/hooks/data_load.cpp
+    src/data_load/defaults.cpp
+    src/data_load/records.cpp
+    src/data_load/objects.cpp
     src/save_interface/save_interface.cpp
     src/save_interface/save_layer.cpp
     src/hooks/file_layer.cpp
@@ -364,6 +368,7 @@ set(ITC_SOURCES
     src/harnesses/archive.cpp
     src/harnesses/save_interface.cpp
     src/harnesses/app_start_up.cpp
+    src/harnesses/data_load.cpp
     src/harnesses/car_sounds.cpp
     src/harnesses/x3daudio.cpp
     src/harnesses/xaudio.cpp

@@ -213,5 +213,6 @@ void XactWaves(Context& h);
 void XactTracks(Context& h);
 void XAudioObjects(Context& h);
 void AppStartUp(Context& h);
+void DataLoad(Context& h);
 
 }  // namespace harness
