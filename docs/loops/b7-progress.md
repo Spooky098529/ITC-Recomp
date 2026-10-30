@@ -61,7 +61,9 @@ file's history. What's left to see in a drive, from every run:
   in play. Subsystem 2 finished.
 - Subsystem 3 of 3: the player's items over the save data
   (`sub_82111780` and the rest of its lead line, the top of
-  `leads.md`). Mapping agent running.
+  `leads.md`). Mapped (d91b1bb, `career.md`, 76 rows, 21 ready
+  groups, no stop; blocked outside by the race event, the next lead).
+  Migration agent running.
 
 ## Done
 

@@ -100,6 +100,16 @@ When the user has reviewed a run's section, its heading gets
   the original: `Defaults::Init`'s r3 sign-extended,
   `Shaders::LoadAll`'s r3 = `BootData::Load`'s frame + 80, failed
   allocations' stores near 0.
+- The career, map (d91b1bb, `career.md`, 76 rows, 35 not seen in
+  play; `known-data.md`: the item record and stats record rows). For
+  review: the race event (`82140340`-`82144E58`) kept as its own lead
+  rather than mapped here (it would take the file to ~170 rows, and
+  its `RaceEvent::` rows live in `race-setup.md` and `race-world.md`);
+  two jump-table cases (`sub_821129E0`, `sub_82114C7C`) to be Merged
+  into their callers; the 3,008-byte stack copies of an item kept as
+  the original leaves them. Three leads added (the race's end on the
+  career's side `sub_82150E00`; front-end screens over the career; a
+  probable menu sound `sub_821103F0`).
 
 ## Run 2026-10-29 22:22 (`b7-loop-29-10-26-2`)
 
