@@ -1105,12 +1105,30 @@ std::vector<RealVoice> MadeVoices(uint8_t* base, const std::vector<uint32_t>& ho
 }
 
 // The words of [address, address + bytes) with those pointing into a made
-// voice's allocator block as (its index, the offset), the rest as they are.
+// voice's allocator block as (its index, the offset), the source voices'
+// stage lists (the engine's +92 and +104) as which of the two is the next
+// one, the rest as they are. The game's mixer swaps the stage's lists
+// (XAudioEngine::SwapStageLists) when it gets the mixer's lock between a
+// case's versions, so a voice started in one version joins the other list
+// than in the other version (seen 2026-10-30: one case in a few runs; with
+// the lists swapped before every native version, 11 of the parts' groups
+// differed without this and none with it); the lock is held from before the
+// call to after these reads, so the next list read here is the call's.
 void Relative(Outputs& out, uint8_t* base, uint32_t address, uint32_t bytes,
               const std::vector<RealVoice>& made) {
   std::vector<uint8_t> words = Read(base, address, bytes);
+  const uint32_t engine = guest::LoadU32(base, xaudio::kEngine);
+  const uint32_t next_list = guest::LoadU32(base, engine + 120);
+  const uint32_t other_list = next_list == engine + 92 ? engine + 104 : engine + 92;
   for (uint32_t i = 0; i + 4 <= bytes; i += 4) {
     const uint32_t word = guest::LoadU32(base, address + i);
+    if (word == next_list || word == other_list) {
+      const uint32_t value = word == next_list ? 0xB0000000u : 0xB0000001u;
+      for (uint32_t b = 0; b < 4; b++) {
+        words[i + b] = uint8_t(value >> (24 - 8 * b));
+      }
+      continue;
+    }
     for (uint32_t k = 0; k < made.size(); k++) {
       if (word >= made[k].allocator && word < made[k].allocator + made[k].bytes) {
         const uint32_t value = 0xA0000000u | (k << 20) | (word - made[k].allocator);
