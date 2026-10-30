@@ -407,6 +407,11 @@ Rows not yet moved stay in the table below. So far:
   unlocks and rewards checked after a race, the stages, the day's
   advance and the day's races picked, and the garage's list (B7; the
   race event it makes has its own lead).
+- [`race-event.md`](race-event.md): the race event at `[0x826C6078]`:
+  the opponents a career race offers, picked from the items by their
+  unlock conditions (68 kinds of test over the save data and the car),
+  grouped by location, and the list the race's set-up and the race
+  world read (B7).
 
 These files hold functions only. What used to follow the table here moved
 out on 2026-10-20: how frame interpolation works, its options and what

@@ -15,7 +15,7 @@ the stage reached (the bits of save +6092, `SaveData::FirstUnsetFlag` in
 the set-up of a race outside `Race::SetUp` (`Career::SetUpEvent`
 `sub_82114268`: the day's races picked from tables 1 to 7 at random,
 then the race event made, `RaceEvent::Make` `sub_82144E58`, mapped
-with the rest of the race event under its lead in `../loops/leads.md`).
+with the rest of the race event in `race-event.md`).
 Names are ours and mostly guesses. Read 2026-10-30 by the B7 loop's
 mapping agent; the large unseen functions only skimmed.
 
