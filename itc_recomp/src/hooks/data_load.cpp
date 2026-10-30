@@ -24,7 +24,7 @@ ITC_FLAG_BOOL(native_data_load, true, "ITC",
               "BootData::Load sub_82106618 and BootData::CreateObjects sub_82105868 (their callees "
               "through their adapters), LoadingScreen::Load sub_82247B98 with "
               "LoadingScreen::AddMovie sub_82247AA0, and sub_82291328 with sub_822912A0 (the "
-              "renderer's objects through [0x826BABA0]'s slots, as the original); no adapters for the fills, the records' members "
+              "renderer's objects through [0x826BABA0]'s slots, as the original); no adapters for the fills, the records and their members "
               "InputRecordings::InputRecordings, LoadingScreen::AddMovie and sub_822912A0: only their callers' plain C++ calls them) "
               "natively instead of through the translated code (the same writes; checked by "
               "--run_harnesses=data_load)");
@@ -42,16 +42,6 @@ extern "C" REX_FUNC(sub_820CCDC0) {
   }
   // r3 as lis and addi leave the address: sign-extended.
   ctx.r3.s64 = int32_t(dl::DefaultsInit(base, ctx.r1.u32 - 128));
-}
-
-extern "C" REX_FUNC(sub_82104C20) {
-  REX_FUNC_PROLOGUE();
-  if (!ITC_FLAG(native_data_load)) {
-    __imp__sub_82104C20(ctx, base);
-    return;
-  }
-  ctx.fpscr.disableFlushMode();
-  ctx.r3.u64 = dl::Record5232Construct(base, ctx.r3.u32);
 }
 
 extern "C" REX_FUNC(sub_82102208) {

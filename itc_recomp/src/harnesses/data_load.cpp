@@ -60,6 +60,10 @@ void NativeMember1136(PPCContext& t, uint8_t* base) {
   t.fpscr.disableFlushMode();
   t.r3.u64 = dl::Member1136Construct(base, t.r3.u32);
 }
+void NativeRecord5232(PPCContext& t, uint8_t* base) {
+  t.fpscr.disableFlushMode();
+  t.r3.u64 = dl::Record5232Construct(base, t.r3.u32);
+}
 void NativeInputRecordingsConstruct(PPCContext& t, uint8_t* base) {
   t.fpscr.disableFlushMode();
   t.r3.u64 = dl::InputRecordingsConstruct(base, t.r3.u32);
@@ -462,7 +466,7 @@ void DataLoad(Context& h) {
               1152);
   Constructor(h, "Member1136::Member1136 (sub_82102888)", __imp__sub_82102888, NativeMember1136,
               2944);
-  Constructor(h, "Record5232::Record5232 (sub_82104C20)", __imp__sub_82104C20, sub_82104C20,
+  Constructor(h, "Record5232::Record5232 (sub_82104C20)", __imp__sub_82104C20, NativeRecord5232,
               dl::kRecordBytes);
   Constructor(h, "InputRecordings::InputRecordings (sub_821054A8)", __imp__sub_821054A8,
               NativeInputRecordingsConstruct, dl::kInputRecordingsBytes);
