@@ -40,7 +40,9 @@ ITC_FLAG_BOOL(native_location_screen, true, "ITC",
               "Transition2 sub_8222D610, Transition14 sub_8222E6E0 and Transition16 "
               "sub_8222E8D8, Transition23 sub_8222A470, Transition33 sub_8222A718 and "
               "Transition7 sub_8222AE00, UiMovie::Finish, FinishNamed, FinishAll and Run through "
-              "their overrides; ShowOpponentPictures sub_8222B200 and UpdateView sub_82227E20) "
+              "their overrides; ShowOpponentPictures sub_8222B200 and UpdateView sub_82227E20; "
+              "with the texts' check ShowOpponentInfo sub_8222B438, Transition12 sub_8222B8A8, "
+              "ShowCard sub_8222BBD0 and Transition17 sub_8222EAD0) "
               "natively instead of through the translated code (the same writes; checked by "
               "--run_harnesses=location_screen)");
 
@@ -375,7 +377,26 @@ LOCATION_SCREEN_TRANSITION(8222E8D8, Transition16)
 LOCATION_SCREEN_TRANSITION(8222A470, Transition23)
 LOCATION_SCREEN_TRANSITION(8222A718, Transition33)
 LOCATION_SCREEN_TRANSITION(8222AE00, Transition7)
+LOCATION_SCREEN_TRANSITION(8222B8A8, Transition12)
+LOCATION_SCREEN_TRANSITION(8222EAD0, Transition17)
 #undef LOCATION_SCREEN_TRANSITION
+
+void LocationScreenShowOpponentInfo(PPCContext& ctx, uint8_t* base) {
+  Texts(ctx, base, __imp__sub_8222B438, [&](uint32_t sp, uint32_t, const ls::Calls& calls) {
+    return ls::ShowOpponentInfo(base, sp, calls);
+  });
+}
+
+void LocationScreenShowCard(PPCContext& ctx, uint8_t* base) {
+  if (!LocationScreenTextsNative(base)) {
+    __imp__sub_8222BBD0(ctx, base);
+    return;
+  }
+  ctx.fpscr.disableFlushMode();
+  const uint32_t sp = ctx.r1.u32;
+  LocationScreenCalls calls(ctx, base);
+  ctx.r3.u64 = ls::ShowCard(base, sp, calls.get());
+}
 
 void LocationScreenShowOpponentPictures(PPCContext& ctx, uint8_t* base) {
   const uint32_t sp = ctx.r1.u32;
@@ -445,3 +466,7 @@ LOCATION_SCREEN_ADAPTER(8222A718, LocationScreenTransition33)
 LOCATION_SCREEN_ADAPTER(8222AE00, LocationScreenTransition7)
 LOCATION_SCREEN_ADAPTER(8222B200, LocationScreenShowOpponentPictures)
 LOCATION_SCREEN_ADAPTER(82227E20, LocationScreenUpdateView)
+LOCATION_SCREEN_ADAPTER(8222B438, LocationScreenShowOpponentInfo)
+LOCATION_SCREEN_ADAPTER(8222B8A8, LocationScreenTransition12)
+LOCATION_SCREEN_ADAPTER(8222BBD0, LocationScreenShowCard)
+LOCATION_SCREEN_ADAPTER(8222EAD0, LocationScreenTransition17)

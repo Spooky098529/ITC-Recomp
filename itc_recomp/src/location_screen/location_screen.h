@@ -355,4 +355,43 @@ uint32_t ShowOpponentPictures(uint8_t* base, uint32_t sp, const Calls& calls);
 // the original's r3).
 uint64_t UpdateView(uint8_t* base, uint32_t sp, const Calls& calls);
 
+// --- The opponents (src/location_screen/opponents.cpp) ---
+//
+// sub_8222B438 LocationScreen::ShowOpponentInfo: the picked opponent's item
+// copied to its 6,240-byte frame's +128; node 12's texts: 6 by its card
+// (+88: 478 to 481), 4 its level (+34, 5299 on; 1711 for kind 1), 7 by its
+// kind (+35: 482 to 485), 8 its name (its id, 4650 on); node (-1, 13) and
+// node 13's children 5 to 7 hidden, and with any of its +92's three items
+// shown, their names in node 13 (for a card 3 item, first the chain of
+// items they name, kept at the frame's +96); node (12, 17)'s texture by its
+// record (0 to 2, or 1 for a won chain with an item not won); node 12's
+// children 14 and 15 switched by its level (48 and 49: 15, its first
+// child's +108 = the id - 310; else 14, its first child's +108 = the
+// level). Returns that child.
+uint32_t ShowOpponentInfo(uint8_t* base, uint32_t sp, const Calls& calls);
+// sub_8222B8A8 LocationScreen::Transition12 (page 3 to 4): the item copied
+// to its 6,192-byte frame's +96; first named 84 + i finished for each
+// opponent, Finish(-1, 13), nodes (-1, 17) and (-1, 18) hidden, Play(-1,
+// 9), the entry kind (as NextOpponentText's, the chain's test after each
+// step) and its 20-byte entry at +872: text (5, 1) (5918 on), node (5, 0)
+// hidden, node 6's pictures, HidePictures; then whether movie 21's run is
+// done, and then node (5, 0) shown while (5, 1) has more and the opponent
+// menu's +24 = 1.
+uint32_t Transition12(uint8_t* base, uint32_t sp, uint32_t step, const Calls& calls);
+// sub_8222BBD0 LocationScreen::ShowCard: movie 30: the item copied to its
+// 3,232-byte frame's +96; its row of the card table (0x82636578, 24 bytes
+// for each location and card category, +90); node 2's children 1 to 27 and
+// their children 6 to 9 hidden with named 0 to 26 finished, node 3's 6 to
+// 32 hidden; texts (3, 55) to (3, 58) (402, 401, 407, 408); with a card
+// (OpponentHasCard) node (-1, 6) shown, text (-1, 12) the row's +16, and
+// both of the row's animations' nodes, else the first's; their named
+// animations played and looped; the row's +8-th child of the first's node
+// shown; named 39 to 50 finished. Returns the last FinishNamed's r3.
+uint64_t ShowCard(uint8_t* base, uint32_t sp, const Calls& calls);
+// sub_8222EAD0 LocationScreen::Transition17 (page 5 to 6): first the item
+// copied, ShowCard, movie 30's named 52 and the row's +20 played, looped;
+// both movies run; 1 (and the confirm menu's +24 = 1) when movie 30's run
+// returns 0.
+uint32_t Transition17(uint8_t* base, uint32_t sp, uint32_t step, const Calls& calls);
+
 }  // namespace location_screen

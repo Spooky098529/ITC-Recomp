@@ -157,6 +157,9 @@ struct Spec {
   std::function<void(PPCContext&, Outputs&)> after;
   // The movies' nodes all TXT, with the texts and string table (ShapeTexts).
   bool texts = false;
+  // The leaves' child entries (+128 on) leaves, for UiMovie::Child (in place
+  // of their picture texture entries).
+  bool children = false;
 };
 
 // UiMovie::Run's calls (the update it jumps to, sub_8211D2F8), kept and
@@ -224,13 +227,14 @@ void Record(Outputs& out, const std::vector<Call>& calls) {
 // index (+116) 70 and 24 animations after it; the sub-scenes' child index 0
 // to 3 and 96 entries (leaves); the leaves' tags PIC, PRM or other (the
 // sub-scenes' SCE, so SetNodeTexture leaves their index), or with `texts`
-// every node a TXT; each leaf's picture texture entries (+144 + 16 k, as
+// every node a TXT; each leaf's picture texture entries (or with
+// `children` its child entries, leaves) (+144 + 16 k, as
 // PictureTexture reads them for an index of k) 0 to 15, into the movies'
 // textures (+28) of 16 words; the first 128 named animations of each movie
 // over the root and one of 8 animations of no tracks (+12 the length); the
 // movie table at the pairs {21, 30}, or only one (then the missing word
 // names the movie 21).
-void ShapeMovies(uint8_t* base, const World& w, Random& r, bool texts) {
+void ShapeMovies(uint8_t* base, const World& w, Random& r, bool texts, bool children) {
   const uint32_t at = w.movies.address;
   const uint32_t movie21 = at, movie30 = at + kMovie30At;
   const uint32_t root = at + kSceneAt;
@@ -289,6 +293,9 @@ void ShapeMovies(uint8_t* base, const World& w, Random& r, bool texts) {
     }
     for (uint32_t i = 144; i < 0x400; i += 16) {
       guest::StoreU32(base, leaf + i, r.Below(16));
+    }
+    for (uint32_t i = 128; children && i < 0x400; i += 8) {
+      guest::StoreU32(base, leaf + i, at + kLeavesAt + 0x400 * r.Below(32));
     }
   }
   const uint32_t pairs = at + kPairsAt;
@@ -414,7 +421,7 @@ void Case(Context& h, Results& results, const World& w, uint64_t seed, const Set
     WriteRandom(h.base, w.movies.address, w.movies.bytes, r);
     ShapeWorld(h.base, w, r);
     WriteRandom(h.base, w.texts.address, w.texts.bytes, r);
-    ShapeMovies(h.base, w, r, spec.texts);
+    ShapeMovies(h.base, w, r, spec.texts, spec.children);
     if (spec.texts) {
       ShapeTexts(h.base, w, r);
     }
@@ -1139,6 +1146,73 @@ void AfterRace(Context& h, const World& w) {
         none, __imp__sub_82227E20, hooks::LocationScreenUpdateView, {{{-304 + 80, 192}}});
 }
 
+// The opponents' pages: the items' chains as Opponents' (+0 the id 0 to 9,
+// +92 lower items), availability (+46, the condition's kind +102), level
+// +34 (0 to 59: 48 and 49 among them), kind +35 (-1 to 6), card +88 (0 to
+// 6), card category +90 (0 or 1); their records; 0 to 6 opponents.
+void ShapeOpponents(uint8_t* base, const World& w, Random& r) {
+  for (uint32_t id = 0; id < kItems; id++) {
+    const uint32_t item = w.item(id);
+    const uint32_t limit = id < 10 ? id : 10;
+    guest::StoreU16(base, item + 0, uint16_t(r.Below(10)));
+    guest::StoreU8(base, item + 34, uint8_t(r.Below(4) == 0 ? 48 + r.Below(2) : r.Below(60)));
+    guest::StoreU8(base, item + 35, uint8_t(r.Below(8) - 1));
+    guest::StoreU8(base, item + 46, uint8_t(r.Below(4) == 0 ? 2 : r.Below(2)));
+    constexpr uint16_t kKinds[] = {0, 67, 68, 0x8000};
+    guest::StoreU16(base, item + 102, kKinds[r.Below(4)]);
+    guest::StoreU16(base, item + 88, uint16_t(r.Below(2) == 0 ? 3 : r.Below(7)));
+    guest::StoreU8(base, item + 90, uint8_t(r.Below(2)));
+    for (uint32_t k = 0; k < 3; k++) {
+      guest::StoreU16(base, item + 92 + 2 * k,
+                      uint16_t(limit == 0 || r.Below(2) == 0 ? 0xFFFF : r.Below(limit)));
+    }
+  }
+  for (uint32_t id = 0; id < 10; id++) {
+    for (uint32_t k = 0; k < 3; k++) {
+      guest::StoreU16(base, w.save.address + ls::kItemRecords + 12 * id + 2 * k,
+                      uint16_t(r.Below(2)));
+    }
+  }
+  guest::StoreU32(base, w.screen.address + 808, r.Below(7));
+  guest::StoreU32(base, w.screen.address + 804, 4 + r.Below(6));
+  guest::StoreU32(base, w.screen.address + 800, r.Below(6));
+}
+
+void OpponentPages(Context& h, const World& w) {
+  uint8_t* const base = h.base;
+  {
+    // The card table's rows (the game's), for the log.
+    std::string rows;
+    for (uint32_t i = 0; i < 12 * 6; i++) {
+      rows += fmt::format(" {}", int32_t(guest::LoadU32(base, 0x82636578 + 4 * i)));
+    }
+    ITC_LOG_INFO("harness: location_screen: the card table:{}", rows);
+  }
+  const SetupFn opponents = [base](Random& r, const World& w) {
+    ShapeScreen(base, w, r);
+    ShapeResults(base, w, r);
+    ShapeOpponents(base, w, r);
+  };
+  const ArgsFn none = [](PPCContext&, Random&, const World&) {};
+  const ArgsFn step = [](PPCContext& t, Random&, const World& w) {
+    t.r3.u64 = w.screen.address + 0x700;
+  };
+  auto texts = [](int32_t frame, uint32_t locals, bool children) {
+    Spec spec{{{-frame + 80, locals}}};
+    spec.texts = true;
+    spec.children = children;
+    return spec;
+  };
+  Group(h, w, "LocationScreen::ShowOpponentInfo (sub_8222B438)", 300, opponents, none,
+        __imp__sub_8222B438, hooks::LocationScreenShowOpponentInfo, texts(6240, 6072, true));
+  Group(h, w, "LocationScreen::Transition12 (sub_8222B8A8)", 300, opponents, step,
+        __imp__sub_8222B8A8, hooks::LocationScreenTransition12, texts(6192, 6032, false));
+  Group(h, w, "LocationScreen::ShowCard (sub_8222BBD0)", 200, opponents, none,
+        __imp__sub_8222BBD0, hooks::LocationScreenShowCard, texts(3232, 3032, true));
+  Group(h, w, "LocationScreen::Transition17 (sub_8222EAD0)", 200, opponents, step,
+        __imp__sub_8222EAD0, hooks::LocationScreenTransition17, texts(3152, 3024, true));
+}
+
 }  // namespace
 
 void LocationScreen(Context& h) {
@@ -1161,6 +1235,7 @@ void LocationScreen(Context& h) {
   Pictures(h, w);
   Texts(h, w);
   AfterRace(h, w);
+  OpponentPages(h, w);
 }
 
 }  // namespace harness

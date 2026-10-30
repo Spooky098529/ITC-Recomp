@@ -127,5 +127,12 @@ void LocationScreenTransition33(PPCContext& ctx, uint8_t* base);
 void LocationScreenTransition7(PPCContext& ctx, uint8_t* base);
 void LocationScreenShowOpponentPictures(PPCContext& ctx, uint8_t* base);
 void LocationScreenUpdateView(PPCContext& ctx, uint8_t* base);
+// sub_8222B438 ShowOpponentInfo, sub_8222BBD0 ShowCard (no arguments);
+// sub_8222B8A8 Transition12 and sub_8222EAD0 Transition17 (r3 = the step's
+// address). The texts' check.
+void LocationScreenShowOpponentInfo(PPCContext& ctx, uint8_t* base);
+void LocationScreenTransition12(PPCContext& ctx, uint8_t* base);
+void LocationScreenShowCard(PPCContext& ctx, uint8_t* base);
+void LocationScreenTransition17(PPCContext& ctx, uint8_t* base);
 
 }  // namespace hooks
