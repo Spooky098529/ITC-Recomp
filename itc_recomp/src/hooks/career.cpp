@@ -7,6 +7,7 @@
 #include "base/flags.h"
 #include "career/career.h"
 #include "hooks/guest_call.h"
+#include "hooks/race_event.h"
 
 ITC_FLAG_BOOL(native_career, true, "ITC",
               "Run the career's progress (docs/functions/career.md: PlayTime::Mark "
@@ -35,7 +36,10 @@ ITC_FLAG_BOOL(native_career, true, "ITC",
               "Unlock2 sub_82111D98 (no adapters); Career::NextDay sub_82116AF0 with "
               "Stats::CloseDay sub_82113898 (no adapter); no adapters either for RunningMean::Merge, "
               "Items::AnyWonKind3Stage1, ItemRecords::AddWin and AddLoss, Results::Push, "
-              "Stats::StartDay and Rewards::Grant: only native callers reach them in play) natively instead of through the translated code (the same writes; "
+              "Stats::StartDay and Rewards::Grant: only native callers reach them in play; "
+              "Career::EventQuery sub_82111638 and Career::EventLocation sub_82111650 over the "
+              "race event's plain C++ (src/race_event/), DayBlock::BestStreak sub_82110588 with "
+              "no adapter: from the race event's EventCondition::SectionRival) natively instead of through the translated code (the same writes; "
               "checked by --run_harnesses=career)");
 
 namespace hooks {
@@ -192,6 +196,20 @@ void CareerNextDay(PPCContext& ctx, uint8_t* base) {
   ctx.r3.u64 = cr::CareerNextDay(base, save, sp, PickNextThrough, &guest);
 }
 
+void CareerEventQuery(PPCContext& ctx, uint8_t* base) {
+  ctx.fpscr.disableFlushMode();
+  const uint32_t flag = ctx.r4.u32;
+  RaceEventGuest guest(ctx, base);
+  ctx.r3.u64 = cr::EventQuery(base, flag, guest.get());
+}
+
+void CareerEventLocation(PPCContext& ctx, uint8_t* base) {
+  ctx.fpscr.disableFlushMode();
+  const uint32_t save = ctx.r3.u32;
+  RaceEventGuest guest(ctx, base);
+  cr::EventLocation(base, save, guest.get());
+}
+
 }  // namespace hooks
 
 #define CAREER_ADAPTER(address, step)   \
@@ -221,3 +239,5 @@ CAREER_ADAPTER(82115190, CareerAddRaceResult)
 CAREER_ADAPTER(821159B0, CareerPickNext)
 CAREER_ADAPTER(82116588, CareerAfterRace)
 CAREER_ADAPTER(82116AF0, CareerNextDay)
+CAREER_ADAPTER(82111638, CareerEventQuery)
+CAREER_ADAPTER(82111650, CareerEventLocation)

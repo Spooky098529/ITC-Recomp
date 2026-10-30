@@ -9,6 +9,8 @@
 #include <cstdint>
 #include <optional>
 
+#include "race_event/race_event.h"
+
 namespace career {
 
 // The save data's parts.
@@ -34,6 +36,9 @@ bool CanCopy(uint32_t destination, uint32_t source, uint32_t size);
 void PlayTimeMark(uint8_t* base, uint32_t save);
 // sub_82110580 DayBlock::WinStreak: halfword +4828 of the day block.
 uint32_t DayBlockWinStreak(uint8_t* base, uint32_t block);
+// sub_82110588 DayBlock::BestStreak: halfword +4830 of the day block (no
+// adapter: only EventCondition::SectionRival's plain C++ calls it).
+uint32_t DayBlockBestStreak(uint8_t* base, uint32_t block);
 // sub_82110590 DayBlock::AddWord4832: word +4832 += amount (its low 32 bits).
 void DayBlockAddWord4832(uint8_t* base, uint32_t block, uint64_t amount);
 // sub_821105A0 DayBlock::Word4832: word +4832.
@@ -242,5 +247,15 @@ constexpr uint32_t kNextDayFrame = 112;
 using PickNextCall = void (*)(void* user, uint32_t save);
 uint32_t CareerNextDay(uint8_t* base, uint32_t save, uint32_t sp, PickNextCall pick_next,
                        void* user);
+
+// --- The race event's refreshes (docs/functions/race-event.md) ---
+
+// sub_82111638 Career::EventQuery: -1 with `flag` set, else
+// RaceEvent::RefreshCurrent (r3 as the original's, 64 bits).
+uint64_t EventQuery(uint8_t* base, uint32_t flag, const race_event::Guest& guest);
+// sub_82111650 Career::EventLocation: the location (+6108; 14 to 19 give 4 to
+// 9, else 4) to RaceEvent::UpdateLocation (from a word on its frame in the
+// original).
+void EventLocation(uint8_t* base, uint32_t save, const race_event::Guest& guest);
 
 }  // namespace career

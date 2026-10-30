@@ -59,4 +59,10 @@ void CareerAfterRace(PPCContext& ctx, uint8_t* base);
 // original's.
 void CareerNextDay(PPCContext& ctx, uint8_t* base);
 
+// Career::EventQuery sub_82111638: r4 = the flag; r3 = -1 or
+// RaceEvent::RefreshCurrent's. Career::EventLocation sub_82111650: r3 = the
+// save data.
+void CareerEventQuery(PPCContext& ctx, uint8_t* base);
+void CareerEventLocation(PPCContext& ctx, uint8_t* base);
+
 }  // namespace hooks

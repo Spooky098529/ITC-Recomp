@@ -240,5 +240,6 @@ void XAudioObjects(Context& h);
 void AppStartUp(Context& h);
 void DataLoad(Context& h);
 void Career(Context& h);
+void RaceEvent(Context& h);
 
 }  // namespace harness
