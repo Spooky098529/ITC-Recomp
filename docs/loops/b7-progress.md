@@ -30,7 +30,8 @@ file's history. What's left to see in a drive, from every run:
   checked (c9aed90..6292712: the voice skip, the start-up's leaves, the
   network manager's set-up, the scene target, `Billboards::Init`, 5
   adapters removed; `--native_app_start_up`; replay ok, `itc_2577`).
-  Validation agent running.
+  Validated (`itc_2594`): 15 of 15 harness lines, all ran in play.
+  Migration 2 running (`App::StartUp` and what's ready under it).
 
 ## Done
 
@@ -61,3 +62,5 @@ file's history. What's left to see in a drive, from every run:
 - After the start-up's migration 1 (`itc_2593`: race 38 s, 0 errors,
   touched harnesses 0 differing): ours 3064, work left 3256 (wrapped
   104, known 495, unknown 2657).
+- After its validation (`itc_2594`: race 7 s, 0 errors, every harness
+  0 differing but the expected groups): ours 3064, work left 3256.
