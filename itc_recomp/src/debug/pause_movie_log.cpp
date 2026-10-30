@@ -564,10 +564,12 @@ extern "C" REX_FUNC(sub_8259DAC0) {
 // may set a node's animation target. sub_821BE5A8 and sub_8220D040 (r3 =
 // node, r4 = selection) set the +80 flag of children 1-15 by the selection.
 // sub_8220BA68 (r3 = the screen state [0x826D84D8]) switches sub-screens.
+// Its work (natively with --native_ui_movies_game and the C runtime's heap)
+// is in src/hooks/ui_movies_game.cpp; logged, the original runs.
 extern "C" REX_FUNC(sub_8211C7E8) {
   REX_FUNC_PROLOGUE();
   if (!ITC_FLAG(log_pause_movie)) {
-    __imp__sub_8211C7E8(ctx, base);
+    ui_movies_game_hooks::SetNodeText(ctx, base);
     return;
   }
   debug::LogCall("8211C7E8 movie node", ctx);

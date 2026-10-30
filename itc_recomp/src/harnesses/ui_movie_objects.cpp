@@ -699,6 +699,7 @@ struct SetterFunction {
 };
 
 constexpr const char* kSetText = "UiMovie::SetText (sub_8211C1F8)";
+constexpr const char* kSetNodeText = "UiMovie::SetNodeText (sub_8211C7E8)";
 
 void SetterCases(Context& h, uint32_t movie) {
   const SetterFunction functions[] = {
@@ -713,6 +714,9 @@ void SetterCases(Context& h, uint32_t movie) {
       // string id (mostly in the table), r7 to r10 its arguments; also
       // compared: the caller's parameter area (r1 + 48, the varargs).
       {kSetText, __imp__sub_8211C1F8, sub_8211C1F8},
+      // The same with the node in r4 (one of the 8, a TXT), the string id in
+      // r5 and r6 to r10 its arguments; also compared: r1 + 40 to + 79.
+      {kSetNodeText, __imp__sub_8211C7E8, sub_8211C7E8},
   };
   constexpr uint32_t kMissing = 0x826C5CD8;
   constexpr uint32_t kOdd[] = {0x7FC00000, 0xFF800001, 0x7F800000, 0x80000000, 0x00000001};
@@ -780,14 +784,15 @@ void SetterCases(Context& h, uint32_t movie) {
         Store(h.base, scene + 108, 0);
         Store(h.base, scene + 128, sub);
         Store(h.base, sub + 108, 0);
-        if (f.name == kSetText) {
+        const bool texts = f.name == kSetText || f.name == kSetNodeText;
+        if (texts) {
           Store(h.base, sub, 0x54585400);  // child 0 of the scene: a TXT too
         }
         for (uint32_t k = 0; k < 8; k++) {
           const uint32_t node = nodes + 128 * k;
           RandomFill(r, h.base, node, 128);
           Store(h.base, node + 108, r.Below(3) == 0 ? 0 : 1 + r.Below(6));
-          if (f.name == kSetText) {
+          if (texts) {
             Store(h.base, node, 0x54585400);  // "TXT\0"
           }
           Store(h.base, (k < 4 ? scene + 136 : sub + 128) + 8 * (k % 4), node);
@@ -834,6 +839,17 @@ void SetterCases(Context& h, uint32_t movie) {
           t.r10.u64 = r.Below(100);
           Fill(h.base, t.r1.u32 + 48, 32);
         }
+        if (f.name == kSetNodeText) {
+          t.r4.u64 = nodes + 128 * r.Below(8);
+          t.r5.u64 = (r.Next() & ~0xFFFFull) | string_id(r);
+          Store(h.base, kStringTable, strings.address);
+          t.r6.u64 = r.Below(100);
+          t.r7.u64 = r.Below(100);
+          t.r8.u64 = r.Below(100);
+          t.r9.u64 = r.Below(100);
+          t.r10.u64 = r.Below(100);
+          Fill(h.base, t.r1.u32 + 40, 40);
+        }
         if (v == 0) {
           RunRecompiled(f.recompiled, t, h.base);
         } else {
@@ -869,6 +885,9 @@ void SetterCases(Context& h, uint32_t movie) {
         out[v].Double(t.f1.u64);
         if (f.name == kSetText) {
           out[v].Bytes(Read(h.base, CallContext(h).r1.u32 + 48, 32));
+        }
+        if (f.name == kSetNodeText) {
+          out[v].Bytes(Read(h.base, CallContext(h).r1.u32 + 40, 40));
         }
       }
       results.Check(out[0], out[1], fmt::format("case {}", i));

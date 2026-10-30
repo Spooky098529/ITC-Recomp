@@ -491,6 +491,14 @@ std::optional<uint32_t> SetText(uint8_t* base, const strings_and_font::FormatCal
                                 uint32_t stack, uint32_t movie, uint32_t sub_scene,
                                 uint32_t child, uint32_t id, const uint64_t varargs[4]);
 
+// sub_8211C7E8 UiMovie::SetNodeText: SetText with the node given (`node`,
+// a TXT, else nullopt: the original loops forever there) and its five
+// arguments (r6 to r10) stored at `stack` + 40 to + 79 (the va_list from
+// there); string `id` (16-bit) the same way. Returns as SetText.
+std::optional<uint32_t> SetNodeText(uint8_t* base, const strings_and_font::FormatCalls& calls,
+                                    uint32_t stack, uint32_t movie, uint32_t node, uint32_t id,
+                                    const uint64_t varargs[5]);
+
 // sub_8211E798 UiMovie::Load: the asset's size (Archive::AssetSize) in pages
 // (VirtualAlloc's, AllocPages), then load(id, them, sub_8211E500, the movie).
 // Returns the serial (r3).

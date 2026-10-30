@@ -59,7 +59,8 @@ ITC_FLAG_BOOL(native_ui_movies_game, true, "ITC",
               "the text setters UiMovie::ClearText sub_8211C470, sub_8211C4F0, "
               "UiMovie::ScrollText sub_8211C570, sub_8211C5F8, UiMovie::RevealText sub_8211D880 "
               "(sub_8211C930) and sub_8211D8D8 (sub_8211C9C0), UiMovie::SetText sub_8211C1F8 (its "
-              "Strings::FormatV through the plain C++); "
+              "Strings::FormatV through the plain C++) and UiMovie::SetNodeText sub_8211C7E8 (the "
+              "same, from its override in src/debug/pause_movie_log.cpp); "
               "the full-frame effect sub_8211BEE8 (CameraPasses::RenderTarget and sub_8259EBE8 "
               "through their overrides); with --native_heap and the archive's queue native, "
               "UiMovie::Load sub_8211E798 and the movie table's UiMovies::Open sub_8211E808, "
@@ -818,6 +819,25 @@ extern "C" REX_FUNC(sub_8211C1F8) {
   }
   __imp__sub_8211C1F8(ctx, base);
 }
+
+namespace ui_movies_game_hooks {
+void SetNodeText(PPCContext& ctx, uint8_t* base) {
+  if (NativeHeap()) {
+    ctx.fpscr.disableFlushMode();
+    const uint64_t lr = ctx.lr;
+    hooks::FormatGuestCalls calls(ctx, base);
+    const uint64_t varargs[5] = {ctx.r6.u64, ctx.r7.u64, ctx.r8.u64, ctx.r9.u64, ctx.r10.u64};
+    const auto r3 = ui_movies::SetNodeText(base, calls.get(), ctx.r1.u32, ctx.r3.u32, ctx.r4.u32,
+                                           ctx.r5.u32, varargs);
+    ctx.lr = lr;
+    if (r3) {
+      ctx.r3.u64 = *r3;
+      return;
+    }
+  }
+  __imp__sub_8211C7E8(ctx, base);
+}
+}  // namespace ui_movies_game_hooks
 
 // UiMovie::RevealText and sub_8211D8D8: 1 or 0.
 extern "C" REX_FUNC(sub_8211D880) {

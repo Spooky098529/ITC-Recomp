@@ -55,4 +55,9 @@ bool DeleteNative();
 ui_movies::OpenCalls OpenCalls(PPCContext& ctx, uint8_t* base, uint32_t sp);
 ui_movies::DeleteCalls DeleteCalls(PPCContext& ctx, uint8_t* base, uint32_t sp);
 
+// UiMovie::SetNodeText (sub_8211C7E8; r3 = movie, r4 = a TXT node, r5 = the
+// string id, r6 to r10 its arguments): natively as SetText (its override
+// logs it for --log_pause_movie).
+void SetNodeText(PPCContext& ctx, uint8_t* base);
+
 }  // namespace ui_movies_game_hooks
