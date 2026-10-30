@@ -42,7 +42,7 @@ ITC_FLAG_BOOL(native_camera_modes, true, "ITC",
               "RivalLogo::Play sub_82211AB0 (without --log_pause_movie); CameraTarget::Track "
               "sub_82153290; Camera::Shake sub_82152CD8 (no adapter: only ChaseCamera::Update's "
               "plain C++ calls it) with ShakeRandom sub_82152BD8 and "
-              "Viewport::Offset sub_821529B0 (no adapters), Viewport::PullBack sub_82152788; "
+              "Viewport::Offset sub_821529B0 (no adapters), Viewport::PullBack sub_82152788 (no adapter: only ChaseCamera::Update's plain C++ calls it); "
               "IntroCamera::StepShot sub_82152E78, IntroCamera::IntroCamera sub_82158F70 with "
               "MakeShot sub_82154108 (no adapter; with native atexit); CameraDirector::Start "
               "sub_82152338 and Release sub_82153098; CutsceneShot::Init sub_82156B68 and Step "
@@ -431,7 +431,9 @@ void CameraModesStep82152CD8(PPCContext& ctx, uint8_t* base) {
   ctx.r3.u64 = guest::LoadU32(base, camera + 20);
 }
 
-// Viewport::PullBack: r3 = the viewport, f1 = the amount, r5 = the offset.
+// Viewport::PullBack (no adapter: only ChaseCamera::Update's plain C++ calls
+// it; the step kept for the harness): r3 = the viewport, f1 = the amount, r5 =
+// the offset.
 void CameraModesStep82152788(PPCContext& ctx, uint8_t* base) {
   ctx.fpscr.disableFlushMode();
   cm::ViewportPullBack(base, ctx.r3.u32, ctx.f1.f64, ctx.r5.u32, ctx.r1.u32);
@@ -831,7 +833,6 @@ ITC_CAMERA_MODES(82152078)
 ITC_CAMERA_MODES(82211848)
 ITC_CAMERA_MODES(82211AB0)
 ITC_CAMERA_MODES(82153290)
-ITC_CAMERA_MODES(82152788)
 ITC_CAMERA_MODES(82152E78)
 ITC_CAMERA_MODES(82158F70)
 ITC_CAMERA_MODES(82152338)
