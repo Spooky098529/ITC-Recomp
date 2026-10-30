@@ -940,6 +940,209 @@ void MovieConstructCases(Context& h) {
   results.Report();
 }
 
+// --- The sound manager's construction ---
+
+constexpr uint32_t kEngineAddRef = 0x8245F860;  // the engine's slot +4: +4 up by one
+constexpr uint32_t kEnginePointer = 0x82954F08;
+
+// The live XAudio engine (StartXAudio's XAudioInitialize takes its AddRef
+// path): its count (+4) read before a version and put back after, the
+// change kept. 0 when there's none, or its AddRef isn't sub_8245F860.
+struct LiveEngine {
+  uint32_t engine = 0;
+  uint32_t count = 0;
+  explicit LiveEngine(uint8_t* base) {
+    const uint32_t live = guest::LoadU32(base, kEnginePointer);
+    if (live != 0 && guest::LoadU32(base, guest::LoadU32(base, live) + 4) == kEngineAddRef) {
+      engine = live;
+    }
+  }
+  void Before(uint8_t* base) { count = guest::LoadU32(base, engine + 4); }
+  uint32_t After(uint8_t* base) const {
+    const uint32_t change = guest::LoadU32(base, engine + 4) - count;
+    guest::StoreU32(base, engine + 4, count);
+    return change;
+  }
+};
+
+// StartXAudio alone: the engine (r3, not read) a scratch word; compared:
+// its frame's +80 to +115 (the parameters), the prologue's saves, r3 in
+// full and the engine's count change.
+void StartXAudioCases(Context& h, LiveEngine& live) {
+  Results results("AudioEngine::StartXAudio (sub_8259CD50)");
+  for (int c = 0; c < 8; c++) {
+    const uint64_t r30 = h.random.Next(), r31 = h.random.Next();
+    const uint32_t fill = uint32_t(h.random.Next());
+    Outputs out[2];
+    for (int v = 0; v < 2; v++) {
+      Fill(h.base, h.data, kScratchBytes);
+      PPCContext t = CallContext(h);
+      for (uint32_t k = 4; k <= 0x400; k += 4) {
+        guest::StoreU32(h.base, t.r1.u32 - k, fill + k);
+      }
+      t.r3.u64 = h.data;
+      t.r30.u64 = r30;
+      t.r31.u64 = r31;
+      t.lr = 0x821198F0;
+      const uint32_t stack = t.r1.u32;
+      live.Before(h.base);
+      (v == 0 ? __imp__sub_8259CD50 : hooks::StartXAudioSteps)(t, h.base);
+      out[v].Word(live.After(h.base));
+      out[v].Bytes(Read(h.base, stack - 144 + 80, 36));
+      out[v].Bytes(Read(h.base, stack - 24, 24));
+      out[v].Word(t.r3.u32);
+      out[v].Word(uint32_t(t.r3.u64 >> 32));
+      out[v].Word(t.r1.u32 - stack);
+    }
+    results.Check(out[0], out[1], fmt::format("case {}", c));
+  }
+  results.Report();
+}
+
+// A manager's words with pointers into it as offsets (0xEE000000 + the
+// offset) and the blocks it holds numbered (0xEF000000 + their index),
+// then the blocks' words the same way: the bank vector's (+1516 to +1524),
+// the lists' head nodes (+1532, +1544) and the name's buffer when it's on
+// the heap (its capacity, +1580, above 15). The blocks freed after.
+void ManagerOut(uint8_t* base, Outputs& out, uint32_t manager) {
+  const uint32_t first = guest::LoadU32(base, manager + 1516);
+  const uint32_t end = guest::LoadU32(base, manager + 1524);
+  std::vector<std::pair<uint32_t, uint32_t>> blocks;  // address, bytes
+  if (first != 0) {
+    blocks.emplace_back(first, end - first < 0x1000 ? end - first : 0);
+  }
+  for (const uint32_t list : {manager + 1528, manager + 1540}) {
+    const uint32_t node = guest::LoadU32(base, list + 4);
+    if (node != 0) {
+      blocks.emplace_back(node, 12);
+    }
+  }
+  if (guest::LoadU32(base, manager + 1580) > 15) {
+    const uint32_t text = guest::LoadU32(base, manager + 1560);
+    blocks.emplace_back(text, 0);
+  }
+  const auto word = [&](uint32_t value) {
+    if (value >= manager && value < manager + asu::kAudioManagerBytes) {
+      return 0xEE000000u + (value - manager);
+    }
+    for (uint32_t i = 0; i < blocks.size(); i++) {
+      if (value != 0 && value >= blocks[i].first &&
+          value <= blocks[i].first + blocks[i].second) {
+        return 0xEF000000u + (i << 16) + (value - blocks[i].first);
+      }
+    }
+    return value;
+  };
+  for (uint32_t at = 0; at < asu::kAudioManagerBytes; at += 4) {
+    out.Word(word(guest::LoadU32(base, manager + at)));
+  }
+  out.Word(uint32_t(blocks.size()));
+  for (const auto& [address, bytes] : blocks) {
+    for (uint32_t at = 0; at < bytes; at += 4) {
+      out.Word(word(guest::LoadU32(base, address + at)));
+    }
+  }
+  for (const auto& [address, bytes] : blocks) {
+    FreeBlock(address);
+  }
+  FreeBlock(manager);
+}
+
+// AudioManager::Create on a fake owner in the scratch area (+0; its vtable
+// at +64, slots 1 and 2 the getter of +60, sub_82090770, answering the
+// object at +128, whose vtable at +192 has slot 1 the counter of its +4,
+// sub_8245F860, and slots 2 to 4 the recorder of r4 at its +4,
+// sub_820A70A8), the name "txr_xact" at +256 and a bank count (0 to 5) at
+// +300; the recompiled one with --native_app_start_up off. The stack below
+// filled the same for both (the word the constructor copies from its
+// frame's +180 among them). Compared: the manager (ManagerOut), the fake
+// object, r3 (as whether it's the manager), the frames' words (the
+// constructor's +80 to +159 and +180, StartXAudio's +80 to +115), the
+// prologues' saves and the live engine's count change.
+void AudioManagerCases(Context& h, LiveEngine& live) {
+  constexpr uint32_t kGetter60 = 0x82090770;
+  constexpr uint32_t kCount4 = 0x8245F860;
+  constexpr uint32_t kStoreR4At4 = 0x820A70A8;
+  Results results("AudioManager::Create (sub_82119B38) with AudioManager::AudioManager "
+                  "(sub_821197E0) and AudioEngine::StartXAudio (sub_8259CD50)");
+  const uint32_t owner = h.data, owner_vtable = h.data + 64, object = h.data + 128,
+                 object_vtable = h.data + 192, name = h.data + 256, count = h.data + 300;
+  for (int c = 0; c < 12; c++) {
+    const uint32_t banks = c < 4 ? 3 : h.random.Below(6);
+    const uint32_t fill = uint32_t(h.random.Next());
+    const uint32_t word4 = uint32_t(h.random.Next());
+    const uint64_t r26 = h.random.Next(), r27 = h.random.Next(), r28 = h.random.Next(),
+                   r29 = h.random.Next(), r30 = h.random.Next(), r31 = h.random.Next();
+    Outputs out[2];
+    for (int v = 0; v < 2; v++) {
+      Fill(h.base, h.data, kScratchBytes);
+      guest::StoreU32(h.base, owner, owner_vtable);
+      guest::StoreU32(h.base, owner + 60, object);
+      guest::StoreU32(h.base, owner_vtable + 4, kGetter60);
+      guest::StoreU32(h.base, owner_vtable + 8, kGetter60);
+      guest::StoreU32(h.base, object, object_vtable);
+      guest::StoreU32(h.base, object + 4, word4);
+      guest::StoreU32(h.base, object_vtable + 4, kCount4);
+      for (uint32_t k = 8; k <= 16; k += 4) {
+        guest::StoreU32(h.base, object_vtable + k, kStoreR4At4);
+      }
+      Write(h.base, name, "txr_xact", 9);
+      guest::StoreU32(h.base, count, banks);
+      PPCContext t = CallContext(h);
+      for (uint32_t k = 4; k <= 0x800; k += 4) {
+        guest::StoreU32(h.base, t.r1.u32 - k, fill + k);
+      }
+      t.r3.u64 = owner;
+      t.r4.u64 = name;
+      t.r5.u64 = count;
+      t.r26.u64 = r26;
+      t.r27.u64 = r27;
+      t.r28.u64 = r28;
+      t.r29.u64 = r29;
+      t.r30.u64 = r30;
+      t.r31.u64 = r31;
+      t.lr = 0x820947C4;
+      const uint32_t stack = t.r1.u32;
+      const uint32_t frame = stack - 112 - 256;
+      live.Before(h.base);
+      StartUpSide(v, [&] {
+        (v == 0 ? __imp__sub_82119B38 : hooks::AudioManagerCreateSteps)(t, h.base);
+      });
+      out[v].Word(live.After(h.base));
+      const uint32_t manager = t.r3.u32;
+      out[v].Word(manager != 0 ? 1 : 0);
+      out[v].Bytes(Read(h.base, object, 8));
+      out[v].Word(t.r1.u32 - stack);
+      out[v].Bytes(Read(h.base, frame + 80, 80));
+      out[v].Word(guest::LoadU32(h.base, frame + 180));
+      out[v].Bytes(Read(h.base, frame - 144 + 80, 36));
+      out[v].Bytes(Read(h.base, stack - 32, 32));
+      out[v].Bytes(Read(h.base, stack - 112 - 56, 56));
+      for (uint32_t at = frame - 24; at < frame; at += 4) {
+        const uint32_t w = guest::LoadU32(h.base, at);
+        out[v].Word(w >= manager && w < manager + asu::kAudioManagerBytes ? w - manager : w);
+      }
+      out[v].Bytes(Read(h.base, frame, 4));
+      if (manager != 0) {
+        ManagerOut(h.base, out[v], manager);
+      }
+    }
+    results.Check(out[0], out[1], fmt::format("case {}: {} banks", c, banks));
+  }
+  results.Report();
+}
+
+void AudioManagerGroup(Context& h) {
+  LiveEngine live(h.base);
+  if (live.engine == 0) {
+    ITC_LOG_WARN("harness: app_start_up: no live XAudio engine with sub_8245F860 as its AddRef: "
+                 "the sound manager's cases skipped");
+    return;
+  }
+  StartXAudioCases(h, live);
+  AudioManagerCases(h, live);
+}
+
 }  // namespace
 
 void AppStartUp(Context& h) {
@@ -964,6 +1167,7 @@ void AppStartUp(Context& h) {
     MovieWrapperLockCases(h);
     MovieWrapperCases(h);
     MovieConstructCases(h);
+    AudioManagerGroup(h);
   }
 }
 

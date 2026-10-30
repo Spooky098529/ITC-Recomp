@@ -29,7 +29,9 @@ ITC_FLAG_BOOL(native_app_start_up, true, "ITC",
               "own; and App::StartUp sub_82106548, its callees through their adapters; with "
               "--native_heap, Movie::Movie sub_820AEA88 and MovieWrapper::MovieWrapper "
               "sub_82593DC0, the wrapper's critical section a host mutex for every user, "
-              "through ScopedLock sub_8258E580 and sub_8258E5B8 for that section) "
+              "through ScopedLock sub_8258E580 and sub_8258E5B8 for that section; AudioManager::Create "
+              "sub_82119B38 with AudioManager::AudioManager sub_821197E0 and "
+              "AudioEngine::StartXAudio sub_8259CD50, no adapters of their own) "
               "natively instead of through the translated code (the same reads and writes; "
               "checked by --run_harnesses=app_start_up)");
 
@@ -526,4 +528,118 @@ extern "C" REX_FUNC(sub_820AEA88) {
     return;
   }
   hooks::MovieConstructSteps(ctx, base);
+}
+
+// --- The sound manager's construction ---
+
+namespace {
+
+void StoreDoubleword(uint8_t* base, uint32_t address, uint64_t value) {
+  guest::StoreU32(base, address, uint32_t(value >> 32));
+  guest::StoreU32(base, address + 4, uint32_t(value));
+}
+
+asu::AudioManagerCalls AudioManagerCallsFor(PPCContext& ctx, uint8_t* base, uint32_t frame) {
+  asu::AudioManagerCalls calls;
+  calls.call = [&ctx, base](uint32_t target, uint32_t sp, uint32_t r3, std::optional<uint32_t> r4,
+                            std::optional<uint32_t> r5, uint32_t return_address) {
+    const uint64_t stack = ctx.r1.u64;
+    ctx.r1.u64 = sp;
+    ctx.r3.u64 = r3;
+    if (r4) {
+      ctx.r4.u64 = *r4;
+    }
+    if (r5) {
+      ctx.r5.u64 = *r5;
+    }
+    ctx.lr = return_address;
+    REX_CALL_INDIRECT_FUNC(target);
+    ctx.r1.u64 = stack;
+    return ctx.r3.u32;
+  };
+  calls.virtual_call = [&ctx, base, frame](uint32_t object, uint32_t offset,
+                                           std::optional<uint32_t> r4, std::optional<uint32_t> r5,
+                                           uint32_t return_address) {
+    const uint64_t stack = ctx.r1.u64;
+    ctx.r1.u64 = frame;
+    if (r4) {
+      ctx.r4.u64 = *r4;
+    }
+    if (r5) {
+      ctx.r5.u64 = *r5;
+    }
+    const uint32_t r3 = VirtualCall(ctx, base, object, offset, return_address);
+    ctx.r1.u64 = stack;
+    return r3;
+  };
+  return calls;
+}
+
+}  // namespace
+
+void hooks::AudioManagerCreateSteps(PPCContext& ctx, uint8_t* base) {
+  const uint32_t owner = ctx.r3.u32, name = ctx.r4.u32, count = ctx.r5.u32;
+  const uint64_t entry_r3 = ctx.r3.u64, entry_r4 = ctx.r4.u64, entry_r5 = ctx.r5.u64;
+  const uint64_t lr = ctx.lr;
+  const uint32_t sp = ctx.r1.u32;
+  // The frames as the original's: Create's 112 bytes (__savegprlr_29), the
+  // constructor's 256 below it (__savegprlr_26), StartXAudio's 144 below
+  // that; their back chains.
+  SaveRegisters(ctx, base, 29);
+  const uint32_t create_frame = sp - 112;
+  const uint32_t frame = create_frame - 256;
+  const uint32_t start_frame = frame - 144;
+  guest::StoreU32(base, create_frame, sp);
+  guest::StoreU32(base, frame, create_frame);
+  guest::StoreU32(base, start_frame, frame);
+  const auto calls = AudioManagerCallsFor(ctx, base, frame);
+  const auto result = asu::AudioManagerCreate(base, owner, name, count, frame, start_frame, calls);
+  ctx.r1.u64 = sp;
+  ctx.lr = lr;
+  if (!result) {
+    ctx.r3.u64 = entry_r3;
+    ctx.r4.u64 = entry_r4;
+    ctx.r5.u64 = entry_r5;
+    __imp__sub_82119B38(ctx, base);
+    return;
+  }
+  if (*result != 0) {
+    // The constructor's prologue saves: lr, r26 to r28 as they came, r29 to
+    // r31 Create's (the count, the name, the owner).
+    guest::StoreU32(base, create_frame - 8, 0x82119B70);
+    StoreDoubleword(base, create_frame - 56, ctx.r26.u64);
+    StoreDoubleword(base, create_frame - 48, ctx.r27.u64);
+    StoreDoubleword(base, create_frame - 40, ctx.r28.u64);
+    StoreDoubleword(base, create_frame - 32, entry_r5);
+    StoreDoubleword(base, create_frame - 24, entry_r4);
+    StoreDoubleword(base, create_frame - 16, entry_r3);
+  }
+  ctx.r3.u64 = *result;
+}
+
+// AudioManager::Create: r3 = the owner (app + 12), r4 = the name, r5 = the
+// bank count's address; from App::App once at boot. (AudioManager's
+// constructor and AudioEngine::StartXAudio have no adapters: only its plain
+// C++ calls them in play.)
+extern "C" REX_FUNC(sub_82119B38) {
+  REX_FUNC_PROLOGUE();
+  if (!ITC_FLAG(native_app_start_up) || !hooks::NativeHeapActive()) {
+    __imp__sub_82119B38(ctx, base);
+    return;
+  }
+  hooks::AudioManagerCreateSteps(ctx, base);
+}
+
+void hooks::StartXAudioSteps(PPCContext& ctx, uint8_t* base) {
+  const uint32_t sp = ctx.r1.u32;
+  const uint64_t lr = ctx.lr;
+  // The original's prologue: lr, r30 and r31 above its 144-byte frame.
+  SaveRegisters(ctx, base, 30);
+  const uint32_t frame = sp - 144;
+  guest::StoreU32(base, frame, sp);
+  const auto calls = AudioManagerCallsFor(ctx, base, frame);
+  // r3 as the last guest call left it (XAudioInitialize's, in full).
+  asu::StartXAudio(base, frame, calls);
+  ctx.r1.u64 = sp;
+  ctx.lr = lr;
 }

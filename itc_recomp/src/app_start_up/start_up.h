@@ -266,6 +266,56 @@ struct MovieCalls {
 std::optional<uint32_t> MovieConstruct(uint8_t* base, uint32_t movie, uint32_t block,
                                        uint32_t frame, const MovieCalls& calls);
 
+// --- The sound manager's construction (sound-cues.md) ---
+
+constexpr uint32_t kAudioManagerBytes = 1624;
+
+// The guest calls the sound manager's construction makes, each from the
+// stack pointer `sp` (the original's frame there) with the original's
+// return address and r3 (r4 and r5 when given, else left as they are):
+// `call` the callee at `target` (its adapter), `virtual_call` the object's
+// vtable slot at `offset`; each returns r3.
+struct AudioManagerCalls {
+  std::function<uint32_t(uint32_t target, uint32_t sp, uint32_t r3, std::optional<uint32_t> r4,
+                         std::optional<uint32_t> r5, uint32_t return_address)>
+      call;
+  std::function<uint32_t(uint32_t object, uint32_t offset, std::optional<uint32_t> r4,
+                         std::optional<uint32_t> r5, uint32_t return_address)>
+      virtual_call;
+};
+
+// sub_8259CD50 AudioEngine::StartXAudio: the parameters on `frame` (the
+// original's 144-byte frame: +88 bytes 6, 1, 48, byte +91 not written, +92
+// frame + 80 (byte 7, +84 0x820713E0), +96 frame + 104 (0x820713D8, 0,
+// 0)), XAudioInitialize(frame + 88) through its adapter; when that's
+// negative (never in play) the two debug prints and the original's write
+// to address 0. Returns XAudioInitialize's r3 (the print's after a failure).
+// The engine (r3) isn't read.
+uint32_t StartXAudio(uint8_t* base, uint32_t frame, const AudioManagerCalls& calls);
+// sub_821197E0 AudioManager::AudioManager: r3 the manager (1,624 bytes),
+// `owner` its +12 (app + 12), `name` a C string (into the std::string at
+// +1556), `count` the bank count's address. The vtables, the listener
+// (+1456), the bank vector (+1512, the count of 0), the two lists (+1528,
+// +1540), +1552 = 1, the name, the command at +1584 (its +20 the frame's
+// +180, a word the original never writes, copied as it's left), XAudio
+// (StartXAudio on `start_frame`, the original's 144 bytes below its
+// 256-byte `frame`) and X3DAudio (Start3D), the command queued (the owner's
+// slot 2's object's slot 1), four handlers registered (the owner's slot 1's
+// object's slots 4, 3, 2 and 1, keys 7, 1, 6 and 8, member delegates on the
+// frame), the bank vector's words cleared. The callees through their
+// adapters. Returns the manager.
+uint32_t AudioManagerConstruct(uint8_t* base, uint32_t manager, uint32_t owner, uint32_t name,
+                               uint32_t count, uint32_t frame, uint32_t start_frame,
+                               const AudioManagerCalls& calls);
+// sub_82119B38 AudioManager::Create: 1,624 bytes (operator new's plain C++)
+// and AudioManagerConstruct on them (`frame` its frame, 256 bytes below
+// Create's 112); returns the manager, or 0 when the allocation fails.
+// nullopt where operator new's plain C++ can't answer (the original runs,
+// nothing written yet).
+std::optional<uint32_t> AudioManagerCreate(uint8_t* base, uint32_t owner, uint32_t name,
+                                           uint32_t count, uint32_t frame, uint32_t start_frame,
+                                           const AudioManagerCalls& calls);
+
 // --- The network manager's set-up (system-services.md) ---
 
 constexpr uint32_t kNetworkManager = 0x826C74A0;

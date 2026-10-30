@@ -32,6 +32,13 @@ void AppStartUpSteps(PPCContext& ctx, uint8_t* base);
 // original's prologue saves; need --native_heap (the adapters check).
 void MovieConstructSteps(PPCContext& ctx, uint8_t* base);
 void MovieWrapperSteps(PPCContext& ctx, uint8_t* base);
+// AudioManager::Create (sub_82119B38: r3 the owner, r4 the name, r5 the
+// count's address) in frames like the original's, with its constructor and
+// StartXAudio; needs --native_heap (the adapter checks).
+void AudioManagerCreateSteps(PPCContext& ctx, uint8_t* base);
+// AudioEngine::StartXAudio (sub_8259CD50: r3 the engine, not read) alone,
+// for the harness (no adapter: only AudioManager's plain C++ calls it).
+void StartXAudioSteps(PPCContext& ctx, uint8_t* base);
 void TextInitSteps(PPCContext& ctx, uint8_t* base);
 void FontConstructSteps(PPCContext& ctx, uint8_t* base);
 // Whether Text::Init's and Font::Font's native steps can run.
