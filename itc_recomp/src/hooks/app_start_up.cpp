@@ -15,7 +15,7 @@ using guest_call::InFrame;
 ITC_FLAG_BOOL(native_app_start_up, true, "ITC",
               "Run the app's start-up (docs/functions/app-start-up.md: ReadError::SetApp "
               "sub_8209AC50, sub_8209AC30, sub_8209F580, sub_8225FB70, Movies::Set "
-              "sub_820A4360 and, with --native_heap, CreateVertexDeclaration sub_822A8980; the "
+              "sub_820A4360 (these five without adapters: App::StartUp's plain C++ calls them) and, with --native_heap, CreateVertexDeclaration sub_822A8980; the "
               "network manager's set-up Network::SetUp sub_8214E190 with SignIn::SetUp "
               "sub_8214F1C0, Network::StartUp sub_82148868, XNetStartup sub_82575B08 (its "
               "WSAStartup entry sub_82459C10 merged) and XNet::Configure sub_82577560; with "
@@ -32,52 +32,10 @@ namespace asu = app_start_up;
 
 hooks::StartUpRecorder hooks::g_start_up_recorder = nullptr;
 
-extern "C" REX_FUNC(sub_8209AC50) {
-  REX_FUNC_PROLOGUE();
-  if (!ITC_FLAG(native_app_start_up)) {
-    __imp__sub_8209AC50(ctx, base);
-    return;
-  }
-  asu::ReadErrorSetApp(base, ctx.r3.u32);
-}
-
-extern "C" REX_FUNC(sub_8209AC30) {
-  REX_FUNC_PROLOGUE();
-  if (!ITC_FLAG(native_app_start_up)) {
-    __imp__sub_8209AC30(ctx, base);
-    return;
-  }
-  asu::SetAppInterface84(base, ctx.r3.u32);
-}
-
-extern "C" REX_FUNC(sub_8209F580) {
-  REX_FUNC_PROLOGUE();
-  if (!ITC_FLAG(native_app_start_up)) {
-    __imp__sub_8209F580(ctx, base);
-    return;
-  }
-  asu::SetRenderApp(base, ctx.r3.u32);
-}
-
-extern "C" REX_FUNC(sub_8225FB70) {
-  REX_FUNC_PROLOGUE();
-  if (!ITC_FLAG(native_app_start_up)) {
-    __imp__sub_8225FB70(ctx, base);
-    return;
-  }
-  asu::ClearWords8110(base);
-}
-
-extern "C" REX_FUNC(sub_820A4360) {
-  REX_FUNC_PROLOGUE();
-  if (ITC_FLAG(native_app_start_up)) {
-    if (const auto movie = asu::MoviesSet(base, ctx.r3.u32)) {
-      ctx.r3.u64 = *movie;
-      return;
-    }
-  }
-  __imp__sub_820A4360(ctx, base);
-}
+// ReadError::SetApp (sub_8209AC50), sub_8209AC30, sub_8209F580,
+// sub_8225FB70 and Movies::Set (sub_820A4360) have no adapters: only
+// App::StartUp's plain C++ calls them in play (Movies::Set's original where
+// its plain C++ hands back).
 
 extern "C" REX_FUNC(sub_822A8980) {
   REX_FUNC_PROLOGUE();

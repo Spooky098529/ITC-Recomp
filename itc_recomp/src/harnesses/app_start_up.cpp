@@ -64,6 +64,22 @@ void Setter(Context& h, const char* name, GuestFunction recompiled, GuestFunctio
   }
 }
 
+// The removed adapters' register steps (the setters, sub_8225FB70 and
+// Movies::Set: only App::StartUp's plain C++ calls them in play).
+void NativeReadErrorSetApp(PPCContext& t, uint8_t* base) { asu::ReadErrorSetApp(base, t.r3.u32); }
+void NativeSetAppInterface84(PPCContext& t, uint8_t* base) {
+  asu::SetAppInterface84(base, t.r3.u32);
+}
+void NativeSetRenderApp(PPCContext& t, uint8_t* base) { asu::SetRenderApp(base, t.r3.u32); }
+void NativeClearWords8110(PPCContext&, uint8_t* base) { asu::ClearWords8110(base); }
+void NativeMoviesSet(PPCContext& t, uint8_t* base) {
+  if (const auto movie = asu::MoviesSet(base, t.r3.u32)) {
+    t.r3.u64 = *movie;
+    return;
+  }
+  __imp__sub_820A4360(t, base);
+}
+
 void MoviesSet(Context& h) {
   const uint32_t saved = guest::LoadU32(h.base, asu::kMovieClass);
   Results results("Movies::Set (sub_820A4360)");
@@ -89,7 +105,7 @@ void MoviesSet(Context& h) {
       guest::StoreU32(h.base, asu::kMovieClass, 0x5A5A5A5A);
       PPCContext t = CallContext(h);
       t.r3.u64 = interface;
-      (v == 0 ? __imp__sub_820A4360 : sub_820A4360)(t, h.base);
+      (v == 0 ? __imp__sub_820A4360 : NativeMoviesSet)(t, h.base);
       out[v].Word(guest::LoadU32(h.base, asu::kMovieClass));
       out[v].Word(t.r3.u32);
       out[v].Bytes(Read(h.base, h.data, 512));
@@ -743,12 +759,12 @@ void AppStartUpCases(Context& h) {
 }  // namespace
 
 void AppStartUp(Context& h) {
-  Setter(h, "ReadError::SetApp (sub_8209AC50)", __imp__sub_8209AC50, sub_8209AC50,
+  Setter(h, "ReadError::SetApp (sub_8209AC50)", __imp__sub_8209AC50, NativeReadErrorSetApp,
          {asu::kReadErrorApp});
-  Setter(h, "SetAppInterface84 (sub_8209AC30)", __imp__sub_8209AC30, sub_8209AC30,
+  Setter(h, "SetAppInterface84 (sub_8209AC30)", __imp__sub_8209AC30, NativeSetAppInterface84,
          {asu::kAppInterface84});
-  Setter(h, "SetRenderApp (sub_8209F580)", __imp__sub_8209F580, sub_8209F580, {asu::kRenderApp});
-  Setter(h, "ClearWords8110 (sub_8225FB70)", __imp__sub_8225FB70, sub_8225FB70,
+  Setter(h, "SetRenderApp (sub_8209F580)", __imp__sub_8209F580, NativeSetRenderApp, {asu::kRenderApp});
+  Setter(h, "ClearWords8110 (sub_8225FB70)", __imp__sub_8225FB70, NativeClearWords8110,
          {asu::kWords8110, asu::kWords8114});
   MoviesSet(h);
   CreateVertexDeclaration(h);

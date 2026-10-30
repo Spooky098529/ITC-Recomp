@@ -31,7 +31,7 @@
 
 ITC_FLAG_BOOL(native_strings_and_font, true, "ITC",
               "Run the string table and the font (docs/functions/strings-and-font.md: "
-              "Strings::Init sub_8210A860 (with --native_heap), Strings::OnLoaded sub_8210A850, "
+              "Strings::Init sub_8210A860 (with --native_heap; no adapter: Text::Init's plain C++ calls it), Strings::OnLoaded sub_8210A850, "
               "Strings::Release sub_8210A538 (with --native_heap), Text::IsLoaded "
               "sub_82211C90 with Strings::IsLoaded sub_8210A768 and Font::IsLoaded "
               "sub_821081A0, swprintf sub_8210A490 (with vswprintf sub_825A9A80, _vswprintf_l "
@@ -73,20 +73,10 @@ ITC_FLAG_DECLARE(bool, log_recording_by_pass);
     return;                                    \
   }
 
-// Strings::Init: no arguments; r3 the table when it allocates it, else left.
-// Natively only while --native_heap routes VirtualAlloc to the allocation
-// layer.
-extern "C" REX_FUNC(sub_8210A860) {
-  REX_FUNC_PROLOGUE();
-  if (!ITC_FLAG(native_strings_and_font) || !hooks::NativeHeapActive()) {
-    __imp__sub_8210A860(ctx, base);
-    return;
-  }
-  const uint32_t table = StringsInit(base);
-  if (table != 0) {
-    ctx.r3.u64 = table;
-  }
-}
+// Strings::Init (sub_8210A860) has no adapter: only Text::Init's plain C++
+// (app_start_up::TextInit, src/hooks/app_start_up.cpp) calls it in play,
+// StringsInit directly while --native_strings_and_font and --native_heap
+// are on, else the original.
 
 // Strings::OnLoaded: r6 = the file's loaded flag.
 extern "C" REX_FUNC(sub_8210A850) {
