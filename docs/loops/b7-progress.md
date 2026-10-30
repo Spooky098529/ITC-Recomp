@@ -26,8 +26,11 @@ file's history. What's left to see in a drive, from every run:
   on the drive list.
 - Subsystem 1 of 3: the app's start-up (`sub_82106548`, the top of
   `leads.md`). Mapped (d5647db, `app-start-up.md`, 30 rows, 18 ready
-  groups); the map's stop answered: the voice engine (XHV, `Voice::Init` `sub_8257B7A8` under the network manager's `sub_8214F6E8`): not made; its users seen in play (`sub_8214FA78` every frame, the UI's calls through the engine's +52, the release `sub_8214F690`) skipped natively with what they'd read with no headset (no talkers, no data), Status Dropped (the user's call, 2026-10-30, "Map Xbox features, don't port"). Migration agent
-  running.
+  groups); the map's stop answered: the voice engine (XHV, `Voice::Init` `sub_8257B7A8` under the network manager's `sub_8214F6E8`): not made; its users seen in play (`sub_8214FA78` every frame, the UI's calls through the engine's +52, the release `sub_8214F690`) skipped natively with what they'd read with no headset (no talkers, no data), Status Dropped (the user's call, 2026-10-30, "Map Xbox features, don't port"). Migration 1
+  checked (c9aed90..6292712: the voice skip, the start-up's leaves, the
+  network manager's set-up, the scene target, `Billboards::Init`, 5
+  adapters removed; `--native_app_start_up`; replay ok, `itc_2577`).
+  Validation agent running.
 
 ## Done
 
@@ -55,3 +58,6 @@ file's history. What's left to see in a drive, from every run:
   car_sounds 0 differing): ours 3031, work left 3287.
 - After its validation (`itc_2574`: race 7 s, 0 errors, every harness
   0 differing but the expected groups): ours 3031, work left 3287.
+- After the start-up's migration 1 (`itc_2593`: race 38 s, 0 errors,
+  touched harnesses 0 differing): ours 3064, work left 3256 (wrapped
+  104, known 495, unknown 2657).

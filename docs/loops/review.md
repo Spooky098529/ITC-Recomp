@@ -33,6 +33,18 @@ When the user has reviewed a run's section, its heading gets
   row); `ActionMappers::Init` is called with r3 = app + 16, which
   doesn't match its row ("the input manager"), not checked. The call
   asked: the voice engine (XHV, `Voice::Init` `sub_8257B7A8` under the network manager's `sub_8214F6E8`): not made; its users seen in play (`sub_8214FA78` every frame, the UI's calls through the engine's +52, the release `sub_8214F690`) skipped natively with what they'd read with no headset (no talkers, no data), Status Dropped (the user's call, 2026-10-30, "Map Xbox features, don't port").
+- The app's start-up, migration 1 (c9aed90..6292712): the voice engine
+  not made (`sub_8214F6E8` Dropped, keeping its two words +456 and
+  +444; the engine pointer `0x826C74A0` stays 0; the voice thread's
+  override removed). For review: no reader of the engine needed a skip
+  of its own (`sub_8214FA78` and `sub_8214F810` already out by B5's
+  `Network::Update`; the UI's +52 headset checks `sub_8226BCB8`,
+  `sub_8226EEC8` run only when `sub_82260908` answers 1, a session
+  state only system link and Live set; the release checks for null);
+  no harness for the Dropped set-up (the original would make an engine
+  with a thread). The `notify` harness now empties its listener's
+  queue before its cases (the SDK's start-up notifications go to the
+  first system listener, which was voice's). `sub_82459C10` Merged.
 
 ## Run 2026-10-29 22:22 (`b7-loop-29-10-26-2`)
 
