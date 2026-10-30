@@ -402,6 +402,11 @@ Rows not yet moved stay in the table below. So far:
   constructors), the save defaults' bit sets, the loading screen's and
   another set of UI movies, and two static copies of the replay (B7;
   the loads it calls stay in their files).
+- [`career.md`](career.md): the player's career over the save data:
+  a race's result in the stats record and the items' records, the
+  unlocks and rewards checked after a race, the stages, the day's
+  advance and the day's races picked, and the garage's list (B7; the
+  race event it makes has its own lead).
 
 These files hold functions only. What used to follow the table here moved
 out on 2026-10-20: how frame interpolation works, its options and what
