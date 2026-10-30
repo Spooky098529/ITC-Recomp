@@ -390,6 +390,17 @@ void DirectorStart(uint8_t* base, uint32_t director, const std::function<void()>
 void DirectorRelease(uint8_t* base, uint32_t director, const std::function<void()>& free_all,
                      const std::function<void()>& release_viewports);
 
+// --- The director's state machine and views (src/camera_modes/director.cpp) ---
+
+constexpr uint32_t kMachine = 16;  // the director's state machine
+// sub_82159950 CameraDirector::InitStates: +9620 = 1, the state machine's
+// (+16) 34 transitions added as the original does (its stores and copies
+// replayed in `frame`, its 2,368 bytes: the words it never writes go into
+// the transitions), then +9628, +9632 and +9624 = 0. Returns the last
+// StateMachine::Add's plain C++'s answer (`replaced` its flag).
+constexpr uint32_t kInitStatesFrame = 2368;
+uint32_t DirectorInitStates(uint8_t* base, uint32_t director, uint32_t frame, bool* replaced);
+
 // CutsceneShot::Init's guest calls: the copies List16::Copy32 and
 // Insert32 refuse (memcpy), and CameraAnims::Load of the asset id.
 struct CutsceneCalls {

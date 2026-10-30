@@ -27,6 +27,7 @@
 #include "hooks/ui_movies_game.h"
 #include "memory/c_runtime_heap.h"
 #include "memory/heap.h"
+#include "game_modes/game_modes.h"
 #include "mode_tick/mode_tick.h"
 #include "post_effects/post_effects.h"
 #include "track_zones/track_zones.h"
@@ -3722,6 +3723,56 @@ void GarageCameras(Context& h, Random& r) {
   results.Report();
 }
 
+// --- CameraDirector::InitStates: an empty state machine or one with random
+// transitions already (fewer than 150, so the 34 fit; keys of small numbers,
+// some matching), the original's frame filled with the same random words for
+// both (the words it never writes go into the transitions); the director's
+// first 9,640 bytes, the frame (but its back chain and saved registers) and
+// r3 compared ---
+
+void RandomWords(uint8_t* base, uint32_t address, uint32_t bytes, Random& r) {
+  for (uint32_t i = 0; i < bytes; i += 4) {
+    guest::StoreU32(base, address + i, uint32_t(r.Next()));
+  }
+}
+
+void DirectorInitStates(Context& h, Random& r) {
+  namespace gm = game_modes;
+  Results results("CameraDirector::InitStates (sub_82159950)");
+  Block director(kDirectorBytes);
+  const uint32_t frame = CallContext(h).r1.u32 - cm::kInitStatesFrame;
+  const uint32_t machine = director.address + cm::kMachine;
+  for (int c = 0; c < 24; c++) {
+    const uint64_t seed = r.Next();
+    Outputs out[2];
+    for (int v = 0; v < 2; v++) {
+      Random w(seed);
+      RandomWords(h.base, director.address, 9640, w);
+      RandomWords(h.base, frame, cm::kInitStatesFrame, w);
+      if (c % 2 == 0) {
+        gm::StateMachineConstruct(h.base, machine);
+        guest::StoreU32(h.base, machine + gm::kTransitionCount, 0);
+      } else {
+        guest::StoreU32(h.base, machine + gm::kTransitionCount, w.Below(150));
+        for (uint32_t i = 0; i < 200; i++) {
+          for (uint32_t k = 0; k < 4; k++) {
+            guest::StoreU32(h.base, machine + 48 * i + 4 * k, w.Below(k < 2 ? 60 : 2));
+          }
+        }
+      }
+      PPCContext t = CallContext(h);
+      t.r3.u64 = director.address;
+      (v == 0 ? Original<__imp__sub_82159950> : hooks::CameraModesStep82159950)(t, h.base);
+      out[v].Bytes(Read(h.base, director.address, 9640));
+      out[v].Bytes(Read(h.base, frame + 80, cm::kInitStatesFrame - 80 - 112));
+      out[v].Word(t.r3.u32);
+      out[v].Word(uint32_t(t.r3.u64 >> 32));
+    }
+    results.Check(out[0], out[1], fmt::format("case {}", c));
+  }
+  results.Report();
+}
+
 }  // namespace
 
 void CameraModes(Context& h) {
@@ -3750,6 +3801,7 @@ void CameraModes(Context& h) {
   TvConstructs(h, r);
   TvSteps(h, r);
   GarageCameras(h, r);
+  DirectorInitStates(h, r);
 }
 
 }  // namespace harness

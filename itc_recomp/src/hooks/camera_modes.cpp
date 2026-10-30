@@ -69,7 +69,8 @@ ITC_FLAG_BOOL(native_camera_modes, true, "ITC",
               "through its override, sub_82211A28); the TV camera's TvCamera::TvCamera sub_82155288 "
               "(with native atexit), TvCamera::Update sub_821593D8 with Step sub_821562F8 (no "
               "adapter: only Update's plain C++ calls it; with native atexit; the attract race's color "
-              "filter by rand); the front end's GarageCamera::Update sub_8217BE98) natively instead of "
+              "filter by rand); the front end's GarageCamera::Update sub_8217BE98; the director's "
+              "CameraDirector::InitStates sub_82159950) natively instead of "
               "through the translated code (the same writes; checked by "
               "--run_harnesses=camera_modes)");
 
@@ -1236,6 +1237,27 @@ void CameraModesStep821593D8(PPCContext& ctx, uint8_t* base) {
 }  // namespace hooks
 
 ITC_CAMERA_MODES(821593D8)
+
+// --- The director's state machine ---
+
+namespace hooks {
+
+// CameraDirector::InitStates: r3 = the director; r3 as the last
+// StateMachine::Add leaves it (its adapter's: a new transition's address
+// from the machine's 64-bit r3, src/hooks/game_modes.cpp).
+void CameraModesStep82159950(PPCContext& ctx, uint8_t* base) {
+  ctx.fpscr.disableFlushMode();
+  const uint64_t machine_r3 = ctx.r3.u64 + cm::kMachine;
+  const uint32_t machine = ctx.r3.u32 + cm::kMachine;
+  bool replaced = false;
+  const uint32_t r3 =
+      cm::DirectorInitStates(base, ctx.r3.u32, ctx.r1.u32 - cm::kInitStatesFrame, &replaced);
+  ctx.r3.u64 = replaced ? r3 : machine_r3 + (r3 - machine);
+}
+
+}  // namespace hooks
+
+ITC_CAMERA_MODES(82159950)
 
 // --- The garage camera ---
 
