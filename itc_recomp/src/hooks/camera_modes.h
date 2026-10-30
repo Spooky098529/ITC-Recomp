@@ -58,5 +58,6 @@ void CameraModesStep82154A48(PPCContext& ctx, uint8_t* base);
 void CameraModesStep82153A50(PPCContext& ctx, uint8_t* base);
 void CameraModesStep82154D38(PPCContext& ctx, uint8_t* base);
 void CameraModesStep82153E58(PPCContext& ctx, uint8_t* base);
+void CameraModesStep82155E58(PPCContext& ctx, uint8_t* base);
 
 }  // namespace hooks

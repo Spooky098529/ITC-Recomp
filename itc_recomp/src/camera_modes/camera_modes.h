@@ -326,6 +326,20 @@ void IntroMakeShot(uint8_t* base, uint32_t shot, uint32_t viewport, uint32_t veh
 // Stages::Copy's original (out, stages, stage), where its plain C++
 // refuses.
 using StagesCopyCall = std::function<void(uint32_t, uint32_t, uint32_t)>;
+// sub_82155E58 IntroCamera::Update (vtable slot 0 of 0x820093C4):
+// CameraTarget::Track; with no shots (the list's count +424 0) the race's
+// flag word (+0x59AE4) bit 1 set and phase (+756) 2, nothing else; phase 0:
+// the current shot (+748 steps along the list) stepped (IntroCamera::
+// StepShot, its frame 272 bytes below), +748 on when it ends, phase 1 and
+// 0x826D82C4 = the frame count (+752) after the last; phases 1 and 2: an
+// orbit about the car from its spec block (+76, +80, +84) over t = (the
+// frames since 0x826D82C4) x 1/60 (0x820029E8) clamped to 0-1 (sin and cos
+// of the double at 0x820093A8; a quadratic blend), the eye (+1600) and
+// target (+1616, from (0, +80 x 0x82002CCC's, 0, 1)) through the body's
+// matrix (Vec4::Transform); phase 1 with t at 1: phase 2 and the flag word's
+// bit 1; then the frame count up unless [0x826A50D4] is set. `frame`: 320
+// bytes.
+void IntroUpdate(uint8_t* base, uint32_t camera, uint32_t frame);
 // sub_82158F70 IntroCamera::IntroCamera: vtable 0x820093C4, the tracker's
 // w words 1.0, +748 to +756 0, +16 the vehicle, +20 the viewport, its shot
 // list (+352) reset; the stage's racers (Stages::Copy) whose record's

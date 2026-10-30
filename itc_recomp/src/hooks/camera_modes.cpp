@@ -57,7 +57,7 @@ ITC_FLAG_BOOL(native_camera_modes, true, "ITC",
               "sub_82153640 (no adapters), ChaseCamera::Update sub_82154808, "
               "ViewCamera1::ViewCamera1 sub_82154A48 and ViewCamera2::ViewCamera2 sub_82154D38 "
               "(with native atexit), ViewCamera1::Update sub_82153A50 and ViewCamera2::Update "
-              "sub_82153E58) natively instead of "
+              "sub_82153E58; IntroCamera::Update sub_82155E58) natively instead of "
               "through the translated code (the same writes; checked by "
               "--run_harnesses=camera_modes)");
 
@@ -893,6 +893,22 @@ void CameraModesStep82153E58(PPCContext& ctx, uint8_t* base) {
 
 }  // namespace hooks
 
+namespace hooks {
+
+// IntroCamera::Update (vtable slot 0; its caller reads neither r3 nor f1
+// after): r3 = the camera. A stack pointer not 16-byte aligned runs the
+// original (CameraTarget::Track's frame).
+void CameraModesStep82155E58(PPCContext& ctx, uint8_t* base) {
+  if ((ctx.r1.u32 & 0xF) != 0) {
+    __imp__sub_82155E58(ctx, base);
+    return;
+  }
+  ctx.fpscr.disableFlushMode();
+  cm::IntroUpdate(base, ctx.r3.u32, ctx.r1.u32 - 320);
+}
+
+}  // namespace hooks
+
 // --- The adapters ---
 
 ITC_CAMERA_MODES(82152400)
@@ -934,3 +950,4 @@ ITC_CAMERA_MODES(82154A48)
 ITC_CAMERA_MODES(82153A50)
 ITC_CAMERA_MODES(82154D38)
 ITC_CAMERA_MODES(82153E58)
+ITC_CAMERA_MODES(82155E58)

@@ -2736,6 +2736,63 @@ void ViewCameras(Context& h, Random& r) {
   }
 }
 
+// --- The intro camera's update ---
+
+void IntroUpdates(Context& h, Random& r) {
+  Results results("IntroCamera::Update (sub_82155E58)");
+  constexpr uint32_t kKept = 0x826D82C4, kPaused = 0x826A50D4;
+  Saved kept(h.base, kKept, 4);
+  Saved paused(h.base, kPaused, 4);
+  Saved race_data(h.base, cm::kRaceData, 4);
+  ChaseWorld w;
+  Block race(kRaceBytes);
+  for (int c = 0; c < 300; c++) {
+    w.Randomize(h.base, r);
+    const uint32_t list = w.camera.address + 352;
+    const uint32_t count = r.Below(6) == 0 ? 0 : 1 + r.Below(16);
+    RandomList(h.base, list, 16, count, r);
+    for (uint32_t i = 0; i < 16; i++) {
+      const uint32_t shot = list + 76 + 20 * i;
+      guest::StoreU32(h.base, shot + 0, w.viewport.address);
+      guest::StoreU32(h.base, shot + 4, w.vehicle.address);
+      guest::StoreU32(h.base, shot + 8, r.Below(40));
+      guest::StoreU32(h.base, shot + 12, ViewFloat(r));
+      guest::StoreU32(h.base, shot + 16, r.Below(3) ? 0 : r.Below(5));
+    }
+    const uint32_t frames = r.Below(400);
+    guest::StoreU32(h.base, w.camera.address + 748, count > 0 ? r.Below(count) : 0);
+    guest::StoreU32(h.base, w.camera.address + 752, frames);
+    guest::StoreU32(h.base, w.camera.address + 756, r.Below(5));
+    guest::StoreU32(h.base, w.camera.address + 16, w.vehicle.address);
+    guest::StoreU32(h.base, w.camera.address + 20, w.viewport.address);
+    const auto camera_in = Read(h.base, w.camera.address, 1152);
+    const uint32_t kept_value = r.Below(4) ? frames - r.Below(90) : uint32_t(r.Next());
+    const uint32_t paused_value = r.Below(4) == 0 ? 1 : 0;
+    const uint32_t flags = uint32_t(r.Next());
+    Outputs out[2];
+    for (int v = 0; v < 2; v++) {
+      Write(h.base, w.camera.address, camera_in.data(), 1152);
+      guest::StoreU32(h.base, kKept, kept_value);
+      guest::StoreU32(h.base, kPaused, paused_value);
+      guest::StoreU32(h.base, race.address + 0x59AE4, flags);
+      guest::StoreU32(h.base, cm::kRaceData, race.address);
+      PPCContext t = AlignedContext(h);
+      FillStackBytes(h.base, t.r1.u32, uint64_t(c) + 1, 2048);
+      t.r3.u64 = w.camera.address;
+      (v == 0 ? Original<__imp__sub_82155E58> : hooks::CameraModesStep82155E58)(t, h.base);
+      w.Out(out[v], h.base);
+      out[v].Bytes(Read(h.base, list, 412));
+      out[v].Word(guest::LoadU32(h.base, kKept));
+      out[v].Word(guest::LoadU32(h.base, race.address + 0x59AE4));
+      kept.Restore();
+      paused.Restore();
+      race_data.Restore();
+    }
+    results.Check(out[0], out[1], fmt::format("case {} count {}", c, count));
+  }
+  results.Report();
+}
+
 }  // namespace
 
 void CameraModes(Context& h) {
@@ -2758,6 +2815,7 @@ void CameraModes(Context& h) {
   RoutePaths(h, r);
   ChaseCameras(h, r);
   ViewCameras(h, r);
+  IntroUpdates(h, r);
 }
 
 }  // namespace harness

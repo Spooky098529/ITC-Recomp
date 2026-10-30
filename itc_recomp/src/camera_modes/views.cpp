@@ -452,6 +452,108 @@ void IntroMakeShot(uint8_t* base, uint32_t shot, uint32_t viewport, uint32_t veh
   Stfs(base, shot + 12, Fmuls(n, Lfs(base, 0x82002CCC)));
 }
 
+void IntroUpdate(uint8_t* base, uint32_t camera, uint32_t frame) {
+  ITC_NATIVE_RUNNING("sub_82155E58 IntroCamera::Update");
+  constexpr uint32_t kKept = 0x826D82C4;  // the frame the shots ended at
+  const uint32_t f = frame;
+  TargetTrack(base, camera + 32, Load(base, camera + 16), f - 256);
+  const uint32_t list = camera + 352;
+  if (guest::LoadU16(base, list + 72) == 0) {
+    // No shots: the race's flag word (+0x59AE4) bit 1, phase 2.
+    const uint32_t flags = Load(base, kRaceData) + 0x59AE4;
+    Store(base, flags, Load(base, flags) | 1);
+    Store(base, camera + 756, 2);
+    return;
+  }
+  const uint32_t phase = Load(base, camera + 756);
+  if (phase < 1) {
+    // The shots in turn: the current one stepped, the next when it ends;
+    // after the last, phase 1 from this frame.
+    const uint32_t node = Walk16(base, list, Load(base, camera + 748));
+    const int32_t slot = LoadS16(base, node + 2);
+    const uint32_t shot = uint32_t(int64_t(slot) * 20) + list + 76;
+    if ((IntroStepShot(base, shot, f - 272) & 0xFF) == 0) {
+      Store(base, camera + 748, Load(base, camera + 748) + 1);
+    }
+    const uint32_t count = uint32_t(LoadS16(base, list + 72));
+    if (!(Load(base, camera + 748) < count)) {
+      const uint32_t frames = Load(base, camera + 752);
+      Store(base, camera + 756, 1);
+      Store(base, kKept, frames);
+    }
+  } else if (phase < 3) {
+    // The orbit about the car (from its spec block's size) over the frames
+    // since the shots ended, at 1/60 s a frame, t clamped to 0-1.
+    const uint32_t spec = vehicle_accessors::ObjectRecord1888(
+        Load(base, Load(base, camera + 16) + 5712));
+    const double c = Lfs(base, 0x82002CCC);
+    const uint32_t frames = Load(base, camera + 752);
+    const uint32_t r84 = Load(base, spec + 84);
+    StoreDoubleword(base, f + 80, r84);
+    const double f11 = Single(double(int64_t(r84)));
+    const int32_t since = int32_t(frames - Load(base, kKept));
+    const uint32_t r80 = Load(base, spec + 80);
+    StoreDoubleword(base, f + 240, r80);
+    StoreDoubleword(base, f + 96, uint64_t(int64_t(since)));
+    const double f12 = Single(double(int64_t(since)));
+    const uint32_t r76 = Load(base, spec + 76);
+    StoreDoubleword(base, f + 96, r76);
+    double t = Fmuls(f12, Lfs(base, 0x820029E8));
+    const double zero = Lfs(base, kZero);
+    const double f25 = Fmuls(Single(double(int64_t(r80))), c);
+    const double f27 = Fmadds(Single(double(int64_t(r76))), c, Lfs(base, 0x82008230));
+    const double f26 = Fmadds(f11, c, Lfs(base, 0x82002A14));
+    const double one = Lfs(base, kOne);
+    if (t < zero) {
+      t = zero;
+    } else if (t > one) {
+      t = one;
+    }
+    const double angle = std::bit_cast<double>(Load64(base, 0x820093A8));
+    const double f28 = Fmadds(Single(c_runtime::Sin(angle)), f27, f25);
+    const double f9 = Fmuls(Single(c_runtime::Cos(angle)), f27);
+    for (uint32_t at = f + 188; at <= f + 236; at += 16) {
+      Stfs(base, at, one);
+    }
+    const double u = Fsubs(one, t);
+    const double f10a = Fneg(f9);
+    Stfs(base, f + 92, one);
+    const double tt = Fmuls(t, t);
+    const double f11n = Fneg(f26);
+    const double f8a = Fmuls(u, t);
+    const double uu = Fmuls(u, u);
+    const double f12b = Fmuls(f8a, Lfs(base, 0x820021E8));
+    const double f8b = Fmuls(f10a, f12b);
+    const double f7a = Fadds(tt, f12b);
+    const double f10b = Fmadds(f10a, tt, f8b);
+    const double f8c = Fmuls(f11n, uu);
+    const double f7b = Fadds(f7a, uu);
+    Stfs(base, f + 80, Fmadds(uu, f9, f10b));
+    const double f12c = Fmadds(f11n, f12b, f8c);
+    Stfs(base, f + 84, Fmuls(f7b, f28));
+    Stfs(base, f + 88, Fmadds(tt, zero, f12c));
+    const uint32_t body_matrix =
+        vehicle_accessors::RigidBodyMatrix(Load(base, Load(base, camera + 16) + 336));
+    CopyDoublewords(base, f + 176, body_matrix, 8);
+    CopyWords(base, f + 112, f + 176, 16);
+    matrix_math::Vec4Transform(base, Load(base, camera + 20) + 1600, f + 112, f + 80);
+    Stfs(base, f + 80, zero);
+    Stfs(base, f + 84, f25);
+    Stfs(base, f + 88, zero);
+    Stfs(base, f + 92, one);
+    matrix_math::Vec4Transform(base, Load(base, camera + 20) + 1616, f + 112, f + 80);
+    if (int32_t(Load(base, camera + 756)) == 1 && !(t < one)) {
+      Store(base, camera + 756, 2);
+      const uint32_t flags = Load(base, kRaceData) + 0x59AE4;
+      Store(base, flags, Load(base, flags) | 1);
+    }
+  }
+  // The frames counted unless the screen fade holds them.
+  if (int32_t(Load(base, 0x826A50D4)) == 0) {
+    Store(base, camera + 752, Load(base, camera + 752) + 1);
+  }
+}
+
 uint32_t IntroConstruct(uint8_t* base, uint32_t camera, uint32_t viewport, uint32_t vehicle,
                         uint32_t frame, const StagesCopyCall& stages_copy,
                         const c_runtime::AtexitCall& atexit) {
