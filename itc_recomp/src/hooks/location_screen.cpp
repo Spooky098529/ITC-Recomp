@@ -42,7 +42,10 @@ ITC_FLAG_BOOL(native_location_screen, true, "ITC",
               "Transition7 sub_8222AE00, UiMovie::Finish, FinishNamed, FinishAll and Run through "
               "their overrides; ShowOpponentPictures sub_8222B200 and UpdateView sub_82227E20; "
               "with the texts' check ShowOpponentInfo sub_8222B438, Transition12 sub_8222B8A8, "
-              "ShowCard sub_8222BBD0 and Transition17 sub_8222EAD0) "
+              "ShowCard sub_8222BBD0 and Transition17 sub_8222EAD0; Transition4 sub_8222D828 and "
+              "Transition5 sub_8222DA10 over CameraAnims::Evaluate's plain C++, Transition8 "
+              "sub_8222DC08, Transition24 sub_8222D2E8, Transition34 sub_8222D108 and Start "
+              "sub_8222F0B0) "
               "natively instead of through the translated code (the same writes; checked by "
               "--run_harnesses=location_screen). PictureA, PictureB, Picture::Free, KindText, "
               "SetCursor, ShowUnlockEntry and ShowCard have no adapters: only native callers "
@@ -381,11 +384,22 @@ LOCATION_SCREEN_TRANSITION(8222A718, Transition33)
 LOCATION_SCREEN_TRANSITION(8222AE00, Transition7)
 LOCATION_SCREEN_TRANSITION(8222B8A8, Transition12)
 LOCATION_SCREEN_TRANSITION(8222EAD0, Transition17)
+LOCATION_SCREEN_TRANSITION(8222D828, Transition4)
+LOCATION_SCREEN_TRANSITION(8222DA10, Transition5)
+LOCATION_SCREEN_TRANSITION(8222DC08, Transition8)
+LOCATION_SCREEN_TRANSITION(8222D2E8, Transition24)
+LOCATION_SCREEN_TRANSITION(8222D108, Transition34)
 #undef LOCATION_SCREEN_TRANSITION
 
 void LocationScreenShowOpponentInfo(PPCContext& ctx, uint8_t* base) {
   Texts(ctx, base, __imp__sub_8222B438, [&](uint32_t sp, uint32_t, const ls::Calls& calls) {
     return ls::ShowOpponentInfo(base, sp, calls);
+  });
+}
+
+void LocationScreenStart(PPCContext& ctx, uint8_t* base) {
+  Texts(ctx, base, __imp__sub_8222F0B0, [&](uint32_t sp, uint32_t, const ls::Calls& calls) {
+    return ls::Start(base, sp, calls);
   });
 }
 
@@ -470,3 +484,9 @@ LOCATION_SCREEN_ADAPTER(82227E20, LocationScreenUpdateView)
 LOCATION_SCREEN_ADAPTER(8222B438, LocationScreenShowOpponentInfo)
 LOCATION_SCREEN_ADAPTER(8222B8A8, LocationScreenTransition12)
 LOCATION_SCREEN_ADAPTER(8222EAD0, LocationScreenTransition17)
+LOCATION_SCREEN_ADAPTER(8222D828, LocationScreenTransition4)
+LOCATION_SCREEN_ADAPTER(8222DA10, LocationScreenTransition5)
+LOCATION_SCREEN_ADAPTER(8222DC08, LocationScreenTransition8)
+LOCATION_SCREEN_ADAPTER(8222D2E8, LocationScreenTransition24)
+LOCATION_SCREEN_ADAPTER(8222D108, LocationScreenTransition34)
+LOCATION_SCREEN_ADAPTER(8222F0B0, LocationScreenStart)

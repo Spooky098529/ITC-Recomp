@@ -134,5 +134,15 @@ void LocationScreenShowOpponentInfo(PPCContext& ctx, uint8_t* base);
 void LocationScreenTransition12(PPCContext& ctx, uint8_t* base);
 void LocationScreenShowCard(PPCContext& ctx, uint8_t* base);
 void LocationScreenTransition17(PPCContext& ctx, uint8_t* base);
+// sub_8222D828 Transition4, sub_8222DA10 Transition5, sub_8222DC08
+// Transition8, sub_8222D2E8 Transition24, sub_8222D108 Transition34 (r3 =
+// the step's address) and sub_8222F0B0 Start (r3 not read). The texts'
+// check.
+void LocationScreenTransition4(PPCContext& ctx, uint8_t* base);
+void LocationScreenTransition5(PPCContext& ctx, uint8_t* base);
+void LocationScreenTransition8(PPCContext& ctx, uint8_t* base);
+void LocationScreenTransition24(PPCContext& ctx, uint8_t* base);
+void LocationScreenTransition34(PPCContext& ctx, uint8_t* base);
+void LocationScreenStart(PPCContext& ctx, uint8_t* base);
 
 }  // namespace hooks

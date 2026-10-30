@@ -15,6 +15,8 @@
 #include "harness.h"
 
 #include "archive/archive.h"
+#include "camera_modes/camera_modes.h"
+#include "car_specs/car_specs.h"
 #include "base/flags.h"
 #include "base/log.h"
 #include "data_tables/data_tables.h"
@@ -30,6 +32,7 @@
 
 #include <fmt/format.h>
 
+#include <bit>
 #include <cstring>
 #include <functional>
 #include <string>
@@ -75,6 +78,11 @@ constexpr uint32_t kStringTable = 0x826C5C34;
 constexpr uint32_t kLights = 0x8296B950, kLightsBytes = 0x290;
 constexpr uint32_t kViewCopy = 0x8265ED00;
 constexpr uint32_t kMissingMovie = 0x826C5CDC;  // UiMovies::Find's answer when not found
+// The camera animations' objects (6 entries' worth) and the parameters'
+// object with 4 specs (car_specs::kSpecBytes each) after its 64 bytes.
+constexpr uint32_t kAnimsBytes = 0x6000;
+constexpr uint32_t kSpecs = 4;
+constexpr uint32_t kParamsBytes = 64 + kSpecs * car_specs::kSpecBytes;
 
 struct Block {
   explicit Block(uint32_t bytes) : bytes(bytes), address(memory::Alloc(bytes, 0)) {}
@@ -126,10 +134,13 @@ struct World {
         event(kEventBytes),
         movies(kMoviesBytes),
         texts(kTextsBytes),
-        strings(kStringsBytes) {}
+        strings(kStringsBytes),
+        anims(kAnimsBytes),
+        params(kParamsBytes) {}
   bool ok() const {
     return save.address && tables.address && race.address && screen.address && event.address &&
-           movies.address && texts.address && strings.address;
+           movies.address && texts.address && strings.address && anims.address &&
+           params.address;
   }
   uint32_t items() const { return tables.address + 0x40; }
   uint32_t item(uint32_t id) const { return items() + kItemBytes * id; }
@@ -146,6 +157,8 @@ struct World {
   Block movies;  // movies 21 and 30, their scene tree, the movie table's pairs
   Block texts;   // the movies' text records and buffers
   Block strings;  // the string table for the texts' cases
+  Block anims;    // the camera animations' objects (Transition4, Transition5)
+  Block params;   // the parameters' object and its specs (Start)
 };
 
 struct Spec {
@@ -407,7 +420,10 @@ void Case(Context& h, Results& results, const World& w, uint64_t seed, const Set
                               {kStringTable, 4},
                               {kLights, kLightsBytes},
                               {kViewCopy, 16},
-                              {0x826A50AC, 0x40}});
+                              {0x826A50AC, 0x40},
+                              {camera_modes::kAnims, 6 * camera_modes::kAnimBytes},
+                              {camera_modes::kAnimCount, 4},
+                              {car_specs::kParams, 4}});
     PPCContext t = CallContext(h);
     WriteRandom(h.base, h.data, kScratchBytes, r);
     WriteRandom(h.base, t.r1.u32, h.data - t.r1.u32, r);
@@ -1213,6 +1229,165 @@ void OpponentPages(Context& h, const World& w) {
         __imp__sub_8222EAD0, hooks::LocationScreenTransition17, texts(3152, 3024, true));
 }
 
+// A float word: an ordinary value now and then negative, else any word (NaNs
+// and infinities among them).
+uint32_t AnyFloat(Random& r, float range) {
+  if (r.Below(6) == 0) {
+    return uint32_t(r.Next());
+  }
+  const float value = range * (float(r.Below(20001)) / 10000.0f - 1.0f);
+  return std::bit_cast<uint32_t>(value);
+}
+
+// The camera animations (Transition4, Transition5): 0 to 6 entries, entry e
+// the location e's first animation id (0x82636518 + 16 e), each of 1 to 4
+// objects of kinds 6 (a camera), 7 (a target), 1, 3 or the end (14), their
+// blocks (+80, count +336) of the kinds the evaluations read (0 to 2, 101,
+// 102, 109) and others, each block's data (+60) four frames of floats.
+void ShapeAnims(uint8_t* base, const World& w, Random& r) {
+  uint32_t at = w.anims.address;
+  auto take = [&](uint32_t bytes) {
+    const uint32_t a = at;
+    at += (bytes + 15) & ~15u;
+    return a;
+  };
+  const uint32_t entries = r.Below(8) == 0 ? r.Below(6) : 6;
+  for (uint32_t e = 0; e < entries; e++) {
+    const uint32_t entry = camera_modes::kAnims + camera_modes::kAnimBytes * e;
+    const uint32_t count = 1 + r.Below(4);
+    guest::StoreU32(base, entry, guest::LoadU32(base, 0x82636518 + 16 * e));
+    guest::StoreU32(base, entry + 260, count);
+    for (uint32_t i = 0; i < count; i++) {
+      static constexpr uint32_t kKinds[] = {6, 7, 6, 7, 1, 3, 14};
+      const uint32_t kind = kKinds[r.Below(7)];
+      const uint32_t object = take(340);
+      guest::StoreU32(base, entry + 4 + 4 * i, object);
+      guest::StoreU32(base, object, kind);
+      const uint32_t blocks = 1 + r.Below(7);
+      guest::StoreU32(base, object + 336, blocks);
+      for (uint32_t b = 0; b < blocks; b++) {
+        static constexpr uint32_t kSubs[] = {0, 1, 2, 101, 102, 109, 3, 200};
+        const uint32_t sub = kSubs[r.Below(8)];
+        const uint32_t block = take(64);
+        const uint32_t data = take(16);
+        guest::StoreU32(base, object + 80 + 4 * b, block);
+        guest::StoreU32(base, block, sub);
+        guest::StoreU32(base, block + 60, data);
+        for (uint32_t f = 0; f < 4; f++) {
+          uint32_t word = AnyFloat(r, 400.0f);
+          if ((sub == 101 || sub == 102) && r.Below(8) != 0) {
+            word = std::bit_cast<uint32_t>(float(5.0 + double(r.Below(60000)) / 1000.0));
+          }
+          guest::StoreU32(base, data + 4 * f, word);
+        }
+      }
+    }
+  }
+  guest::StoreU32(base, camera_modes::kAnimCount, entries);
+}
+
+// The start's fields: the garage (the save data's +6120 entries: a next
+// halfword 0 to 49 and a slot 0 to 19, the start at +6324, the count at
+// +0x19920 0 to 3; the slots' cars, 1,968 bytes each from +6120, +224 a
+// spec id 0 to 3), the parameters' object (+12 its specs) and each spec's
+// byte +771 (1, 0 or another); the race data's Stages::Word808 (+0x59620 +
+// 808: 0 or not), +816 (0 or not), the unlock count (0 or 1 to 6), the page
+// object's page (0, 12, 13 or any).
+void ShapeStart(uint8_t* base, const World& w, Random& r) {
+  const uint32_t save = w.save.address;
+  guest::StoreU32(base, save + 0x19920, r.Below(4));
+  guest::StoreU16(base, save + 6324, uint16_t(r.Below(50)));
+  for (uint32_t k = 0; k < 50; k++) {
+    guest::StoreU16(base, save + 6120 + 4 * k, uint16_t(r.Below(50)));
+    guest::StoreU16(base, save + 6122 + 4 * k, uint16_t(r.Below(20)));
+  }
+  for (uint32_t k = 0; k < 20; k++) {
+    guest::StoreU32(base, save + 6120 + 1968 * k + 224, r.Below(kSpecs));
+  }
+  const uint32_t params = w.params.address;
+  guest::StoreU32(base, params + 12, params + 64);
+  for (uint32_t k = 0; k < kSpecs; k++) {
+    const uint32_t spec = params + 64 + car_specs::kSpecBytes * k;
+    guest::StoreU8(base, spec + 771, uint8_t(r.Below(3) == 0 ? r.Next() : r.Below(2)));
+  }
+  guest::StoreU32(base, car_specs::kParams, params);
+  guest::StoreU32(base, w.race.address + 0x59620 + 808, r.Below(2) == 0 ? 0 : uint32_t(r.Next()));
+  guest::StoreU32(base, w.screen.address + 816, r.Below(2) == 0 ? 0 : uint32_t(r.Next()));
+  guest::StoreU32(base, save + 0x1C778 + 768, r.Below(2) == 0 ? 0 : 1 + r.Below(6));
+  static constexpr uint32_t kPages[] = {0, 12, 13};
+  guest::StoreU32(base, w.screen.address + kPagesAt,
+                  r.Below(4) == 0 ? uint32_t(r.Next()) : kPages[r.Below(3)]);
+}
+
+// The course view's transitions (Transition4, Transition5: the camera
+// animation's output floats compared as floats, the frame's +96 to +167
+// and the screen's +592 to +623, +664, +668, then cleared for the byte
+// comparison), the way back (Transition8, Transition24, Transition34) and
+// the start.
+void ViewPages(Context& h, const World& w) {
+  uint8_t* const base = h.base;
+  const SetupFn view = [base](Random& r, const World& w) {
+    ShapeScreen(base, w, r);
+    ShapeAnims(base, w, r);
+  };
+  const SetupFn start = [base](Random& r, const World& w) {
+    ShapeScreen(base, w, r);
+    ShapeStart(base, w, r);
+  };
+  const ArgsFn none = [](PPCContext&, Random&, const World&) {};
+  const ArgsFn step = [](PPCContext& t, Random&, const World& w) {
+    t.r3.u64 = w.screen.address + 0x700;
+  };
+  auto texts = [](int32_t frame, uint32_t locals) {
+    Spec spec{{{-frame + 80, locals}}};
+    spec.texts = true;
+    return spec;
+  };
+  auto camera = [&](int32_t frame) {
+    Spec spec{{{-frame + 80, 88}}};
+    spec.texts = true;
+    const uint32_t screen = w.screen.address;
+    spec.after = [base, frame, screen](PPCContext& t, Outputs& out) {
+      const uint32_t locals = t.r1.u32 - uint32_t(frame) + 96;
+      out.Floats(base, locals, 18);
+      out.Floats(base, screen + 592, 8);
+      out.Floats(base, screen + 664, 2);
+      for (uint32_t i = 0; i < 72; i += 4) {
+        guest::StoreU32(base, locals + i, 0);
+      }
+      for (uint32_t i = 0; i < 32; i += 4) {
+        guest::StoreU32(base, screen + 592 + i, 0);
+      }
+      guest::StoreU32(base, screen + 664, 0);
+      guest::StoreU32(base, screen + 668, 0);
+    };
+    return spec;
+  };
+  Group(h, w, "LocationScreen::Transition4 (sub_8222D828)", 300, view, step,
+        __imp__sub_8222D828, hooks::LocationScreenTransition4, camera(208));
+  Group(h, w, "LocationScreen::Transition5 (sub_8222DA10)", 300, view, step,
+        __imp__sub_8222DA10, hooks::LocationScreenTransition5, camera(224));
+  // Transition8's node reset (UiMovie::ResetNode of the root's child 11):
+  // the sub-scenes' ranges (+100 the first, +104 the count) within the
+  // root's children.
+  const SetupFn back = [base](Random& r, const World& w) {
+    ShapeScreen(base, w, r);
+    for (uint32_t k = 0; k < 16; k++) {
+      const uint32_t sub = w.movies.address + kSubScenesAt + 0x400 * k;
+      guest::StoreU32(base, sub + 100, r.Below(20));
+      guest::StoreU32(base, sub + 104, r.Below(6));
+    }
+  };
+  Group(h, w, "LocationScreen::Transition8 (sub_8222DC08)", 200, back, step,
+        __imp__sub_8222DC08, hooks::LocationScreenTransition8, texts(112, 8));
+  Group(h, w, "LocationScreen::Transition24 (sub_8222D2E8)", 200, view, step,
+        __imp__sub_8222D2E8, hooks::LocationScreenTransition24, texts(112, 8));
+  Group(h, w, "LocationScreen::Transition34 (sub_8222D108)", 200, view, step,
+        __imp__sub_8222D108, hooks::LocationScreenTransition34, texts(112, 8));
+  Group(h, w, "LocationScreen::Start (sub_8222F0B0)", 300, start, none, __imp__sub_8222F0B0,
+        hooks::LocationScreenStart, texts(128, 0));
+}
+
 }  // namespace
 
 void LocationScreen(Context& h) {
@@ -1236,6 +1411,7 @@ void LocationScreen(Context& h) {
   Texts(h, w);
   AfterRace(h, w);
   OpponentPages(h, w);
+  ViewPages(h, w);
 }
 
 }  // namespace harness

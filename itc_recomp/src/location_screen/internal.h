@@ -12,6 +12,7 @@
 #include "mode_tick/mode_tick.h"
 #include "ui_movies/game.h"
 
+#include <bit>
 #include <cstdlib>
 #include <optional>
 
@@ -22,6 +23,11 @@ constexpr uint32_t kFinishAll = 0x8211DFF8;
 constexpr uint32_t kRun = 0x8211E1B8;
 
 inline uint32_t Screen(uint8_t* base) { return guest::LoadU32(base, kScreen); }
+
+// A float word through a float register and back (lfs, stfs).
+inline uint32_t ThroughFloat(uint8_t* base, uint32_t address) {
+  return std::bit_cast<uint32_t>(float(double(guest::LoadFloat(base, address))));
+}
 
 // The movie with id `id`: the id at the frame's +80, then UiMovies::Find.
 inline uint32_t Movie(uint8_t* base, uint32_t frame, uint32_t id) {

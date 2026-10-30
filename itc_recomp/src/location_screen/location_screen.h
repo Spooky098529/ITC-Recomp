@@ -394,4 +394,45 @@ uint64_t ShowCard(uint8_t* base, uint32_t sp, const Calls& calls);
 // returns 0.
 uint32_t Transition17(uint8_t* base, uint32_t sp, uint32_t step, const Calls& calls);
 
+// --- The course view's camera, the way back and the start
+// (src/location_screen/view.cpp) ---
+//
+// Only while the UI movies' text setters run natively (as the transitions
+// above). `sp` the caller's stack pointer, `step` the transition's step word.
+//
+// sub_8222D828 LocationScreen::Transition4 (page 0 to 1): first movie 21's
+// pose reset (ResetPose, FinishAll), ShowPictures, Play(-1, 1), named 103
+// played and looped, ShowListEntry, named 52 + the list cursor played and
+// looped, text 578 and the scroll reset, the location's camera animation
+// evaluated at frame 1 (CameraAnims::Evaluate into its 208-byte frame's
+// +128; the screen's +592 to +623, +664 and +668 from it); then whether
+// movie 21's run is done.
+uint32_t Transition4(uint8_t* base, uint32_t sp, uint32_t step, const Calls& calls);
+// sub_8222DA10 LocationScreen::Transition5 (page 1 to 0): first ResetMovie,
+// HidePictures, text 573 and the scroll reset, Play(-1, 0), the camera
+// animation at frame 0 (as Transition4's, its 224-byte frame); whether
+// movie 21's run is done, and then ListNode(0), the list's menu reset (+16
+// the location record's count, +812, less 1), named 103 finished and
+// SetCarColor.
+uint32_t Transition5(uint8_t* base, uint32_t sp, uint32_t step, const Calls& calls);
+// sub_8222DC08 LocationScreen::Transition8 (page 2 to 1): first node (-1,
+// 11) reset (ResetNode), ShowListEntry, Play(-1, 10), named 52 + the list
+// cursor played and looped, ShowPictures; whether movie 21's run is done.
+uint32_t Transition8(uint8_t* base, uint32_t sp, uint32_t step, const Calls& calls);
+// sub_8222D2E8 LocationScreen::Transition24 (transitions 24 and 26): first
+// FadeOut(60) and named 98; whether no fade runs (read before movie 21's
+// run), and then ResetMovie and SetCarColor.
+uint32_t Transition24(uint8_t* base, uint32_t sp, uint32_t step, const Calls& calls);
+// sub_8222D108 LocationScreen::Transition34: first named 98; whether movie
+// 21's run is done, and then ResetMovie.
+uint32_t Transition34(uint8_t* base, uint32_t sp, uint32_t step, const Calls& calls);
+// sub_8222F0B0 LocationScreen::Start (the machine's state 4): +892 = 1 when
+// the garage's selected car's spec (Params::GetCarSpec) has byte +771 = 1,
+// else 0; ResetMovie (its 128-byte frame); the first page: after a race
+// (the race data's Stages::Word808 and its last racer record, +816 = 0)
+// page 12 through transition 23 (+872, +876 = 0), with an unlock to show
+// page 13 through 25, else page 0 directly; FadeIn(30). Returns 30 (r3 as
+// FadeIn leaves it).
+uint32_t Start(uint8_t* base, uint32_t sp, const Calls& calls);
+
 }  // namespace location_screen

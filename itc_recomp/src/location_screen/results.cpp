@@ -98,11 +98,6 @@ void Store64(uint8_t* base, uint32_t address, uint64_t value) {
   guest::StoreU32(base, address + 4, uint32_t(value));
 }
 
-// A float word through a float register and back (lfs, stfs).
-uint32_t ThroughFloat(uint8_t* base, uint32_t address) {
-  return std::bit_cast<uint32_t>(float(double(guest::LoadFloat(base, address))));
-}
-
 }  // namespace
 
 uint32_t Transition23(uint8_t* base, uint32_t sp, uint32_t step, const Calls& calls) {
