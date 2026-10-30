@@ -374,6 +374,16 @@ as a cleanup lead and made the rest of XAudio's objects native (110 of
 110: the resampler, `PcmCodec::Process`, the reverb; ours 2,999 ->
 3,031), then stopped at its validation: `CarSound::Part840Update`'s
 harness differed once (1 of 80, two pointer words), intermittent so far.
+Its twenty-fourth run (the same branch, the user's call, 2026-10-30,
+not yet merged; summary `docs/loops/b7-loop-2026-10-30-0106.md`; 3
+subsystems) fixed that harness (the game's mixer swaps XAudio's two
+voice stage lists between a case's versions: compared by role) and made
+the app's start-up (`app-start-up.md`, `--native_app_start_up`: `App::App`,
+`App::StartUp` and what they build; the voice engine isn't made, by the
+user's call, 2026-10-30), the data load at boot (`data-load.md`,
+`--native_data_load`) and the career (`career.md`, `--native_career`, 49
+of 53) native (ours 3,031 -> 3,167); the rest waits on the race event
+and the car objects' makers.
 Harness runs use `attract_race.sh 40` (the user's call,
 2026-10-23); a race short only because the harnesses took longer is
 no halt. B7 loop migration agents run only their subsystem's harnesses

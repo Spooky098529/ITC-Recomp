@@ -155,8 +155,13 @@ goes in `src/` as overrides), American English.
   XAudio's objects native (110 of 110: the destructors' harness, the
   resampler, the reverb), then stopped at its validation: an
   intermittent difference in the car sounds' harness
-  (`CarSound::Part840Update`, 1 case of 80) (ours 3,031). The
-  runs' rows wait for the user's review (`docs/loops/review.md`). See
+  (`CarSound::Part840Update`, 1 case of 80) (ours 3,031); its
+  twenty-fourth run (the same branch by the user's call, 2026-10-30, 3
+  subsystems, not yet merged) fixed that harness (the mixer's stage
+  lists compared by role) and made the app's start-up (`app-start-up.md`,
+  the voice engine Dropped by the user's call), the data load at boot
+  (`data-load.md`) and the career (`career.md`, 49 of 53) native (ours
+  3,167). The runs' rows wait for the user's review (`docs/loops/review.md`). See
   "B7's loop runs" under B7, and `docs/loops/b7-progress.md`. Guest
   allocation is no longer a block (`docs/native-memory.md`); what the
   rest waits on is in `docs/loops/leads.md` (the archive loader, the
@@ -2651,6 +2656,7 @@ B7. **The game logic inside**: everything else, subsystem by subsystem,
 | 2026-10-30 | Cleanup lead, no mapping (not counted): the rest of XAudio's factory objects (the XMA codec's destructors' harness, `SetLevels` copying as words, the resampler and its kernels, `PcmCodec::Process`, the reverb's stages, core, set-up, construction and pass) | `xaudio-objects.md` | 110 of 110 in play (three migrations; stopped at the last validation: the car sounds' harness differed once) | `--native_xaudio_objects` |
 | 2026-10-30 | The app's start-up (`App::App` and `App::Create`, `App::StartUp` with the text and font set-up, the network manager's set-up, the scene target, `Billboards::Init`, `Movie::Movie` with the movie wrapper's lock a host recursive mutex, `AudioManager::Create`, `XAudioInitialize`, the second camera class; the voice engine not made, Dropped, the user's call) | `app-start-up.md` (with rows in `system-services.md`, `strings-and-font.md`, `movies.md`, `sound-cues.md`, `cameras.md`, `video-output.md`, `framework.md`) | every ready group in play (three migrations; 59 rows changed or added) | `--native_app_start_up` |
 | 2026-10-30 | The game's data load at boot (`BootData::Load` and `CreateObjects`; the save defaults' bit sets, the race data, input recordings and replay objects with their records and the replay's static set-ups; the loading screen's movies; shared loads under their files' flags: the data tables, car parameters, shaders, text, font, strings, a UI movie) | `data-load.md` (with rows in `data-tables.md`, `car-specs.md`, `models.md`, `strings-and-font.md`, `files-and-saves.md`, `ui-movies-game.md`) | every function seen in play (two migrations) | `--native_data_load` |
+| 2026-10-30 | The career (the player's items and stats over the save data: the win, loss and outcome records, the results and day logs, the garage list, the conditions and rewards, the race result's stats, the progress after a race and the next day; `Career::PickNext` up to its gate) | `career.md` | 49 of 53 in play (one migration; the rest waits on the race event and the car objects' makers) | `--native_career` |
 
     The first run (2026-10-22, branch `b7-loop-test`): every harness at 0 differing, attract races at 20-21 s with no errors,
     and a race the user drove looked right. Ours went from 162 to 335 (work
@@ -4057,3 +4063,18 @@ overridden 108, Native 34, Dropped 26, never called 70, live 211.
 Imports: 186 called, 56 with a live caller. B7 (`b7_status.py`): ours
 3,118, work left 3,202 (Wrapped 104, with a row 470, no row yet 2,628),
 from 3,230.
+
+**2026-10-30, the career (branch `b7-loop-29-10-26-2`):** the
+twenty-fourth run's third subsystem, mapped and made native in one
+migration (`career.md`, `--native_career`, `src/career/`): the player's
+items and stats over the save data, 49 of the 53 functions seen in
+play; no career function runs in an attract race, and the pad replay
+reached 15 (the rest are on the drive list). What blocks the rest: the
+race event (`RaceEvent::Make` `sub_82144E58`, a lead) under
+`Career::SetUpEvent` and two event queries, and the car objects' makers
+(`sub_821104D8`) under `Garage::Add`. The run stopped at its limit.
+The boundary: 449 functions (916 pairs): overridden 108, Native 34,
+Dropped 26, never called 70, live 211. Imports: 186 called, 56 with a
+live caller. B7 (`b7_status.py`): ours 3,167, work left 3,165 (Wrapped
+104, with a row 474, no row yet 2,587), from 3,202 (from 3,287 at the
+run's start).

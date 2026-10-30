@@ -21,6 +21,40 @@ here loses its heading.
   adapters `sub_8258E580` and `sub_8258E5B8` on the movie wrapper's
   lock (`video-output.md`; their users run only with
   `--play_movies_with_ffmpeg=false`)
+- The career, migration 1 (attract race `itc_2659`, replay `itc_2660`,
+  ok; `career.md`; the replay doesn't reach a career race's results):
+  `sub_82110590` DayBlock::AddWord4832,
+  `sub_82110B18` Stats::AddPoints,
+  `sub_82112860` ItemFlags::Set,
+  `sub_821104B0` Car::SpecWord744,
+  `sub_82115CC0` Career::PickFromCar,
+  `sub_82114B88` ItemRecords::AddWin,
+  `sub_821139B8` Stats::AddWin,
+  `sub_82111E10` Counter::AddWin,
+  `sub_821134D0` Opponents::AddWin,
+  `sub_82114B08` ItemRecords::AddLoss,
+  `sub_82113AB8` Stats::AddLoss,
+  `sub_82111E80` Counter::AddLoss,
+  `sub_82111F60` WeekCounter::AddLoss,
+  `sub_82113580` Opponents::AddLoss,
+  `sub_82114A88` ItemRecords::AddOutcome3,
+  `sub_82113B50` Stats::AddOutcome3,
+  `sub_82111EF0` Counter::AddOutcome3,
+  `sub_82113628` Opponents::AddOutcome3,
+  `sub_82111FC8` Results::Push,
+  `sub_82110850` ResultRecord::Fill,
+  `sub_821154E0` Garage::InsertCar,
+  `sub_82113468` GarageList::Insert,
+  `sub_82114C08` Rewards::Grant,
+  `sub_82115190` Stats::AddRaceResult,
+  `sub_82112148` RunningMean::MergeTwo,
+  `sub_82111818` Items::AnyWonKind3Stage2,
+  `sub_821118B0` Items::AllWonKind3,
+  `sub_82111940` Items::AllWonKind4Stage2,
+  `sub_821119D0` Items::AllWonKind4Stage3,
+  `sub_82111A60` Items::AllWonKind5,
+  `sub_82111D20` Locations::Unlock,
+  `sub_82111D98` Locations::Unlock2
 
 ## Run 2026-10-29 22:22 (`b7-loop-29-10-26-2`)
 

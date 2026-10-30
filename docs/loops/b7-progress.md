@@ -11,7 +11,7 @@ file's history. What's left to see in a drive, from every run:
 - Run started 2026-10-30 01:06 on `b7-loop-29-10-26-2` (the user's
   call, 2026-10-30: this run stays on the last run's branch), from
   92ffb30; summary `b7-loop-2026-10-30-0106.md`.
-- Limit for this run: 3 subsystems; 2 taken.
+- Limit for this run: 3 subsystems; 3 taken.
 - First, a cleanup lead without mapping (not counted), the last run's
   stop: `CarSound::Part840Update`'s harness (`sub_8210ECF0`,
   `car-sounds.md`), 1 of 80 cases differing once in `itc_2559`
@@ -66,10 +66,14 @@ file's history. What's left to see in a drive, from every run:
   Migration 1 checked (fd83bca..a3d7ec3: every ready group, 49 of
   53 in play ours, 7 adapters removed; `--native_career`; nothing ready
   left, the rest waits on the race event and the car objects' makers).
-  Validation agent running.
+  Validated (`itc_2659`, `itc_2660`): 47 of 47 harness lines; 15 ran
+  in the replay, 32 to drive. Subsystem 3 finished: the run's limit.
 
 ## Done
 
+- The career (subsystem 3): `career.md`, 49 of 53 in play, one
+  migration; `--native_career`; fd83bca..a3d7ec3. Validated
+  (`itc_2659`, `itc_2660`).
 - The data load at boot (subsystem 2): `data-load.md`, every function
   seen in play, two migrations; `--native_data_load`;
   b810489..8689dc1. Validated (`itc_2642`, `itc_2646`).
@@ -129,3 +133,19 @@ file's history. What's left to see in a drive, from every run:
 - After the career's migration 1 (`itc_2658`: race 38 s, 0 errors,
   career 0 differing): ours 3167, work left 3165 (wrapped 104, known
   474, unknown 2587).
+- After the career's validation (`itc_2659`: race 7 s, 0 errors, every
+  harness 0 differing but the expected groups): ours 3167, work left
+  3165 (wrapped 104, known 474, unknown 2587).
+
+## Stopped
+
+2026-10-30, at the run's limit (3 subsystems: the app's start-up, the
+data load at boot, the career), after the career's validation. Every
+harness 0 differing outside the expected groups; nothing uncommitted;
+`check_function_statuses.py`: 0 errors. Left for the user: the run's
+section in `review.md` (the voice engine Dropped by the user's call;
+the movie wrapper's lock a host recursive mutex by the lead's reading
+of the precedents), the drive list in `to-drive.md` (35 functions,
+mostly the career's results side), and the merge. Next in `leads.md`:
+the race event (`sub_82140340`...`sub_82144E58`), which blocks the
+career's rest.
