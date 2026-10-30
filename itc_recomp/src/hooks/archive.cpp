@@ -295,7 +295,20 @@ extern "C" REX_FUNC(sub_8209DB20) {
 }
 
 archive::LoadCall hooks::NativeArchiveLoad(uint8_t* base) {
-  return [base](uint32_t id, uint32_t destination, uint32_t callback, uint32_t context) {
+  return [base](uint32_t id, uint32_t destination, uint32_t callback,
+                uint32_t context) -> int64_t {
+    // A harness's recorder takes the call first, as Archive::Load's adapter
+    // hands it (so a harness running native callers never queues for real).
+    if (hooks::g_start_up_recorder != nullptr) {
+      PPCContext t{};
+      t.r3.u64 = id;
+      t.r4.u64 = destination;
+      t.r5.u64 = callback;
+      t.r6.u64 = context;
+      if (hooks::g_start_up_recorder(t, 0x8209DE48)) {
+        return t.r3.s64 < 0 ? -1 : int64_t(t.r3.u32);
+      }
+    }
     return archive::Queue(base, archive::BuildLoad(base, id, destination, callback, context, 0, 0));
   };
 }

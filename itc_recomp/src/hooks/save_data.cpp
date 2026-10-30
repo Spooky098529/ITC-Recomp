@@ -86,6 +86,9 @@ void SaveDataDelete(PPCContext& ctx, uint8_t* base) {
 }
 
 void SaveDataCreate(PPCContext& ctx, uint8_t* base) {
+  if (hooks::StartUpRecorded(ctx, 0x821057C8)) {  // the data load's harness
+    return;
+  }
   if (hooks::NativeHeapActive() && sd::CreateNative()) {
     ctx.fpscr.disableFlushMode();
     if (const auto holder = sd::SaveDataCreate(base, ctx.r3.u32)) {

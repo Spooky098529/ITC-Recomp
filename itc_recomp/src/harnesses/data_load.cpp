@@ -11,15 +11,23 @@
 #include "base/flags.h"
 #include "base/log.h"
 #include "data_load/data_load.h"
+#include "hooks/app_start_up.h"
+#include "hooks/data_load.h"
+#include "hooks/archive.h"
 #include "hooks/heap.h"
+#include "memory/heap.h"
+#include "ui_movies/game.h"
+#include "ui_movies/ui_movies.h"
 #include "memory/c_runtime_heap.h"
 
 #include <fmt/format.h>
 
+#include <algorithm>
 #include <string>
 #include <vector>
 
 ITC_FLAG_DECLARE(bool, native_data_load);
+ITC_FLAG_DECLARE(bool, native_ui_movies_game);
 
 namespace harness {
 
@@ -198,6 +206,195 @@ void Maker(Context& h, const char* name, GuestFunction recompiled, GuestFunction
   guest::StoreU32(h.base, slot, saved);
 }
 
+// --- The movie sets ---
+
+// The globals the movie sets write: the two lists with their counts and the
+// loading screen's shown flag, the nine words and the two after them, and
+// UiMovie::SetRenderer's two.
+struct Saved {
+  uint32_t address;
+  uint32_t bytes;
+};
+constexpr Saved kMovieGlobals[] = {{dl::kLoadingShown, 0x50},
+                                   {dl::kOtherWords, 0x88},
+                                   {dl::kOtherWord8130, 4},
+                                   {ui_movies::kRenderer, 8}};
+
+// LoadingScreen::Load and sub_82291328 with the lists' words random (the
+// other set's count small), the movies made for real (the recompiled side
+// with --native_ui_movies_game off, so its UiMovie::Load is the original's
+// too), the loads recorded instead of queued: the globals with each new movie
+// labeled, the movies' first 28 bytes and loaded flag, the calls (the files
+// by whether they're pages) and r3; the movies and files freed, the globals
+// put back.
+void MovieSets(Context& h) {
+  std::vector<std::vector<uint8_t>> saved;
+  for (const Saved& g : kMovieGlobals) {
+    saved.push_back(Read(h.base, g.address, g.bytes));
+  }
+  for (const bool loading : {true, false}) {
+    Results results(loading ? "LoadingScreen::Load (sub_82247B98; LoadingScreen::AddMovie sub_82247AA0)"
+                            : "sub_82291328 (sub_822912A0)");
+    const uint32_t list = loading ? dl::kLoadingMovies : dl::kOtherMovies;
+    for (int c = 0; c < 4; c++) {
+      std::vector<int64_t> serials;
+      for (int i = 0; i < 4; i++) {
+        serials.push_back(h.random.Below(4) == 0 ? -1 : int64_t(h.random.Below(1000000)));
+      }
+      std::vector<std::vector<uint32_t>> words;
+      for (const Saved& g : kMovieGlobals) {
+        std::vector<uint32_t> w;
+        for (uint32_t k = 0; k < g.bytes; k += 4) {
+          w.push_back(uint32_t(h.random.Next()));
+        }
+        words.push_back(w);
+      }
+      const uint32_t old_count = h.random.Below(4);
+      Outputs out[2];
+      for (int v = 0; v < 2; v++) {
+        for (size_t g = 0; g < std::size(kMovieGlobals); g++) {
+          for (size_t k = 0; k < words[g].size(); k++) {
+            guest::StoreU32(h.base, kMovieGlobals[g].address + 4 * uint32_t(k), words[g][k]);
+          }
+        }
+        guest::StoreU32(h.base, list + 64, old_count);
+        ArchiveLoads loads(serials);
+        PPCContext t = CallContext(h);
+        if (v == 0) {
+          ITC_FLAG(native_ui_movies_game) = false;
+          (loading ? __imp__sub_82247B98 : __imp__sub_82291328)(t, h.base);
+          ITC_FLAG(native_ui_movies_game) = true;
+        } else {
+          (loading ? hooks::LoadingScreenLoadSteps : hooks::OtherMoviesLoadSteps)(t, h.base);
+        }
+        const uint32_t count = guest::LoadU32(h.base, list + 64);
+        const uint32_t first = loading ? 0 : old_count;
+        std::vector<uint32_t> movies;
+        for (uint32_t i = first; i < count && i < 16; i++) {
+          movies.push_back(guest::LoadU32(h.base, list + 4 * i));
+        }
+        const auto label = [&](uint32_t word) {
+          const auto at = std::find(movies.begin(), movies.end(), word);
+          return at != movies.end() && word != 0 ? 0x7E000000u + uint32_t(at - movies.begin()) : word;
+        };
+        for (const Saved& g : kMovieGlobals) {
+          for (uint32_t k = 0; k < g.bytes; k += 4) {
+            out[v].Word(label(guest::LoadU32(h.base, g.address + k)));
+          }
+        }
+        const std::vector<uint32_t>& calls = loads.calls();
+        out[v].Word(uint32_t(calls.size()));
+        for (size_t k = 0; k < calls.size(); k++) {
+          if (k % 6 == 1 && calls[k] != 0 && memory::IsPages(calls[k])) {
+            out[v].Word(1);
+            memory::FreePages(calls[k]);
+            continue;
+          }
+          out[v].Word(label(calls[k]));
+        }
+        for (const uint32_t movie : movies) {
+          if (movie == 0) {
+            continue;
+          }
+          out[v].Bytes(Read(h.base, movie, 28));
+          out[v].Word(guest::LoadU32(h.base, movie + ui_movies::kMovieLoaded));
+          ui_movies::DestroyMovie(h.base, movie);
+          memory::crt::OperatorDelete(movie);
+        }
+        out[v].Word(label(t.r3.u32));
+        out[v].Word(uint32_t(t.r3.u64 >> 32));
+      }
+      results.Check(out[0], out[1], fmt::format("case {}: {} in the list", c, old_count));
+    }
+    results.Report();
+  }
+  for (size_t g = 0; g < std::size(kMovieGlobals); g++) {
+    Write(h.base, kMovieGlobals[g].address, saved[g].data(), kMovieGlobals[g].bytes);
+  }
+}
+
+// --- The load ---
+
+// The callees' calls, recorded by their adapters (hooks::StartUpRecorded)
+// and answered with random words instead of running.
+struct BootCalls {
+  std::vector<uint32_t> targets;
+  std::vector<uint32_t> answers;
+  size_t next = 0;
+  std::vector<uint32_t> made;  // each call's address and r3
+};
+BootCalls* g_boot_calls = nullptr;
+
+bool RecordBootCall(PPCContext& t, uint32_t address) {
+  BootCalls* calls = g_boot_calls;
+  if (calls == nullptr ||
+      std::find(calls->targets.begin(), calls->targets.end(), address) == calls->targets.end()) {
+    return false;
+  }
+  calls->made.push_back(address);
+  calls->made.push_back(t.r3.u32);
+  t.r3.u64 = calls->next < calls->answers.size() ? calls->answers[calls->next++] : 0;
+  return true;
+}
+
+// BootData::CreateObjects and BootData::Load (its once flag 0 or set) with
+// every callee recorded instead of run: the calls in order, the flag and r3.
+void Load(Context& h) {
+  const uint32_t saved_flag = guest::LoadU32(h.base, dl::kLoaded);
+  const auto saved_recorder = hooks::g_start_up_recorder;
+  for (const bool load : {false, true}) {
+    Results results(load ? "BootData::Load (sub_82106618)" : "BootData::CreateObjects (sub_82105868)");
+    BootCalls calls;
+    calls.targets = load ? std::vector<uint32_t>{0x820A08A0, 0x8210ADF8, 0x82105868, 0x82247B98,
+                                                 0x82291328, 0x820C9960, 0x820CC2A8}
+                         : std::vector<uint32_t>{0x821057C8, 0x82102208, 0x821021A8, 0x820CCDC0,
+                                                 0x82105508, 0x82105560, 0x82116DB0, 0x82117240};
+    size_t made = 0;
+    for (int c = 0; c < 8; c++) {
+      std::vector<uint32_t> answers;
+      for (int i = 0; i < 8; i++) {
+        answers.push_back(uint32_t(h.random.Next()));
+      }
+      const uint32_t flag = c % 2 == 0 ? 0 : uint32_t(h.random.Next()) | 1;
+      const uint64_t r3 = h.random.Next();
+      Outputs out[2];
+      for (int v = 0; v < 2; v++) {
+        calls.answers = answers;
+        calls.next = 0;
+        calls.made.clear();
+        guest::StoreU32(h.base, dl::kLoaded, flag);
+        g_boot_calls = &calls;
+        hooks::g_start_up_recorder = RecordBootCall;
+        PPCContext t = CallContext(h);
+        t.r3.u64 = r3;
+        if (load) {
+          (v == 0 ? __imp__sub_82106618 : hooks::BootDataLoadSteps)(t, h.base);
+        } else {
+          (v == 0 ? __imp__sub_82105868 : hooks::CreateObjectsSteps)(t, h.base);
+        }
+        hooks::g_start_up_recorder = saved_recorder;
+        g_boot_calls = nullptr;
+        made = std::max(made, calls.made.size() / 2);
+        out[v].Word(uint32_t(calls.made.size()));
+        for (const uint32_t w : calls.made) {
+          out[v].Word(w);
+        }
+        out[v].Word(guest::LoadU32(h.base, dl::kLoaded));
+        out[v].Word(t.r3.u32 - t.r1.u32);
+        out[v].Word(t.r3.u32);
+        out[v].Word(uint32_t(t.r3.u64 >> 32));
+        out[v].Word(t.r1.u32);
+        out[v].Word(uint32_t(t.lr));
+      }
+      results.Check(out[0], out[1], fmt::format("case {}: the flag {:X}", c, flag));
+    }
+    ITC_LOG_INFO("harness: data_load: {}'s cases record up to {} calls a run",
+                 load ? "BootData::Load" : "BootData::CreateObjects", made);
+    results.Report();
+  }
+  guest::StoreU32(h.base, dl::kLoaded, saved_flag);
+}
+
 }  // namespace
 
 void DataLoad(Context& h) {
@@ -223,6 +420,12 @@ void DataLoad(Context& h) {
         dl::kInputRecordingsSlot, dl::kInputRecordingsBytes);
   Maker(h, "Replay::Create (sub_82105560)", __imp__sub_82105560, sub_82105560, dl::kReplaySlot,
         dl::kReplayBytes);
+  if (!hooks::NativeArchiveQueue()) {
+    ITC_LOG_WARN("harness: data_load: the movie sets and the load need the archive's queue native");
+    return;
+  }
+  MovieSets(h);
+  Load(h);
 }
 
 }  // namespace harness

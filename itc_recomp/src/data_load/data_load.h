@@ -3,7 +3,10 @@
 
 #pragma once
 
+#include "archive/archive.h"
+
 #include <cstdint>
+#include <functional>
 #include <optional>
 
 namespace data_load {
@@ -90,5 +93,71 @@ std::optional<uint32_t> InputRecordingsCreate(uint8_t* base);
 // Returns r3 as the original leaves it (the last record, or 0), or nullopt
 // where operator new's plain C++ can't answer.
 std::optional<uint32_t> ReplayCreate(uint8_t* base);
+
+// --- The two UI movie sets (the loading screen's and another) ---
+
+constexpr uint32_t kMovieBytes = 40976;
+constexpr uint32_t kLoadingMovies = 0x82815E68;  // the list; its count at +64
+constexpr uint32_t kLoadingShown = 0x82815E60;
+constexpr uint32_t kOtherMovies = 0x82816610;    // the list; its count at +64
+constexpr uint32_t kOtherMovieIds = 0x82638134;  // three asset ids
+constexpr uint32_t kOtherWords = 0x828165D0;     // nine words
+constexpr uint32_t kOtherWord8600 = 0x82816600;
+constexpr uint32_t kOtherWord8130 = 0x82638130;
+constexpr uint32_t kRenderApp = 0x826BABA0;
+
+// What the movie sets call: UiMovie::UiMovie (its plain C++, the original
+// where it hands back; r3 the movie), Archive::Load, and the renderer's
+// objects (`render_object`: [0x826BABA0]'s slot 8's answer's slot 1 for
+// `which` 0, the command list, slot 2 for 1, the renderer: guest calls).
+struct MovieCalls {
+  std::function<uint32_t(uint32_t movie)> construct;
+  archive::LoadCall load;
+  std::function<uint32_t(int which)> render_object;
+};
+
+// sub_82247AA0 LoadingScreen::AddMovie (the list at 0x82815E68) and
+// sub_822912A0 (the other set's, 0x82816610): a 40,976-byte movie (operator
+// new's plain C++; UiMovie::UiMovie when not null, else 0), sub_8211A9E8 on
+// it, UiMovie::Load(movie, id), the movie appended to the list (its count at
+// +64 up by one). Returns UiMovie::Load's serial (r3), or nullopt where
+// operator new's plain C++ can't answer (nothing written yet: the original
+// runs).
+std::optional<int64_t> LoadingScreenAddMovie(uint8_t* base, uint32_t id, const MovieCalls& calls);
+std::optional<int64_t> OtherMoviesAdd(uint8_t* base, uint32_t id, const MovieCalls& calls);
+// `add` for a set's caller: MovieListAdd, or the original where it hands back.
+using MovieAdd = std::function<int64_t(uint32_t id)>;
+// sub_82247B98 LoadingScreen::Load: the loading screen's count (+64) and
+// shown flag (0x82815E60) = 0, then `add` with assets 22575, 22574 and
+// 22576. Returns the last serial (r3).
+int64_t LoadingScreenLoad(uint8_t* base, const MovieAdd& add);
+// sub_82291328: `add` with the three ids at 0x82638134, nine words at
+// 0x828165D0, 0x82816600 and 0x82638130 = 0, then UiMovie::SetRenderer(the
+// renderer, the command list) (ui_movies' plain C++). Returns r3 as the
+// original leaves it (the renderer: SetRenderer leaves it).
+uint32_t OtherMoviesLoad(uint8_t* base, const MovieAdd& add,
+                         const std::function<uint32_t(int which)>& render_object);
+
+// --- The load ---
+
+constexpr uint32_t kLoaded = 0x826C5B8C;  // BootData::Load's once flag
+
+// A callee through its adapter (a guest call from the original's frame with
+// its return address; r3 when given): its r3.
+using BootCall = std::function<uint32_t(uint32_t target, std::optional<uint32_t> r3,
+                                        uint32_t return_address)>;
+// sub_82105868 BootData::CreateObjects: SaveData::Create(0), RaceData::Create,
+// RaceData::ResetGlobal, Defaults::Init, InputRecordings::Create,
+// Replay::Create, DataTables::Init and DataTables::Load, each through `call`.
+// Returns the last one's r3.
+uint32_t CreateObjects(uint8_t* base, const BootCall& call);
+// sub_82106618 BootData::Load: once (0x826C5B8C 0, then 1): Shaders::LoadAll,
+// Text::Load, BootData::CreateObjects, LoadingScreen::Load, sub_82291328,
+// Params::Init and Params::Load, each through `call`; both GlobalMemoryStatus
+// calls (sub_82294DA0, Dropped: their buffer at `frame` + 80 is never read)
+// left out. `frame` is the original's 128-byte frame. Returns r3 as the
+// original leaves it (`frame` + 80), or nullopt when the flag was set (nothing
+// done; r3 as it came).
+std::optional<uint32_t> BootDataLoad(uint8_t* base, uint32_t frame, const BootCall& call);
 
 }  // namespace data_load

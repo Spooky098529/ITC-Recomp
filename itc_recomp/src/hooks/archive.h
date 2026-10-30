@@ -41,7 +41,8 @@ void ArchiveUclUnpack(PPCContext& ctx, uint8_t* base);
 
 // Archive::Load for native callers (needs NativeArchiveQueue()): the request
 // queued through the archive's plain C++ (Queue(BuildLoad(...)), r7 = r8 =
-// 0).
+// 0), or handed to the harnesses' recorder (hooks::g_start_up_recorder) when
+// one is set, as Archive::Load's adapter does.
 archive::LoadCall NativeArchiveLoad(uint8_t* base);
 // r3 as Archive::Load's adapter leaves a serial: lwz's (zero-extended), or -1
 // (li's).

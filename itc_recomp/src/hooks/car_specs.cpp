@@ -19,6 +19,7 @@
 
 #include "base/flags.h"
 #include "car_specs/car_specs.h"
+#include "hooks/app_start_up.h"
 #include "hooks/archive.h"
 #include "hooks/heap.h"
 
@@ -159,6 +160,9 @@ extern "C" REX_FUNC(sub_820C4998) {
 // allocation would fail.
 extern "C" REX_FUNC(sub_820C9960) {
   REX_FUNC_PROLOGUE();
+  if (hooks::StartUpRecorded(ctx, 0x820C9960)) {
+    return;
+  }
   if (!ITC_FLAG(native_car_specs) || !hooks::NativeHeapActive()) {
     __imp__sub_820C9960(ctx, base);
     return;
@@ -179,6 +183,9 @@ extern "C" REX_FUNC(sub_820C9960) {
 // queue native (the loads through its plain C++).
 extern "C" REX_FUNC(sub_820CC2A8) {
   REX_FUNC_PROLOGUE();
+  if (hooks::StartUpRecorded(ctx, 0x820CC2A8)) {
+    return;
+  }
   if (!ITC_FLAG(native_car_specs) || !hooks::NativeArchiveQueue()) {
     __imp__sub_820CC2A8(ctx, base);
     return;

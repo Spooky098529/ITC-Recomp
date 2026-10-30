@@ -21,6 +21,7 @@
 
 #include "base/flags.h"
 #include "base/log.h"
+#include "hooks/app_start_up.h"
 #include "hooks/archive.h"
 #include "hooks/guest_call.h"
 #include "hooks/heap.h"
@@ -487,6 +488,9 @@ extern "C" REX_FUNC(sub_82596920) {
 // hands back.
 extern "C" REX_FUNC(sub_820A08A0) {
   REX_FUNC_PROLOGUE();
+  if (hooks::StartUpRecorded(ctx, 0x820A08A0)) {
+    return;
+  }
   if (!ITC_FLAG(native_models) || !hooks::NativeHeapActive() || !hooks::NativeArchiveQueue()) {
     __imp__sub_820A08A0(ctx, base);
     return;

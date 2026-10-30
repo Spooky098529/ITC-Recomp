@@ -10,6 +10,7 @@
 
 #include "base/flags.h"
 #include "data_tables/data_tables.h"
+#include "hooks/app_start_up.h"
 #include "hooks/archive.h"
 #include "hooks/heap.h"
 
@@ -82,6 +83,9 @@ extern "C" REX_FUNC(sub_821171B0) {
 // DataTables::Init: r3 as the original leaves it (Archive::Toc's, lwz's).
 extern "C" REX_FUNC(sub_82116DB0) {
   REX_FUNC_PROLOGUE();
+  if (hooks::StartUpRecorded(ctx, 0x82116DB0)) {
+    return;
+  }
   if (ITC_FLAG(native_data_tables) && hooks::NativeHeapActive()) {
     if (const auto r3 = Init(base)) {
       ctx.r3.u64 = *r3;
@@ -94,6 +98,9 @@ extern "C" REX_FUNC(sub_82116DB0) {
 // DataTables::Load: the loads through the archive's queue's plain C++.
 extern "C" REX_FUNC(sub_82117240) {
   REX_FUNC_PROLOGUE();
+  if (hooks::StartUpRecorded(ctx, 0x82117240)) {
+    return;
+  }
   if (!ITC_FLAG(native_data_tables) || !hooks::NativeArchiveQueue()) {
     __imp__sub_82117240(ctx, base);
     return;

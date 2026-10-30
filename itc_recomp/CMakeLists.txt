@@ -206,6 +206,7 @@ set(ITC_SOURCES
     src/data_load/defaults.cpp
     src/data_load/records.cpp
     src/data_load/objects.cpp
+    src/data_load/boot.cpp
     src/save_interface/save_interface.cpp
     src/save_interface/save_layer.cpp
     src/hooks/file_layer.cpp

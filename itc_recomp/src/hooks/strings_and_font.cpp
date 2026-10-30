@@ -23,6 +23,7 @@
 #include "guest.h"
 
 #include "base/flags.h"
+#include "hooks/app_start_up.h"
 #include "hooks/archive.h"
 #include "hooks/guest_call.h"
 #include "hooks/heap.h"
@@ -371,6 +372,9 @@ void hooks::TextLoadSteps(PPCContext& ctx, uint8_t* base) {
 // Text::Load: no arguments; r3 as the original leaves it.
 extern "C" REX_FUNC(sub_8210ADF8) {
   REX_FUNC_PROLOGUE();
+  if (hooks::StartUpRecorded(ctx, 0x8210ADF8)) {
+    return;
+  }
   if (!LoadsNative()) {
     __imp__sub_8210ADF8(ctx, base);
     return;

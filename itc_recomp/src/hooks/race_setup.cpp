@@ -5,6 +5,7 @@
 #include "hooks/race_setup.h"
 
 #include "base/flags.h"
+#include "hooks/app_start_up.h"
 #include "base/log.h"
 #include "race_setup/race_setup.h"
 
@@ -298,6 +299,9 @@ void RaceSetupRaceDataReset(PPCContext& ctx, uint8_t* base) {
 }
 
 void RaceSetupRaceDataResetGlobal(PPCContext& ctx, uint8_t* base) {
+  if (hooks::StartUpRecorded(ctx, 0x821021A8)) {  // the data load's harness
+    return;
+  }
   ctx.fpscr.disableFlushMode();
   if (!rs::RaceDataResetGlobal(base, ctx.r1.u32 - 112)) {
     __imp__sub_821021A8(ctx, base);
