@@ -43,7 +43,8 @@ ITC_FLAG_BOOL(native_camera_modes, true, "ITC",
               "sub_82153290; Camera::Shake sub_82152CD8 (no adapter: only ChaseCamera::Update's "
               "plain C++ calls it) with ShakeRandom sub_82152BD8 and "
               "Viewport::Offset sub_821529B0 (no adapters), Viewport::PullBack sub_82152788 (no adapter: only ChaseCamera::Update's plain C++ calls it); "
-              "IntroCamera::StepShot sub_82152E78, IntroCamera::IntroCamera sub_82158F70 with "
+              "IntroCamera::StepShot sub_82152E78 (no adapter: only IntroCamera::Update's plain C++ "
+              "calls it), IntroCamera::IntroCamera sub_82158F70 with "
               "MakeShot sub_82154108 (no adapter; with native atexit); CameraDirector::Start "
               "sub_82152338 and Release sub_82153098; CutsceneShot::Init sub_82156B68 and Step "
               "sub_82155800); the TV camera's RouteRange::CameraAt sub_820FE830, "
@@ -442,7 +443,8 @@ void CameraModesStep82152788(PPCContext& ctx, uint8_t* base) {
   cm::ViewportPullBack(base, ctx.r3.u32, ctx.f1.f64, ctx.r5.u32, ctx.r1.u32);
 }
 
-// IntroCamera::StepShot: r3 = the shot; r3 = 0 or 1.
+// IntroCamera::StepShot (no adapter: only IntroCamera::Update's plain C++
+// calls it; the step kept for the harness): r3 = the shot; r3 = 0 or 1.
 void CameraModesStep82152E78(PPCContext& ctx, uint8_t* base) {
   ctx.fpscr.disableFlushMode();
   ctx.r3.u64 = cm::IntroStepShot(base, ctx.r3.u32, ctx.r1.u32 - 272);
@@ -934,7 +936,6 @@ ITC_CAMERA_MODES(82152078)
 ITC_CAMERA_MODES(82211848)
 ITC_CAMERA_MODES(82211AB0)
 ITC_CAMERA_MODES(82153290)
-ITC_CAMERA_MODES(82152E78)
 ITC_CAMERA_MODES(82158F70)
 ITC_CAMERA_MODES(82152338)
 ITC_CAMERA_MODES(82153098)
