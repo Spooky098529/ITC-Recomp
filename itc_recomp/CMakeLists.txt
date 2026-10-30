@@ -214,6 +214,7 @@ set(ITC_SOURCES
     src/career/race_result.cpp
     src/career/progress.cpp
     src/career/event_setup.cpp
+    src/career/garage.cpp
     src/hooks/race_event.cpp
     src/race_event/conditions.cpp
     src/race_event/event.cpp
@@ -554,6 +555,7 @@ set_source_files_properties(src/c_runtime/math.cpp src/ui_movies/keys.cpp
     src/xaudio/reverb_stages.cpp src/xaudio/reverb_core.cpp src/xaudio/reverb_setup.cpp
     src/career/accessors.cpp src/career/records.cpp src/career/unlocks.cpp
     src/career/race_result.cpp src/career/progress.cpp src/career/event_setup.cpp
+    src/career/garage.cpp
     src/race_event/conditions.cpp
     src/race_event/event.cpp PROPERTIES
     COMPILE_OPTIONS "-ffp-model=strict;-ffp-contract=off"

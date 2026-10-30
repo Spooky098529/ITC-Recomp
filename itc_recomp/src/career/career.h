@@ -156,6 +156,25 @@ uint32_t GarageListInsert(uint8_t* base, uint32_t list, uint32_t position);
 bool GarageInsertCar(uint8_t* base, uint32_t garage, uint32_t car, uint32_t position,
                      uint32_t* destination);
 
+// sub_821104D8 Car::SetModelAndClass (probably): r3 = a car object, r4 = a
+// car id: Car::SetModel (its old +1884 kept first), +1648 = the spec's byte
+// +708 as 0 to 3 (0 to 2: 0, 3 and 4: 2, 5 and 6: 1, 7: 3; above 7 the word
+// at its frame's +80, which it never writes, read from `sp` - 128 + 80),
+// +1884 = 3 if it was 3, else spec +748; +1900 = the spec of the car's +12's
+// word +744. Returns that spec (r3 as the original leaves it).
+constexpr uint32_t kSetModelAndClassFrame = 128;
+uint32_t CarSetModelAndClass(uint8_t* base, uint32_t car, uint32_t id, uint32_t sp);
+// sub_82116CE0 Garage::Add: r3 = a player's save data, r4 = a car object:
+// Car::SpecWord744, Garage::InsertCar at the count (memcpy through `copy`
+// where its plain C++ can't copy), then on the new last car (the count less
+// one steps from the head) Car::SetModelAndClass(it, the car's +12) from its
+// 128-byte frame below `sp`; with a nonzero spec word, the new car's +1900 =
+// it when the new car's own differs. Returns r3 as the original leaves it.
+constexpr uint32_t kGarageAddFrame = 128;
+using CopyCall = void (*)(void* user, uint32_t destination, uint32_t car);
+uint32_t GarageAdd(uint8_t* base, uint32_t save, uint32_t car, uint32_t sp, CopyCall copy,
+                   void* user);
+
 // --- The unlocks' conditions and the rewards ---
 
 // sub_82112950 Condition::Test (with its jump table's case sub_821129E0

@@ -73,4 +73,11 @@ void CareerEventLocation(PPCContext& ctx, uint8_t* base);
 // C++ refuses).
 void CareerSetUpEvent(PPCContext& ctx, uint8_t* base);
 
+// Car::SetModelAndClass sub_821104D8: r3 = a car object, r4 = a car id; r3
+// = the car's spec. Garage::Add sub_82116CE0: r3 = the save data, r4 = a car
+// object; r3 as the original leaves it (memcpy's adapter from a frame like
+// Garage::InsertCar's where its plain C++ can't copy).
+void CareerCarSetModelAndClass(PPCContext& ctx, uint8_t* base);
+void CareerGarageAdd(PPCContext& ctx, uint8_t* base);
+
 }  // namespace hooks

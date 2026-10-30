@@ -42,7 +42,8 @@ ITC_FLAG_BOOL(native_career, true, "ITC",
               "race event's plain C++ (src/race_event/), DayBlock::BestStreak sub_82110588 with "
               "no adapter: from the race event's EventCondition::SectionRival; Career::SetUpEvent "
               "sub_82114268 over the race event's RaceEvent::Make plain C++, its cases in "
-              "--run_harnesses=race_event) natively instead of through the translated code (the same writes; "
+              "--run_harnesses=race_event; Garage::Add sub_82116CE0 with Car::SetModelAndClass "
+              "sub_821104D8) natively instead of through the translated code (the same writes; "
               "checked by --run_harnesses=career)");
 
 namespace hooks {
@@ -252,6 +253,41 @@ void CareerSetUpEvent(PPCContext& ctx, uint8_t* base) {
   ctx.r3.u64 = cr::SetUpEvent(base, save, mode, location, sp, guest.get(), MakeThrough, &make);
 }
 
+void CareerCarSetModelAndClass(PPCContext& ctx, uint8_t* base) {
+  ctx.fpscr.disableFlushMode();
+  ctx.r3.u64 = cr::CarSetModelAndClass(base, ctx.r3.u32, ctx.r4.u32, ctx.r1.u32);
+}
+
+namespace {
+
+struct GuestCopy {
+  PPCContext& ctx;
+  uint8_t* base;
+};
+
+// memcpy (its adapter) from Garage::InsertCar's frame under Garage::Add's,
+// where the plain C++ can't copy.
+void CopyThrough(void* user, uint32_t destination, uint32_t car) {
+  auto& guest = *static_cast<GuestCopy*>(user);
+  PPCContext& ctx = guest.ctx;
+  guest_call::InFrame(ctx, guest.base, cr::kGarageAddFrame + 112, 0x82115548, [&](uint32_t) {
+    ctx.r3.u64 = destination;
+    ctx.r4.u64 = car;
+    ctx.r5.u64 = 1968;
+    sub_825A7410(ctx, guest.base);  // memcpy
+  });
+  ctx.fpscr.disableFlushMode();
+}
+
+}  // namespace
+
+void CareerGarageAdd(PPCContext& ctx, uint8_t* base) {
+  ctx.fpscr.disableFlushMode();
+  const uint32_t save = ctx.r3.u32, car = ctx.r4.u32, sp = ctx.r1.u32;
+  GuestCopy copy{ctx, base};
+  ctx.r3.u64 = cr::GarageAdd(base, save, car, sp, CopyThrough, &copy);
+}
+
 }  // namespace hooks
 
 #define CAREER_ADAPTER(address, step)   \
@@ -282,3 +318,5 @@ CAREER_ADAPTER(82116AF0, CareerNextDay)
 CAREER_ADAPTER(82111638, CareerEventQuery)
 CAREER_ADAPTER(82111650, CareerEventLocation)
 CAREER_ADAPTER(82114268, CareerSetUpEvent)
+CAREER_ADAPTER(821104D8, CareerCarSetModelAndClass)
+CAREER_ADAPTER(82116CE0, CareerGarageAdd)
