@@ -13,7 +13,16 @@ When the user has reviewed a run's section, its heading gets
 
 ## Run 2026-10-30 01:06 (`b7-loop-29-10-26-2`)
 
-(nothing yet)
+- Car sounds, cleanup migration (d5cfd5c, `car-sounds.md`, the last
+  run's stop): `CarSound::Part840Update`'s 1 of 80 was the game's mixer
+  swapping XAudio's two source-voice stage lists (engine +92 and +104,
+  `[engine+120]` the next one) between a case's recompiled and native
+  versions, so the made voice joined a different list; shown by logging
+  `[engine+120]` and by forcing the swap (42 of 80 differed without the
+  fix). For review: the real-voice cases now write those two list
+  pointers as tokens (the call's next list, the other one) instead of
+  addresses, following the XAudio harnesses' `LockWords` (fa8dcc1). No
+  code change; the row's note says so.
 
 ## Run 2026-10-29 22:22 (`b7-loop-29-10-26-2`)
 

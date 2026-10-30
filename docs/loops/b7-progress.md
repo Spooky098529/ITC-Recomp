@@ -16,8 +16,12 @@ file's history. What's left to see in a drive, from every run:
   stop: `CarSound::Part840Update`'s harness (`sub_8210ECF0`,
   `car-sounds.md`), 1 of 80 cases differing once in `itc_2559`
   (intermittent). The precedent: this run's and the 2026-10-24 21:33
-  run's first leads were the previous stop's harness. Migration agent
-  running.
+  run's first leads were the previous stop's harness. Migration
+  checked (d5cfd5c: the mixer swaps XAudio's two source-voice stage
+  lists between a case's versions; the real-voice cases compare them
+  by role, as the XAudio harnesses' `LockWords`; 0 of 80 over 5 runs,
+  `itc_2569`-`itc_2573`; nothing else ready in `car-sounds.md`).
+  Validation agent running (every harness).
 
 ## Done
 
@@ -39,3 +43,5 @@ file's history. What's left to see in a drive, from every run:
 
 - At the start: ours 3031, work left 3287 (wrapped 104, known 501,
   unknown 2682).
+- After the cleanup's migration (`itc_2573`: race 38 s, 0 errors,
+  car_sounds 0 differing): ours 3031, work left 3287.
