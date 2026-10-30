@@ -210,6 +210,7 @@ set(ITC_SOURCES
     src/hooks/career.cpp
     src/career/accessors.cpp
     src/career/records.cpp
+    src/career/unlocks.cpp
     src/save_interface/save_interface.cpp
     src/save_interface/save_layer.cpp
     src/hooks/file_layer.cpp
@@ -543,7 +544,7 @@ set_source_files_properties(src/c_runtime/math.cpp src/ui_movies/keys.cpp
     src/car_sounds/car_sound_parts.cpp src/xact/voices.cpp src/xact/waves.cpp
     src/xact/tracks.cpp src/xaudio/objects.cpp src/xaudio/resampler.cpp
     src/xaudio/reverb_stages.cpp src/xaudio/reverb_core.cpp src/xaudio/reverb_setup.cpp
-    src/career/accessors.cpp src/career/records.cpp PROPERTIES
+    src/career/accessors.cpp src/career/records.cpp src/career/unlocks.cpp PROPERTIES
     COMPILE_OPTIONS "-ffp-model=strict;-ffp-contract=off"
     SKIP_PRECOMPILE_HEADERS ON)
 

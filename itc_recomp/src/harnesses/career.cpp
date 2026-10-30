@@ -614,6 +614,84 @@ void Garage(Context& h, const World& w) {
       __imp__sub_821154E0, hooks::CareerGarageInsertCar);
 }
 
+// --- The unlocks' conditions and the rewards ---
+
+void Unlocks(Context& h, const World& w) {
+  uint8_t* const base = h.base;
+  const uint32_t data = h.data;
+  Group(
+      h, w, "Condition::Test (sub_82112950, with sub_821129E0)", 240,
+      [base](Random& r, const World& w) {
+        ShapeItems(base, w, r);
+        ShapeRecords(base, w, r, 1 + r.Below(6));
+      },
+      [base, data](PPCContext& t, Random& r, const World& w) {
+        const uint32_t save = w.save.address;
+        const uint32_t kind = r.Below(12) == 0 ? 10 + r.Below(4) : r.Below(10);
+        int32_t value;
+        switch (kind) {
+          case 3:
+          case 4:
+            value = int32_t(r.Below(9));
+            break;
+          case 5:
+          case 6:
+            value = int32_t(r.Below(190));
+            break;
+          case 7:
+          case 8:
+          case 9:
+            value = int32_t(r.Below(r.Below(2) == 0 ? 8 : 200));
+            break;
+          default:
+            value = int32_t(r.Below(kItems));
+        }
+        if (r.Below(10) == 0) {
+          value = -1 - int32_t(r.Below(100));
+        }
+        guest::StoreU32(base, data + 0x900, kind);
+        guest::StoreU32(base, data + 0x904, uint32_t(value));
+        guest::StoreU32(base, save + 6100, r.Below(4) == 0 ? uint32_t(-int32_t(r.Below(30)))
+                                                           : r.Below(2000));
+        for (uint32_t i = 0; i < 192; i++) {
+          if (r.Below(3) == 0) {
+            guest::StoreU32(base, save + 0x1BE78 + 4 * i, r.Below(4));
+            guest::StoreU32(base, save + 0x1C178 + 4 * i, r.Below(4));
+          }
+        }
+        const uint32_t locations[] = {0xFFFFFFFFu, 0, 0, 1, 2, 4, 7, 8, 20, 0xFFFFFFFEu};
+        t.r3.u64 = data + 0x900;
+        t.r4.u64 = locations[r.Below(10)];
+        uint32_t mask = uint32_t(r.Next());
+        if (r.Below(2) == 0) {
+          mask &= ~0x7C00u;
+        }
+        t.r5.u64 = mask;
+      },
+      __imp__sub_82112950, hooks::CareerConditionTest,
+      {.frame_ranges = {{-int32_t(cr::kConditionTestFrame) + 80, 3008}}});
+  Group(
+      h, w, "Rewards::Grant (sub_82114C08, with sub_82114C7C)", 320,
+      [](Random&, const World&) {},
+      [base](PPCContext& t, Random& r, const World& w) {
+        const uint32_t save = w.save.address;
+        t.r3.u64 = save;
+        t.r4.u64 = r.Below(8) == 0 ? uint64_t(-int64_t(1 + r.Below(4))) : r.Below(120);
+        t.r5.u64 = r.Below(16) == 0 ? 42 + r.Below(4) : r.Below(42);
+        t.r6.u64 = r.Below(6) == 0 ? uint64_t(-int64_t(1 + r.Below(500))) : r.Below(40);
+        guest::StoreU32(base, save + 0x1D504, r.Below(60));
+        if (r.Below(2) == 0) {
+          // Most of the unlock sets' bits clear.
+          for (uint32_t i = 0; i < 0x30; i += 4) {
+            guest::StoreU32(base, save + 0x19924 + 4 * i,
+                            guest::LoadU32(base, save + 0x19924 + 4 * i) & uint32_t(r.Next()) &
+                                uint32_t(r.Next()));
+          }
+        }
+      },
+      __imp__sub_82114C08, hooks::CareerRewardsGrant);
+}
+
 }  // namespace
 
 void Career(Context& h) {
@@ -635,6 +713,7 @@ void Career(Context& h) {
   Outcomes(h, w);
   LastResults(h, w);
   Garage(h, w);
+  Unlocks(h, w);
 }
 
 }  // namespace harness

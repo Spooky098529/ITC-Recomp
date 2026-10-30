@@ -23,7 +23,9 @@ ITC_FLAG_BOOL(native_career, true, "ITC",
               "sub_82113628 (no adapters for these callees: only their callers' plain C++ calls "
               "them); Results::Push sub_82111FC8 with ResultRecord::Fill sub_82110850; "
               "Stats::StartDay sub_82112088 with DayLog::Push sub_82112028; Garage::InsertCar "
-              "sub_821154E0 with GarageList::Insert sub_82113468) natively instead of through the translated code (the same writes; "
+              "sub_821154E0 with GarageList::Insert sub_82113468; Condition::Test sub_82112950 "
+              "with its case sub_821129E0 merged; Rewards::Grant sub_82114C08 with its case "
+              "sub_82114C7C merged) natively instead of through the translated code (the same writes; "
               "checked by --run_harnesses=career)");
 
 namespace hooks {
@@ -114,6 +116,19 @@ void CareerGarageInsertCar(PPCContext& ctx, uint8_t* base) {
   ctx.r3.u64 = destination;
 }
 
+void CareerConditionTest(PPCContext& ctx, uint8_t* base) {
+  if (const auto r3 =
+          cr::ConditionTest(base, ctx.r3.u32, ctx.r4.u32, ctx.r5.u32, ctx.r1.u32)) {
+    ctx.r3.u64 = *r3;
+    return;
+  }
+  __imp__sub_82112950(ctx, base);
+}
+
+void CareerRewardsGrant(PPCContext& ctx, uint8_t* base) {
+  ctx.r3.u64 = cr::RewardsGrant(base, ctx.r3.u32, ctx.r4.u32, ctx.r5.u32, ctx.r6.u32);
+}
+
 }  // namespace hooks
 
 #define CAREER_ADAPTER(address, step)   \
@@ -144,3 +159,5 @@ CAREER_ADAPTER(82114B08, CareerItemRecordsAddLoss)
 CAREER_ADAPTER(82111FC8, CareerResultsPush)
 CAREER_ADAPTER(82112088, CareerStatsStartDay)
 CAREER_ADAPTER(821154E0, CareerGarageInsertCar)
+CAREER_ADAPTER(82112950, CareerConditionTest)
+CAREER_ADAPTER(82114C08, CareerRewardsGrant)

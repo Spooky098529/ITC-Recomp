@@ -36,5 +36,12 @@ void CareerStatsStartDay(PPCContext& ctx, uint8_t* base);
 // position; r3 = the slot (memcpy's: through memcpy's adapter where its plain
 // C++ can't copy).
 void CareerGarageInsertCar(PPCContext& ctx, uint8_t* base);
+// Condition::Test sub_82112950: r3 = the condition, r4 = the location, r5 =
+// the kinds' mask; r3 = 0 or 1 (the original where the items' copies aren't
+// native).
+void CareerConditionTest(PPCContext& ctx, uint8_t* base);
+// Rewards::Grant sub_82114C08: r3 = the save data, r4 = the entry's index,
+// r5 = the kind, r6 = the value; r3 left.
+void CareerRewardsGrant(PPCContext& ctx, uint8_t* base);
 
 }  // namespace hooks

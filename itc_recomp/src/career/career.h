@@ -7,6 +7,7 @@
 #pragma once
 
 #include <cstdint>
+#include <optional>
 
 namespace career {
 
@@ -16,6 +17,7 @@ constexpr uint32_t kItemRecords = 0x199F8;     // 400 records of 12 bytes
 constexpr uint32_t kItemFlags = 0x1ACE4;       // a 400-bit set
 constexpr uint32_t kGarage = 6120;             // the garage's list
 constexpr uint32_t kSelectedCar = 0x19920;     // the selected garage car
+constexpr uint32_t kUnlockSet = 0x19930;       // the unlocks the rewards set
 // The play time's frame counter (PlayTime::Add measures from it).
 constexpr uint32_t kPlayTimeFrames = 0x826C5B90;
 // The float the set-ups store (0.0, at 0x82000A34 in the xex).
@@ -148,5 +150,27 @@ uint32_t GarageListInsert(uint8_t* base, uint32_t list, uint32_t position);
 // can't copy it (the caller then runs memcpy).
 bool GarageInsertCar(uint8_t* base, uint32_t garage, uint32_t car, uint32_t position,
                      uint32_t* destination);
+
+// --- The unlocks' conditions and the rewards ---
+
+// sub_82112950 Condition::Test (with its jump table's case sub_821129E0
+// merged): whether an 8-byte condition {kind 0 to 9, value} holds for
+// player 0's save data, `location` and `mask` (the item kinds tested when
+// one of bits 10 to 14 is set). The item counts (7, 8, 9) copy each item
+// onto its 3,168-byte frame below `sp` (at +80; the last copy left there).
+// nullopt, with nothing written, where those copies can't be memcpy's plain
+// C++ (the caller then runs the original). Returns 0 or 1.
+constexpr uint32_t kConditionTestFrame = 3168;
+std::optional<uint32_t> ConditionTest(uint8_t* base, uint32_t condition, uint32_t location,
+                                      uint32_t mask, uint32_t sp);
+// sub_82114C08 Rewards::Grant (with its jump table's case sub_82114C7C
+// merged): bit `index` of +0x1D508 set; then by `kind` (0 to 41) bits at
+// `value` plus offsets set in the unlock set (+0x19930; 38 the set at
+// +0x19924, 40 +0x199A8, 41 +0x199C4), the first tested; when it was clear
+// (or negative), and always for 39 (38 unless already set), {0, 8, index}
+// appended to the list at +0x1CA84 (count +0x1D504). Returns the save data
+// (r3 as the original leaves it).
+uint32_t RewardsGrant(uint8_t* base, uint32_t save, uint32_t index, uint32_t kind,
+                      uint32_t value);
 
 }  // namespace career
