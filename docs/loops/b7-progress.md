@@ -54,10 +54,12 @@ file's history. What's left to see in a drive, from every run:
   camera, `GarageCamera::Update`; 9 adapters removed; 82 of 90 in play
   ours). Validated (`itc_2750` at 60 s, replay `itc_2751` ok): 17 of 17
   harness lines; 10 ran in play, 1 in the replay, 4 more to drive.
-  Migration 3 running. Left: `CameraDirector::InitStates`,
-  `Cutscene::Cutscene` (ready, 2,688 lines) and `SetMode`, then
-  `OnRaceStart`, `Resume`, `Update`; `Viewport::LookAt`'s adapter
-  removable. Left: `CameraDirector::InitStates`,
+  Migration 3 checked (81d51e9..d71eff5: `CameraDirector::InitStates`,
+  `Cutscene::Cutscene` split over three subagents one at a time,
+  `SetMode`, `OnRaceStart`, `Resume`, `Update` (run on logic passes by
+  `--redraw_rival_logo`'s wrapper, its split kept); 11 adapters
+  removed; 87 of 90 in play ours; nothing ready left, `CourseView::Draw`
+  waits on the scenery). Validation running. Left: `CameraDirector::InitStates`,
   `TvCamera::TvCamera`, `Update` and `Step`, `GarageCamera::Update`;
   then, past `UiMovies::Open` (ready), the cutscene and the director's
   `SetMode`, `Update` (`--redraw_rival_logo`'s split kept).
@@ -113,3 +115,6 @@ file's history. What's left to see in a drive, from every run:
 - After its validation (`itc_2750`, 60 s: race 13 s, 0 errors, every
   harness 0 differing but the expected groups): ours 3359, work left
   3038.
+- After the camera modes' migration 3 (`itc_2765`: race 26 s, 0
+  errors, camera_modes and cameras 0 differing): ours 3364, work left
+  3033 (wrapped 104, known 468, unknown 2461).

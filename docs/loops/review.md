@@ -98,6 +98,27 @@ When the user has reviewed a run's section, its heading gets
   removals were checked by the absence of a game line instead of a
   temporary counter (their functions don't run in attract races);
   batch 4's had the counter (`itc_2746`).
+- The camera modes' migration 3 (81d51e9..d71eff5):
+  `CameraDirector::InitStates` replays its 34 transitions' stores and
+  copies in the original's frame from a table extracted from the
+  generated code (as `RaceWorld::Init`); `Cutscene::Cutscene`'s 30
+  scripts as tables read from the generated code by a script
+  (`src/camera_modes/cutscene_scripts.cpp`), falling back to the
+  original when `ChaseReady` refuses or the stack isn't aligned; the
+  constructor can't choose scripts 3-5, and script 5's body is never
+  checked by a harness. `SetMode` calls the six view constructors
+  through their adapters' steps from the original's frame; its harness
+  answers them with a stand-in (`hooks::SetCameraConstructStandIn`),
+  so those six adapters stay though only `SetMode` calls them.
+  `CameraDirector::Update` stays Wrapped: `--redraw_rival_logo`'s
+  wrapper runs the native form on logic passes
+  (`hooks::CameraModesUpdate`), noted in `frame-interpolation.md`; its
+  harness keeps view modes 0-5 (past 5 the original calls a null
+  camera). `Resume` falls back if the color filter's slots aren't the
+  native ones. `Viewport::LookAt`'s adapter removed (`cameras.md`); the
+  `GarageCamera::Update` harness then compares the viewport as floats
+  but the view mode (+1860), as the cameras harness does (24 cases had
+  differed by NaN sign only).
 
 ## Run 2026-10-30 01:06 (`b7-loop-29-10-26-2`)
 
