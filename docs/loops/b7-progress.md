@@ -36,7 +36,15 @@ file's history. What's left to see in a drive, from every run:
   groups each) and run every frame in a race). Mapped (9ac322c,
   `camera-modes.md`, 100 rows, 90 in play, 38 ready groups, no stop;
   blocked outside by `UiMovies::Open`, `Delete` and the scenery's
-  update and draw). Migration 1 running.
+  update and draw). Migration 1 checked (5a1babc..4c274ed, 5 batches,
+  4 by subagents one at a time: the director's view handlers, the
+  camera animations and paths, the rival logo's pieces, the chase,
+  intro and in-car views' cameras, the TV camera's curves; 10 adapters
+  removed; `--native_camera_modes`; frame dumps the same; 74 of 90 in
+  play ours). Validation running. Left: `CameraDirector::InitStates`,
+  `TvCamera::TvCamera`, `Update` and `Step`, `GarageCamera::Update`;
+  then, past `UiMovies::Open` (ready), the cutscene and the director's
+  `SetMode`, `Update` (`--redraw_rival_logo`'s split kept).
 
 ## Done
 
@@ -77,3 +85,6 @@ file's history. What's left to see in a drive, from every run:
   3274, work left 3123.
 - After the camera modes' map: ours 3274, work left 3123 (wrapped 104,
   known 558, unknown 2461).
+- After the camera modes' migration 1 (`itc_2729`: race 26 s, 0
+  errors, camera_modes 0 differing): ours 3348, work left 3049
+  (wrapped 104, known 484, unknown 2461).

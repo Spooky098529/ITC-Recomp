@@ -64,6 +64,19 @@ When the user has reviewed a run's section, its heading gets
   from the image. `known-data.md` rows added; pointers in `cameras.md`,
   `game-modes.md`, `track-zones.md` and two leads updated. Large
   functions skimmed, small ones read in full.
+- The camera modes' migration 1 (5a1babc..4c274ed,
+  `--native_camera_modes`): map corrections (the animations' count at
+  `0x826D81B8`, not `0x826D01B8`; `ToView4` sets +9636 = 1 and +77408 =
+  0; `Viewport::Offset` moves only the target; `Duration` reads the
+  first block's +16; the intro camera's flag word is race data
+  +0x59AE4). Choices: `ViewCamera1/2::Update` leave out the original's
+  unused `NearestHumanVehicle` body read; `CameraPath::Evaluate`'s cases
+  avoid mid-curve keys of kind 3+, where `Curve::Evaluate` returns a
+  stack word the original's `SplinePoint` may have left (not taken in
+  1,006 evaluations in a race; `Curve::Evaluate`'s own harness covers
+  it); `RivalLogo::Play` is `PlayNamed`'s first native caller (runs the
+  original under `--log_pause_movie`). 10 adapters removed; 25
+  functions native with no adapter from the start.
 
 ## Run 2026-10-30 01:06 (`b7-loop-29-10-26-2`)
 
