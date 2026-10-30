@@ -43,6 +43,9 @@ constexpr uint32_t kSaveDataBytes = 0x1F978;
 constexpr uint32_t kSaveSlots = 0x826C5B58;
 constexpr uint32_t kItems = 400;
 constexpr uint32_t kItemBytes = 3008;
+constexpr uint32_t kRaceDataBytes = 0xA3B00;
+constexpr uint32_t kResults = 0x59AE8;            // the race data's result records
+constexpr uint32_t kResultCount = 0x59AE8 + 0x49FE0;
 
 // A block of guest memory for the cases, freed at the end.
 struct Block {
@@ -83,13 +86,18 @@ void WriteRandom(uint8_t* base, uint32_t address, uint32_t bytes, Random& random
 // The cases' memory: a save data block, the data tables' object (+0x40 the
 // items), the car specs' object (+0x40 four specs).
 struct World {
-  World() : save(kSaveDataBytes), tables(0x40 + kItems * kItemBytes), specs(0x40 + 4 * 8432) {}
-  bool ok() const { return save.address && tables.address && specs.address; }
+  World()
+      : save(kSaveDataBytes),
+        tables(0x40 + kItems * kItemBytes),
+        specs(0x40 + 4 * 8432),
+        race(kRaceDataBytes) {}
+  bool ok() const { return save.address && tables.address && specs.address && race.address; }
   uint32_t items() const { return tables.address + 0x40; }
   uint32_t item(uint32_t id) const { return items() + kItemBytes * id; }
   Block save;
   Block tables;
   Block specs;
+  Block race;  // a race data block (read only by the cases so far)
 };
 
 // What a case writes before both runs and compares after them.
@@ -333,6 +341,279 @@ void Accessors(Context& h, const World& w) {
       hooks::CareerAnyWonKind3Stage1);
 }
 
+
+// --- A race's outcome against an item ---
+
+cr::Opponent ReadOpponent(uint8_t* base, uint32_t at) {
+  return {guest::LoadU32(base, at), guest::LoadU32(base, at + 4), guest::LoadU32(base, at + 8)};
+}
+
+// The register steps of the functions without adapters (r4 = the Opponent
+// in guest memory, as the originals read it).
+void NativeCounterAddWin(PPCContext& t, uint8_t* base) {
+  t.r3.u64 = cr::CounterAddWin(base, t.r3.u32, ReadOpponent(base, t.r4.u32));
+}
+void NativeCounterAddLoss(PPCContext& t, uint8_t* base) {
+  t.r3.u64 = cr::CounterAddLoss(base, t.r3.u32, ReadOpponent(base, t.r4.u32));
+}
+void NativeCounterAddOutcome3(PPCContext& t, uint8_t* base) {
+  t.r3.u64 = cr::CounterAddOutcome3(base, t.r3.u32, ReadOpponent(base, t.r4.u32));
+}
+void NativeWeekCounterAddLoss(PPCContext& t, uint8_t* base) {
+  t.r3.u64 = cr::WeekCounterAddLoss(base, t.r3.u32, ReadOpponent(base, t.r4.u32));
+}
+void NativeOpponentsAddWin(PPCContext& t, uint8_t* base) {
+  t.r3.u64 = cr::OpponentsAddWin(base, t.r3.u32, ReadOpponent(base, t.r4.u32));
+}
+void NativeOpponentsAddLoss(PPCContext& t, uint8_t* base) {
+  t.r3.u64 = cr::OpponentsAddLoss(base, t.r3.u32, ReadOpponent(base, t.r4.u32));
+}
+void NativeOpponentsAddOutcome3(PPCContext& t, uint8_t* base) {
+  t.r3.u64 = cr::OpponentsAddOutcome3(base, t.r3.u32, ReadOpponent(base, t.r4.u32));
+}
+void NativeStatsAddWin(PPCContext& t, uint8_t* base) {
+  t.r3.u64 = cr::StatsAddWin(base, t.r3.u32, ReadOpponent(base, t.r4.u32), t.r5.u32);
+}
+void NativeStatsAddLoss(PPCContext& t, uint8_t* base) {
+  t.r3.u64 = cr::StatsAddLoss(base, t.r3.u32, ReadOpponent(base, t.r4.u32), t.r5.u32);
+}
+void NativeStatsAddOutcome3(PPCContext& t, uint8_t* base) {
+  t.r3.u64 = cr::StatsAddOutcome3(base, t.r3.u32, ReadOpponent(base, t.r4.u32), t.r5.u32);
+}
+void NativeItemRecordsAddOutcome3(PPCContext& t, uint8_t* base) {
+  t.r3.u64 = cr::ItemRecordsAddOutcome3(base, t.r3.u32, t.r4.u32, t.r1.u32);
+}
+void NativeResultRecordFill(PPCContext& t, uint8_t* base) {
+  t.r3.u64 = cr::ResultRecordFill(base, t.r3.u32, t.r4.u32);
+}
+void NativeDayLogPush(PPCContext& t, uint8_t* base) {
+  t.fpscr.disableFlushMode();
+  t.r3.u64 = cr::DayLogPush(base, t.r3.u32, t.r4.u32);
+}
+void NativeGarageListInsert(PPCContext& t, uint8_t* base) {
+  t.r3.u64 = cr::GarageListInsert(base, t.r3.u32, t.r4.u32);
+}
+
+// A day block's opponents' list (stats +24 +24, count at +1624): up to 40
+// ids, now and then the case's own.
+void ShapeOpponentList(uint8_t* base, uint32_t day, uint32_t id, Random& r) {
+  const uint32_t count = r.Below(4) == 0 ? 0 : r.Below(40);
+  guest::StoreU32(base, day + 1624, count);
+  for (uint32_t i = 0; i < count; i++) {
+    guest::StoreU32(base, day + 24 + 4 * i, r.Below(3) == 0 ? id : r.Below(400));
+  }
+}
+
+// An Opponent in the scratch area (+0x800): an id, its record in the save
+// block, its item; the record's halfwords 0 or not, the item's kind.
+uint32_t WriteOpponent(uint8_t* base, Random& r, const World& w, uint32_t data) {
+  const uint32_t id = r.Below(kItems);
+  const uint32_t at = data + 0x800;
+  const uint32_t record = w.save.address + cr::kItemRecords + 12 * id;
+  guest::StoreU32(base, at, id);
+  guest::StoreU32(base, at + 4, record);
+  guest::StoreU32(base, at + 8, w.item(id));
+  for (uint32_t k = 0; k < 6; k += 2) {
+    guest::StoreU16(base, record + k, uint16_t(r.Below(2) == 0 ? 0 : r.Below(1200)));
+  }
+  const uint8_t kinds[] = {0, 1, 2, 3, 4, 5, 31, 32, 95, 0xFF, 0x80};
+  guest::StoreU8(base, w.item(id) + 35, kinds[r.Below(11)]);
+  return at;
+}
+
+// Halfwords near the caps now and then.
+void NearCaps(uint8_t* base, Random& r, uint32_t address, uint32_t halfwords) {
+  for (uint32_t i = 0; i < halfwords; i++) {
+    const uint16_t values[] = {0, 1, 998, 999, 1000, 9998, 9999, 10000, 0x8000, 0xFFFF};
+    if (r.Below(3) == 0) {
+      guest::StoreU16(base, address + 2 * i, values[r.Below(10)]);
+    }
+  }
+}
+
+void Outcomes(Context& h, const World& w) {
+  uint8_t* const base = h.base;
+  const uint32_t data = h.data;
+  const SetupFn none = [](Random&, const World&) {};
+  const ArgsFn counter_args = [base, data](PPCContext& t, Random& r, const World& w) {
+    t.r3.u64 = w.save.address + 4 * r.Below(2000);
+    NearCaps(base, r, t.r3.u32, 30);
+    t.r4.u64 = WriteOpponent(base, r, w, data);
+  };
+  Group(h, w, "Counter::AddWin (sub_82111E10)", 48, none, counter_args, __imp__sub_82111E10,
+        NativeCounterAddWin);
+  Group(h, w, "Counter::AddLoss (sub_82111E80)", 48, none, counter_args, __imp__sub_82111E80,
+        NativeCounterAddLoss);
+  Group(h, w, "Counter::AddOutcome3 (sub_82111EF0)", 48, none, counter_args,
+        __imp__sub_82111EF0, NativeCounterAddOutcome3);
+  Group(h, w, "WeekCounter::AddLoss (sub_82111F60)", 48, none, counter_args,
+        __imp__sub_82111F60, NativeWeekCounterAddLoss);
+  const ArgsFn opponents_args = [base, data](PPCContext& t, Random& r, const World& w) {
+    t.r3.u64 = w.save.address + cr::kStats + 24;
+    NearCaps(base, r, t.r3.u32, 12);
+    t.r4.u64 = WriteOpponent(base, r, w, data);
+    const uint32_t id = guest::LoadU32(base, t.r4.u32);
+    NearCaps(base, r, t.r3.u32 + 1628 + 8 * id, 3);
+    ShapeOpponentList(base, t.r3.u32, id, r);
+  };
+  Group(h, w, "Opponents::AddWin (sub_821134D0)", 48, none, opponents_args, __imp__sub_821134D0,
+        NativeOpponentsAddWin);
+  Group(h, w, "Opponents::AddLoss (sub_82113580)", 48, none, opponents_args,
+        __imp__sub_82113580, NativeOpponentsAddLoss);
+  Group(h, w, "Opponents::AddOutcome3 (sub_82113628)", 48, none, opponents_args,
+        __imp__sub_82113628, NativeOpponentsAddOutcome3);
+  const auto shape_stats = [base](Random& r, uint32_t stats, uint32_t id, uint32_t mode) {
+    NearCaps(base, r, stats, 12);
+    NearCaps(base, r, stats + 24, 12);
+    NearCaps(base, r, stats + 4852, 3);
+    NearCaps(base, r, stats + 4864, 30);
+    NearCaps(base, r, stats + 4924, 12);
+    NearCaps(base, r, stats + 5968, 3);
+    NearCaps(base, r, stats + 24 + 1628 + 8 * id, 3);
+    NearCaps(base, r, stats + 5796 + 14 * mode, 7);
+    ShapeOpponentList(base, stats + 24, id, r);
+  };
+  const ArgsFn stats_args = [base, data, shape_stats](PPCContext& t, Random& r, const World& w) {
+    t.r3.u64 = w.save.address + cr::kStats;
+    t.r4.u64 = WriteOpponent(base, r, w, data);
+    t.r5.u64 = r.Below(5);
+    shape_stats(r, t.r3.u32, guest::LoadU32(base, t.r4.u32), t.r5.u32);
+  };
+  Group(h, w, "Stats::AddWin (sub_821139B8)", 48, none, stats_args, __imp__sub_821139B8,
+        NativeStatsAddWin);
+  Group(h, w, "Stats::AddLoss (sub_82113AB8)", 48, none, stats_args, __imp__sub_82113AB8,
+        NativeStatsAddLoss);
+  Group(h, w, "Stats::AddOutcome3 (sub_82113B50)", 48, none, stats_args, __imp__sub_82113B50,
+        NativeStatsAddOutcome3);
+  const ArgsFn records_args = [base, data, shape_stats](PPCContext& t, Random& r,
+                                                        const World& w) {
+    const uint32_t save = w.save.address;
+    t.r3.u64 = save;
+    const uint32_t at = WriteOpponent(base, r, w, data);
+    t.r4.u64 = guest::LoadU32(base, at);
+    const uint32_t mode = r.Below(5);
+    guest::StoreU32(base, save + 6104, mode);
+    shape_stats(r, save + cr::kStats, t.r4.u32, mode);
+    NearCaps(base, r, save + cr::kItemRecords + 12 * t.r4.u32, 3);
+  };
+  const Spec frame{.frame_ranges = {{-int32_t(cr::kItemRecordsFrame) + 80, 12}}};
+  Group(h, w, "ItemRecords::AddWin (sub_82114B88)", 48, none, records_args, __imp__sub_82114B88,
+        hooks::CareerItemRecordsAddWin, frame);
+  Group(h, w, "ItemRecords::AddLoss (sub_82114B08)", 48, none, records_args,
+        __imp__sub_82114B08, hooks::CareerItemRecordsAddLoss, frame);
+  Group(h, w, "ItemRecords::AddOutcome3 (sub_82114A88)", 48, none, records_args,
+        __imp__sub_82114A88, NativeItemRecordsAddOutcome3, frame);
+}
+
+// --- The last results, the day log ---
+
+// The race data's last result record: the count 1 to 77 (none would read
+// from address 0 + 812, unmapped, in both), its racer index small, the
+// record random.
+void ShapeResults(uint8_t* base, const World& w, Random& r) {
+  const uint32_t count = 1 + r.Below(77);
+  guest::StoreU32(base, w.race.address + kResultCount, count);
+  if (count != 0) {
+    const uint32_t last = w.race.address + kResults + 3936 * (count - 1);
+    WriteRandom(base, last, 3936, r);
+    guest::StoreU32(base, last + 4, r.Below(77));
+    guest::StoreU32(base, last + 3924, r.Below(3));
+  }
+  WriteRandom(base, w.race.address, 64, r);
+}
+
+void LastResults(Context& h, const World& w) {
+  uint8_t* const base = h.base;
+  const SetupFn none = [](Random&, const World&) {};
+  Group(
+      h, w, "ResultRecord::Fill (sub_82110850)", 32, none,
+      [base](PPCContext& t, Random& r, const World& w) {
+        ShapeResults(base, w, r);
+        t.r3.u64 = InSave(w, r, 64);
+        t.r4.u64 = w.race.address;
+      },
+      __imp__sub_82110850, NativeResultRecordFill);
+  Group(
+      h, w, "Results::Push (sub_82111FC8)", 32, none,
+      [base](PPCContext& t, Random& r, const World& w) {
+        ShapeResults(base, w, r);
+        t.r3.u64 = w.save.address + cr::kStats + 4948;
+        const uint32_t counts[] = {0, 1, 14, 15, 16, 0xFFFFFFFFu};
+        guest::StoreU32(base, t.r3.u32, counts[r.Below(6)]);
+        t.r4.u64 = w.race.address;
+      },
+      __imp__sub_82111FC8, hooks::CareerResultsPush);
+  const uint32_t stats = cr::kStats;
+  Group(
+      h, w, "DayLog::Push (sub_82112028)", 32, none,
+      [base](PPCContext& t, Random& r, const World& w) {
+        t.r3.u64 = w.save.address + cr::kStats + 5672;
+        const uint32_t counts[] = {0, 1, 9, 10, 11, 0xFFFFFFFFu};
+        guest::StoreU32(base, t.r3.u32, counts[r.Below(6)]);
+        t.r4.u64 = w.save.address + cr::kStats + 24;
+      },
+      __imp__sub_82112028, NativeDayLogPush, {.save_floats = {stats + 5672 + 8}});
+  Group(
+      h, w, "Stats::StartDay (sub_82112088)", 32, none,
+      [base](PPCContext& t, Random& r, const World& w) {
+        t.r3.u64 = w.save.address + cr::kStats;
+        t.r4.u64 = r.Below(4) == 0 ? 0 : r.Below(8);
+        guest::StoreU32(base, t.r3.u32 + 5672, r.Below(12));
+      },
+      __imp__sub_82112088, hooks::CareerStatsStartDay, {.save_floats = {stats + 5672 + 8}});
+}
+
+// --- The garage's list ---
+
+// 50 nodes: `count` linked from the head, the rest on the free list, each
+// slot 0 to 49.
+void ShapeGarage(uint8_t* base, uint32_t garage, Random& r, uint32_t count) {
+  uint32_t order[50];
+  for (uint32_t i = 0; i < 50; i++) {
+    order[i] = i;
+  }
+  for (uint32_t i = 49; i > 0; i--) {
+    std::swap(order[i], order[r.Below(i + 1)]);
+  }
+  const auto link = [&](uint32_t head_at, uint32_t from, uint32_t to) {
+    guest::StoreU16(base, garage + head_at, uint16_t(from < to ? order[from] : 0xFFFF));
+    for (uint32_t i = from; i < to; i++) {
+      guest::StoreU16(base, garage + 4 * order[i], uint16_t(i + 1 < to ? order[i + 1] : 0xFFFF));
+      guest::StoreU16(base, garage + 4 * order[i] + 2, uint16_t(r.Below(50)));
+    }
+  };
+  link(204, 0, count);
+  link(200, count, 50);
+  guest::StoreU16(base, garage + 208, uint16_t(count));
+}
+
+void Garage(Context& h, const World& w) {
+  uint8_t* const base = h.base;
+  const uint32_t data = h.data;
+  const SetupFn none = [](Random&, const World&) {};
+  Group(
+      h, w, "GarageList::Insert (sub_82113468)", 48, none,
+      [base](PPCContext& t, Random& r, const World& w) {
+        const uint32_t garage = w.save.address + cr::kGarage;
+        const uint32_t count = r.Below(49);
+        ShapeGarage(base, garage, r, count);
+        t.r3.u64 = garage;
+        t.r4.u64 = r.Below(count + 1) | (r.Below(4) == 0 ? 0xABCD0000u : 0);
+      },
+      __imp__sub_82113468, NativeGarageListInsert);
+  Group(
+      h, w, "Garage::InsertCar (sub_821154E0)", 48, none,
+      [base, data](PPCContext& t, Random& r, const World& w) {
+        const uint32_t garage = w.save.address + cr::kGarage;
+        const uint32_t count = r.Below(49);
+        ShapeGarage(base, garage, r, count);
+        t.r3.u64 = garage;
+        t.r4.u64 = data + 16;
+        t.r5.u64 = r.Below(count + 1);
+      },
+      __imp__sub_821154E0, hooks::CareerGarageInsertCar);
+}
+
 }  // namespace
 
 void Career(Context& h) {
@@ -346,7 +627,14 @@ void Career(Context& h) {
     Random r(0xCA4EE4);
     WriteRandom(h.base, w.tables.address, w.tables.bytes, r);
   }
+  {
+    Random r(0xCA4EE5);
+    WriteRandom(h.base, w.race.address, w.race.bytes, r);
+  }
   Accessors(h, w);
+  Outcomes(h, w);
+  LastResults(h, w);
+  Garage(h, w);
 }
 
 }  // namespace harness

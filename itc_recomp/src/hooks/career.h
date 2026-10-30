@@ -22,5 +22,19 @@ void CareerRunningMeanMerge(PPCContext& ctx, uint8_t* base);
 void CareerStageOf(PPCContext& ctx, uint8_t* base);
 void CareerEntry56Allows(PPCContext& ctx, uint8_t* base);
 void CareerAnyWonKind3Stage1(PPCContext& ctx, uint8_t* base);
+// ItemRecords::AddWin sub_82114B88, ItemRecords::AddLoss sub_82114B08: r3 =
+// the save data, r4 = the item id; r3 = the stats record + 4924.
+void CareerItemRecordsAddWin(PPCContext& ctx, uint8_t* base);
+void CareerItemRecordsAddLoss(PPCContext& ctx, uint8_t* base);
+// Results::Push sub_82111FC8: r3 = the last results, r4 = the race data; r3
+// = the result record (the original where a copy isn't native).
+void CareerResultsPush(PPCContext& ctx, uint8_t* base);
+// Stats::StartDay sub_82112088: r3 = the stats record, r4 = the weekday; r3
+// = the day block.
+void CareerStatsStartDay(PPCContext& ctx, uint8_t* base);
+// Garage::InsertCar sub_821154E0: r3 = the garage, r4 = the car, r5 = the
+// position; r3 = the slot (memcpy's: through memcpy's adapter where its plain
+// C++ can't copy).
+void CareerGarageInsertCar(PPCContext& ctx, uint8_t* base);
 
 }  // namespace hooks

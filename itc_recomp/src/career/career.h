@@ -18,6 +18,13 @@ constexpr uint32_t kGarage = 6120;             // the garage's list
 constexpr uint32_t kSelectedCar = 0x19920;     // the selected garage car
 // The play time's frame counter (PlayTime::Add measures from it).
 constexpr uint32_t kPlayTimeFrames = 0x826C5B90;
+// The float the set-ups store (0.0, at 0x82000A34 in the xex).
+constexpr uint32_t kZeroFloat = 0x82000A34;
+
+// Whether `size` bytes copy natively (memcpy's plain C++): below the
+// physical views (memcpy's override records those for the renderer's
+// mirrors) and not sharing memory with the source.
+bool CanCopy(uint32_t destination, uint32_t source, uint32_t size);
 
 // --- Small accessors ---
 
@@ -62,5 +69,84 @@ uint32_t Entry56Allows(uint8_t* base, uint32_t entry, uint32_t mode, uint32_t lo
 // sub_82111780 Items::AnyWonKind3Stage1: whether any item with halfword +42
 // 1, byte +36 0 and byte +35 3 has a win in player 0's record (+2).
 uint32_t AnyWonKind3Stage1(uint8_t* base);
+
+// --- A race's outcome against an item (an opponent) ---
+
+// What ItemRecords::Add* build on their stack ({id, the item's record, the
+// item}) and hand their callees by pointer: here by value.
+struct Opponent {
+  uint32_t id;
+  uint32_t record;
+  uint32_t item;
+};
+enum class Outcome { kLoss = 0, kWin = 1, kOutcome3 = 2 };
+
+// sub_82111E10 Counter::AddWin, sub_82111E80 Counter::AddLoss, sub_82111EF0
+// Counter::AddOutcome3: a 24-byte counter block's count (+12, +14, +16) up;
+// on the first such outcome against the item (its record's +2, +0, +4 still
+// 0) and its byte +35 not negative, bit +35 of the set at +0, +4, +8; +22
+// (races) up. Returns the counter (r3 as the originals leave it).
+uint32_t CounterAddWin(uint8_t* base, uint32_t counter, const Opponent& o);
+uint32_t CounterAddLoss(uint8_t* base, uint32_t counter, const Opponent& o);
+uint32_t CounterAddOutcome3(uint8_t* base, uint32_t counter, const Opponent& o);
+// sub_82111F60 WeekCounter::AddLoss: Counter::AddLoss, then by the item's
+// byte +35 (signed): 4 +56 up, 5 +58 up. Returns the block.
+uint32_t WeekCounterAddLoss(uint8_t* base, uint32_t week, const Opponent& o);
+// sub_821134D0 Opponents::AddWin, sub_82113580 Opponents::AddLoss,
+// sub_82113628 Opponents::AddOutcome3: the day block's counter; its
+// halfword +1628 + 8 x id + 2, + 0, + 4 up (at most 999); the id appended to
+// the list at +24 (count +1624) when not in it. Returns the block.
+uint32_t OpponentsAddWin(uint8_t* base, uint32_t block, const Opponent& o);
+uint32_t OpponentsAddLoss(uint8_t* base, uint32_t block, const Opponent& o);
+uint32_t OpponentsAddOutcome3(uint8_t* base, uint32_t block, const Opponent& o);
+// sub_821139B8 Stats::AddWin, sub_82113AB8 Stats::AddLoss, sub_82113B50
+// Stats::AddOutcome3: the stats record's counters, streaks, the week's and
+// the day's blocks and the counts by mode. Return stats + 4924 (r3 as the
+// originals leave it).
+uint32_t StatsAddWin(uint8_t* base, uint32_t stats, const Opponent& o, uint32_t mode);
+uint32_t StatsAddLoss(uint8_t* base, uint32_t stats, const Opponent& o, uint32_t mode);
+uint32_t StatsAddOutcome3(uint8_t* base, uint32_t stats, const Opponent& o, uint32_t mode);
+// sub_82114B88 ItemRecords::AddWin, sub_82114B08 ItemRecords::AddLoss,
+// sub_82114A88 ItemRecords::AddOutcome3: the Opponent built in their
+// 144-byte frame (below `sp`, at +80, as the originals), Stats::Add* (mode
+// save +6104), then the item's record +2, +0, +4 up (at most 999). Return
+// Stats::Add*'s r3.
+constexpr uint32_t kItemRecordsFrame = 144;
+uint32_t ItemRecordsAddWin(uint8_t* base, uint32_t save, uint32_t id, uint32_t sp);
+uint32_t ItemRecordsAddLoss(uint8_t* base, uint32_t save, uint32_t id, uint32_t sp);
+uint32_t ItemRecordsAddOutcome3(uint8_t* base, uint32_t save, uint32_t id, uint32_t sp);
+
+// --- The last results and the day log ---
+
+// sub_82110850 ResultRecord::Fill: a 48-byte record from the race data's
+// last result (RacerRecords::At(race + 0x59AE8, -1)). Returns that result.
+uint32_t ResultRecordFill(uint8_t* base, uint32_t out, uint32_t race);
+// sub_82111FC8 Results::Push: the 14 records moved down (memcpy's copy, from
+// the end), the newest filled at +4, the count (+0) up to 15. Returns
+// ResultRecord::Fill's. ResultsPushNative: whether the copies are native
+// (else the original runs; nothing written).
+bool ResultsPushNative(uint32_t list);
+uint32_t ResultsPush(uint8_t* base, uint32_t list, uint32_t race);
+// sub_82112028 DayLog::Push: 10 records of 12 bytes moved up, the newest
+// {the day block's +22, float +4836, +18}, the count up to 10. Returns the
+// log.
+uint32_t DayLogPush(uint8_t* base, uint32_t log, uint32_t day);
+// sub_82112088 Stats::StartDay: on weekday 0 the week's block cleared;
+// DayLog::Push(+5672, the day block); the day block cleared; the streaks and
+// the day's sums reset. Returns the day block (memset's r3).
+uint32_t StatsStartDay(uint8_t* base, uint32_t stats, uint32_t weekday);
+
+// --- The garage's list ---
+
+// sub_82113468 GarageList::Insert: a node from the free list (+200) linked
+// in after `position` - 1 steps from the head (+204; at the head for 0),
+// the count (+208) up. Returns the list.
+uint32_t GarageListInsert(uint8_t* base, uint32_t list, uint32_t position);
+// sub_821154E0 Garage::InsertCar: GarageList::Insert, then the 1,968-byte
+// car copied into the slot of the node at `position` (+212 + 1,968 x slot).
+// `destination` is that slot (memcpy's r3); false where memcpy's plain C++
+// can't copy it (the caller then runs memcpy).
+bool GarageInsertCar(uint8_t* base, uint32_t garage, uint32_t car, uint32_t position,
+                     uint32_t* destination);
 
 }  // namespace career
