@@ -10,7 +10,21 @@
 
 #include "base/log.h"
 
+#include "hooks/last_error.h"
+
 namespace harness {
+
+namespace {
+
+// GetLastError's register steps (sub_82296EC0 has no adapter: its only
+// caller in play is sub_82295F18's).
+void NativeGetLastError(PPCContext& ctx, uint8_t* base) {
+  const uint32_t in_dpc = guest::LoadU32(base, ctx.r13.u32 + 336);
+  ctx.r11.u64 = in_dpc ? in_dpc : guest::LoadU32(base, ctx.r13.u32 + 256);
+  ctx.r3.u64 = last_error::Get(base, ctx.r13.u32);
+}
+
+}  // namespace
 
 void LastError(Context& h) {
   uint8_t* base = h.base;
@@ -55,7 +69,7 @@ void LastError(Context& h) {
       PPCContext t = CallContext(h);
       t.r3.u64 = 0xCDCDCDCDCDCDCDCDull;
       t.r11.u64 = 0xCDCDCDCDCDCDCDCDull;
-      (v == 0 ? __imp__sub_82296EC0 : i % 2 ? sub_82295F18 : sub_82296EC0)(t, base);
+      (v == 0 ? __imp__sub_82296EC0 : i % 2 ? sub_82295F18 : NativeGetLastError)(t, base);
       guest::StoreU32(base, pcr + 336, saved_dpc);
       out[v].Word(t.r3.u32);
       out[v].Word(uint32_t(t.r3.u64 >> 32));

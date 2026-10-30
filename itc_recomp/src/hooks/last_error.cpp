@@ -48,16 +48,10 @@ extern "C" REX_FUNC(sub_82296E88) {
   ctx.r3.u64 = last_error::SetFromStatus(base, ctx.r13.u32, ctx.r3.u32);
 }
 
-// GetLastError: r3 the error; r11 left as the original leaves it ([PCR+336],
-// or the current thread when that's 0).
-extern "C" REX_FUNC(sub_82296EC0) {
-  REX_FUNC_PROLOGUE();
-  const uint32_t in_dpc = guest::LoadU32(base, ctx.r13.u32 + 336);
-  ctx.r11.u64 = in_dpc ? in_dpc : guest::LoadU32(base, ctx.r13.u32 + 256);
-  ctx.r3.u64 = last_error::Get(base, ctx.r13.u32);
-}
-
-// The same, reached by a jump (after failed file and allocation calls).
+// GetLastError, reached by a jump to sub_82296EC0 (after failed file and
+// allocation calls): r3 the error; r11 left as the original leaves it
+// ([PCR+336], or the current thread when that's 0). sub_82296EC0 itself has
+// no adapter: its only caller in play is this one.
 extern "C" REX_FUNC(sub_82295F18) {
   REX_FUNC_PROLOGUE();
   const uint32_t in_dpc = guest::LoadU32(base, ctx.r13.u32 + 336);
