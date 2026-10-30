@@ -1015,8 +1015,13 @@ constexpr uint32_t kWord60 = 0x82090770;
 // Random words in the scratch area's first 512 bytes, and `objects` objects
 // (at data + 512 + 160 * i) whose vtables (at their + 0x80) hold `targets`.
 void DispatchObjects(Context& h, uint32_t objects, const std::vector<uint32_t>& targets) {
+  // Random words from 0x40000000 to 0x7FFFFFFF: above the allocation
+  // layer's range (0x10000 on, 384 MiB), so none is numbered as a word into
+  // a heap block (a random word within 0x400 above a block numbered by
+  // where each version's block was: App::Run's init case 171, once the
+  // app's start-up changed the boot's allocations).
   for (uint32_t at = 0; at < 1024; at += 4) {
-    guest::StoreU32(h.base, h.data + at, uint32_t(h.random.Next()) & 0x7FFFFFFF);
+    guest::StoreU32(h.base, h.data + at, (uint32_t(h.random.Next()) & 0x3FFFFFFF) | 0x40000000);
   }
   for (uint32_t i = 0; i < objects; i++) {
     const uint32_t object = h.data + 512 + 160 * i;

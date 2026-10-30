@@ -176,6 +176,41 @@ uint32_t FontConstruct(uint8_t* base, uint32_t font, uint32_t frame, uint32_t sh
 uint32_t TextInit(uint8_t* base, uint32_t font_frame, uint32_t shaders_frame,
                   const FontCalls& calls);
 
+// --- The app's constructor ---
+
+constexpr uint32_t kAppBytes = 132;
+constexpr uint32_t kMovieBytes = 312;
+
+// The guest calls App::App makes, from its frame with the original's return
+// address: `call` the callee at `target` (its adapter) with r3, r4 and r5
+// when given (else left as they are) and r30 as the original holds it then
+// (the other saved registers set once by the adapter); `virtual_call` the
+// object's slot at `offset` with r4 and r5. Each returns r3.
+struct AppCalls {
+  std::function<uint32_t(uint32_t target, uint32_t r3, std::optional<uint32_t> r4,
+                         uint32_t return_address, uint32_t r30, std::optional<uint32_t> r5)>
+      call;
+  std::function<uint32_t(uint32_t object, uint32_t offset, uint32_t r4, uint32_t r5,
+                         uint32_t return_address)>
+      virtual_call;
+};
+
+// sub_82094590 App::App: r3 the app (132 bytes), `block` {the run loop, the
+// framework's +36 interface}. The vtables (the bases' at +4 to +20, then
+// the app's at +0 to +20), the four handler maps (+28 to +64,
+// HandlerMap::HandlerMap), +80 to +88 and +100 to +108 = 0, bytes +112 to
+// +114 = 0, +24 the block's +4; the run loop's AddTickHandler (slot 2, key
+// 8, App::Update) and AddListener (slot 1, key 9, App::OnRunLoopEvent),
+// member delegates on `frame` (the original's 240-byte frame: +80 the key,
+// +112 and +128 the delegates); +116 AppStates::Create({the app}), +120 the
+// second camera class (368 bytes, operator new, {app + 20, app + 4}), +128
+// the movie (312 bytes, {app + 20, app + 8}), +124 AudioManager::Create(app
+// + 12, "txr_xact", &3), then App::StartUp(app + 16). The callees through
+// their adapters (operator new's plain C++, its original where it can't
+// answer). Returns the app.
+uint32_t AppConstruct(uint8_t* base, uint32_t app, uint32_t block, uint32_t frame,
+                      const AppCalls& calls);
+
 // --- The app's start-up ---
 
 // The guest calls App::StartUp makes: `call` a guest call of the callee at

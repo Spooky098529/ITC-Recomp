@@ -12,6 +12,7 @@
 #include "framework/framework.h"
 #include "framework/main_loop.h"
 #include "framework/run_loop.h"
+#include "hooks/app_start_up.h"
 #include "hooks/framework.h"
 #include "hooks/guest_call.h"
 #include "hooks/heap.h"
@@ -127,6 +128,11 @@ extern "C" REX_FUNC(sub_82099B18) {
 // HandlerMap: r3 = the map; r3 the head.
 extern "C" REX_FUNC(sub_82099FB0) {
   REX_FUNC_PROLOGUE();
+  // The app's start-up harness's recorder first (hooks/app_start_up.h:
+  // App::App's callees).
+  if (hooks::StartUpRecorded(ctx, 0x82099FB0)) {
+    return;
+  }
   if (!NativeHeap() || !fw::CanAllocate(base)) {
     __imp__sub_82099FB0(ctx, base);
     return;

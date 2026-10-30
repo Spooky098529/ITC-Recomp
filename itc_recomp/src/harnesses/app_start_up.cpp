@@ -1356,6 +1356,135 @@ void AppCameraCases(Context& h) {
   results.Report();
 }
 
+// --- The app's constructor ---
+
+// App::App's callees seen through hooks::g_start_up_recorder (HandlerMap::
+// HandlerMap, AppStates::Create, the camera class, Movie::Movie,
+// AudioManager::Create and App::StartUp): each call's address, r3 to r5,
+// link register, stack pointer and r22 to r31 logged, numbered (the app's
+// words as their offsets, the stack's as their depth, heap blocks, the
+// operator new blocks the constructors get, as one number, freed); r3
+// answered with a number by position.
+struct AppNumbering {
+  uint8_t* base = nullptr;
+  uint32_t app = 0, block = 0, stack = 0;
+  uint32_t Of(uint32_t value) const {
+    if (value >= app && value < app + asu::kAppBytes) {
+      return 0xAA000000u + (value - app);
+    }
+    if (value >= block && value < block + 8) {
+      return 0xBB000000u + (value - block);
+    }
+    if (value <= stack && stack - value < 0x1000) {
+      return 0x5C000000u + (stack - value);
+    }
+    if (value != 0 && memory::IsHeapBlock(value)) {
+      return 0xB10C0000u;
+    }
+    return value;
+  }
+};
+AppNumbering g_app_numbering;
+std::vector<uint32_t> g_app_log;
+uint32_t g_app_calls = 0;
+bool RecordAppCall(PPCContext& ctx, uint32_t address) {
+  const AppNumbering& n = g_app_numbering;
+  g_app_log.insert(g_app_log.end(), {address, n.Of(ctx.r3.u32), n.Of(ctx.r4.u32),
+                                     uint32_t(ctx.lr), n.Of(ctx.r1.u32)});
+  g_app_calls++;
+  if (address == 0x82119B38) {
+    // The name's address and the bank count's (and the count).
+    g_app_log.push_back(n.Of(ctx.r5.u32));
+    g_app_log.push_back(guest::LoadU32(n.base, ctx.r5.u32));
+  }
+  const PPCRegister* saved = &ctx.r22;
+  for (int i = 0; i < 10; i++) {
+    g_app_log.push_back(n.Of(saved[i].u32));
+  }
+  if (address == 0x820A8B88 || address == 0x820AEA88) {
+    FreeBlock(ctx.r3.u32);
+  }
+  ctx.r3.u64 = 0x7A000000u + uint32_t(g_app_log.size());
+  return true;
+}
+
+// App::App on an app in the scratch area (+1024), the block at +0 (+0 a
+// fake run loop at +64 whose vtable at +128 has slot 1 the recorder of r4
+// at its +4, sub_820A70A8, and slot 2 the counter of it, sub_8245F860; +4 a
+// random word), its callees recorded (above); the recompiled one with
+// --native_app_start_up off. Compared: the recorded calls, the app, the run
+// loop's words, r3, the frame's +80 to +143, the prologue's saves and r22 to
+// r31 after (put back).
+void AppConstructCases(Context& h) {
+  constexpr uint32_t kCount4 = 0x8245F860;
+  constexpr uint32_t kStoreR4At4 = 0x820A70A8;
+  Results results("App::App (sub_82094590)");
+  const uint32_t app = h.data + 1024, block = h.data, loop = h.data + 64,
+                 loop_vtable = h.data + 128;
+  for (int c = 0; c < 8; c++) {
+    const uint32_t word4 = uint32_t(h.random.Next()), loop4 = uint32_t(h.random.Next());
+    const uint32_t fill = uint32_t(h.random.Next());
+    uint64_t regs[10];
+    for (auto& r : regs) {
+      r = h.random.Next();
+    }
+    Outputs out[2];
+    for (int v = 0; v < 2; v++) {
+      Fill(h.base, h.data, kScratchBytes);
+      guest::StoreU32(h.base, block + 0, loop);
+      guest::StoreU32(h.base, block + 4, word4);
+      guest::StoreU32(h.base, loop, loop_vtable);
+      guest::StoreU32(h.base, loop + 4, loop4);
+      guest::StoreU32(h.base, loop_vtable + 4, kStoreR4At4);
+      guest::StoreU32(h.base, loop_vtable + 8, kCount4);
+      PPCContext t = CallContext(h);
+      for (uint32_t k = 4; k <= 0x400; k += 4) {
+        guest::StoreU32(h.base, t.r1.u32 - k, fill + k);
+      }
+      PPCRegister* saved = &t.r22;
+      for (int i = 0; i < 10; i++) {
+        saved[i].u64 = regs[i];
+      }
+      t.r3.u64 = app;
+      t.r4.u64 = block;
+      t.lr = 0x82094AE0;
+      const uint32_t stack = t.r1.u32;
+      g_app_numbering = {h.base, app, block, stack};
+      g_app_log.clear();
+      g_app_calls = 0;
+      hooks::g_start_up_recorder = RecordAppCall;
+      StartUpSide(v, [&] {
+        (v == 0 ? __imp__sub_82094590 : hooks::AppConstructSteps)(t, h.base);
+      });
+      hooks::g_start_up_recorder = nullptr;
+      if (c == 0 && v == 1) {
+        ITC_LOG_INFO("harness: app_start_up: App::App's cases record {} calls a run",
+                     g_app_calls);
+      }
+      const AppNumbering& n = g_app_numbering;
+      for (const uint32_t word : g_app_log) {
+        out[v].Word(word);
+      }
+      for (uint32_t at = 0; at < asu::kAppBytes; at += 4) {
+        out[v].Word(n.Of(guest::LoadU32(h.base, app + at)));
+      }
+      out[v].Bytes(Read(h.base, loop, 8));
+      out[v].Word(n.Of(t.r3.u32));
+      out[v].Word(t.r1.u32 - stack);
+      for (uint32_t at = stack - 240 + 80; at < stack - 240 + 144; at += 4) {
+        out[v].Word(n.Of(guest::LoadU32(h.base, at)));
+      }
+      out[v].Bytes(Read(h.base, stack - 88, 88));
+      for (int i = 0; i < 10; i++) {
+        out[v].Word(uint32_t(saved[i].u64 >> 32));
+        out[v].Word(saved[i].u32);
+      }
+    }
+    results.Check(out[0], out[1], fmt::format("case {}", c));
+  }
+  results.Report();
+}
+
 }  // namespace
 
 void AppStartUp(Context& h) {
@@ -1382,6 +1511,7 @@ void AppStartUp(Context& h) {
     MovieConstructCases(h);
     AudioManagerGroup(h);
     AppCameraCases(h);
+    AppConstructCases(h);
   }
 }
 

@@ -34,7 +34,8 @@ ITC_FLAG_BOOL(native_app_start_up, true, "ITC",
               "sub_82119B38 with AudioManager::AudioManager sub_821197E0 and "
               "AudioEngine::StartXAudio sub_8259CD50, no adapters of their own; the second camera "
               "class sub_820A8B88 with its camera sub_820A9E28, list sub_820A98C0 (sub_820A9198 "
-              "and sub_820A8F80 merged) and entry sub_820A75E8, no adapters of their own) "
+              "and sub_820A8F80 merged) and entry sub_820A75E8, no adapters of their own; App::App "
+              "sub_82094590, its callees through their adapters) "
               "natively instead of through the translated code (the same reads and writes; "
               "checked by --run_harnesses=app_start_up)");
 
@@ -439,6 +440,9 @@ void hooks::AppStartUpSteps(PPCContext& ctx, uint8_t* base) {
 // App::StartUp: r3 = app + 16, from App::App once at boot.
 extern "C" REX_FUNC(sub_82106548) {
   REX_FUNC_PROLOGUE();
+  if (hooks::StartUpRecorded(ctx, 0x82106548)) {
+    return;
+  }
   if (!ITC_FLAG(native_app_start_up)) {
     __imp__sub_82106548(ctx, base);
     return;
@@ -526,6 +530,9 @@ void hooks::MovieConstructSteps(PPCContext& ctx, uint8_t* base) {
 // App::App once at boot.
 extern "C" REX_FUNC(sub_820AEA88) {
   REX_FUNC_PROLOGUE();
+  if (hooks::StartUpRecorded(ctx, 0x820AEA88)) {
+    return;
+  }
   if (!ITC_FLAG(native_app_start_up) || !hooks::NativeHeapActive()) {
     __imp__sub_820AEA88(ctx, base);
     return;
@@ -626,6 +633,9 @@ void hooks::AudioManagerCreateSteps(PPCContext& ctx, uint8_t* base) {
 // C++ calls them in play.)
 extern "C" REX_FUNC(sub_82119B38) {
   REX_FUNC_PROLOGUE();
+  if (hooks::StartUpRecorded(ctx, 0x82119B38)) {
+    return;
+  }
   if (!ITC_FLAG(native_app_start_up) || !hooks::NativeHeapActive()) {
     __imp__sub_82119B38(ctx, base);
     return;
@@ -777,9 +787,79 @@ void hooks::AppCameraListConstructSteps(PPCContext& ctx, uint8_t* base) {
 // adapters: only its plain C++ calls them in play.)
 extern "C" REX_FUNC(sub_820A8B88) {
   REX_FUNC_PROLOGUE();
+  if (hooks::StartUpRecorded(ctx, 0x820A8B88)) {
+    return;
+  }
   if (!ITC_FLAG(native_app_start_up) || !hooks::NativeHeapActive()) {
     __imp__sub_820A8B88(ctx, base);
     return;
   }
   hooks::AppCameraSteps(ctx, base);
+}
+
+// --- The app's constructor ---
+
+void hooks::AppConstructSteps(PPCContext& ctx, uint8_t* base) {
+  const uint32_t app = ctx.r3.u32, block = ctx.r4.u32;
+  const uint64_t lr = ctx.lr;
+  const uint32_t sp = ctx.r1.u32;
+  // The original's prologue (__savegprlr_22), then its saved registers as
+  // it sets them for the body (r30 per call), put back at the end.
+  SaveRegisters(ctx, base, 22);
+  PPCRegister* const saved = &ctx.r22;
+  uint64_t entry[10];
+  for (int i = 0; i < 10; i++) {
+    entry[i] = saved[i].u64;
+  }
+  ctx.r22.u64 = 0x82000E08;
+  ctx.r23.u64 = 0x82000E38;
+  ctx.r24.u64 = app + 16;
+  ctx.r25.u64 = app + 12;
+  ctx.r26.u64 = app + 8;
+  ctx.r27.u64 = app + 4;
+  ctx.r28.u64 = block;
+  ctx.r29.u64 = app + 20;
+  ctx.r31.u64 = app;
+  uint32_t r3 = 0;
+  InFrame(ctx, base, 240, 0x82094644, [&](uint32_t frame) {
+    asu::AppCalls calls;
+    calls.call = [&](uint32_t target, uint32_t a, std::optional<uint32_t> b,
+                     uint32_t return_address, uint32_t r30, std::optional<uint32_t> c) {
+      ctx.r3.u64 = a;
+      if (b) {
+        ctx.r4.u64 = *b;
+      }
+      if (c) {
+        ctx.r5.u64 = *c;
+      }
+      ctx.r30.u64 = r30;
+      ctx.lr = return_address;
+      REX_CALL_INDIRECT_FUNC(target);
+      return ctx.r3.u32;
+    };
+    calls.virtual_call = [&](uint32_t object, uint32_t offset, uint32_t a, uint32_t b,
+                             uint32_t return_address) {
+      ctx.r4.u64 = a;
+      ctx.r5.u64 = b;
+      ctx.r30.u64 = 0;
+      return VirtualCall(ctx, base, object, offset, return_address);
+    };
+    r3 = asu::AppConstruct(base, app, block, frame, calls);
+  });
+  for (int i = 0; i < 10; i++) {
+    saved[i].u64 = entry[i];
+  }
+  ctx.lr = lr;
+  ctx.r3.u64 = r3;
+}
+
+// App::App: r3 = the app (132 bytes), r4 = the block; from App::Create once
+// at boot.
+extern "C" REX_FUNC(sub_82094590) {
+  REX_FUNC_PROLOGUE();
+  if (!ITC_FLAG(native_app_start_up) || !hooks::NativeHeapActive()) {
+    __imp__sub_82094590(ctx, base);
+    return;
+  }
+  hooks::AppConstructSteps(ctx, base);
 }

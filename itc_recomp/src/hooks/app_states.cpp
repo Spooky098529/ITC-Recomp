@@ -11,6 +11,7 @@
 #include "base/log.h"
 #include "debug/menu_selection_scan.h"
 #include "framework/run_loop.h"
+#include "hooks/app_start_up.h"
 #include "hooks/guest_call.h"
 
 #include <fmt/format.h>
@@ -740,7 +741,19 @@ ITC_APP_STATES_ADAPTER(82094970, AppAddAlwaysHandler)
 ITC_APP_STATES_ADAPTER(82094A10, AppAddListener)
 ITC_APP_STATES_ADAPTER(82093DC0, AppUpdate)
 ITC_APP_STATES_ADAPTER(820AE130, AppStatesAddLayer)
-ITC_APP_STATES_ADAPTER(820AE498, AppStatesCreate)
+// AppStates::Create: the app's start-up harness's recorder first
+// (hooks/app_start_up.h: App::App's callees).
+extern "C" REX_FUNC(sub_820AE498) {
+  REX_FUNC_PROLOGUE();
+  if (hooks::StartUpRecorded(ctx, 0x820AE498)) {
+    return;
+  }
+  if (!ITC_FLAG(native_app_states)) {
+    __imp__sub_820AE498(ctx, base);
+    return;
+  }
+  hooks::AppStatesCreate(ctx, base);
+}
 ITC_APP_STATES_ADAPTER(82092878, AppStart)
 ITC_APP_STATES_ADAPTER(820ACD80, AppUpdateChild)
 ITC_APP_STATES_ADAPTER(820ACDE8, AppUpdateChildToggled)

@@ -201,6 +201,7 @@ set(ITC_SOURCES
     src/app_start_up/movie.cpp
     src/app_start_up/audio_manager.cpp
     src/app_start_up/app_camera.cpp
+    src/app_start_up/app.cpp
     src/save_interface/save_interface.cpp
     src/save_interface/save_layer.cpp
     src/hooks/file_layer.cpp
