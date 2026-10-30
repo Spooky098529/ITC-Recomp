@@ -77,6 +77,16 @@ When the user has reviewed a run's section, its heading gets
   block); the getter `sub_82379350` runs only in its harness; two
   leads deleted (the second camera class, taken; `sub_82593D78` and
   `sub_82593D88`, the wrapper's slots).
+- The data load at boot, map (562dc47, `data-load.md`, 25 rows, 6 not
+  seen in play; `known-data.md`). For review: `Defaults::Init`
+  `sub_820CCDC0` fills the save defaults' bit sets that `save-data.md`'s
+  `Defaults::Table*` rows said had no known filler (`0x826C3044`,
+  `0x826C3080`, `0x826C3C24`, `0x826C50A8`, `0x826C50E4`,
+  `0x826C4064`); `[0x826C5B4C]`'s block is 0x2225C0 bytes;
+  `[0x826C5B50]` probably the replay kept after a race (static copies at
+  `0x826D8520`, `0x82816E50`); `sub_82291328` loads a second set of
+  three UI movies whose users never ran in play. One lead added (the
+  front end's state machine `sub_822213B0`, `sub_82220C88`).
 
 ## Run 2026-10-29 22:22 (`b7-loop-29-10-26-2`)
 

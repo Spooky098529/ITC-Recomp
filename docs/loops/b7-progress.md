@@ -49,7 +49,8 @@ file's history. What's left to see in a drive, from every run:
   drive. Subsystem 1 finished.
 - Subsystem 2 of 3: the game's data load at boot (`sub_82105868`,
   `sub_82106618`, the top of `leads.md`; 10 ready groups under it).
-  Mapping agent running.
+  Mapped (562dc47, `data-load.md`, 25 rows, 10 ready groups, no
+  stop). Migration agent running.
 
 ## Done
 
@@ -96,3 +97,5 @@ file's history. What's left to see in a drive, from every run:
   104, known 479, unknown 2647).
 - After its validation (`itc_2629`: race 7 s, 0 errors, every harness
   0 differing but the expected groups): ours 3090, work left 3230.
+- After the data load's map: ours 3090, work left 3230 (wrapped 104,
+  known 498, unknown 2628).
