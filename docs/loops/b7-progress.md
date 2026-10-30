@@ -24,9 +24,9 @@ file's history. What's left to see in a drive, from every run:
   stages and process, `SetParameters`, `I3dl2::ToNative`,
   `PcmCodec::Process`, 12 adapters removed; 101 of 109 ours).
   Validated (`itc_2547`): 16 of 16 harness lines, all ran in play.
-  Migration 3 running. Ready and left: `ReverbCore::Apply`,
-  `ReverbCore::Init`, `Reverb::Reverb`'s group, `sub_82465710`,
-  `Reverb::Run`, `Reverb::Process`.
+  Migration 3 checked (1328597..0522cc6: `ReverbCore::Apply`, `Init`,
+  the reverb's construction and pass, 19 adapters removed; 110 of 110
+  ours, nothing ready left). Validation agent running.
 
 ## Done
 
@@ -56,5 +56,8 @@ file's history. What's left to see in a drive, from every run:
   (wrapped 104, known 509, unknown 2682).
 - After its validation (`itc_2547`: race 7 s, 0 errors, every harness
   0 differing but the expected groups): ours 3022, work left 3295.
+- After the cleanup's migration 3 (`itc_2558`: race 38 s, 0 errors,
+  xaudio_objects 0 differing): ours 3031, work left 3287 (wrapped 104,
+  known 501, unknown 2682).
 
 ## Stopped

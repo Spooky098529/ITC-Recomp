@@ -38,6 +38,22 @@ When the user has reviewed a run's section, its heading gets
   `stwu` back-chain word below the stack pointer, and the native math
   doesn't write `log`'s scratch words (as with `FilterCoefficient`'s
   `pow` and `cos`); the harness doesn't compare them.
+- XAudio's objects, cleanup migration 3 (1328597..0522cc6; 110 of 110
+  ours): `ReverbCore::Apply` and `Init` (`src/xaudio/reverb_setup.cpp`,
+  converted from `generated/` by a throwaway script the agent checked,
+  not committed), the reverb's construction and pass, `ReverbCore::SetGain`
+  Merged; `ReverbCore::Apply`'s overlapping memcpy left to the original
+  through a guest call (as `Reverb::SetParameters`). Rows corrected:
+  `I3dl2::SetParameter` (past index 12 nothing is stored, but the native
+  parameters are still made and applied), `ReverbCore::Init` (runs on
+  the reverb's +208 or an I3DL2 side's +52). For review: one run's
+  `XAudioMatrix::MixRamp` case differed only on the live spin lock's
+  depth while the game's audio thread held it (not seen again); this
+  file's harness now compares the depth only when its thread owns the
+  lock (fa8dcc1); `xaudio_engine.cpp` and `xaudio.cpp`'s harnesses read
+  it the same way and weren't changed. The pass harness no longer
+  compares `ReverbCore::Apply`'s 296-byte register-save area (shown
+  through by the recompiled callers once the adapters went; 0522cc6).
 
 ## Run 2026-10-29 15:44 (`b7-loop-29-10-26`)
 
