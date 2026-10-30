@@ -4,6 +4,7 @@
 #pragma once
 
 #include "archive/archive.h"
+#include "c_runtime/exit.h"
 
 #include <cstdint>
 #include <functional>
@@ -93,6 +94,21 @@ std::optional<uint32_t> InputRecordingsCreate(uint8_t* base);
 // Returns r3 as the original leaves it (the last record, or 0), or nullopt
 // where operator new's plain C++ can't answer.
 std::optional<uint32_t> ReplayCreate(uint8_t* base);
+
+// The two static objects with Replay::Create's layout (C runtime static
+// set-ups, no direct callers: _cinit's initializer tables, once at boot).
+constexpr uint32_t kStaticReplayA = 0x826D8520;  // its records from +0x2BF10
+constexpr uint32_t kStaticReplayB = 0x82816E50;
+constexpr uint32_t kStaticReplayAExit = 0x825DB170;  // their clean-ups
+constexpr uint32_t kStaticReplayBExit = 0x825DB1B0;
+// sub_825D9E60 Replay826D8520::StaticInit (0x826D8520, clean-up 0x825DB170)
+// and sub_825D9F68 Replay82816E50::StaticInit (0x82816E50, 0x825DB1B0):
+// Record5232 on the seven records from the object + 0x2BF10, then the
+// clean-up registered with atexit (natively, else through `call`). Return
+// atexit's r3. The frame's saved words (the link register, r30 and r31 below
+// r1) aren't written.
+int32_t StaticReplayAInit(uint8_t* base, const c_runtime::AtexitCall& call);
+int32_t StaticReplayBInit(uint8_t* base, const c_runtime::AtexitCall& call);
 
 // --- The two UI movie sets (the loading screen's and another) ---
 

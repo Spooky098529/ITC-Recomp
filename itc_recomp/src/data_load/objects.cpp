@@ -1,10 +1,11 @@
 // The objects the game keeps for the whole session (data_load.h,
 // docs/functions/data-load.md): the race data's, the input recordings' and
-// the replay's makers.
+// the replay's makers, and the two static replays' set-ups.
 
 #include "data_load/data_load.h"
 
 #include "base/log.h"
+#include "c_runtime/exit.h"
 #include "guest.h"
 #include "memory/c_runtime_heap.h"
 #include "race_setup/race_setup.h"
@@ -66,6 +67,28 @@ std::optional<uint32_t> ReplayCreate(uint8_t* base) {
   guest::StoreU32(base, kReplaySlot, block);
   guest::StoreU32(base, block + 0x2B600, 1);
   return r3;
+}
+
+namespace {
+
+int32_t StaticReplayInit(uint8_t* base, uint32_t object, uint32_t exit_function,
+                         const c_runtime::AtexitCall& call) {
+  for (uint32_t i = 0; i < 7; i++) {
+    Record5232Construct(base, object + 0x2BF10 + kRecordBytes * i);
+  }
+  return c_runtime::AtexitFrom(base, exit_function, call);
+}
+
+}  // namespace
+
+int32_t StaticReplayAInit(uint8_t* base, const c_runtime::AtexitCall& call) {
+  ITC_NATIVE_RUNNING("sub_825D9E60 Replay826D8520::StaticInit");
+  return StaticReplayInit(base, kStaticReplayA, kStaticReplayAExit, call);
+}
+
+int32_t StaticReplayBInit(uint8_t* base, const c_runtime::AtexitCall& call) {
+  ITC_NATIVE_RUNNING("sub_825D9F68 Replay82816E50::StaticInit");
+  return StaticReplayInit(base, kStaticReplayB, kStaticReplayBExit, call);
 }
 
 }  // namespace data_load

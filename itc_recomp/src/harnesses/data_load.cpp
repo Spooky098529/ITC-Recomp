@@ -7,13 +7,16 @@
 // is compared exactly (the records' floats are .rdata's 1.0 and 0.0 copied).
 
 #include "harness.h"
+#include "exit_table.h"
 
 #include "base/flags.h"
 #include "base/log.h"
+#include "c_runtime/exit.h"
 #include "data_load/data_load.h"
 #include "hooks/app_start_up.h"
 #include "hooks/data_load.h"
 #include "hooks/archive.h"
+#include "hooks/c_runtime.h"
 #include "hooks/heap.h"
 #include "memory/heap.h"
 #include "ui_movies/game.h"
@@ -23,6 +26,7 @@
 #include <fmt/format.h>
 
 #include <algorithm>
+#include <mutex>
 #include <string>
 #include <vector>
 
@@ -395,6 +399,58 @@ void Load(Context& h) {
   guest::StoreU32(h.base, dl::kLoaded, saved_flag);
 }
 
+// --- The static replays' set-ups (on the game's static objects and exit
+// table, each put back after a side; the recompiled side with the flag off,
+// so its Record5232 calls are the recompiled ones too). ---
+
+void StaticReplayInit(Context& h, const char* name, GuestFunction recompiled,
+                      GuestFunction native, uint32_t object) {
+  Results results(name);
+  std::lock_guard<std::recursive_mutex> lock(c_runtime::ExitMutex());
+  // The records, and 256 bytes on each side of them.
+  const uint32_t from = object + 0x2BF10 - 256;
+  const uint32_t bytes = 7 * dl::kRecordBytes + 512;
+  const std::vector<uint8_t> saved = Read(h.base, from, bytes);
+  for (int c = 0; c < 4; c++) {
+    Outputs out[2];
+    const Random start = h.random;
+    for (int v = 0; v < 2; v++) {
+      Random random = start;
+      if (c == 0) {
+        Write(h.base, from, saved.data(), bytes);
+      } else {
+        WriteRandom(h.base, from, bytes, random);
+      }
+      if (v == 1) {
+        h.random = random;
+      }
+      const uint32_t mark = exit_table::Mark(h.base);
+      PPCContext t = CallContext(h);
+      ITC_FLAG(native_data_load) = v == 1;
+      (v == 0 ? recompiled : native)(t, h.base);
+      ITC_FLAG(native_data_load) = true;
+      out[v].Bytes(Read(h.base, from, bytes));
+      out[v].Word(t.r3.u32);
+      out[v].Word(uint32_t(t.r3.u64 >> 32));
+      exit_table::Take(h.base, mark, out[v]);
+    }
+    results.Check(out[0], out[1], c == 0 ? "as at boot" : fmt::format("random {}", c));
+  }
+  Write(h.base, from, saved.data(), bytes);
+  results.Report();
+}
+
+void StaticReplayInits(Context& h) {
+  if (!hooks::NativeAtexit()) {
+    ITC_LOG_WARN("harness: data_load: native atexit off: the static replays' cases skipped");
+    return;
+  }
+  StaticReplayInit(h, "Replay826D8520::StaticInit (sub_825D9E60)", __imp__sub_825D9E60,
+                   sub_825D9E60, dl::kStaticReplayA);
+  StaticReplayInit(h, "Replay82816E50::StaticInit (sub_825D9F68)", __imp__sub_825D9F68,
+                   sub_825D9F68, dl::kStaticReplayB);
+}
+
 }  // namespace
 
 void DataLoad(Context& h) {
@@ -410,6 +466,7 @@ void DataLoad(Context& h) {
               dl::kRecordBytes);
   Constructor(h, "InputRecordings::InputRecordings (sub_821054A8)", __imp__sub_821054A8,
               NativeInputRecordingsConstruct, dl::kInputRecordingsBytes);
+  StaticReplayInits(h);
   if (!hooks::NativeHeapActive()) {
     ITC_LOG_WARN("harness: data_load: the makers need --native_heap");
     return;

@@ -6,6 +6,7 @@
 #include "guest.h"
 #include "hooks/app_start_up.h"
 #include "hooks/archive.h"
+#include "hooks/c_runtime.h"
 #include "hooks/data_load.h"
 #include "hooks/guest_call.h"
 #include "hooks/heap.h"
@@ -18,7 +19,8 @@ ITC_FLAG_BOOL(native_data_load, true, "ITC",
               "Member4080::Member4080 sub_82104690 and Part464::Part464 sub_821042A0; with "
               "--native_heap, RaceData::Create sub_82102208, InputRecordings::Create "
               "sub_82105508 with InputRecordings::InputRecordings sub_821054A8 and "
-              "Replay::Create sub_82105560; with them and the archive's queue native, "
+              "Replay::Create sub_82105560; with native atexit, the static replays' set-ups "
+              "Replay826D8520::StaticInit sub_825D9E60 and Replay82816E50::StaticInit sub_825D9F68; with them and the archive's queue native, "
               "BootData::Load sub_82106618 and BootData::CreateObjects sub_82105868 (their callees "
               "through their adapters), LoadingScreen::Load sub_82247B98 with "
               "LoadingScreen::AddMovie sub_82247AA0, and sub_82291328 with sub_822912A0 (the "
@@ -95,6 +97,30 @@ extern "C" REX_FUNC(sub_82105560) {
     }
   }
   __imp__sub_82105560(ctx, base);
+}
+
+// The static replays' set-ups (no direct callers: _cinit's initializer
+// tables, so the adapters stay): no arguments; r3 atexit's.
+extern "C" REX_FUNC(sub_825D9E60) {
+  REX_FUNC_PROLOGUE();
+  if (!ITC_FLAG(native_data_load) || !hooks::NativeAtexit()) {
+    __imp__sub_825D9E60(ctx, base);
+    return;
+  }
+  ctx.fpscr.disableFlushMode();
+  hooks::GuestAtexit guest{ctx, base};
+  ctx.r3.s64 = dl::StaticReplayAInit(base, guest.Call());
+}
+
+extern "C" REX_FUNC(sub_825D9F68) {
+  REX_FUNC_PROLOGUE();
+  if (!ITC_FLAG(native_data_load) || !hooks::NativeAtexit()) {
+    __imp__sub_825D9F68(ctx, base);
+    return;
+  }
+  ctx.fpscr.disableFlushMode();
+  hooks::GuestAtexit guest{ctx, base};
+  ctx.r3.s64 = dl::StaticReplayBInit(base, guest.Call());
 }
 
 // --- The movie sets and the load ---
