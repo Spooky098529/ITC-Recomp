@@ -22,11 +22,6 @@ void CarModelsLoadSlotReleaseBuffer(PPCContext& ctx, uint8_t* base);
 // --native_heap routes VirtualAlloc to the layer.
 void CarModelsLoadSlotLoadShared(PPCContext& ctx, uint8_t* base);
 void CarModelsLoadSlotLoad(PPCContext& ctx, uint8_t* base);
-// CarModel::LoadSetA sub_820D59D8 and LoadSetB sub_820D5AC0: r3 = the car
-// model; r3 as the original leaves it. Natively only while --native_heap
-// routes VirtualAlloc to the layer.
-void CarModelsLoadSetA(PPCContext& ctx, uint8_t* base);
-void CarModelsLoadSetB(PPCContext& ctx, uint8_t* base);
 // The team emblem sub_820D3CF8: r4 = the block; r3 the asset id or -1 (r11,
 // r0, r12 and ctr as the original's jump table leaves them).
 void CarModelsTeamEmblem(PPCContext& ctx, uint8_t* base);

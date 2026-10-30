@@ -20,7 +20,8 @@
 ITC_FLAG_BOOL(native_car_models, true, "ITC",
               "Run the car models' pieces (docs/functions/car-models.md: LoadSlot::Reset "
               "sub_820D0730, LoadSlot::LoadShared sub_820D0860, with --native_heap LoadSlot::Load "
-              "sub_820D07C8 and CarModel::LoadSetA sub_820D59D8 and LoadSetB sub_820D5AC0 and CarModel::LoadExterior sub_820D5EC8, the team "
+              "sub_820D07C8 and CarModel::LoadExterior sub_820D5EC8 (with LoadSetA sub_820D59D8 and "
+              "LoadSetB sub_820D5AC0), the team "
               "emblem sub_820D3CF8, CarModel::LoadDecals sub_820D5B50 and SetVinylTextures "
               "sub_820D5F88, with --native_heap LoadSlot::ReleaseBuffer sub_820D0758, and the "
               "deferred release sub_820C3F50; with --native_heap and the memory blocks' host lock "
@@ -64,22 +65,6 @@ void CarModelsLoadSlotLoad(PPCContext& ctx, uint8_t* base) {
   }
   ctx.r3.u64 = cm::LoadSlotLoad(base, ctx.r3.u32, ctx.r4.u32, ctx.r5.u32, ctx.r6.u32,
                                 ctx.r13.u32, hooks::NativeArchiveLoad(base));
-}
-
-void CarModelsLoadSetA(PPCContext& ctx, uint8_t* base) {
-  if (!hooks::NativeHeapActive()) {
-    __imp__sub_820D59D8(ctx, base);
-    return;
-  }
-  ctx.r3.s64 = cm::CarModelLoadSetA(base, ctx.r3.u32, hooks::NativeArchiveLoad(base));
-}
-
-void CarModelsLoadSetB(PPCContext& ctx, uint8_t* base) {
-  if (!hooks::NativeHeapActive()) {
-    __imp__sub_820D5AC0(ctx, base);
-    return;
-  }
-  ctx.r3.s64 = cm::CarModelLoadSetB(base, ctx.r3.u32, ctx.r13.u32, hooks::NativeArchiveLoad(base));
 }
 
 void CarModelsTeamEmblem(PPCContext& ctx, uint8_t* base) {
@@ -237,8 +222,6 @@ ITC_CAR_MODELS(820D0758, CarModelsLoadSlotReleaseBuffer)
 ITC_CAR_MODELS(820C3F50, CarModelsDeferRelease)
 ITC_CAR_MODELS(820D0860, CarModelsLoadSlotLoadShared)
 ITC_CAR_MODELS(820D07C8, CarModelsLoadSlotLoad)
-ITC_CAR_MODELS(820D59D8, CarModelsLoadSetA)
-ITC_CAR_MODELS(820D5AC0, CarModelsLoadSetB)
 ITC_CAR_MODELS(820D3CF8, CarModelsTeamEmblem)
 ITC_CAR_MODELS(820D5B50, CarModelsLoadDecals)
 ITC_CAR_MODELS(820D5EC8, CarModelsLoadExterior)

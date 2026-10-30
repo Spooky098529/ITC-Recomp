@@ -18,6 +18,7 @@
 #include "car_models/tga.h"
 #include "car_models/vinyl.h"
 #include "graphics/resources.h"
+#include "hooks/archive.h"
 #include "hooks/car_models.h"
 #include "hooks/heap.h"
 #include "hooks/models.h"
@@ -1238,6 +1239,17 @@ std::vector<int64_t> Serials(Random& r) {
 
 void DecalRecords(uint8_t* base, uint32_t records, Random& r, bool none);
 
+// CarModel::LoadSetA and LoadSetB's register steps (their adapters removed:
+// their only caller, LoadExterior, is native): r3 = the car model; r3 as
+// the original leaves it.
+void NativeLoadSetA(PPCContext& ctx, uint8_t* base) {
+  ctx.r3.s64 = car_models::CarModelLoadSetA(base, ctx.r3.u32, hooks::NativeArchiveLoad(base));
+}
+void NativeLoadSetB(PPCContext& ctx, uint8_t* base) {
+  ctx.r3.s64 = car_models::CarModelLoadSetB(base, ctx.r3.u32, ctx.r13.u32,
+                                            hooks::NativeArchiveLoad(base));
+}
+
 // LoadSlot::LoadShared and Load, CarModel::LoadSetA and LoadSetB, with
 // Archive::Load's calls recorded (answered with random serials, -1 now and
 // then) and the scene's second set pointed at the block (its shared buffer
@@ -1339,13 +1351,13 @@ void Loads(Context& h, uint32_t block) {
   };
   {
     Results results("CarModel::LoadSetA (sub_820D59D8)");
-    run(results, 24, __imp__sub_820D59D8, hooks::CarModelsLoadSetA, car_model,
+    run(results, 24, __imp__sub_820D59D8, NativeLoadSetA, car_model,
         {car + 3744, car + 3968}, "set a");
     results.Report();
   }
   {
     Results results("CarModel::LoadSetB (sub_820D5AC0)");
-    run(results, 24, __imp__sub_820D5AC0, hooks::CarModelsLoadSetB, car_model, {car + 3744},
+    run(results, 24, __imp__sub_820D5AC0, NativeLoadSetB, car_model, {car + 3744},
         "set b");
     results.Report();
   }
