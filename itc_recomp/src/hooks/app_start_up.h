@@ -50,6 +50,9 @@ void AppCameraListConstructSteps(PPCContext& ctx, uint8_t* base);
 // original's, its saved registers set as it sets them; needs --native_heap
 // (the adapter checks).
 void AppConstructSteps(PPCContext& ctx, uint8_t* base);
+// App::Create (sub_82094AB8: r3 the block) in a frame like the original's,
+// App::App through its adapter; needs --native_heap (the adapter checks).
+void AppCreateSteps(PPCContext& ctx, uint8_t* base);
 void TextInitSteps(PPCContext& ctx, uint8_t* base);
 void FontConstructSteps(PPCContext& ctx, uint8_t* base);
 // Whether Text::Init's and Font::Font's native steps can run.

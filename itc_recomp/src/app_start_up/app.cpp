@@ -111,3 +111,40 @@ uint32_t AppConstruct(uint8_t* base, uint32_t app, uint32_t block, uint32_t fram
 }
 
 }  // namespace app_start_up
+
+namespace app_start_up {
+
+std::optional<uint32_t> AppCreate(uint8_t* base, uint32_t block,
+                                  const std::function<uint32_t(uint32_t app)>& construct) {
+  const auto app = memory::crt::OperatorNew(base, kAppBytes);
+  if (!app) {
+    return std::nullopt;
+  }
+  ITC_NATIVE_RUNNING("sub_82094AB8 App::Create");
+  (void)block;
+  const uint32_t made = *app != 0 ? construct(*app) : 0;
+  return made != 0 ? made + 20 : 0;
+}
+
+uint32_t InterfaceWord108(uint8_t* base, uint32_t object) {
+  ITC_NATIVE_RUNNING("sub_82379338 (the word at +108)");
+  return Load(base, object + 108);
+}
+
+uint32_t InterfaceWord112(uint8_t* base, uint32_t object) {
+  ITC_NATIVE_RUNNING("sub_82379350 (the word at +112)");
+  return Load(base, object + 112);
+}
+
+SlotCall AppPoolSlot(uint8_t* base, uint32_t interface8) {
+  ITC_NATIVE_RUNNING("sub_82094368 (the framework interface's slot 4)");
+  const uint32_t object = Load(base, interface8 + 16);
+  return {object, Load(base, Load(base, object) + 16)};
+}
+
+SlotCall AppPoolSlotFromInterface16(uint8_t* base, uint32_t interface16) {
+  ITC_NATIVE_RUNNING("sub_820944A8 (this - 8, then sub_82094368)");
+  return AppPoolSlot(base, interface16 - 8);
+}
+
+}  // namespace app_start_up

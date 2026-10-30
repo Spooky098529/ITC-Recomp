@@ -211,6 +211,30 @@ struct AppCalls {
 uint32_t AppConstruct(uint8_t* base, uint32_t app, uint32_t block, uint32_t frame,
                       const AppCalls& calls);
 
+// sub_82094AB8 App::Create: 132 bytes (operator new's plain C++) and
+// App::App on them (`construct`, with `block`, r4 as it came); returns the
+// app + 20 (its 0x82000E08 interface), or 0. nullopt where operator new's
+// plain C++ can't answer (the original runs; nothing written yet).
+std::optional<uint32_t> AppCreate(uint8_t* base, uint32_t block,
+                                  const std::function<uint32_t(uint32_t app)>& construct);
+
+// A tail call through a vtable: the object (r3) and the slot's target.
+struct SlotCall {
+  uint32_t object;
+  uint32_t target;
+};
+// sub_82379338 and sub_82379350: the word at +108 and +112 (the app's
+// interface's slots +48 and +44 at app + 16: the sound manager and the
+// movie; probably folded getters other vtables share).
+uint32_t InterfaceWord108(uint8_t* base, uint32_t object);
+uint32_t InterfaceWord112(uint8_t* base, uint32_t object);
+// sub_82094368 (the app's +8 interface's slot +4): the word at +16 (app +
+// 24, the framework's +36 interface) and its slot +16, tail-called.
+SlotCall AppPoolSlot(uint8_t* base, uint32_t interface8);
+// sub_820944A8 (the app's +16 interface's slot +16): this - 8, then
+// sub_82094368.
+SlotCall AppPoolSlotFromInterface16(uint8_t* base, uint32_t interface16);
+
 // --- The app's start-up ---
 
 // The guest calls App::StartUp makes: `call` a guest call of the callee at

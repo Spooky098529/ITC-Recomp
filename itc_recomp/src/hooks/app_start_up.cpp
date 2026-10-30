@@ -35,7 +35,9 @@ ITC_FLAG_BOOL(native_app_start_up, true, "ITC",
               "AudioEngine::StartXAudio sub_8259CD50, no adapters of their own; the second camera "
               "class sub_820A8B88 with its camera sub_820A9E28, list sub_820A98C0 (sub_820A9198 "
               "and sub_820A8F80 merged) and entry sub_820A75E8, no adapters of their own; App::App "
-              "sub_82094590, its callees through their adapters) "
+              "sub_82094590, its callees through their adapters; App::Create sub_82094AB8; the app's "
+              "interface slots sub_82379338, sub_82379350 (the getters of +108 and +112), "
+              "sub_82094368 and sub_820944A8 (the framework's first worker pool, tail calls)) "
               "natively instead of through the translated code (the same reads and writes; "
               "checked by --run_harnesses=app_start_up)");
 
@@ -851,9 +853,105 @@ void hooks::AppConstructSteps(PPCContext& ctx, uint8_t* base) {
 // at boot.
 extern "C" REX_FUNC(sub_82094590) {
   REX_FUNC_PROLOGUE();
+  if (hooks::StartUpRecorded(ctx, 0x82094590)) {
+    return;
+  }
   if (!ITC_FLAG(native_app_start_up) || !hooks::NativeHeapActive()) {
     __imp__sub_82094590(ctx, base);
     return;
   }
   hooks::AppConstructSteps(ctx, base);
+}
+
+// --- App::Create and the app's interface slots ---
+
+void hooks::AppCreateSteps(PPCContext& ctx, uint8_t* base) {
+  const uint32_t block = ctx.r3.u32;
+  const uint64_t entry_r3 = ctx.r3.u64;
+  const uint64_t lr = ctx.lr;
+  const uint32_t sp = ctx.r1.u32;
+  // The original's prologue: lr and r31 above its 96-byte frame; r31 the
+  // block in the body.
+  SaveRegisters(ctx, base, 31);
+  const uint64_t r31 = ctx.r31.u64;
+  std::optional<uint32_t> result;
+  InFrame(ctx, base, 96, 0x82094AE4, [&](uint32_t) {
+    ctx.r31.u64 = entry_r3;
+    result = asu::AppCreate(base, block, [&](uint32_t app) {
+      ctx.r3.u64 = app;
+      ctx.r4.u64 = entry_r3;
+      ctx.lr = 0x82094AE4;
+      sub_82094590(ctx, base);  // App::App (its adapter: the harness's recorder)
+      return ctx.r3.u32;
+    });
+  });
+  ctx.r31.u64 = r31;
+  ctx.lr = lr;
+  if (!result) {
+    ctx.r3.u64 = entry_r3;
+    __imp__sub_82094AB8(ctx, base);
+    return;
+  }
+  ctx.r3.u64 = *result;
+}
+
+// App::Create: r3 = the block {the run loop, the framework's +36
+// interface}; from Framework::Init (recompiled) once at boot.
+extern "C" REX_FUNC(sub_82094AB8) {
+  REX_FUNC_PROLOGUE();
+  if (!ITC_FLAG(native_app_start_up) || !hooks::NativeHeapActive()) {
+    __imp__sub_82094AB8(ctx, base);
+    return;
+  }
+  hooks::AppCreateSteps(ctx, base);
+}
+
+// The getters of +108 and +112 (vtable slots; r3 the object).
+extern "C" REX_FUNC(sub_82379338) {
+  REX_FUNC_PROLOGUE();
+  if (!ITC_FLAG(native_app_start_up)) {
+    __imp__sub_82379338(ctx, base);
+    return;
+  }
+  ctx.r3.u64 = asu::InterfaceWord108(base, ctx.r3.u32);
+}
+
+extern "C" REX_FUNC(sub_82379350) {
+  REX_FUNC_PROLOGUE();
+  if (!ITC_FLAG(native_app_start_up)) {
+    __imp__sub_82379350(ctx, base);
+    return;
+  }
+  ctx.r3.u64 = asu::InterfaceWord112(base, ctx.r3.u32);
+}
+
+// The app's interfaces' slots to the framework's first worker pool: a tail
+// call (lr the caller's; r11 the target, ctr it, as the original's).
+namespace {
+
+void TailCall(PPCContext& ctx, uint8_t* base, const asu::SlotCall& call) {
+  ctx.r3.u64 = call.object;
+  ctx.r11.u64 = call.target;
+  ctx.ctr.u64 = call.target;
+  REX_CALL_INDIRECT_FUNC(call.target);
+}
+
+}  // namespace
+
+extern "C" REX_FUNC(sub_82094368) {
+  REX_FUNC_PROLOGUE();
+  if (!ITC_FLAG(native_app_start_up)) {
+    __imp__sub_82094368(ctx, base);
+    return;
+  }
+  TailCall(ctx, base, asu::AppPoolSlot(base, ctx.r3.u32));
+}
+
+extern "C" REX_FUNC(sub_820944A8) {
+  REX_FUNC_PROLOGUE();
+  if (!ITC_FLAG(native_app_start_up)) {
+    __imp__sub_820944A8(ctx, base);
+    return;
+  }
+  TailCall(ctx, base, asu::AppPoolSlotFromInterface16(base, ctx.r3.u32));
 }

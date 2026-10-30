@@ -1447,7 +1447,7 @@ void AppConstructCases(Context& h) {
       }
       t.r3.u64 = app;
       t.r4.u64 = block;
-      t.lr = 0x82094AE0;
+      t.lr = 0x82094AE4;
       const uint32_t stack = t.r1.u32;
       g_app_numbering = {h.base, app, block, stack};
       g_app_log.clear();
@@ -1485,6 +1485,125 @@ void AppConstructCases(Context& h) {
   results.Report();
 }
 
+// --- App::Create and the app's interface slots ---
+
+// App::Create on a random block, App::App recorded (its address, r3 as
+// whether it's a heap block of 132 bytes, freed, r4, the link register,
+// the stack pointer's depth and r31; answered with a number). Compared: the
+// log, r3, the prologue's saves and r31 after.
+std::vector<uint32_t> g_create_log;
+uint32_t g_create_stack = 0;
+bool RecordAppConstruct(PPCContext& ctx, uint32_t address) {
+  const uint32_t app = ctx.r3.u32;
+  const bool heap = app != 0 && memory::IsHeapBlock(app) && memory::Size(app) == asu::kAppBytes;
+  g_create_log.insert(g_create_log.end(), {address, heap ? 1u : app, ctx.r4.u32, uint32_t(ctx.lr),
+                                           g_create_stack - ctx.r1.u32, ctx.r31.u32});
+  FreeBlock(app);
+  ctx.r3.u64 = 0x7A000000u + uint32_t(g_create_log.size());
+  return true;
+}
+
+void AppCreateCases(Context& h) {
+  Results results("App::Create (sub_82094AB8)");
+  for (int c = 0; c < 8; c++) {
+    const uint64_t r4 = h.random.Next(), r31 = h.random.Next();
+    const uint32_t block = uint32_t(h.random.Next());
+    Outputs out[2];
+    for (int v = 0; v < 2; v++) {
+      PPCContext t = CallContext(h);
+      t.r3.u64 = block;
+      t.r4.u64 = r4;
+      t.r31.u64 = r31;
+      t.lr = 0x82090C00;
+      const uint32_t stack = t.r1.u32;
+      g_create_stack = stack;
+      g_create_log.clear();
+      hooks::g_start_up_recorder = RecordAppConstruct;
+      StartUpSide(v, [&] {
+        (v == 0 ? __imp__sub_82094AB8 : hooks::AppCreateSteps)(t, h.base);
+      });
+      hooks::g_start_up_recorder = nullptr;
+      for (const uint32_t word : g_create_log) {
+        out[v].Word(word);
+      }
+      out[v].Word(t.r3.u32);
+      out[v].Word(t.r1.u32 - stack);
+      out[v].Bytes(Read(h.base, stack - 16, 16));
+      out[v].Word(uint32_t(t.r31.u64 >> 32));
+      out[v].Word(t.r31.u32);
+    }
+    results.Check(out[0], out[1], fmt::format("case {}", c));
+  }
+  results.Report();
+}
+
+void NativeWord108(PPCContext& t, uint8_t* base) {
+  t.r3.u64 = asu::InterfaceWord108(base, t.r3.u32);
+}
+void NativeWord112(PPCContext& t, uint8_t* base) {
+  t.r3.u64 = asu::InterfaceWord112(base, t.r3.u32);
+}
+
+// The getters on random words in the scratch area; the slots on an object
+// (+16 a second one whose vtable's slot +16 is the getter of +60,
+// sub_82090770), the recompiled ones with --native_app_start_up off:
+// compared r3, r11 and ctr after the tail call.
+void InterfaceSlotCases(Context& h) {
+  for (int which = 0; which < 2; which++) {
+    Results results(which == 0 ? "sub_82379338 (the word at +108)"
+                               : "sub_82379350 (the word at +112)");
+    for (int c = 0; c < 8; c++) {
+      const uint32_t object = h.data + 4 * h.random.Below(256);
+      std::vector<uint32_t> words(kScratchBytes / 4);
+      for (auto& w : words) {
+        w = uint32_t(h.random.Next());
+      }
+      Both(
+          h, results,
+          [&] {
+            for (uint32_t i = 0; i < words.size(); i++) {
+              guest::StoreU32(h.base, h.data + 4 * i, words[i]);
+            }
+          },
+          [&](PPCContext& t) { t.r3.u64 = object; },
+          which == 0 ? __imp__sub_82379338 : __imp__sub_82379350,
+          which == 0 ? NativeWord108 : NativeWord112, h.data, 16, fmt::format("case {}", c));
+    }
+    results.Report();
+  }
+  constexpr uint32_t kGetter60 = 0x82090770;
+  for (int which = 0; which < 2; which++) {
+    Results results(which == 0 ? "sub_82094368 (the framework interface's slot 4)"
+                               : "sub_820944A8 (this - 8, then sub_82094368)");
+    for (int c = 0; c < 8; c++) {
+      const uint32_t word60 = uint32_t(h.random.Next());
+      Outputs out[2];
+      for (int v = 0; v < 2; v++) {
+        Fill(h.base, h.data, kScratchBytes);
+        const uint32_t interface = h.data + 64, object = h.data + 256, vtable = h.data + 512;
+        guest::StoreU32(h.base, interface + 16, object);
+        guest::StoreU32(h.base, object, vtable);
+        guest::StoreU32(h.base, object + 60, word60);
+        guest::StoreU32(h.base, vtable + 16, kGetter60);
+        PPCContext t = CallContext(h);
+        t.r3.u64 = which == 0 ? interface : interface + 8;
+        StartUpSide(v, [&] {
+          if (which == 0) {
+            sub_82094368(t, h.base);
+          } else {
+            sub_820944A8(t, h.base);
+          }
+        });
+        out[v].Word(t.r3.u32);
+        out[v].Word(t.r11.u32);
+        out[v].Word(t.ctr.u32);
+      }
+      results.Check(out[0], out[1], fmt::format("case {}", c));
+    }
+    results.Report();
+  }
+}
+
 }  // namespace
 
 void AppStartUp(Context& h) {
@@ -1512,7 +1631,9 @@ void AppStartUp(Context& h) {
     AudioManagerGroup(h);
     AppCameraCases(h);
     AppConstructCases(h);
+    AppCreateCases(h);
   }
+  InterfaceSlotCases(h);
 }
 
 }  // namespace harness
