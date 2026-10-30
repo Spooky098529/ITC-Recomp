@@ -47,7 +47,15 @@ file's history. What's left to see in a drive, from every run:
   now on (the user's call, 2026-10-30, in `b7-loop.md`). Validated
   again (`itc_2732`, 60 s: race 14 s, 0 errors): 74 of 74 harness
   lines; 38 ran in play, 12 in the replay, 24 to drive. Migration 2
-  running. Left: `CameraDirector::InitStates`,
+  checked (96a281f..27ada48, 5 batches, 3 by subagents one at a time:
+  `UiMovies::Open` and `Delete` under `--native_ui_movies_game`, the
+  rival logo's open and close, the cutscene's step and update (the
+  logo's draw still through `--redraw_rival_logo`'s override), the TV
+  camera, `GarageCamera::Update`; 9 adapters removed; 82 of 90 in play
+  ours). Validation running. Left: `CameraDirector::InitStates`,
+  `Cutscene::Cutscene` (ready, 2,688 lines) and `SetMode`, then
+  `OnRaceStart`, `Resume`, `Update`; `Viewport::LookAt`'s adapter
+  removable. Left: `CameraDirector::InitStates`,
   `TvCamera::TvCamera`, `Update` and `Step`, `GarageCamera::Update`;
   then, past `UiMovies::Open` (ready), the cutscene and the director's
   `SetMode`, `Update` (`--redraw_rival_logo`'s split kept).
@@ -97,3 +105,6 @@ file's history. What's left to see in a drive, from every run:
 - After its validation (`itc_2732`, 60 s: race 14 s, 0 errors, every
   harness 0 differing but the expected groups): ours 3348, work left
   3049.
+- After the camera modes' migration 2 (`itc_2749`: race 26 s, 0
+  errors, touched harnesses 0 differing): ours 3359, work left 3038
+  (wrapped 104, known 473, unknown 2461).

@@ -82,6 +82,22 @@ When the user has reviewed a run's section, its heading gets
   off in `camera_modes`); the validation agent now runs
   `attract_race.sh 60 --run_harnesses=all`, migration agents stay at
   40 (`b7-loop.md`, "Precedent first"; `CLAUDE.md`).
+- The camera modes' migration 2 (96a281f..27ada48): `UiMovies::Open`
+  and `Delete` with `UiMovie::Unload` taken into `ui-movies-game.md`'s
+  code (`--native_ui_movies_game`; callees native where their own
+  checks say so, else their originals from frames like the
+  originals'). Row corrections: the attract filter's `rand() % 4` runs
+  on every TV camera update while +43520 is 0 (probably once a camera
+  path), not once; the TV camera's range table holds at most 40, from
+  `0x82618D30`; `RivalLogo::Open`'s record +8 id, +12 name, +16 asset;
+  `Cutscene::Update` sets bit 0 of race data +0x59AE4, not +0x5E6E4.
+  Native `Cutscene::Step` draws the logo through `sub_82211A28`'s
+  override, so `--redraw_rival_logo` is unchanged; a harness-only
+  stand-in (`race_hud_hooks::g_rival_logo_draw_stand_in`, null outside
+  harness runs) is checked in that override. Batch 3's four adapter
+  removals were checked by the absence of a game line instead of a
+  temporary counter (their functions don't run in attract races);
+  batch 4's had the counter (`itc_2746`).
 
 ## Run 2026-10-30 01:06 (`b7-loop-29-10-26-2`)
 
