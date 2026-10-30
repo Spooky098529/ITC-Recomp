@@ -52,6 +52,15 @@ inline uint32_t SetText(uint8_t* base, const Calls& calls, uint32_t frame, uint3
       "UiMovie::SetText");
 }
 
+// UiMovie::SetNodeText from the frame at `frame`, no arguments (r6 to r10
+// passed as 0: the user's call for SetText's unset varargs, 2026-10-30).
+inline uint32_t SetNodeText(uint8_t* base, const Calls& calls, uint32_t frame, uint32_t movie,
+                            uint32_t node, uint32_t id) {
+  static constexpr uint64_t kNoArguments[5] = {0, 0, 0, 0, 0};
+  return Required(ui_movies::SetNodeText(base, *calls.format, frame, movie, node, id, kNoArguments),
+                  "UiMovie::SetNodeText");
+}
+
 inline uint32_t ShowNode(uint8_t* base, uint32_t movie, uint32_t sub_scene, uint32_t child) {
   const uint32_t node = ui_movies::FindNode(base, movie, sub_scene, child);
   guest::StoreU32(base, node + 80, 1);

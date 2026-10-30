@@ -15,6 +15,8 @@
 #include "guest.h"
 #include "location_screen/internal.h"
 #include "mode_tick/mode_tick.h"
+#include "race_event/race_event.h"
+#include "race_setup/race_setup.h"
 #include "ui_movies/game.h"
 #include "vehicle_accessors/vehicle_accessors.h"
 
@@ -24,8 +26,8 @@ using namespace detail;
 
 namespace {
 
-// The location's first camera animation (0x82636518 + 16 x the location)
-// evaluated at frame `time` into the frame's +128 (CameraAnims::Evaluate,
+// The location's camera animation `which` (0x82636518 + 16 x the location +
+// 4 x which) evaluated at frame `time` into the frame's +128 (CameraAnims::Evaluate,
 // its frame 144 bytes below `frame`; EvalCamera's original through `calls`
 // where its plain C++ can't), after the original's set-up: two vectors of
 // (0, 0, 0, 1) at +96 and +112 copied to +128 and +144 (their w words
@@ -33,7 +35,8 @@ namespace {
 // frame's +144 (16 bytes), +608 = +128, +664 and +668 = +160 and +164
 // (through a float). The floats go through a float register as lfs and
 // stfs leave them.
-void EvaluateView(uint8_t* base, uint32_t frame, uint32_t time, const Calls& calls) {
+void EvaluateView(uint8_t* base, uint32_t frame, uint32_t which, uint32_t time,
+                  const Calls& calls) {
   const uint32_t zero = ThroughFloat(base, 0x82000A34);
   const uint32_t one = ThroughFloat(base, 0x82000A30);
   for (uint32_t v : {96u, 112u}) {
@@ -50,7 +53,8 @@ void EvaluateView(uint8_t* base, uint32_t frame, uint32_t time, const Calls& cal
   guest::StoreU32(base, frame + 160, zero);
   guest::StoreU32(base, frame + 164, zero);
   const uint32_t location = guest::LoadU32(base, Screen(base) + 852);
-  const uint32_t id = guest::LoadU32(base, ((location << 4) & 0xFFFFFFF0u) + 0x82636518);
+  const uint32_t id =
+      guest::LoadU32(base, ((location << 4) & 0xFFFFFFF0u) + 0x82636518 + 4 * which);
   const uint32_t out = frame + 128;
   std::optional<double> f1;
   camera_modes::AnimsEvaluate(
@@ -89,7 +93,7 @@ uint32_t Transition4(uint8_t* base, uint32_t sp, uint32_t step, const Calls& cal
     LoopLast(base, frame, movie);
     SetText(base, calls, frame, movie, 0, 0, 578);
     Required(ui_movies::ResetTextScroll(base, movie, 0, 0), "sub_8211C5F8");
-    EvaluateView(base, frame, 1, calls);
+    EvaluateView(base, frame, 0, 1, calls);
     guest::StoreU32(base, step, 1);
   }
   return uint32_t(Run(calls, frame, 0x8222DA00, movie)) == 0 ? 1 : 0;
@@ -106,7 +110,7 @@ uint32_t Transition5(uint8_t* base, uint32_t sp, uint32_t step, const Calls& cal
     SetText(base, calls, frame, movie, 0, 0, 573);
     Required(ui_movies::ResetTextScroll(base, movie, 0, 0), "sub_8211C5F8");
     ui_movies::Play(base, movie, 0xFFFFFFFFu, 0, 0, 0, 0, 0);
-    EvaluateView(base, frame, 0, calls);
+    EvaluateView(base, frame, 0, 0, calls);
     guest::StoreU32(base, step, 1);
   }
   const uint32_t done = uint32_t(Run(calls, frame, 0x8222DB84, movie)) == 0 ? 1 : 0;
@@ -244,6 +248,81 @@ uint32_t Start(uint8_t* base, uint32_t sp, const Calls& calls) {
   guest::StoreU32(base, pages + 12, transition);
   mode_tick::ScreenFadesFadeIn(base, 30, 0, 0, 0, 0);
   return 30;
+}
+
+uint32_t ShowOpponentSpecs(uint8_t* base, uint32_t sp, const Calls& calls) {
+  ITC_NATIVE_RUNNING("sub_8222C188 LocationScreen::ShowOpponentSpecs");
+  const uint32_t frame = sp - kShowOpponentSpecsFrame;
+  guest::StoreU32(base, frame, sp);
+  const uint32_t movie = Movie(base, frame, kMenusMovie);
+  guest::StoreU32(base, frame + 80, guest::LoadU32(base, Screen(base) + 800));
+  const uint32_t event = race_setup::EventCurrent(base);
+  const uint32_t item = race_event::GroupItem(base, event, guest::LoadU32(base, Screen(base) + 804),
+                                              guest::LoadU32(base, frame + 80));
+  Copy(base, calls, frame, 0x8222C1E4, frame + 96, item, 3008);
+  // The item's car build's car id (+160 + 2788).
+  const uint32_t id = guest::LoadU32(base, frame + 3044);
+  const uint32_t spec = car_specs::GetCarSpec(base, id);
+  const uint32_t n9 = ui_movies::FindNode(base, movie, 12, 9);
+  const uint32_t n10 = ui_movies::FindNode(base, movie, 12, 10);
+  const uint32_t n11 = ui_movies::FindNode(base, movie, 12, 11);
+  SetNodeText(base, calls, frame, movie, n9, guest::LoadU8(base, spec + 769) + 1934);
+  SetNodeText(base, calls, frame, movie, n10, id + 1646);
+  return SetNodeText(base, calls, frame, movie, n11, id + 1718);
+}
+
+uint32_t Transition9(uint8_t* base, uint32_t sp, uint32_t step, const Calls& calls) {
+  ITC_NATIVE_RUNNING("sub_8222DEE0 LocationScreen::Transition9");
+  const uint32_t frame = sp - 240;
+  guest::StoreU32(base, frame, sp);
+  const uint32_t movie = Movie(base, frame, kMenusMovie);
+  if (guest::LoadU32(base, step) == 0) {
+    ResetMovie(base, frame, calls);
+    if (guest::LoadU32(base, Screen(base) + 888) != 0) {
+      HidePictures(base, frame);
+    } else {
+      const uint32_t menu = guest::LoadU32(base, kOpponentMenu);
+      const uint32_t cursor = guest::LoadU32(base, menu);
+      guest::StoreU32(base, menu + 0, 0);
+      guest::StoreU32(base, menu + 4, cursor);
+    }
+    for (uint32_t i = 0; i < 10; i++) {
+      FinishNamed(calls, frame, 0x8222DF60, movie, 13 + i);
+    }
+    for (uint32_t i = 0; i < guest::LoadU32(base, Screen(base) + 808); i++) {
+      FinishNamed(calls, frame, 0x8222DF8C, movie, 84 + i);
+    }
+    HideNode(base, movie, 0xFFFFFFFFu, 18);
+    HideNode(base, movie, 0xFFFFFFFFu, 17);
+    ui_movies::Play(base, movie, 0xFFFFFFFFu, 2, 0, 0, 0, 0);
+    PlayNamed(base, movie, guest::LoadU32(base, Screen(base) + 800) + 84);
+    LoopLast(base, frame, movie);
+    ShowOpponentInfo(base, frame, calls);
+    // The location's second camera animation at the picked opponent's time
+    // (0x82010780 + 4 x +800).
+    const uint32_t picked = guest::LoadU32(base, Screen(base) + 800);
+    EvaluateView(base, frame, 1, guest::LoadU32(base, ((picked << 2) & 0xFFFFFFFCu) + 0x82010780),
+                 calls);
+    ShowOpponentSpecs(base, frame, calls);
+    ShowOpponentPictures(base, frame, calls);
+    guest::StoreU32(base, step, 1);
+  }
+  const uint32_t done = uint32_t(Run(calls, frame, 0x8222E118, movie)) == 0 ? 1 : 0;
+  if (done != 0) {
+    ShowArrows(base, frame);
+    ui_movies::Play(base, movie, 0xFFFFFFFFu, 13, 0, 0, 0, 0);
+    LoopLast(base, frame, movie);
+    // The opponents' menu reset: 6 items (+16 = 6), the rest 0 (the
+    // original's store order).
+    const uint32_t menu = guest::LoadU32(base, kOpponentMenu);
+    guest::StoreU32(base, menu + 12, 0);
+    guest::StoreU32(base, menu + 16, 6);
+    for (uint32_t offset : {20u, 0u, 4u, 8u, 40u, 48u, 52u, 36u, 64u, 24u, 28u, 32u}) {
+      guest::StoreU32(base, menu + offset, 0);
+    }
+    SetCarColor(base, frame);
+  }
+  return done;
 }
 
 }  // namespace location_screen

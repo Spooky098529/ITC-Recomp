@@ -434,6 +434,25 @@ uint32_t Transition34(uint8_t* base, uint32_t sp, uint32_t step, const Calls& ca
 // page 13 through 25, else page 0 directly; FadeIn(30). Returns 30 (r3 as
 // FadeIn leaves it).
 uint32_t Start(uint8_t* base, uint32_t sp, const Calls& calls);
+// sub_8222C188 LocationScreen::ShowOpponentSpecs: the picked opponent's
+// item (RaceEvent::GroupItem of +804 and +800, +800 at frame + 80) copied
+// to its 3,152-byte frame's +96; its car's spec (Params::GetCarSpec of the
+// build's car id, the item's +2948): node 12's texts 9 (the spec's byte
+// +769, 1934 on), 10 (the car id, 1646 on) and 11 (1718 on), through
+// UiMovie::SetNodeText (r6 to r10 passed as 0). Returns the last's r3.
+constexpr uint32_t kShowOpponentSpecsFrame = 3152;
+uint32_t ShowOpponentSpecs(uint8_t* base, uint32_t sp, const Calls& calls);
+// sub_8222DEE0 LocationScreen::Transition9 (to the opponents, page 3):
+// first ResetMovie, HidePictures with +888 set (else the opponents' menu's
+// cursor 0, its +4 the old one), named 13 to 22 and 84 + i for each
+// opponent finished, nodes (-1, 18) and (-1, 17) hidden, Play(-1, 2),
+// named 84 + the picked one played and looped, ShowOpponentInfo, the
+// location's second camera animation at the picked one's time
+// (0x82010780 + 4 x +800; as Transition4's, its 240-byte frame),
+// ShowOpponentSpecs, ShowOpponentPictures; whether movie 21's run is done,
+// and then ShowArrows, Play(-1, 13) looped, the opponents' menu reset (6
+// items) and SetCarColor.
+uint32_t Transition9(uint8_t* base, uint32_t sp, uint32_t step, const Calls& calls);
 
 // --- An opponent's car posed (src/location_screen/pose.cpp) ---
 //

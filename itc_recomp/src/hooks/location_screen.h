@@ -147,5 +147,9 @@ void LocationScreenStart(PPCContext& ctx, uint8_t* base);
 // sub_82228588 PoseCar: r3 = the model + 4288, r4 = the index; r3 = r3 +
 // 272 (as the last Matrix::RotateZ's adapter leaves it), flush-to-zero on.
 void LocationScreenPoseCar(PPCContext& ctx, uint8_t* base);
+// sub_8222C188 ShowOpponentSpecs (no arguments) and sub_8222DEE0
+// Transition9 (r3 = the step's address). The texts' check.
+void LocationScreenShowOpponentSpecs(PPCContext& ctx, uint8_t* base);
+void LocationScreenTransition9(PPCContext& ctx, uint8_t* base);
 
 }  // namespace hooks

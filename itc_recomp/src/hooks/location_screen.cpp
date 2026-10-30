@@ -46,7 +46,8 @@ ITC_FLAG_BOOL(native_location_screen, true, "ITC",
               "Transition5 sub_8222DA10 over CameraAnims::Evaluate's plain C++, Transition8 "
               "sub_8222DC08, Transition24 sub_8222D2E8, Transition34 sub_8222D108 and Start "
               "sub_8222F0B0; PoseCar sub_82228588 over the cars' and the matrix math's plain "
-              "C++) "
+              "C++; ShowOpponentSpecs sub_8222C188 over UiMovie::SetNodeText's plain C++ and "
+              "Transition9 sub_8222DEE0) "
               "natively instead of through the translated code (the same writes; checked by "
               "--run_harnesses=location_screen). PictureA, PictureB, Picture::Free, KindText, "
               "SetCursor, ShowUnlockEntry, ShowCard, ListNode and ShowListEntry have no "
@@ -390,6 +391,7 @@ LOCATION_SCREEN_TRANSITION(8222DA10, Transition5)
 LOCATION_SCREEN_TRANSITION(8222DC08, Transition8)
 LOCATION_SCREEN_TRANSITION(8222D2E8, Transition24)
 LOCATION_SCREEN_TRANSITION(8222D108, Transition34)
+LOCATION_SCREEN_TRANSITION(8222DEE0, Transition9)
 #undef LOCATION_SCREEN_TRANSITION
 
 void LocationScreenShowOpponentInfo(PPCContext& ctx, uint8_t* base) {
@@ -401,6 +403,12 @@ void LocationScreenShowOpponentInfo(PPCContext& ctx, uint8_t* base) {
 void LocationScreenStart(PPCContext& ctx, uint8_t* base) {
   Texts(ctx, base, __imp__sub_8222F0B0, [&](uint32_t sp, uint32_t, const ls::Calls& calls) {
     return ls::Start(base, sp, calls);
+  });
+}
+
+void LocationScreenShowOpponentSpecs(PPCContext& ctx, uint8_t* base) {
+  Texts(ctx, base, __imp__sub_8222C188, [&](uint32_t sp, uint32_t, const ls::Calls& calls) {
+    return ls::ShowOpponentSpecs(base, sp, calls);
   });
 }
 
@@ -506,3 +514,5 @@ LOCATION_SCREEN_ADAPTER(8222D2E8, LocationScreenTransition24)
 LOCATION_SCREEN_ADAPTER(8222D108, LocationScreenTransition34)
 LOCATION_SCREEN_ADAPTER(8222F0B0, LocationScreenStart)
 LOCATION_SCREEN_ADAPTER(82228588, LocationScreenPoseCar)
+LOCATION_SCREEN_ADAPTER(8222C188, LocationScreenShowOpponentSpecs)
+LOCATION_SCREEN_ADAPTER(8222DEE0, LocationScreenTransition9)

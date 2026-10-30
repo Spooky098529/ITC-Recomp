@@ -1497,6 +1497,70 @@ void ShapePose(uint8_t* base, const World& w, Random& r) {
   }
 }
 
+// The opponents' specs (ShowOpponentSpecs, Transition9): every item's
+// build's car id (+2948) one of the parameters' 4 specs (+12), their byte
+// +769 any.
+void ShapeSpecs(uint8_t* base, const World& w, Random& r) {
+  const uint32_t params = w.params.address;
+  guest::StoreU32(base, params + 12, params + 64);
+  for (uint32_t k = 0; k < kSpecs; k++) {
+    guest::StoreU8(base, params + 64 + car_specs::kSpecBytes * k + 769, uint8_t(r.Next()));
+  }
+  guest::StoreU32(base, car_specs::kParams, params);
+  for (uint32_t id = 0; id < kItems; id++) {
+    guest::StoreU32(base, w.item(id) + 2948, r.Below(kSpecs));
+  }
+}
+
+// The opponents' page with its camera: ShowOpponentSpecs (its frame's item
+// copy compared) and Transition9 (the opponents' and the camera's shapes;
+// the evaluated floats as Transition4's).
+void OpponentView(Context& h, const World& w) {
+  uint8_t* const base = h.base;
+  const SetupFn specs = [base](Random& r, const World& w) {
+    ShapeScreen(base, w, r);
+    ShapeOpponents(base, w, r);
+    ShapeSpecs(base, w, r);
+  };
+  const SetupFn view = [base](Random& r, const World& w) {
+    ShapeScreen(base, w, r);
+    ShapeResults(base, w, r);
+    ShapeOpponents(base, w, r);
+    ShapeSpecs(base, w, r);
+    ShapeAnims(base, w, r);
+    guest::StoreU32(base, w.screen.address + 888, r.Below(2) == 0 ? 0 : uint32_t(r.Next()));
+  };
+  const ArgsFn none = [](PPCContext&, Random&, const World&) {};
+  const ArgsFn step = [](PPCContext& t, Random&, const World& w) {
+    t.r3.u64 = w.screen.address + 0x700;
+  };
+  Spec texts{{{-3152 + 80, 3024}}};
+  texts.texts = true;
+  Group(h, w, "LocationScreen::ShowOpponentSpecs (sub_8222C188)", 200, specs, none,
+        __imp__sub_8222C188, hooks::LocationScreenShowOpponentSpecs, texts);
+  constexpr int32_t kFrame = 240;
+  Spec camera{{{-kFrame + 80, 88}}};
+  camera.texts = true;
+  camera.children = true;
+  const uint32_t screen = w.screen.address;
+  camera.after = [base, screen](PPCContext& t, Outputs& out) {
+    const uint32_t locals = t.r1.u32 - uint32_t(kFrame) + 96;
+    out.Floats(base, locals, 18);
+    out.Floats(base, screen + 592, 8);
+    out.Floats(base, screen + 664, 2);
+    for (uint32_t i = 0; i < 72; i += 4) {
+      guest::StoreU32(base, locals + i, 0);
+    }
+    for (uint32_t i = 0; i < 32; i += 4) {
+      guest::StoreU32(base, screen + 592 + i, 0);
+    }
+    guest::StoreU32(base, screen + 664, 0);
+    guest::StoreU32(base, screen + 668, 0);
+  };
+  Group(h, w, "LocationScreen::Transition9 (sub_8222DEE0)", 200, view, step, __imp__sub_8222DEE0,
+        hooks::LocationScreenTransition9, camera);
+}
+
 // PoseCar: its frame (the callees' 2,048 bytes below it, and up to its
 // register saves, 176 bytes below r1) filled and compared, its own float
 // slots (+80, +84, +160 to +223, +288 to +479) and the model's matrices
@@ -1562,6 +1626,7 @@ void LocationScreen(Context& h) {
   OpponentPages(h, w);
   ViewPages(h, w);
   Poses(h, w);
+  OpponentView(h, w);
 }
 
 }  // namespace harness
