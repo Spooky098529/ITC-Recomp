@@ -168,6 +168,19 @@ When the user has reviewed a run's section, its heading gets
   correction: `UpdateView` reads the opponent menu's cursor. The 7
   adapter removals' counter (`itc_2794`) ran in an attract race,
   where the screen doesn't run at all.
+- The parking area's migration 3 (38cc3dc..74c7bf3): `PoseCar` calls
+  the cars' and vehicle's plain C++, its multiplies noted for
+  interpolation with the original call addresses, the original run if
+  the frame isn't 16-byte aligned; its harness inputs are made up (the
+  game's Params and items aren't loaded when harnesses run), shaped
+  like the SetupFromCar and Race::SetUp cases, and its cases force
+  flush-to-zero off at the start (an earlier case's native adapter had
+  left it on), as car_physics does. `UiMovie::SetNodeText` taken under
+  `--native_ui_movies_game` (Wrapped -> Overridden), run from its
+  logging override in `pause_movie_log.cpp` when `--log_pause_movie`
+  is off; its unset varargs passed as 0 (the user's call on
+  `SetText`). `Transition8`'s cases keep sub-scenes' child ranges
+  inside the root's (random trees fault in the original too).
 
 ## Run 2026-10-30 01:06 (`b7-loop-29-10-26-2`)
 
