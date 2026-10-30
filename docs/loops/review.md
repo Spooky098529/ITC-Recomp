@@ -22,6 +22,19 @@ When the user has reviewed a run's section, its heading gets
   20-byte condition; stale "not mapped" notes in `career.md` and
   `ai-drivers.md` pointed to it; the lead for `sub_821442D8`,
   `sub_821434A0`, `sub_82140308` folded in.
+- The race event's migration (6cf1882, `--native_race_event`): adapters
+  only on the six entry points recompiled code calls; `Make`, `Init`,
+  `Destroy` native only when the native heap holds the event's pages.
+  Choices for review: `EventCondition::Power` (kind 40, `sub_82141668`)
+  left recompiled and called from native `Met` through a guest call run
+  at the original's stack depth (it reads stack words below it it never
+  writes; native code reaching `generated/`, the user's call of
+  2026-10-25 to look at later); the kind tests' stores to their own
+  frames left out; r3 not compared for the functions returning nothing
+  (as the race world's harnesses); the 58 kind tests never seen in play
+  ported; `Met`'s row corrected (kind 64 tests bit 0x20, not 0x10).
+  `career.md`: `Career::EventQuery`, `EventLocation` Overridden,
+  `DayBlock::BestStreak` Native.
 
 ## Run 2026-10-30 01:06 (`b7-loop-29-10-26-2`)
 

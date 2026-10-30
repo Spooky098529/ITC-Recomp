@@ -14,7 +14,12 @@ file's history. What's left to see in a drive, from every run:
 - Subsystem 1 of 3: the race event (`sub_82140340`...`sub_82144E58`,
   the top of `leads.md`). Mapped (84e5334, `race-event.md`, 102 rows,
   37 in play, 12 ready groups, no stop; nothing outside blocks it).
-  Migration 1 running.
+  Migration 1 checked (6cf1882: every ready group, 93 Native and 6
+  Overridden of 102, `EventCondition::Met` with 60 of its 61 tests,
+  kind 40 `sub_82141668` left recompiled through a guest call at the
+  original's depth; with the career's `EventQuery`, `EventLocation`,
+  `DayBlock::BestStreak`; `--native_race_event`; nothing ready left,
+  `Career::SetUpEvent` now ready in `career.md`). Validation running.
 
 ## Done
 
@@ -36,3 +41,6 @@ file's history. What's left to see in a drive, from every run:
   unknown 2587).
 - After the race event's map: ours 3167, work left 3165 (wrapped 104,
   known 511, unknown 2550).
+- After the race event's migration 1 (`itc_2672`: race 37 s, 0 errors,
+  race_event and career 0 differing): ours 3271, work left 3126
+  (wrapped 104, known 472, unknown 2550).
