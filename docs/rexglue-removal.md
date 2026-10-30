@@ -2657,6 +2657,7 @@ B7. **The game logic inside**: everything else, subsystem by subsystem,
 | 2026-10-30 | The app's start-up (`App::App` and `App::Create`, `App::StartUp` with the text and font set-up, the network manager's set-up, the scene target, `Billboards::Init`, `Movie::Movie` with the movie wrapper's lock a host recursive mutex, `AudioManager::Create`, `XAudioInitialize`, the second camera class; the voice engine not made, Dropped, the user's call) | `app-start-up.md` (with rows in `system-services.md`, `strings-and-font.md`, `movies.md`, `sound-cues.md`, `cameras.md`, `video-output.md`, `framework.md`) | every ready group in play (three migrations; 59 rows changed or added) | `--native_app_start_up` |
 | 2026-10-30 | The game's data load at boot (`BootData::Load` and `CreateObjects`; the save defaults' bit sets, the race data, input recordings and replay objects with their records and the replay's static set-ups; the loading screen's movies; shared loads under their files' flags: the data tables, car parameters, shaders, text, font, strings, a UI movie) | `data-load.md` (with rows in `data-tables.md`, `car-specs.md`, `models.md`, `strings-and-font.md`, `files-and-saves.md`, `ui-movies-game.md`) | every function seen in play (two migrations) | `--native_data_load` |
 | 2026-10-30 | The career (the player's items and stats over the save data: the win, loss and outcome records, the results and day logs, the garage list, the conditions and rewards, the race result's stats, the progress after a race and the next day; `Career::PickNext` up to its gate) | `career.md` | 49 of 53 in play (one migration; the rest waits on the race event and the car objects' makers) | `--native_career` |
+| 2026-10-30 | The race event (`RaceEvent::Make` and `Init` with the event pools and groups, `Destroy`, the refreshes for the career's event queries, the placements of opponents unlocked during a race and the section rival, the front end's `GroupItem`, `Items::Available`; `EventCondition::Met` with 60 of its 61 kind tests, the unlock states), with the career's `EventQuery`, `EventLocation` and `DayBlock::BestStreak` | `race-event.md` | 100 of 102 (one migration; `EventCondition::Power`, kind 40, waits on the power curve and is called through a guest call at the original's depth; `sub_82142868` Merged) | `--native_race_event` |
 
     The first run (2026-10-22, branch `b7-loop-test`): every harness at 0 differing, attract races at 20-21 s with no errors,
     and a race the user drove looked right. Ours went from 162 to 335 (work
@@ -4078,3 +4079,19 @@ Dropped 26, never called 70, live 211. Imports: 186 called, 56 with a
 live caller. B7 (`b7_status.py`): ours 3,167, work left 3,165 (Wrapped
 104, with a row 474, no row yet 2,587), from 3,202 (from 3,287 at the
 run's start).
+
+**2026-10-30, the race event (branch `b7-loop-30-10-26`):** the
+twenty-fifth run's first subsystem, mapped and made native in one
+migration (`race-event.md`, `--native_race_event`, `src/race_event/`):
+the race event at `[0x826C6078]` and the unlock conditions it's built
+from, 100 of 102 rows ours (58 kind tests never seen in play ported
+with harness cases); none of it runs in an attract race, the pad replay
+reached 26 (the rest are on the drive list). `EventCondition::Power`
+(kind 40, `sub_82141668`) stays recompiled, waiting on the power curve
+(`sub_820CE7F0`, `sub_820CE600`, a lead); native `Met` calls it at the
+original's stack depth, as it reads stack words it never writes. It
+unblocks `Career::SetUpEvent` (`sub_82114268`). The boundary: 449
+functions (916 pairs): overridden 108, Native 34, Dropped 26, never
+called 70, live 211. Imports: 186 called, 56 with a live caller. B7
+(`b7_status.py`): ours 3,271, work left 3,126 (Wrapped 104, with a row
+472, no row yet 2,550), from 3,165.

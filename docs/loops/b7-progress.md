@@ -19,10 +19,18 @@ file's history. What's left to see in a drive, from every run:
   kind 40 `sub_82141668` left recompiled through a guest call at the
   original's depth; with the career's `EventQuery`, `EventLocation`,
   `DayBlock::BestStreak`; `--native_race_event`; nothing ready left,
-  `Career::SetUpEvent` now ready in `career.md`). Validation running.
+  `Career::SetUpEvent` now ready in `career.md`). Validated
+  (`itc_2673`, replay `itc_2676` ok): 103 of 103 harness lines; 26 ran
+  in the replay, 77 to drive. Subsystem 1 finished.
+- Next, a cleanup lead without mapping (not counted): what the race
+  event unblocked in `career.md` (`Career::SetUpEvent` `sub_82114268`).
+  Migration running.
 
 ## Done
 
+- The race event (subsystem 1): `race-event.md`, 100 of 102, one
+  migration; `--native_race_event`; 6cf1882. Validated (`itc_2673`,
+  `itc_2676`).
 ## Rows to review
 
 `review.md`, "Run 2026-10-30 11:39".
@@ -44,3 +52,5 @@ file's history. What's left to see in a drive, from every run:
 - After the race event's migration 1 (`itc_2672`: race 37 s, 0 errors,
   race_event and career 0 differing): ours 3271, work left 3126
   (wrapped 104, known 472, unknown 2550).
+- After its validation (`itc_2673`: race 37 s, 0 errors, every harness
+  0 differing but the expected groups): ours 3271, work left 3126.
