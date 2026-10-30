@@ -11,6 +11,7 @@
 
 #include "harness.h"
 #include "exit_table.h"
+#include "test_route.h"
 
 #include "base/flags.h"
 #include "base/log.h"
@@ -1897,6 +1898,556 @@ void Cutscenes(Context& h, Random& r) {
   }
 }
 
+
+// --- The TV camera's route and paths ---
+
+constexpr uint32_t kRouteGlobal = 0x826C5B10;
+constexpr uint32_t kSliceCountGlobal = 0x82603274;
+// SplinePoint's static: the matrix (0x826C2D30) and its guard (+64).
+constexpr uint32_t kSplineStatic = 0x826C2D30;
+constexpr uint32_t kSplineStaticBytes = 68;
+constexpr uint32_t kRouteArea = 0x3000;
+
+// The stack below a case's stack pointer, `bytes` of it, the same for both.
+void FillStackBytes(uint8_t* base, uint32_t r1, uint64_t seed, uint32_t bytes) {
+  Random s(seed);
+  for (uint32_t i = 0; i < bytes; i += 4) {
+    guest::StoreU32(base, r1 - bytes + i, uint32_t(s.Next()));
+  }
+}
+
+// A route (test_route.h) whose every section has a forward link (0 to 2):
+// TrackRoute::SplinePoint's walk to the slices after a position doesn't
+// end at a section without one.
+test_route::Route PathRoute(uint8_t* base, uint32_t area, uint32_t table, Random& r) {
+  RandomBytes(base, area, kRouteArea, r);
+  const test_route::Route route = test_route::BuildRoute(base, area, table, r);
+  for (uint32_t s = 0; s < 8; s++) {
+    const uint32_t at = route.address[s];
+    bool any = false;
+    for (uint32_t i = 0; i < 3; i++) {
+      any = any || guest::LoadU16(base, at + 28 + 4 * i) != 0xFFFF;
+    }
+    if (!any) {
+      guest::StoreU16(base, at + 28 + 4 * r.Below(3), uint16_t(r.Below(route.sections)));
+    }
+  }
+  // Mostly no NaN or infinite points (the slices' centers, the first three
+  // words of their 84-byte records at +124, and the edge points after them), so the spline's
+  // results aren't mostly NaNs.
+  if (r.Below(4) != 0) {
+    for (uint32_t s = 0; s < 8; s++) {
+      const uint32_t at = route.address[s];
+      const uint32_t n = route.slices[s];
+      for (uint32_t k = 0; k < n; k++) {
+        for (uint32_t i = 0; i < 3; i++) {
+          guest::StoreU32(base, at + 124 + 84 * k + 4 * i, OrdinaryFloat(r, 100.0));
+        }
+      }
+      for (uint32_t i = 0; i < 24 * n + 48; i += 4) {
+        guest::StoreU32(base, at + 124 + 84 * n + i, OrdinaryFloat(r, 100.0));
+      }
+    }
+  }
+  return route;
+}
+
+// A position packed as the originals pass it (section high, slice low).
+uint32_t PackedPosition(uint8_t* base, uint32_t scratch, const test_route::Route& route,
+                        Random& r) {
+  test_route::RandomPosition(base, scratch, route, r);
+  return guest::LoadU32(base, scratch);
+}
+
+// A valid 64-slot list at `list` (track_zones.h's layout) of `count` nodes
+// in a random order of slots, its data words sections of the route mostly.
+void PathList(uint8_t* base, uint32_t list, uint32_t count, const test_route::Route& route,
+              Random& r) {
+  uint32_t order[64];
+  for (uint32_t i = 0; i < 64; i++) {
+    order[i] = i;
+  }
+  for (uint32_t i = 64; i > 1; i--) {
+    std::swap(order[i - 1], order[r.Below(i)]);
+  }
+  for (uint32_t i = 0; i < 64; i++) {
+    const uint32_t node = order[i];
+    guest::StoreU16(base, list + 4 * node, i + 1 < count ? order[i + 1] : 0xFFFF);
+    guest::StoreU16(base, list + 4 * node + 2, order[(i + 7) % 64]);
+    guest::StoreU32(base, list + 268 + 4 * i,
+                    r.Below(8) == 0 ? uint32_t(r.Next()) : r.Below(route.sections));
+  }
+  guest::StoreU16(base, list + 256, count < 64 ? order[count] : 0xFFFF);
+  guest::StoreU16(base, list + 260, count > 0 ? order[0] : 0xFFFF);
+  guest::StoreU16(base, list + 264, count);
+}
+
+// A route range (track_zones.h): the state, the ends, the list of sections
+// to take (+12), an empty list to leave out (+536), +1060. With `bounded`,
+// the end on the start's section (RouteRange::OnPath's walk then ends at
+// once, whatever the links).
+void PathRange(uint8_t* base, uint32_t range, uint32_t scratch, const test_route::Route& route,
+               Random& r, bool bounded) {
+  RandomBytes(base, range, 1064, r);
+  const uint32_t states[] = {1, 1, 1, 2, 0};
+  guest::StoreU32(base, range, states[r.Below(5)]);
+  guest::StoreU32(base, range + 4, PackedPosition(base, scratch, route, r));
+  guest::StoreU32(base, range + 8, PackedPosition(base, scratch, route, r));
+  if (bounded) {
+    guest::StoreU16(base, range + 8, guest::LoadU16(base, range + 4));
+  }
+  PathList(base, range + 12, r.Below(4) == 0 ? r.Below(64) : r.Below(4), route, r);
+  PathList(base, range + 536, 0, route, r);
+  guest::StoreU32(base, range + 1060, r.Below(4) == 0 ? 0 : 1);
+}
+
+// A curve at `curve`: 2 to 7 keys (times rising from about 0, kinds 0 to 2
+// mostly, now and then any), the end key (kind 3), then keys with NaN times
+// (any kind) that stop the search past the end. `game_like`: times from 0
+// and the keys before the end of kinds 0 to 2, as in the game's paths: no
+// segment of kind 3 or more, whose value is the stack's word at +80 as the
+// callers' frames left it (under CameraPath::Evaluate, the saved registers
+// the original's prologues write there and the native code doesn't).
+void PathCurve(uint8_t* base, uint32_t curve, Random& r, bool game_like = false) {
+  const uint32_t keys = 1 + r.Below(6);
+  float time = r.Below(4) == 0 && !game_like ? -float(r.Below(10)) : 0.0f;
+  for (uint32_t k = 0; k <= keys + 4; k++) {
+    const uint32_t key = curve + 24 * k;
+    for (uint32_t i = 0; i < 24; i += 4) {
+      guest::StoreU32(base, key + i, r.Below(8) ? OrdinaryFloat(r, 100.0) : RandomFloat(r));
+    }
+    if (k <= keys) {
+      guest::StoreU32(base, key + 0, r.Below(32) == 0 && !game_like
+                                         ? RandomFloat(r)
+                                         : std::bit_cast<uint32_t>(time));
+      time += float(r.Below(60)) / 4.0f;
+      guest::StoreU32(base, key + 20,
+                      k == keys ? 3 : (r.Below(16) == 0 && !game_like ? r.Below(8) : r.Below(3)));
+    } else {
+      guest::StoreU32(base, key + 0, 0x7FC00000u);
+      guest::StoreU32(base, key + 20, r.Below(8));
+    }
+  }
+}
+
+// A (kind, value) pair at `pair`: kind 0 a float, 1 a curve (at `curve`),
+// else another kind; now and then any word.
+void PathPair(uint8_t* base, uint32_t pair, uint32_t curve, Random& r, bool game_like = false) {
+  const uint32_t kind = r.Below(16) == 0 ? uint32_t(r.Next()) : r.Below(3);
+  guest::StoreU32(base, pair, kind);
+  if (kind == 1) {
+    PathCurve(base, curve, r, game_like);
+    guest::StoreU32(base, pair + 4, curve);
+  } else {
+    guest::StoreU32(base, pair + 4, r.Below(8) ? OrdinaryFloat(r, 100.0) : RandomFloat(r));
+  }
+}
+
+uint64_t PathTime(Random& r) {
+  switch (r.Below(16)) {
+    case 0: return std::bit_cast<uint64_t>(double(std::bit_cast<float>(RandomFloat(r))));
+    case 1: return std::bit_cast<uint64_t>(-0.25);
+    case 2: return std::bit_cast<uint64_t>(1.5);
+    case 3: return std::bit_cast<uint64_t>(0.0);
+    case 4: return std::bit_cast<uint64_t>(1.0);
+    default: return std::bit_cast<uint64_t>(double(float(r.Below(1u << 20)) / float(1u << 20)));
+  }
+}
+
+// The functions without adapters: their plain C++ as their callers call it.
+void NativeHermite(PPCContext& t, uint8_t* base) {
+  t.fpscr.disableFlushMode();
+  cm::HermiteBasis(base, t.r3.u32, t.r4.u32, t.r5.u32, t.f1.f64);
+}
+void NativeCurve(PPCContext& t, uint8_t* base) {
+  t.fpscr.disableFlushMode();
+  t.f1.f64 = cm::CurveEvaluate(base, t.r4.u32, t.f1.f64, t.r1.u32);
+}
+void NativeKeyValue(PPCContext& t, uint8_t* base) {
+  t.fpscr.disableFlushMode();
+  t.f1.f64 = cm::KeyValue(base, t.r3.u32, t.f1.f64, t.r1.u32);
+}
+void NativeKeyVec3(PPCContext& t, uint8_t* base) {
+  t.fpscr.disableFlushMode();
+  cm::KeyVec3(base, t.r3.u32, t.r4.u32, t.f1.f64, t.r1.u32);
+}
+void NativeFromRows3(PPCContext& t, uint8_t* base) {
+  cm::MatrixFromRows3(base, t.r3.u32, t.r4.u32, t.r5.u32, t.r6.u32);
+}
+void NativeAdvance(PPCContext& t, uint8_t* base) {
+  cm::RangeAdvance(base, t.r3.u32, t.r4.u32, t.r5.s32);
+}
+void NativeSplinePoint(PPCContext& t, uint8_t* base) {
+  t.fpscr.disableFlushMode();
+  hooks::GuestAtexit atexit{t, base};
+  cm::SplinePoint(base, t.r3.u32, t.r4.u32, t.r5.u32, t.f1.f64, t.r1.u32, atexit.Call());
+}
+void NativeRoutePoint(PPCContext& t, uint8_t* base) {
+  t.fpscr.disableFlushMode();
+  hooks::GuestAtexit atexit{t, base};
+  cm::RoutePoint(base, t.r3.u32, t.r4.u32, t.r6.u32, t.f1.f64, t.r1.u32, atexit.Call());
+}
+
+void RoutePaths(Context& h, Random& r) {
+  const uint32_t area = memory::Alloc(kRouteArea, 0);
+  const uint32_t table = memory::Alloc(4 * test_route::kTableEntries, 0);
+  test_route::FillTable(h.base, table, area);
+  Saved saved_route(h.base, kRouteGlobal, 4);
+  Saved saved_count(h.base, kSliceCountGlobal, 4);
+  Block work(0x8000);
+  const uint32_t w = work.address;
+  const uint32_t scratch = w + 0x7FF0;
+  {
+    Results results("Hermite::Basis (sub_82293A48)");
+    for (int c = 0; c < 300; c++) {
+      RandomBytes(h.base, w, 64, r);
+      for (uint32_t i = 0; i < 8; i++) {
+        guest::StoreU32(h.base, w + 16 + 4 * i, r.Below(8) ? OrdinaryFloat(r, 50.0) : RandomFloat(r));
+      }
+      const uint64_t time = PathTime(r);
+      const auto inputs = Read(h.base, w, 64);
+      Outputs out[2];
+      for (int v = 0; v < 2; v++) {
+        Write(h.base, w, inputs.data(), 64);
+        PPCContext t = AlignedContext(h);
+        t.r3.u64 = w;
+        t.r4.u64 = w + 16;
+        t.r5.u64 = w + 32;
+        t.f1.u64 = time;
+        (v == 0 ? Original<__imp__sub_82293A48> : NativeHermite)(t, h.base);
+        out[v].Floats(h.base, w, 2);
+        out[v].Bytes(Read(h.base, w + 8, 56));
+      }
+      results.Check(out[0], out[1], fmt::format("case {}", c));
+    }
+    results.Report();
+  }
+  {
+    // Curve::Evaluate, Key::Value and Key::Vec3 on curves at w + 0x1000.
+    const struct {
+      const char* name;
+      GuestFunction recompiled, native;
+    } kFunctions[] = {
+        {"Curve::Evaluate (sub_820AC060)", Original<__imp__sub_820AC060>, NativeCurve},
+        {"Key::Value (sub_820AC178)", Original<__imp__sub_820AC178>, NativeKeyValue},
+        {"Key::Vec3 (sub_820AC1D0)", Original<__imp__sub_820AC1D0>, NativeKeyVec3},
+    };
+    for (int f = 0; f < 3; f++) {
+      Results results(kFunctions[f].name);
+      for (int c = 0; c < 400; c++) {
+        RandomBytes(h.base, w, 0x1000, r);
+        uint32_t curve = w + 0x1000;
+        if (f == 0) {
+          PathCurve(h.base, curve, r);
+        } else {
+          for (uint32_t p = 0; p < 3; p++) {
+            PathPair(h.base, w + 8 * p, curve + 0x400 * p, r);
+          }
+        }
+        const uint64_t time = PathTime(r);
+        const uint64_t seed = r.Next();
+        const auto inputs = Read(h.base, w, 0x2000);
+        Outputs out[2];
+        for (int v = 0; v < 2; v++) {
+          Write(h.base, w, inputs.data(), 0x2000);
+          PPCContext t = AlignedContext(h);
+          FillStackBytes(h.base, t.r1.u32, seed, 1024);
+          t.r3.u64 = w;
+          t.r4.u64 = f == 0 ? curve : w + 64;
+          t.f1.u64 = time;
+          (v == 0 ? kFunctions[f].recompiled : kFunctions[f].native)(t, h.base);
+          if (f == 2) {
+            out[v].Floats(h.base, w + 64, 4);
+          } else {
+            out[v].Double(t.f1.u64);
+          }
+          out[v].Bytes(Read(h.base, w, 64));
+        }
+        results.Check(out[0], out[1], fmt::format("case {}", c));
+      }
+      results.Report();
+    }
+  }
+  {
+    Results results("Matrix::FromRows3 (sub_820AB5F0)");
+    for (int c = 0; c < 100; c++) {
+      RandomBytes(h.base, w, 256, r);
+      const uint32_t at = w + 64 + (c % 4 == 0 ? 4 * r.Below(4) : 0);
+      const auto inputs = Read(h.base, w, 256);
+      Outputs out[2];
+      for (int v = 0; v < 2; v++) {
+        Write(h.base, w, inputs.data(), 256);
+        PPCContext t = AlignedContext(h);
+        t.r3.u64 = at;
+        t.r4.u64 = w + 160;
+        t.r5.u64 = w + 180;
+        t.r6.u64 = w + 200;
+        (v == 0 ? Original<__imp__sub_820AB5F0> : NativeFromRows3)(t, h.base);
+        out[v].Bytes(Read(h.base, w, 256));
+      }
+      results.Check(out[0], out[1], fmt::format("case {}", c));
+    }
+    results.Report();
+  }
+  {
+    Results results("RouteRange::Advance (sub_820FE598)");
+    const uint32_t range = w + 0x100;
+    for (int c = 0; c < 600; c++) {
+      const test_route::Route route = PathRoute(h.base, area, table, r);
+      guest::StoreU32(h.base, kRouteGlobal, area + test_route::kFile);
+      PathRange(h.base, range, scratch, route, r, false);
+      const int32_t distance = r.Below(16) == 0 ? -int32_t(r.Below(100)) : int32_t(r.Below(120));
+      const auto inputs = Read(h.base, area, kRouteArea);
+      const auto range_bytes = Read(h.base, range, 1064);
+      Outputs out[2];
+      for (int v = 0; v < 2; v++) {
+        Write(h.base, area, inputs.data(), kRouteArea);
+        Write(h.base, range, range_bytes.data(), 1064);
+        guest::StoreU32(h.base, w, uint32_t(r.Next()));
+        PPCContext t = AlignedContext(h);
+        t.r3.u64 = w;
+        t.r4.u64 = range;
+        t.r5.s64 = distance;
+        (v == 0 ? Original<__imp__sub_820FE598> : NativeAdvance)(t, h.base);
+        out[v].Bytes(Read(h.base, w, 4));
+        out[v].Bytes(Read(h.base, range, 1064));
+      }
+      results.Check(out[0], out[1], fmt::format("case {} distance {}", c, distance));
+    }
+    results.Report();
+  }
+  {
+    Results results("TrackRoute::SliceFraction (sub_820F9B48)");
+    for (int c = 0; c < 400; c++) {
+      const test_route::Route route = PathRoute(h.base, area, table, r);
+      guest::StoreU32(h.base, kRouteGlobal, area + test_route::kFile);
+      test_route::RandomPosition(h.base, w, route, r);
+      for (uint32_t i = 0; i < 4; i++) {
+        guest::StoreU32(h.base, w + 16 + 4 * i, r.Below(8) ? OrdinaryFloat(r, 100.0) : RandomFloat(r));
+      }
+      const uint64_t seed = r.Next();
+      const auto inputs = Read(h.base, area, kRouteArea);
+      const auto words = Read(h.base, w, 32);
+      Outputs out[2];
+      for (int v = 0; v < 2; v++) {
+        Write(h.base, area, inputs.data(), kRouteArea);
+        Write(h.base, w, words.data(), 32);
+        PPCContext t = AlignedContext(h);
+        FillStackBytes(h.base, t.r1.u32, seed, 1024);
+        t.r3.u64 = w;
+        t.r4.u64 = w + 16;
+        (v == 0 ? Original<__imp__sub_820F9B48> : hooks::CameraModesStep820F9B48)(t, h.base);
+        out[v].Double(t.f1.u64);
+        out[v].Bytes(Read(h.base, w, 32));
+      }
+      results.Check(out[0], out[1], fmt::format("case {}", c));
+    }
+    results.Report();
+  }
+  {
+    // TrackRoute::SplinePoint, CameraPath::RoutePoint and Evaluate: the
+    // static matrix made in a third of the cases (its guard cleared), its
+    // atexit taken from the exit table.
+    std::lock_guard<std::recursive_mutex> lock(c_runtime::ExitMutex());
+    Saved statics(h.base, kSplineStatic, kSplineStaticBytes);
+    const auto made = Read(h.base, kSplineStatic, kSplineStaticBytes);
+    const struct {
+      const char* name;
+      GuestFunction recompiled, native;
+      int kind;
+    } kFunctions[] = {
+        {"TrackRoute::SplinePoint (sub_820AB6A0)", Original<__imp__sub_820AB6A0>,
+         NativeSplinePoint, 0},
+        {"CameraPath::RoutePoint (sub_820ABDA8)", Original<__imp__sub_820ABDA8>,
+         NativeRoutePoint, 1},
+        {"CameraPath::Evaluate (sub_820AC248)", Original<__imp__sub_820AC248>,
+         hooks::CameraModesStep820AC248, 2},
+    };
+    if (!hooks::NativeAtexit()) {
+      ITC_LOG_WARN("harness: camera_modes: TrackRoute::SplinePoint's static needs native atexit");
+    }
+    for (const auto& f : kFunctions) {
+      Results results(f.name);
+      const int cases = f.kind == 2 ? 600 : 400;
+      for (int c = 0; c < cases; c++) {
+        const test_route::Route route = PathRoute(h.base, area, table, r);
+        RandomBytes(h.base, w, 0x6000, r);
+        const uint32_t range = w + 0x100;
+        const uint32_t transform = w + 0x600;
+        const uint32_t key = w + 0x700;
+        const uint32_t curves = w + 0x1000;
+        guest::StoreU32(h.base, kRouteGlobal, area + test_route::kFile);
+        PathRange(h.base, range, scratch, route, r, false);
+        for (uint32_t i = 0; i < 20; i++) {
+          guest::StoreU32(h.base, transform + 4 * i,
+                          r.Below(16) ? OrdinaryFloat(r, i < 4 ? 500.0 : 1.5) : RandomFloat(r));
+        }
+        for (uint32_t p = 0; p < 27; p++) {
+          PathPair(h.base, key + 8 * p, curves + 0x200 * p, r, true);
+        }
+        // The weights and distances of kind 0 often (the paths' usual).
+        for (const uint32_t at : {72u, 104u, 112u, 168u, 200u, 208u}) {
+          if (r.Below(2)) {
+            guest::StoreU32(h.base, key + at, 0);
+            const bool weight = at != 112 && at != 208;
+            guest::StoreU32(h.base, key + at + 4,
+                            r.Below(4) == 0 ? 0u
+                            : weight ? std::bit_cast<uint32_t>(float(r.Below(5)) / 4.0f)
+                                     : std::bit_cast<uint32_t>(float(r.Below(400)) / 10.0f - 5.0f));
+          }
+        }
+        const uint32_t position = PackedPosition(h.base, scratch, route, r);
+        const uint64_t time = PathTime(r);
+        auto statics_in = made;
+        if (c % 3 == 0) {
+          statics_in[67] &= 0xFE;
+        }
+        const uint64_t seed = r.Next();
+        const uint32_t junk = uint32_t(r.Next());
+        const auto route_bytes = Read(h.base, area, kRouteArea);
+        const auto inputs = Read(h.base, w, 0x6000);
+        Outputs out[2];
+        for (int v = 0; v < 2; v++) {
+          Write(h.base, area, route_bytes.data(), kRouteArea);
+          Write(h.base, w, inputs.data(), 0x6000);
+          Write(h.base, kSplineStatic, statics_in.data(), kSplineStaticBytes);
+          const uint32_t mark = exit_table::Mark(h.base);
+          PPCContext t = AlignedContext(h);
+          FillStackBytes(h.base, t.r1.u32, seed, 2048);
+          t.f1.u64 = time;
+          if (f.kind == 0) {
+            t.r3.u64 = w;
+            t.r4.u64 = w + 0x40;
+            t.r5.u64 = position;
+          } else if (f.kind == 1) {
+            t.r3.u64 = w;
+            t.r4.u64 = position;
+            t.r5.u64 = junk;
+            t.r6.u64 = w + 0x40;
+          } else {
+            t.r3.u64 = key;
+            t.r4.u64 = w;
+            t.r5.u64 = range;
+            t.r6.u64 = transform;
+          }
+          (v == 0 ? f.recompiled : f.native)(t, h.base);
+          if (f.kind == 0) {
+            out[v].Floats(h.base, w, 3);
+            out[v].Bytes(Read(h.base, w + 12, 4));
+            out[v].Floats(h.base, w + 0x40, 16);
+            out[v].Bytes(Read(h.base, t.r1.u32 + 36, 4));
+          } else if (f.kind == 1) {
+            out[v].Floats(h.base, w, 3);
+            out[v].Bytes(Read(h.base, w + 12, 0x40));
+          } else {
+            out[v].Bytes(Read(h.base, w, 16));
+            out[v].Floats(h.base, w + 16, 8);
+            out[v].Bytes(Read(h.base, w + 48, 16));
+            out[v].Floats(h.base, w + 64, 2);
+            out[v].Bytes(Read(h.base, w + 72, 8));
+            out[v].Bytes(Read(h.base, range, 1064));
+          }
+          out[v].Bytes(Read(h.base, kSplineStatic + 64, 4));
+          out[v].Floats(h.base, kSplineStatic, 16);
+          exit_table::Take(h.base, mark, out[v]);
+          statics.Restore();
+        }
+        results.Check(out[0], out[1], fmt::format("case {} guard {:X}", c, statics_in[67]));
+      }
+      results.Report();
+    }
+  }
+  {
+    // RouteRange::CameraAt on ranges whose Test ends (the end on the start's
+    // section, or the state 0).
+    Results results("RouteRange::CameraAt (sub_820FE830)");
+    const uint32_t range = w + 0x100;
+    for (int c = 0; c < 400; c++) {
+      const test_route::Route route = PathRoute(h.base, area, table, r);
+      guest::StoreU32(h.base, kRouteGlobal, area + test_route::kFile);
+      PathRange(h.base, range, scratch, route, r, true);
+      if (r.Below(3) == 0) {
+        guest::StoreU32(h.base, w, guest::LoadU32(h.base, range + 4));
+        guest::StoreU16(h.base, w + 2, guest::LoadU16(h.base, range + 6) + r.Below(5) - 2);
+      } else {
+        test_route::RandomPosition(h.base, w, route, r);
+      }
+      const uint32_t count = uint32_t(r.Next());
+      const auto inputs = Read(h.base, area, kRouteArea);
+      const auto range_bytes = Read(h.base, range, 1064);
+      const auto io = Read(h.base, w, 16);
+      Outputs out[2];
+      for (int v = 0; v < 2; v++) {
+        Write(h.base, area, inputs.data(), kRouteArea);
+        Write(h.base, range, range_bytes.data(), 1064);
+        Write(h.base, w, io.data(), 16);
+        guest::StoreU32(h.base, kSliceCountGlobal, count);
+        PPCContext t = AlignedContext(h);
+        t.r3.u64 = range;
+        t.r4.u64 = w;
+        (v == 0 ? Original<__imp__sub_820FE830> : hooks::CameraModesStep820FE830)(t, h.base);
+        out[v].Bytes(Read(h.base, range, 1064));
+        out[v].Word(guest::LoadU32(h.base, kSliceCountGlobal));
+        out[v].Word(uint32_t(t.r3.u64 >> 32));
+        out[v].Word(t.r3.u32);
+      }
+      results.Check(out[0], out[1], fmt::format("case {}", c));
+    }
+    results.Report();
+  }
+  {
+    // TvCamera::Track: up to 40 ranges (their Tests ending, as above), the
+    // four path buffers loading (+24 1 or 2, or another word) so none is
+    // asked for: CameraPath::Request's loads are the attract race's.
+    Results results("TvCamera::Track (sub_82156980)");
+    Block camera(43136);
+    const uint32_t cam = camera.address;
+    for (int c = 0; c < 150; c++) {
+      const test_route::Route route = PathRoute(h.base, area, table, r);
+      guest::StoreU32(h.base, kRouteGlobal, area + test_route::kFile);
+      RandomBytes(h.base, cam, 456, r);
+      const uint32_t ranges = c % 10 == 0 ? 0 : 1 + r.Below(40);
+      guest::StoreU32(h.base, cam + 452, ranges);
+      for (uint32_t i = 0; i < ranges; i++) {
+        PathRange(h.base, cam + 456 + 1064 * i, scratch, route, r, true);
+      }
+      for (uint32_t k = 0; k < 4; k++) {
+        const uint32_t buffer = cam + 43016 + 28 * k;
+        RandomBytes(h.base, buffer, 28, r);
+        guest::StoreU32(h.base, buffer + 12, r.Below(4) ? r.Below(ranges + 1) : uint32_t(r.Next()));
+        const uint32_t states[] = {1, 2, 4, 0x10000};
+        guest::StoreU32(h.base, buffer + 24, states[r.Below(4)]);
+      }
+      if (r.Below(2) && ranges > 0) {
+        guest::StoreU32(h.base, w, guest::LoadU32(h.base, cam + 456 + 1064 * r.Below(ranges) + 4));
+      } else {
+        test_route::RandomPosition(h.base, w, route, r);
+      }
+      const uint32_t count = uint32_t(r.Next());
+      const auto inputs = Read(h.base, area, kRouteArea);
+      const auto cam_bytes = Read(h.base, cam, 43136);
+      const auto io = Read(h.base, w, 16);
+      Outputs out[2];
+      for (int v = 0; v < 2; v++) {
+        Write(h.base, area, inputs.data(), kRouteArea);
+        Write(h.base, cam, cam_bytes.data(), 43136);
+        Write(h.base, w, io.data(), 16);
+        guest::StoreU32(h.base, kSliceCountGlobal, count);
+        PPCContext t = AlignedContext(h);
+        t.r3.u64 = cam;
+        t.r4.u64 = w;
+        (v == 0 ? Original<__imp__sub_82156980> : hooks::CameraModesStep82156980)(t, h.base);
+        out[v].Bytes(Read(h.base, cam, 43136));
+        out[v].Word(guest::LoadU32(h.base, kSliceCountGlobal));
+      }
+      results.Check(out[0], out[1], fmt::format("case {} ranges {}", c, ranges));
+    }
+    results.Report();
+  }
+  memory::Free(table);
+  memory::Free(area);
+}
+
 }  // namespace
 
 void CameraModes(Context& h) {
@@ -1916,6 +2467,7 @@ void CameraModes(Context& h) {
   IntroShots(h, r);
   DirectorStartRelease(h, r);
   Cutscenes(h, r);
+  RoutePaths(h, r);
 }
 
 }  // namespace harness

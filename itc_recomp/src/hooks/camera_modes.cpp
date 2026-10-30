@@ -45,7 +45,13 @@ ITC_FLAG_BOOL(native_camera_modes, true, "ITC",
               "IntroCamera::StepShot sub_82152E78, IntroCamera::IntroCamera sub_82158F70 with "
               "MakeShot sub_82154108 (no adapter; with native atexit); CameraDirector::Start "
               "sub_82152338 and Release sub_82153098; CutsceneShot::Init sub_82156B68 and Step "
-              "sub_82155800) natively instead of "
+              "sub_82155800); the TV camera's RouteRange::CameraAt sub_820FE830, "
+              "TrackRoute::SliceFraction sub_820F9B48, TvCamera::Track sub_82156980 and, with "
+              "native atexit, CameraPath::Evaluate sub_820AC248 with RouteRange::Advance "
+              "sub_820FE598, Curve::Evaluate sub_820AC060, Hermite::Basis sub_82293A48, "
+              "Key::Value sub_820AC178, Key::Vec3 sub_820AC1D0, CameraPath::RoutePoint "
+              "sub_820ABDA8, TrackRoute::SplinePoint sub_820AB6A0 and Matrix::FromRows3 "
+              "sub_820AB5F0 (no adapters)) natively instead of "
               "through the translated code (the same writes; checked by "
               "--run_harnesses=camera_modes)");
 
@@ -598,6 +604,85 @@ void CameraModesStep82155800(PPCContext& ctx, uint8_t* base) {
 
 }  // namespace hooks
 
+// --- The TV camera's route and paths ---
+
+namespace {
+
+// TrackRoute::SplinePoint's atexit through the translated code when the
+// native one can't: from its frame (`sp`, the original's r1 there) with its
+// return address.
+struct SplineAtexit {
+  PPCContext& ctx;
+  uint8_t* base;
+  uint32_t sp;
+  c_runtime::AtexitCall Call() { return {&SplineAtexit::Run, this}; }
+  static int32_t Run(void* self, uint32_t function) {
+    auto& call = *static_cast<SplineAtexit*>(self);
+    const uint64_t stack = call.ctx.r1.u64;
+    call.ctx.r1.u64 = call.sp;
+    call.ctx.lr = 0x820ABB20;
+    call.ctx.r3.u64 = function;
+    __imp__sub_825A7068(call.ctx, call.base);
+    call.ctx.r1.u64 = stack;
+    call.ctx.fpscr.disableFlushMode();
+    return call.ctx.r3.s32;
+  }
+};
+
+}  // namespace
+
+namespace hooks {
+
+// RouteRange::CameraAt: r3 = the range, r4 = &the position; r3 = the
+// slices counted (0x82603274's word) or -1.
+void CameraModesStep820FE830(PPCContext& ctx, uint8_t* base) {
+  ctx.r3.s64 = cm::RangeCameraAt(base, ctx.r3.u32, ctx.r4.u32);
+}
+
+// TrackRoute::SliceFraction: r3 = &the position, r4 = the point; f1 the
+// fraction. Its caller doesn't read r3.
+void CameraModesStep820F9B48(PPCContext& ctx, uint8_t* base) {
+  ctx.fpscr.disableFlushMode();
+  ctx.f1.f64 = cm::SliceFraction(base, ctx.r3.u32, ctx.r4.u32, ctx.r1.u32);
+}
+
+// TvCamera::Track: r3 = the TV camera, r4 = &the position (its caller
+// doesn't read r3 after). CameraPath::Request through its step (which runs
+// its original where it can't) from a frame like the original's (496
+// bytes).
+void CameraModesStep82156980(PPCContext& ctx, uint8_t* base) {
+  ctx.fpscr.disableFlushMode();
+  const uint32_t camera = ctx.r3.u32;
+  cm::TvTrack(base, camera, ctx.r4.u32, ctx.r1.u32 - 496,
+              [&](uint32_t buffer, uint32_t index) {
+                guest_call::InFrame(ctx, base, 496, 0x82156B54, [&](uint32_t) {
+                  ctx.r3.u64 = camera;
+                  ctx.r4.u64 = buffer;
+                  ctx.r5.u64 = index;
+                  CameraModesStep82152E08(ctx, base);
+                });
+                ctx.fpscr.disableFlushMode();
+              });
+}
+
+// CameraPath::Evaluate: r3 = the key, r4 = the camera's out, r5 = the
+// route range, r6 = the transform, f1 = t (its caller reads neither r3 nor
+// f1 after). The original without native atexit (TrackRoute::SplinePoint's
+// static); the atexit's fallback from SplinePoint's frame (272 + 208 + 720
+// bytes below).
+void CameraModesStep820AC248(PPCContext& ctx, uint8_t* base) {
+  if (!hooks::NativeAtexit()) {
+    __imp__sub_820AC248(ctx, base);
+    return;
+  }
+  ctx.fpscr.disableFlushMode();
+  SplineAtexit atexit{ctx, base, ctx.r1.u32 - 272 - 208 - 720};
+  cm::PathEvaluate(base, ctx.r3.u32, ctx.r4.u32, ctx.r5.u32, ctx.r6.u32, ctx.f1.f64,
+                   ctx.r1.u32, atexit.Call());
+}
+
+}  // namespace hooks
+
 
 // --- The adapters ---
 
@@ -633,3 +718,7 @@ ITC_CAMERA_MODES(82152338)
 ITC_CAMERA_MODES(82153098)
 ITC_CAMERA_MODES(82156B68)
 ITC_CAMERA_MODES(82155800)
+ITC_CAMERA_MODES(820FE830)
+ITC_CAMERA_MODES(820F9B48)
+ITC_CAMERA_MODES(82156980)
+ITC_CAMERA_MODES(820AC248)

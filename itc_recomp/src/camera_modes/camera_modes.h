@@ -380,4 +380,80 @@ void CutsceneInit(uint8_t* base, uint32_t shot, uint32_t entry, uint32_t frame,
 uint32_t CutsceneStep(uint8_t* base, uint32_t shot, uint32_t out, uint32_t frame,
                       const std::function<void(uint32_t object)>& camera_original, double* f1);
 
+// --- The TV camera's route and paths (src/camera_modes/paths.cpp) ---
+// `sp` is the caller's r1: each function's frame is below it by the
+// original's size, its locals written there as the original writes them.
+
+// sub_820FE830 RouteRange::CameraAt: the range's state +0 set to 1 around
+// RouteRange::Test of the position at `position` (the old state put back):
+// the word at 0x82603274 (the slices OnPath counted) when it's on the range
+// (2), else -1 (the original's r3, 64 bits).
+int64_t RangeCameraAt(uint8_t* base, uint32_t range, uint32_t position);
+// sub_820FE598 RouteRange::Advance: out (section, slice halfwords) =
+// `distance` slices on from the range's start (+4) along the route toward
+// its end (+8): each section's slices (its +0) taken off while the distance
+// covers them, then its one link, or at a fork the link that's in the
+// range's list of sections to take (+12); the end's section reached, or the
+// slices left, ends it.
+void RangeAdvance(uint8_t* base, uint32_t out, uint32_t range, int32_t distance);
+// sub_820F9B48 TrackRoute::SliceFraction (our name): how far the point is
+// along the slice at `position` (a packed word): the point's feet on the
+// lines through the slice's two edge points and the next slice's (on in
+// the section, else its link 0, TrackRoute::Link), the fraction of the
+// step between them (dot products on the vector unit). Returns f1.
+double SliceFraction(uint8_t* base, uint32_t position, uint32_t point, uint32_t sp);
+// sub_82156980 TvCamera::Track: the TV camera's 40 ranges (+456, 1,064
+// bytes apart, their count +452) updated with the position at `position`
+// (RouteRange::Update), the ones it's on listed (List40::Insert, a list on
+// the stack at `frame` + 96; `frame` is the original's r1 after its stwu,
+// 496 bytes), and for each listed range no path buffer (+43016, four
+// 28-byte buffers, +12 the index) has, the first buffer empty or loaded
+// (+24 0 or 3) asked for it (`request`: CameraPath::Request); once one is
+// found in a buffer, none after it are asked for (as the original's flag).
+void TvTrack(uint8_t* base, uint32_t camera, uint32_t position, uint32_t frame,
+             const std::function<void(uint32_t buffer, uint32_t index)>& request);
+// sub_82293A48 Hermite::Basis: out (2 floats) = the cubic Hermite blend at t
+// of the keys a and b (+0, +4 a value pair, +8, +12 their tangents).
+void HermiteBasis(uint8_t* base, uint32_t out, uint32_t a, uint32_t b, double t);
+// sub_820AC060 Curve::Evaluate: a curve of 24-byte keys (+0 the time, +4 the
+// value, +8 the value it leaves, +16 its tangent, +20 the kind; kind 3 the
+// end key) at the end key's time x t: the key before the first not earlier
+// by its kind: 0 its +8, 1 a line to the next, 2 Hermite::Basis (the keys on
+// the stack); 3 or more the stack's word at +80 (never seen).
+double CurveEvaluate(uint8_t* base, uint32_t curve, double t, uint32_t sp);
+// sub_820AC178 Key::Value: a (kind, value) pair: 0 the float, 1
+// Curve::Evaluate of the curve, else 0.0; times the float at 0x82002834.
+double KeyValue(uint8_t* base, uint32_t pair, double t, uint32_t sp);
+// sub_820AC1D0 Key::Vec3: three pairs' Key::Value into out's x, y, z; w 1.0.
+void KeyVec3(uint8_t* base, uint32_t pairs, uint32_t out, double t, uint32_t sp);
+// sub_820AB5F0 Matrix::FromRows3 (our name): the identity at `out` (16-byte
+// stores), then rows 0 to 2 copied from x, y and z (four words each).
+void MatrixFromRows3(uint8_t* base, uint32_t out, uint32_t x, uint32_t y, uint32_t z);
+// sub_820AB6A0 TrackRoute::SplinePoint: the course's route at `position` (a
+// packed word, also stored at sp + 36 as the original does) and t: four
+// slices' centers (the slice before and the two after, over the links) on
+// a Catmull-Rom spline (its basis matrix made once: guard 0x826C2D70 bit 1,
+// Matrix::FromFloats into 0x826C2D30 and atexit(0x825DAE08)), the point
+// times the float at 0x82001BE4 into `out` (3 floats), and `matrix` its
+// frame: the tangent, up and side (from the slices' edge points) normalized
+// (Matrix::FromRows3), flipped when up's y is below 0.
+void SplinePoint(uint8_t* base, uint32_t out, uint32_t matrix, uint32_t position, double t,
+                 uint32_t sp, const c_runtime::AtexitCall& atexit);
+// sub_820ABDA8 CameraPath::RoutePoint: out (3 floats) = the route's point at
+// the position (TrackRoute::ClampPosition, SplinePoint) plus the offset
+// turned by its frame (Vec4::Transform).
+void RoutePoint(uint8_t* base, uint32_t out, uint32_t position, uint32_t offset, double t,
+                uint32_t sp, const c_runtime::AtexitCall& atexit);
+// sub_820AC248 CameraPath::Evaluate: a 216-byte key at t (clamped to 0-1)
+// into the camera's `out`: +64 the field of view (+8, x the float at
+// 0x8200283C), +68 the float at 0x82002838 / the zoom (+16), the eye +16
+// (+24) and target +32 (+120); the eye and target blended by their weights
+// (+72, +168) toward +48's and +144's offsets (x and z swapped) turned by
+// `transform`'s matrix (+16) plus its position, and by +104's and +200's
+// toward the route's point (RoutePoint) +112's and +208's slices along the
+// range (RangeAdvance) with +80's and +176's offsets; z flipped (the float
+// at 0x82001BE0) where neither moved them.
+void PathEvaluate(uint8_t* base, uint32_t key, uint32_t out, uint32_t range, uint32_t transform,
+                  double t, uint32_t sp, const c_runtime::AtexitCall& atexit);
+
 }  // namespace camera_modes
