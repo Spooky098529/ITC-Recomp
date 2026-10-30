@@ -19,9 +19,9 @@ a camera pass by `CameraPass::FromViewport`. The fields worked out are in
 frame interpolation blends (`../frame-interpolation.md`): the functions
 with overrides (Wrapped) keep their facts, and say what wraps them.
 
-Not here: the camera modes above (`82152028`-`82156CC0`, ~41 functions
-seen in play, `sub_82156CC0` 4,907 lines; with `sub_8217BE98` and
-`sub_822282E8`: a lead), the second camera class made over
+Not here: the camera modes above (`82152028`-`82159950`, with
+`sub_8217BE98` and `sub_822282E8`: [`camera-modes.md`](camera-modes.md)
+since 2026-10-30), the second camera class made over
 `Camera::Camera` at boot (`sub_820A9E28`, from `sub_820A8B88`; mapped and
 native since 2026-10-30 with the app's start-up, its rows at the end of the
 table; its methods not read),

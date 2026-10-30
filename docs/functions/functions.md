@@ -412,6 +412,11 @@ Rows not yet moved stay in the table below. So far:
   unlock conditions (68 kinds of test over the save data and the car),
   grouped by location, and the list the race's set-up and the race
   world read (B7).
+- [`camera-modes.md`](camera-modes.md): the race's camera director and
+  its six views' cameras (chase, two in-car, the start's look at the
+  racers, the TV camera with its paths along the route, the scripted
+  cutscenes with the rival's logo), the camera animation files and two
+  front-end cameras (B7; the viewports below them are in `cameras.md`).
 
 These files hold functions only. What used to follow the table here moved
 out on 2026-10-20: how frame interpolation works, its options and what
@@ -445,7 +450,6 @@ old performance notes to the end of `../native-renderer.md`.
 | `sub_820C0128` | `Vehicle::GetSpeedKmh` | Overridden | Returns the float at vehicle+48 (m/s) times 3.6. The plain C++ (`Vehicle_GetSpeedKmh`, `src/hooks/vehicle.h`) is also called directly by the native `OverlayView::SpeedKmh` (`sub_821268C0`, [`race-overlays.md`](race-overlays.md)); the adapter also tells the state capture (`--capture_dir`) about the vehicle. Checked against the original by the `race_overlays` harness. |
 | `sub_8215B4F8` | `Race::DrawStep` | Wrapped | The race's draw step (Draw message). Its running marks the pass as in a race. |
 | `sub_8258FD48` | `Command::SetShaderConstants` | Wrapped | Render thread, command 7: r3 = payload, r4 = register count, r5 = stage << 24 \| type << 16 \| start << 8 \| count. Interpolation substitutes blended values here. |
-| `sub_82152CD8` | | | Camera shake; scales with speed. |
 | `sub_82146A38` | | | Finds the animation in set r3 whose texture is r4; -1 if none. |
 | `sub_82107B90` | `Boot::StartMovie` | | Message handler: plays the next boot movie, id from the table at `0x826C5BAC` (index at `0x826C5BC8`), via `Movies::Play` (`sub_820A43A8`, the path table at `0x82600BEC`; `movies.md`). See "The title screen" in `../title-screen.md`. |
 | `sub_82107C58` | `Boot::WaitForMovie` | Wrapped | Message handler, every tick while a boot movie plays; ends the step on a button press if skippable (`0x826C5BC4`) or when the movie has finished. The movie started (`Movies::Start`) when its state (`Movies::State`, twice a tick) is 1 with +9608 = 0 (then 1); finished when the state is 1 again with +9608 = 1. `--skip_intro` makes it finish at once. |
@@ -499,7 +503,6 @@ old performance notes to the end of `../native-renderer.md`.
 | `sub_820D06F0` | `CarPart::Draw` | | r3 = the part (returns if `[part + 4]`, its model, is 0), r4 = the camera, r5 = the world matrix, r6, r7: with r7 = 0, `sub_820D04E8([part + 4], camera, world, [part + 228], r6)`. |
 | `sub_820D04E8` | `Model::Draw` | | Draws a model (r31 = r3): a visibility test (`sub_825951E0`), then the per-object recorder `sub_825953D0` (return address `0x820D0564`, which pairs products by r31). Culls with the camera it's given, so a world matrix away from the tick's can be culled. For car parts, `Model::RecordMaterials` (`sub_820CECA0`, `models.md`) for groups 0 and 1. |
 | `sub_820DC958` | `BlinkTimers::Advance` | Wrapped | Skipped on render-only passes (`--per_tick_blink_timers`; "Per-frame logic" in `../frame-interpolation.md`). |
-| `sub_821594B8` | | Wrapped | The rival intro cutscene's Update handler: runs on logic passes; on render-only passes only its logo's draw (`sub_82211A28`) is repeated (`--redraw_rival_logo`; "The rival logo at the race start" in `../frame-interpolation.md`). |
 | `sub_8229E3F0` | `Device::Kick` | Overridden | `src/native/gpu_link.cpp`. r3 device, r4 (size in words, address) pairs, r5 their count. The kicked buffers are applied directly (only their effects outside the GPU) instead of written to the ring; the original is no longer called. `--native_renderer_log_gpu` logs. |
 | `sub_8229E848` | `Device::DeferredKick` | Overridden | Same file. Queued kicks while GPU interrupts were outstanding; every kick completes at once now, so it kicks straight away; the original is no longer called. |
 | `sub_8229DFF8` | | | Links a block into a list in the command buffer: r3 the list (+4, +8 its last), r4 the block, r5 and r6 stored in it; stores the block's address through the old last's pointer (the MMIO store macro, but not shown to be a register) and calls `sub_822AC470` twice. Only from the deferred kick `sub_8229E848`, whose native version doesn't call it: never called (attract race and play). Not read in detail. |

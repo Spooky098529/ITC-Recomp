@@ -1,0 +1,258 @@
+# Known functions: the camera modes
+
+The race's cameras above the viewports (`cameras.md`): the **camera
+director**, the race mode's member at +10512 (77,392 bytes, made by
+`RaceModeMember::RaceModeMember` `sub_82107168`, `game-modes.md`; its
+state machine at +16, set up by `CameraDirector::InitStates`), which
+keeps the view (+9628, written to each viewport's +1860, the view mode
+`CameraPasses::EnableForView` and the car overlays read), switches it on
+the pad's camera button and makes the view's camera object in place
+(`CameraDirector::SetMode`): view 0 at +12976 (probably the chase
+camera: the speed's shake, and the marker above opponents is drawn only
+in view mode 0), views 1 (+11856) and 2 (+9648, and +10752 for player 2
+in split screen) probably the two in-car views (they turn on camera pass
+3, probably the mirror), view 3 at +67760 (probably the race start's
+look at each racer), view 4 at +13360 (the TV camera of replays and
+attract races: cameras placed along the course's route by 44 route
+ranges, their paths loaded as files, and the attract race's random color
+filter) and view 5 at +56896 (the scripted cutscene, among them the
+rival's intro with its logo). Each camera object has a 2-slot vtable
+(slot 0 its update, slot 1 empty or the pad), +16 the vehicle, +20 the
+viewport, and a target tracker at +32 (`CameraTarget::Track`); each
+update writes the viewport's eye, target, up, zoom, near plane and roll
+(`cameras.md`'s `Viewport::` functions). Beside them: the game's
+**camera animations** (a table of loaded animation files at
+`0x826C79B8`, evaluated by the cutscene's shots and by the front end),
+the TV camera's **camera paths** (keyed curves evaluated against the
+course's route) and two front-end cameras (the garage's, probably, and a
+course view's). Names are ours and mostly guesses. Read 2026-10-30 by the
+B7 loop's mapping agent; the large functions only skimmed (their calls,
+fields and constants), the small ones read in full. The fields are in
+`../known-data.md` ("camera director", "camera object", "camera path
+buffer", `0x826C79B8`).
+
+Shared, with their rows where they are: the camera director's and its
+members' constructors and the path buffers' frees and reset
+(`RaceModeMember::RaceModeMember`, `Member13360::Member13360` (the TV
+camera's), `Member56896::Member56896` (the cutscene's),
+`Member67760::Member67760` (view 3's), `XprHolder::XprHolder`,
+`Buffer28::Free` and `Buffer28::Reset` (the camera path buffer),
+`StateMachine::Add`; `game-modes.md`), the viewports and passes
+(`Viewports::Init`, `Release`, `Viewport::Update`, `Set`, `LookAt`,
+`SetZoom`, `SetRoll`, `CameraPasses::SetNear`, `RecordBegins`,
+`RecordEnds`, `CameraPass::FromViewport`, `Enable`; `cameras.md`), the
+matrix math (`Vec4::Transform`, `Vec3::SwapXZ`, `Matrix::Copy`,
+`Multiply`, `RotateX`, `RotateY`, `RotateZ`; `matrix-math.md`;
+`Matrix::MultiplyTranslation`, `car-physics.md`), the vehicle's
+accessors (`RigidBody::Matrix`, `Position`, `sub_820B6880`,
+`sub_820C4550`, `Vehicle::Identity`, `Vehicle::Get`, `SaveData::Of`,
+`RacerRecords::At`, `Stages::Copy`, `ScenePools::FindModel`;
+`vehicle-accessors.md`), `Vehicle::GetSpeedKmh` (`functions.md`),
+`Racers::NearestHumanVehicle`, `TrackPosition::Copy` and
+`CameraCurve::Load` (`vehicle.md`), `Racers::Vehicle`, `RouteRange::Init`,
+`AddBranch`, `Update`, `Test` and `List16::Link` (`track-zones.md`),
+`TrackRoute::ClampPosition` and `Link` (`track-route.md`),
+`Race::RacerCount` (`collision-world.md`), `Stage::Of` (`career.md`),
+`DataTables::Item` (`data-tables.md`), `PostEffects::Get` and the color
+filter's slots (`post-effects.md`), `ScreenFades::FadeIn`, `FadeOut`
+(`mode-tick.md`), `RivalLogo::Draw` (`race-hud.md`), the UI movies'
+`Find`, `IsLoaded`, `Open`, `Delete`, `FinishAll`, `SwapTexture`,
+`PlayNamed` (`ui-movies-game.md`), `XPR::XPR`, `Create`, `Release`
+(`models.md`), `XPR::GetTexture` (`functions.md`), `Archive::AssetSize`
+and `Archive::Load` (`files-and-saves.md`), `Scenery::Update` and
+`Scenery::Draw` (`course-scenery.md`), `VirtualAlloc`, `VirtualFree`
+(`heap.md`), `sin`, `cos`, `tan`, `atan`, `atexit`, `memcpy`, `XMemSet`,
+`XMemCpy` (`c-runtime.md`), `rand` (`race-overlays.md`). Callers outside:
+the director's state machine (its handlers, through
+`StateMachine::Add`), `RaceStates::StageLoadTick` (`sub_82166B40`,
+`race-states.md`, calls `CameraDirector::SetMode`), the front end
+(`sub_8217FE60`, the garage's car draw with 17 callers;
+`sub_8222ED98`; the camera animations' `sub_82227E20`, `sub_82229238`,
+`sub_8222D828`, `sub_8222DA10`, `sub_8222DEE0`, `sub_8222E368`, in the
+front-end menus' and the course scenery's owners' leads in
+`../loops/leads.md`) and `sub_82227A50`, `sub_82228548` (the same
+leads). Not here: `sub_82150DD0` and `sub_82150DE0`, in this range but
+handlers of the race mode's machine at +848 (`sub_821517D8`'s lead), and
+`sub_822116A0` (under the logo's XPR load callback, never run).
+
+Frame interpolation (`../frame-interpolation.md`): the director's update
+`CameraDirector::Update` (`sub_821594B8`, the handler `0x82159948`) is
+wrapped in `src/frame_pacing/per_frame_logic.cpp` (`--redraw_rival_logo`):
+on logic passes it runs whole and notes the logo entry `RivalLogo::Draw`
+gets (the cutscene's, from `Cutscene::Step`); on render-only passes,
+which get its Update too (`game_messages.cpp`), only the logo's draw is
+repeated. Every view's camera is stepped from it, so its native form
+keeps that split. The viewports' functions it reaches keep their own
+hooks (`cameras.md`). `IntroCamera::Update` (`sub_82155E58`) is one of
+the functions loading the 1/60 step (`0x820029E8`, "Fixed time step").
+`RouteRange::Update` and `Test` keep their adapters for the TV camera's
+calls (return addresses `0x821563C0` and `0x820FE854`,
+`src/hooks/track_zones.cpp`).
+
+What a native port meets (read 2026-10-30): no kernel imports or locks.
+Indirect calls: the camera objects' slot 0 (their vtables at
+`0x82006B24`, `0x82006B2C`, `0x82006B34`, `0x820093BC`, `0x820093C4`,
+`0x82006B3C`, read from the image), the video output's slots 7 then 3
+(`[0x8266D088]`, the display's width at +296, as `Viewport::Init`
+reads it natively), the color filter's slots 4, 6, 7, the app
+interface's (`[0x826BABA0]`) in the front-end cameras, and the input
+device's slot 12 in `Cutscene::OnPad` (never run). Function-local
+statics with `atexit` guards: `0x826D8220` (`ChaseCamera`), `0x826D81F0`
+(`IntroCamera::MakeShot`), `0x826D8270`, `0x826D82C0` (views 1, 2),
+`0x826D81C4` (the shake), `0x826D82CC` (the color filter's style),
+`0x826C2D70` (the route spline's basis). Jump tables: three in
+`Cutscene::Cutscene` (`0x82009380`, `0x82009340`, `0x82009320`, 69
+cases). Float constants: as noted per row (read from the image).
+`Cutscene::Cutscene` is 4,907 lines: its migration should be split by
+its parts (the set-up, the racers' records, the two small switches, the
+69 shot scripts, the logo). Blocked outside: the UI movies' `Open` and
+`Delete` (`sub_8211E808`, `sub_8211E258`, `ui-movies-game.md`, not
+native) under the logo, and `Scenery::Update` and `Scenery::Draw` under
+the course view. Nothing here needs a call the user hasn't made.
+
+Status:
+
+- **Native**: plain C++ in `itc_recomp/src/` that doesn't use the
+  PowerPC context (`ctx`): normal arguments and host structs (it may
+  still read and write guest memory through `src/guest.h` while
+  recompiled code shares the data). The game reaches it without `ctx`,
+  from native or overridden callers, and the recompiled original is no
+  longer called (except behind a fallback flag or to check against it).
+  No `REX_FUNC` override of it exists, not even an adapter kept only for
+  a harness (that's Overridden until the adapter goes).
+  The end state for every function.
+- **Overridden**: an `extern "C" REX_FUNC(sub_XXXXXXXX)` override in
+  `itc_recomp/src/` (or a macro defining one) does the work instead of
+  the original: a thin adapter in front of native code, or a body that
+  still uses `ctx` (calling guest code, reading registers). It may call
+  the original when its flag is off, or to check itself against it.
+- **Wrapped**: an override that does something of its own (skipping
+  render-only passes, logging, timing) and still calls the original
+  (`__imp__sub_XXXXXXXX`) for the work.
+- **Dropped**: its work isn't needed on PC (hardware set-up, kernel calls
+  the SDK already stubbed), so it no longer runs: an override in
+  `itc_recomp/src/` replaces it with nothing (or a fixed return value), or
+  its callers, made native, leave the call out (no override then; the row
+  says which caller). Logs, a harness or the renderer's frame dumps have
+  shown that nothing reads what it did. The original is no longer called,
+  except behind a fallback flag while the drop is being checked. A
+  function the game never calls in the first place isn't Dropped: its
+  status stays blank and its row says it's never called.
+- **Merged**: its work is done inside a native caller's plain C++ (a
+  few lines only that caller needs), so it has no function or override of
+  its own in `itc_recomp/src/`. The row names the caller(s) and the
+  harness that covers the work. The original is no longer called, except
+  behind the caller's fallback flag.
+- **Patched**: the generated code was edited in place (search for
+  `PATCH:`).
+
+A function usually moves from recompiled or Wrapped to Overridden to
+Native as the `ctx` edge moves up through its callers, or straight to
+Dropped when its work isn't needed.
+`itc_recomp/tools/check_function_statuses.py` checks this column, in
+every file of the tables, against `src/` (an override marked Native, a
+status with no override, an override with no row, a row in two files);
+run it after changing either, on any branch.
+
+| Address | Name | Status | Notes |
+|---|---|---|---|
+| `sub_82159950` | `CameraDirector::InitStates` | | r3 = the camera director (the race mode's +10512): +9620 = 1, then 34 transitions on its state machine (+16) through `StateMachine::Add`, each a key (state, message) and a functor (vtable `0x82010978`, a member function of the director; or `0x820069BC`, a state change only) with its next state: the handlers `CameraDirector::Start` (state 1, then 3), `OnRaceStart` (3, then 4), `Update` (six keys, and its thunk `0x82159948`), `ToView4` (three), `ToView5`, `ToView3`, `Resume` (three), `ToView3IfCourse`, `SetState3`, `Release` and the empty `sub_82106540` (two). From `RaceMode::Init` (`game-modes.md`), once a race. 2,312 lines, a 2,000-byte frame of functor copies. Not read in detail (the keys' values not listed). Ready. |
+| `sub_82152338` | `CameraDirector::Start` | | Handler (no direct callers; from `InitStates`): r3 = the director. `Viewports::Init`; for both viewports `Viewport::Update`, `CameraPasses::SetNear(0.75)`, `Viewport::SetZoom(1.0)`, entry 0's +72 (its far plane) = 5,000.0; +9636 (the player the views follow) = 0, +13348 = 2, +77408 = 0; `CameraAnims::Clear`. Read in full. |
+| `sub_821596B0` | `CameraDirector::OnRaceStart` | | Handler: r3 = the director. With the race's kind (race data +0xA3AF0) 4, the viewports' +8 = 1 (split screen); with kind 6 and the stage's first word (`Stages::Copy` of race data +0x59620) not 1, the player followed (+9636 and +77408) = 1 when `[0x826C7820 + 4]` is 0, else 0. The view (+9624) from the save data's camera setting (`SaveData::Of(0)` + 0x1F85C + 24: 0 gives view 2, 1 view 1, 2 view 0, else 0), or 2 in split screen (both viewports' +1860); viewport 0's +1860 = it; `CameraDirector::SetMode(view)`; +9632 = the view. Read in full. |
+| `sub_821591F0` | `CameraDirector::SetMode` | | r3 = the director, r4 = the view (0-5): +9628 and both viewports' +1860 = r4, `Viewports::ResetRoll`, the current camera objects (+68528 and +68532) = 0, then the view's object made in place (r3 = the member, r4 = viewport 0, r5 = the vehicle of the player +9636, from `Racers::Vehicle(0)` and `(1)`), its address into +68528: 0 `ChaseCamera::ChaseCamera` (+12976), 1 `ViewCamera1::ViewCamera1` (+11856), 2 `ViewCamera2::ViewCamera2` (+9648; in split screen also +10752 with viewport 1 and player 1's vehicle into +68532), 3 `IntroCamera::IntroCamera` (+67760), 4 `TvCamera::TvCamera` (+13360), 5 `Cutscene::Cutscene` (+56896). From `CameraDirector::Update`, `OnRaceStart`, `Resume` and `RaceStates::StageLoadTick` (`race-states.md`). Read in full. |
+| `sub_821594B8` | `CameraDirector::Update` | Wrapped | The rival intro cutscene's Update handler: runs on logic passes; on render-only passes only its logo's draw (`sub_82211A28`) is repeated (`--redraw_rival_logo`; "The rival logo at the race start" in `../frame-interpolation.md`). B7 loop (2026-10-30): the director's update in every view, not only the cutscene's (six keys of its state machine, and the thunk `sub_82159948`): r3 = the director. A copy of the car input record (`0x826C5B30`) of the player at +77408 (low byte). On the input's flag 0x40 (the camera button, probably), viewport 0's view mode cycles: with the race data's flag 0x80 (+0x59AE4) 0 to 4, 4 to 1, 1 to 2, 2 to 0; without it (and not in split screen) 0 to 1 to 2 to 0. With that flag and a view other than 4, `TvCamera::Track(+13360, [+68528] + 260)` (the TV camera kept up with the car). When the view mode isn't +9628, `CameraDirector::SetMode`. With flag 0x80 in view 0, +13356 = 1; in view 1, +12960 = the input's +12 halfword (the camera stick, probably) × `[0x82002BD4]` × `[0x820093CC]`. Then slot 0 of the camera at +68528 and, in split screen, +68532; `Viewport::Update` on both viewports. Read in full. Its wrapper must stay with any native form (the render-only redraw). |
+| `sub_82159948` | `CameraDirector::UpdateThunk` | | `b sub_821594B8`: the handler address `InitStates` registers (`0x82159948`, the one `--log_recording_handlers` names). Read in full. |
+| `sub_82152400` | `CameraDirector::ToView4` | | Handler: r3 = the director. Viewport 0's +1860 = 4; in split screen, the viewports' +8 = 0 and the player followed (+9636, +77408) = 1 when the racer record (`RacerRecords::At(race data + 0x59AE8, -1)`) has +3924 = 2, else 0; +9632 = +9628. Probably the race's end or replay. Read in full. |
+| `sub_821524B8` | `CameraDirector::ToView5` | | Handler: viewport 0's +1860 = 5 (the cutscene), +9632 = +9628. Leaf. Read in full. |
+| `sub_821524D8` | `CameraDirector::ToView3` | | Handler: viewport 0's +1860 = 3. Leaf. Read in full. |
+| `sub_821597F0` | `CameraDirector::Resume` | | Handler: r3 = the director. The player followed as `OnRaceStart` picks it (kind 6), else 0; with the race's kind 4, split screen on, both viewports' +1860 = 2 and `SetMode(2)`; else viewport 0's +1860 = +9632 (the view kept; `Update` then switches). Then the color filter (`PostEffects::Get(2)`) back to neutral: slot 6 (`Set8112`) 0.0, slot 4 (`SetColor0`) 1.0, 1.0, 1.0, slot 7 (`Set8116`) 0.0. Read in full. |
+| `sub_82153160` | `CameraDirector::ToView3IfCourse` | | Handler: with the race's kind 1 and the race data's +4 (the course) not 8, 9 or 10: viewport 0's +1860 = 3, and +9632 = +9628 unless that is 3. Leaf. Read in full. |
+| `sub_82153150` | `CameraDirector::SetState3` | | Handler: +9620 = 3. Leaf. Not seen in play. |
+| `sub_82153098` | `CameraDirector::Release` | | Handler: `CameraAnims::FreeAll`; with the race's kind 1, 2 or 3, the view (+9628, or +9632 in views 4 and 5) saved to the save data's camera setting (+0x1F85C + 24: view 0 as 2, 1 as 1, 2 as 0; views 3 and up not saved) and +9624 = it; `Viewports::Release`. Read in full. |
+| `sub_821524F0` | `Viewports::ResetRoll` | | `Viewport::SetRoll(0.0)` on both viewports. From `CameraDirector::SetMode`. Read in full. |
+| `sub_82152548` | `Camera::ZoomFromFov` | | f1 = a field of view in degrees, f2 = a width: 0.5 × f2 × tan(the half angle in radians, wrapped into [-π, π] by `[0x82001FA4]` (1/2π) and 2π, a `fctiwz` round toward zero), in single precision. Calls `tan`. From every camera's set-up and update (eight callers). Read in full. |
+| `sub_821525F8` | `Quat::Rotate` | | r3 = out, r4 = a quaternion (x, y, z, w), r5 = a vector: v (w² − x² − y² − z²) + 2 (q·v) q + 2w (q × v), w of the result 1.0. Leaf. From `ChaseCamera::Follow`. Read in full. |
+| `sub_82152698` | `Matrix::FromQuat` | | r3 = the matrix, the quaternion in r4 and r5 (by value, 16 bytes): the rotation scaled by 2 / \|q\|² (`vmsum4fp128`), row 3 (0, 0, 0, 1) and the w words 0. Leaf. From `CameraTarget::Track`. Read in full. |
+| `sub_82153290` | `CameraTarget::Track` | | r3 = a camera's target tracker (camera + 32), r4 = the vehicle (nothing when 0): the last values kept (+0 to +16, +32 to +48, the matrix +64 to +128, +192 to +208), the body matrix (`RigidBody::Matrix(vehicle +336)`) on the stack, the vectors at the vehicle's +1216 and +1584 (`Vec4::Copy`), the rotation from the body's +80 (`sub_820B6880`) into +64 (`Matrix::FromQuat`, with +192, +200), the track position into +224 (`TrackPosition::Copy` of `Vehicle::Identity`). From every camera (11 callers). Not read in detail (the vector unit's work). |
+| `sub_82154548` | `ChaseCamera::ChaseCamera` | | Made in place by `SetMode` (view 0) and by `TvCamera::TvCamera` (its fallback at +43136): r3 = the object, r4 = the viewport, r5 = the vehicle. Vtable `0x82006B24` (slot 0 `ChaseCamera::Update`), the 1.0 w words, +16 = vehicle, +20 = viewport; the car's spec block (`sub_820C4550`) sizes the offset (its +76, +80 times 0.001, 0.5, 1.6, `sin`, `cos` of an angle in degrees); two statics with `atexit` (guard `0x826D8220`: 0.75, 1.8, 0.0, 1.0 at `0x826D8200`); the zoom from 55 degrees by the display's width (`Camera::ZoomFromFov`, `[0x8266D088]` slot 7 then 3, +296) to `Viewport::SetZoom`, the near plane (`CameraPasses::SetNear`, scaled by the viewport's +1868 / +1864), roll 0; `ChaseCamera::Place`, `CameraTarget::Track`, `ChaseCamera::Follow(0.07, 0.1)`; +352 = the viewport's eye. Returns r3. Not read in detail. |
+| `sub_82153478` | `ChaseCamera::Place` | | r3 = the camera, r4, r5 stack vectors, r6, r7 the static offsets: the target tracked (`CameraTarget::Track`) and the eye placed behind the car from the offsets (1.3 at `0x820029F0`), writing the viewport's vectors. From `ChaseCamera::ChaseCamera`. Not read in detail. |
+| `sub_82153640` | `ChaseCamera::Follow` | | r3 = the camera, f1, f2 two rates (0.07 and 0.1 from the set-up): `CameraTarget::Track`, the zoom (`ZoomFromFov`), near plane and roll set, the eye and target moved after the car (`Vec4::Transform`, `Quat::Rotate`, `Matrix::MultiplyTranslation`) into the viewport. 674 lines. From `ChaseCamera::ChaseCamera` and `ChaseCamera::Update`. Not read in detail. |
+| `sub_82154808` | `ChaseCamera::Update` | | Slot 0 of `0x82006B24` (no direct callers; from `CameraDirector::Update`): `ChaseCamera::Follow`, `Camera::Shake`, the speed (`Vehicle::GetSpeedKmh`) into `0x826D8228`, `Viewport::PullBack` (+380 a state). Not read in detail. |
+| `sub_82152CD8` | `Camera::Shake` | | Camera shake; scales with speed. B7 loop (2026-10-30): r3 = the camera: the speed (`Vehicle::GetSpeedKmh(+16)`) over 150 km/h times 0.01, then `Camera::ShakeRandom(viewport +20, that)`. Read in full. |
+| `sub_82152BD8` | `Camera::ShakeRandom` | | r3 = the viewport, f1 = the amount (clamped to 0-1): a static step (guard `0x826D81C4`, `0x826D81C0` = 0.000175), two `rand() % 100` scaled by it into x and y of a vector (z 0, w 1), then `Viewport::Offset`. Not read in detail (the scaling). |
+| `sub_821529B0` | `Viewport::Offset` | | r3 = the viewport, r5 = the offset: added to the eye (+1600) and the target (+1616) in the view's axes. Not read in detail. |
+| `sub_82152788` | `Viewport::PullBack` | | r3 = a viewport, f1: the eye (+1600) moved along the target-to-eye line by f1 (clamped 0-1). From `ChaseCamera::Update`. Not read in detail. |
+| `sub_82154A48` | `ViewCamera1::ViewCamera1` | | View 1's camera (+11856), made in place by `SetMode`: vtable `0x82006B2C` (slot 0 `ViewCamera1::Update`), +16 vehicle, +20 viewport; statics with `atexit` (guard `0x826D8270`; -0.3, -0.32); zoom from 55 degrees, near plane, roll; `CameraTarget::Track`; `CameraCurve::Load` (curve 0, word 30). Probably an in-car view (it turns on camera pass 3, probably the mirror). Not read in detail. |
+| `sub_82153A50` | `ViewCamera1::Update` | | Slot 0 of `0x82006B2C`: `CameraTarget::Track`, zoom from 55 degrees, near 0.1, roll; with the race's kind 6 or 2 the car's model (`ScenePools::FindModel([0x826C2E44], 2, ...)`) for its matrix; the eye and target from the car's matrix (`Matrix::MultiplyTranslation`, `Vec4::Transform`, `Matrix::RotateY` by the look angle +1104); the nearest human car (`Racers::NearestHumanVehicle`) for the up vector. Probably the cockpit view. Not read in detail. |
+| `sub_82154D38` | `ViewCamera2::ViewCamera2` | | View 2's camera (+9648, and +10752 for player 2 in split screen): vtable `0x82006B34` (slot 0 `ViewCamera2::Update`), +16 vehicle, +20 viewport; statics with `atexit` (guard `0x826D82C0`: 1.1, 10.0, -0.8); zoom from 55 degrees, near plane, roll; the car's spec block (`sub_820C4550`); `CameraCurve::Load`; `CameraTarget::Track`. Probably the bumper or hood view. Not read in detail. |
+| `sub_82153E58` | `ViewCamera2::Update` | | Slot 0 of `0x82006B34`: `CameraTarget::Track`, zoom from 55 degrees, near plane, roll; the eye and target from the car's matrix; `Racers::NearestHumanVehicle` and `RigidBody::Position`. Not read in detail. |
+| `sub_82158F70` | `IntroCamera::IntroCamera` | | View 3's camera (+67760), made in place by `SetMode`: vtable `0x820093C4` (slot 0 `IntroCamera::Update`), +16 vehicle, +20 viewport, +748, +752, +756 = 0; its 16-slot shot list (+352: `List16`, free +64, head +68, count +72) reset; for each racer of the stage (`Stages::Copy`, `Race::RacerCount`, `Vehicle::Get`, the racer's item `DataTables::Item` with its halfword +88 tested for 0, 1, 3) a 20-byte shot made (`IntroCamera::MakeShot`) and added (`List16::Insert20`). Probably the race start's look at each car. 375 lines. Not read in detail. |
+| `sub_82154108` | `IntroCamera::MakeShot` | | r3 = a 20-byte shot, r4 = the vehicle, r5 a word: +0 = r4, +4 = r5, +8, +16 = 0; the car's spec block (`sub_820C4550`, +76, +80, +84) sizes an orbit (0.001, 0.20944, 0.5, 3.4, 0.2, `sin`, `cos`); statics with `atexit` (guard `0x826D81F0`; 0.75, 1.8). Not read in detail. |
+| `sub_82154458` | `List16::Insert20` | | r3 = a 16-slot list, r4 = a 20-byte record, r5 = a position: `List16::Link`, then the record copied into the node's slot (+76 + 20 × the node's +2). From `IntroCamera::IntroCamera`. Read in full. |
+| `sub_82155E58` | `IntroCamera::Update` | | Slot 0 of `0x820093C4`: `CameraTarget::Track`; the current shot (+748 the index, +752 frames, +756 a phase 1-3; `0x826D82C4` keeps the shot), its orbit from the spec block and the time (1/60, 0.0005, 3.4, 0.6, 0.20944, 2.0; `sin`, `cos`), the eye from the car's matrix (`RigidBody::Matrix`, `Vec4::Transform`), `IntroCamera::StepShot`; the next shot when it ends, reading the screen fade's alpha (`0x826A50D4`). One of the 1/60 step's functions (`../frame-interpolation.md`). 555 lines. Not read in detail. |
+| `sub_82152E78` | `IntroCamera::StepShot` | | r3 = a 20-byte shot (+0 the vehicle, +4 a body, +8 a frame count, +16 a phase): the body's matrix (`RigidBody::Matrix`), two `Vec4::Transform`, the count up to 29 and the phase on, reading `0x826A50D4`. Not read in detail. |
+| `sub_82155288` | `TvCamera::TvCamera` | | View 4's camera (+13360), made in place by `SetMode`: vtable `0x820093BC` (slot 0 `TvCamera::Update`), +16 vehicle, +20 viewport (and the same for its fallback chase camera at +43136, made with `ChaseCamera::ChaseCamera`); zoom from 55 degrees, near plane; `CameraTarget::Track`; +448 = 0; with +452 (a table, `[0x82618BB4]` from the constructor) set, 44 route ranges (`RouteRange::Init`, a loop) with their forks (`RouteRange::AddBranch`, 44 sections by number: 247, 253, 258, ...), one a camera spot. 829 lines. Not read in detail. |
+| `sub_821593D8` | `TvCamera::Update` | | Slot 0 of `0x820093BC`: slot 0 of the fallback chase camera (+43136, `ChaseCamera::Update`); when +448 is 0, `TvCamera::Step`. Then the attract race's color filter: once (guard `0x826D82CC`, style `0x826D82C8` = 0), when +43520 is 0 the style = one of 0-3 by `rand() % 4` (the signed remainder); `ColorFilter::SetStyle(&style)`. Read in full. The random sepia or gray filter of attract races (CLAUDE.md). |
+| `sub_821562F8` | `TvCamera::Step` | | r3 = the TV camera: `CameraTarget::Track`; for each of 40 ranges (+452's), `RouteRange::Update` with the car's track position, the ranges entered added to a 40-slot list (`List40::Insert`); the spot (+360) picked by `RouteRange::CameraAt` and `RouteRange::Test`, its path asked for (`CameraPath::Request` into one of four path buffers at +43016); when loaded (+24 = 3) the path evaluated along the route (`sub_820F9B48`, `CameraPath::Evaluate`) into the viewport, zoom, near plane and roll set; +352, +356 the spot's state. 993 lines. Calls `RouteRange::Update` at `0x821563C0` (its adapter stays for it, `track-zones.md`). Not read in detail. |
+| `sub_82156980` | `TvCamera::Track` | | r3 = the TV camera, r4 = the current camera's track position (its +260): the 40 ranges updated (`RouteRange::Update`) and listed (`List40::Insert`), and the next spot's path asked for (`CameraPath::Request`), while another view shows. From `CameraDirector::Update`. Not read in detail. |
+| `sub_82152108` | `ColorFilter::SetStyle` | | r3 = &a style (0-3): on the color filter (`PostEffects::Get(2)`, nothing when 0): 0 slot 6 (`Set8112`) 0.0, slot 4 (`SetColor0`) 1.0, 1.0, 1.0, slot 7 (`Set8116`) 0.0 (none); 1 slot 6 0.45, slot 4 1.0 ×3, slot 7 1.0; 2 slot 6 0.975, slot 4 1.5 ×3, slot 7 0.0; 3 slot 6 -0.15, slot 4 1.3, 0.645, 0.5, slot 7 0.5 (probably the sepia). Read in full. `post-effects.md` had it as never run; the coverage list has it. |
+| `sub_82153228` | `List40::Link` | | `List16::Link` for 40 slots: r3 = the list, r4 = a position (signed halfword): free head +160, head +164, count +168 up by 1. Leaf. From `List40::Insert`. Read in full. |
+| `sub_821544E0` | `List40::Insert` | | r3 = a 40-slot list, r4 = &a word, r5 = a position: `List40::Link`, then the node now there has its data word (+172 + 4 × the node's +2) = the word. From `TvCamera::Step`, `TvCamera::Track`. Read in full. |
+| `sub_820FE830` | `RouteRange::CameraAt` | | r3 = a route range: its state +0 forced to 1 around `RouteRange::Test` (the old one put back); returns the word at `0x82603274` (`.data`; the slices counted along the path, `track-zones.md`) when the position is on it (2), else -1. Leaf but for `Test`. In track zones' range (`track-zones.md` had it as not seen in play). From `TvCamera::Step`. Read in full. |
+| `sub_820FE598` | `RouteRange::Advance` | | r3 = out (section, slice halfwords), r4 = a route range, r5 = a distance in slices: from the range's start (+4) along the course's route (`[0x826C5B10]`'s +12, the sections' lengths at +0), at forks taking the link that's in the range's list of sections to take (+12), until the end (+8) or the distance runs out. Leaf. In track zones' range. From `CameraPath::Evaluate`. Read in full. |
+| `sub_820F9B48` | | | r3, r4: walks the course's route (`TrackRoute::Link`) between two positions; probably a distance along the route for the TV camera's path. 394 lines. From `TvCamera::Step`. Not read. |
+| `sub_82152E08` | `CameraPath::Request` | | r3 = unused, r4 = a path buffer (`Buffer28`, 28 bytes), r5 = a path index (-1 none): when the buffer is empty (+24 0) or loaded (3), freed and reset (`Buffer28::Free`, `Reset`), +12 = the index, and `CameraPath::Load` of the asset `[[0x82618D30 + 4 × index]]`. Read in full. |
+| `sub_82152D80` | `CameraPath::Load` | | r3 = the buffer, r4 = an asset id: +24 = 1, +20 = `VirtualAlloc(0, Archive::AssetSize(id), 0x1000, 4)`, +16 = `Archive::Load(id, +20, CameraPath::OnLoaded, buffer)`, +24 = 2. Read in full. |
+| `sub_82152078` | `CameraPath::OnLoaded` | | The archive's load callback (no direct callers): r4 = the file's data, r6 = the buffer. The data: +0 the count of 20-byte paths at +16, +4 the count of 216-byte keys after them; each path's keys fixed up (`CameraPath::FixKeys`); the buffer's +4 = the first path, +8 = the last, +24 = 3 (loaded). Read in full. |
+| `sub_820AC000` | `CameraPath::FixKeys` | | r3 = a 20-byte path (+8 its key count, +16 its first key's index made a pointer: × 216 + the keys' base r4), r5 = the curves' base: each 216-byte key fixed (`CameraPath::FixKey`). Read in full. |
+| `sub_820ABF80` | `CameraPath::FixKey` | | r3 = a 216-byte key, r4 = the curves' base: the (kind, value) pairs at +8 and +16, and the two groups at +24 and +120 (`CameraPath::FixGroup`): a kind 2 becomes kind 1 with value = base + 24 × value (an offset made a pointer). Leaf but for the groups. Read in full. |
+| `sub_820ABED8` | `CameraPath::FixGroup` | | r3 = a 96-byte group: two 24-byte triples (`CameraPath::FixTriple` at +0, +24), the pairs at +48, +80, +88, a third triple at +56. Read in full. |
+| `sub_820ABE68` | `CameraPath::FixTriple` | | r3 = three (kind, value) pairs: each kind 2 made kind 1 with value = r4 + 24 × value. Leaf. Read in full. |
+| `sub_820AC248` | `CameraPath::Evaluate` | | r3 = a key, r4, r5 outputs, r6 the route position: each track read (kind 0 a constant at +4, kind 1 a curve, `Curve::Evaluate`; `Key::Vec3` for vectors): +8 the field of view (degrees, × -π/180), +16 the roll (/ 32,000), the eye +72, target +168, up +104 (`Vec3::SwapXZ`, `Vec4::Transform`), +112 and +208 distances along the route placed with `RouteRange::Advance` and `CameraPath::RoutePoint`, +200. 935 lines. From `TvCamera::Step`. Not read in detail. |
+| `sub_820AC060` | `Curve::Evaluate` | | r3 = a curve, r4 = the time: finds the segment and evaluates it by its kind (1 to 3; a cubic through `Hermite::Basis`). Not read in detail. |
+| `sub_820AC178` | `Key::Value` | | r3 = a (kind, value) pair: kind 0 the float at +4, 1 `Curve::Evaluate(value)`, else 0.0; times 12.5 (`[0x82002834]`) somewhere. Not read in detail. |
+| `sub_820AC1D0` | `Key::Vec3` | | r3 = three pairs, r4 = out: `Key::Value` of each into x, y, z (w 1.0). From `CameraPath::Evaluate`. Read in full. |
+| `sub_82293A48` | `Hermite::Basis` | | r3 = out, r4, r5 two (value, tangent) keys, f1 = t: the cubic Hermite blend (2t³ − 3t² + 1 and the rest; 2.0, 3.0, 1.0). Leaf. From `Curve::Evaluate`. Not read in detail. |
+| `sub_820ABDA8` | `CameraPath::RoutePoint` | | r3 = out, r4 = a route position, r5 = an offset: the position clamped (`TrackRoute::ClampPosition`), the route's point there (`TrackRoute::SplinePoint`) and the offset added through `Vec4::Transform`. Not read in detail. |
+| `sub_820AB6A0` | `TrackRoute::SplinePoint` | | A point on the course's route (`[0x826C5B10]`) at a position (section, slice): the section's neighbors through its links (6 to 9 at forks), a Catmull-Rom basis matrix built once (guard `0x826C2D70`, `Matrix::FromFloats` from -1, 2, 4, -3, -5, 3 and 0.5, with `atexit`), `Vec4::Transform`, `sub_820AB5F0`. 1,101 lines. Not read in detail. |
+| `sub_820AB5F0` | | | From `TrackRoute::SplinePoint`: probably the spline's last step (vector unit work). Leaf. Not read. |
+| `sub_82090000` | `Matrix::FromFloats` | | r3 = a 4×4 matrix, r4 on: 16 float pointers: +12, +28, +44 and +60 set to 1.0 first, then all 16 written. Leaf. From `TrackRoute::SplinePoint` and XACT's static set-ups (`sub_825D8F88`, `sub_825D9060`; their lead in `../loops/leads.md`). Not read in detail. |
+| `sub_821540B0` | `CameraPath::~CameraPath` | | Slot 0 of the path buffer's vtable `0x82009390`: `Buffer28::Free`, and `operator delete` when the flag says. Not seen in play. |
+| `sub_82156CC0` | `Cutscene::Cutscene` | | View 5's camera (+56896), made in place by `SetMode` (the scripted cutscenes: the rival's intro among them). Flag it for splitting in the migration (4,907 lines). Its parts: (1) the set-up: vtable `0x82006B3C` (slot 0 `Cutscene::Update`, slot 1 `Cutscene::OnPad`), the 1.0s, `XprHolder::XprHolder(+10780)`, +16 vehicle, +20 viewport, zoom from 55 degrees, near plane, `CameraTarget::Track`, +352 = -1 (no shot), +356, +360 = 0, two 16-slot lists reset (+364: 32-byte fade cues; +952: 608-byte shots), +10756 = 0, `CameraAnims::FreeAll` and `Clear`; (2) the racers: for each of the stage's racers (`Stages::Copy` of race data +0x59620, `Stage::Of`, `Race::RacerCount`, the racers' manager's racers (`[0x826D82F4]` + 2308 + 4i, `race-world.md`) matched by their +24, `Vehicle::Get` of their +20, their flag 0x400, `DataTables::Item`: its byte +35, halfword +88) up to four records (id, byte, vehicle) on the stack; (3) two switches (jump tables `0x82009380`, `0x82009340`) on the event; (4) the scripts: a 69-case switch (`0x82009320`) adding cues (`List16::Insert32`, 1 to 15 a case) and shots (`CutsceneShot::Init`, `List16::Insert608`); (5) the logo: `RivalLogo::RivalLogo(+10760)`, `RivalLogo::Open`. Returns r3. Not read in detail. |
+| `sub_821561F8` | `Cutscene::Update` | | Slot 0 of `0x82006B3C`: with a shot (+352 not -1), `Cutscene::Step`; when that returns 0 or there's none, the race data's word +0x5E6E4 gets bit 0 (the cutscene done, probably). Read in full. |
+| `sub_82156248` | `Cutscene::OnPad` | | Slot 1 of `0x82006B3C`: +10756 = 1; the input device of `[0x826BABA4]` (`0x826BAB80` + 8 × it), unless its +4 is 1, asked through slot 12 for buttons 164 and 163: `sub_82155BF8` or `sub_82155CC0`, +10756 = 0. Probably skipping. Not seen in play. |
+| `sub_82155BF8` | | | From `Cutscene::OnPad`: moves through the shots (+360, +1024). Not read. Not seen in play. |
+| `sub_82155CC0` | | | As `sub_82155BF8`, the other way, probably. Not read. Not seen in play. |
+| `sub_82155A28` | `Cutscene::Step` | | r3 = the cutscene: the logo played (`RivalLogo::Play(+10760)`) by its flags (+10764); the current shot (+360, the list at +952's count +1024) stepped (`CutsceneShot::Step`), the next taken at its end, `RivalLogo::Close` at the last; the viewport's zoom, near plane, roll and vectors from the shot; the logo drawn (`RivalLogo::Draw(+10760)` when +10764 bit 8 is set, the draw frame interpolation notes); +356 the frame count. Returns 1 while running. 308 lines. Not read in detail. |
+| `sub_82155800` | `CutsceneShot::Step` | | r3 = a 608-byte shot (+4 its camera animation's asset id, +8 the vehicle, +600 the time, +604 the end): `CameraAnims::Evaluate(asset, time, out)` (0 when not loaded), the result placed on the car (`RigidBody::Matrix`, `Vec3::SwapXZ`, `Vec4::Transform`, `[0x82002948]` π/180), its cues stepped (`FadeCue::Step`, list at +12), time on; at the end `CameraAnims::Duration` for the next. Not read in detail. |
+| `sub_82156B68` | `CutsceneShot::Init` | | r3 = a 608-byte shot, r4 = a script entry: +0 = its kind, +4 = the asset id 22824 + kind (a table of 16 on the stack: 22824 to 22839), +8 = its vehicle word; its 16-slot cue list (+12) reset, +600 = 0, +604 = 1; the entry's cues (count +80, 32 bytes each from +8) copied in (`List16::Copy32`, `List16::Insert32`); the animation's file loaded (`CameraAnims::Load(+4)`). Read in full. |
+| `sub_82152290` | `FadeCue::Step` | | r3 = a 32-byte cue (+0 the start frame, +4 the end, +8 the kind, +12 to +20 its arguments, +24 the frame, +28 hold): at the start frame, kind 0 `ScreenFades::FadeIn`, 1 `FadeOut` (r3 = the length, r4 to r6 the arguments, r7 0); +24 counted up to the end unless +28. Read in full. |
+| `sub_82154300` | `List16::Copy32` | | r3 = out, r4 = a 16-slot list, r5 = a position: the node's 32-byte slot (+76 + 32 × its +2) copied out (`memcpy`). Returns r3. Read in full. |
+| `sub_82154378` | `List16::Insert32` | | As `List16::Insert20` for 32-byte records (`memcpy`). From `Cutscene::Cutscene` and `CutsceneShot::Init`. Read in full. |
+| `sub_821543E8` | `List16::Insert608` | | As `List16::Insert20` for 608-byte records (`memcpy`). From `Cutscene::Cutscene`. Read in full. |
+| `sub_82211848` | `RivalLogo::RivalLogo` | | r3 = the logo's entry (the cutscene's +10760): +0 = -1, +4 = 2, +8, +12, +16 = 0, its XPR holder at +20 (`RivalLogo::InitXpr`). In the race HUD's range (`race-hud.md` has its draw). Read in full. |
+| `sub_82211708` | `RivalLogo::InitXpr` | | r3 = the holder: +0 = -1, `XPR::XPR(+4)`, +28 = 2, +56, +60 = 0, +64 = 3, +68 = 4. Read in full. |
+| `sub_822118E0` | `RivalLogo::Open` | | r3 = the entry, r4 = a logo (-1: +4 = 1, nothing), r5 = a texture: when +4 bit 1 is set, +0 = r4, +4 bit 2, +8, +12, +16 = the logo's 12-byte record (`0x8200CD70` + 12 × r4: the movie's id, its asset, its name), `UiMovies::Open(+8, +16)`; for logo 0 the texture's XPR loaded (`RivalLogo::LoadXpr` with `[0x8200CEA0 + 4 × r5]`). Read in full. |
+| `sub_82211878` | `RivalLogo::LoadXpr` | | r3 = the holder, r4 = an asset id: +28 bit 2 set around `Archive::Load(id, [0x826A5134], 0x822117B8, holder)`. Not seen in play. |
+| `sub_822117B8` | | | The XPR's load callback: `XPR::Create`, `XPR::GetTexture`, `sub_822116A0`. Not read. Not seen in play. |
+| `sub_82211980` | `RivalLogo::Close` | | r3 = the entry: the movie (`UiMovies::Find(+8)`) finished (`UiMovie::FinishAll`), its texture put back (`UiMovie::SwapTexture`) for logo 0, the XPR released (`RivalLogo::ReleaseXpr`), the movie deleted (`UiMovies::Delete`), the entry reset. Not read in detail. |
+| `sub_82211768` | `RivalLogo::ReleaseXpr` | | r3 = the holder: +0 = -1, `XPR::Release(+4)`, +28 = 1, +56, +60 = 0. Not seen in play. |
+| `sub_82211AB0` | `RivalLogo::Play` | | r3 = the entry: once the movie is loaded (`UiMovies::IsLoaded`) and, for logo 0, the XPR (+48), the texture swapped in (`UiMovie::SwapTexture`) and the movie played by name (`UiMovie::PlayNamed(+12)`); +4's bits on. Not read in detail. |
+| `sub_82150B10` | `CameraAnims::Load` | | r3 = an asset id: a 4-byte record (`VirtualAlloc`) = the id, the file's buffer (`VirtualAlloc(Archive::AssetSize(id))`), `Archive::Load(id, buffer, CameraAnims::OnLoaded, record)`. From `CutsceneShot::Init` and the front end (`sub_8222C300`). Read in full. |
+| `sub_82150878` | `CameraAnims::OnLoaded` | | The archive's load callback (no direct callers): r4 = the data, r6 = the record. Each object in the file (+0 its kind, +4 and +8 sizes, to kind 14, the end) parsed (`CameraAnim::ParseObject`), the pointers kept; a 264-byte entry (+0 the asset id, +4 up to 64 object pointers, +260 their count) appended to the table at `0x826C79B8` (count at `0x826D01B8`); the file and the record freed (`VirtualFree`). Read in full. |
+| `sub_82150100` | `CameraAnim::ParseObject` | | r3 = an object in the file: a 340-byte copy (`VirtualAlloc`) of its header (+0 to +12) and its tracks (`XMemSet`, `XMemCpy`, more `VirtualAlloc`s; +60 a block, +336 a count). Returns it. 299 lines. Not read in detail. |
+| `sub_82150300` | `CameraAnims::Find` | | r3 = an asset id: the table's entry with that id (`0x826C79B8`, 264 bytes each, count `0x826D01B8`), its +4 (the objects), or 0. Leaf. Read in full. |
+| `sub_82150960` | `CameraAnims::Evaluate` | | r3 = out, r4 = an asset id, r5 = the time: its objects (to kind 14) evaluated: kind 6 (a camera) `CameraAnim::EvalCamera`, kind 7 `CameraAnim::EvalTarget`. Returns 1, or 0 when not loaded. From `CutsceneShot::Step` and the front end (`sub_82229238`, `sub_8222D828`, `sub_8222DA10`, `sub_8222DEE0`; `sub_82150B80`, `sub_8222E1A0`, `sub_8222E368` never seen). Read in full. |
+| `sub_82150350` | `CameraAnim::EvalCamera` | | A kind 6 object at a time: by its subtype (1, 3, 101, 102, 109) the eye and the field of view from the lens (25.4 mm film, `atan`, `tan`, 240.0). Not read in detail. |
+| `sub_821504E0` | `CameraAnim::EvalTarget` | | A kind 7 object at a time (subtypes 1, 3): probably the target. Leaf. Not read in detail. |
+| `sub_82150A98` | `CameraAnims::Duration` | | r3 = an asset id: the first object of kind 1 or 6 (before 14): its float +80; else a constant. From `CutsceneShot::Step`. Read in full. |
+| `sub_82150A10` | `CameraAnims::ObjectMatrix` | | r4 = an asset id: its kind 1 object's matrix at a time (`CameraAnim::Matrix`); 1, or 0 when none. From the front end (`sub_82227E20`, `sub_82229238`). Not read in detail. |
+| `sub_82150590` | `CameraAnim::Matrix` | | An object's rotations and position at a time into a matrix (`Matrix::RotateX`, `RotateY`, `RotateZ`, `Matrix::Multiply`, `memcpy`). 372 lines. Not read in detail. |
+| `sub_821507D8` | `CameraAnims::FreeAll` | | Each table entry from the last (`0x826D01B8` counted down): its objects freed (`CameraAnim::Free`, `VirtualFree`). From `CameraDirector::Release`, `Cutscene::Cutscene` and the front end (`sub_82228548`). Read in full. |
+| `sub_82150098` | `CameraAnim::Free` | | r3 = an object: its +336 sub-blocks (at +80, count +336) freed (`CameraAnimBlock::Free`, `VirtualFree`). Read in full. |
+| `sub_8214FFF0` | `CameraAnimBlock::Free` | | r3 = a block: `VirtualFree(+60, 0, 0x8000)` when set, +60 = 0. Read in full. |
+| `sub_82150078` | `CameraAnims::Clear` | | `0x826D01B8` (the table's count) = 0. Leaf. From `CameraDirector::Start`, `Cutscene::Cutscene`, the front end (`sub_82227A50`). Read in full. |
+| `sub_82150040` | `CameraAnims::SetGlobals` | | r3, r4, r5, f1: `0x826C79A0`, `0x826C79A4`, `0x826C79B0`, `0x826C79AC` = them, `0x826C79A8` = 0.0. Leaf. From `sub_8222E368`. Not seen in play. |
+| `sub_82150B80` | | | From `sub_8222E368`, calls `CameraAnims::Evaluate`. 353 lines. Not read. Not seen in play. |
+| `sub_8217BE98` | `GarageCamera::Update` (probably) | | From `sub_8217FE60` (the front end's car draw, 17 callers): the app interface's (`[0x826BABA0]`) slots for the device, `0x8296B918`, `0x8296B91C`, `0x8296B8F4` set; an orbit around the car (`sin`, `cos` of two angles, `tan` of a field of view against 640.0), `Viewport::SetZoom`, `CameraPasses::SetNear(0.01)`, `SetRoll`, `Vec4::Transform`, `Viewport::LookAt`, `CameraPass::FromViewport`, `CameraPass::Enable`. 396 lines. Not read in detail. Ready. |
+| `sub_822282E8` | `CourseView::Draw` (probably) | | From `sub_8222ED98` (a front-end screen, no direct callers): the same app interface slots and globals; `CameraPass::Enable`, `Viewport::Set`, `CameraPasses::SetNear(0.01)`, `Viewport::SetRoll`, `SetZoom` (5,000.0), the passes recorded (`RecordBegins`, `RecordEnds`) around `Scenery::Update` and `Scenery::Draw` of `[+552]`. Probably the course map or a course preview. Not read in detail. |

@@ -45,9 +45,9 @@ position) and `Stages::Copy` (`sub_820FFD88`) (`vehicle-accessors.md`);
 (`[0x826C5B10]` + 12, `track-route.md`) is read directly. `List64::Insert`
 (`sub_820FE330`) is also called by `sub_82148428` (a list of models, a
 lead), and `List16::Link` (`sub_821531C0`) by `sub_82154378`,
-`sub_821543E8` and `sub_82154458` (the camera modes' area, in a lead).
+`sub_821543E8` and `sub_82154458` (the camera modes' area; `List16::Insert32`, `Insert608` and `Insert20` in `camera-modes.md` since 2026-10-30).
 
-Not seen in play, so without rows: `sub_820FE830` (a range's test with
+Since 2026-10-30 these have rows in `camera-modes.md` (the coverage list now has them seen: `RouteRange::CameraAt`, `RouteRange::Advance`, `TvCamera::TvCamera`, `TvCamera::Step`, `TvCamera::Track`). Not seen in play, so without rows: `sub_820FE830` (a range's test with
 its state forced to 1, returning the slices counted along the path in
 `0x82603274` when the position is on it, else -1; no callers seen),
 `sub_820FE598` (not read), and the camera modes' users of route ranges
