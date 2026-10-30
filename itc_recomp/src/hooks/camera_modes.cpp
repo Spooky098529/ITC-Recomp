@@ -70,7 +70,8 @@ ITC_FLAG_BOOL(native_camera_modes, true, "ITC",
               "(with native atexit), TvCamera::Update sub_821593D8 with Step sub_821562F8 (no "
               "adapter: only Update's plain C++ calls it; with native atexit; the attract race's color "
               "filter by rand); the front end's GarageCamera::Update sub_8217BE98; the director's "
-              "CameraDirector::InitStates sub_82159950) natively instead of "
+              "CameraDirector::InitStates sub_82159950; the cutscene's Cutscene::Cutscene sub_82156CC0 "
+              "with its scripts' cues and shots and the rival logo's open) natively instead of "
               "through the translated code (the same writes; checked by "
               "--run_harnesses=camera_modes)");
 
@@ -593,25 +594,29 @@ void CameraModesStep82153098(PPCContext& ctx, uint8_t* base) {
       });
 }
 
-// CutsceneShot::Init: r3 = the shot, r4 = the script entry; r3 as
-// CameraAnims::Load leaves it (the serial). The copies the native layer
-// refuses go through the guest's memcpy from Copy32's and Insert32's frames
-// below the original's (192 bytes); CameraAnims::Load natively where its
-// adapter would (--native_heap, the archive's queue), else its original.
-void CameraModesStep82156B68(PPCContext& ctx, uint8_t* base) {
-  ctx.fpscr.disableFlushMode();
+}  // namespace hooks
+
+namespace {
+
+// CutsceneShot::Init's guest calls, from frames below the stack pointer the
+// calls are made with (the caller's r1 at Init's call): the copies the
+// native layer refuses through the guest's memcpy from Copy32's and
+// Insert32's frames below Init's (192 bytes); CameraAnims::Load natively
+// where its adapter would (--native_heap, the archive's queue), else its
+// original.
+cm::CutsceneCalls ShotInitCalls(PPCContext& ctx, uint8_t* base) {
   cm::CutsceneCalls calls;
-  calls.copy32 = [&](uint32_t to, uint32_t from, uint32_t size) {
+  calls.copy32 = [&ctx, base](uint32_t to, uint32_t from, uint32_t size) {
     guest_call::InFrame(ctx, base, 192, 0x82156C90, [&](uint32_t) {
       GuestMemcpy(ctx, base, 96, 0x8215435C, to, from, size);
     });
   };
-  calls.insert32 = [&](uint32_t to, uint32_t from, uint32_t size) {
+  calls.insert32 = [&ctx, base](uint32_t to, uint32_t from, uint32_t size) {
     guest_call::InFrame(ctx, base, 192, 0x82156CA0, [&](uint32_t) {
       GuestMemcpy(ctx, base, 112, 0x821543E0, to, from, size);
     });
   };
-  calls.load = [&](uint32_t id) {
+  calls.load = [&ctx, base](uint32_t id) {
     if (hooks::NativeHeapActive() && hooks::NativeArchiveQueue()) {
       hooks::SetArchiveSerial(ctx, cm::AnimsLoad(base, id, hooks::NativeArchiveLoad(base)));
       return;
@@ -621,7 +626,18 @@ void CameraModesStep82156B68(PPCContext& ctx, uint8_t* base) {
       __imp__sub_82150B10(ctx, base);
     });
   };
-  cm::CutsceneInit(base, ctx.r3.u32, ctx.r4.u32, ctx.r1.u32 - 192, calls);
+  return calls;
+}
+
+}  // namespace
+
+namespace hooks {
+
+// CutsceneShot::Init: r3 = the shot, r4 = the script entry; r3 as
+// CameraAnims::Load leaves it (the serial). Its calls: ShotInitCalls.
+void CameraModesStep82156B68(PPCContext& ctx, uint8_t* base) {
+  ctx.fpscr.disableFlushMode();
+  cm::CutsceneInit(base, ctx.r3.u32, ctx.r4.u32, ctx.r1.u32 - 192, ShotInitCalls(ctx, base));
 }
 
 }  // namespace hooks
@@ -1020,36 +1036,51 @@ ITC_CAMERA_MODES(82155288)
 
 // --- The rival logo's open and close ---
 
+namespace {
+
+// RivalLogo::Open's calls from its frame at `sp` (the original's r1, 112
+// bytes): UiMovies::Open natively where its adapter would, else its
+// adapter, and RivalLogo::LoadXpr (never run in play) through the
+// translated code, from frames like the original's.
+struct RivalLogoOpenCalls {
+  std::function<uint32_t(uint32_t, uint32_t)> open;
+  std::function<uint32_t(uint32_t, uint32_t)> load_xpr;
+};
+RivalLogoOpenCalls RivalLogoOpenCallsAt(PPCContext& ctx, uint8_t* base, uint32_t sp) {
+  RivalLogoOpenCalls calls;
+  calls.open = [&ctx, base, sp](uint32_t id, uint32_t asset) -> uint32_t {
+    if (ui_movies_game_hooks::OpenNative()) {
+      return ui_movies::OpenMovie(base, id, asset, sp - 128, hooks::NativeArchiveLoad(base),
+                                  ui_movies_game_hooks::OpenCalls(ctx, base, sp));
+    }
+    CallFrom(ctx, base, sp, 112, 0x8221195C, [&] {
+      ctx.r3.u64 = id;
+      ctx.r4.u64 = asset;
+      sub_8211E808(ctx, base);
+    });
+    return ctx.r3.u32;
+  };
+  calls.load_xpr = [&ctx, base, sp](uint32_t holder, uint32_t id) -> uint32_t {
+    CallFrom(ctx, base, sp, 112, 0x82211978, [&] {
+      ctx.r3.u64 = holder;
+      ctx.r4.u64 = id;
+      sub_82211878(ctx, base);
+    });
+    return ctx.r3.u32;
+  };
+  return calls;
+}
+
+}  // namespace
+
 namespace hooks {
 
 // RivalLogo::Open: r3 = the entry, r4 = the logo, r5 = the texture; r3 as
-// the original leaves it. UiMovies::Open natively where its adapter would,
-// else its adapter, and RivalLogo::LoadXpr (never run in play) through the
-// translated code, from frames like the original's (112 bytes).
+// the original leaves it. Its calls: RivalLogoOpenCallsAt.
 void CameraModesStep822118E0(PPCContext& ctx, uint8_t* base) {
-  const uint32_t sp = ctx.r1.u32 - 112;
-  ctx.r3.u64 = cm::RivalLogoOpen(
-      base, ctx.r3.u32, ctx.r4.u32, ctx.r5.u32,
-      [&](uint32_t id, uint32_t asset) -> uint32_t {
-        if (ui_movies_game_hooks::OpenNative()) {
-          return ui_movies::OpenMovie(base, id, asset, sp - 128, hooks::NativeArchiveLoad(base),
-                                      ui_movies_game_hooks::OpenCalls(ctx, base, sp));
-        }
-        guest_call::InFrame(ctx, base, 112, 0x8221195C, [&](uint32_t) {
-          ctx.r3.u64 = id;
-          ctx.r4.u64 = asset;
-          sub_8211E808(ctx, base);
-        });
-        return ctx.r3.u32;
-      },
-      [&](uint32_t holder, uint32_t id) -> uint32_t {
-        guest_call::InFrame(ctx, base, 112, 0x82211978, [&](uint32_t) {
-          ctx.r3.u64 = holder;
-          ctx.r4.u64 = id;
-          sub_82211878(ctx, base);
-        });
-        return ctx.r3.u32;
-      });
+  const RivalLogoOpenCalls calls = RivalLogoOpenCallsAt(ctx, base, ctx.r1.u32 - 112);
+  ctx.r3.u64 = cm::RivalLogoOpen(base, ctx.r3.u32, ctx.r4.u32, ctx.r5.u32, calls.open,
+                                 calls.load_xpr);
 }
 
 }  // namespace hooks
@@ -1311,3 +1342,83 @@ void CameraModesStep8217BE98(PPCContext& ctx, uint8_t* base) {
 }  // namespace hooks
 
 ITC_CAMERA_MODES(8217BE98)
+
+// --- The cutscene's constructor ---
+
+namespace hooks {
+
+// Cutscene::Cutscene: r3 = the cutscene, r4 = the viewport, r5 = the
+// vehicle; r3 = the cutscene as the original's r23 leaves it, lr put back
+// (as its epilogue). Its guest calls from a frame like the original's
+// (1,632 bytes) with each call site's return address: the video output,
+// CameraAnims::FreeAll natively where its adapter would (--native_heap, the
+// layer's pages), else its original; Stages::Copy's original where its
+// plain C++ refuses; List16::Insert32's and Insert608's refused copies
+// through the guest's memcpy from their frames (112 bytes); CutsceneShot::
+// Init's calls (ShotInitCalls, from Init's frame below this one; the return
+// address of the scripts' last shot call, 0x82158B38, for every shot: only
+// Init's own lr save below the frame would hold it); RivalLogo::Open's from
+// its frame (RivalLogoOpenCallsAt). The original where ChaseNative says no
+// (CameraTarget::Track's frame, ZoomFromFov's tan of the same angle).
+void CameraModesStep82156CC0(PPCContext& ctx, uint8_t* base) {
+  if (!ChaseNative(ctx, base)) {
+    __imp__sub_82156CC0(ctx, base);
+    return;
+  }
+  ctx.fpscr.disableFlushMode();
+  const uint64_t lr = ctx.lr;
+  const uint32_t frame = ctx.r1.u32 - cm::kCutsceneFrame;
+  auto from_frame = [&ctx, base, frame](uint32_t back, const std::function<void()>& call) {
+    CallFrom(ctx, base, frame, cm::kCutsceneFrame, back, call);
+  };
+  const cm::CutsceneCalls shot = ShotInitCalls(ctx, base);
+  const RivalLogoOpenCalls logo = RivalLogoOpenCallsAt(ctx, base, frame - 112);
+  cm::CutsceneConstructCalls calls;
+  calls.video_output = VideoOutput(ctx, base);
+  calls.free_all = [&] {
+    if (hooks::NativeHeapActive() && cm::AnimsFreeable(base)) {
+      cm::AnimsFreeAll(base, frame - 384 + 80);
+      return;
+    }
+    from_frame(0x82156E6C, [&] { __imp__sub_821507D8(ctx, base); });
+  };
+  calls.stages_copy = [&](uint32_t out, uint32_t stages, uint32_t stage) {
+    from_frame(0x82156ED0, [&] {
+      ctx.r3.u64 = out;
+      ctx.r4.u64 = stages;
+      ctx.r5.u64 = stage;
+      __imp__sub_820FFD88(ctx, base);
+    });
+  };
+  calls.scripts.insert32 = [&](uint32_t to, uint32_t from, uint32_t size, uint32_t back) {
+    from_frame(back, [&] { GuestMemcpy(ctx, base, 112, 0x821543E0, to, from, size); });
+  };
+  calls.scripts.insert608 = [&](uint32_t to, uint32_t from, uint32_t size, uint32_t back) {
+    from_frame(back, [&] { GuestMemcpy(ctx, base, 112, 0x82154450, to, from, size); });
+  };
+  calls.scripts.shot.copy32 = [&](uint32_t to, uint32_t from, uint32_t size) {
+    from_frame(0x82158B38, [&] { shot.copy32(to, from, size); });
+  };
+  calls.scripts.shot.insert32 = [&](uint32_t to, uint32_t from, uint32_t size) {
+    from_frame(0x82158B38, [&] { shot.insert32(to, from, size); });
+  };
+  calls.scripts.shot.load = [&](uint32_t id) {
+    from_frame(0x82158B38, [&] { shot.load(id); });
+  };
+  calls.open = [&](uint32_t id, uint32_t asset) {
+    uint32_t r3 = 0;
+    from_frame(0x82158F5C, [&] { r3 = logo.open(id, asset); });
+    return r3;
+  };
+  calls.load_xpr = [&](uint32_t holder, uint32_t id) {
+    uint32_t r3 = 0;
+    from_frame(0x82158F5C, [&] { r3 = logo.load_xpr(holder, id); });
+    return r3;
+  };
+  ctx.r3.u64 = cm::CutsceneConstruct(base, ctx.r3.u32, ctx.r4.u32, ctx.r5.u32, frame, calls);
+  ctx.lr = lr;
+}
+
+}  // namespace hooks
+
+ITC_CAMERA_MODES(82156CC0)

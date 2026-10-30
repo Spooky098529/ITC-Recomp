@@ -3773,6 +3773,280 @@ void DirectorInitStates(Context& h, Random& r) {
   results.Report();
 }
 
+// --- The cutscene's constructor (the third migration, batch 7) ---
+
+// The movie table swapped for one of the case's: ids 10 to 12, and with
+// `there` every logo's movie id (0x8200CD70 + 12 x logo, logos 0 to 24) with
+// the movie 0x12345678; room for 32 pairs. Put back by the case's Saved.
+void LogosTable(uint8_t* base, bool there) {
+  const uint32_t array = memory::crt::OperatorNewArray(base, 256).value_or(0);
+  uint32_t count = 0;
+  for (uint32_t k = 0; k < 3; k++, count++) {
+    guest::StoreU32(base, array + 8 * count, 10 + k);
+    guest::StoreU32(base, array + 8 * count + 4, 0x40000000 + k);
+  }
+  if (there) {
+    for (uint32_t logo = 0; logo < 25; logo++, count++) {
+      guest::StoreU32(base, array + 8 * count, guest::LoadU32(base, 0x8200CD70 + 12 * logo));
+      guest::StoreU32(base, array + 8 * count + 4, 0x12345678);
+    }
+  }
+  guest::StoreU32(base, ui_movies::kMovieTable + 0, array);
+  guest::StoreU32(base, ui_movies::kMovieTable + 4, 32);
+  guest::StoreU32(base, ui_movies::kMovieTable + 8, count);
+}
+
+// Cutscene::Cutscene on a cutscene of random bytes: a chase camera's world
+// for the viewport and the vehicle (CameraTarget::Track), the race data's
+// stage (0 to 2) with 0 to 4 racers (5 in the overflow cases: the fifth id
+// is the stage's count word, as the original reads it), six racer records
+// (+3936's bit 0x2 mostly set, +3960 the item id), the racers' manager's
+// entries (some missing, flag 0x400 random), 400 items (+35 the byte, +88
+// the kind halfword), the save data's flags (Stage::Of), the movie table
+// with the logos' movies or not, the camera animations' table empty, the
+// archive's loads recorded (CameraAnims::Load's and the movie's), the stack
+// random (the same for both: the frame words the scripts don't write are
+// copied into the lists). The first cases force each event (no racers, -1,
+// 27, 28, 181, 182, 376 to 399) and the byte path (0, 1, 2, 3, 0xFF; ids
+// in script 1's texture list or not) by giving every racer the same item.
+// Compared: the cutscene (floats where the tracker's are), the viewport,
+// the near plane, the frame (without its back chain and the saved
+// registers' 160 bytes) and the caller's +20, the animations' table, the
+// loads, the movie table, r3 and lr.
+void CutsceneConstructs(Context& h, Random& r) {
+  if (!ui_movies_game_hooks::OpenNative() || !hooks::NativeHeapActive() ||
+      !hooks::NativeArchiveQueue()) {
+    ITC_LOG_WARN("harness: camera_modes: Cutscene::Cutscene needs the UI movies' Open native "
+                 "(--native_heap, --native_c_runtime_heap, the archive's queue)");
+    return;
+  }
+  constexpr uint32_t kManager = 0x826D82F4;
+  constexpr uint32_t kVehicleArray = 0x826C2E34;
+  constexpr uint32_t kTables = 0x826C5CA0;
+  constexpr uint32_t kSaveData = 0x826C5B58;
+  constexpr uint32_t kLogo = 10760;
+  constexpr uint32_t kCutsceneBytes = kLogo + 96;
+  constexpr uint32_t kItems = 400;
+  constexpr uint32_t kItemBytes = 3008;
+  constexpr uint32_t kSaved = 160;  // f31, r14 to r31 and lr below the caller's frame
+  constexpr int16_t kTextureIds[] = {0,   5,   12,  20,  23,  29,  36,  44,  47,  53,  58,  65,
+                                     72,  78,  83,  92,  96,  104, 115, 119, 126, 133, 142, 150,
+                                     156, 159, 168, 175, 186, 195, 200, 210, 217, 222, 228, 232,
+                                     241, 245, 253, 262, 272, 277, 282, 289, 297, 304};
+  Saved saved_race(h.base, cm::kRaceData, 4);
+  Saved saved_manager(h.base, kManager, 4);
+  Saved saved_vehicles(h.base, kVehicleArray, 4);
+  Saved saved_tables(h.base, kTables, 4);
+  Saved saved_save(h.base, kSaveData, 4);
+  Saved saved_near(h.base, kPassNear, 4);
+  Saved saved_anims(h.base, cm::kAnims, kTableBytes);
+  Block race(kRaceBytes), manager(2400), entries(6 * 32), vehicles(7 * 6272), tables(32),
+      items(kItems * kItemBytes), save(6144), cutscene(kCutsceneBytes);
+  ChaseWorld w;
+  Fill(h.base, race.address, race.bytes, 0);
+
+  // The forced cases: an item id for every racer (-2: no racers) and the
+  // item's byte (-1: random).
+  struct Target {
+    int32_t id;
+    int32_t byte;
+  };
+  std::vector<Target> targets = {{-2, -1}, {-1, -1}, {int32_t(0xFFFF0000u), -1}};
+  for (int32_t id : {27, 28, 181, 182}) {
+    targets.push_back({id, -1});
+  }
+  for (int32_t id = 376; id <= 399; id++) {
+    targets.push_back({id, -1});
+  }
+  for (int32_t b : {0, 1, 2, 3, 0xFF}) {
+    targets.push_back({kTextureIds[uint32_t(b) % std::size(kTextureIds)], b});
+    targets.push_back({301 + b % 7, b});  // not in the texture list
+  }
+  const int forced = int(targets.size()) * 2;
+  const int overflow = 12;
+  const int cases = forced + overflow + 240;
+  // A random case's item id: the events, script 1's textures, any item, or
+  // a negative word (no item; its low halfword the event).
+  auto random_id = [&]() -> uint32_t {
+    switch (r.Below(6)) {
+      case 0: {
+        static constexpr int32_t kEvents[] = {-1, 27, 28, 181, 182};
+        return uint32_t(kEvents[r.Below(5)]);
+      }
+      case 1: return 376 + r.Below(24);
+      case 2: return uint32_t(kTextureIds[r.Below(uint32_t(std::size(kTextureIds)))]);
+      case 3: return 0x80000000u | uint32_t(r.Next());
+      default: return r.Below(kItems);
+    }
+  };
+  std::vector<int> scripts(31, 0), logos(26, 0), counts(8, 0);
+  int textured = 0;
+  Results results("Cutscene::Cutscene (sub_82156CC0)");
+  for (int c = 0; c < cases; c++) {
+    const bool is_forced = c < forced;
+    const bool is_overflow = !is_forced && c < forced + overflow;
+    const Target target = is_forced ? targets[size_t(c) % targets.size()] : Target{0, -1};
+    // The items: +35 mostly 0 to 3, +88 mostly 0 to 4.
+    for (uint32_t k = 0; k < kItems; k++) {
+      const uint32_t item = items.address + kItemBytes * k;
+      const uint32_t b = r.Below(8);
+      guest::StoreU8(h.base, item + 35,
+                     uint8_t(b < 6 ? r.Below(4) : b == 6 ? 0xFF : uint32_t(r.Next())));
+      guest::StoreU16(h.base, item + 88,
+                      uint16_t(r.Below(6) ? r.Below(5) : uint32_t(r.Next())));
+    }
+    // The stage and its racers.
+    const uint32_t stages = race.address + 0x59620;
+    const uint32_t stage = r.Below(3);
+    guest::StoreU32(h.base, stages + 804, stage);
+    const uint32_t at = stages + 80 * stage;
+    const uint32_t count = is_overflow                  ? 5
+                           : is_forced && target.id == -2 ? 0
+                           : is_forced                  ? 1 + r.Below(4)
+                                                        : r.Below(5);
+    guest::StoreU32(h.base, at + 76, count);
+    const std::vector<uint32_t> slots = Permutation(r, 6);
+    for (uint32_t s = 0; s < 4; s++) {
+      guest::StoreU32(h.base, at + 44 + 8 * s, r.Below(5) ? slots[s] : r.Below(6));
+    }
+    for (uint32_t id = 0; id < 6; id++) {
+      const uint32_t record = race.address + (id + 1) * kRecordBytes;
+      const bool set = is_forced || is_overflow || r.Below(4) != 0;
+      const uint32_t flags = uint32_t(r.Next());
+      guest::StoreU32(h.base, record, set ? (flags | 2) : (flags & ~2u));
+      uint32_t item = is_forced ? uint32_t(target.id) : random_id();
+      if (is_overflow && id == 5) {
+        item = 0;  // the fifth record's halfword over the count's high half: 0
+      }
+      guest::StoreU32(h.base, record + 24, item);
+    }
+    if (is_forced && target.byte >= 0) {
+      guest::StoreU8(h.base, items.address + kItemBytes * uint32_t(target.id) + 35,
+                     uint8_t(target.byte));
+    }
+    if (is_overflow) {
+      // Its byte over the count's third byte: 0 (else the vehicle's store
+      // lands far above the frame).
+      guest::StoreU8(h.base, items.address + 35, 0);
+    }
+    // The racers' manager: its entries' ids, flags and vehicles.
+    const uint32_t racers = r.Below(4) == 0 ? r.Below(7) : 6;
+    guest::StoreU32(h.base, manager.address + 2364, racers);
+    const std::vector<uint32_t> ids = Permutation(r, 6);
+    for (uint32_t n = 0; n < 6; n++) {
+      const uint32_t e = entries.address + 32 * n;
+      guest::StoreU32(h.base, manager.address + 2308 + 4 * n, e);
+      guest::StoreU32(h.base, e + 0, r.Below(2) ? (0x400 | uint32_t(r.Next()))
+                                                : (uint32_t(r.Next()) & ~0x400u));
+      guest::StoreU32(h.base, e + 20, r.Below(7));
+      guest::StoreU32(h.base, e + 24, ids[n]);
+    }
+    guest::StoreU32(h.base, tables.address + 16, items.address);
+    guest::StoreU32(h.base, save.address + 6092, r.Below(3) ? r.Below(128) : uint32_t(r.Next()));
+    w.Randomize(h.base, r);
+    RandomBytes(h.base, cutscene.address, cutscene.bytes, r);
+    const bool there = r.Below(3) == 0;
+    const uint64_t stack_seed = r.Next();
+    const auto cutscene_in = Read(h.base, cutscene.address, cutscene.bytes);
+    const auto viewport_in = Read(h.base, w.viewport.address, kViewportBytes);
+    uint32_t script = 0, logo = 0, records = 0;
+    Outputs out[2];
+    for (int v = 0; v < 2; v++) {
+      Saved table(h.base, ui_movies::kMovieTable, 12);
+      Write(h.base, cutscene.address, cutscene_in.data(), cutscene.bytes);
+      Write(h.base, w.viewport.address, viewport_in.data(), kViewportBytes);
+      guest::StoreU32(h.base, cm::kRaceData, race.address);
+      guest::StoreU32(h.base, kManager, manager.address);
+      guest::StoreU32(h.base, kVehicleArray, vehicles.address);
+      guest::StoreU32(h.base, kTables, tables.address);
+      guest::StoreU32(h.base, kSaveData, save.address);
+      guest::StoreU32(h.base, cm::kAnimCount, 0);
+      LogosTable(h.base, there);
+      PPCContext t = AlignedContext(h);
+      FillStackBytes(h.base, t.r1.u32, stack_seed, 4096);
+      guest::StoreU32(h.base, t.r1.u32 + 20, 0x5EEDF00D);
+      const uint32_t frame = t.r1.u32 - cm::kCutsceneFrame;
+      ArchiveLoads loads({int64_t(c), int64_t(c + 1), int64_t(c + 2), int64_t(c + 3),
+                          int64_t(c + 4), int64_t(c + 5)});
+      t.r3.u64 = cutscene.address;
+      t.r4.u64 = w.viewport.address;
+      t.r5.u64 = w.vehicle.address;
+      t.lr = 0x821592B4;
+      (v == 0 ? Original<__imp__sub_82156CC0> : hooks::CameraModesStep82156CC0)(t, h.base);
+      const uint32_t cs = cutscene.address;
+      out[v].Bytes(Read(h.base, cs, 32));
+      out[v].Floats(h.base, cs + 32, 56);
+      out[v].Bytes(Read(h.base, cs + 256, kCutsceneBytes - 256));
+      const uint32_t vp = w.viewport.address;
+      out[v].Bytes(Read(h.base, vp, 1600));
+      out[v].Floats(h.base, vp + 1600, 48);
+      out[v].Bytes(Read(h.base, vp + 1792, kViewportBytes - 1792));
+      out[v].Float(guest::LoadU32(h.base, kPassNear));
+      out[v].Bytes(Read(h.base, frame + 4, cm::kCutsceneFrame - 4 - kSaved));
+      out[v].Word(guest::LoadU32(h.base, t.r1.u32 + 20));
+      out[v].Bytes(Read(h.base, cm::kAnims, kTableBytes));
+      // The loads: the destinations' pages as 1 (LoadXpr's, the game's
+      // buffer [0x826A5134], as it is); a context that's a movie as 2, the
+      // logo's XPR holder as 3, CameraAnims::Load's record by its id.
+      const std::vector<uint32_t>& calls = loads.calls();
+      out[v].Word(uint32_t(calls.size()));
+      for (size_t k = 0; k < calls.size(); k++) {
+        const uint32_t word = calls[k];
+        if (k % 6 == 1 && word != 0 && word != guest::LoadU32(h.base, 0x826A5134) &&
+            memory::IsPages(word)) {
+          out[v].Word(1);
+          memory::FreePages(word);
+        } else if (k % 6 == 3 && memory::IsHeapBlock(word)) {
+          out[v].Word(2);
+        } else if (k % 6 == 3 && word == cs + kLogo + 20) {
+          out[v].Word(3);
+        } else if (k % 6 == 3 && word != 0 && memory::IsPages(word)) {
+          out[v].Word(4);
+          out[v].Word(guest::LoadU32(h.base, word));
+          memory::FreePages(word);
+        } else {
+          out[v].Word(word);
+        }
+      }
+      LogoTableOut(h.base, 0x12345678, out[v]);
+      out[v].Word(t.r3.u32);
+      out[v].Word(uint32_t(t.lr));
+      script = guest::LoadU32(h.base, cs + 352);
+      logo = script == 0xFFFFFFFFu ? 0xFFFFFFFFu : guest::LoadU32(h.base, cs + kLogo);
+      records = guest::LoadU32(h.base, frame + cm::kCutsceneRecordCount);
+      saved_race.Restore();
+      saved_manager.Restore();
+      saved_vehicles.Restore();
+      saved_tables.Restore();
+      saved_save.Restore();
+      saved_near.Restore();
+      saved_anims.Restore();
+    }
+    scripts[script < 30 ? script : 30]++;
+    logos[logo < 25 ? logo : 25]++;
+    counts[records < 7 ? records : 7]++;
+    if (script == 1 && int32_t(guest::LoadU32(h.base, cutscene.address + kLogo + 0)) == 0) {
+      textured++;
+    }
+    results.Check(out[0], out[1],
+                  fmt::format("case {}: racers {} item {} script {} logo {} there {}", c, count,
+                              is_forced ? target.id : -3, int32_t(script), int32_t(logo),
+                              there));
+  }
+  results.Report();
+  auto list = [](const std::vector<int>& seen) {
+    std::string text;
+    for (size_t i = 0; i < seen.size(); i++) {
+      text += fmt::format("{}{}:{}", i ? " " : "", i, seen[i]);
+    }
+    return text;
+  };
+  ITC_LOG_INFO("harness: Cutscene::Cutscene scripts (30: none) {}", list(scripts));
+  ITC_LOG_INFO("harness: Cutscene::Cutscene logos (25: none) {}", list(logos));
+  ITC_LOG_INFO("harness: Cutscene::Cutscene record counts (7: more) {}; script 1 cases {}",
+               list(counts), textured);
+}
+
 }  // namespace
 
 void CameraModes(Context& h) {
@@ -3802,6 +4076,7 @@ void CameraModes(Context& h) {
   TvSteps(h, r);
   GarageCameras(h, r);
   DirectorInitStates(h, r);
+  CutsceneConstructs(h, r);
 }
 
 }  // namespace harness
