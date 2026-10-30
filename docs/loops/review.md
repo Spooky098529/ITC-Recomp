@@ -14,7 +14,18 @@ When the user has reviewed a run's section, its heading gets
 ## Run 2026-10-30 23:03 (`b7-loop-30-10-26-2`)
 
 - `car-models.md` (already mapped; the map checked by the lead, not
-  remapped).
+  remapped). Migration 1's rows (9f71b49..233c175): `LoadSlot::LoadShared`
+  and `Load`, `LoadSetA` and `LoadSetB` (now Native; return `int64_t`,
+  as `Archive::Load`'s serial is sign-extended), `TeamEmblem`,
+  `LoadDecals`, `LoadExterior`, `SetVinylTextures`, `Wheels::SetUp` with
+  the rims and brakes (Native), `CarInterior::LoadSetCBody` and
+  `LoadParts`. For review: `GetLastError` (`sub_82296EC0` Native,
+  `sub_82295F18`, `functions.md`) ported as `last_error::Get` with no
+  flag, as B6's SetLastError; `LoadSetCBody`'s sprintf (only when the
+  node file is empty) follows the parking area's varargs call (r6-r10
+  spilled as 0); `LoadSetA` and the rims not seen in the attract race
+  (harness only); no frame dump (`LoadExterior` only makes the sheet and
+  queues loads: the sheet's bytes compared in the harness).
 
 ## Run 2026-10-30 11:39 (`b7-loop-30-10-26`)
 
