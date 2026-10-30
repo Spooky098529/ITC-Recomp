@@ -11,6 +11,7 @@
 #include "harness.h"
 
 #include "base/log.h"
+#include "helpers/clock.h"
 #include "hooks/heap.h"
 #include "hooks/xaudio.h"
 #include "hooks/xaudio_objects.h"
@@ -47,6 +48,17 @@ struct Block {
 
 void Store(uint8_t* base, uint32_t address, uint32_t value) {
   guest::StoreU32(base, address, value);
+}
+
+// The live spin lock (0x82954F10) after a call: whether this thread (r13
+// `thread`) owns it, and its depth when it does. The game's audio thread
+// takes it too while the harnesses run, so another thread's depth isn't
+// the case's (a case once read the audio thread's depth 1 in one version
+// only, 2026-10-30).
+void LockWords(Outputs& out, uint8_t* base, uint32_t thread) {
+  const bool owned = guest::LoadU32(base, xa::kSpinLock + 8) == thread;
+  out.Word(owned ? guest::LoadU32(base, xa::kSpinLock + 4) : 0);
+  out.Word(owned);
 }
 
 void R3(Outputs& out, uint64_t r3) {
@@ -628,8 +640,7 @@ void LockedCaseWith(Context& h, Results& results, uint32_t block, GuestFunction 
     }
     (v == 0 ? recompiled : native)(t, h.base);
     after(out[v], sp);
-    out[v].Word(guest::LoadU32(h.base, xa::kSpinLock + 4));
-    out[v].Word(guest::LoadU32(h.base, xa::kSpinLock + 8) == t.r13.u32);
+    LockWords(out[v], h.base, t.r13.u32);
     if (hold) {
       hooks::XAudioSpinRelease(lock, h.base);
     }
@@ -961,8 +972,7 @@ void SamplesCase(Context& h, Results& results, uint32_t block, uint32_t samples,
     }
     setup(random, t);
     (v == 0 ? recompiled : native)(t, h.base);
-    out[v].Word(guest::LoadU32(h.base, xa::kSpinLock + 4));
-    out[v].Word(guest::LoadU32(h.base, xa::kSpinLock + 8) == t.r13.u32);
+    LockWords(out[v], h.base, t.r13.u32);
     out[v].Bytes(Read(h.base, block, kBlockBytes));
     out[v].Floats(h.base, samples, kSamplesBytes / 4);
     R3(out[v], t.r3.u64);
@@ -2258,6 +2268,196 @@ void ReverbConstructionCases(Context& h) {
   memory::Free(small);
 }
 
+// The reverb's pass over a real reverb built as for ReverbCore::Process
+// (Reverb::Reverb and ReverbCore::Apply on its defaults, by the translated
+// code), the spin lock held around the call in half the cases.
+// I3dl2::SetParameter (sub_824696F0): r4 0 to 14 or a random word, r5 the
+// I3DL2 parameters (realistic or with edges). Reverb::Run (sub_82465258):
+// the pending bytes +188 (with a gain at +184), +189 (the native parameters
+// at +52 from I3dl2::ToNative's plain C++) and +190 (the I3DL2 ones at
+// +136) set by case, the stereo flag and the inputs random. Reverb::Process
+// (sub_82465428): two buffers (their interfaces at +8): the input's
+// channels 0 to 4, the output's capacity 6 channels (or 4: ClearThunk's
+// error), a fixed performance counter (both versions read the same) and
+// the timers random. Compared: the reverb object and the buffers' samples
+// as floats, the frames' words the originals write exactly (SetParameter's
+// +80 to +164, ToNative's +80, Apply's +80 to +124; the core's frame as its
+// own cases compare it), the spin lock's depth and owner, and r3.
+void ReverbPassCases(Context& h) {
+  const uint32_t reverb_block = memory::Alloc(kReverbBytes + 128, 0);
+  const uint32_t stack = memory::Alloc(kCoreStackBytes + 0x8000, 0);
+  const uint32_t io_block = memory::Alloc(0x2800 + 128, 0);
+  if (reverb_block == 0 || stack == 0 || io_block == 0) {
+    memory::Free(reverb_block);
+    memory::Free(stack);
+    memory::Free(io_block);
+    return;
+  }
+  const uint32_t stack_bytes = kCoreStackBytes + 0x8000;
+  const uint32_t reverb = (reverb_block + 127) & ~127u;
+  const uint32_t core = reverb + 16;
+  const uint32_t io = (io_block + 127) & ~127u;
+  // The samples: the input's two channels at +0, the output's six at +0x800;
+  // the pointer arrays at +0x2000, the descriptor at +0x2040, the buffers at
+  // +0x2100 and +0x2140, the I3DL2 parameters at +0x2200.
+  const uint32_t in_ptrs = io + 0x2000, out_ptrs = io + 0x2010, descriptor = io + 0x2040;
+  const uint32_t in_buffer = io + 0x2100, out_buffer = io + 0x2140, i3dl2 = io + 0x2200;
+  Fill(h.base, reverb, kReverbBytes, 0);
+  Fill(h.base, io, 0x2800, 0);
+  Fill(h.base, stack, stack_bytes, 0);
+  for (uint32_t k = 0; k < 2; k++) {
+    Store(h.base, in_ptrs + 4 * k, io + 0x400 * k);
+  }
+  for (uint32_t k = 0; k < 5; k++) {
+    Store(h.base, out_ptrs + 4 * k, io + 0x800 + 0x400 * k);
+  }
+  Store(h.base, descriptor + 4, 0x10);
+  const uint32_t top = stack + stack_bytes - 0x1000;
+  {
+    PPCContext t = CallContext(h);
+    t.r1.u64 = top;
+    t.r3.u64 = reverb;
+    t.r4.u64 = descriptor;
+    t.fpscr.loadFromHost();
+    __imp__sub_82465608(t, h.base);
+    t = CallContext(h);
+    t.r1.u64 = top;
+    t.r3.u64 = core;
+    t.r4.u64 = core + 52;
+    t.fpscr.loadFromHost();
+    __imp__sub_82467A18(t, h.base);
+  }
+  const std::vector<uint8_t> built = Read(h.base, reverb, kReverbBytes);
+  const auto store64 = [&](uint32_t at, uint64_t value) {
+    Store(h.base, at, uint32_t(value >> 32));
+    Store(h.base, at + 4, uint32_t(value));
+  };
+  // One kind of case: `setup(random, t)` the same for both versions on the
+  // built reverb and fresh random stack and samples; `extra(out, sp)` the
+  // frames' words.
+  const auto run = [&](Results& results, GuestFunction recompiled, GuestFunction native, int i,
+                       auto setup, auto extra) {
+    const Random start = h.random;
+    Random random = start;
+    Write(h.base, reverb, built.data(), kReverbBytes);
+    for (uint32_t k = 0; k < 0x2000; k += 4) {
+      Store(h.base, io + k, k < 0x800 ? Sample(random) : uint32_t(random.Next()));
+    }
+    for (uint32_t k = 0; k < stack_bytes; k += 4) {
+      Store(h.base, stack + k, uint32_t(random.Next()));
+    }
+    const uint32_t sp = top - 16 * uint32_t(i % 8);
+    PPCContext setup_t = CallContext(h);
+    setup(random, setup_t);
+    const std::vector<uint8_t> state = Read(h.base, reverb, kReverbBytes);
+    const std::vector<uint8_t> io_state = Read(h.base, io, 0x2800);
+    const std::vector<uint8_t> stack_state = Read(h.base, stack, stack_bytes);
+    const bool hold = i % 2 == 1;
+    Outputs out[2];
+    for (int v = 0; v < 2; v++) {
+      Write(h.base, reverb, state.data(), kReverbBytes);
+      Write(h.base, io, io_state.data(), 0x2800);
+      Write(h.base, stack, stack_state.data(), stack_bytes);
+      PPCContext t = setup_t;
+      t.r1.u64 = sp;
+      t.fpscr.loadFromHost();
+      PPCContext lock = t;
+      if (hold) {
+        hooks::XAudioSpinTake(lock, h.base);
+      }
+      (v == 0 ? recompiled : native)(t, h.base);
+      LockWords(out[v], h.base, t.r13.u32);
+      if (hold) {
+        hooks::XAudioSpinRelease(lock, h.base);
+      }
+      out[v].Floats(h.base, reverb, kReverbBytes / 4);
+      out[v].Floats(h.base, io, 0x2000 / 4);
+      out[v].Bytes(Read(h.base, io + 0x2000, 0x800));
+      extra(out[v], sp);
+      R3(out[v], t.r3.u64);
+    }
+    h.random = random;
+    results.Check(out[0], out[1], fmt::format("case {}{}", i, hold ? " (lock held)" : ""));
+  };
+  // The core's frame below a caller's frame at `frame`, as ReverbCore::Process's
+  // own cases compare it.
+  const auto core_frame = [&](Outputs& out, uint32_t frame) {
+    const uint32_t r1 = frame - kCoreFrameBytes;
+    out.Bytes(Read(h.base, r1 + 4, 396));
+    out.Floats(h.base, r1 + 400, (kCoreFrameBytes - kCoreSavesBytes - 400) / 4);
+    out.Word(guest::LoadU32(h.base, frame + 20));
+  };
+  {
+    Results results("I3dl2::SetParameter (sub_824696F0), with ReverbCore::Apply");
+    for (int i = 0; i < 32; i++) {
+      run(results, __imp__sub_824696F0, hooks::XAudioI3dl2SetParameter, i,
+          [&](Random& random, PPCContext& t) {
+            I3dl2Parameters(h.base, i3dl2, random, i >= 16);
+            t.r3.u64 = core;
+            t.r4.u64 = i < 30 ? uint32_t(i % 15) : uint32_t(random.Next());
+            t.r5.u64 = i3dl2;
+          },
+          [&](Outputs& out, uint32_t sp) {
+            out.Bytes(Read(h.base, sp - 192 + 80, 84));
+            out.Bytes(Read(h.base, sp - 192 - 128 + 80, 8));
+            out.Bytes(Read(h.base, sp - 192 - 432 + 80, 48));
+          });
+    }
+    results.Report();
+  }
+  {
+    Results results("Reverb::Run (sub_82465258), with ReverbCore::SetGain (sub_82467A00)");
+    for (int i = 0; i < 24; i++) {
+      run(results, __imp__sub_82465258, hooks::XAudioReverbRun, i,
+          [&](Random& random, PPCContext& t) {
+            const uint32_t pending = uint32_t(i % 8);
+            guest::StoreU8(h.base, core + 188, (pending & 1) ? 1 + random.Below(255) : 0);
+            guest::StoreU8(h.base, core + 189, (pending & 2) ? 1 : 0);
+            guest::StoreU8(h.base, core + 190, (pending & 4) ? 1 : 0);
+            Store(h.base, core + 184, i >= 16 ? AnyFloat(random)
+                                              : std::bit_cast<uint32_t>(float(random.Below(2001)) / 1000.0f));
+            I3dl2Parameters(h.base, core + 136, random, i >= 16);
+            xa::ReverbDefaults(h.base, core + 52);
+            I3dl2Parameters(h.base, i3dl2, random, false);
+            xa::I3dl2ToNative(h.base, i3dl2, core + 52, stack + 0x100);
+            Store(h.base, core + 100, random.Below(3));
+            t.r3.u64 = core;
+            t.r4.u64 = in_ptrs;
+            t.r5.u64 = out_ptrs;
+          },
+          [&](Outputs& out, uint32_t sp) { core_frame(out, sp - 144); });
+    }
+    results.Report();
+  }
+  {
+    Results results("Reverb::Process (sub_82465428), with Reverb::Run");
+    for (int i = 0; i < 24; i++) {
+      run(results, __imp__sub_82465428, hooks::XAudioReverbProcess, i,
+          [&](Random& random, PPCContext& t) {
+            static constexpr uint32_t kChannels[] = {1, 2, 1, 2, 0, 3, 4, 2};
+            Buffer(h.base, in_buffer, io, kChannels[i % 8]);
+            Buffer(h.base, out_buffer, io + 0x800, 2);
+            guest::StoreU8(h.base, out_buffer + 13, i % 12 == 11 ? 4 : 6);
+            store64(reverb + 0x4BAA0, random.Next());
+            store64(reverb + 0x4BAA8, random.Below(100000));
+            helpers::SetClocksForHarness(random.Next() >> 8, std::nullopt);
+            t.r3.u64 = reverb;
+            t.r4.u64 = in_buffer + 8;
+            t.r5.u64 = out_buffer + 8;
+          },
+          [&](Outputs& out, uint32_t sp) {
+            out.Bytes(Read(h.base, sp - 192 + 80, 84));
+            core_frame(out, sp - 192 - 144);
+          });
+    }
+    helpers::SetClocksForHarness(std::nullopt, std::nullopt);
+    results.Report();
+  }
+  memory::Free(reverb_block);
+  memory::Free(stack);
+  memory::Free(io_block);
+}
+
 // --- The PCM codec's pass ---
 
 // PcmCodec::Process (sub_8246D860) over a PCM codec at the block (as Codec
@@ -2413,6 +2613,7 @@ void XAudioObjects(Context& h) {
   ReverbApplyCases(h);
   ReverbInitCases(h);
   ReverbConstructionCases(h);
+  ReverbPassCases(h);
 }
 
 }  // namespace harness

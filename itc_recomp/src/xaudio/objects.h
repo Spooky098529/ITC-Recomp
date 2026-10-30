@@ -407,6 +407,45 @@ uint64_t ReverbConstruct(uint8_t* base, uint32_t reverb, uint32_t descriptor, ui
 uint64_t ReverbCreate(uint8_t* base, uint32_t descriptor, uint32_t allocator, uint32_t out,
                       uint32_t frame, const GuestCall& call);
 
+// --- The reverb's pass ---
+
+// I3dl2::SetParameter (sub_824696F0): the I3DL2 side at `object` (the
+// core): `index` 0 all 12 parameters from `value` (memcpy, 48 bytes, to
+// +4; its original through `call` where the plain C++ refuses), 1 to 12 one
+// of them (from `value` + 4 x (index - 1) to +4 x index: words for 1, 2, 6
+// and 8, floats copied as words for the rest); past 12 none. Then always:
+// ReverbCore::Defaults to `frame` + 80, I3dl2::ToNative from +4 into them
+// (in a frame below), ReverbCore::Apply on the core proper (the offset its
+// vtable's +4 holds) with them (in a frame below). `frame` is its (192
+// bytes). Returns Apply's r3.
+uint64_t I3dl2SetParameter(uint8_t* base, uint32_t object, uint32_t index, uint32_t value,
+                           uint32_t frame, const GuestCall& call);
+// Reverb::Run (sub_82465258): `core` the reverb's core (+16, all 64 bits),
+// `inputs` and `outputs` the channels' pointers. Under the voice lists'
+// spin lock (taken by `thread` as the original does), the changes pending:
+// +188 the gain (ReverbCore::SetGain, sub_82467A00, merged: +92 of the
+// core proper = the float at +184 x the float at 0x8200222C), +189
+// ReverbCore::Apply with the native parameters at +52, else +190
+// I3dl2::SetParameter 0 with the I3DL2 ones at +136 (each in a frame
+// below); the three bytes cleared. Then ReverbCore::Process on the core
+// proper for 256 frames (below `frame`). `frame` is its (144 bytes; no
+// words of its own). Returns Process's r3.
+uint64_t ReverbRun(uint8_t* base, uint64_t core, uint32_t inputs, uint32_t outputs,
+                   uint32_t thread, uint32_t frame, const GuestCall& call);
+// Reverb::Process (sub_82465428; slot +24 of 0x8204AAB0): the reverb at
+// `reverb`, `input` and `output` the buffers' interfaces. Both formats
+// (GetFormatThunk to `frame` + 120 and + 104), the output cleared as 6
+// channels at 48 kHz (ClearThunk, flags 3; its original through `call`
+// where that refuses), its error returned; the input's channels 0 nothing,
+// 1 or 2 (ReverbCore::SetStereo 1 or 0), more E_INVALIDARG; the channels'
+// pointers to +80 (the input's two, 1,024 bytes apart) and +144 (the
+// output's 0, 1, 2, 4 and 5); Reverb::Run (in a frame below) timed by the
+// performance counter (+88 and +96) into the reverb's +0x4BAA0 (the sum)
+// and +0x4BAA8 (the count). `frame` is its (192 bytes). Returns 0 or the
+// error.
+uint64_t ReverbProcess(uint8_t* base, uint32_t reverb, uint32_t input, uint32_t output,
+                       uint32_t thread, uint32_t frame, const GuestCall& call);
+
 // --- The PCM codec's pass ---
 
 // PcmCodec::Process (sub_8246D860; slot +24 of 0x8204BB48): one 256-frame

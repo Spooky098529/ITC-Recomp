@@ -45,7 +45,8 @@ uint64_t ReverbCoreProcess(uint8_t* base, uint64_t core, uint32_t inputs, uint32
 uint64_t ReverbCoreApply(uint8_t* base, uint32_t core, uint32_t params, uint32_t frame,
                          const GuestCall& call);
 // sub_82468848: the core's delay lines and filters set up at `lines` (the
-// core's +208): its defaults (+0 the vtable 0x8204A868, the words and floats
+// reverb's +208, the core's +192, from Reverb::Reverb; an I3DL2 side's +52
+// from I3dl2Params with a nonzero flag): its defaults (+0 the vtable 0x8204A868, the words and floats
 // to +100), each line's state and its fill (FillDelayLine), the low-passes
 // with FilterCoefficient, the gains with pow. No frame words. Returns r3 as
 // the original leaves it (`lines`).

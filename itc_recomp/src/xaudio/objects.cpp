@@ -10,6 +10,7 @@
 #include "c_runtime/math.h"
 #include "c_runtime/strings.h"
 #include "guest.h"
+#include "helpers/clock.h"
 #include "xaudio/engine.h"
 #include "xaudio/resampler.h"
 #include "xaudio/reverb_core.h"
@@ -22,6 +23,7 @@
 #include <climits>
 #include <cmath>
 #include <cstring>
+#include <utility>
 
 namespace xaudio {
 
@@ -1897,6 +1899,105 @@ uint64_t ReverbCreate(uint8_t* base, uint32_t descriptor, uint32_t allocator, ui
   }
   call(Method(base, reverb + 4, 12), 0x824657BC, At(frame, Args({object + 4})));
   return r3;
+}
+
+// --- The reverb's pass ---
+
+uint64_t I3dl2SetParameter(uint8_t* base, uint32_t object, uint32_t index, uint32_t value,
+                           uint32_t frame, const GuestCall& call) {
+  ITC_NATIVE_RUNNING("sub_824696F0 I3dl2::SetParameter");
+  if (index == 0) {
+    Copy(base, object + 4, value, 48, 0x8246976C, frame, call);
+  } else if (index <= 12) {
+    // Words for room, room HF, reflections and reverb (1, 2, 6, 8); the
+    // floats copied through f0 (lfs, stfs): their bits.
+    guest::StoreU32(base, object + 4 * index, guest::LoadU32(base, value + 4 * (index - 1)));
+  }
+  const uint32_t native = frame + 80;
+  ReverbDefaults(base, native);
+  I3dl2ToNative(base, object + 4, native, Below(base, frame, 128));
+  const uint32_t core = guest::LoadU32(base, guest::LoadU32(base, object) + 4) + object;
+  return ReverbCoreApply(base, core, native, Below(base, frame, 432), call);
+}
+
+uint64_t ReverbRun(uint8_t* base, uint64_t core64, uint32_t inputs, uint32_t outputs,
+                   uint32_t thread, uint32_t frame, const GuestCall& call) {
+  ITC_NATIVE_RUNNING("sub_82465258 Reverb::Run");
+  const uint32_t core = uint32_t(core64);
+  const auto proper = [&] { return guest::LoadU32(base, guest::LoadU32(base, core) + 4) + core64; };
+  SpinTake(base, thread, call);
+  if (guest::LoadU8(base, core + 188) != 0) {
+    // ReverbCore::SetGain (sub_82467A00), merged: fmuls, stfs.
+    const double gain = double(float(LoadSingle(base, core + 184) * LoadSingle(base, 0x8200222C)));
+    guest::StoreFloat(base, uint32_t(proper()) + 92, float(gain));
+  }
+  if (guest::LoadU8(base, core + 189) != 0) {
+    ReverbCoreApply(base, uint32_t(proper()), core + 52, Below(base, frame, 432), call);
+  } else if (guest::LoadU8(base, core + 190) != 0) {
+    I3dl2SetParameter(base, core, 0, core + 136, Below(base, frame, 192), call);
+  }
+  guest::StoreU8(base, core + 188, 0);
+  guest::StoreU8(base, core + 189, 0);
+  guest::StoreU8(base, core + 190, 0);
+  SpinRelease(base, thread, call);
+  return ReverbCoreProcess(base, proper(), inputs, outputs, frame);
+}
+
+uint64_t ReverbProcess(uint8_t* base, uint32_t reverb, uint32_t input, uint32_t output,
+                       uint32_t thread, uint32_t frame, const GuestCall& call) {
+  ITC_NATIVE_RUNNING("sub_82465428 Reverb::Process");
+  // GetFormat's r3 (always 0: these errors aren't reached).
+  for (const auto& [iface, out] : {std::pair{input, frame + 120}, std::pair{output, frame + 104}}) {
+    const int32_t result = int32_t(BufferGetFormatThunk(base, iface, out));
+    if (result < 0) {
+      return uint64_t(int64_t(result));
+    }
+  }
+  guest::StoreU8(base, frame + 104, 0);
+  guest::StoreU8(base, frame + 105, 6);
+  guest::StoreU32(base, frame + 108, 48000);
+  uint64_t cleared;
+  if (const auto result = BufferClearThunk(base, output, frame + 104, 3)) {
+    cleared = uint64_t(int64_t(int32_t(*result)));
+  } else {
+    call(kBufferClearThunk, 0x82465498, At(frame, Args({output, frame + 104, 3})));
+    cleared = LastCallR3();
+  }
+  if (int32_t(cleared) < 0) {
+    return cleared;
+  }
+  const uint32_t channels = guest::LoadU8(base, frame + 121);
+  if (channels < 1) {
+    return 0;
+  }
+  if (channels >= 3) {
+    return 0xFFFFFFFF80070057ull;  // E_INVALIDARG
+  }
+  const uint32_t core = reverb + 16;
+  ReverbSetStereo(base, guest::LoadU32(base, guest::LoadU32(base, core) + 4) + reverb + 16,
+                  channels == 1 ? 1 : 0);
+  const uint32_t in = guest::LoadU32(base, frame + 128);
+  guest::StoreU32(base, frame + 80, in);
+  guest::StoreU32(base, frame + 84, in + 1024);
+  const uint32_t out = guest::LoadU32(base, frame + 112);
+  guest::StoreU32(base, frame + 144, out);
+  guest::StoreU32(base, frame + 148, out + 1024);
+  guest::StoreU32(base, frame + 152, out + 2048);
+  guest::StoreU32(base, frame + 156, out + 4096);
+  guest::StoreU32(base, frame + 160, out + 5120);
+  const auto counter = [&](uint32_t at) {
+    const uint64_t count = helpers::PerformanceCounter();
+    REX_STORE_U64(at, count);
+  };
+  counter(frame + 88);
+  ReverbRun(base, core, frame + 80, frame + 144, thread, Below(base, frame, 144), call);
+  counter(frame + 96);
+  const uint32_t sum = reverb + 0x4BAA0, count = reverb + 0x4BAA8;
+  const uint64_t total = uint64_t(REX_LOAD_U64(sum)) - uint64_t(REX_LOAD_U64(frame + 88));
+  const uint64_t runs = uint64_t(REX_LOAD_U64(count)) + 1;
+  REX_STORE_U64(count, runs);
+  REX_STORE_U64(sum, total + uint64_t(REX_LOAD_U64(frame + 96)));
+  return 0;
 }
 
 // --- The PCM codec's pass ---

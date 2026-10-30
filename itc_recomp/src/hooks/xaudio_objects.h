@@ -122,4 +122,10 @@ void XAudioI3dl2ParamsConstruct(PPCContext& ctx, uint8_t* base);  // sub_8246984
 void XAudioReverbConstruct(PPCContext& ctx, uint8_t* base);       // sub_82465608
 void XAudioReverbCreate(PPCContext& ctx, uint8_t* base);          // sub_82465710
 
+// The reverb's pass (src/xaudio/objects.h; the spin lock taken by this
+// thread as the game does).
+void XAudioI3dl2SetParameter(PPCContext& ctx, uint8_t* base);  // sub_824696F0
+void XAudioReverbRun(PPCContext& ctx, uint8_t* base);          // sub_82465258
+void XAudioReverbProcess(PPCContext& ctx, uint8_t* base);      // sub_82465428
+
 }  // namespace hooks
