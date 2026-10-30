@@ -649,5 +649,56 @@ void PathEvaluate(uint8_t* base, uint32_t key, uint32_t out, uint32_t range, uin
 uint32_t TvConstruct(uint8_t* base, uint32_t camera, uint32_t viewport, uint32_t vehicle,
                      uint32_t frame, const VideoOutputCall& video_output,
                      const c_runtime::AtexitCall& atexit);
+// TvCamera::Step's guest calls: the copy c_runtime::Memcpy refuses (memcpy
+// from Step's frame, return address 0x8215634C), and CameraPath::Request
+// (the camera, a buffer, an index) from Step's frame with the return
+// address `back`.
+struct TvStepCalls {
+  GuestCopy copy;
+  std::function<void(uint32_t buffer, uint32_t index, uint32_t back)> request;
+};
+// sub_821562F8 TvCamera::Step: CameraTarget::Track; the track position
+// (+260) at `frame` + 80, the tracked point (+32, 16 bytes) and turn (+96,
+// 64 bytes, memcpy) at + 176 (the paths' transform); the +452 ranges updated
+// (RouteRange::Update), those the position is on listed (List40::Insert, a
+// list at `frame` + 256); none: nothing more. The spot (+360) kept when
+// listed and more than one is, else the first listed; its range's camera
+// slice (RouteRange::CameraAt). No path buffer (+43016) holding the spot:
+// each buffer empty or loaded (+24 0 or 3) asked for it unless its index is
+// the spot (CameraPath::Request, back 0x82156544). A buffer holding it and
+// loaded (3): its first 20-byte path record (+4 to +8) covering the slice
+// (+0 and +4 its two ends, either order); the slice's fraction (TrackRoute::
+// SliceFraction) and its place between the ends, clamped to 0-1;
+// +43520's state stepped (0 to 1, 1 to 2 near the far end, 2 to 0 back at the
+// near end); the record's key (+16) evaluated (CameraPath::Evaluate) into
+// +368, the viewport's zoom (+436), near plane, roll (+432), eye (+384),
+// target (+400), up (+1712) and look point (the tracked point) set. With
+// the slice changed from +352: +356 one past the record's far end (or
+// before its near end, going back), the record covering that (evaluated at
+// t 1.0 or 0.0 into `frame` + 96, its eye into the viewport's +1840), or,
+// none, the route's twelve links from the position's section: each on a
+// range (RouteRange::Test) not held by a buffer asked for (back 0x821568D8),
+// and +1840 the eye; +352 = the slice. `frame` is the original's r1 after
+// its stwu (720 bytes).
+void TvStep(uint8_t* base, uint32_t camera, uint32_t frame, const TvStepCalls& calls,
+            const c_runtime::AtexitCall& atexit);
+// TvCamera::Update's guest calls: Step's, the video output, a fallback
+// camera's slot 0 that isn't ChaseCamera::Update's (the function, the
+// camera), and ColorFilter::SetStyle's original where its plain C++ refuses.
+struct TvUpdateCalls {
+  TvStepCalls step;
+  VideoOutputCall video_output;
+  std::function<void(uint32_t function, uint32_t camera)> slot0;
+  std::function<void(uint32_t style)> set_style_original;
+};
+// sub_821593D8 TvCamera::Update (slot 0 of 0x820093BC): the fallback chase
+// camera's (+43136) slot 0 (ChaseCamera::Update, its frame 144 bytes
+// below); TvCamera::Step (its frame 720 bytes below) when +448 is 0. The
+// attract race's color filter: the style (0x826D82C8) = 0 once (guard bit
+// 1 of 0x826D82CC); while +43520 is 0, the style = (0, 1, 2, 3) at `frame`
+// + 80 by rand() % 4 (the signed remainder); ColorFilter::SetStyle(the
+// style). `frame` is the original's r1 after its stwu (128 bytes).
+void TvUpdate(uint8_t* base, uint32_t camera, uint32_t frame, const TvUpdateCalls& calls,
+              const c_runtime::AtexitCall& atexit);
 
 }  // namespace camera_modes

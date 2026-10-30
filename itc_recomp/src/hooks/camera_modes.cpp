@@ -65,7 +65,8 @@ ITC_FLAG_BOOL(native_camera_modes, true, "ITC",
               "Open and Delete natively where their adapters would); Cutscene::Step "
               "sub_82155A28 (no adapter: only Update's plain C++ calls it) and Update sub_821561F8 (the logo's draw "
               "through its override, sub_82211A28); the TV camera's TvCamera::TvCamera sub_82155288 "
-              "(with native atexit)) natively instead of "
+              "(with native atexit), TvCamera::Update sub_821593D8 with Step sub_821562F8 (with native "
+              "atexit; the attract race's color filter by rand)) natively instead of "
               "through the translated code (the same writes; checked by "
               "--run_harnesses=camera_modes)");
 
@@ -109,6 +110,31 @@ void GuestXMemCpy(PPCContext& ctx, uint8_t* base, uint32_t frame, uint32_t retur
     ctx.r4.u64 = source;
     ctx.r5.u64 = size;
     sub_82295890(ctx, base);
+  });
+}
+
+// A guest call from the frame at `frame` (the calling original's r1,
+// `frame_bytes` below its caller's) with the return address `back`.
+template <typename Call>
+void CallFrom(PPCContext& ctx, uint8_t* base, uint32_t frame, uint32_t frame_bytes,
+              uint32_t back, Call call) {
+  const uint64_t stack = ctx.r1.u64;
+  ctx.r1.u64 = frame + frame_bytes;
+  guest_call::InFrame(ctx, base, frame_bytes, back, [&](uint32_t) { call(); });
+  ctx.r1.u64 = stack;
+  ctx.fpscr.disableFlushMode();
+}
+
+// CameraPath::Request (r3 the TV camera, r4 the buffer, r5 the index)
+// through its step from a TV camera function's frame at `frame`
+// (`frame_bytes`) with the return address `back`.
+void PathRequestFrom(PPCContext& ctx, uint8_t* base, uint32_t frame, uint32_t frame_bytes,
+                     uint32_t back, uint32_t camera, uint32_t buffer, uint32_t index) {
+  CallFrom(ctx, base, frame, frame_bytes, back, [&] {
+    ctx.r3.u64 = camera;
+    ctx.r4.u64 = buffer;
+    ctx.r5.u64 = index;
+    hooks::CameraModesStep82152E08(ctx, base);
   });
 }
 
@@ -693,16 +719,10 @@ void CameraModesStep820F9B48(PPCContext& ctx, uint8_t* base) {
 void CameraModesStep82156980(PPCContext& ctx, uint8_t* base) {
   ctx.fpscr.disableFlushMode();
   const uint32_t camera = ctx.r3.u32;
-  cm::TvTrack(base, camera, ctx.r4.u32, ctx.r1.u32 - 496,
-              [&](uint32_t buffer, uint32_t index) {
-                guest_call::InFrame(ctx, base, 496, 0x82156B54, [&](uint32_t) {
-                  ctx.r3.u64 = camera;
-                  ctx.r4.u64 = buffer;
-                  ctx.r5.u64 = index;
-                  CameraModesStep82152E08(ctx, base);
-                });
-                ctx.fpscr.disableFlushMode();
-              });
+  const uint32_t frame = ctx.r1.u32 - 496;
+  cm::TvTrack(base, camera, ctx.r4.u32, frame, [&](uint32_t buffer, uint32_t index) {
+    PathRequestFrom(ctx, base, frame, 496, 0x82156B54, camera, buffer, index);
+  });
 }
 
 // CameraPath::Evaluate: r3 = the key, r4 = the camera's out, r5 = the
@@ -1062,18 +1082,6 @@ cm::RivalLogoCloseCalls RivalLogoCloseCallsAt(PPCContext& ctx, uint8_t* base, ui
   return calls;
 }
 
-// A guest call from the frame at `frame` (the calling original's r1,
-// `frame_bytes` below its caller's) with the return address `back`.
-template <typename Call>
-void CallFrom(PPCContext& ctx, uint8_t* base, uint32_t frame, uint32_t frame_bytes,
-              uint32_t back, Call call) {
-  const uint64_t stack = ctx.r1.u64;
-  ctx.r1.u64 = frame + frame_bytes;
-  guest_call::InFrame(ctx, base, frame_bytes, back, [&](uint32_t) { call(); });
-  ctx.r1.u64 = stack;
-  ctx.fpscr.disableFlushMode();
-}
-
 // Cutscene::Step's calls from its frame at `frame` (the original's r1, 192
 // bytes): CutsceneShot::Step's frame 304 bytes below it, RivalLogo::Close's
 // 128; RivalLogo::Play's original with --log_pause_movie (as its adapter);
@@ -1141,3 +1149,87 @@ void CameraModesStep821561F8(PPCContext& ctx, uint8_t* base) {
 
 ITC_CAMERA_MODES(822118E0)
 ITC_CAMERA_MODES(821561F8)
+
+// --- The TV camera's update ---
+
+namespace {
+
+// TvCamera::Step's guest calls from its frame at `frame` (720 bytes).
+cm::TvStepCalls TvStepCallsAt(PPCContext& ctx, uint8_t* base, uint32_t frame,
+                              uint32_t camera) {
+  cm::TvStepCalls calls;
+  calls.copy = [&ctx, base, frame](uint32_t to, uint32_t from, uint32_t size) {
+    CallFrom(ctx, base, frame, 720, 0x8215634C, [&] {
+      ctx.r3.u64 = to;
+      ctx.r4.u64 = from;
+      ctx.r5.u64 = size;
+      sub_825A7410(ctx, base);
+    });
+  };
+  calls.request = [&ctx, base, frame, camera](uint32_t buffer, uint32_t index, uint32_t back) {
+    PathRequestFrom(ctx, base, frame, 720, back, camera, buffer, index);
+  };
+  return calls;
+}
+
+}  // namespace
+
+namespace hooks {
+
+// TvCamera::Step (its only caller is TvCamera::Update): r3 = the TV camera. The original
+// with a stack pointer not 16-byte aligned (CameraTarget::Track's frame) or
+// without native atexit (CameraPath::Evaluate's spline static; its fallback
+// from SplinePoint's frame, 272 + 208 + 720 bytes below Step's).
+void CameraModesStep821562F8(PPCContext& ctx, uint8_t* base) {
+  if ((ctx.r1.u32 & 0xF) != 0 || !hooks::NativeAtexit()) {
+    __imp__sub_821562F8(ctx, base);
+    return;
+  }
+  ctx.fpscr.disableFlushMode();
+  const uint64_t lr = ctx.lr;
+  const uint32_t frame = ctx.r1.u32 - 720;
+  const uint32_t camera = ctx.r3.u32;
+  SplineAtexit atexit{ctx, base, frame - 272 - 208 - 720};
+  cm::TvStep(base, camera, frame, TvStepCallsAt(ctx, base, frame, camera), atexit.Call());
+  ctx.lr = lr;
+}
+
+// TvCamera::Update (vtable slot 0; CameraDirector::Update reads neither r3
+// nor f1 after): r3 = the TV camera; lr put back. The fallback chase
+// camera's update natively (its frame 144 bytes below Update's 128), else
+// its slot 0 through the translated code; Step's frame 720 bytes below.
+// The original where ChaseNative says no or without native atexit.
+void CameraModesStep821593D8(PPCContext& ctx, uint8_t* base) {
+  if (!ChaseNative(ctx, base) || !hooks::NativeAtexit()) {
+    __imp__sub_821593D8(ctx, base);
+    return;
+  }
+  ctx.fpscr.disableFlushMode();
+  const uint64_t lr = ctx.lr;
+  const uint32_t frame = ctx.r1.u32 - 128;
+  const uint32_t camera = ctx.r3.u32;
+  SplineAtexit atexit{ctx, base, frame - 720 - 272 - 208 - 720};
+  cm::TvUpdateCalls calls;
+  calls.step = TvStepCallsAt(ctx, base, frame - 720, camera);
+  calls.video_output = VideoOutput(ctx, base);
+  calls.slot0 = [&ctx, base, frame](uint32_t function, uint32_t chase) {
+    CallFrom(ctx, base, frame, 128, 0x82159408, [&] {
+      ctx.r3.u64 = chase;
+      ctx.ctr.u64 = function;
+      REX_CALL_INDIRECT_FUNC(function);
+    });
+  };
+  calls.set_style_original = [&ctx, base, frame](uint32_t style) {
+    CallFrom(ctx, base, frame, 128, 0x821594A0, [&] {
+      ctx.r3.u64 = style;
+      __imp__sub_82152108(ctx, base);
+    });
+  };
+  cm::TvUpdate(base, camera, frame, calls, atexit.Call());
+  ctx.lr = lr;
+}
+
+}  // namespace hooks
+
+ITC_CAMERA_MODES(821562F8)
+ITC_CAMERA_MODES(821593D8)

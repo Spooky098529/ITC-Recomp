@@ -16,8 +16,11 @@
 
 #include "base/log.h"
 #include "c_runtime/exit.h"
+#include "c_runtime/strings.h"
+#include "cameras/cameras.h"
 #include "guest.h"
 #include "matrix_math/matrix_math.h"
+#include "race_overlays/race_overlays.h"
 #include "track_route/track_route.h"
 #include "track_zones/track_zones.h"
 
@@ -926,6 +929,354 @@ void PathEvaluate(uint8_t* base, uint32_t key, uint32_t out, uint32_t range, uin
   }
   if (!target_moved) {
     Stfs(base, out + 40, Fmuls(Lfs(base, out + 40), flip));
+  }
+}
+
+
+// --- The TV camera's update ---
+
+namespace {
+
+uint64_t Load64(uint8_t* base, uint32_t a) {
+  return (uint64_t(Load(base, a)) << 32) | Load(base, a + 4);
+}
+void Store64(uint8_t* base, uint32_t a, uint64_t v) {
+  Store(base, a, uint32_t(v >> 32));
+  Store(base, a + 4, uint32_t(v));
+}
+void CopyWords(uint8_t* base, uint32_t to, uint32_t from, uint32_t words) {
+  for (uint32_t i = 0; i < words; i++) {
+    CopyWord(base, to + 4 * i, from + 4 * i);
+  }
+}
+
+// Whether a camera path's record (+0 and +4 the two ends of its slices, in
+// either order) covers the slice `x`, as TvCamera::Step's two walks test it
+// (unsigned compares).
+bool Covers(uint8_t* base, uint32_t record, uint32_t x) {
+  const uint32_t a = Load(base, record + 0);
+  if (!(x < a)) {
+    if (Load(base, record + 4) > x) {
+      return true;
+    }
+    if (x > a) {
+      return false;
+    }
+  }
+  return Load(base, record + 4) < x;
+}
+
+// The first record from the buffer's +4 to its +8 (20 bytes apart; the
+// first one tested whatever +8 holds) covering `x`, or 0.
+uint32_t CoveringRecord(uint8_t* base, uint32_t buffer, uint32_t x) {
+  uint32_t record = Load(base, buffer + 4);
+  while (!Covers(base, record, x)) {
+    record += 20;
+    if (record > Load(base, buffer + 8)) {
+      return 0;
+    }
+  }
+  return record;
+}
+
+// The four path buffers (+43016, 28 bytes apart: +12 the index, +24 the
+// state): those empty or loaded (0 or 3) whose index isn't `spot` asked
+// for `index`.
+void RequestFree(uint8_t* base, uint32_t camera, int32_t spot, uint32_t index, uint32_t back,
+                 const TvStepCalls& calls) {
+  for (uint32_t k = 0; k < 4; k++) {
+    const uint32_t buffer = camera + 43016 + 28 * k;
+    const int32_t state = int32_t(Load(base, buffer + 24));
+    if (state == 0 || state == 3) {
+      if (spot != int32_t(Load(base, buffer + 12))) {
+        calls.request(buffer, index, back);
+      }
+    }
+  }
+}
+
+}  // namespace
+
+void TvStep(uint8_t* base, uint32_t camera, uint32_t frame, const TvStepCalls& calls,
+            const c_runtime::AtexitCall& atexit) {
+  ITC_NATIVE_RUNNING("sub_821562F8 TvCamera::Step");
+  const uint32_t f = frame;
+  const uint32_t tracker = camera + 32;
+  TargetTrack(base, tracker, Load(base, camera + 16), f - 256);
+  // The track position at f + 80, the transform (the tracked point and the
+  // turn) at f + 176.
+  const uint32_t position = Load(base, camera + 260);
+  const uint64_t point_high = Load64(base, tracker + 8);
+  Store(base, f + 80, position);
+  Store64(base, f + 176, Load64(base, tracker + 0));
+  Store64(base, f + 184, point_high);
+  if (!c_runtime::Memcpy(base, f + 192, camera + 96, 64)) {
+    calls.copy(f + 192, camera + 96, 64);
+  }
+  // The ranges the position is on, listed (a 40-slot list at f + 256;
+  // List40::'s layout, its data words at f + 428).
+  const uint32_t list = f + 256;
+  for (uint32_t i = 0; i < 40; i++) {
+    StoreU16(base, list + 4 * i + 2, i);
+    StoreU16(base, list + 4 * i + 0, i + 1);
+  }
+  uint32_t ranges = Load(base, camera + 452);
+  StoreU16(base, f + 416, 0);
+  StoreU16(base, f + 412, 0xFFFF);
+  StoreU16(base, f + 422, 0xFFFF);
+  StoreU16(base, f + 420, 0xFFFF);
+  StoreU16(base, f + 418, 0xFFFF);
+  StoreU16(base, f + 424, 0);
+  uint32_t count = 0;
+  uint32_t head = 0xFFFF;
+  uint32_t i = 0;
+  Store(base, f + 88, i);
+  if (ranges > 0) {
+    do {
+      const track_zones::Position p{uint16_t(LoadU16(base, f + 80)),
+                                    uint16_t(LoadU16(base, f + 82))};
+      if (track_zones::RangeUpdate(base, camera + 456 + i * 1064, p) != 0) {
+        List40Insert(base, list, Load(base, f + 88), uint32_t(int32_t(int16_t(count))));
+        count = LoadU16(base, f + 424);
+      }
+      i++;
+      ranges = Load(base, camera + 452);
+      Store(base, f + 88, i);
+    } while (i < ranges);
+    head = LoadU16(base, f + 420);
+  }
+  const uint32_t listed = uint32_t(int32_t(int16_t(count)));
+  if (listed == 0) {
+    return;
+  }
+  auto node_at = [&](uint32_t j) {
+    uint32_t node = uint32_t(int32_t(int16_t(head))) * 4 + list;
+    for (uint32_t k = j; k != 0; k--) {
+      node = uint32_t(LoadS16(base, node)) * 4 + list;
+    }
+    return node;
+  };
+  auto data_of = [&](uint32_t node) {
+    return Load(base, uint32_t(LoadS16(base, node + 2)) * 4 + f + 428);
+  };
+  // The spot: the one kept (+360) when it's listed among more than one, else
+  // the first listed.
+  bool kept = false;
+  int32_t spot = 0;
+  if (listed > 1) {
+    const uint32_t current = Load(base, camera + 360);
+    for (uint32_t j = 0; j < listed; j++) {
+      if (current == data_of(node_at(j))) {
+        spot = int32_t(current);
+        kept = spot != -1;
+        break;
+      }
+    }
+  }
+  if (!kept) {
+    spot = int32_t(data_of(node_at(0)));
+  }
+  Store(base, camera + 360, uint32_t(spot));
+  const uint32_t range = camera + 456 + uint32_t(spot) * 1064;
+  const uint32_t slice = uint32_t(RangeCameraAt(base, range, f + 80));
+  // The path buffer holding the spot's path.
+  uint32_t buffer = 0;
+  bool held = false;
+  for (uint32_t k = 0; k < 4; k++) {
+    if (int32_t(Load(base, camera + 43028 + 28 * k)) == spot) {
+      buffer = camera + 28 * k + 43016;
+      held = true;
+      break;
+    }
+  }
+  if (!held || buffer == 0) {
+    for (uint32_t k = 0; k < 4; k++) {
+      const uint32_t b = camera + 43016 + 28 * k;
+      const int32_t state = int32_t(Load(base, b + 24));
+      if (state == 0 || state == 3) {
+        if (Load(base, camera + 360) != Load(base, b + 12)) {
+          calls.request(b, uint32_t(spot), 0x82156544);
+        }
+      }
+    }
+    return;
+  }
+  if (int32_t(Load(base, buffer + 24)) != 3) {
+    return;
+  }
+  const uint32_t record = CoveringRecord(base, buffer, slice);
+  if (record == 0) {
+    return;
+  }
+  // t: the slice's fraction plus its place between the record's ends, over
+  // their span, clamped to 0-1.
+  const uint32_t a = Load(base, record + 0);
+  const uint32_t b = Load(base, record + 4);
+  uint32_t low, high;
+  if (b > a) {
+    low = a;
+    high = b;
+  } else {
+    low = b;
+    high = a;
+  }
+  const int64_t span_words = int64_t(int32_t(high - low));
+  Store64(base, f + 88, uint64_t(span_words));
+  const double span = Single(double(span_words));
+  const double fraction = SliceFraction(base, f + 80, tracker, f);
+  const uint64_t past_words = uint64_t(slice - low);
+  const double along = Fdivs(fraction, span);
+  Store64(base, f + 88, past_words);
+  double past = Single(double(int64_t(past_words)));
+  const double zero = Lfs(base, kZero);
+  past = Fdivs(past, span);
+  const double one = Lfs(base, kOne);
+  double t = Fadds(along, past);
+  if (t < zero) {
+    t = zero;
+  } else if (t > one) {
+    t = one;
+  }
+  // The path's state (+43520): 0 to 1; 1 to 2 near the far end; 2 to 0 back
+  // at the near end.
+  const uint32_t state_at = camera + 43520;
+  const uint32_t state = Load(base, state_at);
+  if (state < 1) {
+    Store(base, state_at, 1);
+  } else if (state == 1) {
+    if (!(int32_t(high - 1) > int32_t(slice))) {
+      Store(base, state_at, 2);
+    }
+  } else if (state < 3) {
+    if (!(int32_t(low) < int32_t(slice))) {
+      Store(base, state_at, 0);
+    }
+  }
+  PathEvaluate(base, Load(base, record + 16), camera + 368, range, f + 176, t, f, atexit);
+  cameras::ViewportSetZoom(base, Load(base, camera + 20), Lfs(base, camera + 436));
+  {
+    const uint32_t viewport = Load(base, camera + 20);
+    const double zoom = Lfs(base, camera + 436);
+    const double ratio = Fdivs(Lfs(base, viewport + 1868), Lfs(base, viewport + 1864));
+    cameras::SetNear(base, Fmuls(ratio, zoom));
+  }
+  cameras::ViewportSetRoll(base, Load(base, camera + 20), Lfs(base, camera + 432));
+  CopyWords(base, Load(base, camera + 20) + 1600, camera + 384, 4);
+  CopyWords(base, Load(base, camera + 20) + 1616, camera + 400, 4);
+  {
+    const uint32_t viewport = Load(base, camera + 20);
+    CopyWords(base, viewport + 1632, viewport + 1712, 4);
+  }
+  CopyWords(base, Load(base, camera + 20) + 1648, tracker, 4);
+  // The slice changed since +352: the next record's (+356 past this
+  // record's end, the way the slice moved).
+  const int32_t last = int32_t(Load(base, camera + 352));
+  if (int32_t(slice) == last) {
+    return;
+  }
+  if (int32_t(slice) > last) {
+    uint32_t end = Load(base, record + 0);
+    const uint32_t other = Load(base, record + 4);
+    if (!(end > other)) {
+      end = other;
+    }
+    Store(base, camera + 356, end + 1);
+  } else if (int32_t(slice) < last) {
+    uint32_t end = Load(base, record + 0);
+    const uint32_t other = Load(base, record + 4);
+    if (!(end < other)) {
+      end = other;
+    }
+    Store(base, camera + 356, end - 1);
+  }
+  const uint32_t next = CoveringRecord(base, buffer, Load(base, camera + 356));
+  if (next != 0) {
+    Stfs(base, f + 124, one);
+    Stfs(base, f + 140, one);
+    Stfs(base, f + 156, one);
+    const double at = next < record ? one : zero;
+    PathEvaluate(base, Load(base, next + 16), f + 96, range, f + 176, at, f, atexit);
+    CopyWords(base, Load(base, camera + 20) + 1840, f + 112, 4);
+    Store(base, camera + 352, slice);
+    return;
+  }
+  // None: the position's section's twelve links, each on a range a path
+  // buffer doesn't hold asked for.
+  const uint32_t table = Load(base, Load(base, kRoute) + 12);
+  const uint32_t section = Load(base, table + (LoadU16(base, f + 80) << 2));
+  uint32_t link = section + 30;
+  for (uint32_t n = 12; n != 0; n--, link += 4) {
+    const uint32_t to = LoadU16(base, link - 2);
+    int32_t pick = -1;
+    const uint32_t to_slice = LoadU16(base, link);
+    StoreU16(base, f + 88, to);
+    StoreU16(base, f + 90, to_slice);
+    if (int16_t(to) == -1) {
+      continue;
+    }
+    uint32_t r = 0;
+    if (Load(base, camera + 452) > 0) {
+      uint32_t at = camera + 456;
+      do {
+        const track_zones::Position p{uint16_t(LoadU16(base, f + 88)),
+                                      uint16_t(LoadU16(base, f + 90))};
+        if (track_zones::RangeTest(base, at, p) == 2) {
+          pick = int32_t(r);
+          break;
+        }
+        r++;
+        at += 1064;
+      } while (r < Load(base, camera + 452));
+    }
+    bool has = false;
+    for (uint32_t k = 0; k < 4; k++) {
+      if (pick == int32_t(Load(base, camera + 43028 + 28 * k))) {
+        has = true;
+        break;
+      }
+    }
+    if (has) {
+      continue;
+    }
+    RequestFree(base, camera, spot, uint32_t(pick), 0x821568D8, calls);
+  }
+  CopyWords(base, Load(base, camera + 20) + 1840, camera + 384, 4);
+  Store(base, camera + 352, slice);
+}
+
+void TvUpdate(uint8_t* base, uint32_t camera, uint32_t frame, const TvUpdateCalls& calls,
+              const c_runtime::AtexitCall& atexit) {
+  ITC_NATIVE_RUNNING("sub_821593D8 TvCamera::Update");
+  constexpr uint32_t kStyle = 0x826D82C8;
+  constexpr uint32_t kGuard = 0x826D82CC;
+  const uint32_t chase = camera + 43136;
+  const uint32_t update = Load(base, Load(base, chase));
+  if (update == 0x82154808) {
+    ChaseUpdate(base, chase, frame - 144, calls.video_output);
+  } else {
+    calls.slot0(update, chase);
+  }
+  if (Load(base, camera + 448) == 0) {
+    TvStep(base, camera, frame - 720, calls.step, atexit);
+  }
+  // The attract race's color filter: none once, then while +43520 is 0 one
+  // of the four styles by rand.
+  const uint32_t guard = Load(base, kGuard);
+  if ((guard & 1) == 0) {
+    Store(base, kGuard, guard | 1);
+    Store(base, kStyle, 0);
+  }
+  if (Load(base, camera + 43520) == 0) {
+    Store(base, frame + 80, 0);
+    Store(base, frame + 84, 1);
+    Store(base, frame + 88, 2);
+    Store(base, frame + 92, 3);
+    const int32_t drawn = int32_t(race_overlays::Rand(base));
+    const int32_t pick = drawn % 4;
+    Store(base, kStyle, Load(base, frame + 80 + (uint32_t(pick) << 2)));
+  }
+  if (!ColorFilterSetStyle(base, kStyle)) {
+    calls.set_style_original(kStyle);
   }
 }
 

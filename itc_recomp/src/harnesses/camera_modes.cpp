@@ -28,6 +28,7 @@
 #include "memory/heap.h"
 #include "mode_tick/mode_tick.h"
 #include "post_effects/post_effects.h"
+#include "track_zones/track_zones.h"
 #include "ui_movies/game.h"
 
 #include <fmt/format.h>
@@ -3278,6 +3279,314 @@ void TvConstructs(Context& h, Random& r) {
   memory::Free(area);
 }
 
+// TvCamera::Step's and Update's outputs: the camera (floats where the
+// functions store floats), the fallback chase camera, the viewport.
+void TvStepOut(Outputs& out, uint8_t* base, const TvWorld& w) {
+  const uint32_t c = w.camera.address;
+  out.Bytes(Read(base, c, 32));
+  out.Floats(base, c + 32, 56);
+  out.Bytes(Read(base, c + 256, 112));
+  out.Bytes(Read(base, c + 368, 16));
+  out.Floats(base, c + 384, 8);
+  out.Bytes(Read(base, c + 416, 16));
+  out.Floats(base, c + 432, 2);
+  out.Bytes(Read(base, c + 440, 43136 - 440));
+  const uint32_t s = c + 43136;
+  out.Bytes(Read(base, s, 32));
+  out.Floats(base, s + 32, 56);
+  out.Bytes(Read(base, s + 256, 96));
+  out.Floats(base, s + 352, 5);
+  out.Bytes(Read(base, s + 372, 12));
+  out.Bytes(Read(base, c + 43520, kTvBytes - 43520));
+  const uint32_t v = w.chase.viewport.address;
+  out.Bytes(Read(base, v, 1600));
+  out.Floats(base, v + 1600, 64);
+  out.Bytes(Read(base, v + 1856, kViewportBytes - 1856));
+  out.Float(guest::LoadU32(base, kPassNear));
+}
+
+// TvCamera::Step's spot and camera slice as it will find them (the ranges'
+// updates and RouteRange::CameraAt natively, on the case's inputs, put back
+// after): what the cases' path buffers are made from, so that no buffer the
+// step would ask a path for (CameraPath::Request's real loads) is empty or
+// loaded. False when no range is listed.
+bool TvProbe(uint8_t* base, uint32_t camera, uint32_t position, uint32_t scratch,
+             int32_t* spot, uint32_t* slice) {
+  const auto camera_in = Read(base, camera, 43016);
+  const uint32_t count_in = guest::LoadU32(base, kSliceCountGlobal);
+  std::vector<uint32_t> listed;
+  const track_zones::Position p{uint16_t(position >> 16), uint16_t(position)};
+  for (uint32_t i = 0; i < guest::LoadU32(base, camera + 452); i++) {
+    if (track_zones::RangeUpdate(base, camera + 456 + 1064 * i, p) != 0) {
+      listed.push_back(i);
+    }
+  }
+  bool any = !listed.empty();
+  if (any) {
+    const uint32_t current = guest::LoadU32(base, camera + 360);
+    *spot = int32_t(listed[0]);
+    if (listed.size() > 1) {
+      for (const uint32_t i : listed) {
+        if (i == current) {
+          *spot = int32_t(current);
+        }
+      }
+    }
+    guest::StoreU32(base, scratch, position);
+    *slice = uint32_t(cm::RangeCameraAt(base, camera + 456 + 1064 * uint32_t(*spot), scratch));
+  }
+  Write(base, camera, camera_in.data(), 43016);
+  guest::StoreU32(base, kSliceCountGlobal, count_in);
+  return any;
+}
+
+// A camera path's key at `key` with its curves at `curves` (27 pairs, as
+// CameraPath::Evaluate's cases make them).
+void TvKey(uint8_t* base, uint32_t key, uint32_t curves, Random& r) {
+  RandomBytes(base, key, 216, r);
+  for (uint32_t p = 0; p < 27; p++) {
+    PathPair(base, key + 8 * p, curves + 0x200 * p, r, true);
+  }
+  for (const uint32_t at : {72u, 104u, 112u, 168u, 200u, 208u}) {
+    if (r.Below(2)) {
+      guest::StoreU32(base, key + at, 0);
+      const bool weight = at != 112 && at != 208;
+      guest::StoreU32(base, key + at + 4,
+                      r.Below(4) == 0 ? 0u
+                      : weight ? std::bit_cast<uint32_t>(float(r.Below(5)) / 4.0f)
+                               : std::bit_cast<uint32_t>(float(r.Below(400)) / 10.0f - 5.0f));
+    }
+  }
+}
+
+void TvSteps(Context& h, Random& r) {
+  if (!hooks::NativeAtexit()) {
+    ITC_LOG_WARN("harness: camera_modes: native atexit off: the TV camera's step skipped");
+    return;
+  }
+  std::lock_guard<std::recursive_mutex> lock(c_runtime::ExitMutex());
+  const uint32_t area = memory::Alloc(kRouteArea, 0);
+  const uint32_t table = memory::Alloc(4 * test_route::kTableEntries, 0);
+  test_route::FillTable(h.base, table, area);
+  Saved saved_route(h.base, kRouteGlobal, 4);
+  Saved saved_count(h.base, kSliceCountGlobal, 4);
+  Saved spline(h.base, kSplineStatic, kSplineStaticBytes);
+  Saved seed(h.base, kSeed, 4);
+  Saved shake(h.base, kShakeStatics, 8);
+  Saved statics(h.base, kChaseStatics, kChaseStaticsBytes);
+  Saved near(h.base, kPassNear, 4);
+  // The color filter's style and guard (0x826D82C8, 0x826D82CC), and a
+  // color filter of the case's (PostEffects::Get(2)).
+  constexpr uint32_t kStyle = 0x826D82C8;
+  Saved style(h.base, kStyle, 8);
+  Saved effect(h.base, post_effects::kEffects + 8, 4);
+  Block filter(8200);
+  Block filter_vtable(64);
+  for (uint32_t i = 0; i < 16; i++) {
+    guest::StoreU32(h.base, filter_vtable.address + 4 * i, 0);
+  }
+  guest::StoreU32(h.base, filter_vtable.address + 16, 0x821350F8);
+  guest::StoreU32(h.base, filter_vtable.address + 24, 0x82135138);
+  guest::StoreU32(h.base, filter_vtable.address + 28, 0x82135140);
+  const auto spline_made = Read(h.base, kSplineStatic, kSplineStaticBytes);
+  Block paths(0x8000);  // the records (+0) and two keys (+0x100, +0x200) with their curves
+  Block scratch(16);
+  TvWorld w;
+  const uint32_t cam = w.camera.address;
+  enum Kind { kStep, kUpdate };
+  const struct {
+    const char* name;
+    GuestFunction recompiled, native;
+    Kind kind;
+  } kFunctions[] = {
+      {"TvCamera::Step (sub_821562F8)", Original<__imp__sub_821562F8>,
+       hooks::CameraModesStep821562F8, kStep},
+      {"TvCamera::Update (sub_821593D8)", Original<__imp__sub_821593D8>,
+       hooks::CameraModesStep821593D8, kUpdate},
+  };
+  for (const auto& f : kFunctions) {
+    Results results(f.name);
+    int mode_counts[4] = {};
+    for (int c = 0; c < 200; c++) {
+      const test_route::Route route = PathRoute(h.base, area, table, r);
+      guest::StoreU32(h.base, kRouteGlobal, area + test_route::kFile);
+      w.chase.Randomize(h.base, r);
+      RandomBytes(h.base, cam, kTvBytes, r);
+      RandomFloats(h.base, cam + 32, 56, r);
+      RandomFloats(h.base, cam + 368, 18, r);
+      guest::StoreU32(h.base, cam + 16, w.chase.vehicle.address);
+      guest::StoreU32(h.base, cam + 20, w.chase.viewport.address);
+      guest::StoreU32(h.base, cam + 448, f.kind == kStep || r.Below(2) ? 0 : uint32_t(r.Next()) | 1);
+      const uint32_t ranges = c % 16 == 0 ? 0 : 1 + r.Below(40);
+      guest::StoreU32(h.base, cam + 452, ranges);
+      for (uint32_t i = 0; i < ranges; i++) {
+        PathRange(h.base, cam + 456 + 1064 * i, scratch.address, route, r, true);
+      }
+      // The car's track position (Vehicle::Identity +4, read back from the
+      // tracker's +228): often a range's start.
+      const uint32_t vehicle = w.chase.vehicle.address;
+      if (ranges > 0 && r.Below(4) != 0) {
+        const uint32_t start = guest::LoadU32(h.base, cam + 456 + 1064 * r.Below(ranges) + 4);
+        guest::StoreU32(h.base, vehicle + 5236, r.Below(2) ? start : start + r.Below(5) - 2);
+      } else {
+        test_route::RandomPosition(h.base, vehicle + 5236, route, r);
+      }
+      const uint32_t position = guest::LoadU32(h.base, vehicle + 5236);
+      guest::StoreU32(h.base, cam + 360,
+                      ranges > 0 && r.Below(2) ? r.Below(ranges) : uint32_t(r.Next()));
+      guest::StoreU32(h.base, cam + 43520, r.Below(3) == 0 ? r.Below(5) : 0);
+      // The path buffers from the probe: mode 0 a buffer holding the spot,
+      // loaded, with path records about the camera slice; 1 none holding
+      // it; 2 one holding it, not loaded. No buffer the step would ask for
+      // is empty or loaded.
+      int32_t spot = -1;
+      uint32_t slice = 0;
+      const bool listed = TvProbe(h.base, cam, position, scratch.address, &spot, &slice);
+      const uint32_t mode = r.Below(10) < 5 ? 0 : r.Below(2) + 1;
+      mode_counts[listed ? mode : 3]++;
+      const uint32_t first = r.Below(4);
+      const uint32_t busy[] = {1, 2, 4, 0x10000};
+      const uint32_t records = paths.address;
+      const uint32_t record_count = 1 + r.Below(6);
+      for (uint32_t k = 0; k < 4; k++) {
+        const uint32_t buffer = cam + 43016 + 28 * k;
+        RandomBytes(h.base, buffer, 28, r);
+        uint32_t index = uint32_t(spot) + 1 + r.Below(50);
+        uint32_t state = busy[r.Below(4)];
+        if (mode == 0 && k == first) {
+          index = uint32_t(spot);
+          state = 3;
+        } else if (mode == 0 && k > first && r.Below(2)) {
+          index = uint32_t(spot);
+          state = r.Below(2) ? 3 : busy[r.Below(4)];
+        } else if (mode == 2 && k == first) {
+          index = uint32_t(spot);
+        }
+        guest::StoreU32(h.base, buffer + 12, index);
+        guest::StoreU32(h.base, buffer + 24, state);
+        guest::StoreU32(h.base, buffer + 4, records);
+        guest::StoreU32(h.base, buffer + 8, records + 20 * (record_count - 1));
+      }
+      // The records: their ends about the camera slice; their keys one of
+      // two.
+      for (uint32_t i = 0; i < record_count; i++) {
+        const uint32_t record = records + 20 * i;
+        RandomBytes(h.base, record, 20, r);
+        for (const uint32_t at : {0u, 4u}) {
+          guest::StoreU32(h.base, record + at,
+                          r.Below(8) ? slice + r.Below(9) - 4 : uint32_t(r.Next()));
+        }
+        guest::StoreU32(h.base, record + 16, paths.address + (r.Below(2) ? 0x100 : 0x200));
+      }
+      TvKey(h.base, paths.address + 0x100, paths.address + 0x400, r);
+      TvKey(h.base, paths.address + 0x200, paths.address + 0x400 + 27 * 0x200, r);
+      guest::StoreU32(h.base, cam + 352, r.Below(3) == 0 ? slice : slice + r.Below(7) - 3);
+      guest::StoreU32(h.base, cam + 356, slice + r.Below(9) - 4);
+      // The fallback chase camera (Update's): ChaseCamera::Update's vtable.
+      {
+        const uint32_t s = cam + 43136;
+        guest::StoreU32(h.base, s, 0x82006B24);
+        guest::StoreU32(h.base, s + 16, vehicle);
+        guest::StoreU32(h.base, s + 20, w.chase.viewport.address);
+        RandomFloats(h.base, s + 32, 88, r);
+        guest::StoreU32(h.base, s + 380, r.Below(2) ? 0 : uint32_t(r.Next()) | 1);
+      }
+      auto spline_in = spline_made;
+      if (c % 3 == 0) {
+        spline_in[67] &= 0xFE;
+      }
+      uint32_t chase[kChaseStaticsBytes / 4];
+      for (auto& word : chase) {
+        word = ViewFloat(r);
+      }
+      chase[8] = 3;
+      const uint32_t seed_value = uint32_t(r.Next());
+      const uint32_t shake_step = ViewFloat(r);
+      const uint32_t guard = r.Below(2) ? 1u : uint32_t(r.Next());
+      const uint32_t style_in = r.Below(5);
+      const bool no_filter = c % 13 == 12;
+      RandomBytes(h.base, filter.address + 8064, 64, r);
+      const uint32_t count = uint32_t(r.Next());
+      const auto route_bytes = Read(h.base, area, kRouteArea);
+      const auto camera_in = Read(h.base, cam, kTvBytes);
+      const auto viewport_in = Read(h.base, w.chase.viewport.address, kViewportBytes);
+      const auto vehicle_in = Read(h.base, vehicle, 6272);
+      const auto paths_in = Read(h.base, paths.address, 0x8000);
+      const auto filter_in = Read(h.base, filter.address + 8064, 64);
+      Outputs out[2];
+      for (int v = 0; v < 2; v++) {
+        Write(h.base, area, route_bytes.data(), kRouteArea);
+        Write(h.base, cam, camera_in.data(), kTvBytes);
+        Write(h.base, w.chase.viewport.address, viewport_in.data(), kViewportBytes);
+        Write(h.base, vehicle, vehicle_in.data(), 6272);
+        Write(h.base, paths.address, paths_in.data(), 0x8000);
+        Write(h.base, filter.address + 8064, filter_in.data(), 64);
+        Write(h.base, kSplineStatic, spline_in.data(), kSplineStaticBytes);
+        guest::StoreU32(h.base, kRouteGlobal, area + test_route::kFile);
+        guest::StoreU32(h.base, kSliceCountGlobal, count);
+        guest::StoreU32(h.base, kSeed, seed_value);
+        guest::StoreU32(h.base, kShakeStatics, shake_step);
+        guest::StoreU32(h.base, kShakeStatics + 4, 1);
+        for (uint32_t i = 0; i < kChaseStaticsBytes / 4; i++) {
+          guest::StoreU32(h.base, kChaseStatics + 4 * i, chase[i]);
+        }
+        guest::StoreU32(h.base, kStyle, style_in);
+        guest::StoreU32(h.base, kStyle + 4, guard);
+        guest::StoreU32(h.base, filter.address, filter_vtable.address);
+        guest::StoreU32(h.base, post_effects::kEffects + 8, no_filter ? 0 : filter.address);
+        const uint32_t mark = exit_table::Mark(h.base);
+        PPCContext t = AlignedContext(h);
+        FillStackBytes(h.base, t.r1.u32, uint64_t(c) + 11, 4096);
+        t.r3.u64 = cam;
+        (v == 0 ? f.recompiled : f.native)(t, h.base);
+        TvStepOut(out[v], h.base, w);
+        // Step's frame: the words it writes (under Update, the fallback
+        // chase camera's callees' frames before it leave saved registers
+        // there, which native code doesn't write: only the words Step
+        // writes itself, when it runs).
+        const uint32_t frame = t.r1.u32 - (f.kind == kStep ? 720 : 128 + 720);
+        if (f.kind == kStep) {
+          out[v].Bytes(Read(h.base, frame + 80, 16));
+          out[v].Bytes(Read(h.base, frame + 176, 412));
+        } else if (guest::LoadU32(h.base, cam + 448) == 0) {
+          out[v].Bytes(Read(h.base, frame + 80, 12));
+          out[v].Bytes(Read(h.base, frame + 176, 250));
+        }
+        out[v].Word(guest::LoadU32(h.base, kSliceCountGlobal));
+        out[v].Word(guest::LoadU32(h.base, kSeed));
+        out[v].Bytes(Read(h.base, kStyle, 8));
+        out[v].Floats(h.base, filter.address + 8064, 16);
+        out[v].Bytes(Read(h.base, kShakeStatics, 8));
+        out[v].Floats(h.base, kChaseStatics, 8);
+        out[v].Bytes(Read(h.base, kChaseStatics + 32, 4));
+        out[v].Floats(h.base, kChaseStatics + 36, 2);
+        out[v].Bytes(Read(h.base, kSplineStatic + 64, 4));
+        out[v].Floats(h.base, kSplineStatic, 16);
+        if (f.kind == kUpdate) {
+          out[v].Bytes(Read(h.base, t.r1.u32 - 128 + 80, 16));
+        }
+        exit_table::Take(h.base, mark, out[v]);
+        spline.Restore();
+        seed.Restore();
+        shake.Restore();
+        statics.Restore();
+        near.Restore();
+        style.Restore();
+        effect.Restore();
+      }
+      results.Check(out[0], out[1], fmt::format("case {} ranges {} spot {} slice {:X} mode {}",
+                                                c, ranges, spot, slice, listed ? mode : 3));
+    }
+    ITC_LOG_INFO("harness: camera_modes: {} cases by path: {} loaded, {} not held, {} held "
+                 "not loaded, {} none listed",
+                 f.name, mode_counts[0], mode_counts[1], mode_counts[2], mode_counts[3]);
+    results.Report();
+  }
+  saved_route.Restore();
+  memory::Free(table);
+  memory::Free(area);
+}
+
 }  // namespace
 
 void CameraModes(Context& h) {
@@ -3304,6 +3613,7 @@ void CameraModes(Context& h) {
   RivalLogoOpenClose(h, r);
   CutsceneSteps(h, r);
   TvConstructs(h, r);
+  TvSteps(h, r);
 }
 
 }  // namespace harness
