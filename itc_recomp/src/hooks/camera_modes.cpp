@@ -21,7 +21,7 @@ ITC_FLAG_BOOL(native_camera_modes, true, "ITC",
               "Run the camera modes (docs/functions/camera-modes.md: the camera director's "
               "handlers CameraDirector::ToView4 sub_82152400, ToView5 sub_821524B8, ToView3 "
               "sub_821524D8 and ToView3IfCourse sub_82153160; Viewports::ResetRoll sub_821524F0, "
-              "Camera::ZoomFromFov sub_82152548, Quat::Rotate sub_821525F8, Matrix::FromQuat "
+              "Camera::ZoomFromFov sub_82152548, Quat::Rotate sub_821525F8 (no adapter: only ChaseCamera::Follow's plain C++ calls it), Matrix::FromQuat "
               "sub_82152698 (no adapter: only CameraTarget::Track's plain C++ calls it), Matrix::FromFloats sub_82090000; the lists' List40::Link "
               "sub_82153228 (no adapter: only List40::Insert's plain C++ calls it), "
               "List40::Insert sub_821544E0, List16::Insert20 sub_82154458 (no adapter: only IntroCamera::IntroCamera's plain C++ calls it), "
@@ -142,7 +142,8 @@ void CameraModesStep82152548(PPCContext& ctx, uint8_t* base) {
   ctx.f1.f64 = *zoom;
 }
 
-// Quat::Rotate: r3 = out, r4 = the quaternion, r5 = the vector.
+// Quat::Rotate (no adapter: only ChaseCamera::Follow's plain C++ calls it; the
+// step kept for the harness): r3 = out, r4 = the quaternion, r5 = the vector.
 void CameraModesStep821525F8(PPCContext& ctx, uint8_t* base) {
   ctx.fpscr.disableFlushMode();
   cm::QuatRotate(base, ctx.r3.u32, ctx.r4.u32, ctx.r5.u32);
@@ -810,7 +811,6 @@ ITC_CAMERA_MODES(821524D8)
 ITC_CAMERA_MODES(82153160)
 ITC_CAMERA_MODES(821524F0)
 ITC_CAMERA_MODES(82152548)
-ITC_CAMERA_MODES(821525F8)
 ITC_CAMERA_MODES(82090000)
 ITC_CAMERA_MODES(821544E0)
 ITC_CAMERA_MODES(82154378)
