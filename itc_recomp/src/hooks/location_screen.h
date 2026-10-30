@@ -58,4 +58,8 @@ void LocationScreenResetView(PPCContext& ctx, uint8_t* base);
 void LocationScreenApplyQueuedPage(PPCContext& ctx, uint8_t* base);
 void LocationScreenUpdatePage(PPCContext& ctx, uint8_t* base);
 
+// sub_8222F258 InitStates: r3 = the machine; r3 as the last
+// StateMachine::Add leaves it.
+void LocationScreenInitStates(PPCContext& ctx, uint8_t* base);
+
 }  // namespace hooks

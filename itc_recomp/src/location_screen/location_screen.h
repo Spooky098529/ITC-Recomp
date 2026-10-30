@@ -159,4 +159,12 @@ struct PageCall {
 void UpdatePage(uint8_t* base, uint32_t sp, uint32_t machine, uint32_t dispatcher,
                 const PageCall& call);
 
+// sub_8222F258 LocationScreen::InitStates (src/location_screen/init_states.cpp):
+// the 19 transitions added to `machine` (StateMachine::Add) from functors
+// built in its 1,360-byte frame (`frame`, the original's stores in order),
+// then the machine's +9604 = 0. Returns the last Add's r3 (an index when
+// `replaced`, else the new transition).
+constexpr uint32_t kInitStatesFrame = 1360;
+uint32_t InitStates(uint8_t* base, uint32_t machine, uint32_t frame, bool* replaced);
+
 }  // namespace location_screen

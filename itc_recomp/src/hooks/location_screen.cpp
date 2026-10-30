@@ -20,7 +20,8 @@ ITC_FLAG_BOOL(native_location_screen, true, "ITC",
               "UiMovie::Run through its override; ScreenMachine::Reenter sub_822895E0, Reset "
               "sub_822279A8 with ResetView sub_82227818 (no adapter: only Reset's plain C++ calls it), "
               "ApplyQueuedPage sub_8222C9B0, "
-              "UpdatePage sub_8222EC08, its page's handler through the guest context) "
+              "UpdatePage sub_8222EC08, its page's handler through the guest context; InitStates "
+              "sub_8222F258 over StateMachine::Add's plain C++) "
               "natively instead of through the translated code (the same writes; checked by "
               "--run_harnesses=location_screen)");
 
@@ -208,6 +209,15 @@ void LocationScreenUpdatePage(PPCContext& ctx, uint8_t* base) {
   ctx.lr = lr;
 }
 
+void LocationScreenInitStates(PPCContext& ctx, uint8_t* base) {
+  const uint64_t machine_r3 = ctx.r3.u64;
+  const uint32_t machine = ctx.r3.u32;
+  bool replaced = false;
+  const uint32_t r3 =
+      ls::InitStates(base, machine, ctx.r1.u32 - ls::kInitStatesFrame, &replaced);
+  ctx.r3.u64 = replaced ? r3 : machine_r3 + (r3 - machine);
+}
+
 }  // namespace hooks
 
 #define LOCATION_SCREEN_ADAPTER(address, step)  \
@@ -243,3 +253,4 @@ LOCATION_SCREEN_ADAPTER(822895E0, LocationScreenReenter)
 LOCATION_SCREEN_ADAPTER(822279A8, LocationScreenReset)
 LOCATION_SCREEN_ADAPTER(8222C9B0, LocationScreenApplyQueuedPage)
 LOCATION_SCREEN_ADAPTER(8222EC08, LocationScreenUpdatePage)
+LOCATION_SCREEN_ADAPTER(8222F258, LocationScreenInitStates)

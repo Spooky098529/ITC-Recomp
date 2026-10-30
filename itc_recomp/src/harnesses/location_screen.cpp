@@ -17,6 +17,7 @@
 #include "base/flags.h"
 #include "base/log.h"
 #include "data_tables/data_tables.h"
+#include "game_modes/game_modes.h"
 #include "hooks/location_screen.h"
 #include "hooks/ui_movies.h"
 #include "location_screen/location_screen.h"
@@ -575,6 +576,29 @@ void State(Context& h, const World& w) {
         __imp__sub_8222EC08, hooks::LocationScreenUpdatePage, {{{-240 + 80, 64}}});
 }
 
+// InitStates on a machine at the movies block's start: emptied
+// (StateMachine::StateMachine, count and state 0), and in half the cases
+// set up once already by the original (so every Add replaces); the frame
+// (random words, the same for both) compared but the register saves.
+void InitStates(Context& h, const World& w) {
+  uint8_t* const base = h.base;
+  Group(h, w, "LocationScreen::InitStates (sub_8222F258)", 20,
+        [&h, base](Random& r, const World& w) {
+          const uint32_t machine = w.movies.address;
+          game_modes::StateMachineConstruct(base, machine);
+          guest::StoreU32(base, machine + game_modes::kTransitionCount, 0);
+          guest::StoreU32(base, machine + game_modes::kState, r.Below(12));
+          if (r.Below(2) == 0) {
+            PPCContext t = CallContext(h);
+            t.r3.u64 = machine;
+            __imp__sub_8222F258(t, base);
+          }
+        },
+        [](PPCContext& t, Random&, const World& w) { t.r3.u64 = w.movies.address; },
+        __imp__sub_8222F258, hooks::LocationScreenInitStates,
+        {{{-int32_t(ls::kInitStatesFrame) + 80, 1232}}});
+}
+
 }  // namespace
 
 void LocationScreen(Context& h) {
@@ -591,6 +615,7 @@ void LocationScreen(Context& h) {
   Lists(h, w);
   Movies(h, w);
   State(h, w);
+  InitStates(h, w);
 }
 
 }  // namespace harness
