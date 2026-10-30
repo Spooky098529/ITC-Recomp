@@ -65,7 +65,9 @@ file's history. What's left to see in a drive, from every run:
 - Subsystem 3 of 3: the front-end menus (`sub_822271F8`...
   `sub_8222C300`, the readiness ranking's other top lead, 44 ready
   groups). Mapped (3bf92d8, `location-screen.md`: the lead was one
-  career screen, the player at one of six locations; 99 rows, 77 in
+  screen, the parking area (the user, 2026-10-30: the player loads
+  into it, picks one of up to 6 opponent cars and races; the other way
+  to start a race besides driving on the highway); 99 rows, 77 in
   play, 32 ready groups, no stop; blocked outside by the UI movies'
   text setters, the menu sound and input, the scene and its models,
   the scenery's set-up and teardown, `XPR::GetTexture`). Migration 1

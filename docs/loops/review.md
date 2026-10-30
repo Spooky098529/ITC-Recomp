@@ -121,7 +121,11 @@ When the user has reviewed a run's section, its heading gets
   differed by NaN sign only).
 - The location screen's map (3bf92d8): `functions/location-screen.md`,
   99 new rows (77 seen in play): the lead's "front-end menus" are one
-  career screen (save data +6108, locations 14-19): the location's
+  screen, the parking area (the user's correction, 2026-10-30: the
+  player loads into it, picks one of up to 6 opponent cars and races,
+  the other way to start a race besides the highway; the file's
+  intro updated by the migration agent) (save data +6108, locations
+  14-19): the location's
   scenery through camera animations, its opponents posed as cars, UI
   movies 21 and 30, XPR pictures; its state machine at +9640 of a
   28,940-byte block at a front-end mode's +848 (which mode type isn't
