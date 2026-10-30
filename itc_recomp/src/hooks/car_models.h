@@ -38,6 +38,13 @@ void CarModelsSetVinylTextures(PPCContext& ctx, uint8_t* base);
 // last LoadSlot::LoadShared's (the original where memcpy's copy can't be
 // native).
 void CarModelsWheelsSetUp(PPCContext& ctx, uint8_t* base);
+// CarInterior::LoadSetCBody sub_820D67E8: r3 = the object, r4 = its set-up;
+// r3 the last LoadShared's. Natively only while --native_heap routes
+// VirtualAlloc to the layer, and where memcpy's copy is native.
+// CarInterior::LoadParts sub_820D7730: r3 = the object, r4 = the first id,
+// r5 = the stride, r6 = the offset; r3 the last LoadShared's.
+void CarModelsCockpitLoadSetC(PPCContext& ctx, uint8_t* base);
+void CarModelsInteriorLoadParts(PPCContext& ctx, uint8_t* base);
 // sub_820C3F50: r3 = the set (left), r4 to r7 the record's words.
 void CarModelsDeferRelease(PPCContext& ctx, uint8_t* base);
 

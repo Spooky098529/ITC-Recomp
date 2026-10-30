@@ -25,7 +25,8 @@ ITC_FLAG_BOOL(native_car_models, true, "ITC",
               "LoadSetB sub_820D5AC0), the team "
               "emblem sub_820D3CF8, CarModel::LoadDecals sub_820D5B50 and SetVinylTextures "
               "sub_820D5F88, the wheels' set-up sub_820D9110 (with the rims sub_820D8BA8 and brakes "
-              "sub_820D8C50), with --native_heap LoadSlot::ReleaseBuffer sub_820D0758, and the "
+              "sub_820D8C50), with --native_heap CarInterior::LoadSetCBody sub_820D67E8, "
+              "CarInterior::LoadParts sub_820D7730, with --native_heap LoadSlot::ReleaseBuffer sub_820D0758, and the "
               "deferred release sub_820C3F50; with --native_heap and the memory blocks' host lock "
               "CarModel::Release sub_820D4508; with --native_heap the vinyl sheet's texture, "
               "Texture::Create sub_820ECF08 and Texture::Free sub_820ECFC8; the decals' TGA "
@@ -106,6 +107,22 @@ void CarModelsWheelsSetUp(PPCContext& ctx, uint8_t* base) {
     return;
   }
   __imp__sub_820D9110(ctx, base);
+}
+
+void CarModelsCockpitLoadSetC(PPCContext& ctx, uint8_t* base) {
+  if (hooks::NativeHeapActive()) {
+    if (const auto r3 = cm::CockpitLoadSetC(base, ctx.r3.u32, ctx.r4.u32, ctx.r1.u32, ctx.r13.u32,
+                                            hooks::NativeArchiveLoad(base))) {
+      ctx.r3.u64 = *r3;
+      return;
+    }
+  }
+  __imp__sub_820D67E8(ctx, base);
+}
+
+void CarModelsInteriorLoadParts(PPCContext& ctx, uint8_t* base) {
+  ctx.r3.u64 = cm::InteriorLoadParts(base, ctx.r3.u32, ctx.r4.u32, ctx.r5.u32, ctx.r6.u32,
+                                     hooks::NativeArchiveLoad(base));
 }
 
 void CarModelsDeferRelease(PPCContext& ctx, uint8_t* base) {
@@ -238,6 +255,8 @@ ITC_CAR_MODELS(820D5B50, CarModelsLoadDecals)
 ITC_CAR_MODELS(820D5EC8, CarModelsLoadExterior)
 ITC_CAR_MODELS(820D5F88, CarModelsSetVinylTextures)
 ITC_CAR_MODELS(820D9110, CarModelsWheelsSetUp)
+ITC_CAR_MODELS(820D67E8, CarModelsCockpitLoadSetC)
+ITC_CAR_MODELS(820D7730, CarModelsInteriorLoadParts)
 ITC_CAR_MODELS(820D4508, CarModelsCarModelRelease)
 ITC_CAR_MODELS(820ECF08, CarModelsTextureCreate)
 ITC_CAR_MODELS(820ECFC8, CarModelsTextureFree)

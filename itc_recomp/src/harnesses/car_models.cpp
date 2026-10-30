@@ -1283,7 +1283,8 @@ void Loads(Context& h, uint32_t block) {
   const auto run = [&](Results& results, int cases, GuestFunction recompiled,
                        GuestFunction native,
                        const std::function<void(PPCContext&, Random&)>& setup,
-                       const std::vector<uint32_t>& page_words, const char* what) {
+                       const std::vector<uint32_t>& page_words, const char* what,
+                       const std::function<void(const PPCContext&, Outputs&)>& extra = nullptr) {
     for (int c = 0; c < cases; c++) {
       const uint64_t seed = h.random.Next();
       Outputs out[2];
@@ -1300,6 +1301,9 @@ void Loads(Context& h, uint32_t block) {
         const uint32_t r3 = t.r3.u32;
         const bool r3_pages = r3 != 0 && memory::IsPages(r3);
         TakePages(h.base, page_words, *loads, out[v]);
+        if (extra) {
+          extra(t, out[v]);
+        }
         out[v].Bytes(Read(h.base, block, kBlockBytes));
         out[v].Word(r3_pages ? kMarker : r3);
         out[v].Word(uint32_t(t.r3.u64 >> 32));
@@ -1401,6 +1405,67 @@ void Loads(Context& h, uint32_t block) {
     Results results("LoadSlot::Load (sub_820D07C8)");
     run(results, 32, __imp__sub_820D07C8, hooks::CarModelsLoadSlotLoad, shared, {slot + 16},
         "own");
+    results.Report();
+  }
+  {
+    // CarInterior::LoadSetCBody: the set-up (random, the five parts' numbers
+    // small) copied over the object; the car's block 0 to 44, larger now and
+    // then, and every fourth case one whose node file is empty (sprintf's
+    // path; its text in the frame compared).
+    uint32_t empty_block = 0;
+    for (uint32_t b = 45; b < 4000 && empty_block == 0; b++) {
+      if (archive::AssetSize(h.base, 19928 + 55 * b) == 0) {
+        empty_block = b;
+      }
+    }
+    if (empty_block == 0) {
+      ITC_LOG_WARN("harness: car_models: no block with an empty node file: no sprintf cases");
+    }
+    Results results("CarInterior::LoadSetCBody (sub_820D67E8)");
+    const uint32_t object = block + 0x100;
+    const uint32_t setup = block + 0x3000;
+    int c = 0;
+    run(results, 32, __imp__sub_820D67E8, hooks::CarModelsCockpitLoadSetC,
+        [&](PPCContext& t, Random& r) {
+          Put(h.base, object + 24, block + 0x3E00);
+          const bool empty = empty_block != 0 && (c++ / 2) % 4 == 3;
+          Put(h.base, block + 0x3E20,
+              empty ? empty_block : r.Below(6) == 0 ? 45 + r.Below(100) : r.Below(45));
+          for (uint32_t i = 0; i < 5; i++) {
+            Put(h.base, setup + 4 * i, r.Below(4));
+          }
+          guest::StoreU32(h.base, set + car_models::kSharedBufferSize,
+                          r.Below(4) == 0 ? r.Below(0x10000) : 0x200000);
+          RandomBytes(h.base, t.r1.u32 - 1152 + 80, 128, r);
+          t.r3.u64 = object;
+          t.r4.u64 = setup;
+        },
+        {object + 192}, "cockpit",
+        [&](const PPCContext& t, Outputs& out) {
+          out.Bytes(Read(h.base, t.r1.u32 - 1152 + 80, 128));
+        });
+    results.Report();
+  }
+  {
+    // CarInterior::LoadParts: the three calls CarInterior::Load makes, and
+    // random ones.
+    static constexpr uint32_t kCalls[3][3] = {{891, 226, 219}, {11061, 197, 190}, {19926, 55, 49}};
+    Results results("CarInterior::LoadParts (sub_820D7730)");
+    const uint32_t object = block + 0x100;
+    run(results, 24, __imp__sub_820D7730, hooks::CarModelsInteriorLoadParts,
+        [&](PPCContext& t, Random& r) {
+          Put(h.base, object + 24, block + 0x3E00);
+          Put(h.base, block + 0x3E20,
+              r.Below(6) == 0 ? uint32_t(r.Next()) : r.Below(45));
+          const uint32_t k = r.Below(4);
+          t.r3.u64 = object;
+          t.r4.u64 = k < 3 ? kCalls[k][0] : r.Below(20000);
+          t.r5.u64 = k < 3 ? kCalls[k][1] : uint32_t(r.Next());
+          t.r6.u64 = k < 3 ? kCalls[k][2] : r.Below(300);
+          guest::StoreU32(h.base, set + car_models::kSharedBufferSize,
+                          r.Below(4) == 0 ? r.Below(0x10000) : 0x200000);
+        },
+        {}, "interior parts");
     results.Report();
   }
   const uint32_t car = block + 0x100;
