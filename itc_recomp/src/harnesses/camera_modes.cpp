@@ -4047,6 +4047,95 @@ void CutsceneConstructs(Context& h, Random& r) {
                list(counts), textured);
 }
 
+// --- CameraDirector::SetMode: views 0 to 7 (and a wild one), split screen
+// or not, the followed player 0 to 3 (2 and 3 read the frame's next words,
+// as the original does), the two racers there or not (bit 0x40, a null
+// racer); the six constructors answered by a stand-in that records its
+// function, registers, stack pointer and return address (their own
+// harnesses cover them); the director's words, both viewports, the frame's
+// two vehicles, the calls and r3 compared ---
+
+struct ConstructCall {
+  uint32_t words[6];
+};
+std::vector<ConstructCall>* g_construct_calls = nullptr;
+
+uint32_t RecordConstruct(uint32_t function, uint32_t r3, uint32_t r4, uint32_t r5, uint32_t r1,
+                         uint32_t lr) {
+  if (g_construct_calls) {
+    g_construct_calls->push_back({{function, r3, r4, r5, r1, lr}});
+  }
+  return (r3 & 1) ? 0 : r3 ^ 0x13579BDF;
+}
+
+void DirectorSetModes(Context& h, Random& r) {
+  constexpr uint32_t kManager = 0x826D82F4;
+  constexpr uint32_t kVehicleArray = 0x826C2E34;
+  Results results("CameraDirector::SetMode (sub_821591F0)");
+  Saved saved_viewports(h.base, cm::kViewports, 4);
+  Saved saved_manager(h.base, kManager, 4);
+  Saved saved_vehicles(h.base, kVehicleArray, 4);
+  Block director(kDirectorBytes), holder(12), first(kViewportBytes), second(kViewportBytes),
+      manager(2400), racers(64), vehicles(7 * 6272);
+  hooks::SetCameraConstructStandIn(RecordConstruct);
+  const uint32_t frame = CallContext(h).r1.u32 - 176;
+  for (int c = 0; c < 300; c++) {
+    const uint32_t view = c < 16 ? uint32_t(c % 8) : r.Below(12) ? r.Below(8) : uint32_t(r.Next());
+    const uint32_t split = r.Below(2) ? 0 : (r.Below(4) ? 1 : uint32_t(r.Next()));
+    const uint32_t followed = r.Below(4) ? r.Below(2) : 2 + r.Below(2);
+    const uint64_t seed = r.Next();
+    Outputs out[2];
+    for (int v = 0; v < 2; v++) {
+      Random w(seed);
+      RandomBytes(h.base, director.address + cm::kView - 16, 32, w);
+      RandomBytes(h.base, director.address + cm::kCurrentCamera, 8, w);
+      guest::StoreU32(h.base, director.address + cm::kFollowed, followed);
+      RandomBytes(h.base, first.address, kViewportBytes, w);
+      RandomBytes(h.base, second.address, kViewportBytes, w);
+      RandomFloats(h.base, first.address + 1600, 48, w);
+      RandomFloats(h.base, second.address + 1600, 48, w);
+      guest::StoreU32(h.base, holder.address + 0, first.address);
+      guest::StoreU32(h.base, holder.address + 4, second.address);
+      guest::StoreU32(h.base, holder.address + 8, split);
+      guest::StoreU32(h.base, cm::kViewports, holder.address);
+      for (uint32_t i = 0; i < 2; i++) {
+        const uint32_t racer = racers.address + 32 * i;
+        const uint32_t pick = w.Below(5);
+        guest::StoreU32(h.base, manager.address + (577 + i) * 4, pick == 0 ? 0 : racer);
+        guest::StoreU32(h.base, racer, pick == 1 ? (uint32_t(w.Next()) & ~0x40u)
+                                                 : (uint32_t(w.Next()) | 0x40u));
+        guest::StoreU32(h.base, racer + 20, w.Below(7));
+      }
+      guest::StoreU32(h.base, kManager, manager.address);
+      guest::StoreU32(h.base, kVehicleArray, w.Below(8) ? vehicles.address : 0);
+      RandomBytes(h.base, frame + 80, 16, w);
+      std::vector<ConstructCall> calls;
+      g_construct_calls = &calls;
+      PPCContext t = CallContext(h);
+      t.r3.u64 = director.address;
+      t.r4.u64 = view;
+      (v == 0 ? Original<__imp__sub_821591F0> : hooks::CameraModesStep821591F0)(t, h.base);
+      g_construct_calls = nullptr;
+      out[v].Bytes(Read(h.base, director.address + cm::kView - 16, 32));
+      out[v].Bytes(Read(h.base, director.address + cm::kCurrentCamera, 8));
+      out[v].Bytes(Read(h.base, first.address, kViewportBytes));
+      out[v].Bytes(Read(h.base, second.address, kViewportBytes));
+      out[v].Bytes(Read(h.base, frame + 80, 16));
+      out[v].Word(uint32_t(calls.size()));
+      for (const ConstructCall& call : calls) {
+        for (uint32_t word : call.words) {
+          out[v].Word(word);
+        }
+      }
+      out[v].Word(t.r3.u32);
+    }
+    results.Check(out[0], out[1],
+                  fmt::format("case {}: view {} split {} followed {}", c, view, split, followed));
+  }
+  hooks::SetCameraConstructStandIn(nullptr);
+  results.Report();
+}
+
 }  // namespace
 
 void CameraModes(Context& h) {
@@ -4076,6 +4165,7 @@ void CameraModes(Context& h) {
   TvSteps(h, r);
   GarageCameras(h, r);
   DirectorInitStates(h, r);
+  DirectorSetModes(h, r);
   CutsceneConstructs(h, r);
 }
 

@@ -7,6 +7,7 @@
 #include "base/log.h"
 #include "game_modes/game_modes.h"
 #include "guest.h"
+#include "track_zones/track_zones.h"
 
 namespace camera_modes {
 
@@ -531,6 +532,66 @@ uint32_t DirectorInitStates(uint8_t* base, uint32_t director, uint32_t frame, bo
         break;
     }
   }
+  return r3;
+}
+
+uint32_t DirectorSetMode(uint8_t* base, uint32_t director, uint32_t view, uint32_t frame,
+                         const SetModeCalls& calls) {
+  ITC_NATIVE_RUNNING("sub_821591F0 CameraDirector::SetMode");
+  const uint32_t first_vehicle = track_zones::RacersVehicle(base, 0);
+  guest::StoreU32(base, frame + 80, first_vehicle);
+  const uint32_t second_vehicle = track_zones::RacersVehicle(base, 1);
+  const uint32_t viewports = guest::LoadU32(base, kViewports);
+  guest::StoreU32(base, frame + 84, second_vehicle);
+  const uint32_t first = guest::LoadU32(base, viewports + 0);
+  const uint32_t second = guest::LoadU32(base, viewports + 4);
+  guest::StoreU32(base, director + kView, view);
+  guest::StoreU32(base, first + 1860, view);
+  guest::StoreU32(base, second + 1860, guest::LoadU32(base, director + kView));
+  ResetRoll(base);
+  // ResetRoll's r3: viewport 1 (its adapter's), what a view past 5 leaves.
+  uint32_t r3 = guest::LoadU32(base, guest::LoadU32(base, kViewports) + 4);
+  const uint32_t current = director + kCurrentCamera;
+  const uint32_t current2 = director + kCurrentCamera2;
+  const uint32_t mode = guest::LoadU32(base, director + kView);
+  guest::StoreU32(base, current, 0);
+  guest::StoreU32(base, current2, 0);
+  // The followed player's vehicle from the two kept in the frame (a player
+  // past 1 reads the frame's next words, as the original does).
+  auto followed = [&] {
+    return guest::LoadU32(base, frame + 80 + 4 * guest::LoadU32(base, director + kFollowed));
+  };
+  // The view's object made in place; 0 where its address is 0 (never in play).
+  auto make = [&](uint32_t view_index, uint32_t offset, uint32_t viewport, uint32_t vehicle,
+                  uint32_t back) -> uint32_t {
+    const uint32_t object = director + offset;
+    if (object == 0) {
+      return 0;
+    }
+    return calls.construct(view_index, object, viewport, vehicle, back);
+  };
+  struct View {
+    uint32_t offset;
+    uint32_t back;
+  };
+  static constexpr View kViews[6] = {{12976, 0x821593C0}, {11856, 0x8215939C},
+                                     {9648, 0x82159378},  {67760, 0x82159300},
+                                     {13360, 0x821592D8}, {56896, 0x821592B4}};
+  if (mode > 5) {
+    return r3;
+  }
+  if (mode == 2 && guest::LoadU32(base, guest::LoadU32(base, kViewports) + 8) != 0) {
+    // Split screen: player 0's and player 1's in-car views.
+    r3 = make(2, 9648, first, first_vehicle, 0x82159328);
+    guest::StoreU32(base, current, r3);
+    r3 = make(2, 10752, second, second_vehicle, 0x8215934C);
+    guest::StoreU32(base, current2, r3);
+    return r3;
+  }
+  r3 = director + kViews[mode].offset == 0
+           ? 0
+           : make(mode, kViews[mode].offset, first, followed(), kViews[mode].back);
+  guest::StoreU32(base, current, r3);
   return r3;
 }
 

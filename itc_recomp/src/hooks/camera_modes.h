@@ -68,6 +68,15 @@ void CameraModesStep821562F8(PPCContext& ctx, uint8_t* base);
 void CameraModesStep821593D8(PPCContext& ctx, uint8_t* base);
 void CameraModesStep8217BE98(PPCContext& ctx, uint8_t* base);
 void CameraModesStep82159950(PPCContext& ctx, uint8_t* base);
+void CameraModesStep821591F0(PPCContext& ctx, uint8_t* base);
+
+// The views' camera constructors' stand-in for the SetMode harness: while
+// set, the six constructors' adapters (and SetMode's native calls) answer
+// with it (the function, r3, r4, r5, r1 and lr; its answer r3). nullptr
+// puts them back.
+using CameraConstructStandIn = uint32_t (*)(uint32_t function, uint32_t r3, uint32_t r4,
+                                            uint32_t r5, uint32_t r1, uint32_t lr);
+void SetCameraConstructStandIn(CameraConstructStandIn stand_in);
 void CameraModesStep82156CC0(PPCContext& ctx, uint8_t* base);
 
 }  // namespace hooks

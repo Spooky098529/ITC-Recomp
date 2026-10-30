@@ -70,7 +70,7 @@ ITC_FLAG_BOOL(native_camera_modes, true, "ITC",
               "(with native atexit), TvCamera::Update sub_821593D8 with Step sub_821562F8 (no "
               "adapter: only Update's plain C++ calls it; with native atexit; the attract race's color "
               "filter by rand); the front end's GarageCamera::Update sub_8217BE98; the director's "
-              "CameraDirector::InitStates sub_82159950; the cutscene's Cutscene::Cutscene sub_82156CC0 "
+              "CameraDirector::InitStates sub_82159950 and SetMode sub_821591F0; the cutscene's Cutscene::Cutscene sub_82156CC0 "
               "with its scripts' cues and shots and the rival logo's open) natively instead of "
               "through the translated code (the same writes; checked by "
               "--run_harnesses=camera_modes)");
@@ -89,6 +89,34 @@ namespace cm = camera_modes;
       return;                                           \
     }                                                   \
     hooks::CameraModesStep##address(ctx, base);         \
+  }
+
+// The views' camera constructors' stand-in while the SetMode harness asks
+// (hooks::SetCameraConstructStandIn): it answers in place of the
+// constructor, on the recompiled and the native path alike.
+namespace {
+hooks::CameraConstructStandIn g_construct_stand_in = nullptr;
+}  // namespace
+
+void hooks::SetCameraConstructStandIn(CameraConstructStandIn stand_in) {
+  g_construct_stand_in = stand_in;
+}
+
+// A view's camera constructor's adapter: the stand-in while the harness
+// asks, else as ITC_CAMERA_MODES.
+#define ITC_CAMERA_MODES_CONSTRUCT(address)                                              \
+  extern "C" REX_FUNC(sub_##address) {                                                   \
+    REX_FUNC_PROLOGUE();                                                                 \
+    if (g_construct_stand_in) {                                                          \
+      ctx.r3.u64 = g_construct_stand_in(0x##address, ctx.r3.u32, ctx.r4.u32, ctx.r5.u32, \
+                                        ctx.r1.u32, uint32_t(ctx.lr));                   \
+      return;                                                                            \
+    }                                                                                    \
+    if (!ITC_FLAG(native_camera_modes)) {                                                \
+      __imp__sub_##address(ctx, base);                                                   \
+      return;                                                                            \
+    }                                                                                    \
+    hooks::CameraModesStep##address(ctx, base);                                          \
   }
 
 namespace {
@@ -1020,19 +1048,19 @@ ITC_CAMERA_MODES(82152E08)
 ITC_CAMERA_MODES(82152078)
 ITC_CAMERA_MODES(82211848)
 ITC_CAMERA_MODES(82153290)
-ITC_CAMERA_MODES(82158F70)
+ITC_CAMERA_MODES_CONSTRUCT(82158F70)
 ITC_CAMERA_MODES(82152338)
 ITC_CAMERA_MODES(82153098)
 ITC_CAMERA_MODES(82156B68)
 ITC_CAMERA_MODES(82156980)
-ITC_CAMERA_MODES(82154548)
+ITC_CAMERA_MODES_CONSTRUCT(82154548)
 ITC_CAMERA_MODES(82154808)
-ITC_CAMERA_MODES(82154A48)
+ITC_CAMERA_MODES_CONSTRUCT(82154A48)
 ITC_CAMERA_MODES(82153A50)
-ITC_CAMERA_MODES(82154D38)
+ITC_CAMERA_MODES_CONSTRUCT(82154D38)
 ITC_CAMERA_MODES(82153E58)
 ITC_CAMERA_MODES(82155E58)
-ITC_CAMERA_MODES(82155288)
+ITC_CAMERA_MODES_CONSTRUCT(82155288)
 
 // --- The rival logo's open and close ---
 
@@ -1286,9 +1314,43 @@ void CameraModesStep82159950(PPCContext& ctx, uint8_t* base) {
   ctx.r3.u64 = replaced ? r3 : machine_r3 + (r3 - machine);
 }
 
+
+// CameraDirector::SetMode: r3 = the director, r4 = the view; r3 as the
+// original leaves it. The view's camera object made through its adapter's
+// step (which falls back to its original itself) from the original's frame
+// (176 bytes) with the call site's return address; lr put back.
+void CameraModesStep821591F0(PPCContext& ctx, uint8_t* base) {
+  ctx.fpscr.disableFlushMode();
+  const uint64_t lr = ctx.lr;
+  const uint32_t frame = ctx.r1.u32 - 176;
+  cm::SetModeCalls calls;
+  calls.construct = [&ctx, base, frame](uint32_t view, uint32_t object, uint32_t viewport,
+                                        uint32_t vehicle, uint32_t back) -> uint32_t {
+    static constexpr void (*kSteps[6])(PPCContext&, uint8_t*) = {
+        CameraModesStep82154548, CameraModesStep82154A48, CameraModesStep82154D38,
+        CameraModesStep82158F70, CameraModesStep82155288, CameraModesStep82156CC0};
+    static constexpr uint32_t kFunctions[6] = {0x82154548, 0x82154A48, 0x82154D38,
+                                               0x82158F70, 0x82155288, 0x82156CC0};
+    if (g_construct_stand_in) {
+      return g_construct_stand_in(kFunctions[view], object, viewport, vehicle, frame, back);
+    }
+    const uint64_t stack = ctx.r1.u64;
+    ctx.r1.u64 = frame;
+    ctx.r3.u64 = object;
+    ctx.r4.u64 = viewport;
+    ctx.r5.u64 = vehicle;
+    ctx.lr = back;
+    kSteps[view](ctx, base);
+    ctx.r1.u64 = stack;
+    return ctx.r3.u32;
+  };
+  ctx.r3.u64 = cm::DirectorSetMode(base, ctx.r3.u32, ctx.r4.u32, frame, calls);
+  ctx.lr = lr;
+}
 }  // namespace hooks
 
 ITC_CAMERA_MODES(82159950)
+ITC_CAMERA_MODES(821591F0)
 
 // --- The garage camera ---
 
@@ -1421,4 +1483,4 @@ void CameraModesStep82156CC0(PPCContext& ctx, uint8_t* base) {
 
 }  // namespace hooks
 
-ITC_CAMERA_MODES(82156CC0)
+ITC_CAMERA_MODES_CONSTRUCT(82156CC0)

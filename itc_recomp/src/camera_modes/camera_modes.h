@@ -401,6 +401,27 @@ constexpr uint32_t kMachine = 16;  // the director's state machine
 constexpr uint32_t kInitStatesFrame = 2368;
 uint32_t DirectorInitStates(uint8_t* base, uint32_t director, uint32_t frame, bool* replaced);
 
+constexpr uint32_t kCurrentCamera = 68528;   // the view's camera object
+constexpr uint32_t kCurrentCamera2 = 68532;  // player 1's in split screen
+// SetMode's constructor call: view `view`'s camera object made in place at
+// `object` (ChaseCamera::ChaseCamera, ViewCamera1, ViewCamera2,
+// IntroCamera, TvCamera, Cutscene for views 0-5) with the viewport and the
+// vehicle, from the original's call site `back`; its r3.
+struct SetModeCalls {
+  std::function<uint32_t(uint32_t view, uint32_t object, uint32_t viewport, uint32_t vehicle,
+                         uint32_t back)>
+      construct;
+};
+// sub_821591F0 CameraDirector::SetMode: the two players' vehicles
+// (Racers::Vehicle 0 and 1) kept at `frame` + 80 and + 84 (the original's
+// r1, 176 bytes), +9628 and both viewports' +1860 = `view`,
+// Viewports::ResetRoll, +68528 and +68532 = 0, then the view's camera
+// object made (the followed player's vehicle from the frame; in split
+// screen's view 2 both players' in-car cameras, +9648 and +10752) and its
+// address into +68528 (+68532). Returns r3 as the original leaves it.
+uint32_t DirectorSetMode(uint8_t* base, uint32_t director, uint32_t view, uint32_t frame,
+                         const SetModeCalls& calls);
+
 // CutsceneShot::Init's guest calls: the copies List16::Copy32 and
 // Insert32 refuse (memcpy), and CameraAnims::Load of the asset id.
 struct CutsceneCalls {
