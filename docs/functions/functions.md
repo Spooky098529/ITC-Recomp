@@ -389,6 +389,13 @@ Rows not yet moved stay in the table below. So far:
   format, the pass) and their resampler, the output matrices (set, mix),
   the reverb and the volume meter (B7; the XMA voice's hardware side
   stays in `audio.md`).
+- [`app-start-up.md`](app-start-up.md): the app's constructor and its
+  start-up at boot: the app's vtables, maps, tick handler and listener,
+  the objects it owns, the globals that keep its interface, the scene's
+  1024 × 576 target and tile surfaces, the light billboards' shaders and
+  vertex declaration, `CreateVertexDeclaration`, and the voice engine's
+  set-up parts that had no rows (its talkers, processing objects and
+  XAudio voices; the rest of voice stays in `system-services.md`) (B7).
 
 These files hold functions only. What used to follow the table here moved
 out on 2026-10-20: how frame interpolation works, its options and what
@@ -459,7 +466,6 @@ old performance notes to the end of `../native-renderer.md`.
 | `sub_824846D8` | | | Vtable function (no direct callers), seen in play. Makes a vertex shader (`sub_822AA018`) and pixel shaders (`sub_822A9EE8`, twice) without compiling: probably where the game's precompiled shaders are made. Not read. |
 | `sub_8248FBE0` | | | A method that isn't implemented: `DbgPrint` and `0x80004001` (E_NOTIMPL). No direct caller (a vtable). Never called in play (two attract races and two sessions the user played, 2026-10-21). |
 | `sub_8229B7B0` | | | Copies four words of the device's presentation parameters (+13188 width, +13192 height, +13236, +13196) to r5. r3 device, r4 unused (0). From `sub_82482B18`. |
-| `sub_822A8980` | | | Probably CreateVertexDeclaration: r3 the elements (`8264D550` from `sub_82482B18`); allocates (`sub_822976F8`), clears and copies (`memset`, `sub_825A7410`). Not read in detail. |
 | `sub_822221A0` | `TitleScreen::Update` | Wrapped | Counts idle ticks and starts the attract race at 600 (see "The title screen" in `../title-screen.md`). `--attract_after_s` shortens the wait. |
 | `sub_820C9170` | | | Asks `sub_820F4128` for up to 10 lights near a point (r1+112) in a cone (cosine-like value from `sub_825A8978` of a setting at `[r27+11844]+5500` times a constant) of the light set at `[0x826C551C]`. Probably feeds the 8 per-object light slots of the pixel constants (see "Per-object pixel constants" in `../frame-interpolation.md`; not checked). Called from `0x820E1DF0`, `0x820E6B00` and `0x820DC3B8`. |
 | `sub_8218E420` | | Patched | Post-race check; the comparison against 60 was changed to 1 to fix the black screen after quest races. |
