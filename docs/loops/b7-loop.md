@@ -538,6 +538,12 @@ Calls so far for decisions the loop meets often:
   made, their game-level users seen in play skipped natively with what
   they'd read with the feature absent, Status Dropped (the voice
   engine under the app's start-up, 2026-10-30).
+- Register leftovers a varargs callee stores (`UiMovie::SetText`
+  `sub_8211C1F8` storing r7-r10 into its caller's frame, set or not by
+  the call site): native callers pass 0 for the arguments they don't
+  set (only dead frame words differ), and the harness cases use strings
+  without argument codes for those calls (the parking area, 2026-10-30).
+  Memory leftovers are still copied as the original leaves them.
 - Harness run times: migration agents `attract_race.sh 40` with their
   own harnesses; the validation agent `attract_race.sh 60
   --run_harnesses=all` (2026-10-30, when all of them outgrew 40 s). If

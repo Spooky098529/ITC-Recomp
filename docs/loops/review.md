@@ -135,6 +135,23 @@ When the user has reviewed a run's section, its heading gets
   912-byte screen at `0x82814E50`, three save-data fields). Folded in:
   the course scenery's front-end owners and `sub_822280D8`,
   `sub_82228138` (their lead lines kept with a note); 3 leads added.
+- The parking area's migration 1 (f0ee4da..a4cfca2,
+  `--native_location_screen`): the file retitled "the parking area"
+  with the user's description (574e514; the file name, flag, `src/`
+  directory and `LocationScreen::` names kept). `UiMovie::SetText`
+  taken under `--native_ui_movies_game`, with `hooks::FormatGuestCalls`
+  added for `Strings::FormatV`'s plain C++; its harness uses its own
+  string table (on the game's, one case never returned from
+  `Strings::Get` for string 0x502 on both sides, not looked into).
+  `UpdatePage`'s harness covers pages -1, 7 and 10 only (the others run
+  the menus' input). `InitStates` replays the original's frame stores
+  from a step table generated from the translated code. Row
+  corrections: `ShowArrows` hides nodes 17 and 18 with one opponent;
+  `ListNode` sets the node's +16 to r3 as a float. The replay doesn't
+  reach the parking area: no frame dump. Slip: two temporary logging
+  edits reverted with `git checkout` rather than committed first (logs
+  only, nothing committed lost). The user's call: the 22 `SetText`
+  callers pass 0 for the r7-r10 they don't set.
 
 ## Run 2026-10-30 01:06 (`b7-loop-29-10-26-2`)
 

@@ -139,3 +139,6 @@ file's history. What's left to see in a drive, from every run:
   3033.
 - After the location screen's map: ours 3364, work left 3033 (wrapped
   104, known 545, unknown 2384).
+- After the parking area's migration 1 (`itc_2782`: race 36 s, 0
+  errors, touched harnesses 0 differing): ours 3390, work left 3007
+  (wrapped 104, known 519, unknown 2384).
