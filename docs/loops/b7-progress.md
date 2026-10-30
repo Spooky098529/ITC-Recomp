@@ -21,11 +21,17 @@ file's history. What's left to see in a drive, from every run:
   lists between a case's versions; the real-voice cases compare them
   by role, as the XAudio harnesses' `LockWords`; 0 of 80 over 5 runs,
   `itc_2569`-`itc_2573`; nothing else ready in `car-sounds.md`).
-  Validation agent running (every harness).
+  Validated (`itc_2574`, `itc_2575`): 56 of 56 harness lines, every
+  harness 0 outside the expected groups; `CarSounds::StopAll` already
+  on the drive list.
+- Subsystem 1 of 3: the app's start-up (`sub_82106548`, the top of
+  `leads.md`). Mapping agent running.
 
 ## Done
 
-(none yet)
+- The last stop's `CarSound::Part840Update` harness (cleanup lead, not
+  counted): d5cfd5c, a harness fix only (the stage lists compared by
+  role); validated (`itc_2574`, `itc_2575`).
 
 ## Rows to review
 
@@ -45,3 +51,5 @@ file's history. What's left to see in a drive, from every run:
   unknown 2682).
 - After the cleanup's migration (`itc_2573`: race 38 s, 0 errors,
   car_sounds 0 differing): ours 3031, work left 3287.
+- After its validation (`itc_2574`: race 7 s, 0 errors, every harness
+  0 differing but the expected groups): ours 3031, work left 3287.
