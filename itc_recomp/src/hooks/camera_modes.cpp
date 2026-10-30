@@ -54,7 +54,10 @@ ITC_FLAG_BOOL(native_camera_modes, true, "ITC",
               "sub_820ABDA8, TrackRoute::SplinePoint sub_820AB6A0 and Matrix::FromRows3 "
               "sub_820AB5F0 (no adapters)); the views' cameras' ChaseCamera::ChaseCamera "
               "sub_82154548 (with native atexit) with Place sub_82153478 and Follow "
-              "sub_82153640 (no adapters), ChaseCamera::Update sub_82154808) natively instead of "
+              "sub_82153640 (no adapters), ChaseCamera::Update sub_82154808, "
+              "ViewCamera1::ViewCamera1 sub_82154A48 and ViewCamera2::ViewCamera2 sub_82154D38 "
+              "(with native atexit), ViewCamera1::Update sub_82153A50 and ViewCamera2::Update "
+              "sub_82153E58) natively instead of "
               "through the translated code (the same writes; checked by "
               "--run_harnesses=camera_modes)");
 
@@ -741,6 +744,38 @@ struct ChaseAtexit {
   }
 };
 
+// The views' constructors' atexit through the translated code when the
+// native one can't: from the constructor's frame (`sp`), the return address
+// by the function registered.
+struct ViewAtexit {
+  PPCContext& ctx;
+  uint8_t* base;
+  uint32_t sp;
+  c_runtime::AtexitCall Call() { return {&ViewAtexit::Run, this}; }
+  static int32_t Run(void* self, uint32_t function) {
+    auto& call = *static_cast<ViewAtexit*>(self);
+    uint32_t back = 0;
+    switch (function) {
+      case 0x825DB120: back = 0x82154B24; break;
+      case 0x825DB118: back = 0x82154B5C; break;
+      case 0x825DB110: back = 0x82154B9C; break;
+      case 0x825DB108: back = 0x82154BD4; break;
+      case 0x825DB140: back = 0x82154E18; break;
+      case 0x825DB138: back = 0x82154E58; break;
+      case 0x825DB130: back = 0x82154E90; break;
+      default: back = 0x82154ED0; break;  // 0x825DB128
+    }
+    const uint64_t stack = call.ctx.r1.u64;
+    call.ctx.r1.u64 = call.sp;
+    call.ctx.lr = back;
+    call.ctx.r3.u64 = function;
+    __imp__sub_825A7068(call.ctx, call.base);
+    call.ctx.r1.u64 = stack;
+    call.ctx.fpscr.disableFlushMode();
+    return call.ctx.r3.s32;
+  }
+};
+
 // Whether the chase camera's plain C++ can stand in: a 16-byte aligned
 // stack pointer (CameraTarget::Track's and the vector loads' frames) and
 // ZoomFromFov's tan.
@@ -808,6 +843,56 @@ void CameraModesStep82154808(PPCContext& ctx, uint8_t* base) {
 }  // namespace hooks
 
 
+namespace hooks {
+
+// ViewCamera1::ViewCamera1 and ViewCamera2::ViewCamera2: r3 = the camera,
+// r4 = the viewport, r5 = the vehicle; r3 = the camera. The original where
+// ChaseNative says no or without native atexit.
+void CameraModesStep82154A48(PPCContext& ctx, uint8_t* base) {
+  if (!ChaseNative(ctx, base) || !hooks::NativeAtexit()) {
+    __imp__sub_82154A48(ctx, base);
+    return;
+  }
+  ctx.fpscr.disableFlushMode();
+  const uint32_t frame = ctx.r1.u32 - 192;
+  ViewAtexit atexit{ctx, base, frame};
+  ctx.r3.u64 = cm::View1Construct(base, ctx.r3.u32, ctx.r4.u32, ctx.r5.u32, frame,
+                                  VideoOutput(ctx, base), atexit.Call());
+}
+void CameraModesStep82154D38(PPCContext& ctx, uint8_t* base) {
+  if (!ChaseNative(ctx, base) || !hooks::NativeAtexit()) {
+    __imp__sub_82154D38(ctx, base);
+    return;
+  }
+  ctx.fpscr.disableFlushMode();
+  const uint32_t frame = ctx.r1.u32 - 192;
+  ViewAtexit atexit{ctx, base, frame};
+  ctx.r3.u64 = cm::View2Construct(base, ctx.r3.u32, ctx.r4.u32, ctx.r5.u32, frame,
+                                  VideoOutput(ctx, base), atexit.Call());
+}
+
+// ViewCamera1::Update and ViewCamera2::Update (vtable slot 0; their caller
+// reads neither r3 nor f1 after): r3 = the camera. The original where
+// ChaseNative says no.
+void CameraModesStep82153A50(PPCContext& ctx, uint8_t* base) {
+  if (!ChaseNative(ctx, base)) {
+    __imp__sub_82153A50(ctx, base);
+    return;
+  }
+  ctx.fpscr.disableFlushMode();
+  cm::View1Update(base, ctx.r3.u32, ctx.r1.u32 - 352, VideoOutput(ctx, base));
+}
+void CameraModesStep82153E58(PPCContext& ctx, uint8_t* base) {
+  if (!ChaseNative(ctx, base)) {
+    __imp__sub_82153E58(ctx, base);
+    return;
+  }
+  ctx.fpscr.disableFlushMode();
+  cm::View2Update(base, ctx.r3.u32, ctx.r1.u32 - 240, VideoOutput(ctx, base));
+}
+
+}  // namespace hooks
+
 // --- The adapters ---
 
 ITC_CAMERA_MODES(82152400)
@@ -845,3 +930,7 @@ ITC_CAMERA_MODES(82156980)
 ITC_CAMERA_MODES(820AC248)
 ITC_CAMERA_MODES(82154548)
 ITC_CAMERA_MODES(82154808)
+ITC_CAMERA_MODES(82154A48)
+ITC_CAMERA_MODES(82153A50)
+ITC_CAMERA_MODES(82154D38)
+ITC_CAMERA_MODES(82153E58)

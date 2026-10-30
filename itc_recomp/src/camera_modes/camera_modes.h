@@ -436,6 +436,48 @@ uint32_t ChaseConstruct(uint8_t* base, uint32_t camera, uint32_t viewport, uint3
 // = the eye. `frame`: 144 bytes.
 void ChaseUpdate(uint8_t* base, uint32_t camera, uint32_t frame,
                  const VideoOutputCall& video_output);
+// sub_82154A48 ViewCamera1::ViewCamera1: +16, +20 = 0, the tracker's w
+// words 1.0, vtable 0x82006B2C, +1100 = 1.0; four statics (guard
+// 0x826D8270, bits 1 to 8: 0x826D8260 = (0x820093B8's, 1, 0x82002A00's, 1),
+// atexit 0x825DB120; 0x826D8250 = (1, 1, 0x82002A00's, 1), 0x825DB118;
+// 0x826D8240 = (0, 1, 0, 1), 0x825DB110; 0x826D8230 = (0, 0, 0, 1),
+// 0x825DB108); +16 the vehicle, +20 the viewport; zoom from 0x82009300's
+// angle, SetZoom, SetNear(0.0), SetRoll(0.0); the viewport's +1680, +1696,
+// +1712, +1744 = the statics; CameraTarget::Track; CameraCurve::Load(+352,
+// 0, 30); +1088 = the rotation (+224); +1104 = 0.0. Returns the camera.
+// `frame`: 192 bytes.
+uint32_t View1Construct(uint8_t* base, uint32_t camera, uint32_t viewport, uint32_t car,
+                        uint32_t frame, const VideoOutputCall& video_output,
+                        const c_runtime::AtexitCall& atexit);
+// sub_82153A50 ViewCamera1::Update (vtable slot 0): CameraTarget::Track;
+// zoom, SetZoom, SetNear(0x82001FBC's), SetRoll(0.0); the car's model
+// (ScenePools::FindModel([0x826C2E44], 2, n): n 1 in a race of kind 6 with
+// +0x59614 2 and [0x826C7824] 0, else 0) picks the eye's and target's
+// offsets (its +48 x 32 + 0x82618DC0 and + 0x82618DD0), through the turn
+// about the tracked point (Matrix::MultiplyTranslation) into +1600 and
+// +1616 (+1664 = +1616), up (+1632) = +1712 through the turn; the target
+// moved to the eye + the unit direction turned by +1104 (Matrix::RotateY);
+// Racers::NearestHumanVehicle (unused); the look point. `frame`: 352 bytes.
+void View1Update(uint8_t* base, uint32_t camera, uint32_t frame,
+                 const VideoOutputCall& video_output);
+// sub_82154D38 ViewCamera2::ViewCamera2: as View1Construct with vtable
+// 0x82006B34 and its statics (guard 0x826D82C0: 0x826D82B0 = (1,
+// 0x82002CB0's, 0, 1), atexit 0x825DB140; 0x826D82A0 = (0x82001FD8's,
+// 0x82002CB0's, 0, 1), 0x825DB138; 0x826D8290 = (0, 1, 0, 1), 0x825DB130;
+// 0x826D8280 = (0x820029C8's, 0x82002CB0's, 0, 1), 0x825DB128); SetNear(the
+// ratio x zoom); with a vehicle, the eye (+1680, +1684) and target (+1696,
+// +1700) from its spec's +76 / 10 and +76, +80 halved; CameraCurve::Load,
+// CameraTarget::Track, +1088 = the rotation. `frame`: 192 bytes.
+uint32_t View2Construct(uint8_t* base, uint32_t camera, uint32_t viewport, uint32_t car,
+                        uint32_t frame, const VideoOutputCall& video_output,
+                        const c_runtime::AtexitCall& atexit);
+// sub_82153E58 ViewCamera2::Update (vtable slot 0): CameraTarget::Track;
+// zoom, SetZoom, SetNear, SetRoll(0.0); the eye (+1600), target (+1616) and
+// +1664 = +1680, +1696, +1744 through the turn about the tracked point, up
+// (+1632) = +1712 through the turn; Racers::NearestHumanVehicle (unused);
+// the look point (+1648 = the eye + the unit direction). `frame`: 240 bytes.
+void View2Update(uint8_t* base, uint32_t camera, uint32_t frame,
+                 const VideoOutputCall& video_output);
 
 // --- The TV camera's route and paths (src/camera_modes/paths.cpp) ---
 // `sp` is the caller's r1: each function's frame is below it by the

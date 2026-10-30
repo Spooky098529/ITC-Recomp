@@ -1,5 +1,6 @@
 // The camera modes' views' cameras (docs/functions/camera-modes.md): the
-// chase camera (view 0, and the TV camera's fallback at +43136). Plain C++
+// chase camera (view 0, and the TV camera's fallback at +43136) and views 1
+// and 2's cameras (probably the in-car views). Plain C++
 // over guest memory, the originals' loads and stores in their order, their
 // float steps as the translated code's (src/camera_modes/steps.h); the
 // vector unit's work with flush-to-zero on, the rest with it off. Stack
@@ -14,6 +15,7 @@
 #include "c_runtime/math.h"
 #include "cameras/cameras.h"
 #include "car_physics/car_physics.h"
+#include "vehicle/vehicle.h"
 #include "guest.h"
 #include "hooks/vehicle.h"
 #include "matrix_math/matrix_math.h"
@@ -131,13 +133,87 @@ double Zoom(uint8_t* base, uint32_t degrees, uint32_t slot, uint32_t frame, uint
 }
 
 // The zoom, near plane and roll every view's camera sets: SetZoom(zoom),
-// SetNear(+1868 / +1864 x zoom), SetRoll(0.0).
+// SetNear(+1868 / +1864 x zoom), SetRoll(roll).
 void SetLens(uint8_t* base, uint32_t camera, double zoom, double roll) {
   cameras::ViewportSetZoom(base, Load(base, camera + 20), zoom);
   const uint32_t viewport = Load(base, camera + 20);
   const double ratio = Fdivs(Lfs(base, viewport + 1868), Lfs(base, viewport + 1864));
   cameras::SetNear(base, Fmuls(ratio, zoom));
   cameras::ViewportSetRoll(base, Load(base, camera + 20), roll);
+}
+// The same with a given near plane.
+void SetLensNear(uint8_t* base, uint32_t camera, double zoom, double near, double roll) {
+  cameras::ViewportSetZoom(base, Load(base, camera + 20), zoom);
+  cameras::SetNear(base, near);
+  cameras::ViewportSetRoll(base, Load(base, camera + 20), roll);
+}
+
+// The tracker's w words (1.0), as every view camera's constructor sets them.
+void TrackerOnes(uint8_t* base, uint32_t tracker, double one) {
+  for (uint32_t at = 12; at <= 220; at += 16) {
+    Stfs(base, tracker + at, one);
+  }
+  for (uint32_t at : {252u, 268u, 284u, 300u}) {
+    Stfs(base, tracker + at, one);
+  }
+}
+
+// A static vector made once: (x, y, z, w) at `at` with guard bit `bit` of
+// `guard` set, then atexit(`function`). `guard_first`: the guard stored
+// before the floats (as some originals do). Returns the guard as reloaded.
+uint32_t MakeStatic(uint8_t* base, uint32_t guard_address, uint32_t guard, uint32_t bit,
+                    uint32_t at, const double (&v)[4], uint32_t function, bool guard_first,
+                    const c_runtime::AtexitCall& atexit) {
+  if ((guard & bit) != 0) {
+    return guard;
+  }
+  guard |= bit;
+  if (guard_first) {
+    Store(base, guard_address, guard);
+  }
+  for (uint32_t i = 0; i < 4; i++) {
+    Stfs(base, at + 4 * i, v[i]);
+  }
+  if (!guard_first) {
+    Store(base, guard_address, guard);
+  }
+  c_runtime::AtexitFrom(base, function, atexit);
+  return Load(base, guard_address);
+}
+
+// The look point every in-car view sets: +1648 = the eye + the view's unit
+// direction (target less eye, normalized on the vector unit at `f` + 80),
+// +1660 = 1.0.
+void LookPoint(uint8_t* base, uint32_t camera, uint32_t f, double one) {
+  uint32_t viewport = Load(base, camera + 20);
+  Stfs(base, f + 92, one);
+  const double ex = Lfs(base, viewport + 1600);
+  Stfs(base, f + 80, Fsubs(Lfs(base, viewport + 1616), ex));
+  const double ty = Lfs(base, viewport + 1620), tz = Lfs(base, viewport + 1624);
+  const double ey = Lfs(base, viewport + 1604), ez = Lfs(base, viewport + 1608);
+  const double dy = Fsubs(ty, ey);
+  Stfs(base, f + 88, Fsubs(tz, ez));
+  Stfs(base, f + 84, dy);
+  const simde__m128 v = Lvx(base, f + 80);
+  simde__m128 n;
+  {
+    FlushToZero ftz;
+    n = Normalized(v, Dot3(v, v));
+  }
+  Stvx(base, f + 80, n);
+  Stfs(base, viewport + 1648, Fadds(ex, Lfs(base, f + 80)));
+  Stfs(base, viewport + 1652, Fadds(Lfs(base, viewport + 1604), Lfs(base, f + 84)));
+  Stfs(base, viewport + 1656, Fadds(Lfs(base, viewport + 1608), Lfs(base, f + 88)));
+  viewport = Load(base, camera + 20);
+  Stfs(base, viewport + 1660, one);
+}
+
+// The nearest human car's body (Racers::NearestHumanVehicle(the tracker's
+// position at `point`, 1), its frame below `f`): the originals then take
+// its matrix or position and leave it unused.
+void NearestHuman(uint8_t* base, uint32_t camera, uint32_t point, uint32_t f) {
+  CopyWords(base, point, camera + 32, 4);
+  vehicle::RacersNearestHumanVehicle(base, point, 1, f - 304);
 }
 
 constexpr uint32_t kChaseDegrees = 0x82009300;   // the constructor's (55.0)
@@ -456,6 +532,195 @@ void ChaseUpdate(uint8_t* base, uint32_t camera, uint32_t frame,
     Store(base, camera + 380, 0);
   }
   CopyWords(base, camera + 352, Load(base, camera + 20) + 1600, 4);
+}
+
+// --- Views 1 and 2 ---
+
+uint32_t View1Construct(uint8_t* base, uint32_t camera, uint32_t viewport, uint32_t car,
+                        uint32_t frame, const VideoOutputCall& video_output,
+                        const c_runtime::AtexitCall& atexit) {
+  ITC_NATIVE_RUNNING("sub_82154A48 ViewCamera1::ViewCamera1");
+  constexpr uint32_t kGuard = 0x826D8270;
+  const uint32_t f = frame;
+  const uint32_t tracker = camera + 32;
+  Store(base, camera + 16, 0);
+  const double one = Lfs(base, kOne);
+  Store(base, camera + 20, 0);
+  TrackerOnes(base, tracker, one);
+  uint32_t guard = Load(base, kGuard);
+  Store(base, camera + 0, 0x82006B2C);
+  const double depth = Lfs(base, 0x82002A00);
+  Stfs(base, camera + 1100, one);
+  guard = MakeStatic(base, kGuard, guard, 1, 0x826D8260,
+                     {Lfs(base, 0x820093B8), one, depth, one}, 0x825DB120, true, atexit);
+  guard = MakeStatic(base, kGuard, guard, 2, 0x826D8250, {one, one, depth, one}, 0x825DB118,
+                     false, atexit);
+  const double zero = Lfs(base, kZero);
+  guard = MakeStatic(base, kGuard, guard, 4, 0x826D8240, {zero, one, zero, one}, 0x825DB110,
+                     false, atexit);
+  MakeStatic(base, kGuard, guard, 8, 0x826D8230, {zero, zero, zero, one}, 0x825DB108, false,
+             atexit);
+  Store(base, camera + 16, car);
+  Store(base, camera + 20, viewport);
+  SetLensNear(base, camera, Zoom(base, kChaseDegrees, f + 80, f, 0x82154BF4, video_output), zero,
+              zero);
+  CopyWords(base, Load(base, camera + 20) + 1680, 0x826D8260, 4);
+  CopyWords(base, Load(base, camera + 20) + 1696, 0x826D8250, 4);
+  CopyWords(base, Load(base, camera + 20) + 1712, 0x826D8240, 4);
+  CopyWords(base, Load(base, camera + 20) + 1744, 0x826D8230, 4);
+  TargetTrack(base, tracker, Load(base, camera + 16), f - 256);
+  vehicle::CameraCurveLoad(base, camera + 352, 0, 30);
+  CopyWords(base, camera + 1088, camera + 224, 4);
+  CopyDoublewords(base, camera + 1088, camera + 224, 2);
+  Stfs(base, camera + 1104, zero);
+  return camera;
+}
+
+void View1Update(uint8_t* base, uint32_t camera, uint32_t frame,
+                 const VideoOutputCall& video_output) {
+  ITC_NATIVE_RUNNING("sub_82153A50 ViewCamera1::Update");
+  const uint32_t f = frame;
+  const uint32_t tracker = camera + 32;
+  const double one = Lfs(base, kOne);
+  for (uint32_t at : {220u, 236u, 252u, 268u}) {
+    Stfs(base, f + at, one);
+  }
+  TargetTrack(base, tracker, Load(base, camera + 16), f - 256);
+  const double zoom = Zoom(base, kChaseDegrees, f + 80, f, 0x82153AB8, video_output);
+  const double zero = Lfs(base, kZero);
+  SetLensNear(base, camera, zoom, Lfs(base, 0x82001FBC), zero);
+  // The car's model: the second in some races (kind 6 with +0x59614 2 and
+  // [0x826C7824] 0), else the first; its +48 picks the eye and target
+  // offsets (32 bytes each at 0x82618DC0).
+  uint32_t n = 0;
+  const uint32_t race = Load(base, kRaceData);
+  if (int32_t(Load(base, race + 0xA3AF0)) == 6 && int32_t(Load(base, race + 0x59614)) == 2) {
+    n = Load(base, 0x826C7824) == 0 ? 1 : 0;
+  }
+  const uint32_t model =
+      vehicle_accessors::ScenePoolsFindModel(base, Load(base, 0x826C2E44), 2, n);
+  const uint32_t entry = (Load(base, model + 48) << 5) & 0xFFFFFFE0u;
+  CopyWords(base, f + 80, 0x82618DC0 + entry, 4);
+  CopyWords(base, f + 112, 0x82618DD0 + entry, 4);
+  const uint32_t turn = camera + 96;
+  car_physics::MatrixMultiplyTranslation(base, f + 208, turn, tracker, f - 192);
+  matrix_math::Vec4Transform(base, Load(base, camera + 20) + 1600, f + 208, f + 80);
+  matrix_math::Vec4Transform(base, Load(base, camera + 20) + 1616, f + 208, f + 112);
+  uint32_t viewport = Load(base, camera + 20);
+  CopyWords(base, viewport + 1664, viewport + 1616, 4);
+  viewport = Load(base, camera + 20);
+  matrix_math::Vec4Transform(base, viewport + 1632, turn, viewport + 1712);
+  // The look turned by +1104 (Matrix::RotateY of the identity at +144).
+  Stfs(base, f + 96, zero);
+  Stfs(base, f + 100, zero);
+  Stfs(base, f + 104, zero);
+  Stfs(base, f + 108, one);
+  StoreIdentity(base, f + 144);
+  viewport = Load(base, camera + 20);
+  Stfs(base, f + 96, Fsubs(Lfs(base, viewport + 1616), Lfs(base, viewport + 1600)));
+  Stfs(base, f + 100, Fsubs(Lfs(base, viewport + 1620), Lfs(base, viewport + 1604)));
+  Stfs(base, f + 104, Fsubs(Lfs(base, viewport + 1624), Lfs(base, viewport + 1608)));
+  {
+    const simde__m128 v = Lvx(base, f + 96);
+    simde__m128 nv;
+    {
+      FlushToZero ftz;
+      nv = Normalized(v, Dot3(v, v));
+    }
+    Stvx(base, f + 96, nv);
+  }
+  matrix_math::RotateY(base, f + 144, f + 144, camera + 1104, f - 80);
+  matrix_math::Vec4Transform(base, f + 96, f + 144, f + 96);
+  viewport = Load(base, camera + 20);
+  for (uint32_t i = 0; i < 3; i++) {
+    Stfs(base, viewport + 1616 + 4 * i,
+         Fadds(Lfs(base, viewport + 1600 + 4 * i), Lfs(base, f + 96 + 4 * i)));
+  }
+  NearestHuman(base, camera, f + 128, f);
+  LookPoint(base, camera, f, one);
+}
+
+uint32_t View2Construct(uint8_t* base, uint32_t camera, uint32_t viewport, uint32_t car,
+                        uint32_t frame, const VideoOutputCall& video_output,
+                        const c_runtime::AtexitCall& atexit) {
+  ITC_NATIVE_RUNNING("sub_82154D38 ViewCamera2::ViewCamera2");
+  constexpr uint32_t kGuard = 0x826D82C0;
+  const uint32_t f = frame;
+  const uint32_t tracker = camera + 32;
+  const double one = Lfs(base, kOne);
+  TrackerOnes(base, tracker, one);
+  uint32_t guard = Load(base, kGuard);
+  Store(base, camera + 16, 0);
+  Store(base, camera + 20, 0);
+  Store(base, camera + 0, 0x82006B34);
+  const double height = Lfs(base, 0x82002CB0);
+  Stfs(base, camera + 1100, one);
+  const double zero = Lfs(base, kZero);
+  guard = MakeStatic(base, kGuard, guard, 1, 0x826D82B0, {one, height, zero, one}, 0x825DB140,
+                     false, atexit);
+  guard = MakeStatic(base, kGuard, guard, 2, 0x826D82A0,
+                     {Lfs(base, 0x82001FD8), height, zero, one}, 0x825DB138, true, atexit);
+  guard = MakeStatic(base, kGuard, guard, 4, 0x826D8290, {zero, one, zero, one}, 0x825DB130,
+                     false, atexit);
+  MakeStatic(base, kGuard, guard, 8, 0x826D8280, {Lfs(base, 0x820029C8), height, zero, one},
+             0x825DB128, true, atexit);
+  Store(base, camera + 16, car);
+  Store(base, camera + 20, viewport);
+  SetLens(base, camera, Zoom(base, kChaseDegrees, f + 80, f, 0x82154EF0, video_output), zero);
+  CopyWords(base, Load(base, camera + 20) + 1680, 0x826D82B0, 4);
+  CopyWords(base, Load(base, camera + 20) + 1696, 0x826D82A0, 4);
+  CopyWords(base, Load(base, camera + 20) + 1712, 0x826D8290, 4);
+  CopyWords(base, Load(base, camera + 20) + 1744, 0x826D8280, 4);
+  const uint32_t the_vehicle = Load(base, camera + 16);
+  if (the_vehicle != 0) {
+    // The eye and target from the car's size: its spec's +76 / 10 (x the
+    // floats at 0x82001BE0 and 0x820029D8) and +76, +80 halved.
+    const uint32_t spec = vehicle_accessors::ObjectRecord1888(Load(base, the_vehicle + 5712));
+    const double scale = Lfs(base, 0x820029D8);
+    const uint32_t tenth = Load(base, spec + 76) / 10;
+    Store64(base, f + 80, tenth);
+    double x = Fmuls(Single(double(int64_t(tenth))), Lfs(base, 0x82001BE0));
+    Stfs(base, Load(base, camera + 20) + 1680, Fmuls(x, scale));
+    const uint32_t fields[3][2] = {{80, 1684}, {76, 1696}, {80, 1700}};
+    for (const auto& field : fields) {
+      const uint32_t half = Load(base, spec + field[0]) >> 1;
+      const uint32_t at = Load(base, camera + 20) + field[1];
+      Store64(base, f + 80, half);
+      Stfs(base, at, Fmuls(Single(double(int64_t(half))), scale));
+    }
+  }
+  vehicle::CameraCurveLoad(base, camera + 352, 0, 30);
+  TargetTrack(base, tracker, Load(base, camera + 16), f - 256);
+  CopyWords(base, camera + 1088, camera + 224, 4);
+  CopyDoublewords(base, camera + 1088, camera + 224, 2);
+  return camera;
+}
+
+void View2Update(uint8_t* base, uint32_t camera, uint32_t frame,
+                 const VideoOutputCall& video_output) {
+  ITC_NATIVE_RUNNING("sub_82153E58 ViewCamera2::Update");
+  const uint32_t f = frame;
+  const uint32_t tracker = camera + 32;
+  const double one = Lfs(base, kOne);
+  for (uint32_t at : {124u, 140u, 156u, 172u}) {
+    Stfs(base, f + at, one);
+  }
+  StoreIdentity(base, f + 112);
+  TargetTrack(base, tracker, Load(base, camera + 16), f - 256);
+  SetLens(base, camera, Zoom(base, kChaseDegrees, f + 80, f, 0x82153EF0, video_output),
+          Lfs(base, kZero));
+  const uint32_t turn = camera + 96;
+  car_physics::MatrixMultiplyTranslation(base, f + 112, turn, tracker, f - 192);
+  uint32_t viewport = Load(base, camera + 20);
+  matrix_math::Vec4Transform(base, viewport + 1600, f + 112, viewport + 1680);
+  viewport = Load(base, camera + 20);
+  matrix_math::Vec4Transform(base, viewport + 1616, f + 112, viewport + 1696);
+  viewport = Load(base, camera + 20);
+  matrix_math::Vec4Transform(base, viewport + 1664, f + 112, viewport + 1744);
+  viewport = Load(base, camera + 20);
+  matrix_math::Vec4Transform(base, viewport + 1632, turn, viewport + 1712);
+  NearestHuman(base, camera, f + 96, f);
+  LookPoint(base, camera, f, one);
 }
 
 }  // namespace camera_modes
