@@ -192,6 +192,8 @@ set(ITC_SOURCES
     src/xaudio/reverb_stages.cpp
     src/xaudio/reverb_core.cpp
     src/xaudio/reverb_setup.cpp
+    src/hooks/app_start_up.cpp
+    src/app_start_up/start_up.cpp
     src/save_interface/save_interface.cpp
     src/save_interface/save_layer.cpp
     src/hooks/file_layer.cpp
@@ -353,6 +355,7 @@ set(ITC_SOURCES
     src/harnesses/race_states.cpp
     src/harnesses/archive.cpp
     src/harnesses/save_interface.cpp
+    src/harnesses/app_start_up.cpp
     src/harnesses/car_sounds.cpp
     src/harnesses/x3daudio.cpp
     src/harnesses/xaudio.cpp
