@@ -259,6 +259,9 @@ struct SetUpGuestCalls {
 // restored; the request it leaves in its own frame is read by nothing.
 extern "C" REX_FUNC(sub_8209DE48) {
   ITC_ARCHIVE_QUEUE_FALLBACK(8209DE48)
+  if (hooks::StartUpRecorded(ctx, 0x8209DE48)) {
+    return;
+  }
   SetSerial(ctx, archive::Queue(base, archive::BuildLoad(base, ctx.r3.u32, ctx.r4.u32,
                                                          ctx.r5.u32, ctx.r6.u32, ctx.r7.u32,
                                                          ctx.r8.u32)));

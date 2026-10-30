@@ -8,15 +8,20 @@
 
 #include "guest.h"
 
+#include "archive/archive.h"
 #include "base/flags.h"
 #include "data_tables/data_tables.h"
+#include "hooks/archive.h"
+#include "hooks/heap.h"
 
 ITC_FLAG_BOOL(native_data_tables, true, "ITC",
               "Run the data tables (docs/functions/data-tables.md: SwapWord, sub_820C97D8; "
               "the entries' swaps, sub_82111AE0, sub_82111B30 and sub_821128E0; the loads' "
               "callbacks, sub_821170D8, sub_821170C0, sub_821170F0, sub_82116FF0 and "
               "sub_82117058; the accessors, sub_82117158, sub_82117178, sub_82116DA8, "
-              "sub_82117190, sub_821171B0, sub_82117210 and sub_82117228) natively instead of through the translated code (same results; "
+              "sub_82117190, sub_821171B0, sub_82117210 and sub_82117228; with --native_heap, "
+              "DataTables::Init sub_82116DB0, and with the archive's queue native, "
+              "DataTables::Load sub_82117240) natively instead of through the translated code (same results; "
               "checked by --run_harnesses=data_tables)");
 
 // The flag's fallback. The swapping adapters then turn flush-to-zero off, as
@@ -73,4 +78,35 @@ ITC_DATA_TABLES_WORD(82117228, Entry40(base, ctx.r3.u32))
 extern "C" REX_FUNC(sub_821171B0) {
   ITC_DATA_TABLES_FALLBACK(821171B0)
   ctx.r3.s64 = Find20(base, ctx.r3.u32, ctx.r4.u32);
+}
+
+// DataTables::Init: r3 as the original leaves it (Archive::Toc's, lwz's).
+extern "C" REX_FUNC(sub_82116DB0) {
+  REX_FUNC_PROLOGUE();
+  if (ITC_FLAG(native_data_tables) && hooks::NativeHeapActive()) {
+    if (const auto r3 = Init(base)) {
+      ctx.r3.u64 = *r3;
+      return;
+    }
+  }
+  __imp__sub_82116DB0(ctx, base);
+}
+
+// DataTables::Load: the loads through the archive's queue's plain C++.
+extern "C" REX_FUNC(sub_82117240) {
+  REX_FUNC_PROLOGUE();
+  if (!ITC_FLAG(native_data_tables) || !hooks::NativeArchiveQueue()) {
+    __imp__sub_82117240(ctx, base);
+    return;
+  }
+  const int64_t serial = Load(base, [base](uint32_t id, uint32_t destination, uint32_t callback,
+                                           uint32_t context) {
+    return archive::Queue(base, archive::BuildLoad(base, id, destination, callback, context, 0, 0));
+  });
+  // r3 the serial (lwz's) or -1 (li's), as Archive::Load's adapter leaves it.
+  if (serial < 0) {
+    ctx.r3.s64 = -1;
+  } else {
+    ctx.r3.u64 = uint64_t(serial);
+  }
 }

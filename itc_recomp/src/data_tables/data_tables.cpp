@@ -3,7 +3,9 @@
 #include "data_tables/data_tables.h"
 
 #include "base/log.h"
+#include "archive/archive.h"
 #include "guest.h"
+#include "memory/c_runtime_heap.h"
 
 #include <bit>
 
@@ -142,6 +144,102 @@ uint32_t Entry20(uint8_t* base, uint32_t index) {
 uint32_t Entry40(uint8_t* base, uint32_t index) {
   ITC_NATIVE_RUNNING("sub_82117228 DataTables::Entry40");
   return guest::LoadU32(base, guest::LoadU32(base, kTables) + 56) + 40 * index;
+}
+
+namespace {
+
+// The TOC's size for `id` as Init reads it: the unpacked size, or the stored
+// size when that's 0. `toc` is Archive::Toc's answer.
+uint32_t TocSize(uint8_t* base, uint32_t toc, uint32_t id) {
+  const uint32_t unpacked = guest::LoadU32(base, toc + 16 * id + 24);
+  return unpacked != 0 ? unpacked : guest::LoadU32(base, toc + 16 * id + 20);
+}
+
+// +4 (the loads pending) up by one.
+void CountUp(uint8_t* base, uint32_t object) {
+  guest::StoreU32(base, object + 4, guest::LoadU32(base, object + 4) + 1);
+}
+
+}  // namespace
+
+std::optional<uint32_t> Init(uint8_t* base) {
+  ITC_NATIVE_RUNNING("sub_82116DB0 DataTables::Init");
+  const auto made = memory::crt::OperatorNew(base, 64);
+  if (!made) {
+    return std::nullopt;
+  }
+  const uint32_t object = *made;
+  guest::StoreU32(base, kTables, object);
+  guest::StoreU32(base, object + 12, 0);
+  guest::StoreU32(base, object + 4, 0);
+  guest::StoreU32(base, object + 8, 0);
+  if (guest::LoadU32(base, object + 12) != 0) {
+    return uint32_t(object);  // never: the store above
+  }
+  uint32_t total = 0;
+  uint32_t toc = 0;
+  for (;;) {
+    if (total != 0) {
+      const auto block = memory::crt::OperatorNewArray(base, total);
+      if (!block) {
+        return std::nullopt;
+      }
+      guest::StoreU32(base, object + 12, *block);
+    }
+    const uint32_t block = guest::LoadU32(base, object + 12);
+    // Each table pointer: the block plus the sizes so far, or 0 when the
+    // one before was 0 (the first: the block itself).
+    uint32_t pointer = block;
+    const auto next = [&](uint32_t size) { pointer = pointer != 0 ? block + size : 0u; };
+    guest::StoreU32(base, object + 4, 0);
+    CountUp(base, object);
+    guest::StoreU32(base, object + 16, pointer);
+    toc = archive::Toc(base, 94);
+    uint32_t size = TocSize(base, toc, 94);
+    next(size);
+    CountUp(base, object);
+    guest::StoreU32(base, object + 60, pointer);
+    toc = archive::Toc(base, 84);
+    size += TocSize(base, toc, 84);
+    next(size);
+    for (uint32_t i = 0; i < 8; i++) {
+      CountUp(base, object);
+      guest::StoreU32(base, object + 20 + 4 * i, pointer);
+      size += archive::AssetSize(base, guest::LoadU32(base, kTableIds + 4 * i));
+      next(size);
+    }
+    CountUp(base, object);
+    guest::StoreU32(base, object + 52, pointer);
+    toc = archive::Toc(base, 95);
+    size += TocSize(base, toc, 95);
+    next(size);
+    CountUp(base, object);
+    guest::StoreU32(base, object + 56, pointer);
+    toc = archive::Toc(base, 96);
+    total = size + TocSize(base, toc, 96);
+    if (guest::LoadU32(base, object + 12) != 0) {
+      return toc;
+    }
+  }
+}
+
+int64_t Load(uint8_t* base, const LoadCall& load) {
+  ITC_NATIVE_RUNNING("sub_82117240 DataTables::Load");
+  int64_t serial = 0;
+  const auto one = [&](uint32_t id, uint32_t offset, uint32_t callback, bool table_context) {
+    const uint32_t object = guest::LoadU32(base, kTables);
+    const uint32_t table = guest::LoadU32(base, object + offset);
+    serial = load(id, table, callback, table_context ? table : object);
+    guest::StoreU32(base, guest::LoadU32(base, kTables), uint32_t(serial));
+  };
+  one(94, 16, 0x821170D8, false);
+  one(84, 60, 0x821170C0, false);
+  for (uint32_t i = 0; i < 8; i++) {
+    one(guest::LoadU32(base, kTableIds + 4 * i), 20 + 4 * i, 0x821170F0, true);
+  }
+  one(95, 52, 0x82116FF0, true);
+  one(96, 56, 0x82117058, true);
+  return serial;
 }
 
 }  // namespace data_tables

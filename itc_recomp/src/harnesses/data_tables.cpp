@@ -8,13 +8,20 @@
 
 #include "harness.h"
 
+#include "archive/archive.h"
 #include "base/flags.h"
+#include "base/log.h"
 #include "data_tables/data_tables.h"
+#include "hooks/app_start_up.h"
+#include "hooks/archive.h"
+#include "hooks/heap.h"
+#include "memory/c_runtime_heap.h"
 
 #include <fmt/format.h>
 
 #include <iterator>
 #include <string>
+#include <vector>
 
 ITC_FLAG_DECLARE(bool, native_data_tables);
 
@@ -357,6 +364,181 @@ void Accessors(Context& h) {
   }
 }
 
+// --- The set-up and the loads ---
+
+void NativeInit(PPCContext& t, uint8_t* base) {
+  if (const auto r3 = dt::Init(base)) {
+    t.r3.u64 = *r3;
+    return;
+  }
+  __imp__sub_82116DB0(t, base);
+}
+
+// DataTables::Init with the real TOC (case 0) or a fake BUILD TOC in the
+// scratch area (random sizes, the unpacked one 0 at times). The object is
+// prefilled (its +0 isn't written: the allocation layer's first fit hands
+// the freed 64 bytes back) and compared by its words, the table pointers
+// against the block; then both freed and the global put back.
+void Init(Context& h) {
+  Results results("DataTables::Init (sub_82116DB0)");
+  if (!hooks::NativeHeapActive()) {
+    ITC_LOG_WARN("harness: data_tables: DataTables::Init needs --native_heap");
+    return;
+  }
+  const uint32_t tables_global = guest::LoadU32(h.base, dt::kTables);
+  const uint32_t toc_global = guest::LoadU32(h.base, archive::kBuildToc);
+  const uint32_t fake = h.data + 1024;
+  int reused = 0;
+  for (int c = 0; c < 8; c++) {
+    std::vector<uint32_t> sizes;
+    for (uint32_t i = 0; i < 2 * 97; i++) {
+      sizes.push_back(h.random.Below(3) == 0 ? 0 : h.random.Below(3000));
+    }
+    sizes[2 * 96] = 1 + h.random.Below(3000);  // a total that isn't 0
+    const uint32_t fill = uint32_t(h.random.Next());
+    Outputs out[2];
+    for (int v = 0; v < 2; v++) {
+      Fill(h.base, h.data, kScratchBytes);
+      if (c != 0) {
+        for (uint32_t i = 0; i < 97; i++) {
+          guest::StoreU32(h.base, fake + 16 * (i + 1) + 4, sizes[2 * i + 1]);
+          guest::StoreU32(h.base, fake + 16 * (i + 1) + 8, sizes[2 * i]);
+        }
+        guest::StoreU32(h.base, archive::kBuildToc, fake);
+      }
+      uint32_t prefilled = 0;
+      if (const auto block = memory::crt::OperatorNew(h.base, 64); block && *block != 0) {
+        for (uint32_t k = 0; k < 64; k += 4) {
+          guest::StoreU32(h.base, *block + k, fill + k);
+        }
+        memory::crt::OperatorDelete(*block);
+        prefilled = *block;
+      }
+      PPCContext t = CallContext(h);
+      ITC_FLAG(native_data_tables) = v == 1;
+      (v == 0 ? __imp__sub_82116DB0 : NativeInit)(t, h.base);
+      ITC_FLAG(native_data_tables) = true;
+      guest::StoreU32(h.base, archive::kBuildToc, toc_global);
+      const uint32_t object = guest::LoadU32(h.base, dt::kTables);
+      const uint32_t block = guest::LoadU32(h.base, object + 12);
+      out[v].Word(object == prefilled ? 1 : 0);
+      reused += object == prefilled;
+      for (uint32_t k = 0; k < 12; k += 4) {
+        out[v].Word(guest::LoadU32(h.base, object + k));
+      }
+      out[v].Word(block != 0 ? 1 : 0);
+      for (uint32_t k = 16; k < 64; k += 4) {
+        out[v].Word(guest::LoadU32(h.base, object + k) - block);
+      }
+      out[v].Word(t.r3.u32 == (c != 0 ? fake : toc_global) ? 1 : t.r3.u32);
+      out[v].Word(uint32_t(t.r3.u64 >> 32));
+      out[v].Bytes(Read(h.base, h.data, kScratchBytes));
+      memory::crt::OperatorDeleteArray(block);
+      memory::crt::OperatorDelete(object);
+      guest::StoreU32(h.base, dt::kTables, tables_global);
+    }
+    results.Check(out[0], out[1], c == 0 ? "the real TOC" : fmt::format("a fake TOC, case {}", c));
+  }
+  ITC_LOG_INFO("harness: DataTables::Init: {} of 16 runs got the prefilled object back", reused);
+  results.Report();
+}
+
+// The loads Archive::Load is asked for (both versions'), each answered with
+// the next of `serials`.
+struct LoadRecord {
+  std::vector<uint32_t> calls;
+  std::vector<int64_t> serials;
+  size_t next = 0;
+  int64_t Answer(uint32_t id, uint32_t destination, uint32_t callback, uint32_t context,
+                 uint32_t r7, uint32_t r8) {
+    calls.insert(calls.end(), {id, destination, callback, context, r7, r8});
+    return next < serials.size() ? serials[next++] : 0;
+  }
+};
+LoadRecord* g_loads = nullptr;
+
+// Archive::Load's adapter's recorder (the recompiled version's calls).
+bool RecordLoad(PPCContext& t, uint32_t address) {
+  if (address != 0x8209DE48 || g_loads == nullptr) {
+    return false;
+  }
+  const int64_t serial =
+      g_loads->Answer(t.r3.u32, t.r4.u32, t.r5.u32, t.r6.u32, t.r7.u32, t.r8.u32);
+  if (serial < 0) {
+    t.r3.s64 = -1;
+  } else {
+    t.r3.u64 = uint64_t(serial);
+  }
+  return true;
+}
+
+void NativeLoad(PPCContext& t, uint8_t* base) {
+  const int64_t serial = dt::Load(base, [](uint32_t id, uint32_t destination, uint32_t callback,
+                                           uint32_t context) {
+    return g_loads->Answer(id, destination, callback, context, 0, 0);
+  });
+  if (serial < 0) {
+    t.r3.s64 = -1;
+  } else {
+    t.r3.u64 = uint64_t(serial);
+  }
+}
+
+// DataTables::Load on an object in the scratch area (random table pointers),
+// the loads recorded instead of queued (random serials, -1 at times): the
+// calls, the area and r3 compared.
+void Load(Context& h) {
+  Results results("DataTables::Load (sub_82117240)");
+  if (!hooks::NativeArchiveQueue()) {
+    ITC_LOG_WARN("harness: data_tables: DataTables::Load needs the archive's queue native");
+    return;
+  }
+  const auto saved_recorder = hooks::g_start_up_recorder;
+  const uint32_t tables_global = guest::LoadU32(h.base, dt::kTables);
+  const uint32_t object = h.data + 64;
+  for (int c = 0; c < 16; c++) {
+    std::vector<int64_t> serials;
+    for (int i = 0; i < 12; i++) {
+      serials.push_back(h.random.Below(5) == 0 ? -1 : int64_t(h.random.Below(0x7FFFFFFF)));
+    }
+    std::vector<uint32_t> words;
+    for (int i = 0; i < 16; i++) {
+      words.push_back(RandomWord(h.random));
+    }
+    Outputs out[2];
+    for (int v = 0; v < 2; v++) {
+      Fill(h.base, h.data, kScratchBytes);
+      for (uint32_t i = 0; i < 16; i++) {
+        guest::StoreU32(h.base, object + 4 * i, words[i]);
+      }
+      guest::StoreU32(h.base, dt::kTables, object);
+      LoadRecord loads;
+      loads.serials = serials;
+      g_loads = &loads;
+      PPCContext t = CallContext(h);
+      if (v == 0) {
+        hooks::g_start_up_recorder = RecordLoad;
+        __imp__sub_82117240(t, h.base);
+        hooks::g_start_up_recorder = saved_recorder;
+      } else {
+        NativeLoad(t, h.base);
+      }
+      g_loads = nullptr;
+      guest::StoreU32(h.base, dt::kTables, tables_global);
+      out[v].Bytes(Read(h.base, h.data, kScratchBytes));
+      out[v].Word(uint32_t(loads.calls.size()));
+      for (const uint32_t w : loads.calls) {
+        out[v].Word(w);
+      }
+      out[v].Word(t.r3.u32);
+      out[v].Word(uint32_t(t.r3.u64 >> 32));
+    }
+    results.Check(out[0], out[1], fmt::format("case {}", c));
+  }
+  hooks::g_start_up_recorder = saved_recorder;
+  results.Report();
+}
+
 }  // namespace
 
 void DataTables(Context& h) {
@@ -364,6 +546,8 @@ void DataTables(Context& h) {
   Entries(h);
   Callbacks(h);
   Accessors(h);
+  Init(h);
+  Load(h);
 }
 
 }  // namespace harness

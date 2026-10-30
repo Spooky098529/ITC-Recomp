@@ -8,6 +8,8 @@
 #pragma once
 
 #include <cstdint>
+#include <functional>
+#include <optional>
 
 namespace data_tables {
 
@@ -52,5 +54,34 @@ int32_t Find20(uint8_t* base, uint32_t key8, uint32_t key0);
 // of asset 95's and 96's tables.
 uint32_t Entry20(uint8_t* base, uint32_t index);
 uint32_t Entry40(uint8_t* base, uint32_t index);
+
+// --- The set-up and the loads (from BootData::CreateObjects, once) ---
+
+// The eight 56-byte tables' asset ids (+20 to +48).
+constexpr uint32_t kTableIds = 0x82616C64;
+
+// sub_82116DB0 DataTables::Init: the 64-byte object (operator new's plain
+// C++) into 0x826C5CA0, its +12, +4 and +8 = 0; then two passes over the
+// twelve assets (94 at +16, 84 at +60, the eight at +20 to +48, 95 at +52,
+// 96 at +56), each table pointer the block (+12) plus the sizes so far (0
+// while there's no block) and +4 counted up from 0; the sizes from the TOC
+// (Archive::Toc(id) + 16 x id + 24, or + 20 when that's 0;
+// Archive::AssetSize for the eight); between the passes the block (operator
+// new[] of the total). Returns r3 as the original leaves it (the last
+// Archive::Toc's), or nullopt where operator new's plain C++ can't answer
+// (the original runs: before anything is written for the object, or, for the
+// block, never in play).
+std::optional<uint32_t> Init(uint8_t* base);
+
+// Archive::Load (r3 the id, r4 the destination, r5 the callback, r6 its
+// context; r7 and r8 0): the serial or -1.
+using LoadCall = std::function<int64_t(uint32_t id, uint32_t destination, uint32_t callback,
+                                       uint32_t context)>;
+// sub_82117240 DataTables::Load: the twelve loads into the tables Init set
+// (94 into +16 with OnItemsLoaded and the object; 84 into +60 with OnLoaded84
+// and the object; the eight into +20 to +48 with On56Loaded and the table;
+// 95 into +52 with On20Loaded and 96 into +56 with On40Loaded, the table),
+// each serial stored at the object's +0. Returns the last serial (r3).
+int64_t Load(uint8_t* base, const LoadCall& load);
 
 }  // namespace data_tables

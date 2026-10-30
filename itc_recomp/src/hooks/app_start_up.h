@@ -11,7 +11,8 @@ namespace hooks {
 // (SceneTarget::Create, Archive::Init, ActionMappers::Init,
 // CameraPasses::Init, ScreenFades::Init, Billboards::Init,
 // SoundGlobals::Init, SaveInterface::Init, Network::SetUp, Text::Init,
-// Players::ResetControllers, Archive::WaitIdle) hand their call to it first;
+// Players::ResetControllers, Archive::WaitIdle; and Archive::Load, for the
+// data load's harness) hand their call to it first;
 // when it answers true, the adapter returns (the recorder set r3), so the
 // harness sees what App::StartUp hands each without setting anything up
 // again.
