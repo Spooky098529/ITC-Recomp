@@ -20,7 +20,9 @@
 ITC_FLAG_BOOL(native_car_models, true, "ITC",
               "Run the car models' pieces (docs/functions/car-models.md: LoadSlot::Reset "
               "sub_820D0730, LoadSlot::LoadShared sub_820D0860, with --native_heap LoadSlot::Load "
-              "sub_820D07C8 and CarModel::LoadSetA sub_820D59D8 and LoadSetB sub_820D5AC0, with --native_heap LoadSlot::ReleaseBuffer sub_820D0758, and the "
+              "sub_820D07C8 and CarModel::LoadSetA sub_820D59D8 and LoadSetB sub_820D5AC0 and CarModel::LoadExterior sub_820D5EC8, the team "
+              "emblem sub_820D3CF8, CarModel::LoadDecals sub_820D5B50 and SetVinylTextures "
+              "sub_820D5F88, with --native_heap LoadSlot::ReleaseBuffer sub_820D0758, and the "
               "deferred release sub_820C3F50; with --native_heap and the memory blocks' host lock "
               "CarModel::Release sub_820D4508; with --native_heap the vinyl sheet's texture, "
               "Texture::Create sub_820ECF08 and Texture::Free sub_820ECFC8; the decals' TGA "
@@ -78,6 +80,36 @@ void CarModelsLoadSetB(PPCContext& ctx, uint8_t* base) {
     return;
   }
   ctx.r3.s64 = cm::CarModelLoadSetB(base, ctx.r3.u32, ctx.r13.u32, hooks::NativeArchiveLoad(base));
+}
+
+void CarModelsTeamEmblem(PPCContext& ctx, uint8_t* base) {
+  // The original's jump table left in r11, r0, r12 and ctr.
+  ctx.r11.s64 = ctx.r4.s64 - 18;
+  if (ctx.r11.u32 <= 26) {
+    ctx.r0.u64 = guest::LoadU8(base, 0x82004F60 + ctx.r11.u32);
+    ctx.r12.s64 = int64_t(int32_t(0x820D3D2Cu)) + int64_t(ctx.r0.u64);
+    ctx.ctr.u64 = ctx.r12.u64;
+  }
+  ctx.r3.s64 = cm::TeamEmblem(ctx.r4.u32);
+}
+
+void CarModelsLoadDecals(PPCContext& ctx, uint8_t* base) {
+  ctx.r3.u64 = cm::CarModelLoadDecals(base, ctx.r3.u32, hooks::NativeArchiveLoad(base));
+}
+
+void CarModelsLoadExterior(PPCContext& ctx, uint8_t* base) {
+  if (hooks::NativeHeapActive()) {
+    if (const auto r3 = cm::CarModelLoadExterior(base, ctx.r3.u32, ctx.r4.u32, ctx.r1.u32,
+                                                 ctx.r13.u32, hooks::NativeArchiveLoad(base))) {
+      ctx.r3.u64 = *r3;
+      return;
+    }
+  }
+  __imp__sub_820D5EC8(ctx, base);
+}
+
+void CarModelsSetVinylTextures(PPCContext& ctx, uint8_t* base) {
+  ctx.r3.u64 = cm::CarModelSetVinylTextures(base, ctx.r3.u32);
 }
 
 void CarModelsDeferRelease(PPCContext& ctx, uint8_t* base) {
@@ -207,6 +239,10 @@ ITC_CAR_MODELS(820D0860, CarModelsLoadSlotLoadShared)
 ITC_CAR_MODELS(820D07C8, CarModelsLoadSlotLoad)
 ITC_CAR_MODELS(820D59D8, CarModelsLoadSetA)
 ITC_CAR_MODELS(820D5AC0, CarModelsLoadSetB)
+ITC_CAR_MODELS(820D3CF8, CarModelsTeamEmblem)
+ITC_CAR_MODELS(820D5B50, CarModelsLoadDecals)
+ITC_CAR_MODELS(820D5EC8, CarModelsLoadExterior)
+ITC_CAR_MODELS(820D5F88, CarModelsSetVinylTextures)
 ITC_CAR_MODELS(820D4508, CarModelsCarModelRelease)
 ITC_CAR_MODELS(820ECF08, CarModelsTextureCreate)
 ITC_CAR_MODELS(820ECFC8, CarModelsTextureFree)

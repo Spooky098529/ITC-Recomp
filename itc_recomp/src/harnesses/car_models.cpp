@@ -1236,6 +1236,8 @@ std::vector<int64_t> Serials(Random& r) {
   return serials;
 }
 
+void DecalRecords(uint8_t* base, uint32_t records, Random& r, bool none);
+
 // LoadSlot::LoadShared and Load, CarModel::LoadSetA and LoadSetB, with
 // Archive::Load's calls recorded (answered with random serials, -1 now and
 // then) and the scene's second set pointed at the block (its shared buffer
@@ -1294,6 +1296,30 @@ void Loads(Context& h, uint32_t block) {
         "shared");
     results.Report();
   }
+  {
+    Results results("CarModel::LoadDecals (sub_820D5B50)");
+    run(results, 24, __imp__sub_820D5B50, hooks::CarModelsLoadDecals,
+        [&](PPCContext& t, Random& r) {
+          DecalRecords(h.base, block + 0x100 + 208, r, r.Below(5) == 0);
+          guest::StoreU32(h.base, set + car_models::kSharedBufferSize,
+                          r.Below(4) == 0 ? r.Below(0x10000) : 0x200000);
+          t.r3.u64 = block + 0x100;
+        },
+        {}, "decals");
+    results.Report();
+  }
+  {
+    // A scene model with its car model at +24 (both in the block).
+    Results results("CarModel::SetVinylTextures (sub_820D5F88)");
+    run(results, 16, __imp__sub_820D5F88, hooks::CarModelsSetVinylTextures,
+        [&](PPCContext& t, Random& r) {
+          const uint32_t scene_model = block + 0x40 + 4 * r.Below(16);
+          guest::StoreU32(h.base, scene_model + 24, block + 0x1000 + 4 * r.Below(256));
+          t.r3.u64 = scene_model;
+        },
+        {}, "vinyl textures");
+    results.Report();
+  }
   if (!hooks::NativeHeapActive()) {
     ITC_LOG_WARN("harness: car_models: --native_heap is off: the loads' cases skipped");
     return;
@@ -1325,6 +1351,116 @@ void Loads(Context& h, uint32_t block) {
   }
 }
 
+// The team emblem: blocks around 18 to 44 and any; r3, and r11, r0, r12 and
+// ctr as the jump table leaves them (the same values in before).
+void TeamEmblems(Context& h) {
+  Results results("TeamEmblem (sub_820D3CF8)");
+  for (int c = 0; c < 96; c++) {
+    const uint32_t block = c < 64 ? uint32_t(c - 10) : uint32_t(h.random.Next());
+    Outputs out[2];
+    for (int v = 0; v < 2; v++) {
+      PPCContext t = CallContext(h);
+      t.r0.u64 = t.r11.u64 = t.r12.u64 = t.ctr.u64 = 0xCDCDCDCDCDCDCDCDull;
+      t.r3.u64 = 0x1234;
+      t.r4.u64 = block;
+      t.r5.u64 = 0x5678;
+      (v == 0 ? __imp__sub_820D3CF8 : hooks::CarModelsTeamEmblem)(t, h.base);
+      for (const uint64_t word : {t.r3.u64, t.r11.u64, t.r0.u64, t.r12.u64, t.ctr.u64}) {
+        out[v].Word(uint32_t(word));
+        out[v].Word(uint32_t(word >> 32));
+      }
+    }
+    results.Check(out[0], out[1], fmt::format("block {}", int32_t(block)));
+  }
+  results.Report();
+}
+
+// A car model's decal records: each of the six layers and 48 stickers a
+// negative index now and then (all of them in `none`), else a small one;
+// the stickers' +8 now and then 9 (the index taken as it is).
+void DecalRecords(uint8_t* base, uint32_t records, Random& r, bool none) {
+  for (uint32_t i = 0; i < 6; i++) {
+    Put(base, records + 64 * i,
+        none || r.Below(3) == 0 ? uint32_t(-1 - int32_t(r.Below(4))) : r.Below(26));
+  }
+  for (uint32_t k = 0; k < 48; k++) {
+    const uint32_t record = records + 384 + 64 * k;
+    Put(base, record, none || r.Below(2) == 0 ? uint32_t(-1 - int32_t(r.Below(4))) : r.Below(300));
+    if (r.Below(3) == 0) {
+      Put(base, record + 8, 9);
+    }
+  }
+}
+
+// CarModel::LoadExterior: the set-up (random, its block, set kind and decal
+// records written) copied into a car model; Archive::Load's calls recorded.
+// The block, the frame words Texture::Create leaves, the sheet's header and
+// data, and the calls, with the case's allocations (the sheet's header and
+// data, the set's pages) compared by role, then freed.
+void Exteriors(Context& h, uint32_t block) {
+  namespace cm = car_models;
+  SavedWord scene(h.base, cm::kSceneSet);
+  const uint32_t set = block + 0x2000 - cm::kSharedBuffer;
+  const uint32_t car = block + 0x100;
+  const uint32_t setup = block + 0x2100;
+  const uint32_t kind = block + 0x3F00;
+  Results results("CarModel::LoadExterior (sub_820D5EC8)");
+  for (int c = 0; c < 12; c++) {
+    const uint64_t seed = h.random.Next();
+    Outputs out[2];
+    for (int v = 0; v < 2; v++) {
+      Random r(seed);
+      RandomBytes(h.base, block, kBlockBytes, r);
+      guest::StoreU32(h.base, cm::kSceneSet, set);
+      guest::StoreU32(h.base, set + cm::kSharedBuffer, uint32_t(r.Next()));
+      guest::StoreU32(h.base, set + cm::kSharedBufferSize, 0x200000);
+      Put(h.base, setup, r.Below(6) == 0 ? 45 + r.Below(100) : r.Below(45));
+      DecalRecords(h.base, setup + 176 + 384, r, c == 3);  // the stickers' groups from +592
+      DecalRecords(h.base, setup + 176, r, c == 3);        // the layers at +208 last
+      Put(h.base, car + 7256, kind);
+      Put(h.base, kind + 8, c % 4 == 2 ? 2 + r.Below(4) : c % 2);
+      PPCContext t = CallContext(h);
+      const uint32_t frame = t.r1.u32 - 112 - cm::kTextureCreateFrameBytes;
+      RandomBytes(h.base, frame, cm::kTextureCreateFrameBytes, r);
+      std::optional<ArchiveLoads> loads;
+      loads.emplace(std::vector<int64_t>{1, 2, -1, 4});
+      t.r3.u64 = car;
+      t.r4.u64 = setup;
+      (v == 0 ? __imp__sub_820D5EC8 : hooks::CarModelsLoadExterior)(t, h.base);
+      const uint32_t header = guest::LoadU32(h.base, car + 6684);
+      const uint32_t data = guest::LoadU32(h.base, car + 6688);
+      const uint32_t bytes =
+          TextureBytes(h.base, cm::kSheetFormat, guest::LoadU32(h.base, cm::kVinylSheetWidth),
+                       guest::LoadU32(h.base, cm::kVinylSheetWidth + 4));
+      std::vector<Known> known = {{header, 52}, {data, bytes}};
+      for (const uint32_t at : {car + 3744, car + 3968}) {
+        const uint32_t pages = guest::LoadU32(h.base, at);
+        if (memory::IsPages(pages)) {
+          known.push_back({pages, 1});
+        }
+      }
+      out[v].Word(t.r3.u32);
+      out[v].Word(uint32_t(t.r3.u64 >> 32));
+      Addresses(out[v], h.base, block, kBlockBytes, known);
+      Addresses(out[v], h.base, header, 52, known);
+      out[v].Bytes(Read(h.base, data, bytes));
+      Addresses(out[v], h.base, frame + 84, 28, known);
+      out[v].Word(uint32_t(loads->calls().size()));
+      for (const uint32_t word : loads->calls()) {
+        Address(out[v], word, known);
+      }
+      loads.reset();
+      memory::FreePages(header);
+      memory::FreePhysical(data);
+      for (size_t k = 2; k < known.size(); k++) {
+        memory::FreePages(known[k].address);
+      }
+    }
+    results.Check(out[0], out[1], fmt::format("case {}", c));
+  }
+  results.Report();
+}
+
 void Vinyls(Context& h, uint32_t block) {
   TgaHeaderClears(h, block);
   Rasterizer(h, block);
@@ -1345,7 +1481,11 @@ void CarModels(Context& h) {
   const uint32_t allocation = memory::Alloc(kBlockBytes + 16, 0);
   const uint32_t block = (allocation + 15) & ~15u;
   Slots(h, block);
+  TeamEmblems(h);
   Loads(h, block);
+  if (hooks::NativeHeapActive()) {
+    Exteriors(h, block);
+  }
   DeferReleases(h, block);
   Releases(h, block);
   Vinyls(h, block);

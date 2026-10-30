@@ -51,4 +51,40 @@ int64_t CarModelLoadSetA(uint8_t* base, uint32_t car_model, const archive::LoadC
 int64_t CarModelLoadSetB(uint8_t* base, uint32_t car_model, uint32_t pcr,
                           const archive::LoadCall& load);
 
+// sub_820D3CF8 (the team emblem): for blocks 18 to 44 the emblem's asset id
+// (168 to 188, by the original's table), -1 for the others.
+int32_t TeamEmblem(uint32_t block);
+
+// The callback the decals' loads hand Archive::Load: CarModel::OnDecalLoaded.
+constexpr uint32_t kOnDecalLoaded = 0x820D5750;
+
+// CarModel::LoadDecals (sub_820D5B50): the six vinyl layers (+208, 64 bytes
+// apart; asset index + 163 for layers 0-2, + 189 for 3-5) through
+// LoadSlot::LoadShared into +4092 + 48i, then the 48 stickers from 47 down
+// to 0 (sticker j: group j / 6's records, 64 bytes apart, at +1360, +976,
+// +1744, +2128, +3280, +2896, +2512, +592 for groups 0 to 7, record j % 6;
+// index + 383, or the index itself when the record's +8 is 9) into +4380 +
+// 48j, with OnDecalLoaded and the car model; a negative index leaves the
+// slot's +20 = 1. +4088 = 2, or 3 when nothing was asked for. Returns 1.
+uint32_t CarModelLoadDecals(uint8_t* base, uint32_t car_model, const archive::LoadCall& load);
+
+// CarModel::LoadExterior (sub_820D5EC8): the 3,696-byte set-up copied to
+// +32 (memcpy, native::Buffers_Memcpy), the vinyl sheet made (Texture::Create
+// of A8R8G8B8 at the size in 0x82602570, into +6684, +6688; `stack` the
+// guest r1 at entry, its frame 112 bytes below), for blocks 18 and up the
+// team emblem in sticker group 7's first record (+592 the id, +600 = 9),
+// set a (LoadSetA) or set b (LoadSetB) by [[+7256] + 8] (0, 1; neither
+// above), then LoadDecals. Returns 1 (LoadDecals' r3); nullopt, with nothing
+// done, where the copy can't be native (the original runs). Only while
+// --native_heap routes the game's heap to the layer.
+std::optional<uint32_t> CarModelLoadExterior(uint8_t* base, uint32_t car_model, uint32_t setup,
+                                             uint32_t stack, uint32_t pcr,
+                                             const archive::LoadCall& load);
+
+// CarModel::SetVinylTextures (sub_820D5F88): r3 = the scene model (its car
+// model at +24): the six part models at +688, 464 bytes apart, given the car
+// model's vinyl sheet (Model::SetVinylTextures with [+6684], [+6692], the
+// car model reread each time). Returns the last part model (its r3).
+uint32_t CarModelSetVinylTextures(uint8_t* base, uint32_t scene_model);
+
 }  // namespace car_models
