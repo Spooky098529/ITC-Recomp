@@ -110,6 +110,22 @@ When the user has reviewed a run's section, its heading gets
   the original leaves them. Three leads added (the race's end on the
   career's side `sub_82150E00`; front-end screens over the career; a
   probable menu sound `sub_821103F0`).
+- The career, migration 1 (fd83bca..a3d7ec3). For review: no career
+  function runs in an attract race (front end and the career race's
+  end), so no group was counted in a race; `Career::PickNext`
+  `sub_821159B0` native only up to its gate (15 races and day 3, the
+  path seen in play), the original past it; the stack copies (the
+  3,008-byte items, the running means, the conversions) written where
+  the originals leave them, the last of each loop only; the harness
+  skips the frame words the originals' later callees overwrite with
+  back chains and saved registers (r1 - 272 and r1 - 256 in
+  `AfterRace`, `CloseDay`'s +80 pair under `NextDay`), as native code
+  saves no registers on the guest stack, with no "(expected to
+  differ)" group; `Stats::CloseDay`'s division by 0 gives 0 as the
+  translated code's trap does, with a warning logged; the outcome-3
+  group (not seen in play) ported for `Stats::AddRaceResult`; the
+  career files build with the strict float flags. Two mutation tests
+  (reverted) showed the harness catches changes.
 
 ## Run 2026-10-29 22:22 (`b7-loop-29-10-26-2`)
 

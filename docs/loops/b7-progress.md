@@ -63,7 +63,10 @@ file's history. What's left to see in a drive, from every run:
   (`sub_82111780` and the rest of its lead line, the top of
   `leads.md`). Mapped (d91b1bb, `career.md`, 76 rows, 21 ready
   groups, no stop; blocked outside by the race event, the next lead).
-  Migration agent running.
+  Migration 1 checked (fd83bca..a3d7ec3: every ready group, 49 of
+  53 in play ours, 7 adapters removed; `--native_career`; nothing ready
+  left, the rest waits on the race event and the car objects' makers).
+  Validation agent running.
 
 ## Done
 
@@ -123,3 +126,6 @@ file's history. What's left to see in a drive, from every run:
 - After the data load's validation (`itc_2646`: race 7 s, 0 errors,
   every harness 0 differing but the expected groups): ours 3118, work
   left 3202 (wrapped 104, known 470, unknown 2628).
+- After the career's migration 1 (`itc_2658`: race 38 s, 0 errors,
+  career 0 differing): ours 3167, work left 3165 (wrapped 104, known
+  474, unknown 2587).
