@@ -44,6 +44,9 @@ constexpr uint32_t kSaveSlots = 0x826C5B58;
 constexpr uint32_t kItems = 400;
 constexpr uint32_t kItemBytes = 3008;
 constexpr uint32_t kRaceDataBytes = 0xA3B00;
+constexpr uint32_t kRaceDataSlot = 0x826C5B2C;
+constexpr uint32_t kTable0 = 0x1000;   // in the race block: the cases' table 0
+constexpr uint32_t kTable40 = 0x2000;  // and their 40-byte table
 constexpr uint32_t kResults = 0x59AE8;            // the race data's result records
 constexpr uint32_t kResultCount = 0x59AE8 + 0x49FE0;
 
@@ -152,6 +155,7 @@ void Case(Context& h, Results& results, const World& w, uint64_t seed, const Set
   for (int v = 0; v < 2; v++) {
     Random r(seed);
     SavedBytes saved(h.base, {{kSaveSlots, 16},
+                              {kRaceDataSlot, 4},
                               {data_tables::kTables, 4},
                               {car_specs::kParams, 4},
                               {cr::kPlayTimeFrames, 4}});
@@ -171,6 +175,9 @@ void Case(Context& h, Results& results, const World& w, uint64_t seed, const Set
       guest::StoreU32(h.base, kSaveSlots + 4 * p, w.save.address);
     }
     guest::StoreU32(h.base, data_tables::kTables, w.tables.address);
+    guest::StoreU32(h.base, w.tables.address + 20, w.race.address + kTable0);
+    guest::StoreU32(h.base, w.tables.address + 56, w.race.address + kTable40);
+    guest::StoreU32(h.base, kRaceDataSlot, w.race.address);
     guest::StoreU32(h.base, car_specs::kParams, w.specs.address);
     guest::StoreU32(h.base, cr::kPlayTimeFrames, uint32_t(r.Next()));
     setup(r, w);
@@ -797,6 +804,181 @@ void RaceResult(Context& h, const World& w) {
       __imp__sub_821159B0, hooks::CareerPickNext);
 }
 
+// --- The progress after a race, the day ---
+
+void NativeAnyWonKind3Stage2(PPCContext& t, uint8_t* base) {
+  t.r3.u64 = cr::AnyWonKind3Stage2(base);
+}
+void NativeAllWonKind3(PPCContext& t, uint8_t* base) { t.r3.u64 = cr::AllWonKind3(base); }
+void NativeAllWonKind4Stage2(PPCContext& t, uint8_t* base) {
+  t.r3.u64 = cr::AllWonKind4Stage2(base);
+}
+void NativeAllWonKind4Stage3(PPCContext& t, uint8_t* base) {
+  t.r3.u64 = cr::AllWonKind4Stage3(base);
+}
+void NativeAllWonKind5(PPCContext& t, uint8_t* base) { t.r3.u64 = cr::AllWonKind5(base); }
+void NativeLocationsUnlock(PPCContext& t, uint8_t* base) {
+  cr::LocationsUnlock(base, t.r3.u32, t.r4.u32);
+}
+void NativeLocationsUnlock2(PPCContext& t, uint8_t* base) {
+  cr::LocationsUnlock2(base, t.r3.u32, t.r4.u32);
+}
+void NativeCloseDay(PPCContext& t, uint8_t* base) {
+  t.fpscr.disableFlushMode();
+  t.r3.u64 = cr::StatsCloseDay(base, t.r3.u32, t.r1.u32);
+}
+
+// The day's sums CloseDay divides and means (small, a divisor of 0 and the
+// overflowing division now and then).
+void ShapeDaySums(uint8_t* base, uint32_t stats, Random& r) {
+  for (uint32_t at : {5928u, 5936u, 5944u}) {
+    guest::StoreU32(base, stats + at, SomeFloat(r));
+    guest::StoreU32(base, stats + at + 4, r.Below(4) == 0 ? 0 : r.Below(100));
+  }
+  guest::StoreU32(base, stats + 5952, r.Below(500));
+  const uint32_t divisors[] = {1, 2, 7, 30, 0, 0xFFFFFFFFu};
+  guest::StoreU32(base, stats + 5956, divisors[r.Below(6)]);
+  if (r.Below(8) == 0) {
+    // x 100 wraps to INT_MIN, over -1: the division's other trap.
+    guest::StoreU32(base, stats + 5952, 0x20000000u);
+    guest::StoreU32(base, stats + 5956, 0xFFFFFFFFu);
+  }
+  guest::StoreU32(base, stats + 5960, r.Below(4) == 0 ? uint32_t(-int32_t(r.Below(9))) : r.Below(99999));
+  guest::StoreU32(base, stats + 5964, r.Below(99999));
+  guest::StoreU16(base, stats + 6028, uint16_t(r.Below(2) == 0 ? 9998 + r.Below(3) : r.Below(100)));
+}
+
+// A table-0 entry or a 40-byte entry's three conditions.
+void WriteConditions(uint8_t* base, uint32_t at, Random& r, bool first_valid) {
+  for (uint32_t k = 0; k < 3; k++) {
+    const uint32_t c = at + 8 * k;
+    const uint32_t kinds[] = {0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 0xFFFFFFFFu, 0xFFFFFFFFu};
+    uint32_t kind = kinds[r.Below(12)];
+    if (k == 0 && first_valid && kind == 0xFFFFFFFFu) {
+      kind = r.Below(10);
+    }
+    guest::StoreU32(base, c, kind);
+    uint32_t value = kind >= 7 && kind <= 9 ? r.Below(6) : r.Below(kind == 5 || kind == 6 ? 60 : 9);
+    if (r.Below(10) == 0) {
+      value = 0xFFFFFFFFu;
+    }
+    guest::StoreU32(base, c + 4, value);
+  }
+}
+
+void ShapeAfterRace(uint8_t* base, const World& w, Random& r) {
+  const uint32_t save = w.save.address;
+  const uint32_t race = w.race.address;
+  ShapeItems(base, w, r);
+  ShapeRecords(base, w, r, 1 + r.Below(3));
+  WriteRandom(base, race + 0xA3AD0, 16, r);
+  guest::StoreU32(base, race + 0x59AE4, uint32_t(r.Next()));
+  const uint32_t locations[] = {48, 48, 14, 16, 19, 20, 5};
+  guest::StoreU32(base, save + 6112, locations[r.Below(7)]);
+  guest::StoreU32(base, save + 6108, locations[r.Below(7)]);
+  guest::StoreU32(base, save + 6104, r.Below(4));
+  guest::StoreU32(base, save + 6092, (1u << r.Below(8)) - 1);
+  guest::StoreU32(base, save + 6100, r.Below(50));
+  for (uint32_t i = 0; i < 2; i++) {
+    guest::StoreU32(base, save + 0x1CA7C + 4 * i, uint32_t(r.Next()) & uint32_t(r.Next()));
+    guest::StoreU32(base, save + 0x1D508 + 4 * i, uint32_t(r.Next()) & uint32_t(r.Next()));
+  }
+  guest::StoreU32(base, save + 0x1CA78, r.Below(20));
+  guest::StoreU32(base, save + 0x1D504, r.Below(20));
+  // Table 0: up to 40 entries, then the end (-1).
+  const uint32_t entries0 = r.Below(40);
+  for (uint32_t i = 0; i < entries0; i++) {
+    const uint32_t e = race + kTable0 + 56 * i;
+    guest::StoreU32(base, e + 0, r.Below(5));
+    guest::StoreU32(base, e + 4, uint32_t(r.Next()) | (r.Below(2) == 0 ? 0 : 0x7FF0u));
+    guest::StoreU32(base, e + 20, r.Below(2));
+    WriteConditions(base, e + 24, r, false);
+  }
+  guest::StoreU32(base, race + kTable0 + 56 * entries0, 0xFFFFFFFFu);
+  // The 40-byte table: up to 40 entries, then the end (+16 = -1).
+  const uint32_t entries40 = r.Below(40);
+  for (uint32_t i = 0; i < entries40; i++) {
+    const uint32_t e = race + kTable40 + 40 * i;
+    guest::StoreU32(base, e + 0, uint32_t(r.Next()));
+    guest::StoreU32(base, e + 4, r.Below(42));
+    guest::StoreU32(base, e + 8, r.Below(40));
+    guest::StoreU32(base, e + 12, r.Below(2));
+    WriteConditions(base, e + 16, r, true);
+  }
+  guest::StoreU32(base, race + kTable40 + 40 * entries40 + 16, 0xFFFFFFFFu);
+}
+
+void Progress(Context& h, const World& w) {
+  uint8_t* const base = h.base;
+  const ArgsFn no_args = [](PPCContext&, Random&, const World&) {};
+  const SetupFn some_won = [base](Random& r, const World& w) {
+    ShapeItems(base, w, r);
+    const uint32_t zero_in[] = {1, 1, 2, 60};
+    ShapeRecords(base, w, r, zero_in[r.Below(4)]);
+  };
+  Group(h, w, "Items::AnyWonKind3Stage2 (sub_82111818)", 32, some_won, no_args,
+        __imp__sub_82111818, NativeAnyWonKind3Stage2);
+  Group(h, w, "Items::AllWonKind3 (sub_821118B0)", 32, some_won, no_args, __imp__sub_821118B0,
+        NativeAllWonKind3);
+  Group(h, w, "Items::AllWonKind4Stage2 (sub_82111940)", 32, some_won, no_args,
+        __imp__sub_82111940, NativeAllWonKind4Stage2);
+  Group(h, w, "Items::AllWonKind4Stage3 (sub_821119D0)", 32, some_won, no_args,
+        __imp__sub_821119D0, NativeAllWonKind4Stage3);
+  Group(h, w, "Items::AllWonKind5 (sub_82111A60)", 32, some_won, no_args, __imp__sub_82111A60,
+        NativeAllWonKind5);
+  const SetupFn none = [](Random&, const World&) {};
+  const ArgsFn bit_args = [](PPCContext& t, Random& r, const World& w) {
+    t.r3.u64 = w.save.address;
+    t.r4.u64 = r.Below(8) == 0 ? uint64_t(-int64_t(1 + r.Below(8))) : r.Below(64);
+  };
+  Group(h, w, "Locations::Unlock (sub_82111D20)", 32, none, bit_args, __imp__sub_82111D20,
+        NativeLocationsUnlock);
+  Group(h, w, "Locations::Unlock2 (sub_82111D98)", 32, none, bit_args, __imp__sub_82111D98,
+        NativeLocationsUnlock2);
+  const int32_t close = -int32_t(cr::kCloseDayFrame);
+  Group(
+      h, w, "Stats::CloseDay (sub_82113898)", 64, none,
+      [base](PPCContext& t, Random& r, const World& w) {
+        t.r3.u64 = w.save.address + cr::kStats;
+        ShapeDaySums(base, t.r3.u32, r);
+      },
+      __imp__sub_82113898, NativeCloseDay,
+      {.save_floats = {48 + 5928, 48 + 5936, 48 + 5944},
+       .frame_ranges = {{close + 24, 8}, {close + 80, 16}}});
+  const int32_t next_close = -int32_t(cr::kNextDayFrame) + close;
+  Group(
+      h, w, "Career::NextDay (sub_82116AF0)", 64, none,
+      [base](PPCContext& t, Random& r, const World& w) {
+        const uint32_t save = w.save.address;
+        t.r3.u64 = save;
+        ShapeGarage(base, save + cr::kGarage, r, r.Below(20));
+        ShapeDaySums(base, save + cr::kStats, r);
+        guest::StoreU32(base, save + 6100, r.Below(30));
+        // Career::PickNext's gate holds (past it, never seen in play).
+        guest::StoreU16(base, save + 70, uint16_t(r.Below(15)));
+        guest::StoreU32(base, save + cr::kStats + 5672, r.Below(12));
+      },
+      __imp__sub_82116AF0, hooks::CareerNextDay,
+      // Stats::CloseDay's running mean at its frame's +80 is left out: the
+      // original's later callees (Career::PickNext, Stats::StartDay) save
+      // their registers over it, which native code doesn't do.
+      {.save_floats = {48 + 5672 + 8, 48 + 5928, 48 + 5936, 48 + 5944},
+       .frame_ranges = {{next_close + 24, 8}}});
+  Group(
+      h, w, "Progress::AfterRace (sub_82116588)", 160,
+      [base](Random& r, const World& w) { ShapeAfterRace(base, w, r); },
+      [](PPCContext& t, Random&, const World& w) { t.r3.u64 = w.save.address; },
+      __imp__sub_82116588, hooks::CareerAfterRace,
+      // Condition::Test's last item copy, without the words at r1 - 272 and
+      // r1 - 256: the back chains the original's stage tests (112-byte
+      // frames) and Stage::Of (96 bytes) store there below
+      // Progress::AfterRace's frame, which native code doesn't.
+      {.frame_ranges = {{-int32_t(cr::kAfterRaceFrame) - int32_t(cr::kConditionTestFrame) + 80,
+                         2976},
+                        {-272 + 4, 12},
+                        {-256 + 4, 12}}});
+}
+
 }  // namespace
 
 void Career(Context& h) {
@@ -820,6 +1002,7 @@ void Career(Context& h) {
   Garage(h, w);
   Unlocks(h, w);
   RaceResult(h, w);
+  Progress(h, w);
 }
 
 }  // namespace harness

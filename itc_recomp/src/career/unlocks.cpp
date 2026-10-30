@@ -34,6 +34,15 @@ bool KindAllowed(uint8_t* base, uint32_t item, uint32_t mask) {
 
 }  // namespace
 
+bool ConditionTestFits(uint8_t* base, uint32_t sp) {
+  const uint32_t to = sp - kConditionTestFrame + 80;
+  const int32_t items =
+      int32_t(guest::LoadU32(base, guest::LoadU32(base, data_tables::kTables) + 8));
+  return items <= 0 ||
+         (to < 0xA0000000u &&
+          !c_runtime::MayShare(to, 3008, data_tables::Item(base, 0), 3008 * uint32_t(items)));
+}
+
 std::optional<uint32_t> ConditionTest(uint8_t* base, uint32_t condition, uint32_t location,
                                       uint32_t mask, uint32_t sp) {
   ITC_NATIVE_RUNNING("sub_82112950 Condition::Test");
@@ -84,10 +93,7 @@ std::optional<uint32_t> ConditionTest(uint8_t* base, uint32_t condition, uint32_
       // copied onto the stack first (only the last copy is left there).
       const uint32_t tables = data_tables::kTables;
       const uint32_t to = sp - kConditionTestFrame + 80;
-      const int32_t items = int32_t(guest::LoadU32(base, guest::LoadU32(base, tables) + 8));
-      if (items > 0 && (to >= 0xA0000000u ||
-                        c_runtime::MayShare(to, 3008, data_tables::Item(base, 0),
-                                            3008 * uint32_t(items)))) {
+      if (!ConditionTestFits(base, sp)) {
         return std::nullopt;  // nothing written yet
       }
       int32_t count = 0;

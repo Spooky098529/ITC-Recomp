@@ -6,6 +6,7 @@
 
 #include "base/flags.h"
 #include "career/career.h"
+#include "hooks/guest_call.h"
 
 ITC_FLAG_BOOL(native_career, true, "ITC",
               "Run the career's progress (docs/functions/career.md: PlayTime::Mark "
@@ -27,7 +28,12 @@ ITC_FLAG_BOOL(native_career, true, "ITC",
               "with its case sub_821129E0 merged; Rewards::Grant sub_82114C08 with its case "
               "sub_82114C7C merged; Stats::AddRaceResult sub_82115190 with RunningMean::MergeTwo "
               "sub_82112148 (no adapter); Career::PickNext sub_821159B0's gate (past it, never "
-              "seen in play, the original)) natively instead of through the translated code (the same writes; "
+              "seen in play, the original); Progress::AfterRace sub_82116588 with the stage tests "
+              "Items::AnyWonKind3Stage2 sub_82111818, Items::AllWonKind3 sub_821118B0, "
+              "Items::AllWonKind4Stage2 sub_82111940, Items::AllWonKind4Stage3 sub_821119D0, "
+              "Items::AllWonKind5 sub_82111A60 and Locations::Unlock sub_82111D20 and "
+              "Unlock2 sub_82111D98 (no adapters); Career::NextDay sub_82116AF0 with "
+              "Stats::CloseDay sub_82113898 (no adapter)) natively instead of through the translated code (the same writes; "
               "checked by --run_harnesses=career)");
 
 namespace hooks {
@@ -146,6 +152,44 @@ void CareerPickNext(PPCContext& ctx, uint8_t* base) {
   }
 }
 
+void CareerAfterRace(PPCContext& ctx, uint8_t* base) {
+  ctx.fpscr.disableFlushMode();
+  if (!cr::AfterRaceNative(base, ctx.r1.u32)) {
+    __imp__sub_82116588(ctx, base);
+    return;
+  }
+  ctx.r3.s64 = int32_t(cr::ProgressAfterRace(base, ctx.r3.u32, ctx.r1.u32));
+}
+
+namespace {
+
+struct GuestPickNext {
+  PPCContext& ctx;
+  uint8_t* base;
+};
+
+// Career::PickNext from Career::NextDay's frame (its adapter: the gate, then
+// the original).
+void PickNextThrough(void* user, uint32_t save) {
+  auto& guest = *static_cast<GuestPickNext*>(user);
+  PPCContext& ctx = guest.ctx;
+  guest_call::InFrame(ctx, guest.base, cr::kNextDayFrame, 0x82116BA8, [&](uint32_t) {
+    ctx.r3.u64 = save;
+    ctx.r4.u64 = 0;
+    sub_821159B0(ctx, guest.base);
+  });
+}
+
+}  // namespace
+
+void CareerNextDay(PPCContext& ctx, uint8_t* base) {
+  ctx.fpscr.disableFlushMode();
+  GuestPickNext guest{ctx, base};
+  const uint32_t save = ctx.r3.u32;
+  const uint32_t sp = ctx.r1.u32;
+  ctx.r3.u64 = cr::CareerNextDay(base, save, sp, PickNextThrough, &guest);
+}
+
 }  // namespace hooks
 
 #define CAREER_ADAPTER(address, step)   \
@@ -180,3 +224,5 @@ CAREER_ADAPTER(82112950, CareerConditionTest)
 CAREER_ADAPTER(82114C08, CareerRewardsGrant)
 CAREER_ADAPTER(82115190, CareerAddRaceResult)
 CAREER_ADAPTER(821159B0, CareerPickNext)
+CAREER_ADAPTER(82116588, CareerAfterRace)
+CAREER_ADAPTER(82116AF0, CareerNextDay)

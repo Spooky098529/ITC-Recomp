@@ -163,6 +163,9 @@ bool GarageInsertCar(uint8_t* base, uint32_t garage, uint32_t car, uint32_t posi
 constexpr uint32_t kConditionTestFrame = 3168;
 std::optional<uint32_t> ConditionTest(uint8_t* base, uint32_t condition, uint32_t location,
                                       uint32_t mask, uint32_t sp);
+// Whether Condition::Test's copies from `sp` are memcpy's plain C++ (then it
+// never answers nullopt).
+bool ConditionTestFits(uint8_t* base, uint32_t sp);
 // sub_82114C08 Rewards::Grant (with its jump table's case sub_82114C7C
 // merged): bit `index` of +0x1D508 set; then by `kind` (0 to 41) bits at
 // `value` plus offsets set in the unlock set (+0x19930; 38 the set at
@@ -197,5 +200,47 @@ uint32_t StatsAddRaceResult(uint8_t* base, uint32_t save, uint32_t race, uint32_
 // races +70 below 15, or the day +6100 below 3); past it (never seen in
 // play) the original runs.
 bool PickNextSkips(uint8_t* base, uint32_t save);
+
+// --- The progress after a race, the day ---
+
+// The stage tests (no arguments read: player 0's records): sub_82111818
+// Items::AnyWonKind3Stage2 (+42 2, +36 1, +35 3, any won); sub_821118B0
+// Items::AllWonKind3 (+42 1, +35 3), sub_82111940 Items::AllWonKind4Stage2
+// (+42 2, +35 4), sub_821119D0 Items::AllWonKind4Stage3 (+42 3, +35 4),
+// sub_82111A60 Items::AllWonKind5 (+35 5): 0 when such an item has no win,
+// else 1.
+uint32_t AnyWonKind3Stage2(uint8_t* base);
+uint32_t AllWonKind3(uint8_t* base);
+uint32_t AllWonKind4Stage2(uint8_t* base);
+uint32_t AllWonKind4Stage3(uint8_t* base);
+uint32_t AllWonKind5(uint8_t* base);
+// sub_82111D20 Locations::Unlock, sub_82111D98 Locations::Unlock2: bit `bit`
+// (when not negative) set in +0x199E0 or +0x199E8.
+void LocationsUnlock(uint8_t* base, uint32_t save, uint32_t bit);
+void LocationsUnlock2(uint8_t* base, uint32_t save, uint32_t bit);
+// sub_82116588 Progress::AfterRace: the race data's totals into the stats,
+// the table-0 unlocks and the 40-byte rewards (Condition::Test from its
+// 160-byte frame below `sp`), the stage reached and its locations, the
+// location put back. Returns the stage reached (2 to 8) or -1.
+// AfterRaceNative: whether Condition::Test's copies are native (else the
+// original runs; nothing written).
+constexpr uint32_t kAfterRaceFrame = 160;
+bool AfterRaceNative(uint8_t* base, uint32_t sp);
+uint32_t ProgressAfterRace(uint8_t* base, uint32_t save, uint32_t sp);
+// sub_82113898 Stats::CloseDay: +6028 (days) up; running means from its
+// 128-byte frame below `sp` (+80, the conversions at +88, as the original):
+// +5936 from +5960, +5944 from +5964, +5928 from +5952 x 100 / +5956 (a
+// division by 0, a trap the translated code logs and runs on, gives 0).
+// Returns stats + 5928.
+constexpr uint32_t kCloseDayFrame = 128;
+uint32_t StatsCloseDay(uint8_t* base, uint32_t stats, uint32_t sp);
+// sub_82116AF0 Career::NextDay: the day up, each garage car's +1896 up, save
+// +0x1ACE0 = 0, Stats::CloseDay, Career::PickNext(save, 0) (its gate
+// natively, past it `pick_next(user, save)`, the original), Stats::StartDay
+// (the day % 7). Returns Stats::StartDay's.
+constexpr uint32_t kNextDayFrame = 112;
+using PickNextCall = void (*)(void* user, uint32_t save);
+uint32_t CareerNextDay(uint8_t* base, uint32_t save, uint32_t sp, PickNextCall pick_next,
+                       void* user);
 
 }  // namespace career

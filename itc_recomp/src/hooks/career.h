@@ -50,5 +50,12 @@ void CareerAddRaceResult(PPCContext& ctx, uint8_t* base);
 // Career::PickNext sub_821159B0: r3 = the save data, r4 = the flag; nothing
 // natively below its gate, the original past it.
 void CareerPickNext(PPCContext& ctx, uint8_t* base);
+// Progress::AfterRace sub_82116588: r3 = the save data; r3 = the stage
+// reached or -1 (sign-extended; the original where a copy isn't native).
+void CareerAfterRace(PPCContext& ctx, uint8_t* base);
+// Career::NextDay sub_82116AF0: r3 = the save data; r3 = Stats::StartDay's.
+// Career::PickNext past its gate through its adapter, from a frame like the
+// original's.
+void CareerNextDay(PPCContext& ctx, uint8_t* base);
 
 }  // namespace hooks
