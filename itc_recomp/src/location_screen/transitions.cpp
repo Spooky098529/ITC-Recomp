@@ -11,115 +11,14 @@
 #include "base/log.h"
 #include "data_tables/data_tables.h"
 #include "guest.h"
+#include "location_screen/internal.h"
 #include "mode_tick/mode_tick.h"
 #include "ui_movies/game.h"
 #include "vehicle_accessors/vehicle_accessors.h"
 
-#include <cstdlib>
-
 namespace location_screen {
 
-namespace {
-
-constexpr uint32_t kFinishNamed = 0x8211DF20;
-constexpr uint32_t kFinishAll = 0x8211DFF8;
-constexpr uint32_t kRun = 0x8211E1B8;
-
-uint32_t Screen(uint8_t* base) { return guest::LoadU32(base, kScreen); }
-
-// The movie with id `id`: the id at the frame's +80, then UiMovies::Find.
-uint32_t Movie(uint8_t* base, uint32_t frame, uint32_t id) {
-  guest::StoreU32(base, frame + 80, id);
-  return guest::LoadU32(base, ui_movies::PairsFind(base, ui_movies::kMovieTable, frame + 80));
-}
-
-uint32_t Required(const std::optional<uint32_t>& r3, const char* what) {
-  if (!r3) {
-    ITC_LOG_ERROR("location screen: {} refused after the adapter's checks", what);
-    std::abort();
-  }
-  return *r3;
-}
-
-// UiMovie::SetText from the frame at `frame` (its r1), no arguments.
-uint32_t SetText(uint8_t* base, const Calls& calls, uint32_t frame, uint32_t movie,
-                 uint32_t sub_scene, uint32_t child, uint32_t id) {
-  static constexpr uint64_t kNoArguments[4] = {0, 0, 0, 0};
-  return Required(ui_movies::SetText(base, *calls.format, frame, movie, sub_scene, child, id,
-                                     kNoArguments),
-                  "UiMovie::SetText");
-}
-
-uint32_t ShowNode(uint8_t* base, uint32_t movie, uint32_t sub_scene, uint32_t child) {
-  const uint32_t node = ui_movies::FindNode(base, movie, sub_scene, child);
-  guest::StoreU32(base, node + 80, 1);
-  return node;
-}
-
-uint32_t HideNode(uint8_t* base, uint32_t movie, uint32_t sub_scene, uint32_t child) {
-  const uint32_t node = ui_movies::FindNode(base, movie, sub_scene, child);
-  guest::StoreU32(base, node + 80, 0);
-  return node;
-}
-
-// UiMovie::SetNodeColor: the node (sub_scene, child)'s color.
-uint32_t SetNodeColor(uint8_t* base, uint32_t movie, uint32_t sub_scene, uint32_t child,
-                      uint32_t color) {
-  const uint32_t node = ui_movies::FindNode(base, movie, sub_scene, child);
-  ui_movies::SetColor(base, node, color);
-  return node;
-}
-
-// UiMovie::SetPictureTexture: the picture's texture swapped; the old one.
-uint32_t SetPictureTexture(uint8_t* base, uint32_t movie, uint32_t sub_scene, uint32_t child,
-                           uint32_t texture) {
-  const uint32_t picture = ui_movies::FindNode(base, movie, sub_scene, child);
-  const uint32_t slot = ui_movies::PictureTextureSlot(base, movie, picture);
-  const uint32_t old = guest::LoadU32(base, slot);
-  guest::StoreU32(base, slot, texture);
-  return old;
-}
-
-uint32_t PlayNamed(uint8_t* base, uint32_t movie, uint32_t named, uint32_t chained = 0,
-                   uint32_t reversed = 0) {
-  return ui_movies::PlayNamed(base, movie, named, chained, reversed, 0, 0);
-}
-
-// UiMovie::LoopLast called from the frame at `frame`: its r3 (the slot it
-// moved to, else a copy in its 176-byte frame or the movie).
-uint32_t LoopLast(uint8_t* base, uint32_t frame, uint32_t movie) {
-  const ui_movies::Moved moved = ui_movies::LoopLast(base, movie);
-  if (moved.slot) {
-    return *moved.slot;
-  }
-  return moved.looked ? frame - 176 + 80 : movie;
-}
-
-void FinishNamed(const Calls& calls, uint32_t frame, uint32_t lr, uint32_t movie,
-                 uint32_t named) {
-  calls.Call(kFinishNamed, frame, lr, movie, named);
-}
-
-uint64_t Run(const Calls& calls, uint32_t frame, uint32_t lr, uint32_t movie) {
-  return calls.Call(kRun, frame, lr, movie, 0);
-}
-
-// Whether a fade runs (either fade's counts word set).
-bool Fading(uint8_t* base) {
-  return (guest::LoadU32(base, mode_tick::kFadeOutCounts) |
-          guest::LoadU32(base, mode_tick::kFadeInCounts)) != 0;
-}
-
-// LocationScreen::OpponentHasCard from the frame at `frame`: its plain C++,
-// or its adapter through `calls` where the item's copy can't be native.
-uint32_t HasCard(uint8_t* base, const Calls& calls, uint32_t frame, uint32_t lr) {
-  if (const auto r3 = OpponentHasCard(base, frame)) {
-    return *r3;
-  }
-  return uint32_t(calls.Call(0x82227708, frame, lr, 0));
-}
-
-}  // namespace
+using namespace detail;
 
 uint32_t ResetMovie(uint8_t* base, uint32_t sp, const Calls& calls) {
   ITC_NATIVE_RUNNING("sub_8222CD60 LocationScreen::ResetMovie");
@@ -142,8 +41,7 @@ uint32_t ResetMovie(uint8_t* base, uint32_t sp, const Calls& calls) {
             guest::LoadU32(base, frame + 96 + 4 * i));
   }
   const uint32_t menu = guest::LoadU32(base, kMenu);
-  if (guest::LoadU32(base, Screen(base) + 892) == 0 ||
-      int32_t(guest::LoadU32(base, menu)) != 2) {
+  if (guest::LoadU32(base, Screen(base) + 892) == 0 || int32_t(guest::LoadU32(base, menu)) != 2) {
     PlayNamed(base, movie, guest::LoadU32(base, menu) + 13);
     LoopLast(base, frame, movie);
   }
@@ -186,8 +84,8 @@ uint32_t ShowUnlockEntry(uint8_t* base, uint32_t sp, const Calls& calls) {
     return save;
   }
   const uint32_t entry = n * 12 + list;
-  const uint32_t e56 = data_tables::Entry56(base, guest::LoadU32(base, entry + 4),
-                                            guest::LoadU32(base, entry + 8));
+  const uint32_t e56 =
+      data_tables::Entry56(base, guest::LoadU32(base, entry + 4), guest::LoadU32(base, entry + 8));
   guest::StoreU32(base, Screen(base) + 876, guest::LoadU32(base, entry + 4));
   guest::StoreU32(base, Screen(base) + 872, guest::LoadU32(base, entry + 8));
   SetText(base, calls, frame, movie, 4, 1, guest::LoadU32(base, e56 + 12) + 4650);

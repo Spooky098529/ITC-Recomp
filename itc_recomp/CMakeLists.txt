@@ -235,6 +235,7 @@ set(ITC_SOURCES
     src/location_screen/pictures.cpp
     src/location_screen/race.cpp
     src/location_screen/transitions.cpp
+    src/location_screen/results.cpp
     src/save_interface/save_interface.cpp
     src/save_interface/save_layer.cpp
     src/hooks/file_layer.cpp

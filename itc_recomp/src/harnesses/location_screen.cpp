@@ -70,6 +70,10 @@ constexpr uint32_t kTextsBytes = 0x21000;
 constexpr uint32_t kStringsBytes = 0x10000;
 constexpr uint32_t kMissingText = 0x826C5CD8;  // TextMap::Find's answer when not found
 constexpr uint32_t kStringTable = 0x826C5C34;
+// UpdateView's globals: the lights' arrays (0x8296B950 to 0x8296BBE0) and
+// 0x8265ED00.
+constexpr uint32_t kLights = 0x8296B950, kLightsBytes = 0x290;
+constexpr uint32_t kViewCopy = 0x8265ED00;
 constexpr uint32_t kMissingMovie = 0x826C5CDC;  // UiMovies::Find's answer when not found
 
 struct Block {
@@ -394,6 +398,8 @@ void Case(Context& h, Results& results, const World& w, uint64_t seed, const Set
                               {kMissingMovie, 4},
                               {kMissingText, 4},
                               {kStringTable, 4},
+                              {kLights, kLightsBytes},
+                              {kViewCopy, 16},
                               {0x826A50AC, 0x40}});
     PPCContext t = CallContext(h);
     WriteRandom(h.base, h.data, kScratchBytes, r);
@@ -432,6 +438,8 @@ void Case(Context& h, Results& results, const World& w, uint64_t seed, const Set
     }
     out[v].Bytes(Read(h.base, w.movies.address, w.movies.bytes));
     out[v].Bytes(Read(h.base, w.texts.address, w.texts.bytes));
+    out[v].Bytes(Read(h.base, kLights, kLightsBytes));
+    out[v].Bytes(Read(h.base, kViewCopy, 16));
     out[v].Bytes(Read(h.base, 0x826A50AC, 0x40));
     Record(out[v], calls);
     out[v].Word(uint32_t(t.lr));
@@ -926,6 +934,8 @@ void BuildStrings(uint8_t* base, const World& w) {
       span = uint32_t(to - from);
     }
   }
+  ITC_LOG_INFO("harness: location_screen: strings to {}, files of up to {}",
+               int32_t(guest::LoadU32(base, kBounds + 4 * 17)), span);
   const uint32_t at = w.strings.address, container = at + 0x100;
   const uint32_t strings = container + 4 + 4 * span;
   if (strings + 8 * 64 > at + w.strings.bytes) {
@@ -1038,6 +1048,97 @@ void Texts(Context& h, const World& w) {
         __imp__sub_8222E8D8, hooks::LocationScreenTransition16, texts(160, 32));
 }
 
+// After a race (Transition23, Transition33): the racer records (1 to 4;
+// racer 0's and the human's (the last) item 0 to 9, the human's +3924 1 or
+// not), the items' +88 (3 or not) and category byte +35 (2 to 6), their
+// records' +2 (0 to 2); the 20-byte entries' +12 and +16 small (texts and
+// pictures). Transition7: the 56-byte entries' +48 (0 or 1) and +52 (an
+// item id, or -1) for ItemFlags::Set. ShowOpponentPictures: as
+// NextOpponentText's (Opponents) with 0 to 6 opponents. UpdateView: the
+// location and the opponent menu's cursor (0 to 5).
+void ShapeResults(uint8_t* base, const World& w, Random& r) {
+  guest::StoreU32(base, w.records() + kRecordCount, 1 + r.Below(4));
+  for (uint32_t k = 0; k < 4; k++) {
+    const uint32_t record = w.records() + kRecordBytes * k;
+    guest::StoreU32(base, record + 980, r.Below(10));
+    guest::StoreU32(base, record + 3924, r.Below(3) == 0 ? uint32_t(r.Next()) : r.Below(2) + 1);
+  }
+  for (uint32_t id = 0; id < kItems; id++) {
+    guest::StoreU16(base, w.item(id) + 88, uint16_t(r.Below(2) == 0 ? 3 : r.Below(6)));
+    guest::StoreU8(base, w.item(id) + 35, uint8_t(2 + r.Below(5)));
+  }
+  for (uint32_t id = 0; id < 10; id++) {
+    guest::StoreU16(base, w.save.address + ls::kItemRecords + 12 * id + 2, uint16_t(r.Below(3)));
+  }
+  for (uint32_t i = 0; i < kEntries20; i++) {
+    guest::StoreU32(base, w.table20() + 20 * i + 12, r.Below(20));
+    guest::StoreU32(base, w.table20() + 20 * i + 16, r.Below(10));
+  }
+  for (uint32_t t = 0; t < kTables56; t++) {
+    for (uint32_t i = 0; i < kEntries56; i++) {
+      const uint32_t entry = w.table56(t) + 56 * i;
+      guest::StoreU32(base, entry + 48, r.Below(4) == 0 ? 1 : 0);
+      guest::StoreU32(base, entry + 52, r.Below(8) == 0 ? 0xFFFFFFFFu : r.Below(kItems));
+    }
+  }
+  guest::StoreU32(base, w.screen.address + 872, r.Below(4));
+}
+
+void AfterRace(Context& h, const World& w) {
+  uint8_t* const base = h.base;
+  const SetupFn results = [base](Random& r, const World& w) {
+    ShapeScreen(base, w, r);
+    ShapeResults(base, w, r);
+  };
+  const ArgsFn none = [](PPCContext&, Random&, const World&) {};
+  const ArgsFn step = [](PPCContext& t, Random&, const World& w) {
+    t.r3.u64 = w.screen.address + 0x700;
+  };
+  auto texts = [](int32_t frame, uint32_t locals) {
+    Spec spec{{{-frame + 80, locals}}};
+    spec.texts = true;
+    return spec;
+  };
+  Group(h, w, "LocationScreen::Transition23 (sub_8222A470)", 300, results, step,
+        __imp__sub_8222A470, hooks::LocationScreenTransition23, texts(3168, 3024));
+  Group(h, w, "LocationScreen::Transition33 (sub_8222A718)", 300, results, step,
+        __imp__sub_8222A718, hooks::LocationScreenTransition33, texts(3168, 3024));
+  Group(h, w, "LocationScreen::Transition7 (sub_8222AE00)", 300, results, step,
+        __imp__sub_8222AE00, hooks::LocationScreenTransition7, texts(288, 128));
+  Group(h, w, "LocationScreen::ShowOpponentPictures (sub_8222B200)", 300,
+        [base](Random& r, const World& w) {
+          ShapeResults(base, w, r);
+          guest::StoreU32(base, w.screen.address + 808, r.Below(7));
+          guest::StoreU32(base, w.screen.address + 804, 4 + r.Below(6));
+          for (uint32_t id = 0; id < kItems; id++) {
+            const uint32_t item = w.item(id);
+            const uint32_t limit = id < 10 ? id : 10;
+            guest::StoreU16(base, item + 0, uint16_t(r.Below(10)));
+            for (uint32_t k = 0; k < 3; k++) {
+              guest::StoreU16(base, item + 92 + 2 * k,
+                              uint16_t(limit == 0 || r.Below(2) == 0 ? 0xFFFF : r.Below(limit)));
+            }
+          }
+          for (uint32_t id = 0; id < 10; id++) {
+            for (uint32_t k = 0; k < 3; k++) {
+              guest::StoreU16(base, w.save.address + ls::kItemRecords + 12 * id + 2 * k,
+                              uint16_t(r.Below(2)));
+            }
+          }
+        },
+        none, __imp__sub_8222B200, hooks::LocationScreenShowOpponentPictures,
+        {{{-6224 + 80, 6072}}});
+  Group(h, w, "LocationScreen::UpdateView (sub_82227E20)", 100,
+        [base](Random& r, const World& w) {
+          guest::StoreU32(base, w.screen.address + 852, r.Below(6));
+          guest::StoreU32(base, w.screen.address + kOpponentMenuAt, r.Below(6));
+          for (uint32_t i = 0; i < kLightsBytes; i += 4) {
+            guest::StoreU32(base, kLights + i, uint32_t(r.Next()));
+          }
+        },
+        none, __imp__sub_82227E20, hooks::LocationScreenUpdateView, {{{-304 + 80, 192}}});
+}
+
 }  // namespace
 
 void LocationScreen(Context& h) {
@@ -1059,6 +1160,7 @@ void LocationScreen(Context& h) {
   Opponents(h, w);
   Pictures(h, w);
   Texts(h, w);
+  AfterRace(h, w);
 }
 
 }  // namespace harness

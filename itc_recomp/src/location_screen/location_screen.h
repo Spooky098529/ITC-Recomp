@@ -312,4 +312,47 @@ uint32_t Transition14(uint8_t* base, uint32_t sp, uint32_t step, const Calls& ca
 // 1.
 uint32_t Transition16(uint8_t* base, uint32_t sp, uint32_t step, const Calls& calls);
 
+// --- After a race, the list's entry, the opponents' pictures, the lights
+// (src/location_screen/results.cpp) ---
+//
+// sub_8222A470 LocationScreen::Transition23 (to page 12, after a race) and
+// sub_8222A718 Transition33 (the same without the fade): first racer 0's
+// item copied to its 3,168-byte frame's +96, the human racer's outcome
+// (+3924 1) and its item record's +2 (1: entry kind 10, and +820 = 1 for
+// an item of category 3 to 5 at +35; else 11; else 12), its 20-byte entry
+// at +872: texts (4, 2) (5918 on) and (4, 1) (the entry's +12, 4650 on),
+// node (4, 0) hidden, node 6's pictures, named 5 looped, FadeIn(60), named
+// 95, HidePictures; then (Transition23: 0 while a fade runs) whether movie
+// 21's run is done, and then node (4, 0) shown while (4, 2) has more.
+uint32_t Transition23(uint8_t* base, uint32_t sp, uint32_t step, const Calls& calls);
+uint32_t Transition33(uint8_t* base, uint32_t sp, uint32_t step, const Calls& calls);
+// sub_8222AE00 LocationScreen::Transition7 (page 1 to 2): first the
+// location's record copied to its 288-byte frame's +96, the list cursor's
+// entry marked (+0 = 1, in the copy and the save data), its flags word 2
+// (and ItemFlags::Set of the Entry56's +48, +52 when it wasn't), save +6076
+// = 0 for tables 2 to 7, named 52 + the cursor finished, Play(-1, 8), texts
+// (4, 1) (the Entry56's +12, 4650 on) and (4, 2) (KindText), node (4, 0)
+// hidden, named 5 looped, HidePictures; then whether movie 21's run is
+// done, and then node (-1, 19 + the cursor) hidden and (4, 0) shown while
+// (4, 2) has more.
+uint32_t Transition7(uint8_t* base, uint32_t sp, uint32_t step, const Calls& calls);
+// sub_8222B200 LocationScreen::ShowOpponentPictures: node 14's children 0
+// to 6 hidden; for each of the group's opponents (+808) its item copied to
+// its 6,224-byte frame's +128, node (14, i) shown, node (14, 7 + 6i)'s
+// texture 0, 1 or 2 by its record (none, seen, won), and for a won item of
+// category 3 the first not won of the items its +92 names (copied to
+// +3136, followed) giving 1. Returns the last call's r3.
+uint32_t ShowOpponentPictures(uint8_t* base, uint32_t sp, const Calls& calls);
+// sub_82227E20 LocationScreen::UpdateView: the third camera animation's
+// object matrix (CameraAnims::ObjectMatrix, the location's id at
+// 0x82636520 + 16 x +852, the time at 0x82010780 + 4 x the opponent menu's
+// cursor) into its 304-byte frame's +208 (its w words 1.0 first, never
+// read); the three 64-byte arrays at 0x8296B950, 0x8296B980 and 0x8296B9B0
+// each moved on by a vector (0x826366C0, 0x826366B0 and the frame's 1.0
+// vectors their new first; the original's loads and stores in their
+// order), 0x8265ED00 = 0x826366A0's 16 bytes, and 128 bytes each at
+// 0x8296BAE0 and 0x8296BB60 of 0.0. Returns 0x8296B9B0 (sign-extended, as
+// the original's r3).
+uint64_t UpdateView(uint8_t* base, uint32_t sp, const Calls& calls);
+
 }  // namespace location_screen
