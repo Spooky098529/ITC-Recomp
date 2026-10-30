@@ -33,7 +33,10 @@ file's history. What's left to see in a drive, from every run:
   ran in the replay, 4 to drive.
 - Subsystem 2 of 3: the game's camera modes (`sub_82152338`...
   `sub_822282E8`; picked over the front-end menus, as ready (44 ready
-  groups each) and run every frame in a race). Mapping agent running.
+  groups each) and run every frame in a race). Mapped (9ac322c,
+  `camera-modes.md`, 100 rows, 90 in play, 38 ready groups, no stop;
+  blocked outside by `UiMovies::Open`, `Delete` and the scenery's
+  update and draw). Migration 1 running.
 
 ## Done
 
@@ -72,3 +75,5 @@ file's history. What's left to see in a drive, from every run:
 - After its validation (`itc_2692`: race 5 s after the harnesses, 0
   errors, every harness 0 differing but the expected groups): ours
   3274, work left 3123.
+- After the camera modes' map: ours 3274, work left 3123 (wrapped 104,
+  known 558, unknown 2461).

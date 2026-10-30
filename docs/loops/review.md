@@ -52,6 +52,18 @@ When the user has reviewed a run's section, its heading gets
   SetUpEvent's group mixes its own per case (other harnesses probably
   have the same, not changed); table 0's walk can read past the table
   as the original does, so the harness keeps done bits inside it.
+- The camera modes' map (9ac322c): `functions/camera-modes.md`, 100
+  rows (2 moved from `functions.md`: `sub_82152CD8`, `sub_821594B8`;
+  98 new; 90 seen in play): the race mode's camera director at +10512
+  (`CameraDirector::InitStates` `sub_82159950`, `SetMode`, `Update`),
+  its six views' camera objects (names "probably": chase, two in-car,
+  the start's look at the racers, the TV camera of replays and attract
+  races with its path files and the attract filter's `rand() % 4`, the
+  scripted cutscene `sub_82156CC0` with the rival logo), the camera
+  animations table `0x826C79B8`, two front-end cameras; vtables read
+  from the image. `known-data.md` rows added; pointers in `cameras.md`,
+  `game-modes.md`, `track-zones.md` and two leads updated. Large
+  functions skimmed, small ones read in full.
 
 ## Run 2026-10-30 01:06 (`b7-loop-29-10-26-2`)
 
