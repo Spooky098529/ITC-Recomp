@@ -73,9 +73,18 @@ file's history. What's left to see in a drive, from every run:
   `RaceScreens::Init` with its +1004 object's maker `sub_82216A60`
   (new row); 3 adapters removed; nothing ready left: the rest calls the
   menu sound, `sub_8211D930`, `sub_8211E370` or the other in-race
-  screens). Validation 2 running.
+  screens). Validated (`itc_2893`, replay `itc_2894` broke on the
+  intermittent SDK heap error, ran to the end): 15 of 15 harness lines;
+  4 ran in the race, 9 in the replay, 2 to drive; but `App::App` and
+  `App::Create`'s harnesses differ 8 of 8 (since 83b2b76): the loop
+  stopped.
 
 ## Done
+
+- The race HUD object (subsystem 3): `race-hud-object.md`, 45 of 58 in
+  play, two migrations; `--native_race_hud_object`; ac07446..e4aaf1e.
+  Validated (`itc_2883`, `itc_2893`; the second with the app's harnesses
+  differing).
 
 - The material passes (subsystem 2): `material-passes.md`, 22 of 22 in
   play, two migrations; `--native_material_passes`; 2da185e..4795aab.
@@ -140,5 +149,25 @@ file's history. What's left to see in a drive, from every run:
 - After the race HUD object's migration 2 (`itc_2892`: race 31 s, 0
   errors, race_hud_object and the touched harnesses 0 differing): ours
   3514, work left 2883 (wrapped 103, known 480, unknown 2300).
+- After its validation (`itc_2893`, 60 s: race 2 s, 0 errors, the
+  harnesses done in 56.7 s; `App::App` and `App::Create` 8 of 8
+  differing): ours 3514, work left 2883.
 
 ## Stopped
+
+2026-10-31, at the race HUD object's second validation (`itc_2893`),
+the run's limit reached (3 subsystems: the car models, the material
+passes, the race HUD object). Halted because two harnesses outside the
+subsystem differ: `App::App` (`sub_82094590`) and `App::Create`
+(`sub_82094AB8`), 8 of 8 each, at 0 in `itc_2883` before the
+migration. Probable cause (the validation agent's reading of the log,
+not fixed): 83b2b76 made `operator new`'s adapter (`sub_825A6880`,
+`hooks/c_runtime_heap.cpp`) report its calls to the shared harness
+recorder `hooks::g_start_up_recorder`, which those harnesses also use;
+the recompiled `App::App` and `App::Create` call `operator new` through
+the adapter (recorded), their native versions call it directly (not
+recorded): 240 entries against 210, 17 against 11. Nothing
+uncommitted; `check_function_statuses.py`: 0 errors. Also for the user:
+the harnesses took 56.7 of the validation's 60 s (2 s of race), close
+to outgrowing it. Left for the user: that harness, the run's section
+in `review.md`, `to-drive.md`, and the merge.

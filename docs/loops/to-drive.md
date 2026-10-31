@@ -18,6 +18,13 @@ here loses its heading.
 
 ## Run 2026-10-30 23:03 (`b7-loop-30-10-26-2`)
 
+- The race HUD object, migration 2 (attract race `itc_2893`, replay
+  `itc_2894`: broke, the SDK's "BaseHeap::Release failed because
+  address is not a region start" once at the race-end change ~118 s in,
+  as in `itc_2693` and `itc_2853`; it ran to the end):
+  `sub_82212270` RaceHud::StartCountdown,
+  `sub_82212E60` RaceHud::UpdateRecordingFull.
+
 - The race HUD object, migration 1 (attract race `itc_2883`, replay
   `itc_2884`, ok; `race-hud-object.md`; the timer's and racers' bars'
   modes, not in the replay's race):
