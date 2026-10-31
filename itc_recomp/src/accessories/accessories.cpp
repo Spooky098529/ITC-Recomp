@@ -6,6 +6,7 @@
 #include "archive/archive.h"
 #include "base/log.h"
 #include "c_runtime/strings.h"
+#include "game_data/data_file.h"
 #include "guest.h"
 #include "matrix_math/matrix_math.h"
 #include "memory/c_runtime_heap.h"
@@ -611,6 +612,62 @@ uint32_t FromScaleRotationTranslation(uint8_t* base, uint32_t out, uint32_t angl
   Stfs(base, out + 52, Lfs(base, position + 4));
   Stfs(base, out + 56, Lfs(base, position + 8));
   return out;
+}
+
+// --- The load's end ---
+
+bool Finishable(uint8_t* base, uint32_t accessory) {
+  return FileResetNative(base, accessory + 464) && FileResetNative(base, accessory + 500);
+}
+
+uint32_t AccessoryFinish(uint8_t* base, uint32_t accessory, uint32_t release, uint32_t sp,
+                         const FinishCalls& calls, bool* ran_load) {
+  ITC_NATIVE_RUNNING("sub_820EF368 Accessory::Finish");
+  if (ran_load != nullptr) {
+    *ran_load = false;
+  }
+  if (Load(base, accessory + 1048) != 0 || Load(base, accessory + 476) != 2) {
+    return Load(base, accessory + 1048);
+  }
+  const uint32_t frame = sp - 112;
+  Store(base, frame, sp);  // the back chain, for the guest calls
+  const uint32_t file = Load(base, accessory + 480), xpr = Load(base, accessory + 516);
+  if (!models::ModelLoad(base, accessory, file, xpr, calls.model_load)) {
+    calls.load(accessory, file, xpr, frame);
+  }
+  if (ran_load != nullptr) {
+    *ran_load = true;
+  }
+  if (release != 0) {
+    FileReset(base, accessory + 464);
+    FileReset(base, accessory + 500);
+  }
+  const uint32_t skeleton = accessory + 544;
+  const auto set_up = SkeletonSetUp(base, skeleton, frame);
+  const uint32_t r3 = set_up ? *set_up : calls.set_up(skeleton, frame);
+  if (r3 != 0) {
+    Copy16(base, accessory + 992,
+           Load(base, skeleton + 88) + ((Load(base, skeleton + 256) << 4) & 0xFFFFFFF0u));
+    Store(base, accessory + 1048, 1);
+  }
+  return Load(base, accessory + 1048);
+}
+
+uint64_t EntryOnLoaded(
+    uint8_t* base, uint32_t entry, uint32_t sp, const FinishCalls& calls,
+    const std::function<uint64_t(uint32_t provider, uint32_t frame)>& texture_set,
+    bool* ran_load) {
+  ITC_NATIVE_RUNNING("sub_820F0820 AccessoryEntry::OnLoaded");
+  const uint32_t frame = sp - 112;
+  const uint32_t data = Load(base, entry + 20);
+  const uint32_t accessory = entry + 48;
+  FileSetData(base, accessory + 464, game_data::GetEntry(base, data, 0, false), 0);
+  FileSetData(base, accessory + 500, game_data::GetEntry(base, data, 1, false), 0);
+  FileSetData(base, accessory + 724, game_data::GetEntry(base, data, 2, false), 0);
+  Require(Finishable(base, accessory), "Accessory::Finish");
+  AccessoryFinish(base, accessory, 1, frame, calls, ran_load);
+  return AccessorySetTexture(base, accessory, Load(base, accessory + 1040), -1, frame,
+                             texture_set);
 }
 
 }  // namespace accessories

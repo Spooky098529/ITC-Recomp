@@ -8,6 +8,7 @@
 // recorded (ArchiveLoads), never queued. Compared with harness::Outputs.
 
 #include "harness.h"
+#include "pending_frees.h"
 
 #include "accessories/accessories.h"
 #include "base/flags.h"
@@ -19,13 +20,16 @@
 #include "native/buffers.h"
 #include "memory/heap.h"
 #include "model_animation/model_animation.h"
+#include "models/memory_blocks.h"
 #include "models/model.h"
 #include "models/texture_provider.h"
+#include "models/xpr.h"
 
 #include <fmt/format.h>
 
 #include <cstring>
 #include <functional>
+#include <mutex>
 #include <string>
 #include <optional>
 #include <vector>
@@ -883,6 +887,237 @@ void FromScaleRotationTranslations(Context& h, const Block& block) {
   results.Report();
 }
 
+// --- The load's end ---
+
+constexpr uint32_t kPartFileBytes = 0x5000;
+constexpr uint32_t kPartHeader = 0x4000, kPartVertices = 0x800;
+constexpr uint32_t kXprFileBytes = 0x1000;
+
+// A minimal part file at `file` (no shapes, shader pairs or skeleton; the
+// wrong version now and then; as scene_loaders' Interior::OnPartLoaded
+// cases), its vertex data random.
+void PartFile(uint8_t* base, uint32_t file, Random& r) {
+  std::vector<uint32_t> words(kPartFileBytes / 4, 0);
+  auto put = [&](uint32_t at, uint32_t value) { words[at / 4] = value; };
+  put(0, r.Below(5) == 0 ? 0x00140000 : 0x00150000);
+  put(4, 7);
+  put(8, 9);
+  put(16, 3);
+  put(20, 0x80);
+  put(24, 0x90);
+  put(28, 0x100);
+  put(32, 0xA0);
+  put(44, 0x2000);
+  put(64, kPartHeader);
+  put(68, kPartVertices);
+  put(72, kPartHeader + kPartVertices);
+  for (uint32_t k = kPartHeader; k < kPartHeader + kPartVertices; k += 4) {
+    put(k, uint32_t(r.Next()) & 0x0FFFFFFFu);
+  }
+  for (uint32_t k = 0; k < words.size(); k++) {
+    guest::StoreU32(base, file + 4 * k, words[k]);
+  }
+}
+
+// An XPR2 file at `file` with one texture record (as shader_objects' Model::
+// Load cases).
+void XprFile(uint8_t* base, uint32_t file) {
+  for (uint32_t k = 0; k < kXprFileBytes; k += 4) guest::StoreU32(base, file + k, 0);
+  guest::StoreU32(base, file + 0, 0x58505232);
+  guest::StoreU32(base, file + 4, 256);
+  guest::StoreU32(base, file + 8, kXprFileBytes - 12 - 256);
+  guest::StoreU32(base, file + 12, 1);
+  guest::StoreU32(base, file + 12 + 4, 0x54580000);
+  guest::StoreU32(base, file + 12 + 8, 64);
+  guest::StoreU32(base, file + 12 + 16, 128);
+  guest::StoreU32(base, file + 12 + 64 + 0x20, 0x00001003);
+  guest::StoreU32(base, file + 12 + 64 + 44, 0x80);
+  guest::StoreU32(base, file + 12 + 64 + 0x30, 0x00002005);
+}
+
+// What a finished accessory holds, compared and freed: the pending frees
+// Model::Load added, its header copy and vertex data, the XPR's blocks, the
+// skeleton's arrays (SkeletonBase::SetUp's), the texture provider's storage,
+// and Reset's frame rows when it ran (`reset`; below `sp`, the stack pointer
+// of Finish's caller).
+void TakeFinished(uint8_t* base, uint32_t accessory, uint32_t sp, bool reset,
+                  const pending_frees::ListState& was, Outputs& out) {
+  pending_frees::TakeAddedNodes(base, was, out);
+  const uint32_t header = guest::LoadU32(base, accessory + 16);
+  const uint32_t vertices = guest::LoadU32(base, accessory + 20);
+  const uint32_t xpr_header = guest::LoadU32(base, accessory + models::kModelXpr + 0);
+  const uint32_t xpr_data = guest::LoadU32(base, accessory + models::kModelXpr + 8);
+  out.Word(header);
+  out.Word(vertices);
+  out.Word(xpr_header);
+  out.Word(xpr_data);
+  if (header != 0) out.Bytes(Read(base, header, kPartHeader));
+  if (vertices != 0) out.Bytes(Read(base, vertices, kPartVertices));
+  if (xpr_header != 0) out.Bytes(Read(base, xpr_header, 256));
+  if (xpr_data != 0) out.Bytes(Read(base, xpr_data, kXprFileBytes - 12 - 256));
+  const uint32_t skeleton = accessory + 544;
+  const uint32_t nodes = guest::LoadU32(base, guest::LoadU32(base, skeleton + 196) + 4);
+  const uint32_t entries = guest::LoadU32(base, skeleton + 136);
+  if (entries != 0 && nodes <= 4) out.Bytes(Read(base, entries, 144 * nodes));
+  const uint32_t matrices = guest::LoadU32(base, skeleton + 148);
+  if (matrices != 0 && nodes <= 4) out.Bytes(Read(base, matrices, 64 * nodes));
+  if (reset) out.Bytes(Read(base, sp - 112 - 128 - 192 + 80, 64));
+  out.Bytes(Read(base, accessory, 1056));
+  TakeTextures(base, accessory, out);
+  model_animation::SkeletonBaseFree(base, skeleton);
+  if (header != 0) memory::FreePages(header - models::kBlockHeaderBytes);
+  if (vertices != 0) memory::FreePhysical(vertices - models::kBlockHeaderBytes);
+  if (xpr_header != 0) memory::FreePages(xpr_header - models::kBlockHeaderBytes);
+  if (xpr_data != 0) {
+    memory::crt::XMemFree(xpr_data - models::kBlockHeaderBytes, models::kXprDataAllocation);
+  }
+}
+
+// Pages for a case's file, freed after if still alive (whether compared).
+void TakeFilePages(uint32_t pages, Outputs& out) {
+  const bool alive = pages != 0 && memory::IsPages(pages);
+  out.Word(alive ? 1 : 0);
+  if (alive) memory::FreePages(pages);
+}
+
+// The skeleton's file (accessory +724): loaded or not, a node file of 0 to 4
+// nodes at `file`. Never set up already: with the accessory not loaded, that
+// isn't reachable (SetUp answering 1 marks it loaded), and Finish would read
+// the anchor from the node rows SetUp didn't make.
+void SkeletonFile(uint8_t* base, uint32_t accessory, uint32_t file, bool lay_file,
+                  Random& r) {
+  const uint32_t skeleton = accessory + 544;
+  if (lay_file) {
+    NodeFile(base, file, int32_t(r.Below(5)), r.Below(3), r);
+  }
+  guest::StoreU32(base, skeleton + 192, r.Below(5) == 0 ? 1 : 2);
+  guest::StoreU32(base, skeleton + 196, file);
+  guest::StoreU32(base, skeleton + 260, 0);
+}
+
+// Accessory::Finish on an accessory Accessory::Accessory's plain C++ made in
+// the block: loaded already or not, the model's file loaded (+476 = 2) or
+// not, owned now and then (its part file's pages freed by the reset), the
+// XPR's file (pages holding an XPR2, or none) in any state, owned or not;
+// the skeleton's file as SkeletonFile; r4 0 or 1. The block, what
+// TakeFinished takes, the files' pages alive and r3 compared.
+void Finishes(Context& h, const Block& block) {
+  std::lock_guard<std::recursive_mutex> lock(models::MemoryBlocksMutex());
+  const uint32_t accessory = block.address + 0x100;
+  const uint32_t node_file = block.address + 0x800;
+  Results results("Accessory::Finish (sub_820EF368)");
+  for (int c = 0; c < 32; c++) {
+    const uint64_t seed = h.random.Next();
+    Outputs out[2];
+    for (int v = 0; v < 2; v++) {
+      Random r(seed);
+      WriteRandom(h.base, block.address, block.bytes, r);
+      PPCContext t = CallContext(h);
+      t.r1.u64 &= ~0xFull;
+      ac::AccessoryConstruct(h.base, accessory, t.r1.u32);
+      const uint32_t part = memory::AllocPages(kPartFileBytes, 4096);
+      PartFile(h.base, part, r);
+      const uint32_t xpr = r.Below(3) == 0 ? 0 : memory::AllocPages(kXprFileBytes, 4096);
+      if (xpr != 0) XprFile(h.base, xpr);
+      // The model's file (+464) and the XPR's (+500).
+      guest::StoreU32(h.base, accessory + 476, r.Below(6) == 0 ? r.Below(2) : 2);
+      guest::StoreU32(h.base, accessory + 480, part);
+      guest::StoreU32(h.base, accessory + 488, r.Below(4) == 0 ? 1 : 0);
+      guest::StoreU32(h.base, accessory + 472, 0x70000000u + r.Below(0x1000000));
+      guest::StoreU32(h.base, accessory + 512, r.Below(3));
+      guest::StoreU32(h.base, accessory + 516, xpr);
+      guest::StoreU32(h.base, accessory + 524, r.Below(4) == 0 ? 1 : 0);
+      guest::StoreU32(h.base, accessory + 508, 0x70000000u + r.Below(0x1000000));
+      SkeletonFile(h.base, accessory, node_file, true, r);
+      const bool set_up = guest::LoadU32(h.base, accessory + 544 + 260) != 0;
+      guest::StoreU32(h.base, accessory + 1048, r.Below(6) == 0 ? 1 : 0);
+      t.r3.u64 = accessory;
+      t.r4.u64 = r.Below(4) == 0 ? 0 : 1;
+      const pending_frees::ListState was = pending_frees::SaveList(h.base);
+      (v == 0 ? Original<__imp__sub_820EF368> : hooks::AccessoryFinish)(t, h.base);
+      out[v].Word(t.r3.u32);
+      out[v].Word(uint32_t(t.r3.u64 >> 32));
+      const bool reset = !set_up && guest::LoadU32(h.base, accessory + 544 + 260) != 0;
+      TakeFinished(h.base, accessory, t.r1.u32, reset, was, out[v]);
+      TakeFilePages(part, out[v]);
+      TakeFilePages(xpr, out[v]);
+      out[v].Bytes(Read(h.base, block.address, block.bytes));
+    }
+    results.Check(out[0], out[1], fmt::format("case {}", c));
+  }
+  results.Report();
+}
+
+// AccessoryEntry::OnLoaded on an entry AccessoryEntry::New's plain C++ made
+// (the case's pages): its file's data a container (pages) holding a part
+// file, an XPR2 and a node file (entries 0 to 2), the skeleton's state as
+// SkeletonFile, the texture index random. Loaded already now and then
+// (Finish does nothing; the texture provider then a stand-in whose slot
+// is the getter sub_82090770 over a texture set in the block). The entry's
+// bytes, what TakeFinished takes, the container and r3 compared.
+void OnLoadeds(Context& h, const Block& block) {
+  std::lock_guard<std::recursive_mutex> lock(models::MemoryBlocksMutex());
+  constexpr uint32_t kData = 0x8000, kPart = 0x1000, kXpr = 0x6000, kNodes = 0x7000;
+  Results results("AccessoryEntry::OnLoaded (sub_820F0820)");
+  for (int c = 0; c < 24; c++) {
+    const uint64_t seed = h.random.Next();
+    Outputs out[2];
+    for (int v = 0; v < 2; v++) {
+      Random r(seed);
+      WriteRandom(h.base, block.address, block.bytes, r);
+      PPCContext t = CallContext(h);
+      t.r1.u64 &= ~0xFull;
+      const uint32_t entry = ac::EntryNew(h.base, t.r1.u32);
+      const uint32_t accessory = entry + 48;
+      const uint32_t data = memory::AllocPages(kData, 4096);
+      WriteRandom(h.base, data, kPart, r);
+      // The container: three entries, little-endian.
+      const uint32_t le[4] = {3, kPart, kXpr, kNodes};
+      for (uint32_t k = 0; k < 4; k++) {
+        guest::StoreU32(h.base, data + 4 * k, __builtin_bswap32(le[k]));
+      }
+      PartFile(h.base, data + kPart, r);
+      XprFile(h.base, data + kXpr);
+      NodeFile(h.base, data + kNodes, int32_t(r.Below(5)), r.Below(3), r);
+      guest::StoreU32(h.base, entry + 20, data);
+      SkeletonFile(h.base, accessory, data + kNodes, false, r);
+      const bool set_up = guest::LoadU32(h.base, accessory + 544 + 260) != 0;
+      guest::StoreU32(h.base, accessory + 1040, r.Below(4));
+      const bool loaded = r.Below(6) == 0;
+      uint32_t provider_vtable = 0;
+      if (loaded) {
+        guest::StoreU32(h.base, accessory + 1048, 1);
+        const uint32_t vtable = block.address + 0x100, set = block.address + 0x140;
+        guest::StoreU32(h.base, vtable + 12, kGet60);
+        guest::StoreU32(h.base, set + 20, r.Below(8));
+        provider_vtable = guest::LoadU32(h.base, accessory + 80);
+        guest::StoreU32(h.base, accessory + 80, vtable);
+        guest::StoreU32(h.base, accessory + 140, set);
+      }
+      t.r3.u64 = r.Next();
+      t.r4.u64 = r.Next();
+      t.r5.u64 = r.Next();
+      t.r6.u64 = entry;
+      const pending_frees::ListState was = pending_frees::SaveList(h.base);
+      (v == 0 ? Original<__imp__sub_820F0820> : hooks::AccessoryEntryOnLoaded)(t, h.base);
+      out[v].Word(t.r3.u32 == accessory ? kMarker : t.r3.u32);
+      out[v].Word(uint32_t(t.r3.u64 >> 32));
+      if (loaded) {
+        guest::StoreU32(h.base, accessory + 80, provider_vtable);
+      }
+      out[v].Bytes(Read(h.base, entry, 48));
+      const bool reset = !set_up && guest::LoadU32(h.base, accessory + 544 + 260) != 0;
+      TakeFinished(h.base, accessory, t.r1.u32 - 112, reset, was, out[v]);
+      out[v].Bytes(Read(h.base, data, kData));
+      memory::FreePages(data);
+      memory::FreePages(entry);
+      out[v].Bytes(Read(h.base, block.address, block.bytes));
+    }
+    results.Check(out[0], out[1], fmt::format("case {}", c));
+  }
+  results.Report();
+}
+
 }  // namespace
 
 void Accessories(Context& h) {
@@ -910,6 +1145,8 @@ void Accessories(Context& h) {
         ac::AccessoryConstructible(h.base)) {
       ReleaseAlls(h, block);
       SetDestructors(h, block);
+      Finishes(h, block);
+      OnLoadeds(h, block);
     }
   }
 }

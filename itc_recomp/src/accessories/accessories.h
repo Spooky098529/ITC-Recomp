@@ -13,6 +13,7 @@
 #include <optional>
 
 #include "archive/archive.h"
+#include "models/model_load.h"
 
 namespace accessories {
 
@@ -222,5 +223,39 @@ uint32_t FromScaleRotationTranslation(uint8_t* base, uint32_t out, uint32_t angl
 // Whether a part model is constructed natively (models::CanAllocatePointers
 // for its texture provider): the constructors' adapters check it.
 bool AccessoryConstructible(uint8_t* base);
+
+// --- The load's end ---
+
+// Accessory::Finish's guest calls where a callee's plain C++ declines, each
+// from Finish's 112-byte frame at `frame` (its back chain stored): `load`
+// Model::Load's original (r3 to r5), `set_up` AccessorySkeleton::SetUp's
+// original (its r3). `model_load` Model::Load's plain C++'s own guest calls.
+struct FinishCalls {
+  models::LoadCalls model_load;
+  std::function<void(uint32_t model, uint32_t file, uint32_t xpr, uint32_t frame)> load;
+  std::function<uint32_t(uint32_t skeleton, uint32_t frame)> set_up;
+};
+// Whether Accessory::Finish runs natively: its two files' resets
+// (FileResetNative).
+bool Finishable(uint8_t* base, uint32_t accessory);
+// Accessory::Finish (sub_820EF368): `sp` the caller's stack pointer. Nothing
+// once loaded (+1048) or until the model's file (+464) is loaded (+476 = 2);
+// then Model::Load(it, [+480], [+516]), and with `release` FileReset on +464
+// and +500; then when AccessorySkeleton::SetUp(+544) answers non-zero, the
+// anchor (+992) = the 16 bytes at [skeleton +88] + 16 x [skeleton +256], and
+// +1048 = 1. Returns +1048. `ran_load` (if given) says whether Model::Load
+// was called.
+uint32_t AccessoryFinish(uint8_t* base, uint32_t accessory, uint32_t release, uint32_t sp,
+                         const FinishCalls& calls, bool* ran_load = nullptr);
+// AccessoryEntry::OnLoaded (sub_820F0820, the entry file's callback; r6 the
+// entry): with the file's data ([entry + 20]), FileSetData (not owned) on
+// the accessory's +464, +500 and +724 with DataFile::GetEntry 0, 1 and 2;
+// Accessory::Finish(accessory, 1), then Accessory::SetTexture(accessory,
+// [+1040], -1) (its provider's slot through `texture_set`), all from the
+// 112-byte frame below `sp`. Returns SetTexture's r3.
+uint64_t EntryOnLoaded(
+    uint8_t* base, uint32_t entry, uint32_t sp, const FinishCalls& calls,
+    const std::function<uint64_t(uint32_t provider, uint32_t frame)>& texture_set,
+    bool* ran_load = nullptr);
 
 }  // namespace accessories

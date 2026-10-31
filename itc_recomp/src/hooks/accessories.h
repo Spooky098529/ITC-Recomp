@@ -57,5 +57,16 @@ void AccessorySkeletonSetUp(PPCContext& ctx, uint8_t* base);
 void AccessoriesDestruct(PPCContext& ctx, uint8_t* base);
 void AccessorySetTexture(PPCContext& ctx, uint8_t* base);
 void MatrixFromScaleRotationTranslation(PPCContext& ctx, uint8_t* base);
+// The texture provider's slot as Accessory::SetTexture's plain C++ calls it.
+std::function<uint64_t(uint32_t provider, uint32_t frame)> AccessoryTextureSet(PPCContext& ctx,
+                                                                               uint8_t* base);
+// Whether Accessory::Finish runs natively: the loads, the models' lifetimes
+// and memcpy native, and its files' resets (accessories::Finishable).
+bool AccessoriesFinishNative(uint8_t* base, uint32_t accessory);
+// Accessory::Finish sub_820EF368 (r4 release the model's files; only native
+// code calls it, so no adapter: the harness's step) and
+// AccessoryEntry::OnLoaded sub_820F0820 (r6 the entry).
+void AccessoryFinish(PPCContext& ctx, uint8_t* base);
+void AccessoryEntryOnLoaded(PPCContext& ctx, uint8_t* base);
 
 }  // namespace hooks

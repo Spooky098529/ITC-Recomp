@@ -28,7 +28,8 @@ ITC_FLAG_BOOL(native_accessories, true, "ITC",
               "Accessories::ReleaseAll sub_820F0AD8 and the set's destructors sub_820F0B58, "
               "sub_820F0FE0; the skeleton's set-up sub_820F0070, sub_820EFB30; "
               "Accessory::SetTexture sub_820EF568, the provider's slot through the function "
-              "table; Matrix::FromScaleRotationTranslation sub_820EF660) natively instead of through the translated code "
+              "table; Matrix::FromScaleRotationTranslation sub_820EF660; the load's end "
+              "AccessoryEntry::OnLoaded sub_820F0820 with Accessory::Finish sub_820EF368) natively instead of through the translated code "
               "(the same words; checked by --run_harnesses=accessories)");
 
 namespace hooks {
@@ -215,17 +216,97 @@ void AccessoriesDestruct(PPCContext& ctx, uint8_t* base) {
 
 // --- The draw's helpers ---
 
-// The texture provider's vtable +12 with r4 = 0, from the original's frame,
+// The texture provider's vtable +12 with r4 = 0, from SetTexture's frame,
 // returning to 0x820EF5A8.
+std::function<uint64_t(uint32_t, uint32_t)> AccessoryTextureSet(PPCContext& ctx,
+                                                                uint8_t* base) {
+  return [&ctx, base](uint32_t provider, uint32_t frame) -> uint64_t {
+    const uint32_t function = guest::LoadU32(base, guest::LoadU32(base, provider) + 12);
+    GuestCall(ctx, base, function, frame, 0x820EF5A8, provider, 0);
+    return ctx.r3.u64;
+  };
+}
+
 void AccessorySetTexture(PPCContext& ctx, uint8_t* base) {
-  ctx.r3.u64 = accessories::AccessorySetTexture(
-      base, ctx.r3.u32, ctx.r4.u32, ctx.r5.s32, ctx.r1.u32,
-      [&ctx, base](uint32_t provider, uint32_t frame) -> uint64_t {
-        const uint32_t function =
-            guest::LoadU32(base, guest::LoadU32(base, provider) + 12);
-        GuestCall(ctx, base, function, frame, 0x820EF5A8, provider, 0);
-        return ctx.r3.u64;
-      });
+  ctx.r3.u64 = accessories::AccessorySetTexture(base, ctx.r3.u32, ctx.r4.u32, ctx.r5.s32,
+                                                ctx.r1.u32, AccessoryTextureSet(ctx, base));
+}
+
+// --- The load's end ---
+
+namespace {
+
+// Accessory::Finish's guest calls from its frame: Model::Load's original
+// (returning to 0x820EF3A8) and AccessorySkeleton::SetUp's (0x820EF3CC).
+accessories::FinishCalls FinishGuestCalls(PPCContext& ctx, uint8_t* base,
+                                          ModelLoadGuest& model_load) {
+  accessories::FinishCalls calls;
+  calls.model_load = model_load.Calls();
+  calls.load = [&ctx, base](uint32_t model, uint32_t file, uint32_t xpr, uint32_t frame) {
+    const uint64_t stack = ctx.r1.u64, link = ctx.lr;
+    ctx.r1.u64 = frame;
+    ctx.r3.u64 = model;
+    ctx.r4.u64 = file;
+    ctx.r5.u64 = xpr;
+    ctx.lr = 0x820EF3A8;
+    __imp__sub_82596920(ctx, base);
+    ctx.r1.u64 = stack;
+    ctx.lr = link;
+  };
+  calls.set_up = [&ctx, base](uint32_t skeleton, uint32_t frame) -> uint32_t {
+    const uint64_t stack = ctx.r1.u64, link = ctx.lr;
+    ctx.r1.u64 = frame;
+    ctx.r3.u64 = skeleton;
+    ctx.lr = 0x820EF3CC;
+    __imp__sub_820F0070(ctx, base);
+    ctx.r1.u64 = stack;
+    ctx.lr = link;
+    return ctx.r3.u32;
+  };
+  return calls;
+}
+
+}  // namespace
+
+bool AccessoriesFinishNative(uint8_t* base, uint32_t accessory) {
+  return AccessoriesNativeLoads() && ModelsNativeLifetime() && native::Buffers_NativeMemcpy() &&
+         accessories::Finishable(base, accessory);
+}
+
+void AccessoryFinish(PPCContext& ctx, uint8_t* base) {
+  if (!AccessoriesFinishNative(base, ctx.r3.u32)) {
+    __imp__sub_820EF368(ctx, base);
+    return;
+  }
+  const uint64_t lr = ctx.lr;
+  ModelLoadGuest model_load{ctx, base};
+  bool ran_load = false;
+  const uint32_t r3 =
+      accessories::AccessoryFinish(base, ctx.r3.u32, ctx.r4.u32, ctx.r1.u32,
+                                   FinishGuestCalls(ctx, base, model_load), &ran_load);
+  if (ran_load) {
+    ctx.fpscr.disableFlushMode();  // as Model::Load's adapter leaves it
+  }
+  ctx.lr = lr;
+  ctx.r3.u64 = r3;
+}
+
+void AccessoryEntryOnLoaded(PPCContext& ctx, uint8_t* base) {
+  if (!AccessoriesNativeLoads() || !ModelsNativeLifetime() || !native::Buffers_NativeMemcpy()) {
+    __imp__sub_820F0820(ctx, base);
+    return;
+  }
+  const uint64_t lr = ctx.lr;
+  ModelLoadGuest model_load{ctx, base};
+  bool ran_load = false;
+  const uint64_t r3 = accessories::EntryOnLoaded(base, ctx.r6.u32, ctx.r1.u32,
+                                                 FinishGuestCalls(ctx, base, model_load),
+                                                 AccessoryTextureSet(ctx, base), &ran_load);
+  if (ran_load) {
+    ctx.fpscr.disableFlushMode();
+  }
+  ctx.lr = lr;
+  ctx.r3.u64 = r3;
 }
 
 void MatrixFromScaleRotationTranslation(PPCContext& ctx, uint8_t* base) {
@@ -266,3 +347,4 @@ ITC_ACCESSORIES(820F0070, AccessorySkeletonSetUp)
 ITC_ACCESSORIES(820F0FE0, AccessoriesDestruct)
 ITC_ACCESSORIES(820EF568, AccessorySetTexture)
 ITC_ACCESSORIES(820EF660, MatrixFromScaleRotationTranslation)
+ITC_ACCESSORIES(820F0820, AccessoryEntryOnLoaded)
