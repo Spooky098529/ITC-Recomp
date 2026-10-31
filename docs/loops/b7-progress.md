@@ -62,7 +62,11 @@ file's history. What's left to see in a drive, from every run:
   of the race screens' holder `[0x826D84F0]`; the lead's texture 56
   corrected, the mirror's; blocked in part by the menu sound, two UI
   movie functions, the other in-race screens and the holder's +1004
-  object, all leads). Migration 1 running.
+  object, all leads). Migration 1 checked (003ad8d..6fe8bac: 29
+  functions in five batches, the gauges, dashboard, set-ups, signs and
+  tick; 12 adapters removed; `--native_race_hud_object`; none of it
+  runs in an attract race; 14 ready groups left). Validation 1
+  running.
 
 ## Done
 
@@ -119,5 +123,9 @@ file's history. What's left to see in a drive, from every run:
   2928.
 - After the race HUD object's map: ours 3469, work left 2928 (wrapped
   103, known 524, unknown 2301).
+- After the race HUD object's migration 1 (`itc_2882`: race 32 s, 0
+  errors, race_hud_object, track_zones, ui_movies_game and app_start_up
+  0 differing): ours 3498, work left 2899 (wrapped 103, known 495,
+  unknown 2301).
 
 ## Stopped

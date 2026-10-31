@@ -28,7 +28,21 @@ When the user has reviewed a run's section, its heading gets
   `SetText`/`SetNodeText` arguments left unset (the parking area's
   call); `sub_82212F00`'s read at +420 - 12 when no zone is inside kept;
   the draw-side work goes through the native `UiMovie::Run` (no new
-  interpolation decision). Four leads added.
+  interpolation decision). Four leads added. Migration 1's rows
+  (003ad8d..6fe8bac; `--native_race_hud_object`,
+  `src/race_hud_object/`): 29 functions, 12 now Native;
+  `sub_82212668` named `RaceHud::ResetBar`, `sub_822122A0`
+  `RaceHud::ClearWarning`. For review: the TickTimer harness keeps its
+  floats finite (a NaN distance makes `SetDistance` write negative
+  digits into the nodes' child indices, as the original does, which the
+  harness's fake node pool can't hold); guest calls through
+  `race_hud_object::Calls` (memcpy where refused,
+  `CameraPasses::RenderTarget`, `TrackZones::Create`,
+  `UiMovie::FinishNamed`, `SetText`, `ClearText`, the extra gauges'
+  digit setters); the adapters of `TrackZones::Create`,
+  `UiMovie::SetText` and `ClearText` now hand calls to the harness
+  recorder first (`hooks::StartUpRecorded`); none of it runs in an
+  attract race (no HUD there).
 - The material passes' map (2da185e): `functions/material-passes.md`,
   23 new rows (22 seen in play): `PartModel::SetPaint`, `SetPaintBody`
   (three HSV colors in r4-r9, through `Color::HsvToRgb`; the byte
