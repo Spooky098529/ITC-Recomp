@@ -17,6 +17,9 @@
 namespace track_zones {
 struct OwnerCalls;
 }
+namespace menu_sounds {
+struct Calls;
+}
 
 namespace race_hud_object {
 
@@ -319,6 +322,24 @@ uint64_t ShowItem(uint8_t* base, uint32_t hud, int32_t id, uint32_t sp, const Ca
 // differs from +460, +460 = it and ShowItem(it) (tail call). ShowItem's r3,
 // or the HUD.
 uint64_t UpdateItem(uint8_t* base, uint32_t hud, uint32_t sp, const Calls& calls);
+// RaceHud::RunCountdown (sub_822129A8): +436 = UiMovie::Run(+612, 0)
+// (through `calls`); then by the countdown's animation time
+// (UiMovie::AnimationTime(+612, -1, 0), its plain C++; into `*f1` before the
+// sound, as the original leaves f1, and through fctiwz at the 112-byte
+// frame's +80): 60, 120 or 180 sound 8, 240 sound 9 (MenuSound::Play's plain
+// C++, the manager's slot through `sounds`). The sound's r3, else the movie.
+uint64_t RunCountdown(uint8_t* base, uint32_t hud, uint32_t sp, const Calls& calls,
+                      const menu_sounds::Calls& sounds, double* f1);
+// RaceHud::UpdateRacerBar (sub_82214790): see
+// docs/functions/race-hud-object.md. `index` is the bar (r4), `racer` the
+// racer (r5), both as the original's 64-bit registers. From a 176-byte
+// frame: Touching and HudBar::Step's plain C++, the nodes found and the
+// animation played and looped (UiMovie::FindNode, Play, Loop's plain C++),
+// UiMovie::Finish and the sound manager's slot 14 (IsCuePlaying) through
+// `calls`, MenuSound::Play's plain C++ (its slot through `sounds`). r3 as
+// the original leaves it (the last call's).
+uint64_t UpdateRacerBar(uint8_t* base, uint32_t hud, uint64_t index, uint64_t racer, uint32_t sp,
+                        const Calls& calls, const menu_sounds::Calls& sounds);
 // RaceScreens::MovieMask (sub_82211BE8, with its jump table's case 0
 // sub_82211C1C merged): the movies to load for the race kind, 0 above 10.
 uint32_t MovieMask(uint32_t kind);

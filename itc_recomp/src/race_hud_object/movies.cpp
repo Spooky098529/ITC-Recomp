@@ -7,8 +7,11 @@
 #include "camera_modes/steps.h"
 #include "data_tables/data_tables.h"
 #include "guest.h"
+#include "menu_sounds/menu_sounds.h"
 #include "ui_movies/game.h"
 #include "ui_movies/ui_movies.h"
+
+#include <bit>
 
 namespace race_hud_object {
 
@@ -269,6 +272,129 @@ uint64_t ScreensInit(uint8_t* base, uint32_t holder, uint32_t kind, uint32_t sp,
   Init(base, holder + 16, frame);
   const uint64_t r3 = Make1004(base, holder + 1004, frame, calls);
   guest::StoreU32(base, holder + 8, 0);
+  return r3;
+}
+
+uint64_t RunCountdown(uint8_t* base, uint32_t hud, uint32_t sp, const Calls& calls,
+                      const menu_sounds::Calls& sounds, double* f1) {
+  ITC_NATIVE_RUNNING("sub_822129A8 RaceHud::RunCountdown");
+  const uint32_t frame = sp - 112;
+  guest::StoreU32(base, frame, sp);
+  const uint64_t run = calls.Call(kRun, frame, 0x822129C8, Movie(base, hud, kHudCountdown), 0);
+  const uint32_t movie = Movie(base, hud, kHudCountdown);
+  guest::StoreU32(base, hud + 436, uint32_t(run));
+  // UiMovie::AnimationTime leaves r3 (the movie) and its time in f1, set
+  // before the sound's call as the original leaves it.
+  const uint32_t time = ui_movies::AnimationTime(base, movie, kNone, 0);
+  *f1 = double(std::bit_cast<float>(time));
+  const int32_t frames = camera_modes::steps::Fctiwz(*f1);
+  guest::StoreU32(base, frame + 80, uint32_t(frames));
+  uint32_t cue;
+  if (frames == 60 || frames == 120 || frames == 180) {
+    cue = 8;
+  } else if (frames == 240) {
+    cue = 9;
+  } else {
+    return movie;
+  }
+  return menu_sounds::PlayMenuSound(base, cue, frame, sounds);
+}
+
+uint64_t UpdateRacerBar(uint8_t* base, uint32_t hud, uint64_t index, uint64_t racer, uint32_t sp,
+                        const Calls& calls, const menu_sounds::Calls& sounds) {
+  ITC_NATIVE_RUNNING("sub_82214790 RaceHud::UpdateRacerBar");
+  using namespace camera_modes::steps;
+  const uint32_t frame = sp - 176;
+  guest::StoreU32(base, frame, sp);
+  const uint32_t bar = uint32_t(index * 40 + hud) + 244;
+  const uint32_t racers = guest::LoadU32(base, hud + 444);
+  const uint32_t target = guest::LoadU32(base, uint32_t(racer * 972) + racers + 788);
+  if (guest::LoadU32(base, bar + 36) == 0 && Touching(base, uint32_t(racer), frame) != 0) {
+    const double value = Lfs(base, bar + 0);
+    guest::StoreU32(base, bar + 36, 1);
+    Stfs(base, bar + 8, value);
+  }
+  BarStep(base, bar, int32_t(target), frame);
+  // The group (r4 + 1) and its children 1, 3, 2 and 4, in the original's
+  // order.
+  const uint32_t group = ui_movies::FindNode(base, Movie(base, hud, kHudRacers), kNone,
+                                             uint32_t(index + 1));
+  auto child = [&](uint32_t k) {
+    return ui_movies::FindNode(base, Movie(base, hud, kHudRacers), kNone,
+                               guest::LoadU32(base, group + 100) + k);
+  };
+  const uint32_t n1 = child(1);
+  const uint32_t n3 = child(3);
+  const uint32_t n2 = child(2);
+  const uint32_t n4 = child(4);
+  uint64_t r3 = n4;
+  const bool first = int32_t(uint32_t(index)) == 0;
+  const double goal = Lfs(base, bar + 24);
+  if (!(goal > Lfs(base, bar + 16))) {
+    guest::StoreU32(base, n1 + 80, 0);
+    guest::StoreU32(base, n3 + 80, 0);
+    guest::StoreU32(base, n4 + 80, 0);
+    if (guest::LoadU32(base, bar + 32) != 0) {
+      r3 = calls.Call(kFinish, frame, 0x822148A8, Movie(base, hud, kHudRacers), ~0ull, index);
+    }
+  } else {
+    // The double at 0x8200F738 times the maximum (fmul, not rounded).
+    const uint64_t bits =
+        uint64_t(guest::LoadU32(base, 0x8200F738)) << 32 | guest::LoadU32(base, 0x8200F73C);
+    const double low = Lfs(base, bar + 20) * std::bit_cast<double>(bits);
+    if (!(goal > low)) {
+      guest::StoreU32(base, n1 + 80, 0);
+      guest::StoreU32(base, n3 + 80, 0);
+      guest::StoreU32(base, n4 + 80, 1);
+      guest::StoreU32(base, hud + 456, 1);
+      if (guest::LoadU32(base, bar + 32) == 0) {
+        guest::StoreU32(base, bar + 32, 1);
+        ui_movies::Play(base, Movie(base, hud, kHudRacers), kNone, uint32_t(index), 0, 0, 0, 0);
+        const uint32_t movie = Movie(base, hud, kHudRacers);
+        r3 = MovedR3(ui_movies::MoveAnimation(base, movie, kNone, uint32_t(index), true), frame,
+                     movie);
+      }
+      if (first) {
+        // Sound 7 unless the sound manager's slot 14 (AudioManager::
+        // IsCuePlaying: bank 0, cue 7 at the frame's +84 and +80) says it's
+        // playing.
+        guest::StoreU32(base, frame + 84, 0);
+        guest::StoreU32(base, frame + 80, 7);
+        const uint32_t manager = guest::LoadU32(base, menu_sounds::kSoundManager);
+        const uint32_t playing = guest::LoadU32(base, guest::LoadU32(base, manager) + 56);
+        r3 = calls.Call(playing, frame, 0x82214948, manager, frame + 84, frame + 80);
+        if ((r3 & 0xFF) == 0) {
+          r3 = menu_sounds::PlayMenuSound(base, 7, frame, sounds);
+        }
+      }
+    } else {
+      guest::StoreU32(base, n1 + 80, guest::LoadU32(base, bar + 28) != 0 ? 0 : 1);
+      guest::StoreU32(base, n3 + 80, 1);
+      guest::StoreU32(base, n4 + 80, 0);
+    }
+  }
+  guest::StoreU32(base, n2 + 80, int32_t(guest::LoadU32(base, bar + 36)) == 1 ? 1 : 0);
+  // The four nodes' x scales (+28): the value's fraction of the range (n3,
+  // n1, n4) and the trail's lead over it (n2), each loaded again.
+  auto range = [&]() { return Fsubs(Lfs(base, bar + 20), Lfs(base, bar + 16)); };
+  Stfs(base, n3 + 28, Fdivs(Lfs(base, bar + 0), range()));
+  Stfs(base, n1 + 28, Fdivs(Lfs(base, bar + 0), range()));
+  {
+    const double lead = Fsubs(Lfs(base, bar + 8), Lfs(base, bar + 0));
+    Stfs(base, n2 + 28, Fdivs(lead, range()));
+  }
+  Stfs(base, n4 + 28, Fdivs(Lfs(base, bar + 0), range()));
+  // Node 2's x (+12): after node 1 by the float at 0x8200F730 times its
+  // scale (bar 0: 1.0 less the trail's fraction).
+  const double width = Lfs(base, 0x8200F730);
+  double x;
+  if (first) {
+    const double scale = Fsubs(Lfs(base, 0x82000A30), Fdivs(Lfs(base, bar + 8), range()));
+    x = Fmadds(scale, width, Lfs(base, n1 + 12));
+  } else {
+    x = Fmadds(Lfs(base, n1 + 28), width, Lfs(base, n1 + 12));
+  }
+  Stfs(base, n2 + 12, x);
   return r3;
 }
 

@@ -22,6 +22,7 @@
 #include "hooks/race_hud_object.h"
 #include "hooks/ui_movies.h"
 #include "memory/heap.h"
+#include "menu_sounds/menu_sounds.h"
 #include "race_hud_object/race_hud_object.h"
 #include "ui_movies/game.h"
 
@@ -169,7 +170,8 @@ struct World {
   Block save;  // player 0's save data (the HUD options at +0x1F85C)
   Block misc;  // the viewports' pointer (+0), viewport 0 (+0x10), the build (+0x800),
                // the movies' textures (+0x1000), the racers (+0x2000), the race's
-               // progress (+0x3000)
+               // progress (+0x3000), the fake sound manager (+0x5600, its vtable
+               // +0x5800)
   Block race;  // the race data
   Block zones;  // the track zones' owner and its zones
 };
@@ -378,7 +380,8 @@ void Case(Context& h, Results& results, const World& w, uint64_t seed, const Set
                               {kOwner, 4},
                               {rh::kRaceProgress, 4},
                               {ui_movies::kMovieTable, 16},
-                              {data_tables::kTables, 4}});
+                              {data_tables::kTables, 4},
+                              {menu_sounds::kSoundManager, 4}});
     PPCContext t = CallContext(h);
     const uint32_t sp = t.r1.u32;
     WriteRandom(h.base, sp - kStackBytes, kStackBytes + kCallerBytes, r);
@@ -1311,6 +1314,128 @@ void Movies(Context& h, const World& w) {
   }
 }
 
+// The sound manager ([0x826C5C80]) for MenuSound::Play and the
+// IsCuePlaying slot: a fake one in the misc block (+0x5600, its words the
+// case's random ones) whose vtable (+0x5800) has leaf recorders, recompiled
+// and the same on both sides, as the menu sounds' harness has them: slot 10
+// (PlayCue2D) sub_820A8420 (r4's low byte to +320, r5 to +332, r6 to +336;
+// r3 left) or the getter sub_82090770 (r3 = +60); slot 14 (IsCuePlaying,
+// which reads r3 to r5 only) the getter, its answer at +60 0, 1 or any word
+// (the low byte tested).
+void ShapeSoundManager(uint8_t* base, const World& w, Random& r) {
+  constexpr uint32_t kRecordR4R6 = 0x820A8420, kGet60 = 0x82090770;
+  const uint32_t manager = w.misc.address + 0x5600;
+  const uint32_t vtable = w.misc.address + 0x5800;
+  guest::StoreU32(base, manager, vtable);
+  const uint32_t answer = r.Below(3) == 0 ? uint32_t(r.Next()) : r.Below(2);
+  guest::StoreU32(base, manager + 60, answer);
+  guest::StoreU32(base, vtable + menu_sounds::kPlayCue2DSlot,
+                  r.Below(3) == 0 ? kGet60 : kRecordR4R6);
+  guest::StoreU32(base, vtable + 56, kGet60);
+  guest::StoreU32(base, menu_sounds::kSoundManager, manager);
+}
+
+void Sounds(Context& h, const World& w) {
+  {
+    // The countdown's animation (index 0, sub-scene -1) at one of the times
+    // the sounds play at, near them or any, in the looping list or the
+    // queue, sometimes after other slots or none; the sound manager fake.
+    Spec spec;
+    spec.frame = 112;
+    spec.saves = 16;
+    spec.f1 = true;
+    Group(
+        h, w, "RaceHud::RunCountdown (sub_822129A8)", 300,
+        [&](PPCContext& t, Random& r, const World& w) {
+          const uint32_t movie = w.movie((612 - 604) / 4);
+          const uint32_t scene = guest::LoadU32(h.base, movie + ui_movies::kMovieLive);
+          if (r.Below(6) != 0) {
+            static constexpr float kTimes[] = {60.0f, 120.0f, 180.0f, 240.0f, 60.75f,
+                                               119.99f, 239.5f, 0.0f,  300.0f, -60.0f};
+            float time = kTimes[r.Below(10)];
+            switch (r.Below(10)) {
+              case 0:
+                time = AnyFloat(r, 400.0f);
+                break;
+              case 1:
+                time = std::numeric_limits<float>::quiet_NaN();
+                break;
+              case 2:
+                time = 3.0e9f;
+                break;
+            }
+            ui_movies::Slot slot{};
+            slot[0] = 0;
+            slot[1] = 0xFFFFFFFFu;
+            slot[2] = 0xFFFFFFFFu;
+            slot[3] = scene;
+            slot[4] = w.movies.address + kAnimationsAt + 64 * r.Below(8);
+            slot[5] = Bits(time);
+            ui_movies::Append(h.base, movie + (r.Below(2) == 0 ? ui_movies::kMovieQueue
+                                                               : ui_movies::kMovieLooping),
+                              slot);
+          }
+          if (r.Below(3) == 0) {
+            ShapeAnimations(h.base, w, movie, r);
+          }
+          ShapeSoundManager(h.base, w, r);
+          t.r3.u64 = w.hud.address;
+          t.f1.f64 = AnyDouble(r, 10.0f);
+        },
+        __imp__sub_822129A8, hooks::RaceHudObjectRunCountdown, spec);
+  }
+  {
+    // A bar (0 to 3, mostly 0 for the sound) of the HUD's four at +244:
+    // value, steps, trail, min and max mostly ordinary, +32 and +36 0 or 1;
+    // the racers ([+444], the misc block's) and the racer's +788 an int
+    // around the bar's range; the racers' movie's animations; the sound
+    // manager fake.
+    Spec spec;
+    spec.frame = 176;
+    spec.saves = 80;
+    for (uint32_t b = 0; b < 4; b++) {
+      spec.Floats(244 + 40 * b, 1);
+      spec.Floats(244 + 40 * b + 8, 1);
+      spec.Floats(244 + 40 * b + 24, 1);
+    }
+    Group(
+        h, w, "RaceHud::UpdateRacerBar (sub_82214790)", 800,
+        [&](PPCContext& t, Random& r, const World& w) {
+          const uint32_t hud = w.hud.address;
+          const uint32_t index = r.Below(2) == 0 ? 0 : r.Below(4);
+          const uint32_t racer = r.Below(kVehicleCount);
+          const uint32_t bar = hud + 244 + 40 * index;
+          const bool ordinary = r.Below(4) != 0;
+          auto value = [&](float range) {
+            return ordinary ? float(r.Below(int(range) + 1)) : AnyFloat(r, range);
+          };
+          guest::StoreFloat(h.base, bar + 0, value(200.0f));
+          guest::StoreFloat(h.base, bar + 4, value(20.0f));
+          guest::StoreFloat(h.base, bar + 8, value(200.0f));
+          guest::StoreFloat(h.base, bar + 12, value(20.0f));
+          guest::StoreFloat(h.base, bar + 16, ordinary ? 0.0f : AnyFloat(r, 50.0f));
+          guest::StoreFloat(h.base, bar + 20, ordinary ? 100.0f + float(r.Below(100))
+                                                           : AnyFloat(r, 300.0f));
+          if (r.Below(4) == 0) {
+            guest::StoreU32(h.base, bar + 8, guest::LoadU32(h.base, bar + 0));
+          }
+          guest::StoreU32(h.base, bar + 28, r.Below(2));
+          guest::StoreU32(h.base, bar + 32, r.Below(5) == 0 ? uint32_t(r.Next()) : r.Below(2));
+          guest::StoreU32(h.base, bar + 36, r.Below(5) == 0 ? uint32_t(r.Next()) : r.Below(2));
+          guest::StoreU32(h.base, hud + 444, w.racers());
+          guest::StoreU32(h.base, w.racers() + 972 * racer + 788,
+                          r.Below(6) == 0 ? uint32_t(r.Next())
+                                          : uint32_t(int32_t(r.Below(300)) - 30));
+          ShapeAnimations(h.base, w, w.movie(0), r);
+          ShapeSoundManager(h.base, w, r);
+          t.r3.u64 = hud;
+          t.r4.u64 = index;
+          t.r5.u64 = racer;
+        },
+        __imp__sub_82214790, hooks::RaceHudObjectUpdateRacerBar, spec);
+  }
+}
+
 }  // namespace
 
 void RaceHudObject(Context& h) {
@@ -1326,6 +1451,7 @@ void RaceHudObject(Context& h) {
   Signs(h, w);
   Ticks(h, w);
   Movies(h, w);
+  Sounds(h, w);
 }
 
 }  // namespace harness

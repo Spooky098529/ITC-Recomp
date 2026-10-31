@@ -90,6 +90,11 @@ void RaceHudObjectUpdateRecordingFull(PPCContext& ctx, uint8_t* base);
 // UpdateItem sub_82214238: r3 = the HUD.
 void RaceHudObjectShowItem(PPCContext& ctx, uint8_t* base);
 void RaceHudObjectUpdateItem(PPCContext& ctx, uint8_t* base);
+// RaceHud::RunCountdown sub_822129A8: r3 = the HUD (f1 the time, as the
+// original leaves it); UpdateRacerBar sub_82214790: r3 = the HUD, r4 = the
+// bar, r5 = the racer.
+void RaceHudObjectRunCountdown(PPCContext& ctx, uint8_t* base);
+void RaceHudObjectUpdateRacerBar(PPCContext& ctx, uint8_t* base);
 // RaceScreens::Make1004 sub_82216A60: r3 = the holder's +1004;
 // RaceScreens::Init sub_82211DA0: r3 = the holder, r4 = the race kind.
 void RaceHudObjectMake1004(PPCContext& ctx, uint8_t* base);

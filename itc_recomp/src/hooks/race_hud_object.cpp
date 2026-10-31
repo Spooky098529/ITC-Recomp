@@ -5,6 +5,7 @@
 #include "hooks/race_hud_object.h"
 
 #include "base/flags.h"
+#include "menu_sounds/menu_sounds.h"
 #include "race_hud_object/race_hud_object.h"
 #include "track_zones/track_zones.h"
 
@@ -39,7 +40,10 @@ ITC_FLAG_BOOL(native_race_hud_object, true, "ITC",
               "(the UI movies' start, Strings::Load, UiMovies::Open, operator new, memset and "
               "MenuList::Init through their overrides); MovieMask, RaceHud::Init and Make1004 "
               "have no adapters: only RaceScreens::Init's plain C++ reaches them, and the flag "
-              "switches it) "
+              "switches it); RunCountdown sub_822129A8 (UiMovie::Run through its override, "
+              "MenuSound::Play's plain C++), UpdateRacerBar sub_82214790 (UiMovie::Finish and "
+              "the sound manager's slot 14 through the function table, MenuSound::Play's plain "
+              "C++) "
               "natively instead of through the translated code (the same writes; checked by "
               "--run_harnesses=race_hud_object)");
 
@@ -63,8 +67,29 @@ class GuestCalls {
   // The zones' slots that aren't the native ones (track_zones::OwnerCalls):
   // r4 set when asked, else left.
   track_zones::OwnerCalls zone_calls() { return {this, &GuestCalls::CallZone}; }
+  // MenuSound::Play's slot call (menu_sounds::Calls): the first `set` of r3
+  // to r6 set, the others left, as MenuSound::Play's own adapter does.
+  menu_sounds::Calls sound_calls() { return {this, &GuestCalls::CallSound}; }
 
  private:
+  static uint64_t CallSound(void* user, uint32_t function, const uint64_t args[4], int set,
+                            uint32_t r1, uint32_t lr) {
+    auto& self = *static_cast<GuestCalls*>(user);
+    PPCContext& ctx = self.ctx_;
+    uint8_t* base = self.base_;
+    const uint64_t stack = ctx.r1.u64;
+    ctx.r1.u64 = r1;
+    PPCRegister* registers[4] = {&ctx.r3, &ctx.r4, &ctx.r5, &ctx.r6};
+    for (int i = 0; i < set; i++) {
+      registers[i]->u64 = args[i];
+    }
+    ctx.lr = lr;
+    ctx.ctr.u64 = function;
+    REX_CALL_INDIRECT_FUNC(function);
+    ctx.r1.u64 = stack;
+    ctx.fpscr.disableFlushMode();
+    return ctx.r3.u64;
+  }
   static uint64_t CallZone(void* user, uint32_t function, uint32_t r3, uint32_t r4, bool set_r4,
                            uint32_t frame, uint32_t lr) {
     auto& self = *static_cast<GuestCalls*>(user);
@@ -338,6 +363,20 @@ void RaceHudObjectScreensInit(PPCContext& ctx, uint8_t* base) {
   ctx.r3.u64 = rh::ScreensInit(base, ctx.r3.u32, ctx.r4.u32, ctx.r1.u32, guest.calls());
 }
 
+void RaceHudObjectRunCountdown(PPCContext& ctx, uint8_t* base) {
+  ctx.fpscr.disableFlushMode();
+  GuestCalls guest(ctx, base);
+  ctx.r3.u64 =
+      rh::RunCountdown(base, ctx.r3.u32, ctx.r1.u32, guest.calls(), guest.sound_calls(), &ctx.f1.f64);
+}
+
+void RaceHudObjectUpdateRacerBar(PPCContext& ctx, uint8_t* base) {
+  ctx.fpscr.disableFlushMode();
+  GuestCalls guest(ctx, base);
+  ctx.r3.u64 = rh::UpdateRacerBar(base, ctx.r3.u32, ctx.r4.u64, ctx.r5.u64, ctx.r1.u32,
+                                  guest.calls(), guest.sound_calls());
+}
+
 }  // namespace hooks
 
 // The adapters: the register steps above, or the originals with the flag
@@ -387,3 +426,5 @@ ITC_RACE_HUD_OBJECT(82212E60, RaceHudObjectUpdateRecordingFull)
 ITC_RACE_HUD_OBJECT(82213638, RaceHudObjectShowItem)
 ITC_RACE_HUD_OBJECT(82214238, RaceHudObjectUpdateItem)
 ITC_RACE_HUD_OBJECT(82211DA0, RaceHudObjectScreensInit)
+ITC_RACE_HUD_OBJECT(822129A8, RaceHudObjectRunCountdown)
+ITC_RACE_HUD_OBJECT(82214790, RaceHudObjectUpdateRacerBar)
