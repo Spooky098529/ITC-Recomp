@@ -18,8 +18,12 @@ file's history. What's left to see in a drive, from every run:
   Map checked (ae8e322b: `accessories.md`, the interior accessories
   `820EF250`-`820F1078`, 50 rows, 31 in play, 8 ready groups, no
   outside blockers; the accessories' release lead folded in; the
-  lead's note that its rows were elsewhere was wrong). Step: migration
-  (agent running).
+  lead's note that its rows were elsewhere was wrong). First migration checked (8d5c9078..24186d92: 27 functions native
+  or overridden, 13 adapters removed, `--native_accessories`, harness
+  `accessories` 27 groups 0 differing, race 38 s, 0 errors; no
+  subagents). Left: `Accessory::Finish`, `AccessoryEntry::OnLoaded`,
+  `Accessories::Acquire` with `AcquireEntry`. Step: validation of the
+  first migration (agent running).
 
 ## Done
 
@@ -42,5 +46,8 @@ file's history. What's left to see in a drive, from every run:
 
 - After the accessories' map: ours 3552, work left 2846 (wrapped 103,
   known 518, unknown 2225).
+- After the accessories' first migration (race 38 s, 0 errors,
+  accessories 0 differing): ours 3579, work left 2819 (wrapped 103,
+  known 491, unknown 2225).
 
 ## Stopped

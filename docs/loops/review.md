@@ -13,6 +13,14 @@ When the user has reviewed a run's section, its heading gets
 
 ## Run 2026-10-31 16:54 (`b7-loop-31-10-26`, continued)
 
+- The accessories' first migration (8d5c9078..24186d92): 27 rows in
+  `accessories.md` (13 Native with their adapters removed). For review:
+  guest calls handed back to the adapter (the archive callback, the
+  set's destructor through its vtable, the texture provider's slot +12);
+  `Accessories::Destroy`'s r3 left as the original leaves it with no
+  set; `model_animation::SkeletonBaseDestructible` added beside
+  `BaseFreeable`. Only `Create` and `SetScale` run in attract races.
+
 - The interior accessories' map (ae8e322b): `accessories.md`, 50 new
   rows (31 in play; the anchor, the skeleton's swing and the draws not
   seen in play), three object rows in `known-data.md`; the accessories'
