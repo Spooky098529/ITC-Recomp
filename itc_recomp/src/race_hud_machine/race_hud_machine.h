@@ -12,8 +12,8 @@
 // The handlers' callees (the race HUD's and the alternate HUD's functions,
 // all native) are called through `callees` by their addresses, with the
 // original's registers (r3, r4), frame and return address: the adapters'
-// implementation runs their plain C++ directly (src/hooks/race_hud_machine.cpp),
-// which lets the harness stand in for them on both sides. The kinds whose
+// implementation runs their plain C++ directly (src/hooks/race_hud_machine.cpp).
+// The kinds whose
 // screens are never seen in play (4: the holder's +656 object; 0: its +12)
 // aren't ported: the handlers answer nullopt for them, with nothing written,
 // and the adapters run the originals.

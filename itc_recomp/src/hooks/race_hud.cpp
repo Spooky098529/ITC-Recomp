@@ -6,7 +6,6 @@
 #include "guest.h"
 
 #include "base/flags.h"
-#include "hooks/callee_stand_in.h"
 #include "hooks/guest_call.h"
 #include "hooks/race_hud.h"
 #include "race_hud/race_hud.h"
@@ -20,14 +19,9 @@ ITC_FLAG_BOOL(native_race_hud, true, "ITC",
 
 // RaceHud::RunMovie: r3 = the HUD, r4 = UiMovie::Run's (0 to advance, else
 // draw only). The original's tail calls keep lr, r1 and r4; state 1's
-// (sub_82212908, merged) runs UiMovie::Run from its 112-byte frame. The
-// call goes to the race HUD machine harness's stand-in first
-// (hooks/callee_stand_in.h; null in the game).
+// (sub_82212908, merged) runs UiMovie::Run from its 112-byte frame.
 extern "C" REX_FUNC(sub_822141E8) {
   REX_FUNC_PROLOGUE();
-  if (hooks::CalleeStoodIn(ctx, 0x822141E8)) {
-    return;
-  }
   if (!ITC_FLAG(native_race_hud)) {
     __imp__sub_822141E8(ctx, base);
     return;

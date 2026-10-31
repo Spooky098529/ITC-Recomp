@@ -2,14 +2,12 @@
 // (docs/functions/race-hud-machine.md), with the register steps the harness
 // shares (hooks/race_hud_machine.h). The handlers' callees, the race HUD's
 // and the alternate HUD's functions, run as their plain C++ (their guest
-// calls through this context), or the harness's stand-in
-// (hooks/callee_stand_in.h) while it's set.
+// calls through this context).
 
 #include "hooks/race_hud_machine.h"
 
 #include "alt_hud/alt_hud.h"
 #include "base/flags.h"
-#include "hooks/callee_stand_in.h"
 #include "menu_sounds/menu_sounds.h"
 #include "race_hud/race_hud.h"
 #include "race_hud_machine/race_hud_machine.h"
@@ -34,15 +32,13 @@ ITC_FLAG_DECLARE(bool, native_action_mappers);
 
 namespace hooks {
 
-CalleeStandIn g_callee_stand_in = nullptr;
-
 namespace {
 
 namespace rhm = race_hud_machine;
 namespace rh = race_hud_object;
 
 // The calls the plain C++ makes, through this context. `callees()`: the
-// handlers' callees by address, run as their plain C++ (or the stand-in);
+// handlers' callees by address, run as their plain C++;
 // `calls()`, `zone_calls()` and `sound_calls()`: the callees' own guest
 // calls (r1 and lr set, the function run through the function table, its
 // override when it has one, r1 put back), as the race HUD object's adapters
@@ -65,18 +61,6 @@ class Calls {
     PPCContext& ctx = self.ctx_;
     uint8_t* base = self.base_;
     const uint32_t r3 = uint32_t(args[0]);
-    if (g_callee_stand_in != nullptr) {
-      const uint64_t stack = ctx.r1.u64;
-      ctx.r1.u64 = r1;
-      ctx.r3.u64 = args[0];
-      ctx.r4.u64 = args[1];
-      ctx.lr = lr;
-      if (g_callee_stand_in(ctx, function)) {
-        ctx.r1.u64 = stack;
-        return ctx.r3.u64;
-      }
-      ctx.r1.u64 = stack;
-    }
     switch (function) {
       case rhm::kHudTick:
         return rh::Tick(base, r3, uint32_t(args[1]), r1, self.calls(), self.zone_calls());
