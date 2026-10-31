@@ -37,7 +37,9 @@ ITC_FLAG_BOOL(native_race_hud_object, true, "ITC",
               "and FinishNamed through their overrides), ShowItem sub_82213638 (UiMovie::SetNodeText "
               "through its override, its varargs 0), UpdateItem sub_82214238, RaceScreens::Init sub_82211DA0 and Make1004 sub_82216A60 "
               "(the UI movies' start, Strings::Load, UiMovies::Open, operator new, memset and "
-              "MenuList::Init through their overrides)) "
+              "MenuList::Init through their overrides); MovieMask, RaceHud::Init and Make1004 "
+              "have no adapters: only RaceScreens::Init's plain C++ reaches them, and the flag "
+              "switches it) "
               "natively instead of through the translated code (the same writes; checked by "
               "--run_harnesses=race_hud_object)");
 
@@ -343,7 +345,8 @@ void RaceHudObjectScreensInit(PPCContext& ctx, uint8_t* base) {
 // steps stay for the harness): ShowGauge (from SetUpExtraGauges), SetSpeed,
 // UpdateExtraGauges, SetGear, SetTach, SetBoost, SetBar and UpdateSigns
 // (from Tick), UpdateSign and UpdatePlaceName (from UpdateSigns), SetTime
-// and SetDistance (from TickTimer).
+// and SetDistance (from TickTimer), RaceScreens::MovieMask, RaceHud::Init and
+// RaceScreens::Make1004 (from RaceScreens::Init).
 
 #define ITC_RACE_HUD_OBJECT(address, step)    \
   extern "C" REX_FUNC(sub_##address) {        \
@@ -378,12 +381,9 @@ ITC_RACE_HUD_OBJECT(82212878, RaceHudObjectFinishMovie1)
 ITC_RACE_HUD_OBJECT(82212AC8, RaceHudObjectDrawWarning)
 ITC_RACE_HUD_OBJECT(82212AF8, RaceHudObjectRunMovie1)
 ITC_RACE_HUD_OBJECT(82212B08, RaceHudObjectRunItem)
-ITC_RACE_HUD_OBJECT(82211BE8, RaceHudObjectMovieMask)
-ITC_RACE_HUD_OBJECT(82215260, RaceHudObjectInit)
 ITC_RACE_HUD_OBJECT(822128A8, RaceHudObjectDraw)
 ITC_RACE_HUD_OBJECT(82212C50, RaceHudObjectUpdateWarning)
 ITC_RACE_HUD_OBJECT(82212E60, RaceHudObjectUpdateRecordingFull)
 ITC_RACE_HUD_OBJECT(82213638, RaceHudObjectShowItem)
 ITC_RACE_HUD_OBJECT(82214238, RaceHudObjectUpdateItem)
-ITC_RACE_HUD_OBJECT(82216A60, RaceHudObjectMake1004)
 ITC_RACE_HUD_OBJECT(82211DA0, RaceHudObjectScreensInit)
