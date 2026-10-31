@@ -61,6 +61,9 @@ void CarModelsMakePlate(PPCContext& ctx, uint8_t* base);
 // or a native memcpy.
 void CarModelsOnFileLoaded(PPCContext& ctx, uint8_t* base);
 void CarModelsOnFileLoadedB(PPCContext& ctx, uint8_t* base);
+// CarModel::ReloadDecals sub_820D5D20: r3 = the car model; r3 = 1. The
+// original where +3724 is 1 or without --native_heap.
+void CarModelsReloadDecals(PPCContext& ctx, uint8_t* base);
 // sub_820C3F50: r3 = the set (left), r4 to r7 the record's words.
 void CarModelsDeferRelease(PPCContext& ctx, uint8_t* base);
 

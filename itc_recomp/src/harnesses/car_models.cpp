@@ -2070,6 +2070,75 @@ void Exteriors(Context& h, uint32_t block) {
   results.Report();
 }
 
+// CarModel::ReloadDecals: a car model in the block (its block 0 to 44,
+// larger now and then; its decal records random, none now and then; +3724
+// never 1), its first pool set ([+7256]) in the block with a record list
+// of 4 x (1 to 3) records, some free. The block (the new sheet's words as
+// allocations), the sheet's header and data, Texture::Create's stack
+// words, the loads asked for and r3.
+void ReloadDecalCases(Context& h, uint32_t block) {
+  namespace cm = car_models;
+  SavedWord scene(h.base, cm::kSceneSet);
+  const uint32_t set = block + 0x2000 - cm::kSharedBuffer;
+  const uint32_t car = block + 0x100;
+  const uint32_t first_set = block + 0x3F00;
+  const uint32_t records = block + 0x3E00;
+  Results results("CarModel::ReloadDecals (sub_820D5D20)");
+  for (int c = 0; c < 16; c++) {
+    const uint64_t seed = h.random.Next();
+    Outputs out[2];
+    for (int v = 0; v < 2; v++) {
+      Random r(seed);
+      RandomBytes(h.base, block, kBlockBytes, r);
+      guest::StoreU32(h.base, cm::kSceneSet, set);
+      guest::StoreU32(h.base, set + cm::kSharedBuffer, uint32_t(r.Next()));
+      guest::StoreU32(h.base, set + cm::kSharedBufferSize, 0x200000);
+      Put(h.base, car + 32, r.Below(6) == 0 ? 45 + r.Below(100) : r.Below(45));
+      Put(h.base, car + 3724, r.Below(2) == 0 ? 0 : 2 + r.Below(4));
+      DecalRecords(h.base, car + 592, r, c == 3);
+      DecalRecords(h.base, car + 208, r, c == 3);
+      Put(h.base, car + 7256, first_set);
+      Put(h.base, first_set + 40, 1);
+      Put(h.base, first_set + 12, r.Below(3));
+      Put(h.base, first_set + 52, records);
+      for (uint32_t i = 0; i < 12; i++) {
+        Put(h.base, records + 20 * i + 16, r.Below(3) == 0 ? 0 : 2);
+      }
+      PPCContext t = CallContext(h);
+      const uint32_t frame = t.r1.u32 - 320 - cm::kTextureCreateFrameBytes;
+      RandomBytes(h.base, frame, cm::kTextureCreateFrameBytes, r);
+      std::optional<ArchiveLoads> loads;
+      loads.emplace(std::vector<int64_t>{1, 2, -1, 4});
+      t.r3.u64 = car;
+      // (The callees' adapters on for both sides, as LoadExterior's cases:
+      // their originals save registers into the frames below, which their
+      // plain C++ doesn't; their own cases compare them.)
+      (v == 0 ? __imp__sub_820D5D20 : hooks::CarModelsReloadDecals)(t, h.base);
+      const uint32_t header = guest::LoadU32(h.base, car + 6684);
+      const uint32_t data = guest::LoadU32(h.base, car + 6688);
+      const uint32_t bytes =
+          TextureBytes(h.base, cm::kSheetFormat, guest::LoadU32(h.base, cm::kVinylSheetWidth),
+                       guest::LoadU32(h.base, cm::kVinylSheetWidth + 4));
+      const std::vector<Known> known = {{header, 52}, {data, bytes}};
+      out[v].Word(t.r3.u32);
+      out[v].Word(uint32_t(t.r3.u64 >> 32));
+      Addresses(out[v], h.base, block, kBlockBytes, known);
+      Addresses(out[v], h.base, header, 52, known);
+      out[v].Bytes(Read(h.base, data, bytes));
+      Addresses(out[v], h.base, frame + 84, 28, known);
+      out[v].Word(uint32_t(loads->calls().size()));
+      for (const uint32_t word : loads->calls()) {
+        Address(out[v], word, known);
+      }
+      loads.reset();
+      memory::FreePages(header);
+      memory::FreePhysical(data);
+    }
+    results.Check(out[0], out[1], fmt::format("case {}", c));
+  }
+  results.Report();
+}
+
 void Vinyls(Context& h, uint32_t block) {
   TgaHeaderClears(h, block);
   Rasterizer(h, block);
@@ -2096,6 +2165,7 @@ void CarModels(Context& h) {
   Loads(h, block);
   if (hooks::NativeHeapActive()) {
     Exteriors(h, block);
+    ReloadDecalCases(h, block);
   }
   DeferReleases(h, block);
   Releases(h, block);

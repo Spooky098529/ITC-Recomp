@@ -195,6 +195,34 @@ std::optional<uint32_t> CarModelLoadExterior(uint8_t* base, uint32_t car_model, 
   return CarModelLoadDecals(base, car_model, load);
 }
 
+uint32_t CarModelReloadDecals(uint8_t* base, uint32_t car_model, uint32_t stack,
+                              const archive::LoadCall& load) {
+  ITC_NATIVE_RUNNING("sub_820D5D20 CarModel::ReloadDecals");
+  DeferRelease(base, guest::LoadU32(base, car_model + 7256),
+               guest::LoadU32(base, car_model + 6684), guest::LoadU32(base, car_model + 6688),
+               guest::LoadU32(base, car_model + 6692), guest::LoadU32(base, car_model + 6696));
+  guest::StoreU32(base, car_model + 4088, 0);
+  for (uint32_t k = 0; k < 3; k++) {
+    LoadSlotReset(base, car_model + 4092 + 48 * k);
+  }
+  for (uint32_t k = 0; k < 6; k++) {
+    LoadSlotReset(base, car_model + 4380 + 48 * k);
+  }
+  TextureCreate(base, kSheetFormat, guest::LoadU32(base, kVinylSheetWidth + 0),
+                guest::LoadU32(base, kVinylSheetWidth + 4), car_model + 6684, car_model + 6688,
+                stack - 320);
+  // (+3724 isn't 1: the adapter's check.)
+  const uint32_t block = guest::LoadU32(base, car_model + 32);
+  if (int32_t(block) >= 18) {
+    const int32_t emblem = TeamEmblem(block);
+    if (emblem != -1) {
+      guest::StoreU32(base, car_model + 592, uint32_t(emblem));
+      guest::StoreU32(base, car_model + 600, 9);
+    }
+  }
+  return CarModelLoadDecals(base, car_model, load);
+}
+
 uint32_t CarModelSetVinylTextures(uint8_t* base, uint32_t scene_model) {
   ITC_NATIVE_RUNNING("sub_820D5F88 CarModel::SetVinylTextures");
   uint32_t model = scene_model + 688;

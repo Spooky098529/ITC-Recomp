@@ -81,6 +81,19 @@ std::optional<uint32_t> CarModelLoadExterior(uint8_t* base, uint32_t car_model, 
                                              uint32_t stack, uint32_t pcr,
                                              const archive::LoadCall& load);
 
+// CarModel::ReloadDecals (sub_820D5D20): the old sheet's four words (+6684
+// to +6696) put off for release (sub_820C3F50 on [+7256]), +4088 = 0, the
+// three layer slots (+4092) and six sticker slots (+4380) reset
+// (LoadSlot::Reset), a new sheet made (Texture::Create into +6684, +6688;
+// `stack` the guest r1 at entry, its frame 320 bytes below), for blocks 18
+// and up the team emblem in sticker group 7's first record, then
+// LoadDecals. Returns 1 (LoadDecals' r3). Not where +3724 is 1 (an image
+// drawn into the sheet, sub_820C4E68, never seen in play: the adapter runs
+// the original). Only while --native_heap routes the game's heap to the
+// layer.
+uint32_t CarModelReloadDecals(uint8_t* base, uint32_t car_model, uint32_t stack,
+                              const archive::LoadCall& load);
+
 // CarModel::SetVinylTextures (sub_820D5F88): r3 = the scene model (its car
 // model at +24): the six part models at +688, 464 bytes apart, given the car
 // model's vinyl sheet (Model::SetVinylTextures with [+6684], [+6692], the

@@ -26,7 +26,8 @@ ITC_FLAG_BOOL(native_car_models, true, "ITC",
               "sub_820D0730, LoadSlot::LoadShared sub_820D0860, with --native_heap LoadSlot::Load "
               "sub_820D07C8 and CarModel::LoadExterior sub_820D5EC8 (with LoadSetA sub_820D59D8 and "
               "LoadSetB sub_820D5AC0), the team "
-              "emblem sub_820D3CF8, CarModel::LoadDecals sub_820D5B50 and SetVinylTextures "
+              "emblem sub_820D3CF8, CarModel::LoadDecals sub_820D5B50, with --native_heap "
+              "CarModel::ReloadDecals sub_820D5D20, SetVinylTextures "
               "sub_820D5F88, the wheels' set-up sub_820D9110 (with the rims sub_820D8BA8 and brakes "
               "sub_820D8C50), with --native_heap CarInterior::LoadSetCBody sub_820D67E8, "
               "CarInterior::Load sub_820D79B0 (its accessories' "
@@ -105,6 +106,15 @@ void CarModelsLoadExterior(PPCContext& ctx, uint8_t* base) {
     }
   }
   __imp__sub_820D5EC8(ctx, base);
+}
+
+void CarModelsReloadDecals(PPCContext& ctx, uint8_t* base) {
+  if (!hooks::NativeHeapActive() || int32_t(guest::LoadU32(base, ctx.r3.u32 + 3724)) == 1) {
+    __imp__sub_820D5D20(ctx, base);
+    return;
+  }
+  ctx.r3.u64 = cm::CarModelReloadDecals(base, ctx.r3.u32, ctx.r1.u32,
+                                        hooks::NativeArchiveLoad(base));
 }
 
 void CarModelsSetVinylTextures(PPCContext& ctx, uint8_t* base) {
@@ -374,6 +384,7 @@ ITC_CAR_MODELS(820D3CF8, CarModelsTeamEmblem)
 ITC_CAR_MODELS(820D5B50, CarModelsLoadDecals)
 ITC_CAR_MODELS(820D5EC8, CarModelsLoadExterior)
 ITC_CAR_MODELS(820D5F88, CarModelsSetVinylTextures)
+ITC_CAR_MODELS(820D5D20, CarModelsReloadDecals)
 ITC_CAR_MODELS(820D9110, CarModelsWheelsSetUp)
 ITC_CAR_MODELS(820D67E8, CarModelsCockpitLoadSetC)
 ITC_CAR_MODELS(820D79B0, CarModelsInteriorLoad)
