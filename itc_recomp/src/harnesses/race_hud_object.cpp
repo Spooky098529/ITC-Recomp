@@ -1436,6 +1436,108 @@ void Sounds(Context& h, const World& w) {
   }
 }
 
+// A bar of the HUD's four at +244 + 40 x `index` for UpdateRacerBar: value,
+// steps, trail, min and max mostly ordinary, +28, +32 and +36 0 or 1 (or any
+// word), and racer `racer`'s +788 (the racers [+444], the misc block's) an
+// int around the bar's range.
+void ShapeRacerBar(uint8_t* base, const World& w, uint32_t index, uint32_t racer, Random& r) {
+  const uint32_t hud = w.hud.address;
+  const uint32_t bar = hud + 244 + 40 * index;
+  const bool ordinary = r.Below(4) != 0;
+  auto value = [&](float range) {
+    return ordinary ? float(r.Below(int(range) + 1)) : AnyFloat(r, range);
+  };
+  guest::StoreFloat(base, bar + 0, value(200.0f));
+  guest::StoreFloat(base, bar + 4, value(20.0f));
+  guest::StoreFloat(base, bar + 8, value(200.0f));
+  guest::StoreFloat(base, bar + 12, value(20.0f));
+  guest::StoreFloat(base, bar + 16, ordinary ? 0.0f : AnyFloat(r, 50.0f));
+  guest::StoreFloat(base, bar + 20, ordinary ? 100.0f + float(r.Below(100)) : AnyFloat(r, 300.0f));
+  if (r.Below(4) == 0) {
+    guest::StoreU32(base, bar + 8, guest::LoadU32(base, bar + 0));
+  }
+  guest::StoreU32(base, bar + 28, r.Below(2));
+  guest::StoreU32(base, bar + 32, r.Below(5) == 0 ? uint32_t(r.Next()) : r.Below(2));
+  guest::StoreU32(base, bar + 36, r.Below(5) == 0 ? uint32_t(r.Next()) : r.Below(2));
+  guest::StoreU32(base, hud + 444, w.racers());
+  guest::StoreU32(base, w.racers() + 972 * racer + 788,
+                  r.Below(6) == 0 ? uint32_t(r.Next()) : uint32_t(int32_t(r.Below(300)) - 30));
+}
+
+// The bars' floats (+0, +8 and +24 of each of the four) for a Spec.
+void RacerBarFloats(Spec& spec) {
+  for (uint32_t b = 0; b < 4; b++) {
+    spec.Floats(244 + 40 * b, 1);
+    spec.Floats(244 + 40 * b + 8, 1);
+    spec.Floats(244 + 40 * b + 24, 1);
+  }
+}
+
+void Panels(Context& h, const World& w) {
+  {
+    // The racers' count (+452) 0 to 4 (the four bars), sometimes negative;
+    // each bar shaped with its racer.
+    Spec spec;
+    spec.frame = 112;
+    spec.saves = 24;
+    RacerBarFloats(spec);
+    Group(
+        h, w, "RaceHud::TickRacers (sub_822151F8)", 300,
+        [&](PPCContext& t, Random& r, const World& w) {
+          const uint32_t hud = w.hud.address;
+          const uint32_t count = r.Below(8) == 0 ? uint32_t(-int32_t(r.Below(3))) : r.Below(5);
+          guest::StoreU32(h.base, hud + 452, count);
+          for (uint32_t i = 0; i < 4; i++) {
+            ShapeRacerBar(h.base, w, i, i, r);
+          }
+          ShapeAnimations(h.base, w, w.movie(0), r);
+          ShapeSoundManager(h.base, w, r);
+          t.r3.u64 = hud;
+        },
+        __imp__sub_822151F8, hooks::RaceHudObjectTickRacers, spec);
+  }
+  {
+    // The mode (+448) 0, 1, 3 or 5 and up; modes 2 and 4 (sub_82214E78,
+    // sub_822150F8: the time trial's splits, never seen in play, called as
+    // the originals by both versions) need the splits' world, which this one
+    // doesn't hold. Mode 0's racers and bars, mode 1's timer (as TickTimer's
+    // cases, finite floats), mode 3's player (+16) 0 to 3; the dashboard's
+    // animations and +492 for UpdateRecordingFull.
+    Spec spec;
+    spec.frame = 96;
+    spec.saves = 16;
+    RacerBarFloats(spec);
+    Group(
+        h, w, "RaceHud::TickPanel (sub_82215488)", 400,
+        [&](PPCContext& t, Random& r, const World& w) {
+          const uint32_t hud = w.hud.address;
+          static constexpr uint32_t kModes[] = {0, 0, 1, 1, 3, 3, 5, 0xFFFFFFFFu};
+          guest::StoreU32(h.base, hud + 448, kModes[r.Below(8)]);
+          guest::StoreU32(h.base, hud + 452, r.Below(5));
+          guest::StoreU32(h.base, hud + rh::kHudPlayer, r.Below(4));
+          for (uint32_t i = 0; i < 4; i++) {
+            ShapeRacerBar(h.base, w, i, i, r);
+          }
+          const uint32_t racers = w.racers();
+          guest::StoreU32(h.base, rh::kRaceProgress, w.progress());
+          guest::StoreU32(h.base, racers + 3932,
+                          r.Below(4) == 0 ? uint32_t(r.Next()) : r.Below(200000));
+          guest::StoreFloat(h.base, racers + 828, float(r.Below(10000)));
+          guest::StoreFloat(h.base, w.progress() + 7156, float(r.Below(20000)));
+          const uint32_t animation = r.Below(7) - 1;
+          guest::StoreU32(h.base, racers + 12, animation);
+          guest::StoreU32(h.base, hud + 464, r.Below(3) == 0 ? animation : r.Below(7) - 1);
+          ShapeAnimations(h.base, w, w.movie(0), r);
+          ShapeAnimations(h.base, w, w.movie(1), r);
+          ShapeAnimations(h.base, w, w.movie(5), r);
+          guest::StoreU32(h.base, hud + 492, r.Below(2) == 0 ? 0 : 1);
+          ShapeSoundManager(h.base, w, r);
+          t.r3.u64 = hud;
+        },
+        __imp__sub_82215488, hooks::RaceHudObjectTickPanel, spec);
+  }
+}
+
 }  // namespace
 
 void RaceHudObject(Context& h) {
@@ -1452,6 +1554,7 @@ void RaceHudObject(Context& h) {
   Ticks(h, w);
   Movies(h, w);
   Sounds(h, w);
+  Panels(h, w);
 }
 
 }  // namespace harness

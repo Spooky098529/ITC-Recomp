@@ -8,6 +8,7 @@
 #include "camera_modes/steps.h"
 #include "guest.h"
 #include "hooks/vehicle.h"
+#include "racer_controllers/racer_controllers.h"
 #include "ui_movies/game.h"
 #include "vehicle_accessors/vehicle_accessors.h"
 
@@ -101,6 +102,55 @@ uint64_t TickTimer(uint8_t* base, uint32_t hud, uint32_t sp, const Calls& calls)
   const uint64_t r3 = moved.slot ? *moved.slot : moved.looked ? frame - 176 + 80 : movie;
   guest::StoreU32(base, hud + 464, uint32_t(animation));
   return r3;
+}
+
+uint64_t TickRacers(uint8_t* base, uint32_t hud, uint32_t sp, const Calls& calls,
+                    const menu_sounds::Calls& sounds) {
+  ITC_NATIVE_RUNNING("sub_822151F8 RaceHud::TickRacers");
+  const uint32_t frame = sp - 112;
+  guest::StoreU32(base, frame, sp);
+  uint64_t r3 = hud;
+  const int32_t count = int32_t(guest::LoadU32(base, hud + 452));
+  guest::StoreU32(base, hud + 456, 0);
+  if (count > 0) {
+    int64_t i = 0;
+    do {
+      r3 = UpdateRacerBar(base, hud, uint64_t(i), uint64_t(i), frame, calls, sounds);
+      i++;
+    } while (int32_t(i) < int32_t(guest::LoadU32(base, hud + 452)));
+  }
+  return r3;
+}
+
+uint64_t TickPanel(uint8_t* base, uint32_t hud, uint32_t sp, const Calls& calls,
+                   const menu_sounds::Calls& sounds) {
+  ITC_NATIVE_RUNNING("sub_82215488 RaceHud::TickPanel");
+  const uint32_t frame = sp - 96;
+  guest::StoreU32(base, frame, sp);
+  const uint32_t mode = guest::LoadU32(base, hud + 448);
+  // Modes 2 to 4 never ran in play: the originals, through `calls` (mode
+  // 4's r3 the HUD as well, which the original doesn't set again).
+  switch (mode) {
+    case 0:
+      TickRacers(base, hud, frame, calls, sounds);
+      break;
+    case 1:
+      TickTimer(base, hud, frame, calls);
+      break;
+    case 2:
+      calls.Call(kTickMode2, frame, 0x822154DC, hud);
+      break;
+    case 3:
+      calls.Call(kTickMode3, frame, 0x822154D0, hud);
+      break;
+    case 4:
+      calls.Call(kTickMode4, frame, 0x822154C4, hud);
+      break;
+    default:
+      break;
+  }
+  const uint32_t room = racer_controllers::RecordingHasRoom(base, 0);
+  return UpdateRecordingFull(base, hud, int32_t(room), frame, calls);
 }
 
 }  // namespace race_hud_object

@@ -43,7 +43,8 @@ ITC_FLAG_BOOL(native_race_hud_object, true, "ITC",
               "switches it); RunCountdown sub_822129A8 (UiMovie::Run through its override, "
               "MenuSound::Play's plain C++), UpdateRacerBar sub_82214790 (UiMovie::Finish and "
               "the sound manager's slot 14 through the function table, MenuSound::Play's plain "
-              "C++) "
+              "C++), TickPanel sub_82215488 (TickRacers sub_822151F8, no adapter: only TickPanel's "
+              "plain C++ reaches it; modes 2 to 4's ticks, never seen in play, the originals) "
               "natively instead of through the translated code (the same writes; checked by "
               "--run_harnesses=race_hud_object)");
 
@@ -377,6 +378,19 @@ void RaceHudObjectUpdateRacerBar(PPCContext& ctx, uint8_t* base) {
                                   guest.calls(), guest.sound_calls());
 }
 
+void RaceHudObjectTickRacers(PPCContext& ctx, uint8_t* base) {
+  ctx.fpscr.disableFlushMode();
+  GuestCalls guest(ctx, base);
+  ctx.r3.u64 =
+      rh::TickRacers(base, ctx.r3.u32, ctx.r1.u32, guest.calls(), guest.sound_calls());
+}
+
+void RaceHudObjectTickPanel(PPCContext& ctx, uint8_t* base) {
+  ctx.fpscr.disableFlushMode();
+  GuestCalls guest(ctx, base);
+  ctx.r3.u64 = rh::TickPanel(base, ctx.r3.u32, ctx.r1.u32, guest.calls(), guest.sound_calls());
+}
+
 }  // namespace hooks
 
 // The adapters: the register steps above, or the originals with the flag
@@ -385,7 +399,8 @@ void RaceHudObjectUpdateRacerBar(PPCContext& ctx, uint8_t* base) {
 // UpdateExtraGauges, SetGear, SetTach, SetBoost, SetBar and UpdateSigns
 // (from Tick), UpdateSign and UpdatePlaceName (from UpdateSigns), SetTime
 // and SetDistance (from TickTimer), RaceScreens::MovieMask, RaceHud::Init and
-// RaceScreens::Make1004 (from RaceScreens::Init).
+// RaceScreens::Make1004 (from RaceScreens::Init), TickRacers (from
+// TickPanel).
 
 #define ITC_RACE_HUD_OBJECT(address, step)    \
   extern "C" REX_FUNC(sub_##address) {        \
@@ -428,3 +443,4 @@ ITC_RACE_HUD_OBJECT(82214238, RaceHudObjectUpdateItem)
 ITC_RACE_HUD_OBJECT(82211DA0, RaceHudObjectScreensInit)
 ITC_RACE_HUD_OBJECT(822129A8, RaceHudObjectRunCountdown)
 ITC_RACE_HUD_OBJECT(82214790, RaceHudObjectUpdateRacerBar)
+ITC_RACE_HUD_OBJECT(82215488, RaceHudObjectTickPanel)

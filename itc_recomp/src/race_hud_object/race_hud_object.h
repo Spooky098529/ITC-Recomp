@@ -269,6 +269,23 @@ uint64_t Tick(uint8_t* base, uint32_t hud, uint32_t flag, uint32_t sp, const Cal
 // the original leaves it (the node, or LoopNamed's).
 uint64_t TickTimer(uint8_t* base, uint32_t hud, uint32_t sp, const Calls& calls);
 
+// RaceHud::TickRacers (sub_822151F8): +456 = 0, then UpdateRacerBar(i, i)
+// for each racer (+452, read again after each) from a 112-byte frame. The
+// last bar's r3, or the HUD.
+uint64_t TickRacers(uint8_t* base, uint32_t hud, uint32_t sp, const Calls& calls,
+                    const menu_sounds::Calls& sounds);
+// The panel's ticks for modes 2 to 4 (sub_82214E78, sub_822150A8,
+// sub_822150F8), never seen in play: the originals.
+constexpr uint32_t kTickMode2 = 0x82214E78;
+constexpr uint32_t kTickMode3 = 0x822150A8;
+constexpr uint32_t kTickMode4 = 0x822150F8;
+// RaceHud::TickPanel (sub_82215488): by +448 (unsigned): 0 TickRacers, 1
+// TickTimer, 2 to 4 the modes' ticks through `calls`, others nothing; then
+// UpdateRecordingFull(InputRecording::HasRoom(0), its plain C++) from a
+// 96-byte frame. UpdateRecordingFull's r3.
+uint64_t TickPanel(uint8_t* base, uint32_t hud, uint32_t sp, const Calls& calls,
+                   const menu_sounds::Calls& sounds);
+
 // --- The movie calls and the set-up (movies.cpp) ---
 //
 // Each returns r3 as the original leaves it. `lr` is the caller's return
