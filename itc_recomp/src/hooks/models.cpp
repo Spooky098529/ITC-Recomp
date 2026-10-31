@@ -72,11 +72,14 @@ ITC_FLAG_BOOL(native_models, true, "ITC",
               "never seen in play, the original's), Model::RecordShape sub_82595550 (in "
               "src/scenery_lists/model_draws.cpp, adapter in src/hooks/scenery_lists.cpp: the "
               "model's slot 1 and the texture provider's slots 5 and 6 guest calls; the "
-              "material animation, never seen in play, the original's); with --native_heap and the "
+              "material animation, never seen in play, the original's), Model::RecordMaterials "
+              "sub_820CECA0 (beside it, the same files: the texture provider's slots 5 and 6 and "
+              "CameraPasses::RenderTarget guest calls); with --native_heap and the "
               "archive's queue native, Shaders::LoadAll sub_820A08A0 with Shaders::LoadPair "
               "sub_820A07F0 (no adapter: only LoadAll's plain C++ calls it)) natively instead of through the "
               "translated code (the same writes; "
-              "checked by --run_harnesses=models and, for Model::RecordShape, scenery_lists)");
+              "checked by --run_harnesses=models and, for Model::RecordShape and RecordMaterials, "
+              "scenery_lists)");
 
 bool hooks::ModelsHostLock() {
   static const bool host = ITC_FLAG(native_models);
