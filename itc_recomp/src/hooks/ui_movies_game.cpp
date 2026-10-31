@@ -829,6 +829,9 @@ extern "C" REX_FUNC(sub_8211C1F8) {
 
 namespace ui_movies_game_hooks {
 void SetNodeText(PPCContext& ctx, uint8_t* base) {
+  if (hooks::StartUpRecorded(ctx, 0x8211C7E8)) {
+    return;  // a harness's (the race HUD object's)
+  }
   if (NativeHeap()) {
     ctx.fpscr.disableFlushMode();
     const uint64_t lr = ctx.lr;

@@ -293,6 +293,18 @@ uint64_t UpdateWarning(uint8_t* base, uint32_t hud, uint32_t sp, const Calls& ca
 // (+68) 0.0. From a 96-byte frame. PlayNamed's r3, the node, or the HUD.
 uint64_t UpdateRecordingFull(uint8_t* base, uint32_t hud, int32_t room, uint32_t sp,
                              const Calls& calls);
+// RaceHud::ShowItem (sub_82213638): every PRM, PIC and TXT chunk of the
+// racers' movie's (+604) live scene, to its TRM, shown (+80) for `id` -1
+// and hidden otherwise; for an item, nodes 19, 5 and (5, 0) shown, node
+// 19's text string 4650 + id (UiMovie::SetNodeText through `calls`, its
+// varargs 0) and (5, 0)'s picture (+108) DataTables::Item(id)'s byte +34
+// (signed; 48 and up: id - 262). A 128-byte frame. The HUD (-1) or the
+// item's entry.
+uint64_t ShowItem(uint8_t* base, uint32_t hud, int32_t id, uint32_t sp, const Calls& calls);
+// RaceHud::UpdateItem (sub_82214238): when the race progress's +7240
+// differs from +460, +460 = it and ShowItem(it) (tail call). ShowItem's r3,
+// or the HUD.
+uint64_t UpdateItem(uint8_t* base, uint32_t hud, uint32_t sp, const Calls& calls);
 // RaceScreens::MovieMask (sub_82211BE8, with its jump table's case 0
 // sub_82211C1C merged): the movies to load for the race kind, 0 above 10.
 uint32_t MovieMask(uint32_t kind);

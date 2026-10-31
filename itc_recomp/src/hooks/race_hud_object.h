@@ -86,5 +86,9 @@ void RaceHudObjectInit(PPCContext& ctx, uint8_t* base);
 void RaceHudObjectDraw(PPCContext& ctx, uint8_t* base);
 void RaceHudObjectUpdateWarning(PPCContext& ctx, uint8_t* base);
 void RaceHudObjectUpdateRecordingFull(PPCContext& ctx, uint8_t* base);
+// RaceHud::ShowItem sub_82213638: r3 = the HUD, r4 = the item or -1;
+// UpdateItem sub_82214238: r3 = the HUD.
+void RaceHudObjectShowItem(PPCContext& ctx, uint8_t* base);
+void RaceHudObjectUpdateItem(PPCContext& ctx, uint8_t* base);
 
 }  // namespace hooks

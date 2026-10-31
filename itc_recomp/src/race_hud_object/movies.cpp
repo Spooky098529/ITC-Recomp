@@ -5,8 +5,10 @@
 
 #include "base/log.h"
 #include "camera_modes/steps.h"
+#include "data_tables/data_tables.h"
 #include "guest.h"
 #include "ui_movies/game.h"
+#include "ui_movies/ui_movies.h"
 
 namespace race_hud_object {
 
@@ -144,6 +146,51 @@ uint64_t UpdateRecordingFull(uint8_t* base, uint32_t hud, int32_t room, uint32_t
   const uint32_t node = ui_movies::FindNode(base, dashboard, kNone, 5);
   camera_modes::steps::Stfs(base, node + 68, camera_modes::steps::Lfs(base, kZero));
   return node;
+}
+
+uint64_t ShowItem(uint8_t* base, uint32_t hud, int32_t id, uint32_t sp, const Calls& calls) {
+  ITC_NATIVE_RUNNING("sub_82213638 RaceHud::ShowItem");
+  const uint32_t frame = sp - 128;
+  guest::StoreU32(base, frame, sp);
+  constexpr uint32_t kTagPrm = 0x50524D00;  // "PRM\0"
+  constexpr uint32_t kTagPic = 0x50494300;  // "PIC\0"
+  constexpr uint32_t kTagTxt = 0x54585400;  // "TXT\0"
+  const uint32_t shown = id == -1 ? 1 : 0;
+  uint32_t chunk = guest::LoadU32(base, Movie(base, hud, kHudRacers) + ui_movies::kMovieLive);
+  while (guest::LoadU32(base, chunk) != ui_movies::kTagTrm) {
+    const uint32_t tag = guest::LoadU32(base, chunk);
+    if (tag == kTagPrm || tag == kTagPic || tag == kTagTxt) {
+      guest::StoreU32(base, chunk + 80, shown);
+    }
+    chunk += guest::LoadU32(base, chunk + 4);
+  }
+  if (id == -1) {
+    return hud;
+  }
+  const uint32_t name = ui_movies::FindNode(base, Movie(base, hud, kHudRacers), kNone, 19);
+  const uint32_t picture = ui_movies::FindNode(base, Movie(base, hud, kHudRacers), 5, 0);
+  guest::StoreU32(base, name + 80, 1);
+  const uint32_t panel = ui_movies::FindNode(base, Movie(base, hud, kHudRacers), kNone, 5);
+  guest::StoreU32(base, panel + 80, 1);
+  guest::StoreU32(base, picture + 80, 1);
+  // UiMovie::SetNodeText's r6 to r10 (varargs) passed 0: the original leaves
+  // them unset (the user's call for the parking area, 2026-10-30).
+  calls.Call(kSetNodeText, frame, 0x82213724, Movie(base, hud, kHudRacers), name,
+             uint64_t(int64_t(id) + 4650));
+  const uint32_t item = data_tables::Item(base, uint32_t(id));
+  const int32_t kind = int8_t(guest::LoadU8(base, item + 34));
+  guest::StoreU32(base, picture + 108, uint32_t(kind < 48 ? kind : id - 262));
+  return item;
+}
+
+uint64_t UpdateItem(uint8_t* base, uint32_t hud, uint32_t sp, const Calls& calls) {
+  ITC_NATIVE_RUNNING("sub_82214238 RaceHud::UpdateItem");
+  const uint32_t item = guest::LoadU32(base, guest::LoadU32(base, kRaceProgress) + 7240);
+  if (guest::LoadU32(base, hud + 460) == item) {
+    return hud;
+  }
+  guest::StoreU32(base, hud + 460, item);
+  return ShowItem(base, hud, int32_t(item), sp, calls);
 }
 
 uint32_t MovieMask(uint32_t kind) {

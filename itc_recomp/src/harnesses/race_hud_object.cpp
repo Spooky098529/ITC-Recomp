@@ -17,6 +17,7 @@
 
 #include "base/flags.h"
 #include "base/log.h"
+#include "data_tables/data_tables.h"
 #include "hooks/app_start_up.h"
 #include "hooks/race_hud_object.h"
 #include "hooks/ui_movies.h"
@@ -342,7 +343,8 @@ void Case(Context& h, Results& results, const World& w, uint64_t seed, const Set
                               {rh::kRaceData, 4},
                               {kOwner, 4},
                               {rh::kRaceProgress, 4},
-                              {ui_movies::kMovieTable, 16}});
+                              {ui_movies::kMovieTable, 16},
+                              {data_tables::kTables, 4}});
     PPCContext t = CallContext(h);
     const uint32_t sp = t.r1.u32;
     WriteRandom(h.base, sp - kStackBytes, kStackBytes + kCallerBytes, r);
@@ -1027,6 +1029,37 @@ void ShapeMovieTable(uint8_t* base, const World& w, Random& r) {
   guest::StoreU32(base, ui_movies::kMovieTable + 8, count);
 }
 
+// The racers' movie's (movie 0) live scene as a chunk list for
+// RaceHud::ShowItem: chunk 0 at the scene's +0 (0x180 bytes, holding the
+// child entries FindNode reads), then chunks of 0x60 to 0xC0 bytes tagged
+// PRM, PIC, TXT or else, to a TRM before the node's end (or TRM at once).
+void ShapeChunks(uint8_t* base, const World& w, Random& r) {
+  static constexpr uint32_t kTags[] = {0x50524D00, 0x50494300, 0x54585400, 0x53434500};
+  const uint32_t scene = guest::LoadU32(base, w.movie(0) + ui_movies::kMovieLive);
+  if (r.Below(10) == 0) {
+    guest::StoreU32(base, scene, 0x54524D00);
+    return;
+  }
+  uint32_t at = 0;
+  uint32_t size = 0x180;
+  while (at + size < 0x700) {
+    guest::StoreU32(base, scene + at, r.Below(5) == 0 ? uint32_t(r.Next()) : kTags[r.Below(4)]);
+    guest::StoreU32(base, scene + at + 4, size);
+    at += size;
+    size = 0x60 + 0x20 * r.Below(4);
+  }
+  guest::StoreU32(base, scene + at, 0x54524D00);
+}
+
+// The data tables' object ([0x826C5CA0], misc block +0x5000) for
+// DataTables::Item: its items (+16) placed so item `id`'s entry is the misc
+// block's +0x5200 (its byte +34 the case's random one).
+void PointItems(uint8_t* base, const World& w, uint32_t id) {
+  const uint32_t object = w.misc.address + 0x5000;
+  guest::StoreU32(base, data_tables::kTables, object);
+  guest::StoreU32(base, object + 16, w.misc.address + 0x5200 - 3008 * id);
+}
+
 void Movies(Context& h, const World& w) {
   // The HUD's movies: +604 is movie 0, +608 1 ... +636 8.
   auto hud_movie = [&](uint32_t field) { return w.movie((field - 604) / 4); };
@@ -1166,6 +1199,42 @@ void Movies(Context& h, const World& w) {
           t.r4.u64 = r.Below(4) == 0 ? r.Next() : r.Below(2);
         },
         __imp__sub_82212E60, hooks::RaceHudObjectUpdateRecordingFull, spec);
+  }
+  {
+    // The racers' movie's live scene a chunk list (ShapeChunks); the item
+    // -1, an id of the item table (0 to 399) or any; SetNodeText recorded.
+    Spec spec;
+    spec.frame = 128;
+    spec.saves = 48;
+    Group(
+        h, w, "RaceHud::ShowItem (sub_82213638)", 200,
+        [&](PPCContext& t, Random& r, const World& w) {
+          ShapeChunks(h.base, w, r);
+          t.r3.u64 = w.hud.address;
+          t.r4.u64 = r.Below(3) == 0 ? 0xFFFFFFFFFFFFFFFFull : r.Below(400);
+          PointItems(h.base, w, t.r4.u32);
+          t.r7.u64 = t.r8.u64 = t.r9.u64 = t.r10.u64 = 0;
+        },
+        __imp__sub_82213638, hooks::RaceHudObjectShowItem, spec);
+  }
+  {
+    // The race progress's +7240 against +460 (now and then the same).
+    Spec spec;
+    spec.frame = 128;
+    spec.saves = 48;
+    Group(
+        h, w, "RaceHud::UpdateItem (sub_82214238)", 150,
+        [&](PPCContext& t, Random& r, const World& w) {
+          ShapeChunks(h.base, w, r);
+          guest::StoreU32(h.base, rh::kRaceProgress, w.progress());
+          const uint32_t item = r.Below(3) == 0 ? 0xFFFFFFFFu : r.Below(400);
+          guest::StoreU32(h.base, w.progress() + 7240, item);
+          PointItems(h.base, w, item);
+          guest::StoreU32(h.base, w.hud.address + 460, r.Below(3) == 0 ? item : r.Below(400));
+          t.r3.u64 = w.hud.address;
+          t.r7.u64 = t.r8.u64 = t.r9.u64 = t.r10.u64 = 0;
+        },
+        __imp__sub_82214238, hooks::RaceHudObjectUpdateItem, spec);
   }
 }
 
