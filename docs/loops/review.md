@@ -84,6 +84,17 @@ When the user has reviewed a run's section, its heading gets
   `RaceSceneMachine::Init`'s prints come right after their bail-out
   (when the native `operator new` can't run), so they log only when the
   native path runs (the validation agent's note).
+- The menu sounds' map (60918895): `functions/menu-sounds.md`, 33 new
+  rows (4 seen in play): `MenuSound::Play` (`sub_821103F0`, cue r3 of
+  bank 0 at 1.0 through the sound manager's slot 10, ~270 callers),
+  `Sound::Play` (`sub_82175850`), the volume options for the XACT
+  categories "Default" and "Music" (`sub_821B9C20`, `sub_821B9CF0`),
+  and 29 of the sound manager's methods not seen in play. For review:
+  `known-data.md`'s `0x826C5C80` row corrected (the sound manager
+  `AudioManager`, app + 124, not a music player; `Music::Play`'s slot 4
+  is `AudioManager::LoadBank`); the slots that run keep their rows in
+  `sound-cues.md`; `race-hud-object.md`'s and `location-screen.md`'s
+  intros point to the new file.
 
 ## Run 2026-10-30 23:03 (`b7-loop-30-10-26-2`)
 

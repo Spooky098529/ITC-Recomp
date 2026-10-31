@@ -70,7 +70,11 @@ file's history. What's left to see in a drive, from every run:
 
 - Subsystem 3 of 3: the menu sound (`sub_821103F0`; picked as ready
   and a blocker of the race HUD object's and the parking area's rest,
-  ~300 callers). Step: mapping (agent running).
+  ~300 callers). Mapped (60918895, `menu-sounds.md`, 33 new rows, 4 in
+  play, 4 ready groups, no stop: `MenuSound::Play` through the sound
+  manager's `PlayCue2D` (`[0x826C5C80]` is `AudioManager`, not a music
+  player), `Sound::Play`, the two volume options; 2 leads added).
+  Step: migration (agent running).
 
 ## Done
 
@@ -135,5 +139,7 @@ file's history. What's left to see in a drive, from every run:
 - After its validation (`itc_2930`, 120 s: race 60 s, 0 errors, every
   harness 0 differing but the expected groups): ours 3548, work left
   2850.
+- After the menu sounds' map: ours 3548, work left 2850 (wrapped 103,
+  known 491, unknown 2256).
 
 ## Stopped
