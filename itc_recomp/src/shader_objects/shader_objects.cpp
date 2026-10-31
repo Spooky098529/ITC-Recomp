@@ -318,4 +318,40 @@ bool LoadShaders(uint8_t* base, uint32_t model, uint32_t section, const CreateCa
   return true;
 }
 
+std::optional<bool> PairLoaded(uint8_t* base, uint32_t context, const CreateCalls& calls) {
+  ITC_NATIVE_RUNNING("sub_820A06D0 Shaders::OnPairLoaded");
+  constexpr uint32_t kVertexTable = 0x826BFCB8;
+  constexpr uint32_t kPixelTable = 0x826BDC98;
+  const uint32_t vertex = Load(base, context + 0);
+  const uint32_t pixel = Load(base, context + 4);
+  // The checks first: memcpy's flag, each header copy's byte loop (the new
+  // blocks can't share memory with the files).
+  if (!native::Buffers_NativeMemcpy() ||
+      !c_runtime::XMemCpyBytes(base, vertex, Load(base, vertex + 4)) ||
+      !c_runtime::XMemCpyBytes(base, pixel, Load(base, pixel + 4))) {
+    return std::nullopt;
+  }
+  const auto slot = [&](uint32_t table) { return table + (Load(base, context + 8) << 2); };
+  // The vertex shader.
+  FileRecord record = ReadFile(base, vertex);
+  Store(base, slot(kVertexTable), models::AllocVirtual(base, record.object_bytes));
+  CopyHeaderFrom(base, Load(base, slot(kVertexTable)), vertex, kVertexShaderBytes);
+  uint32_t code = models::AllocPhysicalEx(base, record.code_bytes, 0, 0xFFFFFFFFu, 32, 0x404);
+  Require(native::Buffers_Memcpy(base, code, record.code, record.code_bytes, 0x820A074C),
+          "memcpy");
+  const uint32_t vertex_object = Load(base, slot(kVertexTable));
+  if (!VertexShaderInit(base, vertex_object, code)) {
+    calls.init(calls.user, vertex_object, code);
+  }
+  // The pixel shader (its file read again: nothing above writes it).
+  record = ReadFile(base, Load(base, context + 4));
+  Store(base, slot(kPixelTable), models::AllocVirtual(base, record.object_bytes));
+  CopyHeaderFrom(base, Load(base, slot(kPixelTable)), record.file, kPixelShaderBytes);
+  code = models::AllocPhysicalEx(base, record.code_bytes, 0, 0xFFFFFFFFu, 32, 0x404);
+  Require(native::Buffers_Memcpy(base, code, record.code, record.code_bytes, 0x820A07C8),
+          "memcpy");
+  PixelShaderInit(base, Load(base, slot(kPixelTable)), code);
+  return memory::crt::OperatorDelete(context);
+}
+
 }  // namespace shader_objects

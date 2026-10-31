@@ -27,6 +27,7 @@
 #include "models/part_model.h"
 #include "models/texture_provider.h"
 #include "models/xpr.h"
+#include "shader_objects/shader_objects.h"
 
 #include <fmt/format.h>
 
@@ -1209,6 +1210,160 @@ void ShaderPairs(Context& h) {
   Store(h.base, models::kShaderBuffer, buffer);
 }
 
+// --- The shader pair's load callback ---
+
+// VertexShader::Init's original where its plain C++ declines.
+struct PairInitCall {
+  PPCContext ctx;
+  uint8_t* base;
+};
+void PairInitOriginal(void* user, uint32_t object, uint32_t microcode) {
+  auto& call = *static_cast<PairInitCall*>(user);
+  call.ctx.r3.u64 = object;
+  call.ctx.r4.u64 = microcode;
+  __imp__sub_822A8740(call.ctx, call.base);
+}
+void NativePairLoaded(PPCContext& t, uint8_t* base) {
+  PairInitCall call{t, base};
+  shader_objects::CreateCalls calls;
+  calls.init = &PairInitOriginal;
+  calls.user = &call;
+  const uint64_t r6 = t.r6.u64;
+  if (const auto freed = shader_objects::PairLoaded(base, t.r6.u32, calls)) {
+    t.r3.u64 = r6;
+    if (!*freed) {
+      __imp__sub_825A70E8(t, base);
+    }
+    return;
+  }
+  __imp__sub_820A06D0(t, base);
+}
+
+// A memory block's pages (Memory::AllocVirtual's or AllocPhysicalEx's)
+// given back.
+void FreeShaderBlock(uint32_t block, bool physical) {
+  if (block == 0) {
+    return;
+  }
+  const uint32_t header = block - models::kBlockHeaderBytes;
+  if (physical) {
+    memory::FreePhysical(header);
+  } else {
+    memory::FreePages(header);
+  }
+}
+
+// Shaders::OnPairLoaded: a vertex file (fetch tables of 0 to 32 words, and
+// 40 now and then: VertexShader::Init's original) and a pixel file with
+// random words, headers and microcode of 12 bytes to 3 KB, back to back in
+// a block (the harnesses run before the boot's own pairs are loaded); the
+// context from operator new on each side, a pair whose table slots the game
+// never fills. The two table words' objects (their microcode
+// pointers replaced by a marker) with their headers, the microcode by its
+// contents, the blocks' 16-byte headers, the files' bytes and r3 (the
+// context) compared; then the blocks freed and the table words put back.
+void ShaderPairLoads(Context& h) {
+  if (!hooks::ModelsNativeLifetime()) {
+    ITC_LOG_WARN("harness: models: the shader pair's load callback needs --native_heap");
+    return;
+  }
+  Results results("Shaders::OnPairLoaded (sub_820A06D0)");
+  constexpr uint32_t kFilesBytes = 16 * 1024;
+  constexpr uint32_t kMarker = 0x4D435245;
+  const uint32_t files = memory::Alloc(kFilesBytes, 0);
+  for (int c = 0; c < 120; c++) {
+    // Pairs the game doesn't load (34 to 999, 1006 to 1999): its loader
+    // thread may fill the others' slots while the harness runs.
+    static constexpr uint32_t kEdges[4] = {34, 999, 1006, 1999};
+    const uint32_t pair = c < 4                  ? kEdges[c]
+                          : h.random.Below(2) == 0 ? 34 + h.random.Below(966)
+                                                   : 1006 + h.random.Below(994);
+    struct Shader {
+      uint32_t header, code_bytes, magic, count, first, table;
+      std::vector<uint32_t> words;
+    };
+    Shader shaders[2];
+    std::vector<uint8_t> fill(kFilesBytes);
+    for (auto& x : fill) x = uint8_t(h.random.Next());
+    for (int k = 0; k < 2; k++) {
+      Shader& sh = shaders[k];
+      const bool vertex_shader = k == 0;
+      sh.header = 280 + 4 * h.random.Below(60);
+      sh.code_bytes = 12 + 12 * h.random.Below(256);
+      sh.magic = uint32_t(h.random.Next());
+      sh.magic = vertex_shader ? (sh.magic | 1u) : (sh.magic & ~0x3Fu);
+      sh.table = 32 + 4 * h.random.Below(4);
+      sh.first = h.random.Below(8);
+      sh.count = (c % 20 == 9 && vertex_shader) ? 40 : h.random.Below(33);
+      sh.words.resize(sh.count);
+      for (auto& w : sh.words) {
+        w = (uint32_t(h.random.Next()) & ~0xFFFu) | h.random.Below(sh.code_bytes / 12);
+      }
+    }
+    const uint32_t vertex = files;
+    const uint32_t pixel = vertex + shaders[0].header + shaders[0].code_bytes;
+    const uint32_t file_bytes = pixel + shaders[1].header + shaders[1].code_bytes - vertex;
+    const uint32_t slots[2] = {models::kSharedVertexTable + 4 * pair,
+                               models::kSharedPixelTable + 4 * pair};
+    const uint32_t kept[2] = {Load(h.base, slots[0]), Load(h.base, slots[1])};
+    Outputs out[2];
+    for (int v = 0; v < 2; v++) {
+      Write(h.base, files, fill.data(), kFilesBytes);
+      uint32_t file = vertex;
+      for (int k = 0; k < 2; k++) {
+        const Shader& sh = shaders[k];
+        Store(h.base, file + 0, sh.magic);
+        Store(h.base, file + 4, sh.header);
+        Store(h.base, file + 8, sh.code_bytes);
+        if (k == 0) {
+          Store(h.base, file + 20, sh.table);
+          Store(h.base, file + sh.table + 24, sh.first);
+          Store(h.base, file + sh.table + 28, sh.count);
+          for (uint32_t w = 0; w < sh.count; w++) {
+            Store(h.base, file + sh.table + 4 * (sh.first + 10 + w), sh.words[w]);
+          }
+        }
+        file += sh.header + sh.code_bytes;
+      }
+      const auto context = memory::crt::OperatorNew(h.base, 12);
+      if (!context) {
+        ITC_LOG_ERROR("harness: models: operator new declined");
+        std::abort();
+      }
+      Store(h.base, *context + 0, vertex);
+      Store(h.base, *context + 4, pixel);
+      Store(h.base, *context + 8, pair);
+      PPCContext t = CallContext(h);
+      t.r6.u64 = *context;
+      Side(v, [&] { (v == 0 ? __imp__sub_820A06D0 : NativePairLoaded)(t, h.base); });
+      out[v].Word(t.r3.u32 == *context);
+      out[v].Word(uint32_t(t.r3.u64 >> 32));
+      const uint32_t files_at[2] = {vertex, pixel};
+      for (int k = 0; k < 2; k++) {
+        const uint32_t object = Load(h.base, slots[k]);
+        const uint32_t fields = k == 0 ? shader_objects::kVertexShaderBytes
+                                       : shader_objects::kPixelShaderBytes;
+        const uint32_t header = Load(h.base, files_at[k] + 4);
+        const uint32_t pointer = k == 0 ? 48 : 24;
+        const uint32_t code = Load(h.base, object + pointer);
+        out[v].Bytes(Read(h.base, object - models::kBlockHeaderBytes, 16));
+        out[v].Bytes(Read(h.base, code - models::kBlockHeaderBytes, 16));
+        Store(h.base, object + pointer, kMarker);
+        out[v].Bytes(Read(h.base, object, fields + header));
+        out[v].Bytes(Read(h.base, code, Load(h.base, files_at[k] + 8)));
+        FreeShaderBlock(object, false);
+        FreeShaderBlock(code, true);
+        Store(h.base, slots[k], kept[k]);
+      }
+      out[v].Bytes(Read(h.base, vertex, file_bytes));
+    }
+    results.Check(out[0], out[1],
+                  fmt::format("case {} (pair {}, {} fetches)", c, pair, shaders[0].count));
+  }
+  memory::Free(files);
+  results.Report();
+}
+
 // sub_825896C0: the two table words set from random r3 and r4; the words and
 // r3 compared, then put back.
 void SharedShaderSets(Context& h) {
@@ -1270,6 +1425,7 @@ void Models(Context& h) {
     Accessors(h, block);
     SharedShaderSets(h);
     ShaderPairs(h);
+    ShaderPairLoads(h);
     // The car part model (464 bytes): its constructor and destructor over
     // the model's cases, and its clear on random bytes.
     ModelConstructs(h, block,

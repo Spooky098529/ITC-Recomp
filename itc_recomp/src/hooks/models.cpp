@@ -77,7 +77,10 @@ ITC_FLAG_BOOL(native_models, true, "ITC",
               "sub_820CECA0 (beside it, the same files: the texture provider's slots 5 and 6 and "
               "CameraPasses::RenderTarget guest calls); with --native_heap and the "
               "archive's queue native, Shaders::LoadAll sub_820A08A0 with Shaders::LoadPair "
-              "sub_820A07F0 (no adapter: only LoadAll's plain C++ calls it)) natively instead of through the "
+              "sub_820A07F0 (no adapter: only LoadAll's plain C++ calls it) and its pixel file's load "
+              "callback Shaders::OnPairLoaded sub_820A06D0 (in src/shader_objects/; the adapter "
+              "stays: the archive's request calls it through its function pointer; VertexShader::Init's "
+              "original a guest call where its plain C++ declines)) natively instead of through the "
               "translated code (the same writes; "
               "checked by --run_harnesses=models and, for Model::RecordShape and RecordMaterials, "
               "scenery_lists)");
@@ -516,4 +519,52 @@ extern "C" REX_FUNC(sub_820A08A0) {
     });
   });
   ctx.r3.s64 = int32_t(r3);
+}
+
+namespace {
+
+// VertexShader::Init's original, from a frame as the callback's own.
+struct PairLoadedCalls {
+  PPCContext& ctx;
+  uint8_t* base;
+  static void Init(void* user, uint32_t object, uint32_t microcode) {
+    auto& c = *static_cast<PairLoadedCalls*>(user);
+    guest_call::InFrame(c.ctx, c.base, 144, 0x820A0760, [&](uint32_t) {
+      c.ctx.r3.u64 = object;
+      c.ctx.r4.u64 = microcode;
+      __imp__sub_822A8740(c.ctx, c.base);
+    });
+  }
+};
+
+}  // namespace
+
+// Shaders::OnPairLoaded (Archive::Load's callback; reached through the
+// request's function pointer, so the adapter stays): r6 = the pair's
+// context; r3 = the context, as operator delete leaves it.
+extern "C" REX_FUNC(sub_820A06D0) {
+  REX_FUNC_PROLOGUE();
+  if (hooks::ModelsNativeLifetime()) {
+    const uint64_t lr = ctx.lr;
+    const uint64_t r6 = ctx.r6.u64;
+    const uint32_t context = ctx.r6.u32;
+    PairLoadedCalls guest{ctx, base};
+    shader_objects::CreateCalls calls;
+    calls.init = &PairLoadedCalls::Init;
+    calls.user = &guest;
+    const auto freed = shader_objects::PairLoaded(base, context, calls);
+    ctx.lr = lr;
+    if (freed) {
+      ctx.r3.u64 = r6;
+      if (!*freed) {
+        guest_call::InFrame(ctx, base, 144, 0x820A07E4, [&](uint32_t) {
+          ctx.r3.u64 = r6;
+          __imp__sub_825A70E8(ctx, base);
+        });
+        ctx.lr = lr;
+      }
+      return;
+    }
+  }
+  __imp__sub_820A06D0(ctx, base);
 }

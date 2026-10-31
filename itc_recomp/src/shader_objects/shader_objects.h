@@ -102,4 +102,23 @@ std::optional<uint32_t> PixelShaderCreate(uint8_t* base, uint32_t file);
 // VertexShaderInit declines, `calls.init` (the original).
 bool LoadShaders(uint8_t* base, uint32_t model, uint32_t section, const CreateCalls& calls);
 
+// sub_820A06D0 Shaders::OnPairLoaded (probably; models.md): Archive::Load's
+// callback for a shader pair's pixel file, `context` LoadPair's 12 bytes (+0
+// the vertex file, +4 the pixel file, +8 the pair). For each file, as
+// Mesh::LoadShaders' shaders: its object from Memory::AllocVirtual into the
+// shared vertex table (0x826BFCB8 + 4 x the pair) or pixel table
+// (0x826BDC98 + 4 x the pair), its header copied after the fields, its
+// microcode into Memory::AllocPhysicalEx(size, 0, -1, 32, 0x404) through
+// memcpy (recorded for the renderer: native::Buffers_Memcpy), then its Init
+// (the object read back from the table, the pair read again from the
+// context each time, as the original does); then the context freed
+// (operator delete). Returns whether operator delete's plain C++ freed it
+// (false: the caller runs the original's), or nullopt, with nothing done,
+// where the original must run: memcpy's copy that wouldn't be native
+// (--native_memcpy off), or a header copy XMemCpy hands to the original.
+// Only over the allocation layer with the memory blocks' host lock (the
+// adapter's condition). Where VertexShaderInit declines, `calls.init` (the
+// original).
+std::optional<bool> PairLoaded(uint8_t* base, uint32_t context, const CreateCalls& calls);
+
 }  // namespace shader_objects
