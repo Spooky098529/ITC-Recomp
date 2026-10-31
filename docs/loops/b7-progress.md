@@ -10,7 +10,7 @@ file's history. What's left to see in a drive, from every run:
 
 - Run started 2026-10-30 23:03 on `b7-loop-30-10-26-2`, from ac55473;
   summary `b7-loop-2026-10-30-2303.md`.
-- Limit for this run: 3 subsystems; 2 taken.
+- Limit for this run: 3 subsystems; 3 taken.
 - Subsystem 1 of 3: the car models (`sub_820D5EC8`...`sub_820ED090`,
   the top of `leads.md`). Already mapped (`car-models.md`, 46 rows in
   play, 27 ours, 19 known); the map checked by the lead, not remapped
@@ -53,9 +53,17 @@ file's history. What's left to see in a drive, from every run:
   21 harness lines; 20 ran in the race, 1 in the replay, none to drive.
   Migration 2 checked (4795aab: `PaintPalette::Init`, as data copied
   through lfs/stfs as the original; 22 of 22 in play ours; no adapter
-  removable yet, nothing else ready). Validation 2 running.
+  removable yet, nothing else ready). Validated (`itc_2871`): 1 of 1
+  harness line, ran in play. Subsystem 2 finished.
+- Subsystem 3 of 3: the race's track zone signs, probably a HUD object
+  (`sub_822122B0`...`sub_822141A0`; picked as run every race frame,
+  its 5 roots all ready). Mapping running.
 
 ## Done
+
+- The material passes (subsystem 2): `material-passes.md`, 22 of 22 in
+  play, two migrations; `--native_material_passes`; 2da185e..4795aab.
+  Validated (`itc_2866`, `itc_2871`).
 
 - The car models (subsystem 1): `car-models.md`, 48 of 50 in play, two
   migrations, with `GetLastError` and `Skeleton::LocalMatrices`;
@@ -101,5 +109,8 @@ file's history. What's left to see in a drive, from every run:
 - After the material passes' migration 2 (`itc_2870`: race 38 s, 0
   errors, material_passes 0 differing): ours 3469, work left 2928
   (wrapped 103, known 467, unknown 2358).
+- After its validation (`itc_2871`, 60 s: race 7 s, 0 errors, every
+  harness 0 differing but the expected groups): ours 3469, work left
+  2928.
 
 ## Stopped
