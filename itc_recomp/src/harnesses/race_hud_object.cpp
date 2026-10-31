@@ -26,6 +26,7 @@
 #include <fmt/format.h>
 
 #include <bit>
+#include <cmath>
 #include <cstring>
 #include <functional>
 #include <limits>
@@ -45,7 +46,7 @@ namespace rh = race_hud_object;
 constexpr uint32_t kVehicles = 0x826C2E34;  // Vehicle::Get's array
 constexpr uint32_t kSaveSlots = 0x826C5B58;  // SaveData::Of's four pointers
 constexpr uint32_t kSaveBytes = 0x20000;
-constexpr uint32_t kMiscBytes = 0x2000;  // the viewport, the build, the textures
+constexpr uint32_t kMiscBytes = 0x6000;  // the viewport, the build, the textures, the racers
 constexpr uint32_t kRaceBytes = 0xA4000;  // the race data (to the mode, +0xA3AF4)
 constexpr uint32_t kOwner = 0x828161EC;   // the track zones' owner
 constexpr uint32_t kMirrorTarget = 0x826BABE0;  // render target 11's texture
@@ -151,6 +152,8 @@ struct World {
            zones.address;
   }
   uint32_t textures() const { return misc.address + 0x1000; }
+  uint32_t racers() const { return misc.address + 0x2000; }
+  uint32_t progress() const { return misc.address + 0x3000; }
   uint32_t viewport() const { return misc.address + 0x10; }
   uint32_t build() const { return misc.address + 0x800; }
   uint32_t movie(uint32_t i) const { return movies.address + kMovieBytes * i; }
@@ -163,7 +166,8 @@ struct World {
   Block collision;
   Block save;  // player 0's save data (the HUD options at +0x1F85C)
   Block misc;  // the viewports' pointer (+0), viewport 0 (+0x10), the build (+0x800),
-               // the movies' textures (+0x1000)
+               // the movies' textures (+0x1000), the racers (+0x2000), the race's
+               // progress (+0x3000)
   Block race;  // the race data
   Block zones;  // the track zones' owner and its zones
 };
@@ -317,7 +321,8 @@ void Case(Context& h, Results& results, const World& w, uint64_t seed, const Set
                               {kSaveSlots, 16},
                               {rh::kViewports, 4},
                               {rh::kRaceData, 4},
-                              {kOwner, 4}});
+                              {kOwner, 4},
+                              {rh::kRaceProgress, 4}});
     PPCContext t = CallContext(h);
     const uint32_t sp = t.r1.u32;
     WriteRandom(h.base, sp - kStackBytes, kStackBytes + kCallerBytes, r);
@@ -844,6 +849,79 @@ void ShapeSigns(uint8_t* base, const World& w, Random& r) {
   guest::StoreU32(base, w.race.address + 4, r.Below(4) == 0 ? 8 + r.Below(3) : r.Below(25));
 }
 
+void Ticks(Context& h, const World& w) {
+  {
+    // The car's values (a speed in m/s, the extra gauges' floats, the gear,
+    // the tachometer's +2224, the bar, the boost, the build's +3892), the
+    // curves, the digits' groups, the extra gauges' slots and the signs.
+    Spec spec;
+    spec.frame = 128;
+    spec.saves = 32;
+    spec.Floats(20, 56);
+    spec.Floats(404, 3);
+    Group(
+        h, w, "RaceHud::Tick (sub_822153A0)", 400,
+        [&](PPCContext& t, Random& r, const World& w) {
+          ShapeSigns(h.base, w, r);
+          const uint32_t hud = w.hud.address;
+          const uint32_t car = guest::LoadU32(h.base, hud + rh::kHudVehicle);
+          const bool ordinary = r.Below(4) != 0;
+          guest::StoreFloat(h.base, car + 48, ordinary ? float(r.Below(90)) : AnyFloat(r, 400.0f));
+          for (const uint32_t offset : {6252u, 6256u, 6260u, 2224u, 2420u, 2944u}) {
+            guest::StoreFloat(h.base, car + offset,
+                              ordinary ? float(r.Below(200)) / 2.0f : AnyFloat(r, 300.0f));
+          }
+          guest::StoreU32(h.base, car + 2252, r.Below(9) - 1);
+          ShapeCurve(h.base, hud + 20, r);
+          ShapeCurve(h.base, hud + 132, r);
+          ShapeGroup(h.base, DashboardNode(h.base, w, 0xFFFFFFFFu, 9), r);
+          for (uint32_t k = 0; k < 3; k++) {
+            guest::StoreU32(h.base, hud + 480 + 4 * k, r.Below(4) - 1);
+          }
+          t.r3.u64 = hud;
+          t.r4.u64 = r.Below(3) == 0 ? 1 : 0;
+          t.r7.u64 = t.r8.u64 = t.r9.u64 = t.r10.u64 = 0;
+        },
+        __imp__sub_822153A0, hooks::RaceHudObjectTick, spec);
+  }
+  {
+    // The racers (+444): the ticks (+3932), the start's float (+828), the
+    // animation (+12) -1 to 5; the race's progress (+7156); +464 the last
+    // animation now and then the same.
+    Spec spec;
+    spec.frame = 128;
+    spec.saves = 32;
+    Group(
+        h, w, "RaceHud::TickTimer (sub_82214D78)", 400,
+        [&](PPCContext& t, Random& r, const World& w) {
+          const uint32_t hud = w.hud.address;
+          const uint32_t racers = w.racers();
+          guest::StoreU32(h.base, hud + 444, racers);
+          guest::StoreU32(h.base, rh::kRaceProgress, w.progress());
+          guest::StoreU32(h.base, racers + 3932,
+                          r.Below(4) == 0 ? uint32_t(r.Next()) : r.Below(200000));
+          // Finite values only: a NaN distance (or infinity less infinity)
+          // makes SetDistance write negative digits
+          // into the nodes' child indices, and the lookups after it read
+          // outside the pool (the game's own behavior; the harness's world
+          // can't hold it).
+          const bool ordinary = r.Below(4) != 0;
+          auto any = [&](float range) {
+            const float value = AnyFloat(r, range);
+            return std::isfinite(value) ? value : 0.0f;
+          };
+          guest::StoreFloat(h.base, racers + 828, ordinary ? float(r.Below(10000)) : any(1e5f));
+          guest::StoreFloat(h.base, w.progress() + 7156,
+                            ordinary ? float(r.Below(20000)) : any(1e5f));
+          const uint32_t animation = r.Below(7) - 1;
+          guest::StoreU32(h.base, racers + 12, animation);
+          guest::StoreU32(h.base, hud + 464, r.Below(3) == 0 ? animation : r.Below(7) - 1);
+          t.r3.u64 = hud;
+        },
+        __imp__sub_82214D78, hooks::RaceHudObjectTickTimer, spec);
+  }
+}
+
 void Signs(Context& h, const World& w) {
   // UiMovie::SetText and ClearText recorded (r3 to r6; r7 to r10 0 from
   // the native callers, the user's call, 2026-10-30: the cases start with
@@ -890,6 +968,7 @@ void RaceHudObject(Context& h) {
   Dashboard(h, w);
   SetUps(h, w);
   Signs(h, w);
+  Ticks(h, w);
 }
 
 }  // namespace harness

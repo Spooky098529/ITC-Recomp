@@ -63,4 +63,9 @@ void RaceHudObjectUpdateSigns(PPCContext& ctx, uint8_t* base);
 void RaceHudObjectUpdateSign(PPCContext& ctx, uint8_t* base);
 void RaceHudObjectUpdatePlaceName(PPCContext& ctx, uint8_t* base);
 
+// RaceHud::Tick sub_822153A0: r3 = the HUD, r4 = the race flow's flag;
+// TickTimer sub_82214D78: r3 = the HUD.
+void RaceHudObjectTick(PPCContext& ctx, uint8_t* base);
+void RaceHudObjectTickTimer(PPCContext& ctx, uint8_t* base);
+
 }  // namespace hooks

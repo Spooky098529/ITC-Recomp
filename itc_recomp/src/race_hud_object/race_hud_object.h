@@ -56,6 +56,7 @@ constexpr uint32_t kFinishNamed = 0x8211DF20;
 constexpr uint32_t kSetText = 0x8211C1F8;
 constexpr uint32_t kClearText = 0x8211C470;
 constexpr uint32_t kTrackZones = 0x828161EC;  // the zones' owner
+constexpr uint32_t kRaceProgress = 0x826D82E8;  // the race's progress (+7156 a float)
 
 // A guest function `function` called with r3 to r10 (0 where not given:
 // the varargs UiMovie::SetText's unset r7 to r10 pass 0, the user's call
@@ -219,5 +220,27 @@ uint64_t UpdatePlaceName(uint8_t* base, uint32_t hud, uint32_t sp, const Calls& 
 // UpdatePlaceName.
 uint64_t UpdateSigns(uint8_t* base, uint32_t hud, uint32_t flag, uint32_t sp, const Calls& calls,
                      const track_zones::OwnerCalls& zone_calls);
+
+// --- The ticks (tick.cpp) ---
+
+// RaceHud::Tick (sub_822153A0): by the car (+440): the speed
+// (Vehicle::GetSpeedKmh times the double at 0x8200A510, through frsp and
+// fctiwz at the frame's +80; SetSpeed), the extra gauges (UpdateExtraGauges
+// with f1 = the car's float +6260, r5 = +6256 and r6 = +6252 through
+// fctiwz), the gear (+2252; SetGear), the tachometer (the car's float
+// +2224; SetTach), the bar (+2420; SetBar), the boost (+2944; SetBoost),
+// node 13 +80 = the build's (+5712) +3892, then UpdateSigns(`flag`).
+// UpdateSigns' r3.
+uint64_t Tick(uint8_t* base, uint32_t hud, uint32_t flag, uint32_t sp, const Calls& calls,
+              const track_zones::OwnerCalls& zone_calls);
+// RaceHud::TickTimer (sub_82214D78): SetTime(RaceTime::FromTicks of the
+// racers' (+444) +3932, at the frame's +80), SetDistance((the race
+// progress's +7156 - the racers' +828) x the float at 0x820029D8 x the
+// double at 0x8200A510), then by the racers' +12 (k): below 0 the timer
+// movie's node 0 hidden; else shown and, when k isn't +464, named
+// animations 0 to 4 finished (UiMovie::FinishNamed through `calls`), k
+// played and looped (PlayNamed, LoopNamed's plain C++), +464 = k. r3 as
+// the original leaves it (the node, or LoopNamed's).
+uint64_t TickTimer(uint8_t* base, uint32_t hud, uint32_t sp, const Calls& calls);
 
 }  // namespace race_hud_object

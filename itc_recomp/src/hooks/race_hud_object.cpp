@@ -24,7 +24,8 @@ ITC_FLAG_BOOL(native_race_hud_object, true, "ITC",
               "TrackZones::Create and the extra gauges' digits through their overrides "
               "or the originals; UpdateSigns sub_82214718, UpdateSign sub_82212F00, "
               "UpdatePlaceName sub_82213510, with TrackZones::Update and IsInside's plain C++; "
-              "UiMovie::FinishNamed, SetText and ClearText through their overrides) "
+              "UiMovie::FinishNamed, SetText and ClearText through their overrides; Tick "
+              "sub_822153A0, TickTimer sub_82214D78) "
               "natively instead of through the translated code (the same writes; checked by "
               "--run_harnesses=race_hud_object)");
 
@@ -235,6 +236,19 @@ void RaceHudObjectUpdatePlaceName(PPCContext& ctx, uint8_t* base) {
       rh::UpdatePlaceName(base, ctx.r3.u32, ctx.r1.u32, guest.calls(), guest.zone_calls());
 }
 
+void RaceHudObjectTick(PPCContext& ctx, uint8_t* base) {
+  ctx.fpscr.disableFlushMode();
+  GuestCalls guest(ctx, base);
+  ctx.r3.u64 = rh::Tick(base, ctx.r3.u32, ctx.r4.u32, ctx.r1.u32, guest.calls(),
+                        guest.zone_calls());
+}
+
+void RaceHudObjectTickTimer(PPCContext& ctx, uint8_t* base) {
+  ctx.fpscr.disableFlushMode();
+  GuestCalls guest(ctx, base);
+  ctx.r3.u64 = rh::TickTimer(base, ctx.r3.u32, ctx.r1.u32, guest.calls());
+}
+
 }  // namespace hooks
 
 // The adapters: the register steps above, or the originals with the flag
@@ -277,3 +291,5 @@ ITC_RACE_HUD_OBJECT(82215160, RaceHudObjectUpdateExtraGauges)
 ITC_RACE_HUD_OBJECT(82214718, RaceHudObjectUpdateSigns)
 ITC_RACE_HUD_OBJECT(82212F00, RaceHudObjectUpdateSign)
 ITC_RACE_HUD_OBJECT(82213510, RaceHudObjectUpdatePlaceName)
+ITC_RACE_HUD_OBJECT(822153A0, RaceHudObjectTick)
+ITC_RACE_HUD_OBJECT(82214D78, RaceHudObjectTickTimer)
