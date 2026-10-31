@@ -28,7 +28,10 @@ ITC_FLAG_BOOL(native_race_hud_object, true, "ITC",
               "sub_822153A0, TickTimer sub_82214D78; ShowGauge, SetSpeed, UpdateExtraGauges, SetGear, "
               "SetTach, SetBoost, SetBar, UpdateSigns, UpdateSign, UpdatePlaceName, SetTime and "
               "SetDistance have no adapters: only their native callers reach them, and the flag "
-              "switches those) "
+              "switches those; StartCountdown sub_82212270, StartMovie1 sub_82212718, "
+              "FinishMovie1 sub_82212878, DrawWarning sub_82212AC8, RunMovie1 sub_82212AF8, "
+              "RunItem sub_82212B08 (UiMovie::Run and FinishNamed through their overrides), "
+              "RaceScreens::MovieMask sub_82211BE8, RaceHud::Init sub_82215260) "
               "natively instead of through the translated code (the same writes; checked by "
               "--run_harnesses=race_hud_object)");
 
@@ -252,6 +255,45 @@ void RaceHudObjectTickTimer(PPCContext& ctx, uint8_t* base) {
   ctx.r3.u64 = rh::TickTimer(base, ctx.r3.u32, ctx.r1.u32, guest.calls());
 }
 
+void RaceHudObjectStartCountdown(PPCContext& ctx, uint8_t* base) {
+  ctx.r3.u64 = rh::StartCountdown(base, ctx.r3.u32);
+}
+
+void RaceHudObjectStartMovie1(PPCContext& ctx, uint8_t* base) {
+  ctx.r3.u64 = rh::StartMovie1(base, ctx.r3.u32, ctx.r1.u32);
+}
+
+void RaceHudObjectFinishMovie1(PPCContext& ctx, uint8_t* base) {
+  const uint32_t lr = uint32_t(ctx.lr);
+  GuestCalls guest(ctx, base);
+  ctx.r3.u64 = rh::FinishMovie1(base, ctx.r3.u32, ctx.r1.u32, lr, guest.calls());
+}
+
+void RaceHudObjectDrawWarning(PPCContext& ctx, uint8_t* base) {
+  const uint32_t lr = uint32_t(ctx.lr);
+  GuestCalls guest(ctx, base);
+  ctx.r3.u64 = rh::DrawWarning(base, ctx.r3.u32, ctx.r1.u32, lr, guest.calls());
+}
+
+void RaceHudObjectRunMovie1(PPCContext& ctx, uint8_t* base) {
+  const uint32_t lr = uint32_t(ctx.lr);
+  GuestCalls guest(ctx, base);
+  ctx.r3.u64 = rh::RunMovie1(base, ctx.r3.u32, ctx.r1.u32, lr, guest.calls());
+}
+
+void RaceHudObjectRunItem(PPCContext& ctx, uint8_t* base) {
+  GuestCalls guest(ctx, base);
+  ctx.r3.u64 = rh::RunItem(base, ctx.r3.u32, ctx.r1.u32, guest.calls());
+}
+
+void RaceHudObjectMovieMask(PPCContext& ctx, uint8_t* base) {
+  ctx.r3.u64 = rh::MovieMask(ctx.r4.u32);
+}
+
+void RaceHudObjectInit(PPCContext& ctx, uint8_t* base) {
+  ctx.r3.u64 = rh::Init(base, ctx.r3.u32, ctx.r1.u32);
+}
+
 }  // namespace hooks
 
 // The adapters: the register steps above, or the originals with the flag
@@ -288,3 +330,11 @@ ITC_RACE_HUD_OBJECT(822141A0, RaceHudObjectTearDown)
 ITC_RACE_HUD_OBJECT(822122B0, RaceHudObjectSetUpSigns)
 ITC_RACE_HUD_OBJECT(822153A0, RaceHudObjectTick)
 ITC_RACE_HUD_OBJECT(82214D78, RaceHudObjectTickTimer)
+ITC_RACE_HUD_OBJECT(82212270, RaceHudObjectStartCountdown)
+ITC_RACE_HUD_OBJECT(82212718, RaceHudObjectStartMovie1)
+ITC_RACE_HUD_OBJECT(82212878, RaceHudObjectFinishMovie1)
+ITC_RACE_HUD_OBJECT(82212AC8, RaceHudObjectDrawWarning)
+ITC_RACE_HUD_OBJECT(82212AF8, RaceHudObjectRunMovie1)
+ITC_RACE_HUD_OBJECT(82212B08, RaceHudObjectRunItem)
+ITC_RACE_HUD_OBJECT(82211BE8, RaceHudObjectMovieMask)
+ITC_RACE_HUD_OBJECT(82215260, RaceHudObjectInit)

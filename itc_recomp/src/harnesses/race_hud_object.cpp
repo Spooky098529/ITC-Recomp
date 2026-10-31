@@ -19,6 +19,7 @@
 #include "base/log.h"
 #include "hooks/app_start_up.h"
 #include "hooks/race_hud_object.h"
+#include "hooks/ui_movies.h"
 #include "memory/heap.h"
 #include "race_hud_object/race_hud_object.h"
 #include "ui_movies/game.h"
@@ -185,9 +186,12 @@ bool Recorder(PPCContext& ctx, uint32_t function) {
   if (g_calls == nullptr) {
     return false;
   }
-  // The arguments each reads (TrackZones::Create none, ClearText r3 to r5,
-  // SetText r3 to r6; the rest are leftovers).
-  const uint32_t reads = function == 0x8211C1F8 ? 4 : function == 0x8211C470 ? 3 : 0;
+  // The arguments each reads (TrackZones::Create none, ClearText and
+  // SetNodeText r3 to r5, SetText r3 to r6; the rest are leftovers, and
+  // SetNodeText's r6 to r10 its unset varargs).
+  const uint32_t reads = function == 0x8211C1F8                          ? 4
+                         : function == 0x8211C470 || function == 0x8211C7E8 ? 3
+                                                                            : 0;
   const uint64_t r[4] = {ctx.r3.u64, ctx.r4.u64, ctx.r5.u64, ctx.r6.u64};
   Call call{function, uint32_t(ctx.lr), ctx.r1.u32, 0, 0, 0, 0};
   uint64_t* to[4] = {&call.r3, &call.r4, &call.r5, &call.r6};
@@ -195,6 +199,21 @@ bool Recorder(PPCContext& ctx, uint32_t function) {
     *to[i] = r[i];
   }
   g_calls->push_back(call);
+  ctx.r3.u64 = g_answers.Next();
+  return true;
+}
+
+// The UI movies' update (which UiMovie::Run jumps to: r3 the movie, r4 draw
+// only) and the full-frame effect's recorder call (sub_8259EBE8: r3 the
+// quad, r4 its key, f1 its depth, kept in r5's place), recorded as the
+// recorder's calls and answered the same way, through the UI movies' stand-in
+// (ui_movies_hooks::g_update_callee_stand_in).
+bool StandIn(uint32_t function, PPCContext& ctx, uint8_t*) {
+  if (g_calls == nullptr || (function != 0x8211D2F8 && function != 0x8259EBE8)) {
+    return false;
+  }
+  g_calls->push_back({function, uint32_t(ctx.lr), ctx.r1.u32, ctx.r3.u64, ctx.r4.u64,
+                      function == 0x8259EBE8 ? ctx.f1.u64 : 0, 0});
   ctx.r3.u64 = g_answers.Next();
   return true;
 }
@@ -322,7 +341,8 @@ void Case(Context& h, Results& results, const World& w, uint64_t seed, const Set
                               {rh::kViewports, 4},
                               {rh::kRaceData, 4},
                               {kOwner, 4},
-                              {rh::kRaceProgress, 4}});
+                              {rh::kRaceProgress, 4},
+                              {ui_movies::kMovieTable, 16}});
     PPCContext t = CallContext(h);
     const uint32_t sp = t.r1.u32;
     WriteRandom(h.base, sp - kStackBytes, kStackBytes + kCallerBytes, r);
@@ -343,9 +363,13 @@ void Case(Context& h, Results& results, const World& w, uint64_t seed, const Set
     g_calls = &calls;
     const hooks::StartUpRecorder saved_recorder = hooks::g_start_up_recorder;
     hooks::g_start_up_recorder = Recorder;
+    const ui_movies_hooks::UpdateCalleeStandIn saved_stand_in =
+        ui_movies_hooks::g_update_callee_stand_in;
+    ui_movies_hooks::g_update_callee_stand_in = StandIn;
     ITC_FLAG(native_race_hud_object) = v == 1;
     (v == 0 ? recompiled : native)(t, h.base);
     ITC_FLAG(native_race_hud_object) = true;
+    ui_movies_hooks::g_update_callee_stand_in = saved_stand_in;
     hooks::g_start_up_recorder = saved_recorder;
     g_calls = nullptr;
     out[v].Word(uint32_t(calls.size()));
@@ -955,6 +979,143 @@ void Signs(Context& h, const World& w) {
   }
 }
 
+
+// A movie's animations for UiMovie::Play, PlayNamed, Loop, LoopNamed,
+// Finish and FinishNamed: its live scene's animation index (+116) small (the
+// scene's entries are pool nodes), and now and then a slot in the queue or
+// the looping list naming animation 0 or another, of the live scene (or a
+// sub-scene's -1 or 0), by name 0 or not (its scene the live one, its
+// animation one of the block's).
+void ShapeAnimations(uint8_t* base, const World& w, uint32_t movie, Random& r) {
+  const uint32_t scene = guest::LoadU32(base, movie + ui_movies::kMovieLive);
+  guest::StoreU32(base, scene + 116, r.Below(4));
+  const uint32_t slots = r.Below(3);
+  for (uint32_t k = 0; k < slots; k++) {
+    ui_movies::Slot slot{};
+    slot[0] = r.Below(3) == 0 ? 1 : 0;
+    slot[1] = r.Below(3) == 0 ? 0 : 0xFFFFFFFFu;
+    slot[2] = r.Below(3) == 0 ? 0xFFFFFFFFu : r.Below(2);
+    slot[3] = scene;
+    slot[4] = w.movies.address + kAnimationsAt + 64 * r.Below(8);
+    slot[5] = Bits(float(r.Below(40)) / 4.0f);
+    slot[6] = r.Below(2);
+    slot[7] = r.Below(2);
+    ui_movies::Append(base, movie + (r.Below(2) == 0 ? ui_movies::kMovieQueue
+                                                     : ui_movies::kMovieLooping),
+                      slot);
+  }
+}
+
+// The movie table (UiMovies::Find's pairs) in the misc block (+0x4000):
+// up to 24 pairs of the ids 0 to 23 in a random order (some missing), each
+// value a word of the block.
+void ShapeMovieTable(uint8_t* base, const World& w, Random& r) {
+  const uint32_t pairs = w.misc.address + 0x4000;
+  uint32_t ids[24];
+  for (uint32_t i = 0; i < 24; i++) {
+    ids[i] = i;
+  }
+  for (uint32_t i = 23; i > 0; i--) {
+    std::swap(ids[i], ids[r.Below(i + 1)]);
+  }
+  const uint32_t count = r.Below(4) == 0 ? r.Below(25) : 18 + r.Below(7);
+  for (uint32_t i = 0; i < count; i++) {
+    guest::StoreU32(base, pairs + 8 * i, ids[i]);
+  }
+  guest::StoreU32(base, ui_movies::kMovieTable, pairs);
+  guest::StoreU32(base, ui_movies::kMovieTable + 4, 24);
+  guest::StoreU32(base, ui_movies::kMovieTable + 8, count);
+}
+
+void Movies(Context& h, const World& w) {
+  // The HUD's movies: +604 is movie 0, +608 1 ... +636 8.
+  auto hud_movie = [&](uint32_t field) { return w.movie((field - 604) / 4); };
+  {
+    Spec spec;
+    Group(
+        h, w, "RaceHud::StartCountdown (sub_82212270)", 100,
+        [&](PPCContext& t, Random& r, const World& w) {
+          ShapeAnimations(h.base, w, hud_movie(612), r);
+          t.r3.u64 = w.hud.address;
+        },
+        __imp__sub_82212270, hooks::RaceHudObjectStartCountdown, spec);
+  }
+  {
+    Spec spec;
+    spec.frame = 96;
+    spec.saves = 16;
+    Group(
+        h, w, "RaceHud::StartMovie1 (sub_82212718)", 100,
+        [&](PPCContext& t, Random& r, const World& w) {
+          ShapeAnimations(h.base, w, hud_movie(628), r);
+          t.r3.u64 = w.hud.address;
+        },
+        __imp__sub_82212718, hooks::RaceHudObjectStartMovie1, spec);
+  }
+  {
+    Spec spec;
+    Group(
+        h, w, "RaceHud::FinishMovie1 (sub_82212878)", 100,
+        [&](PPCContext& t, Random& r, const World& w) {
+          ShapeAnimations(h.base, w, hud_movie(628), r);
+          t.r3.u64 = w.hud.address;
+        },
+        __imp__sub_82212878, hooks::RaceHudObjectFinishMovie1, spec);
+  }
+  {
+    Spec spec;
+    Group(
+        h, w, "RaceHud::DrawWarning (sub_82212AC8)", 60,
+        [&](PPCContext& t, Random& r, const World& w) {
+          guest::StoreU32(h.base, w.hud.address + 468, r.Below(2) == 0 ? 0 : r.Below(3));
+          t.r3.u64 = w.hud.address;
+        },
+        __imp__sub_82212AC8, hooks::RaceHudObjectDrawWarning, spec);
+  }
+  {
+    Spec spec;
+    Group(
+        h, w, "RaceHud::RunMovie1 (sub_82212AF8)", 40,
+        [&](PPCContext& t, Random&, const World& w) { t.r3.u64 = w.hud.address; },
+        __imp__sub_82212AF8, hooks::RaceHudObjectRunMovie1, spec);
+  }
+  {
+    Spec spec;
+    spec.frame = 96;
+    spec.saves = 16;
+    Group(
+        h, w, "RaceHud::RunItem (sub_82212B08)", 60,
+        [&](PPCContext& t, Random& r, const World& w) {
+          guest::StoreU32(h.base, w.hud.address + 460,
+                          r.Below(2) == 0 ? 0xFFFFFFFFu : r.Below(3) == 0 ? r.Next() : r.Below(40));
+          t.r3.u64 = w.hud.address;
+        },
+        __imp__sub_82212B08, hooks::RaceHudObjectRunItem, spec);
+  }
+  {
+    Spec spec;
+    Group(
+        h, w, "RaceScreens::MovieMask (sub_82211BE8)", 60,
+        [&](PPCContext& t, Random& r, const World& w) {
+          t.r3.u64 = w.hud.address;
+          t.r4.u64 = r.Below(4) == 0 ? r.Next() : r.Below(13);
+        },
+        __imp__sub_82211BE8, hooks::RaceHudObjectMovieMask, spec);
+  }
+  {
+    Spec spec;
+    spec.frame = 128;
+    spec.saves = 32;
+    Group(
+        h, w, "RaceHud::Init (sub_82215260)", 100,
+        [&](PPCContext& t, Random& r, const World& w) {
+          ShapeMovieTable(h.base, w, r);
+          t.r3.u64 = w.hud.address;
+        },
+        __imp__sub_82215260, hooks::RaceHudObjectInit, spec);
+  }
+}
+
 }  // namespace
 
 void RaceHudObject(Context& h) {
@@ -969,6 +1130,7 @@ void RaceHudObject(Context& h) {
   SetUps(h, w);
   Signs(h, w);
   Ticks(h, w);
+  Movies(h, w);
 }
 
 }  // namespace harness

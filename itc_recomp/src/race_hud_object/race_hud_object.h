@@ -55,6 +55,15 @@ constexpr uint32_t kGaugeInt149 = 0x822145A0;
 constexpr uint32_t kFinishNamed = 0x8211DF20;
 constexpr uint32_t kSetText = 0x8211C1F8;
 constexpr uint32_t kClearText = 0x8211C470;
+// UiMovie::Run (its override, the frame pacing's UiMovie::Update behind
+// it), UiMovie::Finish (its native version makes UiMovie::ApplyAnimation's
+// guest call), UiMovie::SetNodeText and the full-frame effect
+// RaceHud::DrawMirror (sub_8211BEE8: CameraPasses::RenderTarget and the
+// recorder's call) through their overrides.
+constexpr uint32_t kRun = 0x8211E1B8;
+constexpr uint32_t kFinish = 0x8211DE38;
+constexpr uint32_t kSetNodeText = 0x8211C7E8;
+constexpr uint32_t kDrawMirror = 0x8211BEE8;
 constexpr uint32_t kTrackZones = 0x828161EC;  // the zones' owner
 constexpr uint32_t kRaceProgress = 0x826D82E8;  // the race's progress (+7156 a float)
 
@@ -242,5 +251,39 @@ uint64_t Tick(uint8_t* base, uint32_t hud, uint32_t flag, uint32_t sp, const Cal
 // played and looped (PlayNamed, LoopNamed's plain C++), +464 = k. r3 as
 // the original leaves it (the node, or LoopNamed's).
 uint64_t TickTimer(uint8_t* base, uint32_t hud, uint32_t sp, const Calls& calls);
+
+// --- The movie calls and the set-up (movies.cpp) ---
+//
+// Each returns r3 as the original leaves it. `lr` is the caller's return
+// address, which the originals' tail calls keep.
+
+// RaceHud::StartCountdown (sub_82212270): +436 = 1, UiMovie::Play(+612, -1,
+// 0, 0...) (its plain C++).
+uint32_t StartCountdown(uint8_t* base, uint32_t hud);
+// sub_82212718 (RaceHud::StartMovie1, our name): named animation 0 of the
+// movie of id 1 (+628) played and looped (PlayNamed, LoopNamed's plain
+// C++) from a 96-byte frame.
+uint64_t StartMovie1(uint8_t* base, uint32_t hud, uint32_t sp);
+// sub_82212878 (RaceHud::FinishMovie1, our name): UiMovie::FinishNamed(+628,
+// 0) (tail call, through `calls`).
+uint64_t FinishMovie1(uint8_t* base, uint32_t hud, uint32_t sp, uint32_t lr, const Calls& calls);
+// sub_82212AC8 (RaceHud::DrawWarning, our name): while +468, the warning
+// movie drawn only (UiMovie::Run(+616, 1), tail call, through `calls`).
+uint64_t DrawWarning(uint8_t* base, uint32_t hud, uint32_t sp, uint32_t lr, const Calls& calls);
+// sub_82212AF8 (RaceHud::RunMovie1, our name): UiMovie::Run(+628, 0) (tail
+// call, through `calls`).
+uint64_t RunMovie1(uint8_t* base, uint32_t hud, uint32_t sp, uint32_t lr, const Calls& calls);
+// RaceHud::RunItem (sub_82212B08): when +460 isn't -1, the racers' movie
+// run (UiMovie::Run(+604, 0) through `calls`, from a 96-byte frame) and the
+// empty sub_82106540 skipped (r3 200).
+uint64_t RunItem(uint8_t* base, uint32_t hud, uint32_t sp, const Calls& calls);
+// RaceScreens::MovieMask (sub_82211BE8, with its jump table's case 0
+// sub_82211C1C merged): the movies to load for the race kind, 0 above 10.
+uint32_t MovieMask(uint32_t kind);
+// RaceHud::Init (sub_82215260): the nine movies found by id in the movie
+// table (UiMovies::Find, the key at the 128-byte frame's +80): +604 id 10,
+// +608 0, +612 11, +616 3, +620 2, +624 13, +628 1, +632 12, +636 19; +588
+// = 0. The last find's address.
+uint32_t Init(uint8_t* base, uint32_t hud, uint32_t sp);
 
 }  // namespace race_hud_object
