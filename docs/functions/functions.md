@@ -450,6 +450,11 @@ Rows not yet moved stay in the table below. So far:
   callers) and set the effects and music volume options through, and
   the sound manager's interface methods not in `sound-cues.md` (the
   object at `[0x826C5C80]` is the sound manager) (B7).
+- [`accessories.md`](accessories.md): the interior accessories: the
+  set at `[0x826C5510]`, its reference-counted entries loaded from the
+  archive, the accessory (a part model with a small swinging skeleton,
+  probably a hanging ornament), its skeleton's set-up, step and swing,
+  its draw, and the small file class the three use (B7).
 
 These files hold functions only. What used to follow the table here moved
 out on 2026-10-20: how frame interpolation works, its options and what
