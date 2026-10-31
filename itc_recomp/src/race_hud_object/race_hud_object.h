@@ -347,6 +347,13 @@ uint64_t UpdateItem(uint8_t* base, uint32_t hud, uint32_t sp, const Calls& calls
 // C++, the manager's slot through `sounds`). The sound's r3, else the movie.
 uint64_t RunCountdown(uint8_t* base, uint32_t hud, uint32_t sp, const Calls& calls,
                       const menu_sounds::Calls& sounds, double* f1);
+// RaceHud::RunWarning (sub_82212A48): while +468, sound 10 (MenuSound::
+// Play's plain C++, its slot through `sounds`) unless the sound manager's
+// slot 14 (IsCuePlaying: bank 0, cue 10 at the 112-byte frame's +84 and +80,
+// through `calls`) says it's playing, then UiMovie::Run(+616, 0) (through
+// `calls`). Run's r3, or the HUD.
+uint64_t RunWarning(uint8_t* base, uint32_t hud, uint32_t sp, const Calls& calls,
+                    const menu_sounds::Calls& sounds);
 // RaceHud::UpdateRacerBar (sub_82214790): see
 // docs/functions/race-hud-object.md. `index` is the bar (r4), `racer` the
 // racer (r5), both as the original's 64-bit registers. From a 176-byte

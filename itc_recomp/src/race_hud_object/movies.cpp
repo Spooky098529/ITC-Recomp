@@ -300,6 +300,28 @@ uint64_t RunCountdown(uint8_t* base, uint32_t hud, uint32_t sp, const Calls& cal
   return menu_sounds::PlayMenuSound(base, cue, frame, sounds);
 }
 
+uint64_t RunWarning(uint8_t* base, uint32_t hud, uint32_t sp, const Calls& calls,
+                    const menu_sounds::Calls& sounds) {
+  ITC_NATIVE_RUNNING("sub_82212A48 RaceHud::RunWarning");
+  // The frame is made before the flag's test.
+  const uint32_t frame = sp - 112;
+  guest::StoreU32(base, frame, sp);
+  if (guest::LoadU32(base, hud + 468) == 0) {
+    return hud;
+  }
+  // Sound 10 unless the sound manager's slot 14 (AudioManager::IsCuePlaying:
+  // bank 0, cue 10 at the frame's +84 and +80) says it's playing.
+  guest::StoreU32(base, frame + 80, 10);
+  guest::StoreU32(base, frame + 84, 0);
+  const uint32_t manager = guest::LoadU32(base, menu_sounds::kSoundManager);
+  const uint32_t playing = guest::LoadU32(base, guest::LoadU32(base, manager) + 56);
+  const uint64_t r3 = calls.Call(playing, frame, 0x82212A98, manager, frame + 84, frame + 80);
+  if ((r3 & 0xFF) == 0) {
+    menu_sounds::PlayMenuSound(base, 10, frame, sounds);
+  }
+  return calls.Call(kRun, frame, 0x82212AB4, Movie(base, hud, kHudWarning), 0);
+}
+
 uint64_t UpdateRacerBar(uint8_t* base, uint32_t hud, uint64_t index, uint64_t racer, uint32_t sp,
                         const Calls& calls, const menu_sounds::Calls& sounds) {
   ITC_NATIVE_RUNNING("sub_82214790 RaceHud::UpdateRacerBar");

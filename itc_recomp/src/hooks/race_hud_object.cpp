@@ -47,7 +47,9 @@ ITC_FLAG_BOOL(native_race_hud_object, true, "ITC",
               "plain C++ reaches it in play; UiMovie::Finish and "
               "the sound manager's slot 14 through the function table, MenuSound::Play's plain "
               "C++), TickPanel sub_82215488 (TickRacers sub_822151F8, no adapter: only TickPanel's "
-              "plain C++ reaches it; modes 2 to 4's ticks, never seen in play, the originals) "
+              "plain C++ reaches it; modes 2 to 4's ticks, never seen in play, the originals), "
+              "RunWarning sub_82212A48 (the sound manager's slot 14 and UiMovie::Run through the "
+              "function table, MenuSound::Play's plain C++) "
               "natively instead of through the translated code (the same writes; checked by "
               "--run_harnesses=race_hud_object)");
 
@@ -381,6 +383,11 @@ void RaceHudObjectUpdateRacerBar(PPCContext& ctx, uint8_t* base) {
                                   guest.calls(), guest.sound_calls());
 }
 
+void RaceHudObjectRunWarning(PPCContext& ctx, uint8_t* base) {
+  GuestCalls guest(ctx, base);
+  ctx.r3.u64 = rh::RunWarning(base, ctx.r3.u32, ctx.r1.u32, guest.calls(), guest.sound_calls());
+}
+
 void RaceHudObjectTickRacers(PPCContext& ctx, uint8_t* base) {
   ctx.fpscr.disableFlushMode();
   GuestCalls guest(ctx, base);
@@ -445,3 +452,4 @@ ITC_RACE_HUD_OBJECT(82214238, RaceHudObjectUpdateItem)
 ITC_RACE_HUD_OBJECT(82211DA0, RaceHudObjectScreensInit)
 ITC_RACE_HUD_OBJECT(822129A8, RaceHudObjectRunCountdown)
 ITC_RACE_HUD_OBJECT(82215488, RaceHudObjectTickPanel)
+ITC_RACE_HUD_OBJECT(82212A48, RaceHudObjectRunWarning)

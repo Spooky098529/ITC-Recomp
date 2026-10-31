@@ -1434,6 +1434,27 @@ void Sounds(Context& h, const World& w) {
         },
         __imp__sub_82214790, hooks::RaceHudObjectUpdateRacerBar, spec);
   }
+  {
+    // The warning's flag (+468) 0, 1 or any word; the warning movie's (+616)
+    // animations now and then; the sound manager fake (slot 14's answer 0,
+    // 1 or any word).
+    Spec spec;
+    spec.frame = 112;
+    spec.saves = 16;
+    Group(
+        h, w, "RaceHud::RunWarning (sub_82212A48)", 300,
+        [&](PPCContext& t, Random& r, const World& w) {
+          const uint32_t hud = w.hud.address;
+          guest::StoreU32(h.base, hud + 468,
+                          r.Below(3) == 0 ? 0 : r.Below(2) == 0 ? 1 : uint32_t(r.Next()));
+          if (r.Below(2) == 0) {
+            ShapeAnimations(h.base, w, w.movie((616 - 604) / 4), r);
+          }
+          ShapeSoundManager(h.base, w, r);
+          t.r3.u64 = hud;
+        },
+        __imp__sub_82212A48, hooks::RaceHudObjectRunWarning, spec);
+  }
 }
 
 // A bar of the HUD's four at +244 + 40 x `index` for UpdateRacerBar: value,

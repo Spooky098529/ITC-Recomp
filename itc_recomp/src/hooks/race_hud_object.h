@@ -95,6 +95,8 @@ void RaceHudObjectUpdateItem(PPCContext& ctx, uint8_t* base);
 // bar, r5 = the racer.
 void RaceHudObjectRunCountdown(PPCContext& ctx, uint8_t* base);
 void RaceHudObjectUpdateRacerBar(PPCContext& ctx, uint8_t* base);
+// RaceHud::RunWarning sub_82212A48: r3 = the HUD.
+void RaceHudObjectRunWarning(PPCContext& ctx, uint8_t* base);
 // RaceHud::TickRacers sub_822151F8 and TickPanel sub_82215488: r3 = the HUD.
 void RaceHudObjectTickRacers(PPCContext& ctx, uint8_t* base);
 void RaceHudObjectTickPanel(PPCContext& ctx, uint8_t* base);
