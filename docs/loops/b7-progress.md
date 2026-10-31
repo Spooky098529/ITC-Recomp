@@ -10,7 +10,7 @@ file's history. What's left to see in a drive, from every run:
 
 - Run started 2026-10-30 23:03 on `b7-loop-30-10-26-2`, from ac55473;
   summary `b7-loop-2026-10-30-2303.md`.
-- Limit for this run: 3 subsystems; 1 taken.
+- Limit for this run: 3 subsystems; 2 taken.
 - Subsystem 1 of 3: the car models (`sub_820D5EC8`...`sub_820ED090`,
   the top of `leads.md`). Already mapped (`car-models.md`, 46 rows in
   play, 27 ours, 19 known); the map checked by the lead, not remapped
@@ -38,6 +38,11 @@ file's history. What's left to see in a drive, from every run:
   (`itc_2852`, replay `itc_2853` broke on the intermittent SDK heap
   error, ran to the end): 13 of 13 harness lines; `ReloadDecals` to
   drive. Subsystem 1 finished.
+
+- Subsystem 2 of 3: the part models' material passes
+  (`sub_820D0EA8`...`sub_820D3318`; picked as closest to ready, 6 of
+  its 9 roots ready, and blocking the rest of the scene loaders).
+  Mapping running.
 
 ## Done
 
