@@ -254,6 +254,7 @@ set(ITC_SOURCES
     src/race_hud_object/gauges.cpp
     src/race_hud_object/dashboard.cpp
     src/race_hud_object/setup.cpp
+    src/race_hud_object/signs.cpp
     src/save_interface/save_interface.cpp
     src/save_interface/save_layer.cpp
     src/hooks/file_layer.cpp

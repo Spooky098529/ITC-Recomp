@@ -52,12 +52,21 @@ constexpr uint32_t kMirrorTarget = 0x826BABE0;  // render target 11's texture
 constexpr uint32_t kVehicleBytes = 6272;
 constexpr uint32_t kVehicleCount = 4;
 constexpr uint32_t kHudBytes = 0x1000;
-// The movie block: nine movie headers (0x100 each) at +0, then the node pool.
+// The movie block: nine movies (0xA000 each, their animation lists and
+// named animations included) at +0, then the node pool, then 8 animations
+// of no tracks (64 bytes each) for the named ones.
 constexpr uint32_t kMovieHeaders = 9;
-constexpr uint32_t kNodesAt = 0x1000;
+constexpr uint32_t kMovieBytes = 0xA000;
+constexpr uint32_t kNodesAt = kMovieHeaders * kMovieBytes;
 constexpr uint32_t kNodeBytes = 0x800;
 constexpr uint32_t kNodeCount = 24;
-constexpr uint32_t kMoviesBytes = kNodesAt + kNodeBytes * kNodeCount;
+constexpr uint32_t kAnimationsAt = kNodesAt + kNodeBytes * kNodeCount;
+constexpr uint32_t kMoviesBytes = kAnimationsAt + 8 * 64;
+// The track zones' owner (the list's nodes from +0, its head +516, count
+// +520, the zones' pointers from +524) at +0 and 70 small zones (16 bytes
+// apart: +0 the vtable, +17112 the inside flag) from +0x400.
+constexpr uint32_t kZonesAt = 0x400;
+constexpr uint32_t kZonesBytes = 0x5000;
 constexpr uint32_t kCollisionBytes = 0x1000;
 constexpr uint32_t kStackBytes = 1024;  // below the call's stack pointer
 constexpr uint32_t kCallerBytes = 256;  // above it
@@ -134,15 +143,18 @@ struct World {
         collision(kCollisionBytes),
         save(kSaveBytes),
         misc(kMiscBytes),
-        race(kRaceBytes) {}
+        race(kRaceBytes),
+        zones(kZonesBytes) {}
   bool ok() const {
     return hud.address && movies.address && vehicles.address && collision.address &&
-           save.address && misc.address && race.address;
+           save.address && misc.address && race.address &&
+           zones.address;
   }
   uint32_t textures() const { return misc.address + 0x1000; }
   uint32_t viewport() const { return misc.address + 0x10; }
   uint32_t build() const { return misc.address + 0x800; }
-  uint32_t movie(uint32_t i) const { return movies.address + 0x100 * i; }
+  uint32_t movie(uint32_t i) const { return movies.address + kMovieBytes * i; }
+  uint32_t zone(uint32_t i) const { return zones.address + kZonesAt + 16 * i; }
   uint32_t node(uint32_t i) const { return movies.address + kNodesAt + kNodeBytes * i; }
   uint32_t vehicle(uint32_t i) const { return vehicles.address + kVehicleBytes * i; }
   Block hud;
@@ -153,12 +165,14 @@ struct World {
   Block misc;  // the viewports' pointer (+0), viewport 0 (+0x10), the build (+0x800),
                // the movies' textures (+0x1000)
   Block race;  // the race data
+  Block zones;  // the track zones' owner and its zones
 };
 
-// The guest calls the recorder takes (TrackZones::Create), answered with a
-// word from the case's generator.
+// The guest calls the recorder takes (TrackZones::Create, UiMovie::SetText
+// and ClearText), answered with a word from the case's generator.
 struct Call {
   uint32_t function, lr, r1;
+  uint64_t r3, r4, r5, r6;
 };
 std::vector<Call>* g_calls = nullptr;
 Random g_answers;
@@ -167,7 +181,16 @@ bool Recorder(PPCContext& ctx, uint32_t function) {
   if (g_calls == nullptr) {
     return false;
   }
-  g_calls->push_back({function, uint32_t(ctx.lr), ctx.r1.u32});
+  // The arguments each reads (TrackZones::Create none, ClearText r3 to r5,
+  // SetText r3 to r6; the rest are leftovers).
+  const uint32_t reads = function == 0x8211C1F8 ? 4 : function == 0x8211C470 ? 3 : 0;
+  const uint64_t r[4] = {ctx.r3.u64, ctx.r4.u64, ctx.r5.u64, ctx.r6.u64};
+  Call call{function, uint32_t(ctx.lr), ctx.r1.u32, 0, 0, 0, 0};
+  uint64_t* to[4] = {&call.r3, &call.r4, &call.r5, &call.r6};
+  for (uint32_t i = 0; i < reads; i++) {
+    *to[i] = r[i];
+  }
+  g_calls->push_back(call);
   ctx.r3.u64 = g_answers.Next();
   return true;
 }
@@ -182,8 +205,17 @@ bool Recorder(PPCContext& ctx, uint32_t function) {
 // without the mask's bits.
 void ShapeWorld(uint8_t* base, const World& w, Random& r) {
   for (uint32_t m = 0; m < kMovieHeaders; m++) {
-    guest::StoreU32(base, w.movie(m) + 16, w.node(r.Below(kNodeCount)));
-    guest::StoreU32(base, w.movie(m) + 28, w.textures());
+    const uint32_t movie = w.movie(m);
+    ui_movies::InitAnimationLists(base, movie);
+    guest::StoreU32(base, movie + 16, w.node(r.Below(kNodeCount)));
+    guest::StoreU32(base, movie + 20, guest::LoadU32(base, movie + 16));
+    guest::StoreU32(base, movie + 24, guest::LoadU32(base, movie + 16));
+    guest::StoreU32(base, movie + 28, w.textures());
+    for (uint32_t k = 0; k < 16; k++) {
+      const uint32_t named = movie + 176 + 36 * k;
+      guest::StoreU32(base, named + 28, guest::LoadU32(base, movie + 16));
+      guest::StoreU32(base, named + 32, w.movies.address + kAnimationsAt + 64 * r.Below(8));
+    }
     guest::StoreU32(base, w.hud.address + 604 + 4 * m, w.movie(m));
   }
   for (uint32_t k = 0; k < kNodeCount; k++) {
@@ -215,6 +247,29 @@ void ShapeWorld(uint8_t* base, const World& w, Random& r) {
   for (uint32_t p = 0; p < 4; p++) {
     guest::StoreU32(base, kSaveSlots + 4 * p, w.save.address);
   }
+  for (uint32_t k = 0; k < 8; k++) {
+    const uint32_t animation = w.movies.address + kAnimationsAt + 64 * k;
+    for (uint32_t i = 0; i < 64; i += 4) {
+      guest::StoreU32(base, animation + i, 0);
+    }
+    guest::StoreFloat(base, animation + 12, float(r.Below(100)) / 4.0f);
+  }
+  // The track zones: the owner's list of 128 in order (node i: next i + 1,
+  // data i), no zones to update (+520 = 0), zone i's vtable the game's and
+  // its inside flag set now and then.
+  const uint32_t owner = w.zones.address;
+  for (uint32_t i = 0; i < 128; i++) {
+    guest::StoreU16(base, owner + 4 * i, uint16_t(i + 1));
+    guest::StoreU16(base, owner + 4 * i + 2, uint16_t(i));
+  }
+  guest::StoreU16(base, owner + 516, 0);
+  guest::StoreU16(base, owner + 520, 0);
+  for (uint32_t k = 0; k < 70; k++) {
+    guest::StoreU32(base, owner + 524 + 4 * k, w.zone(k));
+    guest::StoreU32(base, w.zone(k), 0x82011AF0 + 12 * k);
+    guest::StoreU32(base, w.zone(k) + 17112, r.Below(12) == 0 ? 1 : 0);
+  }
+  guest::StoreU32(base, kOwner, owner);
   guest::StoreU32(base, rh::kViewports, w.misc.address);
   guest::StoreU32(base, w.misc.address, w.viewport());
   guest::StoreU32(base, w.misc.address + 4, w.viewport() + 0x100);
@@ -274,6 +329,7 @@ void Case(Context& h, Results& results, const World& w, uint64_t seed, const Set
     WriteRandom(h.base, w.misc.address, w.misc.bytes, r);
     WriteRandom(h.base, w.race.address, 4 * rh::kRecordBytes, r);
     WriteRandom(h.base, w.race.address + 0x59600, 0x400, r);
+    WriteRandom(h.base, w.zones.address, w.zones.bytes, r);
     ShapeWorld(h.base, w, r);
     setup(t, r, w);
     t.lr = 0x82000000 | (r.Below(0x10000) << 2);
@@ -292,6 +348,10 @@ void Case(Context& h, Results& results, const World& w, uint64_t seed, const Set
       out[v].Word(call.function);
       out[v].Word(call.lr);
       out[v].Word(call.r1);
+      for (const uint64_t r : {call.r3, call.r4, call.r5, call.r6}) {
+        out[v].Word(uint32_t(r >> 32));
+        out[v].Word(uint32_t(r));
+      }
     }
     out[v].Word(guest::LoadU32(h.base, kOwner));
     uint32_t at = w.hud.address;
@@ -310,6 +370,7 @@ void Case(Context& h, Results& results, const World& w, uint64_t seed, const Set
     out[v].Bytes(Read(h.base, w.save.address + 0x1F800, 0x100));
     out[v].Bytes(Read(h.base, w.misc.address, w.misc.bytes));
     out[v].Bytes(Read(h.base, w.race.address, 4 * rh::kRecordBytes));
+    out[v].Bytes(Read(h.base, w.zones.address, w.zones.bytes));
     if (spec.frame > spec.saves) {
       out[v].Bytes(Read(h.base, sp - spec.frame, spec.frame - spec.saves));
     }
@@ -758,6 +819,64 @@ void SetUps(Context& h, const World& w) {
   }
 }
 
+// The signs' fields: the zone (+416) none, 0 to 31 or any; the place's
+// zone (+428) none, 32 to 69 or any; signs on (+424); the course's flags
+// (+420) a table of 0s and 1s in the misc block (+0x1200, with the entry
+// before it); the car's +6168; the race mode 6 now and then; the course
+// (+4) 8 to 10 now and then.
+void ShapeSigns(uint8_t* base, const World& w, Random& r) {
+  const uint32_t hud = w.hud.address;
+  const uint32_t pick = r.Below(8);
+  guest::StoreU32(base, hud + 416, pick < 3 ? 0xFFFFFFFFu : pick < 7 ? r.Below(32) : r.Below(70));
+  const uint32_t place = r.Below(8);
+  guest::StoreU32(base, hud + 428,
+                  place < 3 ? 0xFFFFFFFFu : place < 7 ? 32 + r.Below(38) : r.Below(70));
+  guest::StoreU32(base, hud + 424, r.Below(4) == 0 ? 0 : 1);
+  const uint32_t flags = w.misc.address + 0x1200;
+  for (uint32_t i = 0; i < 27 * 3; i++) {
+    guest::StoreU32(base, flags - 12 + 4 * i, r.Below(2));
+  }
+  guest::StoreU32(base, hud + 420, flags);
+  const uint32_t car = guest::LoadU32(base, hud + rh::kHudVehicle);
+  guest::StoreU32(base, car + 6168, r.Below(4) == 0 ? 1 : 0);
+  guest::StoreU32(base, rh::kRaceData, w.race.address);
+  guest::StoreU32(base, w.race.address + rh::kRaceMode, r.Below(3) == 0 ? 6 : r.Below(10));
+  guest::StoreU32(base, w.race.address + 4, r.Below(4) == 0 ? 8 + r.Below(3) : r.Below(25));
+}
+
+void Signs(Context& h, const World& w) {
+  // UiMovie::SetText and ClearText recorded (r3 to r6; r7 to r10 0 from
+  // the native callers, the user's call, 2026-10-30: the cases start with
+  // them 0, which the originals leave there).
+  auto setup = [&](PPCContext& t, Random& r, const World& w) {
+    ShapeSigns(h.base, w, r);
+    t.r3.u64 = w.hud.address;
+    t.r4.u64 = r.Below(3) == 0 ? 1 : 0;
+    t.r7.u64 = t.r8.u64 = t.r9.u64 = t.r10.u64 = 0;
+  };
+  {
+    Spec spec;
+    spec.frame = 224;
+    spec.saves = 144;
+    Group(h, w, "RaceHud::UpdateSign (sub_82212F00)", 800, setup, __imp__sub_82212F00,
+          hooks::RaceHudObjectUpdateSign, spec);
+  }
+  {
+    Spec spec;
+    spec.frame = 128;
+    spec.saves = 40;
+    Group(h, w, "RaceHud::UpdatePlaceName (sub_82213510)", 400, setup, __imp__sub_82213510,
+          hooks::RaceHudObjectUpdatePlaceName, spec);
+  }
+  {
+    Spec spec;
+    spec.frame = 112;
+    spec.saves = 24;
+    Group(h, w, "RaceHud::UpdateSigns (sub_82214718)", 400, setup, __imp__sub_82214718,
+          hooks::RaceHudObjectUpdateSigns, spec);
+  }
+}
+
 }  // namespace
 
 void RaceHudObject(Context& h) {
@@ -770,6 +889,7 @@ void RaceHudObject(Context& h) {
   Setters(h, w);
   Dashboard(h, w);
   SetUps(h, w);
+  Signs(h, w);
 }
 
 }  // namespace harness

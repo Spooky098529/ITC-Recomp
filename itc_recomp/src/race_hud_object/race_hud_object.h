@@ -14,6 +14,10 @@
 
 #include <cstdint>
 
+namespace track_zones {
+struct OwnerCalls;
+}
+
 namespace race_hud_object {
 
 // The HUD's fields.
@@ -44,18 +48,28 @@ constexpr uint32_t kTrackZonesDestroy = 0x8228B500;
 constexpr uint32_t kGaugeFloat = 0x82214330;
 constexpr uint32_t kGaugeInt119 = 0x822144B0;
 constexpr uint32_t kGaugeInt149 = 0x822145A0;
+// The signs' movie calls: UiMovie::FinishNamed (its native version makes
+// UiMovie::ApplyAnimation's guest call), SetText and ClearText (their
+// adapters pick the plain C++ or the original by the UI movies' and the
+// heap's flags) through their overrides.
+constexpr uint32_t kFinishNamed = 0x8211DF20;
+constexpr uint32_t kSetText = 0x8211C1F8;
+constexpr uint32_t kClearText = 0x8211C470;
+constexpr uint32_t kTrackZones = 0x828161EC;  // the zones' owner
 
-// A guest function `function` called with r3 to r6 and, when `f1` isn't
-// null, f1 (the other registers as they are), from the frame `r1` with the
-// return address `lr` (the original's); its r3.
+// A guest function `function` called with r3 to r10 (0 where not given:
+// the varargs UiMovie::SetText's unset r7 to r10 pass 0, the user's call
+// for the parking area, 2026-10-30) and, when `f1` isn't null, f1 (the
+// other registers as they are), from the frame `r1` with the return
+// address `lr` (the original's); its r3.
 struct Calls {
   void* user;
-  uint64_t (*call)(void* user, uint32_t function, const uint64_t args[4], const double* f1,
+  uint64_t (*call)(void* user, uint32_t function, const uint64_t args[8], const double* f1,
                    uint32_t r1, uint32_t lr);
 
   uint64_t Call(uint32_t function, uint32_t r1, uint32_t lr, uint64_t r3 = 0, uint64_t r4 = 0,
                 uint64_t r5 = 0, uint64_t r6 = 0, const double* f1 = nullptr) const {
-    const uint64_t args[4] = {r3, r4, r5, r6};
+    const uint64_t args[8] = {r3, r4, r5, r6, 0, 0, 0, 0};
     return call(user, function, args, f1, r1, lr);
   }
 };
@@ -183,5 +197,27 @@ uint64_t SetUpSigns(uint8_t* base, uint32_t hud, uint32_t sp, const Calls& calls
 // through `calls` (the originals). The last call's r3, or the HUD.
 uint64_t UpdateExtraGauges(uint8_t* base, uint32_t hud, double value, uint64_t int119,
                            uint64_t int149, uint32_t sp, const Calls& calls);
+
+// --- The signs (signs.cpp) ---
+//
+// The zones through track_zones' plain C++ (TrackZones::Update and
+// IsInside), their zones' slots that aren't the native ones through
+// `zone_calls`. Each returns r3 as the original leaves it.
+
+// RaceHud::UpdateSign (sub_82212F00): see docs/functions/race-hud-object.md.
+// `flag` is the original's r4 (the race flow's).
+uint64_t UpdateSign(uint8_t* base, uint32_t hud, uint32_t flag, uint32_t sp, const Calls& calls,
+                    const track_zones::OwnerCalls& zone_calls);
+// RaceHud::UpdatePlaceName (sub_82213510): when the zone at +428 isn't
+// inside any more, the first of 32 to 69 inside (or -1); when it changed,
+// node 17's text string 1980 + it (UiMovie::SetText) or cleared
+// (ClearText), +428 = it.
+uint64_t UpdatePlaceName(uint8_t* base, uint32_t hud, uint32_t sp, const Calls& calls,
+                         const track_zones::OwnerCalls& zone_calls);
+// RaceHud::UpdateSigns (sub_82214718): unless the course (race data +4) is
+// 8, 9 or 10 (r3 the HUD), TrackZones::Update, UpdateSign and
+// UpdatePlaceName.
+uint64_t UpdateSigns(uint8_t* base, uint32_t hud, uint32_t flag, uint32_t sp, const Calls& calls,
+                     const track_zones::OwnerCalls& zone_calls);
 
 }  // namespace race_hud_object

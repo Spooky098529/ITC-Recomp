@@ -57,4 +57,10 @@ void RaceHudObjectTearDown(PPCContext& ctx, uint8_t* base);
 void RaceHudObjectSetUpSigns(PPCContext& ctx, uint8_t* base);
 void RaceHudObjectUpdateExtraGauges(PPCContext& ctx, uint8_t* base);
 
+// RaceHud::UpdateSigns sub_82214718 and UpdateSign sub_82212F00: r3 = the
+// HUD, r4 = the race flow's flag; UpdatePlaceName sub_82213510: r3 = the HUD.
+void RaceHudObjectUpdateSigns(PPCContext& ctx, uint8_t* base);
+void RaceHudObjectUpdateSign(PPCContext& ctx, uint8_t* base);
+void RaceHudObjectUpdatePlaceName(PPCContext& ctx, uint8_t* base);
+
 }  // namespace hooks

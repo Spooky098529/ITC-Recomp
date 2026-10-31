@@ -8,6 +8,7 @@
 #include "base/flags.h"
 #include "base/log.h"
 #include "c_runtime/strings.h"
+#include "hooks/app_start_up.h"
 #include "hooks/archive.h"
 #include "hooks/guest_call.h"
 #include "hooks/heap.h"
@@ -776,6 +777,9 @@ extern "C" REX_FUNC(sub_8211BEE8) {
 // UiMovie::ScrollText: r6 = scrolling).
 extern "C" REX_FUNC(sub_8211C470) {
   REX_FUNC_PROLOGUE();
+  if (hooks::StartUpRecorded(ctx, 0x8211C470)) {
+    return;  // a harness's (the race HUD object's)
+  }
   NATIVE_HEAP_OR_ORIGINAL(8211C470,
                           ui_movies::ClearText(base, ctx.r3.u32, ctx.r4.u32, ctx.r5.u32));
 }
@@ -804,6 +808,9 @@ extern "C" REX_FUNC(sub_8211C5F8) {
 // texts' map. FormatV's guest calls through this context, lr put back.
 extern "C" REX_FUNC(sub_8211C1F8) {
   REX_FUNC_PROLOGUE();
+  if (hooks::StartUpRecorded(ctx, 0x8211C1F8)) {
+    return;  // a harness's (the race HUD object's)
+  }
   if (NativeHeap()) {
     ctx.fpscr.disableFlushMode();
     const uint64_t lr = ctx.lr;

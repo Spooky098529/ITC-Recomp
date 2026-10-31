@@ -6,6 +6,7 @@
 
 #include "base/flags.h"
 #include "race_hud_object/race_hud_object.h"
+#include "track_zones/track_zones.h"
 
 #include <optional>
 
@@ -21,7 +22,9 @@ ITC_FLAG_BOOL(native_race_hud_object, true, "ITC",
               "TearDown sub_822141A0, SetUpSigns sub_822122B0, UpdateExtraGauges sub_82215160; "
               "memcpy where its plain C++ refuses, CameraPasses::RenderTarget, "
               "TrackZones::Create and the extra gauges' digits through their overrides "
-              "or the originals) "
+              "or the originals; UpdateSigns sub_82214718, UpdateSign sub_82212F00, "
+              "UpdatePlaceName sub_82213510, with TrackZones::Update and IsInside's plain C++; "
+              "UiMovie::FinishNamed, SetText and ClearText through their overrides) "
               "natively instead of through the translated code (the same writes; checked by "
               "--run_harnesses=race_hud_object)");
 
@@ -42,9 +45,29 @@ class GuestCalls {
   GuestCalls(const GuestCalls&) = delete;
   GuestCalls& operator=(const GuestCalls&) = delete;
   rh::Calls calls() { return {this, &GuestCalls::Call}; }
+  // The zones' slots that aren't the native ones (track_zones::OwnerCalls):
+  // r4 set when asked, else left.
+  track_zones::OwnerCalls zone_calls() { return {this, &GuestCalls::CallZone}; }
 
  private:
-  static uint64_t Call(void* user, uint32_t function, const uint64_t args[4], const double* f1,
+  static uint64_t CallZone(void* user, uint32_t function, uint32_t r3, uint32_t r4, bool set_r4,
+                           uint32_t frame, uint32_t lr) {
+    auto& self = *static_cast<GuestCalls*>(user);
+    PPCContext& ctx = self.ctx_;
+    uint8_t* base = self.base_;
+    const uint64_t stack = ctx.r1.u64;
+    ctx.r1.u64 = frame;
+    ctx.lr = lr;
+    ctx.r3.u64 = r3;
+    if (set_r4) {
+      ctx.r4.u64 = r4;
+    }
+    ctx.ctr.u64 = function;
+    REX_CALL_INDIRECT_FUNC(function);
+    ctx.r1.u64 = stack;
+    return ctx.r3.u64;
+  }
+  static uint64_t Call(void* user, uint32_t function, const uint64_t args[8], const double* f1,
                        uint32_t r1, uint32_t lr) {
     auto& self = *static_cast<GuestCalls*>(user);
     PPCContext& ctx = self.ctx_;
@@ -55,6 +78,10 @@ class GuestCalls {
     ctx.r4.u64 = args[1];
     ctx.r5.u64 = args[2];
     ctx.r6.u64 = args[3];
+    ctx.r7.u64 = args[4];
+    ctx.r8.u64 = args[5];
+    ctx.r9.u64 = args[6];
+    ctx.r10.u64 = args[7];
     if (f1 != nullptr) {
       ctx.f1.f64 = *f1;
     }
@@ -190,6 +217,24 @@ void RaceHudObjectUpdateExtraGauges(PPCContext& ctx, uint8_t* base) {
                                      ctx.r1.u32, guest.calls());
 }
 
+void RaceHudObjectUpdateSigns(PPCContext& ctx, uint8_t* base) {
+  GuestCalls guest(ctx, base);
+  ctx.r3.u64 = rh::UpdateSigns(base, ctx.r3.u32, ctx.r4.u32, ctx.r1.u32, guest.calls(),
+                               guest.zone_calls());
+}
+
+void RaceHudObjectUpdateSign(PPCContext& ctx, uint8_t* base) {
+  GuestCalls guest(ctx, base);
+  ctx.r3.u64 = rh::UpdateSign(base, ctx.r3.u32, ctx.r4.u32, ctx.r1.u32, guest.calls(),
+                              guest.zone_calls());
+}
+
+void RaceHudObjectUpdatePlaceName(PPCContext& ctx, uint8_t* base) {
+  GuestCalls guest(ctx, base);
+  ctx.r3.u64 =
+      rh::UpdatePlaceName(base, ctx.r3.u32, ctx.r1.u32, guest.calls(), guest.zone_calls());
+}
+
 }  // namespace hooks
 
 // The adapters: the register steps above, or the originals with the flag
@@ -229,3 +274,6 @@ ITC_RACE_HUD_OBJECT(822135B0, RaceHudObjectSetUpMirror)
 ITC_RACE_HUD_OBJECT(822141A0, RaceHudObjectTearDown)
 ITC_RACE_HUD_OBJECT(822122B0, RaceHudObjectSetUpSigns)
 ITC_RACE_HUD_OBJECT(82215160, RaceHudObjectUpdateExtraGauges)
+ITC_RACE_HUD_OBJECT(82214718, RaceHudObjectUpdateSigns)
+ITC_RACE_HUD_OBJECT(82212F00, RaceHudObjectUpdateSign)
+ITC_RACE_HUD_OBJECT(82213510, RaceHudObjectUpdatePlaceName)
