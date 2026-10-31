@@ -250,6 +250,8 @@ set(ITC_SOURCES
     src/material_passes/paint.cpp
     src/material_passes/projector.cpp
     src/material_passes/palette.cpp
+    src/hooks/race_hud_object.cpp
+    src/race_hud_object/gauges.cpp
     src/save_interface/save_interface.cpp
     src/save_interface/save_layer.cpp
     src/hooks/file_layer.cpp
@@ -419,6 +421,7 @@ set(ITC_SOURCES
     src/harnesses/camera_modes.cpp
     src/harnesses/location_screen.cpp
     src/harnesses/material_passes.cpp
+    src/harnesses/race_hud_object.cpp
     src/harnesses/car_sounds.cpp
     src/harnesses/x3daudio.cpp
     src/harnesses/xaudio.cpp
