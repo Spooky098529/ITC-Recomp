@@ -324,6 +324,32 @@ std::optional<SceneryDraw> ModelDrawShape(uint8_t* base, const DrawCalls& calls,
                                           uint32_t world, uint32_t shape, uint32_t depth_too,
                                           uint32_t c76, uint32_t range, uint32_t caller_r24);
 
+// Model::RecordMaterials' frame.
+constexpr uint32_t kModelRecordMaterialsFrame = 288;
+
+// Model::RecordMaterials (sub_820CECA0, docs/functions/models.md): the car
+// parts' Model::RecordShape: the arguments saved in the caller's frame
+// (`frame` + 316, + 324, + 332), the header slot at `frame` + 84 and the
+// blend table (0x826018A4) at + 80; the shape's declaration, streams and
+// indices, then per material its shaders (with `set_shaders`: the model's
+// pair, the shared pair 1005 when the model's +440 is set, 1000's for 1004),
+// render state 3, vertex c9-c13, pixel c63-c67, render state 96 for group
+// 0, 48 (by [0x826C5104]), 100 and 56 (2 and 6 swapped when [0x826C5100]
+// is set), the textures (the model's +444, +452, +456, +460 or the
+// provider's slot 5, by the shared pair or the category, or
+// CameraPasses::RenderTarget(0) for category 5) with their sampler states
+// 0 and 4, sampler 6 ([0x8296B8F0] or the provider's slot 6) with its
+// states 16, 20 and 36, and the draw. The provider's slots and
+// RenderTarget are guest calls from `frame`; the stack temporaries (+80 to
+// +111) are written there as the original does. Returns 0 when the group
+// has no materials, else the chunk's first slot. nullopt, with nothing
+// done, where the original must run: a vertex declaration the plain C++
+// leaves to it, more than 4 textures on a material, a chunk open on
+// another list, or no room for its slots.
+std::optional<uint32_t> ModelRecordMaterials(uint8_t* base, const DrawCalls& calls,
+                                             uint32_t frame, uint32_t model, uint32_t shape,
+                                             int32_t group, uint32_t set_shaders);
+
 // PointList::Draw's frame.
 constexpr uint32_t kPointListDrawFrame = 464;
 

@@ -257,6 +257,29 @@ set(ITC_SOURCES
     src/race_hud_object/signs.cpp
     src/race_hud_object/tick.cpp
     src/race_hud_object/movies.cpp
+    src/hooks/alt_hud.cpp
+    src/alt_hud/menu_list.cpp
+    src/alt_hud/alt_hud.cpp
+    src/hooks/race_scene.cpp
+    src/race_scene/race_scene.cpp
+    src/race_scene/race_scene_init.cpp
+    src/hooks/race_hud_machine.cpp
+    src/race_hud_machine/handlers.cpp
+    src/race_hud_machine/race_hud_machine_init.cpp
+    src/hooks/race_screens.cpp
+    src/race_screens/menu_list.cpp
+    src/race_screens/screens.cpp
+    src/race_screens/pages.cpp
+    src/race_screens/transitions.cpp
+    src/race_screens/options.cpp
+    src/race_screens/after_race.cpp
+    src/race_screens/dialog.cpp
+    src/race_screens/career.cpp
+    src/race_screens/draws.cpp
+    src/hooks/menu_sounds.cpp
+    src/menu_sounds/menu_sounds.cpp
+    src/hooks/accessories.cpp
+    src/accessories/accessories.cpp
     src/save_interface/save_interface.cpp
     src/save_interface/save_layer.cpp
     src/hooks/file_layer.cpp
@@ -427,6 +450,12 @@ set(ITC_SOURCES
     src/harnesses/location_screen.cpp
     src/harnesses/material_passes.cpp
     src/harnesses/race_hud_object.cpp
+    src/harnesses/alt_hud.cpp
+    src/harnesses/race_scene.cpp
+    src/harnesses/race_hud_machine.cpp
+    src/harnesses/race_screens.cpp
+    src/harnesses/menu_sounds.cpp
+    src/harnesses/accessories.cpp
     src/harnesses/car_sounds.cpp
     src/harnesses/x3daudio.cpp
     src/harnesses/xaudio.cpp
@@ -589,6 +618,9 @@ set_source_files_properties(src/c_runtime/math.cpp src/ui_movies/keys.cpp
     src/race_states/follow_route.cpp
     src/race_states/race_states_init.cpp
     src/race_states/route_distance.cpp
+    src/race_scene/race_scene.cpp
+    src/menu_sounds/menu_sounds.cpp
+    src/accessories/accessories.cpp
     src/texture_compression/dxt_alpha.cpp src/texture_compression/dxt_color.cpp
     src/texture_compression/dxt45.cpp src/texture_compression/codecs.cpp
     src/texture_compression/blitter.cpp src/texture_compression/compress_surface.cpp

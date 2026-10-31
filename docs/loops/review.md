@@ -11,6 +11,201 @@ functions to check in a drive in the progress file.
 When the user has reviewed a run's section, its heading gets
 "(reviewed <date>)"; the section stays for the record.
 
+## Run 2026-10-31 16:54 (`b7-loop-31-10-26`, continued)
+
+- The in-race screens' third migration (48313a90..d26e6f66): 27 rows
+  in `race-screens.md` (`RaceDialog::OpenAnim`'s modes 0 and 2
+  corrected), 2 in `race-hud-machine.md`, 5 in `race-hud-object.md`.
+  For review: `RaceScreens::Create`'s cases in `RaceScreens::Init`'s
+  harness world with its existing recorder; `RaceDialog::Question`'s
+  harness points the save interface and the replay list at a world of
+  its own (the game's save objects untouched); `sub_8211CBD8` (ready,
+  7 callers in play elsewhere) not taken.
+
+- The pad replay's race (`race_test.jsonl`) reached its countdown in
+  `itc_3021` but not in `itc_2987`, `itc_3004` or `itc_3038` (set up
+  at ~77.5 s, racers never added): not debugged; worth a look in case
+  native code this run is the cause (to debug later, as the earlier
+  unpaced-menus replay).
+
+- The in-race screens' second migration (590250a6..ca74f7fd): 36 rows
+  in `race-screens.md` (11 Native; `PauseMenu::ColorItems`' colors
+  corrected: enabled items 205, 235, 67, disabled white) and 3 in
+  `race-hud-machine.md`. For review: the UI movie calls, the menu
+  sound and the menu list made through their overrides so the pause
+  logging stays; `SetText`'s unset r7-r10 passed as 0 (the 2026-10-30
+  call), the caller frame's +48..+79 (+40..+79 for `SetUpOptions`) left
+  out of those cases; the openers' cases in the `race_screens`
+  harness; kind 4's and the stage's openers left to the originals.
+
+- The in-race screens' first migration (1405beb8..846937fe): 45 rows
+  in `race-screens.md` (3 Native) and 2 in `race-hud-machine.md`. For
+  review: the `--log_pause_movie` and `--log_pause_menu` overrides kept,
+  running the native step, native callers of `ScreenPages::Go` going
+  through its override for the log line; the screens' blocks through
+  the allocation layer, the original when the native heap isn't active;
+  paths only unseen screens take (race kinds 6 and 4, results of kinds
+  2, 4, 6 and kind 1 outside the career) left to the originals.
+
+- The in-race screens' map (421476db): `race-screens.md`, 157 rows
+  (4 moved from `functions.md`), the screens' globals, the page object
+  and the menu list in `known-data.md`; the menu list's helpers put
+  here (no file of their own; `alt-hud.md` holds two); the confirm
+  dialog mapped from the save screens' lead's range; three leads
+  amended, three added. The pause menu's logging wraps and frame-rate
+  fixes named in its rows.
+
+- The race HUD machine's harness rewrite and the 18 adapters (the
+  user's call; 3104033d, 5048300e): 16 rows in `race-hud-object.md`
+  and 2 in `alt-hud.md` to Native; `race-hud-machine.md`'s intro and
+  rows. For review: f1 compared only where the last callee's harness
+  compares it; `RaceUpdate`'s post of message 20 no longer covered
+  (`AltHud::Tick` always answers 0); 7 race HUD adapters stay for the
+  in-race screens' recompiled callers.
+
+- The race HUD machine's migration (e29438da, 7df89f72): 16 rows in
+  `race-hud-machine.md` (15 Overridden, `sub_8216C9B8` Merged), its
+  intro (kind 0 runs in attract races, though `seen_in_play.txt`
+  lacks `sub_8220B9E8`), `sub_8216D7B8`'s bit corrected to 0x400. For
+  review: kind 4, and kind 0 in the draw handlers, left to the
+  originals; a harness stand-in for callees
+  (`hooks/callee_stand_in.h`, null in the game) checked in the race HUD
+  object's, the alternate HUD's and `sub_822141E8`'s adapters, so 18
+  removable callee adapters stay. The user's call (2026-10-31): delete
+  them, the harness rewritten with the HUD's world (a cleanup lead).
+
+- The race HUD machine's map (11e568ee): `race-hud-machine.md`, 50
+  new rows (its 65 transitions decoded), `sub_8215E140` shared with the
+  race overlays' machine; `known-data.md`'s race HUD machine entry and
+  the holder's +8 bit 0 (the replay bit, so the alternate HUD is
+  probably the replay's dashboard); intros of `race-hud-object.md` and
+  `alt-hud.md`; three leads annotated. A correction: the lead said the
+  race flow's set-up registers these handlers; it is
+  `RaceHudMachine::Init` (`sub_8216E6E8`).
+
+- The RunWarning cleanup lead (1213d326, 2ea9a6f1): 3 rows in
+  `race-hud-object.md` (`RunWarning` Overridden; `HudCurve::Eval`,
+  `PowInt` Native). For review: the frame's back chain written even when
+  the flag at +468 is 0, as the original leaves it.
+
+- The race HUD cleanup lead (c17e0401..2bf1cf2c): 8 rows in
+  `race-hud-object.md` (`RunCountdown`, `UpdateRacerBar`, `TickPanel`,
+  `TickRacers`; 5 adapters removed). For review: `MenuSound::Play`'s
+  slot call from native callers through a new `sound_calls()`;
+  `RunCountdown`'s f1 left in ctx as the original leaves it;
+  `TickPanel`'s modes 2 to 4 (never seen in play) still recompiled,
+  through the table, and modes 2 and 4 not in the harness.
+
+- The accessories' second migration (2eb6ca57..3a9de36a): 10 rows in
+  `accessories.md` and `Accessories::Release`'s in `scene-loaders.md`
+  (a correction: its caller is `Interior::Release`, not `ReleaseAll`).
+  For review: the `OnLoaded` harness no longer builds a skeleton marked
+  set up without its node rows (a state play can't reach).
+
+- The accessories' first migration (8d5c9078..24186d92): 27 rows in
+  `accessories.md` (13 Native with their adapters removed). For review:
+  guest calls handed back to the adapter (the archive callback, the
+  set's destructor through its vtable, the texture provider's slot +12);
+  `Accessories::Destroy`'s r3 left as the original leaves it with no
+  set; `model_animation::SkeletonBaseDestructible` added beside
+  `BaseFreeable`. Only `Create` and `SetScale` run in attract races.
+
+- The interior accessories' map (ae8e322b): `accessories.md`, 50 new
+  rows (31 in play; the anchor, the skeleton's swing and the draws not
+  seen in play), three object rows in `known-data.md`; the accessories'
+  release lead folded in and removed from `leads.md`.
+
+## Run 2026-10-31 13:47 (`b7-loop-31-10-26`)
+
+- `Model::RecordMaterials` (`sub_820CECA0`, cleanup lead, 0c226b78):
+  its row in `models.md` (blank -> Overridden, read in full). For
+  review: the original kept for more than 4 textures, a vertex
+  declaration the plain C++ leaves to it, the slot diagnostics, and a
+  chunk open on another list or no room; the frame temporaries and the
+  caller frame's saved arguments written as the original; the harness
+  now saves and compares `0x826C5100` (16 bytes) for every
+  `scenery_lists` case. The vertex declaration `sub_82589728` (8de457d4)
+  Overridden -> Native.
+- The shader pair's load callback (`sub_820A06D0`, cleanup lead,
+  f0e75f6d..b7789d24): named `Shaders::OnPairLoaded` (probably) in
+  `models.md`, Overridden (its adapter kept: `Archive::Load` calls it
+  through the request's pointer). For review: its 16-byte file record
+  kept on the host instead of the stack frame; the original run when
+  memcpy's flag or the header copies' checks fail, and as guest calls
+  where `VertexShader::Init`'s or operator delete's plain C++ declines;
+  the harness uses only pair slots the game never fills (34-999,
+  1006-1999). Seven adapters removed (Overridden -> Native):
+  `sub_822A8568`, `sub_822A9FD8`, `sub_822A9EA8`, `sub_82594570`,
+  `sub_825896C0` (`models.md`), `sub_822A8740`, `sub_822A85B8`
+  (`shader-objects.md`); the first three's prints moved into the host
+  helpers their work now runs in (`ReadFile`, `CopyHeaderFrom`), their
+  own plain C++ called only by the harnesses.
+- The alternate HUD's map (12983d8d): `functions/alt-hud.md`, 26 new
+  rows (21 seen in play): `AltHud::` (our name), the race HUD holder's
+  object at +1004, a second dashboard on UI movie 22 copying the race
+  HUD's gauges plus the input record's throttle, brake and steering;
+  probably the attract or replay races' (a guess). Ticked instead of the
+  race HUD for kind 5, and kinds 1-3 and 6 with the holder's +8 bit 0
+  (its writer not found). For review: `MenuList::PressedX`'s toggle
+  probably never fires (+24 unwritten); `AltHud::SetBar`'s +232 and +236
+  never written found; `sub_82216B08` taken from the power curve lead
+  (its line updated); the menu list helpers `sub_8220BBB0`
+  (`MenuList::Release`, ~50 call sites) and `sub_8220BF00` mapped here.
+  `race-hud-object.md` and `known-data.md` updated.
+- The alternate HUD's migration (515bb2e3, f8054cd4,
+  `--native_alt_hud`): two map rows corrected (`MenuList::PressedX`
+  answers 1 when +24 is 0, so X does flip the toggle; `MenuList::Release`
+  returns 0 with no block). For review: `MenuList::Release` and
+  `AltHud::Destroy` free natively only with `--native_heap` (blocks not
+  the layer's pages go to the original, the car models' precedent);
+  `PressedX` calls `ActionMapper::Pressed`'s plain C++ when the slot is
+  it (the racer controllers' precedent); the three extra-gauge digit
+  setters (never seen in play) left as the recompiled originals; 16
+  functions Native with no adapter (only native callers reach them).
+- The race scene's map (a3291567): `functions/race-scene.md`, 20 new
+  rows (19 seen in play): `RaceScene::` at `[0x826D82D4]` (31,168
+  bytes: seven car slots of 4,288 bytes at +32, 11 lights at +30064,
+  the screen objects at +31152-+31160) and its machine
+  `RaceSceneMachine::` (set up by `sub_8215D808` from `RaceMode::Init`,
+  11 transitions). Two leads merged into it (the post effect users',
+  the race object's), `sub_8215AA88` taken from the course scenery
+  owners' lead. For review: `known-data.md`'s `0x826D82D4` row rewritten
+  (the "7 records at +80" were arrays inside the car slots); notes in
+  `post-effects.md`, `screen-objects.md` and `race-states.md` updated
+  (`Glow::` slots 4-12 now name `Glows::SetParams`; `PostEffects::Get`
+  sets slots 2-12, not 2 and 3); `RaceScene::Destroy` frees the object
+  but leaves the pointer set; `sub_821597F0` stays in `camera-modes.md`
+  (`CameraDirector::Resume`).
+- The race scene's migration (2c5902ef..454bd46e,
+  `--native_race_scene`): for review: `RaceSceneMachine::Init`'s stores
+  and six-word copies replayed from a table in the original's 864-byte
+  frame, so the words it never writes keep the stack's (the
+  `RaceStates::Init` precedent); `SetEffectParams` and
+  `Glows::SetParams` call the setters' plain C++ only when the glows'
+  slots 2-12 and the filters' slot 8 hold them, else the original runs;
+  `Resume` (never seen in play) ported with `TogglePause`; five callees
+  Native with no adapter. `RaceScene::Create`'s and
+  `RaceSceneMachine::Init`'s prints come right after their bail-out
+  (when the native `operator new` can't run), so they log only when the
+  native path runs (the validation agent's note).
+- The menu sounds' map (60918895): `functions/menu-sounds.md`, 33 new
+  rows (4 seen in play): `MenuSound::Play` (`sub_821103F0`, cue r3 of
+  bank 0 at 1.0 through the sound manager's slot 10, ~270 callers),
+  `Sound::Play` (`sub_82175850`), the volume options for the XACT
+  categories "Default" and "Music" (`sub_821B9C20`, `sub_821B9CF0`),
+  and 29 of the sound manager's methods not seen in play. For review:
+  `known-data.md`'s `0x826C5C80` row corrected (the sound manager
+  `AudioManager`, app + 124, not a music player; `Music::Play`'s slot 4
+  is `AudioManager::LoadBank`); the slots that run keep their rows in
+  `sound-cues.md`; `race-hud-object.md`'s and `location-screen.md`'s
+  intros point to the new file.
+- The menu sounds' migration (9f0605c3, `--native_menu_sounds`): the
+  sound manager's slots 10, 29 and 30 and XACT's category calls below
+  them aren't ours, so called through the function table, with only
+  the registers the original sets (the caller's r5 left, the racer
+  controllers' `set_r4` precedent); the four adapters stay for their
+  ~300 recompiled callers.
+
 ## Run 2026-10-30 23:03 (`b7-loop-30-10-26-2`)
 
 - The race HUD object's map (ac07446): `functions/race-hud-object.md`,

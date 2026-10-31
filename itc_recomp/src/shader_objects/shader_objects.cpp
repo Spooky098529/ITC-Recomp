@@ -74,6 +74,9 @@ struct FileRecord {
 };
 
 FileRecord ReadFile(uint8_t* base, uint32_t file) {
+  // ShaderFile::Parse's work (its record kept on the host) for its native
+  // callers.
+  ITC_NATIVE_RUNNING("sub_822A8568 ShaderFile::Parse");
   const uint32_t header = Load(base, file + 4);
   return {file, ObjectBytes(Load(base, file + 0), header), header + file, Load(base, file + 8)};
 }
@@ -249,6 +252,13 @@ std::optional<uint32_t> PixelShaderCreate(uint8_t* base, uint32_t file) {
 namespace {
 
 void CopyHeaderFrom(uint8_t* base, uint32_t object, uint32_t file, uint32_t fields) {
+  // VertexShader::CopyHeader's or PixelShader::CopyHeader's work for their
+  // native callers.
+  if (fields == kVertexShaderBytes) {
+    ITC_NATIVE_RUNNING("sub_822A9FD8 VertexShader::CopyHeader");
+  } else {
+    ITC_NATIVE_RUNNING("sub_822A9EA8 PixelShader::CopyHeader");
+  }
   const uint32_t bytes = Load(base, file + 4);
   Clear(base, object, fields);
   Require(c_runtime::XMemCpy(base, object + fields, file, bytes), "XMemCpy");
@@ -316,6 +326,42 @@ bool LoadShaders(uint8_t* base, uint32_t model, uint32_t section, const CreateCa
     pair = next;
   }
   return true;
+}
+
+std::optional<bool> PairLoaded(uint8_t* base, uint32_t context, const CreateCalls& calls) {
+  ITC_NATIVE_RUNNING("sub_820A06D0 Shaders::OnPairLoaded");
+  constexpr uint32_t kVertexTable = 0x826BFCB8;
+  constexpr uint32_t kPixelTable = 0x826BDC98;
+  const uint32_t vertex = Load(base, context + 0);
+  const uint32_t pixel = Load(base, context + 4);
+  // The checks first: memcpy's flag, each header copy's byte loop (the new
+  // blocks can't share memory with the files).
+  if (!native::Buffers_NativeMemcpy() ||
+      !c_runtime::XMemCpyBytes(base, vertex, Load(base, vertex + 4)) ||
+      !c_runtime::XMemCpyBytes(base, pixel, Load(base, pixel + 4))) {
+    return std::nullopt;
+  }
+  const auto slot = [&](uint32_t table) { return table + (Load(base, context + 8) << 2); };
+  // The vertex shader.
+  FileRecord record = ReadFile(base, vertex);
+  Store(base, slot(kVertexTable), models::AllocVirtual(base, record.object_bytes));
+  CopyHeaderFrom(base, Load(base, slot(kVertexTable)), vertex, kVertexShaderBytes);
+  uint32_t code = models::AllocPhysicalEx(base, record.code_bytes, 0, 0xFFFFFFFFu, 32, 0x404);
+  Require(native::Buffers_Memcpy(base, code, record.code, record.code_bytes, 0x820A074C),
+          "memcpy");
+  const uint32_t vertex_object = Load(base, slot(kVertexTable));
+  if (!VertexShaderInit(base, vertex_object, code)) {
+    calls.init(calls.user, vertex_object, code);
+  }
+  // The pixel shader (its file read again: nothing above writes it).
+  record = ReadFile(base, Load(base, context + 4));
+  Store(base, slot(kPixelTable), models::AllocVirtual(base, record.object_bytes));
+  CopyHeaderFrom(base, Load(base, slot(kPixelTable)), record.file, kPixelShaderBytes);
+  code = models::AllocPhysicalEx(base, record.code_bytes, 0, 0xFFFFFFFFu, 32, 0x404);
+  Require(native::Buffers_Memcpy(base, code, record.code, record.code_bytes, 0x820A07C8),
+          "memcpy");
+  PixelShaderInit(base, Load(base, slot(kPixelTable)), code);
+  return memory::crt::OperatorDelete(context);
 }
 
 }  // namespace shader_objects

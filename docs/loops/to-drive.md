@@ -16,6 +16,92 @@ function goes from this list when a log shows its `native running
 (game):` line (say which log in the commit). A run with nothing left
 here loses its heading.
 
+## Run 2026-10-31 16:54 (`b7-loop-31-10-26`, continued)
+
+- The in-race screens, third migration (attract race `itc_3046`,
+  replay `itc_3047`: broke as `itc_3038` did, no countdown; the pause
+  menu opened and the replay quit through the dialog;
+  `race-screens.md`, `race-hud-machine.md`): `sub_8221BB48`
+  AfterRaceMenu::Draw, `sub_8221A2F8` CareerResults::Draw,
+  `sub_82219210` CareerResults::Intro, `sub_822192B0`
+  CareerResults::Show, `sub_822193D8` CareerResults::Close1,
+  `sub_82219A78` CareerResults::Page1, `sub_8216DD88`
+  RaceHudMachine::AfterRaceUpdate, `sub_8220D740`
+  PauseMenu::SaveHudOptions (`AfterRaceMenu::Update` and
+  `RaceHud::TickPanel` were seen in `itc_3021`).
+
+- The in-race screens, second migration (attract race `itc_3037`,
+  replay `itc_3038`: broke: the race set up at the same time as in
+  `itc_3021` (~77.5 s) but its racers never added and no countdown, as
+  in `itc_2987` and `itc_3004`; the pause press at ~109 s opened the
+  pause menu before the start and the later presses quit through the
+  dialog; not debugged, the native code under test not ruled out;
+  `race-screens.md`, `race-hud-machine.md`): `sub_8220C930`
+  PauseMenu::ToggleOptions, `sub_8220CAB0` PauseMenu::ShowAdjustRow,
+  `sub_8220CBF8` PauseMenu::SetArrowA, `sub_8220D130`
+  PauseMenu::ShowSlider, `sub_8220DD98` PauseMenu::MoveOptions,
+  `sub_8220E1F8` PauseMenu::MoveAdjust, `sub_8220E888`
+  PauseMenu::ShowAdjust, `sub_8220F1B8` PauseMenu::SetAdjust,
+  `sub_8216DA40` RaceHudMachine::OpenRacePause, `sub_8216D8C8`
+  RaceHudMachine::OpenCareerPause, `sub_8221A6C8`
+  AfterRaceMenu::ConfirmPage, `sub_8221A730` AfterRaceMenu::Intro,
+  `sub_8221A7A8` AfterRaceMenu::Show, `sub_8221A950`
+  AfterRaceMenu::CloseMain, `sub_8221AA20` AfterRaceMenu::Move,
+  `sub_8221AC00` AfterRaceMenu::ShowItems, `sub_8221B5C8`
+  AfterRaceMenu::SetUpItems, `sub_8221B768` AfterRaceMenu::ColorItems,
+  `sub_8221B860` AfterRaceMenu::Start, `sub_8221BA68`
+  AfterRaceMenu::Open.
+
+- The in-race screens, first migration (attract race `itc_3020`,
+  replay `itc_3021`, ok: this replay reached the countdown, the race,
+  the results and the menu after the race; `race-screens.md`):
+  `sub_8220BC00` MenuList::SetEnabled, `sub_8220BC40` MenuList::Fit,
+  `sub_8220BF90` MenuList::Pressed166, `sub_8220D740`
+  PauseMenu::SaveHudOptions, `sub_8220D248` PauseMenu::StepAdjust
+  (`RaceDialog::Answer` and `Update` since seen in the replay
+  `itc_3047`).
+
+- The race HUD machine (attract races `itc_2986`, `itc_3003`, replays
+  `itc_2987`, `itc_3004`; the countdown and race handlers and
+  `IsFirstDay` since seen in the replay `itc_3021`;
+  `race-hud-machine.md`): `sub_8216C820` RaceHudMachine::OpponentPrize,
+  `sub_8216C938` RaceHudMachine::ItemBonus.
+
+- `RaceHud::RunWarning` (attract race `itc_2979`, replay `itc_2980`,
+  ok; `race-hud-object.md`): none left to drive.
+
+- The race HUD cleanup lead (attract race `itc_2973`, replay
+  `itc_2974`, ok; the rest since seen in the replay `itc_3021`;
+  `race-hud-object.md`): `sub_82214D78` RaceHud::TickTimer.
+
+- The interior accessories (attract races `itc_2946`, `itc_2963`,
+  replays `itc_2947`, `itc_2964`, ok; `accessories.md`): none left to
+  drive.
+
+## Run 2026-10-31 13:47 (`b7-loop-31-10-26`)
+
+- The menu sounds (attract race `itc_2935`, replay `itc_2936`: broke,
+  the SDK's "BaseHeap::Release failed because address is not a region
+  start" three times at the race-end change, as in `itc_2931`; it ran
+  to the end): none left to drive.
+
+- The race scene (attract race `itc_2930`, replay `itc_2931`: broke,
+  the SDK's "BaseHeap::Release failed because address is not a region
+  start" once at the race-end change ~118 s in, as in `itc_2894`; it
+  ran to the end; `race-scene.md`; never seen in play before either):
+  `sub_8215D0D8` RaceSceneMachine::Resume.
+
+- The alternate HUD (attract race `itc_2920`, replay `itc_2921`, ok;
+  `alt-hud.md`; the replay's race set it up but never ticked it, so
+  probably never showed it): `sub_82217AC8` AltHud::Tick,
+  `sub_82216C00` AltHud::RunMovie, `sub_8220BF00` MenuList::PressedX,
+  `sub_82216E00` AltHud::SetSpeed, `sub_82217A30`
+  AltHud::UpdateExtraGauges, `sub_82217460` AltHud::SetGear,
+  `sub_822173E8` AltHud::SetTach, `sub_822174E0` AltHud::SetNode25,
+  `sub_822175A0` AltHud::SetBar, `sub_82217538` AltHud::SetBoost,
+  `sub_82217638` AltHud::SetThrottle, `sub_82217690` AltHud::SetBrake,
+  `sub_822176E8` AltHud::SetSteering.
+
 ## Run 2026-10-30 23:03 (`b7-loop-30-10-26-2`)
 
 - The race HUD object, migration 2 (attract race `itc_2893`, replay

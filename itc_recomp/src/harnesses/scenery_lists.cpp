@@ -54,6 +54,7 @@ constexpr Region kRegions[] = {
     {0x826C5B20, 0x10}, {0x8296B8B8, 0x20}, {0x8296B910, 0x10},
     {0x8296BD20, 0x10}, {0x8265ECA0, 0xA0}, {0x8296B940, 0x3A0},
     {0x8296B8F0, 0x10}, {0x8296B7B0, 0x140}, {0x8265EC00, 0x90},
+    {0x826C5100, 0x10},  // Model::RecordMaterials' cull swap and render state 48
 };
 
 // The block: 64 KB for the lists, models and sets, then room for the race
@@ -957,6 +958,87 @@ void ModelShapes(Context& h, Random& r, uint32_t block) {
   }
 }
 
+// Model::RecordMaterials' inputs over RandomMaterials': the model's shared
+// pair switch (+440), its textures (+444, +452, +456, +460, the replaced id
+// +436 copied into a material's ids now and then); each material's shared
+// pair (0, 1000 to 1005 or another), category (+408), flags (+104, bit 4
+// too), render states (+112, +344 with the cull modes 2 and 6 often) and
+// +388; the cull swap and render state 48's globals; sampler 6's texture
+// ([0x8296B8F0]) unset now and then. Without a provider, no material reaches
+// it (the original would call through address 0): no shared pairs 1001 to
+// 1003, and sampler 6's texture set.
+void RandomCarMaterials(uint8_t* base, uint32_t block, Random& r) {
+  const uint32_t model = block + 0x100;
+  const bool provider = guest::LoadU32(base, model + 48) != 0;
+  guest::StoreU32(base, model + 440, r.Below(5) == 0 ? 1 : 0);
+  guest::StoreU32(base, model + 444, uint32_t(r.Next()));
+  guest::StoreU32(base, model + 452, r.Below(3) == 0 ? 0 : uint32_t(r.Next()));
+  guest::StoreU32(base, model + 456, r.Below(2) ? 0 : uint32_t(r.Next()));
+  guest::StoreU32(base, model + 432, r.Below(2) ? 0 : 1);
+  guest::StoreU32(base, model + 460, r.Below(2) ? 0 : uint32_t(r.Next()));
+  guest::StoreU32(base, model + 436, r.Below(4));
+  guest::StoreU32(base, 0x826C5100, r.Below(2));
+  guest::StoreU32(base, 0x826C5104, r.Below(2));
+  guest::StoreU32(base, 0x8296B8F0,
+                  provider && r.Below(2) ? 0 : 1 + uint32_t(r.Next() & 0xFFFF));
+  const uint32_t materials = block + 0x6000;
+  const uint32_t count = guest::LoadU32(base, materials + 8) + guest::LoadU32(base, materials + 12);
+  static constexpr uint32_t kPairs[] = {0, 0, 0, 1000, 1001, 1002, 1003, 1004, 1005, 7};
+  static constexpr uint32_t kNoProviderPairs[] = {0, 0, 1000, 1004, 1005, 7};
+  for (uint32_t m = 0; m < count; m++) {
+    const uint32_t material = materials + 16 + 512 * m;
+    guest::StoreU32(base, material + 392,
+                    provider ? kPairs[r.Below(10)] : kNoProviderPairs[r.Below(6)]);
+    guest::StoreU32(base, material + 408, r.Below(4) == 0 ? r.Below(12) : r.Below(2) ? 0 : 3 + 2 * r.Below(2));
+    guest::StoreU32(base, material + 104, uint32_t(r.Next()) & 7u);
+    guest::StoreU32(base, material + 112, uint32_t(r.Next()));
+    guest::StoreU32(base, material + 344, r.Below(2) ? (r.Below(2) ? 2 : 6) : r.Below(8));
+    guest::StoreU32(base, material + 388, r.Below(3) == 0 ? 1 + r.Below(4) : 0);
+    // One texture now and then (categories 3 and 5), the replaced id.
+    if (r.Below(3) == 0) {
+      guest::StoreU32(base, material + 128, 1);
+    }
+    for (uint32_t j = 0; j < 4; j++) {
+      if (r.Below(3) == 0) {
+        guest::StoreU32(base, material + 176 + 4 * j, guest::LoadU32(base, model + 436));
+      }
+    }
+  }
+}
+
+void CarMaterials(Context& h, Random& r, uint32_t block) {
+  const uint32_t model = block + 0x100;
+  Results results("Model::RecordMaterials (sub_820CECA0)");
+  uint32_t stack = 0;
+  for (int c = 0; c < 1024; c++) {
+    Case(
+        h, results, block, r,
+        [&](PPCContext& t) {
+          g_flush_on_entry = r.Below(2) != 0;
+          stack = t.r1.u32;
+          RandomList(h.base, block, r, 400);
+          const uint32_t shape = r.Below(4);
+          RandomShape(h.base, block, r, shape, false);
+          RandomMaterials(h.base, block, r, shape);
+          RandomCarMaterials(h.base, block, r);
+          t.r3.u64 = model;
+          t.r4.u64 = shape;
+          t.r5.u64 = r.Below(2);
+          t.r6.u64 = r.Below(4) == 0 ? 0 : 1;
+        },
+        __imp__sub_820CECA0, hooks::SceneryListsModelRecordMaterials, {},
+        fmt::format("case {}", c), false,
+        [&](const PPCContext& t, Outputs& out) {
+          // The stack temporaries (r1 - 288 + 80 to + 112) and the
+          // arguments saved in the caller's frame (r1 + 28 to + 48).
+          out.Bytes(Read(h.base, t.r1.u32 - 288 + 80, 32));
+          out.Bytes(Read(h.base, t.r1.u32 + 28, 20));
+        },
+        [&] { Fill(h.base, stack, 64); });
+  }
+  results.Report();
+}
+
 // PointList::Draw: a list at the block's +0xE00 whose two nodes both hold
 // the model at +0x100 (shape 0), the entry's points at +0x1100 (most below
 // the lowest y, so a few are drawn), the camera pass at +0xD00 (an identity
@@ -1332,6 +1414,7 @@ void SceneryLists(Context& h) {
   DepthDraws(h, r, block);
   SceneryShapes(h, r, block);
   ModelShapes(h, r, block);
+  CarMaterials(h, r, block);
   const uint32_t slots = memory::Alloc(0x40000 + 16, 0);
   PointLists(h, r, block, (slots + 15) & ~15u);
   DrawSetListsCases(h, r, block, (slots + 15) & ~15u);

@@ -174,7 +174,8 @@ car specs and the cameras native as far as they were ready
 ours 1,023 -> 1,139), the cameras keeping frame interpolation's hooks
 (`BlendState_OnCopy` added); the rest waits on the graphics device's
 resource calls, the archive and memset/atexit.
-Its eighth run (`b7-loop-23-10-26-4`, 2026-10-23, not yet merged;
+Its eighth run (`b7-loop-23-10-26-4`, 2026-10-23, merged into
+`rexglue-removal-project` the same day;
 summary `docs/loops/b7-loop-2026-10-23-1722.md`) made the string table
 and font, `std::string` and the course's route native as far as they
 were ready (`strings-and-font.md`, `std-string.md`, `track-route.md`;
@@ -342,8 +343,8 @@ system's interface (`save-interface.md`, `--native_save_interface`, 41
 of 41 in play) native (ours 2,540 -> 2,628); the rest waits on the
 loose read's and opens' guest calls to B4's `File::` adapters, the
 game's `Semaphore::Init` and the leads in `docs/loops/leads.md`.
-Its twenty-first run (`b7-loop-28-10-26-3`, 2026-10-28 to 29, not
-yet merged; summary `docs/loops/b7-loop-2026-10-28-2222.md`; 3
+Its twenty-first run (`b7-loop-28-10-26-3`, 2026-10-28 to 29, merged
+into `rexglue-removal-project` with the twenty-fifth, 2026-10-30; summary `docs/loops/b7-loop-2026-10-28-2222.md`; 3
 subsystems) made the car sounds with X3DAudio (`car-sounds.md`,
 `--native_car_sounds`, 62 of 62 in play), XAudio's voices (`xaudio.md`,
 `--native_xaudio`, 92 of 96: the game's copy of XAudio, translated) and
@@ -354,7 +355,8 @@ game's, taken natively as the original does, until every user is
 native (then host recursive locks with a readable depth); the rest
 waits on XAudio's engine and mixer, the codecs, XACT's notifications
 and `QueryPerformanceCounter`.
-Its twenty-second run (`b7-loop-29-10-26`, 2026-10-29, not yet merged;
+Its twenty-second run (`b7-loop-29-10-26`, 2026-10-29, merged with
+the twenty-fifth, 2026-10-30;
 summary `docs/loops/b7-loop-2026-10-29-1544.md`; 3 subsystems, stopped
 at a validation: the XMA codec's two destructors had no harness line)
 made XACT's tracks and events (`xact-tracks.md`, `--native_xact_tracks`,
@@ -368,14 +370,14 @@ GetTickCount), and XAudio's own threads, events and semaphore are used
 through the kernel's imports as the original does. The rest waits on
 the resampler and the reverb's core (ready, not taken) and XAudio's
 shut-down.
-Its twenty-third run (`b7-loop-29-10-26-2`, 2026-10-29 to 30, not yet
-merged; summary `docs/loops/b7-loop-2026-10-29-2222.md`) took that stop
+Its twenty-third run (`b7-loop-29-10-26-2`, 2026-10-29 to 30, merged
+with the twenty-fifth, 2026-10-30; summary `docs/loops/b7-loop-2026-10-29-2222.md`) took that stop
 as a cleanup lead and made the rest of XAudio's objects native (110 of
 110: the resampler, `PcmCodec::Process`, the reverb; ours 2,999 ->
 3,031), then stopped at its validation: `CarSound::Part840Update`'s
 harness differed once (1 of 80, two pointer words), intermittent so far.
 Its twenty-fourth run (the same branch, the user's call, 2026-10-30,
-not yet merged; summary `docs/loops/b7-loop-2026-10-30-0106.md`; 3
+merged with the twenty-fifth, 2026-10-30; summary `docs/loops/b7-loop-2026-10-30-0106.md`; 3
 subsystems) fixed that harness (the game's mixer swaps XAudio's two
 voice stage lists between a case's versions: compared by role) and made
 the app's start-up (`app-start-up.md`, `--native_app_start_up`: `App::App`,
@@ -412,13 +414,45 @@ validation: `App::App` and `App::Create`'s harnesses differed since
 (83b2b76; fixed after: their recorders let it allocate), and the
 harnesses take 56.7 s of the validation's 60. The rest waits on the menu sound, the other in-race
 screens and the scene's second set.
+Its twenty-seventh run (`b7-loop-31-10-26`, 2026-10-31, merged into
+`rexglue-removal-project` with the twenty-eighth, 2026-10-31, before a
+drive;
+summary `docs/loops/b7-loop-2026-10-31-1347.md`; 3 subsystems) made two
+cleanup leads under `--native_models` (`Model::RecordMaterials`, the
+shader pair's load callback; eight adapters removed), the alternate HUD
+(`alt-hud.md`, `--native_alt_hud`, 21 of 21 in play: the race HUD
+holder's +1004 dashboard), the race scene (`race-scene.md`,
+`--native_race_scene`, 11 of 20: `[0x826D82D4]` and its machine) and the
+menu sounds (`menu-sounds.md`, `--native_menu_sounds`, 4 of 4 in play)
+native (ours 3,514 -> 3,552); by the user's calls (2026-10-31), the
+validation race is `attract_race.sh 120` (the harnesses take ~58 s), and
+the music, XACT banks the sound manager loads, is translated with XACT.
+The rest waits on the course scenery's and scene models' owners, the
+scene's update, the other in-race screens and the sound manager's slots.
+Its twenty-eighth run (the same branch, continued by the user's call,
+2026-10-31, merged into `rexglue-removal-project` the same day before
+a drive; summary
+`docs/loops/b7-loop-2026-10-31-1654.md`; 3 subsystems) made the
+interior accessories (`accessories.md`, `--native_accessories`, 31 of
+31 in play), the race HUD machine (`race-hud-machine.md`,
+`--native_race_hud_machine`, 23 of 33: the race mode's state machine at
++128664, with the race HUD's countdown, racer bar and warning as
+cleanup leads) and the other in-race screens (`race-screens.md`,
+`--native_race_screens`, 93 of 116: the pause menu, the confirm dialog,
+the career results, the menu after the race) native (ours 3,552 ->
+3,705); by the user's call (2026-10-31), adapters a harness would keep
+as hooks are deleted and the harness builds the callees' world. The
+pad replay's race reached its countdown in only one of four
+validations (to look at later, `docs/loops/review.md`). The rest waits
+on the UI movie calls `sub_8211C740` and `sub_8211CBD8`, the options
+screens and the leads in `docs/loops/leads.md`.
 Harness runs use `attract_race.sh 40` (the user's call,
 2026-10-23); a race short only because the harnesses took longer is
 no halt. B7 loop migration agents run only their subsystem's harnesses
 (and those of files they touched); the validation agent runs them all
 once after each migration (the user's call, 2026-10-28), with
-`attract_race.sh 60` since they outgrew 40 s (the user's call,
-2026-10-30).
+`attract_race.sh 120` since they outgrew 40 s and then 60 (the user's
+calls, 2026-10-30 and 2026-10-31).
 After each plan item, run `itc_recomp/tools/boundary_status.py` and record
 its output in "The boundary over time" at the end of
 `docs/rexglue-removal.md`. Plan steps are done on their

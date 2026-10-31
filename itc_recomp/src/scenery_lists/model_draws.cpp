@@ -1404,6 +1404,516 @@ std::optional<SceneryDraw> ModelDrawShape(uint8_t* base, const DrawCalls& calls,
   return draw;
 }
 
+// --- Model::RecordMaterials (models.md) ---
+
+namespace {
+
+constexpr uint32_t kCarBlendStates = 0x826018A4;   // render state 3 by blend index
+constexpr uint32_t kCullSwap = 0x826C5100;         // the cull modes 2 and 6 swapped
+constexpr uint32_t kRenderState48Off = 0x826C5104;  // render state 48 0 (else 1)
+constexpr uint32_t kSampler6Texture = 0x8296B8F0;  // sampler 6's texture, or 0
+constexpr uint32_t kRenderTarget = 0x8209F7A8;     // CameraPasses::RenderTarget
+
+// Where a material's textures come from (the original's branches).
+enum class TextureSource {
+  kUntextured,      // no provider or no textures, no shared pair: 4 samplers unset
+  kNone,            // a shared pair other than 1000-1004: nothing
+  kModel444,        // pairs 1000 and 1004: the model's +444 as sampler 0
+  kProvider1001,    // pair 1001: the provider's first texture
+  kTwo1002,         // pair 1002: the provider's first, then the model's +444
+  kProvider1003,    // pair 1003 without the replacement: the provider's first
+  kReplaced1003,    // pair 1003: each texture, +460 where its id is +436's
+  kModel452,        // category 3 with one texture: the model's +452
+  kRenderTarget,    // category 5 with one texture: CameraPasses::RenderTarget(0)
+  kFill456,         // the model's +456 for every texture
+  kFill460,         // the model's +460 for every texture
+  kProvider,        // the provider's slot 5 for every texture
+};
+
+TextureSource SourceOf(uint8_t* base, uint32_t model, uint32_t material) {
+  const uint32_t pair = guest::LoadU32(base, material + 392);
+  const int32_t textures = int32_t(guest::LoadU32(base, material + 128));
+  if ((guest::LoadU32(base, model + 48) == 0 || textures == 0) && pair == 0) {
+    return TextureSource::kUntextured;
+  }
+  const bool replaced = guest::LoadU32(base, model + 460) != 0 &&
+                        guest::LoadU32(base, material + 176) == guest::LoadU32(base, model + 436);
+  if (pair != 0) {
+    switch (pair) {
+      case 1000:
+      case 1004:
+        return TextureSource::kModel444;
+      case 1001:
+        return TextureSource::kProvider1001;
+      case 1002:
+        return TextureSource::kTwo1002;
+      case 1003:
+        return replaced ? TextureSource::kReplaced1003 : TextureSource::kProvider1003;
+      default:
+        return TextureSource::kNone;
+    }
+  }
+  switch (int32_t(guest::LoadU32(base, material + 408))) {
+    case 3:
+      return guest::LoadU32(base, model + 452) != 0 && textures == 1 ? TextureSource::kModel452
+                                                                      : TextureSource::kProvider;
+    case 5:
+      return textures == 1 ? TextureSource::kRenderTarget : TextureSource::kProvider;
+    default:
+      if (int32_t(guest::LoadU32(base, model + 432)) != 0 &&
+          guest::LoadU32(base, model + 456) != 0) {
+        return TextureSource::kFill456;
+      }
+      return replaced ? TextureSource::kFill460 : TextureSource::kProvider;
+  }
+}
+
+// Whether sampler 6 is set (the environment texture and its states).
+bool SetsSampler6(uint8_t* base, uint32_t material) {
+  if ((guest::LoadU32(base, material + 104) & 4) != 0 ||
+      guest::LoadU32(base, material + 392) == 0) {
+    return true;
+  }
+  switch (int32_t(guest::LoadU32(base, material + 408))) {
+    case 1:
+    case 2:
+    case 7:
+    case 9:
+    case 10:
+      return true;
+    default:
+      return false;
+  }
+}
+
+// ModelRecordMaterials' slots, or nullopt where it declines (see the header).
+std::optional<uint32_t> ModelRecordMaterialsSlots(uint8_t* base, uint32_t model, uint32_t shape,
+                                                  int32_t group, uint32_t set_shaders) {
+  if (models::MaterialCount(base, model, shape, group) == 0) {
+    return 0;
+  }
+  const uint32_t at = ShapeAt(base, model, shape);
+  if (!models::VertexDeclaration(base, guest::LoadU32(base, at + 244),
+                                 int32_t(guest::LoadU32(base, at + 260)),
+                                 guest::LoadU32(base, at + 276))) {
+    return std::nullopt;
+  }
+  const uint32_t type = guest::LoadU32(base, at + 260);
+  const bool short_streams = type == 9 || type == 10 || guest::LoadU32(base, at + 276) == 6;
+  // The header, the declaration, the streams and the end.
+  uint32_t slots = 2 + (short_streams ? 3 : 4) + 1;
+  if (guest::LoadU32(base, at + 428) == 1 &&
+      guest::LoadU32(base, guest::LoadU32(base, at + 408) + 20) != 0) {
+    slots += 2;
+  }
+  const int32_t count = int32_t(models::MaterialCount(base, model, shape, group));
+  uint32_t material = models::Material(base, model, shape, 0, group);
+  for (int32_t i = 0; i < count; i++, material += 512) {
+    const int32_t textures = int32_t(guest::LoadU32(base, material + 128));
+    if (textures > 4) {
+      return std::nullopt;
+    }
+    const uint32_t each = uint32_t(std::max(textures, 0));
+    // The shaders, render state 3, vertex c9-c13, pixel c63-c67, 96 for
+    // group 0, 48/100/56 and the draw.
+    slots += (set_shaders != 0 ? 4 : 0) + 2 + 6 + 6 + (group == 0 ? 2 : 0) + 4 + 4;
+    switch (SourceOf(base, model, material)) {
+      case TextureSource::kNone:
+        break;
+      case TextureSource::kTwo1002:
+        slots += 8;
+        break;
+      case TextureSource::kReplaced1003:
+      case TextureSource::kFill456:
+      case TextureSource::kFill460:
+      case TextureSource::kProvider:
+        slots += 2 + 3 * each;
+        break;
+      default:  // untextured, or one texture with its two sampler states
+        slots += 5;
+        break;
+    }
+    if (SetsSampler6(base, material)) {
+      slots += 6;
+    }
+  }
+  return slots;
+}
+
+// The two sampler states (0 and 4) of `count` textures.
+void TextureSamplerStates(uint8_t* base, uint32_t list, uint32_t material, int32_t count) {
+  uint32_t slot = Take(base, list);
+  guest::StoreU32(base, slot + 0, 2);
+  guest::StoreU32(base, slot + 8, 0);
+  guest::StoreU32(base, slot + 4, uint32_t(count) << 1);
+  for (int32_t k = 0; k < count; k++) {
+    const uint32_t sampler = uint32_t(k);
+    slot = Take(base, list);
+    guest::StoreU32(base, slot + 0, sampler);
+    guest::StoreU32(base, slot + 4, 0);
+    guest::StoreU32(base, slot + 8, guest::LoadU32(base, material + 272 + 4 * sampler));
+    slot = Take(base, list);
+    guest::StoreU32(base, slot + 4, 4);
+    guest::StoreU32(base, slot + 0, sampler);
+    guest::StoreU32(base, slot + 8, guest::LoadU32(base, material + 304 + 4 * sampler));
+  }
+}
+
+// The provider's slot 5 for texture `k` (its ids at +144 and +176).
+uint32_t ProviderTexture(uint8_t* base, const DrawCalls& calls, uint32_t frame, uint32_t model,
+                         uint32_t material, uint32_t k, uint32_t lr) {
+  const uint32_t provider = guest::LoadU32(base, model + 48);
+  const uint32_t args[3] = {provider, guest::LoadU32(base, material + 144 + 4 * k),
+                            guest::LoadU32(base, material + 176 + 4 * k)};
+  return calls.call(calls.user, guest::LoadU32(base, guest::LoadU32(base, provider) + 20), args,
+                    3, frame, lr);
+}
+
+void RecordMaterialTextures(uint8_t* base, const DrawCalls& calls, uint32_t frame,
+                            uint32_t list, uint32_t model, uint32_t material) {
+  const TextureSource source = SourceOf(base, model, material);
+  uint32_t slot;
+  // One texture as sampler 0 (the header, the texture slot's +0 then +4),
+  // then its two states.
+  auto single = [&](auto texture_of, bool texture_first) {
+    uint32_t texture = 0;
+    if (texture_first) {
+      texture = texture_of();
+    }
+    Slot(base, Take(base, list), 4, 1, 0);
+    if (!texture_first) {
+      texture = texture_of();
+    }
+    slot = Take(base, list);
+    guest::StoreU32(base, slot + 0, 0);
+    guest::StoreU32(base, slot + 4, texture);
+    TextureSamplerStates(base, list, material, 1);
+  };
+  // Every texture from `texture_of(k)` (called before its slot), then the
+  // states.
+  auto each = [&](auto texture_of) {
+    slot = Take(base, list);
+    guest::StoreU32(base, slot + 0, 4);
+    guest::StoreU32(base, slot + 8, 0);
+    guest::StoreU32(base, slot + 4, guest::LoadU32(base, material + 128));
+    for (int32_t k = 0; k < int32_t(guest::LoadU32(base, material + 128)); k++) {
+      const uint32_t texture = texture_of(uint32_t(k));
+      slot = Take(base, list);
+      guest::StoreU32(base, slot + 4, texture);
+      guest::StoreU32(base, slot + 0, uint32_t(k));
+    }
+    TextureSamplerStates(base, list, material, int32_t(guest::LoadU32(base, material + 128)));
+  };
+  uint32_t provider_lr = 0x820CF71C;
+  switch (int32_t(guest::LoadU32(base, material + 408))) {
+    case 0:
+      provider_lr = 0x820CFCA4;
+      break;
+    case 3:
+      provider_lr = 0x820CF9AC;
+      break;
+    case 5:
+      provider_lr = 0x820CF860;
+      break;
+    default:
+      break;
+  }
+  switch (source) {
+    case TextureSource::kUntextured:
+      Slot(base, Take(base, list), 4, 4, 0);
+      for (uint32_t k = 0; k < 4; k++) {
+        slot = Take(base, list);
+        guest::StoreU32(base, slot + 0, k);
+        guest::StoreU32(base, slot + 4, 0);
+      }
+      break;
+    case TextureSource::kNone:
+      break;
+    case TextureSource::kModel444:
+      single([&] { return guest::LoadU32(base, model + 444); }, false);
+      break;
+    case TextureSource::kModel452:
+      single([&] { return guest::LoadU32(base, model + 452); }, false);
+      break;
+    case TextureSource::kProvider1001:
+      single([&] { return ProviderTexture(base, calls, frame, model, material, 0, 0x820D0250); },
+             true);
+      break;
+    case TextureSource::kProvider1003:
+      single([&] { return ProviderTexture(base, calls, frame, model, material, 0, 0x820D0144); },
+             false);
+      break;
+    case TextureSource::kRenderTarget:
+      single(
+          [&] {
+            const uint32_t args[1] = {0};
+            return calls.call(calls.user, kRenderTarget, args, 1, frame, 0x820CF814);
+          },
+          false);
+      break;
+    case TextureSource::kTwo1002: {
+      const uint32_t texture =
+          ProviderTexture(base, calls, frame, model, material, 0, 0x820D017C);
+      Slot(base, Take(base, list), 4, 2, 0);
+      slot = Take(base, list);
+      guest::StoreU32(base, slot + 0, 0);
+      guest::StoreU32(base, slot + 4, texture);
+      slot = Take(base, list);
+      guest::StoreU32(base, slot + 0, 1);
+      guest::StoreU32(base, slot + 4, guest::LoadU32(base, model + 444));
+      // Two textures' states, whatever the count.
+      slot = Take(base, list);
+      guest::StoreU32(base, slot + 0, 2);
+      guest::StoreU32(base, slot + 4, 4);
+      guest::StoreU32(base, slot + 8, 0);
+      for (uint32_t k = 0; k < 2; k++) {
+        slot = Take(base, list);
+        guest::StoreU32(base, slot + 0, k);
+        guest::StoreU32(base, slot + 4, 0);
+        guest::StoreU32(base, slot + 8, guest::LoadU32(base, material + 272 + 4 * k));
+        slot = Take(base, list);
+        guest::StoreU32(base, slot + 4, 4);
+        guest::StoreU32(base, slot + 0, k);
+        guest::StoreU32(base, slot + 8, guest::LoadU32(base, material + 304 + 4 * k));
+      }
+      break;
+    }
+    case TextureSource::kReplaced1003:
+      each([&](uint32_t k) {
+        if (guest::LoadU32(base, material + 176 + 4 * k) == guest::LoadU32(base, model + 436)) {
+          return guest::LoadU32(base, model + 460);
+        }
+        return ProviderTexture(base, calls, frame, model, material, k, 0x820D0058);
+      });
+      break;
+    case TextureSource::kFill456:
+      each([&](uint32_t) { return guest::LoadU32(base, model + 456); });
+      break;
+    case TextureSource::kFill460:
+      each([&](uint32_t) { return guest::LoadU32(base, model + 460); });
+      break;
+    case TextureSource::kProvider:
+      each([&](uint32_t k) {
+        return ProviderTexture(base, calls, frame, model, material, k, provider_lr);
+      });
+      break;
+  }
+}
+
+uint32_t ModelRecordMaterialsChecked(uint8_t* base, const DrawCalls& calls, uint32_t frame,
+                                     uint32_t model, uint32_t shape, int32_t group,
+                                     uint32_t set_shaders) {
+  const uint32_t list = guest::LoadU32(base, kRecordList);
+  const uint32_t at = ShapeAt(base, model, shape);
+  uint32_t stream = at + 320;
+  uint32_t second = at + 352;
+  if (guest::LoadU32(base, at + 428) == 1) {
+    stream = guest::LoadU32(base, at + 412);
+    second = guest::LoadU32(base, at + 420);
+  }
+  command_list::OpenChunk(base, list);
+  const uint32_t header = Take(base, list);
+  guest::StoreU32(base, frame + 84, header);
+  Slot(base, header, 10, 1, 0);
+  const uint32_t declaration = Take(base, list);
+  guest::StoreU32(base, declaration,
+                  *models::VertexDeclaration(base, guest::LoadU32(base, at + 244),
+                                             int32_t(guest::LoadU32(base, at + 260)),
+                                             guest::LoadU32(base, at + 276)));
+  const uint32_t type = guest::LoadU32(base, at + 260);
+  const bool short_streams = type == 9 || type == 10 || guest::LoadU32(base, at + 276) == 6;
+  uint32_t slot;
+  Slot(base, Take(base, list), 11, short_streams ? 2 : 3, 0);
+  slot = Take(base, list);
+  Slot(base, slot, 0, at + 288, 0);
+  guest::StoreU32(base, slot + 12, guest::LoadU32(base, at + 248));
+  slot = Take(base, list);
+  Slot(base, slot, 1, stream, 0);
+  guest::StoreU32(base, slot + 12, guest::LoadU32(base, at + 264));
+  if (!short_streams) {
+    slot = Take(base, list);
+    Slot(base, slot, 2, second, 0);
+    guest::StoreU32(base, slot + 12, guest::LoadU32(base, at + 280));
+  }
+  if (guest::LoadU32(base, at + 428) == 1) {
+    const uint32_t indices = guest::LoadU32(base, at + 408);
+    if (guest::LoadU32(base, indices + 20) != 0) {
+      Slot(base, Take(base, list), 22, 1, 0);
+      slot = Take(base, list);
+      guest::StoreU32(base, slot + 8, 1);
+      guest::StoreU32(base, slot + 4, guest::LoadU32(base, indices + 20));
+    }
+  }
+  uint32_t material = models::Material(base, model, shape, 0, group);
+  if (int32_t(models::MaterialCount(base, model, shape, group)) > 0) {
+    const double zero = Lfs(base, kZero);
+    const double one = Lfs(base, kOne);
+    guest::StoreU32(base, frame + 80, kCarBlendStates);
+    for (int32_t i = 0; i < int32_t(models::MaterialCount(base, model, shape, group));
+         i++, material += 512) {
+      for (uint32_t offset = 96; offset < 112; offset += 4) {
+        guest::StoreFloat(base, frame + offset, float(one));
+      }
+      const uint32_t pair = guest::LoadU32(base, material + 392);
+      // The shaders: the model's own pair, or a shared one (1005 for every
+      // material when the model's +440 is set, 1000's for 1004).
+      if (set_shaders != 0) {
+        Slot(base, Take(base, list), 8, 1, 0);
+        if (pair == 0 && guest::LoadU32(base, model + 440) == 0) {
+          guest::StoreU32(base, Take(base, list),
+                          guest::LoadU32(base, (guest::LoadU32(base, material + 96) << 4) +
+                                                   guest::LoadU32(base, model + 24)));
+          Slot(base, Take(base, list), 9, 1, 0);
+          guest::StoreU32(base, Take(base, list),
+                          guest::LoadU32(base, (guest::LoadU32(base, material + 96) << 4) +
+                                                   guest::LoadU32(base, model + 24) + 4));
+        } else {
+          const uint32_t shared = guest::LoadU32(base, model + 440) != 0 ? 1005
+                                  : pair == 1004                         ? 1000
+                                                                         : pair;
+          guest::StoreU32(base, Take(base, list), models::SharedVertexShader(base, shared));
+          Slot(base, Take(base, list), 9, 1, 0);
+          guest::StoreU32(base, Take(base, list), models::SharedPixelShader(base, shared));
+        }
+      }
+      // The blend (render state 3, the table at the frame's +80).
+      Slot(base, Take(base, list), 3, 1, 0);
+      slot = Take(base, list);
+      guest::StoreU32(base, slot + 0, 0);
+      guest::StoreU32(base, slot + 4,
+                      guest::LoadU32(base, (guest::LoadU32(base, material + 108) << 2) +
+                                               guest::LoadU32(base, frame + 80)));
+      // Vertex c9-c13: four colors (0, 0, 0, 1) and the textures' third
+      // floats (+240) at the frame's +96, each texture's color from the
+      // model's table (+320) where its index (+208) isn't -1; then the
+      // material's +0.
+      Slot(base, Take(base, list), 7, 5, 0x00010905);
+      const uint32_t vertex = Take(base, list, 5);
+      for (uint32_t j = 0; j < 4; j++) {
+        const uint32_t out = vertex + 16 * j;
+        guest::StoreFloat(base, out + 0, float(zero));
+        guest::StoreFloat(base, out + 4, float(zero));
+        guest::StoreFloat(base, out + 8, float(zero));
+        guest::StoreFloat(base, out + 12, float(one));
+        CopyFloat(base, frame + 96 + 4 * j, material + 240 + 4 * j);
+      }
+      for (int32_t j = 0; j < int32_t(guest::LoadU32(base, material + 128)); j++) {
+        const uint32_t out = vertex + 16 * uint32_t(j);
+        const int32_t index = int32_t(guest::LoadU32(base, material + 208 + 4 * uint32_t(j)));
+        double third;
+        if (index != -1) {
+          const uint32_t color = uint32_t(index) << 4;
+          CopyFloat(base, out + 0, color + guest::LoadU32(base, model + 320));
+          CopyFloat(base, out + 4, color + guest::LoadU32(base, model + 320) + 4);
+          third = Lfs(base, color + guest::LoadU32(base, model + 320) + 8);
+        } else {
+          guest::StoreFloat(base, out + 0, float(zero));
+          guest::StoreFloat(base, out + 4, float(zero));
+          guest::StoreFloat(base, out + 8, float(zero));
+          guest::StoreFloat(base, out + 12, float(one));
+          third = Lfs(base, material + 240 + 4 * uint32_t(j));
+        }
+        guest::StoreFloat(base, frame + 96 + 4 * uint32_t(j), float(third));
+      }
+      CopyWords(base, vertex + 64, material, 4);
+      // Pixel c63-c67: the material's +64, +80, +16 (w the float at +88),
+      // +32, then the frame's four floats (as words).
+      Slot(base, Take(base, list), 7, 5, 0x01013F05);
+      const uint32_t pixel = Take(base, list, 5);
+      uint32_t colors[4];
+      for (uint32_t w = 0; w < 4; w++) {
+        colors[w] = guest::LoadU32(base, frame + 96 + 4 * w);
+      }
+      CopyWords(base, pixel + 0, material + 64, 4);
+      CopyWords(base, pixel + 16, material + 80, 4);
+      CopyWords(base, pixel + 32, material + 16, 4);
+      CopyFloat(base, pixel + 44, material + 88);
+      CopyWords(base, pixel + 48, material + 32, 4);
+      for (uint32_t w = 0; w < 4; w++) {
+        guest::StoreU32(base, pixel + 64 + 4 * w, colors[w]);
+      }
+      // Render state 96 for group 0 (by +388).
+      if (group == 0) {
+        Slot(base, Take(base, list), 1, 1, 0);
+        slot = Take(base, list);
+        guest::StoreU32(base, slot + 4, guest::LoadU32(base, material + 388) != 0 ? 1 : 0);
+        guest::StoreU32(base, slot + 0, 96);
+      }
+      // 48 (0 when [0x826C5104] is set), 100 and 56 (the cull mode, 2 and 6
+      // swapped when [0x826C5100] is set).
+      Slot(base, Take(base, list), 1, 3, 0);
+      slot = Take(base, list);
+      guest::StoreU32(base, slot + 4, guest::LoadU32(base, kRenderState48Off) != 0 ? 0 : 1);
+      guest::StoreU32(base, slot + 0, 48);
+      slot = Take(base, list);
+      guest::StoreU32(base, slot + 0, 100);
+      guest::StoreU32(base, slot + 4, guest::LoadU32(base, material + 112));
+      slot = Take(base, list);
+      guest::StoreU32(base, slot + 0, 56);
+      uint32_t cull = guest::LoadU32(base, material + 344);
+      if (guest::LoadU32(base, kCullSwap) != 0 && (cull == 2 || cull == 6)) {
+        cull = cull == 2 ? 6 : 2;
+      }
+      guest::StoreU32(base, slot + 4, cull);
+      RecordMaterialTextures(base, calls, frame, list, model, material);
+      // Sampler 6 and its states 16, 20 and 36.
+      if (SetsSampler6(base, material)) {
+        uint32_t texture = guest::LoadU32(base, kSampler6Texture);
+        if (texture == 0) {
+          const uint32_t provider = guest::LoadU32(base, model + 48);
+          const uint32_t args[3] = {provider, guest::LoadU32(base, material + 124),
+                                    guest::LoadU32(base, material + 120)};
+          texture = calls.call(calls.user,
+                               guest::LoadU32(base, guest::LoadU32(base, provider) + 24), args,
+                               3, frame, 0x820CFE74);
+        }
+        Slot(base, Take(base, list), 4, 1, 0);
+        slot = Take(base, list);
+        guest::StoreU32(base, slot + 0, 6);
+        guest::StoreU32(base, slot + 4, texture);
+        Slot(base, Take(base, list), 2, 3, 0);
+        Slot(base, Take(base, list), 6, 16, 4);
+        Slot(base, Take(base, list), 6, 20, 4);
+        Slot(base, Take(base, list), 6, 36, 3);
+      }
+      // The draw.
+      Slot(base, Take(base, list), 12, 1, 0);
+      guest::StoreU32(base, Take(base, list), material + 352);
+      Slot(base, Take(base, list), 18, 1, 0);
+      slot = Take(base, list);
+      guest::StoreU32(base, slot + 0, guest::LoadU32(base, material + 348));
+      guest::StoreU16(base, slot + 4, 0);
+      guest::StoreU16(base, slot + 6, 0);
+      guest::StoreU32(base, slot + 8, guest::LoadU32(base, material + 340));
+    }
+  }
+  EndRecord(base, list);
+  return guest::LoadU32(base, frame + 84);
+}
+
+}  // namespace
+
+std::optional<uint32_t> ModelRecordMaterials(uint8_t* base, const DrawCalls& calls,
+                                             uint32_t frame, uint32_t model, uint32_t shape,
+                                             int32_t group, uint32_t set_shaders) {
+  ITC_NATIVE_RUNNING("sub_820CECA0 Model::RecordMaterials");
+  const auto slots = ModelRecordMaterialsSlots(base, model, shape, group, set_shaders);
+  if (!slots) {
+    return std::nullopt;
+  }
+  if (*slots != 0 && !CanRecord(base, guest::LoadU32(base, kRecordList), *slots)) {
+    return std::nullopt;
+  }
+  // The arguments the original saves in its caller's frame.
+  guest::StoreU32(base, frame + 316, shape);
+  guest::StoreU32(base, frame + 324, uint32_t(group));
+  guest::StoreU32(base, frame + 332, set_shaders);
+  if (*slots == 0) {
+    return 0;
+  }
+  return ModelRecordMaterialsChecked(base, calls, frame, model, shape, group, set_shaders);
+}
+
 namespace {
 
 constexpr uint32_t kPointLow = 0x82006808;    // the lowest y drawn (-1000.0)

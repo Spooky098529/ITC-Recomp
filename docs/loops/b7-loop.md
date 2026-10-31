@@ -402,11 +402,12 @@ made native, or whose adapter it removed:
 1. **Checks the print** is the first statement of its plain C++ (grep
    `itc_recomp/src` for the address). Missing ones it adds, in one commit,
    pushed (a print only, no other change).
-2. **Runs** the build and `attract_race.sh 60 --run_harnesses=all` with
+2. **Runs** the build and `attract_race.sh 120 --run_harnesses=all` with
    the default flags (every harness, once a migration: the migration
    agent runs only its own, so this run is what shows that nothing else
    was broken; the user's call, 2026-10-28; 60 s since all of them
-   outgrew 40, the user's call, 2026-10-30; migration agents stay at
+   outgrew 40, the user's call, 2026-10-30; 120 s since they took 56.7
+   of the 60, the user's call, 2026-10-31; migration agents stay at
    40), checks every harness is at
    0 differing outside "(expected to differ)" groups (one that isn't,
    in any subsystem, goes in the report's `race:` line, and the lead
@@ -529,8 +530,11 @@ Calls so far for decisions the loop meets often:
   class itself stays recompiled for the others.
 - The graphics: native if the renderer needs it, else Dropped (fence
   waits, cache flushes, packets nothing reads).
-- XACT is translated (2026-10-23); libraries replaced wholesale aren't
-  mapped ("Rules that still hold").
+- XACT is translated (2026-10-23), the music too: it is XACT banks
+  loaded through the sound manager (`Music::Play`,
+  `AudioManager::LoadBank`), not a separate player to replace with a
+  host library (2026-10-31); libraries replaced wholesale aren't mapped
+  ("Rules that still hold").
 - B7 changes no game behavior: stack leftovers and unwritten words are
   copied as the original leaves them (track zones, the race overlays'
   machine).
@@ -545,9 +549,15 @@ Calls so far for decisions the loop meets often:
   without argument codes for those calls (the parking area, 2026-10-30).
   Memory leftovers are still copied as the original leaves them.
 - Harness run times: migration agents `attract_race.sh 40` with their
-  own harnesses; the validation agent `attract_race.sh 60
-  --run_harnesses=all` (2026-10-30, when all of them outgrew 40 s). If
-  they outgrow 60 too, that's a new case for the user.
+  own harnesses; the validation agent `attract_race.sh 120
+  --run_harnesses=all` (60 s on 2026-10-30, when all of them outgrew
+  40 s; 120 s on 2026-10-31, when they took 56.7 of the 60). If they
+  outgrow 120 too, that's a new case for the user.
+- Adapters a new harness would use as hooks (to see which callees a
+  recompiled caller calls): deleted anyway once their callers in play
+  are ours, and the harness built the bigger way, with the callees'
+  world as their own harnesses build it; no stand-in recorders in
+  adapters (the race HUD machine, 2026-10-31).
 - The C runtime's per-thread data over the kernel's TLS (`_mtinit`
   `sub_825AA708`, `_getptd` and the rest in `c-runtime.md`'s "Not
   here"): left for the core, not taken (2026-10-25). Only when it

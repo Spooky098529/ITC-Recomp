@@ -87,12 +87,12 @@ matrix math (`Matrix::Multiply`, `RotateX`, `RotateY`, `RotateZ`,
 (`heap.md`), `memcpy`, `sin`, `XMemSet` (`c-runtime.md`) and the empty
 `sub_82106540` (`audio.md`: page 10, and a sound call's stand-in at the
 draw's start). Not here, in leads (`../loops/leads.md`): the menus'
-input helpers `sub_82186568` and `sub_821864C8`, the menu sound
-`sub_821103F0`, the scene's update, constructor and teardown
+input helpers `sub_82186568` and `sub_821864C8`, the scene's update, constructor and teardown
 (`sub_820C9608`, `sub_820C8A50`, `sub_820C5798`, `sub_820C4D88`,
 `sub_820D0D50`), the scene models' load poll `sub_820DA318` and record
 builder `sub_8215B878`, and the mode's set-up `sub_8222FD68` with the
-mode's two other screens. The course scenery's owners' lead names this
+mode's two other screens. The menu sound `sub_821103F0` is in
+`menu-sounds.md` (2026-10-31). The course scenery's owners' lead names this
 screen's create, set-up, load poll, unload and destroy; their rows are
 here. Not seen in play (`../coverage.md`): 22 of them, marked.
 

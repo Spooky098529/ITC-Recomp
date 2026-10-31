@@ -435,6 +435,38 @@ Rows not yet moved stay in the table below. So far:
   rear-view mirror's texture, the expressway sign and place name by the
   track zones, the countdown, the warning, the racers' bars, the item
   popup and the timer (B7).
+- [`alt-hud.md`](alt-hud.md): the alternate HUD, the in-race screens'
+  holder's object at +1004: a second dashboard on UI movie 22 (the
+  race HUD's gauges plus the throttle, brake and steering), its set-up,
+  tick, view switch and teardown, and two menu list helpers (B7).
+- [`race-scene.md`](race-scene.md): the race scene: the race mode's
+  state machine at +87936 and its object at `[0x826D82D4]`: the race
+  cars' scene model slots, a set of 11 lights, the post effects and
+  screen objects made at the race's set-up with the glows' and color
+  filters' parameters from a table, the pause toggle, and the teardown
+  (B7).
+- [`menu-sounds.md`](menu-sounds.md): the menu sounds: the helpers the
+  screens play their sounds through (`MenuSound::Play`, about 270
+  callers) and set the effects and music volume options through, and
+  the sound manager's interface methods not in `sound-cues.md` (the
+  object at `[0x826C5C80]` is the sound manager) (B7).
+- [`accessories.md`](accessories.md): the interior accessories: the
+  set at `[0x826C5510]`, its reference-counted entries loaded from the
+  archive, the accessory (a part model with a small swinging skeleton,
+  probably a hanging ornament), its skeleton's set-up, step and swing,
+  its draw, and the small file class the three use (B7).
+- [`race-hud-machine.md`](race-hud-machine.md): the race HUD machine:
+  the race mode's state machine at +128664 that drives the in-race
+  screens' holder through a race (made and destroyed, the HUD set up,
+  its ticks and draws by the race kind before the start, in a free
+  run's intro, the countdown, the race, the pause menus, the results and
+  the menu after the race), and the career race's prize money (B7).
+- [`race-screens.md`](race-screens.md): the other in-race screens the
+  holder makes: the pause menu (its main list, the HUD options, the
+  volumes, three adjustments), the confirm dialog with the replay's
+  save steps, the career's results, the menu after the race with the
+  replay list, the makers of four screens never seen in play, and the
+  shared menu list's and page object's helpers (B7).
 
 These files hold functions only. What used to follow the table here moved
 out on 2026-10-20: how frame interpolation works, its options and what
@@ -464,7 +496,6 @@ old performance notes to the end of `../native-renderer.md`.
 | `sub_822B20D8` | | Dropped | Frame statistics, for a debugger: frame counter (+20024 += 1), time since the last Swap from the timebase (+20028; +20032/+20036 the last), +20048/+20056 moved to +20064/+20068 and zeroed, debugger requests (+15168 through `820007F0`), the GPU performance counters while +20104 is 1 or 2 (`Device::SetClockGating`, `sub_8229B930`, `sub_8229B9C8`, `sub_8229BFE8`, `sub_82106540`, `sub_822976F8`), then `sub_822B1788` and the debugger's callback at `820007B4` +4. Was called once a frame, only from Swap. Readers of what it leaves: `sub_822B1088` and `sub_822ACAA8`. The native Swap leaves the call out (before that, skipped behind a temporary switch: only +20024 and +20028 differed, frames right). |
 | `sub_825BA0C8` | `QueryPerformanceCounter` | Overridden | r3 = the 64-bit count (out); returns 1. Read the timebase (`mftb`, the SDK's guest clock: 50 MHz from 0 at its start), again when its low word was 0 (the 360's timebase erratum). Leaf. 23 callers, 5 seen in play: XACT's clock (`sub_825BFE28`) and `XACTSound::AudioUpdate` (`sub_825CBD10`, [`xact.md`](xact.md)), `sub_82465428` and `sub_8258D090`, `sub_8258D0D8`, `sub_8258D170` (not read: probably timing). Nothing else seen in play reads `mftb` (its other readers, `sub_822B20D8` and `sub_8245D288`, are Dropped; `sub_8229D6F0` and `sub_8229D720` never ran), so nothing compares the two. Ours (2026-10-29, the user's call, followed as GetTickCount's): the adapter in `src/hooks/clock.cpp` stores `helpers::PerformanceCounter()` (`src/helpers/clock.cpp`): ticks at QueryPerformanceFrequency's 50 MHz (`sub_825B9A70`) since start from the host's steady clock, read again on a low word of 0 as the original; native callers call it directly, so both share one clock. No flag. Harness `clock` (r3, the bytes past the count, the advance over sleeps within 1 ms of the SDK's timebase). |
 | `sub_822956F0` | `GetTickCount` | Overridden | Returned the word at `[0x82000854]` + 16: the kernel's `KeTimeStampBundle` (a variable import; the SDK sets +16 to its uptime in milliseconds every 1 ms), the game's only reader of it. Leaf. 25 callers, 5 seen in play: XACT's clock (`sub_825BFE28`) and `sub_825CBD10` ([`xact.md`](xact.md)), `sub_8214F6E8` ([`system-services.md`](system-services.md)), `824CF448`, `824CF840`. Ours (2026-10-23, the user's call): the adapter in `src/hooks/clock.cpp` returns `helpers::TickCount()` (`src/helpers/clock.cpp`), milliseconds since start from the host's steady clock, wrapping at 2^32; native callers call it directly, so both share one clock. No flag (a fallback would split the callers between two clocks). Harness `clock` (the advance over sleeps, within 3 ms of the SDK's). |
-| `sub_8220BC28` | `MenuList::GetPreviousSelection` (probably) | Overridden | Returns the word at +20: the menu list's previous selection ("The menu list" in `../pause-menu-fix.md`). A one-instruction getter the linker folded, so XACT's `sub_825C8440` ([`xact.md`](xact.md)) calls it for an entry accessor's play offset (+20). 52 callers, 7 seen in play: the menus' `8220C7B8`, `8220D898`, `8220DD98`, `8220E1F8`, `82218788`, `82222E88`, and XACT's. Leaf. Native in `src/xact/xact.cpp` (`WaveEntryGetPlayOffset`) behind `--native_xact` (adapter in `src/hooks/xact.cpp`, harness `xact`, its wave entries and lookups group): one load, so the override gives every caller, the menus' too, the same result. Runs in attract races. |
 | `sub_820C0128` | `Vehicle::GetSpeedKmh` | Overridden | Returns the float at vehicle+48 (m/s) times 3.6. The plain C++ (`Vehicle_GetSpeedKmh`, `src/hooks/vehicle.h`) is also called directly by the native `OverlayView::SpeedKmh` (`sub_821268C0`, [`race-overlays.md`](race-overlays.md)); the adapter also tells the state capture (`--capture_dir`) about the vehicle. Checked against the original by the `race_overlays` harness. |
 | `sub_8215B4F8` | `Race::DrawStep` | Wrapped | The race's draw step (Draw message). Its running marks the pass as in a race. |
 | `sub_8258FD48` | `Command::SetShaderConstants` | Wrapped | Render thread, command 7: r3 = payload, r4 = register count, r5 = stage << 24 \| type << 16 \| start << 8 \| count. Interpolation substitutes blended values here. |
@@ -629,10 +660,7 @@ old performance notes to the end of `../native-renderer.md`.
 | `sub_825BDDA0` | `EndVertices` | Wrapped | Same file: an inline vertex draw noted, then handed to the native renderer (in commands 15 and 19). |
 | `sub_8258F5C0` | | Wrapped | Same file: the single-command items' command 15 (the helper object's draw), marked as command 15 so the native renderer draws its inline vertices. |
 | `sub_822AFA58` | `Device::Resolve` | Wrapped | Same file: resolves made outside command 25 (command 33's, one per tile) passed to the native renderer. |
-| `sub_8220C1E0` | `MenuList::Update` | Wrapped | Logged for `--log_pause_menu` (`src/debug/pause_menu_log.cpp`). `sub_8210C370` reads logical pad `j`'s values 0-7 (sticks, triggers) through the pointer at mapper +2880 (= input manager +44 + 196j) and the buttons through the listener object at mapper +2464 (seen by the read watch, 2026-10-19). |
 | `sub_821BE5A8` | | Wrapped | The pause sub-menus' calls on their UI movie (setting animation targets and the children's +80 flags, starting animations, switching sub-screens); logged for `--log_pause_movie` (`src/debug/pause_movie_log.cpp`). |
-| `sub_8220D040` | | Wrapped | The pause sub-menus' calls on their UI movie (setting animation targets and the children's +80 flags, starting animations, switching sub-screens); logged for `--log_pause_movie` (`src/debug/pause_movie_log.cpp`). |
-| `sub_8220BA68` | | Wrapped | The pause sub-menus' calls on their UI movie (setting animation targets and the children's +80 flags, starting animations, switching sub-screens); logged for `--log_pause_movie` (`src/debug/pause_movie_log.cpp`). |
 | `sub_8258FBD0` | `Command::*` (1) | Wrapped | The render command handlers, by id (`REPLAY_COUNTED_HANDLER`, `src/native/replay_hooks.cpp`): the native renderer and the stats logger see every command. Command 7 is `sub_8258FD48` above; 0, 36 and 37 aren't wrapped. The commands: "Command list format" in `../frame-interpolation.md` here and `gpu-functions.md`. |
 | `sub_8258FC30` | `Command::*` (2) | Wrapped | The render command handlers, by id (`REPLAY_COUNTED_HANDLER`, `src/native/replay_hooks.cpp`): the native renderer and the stats logger see every command. Command 7 is `sub_8258FD48` above; 0, 36 and 37 aren't wrapped. The commands: "Command list format" in `../frame-interpolation.md` here and `gpu-functions.md`. |
 | `sub_8258FC90` | `Command::*` (3) | Wrapped | The render command handlers, by id (`REPLAY_COUNTED_HANDLER`, `src/native/replay_hooks.cpp`): the native renderer and the stats logger see every command. Command 7 is `sub_8258FD48` above; 0, 36 and 37 aren't wrapped. The commands: "Command list format" in `../frame-interpolation.md` here and `gpu-functions.md`. |

@@ -492,6 +492,31 @@ void SceneryListsModelRecordShape(PPCContext& ctx, uint8_t* base) {
   ctx.r3.u64 = *first;
 }
 
+void SceneryListsModelRecordMaterials(PPCContext& ctx, uint8_t* base) {
+  if (SlotDiagnostics()) {
+    __imp__sub_820CECA0(ctx, base);
+    return;
+  }
+  ctx.fpscr.disableFlushMode();
+  const uint64_t lr = ctx.lr;
+  const uint32_t frame = ctx.r1.u32 - scenery_lists::kModelRecordMaterialsFrame;
+  SceneryDrawGuest context{ctx, base};
+  const scenery_lists::DrawCalls calls = SceneryListsDrawCalls(&context);
+  // The back chain first (as stwu): the plain C++ writes into the frame.
+  const uint32_t chain = guest::LoadU32(base, frame);
+  guest::StoreU32(base, frame, ctx.r1.u32);
+  const auto first = scenery_lists::ModelRecordMaterials(base, calls, frame, ctx.r3.u32,
+                                                         ctx.r4.u32, ctx.r5.s32, ctx.r6.u32);
+  if (!first) {
+    guest::StoreU32(base, frame, chain);
+    __imp__sub_820CECA0(ctx, base);
+    return;
+  }
+  ctx.lr = lr;
+  ctx.fpscr.disableFlushMode();
+  ctx.r3.u64 = *first;
+}
+
 void SceneryListsModelDrawShape(PPCContext& ctx, uint8_t* base) {
   if (SlotDiagnostics()) {
     __imp__sub_82596B18(ctx, base);
@@ -591,4 +616,14 @@ extern "C" REX_FUNC(sub_82595550) {
     return;
   }
   hooks::SceneryListsModelRecordShape(ctx, base);
+}
+
+// Model::RecordMaterials' row is in docs/functions/models.md too.
+extern "C" REX_FUNC(sub_820CECA0) {
+  REX_FUNC_PROLOGUE();
+  if (!ITC_FLAG(native_models)) {
+    __imp__sub_820CECA0(ctx, base);
+    return;
+  }
+  hooks::SceneryListsModelRecordMaterials(ctx, base);
 }

@@ -4,7 +4,10 @@
 
 #include "hooks/race_hud_object.h"
 
+
 #include "base/flags.h"
+#include "hooks/heap.h"
+#include "menu_sounds/menu_sounds.h"
 #include "race_hud_object/race_hud_object.h"
 #include "track_zones/track_zones.h"
 
@@ -12,7 +15,8 @@
 
 ITC_FLAG_BOOL(native_race_hud_object, true, "ITC",
               "Run the race HUD object's functions (docs/functions/race-hud-object.md: "
-              "HudCurve::Eval sub_82212118, PowInt sub_82213C40, HudBar::Step sub_82211FB8, "
+              "HudCurve::Eval sub_82212118, PowInt sub_82213C40 (no adapters: only their native "
+              "callers reach them in play, here and in the alternate HUD), HudBar::Step sub_82211FB8, "
               "RaceHud::SetGear sub_82212DB0, SetBar sub_82214698, ResetBar sub_82212668, "
               "ClearWarning sub_822122A0, SetPlayer sub_82212690, Touching sub_82215820, "
               "SetTach sub_82212D58, SetBoost sub_82212E18, SetSpeed sub_82214260, SetTime "
@@ -25,7 +29,9 @@ ITC_FLAG_BOOL(native_race_hud_object, true, "ITC",
               "or the originals; UpdateSigns sub_82214718, UpdateSign sub_82212F00, "
               "UpdatePlaceName sub_82213510, with TrackZones::Update and IsInside's plain C++; "
               "UiMovie::FinishNamed, SetText and ClearText through their overrides; Tick "
-              "sub_822153A0, TickTimer sub_82214D78; ShowGauge, SetSpeed, UpdateExtraGauges, SetGear, "
+              "sub_822153A0, TickTimer sub_82214D78 (no adapter since TickPanel's plain C++: "
+              "only it reaches TickTimer, UpdateRecordingFull, HudBar::Step and Touching in "
+              "play); ShowGauge, SetSpeed, UpdateExtraGauges, SetGear, "
               "SetTach, SetBoost, SetBar, UpdateSigns, UpdateSign, UpdatePlaceName, SetTime and "
               "SetDistance have no adapters: only their native callers reach them, and the flag "
               "switches those; StartCountdown sub_82212270, StartMovie1 sub_82212718, "
@@ -35,11 +41,18 @@ ITC_FLAG_BOOL(native_race_hud_object, true, "ITC",
               "(UiMovie::Run and the mirror's sub_8211BEE8 through their overrides), "
               "UpdateWarning sub_82212C50, UpdateRecordingFull sub_82212E60 (UiMovie::Finish "
               "and FinishNamed through their overrides), ShowItem sub_82213638 (UiMovie::SetNodeText "
-              "through its override, its varargs 0), UpdateItem sub_82214238, RaceScreens::Init sub_82211DA0 and Make1004 sub_82216A60 "
+              "through its override, its varargs 0), UpdateItem sub_82214238, RaceScreens::Init sub_82211DA0, Create sub_82211F40 (with --native_heap; the in-race screens' makers' plain C++) and Make1004 sub_82216A60 "
               "(the UI movies' start, Strings::Load, UiMovies::Open, operator new, memset and "
               "MenuList::Init through their overrides); MovieMask, RaceHud::Init and Make1004 "
               "have no adapters: only RaceScreens::Init's plain C++ reaches them, and the flag "
-              "switches it) "
+              "switches it); RunCountdown sub_822129A8 (UiMovie::Run through its override, "
+              "MenuSound::Play's plain C++), UpdateRacerBar sub_82214790 (no adapter: only TickRacers' "
+              "plain C++ reaches it in play; UiMovie::Finish and "
+              "the sound manager's slot 14 through the function table, MenuSound::Play's plain "
+              "C++), TickPanel sub_82215488 (TickRacers sub_822151F8, no adapter: only TickPanel's "
+              "plain C++ reaches it; modes 2 to 4's ticks, never seen in play, the originals), "
+              "RunWarning sub_82212A48 (the sound manager's slot 14 and UiMovie::Run through the "
+              "function table, MenuSound::Play's plain C++) "
               "natively instead of through the translated code (the same writes; checked by "
               "--run_harnesses=race_hud_object)");
 
@@ -63,8 +76,29 @@ class GuestCalls {
   // The zones' slots that aren't the native ones (track_zones::OwnerCalls):
   // r4 set when asked, else left.
   track_zones::OwnerCalls zone_calls() { return {this, &GuestCalls::CallZone}; }
+  // MenuSound::Play's slot call (menu_sounds::Calls): the first `set` of r3
+  // to r6 set, the others left, as MenuSound::Play's own adapter does.
+  menu_sounds::Calls sound_calls() { return {this, &GuestCalls::CallSound}; }
 
  private:
+  static uint64_t CallSound(void* user, uint32_t function, const uint64_t args[4], int set,
+                            uint32_t r1, uint32_t lr) {
+    auto& self = *static_cast<GuestCalls*>(user);
+    PPCContext& ctx = self.ctx_;
+    uint8_t* base = self.base_;
+    const uint64_t stack = ctx.r1.u64;
+    ctx.r1.u64 = r1;
+    PPCRegister* registers[4] = {&ctx.r3, &ctx.r4, &ctx.r5, &ctx.r6};
+    for (int i = 0; i < set; i++) {
+      registers[i]->u64 = args[i];
+    }
+    ctx.lr = lr;
+    ctx.ctr.u64 = function;
+    REX_CALL_INDIRECT_FUNC(function);
+    ctx.r1.u64 = stack;
+    ctx.fpscr.disableFlushMode();
+    return ctx.r3.u64;
+  }
   static uint64_t CallZone(void* user, uint32_t function, uint32_t r3, uint32_t r4, bool set_r4,
                            uint32_t frame, uint32_t lr) {
     auto& self = *static_cast<GuestCalls*>(user);
@@ -338,6 +372,47 @@ void RaceHudObjectScreensInit(PPCContext& ctx, uint8_t* base) {
   ctx.r3.u64 = rh::ScreensInit(base, ctx.r3.u32, ctx.r4.u32, ctx.r1.u32, guest.calls());
 }
 
+void RaceHudObjectScreensCreate(PPCContext& ctx, uint8_t* base) {
+  if (!NativeHeapActive()) {
+    __imp__sub_82211F40(ctx, base);
+    return;
+  }
+  GuestCalls guest(ctx, base);
+  ctx.r3.u64 = rh::ScreensCreate(base, ctx.r3.u32, ctx.r1.u32, guest.calls());
+}
+
+void RaceHudObjectRunCountdown(PPCContext& ctx, uint8_t* base) {
+  ctx.fpscr.disableFlushMode();
+  GuestCalls guest(ctx, base);
+  ctx.r3.u64 =
+      rh::RunCountdown(base, ctx.r3.u32, ctx.r1.u32, guest.calls(), guest.sound_calls(), &ctx.f1.f64);
+}
+
+void RaceHudObjectUpdateRacerBar(PPCContext& ctx, uint8_t* base) {
+  ctx.fpscr.disableFlushMode();
+  GuestCalls guest(ctx, base);
+  ctx.r3.u64 = rh::UpdateRacerBar(base, ctx.r3.u32, ctx.r4.u64, ctx.r5.u64, ctx.r1.u32,
+                                  guest.calls(), guest.sound_calls());
+}
+
+void RaceHudObjectRunWarning(PPCContext& ctx, uint8_t* base) {
+  GuestCalls guest(ctx, base);
+  ctx.r3.u64 = rh::RunWarning(base, ctx.r3.u32, ctx.r1.u32, guest.calls(), guest.sound_calls());
+}
+
+void RaceHudObjectTickRacers(PPCContext& ctx, uint8_t* base) {
+  ctx.fpscr.disableFlushMode();
+  GuestCalls guest(ctx, base);
+  ctx.r3.u64 =
+      rh::TickRacers(base, ctx.r3.u32, ctx.r1.u32, guest.calls(), guest.sound_calls());
+}
+
+void RaceHudObjectTickPanel(PPCContext& ctx, uint8_t* base) {
+  ctx.fpscr.disableFlushMode();
+  GuestCalls guest(ctx, base);
+  ctx.r3.u64 = rh::TickPanel(base, ctx.r3.u32, ctx.r1.u32, guest.calls(), guest.sound_calls());
+}
+
 }  // namespace hooks
 
 // The adapters: the register steps above, or the originals with the flag
@@ -346,44 +421,37 @@ void RaceHudObjectScreensInit(PPCContext& ctx, uint8_t* base) {
 // UpdateExtraGauges, SetGear, SetTach, SetBoost, SetBar and UpdateSigns
 // (from Tick), UpdateSign and UpdatePlaceName (from UpdateSigns), SetTime
 // and SetDistance (from TickTimer), RaceScreens::MovieMask, RaceHud::Init and
-// RaceScreens::Make1004 (from RaceScreens::Init).
+// RaceScreens::Make1004 (from RaceScreens::Init), TickRacers (from
+// TickPanel), UpdateRacerBar (from TickRacers; mode 3's tick, never seen in
+// play, runs the original), HudBar::Step and Touching (from UpdateRacerBar;
+// sub_822161D0, never seen in play, runs the originals), TickTimer and
+// UpdateRecordingFull (from TickPanel), HudCurve::Eval (from SetTach, SetBoost,
+// SetUpGauges and the alternate HUD's SetUpGauges, SetTach and SetBoost) and
+// PowInt (from SetSpeed, SetDistance and the alternate HUD's SetSpeed; the
+// +656 object's and the other digits' callers, never seen in play, run the
+// originals); and the race HUD machine's callees only its native handlers
+// reach in play (src/race_hud_machine/, by their plain C++; kind 4's paths,
+// never seen in play, reach the originals): UpdateView, UpdateItem,
+// RunWarning, RunItem, RunCountdown, StartMovie1, FinishMovie1, RunMovie1,
+// SetPlayer, Reset, ClearWarning, SetUpGauges, ResetBar, SetUpExtraGauges,
+// SetUpMirror and SetUpSigns (the user's call, 2026-10-31), and Tick,
+// UpdateWarning and TickPanel (since the machine's PauseUpdate and
+// AfterRaceUpdate went native); RaceScreens::Init (from Create, native).
 
-#define ITC_RACE_HUD_OBJECT(address, step)    \
-  extern "C" REX_FUNC(sub_##address) {        \
-    REX_FUNC_PROLOGUE();                      \
-    if (!ITC_FLAG(native_race_hud_object)) {  \
-      __imp__sub_##address(ctx, base);        \
-      return;                                 \
-    }                                         \
-    hooks::step(ctx, base);                   \
+#define ITC_RACE_HUD_OBJECT(address, step)              \
+  extern "C" REX_FUNC(sub_##address) {                  \
+    REX_FUNC_PROLOGUE();                                \
+    if (!ITC_FLAG(native_race_hud_object)) {            \
+      __imp__sub_##address(ctx, base);                  \
+      return;                                           \
+    }                                                   \
+    hooks::step(ctx, base);                             \
   }
 
-ITC_RACE_HUD_OBJECT(82212118, RaceHudObjectCurveEval)
-ITC_RACE_HUD_OBJECT(82213C40, RaceHudObjectPowInt)
-ITC_RACE_HUD_OBJECT(82211FB8, RaceHudObjectBarStep)
-ITC_RACE_HUD_OBJECT(82212668, RaceHudObjectResetBar)
-ITC_RACE_HUD_OBJECT(822122A0, RaceHudObjectClearWarning)
-ITC_RACE_HUD_OBJECT(82212690, RaceHudObjectSetPlayer)
-ITC_RACE_HUD_OBJECT(82215820, RaceHudObjectTouching)
-ITC_RACE_HUD_OBJECT(822121C0, RaceHudObjectReset)
-ITC_RACE_HUD_OBJECT(82213DB0, RaceHudObjectSetUpExtraGauges)
 ITC_RACE_HUD_OBJECT(82212768, RaceHudObjectApplyOptions)
-ITC_RACE_HUD_OBJECT(82212B68, RaceHudObjectUpdateView)
-ITC_RACE_HUD_OBJECT(82213C90, RaceHudObjectSetUpGauges)
-ITC_RACE_HUD_OBJECT(822135B0, RaceHudObjectSetUpMirror)
 ITC_RACE_HUD_OBJECT(822141A0, RaceHudObjectTearDown)
-ITC_RACE_HUD_OBJECT(822122B0, RaceHudObjectSetUpSigns)
-ITC_RACE_HUD_OBJECT(822153A0, RaceHudObjectTick)
-ITC_RACE_HUD_OBJECT(82214D78, RaceHudObjectTickTimer)
 ITC_RACE_HUD_OBJECT(82212270, RaceHudObjectStartCountdown)
-ITC_RACE_HUD_OBJECT(82212718, RaceHudObjectStartMovie1)
-ITC_RACE_HUD_OBJECT(82212878, RaceHudObjectFinishMovie1)
 ITC_RACE_HUD_OBJECT(82212AC8, RaceHudObjectDrawWarning)
-ITC_RACE_HUD_OBJECT(82212AF8, RaceHudObjectRunMovie1)
-ITC_RACE_HUD_OBJECT(82212B08, RaceHudObjectRunItem)
 ITC_RACE_HUD_OBJECT(822128A8, RaceHudObjectDraw)
-ITC_RACE_HUD_OBJECT(82212C50, RaceHudObjectUpdateWarning)
-ITC_RACE_HUD_OBJECT(82212E60, RaceHudObjectUpdateRecordingFull)
 ITC_RACE_HUD_OBJECT(82213638, RaceHudObjectShowItem)
-ITC_RACE_HUD_OBJECT(82214238, RaceHudObjectUpdateItem)
-ITC_RACE_HUD_OBJECT(82211DA0, RaceHudObjectScreensInit)
+ITC_RACE_HUD_OBJECT(82211F40, RaceHudObjectScreensCreate)

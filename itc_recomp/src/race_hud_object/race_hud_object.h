@@ -17,6 +17,9 @@
 namespace track_zones {
 struct OwnerCalls;
 }
+namespace menu_sounds {
+struct Calls;
+}
 
 namespace race_hud_object {
 
@@ -266,6 +269,23 @@ uint64_t Tick(uint8_t* base, uint32_t hud, uint32_t flag, uint32_t sp, const Cal
 // the original leaves it (the node, or LoopNamed's).
 uint64_t TickTimer(uint8_t* base, uint32_t hud, uint32_t sp, const Calls& calls);
 
+// RaceHud::TickRacers (sub_822151F8): +456 = 0, then UpdateRacerBar(i, i)
+// for each racer (+452, read again after each) from a 112-byte frame. The
+// last bar's r3, or the HUD.
+uint64_t TickRacers(uint8_t* base, uint32_t hud, uint32_t sp, const Calls& calls,
+                    const menu_sounds::Calls& sounds);
+// The panel's ticks for modes 2 to 4 (sub_82214E78, sub_822150A8,
+// sub_822150F8), never seen in play: the originals.
+constexpr uint32_t kTickMode2 = 0x82214E78;
+constexpr uint32_t kTickMode3 = 0x822150A8;
+constexpr uint32_t kTickMode4 = 0x822150F8;
+// RaceHud::TickPanel (sub_82215488): by +448 (unsigned): 0 TickRacers, 1
+// TickTimer, 2 to 4 the modes' ticks through `calls`, others nothing; then
+// UpdateRecordingFull(InputRecording::HasRoom(0), its plain C++) from a
+// 96-byte frame. UpdateRecordingFull's r3.
+uint64_t TickPanel(uint8_t* base, uint32_t hud, uint32_t sp, const Calls& calls,
+                   const menu_sounds::Calls& sounds);
+
 // --- The movie calls and the set-up (movies.cpp) ---
 //
 // Each returns r3 as the original leaves it. `lr` is the caller's return
@@ -319,6 +339,31 @@ uint64_t ShowItem(uint8_t* base, uint32_t hud, int32_t id, uint32_t sp, const Ca
 // differs from +460, +460 = it and ShowItem(it) (tail call). ShowItem's r3,
 // or the HUD.
 uint64_t UpdateItem(uint8_t* base, uint32_t hud, uint32_t sp, const Calls& calls);
+// RaceHud::RunCountdown (sub_822129A8): +436 = UiMovie::Run(+612, 0)
+// (through `calls`); then by the countdown's animation time
+// (UiMovie::AnimationTime(+612, -1, 0), its plain C++; into `*f1` before the
+// sound, as the original leaves f1, and through fctiwz at the 112-byte
+// frame's +80): 60, 120 or 180 sound 8, 240 sound 9 (MenuSound::Play's plain
+// C++, the manager's slot through `sounds`). The sound's r3, else the movie.
+uint64_t RunCountdown(uint8_t* base, uint32_t hud, uint32_t sp, const Calls& calls,
+                      const menu_sounds::Calls& sounds, double* f1);
+// RaceHud::RunWarning (sub_82212A48): while +468, sound 10 (MenuSound::
+// Play's plain C++, its slot through `sounds`) unless the sound manager's
+// slot 14 (IsCuePlaying: bank 0, cue 10 at the 112-byte frame's +84 and +80,
+// through `calls`) says it's playing, then UiMovie::Run(+616, 0) (through
+// `calls`). Run's r3, or the HUD.
+uint64_t RunWarning(uint8_t* base, uint32_t hud, uint32_t sp, const Calls& calls,
+                    const menu_sounds::Calls& sounds);
+// RaceHud::UpdateRacerBar (sub_82214790): see
+// docs/functions/race-hud-object.md. `index` is the bar (r4), `racer` the
+// racer (r5), both as the original's 64-bit registers. From a 176-byte
+// frame: Touching and HudBar::Step's plain C++, the nodes found and the
+// animation played and looped (UiMovie::FindNode, Play, Loop's plain C++),
+// UiMovie::Finish and the sound manager's slot 14 (IsCuePlaying) through
+// `calls`, MenuSound::Play's plain C++ (its slot through `sounds`). r3 as
+// the original leaves it (the last call's).
+uint64_t UpdateRacerBar(uint8_t* base, uint32_t hud, uint64_t index, uint64_t racer, uint32_t sp,
+                        const Calls& calls, const menu_sounds::Calls& sounds);
 // RaceScreens::MovieMask (sub_82211BE8, with its jump table's case 0
 // sub_82211C1C merged): the movies to load for the race kind, 0 above 10.
 uint32_t MovieMask(uint32_t kind);
@@ -340,5 +385,14 @@ uint64_t Make1004(uint8_t* base, uint32_t owner, uint32_t sp, const Calls& calls
 // +8 = 0. Make1004's r3.
 uint64_t ScreensInit(uint8_t* base, uint32_t holder, uint32_t kind, uint32_t sp,
                      const Calls& calls);
+// The in-race screens' holder ([0x826D84F0]).
+constexpr uint32_t kScreensHolder = 0x826D84F0;
+// RaceScreens::Create (sub_82211F40): the holder (VirtualAlloc(0, 1040,
+// MEM_COMMIT, read-write): the allocation layer's pages) at [0x826D84F0],
+// the eight screens' makers (race_screens::PauseMenuCreate and the rest,
+// in-race screens' plain C++, in the original's order), then
+// ScreensInit(the holder, `kind`), all from a 112-byte frame. ScreensInit's
+// r3.
+uint64_t ScreensCreate(uint8_t* base, uint32_t kind, uint32_t sp, const Calls& calls);
 
 }  // namespace race_hud_object

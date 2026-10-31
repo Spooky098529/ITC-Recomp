@@ -138,26 +138,26 @@ goes in `src/` as overrides), American English.
   with sprintf (`file-layer.md`) and the save system's interface
   (`save-interface.md`, 41 of 41) native (ours 2,628); its
   twenty-first run (branch `b7-loop-28-10-26-3`, 2026-10-28 to 29, 3
-  subsystems, not yet merged) made the car sounds with X3DAudio
+  subsystems, merged with the twenty-fifth 2026-10-30) made the car sounds with X3DAudio
   (`car-sounds.md`, 62 of 62), XAudio's voices (`xaudio.md`, 92 of 96;
   its locks the game's, taken as the original does, by the user's
   calls) and XACT's waves and voices (`xact-waves.md`, 22 of 30) native
   (ours 2,804); its twenty-second run (branch `b7-loop-29-10-26`,
-  2026-10-29, 3 subsystems, not yet merged) made XACT's tracks and
+  2026-10-29, 3 subsystems, merged with the twenty-fifth 2026-10-30) made XACT's tracks and
   events (`xact-tracks.md`, 55 of 55), XAudio's engine and mixer
   (`xaudio-engine.md`, 47 of 47) and XAudio's factory objects
   (`xaudio-objects.md`, 78 of 109) native, with QueryPerformanceCounter
   from the host clock and the rest of XACT's waves (31 of 31) by the
   user's calls; it stopped at a validation (two destructors with no
   harness line) (ours 2,999); its twenty-third run (branch
-  `b7-loop-29-10-26-2`, 2026-10-29 to 30, not yet merged) began with
+  `b7-loop-29-10-26-2`, 2026-10-29 to 30, merged with the twenty-fifth 2026-10-30) began with
   that stop as a cleanup lead (not counted) and made the rest of
   XAudio's objects native (110 of 110: the destructors' harness, the
   resampler, the reverb), then stopped at its validation: an
   intermittent difference in the car sounds' harness
   (`CarSound::Part840Update`, 1 case of 80) (ours 3,031); its
   twenty-fourth run (the same branch by the user's call, 2026-10-30, 3
-  subsystems, not yet merged) fixed that harness (the mixer's stage
+  subsystems, merged with the twenty-fifth 2026-10-30) fixed that harness (the mixer's stage
   lists compared by role) and made the app's start-up (`app-start-up.md`,
   the voice engine Dropped by the user's call), the data load at boot
   (`data-load.md`) and the career (`career.md`, 49 of 53) native (ours
@@ -172,7 +172,23 @@ goes in `src/` as overrides), American English.
   added to `operator new`'s adapter, fixed after) made the car models (`car-models.md`, 48 of 50 in
   play), the part models' material passes (`material-passes.md`, 22 of
   22) and the race HUD object (`race-hud-object.md`, 45 of 58 in play)
-  native (ours 3,514). The runs' rows wait for the user's review (`docs/loops/review.md`). See
+  native (ours 3,514); its twenty-seventh run (branch
+  `b7-loop-31-10-26`, 3 subsystems, merged into
+  `rexglue-removal-project` 2026-10-31 with the next) made two cleanup
+  leads under the models (`Model::RecordMaterials`, the shader pair's
+  load callback, eight adapters removed), the alternate HUD
+  (`alt-hud.md`, 21 of 21 in play), the race scene (`race-scene.md`, 11
+  of 20) and the menu sounds (`menu-sounds.md`, 4 of 4 in play) native
+  (ours 3,552); its twenty-eighth run (the same branch, continued by
+  the user's call, 3 subsystems, merged into `rexglue-removal-project`
+  2026-10-31 before a drive) made the interior
+  accessories (`accessories.md`, 31 of 31 in play), the race HUD
+  machine (`race-hud-machine.md`, 23 of 33, with the race HUD's
+  countdown, racer bar and warning as cleanup leads) and the other
+  in-race screens (`race-screens.md`, 93 of 116: the pause menu, the
+  confirm dialog, the career results, the menu after the race) native,
+  and by the user's call deleted adapters a harness had kept as hooks
+  (ours 3,705). The runs' rows wait for the user's review (`docs/loops/review.md`). See
   "B7's loop runs" under B7, and `docs/loops/b7-progress.md`. Guest
   allocation is no longer a block (`docs/native-memory.md`); what the
   rest waits on is in `docs/loops/leads.md` (the archive loader, the
@@ -2674,6 +2690,12 @@ B7. **The game logic inside**: everything else, subsystem by subsystem,
 | 2026-10-31 | The car models (already mapped: the load slots and shared loads, `LoadSetA` and `B`, `LoadExterior` with the team emblem, decals and vinyl textures, the wheels' set-up with the rims and brakes, the interior's set c body, parts and `CarInterior::Load`, `CarModel::MakePlate`, the file-loaded callbacks, `ReloadDecals`), with `GetLastError` (`functions.md`, no flag, as SetLastError) and `Skeleton::LocalMatrices` (`models.md`) | `car-models.md` | 48 of 50 in play (two migrations; the +3724 = 1 image branch `sub_820C4E68`, found running though not in the coverage list, stays on the originals, a lead, so `Vinyl::DrawDecal`'s adapter stays) | `--native_car_models` (with `--native_models`) |
 | 2026-10-31 | The part models' material passes (`PartModel::SetPaint`, `SetPaintBody` and `ApplyPalette` with `Color::HsvToRgb` and `HsvToRgb8`, `PaintPalette::Init`, the one-field passes, `SetMaterials` with `Model::MaterialTotal` and `MaterialAt`, `Projector::Matrices` with `Matrix::LookAt`, `Matrix::TransposeRotation`, four table lookups) | `material-passes.md` | 22 of 22 in play (two migrations; the adapters stay while the scene loaders' walks and the second set's objects, recompiled, call them) | `--native_material_passes` |
 | 2026-10-31 | The race HUD object (`RaceHud::` at +16 of the race screens' holder `[0x826D84F0]`: its UI movies, the dashboard's gauges and digits, the rear-view mirror's render target, the countdown, the warning, the expressway sign and place names from the track zones, the item popup, the timer, the tick and draw; `RaceScreens::Init` with its +1004 object's maker) | `race-hud-object.md` | 45 of 58 in play (two migrations; the rest calls the menu sound `sub_821103F0`, `sub_8211D930`, `sub_8211E370` or the other in-race screens; stopped at the last validation: `App::App` and `App::Create`'s harnesses differ since 83b2b76) | `--native_race_hud_object` |
+| 2026-10-31 | The alternate HUD (`AltHud::`, the race HUD holder's object at +1004: a second dashboard on UI movie 22 with the race HUD's gauges and the input record's throttle, brake and steering, probably the attract or replay races'; its set-up, tick, movie and destroy, with the menu list helpers `MenuList::Release` and `PressedX`) | `alt-hud.md` | 21 of 21 in play (one migration; its tick not seen in an attract race or the replay) | `--native_alt_hud` |
+| 2026-10-31 | The race scene (`RaceScene::` at `[0x826D82D4]`, 31,168 bytes: the seven car slots, the 11 lights, the screen objects; its machine `RaceSceneMachine::` at +87936 of the race mode: `Init`, the lights' set-up, the post effects' and glows' parameters, the pause toggle and `Resume`, `Destroy`) | `race-scene.md` | 11 of 20 in play (one migration; the rest waits on the course scenery's and scene models' owners, the scene and its update, `Race::DrawStep` and the screen objects) | `--native_race_scene` |
+| 2026-10-31 | The menu sounds (`MenuSound::Play`, cue r3 of bank 0 through the sound manager's `PlayCue2D`, ~270 callers; `Sound::Play`; the effects and music volume options over XACT's categories; the sound manager `[0x826C5C80]`'s other methods mapped, not seen in play) | `menu-sounds.md` | 4 of 4 in play (one migration; the manager's slots and XACT's category calls not ours yet, called through the table) | `--native_menu_sounds` |
+| 2026-10-31 | The interior accessories (`Accessories::` at `[0x826C5510]`, three reference-counted 1,104-byte entries loaded from the archive, assets 23008-23010; the accessory, a part model with a small skeleton whose nodes swing as a chain, probably a hanging ornament; its 36-byte file class) | `accessories.md` | 31 of 31 in play (two migrations; the anchor, the skeleton's step and swing, the draws and the deleting destructors never ran in play, and the step and draw wait on the skeleton's unread callees) | `--native_accessories` |
+| 2026-10-31 | The race HUD machine (`RaceHudMachine::`, the race mode's state machine at +128664: `Init` with its 65 transitions, the handlers that set up, update and draw the race HUD and the in-race screens' holder by the race kind at +9612, the prize lookups after a career race; with the race HUD's `RunCountdown`, `UpdateRacerBar`, `RunWarning`, `TickPanel` and `TickRacers` as cleanup leads, and 18 race HUD and alternate HUD adapters removed by the user's call) | `race-hud-machine.md` | 16 of 33 in play (one migration and a harness rewrite; the rest waits on the other in-race screens: the pause menu, the menu after the race, the career results) | `--native_race_hud_machine` |
+| 2026-10-31 | The other in-race screens (the race HUD holder's: the pause menu `PauseMenu::` with its six pages and options, the confirm dialog `RaceDialog::` with the replay save's steps, the career results `CareerResults::` with the prize tally, the menu after the race `AfterRaceMenu::`, four unseen screens' makers and teardowns, the menu list's and page object's helpers; with the race HUD machine's handlers they unblocked) | `race-screens.md` | 93 of 116 in play (three migrations; the rest waits on the UI movie calls `sub_8211C740` and `sub_8211CBD8` and the options screens) | `--native_race_screens` |
 
     The first run (2026-10-22, branch `b7-loop-test`): every harness at 0 differing, attract races at 20-21 s with no errors,
     and a race the user drove looked right. Ours went from 162 to 335 (work
@@ -4197,3 +4219,94 @@ validation's 60. The boundary: 449 functions (916 pairs): overridden
 called, 56 with a live caller. B7 (`b7_status.py`): ours 3,514, work
 left 2,883 (Wrapped 103, with a row 480, no row yet 2,300), from 2,928
 (from 2,974 at the run's start).
+
+**2026-10-31, the alternate HUD (branch `b7-loop-31-10-26`):** the
+twenty-seventh run's first subsystem, mapped and made native in one
+migration (`alt-hud.md`, `--native_alt_hud`, `src/alt_hud/`): the race
+HUD holder's object at +1004, a second dashboard on UI movie 22, 21 of
+the 21 functions seen in play. Before it, two cleanup leads: `Model::RecordMaterials`
+(`sub_820CECA0`) and the shader pair's load callback (`sub_820A06D0`)
+under `--native_models`, with eight adapters removed. The validation's
+attract race is 120 s from this run (the user's call, 2026-10-31): the
+harnesses take ~58 s. The boundary: 449 functions (916 pairs):
+overridden 108, Native 34, Dropped 26, never called 70, live 211.
+Imports: 186 called, 56 with a live caller. B7 (`b7_status.py`): ours
+3,537, work left 2,860 (Wrapped 103, with a row 478, no row yet 2,279),
+from 2,883 at the run's start.
+
+**2026-10-31, the race scene (branch `b7-loop-31-10-26`):** the
+twenty-seventh run's second subsystem, mapped and made native in one
+migration (`race-scene.md`, `--native_race_scene`, `src/race_scene/`):
+the race scene at `[0x826D82D4]` and its machine, 11 of the 20
+functions seen in play, two leads merged (the race's post effect users,
+the race object). What blocks the rest: the course scenery's and scene
+models' owners, the scene at `[0x826C2E44]` and its update,
+`Race::DrawStep` (Wrapped) and the screen objects (leads). The
+boundary: 449 functions (916 pairs): overridden 108, Native 34, Dropped
+26, never called 70, live 211. Imports: 186 called, 56 with a live
+caller. B7 (`b7_status.py`): ours 3,548, work left 2,850 (Wrapped 103,
+with a row 487, no row yet 2,260), from 2,860.
+
+**2026-10-31, the menu sounds (branch `b7-loop-31-10-26`):** the
+twenty-seventh run's third subsystem, mapped and made native in one
+migration (`menu-sounds.md`, `--native_menu_sounds`,
+`src/menu_sounds/`): `MenuSound::Play`, `Sound::Play` and the two
+volume options, 4 of the 4 seen in play; `[0x826C5C80]` is the sound
+manager, not a music player, and the music is XACT banks it loads (the
+user's call, 2026-10-31: translated with XACT). It unblocked
+`RaceHud::UpdateRacerBar` and `RunCountdown` (a cleanup lead). The run
+stopped at its limit. The boundary: 449 functions (916 pairs):
+overridden 108, Native 34, Dropped 26, never called 70, live 211.
+Imports: 186 called, 56 with a live caller. B7 (`b7_status.py`): ours
+3,552, work left 2,846 (Wrapped 103, with a row 487, no row yet 2,256),
+from 2,850 (from 2,883 at the run's start).
+
+**2026-10-31, the interior accessories (branch `b7-loop-31-10-26`):**
+the twenty-eighth run's first subsystem (the previous run's branch,
+continued by the user's call), mapped and made native in two
+migrations (`accessories.md`, `--native_accessories`,
+`src/accessories/`): the set, its entries, the accessory and its file
+class, 31 of the 31 seen in play, 19 Native with their adapters
+removed; the accessories' release lead folded in. Only the set's
+creation and `SetScale` run in an attract race; the rest runs when the
+player's interior loads (the replay). What's left never ran in play.
+The boundary: 449 functions (916 pairs): overridden 108, Native 34,
+Dropped 26, never called 70, live 211. Imports: 186 called, 56 with a
+live caller. B7 (`b7_status.py`): ours 3,584, work left 2,814 (Wrapped
+103, with a row 486, no row yet 2,225), from 2,846 at the run's start.
+
+**2026-10-31, the race HUD machine (branch `b7-loop-31-10-26`):** the
+twenty-eighth run's second subsystem (`race-hud-machine.md`,
+`--native_race_hud_machine`, `src/race_hud_machine/`): the race
+mode's state machine at +128664 and its handlers, 16 of the 33 seen in
+play, with three race HUD cleanup leads before it (`RunCountdown`,
+`UpdateRacerBar`, `TickPanel`, `TickRacers`, `RunWarning`, 7
+adapters removed). By the user's call (2026-10-31), adapters a harness
+would use as hooks are deleted anyway and the harness builds the
+callees' world: the machine's harness was rewritten and 18 more
+adapters removed. The holder's +8 bit 0 is the replay bit. What blocks
+the rest: the other in-race screens (the pause menu, the menu after the
+race, the career results; the next lead). The boundary: 449 functions
+(916 pairs): overridden 108, Native 34, Dropped 26, never called 70,
+live 211. Imports: 186 called, 56 with a live caller. B7
+(`b7_status.py`): ours 3,605, work left 2,794 (Wrapped 103, with a row
+498, no row yet 2,193), from 2,814.
+
+**2026-10-31, the other in-race screens (branch `b7-loop-31-10-26`):**
+the twenty-eighth run's third subsystem, mapped and made native in
+three migrations (`race-screens.md`, `--native_race_screens`,
+`src/race_screens/`): the pause menu, the confirm dialog, the career
+results, the menu after the race and their helpers, 93 of the 116 seen
+in play, with the race HUD machine's openers, `CloseResults`,
+`ResultsUpdate`, `PauseUpdate` and `AfterRaceUpdate` and
+`RaceScreens::Create` (the machine 23 of 33, the race HUD object 51 of
+58). The pause menu's logging overrides keep logging, and pages still
+run on logic passes with draws on every pass. What blocks the rest: the
+UI movie calls `sub_8211C740` and `sub_8211CBD8`, the options
+screens' `sub_821BEA48` and `sub_821BE5A8`; the machine's
+`CreateScreens`, `ClosePause`, `ResultsDraw` and `AfterRaceDraw`
+are ready (a cleanup lead). The run stopped at its limit. The boundary:
+449 functions (916 pairs): overridden 108, Native 34, Dropped 26,
+never called 70, live 211. Imports: 186 called, 56 with a live caller.
+B7 (`b7_status.py`): ours 3,705, work left 2,694 (Wrapped 101, with a
+row 513, no row yet 2,080), from 2,794 (from 2,846 at the run's start).

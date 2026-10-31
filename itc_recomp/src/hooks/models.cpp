@@ -47,7 +47,7 @@ ITC_FLAG_BOOL(native_models, true, "ITC",
               "sub_825970A8 and XPR::~XPR sub_82597148; the texture provider's vector: "
               "Clear sub_82590D68, and with --native_heap Allocate sub_825942B8, "
               "UninitializedCopy sub_82594380 (no adapters: only Reserve and InsertN call "
-              "them), Reserve sub_82594570, InsertN sub_82590EF0 and Assign sub_825947D0 (no "
+              "them), Reserve sub_82594570 (no adapter: only the constructor's plain C++ calls it in play), InsertN sub_82590EF0 and Assign sub_825947D0 (no "
               "adapter: only the constructor calls it), TextureProvider::TextureProvider "
               "sub_82594850 and ~TextureProvider sub_825943E0; Model::Model sub_825948C0, "
               "Model::Release sub_82594970 and Model::~Model sub_82594F58, their members' "
@@ -55,7 +55,8 @@ ITC_FLAG_BOOL(native_models, true, "ITC",
               "sub_820CE990 over them; the part model's sub_820CE9C8 and Model::SetVinylTextures sub_820CE9F8; Skeleton::ResetPose "
               "sub_82599AF0 and Skeleton::LocalMatrices sub_82599C58 (in src/model_animation/); Model::MaterialCount sub_82594AD8, Model::Material "
               "sub_82594B20, ShaderFile::Parse sub_822A8568, VertexShader::CopyHeader sub_822A9FD8 and "
-              "PixelShader::CopyHeader sub_822A9EA8 (in src/shader_objects/), "
+              "PixelShader::CopyHeader sub_822A9EA8 (in src/shader_objects/; no adapters: only "
+              "Mesh::LoadShaders and Shaders::OnPairLoaded call them, natively), "
               "TextureHeader::Relocate sub_8235A990 (with sub_822A5B68; no adapter: only "
               "Resource::Relocate and XPR::Create call it), Resource::Relocate sub_8235A9F8, "
               "with --native_heap XPR::Create sub_82596F68 and Mesh::LoadShaders sub_82594D20 "
@@ -67,16 +68,23 @@ ITC_FLAG_BOOL(native_models, true, "ITC",
               "SkeletonBase::SetUp sub_8259A9E0 (with NodeFile::View sub_825A21A8, no adapter: "
               "only it calls it) and Skeleton::Bind sub_82599A20 (in src/model_animation/), "
               "Memory::AllocPhysical sub_8258E138 (in src/models/memory_blocks.cpp; no adapter: only "
-              "XPR::Create calls it), the shared shaders sub_825896D8 and sub_82589700 and their tables' set-up sub_825896C0, the vertex "
-              "declaration sub_82589728 (its message for a type pair the tables don't cover, "
-              "never seen in play, the original's), Model::RecordShape sub_82595550 (in "
+              "XPR::Create calls it), the shared shaders sub_825896D8 and sub_82589700 and their tables' set-up sub_825896C0 (no adapter: only LoadAll's plain C++ calls it), the vertex "
+              "declaration sub_82589728 (no adapter: only the recorders' plain C++ calls it in play; "
+              "its message for a type pair the tables don't cover, never seen in play, the "
+              "original's), Model::RecordShape sub_82595550 (in "
               "src/scenery_lists/model_draws.cpp, adapter in src/hooks/scenery_lists.cpp: the "
               "model's slot 1 and the texture provider's slots 5 and 6 guest calls; the "
-              "material animation, never seen in play, the original's); with --native_heap and the "
+              "material animation, never seen in play, the original's), Model::RecordMaterials "
+              "sub_820CECA0 (beside it, the same files: the texture provider's slots 5 and 6 and "
+              "CameraPasses::RenderTarget guest calls); with --native_heap and the "
               "archive's queue native, Shaders::LoadAll sub_820A08A0 with Shaders::LoadPair "
-              "sub_820A07F0 (no adapter: only LoadAll's plain C++ calls it)) natively instead of through the "
+              "sub_820A07F0 (no adapter: only LoadAll's plain C++ calls it) and its pixel file's load "
+              "callback Shaders::OnPairLoaded sub_820A06D0 (in src/shader_objects/; the adapter "
+              "stays: the archive's request calls it through its function pointer; VertexShader::Init's "
+              "original a guest call where its plain C++ declines)) natively instead of through the "
               "translated code (the same writes; "
-              "checked by --run_harnesses=models and, for Model::RecordShape, scenery_lists)");
+              "checked by --run_harnesses=models and, for Model::RecordShape and RecordMaterials, "
+              "scenery_lists)");
 
 bool hooks::ModelsHostLock() {
   static const bool host = ITC_FLAG(native_models);
@@ -177,17 +185,10 @@ void SetR3(PPCContext& ctx, const models::R3& r3) {
 
 }  // namespace
 
-// TextureProvider::Reserve: r3 = the vector, r4 = the count.
-extern "C" REX_FUNC(sub_82594570) {
-  REX_FUNC_PROLOGUE();
-  if (NativeLifetime()) {
-    if (const auto r3 = models::PointersReserve(base, ctx.r3.u32, ctx.r4.u32)) {
-      SetR3(ctx, *r3);
-      return;
-    }
-  }
-  __imp__sub_82594570(ctx, base);
-}
+// TextureProvider::Reserve (sub_82594570) has no adapter: only native
+// callers reach it in play (TextureProvider::TextureProvider's plain C++
+// calls it directly; TextureProvider::Set's hands an index past the size to
+// the original, never seen in an attract race).
 
 // TextureProvider::InsertN: r3 = the vector, r4 = where, r5 = the count, r6 =
 // the value's address.
@@ -333,16 +334,6 @@ void ModelsSharedPixelShader(PPCContext& ctx, uint8_t* base) {
   ctx.r3.u64 = models::SharedPixelShader(base, ctx.r3.u32);
 }
 
-void ModelsVertexDeclaration(PPCContext& ctx, uint8_t* base) {
-  const auto declaration =
-      models::VertexDeclaration(base, ctx.r3.u32, ctx.r4.s32, ctx.r5.u32);
-  if (!declaration) {
-    __imp__sub_82589728(ctx, base);
-    return;
-  }
-  ctx.r3.u64 = *declaration;
-}
-
 }  // namespace hooks
 
 #define ITC_MODELS_ACCESSOR(address, steps)  \
@@ -359,36 +350,14 @@ ITC_MODELS_ACCESSOR(82594AD8, ModelsMaterialCount)
 ITC_MODELS_ACCESSOR(82594B20, ModelsMaterial)
 ITC_MODELS_ACCESSOR(825896D8, ModelsSharedVertexShader)
 ITC_MODELS_ACCESSOR(82589700, ModelsSharedPixelShader)
-ITC_MODELS_ACCESSOR(825896C0, ModelsSetSharedShaders)
-ITC_MODELS_ACCESSOR(82589728, ModelsVertexDeclaration)
+// SetSharedShaders (sub_825896C0) has no adapter: only Shaders::LoadAll's
+// plain C++ calls it in play (hooks::ModelsSetSharedShaders stays for the
+// harness).
 
-// ShaderFile::Parse: r3 = the file, r4 = the record. No return value.
-extern "C" REX_FUNC(sub_822A8568) {
-  REX_FUNC_PROLOGUE();
-  if (!ITC_FLAG(native_models)) {
-    __imp__sub_822A8568(ctx, base);
-    return;
-  }
-  shader_objects::ParseFile(base, ctx.r3.u32, ctx.r4.u32);
-}
-
-// VertexShader::CopyHeader and PixelShader::CopyHeader: r3 = the object, r5
-// = the file's record (r4 unread). No return value.
-extern "C" REX_FUNC(sub_822A9FD8) {
-  REX_FUNC_PROLOGUE();
-  if (!ITC_FLAG(native_models) ||
-      !shader_objects::CopyVertexHeader(base, ctx.r3.u32, ctx.r5.u32)) {
-    __imp__sub_822A9FD8(ctx, base);
-  }
-}
-
-extern "C" REX_FUNC(sub_822A9EA8) {
-  REX_FUNC_PROLOGUE();
-  if (!ITC_FLAG(native_models) ||
-      !shader_objects::CopyPixelHeader(base, ctx.r3.u32, ctx.r5.u32)) {
-    __imp__sub_822A9EA8(ctx, base);
-  }
-}
+// ShaderFile::Parse (sub_822A8568), VertexShader::CopyHeader (sub_822A9FD8)
+// and PixelShader::CopyHeader (sub_822A9EA8) have no adapters: only native
+// callers reach them in play (Mesh::LoadShaders and Shaders::OnPairLoaded, in
+// src/shader_objects/, doing their work on the host).
 
 // Resource::Relocate: r3 = the resource, r4 = the address; r3 as the
 // original leaves it.
@@ -523,4 +492,52 @@ extern "C" REX_FUNC(sub_820A08A0) {
     });
   });
   ctx.r3.s64 = int32_t(r3);
+}
+
+namespace {
+
+// VertexShader::Init's original, from a frame as the callback's own.
+struct PairLoadedCalls {
+  PPCContext& ctx;
+  uint8_t* base;
+  static void Init(void* user, uint32_t object, uint32_t microcode) {
+    auto& c = *static_cast<PairLoadedCalls*>(user);
+    guest_call::InFrame(c.ctx, c.base, 144, 0x820A0760, [&](uint32_t) {
+      c.ctx.r3.u64 = object;
+      c.ctx.r4.u64 = microcode;
+      __imp__sub_822A8740(c.ctx, c.base);
+    });
+  }
+};
+
+}  // namespace
+
+// Shaders::OnPairLoaded (Archive::Load's callback; reached through the
+// request's function pointer, so the adapter stays): r6 = the pair's
+// context; r3 = the context, as operator delete leaves it.
+extern "C" REX_FUNC(sub_820A06D0) {
+  REX_FUNC_PROLOGUE();
+  if (hooks::ModelsNativeLifetime()) {
+    const uint64_t lr = ctx.lr;
+    const uint64_t r6 = ctx.r6.u64;
+    const uint32_t context = ctx.r6.u32;
+    PairLoadedCalls guest{ctx, base};
+    shader_objects::CreateCalls calls;
+    calls.init = &PairLoadedCalls::Init;
+    calls.user = &guest;
+    const auto freed = shader_objects::PairLoaded(base, context, calls);
+    ctx.lr = lr;
+    if (freed) {
+      ctx.r3.u64 = r6;
+      if (!*freed) {
+        guest_call::InFrame(ctx, base, 144, 0x820A07E4, [&](uint32_t) {
+          ctx.r3.u64 = r6;
+          __imp__sub_825A70E8(ctx, base);
+        });
+        ctx.lr = lr;
+      }
+      return;
+    }
+  }
+  __imp__sub_820A06D0(ctx, base);
 }

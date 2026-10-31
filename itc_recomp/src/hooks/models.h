@@ -31,14 +31,13 @@ struct ModelLoadGuest {
 // (without the flag): Model::MaterialCount (sub_82594AD8: r3 = the model, r4
 // = the shape, r5 = the group), Model::Material (sub_82594B20: r5 = the
 // index, r6 = the group), the shared shaders (sub_825896D8, sub_82589700: r3
-// = the pair) and the vertex declaration (sub_82589728: r3 to r5 the stream
-// types; the original where the plain C++ declines).
+// = the pair). (The vertex declaration's, sub_82589728, are the harness's:
+// its adapter is gone.)
 void ModelsMaterialCount(PPCContext& ctx, uint8_t* base);
 void ModelsMaterial(PPCContext& ctx, uint8_t* base);
 void ModelsSharedVertexShader(PPCContext& ctx, uint8_t* base);
 void ModelsSharedPixelShader(PPCContext& ctx, uint8_t* base);
 // sub_825896C0 (r3, r4 the tables; r3 left).
 void ModelsSetSharedShaders(PPCContext& ctx, uint8_t* base);
-void ModelsVertexDeclaration(PPCContext& ctx, uint8_t* base);
 
 }  // namespace hooks

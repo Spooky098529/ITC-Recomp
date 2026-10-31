@@ -90,9 +90,22 @@ void RaceHudObjectUpdateRecordingFull(PPCContext& ctx, uint8_t* base);
 // UpdateItem sub_82214238: r3 = the HUD.
 void RaceHudObjectShowItem(PPCContext& ctx, uint8_t* base);
 void RaceHudObjectUpdateItem(PPCContext& ctx, uint8_t* base);
+// RaceHud::RunCountdown sub_822129A8: r3 = the HUD (f1 the time, as the
+// original leaves it); UpdateRacerBar sub_82214790: r3 = the HUD, r4 = the
+// bar, r5 = the racer.
+void RaceHudObjectRunCountdown(PPCContext& ctx, uint8_t* base);
+void RaceHudObjectUpdateRacerBar(PPCContext& ctx, uint8_t* base);
+// RaceHud::RunWarning sub_82212A48: r3 = the HUD.
+void RaceHudObjectRunWarning(PPCContext& ctx, uint8_t* base);
+// RaceHud::TickRacers sub_822151F8 and TickPanel sub_82215488: r3 = the HUD.
+void RaceHudObjectTickRacers(PPCContext& ctx, uint8_t* base);
+void RaceHudObjectTickPanel(PPCContext& ctx, uint8_t* base);
 // RaceScreens::Make1004 sub_82216A60: r3 = the holder's +1004;
 // RaceScreens::Init sub_82211DA0: r3 = the holder, r4 = the race kind.
 void RaceHudObjectMake1004(PPCContext& ctx, uint8_t* base);
 void RaceHudObjectScreensInit(PPCContext& ctx, uint8_t* base);
+// RaceScreens::Create sub_82211F40: r3 = the race kind; the original where
+// the native heap isn't active.
+void RaceHudObjectScreensCreate(PPCContext& ctx, uint8_t* base);
 
 }  // namespace hooks

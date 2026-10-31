@@ -245,5 +245,16 @@ void CameraModes(Context& h);
 void LocationScreen(Context& h);
 void MaterialPasses(Context& h);
 void RaceHudObject(Context& h);
+// The alternate HUD (src/harnesses/alt_hud.cpp).
+void AltHud(Context& h);
+// The race scene (src/harnesses/race_scene.cpp).
+void RaceScene(Context& h);
+// The menu sounds (src/harnesses/menu_sounds.cpp).
+void MenuSounds(Context& h);
+// The interior accessories (src/harnesses/accessories.cpp).
+void Accessories(Context& h);
+// The race HUD machine (src/harnesses/race_hud_machine.cpp).
+void RaceHudMachine(Context& h);
+void RaceScreens(Context& h);
 
 }  // namespace harness

@@ -23,6 +23,7 @@
 #include "frame_pacing/game_messages.h"
 #include "guest.h"
 #include "hooks/ui_movies.h"
+#include "hooks/race_screens.h"
 #include "hooks/ui_movies_game.h"
 
 #include "base/flags.h"
@@ -43,6 +44,7 @@ ITC_FLAG_BOOL(log_pause_movie, false, "ITC",
               "While paused, log the words the pause menu's movie update changes (and "
               "what changes them between updates), and the sub-menus' calls setting its "
               "nodes, by pass type");
+ITC_FLAG_DECLARE(bool, native_race_screens);
 
 namespace debug {
 
@@ -659,12 +661,16 @@ extern "C" REX_FUNC(sub_8211DF20) {
   __imp__sub_8211DF20(ctx, base);
 }
 
+// ScreenPages::Go (natively with --native_race_screens: the adapter's step,
+// hooks/race_screens.h), logged first.
 extern "C" REX_FUNC(sub_8220BA68) {
   REX_FUNC_PROLOGUE();
-  if (!ITC_FLAG(log_pause_movie)) {
-    __imp__sub_8220BA68(ctx, base);
-    return;
+  if (ITC_FLAG(log_pause_movie)) {
+    debug::LogCall("8220BA68 screen switch", ctx);
   }
-  debug::LogCall("8220BA68 screen switch", ctx);
-  __imp__sub_8220BA68(ctx, base);
+  if (ITC_FLAG(native_race_screens)) {
+    hooks::RaceScreensPagesGo(ctx, base);
+  } else {
+    __imp__sub_8220BA68(ctx, base);
+  }
 }
