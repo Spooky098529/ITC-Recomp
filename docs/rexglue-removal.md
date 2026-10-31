@@ -166,10 +166,10 @@ goes in `src/` as overrides), American English.
   100 of 102, with `Career::SetUpEvent`), the camera modes
   (`camera-modes.md`, 87 of 90 in play) and the parking area
   (`location-screen.md`, 57 of 77) native (ours 3,423); its
-  twenty-sixth run (branch `b7-loop-30-10-26-2`, 3 subsystems, not yet
-  merged; stopped at its last validation: `App::App` and `App::Create`'s
-  harnesses differ since a harness recorder was added to `operator
-  new`'s adapter) made the car models (`car-models.md`, 48 of 50 in
+  twenty-sixth run (branch `b7-loop-30-10-26-2`, 3 subsystems, merged
+  2026-10-31 before a drive; stopped at its last validation: `App::App`
+  and `App::Create`'s harnesses differed since a harness recorder was
+  added to `operator new`'s adapter, fixed after) made the car models (`car-models.md`, 48 of 50 in
   play), the part models' material passes (`material-passes.md`, 22 of
   22) and the race HUD object (`race-hud-object.md`, 45 of 58 in play)
   native (ours 3,514). The runs' rows wait for the user's review (`docs/loops/review.md`). See

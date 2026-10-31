@@ -171,3 +171,9 @@ uncommitted; `check_function_statuses.py`: 0 errors. Also for the user:
 the harnesses took 56.7 of the validation's 60 s (2 s of race), close
 to outgrowing it. Left for the user: that harness, the run's section
 in `review.md`, `to-drive.md`, and the merge.
+
+Fixed after the stop, at the user's go-ahead (2026-10-31): the
+`App::App` and `App::Create` harnesses' recorders let `operator new`
+allocate on both sides (`itc_2895`: app_start_up, race_hud_object and
+c_runtime_heap 0 differing, race 28 s, no errors). Merged into
+`rexglue-removal-project` at the user's call, before a drive.
