@@ -268,6 +268,7 @@ set(ITC_SOURCES
     src/race_hud_machine/race_hud_machine_init.cpp
     src/hooks/race_screens.cpp
     src/race_screens/menu_list.cpp
+    src/race_screens/screens.cpp
     src/hooks/menu_sounds.cpp
     src/menu_sounds/menu_sounds.cpp
     src/hooks/accessories.cpp

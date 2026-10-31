@@ -20,6 +20,7 @@
 #include "race_hud_object/race_hud_object.h"
 
 #include <cstdint>
+#include <optional>
 
 namespace race_screens {
 
@@ -104,5 +105,102 @@ uint32_t ListPressed152(uint8_t* base, uint32_t list, uint32_t sp, bool native_s
                         const Calls& calls);
 uint32_t ListPressed166(uint8_t* base, uint32_t list, uint32_t sp, bool native_slots,
                         const Calls& calls);
+
+// --- The screens' globals ---
+
+// The pause menu: the screen (4 bytes, its movie), the data (160), the
+// page object (28), the menu list (72).
+constexpr uint32_t kPauseScreen = 0x826D84D0;
+constexpr uint32_t kPauseData = 0x826D84D4;
+constexpr uint32_t kPausePages = 0x826D84D8;
+constexpr uint32_t kPauseList = 0x826D84DC;
+// Kind 4's pause menu (never seen in play): the same with 80 bytes of data.
+constexpr uint32_t kPause4Screen = 0x826D84E0;
+constexpr uint32_t kPause4Data = 0x826D84E4;
+constexpr uint32_t kPause4Pages = 0x826D84E8;
+constexpr uint32_t kPause4List = 0x826D84EC;
+// The confirm dialog: the menu list (72), the page object (28), the data
+// (40).
+constexpr uint32_t kDialogList = 0x826D84F4;
+constexpr uint32_t kDialogPages = 0x826D84F8;
+constexpr uint32_t kDialogData = 0x826D84FC;
+// The career's results (212 bytes).
+constexpr uint32_t kCareerResults = 0x826D8500;
+// The menu after the race: the screen (4), the data (24), the page object
+// (28), the menu list (72).
+constexpr uint32_t kAfterScreen = 0x826D8510;
+constexpr uint32_t kAfterData = 0x826D8514;
+constexpr uint32_t kAfterPages = 0x826D8518;
+constexpr uint32_t kAfterList = 0x826D851C;
+// The screens never seen in play: kind 6's screen after the race (360
+// bytes, and a word beside it), the results of kinds 1 and 2 (52), those
+// of kinds 4 and 6 (40).
+constexpr uint32_t kKind6Menu = 0x82814E10;
+constexpr uint32_t kKind6Word = 0x82814E14;
+constexpr uint32_t kRaceResults = 0x82814E18;
+constexpr uint32_t kSplitResults = 0x82814E1C;
+
+// The guest functions called through `Calls`: memcpy where its plain C++
+// refuses.
+constexpr uint32_t kMemcpy = 0x825A7410;
+
+// --- The makers and teardowns (screens.cpp) ---
+//
+// The makers allocate with VirtualAlloc(0, size, MEM_COMMIT, read-write):
+// the allocation layer's pages (the adapters run them only over it,
+// hooks::NativeHeapActive). Each returns r3 as the original leaves it.
+// The teardowns free with VirtualFree(.., 0, MEM_RELEASE): nullopt, with
+// nothing done, where a block isn't the layer's pages (or a menu list's
+// block isn't releasable natively: alt_hud::MenuListReleasable), and the
+// adapters run the originals; with the screen's global 0, the original's
+// OutputDebugStringA (its text discarded, helpers::DebugOutput) and r3 the
+// text.
+
+// sub_8220D7E8 PauseMenu::Create, sub_82210868 PauseMenu4::Create,
+// sub_8221B1F0 AfterRaceMenu::Create, sub_82217D70 RaceDialog::Create,
+// sub_82219138 CareerResults::Create, sub_8221F390 RaceResults::Create,
+// sub_8221FA30 SplitResults::Create, sub_8221BDD0 Kind6Menu::Create.
+uint64_t PauseMenuCreate(uint8_t* base, uint32_t sp);
+uint64_t PauseMenu4Create(uint8_t* base, uint32_t sp);
+uint64_t AfterRaceMenuCreate(uint8_t* base, uint32_t sp);
+uint64_t RaceDialogCreate(uint8_t* base, uint32_t sp);
+uint64_t CareerResultsCreate(uint8_t* base, uint32_t sp);
+uint64_t RaceResultsCreate(uint8_t* base, uint32_t sp);
+uint64_t SplitResultsCreate(uint8_t* base, uint32_t sp);
+uint64_t Kind6MenuCreate(uint8_t* base, uint32_t sp);
+// sub_8220C4C8 PauseMenu::Destroy, sub_8220FC98 PauseMenu4::Destroy,
+// sub_8221A3E8 AfterRaceMenu::Destroy, sub_82217CD0 RaceDialog::Destroy,
+// sub_82219170 CareerResults::Destroy, sub_8221F3C8 RaceResults::Destroy,
+// sub_8221FA68 SplitResults::Destroy, sub_8221BE30 Kind6Menu::Destroy.
+std::optional<uint64_t> PauseMenuDestroy(uint8_t* base, uint32_t sp);
+std::optional<uint64_t> PauseMenu4Destroy(uint8_t* base, uint32_t sp);
+std::optional<uint64_t> AfterRaceMenuDestroy(uint8_t* base, uint32_t sp);
+std::optional<uint64_t> RaceDialogDestroy(uint8_t* base, uint32_t sp);
+std::optional<uint64_t> CareerResultsDestroy(uint8_t* base, uint32_t sp);
+std::optional<uint64_t> RaceResultsDestroy(uint8_t* base, uint32_t sp);
+std::optional<uint64_t> SplitResultsDestroy(uint8_t* base, uint32_t sp);
+std::optional<uint64_t> Kind6MenuDestroy(uint8_t* base, uint32_t sp);
+// sub_8221A498 AfterRaceMenu::Close: MenuList::Release([0x826D851C]) (a
+// tail call: `sp` the caller's); nullopt where it isn't native.
+std::optional<uint64_t> AfterRaceMenuClose(uint8_t* base, uint32_t sp);
+
+// --- The pause menu's data and the answers (screens.cpp) ---
+
+// sub_8220F840 PauseMenu::LoadData: the data from player 0's save data (see
+// the row); r3 as the original leaves it.
+uint64_t PauseMenuLoadData(uint8_t* base, uint32_t sp, const Calls& calls);
+// sub_8220D6A0 PauseMenu::SaveOptions (and sub_8220D890 PauseMenu::Close,
+// its tail call) and sub_8220D740 PauseMenu::SaveHudOptions: the data's
+// options written back into player 0's save data (+0x1F85C). Return the
+// save data (r3).
+uint64_t PauseMenuSaveOptions(uint8_t* base, uint32_t sp);
+uint64_t PauseMenuClose(uint8_t* base, uint32_t sp);
+uint64_t PauseMenuSaveHudOptions(uint8_t* base, uint32_t sp);
+// sub_8220C5D0 PauseMenu::AnswerPage: the data's +140. sub_8221A720
+// AfterRaceMenu::AnswerPage: the data's +12. sub_82217D40 RaceDialog::Answer:
+// the data's +32 = 0; 1 when its +0 is 1, else 2.
+uint32_t PauseMenuAnswerPage(uint8_t* base);
+uint32_t AfterRaceMenuAnswerPage(uint8_t* base);
+uint32_t RaceDialogAnswer(uint8_t* base);
 
 }  // namespace race_screens

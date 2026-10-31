@@ -19,7 +19,9 @@
 
 #include <fmt/format.h>
 
+#include <bit>
 #include <cstring>
+#include <limits>
 #include <functional>
 #include <string>
 #include <utility>
@@ -300,6 +302,341 @@ void PagesAndLists(Context& h, const World& w) {
       hooks::RaceScreensListPressed166, pressed);
 }
 
+// --- The makers and teardowns ---
+
+// The screens' globals (0x826D84D0 to 0x826D851F and 0x82814E10 to
+// 0x82814E1F), saved around each run.
+constexpr uint32_t kScreenGlobals = 0x826D84D0;
+constexpr uint32_t kScreenGlobalsBytes = 0x50;
+constexpr uint32_t kUnseenGlobals = 0x82814E10;
+constexpr uint32_t kUnseenGlobalsBytes = 0x10;
+
+struct Maker {
+  const char* name;
+  GuestFunction recompiled, native;
+  // Each global the maker sets and the bytes of its block compared.
+  std::vector<std::pair<uint32_t, uint32_t>> blocks;
+  uint32_t frame, saves;
+};
+
+// A maker run: the globals 0 or random first; compared: each global set
+// (to the layer's pages, by whether they are and their bytes), which one r3
+// is, the frame and r1. The blocks are freed after.
+void Makers(Context& h) {
+  const std::vector<Maker> makers = {
+      {"PauseMenu::Create (sub_8220D7E8)", __imp__sub_8220D7E8,
+       hooks::RaceScreensPauseMenuCreate,
+       {{rs::kPauseScreen, 4}, {rs::kPauseData, 160}, {rs::kPauseList, 72}, {rs::kPausePages, 28}},
+       96, 8},
+      {"PauseMenu4::Create (sub_82210868)", __imp__sub_82210868,
+       hooks::RaceScreensPauseMenu4Create,
+       {{rs::kPause4Screen, 4}, {rs::kPause4Data, 80}, {rs::kPause4List, 72}, {rs::kPause4Pages, 28}},
+       96, 8},
+      {"AfterRaceMenu::Create (sub_8221B1F0)", __imp__sub_8221B1F0,
+       hooks::RaceScreensAfterRaceMenuCreate,
+       {{rs::kAfterScreen, 4}, {rs::kAfterData, 24}, {rs::kAfterPages, 28}, {rs::kAfterList, 72}},
+       96, 8},
+      {"RaceDialog::Create (sub_82217D70)", __imp__sub_82217D70,
+       hooks::RaceScreensRaceDialogCreate,
+       {{rs::kDialogList, 72}, {rs::kDialogPages, 28}, {rs::kDialogData, 40}}, 96, 16},
+      {"CareerResults::Create (sub_82219138)", __imp__sub_82219138,
+       hooks::RaceScreensCareerResultsCreate, {{rs::kCareerResults, 212}}, 96, 8},
+      {"RaceResults::Create (sub_8221F390)", __imp__sub_8221F390,
+       hooks::RaceScreensRaceResultsCreate, {{rs::kRaceResults, 52}}, 96, 8},
+      {"SplitResults::Create (sub_8221FA30)", __imp__sub_8221FA30,
+       hooks::RaceScreensSplitResultsCreate, {{rs::kSplitResults, 40}}, 96, 8},
+      {"Kind6Menu::Create (sub_8221BDD0)", __imp__sub_8221BDD0, hooks::RaceScreensKind6MenuCreate,
+       {{rs::kKind6Menu, 360}, {rs::kKind6Word, 0}}, 96, 8},
+  };
+  for (const Maker& maker : makers) {
+    Results results(maker.name);
+    for (int c = 0; c < 10; c++) {
+      const uint64_t seed = h.random.Next();
+      Outputs out[2];
+      for (int v = 0; v < 2; v++) {
+        Random r(seed);
+        SavedBytes saved(h.base, {{kScreenGlobals, kScreenGlobalsBytes},
+                                  {kUnseenGlobals, kUnseenGlobalsBytes}});
+        WriteRandom(h.base, kScreenGlobals, kScreenGlobalsBytes, r);
+        WriteRandom(h.base, kUnseenGlobals, kUnseenGlobalsBytes, r);
+        PPCContext t = CallContext(h);
+        const uint32_t sp = t.r1.u32;
+        WriteRandom(h.base, sp - 1024, 1024 + kCallerBytes, r);
+        ITC_FLAG(native_race_screens) = v == 1;
+        (v == 0 ? maker.recompiled : maker.native)(t, h.base);
+        ITC_FLAG(native_race_screens) = true;
+        uint32_t which = 0xFFFFFFFF;
+        for (size_t k = 0; k < maker.blocks.size(); k++) {
+          const auto& [global, bytes] = maker.blocks[k];
+          const uint32_t block = guest::LoadU32(h.base, global);
+          if (bytes == 0) {
+            out[v].Word(block);
+            continue;
+          }
+          out[v].Word(block != 0 ? 1 : 0);
+          out[v].Word(memory::IsPages(block) ? 1 : 0);
+          if (block != 0) {
+            out[v].Bytes(Read(h.base, block, bytes));
+          }
+          if (t.r3.u32 == block) {
+            which = uint32_t(k);
+          }
+        }
+        out[v].Word(which);
+        out[v].Word(uint32_t(t.r3.u64 >> 32));
+        out[v].Bytes(Read(h.base, sp - maker.frame, maker.frame - maker.saves));
+        out[v].Bytes(Read(h.base, sp, kCallerBytes));
+        out[v].Word(t.r1.u32);
+        for (const auto& [global, bytes] : maker.blocks) {
+          const uint32_t block = guest::LoadU32(h.base, global);
+          if (bytes != 0 && memory::IsPages(block)) {
+            memory::FreePages(block);
+          }
+        }
+      }
+      results.Check(out[0], out[1], fmt::format("case {}", c));
+    }
+    results.Report();
+  }
+}
+
+struct Teardown {
+  const char* name;
+  GuestFunction recompiled, native;
+  std::vector<uint32_t> globals;  // the blocks freed
+  uint32_t list;                  // the menu list's global, or 0
+  uint32_t frame, saves;
+  bool checks;                    // whether an unset first global prints instead
+};
+
+// A teardown run: the blocks the layer's pages (the menu list's block, +68,
+// 0 or pages), now and then (where the teardown checks) the first global 0;
+// compared: the globals, which blocks were freed, the frames (the
+// teardown's and MenuList::Release's), r1 and r3. Blocks left are freed.
+void Teardowns(Context& h) {
+  const std::vector<Teardown> teardowns = {
+      {"PauseMenu::Destroy (sub_8220C4C8)", __imp__sub_8220C4C8,
+       hooks::RaceScreensPauseMenuDestroy,
+       {rs::kPauseScreen, rs::kPauseData, rs::kPauseList, rs::kPausePages}, rs::kPauseList, 128,
+       40, true},
+      {"PauseMenu4::Destroy (sub_8220FC98)", __imp__sub_8220FC98,
+       hooks::RaceScreensPauseMenu4Destroy,
+       {rs::kPause4Screen, rs::kPause4Data, rs::kPause4List, rs::kPause4Pages}, rs::kPause4List,
+       128, 40, true},
+      {"AfterRaceMenu::Destroy (sub_8221A3E8)", __imp__sub_8221A3E8,
+       hooks::RaceScreensAfterRaceMenuDestroy,
+       {rs::kAfterScreen, rs::kAfterData, rs::kAfterList, rs::kAfterPages}, rs::kAfterList, 128,
+       40, true},
+      {"RaceDialog::Destroy (sub_82217CD0)", __imp__sub_82217CD0,
+       hooks::RaceScreensRaceDialogDestroy, {rs::kDialogList, rs::kDialogPages, rs::kDialogData},
+       rs::kDialogList, 112, 32, false},
+      {"CareerResults::Destroy (sub_82219170)", __imp__sub_82219170,
+       hooks::RaceScreensCareerResultsDestroy, {rs::kCareerResults}, 0, 96, 16, true},
+      {"RaceResults::Destroy (sub_8221F3C8)", __imp__sub_8221F3C8,
+       hooks::RaceScreensRaceResultsDestroy, {rs::kRaceResults}, 0, 96, 16, true},
+      {"SplitResults::Destroy (sub_8221FA68)", __imp__sub_8221FA68,
+       hooks::RaceScreensSplitResultsDestroy, {rs::kSplitResults}, 0, 96, 16, true},
+      {"Kind6Menu::Destroy (sub_8221BE30)", __imp__sub_8221BE30,
+       hooks::RaceScreensKind6MenuDestroy, {rs::kKind6Menu}, 0, 96, 16, true},
+      {"AfterRaceMenu::Close (sub_8221A498)", __imp__sub_8221A498,
+       hooks::RaceScreensAfterRaceMenuClose, {}, rs::kAfterList, 0, 0, false},
+  };
+  for (const Teardown& teardown : teardowns) {
+    Results results(teardown.name);
+    for (int c = 0; c < 20; c++) {
+      const uint64_t seed = h.random.Next();
+      Outputs out[2];
+      for (int v = 0; v < 2; v++) {
+        Random r(seed);
+        SavedBytes saved(h.base, {{kScreenGlobals, kScreenGlobalsBytes},
+                                  {kUnseenGlobals, kUnseenGlobalsBytes}});
+        WriteRandom(h.base, kScreenGlobals, kScreenGlobalsBytes, r);
+        WriteRandom(h.base, kUnseenGlobals, kUnseenGlobalsBytes, r);
+        std::vector<uint32_t> blocks;
+        for (const uint32_t global : teardown.globals) {
+          const uint32_t block = memory::AllocPages(0x100, 4096);
+          WriteRandom(h.base, block, 0x100, r);
+          guest::StoreU32(h.base, global, block);
+          blocks.push_back(block);
+        }
+        uint32_t list_pages = 0;
+        uint32_t own_list = 0;
+        if (teardown.list != 0) {
+          uint32_t list = guest::LoadU32(h.base, teardown.list);
+          if (teardown.globals.empty()) {
+            own_list = memory::AllocPages(0x100, 4096);
+            WriteRandom(h.base, own_list, 0x100, r);
+            guest::StoreU32(h.base, teardown.list, own_list);
+            list = own_list;
+          }
+          if (r.Below(3) != 0) {
+            list_pages = memory::AllocPages(0x1000, 4096);
+          }
+          guest::StoreU32(h.base, list + 68, list_pages);
+        }
+        const bool unset = teardown.checks && r.Below(4) == 0;
+        if (unset) {
+          guest::StoreU32(h.base, teardown.globals[0], 0);
+        }
+        PPCContext t = CallContext(h);
+        const uint32_t sp = t.r1.u32;
+        WriteRandom(h.base, sp - 1024, 1024 + kCallerBytes, r);
+        ITC_FLAG(native_race_screens) = v == 1;
+        (v == 0 ? teardown.recompiled : teardown.native)(t, h.base);
+        ITC_FLAG(native_race_screens) = true;
+        for (const uint32_t global : teardown.globals) {
+          out[v].Word(guest::LoadU32(h.base, global));
+        }
+        for (const uint32_t block : blocks) {
+          out[v].Word(memory::IsPages(block) ? 1 : 0);
+        }
+        out[v].Word(list_pages != 0 && memory::IsPages(list_pages) ? 1 : 0);
+        if (own_list != 0) {
+          out[v].Word(guest::LoadU32(h.base, own_list + 68));
+        }
+        out[v].Bytes(Read(h.base, sp - teardown.frame, teardown.frame - teardown.saves));
+        if (teardown.list != 0) {
+          // MenuList::Release's frame below the teardown's.
+          out[v].Bytes(Read(h.base, sp - teardown.frame - 96, 80));
+        }
+        out[v].Bytes(Read(h.base, sp, kCallerBytes));
+        out[v].Word(t.r1.u32);
+        out[v].Word(t.r3.u32);
+        out[v].Word(uint32_t(t.r3.u64 >> 32));
+        for (const uint32_t block : blocks) {
+          if (memory::IsPages(block)) {
+            memory::FreePages(block);
+          }
+        }
+        for (const uint32_t block : {list_pages, own_list}) {
+          if (block != 0 && memory::IsPages(block)) {
+            memory::FreePages(block);
+          }
+        }
+      }
+      results.Check(out[0], out[1], fmt::format("case {}", c));
+    }
+    results.Report();
+  }
+}
+
+// --- The pause menu's data and the answers ---
+
+constexpr uint32_t kSaveDataPointers = 0x826C5B58;
+constexpr uint32_t kVehiclesPointer = 0x826C2E34;
+constexpr uint32_t kSaveBytes = 0x1F85C + 0x100;
+constexpr uint32_t kVehicleBytes = 6272;
+
+// A float: mostly ordinary values in `range`, sometimes an edge.
+uint32_t AnyFloatBits(Random& r, float range) {
+  switch (r.Below(12)) {
+    case 0:
+      return std::bit_cast<uint32_t>(std::numeric_limits<float>::quiet_NaN());
+    case 1:
+      return std::bit_cast<uint32_t>(std::numeric_limits<float>::infinity());
+    case 2:
+      return std::bit_cast<uint32_t>(-std::numeric_limits<float>::infinity());
+    case 3:
+      return std::bit_cast<uint32_t>(-0.0f);
+    case 4:
+      return uint32_t(r.Next());
+    default:
+      return std::bit_cast<uint32_t>(
+          (float(r.Below(1u << 20)) / float(1u << 20) * 2.0f - 0.5f) * range);
+  }
+}
+
+void Data(Context& h) {
+  const Block save(kSaveBytes);
+  const Block vehicle(kVehicleBytes);
+  const Block data(0x400);  // the pause menu's (+0), the menu after the race's (+0x100),
+                            // the dialog's (+0x200)
+  // A stack of our own for LoadData's 6,176-byte frame (the calls run with
+  // their stack pointer at +kDataStackTop).
+  constexpr uint32_t kDataStackBytes = 0x3000;
+  constexpr uint32_t kDataStackTop = 0x2800;
+  const Block stack(kDataStackBytes);
+  if (!save.address || !vehicle.address || !data.address || !stack.address) {
+    ITC_LOG_ERROR("harness: race_screens: no block from the allocation layer");
+    return;
+  }
+  struct Function {
+    const char* name;
+    GuestFunction recompiled, native;
+    uint32_t frame, saves;
+    int cases;
+  };
+  const std::vector<Function> functions = {
+      {"PauseMenu::LoadData (sub_8220F840)", __imp__sub_8220F840,
+       hooks::RaceScreensPauseMenuLoadData, 6176, 40, 300},
+      {"PauseMenu::SaveOptions (sub_8220D6A0)", __imp__sub_8220D6A0,
+       hooks::RaceScreensPauseMenuSaveOptions, 96, 8, 50},
+      {"PauseMenu::Close (sub_8220D890)", __imp__sub_8220D890, hooks::RaceScreensPauseMenuClose,
+       96, 8, 20},
+      {"PauseMenu::SaveHudOptions (sub_8220D740)", __imp__sub_8220D740,
+       hooks::RaceScreensPauseMenuSaveHudOptions, 96, 8, 50},
+      {"PauseMenu::AnswerPage (sub_8220C5D0)", __imp__sub_8220C5D0,
+       hooks::RaceScreensPauseMenuAnswerPage, 0, 0, 20},
+      {"AfterRaceMenu::AnswerPage (sub_8221A720)", __imp__sub_8221A720,
+       hooks::RaceScreensAfterRaceMenuAnswerPage, 0, 0, 20},
+      {"RaceDialog::Answer (sub_82217D40)", __imp__sub_82217D40,
+       hooks::RaceScreensRaceDialogAnswer, 0, 0, 40},
+  };
+  for (const Function& f : functions) {
+    Results results(f.name);
+    for (int c = 0; c < f.cases; c++) {
+      const uint64_t seed = h.random.Next();
+      Outputs out[2];
+      for (int v = 0; v < 2; v++) {
+        Random r(seed);
+        SavedBytes saved(h.base, {{kScreenGlobals, kScreenGlobalsBytes},
+                                  {kSaveDataPointers, 4},
+                                  {kVehiclesPointer, 4}});
+        WriteRandom(h.base, save.address, save.bytes, r);
+        WriteRandom(h.base, vehicle.address, vehicle.bytes, r);
+        WriteRandom(h.base, data.address, data.bytes, r);
+        guest::StoreU32(h.base, kSaveDataPointers, save.address);
+        guest::StoreU32(h.base, kVehiclesPointer, vehicle.address);
+        guest::StoreU32(h.base, rs::kPauseData, data.address);
+        guest::StoreU32(h.base, rs::kAfterData, data.address + 0x100);
+        guest::StoreU32(h.base, rs::kDialogData, data.address + 0x200);
+        // The pause menu's kind (+132) 0 to 4; the stats' win streak (the
+        // copy's halfword +5970) small, negative or above 999; the day
+        // (+6100) small, negative or large; the vehicle's two floats.
+        guest::StoreU32(h.base, data.address + 132,
+                        r.Below(6) == 0 ? uint32_t(r.Next()) : r.Below(5));
+        const uint16_t streaks[4] = {uint16_t(r.Below(1000)), uint16_t(0x8000 | r.Below(0x8000)),
+                                     uint16_t(1000 + r.Below(5000)), 999};
+        guest::StoreU16(h.base, save.address + 48 + 5970, streaks[r.Below(4)]);
+        const uint32_t days[4] = {r.Below(400), uint32_t(-int32_t(r.Below(50))),
+                                  uint32_t(r.Next()), 1000};
+        guest::StoreU32(h.base, save.address + 6100, days[r.Below(4)]);
+        guest::StoreU32(h.base, vehicle.address + 6248, AnyFloatBits(r, 400.0f));
+        guest::StoreU32(h.base, vehicle.address + 6244, AnyFloatBits(r, 400.0f));
+        guest::StoreU32(h.base, data.address + 0x200, r.Below(3));
+        PPCContext t = CallContext(h);
+        t.r1.u64 = stack.address + kDataStackTop;
+        const uint32_t sp = t.r1.u32;
+        WriteRandom(h.base, stack.address, stack.bytes, r);
+        ITC_FLAG(native_race_screens) = v == 1;
+        (v == 0 ? f.recompiled : f.native)(t, h.base);
+        ITC_FLAG(native_race_screens) = true;
+        out[v].Bytes(Read(h.base, data.address, data.bytes));
+        out[v].Bytes(Read(h.base, save.address + 0x1F85C, 0x100));
+        if (f.frame > f.saves) {
+          out[v].Bytes(Read(h.base, sp - f.frame, f.frame - f.saves));
+        }
+        out[v].Bytes(Read(h.base, sp, kCallerBytes));
+        out[v].Word(t.r1.u32);
+        out[v].Word(t.r3.u32 == save.address ? 1 : t.r3.u32);
+        out[v].Word(uint32_t(t.r3.u64 >> 32));
+      }
+      results.Check(out[0], out[1], fmt::format("case {}", c));
+    }
+    results.Report();
+  }
+}
+
 }  // namespace
 
 void RaceScreens(Context& h) {
@@ -309,6 +646,9 @@ void RaceScreens(Context& h) {
     return;
   }
   PagesAndLists(h, w);
+  Makers(h);
+  Teardowns(h);
+  Data(h);
 }
 
 }  // namespace harness

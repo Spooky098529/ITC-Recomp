@@ -5,6 +5,7 @@
 #include "hooks/race_screens.h"
 
 #include "base/flags.h"
+#include "hooks/heap.h"
 #include "race_screens/race_screens.h"
 
 ITC_FLAG_BOOL(native_race_screens, true, "ITC",
@@ -15,7 +16,12 @@ ITC_FLAG_BOOL(native_race_screens, true, "ITC",
               "sub_8220C020, Update sub_8220C1E0, Accepted sub_8220BD50, Cancelled sub_8220BDE0, "
               "Pressed152 sub_8220BE70 and Pressed166 sub_8220BF90, the mapper's read slots by "
               "their plain C++ with --native_action_mappers, else through the vtable; Go and "
-              "Update keep their --log_pause_movie and --log_pause_menu lines) natively instead "
+              "Update keep their --log_pause_movie and --log_pause_menu lines; the screens' makers "
+              "and teardowns, PauseMenu::, PauseMenu4::, AfterRaceMenu::, RaceDialog::, "
+              "CareerResults::, RaceResults::, SplitResults:: and Kind6Menu::Create and "
+              "Destroy, with --native_heap, and AfterRaceMenu::Close; PauseMenu::LoadData, "
+              "SaveOptions, Close, SaveHudOptions and AnswerPage, AfterRaceMenu::AnswerPage and "
+              "RaceDialog::Answer) natively instead "
               "of through the translated code (the same writes; checked by "
               "--run_harnesses=race_screens)");
 ITC_FLAG_DECLARE(bool, native_action_mappers);
@@ -126,6 +132,75 @@ ITC_RACE_SCREENS_PRESSED(Pressed152)
 ITC_RACE_SCREENS_PRESSED(Pressed166)
 #undef ITC_RACE_SCREENS_PRESSED
 
+#define ITC_RACE_SCREENS_CREATE(name, address)                       \
+  void RaceScreens##name##Create(PPCContext& ctx, uint8_t* base) {   \
+    if (!NativeHeapActive()) {                                       \
+      __imp__sub_##address(ctx, base);                               \
+      return;                                                        \
+    }                                                                \
+    ctx.r3.u64 = race_screens::name##Create(base, ctx.r1.u32);       \
+  }
+ITC_RACE_SCREENS_CREATE(PauseMenu, 8220D7E8)
+ITC_RACE_SCREENS_CREATE(PauseMenu4, 82210868)
+ITC_RACE_SCREENS_CREATE(AfterRaceMenu, 8221B1F0)
+ITC_RACE_SCREENS_CREATE(RaceDialog, 82217D70)
+ITC_RACE_SCREENS_CREATE(CareerResults, 82219138)
+ITC_RACE_SCREENS_CREATE(RaceResults, 8221F390)
+ITC_RACE_SCREENS_CREATE(SplitResults, 8221FA30)
+ITC_RACE_SCREENS_CREATE(Kind6Menu, 8221BDD0)
+#undef ITC_RACE_SCREENS_CREATE
+
+#define ITC_RACE_SCREENS_FREE(function, address)                           \
+  void RaceScreens##function(PPCContext& ctx, uint8_t* base) {             \
+    if (NativeHeapActive()) {                                              \
+      if (const auto r3 = race_screens::function(base, ctx.r1.u32)) {      \
+        ctx.r3.u64 = *r3;                                                  \
+        return;                                                            \
+      }                                                                    \
+    }                                                                      \
+    __imp__sub_##address(ctx, base);                                       \
+  }
+ITC_RACE_SCREENS_FREE(PauseMenuDestroy, 8220C4C8)
+ITC_RACE_SCREENS_FREE(PauseMenu4Destroy, 8220FC98)
+ITC_RACE_SCREENS_FREE(AfterRaceMenuDestroy, 8221A3E8)
+ITC_RACE_SCREENS_FREE(RaceDialogDestroy, 82217CD0)
+ITC_RACE_SCREENS_FREE(CareerResultsDestroy, 82219170)
+ITC_RACE_SCREENS_FREE(RaceResultsDestroy, 8221F3C8)
+ITC_RACE_SCREENS_FREE(SplitResultsDestroy, 8221FA68)
+ITC_RACE_SCREENS_FREE(Kind6MenuDestroy, 8221BE30)
+ITC_RACE_SCREENS_FREE(AfterRaceMenuClose, 8221A498)
+#undef ITC_RACE_SCREENS_FREE
+
+void RaceScreensPauseMenuLoadData(PPCContext& ctx, uint8_t* base) {
+  ctx.fpscr.disableFlushMode();
+  GuestCalls guest(ctx, base);
+  ctx.r3.u64 = race_screens::PauseMenuLoadData(base, ctx.r1.u32, guest.calls());
+}
+
+void RaceScreensPauseMenuSaveOptions(PPCContext& ctx, uint8_t* base) {
+  ctx.r3.u64 = race_screens::PauseMenuSaveOptions(base, ctx.r1.u32);
+}
+
+void RaceScreensPauseMenuClose(PPCContext& ctx, uint8_t* base) {
+  ctx.r3.u64 = race_screens::PauseMenuClose(base, ctx.r1.u32);
+}
+
+void RaceScreensPauseMenuSaveHudOptions(PPCContext& ctx, uint8_t* base) {
+  ctx.r3.u64 = race_screens::PauseMenuSaveHudOptions(base, ctx.r1.u32);
+}
+
+void RaceScreensPauseMenuAnswerPage(PPCContext& ctx, uint8_t* base) {
+  ctx.r3.u64 = race_screens::PauseMenuAnswerPage(base);
+}
+
+void RaceScreensAfterRaceMenuAnswerPage(PPCContext& ctx, uint8_t* base) {
+  ctx.r3.u64 = race_screens::AfterRaceMenuAnswerPage(base);
+}
+
+void RaceScreensRaceDialogAnswer(PPCContext& ctx, uint8_t* base) {
+  ctx.r3.u64 = race_screens::RaceDialogAnswer(base);
+}
+
 }  // namespace hooks
 
 // The adapters: the register steps above, or the originals with the flag
@@ -154,3 +229,27 @@ ITC_RACE_SCREENS(8220BD50, RaceScreensListAccepted)
 ITC_RACE_SCREENS(8220BDE0, RaceScreensListCancelled)
 ITC_RACE_SCREENS(8220BE70, RaceScreensListPressed152)
 ITC_RACE_SCREENS(8220BF90, RaceScreensListPressed166)
+ITC_RACE_SCREENS(8220D7E8, RaceScreensPauseMenuCreate)
+ITC_RACE_SCREENS(82210868, RaceScreensPauseMenu4Create)
+ITC_RACE_SCREENS(8221B1F0, RaceScreensAfterRaceMenuCreate)
+ITC_RACE_SCREENS(82217D70, RaceScreensRaceDialogCreate)
+ITC_RACE_SCREENS(82219138, RaceScreensCareerResultsCreate)
+ITC_RACE_SCREENS(8221F390, RaceScreensRaceResultsCreate)
+ITC_RACE_SCREENS(8221FA30, RaceScreensSplitResultsCreate)
+ITC_RACE_SCREENS(8221BDD0, RaceScreensKind6MenuCreate)
+ITC_RACE_SCREENS(8220C4C8, RaceScreensPauseMenuDestroy)
+ITC_RACE_SCREENS(8220FC98, RaceScreensPauseMenu4Destroy)
+ITC_RACE_SCREENS(8221A3E8, RaceScreensAfterRaceMenuDestroy)
+ITC_RACE_SCREENS(82217CD0, RaceScreensRaceDialogDestroy)
+ITC_RACE_SCREENS(82219170, RaceScreensCareerResultsDestroy)
+ITC_RACE_SCREENS(8221F3C8, RaceScreensRaceResultsDestroy)
+ITC_RACE_SCREENS(8221FA68, RaceScreensSplitResultsDestroy)
+ITC_RACE_SCREENS(8221BE30, RaceScreensKind6MenuDestroy)
+ITC_RACE_SCREENS(8221A498, RaceScreensAfterRaceMenuClose)
+ITC_RACE_SCREENS(8220F840, RaceScreensPauseMenuLoadData)
+ITC_RACE_SCREENS(8220D6A0, RaceScreensPauseMenuSaveOptions)
+ITC_RACE_SCREENS(8220D890, RaceScreensPauseMenuClose)
+ITC_RACE_SCREENS(8220D740, RaceScreensPauseMenuSaveHudOptions)
+ITC_RACE_SCREENS(8220C5D0, RaceScreensPauseMenuAnswerPage)
+ITC_RACE_SCREENS(8221A720, RaceScreensAfterRaceMenuAnswerPage)
+ITC_RACE_SCREENS(82217D40, RaceScreensRaceDialogAnswer)
