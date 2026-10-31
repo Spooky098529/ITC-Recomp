@@ -15,7 +15,11 @@ file's history. What's left to see in a drive, from every run:
 - Subsystem 1 of 3: the second skeleton user (`820EF258`-`820F05D8`),
   the top of `leads.md`:
   - `sub_820EF258`, `sub_820EF310`, `sub_820EF368`, `sub_820EFFD8`, `sub_820F0070`, `sub_820F03F0`: another skeleton user (`820EF258`-`820F05D8`): the skeleton base made (`sub_820F03F0`, 179 lines, calls `SkeletonBase::SkeletonBase`), set up (`sub_820F0070` calls `sub_8259A9E0`) and destroyed (`sub_820EFFD8`, `SkeletonBase::~SkeletonBase`; `functions/model-animation.md`, `functions/models.md`), near `sub_820EF790` (`Model::RecordShape`'s caller). Not read. Found by the B7 loop's mapping agent (model animation), 2026-10-23.
-  Step: mapping (agent running).
+  Map checked (ae8e322b: `accessories.md`, the interior accessories
+  `820EF250`-`820F1078`, 50 rows, 31 in play, 8 ready groups, no
+  outside blockers; the accessories' release lead folded in; the
+  lead's note that its rows were elsewhere was wrong). Step: migration
+  (agent running).
 
 ## Done
 
@@ -35,5 +39,8 @@ file's history. What's left to see in a drive, from every run:
 
 - At the start: ours 3552, work left 2846 (wrapped 103, known 487,
   unknown 2256).
+
+- After the accessories' map: ours 3552, work left 2846 (wrapped 103,
+  known 518, unknown 2225).
 
 ## Stopped

@@ -13,6 +13,11 @@ When the user has reviewed a run's section, its heading gets
 
 ## Run 2026-10-31 16:54 (`b7-loop-31-10-26`, continued)
 
+- The interior accessories' map (ae8e322b): `accessories.md`, 50 new
+  rows (31 in play; the anchor, the skeleton's swing and the draws not
+  seen in play), three object rows in `known-data.md`; the accessories'
+  release lead folded in and removed from `leads.md`.
+
 ## Run 2026-10-31 13:47 (`b7-loop-31-10-26`)
 
 - `Model::RecordMaterials` (`sub_820CECA0`, cleanup lead, 0c226b78):
