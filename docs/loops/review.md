@@ -11,6 +11,8 @@ functions to check in a drive in the progress file.
 When the user has reviewed a run's section, its heading gets
 "(reviewed <date>)"; the section stays for the record.
 
+## Run 2026-10-31 16:54 (`b7-loop-31-10-26`, continued)
+
 ## Run 2026-10-31 13:47 (`b7-loop-31-10-26`)
 
 - `Model::RecordMaterials` (`sub_820CECA0`, cleanup lead, 0c226b78):
