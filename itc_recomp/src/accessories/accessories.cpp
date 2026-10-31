@@ -7,6 +7,8 @@
 #include "base/log.h"
 #include "c_runtime/strings.h"
 #include "guest.h"
+#include "matrix_math/matrix_math.h"
+#include "memory/c_runtime_heap.h"
 #include "memory/heap.h"
 #include "model_animation/model_animation.h"
 #include "models/memory_blocks.h"
@@ -529,6 +531,86 @@ std::optional<uint32_t> SkeletonSetUp(uint8_t* base, uint32_t skeleton, uint32_t
     SkeletonReset(base, skeleton, sp - 128);
   }
   return Load(base, skeleton + 260);
+}
+
+uint32_t SetBaseDestruct(uint8_t* base, uint32_t set) {
+  ITC_NATIVE_RUNNING("sub_820F0B58 AccessoriesBase::~AccessoriesBase");
+  Store(base, set + 0, kSetBaseVtable);
+  const uint32_t r3 = SetReleaseAll(base, set).value_or(set);
+  Store(base, set + 0, kListNodeVtable);
+  return r3;
+}
+
+uint32_t SetDestruct(uint8_t* base, uint32_t set, uint32_t flags) {
+  ITC_NATIVE_RUNNING("sub_820F0FE0 Accessories::~Accessories");
+  Store(base, set + 0, kSetVtable);
+  SetBaseDestruct(base, set);
+  if (flags & 1) {
+    Require(memory::crt::OperatorDelete(set), "operator delete");
+  }
+  return set;
+}
+
+// --- The draw's helpers ---
+
+uint64_t AccessorySetTexture(
+    uint8_t* base, uint32_t accessory, uint32_t index, int32_t shape, uint32_t sp,
+    const std::function<uint64_t(uint32_t provider, uint32_t frame)>& texture_set) {
+  ITC_NATIVE_RUNNING("sub_820EF568 Accessory::SetTexture");
+  Store(base, accessory + 1040, index);
+  uint64_t r3 = accessory;
+  if (Load(base, accessory + 1048) == 0) {
+    return r3;
+  }
+  const uint32_t frame = sp - 160;
+  Store(base, frame, sp);  // the back chain, for the slot's guest call
+  r3 = texture_set(accessory + 80, frame);
+  if (!(Load(base, uint32_t(r3) + 20) > index)) {
+    return r3;
+  }
+  uint32_t first = uint32_t(shape), count = 1;
+  if (shape < 0) {
+    count = Load(base, accessory + 412);
+    first = 0;
+  }
+  for (uint32_t s = first; s < count; s++) {
+    for (uint32_t g = 0; g < 2; g++) {
+      const int32_t group = int32_t(Load(base, kMaterialGroups + 4 * g));
+      const uint32_t materials = models::MaterialCount(base, accessory, s, group);
+      r3 = materials;
+      for (int32_t m = 0; m < int32_t(materials); m++) {
+        const uint32_t material = models::Material(base, accessory, s, uint32_t(m), group);
+        r3 = material;
+        for (uint32_t k = 0; k < 8; k++) {
+          Store(base, material + 176 + 4 * k, index);
+          Store(base, material + 144 + 4 * k, 0);
+        }
+      }
+    }
+  }
+  return r3;
+}
+
+uint32_t FromScaleRotationTranslation(uint8_t* base, uint32_t out, uint32_t angles,
+                                      uint32_t position, uint32_t scale, uint32_t sp) {
+  ITC_NATIVE_RUNNING("sub_820EF660 Matrix::FromScaleRotationTranslation");
+  const uint32_t frame = sp - 208;
+  StoreIdentity(base, frame + 96, 1.0);
+  Require(native::Buffers_Memcpy(base, out, frame + 96, 64, 0x820EF6C0), "memcpy");
+  Stfs(base, out + 0, Lfs(base, scale + 0));
+  Stfs(base, out + 20, Lfs(base, scale + 4));
+  Stfs(base, out + 40, Lfs(base, scale + 8));
+  const uint32_t angle = frame + 80, turn = frame - 80;
+  Stfs(base, angle, Lfs(base, angles + 0));
+  matrix_math::RotateX(base, out, out, angle, turn);
+  Stfs(base, angle, Lfs(base, angles + 4));
+  matrix_math::RotateY(base, out, out, angle, turn);
+  Stfs(base, angle, Lfs(base, angles + 8));
+  matrix_math::RotateZ(base, out, out, angle, turn);
+  Stfs(base, out + 48, Lfs(base, position + 0));
+  Stfs(base, out + 52, Lfs(base, position + 4));
+  Stfs(base, out + 56, Lfs(base, position + 8));
+  return out;
 }
 
 }  // namespace accessories

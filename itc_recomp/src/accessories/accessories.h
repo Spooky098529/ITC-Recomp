@@ -184,6 +184,41 @@ uint32_t SkeletonReset(uint8_t* base, uint32_t skeleton, uint32_t sp);
 // original runs).
 std::optional<uint32_t> SkeletonSetUp(uint8_t* base, uint32_t skeleton, uint32_t sp);
 
+// AccessoriesBase::~AccessoriesBase (sub_820F0B58): the base's vtable,
+// ReleaseAll, then the list node's vtable. ReleaseAll's r3, or the set's
+// when it destroyed nothing. The adapter checks SetReleasable first.
+uint32_t SetBaseDestruct(uint8_t* base, uint32_t set);
+// Accessories::~Accessories (sub_820F0FE0, deleting; slot 0 of 0x82006740):
+// the vtable, the base's destructor, and with `flags` bit 0 operator delete
+// (memory::crt::OperatorDelete; the adapter checks it's a heap block).
+// Returns the set.
+uint32_t SetDestruct(uint8_t* base, uint32_t set, uint32_t flags);
+
+// --- The draw's helpers ---
+
+// The material groups Accessory::SetTexture walks: the words at
+// 0x820066D0 (0 and 1).
+constexpr uint32_t kMaterialGroups = 0x820066D0;
+// Accessory::SetTexture (sub_820EF568): +1040 = `index`; once loaded
+// (+1048), the texture provider's (+80) vtable +12 with r4 = 0 (`texture_set`:
+// a guest call the adapter makes from the 160-byte frame below `sp`, whose
+// back chain is stored here; its r3), and when that answer's +20 is
+// above `index`: for the shape (0 only) or every shape (`shape` < 0, +412),
+// both groups, each material: its 8 words at +176 = index, the 8 at +144 =
+// 0. Returns the r3 the original leaves (the last call's, or the
+// accessory's).
+uint64_t AccessorySetTexture(
+    uint8_t* base, uint32_t accessory, uint32_t index, int32_t shape, uint32_t sp,
+    const std::function<uint64_t(uint32_t provider, uint32_t frame)>& texture_set);
+// Matrix::FromScaleRotationTranslation (sub_820EF660): from the 208-byte
+// frame below `sp` (its identity rows at +96 and the angle at +80 as the
+// original leaves them): out = the identity (memcpy, native::Buffers_Memcpy:
+// the adapter checks it copies), the scale on the diagonal, turned by
+// RotateX, RotateY, RotateZ (matrix_math's plain C++, the turns at the
+// frame's -80) by the three angles, the position into row 3. Returns out.
+uint32_t FromScaleRotationTranslation(uint8_t* base, uint32_t out, uint32_t angles,
+                                      uint32_t position, uint32_t scale, uint32_t sp);
+
 // Whether a part model is constructed natively (models::CanAllocatePointers
 // for its texture provider): the constructors' adapters check it.
 bool AccessoryConstructible(uint8_t* base);

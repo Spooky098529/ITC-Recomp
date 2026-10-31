@@ -24,6 +24,7 @@
 
 #include <fmt/format.h>
 
+#include <cstring>
 #include <functional>
 #include <string>
 #include <optional>
@@ -671,6 +672,157 @@ void SkeletonSetUps(Context& h, const Block& block) {
       });
 }
 
+// The set's destructors: the set in the block (a heap block of its own for
+// the deleting destructor with bit 0), its entries none or made by
+// AccessoryEntry::New's plain C++ with counts 1 to 2. The slots (an entry as
+// a marker with its count), the set's words, the block and r3 compared; the
+// entries left destroyed after.
+void SetDestructors(Context& h, const Block& block) {
+  struct Kind {
+    const char* name;
+    GuestFunction recompiled, native;
+    bool deleting;
+  };
+  const Kind kinds[] = {
+      {"AccessoriesBase::~AccessoriesBase (sub_820F0B58)", Original<__imp__sub_820F0B58>,
+       hooks::AccessoriesBaseDestruct, false},
+      {"Accessories::~Accessories (sub_820F0FE0)", Original<__imp__sub_820F0FE0>,
+       hooks::AccessoriesDestruct, true},
+  };
+  for (const Kind& kind : kinds) {
+    Results results(kind.name);
+    for (int c = 0; c < 16; c++) {
+      const uint64_t seed = h.random.Next();
+      Outputs out[2];
+      for (int v = 0; v < 2; v++) {
+        Random r(seed);
+        WriteRandom(h.base, block.address, block.bytes, r);
+        PPCContext t = CallContext(h);
+        const bool deletes = kind.deleting && r.Below(2) == 0;
+        const uint32_t set = deletes ? memory::Alloc(ac::kSetBytes, 0) : block.address + 0x40;
+        WriteRandom(h.base, set, ac::kSetBytes, r);
+        uint32_t entries[3] = {};
+        for (uint32_t i = 0; i < 3; i++) {
+          if (r.Below(4) != 0) {
+            entries[i] = ac::EntryNew(h.base, t.r1.u32);
+            guest::StoreU32(h.base, entries[i], 1 + r.Below(2));
+          }
+          guest::StoreU32(h.base, set + 4 + 4 * i, entries[i]);
+        }
+        t.r3.u64 = set;
+        t.r4.u64 = deletes ? 1 : (kind.deleting ? r.Next() & ~uint64_t(1) : r.Next());
+        (v == 0 ? kind.recompiled : kind.native)(t, h.base);
+        out[v].Word(t.r3.u32 == set ? kMarker : t.r3.u32);
+        out[v].Word(uint32_t(t.r3.u64 >> 32));
+        out[v].Word(deletes && memory::IsHeapBlock(set) ? 1 : 0);
+        for (uint32_t i = 0; i < 3; i++) {
+          const uint32_t slot = set + 4 + 4 * i;
+          const uint32_t entry = guest::LoadU32(h.base, slot);
+          out[v].Word(entry == 0 ? 0 : entry == entries[i] ? kMarker : 1);
+          if (entries[i] != 0 && memory::IsPages(entries[i])) {
+            out[v].Word(guest::LoadU32(h.base, entries[i]));
+            guest::StoreU32(h.base, block.address + 0x20, entries[i]);
+            ac::EntryDestroy(h.base, block.address + 0x20);
+          }
+          guest::StoreU32(h.base, slot, 0);
+        }
+        out[v].Bytes(Read(h.base, set, ac::kSetBytes));
+        if (deletes && memory::IsHeapBlock(set)) {
+          memory::Free(set);
+        }
+        guest::StoreU32(h.base, block.address + 0x20, 0);
+        out[v].Bytes(Read(h.base, block.address, block.bytes));
+      }
+      results.Check(out[0], out[1], fmt::format("case {}", c));
+    }
+    results.Report();
+  }
+}
+
+// Accessory::SetTexture on a fake accessory (in a block of its own): loaded
+// or not, its texture provider's vtable +12 the getter sub_82090770 (r3 =
+// the provider's +60, the accessory's +140: a texture set whose +20 is its
+// count), up to 3 shapes with up to 2 materials in each group; the index
+// below the count or not, the shape -1, 0 or 1. The block and r3 compared.
+void SetTextures(Context& h) {
+  const Block block(0x4000);
+  if (!block.address) {
+    return;
+  }
+  const uint32_t accessory = block.address;
+  Cases(
+      h, block, "Accessory::SetTexture (sub_820EF568)", 64, Original<__imp__sub_820EF568>,
+      hooks::AccessorySetTexture, [&](PPCContext& t, Random& r) {
+        guest::StoreU32(h.base, accessory + 1048, r.Below(5) == 0 ? 0 : 1);
+        guest::StoreU32(h.base, accessory + 80, block.address + 0x500);
+        guest::StoreU32(h.base, block.address + 0x500 + 12, kGet60);
+        guest::StoreU32(h.base, accessory + 140, block.address + 0x520);
+        guest::StoreU32(h.base, block.address + 0x520 + 20, r.Below(8));
+        const uint32_t shapes = r.Below(4);
+        guest::StoreU32(h.base, accessory + 412, shapes);
+        guest::StoreU32(h.base, accessory + 40, block.address + 0x600);
+        for (uint32_t s = 0; s < 3; s++) {
+          const uint32_t materials = block.address + 0x1000 + 0x1000 * s;
+          guest::StoreU32(h.base, block.address + 0x600 + 544 * s + 396, materials);
+          guest::StoreU32(h.base, materials + 8, r.Below(3));
+          guest::StoreU32(h.base, materials + 12, r.Below(3));
+        }
+        t.r3.u64 = accessory;
+        t.r4.u64 = r.Below(8);
+        t.r5.s64 = int32_t(r.Below(3)) - 1;
+      });
+}
+
+// A float for the matrix's inputs: mostly small, now and then 0, a NaN or
+// an infinity.
+uint32_t InputFloat(Random& r) {
+  switch (r.Below(16)) {
+    case 0: return 0;
+    case 1: return 0x7FC00000u;
+    case 2: return 0xFF800000u;
+    default: {
+      const float f = (float(r.Below(20001)) - 10000.0f) / 1000.0f;
+      uint32_t bits;
+      std::memcpy(&bits, &f, 4);
+      return bits;
+    }
+  }
+}
+
+// Matrix::FromScaleRotationTranslation: the angles, position and scale
+// random floats; out (its floats), the frame's identity rows and angle, and
+// r3 compared.
+void FromScaleRotationTranslations(Context& h, const Block& block) {
+  Results results("Matrix::FromScaleRotationTranslation (sub_820EF660)");
+  const uint32_t out_at = block.address + 0x100, inputs = block.address + 0x200;
+  for (int c = 0; c < 64; c++) {
+    const uint64_t seed = h.random.Next();
+    Outputs out[2];
+    for (int v = 0; v < 2; v++) {
+      Random r(seed);
+      WriteRandom(h.base, block.address, block.bytes, r);
+      for (uint32_t k = 0; k < 12; k++) {
+        guest::StoreU32(h.base, inputs + 4 * k, InputFloat(r));
+      }
+      PPCContext t = CallContext(h);
+      t.r3.u64 = out_at;
+      t.r4.u64 = inputs;
+      t.r5.u64 = inputs + 16;
+      t.r6.u64 = inputs + 32;
+      (v == 0 ? Original<__imp__sub_820EF660> : hooks::MatrixFromScaleRotationTranslation)(
+          t, h.base);
+      out[v].Floats(h.base, out_at, 16);
+      const uint32_t frame = t.r1.u32 - 208;
+      out[v].Float(guest::LoadU32(h.base, frame + 80));
+      out[v].Bytes(Read(h.base, frame + 96, 64));
+      out[v].Word(t.r3.u32);
+      out[v].Word(uint32_t(t.r3.u64 >> 32));
+    }
+    results.Check(out[0], out[1], fmt::format("case {}", c));
+  }
+  results.Report();
+}
+
 }  // namespace
 
 void Accessories(Context& h) {
@@ -686,11 +838,19 @@ void Accessories(Context& h) {
   Sets(h, block);
   Constructors(h, block);
   SkeletonSetUps(h, block);
+  SetTextures(h);
+  if (native::Buffers_NativeMemcpy()) {
+    FromScaleRotationTranslations(h, block);
+  }
   if (hooks::AccessoriesNativeLoads()) {
     FileResets(h, block);
     SetFrees(h, block);
     Destructors(h, block);
-    ReleaseAlls(h, block);
+    if (hooks::ModelsNativeLifetime() && native::Buffers_NativeMemcpy() &&
+        ac::AccessoryConstructible(h.base)) {
+      ReleaseAlls(h, block);
+      SetDestructors(h, block);
+    }
   }
 }
 

@@ -58,5 +58,14 @@ void AccessoryEntryDestroy(PPCContext& ctx, uint8_t* base);
 void AccessoriesReleaseAll(PPCContext& ctx, uint8_t* base);
 void AccessorySkeletonReset(PPCContext& ctx, uint8_t* base);
 void AccessorySkeletonSetUp(PPCContext& ctx, uint8_t* base);
+// AccessoriesBase::~AccessoriesBase sub_820F0B58 and Accessories::
+// ~Accessories sub_820F0FE0 (r4 the flags), Accessory::SetTexture
+// sub_820EF568 (r4 the index, r5 the shape or -1), Matrix::
+// FromScaleRotationTranslation sub_820EF660 (r3 out, r4 the angles, r5 the
+// position, r6 the scale).
+void AccessoriesBaseDestruct(PPCContext& ctx, uint8_t* base);
+void AccessoriesDestruct(PPCContext& ctx, uint8_t* base);
+void AccessorySetTexture(PPCContext& ctx, uint8_t* base);
+void MatrixFromScaleRotationTranslation(PPCContext& ctx, uint8_t* base);
 
 }  // namespace hooks

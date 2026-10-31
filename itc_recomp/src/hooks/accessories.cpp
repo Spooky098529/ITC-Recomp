@@ -25,8 +25,10 @@ ITC_FLAG_BOOL(native_accessories, true, "ITC",
               "sub_820F0F90, sub_820F1078, the set's destructor through its vtable; the entry "
               "and the accessory's construction sub_820F0920, sub_820EF258, sub_820F03F0; their "
               "destructors sub_820F0988, sub_820EF310, sub_820EFFD8, sub_820F0DB8, "
-              "Accessories::ReleaseAll sub_820F0AD8; the skeleton's set-up sub_820F0070, "
-              "sub_820EFB30) natively instead of through the translated code "
+              "Accessories::ReleaseAll sub_820F0AD8 and the set's destructors sub_820F0B58, "
+              "sub_820F0FE0; the skeleton's set-up sub_820F0070, sub_820EFB30; "
+              "Accessory::SetTexture sub_820EF568, the provider's slot through the function "
+              "table; Matrix::FromScaleRotationTranslation sub_820EF660) natively instead of through the translated code "
               "(the same words; checked by --run_harnesses=accessories)");
 
 namespace hooks {
@@ -244,6 +246,53 @@ void AccessorySkeletonSetUp(PPCContext& ctx, uint8_t* base) {
   ctx.r3.u64 = *r3;
 }
 
+void AccessoriesBaseDestruct(PPCContext& ctx, uint8_t* base) {
+  if (!AccessoriesNativeLoads() || !ModelsNativeLifetime() ||
+      !accessories::SetReleasable(base, ctx.r3.u32)) {
+    __imp__sub_820F0B58(ctx, base);
+    return;
+  }
+  ctx.fpscr.disableFlushMode();
+  ctx.r3.u64 = accessories::SetBaseDestruct(base, ctx.r3.u32);
+}
+
+void AccessoriesDestruct(PPCContext& ctx, uint8_t* base) {
+  if (!AccessoriesNativeLoads() || !ModelsNativeLifetime() ||
+      !accessories::SetReleasable(base, ctx.r3.u32) ||
+      ((ctx.r4.u32 & 1) && !memory::IsHeapBlock(ctx.r3.u32))) {
+    __imp__sub_820F0FE0(ctx, base);
+    return;
+  }
+  ctx.fpscr.disableFlushMode();
+  ctx.r3.u64 = accessories::SetDestruct(base, ctx.r3.u32, ctx.r4.u32);
+}
+
+// --- The draw's helpers ---
+
+// The texture provider's vtable +12 with r4 = 0, from the original's frame,
+// returning to 0x820EF5A8.
+void AccessorySetTexture(PPCContext& ctx, uint8_t* base) {
+  ctx.r3.u64 = accessories::AccessorySetTexture(
+      base, ctx.r3.u32, ctx.r4.u32, ctx.r5.s32, ctx.r1.u32,
+      [&ctx, base](uint32_t provider, uint32_t frame) -> uint64_t {
+        const uint32_t function =
+            guest::LoadU32(base, guest::LoadU32(base, provider) + 12);
+        GuestCall(ctx, base, function, frame, 0x820EF5A8, provider, 0);
+        return ctx.r3.u64;
+      });
+}
+
+void MatrixFromScaleRotationTranslation(PPCContext& ctx, uint8_t* base) {
+  if (!native::Buffers_NativeMemcpy()) {
+    __imp__sub_820EF660(ctx, base);
+    return;
+  }
+  ctx.fpscr.disableFlushMode();
+  ctx.r3.u64 = accessories::FromScaleRotationTranslation(base, ctx.r3.u32, ctx.r4.u32,
+                                                         ctx.r5.u32, ctx.r6.u32, ctx.r1.u32);
+  ctx.fpscr.disableFlushMode();  // as the original's last lfs
+}
+
 }  // namespace hooks
 
 // Defines an adapter: the flag, else the original.
@@ -273,3 +322,7 @@ ITC_ACCESSORIES(820F0988, AccessoryEntryDestroy)
 ITC_ACCESSORIES(820F0AD8, AccessoriesReleaseAll)
 ITC_ACCESSORIES(820EFB30, AccessorySkeletonReset)
 ITC_ACCESSORIES(820F0070, AccessorySkeletonSetUp)
+ITC_ACCESSORIES(820F0B58, AccessoriesBaseDestruct)
+ITC_ACCESSORIES(820F0FE0, AccessoriesDestruct)
+ITC_ACCESSORIES(820EF568, AccessorySetTexture)
+ITC_ACCESSORIES(820EF660, MatrixFromScaleRotationTranslation)
