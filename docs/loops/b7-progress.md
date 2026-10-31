@@ -53,7 +53,11 @@ file's history. What's left to see in a drive, from every run:
   `sub_8215C750`, `sub_8215D0D8`, `sub_8228F5C0`, `sub_8228F0B0`,
   `sub_821597F0`; picked as 3 of its 4 roots ready, run at each race's
   set-up, with the race object `[0x826D82D4]`'s own lead offered to the
-  mapper). Step: mapping (agent running).
+  mapper). Mapped (a3291567, `race-scene.md`, 20 new rows, 19 in play,
+  5 ready groups, no stop: `[0x826D82D4]` is the race scene, 31,168
+  bytes, its machine at +87936 of the race mode; the race object's
+  lead taken in and deleted, `sub_8215AA88` taken from the course
+  scenery owners' lead). Step: migration (agent running).
 
 ## Done
 
@@ -106,5 +110,7 @@ file's history. What's left to see in a drive, from every run:
 - After its validation (`itc_2920`, 120 s: race 60 s, 0 errors, every
   harness 0 differing but the expected groups): ours 3537, work left
   2860.
+- After the race scene's map: ours 3537, work left 2860 (wrapped 103,
+  known 497, unknown 2260).
 
 ## Stopped

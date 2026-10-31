@@ -58,6 +58,20 @@ When the user has reviewed a run's section, its heading gets
   it (the racer controllers' precedent); the three extra-gauge digit
   setters (never seen in play) left as the recompiled originals; 16
   functions Native with no adapter (only native callers reach them).
+- The race scene's map (a3291567): `functions/race-scene.md`, 20 new
+  rows (19 seen in play): `RaceScene::` at `[0x826D82D4]` (31,168
+  bytes: seven car slots of 4,288 bytes at +32, 11 lights at +30064,
+  the screen objects at +31152-+31160) and its machine
+  `RaceSceneMachine::` (set up by `sub_8215D808` from `RaceMode::Init`,
+  11 transitions). Two leads merged into it (the post effect users',
+  the race object's), `sub_8215AA88` taken from the course scenery
+  owners' lead. For review: `known-data.md`'s `0x826D82D4` row rewritten
+  (the "7 records at +80" were arrays inside the car slots); notes in
+  `post-effects.md`, `screen-objects.md` and `race-states.md` updated
+  (`Glow::` slots 4-12 now name `Glows::SetParams`; `PostEffects::Get`
+  sets slots 2-12, not 2 and 3); `RaceScene::Destroy` frees the object
+  but leaves the pointer set; `sub_821597F0` stays in `camera-modes.md`
+  (`CameraDirector::Resume`).
 
 ## Run 2026-10-30 23:03 (`b7-loop-30-10-26-2`)
 
