@@ -155,6 +155,7 @@ set(ITC_SOURCES
     src/car_models/raster.cpp
     src/car_models/decals.cpp
     src/car_models/parts.cpp
+    src/car_models/plate.cpp
     src/hooks/save_data.cpp
     src/save_data/save_data.cpp
     src/hooks/race_world.cpp

@@ -9,6 +9,7 @@
 #include "car_models/decals.h"
 #include "car_models/load_slots.h"
 #include "car_models/parts.h"
+#include "car_models/plate.h"
 #include "car_models/raster.h"
 #include "car_models/tga.h"
 #include "car_models/vinyl.h"
@@ -162,6 +163,34 @@ void CarModelsFreePagesAt(PPCContext& ctx, uint8_t* base) {
   __imp__sub_820C3CE0(ctx, base);
 }
 
+void CarModelsMakePlate(PPCContext& ctx, uint8_t* base) {
+  if (!hooks::NativeHeapActive()) {
+    __imp__sub_820ED6D0(ctx, base);
+    return;
+  }
+  const uint64_t regs[4] = {ctx.r7.u64, ctx.r8.u64, ctx.r9.u64, ctx.r10.u64};
+  const uint32_t header_a = ctx.r3.u32, data_a = ctx.r4.u32;
+  const uint32_t header_b = ctx.r5.u32, data_b = ctx.r6.u32;
+  const uint32_t stack = ctx.r1.u32;
+  const uint64_t lr = ctx.lr;
+  std::optional<uint32_t> r3;
+  // Resource::Release from its frame, with the original's return address.
+  guest_call::InFrame(ctx, base, cm::kPlateFrameBytes, 0x820ED8E4, [&](uint32_t) {
+    r3 = cm::MakePlate(base, header_a, data_a, header_b, data_b, regs, stack,
+                       [&ctx, base](uint32_t surface) {
+                         ctx.r3.u64 = surface;
+                         ctx.lr = 0x820ED8E4;
+                         sub_822A67B0(ctx, base);
+                       });
+  });
+  ctx.lr = lr;
+  if (!r3) {
+    __imp__sub_820ED6D0(ctx, base);
+    return;
+  }
+  ctx.r3.u64 = *r3;
+}
+
 void CarModelsDeferRelease(PPCContext& ctx, uint8_t* base) {
   cm::DeferRelease(base, ctx.r3.u32, ctx.r4.u32, ctx.r5.u32, ctx.r6.u32, ctx.r7.u32);
 }
@@ -296,6 +325,7 @@ ITC_CAR_MODELS(820D67E8, CarModelsCockpitLoadSetC)
 ITC_CAR_MODELS(820D7730, CarModelsInteriorLoadParts)
 ITC_CAR_MODELS(820D79B0, CarModelsInteriorLoad)
 ITC_CAR_MODELS(820C3CE0, CarModelsFreePagesAt)
+ITC_CAR_MODELS(820ED6D0, CarModelsMakePlate)
 ITC_CAR_MODELS(820D4508, CarModelsCarModelRelease)
 ITC_CAR_MODELS(820ECF08, CarModelsTextureCreate)
 ITC_CAR_MODELS(820ECFC8, CarModelsTextureFree)

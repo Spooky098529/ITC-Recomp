@@ -54,6 +54,12 @@ void CarModelsInteriorLoad(PPCContext& ctx, uint8_t* base);
 // 0, r5 = MEM_RELEASE as the original leaves them). Natively only while
 // --native_heap routes VirtualFree to the layer and the buffer is its pages.
 void CarModelsFreePagesAt(PPCContext& ctx, uint8_t* base);
+// CarModel::MakePlate sub_820ED6D0: r3 to r6 where the textures go, r7 to
+// r10 and the caller's stack the 48-byte struct; r3 as the original leaves
+// it. Resource::Release a guest call from a 944-byte frame as the
+// original's. Natively only while --native_heap routes the allocations to
+// the layer and memcpy is native.
+void CarModelsMakePlate(PPCContext& ctx, uint8_t* base);
 // sub_820C3F50: r3 = the set (left), r4 to r7 the record's words.
 void CarModelsDeferRelease(PPCContext& ctx, uint8_t* base);
 
