@@ -324,7 +324,9 @@ void RaceScreensPauseMenuOpen(PPCContext& ctx, uint8_t* base) {
 // its plain C++) and AfterRaceMenu::Close (its only caller in play, the race
 // HUD machine's native CloseResults, calls its plain C++) and
 // CareerResults::Update (its only caller in play, the machine's native
-// ResultsUpdate, calls its plain C++); their register steps stay for the
+// ResultsUpdate, calls its plain C++), and PauseMenu::SetArrowA, ShowSlider
+// and ColorItems (their only callers in play, MoveOptions, ShowAdjust and
+// ShowMain, call their plain C++); their register steps stay for the
 // harness.
 
 #define ITC_RACE_SCREENS(address, step)       \
@@ -387,14 +389,11 @@ ITC_RACE_SCREENS(8220CA28, RaceScreensPauseMenuShowVolumeRow)
 ITC_RACE_SCREENS(8220CAB0, RaceScreensPauseMenuShowAdjustRow)
 ITC_RACE_SCREENS(8220C578, RaceScreensPauseMenuConfirmPage)
 ITC_RACE_SCREENS(8220CB38, RaceScreensPauseMenuShowItems)
-ITC_RACE_SCREENS(8220CBF8, RaceScreensPauseMenuSetArrowA)
 ITC_RACE_SCREENS(8220CC60, RaceScreensPauseMenuShowOptions)
 ITC_RACE_SCREENS(8220D0B8, RaceScreensPauseMenuShowVolumes)
-ITC_RACE_SCREENS(8220D130, RaceScreensPauseMenuShowSlider)
 ITC_RACE_SCREENS(8220D5D0, RaceScreensPauseMenuRestoreNodes)
 ITC_RACE_SCREENS(8220DD98, RaceScreensPauseMenuMoveOptions)
 ITC_RACE_SCREENS(8220E1F8, RaceScreensPauseMenuMoveAdjust)
 ITC_RACE_SCREENS(8220EE28, RaceScreensPauseMenuShowMain)
-ITC_RACE_SCREENS(8220E700, RaceScreensPauseMenuColorItems)
 ITC_RACE_SCREENS(8220E888, RaceScreensPauseMenuShowAdjust)
 ITC_RACE_SCREENS(8220FA88, RaceScreensPauseMenuOpen)
