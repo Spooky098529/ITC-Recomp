@@ -74,6 +74,9 @@ struct FileRecord {
 };
 
 FileRecord ReadFile(uint8_t* base, uint32_t file) {
+  // ShaderFile::Parse's work (its record kept on the host) for its native
+  // callers.
+  ITC_NATIVE_RUNNING("sub_822A8568 ShaderFile::Parse");
   const uint32_t header = Load(base, file + 4);
   return {file, ObjectBytes(Load(base, file + 0), header), header + file, Load(base, file + 8)};
 }
@@ -249,6 +252,13 @@ std::optional<uint32_t> PixelShaderCreate(uint8_t* base, uint32_t file) {
 namespace {
 
 void CopyHeaderFrom(uint8_t* base, uint32_t object, uint32_t file, uint32_t fields) {
+  // VertexShader::CopyHeader's or PixelShader::CopyHeader's work for their
+  // native callers.
+  if (fields == kVertexShaderBytes) {
+    ITC_NATIVE_RUNNING("sub_822A9FD8 VertexShader::CopyHeader");
+  } else {
+    ITC_NATIVE_RUNNING("sub_822A9EA8 PixelShader::CopyHeader");
+  }
   const uint32_t bytes = Load(base, file + 4);
   Clear(base, object, fields);
   Require(c_runtime::XMemCpy(base, object + fields, file, bytes), "XMemCpy");

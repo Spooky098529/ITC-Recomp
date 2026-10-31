@@ -55,7 +55,8 @@ ITC_FLAG_BOOL(native_models, true, "ITC",
               "sub_820CE990 over them; the part model's sub_820CE9C8 and Model::SetVinylTextures sub_820CE9F8; Skeleton::ResetPose "
               "sub_82599AF0 and Skeleton::LocalMatrices sub_82599C58 (in src/model_animation/); Model::MaterialCount sub_82594AD8, Model::Material "
               "sub_82594B20, ShaderFile::Parse sub_822A8568, VertexShader::CopyHeader sub_822A9FD8 and "
-              "PixelShader::CopyHeader sub_822A9EA8 (in src/shader_objects/), "
+              "PixelShader::CopyHeader sub_822A9EA8 (in src/shader_objects/; no adapters: only "
+              "Mesh::LoadShaders and Shaders::OnPairLoaded call them, natively), "
               "TextureHeader::Relocate sub_8235A990 (with sub_822A5B68; no adapter: only "
               "Resource::Relocate and XPR::Create call it), Resource::Relocate sub_8235A9F8, "
               "with --native_heap XPR::Create sub_82596F68 and Mesh::LoadShaders sub_82594D20 "
@@ -358,33 +359,10 @@ ITC_MODELS_ACCESSOR(825896D8, ModelsSharedVertexShader)
 ITC_MODELS_ACCESSOR(82589700, ModelsSharedPixelShader)
 ITC_MODELS_ACCESSOR(825896C0, ModelsSetSharedShaders)
 
-// ShaderFile::Parse: r3 = the file, r4 = the record. No return value.
-extern "C" REX_FUNC(sub_822A8568) {
-  REX_FUNC_PROLOGUE();
-  if (!ITC_FLAG(native_models)) {
-    __imp__sub_822A8568(ctx, base);
-    return;
-  }
-  shader_objects::ParseFile(base, ctx.r3.u32, ctx.r4.u32);
-}
-
-// VertexShader::CopyHeader and PixelShader::CopyHeader: r3 = the object, r5
-// = the file's record (r4 unread). No return value.
-extern "C" REX_FUNC(sub_822A9FD8) {
-  REX_FUNC_PROLOGUE();
-  if (!ITC_FLAG(native_models) ||
-      !shader_objects::CopyVertexHeader(base, ctx.r3.u32, ctx.r5.u32)) {
-    __imp__sub_822A9FD8(ctx, base);
-  }
-}
-
-extern "C" REX_FUNC(sub_822A9EA8) {
-  REX_FUNC_PROLOGUE();
-  if (!ITC_FLAG(native_models) ||
-      !shader_objects::CopyPixelHeader(base, ctx.r3.u32, ctx.r5.u32)) {
-    __imp__sub_822A9EA8(ctx, base);
-  }
-}
+// ShaderFile::Parse (sub_822A8568), VertexShader::CopyHeader (sub_822A9FD8)
+// and PixelShader::CopyHeader (sub_822A9EA8) have no adapters: only native
+// callers reach them in play (Mesh::LoadShaders and Shaders::OnPairLoaded, in
+// src/shader_objects/, doing their work on the host).
 
 // Resource::Relocate: r3 = the resource, r4 = the address; r3 as the
 // original leaves it.
