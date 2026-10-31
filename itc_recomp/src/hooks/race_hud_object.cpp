@@ -31,7 +31,10 @@ ITC_FLAG_BOOL(native_race_hud_object, true, "ITC",
               "switches those; StartCountdown sub_82212270, StartMovie1 sub_82212718, "
               "FinishMovie1 sub_82212878, DrawWarning sub_82212AC8, RunMovie1 sub_82212AF8, "
               "RunItem sub_82212B08 (UiMovie::Run and FinishNamed through their overrides), "
-              "RaceScreens::MovieMask sub_82211BE8, RaceHud::Init sub_82215260) "
+              "RaceScreens::MovieMask sub_82211BE8, RaceHud::Init sub_82215260, Draw sub_822128A8 "
+              "(UiMovie::Run and the mirror's sub_8211BEE8 through their overrides), "
+              "UpdateWarning sub_82212C50, UpdateRecordingFull sub_82212E60 (UiMovie::Finish "
+              "and FinishNamed through their overrides)) "
               "natively instead of through the translated code (the same writes; checked by "
               "--run_harnesses=race_hud_object)");
 
@@ -294,6 +297,22 @@ void RaceHudObjectInit(PPCContext& ctx, uint8_t* base) {
   ctx.r3.u64 = rh::Init(base, ctx.r3.u32, ctx.r1.u32);
 }
 
+void RaceHudObjectDraw(PPCContext& ctx, uint8_t* base) {
+  GuestCalls guest(ctx, base);
+  ctx.r3.u64 = rh::Draw(base, ctx.r3.u32, ctx.r1.u32, guest.calls());
+}
+
+void RaceHudObjectUpdateWarning(PPCContext& ctx, uint8_t* base) {
+  GuestCalls guest(ctx, base);
+  ctx.r3.u64 = rh::UpdateWarning(base, ctx.r3.u32, ctx.r1.u32, guest.calls());
+}
+
+void RaceHudObjectUpdateRecordingFull(PPCContext& ctx, uint8_t* base) {
+  ctx.fpscr.disableFlushMode();
+  GuestCalls guest(ctx, base);
+  ctx.r3.u64 = rh::UpdateRecordingFull(base, ctx.r3.u32, ctx.r4.s32, ctx.r1.u32, guest.calls());
+}
+
 }  // namespace hooks
 
 // The adapters: the register steps above, or the originals with the flag
@@ -338,3 +357,6 @@ ITC_RACE_HUD_OBJECT(82212AF8, RaceHudObjectRunMovie1)
 ITC_RACE_HUD_OBJECT(82212B08, RaceHudObjectRunItem)
 ITC_RACE_HUD_OBJECT(82211BE8, RaceHudObjectMovieMask)
 ITC_RACE_HUD_OBJECT(82215260, RaceHudObjectInit)
+ITC_RACE_HUD_OBJECT(822128A8, RaceHudObjectDraw)
+ITC_RACE_HUD_OBJECT(82212C50, RaceHudObjectUpdateWarning)
+ITC_RACE_HUD_OBJECT(82212E60, RaceHudObjectUpdateRecordingFull)

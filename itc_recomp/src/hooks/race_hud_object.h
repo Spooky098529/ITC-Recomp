@@ -81,5 +81,10 @@ void RaceHudObjectRunMovie1(PPCContext& ctx, uint8_t* base);
 void RaceHudObjectRunItem(PPCContext& ctx, uint8_t* base);
 void RaceHudObjectMovieMask(PPCContext& ctx, uint8_t* base);
 void RaceHudObjectInit(PPCContext& ctx, uint8_t* base);
+// RaceHud::Draw sub_822128A8, UpdateWarning sub_82212C50: r3 = the HUD;
+// UpdateRecordingFull sub_82212E60: r3 = the HUD, r4 = HasRoom's.
+void RaceHudObjectDraw(PPCContext& ctx, uint8_t* base);
+void RaceHudObjectUpdateWarning(PPCContext& ctx, uint8_t* base);
+void RaceHudObjectUpdateRecordingFull(PPCContext& ctx, uint8_t* base);
 
 }  // namespace hooks

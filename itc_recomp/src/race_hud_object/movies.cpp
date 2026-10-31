@@ -4,6 +4,7 @@
 #include "race_hud_object/race_hud_object.h"
 
 #include "base/log.h"
+#include "camera_modes/steps.h"
 #include "guest.h"
 #include "ui_movies/game.h"
 
@@ -80,6 +81,69 @@ uint64_t RunItem(uint8_t* base, uint32_t hud, uint32_t sp, const Calls& calls) {
   // sub_82106540(200, 500, 0, 0x8200F710, +460): empty (audio.md), so
   // nothing but its r3, the 200 it was handed.
   return 200;
+}
+
+uint64_t Draw(uint8_t* base, uint32_t hud, uint32_t sp, const Calls& calls) {
+  ITC_NATIVE_RUNNING("sub_822128A8 RaceHud::Draw");
+  const uint32_t frame = sp - 96;
+  guest::StoreU32(base, frame, sp);
+  uint64_t r3 = calls.Call(kRun, frame, 0x822128C8, Movie(base, hud, kHudDashboard), 0);
+  if (guest::LoadU32(base, hud + 472) == 0 || guest::LoadU32(base, hud + 12) == 0) {
+    return r3;
+  }
+  const uint32_t mirror = ui_movies::FindNode(base, Movie(base, hud, kHudDashboard), kNone, 19);
+  return calls.Call(kDrawMirror, frame, 0x822128F4, mirror);
+}
+
+uint64_t UpdateWarning(uint8_t* base, uint32_t hud, uint32_t sp, const Calls& calls) {
+  ITC_NATIVE_RUNNING("sub_82212C50 RaceHud::UpdateWarning");
+  const uint32_t frame = sp - 96;
+  guest::StoreU32(base, frame, sp);
+  const uint32_t car = guest::LoadU32(base, hud + kHudVehicle);
+  const uint32_t wrong_way = guest::LoadU32(base, car + 6168);
+  if (wrong_way == 0) {
+    if (guest::LoadU32(base, hud + 468) == 0) {
+      return hud;
+    }
+    const uint64_t r3 =
+        calls.Call(kFinish, frame, 0x82212C90, Movie(base, hud, kHudWarning), kNone, 0);
+    guest::StoreU32(base, hud + 468, 0);
+    return r3;
+  }
+  if (guest::LoadU32(base, hud + 468) != 0) {
+    return hud;
+  }
+  calls.Call(kFinish, frame, 0x82212CBC, Movie(base, hud, kHudWarning), kNone, 0);
+  ui_movies::Play(base, Movie(base, hud, kHudWarning), kNone, 0, 0, 0, 0, 0);
+  const uint32_t movie = Movie(base, hud, kHudWarning);
+  const uint64_t r3 =
+      MovedR3(ui_movies::MoveAnimation(base, movie, kNone, 0, true), frame, movie);
+  guest::StoreU32(base, hud + 468, 1);
+  return r3;
+}
+
+uint64_t UpdateRecordingFull(uint8_t* base, uint32_t hud, int32_t room, uint32_t sp,
+                             const Calls& calls) {
+  ITC_NATIVE_RUNNING("sub_82212E60 RaceHud::UpdateRecordingFull");
+  const uint32_t frame = sp - 96;
+  guest::StoreU32(base, frame, sp);
+  if (room == 0) {
+    if (guest::LoadU32(base, hud + 492) != 0) {
+      return hud;
+    }
+    const uint32_t dashboard = Movie(base, hud, kHudDashboard);
+    guest::StoreU32(base, hud + 492, 1);
+    calls.Call(kFinishNamed, frame, 0x82212E9C, dashboard, 6);
+    return ui_movies::PlayNamed(base, Movie(base, hud, kHudDashboard), 6, 0, 0, 0, 0);
+  }
+  if (room != 1) {
+    return hud;
+  }
+  const uint32_t dashboard = Movie(base, hud, kHudDashboard);
+  guest::StoreU32(base, hud + 492, 0);
+  const uint32_t node = ui_movies::FindNode(base, dashboard, kNone, 5);
+  camera_modes::steps::Stfs(base, node + 68, camera_modes::steps::Lfs(base, kZero));
+  return node;
 }
 
 uint32_t MovieMask(uint32_t kind) {

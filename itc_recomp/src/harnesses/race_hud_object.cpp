@@ -1114,6 +1114,59 @@ void Movies(Context& h, const World& w) {
         },
         __imp__sub_82215260, hooks::RaceHudObjectInit, spec);
   }
+  {
+    // The mirror's node (19) a primitive of up to 4 vertices from up to 3
+    // texture entries (sub_8211BEE8 runs: its recorder call is the
+    // stand-in's).
+    Spec spec;
+    spec.frame = 96;
+    spec.saves = 16;
+    Group(
+        h, w, "RaceHud::Draw (sub_822128A8)", 100,
+        [&](PPCContext& t, Random& r, const World& w) {
+          const uint32_t hud = w.hud.address;
+          guest::StoreU32(h.base, hud + 472, r.Below(3) == 0 ? 0 : r.Below(3));
+          guest::StoreU32(h.base, hud + 12, r.Below(3) == 0 ? 0 : 1);
+          const uint32_t mirror = DashboardNode(h.base, w, 0xFFFFFFFFu, 19);
+          guest::StoreU32(h.base, mirror + 112, r.Below(4));
+          guest::StoreU32(h.base, mirror + 116, r.Below(5));
+          t.r3.u64 = hud;
+        },
+        __imp__sub_822128A8, hooks::RaceHudObjectDraw, spec);
+  }
+  {
+    // The car's +6168 against +468, each 0 or not.
+    Spec spec;
+    spec.frame = 96;
+    spec.saves = 16;
+    Group(
+        h, w, "RaceHud::UpdateWarning (sub_82212C50)", 200,
+        [&](PPCContext& t, Random& r, const World& w) {
+          const uint32_t hud = w.hud.address;
+          ShapeAnimations(h.base, w, hud_movie(616), r);
+          const uint32_t car = guest::LoadU32(h.base, hud + rh::kHudVehicle);
+          guest::StoreU32(h.base, car + 6168, r.Below(2) == 0 ? 0 : r.Below(3) == 0 ? r.Next() : 1);
+          guest::StoreU32(h.base, hud + 468, r.Below(2) == 0 ? 0 : 1);
+          t.r3.u64 = hud;
+        },
+        __imp__sub_82212C50, hooks::RaceHudObjectUpdateWarning, spec);
+  }
+  {
+    // HasRoom's 0, 1 or anything; +492 0 or not.
+    Spec spec;
+    spec.frame = 96;
+    spec.saves = 16;
+    Group(
+        h, w, "RaceHud::UpdateRecordingFull (sub_82212E60)", 200,
+        [&](PPCContext& t, Random& r, const World& w) {
+          const uint32_t hud = w.hud.address;
+          ShapeAnimations(h.base, w, hud_movie(608), r);
+          guest::StoreU32(h.base, hud + 492, r.Below(2) == 0 ? 0 : 1);
+          t.r3.u64 = hud;
+          t.r4.u64 = r.Below(4) == 0 ? r.Next() : r.Below(2);
+        },
+        __imp__sub_82212E60, hooks::RaceHudObjectUpdateRecordingFull, spec);
+  }
 }
 
 }  // namespace

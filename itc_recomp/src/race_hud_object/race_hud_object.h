@@ -277,6 +277,22 @@ uint64_t RunMovie1(uint8_t* base, uint32_t hud, uint32_t sp, uint32_t lr, const 
 // run (UiMovie::Run(+604, 0) through `calls`, from a 96-byte frame) and the
 // empty sub_82106540 skipped (r3 200).
 uint64_t RunItem(uint8_t* base, uint32_t hud, uint32_t sp, const Calls& calls);
+// RaceHud::Draw (sub_822128A8): the dashboard run (UiMovie::Run(+608, 0)),
+// then when +472 and +12 the mirror drawn (RaceHud::DrawMirror on node
+// 19), both through `calls` from a 96-byte frame. The last call's r3.
+uint64_t Draw(uint8_t* base, uint32_t hud, uint32_t sp, const Calls& calls);
+// RaceHud::UpdateWarning (sub_82212C50): by the car's +6168 against +468:
+// cleared while shown, the warning movie (+616) finished (UiMovie::Finish
+// through `calls`) and +468 = 0; set while hidden, finished, played and
+// looped (Play, Loop's plain C++) and +468 = 1. From a 96-byte frame. r3 as
+// the original leaves it (the HUD when nothing changed).
+uint64_t UpdateWarning(uint8_t* base, uint32_t hud, uint32_t sp, const Calls& calls);
+// RaceHud::UpdateRecordingFull (sub_82212E60): `room` (InputRecording::
+// HasRoom's) 0 the first time: +492 = 1, the dashboard's named animation 6
+// finished (through `calls`) and played; 1: +492 = 0 and node 5's alpha
+// (+68) 0.0. From a 96-byte frame. PlayNamed's r3, the node, or the HUD.
+uint64_t UpdateRecordingFull(uint8_t* base, uint32_t hud, int32_t room, uint32_t sp,
+                             const Calls& calls);
 // RaceScreens::MovieMask (sub_82211BE8, with its jump table's case 0
 // sub_82211C1C merged): the movies to load for the race kind, 0 above 10.
 uint32_t MovieMask(uint32_t kind);
