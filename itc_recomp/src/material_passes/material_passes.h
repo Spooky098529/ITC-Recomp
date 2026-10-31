@@ -122,4 +122,29 @@ void SetMaterialFields(uint8_t* base, uint32_t frame, const uint64_t args[8]);
 bool SetMaterials(uint8_t* base, uint32_t model, const uint64_t regs[7], uint32_t sp,
                   std::optional<uint64_t>* r3);
 
+// --- A projector's matrices (projector.cpp) ---
+
+// Matrix::LookAt (sub_820D1D70): rows 0 = the cross of the direction and
+// the up vector, 2 = the direction (each normalized, kept where its length
+// is 0), 1 = their cross, built in its frame (sp - 224: the identity at +80
+// copied to +144, the rows over it), translated by `position`
+// (car_physics::MatrixMultiplyTranslation, its frame below) and inverted
+// into `out` (matrix_math::Inverse).
+void LookAt(uint8_t* base, uint32_t out, uint32_t position, uint32_t direction, uint32_t up,
+            uint32_t sp);
+struct ProjectorArgs {
+  uint32_t object;  // r3: +16 the world matrix W, +464 a direction
+  uint32_t matrix;  // r4: M
+  uint32_t scale;   // r5: out, a scale matrix
+  uint32_t view;    // r6: out, W's inverse x the look-at matrix
+  uint32_t point;   // r7
+  uint32_t side;    // r9: 0 or not
+};
+// Projector::Matrices (sub_820D1EB8): r3 as the original returns it (0 when
+// the side's axis turned by M faces away from the object's direction, else
+// 1, the matrices written); its frame (sp - 544) as the original leaves it.
+// nullopt where c_runtime::Memcpy refuses the last copy (the original runs
+// there).
+std::optional<uint32_t> ProjectorMatrices(uint8_t* base, const ProjectorArgs& args, uint32_t sp);
+
 }  // namespace material_passes

@@ -31,7 +31,7 @@ namespace harness {
 namespace {
 
 constexpr uint32_t kBlockBytes = 0x4000;
-constexpr uint32_t kStackBytes = 512;  // below the call's stack pointer
+constexpr uint32_t kStackBytes = 1536;  // below the call's stack pointer
 constexpr uint32_t kCallerBytes = 256;  // above it: the caller's frame
 
 void RandomBytes(uint8_t* base, uint32_t address, uint32_t bytes, Random& r) {
@@ -594,6 +594,94 @@ void Paints(Context& h, uint32_t block, const Layout& floats) {
   }
 }
 
+// Matrix::LookAt's register steps (no adapter: only Projector::Matrices
+// calls it): r3 = out, r4 = the position, r5 = the direction, r6 = the up
+// vector.
+void NativeLookAt(PPCContext& ctx, uint8_t* base) {
+  ctx.fpscr.disableFlushMode();
+  material_passes::LookAt(base, ctx.r3.u32, ctx.r4.u32, ctx.r5.u32, ctx.r6.u32, ctx.r1.u32);
+  ctx.fpscr.enableFlushMode();
+}
+
+// A matrix's words: mostly a rotation-like spread (-1 to 1) with a
+// translation, sometimes an edge.
+void RandomMatrix(uint8_t* base, uint32_t at, Random& r) {
+  for (uint32_t i = 0; i < 16; i++) {
+    const float range = i >= 12 ? 100.0f : 1.0f;
+    guest::StoreU32(base, at + 4 * i, Bits(r.Below(16) == 0 ? RandomFloat(r, range)
+                                                             : (float(r.Below(2001)) / 1000.0f - 1.0f) * range));
+  }
+}
+
+void Projectors(Context& h, uint32_t block) {
+  // Inputs at +0x100 (the object: +16 W, +464 its direction), +0x400 (M),
+  // +0x500 (the point, the direction and up vector for LookAt), outputs at
+  // +0x600 and +0x700.
+  const uint32_t object = block + 0x100;
+  const uint32_t matrix = block + 0x400;
+  const uint32_t vectors = block + 0x500;
+  const uint32_t scale = block + 0x600;
+  const uint32_t view = block + 0x700;
+  Layout outputs;
+  outputs.Range(scale, 16);
+  outputs.Range(view, 16);
+  {
+    Results results("Matrix::LookAt (sub_820D1D70)");
+    Layout layout = outputs;
+    layout.saves = 16;  // lr and r31
+    for (int c = 0; c < 128; c++) {
+      Case(
+          h, results, block, h.random.Next(),
+          [&](PPCContext& t, Random& r) {
+            for (uint32_t i = 0; i < 12; i++) {
+              const float v = c % 8 == 7 && i < 8 ? 0.0f  // a zero direction or up vector
+                              : r.Below(16) == 0 ? RandomFloat(r, 10.0f)
+                                                 : float(int32_t(r.Below(2001)) - 1000) / 100.0f;
+              guest::StoreU32(h.base, vectors + 4 * i, Bits(v));
+            }
+            t.r3.u64 = view;
+            t.r4.u64 = vectors + 32;
+            t.r5.u64 = vectors + 0;
+            t.r6.u64 = vectors + 16;
+          },
+          layout, __imp__sub_820D1D70, NativeLookAt, fmt::format("case {}", c));
+    }
+    results.Report();
+  }
+  {
+    Results results("Projector::Matrices (sub_820D1EB8)");
+    Layout layout = outputs;
+    layout.saves = 112;  // v127, f27 to f31, r26 to r31 and lr
+    // Matrix::LookAt's lr and r31 saves (its frame's top, below this one's).
+    layout.scrub = [&](uint32_t sp) { StoreU64(h.base, sp - 544 - 16, 0), StoreU64(h.base, sp - 544 - 8, 0); };
+    for (int c = 0; c < 256; c++) {
+      Case(
+          h, results, block, h.random.Next(),
+          [&](PPCContext& t, Random& r) {
+            RandomMatrix(h.base, object + 16, r);
+            RandomMatrix(h.base, matrix, r);
+            for (uint32_t i = 0; i < 4; i++) {
+              guest::StoreU32(h.base, object + 464 + 4 * i,
+                              Bits(float(int32_t(r.Below(2001)) - 1000) / 1000.0f));
+              const float p = i == 3 ? 1.0f
+                              : r.Below(16) == 0 ? RandomFloat(r, 50.0f)
+                                                 : float(int32_t(r.Below(20001)) - 10000) / 100.0f;
+              guest::StoreU32(h.base, vectors + 4 * i, Bits(p));
+            }
+            t.r3.u64 = object;
+            t.r4.u64 = matrix;
+            t.r5.u64 = scale;
+            t.r6.u64 = view;
+            t.r7.u64 = vectors;
+            t.r9.u64 = c % 2;
+          },
+          layout, __imp__sub_820D1EB8, hooks::MaterialPassesProjectorMatrices,
+          fmt::format("case {}", c));
+    }
+    results.Report();
+  }
+}
+
 }  // namespace
 
 void MaterialPasses(Context& h) {
@@ -602,6 +690,7 @@ void MaterialPasses(Context& h) {
   Colors(h, block);
   Tables(h, block);
   Passes(h, block);
+  Projectors(h, block);
   memory::Free(allocation);
 }
 

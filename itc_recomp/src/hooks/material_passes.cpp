@@ -17,7 +17,9 @@ ITC_FLAG_BOOL(native_material_passes, true, "ITC",
               "SetMaterialFields sub_820D3250, Model::MaterialTotal sub_82594AC0 and "
               "Model::MaterialAt sub_82594B00, no adapters: only it calls them), the paint passes "
               "PartModel::SetPaint sub_820D0EA8, SetPaintBody sub_820D1378 and ApplyPalette "
-              "sub_820D2EA8 (calling the colors' plain C++)) natively "
+              "sub_820D2EA8 (calling the colors' plain C++), Projector::Matrices sub_820D1EB8 (with "
+              "Matrix::LookAt sub_820D1D70, no adapter: only it calls it; the matrix functions' "
+              "plain C++, Copy and Multiply noted for frame interpolation)) natively "
               "instead of through the translated code (the same writes; checked by "
               "--run_harnesses=material_passes)");
 
@@ -110,6 +112,19 @@ void MaterialPassesApplyPalette(PPCContext& ctx, uint8_t* base) {
   ctx.r3.u64 = mp::ApplyPalette(base, ctx.r3.u32, ctx.r1.u32);
 }
 
+void MaterialPassesProjectorMatrices(PPCContext& ctx, uint8_t* base) {
+  const mp::ProjectorArgs args{ctx.r3.u32, ctx.r4.u32, ctx.r5.u32,
+                               ctx.r6.u32, ctx.r7.u32, ctx.r9.u32};
+  ctx.fpscr.disableFlushMode();
+  const auto r3 = mp::ProjectorMatrices(base, args, ctx.r1.u32);
+  if (!r3) {
+    __imp__sub_820D1EB8(ctx, base);
+    return;
+  }
+  ctx.fpscr.disableFlushMode();
+  ctx.r3.u64 = *r3;
+}
+
 }  // namespace hooks
 
 // The adapters: the register steps above, or the originals with the flag
@@ -140,3 +155,4 @@ ITC_MATERIAL_PASSES(820D3318, MaterialPassesSetMaterials)
 ITC_MATERIAL_PASSES(820D0EA8, MaterialPassesSetPaint)
 ITC_MATERIAL_PASSES(820D1378, MaterialPassesSetPaintBody)
 ITC_MATERIAL_PASSES(820D2EA8, MaterialPassesApplyPalette)
+ITC_MATERIAL_PASSES(820D1EB8, MaterialPassesProjectorMatrices)
