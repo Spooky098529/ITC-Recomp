@@ -44,10 +44,16 @@ file's history. What's left to see in a drive, from every run:
   play ours, `--native_alt_hud`, code in `src/alt_hud/`, 21 harness
   lines 0 differing; not called in an attract race (`SetUp`, `Tick`,
   `RunMovie` counted 0; `MenuList::Release` twice, from the front end);
-  two rows corrected; nothing ready left). Step: validation (agent
-  running).
+  two rows corrected; nothing ready left). Validated (`itc_2920`, 120
+  s: race 60 s, 0 errors, harnesses 58.6 s; replay `itc_2921` ok): 21
+  of 21 harness lines; 2 ran in the race, 6 in the replay, 13 to drive
+  (the tick's side). Subsystem 1 finished.
 
 ## Done
+
+- The alternate HUD (subsystem 1): `alt-hud.md`, 21 of 21 in play, one
+  migration; `--native_alt_hud`; 12983d8d..f8054cd4. Validated
+  (`itc_2920`).
 
 - The shader pair's load callback (cleanup lead): `models.md`,
   `Shaders::OnPairLoaded` with 7 adapters removed; `--native_models`;
@@ -79,14 +85,20 @@ file's history. What's left to see in a drive, from every run:
 - After its validation (`itc_2903`, 120 s: race 61 s, 0 errors, every
   harness 0 differing but the expected groups): ours 3515, work left
   2882.
+- After the shader pair callback's migration (`attract_race.sh 40`:
+  race 36-38 s, 0 errors, models, shader_objects and scenery_lists 0
+  differing): ours 3516, work left 2881 (wrapped 103, known 478,
+  unknown 2300).
+- After its validation (`itc_2911`, 120 s: race 61 s, 0 errors, every
+  harness 0 differing but the expected groups): ours 3516, work left
+  2881.
 - After the alternate HUD's map: ours 3516, work left 2881 (wrapped
   103, known 499, unknown 2279).
 - After the alternate HUD's migration (`itc_2919`: race 37 s, 0
   errors, alt_hud 0 differing): ours 3537, work left 2860 (wrapped 103,
   known 478, unknown 2279).
-- After the shader pair callback's migration (`attract_race.sh 40`:
-  race 36-38 s, 0 errors, models, shader_objects and scenery_lists 0
-  differing): ours 3516, work left 2881 (wrapped 103, known 478,
-  unknown 2300).
+- After its validation (`itc_2920`, 120 s: race 60 s, 0 errors, every
+  harness 0 differing but the expected groups): ours 3537, work left
+  2860.
 
 ## Stopped

@@ -16,6 +16,19 @@ function goes from this list when a log shows its `native running
 (game):` line (say which log in the commit). A run with nothing left
 here loses its heading.
 
+## Run 2026-10-31 13:47 (`b7-loop-31-10-26`)
+
+- The alternate HUD (attract race `itc_2920`, replay `itc_2921`, ok;
+  `alt-hud.md`; the replay's race set it up but never ticked it, so
+  probably never showed it): `sub_82217AC8` AltHud::Tick,
+  `sub_82216C00` AltHud::RunMovie, `sub_8220BF00` MenuList::PressedX,
+  `sub_82216E00` AltHud::SetSpeed, `sub_82217A30`
+  AltHud::UpdateExtraGauges, `sub_82217460` AltHud::SetGear,
+  `sub_822173E8` AltHud::SetTach, `sub_822174E0` AltHud::SetNode25,
+  `sub_822175A0` AltHud::SetBar, `sub_82217538` AltHud::SetBoost,
+  `sub_82217638` AltHud::SetThrottle, `sub_82217690` AltHud::SetBrake,
+  `sub_822176E8` AltHud::SetSteering.
+
 ## Run 2026-10-30 23:03 (`b7-loop-30-10-26-2`)
 
 - The race HUD object, migration 2 (attract race `itc_2893`, replay

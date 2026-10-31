@@ -2674,6 +2674,7 @@ B7. **The game logic inside**: everything else, subsystem by subsystem,
 | 2026-10-31 | The car models (already mapped: the load slots and shared loads, `LoadSetA` and `B`, `LoadExterior` with the team emblem, decals and vinyl textures, the wheels' set-up with the rims and brakes, the interior's set c body, parts and `CarInterior::Load`, `CarModel::MakePlate`, the file-loaded callbacks, `ReloadDecals`), with `GetLastError` (`functions.md`, no flag, as SetLastError) and `Skeleton::LocalMatrices` (`models.md`) | `car-models.md` | 48 of 50 in play (two migrations; the +3724 = 1 image branch `sub_820C4E68`, found running though not in the coverage list, stays on the originals, a lead, so `Vinyl::DrawDecal`'s adapter stays) | `--native_car_models` (with `--native_models`) |
 | 2026-10-31 | The part models' material passes (`PartModel::SetPaint`, `SetPaintBody` and `ApplyPalette` with `Color::HsvToRgb` and `HsvToRgb8`, `PaintPalette::Init`, the one-field passes, `SetMaterials` with `Model::MaterialTotal` and `MaterialAt`, `Projector::Matrices` with `Matrix::LookAt`, `Matrix::TransposeRotation`, four table lookups) | `material-passes.md` | 22 of 22 in play (two migrations; the adapters stay while the scene loaders' walks and the second set's objects, recompiled, call them) | `--native_material_passes` |
 | 2026-10-31 | The race HUD object (`RaceHud::` at +16 of the race screens' holder `[0x826D84F0]`: its UI movies, the dashboard's gauges and digits, the rear-view mirror's render target, the countdown, the warning, the expressway sign and place names from the track zones, the item popup, the timer, the tick and draw; `RaceScreens::Init` with its +1004 object's maker) | `race-hud-object.md` | 45 of 58 in play (two migrations; the rest calls the menu sound `sub_821103F0`, `sub_8211D930`, `sub_8211E370` or the other in-race screens; stopped at the last validation: `App::App` and `App::Create`'s harnesses differ since 83b2b76) | `--native_race_hud_object` |
+| 2026-10-31 | The alternate HUD (`AltHud::`, the race HUD holder's object at +1004: a second dashboard on UI movie 22 with the race HUD's gauges and the input record's throttle, brake and steering, probably the attract or replay races'; its set-up, tick, movie and destroy, with the menu list helpers `MenuList::Release` and `PressedX`) | `alt-hud.md` | 21 of 21 in play (one migration; its tick not seen in an attract race or the replay) | `--native_alt_hud` |
 
     The first run (2026-10-22, branch `b7-loop-test`): every harness at 0 differing, attract races at 20-21 s with no errors,
     and a race the user drove looked right. Ours went from 162 to 335 (work
@@ -4197,3 +4198,17 @@ validation's 60. The boundary: 449 functions (916 pairs): overridden
 called, 56 with a live caller. B7 (`b7_status.py`): ours 3,514, work
 left 2,883 (Wrapped 103, with a row 480, no row yet 2,300), from 2,928
 (from 2,974 at the run's start).
+
+**2026-10-31, the alternate HUD (branch `b7-loop-31-10-26`):** the
+twenty-seventh run's first subsystem, mapped and made native in one
+migration (`alt-hud.md`, `--native_alt_hud`, `src/alt_hud/`): the race
+HUD holder's object at +1004, a second dashboard on UI movie 22, 21 of
+the 21 functions seen in play. Before it, two cleanup leads: `Model::RecordMaterials`
+(`sub_820CECA0`) and the shader pair's load callback (`sub_820A06D0`)
+under `--native_models`, with eight adapters removed. The validation's
+attract race is 120 s from this run (the user's call, 2026-10-31): the
+harnesses take ~58 s. The boundary: 449 functions (916 pairs):
+overridden 108, Native 34, Dropped 26, never called 70, live 211.
+Imports: 186 called, 56 with a live caller. B7 (`b7_status.py`): ours
+3,537, work left 2,860 (Wrapped 103, with a row 478, no row yet 2,279),
+from 2,883 at the run's start.
