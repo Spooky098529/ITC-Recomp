@@ -10,7 +10,7 @@ file's history. What's left to see in a drive, from every run:
 
 - Run started 2026-10-31 13:47 on `b7-loop-31-10-26`, from e25e6ac;
   summary `b7-loop-2026-10-31-1347.md`.
-- Limit for this run: 3 subsystems; 0 taken.
+- Limit for this run: 3 subsystems; 1 taken.
 - The validation agent's race is `attract_race.sh 120` from this run
   (the user's call, 2026-10-31: the harnesses took 56.7 of the 60 s).
 - Cleanup lead (no mapping, not counted): the top of `leads.md`, the
@@ -30,9 +30,20 @@ file's history. What's left to see in a drive, from every run:
   adapter kept (a function pointer), 120 cases 0 differing; 56bb7d82,
   b7789d24: 7 adapters removed, `ShaderFile::Parse`, the two
   `CopyHeader`s, the two shaders' `Init`, `TextureProvider::Reserve`,
-  `SetSharedShaders`). Step: validation (agent running).
+  `SetSharedShaders`). Validated (`itc_2911`, 120 s: race 61 s, 0
+  errors, harnesses 57.0 s): 8 of 8 harness lines, all ran in play,
+  none to drive. Done.
+
+- Subsystem 1 of 3: the race HUD holder's object at +1004
+  (`sub_82216BA8`...`sub_82217AC8`; picked as seen in play, updated
+  from the race flow, 5 of its 6 roots ready). Step: mapping (agent
+  running).
 
 ## Done
+
+- The shader pair's load callback (cleanup lead): `models.md`,
+  `Shaders::OnPairLoaded` with 7 adapters removed; `--native_models`;
+  f0e75f6d..b7789d24. Validated (`itc_2911`).
 
 - `Model::RecordMaterials` (cleanup lead): `models.md`, with the vertex
   declaration's adapter removed; `--native_models`; 0c226b78..8de457d4.
