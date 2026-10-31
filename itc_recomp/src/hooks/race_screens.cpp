@@ -25,7 +25,9 @@ ITC_FLAG_BOOL(native_race_screens, true, "ITC",
               "AfterRaceMenu:: and RaceDialog::Update, the pages' handlers through the function "
               "table; CareerResults::Start; PauseMenu::StepVolume and StepAdjust; the pause menu's "
               "transitions RunTen, BackToMain, CloseMain, MoveMain, ShowOptionsRow, ToggleOptions, "
-              "ShowVolumeRow and ShowAdjustRow, ConfirmPage, ShowItems, SetArrowA and ShowOptions, "
+              "ShowVolumeRow, ShowAdjustRow, MoveOptions, MoveAdjust and ShowMain, ConfirmPage, "
+              "ShowItems, SetArrowA, ShowOptions, ShowVolumes, ShowSlider, RestoreNodes, "
+              "ColorItems, ShowAdjust and Open, "
               "the UI movie calls through their overrides) natively instead "
               "of through the translated code (the same writes; checked by "
               "--run_harnesses=race_screens)");
@@ -254,6 +256,9 @@ ITC_RACE_SCREENS_TRANSITION(ShowOptionsRow)
 ITC_RACE_SCREENS_TRANSITION(ToggleOptions)
 ITC_RACE_SCREENS_TRANSITION(ShowVolumeRow)
 ITC_RACE_SCREENS_TRANSITION(ShowAdjustRow)
+ITC_RACE_SCREENS_TRANSITION(MoveOptions)
+ITC_RACE_SCREENS_TRANSITION(MoveAdjust)
+ITC_RACE_SCREENS_TRANSITION(ShowMain)
 #undef ITC_RACE_SCREENS_TRANSITION
 
 void RaceScreensPauseMenuConfirmPage(PPCContext& ctx, uint8_t* base) {
@@ -273,6 +278,41 @@ void RaceScreensPauseMenuSetArrowA(PPCContext& ctx, uint8_t* base) {
 
 void RaceScreensPauseMenuShowOptions(PPCContext& ctx, uint8_t* base) {
   ctx.r3.u64 = race_screens::PauseMenuShowOptions(base, ctx.r1.u32);
+}
+
+void RaceScreensPauseMenuShowVolumes(PPCContext& ctx, uint8_t* base) {
+  GuestCalls guest(ctx, base);
+  ctx.r3.u64 = race_screens::PauseMenuShowVolumes(base, ctx.r1.u32, guest.calls());
+}
+
+void RaceScreensPauseMenuShowSlider(PPCContext& ctx, uint8_t* base) {
+  ctx.fpscr.disableFlushMode();
+  GuestCalls guest(ctx, base);
+  ctx.r3.u64 =
+      race_screens::PauseMenuShowSlider(base, ctx.r3.u32, ctx.r4.u64, ctx.r1.u32, guest.calls());
+}
+
+void RaceScreensPauseMenuRestoreNodes(PPCContext& ctx, uint8_t* base) {
+  GuestCalls guest(ctx, base);
+  ctx.r3.u64 =
+      race_screens::PauseMenuRestoreNodes(base, ctx.r3.u32, ctx.r4.u32, ctx.r1.u32, guest.calls());
+}
+
+void RaceScreensPauseMenuColorItems(PPCContext& ctx, uint8_t* base) {
+  ctx.r3.u64 = race_screens::PauseMenuColorItems(base, ctx.r1.u32);
+}
+
+void RaceScreensPauseMenuShowAdjust(PPCContext& ctx, uint8_t* base) {
+  ctx.fpscr.disableFlushMode();
+  GuestCalls guest(ctx, base);
+  ctx.r3.u64 = race_screens::PauseMenuShowAdjust(base, ctx.r1.u32, guest.calls());
+}
+
+void RaceScreensPauseMenuOpen(PPCContext& ctx, uint8_t* base) {
+  ctx.fpscr.disableFlushMode();
+  GuestCalls guest(ctx, base);
+  ctx.r3.u64 = race_screens::PauseMenuOpen(base, ctx.r3.u32, ctx.r4.u64, ctx.r5.u64, ctx.r1.u32,
+                                           guest.calls());
 }
 
 }  // namespace hooks
@@ -349,3 +389,12 @@ ITC_RACE_SCREENS(8220C578, RaceScreensPauseMenuConfirmPage)
 ITC_RACE_SCREENS(8220CB38, RaceScreensPauseMenuShowItems)
 ITC_RACE_SCREENS(8220CBF8, RaceScreensPauseMenuSetArrowA)
 ITC_RACE_SCREENS(8220CC60, RaceScreensPauseMenuShowOptions)
+ITC_RACE_SCREENS(8220D0B8, RaceScreensPauseMenuShowVolumes)
+ITC_RACE_SCREENS(8220D130, RaceScreensPauseMenuShowSlider)
+ITC_RACE_SCREENS(8220D5D0, RaceScreensPauseMenuRestoreNodes)
+ITC_RACE_SCREENS(8220DD98, RaceScreensPauseMenuMoveOptions)
+ITC_RACE_SCREENS(8220E1F8, RaceScreensPauseMenuMoveAdjust)
+ITC_RACE_SCREENS(8220EE28, RaceScreensPauseMenuShowMain)
+ITC_RACE_SCREENS(8220E700, RaceScreensPauseMenuColorItems)
+ITC_RACE_SCREENS(8220E888, RaceScreensPauseMenuShowAdjust)
+ITC_RACE_SCREENS(8220FA88, RaceScreensPauseMenuOpen)

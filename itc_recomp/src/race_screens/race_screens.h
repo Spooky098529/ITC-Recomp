@@ -308,5 +308,54 @@ uint32_t PauseMenuSetArrowA(uint8_t* base, uint64_t value, uint32_t sp);
 // matching edit (the data's +36 to +48, +144, copied to the frame's +80).
 // Returns r3 as the original leaves it.
 uint32_t PauseMenuShowOptions(uint8_t* base, uint32_t sp);
+// sub_8220D0B8 PauseMenu::ShowVolumes: the type-9 nodes 5 and 6 shown by
+// PauseMenu::ShowVolume (sub_8220D040, never seen in play: the original, its
+// --log_pause_movie line kept) with the data's +52 and +56. r3 its.
+uint64_t PauseMenuShowVolumes(uint8_t* base, uint32_t sp, const Calls& calls);
+// sub_8220D130 PauseMenu::ShowSlider: UiMovie::SetNodeText(movie, child 0,
+// 8, value); child 2's +12 = 16 - (value + 10) x [0x8200A6AC] truncated, as
+// a float (the original's words left at the frame's +80). Returns child 2.
+uint32_t PauseMenuShowSlider(uint8_t* base, uint32_t slider, uint64_t value, uint32_t sp,
+                             const Calls& calls);
+// sub_8220D5D0 PauseMenu::RestoreNodes: child `child` (under `group` when
+// not -1) of the movie's file, live and saved scenes, UiMovie::RestorePose
+// (through its override) on the live and the saved one against the file's.
+// r3 its.
+uint64_t PauseMenuRestoreNodes(uint8_t* base, uint32_t group, uint32_t child, uint32_t sp,
+                               const Calls& calls);
+// sub_8220DD98 PauseMenu::MoveOptions (transition 8): the previous row's
+// animation finished (item 4's by +144, the arrow at 0 or 120 for items 0
+// and 3 through SetArrowA, +144 = 1), the new row's played and looped,
+// named animations 20 and 19 finished and, unless either row is 4, 20
+// (down) or 19 (up) played; done.
+uint64_t PauseMenuMoveOptions(uint8_t* base, uint32_t step, uint32_t sp, const Calls& calls);
+// sub_8220E1F8 PauseMenu::MoveAdjust (transition 18): the same with named
+// animations 192 to 196 (item 3 by +144: 195 or 196; leaving it +144 = 0
+// and sub_8220D1D8, never seen in play, the original, at 0 or 80 for items
+// 0 and 2) and the slide 149 (down) or 148 (up); done.
+uint64_t PauseMenuMoveAdjust(uint8_t* base, uint32_t step, uint32_t sp, const Calls& calls);
+// sub_8220E700 PauseMenu::ColorItems: the type-7 node 0's children colored
+// (+56 to +64): 205, 235, 67 where MenuList::IsEnabled answers nonzero, else
+// 255, 255, 255. r3 as the original leaves it.
+uint32_t PauseMenuColorItems(uint8_t* base, uint32_t sp);
+// sub_8220E888 PauseMenu::ShowAdjust: the type-10 node 0's children 4 to 6
+// each by ShowSlider with the data's +60 to +68 (copied to the frame's +80).
+// r3 the last ShowSlider's.
+uint32_t PauseMenuShowAdjust(uint8_t* base, uint32_t sp, const Calls& calls);
+// sub_8220EE28 PauseMenu::ShowMain (transition 2): animation 0 played and
+// looped, the selected item's (type 7, selection + 1, r6 1) played and
+// looped, ColorItems; done.
+uint64_t PauseMenuShowMain(uint8_t* base, uint32_t step, uint32_t sp, const Calls& calls);
+// sub_8220FA88 PauseMenu::Open: the data's +132 = `kind`, +156 = `flag`, UI
+// movie 4 found into the screen's +0, UiMovie::ResetPose, PauseMenu::LoadData,
+// ScreenPages::Go(0, transition 1, then 2), MenuSound::Play(6) (both through
+// their overrides). r3 MenuSound::Play's.
+uint64_t PauseMenuOpen(uint8_t* base, uint32_t screen, uint64_t kind, uint64_t flag, uint32_t sp,
+                       const Calls& calls);
+constexpr uint32_t kShowVolume = 0x8220D040;
+constexpr uint32_t kArrowB = 0x8220D1D8;
+constexpr uint32_t kRestorePose = 0x82119B80;
+constexpr uint32_t kResetPose = 0x8211ABA8;
+constexpr uint32_t kMenuSoundPlay = 0x821103F0;
 
 }  // namespace race_screens

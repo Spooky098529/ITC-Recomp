@@ -102,5 +102,19 @@ void RaceScreensPauseMenuConfirmPage(PPCContext& ctx, uint8_t* base);
 void RaceScreensPauseMenuShowItems(PPCContext& ctx, uint8_t* base);
 void RaceScreensPauseMenuSetArrowA(PPCContext& ctx, uint8_t* base);
 void RaceScreensPauseMenuShowOptions(PPCContext& ctx, uint8_t* base);
+// ShowVolumes sub_8220D0B8, ShowSlider sub_8220D130 (r3 the slider, r4 the
+// value), RestoreNodes sub_8220D5D0 (r3 the group, r4 the child), the
+// transitions MoveOptions sub_8220DD98, MoveAdjust sub_8220E1F8 and ShowMain
+// sub_8220EE28 (r3 the step word), ColorItems sub_8220E700, ShowAdjust
+// sub_8220E888, Open sub_8220FA88 (r3 the screen, r4 the kind, r5 the flag).
+void RaceScreensPauseMenuShowVolumes(PPCContext& ctx, uint8_t* base);
+void RaceScreensPauseMenuShowSlider(PPCContext& ctx, uint8_t* base);
+void RaceScreensPauseMenuRestoreNodes(PPCContext& ctx, uint8_t* base);
+void RaceScreensPauseMenuMoveOptions(PPCContext& ctx, uint8_t* base);
+void RaceScreensPauseMenuMoveAdjust(PPCContext& ctx, uint8_t* base);
+void RaceScreensPauseMenuShowMain(PPCContext& ctx, uint8_t* base);
+void RaceScreensPauseMenuColorItems(PPCContext& ctx, uint8_t* base);
+void RaceScreensPauseMenuShowAdjust(PPCContext& ctx, uint8_t* base);
+void RaceScreensPauseMenuOpen(PPCContext& ctx, uint8_t* base);
 
 }  // namespace hooks

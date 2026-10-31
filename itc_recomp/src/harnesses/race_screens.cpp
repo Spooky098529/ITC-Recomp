@@ -16,6 +16,7 @@
 #include "hooks/race_screens.h"
 #include "hooks/ui_movies.h"
 #include "memory/heap.h"
+#include "menu_sounds/menu_sounds.h"
 #include "race_screens/race_screens.h"
 #include "ui_movies/game.h"
 
@@ -838,13 +839,25 @@ constexpr uint32_t kStringTable = 0x826C5C34;
 constexpr uint32_t kTagTxt = 0x54585400;
 constexpr uint32_t kTagSce = 0x53434500;
 
+// A stack of its own for PauseMenu::Open (LoadData's 6,176-byte frame
+// below it), the stack pointer at +kOwnStackTop.
+constexpr uint32_t kOwnStackBytes = 0x3000;
+constexpr uint32_t kOwnStackTop = 0x2800;
+
 struct MovieWorld {
   MovieWorld()
       : blocks(kPageBlocks * kPageBlockBytes),
         movies(kMovieWorldBytes),
         texts(kTextWorldBytes),
-        strings(kStringWorldBytes) {}
-  bool ok() const { return blocks.address && movies.address && texts.address && strings.address; }
+        strings(kStringWorldBytes),
+        misc(0x1000),
+        save(kSaveBytes),
+        vehicle(kVehicleBytes),
+        stack(kOwnStackBytes) {}
+  bool ok() const {
+    return blocks.address && movies.address && texts.address && strings.address &&
+           misc.address && save.address && vehicle.address && stack.address;
+  }
   uint32_t block(uint32_t global) const {
     return blocks.address + (global - kScreenGlobals) / 4 * kPageBlockBytes;
   }
@@ -857,6 +870,11 @@ struct MovieWorld {
   Block movies;
   Block texts;
   Block strings;
+  Block misc;     // the sound manager (+0) and its vtable (+0x400); the
+                  // menu lists' item words (+0x800)
+  Block save;     // player 0's save data (PauseMenu::LoadData)
+  Block vehicle;  // Vehicle::Get(0)
+  Block stack;
 };
 
 // The string table: 17 files' pointers to one container of entries enough
@@ -946,6 +964,8 @@ void ShapeMovieWorld(uint8_t* base, const MovieWorld& w, Random& r) {
   }
   constexpr uint32_t kEntries = (kTreeNodeBytes - 128) / 8;
   guest::StoreU32(base, w.root(), kTagSce);
+  guest::StoreU32(base, w.root() + 100, 0);  // the pose resets walk children 0 to 3
+  guest::StoreU32(base, w.root() + 104, r.Below(5));
   guest::StoreU32(base, w.root() + 108, r.Below(4));
   guest::StoreU32(base, w.root() + 116, 60);
   for (uint32_t i = 0; i < kEntries; i++) {
@@ -1000,9 +1020,44 @@ void ShapeMovieWorld(uint8_t* base, const MovieWorld& w, Random& r) {
       guest::StoreU32(base, w.block(list) + field, r.Below(6) == 0 ? r.Below(21) : r.Below(8));
     }
   }
+  // Their last move (+24) -1, 0, 1 or any word, their item words (+68) the
+  // misc block's (half of them 0).
+  WriteRandom(base, w.misc.address, w.misc.bytes, r);
+  for (const uint32_t list : {rs::kPauseList, rs::kAfterList, rs::kDialogList}) {
+    const uint32_t moves[4] = {0xFFFFFFFFu, 0, 1, uint32_t(r.Next())};
+    guest::StoreU32(base, w.block(list) + rs::kListMove, moves[r.Below(4)]);
+    guest::StoreU32(base, w.block(list) + rs::kListBlock, w.misc.address + 0x800);
+  }
+  for (uint32_t i = 0; i < 64; i++) {
+    guest::StoreU32(base, w.misc.address + 0x800 + 4 * i, r.Below(2) == 0 ? 0 : uint32_t(r.Next()));
+  }
   for (const uint32_t pages : {rs::kPausePages, rs::kAfterPages, rs::kDialogPages}) {
     guest::StoreU32(base, w.block(pages) + 24, r.Below(2));
   }
+  // The sound manager fake (the race HUD object's harness's): its vtable's
+  // slot 10 (PlayCue2D) the leaf recorder sub_820A8420 (r4's low byte to
+  // +320, r5 to +332, r6 to +336) or the getter sub_82090770 (r3 = +60).
+  constexpr uint32_t kRecordR4R6 = 0x820A8420, kGet60 = 0x82090770;
+  const uint32_t manager = w.misc.address, vtable = w.misc.address + 0x400;
+  guest::StoreU32(base, manager, vtable);
+  guest::StoreU32(base, vtable + menu_sounds::kPlayCue2DSlot,
+                  r.Below(3) == 0 ? kGet60 : kRecordR4R6);
+  guest::StoreU32(base, menu_sounds::kSoundManager, manager);
+  // Player 0's save data and the car (PauseMenu::LoadData), as the data's
+  // cases shape them: the win streak (the stats' halfword +5970 of the copy
+  // from +48), the day (+6100), the car's two floats.
+  WriteRandom(base, w.save.address, w.save.bytes, r);
+  WriteRandom(base, w.vehicle.address, w.vehicle.bytes, r);
+  guest::StoreU32(base, kSaveDataPointers, w.save.address);
+  guest::StoreU32(base, kVehiclesPointer, w.vehicle.address);
+  const uint16_t streaks[4] = {uint16_t(r.Below(1000)), uint16_t(0x8000 | r.Below(0x8000)),
+                               uint16_t(1000 + r.Below(5000)), 999};
+  guest::StoreU16(base, w.save.address + 48 + 5970, streaks[r.Below(4)]);
+  const uint32_t days[4] = {r.Below(400), uint32_t(-int32_t(r.Below(50))), uint32_t(r.Next()),
+                            1000};
+  guest::StoreU32(base, w.save.address + 6100, days[r.Below(4)]);
+  guest::StoreU32(base, w.vehicle.address + 6248, AnyFloatBits(r, 400.0f));
+  guest::StoreU32(base, w.vehicle.address + 6244, AnyFloatBits(r, 400.0f));
 }
 
 // UiMovie::Run's update calls, kept and answered.
@@ -1029,6 +1084,7 @@ using MovieSetupFn = std::function<void(PPCContext&, Random&, const MovieWorld&)
 struct FrameSpec {
   uint32_t frame = 0, saves = 0;
   std::pair<uint32_t, uint32_t> skip = {0, 0};
+  bool own_stack = false;  // the world's stack (PauseMenu::Open)
 };
 
 void MovieGroup(Context& h, const MovieWorld& w, const char* name, int cases,
@@ -1045,9 +1101,16 @@ void MovieGroup(Context& h, const MovieWorld& w, const char* name, int cases,
                                 {ui_movies::kMovieTable, 12},
                                 {kMissingMovie, 4},
                                 {kMissingText, 4},
-                                {kStringTable, 4}});
+                                {kStringTable, 4},
+                                {menu_sounds::kSoundManager, 4},
+                                {kSaveDataPointers, 4},
+                                {kVehiclesPointer, 4}});
       ShapeMovieWorld(h.base, w, r);
       PPCContext t = CallContext(h);
+      if (spec.own_stack) {
+        WriteRandom(h.base, w.stack.address, w.stack.bytes, r);
+        t.r1.u64 = w.stack.address + kOwnStackTop;
+      }
       const uint32_t sp = t.r1.u32;
       WriteRandom(h.base, sp - kStackBytes, kStackBytes + kCallerBytes, r);
       t.r3.u64 = r.Next();
@@ -1078,6 +1141,7 @@ void MovieGroup(Context& h, const MovieWorld& w, const char* name, int cases,
       out[v].Bytes(Read(h.base, w.blocks.address, w.blocks.bytes));
       out[v].Bytes(Read(h.base, w.movies.address, w.movies.bytes));
       out[v].Bytes(Read(h.base, w.texts.address, w.texts.bytes));
+      out[v].Bytes(Read(h.base, w.misc.address, w.misc.bytes));
       out[v].Bytes(Read(h.base, kScreenGlobals, kScreenGlobalsBytes));
       const uint32_t bottom = sp - spec.frame, top = sp - spec.saves;
       if (spec.skip.second > spec.skip.first) {
@@ -1169,6 +1233,59 @@ void Transitions(Context& h) {
       h, w, "PauseMenu::ShowOptions (sub_8220CC60)", 150,
       [](PPCContext&, Random&, const MovieWorld&) {}, __imp__sub_8220CC60,
       hooks::RaceScreensPauseMenuShowOptions, {192, 88});
+  MovieGroup(
+      h, w, "PauseMenu::ShowVolumes (sub_8220D0B8)", 100,
+      [&h](PPCContext&, Random& r, const MovieWorld& w) {
+        for (const uint32_t field : {52u, 56u}) {
+          guest::StoreU32(h.base, w.block(rs::kPauseData) + field, r.Below(16));
+        }
+      },
+      __imp__sub_8220D0B8, hooks::RaceScreensPauseMenuShowVolumes, {112, 24});
+  // ShowSlider: r3 a leaf, r4 the value -10 to 10, now and then any word
+  // (SetNodeText's unset r7 to r10 stored at its frame's +48 to +79 left out).
+  MovieGroup(
+      h, w, "PauseMenu::ShowSlider (sub_8220D130)", 150,
+      [](PPCContext& t, Random& r, const MovieWorld& w) {
+        t.r3.u64 = w.leaf(r.Below(kLeaves));
+        t.r4.u64 = r.Below(6) == 0 ? r.Next() : uint64_t(int64_t(int32_t(r.Below(21)) - 10));
+      },
+      __imp__sub_8220D130, hooks::RaceScreensPauseMenuShowSlider, {128, 40, {48, 80}});
+  MovieGroup(
+      h, w, "PauseMenu::RestoreNodes (sub_8220D5D0)", 150,
+      [](PPCContext& t, Random& r, const MovieWorld&) {
+        t.r3.u64 = r.Below(3) == 0 ? ~uint64_t(0) : r.Below(16);
+        t.r4.u64 = r.Below(16);
+      },
+      __imp__sub_8220D5D0, hooks::RaceScreensPauseMenuRestoreNodes, {128, 40});
+  MovieGroup(h, w, "PauseMenu::MoveOptions (sub_8220DD98)", 200, pause_step,
+             __imp__sub_8220DD98, hooks::RaceScreensPauseMenuMoveOptions, {144, 64});
+  MovieGroup(h, w, "PauseMenu::MoveAdjust (sub_8220E1F8)", 200, pause_step,
+             __imp__sub_8220E1F8, hooks::RaceScreensPauseMenuMoveAdjust, {144, 56});
+  MovieGroup(h, w, "PauseMenu::ShowMain (sub_8220EE28)", 100, pause_step, __imp__sub_8220EE28,
+             hooks::RaceScreensPauseMenuShowMain, {112, 32});
+  MovieGroup(
+      h, w, "PauseMenu::ColorItems (sub_8220E700)", 100,
+      [](PPCContext&, Random&, const MovieWorld&) {}, __imp__sub_8220E700,
+      hooks::RaceScreensPauseMenuColorItems, {128, 48});
+  MovieGroup(
+      h, w, "PauseMenu::ShowAdjust (sub_8220E888)", 100,
+      [&h](PPCContext&, Random& r, const MovieWorld& w) {
+        for (const uint32_t field : {60u, 64u, 68u}) {
+          guest::StoreU32(h.base, w.block(rs::kPauseData) + field,
+                          r.Below(6) == 0 ? uint32_t(r.Next()) : uint32_t(int32_t(r.Below(21)) - 10));
+        }
+      },
+      __imp__sub_8220E888, hooks::RaceScreensPauseMenuShowAdjust, {128, 32});
+  // Open: r3 the screen word, r4 the kind 0 to 4 (now and then any word),
+  // r5 the flag.
+  MovieGroup(
+      h, w, "PauseMenu::Open (sub_8220FA88)", 150,
+      [](PPCContext& t, Random& r, const MovieWorld& w) {
+        t.r3.u64 = w.block(rs::kPauseScreen);
+        t.r4.u64 = r.Below(6) == 0 ? r.Next() : r.Below(5);
+        t.r5.u64 = r.Below(3) == 0 ? r.Next() : r.Below(2);
+      },
+      __imp__sub_8220FA88, hooks::RaceScreensPauseMenuOpen, {112, 16, {0, 0}, true});
 }
 
 }  // namespace

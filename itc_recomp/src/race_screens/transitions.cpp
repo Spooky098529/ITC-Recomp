@@ -4,6 +4,7 @@
 #include "race_screens/race_screens.h"
 
 #include "base/log.h"
+#include "camera_modes/steps.h"
 #include "guest.h"
 #include "ui_movies/game.h"
 #include "ui_movies/ui_movies.h"
@@ -243,6 +244,216 @@ uint32_t PauseMenuShowOptions(uint8_t* base, uint32_t sp) {
     r3 = second2;
   }
   return r3;
+}
+
+uint64_t PauseMenuShowVolumes(uint8_t* base, uint32_t sp, const Calls& calls) {
+  ITC_NATIVE_RUNNING("sub_8220D0B8 PauseMenu::ShowVolumes");
+  const uint32_t frame = Frame(base, sp, 112);
+  const uint32_t movie = PauseMovie(base);
+  uint32_t node = ui_movies::FindNode(base, movie, 9, 5);
+  calls.Call(kShowVolume, frame, 0x8220D0F8, node,
+             guest::LoadU32(base, Get(base, kPauseData) + 52));
+  node = ui_movies::FindNode(base, movie, 9, 6);
+  return calls.Call(kShowVolume, frame, 0x8220D114, node,
+                    guest::LoadU32(base, Get(base, kPauseData) + 56));
+}
+
+uint32_t PauseMenuShowSlider(uint8_t* base, uint32_t slider, uint64_t value, uint32_t sp,
+                             const Calls& calls) {
+  ITC_NATIVE_RUNNING("sub_8220D130 PauseMenu::ShowSlider");
+  using namespace camera_modes::steps;
+  const uint32_t frame = Frame(base, sp, 128);
+  const uint32_t movie = PauseMovie(base);
+  const uint32_t text = ui_movies::Child(base, slider, 0);
+  const uint64_t args[8] = {movie, text, 8, value, 0, 0, 0, 0};
+  calls.CallArgs(kSetNodeText, frame, 0x8220D170, args);
+  // (value + 10) as a float, times the step, truncated (stfiwx over the
+  // double word's high half), then 16 less it as a float.
+  const int64_t shifted = int64_t(int32_t(uint32_t(value + 10)));
+  guest::StoreU32(base, frame + 84, uint32_t(shifted));
+  const int32_t truncated = Fctiwz(Fmuls(Single(double(shifted)), Lfs(base, 0x8200A6AC)));
+  const int64_t rest = int64_t(int32_t(16u - uint32_t(truncated)));
+  guest::StoreU32(base, frame + 80, uint32_t(uint64_t(rest) >> 32));
+  guest::StoreU32(base, frame + 84, uint32_t(rest));
+  const uint32_t bar = ui_movies::Child(base, slider, 2);
+  Stfs(base, bar + 12, Single(double(rest)));
+  return bar;
+}
+
+uint64_t PauseMenuRestoreNodes(uint8_t* base, uint32_t group, uint32_t child, uint32_t sp,
+                               const Calls& calls) {
+  ITC_NATIVE_RUNNING("sub_8220D5D0 PauseMenu::RestoreNodes");
+  const uint32_t frame = Frame(base, sp, 128);
+  const uint32_t movie = PauseMovie(base);
+  auto node = [&](uint32_t scene) {
+    const uint32_t root = guest::LoadU32(base, movie + scene);
+    return ui_movies::Child(
+        base, int32_t(group) == -1 ? root : ui_movies::Child(base, root, group), child);
+  };
+  const uint32_t file = node(ui_movies::kMovieFile);
+  const uint32_t live = node(ui_movies::kMovieLive);
+  const uint32_t saved = node(ui_movies::kMovieSaved);
+  const uint64_t a[8] = {movie, live, file, 0, 0, 0, 0, 0};
+  calls.CallArgs(kRestorePose, frame, 0x8220D67C, a);
+  const uint64_t b[8] = {movie, saved, file, 0, 0, 0, 0, 0};
+  return calls.CallArgs(kRestorePose, frame, 0x8220D694, b);
+}
+
+uint64_t PauseMenuMoveOptions(uint8_t* base, uint32_t step, uint32_t sp, const Calls& calls) {
+  ITC_NATIVE_RUNNING("sub_8220DD98 PauseMenu::MoveOptions");
+  const uint32_t frame = Frame(base, sp, 144);
+  Transition(base, step, frame, 0x8220DF24, calls, [&](uint32_t movie) {
+    const uint32_t list = Get(base, kPauseList);
+    const uint32_t selection = ListSelection(base, list);
+    const uint32_t previous = guest::LoadU32(base, Get(base, kPauseList) + kListSelectionBefore);
+    if (int32_t(previous) < 4) {
+      calls.Call(kFinish, frame, 0x8220DDFC, movie, 8, uint64_t(previous) + 4);
+    } else {
+      const bool on = int32_t(guest::LoadU32(base, Get(base, kPauseData) + 144)) == 1;
+      calls.Call(kFinish, frame, 0x8220DE1C, movie, 8, on ? 1 : 2);
+      if (int32_t(selection) == 0) {
+        PauseMenuSetArrowA(base, 0, frame);
+      } else if (int32_t(selection) == 3) {
+        PauseMenuSetArrowA(base, 120, frame);
+      }
+      guest::StoreU32(base, Get(base, kPauseData) + 144, 1);
+    }
+    uint64_t row;
+    if (int32_t(selection) < 4) {
+      row = uint64_t(selection) + 4;
+      Play(calls, frame, 0x8220DE70, movie, 8, row);
+    } else if (int32_t(guest::LoadU32(base, Get(base, kPauseData) + 144)) == 1) {
+      row = 1;
+      Play(calls, frame, 0x8220DE90, movie, 8, row);
+    } else {
+      row = 2;
+      Play(calls, frame, 0x8220DEA0, movie, 8, row);
+    }
+    calls.Call(kLoop, frame, 0x8220DEB0, movie, 8, row);
+    calls.Call(kFinishNamed, frame, 0x8220DEBC, movie, 20);
+    calls.Call(kFinishNamed, frame, 0x8220DEC8, movie, 19);
+    if (int32_t(previous) != 4 && int32_t(selection) != 4) {
+      const int32_t move = int32_t(guest::LoadU32(base, Get(base, kPauseList) + kListMove));
+      if (move == 1) {
+        PlayNamed(calls, frame, 0x8220DF14, movie, 20);
+      } else if (move == -1) {
+        PlayNamed(calls, frame, 0x8220DF14, movie, 19);
+      }
+    }
+  });
+  return 1;
+}
+
+uint64_t PauseMenuMoveAdjust(uint8_t* base, uint32_t step, uint32_t sp, const Calls& calls) {
+  ITC_NATIVE_RUNNING("sub_8220E1F8 PauseMenu::MoveAdjust");
+  const uint32_t frame = Frame(base, sp, 144);
+  Transition(base, step, frame, 0x8220E408, calls, [&](uint32_t movie) {
+    const uint32_t previous = guest::LoadU32(base, Get(base, kPauseList) + kListSelectionBefore);
+    const uint32_t selection = ListSelection(base, Get(base, kPauseList));
+    if (previous < 3) {
+      calls.Call(kFinishNamed, frame, 0x8220E2C4, movie, 192 + previous);
+    } else if (previous == 3) {
+      const bool off = int32_t(guest::LoadU32(base, Get(base, kPauseData) + 144)) == 0;
+      calls.Call(kFinishNamed, frame, 0x8220E278, movie, off ? 195 : 196);
+      guest::StoreU32(base, Get(base, kPauseData) + 144, 0);
+      if (int32_t(selection) == 0) {
+        calls.Call(kArrowB, frame, 0x8220E2A4, 0);
+      } else if (int32_t(selection) == 2) {
+        calls.Call(kArrowB, frame, 0x8220E2A4, 80);
+      }
+    }
+    if (selection <= 3) {
+      uint64_t named;
+      uint32_t lr;
+      if (selection < 3) {
+        named = 192 + selection;
+        constexpr uint32_t kLr[3] = {0x8220E384, 0x8220E360, 0x8220E33C};
+        lr = kLr[selection];
+      } else if (int32_t(guest::LoadU32(base, Get(base, kPauseData) + 144)) == 0) {
+        named = 195;
+        lr = 0x8220E308;
+      } else {
+        named = 196;
+        lr = 0x8220E318;
+      }
+      PlayNamed(calls, frame, lr, movie, named);
+      calls.Call(kLoopNamed, frame, 0x8220E390, movie, named);
+    }
+    calls.Call(kFinishNamed, frame, 0x8220E39C, movie, 148);
+    calls.Call(kFinishNamed, frame, 0x8220E3A8, movie, 149);
+    if (int32_t(selection) != 3 && int32_t(previous) != 3) {
+      const int32_t move = int32_t(guest::LoadU32(base, Get(base, kPauseList) + kListMove));
+      if (move == 1) {
+        PlayNamed(calls, frame, 0x8220E3F4, movie, 149);
+      } else if (move == -1) {
+        PlayNamed(calls, frame, 0x8220E3F4, movie, 148);
+      }
+    }
+  });
+  return 1;
+}
+
+uint32_t PauseMenuColorItems(uint8_t* base, uint32_t sp) {
+  ITC_NATIVE_RUNNING("sub_8220E700 PauseMenu::ColorItems");
+  Frame(base, sp, 128);
+  const uint32_t movie = PauseMovie(base);
+  const uint32_t node = ui_movies::FindNode(base, movie, 7, 0);
+  uint32_t r3 = node;
+  for (int32_t i = 0; i < int32_t(guest::LoadU32(base, node + 104)); i++) {
+    const bool enabled = ListIsEnabled(base, Get(base, kPauseList), uint32_t(i)) != 0;
+    const uint32_t color[3] = {enabled ? 205u : 255u, enabled ? 235u : 255u,
+                               enabled ? 67u : 255u};
+    for (uint32_t k = 0; k < 3; k++) {
+      r3 = ui_movies::FindNode(base, movie, 7, guest::LoadU32(base, node + 100) + uint32_t(i));
+      guest::StoreU32(base, r3 + 56 + 4 * k, color[k]);
+    }
+  }
+  return r3;
+}
+
+uint32_t PauseMenuShowAdjust(uint8_t* base, uint32_t sp, const Calls& calls) {
+  ITC_NATIVE_RUNNING("sub_8220E888 PauseMenu::ShowAdjust");
+  const uint32_t frame = Frame(base, sp, 128);
+  const uint32_t data = Get(base, kPauseData);
+  for (uint32_t k = 0; k < 3; k++) {
+    guest::StoreU32(base, frame + 80 + 4 * k, guest::LoadU32(base, data + 60 + 4 * k));
+  }
+  const uint32_t group = ui_movies::FindNode(base, PauseMovie(base), 10, 0);
+  uint32_t r3 = 0;
+  for (uint32_t i = 0; i < 3; i++) {
+    const uint32_t slider = ui_movies::Child(base, group, i + 4);
+    r3 = PauseMenuShowSlider(base, slider, guest::LoadU32(base, frame + 80 + 4 * i), frame, calls);
+  }
+  return r3;
+}
+
+uint64_t PauseMenuShowMain(uint8_t* base, uint32_t step, uint32_t sp, const Calls& calls) {
+  ITC_NATIVE_RUNNING("sub_8220EE28 PauseMenu::ShowMain");
+  const uint32_t frame = Frame(base, sp, 112);
+  Transition(base, step, frame, 0x8220EEE4, calls, [&](uint32_t movie) {
+    Play(calls, frame, 0x8220EE70, movie, kNone, 0);
+    calls.Call(kLoop, frame, 0x8220EE80, movie, kNone, 0);
+    Play(calls, frame, 0x8220EEB0, movie, 7, uint64_t(Selection(base)) + 1, 1);
+    calls.Call(kLoop, frame, 0x8220EECC, movie, 7, uint64_t(Selection(base)) + 1);
+    PauseMenuColorItems(base, frame);
+  });
+  return 1;
+}
+
+uint64_t PauseMenuOpen(uint8_t* base, uint32_t screen, uint64_t kind, uint64_t flag, uint32_t sp,
+                       const Calls& calls) {
+  ITC_NATIVE_RUNNING("sub_8220FA88 PauseMenu::Open");
+  const uint32_t frame = Frame(base, sp, 112);
+  guest::StoreU32(base, Get(base, kPauseData) + 132, uint32_t(kind));
+  guest::StoreU32(base, frame + 80, 4);
+  guest::StoreU32(base, Get(base, kPauseData) + 156, uint32_t(flag));
+  const uint32_t movie =
+      guest::LoadU32(base, ui_movies::PairsFind(base, ui_movies::kMovieTable, frame + 80));
+  guest::StoreU32(base, screen, movie);
+  calls.Call(kResetPose, frame, 0x8220FAD8, movie);
+  PauseMenuLoadData(base, frame, calls);
+  calls.Call(kPagesGo, frame, 0x8220FAF4, Get(base, kPausePages), 0, 1, 2);
+  return calls.Call(kMenuSoundPlay, frame, 0x8220FAFC, 6);
 }
 
 }  // namespace race_screens
