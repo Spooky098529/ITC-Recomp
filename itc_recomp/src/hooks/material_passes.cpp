@@ -11,7 +11,9 @@ ITC_FLAG_BOOL(native_material_passes, true, "ITC",
               "Run the part models' material passes and the helpers beside them "
               "(docs/functions/material-passes.md: Color::HsvToRgb sub_820D0D60, "
               "Color::HsvToRgb8 sub_820C9808, the tables' lookups sub_820D35D0, sub_820D3600, "
-              "sub_820D3638 and sub_820D3728, Matrix::TransposeRotation sub_820D1CB0) natively "
+              "sub_820D3638 and sub_820D3728, Matrix::TransposeRotation sub_820D1CB0, the passes PartModel::SetTexture sub_820D17D8, "
+              "FlipCulling sub_820D1950, ScaleBlended sub_820D1A68, SetPair1002Alpha sub_820D1B38 "
+              "and SetAlpha sub_820D1C00) natively "
               "instead of through the translated code (the same writes; checked by "
               "--run_harnesses=material_passes)");
 
@@ -52,6 +54,29 @@ void MaterialPassesTransposeRotation(PPCContext& ctx, uint8_t* base) {
   ctx.fpscr.disableFlushMode();
 }
 
+void MaterialPassesSetTexture(PPCContext& ctx, uint8_t* base) {
+  ctx.r3.u64 = mp::SetTexture(base, ctx.r3.u32, ctx.r4.u32, ctx.r5.s32, ctx.r1.u32);
+}
+
+void MaterialPassesFlipCulling(PPCContext& ctx, uint8_t* base) {
+  ctx.r3.u64 = mp::FlipCulling(base, ctx.r3.u32, ctx.r1.u32);
+}
+
+void MaterialPassesScaleBlended(PPCContext& ctx, uint8_t* base) {
+  ctx.fpscr.disableFlushMode();
+  ctx.r3.u64 = mp::ScaleBlended(base, ctx.r3.u32, ctx.r4.u32, ctx.f1.f64, ctx.r1.u32);
+}
+
+void MaterialPassesSetPair1002Alpha(PPCContext& ctx, uint8_t* base) {
+  ctx.fpscr.disableFlushMode();
+  ctx.r3.u64 = mp::SetPair1002Alpha(base, ctx.r3.u32, ctx.r4.u32, ctx.f1.f64, ctx.r1.u32);
+}
+
+void MaterialPassesSetAlpha(PPCContext& ctx, uint8_t* base) {
+  ctx.fpscr.disableFlushMode();
+  ctx.r3.u64 = mp::SetAlpha(base, ctx.r3.u32, ctx.r4.u32, ctx.f1.f64, ctx.r1.u32);
+}
+
 }  // namespace hooks
 
 // The adapters: the register steps above, or the originals with the flag
@@ -74,3 +99,8 @@ ITC_MATERIAL_PASSES(820D3600, MaterialPassesIsBlockSetA)
 ITC_MATERIAL_PASSES(820D3638, MaterialPassesIsBlockSetB)
 ITC_MATERIAL_PASSES(820D3728, MaterialPassesRecordAt)
 ITC_MATERIAL_PASSES(820D1CB0, MaterialPassesTransposeRotation)
+ITC_MATERIAL_PASSES(820D17D8, MaterialPassesSetTexture)
+ITC_MATERIAL_PASSES(820D1950, MaterialPassesFlipCulling)
+ITC_MATERIAL_PASSES(820D1A68, MaterialPassesScaleBlended)
+ITC_MATERIAL_PASSES(820D1B38, MaterialPassesSetPair1002Alpha)
+ITC_MATERIAL_PASSES(820D1C00, MaterialPassesSetAlpha)

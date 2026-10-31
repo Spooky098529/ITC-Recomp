@@ -43,4 +43,27 @@ uint64_t RecordAt(uint64_t index);
 // copy (the original runs there).
 bool TransposeRotation(uint8_t* base, uint32_t out, uint32_t m, uint32_t sp);
 
+// --- The passes over a part model's materials (passes.cpp) ---
+//
+// Each takes the part model (nothing but the frame's back chain when 0) and
+// the stack pointer (the back chain of the original's frame written), walks
+// the materials of both groups and returns r3 as the original leaves it.
+
+// PartModel::SetTexture (sub_820D17D8): +144 = 0 and +176 = `texture` on
+// every material of `shape`, or of every shape for -1.
+uint32_t SetTexture(uint8_t* base, uint32_t model, uint32_t texture, int32_t shape, uint32_t sp);
+// PartModel::FlipCulling (sub_820D1950): +344 2 becomes 6 and 6 becomes 2,
+// on every shape.
+uint32_t FlipCulling(uint8_t* base, uint32_t model, uint32_t sp);
+// PartModel::ScaleBlended (sub_820D1A68): group 1 of `shape`: +0 to +8
+// times `factor` where +0 is below 1.1, then +12 = 1.0 and +108 = 2.
+uint32_t ScaleBlended(uint8_t* base, uint32_t model, uint32_t shape, double factor, uint32_t sp);
+// PartModel::SetPair1002Alpha (sub_820D1B38): +12 = `alpha` on the
+// materials of `shape` whose +392 is 1002.
+uint32_t SetPair1002Alpha(uint8_t* base, uint32_t model, uint32_t shape, double alpha,
+                          uint32_t sp);
+// PartModel::SetAlpha (sub_820D1C00): +12 = `alpha` on every material of
+// `shape`.
+uint32_t SetAlpha(uint8_t* base, uint32_t model, uint32_t shape, double alpha, uint32_t sp);
+
 }  // namespace material_passes

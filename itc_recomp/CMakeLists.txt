@@ -245,6 +245,7 @@ set(ITC_SOURCES
     src/hooks/material_passes.cpp
     src/material_passes/colors.cpp
     src/material_passes/helpers.cpp
+    src/material_passes/passes.cpp
     src/save_interface/save_interface.cpp
     src/save_interface/save_layer.cpp
     src/hooks/file_layer.cpp

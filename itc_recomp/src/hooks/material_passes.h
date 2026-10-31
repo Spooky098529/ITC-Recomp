@@ -25,4 +25,14 @@ void MaterialPassesRecordAt(PPCContext& ctx, uint8_t* base);
 // left: memcpy's, the destination).
 void MaterialPassesTransposeRotation(PPCContext& ctx, uint8_t* base);
 
+// The passes: r3 = the part model; SetTexture sub_820D17D8 r4 = the
+// texture, r5 = the shape (-1 every shape); FlipCulling sub_820D1950;
+// ScaleBlended sub_820D1A68, SetPair1002Alpha sub_820D1B38 and SetAlpha
+// sub_820D1C00 r4 = the shape, f1 = the value. r3 as the original leaves it.
+void MaterialPassesSetTexture(PPCContext& ctx, uint8_t* base);
+void MaterialPassesFlipCulling(PPCContext& ctx, uint8_t* base);
+void MaterialPassesScaleBlended(PPCContext& ctx, uint8_t* base);
+void MaterialPassesSetPair1002Alpha(PPCContext& ctx, uint8_t* base);
+void MaterialPassesSetAlpha(PPCContext& ctx, uint8_t* base);
+
 }  // namespace hooks

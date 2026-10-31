@@ -20,6 +20,7 @@
 #include <cmath>
 #include <functional>
 #include <limits>
+#include <set>
 #include <string>
 #include <vector>
 
@@ -27,7 +28,7 @@ namespace harness {
 
 namespace {
 
-constexpr uint32_t kBlockBytes = 0x1000;
+constexpr uint32_t kBlockBytes = 0x4000;
 constexpr uint32_t kStackBytes = 512;  // below the call's stack pointer
 
 void RandomBytes(uint8_t* base, uint32_t address, uint32_t bytes, Random& r) {
@@ -60,11 +61,17 @@ float RandomFloat(Random& r, float range) {
   }
 }
 
-// What a case compares: `floats` (address, words) as floats, the rest of
-// the block and the stack's [sp - kStackBytes, sp - `saves`) exactly, and r3.
+// What a case compares: the words at `floats` (guest addresses inside the
+// block) as floats, the rest of the block and the stack's
+// [sp - kStackBytes, sp - `saves`) exactly, and r3.
 struct Layout {
-  std::vector<std::pair<uint32_t, uint32_t>> floats;
+  std::set<uint32_t> floats;
   uint32_t saves = 0;  // bytes of register saves just below sp, not compared
+  void Range(uint32_t address, uint32_t words) {
+    for (uint32_t i = 0; i < words; i++) {
+      floats.insert(address + 4 * i);
+    }
+  }
 };
 
 // One case through both versions: the block and stack filled from `seed`,
@@ -83,10 +90,15 @@ void Case(Context& h, Results& results, uint32_t block, uint64_t seed,
     setup(t, r);
     (v == 0 ? recompiled : native)(t, h.base);
     uint32_t at = block;
-    for (const auto& [address, words] : layout.floats) {
-      out[v].Bytes(Read(h.base, at, address - at));
-      out[v].Floats(h.base, address, words);
-      at = address + 4 * words;
+    for (const uint32_t address : layout.floats) {
+      if (address < at || address + 4 > block + kBlockBytes) {
+        continue;
+      }
+      if (address > at) {
+        out[v].Bytes(Read(h.base, at, address - at));
+      }
+      out[v].Floats(h.base, address, 1);
+      at = address + 4;
     }
     out[v].Bytes(Read(h.base, at, block + kBlockBytes - at));
     out[v].Bytes(Read(h.base, sp - kStackBytes, kStackBytes - layout.saves));
@@ -105,7 +117,8 @@ void Colors(Context& h, uint32_t block) {
       const bool in_place = c % 10 == 9;
       const uint32_t out = in_place ? block : block + 64;
       Layout layout;
-      layout.floats = {{block, 4}, {block + 64, 4}};
+      layout.Range(block, 4);
+      layout.Range(block + 64, 4);
       Case(
           h, results, block, h.random.Next(),
           [&](PPCContext& t, Random& r) {
@@ -236,7 +249,8 @@ void Tables(Context& h, uint32_t block) {
     for (int c = 0; c < 64; c++) {
       const uint32_t out = c % 8 == 7 ? block : block + 128;
       Layout layout;
-      layout.floats = {{block, 16}, {block + 128, 16}};
+      layout.Range(block, 16);
+      layout.Range(block + 128, 16);
       layout.saves = 24;
       Case(
           h, results, block, h.random.Next(),
@@ -254,6 +268,115 @@ void Tables(Context& h, uint32_t block) {
   }
 }
 
+// A part model at `block` with three shapes (544 bytes each from +0x400),
+// each one's material block at +0x1000 + 64 x shape with counts of -1 to 3
+// a group; the materials' fields these passes read set from small sets
+// (+0 a color's x around the 1.1 limit, +344 the cull mode, +392 the
+// shared pair). Their color words (+0 to +12) are floats.
+constexpr uint32_t kShapes = 0x400;
+constexpr uint32_t kBlocks = 0x1000;
+
+void PartModel(uint8_t* base, uint32_t block, Random& r, Layout* layout) {
+  const int32_t counts[] = {0, 1, 2, 3, -1};
+  guest::StoreU32(base, block + 412, uint32_t(counts[r.Below(4)] + (r.Below(8) == 0 ? -1 : 0)));
+  guest::StoreU32(base, block + 40, block + kShapes);
+  for (uint32_t s = 0; s < 3; s++) {
+    const uint32_t materials = block + kBlocks + 64 * s;
+    guest::StoreU32(base, block + kShapes + 544 * s + 396, materials);
+    guest::StoreU32(base, materials + 8, uint32_t(counts[r.Below(5)]));
+    guest::StoreU32(base, materials + 12, uint32_t(counts[r.Below(5)]));
+  }
+  for (uint32_t s = 0; s < 3; s++) {
+    for (uint32_t i = 0; i < 6; i++) {
+      const uint32_t m = block + kBlocks + 64 * s + 16 + 512 * i;
+      const uint32_t culls[] = {2, 6, 0, 1, uint32_t(r.Next())};
+      guest::StoreU32(base, m + 344, culls[r.Below(5)]);
+      const uint32_t pairs[] = {1002, 1002, 1000, 1004, uint32_t(r.Next())};
+      guest::StoreU32(base, m + 392, pairs[r.Below(5)]);
+      if (r.Below(4) != 0) {
+        guest::StoreU32(base, m + 0, Bits(r.Below(2) == 0 ? 1.1f : RandomFloat(r, 2.0f)));
+      }
+      if (layout != nullptr) {
+        layout->Range(m, 4);
+      }
+    }
+  }
+}
+
+double RandomDouble(Random& r) {
+  if (r.Below(4) == 0) {
+    return double(RandomFloat(r, 4.0f));
+  }
+  return (double(r.Next() >> 11) / double(1ull << 53)) * 4.0 - 1.0;  // finer than a float
+}
+
+void Passes(Context& h, uint32_t block) {
+  Layout floats;
+  {
+    Random r(1);
+    PartModel(h.base, block, r, &floats);
+  }
+  auto model = [&](PPCContext& t, Random& r, int c) {
+    PartModel(h.base, block, r, nullptr);
+    t.r3.u64 = c % 16 == 15 ? 0 : block;
+  };
+  {
+    Results results("PartModel::SetTexture (sub_820D17D8)");
+    for (int c = 0; c < 128; c++) {
+      Case(
+          h, results, block, h.random.Next(),
+          [&](PPCContext& t, Random& r) {
+            model(t, r, c);
+            t.r4.u64 = r.Below(2) == 0 ? r.Below(8) : uint32_t(r.Next());
+            t.r5.u64 = c % 2 == 0 ? uint64_t(-1) : r.Below(3);
+          },
+          Layout{{}, 72}, __imp__sub_820D17D8, hooks::MaterialPassesSetTexture,
+          fmt::format("case {}", c));
+    }
+    results.Report();
+  }
+  {
+    Results results("PartModel::FlipCulling (sub_820D1950)");
+    for (int c = 0; c < 128; c++) {
+      Case(
+          h, results, block, h.random.Next(), [&](PPCContext& t, Random& r) { model(t, r, c); },
+          Layout{{}, 56}, __imp__sub_820D1950, hooks::MaterialPassesFlipCulling,
+          fmt::format("case {}", c));
+    }
+    results.Report();
+  }
+  struct Valued {
+    const char* name;
+    GuestFunction recompiled;
+    GuestFunction native;
+    uint32_t saves;  // the gprs', lr's and fprs' saves
+  };
+  const Valued valued[] = {
+      {"PartModel::ScaleBlended (sub_820D1A68)", __imp__sub_820D1A68,
+       hooks::MaterialPassesScaleBlended, 64},
+      {"PartModel::SetPair1002Alpha (sub_820D1B38)", __imp__sub_820D1B38,
+       hooks::MaterialPassesSetPair1002Alpha, 56},
+      {"PartModel::SetAlpha (sub_820D1C00)", __imp__sub_820D1C00, hooks::MaterialPassesSetAlpha,
+       56},
+  };
+  for (const Valued& f : valued) {
+    Results results(f.name);
+    Layout layout = floats;
+    layout.saves = f.saves;
+    for (int c = 0; c < 128; c++) {
+      Case(
+          h, results, block, h.random.Next(),
+          [&](PPCContext& t, Random& r) {
+            model(t, r, c);
+            t.r4.u64 = r.Below(3);
+            t.f1.f64 = RandomDouble(r);
+          },
+          layout, f.recompiled, f.native, fmt::format("case {}", c));
+    }
+    results.Report();
+  }
+}
+
 }  // namespace
 
 void MaterialPasses(Context& h) {
@@ -261,6 +384,7 @@ void MaterialPasses(Context& h) {
   const uint32_t block = (allocation + 15) & ~15u;
   Colors(h, block);
   Tables(h, block);
+  Passes(h, block);
   memory::Free(allocation);
 }
 
