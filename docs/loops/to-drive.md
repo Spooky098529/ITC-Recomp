@@ -18,6 +18,28 @@ here loses its heading.
 
 ## Run 2026-10-31 16:54 (`b7-loop-31-10-26`, continued)
 
+- The in-race screens, second migration (attract race `itc_3037`,
+  replay `itc_3038`: broke: the race set up at the same time as in
+  `itc_3021` (~77.5 s) but its racers never added and no countdown, as
+  in `itc_2987` and `itc_3004`; the pause press at ~109 s opened the
+  pause menu before the start and the later presses quit through the
+  dialog; not debugged, the native code under test not ruled out;
+  `race-screens.md`, `race-hud-machine.md`): `sub_8220C930`
+  PauseMenu::ToggleOptions, `sub_8220CAB0` PauseMenu::ShowAdjustRow,
+  `sub_8220CBF8` PauseMenu::SetArrowA, `sub_8220D130`
+  PauseMenu::ShowSlider, `sub_8220DD98` PauseMenu::MoveOptions,
+  `sub_8220E1F8` PauseMenu::MoveAdjust, `sub_8220E888`
+  PauseMenu::ShowAdjust, `sub_8220F1B8` PauseMenu::SetAdjust,
+  `sub_8216DA40` RaceHudMachine::OpenRacePause, `sub_8216D8C8`
+  RaceHudMachine::OpenCareerPause, `sub_8221A6C8`
+  AfterRaceMenu::ConfirmPage, `sub_8221A730` AfterRaceMenu::Intro,
+  `sub_8221A7A8` AfterRaceMenu::Show, `sub_8221A950`
+  AfterRaceMenu::CloseMain, `sub_8221AA20` AfterRaceMenu::Move,
+  `sub_8221AC00` AfterRaceMenu::ShowItems, `sub_8221B5C8`
+  AfterRaceMenu::SetUpItems, `sub_8221B768` AfterRaceMenu::ColorItems,
+  `sub_8221B860` AfterRaceMenu::Start, `sub_8221BA68`
+  AfterRaceMenu::Open.
+
 - The in-race screens, first migration (attract race `itc_3020`,
   replay `itc_3021`, ok: this replay reached the countdown, the race,
   the results and the menu after the race; `race-screens.md`):

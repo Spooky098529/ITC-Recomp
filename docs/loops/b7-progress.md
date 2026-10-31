@@ -100,7 +100,11 @@ file's history. What's left to see in a drive, from every run:
   adapters removed; harness 0 differing, race 35-38 s, 0 errors; no
   subagents). Left: 10 ready groups (the dialog's and career results'
   pages), `PauseUpdate`, `AfterRaceUpdate`, `RaceScreens::Create`.
-  Step: validation of the second migration (agent running).
+  Validated (`itc_3037`, 120 s: race 56 s, 0 errors, harnesses ~62 s;
+  replay `itc_3038` broke: its race's racers never added, no
+  countdown, as in `itc_2987` and `itc_3004` but not `itc_3021`): 39
+  of 39 harness lines, 19 ran in the replay (the pause menu opened),
+  20 to drive. Step: third migration (agent running).
 
 ## Done
 
@@ -191,5 +195,8 @@ file's history. What's left to see in a drive, from every run:
 - After the in-race screens' second migration (`itc_3036`: race 35 s,
   0 errors, race_screens 0 differing): ours 3690, work left 2709
   (wrapped 101, known 528, unknown 2080).
+- After its validation (`itc_3037`, 120 s: race 56 s, 0 errors, every
+  harness 0 differing but the expected groups): ours 3690, work left
+  2709.
 
 ## Stopped

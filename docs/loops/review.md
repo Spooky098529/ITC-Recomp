@@ -13,6 +13,12 @@ When the user has reviewed a run's section, its heading gets
 
 ## Run 2026-10-31 16:54 (`b7-loop-31-10-26`, continued)
 
+- The pad replay's race (`race_test.jsonl`) reached its countdown in
+  `itc_3021` but not in `itc_2987`, `itc_3004` or `itc_3038` (set up
+  at ~77.5 s, racers never added): not debugged; worth a look in case
+  native code this run is the cause (to debug later, as the earlier
+  unpaced-menus replay).
+
 - The in-race screens' second migration (590250a6..ca74f7fd): 36 rows
   in `race-screens.md` (11 Native; `PauseMenu::ColorItems`' colors
   corrected: enabled items 205, 235, 67, disabled white) and 3 in
