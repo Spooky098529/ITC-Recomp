@@ -43,7 +43,12 @@ file's history. What's left to see in a drive, from every run:
   lines, none ran in the race or the replay (8 to drive). Done.
 - Cleanup lead (no mapping, not counted): `RaceHud::RunWarning`
   (`sub_82212A48`) and the removable adapters of `HudCurve::Eval` and
-  `PowInt` in `race-hud-object.md`. Step: migration (agent running).
+  `PowInt` in `race-hud-object.md`. Migration checked (1213d326:
+  `RunWarning`, 300 cases 0 differing after the frame's back chain was
+  written as the original does; 2ea9a6f1: the two adapters removed;
+  race 29 s with the harnesses, 0 errors; no subagents). Its four
+  callers, the race flow draws, now ready (noted in their lead). Step:
+  validation (agent running).
 
 ## Done
 
@@ -93,5 +98,8 @@ file's history. What's left to see in a drive, from every run:
 - After its validation (`itc_2973`, 120 s: race 58 s, 0 errors, every
   harness 0 differing but the expected groups): ours 3588, work left
   2810.
+- After the RunWarning lead's migration (`itc_2978`: race 29 s, 0
+  errors, race_hud_object and alt_hud 0 differing): ours 3589, work
+  left 2809 (wrapped 103, known 481, unknown 2225).
 
 ## Stopped

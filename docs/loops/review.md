@@ -13,6 +13,11 @@ When the user has reviewed a run's section, its heading gets
 
 ## Run 2026-10-31 16:54 (`b7-loop-31-10-26`, continued)
 
+- The RunWarning cleanup lead (1213d326, 2ea9a6f1): 3 rows in
+  `race-hud-object.md` (`RunWarning` Overridden; `HudCurve::Eval`,
+  `PowInt` Native). For review: the frame's back chain written even when
+  the flag at +468 is 0, as the original leaves it.
+
 - The race HUD cleanup lead (c17e0401..2bf1cf2c): 8 rows in
   `race-hud-object.md` (`RunCountdown`, `UpdateRacerBar`, `TickPanel`,
   `TickRacers`; 5 adapters removed). For review: `MenuSound::Play`'s
