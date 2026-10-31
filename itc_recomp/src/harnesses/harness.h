@@ -253,5 +253,7 @@ void RaceScene(Context& h);
 void MenuSounds(Context& h);
 // The interior accessories (src/harnesses/accessories.cpp).
 void Accessories(Context& h);
+// The race HUD machine (src/harnesses/race_hud_machine.cpp).
+void RaceHudMachine(Context& h);
 
 }  // namespace harness

@@ -4,6 +4,8 @@
 
 #include "hooks/race_hud_object.h"
 
+#include "hooks/callee_stand_in.h"
+
 #include "base/flags.h"
 #include "menu_sounds/menu_sounds.h"
 #include "race_hud_object/race_hud_object.h"
@@ -420,14 +422,19 @@ void RaceHudObjectTickPanel(PPCContext& ctx, uint8_t* base) {
 // +656 object's and the other digits' callers, never seen in play, run the
 // originals).
 
-#define ITC_RACE_HUD_OBJECT(address, step)    \
-  extern "C" REX_FUNC(sub_##address) {        \
-    REX_FUNC_PROLOGUE();                      \
-    if (!ITC_FLAG(native_race_hud_object)) {  \
-      __imp__sub_##address(ctx, base);        \
-      return;                                 \
-    }                                         \
-    hooks::step(ctx, base);                   \
+// Each hands its call to the race HUD machine harness's stand-in first
+// (hooks/callee_stand_in.h; null in the game).
+#define ITC_RACE_HUD_OBJECT(address, step)              \
+  extern "C" REX_FUNC(sub_##address) {                  \
+    REX_FUNC_PROLOGUE();                                \
+    if (hooks::CalleeStoodIn(ctx, 0x##address)) {       \
+      return;                                           \
+    }                                                   \
+    if (!ITC_FLAG(native_race_hud_object)) {            \
+      __imp__sub_##address(ctx, base);                  \
+      return;                                           \
+    }                                                   \
+    hooks::step(ctx, base);                             \
   }
 
 ITC_RACE_HUD_OBJECT(82212668, RaceHudObjectResetBar)

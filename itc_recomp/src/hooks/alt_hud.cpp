@@ -6,6 +6,7 @@
 
 #include "alt_hud/alt_hud.h"
 #include "base/flags.h"
+#include "hooks/callee_stand_in.h"
 #include "hooks/heap.h"
 
 ITC_FLAG_BOOL(native_alt_hud, true, "ITC",
@@ -213,14 +214,19 @@ void AltHudRunMovie(PPCContext& ctx, uint8_t* base) {
 // SetThrottle, SetBrake and SetSteering (from Tick). MenuList::Release's
 // stays for its ~50 other callers.
 
-#define ITC_ALT_HUD(address, step)        \
-  extern "C" REX_FUNC(sub_##address) {    \
-    REX_FUNC_PROLOGUE();                  \
-    if (!ITC_FLAG(native_alt_hud)) {      \
-      __imp__sub_##address(ctx, base);    \
-      return;                             \
-    }                                     \
-    hooks::step(ctx, base);               \
+// Each hands its call to the race HUD machine harness's stand-in first
+// (hooks/callee_stand_in.h; null in the game).
+#define ITC_ALT_HUD(address, step)                \
+  extern "C" REX_FUNC(sub_##address) {            \
+    REX_FUNC_PROLOGUE();                          \
+    if (hooks::CalleeStoodIn(ctx, 0x##address)) { \
+      return;                                     \
+    }                                             \
+    if (!ITC_FLAG(native_alt_hud)) {              \
+      __imp__sub_##address(ctx, base);            \
+      return;                                     \
+    }                                             \
+    hooks::step(ctx, base);                       \
   }
 
 ITC_ALT_HUD(8220BBB0, AltHudMenuListRelease)

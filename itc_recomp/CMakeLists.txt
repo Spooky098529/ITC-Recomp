@@ -263,6 +263,8 @@ set(ITC_SOURCES
     src/hooks/race_scene.cpp
     src/race_scene/race_scene.cpp
     src/race_scene/race_scene_init.cpp
+    src/hooks/race_hud_machine.cpp
+    src/race_hud_machine/handlers.cpp
     src/hooks/menu_sounds.cpp
     src/menu_sounds/menu_sounds.cpp
     src/hooks/accessories.cpp
@@ -439,6 +441,7 @@ set(ITC_SOURCES
     src/harnesses/race_hud_object.cpp
     src/harnesses/alt_hud.cpp
     src/harnesses/race_scene.cpp
+    src/harnesses/race_hud_machine.cpp
     src/harnesses/menu_sounds.cpp
     src/harnesses/accessories.cpp
     src/harnesses/car_sounds.cpp
