@@ -13,6 +13,14 @@ When the user has reviewed a run's section, its heading gets
 
 ## Run 2026-10-31 16:54 (`b7-loop-31-10-26`, continued)
 
+- The race HUD machine's harness rewrite and the 18 adapters (the
+  user's call; 3104033d, 5048300e): 16 rows in `race-hud-object.md`
+  and 2 in `alt-hud.md` to Native; `race-hud-machine.md`'s intro and
+  rows. For review: f1 compared only where the last callee's harness
+  compares it; `RaceUpdate`'s post of message 20 no longer covered
+  (`AltHud::Tick` always answers 0); 7 race HUD adapters stay for the
+  in-race screens' recompiled callers.
+
 - The race HUD machine's migration (e29438da, 7df89f72): 16 rows in
   `race-hud-machine.md` (15 Overridden, `sub_8216C9B8` Merged), its
   intro (kind 0 runs in attract races, though `seen_in_play.txt`

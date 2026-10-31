@@ -69,7 +69,13 @@ file's history. What's left to see in a drive, from every run:
   drive.
 - Cleanup lead (no mapping, not counted): the race HUD machine's
   harness rewritten without the stand-in and the 18 adapters removed
-  (the user's call). Step: migration (agent running).
+  (the user's call). Migration checked (3104033d: the harness runs the
+  callees for real with the HUDs' worlds, the stand-in deleted;
+  5048300e: the 18 adapters removed, rows Native; every harness 0
+  differing, race 28 s with the harnesses, 38 s without, 0 errors; no
+  subagents). RaceUpdate's post of message 20 no longer reachable in
+  the harness (`AltHud::Tick` answers 0). Step: validation (agent
+  running).
 
 ## Done
 
@@ -137,6 +143,9 @@ file's history. What's left to see in a drive, from every run:
   (wrapped 103, known 498, unknown 2193).
 - After its validation (`itc_2986`, 120 s: race 58 s, 0 errors, every
   harness 0 differing but the expected groups): ours 3605, work left
+  2794.
+- After the harness rewrite and the 18 adapters (`itc_3002`: race 28
+  s, 0 errors, the four harnesses 0 differing): ours 3605, work left
   2794.
 
 ## Stopped
