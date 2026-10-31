@@ -47,7 +47,7 @@ ITC_FLAG_BOOL(native_models, true, "ITC",
               "sub_825970A8 and XPR::~XPR sub_82597148; the texture provider's vector: "
               "Clear sub_82590D68, and with --native_heap Allocate sub_825942B8, "
               "UninitializedCopy sub_82594380 (no adapters: only Reserve and InsertN call "
-              "them), Reserve sub_82594570, InsertN sub_82590EF0 and Assign sub_825947D0 (no "
+              "them), Reserve sub_82594570 (no adapter: only the constructor's plain C++ calls it in play), InsertN sub_82590EF0 and Assign sub_825947D0 (no "
               "adapter: only the constructor calls it), TextureProvider::TextureProvider "
               "sub_82594850 and ~TextureProvider sub_825943E0; Model::Model sub_825948C0, "
               "Model::Release sub_82594970 and Model::~Model sub_82594F58, their members' "
@@ -68,7 +68,7 @@ ITC_FLAG_BOOL(native_models, true, "ITC",
               "SkeletonBase::SetUp sub_8259A9E0 (with NodeFile::View sub_825A21A8, no adapter: "
               "only it calls it) and Skeleton::Bind sub_82599A20 (in src/model_animation/), "
               "Memory::AllocPhysical sub_8258E138 (in src/models/memory_blocks.cpp; no adapter: only "
-              "XPR::Create calls it), the shared shaders sub_825896D8 and sub_82589700 and their tables' set-up sub_825896C0, the vertex "
+              "XPR::Create calls it), the shared shaders sub_825896D8 and sub_82589700 and their tables' set-up sub_825896C0 (no adapter: only LoadAll's plain C++ calls it), the vertex "
               "declaration sub_82589728 (no adapter: only the recorders' plain C++ calls it in play; "
               "its message for a type pair the tables don't cover, never seen in play, the "
               "original's), Model::RecordShape sub_82595550 (in "
@@ -185,17 +185,10 @@ void SetR3(PPCContext& ctx, const models::R3& r3) {
 
 }  // namespace
 
-// TextureProvider::Reserve: r3 = the vector, r4 = the count.
-extern "C" REX_FUNC(sub_82594570) {
-  REX_FUNC_PROLOGUE();
-  if (NativeLifetime()) {
-    if (const auto r3 = models::PointersReserve(base, ctx.r3.u32, ctx.r4.u32)) {
-      SetR3(ctx, *r3);
-      return;
-    }
-  }
-  __imp__sub_82594570(ctx, base);
-}
+// TextureProvider::Reserve (sub_82594570) has no adapter: only native
+// callers reach it in play (TextureProvider::TextureProvider's plain C++
+// calls it directly; TextureProvider::Set's hands an index past the size to
+// the original, never seen in an attract race).
 
 // TextureProvider::InsertN: r3 = the vector, r4 = where, r5 = the count, r6 =
 // the value's address.
@@ -357,7 +350,9 @@ ITC_MODELS_ACCESSOR(82594AD8, ModelsMaterialCount)
 ITC_MODELS_ACCESSOR(82594B20, ModelsMaterial)
 ITC_MODELS_ACCESSOR(825896D8, ModelsSharedVertexShader)
 ITC_MODELS_ACCESSOR(82589700, ModelsSharedPixelShader)
-ITC_MODELS_ACCESSOR(825896C0, ModelsSetSharedShaders)
+// SetSharedShaders (sub_825896C0) has no adapter: only Shaders::LoadAll's
+// plain C++ calls it in play (hooks::ModelsSetSharedShaders stays for the
+// harness).
 
 // ShaderFile::Parse (sub_822A8568), VertexShader::CopyHeader (sub_822A9FD8)
 // and PixelShader::CopyHeader (sub_822A9EA8) have no adapters: only native
