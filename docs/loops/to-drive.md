@@ -18,6 +18,18 @@ here loses its heading.
 
 ## Run 2026-10-31 16:54 (`b7-loop-31-10-26`, continued)
 
+- The race HUD machine (attract race `itc_2986`, replay `itc_2987`:
+  ran to the end, the SDK's "BaseHeap::Release failed" twice at the
+  race-end change ~118 s in, as in `itc_2974`; its race played the
+  intro and never reached the countdown; `race-hud-machine.md`; in
+  kind 0, attract races, the draw handlers hand back before their
+  print): `sub_8216C330` RaceHudMachine::CountdownDraw, `sub_8216CB98`
+  RaceHudMachine::CountdownUpdate, `sub_8216CE00`
+  RaceHudMachine::RaceDraw, `sub_8216D918` RaceHudMachine::RaceUpdate,
+  `sub_8216D3F0` RaceHudMachine::IsFirstDay, `sub_8216C820`
+  RaceHudMachine::OpponentPrize, `sub_8216C938`
+  RaceHudMachine::ItemBonus.
+
 - `RaceHud::RunWarning` (attract race `itc_2979`, replay `itc_2980`,
   ok; `race-hud-object.md`): none left to drive.
 

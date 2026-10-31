@@ -63,7 +63,13 @@ file's history. What's left to see in a drive, from every run:
   `sub_8216D198`, `sub_8216DB70`, `sub_8216DD88`, `sub_8216DFD0`. 18
   callee adapters removable but kept for the harness's stand-in; the
   user's call (2026-10-31): delete them, the harness rewritten the
-  bigger way (a cleanup lead, next after the validation). Step: validation (agent running).
+  bigger way (a cleanup lead, next after the validation). Validated (`itc_2986`,
+  120 s: race 58 s, 0 errors, harnesses 60.1 s; replay `itc_2987` ok):
+  15 of 15 harness lines, 3 ran in the race, 5 in the replay, 7 to
+  drive.
+- Cleanup lead (no mapping, not counted): the race HUD machine's
+  harness rewritten without the stand-in and the 18 adapters removed
+  (the user's call). Step: migration (agent running).
 
 ## Done
 
@@ -129,5 +135,8 @@ file's history. What's left to see in a drive, from every run:
 - After the race HUD machine's migration (`itc_2985`: race 38 s, 0
   errors, race_hud_machine 0 differing): ours 3605, work left 2794
   (wrapped 103, known 498, unknown 2193).
+- After its validation (`itc_2986`, 120 s: race 58 s, 0 errors, every
+  harness 0 differing but the expected groups): ours 3605, work left
+  2794.
 
 ## Stopped
