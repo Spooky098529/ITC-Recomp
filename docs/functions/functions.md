@@ -422,6 +422,13 @@ Rows not yet moved stay in the table below. So far:
   location's opponents posed as cars, the pictures loaded from the
   archive, its 16 pages (menus, texts, the race's set-up) and 36 page
   transitions over two UI movies (B7).
+- [`material-passes.md`](material-passes.md): the passes over a part
+  model's material records: the paint colors from hue, saturation and
+  value or from the paint palette at `0x826C5110` (and the palette's
+  set-up), the alpha, brightness, texture and cull mode of a model's
+  draws and its fields set by a mask, with the second set's small
+  helpers beside them (a projector's matrices, a look-at, table lookups)
+  (B7).
 
 These files hold functions only. What used to follow the table here moved
 out on 2026-10-20: how frame interpolation works, its options and what

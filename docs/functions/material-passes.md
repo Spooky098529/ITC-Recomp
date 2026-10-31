@@ -1,0 +1,102 @@
+# Known functions: the part models' material passes
+
+The passes over a part model's material records (`820D0D60` to `820D3728`)
+that set what its draws read: the paint colors given as hue, saturation
+and value (three colors, turned into RGB with `Color::HsvToRgb`) or taken
+from the paint palette at `0x826C5110` (16 entries of 64 bytes, filled by
+`PaintPalette::Init` when the scene is made), each material's colors
+picked by its category (record +0x198) or its shared shader pair (+0x188,
+1000-1004); the alpha, the brightness and the blend mode of a model's
+blended draws, a texture index, the cull mode flipped, and a material's
+fields set by a mask (`PartModel::SetMaterials`). Beside them, the small
+helpers the second set's objects use with these passes: a projector's
+matrices from a point and a direction (`Projector::Matrices`, with
+`Matrix::LookAt`), a matrix's rotation transposed, and a few lookups in
+fixed tables by index or car block. The material record and block are in
+`../known-data.md` ("material record", "material block"); the draws that
+read these fields (`Model::RecordShape`, `Model::RecordMaterials`) in
+`models.md`. Their callers are the walks of the first set's loading
+objects over their arrived parts (`scene-loaders.md`) and the second
+set's objects at `820DB000`-`820EB400` (leads in `../loops/leads.md`).
+Shared, with their rows elsewhere: `Model::MaterialCount` and
+`Model::Material` (`sub_82594AD8`, `sub_82594B20`, `models.md`), the
+empty walk `sub_820D2270` (`scene-loaders.md`), `memcpy`
+(`sub_825A7410`, `c-runtime.md`) and the matrix functions
+(`Matrix::Multiply`, `Copy`, `Inverse`, `MultiplyTranslation`,
+`Vec4::Transform`, `matrix-math.md`). Not here: `sub_820D0D50` (in the
+scene's lead), `Dial::Angle` and `Dial::TachometerAngles`
+(`sub_820D3688`, `sub_820D3740`, `functions.md`), and the record resets
+at `820D34B8`-`820D3558` (`scene-models.md`). Mapped 2026-10-31 by the
+B7 loop from the lead "the part models' material passes"; every row
+below was read in `generated/` (constants from the image,
+`../known-data.md`'s "Values from the image").
+
+Status:
+
+- **Native**: plain C++ in `itc_recomp/src/` that doesn't use the
+  PowerPC context (`ctx`): normal arguments and host structs (it may
+  still read and write guest memory through `src/guest.h` while
+  recompiled code shares the data). The game reaches it without `ctx`,
+  from native or overridden callers, and the recompiled original is no
+  longer called (except behind a fallback flag or to check against it).
+  No `REX_FUNC` override of it exists, not even an adapter kept only for
+  a harness (that's Overridden until the adapter goes).
+  The end state for every function.
+- **Overridden**: an `extern "C" REX_FUNC(sub_XXXXXXXX)` override in
+  `itc_recomp/src/` (or a macro defining one) does the work instead of
+  the original: a thin adapter in front of native code, or a body that
+  still uses `ctx` (calling guest code, reading registers). It may call
+  the original when its flag is off, or to check itself against it.
+- **Wrapped**: an override that does something of its own (skipping
+  render-only passes, logging, timing) and still calls the original
+  (`__imp__sub_XXXXXXXX`) for the work.
+- **Dropped**: its work isn't needed on PC (hardware set-up, kernel calls
+  the SDK already stubbed), so it no longer runs: an override in
+  `itc_recomp/src/` replaces it with nothing (or a fixed return value), or
+  its callers, made native, leave the call out (no override then; the row
+  says which caller). Logs, a harness or the renderer's frame dumps have
+  shown that nothing reads what it did. The original is no longer called,
+  except behind a fallback flag while the drop is being checked. A
+  function the game never calls in the first place isn't Dropped: its
+  status stays blank and its row says it's never called.
+- **Merged**: its work is done inside a native caller's plain C++ (a
+  few lines only that caller needs), so it has no function or override of
+  its own in `itc_recomp/src/`. The row names the caller(s) and the
+  harness that covers the work. The original is no longer called, except
+  behind the caller's fallback flag.
+- **Patched**: the generated code was edited in place (search for
+  `PATCH:`).
+
+A function usually moves from recompiled or Wrapped to Overridden to
+Native as the `ctx` edge moves up through its callers, or straight to
+Dropped when its work isn't needed.
+`itc_recomp/tools/check_function_statuses.py` checks this column, in
+every file of the tables, against `src/` (an override marked Native, a
+status with no override, an override with no row, a row in two files);
+run it after changing either, on any branch.
+
+| Address | Name | Status | Notes |
+|---|---|---|---|
+| `sub_820D0D60` | `Color::HsvToRgb` | | r3 = out (a float4), r4 = a color as hue (degrees), saturation and value (three floats). A leaf, no state. Saturation 0.0 (`[0x82000A34]`): out +0, +4, +8 = the value, +12 not written. Else h' = hue × `[0x820029E8]` (1/60), i = (int)h' mod 6 (truncated, the C remainder), f = h' − i, p = v(1 − s), q = v(1 − s·f), t = v(1 − s(1 − f)); i 0: (v, t, p), 1: (q, v, p), 2: (p, v, t), 3: (p, q, v), 4: (t, p, v), 5: (v, p, q); +12 = 1.0 (`[0x82000A30]`). i outside 0-5 (a negative hue) writes nothing. 5 callers: `PartModel::SetPaint`, `PartModel::SetPaintBody`, `PartModel::ApplyPalette`, `sub_821847A0` (a lead) and `sub_822738A0` (never ran). Read in full (B7 loop, 2026-10-31). |
+| `sub_820C9808` | `Color::HsvToRgb8` | | The integer version: r3 = out (3 bytes, +3 not written), r4 = a packed color: +0 the hue (s16, degrees), +2 the saturation, +3 the value (bytes, 0-255). Saturation 0: all three the value. Else, with h6 = (s16)(hue × 6): sector = h6 / 360, r = h6 − 360 × sector, p = (255 − s)·v / 255, q = (255 − r·s/360)·v / 255, t = (255 − (360 − r)·s/360)·v / 255 (integer divisions, each byte masked); sector 0: (v, t, p), 1: (q, v, p), 2: (p, v, t), 3: (p, q, v), 4: (t, p, v), 5 and anything else (negative included): (v, p, q). A leaf (r31 saved below the stack pointer). Only callers `PartModel::SetPaint` and `PartModel::SetPaintBody`, whose results it computes are overwritten (see them). Read in full (B7 loop, 2026-10-31). |
+| `sub_820D0EA8` | `PartModel::SetPaint` (probably) | | r3 = a part model (nothing when 0), r4 to r9 = three colors A, B, C as (hue, saturation, value), passed by value two floats a register (A in r4 and r5's high word, B in r6 and r7's, C in r8 and r9's). Each color truncated to integers (hue u16, saturation and value bytes, on the stack), turned into bytes by `Color::HsvToRgb8` and into floats 0-255 with w = 1.0, then overwritten by `Color::HsvToRgb` on the float colors (so the byte path's values stay only for a negative hue). Then for each shape (count at +412), both groups (`Model::MaterialCount`, `Model::Material`): the material's +0x40 (pixel c63) = (1, 1, 1, 1); category (+0x198) 1 or shared pair (+0x188) 1000 or 1001: +0x00 (vertex c13) = (1, 1, 1, 1), +0x40 = A, +0x20 (pixel c66) = C; category 2 or pair 1004: the same with B. Callers: the walks `sub_820D6328` (the cockpit), `sub_820D7388` (the car parts), `sub_820D7840` (the interior) in `scene-loaders.md`, and `sub_820D7E18` (never ran). Read in full (B7 loop, 2026-10-31). |
+| `sub_820D1378` | `PartModel::SetPaintBody` (probably) | | As `PartModel::SetPaint` (the same arguments and the same overwritten byte path), but without the first (1, 1, 1, 1) into +0x40 and with the color into c13: category 1 or pair 1000 (not 1001): +0x00 = A, +0x40 = (1, 1, 1, 1), +0x20 = C; category 2 (not pair 1004): +0x00 = B, the rest the same. Only caller `sub_820D91E0` (from `sub_820E8A00`, from `sub_820D9C50`, Wrapped in `functions.md`). Read in full (B7 loop, 2026-10-31). |
+| `sub_820D2EA8` | `PartModel::ApplyPalette` (probably) | | r3 = a part model (nothing when 0): for each shape and both groups, each material's colors from the paint palette at `0x826C5110` (`PaintPalette::Init`; 64-byte entries: +0, +16, +32 three (hue, saturation, value) float4s, +48 three floats). Category k (+0x198, 1-10) takes entry k: +0x00 = RGB of its +0, +0x20 = of its +16, +0x10 (pixel c65) = of its +32, each with w = 1.0, and +0x50 to +0x58 (pixel c64's x, y, z) = its +48. Shared pair 1000 + j (+0x188, j 0-4) takes entry 11 + j the same way, except that its third color is entry j's +32 (not entry 11 + j's; probably a slip in the original) and that in group 0 +0x10 isn't written (it is in group 1). The category is tested against every k (no break). 5 callers: the walks `sub_820D5FC8` (the cockpit), `sub_820D6F20` (the car parts), `sub_820D7690` (the interior), `sub_820D7BF8` (the traffic car) in `scene-loaders.md`, and `sub_820D92A0` (Wrapped, `functions.md`). Read in full (B7 loop, 2026-10-31). |
+| `sub_820D2330` | `PaintPalette::Init` (probably) | | Fills the paint palette at `0x826C5110` (16 entries of 64 bytes, `../known-data.md`) when the scene (`[0x826C2E44]`) exists: a loop over the 16 entries with a jump table on the index, each case storing fixed constants (from `.rdata`) into its entry's three colors and three floats; some entries pick between two values by the scene's +4. No calls. 1,865 generated lines, a 1,184-byte frame. Callers `sub_820C8A50` (the scene's maker, in the scene's lead) and `sub_820C8DE8` (`car-models.md`). Not read in detail (the cases' constants). |
+| `sub_820D17D8` | `PartModel::SetTexture` (probably) | | r3 = a part model (nothing when 0), r4 = a texture index, r5 = a shape or -1 for every shape: each material of both groups gets +0x90 (texture 0's XPR2) = 0 and +0xB0 (texture 0's index) = r4. 9 callers seen among the second set's objects (`sub_820D8ED0`, `sub_820D8F18`, `sub_820D9638`, `sub_820DCBC0` and `sub_820DDA60` (Wrapped, `functions.md`), `sub_820E39F8`, `sub_820E3CF0`, `sub_820E8028`) and `sub_820E32E8` (never ran). Read in full (B7 loop, 2026-10-31). |
+| `sub_820D1950` | `PartModel::FlipCulling` (probably) | | r3 = a part model (nothing when 0): each material of every shape and both groups: +0x158 (render state 56, probably the cull mode) 2 becomes 6 and 6 becomes 2; other values kept. Callers `sub_820E9A28`, `sub_820EA148` (the second set's objects). Read in full (B7 loop, 2026-10-31). |
+| `sub_820D1A68` | `PartModel::ScaleBlended` (probably) | | r3 = a part model (nothing when 0), r4 = a shape, f1 = a factor: the group 0 count is read and not used; for each material of group 1: when +0x00's x (c13) is below 1.1 (`[0x82002CB0]`) its x, y, z are multiplied by f1; then +0x0C = 1.0 and +0x6C (the blend mode) = 2. 17 callers seen, the second set's objects (`sub_820C52A0`, `sub_820DBB08` and the point set-ups' lead, `sub_820DC850`, `sub_820DE140` to `sub_820DF7F0`, `sub_820E30C0`, `sub_820E5738`, `sub_820E5808`, `sub_820E8028`). Read in full (B7 loop, 2026-10-31). |
+| `sub_820D1B38` | `PartModel::SetPair1002Alpha` (probably) | | r3 = a part model (nothing when 0), r4 = a shape, f1 = a value: each material of both groups whose shared pair (+0x188) is 1002 gets +0x0C (c13's w) = f1. 12 callers seen, the second set's objects (`sub_820DB980`, `sub_820DBA38`, `sub_820DE1C8` to `sub_820DF8B0`, `sub_820E1690`, `sub_820E5668`, `sub_820E61D8`; in `sub_820DF8B0` and `sub_820E1690` f1 is a +636 of theirs). Read in full (B7 loop, 2026-10-31). |
+| `sub_820D1C00` | `PartModel::SetAlpha` (probably) | | r3 = a part model (nothing when 0), r4 = a shape, f1 = a value: every material of both groups gets +0x0C (c13's w) = f1. 12 callers, 6 seen in play (`sub_820DCC10`, `sub_820DD0B0`, `sub_820DD5C0`, `sub_820DF8B0`, `sub_820E5B08`, `sub_820EB388`; `sub_820DCC70`, `sub_820DCF98`, `sub_820DD110`, `sub_820DD438`, `sub_820DD620`, `sub_820DD948` never ran). Read in full (B7 loop, 2026-10-31). |
+| `sub_820D3318` | `PartModel::SetMaterials` (probably) | | r3 = a part model (nothing when 0); r4 to r6 six flags (two words a register); r7-r8, r9-r10 and the stack's +352 two float4s and a third; three floats (stack +368 to +376); the shape (+388; only -1, every shape, does anything); a category (+396) and a shared pair (+404). For each shape and every material of the block (`Model::MaterialTotal`, `Model::MaterialAt`, both groups at once): picked when the category is 0 or more and matches +0x198, else when the pair is 0 or more and matches +0x188, else when the category is -1 or more and the pair is -1 (so a category that doesn't match still picks every material when the pair is -1); a picked material gets the flagged fields from `PartModel::SetMaterialFields` (the 24 bytes of the stack arguments copied with `memcpy`, the material at +116). 6 callers seen: `sub_820D92A0` (Wrapped, `functions.md`), `sub_820D9638`, `sub_820DF8B0`, `sub_820E1690`, `sub_820E5B08`, `sub_820E61D8`. Read in full (B7 loop, 2026-10-31). |
+| `sub_820D3250` | `PartModel::SetMaterialFields` (probably) | | The fields `PartModel::SetMaterials` sets on one material, all arguments by value: the six flags (r3 to r5), three float4s (r6-r7, r8-r9, r10 and the stack), three floats and the material (stack +116). Flag 0: +0x00 (c13) = the first float4; flag 1: +0x20 (c66) = the second; flag 2: +0x10 (c65) = the third; flags 3 to 5: +0x50, +0x54, +0x58 (c64's x, y, z) = the floats. A leaf (stores its register arguments in its caller's frame). Only caller `PartModel::SetMaterials`. Read in full (B7 loop, 2026-10-31). |
+| `sub_82594AC0` | `Model::MaterialTotal` | | r3 = a model, r4 = a shape: the shape's material block's +0 (the record count of both groups). A leaf. Only caller `PartModel::SetMaterials`. Read in full (B7 loop, 2026-10-31). |
+| `sub_82594B00` | `Model::MaterialAt` | | r3 = a model, r4 = a shape, r5 = an index: the block + 16 + 512 × index, without a group (as `Model::Material`'s group 0). A leaf. Only caller `PartModel::SetMaterials`. Read in full (B7 loop, 2026-10-31). |
+| `sub_820D1EB8` | `Projector::Matrices` (probably) | | r3 = an object (+16 a 4x4 matrix W, +464 a direction), r4 = a matrix M, r5 = out (a scale matrix), r6 = out (a matrix), r7 = a point, r9 = a side (0 or not). The axis (1, 0, 0) for r9 = 0, (−1, 0, 0) otherwise, turned by M's rotation (`Matrix::Copy`, translation cleared, `Vec4::Transform`); d = its dot with +464; returns 0 when d ≤ 0.0. Else p = the point through W × M (`Matrix::Multiply`, `Vec4::Transform`); a size s from p.z: (z × 10 + 5000) × 0.0002 × 1.2 × 0.6 for r9 ≠ 0, (z × 500 + 5000) × 0.0002 × 1.2 × 0.4 for r9 = 0, multiplied by 0.8 when its size is below 0.8, clamped to −3.0 to 1.5; p moved back by half its unit vector (zero kept for a zero length); `Matrix::LookAt` from the origin along (1, 0, 0) (r9 ≠ 0) or (−1, 0, 0), with p as its up vector, translated by p (`Matrix::MultiplyTranslation`); r6 = W's inverse (`Matrix::Inverse`) × that; r5 = the identity (`memcpy`) with +0 and +20 = s × d and +40 = d. Returns 1. Probably a light's projected glow or beam (the four callers pass r9 = 0 or 1, from the second set's objects `sub_820DF8B0`, `sub_820E1690`, `sub_820E5B08`, `sub_820E61D8`). Read in full (B7 loop, 2026-10-31); what it's for not known. |
+| `sub_820D1D70` | `Matrix::LookAt` (probably) | | r3 = out, r4 = a position, r5 = a direction, r6 = an up vector: rows 0 = the normalized cross of the direction and the up vector, 2 = the normalized direction (each kept as is when its length is 0), 1 = their cross, row 3 (0, 0, 0, 1); translated by the position (`Matrix::MultiplyTranslation`) and inverted into out (`Matrix::Inverse`): a view matrix. Only caller `Projector::Matrices`. Read in full (B7 loop, 2026-10-31; the cross products' order from the shuffles, probably). |
+| `sub_820D1CB0` | `Matrix::TransposeRotation` (probably) | | r3 = out, r4 = a 4x4 matrix: out = the identity (`memcpy` of 64 bytes from the stack), then its upper 3x3 = r4's upper 3x3 transposed; the translation stays 0. Callers `sub_820DF8B0`, `sub_820E1690`, `sub_820E5B08`, `sub_820E61D8`. Read in full (B7 loop, 2026-10-31). |
+| `sub_820D35D0` | | | r3 = out, r4 = an index, r5 = a sub-index (0-3): copies the 16 bytes at `0x82601A00` + 16 × (4 × r4 + r5) (a table in `.data`, not known whether written). A leaf. Callers `sub_820DAA38` (Wrapped, `functions.md`) and `sub_820E1690`. Read in full (B7 loop, 2026-10-31). |
+| `sub_820D3600` | | | r3 = a value (probably a car block): 1 for 1, 26, 28, 33 and 36, else 0. A leaf. Callers `sub_820E3040`, `sub_820E30C0`. Read in full (B7 loop, 2026-10-31). |
+| `sub_820D3638` | | | r3 = a value (probably a car block): 1 for 10 and 37, else 0. A leaf. Callers `sub_820E3040`, `sub_820E30C0`. Read in full (B7 loop, 2026-10-31). |
+| `sub_820D3658` | | | Not seen in play. r3 = an index, r4 = a value: the address `0x82003600` + 16 × (2 × r3 + (r4 ≥ 3)). A leaf. Only caller `sub_820E32E8` (never ran). Read in full (B7 loop, 2026-10-31). |
+| `sub_820D3728` | | | r3 = an index: the address `0x82003680` + 48 × r3 (a table of 48-byte records in `.rdata`). A leaf. Only caller `sub_820E3040`. Read in full (B7 loop, 2026-10-31). |
