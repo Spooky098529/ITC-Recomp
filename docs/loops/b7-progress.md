@@ -57,7 +57,13 @@ file's history. What's left to see in a drive, from every run:
   5 ready groups, no stop: `[0x826D82D4]` is the race scene, 31,168
   bytes, its machine at +87936 of the race mode; the race object's
   lead taken in and deleted, `sub_8215AA88` taken from the course
-  scenery owners' lead). Step: migration (agent running).
+  scenery owners' lead). Migration checked (2c5902ef..454bd46e: the
+  machine's `Init` (its frame words replayed as the original leaves
+  them, the race states' precedent), the lights' set-up, the effect
+  parameters and glows, the pause toggle and `Resume`, `Destroy`; 11 of
+  20 ours, `--native_race_scene`, 8 harness lines 0 differing, frame
+  dumps alike; nothing ready left, the rest blocked by other leads).
+  Step: validation (agent running).
 
 ## Done
 
@@ -112,5 +118,8 @@ file's history. What's left to see in a drive, from every run:
   2860.
 - After the race scene's map: ours 3537, work left 2860 (wrapped 103,
   known 497, unknown 2260).
+- After the race scene's migration (`itc_2929`: race 38 s, 0 errors,
+  race_scene and post_effects 0 differing): ours 3548, work left 2850
+  (wrapped 103, known 487, unknown 2260).
 
 ## Stopped

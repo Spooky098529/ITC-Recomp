@@ -72,6 +72,15 @@ When the user has reviewed a run's section, its heading gets
   sets slots 2-12, not 2 and 3); `RaceScene::Destroy` frees the object
   but leaves the pointer set; `sub_821597F0` stays in `camera-modes.md`
   (`CameraDirector::Resume`).
+- The race scene's migration (2c5902ef..454bd46e,
+  `--native_race_scene`): for review: `RaceSceneMachine::Init`'s stores
+  and six-word copies replayed from a table in the original's 864-byte
+  frame, so the words it never writes keep the stack's (the
+  `RaceStates::Init` precedent); `SetEffectParams` and
+  `Glows::SetParams` call the setters' plain C++ only when the glows'
+  slots 2-12 and the filters' slot 8 hold them, else the original runs;
+  `Resume` (never seen in play) ported with `TogglePause`; five callees
+  Native with no adapter.
 
 ## Run 2026-10-30 23:03 (`b7-loop-30-10-26-2`)
 
