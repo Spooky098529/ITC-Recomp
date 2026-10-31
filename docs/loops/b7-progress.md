@@ -40,7 +40,12 @@ file's history. What's left to see in a drive, from every run:
   `alt-hud.md`, 26 new rows, 21 in play, 4 ready groups, no stop: a
   second dashboard on UI movie 22, `AltHud::`, probably the attract or
   replay races'; with the menu list helpers `sub_8220BBB0`,
-  `sub_8220BF00`). Step: migration (agent running).
+  `sub_8220BF00`). Migration checked (515bb2e3, f8054cd4: 21 of 21 in
+  play ours, `--native_alt_hud`, code in `src/alt_hud/`, 21 harness
+  lines 0 differing; not called in an attract race (`SetUp`, `Tick`,
+  `RunMovie` counted 0; `MenuList::Release` twice, from the front end);
+  two rows corrected; nothing ready left). Step: validation (agent
+  running).
 
 ## Done
 
@@ -76,6 +81,9 @@ file's history. What's left to see in a drive, from every run:
   2882.
 - After the alternate HUD's map: ours 3516, work left 2881 (wrapped
   103, known 499, unknown 2279).
+- After the alternate HUD's migration (`itc_2919`: race 37 s, 0
+  errors, alt_hud 0 differing): ours 3537, work left 2860 (wrapped 103,
+  known 478, unknown 2279).
 - After the shader pair callback's migration (`attract_race.sh 40`:
   race 36-38 s, 0 errors, models, shader_objects and scenery_lists 0
   differing): ours 3516, work left 2881 (wrapped 103, known 478,

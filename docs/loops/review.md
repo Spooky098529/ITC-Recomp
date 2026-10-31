@@ -48,6 +48,16 @@ When the user has reviewed a run's section, its heading gets
   (its line updated); the menu list helpers `sub_8220BBB0`
   (`MenuList::Release`, ~50 call sites) and `sub_8220BF00` mapped here.
   `race-hud-object.md` and `known-data.md` updated.
+- The alternate HUD's migration (515bb2e3, f8054cd4,
+  `--native_alt_hud`): two map rows corrected (`MenuList::PressedX`
+  answers 1 when +24 is 0, so X does flip the toggle; `MenuList::Release`
+  returns 0 with no block). For review: `MenuList::Release` and
+  `AltHud::Destroy` free natively only with `--native_heap` (blocks not
+  the layer's pages go to the original, the car models' precedent);
+  `PressedX` calls `ActionMapper::Pressed`'s plain C++ when the slot is
+  it (the racer controllers' precedent); the three extra-gauge digit
+  setters (never seen in play) left as the recompiled originals; 16
+  functions Native with no adapter (only native callers reach them).
 
 ## Run 2026-10-30 23:03 (`b7-loop-30-10-26-2`)
 
