@@ -80,7 +80,10 @@ When the user has reviewed a run's section, its heading gets
   `Glows::SetParams` call the setters' plain C++ only when the glows'
   slots 2-12 and the filters' slot 8 hold them, else the original runs;
   `Resume` (never seen in play) ported with `TogglePause`; five callees
-  Native with no adapter.
+  Native with no adapter. `RaceScene::Create`'s and
+  `RaceSceneMachine::Init`'s prints come right after their bail-out
+  (when the native `operator new` can't run), so they log only when the
+  native path runs (the validation agent's note).
 
 ## Run 2026-10-30 23:03 (`b7-loop-30-10-26-2`)
 

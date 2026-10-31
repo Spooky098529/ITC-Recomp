@@ -63,9 +63,16 @@ file's history. What's left to see in a drive, from every run:
   parameters and glows, the pause toggle and `Resume`, `Destroy`; 11 of
   20 ours, `--native_race_scene`, 8 harness lines 0 differing, frame
   dumps alike; nothing ready left, the rest blocked by other leads).
-  Step: validation (agent running).
+  Validated (`itc_2930`, 120 s: race 60 s, 0 errors, harnesses 58.2
+  s; replay `itc_2931` broke on the intermittent SDK heap error, ran to
+  the end): 11 of 11 harness lines; 9 ran in the race, 1 in the
+  replay, `Resume` to drive. Subsystem 2 finished.
 
 ## Done
+
+- The race scene (subsystem 2): `race-scene.md`, 11 of 20 in play, one
+  migration; `--native_race_scene`; a3291567..454bd46e. Validated
+  (`itc_2930`).
 
 - The alternate HUD (subsystem 1): `alt-hud.md`, 21 of 21 in play, one
   migration; `--native_alt_hud`; 12983d8d..f8054cd4. Validated
@@ -121,5 +128,8 @@ file's history. What's left to see in a drive, from every run:
 - After the race scene's migration (`itc_2929`: race 38 s, 0 errors,
   race_scene and post_effects 0 differing): ours 3548, work left 2850
   (wrapped 103, known 487, unknown 2260).
+- After its validation (`itc_2930`, 120 s: race 60 s, 0 errors, every
+  harness 0 differing but the expected groups): ours 3548, work left
+  2850.
 
 ## Stopped

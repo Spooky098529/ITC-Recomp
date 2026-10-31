@@ -18,6 +18,12 @@ here loses its heading.
 
 ## Run 2026-10-31 13:47 (`b7-loop-31-10-26`)
 
+- The race scene (attract race `itc_2930`, replay `itc_2931`: broke,
+  the SDK's "BaseHeap::Release failed because address is not a region
+  start" once at the race-end change ~118 s in, as in `itc_2894`; it
+  ran to the end; `race-scene.md`; never seen in play before either):
+  `sub_8215D0D8` RaceSceneMachine::Resume.
+
 - The alternate HUD (attract race `itc_2920`, replay `itc_2921`, ok;
   `alt-hud.md`; the replay's race set it up but never ticked it, so
   probably never showed it): `sub_82217AC8` AltHud::Tick,

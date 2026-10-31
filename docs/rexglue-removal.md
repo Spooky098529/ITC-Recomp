@@ -2675,6 +2675,7 @@ B7. **The game logic inside**: everything else, subsystem by subsystem,
 | 2026-10-31 | The part models' material passes (`PartModel::SetPaint`, `SetPaintBody` and `ApplyPalette` with `Color::HsvToRgb` and `HsvToRgb8`, `PaintPalette::Init`, the one-field passes, `SetMaterials` with `Model::MaterialTotal` and `MaterialAt`, `Projector::Matrices` with `Matrix::LookAt`, `Matrix::TransposeRotation`, four table lookups) | `material-passes.md` | 22 of 22 in play (two migrations; the adapters stay while the scene loaders' walks and the second set's objects, recompiled, call them) | `--native_material_passes` |
 | 2026-10-31 | The race HUD object (`RaceHud::` at +16 of the race screens' holder `[0x826D84F0]`: its UI movies, the dashboard's gauges and digits, the rear-view mirror's render target, the countdown, the warning, the expressway sign and place names from the track zones, the item popup, the timer, the tick and draw; `RaceScreens::Init` with its +1004 object's maker) | `race-hud-object.md` | 45 of 58 in play (two migrations; the rest calls the menu sound `sub_821103F0`, `sub_8211D930`, `sub_8211E370` or the other in-race screens; stopped at the last validation: `App::App` and `App::Create`'s harnesses differ since 83b2b76) | `--native_race_hud_object` |
 | 2026-10-31 | The alternate HUD (`AltHud::`, the race HUD holder's object at +1004: a second dashboard on UI movie 22 with the race HUD's gauges and the input record's throttle, brake and steering, probably the attract or replay races'; its set-up, tick, movie and destroy, with the menu list helpers `MenuList::Release` and `PressedX`) | `alt-hud.md` | 21 of 21 in play (one migration; its tick not seen in an attract race or the replay) | `--native_alt_hud` |
+| 2026-10-31 | The race scene (`RaceScene::` at `[0x826D82D4]`, 31,168 bytes: the seven car slots, the 11 lights, the screen objects; its machine `RaceSceneMachine::` at +87936 of the race mode: `Init`, the lights' set-up, the post effects' and glows' parameters, the pause toggle and `Resume`, `Destroy`) | `race-scene.md` | 11 of 20 in play (one migration; the rest waits on the course scenery's and scene models' owners, the scene and its update, `Race::DrawStep` and the screen objects) | `--native_race_scene` |
 
     The first run (2026-10-22, branch `b7-loop-test`): every harness at 0 differing, attract races at 20-21 s with no errors,
     and a race the user drove looked right. Ours went from 162 to 335 (work
@@ -4212,3 +4213,16 @@ overridden 108, Native 34, Dropped 26, never called 70, live 211.
 Imports: 186 called, 56 with a live caller. B7 (`b7_status.py`): ours
 3,537, work left 2,860 (Wrapped 103, with a row 478, no row yet 2,279),
 from 2,883 at the run's start.
+
+**2026-10-31, the race scene (branch `b7-loop-31-10-26`):** the
+twenty-seventh run's second subsystem, mapped and made native in one
+migration (`race-scene.md`, `--native_race_scene`, `src/race_scene/`):
+the race scene at `[0x826D82D4]` and its machine, 11 of the 20
+functions seen in play, two leads merged (the race's post effect users,
+the race object). What blocks the rest: the course scenery's and scene
+models' owners, the scene at `[0x826C2E44]` and its update,
+`Race::DrawStep` (Wrapped) and the screen objects (leads). The
+boundary: 449 functions (916 pairs): overridden 108, Native 34, Dropped
+26, never called 70, live 211. Imports: 186 called, 56 with a live
+caller. B7 (`b7_status.py`): ours 3,548, work left 2,850 (Wrapped 103,
+with a row 487, no row yet 2,260), from 2,860.
