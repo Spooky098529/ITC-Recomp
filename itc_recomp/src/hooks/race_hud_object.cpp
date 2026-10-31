@@ -13,7 +13,8 @@
 
 ITC_FLAG_BOOL(native_race_hud_object, true, "ITC",
               "Run the race HUD object's functions (docs/functions/race-hud-object.md: "
-              "HudCurve::Eval sub_82212118, PowInt sub_82213C40, HudBar::Step sub_82211FB8, "
+              "HudCurve::Eval sub_82212118, PowInt sub_82213C40 (no adapters: only their native "
+              "callers reach them in play, here and in the alternate HUD), HudBar::Step sub_82211FB8, "
               "RaceHud::SetGear sub_82212DB0, SetBar sub_82214698, ResetBar sub_82212668, "
               "ClearWarning sub_822122A0, SetPlayer sub_82212690, Touching sub_82215820, "
               "SetTach sub_82212D58, SetBoost sub_82212E18, SetSpeed sub_82214260, SetTime "
@@ -413,7 +414,11 @@ void RaceHudObjectTickPanel(PPCContext& ctx, uint8_t* base) {
 // TickPanel), UpdateRacerBar (from TickRacers; mode 3's tick, never seen in
 // play, runs the original), HudBar::Step and Touching (from UpdateRacerBar;
 // sub_822161D0, never seen in play, runs the originals), TickTimer and
-// UpdateRecordingFull (from TickPanel).
+// UpdateRecordingFull (from TickPanel), HudCurve::Eval (from SetTach, SetBoost,
+// SetUpGauges and the alternate HUD's SetUpGauges, SetTach and SetBoost) and
+// PowInt (from SetSpeed, SetDistance and the alternate HUD's SetSpeed; the
+// +656 object's and the other digits' callers, never seen in play, run the
+// originals).
 
 #define ITC_RACE_HUD_OBJECT(address, step)    \
   extern "C" REX_FUNC(sub_##address) {        \
@@ -425,8 +430,6 @@ void RaceHudObjectTickPanel(PPCContext& ctx, uint8_t* base) {
     hooks::step(ctx, base);                   \
   }
 
-ITC_RACE_HUD_OBJECT(82212118, RaceHudObjectCurveEval)
-ITC_RACE_HUD_OBJECT(82213C40, RaceHudObjectPowInt)
 ITC_RACE_HUD_OBJECT(82212668, RaceHudObjectResetBar)
 ITC_RACE_HUD_OBJECT(822122A0, RaceHudObjectClearWarning)
 ITC_RACE_HUD_OBJECT(82212690, RaceHudObjectSetPlayer)
