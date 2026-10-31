@@ -20,9 +20,18 @@ file's history. What's left to see in a drive, from every run:
   `src/scenery_lists/model_draws.cpp` beside `RecordShape`, under
   `--native_models`, harness 1,024 cases 0 differing, frame dump alike;
   8de457d4: the vertex declaration's adapter `sub_82589728` removed;
-  no subagents). Step: validation (agent running).
+  no subagents). Validated (`itc_2903`, 120 s: race 61 s, 0 errors,
+  harnesses 56.8 s): 2 of 2 harness lines, both ran in play, none to
+  drive. Done.
+- Cleanup lead (no mapping, not counted): `sub_820A06D0`, the shader
+  pair's load callback (`models.md`, ready, 92 lines), left by the one
+  before. Step: migration (agent running).
 
 ## Done
+
+- `Model::RecordMaterials` (cleanup lead): `models.md`, with the vertex
+  declaration's adapter removed; `--native_models`; 0c226b78..8de457d4.
+  Validated (`itc_2903`).
 
 ## Rows to review
 
@@ -43,5 +52,8 @@ file's history. What's left to see in a drive, from every run:
 - After `Model::RecordMaterials`' migration (`itc_2902`: race 36 s, 0
   errors, models and scenery_lists 0 differing): ours 3515, work left
   2882 (wrapped 103, known 479, unknown 2300).
+- After its validation (`itc_2903`, 120 s: race 61 s, 0 errors, every
+  harness 0 differing but the expected groups): ours 3515, work left
+  2882.
 
 ## Stopped
