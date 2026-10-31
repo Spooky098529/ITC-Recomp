@@ -434,7 +434,9 @@ void RaceHudObjectTickPanel(PPCContext& ctx, uint8_t* base) {
 // never seen in play, reach the originals): UpdateView, UpdateItem,
 // RunWarning, RunItem, RunCountdown, StartMovie1, FinishMovie1, RunMovie1,
 // SetPlayer, Reset, ClearWarning, SetUpGauges, ResetBar, SetUpExtraGauges,
-// SetUpMirror and SetUpSigns (the user's call, 2026-10-31).
+// SetUpMirror and SetUpSigns (the user's call, 2026-10-31), and Tick,
+// UpdateWarning and TickPanel (since the machine's PauseUpdate and
+// AfterRaceUpdate went native); RaceScreens::Init (from Create, native).
 
 #define ITC_RACE_HUD_OBJECT(address, step)              \
   extern "C" REX_FUNC(sub_##address) {                  \
@@ -448,12 +450,8 @@ void RaceHudObjectTickPanel(PPCContext& ctx, uint8_t* base) {
 
 ITC_RACE_HUD_OBJECT(82212768, RaceHudObjectApplyOptions)
 ITC_RACE_HUD_OBJECT(822141A0, RaceHudObjectTearDown)
-ITC_RACE_HUD_OBJECT(822153A0, RaceHudObjectTick)
 ITC_RACE_HUD_OBJECT(82212270, RaceHudObjectStartCountdown)
 ITC_RACE_HUD_OBJECT(82212AC8, RaceHudObjectDrawWarning)
 ITC_RACE_HUD_OBJECT(822128A8, RaceHudObjectDraw)
-ITC_RACE_HUD_OBJECT(82212C50, RaceHudObjectUpdateWarning)
 ITC_RACE_HUD_OBJECT(82213638, RaceHudObjectShowItem)
-ITC_RACE_HUD_OBJECT(82211DA0, RaceHudObjectScreensInit)
 ITC_RACE_HUD_OBJECT(82211F40, RaceHudObjectScreensCreate)
-ITC_RACE_HUD_OBJECT(82215488, RaceHudObjectTickPanel)

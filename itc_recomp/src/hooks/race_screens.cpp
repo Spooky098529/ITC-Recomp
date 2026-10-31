@@ -449,8 +449,10 @@ void RaceScreensCareerResultsPage1(PPCContext& ctx, uint8_t* base) {
 // callers in play, the draws, call its plain C++), PauseMenu::SaveOptions
 // and SaveHudOptions (Close and OptionsPage), SetUpOptions (OpenOptions),
 // RaceDialog::Update (the two ConfirmPages) and RaceDialog::Draw (the pause
-// menu's and the menu after the race's draws); their register steps stay
-// for the harness.
+// menu's and the menu after the race's draws), the eight makers
+// (RaceScreens::Create, race-hud-object.md), PauseMenu::Update and
+// AfterRaceMenu::Update (the race HUD machine's PauseUpdate and
+// AfterRaceUpdate); their register steps stay for the harness.
 
 #define ITC_RACE_SCREENS(address, step)       \
   extern "C" REX_FUNC(sub_##address) {        \
@@ -472,14 +474,6 @@ ITC_RACE_SCREENS(8220BD50, RaceScreensListAccepted)
 ITC_RACE_SCREENS(8220BDE0, RaceScreensListCancelled)
 ITC_RACE_SCREENS(8220BE70, RaceScreensListPressed152)
 ITC_RACE_SCREENS(8220BF90, RaceScreensListPressed166)
-ITC_RACE_SCREENS(8220D7E8, RaceScreensPauseMenuCreate)
-ITC_RACE_SCREENS(82210868, RaceScreensPauseMenu4Create)
-ITC_RACE_SCREENS(8221B1F0, RaceScreensAfterRaceMenuCreate)
-ITC_RACE_SCREENS(82217D70, RaceScreensRaceDialogCreate)
-ITC_RACE_SCREENS(82219138, RaceScreensCareerResultsCreate)
-ITC_RACE_SCREENS(8221F390, RaceScreensRaceResultsCreate)
-ITC_RACE_SCREENS(8221FA30, RaceScreensSplitResultsCreate)
-ITC_RACE_SCREENS(8221BDD0, RaceScreensKind6MenuCreate)
 ITC_RACE_SCREENS(8220C4C8, RaceScreensPauseMenuDestroy)
 ITC_RACE_SCREENS(8220FC98, RaceScreensPauseMenu4Destroy)
 ITC_RACE_SCREENS(8221A3E8, RaceScreensAfterRaceMenuDestroy)
@@ -492,8 +486,6 @@ ITC_RACE_SCREENS(8220D890, RaceScreensPauseMenuClose)
 ITC_RACE_SCREENS(8220C5D0, RaceScreensPauseMenuAnswerPage)
 ITC_RACE_SCREENS(8221A720, RaceScreensAfterRaceMenuAnswerPage)
 ITC_RACE_SCREENS(82217D40, RaceScreensRaceDialogAnswer)
-ITC_RACE_SCREENS(8220F638, RaceScreensPauseMenuUpdate)
-ITC_RACE_SCREENS(8221BD20, RaceScreensAfterRaceMenuUpdate)
 ITC_RACE_SCREENS(822191D0, RaceScreensCareerResultsStart)
 ITC_RACE_SCREENS(8220CED0, RaceScreensPauseMenuStepVolume)
 ITC_RACE_SCREENS(8220D248, RaceScreensPauseMenuStepAdjust)
