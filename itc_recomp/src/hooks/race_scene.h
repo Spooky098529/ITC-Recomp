@@ -20,4 +20,10 @@ void RaceSceneMachineInit(PPCContext& ctx, uint8_t* base);
 // leaves them.
 void RaceSceneLightsSetUp(PPCContext& ctx, uint8_t* base);
 
+// RaceScene::SetEffectParams sub_8228F5C0: r3 = the kind, r4 = the index;
+// r3 = the last color filter, f1 = its value, as the original leaves them.
+// The original where the effects' slots aren't the setters
+// (race_scene::EffectParamsReady).
+void RaceSceneSetEffectParams(PPCContext& ctx, uint8_t* base);
+
 }  // namespace hooks

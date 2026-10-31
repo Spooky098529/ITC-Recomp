@@ -14,7 +14,10 @@ ITC_FLAG_BOOL(native_race_scene, true, "ITC",
               "sub_8215D808 with RaceScene::Create sub_8215D738 and RaceScene::RaceScene "
               "sub_8215D6C8, which have no adapters: only Init's plain C++ calls them, with "
               "--native_heap; RaceLights::SetUp sub_8215CF78 with RaceLights::InitEntry "
-              "sub_8215C368, no adapter: only SetUp's plain C++ calls it) natively instead of through the translated code (the same words, "
+              "sub_8215C368, no adapter: only SetUp's plain C++ calls it; RaceScene::SetEffectParams "
+              "sub_8228F5C0 with Glows::SetParams sub_8228F0B0, no adapter: only SetEffectParams' "
+              "plain C++ calls it, the glows' and color filters' setters' plain C++ called where "
+              "their vtables hold them, else the original) natively instead of through the translated code (the same words, "
               "bit for bit; checked by --run_harnesses=race_scene)");
 
 namespace hooks {
@@ -45,6 +48,17 @@ void RaceSceneLightsSetUp(PPCContext& ctx, uint8_t* base) {
   ctx.f1.f64 = rs::LightsLastF1(base);
 }
 
+void RaceSceneSetEffectParams(PPCContext& ctx, uint8_t* base) {
+  ctx.fpscr.disableFlushMode();
+  if (!rs::EffectParamsReady(base)) {
+    __imp__sub_8228F5C0(ctx, base);
+    return;
+  }
+  double f1 = 0;
+  ctx.r3.u64 = rs::SetEffectParams(base, ctx.r3.u32, ctx.r4.u32, &f1);
+  ctx.f1.f64 = f1;
+}
+
 }  // namespace hooks
 
 // Defines an adapter: the flag, else the original.
@@ -60,6 +74,9 @@ void RaceSceneLightsSetUp(PPCContext& ctx, uint8_t* base) {
 
 ITC_RACE_SCENE(8215D808, RaceSceneMachineInit)
 ITC_RACE_SCENE(8215CF78, RaceSceneLightsSetUp)
+ITC_RACE_SCENE(8228F5C0, RaceSceneSetEffectParams)
+// Glows::SetParams (sub_8228F0B0) has no adapter: its only caller,
+// RaceScene::SetEffectParams, is native; --native_race_scene switches it.
 // RaceLights::InitEntry (sub_8215C368) has no adapter: its only caller,
 // RaceLights::SetUp, is native; --native_race_scene switches it.
 // RaceScene::Create (sub_8215D738) and RaceScene::RaceScene (sub_8215D6C8)

@@ -7,6 +7,7 @@
 #include "c_runtime/math.h"
 #include "guest.h"
 #include "memory/c_runtime_heap.h"
+#include "post_effects/post_effects.h"
 #include "scene_models/scene_models.h"
 
 #include <bit>
@@ -140,5 +141,94 @@ void LightsSetUp(uint8_t* base, uint32_t set) {
 }
 
 double LightsLastF1(uint8_t* base) { return c_runtime::Cos(Lfd(base, 0x82002FE0)); }
+
+// --- The post effects' parameters ---
+
+namespace {
+
+constexpr uint32_t kGlowSetters = 0x82136EF8;  // slot 2; 8 bytes apart to slot 12
+constexpr uint32_t kGlowFirstOffset = 8436;
+constexpr uint32_t kFilterSet8120 = 0x82135148;  // slot 8
+
+bool GlowReady(uint8_t* base, uint32_t glow) {
+  if (glow == 0) {
+    return false;
+  }
+  const uint32_t vtable = guest::LoadU32(base, glow);
+  for (uint32_t k = 2; k <= 12; k++) {
+    if (guest::LoadU32(base, vtable + 4 * k) != kGlowSetters + 8 * (k - 2)) {
+      return false;
+    }
+  }
+  return true;
+}
+
+bool FilterReady(uint8_t* base, uint32_t filter) {
+  return filter != 0 && guest::LoadU32(base, guest::LoadU32(base, filter) + 32) == kFilterSet8120;
+}
+
+// The 11 setters' calls on one glow.
+void GlowSetAll(uint8_t* base, uint32_t glow, uint32_t entry) {
+  for (uint32_t k = 0; k < 11; k++) {
+    post_effects::GlowSet(base, glow, kGlowFirstOffset + 4 * k, Lfs(base, entry + 4 * k));
+  }
+}
+
+}  // namespace
+
+bool SplitScreen(uint8_t* base) {
+  return guest::LoadU32(base, guest::LoadU32(base, 0x826C2CE8) + 8) != 0;
+}
+
+bool EffectParamsReady(uint8_t* base) {
+  namespace pe = post_effects;
+  const uint32_t* glows;
+  const uint32_t* filters;
+  static constexpr uint32_t kSplitGlows[] = {5, 9}, kSplitFilters[] = {6, 10};
+  static constexpr uint32_t kGlows[] = {1}, kFilters[] = {2};
+  const bool split = SplitScreen(base);
+  glows = split ? kSplitGlows : kGlows;
+  filters = split ? kSplitFilters : kFilters;
+  const uint32_t count = split ? 2 : 1;
+  for (uint32_t i = 0; i < count; i++) {
+    if (!GlowReady(base, guest::LoadU32(base, pe::kEffects + 4 * glows[i])) ||
+        !FilterReady(base, guest::LoadU32(base, pe::kEffects + 4 * filters[i]))) {
+      return false;
+    }
+  }
+  return true;
+}
+
+uint32_t GlowsSetParams(uint8_t* base, uint32_t entry) {
+  ITC_NATIVE_RUNNING("sub_8228F0B0 Glows::SetParams");
+  if (SplitScreen(base)) {
+    const uint32_t first = post_effects::Get(base, 5);
+    const uint32_t second = post_effects::Get(base, 9);
+    GlowSetAll(base, first, entry);
+    GlowSetAll(base, second, entry);
+    return second;
+  }
+  const uint32_t glow = post_effects::Get(base, 1);
+  GlowSetAll(base, glow, entry);
+  return glow;
+}
+
+uint32_t SetEffectParams(uint8_t* base, uint32_t kind, uint32_t index, double* f1) {
+  ITC_NATIVE_RUNNING("sub_8228F5C0 RaceScene::SetEffectParams");
+  const uint32_t entry = int32_t(kind) < 8 ? 0x82637CC0 + 44 * (3 * kind + index) : 0x82637C94;
+  GlowsSetParams(base, entry);
+  const double value = Lfs(base, 0x82002204);
+  *f1 = value;
+  if (SplitScreen(base)) {
+    const uint32_t first = post_effects::Get(base, 6);
+    const uint32_t second = post_effects::Get(base, 10);
+    post_effects::ColorFilterSet(base, first, 8120, value);
+    post_effects::ColorFilterSet(base, second, 8120, value);
+    return second;
+  }
+  const uint32_t filter = post_effects::Get(base, 2);
+  post_effects::ColorFilterSet(base, filter, 8120, value);
+  return filter;
+}
 
 }  // namespace race_scene

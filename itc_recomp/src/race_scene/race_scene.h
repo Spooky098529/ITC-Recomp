@@ -54,4 +54,27 @@ void LightsSetUp(uint8_t* base, uint32_t set);
 // 0x82002FE0.
 double LightsLastF1(uint8_t* base);
 
+// --- The post effects' parameters (post-effects.md) ---
+
+// Whether the race's post effects are split screen's: [[0x826C2CE8] + 8].
+bool SplitScreen(uint8_t* base);
+// Whether SetEffectParams' and Glows::SetParams' vtable calls reach the
+// setters' plain C++: the glows (effects 5 and 9 in split screen, else 1)
+// and the color filters (6 and 10, else 2) are there, the glows' slots 2 to
+// 12 are Glow::Set8436 to Set8476 (sub_82136EF8 to sub_82136F48) and the
+// filters' slot 8 ColorFilter::Set8120 (sub_82135148). Else the originals
+// run (they'd call through whatever is there, or through address 0).
+bool EffectParamsReady(uint8_t* base);
+// sub_8228F0B0 Glows::SetParams (probably): the 11 floats at `entry` given
+// to each glow's slots 2 to 12 in order. Returns the last glow (r3 as the
+// original leaves it). Only where EffectParamsReady.
+uint32_t GlowsSetParams(uint8_t* base, uint32_t entry);
+// sub_8228F5C0 RaceScene::SetEffectParams (probably): the 44-byte entry at
+// 0x82637CC0 + 44 (3 kind + index) (kind below 8, as signed; else the one at
+// 0x82637C94) through Glows::SetParams, then the color filters' slot 8 with
+// the float at 0x82002204. Returns the last filter (r3 as the original
+// leaves it), `f1` the value (f1 as it leaves it). Only where
+// EffectParamsReady.
+uint32_t SetEffectParams(uint8_t* base, uint32_t kind, uint32_t index, double* f1);
+
 }  // namespace race_scene

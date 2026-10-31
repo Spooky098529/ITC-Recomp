@@ -15,6 +15,7 @@
 #include "hooks/race_scene.h"
 #include "memory/c_runtime_heap.h"
 #include "memory/heap.h"
+#include "post_effects/post_effects.h"
 #include "race_scene/race_scene.h"
 
 #include <fmt/format.h>
@@ -219,11 +220,138 @@ void Lights(Context& h) {
   }
 }
 
+// --- The post effects' parameters: a world of our own (the 15 effect
+// pointers at 0x826C5D80, the viewports' holder at 0x826C2CE8 with its +8,
+// split screen or not): three glows (effects 1, 5, 9) and three color
+// filters (2, 6, 10) in random blocks, their vtables with the setters (one
+// case in eight a slot elsewhere, so the adapter's original runs; never
+// address 0's). RaceScene::SetEffectParams on kinds -1 to 9 and indices 0 to
+// 2 (the image's table, and 0x82637C94 from kind 8); Glows::SetParams on
+// random entries. The setters' floats compared as floats (8436 to 8476 and
+// 8120), every other byte of the effects exactly, r3 and f1 ---
+
+void EffectParams(Context& h) {
+  namespace pe = post_effects;
+  constexpr uint32_t kGlowBytes = 8480;
+  constexpr uint32_t kFilterBytes = 8128;
+  constexpr uint32_t kGlows[] = {1, 5, 9};
+  constexpr uint32_t kFilters[] = {2, 6, 10};
+  const Block glows(3 * kGlowBytes);
+  const Block filters(3 * kFilterBytes);
+  const Block misc(0x200);  // the vtables (+0, +64) and the holder (+128)
+  if (!glows.address || !filters.address || !misc.address) {
+    ITC_LOG_ERROR("harness: race_scene: no block from the allocation layer");
+    return;
+  }
+  const uint32_t glow_vtable = misc.address;
+  const uint32_t filter_vtable = misc.address + 64;
+  const uint32_t holder = misc.address + 128;
+  // The world: `wrong` puts a slot elsewhere (a glow's slot 2 + wrong % 11,
+  // or the filters' slot 8).
+  auto world = [&](Random& r, bool split, int wrong) {
+    WriteRandom(h.base, glows.address, glows.bytes, r);
+    WriteRandom(h.base, filters.address, filters.bytes, r);
+    WriteRandom(h.base, misc.address, misc.bytes, r);
+    for (uint32_t k = 2; k <= 12; k++) {
+      guest::StoreU32(h.base, glow_vtable + 4 * k, 0x82136EF8 + 8 * (k - 2));
+    }
+    guest::StoreU32(h.base, filter_vtable + 32, 0x82135148);
+    if (wrong >= 0) {
+      if (wrong % 2 == 0) {  // another glow setter in the slot
+        const uint32_t k = 2 + uint32_t(wrong) % 11;
+        guest::StoreU32(h.base, glow_vtable + 4 * k, 0x82136EF8 + 8 * ((k - 1) % 11));
+      } else {  // the filter's Set8116
+        guest::StoreU32(h.base, filter_vtable + 32, 0x82135140);
+      }
+    }
+    for (uint32_t i = 0; i < pe::kCount; i++) {
+      guest::StoreU32(h.base, pe::kEffects + 4 * i, 0);
+    }
+    for (uint32_t i = 0; i < 3; i++) {
+      const uint32_t glow = glows.address + kGlowBytes * i;
+      const uint32_t filter = filters.address + kFilterBytes * i;
+      guest::StoreU32(h.base, glow, glow_vtable);
+      guest::StoreU32(h.base, filter, filter_vtable);
+      guest::StoreU32(h.base, pe::kEffects + 4 * kGlows[i], glow);
+      guest::StoreU32(h.base, pe::kEffects + 4 * kFilters[i], filter);
+    }
+    guest::StoreU32(h.base, 0x826C2CE8, holder);
+    guest::StoreU32(h.base, holder + 8, split ? 1 + r.Below(5) : 0);
+  };
+  auto effects_out = [&](Outputs& out) {
+    for (uint32_t i = 0; i < 3; i++) {
+      const uint32_t glow = glows.address + kGlowBytes * i;
+      out.Bytes(Read(h.base, glow, 8436));
+      out.Floats(h.base, glow + 8436, 11);
+      out.Bytes(Read(h.base, glow + 8480, kGlowBytes - 8480));
+      const uint32_t filter = filters.address + kFilterBytes * i;
+      out.Bytes(Read(h.base, filter, 8120));
+      out.Float(guest::LoadU32(h.base, filter + 8120));
+      out.Bytes(Read(h.base, filter + 8124, kFilterBytes - 8124));
+    }
+  };
+  std::vector<uint32_t> globals = {0x826C2CE8};
+  for (uint32_t i = 0; i < pe::kCount; i++) {
+    globals.push_back(pe::kEffects + 4 * i);
+  }
+  {
+    Results results("RaceScene::SetEffectParams (sub_8228F5C0)");
+    int c = 0;
+    for (int32_t kind = -1; kind <= 9; kind++) {
+      for (uint32_t index = 0; index < 3; index++, c++) {
+        Outputs out[2];
+        for (int v = 0; v < 2; v++) {
+          Random r(uint64_t(c) * 131 + 17);
+          Globals saved(h.base, globals);
+          world(r, c % 3 == 1, c % 8 == 5 ? int(r.Below(22)) : -1);
+          PPCContext t = CallContext(h);
+          t.r3.s64 = kind;
+          t.r4.u64 = index;
+          (v == 0 ? Original<__imp__sub_8228F5C0> : hooks::RaceSceneSetEffectParams)(t, h.base);
+          effects_out(out[v]);
+          out[v].Word(t.r3.u32);
+          out[v].Word(uint32_t(t.r3.u64 >> 32));
+          out[v].Double(t.f1.u64);
+        }
+        results.Check(out[0], out[1], fmt::format("kind {} index {}", kind, index));
+      }
+    }
+    results.Report();
+  }
+  {
+    Results results("Glows::SetParams (sub_8228F0B0)");
+    const uint32_t entry = h.data;
+    for (uint64_t seed = 0; seed < 8; seed++) {
+      Outputs out[2];
+      for (int v = 0; v < 2; v++) {
+        Random r(seed * 53 + 3);
+        Globals saved(h.base, globals);
+        world(r, seed % 2 == 1, -1);
+        WriteRandom(h.base, h.data, kScratchBytes, r);
+        uint32_t r3 = 0;
+        if (v == 0) {
+          PPCContext t = CallContext(h);
+          t.r3.u64 = entry;
+          __imp__sub_8228F0B0(t, h.base);
+          r3 = t.r3.u32;
+        } else {
+          r3 = rs::GlowsSetParams(h.base, entry);
+        }
+        effects_out(out[v]);
+        out[v].Word(r3);
+      }
+      results.Check(out[0], out[1], fmt::format("seed {}", seed));
+    }
+    results.Report();
+  }
+}
+
 }  // namespace
 
 void RaceScene(Context& h) {
   Inits(h);
   Lights(h);
+  EffectParams(h);
 }
 
 }  // namespace harness
