@@ -75,10 +75,6 @@ bool AccessoriesNativeLoads() {
 // --- The file ---
 
 
-void AccessoryFileSetData(PPCContext& ctx, uint8_t* base) {
-  accessories::FileSetData(base, ctx.r3.u32, ctx.r4.u32, ctx.r5.u32);
-}
-
 void AccessoryFileLoad(PPCContext& ctx, uint8_t* base) {
   if (!AccessoriesNativeLoads()) {
     __imp__sub_820F0C90(ctx, base);
@@ -102,16 +98,6 @@ void AccessoryFileOnArchiveDone(PPCContext& ctx, uint8_t* base) {
   REX_CALL_INDIRECT_FUNC(callback.function);
 }
 
-
-void AccessoryFileReset(PPCContext& ctx, uint8_t* base) {
-  if (!AccessoriesNativeLoads() || !accessories::FileResetNative(base, ctx.r3.u32)) {
-    __imp__sub_820F0D30(ctx, base);
-    return;
-  }
-  if (const auto r3 = accessories::FileReset(base, ctx.r3.u32)) {
-    ctx.r3.u64 = *r3;
-  }
-}
 
 // --- The set ---
 
@@ -187,20 +173,6 @@ void AccessoriesReleaseAll(PPCContext& ctx, uint8_t* base) {
 
 // --- The skeleton's set-up ---
 
-
-void AccessorySkeletonSetUp(PPCContext& ctx, uint8_t* base) {
-  if (!ModelsNativeLifetime() || !native::Buffers_NativeMemcpy()) {
-    __imp__sub_820F0070(ctx, base);
-    return;
-  }
-  const auto r3 = accessories::SkeletonSetUp(base, ctx.r3.u32, ctx.r1.u32);
-  if (!r3) {
-    __imp__sub_820F0070(ctx, base);
-    return;
-  }
-  ctx.fpscr.disableFlushMode();
-  ctx.r3.u64 = *r3;
-}
 
 
 void AccessoriesDestruct(PPCContext& ctx, uint8_t* base) {
@@ -333,17 +305,14 @@ void MatrixFromScaleRotationTranslation(PPCContext& ctx, uint8_t* base) {
     hooks::step(ctx, base);              \
   }
 
-ITC_ACCESSORIES(820F0BF0, AccessoryFileSetData)
 ITC_ACCESSORIES(820F0C90, AccessoryFileLoad)
 ITC_ACCESSORIES(820F0C20, AccessoryFileOnArchiveDone)
 ITC_ACCESSORIES(820F1038, AccessoriesCreate)
 ITC_ACCESSORIES(820F0F00, AccessoriesSetScale)
-ITC_ACCESSORIES(820F0D30, AccessoryFileReset)
 ITC_ACCESSORIES(820F1078, AccessoriesDestroy)
 ITC_ACCESSORIES(820F0920, AccessoryEntryNew)
 ITC_ACCESSORIES(820F0988, AccessoryEntryDestroy)
 ITC_ACCESSORIES(820F0AD8, AccessoriesReleaseAll)
-ITC_ACCESSORIES(820F0070, AccessorySkeletonSetUp)
 ITC_ACCESSORIES(820F0FE0, AccessoriesDestruct)
 ITC_ACCESSORIES(820EF568, AccessorySetTexture)
 ITC_ACCESSORIES(820EF660, MatrixFromScaleRotationTranslation)

@@ -172,6 +172,34 @@ void NativeAccessoriesBaseDestruct(PPCContext& ctx, uint8_t* base) {
   ctx.r3.u64 = ac::SetBaseDestruct(base, ctx.r3.u32);
 }
 
+void NativeAccessoryFileSetData(PPCContext& ctx, uint8_t* base) {
+  ac::FileSetData(base, ctx.r3.u32, ctx.r4.u32, ctx.r5.u32);
+}
+
+void NativeAccessoryFileReset(PPCContext& ctx, uint8_t* base) {
+  if (!hooks::AccessoriesNativeLoads() || !ac::FileResetNative(base, ctx.r3.u32)) {
+    __imp__sub_820F0D30(ctx, base);
+    return;
+  }
+  if (const auto r3 = ac::FileReset(base, ctx.r3.u32)) {
+    ctx.r3.u64 = *r3;
+  }
+}
+
+void NativeAccessorySkeletonSetUp(PPCContext& ctx, uint8_t* base) {
+  if (!hooks::ModelsNativeLifetime() || !native::Buffers_NativeMemcpy()) {
+    __imp__sub_820F0070(ctx, base);
+    return;
+  }
+  const auto r3 = ac::SkeletonSetUp(base, ctx.r3.u32, ctx.r1.u32);
+  if (!r3) {
+    __imp__sub_820F0070(ctx, base);
+    return;
+  }
+  ctx.fpscr.disableFlushMode();
+  ctx.r3.u64 = *r3;
+}
+
 // The original with --native_accessories off.
 template <GuestFunction recompiled>
 void Original(PPCContext& ctx, uint8_t* base) {
@@ -240,7 +268,7 @@ void Files(Context& h, const Block& block) {
         Original<__imp__sub_820F0C50>, NativeFileConstruct,
         [&](PPCContext& t, Random&) { t.r3.u64 = file; });
   Cases(h, block, "AccessoryFile::SetData (sub_820F0BF0)", 16, Original<__imp__sub_820F0BF0>,
-        hooks::AccessoryFileSetData, [&](PPCContext& t, Random& r) {
+        NativeAccessoryFileSetData, [&](PPCContext& t, Random& r) {
           t.r3.u64 = file;
           t.r4.u64 = r.Next();
           t.r5.u64 = r.Below(2) ? r.Below(2) : r.Next();
@@ -379,7 +407,7 @@ void FileResets(Context& h, const Block& block) {
   uint32_t pages = 0;
   Cases(
       h, block, "AccessoryFile::Reset (sub_820F0D30)", 32, Original<__imp__sub_820F0D30>,
-      hooks::AccessoryFileReset,
+      NativeAccessoryFileReset,
       [&](PPCContext& t, Random& r) {
         guest::StoreU32(h.base, file + 24, r.Below(4) == 0 ? 0 : 1);
         guest::StoreU32(h.base, file + 12, r.Below(4));
@@ -708,7 +736,7 @@ void SkeletonSetUps(Context& h, const Block& block) {
       [&](const PPCContext& t, Outputs& out) { frame_rows(t.r1.u32, out); });
   Cases(
       h, block, "AccessorySkeleton::SetUp (sub_820F0070)", 32, Original<__imp__sub_820F0070>,
-      hooks::AccessorySkeletonSetUp,
+      NativeAccessorySkeletonSetUp,
       [&](PPCContext& t, Random& r) {
         ac::SkeletonConstruct(h.base, skeleton, t.r1.u32);
         const int32_t nodes = r.Below(8) == 0 ? -1 : int32_t(r.Below(5));
