@@ -36,8 +36,11 @@ file's history. What's left to see in a drive, from every run:
 
 - Subsystem 1 of 3: the race HUD holder's object at +1004
   (`sub_82216BA8`...`sub_82217AC8`; picked as seen in play, updated
-  from the race flow, 5 of its 6 roots ready). Step: mapping (agent
-  running).
+  from the race flow, 5 of its 6 roots ready). Mapped (12983d8d,
+  `alt-hud.md`, 26 new rows, 21 in play, 4 ready groups, no stop: a
+  second dashboard on UI movie 22, `AltHud::`, probably the attract or
+  replay races'; with the menu list helpers `sub_8220BBB0`,
+  `sub_8220BF00`). Step: migration (agent running).
 
 ## Done
 
@@ -71,6 +74,8 @@ file's history. What's left to see in a drive, from every run:
 - After its validation (`itc_2903`, 120 s: race 61 s, 0 errors, every
   harness 0 differing but the expected groups): ours 3515, work left
   2882.
+- After the alternate HUD's map: ours 3516, work left 2881 (wrapped
+  103, known 499, unknown 2279).
 - After the shader pair callback's migration (`attract_race.sh 40`:
   race 36-38 s, 0 errors, models, shader_objects and scenery_lists 0
   differing): ours 3516, work left 2881 (wrapped 103, known 478,

@@ -36,6 +36,18 @@ When the user has reviewed a run's section, its heading gets
   (`shader-objects.md`); the first three's prints moved into the host
   helpers their work now runs in (`ReadFile`, `CopyHeaderFrom`), their
   own plain C++ called only by the harnesses.
+- The alternate HUD's map (12983d8d): `functions/alt-hud.md`, 26 new
+  rows (21 seen in play): `AltHud::` (our name), the race HUD holder's
+  object at +1004, a second dashboard on UI movie 22 copying the race
+  HUD's gauges plus the input record's throttle, brake and steering;
+  probably the attract or replay races' (a guess). Ticked instead of the
+  race HUD for kind 5, and kinds 1-3 and 6 with the holder's +8 bit 0
+  (its writer not found). For review: `MenuList::PressedX`'s toggle
+  probably never fires (+24 unwritten); `AltHud::SetBar`'s +232 and +236
+  never written found; `sub_82216B08` taken from the power curve lead
+  (its line updated); the menu list helpers `sub_8220BBB0`
+  (`MenuList::Release`, ~50 call sites) and `sub_8220BF00` mapped here.
+  `race-hud-object.md` and `known-data.md` updated.
 
 ## Run 2026-10-30 23:03 (`b7-loop-30-10-26-2`)
 
