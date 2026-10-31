@@ -67,6 +67,33 @@ uint32_t SetPair1002Alpha(uint8_t* base, uint32_t model, uint32_t shape, double 
 // `shape`.
 uint32_t SetAlpha(uint8_t* base, uint32_t model, uint32_t shape, double alpha, uint32_t sp);
 
+// --- The paint passes (paint.cpp) ---
+//
+// Each takes the part model (nothing but the frame's back chain, and for
+// the first two the registers' stores, when 0) and the stack pointer, and
+// returns r3 as the original leaves it.
+
+// PartModel::SetPaint (sub_820D0EA8): `regs` = r4 to r9, three colors A, B,
+// C as (hue, saturation, value), stored in the caller's frame (sp + 32 on)
+// as the original does. The byte forms (Color::HsvToRgb8 on the truncated
+// values) made into floats 0-255 with w = 1.0, then Color::HsvToRgb on the
+// float colors over them (the bytes' values stay only where it writes
+// nothing, a negative hue). For each material of both groups of every
+// shape: +64 = (1, 1, 1, 1); category 1 or pair 1000 or 1001: +0 = (1, 1,
+// 1, 1), +64 = A, +32 = C; category 2 or pair 1004: the same with B. Frame
+// 320 bytes, its temporaries written as the original's.
+uint32_t SetPaint(uint8_t* base, uint32_t model, const uint64_t regs[6], uint32_t sp);
+// PartModel::SetPaintBody (sub_820D1378): as SetPaint without the first
+// +64 = (1, 1, 1, 1): category 1 or pair 1000: +0 = A, +64 = (1, 1, 1, 1),
+// +32 = C; category 2: +0 = B, the rest the same. Frame 288 bytes.
+uint32_t SetPaintBody(uint8_t* base, uint32_t model, const uint64_t regs[6], uint32_t sp);
+// PartModel::ApplyPalette (sub_820D2EA8): each material's colors from the
+// paint palette (0x826C5110) by its category (1-10: entry k) and its shared
+// pair (1000 + j: entry 11 + j, with entry j's third color; in group 0 +16
+// to +28 not written), through Color::HsvToRgb into its frame's +80, +96
+// and +112. Frame 224 bytes.
+uint32_t ApplyPalette(uint8_t* base, uint32_t model, uint32_t sp);
+
 // --- A part model's materials' fields by a mask (set_materials.cpp) ---
 
 // Model::MaterialTotal (sub_82594AC0): the shape's material block's +0 (the

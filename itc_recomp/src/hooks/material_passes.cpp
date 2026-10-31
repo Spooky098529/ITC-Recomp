@@ -15,7 +15,9 @@ ITC_FLAG_BOOL(native_material_passes, true, "ITC",
               "FlipCulling sub_820D1950, ScaleBlended sub_820D1A68, SetPair1002Alpha sub_820D1B38 "
               "and SetAlpha sub_820D1C00, PartModel::SetMaterials sub_820D3318 (with "
               "SetMaterialFields sub_820D3250, Model::MaterialTotal sub_82594AC0 and "
-              "Model::MaterialAt sub_82594B00, no adapters: only it calls them)) natively "
+              "Model::MaterialAt sub_82594B00, no adapters: only it calls them), the paint passes "
+              "PartModel::SetPaint sub_820D0EA8, SetPaintBody sub_820D1378 and ApplyPalette "
+              "sub_820D2EA8 (calling the colors' plain C++)) natively "
               "instead of through the translated code (the same writes; checked by "
               "--run_harnesses=material_passes)");
 
@@ -93,6 +95,25 @@ void MaterialPassesSetMaterials(PPCContext& ctx, uint8_t* base) {
   }
 }
 
+void MaterialPassesSetPaint(PPCContext& ctx, uint8_t* base) {
+  const uint64_t regs[6] = {ctx.r4.u64, ctx.r5.u64, ctx.r6.u64,
+                            ctx.r7.u64, ctx.r8.u64, ctx.r9.u64};
+  ctx.fpscr.disableFlushMode();
+  ctx.r3.u64 = mp::SetPaint(base, ctx.r3.u32, regs, ctx.r1.u32);
+}
+
+void MaterialPassesSetPaintBody(PPCContext& ctx, uint8_t* base) {
+  const uint64_t regs[6] = {ctx.r4.u64, ctx.r5.u64, ctx.r6.u64,
+                            ctx.r7.u64, ctx.r8.u64, ctx.r9.u64};
+  ctx.fpscr.disableFlushMode();
+  ctx.r3.u64 = mp::SetPaintBody(base, ctx.r3.u32, regs, ctx.r1.u32);
+}
+
+void MaterialPassesApplyPalette(PPCContext& ctx, uint8_t* base) {
+  ctx.fpscr.disableFlushMode();
+  ctx.r3.u64 = mp::ApplyPalette(base, ctx.r3.u32, ctx.r1.u32);
+}
+
 }  // namespace hooks
 
 // The adapters: the register steps above, or the originals with the flag
@@ -121,3 +142,6 @@ ITC_MATERIAL_PASSES(820D1A68, MaterialPassesScaleBlended)
 ITC_MATERIAL_PASSES(820D1B38, MaterialPassesSetPair1002Alpha)
 ITC_MATERIAL_PASSES(820D1C00, MaterialPassesSetAlpha)
 ITC_MATERIAL_PASSES(820D3318, MaterialPassesSetMaterials)
+ITC_MATERIAL_PASSES(820D0EA8, MaterialPassesSetPaint)
+ITC_MATERIAL_PASSES(820D1378, MaterialPassesSetPaintBody)
+ITC_MATERIAL_PASSES(820D2EA8, MaterialPassesApplyPalette)

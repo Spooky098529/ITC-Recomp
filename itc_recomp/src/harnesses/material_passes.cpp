@@ -17,6 +17,7 @@
 #include <fmt/format.h>
 
 #include <algorithm>
+#include <array>
 #include <bit>
 #include <cmath>
 #include <functional>
@@ -69,6 +70,9 @@ float RandomFloat(Random& r, float range) {
 struct Layout {
   std::set<uint32_t> floats;
   uint32_t saves = 0;  // bytes of register saves just below sp, not compared
+  // After each run: words left out of the comparison (cleared on both
+  // sides), such as a callee's register save that only the original writes.
+  std::function<void(uint32_t sp)> scrub;
   void Range(uint32_t address, uint32_t words) {
     for (uint32_t i = 0; i < words; i++) {
       floats.insert(address + 4 * i);
@@ -91,6 +95,9 @@ void Case(Context& h, Results& results, uint32_t block, uint64_t seed,
     RandomBytes(h.base, sp - kStackBytes, kStackBytes + kCallerBytes, r);
     setup(t, r);
     (v == 0 ? recompiled : native)(t, h.base);
+    if (layout.scrub) {
+      layout.scrub(sp);
+    }
     uint32_t at = block;
     for (const uint32_t address : layout.floats) {
       if (address < at || address + 4 > block + kBlockBytes) {
@@ -275,8 +282,8 @@ void Tables(Context& h, uint32_t block) {
 // each one's material block at +0x1000 + 64 x shape with counts of -1 to 3
 // a group and a total of -1 to 6; the materials' fields these passes read set from small sets
 // (+0 a color's x around the 1.1 limit, +344 the cull mode, +392 the
-// shared pair, +408 the category). Their color words (+0 to +12) and
-// +80 to +88 are floats.
+// shared pair, +408 the category). Their colors (+0 to +44) and +80 to
+// +88 are floats.
 constexpr uint32_t kShapes = 0x400;
 constexpr uint32_t kBlocks = 0x1000;
 
@@ -308,7 +315,7 @@ void PartModel(uint8_t* base, uint32_t block, Random& r, Layout* layout) {
         guest::StoreU32(base, m + 0, Bits(r.Below(2) == 0 ? 1.1f : RandomFloat(r, 2.0f)));
       }
       if (layout != nullptr) {
-        layout->Range(m, 4);
+        layout->Range(m, 12);  // three float4s
         layout->Range(m + 80, 3);
       }
     }
@@ -328,6 +335,8 @@ double RandomDouble(Random& r) {
   }
   return (double(r.Next() >> 11) / double(1ull << 53)) * 4.0 - 1.0;  // finer than a float
 }
+
+void Paints(Context& h, uint32_t block, const Layout& floats);
 
 void Passes(Context& h, uint32_t block) {
   Layout floats;
@@ -454,6 +463,126 @@ void Passes(Context& h, uint32_t block) {
           layout, __imp__sub_820D3318, hooks::MaterialPassesSetMaterials,
           fmt::format("case {}", c));
     }
+    results.Report();
+  }
+  Paints(h, block, floats);
+}
+
+// A color as (hue, saturation, value) floats: hues from -360 to 720,
+// saturation and value 0 to 1, sometimes an edge or any value.
+std::array<float, 3> RandomHsv(Random& r) {
+  float hue = float(int32_t(r.Below(1081)) - 360) + float(r.Below(100)) / 100.0f;
+  float saturation = r.Below(4) == 0 ? 0.0f : float(r.Below(1001)) / 1000.0f;
+  float value = float(r.Below(1001)) / 1000.0f;
+  switch (r.Below(8)) {
+    case 0:
+      hue = RandomFloat(r, 2000.0f);
+      break;
+    case 1:
+      saturation = RandomFloat(r, 300.0f);
+      break;
+    case 2:
+      value = RandomFloat(r, 300.0f);
+      break;
+    case 3:
+      saturation = float(r.Below(256));
+      value = float(r.Below(256));
+      break;
+    default:
+      break;
+  }
+  return {hue, saturation, value};
+}
+
+void Paints(Context& h, uint32_t block, const Layout& floats) {
+  auto model = [&](PPCContext& t, Random& r, int c) {
+    PartModel(h.base, block, r, nullptr);
+    t.r3.u64 = c % 16 == 15 ? 0 : block;
+  };
+  struct Paint {
+    const char* name;
+    GuestFunction recompiled;
+    GuestFunction native;
+    uint32_t frame;
+  };
+  const Paint paints[] = {
+      {"PartModel::SetPaint (sub_820D0EA8)", __imp__sub_820D0EA8, hooks::MaterialPassesSetPaint,
+       320},
+      {"PartModel::SetPaintBody (sub_820D1378)", __imp__sub_820D1378,
+       hooks::MaterialPassesSetPaintBody, 288},
+  };
+  for (const Paint& p : paints) {
+    Results results(p.name);
+    Layout layout = floats;
+    layout.saves = 64;  // r26 to r31, lr and f31
+    // Color::HsvToRgb8's r31 save at the frame's -8 stays when no
+    // Color::HsvToRgb call writes its temporaries over it (all three
+    // saturations 0): left out then.
+    layout.scrub = [&](uint32_t sp) {
+      if (guest::LoadFloat(h.base, sp + 36) == 0.0f && guest::LoadFloat(h.base, sp + 52) == 0.0f &&
+          guest::LoadFloat(h.base, sp + 68) == 0.0f) {
+        StoreU64(h.base, sp - p.frame - 8, 0);
+      }
+    };
+    for (int c = 0; c < 256; c++) {
+      Case(
+          h, results, block, h.random.Next(),
+          [&](PPCContext& t, Random& r) {
+            model(t, r, c);
+            PPCRegister* regs[6] = {&t.r4, &t.r5, &t.r6, &t.r7, &t.r8, &t.r9};
+            for (int k = 0; k < 3; k++) {
+              const auto hsv = RandomHsv(r);
+              regs[2 * k]->u64 = (uint64_t(Bits(hsv[0])) << 32) | Bits(hsv[1]);
+              regs[2 * k + 1]->u64 = (uint64_t(Bits(hsv[2])) << 32) | uint32_t(r.Next());
+            }
+          },
+          layout, p.recompiled, p.native, fmt::format("case {}", c));
+    }
+    results.Report();
+  }
+  {
+    // The palette (a live global, 16 entries of 64 bytes) filled with random
+    // colors for each case and put back after.
+    constexpr uint32_t kPalette = 0x826C5110;
+    const std::vector<uint8_t> saved = Read(h.base, kPalette, 1024);
+    Results results("PartModel::ApplyPalette (sub_820D2EA8)");
+    Layout layout = floats;
+    layout.saves = 88;  // r23 to r31, lr and f31
+    for (int c = 0; c < 256; c++) {
+      Case(
+          h, results, block, h.random.Next(),
+          [&](PPCContext& t, Random& r) {
+            model(t, r, c);
+            for (uint32_t e = 0; e < 16; e++) {
+              for (uint32_t k = 0; k < 3; k++) {
+                const auto hsv = RandomHsv(r);
+                for (uint32_t i = 0; i < 3; i++) {
+                  guest::StoreU32(h.base, kPalette + 64 * e + 16 * k + 4 * i, Bits(hsv[i]));
+                }
+                guest::StoreU32(h.base, kPalette + 64 * e + 16 * k + 12, uint32_t(r.Next()));
+              }
+              for (uint32_t i = 0; i < 4; i++) {
+                guest::StoreU32(h.base, kPalette + 64 * e + 48 + 4 * i,
+                                Bits(RandomFloat(r, 2.0f)));
+              }
+            }
+            // Categories and pairs the palette knows.
+            for (uint32_t s = 0; s < 3; s++) {
+              for (uint32_t i = 0; i < 6; i++) {
+                const uint32_t m = block + kBlocks + 64 * s + 16 + 512 * i;
+                if (r.Below(2) == 0) {
+                  guest::StoreU32(h.base, m + 408, r.Below(12));
+                }
+                if (r.Below(2) == 0) {
+                  guest::StoreU32(h.base, m + 392, 999 + r.Below(7));
+                }
+              }
+            }
+          },
+          layout, __imp__sub_820D2EA8, hooks::MaterialPassesApplyPalette,
+          fmt::format("case {}", c));
+    }
+    Write(h.base, kPalette, saved.data(), uint32_t(saved.size()));
     results.Report();
   }
 }

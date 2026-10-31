@@ -40,4 +40,11 @@ void MaterialPassesSetAlpha(PPCContext& ctx, uint8_t* base);
 // leaves it.
 void MaterialPassesSetMaterials(PPCContext& ctx, uint8_t* base);
 
+// PartModel::SetPaint sub_820D0EA8 and SetPaintBody sub_820D1378: r3 = the
+// part model, r4 to r9 the three colors; ApplyPalette sub_820D2EA8: r3 =
+// the part model. r3 as the original leaves it.
+void MaterialPassesSetPaint(PPCContext& ctx, uint8_t* base);
+void MaterialPassesSetPaintBody(PPCContext& ctx, uint8_t* base);
+void MaterialPassesApplyPalette(PPCContext& ctx, uint8_t* base);
+
 }  // namespace hooks
