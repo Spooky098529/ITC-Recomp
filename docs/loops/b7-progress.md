@@ -51,7 +51,9 @@ file's history. What's left to see in a drive, from every run:
   with the flag on and off alike; left: `PaintPalette::Init`, stopped at
   ~five batches). Validated (`itc_2866`, replay `itc_2867` ok): 21 of
   21 harness lines; 20 ran in the race, 1 in the replay, none to drive.
-  Migration 2 running (`PaintPalette::Init`).
+  Migration 2 checked (4795aab: `PaintPalette::Init`, as data copied
+  through lfs/stfs as the original; 22 of 22 in play ours; no adapter
+  removable yet, nothing else ready). Validation 2 running.
 
 ## Done
 
@@ -96,5 +98,8 @@ file's history. What's left to see in a drive, from every run:
 - After its validation (`itc_2866`, 60 s: race 7 s, 0 errors, every
   harness 0 differing but the expected groups): ours 3468, work left
   2929.
+- After the material passes' migration 2 (`itc_2870`: race 38 s, 0
+  errors, material_passes 0 differing): ours 3469, work left 2928
+  (wrapped 103, known 467, unknown 2358).
 
 ## Stopped

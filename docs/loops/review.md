@@ -36,6 +36,11 @@ When the user has reviewed a run's section, its heading gets
   `c_runtime::Memcpy` refuses their copy (for `Projector::Matrices`
   after the view matrix is written, harmless unless outputs overlap
   inputs); `FlipCulling` not seen in an attract race (harness only).
+  Migration 2 (4795aab): `PaintPalette::Init` `sub_820D2330` as a table
+  of 42 `.rdata` float addresses copied through lfs/stfs, the entries'
+  +60 left unwritten and its 1,184-byte frame left as the original
+  leaves it (register saves not written); three floats depend on the
+  scene's +4 (`known-data.md`'s palette row).
 - `car-models.md` (already mapped; the map checked by the lead, not
   remapped). Migration 1's rows (9f71b49..233c175): `LoadSlot::LoadShared`
   and `Load`, `LoadSetA` and `LoadSetB` (now Native; return `int64_t`,
