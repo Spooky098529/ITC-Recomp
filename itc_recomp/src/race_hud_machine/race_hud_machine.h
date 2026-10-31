@@ -67,6 +67,7 @@ constexpr uint32_t kHudSetUpSigns = 0x822122B0;
 constexpr uint32_t kAltSetUp = 0x82217C70;         // AltHud::SetUp(r3, r4 = player)
 constexpr uint32_t kAltTick = 0x82217AC8;          // AltHud::Tick
 constexpr uint32_t kAltRunMovie = 0x82216C00;      // AltHud::RunMovie
+constexpr uint32_t kAfterRaceClose = 0x8221A498;   // AfterRaceMenu::Close (race-screens.md)
 
 // --- The set-up (race_hud_machine_init.cpp) ---
 
@@ -130,6 +131,14 @@ std::optional<uint64_t> RaceUpdate(uint8_t* base, uint64_t r3, uint32_t dispatch
 // sub_8216D450 RaceHudMachine::SetUp: by the kind the alternate HUD's
 // SetUp, the HUD's SetPlayer and its set-ups (see the row), then +9616 = 0.
 std::optional<uint64_t> SetUp(uint8_t* base, uint64_t r3, uint32_t sp, const Calls& callees);
+
+// sub_8216D198 RaceHudMachine::CloseResults: by the race data's kind the
+// results' screen passed to the empty sub_82106540 (nothing done), then
+// AfterRaceMenu::Close(holder +1020) and the holder's +440 = 1; returns
+// Close's r3. nullopt, with nothing done, for kind 6 (its sub_8221C168,
+// never seen in play).
+std::optional<uint64_t> CloseResults(uint8_t* base, uint64_t r3, uint32_t sp,
+                                     const Calls& callees);
 
 // --- The helpers (handlers.cpp) ---
 

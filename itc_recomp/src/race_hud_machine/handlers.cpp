@@ -217,6 +217,32 @@ std::optional<uint64_t> RaceUpdate(uint8_t* base, uint64_t r3, uint32_t dispatch
   return answer;
 }
 
+std::optional<uint64_t> CloseResults(uint8_t* base, uint64_t r3, uint32_t sp,
+                                     const Calls& callees) {
+  const uint32_t machine = uint32_t(r3);
+  const uint32_t race = Load(base, kRaceData);
+  const int32_t kind = int32_t(Load(base, race + 0xA3AF0));
+  if (kind == 6) {
+    return std::nullopt;  // kind 6's screen after the race, never seen in play
+  }
+  ITC_NATIVE_RUNNING("sub_8216D198 RaceHudMachine::CloseResults");
+  const uint32_t frame = Frame(base, sp, 96);
+  // The results' screen by the kind (the empty sub_82106540 on it: only its
+  // loads are left).
+  if (kind == 1) {
+    const int32_t mode = int32_t(Load(base, race + 0xA3AF4));
+    Load(base, Load(base, machine + kHolder) + (mode != 0 ? 1024 : 1028));
+  } else if (kind == 2) {
+    Load(base, Load(base, machine + kHolder) + 1028);
+  } else if (kind == 4) {
+    Load(base, Load(base, machine + kHolder) + 1032);
+  }
+  const uint64_t closed =
+      callees.Call(kAfterRaceClose, frame, 0x8216D24C, Load(base, Holder(base, machine) + 1020));
+  guest::StoreU32(base, Holder(base, machine) + 440, 1);
+  return closed;
+}
+
 std::optional<uint64_t> SetUp(uint8_t* base, uint64_t r3, uint32_t sp, const Calls& callees) {
   const uint32_t machine = uint32_t(r3);
   const int32_t kind = int32_t(Load(base, machine + kKind));

@@ -55,6 +55,7 @@ ITC_FLAG_DECLARE(bool, native_race_hud_machine);
 ITC_FLAG_DECLARE(bool, native_race_hud_object);
 ITC_FLAG_DECLARE(bool, native_alt_hud);
 ITC_FLAG_DECLARE(bool, native_race_hud);
+ITC_FLAG_DECLARE(bool, native_race_screens);
 
 namespace harness {
 
@@ -922,6 +923,9 @@ void BlockOutputs(Outputs& out, uint8_t* base, uint32_t block, uint32_t bytes,
 // register saves left out) compared; `setup_from_car`: the original runs
 // with Vehicle::SetupFromCar's callees' native flags off, as the alternate
 // HUD's harness runs its SetUp.
+// The menu after the race's menu list ([0x826D851C], AfterRaceMenu::Close's).
+constexpr uint32_t kAfterRaceList = 0x826D851C;
+
 struct HandlerSpec {
   uint32_t frame = 0;
   uint32_t saves = 0;
@@ -966,7 +970,8 @@ void HandlerCase(Context& h, Results& results, const HudWorld& w, uint64_t seed,
                               {data_tables::kTables, 4},
                               {menu_sounds::kSoundManager, 4},
                               {kMapperEntries, 32},
-                              {kControllerEntries, 16}});
+                              {kControllerEntries, 16},
+                              {kAfterRaceList, 4}});
     PPCContext t = CallContext(h);
     const uint32_t sp = t.r1.u32;
     WriteRandom(h.base, sp - kHandlerStackBytes, kHandlerStackBytes + kCallerBytes, r);
@@ -1009,7 +1014,8 @@ void HandlerCase(Context& h, Results& results, const HudWorld& w, uint64_t seed,
     // The original reaches its callees' originals (their adapters' flags
     // off); the plain C++ calls theirs.
     bool* flags[] = {&ITC_FLAG(native_race_hud_machine), &ITC_FLAG(native_race_hud_object),
-                     &ITC_FLAG(native_alt_hud), &ITC_FLAG(native_race_hud)};
+                     &ITC_FLAG(native_alt_hud), &ITC_FLAG(native_race_hud),
+                     &ITC_FLAG(native_race_screens)};
     for (bool* flag : flags) {
       *flag = v == 1;
     }
@@ -1105,6 +1111,25 @@ void Handlers(Context& h) {
     guest::StoreU32(h.base, word,
                     (guest::LoadU32(h.base, word) & ~0x400u) | (bit ? 0x400u : 0));
   };
+  // CloseResults: the race data's kind (+0xA3AF0: -1 to 7 but 6, now and
+  // then any word; 6 runs the original, whose sub_8221C168 needs kind 6's
+  // screen, never seen in play) and mode (+0xA3AF4: 0 half the
+  // time); the menu after the race's list in the misc block (+0x4000)
+  // whose block (+68) is 0 or the layer's pages (freed by the release).
+  const HandlerSetupFn close_results = [&h, &by_signed](PPCContext& t, Random& r,
+                                                        const HudWorld& w) {
+    by_signed(t, r, w);
+    uint32_t race_kind = r.Below(8) == 0 ? uint32_t(r.Next()) : uint32_t(int32_t(r.Below(9)) - 1);
+    if (race_kind == 6) {
+      race_kind = 5;
+    }
+    guest::StoreU32(h.base, w.race.address + 0xA3AF0, race_kind);
+    guest::StoreU32(h.base, w.race.address + 0xA3AF4, r.Below(2) == 0 ? 0 : uint32_t(r.Next()));
+    const uint32_t list = w.misc.address + 0x4000;
+    guest::StoreU32(h.base, kAfterRaceList, list);
+    guest::StoreU32(h.base, list + 68,
+                    r.Below(3) == 0 ? 0 : memory::AllocPages(0x1000 * (1 + r.Below(2)), 4096));
+  };
   struct G {
     const char* name;
     int cases;
@@ -1150,6 +1175,9 @@ void Handlers(Context& h) {
       // __savegprlr_24: r24 to r31 and lr in the 80 bytes below sp.
       {"RaceHudMachine::SetUp (sub_8216D450)", 100, &set_up, __imp__sub_8216D450,
        hooks::RaceHudMachineSetUp, HandlerSpec{160, 80, true}, false, hud_last},
+      // MenuList::Release's frame (below the handler's) is its own harness's.
+      {"RaceHudMachine::CloseResults (sub_8216D198)", 80, &close_results, __imp__sub_8216D198,
+       hooks::RaceHudMachineCloseResults, f96, false, never},
   };
   for (const G& g : groups) {
     Results results(g.name);

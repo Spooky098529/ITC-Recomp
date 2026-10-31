@@ -8,10 +8,12 @@
 
 #include "alt_hud/alt_hud.h"
 #include "base/flags.h"
+#include "hooks/heap.h"
 #include "menu_sounds/menu_sounds.h"
 #include "race_hud/race_hud.h"
 #include "race_hud_machine/race_hud_machine.h"
 #include "race_hud_object/race_hud_object.h"
+#include "race_screens/race_screens.h"
 #include "track_zones/track_zones.h"
 
 #include <optional>
@@ -22,10 +24,11 @@ ITC_FLAG_BOOL(native_race_hud_machine, true, "ITC",
               "frame, StateMachine::Add's plain C++), PreRaceUpdate sub_8216C210, PreRaceDraw sub_8216C2A0, "
               "CountdownDraw sub_8216C330, StartIntro sub_8216C510, EndIntro sub_8216C520, "
               "IntroUpdate sub_8216C530, IntroDraw sub_8216C5B8, CountdownUpdate sub_8216CB98, "
-              "RaceDraw sub_8216CE00, RaceUpdate sub_8216D918 and SetUp sub_8216D450, their "
-              "callees the race HUD's and the alternate HUD's plain C++ (kind 4, and kind 0 "
+              "RaceDraw sub_8216CE00, RaceUpdate sub_8216D918, SetUp sub_8216D450 and "
+              "CloseResults sub_8216D198, their callees the race HUD's, the alternate HUD's and "
+              "the in-race screens' plain C++ (kind 4, and kind 0 "
               "where the original draws the holder's +12, never seen in play, run the "
-              "originals); IsFirstDay sub_8216D3F0, OpponentPrize sub_8216C820 and ItemBonus "
+              "originals; CloseResults' race kind 6 too); IsFirstDay sub_8216D3F0, OpponentPrize sub_8216C820 and ItemBonus "
               "sub_8216C938 with sub_8216C9B8 merged) natively instead of through the translated "
               "code (the same writes; checked by --run_harnesses=race_hud_machine)");
 ITC_FLAG_DECLARE(bool, native_action_mappers);
@@ -115,6 +118,15 @@ class Calls {
                              &ctx.f1.f64);
       case rhm::kAltRunMovie:
         return alt_hud::RunMovie(base, r1, self.calls());
+      case rhm::kAfterRaceClose:
+        // As its adapter (src/hooks/race_screens.cpp): over the allocation
+        // layer where the release is native, else the guest call.
+        if (NativeHeapActive()) {
+          if (const auto r3 = race_screens::AfterRaceMenuClose(base, r1)) {
+            return *r3;
+          }
+        }
+        break;
       default:
         break;
     }
@@ -315,6 +327,12 @@ void RaceHudMachineSetUp(PPCContext& ctx, uint8_t* base) {
   });
 }
 
+void RaceHudMachineCloseResults(PPCContext& ctx, uint8_t* base) {
+  Handle(ctx, base, __imp__sub_8216D198, [&](const rh::Calls& callees) {
+    return rhm::CloseResults(base, ctx.r3.u64, ctx.r1.u32, callees);
+  });
+}
+
 void RaceHudMachineIsFirstDay(PPCContext& ctx, uint8_t* base) {
   ctx.r3.u64 = rhm::IsFirstDay(base, ctx.r1.u32);
 }
@@ -354,6 +372,7 @@ ITC_RACE_HUD_MACHINE(8216CB98, RaceHudMachineCountdownUpdate)
 ITC_RACE_HUD_MACHINE(8216CE00, RaceHudMachineRaceDraw)
 ITC_RACE_HUD_MACHINE(8216D918, RaceHudMachineRaceUpdate)
 ITC_RACE_HUD_MACHINE(8216D450, RaceHudMachineSetUp)
+ITC_RACE_HUD_MACHINE(8216D198, RaceHudMachineCloseResults)
 ITC_RACE_HUD_MACHINE(8216D3F0, RaceHudMachineIsFirstDay)
 ITC_RACE_HUD_MACHINE(8216C820, RaceHudMachineOpponentPrize)
 ITC_RACE_HUD_MACHINE(8216C938, RaceHudMachineItemBonus)
