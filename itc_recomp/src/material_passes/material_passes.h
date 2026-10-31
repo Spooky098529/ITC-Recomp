@@ -9,6 +9,7 @@
 #pragma once
 
 #include <cstdint>
+#include <optional>
 
 namespace material_passes {
 
@@ -65,5 +66,33 @@ uint32_t SetPair1002Alpha(uint8_t* base, uint32_t model, uint32_t shape, double 
 // PartModel::SetAlpha (sub_820D1C00): +12 = `alpha` on every material of
 // `shape`.
 uint32_t SetAlpha(uint8_t* base, uint32_t model, uint32_t shape, double alpha, uint32_t sp);
+
+// --- A part model's materials' fields by a mask (set_materials.cpp) ---
+
+// Model::MaterialTotal (sub_82594AC0): the shape's material block's +0 (the
+// count of both groups).
+uint32_t MaterialTotal(uint8_t* base, uint32_t model, uint64_t shape);
+// Model::MaterialAt (sub_82594B00): the block + 16 + 512 x index, as the
+// original's 64-bit sum.
+uint64_t MaterialAt(uint8_t* base, uint32_t model, uint64_t shape, uint64_t index);
+// PartModel::SetMaterialFields (sub_820D3250): its eight register arguments
+// (`args`, r3 to r10) stored in its caller's frame `frame` (+16 to +80, as
+// the original does), then the fields the six flags (the frame's +16 to +36)
+// pick copied into the material (the frame's +116) from the frame: +0 the
+// first float4 (+48), +32 the second (+64), +16 the third (+80), +80 to +88
+// the three floats (+96 to +104).
+void SetMaterialFields(uint8_t* base, uint32_t frame, const uint64_t args[8]);
+// PartModel::SetMaterials (sub_820D3318): `regs` = r4 to r10 (the flags'
+// three registers and the first two float4s); the rest from the caller's
+// frame above `sp` (+96 the third float4's first half, +104 the 24 bytes
+// copied for each material, +132 the shape, +140 the category, +148 the
+// shared pair). Its frame's back chain and r7 to r10 stored at sp + 64 to
+// sp + 88 as the original does; for each picked material, the material at
+// its frame's +116, the 24 bytes copied by memcpy and SetMaterialFields.
+// False where c_runtime::Memcpy refuses the copy (the original runs there,
+// writing the same again); `r3` set to r3 as the original leaves it when a
+// call changed it.
+bool SetMaterials(uint8_t* base, uint32_t model, const uint64_t regs[7], uint32_t sp,
+                  std::optional<uint64_t>* r3);
 
 }  // namespace material_passes

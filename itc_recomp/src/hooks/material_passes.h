@@ -35,4 +35,9 @@ void MaterialPassesScaleBlended(PPCContext& ctx, uint8_t* base);
 void MaterialPassesSetPair1002Alpha(PPCContext& ctx, uint8_t* base);
 void MaterialPassesSetAlpha(PPCContext& ctx, uint8_t* base);
 
+// PartModel::SetMaterials sub_820D3318: r3 = the part model, r4 to r10 and
+// the caller's frame the arguments (material_passes.h); r3 as the original
+// leaves it.
+void MaterialPassesSetMaterials(PPCContext& ctx, uint8_t* base);
+
 }  // namespace hooks

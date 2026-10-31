@@ -16,6 +16,7 @@
 
 #include <fmt/format.h>
 
+#include <algorithm>
 #include <bit>
 #include <cmath>
 #include <functional>
@@ -30,6 +31,7 @@ namespace {
 
 constexpr uint32_t kBlockBytes = 0x4000;
 constexpr uint32_t kStackBytes = 512;  // below the call's stack pointer
+constexpr uint32_t kCallerBytes = 256;  // above it: the caller's frame
 
 void RandomBytes(uint8_t* base, uint32_t address, uint32_t bytes, Random& r) {
   for (uint32_t i = 0; i < bytes; i += 4) {
@@ -86,7 +88,7 @@ void Case(Context& h, Results& results, uint32_t block, uint64_t seed,
     const uint32_t sp = t.r1.u32;
     Random r(seed);
     RandomBytes(h.base, block, kBlockBytes, r);
-    RandomBytes(h.base, sp - kStackBytes, kStackBytes, r);
+    RandomBytes(h.base, sp - kStackBytes, kStackBytes + kCallerBytes, r);
     setup(t, r);
     (v == 0 ? recompiled : native)(t, h.base);
     uint32_t at = block;
@@ -102,6 +104,7 @@ void Case(Context& h, Results& results, uint32_t block, uint64_t seed,
     }
     out[v].Bytes(Read(h.base, at, block + kBlockBytes - at));
     out[v].Bytes(Read(h.base, sp - kStackBytes, kStackBytes - layout.saves));
+    out[v].Bytes(Read(h.base, sp, kCallerBytes));
     out[v].Word(t.r3.u32);
     out[v].Word(uint32_t(t.r3.u64 >> 32));
   }
@@ -270,9 +273,10 @@ void Tables(Context& h, uint32_t block) {
 
 // A part model at `block` with three shapes (544 bytes each from +0x400),
 // each one's material block at +0x1000 + 64 x shape with counts of -1 to 3
-// a group; the materials' fields these passes read set from small sets
+// a group and a total of -1 to 6; the materials' fields these passes read set from small sets
 // (+0 a color's x around the 1.1 limit, +344 the cull mode, +392 the
-// shared pair). Their color words (+0 to +12) are floats.
+// shared pair, +408 the category). Their color words (+0 to +12) and
+// +80 to +88 are floats.
 constexpr uint32_t kShapes = 0x400;
 constexpr uint32_t kBlocks = 0x1000;
 
@@ -283,8 +287,13 @@ void PartModel(uint8_t* base, uint32_t block, Random& r, Layout* layout) {
   for (uint32_t s = 0; s < 3; s++) {
     const uint32_t materials = block + kBlocks + 64 * s;
     guest::StoreU32(base, block + kShapes + 544 * s + 396, materials);
-    guest::StoreU32(base, materials + 8, uint32_t(counts[r.Below(5)]));
-    guest::StoreU32(base, materials + 12, uint32_t(counts[r.Below(5)]));
+    const int32_t first = counts[r.Below(5)];
+    const int32_t second = counts[r.Below(5)];
+    guest::StoreU32(base, materials + 8, uint32_t(first));
+    guest::StoreU32(base, materials + 12, uint32_t(second));
+    // +0, the total Model::MaterialTotal reads: mostly both groups', 6 at most.
+    const int32_t total = std::max(first, 0) + std::max(second, 0);
+    guest::StoreU32(base, materials + 0, uint32_t(r.Below(4) == 0 ? int32_t(r.Below(8)) - 1 : total));
   }
   for (uint32_t s = 0; s < 3; s++) {
     for (uint32_t i = 0; i < 6; i++) {
@@ -293,14 +302,24 @@ void PartModel(uint8_t* base, uint32_t block, Random& r, Layout* layout) {
       guest::StoreU32(base, m + 344, culls[r.Below(5)]);
       const uint32_t pairs[] = {1002, 1002, 1000, 1004, uint32_t(r.Next())};
       guest::StoreU32(base, m + 392, pairs[r.Below(5)]);
+      const uint32_t categories[] = {0, 1, 2, 3, uint32_t(r.Next())};
+      guest::StoreU32(base, m + 408, categories[r.Below(5)]);
       if (r.Below(4) != 0) {
         guest::StoreU32(base, m + 0, Bits(r.Below(2) == 0 ? 1.1f : RandomFloat(r, 2.0f)));
       }
       if (layout != nullptr) {
         layout->Range(m, 4);
+        layout->Range(m + 80, 3);
       }
     }
   }
+}
+
+void NativeMaterialTotal(PPCContext& ctx, uint8_t* base) {
+  ctx.r3.u64 = material_passes::MaterialTotal(base, ctx.r3.u32, ctx.r4.u64);
+}
+void NativeMaterialAt(PPCContext& ctx, uint8_t* base) {
+  ctx.r3.u64 = material_passes::MaterialAt(base, ctx.r3.u32, ctx.r4.u64, ctx.r5.u64);
 }
 
 double RandomDouble(Random& r) {
@@ -372,6 +391,68 @@ void Passes(Context& h, uint32_t block) {
             t.f1.f64 = RandomDouble(r);
           },
           layout, f.recompiled, f.native, fmt::format("case {}", c));
+    }
+    results.Report();
+  }
+  {
+    // Model::MaterialTotal and MaterialAt, through harness-side register
+    // steps (no adapters: only SetMaterials calls them).
+    Results results("Model::MaterialTotal and MaterialAt (sub_82594AC0, sub_82594B00)");
+    for (int c = 0; c < 64; c++) {
+      const bool total = c % 2 == 0;
+      Case(
+          h, results, block, h.random.Next(),
+          [&](PPCContext& t, Random& r) {
+            model(t, r, 0);
+            t.r4.u64 = r.Below(3);
+            t.r5.u64 = r.Below(4) == 0 ? r.Next() : r.Below(8);
+          },
+          Layout{}, total ? __imp__sub_82594AC0 : __imp__sub_82594B00,
+          total ? NativeMaterialTotal : NativeMaterialAt, fmt::format("case {}", c));
+    }
+    results.Report();
+  }
+  {
+    // The flags' registers' words 0 or not; the caller's frame: +96 the
+    // third float4's first half, +104 the 24 bytes copied (its second half
+    // and the three floats), +132 the shape (-1 for anything to happen),
+    // +140 the category, +148 the shared pair.
+    Results results("PartModel::SetMaterials (sub_820D3318)");
+    Layout layout = floats;
+    layout.saves = 128;  // r17 to r31 and lr
+    for (int c = 0; c < 256; c++) {
+      Case(
+          h, results, block, h.random.Next(),
+          [&](PPCContext& t, Random& r) {
+            model(t, r, c);
+            auto flags = [&]() {
+              const uint64_t high = r.Below(2) == 0 ? 0 : (r.Below(2) == 0 ? 1 : r.Next());
+              const uint64_t low = r.Below(2) == 0 ? 0 : (r.Below(2) == 0 ? 1 : r.Next());
+              return (high << 32) | uint32_t(low);
+            };
+            t.r4.u64 = flags();
+            t.r5.u64 = flags();
+            t.r6.u64 = flags();
+            auto floats2 = [&]() {
+              return (uint64_t(Bits(RandomFloat(r, 2.0f))) << 32) | Bits(RandomFloat(r, 2.0f));
+            };
+            t.r7.u64 = floats2();
+            t.r8.u64 = floats2();
+            t.r9.u64 = floats2();
+            t.r10.u64 = floats2();
+            const uint32_t sp = t.r1.u32;
+            for (uint32_t i = 96; i < 128; i += 4) {
+              guest::StoreU32(h.base, sp + i, Bits(RandomFloat(r, 2.0f)));
+            }
+            const int32_t shapes[] = {-1, -1, -1, -1, -1, -1, 0, 1};
+            guest::StoreU32(h.base, sp + 132, uint32_t(shapes[r.Below(8)]));
+            const int32_t categories[] = {-2, -1, -1, 0, 1, 2, 3};
+            guest::StoreU32(h.base, sp + 140, uint32_t(categories[r.Below(7)]));
+            const int32_t pairs[] = {-2, -1, -1, 1000, 1002, 1004};
+            guest::StoreU32(h.base, sp + 148, uint32_t(pairs[r.Below(6)]));
+          },
+          layout, __imp__sub_820D3318, hooks::MaterialPassesSetMaterials,
+          fmt::format("case {}", c));
     }
     results.Report();
   }

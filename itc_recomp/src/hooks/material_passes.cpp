@@ -13,7 +13,9 @@ ITC_FLAG_BOOL(native_material_passes, true, "ITC",
               "Color::HsvToRgb8 sub_820C9808, the tables' lookups sub_820D35D0, sub_820D3600, "
               "sub_820D3638 and sub_820D3728, Matrix::TransposeRotation sub_820D1CB0, the passes PartModel::SetTexture sub_820D17D8, "
               "FlipCulling sub_820D1950, ScaleBlended sub_820D1A68, SetPair1002Alpha sub_820D1B38 "
-              "and SetAlpha sub_820D1C00) natively "
+              "and SetAlpha sub_820D1C00, PartModel::SetMaterials sub_820D3318 (with "
+              "SetMaterialFields sub_820D3250, Model::MaterialTotal sub_82594AC0 and "
+              "Model::MaterialAt sub_82594B00, no adapters: only it calls them)) natively "
               "instead of through the translated code (the same writes; checked by "
               "--run_harnesses=material_passes)");
 
@@ -77,6 +79,20 @@ void MaterialPassesSetAlpha(PPCContext& ctx, uint8_t* base) {
   ctx.r3.u64 = mp::SetAlpha(base, ctx.r3.u32, ctx.r4.u32, ctx.f1.f64, ctx.r1.u32);
 }
 
+void MaterialPassesSetMaterials(PPCContext& ctx, uint8_t* base) {
+  const uint64_t regs[7] = {ctx.r4.u64, ctx.r5.u64, ctx.r6.u64, ctx.r7.u64,
+                            ctx.r8.u64, ctx.r9.u64, ctx.r10.u64};
+  std::optional<uint64_t> r3;
+  if (!mp::SetMaterials(base, ctx.r3.u32, regs, ctx.r1.u32, &r3)) {
+    __imp__sub_820D3318(ctx, base);
+    return;
+  }
+  ctx.fpscr.disableFlushMode();
+  if (r3) {
+    ctx.r3.u64 = *r3;
+  }
+}
+
 }  // namespace hooks
 
 // The adapters: the register steps above, or the originals with the flag
@@ -104,3 +120,4 @@ ITC_MATERIAL_PASSES(820D1950, MaterialPassesFlipCulling)
 ITC_MATERIAL_PASSES(820D1A68, MaterialPassesScaleBlended)
 ITC_MATERIAL_PASSES(820D1B38, MaterialPassesSetPair1002Alpha)
 ITC_MATERIAL_PASSES(820D1C00, MaterialPassesSetAlpha)
+ITC_MATERIAL_PASSES(820D3318, MaterialPassesSetMaterials)
