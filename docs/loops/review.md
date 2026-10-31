@@ -13,6 +13,15 @@ When the user has reviewed a run's section, its heading gets
 
 ## Run 2026-10-31 16:54 (`b7-loop-31-10-26`, continued)
 
+- The race HUD machine's map (11e568ee): `race-hud-machine.md`, 50
+  new rows (its 65 transitions decoded), `sub_8215E140` shared with the
+  race overlays' machine; `known-data.md`'s race HUD machine entry and
+  the holder's +8 bit 0 (the replay bit, so the alternate HUD is
+  probably the replay's dashboard); intros of `race-hud-object.md` and
+  `alt-hud.md`; three leads annotated. A correction: the lead said the
+  race flow's set-up registers these handlers; it is
+  `RaceHudMachine::Init` (`sub_8216E6E8`).
+
 - The RunWarning cleanup lead (1213d326, 2ea9a6f1): 3 rows in
   `race-hud-object.md` (`RunWarning` Overridden; `HudCurve::Eval`,
   `PowInt` Native). For review: the frame's back chain written even when

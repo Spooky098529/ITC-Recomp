@@ -52,7 +52,11 @@ file's history. What's left to see in a drive, from every run:
   harness lines, all 3 ran in the replay, none to drive. Done.
 - Subsystem 2 of 3: the race flow's handlers that drive the race HUD
   (`8216C208`-`8216E668`), from `leads.md` (most of its roots ready).
-  Step: mapping (agent running).
+  Map checked (11e568ee: `race-hud-machine.md`, 50 rows, 32 in play;
+  `RaceHudMachine::Init` `sub_8216E6E8` at the race mode's +128664 is
+  what registers them, not the race flow's set-up; 18 ready groups,
+  three of them holding a screen function left to the in-race screens'
+  lead). Step: migration (agent running).
 
 ## Done
 
@@ -113,5 +117,7 @@ file's history. What's left to see in a drive, from every run:
 - After its validation (`itc_2979`, 120 s: race 58 s, 0 errors, every
   harness 0 differing but the expected groups): ours 3589, work left
   2809.
+- After the race HUD machine's map: ours 3589, work left 2809 (wrapped
+  103, known 513, unknown 2193).
 
 ## Stopped
