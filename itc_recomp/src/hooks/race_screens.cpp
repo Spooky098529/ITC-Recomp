@@ -245,8 +245,10 @@ void RaceScreensPauseMenuStepAdjust(PPCContext& ctx, uint8_t* base) {
 // (src/debug/pause_movie_log.cpp, pause_menu_log.cpp), which call the steps.
 // None for MenuList::Fired (its only caller in play, MenuList::Update, calls
 // its plain C++) and AfterRaceMenu::Close (its only caller in play, the race
-// HUD machine's native CloseResults, calls its plain C++); their register
-// steps stay for the harness.
+// HUD machine's native CloseResults, calls its plain C++) and
+// CareerResults::Update (its only caller in play, the machine's native
+// ResultsUpdate, calls its plain C++); their register steps stay for the
+// harness.
 
 #define ITC_RACE_SCREENS(address, step)       \
   extern "C" REX_FUNC(sub_##address) {        \
@@ -293,7 +295,6 @@ ITC_RACE_SCREENS(8220C5D0, RaceScreensPauseMenuAnswerPage)
 ITC_RACE_SCREENS(8221A720, RaceScreensAfterRaceMenuAnswerPage)
 ITC_RACE_SCREENS(82217D40, RaceScreensRaceDialogAnswer)
 ITC_RACE_SCREENS(8220F638, RaceScreensPauseMenuUpdate)
-ITC_RACE_SCREENS(8221A090, RaceScreensCareerResultsUpdate)
 ITC_RACE_SCREENS(8221BD20, RaceScreensAfterRaceMenuUpdate)
 ITC_RACE_SCREENS(822185B0, RaceScreensRaceDialogUpdate)
 ITC_RACE_SCREENS(822191D0, RaceScreensCareerResultsStart)
