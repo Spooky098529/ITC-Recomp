@@ -82,8 +82,14 @@ file's history. What's left to see in a drive, from every run:
   race HUD machine's last handlers and 7 adapters wait on. Map checked
   (421476db: `race-screens.md`, 157 rows, 116 in play; the pause menu,
   the confirm dialog, the career results, the menu after the race, the
-  menu list's and page object's helpers; 51 ready groups). Step:
-  migration (agent running).
+  menu list's and page object's helpers; 51 ready groups). First migration checked (1405beb8..846937fe: 45
+  functions in `race-screens.md` and the race HUD machine's
+  `CloseResults` and `ResultsUpdate`; 3 adapters removed;
+  `--native_race_screens`, harness race_screens 0 differing, race 37 s,
+  0 errors; the pause menu's logging and pass timing kept; no
+  subagents). Left: 42 ready groups (the screens' transitions and node
+  helpers), `PauseUpdate`, `AfterRaceUpdate`, `RaceScreens::Create`.
+  Step: validation of the first migration (agent running).
 
 ## Done
 
@@ -165,5 +171,8 @@ file's history. What's left to see in a drive, from every run:
   2794.
 - After the in-race screens' map: ours 3605, work left 2794 (wrapped
   103, known 611, unknown 2080).
+- After the in-race screens' first migration (`itc_3019`: race 37 s, 0
+  errors, race_screens and race_hud_machine 0 differing): ours 3652,
+  work left 2747 (wrapped 101, known 566, unknown 2080).
 
 ## Stopped

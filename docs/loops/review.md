@@ -13,6 +13,15 @@ When the user has reviewed a run's section, its heading gets
 
 ## Run 2026-10-31 16:54 (`b7-loop-31-10-26`, continued)
 
+- The in-race screens' first migration (1405beb8..846937fe): 45 rows
+  in `race-screens.md` (3 Native) and 2 in `race-hud-machine.md`. For
+  review: the `--log_pause_movie` and `--log_pause_menu` overrides kept,
+  running the native step, native callers of `ScreenPages::Go` going
+  through its override for the log line; the screens' blocks through
+  the allocation layer, the original when the native heap isn't active;
+  paths only unseen screens take (race kinds 6 and 4, results of kinds
+  2, 4, 6 and kind 1 outside the career) left to the originals.
+
 - The in-race screens' map (421476db): `race-screens.md`, 157 rows
   (4 moved from `functions.md`), the screens' globals, the page object
   and the menu list in `known-data.md`; the menu list's helpers put
