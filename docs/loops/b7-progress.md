@@ -10,7 +10,7 @@ file's history. What's left to see in a drive, from every run:
 
 - Run started 2026-10-31 13:47 on `b7-loop-31-10-26`, from e25e6ac;
   summary `b7-loop-2026-10-31-1347.md`.
-- Limit for this run: 3 subsystems; 1 taken.
+- Limit for this run: 3 subsystems; 2 taken.
 - The validation agent's race is `attract_race.sh 120` from this run
   (the user's call, 2026-10-31: the harnesses took 56.7 of the 60 s).
 - Cleanup lead (no mapping, not counted): the top of `leads.md`, the
@@ -48,6 +48,12 @@ file's history. What's left to see in a drive, from every run:
   s: race 60 s, 0 errors, harnesses 58.6 s; replay `itc_2921` ok): 21
   of 21 harness lines; 2 ran in the race, 6 in the replay, 13 to drive
   (the tick's side). Subsystem 1 finished.
+
+- Subsystem 2 of 3: the race's post effect users (`sub_8215D100`,
+  `sub_8215C750`, `sub_8215D0D8`, `sub_8228F5C0`, `sub_8228F0B0`,
+  `sub_821597F0`; picked as 3 of its 4 roots ready, run at each race's
+  set-up, with the race object `[0x826D82D4]`'s own lead offered to the
+  mapper). Step: mapping (agent running).
 
 ## Done
 
