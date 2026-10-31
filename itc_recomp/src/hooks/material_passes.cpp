@@ -10,7 +10,7 @@
 ITC_FLAG_BOOL(native_material_passes, true, "ITC",
               "Run the part models' material passes and the helpers beside them "
               "(docs/functions/material-passes.md: Color::HsvToRgb sub_820D0D60, "
-              "Color::HsvToRgb8 sub_820C9808, the tables' lookups sub_820D35D0, sub_820D3600, "
+              "Color::HsvToRgb8 sub_820C9808 (no adapter: its callers are native), the tables' lookups sub_820D35D0, sub_820D3600, "
               "sub_820D3638 and sub_820D3728, Matrix::TransposeRotation sub_820D1CB0, the passes PartModel::SetTexture sub_820D17D8, "
               "FlipCulling sub_820D1950, ScaleBlended sub_820D1A68, SetPair1002Alpha sub_820D1B38 "
               "and SetAlpha sub_820D1C00, PartModel::SetMaterials sub_820D3318 (with "
@@ -28,10 +28,6 @@ namespace mp = material_passes;
 void MaterialPassesHsvToRgb(PPCContext& ctx, uint8_t* base) {
   ctx.fpscr.disableFlushMode();
   mp::HsvToRgb(base, ctx.r3.u32, ctx.r4.u32, ctx.r1.u32);
-}
-
-void MaterialPassesHsvToRgb8(PPCContext& ctx, uint8_t* base) {
-  mp::HsvToRgb8(base, ctx.r3.u32, ctx.r4.u32);
 }
 
 void MaterialPassesTableVector(PPCContext& ctx, uint8_t* base) {
@@ -130,7 +126,6 @@ void MaterialPassesApplyPalette(PPCContext& ctx, uint8_t* base) {
   }
 
 ITC_MATERIAL_PASSES(820D0D60, MaterialPassesHsvToRgb)
-ITC_MATERIAL_PASSES(820C9808, MaterialPassesHsvToRgb8)
 ITC_MATERIAL_PASSES(820D35D0, MaterialPassesTableVector)
 ITC_MATERIAL_PASSES(820D3600, MaterialPassesIsBlockSetA)
 ITC_MATERIAL_PASSES(820D3638, MaterialPassesIsBlockSetB)

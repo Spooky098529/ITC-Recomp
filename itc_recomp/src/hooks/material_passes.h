@@ -12,8 +12,6 @@ namespace hooks {
 
 // Color::HsvToRgb sub_820D0D60: r3 = out, r4 = the color (r3 left).
 void MaterialPassesHsvToRgb(PPCContext& ctx, uint8_t* base);
-// Color::HsvToRgb8 sub_820C9808: r3 = out, r4 = the packed color (r3 left).
-void MaterialPassesHsvToRgb8(PPCContext& ctx, uint8_t* base);
 // sub_820D35D0: r3 = out, r4 = the index, r5 = the sub-index (r3 left).
 void MaterialPassesTableVector(PPCContext& ctx, uint8_t* base);
 // sub_820D3600 and sub_820D3638: r3 = a value; r3 = 1 or 0.

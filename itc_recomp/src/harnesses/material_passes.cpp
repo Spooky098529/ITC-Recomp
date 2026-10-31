@@ -118,6 +118,13 @@ void Case(Context& h, Results& results, uint32_t block, uint64_t seed,
   results.Check(out[0], out[1], what);
 }
 
+// Color::HsvToRgb8's register steps (its adapter removed: its callers,
+// SetPaint and SetPaintBody, are native): r3 = out, r4 = the packed color
+// (r3 left).
+void NativeHsvToRgb8(PPCContext& ctx, uint8_t* base) {
+  material_passes::HsvToRgb8(base, ctx.r3.u32, ctx.r4.u32);
+}
+
 void Colors(Context& h, uint32_t block) {
   {
     // The color at +0 (hue, saturation, value, a fourth word), out at +64
@@ -200,7 +207,7 @@ void Colors(Context& h, uint32_t block) {
             t.r3.u64 = out;
             t.r4.u64 = block;
           },
-          Layout{{}, 8}, __imp__sub_820C9808, hooks::MaterialPassesHsvToRgb8,
+          Layout{{}, 8}, __imp__sub_820C9808, NativeHsvToRgb8,
           fmt::format("case {}", c));
     }
     results.Report();
