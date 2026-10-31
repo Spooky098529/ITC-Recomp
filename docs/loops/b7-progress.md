@@ -8,143 +8,20 @@ file's history. What's left to see in a drive, from every run:
 
 ## Now
 
-- Run started 2026-10-31 16:54 on `b7-loop-31-10-26` (the previous
-  run's branch, continued by the user's call, 2026-10-31), from
-  ec0e7141; summary `b7-loop-2026-10-31-1654.md`.
-- Limit for this run: 3 subsystems; 3 taken.
-- Subsystem 1 of 3: the second skeleton user (`820EF258`-`820F05D8`),
-  the top of `leads.md`:
-  - `sub_820EF258`, `sub_820EF310`, `sub_820EF368`, `sub_820EFFD8`, `sub_820F0070`, `sub_820F03F0`: another skeleton user (`820EF258`-`820F05D8`): the skeleton base made (`sub_820F03F0`, 179 lines, calls `SkeletonBase::SkeletonBase`), set up (`sub_820F0070` calls `sub_8259A9E0`) and destroyed (`sub_820EFFD8`, `SkeletonBase::~SkeletonBase`; `functions/model-animation.md`, `functions/models.md`), near `sub_820EF790` (`Model::RecordShape`'s caller). Not read. Found by the B7 loop's mapping agent (model animation), 2026-10-23.
-  Map checked (ae8e322b: `accessories.md`, the interior accessories
-  `820EF250`-`820F1078`, 50 rows, 31 in play, 8 ready groups, no
-  outside blockers; the accessories' release lead folded in; the
-  lead's note that its rows were elsewhere was wrong). First migration checked (8d5c9078..24186d92: 27 functions native
-  or overridden, 13 adapters removed, `--native_accessories`, harness
-  `accessories` 27 groups 0 differing, race 38 s, 0 errors; no
-  subagents). Left: `Accessory::Finish`, `AccessoryEntry::OnLoaded`,
-  `Accessories::Acquire` with `AcquireEntry`. Validated (`itc_2946`, 120 s: race 59 s, 0 errors, harnesses ~60 s;
-  replay `itc_2947` ok): 27 of 27 harness lines, 5 ran in the race,
-  22 in the replay, none to drive. Second migration checked (2eb6ca57..3a9de36a: `Accessory::Finish`,
-  `AccessoryEntry::OnLoaded`, `Accessories::Acquire` with
-  `AcquireEntry`, `Accessories::Release` (`scene-loaders.md`); 6 more
-  adapters removed; 31 of 31 in play ours; harness 0 differing, race
-  38 s, 0 errors; no subagents). Nothing ready left. Validated (`itc_2963`, 120 s: race 60 s, 0 errors, harnesses 58.4 s;
-  replay `itc_2964` ok): 11 of 11 harness lines, 3 ran in the race, 8
-  in the replay, none to drive. Done.
-- Cleanup lead (no mapping, not counted): `RaceHud::UpdateRacerBar`
-  (`sub_82214790`) and `RunCountdown` (`sub_822129A8`) in
-  `race-hud-object.md`, ready since the menu sound is ours. Migration checked (c17e0401:
-  both; 26445f41: `TickPanel` with `TickRacers`, made ready by them;
-  4da95a17, 2bf1cf2c: 5 adapters removed; harness race_hud_object 48
-  groups 0 differing; race 30 s with the harnesses (38 s without), 0
-  errors; no subagents). `RunWarning` and two removable adapters left
-  as a new cleanup lead. Validated (`itc_2973`, 120 s: race 58 s, 0
-  errors, harnesses 59.8 s; replay `itc_2974` ok): 8 of 8 harness
-  lines, none ran in the race or the replay (8 to drive). Done.
-- Cleanup lead (no mapping, not counted): `RaceHud::RunWarning`
-  (`sub_82212A48`) and the removable adapters of `HudCurve::Eval` and
-  `PowInt` in `race-hud-object.md`. Migration checked (1213d326:
-  `RunWarning`, 300 cases 0 differing after the frame's back chain was
-  written as the original does; 2ea9a6f1: the two adapters removed;
-  race 29 s with the harnesses, 0 errors; no subagents). Its four
-  callers, the race flow draws, now ready (noted in their lead). Validated (`itc_2979`, 120 s: race
-  58 s, 0 errors, harnesses 59.8 s; replay `itc_2980` ok): 3 of 3
-  harness lines, all 3 ran in the replay, none to drive. Done.
-- Subsystem 2 of 3: the race flow's handlers that drive the race HUD
-  (`8216C208`-`8216E668`), from `leads.md` (most of its roots ready).
-  Map checked (11e568ee: `race-hud-machine.md`, 50 rows, 32 in play;
-  `RaceHudMachine::Init` `sub_8216E6E8` at the race mode's +128664 is
-  what registers them, not the race flow's set-up; 18 ready groups,
-  three of them holding a screen function left to the in-race screens'
-  lead). Migration checked (e29438da: 14 handler groups; 7df89f72:
-  `Init`; 16 of 33 in play ours, `--native_race_hud_machine`, harness
-  15 groups 0 differing, race 29 s with the harnesses, 38 s without,
-  0 errors; no subagents). Left, waiting on the in-race screens' lead:
-  `sub_8216D198`, `sub_8216DB70`, `sub_8216DD88`, `sub_8216DFD0`. 18
-  callee adapters removable but kept for the harness's stand-in; the
-  user's call (2026-10-31): delete them, the harness rewritten the
-  bigger way (a cleanup lead, next after the validation). Validated (`itc_2986`,
-  120 s: race 58 s, 0 errors, harnesses 60.1 s; replay `itc_2987` ok):
-  15 of 15 harness lines, 3 ran in the race, 5 in the replay, 7 to
-  drive.
-- Cleanup lead (no mapping, not counted): the race HUD machine's
-  harness rewritten without the stand-in and the 18 adapters removed
-  (the user's call). Migration checked (3104033d: the harness runs the
-  callees for real with the HUDs' worlds, the stand-in deleted;
-  5048300e: the 18 adapters removed, rows Native; every harness 0
-  differing, race 28 s with the harnesses, 38 s without, 0 errors; no
-  subagents). RaceUpdate's post of message 20 no longer reachable in
-  the harness (`AltHud::Tick` answers 0). Validated (`itc_3003`, 120 s: race 59 s, 0
-  errors, harnesses 59.5 s; replay `itc_3004` ok): 33 of 33 harness
-  lines, none new to drive. Done.
-- Subsystem 3 of 3: the other in-race screens (the pause menu, the
-  menu after the race, the career results), from `leads.md`: what the
-  race HUD machine's last handlers and 7 adapters wait on. Map checked
-  (421476db: `race-screens.md`, 157 rows, 116 in play; the pause menu,
-  the confirm dialog, the career results, the menu after the race, the
-  menu list's and page object's helpers; 51 ready groups). First migration checked (1405beb8..846937fe: 45
-  functions in `race-screens.md` and the race HUD machine's
-  `CloseResults` and `ResultsUpdate`; 3 adapters removed;
-  `--native_race_screens`, harness race_screens 0 differing, race 37 s,
-  0 errors; the pause menu's logging and pass timing kept; no
-  subagents). Left: 42 ready groups (the screens' transitions and node
-  helpers), `PauseUpdate`, `AfterRaceUpdate`, `RaceScreens::Create`.
-  Validated (`itc_3020`, 120 s: race 58 s, 0 errors, harnesses 59.8
-  s; replay `itc_3021` ok, reaching the race and its end for the first
-  time this run): 47 of 47 harness lines, 9 ran in the race, 31 in the
-  replay, 7 to drive (`itc_3021` also took 11 of this run's earlier
-  functions off the drive list; older runs' entries it shows are left
-  for the user). Second migration checked (590250a6..ca74f7fd: 36 functions in
-  `race-screens.md`, the pause menu's transitions and options page and
-  the menu after the race, with the machine's three pause openers; 11
-  adapters removed; harness 0 differing, race 35-38 s, 0 errors; no
-  subagents). Left: 10 ready groups (the dialog's and career results'
-  pages), `PauseUpdate`, `AfterRaceUpdate`, `RaceScreens::Create`.
-  Validated (`itc_3037`, 120 s: race 56 s, 0 errors, harnesses ~62 s;
-  replay `itc_3038` broke: its race's racers never added, no
-  countdown, as in `itc_2987` and `itc_3004` but not `itc_3021`): 39
-  of 39 harness lines, 19 ran in the replay (the pause menu opened),
-  20 to drive. Third migration checked (48313a90..d26e6f66: 15
-  functions, the dialog's and career results' pages, the screens'
-  draws, the machine's `PauseUpdate` and `AfterRaceUpdate`,
-  `RaceScreens::Create`; 20 adapters removed; every harness 0
-  differing, race 25 s with three subsystems' harnesses, 0 errors; no
-  subagents). Nothing ready left in `race-screens.md` (the two
-  jump-table pieces wait on MainPage); the machine's newly ready
-  handlers left as a cleanup lead for the next run. Validated (`itc_3046`, 120 s: race 54
-  s, 0 errors, harnesses 63.8 s; replay `itc_3047` broke as
-  `itc_3038`): 34 of 34 harness lines, 10 ran in the race, 14 in the
-  replay, 8 to drive. Done.
+- Run started 2026-10-31 23:57 on `b7-loop-31-10-26-2`, from
+  2eb33a3f; summary `b7-loop-2026-10-31-2357.md`.
+- Limit for this run: 3 subsystems; 1 taken.
+- Subsystem 1 of 3: the graphics device's side under the primitive
+  drawer (`sub_822AA018`, `sub_822A9EE8`, `sub_822A8958`,
+  `sub_822A8618`, `sub_822A8960`, `sub_825915E0`), the top of
+  `leads.md` (the first two already in `shader-objects.md`). Step:
+  mapping agent running.
 
 ## Done
 
-- The other in-race screens (subsystem 3): `race-screens.md`, 93 of
-  116 in play, three migrations, with the race HUD machine's handlers
-  they unblocked; `--native_race_screens`; 421476db..d26e6f66.
-  Validated (`itc_3020`, `itc_3037`, `itc_3046`).
-
-- The race HUD machine (subsystem 2): `race-hud-machine.md`, 16 of 33
-  in play, one migration and the harness rewrite with 18 adapters
-  removed (the user's call); `--native_race_hud_machine`;
-  11e568ee..5048300e. Validated (`itc_2986`, `itc_3003`).
-
-- `RaceHud::RunWarning` (cleanup lead): `race-hud-object.md`, with
-  `HudCurve::Eval`'s and `PowInt`'s adapters removed;
-  `--native_race_hud_object`; 1213d326..2ea9a6f1. Validated
-  (`itc_2979`).
-
-- The race HUD's `RunCountdown` and `UpdateRacerBar` (cleanup lead):
-  `race-hud-object.md`, with `TickPanel`, `TickRacers` and 5 adapters
-  removed; `--native_race_hud_object`; c17e0401..2bf1cf2c. Validated
-  (`itc_2973`).
-
-- The interior accessories (subsystem 1): `accessories.md`, 31 of 31
-  in play, two migrations; `--native_accessories`; ae8e322b..3a9de36a.
-  Validated (`itc_2946`, `itc_2963`).
-
 ## Rows to review
 
-`review.md`, "Run 2026-10-31 16:54".
+`review.md`, "Run 2026-10-31 23:57".
 
 ## Expected to differ
 
@@ -156,80 +33,9 @@ file's history. What's left to see in a drive, from every run:
 
 ## Totals
 
-- At the start: ours 3552, work left 2846 (wrapped 103, known 487,
-  unknown 2256).
-
-- After the accessories' map: ours 3552, work left 2846 (wrapped 103,
-  known 518, unknown 2225).
-- After the accessories' first migration (race 38 s, 0 errors,
-  accessories 0 differing): ours 3579, work left 2819 (wrapped 103,
-  known 491, unknown 2225).
-- After its validation (`itc_2946`, 120 s: race 59 s, 0 errors, every
-  harness 0 differing but the expected groups): ours 3579, work left
-  2819.
-- After the accessories' second migration (`itc_2962`: race 38 s, 0
-  errors, accessories 0 differing): ours 3584, work left 2814 (wrapped
-  103, known 486, unknown 2225).
-- After its validation (`itc_2963`, 120 s: race 60 s, 0 errors, every
-  harness 0 differing but the expected groups): ours 3584, work left
-  2814.
-- After the race HUD cleanup lead's migration (`itc_2972`: race 30 s,
-  0 errors, race_hud_object 0 differing): ours 3588, work left 2810
-  (wrapped 103, known 482, unknown 2225).
-- After its validation (`itc_2973`, 120 s: race 58 s, 0 errors, every
-  harness 0 differing but the expected groups): ours 3588, work left
-  2810.
-- After the RunWarning lead's migration (`itc_2978`: race 29 s, 0
-  errors, race_hud_object and alt_hud 0 differing): ours 3589, work
-  left 2809 (wrapped 103, known 481, unknown 2225).
-- After its validation (`itc_2979`, 120 s: race 58 s, 0 errors, every
-  harness 0 differing but the expected groups): ours 3589, work left
-  2809.
-- After the race HUD machine's map: ours 3589, work left 2809 (wrapped
-  103, known 513, unknown 2193).
-- After the race HUD machine's migration (`itc_2985`: race 38 s, 0
-  errors, race_hud_machine 0 differing): ours 3605, work left 2794
-  (wrapped 103, known 498, unknown 2193).
-- After its validation (`itc_2986`, 120 s: race 58 s, 0 errors, every
-  harness 0 differing but the expected groups): ours 3605, work left
-  2794.
-- After the harness rewrite and the 18 adapters (`itc_3002`: race 28
-  s, 0 errors, the four harnesses 0 differing): ours 3605, work left
-  2794.
-- After its validation (`itc_3003`, 120 s: race 59 s, 0 errors, every
-  harness 0 differing but the expected groups): ours 3605, work left
-  2794.
-- After the in-race screens' map: ours 3605, work left 2794 (wrapped
-  103, known 611, unknown 2080).
-- After the in-race screens' first migration (`itc_3019`: race 37 s, 0
-  errors, race_screens and race_hud_machine 0 differing): ours 3652,
-  work left 2747 (wrapped 101, known 566, unknown 2080).
-- After its validation (`itc_3020`, 120 s: race 58 s, 0 errors, every
-  harness 0 differing but the expected groups): ours 3652, work left
-  2747.
-- After the in-race screens' second migration (`itc_3036`: race 35 s,
-  0 errors, race_screens 0 differing): ours 3690, work left 2709
-  (wrapped 101, known 528, unknown 2080).
-- After its validation (`itc_3037`, 120 s: race 56 s, 0 errors, every
-  harness 0 differing but the expected groups): ours 3690, work left
-  2709.
-- After the in-race screens' third migration (`itc_3045`: race 25 s,
-  0 errors, race_screens, race_hud_machine and race_hud_object 0
-  differing): ours 3705, work left 2694 (wrapped 101, known 513,
-  unknown 2080).
-- After its validation (`itc_3046`, 120 s: race 54 s, 0 errors, every
-  harness 0 differing but the expected groups): ours 3705, work left
-  2694 (wrapped 101, known 513, unknown 2080).
+- At the start: ours 3705, work left 2694 (wrapped 101, known 513,
+  unknown 2080). `b7_status.py`'s one check (`movies.md:117`
+  `sub_82108018`: its row says never called, but it ran) was there
+  before the run.
 
 ## Stopped
-
-2026-10-31, at the in-race screens' third validation (`itc_3046`): the
-run's limit reached (3 subsystems: the interior accessories, the race
-HUD machine, the other in-race screens; and three race HUD cleanup
-leads). Nothing failed: every harness 0 differing but the expected
-groups, no attract race errors. The pad replay broke (its race never
-reached the countdown) in three of its four validations since the race
-HUD machine: not debugged, for the user (`review.md`). Nothing
-uncommitted; `check_function_statuses.py`: 0 errors. The harnesses take
-~64 s of the validation's 120. Left for the user: the run's section in
-`review.md`, `to-drive.md`, and the merge.
