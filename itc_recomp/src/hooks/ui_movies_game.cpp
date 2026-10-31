@@ -305,6 +305,9 @@ extern "C" REX_FUNC(sub_8211B3F0) {
 // original leaves it).
 extern "C" REX_FUNC(sub_8211AD00) {
   REX_FUNC_PROLOGUE();
+  if (hooks::StartUpRecorded(ctx, 0x8211AD00)) {
+    return;  // a harness's (the race HUD object's)
+  }
   NATIVE_OR_ORIGINAL(8211AD00);
   constexpr uint32_t kScene = 0x826BABA0;
   ui_movies::ClearScreenFlag(base);
@@ -1010,6 +1013,9 @@ ui_movies::DeleteCalls DeleteCalls(PPCContext& ctx, uint8_t* base, uint32_t sp) 
 // UiMovies::Open: r3 = the movie id, r4 = the asset id; r3 = 1 or 0.
 extern "C" REX_FUNC(sub_8211E808) {
   REX_FUNC_PROLOGUE();
+  if (hooks::StartUpRecorded(ctx, 0x8211E808)) {
+    return;  // a harness's (the race HUD object's)
+  }
   if (!ui_movies_game_hooks::OpenNative()) {
     __imp__sub_8211E808(ctx, base);
     return;

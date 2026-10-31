@@ -90,5 +90,9 @@ void RaceHudObjectUpdateRecordingFull(PPCContext& ctx, uint8_t* base);
 // UpdateItem sub_82214238: r3 = the HUD.
 void RaceHudObjectShowItem(PPCContext& ctx, uint8_t* base);
 void RaceHudObjectUpdateItem(PPCContext& ctx, uint8_t* base);
+// RaceScreens::Make1004 sub_82216A60: r3 = the holder's +1004;
+// RaceScreens::Init sub_82211DA0: r3 = the holder, r4 = the race kind.
+void RaceHudObjectMake1004(PPCContext& ctx, uint8_t* base);
+void RaceHudObjectScreensInit(PPCContext& ctx, uint8_t* base);
 
 }  // namespace hooks

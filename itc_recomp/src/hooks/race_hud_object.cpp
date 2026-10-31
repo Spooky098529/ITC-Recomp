@@ -35,7 +35,9 @@ ITC_FLAG_BOOL(native_race_hud_object, true, "ITC",
               "(UiMovie::Run and the mirror's sub_8211BEE8 through their overrides), "
               "UpdateWarning sub_82212C50, UpdateRecordingFull sub_82212E60 (UiMovie::Finish "
               "and FinishNamed through their overrides), ShowItem sub_82213638 (UiMovie::SetNodeText "
-              "through its override, its varargs 0), UpdateItem sub_82214238) "
+              "through its override, its varargs 0), UpdateItem sub_82214238, RaceScreens::Init sub_82211DA0 and Make1004 sub_82216A60 "
+              "(the UI movies' start, Strings::Load, UiMovies::Open, operator new, memset and "
+              "MenuList::Init through their overrides)) "
               "natively instead of through the translated code (the same writes; checked by "
               "--run_harnesses=race_hud_object)");
 
@@ -324,6 +326,16 @@ void RaceHudObjectUpdateItem(PPCContext& ctx, uint8_t* base) {
   ctx.r3.u64 = rh::UpdateItem(base, ctx.r3.u32, ctx.r1.u32, guest.calls());
 }
 
+void RaceHudObjectMake1004(PPCContext& ctx, uint8_t* base) {
+  GuestCalls guest(ctx, base);
+  ctx.r3.u64 = rh::Make1004(base, ctx.r3.u32, ctx.r1.u32, guest.calls());
+}
+
+void RaceHudObjectScreensInit(PPCContext& ctx, uint8_t* base) {
+  GuestCalls guest(ctx, base);
+  ctx.r3.u64 = rh::ScreensInit(base, ctx.r3.u32, ctx.r4.u32, ctx.r1.u32, guest.calls());
+}
+
 }  // namespace hooks
 
 // The adapters: the register steps above, or the originals with the flag
@@ -373,3 +385,5 @@ ITC_RACE_HUD_OBJECT(82212C50, RaceHudObjectUpdateWarning)
 ITC_RACE_HUD_OBJECT(82212E60, RaceHudObjectUpdateRecordingFull)
 ITC_RACE_HUD_OBJECT(82213638, RaceHudObjectShowItem)
 ITC_RACE_HUD_OBJECT(82214238, RaceHudObjectUpdateItem)
+ITC_RACE_HUD_OBJECT(82216A60, RaceHudObjectMake1004)
+ITC_RACE_HUD_OBJECT(82211DA0, RaceHudObjectScreensInit)

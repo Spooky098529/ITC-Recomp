@@ -223,4 +223,53 @@ uint32_t Init(uint8_t* base, uint32_t hud, uint32_t sp) {
   return found;
 }
 
+uint64_t Make1004(uint8_t* base, uint32_t owner, uint32_t sp, const Calls& calls) {
+  ITC_NATIVE_RUNNING("sub_82216A60 RaceScreens::Make1004");
+  const uint32_t frame = sp - 128;
+  guest::StoreU32(base, frame, sp);
+  uint32_t object = uint32_t(calls.Call(kNew, frame, 0x82216A78, 264));
+  if (object != 0) {
+    calls.Call(kMemset, frame, 0x82216A94, object, 0, 264);
+  }
+  guest::StoreU32(base, owner + 0, object);
+  const uint32_t list = uint32_t(calls.Call(kNew, frame, 0x82216AA8, 72));
+  if (list != 0) {
+    guest::StoreU32(base, list + 68, 0);
+    guest::StoreU32(base, list + 60, 0);
+  }
+  guest::StoreU32(base, owner + 4, list);
+  guest::StoreU32(base, frame + 84, 159);
+  guest::StoreU32(base, frame + 92, 158);
+  const uint64_t r3 =
+      calls.CallArgs(kMenuListInit, frame, 0x82216AF4, {list, 1, 1, 0, 154, 153, 155, 156});
+  object = guest::LoadU32(base, owner + 0);
+  guest::StoreU32(base, object + 0, 0);
+  guest::StoreU32(base, object + 256, 0);
+  return r3;
+}
+
+uint64_t ScreensInit(uint8_t* base, uint32_t holder, uint32_t kind, uint32_t sp,
+                     const Calls& calls) {
+  ITC_NATIVE_RUNNING("sub_82211DA0 RaceScreens::Init");
+  const uint32_t frame = sp - 128;
+  guest::StoreU32(base, frame, sp);
+  calls.Call(kMoviesStart, frame, 0x82211DB8, holder, kind);
+  calls.Call(kStringsLoad, frame, 0x82211DC8, guest::LoadU32(base, 0x826C5C34), 47);
+  const uint32_t mask = MovieMask(kind);
+  for (uint32_t i = 0; i < 23; i++) {
+    if ((mask >> i) & 1) {
+      calls.Call(kMoviesOpen, frame, 0x82211E04, i, guest::LoadU32(base, 0x8200D158 + 4 * i));
+    }
+  }
+  static constexpr uint32_t kGlobals[7] = {0x826D84D0, 0x826D84E0, 0x826D8510, 0x826D8500,
+                                           0x82814E18, 0x82814E1C, 0x82814E10};
+  for (uint32_t i = 0; i < 7; i++) {
+    guest::StoreU32(base, holder + 1012 + 4 * i, guest::LoadU32(base, kGlobals[i]));
+  }
+  Init(base, holder + 16, frame);
+  const uint64_t r3 = Make1004(base, holder + 1004, frame, calls);
+  guest::StoreU32(base, holder + 8, 0);
+  return r3;
+}
+
 }  // namespace race_hud_object

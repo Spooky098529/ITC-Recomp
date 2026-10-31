@@ -179,28 +179,62 @@ struct World {
 struct Call {
   uint32_t function, lr, r1;
   uint64_t r3, r4, r5, r6;
+  // MenuList::Init's r7 to r10 and its stack words (r1 + 84, r1 + 92).
+  uint64_t more[6];
 };
 std::vector<Call>* g_calls = nullptr;
+uint8_t* g_base = nullptr;
 Random g_answers;
+// operator new's answers by the size asked for (264 and 72: RaceScreens::
+// Make1004's), blocks of the case's world (0 for a failure).
+uint32_t g_new_264 = 0, g_new_72 = 0;
 
 bool Recorder(PPCContext& ctx, uint32_t function) {
   if (g_calls == nullptr) {
     return false;
   }
-  // The arguments each reads (TrackZones::Create none, ClearText and
-  // SetNodeText r3 to r5, SetText r3 to r6; the rest are leftovers, and
-  // SetNodeText's r6 to r10 its unset varargs).
-  const uint32_t reads = function == 0x8211C1F8                          ? 4
-                         : function == 0x8211C470 || function == 0x8211C7E8 ? 3
-                                                                            : 0;
+  // The arguments each reads (TrackZones::Create and the UI movies' start
+  // none, ClearText and SetNodeText r3 to r5, SetText r3 to r6, Strings::Load
+  // and UiMovies::Open r3 and r4, operator new r3, MenuList::Init r3 to r10
+  // and its two stack words; the rest are leftovers, and SetNodeText's r6 to
+  // r10 its unset varargs).
+  uint32_t reads = 0;
+  switch (function) {
+    case 0x8211C1F8:
+    case 0x8220BAC0:
+      reads = 4;
+      break;
+    case 0x8211C470:
+    case 0x8211C7E8:
+      reads = 3;
+      break;
+    case 0x8210A8D0:
+    case 0x8211E808:
+      reads = 2;
+      break;
+    case 0x825A6880:
+      reads = 1;
+      break;
+  }
   const uint64_t r[4] = {ctx.r3.u64, ctx.r4.u64, ctx.r5.u64, ctx.r6.u64};
-  Call call{function, uint32_t(ctx.lr), ctx.r1.u32, 0, 0, 0, 0};
+  Call call{function, uint32_t(ctx.lr), ctx.r1.u32, 0, 0, 0, 0, {}};
   uint64_t* to[4] = {&call.r3, &call.r4, &call.r5, &call.r6};
   for (uint32_t i = 0; i < reads; i++) {
     *to[i] = r[i];
   }
+  if (function == 0x8220BAC0) {
+    call.more[0] = ctx.r7.u64;
+    call.more[1] = ctx.r8.u64;
+    call.more[2] = ctx.r9.u64;
+    call.more[3] = ctx.r10.u64;
+    call.more[4] = guest::LoadU32(g_base, ctx.r1.u32 + 84);
+    call.more[5] = guest::LoadU32(g_base, ctx.r1.u32 + 92);
+  }
   g_calls->push_back(call);
   ctx.r3.u64 = g_answers.Next();
+  if (function == 0x825A6880) {
+    ctx.r3.u64 = call.r3 == 264 ? g_new_264 : call.r3 == 72 ? g_new_72 : 0;
+  }
   return true;
 }
 
@@ -214,7 +248,7 @@ bool StandIn(uint32_t function, PPCContext& ctx, uint8_t*) {
     return false;
   }
   g_calls->push_back({function, uint32_t(ctx.lr), ctx.r1.u32, ctx.r3.u64, ctx.r4.u64,
-                      function == 0x8259EBE8 ? ctx.f1.u64 : 0, 0});
+                      function == 0x8259EBE8 ? ctx.f1.u64 : 0, 0, {}});
   ctx.r3.u64 = g_answers.Next();
   return true;
 }
@@ -363,6 +397,7 @@ void Case(Context& h, Results& results, const World& w, uint64_t seed, const Set
     g_answers = Random(r.Next());
     std::vector<Call> calls;
     g_calls = &calls;
+    g_base = h.base;
     const hooks::StartUpRecorder saved_recorder = hooks::g_start_up_recorder;
     hooks::g_start_up_recorder = Recorder;
     const ui_movies_hooks::UpdateCalleeStandIn saved_stand_in =
@@ -379,7 +414,8 @@ void Case(Context& h, Results& results, const World& w, uint64_t seed, const Set
       out[v].Word(call.function);
       out[v].Word(call.lr);
       out[v].Word(call.r1);
-      for (const uint64_t r : {call.r3, call.r4, call.r5, call.r6}) {
+      for (const uint64_t r : {call.r3, call.r4, call.r5, call.r6, call.more[0], call.more[1],
+                               call.more[2], call.more[3], call.more[4], call.more[5]}) {
         out[v].Word(uint32_t(r >> 32));
         out[v].Word(uint32_t(r));
       }
@@ -1235,6 +1271,43 @@ void Movies(Context& h, const World& w) {
           t.r7.u64 = t.r8.u64 = t.r9.u64 = t.r10.u64 = 0;
         },
         __imp__sub_82214238, hooks::RaceHudObjectUpdateItem, spec);
+  }
+  {
+    // operator new answered with blocks of the misc block (the list's now
+    // and then 0); the UI movies' start, Strings::Load, UiMovies::Open and
+    // MenuList::Init recorded; memset runs.
+    auto news = [&](Random& r, const World& w) {
+      g_new_264 = w.misc.address + 0x5400;
+      g_new_72 = r.Below(6) == 0 ? 0 : w.misc.address + 0x5600;
+    };
+    {
+      Spec spec;
+      spec.frame = 128;
+      spec.saves = 32;
+      Group(
+          h, w, "RaceScreens::Make1004 (sub_82216A60)", 60,
+          [&](PPCContext& t, Random& r, const World& w) {
+            news(r, w);
+            t.r3.u64 = w.hud.address + 1004;
+          },
+          __imp__sub_82216A60, hooks::RaceHudObjectMake1004, spec);
+    }
+    {
+      // The holder the HUD block (the HUD at its +16), the race kind 0 to
+      // 12 or any, the movie table for RaceHud::Init.
+      Spec spec;
+      spec.frame = 128;
+      spec.saves = 48;
+      Group(
+          h, w, "RaceScreens::Init (sub_82211DA0)", 100,
+          [&](PPCContext& t, Random& r, const World& w) {
+            news(r, w);
+            ShapeMovieTable(h.base, w, r);
+            t.r3.u64 = w.hud.address;
+            t.r4.u64 = r.Below(5) == 0 ? r.Next() : r.Below(13);
+          },
+          __imp__sub_82211DA0, hooks::RaceHudObjectScreensInit, spec);
+    }
   }
 }
 

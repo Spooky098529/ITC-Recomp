@@ -64,6 +64,16 @@ constexpr uint32_t kRun = 0x8211E1B8;
 constexpr uint32_t kFinish = 0x8211DE38;
 constexpr uint32_t kSetNodeText = 0x8211C7E8;
 constexpr uint32_t kDrawMirror = 0x8211BEE8;
+// RaceScreens::Init's and its +1004 object's calls, through their overrides:
+// the UI movies' start (sub_8211AD00: the renderer's vtable calls),
+// Strings::Load and UiMovies::Open (archive loads), operator new, memset and
+// MenuList::Init.
+constexpr uint32_t kMoviesStart = 0x8211AD00;
+constexpr uint32_t kStringsLoad = 0x8210A8D0;
+constexpr uint32_t kMoviesOpen = 0x8211E808;
+constexpr uint32_t kNew = 0x825A6880;
+constexpr uint32_t kMemset = 0x825A71D0;
+constexpr uint32_t kMenuListInit = 0x8220BAC0;
 constexpr uint32_t kTrackZones = 0x828161EC;  // the zones' owner
 constexpr uint32_t kRaceProgress = 0x826D82E8;  // the race's progress (+7156 a float)
 
@@ -81,6 +91,10 @@ struct Calls {
                 uint64_t r5 = 0, uint64_t r6 = 0, const double* f1 = nullptr) const {
     const uint64_t args[8] = {r3, r4, r5, r6, 0, 0, 0, 0};
     return call(user, function, args, f1, r1, lr);
+  }
+  // The same with r3 to r10 all given.
+  uint64_t CallArgs(uint32_t function, uint32_t r1, uint32_t lr, const uint64_t (&args)[8]) const {
+    return call(user, function, args, nullptr, r1, lr);
   }
 };
 
@@ -313,5 +327,18 @@ uint32_t MovieMask(uint32_t kind);
 // +608 0, +612 11, +616 3, +620 2, +624 13, +628 1, +632 12, +636 19; +588
 // = 0. The last find's address.
 uint32_t Init(uint8_t* base, uint32_t hud, uint32_t sp);
+// sub_82216A60 (RaceScreens::Make1004, our name; the holder's +1004
+// object): +0 = operator new(264) cleared (memset), or 0; +4 = operator
+// new(72) with +68 and +60 0, or 0; MenuList::Init(+4, 1, 1, 0, 154, 153,
+// 155, 156, and 159 and 158 at the 128-byte frame's +84 and +92); then
+// [+0] +0 and +256 = 0. The calls through `calls`. MenuList::Init's r3.
+uint64_t Make1004(uint8_t* base, uint32_t owner, uint32_t sp, const Calls& calls);
+// RaceScreens::Init (sub_82211DA0): the UI movies' start, Strings::Load(
+// [0x826C5C34], 47), the movies of MovieMask(kind) opened (UiMovies::Open(i,
+// [0x8200D158 + 4i])), all through `calls` from a 128-byte frame; +1012 to
+// +1036 the other screens' globals, RaceHud::Init(+16), Make1004(+1004),
+// +8 = 0. Make1004's r3.
+uint64_t ScreensInit(uint8_t* base, uint32_t holder, uint32_t kind, uint32_t sp,
+                     const Calls& calls);
 
 }  // namespace race_hud_object
