@@ -1,7 +1,8 @@
 // The race HUD object's register steps (src/race_hud_object/,
 // docs/functions/race-hud-object.md), shared by the adapters
 // (src/hooks/race_hud_object.cpp, behind --native_race_hud_object) and the
-// harness (without the flag). Each leaves r3 (and f1) as the original does.
+// harness (without the flag); those of functions only native callers reach
+// have no adapter, and only the harness calls them. Each leaves r3 (and f1) as the original does.
 
 #pragma once
 

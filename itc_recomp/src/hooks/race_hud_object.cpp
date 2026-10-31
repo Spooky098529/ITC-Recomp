@@ -25,7 +25,10 @@ ITC_FLAG_BOOL(native_race_hud_object, true, "ITC",
               "or the originals; UpdateSigns sub_82214718, UpdateSign sub_82212F00, "
               "UpdatePlaceName sub_82213510, with TrackZones::Update and IsInside's plain C++; "
               "UiMovie::FinishNamed, SetText and ClearText through their overrides; Tick "
-              "sub_822153A0, TickTimer sub_82214D78) "
+              "sub_822153A0, TickTimer sub_82214D78; ShowGauge, SetSpeed, UpdateExtraGauges, SetGear, "
+              "SetTach, SetBoost, SetBar, UpdateSigns, UpdateSign, UpdatePlaceName, SetTime and "
+              "SetDistance have no adapters: only their native callers reach them, and the flag "
+              "switches those) "
               "natively instead of through the translated code (the same writes; checked by "
               "--run_harnesses=race_hud_object)");
 
@@ -252,7 +255,11 @@ void RaceHudObjectTickTimer(PPCContext& ctx, uint8_t* base) {
 }  // namespace hooks
 
 // The adapters: the register steps above, or the originals with the flag
-// off.
+// off. None for the functions only native callers reach (their register
+// steps stay for the harness): ShowGauge (from SetUpExtraGauges), SetSpeed,
+// UpdateExtraGauges, SetGear, SetTach, SetBoost, SetBar and UpdateSigns
+// (from Tick), UpdateSign and UpdatePlaceName (from UpdateSigns), SetTime
+// and SetDistance (from TickTimer).
 
 #define ITC_RACE_HUD_OBJECT(address, step)    \
   extern "C" REX_FUNC(sub_##address) {        \
@@ -267,19 +274,11 @@ void RaceHudObjectTickTimer(PPCContext& ctx, uint8_t* base) {
 ITC_RACE_HUD_OBJECT(82212118, RaceHudObjectCurveEval)
 ITC_RACE_HUD_OBJECT(82213C40, RaceHudObjectPowInt)
 ITC_RACE_HUD_OBJECT(82211FB8, RaceHudObjectBarStep)
-ITC_RACE_HUD_OBJECT(82212DB0, RaceHudObjectSetGear)
-ITC_RACE_HUD_OBJECT(82214698, RaceHudObjectSetBar)
 ITC_RACE_HUD_OBJECT(82212668, RaceHudObjectResetBar)
 ITC_RACE_HUD_OBJECT(822122A0, RaceHudObjectClearWarning)
 ITC_RACE_HUD_OBJECT(82212690, RaceHudObjectSetPlayer)
 ITC_RACE_HUD_OBJECT(82215820, RaceHudObjectTouching)
-ITC_RACE_HUD_OBJECT(82212D58, RaceHudObjectSetTach)
-ITC_RACE_HUD_OBJECT(82212E18, RaceHudObjectSetBoost)
-ITC_RACE_HUD_OBJECT(82214260, RaceHudObjectSetSpeed)
-ITC_RACE_HUD_OBJECT(82213750, RaceHudObjectSetTime)
-ITC_RACE_HUD_OBJECT(82214A50, RaceHudObjectSetDistance)
 ITC_RACE_HUD_OBJECT(822121C0, RaceHudObjectReset)
-ITC_RACE_HUD_OBJECT(82212D08, RaceHudObjectShowGauge)
 ITC_RACE_HUD_OBJECT(82213DB0, RaceHudObjectSetUpExtraGauges)
 ITC_RACE_HUD_OBJECT(82212768, RaceHudObjectApplyOptions)
 ITC_RACE_HUD_OBJECT(82212B68, RaceHudObjectUpdateView)
@@ -287,9 +286,5 @@ ITC_RACE_HUD_OBJECT(82213C90, RaceHudObjectSetUpGauges)
 ITC_RACE_HUD_OBJECT(822135B0, RaceHudObjectSetUpMirror)
 ITC_RACE_HUD_OBJECT(822141A0, RaceHudObjectTearDown)
 ITC_RACE_HUD_OBJECT(822122B0, RaceHudObjectSetUpSigns)
-ITC_RACE_HUD_OBJECT(82215160, RaceHudObjectUpdateExtraGauges)
-ITC_RACE_HUD_OBJECT(82214718, RaceHudObjectUpdateSigns)
-ITC_RACE_HUD_OBJECT(82212F00, RaceHudObjectUpdateSign)
-ITC_RACE_HUD_OBJECT(82213510, RaceHudObjectUpdatePlaceName)
 ITC_RACE_HUD_OBJECT(822153A0, RaceHudObjectTick)
 ITC_RACE_HUD_OBJECT(82214D78, RaceHudObjectTickTimer)
