@@ -22,8 +22,10 @@ file's history. What's left to see in a drive, from every run:
   or overridden, 13 adapters removed, `--native_accessories`, harness
   `accessories` 27 groups 0 differing, race 38 s, 0 errors; no
   subagents). Left: `Accessory::Finish`, `AccessoryEntry::OnLoaded`,
-  `Accessories::Acquire` with `AcquireEntry`. Step: validation of the
-  first migration (agent running).
+  `Accessories::Acquire` with `AcquireEntry`. Validated (`itc_2946`, 120 s: race 59 s, 0 errors, harnesses ~60 s;
+  replay `itc_2947` ok): 27 of 27 harness lines, 5 ran in the race,
+  22 in the replay, none to drive. Step: second migration (agent
+  running).
 
 ## Done
 
@@ -49,5 +51,8 @@ file's history. What's left to see in a drive, from every run:
 - After the accessories' first migration (race 38 s, 0 errors,
   accessories 0 differing): ours 3579, work left 2819 (wrapped 103,
   known 491, unknown 2225).
+- After its validation (`itc_2946`, 120 s: race 59 s, 0 errors, every
+  harness 0 differing but the expected groups): ours 3579, work left
+  2819.
 
 ## Stopped
