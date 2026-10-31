@@ -28,10 +28,19 @@ file's history. What's left to see in a drive, from every run:
   `AccessoryEntry::OnLoaded`, `Accessories::Acquire` with
   `AcquireEntry`, `Accessories::Release` (`scene-loaders.md`); 6 more
   adapters removed; 31 of 31 in play ours; harness 0 differing, race
-  38 s, 0 errors; no subagents). Nothing ready left. Step: validation
-  of the second migration (agent running).
+  38 s, 0 errors; no subagents). Nothing ready left. Validated (`itc_2963`, 120 s: race 60 s, 0 errors, harnesses 58.4 s;
+  replay `itc_2964` ok): 11 of 11 harness lines, 3 ran in the race, 8
+  in the replay, none to drive. Done.
+- Cleanup lead (no mapping, not counted): `RaceHud::UpdateRacerBar`
+  (`sub_82214790`) and `RunCountdown` (`sub_822129A8`) in
+  `race-hud-object.md`, ready since the menu sound is ours. Step:
+  migration (agent running).
 
 ## Done
+
+- The interior accessories (subsystem 1): `accessories.md`, 31 of 31
+  in play, two migrations; `--native_accessories`; ae8e322b..3a9de36a.
+  Validated (`itc_2946`, `itc_2963`).
 
 ## Rows to review
 
@@ -61,5 +70,8 @@ file's history. What's left to see in a drive, from every run:
 - After the accessories' second migration (`itc_2962`: race 38 s, 0
   errors, accessories 0 differing): ours 3584, work left 2814 (wrapped
   103, known 486, unknown 2225).
+- After its validation (`itc_2963`, 120 s: race 60 s, 0 errors, every
+  harness 0 differing but the expected groups): ours 3584, work left
+  2814.
 
 ## Stopped

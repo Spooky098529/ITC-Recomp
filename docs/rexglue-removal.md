@@ -2683,6 +2683,7 @@ B7. **The game logic inside**: everything else, subsystem by subsystem,
 | 2026-10-31 | The alternate HUD (`AltHud::`, the race HUD holder's object at +1004: a second dashboard on UI movie 22 with the race HUD's gauges and the input record's throttle, brake and steering, probably the attract or replay races'; its set-up, tick, movie and destroy, with the menu list helpers `MenuList::Release` and `PressedX`) | `alt-hud.md` | 21 of 21 in play (one migration; its tick not seen in an attract race or the replay) | `--native_alt_hud` |
 | 2026-10-31 | The race scene (`RaceScene::` at `[0x826D82D4]`, 31,168 bytes: the seven car slots, the 11 lights, the screen objects; its machine `RaceSceneMachine::` at +87936 of the race mode: `Init`, the lights' set-up, the post effects' and glows' parameters, the pause toggle and `Resume`, `Destroy`) | `race-scene.md` | 11 of 20 in play (one migration; the rest waits on the course scenery's and scene models' owners, the scene and its update, `Race::DrawStep` and the screen objects) | `--native_race_scene` |
 | 2026-10-31 | The menu sounds (`MenuSound::Play`, cue r3 of bank 0 through the sound manager's `PlayCue2D`, ~270 callers; `Sound::Play`; the effects and music volume options over XACT's categories; the sound manager `[0x826C5C80]`'s other methods mapped, not seen in play) | `menu-sounds.md` | 4 of 4 in play (one migration; the manager's slots and XACT's category calls not ours yet, called through the table) | `--native_menu_sounds` |
+| 2026-10-31 | The interior accessories (`Accessories::` at `[0x826C5510]`, three reference-counted 1,104-byte entries loaded from the archive, assets 23008-23010; the accessory, a part model with a small skeleton whose nodes swing as a chain, probably a hanging ornament; its 36-byte file class) | `accessories.md` | 31 of 31 in play (two migrations; the anchor, the skeleton's step and swing, the draws and the deleting destructors never ran in play, and the step and draw wait on the skeleton's unread callees) | `--native_accessories` |
 
     The first run (2026-10-22, branch `b7-loop-test`): every harness at 0 differing, attract races at 20-21 s with no errors,
     and a race the user drove looked right. Ours went from 162 to 335 (work
@@ -4247,3 +4248,17 @@ overridden 108, Native 34, Dropped 26, never called 70, live 211.
 Imports: 186 called, 56 with a live caller. B7 (`b7_status.py`): ours
 3,552, work left 2,846 (Wrapped 103, with a row 487, no row yet 2,256),
 from 2,850 (from 2,883 at the run's start).
+
+**2026-10-31, the interior accessories (branch `b7-loop-31-10-26`):**
+the twenty-eighth run's first subsystem (the previous run's branch,
+continued by the user's call), mapped and made native in two
+migrations (`accessories.md`, `--native_accessories`,
+`src/accessories/`): the set, its entries, the accessory and its file
+class, 31 of the 31 seen in play, 19 Native with their adapters
+removed; the accessories' release lead folded in. Only the set's
+creation and `SetScale` run in an attract race; the rest runs when the
+player's interior loads (the replay). What's left never ran in play.
+The boundary: 449 functions (916 pairs): overridden 108, Native 34,
+Dropped 26, never called 70, live 211. Imports: 186 called, 56 with a
+live caller. B7 (`b7_status.py`): ours 3,584, work left 2,814 (Wrapped
+103, with a row 486, no row yet 2,225), from 2,846 at the run's start.
