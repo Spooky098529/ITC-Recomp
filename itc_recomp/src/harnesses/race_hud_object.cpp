@@ -20,6 +20,7 @@
 #include "hooks/race_hud_object.h"
 #include "memory/heap.h"
 #include "race_hud_object/race_hud_object.h"
+#include "ui_movies/game.h"
 
 #include <fmt/format.h>
 
@@ -41,6 +42,9 @@ namespace {
 namespace rh = race_hud_object;
 
 constexpr uint32_t kVehicles = 0x826C2E34;  // Vehicle::Get's array
+constexpr uint32_t kSaveSlots = 0x826C5B58;  // SaveData::Of's four pointers
+constexpr uint32_t kSaveBytes = 0x20000;
+constexpr uint32_t kMiscBytes = 0x2000;  // the viewport, the build
 constexpr uint32_t kVehicleBytes = 6272;
 constexpr uint32_t kVehicleCount = 4;
 constexpr uint32_t kHudBytes = 0x1000;
@@ -123,10 +127,15 @@ struct World {
       : hud(kHudBytes),
         movies(kMoviesBytes),
         vehicles(kVehicleBytes * kVehicleCount),
-        collision(kCollisionBytes) {}
+        collision(kCollisionBytes),
+        save(kSaveBytes),
+        misc(kMiscBytes) {}
   bool ok() const {
-    return hud.address && movies.address && vehicles.address && collision.address;
+    return hud.address && movies.address && vehicles.address && collision.address &&
+           save.address && misc.address;
   }
+  uint32_t viewport() const { return misc.address + 0x10; }
+  uint32_t build() const { return misc.address + 0x800; }
   uint32_t movie(uint32_t i) const { return movies.address + 0x100 * i; }
   uint32_t node(uint32_t i) const { return movies.address + kNodesAt + kNodeBytes * i; }
   uint32_t vehicle(uint32_t i) const { return vehicles.address + kVehicleBytes * i; }
@@ -134,6 +143,8 @@ struct World {
   Block movies;
   Block vehicles;
   Block collision;
+  Block save;  // player 0's save data (the HUD options at +0x1F85C)
+  Block misc;  // the viewports' pointer (+0), viewport 0 (+0x10), the build (+0x800)
 };
 
 // The movies: each header's live scene (+16) a pool node; each node's child
@@ -171,6 +182,15 @@ void ShapeWorld(uint8_t* base, const World& w, Random& r) {
     link = contact;
   }
   guest::StoreU32(base, link + 68, 0);
+  for (uint32_t p = 0; p < 4; p++) {
+    guest::StoreU32(base, kSaveSlots + 4 * p, w.save.address);
+  }
+  guest::StoreU32(base, rh::kViewports, w.misc.address);
+  guest::StoreU32(base, w.misc.address, w.viewport());
+  guest::StoreU32(base, w.misc.address + 4, w.viewport() + 0x100);
+  for (uint32_t v = 0; v < kVehicleCount; v++) {
+    guest::StoreU32(base, w.vehicle(v) + 5712, w.build());
+  }
 }
 
 using SetupFn = std::function<void(PPCContext&, Random&, const World&)>;
@@ -196,7 +216,7 @@ void Case(Context& h, Results& results, const World& w, uint64_t seed, const Set
   Outputs out[2];
   for (int v = 0; v < 2; v++) {
     Random r(seed);
-    SavedBytes saved(h.base, {{kVehicles, 4}});
+    SavedBytes saved(h.base, {{kVehicles, 4}, {kSaveSlots, 16}, {rh::kViewports, 4}});
     PPCContext t = CallContext(h);
     const uint32_t sp = t.r1.u32;
     WriteRandom(h.base, sp - kStackBytes, kStackBytes + kCallerBytes, r);
@@ -204,6 +224,8 @@ void Case(Context& h, Results& results, const World& w, uint64_t seed, const Set
     WriteRandom(h.base, w.movies.address, w.movies.bytes, r);
     WriteRandom(h.base, w.vehicles.address, w.vehicles.bytes, r);
     WriteRandom(h.base, w.collision.address, w.collision.bytes, r);
+    WriteRandom(h.base, w.save.address + 0x1F800, 0x100, r);
+    WriteRandom(h.base, w.misc.address, w.misc.bytes, r);
     ShapeWorld(h.base, w, r);
     setup(t, r, w);
     t.lr = 0x82000000 | (r.Below(0x10000) << 2);
@@ -223,6 +245,8 @@ void Case(Context& h, Results& results, const World& w, uint64_t seed, const Set
     out[v].Bytes(Read(h.base, w.movies.address, w.movies.bytes));
     out[v].Bytes(Read(h.base, w.vehicles.address, w.vehicles.bytes));
     out[v].Bytes(Read(h.base, w.collision.address, w.collision.bytes));
+    out[v].Bytes(Read(h.base, w.save.address + 0x1F800, 0x100));
+    out[v].Bytes(Read(h.base, w.misc.address, w.misc.bytes));
     if (spec.frame > spec.saves) {
       out[v].Bytes(Read(h.base, sp - spec.frame, spec.frame - spec.saves));
     }
@@ -427,6 +451,164 @@ void Setters(Context& h, const World& w) {
   }
 }
 
+// A node's children's range: its first child index (+100) and count (+104).
+void ShapeGroup(uint8_t* base, uint32_t node, Random& r) {
+  guest::StoreU32(base, node + 100, r.Below(100));
+  guest::StoreU32(base, node + 104, r.Below(8) == 0 ? uint32_t(-int32_t(r.Below(3))) : r.Below(5));
+}
+
+uint32_t DashboardNode(uint8_t* base, const World& w, uint32_t sub_scene, uint32_t child) {
+  return ui_movies::FindNode(base, guest::LoadU32(base, w.hud.address + rh::kHudDashboard),
+                             sub_scene, child);
+}
+
+void Dashboard(Context& h, const World& w) {
+  for (int boost = 0; boost < 2; boost++) {
+    Spec spec;
+    spec.frame = 96;
+    spec.saves = 16;
+    spec.Floats(20, 56);
+    Group(
+        h, w, boost ? "RaceHud::SetBoost (sub_82212E18)" : "RaceHud::SetTach (sub_82212D58)",
+        300,
+        [&, boost](PPCContext& t, Random& r, const World& w) {
+          const uint32_t curve = w.hud.address + (boost ? 132 : 20);
+          ShapeCurve(h.base, curve, r);
+          t.r3.u64 = w.hud.address;
+          t.f1.f64 = AnyDouble(r, 120.0f);
+        },
+        boost ? __imp__sub_82212E18 : __imp__sub_82212D58,
+        boost ? hooks::RaceHudObjectSetBoost : hooks::RaceHudObjectSetTach, spec);
+  }
+  {
+    Spec spec;
+    spec.frame = 160;
+    spec.saves = 72;
+    spec.f1 = true;
+    Group(
+        h, w, "RaceHud::SetSpeed (sub_82214260)", 400,
+        [&](PPCContext& t, Random& r, const World& w) {
+          ShapeGroup(h.base, DashboardNode(h.base, w, 0xFFFFFFFFu, 9), r);
+          t.r3.u64 = w.hud.address;
+          t.r4.u64 = r.Below(6) == 0 ? r.Next() : r.Below(1100);
+          t.f1.f64 = AnyDouble(r, 10.0f);
+        },
+        __imp__sub_82214260, hooks::RaceHudObjectSetSpeed, spec);
+  }
+  {
+    Spec spec;
+    spec.frame = 144;
+    spec.saves = 56;
+    Group(
+        h, w, "RaceHud::SetTime (sub_82213750)", 300,
+        [&](PPCContext& t, Random& r, const World& w) {
+          const uint32_t time = w.hud.address + 0x900;
+          uint32_t packed;
+          switch (r.Below(3)) {
+            case 0:
+              packed = uint32_t(r.Next());
+              break;
+            case 1:
+              packed = (r.Below(70) << 16) | (r.Below(64) << 10) | r.Below(1024);
+              break;
+            default:
+              packed = (r.Below(60) << 16) | (r.Below(60) << 10) | r.Below(1000);
+              break;
+          }
+          guest::StoreU32(h.base, time, packed);
+          t.r3.u64 = w.hud.address;
+          t.r4.u64 = time;
+        },
+        __imp__sub_82213750, hooks::RaceHudObjectSetTime, spec);
+  }
+  {
+    Spec spec;
+    spec.frame = 160;
+    spec.saves = 72;
+    spec.f1 = true;
+    Group(
+        h, w, "RaceHud::SetDistance (sub_82214A50)", 400,
+        [&](PPCContext& t, Random& r, const World& w) {
+          t.r3.u64 = w.hud.address;
+          t.f1.f64 = r.Below(2) == 0 ? double(r.Below(20000)) / 100.0 - 5.0
+                                     : AnyDouble(r, 2000.0f);
+        },
+        __imp__sub_82214A50, hooks::RaceHudObjectSetDistance, spec);
+  }
+  {
+    Spec spec;
+    spec.frame = 128;
+    spec.saves = 48;
+    Group(
+        h, w, "RaceHud::Reset (sub_822121C0)", 200,
+        [&](PPCContext& t, Random& r, const World& w) {
+          ShapeGroup(h.base, DashboardNode(h.base, w, 0xFFFFFFFFu, 1), r);
+          t.r3.u64 = w.hud.address;
+        },
+        __imp__sub_822121C0, hooks::RaceHudObjectReset, spec);
+  }
+  {
+    Spec spec;
+    spec.frame = 112;
+    spec.saves = 32;
+    Group(
+        h, w, "RaceHud::ShowGauge (sub_82212D08)", 100,
+        [&](PPCContext& t, Random& r, const World& w) {
+          t.r3.u64 = w.hud.address;
+          t.r4.u64 = r.Below(3);
+          t.r5.u64 = r.Below(3) == 0 ? r.Next() : r.Below(2);
+        },
+        __imp__sub_82212D08, hooks::RaceHudObjectShowGauge, spec);
+  }
+  {
+    // ShowGauge's frames below its own are compared too (their back chains
+    // and register saves aside: 112 bytes each, the saves 32).
+    Spec spec;
+    spec.frame = 144;
+    spec.saves = 32;
+    Group(
+        h, w, "RaceHud::SetUpExtraGauges (sub_82213DB0)", 400,
+        [&](PPCContext& t, Random& r, const World& w) {
+          const uint32_t build = w.build();
+          for (uint32_t k = 0; k < 5; k++) {
+            guest::StoreU32(h.base, build + 1832 + 12 * k,
+                            r.Below(8) == 0 ? uint32_t(r.Next()) : r.Below(6));
+          }
+          guest::StoreU32(h.base, build + 12, r.Below(3) == 0 ? 10 : r.Below(12));
+          guest::StoreU32(h.base, w.hud.address + 8, r.Below(3) == 0 ? uint32_t(r.Next())
+                                                                     : r.Below(2));
+          t.r3.u64 = w.hud.address;
+        },
+        __imp__sub_82213DB0, hooks::RaceHudObjectSetUpExtraGauges, spec);
+  }
+  {
+    Spec spec;
+    spec.frame = 96;
+    spec.saves = 16;
+    Group(
+        h, w, "RaceHud::ApplyOptions (sub_82212768)", 200,
+        [&](PPCContext& t, Random& r, const World& w) {
+          guest::StoreU32(h.base, w.hud.address + 472, r.Below(2));
+          t.r3.u64 = w.hud.address;
+        },
+        __imp__sub_82212768, hooks::RaceHudObjectApplyOptions, spec);
+  }
+  {
+    Spec spec;
+    spec.frame = 112;
+    spec.saves = 24;
+    Group(
+        h, w, "RaceHud::UpdateView (sub_82212B68)", 200,
+        [&](PPCContext& t, Random& r, const World& w) {
+          guest::StoreU32(h.base, w.viewport() + 1860,
+                          r.Below(6) == 0 ? uint32_t(r.Next()) : r.Below(4));
+          guest::StoreU32(h.base, w.hud.address + 12, r.Below(2));
+          t.r3.u64 = w.hud.address;
+        },
+        __imp__sub_82212B68, hooks::RaceHudObjectUpdateView, spec);
+  }
+}
+
 }  // namespace
 
 void RaceHudObject(Context& h) {
@@ -437,6 +619,7 @@ void RaceHudObject(Context& h) {
   }
   Helpers(h, w);
   Setters(h, w);
+  Dashboard(h, w);
 }
 
 }  // namespace harness

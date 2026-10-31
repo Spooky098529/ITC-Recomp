@@ -20,6 +20,10 @@ namespace race_hud_object {
 constexpr uint32_t kHudPlayer = 16;     // the player's index
 constexpr uint32_t kHudVehicle = 440;   // Vehicle::Get(+16)
 constexpr uint32_t kHudDashboard = 608; // the dashboard movie (id 0)
+constexpr uint32_t kHudTimer = 624;     // the timer movie (id 13)
+
+// The two viewports (a pointer to two; +1860 the camera view).
+constexpr uint32_t kViewports = 0x826C2CE8;
 
 // The float 0.0 at 0x82000A34 the originals load.
 constexpr uint32_t kZero = 0x82000A34;
@@ -63,5 +67,50 @@ uint32_t SetPlayer(uint8_t* base, uint32_t hud, uint32_t player, uint32_t sp);
 // RaceHud::Touching (sub_82215820): 1 when the player's vehicle has a
 // collision object (+340) with a contact of mask 0x07000000, else 0.
 uint32_t Touching(uint8_t* base, uint32_t player, uint32_t sp);
+
+// --- The dashboard's digits, needles and set-ups (dashboard.cpp) ---
+//
+// Each returns r3 as the original leaves it; `f1` (in and out) is f1 as the
+// original leaves it where a call to PowInt may change it.
+
+// RaceHud::SetTach (sub_82212D58): HudCurve::Eval(+20, value), node (0, 7)
+// +36 = its output (+120) plus the float at 0x8200F720. The node.
+uint32_t SetTach(uint8_t* base, uint32_t hud, double value, uint32_t sp);
+// RaceHud::SetBoost (sub_82212E18): HudCurve::Eval(+132, value), node
+// (0, 5) +36 = its output (+232). The node.
+uint32_t SetBoost(uint8_t* base, uint32_t hud, double value, uint32_t sp);
+// RaceHud::SetSpeed (sub_82214260): when `speed` is 999 or less (unsigned),
+// node 9's children (from its +100, +104 of them), last first, get their
+// digit + 1, or 0 for leading zeros (below PowInt(10.0, n) through
+// fctiwz, at the frame's +80). The HUD (above 999), node 9 (no children) or
+// the last child.
+uint32_t SetSpeed(uint8_t* base, uint32_t hud, uint32_t speed, uint32_t sp, double* f1);
+// RaceHud::SetTime (sub_82213750): the packed time at `time` (clamped to
+// 59:59.999) into the timer movie's nodes 15/14, 17/16 and 20/19/18 (digit
+// + 1). The last node.
+uint32_t SetTime(uint8_t* base, uint32_t hud, uint32_t time, uint32_t sp);
+// RaceHud::SetDistance (sub_82214A50): `*f1` clamped to [0.0, the float at
+// 0x8200F740], its tenths rounded up (by the hundredths) into the timer
+// movie's nodes 11, 10 and 9 (leading zeros 0). The last node.
+uint32_t SetDistance(uint8_t* base, uint32_t hud, uint32_t sp, double* f1);
+// RaceHud::Reset (sub_822121C0): node 1's children's and node 5's alpha
+// (+68) 0.0, +492 = 0, +460 = -1, node 19 hidden. Node 19.
+uint32_t Reset(uint8_t* base, uint32_t hud, uint32_t sp);
+// RaceHud::ShowGauge (sub_82212D08): nodes (0, 12 + slot) and (0, 9 + slot)
+// +80 = shown. The second.
+uint32_t ShowGauge(uint8_t* base, uint32_t hud, uint32_t slot, uint32_t shown, uint32_t sp);
+// RaceHud::SetUpExtraGauges (sub_82213DB0): the build's five entries (+1832,
+// 12 bytes each) into +476 and three flags at the frame's +80 to +88 (their
+// addresses at +96 to +104), the slots +488 to +480 the first flag set of
+// the three (cleared) or -1, each slot shown (ShowGauge), node (0, 1) by +8
+// and +476. Node (0, 1).
+uint32_t SetUpExtraGauges(uint8_t* base, uint32_t hud, uint32_t sp);
+// RaceHud::ApplyOptions (sub_82212768): four words of player 0's save data
+// (+0x1F85C) to +0 to +12, then nodes 4 (when +472, read before the copy),
+// 3, (0, 3), (0, 4), (0, 1) and 1 shown by them. Node 1.
+uint32_t ApplyOptions(uint8_t* base, uint32_t hud, uint32_t sp);
+// RaceHud::UpdateView (sub_82212B68): +432 = viewport 0's +1860, nodes 0
+// and 4 and +472 by it and +12. Node 4.
+uint32_t UpdateView(uint8_t* base, uint32_t hud, uint32_t sp);
 
 }  // namespace race_hud_object

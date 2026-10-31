@@ -252,6 +252,7 @@ set(ITC_SOURCES
     src/material_passes/palette.cpp
     src/hooks/race_hud_object.cpp
     src/race_hud_object/gauges.cpp
+    src/race_hud_object/dashboard.cpp
     src/save_interface/save_interface.cpp
     src/save_interface/save_layer.cpp
     src/hooks/file_layer.cpp
