@@ -16,7 +16,11 @@ file's history. What's left to see in a drive, from every run:
 - Cleanup lead (no mapping, not counted): the top of `leads.md`, the
   models, textures and shaders, is ours but for `Model::RecordMaterials`
   (`sub_820CECA0`, `models.md`, ready, 1,666 lines: split the
-  migration). Step: migration (agent running).
+  migration). Migration checked (0c226b78: `ModelRecordMaterials` in
+  `src/scenery_lists/model_draws.cpp` beside `RecordShape`, under
+  `--native_models`, harness 1,024 cases 0 differing, frame dump alike;
+  8de457d4: the vertex declaration's adapter `sub_82589728` removed;
+  no subagents). Step: validation (agent running).
 
 ## Done
 
@@ -36,5 +40,8 @@ file's history. What's left to see in a drive, from every run:
 
 - At the start: ours 3514, work left 2883 (wrapped 103, known 480,
   unknown 2300).
+- After `Model::RecordMaterials`' migration (`itc_2902`: race 36 s, 0
+  errors, models and scenery_lists 0 differing): ours 3515, work left
+  2882 (wrapped 103, known 479, unknown 2300).
 
 ## Stopped

@@ -13,7 +13,15 @@ When the user has reviewed a run's section, its heading gets
 
 ## Run 2026-10-31 13:47 (`b7-loop-31-10-26`)
 
-- Nothing yet.
+- `Model::RecordMaterials` (`sub_820CECA0`, cleanup lead, 0c226b78):
+  its row in `models.md` (blank -> Overridden, read in full). For
+  review: the original kept for more than 4 textures, a vertex
+  declaration the plain C++ leaves to it, the slot diagnostics, and a
+  chunk open on another list or no room; the frame temporaries and the
+  caller frame's saved arguments written as the original; the harness
+  now saves and compares `0x826C5100` (16 bytes) for every
+  `scenery_lists` case. The vertex declaration `sub_82589728` (8de457d4)
+  Overridden -> Native.
 
 ## Run 2026-10-30 23:03 (`b7-loop-30-10-26-2`)
 
