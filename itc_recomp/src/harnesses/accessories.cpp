@@ -193,6 +193,18 @@ void NativeAccessoryEntryNew(PPCContext& ctx, uint8_t* base) {
   ctx.r3.u64 = ac::EntryNew(base, ctx.r1.u32);
 }
 
+void NativeAccessoryEntryDestroy(PPCContext& ctx, uint8_t* base) {
+  if (!hooks::AccessoriesNativeLoads() || !hooks::ModelsNativeLifetime() ||
+      !ac::EntryDestroyable(base, ctx.r3.u32)) {
+    __imp__sub_820F0988(ctx, base);
+    return;
+  }
+  if (guest::LoadU32(base, ctx.r3.u32) != 0) {
+    ctx.fpscr.disableFlushMode();
+  }
+  ctx.r3.u64 = ac::EntryDestroy(base, ctx.r3.u32);
+}
+
 void NativeAccessoryFileSetData(PPCContext& ctx, uint8_t* base) {
   ac::FileSetData(base, ctx.r3.u32, ctx.r4.u32, ctx.r5.u32);
 }
@@ -570,7 +582,7 @@ void Destructors(Context& h, const Block& block) {
   };
   const Kind kinds[] = {
       {"AccessoryEntry::Destroy (sub_820F0988)", Original<__imp__sub_820F0988>,
-       hooks::AccessoryEntryDestroy, 0},
+       NativeAccessoryEntryDestroy, 0},
       {"Accessory::~Accessory (sub_820EF310)", Original<__imp__sub_820EF310>,
        NativeAccessoryDestruct, 1},
       {"AccessorySkeleton::~AccessorySkeleton (sub_820EFFD8)", Original<__imp__sub_820EFFD8>,

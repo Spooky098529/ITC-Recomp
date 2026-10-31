@@ -36,8 +36,6 @@ void AccessoriesCreate(PPCContext& ctx, uint8_t* base);
 void AccessoriesSetScale(PPCContext& ctx, uint8_t* base);
 // Accessories::Destroy sub_820F1078.
 void AccessoriesDestroy(PPCContext& ctx, uint8_t* base);
-// AccessoryEntry::Destroy sub_820F0988 (r3 the entry's slot).
-void AccessoryEntryDestroy(PPCContext& ctx, uint8_t* base);
 // Accessories::ReleaseAll sub_820F0AD8 (r3 the set).
 void AccessoriesReleaseAll(PPCContext& ctx, uint8_t* base);
 // Accessories::Release sub_820F0A90 (r3 the set, r4 the index).

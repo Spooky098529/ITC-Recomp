@@ -131,18 +131,6 @@ void AccessoriesDestroy(PPCContext& ctx, uint8_t* base) {
 
 
 
-void AccessoryEntryDestroy(PPCContext& ctx, uint8_t* base) {
-  if (!AccessoriesNativeLoads() || !ModelsNativeLifetime() ||
-      !accessories::EntryDestroyable(base, ctx.r3.u32)) {
-    __imp__sub_820F0988(ctx, base);
-    return;
-  }
-  if (guest::LoadU32(base, ctx.r3.u32) != 0) {
-    ctx.fpscr.disableFlushMode();
-  }
-  ctx.r3.u64 = accessories::EntryDestroy(base, ctx.r3.u32);
-}
-
 void AccessoriesReleaseAll(PPCContext& ctx, uint8_t* base) {
   if (!AccessoriesNativeLoads() || !ModelsNativeLifetime() ||
       !accessories::SetReleasable(base, ctx.r3.u32)) {
@@ -168,7 +156,7 @@ void AccessoriesRelease(PPCContext& ctx, uint8_t* base) {
     const uint32_t entry =
         guest::LoadU32(base, set + ((uint32_t(index + 1) << 2) & 0xFFFFFFFCu));
     if (entry != 0 && guest::LoadU32(base, entry) - 1 == 0) {
-      ctx.fpscr.disableFlushMode();  // as AccessoryEntry::Destroy's adapter
+      ctx.fpscr.disableFlushMode();  // as AccessoryEntry::Destroy's register step
     }
   }
   if (const auto r3 = accessories::SetRelease(base, set, index)) {
@@ -337,7 +325,6 @@ ITC_ACCESSORIES(820F0C20, AccessoryFileOnArchiveDone)
 ITC_ACCESSORIES(820F1038, AccessoriesCreate)
 ITC_ACCESSORIES(820F0F00, AccessoriesSetScale)
 ITC_ACCESSORIES(820F1078, AccessoriesDestroy)
-ITC_ACCESSORIES(820F0988, AccessoryEntryDestroy)
 ITC_ACCESSORIES(820F0AD8, AccessoriesReleaseAll)
 ITC_ACCESSORIES(820F0FE0, AccessoriesDestruct)
 ITC_ACCESSORIES(820EF568, AccessorySetTexture)
