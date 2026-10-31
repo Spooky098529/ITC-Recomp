@@ -72,5 +72,17 @@ void RaceScreensPauseMenuSaveHudOptions(PPCContext& ctx, uint8_t* base);
 void RaceScreensPauseMenuAnswerPage(PPCContext& ctx, uint8_t* base);
 void RaceScreensAfterRaceMenuAnswerPage(PPCContext& ctx, uint8_t* base);
 void RaceScreensRaceDialogAnswer(PPCContext& ctx, uint8_t* base);
+// The pages' dispatch: PauseMenu::Update sub_8220F638 (r3, r4 passed on),
+// CareerResults::Update sub_8221A090 (r3 the screen), AfterRaceMenu::Update
+// sub_8221BD20, RaceDialog::Update sub_822185B0; CareerResults::Start
+// sub_822191D0; PauseMenu::StepVolume sub_8220CED0 and StepAdjust
+// sub_8220D248.
+void RaceScreensPauseMenuUpdate(PPCContext& ctx, uint8_t* base);
+void RaceScreensCareerResultsUpdate(PPCContext& ctx, uint8_t* base);
+void RaceScreensAfterRaceMenuUpdate(PPCContext& ctx, uint8_t* base);
+void RaceScreensRaceDialogUpdate(PPCContext& ctx, uint8_t* base);
+void RaceScreensCareerResultsStart(PPCContext& ctx, uint8_t* base);
+void RaceScreensPauseMenuStepVolume(PPCContext& ctx, uint8_t* base);
+void RaceScreensPauseMenuStepAdjust(PPCContext& ctx, uint8_t* base);
 
 }  // namespace hooks

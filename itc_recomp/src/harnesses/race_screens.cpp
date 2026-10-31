@@ -23,6 +23,7 @@
 #include <cstring>
 #include <limits>
 #include <functional>
+#include <initializer_list>
 #include <string>
 #include <utility>
 #include <vector>
@@ -637,6 +638,161 @@ void Data(Context& h) {
   }
 }
 
+// --- The pages' dispatch and the pause menu's steps ---
+
+// A world for the screens' pages: each screen global (0x826D84D0 on) a
+// block of its own (0x200 bytes) of random words; the pause menu's screen
+// word its movie, whose live scene (+16) is a pool node; each pool node's
+// child index (+108) 0 to 3 and its child entries (+128 on) pool nodes.
+constexpr uint32_t kPageNodes = 16;
+constexpr uint32_t kPageNodeBytes = 0x400;
+constexpr uint32_t kPageBlocks = 20;  // the 20 globals 0x826D84D0 to 0x826D851C
+constexpr uint32_t kPageBlockBytes = 0x200;
+
+struct PageWorld {
+  PageWorld()
+      : blocks(kPageBlocks * kPageBlockBytes), movie(0x100), nodes(kPageNodes * kPageNodeBytes) {}
+  bool ok() const { return blocks.address && movie.address && nodes.address; }
+  uint32_t block(uint32_t global) const {
+    return blocks.address + (global - kScreenGlobals) / 4 * kPageBlockBytes;
+  }
+  uint32_t node(uint32_t i) const { return nodes.address + kPageNodeBytes * i; }
+  Block blocks;
+  Block movie;
+  Block nodes;
+};
+
+void ShapePages(uint8_t* base, const PageWorld& w, Random& r) {
+  WriteRandom(base, w.blocks.address, w.blocks.bytes, r);
+  WriteRandom(base, w.movie.address, w.movie.bytes, r);
+  WriteRandom(base, w.nodes.address, w.nodes.bytes, r);
+  for (uint32_t g = kScreenGlobals; g < kScreenGlobals + kScreenGlobalsBytes; g += 4) {
+    guest::StoreU32(base, g, w.block(g));
+  }
+  guest::StoreU32(base, w.block(rs::kPauseScreen), w.movie.address);
+  guest::StoreU32(base, w.movie.address + 16, w.node(r.Below(kPageNodes)));
+  for (uint32_t k = 0; k < kPageNodes; k++) {
+    guest::StoreU32(base, w.node(k) + 108, r.Below(4));
+    for (uint32_t i = 128; i < kPageNodeBytes; i += 8) {
+      guest::StoreU32(base, w.node(k) + i, w.node(r.Below(kPageNodes)));
+    }
+  }
+}
+
+using PageSetupFn = std::function<void(PPCContext&, Random&, const PageWorld&)>;
+
+void PageGroup(Context& h, const PageWorld& w, const char* name, int cases,
+               const PageSetupFn& setup, GuestFunction recompiled, GuestFunction native,
+               uint32_t frame, uint32_t saves) {
+  Results results(name);
+  for (int c = 0; c < cases; c++) {
+    const uint64_t seed = h.random.Next();
+    Outputs out[2];
+    for (int v = 0; v < 2; v++) {
+      Random r(seed);
+      SavedBytes saved(h.base, {{kScreenGlobals, kScreenGlobalsBytes},
+                                {kUnseenGlobals, kUnseenGlobalsBytes}});
+      ShapePages(h.base, w, r);
+      PPCContext t = CallContext(h);
+      const uint32_t sp = t.r1.u32;
+      WriteRandom(h.base, sp - kStackBytes, kStackBytes + kCallerBytes, r);
+      t.r3.u64 = r.Next();
+      t.r4.u64 = r.Next();
+      t.r5.u64 = r.Next();
+      setup(t, r, w);
+      t.lr = 0x82000000 | (r.Below(0x10000) << 2);
+      ITC_FLAG(native_race_screens) = v == 1;
+      (v == 0 ? recompiled : native)(t, h.base);
+      ITC_FLAG(native_race_screens) = true;
+      out[v].Bytes(Read(h.base, w.blocks.address, w.blocks.bytes));
+      out[v].Bytes(Read(h.base, kScreenGlobals, kScreenGlobalsBytes));
+      out[v].Bytes(Read(h.base, sp - frame, frame - saves));
+      out[v].Bytes(Read(h.base, sp, kCallerBytes));
+      out[v].Word(t.r1.u32);
+      out[v].Word(t.r3.u32);
+      out[v].Word(uint32_t(t.r3.u64 >> 32));
+    }
+    results.Check(out[0], out[1], fmt::format("case {}", c));
+  }
+  results.Report();
+}
+
+void Pages(Context& h) {
+  const PageWorld w;
+  if (!w.ok()) {
+    ITC_LOG_ERROR("harness: race_screens: no block from the allocation layer");
+    return;
+  }
+  auto page_of = [&h](uint32_t pages, std::initializer_list<int32_t> choices, Random& r) {
+    const int32_t* list = choices.begin();
+    guest::StoreU32(h.base, pages, uint32_t(list[r.Below(uint32_t(choices.size()))]));
+  };
+  // The pages whose handlers the cases run: none (-1) and the answers (the
+  // pause menu's 5, the menu after the race's 7, the dialog's 5, the
+  // results' 0 and 4); the dialog's other pages only with its +36 1 (the
+  // Go to 5 leaves no page).
+  PageGroup(
+      h, w, "PauseMenu::Update (sub_8220F638)", 60,
+      [&](PPCContext&, Random& r, const PageWorld& w) {
+        page_of(w.block(rs::kPausePages), {-1, 5}, r);
+      },
+      __imp__sub_8220F638, hooks::RaceScreensPauseMenuUpdate, 112, 8);
+  PageGroup(
+      h, w, "CareerResults::Update (sub_8221A090)", 60,
+      [&](PPCContext& t, Random& r, const PageWorld& w) {
+        t.r3.u64 = w.block(rs::kCareerResults);
+        page_of(w.block(rs::kCareerResults) + 184, {-1, 0, 4}, r);
+      },
+      __imp__sub_8221A090, hooks::RaceScreensCareerResultsUpdate, 112, 8);
+  PageGroup(
+      h, w, "AfterRaceMenu::Update (sub_8221BD20)", 60,
+      [&](PPCContext&, Random& r, const PageWorld& w) {
+        page_of(w.block(rs::kAfterPages), {-1, 7}, r);
+      },
+      __imp__sub_8221BD20, hooks::RaceScreensAfterRaceMenuUpdate, 128, 8);
+  PageGroup(
+      h, w, "RaceDialog::Update (sub_822185B0)", 120,
+      [&](PPCContext&, Random& r, const PageWorld& w) {
+        const uint32_t pages = w.block(rs::kDialogPages);
+        const uint32_t data = w.block(rs::kDialogData);
+        page_of(pages, {-1, 5, 0, 1, 2, 3, 4}, r);
+        const int32_t page = int32_t(guest::LoadU32(h.base, pages));
+        guest::StoreU32(h.base, pages + 12, r.Below(2) == 0 ? 0xFFFFFFFFu : r.Below(3));
+        guest::StoreU32(h.base, data + 36, r.Below(2));
+        guest::StoreU32(h.base, data + 0, r.Below(3));
+        if (page != -1 && page != 5) {
+          guest::StoreU32(h.base, data + 36, 1);
+        } else if (page == -1 && int32_t(guest::LoadU32(h.base, pages + 12)) != -1) {
+          // Skips the Go: the page stays -1.
+        }
+      },
+      __imp__sub_822185B0, hooks::RaceScreensRaceDialogUpdate, 128, 24);
+  PageGroup(
+      h, w, "CareerResults::Start (sub_822191D0)", 20,
+      [](PPCContext&, Random&, const PageWorld&) {}, __imp__sub_822191D0,
+      hooks::RaceScreensCareerResultsStart, 96, 8);
+  // The steps: the list's side (+28) -1, 0, 1 or any word, its selection
+  // (+16; the scroll +4 0) 0 to 4; the values near their bounds.
+  auto steps = [&h](PPCContext&, Random& r, const PageWorld& w) {
+    const uint32_t list = w.block(rs::kPauseList);
+    const uint32_t sides[4] = {0xFFFFFFFFu, 0, 1, uint32_t(r.Next())};
+    guest::StoreU32(h.base, list + rs::kListSide, sides[r.Below(4)]);
+    guest::StoreU32(h.base, list + rs::kListSelection, r.Below(5));
+    const uint32_t data = w.block(rs::kPauseData);
+    for (const uint32_t field : {52u, 56u}) {
+      guest::StoreU32(h.base, data + field, uint32_t(int32_t(r.Below(19)) - 2));
+    }
+    for (const uint32_t field : {60u, 64u, 68u}) {
+      guest::StoreU32(h.base, data + field, uint32_t(int32_t(r.Below(25)) - 12));
+    }
+    guest::StoreU32(h.base, data + 144, r.Below(3));
+  };
+  PageGroup(h, w, "PauseMenu::StepVolume (sub_8220CED0)", 200, steps, __imp__sub_8220CED0,
+            hooks::RaceScreensPauseMenuStepVolume, 96, 16);
+  PageGroup(h, w, "PauseMenu::StepAdjust (sub_8220D248)", 200, steps, __imp__sub_8220D248,
+            hooks::RaceScreensPauseMenuStepAdjust, 96, 16);
+}
+
 }  // namespace
 
 void RaceScreens(Context& h) {
@@ -649,6 +805,7 @@ void RaceScreens(Context& h) {
   Makers(h);
   Teardowns(h);
   Data(h);
+  Pages(h);
 }
 
 }  // namespace harness

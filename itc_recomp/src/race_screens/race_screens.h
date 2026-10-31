@@ -203,4 +203,43 @@ uint32_t PauseMenuAnswerPage(uint8_t* base);
 uint32_t AfterRaceMenuAnswerPage(uint8_t* base);
 uint32_t RaceDialogAnswer(uint8_t* base);
 
+// --- The pages' dispatch and the pause menu's steps (pages.cpp) ---
+//
+// The updates run the page's handler from a table the original builds in
+// its frame (the handlers' addresses, left there), through `calls` with the
+// registers the original has at its bctrl (`r3`, `r4` its caller's where
+// it doesn't set them; r5 to r10 the table's words, sign-extended as its
+// lis and addi leave them); 0 with no page (-1).
+
+// sub_8220F638 PauseMenu::Update: the page [[0x826D84D8]] (r3 and r4 its
+// caller's).
+uint64_t PauseMenuUpdate(uint8_t* base, uint64_t r3, uint64_t r4, uint32_t sp,
+                         const Calls& calls);
+// sub_8221A090 CareerResults::Update: r3 = the screen, its +184 the page
+// (r4 and r5 its caller's).
+uint64_t CareerResultsUpdate(uint8_t* base, uint64_t r3, uint64_t r4, uint64_t r5, uint32_t sp,
+                             const Calls& calls);
+// sub_8221BD20 AfterRaceMenu::Update: the page [[0x826D8518]].
+uint64_t AfterRaceMenuUpdate(uint8_t* base, uint32_t sp, const Calls& calls);
+// sub_822185B0 RaceDialog::Update: with the data's +36 1 (and no page with
+// no transition, or a page) and the page not 5, ScreenPages::Go(5,
+// transition 1) and the data's +0 = 0; then the page's handler (r4 its
+// caller's, or 5 after the Go).
+uint64_t RaceDialogUpdate(uint8_t* base, uint64_t r4, uint32_t sp, const Calls& calls);
+// sub_822191D0 CareerResults::Start: ScreenPages::Go([0x826D8500] + 184, 1,
+// transition 1); returns 0.
+uint64_t CareerResultsStart(uint8_t* base, uint32_t sp, const Calls& calls);
+// sub_8220CED0 PauseMenu::StepVolume and sub_8220D248 PauseMenu::StepAdjust:
+// by the list's side (+28: -1 down, 1 up) the selected value stepped (the
+// volumes +52, +56 within 0 to 15; the three values +60 to +68 within -10
+// to 10) or the last item's +144 toggled; 1 when it changed, else 0
+// (StepVolume's clamped steps store the bound and answer 0). StepAdjust
+// first looks up the type-10 node 0's children 4 to 6 (unused).
+uint32_t PauseMenuStepVolume(uint8_t* base, uint32_t sp);
+uint32_t PauseMenuStepAdjust(uint8_t* base, uint32_t sp);
+
+// The page object's Go through its override (its --log_pause_movie line
+// kept).
+constexpr uint32_t kPagesGo = 0x8220BA68;
+
 }  // namespace race_screens

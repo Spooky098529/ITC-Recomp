@@ -21,7 +21,9 @@ ITC_FLAG_BOOL(native_race_screens, true, "ITC",
               "CareerResults::, RaceResults::, SplitResults:: and Kind6Menu::Create and "
               "Destroy, with --native_heap, and AfterRaceMenu::Close; PauseMenu::LoadData, "
               "SaveOptions, Close, SaveHudOptions and AnswerPage, AfterRaceMenu::AnswerPage and "
-              "RaceDialog::Answer) natively instead "
+              "RaceDialog::Answer; the pages' dispatch, PauseMenu::, CareerResults::, "
+              "AfterRaceMenu:: and RaceDialog::Update, the pages' handlers through the function "
+              "table; CareerResults::Start; PauseMenu::StepVolume and StepAdjust) natively instead "
               "of through the translated code (the same writes; checked by "
               "--run_harnesses=race_screens)");
 ITC_FLAG_DECLARE(bool, native_action_mappers);
@@ -201,6 +203,41 @@ void RaceScreensRaceDialogAnswer(PPCContext& ctx, uint8_t* base) {
   ctx.r3.u64 = race_screens::RaceDialogAnswer(base);
 }
 
+void RaceScreensPauseMenuUpdate(PPCContext& ctx, uint8_t* base) {
+  GuestCalls guest(ctx, base);
+  ctx.r3.u64 =
+      race_screens::PauseMenuUpdate(base, ctx.r3.u64, ctx.r4.u64, ctx.r1.u32, guest.calls());
+}
+
+void RaceScreensCareerResultsUpdate(PPCContext& ctx, uint8_t* base) {
+  GuestCalls guest(ctx, base);
+  ctx.r3.u64 = race_screens::CareerResultsUpdate(base, ctx.r3.u64, ctx.r4.u64, ctx.r5.u64,
+                                                 ctx.r1.u32, guest.calls());
+}
+
+void RaceScreensAfterRaceMenuUpdate(PPCContext& ctx, uint8_t* base) {
+  GuestCalls guest(ctx, base);
+  ctx.r3.u64 = race_screens::AfterRaceMenuUpdate(base, ctx.r1.u32, guest.calls());
+}
+
+void RaceScreensRaceDialogUpdate(PPCContext& ctx, uint8_t* base) {
+  GuestCalls guest(ctx, base);
+  ctx.r3.u64 = race_screens::RaceDialogUpdate(base, ctx.r4.u64, ctx.r1.u32, guest.calls());
+}
+
+void RaceScreensCareerResultsStart(PPCContext& ctx, uint8_t* base) {
+  GuestCalls guest(ctx, base);
+  ctx.r3.u64 = race_screens::CareerResultsStart(base, ctx.r1.u32, guest.calls());
+}
+
+void RaceScreensPauseMenuStepVolume(PPCContext& ctx, uint8_t* base) {
+  ctx.r3.u64 = race_screens::PauseMenuStepVolume(base, ctx.r1.u32);
+}
+
+void RaceScreensPauseMenuStepAdjust(PPCContext& ctx, uint8_t* base) {
+  ctx.r3.u64 = race_screens::PauseMenuStepAdjust(base, ctx.r1.u32);
+}
+
 }  // namespace hooks
 
 // The adapters: the register steps above, or the originals with the flag
@@ -255,3 +292,10 @@ ITC_RACE_SCREENS(8220D740, RaceScreensPauseMenuSaveHudOptions)
 ITC_RACE_SCREENS(8220C5D0, RaceScreensPauseMenuAnswerPage)
 ITC_RACE_SCREENS(8221A720, RaceScreensAfterRaceMenuAnswerPage)
 ITC_RACE_SCREENS(82217D40, RaceScreensRaceDialogAnswer)
+ITC_RACE_SCREENS(8220F638, RaceScreensPauseMenuUpdate)
+ITC_RACE_SCREENS(8221A090, RaceScreensCareerResultsUpdate)
+ITC_RACE_SCREENS(8221BD20, RaceScreensAfterRaceMenuUpdate)
+ITC_RACE_SCREENS(822185B0, RaceScreensRaceDialogUpdate)
+ITC_RACE_SCREENS(822191D0, RaceScreensCareerResultsStart)
+ITC_RACE_SCREENS(8220CED0, RaceScreensPauseMenuStepVolume)
+ITC_RACE_SCREENS(8220D248, RaceScreensPauseMenuStepAdjust)
