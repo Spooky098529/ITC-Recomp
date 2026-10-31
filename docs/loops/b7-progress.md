@@ -74,7 +74,12 @@ file's history. What's left to see in a drive, from every run:
   play, 4 ready groups, no stop: `MenuSound::Play` through the sound
   manager's `PlayCue2D` (`[0x826C5C80]` is `AudioManager`, not a music
   player), `Sound::Play`, the two volume options; 2 leads added).
-  Step: migration (agent running).
+  Migration checked (9f0605c3: 4 of 4 in play ours, one batch,
+  `--native_menu_sounds`, the manager's slots called through its table
+  (not ours), 600 cases 0 differing; `Sound::Play` ran once in an
+  attract race, the rest not; adapters stay for ~300 callers; it
+  unblocked `RaceHud::UpdateRacerBar` and `RunCountdown`, a cleanup
+  lead). Step: validation (agent running).
 
 ## Done
 
@@ -141,5 +146,8 @@ file's history. What's left to see in a drive, from every run:
   2850.
 - After the menu sounds' map: ours 3548, work left 2850 (wrapped 103,
   known 491, unknown 2256).
+- After the menu sounds' migration (attract race 38 s, 0 errors,
+  menu_sounds 0 differing): ours 3552, work left 2846 (wrapped 103,
+  known 487, unknown 2256).
 
 ## Stopped

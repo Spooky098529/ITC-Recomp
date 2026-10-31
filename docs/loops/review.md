@@ -95,6 +95,12 @@ When the user has reviewed a run's section, its heading gets
   is `AudioManager::LoadBank`); the slots that run keep their rows in
   `sound-cues.md`; `race-hud-object.md`'s and `location-screen.md`'s
   intros point to the new file.
+- The menu sounds' migration (9f0605c3, `--native_menu_sounds`): the
+  sound manager's slots 10, 29 and 30 and XACT's category calls below
+  them aren't ours, so called through the function table, with only
+  the registers the original sets (the caller's r5 left, the racer
+  controllers' `set_r4` precedent); the four adapters stay for their
+  ~300 recompiled callers.
 
 ## Run 2026-10-30 23:03 (`b7-loop-30-10-26-2`)
 
