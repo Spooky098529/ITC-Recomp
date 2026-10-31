@@ -47,4 +47,14 @@ void RaceHudObjectUpdateView(PPCContext& ctx, uint8_t* base);
 // RaceHud::ShowGauge sub_82212D08: r3 = the HUD, r4 = the slot, r5 = shown.
 void RaceHudObjectShowGauge(PPCContext& ctx, uint8_t* base);
 
+// RaceHud::SetUpGauges sub_82213C90, SetUpMirror sub_822135B0, TearDown
+// sub_822141A0, SetUpSigns sub_822122B0: r3 = the HUD. UpdateExtraGauges
+// sub_82215160: r3 = the HUD, f1, r5 and r6 the gauges' values. Their guest
+// calls through this context.
+void RaceHudObjectSetUpGauges(PPCContext& ctx, uint8_t* base);
+void RaceHudObjectSetUpMirror(PPCContext& ctx, uint8_t* base);
+void RaceHudObjectTearDown(PPCContext& ctx, uint8_t* base);
+void RaceHudObjectSetUpSigns(PPCContext& ctx, uint8_t* base);
+void RaceHudObjectUpdateExtraGauges(PPCContext& ctx, uint8_t* base);
+
 }  // namespace hooks

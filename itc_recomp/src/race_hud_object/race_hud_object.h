@@ -25,6 +25,41 @@ constexpr uint32_t kHudTimer = 624;     // the timer movie (id 13)
 // The two viewports (a pointer to two; +1860 the camera view).
 constexpr uint32_t kViewports = 0x826C2CE8;
 
+// The race data ([0x826C5B2C]: +4 the course, the racers' records 3,936
+// bytes each from +0, +0xA3AF4 the race mode) and the track zones' owner.
+constexpr uint32_t kRaceData = 0x826C5B2C;
+constexpr uint32_t kRecordBytes = 3936;
+constexpr uint32_t kRaceMode = 0xA3AF4;
+
+// The guest functions called through `Calls`: memcpy where its plain C++
+// refuses, CameraPasses::RenderTarget through its override (the
+// diagnostics' wrapper, as the cameras' native callers call it),
+// TrackZones::Create and Destroy through their overrides (Create's plain
+// C++ takes guest calls of its own; Destroy's where it refuses), and the
+// extra gauges' digits, never seen in play (the originals).
+constexpr uint32_t kMemcpy = 0x825A7410;
+constexpr uint32_t kRenderTarget = 0x8209F7A8;
+constexpr uint32_t kTrackZonesCreate = 0x8228E788;
+constexpr uint32_t kTrackZonesDestroy = 0x8228B500;
+constexpr uint32_t kGaugeFloat = 0x82214330;
+constexpr uint32_t kGaugeInt119 = 0x822144B0;
+constexpr uint32_t kGaugeInt149 = 0x822145A0;
+
+// A guest function `function` called with r3 to r6 and, when `f1` isn't
+// null, f1 (the other registers as they are), from the frame `r1` with the
+// return address `lr` (the original's); its r3.
+struct Calls {
+  void* user;
+  uint64_t (*call)(void* user, uint32_t function, const uint64_t args[4], const double* f1,
+                   uint32_t r1, uint32_t lr);
+
+  uint64_t Call(uint32_t function, uint32_t r1, uint32_t lr, uint64_t r3 = 0, uint64_t r4 = 0,
+                uint64_t r5 = 0, uint64_t r6 = 0, const double* f1 = nullptr) const {
+    const uint64_t args[4] = {r3, r4, r5, r6};
+    return call(user, function, args, f1, r1, lr);
+  }
+};
+
 // The float 0.0 at 0x82000A34 the originals load.
 constexpr uint32_t kZero = 0x82000A34;
 
@@ -112,5 +147,41 @@ uint32_t ApplyOptions(uint8_t* base, uint32_t hud, uint32_t sp);
 // RaceHud::UpdateView (sub_82212B68): +432 = viewport 0's +1860, nodes 0
 // and 4 and +472 by it and +12. Node 4.
 uint32_t UpdateView(uint8_t* base, uint32_t hud, uint32_t sp);
+
+// --- The set-ups and the teardown (setup.cpp) ---
+//
+// Each returns r3 as the original leaves it.
+
+// RaceHud::SetUpGauges (sub_82213C90): the three tachometer curves
+// (0x8200D1F8, 112 bytes each) copied to the frame's +80, +192 and +304;
+// the player's racer record's +60 (an index) and +1704 (0-2 gives 0, 3-6
+// 1, 7 and up 2) pick the curve (the table at 0x8200D3B8 + 16 x index, its
+// word +0) copied to +20 and the dial's face (its word 4 + 4 x the kind)
+// for node (0, 8) +108; the boost curve (0x8200D348) to +132; both
+// evaluated at 0.0. The copies through memcpy's plain C++, or its guest
+// call where that refuses. +132 (HudCurve::Eval's r3).
+uint32_t SetUpGauges(uint8_t* base, uint32_t hud, uint32_t sp, const Calls& calls);
+// RaceHud::SetUpMirror (sub_822135B0): the swapped-out texture put back
+// when +588 is set, +592 = render target 11 (through `calls`), its level
+// 0's size (Texture::LevelDesc into the frame's +80) at +596 and +600,
+// then +592's address swapped in as the dashboard's texture 56 and the old
+// one at +588. The old one.
+uint32_t SetUpMirror(uint8_t* base, uint32_t hud, uint32_t sp, const Calls& calls);
+// RaceHud::TearDown (sub_822141A0): TrackZones::Destroy (its plain C++, or
+// its override where that refuses), then the mirror's texture put back
+// when +588 is set. SwapTexture's r3, else Destroy's.
+uint64_t TearDown(uint8_t* base, uint32_t hud, uint32_t sp, const Calls& calls);
+// RaceHud::SetUpSigns (sub_822122B0): the 24 course tables' addresses
+// (0x8200D9D0 + 312 x k, in the original's order) at the frame's +80 to
+// +172, +420 = the one of Race::CourseLayout (the third's for -1),
+// TrackZones::Create (through `calls`), +416 and +428 = -1, +424 = 1.
+// Create's r3.
+uint64_t SetUpSigns(uint8_t* base, uint32_t hud, uint32_t sp, const Calls& calls);
+// RaceHud::UpdateExtraGauges (sub_82215160): for each slot (+480 to +488):
+// 0 GaugeFloat(value in f1), 1 GaugeInt119(int119), 2 GaugeInt149(int149)
+// (f1 left as it is), the others nothing; the three never ran in play:
+// through `calls` (the originals). The last call's r3, or the HUD.
+uint64_t UpdateExtraGauges(uint8_t* base, uint32_t hud, double value, uint64_t int119,
+                           uint64_t int149, uint32_t sp, const Calls& calls);
 
 }  // namespace race_hud_object

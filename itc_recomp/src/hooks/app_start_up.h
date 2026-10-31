@@ -13,7 +13,8 @@ namespace hooks {
 // SoundGlobals::Init, SaveInterface::Init, Network::SetUp, Text::Init,
 // Players::ResetControllers, Archive::WaitIdle; and Archive::Load, for the
 // data load's harness; Career::EventQuery's and Race::SetUp's register
-// steps, for the location screen's) hand their call to it first;
+// steps, for the location screen's; TrackZones::Create, for the race HUD
+// object's) hand their call to it first;
 // when it answers true, the adapter returns (the recorder set r3), so the
 // harness sees what App::StartUp hands each without setting anything up
 // again.

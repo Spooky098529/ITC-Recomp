@@ -7,6 +7,8 @@
 #include "base/flags.h"
 #include "race_hud_object/race_hud_object.h"
 
+#include <optional>
+
 ITC_FLAG_BOOL(native_race_hud_object, true, "ITC",
               "Run the race HUD object's functions (docs/functions/race-hud-object.md: "
               "HudCurve::Eval sub_82212118, PowInt sub_82213C40, HudBar::Step sub_82211FB8, "
@@ -15,13 +17,60 @@ ITC_FLAG_BOOL(native_race_hud_object, true, "ITC",
               "SetTach sub_82212D58, SetBoost sub_82212E18, SetSpeed sub_82214260, SetTime "
               "sub_82213750, SetDistance sub_82214A50, Reset sub_822121C0, ShowGauge "
               "sub_82212D08, SetUpExtraGauges sub_82213DB0, ApplyOptions sub_82212768, "
-              "UpdateView sub_82212B68) "
+              "UpdateView sub_82212B68, SetUpGauges sub_82213C90, SetUpMirror sub_822135B0, "
+              "TearDown sub_822141A0, SetUpSigns sub_822122B0, UpdateExtraGauges sub_82215160; "
+              "memcpy where its plain C++ refuses, CameraPasses::RenderTarget, "
+              "TrackZones::Create and the extra gauges' digits through their overrides "
+              "or the originals) "
               "natively instead of through the translated code (the same writes; checked by "
               "--run_harnesses=race_hud_object)");
 
 namespace hooks {
 
 namespace rh = race_hud_object;
+
+namespace {
+
+// The guest calls the plain C++ makes (race_hud_object::Calls), through
+// this context: r1, r3 to r6, f1 when given and lr set, the function run
+// through the function table (its override when it has one), r1 put back.
+// The adapter's lr is put back when it ends.
+class GuestCalls {
+ public:
+  GuestCalls(PPCContext& ctx, uint8_t* base) : ctx_(ctx), base_(base), lr_(ctx.lr) {}
+  ~GuestCalls() { ctx_.lr = lr_; }
+  GuestCalls(const GuestCalls&) = delete;
+  GuestCalls& operator=(const GuestCalls&) = delete;
+  rh::Calls calls() { return {this, &GuestCalls::Call}; }
+
+ private:
+  static uint64_t Call(void* user, uint32_t function, const uint64_t args[4], const double* f1,
+                       uint32_t r1, uint32_t lr) {
+    auto& self = *static_cast<GuestCalls*>(user);
+    PPCContext& ctx = self.ctx_;
+    uint8_t* base = self.base_;
+    const uint64_t stack = ctx.r1.u64;
+    ctx.r1.u64 = r1;
+    ctx.r3.u64 = args[0];
+    ctx.r4.u64 = args[1];
+    ctx.r5.u64 = args[2];
+    ctx.r6.u64 = args[3];
+    if (f1 != nullptr) {
+      ctx.f1.f64 = *f1;
+    }
+    ctx.lr = lr;
+    ctx.ctr.u64 = function;
+    REX_CALL_INDIRECT_FUNC(function);
+    ctx.r1.u64 = stack;
+    ctx.fpscr.disableFlushMode();
+    return ctx.r3.u64;
+  }
+  PPCContext& ctx_;
+  uint8_t* base_;
+  uint64_t lr_;
+};
+
+}  // namespace
 
 void RaceHudObjectCurveEval(PPCContext& ctx, uint8_t* base) {
   ctx.fpscr.disableFlushMode();
@@ -113,6 +162,34 @@ void RaceHudObjectUpdateView(PPCContext& ctx, uint8_t* base) {
   ctx.r3.u64 = rh::UpdateView(base, ctx.r3.u32, ctx.r1.u32);
 }
 
+void RaceHudObjectSetUpGauges(PPCContext& ctx, uint8_t* base) {
+  ctx.fpscr.disableFlushMode();
+  GuestCalls guest(ctx, base);
+  ctx.r3.u64 = rh::SetUpGauges(base, ctx.r3.u32, ctx.r1.u32, guest.calls());
+}
+
+void RaceHudObjectSetUpMirror(PPCContext& ctx, uint8_t* base) {
+  GuestCalls guest(ctx, base);
+  ctx.r3.u64 = rh::SetUpMirror(base, ctx.r3.u32, ctx.r1.u32, guest.calls());
+}
+
+void RaceHudObjectTearDown(PPCContext& ctx, uint8_t* base) {
+  GuestCalls guest(ctx, base);
+  ctx.r3.u64 = rh::TearDown(base, ctx.r3.u32, ctx.r1.u32, guest.calls());
+}
+
+void RaceHudObjectSetUpSigns(PPCContext& ctx, uint8_t* base) {
+  GuestCalls guest(ctx, base);
+  ctx.r3.u64 = rh::SetUpSigns(base, ctx.r3.u32, ctx.r1.u32, guest.calls());
+}
+
+void RaceHudObjectUpdateExtraGauges(PPCContext& ctx, uint8_t* base) {
+  ctx.fpscr.disableFlushMode();
+  GuestCalls guest(ctx, base);
+  ctx.r3.u64 = rh::UpdateExtraGauges(base, ctx.r3.u32, ctx.f1.f64, ctx.r5.u64, ctx.r6.u64,
+                                     ctx.r1.u32, guest.calls());
+}
+
 }  // namespace hooks
 
 // The adapters: the register steps above, or the originals with the flag
@@ -147,3 +224,8 @@ ITC_RACE_HUD_OBJECT(82212D08, RaceHudObjectShowGauge)
 ITC_RACE_HUD_OBJECT(82213DB0, RaceHudObjectSetUpExtraGauges)
 ITC_RACE_HUD_OBJECT(82212768, RaceHudObjectApplyOptions)
 ITC_RACE_HUD_OBJECT(82212B68, RaceHudObjectUpdateView)
+ITC_RACE_HUD_OBJECT(82213C90, RaceHudObjectSetUpGauges)
+ITC_RACE_HUD_OBJECT(822135B0, RaceHudObjectSetUpMirror)
+ITC_RACE_HUD_OBJECT(822141A0, RaceHudObjectTearDown)
+ITC_RACE_HUD_OBJECT(822122B0, RaceHudObjectSetUpSigns)
+ITC_RACE_HUD_OBJECT(82215160, RaceHudObjectUpdateExtraGauges)

@@ -17,6 +17,7 @@
 
 #include "base/flags.h"
 #include "base/log.h"
+#include "hooks/app_start_up.h"
 #include "hooks/race_hud_object.h"
 #include "memory/heap.h"
 #include "race_hud_object/race_hud_object.h"
@@ -44,7 +45,10 @@ namespace rh = race_hud_object;
 constexpr uint32_t kVehicles = 0x826C2E34;  // Vehicle::Get's array
 constexpr uint32_t kSaveSlots = 0x826C5B58;  // SaveData::Of's four pointers
 constexpr uint32_t kSaveBytes = 0x20000;
-constexpr uint32_t kMiscBytes = 0x2000;  // the viewport, the build
+constexpr uint32_t kMiscBytes = 0x2000;  // the viewport, the build, the textures
+constexpr uint32_t kRaceBytes = 0xA4000;  // the race data (to the mode, +0xA3AF4)
+constexpr uint32_t kOwner = 0x828161EC;   // the track zones' owner
+constexpr uint32_t kMirrorTarget = 0x826BABE0;  // render target 11's texture
 constexpr uint32_t kVehicleBytes = 6272;
 constexpr uint32_t kVehicleCount = 4;
 constexpr uint32_t kHudBytes = 0x1000;
@@ -129,11 +133,13 @@ struct World {
         vehicles(kVehicleBytes * kVehicleCount),
         collision(kCollisionBytes),
         save(kSaveBytes),
-        misc(kMiscBytes) {}
+        misc(kMiscBytes),
+        race(kRaceBytes) {}
   bool ok() const {
     return hud.address && movies.address && vehicles.address && collision.address &&
-           save.address && misc.address;
+           save.address && misc.address && race.address;
   }
+  uint32_t textures() const { return misc.address + 0x1000; }
   uint32_t viewport() const { return misc.address + 0x10; }
   uint32_t build() const { return misc.address + 0x800; }
   uint32_t movie(uint32_t i) const { return movies.address + 0x100 * i; }
@@ -144,11 +150,32 @@ struct World {
   Block vehicles;
   Block collision;
   Block save;  // player 0's save data (the HUD options at +0x1F85C)
-  Block misc;  // the viewports' pointer (+0), viewport 0 (+0x10), the build (+0x800)
+  Block misc;  // the viewports' pointer (+0), viewport 0 (+0x10), the build (+0x800),
+               // the movies' textures (+0x1000)
+  Block race;  // the race data
 };
 
-// The movies: each header's live scene (+16) a pool node; each node's child
-// index (+108) 0 to 3 and its child entries (+128 on) pool nodes. The HUD's
+// The guest calls the recorder takes (TrackZones::Create), answered with a
+// word from the case's generator.
+struct Call {
+  uint32_t function, lr, r1;
+};
+std::vector<Call>* g_calls = nullptr;
+Random g_answers;
+
+bool Recorder(PPCContext& ctx, uint32_t function) {
+  if (g_calls == nullptr) {
+    return false;
+  }
+  g_calls->push_back({function, uint32_t(ctx.lr), ctx.r1.u32});
+  ctx.r3.u64 = g_answers.Next();
+  return true;
+}
+
+// The movies: each header's live scene (+16) a pool node and its textures
+// (+28) the misc block's; each node's children's range (+100, +104: up to
+// 4 from below 100), child index (+108) 0 to 3 and its child entries (+128
+// on) pool nodes. The HUD's
 // nine movie pointers (+604 to +636) the headers; its vehicle (+440) one of
 // the vehicles; the vehicles' collision objects (+340) 0 or the collision
 // block's, whose contacts (+240, linked by +68) have flags (+4) with or
@@ -156,10 +183,13 @@ struct World {
 void ShapeWorld(uint8_t* base, const World& w, Random& r) {
   for (uint32_t m = 0; m < kMovieHeaders; m++) {
     guest::StoreU32(base, w.movie(m) + 16, w.node(r.Below(kNodeCount)));
+    guest::StoreU32(base, w.movie(m) + 28, w.textures());
     guest::StoreU32(base, w.hud.address + 604 + 4 * m, w.movie(m));
   }
   for (uint32_t k = 0; k < kNodeCount; k++) {
     const uint32_t node = w.node(k);
+    guest::StoreU32(base, node + 100, r.Below(100));  // the children's first index
+    guest::StoreU32(base, node + 104, r.Below(5));    // and count
     guest::StoreU32(base, node + 108, r.Below(4));
     for (uint32_t i = 128; i < kNodeBytes; i += 8) {
       guest::StoreU32(base, node + i, w.node(r.Below(kNodeCount)));
@@ -191,6 +221,18 @@ void ShapeWorld(uint8_t* base, const World& w, Random& r) {
   for (uint32_t v = 0; v < kVehicleCount; v++) {
     guest::StoreU32(base, w.vehicle(v) + 5712, w.build());
   }
+  // The race data: the course (+4) 0 to 24, the flags (+20), the mode
+  // (+0xA3AF4) 0 to 9, the current stage (+0x59620 + 804) 0 to 9 and the
+  // stages' types (80 bytes each) 0 to 2.
+  const uint32_t race = w.race.address;
+  guest::StoreU32(base, rh::kRaceData, r.Below(16) == 0 ? 0 : race);
+  guest::StoreU32(base, race + 4, r.Below(25));
+  guest::StoreU32(base, race + 20, r.Below(64));
+  guest::StoreU32(base, race + rh::kRaceMode, r.Below(10));
+  guest::StoreU32(base, race + 0x59620 + 804, r.Below(10));
+  for (uint32_t k = 0; k < 10; k++) {
+    guest::StoreU32(base, race + 0x59620 + 80 * k, r.Below(3));
+  }
 }
 
 using SetupFn = std::function<void(PPCContext&, Random&, const World&)>;
@@ -216,7 +258,11 @@ void Case(Context& h, Results& results, const World& w, uint64_t seed, const Set
   Outputs out[2];
   for (int v = 0; v < 2; v++) {
     Random r(seed);
-    SavedBytes saved(h.base, {{kVehicles, 4}, {kSaveSlots, 16}, {rh::kViewports, 4}});
+    SavedBytes saved(h.base, {{kVehicles, 4},
+                              {kSaveSlots, 16},
+                              {rh::kViewports, 4},
+                              {rh::kRaceData, 4},
+                              {kOwner, 4}});
     PPCContext t = CallContext(h);
     const uint32_t sp = t.r1.u32;
     WriteRandom(h.base, sp - kStackBytes, kStackBytes + kCallerBytes, r);
@@ -226,12 +272,28 @@ void Case(Context& h, Results& results, const World& w, uint64_t seed, const Set
     WriteRandom(h.base, w.collision.address, w.collision.bytes, r);
     WriteRandom(h.base, w.save.address + 0x1F800, 0x100, r);
     WriteRandom(h.base, w.misc.address, w.misc.bytes, r);
+    WriteRandom(h.base, w.race.address, 4 * rh::kRecordBytes, r);
+    WriteRandom(h.base, w.race.address + 0x59600, 0x400, r);
     ShapeWorld(h.base, w, r);
     setup(t, r, w);
     t.lr = 0x82000000 | (r.Below(0x10000) << 2);
+    g_answers = Random(r.Next());
+    std::vector<Call> calls;
+    g_calls = &calls;
+    const hooks::StartUpRecorder saved_recorder = hooks::g_start_up_recorder;
+    hooks::g_start_up_recorder = Recorder;
     ITC_FLAG(native_race_hud_object) = v == 1;
     (v == 0 ? recompiled : native)(t, h.base);
     ITC_FLAG(native_race_hud_object) = true;
+    hooks::g_start_up_recorder = saved_recorder;
+    g_calls = nullptr;
+    out[v].Word(uint32_t(calls.size()));
+    for (const Call& call : calls) {
+      out[v].Word(call.function);
+      out[v].Word(call.lr);
+      out[v].Word(call.r1);
+    }
+    out[v].Word(guest::LoadU32(h.base, kOwner));
     uint32_t at = w.hud.address;
     for (const uint32_t offset : spec.floats) {
       const uint32_t address = w.hud.address + offset;
@@ -247,6 +309,7 @@ void Case(Context& h, Results& results, const World& w, uint64_t seed, const Set
     out[v].Bytes(Read(h.base, w.collision.address, w.collision.bytes));
     out[v].Bytes(Read(h.base, w.save.address + 0x1F800, 0x100));
     out[v].Bytes(Read(h.base, w.misc.address, w.misc.bytes));
+    out[v].Bytes(Read(h.base, w.race.address, 4 * rh::kRecordBytes));
     if (spec.frame > spec.saves) {
       out[v].Bytes(Read(h.base, sp - spec.frame, spec.frame - spec.saves));
     }
@@ -609,6 +672,92 @@ void Dashboard(Context& h, const World& w) {
   }
 }
 
+void SetUps(Context& h, const World& w) {
+  {
+    // The player 0 to 3; its record's +60 an index whose table entry
+    // (0x8200D3B8 + 16 x index) picks one of the three curves, its +1704 any.
+    Spec spec;
+    spec.frame = 480;
+    spec.saves = 56;
+    spec.Floats(20, 56);
+    Group(
+        h, w, "RaceHud::SetUpGauges (sub_82213C90)", 200,
+        [&](PPCContext& t, Random& r, const World& w) {
+          const uint32_t player = r.Below(4);
+          guest::StoreU32(h.base, w.hud.address + rh::kHudPlayer, player);
+          guest::StoreU32(h.base, rh::kRaceData, w.race.address);
+          const uint32_t record = w.race.address + rh::kRecordBytes * player;
+          uint32_t index = r.Below(8);
+          if (guest::LoadU32(h.base, 0x8200D3B8 + 16 * index) >= 3) {
+            index = 0;
+          }
+          guest::StoreU32(h.base, record + 60, index);
+          guest::StoreU32(h.base, record + 1704,
+                          r.Below(4) == 0 ? uint32_t(r.Next()) : r.Below(10));
+          t.r3.u64 = w.hud.address;
+        },
+        __imp__sub_82213C90, hooks::RaceHudObjectSetUpGauges, spec);
+  }
+  {
+    // Render target 11 the game's own (or none at the harness's time).
+    Spec spec;
+    spec.frame = 144;
+    spec.saves = 24;
+    ITC_LOG_INFO("harness: race_hud_object: render target 11's texture {:08X}",
+                 guest::LoadU32(h.base, kMirrorTarget));
+    Group(
+        h, w, "RaceHud::SetUpMirror (sub_822135B0)", 100,
+        [&](PPCContext& t, Random& r, const World& w) {
+          guest::StoreU32(h.base, w.hud.address + 588, r.Below(3) == 0 ? 0 : uint32_t(r.Next()));
+          t.r3.u64 = w.hud.address;
+        },
+        __imp__sub_822135B0, hooks::RaceHudObjectSetUpMirror, spec);
+  }
+  {
+    // No track zones' owner (nothing to delete).
+    Spec spec;
+    spec.frame = 96;
+    spec.saves = 16;
+    Group(
+        h, w, "RaceHud::TearDown (sub_822141A0)", 100,
+        [&](PPCContext& t, Random& r, const World& w) {
+          guest::StoreU32(h.base, kOwner, 0);
+          guest::StoreU32(h.base, w.hud.address + 588, r.Below(3) == 0 ? 0 : uint32_t(r.Next()));
+          t.r3.u64 = w.hud.address;
+        },
+        __imp__sub_822141A0, hooks::RaceHudObjectTearDown, spec);
+  }
+  {
+    // TrackZones::Create recorded (its r1 and lr compared).
+    Spec spec;
+    spec.frame = 320;
+    spec.saves = 144;
+    Group(
+        h, w, "RaceHud::SetUpSigns (sub_822122B0)", 300,
+        [&](PPCContext& t, Random&, const World& w) { t.r3.u64 = w.hud.address; },
+        __imp__sub_822122B0, hooks::RaceHudObjectSetUpSigns, spec);
+  }
+  {
+    // The slots 0 to 2 or other words; the digits' originals run.
+    Spec spec;
+    spec.frame = 144;
+    spec.saves = 56;
+    Group(
+        h, w, "RaceHud::UpdateExtraGauges (sub_82215160)", 200,
+        [&](PPCContext& t, Random& r, const World& w) {
+          for (uint32_t k = 0; k < 3; k++) {
+            guest::StoreU32(h.base, w.hud.address + 480 + 4 * k,
+                            r.Below(5) == 0 ? uint32_t(r.Next()) : r.Below(4) - 1);
+          }
+          t.r3.u64 = w.hud.address;
+          t.f1.f64 = AnyDouble(r, 300.0f);
+          t.r5.u64 = r.Below(3) == 0 ? r.Next() : r.Below(200);
+          t.r6.u64 = r.Below(3) == 0 ? r.Next() : r.Below(200);
+        },
+        __imp__sub_82215160, hooks::RaceHudObjectUpdateExtraGauges, spec);
+  }
+}
+
 }  // namespace
 
 void RaceHudObject(Context& h) {
@@ -620,6 +769,7 @@ void RaceHudObject(Context& h) {
   Helpers(h, w);
   Setters(h, w);
   Dashboard(h, w);
+  SetUps(h, w);
 }
 
 }  // namespace harness
