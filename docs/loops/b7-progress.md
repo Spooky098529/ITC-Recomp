@@ -65,8 +65,10 @@ file's history. What's left to see in a drive, from every run:
   object, all leads). Migration 1 checked (003ad8d..6fe8bac: 29
   functions in five batches, the gauges, dashboard, set-ups, signs and
   tick; 12 adapters removed; `--native_race_hud_object`; none of it
-  runs in an attract race; 14 ready groups left). Validation 1
-  running.
+  runs in an attract race; 14 ready groups left). Validated
+  (`itc_2883`, replay `itc_2884` ok): 29 of 29 harness lines; 24 ran
+  in the replay, 5 to drive; the harnesses left 2 s of race in 60.
+  Migration 2 running.
 
 ## Done
 
@@ -127,5 +129,8 @@ file's history. What's left to see in a drive, from every run:
   errors, race_hud_object, track_zones, ui_movies_game and app_start_up
   0 differing): ours 3498, work left 2899 (wrapped 103, known 495,
   unknown 2301).
+- After its validation (`itc_2883`, 60 s: race 2 s, 0 errors, every
+  harness 0 differing but the expected groups): ours 3498, work left
+  2899.
 
 ## Stopped
