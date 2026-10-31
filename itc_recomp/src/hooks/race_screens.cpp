@@ -28,7 +28,8 @@ ITC_FLAG_BOOL(native_race_screens, true, "ITC",
               "ShowVolumeRow, ShowAdjustRow, MoveOptions, MoveAdjust and ShowMain, ConfirmPage, "
               "ShowItems, SetArrowA, ShowOptions, ShowVolumes, ShowSlider, RestoreNodes, "
               "ColorItems, ShowAdjust and Open, the options page's ToggleOption, OptionsPage, "
-              "SetUpOptions and SetAdjust, "
+              "SetUpOptions and SetAdjust, the menu after the race's ConfirmPage, Intro, Show, "
+              "CloseMain, Move, ShowItems, SetUpItems, ColorItems, Start and Open, "
               "the UI movie calls through their overrides) natively instead "
               "of through the translated code (the same writes; checked by "
               "--run_harnesses=race_screens)");
@@ -331,6 +332,48 @@ void RaceScreensPauseMenuSetUpOptions(PPCContext& ctx, uint8_t* base) {
   ctx.r3.u64 = race_screens::PauseMenuSetUpOptions(base, ctx.r1.u32, guest.calls());
 }
 
+#define ITC_AFTER_RACE_TRANSITION(name)                                                          \
+  void RaceScreensAfterRaceMenu##name(PPCContext& ctx, uint8_t* base) {                          \
+    GuestCalls guest(ctx, base);                                                                 \
+    ctx.r3.u64 = race_screens::AfterRaceMenu##name(base, ctx.r3.u32, ctx.r1.u32, guest.calls()); \
+  }
+ITC_AFTER_RACE_TRANSITION(Intro)
+ITC_AFTER_RACE_TRANSITION(Show)
+ITC_AFTER_RACE_TRANSITION(CloseMain)
+ITC_AFTER_RACE_TRANSITION(Move)
+#undef ITC_AFTER_RACE_TRANSITION
+
+void RaceScreensAfterRaceMenuConfirmPage(PPCContext& ctx, uint8_t* base) {
+  GuestCalls guest(ctx, base);
+  ctx.r3.u64 =
+      race_screens::AfterRaceMenuConfirmPage(base, ctx.r4.u64, ctx.r1.u32, guest.calls());
+}
+
+void RaceScreensAfterRaceMenuShowItems(PPCContext& ctx, uint8_t* base) {
+  GuestCalls guest(ctx, base);
+  ctx.r3.u64 = race_screens::AfterRaceMenuShowItems(base, ctx.r1.u32, guest.calls());
+}
+
+void RaceScreensAfterRaceMenuSetUpItems(PPCContext& ctx, uint8_t* base) {
+  GuestCalls guest(ctx, base);
+  ctx.r3.u64 = race_screens::AfterRaceMenuSetUpItems(base, ctx.r1.u32, guest.calls());
+}
+
+void RaceScreensAfterRaceMenuColorItems(PPCContext& ctx, uint8_t* base) {
+  ctx.r3.u64 = race_screens::AfterRaceMenuColorItems(base, ctx.r3.u32, ctx.r1.u32);
+}
+
+void RaceScreensAfterRaceMenuStart(PPCContext& ctx, uint8_t* base) {
+  GuestCalls guest(ctx, base);
+  ctx.r3.u64 = race_screens::AfterRaceMenuStart(base, ctx.r1.u32, guest.calls());
+}
+
+void RaceScreensAfterRaceMenuOpen(PPCContext& ctx, uint8_t* base) {
+  GuestCalls guest(ctx, base);
+  ctx.r3.u64 = race_screens::AfterRaceMenuOpen(base, ctx.r3.u32, ctx.r4.u64, ctx.r5.u64,
+                                               ctx.r1.u32, guest.calls());
+}
+
 }  // namespace hooks
 
 // The adapters: the register steps above, or the originals with the flag
@@ -417,3 +460,13 @@ ITC_RACE_SCREENS(8220E888, RaceScreensPauseMenuShowAdjust)
 ITC_RACE_SCREENS(8220DB98, RaceScreensPauseMenuOptionsPage)
 ITC_RACE_SCREENS(8220E530, RaceScreensPauseMenuSetUpOptions)
 ITC_RACE_SCREENS(8220F1B8, RaceScreensPauseMenuSetAdjust)
+ITC_RACE_SCREENS(8221A6C8, RaceScreensAfterRaceMenuConfirmPage)
+ITC_RACE_SCREENS(8221A730, RaceScreensAfterRaceMenuIntro)
+ITC_RACE_SCREENS(8221A7A8, RaceScreensAfterRaceMenuShow)
+ITC_RACE_SCREENS(8221A950, RaceScreensAfterRaceMenuCloseMain)
+ITC_RACE_SCREENS(8221AA20, RaceScreensAfterRaceMenuMove)
+ITC_RACE_SCREENS(8221AC00, RaceScreensAfterRaceMenuShowItems)
+ITC_RACE_SCREENS(8221B5C8, RaceScreensAfterRaceMenuSetUpItems)
+ITC_RACE_SCREENS(8221B768, RaceScreensAfterRaceMenuColorItems)
+ITC_RACE_SCREENS(8221B860, RaceScreensAfterRaceMenuStart)
+ITC_RACE_SCREENS(8221BA68, RaceScreensAfterRaceMenuOpen)

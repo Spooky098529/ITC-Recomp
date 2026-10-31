@@ -377,6 +377,47 @@ uint64_t PauseMenuSetUpOptions(uint8_t* base, uint32_t sp, const Calls& calls);
 // animations 195 and 196 swapped by +144, else ShowAdjust; done.
 uint64_t PauseMenuSetAdjust(uint8_t* base, uint32_t step, uint32_t sp, const Calls& calls);
 
+// --- The menu after the race's pages and transitions (after_race.cpp) ---
+//
+// The movie the screen's +0 ([[0x826D8510]], UI movie 9), read again before
+// each call as the originals do. The items by kind: four words a kind at
+// 0x82010428, -1 ends them.
+constexpr uint32_t kAfterItems = 0x82010428;
+// sub_8221A6C8 AfterRaceMenu::ConfirmPage (page 6): RaceDialog::Update (r4
+// the caller's); its 1 Go(7, transition 4), its 2 Go(1) at once. Returns 0.
+uint64_t AfterRaceMenuConfirmPage(uint8_t* base, uint64_t r4, uint32_t sp, const Calls& calls);
+// The transitions (r3 the step word, set to 1 first on the first call):
+// sub_8221A730 AfterRaceMenu::Intro (animation 0 played; done when the run
+// answers 0), sub_8221A7A8 AfterRaceMenu::Show (animation 2, the selected
+// item's (type 4, r6 1) and named 40 played and looped; done),
+// sub_8221A950 AfterRaceMenu::CloseMain (the item's, animation 2 and named
+// 40 finished, animation 1 played; done when the run answers 0),
+// sub_8221AA20 AfterRaceMenu::Move (the previous item's finished, the new
+// one's played and looped; done).
+uint64_t AfterRaceMenuIntro(uint8_t* base, uint32_t step, uint32_t sp, const Calls& calls);
+uint64_t AfterRaceMenuShow(uint8_t* base, uint32_t step, uint32_t sp, const Calls& calls);
+uint64_t AfterRaceMenuCloseMain(uint8_t* base, uint32_t step, uint32_t sp, const Calls& calls);
+uint64_t AfterRaceMenuMove(uint8_t* base, uint32_t step, uint32_t sp, const Calls& calls);
+// sub_8221AC00 AfterRaceMenu::ShowItems: the type-4 node 0's children:
+// string 1960 + the kind's item (SetText) for the first four, else hidden.
+uint64_t AfterRaceMenuShowItems(uint8_t* base, uint32_t sp, const Calls& calls);
+// sub_8221B5C8 AfterRaceMenu::SetUpItems: MenuList::Init(list, the data's
+// +4 twice, 1, 154, 153, 155, 156; 159, 158), the selection from +16, with
+// +8 set the items of id 1 and 2 disabled, ShowItems. r3 ShowItems'.
+uint64_t AfterRaceMenuSetUpItems(uint8_t* base, uint32_t sp, const Calls& calls);
+// sub_8221B768 AfterRaceMenu::ColorItems (r3 the screen): as the pause
+// menu's on type 4.
+uint32_t AfterRaceMenuColorItems(uint8_t* base, uint32_t screen, uint32_t sp);
+// sub_8221B860 AfterRaceMenu::Start (page 0): ColorItems, Go(1, transition
+// 1). Returns 0.
+uint64_t AfterRaceMenuStart(uint8_t* base, uint32_t sp, const Calls& calls);
+// sub_8221BA68 AfterRaceMenu::Open: the data's +0 = `kind`, UI movie 9 into
+// the screen's +0 and its pose reset, +4 the kind's item count (at most 4),
+// +8 = `flag`, +16 = 0, SetUpItems, ScreenPages::Init(pages, 1) and Go(0,
+// 0, -1), +20 = 0. r3 Go's.
+uint64_t AfterRaceMenuOpen(uint8_t* base, uint32_t screen, uint64_t kind, uint64_t flag,
+                           uint32_t sp, const Calls& calls);
+
 constexpr uint32_t kShowVolume = 0x8220D040;
 constexpr uint32_t kArrowB = 0x8220D1D8;
 constexpr uint32_t kRestorePose = 0x82119B80;

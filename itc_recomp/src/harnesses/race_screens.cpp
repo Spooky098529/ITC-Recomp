@@ -1266,6 +1266,92 @@ void Openers(Context& h, const MovieWorld& w) {
   guest::StoreU32(h.base, kRaceData, saved_race);
 }
 
+// The menu after the race's pages and transitions: its data's kind (+0) 0
+// to 7, item count (+4) 0 to 4, flag (+8) 0, 1 or any, selection (+16) 0
+// to 3; its list's selections as the pause menu's. Init's item block (+68,
+// 0 before) compared and freed as SetUpOptions' cases do.
+void AfterRace(Context& h, const MovieWorld& w) {
+  auto data = [&h](Random& r, const MovieWorld& w) {
+    const uint32_t d = w.block(rs::kAfterData);
+    guest::StoreU32(h.base, d + 0, r.Below(8));
+    guest::StoreU32(h.base, d + 4, r.Below(5));
+    guest::StoreU32(h.base, d + 8, r.Below(4) == 0 ? uint32_t(r.Next()) : r.Below(2));
+    guest::StoreU32(h.base, d + 16, r.Below(4));
+  };
+  auto after_step = [&](PPCContext& t, Random& r, const MovieWorld& w) {
+    data(r, w);
+    StepWord(t, r, w, rs::kAfterPages);
+  };
+  MovieGroup(
+      h, w, "AfterRaceMenu::ConfirmPage (sub_8221A6C8)", 120,
+      [&h](PPCContext&, Random& r, const MovieWorld& w) {
+        const uint32_t pages = w.block(rs::kDialogPages);
+        const uint32_t dialog = w.block(rs::kDialogData);
+        const int32_t choices[7] = {-1, 5, 0, 1, 2, 3, 4};
+        const int32_t page = choices[r.Below(7)];
+        guest::StoreU32(h.base, pages, uint32_t(page));
+        guest::StoreU32(h.base, pages + 12, r.Below(2) == 0 ? 0xFFFFFFFFu : r.Below(3));
+        guest::StoreU32(h.base, dialog + 36, page != -1 && page != 5 ? 1 : r.Below(2));
+        guest::StoreU32(h.base, dialog + 0, r.Below(3));
+      },
+      __imp__sub_8221A6C8, hooks::RaceScreensAfterRaceMenuConfirmPage, {96, 8});
+  MovieGroup(h, w, "AfterRaceMenu::Intro (sub_8221A730)", 100, after_step, __imp__sub_8221A730,
+             hooks::RaceScreensAfterRaceMenuIntro, {96, 16});
+  MovieGroup(h, w, "AfterRaceMenu::Show (sub_8221A7A8)", 100, after_step, __imp__sub_8221A7A8,
+             hooks::RaceScreensAfterRaceMenuShow, {112, 24});
+  MovieGroup(h, w, "AfterRaceMenu::CloseMain (sub_8221A950)", 100, after_step,
+             __imp__sub_8221A950, hooks::RaceScreensAfterRaceMenuCloseMain, {112, 24});
+  MovieGroup(h, w, "AfterRaceMenu::Move (sub_8221AA20)", 100, after_step, __imp__sub_8221AA20,
+             hooks::RaceScreensAfterRaceMenuMove, {112, 32});
+  MovieGroup(
+      h, w, "AfterRaceMenu::ShowItems (sub_8221AC00)", 150,
+      [&](PPCContext&, Random& r, const MovieWorld& w) { data(r, w); }, __imp__sub_8221AC00,
+      hooks::RaceScreensAfterRaceMenuShowItems, {128, 48, {48, 80}});
+  MovieGroup(
+      h, w, "AfterRaceMenu::ColorItems (sub_8221B768)", 100,
+      [&](PPCContext& t, Random& r, const MovieWorld& w) {
+        data(r, w);
+        t.r3.u64 = w.block(rs::kAfterScreen);
+      },
+      __imp__sub_8221B768, hooks::RaceScreensAfterRaceMenuColorItems, {128, 48});
+  MovieGroup(
+      h, w, "AfterRaceMenu::Start (sub_8221B860)", 60,
+      [&](PPCContext&, Random& r, const MovieWorld& w) { data(r, w); }, __imp__sub_8221B860,
+      hooks::RaceScreensAfterRaceMenuStart, {96, 8});
+  // Init's block: compared, freed, +68 0 again.
+  auto init_block = [&](Outputs& out) {
+    const uint32_t list = w.block(rs::kAfterList);
+    const uint32_t block = guest::LoadU32(h.base, list + rs::kListBlock);
+    out.Word(block != 0 ? 1 : 0);
+    if (block != 0 && memory::IsPages(block)) {
+      out.Bytes(Read(h.base, block, 4 * 4));
+      memory::FreePages(block);
+    }
+    guest::StoreU32(h.base, list + rs::kListBlock, 0);
+  };
+  FrameSpec set_up{144, 40};
+  set_up.after = init_block;
+  MovieGroup(
+      h, w, "AfterRaceMenu::SetUpItems (sub_8221B5C8)", 150,
+      [&](PPCContext&, Random& r, const MovieWorld& w) {
+        data(r, w);
+        guest::StoreU32(h.base, w.block(rs::kAfterList) + rs::kListBlock, 0);
+      },
+      __imp__sub_8221B5C8, hooks::RaceScreensAfterRaceMenuSetUpItems, set_up);
+  FrameSpec open{128, 40};
+  open.after = init_block;
+  MovieGroup(
+      h, w, "AfterRaceMenu::Open (sub_8221BA68)", 150,
+      [&](PPCContext& t, Random& r, const MovieWorld& w) {
+        data(r, w);
+        guest::StoreU32(h.base, w.block(rs::kAfterList) + rs::kListBlock, 0);
+        t.r3.u64 = w.block(rs::kAfterScreen);
+        t.r4.u64 = r.Below(8);
+        t.r5.u64 = r.Below(4) == 0 ? r.Next() : r.Below(2);
+      },
+      __imp__sub_8221BA68, hooks::RaceScreensAfterRaceMenuOpen, open);
+}
+
 void Transitions(Context& h) {
   const MovieWorld w;
   if (!w.ok()) {
@@ -1438,6 +1524,7 @@ void Transitions(Context& h) {
   MovieGroup(h, w, "PauseMenu::SetAdjust (sub_8220F1B8)", 100, pause_step,
              __imp__sub_8220F1B8, hooks::RaceScreensPauseMenuSetAdjust, {112, 24});
   Openers(h, w);
+  AfterRace(h, w);
 }
 
 }  // namespace

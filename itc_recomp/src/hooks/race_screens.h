@@ -122,5 +122,20 @@ void RaceScreensPauseMenuToggleOption(PPCContext& ctx, uint8_t* base);
 void RaceScreensPauseMenuOptionsPage(PPCContext& ctx, uint8_t* base);
 void RaceScreensPauseMenuSetUpOptions(PPCContext& ctx, uint8_t* base);
 void RaceScreensPauseMenuSetAdjust(PPCContext& ctx, uint8_t* base);
+// The menu after the race: ConfirmPage sub_8221A6C8 (r4 passed on), the
+// transitions Intro sub_8221A730, Show sub_8221A7A8, CloseMain sub_8221A950,
+// Move sub_8221AA20 (r3 the step word), ShowItems sub_8221AC00, SetUpItems
+// sub_8221B5C8, ColorItems sub_8221B768 (r3 the screen), Start
+// sub_8221B860, Open sub_8221BA68 (r3 the screen, r4 the kind, r5 the flag).
+void RaceScreensAfterRaceMenuConfirmPage(PPCContext& ctx, uint8_t* base);
+void RaceScreensAfterRaceMenuIntro(PPCContext& ctx, uint8_t* base);
+void RaceScreensAfterRaceMenuShow(PPCContext& ctx, uint8_t* base);
+void RaceScreensAfterRaceMenuCloseMain(PPCContext& ctx, uint8_t* base);
+void RaceScreensAfterRaceMenuMove(PPCContext& ctx, uint8_t* base);
+void RaceScreensAfterRaceMenuShowItems(PPCContext& ctx, uint8_t* base);
+void RaceScreensAfterRaceMenuSetUpItems(PPCContext& ctx, uint8_t* base);
+void RaceScreensAfterRaceMenuColorItems(PPCContext& ctx, uint8_t* base);
+void RaceScreensAfterRaceMenuStart(PPCContext& ctx, uint8_t* base);
+void RaceScreensAfterRaceMenuOpen(PPCContext& ctx, uint8_t* base);
 
 }  // namespace hooks
