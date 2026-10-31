@@ -77,4 +77,29 @@ uint32_t GlowsSetParams(uint8_t* base, uint32_t entry);
 // EffectParamsReady.
 uint32_t SetEffectParams(uint8_t* base, uint32_t kind, uint32_t index, double* f1);
 
+// --- The machine's toggle ---
+
+// sub_8215C750 RaceSceneMachine::TogglePause (probably): +9608 = (+9608 ==
+// 0), then Race::ToggleEffects([kScene]) (post-effects.md). Returns r3 as
+// that leaves it.
+uint32_t TogglePause(uint8_t* base, uint32_t machine);
+// sub_8215D0D8 RaceSceneMachine::Resume (probably; not seen in play): when
+// +9608 is set, +9608 = 0 and Race::ToggleEffects([kScene]), returning its
+// r3; else nothing (r3 left).
+std::optional<uint32_t> Resume(uint8_t* base, uint32_t machine);
+
+// --- The scene's freeing ---
+
+// sub_8215D548 RaceScene::DestroyCars: the seven car slots' records' arrays
+// through the array destructor iterator with the empty destructor, last to
+// first (nothing is written).
+void DestroyCars(uint8_t* base, uint32_t cars);
+// Whether RaceScene::Destroy's operator delete is the plain C++'s: no scene,
+// or a block of the allocation layer's.
+bool DestroyReady(uint8_t* base);
+// sub_8215D790 RaceScene::Destroy: when [kScene] is set, DestroyCars(+16)
+// and operator delete of it (the pointer left). Returns the scene (0: r3
+// left as it was). Only where DestroyReady.
+uint32_t Destroy(uint8_t* base);
+
 }  // namespace race_scene

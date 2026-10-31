@@ -17,7 +17,10 @@ ITC_FLAG_BOOL(native_race_scene, true, "ITC",
               "sub_8215C368, no adapter: only SetUp's plain C++ calls it; RaceScene::SetEffectParams "
               "sub_8228F5C0 with Glows::SetParams sub_8228F0B0, no adapter: only SetEffectParams' "
               "plain C++ calls it, the glows' and color filters' setters' plain C++ called where "
-              "their vtables hold them, else the original) natively instead of through the translated code (the same words, "
+              "their vtables hold them, else the original; RaceSceneMachine::TogglePause sub_8215C750 "
+              "and Resume sub_8215D0D8 with Race::ToggleEffects' plain C++; RaceScene::Destroy "
+              "sub_8215D790 with DestroyCars sub_8215D548, no adapter: only Destroy's plain C++ "
+              "calls it, with --native_heap) natively instead of through the translated code (the same words, "
               "bit for bit; checked by --run_harnesses=race_scene)");
 
 namespace hooks {
@@ -59,6 +62,29 @@ void RaceSceneSetEffectParams(PPCContext& ctx, uint8_t* base) {
   ctx.f1.f64 = f1;
 }
 
+void RaceSceneTogglePause(PPCContext& ctx, uint8_t* base) {
+  ctx.fpscr.disableFlushMode();
+  ctx.r3.u64 = rs::TogglePause(base, ctx.r3.u32);
+}
+
+void RaceSceneResume(PPCContext& ctx, uint8_t* base) {
+  ctx.fpscr.disableFlushMode();
+  if (const auto r3 = rs::Resume(base, ctx.r3.u32)) {
+    ctx.r3.u64 = *r3;
+  }
+}
+
+void RaceSceneDestroy(PPCContext& ctx, uint8_t* base) {
+  ctx.fpscr.disableFlushMode();
+  if (!NativeHeapActive() || !rs::DestroyReady(base)) {
+    __imp__sub_8215D790(ctx, base);
+    return;
+  }
+  if (const uint32_t scene = rs::Destroy(base)) {
+    ctx.r3.u64 = scene;
+  }
+}
+
 }  // namespace hooks
 
 // Defines an adapter: the flag, else the original.
@@ -75,6 +101,13 @@ void RaceSceneSetEffectParams(PPCContext& ctx, uint8_t* base) {
 ITC_RACE_SCENE(8215D808, RaceSceneMachineInit)
 ITC_RACE_SCENE(8215CF78, RaceSceneLightsSetUp)
 ITC_RACE_SCENE(8228F5C0, RaceSceneSetEffectParams)
+// The machine's handlers are reached through their functors (no direct
+// callers), so their adapters stay.
+ITC_RACE_SCENE(8215C750, RaceSceneTogglePause)
+ITC_RACE_SCENE(8215D0D8, RaceSceneResume)
+ITC_RACE_SCENE(8215D790, RaceSceneDestroy)
+// RaceScene::DestroyCars (sub_8215D548) has no adapter: its only caller,
+// RaceScene::Destroy, is native; --native_race_scene switches it.
 // Glows::SetParams (sub_8228F0B0) has no adapter: its only caller,
 // RaceScene::SetEffectParams, is native; --native_race_scene switches it.
 // RaceLights::InitEntry (sub_8215C368) has no adapter: its only caller,

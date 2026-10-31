@@ -346,12 +346,129 @@ void EffectParams(Context& h) {
   }
 }
 
+// --- The machine's toggle: a world of our own (the scene at 0x826D82D4 with
+// its three screen objects, each there or not; the 15 effect pointers, some
+// 0; the course scenery at 0x826C551C and the scene at 0x826C2E44, which
+// Race::ToggleEffects flips); TogglePause and Resume on a random machine
+// whose +9608 is 0, 1 or random. The machine's word, every block and r3
+// compared exactly ---
+
+void Toggles(Context& h) {
+  namespace pe = post_effects;
+  constexpr uint32_t kSmall = 64;  // a screen object's or effect's block
+  const Block race(rs::kSceneBytes);
+  const Block objects(3 * kSmall);
+  const Block effects(pe::kCount * kSmall);
+  const Block others(0x1400);  // the scenery at +0, the scene at +0x200
+  const Block machine(0x2600);
+  if (!race.address || !objects.address || !effects.address || !others.address ||
+      !machine.address) {
+    ITC_LOG_ERROR("harness: race_scene: no block from the allocation layer");
+    return;
+  }
+  std::vector<uint32_t> globals = {rs::kScene, 0x826C551C, 0x826C2E44};
+  for (uint32_t i = 0; i < pe::kCount; i++) {
+    globals.push_back(pe::kEffects + 4 * i);
+  }
+  struct Function {
+    const char* name;
+    GuestFunction recompiled;
+    GuestFunction native;
+  };
+  const Function functions[] = {
+      {"RaceSceneMachine::TogglePause (sub_8215C750)", Original<__imp__sub_8215C750>,
+       hooks::RaceSceneTogglePause},
+      {"RaceSceneMachine::Resume (sub_8215D0D8)", Original<__imp__sub_8215D0D8>,
+       hooks::RaceSceneResume},
+  };
+  for (const Function& f : functions) {
+    Results results(f.name);
+    for (uint64_t seed = 0; seed < 12; seed++) {
+      Outputs out[2];
+      for (int v = 0; v < 2; v++) {
+        Random r(seed * 71 + 13);
+        Globals saved(h.base, globals);
+        WriteRandom(h.base, race.address, race.bytes, r);
+        WriteRandom(h.base, objects.address, objects.bytes, r);
+        WriteRandom(h.base, effects.address, effects.bytes, r);
+        WriteRandom(h.base, others.address, others.bytes, r);
+        WriteRandom(h.base, machine.address, machine.bytes, r);
+        for (uint32_t i = 0; i < 3; i++) {
+          guest::StoreU32(h.base, race.address + 31152 + 4 * i,
+                          r.Below(3) != 0 ? objects.address + kSmall * i : 0);
+        }
+        for (uint32_t i = 0; i < pe::kCount; i++) {
+          guest::StoreU32(h.base, pe::kEffects + 4 * i,
+                          r.Below(4) != 0 ? effects.address + kSmall * i : 0);
+          guest::StoreU32(h.base, effects.address + kSmall * i + 44, r.Below(3));
+        }
+        guest::StoreU32(h.base, rs::kScene, race.address);
+        guest::StoreU32(h.base, 0x826C551C, others.address);
+        guest::StoreU32(h.base, 0x826C2E44, others.address + 0x200);
+        const uint32_t paused = seed % 3 == 0 ? 0 : seed % 3 == 1 ? 1 : uint32_t(r.Next());
+        guest::StoreU32(h.base, machine.address + rs::kPaused, paused);
+        PPCContext t = CallContext(h);
+        t.r3.u64 = machine.address;
+        (v == 0 ? f.recompiled : f.native)(t, h.base);
+        out[v].Bytes(Read(h.base, machine.address, machine.bytes));
+        out[v].Bytes(Read(h.base, race.address, race.bytes));
+        out[v].Bytes(Read(h.base, objects.address, objects.bytes));
+        out[v].Bytes(Read(h.base, effects.address, effects.bytes));
+        out[v].Bytes(Read(h.base, others.address, others.bytes));
+        out[v].Word(t.r3.u32);
+        out[v].Word(uint32_t(t.r3.u64 >> 32));
+      }
+      results.Check(out[0], out[1], fmt::format("seed {}", seed));
+    }
+    results.Report();
+  }
+}
+
+// --- RaceScene::Destroy: no scene, or a scene from operator new filled
+// with random words; whether the block was freed (no longer the layer's),
+// the pointer (left) and r3 compared ---
+
+void Destroys(Context& h) {
+  Results results("RaceScene::Destroy (sub_8215D790)");
+  for (uint64_t seed = 0; seed < 4; seed++) {
+    Outputs out[2];
+    for (int v = 0; v < 2; v++) {
+      Random r(seed * 89 + 31);
+      Globals saved(h.base, {rs::kScene});
+      uint32_t block = 0;
+      if (seed != 0) {
+        if (const auto made = memory::crt::OperatorNew(h.base, rs::kSceneBytes)) {
+          block = *made;
+          WriteRandom(h.base, block, rs::kSceneBytes, r);
+        }
+      }
+      guest::StoreU32(h.base, rs::kScene, block);
+      PPCContext t = CallContext(h);
+      t.r3.u64 = 0x1234;
+      (v == 0 ? Original<__imp__sub_8215D790> : hooks::RaceSceneDestroy)(t, h.base);
+      const bool freed = block != 0 && !memory::IsHeapBlock(block);
+      out[v].Word(block != 0 ? 1 : 0);
+      out[v].Word(freed ? 1 : 0);
+      out[v].Word(guest::LoadU32(h.base, rs::kScene) == block ? 1 : 0);
+      out[v].Word(t.r3.u32 == block ? 0xFFFFFFFF : t.r3.u32);
+      out[v].Word(uint32_t(t.r3.u64 >> 32));
+      if (block != 0 && !freed) {
+        memory::crt::OperatorDelete(block);
+      }
+    }
+    results.Check(out[0], out[1], fmt::format("seed {}", seed));
+  }
+  results.Report();
+}
+
 }  // namespace
 
 void RaceScene(Context& h) {
   Inits(h);
   Lights(h);
   EffectParams(h);
+  Toggles(h);
+  Destroys(h);
 }
 
 }  // namespace harness

@@ -26,4 +26,15 @@ void RaceSceneLightsSetUp(PPCContext& ctx, uint8_t* base);
 // (race_scene::EffectParamsReady).
 void RaceSceneSetEffectParams(PPCContext& ctx, uint8_t* base);
 
+// The machine's handlers: r3 = the machine (r4 the dispatcher, not read).
+// RaceSceneMachine::TogglePause sub_8215C750 (r3 as Race::ToggleEffects
+// leaves it) and Resume sub_8215D0D8 (the same, or r3 left when +9608 is
+// 0).
+void RaceSceneTogglePause(PPCContext& ctx, uint8_t* base);
+void RaceSceneResume(PPCContext& ctx, uint8_t* base);
+// RaceScene::Destroy sub_8215D790: no arguments; r3 = the scene (left
+// without one). The original where operator delete's plain C++ wouldn't
+// free it.
+void RaceSceneDestroy(PPCContext& ctx, uint8_t* base);
+
 }  // namespace hooks

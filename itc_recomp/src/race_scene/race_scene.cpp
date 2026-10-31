@@ -4,9 +4,11 @@
 #include "race_scene/race_scene.h"
 
 #include "base/log.h"
+#include "c_runtime/arrays.h"
 #include "c_runtime/math.h"
 #include "guest.h"
 #include "memory/c_runtime_heap.h"
+#include "memory/heap.h"
 #include "post_effects/post_effects.h"
 #include "scene_models/scene_models.h"
 
@@ -229,6 +231,65 @@ uint32_t SetEffectParams(uint8_t* base, uint32_t kind, uint32_t index, double* f
   const uint32_t filter = post_effects::Get(base, 2);
   post_effects::ColorFilterSet(base, filter, 8120, value);
   return filter;
+}
+
+// --- The machine's toggle ---
+
+uint32_t TogglePause(uint8_t* base, uint32_t machine) {
+  ITC_NATIVE_RUNNING("sub_8215C750 RaceSceneMachine::TogglePause");
+  guest::StoreU32(base, machine + kPaused, guest::LoadU32(base, machine + kPaused) == 0 ? 1 : 0);
+  return post_effects::ToggleRaceEffects(base, guest::LoadU32(base, kScene));
+}
+
+std::optional<uint32_t> Resume(uint8_t* base, uint32_t machine) {
+  ITC_NATIVE_RUNNING("sub_8215D0D8 RaceSceneMachine::Resume");
+  if (guest::LoadU32(base, machine + kPaused) == 0) {
+    return std::nullopt;
+  }
+  guest::StoreU32(base, machine + kPaused, 0);
+  return post_effects::ToggleRaceEffects(base, guest::LoadU32(base, kScene));
+}
+
+// --- The scene's freeing ---
+
+void DestroyCars(uint8_t* base, uint32_t cars) {
+  ITC_NATIVE_RUNNING("sub_8215D548 RaceScene::DestroyCars");
+  constexpr uint32_t kEmptyDestructor = 0x82106540;
+  // Each slot's record (cars + 32 + 4,288 i): its arrays from the last.
+  struct Array {
+    uint32_t offset, size, count;
+  };
+  static constexpr Array kArrays[] = {
+      {3264, 64, 6}, {2880, 64, 6}, {2496, 64, 6}, {2112, 64, 6}, {1728, 64, 6}, {1344, 64, 6},
+      {960, 64, 6},  {576, 64, 6},  {384, 64, 3},  {192, 64, 3},  {128, 16, 3},  {80, 16, 3},
+      {32, 16, 3},
+  };
+  for (int32_t i = 6; i >= 0; i--) {
+    const uint32_t record = cars + 32 + 4288 * uint32_t(i);
+    for (const Array& a : kArrays) {
+      c_runtime::VectorDestruct(
+          base, record + a.offset, a.size, a.count, kEmptyDestructor,
+          [](void*, uint64_t, uint64_t) {
+            ITC_LOG_ERROR("race_scene: the car slots' destructor isn't the empty one");
+          },
+          nullptr);
+    }
+  }
+}
+
+bool DestroyReady(uint8_t* base) {
+  const uint32_t scene = guest::LoadU32(base, kScene);
+  return scene == 0 || memory::IsHeapBlock(scene);
+}
+
+uint32_t Destroy(uint8_t* base) {
+  ITC_NATIVE_RUNNING("sub_8215D790 RaceScene::Destroy");
+  const uint32_t scene = guest::LoadU32(base, kScene);
+  if (scene != 0) {
+    DestroyCars(base, scene + 16);
+    memory::crt::OperatorDelete(scene);
+  }
+  return scene;
 }
 
 }  // namespace race_scene
