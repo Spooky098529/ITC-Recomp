@@ -282,7 +282,7 @@ Rows not yet moved stay in the table below. So far:
   `c-runtime.md` (B7).
 - [`race-hud.md`](race-hud.md): the race HUD's movie picker (a UI
   movie run by the HUD's state) and the rival intro's logo draw (B7;
-  the HUD's set-up, update and teardown aren't in it).
+  the HUD's set-up, update and teardown are in `race-hud-object.md`).
 - [`race-setup.md`](race-setup.md): the race's set-up (the race data
   reset, its route and the course routes' table, the racers made from
   the garage, the rival's items and the traffic, their start positions,
@@ -429,6 +429,12 @@ Rows not yet moved stay in the table below. So far:
   draws and its fields set by a mask, with the second set's small
   helpers beside them (a projector's matrices, a look-at, table lookups)
   (B7).
+- [`race-hud-object.md`](race-hud-object.md): the race HUD object and
+  the in-race screens' holder around it: the movies' set-up, the
+  dashboard's gauges (tachometer, boost, speed, gear, extra gauges), the
+  rear-view mirror's texture, the expressway sign and place name by the
+  track zones, the countdown, the warning, the racers' bars, the item
+  popup and the timer (B7).
 
 These files hold functions only. What used to follow the table here moved
 out on 2026-10-20: how frame interpolation works, its options and what

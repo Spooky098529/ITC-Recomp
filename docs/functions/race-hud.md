@@ -1,7 +1,7 @@
 # Known functions: the race HUD's movies and the rival logo
 
 The race's **HUD object** (`RaceHud::`, probably; the code at about
-`82211B98`-`82214718`, a lead in `../loops/leads.md`: set-up
+`82211B98`-`82215820`, mapped in `race-hud-object.md`: set-up
 `sub_822122B0` from `sub_8216D450`, update `sub_82214718`, teardown
 `sub_822141A0`, which make, update and free the track zones,
 `track-zones.md`) and, just before it, the rival intro's logo
