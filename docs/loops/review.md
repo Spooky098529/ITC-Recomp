@@ -13,6 +13,16 @@ When the user has reviewed a run's section, its heading gets
 
 ## Run 2026-10-31 16:54 (`b7-loop-31-10-26`, continued)
 
+- The race HUD machine's migration (e29438da, 7df89f72): 16 rows in
+  `race-hud-machine.md` (15 Overridden, `sub_8216C9B8` Merged), its
+  intro (kind 0 runs in attract races, though `seen_in_play.txt`
+  lacks `sub_8220B9E8`), `sub_8216D7B8`'s bit corrected to 0x400. For
+  review: kind 4, and kind 0 in the draw handlers, left to the
+  originals; a harness stand-in for callees
+  (`hooks/callee_stand_in.h`, null in the game) checked in the race HUD
+  object's, the alternate HUD's and `sub_822141E8`'s adapters, so 18
+  removable callee adapters stay.
+
 - The race HUD machine's map (11e568ee): `race-hud-machine.md`, 50
   new rows (its 65 transitions decoded), `sub_8215E140` shared with the
   race overlays' machine; `known-data.md`'s race HUD machine entry and

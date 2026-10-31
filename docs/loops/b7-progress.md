@@ -56,7 +56,13 @@ file's history. What's left to see in a drive, from every run:
   `RaceHudMachine::Init` `sub_8216E6E8` at the race mode's +128664 is
   what registers them, not the race flow's set-up; 18 ready groups,
   three of them holding a screen function left to the in-race screens'
-  lead). Step: migration (agent running).
+  lead). Migration checked (e29438da: 14 handler groups; 7df89f72:
+  `Init`; 16 of 33 in play ours, `--native_race_hud_machine`, harness
+  15 groups 0 differing, race 29 s with the harnesses, 38 s without,
+  0 errors; no subagents). Left, waiting on the in-race screens' lead:
+  `sub_8216D198`, `sub_8216DB70`, `sub_8216DD88`, `sub_8216DFD0`. 18
+  callee adapters removable but kept for the harness's stand-in (a
+  question for the user). Step: validation (agent running).
 
 ## Done
 
@@ -119,5 +125,8 @@ file's history. What's left to see in a drive, from every run:
   2809.
 - After the race HUD machine's map: ours 3589, work left 2809 (wrapped
   103, known 513, unknown 2193).
+- After the race HUD machine's migration (`itc_2985`: race 38 s, 0
+  errors, race_hud_machine 0 differing): ours 3605, work left 2794
+  (wrapped 103, known 498, unknown 2193).
 
 ## Stopped
