@@ -10,7 +10,9 @@
 
 ITC_FLAG_BOOL(native_alt_hud, true, "ITC",
               "Run the alternate HUD's functions (docs/functions/alt-hud.md: MenuList::Release "
-              "sub_8220BBB0 with --native_heap, its block the allocation layer's; AltHud::SetUp sub_82217C70 with SetUpGauges sub_82216C40, "
+              "sub_8220BBB0 and AltHud::Destroy sub_82216BA8 with --native_heap, their blocks "
+              "the allocation layer's (Destroy's operator delete through its override where its "
+              "plain C++ refuses); AltHud::SetUp sub_82217C70 with SetUpGauges sub_82216C40, "
               "PowerClass sub_82216B08 (Car::SetupVehicle through its override where its plain "
               "C++ refuses), SetUpExtraGauges sub_822178A0, ShowGauge sub_82217380 and ShowPanels "
               "sub_82216D78; AltHud::Tick sub_82217AC8 with MenuList::PressedX sub_8220BF00 "
@@ -222,6 +224,7 @@ void AltHudRunMovie(PPCContext& ctx, uint8_t* base) {
   }
 
 ITC_ALT_HUD(8220BBB0, AltHudMenuListRelease)
+ITC_ALT_HUD(82216BA8, AltHudDestroy)
 ITC_ALT_HUD(82217C70, AltHudSetUp)
 ITC_ALT_HUD(82217AC8, AltHudTick)
 ITC_ALT_HUD(82216C00, AltHudRunMovie)

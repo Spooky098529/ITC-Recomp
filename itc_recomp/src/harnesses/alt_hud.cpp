@@ -745,6 +745,61 @@ void Releases(Context& h) {
   results.Report();
 }
 
+// AltHud::Destroy: the object (+0) and the menu list (+4) operator new's
+// blocks, made for each run (the object now and then 0), the list's block
+// (+68) 0 or the layer's pages. Compared: which block r3 is, the holder,
+// whether the pages were freed, Destroy's and Release's frames (their
+// register saves left out) and r1.
+void Destroys(Context& h) {
+  const Block holder(0x10);
+  if (!holder.address) {
+    ITC_LOG_ERROR("harness: alt_hud: no block from the allocation layer");
+    return;
+  }
+  Results results("AltHud::Destroy (sub_82216BA8)");
+  for (uint64_t c = 0; c < 100; c++) {
+    Outputs out[2];
+    for (int v = 0; v < 2; v++) {
+      Random r(c * 137 + 11);
+      const uint32_t object = r.Below(5) == 0 ? 0 : memory::crt::OperatorNew(h.base, 264).value_or(0);
+      const uint32_t list = memory::crt::OperatorNew(h.base, 72).value_or(0);
+      if (list == 0) {
+        ITC_LOG_ERROR("harness: alt_hud: operator new failed");
+        return;
+      }
+      if (object != 0) {
+        WriteRandom(h.base, object, 264, r);
+      }
+      WriteRandom(h.base, list, 72, r);
+      uint32_t pages = 0;
+      if (r.Below(4) != 0) {
+        pages = memory::AllocPages(0x1000 * (1 + r.Below(4)), 4096);
+      }
+      guest::StoreU32(h.base, list + 68, pages);
+      guest::StoreU32(h.base, holder.address, object);
+      guest::StoreU32(h.base, holder.address + 4, list);
+      PPCContext t = CallContext(h);
+      const uint32_t sp = t.r1.u32;
+      WriteRandom(h.base, sp - kStackBytes, kStackBytes, r);
+      t.r3.u64 = holder.address;
+      ITC_FLAG(native_alt_hud) = v == 1;
+      (v == 0 ? __imp__sub_82216BA8 : hooks::AltHudDestroy)(t, h.base);
+      ITC_FLAG(native_alt_hud) = true;
+      out[v].Word(object != 0 ? 1 : 0);
+      out[v].Word(pages != 0 ? 1 : 0);
+      out[v].Word(pages != 0 && memory::IsPages(pages) ? 1 : 0);
+      out[v].Bytes(Read(h.base, holder.address, 8));
+      out[v].Bytes(Read(h.base, sp - 96, 80));
+      out[v].Bytes(Read(h.base, sp - 192, 80));
+      out[v].Word(t.r1.u32);
+      out[v].Word(t.r3.u32 == list ? 1 : t.r3.u32 == object ? 2 : t.r3.u32);
+      out[v].Word(uint32_t(t.r3.u64 >> 32));
+    }
+    results.Check(out[0], out[1], fmt::format("case {}", c));
+  }
+  results.Report();
+}
+
 }  // namespace
 
 void AltHud(Context& h) {
@@ -757,6 +812,7 @@ void AltHud(Context& h) {
   Setters(h, w);
   Ticks(h, w);
   Releases(h);
+  Destroys(h);
 }
 
 }  // namespace harness
