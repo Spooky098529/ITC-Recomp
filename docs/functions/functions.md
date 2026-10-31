@@ -445,6 +445,11 @@ Rows not yet moved stay in the table below. So far:
   screen objects made at the race's set-up with the glows' and color
   filters' parameters from a table, the pause toggle, and the teardown
   (B7).
+- [`menu-sounds.md`](menu-sounds.md): the menu sounds: the helpers the
+  screens play their sounds through (`MenuSound::Play`, about 270
+  callers) and set the effects and music volume options through, and
+  the sound manager's interface methods not in `sound-cues.md` (the
+  object at `[0x826C5C80]` is the sound manager) (B7).
 
 These files hold functions only. What used to follow the table here moved
 out on 2026-10-20: how frame interpolation works, its options and what

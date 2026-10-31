@@ -64,8 +64,8 @@ set-up by the holder's +9612 kind; the updates `sub_8216C210`,
 `sub_8216DB70`, `sub_8216DD88`, `sub_8216DFD0`; the draws
 `sub_8216C2A0`, `sub_8216C330`, `sub_8216CE00`, `sub_8216CF08`,
 `sub_8216CFE0`, `sub_8216D0C8`), with the race flow's set-up lead
-(`sub_82160AE0`); not mapped here. The menu sound (`sub_821103F0`, a
-lead) is called by the countdown, the warning and the racers' gauges.
+(`sub_82160AE0`); not mapped here. The menu sound (`sub_821103F0`,
+`menu-sounds.md` since 2026-10-31) is called by the countdown, the warning and the racers' gauges.
 
 The HUD's work is in Update handlers (the tick) but for the movie runs
 and the mirror's draw (`RaceHud::Draw` `sub_822128A8` and the other
