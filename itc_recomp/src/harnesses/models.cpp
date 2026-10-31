@@ -1013,6 +1013,21 @@ void PartModelSetVinylTextureCases(Context& h, const Block& block) {
 
 }  // namespace
 
+namespace {
+
+// VertexDeclaration's register steps (its adapter is gone: only native
+// callers reach it in play).
+void NativeVertexDeclaration(PPCContext& t, uint8_t* base) {
+  const auto declaration = models::VertexDeclaration(base, t.r3.u32, t.r4.s32, t.r5.u32);
+  if (!declaration) {
+    __imp__sub_82589728(t, base);
+    return;
+  }
+  t.r3.u64 = *declaration;
+}
+
+}  // namespace
+
 // The materials' and shared shaders' accessors: a model, its shapes and
 // material blocks, and the tables, at random in a block; the block and r3
 // compared (they write nothing). Each case's inputs come from its own seed,
@@ -1028,7 +1043,7 @@ void Accessors(Context& h, const Block& block) {
       {"Model::Material (sub_82594B20)", __imp__sub_82594B20, hooks::ModelsMaterial},
       {"SharedVertexShader (sub_825896D8)", __imp__sub_825896D8, hooks::ModelsSharedVertexShader},
       {"SharedPixelShader (sub_82589700)", __imp__sub_82589700, hooks::ModelsSharedPixelShader},
-      {"VertexDeclaration (sub_82589728)", __imp__sub_82589728, hooks::ModelsVertexDeclaration},
+      {"VertexDeclaration (sub_82589728)", __imp__sub_82589728, NativeVertexDeclaration},
   };
   // The tables they read (the shared shaders' at 0x8296B7B4 and 0x8296B7B8,
   // the declarations' about 0x8296B7F4, the stream kinds at 0x8265EC00):

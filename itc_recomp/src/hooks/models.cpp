@@ -68,8 +68,9 @@ ITC_FLAG_BOOL(native_models, true, "ITC",
               "only it calls it) and Skeleton::Bind sub_82599A20 (in src/model_animation/), "
               "Memory::AllocPhysical sub_8258E138 (in src/models/memory_blocks.cpp; no adapter: only "
               "XPR::Create calls it), the shared shaders sub_825896D8 and sub_82589700 and their tables' set-up sub_825896C0, the vertex "
-              "declaration sub_82589728 (its message for a type pair the tables don't cover, "
-              "never seen in play, the original's), Model::RecordShape sub_82595550 (in "
+              "declaration sub_82589728 (no adapter: only the recorders' plain C++ calls it in play; "
+              "its message for a type pair the tables don't cover, never seen in play, the "
+              "original's), Model::RecordShape sub_82595550 (in "
               "src/scenery_lists/model_draws.cpp, adapter in src/hooks/scenery_lists.cpp: the "
               "model's slot 1 and the texture provider's slots 5 and 6 guest calls; the "
               "material animation, never seen in play, the original's), Model::RecordMaterials "
@@ -336,16 +337,6 @@ void ModelsSharedPixelShader(PPCContext& ctx, uint8_t* base) {
   ctx.r3.u64 = models::SharedPixelShader(base, ctx.r3.u32);
 }
 
-void ModelsVertexDeclaration(PPCContext& ctx, uint8_t* base) {
-  const auto declaration =
-      models::VertexDeclaration(base, ctx.r3.u32, ctx.r4.s32, ctx.r5.u32);
-  if (!declaration) {
-    __imp__sub_82589728(ctx, base);
-    return;
-  }
-  ctx.r3.u64 = *declaration;
-}
-
 }  // namespace hooks
 
 #define ITC_MODELS_ACCESSOR(address, steps)  \
@@ -363,7 +354,6 @@ ITC_MODELS_ACCESSOR(82594B20, ModelsMaterial)
 ITC_MODELS_ACCESSOR(825896D8, ModelsSharedVertexShader)
 ITC_MODELS_ACCESSOR(82589700, ModelsSharedPixelShader)
 ITC_MODELS_ACCESSOR(825896C0, ModelsSetSharedShaders)
-ITC_MODELS_ACCESSOR(82589728, ModelsVertexDeclaration)
 
 // ShaderFile::Parse: r3 = the file, r4 = the record. No return value.
 extern "C" REX_FUNC(sub_822A8568) {
