@@ -251,5 +251,7 @@ void AltHud(Context& h);
 void RaceScene(Context& h);
 // The menu sounds (src/harnesses/menu_sounds.cpp).
 void MenuSounds(Context& h);
+// The interior accessories (src/harnesses/accessories.cpp).
+void Accessories(Context& h);
 
 }  // namespace harness
