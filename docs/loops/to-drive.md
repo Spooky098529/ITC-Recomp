@@ -18,6 +18,11 @@ here loses its heading.
 
 ## Run 2026-10-31 13:47 (`b7-loop-31-10-26`)
 
+- The menu sounds (attract race `itc_2935`, replay `itc_2936`: broke,
+  the SDK's "BaseHeap::Release failed because address is not a region
+  start" three times at the race-end change, as in `itc_2931`; it ran
+  to the end): none left to drive.
+
 - The race scene (attract race `itc_2930`, replay `itc_2931`: broke,
   the SDK's "BaseHeap::Release failed because address is not a region
   start" once at the race-end change ~118 s in, as in `itc_2894`; it

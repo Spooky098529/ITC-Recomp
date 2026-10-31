@@ -79,9 +79,16 @@ file's history. What's left to see in a drive, from every run:
   (not ours), 600 cases 0 differing; `Sound::Play` ran once in an
   attract race, the rest not; adapters stay for ~300 callers; it
   unblocked `RaceHud::UpdateRacerBar` and `RunCountdown`, a cleanup
-  lead). Step: validation (agent running).
+  lead). Validated (`itc_2935`, 120 s: race 60 s, 0 errors, harnesses
+  57.9 s; replay `itc_2936` broke on the intermittent SDK heap error,
+  three lines, ran to the end): 4 of 4 harness lines; 1 ran in the
+  race, 3 in the replay, none to drive. Subsystem 3 finished.
 
 ## Done
+
+- The menu sounds (subsystem 3): `menu-sounds.md`, 4 of 4 in play, one
+  migration; `--native_menu_sounds`; 60918895..9f0605c3. Validated
+  (`itc_2935`).
 
 - The race scene (subsystem 2): `race-scene.md`, 11 of 20 in play, one
   migration; `--native_race_scene`; a3291567..454bd46e. Validated
@@ -149,5 +156,20 @@ file's history. What's left to see in a drive, from every run:
 - After the menu sounds' migration (attract race 38 s, 0 errors,
   menu_sounds 0 differing): ours 3552, work left 2846 (wrapped 103,
   known 487, unknown 2256).
+- After its validation (`itc_2935`, 120 s: race 60 s, 0 errors, every
+  harness 0 differing but the expected groups): ours 3552, work left
+  2846.
 
 ## Stopped
+
+2026-10-31, at the menu sounds' validation (`itc_2935`): the run's
+limit reached (3 subsystems: the alternate HUD, the race scene, the
+menu sounds; and two cleanup leads under the models). Nothing failed:
+every harness 0 differing but the expected groups, no attract race
+errors; the replays broke only on the intermittent SDK heap error.
+Nothing uncommitted; `check_function_statuses.py`: 0 errors. The
+harnesses take ~58 s of the validation's 120. Left for the user: the
+run's section in `review.md`, `to-drive.md` (14 functions: the
+alternate HUD's tick side and `RaceSceneMachine::Resume`), and the
+merge.
+

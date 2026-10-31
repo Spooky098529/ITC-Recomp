@@ -412,6 +412,19 @@ validation: `App::App` and `App::Create`'s harnesses differed since
 (83b2b76; fixed after: their recorders let it allocate), and the
 harnesses take 56.7 s of the validation's 60. The rest waits on the menu sound, the other in-race
 screens and the scene's second set.
+Its twenty-seventh run (`b7-loop-31-10-26`, 2026-10-31, not yet merged;
+summary `docs/loops/b7-loop-2026-10-31-1347.md`; 3 subsystems) made two
+cleanup leads under `--native_models` (`Model::RecordMaterials`, the
+shader pair's load callback; eight adapters removed), the alternate HUD
+(`alt-hud.md`, `--native_alt_hud`, 21 of 21 in play: the race HUD
+holder's +1004 dashboard), the race scene (`race-scene.md`,
+`--native_race_scene`, 11 of 20: `[0x826D82D4]` and its machine) and the
+menu sounds (`menu-sounds.md`, `--native_menu_sounds`, 4 of 4 in play)
+native (ours 3,514 -> 3,552); by the user's calls (2026-10-31), the
+validation race is `attract_race.sh 120` (the harnesses take ~58 s), and
+the music, XACT banks the sound manager loads, is translated with XACT.
+The rest waits on the course scenery's and scene models' owners, the
+scene's update, the other in-race screens and the sound manager's slots.
 Harness runs use `attract_race.sh 40` (the user's call,
 2026-10-23); a race short only because the harnesses took longer is
 no halt. B7 loop migration agents run only their subsystem's harnesses

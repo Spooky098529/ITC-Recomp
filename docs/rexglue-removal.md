@@ -172,7 +172,13 @@ goes in `src/` as overrides), American English.
   added to `operator new`'s adapter, fixed after) made the car models (`car-models.md`, 48 of 50 in
   play), the part models' material passes (`material-passes.md`, 22 of
   22) and the race HUD object (`race-hud-object.md`, 45 of 58 in play)
-  native (ours 3,514). The runs' rows wait for the user's review (`docs/loops/review.md`). See
+  native (ours 3,514); its twenty-seventh run (branch
+  `b7-loop-31-10-26`, 3 subsystems, not yet merged) made two cleanup
+  leads under the models (`Model::RecordMaterials`, the shader pair's
+  load callback, eight adapters removed), the alternate HUD
+  (`alt-hud.md`, 21 of 21 in play), the race scene (`race-scene.md`, 11
+  of 20) and the menu sounds (`menu-sounds.md`, 4 of 4 in play) native
+  (ours 3,552). The runs' rows wait for the user's review (`docs/loops/review.md`). See
   "B7's loop runs" under B7, and `docs/loops/b7-progress.md`. Guest
   allocation is no longer a block (`docs/native-memory.md`); what the
   rest waits on is in `docs/loops/leads.md` (the archive loader, the
@@ -2676,6 +2682,7 @@ B7. **The game logic inside**: everything else, subsystem by subsystem,
 | 2026-10-31 | The race HUD object (`RaceHud::` at +16 of the race screens' holder `[0x826D84F0]`: its UI movies, the dashboard's gauges and digits, the rear-view mirror's render target, the countdown, the warning, the expressway sign and place names from the track zones, the item popup, the timer, the tick and draw; `RaceScreens::Init` with its +1004 object's maker) | `race-hud-object.md` | 45 of 58 in play (two migrations; the rest calls the menu sound `sub_821103F0`, `sub_8211D930`, `sub_8211E370` or the other in-race screens; stopped at the last validation: `App::App` and `App::Create`'s harnesses differ since 83b2b76) | `--native_race_hud_object` |
 | 2026-10-31 | The alternate HUD (`AltHud::`, the race HUD holder's object at +1004: a second dashboard on UI movie 22 with the race HUD's gauges and the input record's throttle, brake and steering, probably the attract or replay races'; its set-up, tick, movie and destroy, with the menu list helpers `MenuList::Release` and `PressedX`) | `alt-hud.md` | 21 of 21 in play (one migration; its tick not seen in an attract race or the replay) | `--native_alt_hud` |
 | 2026-10-31 | The race scene (`RaceScene::` at `[0x826D82D4]`, 31,168 bytes: the seven car slots, the 11 lights, the screen objects; its machine `RaceSceneMachine::` at +87936 of the race mode: `Init`, the lights' set-up, the post effects' and glows' parameters, the pause toggle and `Resume`, `Destroy`) | `race-scene.md` | 11 of 20 in play (one migration; the rest waits on the course scenery's and scene models' owners, the scene and its update, `Race::DrawStep` and the screen objects) | `--native_race_scene` |
+| 2026-10-31 | The menu sounds (`MenuSound::Play`, cue r3 of bank 0 through the sound manager's `PlayCue2D`, ~270 callers; `Sound::Play`; the effects and music volume options over XACT's categories; the sound manager `[0x826C5C80]`'s other methods mapped, not seen in play) | `menu-sounds.md` | 4 of 4 in play (one migration; the manager's slots and XACT's category calls not ours yet, called through the table) | `--native_menu_sounds` |
 
     The first run (2026-10-22, branch `b7-loop-test`): every harness at 0 differing, attract races at 20-21 s with no errors,
     and a race the user drove looked right. Ours went from 162 to 335 (work
@@ -4226,3 +4233,17 @@ boundary: 449 functions (916 pairs): overridden 108, Native 34, Dropped
 26, never called 70, live 211. Imports: 186 called, 56 with a live
 caller. B7 (`b7_status.py`): ours 3,548, work left 2,850 (Wrapped 103,
 with a row 487, no row yet 2,260), from 2,860.
+
+**2026-10-31, the menu sounds (branch `b7-loop-31-10-26`):** the
+twenty-seventh run's third subsystem, mapped and made native in one
+migration (`menu-sounds.md`, `--native_menu_sounds`,
+`src/menu_sounds/`): `MenuSound::Play`, `Sound::Play` and the two
+volume options, 4 of the 4 seen in play; `[0x826C5C80]` is the sound
+manager, not a music player, and the music is XACT banks it loads (the
+user's call, 2026-10-31: translated with XACT). It unblocked
+`RaceHud::UpdateRacerBar` and `RunCountdown` (a cleanup lead). The run
+stopped at its limit. The boundary: 449 functions (916 pairs):
+overridden 108, Native 34, Dropped 26, never called 70, live 211.
+Imports: 186 called, 56 with a live caller. B7 (`b7_status.py`): ours
+3,552, work left 2,846 (Wrapped 103, with a row 487, no row yet 2,256),
+from 2,850 (from 2,883 at the run's start).
