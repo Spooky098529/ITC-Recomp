@@ -258,4 +258,28 @@ uint64_t EntryOnLoaded(
     const std::function<uint64_t(uint32_t provider, uint32_t frame)>& texture_set,
     bool* ran_load = nullptr);
 
+// --- The acquisition ---
+
+// AccessoryEntry::OnLoaded, the callback AccessoriesAcquireEntry hands
+// AccessoryFile::Load.
+constexpr uint32_t kEntryOnLoaded = 0x820F0820;
+// Accessories::AcquireEntry (sub_820F09E0): `sp` the caller's stack pointer
+// (its 128-byte frame below). Index 3 is none (0). With no entry at +4 + 4 x
+// index: AccessoryEntry::New stored there (0: returns 0),
+// Accessory::SetTexture(accessory, texture, -1), then AccessoryFile::Load
+// (entry + 4, 23008 + index, 0, OnLoaded, entry) through `load`; with one,
+// its count + 1 and SetTexture. Returns the entry + 48 (the accessory).
+// SetTexture's provider slot through `texture_set`.
+uint32_t SetAcquireEntry(
+    uint8_t* base, uint32_t set, int32_t index, uint32_t texture, uint32_t sp,
+    const archive::LoadCall& load,
+    const std::function<uint64_t(uint32_t provider, uint32_t frame)>& texture_set);
+// Accessories::Acquire (sub_820F0EB8, slot 1 of 0x82006740): AcquireEntry
+// from the 96-byte frame below `sp`, and with an accessory, the set's scale
+// (+16) into its +1024 (two doublewords). Returns the accessory or 0.
+uint32_t SetAcquire(
+    uint8_t* base, uint32_t set, int32_t index, uint32_t texture, uint32_t sp,
+    const archive::LoadCall& load,
+    const std::function<uint64_t(uint32_t provider, uint32_t frame)>& texture_set);
+
 }  // namespace accessories

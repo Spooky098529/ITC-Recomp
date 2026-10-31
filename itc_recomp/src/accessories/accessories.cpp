@@ -670,4 +670,45 @@ uint64_t EntryOnLoaded(
                              texture_set);
 }
 
+// --- The acquisition ---
+
+uint32_t SetAcquireEntry(
+    uint8_t* base, uint32_t set, int32_t index, uint32_t texture, uint32_t sp,
+    const archive::LoadCall& load,
+    const std::function<uint64_t(uint32_t provider, uint32_t frame)>& texture_set) {
+  ITC_NATIVE_RUNNING("sub_820F09E0 Accessories::AcquireEntry");
+  if (index == 3) {
+    return 0;
+  }
+  const uint32_t frame = sp - 128;
+  const uint32_t slot = set + ((uint32_t(index + 1) << 2) & 0xFFFFFFFCu);
+  const uint32_t entry = Load(base, slot);
+  if (entry == 0) {
+    const uint32_t made = EntryNew(base, frame);
+    Store(base, slot, made);
+    if (made == 0) {
+      return 0;
+    }
+    AccessorySetTexture(base, made + 48, texture, -1, frame, texture_set);
+    const uint32_t stored = Load(base, slot);
+    FileLoad(base, stored + 4, uint32_t(index) + 23008, 0, kEntryOnLoaded, stored, load);
+  } else {
+    Store(base, entry, Load(base, entry) + 1);
+    AccessorySetTexture(base, Load(base, slot) + 48, texture, -1, frame, texture_set);
+  }
+  return Load(base, slot) + 48;
+}
+
+uint32_t SetAcquire(
+    uint8_t* base, uint32_t set, int32_t index, uint32_t texture, uint32_t sp,
+    const archive::LoadCall& load,
+    const std::function<uint64_t(uint32_t provider, uint32_t frame)>& texture_set) {
+  ITC_NATIVE_RUNNING("sub_820F0EB8 Accessories::Acquire");
+  const uint32_t accessory = SetAcquireEntry(base, set, index, texture, sp - 96, load, texture_set);
+  if (accessory != 0) {
+    Copy16(base, accessory + 1024, set + 16);
+  }
+  return accessory;
+}
+
 }  // namespace accessories

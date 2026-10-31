@@ -63,5 +63,10 @@ bool AccessoriesFinishNative(uint8_t* base, uint32_t accessory);
 // AccessoryEntry::OnLoaded sub_820F0820 (r6 the entry).
 void AccessoryFinish(PPCContext& ctx, uint8_t* base);
 void AccessoryEntryOnLoaded(PPCContext& ctx, uint8_t* base);
+// Whether Accessories::Acquire runs natively: the loads, the models'
+// lifetimes and memcpy native, and a part model constructible.
+bool AccessoriesAcquireNative(uint8_t* base);
+// Accessories::Acquire sub_820F0EB8 (r4 the index, r5 the texture index).
+void AccessoriesAcquire(PPCContext& ctx, uint8_t* base);
 
 }  // namespace hooks

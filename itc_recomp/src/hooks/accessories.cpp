@@ -29,7 +29,8 @@ ITC_FLAG_BOOL(native_accessories, true, "ITC",
               "sub_820F0FE0; the skeleton's set-up sub_820F0070, sub_820EFB30; "
               "Accessory::SetTexture sub_820EF568, the provider's slot through the function "
               "table; Matrix::FromScaleRotationTranslation sub_820EF660; the load's end "
-              "AccessoryEntry::OnLoaded sub_820F0820 with Accessory::Finish sub_820EF368) natively instead of through the translated code "
+              "AccessoryEntry::OnLoaded sub_820F0820 with Accessory::Finish sub_820EF368; "
+              "Accessories::Acquire sub_820F0EB8 with AcquireEntry sub_820F09E0) natively instead of through the translated code "
               "(the same words; checked by --run_harnesses=accessories)");
 
 namespace hooks {
@@ -281,6 +282,29 @@ void AccessoryEntryOnLoaded(PPCContext& ctx, uint8_t* base) {
   ctx.r3.u64 = r3;
 }
 
+// --- The acquisition ---
+
+bool AccessoriesAcquireNative(uint8_t* base) {
+  return AccessoriesNativeLoads() && ModelsNativeLifetime() && native::Buffers_NativeMemcpy() &&
+         accessories::AccessoryConstructible(base);
+}
+
+// Accessories::Acquire: r3 the set, r4 the index, r5 the texture index; r3
+// the accessory or 0.
+void AccessoriesAcquire(PPCContext& ctx, uint8_t* base) {
+  if (!AccessoriesAcquireNative(base)) {
+    __imp__sub_820F0EB8(ctx, base);
+    return;
+  }
+  const uint32_t set = ctx.r3.u32;
+  const int32_t index = ctx.r4.s32;
+  if (index != 3 && guest::LoadU32(base, set + ((uint32_t(index + 1) << 2) & 0xFFFFFFFCu)) == 0) {
+    ctx.fpscr.disableFlushMode();  // as AccessoryEntry::New's adapter leaves it
+  }
+  ctx.r3.u64 = accessories::SetAcquire(base, set, index, ctx.r5.u32, ctx.r1.u32,
+                                       NativeArchiveLoad(base), AccessoryTextureSet(ctx, base));
+}
+
 void MatrixFromScaleRotationTranslation(PPCContext& ctx, uint8_t* base) {
   if (!native::Buffers_NativeMemcpy()) {
     __imp__sub_820EF660(ctx, base);
@@ -317,3 +341,4 @@ ITC_ACCESSORIES(820F0FE0, AccessoriesDestruct)
 ITC_ACCESSORIES(820EF568, AccessorySetTexture)
 ITC_ACCESSORIES(820EF660, MatrixFromScaleRotationTranslation)
 ITC_ACCESSORIES(820F0820, AccessoryEntryOnLoaded)
+ITC_ACCESSORIES(820F0EB8, AccessoriesAcquire)

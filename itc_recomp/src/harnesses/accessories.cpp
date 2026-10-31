@@ -14,6 +14,7 @@
 #include "base/flags.h"
 #include "base/log.h"
 #include "hooks/accessories.h"
+#include "hooks/archive.h"
 #include "hooks/heap.h"
 #include "hooks/models.h"
 #include "memory/c_runtime_heap.h"
@@ -1146,6 +1147,116 @@ void OnLoadeds(Context& h, const Block& block) {
   results.Report();
 }
 
+// --- The acquisition ---
+
+// AccessoriesAcquireEntry's register step (no adapter: only Acquire's plain
+// C++ calls it).
+void NativeAccessoriesAcquireEntry(PPCContext& ctx, uint8_t* base) {
+  if (!hooks::AccessoriesAcquireNative(base)) {
+    __imp__sub_820F09E0(ctx, base);
+    return;
+  }
+  ctx.r3.u64 = ac::SetAcquireEntry(base, ctx.r3.u32, ctx.r4.s32, ctx.r5.u32, ctx.r1.u32,
+                                   hooks::NativeArchiveLoad(base),
+                                   hooks::AccessoryTextureSet(ctx, base));
+}
+
+// Accessories::AcquireEntry and Acquire: a set in the block (its scale
+// random), each slot none or an entry made by AccessoryEntry::New's plain
+// C++ with a count of 1 to 3, loaded now and then (its texture provider then
+// a stand-in whose slot is the getter sub_82090770 over a texture set in the
+// block); the index 0 to 3, the texture index random; Archive::Load's calls
+// recorded. The slots (entries as markers with their counts and bytes, the
+// loads' pages as markers), the recorded calls, the block and r3 (an
+// accessory as its slot's marker) compared; the entries destroyed after.
+void Acquires(Context& h, const Block& block) {
+  struct Kind {
+    const char* name;
+    GuestFunction recompiled, native;
+  };
+  const Kind kinds[] = {
+      {"Accessories::AcquireEntry (sub_820F09E0)", Original<__imp__sub_820F09E0>,
+       NativeAccessoriesAcquireEntry},
+      {"Accessories::Acquire (sub_820F0EB8)", Original<__imp__sub_820F0EB8>,
+       hooks::AccessoriesAcquire},
+  };
+  const uint32_t set = block.address + 0x40;
+  const uint32_t vtable = block.address + 0x100, texture_set = block.address + 0x140;
+  for (const Kind& kind : kinds) {
+    Results results(kind.name);
+    for (int c = 0; c < 32; c++) {
+      const uint64_t seed = h.random.Next();
+      Outputs out[2];
+      for (int v = 0; v < 2; v++) {
+        Random r(seed);
+        WriteRandom(h.base, block.address, block.bytes, r);
+        PPCContext t = CallContext(h);
+        guest::StoreU32(h.base, vtable + 12, kGet60);
+        guest::StoreU32(h.base, texture_set + 20, r.Below(8));
+        uint32_t entries[3] = {}, saved_vtable[3] = {}, saved_140[3] = {};
+        bool stand_in[3] = {};
+        for (uint32_t i = 0; i < 3; i++) {
+          if (r.Below(3) != 0) {
+            entries[i] = ac::EntryNew(h.base, t.r1.u32);
+            guest::StoreU32(h.base, entries[i], 1 + r.Below(3));
+            const uint32_t accessory = entries[i] + 48;
+            if (r.Below(3) == 0) {
+              stand_in[i] = true;
+              guest::StoreU32(h.base, accessory + 1048, 1);
+              saved_vtable[i] = guest::LoadU32(h.base, accessory + 80);
+              saved_140[i] = guest::LoadU32(h.base, accessory + 140);
+              guest::StoreU32(h.base, accessory + 80, vtable);
+              guest::StoreU32(h.base, accessory + 140, texture_set);
+            }
+          }
+          guest::StoreU32(h.base, set + 4 + 4 * i, entries[i]);
+        }
+        t.r3.u64 = set;
+        t.r4.u64 = r.Below(4);
+        t.r5.u64 = r.Below(8);
+        std::optional<ArchiveLoads> loads;
+        loads.emplace(Serials(r));
+        (v == 0 ? kind.recompiled : kind.native)(t, h.base);
+        std::vector<uint32_t> calls = loads->calls();
+        loads.reset();
+        uint32_t r3 = t.r3.u32;
+        for (uint32_t i = 0; i < 3; i++) {
+          const uint32_t entry = guest::LoadU32(h.base, set + 4 + 4 * i);
+          if (entry != 0 && r3 == entry + 48) r3 = kMarker + i;
+          const uint32_t data = entry != 0 ? guest::LoadU32(h.base, entry + 20) : 0;
+          for (size_t k = 1; k < calls.size(); k += 6) {
+            if (calls[k] == data && data != 0 && memory::IsPages(data)) calls[k] = kMarker;
+          }
+        }
+        out[v].Word(r3);
+        out[v].Word(uint32_t(t.r3.u64 >> 32));
+        out[v].Word(uint32_t(calls.size()));
+        for (uint32_t w : calls) out[v].Word(w);
+        for (uint32_t i = 0; i < 3; i++) {
+          const uint32_t slot = set + 4 + 4 * i;
+          const uint32_t entry = guest::LoadU32(h.base, slot);
+          const bool pages = entry != 0 && memory::IsPages(entry);
+          out[v].Word(entry == 0 ? 0 : entry == entries[i] ? 1 : pages ? 2 : 3);
+          if (!pages) continue;
+          const uint32_t accessory = entry + 48;
+          if (stand_in[i]) {
+            guest::StoreU32(h.base, accessory + 80, saved_vtable[i]);
+            guest::StoreU32(h.base, accessory + 140, saved_140[i]);
+          }
+          TakePages(h.base, entry + 20, 0, out[v]);
+          guest::StoreU32(h.base, entry + 16, 0);  // the file's state: none
+          out[v].Bytes(Read(h.base, entry, ac::kEntryBytes));
+          ac::EntryDestroy(h.base, slot);
+          guest::StoreU32(h.base, slot, kMarker);
+        }
+        out[v].Bytes(Read(h.base, block.address, block.bytes));
+      }
+      results.Check(out[0], out[1], fmt::format("case {}", c));
+    }
+    results.Report();
+  }
+}
+
 }  // namespace
 
 void Accessories(Context& h) {
@@ -1175,6 +1286,7 @@ void Accessories(Context& h) {
       SetDestructors(h, block);
       Finishes(h, block);
       OnLoadeds(h, block);
+      Acquires(h, block);
     }
   }
 }
