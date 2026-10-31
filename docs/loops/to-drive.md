@@ -18,31 +18,27 @@ here loses its heading.
 
 ## Run 2026-10-31 16:54 (`b7-loop-31-10-26`, continued)
 
-- The race HUD machine (attract race `itc_2986`, replay `itc_2987`:
-  ran to the end, the SDK's "BaseHeap::Release failed" twice at the
-  race-end change ~118 s in, as in `itc_2974`; its race played the
-  intro and never reached the countdown; `race-hud-machine.md`; in
-  kind 0, attract races, the draw handlers hand back before their
-  print): `sub_8216C330` RaceHudMachine::CountdownDraw, `sub_8216CB98`
-  RaceHudMachine::CountdownUpdate, `sub_8216CE00`
-  RaceHudMachine::RaceDraw, `sub_8216D918` RaceHudMachine::RaceUpdate,
-  `sub_8216D3F0` RaceHudMachine::IsFirstDay, `sub_8216C820`
-  RaceHudMachine::OpponentPrize, `sub_8216C938`
-  RaceHudMachine::ItemBonus. The harness rewrite and 18 adapters
-  (`itc_3003`, replay `itc_3004` ok): none new.
+- The in-race screens, first migration (attract race `itc_3020`,
+  replay `itc_3021`, ok: this replay reached the countdown, the race,
+  the results and the menu after the race; `race-screens.md`):
+  `sub_8220BC00` MenuList::SetEnabled, `sub_8220BC40` MenuList::Fit,
+  `sub_8220BF90` MenuList::Pressed166, `sub_8220D740`
+  PauseMenu::SaveHudOptions, `sub_82217D40` RaceDialog::Answer,
+  `sub_822185B0` RaceDialog::Update, `sub_8220D248`
+  PauseMenu::StepAdjust.
+
+- The race HUD machine (attract races `itc_2986`, `itc_3003`, replays
+  `itc_2987`, `itc_3004`; the countdown and race handlers and
+  `IsFirstDay` since seen in the replay `itc_3021`;
+  `race-hud-machine.md`): `sub_8216C820` RaceHudMachine::OpponentPrize,
+  `sub_8216C938` RaceHudMachine::ItemBonus.
 
 - `RaceHud::RunWarning` (attract race `itc_2979`, replay `itc_2980`,
   ok; `race-hud-object.md`): none left to drive.
 
 - The race HUD cleanup lead (attract race `itc_2973`, replay
-  `itc_2974`, ok: its one "BaseHeap::Release failed" line after the
-  race's end, as in `itc_2931`; `race-hud-object.md`; the replay's race
-  set up the HUD but never ticked these): `sub_822129A8`
-  RaceHud::RunCountdown, `sub_82214790` RaceHud::UpdateRacerBar,
-  `sub_82215488` RaceHud::TickPanel, `sub_822151F8` RaceHud::TickRacers,
-  `sub_82211FB8` HudBar::Step, `sub_82215820` RaceHud::Touching,
-  `sub_82214D78` RaceHud::TickTimer, `sub_82212E60`
-  RaceHud::UpdateRecordingFull.
+  `itc_2974`, ok; the rest since seen in the replay `itc_3021`;
+  `race-hud-object.md`): `sub_82214D78` RaceHud::TickTimer.
 
 - The interior accessories (attract races `itc_2946`, `itc_2963`,
   replays `itc_2947`, `itc_2964`, ok; `accessories.md`): none left to
