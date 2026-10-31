@@ -42,7 +42,18 @@ When the user has reviewed a run's section, its heading gets
   digit setters); the adapters of `TrackZones::Create`,
   `UiMovie::SetText` and `ClearText` now hand calls to the harness
   recorder first (`hooks::StartUpRecorded`); none of it runs in an
-  attract race (no HUD there).
+  attract race (no HUD there). Migration 2's rows (653a14e..e4aaf1e):
+  17 more, `sub_82216A60` a new row (`RaceScreens::Make1004`, our name;
+  Native), `sub_82211C1C` Merged into `RaceScreens::MovieMask`; notes
+  in `ui-movies-game.md`, `files-and-saves.md`, `heap.md`,
+  `save-data.md` (their adapters of `SetNodeText`, `sub_8211AD00`,
+  `UiMovies::Open`, `Strings::Load`, `operator new` and `MenuList::Init`
+  now hand calls to the harness recorder first). For review: `ShowItem`
+  passes 0 for `SetNodeText`'s unset r6-r10 (the parking area's call);
+  `RaceHud::Draw` makes the original's `Run` and mirror calls, frame
+  dumps of the replay with the flag on and off alike (`itc_2887`,
+  `itc_2888`); `RunWarning` and `RunCountdown` not ported (the menu
+  sound has no override for the harness to record).
 - The material passes' map (2da185e): `functions/material-passes.md`,
   23 new rows (22 seen in play): `PartModel::SetPaint`, `SetPaintBody`
   (three HSV colors in r4-r9, through `Color::HsvToRgb`; the byte

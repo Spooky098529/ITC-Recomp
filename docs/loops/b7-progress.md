@@ -68,7 +68,12 @@ file's history. What's left to see in a drive, from every run:
   runs in an attract race; 14 ready groups left). Validated
   (`itc_2883`, replay `itc_2884` ok): 29 of 29 harness lines; 24 ran
   in the replay, 5 to drive; the harnesses left 2 s of race in 60.
-  Migration 2 running.
+  Migration 2 checked (653a14e..e4aaf1e: 17 more, the movie calls, the
+  HUD's draw (frame dumps alike), the warning, the item popup,
+  `RaceScreens::Init` with its +1004 object's maker `sub_82216A60`
+  (new row); 3 adapters removed; nothing ready left: the rest calls the
+  menu sound, `sub_8211D930`, `sub_8211E370` or the other in-race
+  screens). Validation 2 running.
 
 ## Done
 
@@ -132,5 +137,8 @@ file's history. What's left to see in a drive, from every run:
 - After its validation (`itc_2883`, 60 s: race 2 s, 0 errors, every
   harness 0 differing but the expected groups): ours 3498, work left
   2899.
+- After the race HUD object's migration 2 (`itc_2892`: race 31 s, 0
+  errors, race_hud_object and the touched harnesses 0 differing): ours
+  3514, work left 2883 (wrapped 103, known 480, unknown 2300).
 
 ## Stopped
