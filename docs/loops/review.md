@@ -13,6 +13,15 @@ When the user has reviewed a run's section, its heading gets
 
 ## Run 2026-10-31 16:54 (`b7-loop-31-10-26`, continued)
 
+- The in-race screens' third migration (48313a90..d26e6f66): 27 rows
+  in `race-screens.md` (`RaceDialog::OpenAnim`'s modes 0 and 2
+  corrected), 2 in `race-hud-machine.md`, 5 in `race-hud-object.md`.
+  For review: `RaceScreens::Create`'s cases in `RaceScreens::Init`'s
+  harness world with its existing recorder; `RaceDialog::Question`'s
+  harness points the save interface and the replay list at a world of
+  its own (the game's save objects untouched); `sub_8211CBD8` (ready,
+  7 callers in play elsewhere) not taken.
+
 - The pad replay's race (`race_test.jsonl`) reached its countdown in
   `itc_3021` but not in `itc_2987`, `itc_3004` or `itc_3038` (set up
   at ~77.5 s, racers never added): not debugged; worth a look in case

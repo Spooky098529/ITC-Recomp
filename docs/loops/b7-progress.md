@@ -104,7 +104,15 @@ file's history. What's left to see in a drive, from every run:
   replay `itc_3038` broke: its race's racers never added, no
   countdown, as in `itc_2987` and `itc_3004` but not `itc_3021`): 39
   of 39 harness lines, 19 ran in the replay (the pause menu opened),
-  20 to drive. Step: third migration (agent running).
+  20 to drive. Third migration checked (48313a90..d26e6f66: 15
+  functions, the dialog's and career results' pages, the screens'
+  draws, the machine's `PauseUpdate` and `AfterRaceUpdate`,
+  `RaceScreens::Create`; 20 adapters removed; every harness 0
+  differing, race 25 s with three subsystems' harnesses, 0 errors; no
+  subagents). Nothing ready left in `race-screens.md` (the two
+  jump-table pieces wait on MainPage); the machine's newly ready
+  handlers left as a cleanup lead for the next run. Step: validation
+  of the third migration (agent running).
 
 ## Done
 
@@ -198,5 +206,9 @@ file's history. What's left to see in a drive, from every run:
 - After its validation (`itc_3037`, 120 s: race 56 s, 0 errors, every
   harness 0 differing but the expected groups): ours 3690, work left
   2709.
+- After the in-race screens' third migration (`itc_3045`: race 25 s,
+  0 errors, race_screens, race_hud_machine and race_hud_object 0
+  differing): ours 3705, work left 2694 (wrapped 101, known 513,
+  unknown 2080).
 
 ## Stopped
