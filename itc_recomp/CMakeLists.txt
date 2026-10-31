@@ -257,6 +257,9 @@ set(ITC_SOURCES
     src/race_hud_object/signs.cpp
     src/race_hud_object/tick.cpp
     src/race_hud_object/movies.cpp
+    src/hooks/alt_hud.cpp
+    src/alt_hud/menu_list.cpp
+    src/alt_hud/alt_hud.cpp
     src/save_interface/save_interface.cpp
     src/save_interface/save_layer.cpp
     src/hooks/file_layer.cpp
@@ -427,6 +430,7 @@ set(ITC_SOURCES
     src/harnesses/location_screen.cpp
     src/harnesses/material_passes.cpp
     src/harnesses/race_hud_object.cpp
+    src/harnesses/alt_hud.cpp
     src/harnesses/car_sounds.cpp
     src/harnesses/x3daudio.cpp
     src/harnesses/xaudio.cpp

@@ -245,5 +245,7 @@ void CameraModes(Context& h);
 void LocationScreen(Context& h);
 void MaterialPasses(Context& h);
 void RaceHudObject(Context& h);
+// The alternate HUD (src/harnesses/alt_hud.cpp).
+void AltHud(Context& h);
 
 }  // namespace harness
