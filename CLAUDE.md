@@ -174,7 +174,8 @@ car specs and the cameras native as far as they were ready
 ours 1,023 -> 1,139), the cameras keeping frame interpolation's hooks
 (`BlendState_OnCopy` added); the rest waits on the graphics device's
 resource calls, the archive and memset/atexit.
-Its eighth run (`b7-loop-23-10-26-4`, 2026-10-23, not yet merged;
+Its eighth run (`b7-loop-23-10-26-4`, 2026-10-23, merged into
+`rexglue-removal-project` the same day;
 summary `docs/loops/b7-loop-2026-10-23-1722.md`) made the string table
 and font, `std::string` and the course's route native as far as they
 were ready (`strings-and-font.md`, `std-string.md`, `track-route.md`;
@@ -342,8 +343,8 @@ system's interface (`save-interface.md`, `--native_save_interface`, 41
 of 41 in play) native (ours 2,540 -> 2,628); the rest waits on the
 loose read's and opens' guest calls to B4's `File::` adapters, the
 game's `Semaphore::Init` and the leads in `docs/loops/leads.md`.
-Its twenty-first run (`b7-loop-28-10-26-3`, 2026-10-28 to 29, not
-yet merged; summary `docs/loops/b7-loop-2026-10-28-2222.md`; 3
+Its twenty-first run (`b7-loop-28-10-26-3`, 2026-10-28 to 29, merged
+into `rexglue-removal-project` with the twenty-fifth, 2026-10-30; summary `docs/loops/b7-loop-2026-10-28-2222.md`; 3
 subsystems) made the car sounds with X3DAudio (`car-sounds.md`,
 `--native_car_sounds`, 62 of 62 in play), XAudio's voices (`xaudio.md`,
 `--native_xaudio`, 92 of 96: the game's copy of XAudio, translated) and
@@ -354,7 +355,8 @@ game's, taken natively as the original does, until every user is
 native (then host recursive locks with a readable depth); the rest
 waits on XAudio's engine and mixer, the codecs, XACT's notifications
 and `QueryPerformanceCounter`.
-Its twenty-second run (`b7-loop-29-10-26`, 2026-10-29, not yet merged;
+Its twenty-second run (`b7-loop-29-10-26`, 2026-10-29, merged with
+the twenty-fifth, 2026-10-30;
 summary `docs/loops/b7-loop-2026-10-29-1544.md`; 3 subsystems, stopped
 at a validation: the XMA codec's two destructors had no harness line)
 made XACT's tracks and events (`xact-tracks.md`, `--native_xact_tracks`,
@@ -368,14 +370,14 @@ GetTickCount), and XAudio's own threads, events and semaphore are used
 through the kernel's imports as the original does. The rest waits on
 the resampler and the reverb's core (ready, not taken) and XAudio's
 shut-down.
-Its twenty-third run (`b7-loop-29-10-26-2`, 2026-10-29 to 30, not yet
-merged; summary `docs/loops/b7-loop-2026-10-29-2222.md`) took that stop
+Its twenty-third run (`b7-loop-29-10-26-2`, 2026-10-29 to 30, merged
+with the twenty-fifth, 2026-10-30; summary `docs/loops/b7-loop-2026-10-29-2222.md`) took that stop
 as a cleanup lead and made the rest of XAudio's objects native (110 of
 110: the resampler, `PcmCodec::Process`, the reverb; ours 2,999 ->
 3,031), then stopped at its validation: `CarSound::Part840Update`'s
 harness differed once (1 of 80, two pointer words), intermittent so far.
 Its twenty-fourth run (the same branch, the user's call, 2026-10-30,
-not yet merged; summary `docs/loops/b7-loop-2026-10-30-0106.md`; 3
+merged with the twenty-fifth, 2026-10-30; summary `docs/loops/b7-loop-2026-10-30-0106.md`; 3
 subsystems) fixed that harness (the game's mixer swaps XAudio's two
 voice stage lists between a case's versions: compared by role) and made
 the app's start-up (`app-start-up.md`, `--native_app_start_up`: `App::App`,
@@ -412,7 +414,9 @@ validation: `App::App` and `App::Create`'s harnesses differed since
 (83b2b76; fixed after: their recorders let it allocate), and the
 harnesses take 56.7 s of the validation's 60. The rest waits on the menu sound, the other in-race
 screens and the scene's second set.
-Its twenty-seventh run (`b7-loop-31-10-26`, 2026-10-31, not yet merged;
+Its twenty-seventh run (`b7-loop-31-10-26`, 2026-10-31, merged into
+`rexglue-removal-project` with the twenty-eighth, 2026-10-31, before a
+drive;
 summary `docs/loops/b7-loop-2026-10-31-1347.md`; 3 subsystems) made two
 cleanup leads under `--native_models` (`Model::RecordMaterials`, the
 shader pair's load callback; eight adapters removed), the alternate HUD
@@ -426,7 +430,8 @@ the music, XACT banks the sound manager loads, is translated with XACT.
 The rest waits on the course scenery's and scene models' owners, the
 scene's update, the other in-race screens and the sound manager's slots.
 Its twenty-eighth run (the same branch, continued by the user's call,
-2026-10-31, not yet merged; summary
+2026-10-31, merged into `rexglue-removal-project` the same day before
+a drive; summary
 `docs/loops/b7-loop-2026-10-31-1654.md`; 3 subsystems) made the
 interior accessories (`accessories.md`, `--native_accessories`, 31 of
 31 in play), the race HUD machine (`race-hud-machine.md`,

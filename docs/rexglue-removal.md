@@ -138,26 +138,26 @@ goes in `src/` as overrides), American English.
   with sprintf (`file-layer.md`) and the save system's interface
   (`save-interface.md`, 41 of 41) native (ours 2,628); its
   twenty-first run (branch `b7-loop-28-10-26-3`, 2026-10-28 to 29, 3
-  subsystems, not yet merged) made the car sounds with X3DAudio
+  subsystems, merged with the twenty-fifth 2026-10-30) made the car sounds with X3DAudio
   (`car-sounds.md`, 62 of 62), XAudio's voices (`xaudio.md`, 92 of 96;
   its locks the game's, taken as the original does, by the user's
   calls) and XACT's waves and voices (`xact-waves.md`, 22 of 30) native
   (ours 2,804); its twenty-second run (branch `b7-loop-29-10-26`,
-  2026-10-29, 3 subsystems, not yet merged) made XACT's tracks and
+  2026-10-29, 3 subsystems, merged with the twenty-fifth 2026-10-30) made XACT's tracks and
   events (`xact-tracks.md`, 55 of 55), XAudio's engine and mixer
   (`xaudio-engine.md`, 47 of 47) and XAudio's factory objects
   (`xaudio-objects.md`, 78 of 109) native, with QueryPerformanceCounter
   from the host clock and the rest of XACT's waves (31 of 31) by the
   user's calls; it stopped at a validation (two destructors with no
   harness line) (ours 2,999); its twenty-third run (branch
-  `b7-loop-29-10-26-2`, 2026-10-29 to 30, not yet merged) began with
+  `b7-loop-29-10-26-2`, 2026-10-29 to 30, merged with the twenty-fifth 2026-10-30) began with
   that stop as a cleanup lead (not counted) and made the rest of
   XAudio's objects native (110 of 110: the destructors' harness, the
   resampler, the reverb), then stopped at its validation: an
   intermittent difference in the car sounds' harness
   (`CarSound::Part840Update`, 1 case of 80) (ours 3,031); its
   twenty-fourth run (the same branch by the user's call, 2026-10-30, 3
-  subsystems, not yet merged) fixed that harness (the mixer's stage
+  subsystems, merged with the twenty-fifth 2026-10-30) fixed that harness (the mixer's stage
   lists compared by role) and made the app's start-up (`app-start-up.md`,
   the voice engine Dropped by the user's call), the data load at boot
   (`data-load.md`) and the career (`career.md`, 49 of 53) native (ours
@@ -173,13 +173,15 @@ goes in `src/` as overrides), American English.
   play), the part models' material passes (`material-passes.md`, 22 of
   22) and the race HUD object (`race-hud-object.md`, 45 of 58 in play)
   native (ours 3,514); its twenty-seventh run (branch
-  `b7-loop-31-10-26`, 3 subsystems, not yet merged) made two cleanup
+  `b7-loop-31-10-26`, 3 subsystems, merged into
+  `rexglue-removal-project` 2026-10-31 with the next) made two cleanup
   leads under the models (`Model::RecordMaterials`, the shader pair's
   load callback, eight adapters removed), the alternate HUD
   (`alt-hud.md`, 21 of 21 in play), the race scene (`race-scene.md`, 11
   of 20) and the menu sounds (`menu-sounds.md`, 4 of 4 in play) native
   (ours 3,552); its twenty-eighth run (the same branch, continued by
-  the user's call, 3 subsystems, not yet merged) made the interior
+  the user's call, 3 subsystems, merged into `rexglue-removal-project`
+  2026-10-31 before a drive) made the interior
   accessories (`accessories.md`, 31 of 31 in play), the race HUD
   machine (`race-hud-machine.md`, 23 of 33, with the race HUD's
   countdown, racer bar and warning as cleanup leads) and the other
