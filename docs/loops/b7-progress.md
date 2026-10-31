@@ -11,7 +11,7 @@ file's history. What's left to see in a drive, from every run:
 - Run started 2026-10-31 16:54 on `b7-loop-31-10-26` (the previous
   run's branch, continued by the user's call, 2026-10-31), from
   ec0e7141; summary `b7-loop-2026-10-31-1654.md`.
-- Limit for this run: 3 subsystems; 1 taken.
+- Limit for this run: 3 subsystems; 2 taken.
 - Subsystem 1 of 3: the second skeleton user (`820EF258`-`820F05D8`),
   the top of `leads.md`:
   - `sub_820EF258`, `sub_820EF310`, `sub_820EF368`, `sub_820EFFD8`, `sub_820F0070`, `sub_820F03F0`: another skeleton user (`820EF258`-`820F05D8`): the skeleton base made (`sub_820F03F0`, 179 lines, calls `SkeletonBase::SkeletonBase`), set up (`sub_820F0070` calls `sub_8259A9E0`) and destroyed (`sub_820EFFD8`, `SkeletonBase::~SkeletonBase`; `functions/model-animation.md`, `functions/models.md`), near `sub_820EF790` (`Model::RecordShape`'s caller). Not read. Found by the B7 loop's mapping agent (model animation), 2026-10-23.
@@ -47,10 +47,19 @@ file's history. What's left to see in a drive, from every run:
   `RunWarning`, 300 cases 0 differing after the frame's back chain was
   written as the original does; 2ea9a6f1: the two adapters removed;
   race 29 s with the harnesses, 0 errors; no subagents). Its four
-  callers, the race flow draws, now ready (noted in their lead). Step:
-  validation (agent running).
+  callers, the race flow draws, now ready (noted in their lead). Validated (`itc_2979`, 120 s: race
+  58 s, 0 errors, harnesses 59.8 s; replay `itc_2980` ok): 3 of 3
+  harness lines, all 3 ran in the replay, none to drive. Done.
+- Subsystem 2 of 3: the race flow's handlers that drive the race HUD
+  (`8216C208`-`8216E668`), from `leads.md` (most of its roots ready).
+  Step: mapping (agent running).
 
 ## Done
+
+- `RaceHud::RunWarning` (cleanup lead): `race-hud-object.md`, with
+  `HudCurve::Eval`'s and `PowInt`'s adapters removed;
+  `--native_race_hud_object`; 1213d326..2ea9a6f1. Validated
+  (`itc_2979`).
 
 - The race HUD's `RunCountdown` and `UpdateRacerBar` (cleanup lead):
   `race-hud-object.md`, with `TickPanel`, `TickRacers` and 5 adapters
@@ -101,5 +110,8 @@ file's history. What's left to see in a drive, from every run:
 - After the RunWarning lead's migration (`itc_2978`: race 29 s, 0
   errors, race_hud_object and alt_hud 0 differing): ours 3589, work
   left 2809 (wrapped 103, known 481, unknown 2225).
+- After its validation (`itc_2979`, 120 s: race 58 s, 0 errors, every
+  harness 0 differing but the expected groups): ours 3589, work left
+  2809.
 
 ## Stopped

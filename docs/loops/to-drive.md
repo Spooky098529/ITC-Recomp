@@ -18,6 +18,9 @@ here loses its heading.
 
 ## Run 2026-10-31 16:54 (`b7-loop-31-10-26`, continued)
 
+- `RaceHud::RunWarning` (attract race `itc_2979`, replay `itc_2980`,
+  ok; `race-hud-object.md`): none left to drive.
+
 - The race HUD cleanup lead (attract race `itc_2973`, replay
   `itc_2974`, ok: its one "BaseHeap::Release failed" line after the
   race's end, as in `itc_2931`; `race-hud-object.md`; the replay's race
