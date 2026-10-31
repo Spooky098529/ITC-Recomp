@@ -158,6 +158,32 @@ bool SkeletonDestructible(uint8_t* base, uint32_t skeleton);
 bool AccessoryDestructible(uint8_t* base, uint32_t accessory);
 bool EntryDestroyable(uint8_t* base, uint32_t slot);
 
+// Accessories::ReleaseAll (sub_820F0AD8): for each of the three entries
+// that's set, its count - 1, and at 0 AccessoryEntry::Destroy on its slot.
+// The r3 it leaves: the last Destroy's, or nullopt (r3 as given) with none.
+std::optional<uint32_t> SetReleaseAll(uint8_t* base, uint32_t set);
+// Whether ReleaseAll runs natively: the entries distinct, and each one it
+// destroys EntryDestroyable.
+bool SetReleasable(uint8_t* base, uint32_t set);
+
+// --- The skeleton's set-up ---
+
+// The string a node's name holds for the swinging node (not read).
+constexpr uint32_t kSwingNodeName = 0x82006710;
+// AccessorySkeleton::Reset (sub_820EFB30): `sp` the caller's stack pointer
+// (its 192-byte frame's identity rows at +80 to +143 as the original leaves
+// them). Each node's local entry from the node file's rows, the angle and
+// its speed 0.0, the two matrices identity (memcpy, native::Buffers_Memcpy),
+// the vectors, +152 = 0. Returns memcpy's r3 (the skeleton + 352).
+uint32_t SkeletonReset(uint8_t* base, uint32_t skeleton, uint32_t sp);
+// AccessorySkeleton::SetUp (sub_820F0070): once (+260 = 0) and with its file
+// loaded (+192 = 2): SkeletonBase::SetUp(it, [+196], 0, 1); with nodes, the
+// first whose name holds kSwingNodeName (strstr) into +256, +260 = 1 and
+// Reset (from the 128-byte frame below `sp`). Returns +260; nullopt, with
+// nothing done, where SkeletonBase::SetUp's plain C++ declines (the
+// original runs).
+std::optional<uint32_t> SkeletonSetUp(uint8_t* base, uint32_t skeleton, uint32_t sp);
+
 // Whether a part model is constructed natively (models::CanAllocatePointers
 // for its texture provider): the constructors' adapters check it.
 bool AccessoryConstructible(uint8_t* base);

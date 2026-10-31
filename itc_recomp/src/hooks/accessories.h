@@ -53,5 +53,10 @@ void AccessoryFileDestruct(PPCContext& ctx, uint8_t* base);
 void AccessorySkeletonDestruct(PPCContext& ctx, uint8_t* base);
 void AccessoryDestruct(PPCContext& ctx, uint8_t* base);
 void AccessoryEntryDestroy(PPCContext& ctx, uint8_t* base);
+// Accessories::ReleaseAll sub_820F0AD8 (r3 the set), AccessorySkeleton::Reset
+// sub_820EFB30 and SetUp sub_820F0070 (r3 the skeleton).
+void AccessoriesReleaseAll(PPCContext& ctx, uint8_t* base);
+void AccessorySkeletonReset(PPCContext& ctx, uint8_t* base);
+void AccessorySkeletonSetUp(PPCContext& ctx, uint8_t* base);
 
 }  // namespace hooks

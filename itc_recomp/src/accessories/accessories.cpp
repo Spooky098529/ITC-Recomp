@@ -5,6 +5,7 @@
 
 #include "archive/archive.h"
 #include "base/log.h"
+#include "c_runtime/strings.h"
 #include "guest.h"
 #include "memory/heap.h"
 #include "model_animation/model_animation.h"
@@ -435,6 +436,99 @@ uint32_t EntryDestroy(uint8_t* base, uint32_t slot) {
   const auto r3 = FileFreeData(base, slot);
   Require(r3.has_value(), "AccessoryFile::FreeData");
   return *r3;
+}
+
+bool SetReleasable(uint8_t* base, uint32_t set) {
+  uint32_t entries[3];
+  for (uint32_t i = 0; i < 3; i++) {
+    entries[i] = Load(base, set + 4 + 4 * i);
+    for (uint32_t k = 0; k < i; k++) {
+      if (entries[i] != 0 && entries[i] == entries[k]) {
+        return false;
+      }
+    }
+    if (entries[i] != 0 && Load(base, entries[i]) - 1 == 0 &&
+        !EntryDestroyable(base, set + 4 + 4 * i)) {
+      return false;
+    }
+  }
+  return true;
+}
+
+std::optional<uint32_t> SetReleaseAll(uint8_t* base, uint32_t set) {
+  ITC_NATIVE_RUNNING("sub_820F0AD8 Accessories::ReleaseAll");
+  std::optional<uint32_t> r3;
+  for (uint32_t i = 0; i < 3; i++) {
+    const uint32_t slot = set + 4 + 4 * i;
+    const uint32_t entry = Load(base, slot);
+    if (entry == 0) {
+      continue;
+    }
+    Store(base, entry, Load(base, entry) - 1);
+    if (Load(base, Load(base, slot)) == 0) {
+      r3 = EntryDestroy(base, slot);
+    }
+  }
+  return r3;
+}
+
+// --- The skeleton's set-up ---
+
+uint32_t SkeletonReset(uint8_t* base, uint32_t skeleton, uint32_t sp) {
+  ITC_NATIVE_RUNNING("sub_820EFB30 AccessorySkeleton::Reset");
+  const uint32_t frame = sp - 192;
+  for (uint32_t i = 0; int32_t(i) < int32_t(Load(base, Load(base, skeleton + 80) + 4)); i++) {
+    const uint32_t entry = Load(base, skeleton + 136) + 144 * i;
+    // Three rows (ld and std of two doublewords each, each row read first).
+    for (uint32_t row = 0; row < 3; row++) {
+      Copy16(base, entry + 16 * row, Load(base, skeleton + 88 + 4 * row) + 16 * i);
+    }
+    const uint32_t node = Load(base, skeleton + 84) + 160 * i;
+    if (Load(base, node + 132) & 0x40) {
+      Copy16(base, entry + 48, node + 64);
+    }
+  }
+  const double zero = Lfs(base, kZero);
+  Stfs(base, skeleton + 268, zero);
+  Stfs(base, skeleton + 272, zero);
+  StoreIdentity(base, frame + 80, 1.0);
+  Require(native::Buffers_Memcpy(base, skeleton + 288, frame + 80, 64, 0x820EFC60), "memcpy");
+  StoreIdentity(base, frame + 80, 1.0);
+  Require(native::Buffers_Memcpy(base, skeleton + 352, frame + 80, 64, 0x820EFCA4), "memcpy");
+  for (uint32_t offset : {424u, 420u, 416u}) {
+    Stfs(base, skeleton + offset, zero);
+  }
+  const double one = Lfs(base, kOne);
+  Stfs(base, skeleton + 428, one);
+  for (uint32_t offset : {440u, 436u, 432u}) {
+    Stfs(base, skeleton + offset, zero);
+  }
+  Stfs(base, skeleton + 444, one);
+  Store(base, skeleton + 152, 0);
+  return skeleton + 352;
+}
+
+std::optional<uint32_t> SkeletonSetUp(uint8_t* base, uint32_t skeleton, uint32_t sp) {
+  if (Load(base, skeleton + 260) != 0 || Load(base, skeleton + 192) != 2) {
+    ITC_NATIVE_RUNNING("sub_820F0070 AccessorySkeleton::SetUp");
+    return Load(base, skeleton + 260);
+  }
+  if (!model_animation::SkeletonSetUp(base, skeleton, Load(base, skeleton + 196), 0, 1)) {
+    return std::nullopt;
+  }
+  ITC_NATIVE_RUNNING("sub_820F0070 AccessorySkeleton::SetUp");
+  const uint32_t view = skeleton + 80;
+  if (int32_t(Load(base, Load(base, view) + 4)) > 0) {
+    for (uint32_t i = 0; int32_t(i) < int32_t(Load(base, Load(base, view) + 4)); i++) {
+      if (c_runtime::Strstr(base, Load(base, skeleton + 84) + 160 * i, kSwingNodeName) >= 0) {
+        Store(base, skeleton + 256, i);
+        break;
+      }
+    }
+    Store(base, skeleton + 260, 1);
+    SkeletonReset(base, skeleton, sp - 128);
+  }
+  return Load(base, skeleton + 260);
 }
 
 }  // namespace accessories

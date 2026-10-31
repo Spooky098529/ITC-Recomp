@@ -24,7 +24,9 @@ ITC_FLAG_BOOL(native_accessories, true, "ITC",
               "sub_820F0C20, sub_820F08D0, sub_820F0D30; Accessories::Free and Destroy "
               "sub_820F0F90, sub_820F1078, the set's destructor through its vtable; the entry "
               "and the accessory's construction sub_820F0920, sub_820EF258, sub_820F03F0; their "
-              "destructors sub_820F0988, sub_820EF310, sub_820EFFD8, sub_820F0DB8) natively instead of through the translated code "
+              "destructors sub_820F0988, sub_820EF310, sub_820EFFD8, sub_820F0DB8, "
+              "Accessories::ReleaseAll sub_820F0AD8; the skeleton's set-up sub_820F0070, "
+              "sub_820EFB30) natively instead of through the translated code "
               "(the same words; checked by --run_harnesses=accessories)");
 
 namespace hooks {
@@ -205,6 +207,43 @@ void AccessoryEntryDestroy(PPCContext& ctx, uint8_t* base) {
   ctx.r3.u64 = accessories::EntryDestroy(base, ctx.r3.u32);
 }
 
+void AccessoriesReleaseAll(PPCContext& ctx, uint8_t* base) {
+  if (!AccessoriesNativeLoads() || !ModelsNativeLifetime() ||
+      !accessories::SetReleasable(base, ctx.r3.u32)) {
+    __imp__sub_820F0AD8(ctx, base);
+    return;
+  }
+  if (const auto r3 = accessories::SetReleaseAll(base, ctx.r3.u32)) {
+    ctx.fpscr.disableFlushMode();
+    ctx.r3.u64 = *r3;
+  }
+}
+
+// --- The skeleton's set-up ---
+
+void AccessorySkeletonReset(PPCContext& ctx, uint8_t* base) {
+  if (!native::Buffers_NativeMemcpy()) {
+    __imp__sub_820EFB30(ctx, base);
+    return;
+  }
+  ctx.fpscr.disableFlushMode();
+  ctx.r3.u64 = accessories::SkeletonReset(base, ctx.r3.u32, ctx.r1.u32);
+}
+
+void AccessorySkeletonSetUp(PPCContext& ctx, uint8_t* base) {
+  if (!ModelsNativeLifetime() || !native::Buffers_NativeMemcpy()) {
+    __imp__sub_820F0070(ctx, base);
+    return;
+  }
+  const auto r3 = accessories::SkeletonSetUp(base, ctx.r3.u32, ctx.r1.u32);
+  if (!r3) {
+    __imp__sub_820F0070(ctx, base);
+    return;
+  }
+  ctx.fpscr.disableFlushMode();
+  ctx.r3.u64 = *r3;
+}
+
 }  // namespace hooks
 
 // Defines an adapter: the flag, else the original.
@@ -231,3 +270,6 @@ ITC_ACCESSORIES(820F0DB8, AccessoryFileDestruct)
 ITC_ACCESSORIES(820EFFD8, AccessorySkeletonDestruct)
 ITC_ACCESSORIES(820EF310, AccessoryDestruct)
 ITC_ACCESSORIES(820F0988, AccessoryEntryDestroy)
+ITC_ACCESSORIES(820F0AD8, AccessoriesReleaseAll)
+ITC_ACCESSORIES(820EFB30, AccessorySkeletonReset)
+ITC_ACCESSORIES(820F0070, AccessorySkeletonSetUp)

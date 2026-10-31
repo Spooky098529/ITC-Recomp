@@ -18,12 +18,14 @@
 #include "memory/c_runtime_heap.h"
 #include "native/buffers.h"
 #include "memory/heap.h"
+#include "model_animation/model_animation.h"
 #include "models/model.h"
 #include "models/texture_provider.h"
 
 #include <fmt/format.h>
 
 #include <functional>
+#include <string>
 #include <optional>
 #include <vector>
 
@@ -529,6 +531,146 @@ void Destructors(Context& h, const Block& block) {
   }
 }
 
+// Accessories::ReleaseAll: each slot none or an entry made by
+// AccessoryEntry::New's plain C++ with a count of 1 to 3. The slots (an
+// entry as a marker with its count), the block and r3 compared; the entries
+// left destroyed after.
+void ReleaseAlls(Context& h, const Block& block) {
+  const uint32_t set = block.address + 0x40;
+  Results results("Accessories::ReleaseAll (sub_820F0AD8)");
+  for (int c = 0; c < 24; c++) {
+    const uint64_t seed = h.random.Next();
+    Outputs out[2];
+    for (int v = 0; v < 2; v++) {
+      Random r(seed);
+      WriteRandom(h.base, block.address, block.bytes, r);
+      PPCContext t = CallContext(h);
+      for (uint32_t i = 0; i < 3; i++) {
+        uint32_t entry = 0;
+        if (r.Below(4) != 0) {
+          entry = ac::EntryNew(h.base, t.r1.u32);
+          guest::StoreU32(h.base, entry, 1 + r.Below(3));
+        }
+        guest::StoreU32(h.base, set + 4 + 4 * i, entry);
+      }
+      t.r3.u64 = set;
+      (v == 0 ? Original<__imp__sub_820F0AD8> : hooks::AccessoriesReleaseAll)(t, h.base);
+      out[v].Word(t.r3.u32 == set ? kMarker : t.r3.u32);
+      out[v].Word(uint32_t(t.r3.u64 >> 32));
+      for (uint32_t i = 0; i < 3; i++) {
+        const uint32_t slot = set + 4 + 4 * i;
+        const uint32_t entry = guest::LoadU32(h.base, slot);
+        out[v].Word(entry == 0 ? 0 : memory::IsPages(entry) ? kMarker : 1);
+        if (entry != 0 && memory::IsPages(entry)) {
+          out[v].Word(guest::LoadU32(h.base, entry));
+          ac::EntryDestroy(h.base, slot);
+          guest::StoreU32(h.base, slot, kMarker);
+        }
+      }
+      out[v].Bytes(Read(h.base, block.address, block.bytes));
+    }
+    results.Check(out[0], out[1], fmt::format("case {}", c));
+  }
+  results.Report();
+}
+
+// A node file in the block at `file` for the skeleton's set-up and reset:
+// `nodes` nodes (160-byte records whose names are random letters, some
+// holding the swinging node's string), their three rows, random flags;
+// `entries` entries; the offsets from the file.
+void NodeFile(uint8_t* base, uint32_t file, int32_t nodes, uint32_t entries, Random& r) {
+  WriteRandom(base, file, 0x600, r);
+  guest::StoreU32(base, file + 4, uint32_t(nodes));
+  guest::StoreU32(base, file + 8, entries);
+  guest::StoreU32(base, file + 12, nodes > 0 ? r.Below(uint32_t(nodes) + 1) : 0);
+  const uint32_t offsets[] = {0x60, 0x300, 0x340, 0x380, 0x3C0, 0x3E0, 0x400, 0x440, 0x480};
+  for (uint32_t k = 0; k < 9; k++) {
+    guest::StoreU32(base, file + 16 + 4 * k, offsets[k]);
+  }
+  std::string swing;
+  for (uint32_t a = ac::kSwingNodeName; guest::LoadU8(base, a) != 0 && swing.size() < 64; a++) {
+    swing.push_back(char(guest::LoadU8(base, a)));
+  }
+  for (int32_t i = 0; i < nodes && i < 4; i++) {
+    const uint32_t record = file + 0x60 + 160 * uint32_t(i);
+    std::string name;
+    for (uint32_t k = r.Below(6); k > 0; k--) {
+      name.push_back(char('a' + r.Below(26)));
+    }
+    if (r.Below(3) == 0) {
+      name += swing;
+    }
+    for (uint32_t k = 0; k <= name.size(); k++) {
+      guest::StoreU8(base, record + k, k < name.size() ? uint8_t(name[k]) : 0);
+    }
+  }
+}
+
+// The skeleton's set-up and reset, on a skeleton AccessorySkeleton's plain
+// C++ made. SetUp: set up already or not, its file loaded or not, the node
+// file's nodes 0 to 4 (a negative count now and then); the skeleton, the
+// arrays SkeletonBase::SetUp made (their contents; the pointers the same on
+// both sides: first fit, each side frees them), the block, Reset's frame
+// rows and r3 compared. Reset alone on the skeleton's views pointed into a
+// node file.
+void SkeletonSetUps(Context& h, const Block& block) {
+  if (!hooks::ModelsNativeLifetime() || !native::Buffers_NativeMemcpy()) {
+    ITC_LOG_WARN("harness: accessories: the models' lifetimes aren't native: the skeleton's "
+                 "set-up cases skipped");
+    return;
+  }
+  const uint32_t skeleton = block.address + 0x100;
+  const uint32_t file = block.address + 0x800;
+  const auto frame_rows = [&](uint32_t sp, Outputs& out) {
+    out.Bytes(Read(h.base, sp - 192 + 80, 64));
+  };
+  Cases(
+      h, block, "AccessorySkeleton::Reset (sub_820EFB30)", 24, Original<__imp__sub_820EFB30>,
+      hooks::AccessorySkeletonReset,
+      [&](PPCContext& t, Random& r) {
+        ac::SkeletonConstruct(h.base, skeleton, t.r1.u32);
+        const int32_t nodes = r.Below(6) == 0 ? -1 : int32_t(r.Below(5));
+        NodeFile(h.base, file, nodes, 0, r);
+        guest::StoreU32(h.base, skeleton + 80, file);
+        guest::StoreU32(h.base, skeleton + 84, file + 0x60);
+        for (uint32_t k = 0; k < 3; k++) {
+          guest::StoreU32(h.base, skeleton + 88 + 4 * k, file + 0x300 + 0x40 * k);
+        }
+        guest::StoreU32(h.base, skeleton + 136, block.address + 0x1000);
+        guest::StoreU32(h.base, skeleton + 152, r.Below(2));
+        t.r3.u64 = skeleton;
+      },
+      [&](const PPCContext& t, Outputs& out) { frame_rows(t.r1.u32, out); });
+  Cases(
+      h, block, "AccessorySkeleton::SetUp (sub_820F0070)", 32, Original<__imp__sub_820F0070>,
+      hooks::AccessorySkeletonSetUp,
+      [&](PPCContext& t, Random& r) {
+        ac::SkeletonConstruct(h.base, skeleton, t.r1.u32);
+        const int32_t nodes = r.Below(8) == 0 ? -1 : int32_t(r.Below(5));
+        NodeFile(h.base, file, nodes < 0 ? 0 : nodes, r.Below(3), r);
+        if (nodes < 0) {
+          guest::StoreU32(h.base, file + 4, 0);
+        }
+        guest::StoreU32(h.base, skeleton + 192, r.Below(5) == 0 ? 1 : 2);
+        guest::StoreU32(h.base, skeleton + 196, file);
+        guest::StoreU32(h.base, skeleton + 260, r.Below(5) == 0 ? 1 : 0);
+        t.r3.u64 = skeleton;
+      },
+      [&](const PPCContext& t, Outputs& out) {
+        frame_rows(t.r1.u32 - 128, out);
+        const uint32_t nodes = guest::LoadU32(h.base, file + 4);
+        const uint32_t entries = guest::LoadU32(h.base, skeleton + 136);
+        if (entries != 0) {
+          out.Bytes(Read(h.base, entries, 144 * nodes));
+        }
+        const uint32_t matrices = guest::LoadU32(h.base, skeleton + 148);
+        if (matrices != 0) {
+          out.Bytes(Read(h.base, matrices, 64 * nodes));
+        }
+        model_animation::SkeletonBaseFree(h.base, skeleton);
+      });
+}
+
 }  // namespace
 
 void Accessories(Context& h) {
@@ -543,10 +685,12 @@ void Accessories(Context& h) {
   }
   Sets(h, block);
   Constructors(h, block);
+  SkeletonSetUps(h, block);
   if (hooks::AccessoriesNativeLoads()) {
     FileResets(h, block);
     SetFrees(h, block);
     Destructors(h, block);
+    ReleaseAlls(h, block);
   }
 }
 
