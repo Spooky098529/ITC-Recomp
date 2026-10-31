@@ -435,6 +435,10 @@ Rows not yet moved stay in the table below. So far:
   rear-view mirror's texture, the expressway sign and place name by the
   track zones, the countdown, the warning, the racers' bars, the item
   popup and the timer (B7).
+- [`alt-hud.md`](alt-hud.md): the alternate HUD, the in-race screens'
+  holder's object at +1004: a second dashboard on UI movie 22 (the
+  race HUD's gauges plus the throttle, brake and steering), its set-up,
+  tick, view switch and teardown, and two menu list helpers (B7).
 
 These files hold functions only. What used to follow the table here moved
 out on 2026-10-20: how frame interpolation works, its options and what
