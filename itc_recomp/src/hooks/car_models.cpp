@@ -26,7 +26,8 @@ ITC_FLAG_BOOL(native_car_models, true, "ITC",
               "sub_820D0730, LoadSlot::LoadShared sub_820D0860, with --native_heap LoadSlot::Load "
               "sub_820D07C8 and CarModel::LoadExterior sub_820D5EC8 (with LoadSetA sub_820D59D8 and "
               "LoadSetB sub_820D5AC0), the team "
-              "emblem sub_820D3CF8, CarModel::LoadDecals sub_820D5B50, with --native_heap "
+              "emblem sub_820D3CF8 and CarModel::LoadDecals sub_820D5B50 (no adapters: their callers in "
+              "play are native), with --native_heap "
               "CarModel::ReloadDecals sub_820D5D20, SetVinylTextures "
               "sub_820D5F88, the wheels' set-up sub_820D9110 (with the rims sub_820D8BA8 and brakes "
               "sub_820D8C50), with --native_heap CarInterior::LoadSetCBody sub_820D67E8, "
@@ -39,7 +40,7 @@ ITC_FLAG_BOOL(native_car_models, true, "ITC",
               "adapter) and OnFileLoadedB sub_820D4F80 (the texture providers' slot +16 and the "
               "originals where a callee's plain C++ declines guest calls), "
               "with --native_heap LoadSlot::ReleaseBuffer sub_820D0758, and the "
-              "deferred release sub_820C3F50; with --native_heap and the memory blocks' host lock "
+              "deferred release sub_820C3F50 (no adapter: its callers in play are native); with --native_heap and the memory blocks' host lock "
               "CarModel::Release sub_820D4508; with --native_heap the vinyl sheet's texture, "
               "Texture::Create sub_820ECF08 and Texture::Free sub_820ECFC8; the decals' TGA "
               "header's clear sub_820EEBC0 and, with --native_heap, TGA::CreateImage sub_820ED020 "
@@ -80,21 +81,6 @@ void CarModelsLoadSlotLoad(PPCContext& ctx, uint8_t* base) {
   }
   ctx.r3.u64 = cm::LoadSlotLoad(base, ctx.r3.u32, ctx.r4.u32, ctx.r5.u32, ctx.r6.u32,
                                 ctx.r13.u32, hooks::NativeArchiveLoad(base));
-}
-
-void CarModelsTeamEmblem(PPCContext& ctx, uint8_t* base) {
-  // The original's jump table left in r11, r0, r12 and ctr.
-  ctx.r11.s64 = ctx.r4.s64 - 18;
-  if (ctx.r11.u32 <= 26) {
-    ctx.r0.u64 = guest::LoadU8(base, 0x82004F60 + ctx.r11.u32);
-    ctx.r12.s64 = int64_t(int32_t(0x820D3D2Cu)) + int64_t(ctx.r0.u64);
-    ctx.ctr.u64 = ctx.r12.u64;
-  }
-  ctx.r3.s64 = cm::TeamEmblem(ctx.r4.u32);
-}
-
-void CarModelsLoadDecals(PPCContext& ctx, uint8_t* base) {
-  ctx.r3.u64 = cm::CarModelLoadDecals(base, ctx.r3.u32, hooks::NativeArchiveLoad(base));
 }
 
 void CarModelsLoadExterior(PPCContext& ctx, uint8_t* base) {
@@ -255,10 +241,6 @@ void CarModelsOnFileLoadedB(PPCContext& ctx, uint8_t* base) {
   CarModelsFileLoaded(ctx, base, cm::FileLoadedSet::kB);
 }
 
-void CarModelsDeferRelease(PPCContext& ctx, uint8_t* base) {
-  cm::DeferRelease(base, ctx.r3.u32, ctx.r4.u32, ctx.r5.u32, ctx.r6.u32, ctx.r7.u32);
-}
-
 void CarModelsCarModelRelease(PPCContext& ctx, uint8_t* base) {
   if (hooks::ModelsNativeLifetime()) {
     ctx.fpscr.disableFlushMode();  // as CarModel::Reset
@@ -377,11 +359,8 @@ void CarModelsDrawDecal(PPCContext& ctx, uint8_t* base) {
 
 ITC_CAR_MODELS(820D0730, CarModelsLoadSlotReset)
 ITC_CAR_MODELS(820D0758, CarModelsLoadSlotReleaseBuffer)
-ITC_CAR_MODELS(820C3F50, CarModelsDeferRelease)
 ITC_CAR_MODELS(820D0860, CarModelsLoadSlotLoadShared)
 ITC_CAR_MODELS(820D07C8, CarModelsLoadSlotLoad)
-ITC_CAR_MODELS(820D3CF8, CarModelsTeamEmblem)
-ITC_CAR_MODELS(820D5B50, CarModelsLoadDecals)
 ITC_CAR_MODELS(820D5EC8, CarModelsLoadExterior)
 ITC_CAR_MODELS(820D5F88, CarModelsSetVinylTextures)
 ITC_CAR_MODELS(820D5D20, CarModelsReloadDecals)

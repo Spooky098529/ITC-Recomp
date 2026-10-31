@@ -114,6 +114,27 @@ void NativeInteriorLoadParts(PPCContext& ctx, uint8_t* base) {
                                              ctx.r6.u32, hooks::NativeArchiveLoad(base));
 }
 
+// The team emblem's, CarModel::LoadDecals' and the deferred release's
+// register steps (their adapters removed: their callers in play are
+// native): r4 = the block, r3 the id or -1 (r11, r0, r12 and ctr as the
+// original's jump table leaves them); r3 = the car model, r3 = 1; r3 = the
+// set (left), r4 to r7 the record's words.
+void NativeTeamEmblem(PPCContext& ctx, uint8_t* base) {
+  ctx.r11.s64 = ctx.r4.s64 - 18;
+  if (ctx.r11.u32 <= 26) {
+    ctx.r0.u64 = guest::LoadU8(base, 0x82004F60 + ctx.r11.u32);
+    ctx.r12.s64 = int64_t(int32_t(0x820D3D2Cu)) + int64_t(ctx.r0.u64);
+    ctx.ctr.u64 = ctx.r12.u64;
+  }
+  ctx.r3.s64 = car_models::TeamEmblem(ctx.r4.u32);
+}
+void NativeLoadDecals(PPCContext& ctx, uint8_t* base) {
+  ctx.r3.u64 = car_models::CarModelLoadDecals(base, ctx.r3.u32, hooks::NativeArchiveLoad(base));
+}
+void NativeDeferRelease(PPCContext& ctx, uint8_t* base) {
+  car_models::DeferRelease(base, ctx.r3.u32, ctx.r4.u32, ctx.r5.u32, ctx.r6.u32, ctx.r7.u32);
+}
+
 void Slots(Context& h, uint32_t block) {
   {
     Results results("LoadSlot::Reset (sub_820D0730)");
@@ -223,7 +244,7 @@ void DeferReleases(Context& h, uint32_t block) {
           t.r6.u64 = r.Next();
           t.r7.u64 = r.Next();
         },
-        nullptr, __imp__sub_820C3F50, hooks::CarModelsDeferRelease, fmt::format("case {}", c));
+        nullptr, __imp__sub_820C3F50, NativeDeferRelease, fmt::format("case {}", c));
   }
   results.Report();
 }
@@ -1775,7 +1796,7 @@ void Loads(Context& h, uint32_t block) {
   }
   {
     Results results("CarModel::LoadDecals (sub_820D5B50)");
-    run(results, 24, __imp__sub_820D5B50, hooks::CarModelsLoadDecals,
+    run(results, 24, __imp__sub_820D5B50, NativeLoadDecals,
         [&](PPCContext& t, Random& r) {
           DecalRecords(h.base, block + 0x100 + 208, r, r.Below(5) == 0);
           guest::StoreU32(h.base, set + car_models::kSharedBufferSize,
@@ -1973,7 +1994,7 @@ void TeamEmblems(Context& h) {
       t.r3.u64 = 0x1234;
       t.r4.u64 = block;
       t.r5.u64 = 0x5678;
-      (v == 0 ? __imp__sub_820D3CF8 : hooks::CarModelsTeamEmblem)(t, h.base);
+      (v == 0 ? __imp__sub_820D3CF8 : NativeTeamEmblem)(t, h.base);
       for (const uint64_t word : {t.r3.u64, t.r11.u64, t.r0.u64, t.r12.u64, t.ctr.u64}) {
         out[v].Word(uint32_t(word));
         out[v].Word(uint32_t(word >> 32));
@@ -2053,7 +2074,9 @@ void Exteriors(Context& h, uint32_t block) {
       Addresses(out[v], h.base, block, kBlockBytes, known);
       Addresses(out[v], h.base, header, 52, known);
       out[v].Bytes(Read(h.base, data, bytes));
-      Addresses(out[v], h.base, frame + 84, 28, known);
+      // Texture::Create's frame isn't compared here (TextureCreates does):
+      // the later callees' originals (LoadDecals', LoadSetA's) save their
+      // registers over it, which their plain C++ doesn't.
       out[v].Word(uint32_t(loads->calls().size()));
       for (const uint32_t word : loads->calls()) {
         Address(out[v], word, known);
@@ -2125,7 +2148,9 @@ void ReloadDecalCases(Context& h, uint32_t block) {
       Addresses(out[v], h.base, block, kBlockBytes, known);
       Addresses(out[v], h.base, header, 52, known);
       out[v].Bytes(Read(h.base, data, bytes));
-      Addresses(out[v], h.base, frame + 84, 28, known);
+      // Texture::Create's frame isn't compared here (TextureCreates does):
+      // the later callees' originals (LoadDecals', LoadSetA's) save their
+      // registers over it, which their plain C++ doesn't.
       out[v].Word(uint32_t(loads->calls().size()));
       for (const uint32_t word : loads->calls()) {
         Address(out[v], word, known);

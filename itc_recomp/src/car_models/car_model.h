@@ -88,8 +88,8 @@ std::optional<uint32_t> CarModelLoadExterior(uint8_t* base, uint32_t car_model, 
 // `stack` the guest r1 at entry, its frame 320 bytes below), for blocks 18
 // and up the team emblem in sticker group 7's first record, then
 // LoadDecals. Returns 1 (LoadDecals' r3). Not where +3724 is 1 (an image
-// drawn into the sheet, sub_820C4E68, never seen in play: the adapter runs
-// the original). Only while --native_heap routes the game's heap to the
+// drawn into the sheet, sub_820C4E68, not mapped: the adapter runs the
+// original). Only while --native_heap routes the game's heap to the
 // layer.
 uint32_t CarModelReloadDecals(uint8_t* base, uint32_t car_model, uint32_t stack,
                               const archive::LoadCall& load);

@@ -36,7 +36,7 @@ struct FileLoadedCalls {
 
 // Whether the callback runs natively for this request: not for the first
 // texture set's (+3956) when +3724 is 1 (sub_820C4E68's image drawn into the
-// sheet, never seen in play: the original's), nor, for set a, when that
+// sheet, not mapped: the original's; it runs in play), nor, for set a, when that
 // set's buffer (+3968 + 24i) isn't pages the allocation layer gave.
 bool FileLoadedNative(uint8_t* base, FileLoadedSet set, uint32_t request, uint32_t car);
 

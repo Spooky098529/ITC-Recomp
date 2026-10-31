@@ -22,11 +22,6 @@ void CarModelsLoadSlotReleaseBuffer(PPCContext& ctx, uint8_t* base);
 // --native_heap routes VirtualAlloc to the layer.
 void CarModelsLoadSlotLoadShared(PPCContext& ctx, uint8_t* base);
 void CarModelsLoadSlotLoad(PPCContext& ctx, uint8_t* base);
-// The team emblem sub_820D3CF8: r4 = the block; r3 the asset id or -1 (r11,
-// r0, r12 and ctr as the original's jump table leaves them).
-void CarModelsTeamEmblem(PPCContext& ctx, uint8_t* base);
-// CarModel::LoadDecals sub_820D5B50: r3 = the car model; r3 = 1.
-void CarModelsLoadDecals(PPCContext& ctx, uint8_t* base);
 // CarModel::LoadExterior sub_820D5EC8: r3 = the car model, r4 = its set-up;
 // r3 = 1. Natively only while --native_heap routes the game's heap to the
 // layer, and where memcpy's copy is native.
@@ -64,8 +59,6 @@ void CarModelsOnFileLoadedB(PPCContext& ctx, uint8_t* base);
 // CarModel::ReloadDecals sub_820D5D20: r3 = the car model; r3 = 1. The
 // original where +3724 is 1 or without --native_heap.
 void CarModelsReloadDecals(PPCContext& ctx, uint8_t* base);
-// sub_820C3F50: r3 = the set (left), r4 to r7 the record's words.
-void CarModelsDeferRelease(PPCContext& ctx, uint8_t* base);
 
 // CarModel::Release sub_820D4508: r3 = the car model; r3 as the original
 // leaves it. Natively only while hooks::ModelsNativeLifetime().
