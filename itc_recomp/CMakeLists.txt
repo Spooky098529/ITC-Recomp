@@ -249,6 +249,7 @@ set(ITC_SOURCES
     src/material_passes/set_materials.cpp
     src/material_passes/paint.cpp
     src/material_passes/projector.cpp
+    src/material_passes/palette.cpp
     src/save_interface/save_interface.cpp
     src/save_interface/save_layer.cpp
     src/hooks/file_layer.cpp

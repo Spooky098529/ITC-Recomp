@@ -44,6 +44,9 @@ void MaterialPassesSetMaterials(PPCContext& ctx, uint8_t* base);
 void MaterialPassesSetPaint(PPCContext& ctx, uint8_t* base);
 void MaterialPassesSetPaintBody(PPCContext& ctx, uint8_t* base);
 void MaterialPassesApplyPalette(PPCContext& ctx, uint8_t* base);
+// PaintPalette::Init sub_820D2330: no arguments; r3 as the original leaves
+// it.
+void MaterialPassesPaintPaletteInit(PPCContext& ctx, uint8_t* base);
 
 // Projector::Matrices sub_820D1EB8: r3 = the object, r4 = the matrix, r5 =
 // the scale matrix (out), r6 = the view matrix (out), r7 = the point, r9 =

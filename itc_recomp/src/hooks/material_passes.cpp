@@ -19,7 +19,8 @@ ITC_FLAG_BOOL(native_material_passes, true, "ITC",
               "PartModel::SetPaint sub_820D0EA8, SetPaintBody sub_820D1378 and ApplyPalette "
               "sub_820D2EA8 (calling the colors' plain C++), Projector::Matrices sub_820D1EB8 (with "
               "Matrix::LookAt sub_820D1D70, no adapter: only it calls it; the matrix functions' "
-              "plain C++, Copy and Multiply noted for frame interpolation)) natively "
+              "plain C++, Copy and Multiply noted for frame interpolation), PaintPalette::Init sub_820D2330 "
+              "(the paint palette's constants)) natively "
               "instead of through the translated code (the same writes; checked by "
               "--run_harnesses=material_passes)");
 
@@ -112,6 +113,13 @@ void MaterialPassesApplyPalette(PPCContext& ctx, uint8_t* base) {
   ctx.r3.u64 = mp::ApplyPalette(base, ctx.r3.u32, ctx.r1.u32);
 }
 
+void MaterialPassesPaintPaletteInit(PPCContext& ctx, uint8_t* base) {
+  ctx.fpscr.disableFlushMode();
+  if (const auto r3 = mp::PaintPaletteInit(base, ctx.r1.u32)) {
+    ctx.r3.u64 = *r3;
+  }
+}
+
 void MaterialPassesProjectorMatrices(PPCContext& ctx, uint8_t* base) {
   const mp::ProjectorArgs args{ctx.r3.u32, ctx.r4.u32, ctx.r5.u32,
                                ctx.r6.u32, ctx.r7.u32, ctx.r9.u32};
@@ -156,3 +164,4 @@ ITC_MATERIAL_PASSES(820D0EA8, MaterialPassesSetPaint)
 ITC_MATERIAL_PASSES(820D1378, MaterialPassesSetPaintBody)
 ITC_MATERIAL_PASSES(820D2EA8, MaterialPassesApplyPalette)
 ITC_MATERIAL_PASSES(820D1EB8, MaterialPassesProjectorMatrices)
+ITC_MATERIAL_PASSES(820D2330, MaterialPassesPaintPaletteInit)

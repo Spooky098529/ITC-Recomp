@@ -94,6 +94,18 @@ uint32_t SetPaintBody(uint8_t* base, uint32_t model, const uint64_t regs[6], uin
 // and +112. Frame 224 bytes.
 uint32_t ApplyPalette(uint8_t* base, uint32_t model, uint32_t sp);
 
+// --- The paint palette (palette.cpp) ---
+
+// PaintPalette::Init (sub_820D2330): when the scene ([0x826C2E44]) exists,
+// the palette's 16 entries (0x826C5110, 64 bytes each: +0, +16, +32 three
+// colors as (hue, saturation, value, 1.0), +48 to +56 three floats, +60
+// left) filled with the image's constants; three floats differ when the
+// scene's +4 isn't zero. Its frame (sp - 1184: the back chain, the scene at
+// +24, its locals at +16 to +108, the loop's index 16 at +40, the colors
+// built at +112 to +876) as the original leaves it. r3 as the original
+// leaves it, or nullopt (r3 untouched) when there's no scene.
+std::optional<uint64_t> PaintPaletteInit(uint8_t* base, uint32_t sp);
+
 // --- A part model's materials' fields by a mask (set_materials.cpp) ---
 
 // Model::MaterialTotal (sub_82594AC0): the shape's material block's +0 (the

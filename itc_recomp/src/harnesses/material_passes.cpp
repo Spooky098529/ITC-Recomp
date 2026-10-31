@@ -682,6 +682,53 @@ void Projectors(Context& h, uint32_t block) {
   }
 }
 
+void Palettes(Context& h, uint32_t block) {
+  // The palette and the scene's pointer (live globals) set for each case and
+  // put back after. Every call runs all 16 of the jump table's cases (its
+  // index never leaves 0-15); the scene's +4 picks three floats.
+  constexpr uint32_t kPalette = 0x826C5110;
+  constexpr uint32_t kScenePointer = 0x826C2E44;
+  constexpr uint32_t kSaves = 296;  // r14 to r31 and lr, f14 to f31
+  const std::vector<uint8_t> saved = Read(h.base, kPalette, 1024);
+  const uint32_t saved_scene = guest::LoadU32(h.base, kScenePointer);
+  const uint32_t scene = block + 0x100;
+  Results results("PaintPalette::Init (sub_820D2330)");
+  for (int c = 0; c < 64; c++) {
+    const uint64_t seed = h.random.Next();
+    Outputs out[2];
+    for (int v = 0; v < 2; v++) {
+      PPCContext t = CallContext(h);
+      const uint32_t sp = t.r1.u32;
+      Random r(seed);
+      RandomBytes(h.base, block, kBlockBytes, r);
+      RandomBytes(h.base, sp - kStackBytes, kStackBytes + kCallerBytes, r);
+      RandomBytes(h.base, kPalette, 1024, r);
+      // No scene, then the scene's +4 zero, 1, -1 and anything else.
+      const uint32_t kind = uint32_t(c) % 5;
+      static constexpr uint32_t kSets[3] = {0, 1, 0xFFFFFFFFu};
+      const uint32_t set = kind == 0 || kind == 4 ? uint32_t(r.Next()) | 0x10u : kSets[kind - 1];
+      guest::StoreU32(h.base, kScenePointer, kind == 0 ? 0 : scene);
+      guest::StoreU32(h.base, scene + 4, set);
+      t.r3.u64 = r.Next();
+      (v == 0 ? __imp__sub_820D2330 : hooks::MaterialPassesPaintPaletteInit)(t, h.base);
+      for (uint32_t e = 0; e < 16; e++) {
+        out[v].Floats(h.base, kPalette + 64 * e, 15);
+        out[v].Bytes(Read(h.base, kPalette + 64 * e + 60, 4));
+      }
+      out[v].Bytes(Read(h.base, block, kBlockBytes));
+      out[v].Bytes(Read(h.base, sp - kStackBytes, kStackBytes - kSaves));
+      out[v].Bytes(Read(h.base, sp, kCallerBytes));
+      out[v].Word(guest::LoadU32(h.base, kScenePointer));
+      out[v].Word(t.r3.u32);
+      out[v].Word(uint32_t(t.r3.u64 >> 32));
+    }
+    results.Check(out[0], out[1], fmt::format("case {}", c));
+  }
+  guest::StoreU32(h.base, kScenePointer, saved_scene);
+  Write(h.base, kPalette, saved.data(), uint32_t(saved.size()));
+  results.Report();
+}
+
 }  // namespace
 
 void MaterialPasses(Context& h) {
@@ -691,6 +738,7 @@ void MaterialPasses(Context& h) {
   Tables(h, block);
   Passes(h, block);
   Projectors(h, block);
+  Palettes(h, block);
   memory::Free(allocation);
 }
 
