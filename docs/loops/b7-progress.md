@@ -42,7 +42,9 @@ file's history. What's left to see in a drive, from every run:
 - Subsystem 2 of 3: the part models' material passes
   (`sub_820D0EA8`...`sub_820D3318`; picked as closest to ready, 6 of
   its 9 roots ready, and blocking the rest of the scene loaders).
-  Mapping running.
+  Mapped (2da185e, `material-passes.md`, 23 new rows, 22 in play, 15
+  ready groups, no stop; nothing outside blocks it; `PaintPalette::Init`
+  `sub_820D2330` taken in from the scene's lead). Migration 1 running.
 
 ## Done
 
@@ -79,5 +81,7 @@ file's history. What's left to see in a drive, from every run:
 - After its validation (`itc_2852`, 60 s: race 7 s, 0 errors, every
   harness 0 differing but the expected groups): ours 3447, work left
   2950.
+- After the material passes' map: ours 3447, work left 2950 (wrapped
+  103, known 489, unknown 2358).
 
 ## Stopped

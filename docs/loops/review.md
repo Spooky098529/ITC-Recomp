@@ -13,6 +13,17 @@ When the user has reviewed a run's section, its heading gets
 
 ## Run 2026-10-30 23:03 (`b7-loop-30-10-26-2`)
 
+- The material passes' map (2da185e): `functions/material-passes.md`,
+  23 new rows (22 seen in play): `PartModel::SetPaint`, `SetPaintBody`
+  (three HSV colors in r4-r9, through `Color::HsvToRgb`; the byte
+  conversion `Color::HsvToRgb8`'s results overwritten but for a
+  negative hue, kept as is), `ApplyPalette` over the palette at
+  `0x826C5110` (`known-data.md`; for pairs the third color from entry j,
+  not 11+j, probably a slip in the original), `PaintPalette::Init`
+  `sub_820D2330` (taken in from the scene's lead), the small passes,
+  `Projector::Matrices` with `Matrix::LookAt` (what it's for not known),
+  four table lookups; `scene-loaders.md`'s seven walks now name the
+  passes. Two leads added.
 - `car-models.md` (already mapped; the map checked by the lead, not
   remapped). Migration 1's rows (9f71b49..233c175): `LoadSlot::LoadShared`
   and `Load`, `LoadSetA` and `LoadSetB` (now Native; return `int64_t`,
