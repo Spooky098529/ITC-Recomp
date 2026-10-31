@@ -16,6 +16,30 @@ function goes from this list when a log shows its `native running
 (game):` line (say which log in the commit). A run with nothing left
 here loses its heading.
 
+## Run 2026-10-30 23:03 (`b7-loop-30-10-26-2`)
+
+- The race HUD object, migration 2 (attract race `itc_2893`, replay
+  `itc_2894`: broke, the SDK's "BaseHeap::Release failed because
+  address is not a region start" once at the race-end change ~118 s in,
+  as in `itc_2693` and `itc_2853`; it ran to the end):
+  `sub_82212270` RaceHud::StartCountdown,
+  `sub_82212E60` RaceHud::UpdateRecordingFull.
+
+- The race HUD object, migration 1 (attract race `itc_2883`, replay
+  `itc_2884`, ok; `race-hud-object.md`; the timer's and racers' bars'
+  modes, not in the replay's race):
+  `sub_82211FB8` HudBar::Step,
+  `sub_82215820` RaceHud::Touching,
+  `sub_82213750` RaceHud::SetTime,
+  `sub_82214A50` RaceHud::SetDistance,
+  `sub_82214D78` RaceHud::TickTimer.
+
+- The car models, migration 2 (attract race `itc_2852`, replay
+  `itc_2853`: broke, the SDK's "BaseHeap::Release failed because
+  address is not a region start" once at the race-end change ~118 s in,
+  as in `itc_2693` and `itc_2784`; it ran to the end; `car-models.md`):
+  `sub_820D5D20` CarModel::ReloadDecals.
+
 ## Run 2026-10-30 11:39 (`b7-loop-30-10-26`)
 
 - The race event, migration 1 (attract race `itc_2673`, replay

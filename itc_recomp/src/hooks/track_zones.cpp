@@ -13,6 +13,7 @@
 #include "guest.h"
 
 #include "base/flags.h"
+#include "hooks/app_start_up.h"
 #include "hooks/guest_call.h"
 #include "track_zones/track_zones.h"
 
@@ -153,6 +154,9 @@ ITC_TRACK_ZONES(820C9718, ctx.r3.u64 = RacersVehicle(base, ctx.r3.u32))
 // where operator new can't be native.
 extern "C" REX_FUNC(sub_8228E788) {
   REX_FUNC_PROLOGUE();
+  if (hooks::StartUpRecorded(ctx, 0x8228E788)) {
+    return;  // a harness's (the race HUD object's)
+  }
   if (!ITC_FLAG(native_track_zones)) {
     __imp__sub_8228E788(ctx, base);
     return;

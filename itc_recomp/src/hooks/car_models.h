@@ -16,8 +16,49 @@ void CarModelsLoadSlotReset(PPCContext& ctx, uint8_t* base);
 // leaves it. Natively only while --native_heap routes VirtualFree to the
 // allocation layer.
 void CarModelsLoadSlotReleaseBuffer(PPCContext& ctx, uint8_t* base);
-// sub_820C3F50: r3 = the set (left), r4 to r7 the record's words.
-void CarModelsDeferRelease(PPCContext& ctx, uint8_t* base);
+// LoadSlot::LoadShared sub_820D0860 and LoadSlot::Load sub_820D07C8: r3 =
+// the slot, r4 = the asset id, r5 = the callback's context, r6 = the
+// callback; r3 1 when loading, else 0. LoadSlot::Load natively only while
+// --native_heap routes VirtualAlloc to the layer.
+void CarModelsLoadSlotLoadShared(PPCContext& ctx, uint8_t* base);
+void CarModelsLoadSlotLoad(PPCContext& ctx, uint8_t* base);
+// CarModel::LoadExterior sub_820D5EC8: r3 = the car model, r4 = its set-up;
+// r3 = 1. Natively only while --native_heap routes the game's heap to the
+// layer, and where memcpy's copy is native.
+void CarModelsLoadExterior(PPCContext& ctx, uint8_t* base);
+// CarModel::SetVinylTextures sub_820D5F88: r3 = the scene model; r3 the last
+// part model.
+void CarModelsSetVinylTextures(PPCContext& ctx, uint8_t* base);
+// The wheels' set-up sub_820D9110: r3 = the wheels, r4 = the set-up; r3 the
+// last LoadSlot::LoadShared's (the original where memcpy's copy can't be
+// native).
+void CarModelsWheelsSetUp(PPCContext& ctx, uint8_t* base);
+// CarInterior::LoadSetCBody sub_820D67E8: r3 = the object, r4 = its set-up;
+// r3 the last LoadShared's. Natively only while --native_heap routes
+// VirtualAlloc to the layer, and where memcpy's copy is native.
+void CarModelsCockpitLoadSetC(PPCContext& ctx, uint8_t* base);
+// CarInterior::Load sub_820D79B0: r3 = the object, r4 = its set-up; r3 the
+// last accessories' slot +4 call's (memcpy's for other sets). The slot +4
+// calls are guest calls, from a 112-byte frame as the original's; the
+// original where memcpy's copy can't be native.
+void CarModelsInteriorLoad(PPCContext& ctx, uint8_t* base);
+// CarModel::MakePlate sub_820ED6D0: r3 to r6 where the textures go, r7 to
+// r10 and the caller's stack the 48-byte struct; r3 as the original leaves
+// it. Resource::Release a guest call from a 944-byte frame as the
+// original's. Natively only while --native_heap routes the allocations to
+// the layer and memcpy is native.
+void CarModelsMakePlate(PPCContext& ctx, uint8_t* base);
+// CarModel::OnFileLoaded sub_820D47A8 and OnFileLoadedB sub_820D4F80:
+// r3 = the request's serial, r4 = its buffer, r6 = the car model (r3 left
+// as it came: the archive's finish doesn't read it). Their guest calls from
+// a 1,552-byte frame as the original's; the original for a request
+// FileLoadedNative refuses, or without the allocation layer, --native_models
+// or a native memcpy.
+void CarModelsOnFileLoaded(PPCContext& ctx, uint8_t* base);
+void CarModelsOnFileLoadedB(PPCContext& ctx, uint8_t* base);
+// CarModel::ReloadDecals sub_820D5D20: r3 = the car model; r3 = 1. The
+// original where +3724 is 1 or without --native_heap.
+void CarModelsReloadDecals(PPCContext& ctx, uint8_t* base);
 
 // CarModel::Release sub_820D4508: r3 = the car model; r3 as the original
 // leaves it. Natively only while hooks::ModelsNativeLifetime().

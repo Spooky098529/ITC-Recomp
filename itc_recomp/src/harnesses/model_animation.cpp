@@ -74,6 +74,7 @@ ITC_NATIVE_STEP(NativeLoadNodeValues,
                 ma::SkeletonLoadNodeValues(base, ctx.r3.u32, ctx.r4.u32))
 ITC_NATIVE_STEP(NativeApplyAnimation, ma::SkeletonApplyAnimation(base, ctx.r3.u32))
 ITC_NATIVE_STEP(NativeResetPose, ma::SkeletonResetPose(base, ctx.r3.u32))
+ITC_NATIVE_STEP(NativeLocalMatrices, ma::SkeletonLocalMatrices(base, ctx.r3.u32, ctx.r1.u32))
 ITC_NATIVE_STEP(NativeCursorCurveSample,
                 ctx.f1.f64 = ma::CursorCurveSample(base, ctx.r4.u32, ctx.r5.u32, ctx.r6.u32,
                                                    ctx.f1.f64))
@@ -747,6 +748,73 @@ void Skeletons(Context& h) {
   results.Report();
 }
 
+// Skeleton::LocalMatrices: the skeleton's layout with the file's matrices
+// (+104) and the bones' 144-byte records (+140) past the section, all
+// floats; the area (its float words as floats) and the original's frame
+// (320 bytes below the stack: the angles, their turns, the identity) with
+// the rotations' turns below it compared. r3 isn't: no caller reads it.
+void LocalMatricesCases(Context& h) {
+  const SkeletonLayout l = MakeSkeletonLayout(h);
+  const uint32_t file_matrices = h.data + 2816;  // 64 bytes a node
+  const uint32_t bones = h.data + 3072;          // 144 bytes a node
+  std::vector<uint32_t> floats = SkeletonFloats(l);
+  for (uint32_t i = 0; i < kMaxNodes * 16; i++) {
+    floats.push_back(file_matrices + 4 * i);
+  }
+  for (uint32_t i = 0; i < kMaxNodes * 36 && bones + 4 * i < h.data + kScratchBytes; i++) {
+    floats.push_back(bones + 4 * i);
+  }
+  for (uint32_t n = 0; n < kMaxNodes; n++) {
+    for (uint32_t i = 0; i < 3; i++) {
+      floats.push_back(l.nodes + 144 * n + 32 + 4 * i);  // the scale
+    }
+  }
+  Results results("sub_82599C58 Skeleton::LocalMatrices");
+  for (int c = 0; c < 400; c++) {
+    Outputs out[2];
+    const Random start = h.random;
+    Random after;
+    for (int v = 0; v < 2; v++) {
+      h.random = start;
+      Fill(h.base, h.data, kScratchBytes);
+      WriteSkeleton(h, l, false);
+      guest::StoreU32(h.base, l.skeleton + 104, file_matrices);
+      guest::StoreU32(h.base, l.skeleton + 140, bones);
+      for (uint32_t i = 0; i < kMaxNodes * 16; i++) {
+        StoreFloatWord(h.base, file_matrices + 4 * i, MatrixWord(h.random));
+      }
+      for (uint32_t i = 0; i < kMaxNodes * 36 && bones + 4 * i < h.data + kScratchBytes; i++) {
+        StoreFloatWord(h.base, bones + 4 * i,
+                       h.random.Below(2) ? FloatWord(h.random) : MatrixWord(h.random));
+      }
+      for (uint32_t n = 0; n < kMaxNodes; n++) {
+        // Angles of a few turns either way, now and then.
+        for (uint32_t i = 0; i < 3; i++) {
+          if (h.random.Below(3) == 0) {
+            StoreFloatWord(h.base, l.nodes + 144 * n + 16 + 4 * i,
+                           std::bit_cast<uint32_t>(float(int32_t(h.random.Below(4001)) - 2000) /
+                                                   100.0f));
+          }
+        }
+      }
+      PPCContext t = CallContext(h);
+      const uint32_t frame = t.r1.u32 - 320;
+      for (uint32_t i = 0; i < 512; i += 4) {
+        guest::StoreU32(h.base, t.r1.u32 - 512 + i, 0xCDCDCDCDu);
+      }
+      t.r3.u64 = l.skeleton;
+      (v == 0 ? __imp__sub_82599C58 : NativeLocalMatrices)(t, h.base);
+      AreaOutputs(h, out[v], floats);
+      out[v].Bytes(Read(h.base, frame + 80, 128));
+      out[v].Bytes(Read(h.base, (frame - 80) & ~0xFu, 64));
+      after = h.random;
+    }
+    h.random = after;
+    results.Check(out[0], out[1], fmt::format("case {}", c));
+  }
+  results.Report();
+}
+
 // The skeleton's frees and the primitive drawer's constructor: blocks from
 // the allocation layer at +128 (plain), +132, +136, +144 (count headers)
 // and +176 (plain), each there or not; after each side, the skeleton's
@@ -836,6 +904,7 @@ void ModelAnimation(Context& h) {
   Curves(h);
   Lifetime(h);
   Skeletons(h);
+  LocalMatricesCases(h);
   SkeletonLifetime(h);
 }
 

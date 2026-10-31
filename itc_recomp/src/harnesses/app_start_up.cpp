@@ -1385,9 +1385,16 @@ struct AppNumbering {
   }
 };
 AppNumbering g_app_numbering;
+// operator new's adapter (sub_825A6880) reports to the shared recorder for
+// the race HUD object's harness; the native steps call it directly, so these
+// recorders let it allocate on both sides.
+constexpr uint32_t kOperatorNew = 0x825A6880;
 std::vector<uint32_t> g_app_log;
 uint32_t g_app_calls = 0;
 bool RecordAppCall(PPCContext& ctx, uint32_t address) {
+  if (address == kOperatorNew) {
+    return false;  // allocates, as the native side's direct call does
+  }
   const AppNumbering& n = g_app_numbering;
   g_app_log.insert(g_app_log.end(), {address, n.Of(ctx.r3.u32), n.Of(ctx.r4.u32),
                                      uint32_t(ctx.lr), n.Of(ctx.r1.u32)});
@@ -1494,6 +1501,9 @@ void AppConstructCases(Context& h) {
 std::vector<uint32_t> g_create_log;
 uint32_t g_create_stack = 0;
 bool RecordAppConstruct(PPCContext& ctx, uint32_t address) {
+  if (address == kOperatorNew) {
+    return false;  // allocates, as the native side's direct call does
+  }
   const uint32_t app = ctx.r3.u32;
   const bool heap = app != 0 && memory::IsHeapBlock(app) && memory::Size(app) == asu::kAppBytes;
   g_create_log.insert(g_create_log.end(), {address, heap ? 1u : app, ctx.r4.u32, uint32_t(ctx.lr),

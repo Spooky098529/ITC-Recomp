@@ -194,5 +194,17 @@ extern "C" REX_FUNC(sub_8209F5E0) {
   }
   hooks::SaveDataResetControllers(ctx, base);
 }
-ITC_SAVE_DATA_ADAPTER(8220BAC0, SaveDataMenuListInit)
+// MenuList::Init hands its call to the harnesses' recorder first (the race
+// HUD object's).
+extern "C" REX_FUNC(sub_8220BAC0) {
+  REX_FUNC_PROLOGUE();
+  if (hooks::StartUpRecorded(ctx, 0x8220BAC0)) {
+    return;
+  }
+  if (!ITC_FLAG(native_save_data)) {
+    __imp__sub_8220BAC0(ctx, base);
+    return;
+  }
+  hooks::SaveDataMenuListInit(ctx, base);
+}
 ITC_SAVE_DATA_ADAPTER(82221D00, SaveDataResetPlayer)

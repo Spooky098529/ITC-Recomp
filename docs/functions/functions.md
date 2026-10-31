@@ -282,7 +282,7 @@ Rows not yet moved stay in the table below. So far:
   `c-runtime.md` (B7).
 - [`race-hud.md`](race-hud.md): the race HUD's movie picker (a UI
   movie run by the HUD's state) and the rival intro's logo draw (B7;
-  the HUD's set-up, update and teardown aren't in it).
+  the HUD's set-up, update and teardown are in `race-hud-object.md`).
 - [`race-setup.md`](race-setup.md): the race's set-up (the race data
   reset, its route and the course routes' table, the racers made from
   the garage, the rival's items and the traffic, their start positions,
@@ -422,6 +422,19 @@ Rows not yet moved stay in the table below. So far:
   location's opponents posed as cars, the pictures loaded from the
   archive, its 16 pages (menus, texts, the race's set-up) and 36 page
   transitions over two UI movies (B7).
+- [`material-passes.md`](material-passes.md): the passes over a part
+  model's material records: the paint colors from hue, saturation and
+  value or from the paint palette at `0x826C5110` (and the palette's
+  set-up), the alpha, brightness, texture and cull mode of a model's
+  draws and its fields set by a mask, with the second set's small
+  helpers beside them (a projector's matrices, a look-at, table lookups)
+  (B7).
+- [`race-hud-object.md`](race-hud-object.md): the race HUD object and
+  the in-race screens' holder around it: the movies' set-up, the
+  dashboard's gauges (tachometer, boost, speed, gear, extra gauges), the
+  rear-view mirror's texture, the expressway sign and place name by the
+  track zones, the countdown, the warning, the racers' bars, the item
+  popup and the timer (B7).
 
 These files hold functions only. What used to follow the table here moved
 out on 2026-10-20: how frame interpolation works, its options and what
@@ -476,10 +489,10 @@ old performance notes to the end of `../native-renderer.md`.
 | `sub_82297DC0` | | | Empty (`blr`): the retail game's debug output goes nowhere. |
 | `sub_82296E70` | `SetLastError` | Overridden | r3 = the error: stored in the current thread's last error, `[[r13+256]+352]` (r13 = the PCR, +256 its current thread), unless `[r13+336]` is set (probably: in a DPC). Ours: `last_error::Set` (`src/hooks/last_error.cpp`), a thin adapter for the recompiled callers; our adapters call it directly. 2,000 cases the same as the recompiled one (with `sub_82296FD0`). |
 | `sub_82296FD0` | `SetLastError` | Overridden | Jumps to `sub_82296E70`. Ours: the same as `sub_82296E70`. |
-| `sub_82296EC0` | `GetLastError` | | The thread's last error (`[[r13+256]+352]`), or 0 while `[r13+336]` is set. Called by `sub_82294ED8` after its XMsg call. |
+| `sub_82296EC0` | `GetLastError` | Native | The thread's last error (`[[r13+256]+352]`), or 0 while `[r13+336]` is set. Called by `sub_82294ED8` after its XMsg call (Dropped, never runs), and through `sub_82295F18`. Ours (B7 loop, 2026-10-30, a ready group under the car models' `LoadSlot::Load`): `last_error::Get` (`src/hooks/last_error.cpp`, as `SetLastError`'s, no flag), reached by `sub_82295F18`'s adapter and `car_models::LoadSlotLoad`; its own adapter removed (its only caller in play is `sub_82295F18`'s, a temporary counter saw no call in an attract race). Harness `last_error` (64 cases, both entry points against this one; its register steps, r11 as the original leaves it, in the harness file).
 | `sub_82294E20` | `CloseHandle` | | r3 = handle: `NtClose`; 1, or 0 with the last error. Called for files, events and enumerators (the file class's close, the save slot's close wait, the enumeration's wait, `Archive::Shutdown`). |
 | `sub_82294DA0` | `GlobalMemoryStatus` | Dropped | r3 = a MEMORYSTATUS (32 bytes) filled from `MmQueryStatistics`. From `sub_82106548`, `sub_82106618` and `sub_82107910` (25 calls in a session), each with a buffer in its frame that it never reads. Ours (`src/hooks/memory_status.cpp`): writes nothing. `BootData::Load`'s plain C++ (`src/data_load/boot.cpp`, 2026-10-30) leaves both its calls out, as `App::StartUp`'s does. |
-| `sub_82295F18` | `GetLastError` | | Jumps to `sub_82296EC0`. Called after failed file calls (GetDiskFreeSpaceEx, XGetOverlappedResult, the C runtime's I/O), and on free's and realloc's failure paths (`heap.md`, never ran). |
+| `sub_82295F18` | `GetLastError` | Overridden | Jumps to `sub_82296EC0`. Called after failed file calls (GetDiskFreeSpaceEx, XGetOverlappedResult, the C runtime's I/O), and on free's and realloc's failure paths (`heap.md`, never ran), and `LoadSlot::Load`'s (`car-models.md`) when its VirtualAlloc fails (the result not read). Ours: the same as `sub_82296EC0` (`last_error::Get`). |
 | `sub_82296E88` | `SetLastErrorFromStatus` | Overridden | r3 = an NTSTATUS: `SetLastError(RtlNtStatusToDosError(r3))` (the same check of `[r13+336]`), returning the DOS error. Called after failed kernel calls (27 files). Ours: `last_error::SetFromStatus`, the mapping from the SDK's `xeRtlNtStatusToDosError` (C++, no guest call) until the import's last recompiled caller, `sub_822953E8`, is native and the table is ours. 1,000 statuses across the mapping's branches the same as the recompiled one. |
 | `sub_82297340` | | | UTF-8 to UTF-16, for `MultiByteToWideChar`'s code page 65001: r3 = source, r4 = its length, r5 = destination, r6 = its room. Not read. |
 | `sub_82297540` | | | UTF-16 to UTF-8, for `WideCharToMultiByte`'s code page 65001; arguments as `sub_82297340`. Not read. |

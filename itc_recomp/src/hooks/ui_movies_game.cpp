@@ -8,6 +8,7 @@
 #include "base/flags.h"
 #include "base/log.h"
 #include "c_runtime/strings.h"
+#include "hooks/app_start_up.h"
 #include "hooks/archive.h"
 #include "hooks/guest_call.h"
 #include "hooks/heap.h"
@@ -304,6 +305,9 @@ extern "C" REX_FUNC(sub_8211B3F0) {
 // original leaves it).
 extern "C" REX_FUNC(sub_8211AD00) {
   REX_FUNC_PROLOGUE();
+  if (hooks::StartUpRecorded(ctx, 0x8211AD00)) {
+    return;  // a harness's (the race HUD object's)
+  }
   NATIVE_OR_ORIGINAL(8211AD00);
   constexpr uint32_t kScene = 0x826BABA0;
   ui_movies::ClearScreenFlag(base);
@@ -776,6 +780,9 @@ extern "C" REX_FUNC(sub_8211BEE8) {
 // UiMovie::ScrollText: r6 = scrolling).
 extern "C" REX_FUNC(sub_8211C470) {
   REX_FUNC_PROLOGUE();
+  if (hooks::StartUpRecorded(ctx, 0x8211C470)) {
+    return;  // a harness's (the race HUD object's)
+  }
   NATIVE_HEAP_OR_ORIGINAL(8211C470,
                           ui_movies::ClearText(base, ctx.r3.u32, ctx.r4.u32, ctx.r5.u32));
 }
@@ -804,6 +811,9 @@ extern "C" REX_FUNC(sub_8211C5F8) {
 // texts' map. FormatV's guest calls through this context, lr put back.
 extern "C" REX_FUNC(sub_8211C1F8) {
   REX_FUNC_PROLOGUE();
+  if (hooks::StartUpRecorded(ctx, 0x8211C1F8)) {
+    return;  // a harness's (the race HUD object's)
+  }
   if (NativeHeap()) {
     ctx.fpscr.disableFlushMode();
     const uint64_t lr = ctx.lr;
@@ -822,6 +832,9 @@ extern "C" REX_FUNC(sub_8211C1F8) {
 
 namespace ui_movies_game_hooks {
 void SetNodeText(PPCContext& ctx, uint8_t* base) {
+  if (hooks::StartUpRecorded(ctx, 0x8211C7E8)) {
+    return;  // a harness's (the race HUD object's)
+  }
   if (NativeHeap()) {
     ctx.fpscr.disableFlushMode();
     const uint64_t lr = ctx.lr;
@@ -1000,6 +1013,9 @@ ui_movies::DeleteCalls DeleteCalls(PPCContext& ctx, uint8_t* base, uint32_t sp) 
 // UiMovies::Open: r3 = the movie id, r4 = the asset id; r3 = 1 or 0.
 extern "C" REX_FUNC(sub_8211E808) {
   REX_FUNC_PROLOGUE();
+  if (hooks::StartUpRecorded(ctx, 0x8211E808)) {
+    return;  // a harness's (the race HUD object's)
+  }
   if (!ui_movies_game_hooks::OpenNative()) {
     __imp__sub_8211E808(ctx, base);
     return;

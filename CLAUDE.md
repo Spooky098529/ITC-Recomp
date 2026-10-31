@@ -400,6 +400,18 @@ opponents to race, the user's description) native (ours 3,167 ->
 `UiMovie::SetText` and `SetNodeText` calls leave unset. The rest waits
 on the menu input and sound, the scene and its models, the scenery's
 set-up and teardown and `XPR::GetTexture`.
+Its twenty-sixth run (`b7-loop-30-10-26-2`, 2026-10-30 to 31, merged
+into `rexglue-removal-project` 2026-10-31 before a drive; summary `docs/loops/b7-loop-2026-10-30-2303.md`; 3 subsystems)
+made the car models (`car-models.md`, `--native_car_models`, 48 of 50
+in play, with `GetLastError`), the part models' material passes
+(`material-passes.md`, `--native_material_passes`, 22 of 22) and the
+race HUD object (`race-hud-object.md`, `--native_race_hud_object`, 45
+of 58 in play) native (ours 3,423 -> 3,514); it stopped at its last
+validation: `App::App` and `App::Create`'s harnesses differed since
+`operator new`'s adapter reports to their shared harness recorder
+(83b2b76; fixed after: their recorders let it allocate), and the
+harnesses take 56.7 s of the validation's 60. The rest waits on the menu sound, the other in-race
+screens and the scene's second set.
 Harness runs use `attract_race.sh 40` (the user's call,
 2026-10-23); a race short only because the harnesses took longer is
 no halt. B7 loop migration agents run only their subsystem's harnesses

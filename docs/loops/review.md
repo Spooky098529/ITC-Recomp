@@ -11,6 +11,111 @@ functions to check in a drive in the progress file.
 When the user has reviewed a run's section, its heading gets
 "(reviewed <date>)"; the section stays for the record.
 
+## Run 2026-10-30 23:03 (`b7-loop-30-10-26-2`)
+
+- The race HUD object's map (ac07446): `functions/race-hud-object.md`,
+  86 new rows (57 seen in play, 29 not): `RaceHud::` (our name) at +16
+  of `RaceScreens::` (the holder at `[0x826D84F0]`, made by
+  `sub_82211F40`): its nine UI movies, the dashboard's gauges, the
+  rear-view mirror's render target (texture 56), the countdown and its
+  sounds, the warning movie, the racers' bars, the item popup, the
+  timer, the mode at +448; the expressway sign from zones 0-31
+  (`sub_82212F00`) and the place's text from zones 32-69
+  (`sub_82213510`; the lead said texture 56, corrected in
+  `track-zones.md`'s intro). `known-data.md`: `0x8200D838` rewritten,
+  rows for `0x8200D9D0`, the gauge curves, the holder and the HUD's
+  fields. For review: native callers will pass 0 for the varargs
+  `SetText`/`SetNodeText` arguments left unset (the parking area's
+  call); `sub_82212F00`'s read at +420 - 12 when no zone is inside kept;
+  the draw-side work goes through the native `UiMovie::Run` (no new
+  interpolation decision). Four leads added. Migration 1's rows
+  (003ad8d..6fe8bac; `--native_race_hud_object`,
+  `src/race_hud_object/`): 29 functions, 12 now Native;
+  `sub_82212668` named `RaceHud::ResetBar`, `sub_822122A0`
+  `RaceHud::ClearWarning`. For review: the TickTimer harness keeps its
+  floats finite (a NaN distance makes `SetDistance` write negative
+  digits into the nodes' child indices, as the original does, which the
+  harness's fake node pool can't hold); guest calls through
+  `race_hud_object::Calls` (memcpy where refused,
+  `CameraPasses::RenderTarget`, `TrackZones::Create`,
+  `UiMovie::FinishNamed`, `SetText`, `ClearText`, the extra gauges'
+  digit setters); the adapters of `TrackZones::Create`,
+  `UiMovie::SetText` and `ClearText` now hand calls to the harness
+  recorder first (`hooks::StartUpRecorded`); none of it runs in an
+  attract race (no HUD there). Migration 2's rows (653a14e..e4aaf1e):
+  17 more, `sub_82216A60` a new row (`RaceScreens::Make1004`, our name;
+  Native), `sub_82211C1C` Merged into `RaceScreens::MovieMask`; notes
+  in `ui-movies-game.md`, `files-and-saves.md`, `heap.md`,
+  `save-data.md` (their adapters of `SetNodeText`, `sub_8211AD00`,
+  `UiMovies::Open`, `Strings::Load`, `operator new` and `MenuList::Init`
+  now hand calls to the harness recorder first). For review: `ShowItem`
+  passes 0 for `SetNodeText`'s unset r6-r10 (the parking area's call);
+  `RaceHud::Draw` makes the original's `Run` and mirror calls, frame
+  dumps of the replay with the flag on and off alike (`itc_2887`,
+  `itc_2888`); `RunWarning` and `RunCountdown` not ported (the menu
+  sound has no override for the harness to record).
+- The material passes' map (2da185e): `functions/material-passes.md`,
+  23 new rows (22 seen in play): `PartModel::SetPaint`, `SetPaintBody`
+  (three HSV colors in r4-r9, through `Color::HsvToRgb`; the byte
+  conversion `Color::HsvToRgb8`'s results overwritten but for a
+  negative hue, kept as is), `ApplyPalette` over the palette at
+  `0x826C5110` (`known-data.md`; for pairs the third color from entry j,
+  not 11+j, probably a slip in the original), `PaintPalette::Init`
+  `sub_820D2330` (taken in from the scene's lead), the small passes,
+  `Projector::Matrices` with `Matrix::LookAt` (what it's for not known),
+  four table lookups; `scene-loaders.md`'s seven walks now name the
+  passes. Two leads added. Migration 1's rows (579077c..a02c2b2;
+  `--native_material_passes`, `src/material_passes/`): 21 rows, among
+  them `Model::MaterialTotal` and `MaterialAt` (`sub_82594AC0`,
+  `sub_82594B00`), `sub_820D3250` and `Matrix::LookAt` Native with no
+  adapter; `HsvToRgb8` Native. For review: the harness skips three
+  register-save words only the originals write (`HsvToRgb8`'s r31 save;
+  the same under `SetPaint` and `SetPaintBody` when all three
+  saturations are 0; `LookAt`'s lr and r31 under `Projector::Matrices`),
+  as the car models' `Texture::Create` frame; `TransposeRotation`,
+  `SetMaterials` and `Projector::Matrices` run the original when
+  `c_runtime::Memcpy` refuses their copy (for `Projector::Matrices`
+  after the view matrix is written, harmless unless outputs overlap
+  inputs); `FlipCulling` not seen in an attract race (harness only).
+  Migration 2 (4795aab): `PaintPalette::Init` `sub_820D2330` as a table
+  of 42 `.rdata` float addresses copied through lfs/stfs, the entries'
+  +60 left unwritten and its 1,184-byte frame left as the original
+  leaves it (register saves not written); three floats depend on the
+  scene's +4 (`known-data.md`'s palette row).
+- `car-models.md` (already mapped; the map checked by the lead, not
+  remapped). Migration 1's rows (9f71b49..233c175): `LoadSlot::LoadShared`
+  and `Load`, `LoadSetA` and `LoadSetB` (now Native; return `int64_t`,
+  as `Archive::Load`'s serial is sign-extended), `TeamEmblem`,
+  `LoadDecals`, `LoadExterior`, `SetVinylTextures`, `Wheels::SetUp` with
+  the rims and brakes (Native), `CarInterior::LoadSetCBody` and
+  `LoadParts`. For review: `GetLastError` (`sub_82296EC0` Native,
+  `sub_82295F18`, `functions.md`) ported as `last_error::Get` with no
+  flag, as B6's SetLastError; `LoadSetCBody`'s sprintf (only when the
+  node file is empty) follows the parking area's varargs call (r6-r10
+  spilled as 0); `LoadSetA` and the rims not seen in the attract race
+  (harness only); no frame dump (`LoadExterior` only makes the sheet and
+  queues loads: the sheet's bytes compared in the harness). The
+  validation counted `sub_82295F18` (an adapter with no plain C++ of its
+  own, calling `last_error::Get`) through `sub_82296EC0`'s print.
+  Migration 2's rows (27d7e64..9260d11): `CarInterior::Load` (its
+  accessories' two vtable calls through the guest), `FreePagesAt`
+  `sub_820C3CE0` (new row), `CarModel::MakePlate` `sub_820ED6D0` (the
+  name a guess: a 300 x 150 texture from five images) with
+  `sub_820C4DD8` and `sub_820ED630` (new rows), the file-loaded
+  callbacks `sub_820D47A8` and `sub_820D4F80`, `ReloadDecals`
+  `sub_820D5D20`, `Skeleton::LocalMatrices` `sub_82599C58`
+  (`models.md`); 5 adapters removed. For review: the +3724 = 1 image
+  branch (`sub_820C4E68`, no row) runs in an attract race though the
+  coverage list lacks it: the callbacks and `ReloadDecals` hand it back
+  to their originals, `Vinyl::DrawDecal`'s adapter stays, and it is a
+  lead (dd86385's message still says "never seen in play", corrected in
+  9260d11's rows); `LoadExterior`'s and `ReloadDecals`' cases no longer
+  compare `Texture::Create`'s frame words (the callees' originals save
+  registers there; `TextureCreates` still compares it, as
+  `Vinyl::Compress`); r3 not compared for the callbacks and
+  `LocalMatrices` (no caller reads it, as `ResetPose`); no frame dump
+  for the plate (both textures' bytes compared in the harness).
+
 ## Run 2026-10-30 11:39 (`b7-loop-30-10-26`)
 
 - The race event's map (84e5334): `functions/race-event.md`, 102 new

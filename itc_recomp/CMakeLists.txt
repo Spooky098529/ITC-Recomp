@@ -154,6 +154,9 @@ set(ITC_SOURCES
     src/car_models/tga.cpp
     src/car_models/raster.cpp
     src/car_models/decals.cpp
+    src/car_models/parts.cpp
+    src/car_models/plate.cpp
+    src/car_models/file_loaded.cpp
     src/hooks/save_data.cpp
     src/save_data/save_data.cpp
     src/hooks/race_world.cpp
@@ -239,6 +242,21 @@ set(ITC_SOURCES
     src/location_screen/opponents.cpp
     src/location_screen/view.cpp
     src/location_screen/pose.cpp
+    src/hooks/material_passes.cpp
+    src/material_passes/colors.cpp
+    src/material_passes/helpers.cpp
+    src/material_passes/passes.cpp
+    src/material_passes/set_materials.cpp
+    src/material_passes/paint.cpp
+    src/material_passes/projector.cpp
+    src/material_passes/palette.cpp
+    src/hooks/race_hud_object.cpp
+    src/race_hud_object/gauges.cpp
+    src/race_hud_object/dashboard.cpp
+    src/race_hud_object/setup.cpp
+    src/race_hud_object/signs.cpp
+    src/race_hud_object/tick.cpp
+    src/race_hud_object/movies.cpp
     src/save_interface/save_interface.cpp
     src/save_interface/save_layer.cpp
     src/hooks/file_layer.cpp
@@ -407,6 +425,8 @@ set(ITC_SOURCES
     src/harnesses/race_event.cpp
     src/harnesses/camera_modes.cpp
     src/harnesses/location_screen.cpp
+    src/harnesses/material_passes.cpp
+    src/harnesses/race_hud_object.cpp
     src/harnesses/car_sounds.cpp
     src/harnesses/x3daudio.cpp
     src/harnesses/xaudio.cpp
@@ -572,7 +592,8 @@ set_source_files_properties(src/c_runtime/math.cpp src/ui_movies/keys.cpp
     src/texture_compression/dxt_alpha.cpp src/texture_compression/dxt_color.cpp
     src/texture_compression/dxt45.cpp src/texture_compression/codecs.cpp
     src/texture_compression/blitter.cpp src/texture_compression/compress_surface.cpp
-    src/car_models/raster.cpp src/car_models/decals.cpp src/car_sounds/x3daudio.cpp
+    src/car_models/raster.cpp src/car_models/decals.cpp src/car_models/file_loaded.cpp
+    src/car_sounds/x3daudio.cpp
     src/car_sounds/car_sound_3d.cpp src/car_sounds/car_sound_voices.cpp
     src/car_sounds/car_sound_parts.cpp src/xact/voices.cpp src/xact/waves.cpp
     src/xact/tracks.cpp src/xaudio/objects.cpp src/xaudio/resampler.cpp

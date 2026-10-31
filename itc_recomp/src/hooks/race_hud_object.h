@@ -1,0 +1,98 @@
+// The race HUD object's register steps (src/race_hud_object/,
+// docs/functions/race-hud-object.md), shared by the adapters
+// (src/hooks/race_hud_object.cpp, behind --native_race_hud_object) and the
+// harness (without the flag); those of functions only native callers reach
+// have no adapter, and only the harness calls them. Each leaves r3 (and f1) as the original does.
+
+#pragma once
+
+#include "guest.h"
+
+namespace hooks {
+
+// HudCurve::Eval sub_82212118: r3 = the curve, f1 = x (r3 left).
+void RaceHudObjectCurveEval(PPCContext& ctx, uint8_t* base);
+// PowInt sub_82213C40: f1 = x, r4 = n; f1 = x to the n.
+void RaceHudObjectPowInt(PPCContext& ctx, uint8_t* base);
+// HudBar::Step sub_82211FB8: r3 = the bar, r4 = the target (r3 left).
+void RaceHudObjectBarStep(PPCContext& ctx, uint8_t* base);
+// RaceHud::SetGear sub_82212DB0: r3 = the HUD, r4 = the gear; r3 = the node.
+void RaceHudObjectSetGear(PPCContext& ctx, uint8_t* base);
+// RaceHud::SetBar sub_82214698: r3 = the HUD, f1 = the value; r3 = the node.
+void RaceHudObjectSetBar(PPCContext& ctx, uint8_t* base);
+// sub_82212668 and sub_822122A0: r3 = the HUD (left).
+void RaceHudObjectResetBar(PPCContext& ctx, uint8_t* base);
+void RaceHudObjectClearWarning(PPCContext& ctx, uint8_t* base);
+// RaceHud::SetPlayer sub_82212690: r3 = the HUD, r4 = the player; r3 = the
+// vehicle.
+void RaceHudObjectSetPlayer(PPCContext& ctx, uint8_t* base);
+// RaceHud::Touching sub_82215820: r4 = the player; r3 = 1 or 0.
+void RaceHudObjectTouching(PPCContext& ctx, uint8_t* base);
+
+// RaceHud::SetTach sub_82212D58 and SetBoost sub_82212E18: r3 = the HUD,
+// f1 = the value; r3 = the node.
+void RaceHudObjectSetTach(PPCContext& ctx, uint8_t* base);
+void RaceHudObjectSetBoost(PPCContext& ctx, uint8_t* base);
+// RaceHud::SetSpeed sub_82214260: r3 = the HUD, r4 = the speed.
+void RaceHudObjectSetSpeed(PPCContext& ctx, uint8_t* base);
+// RaceHud::SetTime sub_82213750: r3 = the HUD, r4 = the time's address.
+void RaceHudObjectSetTime(PPCContext& ctx, uint8_t* base);
+// RaceHud::SetDistance sub_82214A50: r3 = the HUD, f1 = the value.
+void RaceHudObjectSetDistance(PPCContext& ctx, uint8_t* base);
+// RaceHud::Reset sub_822121C0, SetUpExtraGauges sub_82213DB0, ApplyOptions
+// sub_82212768, UpdateView sub_82212B68: r3 = the HUD.
+void RaceHudObjectReset(PPCContext& ctx, uint8_t* base);
+void RaceHudObjectSetUpExtraGauges(PPCContext& ctx, uint8_t* base);
+void RaceHudObjectApplyOptions(PPCContext& ctx, uint8_t* base);
+void RaceHudObjectUpdateView(PPCContext& ctx, uint8_t* base);
+// RaceHud::ShowGauge sub_82212D08: r3 = the HUD, r4 = the slot, r5 = shown.
+void RaceHudObjectShowGauge(PPCContext& ctx, uint8_t* base);
+
+// RaceHud::SetUpGauges sub_82213C90, SetUpMirror sub_822135B0, TearDown
+// sub_822141A0, SetUpSigns sub_822122B0: r3 = the HUD. UpdateExtraGauges
+// sub_82215160: r3 = the HUD, f1, r5 and r6 the gauges' values. Their guest
+// calls through this context.
+void RaceHudObjectSetUpGauges(PPCContext& ctx, uint8_t* base);
+void RaceHudObjectSetUpMirror(PPCContext& ctx, uint8_t* base);
+void RaceHudObjectTearDown(PPCContext& ctx, uint8_t* base);
+void RaceHudObjectSetUpSigns(PPCContext& ctx, uint8_t* base);
+void RaceHudObjectUpdateExtraGauges(PPCContext& ctx, uint8_t* base);
+
+// RaceHud::UpdateSigns sub_82214718 and UpdateSign sub_82212F00: r3 = the
+// HUD, r4 = the race flow's flag; UpdatePlaceName sub_82213510: r3 = the HUD.
+void RaceHudObjectUpdateSigns(PPCContext& ctx, uint8_t* base);
+void RaceHudObjectUpdateSign(PPCContext& ctx, uint8_t* base);
+void RaceHudObjectUpdatePlaceName(PPCContext& ctx, uint8_t* base);
+
+// RaceHud::Tick sub_822153A0: r3 = the HUD, r4 = the race flow's flag;
+// TickTimer sub_82214D78: r3 = the HUD.
+void RaceHudObjectTick(PPCContext& ctx, uint8_t* base);
+void RaceHudObjectTickTimer(PPCContext& ctx, uint8_t* base);
+
+// RaceHud::StartCountdown sub_82212270, StartMovie1 sub_82212718,
+// FinishMovie1 sub_82212878, DrawWarning sub_82212AC8, RunMovie1
+// sub_82212AF8, RunItem sub_82212B08, Init sub_82215260: r3 = the HUD.
+// RaceScreens::MovieMask sub_82211BE8: r4 = the race kind.
+void RaceHudObjectStartCountdown(PPCContext& ctx, uint8_t* base);
+void RaceHudObjectStartMovie1(PPCContext& ctx, uint8_t* base);
+void RaceHudObjectFinishMovie1(PPCContext& ctx, uint8_t* base);
+void RaceHudObjectDrawWarning(PPCContext& ctx, uint8_t* base);
+void RaceHudObjectRunMovie1(PPCContext& ctx, uint8_t* base);
+void RaceHudObjectRunItem(PPCContext& ctx, uint8_t* base);
+void RaceHudObjectMovieMask(PPCContext& ctx, uint8_t* base);
+void RaceHudObjectInit(PPCContext& ctx, uint8_t* base);
+// RaceHud::Draw sub_822128A8, UpdateWarning sub_82212C50: r3 = the HUD;
+// UpdateRecordingFull sub_82212E60: r3 = the HUD, r4 = HasRoom's.
+void RaceHudObjectDraw(PPCContext& ctx, uint8_t* base);
+void RaceHudObjectUpdateWarning(PPCContext& ctx, uint8_t* base);
+void RaceHudObjectUpdateRecordingFull(PPCContext& ctx, uint8_t* base);
+// RaceHud::ShowItem sub_82213638: r3 = the HUD, r4 = the item or -1;
+// UpdateItem sub_82214238: r3 = the HUD.
+void RaceHudObjectShowItem(PPCContext& ctx, uint8_t* base);
+void RaceHudObjectUpdateItem(PPCContext& ctx, uint8_t* base);
+// RaceScreens::Make1004 sub_82216A60: r3 = the holder's +1004;
+// RaceScreens::Init sub_82211DA0: r3 = the holder, r4 = the race kind.
+void RaceHudObjectMake1004(PPCContext& ctx, uint8_t* base);
+void RaceHudObjectScreensInit(PPCContext& ctx, uint8_t* base);
+
+}  // namespace hooks

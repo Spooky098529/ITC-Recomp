@@ -13,6 +13,10 @@ namespace last_error {
 // SetLastError (sub_82296E70, sub_82296FD0).
 void Set(uint8_t* base, uint32_t pcr, uint32_t error);
 
+// GetLastError (sub_82296EC0, sub_82295F18): the thread's last error, or 0
+// while `[PCR+336]` is set.
+uint32_t Get(uint8_t* base, uint32_t pcr);
+
 // SetLastError from an NTSTATUS (sub_82296E88); returns the DOS error. The
 // mapping is the SDK's (xeRtlNtStatusToDosError) until the import's last
 // recompiled caller, sub_822953E8 (probably a file I/O completion routine,

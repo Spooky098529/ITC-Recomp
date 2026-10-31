@@ -9,6 +9,7 @@
 #include "guest.h"
 
 #include "base/flags.h"
+#include "hooks/app_start_up.h"
 #include "hooks/heap.h"
 #include "memory/c_runtime_heap.h"
 
@@ -121,6 +122,9 @@ extern "C" REX_FUNC(sub_82297790) {
 // operator new: r3 = size; returns the block.
 extern "C" REX_FUNC(sub_825A6880) {
   REX_FUNC_PROLOGUE();
+  if (hooks::StartUpRecorded(ctx, 0x825A6880)) {
+    return;  // a harness's (the race HUD object's)
+  }
   if (Native()) {
     if (auto block = memory::crt::OperatorNew(base, ctx.r3.u32)) {
       ctx.r3.u64 = *block;

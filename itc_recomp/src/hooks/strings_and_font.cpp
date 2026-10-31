@@ -362,6 +362,9 @@ bool LoadsNative() {
 // serial (left as it came when nothing was loaded).
 extern "C" REX_FUNC(sub_8210A8D0) {
   REX_FUNC_PROLOGUE();
+  if (hooks::StartUpRecorded(ctx, 0x8210A8D0)) {
+    return;  // a harness's (the race HUD object's)
+  }
   if (!LoadsNative()) {
     __imp__sub_8210A8D0(ctx, base);
     return;
