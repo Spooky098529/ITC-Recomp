@@ -33,8 +33,12 @@ file's history. What's left to see in a drive, from every run:
   in the replay, none to drive. Done.
 - Cleanup lead (no mapping, not counted): `RaceHud::UpdateRacerBar`
   (`sub_82214790`) and `RunCountdown` (`sub_822129A8`) in
-  `race-hud-object.md`, ready since the menu sound is ours. Step:
-  migration (agent running).
+  `race-hud-object.md`, ready since the menu sound is ours. Migration checked (c17e0401:
+  both; 26445f41: `TickPanel` with `TickRacers`, made ready by them;
+  4da95a17, 2bf1cf2c: 5 adapters removed; harness race_hud_object 48
+  groups 0 differing; race 30 s with the harnesses (38 s without), 0
+  errors; no subagents). `RunWarning` and two removable adapters left
+  as a new cleanup lead. Step: validation (agent running).
 
 ## Done
 
@@ -73,5 +77,8 @@ file's history. What's left to see in a drive, from every run:
 - After its validation (`itc_2963`, 120 s: race 60 s, 0 errors, every
   harness 0 differing but the expected groups): ours 3584, work left
   2814.
+- After the race HUD cleanup lead's migration (`itc_2972`: race 30 s,
+  0 errors, race_hud_object 0 differing): ours 3588, work left 2810
+  (wrapped 103, known 482, unknown 2225).
 
 ## Stopped

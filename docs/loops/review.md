@@ -13,6 +13,14 @@ When the user has reviewed a run's section, its heading gets
 
 ## Run 2026-10-31 16:54 (`b7-loop-31-10-26`, continued)
 
+- The race HUD cleanup lead (c17e0401..2bf1cf2c): 8 rows in
+  `race-hud-object.md` (`RunCountdown`, `UpdateRacerBar`, `TickPanel`,
+  `TickRacers`; 5 adapters removed). For review: `MenuSound::Play`'s
+  slot call from native callers through a new `sound_calls()`;
+  `RunCountdown`'s f1 left in ctx as the original leaves it;
+  `TickPanel`'s modes 2 to 4 (never seen in play) still recompiled,
+  through the table, and modes 2 and 4 not in the harness.
+
 - The accessories' second migration (2eb6ca57..3a9de36a): 10 rows in
   `accessories.md` and `Accessories::Release`'s in `scene-loaders.md`
   (a correction: its caller is `Interior::Release`, not `ReleaseAll`).
