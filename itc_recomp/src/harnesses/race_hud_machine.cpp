@@ -21,6 +21,7 @@
 #include "base/flags.h"
 #include "base/log.h"
 #include "data_tables/data_tables.h"
+#include "game_modes/game_modes.h"
 #include "hooks/callee_stand_in.h"
 #include "hooks/race_hud_machine.h"
 #include "memory/heap.h"
@@ -359,6 +360,69 @@ void Helpers(Context& h, const World& w) {
         hooks::RaceHudMachineIsFirstDay, Spec{96, 8});
 }
 
+// --- RaceHudMachine::Init: an empty state machine or one with random
+// transitions already (fewer than 130, so the 65 fit), some with the keys
+// Init adds (the last, (24, 50), among them: its r3 is then the index); the
+// original's frame filled with the same random words for both (the words it
+// never writes go into the transitions); the machine, the frame (but its
+// back chain and saved registers) and r3 compared ---
+
+void Inits(Context& h, const World& w) {
+  namespace gm = game_modes;
+  constexpr uint32_t kSaves = 144;  // __savegprlr_15: r15 at -144, lr at -8
+  Results results("RaceHudMachine::Init (sub_8216E6E8)");
+  const uint32_t machine = w.machine.address;
+  const uint32_t frame = CallContext(h).r1.u32 - rhm::kInitFrame;
+  constexpr uint32_t kPlanted[][2] = {{0, 0}, {9, 29}, {22, 49}, {24, 50}};
+  for (uint64_t seed = 0; seed < 8; seed++) {
+    Outputs out[2];
+    for (int v = 0; v < 2; v++) {
+      Random r(seed * 157 + 41);
+      WriteRandom(h.base, h.data, kScratchBytes, r);
+      WriteRandom(h.base, machine, kMachineBytes, r);
+      WriteRandom(h.base, frame, rhm::kInitFrame, r);
+      if (seed % 2 == 0) {
+        gm::StateMachineConstruct(h.base, machine);
+        guest::StoreU32(h.base, machine + gm::kTransitionCount, 0);
+      } else {
+        const uint32_t count = 8 + r.Below(120);
+        guest::StoreU32(h.base, machine + gm::kTransitionCount, count);
+        for (uint32_t i = 0; i < 200; i++) {  // keys of small numbers, some matching
+          for (uint32_t k = 0; k < 4; k++) {
+            guest::StoreU32(h.base, machine + 48 * i + 4 * k, r.Below(k < 2 ? 60 : 2));
+          }
+        }
+        for (const auto& key : kPlanted) {
+          if (seed % 4 == 1 && key[0] == 24) {
+            continue;  // seeds 1 and 5: the last Add makes a new transition
+          }
+          const uint32_t at = machine + 48 * r.Below(count);
+          guest::StoreU32(h.base, at, key[0]);
+          guest::StoreU32(h.base, at + 4, key[1]);
+          guest::StoreU32(h.base, at + 8, 0);
+          guest::StoreU32(h.base, at + 12, 0);
+        }
+      }
+      PPCContext t = CallContext(h);
+      t.r3.u64 = machine;
+      if (v == 0) {
+        ITC_FLAG(native_race_hud_machine) = false;
+        __imp__sub_8216E6E8(t, h.base);
+        ITC_FLAG(native_race_hud_machine) = true;
+      } else {
+        hooks::RaceHudMachineInit(t, h.base);
+      }
+      out[v].Bytes(Read(h.base, machine, kMachineBytes));
+      out[v].Bytes(Read(h.base, frame + 80, rhm::kInitFrame - 80 - kSaves));
+      out[v].Bytes(Read(h.base, h.data, kScratchBytes));
+      out[v].Word(t.r3.u32);
+      out[v].Word(uint32_t(t.r3.u64 >> 32));
+    }
+    results.Check(out[0], out[1], fmt::format("seed {}", seed));
+  }
+  results.Report();
+}
+
 }  // namespace
 
 void RaceHudMachine(Context& h) {
@@ -367,6 +431,7 @@ void RaceHudMachine(Context& h) {
     ITC_LOG_ERROR("harness: race_hud_machine: no blocks from the allocation layer");
     return;
   }
+  Inits(h, w);
   Handlers(h, w);
   Helpers(h, w);
 }

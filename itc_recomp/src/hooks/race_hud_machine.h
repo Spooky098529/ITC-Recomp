@@ -11,6 +11,9 @@
 
 namespace hooks {
 
+// RaceHudMachine::Init sub_8216E6E8: r3 = the machine (race mode +
+// 128664); r3 as the last StateMachine::Add leaves it.
+void RaceHudMachineInit(PPCContext& ctx, uint8_t* base);
 // The handlers: r3 = the machine, r4 = the race mode's dispatcher.
 void RaceHudMachinePreRaceUpdate(PPCContext& ctx, uint8_t* base);   // sub_8216C210
 void RaceHudMachinePreRaceDraw(PPCContext& ctx, uint8_t* base);     // sub_8216C2A0

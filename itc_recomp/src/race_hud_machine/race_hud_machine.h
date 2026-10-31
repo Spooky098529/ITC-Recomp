@@ -68,6 +68,16 @@ constexpr uint32_t kAltSetUp = 0x82217C70;         // AltHud::SetUp(r3, r4 = pla
 constexpr uint32_t kAltTick = 0x82217AC8;          // AltHud::Tick
 constexpr uint32_t kAltRunMovie = 0x82216C00;      // AltHud::RunMovie
 
+// --- The set-up (race_hud_machine_init.cpp) ---
+
+// RaceHudMachine::Init's frame (its r1 less this).
+constexpr uint32_t kInitFrame = 4400;
+// sub_8216E6E8 RaceHudMachine::Init: the state = 0 and the 65 transitions
+// added (StateMachine::Add), built in the original's stack frame at `frame`
+// (its r1 less kInitFrame: see race_hud_machine_init.cpp). Returns the last
+// StateMachine::Add's answer (`replaced` as its).
+uint32_t MachineInit(uint8_t* base, uint32_t machine, uint32_t frame, bool* replaced);
+
 // --- The handlers (handlers.cpp) ---
 //
 // r3 = the machine; each returns r3 as the original leaves it (`r3` itself,

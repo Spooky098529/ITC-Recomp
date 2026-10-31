@@ -20,7 +20,8 @@
 
 ITC_FLAG_BOOL(native_race_hud_machine, true, "ITC",
               "Run the race HUD machine's functions (docs/functions/race-hud-machine.md: "
-              "RaceHudMachine::PreRaceUpdate sub_8216C210, PreRaceDraw sub_8216C2A0, "
+              "RaceHudMachine::Init sub_8216E6E8 (the 65 transitions' words replayed in its "
+              "frame, StateMachine::Add's plain C++), PreRaceUpdate sub_8216C210, PreRaceDraw sub_8216C2A0, "
               "CountdownDraw sub_8216C330, StartIntro sub_8216C510, EndIntro sub_8216C520, "
               "IntroUpdate sub_8216C530, IntroDraw sub_8216C5B8, CountdownUpdate sub_8216CB98, "
               "RaceDraw sub_8216CE00, RaceUpdate sub_8216D918 and SetUp sub_8216D450, their "
@@ -250,6 +251,17 @@ void Handle(PPCContext& ctx, uint8_t* base, void (*original)(PPCContext&, uint8_
 
 }  // namespace
 
+void RaceHudMachineInit(PPCContext& ctx, uint8_t* base) {
+  ctx.fpscr.disableFlushMode();
+  const uint64_t machine_r3 = ctx.r3.u64;
+  const uint32_t machine = ctx.r3.u32;
+  bool replaced = false;
+  const uint32_t r3 = rhm::MachineInit(base, machine, ctx.r1.u32 - rhm::kInitFrame, &replaced);
+  // StateMachine::Add's adapter's r3 (src/hooks/game_modes.cpp): a new
+  // transition's address from the machine's 64-bit r3.
+  ctx.r3.u64 = replaced ? r3 : machine_r3 + (r3 - machine);
+}
+
 void RaceHudMachinePreRaceUpdate(PPCContext& ctx, uint8_t* base) {
   Handle(ctx, base, __imp__sub_8216C210, [&](const rh::Calls& callees) {
     return rhm::PreRaceUpdate(base, ctx.r3.u64, ctx.r1.u32, callees);
@@ -346,6 +358,7 @@ void RaceHudMachineItemBonus(PPCContext& ctx, uint8_t* base) {
     hooks::step(ctx, base);                    \
   }
 
+ITC_RACE_HUD_MACHINE(8216E6E8, RaceHudMachineInit)
 ITC_RACE_HUD_MACHINE(8216C210, RaceHudMachinePreRaceUpdate)
 ITC_RACE_HUD_MACHINE(8216C2A0, RaceHudMachinePreRaceDraw)
 ITC_RACE_HUD_MACHINE(8216C330, RaceHudMachineCountdownDraw)

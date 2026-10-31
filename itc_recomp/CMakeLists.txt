@@ -265,6 +265,7 @@ set(ITC_SOURCES
     src/race_scene/race_scene_init.cpp
     src/hooks/race_hud_machine.cpp
     src/race_hud_machine/handlers.cpp
+    src/race_hud_machine/race_hud_machine_init.cpp
     src/hooks/menu_sounds.cpp
     src/menu_sounds/menu_sounds.cpp
     src/hooks/accessories.cpp
