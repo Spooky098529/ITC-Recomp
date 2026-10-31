@@ -29,8 +29,15 @@ ITC_FLAG_BOOL(native_car_models, true, "ITC",
               "emblem sub_820D3CF8, CarModel::LoadDecals sub_820D5B50 and SetVinylTextures "
               "sub_820D5F88, the wheels' set-up sub_820D9110 (with the rims sub_820D8BA8 and brakes "
               "sub_820D8C50), with --native_heap CarInterior::LoadSetCBody sub_820D67E8, "
-              "CarInterior::LoadParts sub_820D7730, CarInterior::Load sub_820D79B0 (its accessories' "
-              "calls through the guest), with --native_heap the buffer release sub_820C3CE0, with --native_heap LoadSlot::ReleaseBuffer sub_820D0758, and the "
+              "CarInterior::Load sub_820D79B0 (its accessories' "
+              "calls through the guest; CarInterior::LoadParts sub_820D7730 under it, no adapter), "
+              "with --native_heap CarModel::MakePlate sub_820ED6D0 (with sub_820C4DD8 and "
+              "sub_820ED630, no adapters: only it calls them; Resource::Release a guest call), "
+              "with --native_heap and --native_models the file-loaded callbacks "
+              "CarModel::OnFileLoaded sub_820D47A8 (with the buffer release sub_820C3CE0, no "
+              "adapter) and OnFileLoadedB sub_820D4F80 (the texture providers' slot +16 and the "
+              "originals where a callee's plain C++ declines guest calls), "
+              "with --native_heap LoadSlot::ReleaseBuffer sub_820D0758, and the "
               "deferred release sub_820C3F50; with --native_heap and the memory blocks' host lock "
               "CarModel::Release sub_820D4508; with --native_heap the vinyl sheet's texture, "
               "Texture::Create sub_820ECF08 and Texture::Free sub_820ECFC8; the decals' TGA "
@@ -124,11 +131,6 @@ void CarModelsCockpitLoadSetC(PPCContext& ctx, uint8_t* base) {
   __imp__sub_820D67E8(ctx, base);
 }
 
-void CarModelsInteriorLoadParts(PPCContext& ctx, uint8_t* base) {
-  ctx.r3.u64 = cm::InteriorLoadParts(base, ctx.r3.u32, ctx.r4.u32, ctx.r5.u32, ctx.r6.u32,
-                                     hooks::NativeArchiveLoad(base));
-}
-
 void CarModelsInteriorLoad(PPCContext& ctx, uint8_t* base) {
   const uint64_t lr = ctx.lr;
   std::optional<uint32_t> r3;
@@ -151,18 +153,6 @@ void CarModelsInteriorLoad(PPCContext& ctx, uint8_t* base) {
     return;
   }
   ctx.r3.u64 = *r3;
-}
-
-void CarModelsFreePagesAt(PPCContext& ctx, uint8_t* base) {
-  if (hooks::NativeHeapActive()) {
-    if (const auto r3 = cm::FreePagesAt(base, ctx.r4.u32)) {
-      ctx.r3.u64 = *r3;
-      ctx.r4.u64 = 0;
-      ctx.r5.u64 = 0x8000;
-      return;
-    }
-  }
-  __imp__sub_820C3CE0(ctx, base);
 }
 
 void CarModelsMakePlate(PPCContext& ctx, uint8_t* base) {
@@ -386,9 +376,7 @@ ITC_CAR_MODELS(820D5EC8, CarModelsLoadExterior)
 ITC_CAR_MODELS(820D5F88, CarModelsSetVinylTextures)
 ITC_CAR_MODELS(820D9110, CarModelsWheelsSetUp)
 ITC_CAR_MODELS(820D67E8, CarModelsCockpitLoadSetC)
-ITC_CAR_MODELS(820D7730, CarModelsInteriorLoadParts)
 ITC_CAR_MODELS(820D79B0, CarModelsInteriorLoad)
-ITC_CAR_MODELS(820C3CE0, CarModelsFreePagesAt)
 ITC_CAR_MODELS(820ED6D0, CarModelsMakePlate)
 ITC_CAR_MODELS(820D47A8, CarModelsOnFileLoaded)
 ITC_CAR_MODELS(820D4F80, CarModelsOnFileLoadedB)

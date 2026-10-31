@@ -92,6 +92,28 @@ void Case(Context& h, Results& results, uint32_t block, uint64_t seed,
   results.Check(out[0], out[1], what);
 }
 
+// sub_820C3CE0's register steps (its adapter removed: its only caller,
+// CarModel::OnFileLoaded, is native): r4 = where the buffer's address is;
+// r3 VirtualFree's, r4 = 0, r5 = MEM_RELEASE; the original where the word
+// isn't the layer's pages.
+void NativeFreePagesAt(PPCContext& ctx, uint8_t* base) {
+  if (const auto r3 = car_models::FreePagesAt(base, ctx.r4.u32)) {
+    ctx.r3.u64 = *r3;
+    ctx.r4.u64 = 0;
+    ctx.r5.u64 = 0x8000;
+    return;
+  }
+  __imp__sub_820C3CE0(ctx, base);
+}
+
+// CarInterior::LoadParts' register steps (its adapter removed: its only
+// caller, CarInterior::Load, is native): r3 = the object, r4 = the first
+// id, r5 = the stride, r6 = the offset; r3 the last LoadShared's.
+void NativeInteriorLoadParts(PPCContext& ctx, uint8_t* base) {
+  ctx.r3.u64 = car_models::InteriorLoadParts(base, ctx.r3.u32, ctx.r4.u32, ctx.r5.u32,
+                                             ctx.r6.u32, hooks::NativeArchiveLoad(base));
+}
+
 void Slots(Context& h, uint32_t block) {
   {
     Results results("LoadSlot::Reset (sub_820D0730)");
@@ -164,7 +186,7 @@ void Slots(Context& h, uint32_t block) {
               memory::FreePages(pages[v]);
             }
           },
-          __imp__sub_820C3CE0, hooks::CarModelsFreePagesAt, fmt::format("case {}", c));
+          __imp__sub_820C3CE0, NativeFreePagesAt, fmt::format("case {}", c));
     }
     results.Report();
   }
@@ -1868,7 +1890,7 @@ void Loads(Context& h, uint32_t block) {
     static constexpr uint32_t kCalls[3][3] = {{891, 226, 219}, {11061, 197, 190}, {19926, 55, 49}};
     Results results("CarInterior::LoadParts (sub_820D7730)");
     const uint32_t object = block + 0x100;
-    run(results, 24, __imp__sub_820D7730, hooks::CarModelsInteriorLoadParts,
+    run(results, 24, __imp__sub_820D7730, NativeInteriorLoadParts,
         [&](PPCContext& t, Random& r) {
           Put(h.base, object + 24, block + 0x3E00);
           Put(h.base, block + 0x3E20,
