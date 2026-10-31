@@ -57,7 +57,12 @@ file's history. What's left to see in a drive, from every run:
   harness line, ran in play. Subsystem 2 finished.
 - Subsystem 3 of 3: the race's track zone signs, probably a HUD object
   (`sub_822122B0`...`sub_822141A0`; picked as run every race frame,
-  its 5 roots all ready). Mapping running.
+  its 5 roots all ready). Mapped (ac07446, `race-hud-object.md`, 86
+  new rows, 57 in play, 30 ready groups, no stop: the race's HUD at +16
+  of the race screens' holder `[0x826D84F0]`; the lead's texture 56
+  corrected, the mirror's; blocked in part by the menu sound, two UI
+  movie functions, the other in-race screens and the holder's +1004
+  object, all leads). Migration 1 running.
 
 ## Done
 
@@ -112,5 +117,7 @@ file's history. What's left to see in a drive, from every run:
 - After its validation (`itc_2871`, 60 s: race 7 s, 0 errors, every
   harness 0 differing but the expected groups): ours 3469, work left
   2928.
+- After the race HUD object's map: ours 3469, work left 2928 (wrapped
+  103, known 524, unknown 2301).
 
 ## Stopped

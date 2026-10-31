@@ -13,6 +13,22 @@ When the user has reviewed a run's section, its heading gets
 
 ## Run 2026-10-30 23:03 (`b7-loop-30-10-26-2`)
 
+- The race HUD object's map (ac07446): `functions/race-hud-object.md`,
+  86 new rows (57 seen in play, 29 not): `RaceHud::` (our name) at +16
+  of `RaceScreens::` (the holder at `[0x826D84F0]`, made by
+  `sub_82211F40`): its nine UI movies, the dashboard's gauges, the
+  rear-view mirror's render target (texture 56), the countdown and its
+  sounds, the warning movie, the racers' bars, the item popup, the
+  timer, the mode at +448; the expressway sign from zones 0-31
+  (`sub_82212F00`) and the place's text from zones 32-69
+  (`sub_82213510`; the lead said texture 56, corrected in
+  `track-zones.md`'s intro). `known-data.md`: `0x8200D838` rewritten,
+  rows for `0x8200D9D0`, the gauge curves, the holder and the HUD's
+  fields. For review: native callers will pass 0 for the varargs
+  `SetText`/`SetNodeText` arguments left unset (the parking area's
+  call); `sub_82212F00`'s read at +420 - 12 when no zone is inside kept;
+  the draw-side work goes through the native `UiMovie::Run` (no new
+  interpolation decision). Four leads added.
 - The material passes' map (2da185e): `functions/material-passes.md`,
   23 new rows (22 seen in play): `PartModel::SetPaint`, `SetPaintBody`
   (three HSV colors in r4-r9, through `Color::HsvToRgb`; the byte
