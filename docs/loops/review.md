@@ -22,6 +22,20 @@ When the user has reviewed a run's section, its heading gets
   now saves and compares `0x826C5100` (16 bytes) for every
   `scenery_lists` case. The vertex declaration `sub_82589728` (8de457d4)
   Overridden -> Native.
+- The shader pair's load callback (`sub_820A06D0`, cleanup lead,
+  f0e75f6d..b7789d24): named `Shaders::OnPairLoaded` (probably) in
+  `models.md`, Overridden (its adapter kept: `Archive::Load` calls it
+  through the request's pointer). For review: its 16-byte file record
+  kept on the host instead of the stack frame; the original run when
+  memcpy's flag or the header copies' checks fail, and as guest calls
+  where `VertexShader::Init`'s or operator delete's plain C++ declines;
+  the harness uses only pair slots the game never fills (34-999,
+  1006-1999). Seven adapters removed (Overridden -> Native):
+  `sub_822A8568`, `sub_822A9FD8`, `sub_822A9EA8`, `sub_82594570`,
+  `sub_825896C0` (`models.md`), `sub_822A8740`, `sub_822A85B8`
+  (`shader-objects.md`); the first three's prints moved into the host
+  helpers their work now runs in (`ReadFile`, `CopyHeaderFrom`), their
+  own plain C++ called only by the harnesses.
 
 ## Run 2026-10-30 23:03 (`b7-loop-30-10-26-2`)
 
