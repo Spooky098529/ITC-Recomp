@@ -108,6 +108,66 @@ void NativeAccessoryConstruct(PPCContext& ctx, uint8_t* base) {
   ctx.r3.u64 = ac::AccessoryConstruct(base, ctx.r3.u32, ctx.r1.u32);
 }
 
+void NativeAccessoryFileFreeData(PPCContext& ctx, uint8_t* base) {
+  if (!hooks::NativeHeapActive()) {
+    __imp__sub_820F08D0(ctx, base);
+    return;
+  }
+  const auto r3 = ac::FileFreeData(base, ctx.r3.u32);
+  if (!r3) {
+    __imp__sub_820F08D0(ctx, base);
+    return;
+  }
+  ctx.r3.u64 = *r3;
+}
+
+void NativeAccessoryFileDestruct(PPCContext& ctx, uint8_t* base) {
+  if (!hooks::AccessoriesNativeLoads() || !ac::FileDestructible(base, ctx.r3.u32)) {
+    __imp__sub_820F0DB8(ctx, base);
+    return;
+  }
+  ctx.r3.u64 = ac::FileDestruct(base, ctx.r3.u32);
+}
+
+void NativeAccessoryDestruct(PPCContext& ctx, uint8_t* base) {
+  if (!hooks::AccessoriesNativeLoads() || !hooks::ModelsNativeLifetime() ||
+      !ac::AccessoryDestructible(base, ctx.r3.u32)) {
+    __imp__sub_820EF310(ctx, base);
+    return;
+  }
+  ctx.fpscr.disableFlushMode();
+  ctx.r3.u64 = ac::AccessoryDestruct(base, ctx.r3.u32);
+}
+
+void NativeAccessorySkeletonDestruct(PPCContext& ctx, uint8_t* base) {
+  if (!hooks::AccessoriesNativeLoads() || !hooks::ModelsNativeLifetime() ||
+      !ac::SkeletonDestructible(base, ctx.r3.u32)) {
+    __imp__sub_820EFFD8(ctx, base);
+    return;
+  }
+  ctx.fpscr.disableFlushMode();  // as SkeletonBase::~SkeletonBase's adapter
+  ctx.r3.u64 = ac::SkeletonDestruct(base, ctx.r3.u32);
+}
+
+void NativeAccessorySkeletonReset(PPCContext& ctx, uint8_t* base) {
+  if (!native::Buffers_NativeMemcpy()) {
+    __imp__sub_820EFB30(ctx, base);
+    return;
+  }
+  ctx.fpscr.disableFlushMode();
+  ctx.r3.u64 = ac::SkeletonReset(base, ctx.r3.u32, ctx.r1.u32);
+}
+
+void NativeAccessoriesBaseDestruct(PPCContext& ctx, uint8_t* base) {
+  if (!hooks::AccessoriesNativeLoads() || !hooks::ModelsNativeLifetime() ||
+      !ac::SetReleasable(base, ctx.r3.u32)) {
+    __imp__sub_820F0B58(ctx, base);
+    return;
+  }
+  ctx.fpscr.disableFlushMode();
+  ctx.r3.u64 = ac::SetBaseDestruct(base, ctx.r3.u32);
+}
+
 // The original with --native_accessories off.
 template <GuestFunction recompiled>
 void Original(PPCContext& ctx, uint8_t* base) {
@@ -210,7 +270,7 @@ void Files(Context& h, const Block& block) {
   const uint32_t word = block.address + 0x200;
   Cases(
       h, block, "AccessoryFile::FreeData (sub_820F08D0)", 16, Original<__imp__sub_820F08D0>,
-      hooks::AccessoryFileFreeData,
+      NativeAccessoryFileFreeData,
       [&](PPCContext& t, Random& r) {
         guest::StoreU32(h.base, word, r.Below(4) == 0 ? 0 : memory::AllocPages(4096, 4096));
         t.r3.u64 = word;
@@ -459,11 +519,11 @@ void Destructors(Context& h, const Block& block) {
       {"AccessoryEntry::Destroy (sub_820F0988)", Original<__imp__sub_820F0988>,
        hooks::AccessoryEntryDestroy, 0},
       {"Accessory::~Accessory (sub_820EF310)", Original<__imp__sub_820EF310>,
-       hooks::AccessoryDestruct, 1},
+       NativeAccessoryDestruct, 1},
       {"AccessorySkeleton::~AccessorySkeleton (sub_820EFFD8)", Original<__imp__sub_820EFFD8>,
-       hooks::AccessorySkeletonDestruct, 2},
+       NativeAccessorySkeletonDestruct, 2},
       {"AccessoryFile::~AccessoryFile (sub_820F0DB8)", Original<__imp__sub_820F0DB8>,
-       hooks::AccessoryFileDestruct, 3},
+       NativeAccessoryFileDestruct, 3},
   };
   const uint32_t slot = block.address + 0x40;
   for (const Kind& kind : kinds) {
@@ -627,7 +687,7 @@ void SkeletonSetUps(Context& h, const Block& block) {
   };
   Cases(
       h, block, "AccessorySkeleton::Reset (sub_820EFB30)", 24, Original<__imp__sub_820EFB30>,
-      hooks::AccessorySkeletonReset,
+      NativeAccessorySkeletonReset,
       [&](PPCContext& t, Random& r) {
         ac::SkeletonConstruct(h.base, skeleton, t.r1.u32);
         const int32_t nodes = r.Below(6) == 0 ? -1 : int32_t(r.Below(5));
@@ -685,7 +745,7 @@ void SetDestructors(Context& h, const Block& block) {
   };
   const Kind kinds[] = {
       {"AccessoriesBase::~AccessoriesBase (sub_820F0B58)", Original<__imp__sub_820F0B58>,
-       hooks::AccessoriesBaseDestruct, false},
+       NativeAccessoriesBaseDestruct, false},
       {"Accessories::~Accessories (sub_820F0FE0)", Original<__imp__sub_820F0FE0>,
        hooks::AccessoriesDestruct, true},
   };

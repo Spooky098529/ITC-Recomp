@@ -101,18 +101,6 @@ void AccessoryFileOnArchiveDone(PPCContext& ctx, uint8_t* base) {
   REX_CALL_INDIRECT_FUNC(callback.function);
 }
 
-void AccessoryFileFreeData(PPCContext& ctx, uint8_t* base) {
-  if (!NativeHeapActive()) {
-    __imp__sub_820F08D0(ctx, base);
-    return;
-  }
-  const auto r3 = accessories::FileFreeData(base, ctx.r3.u32);
-  if (!r3) {
-    __imp__sub_820F08D0(ctx, base);
-    return;
-  }
-  ctx.r3.u64 = *r3;
-}
 
 void AccessoryFileReset(PPCContext& ctx, uint8_t* base) {
   if (!AccessoriesNativeLoads() || !accessories::FileResetNative(base, ctx.r3.u32)) {
@@ -169,33 +157,8 @@ void AccessoryEntryNew(PPCContext& ctx, uint8_t* base) {
 
 // --- The destructors ---
 
-void AccessoryFileDestruct(PPCContext& ctx, uint8_t* base) {
-  if (!AccessoriesNativeLoads() || !accessories::FileDestructible(base, ctx.r3.u32)) {
-    __imp__sub_820F0DB8(ctx, base);
-    return;
-  }
-  ctx.r3.u64 = accessories::FileDestruct(base, ctx.r3.u32);
-}
 
-void AccessorySkeletonDestruct(PPCContext& ctx, uint8_t* base) {
-  if (!AccessoriesNativeLoads() || !ModelsNativeLifetime() ||
-      !accessories::SkeletonDestructible(base, ctx.r3.u32)) {
-    __imp__sub_820EFFD8(ctx, base);
-    return;
-  }
-  ctx.fpscr.disableFlushMode();  // as SkeletonBase::~SkeletonBase's adapter
-  ctx.r3.u64 = accessories::SkeletonDestruct(base, ctx.r3.u32);
-}
 
-void AccessoryDestruct(PPCContext& ctx, uint8_t* base) {
-  if (!AccessoriesNativeLoads() || !ModelsNativeLifetime() ||
-      !accessories::AccessoryDestructible(base, ctx.r3.u32)) {
-    __imp__sub_820EF310(ctx, base);
-    return;
-  }
-  ctx.fpscr.disableFlushMode();
-  ctx.r3.u64 = accessories::AccessoryDestruct(base, ctx.r3.u32);
-}
 
 void AccessoryEntryDestroy(PPCContext& ctx, uint8_t* base) {
   if (!AccessoriesNativeLoads() || !ModelsNativeLifetime() ||
@@ -223,14 +186,6 @@ void AccessoriesReleaseAll(PPCContext& ctx, uint8_t* base) {
 
 // --- The skeleton's set-up ---
 
-void AccessorySkeletonReset(PPCContext& ctx, uint8_t* base) {
-  if (!native::Buffers_NativeMemcpy()) {
-    __imp__sub_820EFB30(ctx, base);
-    return;
-  }
-  ctx.fpscr.disableFlushMode();
-  ctx.r3.u64 = accessories::SkeletonReset(base, ctx.r3.u32, ctx.r1.u32);
-}
 
 void AccessorySkeletonSetUp(PPCContext& ctx, uint8_t* base) {
   if (!ModelsNativeLifetime() || !native::Buffers_NativeMemcpy()) {
@@ -246,15 +201,6 @@ void AccessorySkeletonSetUp(PPCContext& ctx, uint8_t* base) {
   ctx.r3.u64 = *r3;
 }
 
-void AccessoriesBaseDestruct(PPCContext& ctx, uint8_t* base) {
-  if (!AccessoriesNativeLoads() || !ModelsNativeLifetime() ||
-      !accessories::SetReleasable(base, ctx.r3.u32)) {
-    __imp__sub_820F0B58(ctx, base);
-    return;
-  }
-  ctx.fpscr.disableFlushMode();
-  ctx.r3.u64 = accessories::SetBaseDestruct(base, ctx.r3.u32);
-}
 
 void AccessoriesDestruct(PPCContext& ctx, uint8_t* base) {
   if (!AccessoriesNativeLoads() || !ModelsNativeLifetime() ||
@@ -309,20 +255,14 @@ void MatrixFromScaleRotationTranslation(PPCContext& ctx, uint8_t* base) {
 ITC_ACCESSORIES(820F0BF0, AccessoryFileSetData)
 ITC_ACCESSORIES(820F0C90, AccessoryFileLoad)
 ITC_ACCESSORIES(820F0C20, AccessoryFileOnArchiveDone)
-ITC_ACCESSORIES(820F08D0, AccessoryFileFreeData)
 ITC_ACCESSORIES(820F1038, AccessoriesCreate)
 ITC_ACCESSORIES(820F0F00, AccessoriesSetScale)
 ITC_ACCESSORIES(820F0D30, AccessoryFileReset)
 ITC_ACCESSORIES(820F1078, AccessoriesDestroy)
 ITC_ACCESSORIES(820F0920, AccessoryEntryNew)
-ITC_ACCESSORIES(820F0DB8, AccessoryFileDestruct)
-ITC_ACCESSORIES(820EFFD8, AccessorySkeletonDestruct)
-ITC_ACCESSORIES(820EF310, AccessoryDestruct)
 ITC_ACCESSORIES(820F0988, AccessoryEntryDestroy)
 ITC_ACCESSORIES(820F0AD8, AccessoriesReleaseAll)
-ITC_ACCESSORIES(820EFB30, AccessorySkeletonReset)
 ITC_ACCESSORIES(820F0070, AccessorySkeletonSetUp)
-ITC_ACCESSORIES(820F0B58, AccessoriesBaseDestruct)
 ITC_ACCESSORIES(820F0FE0, AccessoriesDestruct)
 ITC_ACCESSORIES(820EF568, AccessorySetTexture)
 ITC_ACCESSORIES(820EF660, MatrixFromScaleRotationTranslation)
