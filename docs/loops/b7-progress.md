@@ -111,10 +111,17 @@ file's history. What's left to see in a drive, from every run:
   differing, race 25 s with three subsystems' harnesses, 0 errors; no
   subagents). Nothing ready left in `race-screens.md` (the two
   jump-table pieces wait on MainPage); the machine's newly ready
-  handlers left as a cleanup lead for the next run. Step: validation
-  of the third migration (agent running).
+  handlers left as a cleanup lead for the next run. Validated (`itc_3046`, 120 s: race 54
+  s, 0 errors, harnesses 63.8 s; replay `itc_3047` broke as
+  `itc_3038`): 34 of 34 harness lines, 10 ran in the race, 14 in the
+  replay, 8 to drive. Done.
 
 ## Done
+
+- The other in-race screens (subsystem 3): `race-screens.md`, 93 of
+  116 in play, three migrations, with the race HUD machine's handlers
+  they unblocked; `--native_race_screens`; 421476db..d26e6f66.
+  Validated (`itc_3020`, `itc_3037`, `itc_3046`).
 
 - The race HUD machine (subsystem 2): `race-hud-machine.md`, 16 of 33
   in play, one migration and the harness rewrite with 18 adapters
@@ -210,5 +217,19 @@ file's history. What's left to see in a drive, from every run:
   0 errors, race_screens, race_hud_machine and race_hud_object 0
   differing): ours 3705, work left 2694 (wrapped 101, known 513,
   unknown 2080).
+- After its validation (`itc_3046`, 120 s: race 54 s, 0 errors, every
+  harness 0 differing but the expected groups): ours 3705, work left
+  2694 (wrapped 101, known 513, unknown 2080).
 
 ## Stopped
+
+2026-10-31, at the in-race screens' third validation (`itc_3046`): the
+run's limit reached (3 subsystems: the interior accessories, the race
+HUD machine, the other in-race screens; and three race HUD cleanup
+leads). Nothing failed: every harness 0 differing but the expected
+groups, no attract race errors. The pad replay broke (its race never
+reached the countdown) in three of its four validations since the race
+HUD machine: not debugged, for the user (`review.md`). Nothing
+uncommitted; `check_function_statuses.py`: 0 errors. The harnesses take
+~64 s of the validation's 120. Left for the user: the run's section in
+`review.md`, `to-drive.md`, and the merge.

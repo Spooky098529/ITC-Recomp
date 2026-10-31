@@ -425,6 +425,22 @@ validation race is `attract_race.sh 120` (the harnesses take ~58 s), and
 the music, XACT banks the sound manager loads, is translated with XACT.
 The rest waits on the course scenery's and scene models' owners, the
 scene's update, the other in-race screens and the sound manager's slots.
+Its twenty-eighth run (the same branch, continued by the user's call,
+2026-10-31, not yet merged; summary
+`docs/loops/b7-loop-2026-10-31-1654.md`; 3 subsystems) made the
+interior accessories (`accessories.md`, `--native_accessories`, 31 of
+31 in play), the race HUD machine (`race-hud-machine.md`,
+`--native_race_hud_machine`, 23 of 33: the race mode's state machine at
++128664, with the race HUD's countdown, racer bar and warning as
+cleanup leads) and the other in-race screens (`race-screens.md`,
+`--native_race_screens`, 93 of 116: the pause menu, the confirm dialog,
+the career results, the menu after the race) native (ours 3,552 ->
+3,705); by the user's call (2026-10-31), adapters a harness would keep
+as hooks are deleted and the harness builds the callees' world. The
+pad replay's race reached its countdown in only one of four
+validations (to look at later, `docs/loops/review.md`). The rest waits
+on the UI movie calls `sub_8211C740` and `sub_8211CBD8`, the options
+screens and the leads in `docs/loops/leads.md`.
 Harness runs use `attract_race.sh 40` (the user's call,
 2026-10-23); a race short only because the harnesses took longer is
 no halt. B7 loop migration agents run only their subsystem's harnesses

@@ -18,6 +18,18 @@ here loses its heading.
 
 ## Run 2026-10-31 16:54 (`b7-loop-31-10-26`, continued)
 
+- The in-race screens, third migration (attract race `itc_3046`,
+  replay `itc_3047`: broke as `itc_3038` did, no countdown; the pause
+  menu opened and the replay quit through the dialog;
+  `race-screens.md`, `race-hud-machine.md`): `sub_8221BB48`
+  AfterRaceMenu::Draw, `sub_8221A2F8` CareerResults::Draw,
+  `sub_82219210` CareerResults::Intro, `sub_822192B0`
+  CareerResults::Show, `sub_822193D8` CareerResults::Close1,
+  `sub_82219A78` CareerResults::Page1, `sub_8216DD88`
+  RaceHudMachine::AfterRaceUpdate, `sub_8220D740`
+  PauseMenu::SaveHudOptions (`AfterRaceMenu::Update` and
+  `RaceHud::TickPanel` were seen in `itc_3021`).
+
 - The in-race screens, second migration (attract race `itc_3037`,
   replay `itc_3038`: broke: the race set up at the same time as in
   `itc_3021` (~77.5 s) but its racers never added and no countdown, as
@@ -45,9 +57,9 @@ here loses its heading.
   the results and the menu after the race; `race-screens.md`):
   `sub_8220BC00` MenuList::SetEnabled, `sub_8220BC40` MenuList::Fit,
   `sub_8220BF90` MenuList::Pressed166, `sub_8220D740`
-  PauseMenu::SaveHudOptions, `sub_82217D40` RaceDialog::Answer,
-  `sub_822185B0` RaceDialog::Update, `sub_8220D248`
-  PauseMenu::StepAdjust.
+  PauseMenu::SaveHudOptions, `sub_8220D248` PauseMenu::StepAdjust
+  (`RaceDialog::Answer` and `Update` since seen in the replay
+  `itc_3047`).
 
 - The race HUD machine (attract races `itc_2986`, `itc_3003`, replays
   `itc_2987`, `itc_3004`; the countdown and race handlers and
