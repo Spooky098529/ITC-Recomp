@@ -28,7 +28,8 @@ here loses its heading.
   RaceHudMachine::RaceDraw, `sub_8216D918` RaceHudMachine::RaceUpdate,
   `sub_8216D3F0` RaceHudMachine::IsFirstDay, `sub_8216C820`
   RaceHudMachine::OpponentPrize, `sub_8216C938`
-  RaceHudMachine::ItemBonus.
+  RaceHudMachine::ItemBonus. The harness rewrite and 18 adapters
+  (`itc_3003`, replay `itc_3004` ok): none new.
 
 - `RaceHud::RunWarning` (attract race `itc_2979`, replay `itc_2980`,
   ok; `race-hud-object.md`): none left to drive.

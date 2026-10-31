@@ -11,7 +11,7 @@ file's history. What's left to see in a drive, from every run:
 - Run started 2026-10-31 16:54 on `b7-loop-31-10-26` (the previous
   run's branch, continued by the user's call, 2026-10-31), from
   ec0e7141; summary `b7-loop-2026-10-31-1654.md`.
-- Limit for this run: 3 subsystems; 2 taken.
+- Limit for this run: 3 subsystems; 3 taken.
 - Subsystem 1 of 3: the second skeleton user (`820EF258`-`820F05D8`),
   the top of `leads.md`:
   - `sub_820EF258`, `sub_820EF310`, `sub_820EF368`, `sub_820EFFD8`, `sub_820F0070`, `sub_820F03F0`: another skeleton user (`820EF258`-`820F05D8`): the skeleton base made (`sub_820F03F0`, 179 lines, calls `SkeletonBase::SkeletonBase`), set up (`sub_820F0070` calls `sub_8259A9E0`) and destroyed (`sub_820EFFD8`, `SkeletonBase::~SkeletonBase`; `functions/model-animation.md`, `functions/models.md`), near `sub_820EF790` (`Model::RecordShape`'s caller). Not read. Found by the B7 loop's mapping agent (model animation), 2026-10-23.
@@ -74,10 +74,20 @@ file's history. What's left to see in a drive, from every run:
   5048300e: the 18 adapters removed, rows Native; every harness 0
   differing, race 28 s with the harnesses, 38 s without, 0 errors; no
   subagents). RaceUpdate's post of message 20 no longer reachable in
-  the harness (`AltHud::Tick` answers 0). Step: validation (agent
-  running).
+  the harness (`AltHud::Tick` answers 0). Validated (`itc_3003`, 120 s: race 59 s, 0
+  errors, harnesses 59.5 s; replay `itc_3004` ok): 33 of 33 harness
+  lines, none new to drive. Done.
+- Subsystem 3 of 3: the other in-race screens (the pause menu, the
+  menu after the race, the career results), from `leads.md`: what the
+  race HUD machine's last handlers and 7 adapters wait on. Step:
+  mapping (agent running).
 
 ## Done
+
+- The race HUD machine (subsystem 2): `race-hud-machine.md`, 16 of 33
+  in play, one migration and the harness rewrite with 18 adapters
+  removed (the user's call); `--native_race_hud_machine`;
+  11e568ee..5048300e. Validated (`itc_2986`, `itc_3003`).
 
 - `RaceHud::RunWarning` (cleanup lead): `race-hud-object.md`, with
   `HudCurve::Eval`'s and `PowInt`'s adapters removed;
@@ -146,6 +156,9 @@ file's history. What's left to see in a drive, from every run:
   2794.
 - After the harness rewrite and the 18 adapters (`itc_3002`: race 28
   s, 0 errors, the four harnesses 0 differing): ours 3605, work left
+  2794.
+- After its validation (`itc_3003`, 120 s: race 59 s, 0 errors, every
+  harness 0 differing but the expected groups): ours 3605, work left
   2794.
 
 ## Stopped
