@@ -530,8 +530,11 @@ Calls so far for decisions the loop meets often:
   class itself stays recompiled for the others.
 - The graphics: native if the renderer needs it, else Dropped (fence
   waits, cache flushes, packets nothing reads).
-- XACT is translated (2026-10-23); libraries replaced wholesale aren't
-  mapped ("Rules that still hold").
+- XACT is translated (2026-10-23), the music too: it is XACT banks
+  loaded through the sound manager (`Music::Play`,
+  `AudioManager::LoadBank`), not a separate player to replace with a
+  host library (2026-10-31); libraries replaced wholesale aren't mapped
+  ("Rules that still hold").
 - B7 changes no game behavior: stack leftovers and unwritten words are
   copied as the original leaves them (track zones, the race overlays'
   machine).
