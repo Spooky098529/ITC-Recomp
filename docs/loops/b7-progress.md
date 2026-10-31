@@ -49,7 +49,9 @@ file's history. What's left to see in a drive, from every run:
   `SetMaterials`, the paint passes, `Projector::Matrices` with
   `LookAt`; 1 adapter removed; `--native_material_passes`; frame dumps
   with the flag on and off alike; left: `PaintPalette::Init`, stopped at
-  ~five batches). Validation 1 running.
+  ~five batches). Validated (`itc_2866`, replay `itc_2867` ok): 21 of
+  21 harness lines; 20 ran in the race, 1 in the replay, none to drive.
+  Migration 2 running (`PaintPalette::Init`).
 
 ## Done
 
@@ -91,5 +93,8 @@ file's history. What's left to see in a drive, from every run:
 - After the material passes' migration 1 (`itc_2863`: race 38 s, 0
   errors, material_passes 0 differing): ours 3468, work left 2929
   (wrapped 103, known 468, unknown 2358).
+- After its validation (`itc_2866`, 60 s: race 7 s, 0 errors, every
+  harness 0 differing but the expected groups): ours 3468, work left
+  2929.
 
 ## Stopped
