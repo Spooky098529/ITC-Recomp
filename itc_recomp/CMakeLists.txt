@@ -270,6 +270,7 @@ set(ITC_SOURCES
     src/race_screens/menu_list.cpp
     src/race_screens/screens.cpp
     src/race_screens/pages.cpp
+    src/race_screens/transitions.cpp
     src/hooks/menu_sounds.cpp
     src/menu_sounds/menu_sounds.cpp
     src/hooks/accessories.cpp

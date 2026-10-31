@@ -23,7 +23,10 @@ ITC_FLAG_BOOL(native_race_screens, true, "ITC",
               "SaveOptions, Close, SaveHudOptions and AnswerPage, AfterRaceMenu::AnswerPage and "
               "RaceDialog::Answer; the pages' dispatch, PauseMenu::, CareerResults::, "
               "AfterRaceMenu:: and RaceDialog::Update, the pages' handlers through the function "
-              "table; CareerResults::Start; PauseMenu::StepVolume and StepAdjust) natively instead "
+              "table; CareerResults::Start; PauseMenu::StepVolume and StepAdjust; the pause menu's "
+              "transitions RunTen, BackToMain, CloseMain, MoveMain, ShowOptionsRow, ToggleOptions, "
+              "ShowVolumeRow and ShowAdjustRow, ConfirmPage, ShowItems, SetArrowA and ShowOptions, "
+              "the UI movie calls through their overrides) natively instead "
               "of through the translated code (the same writes; checked by "
               "--run_harnesses=race_screens)");
 ITC_FLAG_DECLARE(bool, native_action_mappers);
@@ -238,6 +241,40 @@ void RaceScreensPauseMenuStepAdjust(PPCContext& ctx, uint8_t* base) {
   ctx.r3.u64 = race_screens::PauseMenuStepAdjust(base, ctx.r1.u32);
 }
 
+#define ITC_RACE_SCREENS_TRANSITION(name)                                                  \
+  void RaceScreensPauseMenu##name(PPCContext& ctx, uint8_t* base) {                          \
+    GuestCalls guest(ctx, base);                                                             \
+    ctx.r3.u64 = race_screens::PauseMenu##name(base, ctx.r3.u32, ctx.r1.u32, guest.calls()); \
+  }
+ITC_RACE_SCREENS_TRANSITION(RunTen)
+ITC_RACE_SCREENS_TRANSITION(BackToMain)
+ITC_RACE_SCREENS_TRANSITION(CloseMain)
+ITC_RACE_SCREENS_TRANSITION(MoveMain)
+ITC_RACE_SCREENS_TRANSITION(ShowOptionsRow)
+ITC_RACE_SCREENS_TRANSITION(ToggleOptions)
+ITC_RACE_SCREENS_TRANSITION(ShowVolumeRow)
+ITC_RACE_SCREENS_TRANSITION(ShowAdjustRow)
+#undef ITC_RACE_SCREENS_TRANSITION
+
+void RaceScreensPauseMenuConfirmPage(PPCContext& ctx, uint8_t* base) {
+  GuestCalls guest(ctx, base);
+  ctx.r3.u64 = race_screens::PauseMenuConfirmPage(base, ctx.r4.u64, ctx.r1.u32, guest.calls());
+}
+
+void RaceScreensPauseMenuShowItems(PPCContext& ctx, uint8_t* base) {
+  GuestCalls guest(ctx, base);
+  ctx.r3.u64 = race_screens::PauseMenuShowItems(base, ctx.r1.u32, guest.calls());
+}
+
+void RaceScreensPauseMenuSetArrowA(PPCContext& ctx, uint8_t* base) {
+  ctx.fpscr.disableFlushMode();
+  ctx.r3.u64 = race_screens::PauseMenuSetArrowA(base, ctx.r3.u64, ctx.r1.u32);
+}
+
+void RaceScreensPauseMenuShowOptions(PPCContext& ctx, uint8_t* base) {
+  ctx.r3.u64 = race_screens::PauseMenuShowOptions(base, ctx.r1.u32);
+}
+
 }  // namespace hooks
 
 // The adapters: the register steps above, or the originals with the flag
@@ -300,3 +337,15 @@ ITC_RACE_SCREENS(822185B0, RaceScreensRaceDialogUpdate)
 ITC_RACE_SCREENS(822191D0, RaceScreensCareerResultsStart)
 ITC_RACE_SCREENS(8220CED0, RaceScreensPauseMenuStepVolume)
 ITC_RACE_SCREENS(8220D248, RaceScreensPauseMenuStepAdjust)
+ITC_RACE_SCREENS(8220C5E0, RaceScreensPauseMenuRunTen)
+ITC_RACE_SCREENS(8220C668, RaceScreensPauseMenuBackToMain)
+ITC_RACE_SCREENS(8220C700, RaceScreensPauseMenuCloseMain)
+ITC_RACE_SCREENS(8220C7B8, RaceScreensPauseMenuMoveMain)
+ITC_RACE_SCREENS(8220C868, RaceScreensPauseMenuShowOptionsRow)
+ITC_RACE_SCREENS(8220C930, RaceScreensPauseMenuToggleOptions)
+ITC_RACE_SCREENS(8220CA28, RaceScreensPauseMenuShowVolumeRow)
+ITC_RACE_SCREENS(8220CAB0, RaceScreensPauseMenuShowAdjustRow)
+ITC_RACE_SCREENS(8220C578, RaceScreensPauseMenuConfirmPage)
+ITC_RACE_SCREENS(8220CB38, RaceScreensPauseMenuShowItems)
+ITC_RACE_SCREENS(8220CBF8, RaceScreensPauseMenuSetArrowA)
+ITC_RACE_SCREENS(8220CC60, RaceScreensPauseMenuShowOptions)

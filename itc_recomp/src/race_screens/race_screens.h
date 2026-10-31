@@ -242,4 +242,71 @@ uint32_t PauseMenuStepAdjust(uint8_t* base, uint32_t sp);
 // kept).
 constexpr uint32_t kPagesGo = 0x8220BA68;
 
+// --- The pause menu's transitions and item helpers (transitions.cpp) ---
+//
+// The UI movie calls go through their overrides (`calls`): Play, PlayNamed,
+// Loop, Finish, FinishNamed and SetNodeText keep their --log_pause_movie
+// lines there (the originals run when logged, the plain C++ otherwise), Run
+// its frame pacing, SetText, LoopNamed, LoopLast and ClearText their
+// heap checks. SetText's unset varargs (r7 to r10) are passed as 0 (the
+// user's call, 2026-10-30: only dead words of the caller's parameter area,
+// +48 to +79 of its frame, differ). The node lookups (UiMovie::FindNode,
+// UiMovie::Child) are their plain C++.
+constexpr uint32_t kPlay = 0x8211D978;
+constexpr uint32_t kPlayNamed = 0x8211DAC8;
+constexpr uint32_t kLoop = 0x8211DDD8;
+constexpr uint32_t kLoopNamed = 0x8211DDE0;
+constexpr uint32_t kLoopLast = 0x8211DDE8;
+constexpr uint32_t kFinish = 0x8211DE38;
+constexpr uint32_t kFinishNamed = 0x8211DF20;
+constexpr uint32_t kRun = 0x8211E1B8;
+constexpr uint32_t kSetText = 0x8211C1F8;
+constexpr uint32_t kSetNodeText = 0x8211C7E8;
+constexpr uint32_t kClearText = 0x8211C470;
+// The pause menu's items by kind (six words a kind, -1 ends them).
+constexpr uint32_t kPauseItems = 0x8200CBF0;
+
+// The transitions (r3 the step word, 0 on the first call: the page object's
+// +24) run the pause menu's movie ([[0x826D84D0]]) once (UiMovie::Run(movie,
+// 0)) after their first call's work, and answer whether they're done.
+// sub_8220C5E0 PauseMenu::RunTen: the data's +152 counted from 0, done at 10.
+uint64_t PauseMenuRunTen(uint8_t* base, uint32_t step, uint32_t sp, const Calls& calls);
+// sub_8220C668 PauseMenu::BackToMain: the selected item's animation (type 7,
+// selection + 1) played (r6 1) and looped; done.
+uint64_t PauseMenuBackToMain(uint8_t* base, uint32_t step, uint32_t sp, const Calls& calls);
+// sub_8220C700 PauseMenu::CloseMain: the item's animation and animation 0
+// finished, animation 2 played; done when the run answers 0.
+uint64_t PauseMenuCloseMain(uint8_t* base, uint32_t step, uint32_t sp, const Calls& calls);
+// sub_8220C7B8 PauseMenu::MoveMain: the previous item's animation (+20 + 1)
+// finished, the new one's played (r6 1) and looped; done.
+uint64_t PauseMenuMoveMain(uint8_t* base, uint32_t step, uint32_t sp, const Calls& calls);
+// sub_8220C868 PauseMenu::ShowOptionsRow: the type-8 row (selection + 4
+// below item 4, else 2 or 1 by the data's +144) played and looped; done.
+uint64_t PauseMenuShowOptionsRow(uint8_t* base, uint32_t step, uint32_t sp, const Calls& calls);
+// sub_8220C930 PauseMenu::ToggleOptions: on item 4, the type-8 row by +144
+// finished and the other played and looped; done.
+uint64_t PauseMenuToggleOptions(uint8_t* base, uint32_t step, uint32_t sp, const Calls& calls);
+// sub_8220CA28 PauseMenu::ShowVolumeRow: the type-9 row 1 played and
+// LoopLast; done.
+uint64_t PauseMenuShowVolumeRow(uint8_t* base, uint32_t step, uint32_t sp, const Calls& calls);
+// sub_8220CAB0 PauseMenu::ShowAdjustRow: named animation 192 played and
+// looped; done.
+uint64_t PauseMenuShowAdjustRow(uint8_t* base, uint32_t step, uint32_t sp, const Calls& calls);
+// sub_8220C578 PauseMenu::ConfirmPage: RaceDialog::Update (r4 the caller's);
+// its 1 (yes) Go(5, transition 5), its 2 (no) Go(0) at once. Returns 0.
+uint64_t PauseMenuConfirmPage(uint8_t* base, uint64_t r4, uint32_t sp, const Calls& calls);
+// sub_8220CB38 PauseMenu::ShowItems: the type-7 node 0's children (+100 on,
+// +104 of them): string 1989 + the kind's item (UiMovie::SetText) for the
+// first six items, else hidden (+80 = 0). r3 as the original leaves it.
+uint64_t PauseMenuShowItems(uint8_t* base, uint32_t sp, const Calls& calls);
+// sub_8220CBF8 PauseMenu::SetArrowA: the type-8 node 0's child 0's +16 =
+// `value` as a float (its double word left at the frame's +80). Returns the
+// child.
+uint32_t PauseMenuSetArrowA(uint8_t* base, uint64_t value, uint32_t sp);
+// sub_8220CC60 PauseMenu::ShowOptions: for each child of the type-8 node 2,
+// its two parts' children 0 and 2 marked on or off (+108, +80) by the
+// matching edit (the data's +36 to +48, +144, copied to the frame's +80).
+// Returns r3 as the original leaves it.
+uint32_t PauseMenuShowOptions(uint8_t* base, uint32_t sp);
+
 }  // namespace race_screens

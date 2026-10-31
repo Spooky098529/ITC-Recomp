@@ -84,5 +84,23 @@ void RaceScreensRaceDialogUpdate(PPCContext& ctx, uint8_t* base);
 void RaceScreensCareerResultsStart(PPCContext& ctx, uint8_t* base);
 void RaceScreensPauseMenuStepVolume(PPCContext& ctx, uint8_t* base);
 void RaceScreensPauseMenuStepAdjust(PPCContext& ctx, uint8_t* base);
+// The pause menu's transitions (r3 the step word): RunTen sub_8220C5E0,
+// BackToMain sub_8220C668, CloseMain sub_8220C700, MoveMain sub_8220C7B8,
+// ShowOptionsRow sub_8220C868, ToggleOptions sub_8220C930, ShowVolumeRow
+// sub_8220CA28, ShowAdjustRow sub_8220CAB0; ConfirmPage sub_8220C578 (r4
+// passed on); ShowItems sub_8220CB38, SetArrowA sub_8220CBF8 (r3 the value),
+// ShowOptions sub_8220CC60.
+void RaceScreensPauseMenuRunTen(PPCContext& ctx, uint8_t* base);
+void RaceScreensPauseMenuBackToMain(PPCContext& ctx, uint8_t* base);
+void RaceScreensPauseMenuCloseMain(PPCContext& ctx, uint8_t* base);
+void RaceScreensPauseMenuMoveMain(PPCContext& ctx, uint8_t* base);
+void RaceScreensPauseMenuShowOptionsRow(PPCContext& ctx, uint8_t* base);
+void RaceScreensPauseMenuToggleOptions(PPCContext& ctx, uint8_t* base);
+void RaceScreensPauseMenuShowVolumeRow(PPCContext& ctx, uint8_t* base);
+void RaceScreensPauseMenuShowAdjustRow(PPCContext& ctx, uint8_t* base);
+void RaceScreensPauseMenuConfirmPage(PPCContext& ctx, uint8_t* base);
+void RaceScreensPauseMenuShowItems(PPCContext& ctx, uint8_t* base);
+void RaceScreensPauseMenuSetArrowA(PPCContext& ctx, uint8_t* base);
+void RaceScreensPauseMenuShowOptions(PPCContext& ctx, uint8_t* base);
 
 }  // namespace hooks
