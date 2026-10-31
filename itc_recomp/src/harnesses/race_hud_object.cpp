@@ -352,6 +352,14 @@ void ShapeWorld(uint8_t* base, const World& w, Random& r) {
 
 using SetupFn = std::function<void(PPCContext&, Random&, const World&)>;
 
+// The in-race screens' globals (0x826D84D0 to 0x826D851F, the holder
+// [0x826D84F0] among them, and 0x82814E10 to 0x82814E1F), put back after
+// each side (RaceScreens::Create sets them).
+constexpr uint32_t kScreenGlobals = 0x826D84D0;
+constexpr uint32_t kScreenGlobalsBytes = 0x50;
+constexpr uint32_t kUnseenGlobals = 0x82814E10;
+constexpr uint32_t kUnseenGlobalsBytes = 0x10;
+
 // What a case compares besides the blocks: the original's frame
 // [sp - frame, sp - saves) (its register saves left out), and the HUD
 // block's float words at `floats` (offsets).
@@ -360,6 +368,9 @@ struct Spec {
   uint32_t saves = 0;
   std::set<uint32_t> floats;
   bool f1 = false;
+  // Run after the function, before the outputs are read (frees), with the
+  // case's outputs to add to.
+  std::function<void(Outputs&)> after;
   void Floats(uint32_t offset, uint32_t words) {
     for (uint32_t i = 0; i < words; i++) {
       floats.insert(offset + 4 * i);
@@ -381,7 +392,9 @@ void Case(Context& h, Results& results, const World& w, uint64_t seed, const Set
                               {rh::kRaceProgress, 4},
                               {ui_movies::kMovieTable, 16},
                               {data_tables::kTables, 4},
-                              {menu_sounds::kSoundManager, 4}});
+                              {menu_sounds::kSoundManager, 4},
+                              {kScreenGlobals, kScreenGlobalsBytes},
+                              {kUnseenGlobals, kUnseenGlobalsBytes}});
     PPCContext t = CallContext(h);
     const uint32_t sp = t.r1.u32;
     WriteRandom(h.base, sp - kStackBytes, kStackBytes + kCallerBytes, r);
@@ -412,6 +425,9 @@ void Case(Context& h, Results& results, const World& w, uint64_t seed, const Set
     ui_movies_hooks::g_update_callee_stand_in = saved_stand_in;
     hooks::g_start_up_recorder = saved_recorder;
     g_calls = nullptr;
+    if (spec.after) {
+      spec.after(out[v]);
+    }
     out[v].Word(uint32_t(calls.size()));
     for (const Call& call : calls) {
       out[v].Word(call.function);
@@ -1310,6 +1326,48 @@ void Movies(Context& h, const World& w) {
             t.r4.u64 = r.Below(5) == 0 ? r.Next() : r.Below(13);
           },
           __imp__sub_82211DA0, hooks::RaceHudObjectScreensInit, spec);
+    }
+    {
+      // Create: the race kind as Init's cases; RaceScreens::Init's world as
+      // its own cases build it (the HUD's movies, the recorded calls). The
+      // holder and the eight screens' blocks (the allocation layer's pages:
+      // their globals, whether each is pages, their bytes) compared and
+      // freed; the screens' globals put back. The original's makers are
+      // their adapters (--native_race_screens on: the same plain C++).
+      Spec spec;
+      spec.frame = 112;
+      spec.saves = 24;
+      spec.after = [&h](Outputs& out) {
+        static const std::pair<uint32_t, uint32_t> kBlocks[] = {
+            {0x826D84F0, 1040}, {0x826D84D0, 4},   {0x826D84D4, 160}, {0x826D84DC, 72},
+            {0x826D84D8, 28},   {0x826D84E0, 4},   {0x826D84E4, 80},  {0x826D84EC, 72},
+            {0x826D84E8, 28},   {0x826D8510, 4},   {0x826D8514, 24},  {0x826D8518, 28},
+            {0x826D851C, 72},   {0x826D8500, 212}, {0x82814E18, 52},  {0x82814E1C, 40},
+            {0x826D84F4, 72},   {0x826D84F8, 28},  {0x826D84FC, 40},  {0x82814E10, 360}};
+        for (const auto& [global, bytes] : kBlocks) {
+          const uint32_t block = guest::LoadU32(h.base, global);
+          const bool pages = block != 0 && memory::IsPages(block);
+          out.Word(pages ? 1 : 0);
+          if (pages) {
+            out.Bytes(Read(h.base, block, bytes));
+          }
+        }
+        out.Word(guest::LoadU32(h.base, 0x82814E14));
+        for (const auto& [global, bytes] : kBlocks) {
+          const uint32_t block = guest::LoadU32(h.base, global);
+          if (block != 0 && memory::IsPages(block)) {
+            memory::FreePages(block);
+          }
+        }
+      };
+      Group(
+          h, w, "RaceScreens::Create (sub_82211F40)", 60,
+          [&](PPCContext& t, Random& r, const World& w) {
+            news(r, w);
+            ShapeMovieTable(h.base, w, r);
+            t.r3.u64 = r.Below(5) == 0 ? r.Next() : r.Below(13);
+          },
+          __imp__sub_82211F40, hooks::RaceHudObjectScreensCreate, spec);
     }
   }
 }

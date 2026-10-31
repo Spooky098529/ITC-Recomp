@@ -252,6 +252,129 @@ std::optional<uint64_t> ResultsUpdate(uint8_t* base, uint64_t r3, uint32_t dispa
   return first_day;
 }
 
+std::optional<uint64_t> PauseUpdate(uint8_t* base, uint64_t r3, uint32_t dispatcher, uint32_t sp,
+                                    const Calls& callees) {
+  const uint32_t machine = uint32_t(r3);
+  const int32_t kind = int32_t(Load(base, machine + kKind));
+  if (kind == 4) {
+    return std::nullopt;  // kind 4's pause (sub_82211458), never seen in play
+  }
+  ITC_NATIVE_RUNNING("sub_8216DB70 RaceHudMachine::PauseUpdate");
+  const uint32_t frame = Frame(base, sp, 128);
+  const int32_t mode = int32_t(Load(base, Load(base, kRaceData) + 0xA3AF4));
+  uint64_t answer = 0;
+  if (kind > 0 && (kind <= 3 || kind == 5 || kind == 6)) {
+    if (kind == 6 && mode == 8) {
+      const uint32_t hud = Holder(base, machine) + kHud;
+      callees.Call(kHudTick, frame, 0x8216DBE8, hud, 1);
+      callees.Call(kHudUpdateWarning, frame, 0x8216DBF0, hud);
+      callees.Call(kHudTickPanel, frame, 0x8216DBF8, hud);
+    }
+    // PauseMenu::Update's handlers don't read r4: the dispatcher passed.
+    answer = callees.Call(kPauseMenuUpdate, frame, 0x8216DC04,
+                          Load(base, Load(base, kHolderGlobal) + 1012), dispatcher);
+  }
+  switch (uint32_t(answer)) {
+    case 1:
+      race_states::steps::Post(base, dispatcher, 29);
+      break;
+    case 2:
+    case 6:
+    case 7:
+      race_states::steps::Post(base, dispatcher, 48);
+      break;
+    case 3:
+      race_states::steps::Post(base, dispatcher, 45);
+      // sub_82211D00 (the countdown stopped), never seen in play: the
+      // original.
+      return callees.Call(0x82211D00, frame, 0x8216DCF4, Holder(base, machine));
+    case 4:
+      race_states::steps::Post(base, dispatcher, 20);
+      break;
+    case 5:
+      race_states::steps::Post(base, dispatcher, 21);
+      break;
+    case 8:
+      return callees.Call(kHudApplyOptions, frame, 0x8216DD14,
+                          uint64_t(Load(base, kHolderGlobal)) + kHud);
+    case 9:
+      race_states::steps::Post(base, dispatcher, 48);
+      if (mode == 7) {
+        guest::StoreU32(base, Load(base, 0x82816E3C) + 240, 1);
+      }
+      break;
+    default:
+      break;
+  }
+  return answer;
+}
+
+std::optional<uint64_t> AfterRaceUpdate(uint8_t* base, uint64_t r3, uint32_t dispatcher,
+                                        uint32_t sp, const Calls& callees) {
+  const uint32_t machine = uint32_t(r3);
+  const uint32_t race = Load(base, kRaceData);
+  const uint32_t kind = Load(base, machine + kKind);
+  const uint32_t record = vehicle_accessors::RacerRecordsAt(base, race + 0x59AE8, 0xFFFFFFFFu);
+  const uint32_t word = Load(base, record + 3916);
+  // Kind 0's +12 screen, kind 4's and kind 6's screen after the race
+  // (sub_8220B9E8, sub_82216850, sub_8221F1E8), never seen in play: the
+  // original.
+  if (kind == 0 || kind == 4 || (kind == 6 && (word == 1 || word == 3))) {
+    return std::nullopt;
+  }
+  ITC_NATIVE_RUNNING("sub_8216DD88 RaceHudMachine::AfterRaceUpdate");
+  const uint32_t frame = Frame(base, sp, 128);
+  uint64_t last = record;
+  if ((kind >= 1 && kind <= 3) || kind == 6) {
+    const uint32_t hud = Holder(base, machine) + kHud;
+    callees.Call(kHudTick, frame, 0x8216DDEC, hud, 0);
+    last = callees.Call(kHudUpdateWarning, frame, 0x8216DDF4, hud);
+  }
+  // A post, then the replay bit (+8 bit 0) set or cleared.
+  auto post = [&](uint32_t message, bool set) {
+    race_states::steps::Post(base, dispatcher, message);
+    const uint32_t holder = Holder(base, machine);
+    const uint32_t flags = Load(base, holder + kHolderFlags);
+    guest::StoreU32(base, holder + kHolderFlags, set ? (flags | 1) : (flags & ~1u));
+  };
+  const int32_t now = int32_t(Load(base, machine + kKind));
+  if (now <= 0) {
+    return last;
+  }
+  if (now == 6) {
+    if (word == 0 || word == 2) {
+      race_states::steps::Post(base, dispatcher, 40);
+    }
+    return last;
+  }
+  if (now > 4) {
+    return last;
+  }
+  const uint64_t answer = callees.Call(kAfterRaceUpdate, frame, 0x8216DF90,
+                                       Load(base, Holder(base, machine) + 1020));
+  switch (uint32_t(answer)) {
+    case 1:
+    case 8:
+      post(40, false);
+      break;
+    case 2:
+      post(42, true);
+      break;
+    case 4:
+    case 5:
+    case 7:
+    case 9:
+      post(48, false);
+      break;
+    case 6:
+      post(45, false);
+      break;
+    default:
+      break;
+  }
+  return answer;
+}
+
 std::optional<uint64_t> CloseResults(uint8_t* base, uint64_t r3, uint32_t sp,
                                      const Calls& callees) {
   const uint32_t machine = uint32_t(r3);

@@ -7,6 +7,8 @@
 #include "camera_modes/steps.h"
 #include "data_tables/data_tables.h"
 #include "guest.h"
+#include "memory/heap.h"
+#include "race_screens/race_screens.h"
 #include "menu_sounds/menu_sounds.h"
 #include "ui_movies/game.h"
 #include "ui_movies/ui_movies.h"
@@ -273,6 +275,24 @@ uint64_t ScreensInit(uint8_t* base, uint32_t holder, uint32_t kind, uint32_t sp,
   const uint64_t r3 = Make1004(base, holder + 1004, frame, calls);
   guest::StoreU32(base, holder + 8, 0);
   return r3;
+}
+
+uint64_t ScreensCreate(uint8_t* base, uint32_t kind, uint32_t sp, const Calls& calls) {
+  ITC_NATIVE_RUNNING("sub_82211F40 RaceScreens::Create");
+  const uint32_t frame = sp - 112;
+  guest::StoreU32(base, frame, sp);
+  // VirtualAlloc(0, 1040, MEM_COMMIT, PAGE_READWRITE) over the allocation
+  // layer (the adapter runs this only there, hooks::NativeHeapActive).
+  guest::StoreU32(base, kScreensHolder, memory::AllocPages(1040, 4096));
+  race_screens::PauseMenuCreate(base, frame);
+  race_screens::PauseMenu4Create(base, frame);
+  race_screens::AfterRaceMenuCreate(base, frame);
+  race_screens::CareerResultsCreate(base, frame);
+  race_screens::RaceResultsCreate(base, frame);
+  race_screens::SplitResultsCreate(base, frame);
+  race_screens::RaceDialogCreate(base, frame);
+  race_screens::Kind6MenuCreate(base, frame);
+  return ScreensInit(base, guest::LoadU32(base, kScreensHolder), kind, frame, calls);
 }
 
 uint64_t RunCountdown(uint8_t* base, uint32_t hud, uint32_t sp, const Calls& calls,

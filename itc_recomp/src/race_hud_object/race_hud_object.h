@@ -385,5 +385,14 @@ uint64_t Make1004(uint8_t* base, uint32_t owner, uint32_t sp, const Calls& calls
 // +8 = 0. Make1004's r3.
 uint64_t ScreensInit(uint8_t* base, uint32_t holder, uint32_t kind, uint32_t sp,
                      const Calls& calls);
+// The in-race screens' holder ([0x826D84F0]).
+constexpr uint32_t kScreensHolder = 0x826D84F0;
+// RaceScreens::Create (sub_82211F40): the holder (VirtualAlloc(0, 1040,
+// MEM_COMMIT, read-write): the allocation layer's pages) at [0x826D84F0],
+// the eight screens' makers (race_screens::PauseMenuCreate and the rest,
+// in-race screens' plain C++, in the original's order), then
+// ScreensInit(the holder, `kind`), all from a 112-byte frame. ScreensInit's
+// r3.
+uint64_t ScreensCreate(uint8_t* base, uint32_t kind, uint32_t sp, const Calls& calls);
 
 }  // namespace race_hud_object

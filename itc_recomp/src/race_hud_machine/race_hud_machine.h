@@ -69,6 +69,11 @@ constexpr uint32_t kAltTick = 0x82217AC8;          // AltHud::Tick
 constexpr uint32_t kAltRunMovie = 0x82216C00;      // AltHud::RunMovie
 constexpr uint32_t kAfterRaceClose = 0x8221A498;   // AfterRaceMenu::Close (race-screens.md)
 constexpr uint32_t kCareerResultsUpdate = 0x8221A090;  // CareerResults::Update (race-screens.md)
+constexpr uint32_t kPauseMenuUpdate = 0x8220F638;      // PauseMenu::Update (race-screens.md)
+constexpr uint32_t kAfterRaceUpdate = 0x8221BD20;      // AfterRaceMenu::Update (race-screens.md)
+// The in-race screens' holder ([0x826D84F0]), which the pause's update reads
+// instead of +9608.
+constexpr uint32_t kHolderGlobal = 0x826D84F0;
 
 // --- The set-up (race_hud_machine_init.cpp) ---
 
@@ -142,6 +147,27 @@ std::optional<uint64_t> SetUp(uint8_t* base, uint64_t r3, uint32_t sp, const Cal
 // in play (2, 4, 6, and 1 with +0xA3AF4 0).
 std::optional<uint64_t> ResultsUpdate(uint8_t* base, uint64_t r3, uint32_t dispatcher, uint32_t sp,
                                       const Calls& callees);
+// sub_8216DB70 RaceHudMachine::PauseUpdate: r4 the dispatcher. Kind 6 with
+// the race data's +0xA3AF4 8 the HUD's Tick(1), UpdateWarning, TickPanel;
+// kinds 1 to 3, 5 and 6 the answer PauseMenu::Update([0x826D84F0] + 1012),
+// others 0; by it: 1 posts 29, 2, 6 and 7 post 48, 3 posts 45 and
+// sub_82211D00(+9608) (never seen in play: the original), 4 posts 20, 5
+// posts 21, 8 RaceHud::ApplyOptions([0x826D84F0] + 16), 9 posts 48 and
+// with +0xA3AF4 7 [0x82816E3C] +240 = 1. nullopt, with nothing done, for
+// kind 4 (sub_82211458, never seen in play).
+std::optional<uint64_t> PauseUpdate(uint8_t* base, uint64_t r3, uint32_t dispatcher, uint32_t sp,
+                                    const Calls& callees);
+// sub_8216DD88 RaceHudMachine::AfterRaceUpdate: r4 the dispatcher. The last
+// result's +3916 (RacerRecords::At(the race data's +0x59AE8, -1)); kinds 1
+// to 3 and 6 the HUD's Tick(0) and UpdateWarning; kinds 1 to 3 the answer
+// AfterRaceMenu::Update(holder +1020): 1 and 8 post 40, 2 posts 42 and sets
+// the replay bit, 4, 5, 7 and 9 post 48, 6 posts 45, 3 nothing, every post
+// but 42's clearing the bit; kind 6 with the result's word 0 or 2 posts 40.
+// nullopt, with nothing done, for kinds 0 and 4 (sub_8220B9E8,
+// sub_82216850) and kind 6 with the word 1 or 3 (sub_8221F1E8), never seen
+// in play.
+std::optional<uint64_t> AfterRaceUpdate(uint8_t* base, uint64_t r3, uint32_t dispatcher,
+                                        uint32_t sp, const Calls& callees);
 // sub_8216D198 RaceHudMachine::CloseResults: by the race data's kind the
 // results' screen passed to the empty sub_82106540 (nothing done), then
 // AfterRaceMenu::Close(holder +1020) and the holder's +440 = 1; returns

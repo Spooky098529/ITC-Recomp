@@ -104,5 +104,8 @@ void RaceHudObjectTickPanel(PPCContext& ctx, uint8_t* base);
 // RaceScreens::Init sub_82211DA0: r3 = the holder, r4 = the race kind.
 void RaceHudObjectMake1004(PPCContext& ctx, uint8_t* base);
 void RaceHudObjectScreensInit(PPCContext& ctx, uint8_t* base);
+// RaceScreens::Create sub_82211F40: r3 = the race kind; the original where
+// the native heap isn't active.
+void RaceHudObjectScreensCreate(PPCContext& ctx, uint8_t* base);
 
 }  // namespace hooks

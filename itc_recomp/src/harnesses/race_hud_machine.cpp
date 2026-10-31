@@ -928,6 +928,13 @@ constexpr uint32_t kAfterRaceList = 0x826D851C;
 // The career's results' screen ([0x826D8500], CareerResults::Start's).
 constexpr uint32_t kCareerResults = 0x826D8500;
 
+// The in-race screens' globals (0x826D84D0 to 0x826D851F: the holder
+// [0x826D84F0], the pause menu's data and page object, the menu after the
+// race's), and the object the pause's answer 9 marks ([0x82816E3C] +240).
+constexpr uint32_t kScreenGlobals = 0x826D84D0;
+constexpr uint32_t kScreenGlobalsBytes = 0x50;
+constexpr uint32_t kStageObject = 0x82816E3C;
+
 struct HandlerSpec {
   uint32_t frame = 0;
   uint32_t saves = 0;
@@ -974,7 +981,9 @@ void HandlerCase(Context& h, Results& results, const HudWorld& w, uint64_t seed,
                               {kMapperEntries, 32},
                               {kControllerEntries, 16},
                               {kAfterRaceList, 4},
-                              {kCareerResults, 4}});
+                              {kCareerResults, 4},
+                              {kScreenGlobals, kScreenGlobalsBytes},
+                              {kStageObject, 4}});
     PPCContext t = CallContext(h);
     const uint32_t sp = t.r1.u32;
     WriteRandom(h.base, sp - kHandlerStackBytes, kHandlerStackBytes + kCallerBytes, r);
@@ -1157,6 +1166,49 @@ void Handlers(Context& h) {
     const int32_t pages[3] = {-1, 0, 4};
     guest::StoreU32(h.base, screen + 184, uint32_t(pages[r.Below(3)]));
   };
+  // The screens' pages whose handlers PauseMenu::Update and
+  // AfterRaceMenu::Update run (as the in-race screens' harness's pages
+  // cases): none (-1) or the answer page (the pause menu's 5: its data's
+  // +140; the menu after the race's 7: its data's +12), the answer 0 to 10,
+  // now and then any word; their page objects and data in the misc block
+  // (+0x4300, +0x4340).
+  auto screen_pages = [&h](Random& r, const HudWorld& w, uint32_t pages_global,
+                           uint32_t data_global, int32_t answer_page, uint32_t answer_at) {
+    const uint32_t pages = w.misc.address + 0x4300, data = w.misc.address + 0x4340;
+    guest::StoreU32(h.base, pages_global, pages);
+    guest::StoreU32(h.base, data_global, data);
+    guest::StoreU32(h.base, pages, r.Below(4) == 0 ? 0xFFFFFFFFu : uint32_t(answer_page));
+    guest::StoreU32(h.base, data + answer_at, r.Below(8) == 0 ? uint32_t(r.Next()) : r.Below(11));
+  };
+  // PauseUpdate: the holder [0x826D84F0] the world's; the race data's mode
+  // (+0xA3AF4) 7, 8 or another; [0x82816E3C] a block of the misc one
+  // (+0x4400) for answer 9.
+  const HandlerSetupFn pause_update = [&h, &by_signed, &screen_pages](PPCContext& t, Random& r,
+                                                                      const HudWorld& w) {
+    by_signed(t, r, w);
+    guest::StoreU32(h.base, kScreenGlobals + 0x20, w.holder.address);
+    const uint32_t modes[4] = {7, 8, r.Below(10), uint32_t(r.Next())};
+    guest::StoreU32(h.base, w.race.address + 0xA3AF4, modes[r.Below(4)]);
+    guest::StoreU32(h.base, kStageObject, w.misc.address + 0x4400);
+    screen_pages(r, w, 0x826D84D8, 0x826D84D4, 5, 140);
+  };
+  // AfterRaceUpdate: the racer records' count 1 to 3 and the last one's
+  // +3916 0 to 4 (kind 6's 1 and 3, sub_8221F1E8's, never seen in play, left
+  // out) or any word.
+  const HandlerSetupFn after_race_update = [&h, &by_draw, &screen_pages](
+                                               PPCContext& t, Random& r, const HudWorld& w) {
+    by_draw(t, r, w);
+    const uint32_t records = w.race.address + 0x59AE8;
+    const uint32_t count = 1 + r.Below(3);
+    guest::StoreU32(h.base, records + 0x49FE0, count);
+    uint32_t word = r.Below(6) == 0 ? uint32_t(r.Next()) : r.Below(5);
+    if (int32_t(guest::LoadU32(h.base, w.machine.address + rhm::kKind)) == 6 &&
+        (word == 1 || word == 3)) {
+      word = 2;
+    }
+    guest::StoreU32(h.base, records + rh::kRecordBytes * (count - 1) + 3916, word);
+    screen_pages(r, w, 0x826D8518, 0x826D8514, 7, 12);
+  };
   struct G {
     const char* name;
     int cases;
@@ -1208,6 +1260,11 @@ void Handlers(Context& h) {
        never},
       {"RaceHudMachine::CloseResults (sub_8216D198)", 80, &close_results, __imp__sub_8216D198,
        hooks::RaceHudMachineCloseResults, f96, false, never},
+      {"RaceHudMachine::PauseUpdate (sub_8216DB70)", 200, &pause_update, __imp__sub_8216DB70,
+       hooks::RaceHudMachinePauseUpdate, HandlerSpec{128, 48}, false, never},
+      {"RaceHudMachine::AfterRaceUpdate (sub_8216DD88)", 200, &after_race_update,
+       __imp__sub_8216DD88, hooks::RaceHudMachineAfterRaceUpdate, HandlerSpec{128, 40}, false,
+       never},
   };
   for (const G& g : groups) {
     Results results(g.name);

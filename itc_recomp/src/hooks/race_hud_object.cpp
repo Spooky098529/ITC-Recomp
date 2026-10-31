@@ -6,6 +6,7 @@
 
 
 #include "base/flags.h"
+#include "hooks/heap.h"
 #include "menu_sounds/menu_sounds.h"
 #include "race_hud_object/race_hud_object.h"
 #include "track_zones/track_zones.h"
@@ -40,7 +41,7 @@ ITC_FLAG_BOOL(native_race_hud_object, true, "ITC",
               "(UiMovie::Run and the mirror's sub_8211BEE8 through their overrides), "
               "UpdateWarning sub_82212C50, UpdateRecordingFull sub_82212E60 (UiMovie::Finish "
               "and FinishNamed through their overrides), ShowItem sub_82213638 (UiMovie::SetNodeText "
-              "through its override, its varargs 0), UpdateItem sub_82214238, RaceScreens::Init sub_82211DA0 and Make1004 sub_82216A60 "
+              "through its override, its varargs 0), UpdateItem sub_82214238, RaceScreens::Init sub_82211DA0, Create sub_82211F40 (with --native_heap; the in-race screens' makers' plain C++) and Make1004 sub_82216A60 "
               "(the UI movies' start, Strings::Load, UiMovies::Open, operator new, memset and "
               "MenuList::Init through their overrides); MovieMask, RaceHud::Init and Make1004 "
               "have no adapters: only RaceScreens::Init's plain C++ reaches them, and the flag "
@@ -371,6 +372,15 @@ void RaceHudObjectScreensInit(PPCContext& ctx, uint8_t* base) {
   ctx.r3.u64 = rh::ScreensInit(base, ctx.r3.u32, ctx.r4.u32, ctx.r1.u32, guest.calls());
 }
 
+void RaceHudObjectScreensCreate(PPCContext& ctx, uint8_t* base) {
+  if (!NativeHeapActive()) {
+    __imp__sub_82211F40(ctx, base);
+    return;
+  }
+  GuestCalls guest(ctx, base);
+  ctx.r3.u64 = rh::ScreensCreate(base, ctx.r3.u32, ctx.r1.u32, guest.calls());
+}
+
 void RaceHudObjectRunCountdown(PPCContext& ctx, uint8_t* base) {
   ctx.fpscr.disableFlushMode();
   GuestCalls guest(ctx, base);
@@ -445,4 +455,5 @@ ITC_RACE_HUD_OBJECT(822128A8, RaceHudObjectDraw)
 ITC_RACE_HUD_OBJECT(82212C50, RaceHudObjectUpdateWarning)
 ITC_RACE_HUD_OBJECT(82213638, RaceHudObjectShowItem)
 ITC_RACE_HUD_OBJECT(82211DA0, RaceHudObjectScreensInit)
+ITC_RACE_HUD_OBJECT(82211F40, RaceHudObjectScreensCreate)
 ITC_RACE_HUD_OBJECT(82215488, RaceHudObjectTickPanel)
