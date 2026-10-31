@@ -206,6 +206,10 @@ void RaceScreensRaceDialogAnswer(PPCContext& ctx, uint8_t* base) {
 // The adapters: the register steps above, or the originals with the flag
 // off. ScreenPages::Go's and MenuList::Update's are their logging overrides
 // (src/debug/pause_movie_log.cpp, pause_menu_log.cpp), which call the steps.
+// None for MenuList::Fired (its only caller in play, MenuList::Update, calls
+// its plain C++) and AfterRaceMenu::Close (its only caller in play, the race
+// HUD machine's native CloseResults, calls its plain C++); their register
+// steps stay for the harness.
 
 #define ITC_RACE_SCREENS(address, step)       \
   extern "C" REX_FUNC(sub_##address) {        \
@@ -224,7 +228,6 @@ ITC_RACE_SCREENS(8220BC30, RaceScreensListSetSelection)
 ITC_RACE_SCREENS(8220BC00, RaceScreensListSetEnabled)
 ITC_RACE_SCREENS(8220BC10, RaceScreensListIsEnabled)
 ITC_RACE_SCREENS(8220BC40, RaceScreensListFit)
-ITC_RACE_SCREENS(8220C020, RaceScreensListFired)
 ITC_RACE_SCREENS(8220BD50, RaceScreensListAccepted)
 ITC_RACE_SCREENS(8220BDE0, RaceScreensListCancelled)
 ITC_RACE_SCREENS(8220BE70, RaceScreensListPressed152)
@@ -245,7 +248,6 @@ ITC_RACE_SCREENS(82219170, RaceScreensCareerResultsDestroy)
 ITC_RACE_SCREENS(8221F3C8, RaceScreensRaceResultsDestroy)
 ITC_RACE_SCREENS(8221FA68, RaceScreensSplitResultsDestroy)
 ITC_RACE_SCREENS(8221BE30, RaceScreensKind6MenuDestroy)
-ITC_RACE_SCREENS(8221A498, RaceScreensAfterRaceMenuClose)
 ITC_RACE_SCREENS(8220F840, RaceScreensPauseMenuLoadData)
 ITC_RACE_SCREENS(8220D6A0, RaceScreensPauseMenuSaveOptions)
 ITC_RACE_SCREENS(8220D890, RaceScreensPauseMenuClose)
