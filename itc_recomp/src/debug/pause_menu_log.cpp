@@ -19,6 +19,7 @@
 #include "debug/pause_menu_log.h"
 #include "frame_pacing/game_messages.h"
 #include "guest.h"
+#include "hooks/race_screens.h"
 
 #include "base/flags.h"
 #include "base/log.h"
@@ -32,6 +33,7 @@ ITC_FLAG_BOOL(log_pause_menu, false, "ITC",
               "Log menu list updates (sub_8220C1E0) and the action mapper's updates "
               "(sub_8210C370) while a direction fires, by pass type; count the mappers' "
               "updates and reads by caller once a second");
+ITC_FLAG_DECLARE(bool, native_race_screens);
 
 namespace {
 
@@ -183,11 +185,20 @@ void debug::PauseMenuLog_NoteMapperUpdate(uint32_t caller) {
   }
 }
 
-// The menu list update.
+// The menu list update (natively with --native_race_screens: the adapter's
+// step, hooks/race_screens.h), logged around the update.
+static void MenuListUpdate(PPCContext& ctx, uint8_t* base) {
+  if (ITC_FLAG(native_race_screens)) {
+    hooks::RaceScreensListUpdate(ctx, base);
+  } else {
+    __imp__sub_8220C1E0(ctx, base);
+  }
+}
+
 extern "C" REX_FUNC(sub_8220C1E0) {
   REX_FUNC_PROLOGUE();
   if (!ITC_FLAG(log_pause_menu)) {
-    __imp__sub_8220C1E0(ctx, base);
+    MenuListUpdate(ctx, base);
     return;
   }
   uint32_t menu = ctx.r3.u32;
@@ -197,7 +208,7 @@ extern "C" REX_FUNC(sub_8220C1E0) {
   uint32_t held = mapper ? guest::LoadU32(base, mapper + 448) : 0;
   uint32_t before = guest::LoadU32(base, menu + 16);
   uint32_t scroll = guest::LoadU32(base, menu + 4);
-  __imp__sub_8220C1E0(ctx, base);
+  MenuListUpdate(ctx, base);
   uint32_t after = guest::LoadU32(base, menu + 16);
   bool pause_menu = menu == guest::LoadU32(base, 0x826D84DC);
   if ((after != before || (fired & kDirectionBits) || (held & kDirectionBits)) && TakeLine()) {
