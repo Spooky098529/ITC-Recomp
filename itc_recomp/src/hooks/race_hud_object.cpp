@@ -41,7 +41,8 @@ ITC_FLAG_BOOL(native_race_hud_object, true, "ITC",
               "MenuList::Init through their overrides); MovieMask, RaceHud::Init and Make1004 "
               "have no adapters: only RaceScreens::Init's plain C++ reaches them, and the flag "
               "switches it); RunCountdown sub_822129A8 (UiMovie::Run through its override, "
-              "MenuSound::Play's plain C++), UpdateRacerBar sub_82214790 (UiMovie::Finish and "
+              "MenuSound::Play's plain C++), UpdateRacerBar sub_82214790 (no adapter: only TickRacers' "
+              "plain C++ reaches it in play; UiMovie::Finish and "
               "the sound manager's slot 14 through the function table, MenuSound::Play's plain "
               "C++), TickPanel sub_82215488 (TickRacers sub_822151F8, no adapter: only TickPanel's "
               "plain C++ reaches it; modes 2 to 4's ticks, never seen in play, the originals) "
@@ -400,7 +401,8 @@ void RaceHudObjectTickPanel(PPCContext& ctx, uint8_t* base) {
 // (from Tick), UpdateSign and UpdatePlaceName (from UpdateSigns), SetTime
 // and SetDistance (from TickTimer), RaceScreens::MovieMask, RaceHud::Init and
 // RaceScreens::Make1004 (from RaceScreens::Init), TickRacers (from
-// TickPanel).
+// TickPanel), UpdateRacerBar (from TickRacers; mode 3's tick, never seen in
+// play, runs the original).
 
 #define ITC_RACE_HUD_OBJECT(address, step)    \
   extern "C" REX_FUNC(sub_##address) {        \
@@ -442,5 +444,4 @@ ITC_RACE_HUD_OBJECT(82213638, RaceHudObjectShowItem)
 ITC_RACE_HUD_OBJECT(82214238, RaceHudObjectUpdateItem)
 ITC_RACE_HUD_OBJECT(82211DA0, RaceHudObjectScreensInit)
 ITC_RACE_HUD_OBJECT(822129A8, RaceHudObjectRunCountdown)
-ITC_RACE_HUD_OBJECT(82214790, RaceHudObjectUpdateRacerBar)
 ITC_RACE_HUD_OBJECT(82215488, RaceHudObjectTickPanel)
