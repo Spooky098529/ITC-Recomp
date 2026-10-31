@@ -38,9 +38,19 @@ file's history. What's left to see in a drive, from every run:
   4da95a17, 2bf1cf2c: 5 adapters removed; harness race_hud_object 48
   groups 0 differing; race 30 s with the harnesses (38 s without), 0
   errors; no subagents). `RunWarning` and two removable adapters left
-  as a new cleanup lead. Step: validation (agent running).
+  as a new cleanup lead. Validated (`itc_2973`, 120 s: race 58 s, 0
+  errors, harnesses 59.8 s; replay `itc_2974` ok): 8 of 8 harness
+  lines, none ran in the race or the replay (8 to drive). Done.
+- Cleanup lead (no mapping, not counted): `RaceHud::RunWarning`
+  (`sub_82212A48`) and the removable adapters of `HudCurve::Eval` and
+  `PowInt` in `race-hud-object.md`. Step: migration (agent running).
 
 ## Done
+
+- The race HUD's `RunCountdown` and `UpdateRacerBar` (cleanup lead):
+  `race-hud-object.md`, with `TickPanel`, `TickRacers` and 5 adapters
+  removed; `--native_race_hud_object`; c17e0401..2bf1cf2c. Validated
+  (`itc_2973`).
 
 - The interior accessories (subsystem 1): `accessories.md`, 31 of 31
   in play, two migrations; `--native_accessories`; ae8e322b..3a9de36a.
@@ -80,5 +90,8 @@ file's history. What's left to see in a drive, from every run:
 - After the race HUD cleanup lead's migration (`itc_2972`: race 30 s,
   0 errors, race_hud_object 0 differing): ours 3588, work left 2810
   (wrapped 103, known 482, unknown 2225).
+- After its validation (`itc_2973`, 120 s: race 58 s, 0 errors, every
+  harness 0 differing but the expected groups): ours 3588, work left
+  2810.
 
 ## Stopped

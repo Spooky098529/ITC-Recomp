@@ -16,6 +16,22 @@ function goes from this list when a log shows its `native running
 (game):` line (say which log in the commit). A run with nothing left
 here loses its heading.
 
+## Run 2026-10-31 16:54 (`b7-loop-31-10-26`, continued)
+
+- The race HUD cleanup lead (attract race `itc_2973`, replay
+  `itc_2974`, ok: its one "BaseHeap::Release failed" line after the
+  race's end, as in `itc_2931`; `race-hud-object.md`; the replay's race
+  set up the HUD but never ticked these): `sub_822129A8`
+  RaceHud::RunCountdown, `sub_82214790` RaceHud::UpdateRacerBar,
+  `sub_82215488` RaceHud::TickPanel, `sub_822151F8` RaceHud::TickRacers,
+  `sub_82211FB8` HudBar::Step, `sub_82215820` RaceHud::Touching,
+  `sub_82214D78` RaceHud::TickTimer, `sub_82212E60`
+  RaceHud::UpdateRecordingFull.
+
+- The interior accessories (attract races `itc_2946`, `itc_2963`,
+  replays `itc_2947`, `itc_2964`, ok; `accessories.md`): none left to
+  drive.
+
 ## Run 2026-10-31 13:47 (`b7-loop-31-10-26`)
 
 - The menu sounds (attract race `itc_2935`, replay `itc_2936`: broke,
