@@ -249,5 +249,7 @@ void RaceHudObject(Context& h);
 void AltHud(Context& h);
 // The race scene (src/harnesses/race_scene.cpp).
 void RaceScene(Context& h);
+// The menu sounds (src/harnesses/menu_sounds.cpp).
+void MenuSounds(Context& h);
 
 }  // namespace harness
