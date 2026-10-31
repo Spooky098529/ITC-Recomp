@@ -3,9 +3,14 @@
 
 #include "accessories/accessories.h"
 
+#include "archive/archive.h"
 #include "base/log.h"
 #include "guest.h"
 #include "memory/heap.h"
+#include "model_animation/model_animation.h"
+#include "models/part_model.h"
+#include "models/texture_provider.h"
+#include "native/buffers.h"
 
 #include <cstring>
 
@@ -48,6 +53,29 @@ void Copy16(uint8_t* base, uint32_t to, uint32_t from) {
     const uint32_t high = Load(base, from + half), low = Load(base, from + half + 4);
     Store(base, to + half, high);
     Store(base, to + half + 4, low);
+  }
+}
+
+// A callee whose checks the adapter made: aborts when it refuses anyway.
+void Require(bool done, const char* what) {
+  if (!done) {
+    ITC_LOG_ERROR("Accessories: {} refused after its checks", what);
+    std::abort();
+  }
+}
+
+// The identity's four rows as the originals' stvx leave them at `rows`
+// (16-byte aligned down, as stvx).
+void StoreIdentity(uint8_t* base, uint32_t rows, double one) {
+  const uint32_t at = rows & ~0xFu;
+  for (uint32_t row = 0; row < 4; row++) {
+    for (uint32_t column = 0; column < 4; column++) {
+      if (row == column) {
+        Stfs(base, at + 16 * row + 4 * column, one);
+      } else {
+        Store(base, at + 16 * row + 4 * column, 0);
+      }
+    }
   }
 }
 
@@ -128,6 +156,37 @@ std::optional<uint32_t> FileFreeData(uint8_t* base, uint32_t slot) {
   return r3;
 }
 
+bool FileResetNative(uint8_t* base, uint32_t file) {
+  if (Load(base, file + 24) == 0 || Load(base, file + 12) != 2) {
+    return true;
+  }
+  const uint32_t block = Load(base, file + 16);
+  return block == 0 || memory::IsPages(block);
+}
+
+std::optional<uint32_t> FileReset(uint8_t* base, uint32_t file) {
+  ITC_NATIVE_RUNNING("sub_820F0D30 AccessoryFile::Reset");
+  std::optional<uint32_t> r3;
+  if (Load(base, file + 24) != 0) {
+    const uint32_t state = Load(base, file + 12);
+    if (state == 1) {
+      r3 = archive::Cancel(base, Load(base, file + 8));
+    } else if (state == 2) {
+      r3 = FileFreeData(base, file + 16);
+      Require(r3.has_value(), "AccessoryFile::FreeData");
+    }
+  }
+  Store(base, file + 12, 0);
+  Store(base, file + 4, 0xFFFFFFFFu);
+  Store(base, file + 8, 0xFFFFFFFFu);
+  Store(base, file + 16, 0);
+  Store(base, file + 20, 0);
+  Store(base, file + 24, 1);
+  Store(base, file + 28, 0);
+  Store(base, file + 32, 0);
+  return r3;
+}
+
 // --- The set ---
 
 void SetBaseConstruct(uint8_t* base, uint32_t set) {
@@ -177,6 +236,128 @@ void SetScale(uint8_t* base, uint32_t set, uint32_t scale) {
     }
   }
   Copy16(base, set + 16, scale);
+}
+
+uint32_t SetFree(uint8_t* base, uint32_t slot, uint32_t sp,
+                 const std::function<void(uint32_t set, uint32_t frame)>& destroy) {
+  ITC_NATIVE_RUNNING("sub_820F0F90 Accessories::Free");
+  const uint32_t set = Load(base, slot);
+  if (set == 0) {
+    return 0;
+  }
+  const uint32_t frame = sp - 96;
+  Store(base, frame, sp);  // the back chain, for the destructor's guest call
+  destroy(set, frame);
+  const auto r3 = FileFreeData(base, slot);
+  Require(r3.has_value(), "AccessoryFile::FreeData");
+  return *r3;
+}
+
+uint64_t SetDestroy(uint8_t* base, uint32_t sp,
+                    const std::function<void(uint32_t set, uint32_t frame)>& destroy) {
+  ITC_NATIVE_RUNNING("sub_820F1078 Accessories::Destroy");
+  if (Load(base, kSet) == 0) {
+    return uint64_t(int64_t(int32_t(kSet)));  // lis and addi: sign-extended
+  }
+  return SetFree(base, kSet, sp, destroy);
+}
+
+// --- The entry and the accessory ---
+
+bool AccessoryConstructible(uint8_t* base) {
+  return models::CanAllocatePointers(base, models::kTextureProviderSlots);
+}
+
+uint32_t SkeletonConstruct(uint8_t* base, uint32_t skeleton, uint32_t sp) {
+  ITC_NATIVE_RUNNING("sub_820F03F0 AccessorySkeleton::AccessorySkeleton");
+  const uint32_t frame = sp - 224;
+  model_animation::SkeletonBaseConstruct(base, skeleton);
+  Store(base, skeleton + 176, kListNodeVtable);
+  Store(base, skeleton + 0, kSkeletonVtable);
+  Store(base, skeleton + 176, kSkeletonVtable2);
+  FileConstruct(base, skeleton + 180);
+  const double one = Lfs(base, kOne);
+  const double zero = Lfs(base, kZero);
+  // The job (+216): its functor's vtable (+220) set twice, its flags.
+  const uint32_t job = skeleton + 216;
+  Store(base, job + 4, kJobFunctorFirst);
+  guest::StoreU8(base, job + 17, 1);
+  Store(base, job + 0, kJobVtable);
+  Store(base, job + 4, kJobFunctor);
+  Store(base, frame + 80, 0);
+  Store(base, frame + 84, 0);
+  Store(base, job + 8, 0);
+  Store(base, job + 12, 0);
+  guest::StoreU8(base, job + 16, 0);
+  guest::StoreU8(base, job + 18, 0);
+  Store(base, job + 32, Load(base, frame + 80));
+  Store(base, job + 36, Load(base, frame + 84));
+  Store(base, job + 24, kJobDelegate);
+  Store(base, job + 28, 0);
+  const uint32_t matrix = skeleton + 288, last = skeleton + 352;
+  for (uint32_t offset : {12u, 28u, 44u, 60u}) {
+    Stfs(base, matrix + offset, one);
+  }
+  for (uint32_t offset : {12u, 28u, 44u, 60u}) {
+    Stfs(base, last + offset, one);
+  }
+  Stfs(base, skeleton + 428, one);
+  Stfs(base, skeleton + 444, one);
+  Store(base, skeleton + 264, 1);
+  Stfs(base, skeleton + 268, zero);
+  Stfs(base, skeleton + 272, zero);
+  Store(base, skeleton + 260, 0);
+  Store(base, skeleton + 256, 0);
+  StoreIdentity(base, frame + 96, 1.0);
+  Require(native::Buffers_Memcpy(base, matrix, frame + 96, 64, 0x820F0544), "memcpy");
+  StoreIdentity(base, frame + 96, 1.0);
+  Require(native::Buffers_Memcpy(base, last, frame + 96, 64, 0x820F0588), "memcpy");
+  for (uint32_t offset : {424u, 420u, 416u}) {
+    Stfs(base, skeleton + offset, zero);
+  }
+  Stfs(base, skeleton + 428, one);
+  for (uint32_t offset : {440u, 436u, 432u}) {
+    Stfs(base, skeleton + offset, zero);
+  }
+  Stfs(base, skeleton + 444, one);
+  return skeleton;
+}
+
+uint32_t AccessoryConstruct(uint8_t* base, uint32_t accessory, uint32_t sp) {
+  ITC_NATIVE_RUNNING("sub_820EF258 Accessory::Accessory");
+  const uint32_t frame = sp - 96;
+  Require(models::PartModelConstruct(base, accessory), "PartModel::PartModel");
+  Store(base, accessory + 0, kAccessoryVtable);
+  FileConstruct(base, accessory + 464);
+  FileConstruct(base, accessory + 500);
+  SkeletonConstruct(base, accessory + 544, frame);
+  const double one = Lfs(base, kOne);
+  for (uint32_t offset : {1004u, 1020u, 1036u, 1004u}) {
+    Stfs(base, accessory + offset, one);
+  }
+  const double zero = Lfs(base, kZero);
+  for (uint32_t offset : {1000u, 996u, 992u, 1016u, 1012u, 1008u}) {
+    Stfs(base, accessory + offset, zero);
+  }
+  for (uint32_t offset : {1020u, 1024u, 1028u, 1032u, 1036u}) {
+    Stfs(base, accessory + offset, one);
+  }
+  Store(base, accessory + 1044, 1);
+  Store(base, accessory + 1040, 0);
+  Store(base, accessory + 1048, 0);
+  return accessory;
+}
+
+uint32_t EntryNew(uint8_t* base, uint32_t sp) {
+  ITC_NATIVE_RUNNING("sub_820F0920 AccessoryEntry::New");
+  const uint32_t entry = VirtualAlloc(kEntryBytes);
+  if (entry == 0) {
+    return 0;
+  }
+  Store(base, entry + 0, 1);
+  FileConstruct(base, entry + 4);
+  AccessoryConstruct(base, entry + 48, sp - 96);
+  return entry;
 }
 
 }  // namespace accessories

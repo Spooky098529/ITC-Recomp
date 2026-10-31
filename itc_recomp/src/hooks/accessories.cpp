@@ -10,16 +10,59 @@
 #include "base/flags.h"
 #include "hooks/archive.h"
 #include "hooks/heap.h"
+#include "hooks/models.h"
 #include "memory/heap.h"
+#include "native/buffers.h"
+
+#include <functional>
 
 ITC_FLAG_BOOL(native_accessories, true, "ITC",
               "Run the interior accessories (docs/functions/accessories.md: the set at "
               "[0x826C5510] sub_820F1038, sub_820F0F48, sub_820F0E60, sub_820F07B8, "
               "sub_820F0F00; the file class sub_820F0C50, sub_820F0BF0, sub_820F0C90, "
-              "sub_820F0C20, sub_820F08D0) natively instead of through the translated code "
+              "sub_820F0C20, sub_820F08D0, sub_820F0D30; Accessories::Free and Destroy "
+              "sub_820F0F90, sub_820F1078, the set's destructor through its vtable; the entry "
+              "and the accessory's construction sub_820F0920, sub_820EF258, sub_820F03F0) natively instead of through the translated code "
               "(the same words; checked by --run_harnesses=accessories)");
 
 namespace hooks {
+
+namespace {
+
+// A guest call the plain C++ hands back: `function` through the function
+// table (its override when it has one) with r3, r4 set, from the frame at
+// `r1` with the link register `lr` (the original's return address); r1 and
+// lr put back after.
+void GuestCall(PPCContext& ctx, uint8_t* base, uint32_t function, uint32_t r1, uint32_t lr,
+               uint64_t r3, uint64_t r4) {
+  const uint64_t stack = ctx.r1.u64, link = ctx.lr;
+  ctx.r1.u64 = r1;
+  ctx.r3.u64 = r3;
+  ctx.r4.u64 = r4;
+  ctx.lr = lr;
+  ctx.ctr.u64 = function;
+  REX_CALL_INDIRECT_FUNC(function);
+  ctx.r1.u64 = stack;
+  ctx.lr = link;
+}
+
+// The set's destructor without delete (its vtable slot 0, r4 = 0), as
+// Accessories::Free calls it.
+std::function<void(uint32_t, uint32_t)> SetDestructor(PPCContext& ctx, uint8_t* base) {
+  return [&ctx, base](uint32_t set, uint32_t frame) {
+    const uint32_t function = guest::LoadU32(base, guest::LoadU32(base, set));
+    GuestCall(ctx, base, function, frame, 0x820F0FC4, set, 0);
+  };
+}
+
+// Whether the set in [slot] (if any) is the allocation layer's pages, so
+// Free's FreeData runs natively.
+bool SetFreeable(uint8_t* base, uint32_t slot) {
+  const uint32_t set = guest::LoadU32(base, slot);
+  return set == 0 || memory::IsPages(set);
+}
+
+}  // namespace
 
 bool AccessoriesNativeLoads() {
   return NativeHeapActive() && NativeArchiveQueue();
@@ -71,6 +114,16 @@ void AccessoryFileFreeData(PPCContext& ctx, uint8_t* base) {
   ctx.r3.u64 = *r3;
 }
 
+void AccessoryFileReset(PPCContext& ctx, uint8_t* base) {
+  if (!AccessoriesNativeLoads() || !accessories::FileResetNative(base, ctx.r3.u32)) {
+    __imp__sub_820F0D30(ctx, base);
+    return;
+  }
+  if (const auto r3 = accessories::FileReset(base, ctx.r3.u32)) {
+    ctx.r3.u64 = *r3;
+  }
+}
+
 // --- The set ---
 
 void AccessoriesBaseConstruct(PPCContext& ctx, uint8_t* base) {
@@ -106,6 +159,53 @@ void AccessoriesSetScale(PPCContext& ctx, uint8_t* base) {
   accessories::SetScale(base, ctx.r3.u32, ctx.r4.u32);
 }
 
+void AccessoriesFree(PPCContext& ctx, uint8_t* base) {
+  if (!NativeHeapActive() || !SetFreeable(base, ctx.r3.u32)) {
+    __imp__sub_820F0F90(ctx, base);
+    return;
+  }
+  ctx.r3.u64 = accessories::SetFree(base, ctx.r3.u32, ctx.r1.u32, SetDestructor(ctx, base));
+}
+
+void AccessoriesDestroy(PPCContext& ctx, uint8_t* base) {
+  if (!NativeHeapActive() || !SetFreeable(base, accessories::kSet)) {
+    __imp__sub_820F1078(ctx, base);
+    return;
+  }
+  ctx.r3.u64 = accessories::SetDestroy(base, ctx.r1.u32, SetDestructor(ctx, base));
+}
+
+// --- The entry and the accessory ---
+
+void AccessorySkeletonConstruct(PPCContext& ctx, uint8_t* base) {
+  if (!native::Buffers_NativeMemcpy()) {
+    __imp__sub_820F03F0(ctx, base);
+    return;
+  }
+  ctx.fpscr.disableFlushMode();
+  ctx.r3.u64 = accessories::SkeletonConstruct(base, ctx.r3.u32, ctx.r1.u32);
+}
+
+void AccessoryConstruct(PPCContext& ctx, uint8_t* base) {
+  if (!ModelsNativeLifetime() || !native::Buffers_NativeMemcpy() ||
+      !accessories::AccessoryConstructible(base)) {
+    __imp__sub_820EF258(ctx, base);
+    return;
+  }
+  ctx.fpscr.disableFlushMode();
+  ctx.r3.u64 = accessories::AccessoryConstruct(base, ctx.r3.u32, ctx.r1.u32);
+}
+
+void AccessoryEntryNew(PPCContext& ctx, uint8_t* base) {
+  if (!NativeHeapActive() || !ModelsNativeLifetime() || !native::Buffers_NativeMemcpy() ||
+      !accessories::AccessoryConstructible(base)) {
+    __imp__sub_820F0920(ctx, base);
+    return;
+  }
+  ctx.fpscr.disableFlushMode();
+  ctx.r3.u64 = accessories::EntryNew(base, ctx.r1.u32);
+}
+
 }  // namespace hooks
 
 // Defines an adapter: the flag, else the original.
@@ -129,3 +229,9 @@ ITC_ACCESSORIES(820F0E60, AccessoriesConstruct)
 ITC_ACCESSORIES(820F0F48, AccessoriesNew)
 ITC_ACCESSORIES(820F1038, AccessoriesCreate)
 ITC_ACCESSORIES(820F0F00, AccessoriesSetScale)
+ITC_ACCESSORIES(820F0D30, AccessoryFileReset)
+ITC_ACCESSORIES(820F0F90, AccessoriesFree)
+ITC_ACCESSORIES(820F1078, AccessoriesDestroy)
+ITC_ACCESSORIES(820F03F0, AccessorySkeletonConstruct)
+ITC_ACCESSORIES(820EF258, AccessoryConstruct)
+ITC_ACCESSORIES(820F0920, AccessoryEntryNew)

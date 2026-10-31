@@ -33,5 +33,15 @@ void AccessoriesConstruct(PPCContext& ctx, uint8_t* base);
 void AccessoriesNew(PPCContext& ctx, uint8_t* base);
 void AccessoriesCreate(PPCContext& ctx, uint8_t* base);
 void AccessoriesSetScale(PPCContext& ctx, uint8_t* base);
+// AccessoryFile::Reset sub_820F0D30 (r3 the file), Accessories::Free
+// sub_820F0F90 (r3 the set's slot) and Destroy sub_820F1078.
+void AccessoryFileReset(PPCContext& ctx, uint8_t* base);
+void AccessoriesFree(PPCContext& ctx, uint8_t* base);
+void AccessoriesDestroy(PPCContext& ctx, uint8_t* base);
+// AccessorySkeleton::AccessorySkeleton sub_820F03F0, Accessory::Accessory
+// sub_820EF258 (r3 them) and AccessoryEntry::New sub_820F0920.
+void AccessorySkeletonConstruct(PPCContext& ctx, uint8_t* base);
+void AccessoryConstruct(PPCContext& ctx, uint8_t* base);
+void AccessoryEntryNew(PPCContext& ctx, uint8_t* base);
 
 }  // namespace hooks

@@ -9,6 +9,7 @@
 #pragma once
 
 #include <cstdint>
+#include <functional>
 #include <optional>
 
 #include "archive/archive.h"
@@ -60,6 +61,17 @@ Callback FileOnArchiveDone(uint8_t* base, uint32_t serial, uint32_t file);
 // (the original runs).
 std::optional<uint32_t> FileFreeData(uint8_t* base, uint32_t slot);
 
+// AccessoryFile::Reset (sub_820F0D30): when owned (+24), Archive::Cancel(+8)
+// while loading (+12 = 1) or FreeData(+16) once loaded (2); then +12 = 0,
+// +4 and +8 = -1, +16 and +20 = 0, +24 = 1, +28 and +32 = 0. The r3 it
+// leaves: Cancel's or FreeData's, or nullopt (r3 as given) when neither ran.
+// The adapter checks a loaded block is the allocation layer's first
+// (FileResetNative).
+std::optional<uint32_t> FileReset(uint8_t* base, uint32_t file);
+// Whether FileReset runs natively for `file`: no loaded, owned block the
+// allocation layer didn't give.
+bool FileResetNative(uint8_t* base, uint32_t file);
+
 // --- The set ([0x826C5510], 32 bytes) ---
 
 // AccessoriesBase::AccessoriesBase (sub_820F07B8): the base's vtable, the
@@ -79,5 +91,53 @@ std::optional<uint32_t> SetCreate(uint8_t* base);
 // each entry's +1072 (the accessory's scale) and the set's +16, as two
 // doublewords each.
 void SetScale(uint8_t* base, uint32_t set, uint32_t scale);
+
+// Accessories::Free (sub_820F0F90): r3 = the set's slot; when it holds a
+// set, `destroy` (the set's vtable slot 0 with r4 = 0, the destructor
+// without delete: a guest call the adapter makes from the 96-byte frame
+// below `sp`, whose back chain is stored here), then FreeData on the slot.
+// The r3 it leaves: 0 for an empty slot, else FreeData's. The adapter
+// checks the set is the allocation layer's pages first.
+uint32_t SetFree(uint8_t* base, uint32_t slot, uint32_t sp,
+                 const std::function<void(uint32_t set, uint32_t frame)>& destroy);
+// Accessories::Destroy (sub_820F1078): when [0x826C5510] holds a set,
+// Free(0x826C5510) (a tail call: its frame below `sp`). The r3 it leaves:
+// 0x826C5510 sign-extended (lis and addi) when there's none, else Free's.
+uint64_t SetDestroy(uint8_t* base, uint32_t sp,
+                    const std::function<void(uint32_t set, uint32_t frame)>& destroy);
+
+// --- The entry (1,104 bytes) and the accessory (entry + 48, 1,056 bytes) ---
+
+constexpr uint32_t kAccessoryVtable = 0x820066C8;
+// The skeleton's vtables (+0, its second base +176), the second base's base
+// (the list node's), the job's (+216, +220 first and then) and its
+// delegate's (+240).
+constexpr uint32_t kSkeletonVtable = 0x82006700;
+constexpr uint32_t kSkeletonVtable2 = 0x820066FC;
+constexpr uint32_t kListNodeVtable = 0x82010B5C;
+constexpr uint32_t kJobVtable = 0x820066DC;
+constexpr uint32_t kJobFunctorFirst = 0x82000AB4;
+constexpr uint32_t kJobFunctor = 0x82002908;
+constexpr uint32_t kJobDelegate = 0x8200833C;
+
+// AccessorySkeleton::AccessorySkeleton (sub_820F03F0): r3 = the skeleton
+// (accessory + 544), `sp` the caller's stack pointer (its 224-byte frame's
+// words as the original leaves them: +80 and +84 0, the identity at +96 to
+// +159). SkeletonBase::SkeletonBase, the vtables, the file at +180, the job
+// at +216, the two matrices identity (memcpy, native::Buffers_Memcpy: the
+// adapter checks it copies), the vectors and angles. Returns the skeleton.
+uint32_t SkeletonConstruct(uint8_t* base, uint32_t skeleton, uint32_t sp);
+// Accessory::Accessory (sub_820EF258): PartModel::PartModel (the adapter
+// checks models::CanAllocatePointers first), the vtable, the two files, the
+// skeleton (from the 96-byte frame below `sp`), the anchor, angles, scale,
+// texture index, visible and loaded. Returns the accessory.
+uint32_t AccessoryConstruct(uint8_t* base, uint32_t accessory, uint32_t sp);
+// AccessoryEntry::New (sub_820F0920): VirtualAlloc(1104) (the allocation
+// layer's pages); +0 = 1, the file at +4, the accessory at +48 (from the
+// 96-byte frame below `sp`). Returns it, or 0.
+uint32_t EntryNew(uint8_t* base, uint32_t sp);
+// Whether a part model is constructed natively (models::CanAllocatePointers
+// for its texture provider): the constructors' adapters check it.
+bool AccessoryConstructible(uint8_t* base);
 
 }  // namespace accessories

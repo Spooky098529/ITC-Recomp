@@ -13,7 +13,10 @@
 #include "base/flags.h"
 #include "base/log.h"
 #include "hooks/accessories.h"
+#include "memory/c_runtime_heap.h"
 #include "memory/heap.h"
+#include "models/model.h"
+#include "models/texture_provider.h"
 
 #include <fmt/format.h>
 
@@ -251,6 +254,134 @@ void Sets(Context& h, const Block& block) {
       });
 }
 
+// AccessoryFile::Reset: owned or not, each state (0 to 3), a loaded block
+// the case's pages or none, a loading serial no request has (Cancel answers
+// 1 without touching the queue).
+void FileResets(Context& h, const Block& block) {
+  const uint32_t file = block.address + 0x100;
+  uint32_t pages = 0;
+  Cases(
+      h, block, "AccessoryFile::Reset (sub_820F0D30)", 32, Original<__imp__sub_820F0D30>,
+      hooks::AccessoryFileReset,
+      [&](PPCContext& t, Random& r) {
+        guest::StoreU32(h.base, file + 24, r.Below(4) == 0 ? 0 : 1);
+        guest::StoreU32(h.base, file + 12, r.Below(4));
+        guest::StoreU32(h.base, file + 8, 0x70000000u + r.Below(0x1000000));
+        pages = r.Below(4) == 0 ? 0 : memory::AllocPages(4096, 4096);
+        guest::StoreU32(h.base, file + 16, pages);
+        t.r3.u64 = file;
+      },
+      [&](const PPCContext&, Outputs& out) {
+        // Freed or not; still the case's pages, freed here.
+        out.Word(pages != 0 && memory::IsPages(pages) ? 1 : 0);
+        if (pages != 0 && memory::IsPages(pages)) {
+          memory::FreePages(pages);
+        }
+      });
+}
+
+// A set (the case's pages) whose vtable's slot 0 is a leaf recorder (r4, r5
+// to the set's +444, +448: read after, though freed); the slot empty now
+// and then.
+void SetFrees(Context& h, const Block& block) {
+  const uint32_t slot = block.address + 0x40, vtable = block.address + 0x80;
+  const auto lay = [&](Random& r, uint32_t at) {
+    const uint32_t set = r.Below(6) == 0 ? 0 : memory::AllocPages(ac::kSetBytes, 4096);
+    guest::StoreU32(h.base, at, set);
+    guest::StoreU32(h.base, vtable, kRecordR4R5);
+    if (set != 0) {
+      guest::StoreU32(h.base, set, vtable);
+    }
+    return set;
+  };
+  uint32_t set = 0;
+  const auto collect = [&](const PPCContext& t, Outputs& out) {
+    if (set != 0) {
+      out.Word(memory::IsPages(set) ? 1 : 0);
+      out.Bytes(Read(h.base, set + 444, 8));
+      if (memory::IsPages(set)) {
+        memory::FreePages(set);
+      }
+    }
+    out.Word(t.r4.u32);
+  };
+  Cases(
+      h, block, "Accessories::Free (sub_820F0F90)", 16, Original<__imp__sub_820F0F90>,
+      hooks::AccessoriesFree,
+      [&](PPCContext& t, Random& r) {
+        set = lay(r, slot);
+        t.r3.u64 = slot;
+      },
+      collect);
+  const uint32_t saved = guest::LoadU32(h.base, ac::kSet);
+  Cases(
+      h, block, "Accessories::Destroy (sub_820F1078)", 16, Original<__imp__sub_820F1078>,
+      hooks::AccessoriesDestroy,
+      [&](PPCContext& t, Random& r) {
+        set = lay(r, ac::kSet);
+        t.r3.u64 = r.Next();
+      },
+      [&](const PPCContext& t, Outputs& out) {
+        out.Word(guest::LoadU32(h.base, ac::kSet));
+        collect(t, out);
+        guest::StoreU32(h.base, ac::kSet, saved);
+      });
+}
+
+// A part model's texture provider storage (operator new): compared by its
+// size, the pointer as a marker, then freed.
+void TakeTextures(uint8_t* base, uint32_t model, Outputs& out) {
+  const uint32_t vector = model + models::kModelTextures + models::kTextureProviderVector;
+  const uint32_t first = guest::LoadU32(base, vector + models::kVectorFirst);
+  out.Word(guest::LoadU32(base, vector + models::kVectorLast) - first);
+  out.Word(guest::LoadU32(base, vector + models::kVectorEnd) - first);
+  out.Bytes(Read(base, first, 4 * models::kTextureProviderSlots));
+  guest::StoreU32(base, vector + models::kVectorFirst, kMarker);
+  guest::StoreU32(base, vector + models::kVectorLast, 0);
+  guest::StoreU32(base, vector + models::kVectorEnd, 0);
+  memory::crt::OperatorDelete(first);
+}
+
+// The constructors: the skeleton alone, the accessory and the entry (the
+// case's pages), the frame's words the skeleton's constructor leaves (+80
+// and +84, the identity at +96 to +159 of its 224-byte frame) compared.
+void Constructors(Context& h, const Block& block) {
+  const uint32_t object = block.address + 0x200;
+  const auto frame_words = [&](const PPCContext& t, uint32_t below, Outputs& out) {
+    // +88 to +95 aren't written (the part model's calls leave words there).
+    const uint32_t frame = t.r1.u32 - below - 224;
+    out.Bytes(Read(h.base, frame + 80, 8));
+    out.Bytes(Read(h.base, frame + 96, 64));
+  };
+  Cases(
+      h, block, "AccessorySkeleton::AccessorySkeleton (sub_820F03F0)", 8,
+      Original<__imp__sub_820F03F0>, hooks::AccessorySkeletonConstruct,
+      [&](PPCContext& t, Random&) { t.r3.u64 = object; },
+      [&](const PPCContext& t, Outputs& out) { frame_words(t, 0, out); });
+  Cases(
+      h, block, "Accessory::Accessory (sub_820EF258)", 8, Original<__imp__sub_820EF258>,
+      hooks::AccessoryConstruct, [&](PPCContext& t, Random&) { t.r3.u64 = object; },
+      [&](const PPCContext& t, Outputs& out) {
+        frame_words(t, 96, out);
+        TakeTextures(h.base, object, out);
+      });
+  if (!hooks::AccessoriesNativeLoads()) {
+    return;
+  }
+  Cases(
+      h, block, "AccessoryEntry::New (sub_820F0920)", 8, Original<__imp__sub_820F0920>,
+      hooks::AccessoryEntryNew, [&](PPCContext&, Random&) {},
+      [&](const PPCContext& t, Outputs& out) {
+        frame_words(t, 192, out);
+        const uint32_t entry = t.r3.u32;
+        if (entry != 0 && memory::IsPages(entry)) {
+          TakeTextures(h.base, entry + 48, out);
+        }
+        guest::StoreU32(h.base, block.address, entry);
+        TakePages(h.base, block.address, ac::kEntryBytes, out);
+      });
+}
+
 }  // namespace
 
 void Accessories(Context& h) {
@@ -264,6 +395,11 @@ void Accessories(Context& h) {
     FileLoads(h, block);
   }
   Sets(h, block);
+  Constructors(h, block);
+  if (hooks::AccessoriesNativeLoads()) {
+    FileResets(h, block);
+    SetFrees(h, block);
+  }
 }
 
 }  // namespace harness
