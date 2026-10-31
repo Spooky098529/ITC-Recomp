@@ -389,8 +389,10 @@ void RaceScreensAfterRaceMenuOpen(PPCContext& ctx, uint8_t* base) {
 // ShowOptions (their callers in play, OptionsPage, ToggleOption and
 // SetUpOptions, call their plain C++), and PauseMenu::Open and LoadData
 // (their callers in play, the race HUD machine's OpenPause, OpenRacePause
-// and OpenCareerPause and Open, call their plain C++); their register steps
-// stay for the harness.
+// and OpenCareerPause and Open, call their plain C++), and AfterRaceMenu::
+// ShowItems, SetUpItems and ColorItems (their callers in play, SetUpItems,
+// Open and Start, call their plain C++); their register steps stay for the
+// harness.
 
 #define ITC_RACE_SCREENS(address, step)       \
   extern "C" REX_FUNC(sub_##address) {        \
@@ -465,8 +467,5 @@ ITC_RACE_SCREENS(8221A730, RaceScreensAfterRaceMenuIntro)
 ITC_RACE_SCREENS(8221A7A8, RaceScreensAfterRaceMenuShow)
 ITC_RACE_SCREENS(8221A950, RaceScreensAfterRaceMenuCloseMain)
 ITC_RACE_SCREENS(8221AA20, RaceScreensAfterRaceMenuMove)
-ITC_RACE_SCREENS(8221AC00, RaceScreensAfterRaceMenuShowItems)
-ITC_RACE_SCREENS(8221B5C8, RaceScreensAfterRaceMenuSetUpItems)
-ITC_RACE_SCREENS(8221B768, RaceScreensAfterRaceMenuColorItems)
 ITC_RACE_SCREENS(8221B860, RaceScreensAfterRaceMenuStart)
 ITC_RACE_SCREENS(8221BA68, RaceScreensAfterRaceMenuOpen)
