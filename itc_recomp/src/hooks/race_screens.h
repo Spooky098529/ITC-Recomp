@@ -116,5 +116,11 @@ void RaceScreensPauseMenuShowMain(PPCContext& ctx, uint8_t* base);
 void RaceScreensPauseMenuColorItems(PPCContext& ctx, uint8_t* base);
 void RaceScreensPauseMenuShowAdjust(PPCContext& ctx, uint8_t* base);
 void RaceScreensPauseMenuOpen(PPCContext& ctx, uint8_t* base);
+// The options page: ToggleOption sub_8220CDA0, OptionsPage sub_8220DB98,
+// SetUpOptions sub_8220E530, SetAdjust sub_8220F1B8 (r3 the step word).
+void RaceScreensPauseMenuToggleOption(PPCContext& ctx, uint8_t* base);
+void RaceScreensPauseMenuOptionsPage(PPCContext& ctx, uint8_t* base);
+void RaceScreensPauseMenuSetUpOptions(PPCContext& ctx, uint8_t* base);
+void RaceScreensPauseMenuSetAdjust(PPCContext& ctx, uint8_t* base);
 
 }  // namespace hooks

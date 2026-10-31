@@ -27,7 +27,8 @@ ITC_FLAG_BOOL(native_race_screens, true, "ITC",
               "transitions RunTen, BackToMain, CloseMain, MoveMain, ShowOptionsRow, ToggleOptions, "
               "ShowVolumeRow, ShowAdjustRow, MoveOptions, MoveAdjust and ShowMain, ConfirmPage, "
               "ShowItems, SetArrowA, ShowOptions, ShowVolumes, ShowSlider, RestoreNodes, "
-              "ColorItems, ShowAdjust and Open, "
+              "ColorItems, ShowAdjust and Open, the options page's ToggleOption, OptionsPage, "
+              "SetUpOptions and SetAdjust, "
               "the UI movie calls through their overrides) natively instead "
               "of through the translated code (the same writes; checked by "
               "--run_harnesses=race_screens)");
@@ -259,6 +260,7 @@ ITC_RACE_SCREENS_TRANSITION(ShowAdjustRow)
 ITC_RACE_SCREENS_TRANSITION(MoveOptions)
 ITC_RACE_SCREENS_TRANSITION(MoveAdjust)
 ITC_RACE_SCREENS_TRANSITION(ShowMain)
+ITC_RACE_SCREENS_TRANSITION(SetAdjust)
 #undef ITC_RACE_SCREENS_TRANSITION
 
 void RaceScreensPauseMenuConfirmPage(PPCContext& ctx, uint8_t* base) {
@@ -313,6 +315,20 @@ void RaceScreensPauseMenuOpen(PPCContext& ctx, uint8_t* base) {
   GuestCalls guest(ctx, base);
   ctx.r3.u64 = race_screens::PauseMenuOpen(base, ctx.r3.u32, ctx.r4.u64, ctx.r5.u64, ctx.r1.u32,
                                            guest.calls());
+}
+
+void RaceScreensPauseMenuToggleOption(PPCContext& ctx, uint8_t* base) {
+  ctx.r3.u64 = race_screens::PauseMenuToggleOption(base, ctx.r1.u32);
+}
+
+void RaceScreensPauseMenuOptionsPage(PPCContext& ctx, uint8_t* base) {
+  GuestCalls guest(ctx, base);
+  ctx.r3.u64 = race_screens::PauseMenuOptionsPage(base, ctx.r1.u32, guest.calls());
+}
+
+void RaceScreensPauseMenuSetUpOptions(PPCContext& ctx, uint8_t* base) {
+  GuestCalls guest(ctx, base);
+  ctx.r3.u64 = race_screens::PauseMenuSetUpOptions(base, ctx.r1.u32, guest.calls());
 }
 
 }  // namespace hooks
@@ -397,3 +413,7 @@ ITC_RACE_SCREENS(8220E1F8, RaceScreensPauseMenuMoveAdjust)
 ITC_RACE_SCREENS(8220EE28, RaceScreensPauseMenuShowMain)
 ITC_RACE_SCREENS(8220E888, RaceScreensPauseMenuShowAdjust)
 ITC_RACE_SCREENS(8220FA88, RaceScreensPauseMenuOpen)
+ITC_RACE_SCREENS(8220CDA0, RaceScreensPauseMenuToggleOption)
+ITC_RACE_SCREENS(8220DB98, RaceScreensPauseMenuOptionsPage)
+ITC_RACE_SCREENS(8220E530, RaceScreensPauseMenuSetUpOptions)
+ITC_RACE_SCREENS(8220F1B8, RaceScreensPauseMenuSetAdjust)

@@ -1085,6 +1085,14 @@ struct FrameSpec {
   uint32_t frame = 0, saves = 0;
   std::pair<uint32_t, uint32_t> skip = {0, 0};
   bool own_stack = false;  // the world's stack (PauseMenu::Open)
+  // The pause menu's list moved to a menu list world of the first section's
+  // (World: its list, the action mappers and their vtables, ShapeWorld) with
+  // 5 items shown from 0 and the selection 0 to 4, for the pages that run
+  // MenuList::Update and its tests; that world compared too.
+  const World* list_world = nullptr;
+  // Run after the function, before the outputs are read (frees, and words
+  // made comparable), with the case's outputs to add to.
+  std::function<void(Outputs&)> after;
 };
 
 void MovieGroup(Context& h, const MovieWorld& w, const char* name, int cases,
@@ -1104,8 +1112,23 @@ void MovieGroup(Context& h, const MovieWorld& w, const char* name, int cases,
                                 {kStringTable, 4},
                                 {menu_sounds::kSoundManager, 4},
                                 {kSaveDataPointers, 4},
-                                {kVehiclesPointer, 4}});
+                                {kVehiclesPointer, 4},
+                                {rs::kMapperEntries, 32},
+                                {rs::kControllerEntries, 16}});
       ShapeMovieWorld(h.base, w, r);
+      if (spec.list_world != nullptr) {
+        const World& lw = *spec.list_world;
+        WriteRandom(h.base, lw.misc.address, lw.misc.bytes, r);
+        ShapeWorld(h.base, lw, r);
+        guest::StoreU32(h.base, lw.list() + rs::kListCount, 5);
+        guest::StoreU32(h.base, lw.list() + rs::kListShown, 5);
+        guest::StoreU32(h.base, lw.list() + rs::kListScroll, 0);
+        guest::StoreU32(h.base, lw.list() + rs::kListSelection, r.Below(5));
+        guest::StoreU32(h.base, lw.list() + rs::kListSelectionBefore, r.Below(5));
+        guest::StoreU32(h.base, lw.list() + rs::kListSide,
+                        r.Below(3) == 0 ? 0 : (r.Below(2) == 0 ? 1 : 0xFFFFFFFFu));
+        guest::StoreU32(h.base, rs::kPauseList, lw.list());
+      }
       PPCContext t = CallContext(h);
       if (spec.own_stack) {
         WriteRandom(h.base, w.stack.address, w.stack.bytes, r);
@@ -1129,6 +1152,9 @@ void MovieGroup(Context& h, const MovieWorld& w, const char* name, int cases,
       ITC_FLAG(native_race_screens) = true;
       ui_movies_hooks::g_update_callee_stand_in = saved_stand_in;
       g_updates = nullptr;
+      if (spec.after) {
+        spec.after(out[v]);
+      }
       out[v].Word(uint32_t(updates.size()));
       for (const UpdateCall& u : updates) {
         out[v].Word(u.lr);
@@ -1142,6 +1168,10 @@ void MovieGroup(Context& h, const MovieWorld& w, const char* name, int cases,
       out[v].Bytes(Read(h.base, w.movies.address, w.movies.bytes));
       out[v].Bytes(Read(h.base, w.texts.address, w.texts.bytes));
       out[v].Bytes(Read(h.base, w.misc.address, w.misc.bytes));
+      if (spec.list_world != nullptr) {
+        out[v].Bytes(Read(h.base, spec.list_world->misc.address, spec.list_world->misc.bytes));
+        out[v].Bytes(Read(h.base, rs::kMapperEntries, 32));
+      }
       out[v].Bytes(Read(h.base, kScreenGlobals, kScreenGlobalsBytes));
       const uint32_t bottom = sp - spec.frame, top = sp - spec.saves;
       if (spec.skip.second > spec.skip.first) {
@@ -1286,6 +1316,57 @@ void Transitions(Context& h) {
         t.r5.u64 = r.Below(3) == 0 ? r.Next() : r.Below(2);
       },
       __imp__sub_8220FA88, hooks::RaceScreensPauseMenuOpen, {112, 16, {0, 0}, true});
+  // The options page: the edits (+36 to +48, +144) and the saved ones (+0 to
+  // +12, +72 to +84) 0, 1 or any; the list's selection 0 to 4.
+  auto edits = [&h](Random& r, const MovieWorld& w) {
+    const uint32_t data = w.block(rs::kPauseData);
+    for (const uint32_t field : {0u, 4u, 8u, 12u, 36u, 40u, 44u, 48u, 72u, 76u, 80u, 84u}) {
+      guest::StoreU32(h.base, data + field, r.Below(5) == 0 ? uint32_t(r.Next()) : r.Below(2));
+    }
+    guest::StoreU32(h.base, w.block(rs::kPauseList) + rs::kListSelection, r.Below(5));
+  };
+  MovieGroup(
+      h, w, "PauseMenu::ToggleOption (sub_8220CDA0)", 200,
+      [&](PPCContext&, Random& r, const MovieWorld& w) {
+        edits(r, w);
+        const uint32_t sides[4] = {0xFFFFFFFFu, 0, 1, uint32_t(r.Next())};
+        guest::StoreU32(h.base, w.block(rs::kPauseList) + rs::kListSide, sides[r.Below(4)]);
+      },
+      __imp__sub_8220CDA0, hooks::RaceScreensPauseMenuToggleOption, {128, 16});
+  const World list_world;
+  if (!list_world.ok()) {
+    ITC_LOG_ERROR("harness: race_screens: no block from the allocation layer");
+    return;
+  }
+  FrameSpec options{112, 24};
+  options.list_world = &list_world;
+  MovieGroup(
+      h, w, "PauseMenu::OptionsPage (sub_8220DB98)", 400,
+      [&](PPCContext&, Random& r, const MovieWorld& w) { edits(r, w); },
+      __imp__sub_8220DB98, hooks::RaceScreensPauseMenuOptionsPage, options);
+  // SetUpOptions: MenuList::Init frees the list's old item block (+68, 0
+  // here) and makes one of its own: its words compared, then it's freed and
+  // +68 put to 0.
+  FrameSpec set_up{144, 40, {40, 80}};
+  set_up.after = [&](Outputs& out) {
+    const uint32_t list = w.block(rs::kPauseList);
+    const uint32_t block = guest::LoadU32(h.base, list + rs::kListBlock);
+    out.Word(block != 0 ? 1 : 0);
+    if (block != 0 && memory::IsPages(block)) {
+      out.Bytes(Read(h.base, block, 5 * 4));
+      memory::FreePages(block);
+    }
+    guest::StoreU32(h.base, list + rs::kListBlock, 0);
+  };
+  MovieGroup(
+      h, w, "PauseMenu::SetUpOptions (sub_8220E530)", 100,
+      [&](PPCContext&, Random& r, const MovieWorld& w) {
+        edits(r, w);
+        guest::StoreU32(h.base, w.block(rs::kPauseList) + rs::kListBlock, 0);
+      },
+      __imp__sub_8220E530, hooks::RaceScreensPauseMenuSetUpOptions, set_up);
+  MovieGroup(h, w, "PauseMenu::SetAdjust (sub_8220F1B8)", 100, pause_step,
+             __imp__sub_8220F1B8, hooks::RaceScreensPauseMenuSetAdjust, {112, 24});
 }
 
 }  // namespace

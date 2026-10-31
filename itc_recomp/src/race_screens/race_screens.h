@@ -352,6 +352,31 @@ uint64_t PauseMenuShowMain(uint8_t* base, uint32_t step, uint32_t sp, const Call
 // their overrides). r3 MenuSound::Play's.
 uint64_t PauseMenuOpen(uint8_t* base, uint32_t screen, uint64_t kind, uint64_t flag, uint32_t sp,
                        const Calls& calls);
+// --- The pause menu's options page (options.cpp) ---
+//
+// MenuList::Update, Accepted and Cancelled and MenuList::Init through their
+// overrides (Update's --log_pause_menu lines kept), the sounds through
+// MenuSound::Play's override.
+constexpr uint32_t kListUpdate = 0x8220C1E0;
+constexpr uint32_t kListAccepted = 0x8220BD50;
+constexpr uint32_t kListCancelled = 0x8220BDE0;
+constexpr uint32_t kListInit = 0x8220BAC0;
+// sub_8220CDA0 PauseMenu::ToggleOption: by the list's side (+28: -1 sets, 1
+// clears) the selected item's edit (+36 to +48, item 4's +144; their
+// addresses at the frame's +80) changed when it differs, then ShowOptions; 1
+// when it changed, else 0.
+uint32_t PauseMenuToggleOption(uint8_t* base, uint32_t sp);
+// sub_8220DB98 PauseMenu::OptionsPage (page 1): see the row. 0 or 8.
+uint64_t PauseMenuOptionsPage(uint8_t* base, uint32_t sp, const Calls& calls);
+// sub_8220E530 PauseMenu::SetUpOptions: MenuList::Init(list, 5, 5, 1, 154,
+// 153, 155, 156; 159, 158), the edits from the options, +144 = 1,
+// RestoreNodes(-1, 8), the labels (UiMovie::SetNodeText, unset varargs 0),
+// ShowOptions. r3 ShowOptions'.
+uint64_t PauseMenuSetUpOptions(uint8_t* base, uint32_t sp, const Calls& calls);
+// sub_8220F1B8 PauseMenu::SetAdjust (transition 19): on item 3 the named
+// animations 195 and 196 swapped by +144, else ShowAdjust; done.
+uint64_t PauseMenuSetAdjust(uint8_t* base, uint32_t step, uint32_t sp, const Calls& calls);
+
 constexpr uint32_t kShowVolume = 0x8220D040;
 constexpr uint32_t kArrowB = 0x8220D1D8;
 constexpr uint32_t kRestorePose = 0x82119B80;
