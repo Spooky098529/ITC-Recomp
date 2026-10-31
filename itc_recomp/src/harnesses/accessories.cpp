@@ -173,6 +173,26 @@ void NativeAccessoriesBaseDestruct(PPCContext& ctx, uint8_t* base) {
   ctx.r3.u64 = ac::SetBaseDestruct(base, ctx.r3.u32);
 }
 
+void NativeAccessoryFileLoad(PPCContext& ctx, uint8_t* base) {
+  if (!hooks::AccessoriesNativeLoads()) {
+    __imp__sub_820F0C90(ctx, base);
+    return;
+  }
+  const int64_t serial = ac::FileLoad(base, ctx.r3.u32, ctx.r4.u32, ctx.r5.u32, ctx.r6.u32,
+                                      ctx.r7.u32, hooks::NativeArchiveLoad(base));
+  hooks::SetArchiveSerial(ctx, serial);
+}
+
+void NativeAccessoryEntryNew(PPCContext& ctx, uint8_t* base) {
+  if (!hooks::NativeHeapActive() || !hooks::ModelsNativeLifetime() ||
+      !native::Buffers_NativeMemcpy() || !ac::AccessoryConstructible(base)) {
+    __imp__sub_820F0920(ctx, base);
+    return;
+  }
+  ctx.fpscr.disableFlushMode();
+  ctx.r3.u64 = ac::EntryNew(base, ctx.r1.u32);
+}
+
 void NativeAccessoryFileSetData(PPCContext& ctx, uint8_t* base) {
   ac::FileSetData(base, ctx.r3.u32, ctx.r4.u32, ctx.r5.u32);
 }
@@ -331,7 +351,7 @@ void FileLoads(Context& h, const Block& block) {
       t.r7.u64 = r.Next();
       std::optional<ArchiveLoads> loads;
       loads.emplace(Serials(r));
-      (v == 0 ? Original<__imp__sub_820F0C90> : hooks::AccessoryFileLoad)(t, h.base);
+      (v == 0 ? Original<__imp__sub_820F0C90> : NativeAccessoryFileLoad)(t, h.base);
       std::vector<uint32_t> calls = loads->calls();
       const uint32_t data = guest::LoadU32(h.base, file + 16);
       for (size_t k = 1; k < calls.size(); k += 6) {
@@ -516,7 +536,7 @@ void Constructors(Context& h, const Block& block) {
   }
   Cases(
       h, block, "AccessoryEntry::New (sub_820F0920)", 8, Original<__imp__sub_820F0920>,
-      hooks::AccessoryEntryNew, [&](PPCContext&, Random&) {},
+      NativeAccessoryEntryNew, [&](PPCContext&, Random&) {},
       [&](const PPCContext& t, Outputs& out) {
         frame_words(t, 192, out);
         const uint32_t entry = t.r3.u32;

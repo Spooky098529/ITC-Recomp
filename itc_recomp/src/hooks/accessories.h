@@ -28,10 +28,7 @@ std::function<void(uint32_t set, uint32_t frame)> AccessoriesSetDestructor(PPCCo
 // Free's FreeData runs natively.
 bool AccessoriesSetFreeable(uint8_t* base, uint32_t slot);
 
-// AccessoryFile::Load sub_820F0C90 (r4 the id, r5 a buffer, r6 a callback,
-// r7 its context) and OnArchiveDone sub_820F0C20 (r3 the serial, r6 the
-// file): r3 the file.
-void AccessoryFileLoad(PPCContext& ctx, uint8_t* base);
+// AccessoryFile::OnArchiveDone sub_820F0C20 (r3 the serial, r6 the file).
 void AccessoryFileOnArchiveDone(PPCContext& ctx, uint8_t* base);
 // Accessories::Create sub_820F1038 and SetScale sub_820F0F00 (r4 the
 // scale).
@@ -39,8 +36,6 @@ void AccessoriesCreate(PPCContext& ctx, uint8_t* base);
 void AccessoriesSetScale(PPCContext& ctx, uint8_t* base);
 // Accessories::Destroy sub_820F1078.
 void AccessoriesDestroy(PPCContext& ctx, uint8_t* base);
-// AccessoryEntry::New sub_820F0920.
-void AccessoryEntryNew(PPCContext& ctx, uint8_t* base);
 // AccessoryEntry::Destroy sub_820F0988 (r3 the entry's slot).
 void AccessoryEntryDestroy(PPCContext& ctx, uint8_t* base);
 // Accessories::ReleaseAll sub_820F0AD8 (r3 the set).

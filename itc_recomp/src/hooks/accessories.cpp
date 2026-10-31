@@ -76,15 +76,6 @@ bool AccessoriesNativeLoads() {
 // --- The file ---
 
 
-void AccessoryFileLoad(PPCContext& ctx, uint8_t* base) {
-  if (!AccessoriesNativeLoads()) {
-    __imp__sub_820F0C90(ctx, base);
-    return;
-  }
-  const int64_t serial = accessories::FileLoad(base, ctx.r3.u32, ctx.r4.u32, ctx.r5.u32,
-                                               ctx.r6.u32, ctx.r7.u32, NativeArchiveLoad(base));
-  SetArchiveSerial(ctx, serial);
-}
 
 // The tail call to the file's callback (r3 to r5 as given, r6 its context,
 // lr the caller's): the guest function through the function table.
@@ -133,15 +124,6 @@ void AccessoriesDestroy(PPCContext& ctx, uint8_t* base) {
 
 
 
-void AccessoryEntryNew(PPCContext& ctx, uint8_t* base) {
-  if (!NativeHeapActive() || !ModelsNativeLifetime() || !native::Buffers_NativeMemcpy() ||
-      !accessories::AccessoryConstructible(base)) {
-    __imp__sub_820F0920(ctx, base);
-    return;
-  }
-  ctx.fpscr.disableFlushMode();
-  ctx.r3.u64 = accessories::EntryNew(base, ctx.r1.u32);
-}
 
 // --- The destructors ---
 
@@ -299,7 +281,7 @@ void AccessoriesAcquire(PPCContext& ctx, uint8_t* base) {
   const uint32_t set = ctx.r3.u32;
   const int32_t index = ctx.r4.s32;
   if (index != 3 && guest::LoadU32(base, set + ((uint32_t(index + 1) << 2) & 0xFFFFFFFCu)) == 0) {
-    ctx.fpscr.disableFlushMode();  // as AccessoryEntry::New's adapter leaves it
+    ctx.fpscr.disableFlushMode();  // as AccessoryEntry::New's register step leaves it
   }
   ctx.r3.u64 = accessories::SetAcquire(base, set, index, ctx.r5.u32, ctx.r1.u32,
                                        NativeArchiveLoad(base), AccessoryTextureSet(ctx, base));
@@ -329,12 +311,10 @@ void MatrixFromScaleRotationTranslation(PPCContext& ctx, uint8_t* base) {
     hooks::step(ctx, base);              \
   }
 
-ITC_ACCESSORIES(820F0C90, AccessoryFileLoad)
 ITC_ACCESSORIES(820F0C20, AccessoryFileOnArchiveDone)
 ITC_ACCESSORIES(820F1038, AccessoriesCreate)
 ITC_ACCESSORIES(820F0F00, AccessoriesSetScale)
 ITC_ACCESSORIES(820F1078, AccessoriesDestroy)
-ITC_ACCESSORIES(820F0920, AccessoryEntryNew)
 ITC_ACCESSORIES(820F0988, AccessoryEntryDestroy)
 ITC_ACCESSORIES(820F0AD8, AccessoriesReleaseAll)
 ITC_ACCESSORIES(820F0FE0, AccessoriesDestruct)
