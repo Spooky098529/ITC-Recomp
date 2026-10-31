@@ -44,7 +44,12 @@ file's history. What's left to see in a drive, from every run:
   its 9 roots ready, and blocking the rest of the scene loaders).
   Mapped (2da185e, `material-passes.md`, 23 new rows, 22 in play, 15
   ready groups, no stop; nothing outside blocks it; `PaintPalette::Init`
-  `sub_820D2330` taken in from the scene's lead). Migration 1 running.
+  `sub_820D2330` taken in from the scene's lead). Migration 1 checked
+  (579077c..a02c2b2: the color conversions, the small passes,
+  `SetMaterials`, the paint passes, `Projector::Matrices` with
+  `LookAt`; 1 adapter removed; `--native_material_passes`; frame dumps
+  with the flag on and off alike; left: `PaintPalette::Init`, stopped at
+  ~five batches). Validation 1 running.
 
 ## Done
 
@@ -83,5 +88,8 @@ file's history. What's left to see in a drive, from every run:
   2950.
 - After the material passes' map: ours 3447, work left 2950 (wrapped
   103, known 489, unknown 2358).
+- After the material passes' migration 1 (`itc_2863`: race 38 s, 0
+  errors, material_passes 0 differing): ours 3468, work left 2929
+  (wrapped 103, known 468, unknown 2358).
 
 ## Stopped

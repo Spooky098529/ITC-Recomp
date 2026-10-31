@@ -23,7 +23,19 @@ When the user has reviewed a run's section, its heading gets
   `sub_820D2330` (taken in from the scene's lead), the small passes,
   `Projector::Matrices` with `Matrix::LookAt` (what it's for not known),
   four table lookups; `scene-loaders.md`'s seven walks now name the
-  passes. Two leads added.
+  passes. Two leads added. Migration 1's rows (579077c..a02c2b2;
+  `--native_material_passes`, `src/material_passes/`): 21 rows, among
+  them `Model::MaterialTotal` and `MaterialAt` (`sub_82594AC0`,
+  `sub_82594B00`), `sub_820D3250` and `Matrix::LookAt` Native with no
+  adapter; `HsvToRgb8` Native. For review: the harness skips three
+  register-save words only the originals write (`HsvToRgb8`'s r31 save;
+  the same under `SetPaint` and `SetPaintBody` when all three
+  saturations are 0; `LookAt`'s lr and r31 under `Projector::Matrices`),
+  as the car models' `Texture::Create` frame; `TransposeRotation`,
+  `SetMaterials` and `Projector::Matrices` run the original when
+  `c_runtime::Memcpy` refuses their copy (for `Projector::Matrices`
+  after the view matrix is written, harmless unless outputs overlap
+  inputs); `FlipCulling` not seen in an attract race (harness only).
 - `car-models.md` (already mapped; the map checked by the lead, not
   remapped). Migration 1's rows (9f71b49..233c175): `LoadSlot::LoadShared`
   and `Load`, `LoadSetA` and `LoadSetB` (now Native; return `int64_t`,
