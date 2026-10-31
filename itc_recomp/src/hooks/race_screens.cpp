@@ -30,6 +30,7 @@ ITC_FLAG_BOOL(native_race_screens, true, "ITC",
               "ColorItems, ShowAdjust and Open, the options page's ToggleOption, OptionsPage, "
               "SetUpOptions and SetAdjust, the menu after the race's ConfirmPage, Intro, Show, "
               "CloseMain, Move, ShowItems, SetUpItems, ColorItems, Start and Open, "
+              "the confirm dialog's Question, OpenAnim, Move and Draw, "
               "the UI movie calls through their overrides) natively instead "
               "of through the translated code (the same writes; checked by "
               "--run_harnesses=race_screens)");
@@ -374,6 +375,26 @@ void RaceScreensAfterRaceMenuOpen(PPCContext& ctx, uint8_t* base) {
                                                ctx.r1.u32, guest.calls());
 }
 
+void RaceScreensRaceDialogQuestion(PPCContext& ctx, uint8_t* base) {
+  GuestCalls guest(ctx, base);
+  ctx.r3.u64 = race_screens::RaceDialogQuestion(base, ctx.r1.u32, guest.calls());
+}
+
+void RaceScreensRaceDialogOpenAnim(PPCContext& ctx, uint8_t* base) {
+  GuestCalls guest(ctx, base);
+  ctx.r3.u64 = race_screens::RaceDialogOpenAnim(base, ctx.r3.u32, ctx.r1.u32, guest.calls());
+}
+
+void RaceScreensRaceDialogMove(PPCContext& ctx, uint8_t* base) {
+  GuestCalls guest(ctx, base);
+  ctx.r3.u64 = race_screens::RaceDialogMove(base, ctx.r3.u32, ctx.r1.u32, guest.calls());
+}
+
+void RaceScreensRaceDialogDraw(PPCContext& ctx, uint8_t* base) {
+  GuestCalls guest(ctx, base);
+  ctx.r3.u64 = race_screens::RaceDialogDraw(base, ctx.r1.u32, guest.calls());
+}
+
 }  // namespace hooks
 
 // The adapters: the register steps above, or the originals with the flag
@@ -469,3 +490,7 @@ ITC_RACE_SCREENS(8221A950, RaceScreensAfterRaceMenuCloseMain)
 ITC_RACE_SCREENS(8221AA20, RaceScreensAfterRaceMenuMove)
 ITC_RACE_SCREENS(8221B860, RaceScreensAfterRaceMenuStart)
 ITC_RACE_SCREENS(8221BA68, RaceScreensAfterRaceMenuOpen)
+ITC_RACE_SCREENS(82217F40, RaceScreensRaceDialogQuestion)
+ITC_RACE_SCREENS(822186A8, RaceScreensRaceDialogOpenAnim)
+ITC_RACE_SCREENS(82218788, RaceScreensRaceDialogMove)
+ITC_RACE_SCREENS(82218F30, RaceScreensRaceDialogDraw)

@@ -418,6 +418,33 @@ uint64_t AfterRaceMenuStart(uint8_t* base, uint32_t sp, const Calls& calls);
 uint64_t AfterRaceMenuOpen(uint8_t* base, uint32_t screen, uint64_t kind, uint64_t flag,
                            uint32_t sp, const Calls& calls);
 
+// --- The confirm dialog's pages, transitions and draw (dialog.cpp) ---
+//
+// The dialog's movie found each time (UiMovies::Find(14): the id at the
+// frame's +80, the movie table's pair, as the originals do). MenuList::
+// Update, Accepted and Cancelled, ScreenPages::Go, the UI movie calls,
+// MenuSound::Play and SaveSlots::RequestDevice through their overrides;
+// Replays::Delete (sub_822905C0, never seen in play) the original.
+constexpr uint32_t kRequestDevice = 0x8228F9B0;
+constexpr uint32_t kReplaysDelete = 0x822905C0;
+// sub_82217F40 RaceDialog::Question (page 1): see the row. Returns 0.
+uint64_t RaceDialogQuestion(uint8_t* base, uint32_t sp, const Calls& calls);
+// sub_822186A8 RaceDialog::OpenAnim (transition 1): on its first call by the
+// data's +16: 0 named animation 15 played; 1 the selection's (+2) finished
+// and 14 played; 2 named 0 finished and 15 played; sound 5. Done when the
+// run answers 0, then +16 = +20.
+uint64_t RaceDialogOpenAnim(uint8_t* base, uint32_t step, uint32_t sp, const Calls& calls);
+// sub_82218788 RaceDialog::Move (transition 2): on its first call the
+// previous item's named animation (+2) finished, the new one's played and
+// looped; done.
+uint64_t RaceDialogMove(uint8_t* base, uint32_t step, uint32_t sp, const Calls& calls);
+// sub_82218F30 RaceDialog::Draw: with a transition running, its handler (0
+// ShowMessage, 1 OpenAnim, 2 Move, from a table in the frame, through the
+// function table) with the page object's +24, then ScreenPages::Finish (a
+// negative transition other than -1: Finish(1)); else UiMovie::Run(movie,
+// 0). r3 as the original leaves it.
+uint64_t RaceDialogDraw(uint8_t* base, uint32_t sp, const Calls& calls);
+
 constexpr uint32_t kShowVolume = 0x8220D040;
 constexpr uint32_t kArrowB = 0x8220D1D8;
 constexpr uint32_t kRestorePose = 0x82119B80;

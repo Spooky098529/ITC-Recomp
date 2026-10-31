@@ -840,6 +840,12 @@ constexpr uint32_t kStringTable = 0x826C5C34;
 constexpr uint32_t kTagTxt = 0x54585400;
 constexpr uint32_t kTagSce = 0x53434500;
 
+// The save system's interface ([0x826BDC90]) and the replay list
+// ([0x828161F0]), pointed at a world of the case's own where the confirm
+// dialog's cases reach them (SaveSlots::RequestDevice, Replays::Delete).
+constexpr uint32_t kSaveInterfaceGlobal = 0x826BDC90;
+constexpr uint32_t kReplayList = 0x828161F0;
+
 // A stack of its own for PauseMenu::Open (LoadData's 6,176-byte frame
 // below it), the stack pointer at +kOwnStackTop.
 constexpr uint32_t kOwnStackBytes = 0x3000;
@@ -1091,6 +1097,7 @@ struct FrameSpec {
   // 5 items shown from 0 and the selection 0 to 4, for the pages that run
   // MenuList::Update and its tests; that world compared too.
   const World* list_world = nullptr;
+  uint32_t list_global = race_screens::kPauseList;  // the global it's moved to
   // Run after the function, before the outputs are read (frees, and words
   // made comparable), with the case's outputs to add to.
   std::function<void(Outputs&)> after;
@@ -1115,7 +1122,9 @@ void MovieGroup(Context& h, const MovieWorld& w, const char* name, int cases,
                                 {kSaveDataPointers, 4},
                                 {kVehiclesPointer, 4},
                                 {rs::kMapperEntries, 32},
-                                {rs::kControllerEntries, 16}});
+                                {rs::kControllerEntries, 16},
+                                {kSaveInterfaceGlobal, 4},
+                                {kReplayList, 4}});
       ShapeMovieWorld(h.base, w, r);
       if (spec.list_world != nullptr) {
         const World& lw = *spec.list_world;
@@ -1128,7 +1137,7 @@ void MovieGroup(Context& h, const MovieWorld& w, const char* name, int cases,
         guest::StoreU32(h.base, lw.list() + rs::kListSelectionBefore, r.Below(5));
         guest::StoreU32(h.base, lw.list() + rs::kListSide,
                         r.Below(3) == 0 ? 0 : (r.Below(2) == 0 ? 1 : 0xFFFFFFFFu));
-        guest::StoreU32(h.base, rs::kPauseList, lw.list());
+        guest::StoreU32(h.base, spec.list_global, lw.list());
       }
       PPCContext t = CallContext(h);
       if (spec.own_stack) {
@@ -1352,6 +1361,111 @@ void AfterRace(Context& h, const MovieWorld& w) {
       __imp__sub_8221BA68, hooks::RaceScreensAfterRaceMenuOpen, open);
 }
 
+// The confirm dialog's pages, transitions and draw.
+//
+// Question's callees reach SaveSlots::RequestDevice (the save system's
+// interface) and Replays::Delete (the replay list): both pointed at a block
+// of the case's own, built as the save interface's harness builds its
+// world (the interface, its +36 object, the save devices, the users and
+// three 1,000-byte slots, with the game's vtables), so the game's own
+// objects aren't touched; the replay list's 0 to 2 entries never match the
+// dialog's replay (+4), so SaveInterface::Delete isn't reached. The block
+// is compared. The list moved to a menu list world (MenuList::Update and
+// its tests) as the options page's cases do.
+constexpr uint32_t kSaveWorldBytes = 0x3000;
+constexpr uint32_t kSaveObject36 = 0x40, kSaveDevices = 0x100, kSaveUsers = 0x200;
+constexpr uint32_t kSaveSlots = 0x800, kReplayHeader = 0x2000, kReplayEntries = 0x2040;
+
+void ShapeSaveWorld(uint8_t* base, uint32_t block, Random& r) {
+  WriteRandom(base, block, kSaveWorldBytes, r);
+  guest::StoreU32(base, block, 0x82000E38);
+  guest::StoreU32(base, block + 8, block + kSaveObject36);
+  guest::StoreU32(base, block + kSaveObject36, 0x82000AFC);
+  guest::StoreU32(base, block + kSaveObject36 + 88, block + kSaveDevices);
+  guest::StoreU32(base, block + kSaveObject36 + 92, block + kSaveUsers);
+  guest::StoreU32(base, block + kSaveDevices, 0x82002198);
+  guest::StoreU32(base, block + kSaveDevices + 44, block + kSaveSlots);
+  guest::StoreU32(base, block + kSaveUsers, 0x82000FA0);
+  guest::StoreU32(base, block + kSaveUsers + 216, r.Below(6));
+  for (uint32_t i = 0; i < 4; i++) {
+    guest::StoreU32(base, block + kSaveUsers + 200 + 4 * i, r.Below(4));
+    guest::StoreU32(base, block + kSaveUsers + 8 + 40 * i, r.Below(3) == 0 ? 0 : r.Below(5));
+  }
+  for (uint32_t k = 0; k < 3; k++) {
+    const uint32_t slot = block + kSaveSlots + 1000 * k;
+    guest::StoreU32(base, slot + 988, r.Below(2) == 0 ? 3 : r.Below(12));
+    for (uint32_t word = 960; word <= 980; word += 4) {
+      guest::StoreU32(base, slot + word, r.Below(2));
+    }
+  }
+  guest::StoreU32(base, kSaveInterfaceGlobal, block);
+}
+
+void Dialog(Context& h, const MovieWorld& w) {
+  const Block save(kSaveWorldBytes);
+  const World list_world;
+  if (save.address == 0 || !list_world.ok()) {
+    ITC_LOG_ERROR("harness: race_screens: no block from the allocation layer");
+    return;
+  }
+  // The data: the mode (+12) the question's and the save flow's (1, 4, 5,
+  // 6, 8, 13) or any small one, the animation's (+16) 0 to 3 (now and then
+  // any word) and the next (+20), the replay (+4).
+  auto data = [&h](Random& r, const MovieWorld& w) {
+    const uint32_t d = w.block(rs::kDialogData);
+    const uint32_t modes[8] = {1, 4, 5, 6, 8, 13, r.Below(16), r.Below(16)};
+    guest::StoreU32(h.base, d + 12, modes[r.Below(8)]);
+    guest::StoreU32(h.base, d + 16, r.Below(6) == 0 ? uint32_t(r.Next()) : r.Below(4));
+    guest::StoreU32(h.base, d + 20, r.Below(4));
+    guest::StoreU32(h.base, d + 4, r.Below(100));
+  };
+  FrameSpec question{112, 32};
+  question.list_world = &list_world;
+  question.list_global = rs::kDialogList;
+  question.after = [&](Outputs& out) {
+    out.Bytes(Read(h.base, save.address, kSaveWorldBytes));
+  };
+  MovieGroup(
+      h, w, "RaceDialog::Question (sub_82217F40)", 400,
+      [&](PPCContext&, Random& r, const MovieWorld& w) {
+        data(r, w);
+        ShapeSaveWorld(h.base, save.address, r);
+        const uint32_t replay = guest::LoadU32(h.base, w.block(rs::kDialogData) + 4);
+        const uint32_t count = r.Below(3);
+        guest::StoreU32(h.base, save.address + kReplayHeader + 16, save.address + kReplayEntries);
+        guest::StoreU32(h.base, save.address + kReplayHeader + 20, count);
+        for (uint32_t k = 0; k < count; k++) {
+          guest::StoreU32(h.base, save.address + kReplayEntries + 304 * k + 300,
+                          replay + 1 + k);
+        }
+        guest::StoreU32(h.base, kReplayList, save.address + kReplayHeader);
+      },
+      __imp__sub_82217F40, hooks::RaceScreensRaceDialogQuestion, question);
+  auto step = [&](PPCContext& t, Random& r, const MovieWorld& w) {
+    data(r, w);
+    StepWord(t, r, w, rs::kDialogPages);
+  };
+  MovieGroup(h, w, "RaceDialog::OpenAnim (sub_822186A8)", 150, step, __imp__sub_822186A8,
+             hooks::RaceScreensRaceDialogOpenAnim, {128, 32});
+  MovieGroup(h, w, "RaceDialog::Move (sub_82218788)", 100, step, __imp__sub_82218788,
+             hooks::RaceScreensRaceDialogMove, {128, 32});
+  // Draw: the running transition (+12) none (-1), OpenAnim's (1), Move's (2)
+  // or another negative one (ShowMessage's, 0, never seen in play, left out:
+  // the original on both sides), the queued one (+16) -1 or 0 to 2.
+  MovieGroup(
+      h, w, "RaceDialog::Draw (sub_82218F30)", 200,
+      [&](PPCContext&, Random& r, const MovieWorld& w) {
+        data(r, w);
+        const uint32_t pages = w.block(rs::kDialogPages);
+        const uint32_t transitions[5] = {0xFFFFFFFFu, 1, 2, uint32_t(-2 - int32_t(r.Below(50))),
+                                         0xFFFFFFFFu};
+        guest::StoreU32(h.base, pages + 12, transitions[r.Below(5)]);
+        guest::StoreU32(h.base, pages + 16, r.Below(2) == 0 ? 0xFFFFFFFFu : r.Below(3));
+        guest::StoreU32(h.base, pages + 4, r.Below(8));
+      },
+      __imp__sub_82218F30, hooks::RaceScreensRaceDialogDraw, {128, 16});
+}
+
 void Transitions(Context& h) {
   const MovieWorld w;
   if (!w.ok()) {
@@ -1525,6 +1639,7 @@ void Transitions(Context& h) {
              __imp__sub_8220F1B8, hooks::RaceScreensPauseMenuSetAdjust, {112, 24});
   Openers(h, w);
   AfterRace(h, w);
+  Dialog(h, w);
 }
 
 }  // namespace

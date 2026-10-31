@@ -137,5 +137,11 @@ void RaceScreensAfterRaceMenuSetUpItems(PPCContext& ctx, uint8_t* base);
 void RaceScreensAfterRaceMenuColorItems(PPCContext& ctx, uint8_t* base);
 void RaceScreensAfterRaceMenuStart(PPCContext& ctx, uint8_t* base);
 void RaceScreensAfterRaceMenuOpen(PPCContext& ctx, uint8_t* base);
+// The confirm dialog: Question sub_82217F40, the transitions OpenAnim
+// sub_822186A8 and Move sub_82218788 (r3 the step word), Draw sub_82218F30.
+void RaceScreensRaceDialogQuestion(PPCContext& ctx, uint8_t* base);
+void RaceScreensRaceDialogOpenAnim(PPCContext& ctx, uint8_t* base);
+void RaceScreensRaceDialogMove(PPCContext& ctx, uint8_t* base);
+void RaceScreensRaceDialogDraw(PPCContext& ctx, uint8_t* base);
 
 }  // namespace hooks
