@@ -3,9 +3,10 @@
 // originals run with --native_race_hud_machine off, the plain C++ through
 // the register steps (hooks/race_hud_machine.h). The handlers' callees (the
 // race HUD's and the alternate HUD's functions) run for real on both sides:
-// the recompiled handlers reach the callees' originals (their adapters'
-// flags, --native_race_hud_object, --native_alt_hud and --native_race_hud,
-// off), the native ones the callees' plain C++. So each case builds the
+// the recompiled handlers reach the callees' originals (directly, the
+// adapters of the callees only they call in play deleted, 2026-10-31; the
+// others' with their flags, --native_race_hud_object, --native_alt_hud and
+// --native_race_hud, off), the native ones the callees' plain C++. So each case builds the
 // world they read, the race HUD's as the race HUD object's harness builds it
 // and the alternate HUD's as the alternate HUD's does (the user's call,
 // 2026-10-31: no stand-in for the callees), with the guest calls those

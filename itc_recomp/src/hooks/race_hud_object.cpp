@@ -419,7 +419,12 @@ void RaceHudObjectTickPanel(PPCContext& ctx, uint8_t* base) {
 // SetUpGauges and the alternate HUD's SetUpGauges, SetTach and SetBoost) and
 // PowInt (from SetSpeed, SetDistance and the alternate HUD's SetSpeed; the
 // +656 object's and the other digits' callers, never seen in play, run the
-// originals).
+// originals); and the race HUD machine's callees only its native handlers
+// reach in play (src/race_hud_machine/, by their plain C++; kind 4's paths,
+// never seen in play, reach the originals): UpdateView, UpdateItem,
+// RunWarning, RunItem, RunCountdown, StartMovie1, FinishMovie1, RunMovie1,
+// SetPlayer, Reset, ClearWarning, SetUpGauges, ResetBar, SetUpExtraGauges,
+// SetUpMirror and SetUpSigns (the user's call, 2026-10-31).
 
 #define ITC_RACE_HUD_OBJECT(address, step)              \
   extern "C" REX_FUNC(sub_##address) {                  \
@@ -431,29 +436,13 @@ void RaceHudObjectTickPanel(PPCContext& ctx, uint8_t* base) {
     hooks::step(ctx, base);                             \
   }
 
-ITC_RACE_HUD_OBJECT(82212668, RaceHudObjectResetBar)
-ITC_RACE_HUD_OBJECT(822122A0, RaceHudObjectClearWarning)
-ITC_RACE_HUD_OBJECT(82212690, RaceHudObjectSetPlayer)
-ITC_RACE_HUD_OBJECT(822121C0, RaceHudObjectReset)
-ITC_RACE_HUD_OBJECT(82213DB0, RaceHudObjectSetUpExtraGauges)
 ITC_RACE_HUD_OBJECT(82212768, RaceHudObjectApplyOptions)
-ITC_RACE_HUD_OBJECT(82212B68, RaceHudObjectUpdateView)
-ITC_RACE_HUD_OBJECT(82213C90, RaceHudObjectSetUpGauges)
-ITC_RACE_HUD_OBJECT(822135B0, RaceHudObjectSetUpMirror)
 ITC_RACE_HUD_OBJECT(822141A0, RaceHudObjectTearDown)
-ITC_RACE_HUD_OBJECT(822122B0, RaceHudObjectSetUpSigns)
 ITC_RACE_HUD_OBJECT(822153A0, RaceHudObjectTick)
 ITC_RACE_HUD_OBJECT(82212270, RaceHudObjectStartCountdown)
-ITC_RACE_HUD_OBJECT(82212718, RaceHudObjectStartMovie1)
-ITC_RACE_HUD_OBJECT(82212878, RaceHudObjectFinishMovie1)
 ITC_RACE_HUD_OBJECT(82212AC8, RaceHudObjectDrawWarning)
-ITC_RACE_HUD_OBJECT(82212AF8, RaceHudObjectRunMovie1)
-ITC_RACE_HUD_OBJECT(82212B08, RaceHudObjectRunItem)
 ITC_RACE_HUD_OBJECT(822128A8, RaceHudObjectDraw)
 ITC_RACE_HUD_OBJECT(82212C50, RaceHudObjectUpdateWarning)
 ITC_RACE_HUD_OBJECT(82213638, RaceHudObjectShowItem)
-ITC_RACE_HUD_OBJECT(82214238, RaceHudObjectUpdateItem)
 ITC_RACE_HUD_OBJECT(82211DA0, RaceHudObjectScreensInit)
-ITC_RACE_HUD_OBJECT(822129A8, RaceHudObjectRunCountdown)
 ITC_RACE_HUD_OBJECT(82215488, RaceHudObjectTickPanel)
-ITC_RACE_HUD_OBJECT(82212A48, RaceHudObjectRunWarning)

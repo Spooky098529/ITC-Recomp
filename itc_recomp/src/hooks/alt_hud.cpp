@@ -210,8 +210,11 @@ void AltHudRunMovie(PPCContext& ctx, uint8_t* base) {
 // steps stay for the harness): PowerClass, SetUpGauges, SetUpExtraGauges,
 // ShowGauge and ShowPanels (from SetUp), MenuList::PressedX, SetSpeed,
 // UpdateExtraGauges, SetGear, SetTach, SetNode25, SetBar, SetBoost,
-// SetThrottle, SetBrake and SetSteering (from Tick). MenuList::Release's
-// stays for its ~50 other callers.
+// SetThrottle, SetBrake and SetSteering (from Tick); SetUp and Tick, from
+// the race HUD machine's native handlers only in play (src/race_hud_machine/,
+// by their plain C++; kind 4's paths, never seen in play, reach the
+// originals; the user's call, 2026-10-31). MenuList::Release's stays for its
+// ~50 other callers.
 
 #define ITC_ALT_HUD(address, step)                \
   extern "C" REX_FUNC(sub_##address) {            \
@@ -225,6 +228,4 @@ void AltHudRunMovie(PPCContext& ctx, uint8_t* base) {
 
 ITC_ALT_HUD(8220BBB0, AltHudMenuListRelease)
 ITC_ALT_HUD(82216BA8, AltHudDestroy)
-ITC_ALT_HUD(82217C70, AltHudSetUp)
-ITC_ALT_HUD(82217AC8, AltHudTick)
 ITC_ALT_HUD(82216C00, AltHudRunMovie)
