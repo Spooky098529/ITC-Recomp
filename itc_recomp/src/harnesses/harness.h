@@ -247,5 +247,7 @@ void MaterialPasses(Context& h);
 void RaceHudObject(Context& h);
 // The alternate HUD (src/harnesses/alt_hud.cpp).
 void AltHud(Context& h);
+// The race scene (src/harnesses/race_scene.cpp).
+void RaceScene(Context& h);
 
 }  // namespace harness
