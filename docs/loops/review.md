@@ -28,6 +28,24 @@ When the user has reviewed a run's section, its heading gets
   queues loads: the sheet's bytes compared in the harness). The
   validation counted `sub_82295F18` (an adapter with no plain C++ of its
   own, calling `last_error::Get`) through `sub_82296EC0`'s print.
+  Migration 2's rows (27d7e64..9260d11): `CarInterior::Load` (its
+  accessories' two vtable calls through the guest), `FreePagesAt`
+  `sub_820C3CE0` (new row), `CarModel::MakePlate` `sub_820ED6D0` (the
+  name a guess: a 300 x 150 texture from five images) with
+  `sub_820C4DD8` and `sub_820ED630` (new rows), the file-loaded
+  callbacks `sub_820D47A8` and `sub_820D4F80`, `ReloadDecals`
+  `sub_820D5D20`, `Skeleton::LocalMatrices` `sub_82599C58`
+  (`models.md`); 5 adapters removed. For review: the +3724 = 1 image
+  branch (`sub_820C4E68`, no row) runs in an attract race though the
+  coverage list lacks it: the callbacks and `ReloadDecals` hand it back
+  to their originals, `Vinyl::DrawDecal`'s adapter stays, and it is a
+  lead (dd86385's message still says "never seen in play", corrected in
+  9260d11's rows); `LoadExterior`'s and `ReloadDecals`' cases no longer
+  compare `Texture::Create`'s frame words (the callees' originals save
+  registers there; `TextureCreates` still compares it, as
+  `Vinyl::Compress`); r3 not compared for the callbacks and
+  `LocalMatrices` (no caller reads it, as `ResetPose`); no frame dump
+  for the plate (both textures' bytes compared in the harness).
 
 ## Run 2026-10-30 11:39 (`b7-loop-30-10-26`)
 

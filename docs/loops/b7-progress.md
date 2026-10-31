@@ -26,10 +26,16 @@ file's history. What's left to see in a drive, from every run:
   blocking the file-loaded callbacks). Validated (`itc_2834`, replay
   `itc_2835` ok): 15 of 15 harness lines (`sub_82295F18`, an adapter
   with no plain C++, through `GetLastError`'s shared print); 12 ran in
-  the race, 3 in the replay, none to drive. Migration 2 running (ready:
-  `ReloadDecals`, `CarInterior::Load`, `sub_820ED6D0`'s group,
-  `sub_82599C58`, `sub_820C3CE0`, `sub_820C4338`'s group and those under
-  `sub_820C8DE8`).
+  the race, 3 in the replay, none to drive. Migration 2 checked
+  (27d7e64..9260d11: `CarInterior::Load`, `Skeleton::LocalMatrices`
+  (`models.md`, `--native_models`), `CarModel::MakePlate` with its two
+  helpers (new rows), the file-loaded callbacks, `ReloadDecals`; 5
+  adapters removed; car models 48 of 50 in play ours; the +3724 = 1
+  image branch `sub_820C4E68`, found running in an attract race though
+  not in the coverage list, left on the originals and made a lead, so
+  `Vinyl::DrawDecal`'s adapter stays; the groups left belong to other
+  files (`sub_820C4338`'s, those under `sub_820C8DE8`)). Validation 2
+  running.
 
 ## Done
 
@@ -55,5 +61,8 @@ file's history. What's left to see in a drive, from every run:
 - After its validation (`itc_2834`, 60 s: race 6 s, 0 errors, every
   harness 0 differing but the expected groups): ours 3438, work left
   2959.
+- After the car models' migration 2 (`itc_2851`: race 36 s, 0 errors,
+  car_models and scene_loaders 0 differing): ours 3447, work left 2950
+  (wrapped 103, known 467, unknown 2380).
 
 ## Stopped
