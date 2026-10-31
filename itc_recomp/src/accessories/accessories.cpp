@@ -475,6 +475,40 @@ std::optional<uint32_t> SetReleaseAll(uint8_t* base, uint32_t set) {
   return r3;
 }
 
+namespace {
+
+uint32_t ReleaseSlot(uint32_t set, int32_t index) {
+  return set + ((uint32_t(index + 1) << 2) & 0xFFFFFFFCu);
+}
+
+}  // namespace
+
+bool SetReleaseNative(uint8_t* base, uint32_t set, int32_t index) {
+  if (index == 3) {
+    return true;
+  }
+  const uint32_t slot = ReleaseSlot(set, index);
+  const uint32_t entry = Load(base, slot);
+  return entry == 0 || Load(base, entry) - 1 != 0 || EntryDestroyable(base, slot);
+}
+
+std::optional<uint32_t> SetRelease(uint8_t* base, uint32_t set, int32_t index) {
+  ITC_NATIVE_RUNNING("sub_820F0A90 Accessories::Release");
+  if (index == 3) {
+    return std::nullopt;
+  }
+  const uint32_t slot = ReleaseSlot(set, index);
+  const uint32_t entry = Load(base, slot);
+  if (entry == 0) {
+    return slot;
+  }
+  Store(base, entry, Load(base, entry) - 1);
+  if (Load(base, Load(base, slot)) != 0) {
+    return slot;
+  }
+  return EntryDestroy(base, slot);
+}
+
 // --- The skeleton's set-up ---
 
 uint32_t SkeletonReset(uint8_t* base, uint32_t skeleton, uint32_t sp) {

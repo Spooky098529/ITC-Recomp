@@ -688,6 +688,50 @@ void ReleaseAlls(Context& h, const Block& block) {
   results.Report();
 }
 
+// Accessories::Release: each slot none or an entry made by
+// AccessoryEntry::New's plain C++ with a count of 1 to 2; the index 0 to 3.
+// The slots (an entry as a marker with its count), the block and r3 (the
+// slot or the set as markers) compared; the entries left destroyed after.
+void Releases(Context& h, const Block& block) {
+  const uint32_t set = block.address + 0x40;
+  Results results("Accessories::Release (sub_820F0A90)");
+  for (int c = 0; c < 32; c++) {
+    const uint64_t seed = h.random.Next();
+    Outputs out[2];
+    for (int v = 0; v < 2; v++) {
+      Random r(seed);
+      WriteRandom(h.base, block.address, block.bytes, r);
+      PPCContext t = CallContext(h);
+      for (uint32_t i = 0; i < 3; i++) {
+        uint32_t entry = 0;
+        if (r.Below(4) != 0) {
+          entry = ac::EntryNew(h.base, t.r1.u32);
+          guest::StoreU32(h.base, entry, 1 + r.Below(2));
+        }
+        guest::StoreU32(h.base, set + 4 + 4 * i, entry);
+      }
+      t.r3.u64 = set;
+      t.r4.u64 = r.Below(4);
+      (v == 0 ? Original<__imp__sub_820F0A90> : hooks::AccessoriesRelease)(t, h.base);
+      out[v].Word(t.r3.u32 == set ? kMarker : t.r3.u32);
+      out[v].Word(uint32_t(t.r3.u64 >> 32));
+      for (uint32_t i = 0; i < 3; i++) {
+        const uint32_t slot = set + 4 + 4 * i;
+        const uint32_t entry = guest::LoadU32(h.base, slot);
+        out[v].Word(entry == 0 ? 0 : memory::IsPages(entry) ? kMarker : 1);
+        if (entry != 0 && memory::IsPages(entry)) {
+          out[v].Word(guest::LoadU32(h.base, entry));
+          ac::EntryDestroy(h.base, slot);
+          guest::StoreU32(h.base, slot, kMarker);
+        }
+      }
+      out[v].Bytes(Read(h.base, block.address, block.bytes));
+    }
+    results.Check(out[0], out[1], fmt::format("case {}", c));
+  }
+  results.Report();
+}
+
 // A node file in the block at `file` for the skeleton's set-up and reset:
 // `nodes` nodes (160-byte records whose names are random letters, some
 // holding the swinging node's string), their three rows, random flags;
@@ -1303,6 +1347,7 @@ void Accessories(Context& h) {
     if (hooks::ModelsNativeLifetime() && native::Buffers_NativeMemcpy() &&
         ac::AccessoryConstructible(h.base)) {
       ReleaseAlls(h, block);
+      Releases(h, block);
       SetDestructors(h, block);
       Finishes(h, block);
       OnLoadeds(h, block);

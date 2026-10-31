@@ -166,6 +166,14 @@ std::optional<uint32_t> SetReleaseAll(uint8_t* base, uint32_t set);
 // Whether ReleaseAll runs natively: the entries distinct, and each one it
 // destroys EntryDestroyable.
 bool SetReleasable(uint8_t* base, uint32_t set);
+// Accessories::Release (sub_820F0A90; its row in scene-loaders.md): index 3
+// is none (nullopt: r3 as given). Else r3 = the slot (+4 + 4 x index); when
+// it holds an entry, its count - 1, and at 0 AccessoryEntry::Destroy on the
+// slot (a tail call: its r3). The r3 it leaves.
+std::optional<uint32_t> SetRelease(uint8_t* base, uint32_t set, int32_t index);
+// Whether Release runs natively: the entry it would destroy (if any)
+// EntryDestroyable.
+bool SetReleaseNative(uint8_t* base, uint32_t set, int32_t index);
 
 // --- The skeleton's set-up ---
 

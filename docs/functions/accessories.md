@@ -66,7 +66,8 @@ class, the skeleton's set-up and reset, `Accessory::SetTexture` and
 same day) the load's end, `AccessoryEntry::OnLoaded` (the entry file's
 callback) with `Accessory::Finish` (the part model's `Model::Load`, the
 files' resets, the skeleton's set-up and the anchor), and the
-acquisition, `Accessories::Acquire` with `AcquireEntry`. What they can't
+acquisition, `Accessories::Acquire` with `AcquireEntry`, and
+`Accessories::Release` (its row in `scene-loaders.md`). What they can't
 do natively stays a guest call the adapter makes (the archive's
 callback, the set's destructor through its vtable, the texture
 provider's slot, `Model::Load`'s and `AccessorySkeleton::SetUp`'s

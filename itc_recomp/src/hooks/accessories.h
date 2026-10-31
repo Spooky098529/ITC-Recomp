@@ -40,6 +40,8 @@ void AccessoriesDestroy(PPCContext& ctx, uint8_t* base);
 void AccessoryEntryDestroy(PPCContext& ctx, uint8_t* base);
 // Accessories::ReleaseAll sub_820F0AD8 (r3 the set).
 void AccessoriesReleaseAll(PPCContext& ctx, uint8_t* base);
+// Accessories::Release sub_820F0A90 (r3 the set, r4 the index).
+void AccessoriesRelease(PPCContext& ctx, uint8_t* base);
 // Accessories::~Accessories sub_820F0FE0 (r4 the flags), Accessory::SetTexture
 // sub_820EF568 (r4 the index, r5 the shape or -1), Matrix::
 // FromScaleRotationTranslation sub_820EF660 (r3 out, r4 the angles, r5 the
