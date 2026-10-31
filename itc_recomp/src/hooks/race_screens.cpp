@@ -344,8 +344,10 @@ void RaceScreensPauseMenuSetUpOptions(PPCContext& ctx, uint8_t* base) {
 // and ColorItems (their only callers in play, MoveOptions, ShowAdjust and
 // ShowMain, call their plain C++), and PauseMenu::ToggleOption and
 // ShowOptions (their callers in play, OptionsPage, ToggleOption and
-// SetUpOptions, call their plain C++); their register steps stay for the
-// harness.
+// SetUpOptions, call their plain C++), and PauseMenu::Open and LoadData
+// (their callers in play, the race HUD machine's OpenPause, OpenRacePause
+// and OpenCareerPause and Open, call their plain C++); their register steps
+// stay for the harness.
 
 #define ITC_RACE_SCREENS(address, step)       \
   extern "C" REX_FUNC(sub_##address) {        \
@@ -384,7 +386,6 @@ ITC_RACE_SCREENS(82219170, RaceScreensCareerResultsDestroy)
 ITC_RACE_SCREENS(8221F3C8, RaceScreensRaceResultsDestroy)
 ITC_RACE_SCREENS(8221FA68, RaceScreensSplitResultsDestroy)
 ITC_RACE_SCREENS(8221BE30, RaceScreensKind6MenuDestroy)
-ITC_RACE_SCREENS(8220F840, RaceScreensPauseMenuLoadData)
 ITC_RACE_SCREENS(8220D6A0, RaceScreensPauseMenuSaveOptions)
 ITC_RACE_SCREENS(8220D890, RaceScreensPauseMenuClose)
 ITC_RACE_SCREENS(8220D740, RaceScreensPauseMenuSaveHudOptions)
@@ -413,7 +414,6 @@ ITC_RACE_SCREENS(8220DD98, RaceScreensPauseMenuMoveOptions)
 ITC_RACE_SCREENS(8220E1F8, RaceScreensPauseMenuMoveAdjust)
 ITC_RACE_SCREENS(8220EE28, RaceScreensPauseMenuShowMain)
 ITC_RACE_SCREENS(8220E888, RaceScreensPauseMenuShowAdjust)
-ITC_RACE_SCREENS(8220FA88, RaceScreensPauseMenuOpen)
 ITC_RACE_SCREENS(8220DB98, RaceScreensPauseMenuOptionsPage)
 ITC_RACE_SCREENS(8220E530, RaceScreensPauseMenuSetUpOptions)
 ITC_RACE_SCREENS(8220F1B8, RaceScreensPauseMenuSetAdjust)
