@@ -61,8 +61,9 @@ file's history. What's left to see in a drive, from every run:
   15 groups 0 differing, race 29 s with the harnesses, 38 s without,
   0 errors; no subagents). Left, waiting on the in-race screens' lead:
   `sub_8216D198`, `sub_8216DB70`, `sub_8216DD88`, `sub_8216DFD0`. 18
-  callee adapters removable but kept for the harness's stand-in (a
-  question for the user). Step: validation (agent running).
+  callee adapters removable but kept for the harness's stand-in; the
+  user's call (2026-10-31): delete them, the harness rewritten the
+  bigger way (a cleanup lead, next after the validation). Step: validation (agent running).
 
 ## Done
 

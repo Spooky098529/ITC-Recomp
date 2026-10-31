@@ -21,7 +21,8 @@ When the user has reviewed a run's section, its heading gets
   originals; a harness stand-in for callees
   (`hooks/callee_stand_in.h`, null in the game) checked in the race HUD
   object's, the alternate HUD's and `sub_822141E8`'s adapters, so 18
-  removable callee adapters stay.
+  removable callee adapters stay. The user's call (2026-10-31): delete
+  them, the harness rewritten with the HUD's world (a cleanup lead).
 
 - The race HUD machine's map (11e568ee): `race-hud-machine.md`, 50
   new rows (its 65 transitions decoded), `sub_8215E140` shared with the

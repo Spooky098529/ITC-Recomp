@@ -553,6 +553,11 @@ Calls so far for decisions the loop meets often:
   --run_harnesses=all` (60 s on 2026-10-30, when all of them outgrew
   40 s; 120 s on 2026-10-31, when they took 56.7 of the 60). If they
   outgrow 120 too, that's a new case for the user.
+- Adapters a new harness would use as hooks (to see which callees a
+  recompiled caller calls): deleted anyway once their callers in play
+  are ours, and the harness built the bigger way, with the callees'
+  world as their own harnesses build it; no stand-in recorders in
+  adapters (the race HUD machine, 2026-10-31).
 - The C runtime's per-thread data over the kernel's TLS (`_mtinit`
   `sub_825AA708`, `_getptd` and the rest in `c-runtime.md`'s "Not
   here"): left for the core, not taken (2026-10-25). Only when it
