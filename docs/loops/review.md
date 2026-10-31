@@ -13,6 +13,12 @@ When the user has reviewed a run's section, its heading gets
 
 ## Run 2026-10-31 16:54 (`b7-loop-31-10-26`, continued)
 
+- The accessories' second migration (2eb6ca57..3a9de36a): 10 rows in
+  `accessories.md` and `Accessories::Release`'s in `scene-loaders.md`
+  (a correction: its caller is `Interior::Release`, not `ReleaseAll`).
+  For review: the `OnLoaded` harness no longer builds a skeleton marked
+  set up without its node rows (a state play can't reach).
+
 - The accessories' first migration (8d5c9078..24186d92): 27 rows in
   `accessories.md` (13 Native with their adapters removed). For review:
   guest calls handed back to the adapter (the archive callback, the

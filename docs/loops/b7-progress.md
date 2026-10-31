@@ -24,8 +24,12 @@ file's history. What's left to see in a drive, from every run:
   subagents). Left: `Accessory::Finish`, `AccessoryEntry::OnLoaded`,
   `Accessories::Acquire` with `AcquireEntry`. Validated (`itc_2946`, 120 s: race 59 s, 0 errors, harnesses ~60 s;
   replay `itc_2947` ok): 27 of 27 harness lines, 5 ran in the race,
-  22 in the replay, none to drive. Step: second migration (agent
-  running).
+  22 in the replay, none to drive. Second migration checked (2eb6ca57..3a9de36a: `Accessory::Finish`,
+  `AccessoryEntry::OnLoaded`, `Accessories::Acquire` with
+  `AcquireEntry`, `Accessories::Release` (`scene-loaders.md`); 6 more
+  adapters removed; 31 of 31 in play ours; harness 0 differing, race
+  38 s, 0 errors; no subagents). Nothing ready left. Step: validation
+  of the second migration (agent running).
 
 ## Done
 
@@ -54,5 +58,8 @@ file's history. What's left to see in a drive, from every run:
 - After its validation (`itc_2946`, 120 s: race 59 s, 0 errors, every
   harness 0 differing but the expected groups): ours 3579, work left
   2819.
+- After the accessories' second migration (`itc_2962`: race 38 s, 0
+  errors, accessories 0 differing): ours 3584, work left 2814 (wrapped
+  103, known 486, unknown 2225).
 
 ## Stopped
