@@ -16,14 +16,16 @@ by `HudCurve::Eval`, the bar, the three extra gauges' digits by
 throttle, brake and steering (`[0x826C5B30 + 4 × player]`,
 `racer-controllers.md`), so probably the attract or replay races'
 dashboard (a guess: which race kinds those are isn't known). The race
-flow's handlers (`8216C208`-`8216E668`, a lead in `../loops/leads.md`)
-pick it: the set-up handler `sub_8216D450` sets it up (`AltHud::SetUp`)
+HUD machine's handlers (`8216C208`-`8216E668`, `race-hud-machine.md`
+since 2026-10-31) pick it: the set-up handler `sub_8216D450` sets it up (`AltHud::SetUp`)
 for the kinds at +9612 1, 2, 4 and 5 with player 0, and 6 with player 0
 or 1 (by bit 0x200 of a racer record's word +0), beside the race HUD
 but for kinds 4 and 5; the update handler `sub_8216D918` ticks it
 (`AltHud::Tick`) instead of the race HUD for kind 5, and for kinds 1 to
 3 and 6 when the holder's +8 has bit 0 set (cleared by
-`RaceScreens::Init`; what sets it isn't known). The Draw handlers
+`RaceScreens::Init`; set by the menu after the race when it picks the
+replay, `RaceHudMachine::AfterRaceUpdate` in `race-hud-machine.md`, so
+the alternate HUD is probably the replay's dashboard). The Draw handlers
 `sub_8216C330`, `sub_8216CE00`, `sub_8216CF08`, `sub_8216CFE0` (and
 `sub_8216C460`, never seen in play) run movie 22 (`AltHud::RunMovie`).
 A view switch (`AltHud::ToggleView`, from `sub_8216CEB8`, never seen in

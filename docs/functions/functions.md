@@ -455,6 +455,12 @@ Rows not yet moved stay in the table below. So far:
   archive, the accessory (a part model with a small swinging skeleton,
   probably a hanging ornament), its skeleton's set-up, step and swing,
   its draw, and the small file class the three use (B7).
+- [`race-hud-machine.md`](race-hud-machine.md): the race HUD machine:
+  the race mode's state machine at +128664 that drives the in-race
+  screens' holder through a race (made and destroyed, the HUD set up,
+  its ticks and draws by the race kind before the start, in a free
+  run's intro, the countdown, the race, the pause menus, the results and
+  the menu after the race), and the career race's prize money (B7).
 
 These files hold functions only. What used to follow the table here moved
 out on 2026-10-20: how frame interpolation works, its options and what
