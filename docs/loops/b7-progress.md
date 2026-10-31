@@ -79,8 +79,11 @@ file's history. What's left to see in a drive, from every run:
   lines, none new to drive. Done.
 - Subsystem 3 of 3: the other in-race screens (the pause menu, the
   menu after the race, the career results), from `leads.md`: what the
-  race HUD machine's last handlers and 7 adapters wait on. Step:
-  mapping (agent running).
+  race HUD machine's last handlers and 7 adapters wait on. Map checked
+  (421476db: `race-screens.md`, 157 rows, 116 in play; the pause menu,
+  the confirm dialog, the career results, the menu after the race, the
+  menu list's and page object's helpers; 51 ready groups). Step:
+  migration (agent running).
 
 ## Done
 
@@ -160,5 +163,7 @@ file's history. What's left to see in a drive, from every run:
 - After its validation (`itc_3003`, 120 s: race 59 s, 0 errors, every
   harness 0 differing but the expected groups): ours 3605, work left
   2794.
+- After the in-race screens' map: ours 3605, work left 2794 (wrapped
+  103, known 611, unknown 2080).
 
 ## Stopped

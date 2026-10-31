@@ -13,6 +13,14 @@ When the user has reviewed a run's section, its heading gets
 
 ## Run 2026-10-31 16:54 (`b7-loop-31-10-26`, continued)
 
+- The in-race screens' map (421476db): `race-screens.md`, 157 rows
+  (4 moved from `functions.md`), the screens' globals, the page object
+  and the menu list in `known-data.md`; the menu list's helpers put
+  here (no file of their own; `alt-hud.md` holds two); the confirm
+  dialog mapped from the save screens' lead's range; three leads
+  amended, three added. The pause menu's logging wraps and frame-rate
+  fixes named in its rows.
+
 - The race HUD machine's harness rewrite and the 18 adapters (the
   user's call; 3104033d, 5048300e): 16 rows in `race-hud-object.md`
   and 2 in `alt-hud.md` to Native; `race-hud-machine.md`'s intro and
