@@ -13,6 +13,7 @@
 
 #include "base/flags.h"
 #include "base/log.h"
+#include "hooks/race_hud_machine.h"
 #include "hooks/race_screens.h"
 #include "hooks/ui_movies.h"
 #include "memory/heap.h"
@@ -1196,6 +1197,75 @@ void StepWord(PPCContext& t, Random& r, const MovieWorld& w, uint32_t pages) {
   (void)r;
 }
 
+// The race HUD machine's pause menu openers (race-hud-machine.md), whose
+// callee PauseMenu::Open runs for real in this world: the machine (+9612
+// the kind -1 to 6, now and then any word; +9608 the holder; +9616 any),
+// the holder (+8 the replay bit 0 or 1, +1012 the pause menu's screen
+// word), the race data's +0xA3AF0 (the race kind 0 to 2) and +0xA3AF4 (0,
+// 1 or any), the save data's day (+6100) 1 half the time (IsFirstDay).
+// Kinds 4 and 6 without the replay bit (the original runs there: kind 4's
+// and the stage's openers, never seen in play) are left out. The originals
+// run with --native_race_screens off (PauseMenu::Open's original), ours
+// with Open's plain C++.
+void Openers(Context& h, const MovieWorld& w) {
+  constexpr uint32_t kRaceData = 0x826C5B2C;
+  const Block machine(9620 + 12);
+  const Block holder(0x420);
+  const Block race(0xA3B00);
+  if (!machine.address || !holder.address || !race.address) {
+    ITC_LOG_ERROR("harness: race_screens: no block from the allocation layer");
+    return;
+  }
+  auto shape = [&](PPCContext& t, Random& r, const MovieWorld& w, bool racing) {
+    WriteRandom(h.base, machine.address, machine.bytes, r);
+    WriteRandom(h.base, holder.address, holder.bytes, r);
+    int32_t kind = r.Below(10) == 0 ? int32_t(r.Next()) : int32_t(r.Below(8)) - 1;
+    const uint32_t bit = r.Below(2);
+    if (kind == 4 || (kind == 6 && (!racing || bit == 0))) {
+      kind = 1;
+    }
+    guest::StoreU32(h.base, machine.address + 9612, uint32_t(kind));
+    guest::StoreU32(h.base, machine.address + 9608, holder.address);
+    guest::StoreU32(h.base, holder.address + 8, (uint32_t(r.Next()) & ~1u) | bit);
+    guest::StoreU32(h.base, holder.address + 1012, w.block(rs::kPauseScreen));
+    guest::StoreU32(h.base, kRaceData, race.address);
+    guest::StoreU32(h.base, race.address + 0xA3AF0, r.Below(3));
+    guest::StoreU32(h.base, race.address + 0xA3AF4,
+                    r.Below(4) == 0 ? uint32_t(r.Next()) : r.Below(2));
+    if (r.Below(2) == 0) {
+      guest::StoreU32(h.base, w.save.address + 6100, 1);
+    }
+    t.r3.u64 = machine.address;
+  };
+  const uint32_t saved_race = guest::LoadU32(h.base, kRaceData);
+  FrameSpec open{112, 16, {0, 0}, true};
+  open.after = [&](Outputs& out) {
+    out.Bytes(Read(h.base, machine.address, machine.bytes));
+    out.Bytes(Read(h.base, holder.address, holder.bytes));
+  };
+  MovieGroup(
+      h, w, "RaceHudMachine::OpenPause (sub_8216D600)", 150,
+      [&](PPCContext& t, Random& r, const MovieWorld& w) { shape(t, r, w, false); },
+      __imp__sub_8216D600, hooks::RaceHudMachineOpenPause, open);
+  // OpenRacePause's career path runs OpenCareerPause's 96-byte frame first
+  // (Open's below it, its register saves at sp - 112 to sp - 96): the
+  // frame's lowest 16 bytes (Open's back chain on the other paths) left
+  // out.
+  FrameSpec racing = open;
+  racing.skip = {0, 16};
+  MovieGroup(
+      h, w, "RaceHudMachine::OpenRacePause (sub_8216DA40)", 200,
+      [&](PPCContext& t, Random& r, const MovieWorld& w) { shape(t, r, w, true); },
+      __imp__sub_8216DA40, hooks::RaceHudMachineOpenRacePause, racing);
+  FrameSpec career{96, 16, {0, 0}, true};
+  career.after = open.after;
+  MovieGroup(
+      h, w, "RaceHudMachine::OpenCareerPause (sub_8216D8C8)", 100,
+      [&](PPCContext& t, Random& r, const MovieWorld& w) { shape(t, r, w, false); },
+      __imp__sub_8216D8C8, hooks::RaceHudMachineOpenCareerPause, career);
+  guest::StoreU32(h.base, kRaceData, saved_race);
+}
+
 void Transitions(Context& h) {
   const MovieWorld w;
   if (!w.ok()) {
@@ -1367,6 +1437,7 @@ void Transitions(Context& h) {
       __imp__sub_8220E530, hooks::RaceScreensPauseMenuSetUpOptions, set_up);
   MovieGroup(h, w, "PauseMenu::SetAdjust (sub_8220F1B8)", 100, pause_step,
              __imp__sub_8220F1B8, hooks::RaceScreensPauseMenuSetAdjust, {112, 24});
+  Openers(h, w);
 }
 
 }  // namespace

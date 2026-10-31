@@ -325,6 +325,78 @@ std::optional<uint64_t> SetUp(uint8_t* base, uint64_t r3, uint32_t sp, const Cal
   return last;
 }
 
+namespace {
+
+// PauseMenu::Open(holder +1012, page, flag) as a tail call.
+uint64_t OpenAt(uint8_t* base, uint32_t holder, uint64_t page, uint64_t flag, uint32_t sp,
+                uint32_t lr, const Calls& callees) {
+  return callees.Call(kPauseMenuOpen, sp, lr, Load(base, holder + 1012), page, flag);
+}
+
+}  // namespace
+
+std::optional<uint64_t> OpenPause(uint8_t* base, uint64_t r3, uint32_t sp, uint32_t lr,
+                                  const Calls& callees) {
+  const uint32_t machine = uint32_t(r3);
+  const int32_t kind = int32_t(Load(base, machine + kKind));
+  if (kind == 4 || kind == 6) {
+    return std::nullopt;
+  }
+  if (kind < 1 || kind > 6) {
+    return r3;
+  }
+  ITC_NATIVE_RUNNING("sub_8216D600 RaceHudMachine::OpenPause");
+  const uint32_t holder = Holder(base, machine);
+  switch (kind) {
+    case 1:
+      return OpenAt(base, holder, ReplayBit(base, holder) ? 8 : 0, 0, sp, lr, callees);
+    case 2:
+      return OpenAt(base, holder, 3, 0, sp, lr, callees);
+    case 3:
+      return OpenAt(base, holder, 4, 0, sp, lr, callees);
+    default:
+      return OpenAt(base, holder, 8, 0, sp, lr, callees);
+  }
+}
+
+std::optional<uint64_t> OpenRacePause(uint8_t* base, uint64_t r3, uint32_t sp, uint32_t lr,
+                                      const Calls& callees) {
+  const uint32_t machine = uint32_t(r3);
+  const int32_t kind = int32_t(Load(base, machine + kKind));
+  if (kind == 4 || (kind == 6 && !ReplayBit(base, Holder(base, machine)))) {
+    return std::nullopt;
+  }
+  if (kind < 1 || kind > 6) {
+    return r3;
+  }
+  ITC_NATIVE_RUNNING("sub_8216DA40 RaceHudMachine::OpenRacePause");
+  const uint32_t holder = Holder(base, machine);
+  switch (kind) {
+    case 1:
+      if (ReplayBit(base, holder)) {
+        return OpenAt(base, holder, 8, 0, sp, lr, callees);
+      }
+      if (Load(base, Load(base, kRaceData) + 0xA3AF4) != 0) {
+        return OpenCareerPause(base, machine, sp, callees);
+      }
+      return OpenAt(base, holder, 2, 0, sp, lr, callees);
+    case 2:
+      return OpenAt(base, holder, ReplayBit(base, holder) ? 8 : 3, 0, sp, lr, callees);
+    case 3:
+      return OpenAt(base, holder, 4, 0, sp, lr, callees);
+    default:  // 5, and 6 with the replay bit
+      return OpenAt(base, holder, 8, 0, sp, lr, callees);
+  }
+}
+
+uint64_t OpenCareerPause(uint8_t* base, uint32_t machine, uint32_t sp, const Calls& callees) {
+  ITC_NATIVE_RUNNING("sub_8216D8C8 RaceHudMachine::OpenCareerPause");
+  const uint32_t frame = Frame(base, sp, 96);
+  const uint32_t first_day = IsFirstDay(base, frame);
+  return OpenAt(base, Holder(base, machine), 1, first_day != 0 ? 1 : 0, frame, 0x8216D900,
+                callees);
+}
+
 uint32_t IsFirstDay(uint8_t* base, uint32_t sp) {
   ITC_NATIVE_RUNNING("sub_8216D3F0 RaceHudMachine::IsFirstDay");
   Frame(base, sp, 96);

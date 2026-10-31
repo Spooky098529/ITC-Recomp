@@ -33,5 +33,12 @@ void RaceHudMachineResultsUpdate(PPCContext& ctx, uint8_t* base);   // sub_8216D
 void RaceHudMachineIsFirstDay(PPCContext& ctx, uint8_t* base);
 void RaceHudMachineOpponentPrize(PPCContext& ctx, uint8_t* base);
 void RaceHudMachineItemBonus(PPCContext& ctx, uint8_t* base);
+// The pause menu's openers: OpenPause sub_8216D600 and OpenRacePause
+// sub_8216DA40 (r3 the machine, tail calls with the caller's lr),
+// OpenCareerPause sub_8216D8C8 (no adapter: its only caller,
+// OpenRacePause's plain C++, calls it directly; the step for the harness).
+void RaceHudMachineOpenPause(PPCContext& ctx, uint8_t* base);
+void RaceHudMachineOpenRacePause(PPCContext& ctx, uint8_t* base);
+void RaceHudMachineOpenCareerPause(PPCContext& ctx, uint8_t* base);
 
 }  // namespace hooks

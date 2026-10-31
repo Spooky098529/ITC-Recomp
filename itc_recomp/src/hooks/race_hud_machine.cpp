@@ -29,7 +29,9 @@ ITC_FLAG_BOOL(native_race_hud_machine, true, "ITC",
               "the in-race screens' plain C++ (kind 4, and kind 0 "
               "where the original draws the holder's +12, never seen in play, run the "
               "originals; CloseResults' race kind 6 and ResultsUpdate's unseen results too); IsFirstDay sub_8216D3F0, OpponentPrize sub_8216C820 and ItemBonus "
-              "sub_8216C938 with sub_8216C9B8 merged) natively instead of through the translated "
+              "sub_8216C938 with sub_8216C9B8 merged; the pause menu's openers OpenPause sub_8216D600, "
+              "OpenRacePause sub_8216DA40 and OpenCareerPause sub_8216D8C8, PauseMenu::Open's "
+              "plain C++, kind 4's and the stage's unseen openers the originals) natively instead of through the translated "
               "code (the same writes; checked by --run_harnesses=race_hud_machine)");
 ITC_FLAG_DECLARE(bool, native_action_mappers);
 
@@ -122,6 +124,8 @@ class Calls {
         // Its page's handler through the function table (r4 and r5 not read
         // by the handlers: 0).
         return race_screens::CareerResultsUpdate(base, args[0], 0, 0, r1, self.calls());
+      case rhm::kPauseMenuOpen:
+        return race_screens::PauseMenuOpen(base, r3, args[1], args[2], r1, self.calls());
       case rhm::kAfterRaceClose:
         // As its adapter (src/hooks/race_screens.cpp): over the allocation
         // layer where the release is native, else the guest call.
@@ -356,6 +360,26 @@ void RaceHudMachineItemBonus(PPCContext& ctx, uint8_t* base) {
   ctx.r3.u64 = rhm::ItemBonus(base, ctx.r4.u32, ctx.r1.u32);
 }
 
+void RaceHudMachineOpenPause(PPCContext& ctx, uint8_t* base) {
+  const uint32_t lr = uint32_t(ctx.lr);
+  Handle(ctx, base, __imp__sub_8216D600, [&](const rh::Calls& callees) {
+    return rhm::OpenPause(base, ctx.r3.u64, ctx.r1.u32, lr, callees);
+  });
+}
+
+void RaceHudMachineOpenRacePause(PPCContext& ctx, uint8_t* base) {
+  const uint32_t lr = uint32_t(ctx.lr);
+  Handle(ctx, base, __imp__sub_8216DA40, [&](const rh::Calls& callees) {
+    return rhm::OpenRacePause(base, ctx.r3.u64, ctx.r1.u32, lr, callees);
+  });
+}
+
+void RaceHudMachineOpenCareerPause(PPCContext& ctx, uint8_t* base) {
+  Handle(ctx, base, __imp__sub_8216D8C8, [&](const rh::Calls& callees) {
+    return std::optional<uint64_t>(rhm::OpenCareerPause(base, ctx.r3.u32, ctx.r1.u32, callees));
+  });
+}
+
 }  // namespace hooks
 
 // The adapters: the register steps above, or the originals with the flag
@@ -388,3 +412,5 @@ ITC_RACE_HUD_MACHINE(8216DFD0, RaceHudMachineResultsUpdate)
 ITC_RACE_HUD_MACHINE(8216D3F0, RaceHudMachineIsFirstDay)
 ITC_RACE_HUD_MACHINE(8216C820, RaceHudMachineOpponentPrize)
 ITC_RACE_HUD_MACHINE(8216C938, RaceHudMachineItemBonus)
+ITC_RACE_HUD_MACHINE(8216D600, RaceHudMachineOpenPause)
+ITC_RACE_HUD_MACHINE(8216DA40, RaceHudMachineOpenRacePause)

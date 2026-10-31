@@ -150,6 +150,27 @@ std::optional<uint64_t> ResultsUpdate(uint8_t* base, uint64_t r3, uint32_t dispa
 std::optional<uint64_t> CloseResults(uint8_t* base, uint64_t r3, uint32_t sp,
                                      const Calls& callees);
 
+// The pause menu's openers (tail calls to PauseMenu::Open, sub_8220FA88,
+// race-screens.md, from the caller's frame `sp` with its return address
+// `lr`; r3 = the holder's +1012, r4 = the page, r5 = the flag). Kinds other
+// than 1 to 6 return r3 (the machine) as the original's blr. nullopt, with
+// nothing done, for kind 4 (sub_82211390) and the stage's
+// (RaceHudMachine::OpenPauseByStage sub_8216C798), never seen in play.
+// sub_8216D600 RaceHudMachine::OpenPause: 1 page 0 (8 with the replay bit),
+// 2 page 3, 3 page 4, 5 page 8, 6 the stage's.
+std::optional<uint64_t> OpenPause(uint8_t* base, uint64_t r3, uint32_t sp, uint32_t lr,
+                                  const Calls& callees);
+// sub_8216DA40 RaceHudMachine::OpenRacePause: 1 page 8 with the replay bit,
+// else page 2 with the race data's +0xA3AF4 0, else OpenCareerPause; 2 page
+// 3 (8 with the bit); 3 page 4; 5 page 8; 6 page 8 with the bit, else the
+// stage's.
+std::optional<uint64_t> OpenRacePause(uint8_t* base, uint64_t r3, uint32_t sp, uint32_t lr,
+                                      const Calls& callees);
+// sub_8216D8C8 RaceHudMachine::OpenCareerPause: PauseMenu::Open(holder +1012,
+// 1, IsFirstDay) from its 96-byte frame. Open's r3.
+uint64_t OpenCareerPause(uint8_t* base, uint32_t machine, uint32_t sp, const Calls& callees);
+constexpr uint32_t kPauseMenuOpen = 0x8220FA88;  // PauseMenu::Open (race-screens.md)
+
 // --- The helpers (handlers.cpp) ---
 
 // sub_8216D3F0 RaceHudMachine::IsFirstDay (probably): 1 when the race data's
