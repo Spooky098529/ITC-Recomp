@@ -10,7 +10,7 @@ file's history. What's left to see in a drive, from every run:
 
 - Run started 2026-10-31 13:47 on `b7-loop-31-10-26`, from e25e6ac;
   summary `b7-loop-2026-10-31-1347.md`.
-- Limit for this run: 3 subsystems; 2 taken.
+- Limit for this run: 3 subsystems; 3 taken.
 - The validation agent's race is `attract_race.sh 120` from this run
   (the user's call, 2026-10-31: the harnesses took 56.7 of the 60 s).
 - Cleanup lead (no mapping, not counted): the top of `leads.md`, the
@@ -67,6 +67,10 @@ file's history. What's left to see in a drive, from every run:
   s; replay `itc_2931` broke on the intermittent SDK heap error, ran to
   the end): 11 of 11 harness lines; 9 ran in the race, 1 in the
   replay, `Resume` to drive. Subsystem 2 finished.
+
+- Subsystem 3 of 3: the menu sound (`sub_821103F0`; picked as ready
+  and a blocker of the race HUD object's and the parking area's rest,
+  ~300 callers). Step: mapping (agent running).
 
 ## Done
 
