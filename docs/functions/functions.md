@@ -439,6 +439,12 @@ Rows not yet moved stay in the table below. So far:
   holder's object at +1004: a second dashboard on UI movie 22 (the
   race HUD's gauges plus the throttle, brake and steering), its set-up,
   tick, view switch and teardown, and two menu list helpers (B7).
+- [`race-scene.md`](race-scene.md): the race scene: the race mode's
+  state machine at +87936 and its object at `[0x826D82D4]`: the race
+  cars' scene model slots, a set of 11 lights, the post effects and
+  screen objects made at the race's set-up with the glows' and color
+  filters' parameters from a table, the pause toggle, and the teardown
+  (B7).
 
 These files hold functions only. What used to follow the table here moved
 out on 2026-10-20: how frame interpolation works, its options and what

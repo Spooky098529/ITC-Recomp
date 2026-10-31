@@ -3,7 +3,7 @@
 The race's **screen objects** (`ScreenObject::`, the code at
 `8212EDF8`-`82133000`, between the race overlays' range and the post
 effects'): one 128,000-byte object a view, made by the race's set-up
-`sub_8215D100` (a lead in `../loops/leads.md`) at the race object
+`RaceScene::SetUp` (`sub_8215D100`, `race-scene.md`) at the race scene
 `[0x826D82D4]` + 31152 (1024 × 576, camera pass 0), or two at + 31156
 and + 31160 in split screen (1024 × 288 each, at y 0 and 288, camera
 passes 1 and 2; when the race data's word + 0xA3AF0 is 4). Each holds a
