@@ -8,6 +8,8 @@
 #include "guest.h"
 #include "memory/heap.h"
 #include "model_animation/model_animation.h"
+#include "models/memory_blocks.h"
+#include "models/model.h"
 #include "models/part_model.h"
 #include "models/texture_provider.h"
 #include "native/buffers.h"
@@ -358,6 +360,81 @@ uint32_t EntryNew(uint8_t* base, uint32_t sp) {
   FileConstruct(base, entry + 4);
   AccessoryConstruct(base, entry + 48, sp - 96);
   return entry;
+}
+
+// --- The destructors ---
+
+constexpr uint32_t kJobDelegateBase = 0x82000ABC;  // the functors' base
+constexpr uint32_t kJobFunctorBase = 0x82000BA8;
+constexpr uint32_t kJobBaseVtable = 0x82000EB8;
+
+bool FileDestructible(uint8_t* base, uint32_t file) {
+  return FileResetNative(base, file);
+}
+
+bool SkeletonDestructible(uint8_t* base, uint32_t skeleton) {
+  return model_animation::SkeletonBaseDestructible(base, skeleton) &&
+         FileDestructible(base, skeleton + 180);
+}
+
+bool AccessoryDestructible(uint8_t* base, uint32_t accessory) {
+  return SkeletonDestructible(base, accessory + 544) && FileDestructible(base, accessory + 500) &&
+         FileDestructible(base, accessory + 464) &&
+         models::ModelMembersDestructible(base, accessory) &&
+         models::PendingFreesHaveRoom(base, models::ModelReleaseNodes(base, accessory));
+}
+
+bool EntryDestroyable(uint8_t* base, uint32_t slot) {
+  const uint32_t entry = Load(base, slot);
+  return entry == 0 || (memory::IsPages(entry) && AccessoryDestructible(base, entry + 48) &&
+                        FileDestructible(base, entry + 4));
+}
+
+uint32_t FileDestruct(uint8_t* base, uint32_t file) {
+  ITC_NATIVE_RUNNING("sub_820F0DB8 AccessoryFile::~AccessoryFile");
+  Store(base, file + 0, kFileVtable);
+  const uint32_t r3 = FileReset(base, file).value_or(file);
+  Store(base, file + 0, kListNodeVtable);
+  return r3;
+}
+
+uint32_t SkeletonDestruct(uint8_t* base, uint32_t skeleton) {
+  ITC_NATIVE_RUNNING("sub_820EFFD8 AccessorySkeleton::~AccessorySkeleton");
+  const uint32_t job = skeleton + 216;
+  Store(base, skeleton + 0, kSkeletonVtable);
+  Store(base, skeleton + 176, kSkeletonVtable2);
+  Store(base, job + 24, kJobDelegateBase);
+  Store(base, job + 4, kJobFunctorBase);
+  Store(base, job + 4, kJobFunctorFirst);
+  Store(base, job + 0, kJobBaseVtable);
+  FileDestruct(base, skeleton + 180);
+  Store(base, skeleton + 176, kListNodeVtable);
+  Require(model_animation::SkeletonBaseDestruct(base, skeleton), "SkeletonBase::~SkeletonBase");
+  return skeleton;
+}
+
+uint32_t AccessoryDestruct(uint8_t* base, uint32_t accessory) {
+  ITC_NATIVE_RUNNING("sub_820EF310 Accessory::~Accessory");
+  Store(base, accessory + 0, kAccessoryVtable);
+  SkeletonDestruct(base, accessory + 544);
+  FileDestruct(base, accessory + 500);
+  FileDestruct(base, accessory + 464);
+  const auto r3 = models::PartModelDestruct(base, accessory);
+  Require(r3.has_value(), "PartModel::~PartModel");
+  return *r3;
+}
+
+uint32_t EntryDestroy(uint8_t* base, uint32_t slot) {
+  ITC_NATIVE_RUNNING("sub_820F0988 AccessoryEntry::Destroy");
+  const uint32_t entry = Load(base, slot);
+  if (entry == 0) {
+    return slot;
+  }
+  AccessoryDestruct(base, entry + 48);
+  FileDestruct(base, entry + 4);
+  const auto r3 = FileFreeData(base, slot);
+  Require(r3.has_value(), "AccessoryFile::FreeData");
+  return *r3;
 }
 
 }  // namespace accessories

@@ -112,9 +112,11 @@ bool SkeletonFreeNodeValues(uint8_t* base, uint32_t skeleton);
 
 // For native callers checking before they free (nothing changed): whether
 // TrackSetReleaseArray (`array`) or TrackSetRelease would free the set's
-// values natively, and whether SkeletonDestruct would.
+// values natively, and whether SkeletonDestruct and SkeletonBaseDestruct
+// would.
 bool TrackSetReleasable(uint8_t* base, uint32_t set, bool array);
 bool SkeletonDestructible(uint8_t* base, uint32_t skeleton);
+bool SkeletonBaseDestructible(uint8_t* base, uint32_t skeleton);
 
 // sub_825A21A8 NodeFile::View (probably; models.md): the view's +0 = the
 // file, +4 to +32 its +16 to +44 made pointers, +36 = +32's + 16, +40 its +48

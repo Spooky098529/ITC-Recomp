@@ -600,6 +600,10 @@ bool SkeletonDestructible(uint8_t* base, uint32_t skeleton) {
   return Deletable(Load(base, skeleton + 176)) && BaseFreeable(base, skeleton);
 }
 
+bool SkeletonBaseDestructible(uint8_t* base, uint32_t skeleton) {
+  return BaseFreeable(base, skeleton);
+}
+
 void NodeFileView(uint8_t* base, uint32_t view, uint32_t file) {
   ITC_NATIVE_RUNNING("sub_825A21A8 NodeFile::View");
   Store(base, view + 0, file);

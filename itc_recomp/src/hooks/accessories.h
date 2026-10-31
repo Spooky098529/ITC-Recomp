@@ -46,5 +46,12 @@ void AccessoryFileReset(PPCContext& ctx, uint8_t* base);
 void AccessoriesDestroy(PPCContext& ctx, uint8_t* base);
 // AccessoryEntry::New sub_820F0920.
 void AccessoryEntryNew(PPCContext& ctx, uint8_t* base);
+// AccessoryFile::~AccessoryFile sub_820F0DB8, AccessorySkeleton::
+// ~AccessorySkeleton sub_820EFFD8, Accessory::~Accessory sub_820EF310 (r3
+// them) and AccessoryEntry::Destroy sub_820F0988 (r3 the entry's slot).
+void AccessoryFileDestruct(PPCContext& ctx, uint8_t* base);
+void AccessorySkeletonDestruct(PPCContext& ctx, uint8_t* base);
+void AccessoryDestruct(PPCContext& ctx, uint8_t* base);
+void AccessoryEntryDestroy(PPCContext& ctx, uint8_t* base);
 
 }  // namespace hooks

@@ -432,6 +432,103 @@ void Constructors(Context& h, const Block& block) {
       });
 }
 
+// The destructors, on an entry made by AccessoryEntry::New's plain C++ (the
+// case's pages, the same on both sides: the layer is first fit and each
+// side frees what it took): its four files (the entry's, the model's two,
+// the skeleton's) each empty, loading (a serial no request has) or loaded
+// (owned pages or data not owned). Run on the entry's slot, the accessory,
+// the skeleton or the entry's file; the entry's bytes (read after, though
+// freed), whether each block is still pages, and r3 compared; what's left
+// freed after.
+void Destructors(Context& h, const Block& block) {
+  if (!hooks::AccessoriesNativeLoads() || !hooks::ModelsNativeLifetime() ||
+      !native::Buffers_NativeMemcpy() || !ac::AccessoryConstructible(h.base)) {
+    ITC_LOG_WARN("harness: accessories: the models' lifetimes aren't native: the "
+                 "destructors' cases skipped");
+    return;
+  }
+  struct Kind {
+    const char* name;
+    GuestFunction recompiled, native;
+    int target;  // 0 the slot, 1 the accessory, 2 the skeleton, 3 the entry's file
+  };
+  const Kind kinds[] = {
+      {"AccessoryEntry::Destroy (sub_820F0988)", Original<__imp__sub_820F0988>,
+       hooks::AccessoryEntryDestroy, 0},
+      {"Accessory::~Accessory (sub_820EF310)", Original<__imp__sub_820EF310>,
+       hooks::AccessoryDestruct, 1},
+      {"AccessorySkeleton::~AccessorySkeleton (sub_820EFFD8)", Original<__imp__sub_820EFFD8>,
+       hooks::AccessorySkeletonDestruct, 2},
+      {"AccessoryFile::~AccessoryFile (sub_820F0DB8)", Original<__imp__sub_820F0DB8>,
+       hooks::AccessoryFileDestruct, 3},
+  };
+  const uint32_t slot = block.address + 0x40;
+  for (const Kind& kind : kinds) {
+    Results results(kind.name);
+    for (int c = 0; c < 16; c++) {
+      const uint64_t seed = h.random.Next();
+      Outputs out[2];
+      for (int v = 0; v < 2; v++) {
+        Random r(seed);
+        WriteRandom(h.base, block.address, block.bytes, r);
+        PPCContext t = CallContext(h);
+        const bool none = kind.target == 0 && r.Below(8) == 0;
+        const uint32_t entry = none ? 0 : ac::EntryNew(h.base, t.r1.u32);
+        const uint32_t accessory = entry + 48;
+        const uint32_t files[4] = {entry + 4, accessory + 464, accessory + 500,
+                                   accessory + 544 + 180};
+        uint32_t pages[4] = {};
+        for (uint32_t i = 0; i < 4 && entry != 0; i++) {
+          const uint32_t file = files[i];
+          const uint32_t state = r.Below(3);
+          const uint32_t owned = r.Below(4) == 0 ? 0 : 1;
+          guest::StoreU32(h.base, file + 12, state);
+          guest::StoreU32(h.base, file + 24, owned);
+          guest::StoreU32(h.base, file + 8, 0x70000000u + r.Below(0x1000000));
+          guest::StoreU32(h.base, file + 4, r.Below(23011));
+          if (state == 2 && owned) {
+            pages[i] = memory::AllocPages(4096, 4096);
+            guest::StoreU32(h.base, file + 16, pages[i]);
+          } else {
+            guest::StoreU32(h.base, file + 16, block.address + 0x1000);
+          }
+        }
+        guest::StoreU32(h.base, slot, entry);
+        const uint32_t targets[4] = {slot, accessory, accessory + 544, entry + 4};
+        t.r3.u64 = targets[kind.target];
+        (v == 0 ? kind.recompiled : kind.native)(t, h.base);
+        out[v].Word(t.r3.u32 == entry && entry != 0 ? kMarker : t.r3.u32);
+        out[v].Word(uint32_t(t.r3.u64 >> 32));
+        out[v].Bytes(Read(h.base, block.address, block.bytes));
+        if (entry == 0) {
+          continue;
+        }
+        const bool entry_pages = memory::IsPages(entry);
+        out[v].Word(entry_pages ? 1 : 0);
+        out[v].Bytes(Read(h.base, entry, ac::kEntryBytes));
+        for (uint32_t i = 0; i < 4; i++) {
+          const bool still = pages[i] != 0 && memory::IsPages(pages[i]);
+          out[v].Word(still ? 1 : 0);
+          if (still) {
+            memory::FreePages(pages[i]);
+          }
+        }
+        if (entry_pages) {
+          if (kind.target >= 2) {  // the model wasn't destroyed: its storage
+            const uint32_t first = guest::LoadU32(
+                h.base, accessory + models::kModelTextures + models::kTextureProviderVector +
+                            models::kVectorFirst);
+            memory::crt::OperatorDelete(first);
+          }
+          memory::FreePages(entry);
+        }
+      }
+      results.Check(out[0], out[1], fmt::format("case {}", c));
+    }
+    results.Report();
+  }
+}
+
 }  // namespace
 
 void Accessories(Context& h) {
@@ -449,6 +546,7 @@ void Accessories(Context& h) {
   if (hooks::AccessoriesNativeLoads()) {
     FileResets(h, block);
     SetFrees(h, block);
+    Destructors(h, block);
   }
 }
 

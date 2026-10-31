@@ -136,6 +136,28 @@ uint32_t AccessoryConstruct(uint8_t* base, uint32_t accessory, uint32_t sp);
 // layer's pages); +0 = 1, the file at +4, the accessory at +48 (from the
 // 96-byte frame below `sp`). Returns it, or 0.
 uint32_t EntryNew(uint8_t* base, uint32_t sp);
+// The destructors, each nothing done unless its check (the *Destructible
+// below) passed; each returns the r3 the original leaves.
+// AccessoryFile::~AccessoryFile (sub_820F0DB8): the vtable, Reset, then the
+// list node's vtable. Reset's r3, or the file's when Reset called nothing.
+uint32_t FileDestruct(uint8_t* base, uint32_t file);
+// AccessorySkeleton::~AccessorySkeleton (sub_820EFFD8): the vtables, the
+// job's destructor inline (+240, +220 twice, +216), the file (+180), +176 =
+// the list node's vtable, then SkeletonBase::~SkeletonBase (its adapter
+// leaves r3: the skeleton).
+uint32_t SkeletonDestruct(uint8_t* base, uint32_t skeleton);
+// Accessory::~Accessory (sub_820EF310): the vtable, the skeleton, the files
+// (+500, +464), then PartModel::~PartModel (its r3).
+uint32_t AccessoryDestruct(uint8_t* base, uint32_t accessory);
+// AccessoryEntry::Destroy (sub_820F0988): r3 = the entry's slot; when it
+// holds an entry, ~Accessory (+48), ~AccessoryFile (+4), then FreeData on
+// the slot (its r3); else r3 the slot.
+uint32_t EntryDestroy(uint8_t* base, uint32_t slot);
+bool FileDestructible(uint8_t* base, uint32_t file);
+bool SkeletonDestructible(uint8_t* base, uint32_t skeleton);
+bool AccessoryDestructible(uint8_t* base, uint32_t accessory);
+bool EntryDestroyable(uint8_t* base, uint32_t slot);
+
 // Whether a part model is constructed natively (models::CanAllocatePointers
 // for its texture provider): the constructors' adapters check it.
 bool AccessoryConstructible(uint8_t* base);

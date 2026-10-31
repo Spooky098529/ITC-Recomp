@@ -23,7 +23,8 @@ ITC_FLAG_BOOL(native_accessories, true, "ITC",
               "sub_820F0F00; the file class sub_820F0C50, sub_820F0BF0, sub_820F0C90, "
               "sub_820F0C20, sub_820F08D0, sub_820F0D30; Accessories::Free and Destroy "
               "sub_820F0F90, sub_820F1078, the set's destructor through its vtable; the entry "
-              "and the accessory's construction sub_820F0920, sub_820EF258, sub_820F03F0) natively instead of through the translated code "
+              "and the accessory's construction sub_820F0920, sub_820EF258, sub_820F03F0; their "
+              "destructors sub_820F0988, sub_820EF310, sub_820EFFD8, sub_820F0DB8) natively instead of through the translated code "
               "(the same words; checked by --run_harnesses=accessories)");
 
 namespace hooks {
@@ -162,6 +163,48 @@ void AccessoryEntryNew(PPCContext& ctx, uint8_t* base) {
   ctx.r3.u64 = accessories::EntryNew(base, ctx.r1.u32);
 }
 
+// --- The destructors ---
+
+void AccessoryFileDestruct(PPCContext& ctx, uint8_t* base) {
+  if (!AccessoriesNativeLoads() || !accessories::FileDestructible(base, ctx.r3.u32)) {
+    __imp__sub_820F0DB8(ctx, base);
+    return;
+  }
+  ctx.r3.u64 = accessories::FileDestruct(base, ctx.r3.u32);
+}
+
+void AccessorySkeletonDestruct(PPCContext& ctx, uint8_t* base) {
+  if (!AccessoriesNativeLoads() || !ModelsNativeLifetime() ||
+      !accessories::SkeletonDestructible(base, ctx.r3.u32)) {
+    __imp__sub_820EFFD8(ctx, base);
+    return;
+  }
+  ctx.fpscr.disableFlushMode();  // as SkeletonBase::~SkeletonBase's adapter
+  ctx.r3.u64 = accessories::SkeletonDestruct(base, ctx.r3.u32);
+}
+
+void AccessoryDestruct(PPCContext& ctx, uint8_t* base) {
+  if (!AccessoriesNativeLoads() || !ModelsNativeLifetime() ||
+      !accessories::AccessoryDestructible(base, ctx.r3.u32)) {
+    __imp__sub_820EF310(ctx, base);
+    return;
+  }
+  ctx.fpscr.disableFlushMode();
+  ctx.r3.u64 = accessories::AccessoryDestruct(base, ctx.r3.u32);
+}
+
+void AccessoryEntryDestroy(PPCContext& ctx, uint8_t* base) {
+  if (!AccessoriesNativeLoads() || !ModelsNativeLifetime() ||
+      !accessories::EntryDestroyable(base, ctx.r3.u32)) {
+    __imp__sub_820F0988(ctx, base);
+    return;
+  }
+  if (guest::LoadU32(base, ctx.r3.u32) != 0) {
+    ctx.fpscr.disableFlushMode();
+  }
+  ctx.r3.u64 = accessories::EntryDestroy(base, ctx.r3.u32);
+}
+
 }  // namespace hooks
 
 // Defines an adapter: the flag, else the original.
@@ -184,3 +227,7 @@ ITC_ACCESSORIES(820F0F00, AccessoriesSetScale)
 ITC_ACCESSORIES(820F0D30, AccessoryFileReset)
 ITC_ACCESSORIES(820F1078, AccessoriesDestroy)
 ITC_ACCESSORIES(820F0920, AccessoryEntryNew)
+ITC_ACCESSORIES(820F0DB8, AccessoryFileDestruct)
+ITC_ACCESSORIES(820EFFD8, AccessorySkeletonDestruct)
+ITC_ACCESSORIES(820EF310, AccessoryDestruct)
+ITC_ACCESSORIES(820F0988, AccessoryEntryDestroy)
