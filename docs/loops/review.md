@@ -13,6 +13,16 @@ When the user has reviewed a run's section, its heading gets
 
 ## Run 2026-10-31 16:54 (`b7-loop-31-10-26`, continued)
 
+- The in-race screens' second migration (590250a6..ca74f7fd): 36 rows
+  in `race-screens.md` (11 Native; `PauseMenu::ColorItems`' colors
+  corrected: enabled items 205, 235, 67, disabled white) and 3 in
+  `race-hud-machine.md`. For review: the UI movie calls, the menu
+  sound and the menu list made through their overrides so the pause
+  logging stays; `SetText`'s unset r7-r10 passed as 0 (the 2026-10-30
+  call), the caller frame's +48..+79 (+40..+79 for `SetUpOptions`) left
+  out of those cases; the openers' cases in the `race_screens`
+  harness; kind 4's and the stage's openers left to the originals.
+
 - The in-race screens' first migration (1405beb8..846937fe): 45 rows
   in `race-screens.md` (3 Native) and 2 in `race-hud-machine.md`. For
   review: the `--log_pause_movie` and `--log_pause_menu` overrides kept,

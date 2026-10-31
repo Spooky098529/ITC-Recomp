@@ -94,7 +94,13 @@ file's history. What's left to see in a drive, from every run:
   time this run): 47 of 47 harness lines, 9 ran in the race, 31 in the
   replay, 7 to drive (`itc_3021` also took 11 of this run's earlier
   functions off the drive list; older runs' entries it shows are left
-  for the user). Step: second migration (agent running).
+  for the user). Second migration checked (590250a6..ca74f7fd: 36 functions in
+  `race-screens.md`, the pause menu's transitions and options page and
+  the menu after the race, with the machine's three pause openers; 11
+  adapters removed; harness 0 differing, race 35-38 s, 0 errors; no
+  subagents). Left: 10 ready groups (the dialog's and career results'
+  pages), `PauseUpdate`, `AfterRaceUpdate`, `RaceScreens::Create`.
+  Step: validation of the second migration (agent running).
 
 ## Done
 
@@ -182,5 +188,8 @@ file's history. What's left to see in a drive, from every run:
 - After its validation (`itc_3020`, 120 s: race 58 s, 0 errors, every
   harness 0 differing but the expected groups): ours 3652, work left
   2747.
+- After the in-race screens' second migration (`itc_3036`: race 35 s,
+  0 errors, race_screens 0 differing): ours 3690, work left 2709
+  (wrapped 101, known 528, unknown 2080).
 
 ## Stopped
