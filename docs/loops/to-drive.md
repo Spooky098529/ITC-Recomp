@@ -16,6 +16,14 @@ function goes from this list when a log shows its `native running
 (game):` line (say which log in the commit). A run with nothing left
 here loses its heading.
 
+## Run 2026-10-30 23:03 (`b7-loop-30-10-26-2`)
+
+- The car models, migration 2 (attract race `itc_2852`, replay
+  `itc_2853`: broke, the SDK's "BaseHeap::Release failed because
+  address is not a region start" once at the race-end change ~118 s in,
+  as in `itc_2693` and `itc_2784`; it ran to the end; `car-models.md`):
+  `sub_820D5D20` CarModel::ReloadDecals.
+
 ## Run 2026-10-30 11:39 (`b7-loop-30-10-26`)
 
 - The race event, migration 1 (attract race `itc_2673`, replay

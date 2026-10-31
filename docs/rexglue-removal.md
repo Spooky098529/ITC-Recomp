@@ -2664,6 +2664,7 @@ B7. **The game logic inside**: everything else, subsystem by subsystem,
 | 2026-10-30 | The race event (`RaceEvent::Make` and `Init` with the event pools and groups, `Destroy`, the refreshes for the career's event queries, the placements of opponents unlocked during a race and the section rival, the front end's `GroupItem`, `Items::Available`; `EventCondition::Met` with 60 of its 61 kind tests, the unlock states), with the career's `EventQuery`, `EventLocation` and `DayBlock::BestStreak` | `race-event.md` | 100 of 102 (one migration; `EventCondition::Power`, kind 40, waits on the power curve and is called through a guest call at the original's depth; `sub_82142868` Merged) | `--native_race_event` |
 | 2026-10-30 | The camera modes (the race mode's camera director, its six views' cameras: chase, two in-car, the start's look at the racers, the TV camera of replays and attract races with its path curves, the scripted cutscene with the rival logo; the camera animations, the garage camera), with `UiMovies::Open` and `Delete` | `camera-modes.md` | 87 of 90 in play (three migrations; `CameraDirector::Update` stays Wrapped by `--redraw_rival_logo`, which runs its native form on logic passes; `CourseView::Draw` waits on the scenery) | `--native_camera_modes` (with `--native_ui_movies_game`) |
 | 2026-10-30 | The parking area (the career's front-end screen where the player loads in, picks one of up to 6 opponent cars and races; its state machine, pages and transitions, the opponents' cards and pictures, the cars posed in the scene), with `UiMovie::SetText` and `SetNodeText` | `location-screen.md` | 57 of 77 in play (three migrations; the rest waits on the menu input and sound, the scene and its models, the scenery's set-up and teardown, `XPR::GetTexture`) | `--native_location_screen` (with `--native_ui_movies_game`) |
+| 2026-10-31 | The car models (already mapped: the load slots and shared loads, `LoadSetA` and `B`, `LoadExterior` with the team emblem, decals and vinyl textures, the wheels' set-up with the rims and brakes, the interior's set c body, parts and `CarInterior::Load`, `CarModel::MakePlate`, the file-loaded callbacks, `ReloadDecals`), with `GetLastError` (`functions.md`, no flag, as SetLastError) and `Skeleton::LocalMatrices` (`models.md`) | `car-models.md` | 48 of 50 in play (two migrations; the +3724 = 1 image branch `sub_820C4E68`, found running though not in the coverage list, stays on the originals, a lead, so `Vinyl::DrawDecal`'s adapter stays) | `--native_car_models` (with `--native_models`) |
 
     The first run (2026-10-22, branch `b7-loop-test`): every harness at 0 differing, attract races at 20-21 s with no errors,
     and a race the user drove looked right. Ours went from 162 to 335 (work
@@ -4143,3 +4144,17 @@ everything worked): the parking area, a career race and the rival intro
 cutscene ran as native code, 166 functions off the drive list
 (`docs/loops/to-drive.md`), 0 errors and 0 warnings. Totals unchanged
 from the run's end: ours 3,423, work left 2,974.
+
+**2026-10-31, the car models (branch `b7-loop-30-10-26-2`):** the
+twenty-sixth run's first subsystem, already mapped (`car-models.md`,
+the map checked, not remapped) and made native in two migrations under
+`--native_car_models`: 48 of the 50 functions seen in play, with
+`GetLastError` (`last_error::Get`, no flag, as B6's SetLastError) and
+`Skeleton::LocalMatrices` (`--native_models`). The coverage list misses
+`sub_820C4E68`, the car model's +3724 = 1 image branch, seen running in
+an attract race (`itc_2848`): its callers hand that branch back to their
+originals until it is native (a lead). The boundary: 449 functions (916
+pairs): overridden 108, Native 34, Dropped 26, never called 70, live
+211. Imports: 186 called, 56 with a live caller. B7 (`b7_status.py`):
+ours 3,447, work left 2,950 (Wrapped 103, with a row 467, no row yet
+2,380), from 2,974.

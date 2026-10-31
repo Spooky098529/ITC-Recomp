@@ -34,10 +34,17 @@ file's history. What's left to see in a drive, from every run:
   image branch `sub_820C4E68`, found running in an attract race though
   not in the coverage list, left on the originals and made a lead, so
   `Vinyl::DrawDecal`'s adapter stays; the groups left belong to other
-  files (`sub_820C4338`'s, those under `sub_820C8DE8`)). Validation 2
-  running.
+  files (`sub_820C4338`'s, those under `sub_820C8DE8`)). Validated
+  (`itc_2852`, replay `itc_2853` broke on the intermittent SDK heap
+  error, ran to the end): 13 of 13 harness lines; `ReloadDecals` to
+  drive. Subsystem 1 finished.
 
 ## Done
+
+- The car models (subsystem 1): `car-models.md`, 48 of 50 in play, two
+  migrations, with `GetLastError` and `Skeleton::LocalMatrices`;
+  `--native_car_models`; 9f71b49..9260d11. Validated (`itc_2834`,
+  `itc_2852`).
 
 ## Rows to review
 
@@ -64,5 +71,8 @@ file's history. What's left to see in a drive, from every run:
 - After the car models' migration 2 (`itc_2851`: race 36 s, 0 errors,
   car_models and scene_loaders 0 differing): ours 3447, work left 2950
   (wrapped 103, known 467, unknown 2380).
+- After its validation (`itc_2852`, 60 s: race 7 s, 0 errors, every
+  harness 0 differing but the expected groups): ours 3447, work left
+  2950.
 
 ## Stopped
