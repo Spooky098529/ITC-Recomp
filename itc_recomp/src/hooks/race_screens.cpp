@@ -445,8 +445,12 @@ void RaceScreensCareerResultsPage1(PPCContext& ctx, uint8_t* base) {
 // (their callers in play, the race HUD machine's OpenPause, OpenRacePause
 // and OpenCareerPause and Open, call their plain C++), and AfterRaceMenu::
 // ShowItems, SetUpItems and ColorItems (their callers in play, SetUpItems,
-// Open and Start, call their plain C++); their register steps stay for the
-// harness.
+// Open and Start, call their plain C++), and ScreenPages::Finish (its
+// callers in play, the draws, call its plain C++), PauseMenu::SaveOptions
+// and SaveHudOptions (Close and OptionsPage), SetUpOptions (OpenOptions),
+// RaceDialog::Update (the two ConfirmPages) and RaceDialog::Draw (the pause
+// menu's and the menu after the race's draws); their register steps stay
+// for the harness.
 
 #define ITC_RACE_SCREENS(address, step)       \
   extern "C" REX_FUNC(sub_##address) {        \
@@ -459,7 +463,6 @@ void RaceScreensCareerResultsPage1(PPCContext& ctx, uint8_t* base) {
   }
 
 ITC_RACE_SCREENS(8220BA98, RaceScreensPagesInit)
-ITC_RACE_SCREENS(8220BA28, RaceScreensPagesFinish)
 ITC_RACE_SCREENS(8220BC20, RaceScreensListSelection)
 ITC_RACE_SCREENS(8220BC30, RaceScreensListSetSelection)
 ITC_RACE_SCREENS(8220BC00, RaceScreensListSetEnabled)
@@ -485,15 +488,12 @@ ITC_RACE_SCREENS(82219170, RaceScreensCareerResultsDestroy)
 ITC_RACE_SCREENS(8221F3C8, RaceScreensRaceResultsDestroy)
 ITC_RACE_SCREENS(8221FA68, RaceScreensSplitResultsDestroy)
 ITC_RACE_SCREENS(8221BE30, RaceScreensKind6MenuDestroy)
-ITC_RACE_SCREENS(8220D6A0, RaceScreensPauseMenuSaveOptions)
 ITC_RACE_SCREENS(8220D890, RaceScreensPauseMenuClose)
-ITC_RACE_SCREENS(8220D740, RaceScreensPauseMenuSaveHudOptions)
 ITC_RACE_SCREENS(8220C5D0, RaceScreensPauseMenuAnswerPage)
 ITC_RACE_SCREENS(8221A720, RaceScreensAfterRaceMenuAnswerPage)
 ITC_RACE_SCREENS(82217D40, RaceScreensRaceDialogAnswer)
 ITC_RACE_SCREENS(8220F638, RaceScreensPauseMenuUpdate)
 ITC_RACE_SCREENS(8221BD20, RaceScreensAfterRaceMenuUpdate)
-ITC_RACE_SCREENS(822185B0, RaceScreensRaceDialogUpdate)
 ITC_RACE_SCREENS(822191D0, RaceScreensCareerResultsStart)
 ITC_RACE_SCREENS(8220CED0, RaceScreensPauseMenuStepVolume)
 ITC_RACE_SCREENS(8220D248, RaceScreensPauseMenuStepAdjust)
@@ -514,7 +514,6 @@ ITC_RACE_SCREENS(8220E1F8, RaceScreensPauseMenuMoveAdjust)
 ITC_RACE_SCREENS(8220EE28, RaceScreensPauseMenuShowMain)
 ITC_RACE_SCREENS(8220E888, RaceScreensPauseMenuShowAdjust)
 ITC_RACE_SCREENS(8220DB98, RaceScreensPauseMenuOptionsPage)
-ITC_RACE_SCREENS(8220E530, RaceScreensPauseMenuSetUpOptions)
 ITC_RACE_SCREENS(8220F1B8, RaceScreensPauseMenuSetAdjust)
 ITC_RACE_SCREENS(8221A6C8, RaceScreensAfterRaceMenuConfirmPage)
 ITC_RACE_SCREENS(8221A730, RaceScreensAfterRaceMenuIntro)
@@ -526,7 +525,6 @@ ITC_RACE_SCREENS(8221BA68, RaceScreensAfterRaceMenuOpen)
 ITC_RACE_SCREENS(82217F40, RaceScreensRaceDialogQuestion)
 ITC_RACE_SCREENS(822186A8, RaceScreensRaceDialogOpenAnim)
 ITC_RACE_SCREENS(82218788, RaceScreensRaceDialogMove)
-ITC_RACE_SCREENS(82218F30, RaceScreensRaceDialogDraw)
 ITC_RACE_SCREENS(8220EEF0, RaceScreensPauseMenuOpenOptions)
 ITC_RACE_SCREENS(8220FB10, RaceScreensPauseMenuDraw)
 ITC_RACE_SCREENS(8221BB48, RaceScreensAfterRaceMenuDraw)
