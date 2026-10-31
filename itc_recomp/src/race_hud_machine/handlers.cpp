@@ -217,6 +217,41 @@ std::optional<uint64_t> RaceUpdate(uint8_t* base, uint64_t r3, uint32_t dispatch
   return answer;
 }
 
+std::optional<uint64_t> ResultsUpdate(uint8_t* base, uint64_t r3, uint32_t dispatcher, uint32_t sp,
+                                      const Calls& callees) {
+  const uint32_t machine = uint32_t(r3);
+  const uint32_t race = Load(base, kRaceData);
+  const int32_t race_kind = int32_t(Load(base, race + 0xA3AF0));
+  const uint32_t kind = Load(base, machine + kKind);
+  // Kind 4's sub_82216850 and the results of race kinds 2, 4 and 6 and of
+  // kind 1 outside the career (sub_8221F930, sub_8221FFF0) are never seen
+  // in play: the original runs.
+  if (kind == 4 || race_kind == 2 || race_kind == 4 || race_kind == 6 ||
+      (race_kind == 1 && int32_t(Load(base, race + 0xA3AF4)) == 0)) {
+    return std::nullopt;
+  }
+  ITC_NATIVE_RUNNING("sub_8216DFD0 RaceHudMachine::ResultsUpdate");
+  const uint32_t frame = Frame(base, sp, 144);
+  vehicle_accessors::RacerRecordsAt(base, race + 0x59AE8, 0xFFFFFFFFu);
+  if (kind < 4 || kind == 6) {
+    const uint32_t hud = Holder(base, machine) + kHud;
+    callees.Call(kHudTick, frame, 0x8216E038, hud, 0);
+    callees.Call(kHudUpdateWarning, frame, 0x8216E040, hud);
+  }
+  uint64_t answer = 0;
+  if (race_kind == 1 && IsFirstDay(base, frame) == 0) {
+    answer = callees.Call(kCareerResultsUpdate, frame, 0x8216E0C4,
+                          Load(base, Holder(base, machine) + 1024));
+  }
+  const uint32_t first_day = IsFirstDay(base, frame);
+  if (first_day != 0) {
+    race_states::steps::Post(base, dispatcher, 48);
+  } else if (uint32_t(answer) != 0 || ReplayBit(base, Holder(base, machine))) {
+    guest::StoreU32(base, machine + kState, 22);
+  }
+  return first_day;
+}
+
 std::optional<uint64_t> CloseResults(uint8_t* base, uint64_t r3, uint32_t sp,
                                      const Calls& callees) {
   const uint32_t machine = uint32_t(r3);

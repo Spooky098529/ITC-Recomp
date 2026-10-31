@@ -925,6 +925,8 @@ void BlockOutputs(Outputs& out, uint8_t* base, uint32_t block, uint32_t bytes,
 // HUD's harness runs its SetUp.
 // The menu after the race's menu list ([0x826D851C], AfterRaceMenu::Close's).
 constexpr uint32_t kAfterRaceList = 0x826D851C;
+// The career's results' screen ([0x826D8500], CareerResults::Start's).
+constexpr uint32_t kCareerResults = 0x826D8500;
 
 struct HandlerSpec {
   uint32_t frame = 0;
@@ -971,7 +973,8 @@ void HandlerCase(Context& h, Results& results, const HudWorld& w, uint64_t seed,
                               {menu_sounds::kSoundManager, 4},
                               {kMapperEntries, 32},
                               {kControllerEntries, 16},
-                              {kAfterRaceList, 4}});
+                              {kAfterRaceList, 4},
+                              {kCareerResults, 4}});
     PPCContext t = CallContext(h);
     const uint32_t sp = t.r1.u32;
     WriteRandom(h.base, sp - kHandlerStackBytes, kHandlerStackBytes + kCallerBytes, r);
@@ -1130,6 +1133,30 @@ void Handlers(Context& h) {
     guest::StoreU32(h.base, list + 68,
                     r.Below(3) == 0 ? 0 : memory::AllocPages(0x1000 * (1 + r.Below(2)), 4096));
   };
+  // ResultsUpdate: the race data's kind -1, 0, 1, 3, 5 or 7 (2, 4, 6 and 1
+  // with +0xA3AF4 0 run the original, their results never seen in play),
+  // its mode (+0xA3AF4) not 0 for kind 1; player 0's day (the save data's
+  // +6100, IsFirstDay's) 1 or not; the career's results (holder +1024) a
+  // block of the misc one (+0x4100, also [0x826D8500], which the start
+  // reads) whose page (+184) is none (-1), 0 (the start: ScreenPages::Go)
+  // or 4 (the shared "returns 1").
+  const HandlerSetupFn results_update = [&h, &by_signed](PPCContext& t, Random& r,
+                                                         const HudWorld& w) {
+    by_signed(t, r, w);
+    const int32_t kinds[6] = {-1, 0, 1, 3, 5, 7};
+    const int32_t race_kind = kinds[r.Below(6)];
+    guest::StoreU32(h.base, w.race.address + 0xA3AF0, uint32_t(race_kind));
+    guest::StoreU32(h.base, w.race.address + 0xA3AF4, 1 + r.Below(3));
+    const uint32_t save = guest::LoadU32(h.base, 0x826C5B58);
+    if (save != 0) {
+      guest::StoreU32(h.base, save + 6100, r.Below(2) == 0 ? 1 : r.Below(4));
+    }
+    const uint32_t screen = w.misc.address + 0x4100;
+    guest::StoreU32(h.base, w.holder.address + 1024, screen);
+    guest::StoreU32(h.base, kCareerResults, screen);
+    const int32_t pages[3] = {-1, 0, 4};
+    guest::StoreU32(h.base, screen + 184, uint32_t(pages[r.Below(3)]));
+  };
   struct G {
     const char* name;
     int cases;
@@ -1176,6 +1203,9 @@ void Handlers(Context& h) {
       {"RaceHudMachine::SetUp (sub_8216D450)", 100, &set_up, __imp__sub_8216D450,
        hooks::RaceHudMachineSetUp, HandlerSpec{160, 80, true}, false, hud_last},
       // MenuList::Release's frame (below the handler's) is its own harness's.
+      {"RaceHudMachine::ResultsUpdate (sub_8216DFD0)", 120, &results_update,
+       __imp__sub_8216DFD0, hooks::RaceHudMachineResultsUpdate, HandlerSpec{144, 56}, false,
+       never},
       {"RaceHudMachine::CloseResults (sub_8216D198)", 80, &close_results, __imp__sub_8216D198,
        hooks::RaceHudMachineCloseResults, f96, false, never},
   };

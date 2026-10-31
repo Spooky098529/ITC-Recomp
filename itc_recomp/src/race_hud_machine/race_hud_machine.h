@@ -68,6 +68,7 @@ constexpr uint32_t kAltSetUp = 0x82217C70;         // AltHud::SetUp(r3, r4 = pla
 constexpr uint32_t kAltTick = 0x82217AC8;          // AltHud::Tick
 constexpr uint32_t kAltRunMovie = 0x82216C00;      // AltHud::RunMovie
 constexpr uint32_t kAfterRaceClose = 0x8221A498;   // AfterRaceMenu::Close (race-screens.md)
+constexpr uint32_t kCareerResultsUpdate = 0x8221A090;  // CareerResults::Update (race-screens.md)
 
 // --- The set-up (race_hud_machine_init.cpp) ---
 
@@ -132,6 +133,15 @@ std::optional<uint64_t> RaceUpdate(uint8_t* base, uint64_t r3, uint32_t dispatch
 // SetUp, the HUD's SetPlayer and its set-ups (see the row), then +9616 = 0.
 std::optional<uint64_t> SetUp(uint8_t* base, uint64_t r3, uint32_t sp, const Calls& callees);
 
+// sub_8216DFD0 RaceHudMachine::ResultsUpdate: RacerRecords::At(the race
+// data's +0x59AE8, -1) (unused); kinds 0 to 3 and 6 the HUD's Tick(0) and
+// UpdateWarning; race kind 1 outside the first day CareerResults::Update
+// (holder +1024); then with IsFirstDay 48 posted, else with the answer or
+// the replay bit the state 22. Returns IsFirstDay's answer. nullopt, with
+// nothing done, for kind 4 and the race kinds whose results are never seen
+// in play (2, 4, 6, and 1 with +0xA3AF4 0).
+std::optional<uint64_t> ResultsUpdate(uint8_t* base, uint64_t r3, uint32_t dispatcher, uint32_t sp,
+                                      const Calls& callees);
 // sub_8216D198 RaceHudMachine::CloseResults: by the race data's kind the
 // results' screen passed to the empty sub_82106540 (nothing done), then
 // AfterRaceMenu::Close(holder +1020) and the holder's +440 = 1; returns

@@ -25,10 +25,10 @@ ITC_FLAG_BOOL(native_race_hud_machine, true, "ITC",
               "CountdownDraw sub_8216C330, StartIntro sub_8216C510, EndIntro sub_8216C520, "
               "IntroUpdate sub_8216C530, IntroDraw sub_8216C5B8, CountdownUpdate sub_8216CB98, "
               "RaceDraw sub_8216CE00, RaceUpdate sub_8216D918, SetUp sub_8216D450 and "
-              "CloseResults sub_8216D198, their callees the race HUD's, the alternate HUD's and "
+              "CloseResults sub_8216D198 and ResultsUpdate sub_8216DFD0, their callees the race HUD's, the alternate HUD's and "
               "the in-race screens' plain C++ (kind 4, and kind 0 "
               "where the original draws the holder's +12, never seen in play, run the "
-              "originals; CloseResults' race kind 6 too); IsFirstDay sub_8216D3F0, OpponentPrize sub_8216C820 and ItemBonus "
+              "originals; CloseResults' race kind 6 and ResultsUpdate's unseen results too); IsFirstDay sub_8216D3F0, OpponentPrize sub_8216C820 and ItemBonus "
               "sub_8216C938 with sub_8216C9B8 merged) natively instead of through the translated "
               "code (the same writes; checked by --run_harnesses=race_hud_machine)");
 ITC_FLAG_DECLARE(bool, native_action_mappers);
@@ -118,6 +118,10 @@ class Calls {
                              &ctx.f1.f64);
       case rhm::kAltRunMovie:
         return alt_hud::RunMovie(base, r1, self.calls());
+      case rhm::kCareerResultsUpdate:
+        // Its page's handler through the function table (r4 and r5 not read
+        // by the handlers: 0).
+        return race_screens::CareerResultsUpdate(base, args[0], 0, 0, r1, self.calls());
       case rhm::kAfterRaceClose:
         // As its adapter (src/hooks/race_screens.cpp): over the allocation
         // layer where the release is native, else the guest call.
@@ -327,6 +331,13 @@ void RaceHudMachineSetUp(PPCContext& ctx, uint8_t* base) {
   });
 }
 
+void RaceHudMachineResultsUpdate(PPCContext& ctx, uint8_t* base) {
+  const uint32_t dispatcher = ctx.r4.u32;
+  Handle(ctx, base, __imp__sub_8216DFD0, [&](const rh::Calls& callees) {
+    return rhm::ResultsUpdate(base, ctx.r3.u64, dispatcher, ctx.r1.u32, callees);
+  });
+}
+
 void RaceHudMachineCloseResults(PPCContext& ctx, uint8_t* base) {
   Handle(ctx, base, __imp__sub_8216D198, [&](const rh::Calls& callees) {
     return rhm::CloseResults(base, ctx.r3.u64, ctx.r1.u32, callees);
@@ -373,6 +384,7 @@ ITC_RACE_HUD_MACHINE(8216CE00, RaceHudMachineRaceDraw)
 ITC_RACE_HUD_MACHINE(8216D918, RaceHudMachineRaceUpdate)
 ITC_RACE_HUD_MACHINE(8216D450, RaceHudMachineSetUp)
 ITC_RACE_HUD_MACHINE(8216D198, RaceHudMachineCloseResults)
+ITC_RACE_HUD_MACHINE(8216DFD0, RaceHudMachineResultsUpdate)
 ITC_RACE_HUD_MACHINE(8216D3F0, RaceHudMachineIsFirstDay)
 ITC_RACE_HUD_MACHINE(8216C820, RaceHudMachineOpponentPrize)
 ITC_RACE_HUD_MACHINE(8216C938, RaceHudMachineItemBonus)
