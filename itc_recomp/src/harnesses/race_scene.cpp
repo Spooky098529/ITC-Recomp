@@ -152,10 +152,78 @@ void Inits(Context& h) {
   results.Report();
 }
 
+// --- The light set: RaceLights::InitEntry on a random entry for each index
+// from -2 to 13 (the kinds' branches, the colors' cases, and 11 and more:
+// nothing), twice each; RaceLights::SetUp on a random set. The words they
+// store as floats compared as floats, the rest exactly; SetUp's r3 and f1
+// too ---
+
+void Lights(Context& h) {
+  constexpr uint32_t kSetBytes = 16 + 96 * 11 + 64;  // past +1072
+  const Block set(kSetBytes);
+  if (!set.address) {
+    ITC_LOG_ERROR("harness: race_scene: no block from the allocation layer");
+    return;
+  }
+  // An entry's words: +0 the kind, +4 to +15 untouched, then float vectors.
+  auto entry_out = [&](Outputs& out, uint32_t entry) {
+    out.Bytes(Read(h.base, entry, 16));
+    out.Floats(h.base, entry + 16, 20);
+  };
+  {
+    Results results("RaceLights::InitEntry (sub_8215C368)");
+    int c = 0;
+    for (int32_t index = -2; index <= 13; index++) {
+      for (int k = 0; k < 2; k++, c++) {
+        Outputs out[2];
+        for (int v = 0; v < 2; v++) {
+          Random r(uint64_t(c) * 97 + 11);
+          WriteRandom(h.base, set.address, kSetBytes, r);
+          if (v == 0) {
+            PPCContext t = CallContext(h);
+            t.r3.u64 = set.address;
+            t.r4.s64 = index;
+            __imp__sub_8215C368(t, h.base);
+          } else {
+            rs::LightsInitEntry(h.base, set.address, index);
+          }
+          entry_out(out[v], set.address);
+        }
+        results.Check(out[0], out[1], fmt::format("index {} ({})", index, k));
+      }
+    }
+    results.Report();
+  }
+  {
+    Results results("RaceLights::SetUp (sub_8215CF78)");
+    for (uint64_t seed = 0; seed < 4; seed++) {
+      Outputs out[2];
+      for (int v = 0; v < 2; v++) {
+        Random r(seed * 61 + 7);
+        WriteRandom(h.base, set.address, kSetBytes, r);
+        PPCContext t = CallContext(h);
+        t.r3.u64 = set.address;
+        (v == 0 ? Original<__imp__sub_8215CF78> : hooks::RaceSceneLightsSetUp)(t, h.base);
+        out[v].Bytes(Read(h.base, set.address, 16));
+        for (uint32_t i = 0; i < 11; i++) {
+          entry_out(out[v], set.address + 16 + 96 * i);
+        }
+        out[v].Bytes(Read(h.base, set.address + 16 + 96 * 11, kSetBytes - 16 - 96 * 11));
+        out[v].Word(t.r3.u32);
+        out[v].Word(uint32_t(t.r3.u64 >> 32));
+        out[v].Double(t.f1.u64);
+      }
+      results.Check(out[0], out[1], fmt::format("seed {}", seed));
+    }
+    results.Report();
+  }
+}
+
 }  // namespace
 
 void RaceScene(Context& h) {
   Inits(h);
+  Lights(h);
 }
 
 }  // namespace harness

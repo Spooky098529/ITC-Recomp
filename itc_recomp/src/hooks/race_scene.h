@@ -15,4 +15,9 @@ namespace hooks {
 // operator new's plain C++ refuses (or without --native_heap's layer).
 void RaceSceneMachineInit(PPCContext& ctx, uint8_t* base);
 
+// RaceLights::SetUp sub_8215CF78: r3 = the light set (the scene + 30064);
+// r3 = the last entry (r3 + 976) and f1 = the last cos, as the original
+// leaves them.
+void RaceSceneLightsSetUp(PPCContext& ctx, uint8_t* base);
+
 }  // namespace hooks

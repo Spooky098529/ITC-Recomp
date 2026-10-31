@@ -38,4 +38,20 @@ bool SceneCreate(uint8_t* base);
 std::optional<uint32_t> MachineInit(uint8_t* base, uint32_t machine, uint32_t frame,
                                     bool* replaced);
 
+// --- The light set (the object's +30064) ---
+
+// sub_8215C368 RaceLights::InitEntry (probably): a 96-byte entry for its
+// index (11 or more, as signed: nothing): +0 = 0, then kind 1 (indices
+// below 3) or 2 with their vectors from the image's constants (the cone's
+// two cosines, cos, for kind 2), and the color +16 by index. Returns
+// nothing: r3 is left as it was, f1 as the last cos leaves it.
+void LightsInitEntry(uint8_t* base, uint32_t entry, int32_t index);
+// sub_8215CF78 RaceLights::SetUp (probably): +0, +1072, +8, +4 = 0, then
+// the 11 entries (+16 + 96 i) set up and counted (+4 kind 1, +8 kind 2, +0
+// both).
+void LightsSetUp(uint8_t* base, uint32_t set);
+// f1 as the last entry's InitEntry leaves it: cos of the double at
+// 0x82002FE0.
+double LightsLastF1(uint8_t* base);
+
 }  // namespace race_scene
