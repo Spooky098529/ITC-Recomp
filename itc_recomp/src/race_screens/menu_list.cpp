@@ -141,6 +141,11 @@ void PagesFinish(uint8_t* base, uint32_t pages, uint32_t result) {
   guest::StoreU32(base, pages + 24, 0);
 }
 
+uint64_t MapperPressed(uint8_t* base, uint32_t mapper, uint32_t action, uint32_t frame,
+                       uint32_t lr, bool native_slots, const Calls& calls) {
+  return ReadSlot(base, mapper, 40, kPressedSlot, 10, action, frame, lr, native_slots, calls);
+}
+
 uint32_t ListSelection(uint8_t* base, uint32_t list) {
   ITC_NATIVE_RUNNING("sub_8220BC20 MenuList::Selection");
   return Word(base, list, kListSelection);

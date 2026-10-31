@@ -106,6 +106,13 @@ uint32_t ListPressed152(uint8_t* base, uint32_t list, uint32_t sp, bool native_s
 uint32_t ListPressed166(uint8_t* base, uint32_t list, uint32_t sp, bool native_slots,
                         const Calls& calls);
 
+// A mapper's read slot 10 (+40, ActionMapper::Pressed) on `action`, as an
+// original's bctrl from `frame` returning to `lr`: the slot's plain C++ when
+// it's ActionMapper::Pressed and `native_slots` (logged for --log_pause_menu
+// as its adapter does), else the slot through `calls`.
+uint64_t MapperPressed(uint8_t* base, uint32_t mapper, uint32_t action, uint32_t frame,
+                       uint32_t lr, bool native_slots, const Calls& calls);
+
 // --- The screens' globals ---
 
 // The pause menu: the screen (4 bytes, its movie), the data (160), the
@@ -444,6 +451,51 @@ uint64_t RaceDialogMove(uint8_t* base, uint32_t step, uint32_t sp, const Calls& 
 // negative transition other than -1: Finish(1)); else UiMovie::Run(movie,
 // 0). r3 as the original leaves it.
 uint64_t RaceDialogDraw(uint8_t* base, uint32_t sp, const Calls& calls);
+
+// sub_8220EEF0 PauseMenu::OpenOptions (transition 6): on its first call the
+// data's +148 = the selection, the item's animation (type 7) finished,
+// animation 3 played, SetUpOptions, then the step word 1; done when the run
+// answers 0 (options.cpp).
+uint64_t PauseMenuOpenOptions(uint8_t* base, uint32_t step, uint32_t sp, const Calls& calls);
+
+// --- The screens' draws (draws.cpp) ---
+//
+// With a transition running (the page object's +12), its handler from a
+// table in the frame (through the function table, with the original's
+// registers at its bctrl; any index read from the frame as the original
+// does) with the page object's +24, then ScreenPages::Finish with its answer;
+// else UiMovie::Run(the screen's +0, 0). Then the confirm dialog's draw on
+// the pages that show it. r3 as the original leaves it.
+// sub_8220FB10 PauseMenu::Draw (r3 the screen): 21 transitions; a negative
+// one other than -1 Finish(1); RaceDialog::Draw on page 4.
+uint64_t PauseMenuDraw(uint8_t* base, uint32_t screen, uint32_t sp, const Calls& calls);
+// sub_8221BB48 AfterRaceMenu::Draw (r3 the screen): the debug texts (the
+// empty sub_82106540: nothing done); 10 transitions (any negative one the
+// run); RaceDialog::Draw on pages 2 to 4 and 6.
+uint64_t AfterRaceMenuDraw(uint8_t* base, uint32_t screen, uint32_t sp, const Calls& calls);
+// sub_8221A2F8 CareerResults::Draw (r3 the screen): its page object at
+// +184, its transition +196, 9 transitions (any negative one the run of
+// the movie +180) with +208.
+uint64_t CareerResultsDraw(uint8_t* base, uint32_t screen, uint32_t sp, const Calls& calls);
+
+// --- The career's results' pages and transitions (career.cpp) ---
+//
+// The screen [0x826D8500] (its +0 the kind 0 to 2, +180 the movie) read
+// again before each use, as the originals do.
+// sub_82219210 CareerResults::Intro (transition 0): on its first call
+// animation 0, 1 or 2 by the kind played; done when the run answers 0.
+uint64_t CareerResultsIntro(uint8_t* base, uint32_t step, uint32_t sp, const Calls& calls);
+// sub_822192B0 CareerResults::Show (transition 1): on its first call
+// animation 3 and 11, 12 or 13 by the kind played and looped; done.
+uint64_t CareerResultsShow(uint8_t* base, uint32_t step, uint32_t sp, const Calls& calls);
+// sub_822193D8 CareerResults::Close1 (transition 6): on its first call
+// animation 3 and 11, 12 or 13 by the kind finished, 4 played; done when the
+// run answers 0.
+uint64_t CareerResultsClose1(uint8_t* base, uint32_t step, uint32_t sp, const Calls& calls);
+// sub_82219A78 CareerResults::Page1 (page 1): on accept or back (actions
+// 159, 158 through player 0's mapper, slot 10; sound 0): +20 above 0 Go(2,
+// 2); else +24 above 0.0 Go(3, 3); else Go(4, 6). Returns 0.
+uint64_t CareerResultsPage1(uint8_t* base, uint32_t sp, bool native_slots, const Calls& calls);
 
 constexpr uint32_t kShowVolume = 0x8220D040;
 constexpr uint32_t kArrowB = 0x8220D1D8;

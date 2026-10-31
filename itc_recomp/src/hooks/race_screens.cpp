@@ -30,7 +30,9 @@ ITC_FLAG_BOOL(native_race_screens, true, "ITC",
               "ColorItems, ShowAdjust and Open, the options page's ToggleOption, OptionsPage, "
               "SetUpOptions and SetAdjust, the menu after the race's ConfirmPage, Intro, Show, "
               "CloseMain, Move, ShowItems, SetUpItems, ColorItems, Start and Open, "
-              "the confirm dialog's Question, OpenAnim, Move and Draw, "
+              "the confirm dialog's Question, OpenAnim, Move and Draw, PauseMenu::OpenOptions, "
+              "the draws PauseMenu::, AfterRaceMenu:: and CareerResults::Draw, the career's "
+              "results' Intro, Show, Close1 and Page1, "
               "the UI movie calls through their overrides) natively instead "
               "of through the translated code (the same writes; checked by "
               "--run_harnesses=race_screens)");
@@ -395,6 +397,37 @@ void RaceScreensRaceDialogDraw(PPCContext& ctx, uint8_t* base) {
   ctx.r3.u64 = race_screens::RaceDialogDraw(base, ctx.r1.u32, guest.calls());
 }
 
+void RaceScreensPauseMenuOpenOptions(PPCContext& ctx, uint8_t* base) {
+  GuestCalls guest(ctx, base);
+  ctx.r3.u64 = race_screens::PauseMenuOpenOptions(base, ctx.r3.u32, ctx.r1.u32, guest.calls());
+}
+
+#define ITC_RACE_SCREENS_DRAW(name)                                                         \
+  void RaceScreens##name##Draw(PPCContext& ctx, uint8_t* base) {                            \
+    GuestCalls guest(ctx, base);                                                            \
+    ctx.r3.u64 = race_screens::name##Draw(base, ctx.r3.u32, ctx.r1.u32, guest.calls());     \
+  }
+ITC_RACE_SCREENS_DRAW(PauseMenu)
+ITC_RACE_SCREENS_DRAW(AfterRaceMenu)
+ITC_RACE_SCREENS_DRAW(CareerResults)
+#undef ITC_RACE_SCREENS_DRAW
+
+#define ITC_CAREER_RESULTS_TRANSITION(name)                                                      \
+  void RaceScreensCareerResults##name(PPCContext& ctx, uint8_t* base) {                          \
+    GuestCalls guest(ctx, base);                                                                 \
+    ctx.r3.u64 = race_screens::CareerResults##name(base, ctx.r3.u32, ctx.r1.u32, guest.calls()); \
+  }
+ITC_CAREER_RESULTS_TRANSITION(Intro)
+ITC_CAREER_RESULTS_TRANSITION(Show)
+ITC_CAREER_RESULTS_TRANSITION(Close1)
+#undef ITC_CAREER_RESULTS_TRANSITION
+
+void RaceScreensCareerResultsPage1(PPCContext& ctx, uint8_t* base) {
+  GuestCalls guest(ctx, base);
+  ctx.r3.u64 =
+      race_screens::CareerResultsPage1(base, ctx.r1.u32, NativeSlots(), guest.calls());
+}
+
 }  // namespace hooks
 
 // The adapters: the register steps above, or the originals with the flag
@@ -494,3 +527,11 @@ ITC_RACE_SCREENS(82217F40, RaceScreensRaceDialogQuestion)
 ITC_RACE_SCREENS(822186A8, RaceScreensRaceDialogOpenAnim)
 ITC_RACE_SCREENS(82218788, RaceScreensRaceDialogMove)
 ITC_RACE_SCREENS(82218F30, RaceScreensRaceDialogDraw)
+ITC_RACE_SCREENS(8220EEF0, RaceScreensPauseMenuOpenOptions)
+ITC_RACE_SCREENS(8220FB10, RaceScreensPauseMenuDraw)
+ITC_RACE_SCREENS(8221BB48, RaceScreensAfterRaceMenuDraw)
+ITC_RACE_SCREENS(8221A2F8, RaceScreensCareerResultsDraw)
+ITC_RACE_SCREENS(82219210, RaceScreensCareerResultsIntro)
+ITC_RACE_SCREENS(822192B0, RaceScreensCareerResultsShow)
+ITC_RACE_SCREENS(822193D8, RaceScreensCareerResultsClose1)
+ITC_RACE_SCREENS(82219A78, RaceScreensCareerResultsPage1)

@@ -143,5 +143,18 @@ void RaceScreensRaceDialogQuestion(PPCContext& ctx, uint8_t* base);
 void RaceScreensRaceDialogOpenAnim(PPCContext& ctx, uint8_t* base);
 void RaceScreensRaceDialogMove(PPCContext& ctx, uint8_t* base);
 void RaceScreensRaceDialogDraw(PPCContext& ctx, uint8_t* base);
+// PauseMenu::OpenOptions sub_8220EEF0 (r3 the step word); the draws (r3 the
+// screen): PauseMenu::Draw sub_8220FB10, AfterRaceMenu::Draw sub_8221BB48,
+// CareerResults::Draw sub_8221A2F8; the career's results' transitions Intro
+// sub_82219210, Show sub_822192B0, Close1 sub_822193D8 (r3 the step word)
+// and Page1 sub_82219A78.
+void RaceScreensPauseMenuOpenOptions(PPCContext& ctx, uint8_t* base);
+void RaceScreensPauseMenuDraw(PPCContext& ctx, uint8_t* base);
+void RaceScreensAfterRaceMenuDraw(PPCContext& ctx, uint8_t* base);
+void RaceScreensCareerResultsDraw(PPCContext& ctx, uint8_t* base);
+void RaceScreensCareerResultsIntro(PPCContext& ctx, uint8_t* base);
+void RaceScreensCareerResultsShow(PPCContext& ctx, uint8_t* base);
+void RaceScreensCareerResultsClose1(PPCContext& ctx, uint8_t* base);
+void RaceScreensCareerResultsPage1(PPCContext& ctx, uint8_t* base);
 
 }  // namespace hooks

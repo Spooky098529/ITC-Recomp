@@ -1466,6 +1466,130 @@ void Dialog(Context& h, const MovieWorld& w) {
       __imp__sub_82218F30, hooks::RaceScreensRaceDialogDraw, {128, 16});
 }
 
+// The dialog's page object and data as its draw's cases shape them (its
+// running transition none, OpenAnim's, Move's or another negative one).
+void ShapeDialogPages(uint8_t* base, Random& r, const MovieWorld& w) {
+  const uint32_t pages = w.block(rs::kDialogPages);
+  const uint32_t transitions[4] = {0xFFFFFFFFu, 1, 2, uint32_t(-2 - int32_t(r.Below(50)))};
+  guest::StoreU32(base, pages + 12, transitions[r.Below(4)]);
+  guest::StoreU32(base, pages + 16, r.Below(2) == 0 ? 0xFFFFFFFFu : r.Below(3));
+  guest::StoreU32(base, w.block(rs::kDialogData) + 16, r.Below(4));
+}
+
+// The draws and the career's results.
+//
+// The screens' draws run the transitions of this file that are native (the
+// others, never seen in play or not yet native, are left out: they'd be the
+// originals on both sides), a negative transition other than -1 and none;
+// the pages the confirm dialog's draw follows; the dialog's page object as
+// its draw's cases shape it. The career's results: its screen block (212
+// bytes in the global's block) with the kind (+0) 0 to 3, now and then any
+// word, +20 around 0, +24 a float around 0.0, the movie (+180) the world's
+// id 6, its page object at +184 and step word +208.
+void Draws(Context& h, const MovieWorld& w) {
+  const World list_world;
+  if (!list_world.ok()) {
+    ITC_LOG_ERROR("harness: race_screens: no block from the allocation layer");
+    return;
+  }
+  // MenuList::Init's block (OpenOptions' SetUpOptions): +68 0 first, then
+  // compared and freed.
+  auto pause_block = [&](Outputs& out) {
+    const uint32_t list = w.block(rs::kPauseList);
+    const uint32_t block = guest::LoadU32(h.base, list + rs::kListBlock);
+    out.Word(block != 0 ? 1 : 0);
+    if (block != 0 && memory::IsPages(block)) {
+      out.Bytes(Read(h.base, block, 5 * 4));
+      memory::FreePages(block);
+    }
+    guest::StoreU32(h.base, list + rs::kListBlock, 0);
+  };
+  FrameSpec open_options{112, 24};
+  open_options.after = pause_block;
+  MovieGroup(
+      h, w, "PauseMenu::OpenOptions (sub_8220EEF0)", 120,
+      [&h](PPCContext& t, Random& r, const MovieWorld& w) {
+        guest::StoreU32(h.base, w.block(rs::kPauseList) + rs::kListBlock, 0);
+        StepWord(t, r, w, rs::kPausePages);
+      },
+      __imp__sub_8220EEF0, hooks::RaceScreensPauseMenuOpenOptions, open_options);
+  FrameSpec pause_draw{320, 144};
+  pause_draw.after = pause_block;
+  MovieGroup(
+      h, w, "PauseMenu::Draw (sub_8220FB10)", 300,
+      [&h](PPCContext& t, Random& r, const MovieWorld& w) {
+        guest::StoreU32(h.base, w.block(rs::kPauseList) + rs::kListBlock, 0);
+        const uint32_t pages = w.block(rs::kPausePages);
+        const uint32_t transitions[16] = {0xFFFFFFFFu, 0xFFFFFFFFu, uint32_t(-2 - int32_t(r.Below(9))),
+                                          0, 2, 3, 4, 5, 6, 7, 8, 9, 12, 17, 18, 19};
+        guest::StoreU32(h.base, pages + 12, transitions[r.Below(16)]);
+        guest::StoreU32(h.base, pages + 16, r.Below(2) == 0 ? 0xFFFFFFFFu : r.Below(21));
+        guest::StoreU32(h.base, pages + 4, r.Below(3) == 0 ? 4 : r.Below(6));
+        guest::StoreU32(h.base, pages + 0, r.Below(3) == 0 ? 4 : r.Below(6));
+        ShapeDialogPages(h.base, r, w);
+        t.r3.u64 = w.block(rs::kPauseScreen);
+      },
+      __imp__sub_8220FB10, hooks::RaceScreensPauseMenuDraw, pause_draw);
+  MovieGroup(
+      h, w, "AfterRaceMenu::Draw (sub_8221BB48)", 200,
+      [&h](PPCContext& t, Random& r, const MovieWorld& w) {
+        const uint32_t d = w.block(rs::kAfterData);
+        guest::StoreU32(h.base, d + 0, r.Below(8));
+        guest::StoreU32(h.base, d + 4, r.Below(5));
+        const uint32_t pages = w.block(rs::kAfterPages);
+        const uint32_t transitions[7] = {0xFFFFFFFFu, 0xFFFFFFFFu,
+                                         uint32_t(-2 - int32_t(r.Below(9))), 0, 1, 3, 4};
+        guest::StoreU32(h.base, pages + 12, transitions[r.Below(7)]);
+        guest::StoreU32(h.base, pages + 16, r.Below(2) == 0 ? 0xFFFFFFFFu : r.Below(10));
+        guest::StoreU32(h.base, pages + 4, r.Below(8));
+        guest::StoreU32(h.base, pages + 0, r.Below(8));
+        ShapeDialogPages(h.base, r, w);
+        t.r3.u64 = w.block(rs::kAfterScreen);
+      },
+      __imp__sub_8221BB48, hooks::RaceScreensAfterRaceMenuDraw, {176, 56});
+  auto career = [&h](Random& r, const MovieWorld& w) {
+    const uint32_t screen = w.block(rs::kCareerResults);
+    guest::StoreU32(h.base, screen + 0, r.Below(6) == 0 ? uint32_t(r.Next()) : r.Below(4));
+    guest::StoreU32(h.base, screen + 20, Around(r, -2, 2));
+    guest::StoreU32(h.base, screen + 24,
+                    r.Below(3) == 0 ? 0 : AnyFloatBits(r, 1000.0f) ^ (r.Below(2) << 31));
+    guest::StoreU32(h.base, screen + 180, w.movie(2));
+    guest::StoreU32(h.base, screen + 208, r.Below(2));
+    return screen;
+  };
+  auto career_step = [&](PPCContext& t, Random& r, const MovieWorld& w) {
+    t.r3.u64 = career(r, w) + 208;
+  };
+  MovieGroup(h, w, "CareerResults::Intro (sub_82219210)", 100, career_step, __imp__sub_82219210,
+             hooks::RaceScreensCareerResultsIntro, {96, 16});
+  MovieGroup(h, w, "CareerResults::Show (sub_822192B0)", 100, career_step, __imp__sub_822192B0,
+             hooks::RaceScreensCareerResultsShow, {96, 16});
+  MovieGroup(h, w, "CareerResults::Close1 (sub_822193D8)", 100, career_step,
+             __imp__sub_822193D8, hooks::RaceScreensCareerResultsClose1, {96, 16});
+  // Page1: player 0's mapper from a menu list world of the first section's.
+  FrameSpec page1{112, 32};
+  page1.list_world = &list_world;
+  MovieGroup(
+      h, w, "CareerResults::Page1 (sub_82219A78)", 300,
+      [&](PPCContext&, Random& r, const MovieWorld& w) { career(r, w); }, __imp__sub_82219A78,
+      hooks::RaceScreensCareerResultsPage1, page1);
+  // Draw: the running transition (+196) none (-1), another negative one, or
+  // the native ones (0 Intro, 1 Show, 6 Close1); the queued one (+200) -1 or
+  // 0 to 8.
+  MovieGroup(
+      h, w, "CareerResults::Draw (sub_8221A2F8)", 200,
+      [&](PPCContext& t, Random& r, const MovieWorld& w) {
+        const uint32_t screen = career(r, w);
+        const uint32_t transitions[6] = {0xFFFFFFFFu, 0xFFFFFFFFu,
+                                         uint32_t(-2 - int32_t(r.Below(9))), 0, 1, 6};
+        guest::StoreU32(h.base, screen + 196, transitions[r.Below(6)]);
+        guest::StoreU32(h.base, screen + 200, r.Below(2) == 0 ? 0xFFFFFFFFu : r.Below(9));
+        guest::StoreU32(h.base, screen + 188, r.Below(5));
+        t.r3.u64 = screen;
+      },
+      __imp__sub_8221A2F8, hooks::RaceScreensCareerResultsDraw, {144, 24});
+}
+
 void Transitions(Context& h) {
   const MovieWorld w;
   if (!w.ok()) {
@@ -1640,6 +1764,7 @@ void Transitions(Context& h) {
   Openers(h, w);
   AfterRace(h, w);
   Dialog(h, w);
+  Draws(h, w);
 }
 
 }  // namespace

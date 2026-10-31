@@ -171,4 +171,20 @@ uint64_t PauseMenuSetAdjust(uint8_t* base, uint32_t step, uint32_t sp, const Cal
   return 1;
 }
 
+uint64_t PauseMenuOpenOptions(uint8_t* base, uint32_t step, uint32_t sp, const Calls& calls) {
+  ITC_NATIVE_RUNNING("sub_8220EEF0 PauseMenu::OpenOptions");
+  const uint32_t frame = Frame(base, sp, 112);
+  const uint32_t movie = PauseMovie(base);
+  if (guest::LoadU32(base, step) == 0) {
+    const uint32_t selection = ListSelection(base, Get(base, kPauseList));
+    guest::StoreU32(base, Get(base, kPauseData) + 148, selection);
+    calls.Call(kFinish, frame, 0x8220EF4C, movie, 7, uint64_t(selection) + 1);
+    const uint64_t play[8] = {movie, kNone, 3, 0, 0, 0, 0, 0};
+    calls.CallArgs(kPlay, frame, 0x8220EF6C, play);
+    PauseMenuSetUpOptions(base, frame, calls);
+    guest::StoreU32(base, step, 1);
+  }
+  return uint32_t(calls.Call(kRun, frame, 0x8220EF84, movie, 0)) == 0 ? 1 : 0;
+}
+
 }  // namespace race_screens
