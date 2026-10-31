@@ -60,6 +60,14 @@ void CarModelsFreePagesAt(PPCContext& ctx, uint8_t* base);
 // original's. Natively only while --native_heap routes the allocations to
 // the layer and memcpy is native.
 void CarModelsMakePlate(PPCContext& ctx, uint8_t* base);
+// CarModel::OnFileLoaded sub_820D47A8 and OnFileLoadedB sub_820D4F80:
+// r3 = the request's serial, r4 = its buffer, r6 = the car model (r3 left
+// as it came: the archive's finish doesn't read it). Their guest calls from
+// a 1,552-byte frame as the original's; the original for a request
+// FileLoadedNative refuses, or without the allocation layer, --native_models
+// or a native memcpy.
+void CarModelsOnFileLoaded(PPCContext& ctx, uint8_t* base);
+void CarModelsOnFileLoadedB(PPCContext& ctx, uint8_t* base);
 // sub_820C3F50: r3 = the set (left), r4 to r7 the record's words.
 void CarModelsDeferRelease(PPCContext& ctx, uint8_t* base);
 

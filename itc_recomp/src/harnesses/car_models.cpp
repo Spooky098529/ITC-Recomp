@@ -13,6 +13,7 @@
 #include "base/log.h"
 #include "car_models/car_model.h"
 #include "car_models/decals.h"
+#include "car_models/file_loaded.h"
 #include "car_models/load_slots.h"
 #include "car_models/parts.h"
 #include "car_models/plate.h"
@@ -25,6 +26,8 @@
 #include "hooks/heap.h"
 #include "hooks/models.h"
 #include "models/memory_blocks.h"
+#include "models/xpr.h"
+#include "memory/c_runtime_heap.h"
 #include "scene_loaders/objects.h"
 #include "scene_loaders/pools.h"
 #include "scene_models/scene_models.h"
@@ -36,6 +39,7 @@
 
 #include <algorithm>
 #include <bit>
+#include <cstring>
 #include <functional>
 #include <limits>
 #include <optional>
@@ -591,6 +595,282 @@ void PlateCases(Context& h, uint32_t block) {
   memory::Free(set_block);
   guest::StoreU32(h.base, cm::kSceneSet, saved_scene);
   results.Report();
+}
+
+// The file-loaded callbacks' register steps without the flag.
+void NativeOnFileLoaded(PPCContext& ctx, uint8_t* base) { hooks::CarModelsOnFileLoaded(ctx, base); }
+void NativeOnFileLoadedB(PPCContext& ctx, uint8_t* base) {
+  hooks::CarModelsOnFileLoadedB(ctx, base);
+}
+
+// An XPR block XPR::Create made, given back (models' memory blocks: the
+// header virtual, the data physical).
+void FreeXprBlocks(uint8_t* base, uint32_t xpr) {
+  const uint32_t header = guest::LoadU32(base, xpr + 0);
+  const uint32_t data = guest::LoadU32(base, xpr + 8);
+  if (header != 0) memory::FreePages(header - models::kBlockHeaderBytes);
+  if (data != 0) memory::crt::XMemFree(data - models::kBlockHeaderBytes, models::kXprDataAllocation);
+}
+
+// A C string in guest memory (64 characters at most).
+std::string ReadString(uint8_t* base, uint32_t address) {
+  std::string text;
+  for (uint32_t i = 0; i < 64; i++) {
+    const char ch = char(guest::LoadU8(base, address + i));
+    if (ch == 0) break;
+    text += ch;
+  }
+  return text;
+}
+
+// A small float (eighths from -4 to 4).
+uint32_t SmallFloat(Random& r) {
+  return std::bit_cast<uint32_t>(float(int32_t(r.Below(65)) - 32) / 8.0f);
+}
+
+// CarModel::OnFileLoaded and OnFileLoadedB (sub_820D47A8, sub_820D4F80):
+// a car model (8 KB, random bytes, its float fields small floats) with its
+// block 0 to 44, and a request that's its node file's (a node file of 1 to
+// 8 nodes named from the seven names and others, their parents, types,
+// sources and matrices; the skeleton's arrays none), its first or second
+// texture set's (an XPR2 of 0 to 8 records, some named as the callback
+// looks for; set a's in the layer's pages, freed; set b's at r4), or
+// neither. The provider's slot +16 a stand-in (sub_822A8C18) in the
+// block, the accessory word 0 or a matrix in the block; for the first
+// texture set the plate's images as MakePlate's cases. The recompiled side
+// with --native_car_models off. The block (the allocations as which and
+// where), the skeleton's arrays and the XPR's blocks by their contents, the
+// plate's textures, the frame (+80 up to the saved registers), r3.
+void FileLoadedCases(Context& h) {
+  namespace cm = car_models;
+  if (!hooks::ModelsNativeLifetime()) {
+    ITC_LOG_WARN("harness: car_models: the file-loaded callbacks skipped (models' lifetime "
+                 "not native)");
+    return;
+  }
+  const uint32_t saved_scene = guest::LoadU32(h.base, cm::kSceneSet);
+  constexpr uint32_t kCarBytes = 8192;
+  const uint32_t car_block = memory::Alloc(kCarBytes, 0);
+  const uint32_t file_block = memory::Alloc(4096, 0);
+  const uint32_t set_block = memory::Alloc(4096, 0);
+  const uint32_t set = set_block - 3600;
+  static constexpr uint32_t kJ[5] = {0, 4, 7, 11, 15};
+  static const char* kNodeNames[] = {"tire_fl", "tire_fr", "tire_rl", "tire_rr",
+                                     "seat_L",  "seat_R",  "acce_null", "body", "tire"};
+  for (int which = 0; which < 2; which++) {
+    const bool a = which == 0;
+    Results results(a ? "CarModel::OnFileLoaded (sub_820D47A8)"
+                      : "CarModel::OnFileLoadedB (sub_820D4F80)");
+    for (int c = 0; c < 40; c++) {
+      Random& g = h.random;
+      const uint32_t path = c % 4;  // node file, texture set 0, 1, neither
+      const uint32_t block = g.Below(45);
+      // The plate's images (as MakePlate's cases).
+      uint32_t w[5] = {30 + g.Below(35), 300, 1521 + g.Below(20), 12 * (1 + g.Below(60)),
+                       10 * (1 + g.Below(25))};
+      uint32_t hh[5] = {6 * (33 + g.Below(13)), 150, 1 + g.Below(80), 10 * (1 + g.Below(10)),
+                        1 + g.Below(100)};
+      uint32_t pixels[5] = {};
+      if (path == 1) {
+        for (int k = 0; k < 5; k++) {
+          pixels[k] = memory::Alloc(w[k] * hh[k] * 4, 0);
+          RandomBytes(h.base, pixels[k], w[k] * hh[k] * 4, g);
+        }
+      }
+      uint32_t words[12];
+      words[0] = uint32_t(g.Next());
+      words[1] = g.Below(101);
+      for (int k = 2; k < 5; k++) words[k] = g.Below(4) == 0 ? 38 : g.Below(10);
+      for (int k = 5; k < 12; k++) words[k] = g.Below(4) == 0 ? 37 : g.Below(37);
+      // The XPR2's records: names the callback looks for or others.
+      const std::string car_name =
+          ReadString(h.base, guest::LoadU32(h.base, 0x826018C8 + 4 * block));
+      const std::string suffix = a ? "_inte_off" : "_inte_on";
+      const uint32_t records = g.Below(9);
+      std::vector<std::string> names;
+      for (uint32_t i = 0; i < records; i++) {
+        const uint32_t k = g.Below(8);
+        names.push_back(k == 0   ? car_name + suffix
+                        : k < 6  ? car_name + suffix + "_0" + std::to_string(k)
+                        : k == 6 ? std::string("other")
+                                 : car_name);
+      }
+      // The node file's nodes.
+      const uint32_t nodes = 1 + g.Below(8);
+      const uint32_t bones = g.Below(nodes + 1);
+      const uint32_t first_bone = g.Below(nodes - bones + 1);
+      std::vector<uint32_t> node_names(nodes), parents(nodes), types(nodes);
+      for (uint32_t n = 0; n < nodes; n++) {
+        node_names[n] = c % 8 == 0 ? (n < 7 ? n : 7) : g.Below(9);
+        parents[n] = n == 0 || g.Below(4) == 0 ? 0xFFFFFFFFu : g.Below(n);
+        static const uint32_t kTypes[] = {0, 1, 2, 3, 4, 5, 0x80, 0x81, 32};
+        types[n] = kTypes[g.Below(std::size(kTypes))];
+      }
+      const bool accessory = g.Below(2) == 0;
+      const uint64_t seed = g.Next();
+      Outputs out[2];
+      for (int v = 0; v < 2; v++) {
+        Random r(seed);
+        const uint32_t car = car_block;
+        RandomBytes(h.base, car, kCarBytes, r);
+        for (uint32_t at = 6720; at < 7260; at += 4) Put(h.base, car + at, SmallFloat(r));
+        for (uint32_t at = 3776; at < 3840; at += 4) Put(h.base, car + at, SmallFloat(r));
+        Put(h.base, car + 32, block);
+        Put(h.base, car + 3724, r.Below(2) == 0 ? 0 : 2);
+        for (uint32_t off : {128u, 132u, 136u, 144u, 176u}) Put(h.base, car + 3760 + off, 0);
+        Put(h.base, car + 7200, accessory ? car + 7400 : 0);
+        for (uint32_t k = 0; k < 12; k++) Put(h.base, car + 3664 + 4 * k, words[k]);
+        // The providers' vtable: slot +16 stores r4 and r5 at r3 + 60.
+        for (uint32_t i = 0; i < 2; i++) Put(h.base, car + 4048 + 20 * i, car + 7800);
+        Put(h.base, car + 7816, 0x822A8C18);
+        // The requests: distinct serials.
+        Put(h.base, car + 3732, 0x1000);
+        Put(h.base, car + 3956, 0x2000);
+        Put(h.base, car + 3980, 0x3000);
+        const uint32_t request = path == 0 ? 0x1000 : path == 1 ? 0x2000 : path == 2 ? 0x3000
+                                                                                       : 0x4000;
+        // The node file.
+        const uint32_t file = file_block;
+        RandomBytes(h.base, file, 4096, r);
+        Put(h.base, file + 4, nodes);
+        Put(h.base, file + 8, bones);
+        Put(h.base, file + 12, first_bone);
+        const uint32_t kRecords = 256, kSources = 1536, kMatrices = 1920, kTail = 2432;
+        Put(h.base, file + 16, kRecords);
+        Put(h.base, file + 20, kSources);
+        Put(h.base, file + 24, kSources + 128);
+        Put(h.base, file + 28, kSources + 256);
+        Put(h.base, file + 32, kTail + 64);
+        Put(h.base, file + 36, kMatrices);
+        Put(h.base, file + 40, kTail + 128);
+        Put(h.base, file + 44, kTail);
+        Put(h.base, file + 48, kTail + 192);
+        for (uint32_t n = 0; n < nodes; n++) {
+          const uint32_t record = file + kRecords + 160 * n;
+          const char* nm = kNodeNames[node_names[n]];
+          for (uint32_t k = 0; k <= std::strlen(nm); k++) {
+            guest::StoreU8(h.base, record + k, uint8_t(nm[k]));
+          }
+          Put(h.base, record + 92, parents[n]);
+          Put(h.base, record + 132, types[n]);
+        }
+        for (uint32_t at = kSources; at < kTail; at += 4) Put(h.base, file + at, SmallFloat(r));
+        Put(h.base, car + 3744, file);
+        // The XPR2: set a's in pages (freed), set b's in the file block.
+        const uint32_t names_at = 4 + 16 * records;
+        uint32_t header_bytes = names_at;
+        for (const auto& n : names) header_bytes += uint32_t(n.size()) + 1;
+        header_bytes = (header_bytes + 3) & ~3u;
+        const uint32_t data_bytes = 64;
+        const uint32_t xpr_bytes = 12 + header_bytes + data_bytes;
+        const uint32_t xpr_file = a ? memory::AllocPages(xpr_bytes, 4096) : file_block + 2560;
+        RandomBytes(h.base, xpr_file, xpr_bytes & ~3u, r);
+        Put(h.base, xpr_file + 0, 0x58505232);
+        Put(h.base, xpr_file + 4, header_bytes);
+        Put(h.base, xpr_file + 8, data_bytes);
+        Put(h.base, xpr_file + 12, records);
+        uint32_t name_at = names_at;
+        for (uint32_t i = 0; i < records; i++) {
+          const uint32_t record = xpr_file + 16 + 16 * i;
+          Put(h.base, record + 0, 0x56420000u | (guest::LoadU32(h.base, record) & 0xFFFF));
+          Put(h.base, record + 12, name_at);
+          for (uint32_t k = 0; k <= names[i].size(); k++) {
+            guest::StoreU8(h.base, xpr_file + 12 + name_at + k,
+                           k < names[i].size() ? uint8_t(names[i][k]) : 0);
+          }
+          name_at += uint32_t(names[i].size()) + 1;
+        }
+        for (uint32_t i = 0; i < 2; i++) {
+          Put(h.base, car + 3968 + 24 * i, a && path == 1 + i ? xpr_file : 0);
+        }
+        // The plate's images.
+        RandomBytes(h.base, set_block, 4096, r);
+        for (int k = 0; k < 5; k++) {
+          const uint32_t header = set + 3732 + 20 * kJ[k];
+          guest::StoreU16(h.base, header + 14, uint16_t(w[k]));
+          guest::StoreU16(h.base, header + 16, uint16_t(hh[k]));
+          Put(h.base, set + 3656 + 4 * kJ[k], pixels[k]);
+        }
+        guest::StoreU32(h.base, cm::kSceneSet, set);
+        PPCContext t = CallContext(h);
+        t.r1.u64 &= ~0xFull;
+        const uint32_t stack = t.r1.u32;
+        const uint32_t frame = stack - cm::kFileLoadedFrameBytes;
+        RandomBytes(h.base, frame - 1024, cm::kFileLoadedFrameBytes + 1024, r);
+        t.r3.u64 = request;
+        t.r4.u64 = a ? uint32_t(r.Next()) : xpr_file;
+        t.r6.u64 = car;
+        ITC_FLAG(native_car_models) = v == 1;
+        (v == 0 ? (a ? __imp__sub_820D47A8 : __imp__sub_820D4F80)
+                : (a ? NativeOnFileLoaded : NativeOnFileLoadedB))(t, h.base);
+        ITC_FLAG(native_car_models) = true;
+        // The allocations.
+        const uint32_t texture_bytes = TextureBytes(h.base, cm::kSheetFormat, 300, 150);
+        std::vector<Known> known;
+        for (uint32_t k = 0; k < 4; k++) {
+          known.push_back({guest::LoadU32(h.base, car + 6700 + 4 * k), k % 2 ? texture_bytes : 52});
+        }
+        for (uint32_t i = 0; i < 2; i++) {
+          known.push_back({guest::LoadU32(h.base, car + 4000 + 24 * i), header_bytes});
+          known.push_back({guest::LoadU32(h.base, car + 4008 + 24 * i), data_bytes});
+        }
+        const uint32_t sk = car + 3760;
+        const std::vector<std::pair<uint32_t, uint32_t>> arrays = {
+            {128, 20}, {136, 16 + 144 * nodes}, {132, 16 + 64 * nodes}, {144, 16 + 64 * bones},
+            {176, 16 * nodes}};
+        for (const auto& [offset, bytes] : arrays) {
+          const uint32_t at = guest::LoadU32(h.base, sk + offset);
+          const uint32_t header = offset == 128 || offset == 176 ? 0 : 16;
+          known.push_back({at == 0 ? 0 : at - header, bytes});
+        }
+        known.push_back({frame, cm::kFileLoadedFrameBytes});
+        known.push_back({xpr_file, xpr_bytes});
+        known.push_back({file, 4096});
+        // r3 isn't compared: the archive's finish, their only caller, doesn't
+        // read it (the original leaves its last callee's).
+        Addresses(out[v], h.base, car, kCarBytes, known);
+        for (const auto& [offset, bytes] : arrays) {
+          const uint32_t at = guest::LoadU32(h.base, sk + offset);
+          const uint32_t header = offset == 128 || offset == 176 ? 0 : 16;
+          if (at != 0) {
+            Addresses(out[v], h.base, at - header, bytes, known);
+            memory::crt::OperatorDeleteArray(at - header);
+          }
+        }
+        for (uint32_t i = 0; i < 2; i++) {
+          const uint32_t xpr = car + 4000 + 24 * i;
+          if (path == 1 + i) {
+            Addresses(out[v], h.base, guest::LoadU32(h.base, xpr + 0), header_bytes, known);
+            out[v].Bytes(Read(h.base, guest::LoadU32(h.base, xpr + 8), data_bytes));
+            FreeXprBlocks(h.base, xpr);
+          }
+        }
+        if (path == 1) {
+          for (uint32_t k = 0; k < 4; k += 2) {
+            const uint32_t header = guest::LoadU32(h.base, car + 6700 + 4 * k);
+            const uint32_t data = guest::LoadU32(h.base, car + 6704 + 4 * k);
+            Addresses(out[v], h.base, header, 52, known);
+            out[v].Bytes(Read(h.base, data, texture_bytes));
+            memory::FreePages(header);
+            memory::FreePhysical(data);
+          }
+        }
+        Addresses(out[v], h.base, frame + 80, cm::kFileLoadedFrameBytes - 80 - 136, known);
+        const bool alive = a && memory::IsPages(xpr_file);
+        out[v].Word(alive);
+        if (alive) memory::FreePages(xpr_file);
+      }
+      for (int k = 0; k < 5; k++) {
+        if (pixels[k] != 0) memory::Free(pixels[k]);
+      }
+      results.Check(out[0], out[1], fmt::format("case {} (path {})", c, path));
+    }
+    results.Report();
+  }
+  memory::Free(car_block);
+  memory::Free(file_block);
+  memory::Free(set_block);
+  guest::StoreU32(h.base, cm::kSceneSet, saved_scene);
 }
 
 // The decals' TGA header's clear: a header anywhere in the block.
@@ -1780,6 +2060,7 @@ void Vinyls(Context& h, uint32_t block) {
   TextureFrees(h, block);
   VinylCompresses(h, block);
   PlateCases(h, block);
+  FileLoadedCases(h);
   DecalLoadCases(h);
 }
 

@@ -7,6 +7,7 @@
 #include "base/flags.h"
 #include "car_models/car_model.h"
 #include "car_models/decals.h"
+#include "car_models/file_loaded.h"
 #include "car_models/load_slots.h"
 #include "car_models/parts.h"
 #include "car_models/plate.h"
@@ -18,6 +19,7 @@
 #include "hooks/heap.h"
 #include "hooks/models.h"
 #include "hooks/texture_compression.h"
+#include "native/buffers.h"
 
 ITC_FLAG_BOOL(native_car_models, true, "ITC",
               "Run the car models' pieces (docs/functions/car-models.md: LoadSlot::Reset "
@@ -191,6 +193,68 @@ void CarModelsMakePlate(PPCContext& ctx, uint8_t* base) {
   ctx.r3.u64 = *r3;
 }
 
+void CarModelsFileLoaded(PPCContext& ctx, uint8_t* base, cm::FileLoadedSet set) {
+  const bool a = set == cm::FileLoadedSet::kA;
+  const uint32_t request = ctx.r3.u32, buffer = ctx.r4.u32, car = ctx.r6.u32;
+  if (!hooks::ModelsNativeLifetime() || !native::Buffers_NativeMemcpy() ||
+      !cm::FileLoadedNative(base, set, request, car)) {
+    (a ? __imp__sub_820D47A8 : __imp__sub_820D4F80)(ctx, base);
+    return;
+  }
+  ctx.fpscr.disableFlushMode();
+  const uint32_t stack = ctx.r1.u32;
+  const uint64_t lr = ctx.lr;
+  // The guest calls from the original's frame (1,552 bytes), with its
+  // return addresses.
+  guest_call::InFrame(ctx, base, cm::kFileLoadedFrameBytes, a ? 0x820D47F4 : 0x820D4FD0,
+                      [&](uint32_t) {
+    cm::FileLoadedCalls calls;
+    calls.skeleton_bind = [&](uint32_t skeleton, uint32_t file) {
+      ctx.r3.u64 = skeleton;
+      ctx.r4.u64 = file;
+      ctx.r5.u64 = 0;
+      ctx.lr = a ? 0x820D483C : 0x820D5018;
+      __imp__sub_82599A20(ctx, base);
+    };
+    calls.update_matrices = [&](uint32_t skeleton) {
+      ctx.r3.u64 = skeleton;
+      ctx.lr = a ? 0x820D4854 : 0x820D5030;
+      __imp__sub_825998A0(ctx, base);
+    };
+    calls.xpr_create = [&](uint32_t xpr, uint32_t file) {
+      ctx.r3.u64 = xpr;
+      ctx.r4.u64 = file;
+      ctx.lr = a ? 0x820D4DC8 : 0x820D55A0;
+      __imp__sub_82596F68(ctx, base);
+    };
+    calls.provider_set = [&](uint32_t provider, uint32_t xpr) {
+      ctx.r3.u64 = provider;
+      ctx.r4.u64 = 0;
+      ctx.r5.u64 = xpr;
+      ctx.lr = a ? 0x820D4DEC : 0x820D55C4;
+      REX_CALL_INDIRECT_FUNC(guest::LoadU32(base, guest::LoadU32(base, provider) + 16));
+    };
+    calls.plate_release = [&](uint32_t surface) {
+      // From MakePlate's frame (944 bytes below this one).
+      guest_call::InFrame(ctx, base, cm::kPlateFrameBytes, 0x820ED8E4, [&](uint32_t) {
+        ctx.r3.u64 = surface;
+        sub_822A67B0(ctx, base);
+      });
+    };
+    cm::FileLoaded(base, set, request, buffer, car, stack, calls);
+  });
+  ctx.lr = lr;
+  ctx.fpscr.disableFlushMode();
+}
+
+void CarModelsOnFileLoaded(PPCContext& ctx, uint8_t* base) {
+  CarModelsFileLoaded(ctx, base, cm::FileLoadedSet::kA);
+}
+
+void CarModelsOnFileLoadedB(PPCContext& ctx, uint8_t* base) {
+  CarModelsFileLoaded(ctx, base, cm::FileLoadedSet::kB);
+}
+
 void CarModelsDeferRelease(PPCContext& ctx, uint8_t* base) {
   cm::DeferRelease(base, ctx.r3.u32, ctx.r4.u32, ctx.r5.u32, ctx.r6.u32, ctx.r7.u32);
 }
@@ -326,6 +390,8 @@ ITC_CAR_MODELS(820D7730, CarModelsInteriorLoadParts)
 ITC_CAR_MODELS(820D79B0, CarModelsInteriorLoad)
 ITC_CAR_MODELS(820C3CE0, CarModelsFreePagesAt)
 ITC_CAR_MODELS(820ED6D0, CarModelsMakePlate)
+ITC_CAR_MODELS(820D47A8, CarModelsOnFileLoaded)
+ITC_CAR_MODELS(820D4F80, CarModelsOnFileLoadedB)
 ITC_CAR_MODELS(820D4508, CarModelsCarModelRelease)
 ITC_CAR_MODELS(820ECF08, CarModelsTextureCreate)
 ITC_CAR_MODELS(820ECFC8, CarModelsTextureFree)
