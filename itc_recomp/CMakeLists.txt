@@ -242,6 +242,9 @@ set(ITC_SOURCES
     src/location_screen/opponents.cpp
     src/location_screen/view.cpp
     src/location_screen/pose.cpp
+    src/hooks/material_passes.cpp
+    src/material_passes/colors.cpp
+    src/material_passes/helpers.cpp
     src/save_interface/save_interface.cpp
     src/save_interface/save_layer.cpp
     src/hooks/file_layer.cpp
@@ -410,6 +413,7 @@ set(ITC_SOURCES
     src/harnesses/race_event.cpp
     src/harnesses/camera_modes.cpp
     src/harnesses/location_screen.cpp
+    src/harnesses/material_passes.cpp
     src/harnesses/car_sounds.cpp
     src/harnesses/x3daudio.cpp
     src/harnesses/xaudio.cpp

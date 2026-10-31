@@ -243,5 +243,6 @@ void Career(Context& h);
 void RaceEvent(Context& h);
 void CameraModes(Context& h);
 void LocationScreen(Context& h);
+void MaterialPasses(Context& h);
 
 }  // namespace harness
