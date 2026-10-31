@@ -13,7 +13,10 @@
 #include "base/flags.h"
 #include "base/log.h"
 #include "hooks/accessories.h"
+#include "hooks/heap.h"
+#include "hooks/models.h"
 #include "memory/c_runtime_heap.h"
+#include "native/buffers.h"
 #include "memory/heap.h"
 #include "models/model.h"
 #include "models/texture_provider.h"
@@ -53,6 +56,53 @@ void WriteRandom(uint8_t* base, uint32_t address, uint32_t bytes, Random& r) {
   for (uint32_t i = 0; i + 4 <= bytes; i += 4) {
     guest::StoreU32(base, address + i, uint32_t(r.Next()));
   }
+}
+
+// The register steps of the functions only native code calls (their
+// adapters removed): the plain C++ with the adapters' checks, else the
+// original.
+void NativeFileConstruct(PPCContext& ctx, uint8_t* base) {
+  ac::FileConstruct(base, ctx.r3.u32);
+}
+void NativeSetBaseConstruct(PPCContext& ctx, uint8_t* base) {
+  ac::SetBaseConstruct(base, ctx.r3.u32);
+}
+void NativeSetConstruct(PPCContext& ctx, uint8_t* base) {
+  ctx.fpscr.disableFlushMode();
+  ctx.r3.u64 = ac::SetConstruct(base, ctx.r3.u32);
+}
+void NativeSetNew(PPCContext& ctx, uint8_t* base) {
+  if (!hooks::NativeHeapActive()) {
+    __imp__sub_820F0F48(ctx, base);
+    return;
+  }
+  ctx.fpscr.disableFlushMode();
+  ctx.r3.u64 = ac::SetNew(base);
+}
+void NativeSetFree(PPCContext& ctx, uint8_t* base) {
+  if (!hooks::NativeHeapActive() || !hooks::AccessoriesSetFreeable(base, ctx.r3.u32)) {
+    __imp__sub_820F0F90(ctx, base);
+    return;
+  }
+  ctx.r3.u64 =
+      ac::SetFree(base, ctx.r3.u32, ctx.r1.u32, hooks::AccessoriesSetDestructor(ctx, base));
+}
+void NativeSkeletonConstruct(PPCContext& ctx, uint8_t* base) {
+  if (!native::Buffers_NativeMemcpy()) {
+    __imp__sub_820F03F0(ctx, base);
+    return;
+  }
+  ctx.fpscr.disableFlushMode();
+  ctx.r3.u64 = ac::SkeletonConstruct(base, ctx.r3.u32, ctx.r1.u32);
+}
+void NativeAccessoryConstruct(PPCContext& ctx, uint8_t* base) {
+  if (!hooks::ModelsNativeLifetime() || !native::Buffers_NativeMemcpy() ||
+      !ac::AccessoryConstructible(base)) {
+    __imp__sub_820EF258(ctx, base);
+    return;
+  }
+  ctx.fpscr.disableFlushMode();
+  ctx.r3.u64 = ac::AccessoryConstruct(base, ctx.r3.u32, ctx.r1.u32);
 }
 
 // The original with --native_accessories off.
@@ -120,7 +170,7 @@ std::vector<int64_t> Serials(Random& r) {
 void Files(Context& h, const Block& block) {
   const uint32_t file = block.address + 0x100;
   Cases(h, block, "AccessoryFile::AccessoryFile (sub_820F0C50)", 8,
-        Original<__imp__sub_820F0C50>, hooks::AccessoryFileConstruct,
+        Original<__imp__sub_820F0C50>, NativeFileConstruct,
         [&](PPCContext& t, Random&) { t.r3.u64 = file; });
   Cases(h, block, "AccessoryFile::SetData (sub_820F0BF0)", 16, Original<__imp__sub_820F0BF0>,
         hooks::AccessoryFileSetData, [&](PPCContext& t, Random& r) {
@@ -212,10 +262,10 @@ void FileLoads(Context& h, const Block& block) {
 void Sets(Context& h, const Block& block) {
   const uint32_t set = block.address + 0x100;
   Cases(h, block, "AccessoriesBase::AccessoriesBase (sub_820F07B8)", 8,
-        Original<__imp__sub_820F07B8>, hooks::AccessoriesBaseConstruct,
+        Original<__imp__sub_820F07B8>, NativeSetBaseConstruct,
         [&](PPCContext& t, Random&) { t.r3.u64 = set; });
   Cases(h, block, "Accessories::Accessories (sub_820F0E60)", 8, Original<__imp__sub_820F0E60>,
-        hooks::AccessoriesConstruct, [&](PPCContext& t, Random&) { t.r3.u64 = set; });
+        NativeSetConstruct, [&](PPCContext& t, Random&) { t.r3.u64 = set; });
   // Each entry none or one in the block; the scale any 16 bytes (overlapping
   // an entry's +1072 now and then).
   Cases(h, block, "Accessories::SetScale (sub_820F0F00)", 32, Original<__imp__sub_820F0F00>,
@@ -233,7 +283,7 @@ void Sets(Context& h, const Block& block) {
   }
   Cases(
       h, block, "Accessories::New (sub_820F0F48)", 4, Original<__imp__sub_820F0F48>,
-      hooks::AccessoriesNew, [&](PPCContext&, Random&) {},
+      NativeSetNew, [&](PPCContext&, Random&) {},
       [&](const PPCContext& t, Outputs& out) {
         guest::StoreU32(h.base, block.address, t.r3.u32);
         TakePages(h.base, block.address, ac::kSetBytes, out);
@@ -307,7 +357,7 @@ void SetFrees(Context& h, const Block& block) {
   };
   Cases(
       h, block, "Accessories::Free (sub_820F0F90)", 16, Original<__imp__sub_820F0F90>,
-      hooks::AccessoriesFree,
+      NativeSetFree,
       [&](PPCContext& t, Random& r) {
         set = lay(r, slot);
         t.r3.u64 = slot;
@@ -355,12 +405,12 @@ void Constructors(Context& h, const Block& block) {
   };
   Cases(
       h, block, "AccessorySkeleton::AccessorySkeleton (sub_820F03F0)", 8,
-      Original<__imp__sub_820F03F0>, hooks::AccessorySkeletonConstruct,
+      Original<__imp__sub_820F03F0>, NativeSkeletonConstruct,
       [&](PPCContext& t, Random&) { t.r3.u64 = object; },
       [&](const PPCContext& t, Outputs& out) { frame_words(t, 0, out); });
   Cases(
       h, block, "Accessory::Accessory (sub_820EF258)", 8, Original<__imp__sub_820EF258>,
-      hooks::AccessoryConstruct, [&](PPCContext& t, Random&) { t.r3.u64 = object; },
+      NativeAccessoryConstruct, [&](PPCContext& t, Random&) { t.r3.u64 = object; },
       [&](const PPCContext& t, Outputs& out) {
         frame_words(t, 96, out);
         TakeTextures(h.base, object, out);

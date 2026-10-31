@@ -9,6 +9,9 @@
 
 #include "guest.h"
 
+#include <cstdint>
+#include <functional>
+
 namespace hooks {
 
 // Whether the accessories' functions that allocate, free or queue loads can
@@ -16,32 +19,32 @@ namespace hooks {
 // and Archive::Load's queue native.
 bool AccessoriesNativeLoads();
 
-// AccessoryFile::AccessoryFile sub_820F0C50, SetData sub_820F0BF0 (r4 the
-// data, r5 owned), Load sub_820F0C90 (r4 the id, r5 a buffer, r6 a
-// callback, r7 its context), OnArchiveDone sub_820F0C20 (r3 the serial, r6
-// the file) and FreeData sub_820F08D0 (r3 the word): r3 the file.
-void AccessoryFileConstruct(PPCContext& ctx, uint8_t* base);
+// The set's destructor without delete (its vtable slot 0, r4 = 0) as
+// Accessories::Free calls it: a guest call from `frame` returning to
+// 0x820F0FC4, through `ctx`.
+std::function<void(uint32_t set, uint32_t frame)> AccessoriesSetDestructor(PPCContext& ctx,
+                                                                           uint8_t* base);
+// Whether the set in [slot] (if any) is the allocation layer's pages, so
+// Free's FreeData runs natively.
+bool AccessoriesSetFreeable(uint8_t* base, uint32_t slot);
+
+// AccessoryFile::SetData sub_820F0BF0 (r4 the data, r5 owned), Load
+// sub_820F0C90 (r4 the id, r5 a buffer, r6 a callback, r7 its context),
+// OnArchiveDone sub_820F0C20 (r3 the serial, r6 the file) and FreeData
+// sub_820F08D0 (r3 the word): r3 the file.
 void AccessoryFileSetData(PPCContext& ctx, uint8_t* base);
 void AccessoryFileLoad(PPCContext& ctx, uint8_t* base);
 void AccessoryFileOnArchiveDone(PPCContext& ctx, uint8_t* base);
 void AccessoryFileFreeData(PPCContext& ctx, uint8_t* base);
-// AccessoriesBase::AccessoriesBase sub_820F07B8, Accessories::Accessories
-// sub_820F0E60, New sub_820F0F48, Create sub_820F1038 and SetScale
-// sub_820F0F00 (r4 the scale).
-void AccessoriesBaseConstruct(PPCContext& ctx, uint8_t* base);
-void AccessoriesConstruct(PPCContext& ctx, uint8_t* base);
-void AccessoriesNew(PPCContext& ctx, uint8_t* base);
+// Accessories::Create sub_820F1038 and SetScale sub_820F0F00 (r4 the
+// scale).
 void AccessoriesCreate(PPCContext& ctx, uint8_t* base);
 void AccessoriesSetScale(PPCContext& ctx, uint8_t* base);
-// AccessoryFile::Reset sub_820F0D30 (r3 the file), Accessories::Free
-// sub_820F0F90 (r3 the set's slot) and Destroy sub_820F1078.
+// AccessoryFile::Reset sub_820F0D30 (r3 the file) and Accessories::Destroy
+// sub_820F1078.
 void AccessoryFileReset(PPCContext& ctx, uint8_t* base);
-void AccessoriesFree(PPCContext& ctx, uint8_t* base);
 void AccessoriesDestroy(PPCContext& ctx, uint8_t* base);
-// AccessorySkeleton::AccessorySkeleton sub_820F03F0, Accessory::Accessory
-// sub_820EF258 (r3 them) and AccessoryEntry::New sub_820F0920.
-void AccessorySkeletonConstruct(PPCContext& ctx, uint8_t* base);
-void AccessoryConstruct(PPCContext& ctx, uint8_t* base);
+// AccessoryEntry::New sub_820F0920.
 void AccessoryEntryNew(PPCContext& ctx, uint8_t* base);
 
 }  // namespace hooks
