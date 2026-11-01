@@ -10,7 +10,6 @@ file's history. What's left to see in a drive, from every run:
 
 - Run started 2026-10-31 23:57 on `b7-loop-31-10-26-2`, from
   2eb33a3f; summary `b7-loop-2026-10-31-2357.md`.
-- Limit for this run: 3 subsystems; 1 taken.
 - Subsystem 1 of 3: the device's shader setters and the render queue
   (`device-shaders.md`). Done (map 112775ae, migration
   657efc7b..e727bc39, validated `itc_3054`: 120 s, race 55 s, 0 errors,
@@ -39,8 +38,17 @@ file's history. What's left to see in a drive, from every run:
   replay `itc_3081` ok): 5 of 5 harness lines, all 5 ran in the
   replay, none to drive. Done.
 - Cleanup lead (no mapping, not counted): the jump-table pieces
-  `sub_8220DA38` and `sub_8221A56C` (`race-screens.md`). Step:
-  migration agent running.
+  `sub_8220DA38` and `sub_8221A56C` (`race-screens.md`). Nothing
+  migrated (`itc_3082`, race_screens 0 differing, 0 errors): each is
+  its recompiled MainPage's case 0, popping MainPage's frame, so it
+  goes native or Merged with `PauseMenu::MainPage` and
+  `AfterRaceMenu::MainPage`, which wait on `sub_8211CBD8`,
+  `RaceDialog::SetText` and `RaceDialog::Open`; no adapter removable.
+  No validation needed.
+- Limit for this run: 3 subsystems; 2 taken.
+- Subsystem 2 of 3: the render queue's methods (`sub_8258EDC8`,
+  `sub_8258E5F8`, `sub_8258E618`, `sub_8258E5E0`, `sub_8258ED78`),
+  from `leads.md` (all ready, every pass). Step: mapping agent running.
 
 ## Done
 
