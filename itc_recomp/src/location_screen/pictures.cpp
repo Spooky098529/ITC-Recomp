@@ -85,8 +85,10 @@ uint64_t FreePictures(uint8_t* base, uint32_t sp, uint32_t screen, const Calls& 
 
 uint64_t OnPictureLoaded(uint8_t* base, uint32_t sp, uint32_t screen, uint32_t buffer,
                          uint32_t list, const Calls& calls) {
-  ITC_NATIVE_RUNNING(list == 0 ? "sub_82228E88 LocationScreen::OnPictureLoadedA"
-                               : "sub_82228FC8 LocationScreen::OnPictureLoadedB");
+  if (list == 0)
+    ITC_NATIVE_RUNNING("sub_82228E88 LocationScreen::OnPictureLoadedA");
+  else
+    ITC_NATIVE_RUNNING("sub_82228FC8 LocationScreen::OnPictureLoadedB");
   // The return addresses: B's code is A's 0x140 bytes on.
   const uint32_t at = list == 0 ? 0 : 0x140;
   const uint32_t pictures = screen + (list == 0 ? 8 : 276);
