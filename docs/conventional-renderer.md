@@ -1152,6 +1152,18 @@ since its upload.
 unannounced); dumps against two runs; the buffers' log lines; then the
 user's drive.
 
+**Built** (`298b734b`): `graphics::BufferWritten` (buffers only, by the
+header's type) is called by `IndexBuffer::Unlock` and by the wheels' set-ups
+after each morph's copies over a shape's streams (the shape's headers at
++288, +320 and +352: which goes with which stream wasn't needed, all three
+are announced). memcpy's records and `MarkWritten` are gone; memcpy's
+override keeps only `--native_renderer_log_buffers`' logging. Attract race
+`itc_3296` (100 s, across a race's end, `--native_renderer_verify_buffers`):
+~0.7-1 million checks per 5 s, 0 changed with no `BufferWritten`, 0 draws
+left out, 0 error lines; the user: looks fine. The dumps were skipped (the
+user's call: it looks fine). The check has found nothing so far, so it
+hasn't been seen catching a change.
+
 ## 7. Risks, and what's still unknown
 
 - **Readers of the register shadow outside the replay.** Once the
