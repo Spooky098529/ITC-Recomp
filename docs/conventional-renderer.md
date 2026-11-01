@@ -795,7 +795,7 @@ handlers with the recompiled ones; decision 10); its other cases pass.
 after (`itc_3267`): every draw drawn, `passes.txt` the same,
 interpolation paired, pixels within the runs' spread.
 
-## Step 2 (2026-11-01, on `conventional-renderer`; done, a drive to come)
+## Step 2 (2026-11-01, on `conventional-renderer`; done)
 
 Textures only (the user's calls, 2026-11-01): buffers go to 2b with the
 mirrors, where their records are used; textures are still uploaded at
@@ -932,6 +932,11 @@ byte stores, then the header given new data: a destroy and a create).
   (`GetSwizzledView` ~40 kcycles a frame, the handle table ~20). Left for
   later (the user's call, 2026-11-01: working first, optimized later); a
   one-entry memo per handle was tried in code but not measured.
+
+**The user's drive** (2026-11-01, `itc_3276`; the plate and vinyl, the
+glow and motion blur, a race change, the menus): "game looks fine". The
+log: 0 error lines, none bound never made, no header changed unannounced,
+no aliasing; loaded textures 23-83 MB, ~1,900-2,900 handles, no growth.
 
 ## 7. Risks, and what's still unknown
 
