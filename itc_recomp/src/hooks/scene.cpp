@@ -8,6 +8,7 @@
 #include "base/flags.h"
 #include "car_models/vinyl.h"
 #include "hooks/accessories.h"
+#include "hooks/archive.h"
 #include "hooks/heap.h"
 #include "hooks/models.h"
 #include "scene/scene.h"
@@ -30,7 +31,7 @@ ITC_FLAG_BOOL(native_scene, true, "ITC",
               "and the models' lifetime SceneAssets::Release sub_820C4C80 (the original "
               "VirtualFree for a TGA pixels' word that isn't the layer's) and CarScene::Create "
               "sub_820C8A50 (over ScenePools::MakeA's, PaintPalette::Init's and the accessories' "
-              "plain C++)) natively instead of through the "
+              "plain C++), with --native_heap and the archive's queue CarScene::LoadAssets sub_820C8B40) natively instead of through the "
               "translated code (the same writes; checked by --run_harnesses=scene)");
 
 namespace hooks {
@@ -233,6 +234,14 @@ void SceneCreate(PPCContext& ctx, uint8_t* base) {
   ctx.r3.u64 = scene::Create(base, ctx.r1.u32);
 }
 
+void SceneLoadAssets(PPCContext& ctx, uint8_t* base) {
+  if (!hooks::NativeHeapActive() || !NativeArchiveQueue()) {
+    __imp__sub_820C8B40(ctx, base);
+    return;
+  }
+  ctx.r3.u64 = scene::LoadAssets(base, ctx.r3.u32, ctx.r13.u32, NativeArchiveLoad(base));
+}
+
 }  // namespace hooks
 
 // The adapters: the register steps above, or the originals with the flag
@@ -256,6 +265,7 @@ ITC_SCENE(820C3DA0, SceneUpdateA)
 ITC_SCENE(820C9110, SceneCarSceneDestruct)
 ITC_SCENE(820C4C80, SceneAssetsRelease)
 ITC_SCENE(820C8A50, SceneCreate)
+ITC_SCENE(820C8B40, SceneLoadAssets)
 // No adapters (their callers in play are native; the register steps above
 // are the harness's): ScenePools::StartTeardownA sub_820C3C80, DestroyA
 // sub_820C3CF8, SceneAssets::SceneAssets sub_820C5008 and ~SceneAssets

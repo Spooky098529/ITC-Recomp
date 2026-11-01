@@ -621,4 +621,46 @@ uint64_t Create(uint8_t* base, uint32_t sp) {
   return set;
 }
 
+
+uint32_t LoadAssets(uint8_t* base, uint32_t scene, uint32_t pcr, const archive::LoadCall& load) {
+  ITC_NATIVE_RUNNING("sub_820C8B40 CarScene::LoadAssets");
+  uint32_t r3 = 0;
+  auto shared = [&](uint32_t offset, uint32_t id) {
+    r3 = car_models::LoadSlotLoadShared(base, scene + offset, id, scene, kOnFileLoaded, load);
+  };
+  auto own = [&](uint32_t offset, uint32_t id) {
+    car_models::LoadSlotLoad(base, scene + offset, id, scene, kOnFileLoaded, pcr, load);
+  };
+  shared(112, 586);
+  if (Load(base, scene + 4) == 0 || Load(base, scene + 5044) != 0) {
+    shared(64, 141);
+  }
+  shared(248, 888);
+  shared(316, 144);
+  shared(384, 145);
+  own(452, 142);
+  shared(944, 143);
+  shared(968, 146);
+  shared(1016, 106);
+  shared(1084, 107);
+  if (Load(base, scene + 4) == 0) {
+    own(4112, 108);
+    shared(4136, 109);
+  }
+  shared(4624, 105);
+  const bool set_a = Load(base, scene + 4) == 0;
+  for (uint32_t i = 0; i < 4; i++) {
+    own(1152 + 24 * i, (set_a ? 129 : 133) + i);
+    shared(3104 + 24 * i, 137 + i);
+  }
+  for (uint32_t i = 0; i < 19; i++) {
+    shared(3200 + 24 * i, 110 + i);
+  }
+  const bool bundles_a = Load(base, scene + 4) == 0;
+  for (uint32_t i = 0; i < 4; i++) {
+    shared(4672 + 24 * i, (bundles_a ? 97 : 101) + i);
+  }
+  return r3;
+}
+
 }  // namespace scene

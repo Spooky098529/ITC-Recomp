@@ -15,6 +15,7 @@
 #include "base/flags.h"
 #include "base/log.h"
 #include "hooks/accessories.h"
+#include "hooks/archive.h"
 #include "hooks/heap.h"
 #include "hooks/models.h"
 #include "hooks/scene.h"
@@ -32,6 +33,7 @@
 #include <algorithm>
 #include <functional>
 #include <mutex>
+#include <optional>
 #include <string>
 #include <vector>
 
@@ -744,6 +746,65 @@ void Creates(Context& h, const Block& block) {
   results.Report();
 }
 
+
+// CarScene::LoadAssets with its loads recorded (each case's own recorder):
+// the scene in the block and [0x826C2E44] pointing at it (LoadShared reads
+// the shared buffer's size there), set a or b, +5044 0 or not, the shared
+// buffer in the block and its size small or large; the part files' pages
+// compared as markers.
+void LoadAssetsCases(Context& h, const Block& block) {
+  if (!hooks::NativeHeapActive() || !hooks::NativeArchiveQueue()) {
+    return;
+  }
+  Results results("CarScene::LoadAssets (sub_820C8B40)");
+  const uint32_t scene = block.address + 0x100;
+  constexpr uint32_t kOwn[] = {452, 4112, 1152, 1176, 1200, 1224};
+  for (int c = 0; c < 8; c++) {
+    const uint64_t seed = h.random.Next();
+    Outputs out[2];
+    for (int v = 0; v < 2; v++) {
+      Globals globals(h.base);
+      Random r(seed);
+      WriteRandom(h.base, block.address, block.bytes, r);
+      Store(h.base, scene::kScene, scene);
+      Store(h.base, scene + 4, r.Below(2));
+      Store(h.base, scene + 5044, r.Below(2));
+      Store(h.base, scene + 5056, block.address + 0x4000);
+      Store(h.base, scene + 5060, r.Below(2) ? 0x100000 : r.Below(0x20000));
+      for (const uint32_t at : kOwn) {
+        Store(h.base, scene + at + 16, 0);
+      }
+      std::vector<int64_t> serials;
+      for (int k = 0; k < 64; k++) {
+        serials.push_back(r.Below(8) == 0 ? -1 : int64_t(r.Below(0x7FFFFFFF)));
+      }
+      std::optional<ArchiveLoads> loads;
+      loads.emplace(serials);
+      PPCContext t = CallContext(h);
+      t.r3.u64 = scene;
+      (v == 0 ? Original<__imp__sub_820C8B40> : hooks::SceneLoadAssets)(t, h.base);
+      std::vector<uint32_t> calls = loads->calls();
+      for (uint32_t& w : calls) {
+        if (w != 0 && memory::IsPages(w)) {
+          w = kStorageMarker;
+        }
+      }
+      out[v].Word(uint32_t(calls.size()));
+      for (const uint32_t w : calls) {
+        out[v].Word(w);
+      }
+      for (const uint32_t at : kOwn) {
+        TakePagesWord(h.base, scene + at + 16, out[v]);
+      }
+      out[v].Bytes(Read(h.base, block.address, block.bytes));
+      out[v].Word(t.r3.u32);
+      out[v].Word(uint32_t(t.r3.u64 >> 32));
+    }
+    results.Check(out[0], out[1], fmt::format("case {}", c));
+  }
+  results.Report();
+}
+
 }  // namespace
 
 void Scene(Context& h) {
@@ -758,6 +819,7 @@ void Scene(Context& h) {
   Lighting(h, block);
   Releases(h, block);
   Creates(h, block);
+  LoadAssetsCases(h, block);
 }
 
 }  // namespace harness

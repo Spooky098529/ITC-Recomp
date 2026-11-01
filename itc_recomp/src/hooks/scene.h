@@ -52,5 +52,8 @@ void SceneInitLighting(PPCContext& ctx, uint8_t* base);
 void SceneAssetsRelease(PPCContext& ctx, uint8_t* base);
 // CarScene::Create sub_820C8A50: over the layer with the models' lifetime.
 void SceneCreate(PPCContext& ctx, uint8_t* base);
+// CarScene::LoadAssets sub_820C8B40: r3 = the scene; over the layer with
+// the archive's queue native.
+void SceneLoadAssets(PPCContext& ctx, uint8_t* base);
 
 }  // namespace hooks

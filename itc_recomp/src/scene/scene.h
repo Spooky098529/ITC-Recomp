@@ -15,6 +15,8 @@
 #include <functional>
 #include <optional>
 
+#include "archive/archive.h"
+
 namespace scene {
 
 constexpr uint32_t kScene = 0x826C2E44;     // [it] the scene
@@ -134,6 +136,18 @@ bool AssetsReleasable(uint8_t* base, uint32_t assets);
 // CreateNative (the adapter's check, with the layer and the models'
 // lifetime).
 uint64_t Create(uint8_t* base, uint32_t sp);
+
+// CarScene::OnFileLoaded's address, the callback the loads are given.
+constexpr uint32_t kOnFileLoaded = 0x820C52A0;
+
+// CarScene::LoadAssets (sub_820C8B40): the shared assets' loads started
+// (LoadSlot::LoadShared, or LoadSlot::Load for the part files) with the
+// scene as the context and kOnFileLoaded as the callback, in scene.md's
+// row's order; set a (+4 = 0) or b picks the assets. `pcr` for
+// LoadSlot::Load's GetLastError. Returns the r3 it leaves (the last
+// LoadShared's). Only over the layer with the archive's queue native (the
+// adapter's check).
+uint32_t LoadAssets(uint8_t* base, uint32_t scene, uint32_t pcr, const archive::LoadCall& load);
 bool CreateNative(uint8_t* base);
 
 // CarScene::CarScene (sub_820C89A8): SceneSetUp::SceneSetUp (+4),
