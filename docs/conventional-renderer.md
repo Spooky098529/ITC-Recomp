@@ -34,7 +34,17 @@ The user's decisions:
    finite shader set into stored blobs per backend, as
    `src/graphics/compiled_shaders.h` did for the HLSL compiler.
 4. **MSAA becomes a player option in `itc.toml`**, as in a typical PC
-   game, instead of the sample counts the 360's EDRAM budget chose.
+   game, instead of the sample counts the 360's EDRAM budget chose: one
+   fixed value applied to every target the game drew with MSAA (the
+   main view, the mirror, the reflections, the minimap, the menus' 3D
+   view). Its default is still to pick.
+7. **Precision differences are acceptable**: a pass drawn straight into
+   its destination's format (more precise than the 360's 8-bit target
+   then converted) may differ slightly in dumps, as an explained
+   difference.
+8. **The Vulkan backend translates shaders at runtime**, as now (the
+   SDK's translator and the disk cache); the offline blobs are for other
+   backends.
 5. **Shadows and reflections once a tick** is interpolation's question,
    not the renderer's: left out of this plan.
 6. **The work goes on its own branch** after the B7 loop's run; this
@@ -435,7 +445,7 @@ The checks:
 | **3** | **The renderer switched to the interface.** `State::Draw` reads the interface's state. The handlers stop calling the game's Direct3D. The Vulkan backend makes the translator's registers itself, and translates (vertex shader, declaration) pairs itself in place of the game's patch. Resolves and clears are still made by the renderer as now (copies), from the handlers' arguments | The register shadow's writes and reads on the render path, `ReadRegisters`, the dirty masks, the PM4 packets, the kick, the shader load and patch, `replay_hooks.cpp`, `draw_packets.cpp`, `gpu_link.cpp` | Dumps identical (`draws.txt` and pixels); the menus and tiling by the user; profile; a drive | Large. After it, the game's Direct3D is off the render path |
 | **4** | **Resources through the interface.** Textures and buffers made and filled when the game makes them (`XPR::GetTexture`, `Resource::Lock` and Unlock, `Mesh::Parse`, the loaders, the native texture writers), bound by handle. The Vulkan backend keeps fetch by address over its own arena until vertex input is per-stream | The mirrors, the fetch-constant-keyed texture lookups, most of memcpy's tracking | A check of every bound buffer and texture against guest memory over a drive (as `--native_renderer_verify_mirror` did); dumps identical; the hitch log | Medium |
 | **5** | **Passes into their textures.** The destination scan (section 5): each pass draws into its destination; depth maps sampled as depth; the swap and the format changes gone; the glow's steps into their own textures; grab passes as `CopyTexture`; tiling as one target. MSAA keeps the game's sample counts for now (resolved at the pass's end) | The resolve copies but the grab passes, `ResolveInto`'s conversions, the resolve destinations' separate images | Dumps: each destination against the step before; differences explained (precision) | Medium. The exponent bias (section 2) is decided here |
-| **6** | **MSAA as a player option** (`itc.toml`; off, 2x, 4x, 8x, plus a default matching the game, to decide). Applied to the targets the game drew with MSAA, or to all (to decide) | The 360's fixed sample counts | Dumps at each setting; the user | Small |
+| **6** | **MSAA as a player option** (`itc.toml`; off, 2x, 4x, 8x): one value for every target the game drew with MSAA (decision 4; the default to pick) | The 360's fixed sample counts | Dumps at each setting; the user | Small |
 | **7** | **The frame composed natively** (`unlocked-res.md`, "Later"): first read the upscale's pixel shader and check that nothing else reads `1ECB9000`; then the 3D view drawn into the frame (or its region) and the HUD over it | The partial-rect resolve and the upscale draw | Dumps; the user at 4K | Small to medium |
 | **8** | **The Vulkan backend behind the interface**: the Vulkan code moved under `src/render/vulkan/`, the interface free of Vulkan types; the shader blobs' format defined for other backends | Nothing at runtime | Builds and dumps identical | Medium, mechanical |
 | later | **Tick replay** (`tick-replay.md`): with draws in the interface's terms, a tick's draws kept and replayed on render-only frames | The per-draw work on ~14 of 15 frames | Its own diagnostic first | Large; needs interpolation's join keyed by draw |
@@ -474,7 +484,7 @@ path. Step 5 is where the resolves go.
 - **The upscale draw's pixel shader**: not read.
 - **Precision differences** when a pass draws in its destination's
   format (the mirror's 8-bit target into a 10/16-bit texture): visible
-  only as explained pixel differences in dumps.
+  only as explained pixel differences in dumps (accepted, decision 7).
 - **D3D11 at 10_0**: everything said about it is from the API's known
   limits, not checked.
 - **Speed**: not a goal, but the steps change the per-draw path. Step 0's
@@ -488,13 +498,7 @@ destinations and readers come from the docs' trace and dumps (one trace,
 
 ## 8. Questions still open
 
-1. **MSAA's default** in `itc.toml`: the game's own counts (2x main view,
-   4x mirror, reflections, minimap and menus), or one setting such as 4x?
-   And should the option apply to every target the game drew with MSAA,
-   or only the main view and the menus' 3D view?
-2. **Pixel differences from precision** (a pass drawn straight into a
-   10/16-bit texture instead of 8-bit then converted): accept as
-   explained differences, or keep the 360's precision where it shows?
-3. **The Vulkan backend's shaders**: keep the runtime translator (as
-   now), or also move Vulkan to the offline blobs, so every backend works
-   the same way?
+Answered 2026-11-01 (decisions 4, 7 and 8 above). Left open:
+
+1. **MSAA's default value** in `itc.toml` (off, 2x, 4x or 8x), to pick
+   at step 6.
