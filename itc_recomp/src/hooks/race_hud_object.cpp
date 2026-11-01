@@ -53,8 +53,8 @@ ITC_FLAG_BOOL(native_race_hud_object, true, "ITC",
               "plain C++ reaches it; modes 2 to 4's ticks, never seen in play, the originals), "
               "RunWarning sub_82212A48 (the sound manager's slot 14 and UiMovie::Run through the "
               "function table, MenuSound::Play's plain C++), RaceScreens::DrawPauseMenu sub_82211D08 "
-              "and DrawAfterRaceMenu sub_82211D10 (no adapter: only the race HUD machine's "
-              "AfterRaceDraw's plain C++ reaches it; PauseMenu::Draw's and AfterRaceMenu::Draw's "
+              "and DrawAfterRaceMenu sub_82211D10 (no adapters: only the race HUD machine's "
+              "PauseDraw's, RacePauseDraw's and AfterRaceDraw's plain C++ reach them; PauseMenu::Draw's and AfterRaceMenu::Draw's "
               "plain C++) "
               "natively instead of through the translated code (the same writes; checked by "
               "--run_harnesses=race_hud_object)");
@@ -453,6 +453,8 @@ void RaceHudObjectTickPanel(PPCContext& ctx, uint8_t* base) {
 // UpdateWarning and TickPanel (since the machine's PauseUpdate and
 // AfterRaceUpdate went native); RaceScreens::Init (from Create, native);
 // DrawAfterRaceMenu (from the race HUD machine's AfterRaceDraw, native);
+// DrawPauseMenu (from the race HUD machine's PauseDraw and RacePauseDraw,
+// native);
 // RaceScreens::Create (from the race HUD machine's CreateScreens, native,
 // with --native_heap; without it the original); ApplyOptions (from the race
 // HUD machine's SetUp, PauseUpdate and ClosePause, native).
@@ -472,4 +474,3 @@ ITC_RACE_HUD_OBJECT(82212270, RaceHudObjectStartCountdown)
 ITC_RACE_HUD_OBJECT(82212AC8, RaceHudObjectDrawWarning)
 ITC_RACE_HUD_OBJECT(822128A8, RaceHudObjectDraw)
 ITC_RACE_HUD_OBJECT(82213638, RaceHudObjectShowItem)
-ITC_RACE_HUD_OBJECT(82211D08, RaceHudObjectDrawPauseMenu)

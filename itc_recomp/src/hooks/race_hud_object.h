@@ -108,9 +108,9 @@ void RaceHudObjectScreensInit(PPCContext& ctx, uint8_t* base);
 // the native heap isn't active.
 void RaceHudObjectScreensCreate(PPCContext& ctx, uint8_t* base);
 // sub_82211D08 RaceScreens::DrawPauseMenu and sub_82211D10
-// DrawAfterRaceMenu (r3 = the holder; tail calls). DrawAfterRaceMenu has no
-// adapter (its only caller, the race HUD machine's AfterRaceDraw, calls its
-// plain C++): the step for the harness.
+// DrawAfterRaceMenu (r3 = the holder; tail calls). Neither has an adapter
+// (their callers in play, the race HUD machine's PauseDraw, RacePauseDraw and
+// AfterRaceDraw, call their plain C++): the steps for the harness.
 void RaceHudObjectDrawPauseMenu(PPCContext& ctx, uint8_t* base);
 void RaceHudObjectDrawAfterRaceMenu(PPCContext& ctx, uint8_t* base);
 
