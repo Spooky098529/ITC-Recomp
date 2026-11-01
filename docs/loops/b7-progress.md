@@ -10,7 +10,7 @@ file's history. What's left to see in a drive, from every run:
 
 - Run started 2026-10-31 23:57 on `b7-loop-31-10-26-2`, from
   2eb33a3f; summary `b7-loop-2026-10-31-2357.md`.
-- Subsystem 1 of 3: the device's shader setters and the render queue
+- Subsystem 1 of 5: the device's shader setters and the render queue
   (`device-shaders.md`). Done (map 112775ae, migration
   657efc7b..e727bc39, validated `itc_3054`: 120 s, race 55 s, 0 errors,
   7 of 7 harness lines, all 7 ran in the race, replay not needed).
@@ -45,8 +45,9 @@ file's history. What's left to see in a drive, from every run:
   `AfterRaceMenu::MainPage`, which wait on `sub_8211CBD8`,
   `RaceDialog::SetText` and `RaceDialog::Open`; no adapter removable.
   No validation needed.
-- Limit for this run: 3 subsystems; 2 taken.
-- Subsystem 2 of 3: the render queue's methods (`sub_8258EDC8`,
+- Limit for this run: 5 subsystems (the user's call, 2026-11-01; 3
+  before); 2 taken.
+- Subsystem 2 of 5: the render queue's methods (`sub_8258EDC8`,
   `sub_8258E5F8`, `sub_8258E618`, `sub_8258E5E0`, `sub_8258ED78`),
   from `leads.md` (all ready, every pass). Map checked (ee891a3a: 24
   rows added to `device-shaders.md`, the queue (the game's `OT`, an
