@@ -70,6 +70,10 @@ constexpr uint32_t kAltRunMovie = 0x82216C00;      // AltHud::RunMovie
 constexpr uint32_t kAfterRaceClose = 0x8221A498;   // AfterRaceMenu::Close (race-screens.md)
 constexpr uint32_t kCareerResultsUpdate = 0x8221A090;  // CareerResults::Update (race-screens.md)
 constexpr uint32_t kPauseMenuUpdate = 0x8220F638;      // PauseMenu::Update (race-screens.md)
+constexpr uint32_t kPauseMenuClose = 0x8220D890;       // PauseMenu::Close (race-screens.md)
+constexpr uint32_t kCareerResultsDraw = 0x8221A2F8;    // CareerResults::Draw (race-screens.md)
+constexpr uint32_t kDrawAfterRaceMenu = 0x82211D10;    // RaceScreens::DrawAfterRaceMenu
+constexpr uint32_t kScreensCreate = 0x82211F40;        // RaceScreens::Create (race-hud-object.md)
 constexpr uint32_t kAfterRaceUpdate = 0x8221BD20;      // AfterRaceMenu::Update (race-screens.md)
 // The in-race screens' holder ([0x826D84F0]), which the pause's update reads
 // instead of +9608.
@@ -175,6 +179,35 @@ std::optional<uint64_t> AfterRaceUpdate(uint8_t* base, uint64_t r3, uint32_t dis
 // never seen in play).
 std::optional<uint64_t> CloseResults(uint8_t* base, uint64_t r3, uint32_t sp,
                                      const Calls& callees);
+
+// sub_8216CA28 RaceHudMachine::CreateScreens: +9612 = the race data's kind
+// (+0xA3AF0); RaceScreens::Create with the holder's kind by it and the
+// current stage's type (Stages::Type(race data + 0x59620, -1)), none where
+// the original makes none; then +9608 = [0x826D84F0]. Create's r3, or the
+// type's where none is made.
+uint64_t CreateScreens(uint8_t* base, uint32_t machine, uint32_t sp, const Calls& callees);
+// sub_8216C658 RaceHudMachine::ClosePause: kinds 1 to 3 and 6
+// PauseMenu::Close(holder +1012) and RaceHud::ApplyOptions(holder +16); kind
+// 4 the holder's +1016 passed to the empty sub_82106540 (only its load
+// left); then +9616 = 0. The last call's r3 (the +1016 word for kind 4, the
+// machine's r3 for the others).
+uint64_t ClosePause(uint8_t* base, uint64_t r3, uint32_t sp, const Calls& callees);
+// sub_8216D6D0 RaceHudMachine::ResultsDraw: race kind 1 with the mode
+// (+0xA3AF4) not 0, unless IsFirstDay, CareerResults::Draw(holder +1024);
+// 3, 5 and above 6 nothing; then RaceHud::Draw(holder +16). Draw's r3.
+// nullopt, with nothing done, for kind 4 (sub_82215D58) and the race kinds
+// whose results' draws are never seen in play (0 sub_8220B9E8, 2 and 1 with
+// the mode 0 sub_8221F7D0, 4 and 6 sub_822200E0).
+std::optional<uint64_t> ResultsDraw(uint8_t* base, uint64_t r3, uint32_t sp,
+                                    const Calls& callees);
+// sub_8216C6D8 RaceHudMachine::AfterRaceDraw: the last result
+// (RacerRecords::At(the race data's +0x59AE8, -1)); kinds 1 to 3
+// RaceHud::Draw(holder +16) and DrawAfterRaceMenu(holder); 5, 6 (with the
+// result's +3916 not 1 or 3) and above nothing (r3 the result). nullopt,
+// with nothing done, for kinds 0 and 4 and kind 6 with the word 1 or 3
+// (sub_8220B9E8, sub_82215D58, sub_8221EF60), never seen in play.
+std::optional<uint64_t> AfterRaceDraw(uint8_t* base, uint64_t r3, uint32_t sp,
+                                      const Calls& callees);
 
 // The pause menu's openers (tail calls to PauseMenu::Open, sub_8220FA88,
 // race-screens.md, from the caller's frame `sp` with its return address

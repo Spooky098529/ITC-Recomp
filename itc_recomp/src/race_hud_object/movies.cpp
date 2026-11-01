@@ -295,6 +295,16 @@ uint64_t ScreensCreate(uint8_t* base, uint32_t kind, uint32_t sp, const Calls& c
   return ScreensInit(base, guest::LoadU32(base, kScreensHolder), kind, frame, calls);
 }
 
+uint64_t DrawPauseMenu(uint8_t* base, uint32_t holder, uint32_t sp, const Calls& calls) {
+  ITC_NATIVE_RUNNING("sub_82211D08 RaceScreens::DrawPauseMenu");
+  return race_screens::PauseMenuDraw(base, guest::LoadU32(base, holder + 1012), sp, calls);
+}
+
+uint64_t DrawAfterRaceMenu(uint8_t* base, uint32_t holder, uint32_t sp, const Calls& calls) {
+  ITC_NATIVE_RUNNING("sub_82211D10 RaceScreens::DrawAfterRaceMenu");
+  return race_screens::AfterRaceMenuDraw(base, guest::LoadU32(base, holder + 1020), sp, calls);
+}
+
 uint64_t RunCountdown(uint8_t* base, uint32_t hud, uint32_t sp, const Calls& calls,
                       const menu_sounds::Calls& sounds, double* f1) {
   ITC_NATIVE_RUNNING("sub_822129A8 RaceHud::RunCountdown");

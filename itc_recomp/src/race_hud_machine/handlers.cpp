@@ -448,6 +448,119 @@ std::optional<uint64_t> SetUp(uint8_t* base, uint64_t r3, uint32_t sp, const Cal
   return last;
 }
 
+uint64_t CreateScreens(uint8_t* base, uint32_t machine, uint32_t sp, const Calls& callees) {
+  ITC_NATIVE_RUNNING("sub_8216CA28 RaceHudMachine::CreateScreens");
+  const uint32_t frame = Frame(base, sp, 112);
+  guest::StoreU32(base, machine + kKind, Load(base, Load(base, kRaceData) + 0xA3AF0));
+  const uint32_t race = Load(base, kRaceData);
+  const int32_t type = int32_t(vehicle_accessors::StagesType(base, race + 0x59620, 0xFFFFFFFFu));
+  const uint32_t kind = Load(base, machine + kKind);
+  // The holder's kind, or -1 for none.
+  int32_t holder_kind = -1;
+  auto by_type = [type](int32_t even, int32_t odd) {
+    if (type == 0 || type == 2) {
+      return even;
+    }
+    return type == 1 || type == 3 ? odd : -1;
+  };
+  switch (kind) {
+    case 0:
+      holder_kind = 8;
+      break;
+    case 1:
+      if (type == 0 || type == 2 || type == 4) {
+        holder_kind = 0;
+      } else if (type == 1 || type == 3) {
+        holder_kind = Load(base, Load(base, kRaceData) + 0xA3AF4) == 0 ? 2 : 1;
+      }
+      break;
+    case 2:
+      holder_kind = 2;
+      break;
+    case 3:
+      holder_kind = 3;
+      break;
+    case 4:
+      holder_kind = by_type(4, 5);
+      break;
+    case 5:
+      holder_kind = 9;
+      break;
+    case 6:
+      holder_kind = by_type(7, 6);
+      break;
+    default:
+      holder_kind = 10;
+      break;
+  }
+  uint64_t r3 = uint32_t(type);
+  if (holder_kind >= 0) {
+    r3 = callees.Call(kScreensCreate, frame, 0x8216CB74, uint32_t(holder_kind));
+  }
+  guest::StoreU32(base, machine + kHolder, Load(base, kHolderGlobal));
+  return r3;
+}
+
+uint64_t ClosePause(uint8_t* base, uint64_t r3, uint32_t sp, const Calls& callees) {
+  ITC_NATIVE_RUNNING("sub_8216C658 RaceHudMachine::ClosePause");
+  const uint32_t machine = uint32_t(r3);
+  const uint32_t frame = Frame(base, sp, 96);
+  const int32_t kind = int32_t(Load(base, machine + kKind));
+  uint64_t last = r3;
+  if (kind == 4) {
+    // The empty sub_82106540 on the holder's +1016: its r3 left.
+    last = Load(base, Holder(base, machine) + 1016);
+  } else if (kind > 0 && (kind <= 3 || kind == 6)) {
+    callees.Call(kPauseMenuClose, frame, 0x8216C69C, Load(base, Holder(base, machine) + 1012));
+    last = callees.Call(kHudApplyOptions, frame, 0x8216C6A8,
+                        uint64_t(Holder(base, machine)) + kHud);
+  }
+  guest::StoreU32(base, machine + kFlag, 0);
+  return last;
+}
+
+std::optional<uint64_t> ResultsDraw(uint8_t* base, uint64_t r3, uint32_t sp,
+                                    const Calls& callees) {
+  const uint32_t machine = uint32_t(r3);
+  const uint32_t race = Load(base, kRaceData);
+  const uint32_t race_kind = Load(base, race + 0xA3AF0);
+  const bool career = race_kind == 1 && Load(base, race + 0xA3AF4) != 0;
+  if (Load(base, machine + kKind) == 4 || race_kind == 0 || race_kind == 2 || race_kind == 4 ||
+      race_kind == 6 || (race_kind == 1 && !career)) {
+    return std::nullopt;
+  }
+  ITC_NATIVE_RUNNING("sub_8216D6D0 RaceHudMachine::ResultsDraw");
+  const uint32_t frame = Frame(base, sp, 96);
+  if (career && IsFirstDay(base, frame) == 0) {
+    callees.Call(kCareerResultsDraw, frame, 0x8216D76C, Load(base, Holder(base, machine) + 1024));
+  }
+  return callees.Call(kHudDraw, frame, 0x8216D794, uint64_t(Holder(base, machine)) + kHud);
+}
+
+std::optional<uint64_t> AfterRaceDraw(uint8_t* base, uint64_t r3, uint32_t sp,
+                                      const Calls& callees) {
+  const uint32_t machine = uint32_t(r3);
+  const uint32_t race = Load(base, kRaceData);
+  const uint32_t kind = Load(base, machine + kKind);
+  const uint32_t record = vehicle_accessors::RacerRecordsAt(base, race + 0x59AE8, 0xFFFFFFFFu);
+  if (kind == 0 || kind == 4) {
+    return std::nullopt;
+  }
+  if (kind == 6) {
+    const int32_t word = int32_t(Load(base, record + 3916));
+    if (word == 1 || word == 3) {
+      return std::nullopt;
+    }
+  }
+  ITC_NATIVE_RUNNING("sub_8216C6D8 RaceHudMachine::AfterRaceDraw");
+  const uint32_t frame = Frame(base, sp, 96);
+  if (kind > 3) {
+    return record;
+  }
+  callees.Call(kHudDraw, frame, 0x8216C768, uint64_t(Holder(base, machine)) + kHud);
+  return callees.Call(kDrawAfterRaceMenu, frame, 0x8216C770, Holder(base, machine));
+}
+
 namespace {
 
 // PauseMenu::Open(holder +1012, page, flag) as a tail call.

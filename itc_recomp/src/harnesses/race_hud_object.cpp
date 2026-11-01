@@ -19,6 +19,7 @@
 #include "base/log.h"
 #include "data_tables/data_tables.h"
 #include "hooks/app_start_up.h"
+#include "hooks/race_hud_machine.h"
 #include "hooks/race_hud_object.h"
 #include "hooks/ui_movies.h"
 #include "memory/heap.h"
@@ -1334,10 +1335,7 @@ void Movies(Context& h, const World& w) {
       // their globals, whether each is pages, their bytes) compared and
       // freed; the screens' globals put back. The original's makers are
       // their adapters (--native_race_screens on: the same plain C++).
-      Spec spec;
-      spec.frame = 112;
-      spec.saves = 24;
-      spec.after = [&h](Outputs& out) {
+      auto created = [&h](Outputs& out) {
         static const std::pair<uint32_t, uint32_t> kBlocks[] = {
             {0x826D84F0, 1040}, {0x826D84D0, 4},   {0x826D84D4, 160}, {0x826D84DC, 72},
             {0x826D84D8, 28},   {0x826D84E0, 4},   {0x826D84E4, 80},  {0x826D84EC, 72},
@@ -1360,6 +1358,10 @@ void Movies(Context& h, const World& w) {
           }
         }
       };
+      Spec spec;
+      spec.frame = 112;
+      spec.saves = 24;
+      spec.after = created;
       Group(
           h, w, "RaceScreens::Create (sub_82211F40)", 60,
           [&](PPCContext& t, Random& r, const World& w) {
@@ -1368,6 +1370,46 @@ void Movies(Context& h, const World& w) {
             t.r3.u64 = r.Below(5) == 0 ? r.Next() : r.Below(13);
           },
           __imp__sub_82211F40, hooks::RaceHudObjectScreensCreate, spec);
+      // The race HUD machine's CreateScreens (race-hud-machine.md), whose
+      // callee Create runs for real in its world: the machine a block of the
+      // race data's (+0x10000, its +9600 to +9620 compared), the race data
+      // always the world's with its kind (+0xA3AF0) -1 to 8 or any word, its
+      // mode 0 half the time, the current stage's type 0 to 5 or any word.
+      // The holder made or not ([0x826D84F0] then the shaped word).
+      const uint32_t machine = w.race.address + 0x10000;
+      Spec machine_spec;
+      machine_spec.frame = 112;
+      machine_spec.saves = 24;
+      machine_spec.after = [&h, created, machine](Outputs& out) {
+        out.Bytes(Read(h.base, machine + 9600, 20));
+        created(out);
+      };
+      Group(
+          h, w, "RaceHudMachine::CreateScreens (sub_8216CA28)", 80,
+          [&h, &news, machine](PPCContext& t, Random& r, const World& w) {
+            news(r, w);
+            ShapeMovieTable(h.base, w, r);
+            const uint32_t race = w.race.address;
+            guest::StoreU32(h.base, rh::kRaceData, race);
+            WriteRandom(h.base, machine + 9600, 20, r);
+            // The screens' globals 0 (put back after the case): where no
+            // holder is made, nothing of the game's is read or freed.
+            for (uint32_t g = 0; g < kScreenGlobalsBytes; g += 4) {
+              guest::StoreU32(h.base, kScreenGlobals + g, 0);
+            }
+            for (uint32_t g = 0; g < kUnseenGlobalsBytes; g += 4) {
+              guest::StoreU32(h.base, kUnseenGlobals + g, 0);
+            }
+            guest::StoreU32(h.base, race + 0xA3AF0,
+                            r.Below(6) == 0 ? uint32_t(r.Next()) : uint32_t(int32_t(r.Below(10)) - 1));
+            guest::StoreU32(h.base, race + rh::kRaceMode,
+                            r.Below(2) == 0 ? 0 : uint32_t(r.Next()));
+            const uint32_t stage = guest::LoadU32(h.base, race + 0x59620 + 804);
+            guest::StoreU32(h.base, race + 0x59620 + 80 * stage,
+                            r.Below(6) == 0 ? uint32_t(r.Next()) : r.Below(6));
+            t.r3.u64 = machine;
+          },
+          __imp__sub_8216CA28, hooks::RaceHudMachineCreateScreens, machine_spec);
     }
   }
 }

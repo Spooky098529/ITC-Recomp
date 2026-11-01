@@ -52,7 +52,10 @@ ITC_FLAG_BOOL(native_race_hud_object, true, "ITC",
               "C++), TickPanel sub_82215488 (TickRacers sub_822151F8, no adapter: only TickPanel's "
               "plain C++ reaches it; modes 2 to 4's ticks, never seen in play, the originals), "
               "RunWarning sub_82212A48 (the sound manager's slot 14 and UiMovie::Run through the "
-              "function table, MenuSound::Play's plain C++) "
+              "function table, MenuSound::Play's plain C++), RaceScreens::DrawPauseMenu sub_82211D08 "
+              "and DrawAfterRaceMenu sub_82211D10 (no adapter: only the race HUD machine's "
+              "AfterRaceDraw's plain C++ reaches it; PauseMenu::Draw's and AfterRaceMenu::Draw's "
+              "plain C++) "
               "natively instead of through the translated code (the same writes; checked by "
               "--run_harnesses=race_hud_object)");
 
@@ -381,6 +384,18 @@ void RaceHudObjectScreensCreate(PPCContext& ctx, uint8_t* base) {
   ctx.r3.u64 = rh::ScreensCreate(base, ctx.r3.u32, ctx.r1.u32, guest.calls());
 }
 
+void RaceHudObjectDrawPauseMenu(PPCContext& ctx, uint8_t* base) {
+  ctx.fpscr.disableFlushMode();
+  GuestCalls guest(ctx, base);
+  ctx.r3.u64 = rh::DrawPauseMenu(base, ctx.r3.u32, ctx.r1.u32, guest.calls());
+}
+
+void RaceHudObjectDrawAfterRaceMenu(PPCContext& ctx, uint8_t* base) {
+  ctx.fpscr.disableFlushMode();
+  GuestCalls guest(ctx, base);
+  ctx.r3.u64 = rh::DrawAfterRaceMenu(base, ctx.r3.u32, ctx.r1.u32, guest.calls());
+}
+
 void RaceHudObjectRunCountdown(PPCContext& ctx, uint8_t* base) {
   ctx.fpscr.disableFlushMode();
   GuestCalls guest(ctx, base);
@@ -436,7 +451,8 @@ void RaceHudObjectTickPanel(PPCContext& ctx, uint8_t* base) {
 // SetPlayer, Reset, ClearWarning, SetUpGauges, ResetBar, SetUpExtraGauges,
 // SetUpMirror and SetUpSigns (the user's call, 2026-10-31), and Tick,
 // UpdateWarning and TickPanel (since the machine's PauseUpdate and
-// AfterRaceUpdate went native); RaceScreens::Init (from Create, native).
+// AfterRaceUpdate went native); RaceScreens::Init (from Create, native);
+// DrawAfterRaceMenu (from the race HUD machine's AfterRaceDraw, native).
 
 #define ITC_RACE_HUD_OBJECT(address, step)              \
   extern "C" REX_FUNC(sub_##address) {                  \
@@ -455,3 +471,4 @@ ITC_RACE_HUD_OBJECT(82212AC8, RaceHudObjectDrawWarning)
 ITC_RACE_HUD_OBJECT(822128A8, RaceHudObjectDraw)
 ITC_RACE_HUD_OBJECT(82213638, RaceHudObjectShowItem)
 ITC_RACE_HUD_OBJECT(82211F40, RaceHudObjectScreensCreate)
+ITC_RACE_HUD_OBJECT(82211D08, RaceHudObjectDrawPauseMenu)

@@ -14,6 +14,7 @@
 #include "base/flags.h"
 #include "base/log.h"
 #include "hooks/race_hud_machine.h"
+#include "hooks/race_hud_object.h"
 #include "hooks/race_screens.h"
 #include "hooks/ui_movies.h"
 #include "memory/heap.h"
@@ -1515,38 +1516,75 @@ void Draws(Context& h, const MovieWorld& w) {
       __imp__sub_8220EEF0, hooks::RaceScreensPauseMenuOpenOptions, open_options);
   FrameSpec pause_draw{320, 144};
   pause_draw.after = pause_block;
-  MovieGroup(
-      h, w, "PauseMenu::Draw (sub_8220FB10)", 300,
-      [&h](PPCContext& t, Random& r, const MovieWorld& w) {
-        guest::StoreU32(h.base, w.block(rs::kPauseList) + rs::kListBlock, 0);
-        const uint32_t pages = w.block(rs::kPausePages);
-        const uint32_t transitions[16] = {0xFFFFFFFFu, 0xFFFFFFFFu, uint32_t(-2 - int32_t(r.Below(9))),
-                                          0, 2, 3, 4, 5, 6, 7, 8, 9, 12, 17, 18, 19};
-        guest::StoreU32(h.base, pages + 12, transitions[r.Below(16)]);
-        guest::StoreU32(h.base, pages + 16, r.Below(2) == 0 ? 0xFFFFFFFFu : r.Below(21));
-        guest::StoreU32(h.base, pages + 4, r.Below(3) == 0 ? 4 : r.Below(6));
-        guest::StoreU32(h.base, pages + 0, r.Below(3) == 0 ? 4 : r.Below(6));
-        ShapeDialogPages(h.base, r, w);
-        t.r3.u64 = w.block(rs::kPauseScreen);
-      },
-      __imp__sub_8220FB10, hooks::RaceScreensPauseMenuDraw, pause_draw);
-  MovieGroup(
-      h, w, "AfterRaceMenu::Draw (sub_8221BB48)", 200,
-      [&h](PPCContext& t, Random& r, const MovieWorld& w) {
-        const uint32_t d = w.block(rs::kAfterData);
-        guest::StoreU32(h.base, d + 0, r.Below(8));
-        guest::StoreU32(h.base, d + 4, r.Below(5));
-        const uint32_t pages = w.block(rs::kAfterPages);
-        const uint32_t transitions[7] = {0xFFFFFFFFu, 0xFFFFFFFFu,
-                                         uint32_t(-2 - int32_t(r.Below(9))), 0, 1, 3, 4};
-        guest::StoreU32(h.base, pages + 12, transitions[r.Below(7)]);
-        guest::StoreU32(h.base, pages + 16, r.Below(2) == 0 ? 0xFFFFFFFFu : r.Below(10));
-        guest::StoreU32(h.base, pages + 4, r.Below(8));
-        guest::StoreU32(h.base, pages + 0, r.Below(8));
-        ShapeDialogPages(h.base, r, w);
-        t.r3.u64 = w.block(rs::kAfterScreen);
-      },
-      __imp__sub_8221BB48, hooks::RaceScreensAfterRaceMenuDraw, {176, 56});
+  const MovieSetupFn pause_draw_setup = [&h](PPCContext& t, Random& r, const MovieWorld& w) {
+    guest::StoreU32(h.base, w.block(rs::kPauseList) + rs::kListBlock, 0);
+    const uint32_t pages = w.block(rs::kPausePages);
+    const uint32_t transitions[16] = {0xFFFFFFFFu, 0xFFFFFFFFu, uint32_t(-2 - int32_t(r.Below(9))),
+                                      0, 2, 3, 4, 5, 6, 7, 8, 9, 12, 17, 18, 19};
+    guest::StoreU32(h.base, pages + 12, transitions[r.Below(16)]);
+    guest::StoreU32(h.base, pages + 16, r.Below(2) == 0 ? 0xFFFFFFFFu : r.Below(21));
+    guest::StoreU32(h.base, pages + 4, r.Below(3) == 0 ? 4 : r.Below(6));
+    guest::StoreU32(h.base, pages + 0, r.Below(3) == 0 ? 4 : r.Below(6));
+    ShapeDialogPages(h.base, r, w);
+    t.r3.u64 = w.block(rs::kPauseScreen);
+  };
+  MovieGroup(h, w, "PauseMenu::Draw (sub_8220FB10)", 300, pause_draw_setup, __imp__sub_8220FB10,
+             hooks::RaceScreensPauseMenuDraw, pause_draw);
+  const MovieSetupFn after_draw_setup = [&h](PPCContext& t, Random& r, const MovieWorld& w) {
+    const uint32_t d = w.block(rs::kAfterData);
+    guest::StoreU32(h.base, d + 0, r.Below(8));
+    guest::StoreU32(h.base, d + 4, r.Below(5));
+    const uint32_t pages = w.block(rs::kAfterPages);
+    const uint32_t transitions[7] = {0xFFFFFFFFu, 0xFFFFFFFFu,
+                                     uint32_t(-2 - int32_t(r.Below(9))), 0, 1, 3, 4};
+    guest::StoreU32(h.base, pages + 12, transitions[r.Below(7)]);
+    guest::StoreU32(h.base, pages + 16, r.Below(2) == 0 ? 0xFFFFFFFFu : r.Below(10));
+    guest::StoreU32(h.base, pages + 4, r.Below(8));
+    guest::StoreU32(h.base, pages + 0, r.Below(8));
+    ShapeDialogPages(h.base, r, w);
+    t.r3.u64 = w.block(rs::kAfterScreen);
+  };
+  MovieGroup(h, w, "AfterRaceMenu::Draw (sub_8221BB48)", 200, after_draw_setup,
+             __imp__sub_8221BB48, hooks::RaceScreensAfterRaceMenuDraw, {176, 56});
+  // The race HUD object's tail calls to these draws (race-hud-object.md):
+  // r3 a holder of the case's own (its words random) whose +1012 and +1020
+  // are the screens the draws' cases pass; the holder compared.
+  const Block holder(0x420);
+  if (!holder.address) {
+    ITC_LOG_ERROR("harness: race_screens: no block from the allocation layer");
+    return;
+  }
+  auto of_holder = [&h, &holder](const MovieSetupFn& setup) -> MovieSetupFn {
+    return [&h, &holder, setup](PPCContext& t, Random& r, const MovieWorld& w) {
+      setup(t, r, w);
+      WriteRandom(h.base, holder.address, holder.bytes, r);
+      guest::StoreU32(h.base, holder.address + 1012, w.block(rs::kPauseScreen));
+      guest::StoreU32(h.base, holder.address + 1020, w.block(rs::kAfterScreen));
+      t.r3.u64 = holder.address;
+    };
+  };
+  FrameSpec held_pause = pause_draw;
+  held_pause.after = [&](Outputs& out) {
+    pause_block(out);
+    out.Bytes(Read(h.base, holder.address, holder.bytes));
+  };
+  // The pause menu's list's items (+68) the world's block (ShapeMovieWorld's
+  // item words) but for OpenOptions (6), whose MenuList::Init frees the old
+  // block: ShowMain's ColorItems reads them on its first call.
+  const MovieSetupFn pause_items_setup = [&h, &pause_draw_setup](PPCContext& t, Random& r,
+                                                                const MovieWorld& w) {
+    pause_draw_setup(t, r, w);
+    if (guest::LoadU32(h.base, w.block(rs::kPausePages) + 12) != 6) {
+      guest::StoreU32(h.base, w.block(rs::kPauseList) + rs::kListBlock, w.misc.address + 0x800);
+    }
+  };
+  MovieGroup(h, w, "RaceScreens::DrawPauseMenu (sub_82211D08)", 150, of_holder(pause_items_setup),
+             __imp__sub_82211D08, hooks::RaceHudObjectDrawPauseMenu, held_pause);
+  FrameSpec held_after{176, 56};
+  held_after.after = [&](Outputs& out) { out.Bytes(Read(h.base, holder.address, holder.bytes)); };
+  MovieGroup(h, w, "RaceScreens::DrawAfterRaceMenu (sub_82211D10)", 150,
+             of_holder(after_draw_setup), __imp__sub_82211D10,
+             hooks::RaceHudObjectDrawAfterRaceMenu, held_after);
   auto career = [&h](Random& r, const MovieWorld& w) {
     const uint32_t screen = w.block(rs::kCareerResults);
     guest::StoreU32(h.base, screen + 0, r.Below(6) == 0 ? uint32_t(r.Next()) : r.Below(4));

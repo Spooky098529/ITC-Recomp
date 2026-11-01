@@ -1209,6 +1209,78 @@ void Handlers(Context& h) {
     guest::StoreU32(h.base, records + rh::kRecordBytes * (count - 1) + 3916, word);
     screen_pages(r, w, 0x826D8518, 0x826D8514, 7, 12);
   };
+  // ClosePause: every kind (4's empty sub_82106540 ported); the pause
+  // menu's data ([0x826D84D4], PauseMenu::Close's SaveOptions) a block of
+  // the misc one (+0x4340), written into player 0's save data's options.
+  const std::vector<int32_t> all_kinds = {-1, 0, 1, 2, 3, 4, 5, 6, 7, 8};
+  const HandlerSetupFn by_all = kinds(all_kinds);
+  const HandlerSetupFn close_pause = [&h, &by_all](PPCContext& t, Random& r, const HudWorld& w) {
+    by_all(t, r, w);
+    guest::StoreU32(h.base, 0x826D84D4, w.misc.address + 0x4340);
+  };
+  // A UI movie of the world (the HUD's nine) for the screens' runs.
+  auto any_movie = [](Random& r, const HudWorld& w) { return w.movie(r.Below(9)); };
+  // ResultsDraw: the race data's kind 1 (its mode, +0xA3AF4, 1 to 3), 3, 5,
+  // 7 or any other word (0, 2, 4, 6 and 1 with the mode 0 run the
+  // original, their results' draws never seen in play), player 0's day 1 or
+  // not (IsFirstDay); the career's results (holder +1024) a block of the
+  // misc one (+0x4100) whose running transition (+196) is -1 or another
+  // negative one (the run of its movie +180; the transitions are the
+  // in-race screens' harness's cases).
+  const HandlerSetupFn results_draw = [&h, &by_signed, any_movie](PPCContext& t, Random& r,
+                                                                   const HudWorld& w) {
+    by_signed(t, r, w);
+    uint32_t race_kind = r.Below(4) == 0 ? uint32_t(r.Next()) : (r.Below(2) == 0 ? 1 : 3 + 2 * r.Below(3));
+    if (race_kind == 0 || race_kind == 2 || race_kind == 4 || race_kind == 6) {
+      race_kind = 1;
+    }
+    guest::StoreU32(h.base, w.race.address + 0xA3AF0, race_kind);
+    guest::StoreU32(h.base, w.race.address + 0xA3AF4, 1 + r.Below(3));
+    const uint32_t save = guest::LoadU32(h.base, 0x826C5B58);
+    if (save != 0) {
+      guest::StoreU32(h.base, save + 6100, r.Below(2) == 0 ? 1 : r.Below(4));
+    }
+    const uint32_t screen = w.misc.address + 0x4100;
+    guest::StoreU32(h.base, w.holder.address + 1024, screen);
+    guest::StoreU32(h.base, screen + 196,
+                    r.Below(2) == 0 ? 0xFFFFFFFFu : uint32_t(-2 - int32_t(r.Below(50))));
+    guest::StoreU32(h.base, screen + 180, any_movie(r, w));
+  };
+  // AfterRaceDraw: the racer records as AfterRaceUpdate's cases (kind 6's 1
+  // and 3, sub_8221EF60's, never seen in play, left out); the menu after the
+  // race (holder +1020) a block of the misc one (+0x4200) whose movie (+0)
+  // is the world's, its page object ([0x826D8518], +0x4300) with a negative
+  // running transition (+12: the run) and a page (+0) the confirm dialog's
+  // draw doesn't follow (its draw is the in-race screens' harness's).
+  const HandlerSetupFn after_race_draw = [&h, &by_draw, any_movie](PPCContext& t, Random& r,
+                                                                    const HudWorld& w) {
+    by_draw(t, r, w);
+    const uint32_t records = w.race.address + 0x59AE8;
+    const uint32_t count = 1 + r.Below(3);
+    guest::StoreU32(h.base, records + 0x49FE0, count);
+    uint32_t word = r.Below(6) == 0 ? uint32_t(r.Next()) : r.Below(5);
+    if (int32_t(guest::LoadU32(h.base, w.machine.address + rhm::kKind)) == 6 &&
+        (word == 1 || word == 3)) {
+      word = 2;
+    }
+    guest::StoreU32(h.base, records + rh::kRecordBytes * (count - 1) + 3916, word);
+    const uint32_t screen = w.misc.address + 0x4200, pages = w.misc.address + 0x4300;
+    guest::StoreU32(h.base, w.holder.address + 1020, screen);
+    guest::StoreU32(h.base, screen, any_movie(r, w));
+    guest::StoreU32(h.base, 0x826D8518, pages);
+    guest::StoreU32(h.base, pages + 12,
+                    r.Below(2) == 0 ? 0xFFFFFFFFu : uint32_t(-2 - int32_t(r.Below(50))));
+    const uint32_t page_words[6] = {0xFFFFFFFFu, 0, 1, 5, 7, 8};
+    guest::StoreU32(h.base, pages, page_words[r.Below(6)]);
+    // The original's debug texts' loads: its data ([0x826D8514], +0x4380:
+    // the kind +0 0 to 7, the item count +4 0 to 4) and its menu list
+    // ([0x826D851C], +0x4480: the selection +16).
+    const uint32_t data = w.misc.address + 0x4380;
+    guest::StoreU32(h.base, 0x826D8514, data);
+    guest::StoreU32(h.base, data, r.Below(8));
+    guest::StoreU32(h.base, data + 4, r.Below(5));
+    guest::StoreU32(h.base, 0x826D851C, w.misc.address + 0x4480);
+  };
   struct G {
     const char* name;
     int cases;
@@ -1265,6 +1337,12 @@ void Handlers(Context& h) {
       {"RaceHudMachine::AfterRaceUpdate (sub_8216DD88)", 200, &after_race_update,
        __imp__sub_8216DD88, hooks::RaceHudMachineAfterRaceUpdate, HandlerSpec{128, 40}, false,
        never},
+      {"RaceHudMachine::ClosePause (sub_8216C658)", 100, &close_pause, __imp__sub_8216C658,
+       hooks::RaceHudMachineClosePause, f96, false, never},
+      {"RaceHudMachine::ResultsDraw (sub_8216D6D0)", 120, &results_draw, __imp__sub_8216D6D0,
+       hooks::RaceHudMachineResultsDraw, f96, true, never},
+      {"RaceHudMachine::AfterRaceDraw (sub_8216C6D8, with sub_82211D10)", 150, &after_race_draw,
+       __imp__sub_8216C6D8, hooks::RaceHudMachineAfterRaceDraw, f96, true, never},
   };
   for (const G& g : groups) {
     Results results(g.name);

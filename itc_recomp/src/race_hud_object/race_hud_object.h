@@ -394,5 +394,12 @@ constexpr uint32_t kScreensHolder = 0x826D84F0;
 // ScreensInit(the holder, `kind`), all from a 112-byte frame. ScreensInit's
 // r3.
 uint64_t ScreensCreate(uint8_t* base, uint32_t kind, uint32_t sp, const Calls& calls);
+// sub_82211D08 (RaceScreens::DrawPauseMenu, our name) and sub_82211D10
+// (RaceScreens::DrawAfterRaceMenu): tail calls to PauseMenu::Draw(the
+// holder's +1012) and AfterRaceMenu::Draw(+1020), their plain C++
+// (race_screens::PauseMenuDraw, AfterRaceMenuDraw) from the caller's frame
+// `sp`. The draw's r3.
+uint64_t DrawPauseMenu(uint8_t* base, uint32_t holder, uint32_t sp, const Calls& calls);
+uint64_t DrawAfterRaceMenu(uint8_t* base, uint32_t holder, uint32_t sp, const Calls& calls);
 
 }  // namespace race_hud_object
