@@ -35,7 +35,8 @@ ITC_FLAG_BOOL(native_race_hud_object, true, "ITC",
               "SetTach, SetBoost, SetBar, UpdateSigns, UpdateSign, UpdatePlaceName, SetTime and "
               "SetDistance have no adapters: only their native callers reach them, and the flag "
               "switches those; StartCountdown sub_82212270, StartMovie1 sub_82212718, "
-              "FinishMovie1 sub_82212878, DrawWarning sub_82212AC8, RunMovie1 sub_82212AF8, "
+              "FinishMovie1 sub_82212878, DrawWarning sub_82212AC8 (no adapter: only the race HUD "
+              "machine's PauseDraw's and RacePauseDraw's plain C++ reach it in play), RunMovie1 sub_82212AF8, "
               "RunItem sub_82212B08 (UiMovie::Run and FinishNamed through their overrides), "
               "RaceScreens::MovieMask sub_82211BE8, RaceHud::Init sub_82215260, Draw sub_822128A8 "
               "(UiMovie::Run and the mirror's sub_8211BEE8 through their overrides), "
@@ -453,8 +454,8 @@ void RaceHudObjectTickPanel(PPCContext& ctx, uint8_t* base) {
 // UpdateWarning and TickPanel (since the machine's PauseUpdate and
 // AfterRaceUpdate went native); RaceScreens::Init (from Create, native);
 // DrawAfterRaceMenu (from the race HUD machine's AfterRaceDraw, native);
-// DrawPauseMenu (from the race HUD machine's PauseDraw and RacePauseDraw,
-// native);
+// DrawPauseMenu and DrawWarning (from the race HUD machine's PauseDraw and
+// RacePauseDraw, native);
 // RaceScreens::Create (from the race HUD machine's CreateScreens, native,
 // with --native_heap; without it the original); ApplyOptions (from the race
 // HUD machine's SetUp, PauseUpdate and ClosePause, native).
@@ -471,6 +472,5 @@ void RaceHudObjectTickPanel(PPCContext& ctx, uint8_t* base) {
 
 ITC_RACE_HUD_OBJECT(822141A0, RaceHudObjectTearDown)
 ITC_RACE_HUD_OBJECT(82212270, RaceHudObjectStartCountdown)
-ITC_RACE_HUD_OBJECT(82212AC8, RaceHudObjectDrawWarning)
 ITC_RACE_HUD_OBJECT(822128A8, RaceHudObjectDraw)
 ITC_RACE_HUD_OBJECT(82213638, RaceHudObjectShowItem)

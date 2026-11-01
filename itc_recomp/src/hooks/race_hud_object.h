@@ -72,7 +72,9 @@ void RaceHudObjectTickTimer(PPCContext& ctx, uint8_t* base);
 // RaceHud::StartCountdown sub_82212270, StartMovie1 sub_82212718,
 // FinishMovie1 sub_82212878, DrawWarning sub_82212AC8, RunMovie1
 // sub_82212AF8, RunItem sub_82212B08, Init sub_82215260: r3 = the HUD.
-// RaceScreens::MovieMask sub_82211BE8: r4 = the race kind.
+// RaceScreens::MovieMask sub_82211BE8: r4 = the race kind. DrawWarning has
+// no adapter (its callers in play, the race HUD machine's PauseDraw and
+// RacePauseDraw, call its plain C++): the step for the harness.
 void RaceHudObjectStartCountdown(PPCContext& ctx, uint8_t* base);
 void RaceHudObjectStartMovie1(PPCContext& ctx, uint8_t* base);
 void RaceHudObjectFinishMovie1(PPCContext& ctx, uint8_t* base);
