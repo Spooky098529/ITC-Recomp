@@ -22,6 +22,13 @@ When the user has reviewed a run's section, its heading gets
   `sub_8258EB38`, and two destructors not seen in play. `known-data.md`:
   device +12432, +12436, +11552, +13156; the render queue at scene +
   64. `leads.md`: the render queue's methods.
+- `device-shaders.md` migration (657efc7b..e727bc39,
+  `--native_device_shaders`): 7 rows. For review: native
+  SetVertexShader does `refcount.cpp`'s rebind skip itself (its wrapper
+  became `refcount::SetUnchangedShader` and `NoteSetVertexShader`; with
+  the flag off the entry runs the original with the old skip around
+  it); the constructors are native only with the native heap; their
+  harness compares the allocated blocks by role.
 
 ## Run 2026-10-31 16:54 (`b7-loop-31-10-26`, continued)
 

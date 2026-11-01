@@ -20,7 +20,14 @@ file's history. What's left to see in a drive, from every run:
   SetVertexDeclaration, the render queue's constructor and pass lists;
   `sub_822A8808`'s row moved from `functions.md`, Wrapped by
   `src/native/refcount.cpp`; 4 ready groups, no outside blockers; 1
-  lead added; no subagents). Step: migration agent running.
+  lead added; no subagents). Migration checked (657efc7b..e727bc39:
+  the 7 in play native, 2 adapters removed, `--native_device_shaders`;
+  SetVertexShader keeps `refcount.cpp`'s rebind skip, its wrapper made
+  helpers; harness device_shaders 0 differing, graphics_resources 0
+  outside its expected groups; frame dumps alike; race 38 s, 0 errors;
+  no subagents). Nothing ready left; `PassList::Clear`'s and the
+  setters' adapters stay for recompiled callers. Step: validation agent
+  running.
 
 ## Done
 
@@ -44,5 +51,8 @@ file's history. What's left to see in a drive, from every run:
   before the run.
 - After the device shaders' map: ours 3705, work left 2694 (wrapped
   101, known 519, unknown 2074).
+- After its migration (`itc_3053`: race 38 s, 0 errors, device_shaders
+  0 differing): ours 3712, work left 2687 (wrapped 100, known 513,
+  unknown 2074).
 
 ## Stopped
