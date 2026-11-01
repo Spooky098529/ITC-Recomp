@@ -32,6 +32,11 @@ here loses its heading.
   when the vector grows with allocation allowed, and when `InsertN`
   takes the insert).
 
+- The `XPR::GetTexture` cleanup lead (attract race `itc_3105`, replay
+  `itc_3106` ok; `location-screen.md`, a career screen):
+  `sub_82228E88` LocationScreen::OnPictureLoadedA, `sub_82228FC8`
+  LocationScreen::OnPictureLoadedB.
+
 ## Run 2026-10-31 16:54 (`b7-loop-31-10-26`, continued)
 
 - The in-race screens, third migration (attract race `itc_3046`,

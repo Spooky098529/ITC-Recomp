@@ -75,7 +75,12 @@ file's history. What's left to see in a drive, from every run:
   ready in `scene-loaders.md`: `Cockpit::BindTextures`,
   `TrafficCar::BindTextures`, `ModelPoint::Find`,
   `Cockpit::OnFileLoaded`, `TrafficCar::OnFileLoaded` (a second
-  migration after the validation). Step: validation agent running.
+  migration after the validation). Validated (`itc_3105`, 120 s: race
+  54 s, 0 errors; replay `itc_3106` ok; `OnPictureLoadedB`'s print,
+  shared with A's in one call site, split, 06f85ec9): 21 of 21 harness
+  lines, 12 ran in the race, 7 in the replay, 2 to drive. Second
+  migration (the five left in `scene-loaders.md`): migration agent
+  running.
 
 ## Done
 
