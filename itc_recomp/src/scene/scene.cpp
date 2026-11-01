@@ -4,8 +4,18 @@
 #include "scene/scene.h"
 
 #include "base/log.h"
+#include "car_models/load_slots.h"
+#include "car_models/tga.h"
 #include "guest.h"
+#include "memory/c_runtime_heap.h"
 #include "memory/heap.h"
+#include "models/memory_blocks.h"
+#include "models/model.h"
+#include "models/part_model.h"
+#include "models/texture_provider.h"
+#include "models/xpr.h"
+#include "scene_loaders/loads.h"
+#include "scenery_lists/scenery_lists.h"
 #include "vehicle_accessors/vehicle_accessors.h"
 
 #include <cstdlib>
@@ -117,6 +127,358 @@ void DestroyA(uint8_t* base, uint32_t set, uint32_t sp,
       Require(memory::IsPages(object) && memory::FreePages(object), "VirtualFree");
     }
   }
+}
+
+// --- The shared assets ---
+
+namespace {
+
+// The load slots SceneAssets::Reset resets, the XPRs it releases and the
+// providers it clears, in its order: each step a slot, an XPR, a provider,
+// a part model or a pixels' word (offsets in the assets).
+enum class Step : uint8_t { kSlot, kXpr, kProvider, kModel, kPixels };
+struct ResetStep {
+  Step step;
+  uint32_t offset;
+};
+constexpr ResetStep kResetSteps[] = {
+    {Step::kSlot, 0},        {Step::kXpr, 24},        {Step::kSlot, 48},
+    {Step::kXpr, 96},        {Step::kProvider, 144},  {Step::kSlot, 72},
+    {Step::kXpr, 120},       {Step::kProvider, 164},  {Step::kSlot, 184},
+    {Step::kXpr, 208},       {Step::kProvider, 232},  {Step::kSlot, 252},
+    {Step::kXpr, 276},       {Step::kProvider, 300},  {Step::kSlot, 320},
+    {Step::kXpr, 344},       {Step::kProvider, 368},  {Step::kSlot, 388},
+    {Step::kModel, 416},     {Step::kSlot, 880},      {Step::kSlot, 904},
+    {Step::kPixels, 948},    {Step::kSlot, 4560},     {Step::kXpr, 4584},
+    {Step::kSlot, 952},      {Step::kXpr, 976},       {Step::kProvider, 1000},
+    {Step::kSlot, 1020},     {Step::kXpr, 1044},      {Step::kProvider, 1068},
+    {Step::kSlot, 4048},     {Step::kSlot, 4072},     {Step::kModel, 4096},
+};
+
+uint64_t PendingNodes(uint8_t* base, uint32_t assets) {
+  uint64_t nodes = 2 * std::size(kAssetsXprs);  // XPR::Release checks for two each
+  for (const uint32_t model : kAssetsModels) {
+    nodes += models::ModelReleaseNodes(base, assets + model);
+  }
+  return nodes;
+}
+
+bool Room(uint8_t* base, uint64_t nodes) {
+  return nodes <= 0x3FFFFFFFu && models::PendingFreesHaveRoom(base, uint32_t(nodes));
+}
+
+void ReleaseModel(uint8_t* base, uint32_t model) {
+  Require(models::ModelRelease(base, model).has_value(), "Model::Release");
+}
+
+}  // namespace
+
+bool AssetsConstruct(uint8_t* base, uint32_t assets) {
+  ITC_NATIVE_RUNNING("sub_820C5008 SceneAssets::SceneAssets");
+  if (!models::CanAllocatePointers(base, models::kTextureProviderSlots)) {
+    return false;
+  }
+  auto xpr = [&](uint32_t offset) { models::XprConstruct(base, assets + offset); };
+  auto provider = [&](uint32_t offset) {
+    Require(models::TextureProviderConstruct(base, assets + offset, -1).has_value(),
+            "TextureProvider::TextureProvider");
+  };
+  auto model = [&](uint32_t offset) {
+    Require(models::PartModelConstruct(base, assets + offset), "PartModel::PartModel");
+  };
+  xpr(24);
+  xpr(96);
+  xpr(120);
+  provider(144);
+  provider(164);
+  xpr(208);
+  provider(232);
+  xpr(276);
+  provider(300);
+  xpr(344);
+  provider(368);
+  model(416);
+  car_models::TgaHeaderClear(base, assets + 928);
+  xpr(976);
+  provider(1000);
+  xpr(1044);
+  provider(1068);
+  for (uint32_t i = 0; i < 4; i++) {
+    model(1184 + 464 * i);
+  }
+  for (uint32_t i = 0; i < 19; i++) {
+    car_models::TgaHeaderClear(base, assets + 3668 + 20 * i);
+  }
+  model(4096);
+  xpr(4584);
+  for (uint32_t i = 0; i < 4; i++) {
+    xpr(4704 + 24 * i);
+  }
+  for (uint32_t i = 0; i < 4; i++) {
+    provider(4800 + 20 * i);
+  }
+  return true;
+}
+
+bool AssetsResettable(uint8_t* base, uint32_t assets) {
+  for (const uint32_t provider : kAssetsProviders) {
+    const uint32_t vtable = Load(base, assets + provider);
+    if (Load(base, vtable + 8) != scene_loaders::kTextureProviderClearAll) {
+      return false;
+    }
+  }
+  return Room(base, PendingNodes(base, assets));
+}
+
+std::optional<uint32_t> AssetsReset(uint8_t* base, uint32_t assets) {
+  ITC_NATIVE_RUNNING("sub_820C4A70 SceneAssets::Reset");
+  if (!AssetsResettable(base, assets)) {
+    return std::nullopt;
+  }
+  auto run = [&](const ResetStep& step) {
+    const uint32_t at = assets + step.offset;
+    switch (step.step) {
+      case Step::kSlot:
+        car_models::LoadSlotReset(base, at);
+        break;
+      case Step::kXpr:
+        Require(models::XprRelease(base, at).has_value(), "XPR::Release");
+        break;
+      case Step::kProvider:
+        scenery_lists::TextureProviderClearAll(base, at);
+        break;
+      case Step::kModel:
+        ReleaseModel(base, at);
+        break;
+      case Step::kPixels:
+        Store(base, at, 0);
+        break;
+    }
+  };
+  for (const ResetStep& step : kResetSteps) {
+    run(step);
+  }
+  for (uint32_t i = 0; i < 4; i++) {
+    car_models::LoadSlotReset(base, assets + 1088 + 24 * i);
+    ReleaseModel(base, assets + 1184 + 464 * i);
+    car_models::LoadSlotReset(base, assets + 3040 + 24 * i);
+  }
+  for (uint32_t i = 0; i < 19; i++) {
+    car_models::LoadSlotReset(base, assets + 3136 + 24 * i);
+    Store(base, assets + 3592 + 4 * i, 0);
+  }
+  for (uint32_t i = 0; i < 4; i++) {
+    car_models::LoadSlotReset(base, assets + 4608 + 24 * i);
+    Require(models::XprRelease(base, assets + 4704 + 24 * i).has_value(), "XPR::Release");
+    scenery_lists::TextureProviderClearAll(base, assets + 4800 + 20 * i);
+  }
+  return assets + 4860;  // ClearAll leaves r3 the provider
+}
+
+bool AssetsDestructible(uint8_t* base, uint32_t assets) {
+  for (const uint32_t provider : kAssetsProviders) {
+    const uint32_t storage = Load(base, assets + provider + models::kTextureProviderVector +
+                                            models::kVectorFirst);
+    if (storage != 0 && !memory::IsHeapBlock(storage)) {
+      return false;
+    }
+  }
+  for (const uint32_t model : kAssetsModels) {
+    if (!models::ModelMembersDestructible(base, assets + model)) {
+      return false;
+    }
+  }
+  return Room(base, PendingNodes(base, assets));
+}
+
+std::optional<uint32_t> AssetsDestruct(uint8_t* base, uint32_t assets) {
+  ITC_NATIVE_RUNNING("sub_820C5168 SceneAssets::~SceneAssets");
+  if (!AssetsDestructible(base, assets)) {
+    return std::nullopt;
+  }
+  auto xpr = [&](uint32_t offset) {
+    const auto r3 = models::XprDestruct(base, assets + offset);
+    Require(r3.has_value(), "XPR::~XPR");
+    return *r3;
+  };
+  auto provider = [&](uint32_t offset) {
+    Require(models::TextureProviderDestruct(base, assets + offset).has_value(),
+            "TextureProvider::~TextureProvider");
+  };
+  auto model = [&](uint32_t offset) {
+    Require(models::PartModelDestruct(base, assets + offset).has_value(),
+            "PartModel::~PartModel");
+  };
+  for (uint32_t i = 4; i-- > 0;) {
+    provider(4800 + 20 * i);
+  }
+  for (uint32_t i = 4; i-- > 0;) {
+    xpr(4704 + 24 * i);
+  }
+  xpr(4584);
+  model(4096);
+  // The 19 TGA headers' destructor (sub_82106540) is empty.
+  for (uint32_t i = 4; i-- > 0;) {
+    model(1184 + 464 * i);
+  }
+  provider(1068);
+  xpr(1044);
+  provider(1000);
+  xpr(976);
+  model(416);
+  provider(368);
+  xpr(344);
+  provider(300);
+  xpr(276);
+  provider(232);
+  xpr(208);
+  provider(164);
+  provider(144);
+  xpr(120);
+  xpr(96);
+  return xpr(24);
+}
+
+// --- The scene ---
+
+bool CarSceneConstruct(uint8_t* base, uint32_t scene) {
+  ITC_NATIVE_RUNNING("sub_820C89A8 CarScene::CarScene");
+  if (!models::CanAllocatePointers(base, models::kTextureProviderSlots)) {
+    return false;
+  }
+  SetUpConstruct(base, scene + 4);
+  Require(AssetsConstruct(base, scene + kAssets), "SceneAssets::SceneAssets");
+  for (uint32_t i = 0; i < 8; i++) {
+    vehicle_accessors::ListInit(base, scene + 4944 + 12 * i);
+  }
+  const uint32_t one = Load(base, 0x82000A30);  // 1.0, stored as lfs and stfs leave it
+  for (uint32_t i = 0; i < 5; i++) {
+    Store(base, scene + 5180 + 16 * i, one);
+  }
+  for (uint32_t i = 0; i < 8; i++) {
+    Store(base, scene + 5260 + 16 * i, one);
+  }
+  for (uint32_t i = 0; i < 9; i++) {
+    Store(base, scene + 5388 + 16 * i, one);
+  }
+  return true;
+}
+
+void ListDeleteAll(uint8_t* base, uint32_t list, uint32_t sp, const DestroyCall& destroy) {
+  ITC_NATIVE_RUNNING("sub_82593FF8 List::DeleteAll");
+  const uint32_t frame = sp - 96;
+  Store(base, frame, sp);
+  for (uint32_t node = Load(base, list); node != 0; node = Load(base, list)) {
+    destroy(node, 1, frame);
+  }
+}
+
+void ListDestruct(uint8_t* base, uint32_t list, uint32_t sp, const DestroyCall& destroy) {
+  ITC_NATIVE_RUNNING("sub_82594188 List::~List");
+  ListDeleteAll(base, list, sp, destroy);
+}
+
+bool CarSceneDestructible(uint8_t* base, uint32_t scene, uint32_t flags) {
+  return AssetsDestructible(base, scene + kAssets) &&
+         ((flags & 1) == 0 || memory::IsHeapBlock(scene));
+}
+
+std::optional<uint32_t> CarSceneDestruct(uint8_t* base, uint32_t scene, uint32_t flags,
+                                         uint32_t sp, const DestroyCall& destroy) {
+  ITC_NATIVE_RUNNING("sub_820C9110 CarScene::~CarScene");
+  if (!CarSceneDestructible(base, scene, flags)) {
+    return std::nullopt;
+  }
+  const uint32_t frame = sp - 128;
+  Store(base, frame, sp);
+  for (uint32_t i = 8; i-- > 0;) {
+    // List::~List (sub_82594188) is a jump to DeleteAll: its frame below
+    // ~CarScene's.
+    ListDestruct(base, scene + 4944 + 12 * i, frame, destroy);
+  }
+  Require(AssetsDestruct(base, scene + kAssets).has_value(), "SceneAssets::~SceneAssets");
+  if (flags & 1) {
+    Require(memory::crt::OperatorDelete(scene), "operator delete");
+  }
+  return scene;
+}
+
+// --- The first set's update ---
+
+bool UpdateANative(uint8_t* base) {
+  const uint32_t set = Load(base, kFirstSet);
+  if (set == 0 || int32_t(Load(base, set + 4)) != 4 || Load(base, set + 0) != 0) {
+    return true;
+  }
+  const uint32_t records = Load(base, set + 52);
+  return DestroyAFreeable(base, set) && records != 0 && memory::IsPages(records) &&
+         memory::IsPages(set);
+}
+
+std::optional<uint32_t> UpdateA(uint8_t* base, uint32_t sp, const DestroyCall& destroy,
+                                const TextureFreeCall& texture_free) {
+  ITC_NATIVE_RUNNING("sub_820C3DA0 ScenePools::UpdateA");
+  uint32_t set = Load(base, kFirstSet);
+  if (set == 0) {
+    return std::nullopt;
+  }
+  const uint32_t frame = sp - 128;
+  // The four words of a record cleared, [+52] read again for each.
+  auto clear = [&](uint32_t at) {
+    for (uint32_t w = 0; w < 4; w++) {
+      Store(base, Load(base, set + 52) + at + 4 * w, 0);
+    }
+  };
+  auto count = [&]() { return int32_t((Load(base, set + 40) + Load(base, set + 12)) << 2); };
+  std::optional<uint32_t> r3;
+  if (int32_t(Load(base, set + 4)) != 4) {
+    const int32_t n = count();
+    for (int32_t i = 0; i < n; i++) {
+      const uint32_t at = 20 * uint32_t(i);
+      const uint32_t record = Load(base, set + 52) + at;
+      const int32_t state = int32_t(Load(base, record + 16));
+      if (state <= 0) {
+        continue;
+      }
+      Store(base, record + 16, uint32_t(state - 1));
+      const uint32_t again = Load(base, set + 52) + at;
+      r3 = again;
+      if (Load(base, again + 16) != 0) {
+        continue;
+      }
+      texture_free(again, again + 4, frame);
+      const uint32_t second = Load(base, set + 52) + at;
+      r3 = texture_free(second + 8, second + 12, frame);
+      clear(at);
+    }
+    return r3;
+  }
+  if (Load(base, set + 0) != 0) {
+    Store(base, set + 0, Load(base, set + 0) - 1);
+    return std::nullopt;
+  }
+  Store(base, frame, sp);
+  DestroyA(base, set, frame, [&](uint32_t object, uint32_t destroy_frame) {
+    destroy(object, 0, destroy_frame);
+  });
+  set = Load(base, kFirstSet);
+  const int32_t n = count();
+  for (int32_t i = 0; i < n; i++) {
+    const uint32_t at = 20 * uint32_t(i);
+    const uint32_t record = Load(base, set + 52) + at;
+    if (int32_t(Load(base, record + 16)) <= 0) {
+      continue;
+    }
+    texture_free(record, record + 4, frame);
+    const uint32_t second = Load(base, set + 52) + at;
+    texture_free(second + 8, second + 12, frame);
+    clear(at);
+  }
+  Require(FreePagesIn(base, set + 52).has_value(), "FreePagesIn");
+  const uint32_t pages = Load(base, kFirstSet);
+  Require(memory::IsPages(pages) && memory::FreePages(pages), "VirtualFree");
+  Store(base, kFirstSet, 0);
+  return 1;
 }
 
 }  // namespace scene

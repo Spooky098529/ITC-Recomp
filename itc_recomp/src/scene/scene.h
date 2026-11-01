@@ -66,4 +66,93 @@ void DestroyA(uint8_t* base, uint32_t set, uint32_t sp,
 // 4,096 nodes).
 bool DestroyAFreeable(uint8_t* base, uint32_t set);
 
+// --- The shared assets (scene + 64) ---
+
+// The assets' members, at their offsets in the assets: the XPR objects, the
+// texture providers and the part models (the layout in scene.md's intro).
+constexpr uint32_t kAssetsXprs[13] = {24, 96, 120, 208, 276, 344, 976, 1044, 4584,
+                                      4704, 4728, 4752, 4776};
+constexpr uint32_t kAssetsProviders[11] = {144, 164, 232, 300, 368, 1000, 1068,
+                                           4800, 4820, 4840, 4860};
+constexpr uint32_t kAssetsModels[6] = {416, 1184, 1648, 2112, 2576, 4096};
+
+// SceneAssets::SceneAssets (sub_820C5008): XPR::XPR, TextureProvider's
+// constructor (64 slots), PartModel::PartModel and TgaHeader::Clear on the
+// members, in the original's order (the load slots untouched). Returns the
+// assets. False, with nothing done, where a member's plain C++ would refuse
+// (a provider's storage operator new can't give natively); only where the
+// models' lifetime is native (the adapter's check).
+bool AssetsConstruct(uint8_t* base, uint32_t assets);
+
+// SceneAssets::Reset (sub_820C4A70): LoadSlot::Reset on every slot,
+// XPR::Release on every XPR, the providers' slot 2 (TextureProvider::ClearAll),
+// Model::Release on the part models, the TGA pixels' words (+948, +3592 +
+// 4i) = 0, in the layout's order. Returns the r3 it leaves (the last
+// provider, +4860); nullopt, with nothing done, where AssetsResettable says
+// no. Only where the models' lifetime is native.
+std::optional<uint32_t> AssetsReset(uint8_t* base, uint32_t assets);
+// Whether AssetsReset runs natively (nothing changed): each provider's slot
+// 2 TextureProvider::ClearAll, room in the pending frees for every block it
+// may put off.
+bool AssetsResettable(uint8_t* base, uint32_t assets);
+
+// SceneAssets::~SceneAssets (sub_820C5168): what the constructor made, last
+// first (the TGA headers' empty destructor left out). Returns the r3 it
+// leaves (XPR::~XPR's on +24); nullopt, with nothing done, where a member's
+// plain C++ would refuse. Only where the models' lifetime is native.
+std::optional<uint32_t> AssetsDestruct(uint8_t* base, uint32_t assets);
+bool AssetsDestructible(uint8_t* base, uint32_t assets);
+
+// --- The scene ---
+
+// CarScene::CarScene (sub_820C89A8): SceneSetUp::SceneSetUp (+4),
+// SceneAssets::SceneAssets (+64), List::Init on the eight lists at +4944 +
+// 12i, then the float at 0x82000A30 (1.0) into +5180 + 16i (five), +5260 +
+// 16i (eight) and +5388 + 16i (nine). Returns the scene; false where
+// AssetsConstruct refuses (nothing done).
+bool CarSceneConstruct(uint8_t* base, uint32_t scene);
+
+// The pool objects' deleting destructors (vtable slot 0 with r4 = `flags`),
+// a guest call from `frame` (its back chain stored), from the return address
+// the caller gives.
+using DestroyCall = std::function<void(uint32_t object, uint32_t flags, uint32_t frame)>;
+
+// List::DeleteAll (sub_82593FF8), through List::~List (sub_82594188, a
+// jump): while the list's first node (+0) isn't 0, its slot 0 with r4 = 1,
+// from the 96-byte frame below `sp`. r3 is left 0.
+void ListDeleteAll(uint8_t* base, uint32_t list, uint32_t sp, const DestroyCall& destroy);
+// List::~List (sub_82594188): a jump to DeleteAll (the same frame).
+void ListDestruct(uint8_t* base, uint32_t list, uint32_t sp, const DestroyCall& destroy);
+
+// CarScene::~CarScene (sub_820C9110): List::~List on the eight lists, last
+// first (from the 128-byte frame below `sp`), SceneAssets::~SceneAssets
+// (+64), the set-up record's empty destructor left out, then operator
+// delete when `flags`' bit 0 is set. Returns the scene; nullopt, with
+// nothing done, where CarSceneDestructible says no.
+std::optional<uint32_t> CarSceneDestruct(uint8_t* base, uint32_t scene, uint32_t flags,
+                                         uint32_t sp, const DestroyCall& destroy);
+bool CarSceneDestructible(uint8_t* base, uint32_t scene, uint32_t flags);
+
+// ScenePools::UpdateA (sub_820C3DA0): the first set's update (scene.md's
+// row): the deferred texture releases counted down and freed
+// (Texture::Free), or in a teardown (+4 = 4) the count (+0) down and at 0
+// DestroyA, every pending release freed, FreePagesIn(+52), the set's pages
+// freed and [0x826C2E40] = 0. `sp` the guest r1 at entry (DestroyA's frame
+// below its 128-byte one). Returns the r3 it leaves, or nullopt (r3 as
+// given). Only where UpdateANative (the adapter's check).
+//
+// Texture::Free's calls go through `texture_free(header_in, data_in,
+// frame)` (its plain C++ where its adapter would run it, else the original
+// from UpdateA's frame), answering the r3 it leaves: the pool objects'
+// destructors may put off releases of their own before the teardown frees
+// them.
+using TextureFreeCall =
+    std::function<uint32_t(uint32_t header_in, uint32_t data_in, uint32_t frame)>;
+std::optional<uint32_t> UpdateA(uint8_t* base, uint32_t sp, const DestroyCall& destroy,
+                                const TextureFreeCall& texture_free);
+// Whether UpdateA runs natively (nothing changed): no first set, no
+// teardown due, or DestroyAFreeable with the records' block (+52) and the
+// set the allocation layer's pages.
+bool UpdateANative(uint8_t* base);
+
 }  // namespace scene

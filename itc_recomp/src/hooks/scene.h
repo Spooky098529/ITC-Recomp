@@ -26,4 +26,24 @@ void SceneSetInteriorWord(PPCContext& ctx, uint8_t* base);
 // guest calls. Natively only over the layer where DestroyAFreeable.
 void SceneDestroyA(PPCContext& ctx, uint8_t* base);
 
+// SceneAssets::SceneAssets sub_820C5008 (r3 the assets, left) and
+// CarScene::CarScene sub_820C89A8 (r3 the scene, left): natively where the
+// models' lifetime is native.
+void SceneAssetsConstruct(PPCContext& ctx, uint8_t* base);
+void SceneCarSceneConstruct(PPCContext& ctx, uint8_t* base);
+// SceneAssets::Reset sub_820C4A70 and ~SceneAssets sub_820C5168: r3 the
+// assets; the r3 the original leaves.
+void SceneAssetsReset(PPCContext& ctx, uint8_t* base);
+void SceneAssetsDestruct(PPCContext& ctx, uint8_t* base);
+// List::DeleteAll sub_82593FF8 and List::~List sub_82594188: r3 the list;
+// the nodes' deleting destructors guest calls.
+void SceneListDeleteAll(PPCContext& ctx, uint8_t* base);
+void SceneListDestruct(PPCContext& ctx, uint8_t* base);
+// CarScene::~CarScene sub_820C9110: r3 the scene, r4 the flags.
+void SceneCarSceneDestruct(PPCContext& ctx, uint8_t* base);
+// ScenePools::UpdateA sub_820C3DA0: over the layer where UpdateANative;
+// Texture::Free's plain C++ where its adapter would run it, else the
+// original from UpdateA's frame.
+void SceneUpdateA(PPCContext& ctx, uint8_t* base);
+
 }  // namespace hooks

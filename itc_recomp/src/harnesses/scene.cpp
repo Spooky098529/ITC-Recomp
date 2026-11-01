@@ -9,6 +9,7 @@
 // were freed. Compared with harness::Outputs.
 
 #include "harness.h"
+#include "pending_frees.h"
 
 #include "accessories/accessories.h"
 #include "base/flags.h"
@@ -17,13 +18,20 @@
 #include "hooks/heap.h"
 #include "hooks/models.h"
 #include "hooks/scene.h"
+#include "memory/c_runtime_heap.h"
 #include "memory/heap.h"
+#include "models/memory_blocks.h"
+#include "models/model.h"
+#include "models/texture_provider.h"
+#include "models/xpr.h"
 #include "scene/scene.h"
 #include "scene_loaders/pools.h"
 
 #include <fmt/format.h>
 
+#include <algorithm>
 #include <functional>
+#include <mutex>
 #include <string>
 #include <vector>
 
@@ -259,6 +267,313 @@ void DestroyA(Context& h, const Block& block) {
   results.Report();
 }
 
+// --- The shared assets and the scene ---
+
+constexpr uint32_t kStorageMarker = 0x53544F52;  // a provider's storage, taken
+
+// A texture provider's storage after a case: compared as a marker, its
+// size and capacity and its words (nulls after the constructors and
+// ClearAll), then freed and the vector's words cleared.
+void TakeProvider(uint8_t* base, uint32_t provider, Outputs& out) {
+  const uint32_t vector = provider + models::kTextureProviderVector;
+  const uint32_t first = Load(base, vector + models::kVectorFirst);
+  const uint32_t last = Load(base, vector + models::kVectorLast);
+  const uint32_t end = Load(base, vector + models::kVectorEnd);
+  const bool heap = first != 0 && memory::IsHeapBlock(first);
+  out.Word(heap ? kStorageMarker : first);
+  out.Word(last - first);
+  out.Word(end - first);
+  if (heap && last - first <= 4096) {
+    for (uint32_t p = first; p != last; p += 4) {
+      out.Word(Load(base, p));
+    }
+  }
+  if (heap) {
+    memory::crt::OperatorDelete(first);
+  }
+  for (uint32_t w = 0; w < 3; w++) {
+    Store(base, vector + 4 + 4 * w, 0);
+  }
+}
+
+// Every provider in the assets (theirs and the part models'), taken.
+void TakeAssetProviders(uint8_t* base, uint32_t assets, Outputs& out) {
+  for (const uint32_t provider : scene::kAssetsProviders) {
+    TakeProvider(base, assets + provider, out);
+  }
+  for (const uint32_t model : scene::kAssetsModels) {
+    TakeProvider(base, assets + model + models::kModelTextures, out);
+  }
+}
+
+// The register steps of the constructors without the flag (the harness's
+// own way to make the assets the other cases start from).
+void MakeAssets(PPCContext& ctx, uint8_t* base, uint32_t assets) {
+  ctx.r3.u64 = assets;
+  hooks::SceneAssetsConstruct(ctx, base);
+}
+
+// Blocks for the releases: some XPRs' header and data words, and the part
+// models' +16, a tagged block (its header in the block from `headers`) or
+// 0, from `r`.
+void WriteAssetBlocks(uint8_t* base, uint32_t assets, uint32_t headers, Random& r) {
+  uint32_t next = 0;
+  auto block_for = [&]() {
+    const uint32_t words[3] = {uint32_t(r.Next()), uint32_t(r.Next()), uint32_t(r.Next())};
+    const uint32_t kind = r.Below(3) == 0 ? 2 : 0;
+    const uint32_t header = headers + 16 * next++;
+    return pending_frees::WriteBlock(base, kind, header, words);
+  };
+  for (const uint32_t xpr : scene::kAssetsXprs) {
+    Store(base, assets + xpr + models::kXprHeader, block_for());
+    Store(base, assets + xpr + models::kXprData, block_for());
+  }
+  for (const uint32_t model : scene::kAssetsModels) {
+    Store(base, assets + model + 16, block_for());
+  }
+}
+
+void Assets(Context& h, const Block& block) {
+  if (!hooks::ModelsNativeLifetime() || !hooks::ModelsHostLock()) {
+    ITC_LOG_WARN("harness: scene: the models' lifetime isn't native: the assets' cases skipped");
+    return;
+  }
+  std::lock_guard<std::recursive_mutex> lock(models::MemoryBlocksMutex());
+  const uint32_t assets = block.address + 0x100;
+  const uint32_t headers = block.address + 0x8000;
+  struct Case {
+    const char* name;
+    GuestFunction recompiled, native;
+    bool made;  // the assets made first (the constructor's register step)
+  };
+  const Case cases[] = {
+      {"SceneAssets::SceneAssets (sub_820C5008)", Original<__imp__sub_820C5008>,
+       hooks::SceneAssetsConstruct, false},
+      {"SceneAssets::Reset (sub_820C4A70, on the game's list)", Original<__imp__sub_820C4A70>,
+       hooks::SceneAssetsReset, true},
+      {"SceneAssets::~SceneAssets (sub_820C5168, on the game's list)",
+       Original<__imp__sub_820C5168>, hooks::SceneAssetsDestruct, true},
+  };
+  for (const Case& f : cases) {
+    Results results(f.name);
+    for (int c = 0; c < 8; c++) {
+      const uint64_t seed = h.random.Next();
+      Outputs out[2];
+      for (int v = 0; v < 2; v++) {
+        Random r(seed);
+        WriteRandom(h.base, block.address, block.bytes, r);
+        PPCContext t = CallContext(h);
+        if (f.made) {
+          MakeAssets(t, h.base, assets);
+          if (c > 0) {
+            WriteAssetBlocks(h.base, assets, headers, r);
+          }
+        }
+        const pending_frees::ListState was = pending_frees::SaveList(h.base);
+        t.r3.u64 = assets;
+        (v == 0 ? f.recompiled : f.native)(t, h.base);
+        pending_frees::TakeAddedNodes(h.base, was, out[v]);
+        TakeAssetProviders(h.base, assets, out[v]);
+        out[v].Bytes(Read(h.base, block.address, block.bytes));
+        out[v].Word(t.r3.u32);
+        out[v].Word(uint32_t(t.r3.u64 >> 32));
+      }
+      results.Check(out[0], out[1], fmt::format("case {}", c));
+    }
+    results.Report();
+  }
+}
+
+// List::DeleteAll and ~List: 0 to 4 pool nodes in the list (in the block),
+// each one's vtable slot 0 ~PoolNode (it unlinks the node; r4 ignored).
+void Lists(Context& h, const Block& block) {
+  const uint32_t list = block.address + 0x400;
+  const uint32_t vtable = block.address + 0x300;
+  const struct {
+    const char* name;
+    GuestFunction recompiled, native;
+  } cases[] = {
+      {"List::DeleteAll (sub_82593FF8)", Original<__imp__sub_82593FF8>,
+       hooks::SceneListDeleteAll},
+      {"List::~List (sub_82594188)", Original<__imp__sub_82594188>, hooks::SceneListDestruct},
+  };
+  for (const auto& f : cases) {
+    Cases(h, block, f.name, 12, f.recompiled, f.native, [&](PPCContext& t, Random& r) {
+      Store(h.base, vtable, kPoolNodeDestruct);
+      Store(h.base, list + 0, 0);
+      Store(h.base, list + 4, 0);
+      Store(h.base, list + 8, 0);
+      const uint32_t count = r.Below(5);
+      for (uint32_t k = 0; k < count; k++) {
+        const uint32_t node = block.address + 0x1000 + 0x40 * k;
+        scene_loaders::PoolNodeConstruct(h.base, node, list);
+        Store(h.base, node, vtable);
+      }
+      t.r3.u64 = list;
+    });
+  }
+}
+
+// CarScene::CarScene and ~CarScene (r4 = 0: the scene's pages are freed by
+// its caller): the scene in the block, made first for the destructor, its
+// lists empty or holding pool nodes (their slot 0 ~PoolNode).
+void Scenes(Context& h, const Block& block) {
+  if (!hooks::ModelsNativeLifetime() || !hooks::ModelsHostLock()) {
+    return;
+  }
+  std::lock_guard<std::recursive_mutex> lock(models::MemoryBlocksMutex());
+  const uint32_t scene = block.address + 0x100;
+  const uint32_t headers = block.address + 0x8000;
+  const uint32_t vtable = block.address + 0x40;
+  for (int which = 0; which < 2; which++) {
+    Results results(which == 0 ? "CarScene::CarScene (sub_820C89A8)"
+                               : "CarScene::~CarScene (sub_820C9110, on the game's list)");
+    for (int c = 0; c < 8; c++) {
+      const uint64_t seed = h.random.Next();
+      Outputs out[2];
+      for (int v = 0; v < 2; v++) {
+        Random r(seed);
+        WriteRandom(h.base, block.address, block.bytes, r);
+        PPCContext t = CallContext(h);
+        if (which == 1) {
+          t.r3.u64 = scene;
+          hooks::SceneCarSceneConstruct(t, h.base);
+          if (c > 0) {
+            WriteAssetBlocks(h.base, scene + scene::kAssets, headers, r);
+          }
+          Store(h.base, vtable, kPoolNodeDestruct);
+          for (uint32_t i = 0; i < 8; i++) {
+            if (r.Below(4) == 0) {
+              const uint32_t node = block.address + 0x2000 + 0x40 * i;
+              scene_loaders::PoolNodeConstruct(h.base, node, scene + 4944 + 12 * i);
+              Store(h.base, node, vtable);
+            }
+          }
+          t.r4.u64 = 0;
+        }
+        const pending_frees::ListState was = pending_frees::SaveList(h.base);
+        t.r3.u64 = scene;
+        if (which == 0) {
+          (v == 0 ? Original<__imp__sub_820C89A8> : hooks::SceneCarSceneConstruct)(t, h.base);
+          TakeAssetProviders(h.base, scene + scene::kAssets, out[v]);
+        } else {
+          (v == 0 ? Original<__imp__sub_820C9110> : hooks::SceneCarSceneDestruct)(t, h.base);
+        }
+        pending_frees::TakeAddedNodes(h.base, was, out[v]);
+        out[v].Bytes(Read(h.base, block.address, block.bytes));
+        out[v].Word(t.r3.u32);
+        out[v].Word(uint32_t(t.r3.u64 >> 32));
+      }
+      results.Check(out[0], out[1], fmt::format("case {}", c));
+    }
+    results.Report();
+  }
+}
+
+// ScenePools::UpdateA: the first set none, counting down its releases (in
+// the block, the records' textures' words 0 or the case's pages for the
+// headers, as Texture::Free takes them), or in a teardown (+4 = 4) with its
+// count above 0 or at 0: then the set, its records and its pool objects
+// the case's pages (the objects pool nodes whose slot 0 is ~PoolNode).
+void UpdateA(Context& h, const Block& block) {
+  if (!hooks::NativeHeapActive()) {
+    return;
+  }
+  Results results("ScenePools::UpdateA (sub_820C3DA0)");
+  const uint32_t vtable = block.address + 0x40;
+  for (int c = 0; c < 32; c++) {
+    const uint64_t seed = h.random.Next();
+    Outputs out[2];
+    for (int v = 0; v < 2; v++) {
+      Globals globals(h.base);
+      Random r(seed);
+      WriteRandom(h.base, block.address, block.bytes, r);
+      Store(h.base, vtable, kPoolNodeDestruct);
+      const uint32_t kind = c < 4 ? 0 : 1 + r.Below(3);  // none, releases, teardown, due
+      const bool due = kind == 3;
+      const uint32_t set = due ? memory::AllocPages(4096, 4096) : block.address + 0x100;
+      if (due) {
+        WriteRandom(h.base, set, 4096, r);
+      }
+      Store(h.base, scene::kFirstSet, kind == 0 ? 0 : set);
+      Store(h.base, set + 4, kind == 1 ? r.Below(4) : 4);
+      Store(h.base, set + 0, kind == 2 ? 1 + r.Below(3) : 0);
+      Store(h.base, set + 40, r.Below(3));
+      Store(h.base, set + 12, r.Below(3));
+      const uint32_t n = (Load(h.base, set + 40) + Load(h.base, set + 12)) * 4;
+      const uint32_t records = due ? memory::AllocPages(4096, 4096) : block.address + 0x1000;
+      Store(h.base, set + 52, records);
+      std::vector<uint32_t> pages;
+      for (uint32_t i = 0; i < n; i++) {
+        const uint32_t record = records + 20 * i;
+        for (uint32_t w = 0; w < 4; w++) {
+          const bool header = (w & 1) == 0;
+          // A header's word holds the case's pages or 0; a data word 0.
+          uint32_t value = 0;
+          if (header && r.Below(3) == 0) {
+            value = memory::AllocPages(4096, 4096);
+            pages.push_back(value);
+          }
+          Store(h.base, record + 4 * w, value);
+        }
+        Store(h.base, record + 16, r.Below(4) == 0 ? 0xFFFFFFFFu : r.Below(3));
+      }
+      std::vector<uint32_t> objects;
+      for (uint32_t pool = 0; pool < 7; pool++) {
+        const uint32_t list = set + 56 + 12 * pool;
+        Store(h.base, list + 0, 0);
+        Store(h.base, list + 4, 0);
+        Store(h.base, list + 8, 0);
+        const uint32_t count = due ? r.Below(3) : 0;
+        for (uint32_t k = 0; k < count; k++) {
+          const uint32_t object = memory::AllocPages(4096, 4096);
+          scene_loaders::PoolNodeConstruct(h.base, object, list);
+          Store(h.base, object, vtable);
+          objects.push_back(object);
+        }
+      }
+      PPCContext t = CallContext(h);
+      t.r3.u64 = r.Next();
+      (v == 0 ? Original<__imp__sub_820C3DA0> : hooks::SceneUpdateA)(t, h.base);
+      out[v].Word(Load(h.base, scene::kFirstSet) == set);
+      for (const auto* list : {&pages, &objects}) {
+        for (const uint32_t p : *list) {
+          const bool freed = !memory::IsPages(p);
+          out[v].Word(freed);
+          if (!freed) {
+            memory::FreePages(p);
+          }
+        }
+      }
+      if (due) {
+        out[v].Word(!memory::IsPages(set));
+        out[v].Word(!memory::IsPages(records));
+        for (const uint32_t p : {set, records}) {
+          if (memory::IsPages(p)) {
+            memory::FreePages(p);
+          }
+        }
+      } else {
+        // The records' header words: the case's pages as a marker.
+        for (uint32_t i = 0; i < n; i++) {
+          for (uint32_t w = 0; w < 4; w++) {
+            const uint32_t at = records + 20 * i + 4 * w;
+            const uint32_t value = Load(h.base, at);
+            if (value != 0 && std::find(pages.begin(), pages.end(), value) != pages.end()) {
+              Store(h.base, at, kStorageMarker);
+            }
+          }
+        }
+        out[v].Bytes(Read(h.base, block.address, block.bytes));
+      }
+      out[v].Word(t.r3.u32);
+      out[v].Word(uint32_t(t.r3.u64 >> 32));
+    }
+    results.Check(out[0], out[1], fmt::format("case {}", c));
+  }
+  results.Report();
+}
+
 }  // namespace
 
 void Scene(Context& h) {
@@ -266,6 +581,10 @@ void Scene(Context& h) {
   SmallPieces(h, block);
   Pages(h, block);
   DestroyA(h, block);
+  Assets(h, block);
+  Lists(h, block);
+  Scenes(h, block);
+  UpdateA(h, block);
 }
 
 }  // namespace harness
