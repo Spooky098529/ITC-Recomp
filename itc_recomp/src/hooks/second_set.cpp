@@ -6,6 +6,7 @@
 
 #include "base/flags.h"
 #include "native/buffers.h"
+#include "second_set/blocks.h"
 #include "second_set/finds.h"
 #include "second_set/point_groups.h"
 #include "second_set/points.h"
@@ -34,7 +35,15 @@ ITC_FLAG_BOOL(native_second_set, true, "ITC",
               "sub_820E3200, ResetSteering sub_820E33F0, ResetSeats sub_820E3440, ResetRollCage "
               "sub_820E34F8, LightPoints::ResetFront sub_820DC748, ResetSides sub_820DC7A0, "
               "ResetRear sub_820DC7F8, TrafficPoints::ResetBody sub_820E54E8, ResetHeadlights "
-              "sub_820E56D0 and ResetTailLights sub_820E57A0; with "
+              "sub_820E56D0 and ResetTailLights sub_820E57A0, the point blocks' constructors and "
+              "resets: PartsPoints::PartsPoints sub_820E2A10 and Reset sub_820E00F0 (with "
+              "--native_material_passes; with InitLeftDoor sub_820DF5B8, InitRightDoor "
+              "sub_820DF610, InitHeadlights sub_820E1388 and InitMufflers sub_820E0010, no "
+              "adapters: only PartsPoints::PartsPoints calls them), "
+              "CockpitPoints::CockpitPoints sub_820DC190 and Reset sub_820DBC10, "
+              "InteriorPoints::InteriorPoints sub_820E4FD8 and Reset sub_820E35D8, "
+              "LightPoints::LightPoints sub_820DDCF8 and Reset sub_820DC8A8, "
+              "TrafficPoints::TrafficPoints sub_820E68E8 and Reset sub_820E5880; with "
               "--native_models and --native_material_passes the point set-ups "
               "PartsPoints::Find sub_820E0258, CockpitPoints::Find sub_820DBC88, "
               "InteriorPoints::Find sub_820E3660, LightPoints::Find sub_820DC900 and "
@@ -139,6 +148,14 @@ ITC_SECOND_SET_GROUP(820DC7F8, LightsResetRear)
 ITC_SECOND_SET_GROUP(820E54E8, TrafficResetBody)
 ITC_SECOND_SET_GROUP(820E56D0, TrafficResetHeadlights)
 ITC_SECOND_SET_GROUP(820E57A0, TrafficResetTailLights)
+ITC_SECOND_SET_GROUP(820DC190, CockpitPointsConstruct)
+ITC_SECOND_SET_GROUP(820DBC10, CockpitPointsReset)
+ITC_SECOND_SET_GROUP(820E4FD8, InteriorPointsConstruct)
+ITC_SECOND_SET_GROUP(820E35D8, InteriorPointsReset)
+ITC_SECOND_SET_GROUP(820DDCF8, LightPointsConstruct)
+ITC_SECOND_SET_GROUP(820DC8A8, LightPointsReset)
+ITC_SECOND_SET_GROUP(820E68E8, TrafficPointsConstruct)
+ITC_SECOND_SET_GROUP(820E5880, TrafficPointsReset)
 
 void SecondSetFindStep(PPCContext& ctx, uint8_t* base, FindFunction find) {
   if (!native::Buffers_NativeMemcpy() || !ITC_FLAG(native_models) ||
@@ -212,6 +229,22 @@ void SecondSetTrafficFind(PPCContext& ctx, uint8_t* base) {
   SecondSetFindStep(ctx, base, ss::TrafficFind);
 }
 
+void SecondSetPartsPointsConstruct(PPCContext& ctx, uint8_t* base) {
+  if (!ITC_FLAG(native_material_passes)) {
+    __imp__sub_820E2A10(ctx, base);
+    return;
+  }
+  GroupStep(ctx, base, __imp__sub_820E2A10, ss::PartsPointsConstruct);
+}
+
+void SecondSetPartsPointsReset(PPCContext& ctx, uint8_t* base) {
+  if (!ITC_FLAG(native_material_passes)) {
+    __imp__sub_820E00F0(ctx, base);
+    return;
+  }
+  GroupStep(ctx, base, __imp__sub_820E00F0, ss::PartsPointsReset);
+}
+
 void SecondSetPartsResetRightDoor(PPCContext& ctx, uint8_t* base) {
   if (!ITC_FLAG(native_material_passes)) {
     __imp__sub_820DE7E8(ctx, base);
@@ -280,3 +313,13 @@ ITC_SECOND_SET(820E57A0, SecondSetTrafficResetTailLights)
 ITC_SECOND_SET(820E3660, SecondSetInteriorFind)
 ITC_SECOND_SET(820DC900, SecondSetLightsFind)
 ITC_SECOND_SET(820E58C8, SecondSetTrafficFind)
+ITC_SECOND_SET(820E2A10, SecondSetPartsPointsConstruct)
+ITC_SECOND_SET(820E00F0, SecondSetPartsPointsReset)
+ITC_SECOND_SET(820DC190, SecondSetCockpitPointsConstruct)
+ITC_SECOND_SET(820DBC10, SecondSetCockpitPointsReset)
+ITC_SECOND_SET(820E4FD8, SecondSetInteriorPointsConstruct)
+ITC_SECOND_SET(820E35D8, SecondSetInteriorPointsReset)
+ITC_SECOND_SET(820DDCF8, SecondSetLightPointsConstruct)
+ITC_SECOND_SET(820DC8A8, SecondSetLightPointsReset)
+ITC_SECOND_SET(820E68E8, SecondSetTrafficPointsConstruct)
+ITC_SECOND_SET(820E5880, SecondSetTrafficPointsReset)

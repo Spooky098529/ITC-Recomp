@@ -64,6 +64,19 @@ void SecondSetLightsResetRear(PPCContext& ctx, uint8_t* base);
 void SecondSetTrafficResetBody(PPCContext& ctx, uint8_t* base);
 void SecondSetTrafficResetHeadlights(PPCContext& ctx, uint8_t* base);
 void SecondSetTrafficResetTailLights(PPCContext& ctx, uint8_t* base);
+// The point blocks' constructors and resets (src/second_set/blocks.h): r3 =
+// the block; r3 as the original leaves it. The parts' natively only with
+// --native_material_passes (else the original).
+void SecondSetPartsPointsConstruct(PPCContext& ctx, uint8_t* base);
+void SecondSetPartsPointsReset(PPCContext& ctx, uint8_t* base);
+void SecondSetCockpitPointsConstruct(PPCContext& ctx, uint8_t* base);
+void SecondSetCockpitPointsReset(PPCContext& ctx, uint8_t* base);
+void SecondSetInteriorPointsConstruct(PPCContext& ctx, uint8_t* base);
+void SecondSetInteriorPointsReset(PPCContext& ctx, uint8_t* base);
+void SecondSetLightPointsConstruct(PPCContext& ctx, uint8_t* base);
+void SecondSetLightPointsReset(PPCContext& ctx, uint8_t* base);
+void SecondSetTrafficPointsConstruct(PPCContext& ctx, uint8_t* base);
+void SecondSetTrafficPointsReset(PPCContext& ctx, uint8_t* base);
 
 
 // The point set-ups (src/second_set/finds.h): r3 = the group or block, r4 =

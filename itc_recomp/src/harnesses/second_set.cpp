@@ -15,11 +15,13 @@
 #include "memory/c_runtime_heap.h"
 #include "memory/heap.h"
 #include "model_animation/model_animation.h"
+#include "second_set/blocks.h"
 #include "second_set/finds.h"
 #include "second_set/points.h"
 
 #include <fmt/format.h>
 
+#include <algorithm>
 #include <bit>
 #include <functional>
 #include <string>
@@ -260,7 +262,14 @@ void Groups(Context& h, Random& r, uint32_t block) {
     uint32_t frame;  // the function's own frame
     uint32_t bytes;  // what it touches from r3
     bool init;       // a single record's init (Clear under PointRecord's too)
+    bool frames = true;  // its Clear's frame words compared (not for nested ones)
   };
+  // The inits only PartsPoints::PartsPoints calls (no adapters).
+#define ITC_GROUP_STEP(function)                                 \
+  [](PPCContext& c, uint8_t* b) {                                \
+    c.fpscr.disableFlushMode();                                  \
+    c.r3.u64 = ss::function(b, c.r3.u32, c.r1.u32);              \
+  }
   const Group groups[] = {
       {"PartsPoints::ResetFrontBumper (sub_820DE0E0)", __imp__sub_820DE0E0,
        hooks::SecondSetPartsResetFrontBumper, 112, 2656, false},
@@ -336,24 +345,56 @@ void Groups(Context& h, Random& r, uint32_t block) {
        hooks::SecondSetTrafficResetHeadlights, 128, 1680, false},
       {"TrafficPoints::ResetTailLights (sub_820E57A0)", __imp__sub_820E57A0,
        hooks::SecondSetTrafficResetTailLights, 128, 2880, false},
+      {"PartsPoints::InitLeftDoor (sub_820DF5B8)", __imp__sub_820DF5B8,
+       ITC_GROUP_STEP(PartsInitLeftDoor), 112, 6096, false, false},
+      {"PartsPoints::InitRightDoor (sub_820DF610)", __imp__sub_820DF610,
+       ITC_GROUP_STEP(PartsInitRightDoor), 112, 6096, false, false},
+      {"PartsPoints::InitHeadlights (sub_820E1388)", __imp__sub_820E1388,
+       ITC_GROUP_STEP(PartsInitHeadlights), 112, 3200, false, false},
+      {"PartsPoints::InitMufflers (sub_820E0010)", __imp__sub_820E0010,
+       ITC_GROUP_STEP(PartsInitMufflers), 112, 1456, false, false},
+      {"PartsPoints::PartsPoints (sub_820E2A10)", __imp__sub_820E2A10,
+       hooks::SecondSetPartsPointsConstruct, 128, 37096, false, false},
+      {"PartsPoints::Reset (sub_820E00F0)", __imp__sub_820E00F0,
+       hooks::SecondSetPartsPointsReset, 112, 37096, false, false},
+      {"CockpitPoints::CockpitPoints (sub_820DC190)", __imp__sub_820DC190,
+       hooks::SecondSetCockpitPointsConstruct, 128, 4084, false, false},
+      {"CockpitPoints::Reset (sub_820DBC10)", __imp__sub_820DBC10,
+       hooks::SecondSetCockpitPointsReset, 112, 4084, false, false},
+      {"InteriorPoints::InteriorPoints (sub_820E4FD8)", __imp__sub_820E4FD8,
+       hooks::SecondSetInteriorPointsConstruct, 128, 11460, false, false},
+      {"InteriorPoints::Reset (sub_820E35D8)", __imp__sub_820E35D8,
+       hooks::SecondSetInteriorPointsReset, 96, 11460, false, false},
+      {"LightPoints::LightPoints (sub_820DDCF8)", __imp__sub_820DDCF8,
+       hooks::SecondSetLightPointsConstruct, 128, 13072, false, false},
+      {"LightPoints::Reset (sub_820DC8A8)", __imp__sub_820DC8A8,
+       hooks::SecondSetLightPointsReset, 96, 13072, false, false},
+      {"TrafficPoints::TrafficPoints (sub_820E68E8)", __imp__sub_820E68E8,
+       hooks::SecondSetTrafficPointsConstruct, 128, 6080, false, false},
+      {"TrafficPoints::Reset (sub_820E5880)", __imp__sub_820E5880,
+       hooks::SecondSetTrafficPointsReset, 96, 6080, false, false},
   };
   for (const Group& g : groups) {
     Results results(g.name);
-    std::vector<Window> windows = {ClearWindow(g.frame)};
+    std::vector<Window> windows;
+    if (g.frames) {
+      windows.push_back(ClearWindow(g.frame));
+    }
     if (g.init) {
       windows.push_back(ClearWindow(g.frame + ss::kConstructFrameBytes));
     }
-    if (g.frame == 192) {
+    if (g.frame == 192 && g.frames) {
       windows.push_back({192 - 80, 64});  // ResetHeadlights' identity
     }
     for (int c = 0; c < 4; c++) {
       FrameCase(
-          h, results, block, 0x2000, r,
+          h, results, block, std::max<uint32_t>(0x2000, (g.bytes + 0x8F) & ~0xFu), r,
           [&](PPCContext& t) { t.r3.u64 = block + 16 * r.Below(8); }, g.recompiled, g.native,
           windows, fmt::format("case {} ({} bytes)", c, g.bytes));
     }
     results.Report();
   }
+#undef ITC_GROUP_STEP
 }
 
 // --- The point set-ups ---
