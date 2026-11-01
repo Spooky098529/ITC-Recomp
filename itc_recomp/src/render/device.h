@@ -29,6 +29,10 @@ struct Surface : Object {};
 struct Texture : Object {};
 struct VertexBuffer : Object {};
 struct IndexBuffer : Object {};
+// Either, as resources.h's events name them.
+struct Buffer : Object {};
+enum class BufferKind : uint8_t;
+struct BufferData;
 struct VertexShader : Object {};
 struct PixelShader : Object {};
 struct VertexDeclaration : Object {};
@@ -308,6 +312,10 @@ class Backend {
   virtual void TextureCreated(Texture texture) = 0;
   virtual void TextureWritten(Texture texture) = 0;
   virtual void TextureDestroyed(Texture texture) = 0;
+  // Buffers made, written and freed, the same way (step 2b).
+  virtual void BufferCreated(Buffer buffer, const BufferData& data) = 0;
+  virtual void BufferWritten(Buffer buffer) = 0;
+  virtual void BufferDestroyed(Buffer buffer) = 0;
 };
 
 }  // namespace render

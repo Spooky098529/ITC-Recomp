@@ -115,8 +115,10 @@ uint32_t RelocateResource(uint8_t* base, uint32_t resource, uint32_t address) {
   if (kind == 1) {
     const uint32_t word = Load(base, resource + 24);
     Store(base, resource + 24, (((word & ~3u) + address) & ~3u) | (word & 3u));
+    graphics::BufferMade(base, resource);
   } else if (kind == 2 || kind == 8) {
     Store(base, resource + 24, Load(base, resource + 24) + address);
+    graphics::BufferMade(base, resource);
   } else if (kind == 3 || (kind > 8 && type - 17 <= 3)) {
     const uint32_t mip = (Load(base, resource + 48) & 0xFFFFF000u) != 0 ? address : 0;
     return RelocateTexture(base, resource, address, mip);

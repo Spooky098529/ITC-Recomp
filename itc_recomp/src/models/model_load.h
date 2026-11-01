@@ -32,6 +32,11 @@ struct LoadCalls {
 // gets the original's debug message, logged). See models.md's row.
 void MeshParse(uint8_t* base, uint32_t model, uint32_t file, const LoadCalls& calls);
 
+// For the renderer (docs/conventional-renderer.md, "Step 2b"): the buffers
+// MeshParse relocated (each shape's +288, +320 and +352, each material's
+// +368) freed through our interface. Model::Release's, before its frees.
+void MeshBuffersFreed(uint8_t* base, uint32_t model);
+
 // Whether MeshParse and ModelLoad run natively (checked before anything is
 // done): memcpy's copies native (--native_memcpy), and each of the file's
 // shader header copies XMemCpy makes natively.

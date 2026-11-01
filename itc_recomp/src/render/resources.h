@@ -1,5 +1,5 @@
 // Resources made, written and freed through our interface
-// (docs/conventional-renderer.md, "Step 2"): called where the game makes,
+// (docs/conventional-renderer.md, "Step 2" and "Step 2b"): called where the game makes,
 // fills and frees them, on any thread. The events are queued and handed
 // to the backend on the render thread before the next list it replays, so
 // a list never sees a texture freed after it was recorded, and always sees
@@ -29,6 +29,22 @@ void TextureCreated(Texture texture);
 void TextureWritten(Texture texture);
 // Its header or data is freed: the handle names nothing until made again.
 void TextureDestroyed(Texture texture);
+
+// A vertex or index buffer (or another resource with data at +24, types 7
+// and 8), by its header's guest address. Its data's guest address and size
+// are taken at the call (the work memory's headers are set again every
+// frame); the data may still be to come.
+enum class BufferKind : uint8_t { kVertex, kIndex, kOther };
+struct BufferData {
+  BufferKind kind = BufferKind::kVertex;
+  uint32_t address = 0;
+  uint32_t size = 0;
+};
+void BufferCreated(Buffer buffer, BufferData data);
+// Its data was written after it was made.
+void BufferWritten(Buffer buffer);
+// Its header or data is freed.
+void BufferDestroyed(Buffer buffer);
 
 // Main thread: a list was handed over to the render thread; the events
 // queued so far go before it.

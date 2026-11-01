@@ -1000,11 +1000,36 @@ memory, uploaded at first bind as in step 2.
    against two runs of each build; `--log_blend_state`,
    `--log_stepping_constants`; `--log_gpu_memory` over races; a profile;
    a 4K run only if the user asks; a drive.
+   **Why one buffer is enough** (the user's question, 2026-11-01): the
+   mirrors went one per frame in flight (`fed38bb7`) because, with one
+   shared, the next frame's CPU copies could overwrite data the GPU was
+   still drawing the previous frame with. In the arena the CPU never writes
+   memory the GPU draws from: it writes a staging slot (reused only after
+   that frame's fence), and the GPU copies it into the arena at the frame's
+   start after a barrier on earlier submissions' vertex and index reads.
+   A list's draws see the writes made before its hand-over, as with
+   `mirror_to_both` now.
 3. **Native writers skip guest memory, narrowly.** `Mesh::Parse` hands its
    vertex data to `UpdateBuffer` from the read buffer, keeping the guest
    allocation (headers, addresses and frees unchanged), only for models
    whose shapes aren't morph or skin sources; anything else writes both.
    The gain is small (a memcpy at load); the risk is data the CPU reads.
+
+**Part 1, built**: `render::BufferCreated` (with the data's address and
+size taken at the call), `BufferWritten` and `BufferDestroyed`, through
+the textures' queue; `graphics::BufferMade` and `BufferFreed` read the
+header (`graphics/resources.cpp`), called from `CreateVertexBuffer`,
+`CreateIndexBuffer`, `Resource::Relocate` (kinds 1, 2, 8),
+`Resource::Destroy` and `Model::Release` (`models::MeshBuffersFreed`); the
+backend's `BufferTable` (`native/buffer_table.cpp`) holds them, checks
+each draw's bound streams and indices (a buffer never made logged once
+and taken as made), and logs a line every 5 s. Nothing calls
+`BufferWritten` yet (part 2: memcpy's records). Attract race `itc_3277`
+(100 s, across a race's end): 0 bound never made, 0 freed never made, 0
+made again while held; ~2,750-3,065 held, 32-37 MB of vertices and
+2.5-3.3 MB of indices; at the race's end 3,045 freed and 0 held, then
+~3,250 made for the next. The work memory made none (attract races draw
+no morphed wheels): its size is for a drive.
 
 ## 7. Risks, and what's still unknown
 

@@ -42,6 +42,40 @@ constexpr uint32_t kHiZTaken = 0x829537C4;
 
 }  // namespace
 
+void BufferMade(uint8_t* base, uint32_t header) {
+  const uint32_t type = Load(base, header) & 0xF;
+  render::BufferData data;
+  switch (type) {
+    case 1:
+      data = {render::BufferKind::kVertex, Load(base, header + 24) & ~3u,
+              ((Load(base, header + 28) >> 2) & 0xFFFFFF) * 4};
+      break;
+    case 2:
+      data = {render::BufferKind::kIndex, Load(base, header + 24), Load(base, header + 28)};
+      break;
+    case 7:
+    case 8:
+      data = {render::BufferKind::kOther, Load(base, header + 24), Load(base, header + 28)};
+      break;
+    default:
+      return;
+  }
+  render::BufferCreated({header}, data);
+}
+
+void BufferFreed(uint8_t* base, uint32_t header) {
+  switch (Load(base, header) & 0xF) {
+    case 1:
+    case 2:
+    case 7:
+    case 8:
+      render::BufferDestroyed({header});
+      break;
+    default:
+      break;
+  }
+}
+
 uint32_t ResourceType(uint8_t* base, uint32_t resource) {
   ITC_NATIVE_RUNNING("sub_822A6180 Resource::GetType");
   const uint32_t common = Load(base, resource);
@@ -891,6 +925,7 @@ uint32_t CreateVertexBuffer(uint8_t* base, uint32_t bytes, uint32_t usage) {
   Store(base, header + 24, data | 3);
   Store(base, header + 20, kUnlocked);
   Store(base, header + 28, (bytes & 0x3FFFFFC) | (old28 & 0x8000000) | 0x10000000 | 2);
+  BufferMade(base, header);
   return header;
 }
 
@@ -919,6 +954,7 @@ uint32_t CreateIndexBuffer(uint8_t* base, uint32_t bytes, uint32_t usage, uint32
   Store(base, header + 24, data);
   Store(base, header + 4, 1);
   Store(base, header + 20, kUnlocked);
+  BufferMade(base, header);
   return header;
 }
 
@@ -1298,6 +1334,7 @@ uint32_t DestroyResource(uint8_t* base, uint32_t resource) {
   // The fence waits are Dropped (resources.h).
   constexpr uint32_t kDataFreeAttributes = 0xB1800000;
   const uint32_t common = Load(base, resource);
+  BufferFreed(base, resource);
   switch (common & 0xF) {
     case 1:
       memory::crt::XMemFree(Load(base, resource + 24) & 0xFFFFFFFC, kDataFreeAttributes);

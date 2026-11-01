@@ -12,6 +12,7 @@
 #include <string>
 #include <vector>
 
+#include "buffer_table.h"
 #include "device_context.h"
 #include "render/device.h"
 #include "state.h"
@@ -47,6 +48,11 @@ class Passes {
   void TextureCreated(uint32_t handle);
   void TextureWritten(uint32_t handle);
   void TextureDestroyed(uint32_t handle);
+  // Buffers made, written and freed (render/resources.h, step 2b): the
+  // buffer table (buffer_table.h).
+  void BufferCreated(uint32_t handle, const render::BufferData& data);
+  void BufferWritten(uint32_t handle);
+  void BufferDestroyed(uint32_t handle);
   void InterfaceDraw(VkCommandBuffer commands, uint8_t* base, render::State& state,
                      const render::DrawIndexed& draw);
   void InterfaceInlineDraw(VkCommandBuffer commands, uint8_t* base, render::State& state,
@@ -268,6 +274,7 @@ class Passes {
     uint64_t tilings = 0, tiled_resolves = 0;
     uint32_t resolve_flags_sample = 0;
     TextureCache::Stats textures;
+    BufferTable::Stats buffers;
   };
   Stats TakeStats();
 

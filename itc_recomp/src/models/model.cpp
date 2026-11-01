@@ -8,6 +8,7 @@
 #include "memory/heap.h"
 #include "model_animation/model_animation.h"
 #include "models/memory_blocks.h"
+#include "models/model_load.h"
 #include "models/texture_provider.h"
 #include "models/xpr.h"
 
@@ -61,6 +62,7 @@ void FreeIfAny(uint8_t* base, uint32_t block) {
 
 // Model::Release's work, its checks made.
 uint32_t Release(uint8_t* base, uint32_t model) {
+  MeshBuffersFreed(base, model);
   FreeIfAny(base, Load(base, model + 16));
   FreeIfAny(base, Load(base, model + 20));
   for (uint32_t i = 0; i < Load(base, model + kModelShaderPairCount); i++) {

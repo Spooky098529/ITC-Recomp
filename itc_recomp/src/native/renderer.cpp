@@ -386,6 +386,15 @@ class Renderer {
     void TextureDestroyed(render::Texture texture) override {
       renderer_.passes_.TextureDestroyed(texture.address);
     }
+    void BufferCreated(render::Buffer buffer, const render::BufferData& data) override {
+      renderer_.passes_.BufferCreated(buffer.address, data);
+    }
+    void BufferWritten(render::Buffer buffer) override {
+      renderer_.passes_.BufferWritten(buffer.address);
+    }
+    void BufferDestroyed(render::Buffer buffer) override {
+      renderer_.passes_.BufferDestroyed(buffer.address);
+    }
 
    private:
     Renderer& renderer_;
@@ -1079,6 +1088,14 @@ void Renderer::LogStats() {
                "unannounced, {} reading another's resolve destination",
                t.created, t.remade, t.written, t.destroyed, t.handles, t.never_created,
                t.unannounced, t.aliased);
+  const BufferTable::Stats& b = view.buffers;
+  ITC_LOG_INFO("native renderer: buffers through the interface: {} made ({} again), {} written, "
+               "{} freed ({} never made); {} held: {:.1f} MB vertices, {:.1f} MB indices, {:.1f} "
+               "MB other; work memory {} made, {:.1f} MB; {} bound never made",
+               b.created, b.remade, b.written, b.destroyed, b.destroyed_unknown, b.held,
+               b.held_vertex_bytes / 1048576.0, b.held_index_bytes / 1048576.0,
+               b.held_other_bytes / 1048576.0, b.work_created, b.work_bytes / 1048576.0,
+               b.never_created);
   if (t.unrecorded) {
     ITC_LOG_INFO("native renderer: {} textures changed in memory with no TextureWritten, e.g. "
                  "{:08X}, {} frames after it was first loaded",

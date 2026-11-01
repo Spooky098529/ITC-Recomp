@@ -5,6 +5,7 @@
 
 #include "base/log.h"
 #include "c_runtime/strings.h"
+#include "graphics/resources.h"
 #include "car_physics/float_ops.h"
 #include "guest.h"
 #include "model_animation/model_animation.h"
@@ -240,6 +241,23 @@ void MeshParse(uint8_t* base, uint32_t model, uint32_t file, const LoadCalls& ca
         RelocateResource(base, Load(base, shape() + 396) + kMaterialBytes * uint32_t(j) + 368,
                          Load(base, model + 20));
       }
+    }
+  }
+}
+
+void MeshBuffersFreed(uint8_t* base, uint32_t model) {
+  const uint32_t shapes = Load(base, model + 40);
+  if (shapes == 0) {
+    return;
+  }
+  for (int32_t i = 0; i < int32_t(Load(base, model + 412)); i++) {
+    const uint32_t shape = shapes + kShapeBytes * uint32_t(i);
+    for (uint32_t field : {288u, 320u, 352u}) {
+      graphics::BufferFreed(base, shape + field);
+    }
+    const uint32_t materials = Load(base, shape + 396);
+    for (int32_t j = 0; materials != 0 && j < int32_t(Load(base, materials)); j++) {
+      graphics::BufferFreed(base, materials + kMaterialBytes * uint32_t(j) + 368);
     }
   }
 }

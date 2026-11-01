@@ -566,6 +566,7 @@ set(ITC_SOURCES
     src/debug/replay_stats.cpp
     src/debug/thread_cpu.cpp
     src/native/app_window.cpp
+    src/native/buffer_table.cpp
     src/native/buffers.cpp
     src/native/disk_cache.cpp
     src/native/gpu_link.cpp

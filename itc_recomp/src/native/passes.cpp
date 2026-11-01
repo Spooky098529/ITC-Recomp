@@ -1109,6 +1109,7 @@ struct Passes::State {
   // Textures, and white 1x1 placeholders of each declared type for what
   // can't be had yet.
   TextureCache textures;
+  BufferTable buffers;
   Image dummy_2d_array, dummy_3d, dummy_cube;
   // Zero (transparent black) ones for a texture of another dimension than
   // the shader declares: the plugin binds a null descriptor, which reads
@@ -3218,6 +3219,7 @@ bool Passes::Init(const DeviceContext& context, uint8_t* base, uint32_t frames_i
                s.scale, s.shown_extent.width, s.shown_extent.height, s.main_view_extent.width,
                s.main_view_extent.height, s.main_view_scale);
   s.guest_base = base;
+  s.buffers.set_base(base);
   s.frames_in_flight = frames_in_flight;
   const std::string& log_level = ITC_FLAG(log_level);
   s.collect_interfaces = log_level == "trace" || log_level == "debug" || log_level == "info";
@@ -3335,6 +3337,7 @@ void Passes::State::MaybeSavePipelineCache() {
 void Passes::BeginFrame(uint32_t frame_index) {
   State& s = *state_;
   s.MaybeSavePipelineCache();
+  s.buffers.OnFrame();
   s.frame = frame_index;
   s.ring_offset = 0;
   s.rings[frame_index].block = 0;
@@ -4010,6 +4013,16 @@ void Passes::State::Draw(VkCommandBuffer commands, uint8_t* base, uint32_t devic
   // draw's vertices are there already). A vertex fetch constant is two
   // words: the address (word 0, low 2 bits the type) and the size in words
   // (word 1, bits 2-25).
+  // The buffers this draw binds, made through the interface (step 2b's
+  // safety net: a path missed is logged once).
+  if (!call.inline_vertices && s.interface) {
+    s.buffers.Bound(render::kStreams, s.interface->indices.address);
+    for (uint32_t k = 96 - render::kStreams; k < 96; k++) {
+      if (vertex->vertex_fetch_constants[k >> 5] & (1u << (k & 31))) {
+        s.buffers.Bound(95 - k, s.interface->streams[95 - k].buffer.address);
+      }
+    }
+  }
   if (!call.inline_vertices && mirror_per_draw) {
     s.Mirror(base, index_address, index_count * (index_32bit ? 4 : 2), true,
              s.draw_index_newest);
@@ -4560,6 +4573,18 @@ void Passes::TextureWritten(uint32_t handle) {
 
 void Passes::TextureDestroyed(uint32_t handle) {
   state_->textures.Destroyed(handle);
+}
+
+void Passes::BufferCreated(uint32_t handle, const render::BufferData& data) {
+  state_->buffers.Created(handle, data);
+}
+
+void Passes::BufferWritten(uint32_t handle) {
+  state_->buffers.Written(handle);
+}
+
+void Passes::BufferDestroyed(uint32_t handle) {
+  state_->buffers.Destroyed(handle);
 }
 
 void Passes::InterfaceDraw(VkCommandBuffer commands, uint8_t* base, render::State& state,
@@ -5787,6 +5812,7 @@ VkImage Passes::shown() const {
 Passes::Stats Passes::TakeStats() {
   Stats stats = state_->stats;
   stats.textures = state_->textures.TakeStats();
+  stats.buffers = state_->buffers.TakeStats();
   stats.shaders_translated = state_->shaders->translated();
   stats.shaders_failed = state_->shaders->failed();
   stats.shaders_from_disk = state_->shaders->from_disk();

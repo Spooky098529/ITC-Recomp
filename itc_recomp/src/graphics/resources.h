@@ -20,6 +20,16 @@ namespace graphics {
 // a texture's surfaces (4) by their parent's.
 uint32_t ResourceType(uint8_t* base, uint32_t resource);
 
+// For the renderer (docs/conventional-renderer.md, "Step 2b"): a buffer
+// header (+0's type 1 vertex, 2 index, 7 or 8 other) made through our
+// interface with its data's address and size as the header gives them now
+// (a vertex buffer's +24 without its 2 low bits and its fetch constant's
+// size in words at +28 bits 2-25; the others' +24 and +28 in bytes, for 7
+// and 8 probably). Other types: nothing.
+void BufferMade(uint8_t* base, uint32_t header);
+// The same header freed (nothing for other types).
+void BufferFreed(uint8_t* base, uint32_t header);
+
 // sub_822A44A8 Texture::Format: the format word rebuilt from the fetch
 // constant's +28, +32 and +40.
 uint32_t TextureFormat(uint8_t* base, uint32_t texture);
