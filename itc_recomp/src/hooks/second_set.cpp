@@ -16,7 +16,8 @@ ITC_FLAG_DECLARE(bool, native_models);
 
 ITC_FLAG_BOOL(native_second_set, true, "ITC",
               "Run the second set of the car scene's objects (docs/functions/second-set.md: "
-              "PointRecord::SetNode sub_820CE8D8 and SetShape sub_820CE900, with native memcpy "
+              "PointRecord::SetNode sub_820CE8D8 (no adapter: its callers are native) and SetShape "
+              "sub_820CE900, with native memcpy "
               "PointRecord::Clear sub_820CEA08, PointRecord::PointRecord sub_820D0270 and "
               "ModelPoint::FindShape sub_820CEB30, the point groups' resets and inits: "
               "PartsPoints::ResetFrontBumper sub_820DE0E0, ResetRearBumper sub_820DE2C8, "
@@ -231,7 +232,8 @@ void SecondSetPartsResetRightDoor(PPCContext& ctx, uint8_t* base) {
     hooks::step(ctx, base);              \
   }
 
-ITC_SECOND_SET(820CE8D8, SecondSetPointSetNode)
+// No adapter: PointRecord::SetNode sub_820CE8D8 (its callers in play are
+// native and call its plain C++; the step above is the harness's).
 ITC_SECOND_SET(820CE900, SecondSetPointSetShape)
 ITC_SECOND_SET(820CEA08, SecondSetPointClear)
 ITC_SECOND_SET(820D0270, SecondSetPointConstruct)

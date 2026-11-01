@@ -11,8 +11,9 @@
 
 namespace hooks {
 
-// PointRecord::SetNode sub_820CE8D8 and SetShape sub_820CE900: r3 = the
-// record (left), r4 = the string.
+// PointRecord::SetNode sub_820CE8D8 (no adapter: its callers are native;
+// the harness's) and SetShape sub_820CE900: r3 = the record (left), r4 =
+// the string.
 void SecondSetPointSetNode(PPCContext& ctx, uint8_t* base);
 void SecondSetPointSetShape(PPCContext& ctx, uint8_t* base);
 // PointRecord::Clear sub_820CEA08 (r3 = the record; r3 = +80) and
