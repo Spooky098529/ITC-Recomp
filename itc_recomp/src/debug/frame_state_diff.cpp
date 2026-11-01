@@ -4,6 +4,7 @@
 #include "guest.h"
 #include "cameras/cameras.h"
 #include "hooks/cameras.h"
+#include "hooks/car_draw.h"
 #include "hooks/framework.h"
 #include "hooks/load_poll.h"
 #include "hooks/second_set.h"
@@ -31,6 +32,7 @@ ITC_FLAG_DECLARE(bool, native_cameras);
 ITC_FLAG_DECLARE(bool, native_models);
 ITC_FLAG_DECLARE(bool, native_second_set);
 ITC_FLAG_DECLARE(bool, native_load_poll);
+ITC_FLAG_DECLARE(bool, native_car_draw);
 
 ITC_FLAG_BOOL(find_per_frame_state, false, "ITC",
               "Find game state that advances on render-only passes, and the code that "
@@ -607,7 +609,22 @@ ITC_FRAME_STATE_WRAP_LOAD_POLL(820D92A0, LoadPollWheelsApplyPalette)
 ITC_FRAME_STATE_WRAP_LOAD_POLL(820D9B68, LoadPollSceneModelApplyPaint)
 ITC_FRAME_STATE_WRAP_LOAD_POLL(820D9C50, LoadPollSceneModelApplyWheelPaint)
 ITC_FRAME_STATE_WRAP_LOAD_POLL(820D9EA0, LoadPollSceneModelApplyPalettes)
-ITC_FRAME_STATE_WRAP(820DAB58)
+// SceneModel::IsNearPlayerHeight natively under --native_car_draw
+// (src/car_draw/; its native callers call the plain C++, not this wrap),
+// inside the same wrap.
+extern "C" REX_FUNC(sub_820DAB58) {
+  REX_FUNC_PROLOGUE();
+  if (debug::IsHidden(0x820DAB58)) {
+    return;
+  }
+  debug::FrameStateDiff_Before(base);
+  if (ITC_FLAG(native_car_draw)) {
+    hooks::CarDrawIsNearPlayerHeight(ctx, base);
+  } else {
+    __imp__sub_820DAB58(ctx, base);
+  }
+  debug::FrameStateDiff_After(base, "draw step part", 0x820DAB58);
+}
 ITC_FRAME_STATE_WRAP_LOAD_POLL(820DBFF8, LoadPollSceneCockpitFinish)
 ITC_FRAME_STATE_WRAP(820DC498)
 ITC_FRAME_STATE_WRAP_LOAD_POLL(820DCBC0, LoadPollSceneLightsApplyRecord)

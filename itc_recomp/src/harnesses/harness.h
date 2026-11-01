@@ -264,5 +264,7 @@ void Scene(Context& h);
 void SecondSet(Context& h);
 void LoadPoll(Context& h);
 void BootMode(Context& h);
+// The car draw (src/harnesses/car_draw.cpp).
+void CarDraw(Context& h);
 
 }  // namespace harness

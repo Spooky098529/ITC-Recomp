@@ -152,6 +152,10 @@ set(ITC_SOURCES
     src/hooks/second_set.cpp
     src/hooks/load_poll.cpp
     src/load_poll/load_poll.cpp
+    src/hooks/car_draw.cpp
+    src/car_draw/car_draw.cpp
+    src/car_draw/lighting.cpp
+    src/car_draw/blink.cpp
     src/hooks/boot_mode.cpp
     src/boot_mode/boot_mode.cpp
     src/second_set/points.cpp
@@ -459,6 +463,7 @@ set(ITC_SOURCES
     src/harnesses/scene_loaders.cpp
     src/harnesses/second_set.cpp
     src/harnesses/load_poll.cpp
+    src/harnesses/car_draw.cpp
     src/harnesses/boot_mode.cpp
     src/harnesses/car_models.cpp
     src/harnesses/save_data.cpp
@@ -611,7 +616,8 @@ set(ITC_SOURCES
 # encoders (src/texture_compression/, docs/functions/texture-compression.md)
 # and the career (src/career/, docs/functions/career.md) and the race event
 # (src/race_event/, docs/functions/race-event.md) and the camera modes
-# (src/camera_modes/, docs/functions/camera-modes.md).
+# (src/camera_modes/, docs/functions/camera-modes.md) and the car draw
+# (src/car_draw/, docs/functions/car-draw.md).
 set_source_files_properties(src/c_runtime/math.cpp src/ui_movies/keys.cpp
     src/ui_movies/animation.cpp
     src/ui_movies/draw.cpp src/ui_movies/texts.cpp src/ui_movies/update.cpp
@@ -656,6 +662,7 @@ set_source_files_properties(src/c_runtime/math.cpp src/ui_movies/keys.cpp
     src/scene_loaders/file_loaded.cpp src/scene_loaders/model_point.cpp
     src/second_set/finds.cpp src/second_set/morph.cpp src/second_set/wheels.cpp
     src/load_poll/load_poll.cpp
+    src/car_draw/car_draw.cpp src/car_draw/lighting.cpp src/car_draw/blink.cpp
     src/car_sounds/x3daudio.cpp
     src/car_sounds/car_sound_3d.cpp src/car_sounds/car_sound_voices.cpp
     src/car_sounds/car_sound_parts.cpp src/xact/voices.cpp src/xact/waves.cpp

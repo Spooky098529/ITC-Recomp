@@ -13,6 +13,7 @@
 #include "debug/pause_movie_log.h"
 #include "hooks/camera_modes.h"
 #include "hooks/cameras.h"
+#include "hooks/car_draw.h"
 #include "hooks/race_hud.h"
 #include "hooks/ui_movies.h"
 #include "interpolation/blend_state.h"
@@ -38,6 +39,7 @@
 ITC_FLAG_DECLARE(bool, interpolate_draw_state);
 ITC_FLAG_DECLARE(bool, native_course_scenery);
 ITC_FLAG_DECLARE(bool, log_pause_movie);
+ITC_FLAG_DECLARE(bool, native_car_draw);
 ITC_FLAG_BOOL(per_tick_blink_timers, true, "ITC",
               "Advance the car blink timers once per tick on render-only passes");
 ITC_FLAG_BOOL(per_tick_ui_movies, true, "ITC",
@@ -62,9 +64,15 @@ ITC_FLAG_BOOL(log_replays, false, "ITC",
 // Blink timers (r3 = timer set, from the car's draw, sub_820DDE58): adds one
 // to each of four frame counters (+8, +16, +24, +32, 64-bit) and resets each
 // past its duration. Drives the flashing sprites above cars.
+// The advance itself natively under --native_car_draw (src/car_draw/; its
+// native caller honors the skip through hooks::CarDrawBlinkTimersHeld).
 extern "C" REX_FUNC(sub_820DC958) {
   REX_FUNC_PROLOGUE();
-  if (frame_pacing::GameMessages_IsRenderOnlyPass() && ITC_FLAG(per_tick_blink_timers)) {
+  if (hooks::CarDrawBlinkTimersHeld()) {
+    return;
+  }
+  if (ITC_FLAG(native_car_draw)) {
+    hooks::CarDrawBlinkTimersAdvance(ctx, base);
     return;
   }
   __imp__sub_820DC958(ctx, base);

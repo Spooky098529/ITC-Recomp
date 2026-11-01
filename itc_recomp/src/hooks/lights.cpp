@@ -11,6 +11,8 @@
 // 1/sqrt and one Newton step), so the same lights pass. The lights that do are
 // then merged and sorted one by one as the original does.
 
+#include "hooks/lights.h"
+
 #include "guest.h"
 
 #include "base/flags.h"
@@ -233,6 +235,39 @@ bool IsFloat(double value) {
 
 }  // namespace
 
+namespace lights {
+
+std::optional<uint32_t> FindNearest(uint8_t* base, uint32_t owner, uint32_t output,
+                                    uint32_t point, int32_t most, uint32_t direction, double f1,
+                                    double f2, double f3) {
+  // Comparisons the original makes in double are made here in float: the
+  // caller passes floats (lfs, frsp), but anything else goes to the original.
+  if (!ITC_FLAG(native_nearest_lights) || !IsFloat(f2) || !IsFloat(f3)) [[unlikely]] {
+    return std::nullopt;
+  }
+  if (guest::LoadU32(base, owner + kSetListOffset) == 0 || most > kMostLights) {
+    return 0;
+  }
+  Query query;
+  query.px = guest::LoadFloat(base, point);
+  query.py = guest::LoadFloat(base, point + 4);
+  query.pz = guest::LoadFloat(base, point + 8);
+  direction &= ~0xFu;
+  query.dx = _mm_set1_ps(guest::LoadFloat(base, direction));
+  query.dy = _mm_set1_ps(guest::LoadFloat(base, direction + 4));
+  query.dz = _mm_set1_ps(guest::LoadFloat(base, direction + 8));
+  query.merge_squared = float(f1 * f1);
+  query.farthest = _mm_set1_ps(float(f2));
+  query.least_dot = _mm_set1_ps(float(f3));
+  query.most = most;
+  Search search;
+  FindNearest(base, owner, query, search);
+  Write(base, search, output);
+  return uint32_t(search.count);
+}
+
+}  // namespace lights
+
 // Lights_FindNearest: r3 = the light sets' owner, r4 = output (32 bytes a
 // light), r5 = the point, r6 = most lights (at most 32), r9 = the direction,
 // f1 = merge distance, f2 = farthest squared distance, f3 = least dot product
@@ -241,33 +276,11 @@ bool IsFloat(double value) {
 extern "C" REX_FUNC(sub_820F4128) {
   REX_FUNC_PROLOGUE();
   ctx.fpscr.disableFlushMode();
-  // Comparisons the original makes in double are made here in float: the
-  // caller passes floats (lfs, frsp), but anything else goes to the original.
-  if (!ITC_FLAG(native_nearest_lights) || !IsFloat(ctx.f2.f64) || !IsFloat(ctx.f3.f64))
-      [[unlikely]] {
+  const auto found = lights::FindNearest(base, ctx.r3.u32, ctx.r4.u32, ctx.r5.u32, ctx.r6.s32,
+                                         ctx.r9.u32, ctx.f1.f64, ctx.f2.f64, ctx.f3.f64);
+  if (!found) [[unlikely]] {
     __imp__sub_820F4128(ctx, base);
     return;
   }
-  uint32_t owner = ctx.r3.u32;
-  int32_t most = ctx.r6.s32;
-  if (guest::LoadU32(base, owner + kSetListOffset) == 0 || most > kMostLights) {
-    ctx.r3.s64 = 0;
-    return;
-  }
-  Query query;
-  query.px = guest::LoadFloat(base, ctx.r5.u32);
-  query.py = guest::LoadFloat(base, ctx.r5.u32 + 4);
-  query.pz = guest::LoadFloat(base, ctx.r5.u32 + 8);
-  uint32_t direction = ctx.r9.u32 & ~0xFu;
-  query.dx = _mm_set1_ps(guest::LoadFloat(base, direction));
-  query.dy = _mm_set1_ps(guest::LoadFloat(base, direction + 4));
-  query.dz = _mm_set1_ps(guest::LoadFloat(base, direction + 8));
-  query.merge_squared = float(ctx.f1.f64 * ctx.f1.f64);
-  query.farthest = _mm_set1_ps(float(ctx.f2.f64));
-  query.least_dot = _mm_set1_ps(float(ctx.f3.f64));
-  query.most = most;
-  Search search;
-  FindNearest(base, owner, query, search);
-  Write(base, search, ctx.r4.u32);
-  ctx.r3.s64 = search.count;
+  ctx.r3.s64 = int32_t(*found);
 }

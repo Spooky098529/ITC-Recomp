@@ -350,6 +350,19 @@ std::optional<uint32_t> ModelRecordMaterials(uint8_t* base, const DrawCalls& cal
                                              uint32_t frame, uint32_t model, uint32_t shape,
                                              int32_t group, uint32_t set_shaders);
 
+// For native draws over these recorders (Model::Draw, src/car_draw/), to
+// check every slot before anything is done: the slots ModelRecordMaterials
+// takes (0 for a group without materials; nullopt where it declines), the
+// slots RecordShapeDepth takes (0 when it records nothing), and the command
+// list's checks before a recorder (its chunk open or none open on any list,
+// and room for `slots`).
+std::optional<uint32_t> ModelRecordMaterialsSlotCount(uint8_t* base, uint32_t model,
+                                                      uint32_t shape, int32_t group,
+                                                      uint32_t set_shaders);
+uint32_t RecordShapeDepthSlotCount(uint8_t* base, uint32_t model, uint32_t shape, int32_t group,
+                                   uint32_t mask, uint32_t with_flagged);
+bool CommandListHasRoom(uint8_t* base, uint32_t list, uint32_t slots);
+
 // PointList::Draw's frame.
 constexpr uint32_t kPointListDrawFrame = 464;
 

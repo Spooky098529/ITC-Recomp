@@ -1914,6 +1914,21 @@ std::optional<uint32_t> ModelRecordMaterials(uint8_t* base, const DrawCalls& cal
   return ModelRecordMaterialsChecked(base, calls, frame, model, shape, group, set_shaders);
 }
 
+std::optional<uint32_t> ModelRecordMaterialsSlotCount(uint8_t* base, uint32_t model,
+                                                      uint32_t shape, int32_t group,
+                                                      uint32_t set_shaders) {
+  return ModelRecordMaterialsSlots(base, model, shape, group, set_shaders);
+}
+
+uint32_t RecordShapeDepthSlotCount(uint8_t* base, uint32_t model, uint32_t shape, int32_t group,
+                                   uint32_t mask, uint32_t with_flagged) {
+  return RecordShapeDepthSlots(base, model, shape, group, mask, with_flagged);
+}
+
+bool CommandListHasRoom(uint8_t* base, uint32_t list, uint32_t slots) {
+  return CanRecord(base, list, slots);
+}
+
 namespace {
 
 constexpr uint32_t kPointLow = 0x82006808;    // the lowest y drawn (-1000.0)
