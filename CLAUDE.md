@@ -569,7 +569,6 @@ cmake --build itc_recomp/out/build/linux-amd64-release -j$(nproc)
 G="$PWD/itc/Import Tuner Challenge (USA)"; B=itc_recomp/out/build/linux-amd64-release
 XDG_DATA_DIRS=/usr/local/share:/usr/share LD_LIBRARY_PATH=$B:rexglue-sdk/out/linux-amd64 \
   $B/itc --native_audio=true \
-  --native_renderer_mirror_by_tick=true --native_renderer_mirror_to_both=true \
   --game_data_root="$G" --max_fps=144 --fullscreen=false \
   --log_fps=true --interpolate_draw_state=true <diagnostic flags>
 find /dev/shm -maxdepth 1 -user "$USER" -name 'xenia_memory_*' -delete
@@ -580,10 +579,11 @@ find /dev/shm -maxdepth 1 -user "$USER" -name 'xenia_memory_*' -delete
   (`itc.toml`'s settings and the defaults; the flags it spells out are on
   by default now): always `--native_audio=true` (without it the SDK's
   Audio Worker spins on a core and frame rates come out lower than players
-  get) and the mirrors updated once a frame
-  (`--native_renderer_mirror_by_tick=true
-  --native_renderer_mirror_to_both=true`; `=false` on the first for the
-  old per-draw mirror). `profile_render_thread.sh` does the same.
+  get). `profile_render_thread.sh` does the same. (The guest memory
+  mirrors and their flags, `--native_renderer_mirror_by_tick` and
+  `--native_renderer_mirror_to_both`, went in the conventional renderer's
+  step 2b, 2026-11-01: draws read a device-local buffer arena;
+  `docs/conventional-renderer.md`.)
 - For logs to read (frame rate, where each frame's time goes, each busy
   thread's CPU use), add `--log_level=info --log_fps=true
   --log_frame_times=true --log_thread_cpu=true`.

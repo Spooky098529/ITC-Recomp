@@ -772,6 +772,17 @@ step 1's logs are there to find them before anything is stubbed.
 
 ## Buffers (where vertex and index data comes from)
 
+**Since 2026-11-01** the guest memory mirrors are gone, with their flags
+(`--native_renderer_mirror_by_tick`, `--native_renderer_mirror_to_both`,
+`--native_renderer_verify_mirror`, `--native_renderer_copy_all`,
+`--native_renderer_check_mirror`, `--native_renderer_check_late_writes`,
+`--native_renderer_check_clobbers`, `--native_renderer_log_index_ranges`,
+`--native_renderer_cache_index_ranges`,
+`--native_renderer_log_physical_writes`): draws read vertices and indices
+from a device-local buffer arena that the buffers made through our
+interface are copied into (the conventional renderer's step 2b,
+`docs/conventional-renderer.md`). What follows is kept as history.
+
 Found 2026-10-14 with `--native_renderer_log_buffers` (`buffers.cpp`), in
 uncapped attract races of 70 s, to replace the per-frame mirror copies
 with uploads when the game fills its buffers (the user's direction: draw
@@ -2329,6 +2340,17 @@ any other). Over both steps the mirror's per-draw work is ~−400 thousand
 cycles a frame (~3% of the render thread).
 
 ### Hypothesis to test: the mirrors updated once a tick (the user's, 2026-10-15)
+
+**Since 2026-11-01** the guest memory mirrors are gone, with their flags
+(`--native_renderer_mirror_by_tick`, `--native_renderer_mirror_to_both`,
+`--native_renderer_verify_mirror`, `--native_renderer_copy_all`,
+`--native_renderer_check_mirror`, `--native_renderer_check_late_writes`,
+`--native_renderer_check_clobbers`, `--native_renderer_log_index_ranges`,
+`--native_renderer_cache_index_ranges`,
+`--native_renderer_log_physical_writes`): draws read vertices and indices
+from a device-local buffer arena that the buffers made through our
+interface are copied into (the conventional renderer's step 2b,
+`docs/conventional-renderer.md`). What follows is kept as history.
 
 **Outcome:** done and merged (`mirrors-fix`, released in v0.3.8, on by
 default); the handover below is kept as written, with the

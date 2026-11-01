@@ -42,7 +42,7 @@ start_game() {
   SDL_GAMECONTROLLER_IGNORE_DEVICES=$REAL_PAD SDL_JOYSTICK_ALLOW_BACKGROUND_EVENTS=1 \
   XDG_DATA_DIRS=/usr/local/share:/usr/share LD_LIBRARY_PATH=$B:rexglue-sdk/out/linux-amd64 \
     timeout "$SECONDS_TO_RUN" "$B/itc" \
-    --native_audio=true --native_renderer_mirror_by_tick=true --native_renderer_mirror_to_both=true \
+    --native_audio=true \
     --game_data_root="$G" --max_fps=144 --fullscreen=false --log_fps=true \
     --interpolate_draw_state=true --log_level=info --skip_intro "$@" \
     >/dev/null 2>&1 &

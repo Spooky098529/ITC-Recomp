@@ -39,18 +39,12 @@ void BufferTable::Hold(const render::BufferData& data, int64_t sign) {
 void BufferTable::Place(uint32_t handle, Record& record) {
   record.physical = GpuPhysicalAddress(record.data.address);
   record.dirty = true;
-  if (!arena_) {
-    return;
-  }
   record.space = arena_->Allocate(record.data.size, record.offset);
   by_physical_.emplace(record.physical, handle);
   longest_ = std::max(longest_, record.data.size);
 }
 
 void BufferTable::Unplace(uint32_t handle, Record& record) {
-  if (!arena_) {
-    return;
-  }
   if (record.space) {
     arena_->Free(record.offset, record.data.size);
     record.space = false;
@@ -99,11 +93,6 @@ void BufferTable::Destroyed(uint32_t handle) {
   Unplace(handle, it->second);
   records_.erase(it);
   freed_at_[handle] = frame_;
-  for (uint32_t& last : last_bound_) {
-    if (last == handle) {
-      last = 0;
-    }
-  }
 }
 
 void BufferTable::MarkWritten(const std::vector<std::pair<uint32_t, uint32_t>>& writes) {
@@ -152,16 +141,6 @@ BufferTable::Record& BufferTable::NeverMade(uint32_t slot, uint32_t handle) {
   Hold(data, 1);
   Place(handle, record);
   return record;
-}
-
-void BufferTable::Bound(uint32_t slot, uint32_t handle) {
-  if (!handle || last_bound_[slot] == handle) {
-    return;
-  }
-  last_bound_[slot] = handle;
-  if (!records_.count(handle)) {
-    NeverMade(slot, handle);
-  }
 }
 
 bool BufferTable::Use(uint32_t slot, uint32_t handle, uint32_t& offset) {

@@ -16,17 +16,16 @@
 # ITC_ARGS adds flags to the game's command line (e.g. to compare one build
 # with an option on and off); a default flag it names again is left out (the
 # game rejects a flag given twice), e.g.
-# ITC_ARGS=--native_renderer_mirror_by_tick=false for the old mirror.
+# ITC_ARGS=--motion_blur=false to leave out the motion blur.
 # ITC_THREAD=main records the main thread (Main XThread, which records the
 # game's command lists) instead; the figures are then that thread's.
 set -e
 D=$1; NAME=$2; PATTERN=${3:-BlendState_ReplayConstants}
 B=itc_recomp/out/build/linux-amd64-release; G="$PWD/itc/Import Tuner Challenge (USA)"
 mkdir -p itc_recomp/out/profiles; O=itc_recomp/out/profiles/$NAME.data
-# As players get it: our audio, the mirrors updated once a frame, and a window, not
+# As players get it: our audio, and a window, not
 # fullscreen (the SDK's --fullscreen defaults to true).
 defaults=(--native_audio=true
-  --native_renderer_mirror_by_tick=true --native_renderer_mirror_to_both=true
   --game_data_root="$G" --max_fps=0 --log_fps=true --interpolate_draw_state=true
   --skip_intro --attract_after_s=1 --fullscreen=false)
 read -ra extra <<< "${ITC_ARGS:-}"

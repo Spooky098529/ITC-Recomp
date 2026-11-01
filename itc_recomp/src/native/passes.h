@@ -94,9 +94,6 @@ class Passes {
                       const std::string& dump_prefix = "shown", bool dump_resolves = true);
   // For the next frames: the texture cache's debug_hide (see TextureCache).
   void set_debug_hide(TextureCache::Hide hide, uint32_t value = 0);
-  // A debugging aid: hash each vertex and index range again at every use,
-  // counting ranges whose contents changed within a frame (stats).
-  void set_check_mirror(bool check);
   // Debugging aids: skip the draws of a pixel shader (0: none); describe
   // each draw of the frames recorded, written with the next dump
   // (draws.txt); the pixel shaders the last frame drew the main view with.
@@ -113,27 +110,11 @@ class Passes {
   // second, by logic and render-only frames.
   void set_log_glow(bool log);
   std::vector<uint64_t> main_view_pixel_shaders() const;
-  // A debugging aid: hash each vertex and index range every frame, keeping
-  // how often each changes between frames; TakeMirrorChanges describes the
-  // ranges that changed since it was last called (the most changed first).
-  void set_check_mirror_frames(bool check);
-  // Debugging aids: copy every vertex and index range into the mirror every
-  // frame (as before memcpy's writes were tracked); compare each range not
-  // copied with guest memory (Stats::mirror_stale; slow).
-  void set_copy_all(bool copy_all);
   void set_skip_repeated_state(bool skip);
   void set_reuse_constants(bool reuse);
   // Counts why constants aren't reused (Stats::fetch_changed and
   // offset_differs; a diagnostic, off by default).
   void set_log_constant_changes(bool log);
-  // A diagnostic: how often each draw's index range is scanned again
-  // unchanged, and how the mirror's checks go; TakeIndexRanges describes
-  // them since it was last called.
-  // Keep draws' index ranges' lowest and highest index until memcpy writes
-  // them (on by default).
-  void set_cache_index_ranges(bool cache);
-  void set_log_index_ranges(bool log);
-  std::string TakeIndexRanges();
   // A diagnostic: how much of texture binding repeats from draw to draw
   // (to judge caching it); TakeTextureBindings describes it since it was
   // last called.
@@ -151,25 +132,6 @@ class Passes {
   void set_cache_shader_lookups(bool cache);
   void set_log_shader_lookups(bool log);
   std::string TakeShaderLookups();
-  // Fixed at start (--native_renderer_mirror_by_tick): draws read a mirror
-  // updated only as a logic pass's list starts replaying (an experiment);
-  // TakeMirrorByTick describes it since it was last called.
-  void set_mirror_by_tick(bool by_tick);
-  // With it (--native_renderer_mirror_to_both): memcpy's writes also go into
-  // the front mirror at each frame's start.
-  void set_mirror_to_both(bool to_both);
-  std::string TakeMirrorByTick();
-  void set_verify_mirror(bool verify);
-  // A debugging aid: hash each copied vertex and index range again at the
-  // end of the frame; TakeLateWrites describes those that changed.
-  void set_check_late_writes(bool check);
-  std::string TakeLateWrites();
-  // A debugging aid: find copies into the mirror that change bytes an
-  // earlier draw's copy this frame put there (that draw then reads the new
-  // ones); TakeClobbers describes them.
-  void set_check_clobbers(bool check);
-  std::string TakeClobbers();
-  std::string TakeMirrorChanges();
   // A debugging aid: compare each main view draw's inputs with the same
   // draw's in the previous frame; TakeWatchLines gives how many changed (of
   // how many watched) and descriptions of the first since the last call.
@@ -199,20 +161,9 @@ class Passes {
 
   // Logged by the renderer.
   struct Stats {
-    uint64_t drawn = 0, unsupported = 0, failed = 0, mirrored_bytes = 0;
+    uint64_t drawn = 0, unsupported = 0, failed = 0;
     // Failed draws by reason (kFailedDrawReasons in renderer.cpp).
     std::array<uint64_t, 9> failed_by{};
-    // Ranges not copied (unchanged since this mirror got them); with
-    // set_verify_mirror, those whose contents differ from guest memory, and
-    // an example.
-    uint64_t mirror_skipped_bytes = 0, mirror_checked = 0, mirror_stale = 0,
-             mirror_stale_bytes = 0;
-    uint32_t mirror_stale_sample_address = 0, mirror_stale_sample_size = 0;
-    bool mirror_stale_sample_index = false;
-    // With set_check_mirror: ranges used again in a frame with other
-    // contents, and an example.
-    uint64_t mirror_rewritten = 0, mirror_rewritten_bytes = 0;
-    uint32_t mirror_rewritten_sample_address = 0, mirror_rewritten_sample_size = 0;
     uint32_t pipelines = 0, shaders_translated = 0, shaders_failed = 0, targets = 0;
     uint32_t shaders_from_disk = 0;
     // Draws skipped as having an empty viewport or scissor, and one example:
@@ -227,16 +178,11 @@ class Passes {
     uint64_t movie_draws = 0;
     // Draws with a depth bias, and with an "equal" depth test.
     uint64_t depth_biased = 0, depth_equal = 0;
-    // Draws reading a vertex buffer past the size its fetch constant gives,
-    // and an example: address, size, size needed, highest vertex, stride
-    // in words.
-    uint64_t vertex_overruns = 0;
     // Draws whose item's base vertex differs from VGT_INDX_OFFSET, and an
     // example (item's, register's).
     uint64_t base_vertex_differs = 0;
-    // Draws with indices outside VGT_MIN/MAX_VTX_INDX (the shader clamps
-    // them), and an example: lowest and highest index, the registers.
-    uint64_t clamped_draws = 0, param_gen_draws = 0;
+    // Draws with PsParamGen.
+    uint64_t param_gen_draws = 0;
     // Inline vertex draws drawn (also counted in drawn), and by primitive
     // type (4, 6, 8 rectangle list, 13 quad list).
     uint64_t inline_draws = 0;
@@ -264,9 +210,7 @@ class Passes {
     uint64_t offsets_differ = 0, only_fetch_offset_differs = 0;
     uint64_t fetch_changed = 0, fetch_changed_texture = 0, fetch_changed_vertex = 0,
              fetch_changed_vertex_address = 0, fetch_changed_unread = 0;
-    std::array<uint32_t, 4> clamped_sample{};
     std::array<uint32_t, 2> base_vertex_sample{};
-    std::array<uint32_t, 5> vertex_overrun_sample{};
     uint64_t clears = 0, clear_rects = 0;
     // Resolves done; skipped (no source or destination, a level or slice
     // other than 0, a destination format we can't draw into); flags with
@@ -277,9 +221,8 @@ class Passes {
     uint32_t resolve_flags_sample = 0;
     TextureCache::Stats textures;
     BufferTable::Stats buffers;
-    // With the buffer arena (step 2b): its stats, and draws whose vertex
-    // shader fetches from a stream with no buffer bound.
-    bool arena_on = false;
+    // The buffer arena's (step 2b), and draws whose vertex shader fetches
+    // from a stream with no buffer bound.
     BufferArena::Stats arena;
     uint64_t arena_unbound = 0;
   };

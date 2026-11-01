@@ -1127,21 +1127,6 @@ TextureCache::GenerationEvents TextureCache::TakeGenerationEvents() {
   return events;
 }
 
-// A diagnostic's (buffers.cpp's logged writes): a scan of every texture
-// loaded from guest memory.
-bool TextureCache::Holds(uint32_t start, uint32_t end) const {
-  for (const auto& [handle, h] : state_->handles) {
-    for (const auto& [levels, t] : h.loaded) {
-      for (const auto& [address, size] : t.ranges) {
-        if (size && address < end && start < address + size) {
-          return true;
-        }
-      }
-    }
-  }
-  return false;
-}
-
 namespace {
 template <typename Handle>
 uint64_t HandleBits(Handle handle) {

@@ -13,7 +13,7 @@ namespace native {
 // Main thread, as a pass's command list is handed to the render thread
 // (before Renderer::WaitForFrame): whether a logic pass recorded it. Render
 // thread, as a frame's replay starts: takes the next list's. Then whether
-// the list being replayed came from a logic pass (--native_renderer_mirror_by_tick).
+// the list being replayed came from a logic pass (the pass and glow logs).
 void Renderer_OnListHandedOver(bool logic_pass);
 void Renderer_OnReplayStart();
 bool Renderer_ReplayingLogicList();

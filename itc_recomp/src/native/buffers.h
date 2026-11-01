@@ -4,7 +4,6 @@
 #pragma once
 
 #include <cstdint>
-#include <functional>
 #include <utility>
 #include <vector>
 
@@ -15,7 +14,7 @@ bool Buffers_Logging();
 // The library's memcpy (sub_825A7410) for native callers: the bytes copied
 // as its override copies them natively (c_runtime::Memcpy), with the
 // override's work around it (copies into the physical views recorded for the
-// renderer's mirrors and texture cache once done; the logging), `caller`
+// renderer's buffer arena once done; the logging), `caller`
 // standing for the call's return address in the logs. False, with nothing
 // done, where the override would run the original: --native_memcpy off, or
 // ranges that may share memory.
@@ -29,43 +28,9 @@ bool Buffers_NativeMemcpy();
 // 11 and 12 bind.
 void Buffers_OnCommand(uint8_t* base, uint32_t id, uint32_t payload, uint32_t count);
 
-// Render thread: the sequence number of the newest write the library's
-// memcpy made into [physical, physical + size), 0 if none; and the newest
-// sequence number of all. A range read when the sequence was S needs reading
-// again only if Buffers_NewestWrite returns more than S.
-uint64_t Buffers_NewestWrite(uint32_t physical, uint32_t size);
-uint64_t Buffers_Sequence();
-// Render thread: what the library's memcpy wrote into [physical, physical +
-// size): bytes covered, the first segment's caller, and the newest write's
-// sequence and caller.
-struct Buffers_Coverage {
-  uint64_t bytes = 0, newest = 0;
-  uint32_t newest_caller = 0, first_caller = 0;
-};
-Buffers_Coverage Buffers_CoverageOf(uint32_t physical, uint32_t size);
-// Render thread (--native_renderer_mirror_by_tick): from the first call
-// to Buffers_CollectMirrorWrites on, the same writes kept for the mirrors,
-// taken by Buffers_TakeMirrorWrites (all of them since start up, as pending
-// writes are kept until taken).
-void Buffers_CollectMirrorWrites();
-void Buffers_TakeMirrorWrites(std::vector<std::pair<uint32_t, uint32_t>>& out);
-// Render thread: whether to keep the segments memcpy wrote (for
-// Buffers_NewestWrite and Buffers_CoverageOf; on by default). Off with
-// --native_renderer_mirror_by_tick unless a diagnostic asks of them: writes
-// taken while off are missing from the answers.
-void Buffers_KeepSegments(bool keep);
-
-// Render thread, with logging: a vertex or index range (physical) copied
-// into the mirror, the first time in a frame.
-void Buffers_OnMirror(uint32_t physical, uint32_t size, bool index);
-
-// --native_renderer_log_physical_writes (see buffers.cpp).
-bool Buffers_LogPhysicalWrites();
-// Render thread: a frame's recording starts (is_texture: whether a physical
-// range overlaps a texture the cache holds) and ends; and each vertex or
-// index range it draws, the first time in the frame.
-void Buffers_OnFrameStart(const std::function<bool(uint32_t, uint32_t)>& is_texture);
-void Buffers_OnFrameEnd();
-void Buffers_OnDrawnRange(uint32_t physical, uint32_t size, bool index);
+// Render thread: memcpy's writes into the physical views ([start, end),
+// physical) since the last call (all of them since start-up the first
+// time), for the buffer arena (buffer_table.h's MarkWritten).
+void Buffers_TakeWrites(std::vector<std::pair<uint32_t, uint32_t>>& out);
 
 }  // namespace native

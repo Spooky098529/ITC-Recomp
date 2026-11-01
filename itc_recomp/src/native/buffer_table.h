@@ -1,12 +1,12 @@
 // The renderer's buffers by handle (docs/conventional-renderer.md, "Step
 // 2b"): filled only by the interface's BufferCreated and BufferDestroyed
-// (render/resources.h), on the render thread between lists. With the
-// arena (part 2, buffer_arena.h), each buffer has its own space there, and
-// its data is copied from guest memory when a draw first uses it after it
-// was made or written (BufferWritten, or memcpy's records of writes into
-// its range: MarkWritten). A buffer a draw binds that was never made
-// through the interface is logged once with its header and taken as made
-// (a creation path missed).
+// (render/resources.h), on the render thread between lists. Each buffer has
+// its own space in the buffer arena (buffer_arena.h), and its data is
+// copied from guest memory when a draw first uses it after it was made or
+// written (BufferWritten, or memcpy's records of writes into its range:
+// MarkWritten). A buffer a draw binds that was never made through the
+// interface is logged once with its header and taken as made (a creation
+// path missed).
 
 #pragma once
 
@@ -24,20 +24,17 @@ namespace native {
 class BufferTable {
  public:
   void set_base(uint8_t* base) { base_ = base; }
-  // The arena buffers get space in (none: the records only).
+  // The arena buffers get space in.
   void set_arena(BufferArena* arena) { arena_ = arena; }
   void OnFrame() { frame_++; }
 
   void Created(uint32_t handle, const render::BufferData& data);
   void Written(uint32_t handle);
   void Destroyed(uint32_t handle);
-  // A draw binds `handle` (a stream's or the indices'). Cheap when it was
-  // the last one checked in `slot`.
-  void Bound(uint32_t slot, uint32_t handle);
-  // With the arena: a draw uses `handle` in `slot` (as Bound): its offset in
-  // the arena, its data copied there first if made or written since. False
-  // when it has no space or this frame's staging is full (the draw is left
-  // out).
+  // A draw uses `handle` in `slot` (a stream, or kSlots - 1 the indices):
+  // its offset in the arena, its data copied there first if made or written
+  // since. False when it has no space or this frame's staging is full (the
+  // draw is left out).
   bool Use(uint32_t slot, uint32_t handle, uint32_t& offset);
   // memcpy's writes into the physical views ([start, end) each): the
   // buffers they touch are written.
@@ -51,8 +48,8 @@ class BufferTable {
     uint64_t work_created = 0, work_bytes = 0;
     uint64_t held = 0, held_vertex_bytes = 0, held_index_bytes = 0, held_other_bytes = 0;
     uint64_t never_created = 0;
-    // With the arena: buffers marked written by memcpy's records, and
-    // copies made at draws (and their bytes).
+    // Buffers marked written by memcpy's records, and copies made at draws
+    // (and their bytes).
     uint64_t marked = 0, uploads = 0, upload_bytes = 0;
   };
   Stats TakeStats();
@@ -71,8 +68,8 @@ class BufferTable {
 
   uint8_t* base_ = nullptr;
   BufferArena* arena_ = nullptr;
-  // With the arena: the records by their data's physical address, and the
-  // longest, to find those a write touches.
+  // The records by their data's physical address, and the longest, to find
+  // those a write touches.
   std::multimap<uint32_t, uint32_t> by_physical_;
   uint32_t longest_ = 0;
   uint64_t frame_ = 0;
@@ -80,7 +77,6 @@ class BufferTable {
   // The frame each handle was last freed in, for the never-made warning.
   std::unordered_map<uint32_t, uint64_t> freed_at_;
   static constexpr uint32_t kSlots = 17;  // 16 streams, the indices
-  uint32_t last_bound_[kSlots] = {};
   Stats stats_;
 };
 
