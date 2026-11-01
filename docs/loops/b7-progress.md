@@ -46,7 +46,7 @@ file's history. What's left to see in a drive, from every run:
   `RaceDialog::SetText` and `RaceDialog::Open`; no adapter removable.
   No validation needed.
 - Limit for this run: 5 subsystems (the user's call, 2026-11-01; 3
-  before); 2 taken.
+  before); 3 taken.
 - Subsystem 2 of 5: the render queue's methods (`sub_8258EDC8`,
   `sub_8258E5F8`, `sub_8258E618`, `sub_8258E5E0`, `sub_8258ED78`),
   from `leads.md` (all ready, every pass). Map checked (ee891a3a: 24
@@ -86,6 +86,12 @@ file's history. What's left to see in a drive, from every run:
   errors; no subagents). Nothing ready left. Validated (`itc_3127`,
   120 s: race 54 s, 0 errors): 5 of 5 harness lines, all 5 ran in the
   race, replay not needed. Done.
+
+- Subsystem 3 of 5: the scene's update (`sub_820C9608`, `sub_820C3DA0`,
+  `sub_820C59B0`, `sub_820C4C80`, `sub_820F1078`), from `leads.md` (14
+  ready groups under it since the scene loaders are ours; the scene at
+  `[0x826C2E44]` lead beside it, `sub_820C8A50`, given to the mapping
+  agent to fold in if it fits). Step: mapping agent running.
 
 ## Done
 
