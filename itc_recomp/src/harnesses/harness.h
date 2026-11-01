@@ -199,6 +199,8 @@ void RacerControllers(Context& h);
 void TrackZones(Context& h);
 void GraphicsResources(Context& h);
 void DeviceShaders(Context& h);
+// The render queue's methods (src/harnesses/render_queue.cpp).
+void RenderQueue(Context& h);
 void VideoOutput(Context& h);
 void DeviceState(Context& h);
 void CourseScenery(Context& h);

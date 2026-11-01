@@ -1,0 +1,97 @@
+// The render queue's methods (docs/functions/device-shaders.md): see
+// render_queue.h.
+
+#include "graphics/render_queue.h"
+
+#include "guest.h"
+
+#include "base/log.h"
+#include "graphics/device_shaders.h"
+#include "graphics/resources.h"
+
+#include <cstdint>
+
+namespace graphics::render_queue {
+
+namespace {
+
+constexpr uint32_t kZero = 0x82000A34;  // 0.0
+
+constexpr uint32_t kRecordingSlot = 28;  // slot 7
+constexpr uint32_t kRecordingFunction = 0x8258E5F8;
+
+uint32_t State(uint8_t* base, uint32_t queue) { return guest::LoadU32(base, queue + 4); }
+
+// A frame of `bytes` below `sp`, with its back chain.
+uint32_t Frame(uint8_t* base, uint32_t sp, uint32_t bytes) {
+  const uint32_t frame = sp - bytes;
+  guest::StoreU32(base, frame, sp);
+  return frame;
+}
+
+// The queue's slot at `slot` (bytes into its vtable) with r3 = the queue:
+// its plain C++ when it's the queue's own `function`, else a guest call.
+uint32_t QueueSlot(uint8_t* base, uint32_t queue, uint32_t slot, uint32_t function,
+                   uint32_t (*own)(uint8_t*, uint32_t), uint32_t frame, uint32_t return_address,
+                   const GuestCall& call) {
+  const uint32_t target = guest::LoadU32(base, guest::LoadU32(base, queue) + slot);
+  if (target == function) {
+    return own(base, queue);
+  }
+  return uint32_t(call(target, frame, return_address, 1, queue, 0, 0).r3);
+}
+
+}  // namespace
+
+void Flip(uint8_t* base, uint32_t queue) {
+  ITC_NATIVE_RUNNING("sub_8258E5E0 RenderQueue::Flip");
+  const uint32_t state = State(base, queue);
+  guest::StoreU32(base, state, guest::LoadU32(base, state) == 0 ? 1 : 0);
+}
+
+uint32_t Recording(uint8_t* base, uint32_t queue) {
+  ITC_NATIVE_RUNNING("sub_8258E5F8 RenderQueue::Recording");
+  const uint32_t index = guest::LoadU32(base, State(base, queue)) == 0 ? 1 : 0;
+  return guest::LoadU32(base, queue + ((index + 2) << 2));
+}
+
+uint32_t Replaying(uint8_t* base, uint32_t queue) {
+  ITC_NATIVE_RUNNING("sub_8258E618 RenderQueue::Replaying");
+  const uint32_t index = guest::LoadU32(base, State(base, queue));
+  return guest::LoadU32(base, queue + ((index + 2) << 2));
+}
+
+float Sequence(uint8_t* base, uint32_t entry) {
+  ITC_NATIVE_RUNNING("sub_8258E5C0 QueueEntry::Sequence");
+  return guest::LoadFloat(base, entry + 8);
+}
+
+uint32_t ClearRecording(uint8_t* base, uint32_t queue, uint32_t sp, const GuestCall& call) {
+  ITC_NATIVE_RUNNING("sub_8258ED78 RenderQueue::ClearRecording");
+  const uint32_t frame = Frame(base, sp, 96);
+  const uint32_t list = QueueSlot(base, queue, kRecordingSlot, kRecordingFunction, Recording,
+                                  frame, 0x8258ED9C, call);
+  device_shaders::PassListClear(base, list);
+  // lfs, then stfs: the float through a double, as the original.
+  const double zero = guest::LoadFloat(base, kZero);
+  guest::StoreFloat(base, State(base, queue) + 84, float(zero));
+  return list;
+}
+
+uint32_t Init(uint8_t* base, uint32_t queue, uint32_t device, uint32_t sp, const GuestCall& call) {
+  ITC_NATIVE_RUNNING("sub_8258ED00 RenderQueue::Init");
+  const uint32_t frame = Frame(base, sp, 128);
+  const uint32_t drawer = State(base, queue) + 4;
+  call(guest::LoadU32(base, guest::LoadU32(base, drawer)), frame, 0x8258ED2C, 2, drawer, device,
+       0);
+  for (uint32_t i = 0, offset = 48; offset < 64; i++, offset += 4) {
+    const uint32_t at = offset + State(base, queue);
+    guest::StoreU32(base, at, GetRenderTarget(base, device, i));
+  }
+  const uint32_t state = State(base, queue);
+  const uint32_t depth = GetDepthStencilSurface(base, device);
+  guest::StoreU32(base, state + 64, depth);
+  return depth;
+}
+
+}  // namespace graphics::render_queue
