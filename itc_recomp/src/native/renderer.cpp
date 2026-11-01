@@ -8,6 +8,7 @@
 #include "state.h"
 
 #include "passes.h"
+#include "render/commands.h"
 #include "shaders.h"
 #include "vulkan_functions.h"
 
@@ -360,8 +361,38 @@ class Renderer {
   std::array<Frame, kFramesInFlight> frames_{};
   uint32_t frame_index_ = 0;
 
+  // The conventional renderer's backend (render/device.h): our command
+  // handlers' draws, clears, resolves and tiling, into this frame's passes.
+  class InterfaceBackend final : public render::Backend {
+   public:
+    InterfaceBackend(Renderer& renderer, uint8_t* base) : renderer_(renderer), base_(base) {}
+    void DrawIndexed(render::State& state, const render::DrawIndexed& draw) override {
+      renderer_.passes_.InterfaceDraw(renderer_.BeginFrame(), base_, state, draw);
+    }
+    void DrawInline(render::State& state, const render::DrawInline& draw) override {
+      renderer_.passes_.InterfaceInlineDraw(renderer_.BeginFrame(), base_, state, draw);
+    }
+    void Clear(render::State& state, const render::Clear& clear) override {
+      renderer_.passes_.InterfaceClear(renderer_.BeginFrame(), base_, state, clear);
+    }
+    void Resolve(render::State& state, const render::Resolve& resolve) override {
+      renderer_.passes_.InterfaceResolve(renderer_.BeginFrame(), base_, state, resolve);
+    }
+    void BeginTiling(render::State& state, uint32_t width, uint32_t height,
+                     float clear) override {
+      renderer_.passes_.InterfaceBeginTiling(renderer_.BeginFrame(), base_, state, width, height,
+                                             clear);
+    }
+    void EndTiling(render::State&) override { renderer_.passes_.EndTiling(); }
+
+   private:
+    Renderer& renderer_;
+    uint8_t* base_;
+  };
+
   DeviceContext context_{};
   Passes passes_;
+  std::unique_ptr<InterfaceBackend> interface_backend_;
   bool recording_ = false;  // this frame's command buffer is open
   // The dump's frames after the first: what each hides.
   struct DumpStep {
@@ -667,6 +698,15 @@ bool Renderer::Init(uint8_t* base) {
   }
   passes_.set_mirror_by_tick(ITC_FLAG(native_renderer_mirror_by_tick));
   passes_.set_mirror_to_both(ITC_FLAG(native_renderer_mirror_to_both));
+  // Our handlers draw through the backend from here on (Renderer_OnCommand
+  // starts the renderer before each of them runs).
+  if (render::ConventionalRenderer()) {
+    render::Commands* commands = render::GetCommands();
+    interface_backend_ = std::make_unique<InterfaceBackend>(*this, base);
+    commands->set_backend(interface_backend_.get());
+    passes_.set_interface(&commands->state());
+    ITC_LOG_INFO("native renderer: drawing from the conventional renderer's interface");
+  }
   return true;
 }
 
