@@ -173,10 +173,16 @@ file's history. What's left to see in a drive, from every run:
   flags; the finishers run inside their `frame_state_diff` wraps; the
   stack words the original never writes passed on as left; harness
   load_poll and second_set 0 differing, frame dumps alike, race 38 s,
-  0 errors; no subagents). Nothing ready left. Step: validation agent
-  running.
+  0 errors; no subagents). Nothing ready left. Validated (`itc_3215`,
+  120 s: race 53 s, 0 errors; replay `itc_3216` ok but for one
+  BaseHeap line at the race-end change): 32 of 32 harness lines, 28
+  ran in the race, 4 to drive (never seen in play before). Done.
 
 ## Done
+
+- The scene models' load poll (subsystem 5): `load-poll.md`, 31 of 32,
+  one migration; `--native_load_poll`; 103db371..fdcd3ccb. Validated
+  (`itc_3215`).
 
 - `ScenePools::ReleaseB` (cleanup lead): with the cockpit's and scene
   model's releases and 10 adapters removed; `second-set.md` 152 of 152;
@@ -319,4 +325,19 @@ file's history. What's left to see in a drive, from every run:
   load_poll and second_set 0 differing): ours 3962, work left 2441
   (wrapped 82, known 490, unknown 1869).
 
+- After its validation (`itc_3215`, 120 s: race 53 s, 0 errors, every
+  harness 0 differing but the expected groups): ours 3962, work left
+  2441 (wrapped 82, known 490, unknown 1869).
+
 ## Stopped
+
+2026-11-01, after the load poll's validation (`itc_3215`): the run's
+limit reached (5 subsystems, the user's call: the device shaders with
+the render queue counted as two, the car scene, its second set, the
+load poll; and six cleanup leads). Nothing failed: every harness 0
+differing but the expected groups, no attract race errors. The pad
+replay logged the SDK's intermittent "BaseHeap::Release failed" at the
+race-end change in four of its validations (seen before this run too):
+not debugged, for the user (`review.md`). Nothing uncommitted;
+`check_function_statuses.py`: 0 errors. Left for the user: the run's
+section in `review.md`, `to-drive.md`, and the merge.

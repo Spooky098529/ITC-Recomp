@@ -43,6 +43,13 @@ here loses its heading.
   not a region start" at the race-end change (seen in replays before
   this run too; the native code under test not ruled out).
 
+- The load poll (attract race `itc_3215`, replay `itc_3216` ok but for
+  one BaseHeap line at the race-end change; `load-poll.md`,
+  `material-passes.md`; none ever seen in play): `sub_820E32E8`
+  InteriorMeters::SetGauge, `sub_820E61D0` SceneTraffic::ApplyPaint,
+  `sub_820D7E18` TrafficCar::SetPaint, `sub_820D3658` (the gauge
+  table's entry).
+
 ## Run 2026-10-31 16:54 (`b7-loop-31-10-26`, continued)
 
 - The in-race screens, third migration (attract race `itc_3046`,

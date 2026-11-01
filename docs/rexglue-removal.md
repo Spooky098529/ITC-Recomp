@@ -52,7 +52,7 @@ goes in `src/` as overrides), American English.
   the leftovers above (the movie player, Voice::Init skipped as high as
   is safe), or the main thread's performance leads
   (`sub_821298C0`, `sub_8209C6E0`, in `docs/native-renderer.md`).
-- **B7 in progress (2026-10-31):** its measure is `b7_status.py`
+- **B7 in progress (2026-11-01):** its measure is `b7_status.py`
   (`docs/coverage.md`), and the B7 loop (`docs/loops/b7-loop.md`, a
   `/loop` session handing each subsystem to a mapping agent, then
   migration agents) did its first run on the branch `b7-loop-test` (merged 2026-10-22): five
@@ -188,7 +188,15 @@ goes in `src/` as overrides), American English.
   in-race screens (`race-screens.md`, 93 of 116: the pause menu, the
   confirm dialog, the career results, the menu after the race) native,
   and by the user's call deleted adapters a harness had kept as hooks
-  (ours 3,705). The runs' rows wait for the user's review (`docs/loops/review.md`). See
+  (ours 3,705); its twenty-ninth run (branch `b7-loop-31-10-26-2`,
+  2026-10-31 to 11-01, 5 subsystems by the user's call, not yet merged)
+  made the device's shader setters and the render queue
+  (`device-shaders.md`, 25 of 25 in play, with the per-frame replay),
+  the car scene (`scene.md`, 19 of 22), its second set of pools
+  (`second-set.md`, 152 of 152) and the scene models' load poll
+  (`load-poll.md`, 31 of 32) native, with cleanup leads finishing the
+  scene loaders (78 of 78, with `XPR::GetTexture`) and the race HUD
+  machine's draws (ours 3,962). The runs' rows wait for the user's review (`docs/loops/review.md`). See
   "B7's loop runs" under B7, and `docs/loops/b7-progress.md`. Guest
   allocation is no longer a block (`docs/native-memory.md`); what the
   rest waits on is in `docs/loops/leads.md` (the archive loader, the
@@ -2700,6 +2708,7 @@ B7. **The game logic inside**: everything else, subsystem by subsystem,
 | 2026-11-01 | The render queue's methods (the game's `OT`, an ordering table at scene + 64, vtable `0x8206CB8C`: `Init`, `Flip`, `ClearRecording`, `Add` with `PassList::Add`, `Recording`, `Replaying`, the release list's `PtrVector`, and the per-frame `Replay` with its quicksort and chunk walker) | `device-shaders.md` | 25 of 25 in play (with the shader setters and the queue's constructor; one migration) | `--native_render_queue` |
 | 2026-11-01 | The car scene (`CarScene::` at `[0x826C2E44]`: `Create`, the constructor, its set-up record, the lighting block, the shared assets at +64, `LoadAssets` and `OnFileLoaded`, the first set's update, the teardown and destructor) | `scene.md` | 19 of 22 in play (one migration; the rest waits on the scene models' updates and the parts' finishers) | `--native_scene` |
 | 2026-11-01 | The car scene's second set of pools (`sub_820C8DE8`'s eight objects: the car model, parts, cockpit, interior, the neon and LED kit, wheels, traffic car and scene model; their 240-byte point records, point groups and point set-ups, the wheels' morph of the tire, rim and brake shapes) | `second-set.md` | 148 of 152 in play (three migrations; the rest waits on `ScenePools::ReleaseB`) | `--native_second_set` |
+| 2026-11-01 | The scene models' load poll (`SceneModel::PollLoad`: each part's finisher, the ready flags, the palettes and paint applied once; `SceneParts::Build`, `SceneInterior::SetGauges`) | `load-poll.md` | 31 of 32 (one migration; `ApplyLightKit` is the front end's) | `--native_load_poll` |
 
     The first run (2026-10-22, branch `b7-loop-test`): every harness at 0 differing, attract races at 20-21 s with no errors,
     and a race the user drove looked right. Ours went from 162 to 335 (work
@@ -4376,3 +4385,19 @@ overridden 108, Native 34, Dropped 26, never called 70, live 211.
 Imports: 186 called, 56 with a live caller. B7 (`b7_status.py`): ours
 3,925, work left 2,474 (Wrapped 97, with a row 493, no row yet 1,884),
 from 2,622.
+
+**2026-11-01, the scene models' load poll (branch `b7-loop-31-10-26-2`):**
+the twenty-ninth run's fifth and last subsystem, mapped and made native
+in one migration (`load-poll.md`, `--native_load_poll`, `src/load_poll/`):
+the poll the race and the front end run until a car's parts are loaded,
+its 13 part finishers (run inside their `frame_state_diff` wraps, kept
+for their recompiled callers), the palettes and paint applied once, 31
+of 32 (`SceneModel::ApplyLightKit` is the front end's). The flag takes
+effect only with its callees' flags on. Left for the scene: the car
+scene's update (the scene models' updates, `sub_820C5A60`), the scene's
+draw and `Car::DrawUpdate` (leads). The run stopped at its limit. The
+boundary: 449 functions (916 pairs): overridden 108, Native 34, Dropped
+26, never called 70, live 211. Imports: 186 called, 56 with a live
+caller. B7 (`b7_status.py`): ours 3,962, work left 2,441 (Wrapped 82,
+with a row 490, no row yet 1,869), from 2,469 (from 2,694 at the run's
+start).

@@ -446,6 +446,23 @@ pad replay's race reached its countdown in only one of four
 validations (to look at later, `docs/loops/review.md`). The rest waits
 on the UI movie calls `sub_8211C740` and `sub_8211CBD8`, the options
 screens and the leads in `docs/loops/leads.md`.
+Its twenty-ninth run (`b7-loop-31-10-26-2`, 2026-10-31 to 11-01, not
+yet merged; summary `docs/loops/b7-loop-2026-10-31-2357.md`; 5
+subsystems, the user's call) made the device's shader setters and the
+render queue (`device-shaders.md`, `--native_device_shaders`,
+`--native_render_queue`, 25 of 25 in play: the per-frame replay, frame
+dumps pixel-identical), the car scene at `[0x826C2E44]` (`scene.md`,
+`--native_scene`, 19 of 22), its second set of pools (`second-set.md`,
+`--native_second_set`, 152 of 152, with the wheels' morph) and the
+scene models' load poll (`load-poll.md`, `--native_load_poll`, 31 of
+32) native, with cleanup leads finishing the scene loaders (78 of 78,
+`XPR::GetTexture`) and the race HUD machine's draws (ours 3,705 ->
+3,962); diagnostics' wraps (`frame_state_diff`, `refcount.cpp`) are
+kept around native bodies. Its replays logged the SDK's intermittent
+"BaseHeap::Release failed" at the race-end change in four validations
+(seen before the run too; `docs/loops/review.md`). The rest waits on
+the scene models' updates, the scene's draw, `Car::DrawUpdate` and the
+leads in `docs/loops/leads.md`.
 Harness runs use `attract_race.sh 40` (the user's call,
 2026-10-23); a race short only because the harnesses took longer is
 no halt. B7 loop migration agents run only their subsystem's harnesses
