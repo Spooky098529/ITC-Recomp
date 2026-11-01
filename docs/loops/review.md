@@ -29,6 +29,16 @@ When the user has reviewed a run's section, its heading gets
   the flag off the entry runs the original with the old skip around
   it); the constructors are native only with the native heap; their
   harness compares the allocated blocks by role.
+- The race HUD machine cleanup lead (61f7966b..7476d237): 12 rows in
+  `race-hud-machine.md`, `race-hud-object.md`, `race-screens.md`. For
+  review: `ResultsDraw`'s and `AfterRaceDraw`'s unseen kinds run the
+  original (the handlers hand back); `ClosePause`'s kind 4 ported (its
+  callee `sub_82106540` is empty); `sub_82211D10` Native with no adapter
+  ever; the harnesses of `CreateScreens`, `DrawPauseMenu` and
+  `DrawAfterRaceMenu` run in other files' worlds. The existing
+  `PauseMenu::Draw` harness group sets the pause list's +68 to 0, so
+  `ShowMain`'s `ColorItems` reads guest address 0: it passes only by
+  how its random cases fall (left unchanged, a latent harness gap).
 
 ## Run 2026-10-31 16:54 (`b7-loop-31-10-26`, continued)
 

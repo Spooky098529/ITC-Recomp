@@ -19,8 +19,13 @@ file's history. What's left to see in a drive, from every run:
   `sub_8216CA28`, `ClosePause` `sub_8216C658`, `ResultsDraw`
   `sub_8216D6D0`, `AfterRaceDraw` `sub_8216C6D8` with `sub_82211D10`,
   and `sub_82211D08` (`race-hud-machine.md`, `race-hud-object.md`),
-  all ready; then `--removable` on the three files. Step: migration
-  agent running.
+  all ready; then `--removable` on the three files. Migration checked
+  (61f7966b: the six; 8c5e2c76..7476d237: 6 adapters removed in
+  `race-screens.md` and `race-hud-object.md`; the three files'
+  harnesses 0 differing, race 25 s with them, 0 errors; unseen callees
+  left on the recompiled path behind the flags; no subagents). Left:
+  `PauseDraw` `sub_8216CF08` and `sub_8216CFE0`, ready now (a new
+  cleanup lead). Step: validation agent running.
 
 ## Done
 
@@ -55,5 +60,8 @@ file's history. What's left to see in a drive, from every run:
 - After its validation (`itc_3054`, 120 s: race 55 s, 0 errors, every
   harness 0 differing but the expected groups): ours 3712, work left
   2687.
+- After the race HUD machine cleanup's migration (`itc_3071`: race 25 s,
+  0 errors, three harnesses 0 differing): ours 3718, work left 2681
+  (wrapped 100, known 507, unknown 2074).
 
 ## Stopped
