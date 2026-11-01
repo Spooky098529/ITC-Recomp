@@ -587,6 +587,113 @@ void Objects(Context& h, Random& r, uint32_t block) {
   }
 }
 
+// --- ScenePools::ReleaseB and the releases it reaches ---
+//
+// A second set at the block (its lists at +4944 + 12 x pool, pools 0 to 9,
+// each one object long; 8 and 9 hold one of the others) and one object of
+// each pool past it, their words random but the list's (+8 = 0: the last
+// node; +20 an index, 0 or past the end, both the first node), +16 (3, or
+// random) and the first-set words (0: no ScenePools::ReleaseA). The
+// cockpit's interior (+28) is the pool 3 object or 0 (+4316 = the set); the
+// scene model's (+5044 0 or random, +32 kind 3 or random, +5116 the set)
+// parts the pools' objects or 0, so ReleaseB nests through it and the
+// cockpit, and an object released once has +16 = 0 the second time. The
+// block and r3 compared (the frames aren't: the plain C++ doesn't write the
+// saved registers' slots).
+constexpr uint32_t kReleasePools = 8;
+constexpr uint32_t kReleaseObjectBytes[kReleasePools] = {3744,  37296, 4320, 11680,
+                                                         13168, 16800, 9808, 5120};
+// The first-set object's word in each (none in the scene model).
+constexpr uint32_t kReleaseFirstWords[kReleasePools - 1] = {24, 104, 32, 36, 28, 28, 9760};
+
+struct ReleaseWorld {
+  uint32_t set = 0;
+  uint32_t objects[kReleasePools] = {};
+};
+
+ReleaseWorld MakeReleaseWorld(uint8_t* base, uint32_t block, Random& r) {
+  ReleaseWorld w;
+  w.set = block;
+  uint32_t at = block + 0x1400;
+  for (uint32_t p = 0; p < kReleasePools; p++) {
+    w.objects[p] = at;
+    at += (kReleaseObjectBytes[p] + 15) & ~15u;
+  }
+  for (uint32_t p = 0; p < 10; p++) {
+    Put(base, w.set + 4944 + 12 * p, p < kReleasePools ? w.objects[p] : w.objects[r.Below(8)]);
+  }
+  for (uint32_t p = 0; p < kReleasePools; p++) {
+    const uint32_t object = w.objects[p];
+    Put(base, object + 8, 0);
+    Put(base, object + 20, r.Below(3));
+    Put(base, object + 16, r.Below(4) == 0 ? uint32_t(r.Next()) : 3);
+    if (p < kReleasePools - 1) {
+      Put(base, object + kReleaseFirstWords[p], 0);
+    }
+  }
+  const uint32_t cockpit = w.objects[2];
+  Put(base, cockpit + 28, r.Below(3) == 0 ? 0 : w.objects[3]);
+  Put(base, cockpit + 4316, w.set);
+  const uint32_t model = w.objects[7];
+  Put(base, model + 5044, r.Below(3) == 0 ? uint32_t(r.Next()) : 0);
+  Put(base, model + 32, r.Below(4) == 0 ? 3 : uint32_t(r.Next()));
+  Put(base, model + 5116, w.set);
+  static constexpr uint32_t kParts[][2] = {{5048, 0}, {5060, 1}, {5068, 3}, {5084, 4},
+                                           {5100, 5}, {5076, 2}, {5092, 6}};
+  for (const auto& part : kParts) {
+    Put(base, model + part[0], r.Below(4) == 0 ? 0 : w.objects[part[1]]);
+  }
+  return w;
+}
+
+void ReleaseBs(Context& h, Random& r, uint32_t block) {
+  struct Group {
+    const char* name;
+    GuestFunction recompiled, native;
+    int target;  // the object's pool for a release's own cases, -1 ReleaseB's
+    bool car_models_off;
+  };
+  const Group groups[] = {
+      {"ScenePools::ReleaseB (sub_820C5C88, with SceneModel::Release sub_820DA5D0 and "
+       "SceneCockpit::Release sub_820DBF88, no first-set objects)",
+       __imp__sub_820C5C88, hooks::SecondSetReleaseB, -1, false},
+      // Pool 0's release not native (--native_car_models off on both sides):
+      // the original ReleaseB for it, at the top and nested.
+      {"ScenePools::ReleaseB (sub_820C5C88, pool 0 left to the original)", __imp__sub_820C5C88,
+       hooks::SecondSetReleaseB, -1, true},
+      {"SceneCockpit::Release (sub_820DBF88, no cockpit body)", __imp__sub_820DBF88,
+       hooks::SecondSetSceneCockpitRelease, 2, false},
+      {"SceneModel::Release (sub_820DA5D0, no first-set objects)", __imp__sub_820DA5D0,
+       hooks::SecondSetSceneModelRelease, 7, false},
+  };
+  for (const Group& g : groups) {
+    Results results(g.name);
+    for (int c = 0; c < 24; c++) {
+      // Pools 7 and 2 (the nesting ones) more often; 8 and 9 past the
+      // releases.
+      const uint32_t pick = r.Below(14);
+      const uint32_t pool = pick < 4 ? 7 : (pick < 6 ? 2 : (pick < 8 ? 0 : pick - 6));
+      ITC_FLAG(native_car_models) = !g.car_models_off;
+      Case(
+          h, results, block, kBlockBytes, r,
+          [&](PPCContext& t) {
+            const ReleaseWorld w = MakeReleaseWorld(h.base, block, r);
+            if (g.target >= 0) {
+              t.r3.u64 = w.objects[g.target];
+              return;
+            }
+            t.r3.u64 = w.set;
+            t.r4.u64 = pool;
+            t.r5.u64 = r.Below(4);
+          },
+          g.recompiled, g.native,
+          g.target >= 0 ? fmt::format("case {}", c) : fmt::format("case {} (pool {})", c, pool));
+      ITC_FLAG(native_car_models) = true;
+    }
+    results.Report();
+  }
+}
+
 // SceneCarModel::Release with its first-set car model (+24): the car model's
 // inputs as car_models' CarModel::Release cases build them
 // (car_model_inputs.h), the first pool set ([0x826C2E40]) a block whose pool
@@ -603,7 +710,7 @@ void CarModelReleases(Context& h, Random& r, uint32_t block) {
     return;
   }
   std::lock_guard<std::recursive_mutex> lock(models::MemoryBlocksMutex());
-  constexpr uint32_t kBytes = 0x6000;
+  constexpr uint32_t kBytes = 0x6400;
   const uint32_t scratch = block + 0x100;
   const uint32_t car = block + 0x1000;
   const uint32_t loads = car + sl::kCarModelLoads;
@@ -611,53 +718,72 @@ void CarModelReleases(Context& h, Random& r, uint32_t block) {
   const uint32_t records = set + 0x100;
   const uint32_t first_set = block + 0x3800;
   const uint32_t object = block + 0x4000;
+  // The second set (ReleaseB's cases): its pool 0 list (+4944) holds the
+  // object.
+  const uint32_t second_set = block + 0x5000;
   const uint32_t saved_set = guest::LoadU32(h.base, scene::kFirstSet);
-  Results results("SceneCarModel::Release (sub_820DB6C0, with a car model)");
-  for (int c = 0; c < 24; c++) {
-    const uint64_t seed = r.Next();
-    const cmi::Plan plan = cmi::MakePlan(r);
-    const uint32_t a = r.Below(3), b = r.Below(3);
-    const uint32_t index = r.Below(2) == 0 ? 0 : 1 + r.Below(4);
-    PPCContext start = CallContext(h);
-    start.r1.u64 &= ~0xFull;
-    Outputs out[2];
-    for (int v = 0; v < 2; v++) {
-      Random bytes(seed);
-      RandomBytes(h.base, block, kBytes, bytes);
-      cmi::Held held;
-      cmi::Write(h.base, loads, scratch, plan, true, held);
-      Put(h.base, car + sl::kCarModelSet, set);
-      Put(h.base, set + 40, a);
-      Put(h.base, set + 12, b);
-      Put(h.base, set + 52, records);
-      for (uint32_t i = 0; i < 4 * (a + b); i++) {
-        Put(h.base, records + 20 * i + 16, bytes.Below(4) == 0 ? 0 : 2);
+  for (int via = 0; via < 2; via++) {
+    Results results(via == 0 ? "SceneCarModel::Release (sub_820DB6C0, with a car model)"
+                             : "ScenePools::ReleaseB (sub_820C5C88, pool 0 with a car model)");
+    for (int c = 0; c < 24; c++) {
+      const uint64_t seed = r.Next();
+      const cmi::Plan plan = cmi::MakePlan(r);
+      const uint32_t a = r.Below(3), b = r.Below(3);
+      const uint32_t index = r.Below(2) == 0 ? 0 : 1 + r.Below(4);
+      PPCContext start = CallContext(h);
+      start.r1.u64 &= ~0xFull;
+      Outputs out[2];
+      for (int v = 0; v < 2; v++) {
+        Random bytes(seed);
+        RandomBytes(h.base, block, kBytes, bytes);
+        cmi::Held held;
+        cmi::Write(h.base, loads, scratch, plan, true, held);
+        Put(h.base, car + sl::kCarModelSet, set);
+        Put(h.base, set + 40, a);
+        Put(h.base, set + 12, b);
+        Put(h.base, set + 52, records);
+        for (uint32_t i = 0; i < 4 * (a + b); i++) {
+          Put(h.base, records + 20 * i + 16, bytes.Below(4) == 0 ? 0 : 2);
+        }
+        Put(h.base, car + 8, 0);  // the list's last node
+        Put(h.base, car + 20, index);
+        Put(h.base, first_set + 56, car);
+        Put(h.base, object + 24, car);
+        Put(h.base, scene::kFirstSet, first_set);
+        PPCContext t = start;
+        t.r3.u64 = object;
+        if (via == 1) {
+          Put(h.base, second_set + 4944, object);
+          Put(h.base, object + 8, 0);
+          Put(h.base, object + 20, bytes.Below(3));
+          Put(h.base, object + 16, bytes.Below(4) == 0 ? uint32_t(bytes.Next()) : 3);
+          t.r3.u64 = second_set;
+          t.r4.u64 = 0;
+          t.r5.u64 = bytes.Below(4);
+        }
+        const pending_frees::ListState was = pending_frees::SaveList(h.base);
+        ITC_FLAG(native_second_set) = v == 1;
+        ITC_FLAG(native_scene_loaders) = v == 1;
+        ITC_FLAG(native_car_models) = v == 1;
+        if (via == 0) {
+          (v == 0 ? __imp__sub_820DB6C0 : hooks::SecondSetSceneCarModelRelease)(t, h.base);
+        } else {
+          (v == 0 ? __imp__sub_820C5C88 : hooks::SecondSetReleaseB)(t, h.base);
+        }
+        ITC_FLAG(native_second_set) = true;
+        ITC_FLAG(native_scene_loaders) = true;
+        ITC_FLAG(native_car_models) = true;
+        Put(h.base, scene::kFirstSet, saved_set);
+        pending_frees::TakeAddedNodes(h.base, was, out[v]);
+        cmi::Take(h.base, loads, held, out[v]);
+        out[v].Bytes(Read(h.base, block, kBytes));
+        out[v].Word(t.r3.u32);
+        out[v].Word(uint32_t(t.r3.u64 >> 32));
       }
-      Put(h.base, car + 8, 0);  // the list's last node
-      Put(h.base, car + 20, index);
-      Put(h.base, first_set + 56, car);
-      Put(h.base, object + 24, car);
-      Put(h.base, scene::kFirstSet, first_set);
-      const pending_frees::ListState was = pending_frees::SaveList(h.base);
-      PPCContext t = start;
-      t.r3.u64 = object;
-      ITC_FLAG(native_second_set) = v == 1;
-      ITC_FLAG(native_scene_loaders) = v == 1;
-      ITC_FLAG(native_car_models) = v == 1;
-      (v == 0 ? __imp__sub_820DB6C0 : hooks::SecondSetSceneCarModelRelease)(t, h.base);
-      ITC_FLAG(native_second_set) = true;
-      ITC_FLAG(native_scene_loaders) = true;
-      ITC_FLAG(native_car_models) = true;
-      Put(h.base, scene::kFirstSet, saved_set);
-      pending_frees::TakeAddedNodes(h.base, was, out[v]);
-      cmi::Take(h.base, loads, held, out[v]);
-      out[v].Bytes(Read(h.base, block, kBytes));
-      out[v].Word(t.r3.u32);
-      out[v].Word(uint32_t(t.r3.u64 >> 32));
+      results.Check(out[0], out[1], fmt::format("case {} (index {})", c, index));
     }
-    results.Check(out[0], out[1], fmt::format("case {} (index {})", c, index));
+    results.Report();
   }
-  results.Report();
   Put(h.base, scene::kFirstSet, saved_set);
 }
 
@@ -1637,6 +1763,7 @@ void SecondSet(Context& h) {
   Groups(h, r, block);
   Finds(h, r, block);
   Objects(h, r, block);
+  ReleaseBs(h, r, block);
   CarModelReleases(h, r, block);
   Morphs(h, r, block);
   Wheels(h, r, block);

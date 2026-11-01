@@ -12,6 +12,7 @@
 #include "scene_loaders/pools.h"
 #include "scene_models/scene_models.h"
 #include "second_set/blocks.h"
+#include "vehicle_accessors/vehicle_accessors.h"
 
 #include <bit>
 #include <cstdlib>
@@ -210,6 +211,109 @@ std::optional<uint32_t> SceneWheelsRelease(uint8_t* base, uint32_t object, uint3
 std::optional<uint32_t> SceneTrafficRelease(uint8_t* base, uint32_t object, uint32_t stack) {
   ITC_NATIVE_RUNNING("sub_820E5A18 SceneTraffic::Release");
   return Release(base, object, 9760, 6, stack, SceneTrafficReset);
+}
+
+uint64_t ReleaseB(uint8_t* base, uint32_t set, uint32_t pool, uint32_t index, uint32_t stack,
+                  uint32_t lr, const ReleaseCalls& calls) {
+  ITC_NATIVE_RUNNING("sub_820C5C88 ScenePools::ReleaseB");
+  if (pool <= 7 && !calls.native(pool)) {
+    return calls.release_b(set, pool, index, stack, lr);
+  }
+  const uint32_t sp = stack - 112;
+  const uint32_t object = vehicle_accessors::ListAt(base, (pool + 412) * 12 + set, index);
+  if (Load(base, object + 16) != 3) {
+    return object;
+  }
+  std::optional<uint32_t> r3 = object;
+  switch (pool) {
+    case 0:
+      r3 = SceneCarModelRelease(base, object, sp);
+      break;
+    case 1:
+      r3 = ScenePartsRelease(base, object, sp);
+      break;
+    case 2:
+      r3 = SceneCockpitRelease(base, object, sp, calls);
+      break;
+    case 3:
+      r3 = SceneInteriorRelease(base, object, sp);
+      break;
+    case 4:
+      r3 = SceneLightsRelease(base, object, sp);
+      break;
+    case 5:
+      r3 = SceneWheelsRelease(base, object, sp);
+      break;
+    case 6:
+      r3 = SceneTrafficRelease(base, object, sp);
+      break;
+    case 7:
+      r3 = SceneModelRelease(base, object, sp, calls);
+      break;
+    default:
+      break;
+  }
+  if (!r3) {
+    return calls.release_b(set, pool, index, stack, lr);
+  }
+  Store(base, object + 16, 0);
+  return *r3;
+}
+
+std::optional<uint32_t> SceneCockpitRelease(uint8_t* base, uint32_t object, uint32_t stack,
+                                            const ReleaseCalls& calls) {
+  ITC_NATIVE_RUNNING("sub_820DBF88 SceneCockpit::Release");
+  const uint32_t sp = stack - 96;
+  const uint32_t body = Load(base, object + 32);
+  if (body != 0) {
+    if (!scene_loaders::ReleaseA(base, Load(base, scene::kFirstSet), 2, Load(base, body + 20))) {
+      return std::nullopt;
+    }
+  }
+  const uint32_t interior = Load(base, object + 28);
+  if (interior != 0) {
+    ReleaseB(base, Load(base, object + 4316), 3, Load(base, interior + 20), sp, 0x820DBFD8,
+             calls);
+  }
+  return SceneCockpitReset(base, object, sp);
+}
+
+uint32_t SceneModelRelease(uint8_t* base, uint32_t object, uint32_t stack,
+                           const ReleaseCalls& calls) {
+  ITC_NATIVE_RUNNING("sub_820DA5D0 SceneModel::Release");
+  const uint32_t sp = stack - 96;
+  if (Load(base, object + 5044) == 0) {
+    // The parts in the original's order: the word, the pool, the return
+    // address after its call.
+    struct Part {
+      uint32_t at, pool, lr;
+    };
+    static constexpr Part kParts[] = {{5048, 0, 0x820DA618}, {5060, 1, 0x820DA634},
+                                      {5068, 3, 0x820DA650}, {5084, 4, 0x820DA66C},
+                                      {5100, 5, 0x820DA688}, {5076, 2, 0x820DA6A4},
+                                      {5092, 6, 0x820DA6C0}};
+    for (const Part& part : kParts) {
+      // Traffic (kind 3) has no car model to release.
+      if (part.pool == 0 && Load(base, object + 32) == 3) {
+        continue;
+      }
+      const uint32_t held = Load(base, object + part.at);
+      if (held != 0) {
+        ReleaseB(base, Load(base, object + 5116), part.pool, Load(base, held + 20), sp, part.lr,
+                 calls);
+      }
+    }
+  }
+  scene_models::SceneModelRecordReset(base, object + 32);
+  const uint32_t r3 = SceneModelBlockReset(base, object + 4288, sp);
+  for (const uint32_t at : {5024u, 5028u, 5032u, 5036u, 5040u, 5048u, 5052u, 5056u, 5060u, 5064u,
+                            5068u, 5072u, 5084u, 5088u, 5076u, 5080u, 5092u, 5096u, 5100u, 5104u,
+                            5108u, 5112u}) {
+    Store(base, object + at, 0);
+  }
+  Store(base, object + 5044, 3);
+  Store(base, object + 5116, Load(base, scene::kScene));
+  return r3;
 }
 
 uint32_t SceneCarModelConstruct(uint8_t* base, uint32_t object, uint32_t list, uint32_t stack) {

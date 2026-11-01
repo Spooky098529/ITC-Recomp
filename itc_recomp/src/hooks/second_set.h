@@ -8,6 +8,7 @@
 
 #include "guest.h"
 #include "second_set/finds.h"
+#include "second_set/objects.h"
 #include "second_set/wheels.h"
 
 namespace hooks {
@@ -136,6 +137,18 @@ void SecondSetMorphBlend(PPCContext& ctx, uint8_t* base);
 void SecondSetMorphRun(PPCContext& ctx, uint8_t* base);
 void SecondSetTireFillEntries(PPCContext& ctx, uint8_t* base);
 void SecondSetTireReadEntry(PPCContext& ctx, uint8_t* base);
+// ScenePools::ReleaseB sub_820C5C88 (r3 the set, r4 the pool, r5 the
+// index; its adapter is the diagnostics' wrap, src/debug/frame_state_diff.cpp),
+// SceneCockpit::Release sub_820DBF88 and SceneModel::Release sub_820DA5D0
+// (no adapter: only ReleaseB calls it; the harness's) (objects.h): r3 the
+// object; natively where SecondSetReleaseNative says (else the original), the
+// nested ReleaseB's original where its plain C++ declines. r3 as the original
+// leaves it.
+bool SecondSetReleaseNative(uint32_t pool);
+second_set::ReleaseCalls SecondSetReleaseCalls(PPCContext& ctx, uint8_t* base);
+void SecondSetReleaseB(PPCContext& ctx, uint8_t* base);
+void SecondSetSceneCockpitRelease(PPCContext& ctx, uint8_t* base);
+void SecondSetSceneModelRelease(PPCContext& ctx, uint8_t* base);
 // The destructors and deleting destructors (objects.h; r3 the object, left;
 // r4 the flags), natively where their releases are (else the original), and
 // the point blocks' destructors (blocks.h; r3 as the original leaves it).

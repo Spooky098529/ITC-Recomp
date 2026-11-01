@@ -57,7 +57,10 @@ ITC_FLAG_BOOL(native_second_set, true, "ITC",
               "SceneCockpit::Reset sub_820DBE20, SceneInterior::Reset sub_820E3748, "
               "SceneLights::Reset sub_820DCA40 and SceneTraffic::Reset sub_820E5930, "
               "SceneCarModel::Release sub_820DB6C0 (where ScenePools::ReleaseA's plain C++ "
-              "runs), the scene model's block SceneModelBlock::SceneModelBlock sub_820DA108 and "
+              "runs), ScenePools::ReleaseB sub_820C5C88 (inside the diagnostics' wrap) with "
+              "SceneCockpit::Release sub_820DBF88 and SceneModel::Release sub_820DA5D0 (no "
+              "adapter: only ReleaseB calls it) (where their releases run natively; the original "
+              "ReleaseB for a pool whose release doesn't), the scene model's block SceneModelBlock::SceneModelBlock sub_820DA108 and "
               "Reset sub_820D9F50, SceneWheels::Reset sub_820E88A8, WheelPoints::Reset sub_820E85C8 and "
               "WheelPoints sub_820ECC48 with InitTire sub_820E8A80, InitRimA sub_820E99C0, InitRimB "
               "sub_820EA8E8 and InitBrakes sub_820EB320, the releases SceneParts::Release "
@@ -297,12 +300,7 @@ ITC_SECOND_SET_CONSTRUCT(820ECE40, SceneWheelsConstruct)
 ITC_SECOND_SET_CONSTRUCT(820E6E70, SceneTrafficConstruct)
 ITC_SECOND_SET_CONSTRUCT(820DB330, SceneModelConstruct)
 
-namespace {
-
-// Whether a destructor's release runs natively: memcpy native and
-// ReleaseA's plain C++ for `pool` (with --native_material_passes for the
-// parts'); a pool past 6 for the ones that release nothing.
-bool DestructNative(uint32_t pool) {
+bool SecondSetReleaseNative(uint32_t pool) {
   if (!native::Buffers_NativeMemcpy()) {
     return false;
   }
@@ -311,6 +309,68 @@ bool DestructNative(uint32_t pool) {
   }
   return SceneLoadersReleaseANative(pool) && (pool != 1 || ITC_FLAG(native_material_passes));
 }
+
+ss::ReleaseCalls SecondSetReleaseCalls(PPCContext& ctx, uint8_t* base) {
+  ss::ReleaseCalls calls;
+  calls.native = SecondSetReleaseNative;
+  calls.release_b = [&ctx, base](uint32_t set, uint32_t pool, uint32_t index, uint32_t sp,
+                                 uint32_t lr) {
+    const uint64_t stack = ctx.r1.u64, link = ctx.lr;
+    ctx.r1.u64 = sp;
+    ctx.lr = lr;
+    ctx.r3.u64 = set;
+    ctx.r4.u64 = pool;
+    ctx.r5.u64 = index;
+    __imp__sub_820C5C88(ctx, base);
+    ctx.r1.u64 = stack;
+    ctx.lr = link;
+    ctx.fpscr.disableFlushMode();
+    return ctx.r3.u64;
+  };
+  return calls;
+}
+
+void SecondSetReleaseB(PPCContext& ctx, uint8_t* base) {
+  if (!SecondSetReleaseNative(ctx.r4.u32 <= 7 ? ctx.r4.u32 : 7)) {
+    __imp__sub_820C5C88(ctx, base);
+    return;
+  }
+  ctx.fpscr.disableFlushMode();
+  const ss::ReleaseCalls calls = SecondSetReleaseCalls(ctx, base);
+  ctx.r3.u64 = ss::ReleaseB(base, ctx.r3.u32, ctx.r4.u32, ctx.r5.u32, ctx.r1.u32,
+                            uint32_t(ctx.lr), calls);
+}
+
+void SecondSetSceneCockpitRelease(PPCContext& ctx, uint8_t* base) {
+  if (!SecondSetReleaseNative(2)) {
+    __imp__sub_820DBF88(ctx, base);
+    return;
+  }
+  ctx.fpscr.disableFlushMode();
+  const ss::ReleaseCalls calls = SecondSetReleaseCalls(ctx, base);
+  if (const auto r3 = ss::SceneCockpitRelease(base, ctx.r3.u32, ctx.r1.u32, calls)) {
+    ctx.r3.u64 = *r3;
+    return;
+  }
+  __imp__sub_820DBF88(ctx, base);
+}
+
+void SecondSetSceneModelRelease(PPCContext& ctx, uint8_t* base) {
+  if (!SecondSetReleaseNative(7)) {
+    __imp__sub_820DA5D0(ctx, base);
+    return;
+  }
+  ctx.fpscr.disableFlushMode();
+  const ss::ReleaseCalls calls = SecondSetReleaseCalls(ctx, base);
+  ctx.r3.u64 = ss::SceneModelRelease(base, ctx.r3.u32, ctx.r1.u32, calls);
+}
+
+namespace {
+
+// Whether a destructor's release runs natively: memcpy native and
+// ReleaseA's plain C++ for `pool` (with --native_material_passes for the
+// parts'); a pool past 6 for the ones that release nothing.
+bool DestructNative(uint32_t pool) { return SecondSetReleaseNative(pool); }
 
 // A destructor: r3 = the object, left; the original where it declines.
 void DestructStep(PPCContext& ctx, uint8_t* base, void (*original)(PPCContext&, uint8_t*),
@@ -682,6 +742,7 @@ ITC_SECOND_SET(820E58C8, SecondSetTrafficFind)
 ITC_SECOND_SET(820E00F0, SecondSetPartsPointsReset)
 ITC_SECOND_SET(820DBE20, SecondSetSceneCockpitReset)
 ITC_SECOND_SET(820DB6C0, SecondSetSceneCarModelRelease)
+ITC_SECOND_SET(820DBF88, SecondSetSceneCockpitRelease)
 ITC_SECOND_SET(820DA108, SecondSetSceneModelBlockConstruct)
 ITC_SECOND_SET(820D9F50, SecondSetSceneModelBlockReset)
 ITC_SECOND_SET(82594C18, SecondSetMorphSetUp)

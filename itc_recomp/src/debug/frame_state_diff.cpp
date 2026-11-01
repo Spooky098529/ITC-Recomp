@@ -5,6 +5,7 @@
 #include "cameras/cameras.h"
 #include "hooks/cameras.h"
 #include "hooks/framework.h"
+#include "hooks/second_set.h"
 #include "matrix_math/matrix_math.h"
 #include "models/xpr.h"
 
@@ -27,6 +28,7 @@
 ITC_FLAG_DECLARE(bool, native_matrix_math);
 ITC_FLAG_DECLARE(bool, native_cameras);
 ITC_FLAG_DECLARE(bool, native_models);
+ITC_FLAG_DECLARE(bool, native_second_set);
 
 ITC_FLAG_BOOL(find_per_frame_state, false, "ITC",
               "Find game state that advances on render-only passes, and the code that "
@@ -563,7 +565,23 @@ extern "C" REX_FUNC(sub_8209CC38) {
 }
 // The per-car update called from Draw (sub_820DAC68), and its callees.
 ITC_FRAME_STATE_WRAP(820DAC68)
-ITC_FRAME_STATE_WRAP(820C5C88)
+// ScenePools::ReleaseB: r3 = the second set, r4 = the pool, r5 = the index.
+// Natively under --native_second_set (src/second_set/objects.cpp; the
+// releases it reaches call its plain C++, not this wrap), inside the same
+// wrap.
+extern "C" REX_FUNC(sub_820C5C88) {
+  REX_FUNC_PROLOGUE();
+  if (debug::IsHidden(0x820C5C88)) {
+    return;
+  }
+  debug::FrameStateDiff_Before(base);
+  if (ITC_FLAG(native_second_set)) {
+    hooks::SecondSetReleaseB(ctx, base);
+  } else {
+    __imp__sub_820C5C88(ctx, base);
+  }
+  debug::FrameStateDiff_After(base, "draw step part", 0x820C5C88);
+}
 ITC_FRAME_STATE_WRAP(820D4048)
 ITC_FRAME_STATE_WRAP(820D72D8)
 ITC_FRAME_STATE_WRAP(820D92A0)

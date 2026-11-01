@@ -13,6 +13,7 @@
 #pragma once
 
 #include <cstdint>
+#include <functional>
 #include <optional>
 
 namespace second_set {
@@ -64,6 +65,45 @@ std::optional<uint32_t> SceneInteriorRelease(uint8_t* base, uint32_t object, uin
 std::optional<uint32_t> SceneLightsRelease(uint8_t* base, uint32_t object, uint32_t stack);
 std::optional<uint32_t> SceneWheelsRelease(uint8_t* base, uint32_t object, uint32_t stack);
 std::optional<uint32_t> SceneTrafficRelease(uint8_t* base, uint32_t object, uint32_t stack);
+
+// What ScenePools::ReleaseB's plain C++ hands back to the adapters.
+struct ReleaseCalls {
+  // Whether the release of `pool` runs natively (the adapters' checks:
+  // native memcpy, ReleaseA's plain C++ for the pool, the parts' with
+  // --native_material_passes).
+  std::function<bool(uint32_t pool)> native;
+  // ScenePools::ReleaseB's original (r3 the set, r4 the pool, r5 the index)
+  // from the frame at `sp` with `lr`, where the plain C++ declines (nothing
+  // done); its r3.
+  std::function<uint64_t(uint32_t set, uint32_t pool, uint32_t index, uint32_t sp, uint32_t lr)>
+      release_b;
+};
+
+// ScenePools::ReleaseB (sub_820C5C88): r3 = the second set, r4 = a pool, r5
+// = an index: the object (List::At on +4944 + 12 x pool); when its +16 is 3,
+// its pool's release (0 SceneCarModel, 1 SceneParts, 2 SceneCockpit, 3
+// SceneInterior, 4 SceneLights, 5 SceneWheels, 6 SceneTraffic, 7
+// SceneModel; nothing past 7), then +16 = 0. Returns the release's r3 (the
+// object otherwise). The original (calls.release_b, from `stack` with `lr`)
+// where the pool's release isn't native or declines with nothing done.
+uint64_t ReleaseB(uint8_t* base, uint32_t set, uint32_t pool, uint32_t index, uint32_t stack,
+                  uint32_t lr, const ReleaseCalls& calls);
+// SceneCockpit::Release (sub_820DBF88): when +32 (the first set's cockpit
+// body) is set, ScenePools::ReleaseA([0x826C2E40], 2, its +20); when +28
+// (its interior) is set, ReleaseB(+4316, 3, its +20); then
+// SceneCockpit::Reset. Returns the reset's r3; nullopt, with nothing done,
+// where ReleaseA's plain C++ declines.
+std::optional<uint32_t> SceneCockpitRelease(uint8_t* base, uint32_t object, uint32_t stack,
+                                            const ReleaseCalls& calls);
+// SceneModel::Release (sub_820DA5D0): when +5044 is 0, ReleaseB(+5116, the
+// pool, the part's +20) on the car model (+5048, pool 0; not for kind 3 at
+// +32), the parts (+5060, 1), the interior (+5068, 3), pool 4 (+5084), the
+// wheels (+5100, 5), the cockpit (+5076, 2) and the traffic body (+5092, 6)
+// that are set; then SceneModelRecord::Reset(+32), SceneModelBlock::Reset
+// (+4288), +5024 to +5112 = 0 but +5044 = 3, +5116 = the scene. Returns
+// SceneModelBlock::Reset's r3.
+uint32_t SceneModelRelease(uint8_t* base, uint32_t object, uint32_t stack,
+                           const ReleaseCalls& calls);
 
 // The constructors: PoolNode::PoolNode(the object, `list`), the vtable, +16
 // = 0 and +20 = -1 (in the original's order), the records' and point
