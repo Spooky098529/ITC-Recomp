@@ -97,6 +97,9 @@ class Passes {
   // For set_skip_pixel_shader: skip the draws without a pixel shader.
   static constexpr uint64_t kSkipNoPixelShader = 1;
   void set_record_draws(bool record);
+  // A diagnostic: with record_draws, also note the frame's passes, clears
+  // and resolves, written with the dump (passes.txt).
+  void set_log_passes(bool log);
   // A diagnostic: log the glow history's cross-fades and write-backs once a
   // second, by logic and render-only frames.
   void set_log_glow(bool log);

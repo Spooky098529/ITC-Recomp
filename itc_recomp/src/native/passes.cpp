@@ -972,6 +972,30 @@ struct Passes::State {
     std::vector<Texture> textures;
   };
   std::vector<RecordedDraw> recorded_draws;
+  // With log_passes and record_draws: the frame's draws, clears and
+  // resolves in order, written with the dump (passes.txt; step 0 of
+  // docs/conventional-renderer.md). clear_reason names what the next
+  // ClearTarget is for.
+  bool log_passes = false;
+  struct PassEvent {
+    enum Kind : uint8_t { kDraw, kClear, kResolve, kFrontBuffer } kind;
+    const Target* color = nullptr;  // kClear, kResolve, kFrontBuffer: the target
+    const Target* depth = nullptr;
+    uint32_t draw = 0;  // kDraw: its number in recorded_draws
+    const char* reason = "";  // kClear
+    // kResolve: the item's flags and rect, the destination texture (its
+    // physical address, format and size), frame_resolves' index (-1 if
+    // none was made), and whether a tile of tiling made it.
+    uint32_t flags = 0, destination = 0, address = 0, format = 0, width = 0, height = 0;
+    int32_t rect[4] = {};
+    bool has_rect = false, tiled = false;
+    int32_t resolved = -1;
+  };
+  std::vector<PassEvent> pass_events;
+  bool pass_events_logic = false;  // the frame's list was a logic pass's
+  const char* clear_reason = "other";
+  bool LoggingPasses() const { return log_passes && record_draws; }
+  std::string DescribePasses() const;
   // The pixel shaders drawn into the main view this frame and the last.
   std::vector<uint64_t> frame_pixel_shaders, last_pixel_shaders;
 
@@ -2537,12 +2561,21 @@ Target* Passes::State::GetTarget(VkCommandBuffer commands, uint8_t* base, uint32
   if (!depth) {
     initial.color = {{0.0f, 0.0f, 0.0f, 0.0f}};
   }
+  const char* reason = clear_reason;
+  clear_reason = "created";
   ClearTarget(commands, t, initial);
+  clear_reason = reason;
   return &t;
 }
 
 void Passes::State::ClearTarget(VkCommandBuffer commands, Target& target,
                                 const VkClearValue& value, VkImageAspectFlags aspects) {
+  if (LoggingPasses()) {
+    PassEvent& e = pass_events.emplace_back();
+    e.kind = PassEvent::kClear;
+    e.color = &target;
+    e.reason = clear_reason;
+  }
   EndRendering(commands);
   Transition(commands, target.image.image, target.aspects(), target.layout,
              VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL);
@@ -3564,6 +3597,16 @@ void Passes::State::Draw(VkCommandBuffer commands, uint8_t* base, uint32_t devic
   if (record_draws) {
     // Raw, to keep recording at its usual speed (the effect being looked for
     // depends on timing); formatted with the dump.
+    if (log_passes) {
+      if (recorded_draws.empty()) {
+        pass_events_logic = Renderer_ReplayingLogicList();
+      }
+      PassEvent& e = pass_events.emplace_back();
+      e.kind = PassEvent::kDraw;
+      e.color = color;
+      e.depth = depth;
+      e.draw = uint32_t(recorded_draws.size());
+    }
     RecordedDraw& r = recorded_draws.emplace_back();
     r.main_view = main_view_draw;
     r.surface = color ? color->surface : depth->surface;
@@ -4409,6 +4452,7 @@ void Passes::AfterClear(VkCommandBuffer commands, uint8_t* base, uint32_t payloa
   // (bits 0-3 render targets 0-3, 0x10 Z, 0x20 stencil), +268 color
   // (D3DCOLOR), +272 Z, +276 stencil. Rects aren't kept: the whole target
   // is cleared.
+  s.clear_reason = "command 26";
   for (uint32_t i = 0; i < arg1; i++) {
     uint32_t item = payload + 280 * i;
     uint32_t flags = guest::LoadU32(base, item + 8);
@@ -4444,6 +4488,7 @@ void Passes::AfterClear(VkCommandBuffer commands, uint8_t* base, uint32_t payloa
       }
     }
   }
+  s.clear_reason = "other";
 }
 
 void Passes::AfterResolve(VkCommandBuffer commands, uint8_t* base, uint32_t payload,
@@ -4494,15 +4539,40 @@ void Passes::State::Resolve(VkCommandBuffer commands, uint8_t* base, uint32_t de
   uint32_t depth_object = guest::LoadU32(base, device + kDeviceDepthStencil);
   uint32_t source_object = from_depth ? depth_object : color_object;
   Target* source = source_object ? GetTarget(commands, base, source_object, from_depth) : nullptr;
+  size_t resolves_before = frame_resolves.size();
   if (source && destination && !level_or_slice &&
       ResolveInto(commands, base, *source, destination, rect, point, flags)) {
     stats.resolves++;
   } else {
     stats.resolves_skipped++;
   }
+  if (LoggingPasses()) {
+    PassEvent& e = pass_events.emplace_back();
+    e.kind = PassEvent::kResolve;
+    e.color = source;
+    e.flags = flags;
+    e.destination = destination;
+    if (destination) {
+      uint32_t word1 = guest::LoadU32(base, destination + 28 + 4);
+      uint32_t word2 = guest::LoadU32(base, destination + 28 + 8);
+      e.address = GpuPhysicalAddress(word1 & 0xFFFFF000u);
+      e.format = word1 & 0x3F;
+      e.width = (word2 & 0x1FFF) + 1;
+      e.height = ((word2 >> 13) & 0x1FFF) + 1;
+    }
+    e.has_rect = rect != nullptr;
+    for (uint32_t k = 0; rect && k < 4; k++) {
+      e.rect[k] = rect[k];
+    }
+    e.tiled = tiling;
+    if (frame_resolves.size() > resolves_before) {
+      e.resolved = int32_t(resolves_before);
+    }
+  }
   if (!apply_clears) {
     return;
   }
+  clear_reason = "the resolve's clear";
   if ((flags & 0x100) && color_object) {
     if (Target* target = GetTarget(commands, base, color_object, false)) {
       VkClearValue value{};
@@ -4520,6 +4590,7 @@ void Passes::State::Resolve(VkCommandBuffer commands, uint8_t* base, uint32_t de
       ClearTarget(commands, *target, value);
     }
   }
+  clear_reason = "other";
 }
 
 void Passes::BeginTiling(VkCommandBuffer commands, uint8_t* base, uint32_t payload) {
@@ -4553,6 +4624,7 @@ void Passes::BeginTiling(VkCommandBuffer commands, uint8_t* base, uint32_t paylo
   s.tiling = true;
   s.tiling_extent = {std::min(width, 8192u), std::min(height, 8192u)};
   s.stats.tilings++;
+  s.clear_reason = "tiling";
   // Each tile starts cleared to these.
   if (uint32_t object = guest::LoadU32(base, device + kDeviceRenderTarget0)) {
     if (Target* target = s.GetTarget(commands, base, object, false)) {
@@ -4568,6 +4640,7 @@ void Passes::BeginTiling(VkCommandBuffer commands, uint8_t* base, uint32_t paylo
       s.ClearTarget(commands, *target, value);
     }
   }
+  s.clear_reason = "other";
 }
 
 void Passes::TiledResolve(VkCommandBuffer commands, uint8_t* base, uint32_t device,
@@ -4616,6 +4689,13 @@ void Passes::FrontBufferResolve(VkCommandBuffer commands, uint8_t* base, uint32_
   uint32_t size = front_buffer ? guest::LoadU32(base, front_buffer + 28 + 8) : 0;
   s.front_extent = {(size & 0x1FFF) + 1, ((size >> 13) & 0x1FFF) + 1};
   s.front = target;
+  if (s.LoggingPasses()) {
+    State::PassEvent& e = s.pass_events.emplace_back();
+    e.kind = State::PassEvent::kFrontBuffer;
+    e.color = target;
+    e.width = s.front_extent.width;
+    e.height = s.front_extent.height;
+  }
   if (!s.logged_front) {
     s.logged_front = true;
     Surface surface = object ? ReadSurface(base, object) : Surface{};
@@ -4692,6 +4772,10 @@ void Passes::set_skip_pixel_shader(uint64_t hash) {
 
 void Passes::set_skip_motion_blur(bool skip) {
   state_->skip_motion_blur = skip;
+}
+
+void Passes::set_log_passes(bool log) {
+  state_->log_passes = log;
 }
 
 void Passes::set_record_draws(bool record) {
@@ -5412,6 +5496,254 @@ void Passes::State::DumpGuestResolves() {
   }
 }
 
+// The pass log (log_passes): the frame's draws grouped into passes by the
+// targets bound, with its clears and resolves in order. For each resolve:
+// how often its source is drawn into again before its next clear, and
+// which passes sample its destination, before or after it. Then the EDRAM
+// ranges used by more than one target, and whether each was cleared before
+// it was first drawn into.
+std::string Passes::State::DescribePasses() const {
+  std::map<const Target*, uint32_t> ids;  // by first use
+  auto id_of = [&](const Target* t) {
+    return ids.try_emplace(t, uint32_t(ids.size())).first->second;
+  };
+  for (const PassEvent& e : pass_events) {
+    if (e.color) {
+      id_of(e.color);
+    }
+    if (e.depth) {
+      id_of(e.depth);
+    }
+  }
+  auto describe = [&](const Target* t) {
+    if (!t) {
+      return std::string("none");
+    }
+    return fmt::format("T{} ({} EDRAM base {}, pitch {}, MSAA {}, format {}, {}x{})", id_of(t),
+                       t->depth ? "depth" : "color", t->surface.edram_base, t->surface.pitch,
+                       t->surface.msaa, t->surface.format, t->guest_extent.width,
+                       t->guest_extent.height);
+  };
+  // The texture addresses each draw samples (as resolve destinations are
+  // known: physical, 4 KB aligned).
+  auto sampled = [&](const PassEvent& e) {
+    std::vector<uint32_t> addresses;
+    for (const RecordedDraw::Texture& t : recorded_draws[e.draw].textures) {
+      addresses.push_back(t.fetch[1] & 0x1FFFF000u);
+    }
+    return addresses;
+  };
+  // Passes: a run of draws with the same targets bound (clears and
+  // resolves don't end one).
+  std::vector<uint32_t> pass_of(pass_events.size(), UINT32_MAX);
+  uint32_t passes = 0;
+  const Target *bound_color = nullptr, *bound_depth = nullptr;
+  bool any_draw = false;
+  for (size_t i = 0; i < pass_events.size(); i++) {
+    const PassEvent& e = pass_events[i];
+    if (e.kind != PassEvent::kDraw) {
+      continue;
+    }
+    if (!any_draw || e.color != bound_color || e.depth != bound_depth) {
+      passes++;
+      bound_color = e.color;
+      bound_depth = e.depth;
+      any_draw = true;
+    }
+    pass_of[i] = passes - 1;
+  }
+  std::string out = fmt::format(
+      "A {} pass's frame: {} events, {} draws, {} passes, {} targets\n\n",
+      pass_events_logic ? "logic" : "render-only", pass_events.size(), recorded_draws.size(),
+      passes, ids.size());
+  uint32_t current = UINT32_MAX;
+  uint32_t first_draw = 0, last_draw = 0, draws = 0, resolves = 0;
+  std::map<uint32_t, uint32_t> pass_samples;  // address: draws
+  auto end_pass = [&]() {
+    if (current == UINT32_MAX) {
+      return;
+    }
+    if (draws) {
+      out += fmt::format("  draws {}-{} ({})\n", first_draw, last_draw, draws);
+    }
+    if (!pass_samples.empty()) {
+      out += "  samples:";
+      for (auto [address, count] : pass_samples) {
+        out += fmt::format(" {:08X} x{}", address, count);
+      }
+      out += "\n";
+    }
+    pass_samples.clear();
+    draws = 0;
+  };
+  for (size_t i = 0; i < pass_events.size(); i++) {
+    const PassEvent& e = pass_events[i];
+    if (e.kind == PassEvent::kDraw) {
+      if (pass_of[i] != current) {
+        end_pass();
+        current = pass_of[i];
+        out += fmt::format("pass {}: color {}, depth {}\n", current, describe(e.color),
+                           describe(e.depth));
+        first_draw = e.draw;
+      }
+      last_draw = e.draw;
+      draws++;
+      for (uint32_t address : sampled(e)) {
+        pass_samples[address]++;
+      }
+      continue;
+    }
+    if (draws) {
+      // Draws before this event in the pass are listed first.
+      out += fmt::format("  draws {}-{} ({})\n", first_draw, last_draw, draws);
+      draws = 0;
+      first_draw = last_draw + 1;
+    }
+    if (e.kind == PassEvent::kClear) {
+      out += fmt::format("  clear {} ({})\n", describe(e.color), e.reason);
+    } else if (e.kind == PassEvent::kFrontBuffer) {
+      out += fmt::format("  front buffer from {}\n", describe(e.color));
+    } else {
+      // Forward: draws into the source before it's cleared; and the
+      // passes sampling the destination until it's resolved into again.
+      uint32_t drawn_after = 0;
+      bool cleared = false;
+      std::vector<uint32_t> readers_after, readers_before;
+      bool written_again = false;
+      for (size_t j = i + 1; j < pass_events.size(); j++) {
+        const PassEvent& f = pass_events[j];
+        if (f.kind == PassEvent::kClear && f.color == e.color) {
+          cleared = true;
+        }
+        if (f.kind == PassEvent::kDraw && !cleared && (f.color == e.color || f.depth == e.color)) {
+          drawn_after++;
+        }
+        if (f.kind == PassEvent::kResolve && f.address == e.address) {
+          written_again = true;
+        }
+        if (f.kind == PassEvent::kDraw && !written_again) {
+          for (uint32_t address : sampled(f)) {
+            if (address == (e.address & 0x1FFFF000u) &&
+                (readers_after.empty() || readers_after.back() != pass_of[j])) {
+              readers_after.push_back(pass_of[j]);
+            }
+          }
+        }
+      }
+      // Backward: passes sampling it earlier, since the last resolve into
+      // it (or the frame's start: they read what the last frame left).
+      int32_t earlier = -1;
+      for (size_t j = i; j-- > 0;) {
+        const PassEvent& f = pass_events[j];
+        if (f.kind == PassEvent::kResolve && f.address == e.address) {
+          for (size_t k = 0; k < j; k++) {
+            earlier += pass_events[k].kind == PassEvent::kResolve;
+          }
+          earlier++;
+          break;
+        }
+        if (f.kind == PassEvent::kDraw) {
+          for (uint32_t address : sampled(f)) {
+            if (address == (e.address & 0x1FFFF000u) &&
+                (readers_before.empty() || readers_before.back() != pass_of[j])) {
+              readers_before.push_back(pass_of[j]);
+            }
+          }
+        }
+      }
+      std::reverse(readers_before.begin(), readers_before.end());
+      auto list = [](const std::vector<uint32_t>& passes) {
+        std::string s;
+        for (uint32_t p : passes) {
+          s += fmt::format(" {}", p);
+        }
+        return s.empty() ? std::string(" none") : s;
+      };
+      std::string rect = e.has_rect ? fmt::format("{},{}-{},{}", e.rect[0], e.rect[1], e.rect[2],
+                                                  e.rect[3])
+                                    : std::string("whole");
+      out += fmt::format(
+          "  resolve {}{}: from {}, flags {:08X}, rect {}, to {:08X} ({:08X}, format {}, {}x{}){}\n"
+          "    source drawn into {} more times before {}; destination sampled after it (until "
+          "the next resolve into it) by passes{}; before it, reading {}, by passes{}\n",
+          resolves++, e.tiled ? " (a tile)" : "", describe(e.color), e.flags, rect, e.address,
+          e.destination, e.format, e.width, e.height,
+          e.resolved < 0 ? " (not made)" : fmt::format(" (dump resolve_{:02})", e.resolved),
+          drawn_after, cleared ? "its next clear" : "the frame's end (no clear)",
+          list(readers_after),
+          earlier < 0 ? std::string("the last frame's") : fmt::format("resolve {}'s", earlier),
+          list(readers_before));
+    }
+  }
+  end_pass();
+
+  // EDRAM: each target's range, in tiles of 80x16 samples at 32 bits a
+  // sample (about: 64-bit formats take two tiles, MSAA doubles rows, 4x
+  // columns too). Targets are made as tall as EDRAM allows, so the height
+  // used is the tallest resolve from it (or the front buffer's); unknown
+  // for targets never resolved.
+  std::map<const Target*, uint32_t> heights;
+  for (const PassEvent& e : pass_events) {
+    if (e.kind == PassEvent::kResolve || e.kind == PassEvent::kFrontBuffer) {
+      uint32_t h = e.has_rect ? uint32_t(std::max(e.rect[3], 0)) : e.height;
+      uint32_t& height = heights[e.color];
+      height = std::max(height, h);
+    }
+  }
+  struct Range {
+    const Target* target;
+    uint32_t begin, end;
+    const char* first;  // what first touched it this frame
+    bool height_known;
+  };
+  std::vector<Range> ranges;
+  for (auto [target, id] : ids) {
+    (void)id;
+    uint32_t x = target->surface.msaa == 2 ? 2 : 1;
+    uint32_t y = target->surface.msaa ? 2 : 1;
+    uint32_t format = target->surface.format;
+    bool wide = !target->depth && (format == 5 || format == 7 || format == 15);
+    uint32_t columns = (target->surface.pitch * x + 79) / 80 * (wide ? 2 : 1);
+    auto known = heights.find(target);
+    uint32_t height = known != heights.end() ? known->second : target->guest_extent.height;
+    uint32_t rows = (height * y + 15) / 16;
+    const char* first = "not drawn or cleared";
+    for (const PassEvent& e : pass_events) {
+      if (e.kind == PassEvent::kClear && e.color == target) {
+        first = e.reason;
+        break;
+      }
+      if (e.kind == PassEvent::kDraw && (e.color == target || e.depth == target)) {
+        first = "a draw (not cleared first)";
+        break;
+      }
+      if (e.kind == PassEvent::kResolve && e.color == target) {
+        first = "a resolve (not cleared first)";
+        break;
+      }
+    }
+    ranges.push_back({target, target->surface.edram_base,
+                      target->surface.edram_base + columns * rows, first,
+                      known != heights.end()});
+  }
+  std::sort(ranges.begin(), ranges.end(),
+            [&](const Range& a, const Range& b) { return ids.at(a.target) < ids.at(b.target); });
+  out += "\nEDRAM ranges in tiles (about), and what first touched each target this frame:\n";
+  for (const Range& r : ranges) {
+    std::string shared;
+    for (const Range& other : ranges) {
+      if (other.target != r.target && other.begin < r.end && r.begin < other.end) {
+        shared += fmt::format(" T{}{}", ids.at(other.target),
+                              other.begin == r.begin ? " (same base)" : "");
+      }
+    }
+    out += fmt::format("  {}: tiles {}-{}{}; first {}; overlaps{}\n", describe(r.target),
+                       r.begin, r.end, r.height_known ? "" : " (height not known: never resolved)",
+                       r.first, shared.empty() ? " none" : shared);
+  }
+  return out;
+}
+
 void Passes::WriteDump(const std::string& directory) {
   State& s = *state_;
   if (s.dumped.empty()) {
@@ -5475,6 +5807,14 @@ void Passes::WriteDump(const std::string& directory) {
         std::fprintf(file, "%s\n", line.c_str());
       }
       std::fclose(file);
+    }
+    if (!s.pass_events.empty()) {
+      if (FILE* file = std::fopen((directory + "/passes.txt").c_str(), "w")) {
+        std::string text = s.DescribePasses();
+        std::fwrite(text.data(), 1, text.size(), file);
+        std::fclose(file);
+      }
+      s.pass_events.clear();
     }
     s.recorded_draws.clear();
   }

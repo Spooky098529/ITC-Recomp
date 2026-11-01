@@ -128,6 +128,10 @@ ITC_FLAG_BOOL(native_renderer_verify_textures, false, "ITC",
               "memory changed with no memcpy write recorded (a debugging aid)");
 ITC_FLAG_BOOL(native_renderer_no_index_clamp, false, "ITC",
               "Don't clamp indices to VGT_MIN/MAX_VTX_INDX (a debugging aid)");
+ITC_FLAG_BOOL(native_renderer_log_passes, false, "ITC",
+              "With --native_renderer_dump, also write passes.txt: the dumped frame's passes, "
+              "clears and resolves, who samples each resolve's destination, and the targets "
+              "sharing EDRAM (a diagnostic)");
 ITC_FLAG_INT32(native_renderer_dump_every, 0, "ITC",
                "With native_renderer_dump: dump only the frame itself (shown image, draw "
                "IDs, draws.txt) every this many seconds of a race (a debugging aid)");
@@ -735,6 +739,7 @@ VkCommandBuffer Renderer::BeginFrame() {
     // Its first frame describes each draw (cheaply: the effect being looked
     // for went away while frames were recorded slowly).
     passes_.set_record_draws(dumping_ && dump_step_ == 0);
+    passes_.set_log_passes(ITC_FLAG(native_renderer_log_passes));
     passes_.set_check_mirror_frames(ITC_FLAG(native_renderer_check_mirror));
     passes_.set_copy_all(ITC_FLAG(native_renderer_copy_all));
     passes_.set_skip_repeated_state(ITC_FLAG(native_renderer_skip_repeated_state));
