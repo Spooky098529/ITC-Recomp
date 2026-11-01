@@ -5,6 +5,7 @@
 
 #include "base/log.h"
 #include "camera_modes/steps.h"
+#include "graphics/resources.h"
 #include "guest.h"
 #include "material_passes/material_passes.h"
 #include "native/buffers.h"
@@ -73,6 +74,17 @@ void Copy(uint8_t* base, uint32_t to, uint32_t from, uint32_t bytes, uint32_t sp
   }
 }
 
+// For the renderer (docs/conventional-renderer.md, "Step 2b"): the morph
+// copied over shape `shape`'s streams, so its buffers (the headers
+// Mesh::Parse relocated at +288, +320 and +352) are written.
+void ShapeBuffersWritten(uint8_t* base, uint32_t model, uint32_t shape) {
+  constexpr uint32_t kShapeBytes = 544;
+  const uint32_t at = Load(base, model + 40) + kShapeBytes * shape;
+  for (uint32_t field : {288u, 320u, 352u}) {
+    graphics::BufferWritten(base, at + field);
+  }
+}
+
 uint64_t Free(uint8_t* base, uint32_t at, uint32_t sp, uint32_t lr, WheelCalls& calls) {
   if (const auto r3 = scene::FreePagesIn(base, at)) {
     return *r3;
@@ -124,6 +136,7 @@ uint64_t MorphPair(uint8_t* base, uint32_t model, uint32_t group, uint32_t k, ui
        site + sites.copy1, calls);
   Copy(base, ModelStreamData2(base, model, Load(base, shape_at)), Load(base, sp + 84),
        second_by_first ? size1 : size2, sp, site + sites.copy2, calls);
+  ShapeBuffersWritten(base, model, Load(base, shape_at));
   Free(base, sp + 80, sp, site + sites.free1, calls);
   Store(base, sp + 80, 0);
   return Free(base, sp + 84, sp, site + sites.free2, calls);
@@ -264,6 +277,7 @@ uint64_t WheelsSetUpTire(uint8_t* base, uint32_t group, uint32_t model, uint32_t
        sp, 0x820E78E8, calls);
   Copy(base, ModelStreamData2(base, model, Load(base, group + 596)), Load(base, sp + 80), size2,
        sp, 0x820E7900, calls);
+  ShapeBuffersWritten(base, model, Load(base, group + 596));
   Free(base, sp + 84, sp, 0x820E7908, calls);
   return Free(base, sp + 80, sp, 0x820E7910, calls);
 }

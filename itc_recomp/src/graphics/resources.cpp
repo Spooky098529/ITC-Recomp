@@ -63,16 +63,31 @@ void BufferMade(uint8_t* base, uint32_t header) {
   render::BufferCreated({header}, data);
 }
 
-void BufferFreed(uint8_t* base, uint32_t header) {
+namespace {
+
+bool IsBuffer(uint8_t* base, uint32_t header) {
   switch (Load(base, header) & 0xF) {
     case 1:
     case 2:
     case 7:
     case 8:
-      render::BufferDestroyed({header});
-      break;
+      return true;
     default:
-      break;
+      return false;
+  }
+}
+
+}  // namespace
+
+void BufferFreed(uint8_t* base, uint32_t header) {
+  if (IsBuffer(base, header)) {
+    render::BufferDestroyed({header});
+  }
+}
+
+void BufferWritten(uint8_t* base, uint32_t header) {
+  if (IsBuffer(base, header)) {
+    render::BufferWritten({header});
   }
 }
 
@@ -1326,6 +1341,7 @@ uint32_t UnlockVertexBuffer(uint8_t* base, uint32_t buffer) {
 
 uint32_t UnlockIndexBuffer(uint8_t* base, uint32_t buffer) {
   ITC_NATIVE_RUNNING("sub_822A6A78 IndexBuffer::Unlock");
+  BufferWritten(base, buffer);  // what was stored while it was locked
   return UnlockResource(base, buffer, Load(base, buffer + 24), 0);
 }
 

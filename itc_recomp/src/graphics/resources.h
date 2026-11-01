@@ -29,6 +29,9 @@ uint32_t ResourceType(uint8_t* base, uint32_t resource);
 void BufferMade(uint8_t* base, uint32_t header);
 // The same header freed (nothing for other types).
 void BufferFreed(uint8_t* base, uint32_t header);
+// Its data written after it was made, by the code that wrote it (nothing
+// for other types).
+void BufferWritten(uint8_t* base, uint32_t header);
 
 // sub_822A44A8 Texture::Format: the format word rebuilt from the fetch
 // constant's +28, +32 and +40.

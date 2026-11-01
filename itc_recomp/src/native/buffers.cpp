@@ -2,11 +2,11 @@
 // (milestone 6 step 5; see "Buffers" in docs/native-renderer.md).
 //
 // The game fills its vertex and index buffers with the library's memcpy
-// (sub_825A7410), wrapped here: each copy into the physical views is
-// recorded once it's done, and the renderer takes them at each frame's
-// start (Buffers_TakeWrites): the buffers they touch are copied into the
-// buffer arena again at their next use (docs/conventional-renderer.md,
-// "Step 2b"; the guest memory mirrors this fed before are gone).
+// (sub_825A7410), wrapped here. The renderer doesn't learn of writes from
+// it: the code that writes a buffer after it's made says so
+// (render::BufferWritten; docs/conventional-renderer.md, "Step 2b"). Its
+// records of copies into the physical views, which fed the guest memory
+// mirrors and then the buffer arena, went in step 2b.
 //
 // With --native_renderer_log_buffers:
 // - each buffer object the first time SetStreamSource (command 11) or
@@ -55,17 +55,6 @@ std::unordered_map<uint32_t, BufferObject> g_objects;  // by object address
 Clock::time_point g_start = Clock::now(), g_last_log = Clock::now();
 uint64_t g_new = 0, g_changed = 0, g_binds = 0;
 uint32_t g_lines = 400;  // new objects and changes logged one by one, up to this
-
-// Any thread (under g_pending_mutex): memcpy's writes into the physical
-// views not yet taken by the render thread.
-struct PendingWrite {
-  uint32_t start, end, caller;
-};
-std::mutex g_pending_mutex;
-std::vector<PendingWrite> g_pending;
-
-// Render thread: the writes taken from g_pending, until Buffers_TakeWrites.
-std::vector<PendingWrite> g_taken;
 
 // Any thread (under g_mutex), for the logging: the headers of known buffer
 // objects (object: end).
@@ -171,17 +160,6 @@ void Buffers_OnCommand(uint8_t* base, uint32_t id, uint32_t payload, uint32_t co
   }
 }
 
-void Buffers_TakeWrites(std::vector<std::pair<uint32_t, uint32_t>>& out) {
-  {
-    std::lock_guard lock(g_pending_mutex);
-    g_taken.swap(g_pending);
-  }
-  for (const PendingWrite& write : g_taken) {
-    out.emplace_back(write.start, write.end);
-  }
-  g_taken.clear();
-}
-
 }  // namespace native
 
 ITC_FLAG_DECLARE(bool, native_memcpy);
@@ -190,8 +168,7 @@ namespace native {
 
 namespace {
 
-// The override's work around a copy (`copy()`): the logging, and copies
-// into the physical views recorded once done.
+// The override's work around a copy (`copy()`): the logging.
 template <typename Copy>
 void CopyWithRecords(uint8_t* base, uint32_t destination, uint32_t source, uint32_t size,
                      uint32_t caller, Copy copy) {
@@ -220,12 +197,6 @@ void CopyWithRecords(uint8_t* base, uint32_t destination, uint32_t source, uint3
     }
   }
   copy();
-  // Recorded after the copy, so a range read meanwhile is read again.
-  if (size && destination >= 0xA0000000u) {
-    uint32_t physical = GpuPhysicalAddress(destination);
-    std::lock_guard lock(g_pending_mutex);
-    g_pending.push_back({physical, physical + size, caller});
-  }
 }
 
 }  // namespace
@@ -247,8 +218,7 @@ bool Buffers_Memcpy(uint8_t* base, uint32_t destination, uint32_t source, uint32
 
 }  // namespace native
 
-// The library's memcpy (r3 destination, r4 source, r5 size): copies into
-// the physical views are recorded once done (see Buffers_TakeWrites); with
+// The library's memcpy (r3 destination, r4 source, r5 size): with
 // --native_renderer_log_buffers, copies into a known buffer header logged.
 // The copy itself is native (c_runtime::Memcpy, --native_memcpy) where the
 // ranges don't share memory; r3 stays the destination either way, and the

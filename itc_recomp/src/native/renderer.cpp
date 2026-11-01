@@ -1045,13 +1045,18 @@ void Renderer::LogStats() {
                b.never_created);
   {
     const BufferArena::Stats& a = view.arena;
-    ITC_LOG_INFO("native renderer: buffer arena: {} buffers marked written by memcpy, {} copied "
-                 "at draws ({:.1f} MB); {} copies in all ({:.1f} MB, inline vertices included); "
+    ITC_LOG_INFO("native renderer: buffer arena: {} buffers copied at draws ({:.1f} MB); {} "
+                 "copies in all ({:.1f} MB, inline vertices included); "
                  "{:.1f} MB used, at most {:.1f} MB; {} staging full, {} without space; {} "
                  "draws a frame with a used stream unbound",
-                 b.marked, b.uploads, b.upload_bytes / 1048576.0, a.uploads,
+                 b.uploads, b.upload_bytes / 1048576.0, a.uploads,
                  a.upload_bytes / 1048576.0, a.used / 1048576.0, a.most_used / 1048576.0,
                  a.staging_full, a.allocation_failed, double(view.arena_unbound) / frames);
+  }
+  if (b.verified) {
+    ITC_LOG_INFO("native renderer: buffers verified: {} checked, {} changed in memory with no "
+                 "BufferWritten",
+                 b.verified, b.unannounced);
   }
   if (t.unrecorded) {
     ITC_LOG_INFO("native renderer: {} textures changed in memory with no TextureWritten, e.g. "

@@ -3,6 +3,7 @@
 #include <algorithm>
 #include <string>
 
+#include "base/hash.h"
 #include "base/log.h"
 #include "guest.h"
 #include "state.h"
@@ -34,27 +35,44 @@ void BufferTable::Hold(const render::BufferData& data, int64_t sign) {
   }
 }
 
-// Space in the arena and the physical index; the data to copy at the next
-// use.
-void BufferTable::Place(uint32_t handle, Record& record) {
+// Space in the arena; the data to copy at the next use.
+void BufferTable::Place(Record& record) {
   record.physical = GpuPhysicalAddress(record.data.address);
   record.dirty = true;
+  record.reported = false;
   record.space = arena_->Allocate(record.data.size, record.offset);
-  by_physical_.emplace(record.physical, handle);
-  longest_ = std::max(longest_, record.data.size);
 }
 
-void BufferTable::Unplace(uint32_t handle, Record& record) {
+void BufferTable::Unplace(Record& record) {
   if (record.space) {
     arena_->Free(record.offset, record.data.size);
     record.space = false;
   }
-  auto [first, last] = by_physical_.equal_range(record.physical);
-  for (auto it = first; it != last; ++it) {
-    if (it->second == handle) {
-      by_physical_.erase(it);
-      break;
-    }
+}
+
+uint64_t BufferTable::Hash(const Record& record) const {
+  return base::Hash64(PhysicalHostAddress(base_, record.physical), record.data.size, 0);
+}
+
+// With verify, once a frame: the buffer's memory as when it was copied, or
+// it changed with no BufferWritten (a writer missed; drawn as copied).
+void BufferTable::Verify(uint32_t handle, Record& record) {
+  if (record.checked_frame == frame_ || record.reported) {
+    return;
+  }
+  record.checked_frame = frame_;
+  stats_.verified++;
+  if (Hash(record) == record.hash) {
+    return;
+  }
+  record.reported = true;
+  stats_.unannounced++;
+  if (unannounced_lines_) {
+    unannounced_lines_--;
+    ITC_LOG_WARN("native renderer: buffer {:08X} ({} bytes at {:08X}) changed in memory with no "
+                 "BufferWritten, {} frames after it was copied (logged once a buffer; a "
+                 "debugging aid)",
+                 handle, record.data.size, record.data.address, frame_ - record.uploaded_frame);
   }
 }
 
@@ -68,11 +86,11 @@ void BufferTable::Created(uint32_t handle, const render::BufferData& data) {
   if (!added) {
     stats_.remade++;
     Hold(it->second.data, -1);
-    Unplace(handle, it->second);
+    Unplace(it->second);
   }
   it->second.data = data;
   Hold(data, 1);
-  Place(handle, it->second);
+  Place(it->second);
 }
 
 void BufferTable::Written(uint32_t handle) {
@@ -90,22 +108,9 @@ void BufferTable::Destroyed(uint32_t handle) {
     return;
   }
   Hold(it->second.data, -1);
-  Unplace(handle, it->second);
+  Unplace(it->second);
   records_.erase(it);
   freed_at_[handle] = frame_;
-}
-
-void BufferTable::MarkWritten(const std::vector<std::pair<uint32_t, uint32_t>>& writes) {
-  for (auto [start, end] : writes) {
-    auto it = by_physical_.lower_bound(start > longest_ ? start - longest_ : 0);
-    for (; it != by_physical_.end() && it->first < end; ++it) {
-      Record& record = records_[it->second];
-      if (it->first + record.data.size > start && !record.dirty) {
-        record.dirty = true;
-        stats_.marked++;
-      }
-    }
-  }
 }
 
 // A buffer bound that was never made through the interface: logged once
@@ -139,7 +144,7 @@ BufferTable::Record& BufferTable::NeverMade(uint32_t slot, uint32_t handle) {
   Record& record = records_[handle];
   record.data = data;
   Hold(data, 1);
-  Place(handle, record);
+  Place(record);
   return record;
 }
 
@@ -158,6 +163,12 @@ bool BufferTable::Use(uint32_t slot, uint32_t handle, uint32_t& offset) {
     record.dirty = false;
     stats_.uploads++;
     stats_.upload_bytes += size;
+    if (verify_) {
+      record.hash = Hash(record);
+      record.uploaded_frame = record.checked_frame = frame_;
+    }
+  } else if (verify_) {
+    Verify(handle, record);
   }
   offset = record.offset;
   return true;

@@ -42,6 +42,10 @@
 #include "base/log.h"
 
 ITC_FLAG_DECLARE(std::string, log_level);
+ITC_FLAG_BOOL(native_renderer_verify_buffers, false, "ITC",
+              "Hash each vertex and index buffer's data when it's copied to the GPU and "
+              "check it once a frame when it's drawn again, logging buffers whose memory "
+              "changed with no BufferWritten (a writer missed; a debugging aid, slow)");
 
 ITC_FLAG_STRING(xbox_gamma, "off", "ITC",
                 "Show the frame through the display gamma table the game sets for a kind "
@@ -547,7 +551,6 @@ struct Passes::State {
   VkExtent2D main_view_extent{kMainViewWidth, kMainViewHeight};
 
   uint8_t* guest_base = nullptr;
-  std::vector<std::pair<uint32_t, uint32_t>> writes_taken;  // memcpy's, at a frame's start
   uint32_t inline_offset = 0;  // this frame's inline vertices so far
   // With watch_draws: each main view draw's inputs, by the draw (shaders,
   // index address, primitive count, and which of the frame's draws with
@@ -2613,6 +2616,7 @@ bool Passes::Init(const DeviceContext& context, uint8_t* base, uint32_t frames_i
                s.main_view_extent.height, s.main_view_scale);
   s.guest_base = base;
   s.buffers.set_base(base);
+  s.buffers.set_verify(ITC_FLAG(native_renderer_verify_buffers));
   s.frames_in_flight = frames_in_flight;
   const std::string& log_level = ITC_FLAG(log_level);
   s.collect_interfaces = log_level == "trace" || log_level == "debug" || log_level == "info";
@@ -2756,11 +2760,6 @@ void Passes::BeginFrame(uint32_t frame_index) {
       }
       s.arena.Upload(s.rectangle_indices, fixed.data(), uint32_t(4 * fixed.size()));
     }
-    // memcpy's writes since the last frame: the buffers they touch are
-    // copied again at their next use.
-    s.writes_taken.clear();
-    Buffers_TakeWrites(s.writes_taken);
-    s.buffers.MarkWritten(s.writes_taken);
   }
   s.ring_offset = 0;
   s.rings[frame_index].block = 0;
