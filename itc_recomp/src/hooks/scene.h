@@ -55,5 +55,8 @@ void SceneCreate(PPCContext& ctx, uint8_t* base);
 // CarScene::LoadAssets sub_820C8B40: r3 = the scene; over the layer with
 // the archive's queue native.
 void SceneLoadAssets(PPCContext& ctx, uint8_t* base);
+// CarScene::OnFileLoaded sub_820C52A0: r3 = the request, r4 = the data, r6
+// = the scene; its guest calls from the original's 128-byte frame.
+void SceneOnFileLoaded(PPCContext& ctx, uint8_t* base);
 
 }  // namespace hooks

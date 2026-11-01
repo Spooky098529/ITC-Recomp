@@ -3,10 +3,12 @@
 
 #include "scene/scene.h"
 
+#include "accessories/accessories.h"
 #include "base/log.h"
 #include "car_models/load_slots.h"
 #include "car_models/tga.h"
 #include "guest.h"
+#include "material_passes/material_passes.h"
 #include "memory/c_runtime_heap.h"
 #include "memory/heap.h"
 #include "models/memory_blocks.h"
@@ -14,13 +16,12 @@
 #include "models/part_model.h"
 #include "models/texture_provider.h"
 #include "models/xpr.h"
-#include "accessories/accessories.h"
-#include "material_passes/material_passes.h"
 #include "scene_loaders/loads.h"
 #include "scene_loaders/pools.h"
 #include "scenery_lists/scenery_lists.h"
 #include "vehicle_accessors/vehicle_accessors.h"
 
+#include <bit>
 #include <cstdlib>
 #include <unordered_set>
 #include <vector>
@@ -660,6 +661,157 @@ uint32_t LoadAssets(uint8_t* base, uint32_t scene, uint32_t pcr, const archive::
   for (uint32_t i = 0; i < 4; i++) {
     shared(4672 + 24 * i, (bundles_a ? 97 : 101) + i);
   }
+  return r3;
+}
+
+
+// --- The loads' callback ---
+
+namespace {
+
+constexpr uint32_t kTextureProviderSet = 0x82594718;  // slot +16
+
+enum class Kind : uint8_t { kXpr, kXprProvider, kPart, kTexture, kTga };
+
+// A branch of OnFileLoaded: the slot whose request matched (offsets in the
+// assets) and what it finishes.
+struct Branch {
+  Kind kind;
+  uint32_t slot;
+  uint32_t a = 0;  // the XPR, the part model or the TGA header
+  uint32_t b = 0;  // the provider, the part file's slot or the pixels' word
+};
+
+std::optional<Branch> FindBranch(uint8_t* base, uint32_t assets, uint32_t request) {
+  auto is = [&](uint32_t slot) { return Load(base, assets + slot + 4) == request; };
+  if (is(0)) {
+    return Branch{Kind::kXpr, 0, 24};
+  }
+  for (uint32_t i = 0; i < 2; i++) {
+    if (is(48 + 24 * i)) {
+      return Branch{Kind::kXprProvider, 48 + 24 * i, 96 + 24 * i, 144 + 20 * i};
+    }
+  }
+  if (is(184)) return Branch{Kind::kXprProvider, 184, 208, 232};
+  if (is(252)) return Branch{Kind::kXprProvider, 252, 276, 300};
+  if (is(320)) return Branch{Kind::kXprProvider, 320, 344, 368};
+  if (is(388)) return Branch{Kind::kPart, 388};
+  if (is(880)) return Branch{Kind::kTexture, 880, 416, 388};
+  if (is(904)) return Branch{Kind::kTga, 904, 928, 948};
+  if (is(952)) return Branch{Kind::kXprProvider, 952, 976, 1000};
+  if (is(1020)) return Branch{Kind::kXprProvider, 1020, 1044, 1068};
+  for (uint32_t i = 0; i < 4; i++) {
+    if (is(1088 + 24 * i)) {
+      return Branch{Kind::kPart, 1088 + 24 * i};
+    }
+    if (is(3040 + 24 * i)) {
+      return Branch{Kind::kTexture, 3040 + 24 * i, 1184 + 464 * i, 1088 + 24 * i};
+    }
+  }
+  for (uint32_t i = 0; i < 19; i++) {
+    if (is(3136 + 24 * i)) {
+      return Branch{Kind::kTga, 3136 + 24 * i, 3668 + 20 * i, 3592 + 4 * i};
+    }
+  }
+  if (is(4048)) return Branch{Kind::kPart, 4048};
+  if (is(4072)) return Branch{Kind::kTexture, 4072, 4096, 4048};
+  if (is(4560)) return Branch{Kind::kXpr, 4560, 4584};
+  for (uint32_t i = 0; i < 4; i++) {
+    if (is(4608 + 24 * i)) {
+      return Branch{Kind::kXprProvider, 4608 + 24 * i, 4704 + 24 * i, 4800 + 20 * i};
+    }
+  }
+  return std::nullopt;
+}
+
+uint32_t Release(uint8_t* base, uint32_t slot) {
+  const auto r3 = car_models::LoadSlotReleaseBuffer(base, slot);
+  Require(r3.has_value(), "LoadSlot::ReleaseBuffer");
+  return *r3;
+}
+
+}  // namespace
+
+bool FileLoadedNative(uint8_t* base, uint32_t request, uint32_t scene) {
+  const uint32_t assets = scene + kAssets;
+  const auto branch = FindBranch(base, assets, request);
+  if (!branch || branch->kind == Kind::kPart) {
+    return true;
+  }
+  uint32_t first = 0, second = 0;
+  if (!car_models::LoadSlotReleasable(base, assets + branch->slot, &first)) {
+    return false;
+  }
+  if (branch->kind == Kind::kTexture) {
+    // The part file's slot released first.
+    return car_models::LoadSlotReleasable(base, assets + branch->b, &second) &&
+           (first == 0 || first != second);
+  }
+  return true;
+}
+
+std::optional<uint64_t> FileLoaded(uint8_t* base, uint32_t request, uint32_t data,
+                                   uint32_t scene, uint32_t sp, const FileLoadedCalls& calls) {
+  ITC_NATIVE_RUNNING("sub_820C52A0 CarScene::OnFileLoaded");
+  const uint32_t assets = scene + kAssets;
+  const uint32_t frame = sp - 128;
+  Store(base, frame + 156, data);
+  const auto branch = FindBranch(base, assets, request);
+  if (!branch) {
+    return std::nullopt;
+  }
+  const uint32_t slot = assets + branch->slot;
+  auto xpr_create = [&](uint32_t xpr) {
+    if (!models::XprCreate(base, xpr, data)) {
+      calls.xpr_create(xpr, data);
+    }
+  };
+  switch (branch->kind) {
+    case Kind::kXpr:
+      xpr_create(assets + branch->a);
+      break;
+    case Kind::kXprProvider: {
+      const uint32_t xpr = assets + branch->a, provider = assets + branch->b;
+      xpr_create(xpr);
+      const uint32_t set = Load(base, Load(base, provider) + 16);
+      if (set != kTextureProviderSet ||
+          !scenery_lists::TextureProviderSet(base, provider, 0, xpr)) {
+        calls.provider_set(provider, xpr);
+      }
+      break;
+    }
+    case Kind::kPart:
+      Store(base, slot + 20, 3);
+      return std::nullopt;
+    case Kind::kTexture: {
+      const uint32_t model = assets + branch->a;
+      const uint32_t file = Load(base, assets + branch->b + 16);
+      if (!models::ModelLoad(base, model, file, data, calls.model_load)) {
+        calls.model_load_original(model, file, data);
+      }
+      Release(base, assets + branch->b);
+      uint64_t r3 = Release(base, slot);
+      Store(base, slot + 20, 3);
+      if (branch->slot == 880) {
+        const int32_t shapes = int32_t(Load(base, assets + 828));
+        const double one = double(std::bit_cast<float>(Load(base, 0x82000A30)));
+        for (int32_t i = 0; i < shapes; i++) {
+          r3 = material_passes::ScaleBlended(base, model, uint32_t(i), one, frame);
+        }
+      }
+      return r3;
+    }
+    case Kind::kTga: {
+      const uint32_t header = assets + branch->a, pixels = assets + branch->b;
+      const uint32_t size = Load(base, slot + 8);
+      if (!car_models::TgaCreateImage(base, header, size, frame + 156, pixels, frame)) {
+        calls.tga_create(header, size, frame + 156, pixels);
+      }
+      break;
+    }
+  }
+  const uint32_t r3 = Release(base, slot);
+  Store(base, slot + 20, 3);
   return r3;
 }
 

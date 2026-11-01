@@ -805,6 +805,117 @@ void LoadAssetsCases(Context& h, const Block& block) {
   results.Report();
 }
 
+
+// CarScene::OnFileLoaded: the assets made (the constructor's register step)
+// in a scene at the block's +0x100, every slot's request distinct; r3 one
+// of an XPR2 slot's (r4 random words: XPR::Create's error path, the
+// providers' TextureProvider::Set), a part file's, a TGA's (a small
+// uncompressed one) or none. The texture slots'
+// branches (Model::Load on a part file) aren't among the cases: they run
+// at every scene's set-up in play. Compared: the pending frees, the
+// providers, the slots' pages, the block, the word at the caller's frame's
+// +28, r3.
+void FileLoadedCases(Context& h, const Block& block) {
+  if (!hooks::ModelsNativeLifetime() || !hooks::ModelsHostLock() || !hooks::NativeHeapActive()) {
+    return;
+  }
+  std::lock_guard<std::recursive_mutex> lock(models::MemoryBlocksMutex());
+  Results results("CarScene::OnFileLoaded (sub_820C52A0)");
+  const uint32_t scene = block.address + 0x100;
+  const uint32_t assets = scene + scene::kAssets;
+  std::vector<uint32_t> slots = {0, 48, 72, 184, 252, 320, 388, 904, 952, 1020, 4048, 4560};
+  for (uint32_t i = 0; i < 4; i++) {
+    slots.push_back(1088 + 24 * i);
+    slots.push_back(4608 + 24 * i);
+  }
+  for (uint32_t i = 0; i < 19; i++) {
+    slots.push_back(3136 + 24 * i);
+  }
+  const uint32_t others[] = {880, 3040, 3064, 3088, 3112, 4072};
+  for (int c = 0; c < 48; c++) {
+    const uint64_t seed = h.random.Next();
+    const uint32_t which = uint32_t(c) % uint32_t(slots.size() + 1);
+    Outputs out[2];
+    for (int v = 0; v < 2; v++) {
+      Random r(seed);
+      WriteRandom(h.base, block.address, block.bytes, r);
+      PPCContext t = CallContext(h);
+      MakeAssets(t, h.base, assets);
+      uint32_t k = 1;
+      for (const uint32_t slot : slots) {
+        Store(h.base, assets + slot + 4, 0x10000u * k++);
+        Store(h.base, assets + slot + 12, 0);
+        Store(h.base, assets + slot + 16, 0);
+      }
+      for (const uint32_t slot : others) {
+        Store(h.base, assets + slot + 4, 0x10000u * k++);
+      }
+      uint32_t request = 0x123;
+      uint32_t pages = 0;
+      if (which < slots.size()) {
+        const uint32_t slot = assets + slots[which];
+        request = Load(h.base, slot + 4);
+        if (r.Below(4) == 0) {
+          Store(h.base, slot + 12, 1);
+          Store(h.base, slot + 16, r.Next() | 1);
+        } else {
+          pages = memory::AllocPages(4096, 4096);
+          WriteRandom(h.base, pages, 4096, r);
+          Store(h.base, slot + 16, pages);
+        }
+        Store(h.base, slot + 8, 64 + r.Below(1024));
+      }
+      const uint32_t data = block.address + 0xC000;
+      if (which < slots.size() && (slots[which] == 904 || slots[which] >= 3136 && slots[which] < 3592)) {
+        // A TGA (uncompressed, 32 bits a pixel, 1 to 8 pixels square, its
+        // origin at the top or bottom), its pixels random.
+        const uint32_t w = 1 + r.Below(8), hgt = 1 + r.Below(8);
+        const uint8_t header[18] = {0, 0, 2, 0, 0, 0, 0, 0, 0, 0, 0, 0, uint8_t(w), 0,
+                                    uint8_t(hgt), 0, 32, uint8_t(r.Below(2) ? 0x28 : 0x08)};
+        Write(h.base, data, header, 18);
+        Store(h.base, assets + slots[which] + 8, 18 + 4 * w * hgt);
+      }
+      for (uint32_t i = 0; i < 20; i++) {
+        Store(h.base, assets + (i == 0 ? 948 : 3592 + 4 * (i - 1)), 0);
+      }
+      const pending_frees::ListState was = pending_frees::SaveList(h.base);
+      t.r3.u64 = request;
+      t.r4.u64 = data;
+      t.r6.u64 = scene;
+      const uint32_t sp = t.r1.u32;
+      (v == 0 ? Original<__imp__sub_820C52A0> : hooks::SceneOnFileLoaded)(t, h.base);
+      pending_frees::TakeAddedNodes(h.base, was, out[v]);
+      TakeAssetProviders(h.base, assets, out[v]);
+      if (pages != 0) {
+        const bool freed = !memory::IsPages(pages);
+        out[v].Word(freed);
+        if (!freed) {
+          memory::FreePages(pages);
+        }
+        for (const uint32_t slot : slots) {
+          if (Load(h.base, assets + slot + 16) == pages) {
+            Store(h.base, assets + slot + 16, kStorageMarker);
+          }
+        }
+      }
+      for (uint32_t i = 0; i < 20; i++) {
+        const uint32_t word = assets + (i == 0 ? 948 : 3592 + 4 * (i - 1));
+        if (Load(h.base, word) != 0 && memory::IsPages(Load(h.base, word))) {
+          out[v].Bytes(Read(h.base, Load(h.base, word), 256));
+        }
+        TakePagesWord(h.base, word, out[v]);
+      }
+      out[v].Word(Load(h.base, sp + 28));
+      out[v].Bytes(Read(h.base, block.address, block.bytes));
+      out[v].Word(t.r3.u32);
+      out[v].Word(uint32_t(t.r3.u64 >> 32));
+    }
+    results.Check(out[0], out[1], fmt::format("case {} (slot {})", c,
+                                              which < slots.size() ? slots[which] : 0xFFFFu));
+  }
+  results.Report();
+}
+
 }  // namespace
 
 void Scene(Context& h) {
@@ -820,6 +931,7 @@ void Scene(Context& h) {
   Releases(h, block);
   Creates(h, block);
   LoadAssetsCases(h, block);
+  FileLoadedCases(h, block);
 }
 
 }  // namespace harness

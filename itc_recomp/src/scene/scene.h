@@ -16,6 +16,7 @@
 #include <optional>
 
 #include "archive/archive.h"
+#include "models/model_load.h"
 
 namespace scene {
 
@@ -148,6 +149,36 @@ constexpr uint32_t kOnFileLoaded = 0x820C52A0;
 // LoadShared's). Only over the layer with the archive's queue native (the
 // adapter's check).
 uint32_t LoadAssets(uint8_t* base, uint32_t scene, uint32_t pcr, const archive::LoadCall& load);
+
+// The guest calls CarScene::OnFileLoaded makes, from its 128-byte frame with
+// the original's return addresses: Model::Load's own (`model_load`), the
+// originals of Model::Load, XPR::Create and TGA::CreateImage where their
+// plain C++ declines, and the texture provider's vtable slot +16 (r4 = 0,
+// r5 = the XPR), each answering the r3 it leaves.
+struct FileLoadedCalls {
+  models::LoadCalls model_load;
+  std::function<void(uint32_t model, uint32_t file, uint32_t xpr)> model_load_original;
+  std::function<void(uint32_t xpr, uint32_t file)> xpr_create;
+  std::function<uint64_t(uint32_t provider, uint32_t xpr)> provider_set;
+  std::function<void(uint32_t header, uint32_t size, uint32_t buffer_at, uint32_t pixels)>
+      tga_create;
+};
+
+// Whether CarScene::OnFileLoaded runs natively for `request` (nothing
+// changed): the slots the matching branch releases freed natively (each
+// its own pages).
+bool FileLoadedNative(uint8_t* base, uint32_t request, uint32_t scene);
+
+// CarScene::OnFileLoaded (sub_820C52A0, the loads' callback): r3 =
+// `request`, r4 = `data`, r6 = the scene. `data` stored at the caller's
+// frame's +28 (`sp` + 28, the original's r1 + 156: TGA::CreateImage reads
+// the buffer there); the first slot (the layout's order) whose request (+4)
+// is `request` finished as scene.md's row says, its state (+20) = 3.
+// Returns the r3 it leaves: the last call's, or `request` (nullopt) where
+// none matched or a part file arrived. Only where FileLoadedNative and the
+// models' lifetime are native (the adapter's checks).
+std::optional<uint64_t> FileLoaded(uint8_t* base, uint32_t request, uint32_t data,
+                                   uint32_t scene, uint32_t sp, const FileLoadedCalls& calls);
 bool CreateNative(uint8_t* base);
 
 // CarScene::CarScene (sub_820C89A8): SceneSetUp::SceneSetUp (+4),

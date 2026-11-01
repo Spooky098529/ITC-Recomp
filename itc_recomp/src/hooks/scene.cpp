@@ -9,9 +9,12 @@
 #include "car_models/vinyl.h"
 #include "hooks/accessories.h"
 #include "hooks/archive.h"
+#include "hooks/guest_call.h"
 #include "hooks/heap.h"
 #include "hooks/models.h"
 #include "scene/scene.h"
+
+#include <optional>
 
 ITC_FLAG_DECLARE(bool, native_accessories);
 ITC_FLAG_DECLARE(bool, native_car_models);
@@ -31,7 +34,10 @@ ITC_FLAG_BOOL(native_scene, true, "ITC",
               "and the models' lifetime SceneAssets::Release sub_820C4C80 (the original "
               "VirtualFree for a TGA pixels' word that isn't the layer's) and CarScene::Create "
               "sub_820C8A50 (over ScenePools::MakeA's, PaintPalette::Init's and the accessories' "
-              "plain C++), with --native_heap and the archive's queue CarScene::LoadAssets sub_820C8B40) natively instead of through the "
+              "plain C++), with --native_heap and the archive's queue CarScene::LoadAssets sub_820C8B40, with the models' lifetime CarScene::OnFileLoaded "
+              "sub_820C52A0 (Model::Load's, XPR::Create's and TGA::CreateImage's originals "
+              "where their plain C++ declines, the providers' slot +16 through their vtables "
+              "unless it's TextureProvider::Set)) natively instead of through the "
               "translated code (the same writes; checked by --run_harnesses=scene)");
 
 namespace hooks {
@@ -242,6 +248,57 @@ void SceneLoadAssets(PPCContext& ctx, uint8_t* base) {
   ctx.r3.u64 = scene::LoadAssets(base, ctx.r3.u32, ctx.r13.u32, NativeArchiveLoad(base));
 }
 
+void SceneOnFileLoaded(PPCContext& ctx, uint8_t* base) {
+  const uint32_t request = ctx.r3.u32, data = ctx.r4.u32, scene_at = ctx.r6.u32;
+  if (!ModelsNativeLifetime() || !scene::FileLoadedNative(base, request, scene_at)) {
+    __imp__sub_820C52A0(ctx, base);
+    return;
+  }
+  ctx.fpscr.disableFlushMode();
+  const uint32_t stack = ctx.r1.u32;
+  const uint64_t lr = ctx.lr, r3_in = ctx.r3.u64;
+  std::optional<uint64_t> r3;
+  // The guest calls from the original's frame (128 bytes).
+  guest_call::InFrame(ctx, base, 128, 0x820C52D0, [&](uint32_t) {
+    hooks::ModelLoadGuest model_guest{ctx, base};
+    scene::FileLoadedCalls calls;
+    calls.model_load = model_guest.Calls();
+    calls.model_load_original = [&](uint32_t model, uint32_t file, uint32_t xpr) {
+      ctx.r3.u64 = model;
+      ctx.r4.u64 = file;
+      ctx.r5.u64 = xpr;
+      ctx.lr = 0x820C5480;
+      __imp__sub_82596920(ctx, base);
+    };
+    calls.xpr_create = [&](uint32_t xpr, uint32_t file) {
+      ctx.r3.u64 = xpr;
+      ctx.r4.u64 = file;
+      ctx.lr = 0x820C52D0;
+      __imp__sub_82596F68(ctx, base);
+    };
+    calls.provider_set = [&](uint32_t provider, uint32_t xpr) -> uint64_t {
+      ctx.r3.u64 = provider;
+      ctx.r4.u64 = 0;
+      ctx.r5.u64 = xpr;
+      ctx.lr = 0x820C5340;
+      REX_CALL_INDIRECT_FUNC(guest::LoadU32(base, guest::LoadU32(base, provider) + 16));
+      return ctx.r3.u64;
+    };
+    calls.tga_create = [&](uint32_t header, uint32_t size, uint32_t buffer_at, uint32_t pixels) {
+      ctx.r3.u64 = header;
+      ctx.r4.u64 = size;
+      ctx.r5.u64 = buffer_at;
+      ctx.r6.u64 = pixels;
+      ctx.lr = 0x820C54F0;
+      __imp__sub_820ED020(ctx, base);
+    };
+    r3 = scene::FileLoaded(base, request, data, scene_at, stack, calls);
+  });
+  ctx.lr = lr;
+  ctx.r3.u64 = r3 ? *r3 : r3_in;
+  ctx.fpscr.disableFlushMode();
+}
+
 }  // namespace hooks
 
 // The adapters: the register steps above, or the originals with the flag
@@ -266,6 +323,7 @@ ITC_SCENE(820C9110, SceneCarSceneDestruct)
 ITC_SCENE(820C4C80, SceneAssetsRelease)
 ITC_SCENE(820C8A50, SceneCreate)
 ITC_SCENE(820C8B40, SceneLoadAssets)
+ITC_SCENE(820C52A0, SceneOnFileLoaded)
 // No adapters (their callers in play are native; the register steps above
 // are the harness's): ScenePools::StartTeardownA sub_820C3C80, DestroyA
 // sub_820C3CF8, SceneAssets::SceneAssets sub_820C5008 and ~SceneAssets
