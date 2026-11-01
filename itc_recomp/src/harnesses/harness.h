@@ -259,5 +259,6 @@ void Accessories(Context& h);
 // The race HUD machine (src/harnesses/race_hud_machine.cpp).
 void RaceHudMachine(Context& h);
 void RaceScreens(Context& h);
+void Scene(Context& h);
 
 }  // namespace harness

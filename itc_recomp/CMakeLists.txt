@@ -282,6 +282,8 @@ set(ITC_SOURCES
     src/menu_sounds/menu_sounds.cpp
     src/hooks/accessories.cpp
     src/accessories/accessories.cpp
+    src/hooks/scene.cpp
+    src/scene/scene.cpp
     src/save_interface/save_interface.cpp
     src/save_interface/save_layer.cpp
     src/hooks/file_layer.cpp
@@ -462,6 +464,7 @@ set(ITC_SOURCES
     src/harnesses/race_screens.cpp
     src/harnesses/menu_sounds.cpp
     src/harnesses/accessories.cpp
+    src/harnesses/scene.cpp
     src/harnesses/car_sounds.cpp
     src/harnesses/x3daudio.cpp
     src/harnesses/xaudio.cpp
