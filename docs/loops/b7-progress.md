@@ -46,7 +46,7 @@ file's history. What's left to see in a drive, from every run:
   `RaceDialog::SetText` and `RaceDialog::Open`; no adapter removable.
   No validation needed.
 - Limit for this run: 5 subsystems (the user's call, 2026-11-01; 3
-  before); 3 taken.
+  before); 4 taken.
 - Subsystem 2 of 5: the render queue's methods (`sub_8258EDC8`,
   `sub_8258E5F8`, `sub_8258E618`, `sub_8258E5E0`, `sub_8258ED78`),
   from `leads.md` (all ready, every pass). Map checked (ee891a3a: 24
@@ -108,6 +108,12 @@ file's history. What's left to see in a drive, from every run:
   `itc_3081`, `itc_3093`, `itc_3106`; ran to its end): 19 of 19 harness
   lines, 10 ran in the race, 9 in the replay (the teardown, at the
   attract race's end, with no error there), none to drive. Done.
+
+- Subsystem 4 of 5: the second set's objects' makers (`sub_820C8DE8`'s
+  eight calls, `sub_820DB330`..`sub_820ECE40`, with the point record
+  helpers `sub_820CEA08`, `sub_820CEB30`), from `leads.md` (under the
+  load poll and the parts' finishers the car scene waits on). Step:
+  mapping agent running.
 
 ## Done
 
