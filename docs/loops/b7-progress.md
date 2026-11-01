@@ -83,10 +83,16 @@ file's history. What's left to see in a drive, from every run:
   game; `scene-loaders.md` 78 of 78 ours; `XPR::FindByName`'s adapter
   kept for `CarModel::OnFileLoaded`'s hand-back that runs in play;
   harness scene_loaders 0 differing, frame dumps alike, race 38 s, 0
-  errors; no subagents). Nothing ready left. Step: validation agent
-  running.
+  errors; no subagents). Nothing ready left. Validated (`itc_3127`,
+  120 s: race 54 s, 0 errors): 5 of 5 harness lines, all 5 ran in the
+  race, replay not needed. Done.
 
 ## Done
+
+- `XPR::GetTexture` and the rest of the scene loaders (cleanup lead):
+  `functions.md`, `location-screen.md` (the picture callbacks),
+  `scene-loaders.md` 78 of 78; 8 adapters removed; b409aa64..1ff4d670.
+  Validated (`itc_3105`, `itc_3127`).
 
 - The render queue's methods (subsystem 2): `device-shaders.md`, 25 of
   25 in play with subsystem 1; `--native_render_queue`;
@@ -162,5 +168,9 @@ file's history. What's left to see in a drive, from every run:
 - After the scene loaders' second migration (`itc_3124`: race 38 s, 0
   errors, scene_loaders 0 differing): ours 3758, work left 2641
   (wrapped 97, known 486, unknown 2058).
+
+- After its validation (`itc_3127`, 120 s: race 54 s, 0 errors, every
+  harness 0 differing but the expected groups): ours 3758, work left
+  2641.
 
 ## Stopped
