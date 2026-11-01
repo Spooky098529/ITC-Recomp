@@ -91,7 +91,12 @@ file's history. What's left to see in a drive, from every run:
   `sub_820C59B0`, `sub_820C4C80`, `sub_820F1078`), from `leads.md` (14
   ready groups under it since the scene loaders are ours; the scene at
   `[0x826C2E44]` lead beside it, `sub_820C8A50`, given to the mapping
-  agent to fold in if it fits). Step: mapping agent running.
+  agent to fold in if it fits). Map checked (e8dcd16c: `scene.md`,
+  23 rows, 22 in play: `CarScene::` at `[0x826C2E44]`, its making,
+  loading, update and teardown; three leads folded in and deleted, 3
+  added; 11 ready groups; blocked by the scene models' updates
+  `sub_820C5A60` and the parts' finishers (Wrapped in `functions.md`);
+  no subagents). Step: migration agent running.
 
 ## Done
 
@@ -178,5 +183,8 @@ file's history. What's left to see in a drive, from every run:
 - After its validation (`itc_3127`, 120 s: race 54 s, 0 errors, every
   harness 0 differing but the expected groups): ours 3758, work left
   2641.
+
+- After the car scene's map: ours 3758, work left 2641 (wrapped 97,
+  known 508, unknown 2036).
 
 ## Stopped

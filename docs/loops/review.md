@@ -81,6 +81,17 @@ When the user has reviewed a run's section, its heading gets
   are guest calls from the original's frame; sprintf's unset arguments
   as 0 (the `UiMovie::SetText` precedent); the new files build with
   `-ffp-model=strict`.
+- `scene.md` (new, e8dcd16c): 23 rows, `CarScene::` at `[0x826C2E44]`
+  (named apart from the app's `Scene::Update` `sub_820988C8`): Create,
+  the constructor, the set-up record, the lighting block at +5248, the
+  shared assets at +64, `LoadAssets` and `OnFileLoaded`, the update,
+  the first set's update, the teardown (both pool sets' destroys,
+  `LoadsDone`, the destructor, `List::~List`, `List::DeleteAll`);
+  `CarScene::InitLighting` read only for its stores and calls. Leads
+  folded in and deleted: the scene's maker (`sub_820C8A50`), its set-up
+  and teardown objects (`sub_820C5008`), the TGA getter `sub_820C4E68`
+  (now a row, not seen in play but ran in `itc_2848`). `known-data.md`:
+  the scene's layout, `0x82601854`-`0x8260185C`.
 
 ## Run 2026-10-31 16:54 (`b7-loop-31-10-26`, continued)
 
