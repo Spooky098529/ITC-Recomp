@@ -48,7 +48,13 @@ file's history. What's left to see in a drive, from every run:
 - Limit for this run: 3 subsystems; 2 taken.
 - Subsystem 2 of 3: the render queue's methods (`sub_8258EDC8`,
   `sub_8258E5F8`, `sub_8258E618`, `sub_8258E5E0`, `sub_8258ED78`),
-  from `leads.md` (all ready, every pass). Step: mapping agent running.
+  from `leads.md` (all ready, every pass). Map checked (ee891a3a: 24
+  rows added to `device-shaders.md`, the queue (the game's `OT`, an
+  ordering table) with its vtable `0x8206CB8C`'s slots, `PassList::Add`,
+  the replay `sub_82591238` with its sort and chunk walker; 2 rows
+  moved from `functions.md`; 9 ready groups; the indirect calls reach
+  `PrimitiveDrawer::Init` and the render command tables; 1 lead added;
+  no subagents). Step: migration agent running.
 
 ## Done
 
@@ -103,5 +109,8 @@ file's history. What's left to see in a drive, from every run:
 - After its validation (`itc_3080`, 120 s: race 52 s, 0 errors, every
   harness 0 differing but the expected groups): ours 3720, work left
   2679.
+
+- After the render queue's map: ours 3720, work left 2679 (wrapped
+  100, known 521, unknown 2058).
 
 ## Stopped

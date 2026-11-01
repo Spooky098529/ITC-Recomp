@@ -46,6 +46,15 @@ When the user has reviewed a run's section, its heading gets
   their prints come first, so they also log on those hand-backs; the
   harness's pause menu set up with a negative running transition and
   without the confirm dialog (`race_screens` covers it).
+- `device-shaders.md`, the render queue's methods (ee891a3a): 24 rows
+  (the vtable `0x8206CB8C`'s slots, the replay and its sort and chunk
+  walker, `PassList::Add`, the release list's `PtrVector`); 2 moved
+  from `functions.md` (Wrapped for `--find_menu_selection`). Corrections:
+  the chunk walker reads the kind from the first word's low halfword
+  (`gpu-functions.md` says the first halfword; not edited);
+  `known-data.md`'s scene + 64 buckets (+0, +4 first and last, +12 a
+  count `Clear` never resets; not next pointers at +8). `known-data.md`:
+  the replay's globals `0x8296BD8C`-`0x82970BC0`.
 
 ## Run 2026-10-31 16:54 (`b7-loop-31-10-26`, continued)
 
