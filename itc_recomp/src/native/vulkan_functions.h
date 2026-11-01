@@ -93,6 +93,7 @@
   X(vkCmdSetDepthBias)                 \
   X(vkCmdSetBlendConstants)            \
   X(vkCmdBlitImage)                    \
+  X(vkCmdCopyBuffer)                   \
   X(vkCmdCopyBufferToImage)            \
   X(vkCmdCopyImageToBuffer)            \
   X(vkQueueWaitIdle)                   \

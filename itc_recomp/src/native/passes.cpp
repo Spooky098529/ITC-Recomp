@@ -42,6 +42,7 @@
 #include "base/log.h"
 
 ITC_FLAG_DECLARE(std::string, log_level);
+ITC_FLAG_DECLARE(bool, native_renderer_buffer_arena);
 
 ITC_FLAG_STRING(xbox_gamma, "off", "ITC",
                 "Show the frame through the display gamma table the game sets for a kind "
@@ -705,16 +706,24 @@ struct Passes::State {
     uint64_t stale_lines = 200;
   } by_tick;
   // The mirror this frame's draws read.
-  GuestMirror& draw_mirror() { return mirrors[mirror_by_tick ? front_mirror : frame]; }
+  GuestMirror& draw_mirror() {
+    return mirrors[arena_on ? 0 : mirror_by_tick ? front_mirror : frame];
+  }
   // Whether draws work out their vertex and index ranges and pass them to
   // Mirror: always, except with mirror_by_tick and none of the mirror's
   // diagnostics (then the mirror needs nothing from draws).
   bool MirrorPerDraw() const {
+    if (arena_on) {
+      return false;  // no mirrors
+    }
     return !mirror_by_tick || check_mirror || check_mirror_frames || check_late_writes ||
            check_clobbers || verify_mirror || log_index_ranges ||
            Buffers_Logging() || Buffers_LogPhysicalWrites();
   }
   uint32_t inline_slot_size() const {
+    if (arena_on) {
+      return BufferArena::kInlineSize;  // one region: written in order by its copies
+    }
     return mirror_by_tick ? kInlineVerticesSize / frames_in_flight : kInlineVerticesSize;
   }
   void MirrorByTickFrameStart(uint8_t* base);
@@ -1110,6 +1119,14 @@ struct Passes::State {
   // can't be had yet.
   TextureCache textures;
   BufferTable buffers;
+  // The buffer arena (step 2b, --native_renderer_buffer_arena): draws read
+  // vertices and indices from it instead of the mirrors (the one "mirror"
+  // then stands for it: its buffer and set, nothing mapped). The built-in
+  // index lists and the inline vertices are in it too, at these offsets.
+  bool arena_on = false, arena_fixed_uploaded = false;
+  BufferArena arena;
+  uint32_t rectangle_indices = kRectangleIndices, quad_indices = kQuadIndices,
+           inline_vertices = kInlineVertices;
   Image dummy_2d_array, dummy_3d, dummy_cube;
   // Zero (transparent black) ones for a texture of another dimension than
   // the shader declares: the plugin binds a null descriptor, which reads
@@ -3224,7 +3241,20 @@ bool Passes::Init(const DeviceContext& context, uint8_t* base, uint32_t frames_i
   const std::string& log_level = ITC_FLAG(log_level);
   s.collect_interfaces = log_level == "trace" || log_level == "debug" || log_level == "info";
   vk::vkGetPhysicalDeviceMemoryProperties(context.physical_device, &s.memory_properties);
-  if (!s.CreateGuestMemoryMirror()) {
+  s.arena_on = ITC_FLAG(native_renderer_buffer_arena);
+  if (s.arena_on) {
+    constexpr uint32_t kFixedBytes = kInlineVertices - kRectangleIndices;
+    if (!s.arena.Init(context, frames_in_flight, kFixedBytes)) {
+      return false;
+    }
+    s.buffers.set_arena(&s.arena);
+    s.rectangle_indices = s.arena.fixed_base();
+    s.quad_indices = s.rectangle_indices + (kQuadIndices - kRectangleIndices);
+    s.inline_vertices = s.arena.inline_base();
+    s.mirrors.resize(1);
+    s.mirrors[0].buffer = s.arena.buffer();
+    Buffers_CollectMirrorWrites();
+  } else if (!s.CreateGuestMemoryMirror()) {
     return false;
   }
   const std::string& gamma = ITC_FLAG(xbox_gamma);
@@ -3339,6 +3369,30 @@ void Passes::BeginFrame(uint32_t frame_index) {
   s.MaybeSavePipelineCache();
   s.buffers.OnFrame();
   s.frame = frame_index;
+  if (s.arena_on) {
+    s.arena.BeginFrame(frame_index);
+    if (!s.arena_fixed_uploaded) {
+      s.arena_fixed_uploaded = true;
+      std::vector<uint32_t> fixed;
+      for (uint32_t i = 0; i < kBuiltinPrimitives; i++) {
+        if (i) {
+          fixed.push_back(UINT32_MAX);
+        }
+        for (uint32_t j = 0; j < 4; j++) {
+          fixed.push_back(i << 2 | j);
+        }
+      }
+      for (uint32_t i = 0; i < kBuiltinPrimitives; i++) {
+        for (uint32_t j : {0u, 1u, 2u, 0u, 2u, 3u}) {
+          fixed.push_back(4 * i + j);
+        }
+      }
+      s.arena.Upload(s.rectangle_indices, fixed.data(), uint32_t(4 * fixed.size()));
+    }
+    s.mirror_taken.clear();
+    Buffers_TakeMirrorWrites(s.mirror_taken);
+    s.buffers.MarkWritten(s.mirror_taken);
+  }
   s.ring_offset = 0;
   s.rings[frame_index].block = 0;
   s.rendering = false;
@@ -3392,6 +3446,10 @@ void Passes::BeginFrame(uint32_t frame_index) {
   ring.texture_pool = 0;
   vk::vkResetDescriptorPool(s.context.device, s.resolve_pools[frame_index], 0);
   s.textures.BeginFrame(frame_index);
+}
+
+VkCommandBuffer Passes::EndBufferUploads() {
+  return state_->arena_on ? state_->arena.EndUploads() : VK_NULL_HANDLE;
 }
 
 VkCommandBuffer Passes::EndUploads() {
@@ -3597,6 +3655,35 @@ void Passes::State::Draw(VkCommandBuffer commands, uint8_t* base, uint32_t devic
   } else if (skip_pixel_shader == kSkipNoPixelShader) {
     return;
   }
+  // With the buffer arena: the streams the vertex shader fetches from, and
+  // the indices, at their offsets in it (copied there first when made or
+  // written since); their guest physical addresses kept for diagnostics.
+  uint32_t arena_index_offset = 0;
+  if (s.arena_on && !call.inline_vertices && s.interface) {
+    bool placed = true;
+    for (uint32_t k = 96 - render::kStreams; k < 96 && placed; k++) {
+      if (!(vertex->vertex_fetch_constants[k >> 5] & (1u << (k & 31)))) {
+        continue;
+      }
+      const render::Stream& stream = s.interface->streams[95 - k];
+      if (!stream.buffer) {
+        s.stats.arena_unbound++;
+        continue;
+      }
+      uint32_t offset = 0;
+      placed = s.buffers.Use(95 - k, stream.buffer.address, offset);
+      uint32_t& word0 = regs.values[XE_GPU_REG_SHADER_CONSTANT_FETCH_00_0 + 2 * k];
+      word0 = (offset + stream.offset) | (word0 & 3);
+    }
+    if (placed && bound.index_buffer) {
+      placed = s.buffers.Use(render::kStreams, bound.index_buffer, arena_index_offset);
+    }
+    if (!placed) {
+      s.stats.failed++;
+      s.stats.failed_by[8]++;
+      return;
+    }
+  }
   if (record_draws) {
     // Raw, to keep recording at its usual speed (the effect being looked for
     // depends on timing); formatted with the dump.
@@ -3646,7 +3733,7 @@ void Passes::State::Draw(VkCommandBuffer commands, uint8_t* base, uint32_t devic
   if (log_glow && pixel && pixel->hash == kGlowCrossFade) {
     glow_frame.cross_fades++;
     glow_frame.constants.clear();
-    if (call.inline_vertices) {
+    if (call.inline_vertices && s.draw_mirror().mapped) {
       // Its weight: the vertices' color alpha (the shader outputs the
       // history times the color, and the color's alpha).
       uint8_t* vertices = draw_mirror().mapped;
@@ -3693,7 +3780,8 @@ void Passes::State::Draw(VkCommandBuffer commands, uint8_t* base, uint32_t devic
     uint32_t index_word = guest::LoadU32(base, index_buffer);
     index_32bit = index_word >> 31;
     index_endian = (index_word >> 29) & 3;
-    index_address = GpuPhysicalAddress(guest::LoadU32(base, index_buffer + 24)) +
+    index_address = (s.arena_on ? arena_index_offset
+                                : GpuPhysicalAddress(guest::LoadU32(base, index_buffer + 24))) +
                     start_index * (index_32bit ? 4 : 2);
   }
 
@@ -4073,7 +4161,9 @@ void Passes::State::Draw(VkCommandBuffer commands, uint8_t* base, uint32_t devic
     s.Mirror(base, word0 & 0x1FFFFFFCu, size, false);
   }
   // --watch_gpu_data_reads: the data this draw uses.
-  if (!call.inline_vertices && debug::RenderWatch_WatchingGpuData()) {
+  // (Guest addresses: not with the buffer arena, whose offsets the fetch
+  // constants hold.)
+  if (!call.inline_vertices && !s.arena_on && debug::RenderWatch_WatchingGpuData()) {
     if (index_address) {
       debug::RenderWatch_OnGpuData(index_address, index_count * (index_32bit ? 4 : 2),
                                    debug::GpuData::kIndex);
@@ -4156,8 +4246,8 @@ void Passes::State::Draw(VkCommandBuffer commands, uint8_t* base, uint32_t devic
   now.index_type = rectangle_list || quad_list || index_32bit ? VK_INDEX_TYPE_UINT32
                                                               : VK_INDEX_TYPE_UINT16;
   uint32_t index_bytes = now.index_type == VK_INDEX_TYPE_UINT32 ? 4 : 2;
-  uint64_t index_start = rectangle_list ? kRectangleIndices
-                         : quad_list    ? kQuadIndices
+  uint64_t index_start = rectangle_list ? s.rectangle_indices
+                         : quad_list    ? s.quad_indices
                                         : index_address;
   uint32_t first_index = 0;
   if (s.skip_repeated_state && index_start % index_bytes == 0) {
@@ -4616,9 +4706,18 @@ void Passes::InterfaceInlineDraw(VkCommandBuffer commands, uint8_t* base, render
   call.inline_vertices = true;
   call.vertex_count = count;
   call.stride = stride;
-  call.vertex_address =
-      kInlineVertices + (s.mirror_by_tick ? s.frame * s.inline_slot_size() : 0) + offset;
-  std::memcpy(s.draw_mirror().mapped + call.vertex_address, draw.vertices, size);
+  if (s.arena_on) {
+    call.vertex_address = s.inline_vertices + offset;
+    if (!s.arena.Upload(call.vertex_address, draw.vertices, size)) {
+      s.stats.failed++;
+      s.stats.failed_by[8]++;
+      return;
+    }
+  } else {
+    call.vertex_address =
+        kInlineVertices + (s.mirror_by_tick ? s.frame * s.inline_slot_size() : 0) + offset;
+    std::memcpy(s.draw_mirror().mapped + call.vertex_address, draw.vertices, size);
+  }
   s.stats.mirrored_bytes += size;
   s.interface_registers.Build(base, state, 0, s.regs);
   // Vertex fetch constants 93-95 as the 360's BeginVertices set them: 95
@@ -4908,6 +5007,9 @@ void Passes::set_mirror_to_both(bool to_both) {
 
 void Passes::set_mirror_by_tick(bool by_tick) {
   State& s = *state_;
+  if (s.arena_on) {
+    return;  // no mirrors
+  }
   if (by_tick && s.mirrors.size() != 2) {
     ITC_LOG_WARN("native renderer: mirror by tick needs two mirrors, not {}: off",
                  s.mirrors.size());
@@ -5813,6 +5915,10 @@ Passes::Stats Passes::TakeStats() {
   Stats stats = state_->stats;
   stats.textures = state_->textures.TakeStats();
   stats.buffers = state_->buffers.TakeStats();
+  stats.arena_on = state_->arena_on;
+  if (state_->arena_on) {
+    stats.arena = state_->arena.TakeStats();
+  }
   stats.shaders_translated = state_->shaders->translated();
   stats.shaders_failed = state_->shaders->failed();
   stats.shaders_from_disk = state_->shaders->from_disk();

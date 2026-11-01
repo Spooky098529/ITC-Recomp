@@ -19,6 +19,7 @@ enum class Kind {
   kImage,      // Passes::State::CreateImage: targets, dummies, the shown frame
   kStaging,    // texture upload staging buffers
   kMirror,     // guest memory mirrors
+  kBuffers,    // the vertex and index arena and its staging (buffer_arena.h)
   kConstants,  // constant blocks
   kOther,      // the gamma table
   kCount

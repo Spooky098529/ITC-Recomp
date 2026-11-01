@@ -194,12 +194,14 @@ class Passes {
   // The frame's texture uploads, to be submitted before its commands; null
   // if none.
   VkCommandBuffer EndUploads();
+  // The same for the buffer arena's copies (step 2b), submitted first.
+  VkCommandBuffer EndBufferUploads();
 
   // Logged by the renderer.
   struct Stats {
     uint64_t drawn = 0, unsupported = 0, failed = 0, mirrored_bytes = 0;
     // Failed draws by reason (kFailedDrawReasons in renderer.cpp).
-    std::array<uint64_t, 8> failed_by{};
+    std::array<uint64_t, 9> failed_by{};
     // Ranges not copied (unchanged since this mirror got them); with
     // set_verify_mirror, those whose contents differ from guest memory, and
     // an example.
@@ -275,6 +277,11 @@ class Passes {
     uint32_t resolve_flags_sample = 0;
     TextureCache::Stats textures;
     BufferTable::Stats buffers;
+    // With the buffer arena (step 2b): its stats, and draws whose vertex
+    // shader fetches from a stream with no buffer bound.
+    bool arena_on = false;
+    BufferArena::Stats arena;
+    uint64_t arena_unbound = 0;
   };
   Stats TakeStats();
 

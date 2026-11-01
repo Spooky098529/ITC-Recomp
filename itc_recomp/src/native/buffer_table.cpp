@@ -1,9 +1,11 @@
 #include "native/buffer_table.h"
 
+#include <algorithm>
 #include <string>
 
 #include "base/log.h"
 #include "guest.h"
+#include "state.h"
 
 namespace native {
 
@@ -32,6 +34,36 @@ void BufferTable::Hold(const render::BufferData& data, int64_t sign) {
   }
 }
 
+// Space in the arena and the physical index; the data to copy at the next
+// use.
+void BufferTable::Place(uint32_t handle, Record& record) {
+  record.physical = GpuPhysicalAddress(record.data.address);
+  record.dirty = true;
+  if (!arena_) {
+    return;
+  }
+  record.space = arena_->Allocate(record.data.size, record.offset);
+  by_physical_.emplace(record.physical, handle);
+  longest_ = std::max(longest_, record.data.size);
+}
+
+void BufferTable::Unplace(uint32_t handle, Record& record) {
+  if (!arena_) {
+    return;
+  }
+  if (record.space) {
+    arena_->Free(record.offset, record.data.size);
+    record.space = false;
+  }
+  auto [first, last] = by_physical_.equal_range(record.physical);
+  for (auto it = first; it != last; ++it) {
+    if (it->second == handle) {
+      by_physical_.erase(it);
+      break;
+    }
+  }
+}
+
 void BufferTable::Created(uint32_t handle, const render::BufferData& data) {
   stats_.created++;
   if (handle >= kWorkHeaders && handle < kWorkHeadersEnd) {
@@ -42,13 +74,18 @@ void BufferTable::Created(uint32_t handle, const render::BufferData& data) {
   if (!added) {
     stats_.remade++;
     Hold(it->second.data, -1);
+    Unplace(handle, it->second);
   }
   it->second.data = data;
   Hold(data, 1);
+  Place(handle, it->second);
 }
 
 void BufferTable::Written(uint32_t handle) {
   stats_.written++;
+  if (auto it = records_.find(handle); it != records_.end()) {
+    it->second.dirty = true;
+  }
 }
 
 void BufferTable::Destroyed(uint32_t handle) {
@@ -59,6 +96,7 @@ void BufferTable::Destroyed(uint32_t handle) {
     return;
   }
   Hold(it->second.data, -1);
+  Unplace(handle, it->second);
   records_.erase(it);
   freed_at_[handle] = frame_;
   for (uint32_t& last : last_bound_) {
@@ -68,14 +106,22 @@ void BufferTable::Destroyed(uint32_t handle) {
   }
 }
 
-void BufferTable::Bound(uint32_t slot, uint32_t handle) {
-  if (!handle || last_bound_[slot] == handle) {
-    return;
+void BufferTable::MarkWritten(const std::vector<std::pair<uint32_t, uint32_t>>& writes) {
+  for (auto [start, end] : writes) {
+    auto it = by_physical_.lower_bound(start > longest_ ? start - longest_ : 0);
+    for (; it != by_physical_.end() && it->first < end; ++it) {
+      Record& record = records_[it->second];
+      if (it->first + record.data.size > start && !record.dirty) {
+        record.dirty = true;
+        stats_.marked++;
+      }
+    }
   }
-  last_bound_[slot] = handle;
-  if (records_.count(handle)) {
-    return;
-  }
+}
+
+// A buffer bound that was never made through the interface: logged once
+// and taken as made.
+BufferTable::Record& BufferTable::NeverMade(uint32_t slot, uint32_t handle) {
   stats_.never_created++;
   std::string words;
   for (uint32_t i = 0; base_ && i < 8; i++) {
@@ -92,12 +138,50 @@ void BufferTable::Bound(uint32_t slot, uint32_t handle) {
   render::BufferData data;
   if (base_) {
     const uint32_t type = guest::LoadU32(base_, handle) & 0xF;
-    data.kind = type == 1   ? render::BufferKind::kVertex
-                : type == 2 ? render::BufferKind::kIndex
-                            : render::BufferKind::kOther;
+    const uint32_t word = guest::LoadU32(base_, handle + 28);
+    if (type == 1) {
+      data = {render::BufferKind::kVertex, guest::LoadU32(base_, handle + 24) & ~3u,
+              ((word >> 2) & 0xFFFFFF) * 4};
+    } else {
+      data = {type == 2 ? render::BufferKind::kIndex : render::BufferKind::kOther,
+              guest::LoadU32(base_, handle + 24), word};
+    }
   }
-  records_[handle].data = data;
+  Record& record = records_[handle];
+  record.data = data;
   Hold(data, 1);
+  Place(handle, record);
+  return record;
+}
+
+void BufferTable::Bound(uint32_t slot, uint32_t handle) {
+  if (!handle || last_bound_[slot] == handle) {
+    return;
+  }
+  last_bound_[slot] = handle;
+  if (!records_.count(handle)) {
+    NeverMade(slot, handle);
+  }
+}
+
+bool BufferTable::Use(uint32_t slot, uint32_t handle, uint32_t& offset) {
+  auto it = records_.find(handle);
+  Record& record = it != records_.end() ? it->second : NeverMade(slot, handle);
+  if (!record.space) {
+    return false;
+  }
+  if (record.dirty) {
+    const uint32_t size = record.data.size;
+    if (uint64_t(record.physical) + size > kPhysicalMemorySize ||
+        !arena_->Upload(record.offset, PhysicalHostAddress(base_, record.physical), size)) {
+      return false;
+    }
+    record.dirty = false;
+    stats_.uploads++;
+    stats_.upload_bytes += size;
+  }
+  offset = record.offset;
+  return true;
 }
 
 BufferTable::Stats BufferTable::TakeStats() {

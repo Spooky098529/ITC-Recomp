@@ -86,6 +86,10 @@ ITC_FLAG_BOOL(native_renderer_mirror_by_tick, true, "ITC",
               "replaying, the two mirrors alternating (=false for the old per-draw "
               "mirror; see 'Hypothesis to test: the mirrors updated once a tick' in "
               "docs/native-renderer.md)");
+ITC_FLAG_BOOL(native_renderer_buffer_arena, true, "ITC",
+              "Draws read vertices and indices from a device-local arena the buffers made "
+              "through the interface are copied into, instead of the guest memory mirrors "
+              "(docs/conventional-renderer.md, 'Step 2b'; =false for the mirrors)");
 ITC_FLAG_BOOL(native_renderer_mirror_to_both, true, "ITC",
               "With --native_renderer_mirror_by_tick: memcpy's writes go into both mirrors "
               "at each frame's start, the one draws read included");
@@ -913,9 +917,12 @@ void Renderer::EndFrame() {
     submit.signalSemaphoreCount = 1;
     submit.pSignalSemaphores = &render_done_[image_index];
   }
-  // Texture uploads first, then the frame.
-  VkCommandBuffer command_buffers[2];
+  // Buffer and texture uploads first, then the frame.
+  VkCommandBuffer command_buffers[3];
   submit.commandBufferCount = 0;
+  if (VkCommandBuffer uploads = passes_.EndBufferUploads()) {
+    command_buffers[submit.commandBufferCount++] = uploads;
+  }
   if (VkCommandBuffer uploads = passes_.EndUploads()) {
     command_buffers[submit.commandBufferCount++] = uploads;
   }
@@ -1028,7 +1035,7 @@ void Renderer::LogStats() {
     static constexpr const char* kFailedDrawReasons[] = {
         "no target", "no vertex shader", "shader translation", "no index buffer",
         "constants ring full", "texture set layout", "texture set",
-        "inline vertex space full"};
+        "inline vertex space full", "buffer arena (no space or staging full)"};
     std::string reasons;
     for (size_t i = 0; i < view.failed_by.size(); i++) {
       if (view.failed_by[i]) {
@@ -1096,6 +1103,16 @@ void Renderer::LogStats() {
                b.held_vertex_bytes / 1048576.0, b.held_index_bytes / 1048576.0,
                b.held_other_bytes / 1048576.0, b.work_created, b.work_bytes / 1048576.0,
                b.never_created);
+  if (view.arena_on) {
+    const BufferArena::Stats& a = view.arena;
+    ITC_LOG_INFO("native renderer: buffer arena: {} buffers marked written by memcpy, {} copied "
+                 "at draws ({:.1f} MB); {} copies in all ({:.1f} MB, inline vertices included); "
+                 "{:.1f} MB used, at most {:.1f} MB; {} staging full, {} without space; {} "
+                 "draws a frame with a used stream unbound",
+                 b.marked, b.uploads, b.upload_bytes / 1048576.0, a.uploads,
+                 a.upload_bytes / 1048576.0, a.used / 1048576.0, a.most_used / 1048576.0,
+                 a.staging_full, a.allocation_failed, double(view.arena_unbound) / frames);
+  }
   if (t.unrecorded) {
     ITC_LOG_INFO("native renderer: {} textures changed in memory with no TextureWritten, e.g. "
                  "{:08X}, {} frames after it was first loaded",
@@ -1315,8 +1332,8 @@ void Renderer_EndFrame() {
 namespace native::gpu_memory {
 
 std::string Describe() {
-  static constexpr const char* kKinds[] = {"textures", "resolved", "images",   "staging",
-                                           "mirrors",  "constants", "other"};
+  static constexpr const char* kKinds[] = {"textures", "resolved",  "images", "staging",
+                                           "mirrors",  "buffers",   "constants", "other"};
   static constexpr const char* kObjects[] = {"views", "samplers", "descriptor pools",
                                              "pipelines"};
   static_assert(std::size(kKinds) == size_t(Kind::kCount));
