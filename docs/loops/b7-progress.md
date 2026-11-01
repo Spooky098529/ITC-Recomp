@@ -136,8 +136,13 @@ file's history. What's left to see in a drive, from every run:
   third migration); blocked by `ScenePools::ReleaseB`. Validated
   (`itc_3178`, 120 s: race 54 s, 0 errors; replay `itc_3179` ok, the
   teardown reached): 74 of 74 harness lines, 51 ran in the race, 23 in
-  the replay, none to drive. Third migration (`WheelPoints::SetUp`):
-  migration agent running.
+  the replay, none to drive. Third migration checked (6b2c7657,
+  76b512a3: `WheelPoints::SetUp` with the tire's, rims' and brakes'
+  set-ups; 6 adapters removed; 148 of 152 ours; harness second_set 0
+  differing, frame dump alike, race 38 s, 0 errors; no subagents).
+  Nothing ready left: the last four wait on `ScenePools::ReleaseB`
+  `sub_820C5C88` (Wrapped by `frame_state_diff`; a lead added). Step:
+  validation agent running.
 
 ## Done
 
@@ -250,5 +255,9 @@ file's history. What's left to see in a drive, from every run:
 - After the second set's second migration (`itc_3175`: race 38 s, 0
   errors, second_set 0 differing): ours 3920, work left 2479 (wrapped
   97, known 498, unknown 1884).
+
+- After the second set's third migration (`itc_3185`: race 38 s, 0
+  errors, second_set 0 differing): ours 3925, work left 2474 (wrapped
+  97, known 493, unknown 1884).
 
 ## Stopped

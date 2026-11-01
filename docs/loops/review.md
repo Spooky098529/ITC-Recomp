@@ -140,6 +140,13 @@ When the user has reviewed a run's section, its heading gets
   `hooks::SceneLoadersReleaseANative(pool)` from `hooks/scene_loaders`;
   the morph's flush-to-zero as the translated code sets it, put back by
   the adapters.
+- The second set's third migration (6b2c7657, 76b512a3): 11 rows. For
+  review: `SetUpRimA`'s second morph sized by the first stream copied;
+  only `SetUp` has an adapter (native with native memcpy, the native
+  heap and `--native_material_passes`, else the original); the tire's
+  red-zone word not compared in `SetUp`'s frames (the morph's callees'
+  saved registers land there; `sub_820E6F28`'s and `sub_820E7010`'s
+  harnesses cover it).
 
 ## Run 2026-10-31 16:54 (`b7-loop-31-10-26`, continued)
 
