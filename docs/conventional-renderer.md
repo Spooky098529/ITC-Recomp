@@ -45,7 +45,7 @@ The user's decisions:
 8. **The Vulkan backend translates shaders at runtime**, as now (the
    SDK's translator and the disk cache); the offline blobs are for other
    backends.
-9. **GPU data may leave guest memory now** (step 4b), ahead of the
+9. **GPU data may leave guest memory now** (step 2b), ahead of the
    decision on guest memory as a whole that B7 left "to the end", since
    most graphics code is native. The headers stay in guest memory, and
    so does any data the CPU also reads.
@@ -509,15 +509,19 @@ The checks:
 |---|---|---|---|---|
 | **0** | **Measure and log.** A render thread profile on the current code (a baseline: none since the setters, shaders and render queue went native). A pass log for one race frame and one menu frame. For each pass it records: the targets set; the draws; each resolve (rect, flags, destination); whether the source is drawn into again before the next clear; and whether each destination is sampled before it's resolved into, within the frame. Also whether game code outside the replay reads the register shadow (a watch on its blocks for a race) | Nothing; it settles the open rows of section 2 | The log; the profile | Small. **Needs the user to run it** (or the tree free of the B7 loop) |
 | **1** | **Our command handlers, feeding our interface, the game's Direct3D off the render path** (steps 1-3 merged, decision 10). The interface defined (`src/render/device.h`, no Vulkan types). Native handlers decode each command (`functions/render-commands.md`) into it: state blocks, textures, streams, shaders and declarations, constants (command 7 keeps interpolation's substitution where it is), draws, targets, viewport and scissor, clears, resolves and tiling as the renderer's own operations. The primitive drawer's draw (`PrimitiveDrawer::Draw`, under command 15) feeds it too. The Vulkan renderer reads the interface instead of the registers, and makes the translator's registers and the (vertex shader, declaration) pairs itself. Resolves are still made as copies, as now. The old path stays behind a flag until this is checked | The register shadow's writes and reads on the render path, `ReadRegisters`, the dirty masks, the PM4 packets, the kick, the shader load and patch, the recompiled handlers, `replay_hooks.cpp`, `draw_packets.cpp`, `gpu_link.cpp` | Dumps against the current renderer (`draws.txt` and pixels; differences explained); the menus and tiling by the user; `--log_blend_state`, `--log_stepping_constants`; a drive; a profile against step 0's | Large. After it, the game's Direct3D is off the render path. Its parts can land one after another behind the flag |
-| **4** | **Resources through the interface.** Textures and buffers made and filled when the game makes them (`XPR::GetTexture`, `Resource::Lock` and Unlock, `Mesh::Parse`, the loaders, the native texture writers), bound by handle. The Vulkan backend keeps fetch by address over its own arena until vertex input is per-stream | The mirrors, the fetch-constant-keyed texture lookups, most of memcpy's tracking | A check of every bound buffer and texture against guest memory over a drive (as `--native_renderer_verify_mirror` did); dumps identical; the hitch log | Medium |
-| **4b** | **GPU data out of guest memory** ("GPU data out of guest memory" in section 3). First the read watch: which resource data the CPU reads after a draw first uses it. Then each native writer whose data the CPU doesn't read hands it to `UpdateBuffer` or `UpdateTexture` into device-local memory and leaves guest memory unwritten (headers kept); data the CPU reads is written to both; memcpy's tracking stays for recompiled writers. Buffers and textures device-local; per-frame vertices through an upload ring | The mirrors (for native writers' data), most of the guest memory physical allocations for GPU data, vertex reads across PCIe | The read watch over a race and a drive (0 reads of moved data); dumps identical; a GPU-bound run (4K) and the render thread profile, before and after | Medium; risk in data the CPU reads that the watch didn't see |
-| **5** | **Passes into their textures.** The destination scan (section 5): each pass draws into its destination; depth maps sampled as depth; the swap and the format changes gone; the glow's steps into their own textures; grab passes as `CopyTexture`; tiling as one target. MSAA keeps the game's sample counts for now (resolved at the pass's end) | The resolve copies but the grab passes, `ResolveInto`'s conversions, the resolve destinations' separate images | Dumps: each destination against the step before; differences explained (precision) | Medium. The exponent bias (section 2) is decided here |
-| **6** | **MSAA as a player option** (`itc.toml`; off, 2x, 4x, 8x): one value for every target the game drew with MSAA (decision 4; the default to pick) | The 360's fixed sample counts | Dumps at each setting; the user | Small |
-| **7** | **The frame composed natively** (`unlocked-res.md`, "Later"): first read the upscale's pixel shader and check that nothing else reads `1ECB9000`; then the 3D view drawn into the frame (or its region) and the HUD over it | The partial-rect resolve and the upscale draw | Dumps; the user at 4K | Small to medium |
-| **8** | **The Vulkan backend behind the interface**: the Vulkan code moved under `src/render/vulkan/`, the interface free of Vulkan types; the shader blobs' format defined for other backends | Nothing at runtime | Builds and dumps identical | Medium, mechanical |
+| **2** | **Resources through the interface.** Textures and buffers made and filled when the game makes them (`XPR::GetTexture`, `Resource::Lock` and Unlock, `Mesh::Parse`, the loaders, the native texture writers), bound by handle. The Vulkan backend keeps fetch by address over its own arena until vertex input is per-stream | The mirrors, the fetch-constant-keyed texture lookups, most of memcpy's tracking | A check of every bound buffer and texture against guest memory over a drive (as `--native_renderer_verify_mirror` did); dumps identical; the hitch log | Medium |
+| **2b** | **GPU data out of guest memory** ("GPU data out of guest memory" in section 3). First the read watch: which resource data the CPU reads after a draw first uses it. Then each native writer whose data the CPU doesn't read hands it to `UpdateBuffer` or `UpdateTexture` into device-local memory and leaves guest memory unwritten (headers kept); data the CPU reads is written to both; memcpy's tracking stays for recompiled writers. Buffers and textures device-local; per-frame vertices through an upload ring | The mirrors (for native writers' data), most of the guest memory physical allocations for GPU data, vertex reads across PCIe | The read watch over a race and a drive (0 reads of moved data); dumps identical; a GPU-bound run (4K) and the render thread profile, before and after | Medium; risk in data the CPU reads that the watch didn't see |
+| **3** | **Passes into their textures.** The destination scan (section 5): each pass draws into its destination; depth maps sampled as depth; the swap and the format changes gone; the glow's steps into their own textures; grab passes as `CopyTexture`; tiling as one target. MSAA keeps the game's sample counts for now (resolved at the pass's end) | The resolve copies but the grab passes, `ResolveInto`'s conversions, the resolve destinations' separate images | Dumps: each destination against the step before; differences explained (precision) | Medium. The exponent bias (section 2) is decided here |
+| **4** | **MSAA as a player option** (`itc.toml`; off, 2x, 4x, 8x): one value for every target the game drew with MSAA (decision 4; the default to pick) | The 360's fixed sample counts | Dumps at each setting; the user | Small |
+| **5** | **The frame composed natively** (`unlocked-res.md`, "Later"): first read the upscale's pixel shader and check that nothing else reads `1ECB9000`; then the 3D view drawn into the frame (or its region) and the HUD over it | The partial-rect resolve and the upscale draw | Dumps; the user at 4K | Small to medium |
+| **6** | **The Vulkan backend behind the interface**: the Vulkan code moved under `src/render/vulkan/`, the interface free of Vulkan types; the shader blobs' format defined for other backends | Nothing at runtime | Builds and dumps identical | Medium, mechanical |
 | later | **Tick replay** (`tick-replay.md`): with draws in the interface's terms, a tick's draws kept and replayed on render-only frames | The per-draw work on ~14 of 15 frames | Its own diagnostic first | Large; needs interpolation's join keyed by draw |
 
-Step 1 is where most of the 360 machinery leaves the render path. Step 5 is where the resolves go.
+Step 1 is where most of the 360 machinery leaves the render path. Step 3 is where the resolves go.
+
+The steps were numbered 0, 1, 4, 4b, 5, 6, 7, 8 until step 1 was done
+(old steps 1-3 merged into it); renumbered 2026-11-01, so commit
+messages before then name old 4-8 for today's 2-6.
 
 ## Step 0's findings (2026-11-01, on `conventional-renderer`)
 
@@ -580,7 +584,7 @@ the frame's color and depth (pitch 1280). Each first draw neither blends
 (`RB_BLENDCONTROL` `00010001`: one and zero) nor tests depth
 (`RB_DEPTHCONTROL` `00700760`). So in this frame no pass reads what
 another target left in EDRAM, and drawing each pass into its own texture
-(step 5) keeps the same pixels. Ranges overlapping by EDRAM base only
+(step 3) keeps the same pixels. Ranges overlapping by EDRAM base only
 mean shared EDRAM, not shared data.
 
 **Section 5's cases**:
@@ -666,7 +670,7 @@ only path (`c65b3c3e`). The code:
 
 - **The interface**, `src/render/device.h`: `render::State` (plain state
   with dirty bits; the game's objects' guest addresses as handles until
-  step 4; enum values equal to the game's encodings) and
+  step 2; enum values equal to the game's encodings) and
   `render::Backend` (`DrawIndexed`, `DrawInline`, `Clear`, `Resolve`,
   `BeginTiling`, `EndTiling`; each takes the state and clears the dirty
   bits it reads).
@@ -814,12 +818,12 @@ interpolation paired, pixels within the runs' spread.
 - **Render states and formats**: the interface's mapping from the
   game's states and Xenos formats must match what the registers gave.
   That includes the main view's format switching per draw by render
-  states 308-320 (`gpu-functions.md`). Step 2's both-ways check is there
-  for this.
+  states 308-320 (`gpu-functions.md`). Step 1's both-ways check
+  (`--check_conventional_renderer`, removed) found none differing.
 - **EDRAM aliasing.** Targets are keyed by EDRAM base, pitch, format and
   MSAA, and different keys don't share memory. Drawing is right that
   way, so the game probably doesn't read one surface's EDRAM through
-  another. Drawing into destination textures (step 5) relies on it. To
+  another. Drawing into destination textures (step 3) relies on it. To
   check: log surfaces sharing an EDRAM base with different keys within
   a frame (step 0).
 - **The exponent bias** (section 2): how readers get the 1/8 scale
@@ -831,14 +835,14 @@ interpolation paired, pixels within the runs' spread.
 - **Precision differences** when a pass draws in its destination's
   format (the mirror's 8-bit target into a 10/16-bit texture): visible
   only as explained pixel differences in dumps (accepted, decision 7).
-- **CPU reads of GPU data** (step 4b): whether game code reads vertex,
+- **CPU reads of GPU data** (step 2b): whether game code reads vertex,
   index or texture data after loading it isn't known. If it does and the
   watch misses a path (one a drive didn't take), moving that data out of
   guest memory would give the game zeros or stale bytes. Writing both
   copies for anything in doubt is the safe default.
 - **Where the mirrors' memory lives**: host-visible without device-local,
   so probably system memory on a discrete GPU (not checked per driver);
-  the size of step 4b's GPU-side gain depends on it.
+  the size of step 2b's GPU-side gain depends on it.
 - **D3D11 at 10_0**: everything said about it is from the API's known
   limits, not checked.
 - **Speed**: not a goal, but the steps change the per-draw path. Step 0's
@@ -855,4 +859,4 @@ destinations and readers come from the docs' trace and dumps (one trace,
 Answered 2026-11-01 (decisions 4, 7, 8 and 9 above). Left open:
 
 1. **MSAA's default value** in `itc.toml` (off, 2x, 4x or 8x), to pick
-   at step 6.
+   at step 4.
