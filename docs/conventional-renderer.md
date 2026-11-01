@@ -1,4 +1,4 @@
-# A conventional renderer (a plan; steps 1 and 2 done)
+# A conventional renderer (a plan; steps 1 and 2 done, 2b designed)
 
 Written 2026-11-01. This is a map and a plan only. No code has changed,
 and nothing here was built, run or profiled for it. It is built from
@@ -937,6 +937,74 @@ byte stores, then the header given new data: a destroy and a create).
 glow and motion blur, a race change, the menus): "game looks fine". The
 log: 0 error lines, none bound never made, no header changed unannounced,
 no aliasing; loaded textures 23-83 MB, ~1,900-2,900 handles, no growth.
+
+## Step 2b (2026-11-01, on `conventional-renderer`; design agreed)
+
+Buffers only (the user's call, 2026-11-01): texture data stays in guest
+memory, uploaded at first bind as in step 2.
+
+**What the survey found** (2026-11-01):
+
+- **Draws read one storage buffer by address**: set 0 is the mirror, the
+  translated shaders fetch at the fetch constant's address
+  (`InterfaceRegisters` builds it from the stream header's +24,
+  `interface_registers.cpp:317`), and indexed draws bind the same mirror
+  at the index address. Past guest memory the mirror holds the built-in
+  rectangle and quad index lists and the frame's inline vertices. With
+  `mirror_by_tick`, two 512 MB host-visible mirrors.
+- **Made**: `Device::CreateVertexBuffer` and `CreateIndexBuffer`;
+  `Resource::Relocate` kinds 1, 2 and 8 (`Mesh::Parse`, its data copied
+  before the relocation; the work memory below). **Freed**:
+  `Resource::Destroy` types 1, 2, 7 and 8; `Model::Release` (the shapes'
+  block and the vertex data at `model + 20`); the streamed track sections
+  are freed and loaded again at the same header addresses.
+- **The work memory makes buffers every frame**: `WorkMem::AllocVertexBuffer`
+  (`sub_8258A9E8`, recompiled; `car-draw.md`) takes up to 1,280 headers
+  of each of two buffers (`XGSetVertexBufferHeader`, then our
+  `Relocate`), filled by `Morph::Blend` on a worker thread (a memcpy, then
+  plain stores). The mirror gets the stores only because it copies the
+  memcpy's range at the frame's start, after the job ran.
+- **The CPU reads vertex data**: `Model::MorphShape` reads the base
+  shapes' streams every frame, and the wheels' set-ups morph and write
+  over shape data. The read watch (step 0) didn't see it: it arms pages
+  only after a draw, and those base shapes are probably not drawn.
+
+**The design, in three parts:**
+
+1. **Buffers' records, nothing moved.** `BufferCreated`, `BufferWritten`
+   and `BufferDestroyed` in `render/resources.h`, by the header's address,
+   through the same queue as textures (frees one list later). Made at the
+   two `Create*Buffer` and `Relocate` kinds 1, 2 and 8; freed at
+   `Resource::Destroy` (1, 2, 7, 8) and `Model::Release` (each shape's
+   headers, as `XPR::Release` does for textures); a section loaded again
+   is the handle made again. The backend keeps handle to address and size;
+   draws still read the mirrors. A buffer bound but never made is logged
+   once with its header. Measured here: the bytes held in a race, and the
+   work memory's bytes a tick (part 2's sizes).
+2. **A device-local arena; the mirrors go.** One device-local buffer,
+   space per handle (given back when freed or made again, reused after
+   the frames in flight). `BufferCreated` and `BufferWritten` data is
+   copied from guest memory into a staging ring at the next replay's
+   start, then `vkCmdCopyBuffer` into the arena after a barrier (a write
+   in place waits for earlier frames' reads: the queue orders it, so **no
+   front and back mirrors**: `mirror_by_tick` and `mirror_to_both` go with
+   the mirrors). `InterfaceRegisters` puts the handle's arena offset in
+   fetch constant word 0 (the translated shaders unchanged); indexed draws
+   bind the arena at the handle's offset. Inline vertices in a per-frame
+   host-visible ring with its own set 0, swapped in for inline draws; the
+   built-in index lists in a small static buffer. memcpy's records stay as
+   the fallback for recompiled writers: a recorded write overlapping a
+   handle's range is its `BufferWritten` (the work memory, `Morph::Blend`'s
+   stores read at the replay's start, as the mirrors do now). Checked by:
+   a temporary per-draw compare of the arena with guest memory; dumps
+   against two runs of each build; `--log_blend_state`,
+   `--log_stepping_constants`; `--log_gpu_memory` over races; a profile;
+   a 4K run only if the user asks; a drive.
+3. **Native writers skip guest memory, narrowly.** `Mesh::Parse` hands its
+   vertex data to `UpdateBuffer` from the read buffer, keeping the guest
+   allocation (headers, addresses and frees unchanged), only for models
+   whose shapes aren't morph or skin sources; anything else writes both.
+   The gain is small (a memcpy at load); the risk is data the CPU reads.
 
 ## 7. Risks, and what's still unknown
 
