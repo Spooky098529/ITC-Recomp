@@ -37,7 +37,6 @@
 #include "transform.h"
 
 #include "base/flags.h"
-#include "render/commands.h"
 #include "base/log.h"
 
 #include <algorithm>
@@ -4333,9 +4332,8 @@ extern "C" REX_FUNC(sub_8209C6E0) {
   interpolation::GetDrawState().AfterBillboards(base);
 }
 
-// Command 7, set shader constants (render thread): r3 = payload, r4 =
-// register count, r5 = packed stage/type/start/count. Uploads the frame's
-// blend in place of the tick's camera products and lighting.
+// Command 7's times (src/render/commands.cpp runs it through
+// BlendState_ReplayConstants).
 namespace {
 std::atomic<int64_t> g_replay_total_ns = 0, g_replay_upload_ns = 0;
 }  // namespace
@@ -4346,31 +4344,9 @@ void interpolation::BlendState_TakeReplayTimes(int64_t& blend_ns, int64_t& uploa
   upload_ns = upload;
 }
 
-extern "C" REX_FUNC(sub_8258FD48) {
-  REX_FUNC_PROLOGUE();
-  uint32_t payload = ctx.r3.u32, packed = ctx.r5.u32, count = ctx.r4.u32;
-  debug::ReplayStats_OnCommand(base, 7, payload, ctx.r4.u32, packed);
-  native::Renderer_OnCommand(base, 7, payload, ctx.r4.u32, packed);
-  // --check_conventional_renderer: our handlers' state takes the same upload
-  // (src/render/commands.h).
-  render::Commands* check = render::GetCommands();
-  if (!ITC_FLAG(log_frame_times)) {
-    interpolation::BlendState_ReplayConstants(base, payload, packed, [&] {
-      __imp__sub_8258FD48(ctx, base);
-      if (check) {
-        check->SetShaderConstants(base, payload, count, packed);
-      }
-    });
-    return;
-  }
-  using Clock = std::chrono::steady_clock;
-  Clock::time_point start = Clock::now();
-  interpolation::BlendState_ReplayConstants(base, payload, packed, [&] {
-    Clock::time_point upload_start = Clock::now();
-    __imp__sub_8258FD48(ctx, base);
-    g_replay_upload_ns += (Clock::now() - upload_start).count();
-  });
-  g_replay_total_ns += (Clock::now() - start).count();
+void interpolation::BlendState_AddReplayTimes(int64_t total_ns, int64_t upload_ns) {
+  g_replay_total_ns += total_ns;
+  g_replay_upload_ns += upload_ns;
 }
 
 // The per-object recorder (~150 calls a pass in a race): r4 = camera

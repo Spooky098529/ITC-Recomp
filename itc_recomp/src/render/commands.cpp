@@ -14,16 +14,11 @@
 
 #include <algorithm>
 #include <bit>
+#include <chrono>
 #include <cstring>
 #include <set>
 
-ITC_FLAG_BOOL(conventional_renderer, false, "ITC",
-              "Draw through our own render command handlers and renderer interface instead of "
-              "the game's Direct3D (docs/conventional-renderer.md, step 1; being checked)");
-ITC_FLAG_BOOL(check_conventional_renderer, false, "ITC",
-              "Run our render command handlers beside the game's on the state alone, and log "
-              "where what the renderer would draw from them differs from what it draws from the "
-              "registers (a temporary check for --conventional_renderer)");
+ITC_FLAG_DECLARE(bool, log_frame_times);
 
 namespace render {
 
@@ -90,13 +85,8 @@ Commands g_commands;
 
 }  // namespace
 
-bool ConventionalRenderer() {
-  return ITC_FLAG(conventional_renderer);
-}
-
 Commands* GetCommands() {
-  return ITC_FLAG(conventional_renderer) || ITC_FLAG(check_conventional_renderer) ? &g_commands
-                                                                                  : nullptr;
+  return &g_commands;
 }
 
 void Commands::BeginReplay(uint8_t* base) {
@@ -748,9 +738,6 @@ void Commands::Resolve(uint8_t* base, uint32_t item) {
 uint32_t Commands::Run(uint8_t* base, uint32_t id, uint32_t payload, uint32_t count,
                        uint32_t arg2, const GameCall& call) {
   State& s = state_;
-  // Calls into game code: only when ours replace the game's handlers (the
-  // check runs both).
-  const bool conventional = ConventionalRenderer();
   auto u32 = [&](uint32_t address) { return guest::LoadU32(base, address); };
   switch (id) {
     case 1:
@@ -795,13 +782,25 @@ uint32_t Commands::Run(uint8_t* base, uint32_t id, uint32_t payload, uint32_t co
       guest::StoreU32(base, drawer_state + 28, arg2);
       return (count * (arg2 ? 4 : 2) + 15) / 16;
     }
-    case 7:
-      if (!ConventionalRenderer()) {
-        return 0;  // the check: decoded from interpolation's wrapper of the game's
+    case 7: {
+      // Interpolation's substitution, around our upload (timed with
+      // --log_frame_times).
+      if (!ITC_FLAG(log_frame_times)) {
+        interpolation::BlendState_ReplayConstants(
+            base, payload, arg2, [&] { SetShaderConstants(base, payload, count, arg2); });
+        return (arg2 >> 24) <= 1 ? count : 0;
       }
-      interpolation::BlendState_ReplayConstants(
-          base, payload, arg2, [&] { SetShaderConstants(base, payload, count, arg2); });
+      using Clock = std::chrono::steady_clock;
+      const Clock::time_point start = Clock::now();
+      int64_t upload_ns = 0;
+      interpolation::BlendState_ReplayConstants(base, payload, arg2, [&] {
+        const Clock::time_point upload_start = Clock::now();
+        SetShaderConstants(base, payload, count, arg2);
+        upload_ns = (Clock::now() - upload_start).count();
+      });
+      interpolation::BlendState_AddReplayTimes((Clock::now() - start).count(), upload_ns);
       return (arg2 >> 24) <= 1 ? count : 0;
+    }
     case 8:
       for (uint32_t i = 0; i < count; i++) {
         SetVertexShader(base, u32(payload + 16 * i));
@@ -885,7 +884,7 @@ uint32_t Commands::Run(uint8_t* base, uint32_t id, uint32_t payload, uint32_t co
       }
       return count;
     case 20:
-      for (uint32_t i = 0; conventional && i < count; i++) {
+      for (uint32_t i = 0; i < count; i++) {
         if (const uint32_t object = u32(payload + 16 * i)) {
           call(kResourceRelease, 1, object, 0, 0);
         }
@@ -894,7 +893,7 @@ uint32_t Commands::Run(uint8_t* base, uint32_t id, uint32_t payload, uint32_t co
     case 21:
       return (count + 15) / 16;
     case 22:
-      for (uint32_t i = 0; conventional && i < count; i++) {
+      for (uint32_t i = 0; i < count; i++) {
         const uint32_t item = payload + 16 * i;
         const uint32_t object = u32(item + 4);
         auto slot = [&](uint32_t n) { return u32(u32(object) + 4 * n); };
@@ -937,7 +936,7 @@ uint32_t Commands::Run(uint8_t* base, uint32_t id, uint32_t payload, uint32_t co
       LogOnce("command (not drawn)", id);
       return (count * 32 + 15) / 16;
     case 28:
-      for (uint32_t i = 0; conventional && i < count; i++) {
+      for (uint32_t i = 0; i < count; i++) {
         const uint32_t object = u32(payload + 16 * i + 4);
         LogOnce("callback command's object", object);
         call(u32(u32(object)), 2, object, u32(kDevice), 0);
@@ -1023,12 +1022,12 @@ uint32_t Commands::Run(uint8_t* base, uint32_t id, uint32_t payload, uint32_t co
       saved_viewport_ = s.viewport;
       for (uint32_t t = 0; t < kTargets; t++) {
         saved_targets_[t] = s.targets[t];
-        if (conventional && s.targets[t]) {
+        if (s.targets[t]) {
           refcount::AddRef(base, s.targets[t].address);  // as GetRenderTarget
         }
       }
       saved_depth_ = s.depth;
-      if (conventional && s.depth) {
+      if (s.depth) {
         refcount::AddRef(base, s.depth.address);
       }
       return count;
@@ -1100,7 +1099,7 @@ uint32_t Commands::RunSingle(uint8_t* base, uint32_t slot, const GameCall& call)
       return 0;
     case 28: {
       const uint32_t object = u32(slot + 4);
-      if (ConventionalRenderer()) call(u32(u32(object)), 2, object, u32(kDevice), 0);
+      call(u32(u32(object)), 2, object, u32(kDevice), 0);
       return 0;
     }
     default:

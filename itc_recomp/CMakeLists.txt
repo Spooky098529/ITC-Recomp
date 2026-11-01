@@ -568,18 +568,15 @@ set(ITC_SOURCES
     src/native/app_window.cpp
     src/native/buffers.cpp
     src/native/disk_cache.cpp
-    src/native/draw_packets.cpp
     src/native/gpu_link.cpp
     src/native/passes.cpp
     src/native/refcount.cpp
     src/native/renderer.cpp
     src/native/replay_hooks.cpp
     src/native/shaders.cpp
-    src/native/state.cpp
     src/native/textures.cpp
     src/native/vertex_fetch_patch.cpp
     src/native/interface_registers.cpp
-    src/native/interface_check.cpp
     src/render/commands.cpp
     src/native/vulkan_functions.cpp
     src/interpolation/transform.cpp

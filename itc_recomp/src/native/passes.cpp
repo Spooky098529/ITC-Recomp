@@ -14,7 +14,6 @@
 #include "buffers.h"
 #include "debug/render_watch.h"
 #include "gpu_memory.h"
-#include "interface_check.h"
 #include "interface_registers.h"
 #include "guest.h"
 #include "renderer.h"
@@ -801,8 +800,6 @@ struct Passes::State {
   };
   std::vector<CopiedRange> copied_ranges;
   uint64_t current_vertex_shader = 0, current_pixel_shader = 0;
-  uint32_t vertex_shader_patches = 0;  // g_vertex_shader_patches at the last draw
-  std::vector<std::string> declaration_lines;
   // With check_clobbers: the ranges copied this frame, by start (end,
   // index or not, the shaders of the draw that copied it), to find copies
   // that change bytes an earlier draw's copy put in the mirror (the GPU
@@ -904,27 +901,20 @@ struct Passes::State {
   // judge keying it by what the draw reads from the shader objects instead
   // of hashing the microcode (TakeShaderLookups describes it). A stage's
   // key is its object, microcode address and size, and for the vertex
-  // shader the id it's patched for, the bound declaration's and whether the
-  // patched copy is drawn. A key met before (this session) whose microcode
+  // shader our patched copy's declaration (twice: the key's layout). A key met before (this session) whose microcode
   // now hashes differently is stale: a cache by the key would have given
-  // the wrong shader. Split by whether a patch (g_vertex_shader_patches)
-  // came between.
+  // the wrong shader.
   bool log_shader_lookups = false;
   struct ShaderKey {
-    uint32_t object, microcode, size, patched_for, declaration_id, copy;
+    uint32_t object, microcode, size, patched_for, declaration_id;
   };
-  struct ShaderSeen {
-    uint64_t hash;
-    uint32_t patches;  // g_vertex_shader_patches when last seen
-  };
-  std::unordered_map<uint64_t, ShaderSeen> shaders_seen[2];  // by key hash; vertex, pixel
+  std::unordered_map<uint64_t, uint64_t> shaders_seen[2];  // the microcode's hash  // by key hash; vertex, pixel
   std::unordered_set<uint64_t> lookups_seen;  // whole lookups' key hashes
   struct ShaderLookupCounts {
-    uint64_t frames = 0, draws = 0, copies = 0, lookup_same = 0, lookup_seen = 0;
-    uint64_t same[2] = {}, seen[2] = {}, stale[2] = {}, stale_patched[2] = {};
+    uint64_t frames = 0, draws = 0, lookup_same = 0, lookup_seen = 0;
+    uint64_t same[2] = {}, seen[2] = {}, stale[2] = {};
     ShaderKey stale_sample[2] = {};
     uint64_t stale_hashes[2][2] = {};  // the sample's hash before and now
-    uint32_t patches = 0;  // g_vertex_shader_patches when last taken
   } lookup_counts;
   struct LastLookup {
     uint64_t key[2], lookup;
@@ -1016,7 +1006,6 @@ struct Passes::State {
   Target* front = nullptr;
   VkExtent2D front_extent{};
   bool logged_front = false;
-  std::unordered_set<uint64_t> logged_tilings, logged_tiled_resolves;
 
   // What's shown, and this frame's resolve destinations (for showing one).
   Image shown;
@@ -1184,15 +1173,6 @@ struct Passes::State {
   } last_constants;
   bool reuse_constants = true;
   bool log_constant_changes = false;
-  bool log_register_reads = false;
-  // ReadRegisters into regs, counted with log_register_reads.
-  void ReadState(uint8_t* base, uint32_t device) {
-    if (log_register_reads) {
-      ReadRegisters(base, device, regs, stats.register_reads);
-    } else {
-      ReadRegisters(base, device, regs);
-    }
-  }
   // Points offset at a copy of the block's size bytes in the constant
   // block in use: the last one written if the same (and reuse_constants),
   // or a new one, reserving range bytes. With copied, the bytes are
@@ -1293,8 +1273,8 @@ struct Passes::State {
   bool Reserve(VkDeviceSize size, uint32_t& offset, uint8_t*& data);
   void BeginRendering(VkCommandBuffer commands, Target* color, Target* depth);
   void Draw(VkCommandBuffer commands, uint8_t* base, uint32_t device, const DrawCall& call);
-  // The bound objects a draw, clear or resolve uses: the device's fields,
-  // or, for the conventional renderer, our interface's (render/device.h).
+  // The bound objects a draw, clear or resolve uses: our interface's
+  // (render/device.h).
   struct Bindings {
     uint32_t targets[4] = {}, depth = 0, vertex_shader = 0, pixel_shader = 0, declaration = 0,
              index_buffer = 0;
@@ -1302,7 +1282,7 @@ struct Passes::State {
     int32_t scissor_rect[4] = {};
   };
   Bindings Bound(uint8_t* base, uint32_t device) const;
-  // The conventional renderer's interface (null: draws read the device), and
+  // The conventional renderer's interface (set before the first frame), and
   // the registers made from it.
   render::State* interface = nullptr;
   InterfaceRegisters interface_registers;
@@ -1316,41 +1296,22 @@ struct Passes::State {
                    uint32_t height, float clear);
 };
 
-Passes::State::Bindings Passes::State::Bound(uint8_t* base, uint32_t device) const {
+Passes::State::Bindings Passes::State::Bound(uint8_t*, uint32_t) const {
   Bindings b;
-  if (interface) {
-    for (uint32_t i = 0; i < 4; i++) {
-      b.targets[i] = interface->targets[i].address;
-    }
-    b.depth = interface->depth.address;
-    b.vertex_shader = interface->vertex_shader.address;
-    b.pixel_shader = interface->pixel_shader.address;
-    b.declaration = interface->declaration.address;
-    b.index_buffer = interface->indices.address;
-    b.scissor = interface->scissor;
-    const render::Rect& r = interface->scissor_rect;
-    b.scissor_rect[0] = r.left;
-    b.scissor_rect[1] = r.top;
-    b.scissor_rect[2] = r.right;
-    b.scissor_rect[3] = r.bottom;
-    return b;
-  }
   for (uint32_t i = 0; i < 4; i++) {
-    b.targets[i] = guest::LoadU32(base, device + kDeviceRenderTarget0 + 4 * i);
+    b.targets[i] = interface->targets[i].address;
   }
-  b.depth = guest::LoadU32(base, device + kDeviceDepthStencil);
-  b.vertex_shader = guest::LoadU32(base, device + kDeviceVertexShader);
-  b.pixel_shader = guest::LoadU32(base, device + kDevicePixelShader);
-  b.declaration = guest::LoadU32(base, device + kDeviceVertexDeclaration);
-  b.index_buffer = guest::LoadU32(base, device + kDeviceIndexBuffer);
-  // Scissor: the window scissor registers aren't in the shadow's flushed
-  // blocks, so take it as the library keeps it: enabled by render state 200
-  // (device +11600), rectangle (left, top, right, bottom) at +12416 from
-  // SetScissorRect.
-  b.scissor = guest::LoadU32(base, device + kDeviceScissorEnable) != 0;
-  for (uint32_t k = 0; k < 4; k++) {
-    b.scissor_rect[k] = int32_t(guest::LoadU32(base, device + kDeviceScissorRect + 4 * k));
-  }
+  b.depth = interface->depth.address;
+  b.vertex_shader = interface->vertex_shader.address;
+  b.pixel_shader = interface->pixel_shader.address;
+  b.declaration = interface->declaration.address;
+  b.index_buffer = interface->indices.address;
+  b.scissor = interface->scissor;
+  const render::Rect& r = interface->scissor_rect;
+  b.scissor_rect[0] = r.left;
+  b.scissor_rect[1] = r.top;
+  b.scissor_rect[2] = r.right;
+  b.scissor_rect[3] = r.bottom;
   return b;
 }
 
@@ -2250,28 +2211,23 @@ void Passes::State::CountShaderLookup(const ShaderKey keys[2], const uint64_t ha
   ShaderLookupCounts& c = lookup_counts;
   LastLookup& last = last_lookup;
   c.draws++;
-  c.copies += keys[0].copy;
   uint64_t key_hashes[2];
   for (int stage = 0; stage < 2; stage++) {
     key_hashes[stage] = base::Hash64(&keys[stage], sizeof(ShaderKey));
     c.same[stage] += last.valid && last.key[stage] == key_hashes[stage];
-    auto [it, added] =
-        shaders_seen[stage].try_emplace(key_hashes[stage], ShaderSeen{hashes[stage], 0});
+    auto [it, added] = shaders_seen[stage].try_emplace(key_hashes[stage], hashes[stage]);
     if (!added) {
       c.seen[stage]++;
-      if (it->second.hash != hashes[stage]) {
-        bool patched = it->second.patches != g_vertex_shader_patches;
+      if (it->second != hashes[stage]) {
         c.stale[stage]++;
-        c.stale_patched[stage] += patched;
-        if (!patched && !c.stale_sample[stage].object) {
+        if (!c.stale_sample[stage].object) {
           c.stale_sample[stage] = keys[stage];
-          c.stale_hashes[stage][0] = it->second.hash;
+          c.stale_hashes[stage][0] = it->second;
           c.stale_hashes[stage][1] = hashes[stage];
         }
-        it->second.hash = hashes[stage];
+        it->second = hashes[stage];
       }
     }
-    it->second.patches = g_vertex_shader_patches;
   }
   // The whole lookup: both stages' keys and what the interface depends on.
   uint64_t lookup[4] = {key_hashes[0], key_hashes[1],
@@ -3527,47 +3483,15 @@ void Passes::State::Draw(VkCommandBuffer commands, uint8_t* base, uint32_t devic
   const uint8_t* vertex_ucode = PhysicalHostAddress(base, GpuPhysicalAddress(vertex_address));
   uint32_t vertex_size = guest::LoadU32(base, vertex_object + 600);
   uint32_t declaration = bound.declaration;
-  uint32_t declaration_id = declaration ? guest::LoadU32(base, declaration + 48) : 0;
-  uint32_t patched_for = guest::LoadU32(base, vertex_object + 24);
-  bool patched = g_vertex_shader_patches != s.vertex_shader_patches;
-  s.vertex_shader_patches = g_vertex_shader_patches;
-  // The object's microcode is patched for another declaration: the GPU runs
-  // the copy the library patched in the command buffer instead.
-  const LoadedVertexShader& loaded = g_loaded_vertex_shader;
-  bool vertex_copy = false;
-  if (!s.interface && declaration_id != patched_for && loaded.object == vertex_object &&
-      loaded.declaration_id == declaration_id && loaded.microcode.size() == vertex_size) {
-    vertex_ucode = loaded.microcode.data();
-    patched_for = declaration_id;
-    vertex_copy = true;
-    s.stats.vertex_shader_copies++;
-  }
-  if (s.interface) {
-    // Ours, patched for the declaration and the strides (the game's shader
-    // load doesn't run), kept by a number of their own; the declaration by
-    // its address (its id is the shader load's).
-    const InterfaceRegisters::PatchedShader* ours = s.interface_registers.PatchedVertexShader(
-        base, *s.interface, call.inline_vertices ? call.stride : 0);
-    vertex_ucode = ours->microcode.data();
-    vertex_size = uint32_t(ours->microcode.size());
-    vertex_address = ours->id;
-    declaration_id = declaration;
-    patched_for = declaration_id;
-  }
-  if (declaration_id != patched_for) {
-    s.stats.declaration_mismatches++;
-    s.stats.declaration_mismatches_patched += patched;
-    if (s.declaration_lines.size() < 6) {
-      s.declaration_lines.push_back(fmt::format(
-          "vs object {:08X} patched for {} ({:016X}), bound declaration {:08X} id {}; this "
-          "draw patched {}; last patch: object {:08X} declaration {:08X} id {}",
-          vertex_object, patched_for, base::Hash64(vertex_ucode, vertex_size), declaration,
-          declaration_id, patched, g_last_patch[0], g_last_patch[1], g_last_patch[2]));
-    }
-    if (!s.stats.declaration_sample[0] && !s.stats.declaration_sample[1]) {
-      s.stats.declaration_sample = {patched_for, declaration_id};
-    }
-  }
+  // Ours, patched for the declaration and the strides (src/native/
+  // vertex_fetch_patch.cpp), kept by a number of their own; the declaration
+  // by its address.
+  const InterfaceRegisters::PatchedShader* ours = s.interface_registers.PatchedVertexShader(
+      base, *s.interface, call.inline_vertices ? call.stride : 0);
+  vertex_ucode = ours->microcode.data();
+  vertex_size = uint32_t(ours->microcode.size());
+  vertex_address = ours->id;
+  const uint32_t declaration_id = declaration, patched_for = declaration;
   uint32_t pixel_address = pixel_object ? guest::LoadU32(base, pixel_object + 24) : 0;
   const uint8_t* pixel_ucode =
       pixel_object ? PhysicalHostAddress(base, GpuPhysicalAddress(pixel_address)) : nullptr;
@@ -3597,7 +3521,7 @@ void Passes::State::Draw(VkCommandBuffer commands, uint8_t* base, uint32_t devic
   // except for the patched copy (its contents change at one address) and
   // with the diagnostic that needs the hashes worked out.
   ShaderLookup lookup;
-  if (s.cache_shader_lookups && !vertex_copy && !s.log_shader_lookups) {
+  if (s.cache_shader_lookups && !s.log_shader_lookups) {
     ShaderLookupTable::Key key = {{vertex_object, vertex_address, vertex_size, patched_for,
                                    declaration_id, pixel_object, pixel_address, pixel_size,
                                    program_control, context_misc,
@@ -3628,8 +3552,8 @@ void Passes::State::Draw(VkCommandBuffer commands, uint8_t* base, uint32_t devic
   uint64_t pixel_hash = lookup.pixel_hash;
   if (s.log_shader_lookups) {
     State::ShaderKey keys[2] = {
-        {vertex_object, vertex_address, vertex_size, patched_for, declaration_id, vertex_copy},
-        {pixel_object, pixel_address, pixel_size, 0, 0, 0}};
+        {vertex_object, vertex_address, vertex_size, patched_for, declaration_id},
+        {pixel_object, pixel_address, pixel_size, 0, 0}};
     uint64_t hashes[2] = {lookup.vertex_hash, pixel_hash};
     s.CountShaderLookup(keys, hashes, program_control, context_misc, type == 1, rectangle_list);
   }
@@ -4486,89 +4410,6 @@ void Passes::State::DrawIds(VkCommandBuffer commands) {
   id_drawn = true;
 }
 
-void Passes::AfterDraw(VkCommandBuffer commands, uint8_t* base, uint32_t id, uint32_t payload,
-                       uint32_t arg1) {
-  State& s = *state_;
-  // Only indexed draws for now (command 18, 12 bytes an item).
-  if (id != 18) {
-    s.stats.unsupported += arg1;
-    return;
-  }
-  uint32_t device = guest::LoadU32(base, kDevicePointer);
-  s.ReadState(base, device);
-  for (uint32_t i = 0; i < arg1; i++) {
-    uint32_t item = payload + 12 * i;
-    DrawCall call;
-    call.type = guest::LoadU32(base, item);
-    call.base_start = guest::LoadU32(base, item + 4);
-    call.primitive_count = guest::LoadU32(base, item + 8);
-    InterfaceCheck_Draw(base, device, s.regs, false, int32_t(call.base_start) >> 16, 0);
-    s.Draw(commands, base, device, call);
-  }
-}
-
-void Passes::InlineDraw(VkCommandBuffer commands, uint8_t* base, uint32_t type, uint32_t count,
-                        uint32_t stride, uint32_t data) {
-  State& s = *state_;
-  uint32_t size = count * stride;
-  uint32_t offset = (s.inline_offset + 15) & ~15u;
-  if (!count || !stride || offset + size > s.inline_slot_size()) {
-    s.stats.failed++;
-    s.stats.failed_by[7]++;
-    return;
-  }
-  s.inline_offset = offset + size;
-  DrawCall call;
-  call.type = type;
-  call.inline_vertices = true;
-  call.vertex_count = count;
-  call.vertex_address =
-      kInlineVertices + (s.mirror_by_tick ? s.frame * s.inline_slot_size() : 0) + offset;
-  call.stride = stride;
-  std::memcpy(s.draw_mirror().mapped + call.vertex_address, base + data, size);
-  s.stats.mirrored_bytes += size;
-  uint32_t device = guest::LoadU32(base, kDevicePointer);
-  s.ReadState(base, device);
-  // What BeginVertices wrote to the GPU instead of the shadow.
-  uint32_t* fetch = &s.regs.values[XE_GPU_REG_SHADER_CONSTANT_FETCH_00_0];
-  fetch[2 * (kInlineFetchConstant - 2)] = 1;
-  fetch[2 * (kInlineFetchConstant - 2) + 1] = 0;
-  fetch[2 * (kInlineFetchConstant - 1)] = 1;
-  fetch[2 * (kInlineFetchConstant - 1) + 1] = 0;
-  fetch[2 * kInlineFetchConstant] = call.vertex_address | 3;
-  fetch[2 * kInlineFetchConstant + 1] =
-      0x10000000u | ((size / 4) << 2) | uint32_t(xenos::Endian::k8in32);
-  s.regs.values[XE_GPU_REG_VGT_INDX_OFFSET] = 0;
-  InterfaceCheck_Draw(base, device, s.regs, true, 0, stride);
-  s.Draw(commands, base, device, call);
-  // Read them from the shadow again next time.
-  static_assert((kInlineFetchConstant - 2) / 3 == kInlineFetchConstant / 3);
-  MarkFetchConstantsDirty(1ull << (63 - kInlineFetchConstant / 3));
-  MarkRegistersDirty(XE_GPU_REG_VGT_INDX_OFFSET, 1ull << 63);
-}
-
-void Passes::AfterClear(VkCommandBuffer commands, uint8_t* base, uint32_t payload,
-                        uint32_t arg1) {
-  State& s = *state_;
-  uint32_t device = guest::LoadU32(base, kDevicePointer);
-  // Command 26's item (280 bytes): +4 rect count (rects from +12), +8 flags
-  // (bits 0-3 render targets 0-3, 0x10 Z, 0x20 stencil), +268 color
-  // (D3DCOLOR), +272 Z, +276 stencil. Rects aren't kept: the whole target
-  // is cleared.
-  s.clear_reason = "command 26";
-  for (uint32_t i = 0; i < arg1; i++) {
-    uint32_t item = payload + 280 * i;
-    uint32_t flags = guest::LoadU32(base, item + 8);
-    s.stats.clears++;
-    if (guest::LoadU32(base, item + 4)) {
-      s.stats.clear_rects++;
-    }
-    s.ClearBound(commands, base, device, flags, guest::LoadU32(base, item + 268),
-                 guest::LoadU32(base, item + 272), guest::LoadU32(base, item + 276));
-  }
-  s.clear_reason = "other";
-}
-
 void Passes::State::ClearBound(VkCommandBuffer commands, uint8_t* base, uint32_t device,
                                uint32_t flags, uint32_t color, uint32_t z, uint32_t stencil) {
   State& s = *this;
@@ -4599,37 +4440,6 @@ void Passes::State::ClearBound(VkCommandBuffer commands, uint8_t* base, uint32_t
                           ((flags & 0x20) ? VK_IMAGE_ASPECT_STENCIL_BIT : 0));
       }
     }
-  }
-}
-
-void Passes::AfterResolve(VkCommandBuffer commands, uint8_t* base, uint32_t payload,
-                          uint32_t arg1) {
-  State& s = *state_;
-  uint32_t device = guest::LoadU32(base, kDevicePointer);
-  // Command 25's item (68 bytes; see "Pass command items" in
-  // docs/gpu-functions.md); its flags are State::Resolve's.
-  for (uint32_t i = 0; i < arg1; i++) {
-    uint32_t item = payload + 68 * i;
-    uint32_t fields = guest::LoadU32(base, item);
-    uint32_t flags = guest::LoadU32(base, item + 4);
-    int32_t rect[4], point[2];
-    for (uint32_t k = 0; k < 4; k++) {
-      rect[k] = int32_t(guest::LoadU32(base, item + 8 + 4 * k));
-    }
-    point[0] = int32_t(guest::LoadU32(base, item + 28));
-    point[1] = int32_t(guest::LoadU32(base, item + 32));
-    // The clear color's 4 bytes, as floats (as the handler converts them).
-    float color[4] = {};
-    for (uint32_t c = 0; (fields & 8) && c < 4; c++) {
-      color[c] = float(guest::LoadU8(base, item + 44 + c)) / 255.0f;
-    }
-    uint32_t z = guest::LoadU32(base, item + 48);
-    float clear_z;
-    std::memcpy(&clear_z, &z, 4);
-    s.Resolve(commands, base, device, flags, (fields & 1) ? rect : nullptr,
-              (fields & 2) ? guest::LoadU32(base, item + 24) : 0, (fields & 4) ? point : nullptr,
-              guest::LoadU32(base, item + 36) || guest::LoadU32(base, item + 40), color, clear_z,
-              guest::LoadU32(base, item + 52), true);
   }
 }
 
@@ -4705,36 +4515,6 @@ void Passes::State::Resolve(VkCommandBuffer commands, uint8_t* base, uint32_t de
   clear_reason = "other";
 }
 
-void Passes::BeginTiling(VkCommandBuffer commands, uint8_t* base, uint32_t payload) {
-  State& s = *state_;
-  uint32_t device = guest::LoadU32(base, kDevicePointer);
-  // Command 32's item (16 bytes): +0 flags, +4 tile count, +8 the tiles'
-  // rectangles (16 bytes each: left, top, right, bottom). The handler gives
-  // BeginTiling a clear color and Z of the float at 0x82000A34, stencil 0.
-  uint32_t flags = guest::LoadU32(base, payload);
-  uint32_t count = guest::LoadU32(base, payload + 4);
-  uint32_t rects = guest::LoadU32(base, payload + 8);
-  uint32_t width = 0, height = 0;
-  std::string tiles;
-  for (uint32_t i = 0; rects && i < count && i < 16; i++) {
-    int32_t r[4];
-    for (uint32_t k = 0; k < 4; k++) {
-      r[k] = int32_t(guest::LoadU32(base, rects + 16 * i + 4 * k));
-    }
-    width = std::max(width, uint32_t(std::max(r[2], 0)));
-    height = std::max(height, uint32_t(std::max(r[3], 0)));
-    tiles += fmt::format(" {},{}-{},{}", r[0], r[1], r[2], r[3]);
-  }
-  uint32_t clear_bits = guest::LoadU32(base, 0x82000A34);
-  float clear;
-  std::memcpy(&clear, &clear_bits, 4);
-  if (s.logged_tilings.insert(uint64_t(rects) << 32 | count).second) {
-    ITC_LOG_INFO("native renderer: begin tiling: flags {:X}, {} tiles:{}; clear color and Z {}",
-                 flags, count, tiles, clear);
-  }
-  s.BeginTiling(commands, base, device, width, height, clear);
-}
-
 void Passes::State::BeginTiling(VkCommandBuffer commands, uint8_t* base, uint32_t device,
                                 uint32_t width, uint32_t height, float clear) {
   State& s = *this;
@@ -4760,38 +4540,6 @@ void Passes::State::BeginTiling(VkCommandBuffer commands, uint8_t* base, uint32_
     }
   }
   s.clear_reason = "other";
-}
-
-void Passes::TiledResolve(VkCommandBuffer commands, uint8_t* base, uint32_t device,
-                          uint32_t flags, uint32_t rect_address, uint32_t destination,
-                          uint32_t point_address, uint32_t clear_color_address, float clear_z,
-                          uint32_t tile, uint32_t tiles) {
-  State& s = *state_;
-  int32_t rect[4], point[2];
-  for (uint32_t k = 0; rect_address && k < 4; k++) {
-    rect[k] = int32_t(guest::LoadU32(base, rect_address + 4 * k));
-  }
-  for (uint32_t k = 0; point_address && k < 2; k++) {
-    point[k] = int32_t(guest::LoadU32(base, point_address + 4 * k));
-  }
-  float color[4] = {};
-  for (uint32_t c = 0; clear_color_address && c < 4; c++) {
-    uint32_t bits = guest::LoadU32(base, clear_color_address + 4 * c);
-    std::memcpy(&color[c], &bits, 4);
-  }
-  if (s.logged_tiled_resolves.insert(uint64_t(destination) << 8 | tile).second) {
-    ITC_LOG_INFO("native renderer: tiled resolve {} of {}: flags {:08X}, rect {},{}-{},{}, to "
-                 "{:08X} at {},{}",
-                 tile + 1, tiles, flags, rect_address ? rect[0] : -1, rect_address ? rect[1] : -1,
-                 rect_address ? rect[2] : -1, rect_address ? rect[3] : -1, destination,
-                 point_address ? point[0] : -1, point_address ? point[1] : -1);
-  }
-  // The library clears the target after each tile but the last for the
-  // next tile; the whole surface is drawn at once here, so only the last
-  // tile's clears are made.
-  s.Resolve(commands, base, device, flags, rect_address ? rect : nullptr, destination,
-            point_address ? point : nullptr, false, color, clear_z, 0, tile + 1 >= tiles);
-  s.stats.tiled_resolves++;
 }
 
 void Passes::EndTiling() {
@@ -5002,9 +4750,6 @@ void Passes::set_log_constant_changes(bool log) {
   state_->log_constant_changes = log;
 }
 
-void Passes::set_log_register_reads(bool log) {
-  state_->log_register_reads = log;
-}
 
 void Passes::set_cache_index_ranges(bool cache) {
   state_->cache_index_ranges = cache;
@@ -5093,29 +4838,26 @@ std::string Passes::TakeShaderLookups() {
   double frames = double(std::max<uint64_t>(c.frames, 1));
   auto share = [](uint64_t n, uint64_t of) { return 100.0 * double(n) / double(std::max<uint64_t>(of, 1)); };
   std::string text = fmt::format(
-      "shader lookups: {:.1f} draws a frame ({:.1f} with the patched copy); the same keys as "
+      "shader lookups: {:.1f} draws a frame; the same keys as "
       "the last draw: vertex {:.1f}%, pixel {:.1f}%, whole lookup {:.1f}%; seen before: vertex "
-      "{:.1f}%, pixel {:.1f}%, whole lookup {:.1f}%; stale (seen, microcode changed): vertex {} "
-      "({} with a patch between), pixel {} ({} with a patch between); {} vertex shader patches; "
-      "keys this session: vertex {}, pixel {}, whole lookups {}",
-      c.draws / frames, c.copies / frames, share(c.same[0], c.draws), share(c.same[1], c.draws),
+      "{:.1f}%, pixel {:.1f}%, whole lookup {:.1f}%; stale (seen, microcode changed): vertex {}, "
+      "pixel {}; keys this session: vertex {}, pixel {}, whole lookups {}",
+      c.draws / frames, share(c.same[0], c.draws), share(c.same[1], c.draws),
       share(c.lookup_same, c.draws), share(c.seen[0], c.draws), share(c.seen[1], c.draws),
-      share(c.lookup_seen, c.draws), c.stale[0], c.stale_patched[0], c.stale[1],
-      c.stale_patched[1], g_vertex_shader_patches - c.patches, s.shaders_seen[0].size(),
+      share(c.lookup_seen, c.draws), c.stale[0], c.stale[1], s.shaders_seen[0].size(),
       s.shaders_seen[1].size(), s.lookups_seen.size());
   static const char* const kStage[2] = {"vertex", "pixel"};
   for (int stage = 0; stage < 2; stage++) {
     const State::ShaderKey& k = c.stale_sample[stage];
     if (k.object) {
       text += fmt::format(
-          "; stale {} sample without a patch: object {:08X} microcode {:08X} size {} patched for "
-          "{} declaration {} copy {}, hash {:016X} then {:016X}",
-          kStage[stage], k.object, k.microcode, k.size, k.patched_for, k.declaration_id, k.copy,
+          "; stale {} sample: object {:08X} microcode {:08X} size {} patched for "
+          "{} declaration {}, hash {:016X} then {:016X}",
+          kStage[stage], k.object, k.microcode, k.size, k.patched_for, k.declaration_id,
           c.stale_hashes[stage][0], c.stale_hashes[stage][1]);
     }
   }
   c = {};
-  c.patches = g_vertex_shader_patches;
   return text;
 }
 
@@ -5368,9 +5110,6 @@ void Passes::set_check_clobbers(bool check) {
   state_->check_clobbers = check;
 }
 
-std::vector<std::string> Passes::TakeDeclarationLines() {
-  return std::exchange(state_->declaration_lines, {});
-}
 
 std::string Passes::TakeClobbers() {
   State& s = *state_;

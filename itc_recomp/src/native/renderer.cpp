@@ -58,9 +58,6 @@ ITC_FLAG_BOOL(native_renderer_reuse_constants, true, "ITC",
 ITC_FLAG_BOOL(native_renderer_log_constant_changes, false, "ITC",
               "Log why draws' constants aren't reused: what differs in the fetch block, "
               "and which blocks' offsets differ when the descriptor sets repeat");
-ITC_FLAG_BOOL(native_renderer_log_register_reads, false, "ITC",
-              "Log how often the device's register shadow is read a frame, how many words "
-              "are copied (those marked dirty) and what changed since the last read");
 ITC_FLAG_BOOL(native_renderer_cache_index_ranges, true, "ITC",
               "Keep each draw's lowest and highest index until memcpy writes its index "
               "range, instead of scanning the indices every draw");
@@ -311,14 +308,6 @@ class Renderer {
   // Render thread. Returns false if the renderer can't run.
   bool Init(uint8_t* base);
   void OnCommand(uint32_t id, uint32_t arg1);
-  void AfterCommand(uint8_t* base, uint32_t id, uint32_t payload, uint32_t arg1);
-  void InlineDraw(uint8_t* base, uint32_t type, uint32_t count, uint32_t stride, uint32_t data);
-  void TiledResolve(uint8_t* base, uint32_t device, uint32_t flags, uint32_t rect,
-                    uint32_t destination, uint32_t point, uint32_t clear_color, float clear_z,
-                    uint32_t tile, uint32_t tiles) {
-    passes_.TiledResolve(BeginFrame(), base, device, flags, rect, destination, point, clear_color,
-                         clear_z, tile, tiles);
-  }
   void FrontBufferResolve(uint8_t* base, uint32_t device, uint32_t front_buffer) {
     passes_.FrontBufferResolve(BeginFrame(), base, device, front_buffer);
   }
@@ -700,13 +689,10 @@ bool Renderer::Init(uint8_t* base) {
   passes_.set_mirror_to_both(ITC_FLAG(native_renderer_mirror_to_both));
   // Our handlers draw through the backend from here on (Renderer_OnCommand
   // starts the renderer before each of them runs).
-  if (render::ConventionalRenderer()) {
-    render::Commands* commands = render::GetCommands();
-    interface_backend_ = std::make_unique<InterfaceBackend>(*this, base);
-    commands->set_backend(interface_backend_.get());
-    passes_.set_interface(&commands->state());
-    ITC_LOG_INFO("native renderer: drawing from the conventional renderer's interface");
-  }
+  render::Commands* commands = render::GetCommands();
+  interface_backend_ = std::make_unique<InterfaceBackend>(*this, base);
+  commands->set_backend(interface_backend_.get());
+  passes_.set_interface(&commands->state());
   return true;
 }
 
@@ -785,7 +771,6 @@ VkCommandBuffer Renderer::BeginFrame() {
     passes_.set_skip_repeated_state(ITC_FLAG(native_renderer_skip_repeated_state));
     passes_.set_reuse_constants(ITC_FLAG(native_renderer_reuse_constants));
     passes_.set_log_constant_changes(ITC_FLAG(native_renderer_log_constant_changes));
-    passes_.set_log_register_reads(ITC_FLAG(native_renderer_log_register_reads));
     passes_.set_log_index_ranges(ITC_FLAG(native_renderer_log_index_ranges));
     passes_.set_log_texture_bindings(ITC_FLAG(native_renderer_log_texture_bindings));
     passes_.set_log_shader_lookups(ITC_FLAG(native_renderer_log_shader_lookups));
@@ -806,30 +791,6 @@ VkCommandBuffer Renderer::BeginFrame() {
     recording_ = true;
   }
   return frame.commands;
-}
-
-void Renderer::InlineDraw(uint8_t* base, uint32_t type, uint32_t count, uint32_t stride,
-                          uint32_t data) {
-  passes_.InlineDraw(BeginFrame(), base, type, count, stride, data);
-}
-
-void Renderer::AfterCommand(uint8_t* base, uint32_t id, uint32_t payload, uint32_t arg1) {
-  // Commands 15 and 19 draw inline vertices, drawn at the library's End
-  // (Renderer_InlineDraw).
-  if (IsDraw(id) && id != 15 && id != 19) {
-    passes_.AfterDraw(BeginFrame(), base, id, payload, arg1);
-  } else if (id == 25) {
-    passes_.AfterResolve(BeginFrame(), base, payload, arg1);
-  } else if (id == 26) {
-    passes_.AfterClear(BeginFrame(), base, payload, arg1);
-  } else if (id == 32) {
-    // One item of 16 bytes per tiling begun.
-    for (uint32_t i = 0; i < arg1; i++) {
-      passes_.BeginTiling(BeginFrame(), base, payload + 16 * i);
-    }
-  } else if (id == 33) {
-    passes_.EndTiling();
-  }
 }
 
 void Renderer::EndFrame() {
@@ -1148,18 +1109,6 @@ void Renderer::LogStats() {
                    share(o[3]), share(o[4]), share(view.only_fetch_offset_differs));
     }
   }
-  if (const RegisterReadStats& r = view.register_reads; r.calls) {
-    auto share = [&](uint64_t n) { return 100.0 * double(n) / double(r.calls); };
-    const auto& b = r.blocks_changed;
-    ITC_LOG_INFO("native renderer: register reads: {:.1f} a frame, of {:.0f} words a frame {:.0f} "
-                 "copied (dirty), {:.1f} changed; {:.0f}% changed anything; changed by block: "
-                 "2000 {:.0f}%, 2100 {:.0f}%, 2180 {:.0f}%, 2200 {:.0f}%, 2280 {:.0f}%, 2300 "
-                 "{:.0f}%, 2380 {:.0f}%, fetch {:.0f}%, bool {:.0f}%, loop {:.0f}%",
-                 double(r.calls) / frames, double(r.words) / frames,
-                 double(r.words_copied) / frames, double(r.words_changed) / frames,
-                 share(r.calls_changed), share(b[0]), share(b[1]), share(b[2]), share(b[3]),
-                 share(b[4]), share(b[5]), share(b[6]), share(b[7]), share(b[8]), share(b[9]));
-  }
   if (view.constants_draws) {
     const auto& r = view.constants_reused;
     auto share = [&](uint64_t n) { return 100.0 * double(n) / double(view.constants_draws); };
@@ -1176,22 +1125,6 @@ void Renderer::LogStats() {
                    share(view.fetch_changed_vertex), share(view.fetch_changed_vertex_address),
                    share(view.fetch_changed_unread));
     }
-  }
-  if (view.vertex_shader_copies) {
-    ITC_LOG_INFO("native renderer: {:.1f} draws a frame got their vertex shader from the library's "
-                 "patched copy in the command buffer",
-                 double(view.vertex_shader_copies) / frames);
-  }
-  if (view.declaration_mismatches) {
-    ITC_LOG_INFO("native renderer: {:.1f} draws a frame had a vertex shader patched for another "
-                 "vertex declaration than the bound one ({:.1f} patched in their library call), "
-                 "e.g. {} (bound {})",
-                 double(view.declaration_mismatches) / frames,
-                 double(view.declaration_mismatches_patched) / frames, view.declaration_sample[0],
-                 view.declaration_sample[1]);
-  }
-  for (const std::string& line : passes_.TakeDeclarationLines()) {
-    ITC_LOG_INFO("native renderer: declaration mismatch: {}", line);
   }
   if (view.base_vertex_differs) {
     ITC_LOG_INFO("native renderer: {:.1f} draws a frame have a base vertex in their item other "
@@ -1275,32 +1208,6 @@ void Renderer_OnCommand(uint8_t* base, uint32_t id, uint32_t payload, uint32_t a
   Buffers_OnCommand(base, id, payload, arg1);
   if (Renderer* renderer = GetRenderer()) {
     renderer->OnCommand(id, arg1);
-  }
-}
-
-void Renderer_AfterCommand(uint8_t* base, uint32_t id, uint32_t payload, uint32_t arg1,
-                           uint32_t arg2) {
-  if (!(IsDraw(id) || id == 25 || id == 26 || id == 32 || id == 33)) {
-    return;
-  }
-  if (Renderer* renderer = GetRenderer()) {
-    renderer->AfterCommand(base, id, payload, arg1);
-  }
-}
-
-void Renderer_InlineDraw(uint8_t* base, uint32_t type, uint32_t count, uint32_t stride,
-                         uint32_t data) {
-  if (Renderer* renderer = GetRenderer()) {
-    renderer->InlineDraw(base, type, count, stride, data);
-  }
-}
-
-void Renderer_TiledResolve(uint8_t* base, uint32_t device, uint32_t flags, uint32_t rect,
-                           uint32_t destination, uint32_t point, uint32_t clear_color,
-                           float clear_z, uint32_t tile, uint32_t tiles) {
-  if (Renderer* renderer = GetRenderer()) {
-    renderer->TiledResolve(base, device, flags, rect, destination, point, clear_color, clear_z,
-                           tile, tiles);
   }
 }
 

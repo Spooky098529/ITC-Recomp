@@ -76,5 +76,8 @@ void BlendState_ReplayConstants(uint8_t* base, uint32_t payload, uint32_t packed
 // constant uploads since the last call, in ours (blending) and in the
 // uploads themselves, in nanoseconds.
 void BlendState_TakeReplayTimes(int64_t& blend_ns, int64_t& upload_ns);
+// Command 7's times (render thread, --log_frame_times): the whole of
+// BlendState_ReplayConstants and the upload inside it.
+void BlendState_AddReplayTimes(int64_t total_ns, int64_t upload_ns);
 
 }  // namespace interpolation

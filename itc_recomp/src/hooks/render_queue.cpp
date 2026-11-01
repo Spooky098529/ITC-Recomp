@@ -19,10 +19,11 @@ ITC_FLAG_BOOL(native_render_queue, true, "ITC",
               "Recording sub_8258E5F8, Replaying sub_8258E618, QueueEntry::Sequence "
               "sub_8258E5C0, Add sub_8258EDC8 with PassList::Add sub_8258EB88; PtrVector::PushBack sub_82591540 with Insert "
               "sub_825911C8, which allocates only with --native_models and the native heap; Replay sub_82591238 "
-              "with its sort and the chunk walker, the command handlers called as before, where the "
-              "native renderer's wrappers see them) natively instead of through the translated code (the same "
+              "with its sort and the chunk walker, the commands going to our own handlers, "
+              "src/render/commands.cpp) natively instead of through the translated code (the same "
               "writes; guest calls for the drawer's Init and vtable slots that aren't the "
-              "queue's own; checked by --run_harnesses=render_queue)");
+              "queue's own; checked by --run_harnesses=render_queue but the replay; off, the recompiled replay's "
+              "commands reach no renderer and nothing is drawn)");
 
 namespace rq = graphics::render_queue;
 

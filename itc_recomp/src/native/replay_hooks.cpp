@@ -1,252 +1,20 @@
-// The render command handlers (the table at 0x8265EDE0; see
-// docs/gpu-functions.md), wrapped to pass each command on before it runs.
+// The game's Direct3D calls the renderer still sees outside the render
+// commands (which our own handlers run: src/render/commands.cpp, the
+// conventional renderer, docs/conventional-renderer.md): the frame's end
+// and the library's Resolve.
 
-#include "debug/replay_stats.h"
-#include "draw_packets.h"
 #include "guest.h"
 #include "renderer.h"
-#include "state.h"
-#include "vertex_fetch_patch.h"
 
-#include "base/flags.h"
 #include "base/log.h"
 
-#include <cstring>
 #include <set>
-#include <string>
-#include <tuple>
 #include <utility>
-#include <vector>
-
-// Command handlers, wrapped so the stats logger and the native renderer
-// see every command. Command 7 (sub_8258FD48) is wrapped in blend_state.cpp.
-// Ids 0, 36 and 37 (sub_82304258) aren't wrapped: that function is also
-// used elsewhere, and they do nothing.
-#define REPLAY_COUNTED_HANDLER(address, id)                                         \
-  extern "C" REX_FUNC(sub_##address) {                                              \
-    REX_FUNC_PROLOGUE();                                                            \
-    uint32_t payload = ctx.r3.u32, arg1 = ctx.r4.u32, arg2 = ctx.r5.u32;           \
-    debug::ReplayStats_OnCommand(base, id, payload, arg1, arg2);                    \
-    native::Renderer_OnCommand(base, id, payload, arg1, arg2);                      \
-    uint32_t outer_command = native::g_current_command;                             \
-    native::g_current_command = id;                                                 \
-    native::g_command_serial++;                                                     \
-    __imp__sub_##address(ctx, base);                                                \
-    native::g_current_command = outer_command;                                      \
-    native::Renderer_AfterCommand(base, id, payload, arg1, arg2);                   \
-  }
-
-// The library's vertex shader patcher (see "Vertex declaration" in
-// docs/gpu-functions.md): counted, so the native renderer can tell whether a
-// draw's library call patched the shader's microcode.
-namespace native {
-uint32_t g_vertex_shader_patches = 0;
-uint32_t g_last_patch[3] = {};
-LoadedVertexShader g_loaded_vertex_shader;
-uint32_t g_current_command = 0;
-uint32_t g_command_serial = 0;
-}
-
-// --check_vertex_fetch_patch (temporary, for the conventional renderer's
-// port of the patcher): the library's patch, and the native one
-// (vertex_fetch_patch.cpp) on a copy of the same microcode, compared.
-ITC_FLAG_BOOL(check_vertex_fetch_patch, false, "ITC",
-              "Patch each vertex shader the graphics library patches for its declaration "
-              "(sub_822AE340) natively as well (src/native/vertex_fetch_patch.cpp) and log "
-              "where the two differ (a temporary check of the port)");
-
-namespace {
-struct PatchCheck {
-  uint64_t patches = 0, differ = 0, unread = 0;
-  std::set<std::tuple<uint32_t, uint32_t, std::vector<uint8_t>>> seen;  // (shader, declaration, strides)
-} g_patch_check;
-
-void CheckVertexFetchPatch(PPCContext& ctx, uint8_t* base) {
-  static const native::VertexFetchTables tables = [&] {
-    native::VertexFetchTables t = native::LoadVertexFetchTables(base);
-    std::string masks, sizes;
-    for (uint16_t m : t.select_masks) masks += fmt::format(" {:04X}", m);
-    for (uint8_t s : t.format_sizes) sizes += fmt::format(" {}", s);
-    ITC_LOG_INFO("vertex fetch patch: select masks{}; format sizes{}", masks, sizes);
-    return t;
-  }();
-  PatchCheck& c = g_patch_check;
-  uint32_t object = ctx.r3.u32, microcode = ctx.r4.u32, declaration = ctx.r5.u32;
-  uint8_t strides[16];
-  std::memcpy(strides, base + ctx.r6.u32, sizeof(strides));
-  uint32_t size = guest::LoadU32(base, object + 600);
-  native::GuestVertexFetchInputs inputs;
-  bool read = native::ReadGuestVertexFetchInputs(base, object, declaration, inputs);
-  std::vector<uint8_t> ours(base + microcode, base + microcode + size);
-  bool inside = read && native::PatchVertexFetches(tables, inputs.fetches(), inputs.declaration(),
-                                                   strides, ours.data(), ours.size());
-  __imp__sub_822AE340(ctx, base);
-  c.patches++;
-  if (!read) {
-    c.unread++;
-    return;
-  }
-  bool same = std::memcmp(ours.data(), base + microcode, size) == 0;
-  bool first = c.seen.insert({object, guest::LoadU32(base, declaration + 48),
-                              std::vector<uint8_t>(strides, strides + 16)})
-                   .second;
-  if (!same) {
-    c.differ++;
-    if (c.differ <= 20) {
-      std::string words;
-      for (uint32_t at = 0; at + 4 <= size; at += 4) {
-        uint32_t theirs = guest::LoadU32(base, microcode + at);
-        uint32_t mine = uint32_t(ours[at]) << 24 | uint32_t(ours[at + 1]) << 16 |
-                        uint32_t(ours[at + 2]) << 8 | ours[at + 3];
-        if (theirs != mine) {
-          words += fmt::format(" [{}] {:08X} ours {:08X};", at / 4, theirs, mine);
-        }
-      }
-      ITC_LOG_INFO("vertex fetch patch: differs: shader {:08X} ({} fetches), declaration {:08X} "
-                   "({} elements){}:{}",
-                   object, inputs.fetch_count, declaration, inputs.element_count,
-                   inside ? "" : " (out of range)", words);
-    }
-  }
-  if (first || c.patches % 1000 == 0) {
-    ITC_LOG_INFO("vertex fetch patch: {} patches, {} differ, {} unread; {} distinct (shader, "
-                 "declaration, strides)",
-                 c.patches, c.differ, c.unread, c.seen.size());
-  }
-}
-}  // namespace
-
-// When the GPU may still be using a vertex shader's microcode, the library
-// can't patch it in place: sub_822AEBF0 copies it into the command buffer
-// (IM_LOAD_IMMEDIATE) and patches the copy, leaving the object's microcode
-// (+48) and the id it's patched for (+24) as they were. The GPU then runs
-// the copy, and keeps running it while the shader isn't loaded again. So
-// the copy, once patched, is kept here for the native renderer.
-extern "C" REX_FUNC(sub_822AE340) {
-  REX_FUNC_PROLOGUE();
-  uint32_t object = ctx.r3.u32, microcode = ctx.r4.u32, declaration = ctx.r5.u32;
-  bool copy = microcode != guest::LoadU32(base, object + 48);
-  native::g_vertex_shader_patches++;
-  native::g_last_patch[0] = object;
-  native::g_last_patch[1] = declaration;
-  native::g_last_patch[2] = declaration ? guest::LoadU32(base, declaration + 48) : 0;
-  if (ITC_FLAG(check_vertex_fetch_patch)) {
-    CheckVertexFetchPatch(ctx, base);
-    return;
-  }
-  __imp__sub_822AE340(ctx, base);
-  if (copy) {
-    native::LoadedVertexShader& loaded = native::g_loaded_vertex_shader;
-    loaded.object = object;
-    loaded.declaration_id = declaration ? guest::LoadU32(base, declaration + 48) : 0;
-    uint32_t size = guest::LoadU32(base, object + 600);
-    loaded.microcode.assign(base + microcode, base + microcode + size);
-  } else {
-    native::g_loaded_vertex_shader.object = 0;  // the object's own, patched in place
-  }
-}
-
-// Inline vertex draws (DrawPrimitiveUP, command 19, and the helper object's
-// draws, command 15; see "Inline vertex draws" in docs/gpu-functions.md):
-// BeginVertices (sub_825BD8F0: device, primitive type, vertex count, stride
-// in bytes) returns where in the command buffer the caller copies the
-// vertices; End (sub_825BDDA0) follows the copy, so the native renderer
-// draws them then.
-namespace {
-struct PendingInline {
-  bool pending = false;
-  uint32_t type, count, stride, data, caller;
-} g_pending_inline;
-// Library calls that draw or resolve made outside a replayed command (e.g.
-// the front buffer resolve), logged once per function and caller.
-std::set<std::pair<uint32_t, uint32_t>> g_logged_outside;
-void LogOutside(const char* what, uint32_t function, uint32_t caller, uint32_t command) {
-  if (!g_logged_outside.insert({function, caller}).second) {
-    return;
-  }
-  ITC_LOG_INFO("native renderer: {} ({:08X}) called from {:08X} in command {}{}", what, function,
-               caller, command, command ? "" : " (outside the command list)");
-}
-}  // namespace
-
-extern "C" REX_FUNC(sub_825BD8F0) {
-  REX_FUNC_PROLOGUE();
-  uint32_t type = ctx.r4.u32, count = ctx.r5.u32, stride = ctx.r6.u32;
-  uint32_t caller = uint32_t(ctx.lr);
-  __imp__sub_825BD8F0(ctx, base);
-  g_pending_inline = {ctx.r3.u32 != 0, type, count, stride, ctx.r3.u32, caller};
-}
-
-extern "C" REX_FUNC(sub_825BDDA0) {
-  REX_FUNC_PROLOGUE();
-  PendingInline draw = g_pending_inline;
-  g_pending_inline.pending = false;
-  if (draw.pending) {
-    uint32_t command = native::g_current_command;
-    if (command == 15 || command == 19) {
-      native::Renderer_InlineDraw(base, draw.type, draw.count, draw.stride, draw.data);
-    } else {
-      LogOutside("an inline vertex draw, not drawn, BeginVertices", 0x825BD8F0, draw.caller,
-                 command);
-    }
-  }
-  __imp__sub_825BDDA0(ctx, base);
-}
-
-REPLAY_COUNTED_HANDLER(8258FBD0, 1)
-REPLAY_COUNTED_HANDLER(8258FC30, 2)
-REPLAY_COUNTED_HANDLER(8258FC90, 3)
-REPLAY_COUNTED_HANDLER(8258FCE0, 4)
-REPLAY_COUNTED_HANDLER(8258E9F8, 5)
-REPLAY_COUNTED_HANDLER(8258EA20, 6)
-REPLAY_COUNTED_HANDLER(8258FF50, 8)
-REPLAY_COUNTED_HANDLER(8258FFA0, 9)
-REPLAY_COUNTED_HANDLER(8258FFF0, 10)
-REPLAY_COUNTED_HANDLER(82590040, 11)
-REPLAY_COUNTED_HANDLER(825900B8, 12)
-REPLAY_COUNTED_HANDLER(8258EA58, 13)  // also 14: one handler
-REPLAY_COUNTED_HANDLER(82590108, 15)
-REPLAY_COUNTED_HANDLER(825901B0, 16)
-REPLAY_COUNTED_HANDLER(82590268, 17)
-REPLAY_COUNTED_HANDLER(825902E0, 18)
-REPLAY_COUNTED_HANDLER(82590360, 19)
-REPLAY_COUNTED_HANDLER(825903D8, 20)
-REPLAY_COUNTED_HANDLER(8258EAD0, 21)
-REPLAY_COUNTED_HANDLER(82591798, 22)
-REPLAY_COUNTED_HANDLER(82590428, 23)
-REPLAY_COUNTED_HANDLER(82590478, 24)
-REPLAY_COUNTED_HANDLER(825904C8, 25)
-REPLAY_COUNTED_HANDLER(82590620, 26)
-REPLAY_COUNTED_HANDLER(82590698, 27)
-REPLAY_COUNTED_HANDLER(8258EAE0, 28)
-REPLAY_COUNTED_HANDLER(82590768, 29)
-REPLAY_COUNTED_HANDLER(82590860, 30)
-REPLAY_COUNTED_HANDLER(825908E0, 31)
-REPLAY_COUNTED_HANDLER(82590968, 32)
-REPLAY_COUNTED_HANDLER(825909E8, 33)
-REPLAY_COUNTED_HANDLER(82590A68, 34)
-REPLAY_COUNTED_HANDLER(82590AD0, 35)
-
-
-// The chain walker (sub_8258EE98) also has items of single commands, a
-// slot each ([id, arguments]), dispatched by sub_8258E630 through a second
-// table at 0x8265ED48 with the same ids. In a race only 5, 7, 13 and 15
-// come this way (a few a frame: the minimap's player triangle). Its 15,
-// the helper object's draw, is marked as command 15 so the native renderer
-// draws its inline vertices; the others reach the device's shadow, which
-// the renderer reads anyway.
-extern "C" REX_FUNC(sub_8258F5C0) {
-  REX_FUNC_PROLOGUE();
-  uint32_t outer_command = native::g_current_command;
-  native::g_current_command = 15;
-  __imp__sub_8258F5C0(ctx, base);
-  native::g_current_command = outer_command;
-}
 
 // The frame's end (see "The end of a frame" in docs/gpu-functions.md):
 // sub_8258D998(video output) resolves render target 0 into one of two front
 // buffer textures (video output + 4 * (68 + *(+268))) with the library's
-// Resolve, outside command 25; the native renderer shows that target.
+// Resolve, outside the command list; the native renderer shows that target.
 extern "C" REX_FUNC(sub_8258D998) {
   REX_FUNC_PROLOGUE();
   uint32_t video_output = ctx.r3.u32;
@@ -256,49 +24,16 @@ extern "C" REX_FUNC(sub_8258D998) {
   __imp__sub_8258D998(ctx, base);
 }
 
-// The library's other draws and Resolve: logged when called outside the
-// commands that are known to make them (18, 17, 27, 25).
-#define LOG_OUTSIDE_WRAPPER(address, what, expected)                                  \
-  extern "C" REX_FUNC(sub_##address) {                                                \
-    REX_FUNC_PROLOGUE();                                                              \
-    if (native::g_current_command != (expected)) {                                    \
-      LogOutside(what, 0x##address, uint32_t(ctx.lr), native::g_current_command);     \
-    }                                                                                 \
-    __imp__sub_##address(ctx, base);                                                  \
-  }
-LOG_OUTSIDE_WRAPPER(825BE300, "DrawVertices", 17)
-LOG_OUTSIDE_WRAPPER(825BDDC0, "BeginIndexedVertices", 27)
-
-// DrawIndexedVertices: in exclusive mode without its packets (see
-// draw_packets.cpp).
-extern "C" REX_FUNC(sub_825BE708) {
-  REX_FUNC_PROLOGUE();
-  if (native::g_current_command != 18) {
-    LogOutside("DrawIndexedVertices", 0x825BE708, uint32_t(ctx.lr), native::g_current_command);
-  }
-  native::DrawPackets_IndexedDraw(ctx, base);
-}
-
-// The library's Resolve (r3 device, r4 flags, r5 source rect, r6
-// destination texture, r7 destination point, r8 level, r9 slice, r10 clear
-// color as 4 floats, f1 clear Z). Command 25's are handled from its items;
-// command 33 (EndTiling, see "Predicated tiling" in docs/gpu-functions.md)
-// makes one per tile (the tile count at device +12488), passed on here.
+// The library's Resolve (r3 device, r4 flags, ...): only the frame's end
+// calls it now; each caller logged once. The front buffer's ("called from
+// 8258D9E8") marks the boot's end for scripted_run.sh.
 extern "C" REX_FUNC(sub_822AFA58) {
   REX_FUNC_PROLOGUE();
-  static uint32_t serial = 0, tile = 0;
-  uint32_t command = native::g_current_command;
-  if (command == 33) {
-    if (serial != native::g_command_serial) {
-      serial = native::g_command_serial;
-      tile = 0;
-    }
-    uint32_t device = ctx.r3.u32;
-    native::Renderer_TiledResolve(base, device, ctx.r4.u32, ctx.r5.u32, ctx.r6.u32, ctx.r7.u32,
-                                  ctx.r10.u32, float(ctx.f1.f64), tile++,
-                                  guest::LoadU32(base, device + 12488));
-  } else if (command != 25) {
-    LogOutside("Resolve", 0x822AFA58, uint32_t(ctx.lr), command);
+  static std::set<uint32_t> logged;
+  if (logged.insert(uint32_t(ctx.lr)).second) {
+    ITC_LOG_INFO("native renderer: Resolve ({:08X}) called from {:08X} in command 0 (outside the "
+                 "command list)",
+                 0x822AFA58, uint32_t(ctx.lr));
   }
   __imp__sub_822AFA58(ctx, base);
 }

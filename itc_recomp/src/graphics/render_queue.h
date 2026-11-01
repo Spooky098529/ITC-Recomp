@@ -4,10 +4,11 @@
 // render targets and depth surface Init keeps, +68 the release list, +84
 // the submission sequence) and its two pass lists (+8, +12). Every read and
 // write is the original's, in its order. Calls to code still recompiled (the
-// drawer's Init, the render command handlers of the tables 0x8265EDE0 and
-// 0x8265ED48, the release list's objects, a vtable slot that isn't the
+// drawer's Init, the release list's objects, a vtable slot that isn't the
 // queue's own) are guest calls through `call`, from frames made where the
-// originals make theirs. Adapters: src/hooks/render_queue.cpp
+// originals make theirs. The render commands go to our own handlers
+// (src/render/commands.h, the conventional renderer) instead of the tables
+// 0x8265EDE0 and 0x8265ED48. Adapters: src/hooks/render_queue.cpp
 // (--native_render_queue).
 
 #pragma once

@@ -15,11 +15,9 @@
 // the retire list's objects, callbacks, a drawer other than the primitive
 // drawer) are guest calls through `GameCall`.
 //
-// --conventional_renderer: the handlers run instead of the recompiled ones
-// and the Vulkan renderer draws from the interface. Off (the default), with
-// --check_conventional_renderer, they run beside the recompiled ones on the
-// state alone, and the renderer compares what it would draw from the
-// interface with what it draws from the registers (a temporary check).
+// The render queue's replay (src/graphics/render_queue.cpp) runs these
+// instead of the recompiled handlers, and the Vulkan renderer draws from
+// the interface (its backend, src/native/renderer.cpp).
 
 #pragma once
 
@@ -100,10 +98,7 @@ class Commands {
   uint64_t unhandled_patch_records_ = 0;
 };
 
-// The handlers in use (null when neither the conventional renderer nor its
-// check is on).
+// The handlers (render thread).
 Commands* GetCommands();
-// Whether the handlers replace the recompiled ones (--conventional_renderer).
-bool ConventionalRenderer();
 
 }  // namespace render

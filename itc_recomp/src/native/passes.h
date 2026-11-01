@@ -33,33 +33,14 @@ class Passes {
 
   // Render thread. Before a frame's first command.
   void BeginFrame(uint32_t frame_index);
-  // After a draw command's library call (the device's shadow is complete).
-  void AfterDraw(VkCommandBuffer commands, uint8_t* base, uint32_t id, uint32_t payload,
-                 uint32_t arg1);
-  // A draw of vertices given inline (DrawPrimitiveUP, command 19, and the
-  // helper object's draws, command 15): at the library's End
-  // (sub_825BDDA0), when the vertices have been copied to `data` (a guest
-  // address) and the device's shadow holds the draw's state. type: the
-  // primitive type; count: vertices; stride in bytes.
-  void InlineDraw(VkCommandBuffer commands, uint8_t* base, uint32_t type, uint32_t count,
-                  uint32_t stride, uint32_t data);
-  // After a clear (26) or resolve (25) command's library call.
-  void AfterClear(VkCommandBuffer commands, uint8_t* base, uint32_t payload, uint32_t arg1);
-  void AfterResolve(VkCommandBuffer commands, uint8_t* base, uint32_t payload, uint32_t arg1);
-  // Predicated tiling (see "Predicated tiling" in docs/gpu-functions.md):
-  // after command 32 (BeginTiling); each Resolve the library's EndTiling
-  // (command 33) makes, tile of tiles, with its arguments (guest addresses
-  // of the rectangle, point and clear color, 0 if none); after command 33.
-  void BeginTiling(VkCommandBuffer commands, uint8_t* base, uint32_t payload);
-  void TiledResolve(VkCommandBuffer commands, uint8_t* base, uint32_t device, uint32_t flags,
-                    uint32_t rect, uint32_t destination, uint32_t point, uint32_t clear_color,
-                    float clear_z, uint32_t tile, uint32_t tiles);
+  // Predicated tiling's end (command 33): see InterfaceBeginTiling.
   void EndTiling();
   // The conventional renderer (render/device.h, docs/conventional-renderer.md
-  // step 1): draws, clears, resolves and tiling from our interface's state,
-  // the registers made from it (interface_registers.h) instead of read from
-  // the device. set_interface also has FrontBufferResolve and DrawMovie take
-  // render target 0 from it (null: the device).
+  // step 1): draws, clears, resolves and tiling (see "Predicated tiling" in
+  // docs/gpu-functions.md) from our interface's state, with the translator's
+  // registers made from it (interface_registers.h). set_interface, before
+  // the first frame, is the state everything binds from (FrontBufferResolve
+  // and DrawMovie take render target 0 from it too).
   void set_interface(render::State* state);
   void InterfaceDraw(VkCommandBuffer commands, uint8_t* base, render::State& state,
                      const render::DrawIndexed& draw);
@@ -134,7 +115,6 @@ class Passes {
   // Counts why constants aren't reused (Stats::fetch_changed and
   // offset_differs; a diagnostic, off by default).
   void set_log_constant_changes(bool log);
-  void set_log_register_reads(bool log);
   // A diagnostic: how often each draw's index range is scanned again
   // unchanged, and how the mirror's checks go; TakeIndexRanges describes
   // them since it was last called.
@@ -178,8 +158,6 @@ class Passes {
   // ones); TakeClobbers describes them.
   void set_check_clobbers(bool check);
   std::string TakeClobbers();
-  // Examples of draws counted in Stats::declaration_mismatches.
-  std::vector<std::string> TakeDeclarationLines();
   std::string TakeMirrorChanges();
   // A debugging aid: compare each main view draw's inputs with the same
   // draw's in the previous frame; TakeWatchLines gives how many changed (of
@@ -246,14 +224,6 @@ class Passes {
     // Draws with indices outside VGT_MIN/MAX_VTX_INDX (the shader clamps
     // them), and an example: lowest and highest index, the registers.
     uint64_t clamped_draws = 0, param_gen_draws = 0;
-    // Draws whose vertex shader's microcode, when read, was patched for
-    // another vertex declaration than the bound one, and an example (the
-    // shader's declaration id, the bound one's).
-    // Of those, draws whose library call patched a vertex shader.
-    uint64_t declaration_mismatches = 0, declaration_mismatches_patched = 0;
-    // Draws given the vertex shader copy the library patched in the
-    // command buffer (the object's own being patched for another declaration).
-    uint64_t vertex_shader_copies = 0;
     // Inline vertex draws drawn (also counted in drawn), and by primitive
     // type (4, 6, 8 rectangle list, 13 quad list).
     uint64_t inline_draws = 0;
@@ -281,7 +251,6 @@ class Passes {
     uint64_t offsets_differ = 0, only_fetch_offset_differs = 0;
     uint64_t fetch_changed = 0, fetch_changed_texture = 0, fetch_changed_vertex = 0,
              fetch_changed_vertex_address = 0, fetch_changed_unread = 0;
-    std::array<uint32_t, 2> declaration_sample{};
     std::array<uint32_t, 4> clamped_sample{};
     std::array<uint32_t, 2> base_vertex_sample{};
     std::array<uint32_t, 5> vertex_overrun_sample{};
@@ -293,8 +262,6 @@ class Passes {
     // Predicated tilings begun, and the resolves their ends made.
     uint64_t tilings = 0, tiled_resolves = 0;
     uint32_t resolve_flags_sample = 0;
-    // With log_register_reads.
-    RegisterReadStats register_reads;
     TextureCache::Stats textures;
   };
   Stats TakeStats();
