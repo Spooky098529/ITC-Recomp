@@ -346,6 +346,9 @@ class Renderer {
                                              clear);
     }
     void EndTiling(render::State&) override { renderer_.passes_.EndTiling(); }
+    void PassPlanned(const render::PassPlan& plan) override {
+      renderer_.passes_.PassPlanned(plan);
+    }
     void TextureCreated(render::Texture texture) override {
       renderer_.passes_.TextureCreated(texture.address);
     }
@@ -1015,6 +1018,14 @@ void Renderer::LogStats() {
                double(view.depth_biased) / frames, double(view.depth_equal) / frames,
                view.resolve_unknown_flags, view.resolve_flags_sample, view.tilings,
                view.tiled_resolves);
+  ITC_LOG_INFO("native renderer: pass plan: per frame {:.1f} resolves drawn into, {:.1f} "
+               "multisample resolves, {:.1f} copies, {:.1f} skipped; {} not as planned, {} "
+               "lists planned without a whole walk",
+               double(view.planned_kinds[size_t(render::ResolveKind::kDrawnInto)]) / frames,
+               double(view.planned_kinds[size_t(render::ResolveKind::kMultisample)]) / frames,
+               double(view.planned_kinds[size_t(render::ResolveKind::kCopy)]) / frames,
+               double(view.planned_kinds[size_t(render::ResolveKind::kSkipped)]) / frames,
+               view.plan_mismatches, view.plans_incomplete);
   frames_presented_ = frames_skipped_ = commands_ = draws_ = 0;
   const TextureCache::Stats& t = view.textures;
   ITC_LOG_INFO("native renderer: textures: {} ({} samplers); {} loaded, {} reloaded, {:.1f} MB "

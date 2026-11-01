@@ -735,7 +735,7 @@ void Commands::Resolve(uint8_t* base, uint32_t item) {
   }
 }
 
-uint32_t Commands::Run(uint8_t* base, uint32_t id, uint32_t payload, uint32_t count,
+void Commands::Execute(uint8_t* base, uint32_t id, uint32_t payload, uint32_t count,
                        uint32_t arg2, const GameCall& call) {
   State& s = state_;
   auto u32 = [&](uint32_t address) { return guest::LoadU32(base, address); };
@@ -744,13 +744,13 @@ uint32_t Commands::Run(uint8_t* base, uint32_t id, uint32_t payload, uint32_t co
       for (uint32_t i = 0; i < count; i++) {
         SetRenderState(base, u32(payload + 16 * i), u32(payload + 16 * i + 4));
       }
-      return count;
+      return;
     case 2:
       for (uint32_t i = 0; i < count; i++) {
         SetSamplerState(base, u32(payload + 16 * i), u32(payload + 16 * i + 4),
                         u32(payload + 16 * i + 8));
       }
-      return count;
+      return;
     case 3:
       for (uint32_t i = 0; i < count; i++) {
         const uint32_t target = u32(payload + 16 * i);
@@ -759,7 +759,7 @@ uint32_t Commands::Run(uint8_t* base, uint32_t id, uint32_t payload, uint32_t co
         }
       }
       UpdateBlend();
-      return count;
+      return;
     case 4:
       for (uint32_t i = 0; i < count; i++) {
         const uint32_t stage = u32(payload + 16 * i);
@@ -768,19 +768,19 @@ uint32_t Commands::Run(uint8_t* base, uint32_t id, uint32_t payload, uint32_t co
         }
       }
       s.dirty |= kDirtyTextures;
-      return count;
+      return;
     case 5: {
       const uint32_t drawer_state = u32(kDrawerState);
       guest::StoreU32(base, drawer_state + 12, payload);
       guest::StoreU32(base, drawer_state + 16, count);
-      return (count * 24 + 15) / 16;
+      return;
     }
     case 6: {
       const uint32_t drawer_state = u32(kDrawerState);
       guest::StoreU32(base, drawer_state + 20, payload);
       guest::StoreU32(base, drawer_state + 24, count);
       guest::StoreU32(base, drawer_state + 28, arg2);
-      return (count * (arg2 ? 4 : 2) + 15) / 16;
+      return;
     }
     case 7: {
       // Interpolation's substitution, around our upload (timed with
@@ -788,7 +788,7 @@ uint32_t Commands::Run(uint8_t* base, uint32_t id, uint32_t payload, uint32_t co
       if (!ITC_FLAG(log_frame_times)) {
         interpolation::BlendState_ReplayConstants(
             base, payload, arg2, [&] { SetShaderConstants(base, payload, count, arg2); });
-        return (arg2 >> 24) <= 1 ? count : 0;
+        return;
       }
       using Clock = std::chrono::steady_clock;
       const Clock::time_point start = Clock::now();
@@ -799,24 +799,24 @@ uint32_t Commands::Run(uint8_t* base, uint32_t id, uint32_t payload, uint32_t co
         upload_ns = (Clock::now() - upload_start).count();
       });
       interpolation::BlendState_AddReplayTimes((Clock::now() - start).count(), upload_ns);
-      return (arg2 >> 24) <= 1 ? count : 0;
+      return;
     }
     case 8:
       for (uint32_t i = 0; i < count; i++) {
         SetVertexShader(base, u32(payload + 16 * i));
       }
-      return count;
+      return;
     case 9:
       for (uint32_t i = 0; i < count; i++) {
         SetPixelShader(base, u32(payload + 16 * i));
       }
-      return count;
+      return;
     case 10:
       for (uint32_t i = 0; i < count; i++) {
         s.declaration.address = u32(payload + 16 * i);
       }
       s.dirty |= kDirtyShaders;
-      return count;
+      return;
     case 11:
       for (uint32_t i = 0; i < count; i++) {
         const uint32_t item = payload + 16 * i;
@@ -826,13 +826,13 @@ uint32_t Commands::Run(uint8_t* base, uint32_t id, uint32_t payload, uint32_t co
         }
       }
       s.dirty |= kDirtyStreams | kDirtyShaders;
-      return count;
+      return;
     case 12:
       for (uint32_t i = 0; i < count; i++) {
         s.indices.address = u32(payload + 16 * i);
       }
       s.dirty |= kDirtyIndices;
-      return count;
+      return;
     case 13:
     case 14:
       for (uint32_t i = 0; i < count; i++) {
@@ -854,18 +854,18 @@ uint32_t Commands::Run(uint8_t* base, uint32_t id, uint32_t payload, uint32_t co
           LogOnce("drawer vtable at set-up", u32(drawer));
         }
       }
-      return count;
+      return;
     case 15:
       for (uint32_t i = 0; i < count; i++) {
         DrawDrawer(base, call, false);
       }
-      return count;
+      return;
     case 16:
       LogOnce("command (not drawn)", id);
-      return count;
+      return;
     case 17:
       LogOnce("command (not drawn)", id);
-      return count;
+      return;
     case 18:
       for (uint32_t i = 0; i < count; i++) {
         const uint32_t item = payload + 12 * i;
@@ -875,23 +875,23 @@ uint32_t Commands::Run(uint8_t* base, uint32_t id, uint32_t payload, uint32_t co
                                     base_start & 0xFFFF, u32(item + 8)});
         }
       }
-      return count;
+      return;
     case 19:
       for (uint32_t i = 0; i < count; i++) {
         const uint32_t item = payload + 12 * i;
         InlineDraw(base, u32(item), u32(item + 8), guest::LoadU16(base, item + 4),
                    guest::LoadU16(base, item + 6));
       }
-      return count;
+      return;
     case 20:
       for (uint32_t i = 0; i < count; i++) {
         if (const uint32_t object = u32(payload + 16 * i)) {
           call(kResourceRelease, 1, object, 0, 0);
         }
       }
-      return count;
+      return;
     case 21:
-      return (count + 15) / 16;
+      return;
     case 22:
       for (uint32_t i = 0; i < count; i++) {
         const uint32_t item = payload + 16 * i;
@@ -903,22 +903,22 @@ uint32_t Commands::Run(uint8_t* base, uint32_t id, uint32_t payload, uint32_t co
           call(slot(3), 1, object, 0, 0);
         }
       }
-      return count;
+      return;
     case 23:
       for (uint32_t i = 0; i < count; i++) {
         SetRenderTarget(base, u32(payload + 16 * i), u32(payload + 16 * i + 4));
       }
-      return count;
+      return;
     case 24:
       for (uint32_t i = 0; i < count; i++) {
         SetDepthStencilSurface(base, u32(payload + 16 * i));
       }
-      return count;
+      return;
     case 25:
       for (uint32_t i = 0; i < count; i++) {
         Resolve(base, payload + 68 * i);
       }
-      return (count * 68 + 15) / 16;
+      return;
     case 26:
       for (uint32_t i = 0; i < count; i++) {
         const uint32_t item = payload + 280 * i;
@@ -931,17 +931,17 @@ uint32_t Commands::Run(uint8_t* base, uint32_t id, uint32_t payload, uint32_t co
           backend_->Clear(s, c);
         }
       }
-      return (count * 280 + 15) / 16;
+      return;
     case 27:
       LogOnce("command (not drawn)", id);
-      return (count * 32 + 15) / 16;
+      return;
     case 28:
       for (uint32_t i = 0; i < count; i++) {
         const uint32_t object = u32(payload + 16 * i + 4);
         LogOnce("callback command's object", object);
         call(u32(u32(object)), 2, object, u32(kDevice), 0);
       }
-      return count;
+      return;
     case 29:
       for (uint32_t i = 0; i < count; i++) {
         // [0x82970BC0]: the set RenderQueue::Init kept (the queue state's +48).
@@ -955,7 +955,7 @@ uint32_t Commands::Run(uint8_t* base, uint32_t id, uint32_t payload, uint32_t co
           SetDepthStencilSurface(base, u32(saved + 16));
         }
       }
-      return count;
+      return;
     case 30:
       for (uint32_t i = 0; i < count; i++) {
         const uint32_t item = payload + 16 * i;
@@ -963,7 +963,7 @@ uint32_t Commands::Run(uint8_t* base, uint32_t id, uint32_t payload, uint32_t co
                     guest::LoadU16(base, item + 4), guest::LoadU16(base, item + 6),
                     guest::LoadFloat(base, item + 8), guest::LoadFloat(base, item + 12), base);
       }
-      return count;
+      return;
     case 31:
       for (uint32_t i = 0; i < count; i++) {
         const uint32_t item = payload + 8 * i;
@@ -973,7 +973,7 @@ uint32_t Commands::Run(uint8_t* base, uint32_t id, uint32_t payload, uint32_t co
                           int16_t(guest::LoadU16(base, item + 6))};
       }
       s.dirty |= kDirtyScissor;
-      return count;
+      return;
     case 32:
       for (uint32_t i = 0; i < count; i++) {
         // [flags, tile count, tile rects (left, top, right, bottom)]
@@ -989,7 +989,7 @@ uint32_t Commands::Run(uint8_t* base, uint32_t id, uint32_t payload, uint32_t co
           backend_->BeginTiling(s, tiling_width_, tiling_height_, guest::LoadFloat(base, kZero));
         }
       }
-      return count;
+      return;
     case 33:
       for (uint32_t i = 0; i < count; i++) {
         // [flags, destination]: a resolve of each tile into its place.
@@ -1017,7 +1017,7 @@ uint32_t Commands::Run(uint8_t* base, uint32_t id, uint32_t payload, uint32_t co
           backend_->EndTiling(s);
         }
       }
-      return count;
+      return;
     case 34:
       saved_viewport_ = s.viewport;
       for (uint32_t t = 0; t < kTargets; t++) {
@@ -1030,7 +1030,7 @@ uint32_t Commands::Run(uint8_t* base, uint32_t id, uint32_t payload, uint32_t co
       if (s.depth) {
         refcount::AddRef(base, s.depth.address);
       }
-      return count;
+      return;
     case 35:
       for (uint32_t t = 0; t < kTargets; t++) {
         SetRenderTarget(base, t, saved_targets_[t].address);
@@ -1038,9 +1038,36 @@ uint32_t Commands::Run(uint8_t* base, uint32_t id, uint32_t payload, uint32_t co
       SetDepthStencilSurface(base, saved_depth_.address);
       SetViewport(saved_viewport_.x, saved_viewport_.y, saved_viewport_.width,
                   saved_viewport_.height, saved_viewport_.min_z, saved_viewport_.max_z, base);
-      return count;
+      return;
     default:
       LogOnce("unknown command", id);
+      return;
+  }
+}
+
+uint32_t Commands::Run(uint8_t* base, uint32_t id, uint32_t payload, uint32_t count,
+                       uint32_t arg2, const GameCall& call) {
+  Execute(base, id, payload, count, arg2, call);
+  return Slots(id, count, arg2);
+}
+
+uint32_t Commands::Slots(uint32_t id, uint32_t count, uint32_t arg2) {
+  switch (id) {
+    case 5:
+      return (count * 24 + 15) / 16;
+    case 6:
+      return (count * (arg2 ? 4 : 2) + 15) / 16;
+    case 7:
+      return (arg2 >> 24) <= 1 ? count : 0;
+    case 21:
+      return (count + 15) / 16;
+    case 25:
+      return (count * 68 + 15) / 16;
+    case 26:
+      return (count * 280 + 15) / 16;
+    case 27:
+      return (count * 32 + 15) / 16;
+    default:
       return count;
   }
 }

@@ -22,9 +22,12 @@
 #pragma once
 
 #include "render/device.h"
+#include "render/pass_plan.h"
 
 #include <cstdint>
 #include <functional>
+#include <utility>
+#include <vector>
 
 namespace render {
 
@@ -39,6 +42,15 @@ class Commands {
   // and arg2; returns the slots its payload took (the handler's r3).
   uint32_t Run(uint8_t* base, uint32_t id, uint32_t payload, uint32_t count, uint32_t arg2,
                const GameCall& call);
+  // The slots command `id`'s payload takes (what Run returns).
+  static uint32_t Slots(uint32_t id, uint32_t count, uint32_t arg2);
+  // The frame's pass plan (render/pass_plan.h), scanned before the replay
+  // from the handlers' state: BeginPlan, each command in the replay's
+  // order, then EndPlan (complete: the whole list was walked), which hands
+  // it to the backend (render/pass_plan.cpp).
+  void BeginPlan();
+  void PlanCommand(uint8_t* base, uint32_t id, uint32_t payload, uint32_t count, uint32_t arg2);
+  void EndPlan(bool complete);
   // A single command (the table at 0x8265ED48) at `slot`; returns the
   // slots after it its items took.
   uint32_t RunSingle(uint8_t* base, uint32_t slot, const GameCall& call);
@@ -47,8 +59,14 @@ class Commands {
   void SetShaderConstants(uint8_t* base, uint32_t payload, uint32_t count, uint32_t packed);
 
   State& state() { return state_; }
-  // Null: the state alone (the check).
-  void set_backend(Backend* backend) { backend_ = backend; }
+  // Set during the first replay (the renderer starts at its first
+  // command): it gets that replay's plan.
+  void set_backend(Backend* backend) {
+    backend_ = backend;
+    if (backend_) {
+      backend_->PassPlanned(plan_);
+    }
+  }
   // Called at the replay's start: the game's defaults the first time.
   void BeginReplay(uint8_t* base);
 
@@ -57,6 +75,11 @@ class Commands {
   uint64_t unhandled_patch_records() const { return unhandled_patch_records_; }
 
  private:
+  void Execute(uint8_t* base, uint32_t id, uint32_t payload, uint32_t count, uint32_t arg2,
+               const GameCall& call);
+  void PlanResolve(uint8_t* base, uint32_t flags, uint32_t destination, bool has_rect,
+                   const int32_t rect[4], bool has_point, const int32_t point[2],
+                   bool level_or_slice);
   void SetRenderState(uint8_t* base, uint32_t state, uint32_t value);
   void SetSamplerState(uint8_t* base, uint32_t sampler, uint32_t state, uint32_t value);
   void SetRenderTarget(uint8_t* base, uint32_t index, uint32_t surface);
@@ -96,6 +119,17 @@ class Commands {
   uint32_t tiling_width_ = 0, tiling_height_ = 0;
   uint32_t tile_rects_ = 0, tile_count_ = 0;
   uint64_t unhandled_patch_records_ = 0;
+
+  // The scan's own copy of what the replay will have bound, from the
+  // handlers' state at BeginPlan, and each target's resolves so far.
+  struct Planning {
+    Surface targets[kTargets], depth, saved_targets[kTargets], saved_depth;
+    bool tiling = false;
+    uint32_t tile_rects = 0, tile_count = 0;
+    std::vector<std::pair<TargetId, uint32_t>> segments;
+  };
+  Planning planning_;
+  PassPlan plan_;
 };
 
 // The handlers (render thread).

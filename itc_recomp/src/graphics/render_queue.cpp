@@ -16,6 +16,7 @@
 #include "vehicle_accessors/vehicle_accessors.h"
 
 #include <cstdint>
+#include <vector>
 
 namespace graphics::render_queue {
 
@@ -311,6 +312,46 @@ uint32_t RunInlineLast(uint8_t* base, uint32_t item, uint32_t sp, const GuestCal
   return 0;
 }
 
+// The commands from `command` until id 36, into the pass plan.
+void PlanCommands(uint8_t* base, uint32_t command) {
+  render::Commands* native = render::GetCommands();
+  uint32_t id = guest::LoadU32(base, command);
+  while (int32_t(id) != int32_t(kEndCommand)) {
+    const uint32_t r4 = guest::LoadU32(base, command + 4);
+    const uint32_t r5 = guest::LoadU32(base, command + 8);
+    native->PlanCommand(base, id, command + 16, r4, r5);
+    command += (render::Commands::Slots(id, r4, r5) + 1) << 4;
+    id = guest::LoadU32(base, command);
+  }
+}
+
+// A chain into the pass plan, walked as ChunkChainRun runs it (single
+// commands bind no targets); false if it holds a kind the walk can't
+// follow (1 and 2, guest code never seen in play, or an unknown one).
+bool PlanChain(uint8_t* base, uint32_t item) {
+  while (item != 0) {
+    const uint32_t kind = uint32_t(int32_t(int16_t(guest::LoadU32(base, item) & 0xFFFF)));
+    switch (kind) {
+      case 0:
+      case 6:
+        return true;
+      case 3:
+        PlanCommands(base, guest::LoadU32(base, item + 4));
+        item += 16;
+        break;
+      case 4:
+        PlanCommands(base, guest::LoadU32(base, item + 4));
+        return true;
+      case 5:
+        PlanCommands(base, item + 16);
+        return true;
+      default:
+        return false;
+    }
+  }
+  return true;
+}
+
 }  // namespace
 
 int32_t Partition(uint8_t* base, uint32_t array, int32_t lo, int32_t hi, uint32_t getter,
@@ -412,6 +453,9 @@ void Replay(uint8_t* base, uint32_t queue, uint32_t device, uint32_t video_outpu
   models::PointersClear(base, state + 68);
   const uint32_t list = QueueSlot(base, queue, kReplayingSlot, kReplayingFunction, Replaying,
                                   frame, 0x825912BC, call);
+  // The sorted buckets' chains, in the order they run (render thread only).
+  static std::vector<uint32_t> chains;
+  chains.clear();
   uint32_t buckets_left = guest::LoadU32(base, list + 12);
   if (buckets_left != 0) {
     uint32_t bucket = guest::LoadU32(base, list + 24);
@@ -473,7 +517,7 @@ void Replay(uint8_t* base, uint32_t queue, uint32_t device, uint32_t video_outpu
           uint32_t left = n, at_entry = kEntries;
           do {
             const uint32_t entry = guest::LoadU32(base, at_entry);
-            ChunkChainRun(base, queue, guest::LoadU32(base, entry + 0), frame, call);
+            chains.push_back(guest::LoadU32(base, entry + 0));
             left--;
             at_entry += 4;
           } while (left != 0);
@@ -482,6 +526,19 @@ void Replay(uint8_t* base, uint32_t queue, uint32_t device, uint32_t video_outpu
       buckets_left--;
       bucket += 16;
     } while (buckets_left != 0);
+  }
+  // Every bucket sorted first, the original running each bucket's chains
+  // after its sort: the frame's pass plan is scanned from the whole list
+  // before any of it runs (docs/conventional-renderer.md, "Step 3").
+  render::Commands* commands = render::GetCommands();
+  commands->BeginPlan();
+  bool complete = true;
+  for (const uint32_t chain : chains) {
+    complete = PlanChain(base, chain) && complete;
+  }
+  commands->EndPlan(complete);
+  for (const uint32_t chain : chains) {
+    ChunkChainRun(base, queue, chain, frame, call);
   }
   // The release list: each object's slot 0 with r4 = 1, the element then 0.
   uint32_t vector = guest::LoadU32(base, kReleaseList);

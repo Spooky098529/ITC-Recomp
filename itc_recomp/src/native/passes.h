@@ -15,6 +15,7 @@
 #include "buffer_table.h"
 #include "device_context.h"
 #include "render/device.h"
+#include "render/pass_plan.h"
 #include "state.h"
 #include "textures.h"
 #include "vulkan_functions.h"
@@ -53,6 +54,9 @@ class Passes {
   void BufferCreated(uint32_t handle, const render::BufferData& data);
   void BufferWritten(uint32_t handle);
   void BufferDestroyed(uint32_t handle);
+  // The frame's pass plan (render/pass_plan.h), before its list is
+  // replayed: each resolve is checked against it (step 3).
+  void PassPlanned(const render::PassPlan& plan);
   void InterfaceDraw(VkCommandBuffer commands, uint8_t* base, render::State& state,
                      const render::DrawIndexed& draw);
   void InterfaceInlineDraw(VkCommandBuffer commands, uint8_t* base, render::State& state,
@@ -218,6 +222,11 @@ class Passes {
     uint64_t resolves = 0, resolves_skipped = 0, resolve_unknown_flags = 0;
     // Predicated tilings begun, and the resolves their ends made.
     uint64_t tilings = 0, tiled_resolves = 0;
+    // The pass plan (step 3): resolves by planned kind (render::ResolveKind),
+    // resolves not as planned (another source or destination, or past the
+    // plan's end), and lists planned without a whole walk.
+    std::array<uint64_t, 4> planned_kinds{};
+    uint64_t plan_mismatches = 0, plans_incomplete = 0;
     uint32_t resolve_flags_sample = 0;
     TextureCache::Stats textures;
     BufferTable::Stats buffers;

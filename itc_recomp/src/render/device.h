@@ -19,6 +19,8 @@
 
 namespace render {
 
+struct PassPlan;  // render/pass_plan.h
+
 // A game object (a guest address), 0 for none.
 struct Object {
   uint32_t address = 0;
@@ -307,6 +309,9 @@ class Backend {
   // (the tiles' extent), each cleared to `clear` first.
   virtual void BeginTiling(State& state, uint32_t width, uint32_t height, float clear) = 0;
   virtual void EndTiling(State& state) = 0;
+  // The frame's pass plan (render/pass_plan.h), before the list it plans is
+  // replayed; it holds until the next.
+  virtual void PassPlanned(const PassPlan& plan) = 0;
 
   // Textures made, written and freed (render/resources.h), between lists.
   virtual void TextureCreated(Texture texture) = 0;

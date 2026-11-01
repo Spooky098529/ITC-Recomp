@@ -731,8 +731,19 @@ struct Passes::State {
     int32_t rect[4] = {};
     bool has_rect = false, tiled = false;
     int32_t resolved = -1;
+    // kResolve: its kind in the pass plan, and whether it was as planned.
+    render::ResolveKind planned = render::ResolveKind::kSkipped;
+    bool as_planned = true;
   };
   std::vector<PassEvent> pass_events;
+  // The frame's pass plan (step 3) and the next resolve's place in it.
+  render::PassPlan plan;
+  size_t plan_next = 0;
+  uint32_t logged_plan_mismatches = 0;
+  // The planned resolve the next one is (null past the plan's end), and
+  // whether it's that one; counted in the stats.
+  const render::PlannedResolve* CheckPlan(uint8_t* base, uint32_t source_object, bool from_depth,
+                                          uint32_t destination, uint32_t flags, bool& matches);
   bool pass_events_logic = false;  // the frame's list was a logic pass's
   const char* clear_reason = "other";
   bool LoggingPasses() const { return log_passes && record_draws; }
@@ -3782,6 +3793,9 @@ void Passes::State::Resolve(VkCommandBuffer commands, uint8_t* base, uint32_t de
   uint32_t color_object = bound.targets[flags & 3];
   uint32_t depth_object = bound.depth;
   uint32_t source_object = from_depth ? depth_object : color_object;
+  bool as_planned = false;
+  const render::PlannedResolve* planned =
+      CheckPlan(base, source_object, from_depth, destination, flags, as_planned);
   Target* source = source_object ? GetTarget(commands, base, source_object, from_depth) : nullptr;
   size_t resolves_before = frame_resolves.size();
   if (source && destination && !level_or_slice &&
@@ -3809,6 +3823,8 @@ void Passes::State::Resolve(VkCommandBuffer commands, uint8_t* base, uint32_t de
       e.rect[k] = rect[k];
     }
     e.tiled = tiling;
+    e.planned = planned ? planned->kind : render::ResolveKind::kSkipped;
+    e.as_planned = as_planned;
     if (frame_resolves.size() > resolves_before) {
       e.resolved = int32_t(resolves_before);
     }
@@ -3894,6 +3910,64 @@ void Passes::BufferWritten(uint32_t handle) {
 
 void Passes::BufferDestroyed(uint32_t handle) {
   state_->buffers.Destroyed(handle);
+}
+
+void Passes::PassPlanned(const render::PassPlan& plan) {
+  State& s = *state_;
+  // Resolves the last plan had that weren't made.
+  if (s.plan_next < s.plan.resolves.size()) {
+    s.stats.plan_mismatches += s.plan.resolves.size() - s.plan_next;
+    if (s.logged_plan_mismatches < 10) {
+      s.logged_plan_mismatches++;
+      ITC_LOG_WARN("native renderer: pass plan: {} of {} planned resolves not made",
+                   s.plan.resolves.size() - s.plan_next, s.plan.resolves.size());
+    }
+  }
+  s.plan = plan;
+  s.plan_next = 0;
+  if (!plan.complete) {
+    s.stats.plans_incomplete++;
+  }
+}
+
+const render::PlannedResolve* Passes::State::CheckPlan(uint8_t* base, uint32_t source_object,
+                                                        bool from_depth, uint32_t destination,
+                                                        uint32_t flags, bool& matches) {
+  const render::PlannedResolve* p =
+      plan_next < plan.resolves.size() ? &plan.resolves[plan_next] : nullptr;
+  plan_next++;
+  matches = p && p->destination == destination && p->flags == flags;
+  if (matches && p->kind != render::ResolveKind::kSkipped) {
+    matches = source_object &&
+              render::SurfaceTarget(base, source_object, from_depth, tiling) == p->source;
+  } else if (matches && !source_object) {
+    matches = false;  // planned with a source
+  }
+  if (p) {
+    stats.planned_kinds[size_t(p->kind)]++;
+  }
+  if (!matches) {
+    stats.plan_mismatches++;
+    if (logged_plan_mismatches < 10) {
+      logged_plan_mismatches++;
+      const render::TargetId now =
+          source_object ? render::SurfaceTarget(base, source_object, from_depth, tiling)
+                        : render::TargetId{};
+      ITC_LOG_WARN("native renderer: pass plan: resolve {} of {} not as planned: made from {} "
+                   "(EDRAM base {}, pitch {}, MSAA {}, format class {}{}) to {:08X}, flags "
+                   "{:08X}; planned {}",
+                   plan_next - 1, plan.resolves.size(), now.depth ? "depth" : "color",
+                   now.edram_base, now.pitch, now.msaa, now.format_class,
+                   now.tiled ? ", tiled" : "", destination, flags,
+                   p ? fmt::format("{} from EDRAM base {}, pitch {}, MSAA {}, format class {} to "
+                                   "{:08X}, flags {:08X}",
+                                   render::ResolveKindName(p->kind), p->source.edram_base,
+                                   p->source.pitch, p->source.msaa, p->source.format_class,
+                                   p->destination, p->flags)
+                     : std::string("nothing (past the plan's end)"));
+    }
+  }
+  return p;
 }
 
 void Passes::InterfaceDraw(VkCommandBuffer commands, uint8_t* base, render::State& state,
@@ -4769,11 +4843,13 @@ std::string Passes::State::DescribePasses() const {
                                     : std::string("whole");
       out += fmt::format(
           "  resolve {}{}: from {}, flags {:08X}, rect {}, to {:08X} ({:08X}, format {}, {}x{}){}\n"
+          "    planned: {}{}\n"
           "    source drawn into {} more times before {}; destination sampled after it (until "
           "the next resolve into it) by passes{}; before it, reading {}, by passes{}\n",
           resolves++, e.tiled ? " (a tile)" : "", describe(e.color), e.flags, rect, e.address,
           e.destination, e.format, e.width, e.height,
           e.resolved < 0 ? " (not made)" : fmt::format(" (dump resolve_{:02})", e.resolved),
+          render::ResolveKindName(e.planned), e.as_planned ? "" : " (NOT as planned)",
           drawn_after, cleared ? "its next clear" : "the frame's end (no clear)",
           list(readers_after),
           earlier < 0 ? std::string("the last frame's") : fmt::format("resolve {}'s", earlier),
