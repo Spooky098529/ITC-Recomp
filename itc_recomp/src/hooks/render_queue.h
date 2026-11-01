@@ -20,5 +20,6 @@ void NativeRenderQueueClearRecording(PPCContext& ctx, uint8_t* base);
 void NativeRenderQueueInit(PPCContext& ctx, uint8_t* base);
 // Add, with the original from the start for the warning's path.
 void NativeRenderQueueAdd(PPCContext& ctx, uint8_t* base);
+void NativeRenderQueueReplay(PPCContext& ctx, uint8_t* base);
 
 }  // namespace hooks

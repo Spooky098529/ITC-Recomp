@@ -17,7 +17,10 @@ checked at runtime.
    "Render command recording" in `frame-interpolation.md`).
 2. The render thread replays them: `sub_8258EE98` walks the item chains,
    and `sub_8258E698` dispatches each command through the table at
-   `0x8265EDE0`.
+   `0x8265EDE0`. (Since 2026-11-01 the replay, its sort and the walker are
+   native, `--native_render_queue`, `functions/device-shaders.md`: the
+   handlers are still called through the tables, so the wrappers below see
+   each command as before.)
 3. Each handler calls the graphics library on the device at `0x8296BD90`
    (`lis rX,-32105` + `-17008`), which writes Xenos GPU packets (PM4) into
    the ring buffer.

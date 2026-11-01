@@ -18,7 +18,9 @@ ITC_FLAG_BOOL(native_render_queue, true, "ITC",
               "RenderQueue::Init sub_8258ED00, ClearRecording sub_8258ED78, Flip sub_8258E5E0, "
               "Recording sub_8258E5F8, Replaying sub_8258E618, QueueEntry::Sequence "
               "sub_8258E5C0, Add sub_8258EDC8 with PassList::Add sub_8258EB88; PtrVector::PushBack sub_82591540 with Insert "
-              "sub_825911C8, which allocates only with --native_models and the native heap) natively instead of through the translated code (the same "
+              "sub_825911C8, which allocates only with --native_models and the native heap; Replay sub_82591238 "
+              "with its sort and the chunk walker, the command handlers called as before, where the "
+              "native renderer's wrappers see them) natively instead of through the translated code (the same "
               "writes; guest calls for the drawer's Init and vtable slots that aren't the "
               "queue's own; checked by --run_harnesses=render_queue)");
 
@@ -83,6 +85,24 @@ extern "C" REX_FUNC(sub_82591540) {
     }
   }
   __imp__sub_82591540(ctx, base);
+}
+
+void hooks::NativeRenderQueueReplay(PPCContext& ctx, uint8_t* base) {
+  rq::Replay(base, ctx.r3.u32, ctx.r4.u32, ctx.r5.u32, ctx.r1.u32, RenderQueueCall(ctx, base));
+}
+
+// Replay: r3 = the queue, r4 = the device, r5 = the video output. Its
+// callees (Partition sub_8258EC38, QuickSort sub_82590CB0, ChunkChain::Run
+// sub_8258EE98 and the walkers sub_8258E630, sub_8258E780, sub_8258E7E8,
+// sub_8258E868) have no adapters: only Replay calls them.
+extern "C" REX_FUNC(sub_82591238) {
+  REX_FUNC_PROLOGUE();
+  if (!ITC_FLAG(native_render_queue)) {
+    __imp__sub_82591238(ctx, base);
+    return;
+  }
+  ctx.fpscr.disableFlushMode();
+  hooks::NativeRenderQueueReplay(ctx, base);
 }
 
 // Init: r3 = the queue, r4 = the device.

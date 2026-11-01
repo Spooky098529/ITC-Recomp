@@ -95,4 +95,48 @@ std::optional<uint32_t> PushBack(uint8_t* base, uint32_t vector, uint32_t value,
 std::optional<uint32_t> PtrVectorInsert(uint8_t* base, uint32_t answer, uint32_t vector,
                                         uint32_t where, uint32_t value);
 
+// --- The replay ---
+
+// RenderQueue::Partition (sub_8258EC38), quicksort's partition over an
+// array of pointers from `lo` to `hi` with `getter` (r3 = an element,
+// returns f1) as the key, in its 160-byte frame below `sp`: the pivot
+// a[hi]; i up from lo - 1 while key(a[i]) < the pivot's key, j down from hi
+// while j > i and the pivot's key < key(a[j]); a[i] and a[j] swapped and
+// both go on (the pivot's key asked again); at the end a[i] and a[hi]
+// swapped; returns i. The getters RigidBody::Mass (0x820B6708) and
+// QueueEntry::Sequence (0x8258E5C0) are read natively, any other is a guest
+// call.
+int32_t Partition(uint8_t* base, uint32_t array, int32_t lo, int32_t hi, uint32_t getter,
+                  uint32_t sp, const GuestCall& call);
+// RenderQueue::QuickSort (sub_82590CB0), in its 128-byte frame: while lo <
+// hi, p = Partition, QuickSort(lo, p - 1), lo = p + 1.
+void QuickSort(uint8_t* base, uint32_t array, int32_t lo, int32_t hi, uint32_t getter,
+               uint32_t sp, const GuestCall& call);
+// ChunkChain::Run (sub_8258EE98), in its 96-byte frame: while `item` isn't
+// 0, its kind (the first word's low halfword, sign-extended): 0 the single
+// commands (sub_8258E630), 1 and 2 the original's walkers (never seen in
+// play: guest calls), 3 the commands at +4 then item + 16 (sub_8258E780),
+// 4 the commands at +4 then the end (sub_8258E7E8), 5 the commands inline
+// from item + 16 then the end (sub_8258E868), 6 the end; another kind loops
+// on the same item, as the original. The commands go to the tables
+// 0x8265ED48 (single: r3 = the slot) and 0x8265EDE0 (r3 = the payload, r4
+// and r5 the slot's +4 and +8; until id 36) as guest calls, where the
+// native renderer's and the stats' wrappers see them.
+void ChunkChainRun(uint8_t* base, uint32_t queue, uint32_t item, uint32_t sp,
+                   const GuestCall& call);
+// RenderQueue::Replay (sub_82591238, slot 5): r3 = the queue, r4 = the
+// device, r5 = the video output, in its 192-byte frame: the globals the
+// command handlers read ([0x8296BD90] the device, [0x82970BB8] the drawer,
+// [0x82970BBC] state + 12, [0x82970BC0] the render targets, [0x8296BD8C] the
+// release list, which is emptied), state +44 = the video output, +24 to +36
+// = 0; then for each bucket of the list the queue's slot 8 returns, its
+// items (+0 the next) as item + 4 at 0x8296BD98 (the list's +28, +32 and
+// byte +4 following along as the original's), sorted by key (RigidBody::Mass
+// as the getter) and each run of equal keys by sequence, and each one's
+// chunk run (ChunkChain::Run); then the release list's objects' slot 0 with
+// r4 = 1, each element then 0; [0x8296BD90] = 0. r3 isn't returned (its
+// caller, Scene::Draw, doesn't read it).
+void Replay(uint8_t* base, uint32_t queue, uint32_t device, uint32_t video_output, uint32_t sp,
+            const GuestCall& call);
+
 }  // namespace graphics::render_queue
