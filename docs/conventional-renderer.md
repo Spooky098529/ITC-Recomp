@@ -230,6 +230,60 @@ any more.
 | **Shader microcode translation** (the SDK's SPIR-V translator, `shaders.cpp:272`; disk cache `cache/`; lookups by the objects' fields) | Game data; the 14 stored boot shaders (`compiled_shaders.h`) | Our renderer, per pipeline | Vulkan: the runtime translator stays, inside the backend. Other backends: offline blobs of the game's shader and declaration pairs (decision 3) | — |
 | **`replay_hooks.cpp`, `draw_packets.cpp`, `gpu_link.cpp`, `refcount.cpp`'s render-thread skip** | — | — | Native handlers | Go when the handlers are native and no longer call the game's Direct3D |
 
+### GPU data out of guest memory (added 2026-11-01, the user's call)
+
+The 360's CPU and GPU share one memory: the game writes GPU data into
+physical memory and the GPU reads it in place. We copy it from guest
+memory into Vulkan buffers and images: the mirrors for vertices and
+indices, uploads for textures. The aim is for game code that writes GPU
+data (native code, as B7 makes it so) to hand it to the renderer
+directly (`UpdateBuffer`, `UpdateTexture`), into device-local memory,
+without writing guest memory first.
+
+**Where the time goes now.** Since `mirrors-fix`, draws copy nothing:
+only memcpy's new writes (~0.1 MB a frame in a race) reach the mirrors,
+at frame start. The mirrors, though, are host-visible and coherent with
+no device-local bit (`passes.cpp:1336`). On a discrete GPU that's
+probably system memory (unless the driver gives resizable BAR memory),
+so every draw's vertex and index reads would cross PCIe. So the expected
+gain is GPU time (most where the GPU is the limit, at 4K) and memory
+(two or three 512 MB mirrors), more than render thread time. To be
+measured: a GPU-bound run (4K) before and after, plus the render thread
+profile.
+
+**The game's writers of GPU data into guest memory** (from
+`native-renderer.md`, "Buffers", `texture-handling-optimization.md` and
+the B7 files; whether each is native is as of `b287c74c`):
+
+| Writer | What | Native? | Into the renderer directly? |
+|---|---|---|---|
+| `Mesh::Parse` (`sub_825963F0`, `models.md`) and `sub_82596F68` | Vertex and index data, 1-3 MB copies from read buffers (~90% of the ranges); the headers | Native (B7) | Yes, once no CPU reader needs the data (below) |
+| `sub_820E7598`, `sub_820E7CA0`, `sub_820E8028` | 2-4 ranges at a time | Not looked at | When native |
+| XPR loading (`XPR::GetTexture`, the archive, the file layer) | Texture data | Native | Yes |
+| The license plate (`CarModel::MakePlate`), the vinyl sheet and decals (`Vinyl::Compress`, `XGCompressSurface`), anything through `Resource::Lock` and `Unlock` | Textures the game makes and writes itself | Native | Yes: their native code calls `UpdateTexture` at the unlock or the write's end |
+| Per-frame vertices built on the CPU: the light billboards (`sub_8209C6E0`), the world-space sprites' corners, the post effects' quads, every inline draw (commands 5, 19, 27) | Vertices in the command list's payload or in game objects | Mostly native | Into a per-frame upload ring, from the payload or the object, as now. The payload stays in guest memory: interpolation substitutes there |
+| Shader microcode (`Model::Load`, the shader objects) | Read once, for translation | Native | No need: once per shader |
+
+**What limits it:**
+
+- **Recompiled writers keep writing guest memory.** memcpy's tracking
+  stays as the fallback for any that are left.
+- **The CPU may read the same data.** If game code reads a mesh's
+  vertices or indices (collision, the minimap, culling, the course
+  route), that data has to stay in guest memory as well, and only the
+  GPU's copy moves. Not known yet. To check before anything moves: a
+  read watch on resource data ranges after their first use by a draw, in
+  a race and a drive. There's a precedent: a `--watch_input_reads`
+  watch, tried and stashed on 2026-10-19.
+- **The resource headers stay in guest memory** (fetch constants, sizes,
+  formats) while recompiled code reads them. Only the data behind them
+  moves.
+- **The command list's payload stays** (interpolation's substitution)
+  until tick replay.
+- **Guest memory's future was left "to decide at the end"** (the user's
+  call, B7 step 1: one native heap over guest memory, shared with the
+  game). This would be the first data deliberately kept out of it.
+
 ## 4. Frame interpolation's dependencies
 
 Read in `src/interpolation/blend_state.cpp`, `glow.cpp`,
@@ -444,6 +498,7 @@ The checks:
 | **2** | **The interface, fed beside the Direct3D path.** The interface defined; the native handlers also call it; the Vulkan renderer builds each draw's state both ways (from the interface, and from the registers as now) and logs mismatches | Nothing yet | 0 mismatches over an attract race, a drive and the menus | Large: the render states' and formats' mapping is the work |
 | **3** | **The renderer switched to the interface.** `State::Draw` reads the interface's state. The handlers stop calling the game's Direct3D. The Vulkan backend makes the translator's registers itself, and translates (vertex shader, declaration) pairs itself in place of the game's patch. Resolves and clears are still made by the renderer as now (copies), from the handlers' arguments | The register shadow's writes and reads on the render path, `ReadRegisters`, the dirty masks, the PM4 packets, the kick, the shader load and patch, `replay_hooks.cpp`, `draw_packets.cpp`, `gpu_link.cpp` | Dumps identical (`draws.txt` and pixels); the menus and tiling by the user; profile; a drive | Large. After it, the game's Direct3D is off the render path |
 | **4** | **Resources through the interface.** Textures and buffers made and filled when the game makes them (`XPR::GetTexture`, `Resource::Lock` and Unlock, `Mesh::Parse`, the loaders, the native texture writers), bound by handle. The Vulkan backend keeps fetch by address over its own arena until vertex input is per-stream | The mirrors, the fetch-constant-keyed texture lookups, most of memcpy's tracking | A check of every bound buffer and texture against guest memory over a drive (as `--native_renderer_verify_mirror` did); dumps identical; the hitch log | Medium |
+| **4b** | **GPU data out of guest memory** ("GPU data out of guest memory" in section 3). First the read watch: which resource data the CPU reads after a draw first uses it. Then each native writer whose data the CPU doesn't read hands it to `UpdateBuffer` or `UpdateTexture` into device-local memory and leaves guest memory unwritten (headers kept); data the CPU reads is written to both; memcpy's tracking stays for recompiled writers. Buffers and textures device-local; per-frame vertices through an upload ring | The mirrors (for native writers' data), most of the guest memory physical allocations for GPU data, vertex reads across PCIe | The read watch over a race and a drive (0 reads of moved data); dumps identical; a GPU-bound run (4K) and the render thread profile, before and after | Medium; risk in data the CPU reads that the watch didn't see |
 | **5** | **Passes into their textures.** The destination scan (section 5): each pass draws into its destination; depth maps sampled as depth; the swap and the format changes gone; the glow's steps into their own textures; grab passes as `CopyTexture`; tiling as one target. MSAA keeps the game's sample counts for now (resolved at the pass's end) | The resolve copies but the grab passes, `ResolveInto`'s conversions, the resolve destinations' separate images | Dumps: each destination against the step before; differences explained (precision) | Medium. The exponent bias (section 2) is decided here |
 | **6** | **MSAA as a player option** (`itc.toml`; off, 2x, 4x, 8x): one value for every target the game drew with MSAA (decision 4; the default to pick) | The 360's fixed sample counts | Dumps at each setting; the user | Small |
 | **7** | **The frame composed natively** (`unlocked-res.md`, "Later"): first read the upscale's pixel shader and check that nothing else reads `1ECB9000`; then the 3D view drawn into the frame (or its region) and the HUD over it | The partial-rect resolve and the upscale draw | Dumps; the user at 4K | Small to medium |
@@ -485,6 +540,14 @@ path. Step 5 is where the resolves go.
 - **Precision differences** when a pass draws in its destination's
   format (the mirror's 8-bit target into a 10/16-bit texture): visible
   only as explained pixel differences in dumps (accepted, decision 7).
+- **CPU reads of GPU data** (step 4b): whether game code reads vertex,
+  index or texture data after loading it isn't known. If it does and the
+  watch misses a path (one a drive didn't take), moving that data out of
+  guest memory would give the game zeros or stale bytes. Writing both
+  copies for anything in doubt is the safe default.
+- **Where the mirrors' memory lives**: host-visible without device-local,
+  so probably system memory on a discrete GPU (not checked per driver);
+  the size of step 4b's GPU-side gain depends on it.
 - **D3D11 at 10_0**: everything said about it is from the API's known
   limits, not checked.
 - **Speed**: not a goal, but the steps change the per-draw path. Step 0's
@@ -502,3 +565,7 @@ Answered 2026-11-01 (decisions 4, 7 and 8 above). Left open:
 
 1. **MSAA's default value** in `itc.toml` (off, 2x, 4x or 8x), to pick
    at step 6.
+2. **GPU data kept out of guest memory** (step 4b) would be the first
+   data deliberately not in guest memory, where the B7 decision left
+   guest memory's future "to decide at the end". Is that fine for the
+   GPU's data now, with the headers staying?
