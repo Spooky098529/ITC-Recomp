@@ -35,9 +35,18 @@ file's history. What's left to see in a drive, from every run:
   adapters of `DrawPauseMenu`, `RaceHud::DrawWarning`, `RaceHud::Draw`
   removed, a counter at 0 in an attract race and the replay; three
   harnesses 0 differing, races 24-25 s with them, 0 errors; no
-  subagents). Step: validation agent running.
+  subagents). Validated (`itc_3080`, 120 s: race 52 s, 0 errors;
+  replay `itc_3081` ok): 5 of 5 harness lines, all 5 ran in the
+  replay, none to drive. Done.
+- Cleanup lead (no mapping, not counted): the jump-table pieces
+  `sub_8220DA38` and `sub_8221A56C` (`race-screens.md`). Step:
+  migration agent running.
 
 ## Done
+
+- The race HUD machine's `PauseDraw` and `RacePauseDraw` (cleanup
+  lead): with 3 adapters removed; acac516d..0c9db58c. Validated
+  (`itc_3080`).
 
 - The race HUD machine's `CreateScreens`, `ClosePause`, `ResultsDraw`,
   `AfterRaceDraw` (cleanup lead): with `sub_82211D08`, `sub_82211D10`
@@ -83,5 +92,8 @@ file's history. What's left to see in a drive, from every run:
 - After the PauseDraw lead's migration (`itc_3079`: race 25 s, 0
   errors, three harnesses 0 differing): ours 3720, work left 2679
   (wrapped 100, known 505, unknown 2074).
+- After its validation (`itc_3080`, 120 s: race 52 s, 0 errors, every
+  harness 0 differing but the expected groups): ours 3720, work left
+  2679.
 
 ## Stopped
