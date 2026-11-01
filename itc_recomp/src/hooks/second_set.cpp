@@ -61,7 +61,8 @@ ITC_FLAG_BOOL(native_second_set, true, "ITC",
               "groups' finds under them, no adapters: only they call them; "
               "Skeleton::UpdateMatrices' original where its plain C++ declines)) natively instead of through the translated "
               "code (the same writes; checked by --run_harnesses=second_set); the point groups' "
-              "resets and inits and SetNode have no adapters (their callers are native)");
+              "resets and inits, SetNode, Clear, SetShape and the cockpit's, interior's, light kit's and "
+              "traffic body's block resets have no adapters (their callers are native)");
 
 namespace hooks {
 
@@ -314,9 +315,11 @@ void SecondSetPartsResetRightDoor(PPCContext& ctx, uint8_t* base) {
 // No adapters (their callers in play are native and call their plain C++;
 // the steps above are the harness's): PointRecord::SetNode sub_820CE8D8, and
 // the point groups' resets and inits (2026-11-01): the parts' 19, the
-// cockpit's 6, the interior's 6, the light kit's 3 and the traffic body's 3.
-ITC_SECOND_SET(820CE900, SecondSetPointSetShape)
-ITC_SECOND_SET(820CEA08, SecondSetPointClear)
+// cockpit's 6, the interior's 6, the light kit's 3 and the traffic body's 3;
+// PointRecord::Clear sub_820CEA08 and SetShape sub_820CE900, CockpitPoints::Reset
+// sub_820DBC10, InteriorPoints::Reset sub_820E35D8, LightPoints::Reset
+// sub_820DC8A8 and TrafficPoints::Reset sub_820E5880 (2026-11-01, their callers
+// in play native).
 ITC_SECOND_SET(820D0270, SecondSetPointConstruct)
 ITC_SECOND_SET(820CEB30, SecondSetFindShape)
 ITC_SECOND_SET(820E0258, SecondSetPartsFind)
@@ -327,13 +330,9 @@ ITC_SECOND_SET(820E58C8, SecondSetTrafficFind)
 ITC_SECOND_SET(820E2A10, SecondSetPartsPointsConstruct)
 ITC_SECOND_SET(820E00F0, SecondSetPartsPointsReset)
 ITC_SECOND_SET(820DC190, SecondSetCockpitPointsConstruct)
-ITC_SECOND_SET(820DBC10, SecondSetCockpitPointsReset)
 ITC_SECOND_SET(820E4FD8, SecondSetInteriorPointsConstruct)
-ITC_SECOND_SET(820E35D8, SecondSetInteriorPointsReset)
 ITC_SECOND_SET(820DDCF8, SecondSetLightPointsConstruct)
-ITC_SECOND_SET(820DC8A8, SecondSetLightPointsReset)
 ITC_SECOND_SET(820E68E8, SecondSetTrafficPointsConstruct)
-ITC_SECOND_SET(820E5880, SecondSetTrafficPointsReset)
 ITC_SECOND_SET(820E74B8, SecondSetWheelsResetTire)
 ITC_SECOND_SET(820E7918, SecondSetWheelsResetRimA)
 ITC_SECOND_SET(820E7C08, SecondSetWheelsResetRimB)
