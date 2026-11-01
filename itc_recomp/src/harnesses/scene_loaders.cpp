@@ -28,6 +28,7 @@
 
 #include <fmt/format.h>
 
+#include <bit>
 #include <functional>
 #include <mutex>
 #include <unordered_set>
@@ -382,6 +383,89 @@ void Queries(Context& h, Random& r, uint32_t block) {
             t.r3.u64 = block;
           },
           __imp__sub_820D6EB8, hooks::SceneLoadersPartsWalkMaterials, fmt::format("case {}", c));
+    }
+    results.Report();
+  }
+  // The paint walks: as WalkMaterials' cases (the cockpit's six part models
+  // at +688 + 464i, their states at +556 + 24i), the colors in r4 to r9
+  // (hue, saturation, value) for SetPaint's. Both sides reach the same
+  // ApplyPalette and SetPaint (their adapters' plain C++), so the floats
+  // they write are compared exactly.
+  auto colors = [&](PPCContext& t) {
+    PPCRegister* regs[6] = {&t.r4, &t.r5, &t.r6, &t.r7, &t.r8, &t.r9};
+    for (int k = 0; k < 3; k++) {
+      const float hue = float(r.Below(720)) - 180.0f;
+      const float saturation = float(r.Below(1001)) / 1000.0f;
+      const float value = float(r.Below(1001)) / 1000.0f;
+      regs[2 * k]->u64 = (uint64_t(std::bit_cast<uint32_t>(hue)) << 32) |
+                         std::bit_cast<uint32_t>(saturation);
+      regs[2 * k + 1]->u64 =
+          (uint64_t(std::bit_cast<uint32_t>(value)) << 32) | uint32_t(r.Next());
+    }
+  };
+  struct Walk {
+    const char* name;
+    GuestFunction recompiled, native;
+    bool cockpit, paint;
+  };
+  const Walk walks[] = {
+      {"sub_820D6F20 (CarParts' ApplyPalette walk)", __imp__sub_820D6F20,
+       hooks::SceneLoadersPartsApplyPalette, false, false},
+      {"sub_820D7388 (CarParts' SetPaint walk)", __imp__sub_820D7388,
+       hooks::SceneLoadersPartsSetPaint, false, true},
+      {"sub_820D5FC8 (the cockpit's ApplyPalette walk)", __imp__sub_820D5FC8,
+       hooks::SceneLoadersCockpitApplyPalette, true, false},
+      {"sub_820D6328 (the cockpit's SetPaint walk)", __imp__sub_820D6328,
+       hooks::SceneLoadersCockpitSetPaint, true, true},
+  };
+  for (const Walk& walk : walks) {
+    Results results(walk.name);
+    for (int c = 0; c < 24; c++) {
+      Case(
+          h, results, block, kBlockBytes, r,
+          [&](PPCContext& t) {
+            if (walk.cockpit) {
+              for (uint32_t i = 0; i < 6; i++) {
+                Put(h.base, block + 556 + sl::kSlotBytes * i, RandomState(r, 6));
+                part_model(block + 688 + sl::kPartModelBytes * i, block + 0x1A100,
+                           block + 0x1AA00 + 0x100 * r.Below(4));
+              }
+            } else {
+              parts_setup(6);
+              for (uint32_t i = 0; i < sl::kPartsCount; i++) {
+                part_model(block + sl::kPartsModels + sl::kPartModelBytes * i, block + 0x1A100,
+                           block + 0x1AA00 + 0x100 * r.Below(4));
+              }
+            }
+            if (walk.paint) {
+              colors(t);
+            }
+            t.r3.u64 = block;
+          },
+          walk.recompiled, walk.native, fmt::format("case {}", c));
+    }
+    results.Report();
+  }
+  {
+    // The car model at the block: +3712 the lookup (0-5), +7232 + 4i the six
+    // words (-1 or an index), the first body XPR at +4000 (its records at
+    // +0x2000, 16 bytes each, their +4 an offset; the count 0-8).
+    Results results("CarModel::SelectedTexture (sub_820D4588)");
+    for (int c = 0; c < 48; c++) {
+      Case(
+          h, results, block, kSmallBytes * 2, r,
+          [&](PPCContext& t) {
+            Put(h.base, block + 3712, r.Below(6));
+            for (uint32_t i = 0; i < 6; i++) {
+              Put(h.base, block + 7232 + 4 * i,
+                  r.Below(3) == 0 ? 0xFFFFFFFFu : r.Below(4) == 0 ? uint32_t(r.Next()) : r.Below(10));
+            }
+            Put(h.base, block + 4000 + 16, block + 0x2000);
+            Put(h.base, block + 4000 + 20, r.Below(9));
+            t.r3.u64 = block;
+          },
+          __imp__sub_820D4588, hooks::SceneLoadersCarModelSelectedTexture,
+          fmt::format("case {}", c));
     }
     results.Report();
   }

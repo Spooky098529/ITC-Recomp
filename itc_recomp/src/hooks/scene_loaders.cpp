@@ -13,13 +13,19 @@
 #include "scene_loaders/objects.h"
 #include "scene_loaders/pools.h"
 
+ITC_FLAG_DECLARE(bool, native_material_passes);
+ITC_FLAG_DECLARE(bool, native_models);
+
 ITC_FLAG_BOOL(native_scene_loaders, true, "ITC",
               "Run the scene's loading objects (docs/functions/scene-loaders.md: with "
               "--native_heap ScenePools::MakeA sub_820C3C40 and sub_820D0960; PoolNode::PoolNode "
               "sub_82594050 and ~PoolNode sub_825940B0; CarModel::IsLoaded sub_820D3C28, "
               "Pool4Object::IsLoaded sub_820D6A08 and SetRecord sub_820D6A60, CarParts::Part "
               "sub_820D6E10 (with SlotOf sub_820D6D48, no adapter), IsLoaded sub_820D7258 and "
-              "WalkMaterials sub_820D6EB8 (with sub_820D2270, no adapter), Interior::IsLoaded "
+              "WalkMaterials sub_820D6EB8 (with sub_820D2270, no adapter), with --native_material_passes "
+              "the paint walks sub_820D6F20, sub_820D7388, sub_820D5FC8 and sub_820D6328 (over "
+              "PartModel::ApplyPalette's and SetPaint's plain C++), with --native_models "
+              "CarModel::SelectedTexture sub_820D4588 (over XPR::GetTexture's), Interior::IsLoaded "
               "sub_820D7790 (with Accessories::AllLoaded sub_820F07D8, no adapter); NameMatches "
               "sub_820CE800 and XPR::FindByName sub_820D09B8 (with XPR::Count sub_82596F20 and "
               "RecordName sub_82596F40, no adapters); with --native_heap and the memory blocks' host lock "
@@ -117,6 +123,60 @@ void SceneLoadersPartWalkMaterials(PPCContext& ctx, uint8_t* base) {
 
 void SceneLoadersPartsWalkMaterials(PPCContext& ctx, uint8_t* base) {
   ctx.r3.u64 = sl::PartsWalkMaterials(base, ctx.r3.u32);
+}
+
+namespace {
+
+// The paint walks' callees' flag: the original when it's off.
+template <typename Walk>
+void PaintWalk(PPCContext& ctx, uint8_t* base, void (*original)(PPCContext&, uint8_t*),
+               Walk walk) {
+  if (!ITC_FLAG(native_material_passes)) {
+    original(ctx, base);
+    return;
+  }
+  const uint64_t regs[6] = {ctx.r4.u64, ctx.r5.u64, ctx.r6.u64,
+                            ctx.r7.u64, ctx.r8.u64, ctx.r9.u64};
+  ctx.fpscr.disableFlushMode();
+  ctx.r3.u64 = walk(ctx.r3.u32, ctx.r3.u64, regs, ctx.r1.u32);
+}
+
+}  // namespace
+
+void SceneLoadersPartsApplyPalette(PPCContext& ctx, uint8_t* base) {
+  PaintWalk(ctx, base, __imp__sub_820D6F20,
+            [&](uint32_t object, uint64_t r3, const uint64_t*, uint32_t sp) {
+              return sl::PartsApplyPalette(base, object, r3, sp);
+            });
+}
+
+void SceneLoadersPartsSetPaint(PPCContext& ctx, uint8_t* base) {
+  PaintWalk(ctx, base, __imp__sub_820D7388,
+            [&](uint32_t object, uint64_t r3, const uint64_t* regs, uint32_t sp) {
+              return sl::PartsSetPaint(base, object, r3, regs, sp);
+            });
+}
+
+void SceneLoadersCockpitApplyPalette(PPCContext& ctx, uint8_t* base) {
+  PaintWalk(ctx, base, __imp__sub_820D5FC8,
+            [&](uint32_t object, uint64_t r3, const uint64_t*, uint32_t sp) {
+              return sl::CockpitApplyPalette(base, object, r3, sp);
+            });
+}
+
+void SceneLoadersCockpitSetPaint(PPCContext& ctx, uint8_t* base) {
+  PaintWalk(ctx, base, __imp__sub_820D6328,
+            [&](uint32_t object, uint64_t r3, const uint64_t* regs, uint32_t sp) {
+              return sl::CockpitSetPaint(base, object, r3, regs, sp);
+            });
+}
+
+void SceneLoadersCarModelSelectedTexture(PPCContext& ctx, uint8_t* base) {
+  if (!ITC_FLAG(native_models)) {
+    __imp__sub_820D4588(ctx, base);
+    return;
+  }
+  ctx.r3.u64 = sl::CarModelSelectedTexture(base, ctx.r3.u32);
 }
 
 void SceneLoadersNameMatches(PPCContext& ctx, uint8_t* base) {
@@ -382,6 +442,11 @@ ITC_SCENE_LOADERS(820D6A60, SceneLoadersPool4SetRecord)
 ITC_SCENE_LOADERS(820D6E10, SceneLoadersPartsPart)
 ITC_SCENE_LOADERS(820D7258, SceneLoadersPartsIsLoaded)
 ITC_SCENE_LOADERS(820D6EB8, SceneLoadersPartsWalkMaterials)
+ITC_SCENE_LOADERS(820D6F20, SceneLoadersPartsApplyPalette)
+ITC_SCENE_LOADERS(820D7388, SceneLoadersPartsSetPaint)
+ITC_SCENE_LOADERS(820D5FC8, SceneLoadersCockpitApplyPalette)
+ITC_SCENE_LOADERS(820D6328, SceneLoadersCockpitSetPaint)
+ITC_SCENE_LOADERS(820D4588, SceneLoadersCarModelSelectedTexture)
 ITC_SCENE_LOADERS(820D7790, SceneLoadersInteriorIsLoaded)
 ITC_SCENE_LOADERS(820CE800, SceneLoadersNameMatches)
 ITC_SCENE_LOADERS(820D09B8, SceneLoadersXprFindByName)

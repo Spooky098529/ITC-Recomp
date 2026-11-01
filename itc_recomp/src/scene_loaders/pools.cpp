@@ -6,8 +6,10 @@
 #include "base/log.h"
 #include "c_runtime/strings.h"
 #include "guest.h"
+#include "material_passes/material_passes.h"
 #include "memory/heap.h"
 #include "models/model.h"
+#include "models/xpr.h"
 #include "scene_loaders/objects.h"
 #include "scene_models/scene_models.h"
 
@@ -271,6 +273,77 @@ uint32_t PartsWalkMaterials(uint8_t* base, uint32_t parts) {
     }
   }
   return r3;
+}
+
+namespace {
+
+constexpr uint32_t kCockpitStates = 556;
+constexpr uint32_t kCockpitModels = 688;
+constexpr uint32_t kCockpitParts = 6;
+
+// The car parts' walk's count: 216 for set a, else 187.
+uint32_t PartsWalkCount(uint8_t* base, uint32_t parts) {
+  return ModelSet(base, parts, kPartsSet) == 0 ? kPartsCount : 187;
+}
+
+}  // namespace
+
+uint64_t PartsApplyPalette(uint8_t* base, uint32_t parts, uint64_t r3, uint32_t sp) {
+  ITC_NATIVE_RUNNING("sub_820D6F20 CarParts::ApplyPalette");
+  const uint32_t count = PartsWalkCount(base, parts);
+  for (uint32_t i = 0; i < count; i++) {
+    if (LoadS(base, parts + kPartsStates + kSlotBytes * i) == kSlotArrived) {
+      r3 = material_passes::ApplyPalette(base, parts + kPartsModels + kPartModelBytes * i,
+                                         sp - 112);
+    }
+  }
+  return r3;
+}
+
+uint64_t PartsSetPaint(uint8_t* base, uint32_t parts, uint64_t r3, const uint64_t regs[6],
+                       uint32_t sp) {
+  ITC_NATIVE_RUNNING("sub_820D7388 CarParts::SetPaint");
+  const uint32_t count = PartsWalkCount(base, parts);
+  for (uint32_t i = 0; i < count; i++) {
+    if (LoadS(base, parts + kPartsStates + kSlotBytes * i) == kSlotArrived) {
+      r3 = material_passes::SetPaint(base, parts + kPartsModels + kPartModelBytes * i, regs,
+                                     sp - 160);
+    }
+  }
+  return r3;
+}
+
+uint64_t CockpitApplyPalette(uint8_t* base, uint32_t cockpit, uint64_t r3, uint32_t sp) {
+  ITC_NATIVE_RUNNING("sub_820D5FC8 Cockpit::ApplyPalette");
+  for (uint32_t i = 0; i < kCockpitParts; i++) {
+    if (LoadS(base, cockpit + kCockpitStates + kSlotBytes * i) == kSlotArrived) {
+      r3 = material_passes::ApplyPalette(base, cockpit + kCockpitModels + kPartModelBytes * i,
+                                         sp - 112);
+    }
+  }
+  return r3;
+}
+
+uint64_t CockpitSetPaint(uint8_t* base, uint32_t cockpit, uint64_t r3, const uint64_t regs[6],
+                         uint32_t sp) {
+  ITC_NATIVE_RUNNING("sub_820D6328 Cockpit::SetPaint");
+  for (uint32_t i = 0; i < kCockpitParts; i++) {
+    if (LoadS(base, cockpit + kCockpitStates + kSlotBytes * i) == kSlotArrived) {
+      r3 = material_passes::SetPaint(base, cockpit + kCockpitModels + kPartModelBytes * i, regs,
+                                     sp - 160);
+    }
+  }
+  return r3;
+}
+
+uint64_t CarModelSelectedTexture(uint8_t* base, uint32_t car_model) {
+  ITC_NATIVE_RUNNING("sub_820D4588 CarModel::SelectedTexture");
+  const uint32_t offset = ((Load(base, car_model + 3712) + 1808) << 2);
+  const uint32_t index = Load(base, offset + car_model);
+  if (int32_t(index) == -1) {
+    return 0;
+  }
+  return models::XprGetTexture(base, car_model + 4000, index);
 }
 
 uint32_t AccessoriesAllLoaded(uint8_t* base, uint32_t set) {

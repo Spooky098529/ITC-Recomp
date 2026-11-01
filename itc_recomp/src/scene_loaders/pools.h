@@ -123,6 +123,32 @@ uint32_t PartWalkMaterials(uint8_t* base, uint32_t model);
 // leaves (the last call's, else `parts`).
 uint32_t PartsWalkMaterials(uint8_t* base, uint32_t parts);
 
+// The walks that paint the arrived part models (PartModel::ApplyPalette and
+// SetPaint, material_passes.h), each from its own frame: `sp` the caller's
+// stack pointer, the callee run at sp - 112 (ApplyPalette's walks) or sp -
+// 160 (SetPaint's). Each returns the r3 the original leaves: the last
+// call's, else r3 as it came (`r3`, all 64 bits). `regs` = r4 to r9 (the
+// three colors), passed through.
+//
+// sub_820D6F20: ApplyPalette on each arrived part model among the car
+// parts' first 216 (set a) or 187.
+uint64_t PartsApplyPalette(uint8_t* base, uint32_t parts, uint64_t r3, uint32_t sp);
+// sub_820D7388: SetPaint on the same.
+uint64_t PartsSetPaint(uint8_t* base, uint32_t parts, uint64_t r3, const uint64_t regs[6],
+                       uint32_t sp);
+// sub_820D5FC8: ApplyPalette on each of the cockpit's six part models (+688
+// + 464i) whose slot state (+556 + 24i) is 3.
+uint64_t CockpitApplyPalette(uint8_t* base, uint32_t cockpit, uint64_t r3, uint32_t sp);
+// sub_820D6328: SetPaint on the same.
+uint64_t CockpitSetPaint(uint8_t* base, uint32_t cockpit, uint64_t r3, const uint64_t regs[6],
+                         uint32_t sp);
+
+// CarModel::SelectedTexture (sub_820D4588): the word at +7232 + 4 x [+3712]
+// (unsigned, wrapping as the original's add); -1 gives 0, else
+// XPR::GetTexture(+4000, it) (models::XprGetTexture; its diagnostics' wrap
+// left out: a leaf).
+uint64_t CarModelSelectedTexture(uint8_t* base, uint32_t car_model);
+
 // Accessories::AllLoaded (sub_820F07D8): 0 when one of the set's three
 // entries (+4 + 4i) is set with its +1096 = 0, else 1.
 uint32_t AccessoriesAllLoaded(uint8_t* base, uint32_t set);

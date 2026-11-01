@@ -43,6 +43,18 @@ void SceneLoadersPartWalkMaterials(PPCContext& ctx, uint8_t* base);
 // CarParts::WalkMaterials sub_820D6EB8: r3 = the parts; r3 as the original
 // leaves it.
 void SceneLoadersPartsWalkMaterials(PPCContext& ctx, uint8_t* base);
+// The paint walks (r3 = the parts or the cockpit; r4 to r9 the colors for
+// SetPaint's; r3 as the original leaves it): CarParts' sub_820D6F20
+// (ApplyPalette) and sub_820D7388 (SetPaint), the cockpit's sub_820D5FC8
+// and sub_820D6328. Natively only with --native_material_passes (else the
+// original).
+void SceneLoadersPartsApplyPalette(PPCContext& ctx, uint8_t* base);
+void SceneLoadersPartsSetPaint(PPCContext& ctx, uint8_t* base);
+void SceneLoadersCockpitApplyPalette(PPCContext& ctx, uint8_t* base);
+void SceneLoadersCockpitSetPaint(PPCContext& ctx, uint8_t* base);
+// CarModel::SelectedTexture sub_820D4588: r3 = the car model; r3 the
+// texture or 0. Natively only with --native_models (else the original).
+void SceneLoadersCarModelSelectedTexture(PPCContext& ctx, uint8_t* base);
 // NameMatches sub_820CE800: r3, r4 = the strings; r3 = 1 or 0.
 void SceneLoadersNameMatches(PPCContext& ctx, uint8_t* base);
 // XPR::Count sub_82596F20 (r3 = the XPR) and XPR::RecordName sub_82596F40
