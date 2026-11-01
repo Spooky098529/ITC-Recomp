@@ -11,6 +11,10 @@ functions to check in a drive in the progress file.
 When the user has reviewed a run's section, its heading gets
 "(reviewed <date>)"; the section stays for the record.
 
+## Run 2026-11-01 12:56 (`b7-loop-01-11-26`)
+
+(Nothing yet.)
+
 ## Run 2026-10-31 23:57 (`b7-loop-31-10-26-2`)
 
 - `device-shaders.md` (new, 112775ae): 9 rows: `D3DDevice_SetVertexShader`
