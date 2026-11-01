@@ -149,6 +149,16 @@ When the user has reviewed a run's section, its heading gets
   red-zone word not compared in `SetUp`'s frames (the morph's callees'
   saved registers land there; `sub_820E6F28`'s and `sub_820E7010`'s
   harnesses cover it).
+- The `ScenePools::ReleaseB` cleanup lead (caab6e04..f0896384): 14 rows
+  in `functions.md`, `second-set.md`, `scene-models.md`. For review:
+  `ReleaseB` and `SceneCockpit::Release` call each other (the cockpit's
+  interior), made native as one group; a nested `ReleaseB` whose pool's
+  release isn't native or refuses with nothing done falls back to its
+  own original from the same frame (as `WheelCalls`); the
+  `frame_state_diff` wrap kept as an explicit wrap around the native
+  adapter, nested native calls skipping it. Its replays: `itc_3190`
+  clean, `itc_3191` one BaseHeap line at the race end; the agent found
+  no native path freeing without `memory::IsPages`.
 
 ## Run 2026-10-31 16:54 (`b7-loop-31-10-26`, continued)
 

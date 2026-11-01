@@ -149,7 +149,13 @@ file's history. What's left to see in a drive, from every run:
 
 - Cleanup lead (no mapping, not counted): `ScenePools::ReleaseB`
   `sub_820C5C88` (Wrapped by `frame_state_diff`), then the second set's
-  last four. Step: migration agent running.
+  last four. Migration checked (caab6e04..f0896384: `ReleaseB` with
+  `SceneCockpit::Release`, which call each other, and
+  `SceneModel::Release`; then `~SceneCockpit` and its deleting
+  destructor; 10 adapters removed; `second-set.md` 152 of 152 ours;
+  harness 0 differing, race 38 s, 0 errors; replays `itc_3190` clean,
+  `itc_3191` with one BaseHeap line; no native path frees without
+  `memory::IsPages`; no subagents). Step: validation agent running.
 
 ## Done
 
@@ -274,5 +280,9 @@ file's history. What's left to see in a drive, from every run:
 - After its validation (`itc_3186`, 120 s: race 53 s, 0 errors, every
   harness 0 differing but the expected groups): ours 3925, work left
   2474.
+
+- After the ReleaseB lead's migration (`itc_3192`: race 38 s, 0 errors,
+  second_set and scene_loaders 0 differing): ours 3930, work left 2469
+  (wrapped 96, known 489, unknown 1884).
 
 ## Stopped
