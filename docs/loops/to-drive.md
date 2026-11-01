@@ -26,6 +26,12 @@ here loses its heading.
   and `sub_8221BB48` AfterRaceMenu::Draw, adapters removed this run,
   are under the previous run already).
 
+- The render queue (attract race `itc_3092`, replay `itc_3093` ok;
+  `device-shaders.md`): `sub_82591540` PtrVector::PushBack,
+  `sub_825911C8` PtrVector::Insert (their native paths may run only
+  when the vector grows with allocation allowed, and when `InsertN`
+  takes the insert).
+
 ## Run 2026-10-31 16:54 (`b7-loop-31-10-26`, continued)
 
 - The in-race screens, third migration (attract race `itc_3046`,

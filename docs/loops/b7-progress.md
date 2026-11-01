@@ -61,9 +61,15 @@ file's history. What's left to see in a drive, from every run:
   wrappers moved into the new adapters, the renderer's command hooks
   untouched; frame dump pixel-identical against the flag off; harness
   render_queue and device_shaders 0 differing, race 38 s, 0 errors; no
-  subagents). Nothing ready left. Step: validation agent running.
+  subagents). Nothing ready left. Validated (`itc_3092`, 120 s: race
+  54 s, 0 errors; replay `itc_3093` ok): 19 of 19 harness lines, 17
+  ran in the race, 2 to drive. Done.
 
 ## Done
+
+- The render queue's methods (subsystem 2): `device-shaders.md`, 25 of
+  25 in play with subsystem 1; `--native_render_queue`;
+  ee891a3a..f1c2a45a. Validated (`itc_3092`).
 
 - The race HUD machine's `PauseDraw` and `RacePauseDraw` (cleanup
   lead): with 3 adapters removed; acac516d..0c9db58c. Validated
@@ -123,5 +129,9 @@ file's history. What's left to see in a drive, from every run:
 - After its migration (`itc_3091`: race 38 s, 0 errors, render_queue
   0 differing): ours 3738, work left 2661 (wrapped 98, known 505,
   unknown 2058).
+
+- After its validation (`itc_3092`, 120 s: race 54 s, 0 errors, every
+  harness 0 differing but the expected groups): ours 3738, work left
+  2661.
 
 ## Stopped

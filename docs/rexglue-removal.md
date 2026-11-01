@@ -2697,6 +2697,7 @@ B7. **The game logic inside**: everything else, subsystem by subsystem,
 | 2026-10-31 | The race HUD machine (`RaceHudMachine::`, the race mode's state machine at +128664: `Init` with its 65 transitions, the handlers that set up, update and draw the race HUD and the in-race screens' holder by the race kind at +9612, the prize lookups after a career race; with the race HUD's `RunCountdown`, `UpdateRacerBar`, `RunWarning`, `TickPanel` and `TickRacers` as cleanup leads, and 18 race HUD and alternate HUD adapters removed by the user's call) | `race-hud-machine.md` | 16 of 33 in play (one migration and a harness rewrite; the rest waits on the other in-race screens: the pause menu, the menu after the race, the career results) | `--native_race_hud_machine` |
 | 2026-10-31 | The other in-race screens (the race HUD holder's: the pause menu `PauseMenu::` with its six pages and options, the confirm dialog `RaceDialog::` with the replay save's steps, the career results `CareerResults::` with the prize tally, the menu after the race `AfterRaceMenu::`, four unseen screens' makers and teardowns, the menu list's and page object's helpers; with the race HUD machine's handlers they unblocked) | `race-screens.md` | 93 of 116 in play (three migrations; the rest waits on the UI movie calls `sub_8211C740` and `sub_8211CBD8` and the options screens) | `--native_race_screens` |
 | 2026-11-01 | The device's shader setters and the render queue (`D3DDevice_SetVertexShader` with `Device::SetVertexShader`, keeping `refcount.cpp`'s rebind skip; `SetPixelShader`, `SetVertexDeclaration`; `RenderQueue::RenderQueue` at scene + 64 with its two `PassList`s and `PassList::Clear`) | `device-shaders.md` | 7 of 7 in play (one migration; the render queue's methods a lead) | `--native_device_shaders` |
+| 2026-11-01 | The render queue's methods (the game's `OT`, an ordering table at scene + 64, vtable `0x8206CB8C`: `Init`, `Flip`, `ClearRecording`, `Add` with `PassList::Add`, `Recording`, `Replaying`, the release list's `PtrVector`, and the per-frame `Replay` with its quicksort and chunk walker) | `device-shaders.md` | 25 of 25 in play (with the shader setters and the queue's constructor; one migration) | `--native_render_queue` |
 
     The first run (2026-10-22, branch `b7-loop-test`): every harness at 0 differing, attract races at 20-21 s with no errors,
     and a race the user drove looked right. Ours went from 162 to 335 (work
@@ -4326,3 +4327,18 @@ overridden 108, Native 34, Dropped 26, never called 70, live 211.
 Imports: 186 called, 56 with a live caller. B7 (`b7_status.py`): ours
 3,712, work left 2,687 (Wrapped 100, with a row 513, no row yet 2,074),
 from 2,694.
+
+**2026-11-01, the render queue's methods (branch `b7-loop-31-10-26-2`):**
+the twenty-ninth run's second subsystem, added to `device-shaders.md`
+and made native in one migration (`--native_render_queue`,
+`src/graphics/render_queue.cpp`): every slot of the queue seen in play,
+with the replay `Scene::Draw` runs once a frame on the render thread
+(sort by key and sequence, the chunk walker, the release list). The
+`--find_menu_selection` wrappers moved into its adapters; the command
+handlers stay recompiled, called through their tables as guest calls,
+so the renderer's hooks on them see every command (a frame dump
+pixel-identical with the flag off). The boundary: 449 functions (916
+pairs): overridden 108, Native 34, Dropped 26, never called 70, live
+211. Imports: 186 called, 56 with a live caller. B7 (`b7_status.py`):
+ours 3,738, work left 2,661 (Wrapped 98, with a row 505, no row yet
+2,058), from 2,679.
