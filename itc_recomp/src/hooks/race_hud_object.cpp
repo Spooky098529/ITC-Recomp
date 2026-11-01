@@ -452,7 +452,9 @@ void RaceHudObjectTickPanel(PPCContext& ctx, uint8_t* base) {
 // SetUpMirror and SetUpSigns (the user's call, 2026-10-31), and Tick,
 // UpdateWarning and TickPanel (since the machine's PauseUpdate and
 // AfterRaceUpdate went native); RaceScreens::Init (from Create, native);
-// DrawAfterRaceMenu (from the race HUD machine's AfterRaceDraw, native).
+// DrawAfterRaceMenu (from the race HUD machine's AfterRaceDraw, native);
+// RaceScreens::Create (from the race HUD machine's CreateScreens, native,
+// with --native_heap; without it the original).
 
 #define ITC_RACE_HUD_OBJECT(address, step)              \
   extern "C" REX_FUNC(sub_##address) {                  \
@@ -470,5 +472,4 @@ ITC_RACE_HUD_OBJECT(82212270, RaceHudObjectStartCountdown)
 ITC_RACE_HUD_OBJECT(82212AC8, RaceHudObjectDrawWarning)
 ITC_RACE_HUD_OBJECT(822128A8, RaceHudObjectDraw)
 ITC_RACE_HUD_OBJECT(82213638, RaceHudObjectShowItem)
-ITC_RACE_HUD_OBJECT(82211F40, RaceHudObjectScreensCreate)
 ITC_RACE_HUD_OBJECT(82211D08, RaceHudObjectDrawPauseMenu)
