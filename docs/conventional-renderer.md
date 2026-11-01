@@ -1,4 +1,4 @@
-# A conventional renderer (a plan; steps 1 and 2 done, 2b designed)
+# A conventional renderer (a plan; steps 1, 2 and 2b done)
 
 Written 2026-11-01. This is a map and a plan only. No code has changed,
 and nothing here was built, run or profiled for it. It is built from
@@ -510,7 +510,7 @@ The checks:
 | **0** | **Measure and log.** A render thread profile on the current code (a baseline: none since the setters, shaders and render queue went native). A pass log for one race frame and one menu frame. For each pass it records: the targets set; the draws; each resolve (rect, flags, destination); whether the source is drawn into again before the next clear; and whether each destination is sampled before it's resolved into, within the frame. Also whether game code outside the replay reads the register shadow (a watch on its blocks for a race) | Nothing; it settles the open rows of section 2 | The log; the profile | Small. **Needs the user to run it** (or the tree free of the B7 loop) |
 | **1** | **Our command handlers, feeding our interface, the game's Direct3D off the render path** (steps 1-3 merged, decision 10). The interface defined (`src/render/device.h`, no Vulkan types). Native handlers decode each command (`functions/render-commands.md`) into it: state blocks, textures, streams, shaders and declarations, constants (command 7 keeps interpolation's substitution where it is), draws, targets, viewport and scissor, clears, resolves and tiling as the renderer's own operations. The primitive drawer's draw (`PrimitiveDrawer::Draw`, under command 15) feeds it too. The Vulkan renderer reads the interface instead of the registers, and makes the translator's registers and the (vertex shader, declaration) pairs itself. Resolves are still made as copies, as now. The old path stays behind a flag until this is checked | The register shadow's writes and reads on the render path, `ReadRegisters`, the dirty masks, the PM4 packets, the kick, the shader load and patch, the recompiled handlers, `replay_hooks.cpp`, `draw_packets.cpp`, `gpu_link.cpp` | Dumps against the current renderer (`draws.txt` and pixels; differences explained); the menus and tiling by the user; `--log_blend_state`, `--log_stepping_constants`; a drive; a profile against step 0's | Large. After it, the game's Direct3D is off the render path. Its parts can land one after another behind the flag |
 | **2** | **Textures through the interface** (buffers moved to 2b, the user's call, 2026-11-01; design in "Step 2" below). Textures created, written and destroyed through the interface where the game makes, fills and frees them (the five creation paths, the four free points, the plate, the vinyl sheet), bound by handle; still uploaded at first bind (the user's call) | The fetch-constant-keyed texture lookups, memcpy's marking of written textures, the texture lifetimes' guesses (`RetireOverwritten`, `RetireMovedResolveDestinations`, the race-end flush) | Bound textures never created logged; `--native_renderer_verify_textures` over a drive (no unannounced changes); dumps against two runs' spread; the hitch log; `--log_gpu_memory` over races (no growth) | Medium |
-| **2b** | **Buffers through the interface, and GPU data out of guest memory** ("GPU data out of guest memory" in section 3). Buffers' records first (created by `Mesh::Parse`'s relocations, `CreateVertexBuffer` and `CreateIndexBuffer`, the work memory's headers; destroyed where freed), the backend fetching by address over its own arena until vertex input is per-stream. First the read watch: which resource data the CPU reads after a draw first uses it. Then each native writer whose data the CPU doesn't read hands it to `UpdateBuffer` or `UpdateTexture` into device-local memory and leaves guest memory unwritten (headers kept); data the CPU reads is written to both; memcpy's tracking stays for recompiled writers. Buffers and textures device-local; per-frame vertices through an upload ring | The mirrors (for native writers' data), most of the guest memory physical allocations for GPU data, vertex reads across PCIe | The read watch over a race and a drive (0 reads of moved data); dumps identical; a GPU-bound run (4K) and the render thread profile, before and after | Medium; risk in data the CPU reads that the watch didn't see |
+| **2b** | **Buffers through the interface, and GPU data out of guest memory** (done 2026-11-01, as "Step 2b" below: buffers only, the mirrors replaced by a device-local arena, native writers still writing guest memory; the rest of this row is the plan as first written) ("GPU data out of guest memory" in section 3). Buffers' records first (created by `Mesh::Parse`'s relocations, `CreateVertexBuffer` and `CreateIndexBuffer`, the work memory's headers; destroyed where freed), the backend fetching by address over its own arena until vertex input is per-stream. First the read watch: which resource data the CPU reads after a draw first uses it. Then each native writer whose data the CPU doesn't read hands it to `UpdateBuffer` or `UpdateTexture` into device-local memory and leaves guest memory unwritten (headers kept); data the CPU reads is written to both; memcpy's tracking stays for recompiled writers. Buffers and textures device-local; per-frame vertices through an upload ring | The mirrors (for native writers' data), most of the guest memory physical allocations for GPU data, vertex reads across PCIe | The read watch over a race and a drive (0 reads of moved data); dumps identical; a GPU-bound run (4K) and the render thread profile, before and after | Medium; risk in data the CPU reads that the watch didn't see |
 | **3** | **Passes into their textures.** The destination scan (section 5): each pass draws into its destination; depth maps sampled as depth; the swap and the format changes gone; the glow's steps into their own textures; grab passes as `CopyTexture`; tiling as one target. MSAA keeps the game's sample counts for now (resolved at the pass's end) | The resolve copies but the grab passes, `ResolveInto`'s conversions, the resolve destinations' separate images | Dumps: each destination against the step before; differences explained (precision) | Medium. The exponent bias (section 2) is decided here |
 | **4** | **MSAA as a player option** (`itc.toml`; off, 2x, 4x, 8x): one value for every target the game drew with MSAA (decision 4; the default to pick) | The 360's fixed sample counts | Dumps at each setting; the user | Small |
 | **5** | **The frame composed natively** (`unlocked-res.md`, "Later"): first read the upscale's pixel shader and check that nothing else reads `1ECB9000`; then the 3D view drawn into the frame (or its region) and the HUD over it | The partial-rect resolve and the upscale draw | Dumps; the user at 4K | Small to medium |
@@ -938,7 +938,7 @@ glow and motion blur, a race change, the menus): "game looks fine". The
 log: 0 error lines, none bound never made, no header changed unannounced,
 no aliasing; loaded textures 23-83 MB, ~1,900-2,900 handles, no growth.
 
-## Step 2b (2026-11-01, on `conventional-renderer`; design agreed)
+## Step 2b (2026-11-01, on `conventional-renderer`; done)
 
 Buffers only (the user's call, 2026-11-01): texture data stays in guest
 memory, uploaded at first bind as in step 2.
@@ -1009,7 +1009,11 @@ memory, uploaded at first bind as in step 2.
    start after a barrier on earlier submissions' vertex and index reads.
    A list's draws see the writes made before its hand-over, as with
    `mirror_to_both` now.
-3. **Native writers skip guest memory, narrowly.** `Mesh::Parse` hands its
+3. **Native writers skip guest memory, narrowly** (dropped, the user's
+   call, 2026-11-01: the copy into the arena is made on the render thread
+   at a draw, while `Mesh::Parse` runs on a loader thread from a read
+   buffer that's reused, so its data would still need a CPU copy of ours
+   first: the same cost, and the risk of CPU readers not seen). `Mesh::Parse` hands its
    vertex data to `UpdateBuffer` from the read buffer, keeping the guest
    allocation (headers, addresses and frees unchanged), only for models
    whose shapes aren't morph or skin sources; anything else writes both.
@@ -1088,6 +1092,14 @@ race `itc_3293` (60 s): 0 error lines, 0 draws left out, 0 bound never
 made, ~39 MB used. Dump `itc_3294`: `passes.txt` and `draws.txt` the same
 masked; the shown frame 4.0-5.1% from the arena's and the mirrors' runs
 (within the runs' spread, the mirrors' two ~40% apart).
+
+**The user's drive** (2026-11-01, `itc_3295`, ~2 minutes: the front end,
+a race, back to the front end): 0 error or warning lines, none bound
+never made, 0 draws left out, 0 staging full; ~9 MB of the arena used in
+the front end, ~35 MB in the race, all 3,689 freed at its end. Nothing
+was marked written by memcpy after its first draw (the wheels' morph at
+set-up writes its shapes before they're drawn), so that path is still
+unexercised in play.
 
 ## 7. Risks, and what's still unknown
 
