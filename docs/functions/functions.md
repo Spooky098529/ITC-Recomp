@@ -467,6 +467,10 @@ Rows not yet moved stay in the table below. So far:
   save steps, the career's results, the menu after the race with the
   replay list, the makers of four screens never seen in play, and the
   shared menu list's and page object's helpers (B7).
+- [`device-shaders.md`](device-shaders.md): the device's shader
+  setters under the primitive drawer (`SetVertexShader`,
+  `SetPixelShader`, `SetVertexDeclaration`) and the render queue at
+  scene + 64 that makes the drawer, with its two pass lists (B7).
 
 These files hold functions only. What used to follow the table here moved
 out on 2026-10-20: how frame interpolation works, its options and what
@@ -654,7 +658,6 @@ old performance notes to the end of `../native-renderer.md`.
 | `sub_8229E9D0` | | | From `sub_822A0718` (r4 the write position, r6 `822A0688`, r7 from +13240 and +11596); writes packets. Not read. |
 | `sub_825BED08` | | | Graphics library; calls `sub_822A3B90`, sets +10811 bit 6. Not read. |
 | `sub_825BE708` | `DrawIndexedVertices` | Overridden | Exclusive mode, without its packets (`src/native/draw_packets.cpp`). Predicated draws (the device's tiling flags, bit 2) and `--native_renderer_library_packets` still run the original there, so it runs in play (coverage, 2026-10-21). |
-| `sub_822A8808` | `Device::SetVertexShader` | Wrapped | Same file: marks a rebind of the bound shader, so `AddRef` and `Release` skip it. |
 | `sub_822AE340` | | Wrapped | `src/native/replay_hooks.cpp`: keeps the patched copy of a vertex shader's microcode (made when the GPU may still use the original) for the native renderer. |
 | `sub_825BD8F0` | `BeginVertices` | Wrapped | Same file: an inline vertex draw noted, then handed to the native renderer (in commands 15 and 19). |
 | `sub_825BDDA0` | `EndVertices` | Wrapped | Same file: an inline vertex draw noted, then handed to the native renderer (in commands 15 and 19). |
