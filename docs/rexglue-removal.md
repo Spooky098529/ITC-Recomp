@@ -189,14 +189,20 @@ goes in `src/` as overrides), American English.
   confirm dialog, the career results, the menu after the race) native,
   and by the user's call deleted adapters a harness had kept as hooks
   (ours 3,705); its twenty-ninth run (branch `b7-loop-31-10-26-2`,
-  2026-10-31 to 11-01, 5 subsystems by the user's call, not yet merged)
+  2026-10-31 to 11-01, 5 subsystems by the user's call, merged)
   made the device's shader setters and the render queue
   (`device-shaders.md`, 25 of 25 in play, with the per-frame replay),
   the car scene (`scene.md`, 19 of 22), its second set of pools
   (`second-set.md`, 152 of 152) and the scene models' load poll
   (`load-poll.md`, 31 of 32) native, with cleanup leads finishing the
   scene loaders (78 of 78, with `XPR::GetTexture`) and the race HUD
-  machine's draws (ours 3,962). The runs' rows wait for the user's review (`docs/loops/review.md`). See
+  machine's draws (ours 3,962); its thirtieth run (branch
+  `b7-loop-01-11-26`, 2026-11-01, 2 subsystems by the user's call,
+  paused by the user, not merged) made the boot mode native
+  (`boot-mode.md`, 12 of 12 in play) and mapped the car draw
+  (`car-draw.md`, `Car::DrawUpdate` and the scene model's per-pass
+  draws, 86 rows), its migration paused after part 1 of about 16 (7 of
+  78; ours 3,988; to pick up from `docs/loops/b7-progress.md`). The runs' rows wait for the user's review (`docs/loops/review.md`). See
   "B7's loop runs" under B7, and `docs/loops/b7-progress.md`. Guest
   allocation is no longer a block (`docs/native-memory.md`); what the
   rest waits on is in `docs/loops/leads.md` (the archive loader, the

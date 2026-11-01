@@ -44,6 +44,15 @@ When the user has reviewed a run's section, its heading gets
   `Model::MorphShape`); the worker-job lead's vtable (`0x8200286C`).
   `leads.md`: the second set's per-frame passes lead deleted (covered),
   the model draws' lead cut to `sub_820C8480`.
+- `car-draw.md` migration, part 1 (a036f833, a6ae298c,
+  `--native_car_draw`): 7 rows (`Model::Draw`, `CarPart::Draw`,
+  `Matrix::Shadow` (Native, its adapter removed), `CarLighting::Gather`,
+  `LightKit::BlinkLevel`, `BlinkTimers::Advance`,
+  `SceneModel::IsNearPlayerHeight`). For review: `src/car_draw/` built
+  with `-ffp-model=strict`; `Model::Draw` and `CarPart::Draw` hand back
+  to the original as a guest call when their plain C++ answers nullopt;
+  `CarPart::Draw`'s adapter kept for the cockpit dials. The rest of the
+  migration paused by the user.
 
 ## Run 2026-10-31 23:57 (`b7-loop-31-10-26-2`)
 

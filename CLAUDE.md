@@ -463,6 +463,15 @@ kept around native bodies. Its replays logged the SDK's intermittent
 (seen before the run too; `docs/loops/review.md`). The rest waits on
 the scene models' updates, the scene's draw, `Car::DrawUpdate` and the
 leads in `docs/loops/leads.md`.
+Its thirtieth run (`b7-loop-01-11-26`, 2026-11-01, not yet merged;
+limit 2 subsystems, the user's call; summary
+`docs/loops/b7-loop-2026-11-01-1256.md`) made the boot mode native
+(`boot-mode.md`, `--native_boot_mode`, 12 of 12 in play: the boot
+movies' mode and its state machine) and mapped the car draw
+(`car-draw.md`, `Car::DrawUpdate` and the per-pass part draws,
+`--native_car_draw`); paused by the user after the car draw's part 1
+(ours 3,962 -> 3,988): the next loop continues this run from "To pick
+up" in `docs/loops/b7-progress.md` (brief `docs/loops/car-draw-brief.md`).
 Harness runs use `attract_race.sh 40` (the user's call,
 2026-10-23); a race short only because the harnesses took longer is
 no halt. B7 loop migration agents run only their subsystem's harnesses
