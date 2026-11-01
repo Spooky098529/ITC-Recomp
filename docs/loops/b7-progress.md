@@ -10,10 +10,11 @@ file's history. What's left to see in a drive, from every run:
 
 - Run started 2026-11-01 12:56 on `b7-loop-01-11-26`, from d8348c7b;
   summary `b7-loop-2026-11-01-1256.md`. Limit: 3 subsystems.
-- Subsystem 1 of 3: the modes' per-type constructors and the ring
-  record adder beside the string table (`sub_82108018`,
-  `sub_82106DB8` and the others from `Mode::Create`; the top of
-  `leads.md`). Step: mapping (agent running).
+- Subsystem 1 of 3: the boot mode (`boot-mode.md`; from the top of
+  `leads.md`, the modes' constructors beside the string table, which
+  were already ours in `game-modes.md`). Map checked (49161912: 24
+  rows, 0 errors, 10 ready groups, 1 lead added). Step: migration
+  (agent running).
 
 ## Done
 
@@ -37,3 +38,5 @@ file's history. What's left to see in a drive, from every run:
   unknown 1869). `b7_status.py`'s one check (`movies.md:117`
   `sub_82108018`: its row says never called, but it ran) was there
   before the run.
+- After the boot mode's map: ours 3962, work left 2441 (wrapped 82,
+  known 498, unknown 1861).

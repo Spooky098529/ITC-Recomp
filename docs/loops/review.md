@@ -13,7 +13,17 @@ When the user has reviewed a run's section, its heading gets
 
 ## Run 2026-11-01 12:56 (`b7-loop-01-11-26`)
 
-(Nothing yet.)
+- `boot-mode.md` (new, 49161912): 24 rows: the boot mode (type 3: the
+  movie list at `0x826C5BAC` played through a state machine at +848),
+  `BootMode::NextMode` `sub_82108018` (moved from `movies.md`, its
+  "never called" corrected: it runs every tick of a boot mode),
+  `Boot::StartMovie`, `WaitForMovie`, `EndMovie` (moved from
+  `functions.md`), `ScreenMachine::ScreenMachine`, the mode delegate's
+  thunk; 11 rows not seen in play. The modes' constructors the lead
+  named stay in `game-modes.md` (shared). `known-data.md`: the boot
+  mode, `0x826C5BA4`, `0x826C5BA8`, `0x826C5BAC`, `0x826C7960`.
+  `leads.md`: the front-end screens' constructors over
+  `ScreenMachine::ScreenMachine`.
 
 ## Run 2026-10-31 23:57 (`b7-loop-31-10-26-2`)
 
