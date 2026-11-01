@@ -45,6 +45,10 @@ The user's decisions:
 8. **The Vulkan backend translates shaders at runtime**, as now (the
    SDK's translator and the disk cache); the offline blobs are for other
    backends.
+9. **GPU data may leave guest memory now** (step 4b), ahead of the
+   decision on guest memory as a whole that B7 left "to the end", since
+   most graphics code is native. The headers stay in guest memory, and
+   so does any data the CPU also reads.
 5. **Shadows and reflections once a tick** is interpolation's question,
    not the renderer's: left out of this plan.
 6. **The work goes on its own branch** after the B7 loop's run; this
@@ -282,7 +286,8 @@ the B7 files; whether each is native is as of `b287c74c`):
   until tick replay.
 - **Guest memory's future was left "to decide at the end"** (the user's
   call, B7 step 1: one native heap over guest memory, shared with the
-  game). This would be the first data deliberately kept out of it.
+  game). GPU data is the exception, decided now (decision 9): the first
+  data deliberately kept out of it.
 
 ## 4. Frame interpolation's dependencies
 
@@ -561,11 +566,7 @@ destinations and readers come from the docs' trace and dumps (one trace,
 
 ## 8. Questions still open
 
-Answered 2026-11-01 (decisions 4, 7 and 8 above). Left open:
+Answered 2026-11-01 (decisions 4, 7, 8 and 9 above). Left open:
 
 1. **MSAA's default value** in `itc.toml` (off, 2x, 4x or 8x), to pick
    at step 6.
-2. **GPU data kept out of guest memory** (step 4b) would be the first
-   data deliberately not in guest memory, where the B7 decision left
-   guest memory's future "to decide at the end". Is that fine for the
-   GPU's data now, with the headers staying?
