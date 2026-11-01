@@ -499,9 +499,11 @@ The checks:
   computes both ways on every draw and logs the mismatches over a race.
 - **No harnesses** (decision 10): render-path code isn't compared with
   the recompiled code; the dumps and the drives judge it.
-- **Render thread profiles** (`profile_render_thread.sh`, two or three
-  runs a build, alternating): a step may be faster, but none should be
-  slower unseen.
+- **Render thread profiles: not until the conventional renderer's work is
+  all done** (the user's call, 2026-11-01). Steps are checked by dumps,
+  logs and drives only; profiling (`profile_render_thread.sh`, two or
+  three runs a build, alternating, against step 0's baseline) comes once
+  at the end. Steps 1 and 2 were profiled before this call.
 - **Interpolation**: `--log_blend_state` and `--log_stepping_constants`,
   then a drive by the user, for every step from 1 on.
 
