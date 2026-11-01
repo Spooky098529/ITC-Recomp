@@ -49,6 +49,24 @@ Shared, with rows elsewhere: the point set-ups (`PartsPoints::Reset`,
 objects' per-frame passes. Fields: `../known-data.md` ("scene model",
 "second set objects").
 
+Made native by the B7 loop's migration (2026-11-01, `--native_load_poll`,
+plain C++ in `src/load_poll/load_poll.cpp`, adapters in
+`src/hooks/load_poll.cpp`, harness `load_poll`): 32 of 32, the poll
+itself included. The finishers and apply steps the diagnostics wrap
+(`--find_per_frame_state`, `--debug_hide`) run natively inside those wraps
+(`ITC_FRAME_STATE_WRAP_LOAD_POLL` in `src/debug/frame_state_diff.cpp`),
+kept for their recompiled callers (`Car::DrawUpdate`,
+`CarScene::LoadsDone`, the front end); the poll calls their plain C++.
+Natively only with the callees' plain C++ native (`--native_second_set`,
+`--native_scene_loaders`, `--native_car_models`, native memcpy,
+`--native_heap`, `--native_models`, `--native_material_passes`), else the
+originals. The wheels' `SetMaterials` frames (`Wheels::BindTextures`,
+`Wheels::ApplyPalette`) are set as the originals set them and their
+unwritten words passed on as the stack leaves them; the flush mode is left
+as the point set-ups' last float step leaves it. The two functions never
+seen in play under `SceneModel::ApplyPaint` and `SceneInterior::SetGauges`
+(and `sub_820D3658` in `material-passes.md`) were ported with them.
+
 Constants: `[0x82000A30]` is 1.0 and `[0x82000A34]` 0.0 (as in
 `second-set.md`). `[0x826C2E44]` is the scene.
 
