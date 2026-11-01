@@ -652,6 +652,8 @@ void ReleaseBs(Context& h, Random& r, uint32_t block) {
     GuestFunction recompiled, native;
     int target;  // the object's pool for a release's own cases, -1 ReleaseB's
     bool car_models_off;
+    bool node = false;   // a destructor's: the object off any list or alone on one
+    bool flags = false;  // r4 the deleting destructor's flags (bit 0 clear)
   };
   const Group groups[] = {
       {"ScenePools::ReleaseB (sub_820C5C88, with SceneModel::Release sub_820DA5D0 and "
@@ -665,6 +667,10 @@ void ReleaseBs(Context& h, Random& r, uint32_t block) {
        hooks::SecondSetSceneCockpitRelease, 2, false},
       {"SceneModel::Release (sub_820DA5D0, no first-set objects)", __imp__sub_820DA5D0,
        hooks::SecondSetSceneModelRelease, 7, false},
+      {"SceneCockpit::~SceneCockpit (sub_820DC2F8, no cockpit body)", __imp__sub_820DC2F8,
+       hooks::SecondSetSceneCockpitDestruct, 2, false, true},
+      {"SceneCockpit's deleting destructor (sub_820DC448, no cockpit body)", __imp__sub_820DC448,
+       hooks::SecondSetSceneCockpitDeletingDestruct, 2, false, true, true},
   };
   for (const Group& g : groups) {
     Results results(g.name);
@@ -679,7 +685,21 @@ void ReleaseBs(Context& h, Random& r, uint32_t block) {
           [&](PPCContext& t) {
             const ReleaseWorld w = MakeReleaseWorld(h.base, block, r);
             if (g.target >= 0) {
-              t.r3.u64 = w.objects[g.target];
+              const uint32_t object = w.objects[g.target];
+              t.r3.u64 = object;
+              if (g.node) {
+                // Its list (past the set's lists): off it, or alone on it.
+                const uint32_t list = w.set + 5072;
+                const bool on = r.Below(2) == 0;
+                Put(h.base, object + 4, on ? list : 0);
+                Put(h.base, object + 12, 0);
+                Put(h.base, list + 0, object);
+                Put(h.base, list + 4, object);
+                Put(h.base, list + 8, 1);
+              }
+              if (g.flags) {
+                t.r4.u64 = r.Next() & ~1ull;
+              }
               return;
             }
             t.r3.u64 = w.set;

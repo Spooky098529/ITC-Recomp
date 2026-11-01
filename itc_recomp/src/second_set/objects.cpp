@@ -518,6 +518,26 @@ bool PoolObjectDeletingDestruct(uint8_t* base, uint32_t object, uint32_t flags, 
   return true;
 }
 
+bool SceneCockpitDestruct(uint8_t* base, uint32_t object, uint32_t stack,
+                          const ReleaseCalls& calls) {
+  ITC_NATIVE_RUNNING("sub_820DC2F8 SceneCockpit::~SceneCockpit");
+  const uint32_t sp = stack - 96;
+  Store(base, object + 0, 0x8200527C);
+  if (!SceneCockpitRelease(base, object, sp, calls)) {
+    return false;
+  }
+  CockpitPointsDestruct(object + 192);
+  Store(base, object + 0, kPoolObjectVtable);
+  scene_loaders::PoolNodeDestruct(base, object);
+  return true;
+}
+
+bool SceneCockpitDeletingDestruct(uint8_t* base, uint32_t object, uint32_t flags, uint32_t stack,
+                                  const ReleaseCalls& calls) {
+  ITC_NATIVE_RUNNING("sub_820DC448 SceneCockpit::DeletingDestructor");
+  return (flags & 1) == 0 && SceneCockpitDestruct(base, object, stack - 112, calls);
+}
+
 void SceneModelBlockConstruct(uint8_t* base, uint32_t block) {
   ITC_NATIVE_RUNNING("sub_820DA108 SceneModelBlock::SceneModelBlock");
   for (const uint32_t at : {28u, 44u, 60u, 76u}) {

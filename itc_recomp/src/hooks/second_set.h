@@ -149,6 +149,12 @@ second_set::ReleaseCalls SecondSetReleaseCalls(PPCContext& ctx, uint8_t* base);
 void SecondSetReleaseB(PPCContext& ctx, uint8_t* base);
 void SecondSetSceneCockpitRelease(PPCContext& ctx, uint8_t* base);
 void SecondSetSceneModelRelease(PPCContext& ctx, uint8_t* base);
+// SceneCockpit::~SceneCockpit sub_820DC2F8 (no adapter: only its deleting
+// destructor calls it; the harness's) and the deleting destructor
+// sub_820DC448 (r3 the object, left; r4 the flags, bit 0 to the original):
+// natively where pool 2's release is (else the original).
+void SecondSetSceneCockpitDestruct(PPCContext& ctx, uint8_t* base);
+void SecondSetSceneCockpitDeletingDestruct(PPCContext& ctx, uint8_t* base);
 // The destructors and deleting destructors (objects.h; r3 the object, left;
 // r4 the flags), natively where their releases are (else the original), and
 // the point blocks' destructors (blocks.h; r3 as the original leaves it).

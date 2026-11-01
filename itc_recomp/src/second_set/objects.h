@@ -157,6 +157,17 @@ bool SceneWheelsDeletingDestruct(uint8_t* base, uint32_t object, uint32_t flags,
 bool SceneTrafficDeletingDestruct(uint8_t* base, uint32_t object, uint32_t flags, uint32_t stack);
 bool PoolObjectDeletingDestruct(uint8_t* base, uint32_t object, uint32_t flags, uint32_t stack);
 
+// SceneCockpit::~SceneCockpit (sub_820DC2F8): the vtable (0x8200527C),
+// SceneCockpit::Release, CockpitPoints::~CockpitPoints(+192), the base
+// vtable, PoolNode::~PoolNode; false where the release declines (only the
+// vtable word written). Its deleting destructor (sub_820DC448, vtable slot
+// 0): operator delete when bit 0 of `flags` is set, left to the original
+// (false, nothing done). The object is the r3 they leave.
+bool SceneCockpitDestruct(uint8_t* base, uint32_t object, uint32_t stack,
+                          const ReleaseCalls& calls);
+bool SceneCockpitDeletingDestruct(uint8_t* base, uint32_t object, uint32_t flags, uint32_t stack,
+                                  const ReleaseCalls& calls);
+
 // SceneModelBlock::SceneModelBlock (sub_820DA108): 1.0 into the w's of the
 // matrix at +16, the four at +80 and the four at +336, and +668, +684. Leaf;
 // r3 left.

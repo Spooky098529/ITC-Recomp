@@ -74,7 +74,8 @@ ITC_FLAG_BOOL(native_second_set, true, "ITC",
               "sub_820E2E10, ~SceneInterior sub_820E5178, ~SceneLights sub_820DDE00, ~SceneWheels "
               "sub_820ECDD0 (where their releases run natively) and ~SceneTraffic sub_820E69F0, the "
               "deleting destructors sub_820DB7C8, sub_820E2F78, sub_820E53A0, sub_820DE090, "
-              "sub_820ECEB8, sub_820E6ED8 and the pool objects' base class's sub_820DB400 (without "
+              "sub_820ECEB8, sub_820E6ED8, SceneCockpit's sub_820DC448 (with ~SceneCockpit sub_820DC2F8, no "
+              "adapter: only it calls it) and the pool objects' base class's sub_820DB400 (without "
               "operator delete: r4 bit 0 goes to the original), the point blocks' destructors "
               "sub_820E2C10, sub_820DC258, sub_820E50C0, sub_820DDD90, sub_820ECCB8 and "
               "sub_820E6980, the model's shape accessors Model::StreamData sub_82594A60, StreamSize "
@@ -431,6 +432,28 @@ ITC_SECOND_SET_POINTS_DESTRUCT(LightPointsDestruct)
 ITC_SECOND_SET_POINTS_DESTRUCT(WheelPointsDestruct)
 ITC_SECOND_SET_POINTS_DESTRUCT(TrafficPointsDestruct)
 
+void SecondSetSceneCockpitDestruct(PPCContext& ctx, uint8_t* base) {
+  if (DestructNative(2)) {
+    ctx.fpscr.disableFlushMode();
+    const ss::ReleaseCalls calls = SecondSetReleaseCalls(ctx, base);
+    if (ss::SceneCockpitDestruct(base, ctx.r3.u32, ctx.r1.u32, calls)) {
+      return;
+    }
+  }
+  __imp__sub_820DC2F8(ctx, base);
+}
+
+void SecondSetSceneCockpitDeletingDestruct(PPCContext& ctx, uint8_t* base) {
+  if (DestructNative(2)) {
+    ctx.fpscr.disableFlushMode();
+    const ss::ReleaseCalls calls = SecondSetReleaseCalls(ctx, base);
+    if (ss::SceneCockpitDeletingDestruct(base, ctx.r3.u32, ctx.r4.u32, ctx.r1.u32, calls)) {
+      return;
+    }
+  }
+  __imp__sub_820DC448(ctx, base);
+}
+
 void SecondSetSceneTrafficDestruct(PPCContext& ctx, uint8_t* base) {
   ss::SceneTrafficDestruct(base, ctx.r3.u32);
 }
@@ -757,6 +780,7 @@ ITC_SECOND_SET(820DE090, SecondSetSceneLightsDeletingDestruct)
 ITC_SECOND_SET(820ECEB8, SecondSetSceneWheelsDeletingDestruct)
 ITC_SECOND_SET(820E6ED8, SecondSetSceneTrafficDeletingDestruct)
 ITC_SECOND_SET(820DB400, SecondSetPoolObjectDeletingDestruct)
+ITC_SECOND_SET(820DC448, SecondSetSceneCockpitDeletingDestruct)
 ITC_SECOND_SET(820DC258, SecondSetCockpitPointsDestruct)
 ITC_SECOND_SET(820E0590, SecondSetScenePartsRelease)
 ITC_SECOND_SET(820E3890, SecondSetSceneInteriorRelease)
