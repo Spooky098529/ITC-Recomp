@@ -13,7 +13,15 @@ When the user has reviewed a run's section, its heading gets
 
 ## Run 2026-10-31 23:57 (`b7-loop-31-10-26-2`)
 
-- Nothing yet.
+- `device-shaders.md` (new, 112775ae): 9 rows: `D3DDevice_SetVertexShader`
+  `sub_822A8958` and `Device::SetVertexShader` `sub_822A8808` (moved
+  from `functions.md`, Wrapped by `src/native/refcount.cpp`'s rebind
+  skip), `SetPixelShader` `sub_822A8618`, `SetVertexDeclaration`
+  `sub_822A8960`, `RenderQueue::RenderQueue` `sub_825915E0` (scene +
+  64), `PassList::PassList` `sub_82590B38`, `PassList::Clear`
+  `sub_8258EB38`, and two destructors not seen in play. `known-data.md`:
+  device +12432, +12436, +11552, +13156; the render queue at scene +
+  64. `leads.md`: the render queue's methods.
 
 ## Run 2026-10-31 16:54 (`b7-loop-31-10-26`, continued)
 

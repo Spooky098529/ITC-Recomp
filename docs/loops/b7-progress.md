@@ -14,8 +14,13 @@ file's history. What's left to see in a drive, from every run:
 - Subsystem 1 of 3: the graphics device's side under the primitive
   drawer (`sub_822AA018`, `sub_822A9EE8`, `sub_822A8958`,
   `sub_822A8618`, `sub_822A8960`, `sub_825915E0`), the top of
-  `leads.md` (the first two already in `shader-objects.md`). Step:
-  mapping agent running.
+  `leads.md` (the first two already in `shader-objects.md`). Map
+  checked (112775ae: `device-shaders.md`, 9 rows, 7 in play: the
+  device's SetVertexShader with its entry, SetPixelShader,
+  SetVertexDeclaration, the render queue's constructor and pass lists;
+  `sub_822A8808`'s row moved from `functions.md`, Wrapped by
+  `src/native/refcount.cpp`; 4 ready groups, no outside blockers; 1
+  lead added; no subagents). Step: migration agent running.
 
 ## Done
 
@@ -37,5 +42,7 @@ file's history. What's left to see in a drive, from every run:
   unknown 2080). `b7_status.py`'s one check (`movies.md:117`
   `sub_82108018`: its row says never called, but it ran) was there
   before the run.
+- After the device shaders' map: ours 3705, work left 2694 (wrapped
+  101, known 519, unknown 2074).
 
 ## Stopped
