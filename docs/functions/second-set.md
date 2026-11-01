@@ -1,0 +1,265 @@
+# Known functions: the second set's objects
+
+The second set of the car scene's object pools (`[0x826C2E44]` + 4944 +
+12 × pool, `scene.md`): the eight objects `sub_820C8DE8`
+(`car-models.md`) allocates (`VirtualAlloc`, the pool's record count
+each) and constructs after copying the scene's set-up record, each
+linked into its pool's list as a `PoolNode` (`scene-loaders.md`) with
+its +20 the index in the pool: pool 0 the car model (`SceneCarModel`,
+3,744 bytes), 1 the parts (`SceneParts`, 37,296), 2 the cockpit body
+(`SceneCockpit`, 4,320), 3 the interior (`SceneInterior`, 11,680), 4
+the light kit (`SceneLights`, 13,168: the neons, LEDs and spots of the
+front bumper, side skirts and rear bumper, by their shapes' names; what
+`scene-models.md` calls pool 4), 5 the wheels (`SceneWheels`, 16,800),
+6 the traffic body (`SceneTraffic`, 9,808) and 7 the scene models
+(`SceneModel`, 5,120). This file holds their lifetimes (each class's
+constructor, reset, release, destructor and deleting destructor, the
+last a vtable slot 0 that `ScenePools::DestroyB` calls with r4 = 0,
+`scene.md`) and their point records: 240-byte records
+(`PointRecord`) a node or a shape of a part model is found into, named
+from tables of strings in the image (`*` matches any character,
+`NameMatches`), one block of them per object, grouped by part (the
+bumpers, doors, lights, dials, seats, wheels and the rest), made by the
+constructors, cleared and named again by the resets, and filled by the
+point set-ups (the `Find` functions) the parts' finishers call once the
+part models have arrived (`sub_820DBFF8`, `sub_820DDA60`,
+`sub_820E4140`, `sub_820E5A68`, `sub_820E8908` and, under
+`sub_820E05E0`, `sub_820E2E68`; rows in `functions.md` and the load
+poll's lead). The wheels' set-ups also morph the tire, rim and brake
+models to the car's sizes (`Morph::`, over the model class's shape
+accessors), when the wheels record's +8 is 0. The set-up side (each
+object's `SetUp`, `Link` and `Apply`, the scene model's build) is in
+`scene-models.md`; the first set's loading objects these claim are in
+`scene-loaders.md`.
+
+Read by the B7 loop's mapping agent (2026-11-01) from the lead of the
+second set's objects' makers, with three leads folded in (the release,
+pools 0 to 7; the point set-ups; the deleting destructors and the
+morph they reach). Read in full except where a row says otherwise. The
+name tables are in `.data` (`0x826025F4`-`0x82602A1B`) for pools 1, 3,
+5 and 6, in `.rdata` (`0x82005238`-`0x8200527B`, `0x820055F0`-
+`0x820056C7`) for pools 2 and 4; they were read from the image
+(`itc/xex_image/default.bin`). Shared, with rows elsewhere:
+`PoolNode::PoolNode`, `~PoolNode`, `ScenePools::ReleaseA`,
+`ModelPoint::Find` (`sub_820D02D0`, the node search), `NameMatches`
+and `sub_820D0960` (an allocation into a word) in `scene-loaders.md`;
+`CarRecord::Reset` (`sub_820D0A98`), `sub_820D45B0` (the car record's
+w's), `SceneModelRecord::SceneModelRecord`, `Reset` and the records'
+defaults (`sub_820D3558`, `sub_820D3840`, `sub_820D34B8`,
+`sub_820D3900`, `sub_820D34E0`, `sub_820D3B38`) in `scene-models.md`;
+`ScenePools::ReleaseB` (`sub_820C5C88`, Wrapped) and the parts'
+finishers in `functions.md`; `PartModel::ScaleBlended`,
+`PartModel::SetTexture`, `sub_820D3600` and `sub_820D3638` (the car
+block's sets) in `material-passes.md`; `FreePagesIn` (`sub_820D09A0`)
+in `scene.md`; `Matrix::Copy` in `matrix-math.md`; `memcpy` and
+`memset` in `c-runtime.md`; `VirtualAlloc` and `operator delete` in
+`heap.md`; the empty destructor `sub_82106540` (each point record's) in
+`audio.md`; `DebugPrintf` (`sub_825A1318`) in `device-shaders.md`. Not
+here: the objects' per-frame passes and the wheels' per-frame morphs
+(`sub_820E9318`, `sub_820EA148`, `sub_820EB388`, `sub_820EBEB8` and
+their `sub_82595110`, which also run `Morph::Blend`) and the load poll
+with the finishers: leads in `../loops/leads.md`. Fields:
+`../known-data.md` ("point record", "second set objects").
+
+Constants: `[0x82000A30]` is 1.0 and `[0x82000A34]` 0.0;
+`[0x82005FE4]` is 5.0, `[0x82006420]` 3.0 (read from the image).
+
+Status:
+
+- **Native**: plain C++ in `itc_recomp/src/` that doesn't use the
+  PowerPC context (`ctx`): normal arguments and host structs (it may
+  still read and write guest memory through `src/guest.h` while
+  recompiled code shares the data). The game reaches it without `ctx`,
+  from native or overridden callers, and the recompiled original is no
+  longer called (except behind a fallback flag or to check against it).
+  No `REX_FUNC` override of it exists, not even an adapter kept only for
+  a harness (that's Overridden until the adapter goes).
+  The end state for every function.
+- **Overridden**: an `extern "C" REX_FUNC(sub_XXXXXXXX)` override in
+  `itc_recomp/src/` (or a macro defining one) does the work instead of
+  the original: a thin adapter in front of native code, or a body that
+  still uses `ctx` (calling guest code, reading registers). It may call
+  the original when its flag is off, or to check itself against it.
+- **Wrapped**: an override that does something of its own (skipping
+  render-only passes, logging, timing) and still calls the original
+  (`__imp__sub_XXXXXXXX`) for the work.
+- **Dropped**: its work isn't needed on PC (hardware set-up, kernel calls
+  the SDK already stubbed), so it no longer runs: an override in
+  `itc_recomp/src/` replaces it with nothing (or a fixed return value), or
+  its callers, made native, leave the call out (no override then; the row
+  says which caller). Logs, a harness or the renderer's frame dumps have
+  shown that nothing reads what it did. The original is no longer called,
+  except behind a fallback flag while the drop is being checked. A
+  function the game never calls in the first place isn't Dropped: its
+  status stays blank and its row says it's never called.
+- **Merged**: its work is done inside a native caller's plain C++ (a
+  few lines only that caller needs), so it has no function or override of
+  its own in `itc_recomp/src/`. The row names the caller(s) and the
+  harness that covers the work. The original is no longer called, except
+  behind the caller's fallback flag.
+- **Patched**: the generated code was edited in place (search for
+  `PATCH:`).
+
+A function usually moves from recompiled or Wrapped to Overridden to
+Native as the `ctx` edge moves up through its callers, or straight to
+Dropped when its work isn't needed.
+`itc_recomp/tools/check_function_statuses.py` checks this column, in
+every file of the tables, against `src/` (an override marked Native, a
+status with no override, an override with no row, a row in two files);
+run it after changing either, on any branch.
+
+| Address | Name | Status | Notes |
+|---|---|---|---|
+| `sub_820D0270` | `PointRecord::PointRecord` | | r3 = a 240-byte point record: the w's of its nine rows at +16 + 16k (+28 to +156) = 1.0 (`[0x82000A30]`), then `PointRecord::Clear` (which overwrites them). Returns r3. 21 callers seen, the point blocks' constructors here. |
+| `sub_820CEA08` | `PointRecord::Clear` | | r3 = a point record: +0, +4, +8 = 0; +224 and +228 = -1; two identity matrices (built from `vupkd3d` of zero, `memcpy` from its 208-byte frame) at +16 and +80; +144 = (0.0, 0.0, 0.0, 1.0) (`[0x82000A34]` × 3, `[0x82000A30]`); the names at +160 and +192 emptied (their first byte 0). 50 call sites: `PointRecord::PointRecord` and the point blocks' resets here. |
+| `sub_820CE8D8` | `PointRecord::SetNode` | | r3 = a point record, r4 = a string: copied (with its 0) into +160, the node name `ModelPoint::Find` (`scene-loaders.md`) looks for. Leaf. 12 callers, the resets whose records are nodes. |
+| `sub_820CE900` | `PointRecord::SetShape` | | r3 = a point record, r4 = a string: copied into +192, the shape name `ModelPoint::FindShape` looks for. Leaf. 49 call sites, the resets here. |
+| `sub_820CEB30` | `ModelPoint::FindShape` | | r3 = a point record, r4 = a part model: +228 = -1, +0, +4, +8 = 0, +16 the identity (`memcpy` from its frame). Then over the model's nodes (+408 of them, 192 bytes each at `[+36]`): a node whose +40 isn't -1 names a shape (544 bytes each at `[+40]`, `models.md`); the first shape whose name (its +0) matches the record's +192 (`NameMatches`, `scene-loaders.md`) gives +4 = the model, +8 = the shape, +228 = the node's +40 (the shape's index), and returns 1. Else 0 (the record left cleared). 27 callers seen, the point set-ups here. |
+| `sub_820DB770` | `SceneCarModel::SceneCarModel` | | Pool 0 (3,744 bytes): r3 = the object, r4 = its list: `PoolNode::PoolNode`, vtable `0x82005130`, +20 = -1, +16 = 0; `sub_820D45B0` and `CarRecord::Reset` on the car record (+32); +24 (the first set's car model) and +3728 (the scene, `SceneCarModel::SetUp`) = 0. Returns r3. Only caller `sub_820C8DE8`. |
+| `sub_820DB6C0` | `SceneCarModel::Release` | | r3 = the object: when +24 (the first set's car model) is set, `ScenePools::ReleaseA([0x826C2E40], 0, its +20)`; `CarRecord::Reset(+32)`; +24 and +3728 = 0. From `ScenePools::ReleaseB` (pool 0) and `SceneCarModel::~SceneCarModel`. |
+| `sub_820DB720` | `SceneCarModel::~SceneCarModel` | | r3 = the object: vtable `0x82005130`, `SceneCarModel::Release`, vtable `0x82004F90` (the pool objects' base), `PoolNode::~PoolNode`. Only caller `SceneCarModel::DeletingDestructor`. |
+| `sub_820DB7C8` | `SceneCarModel::DeletingDestructor` (probably) | | r3 = the object, r4 = flags: `SceneCarModel::~SceneCarModel`, then `operator delete` when bit 0 is set; returns r3. No direct callers (vtable `0x82005130` slot 0; `ScenePools::DestroyB` passes 0). |
+| `sub_820E2F18` | `SceneParts::SceneParts` | | Pool 1 (37,296 bytes): r3 = the object, r4 = its list: `PoolNode::PoolNode`, vtable `0x82006024`, +16 = 0, +20 = -1; `PartsPoints::PartsPoints(+176)`; `SceneParts::Reset`. Returns r3. Only caller `sub_820C8DE8`. |
+| `sub_820E0510` | `SceneParts::Reset` | | r3 = the object: `sub_820D3558` on the parts record (+108); `PartsPoints::Reset(+176)`; +24, +28, +100, +104 (the first set's parts) and +37280 = 0; +37284 = 0, then the scene (`[0x826C2E44]`); `memset(+32, 0, 68)` (a tail call). From `SceneParts::SceneParts` and `SceneParts::Release`. |
+| `sub_820E0590` | `SceneParts::Release` | | r3 = the object: when +104 is set, `ScenePools::ReleaseA([0x826C2E40], 1, its +20)`; then `SceneParts::Reset`. From `ScenePools::ReleaseB` (pool 1) and `SceneParts::~SceneParts`. |
+| `sub_820E2E10` | `SceneParts::~SceneParts` | | r3 = the object: vtable `0x82006024`, `SceneParts::Release`, `PartsPoints::~PartsPoints(+176)`, vtable `0x82004F90`, `PoolNode::~PoolNode`. Only caller `SceneParts::DeletingDestructor`. |
+| `sub_820E2F78` | `SceneParts::DeletingDestructor` (probably) | | As `SceneCarModel::DeletingDestructor` over `SceneParts::~SceneParts` (vtable `0x82006024` slot 0). No direct callers. |
+| `sub_820E2A10` | `PartsPoints::PartsPoints` | | r3 = the parts' point block (object + 176; offsets below from it): `PointRecord::PointRecord` on each group's records, then the group's reset: 11 at +0 (`ResetFrontBumper`), `InitCooling(+2656)`, 7 at +2896 (`ResetRearBumper`), `InitSideSkirts(+4592)`, 3 at +4832 (`ResetRearSpoiler`), 2 at +5552 (`ResetBonnet`), `InitLeftDoor(+6032)`, `InitRightDoor(+12128)`, 23 at +18224 (`ResetDoors`), `InitLeftMirror(+23760)`, `InitRightMirror(+24000)`, `InitMirror(+24240)`, `InitHeadlights(+24480)`, 15 at +27680 (`ResetTailLights`), 7 at +31280 (`ResetFenders`), 5 at +32960 (`ResetCabin`), 2 at +34160 (`ResetEngine`), `InitMufflers(+34640)`, 4 at +36096 (`ResetShadows`). Returns r3. Only caller `SceneParts::SceneParts`. |
+| `sub_820E00F0` | `PartsPoints::Reset` | | r3 = the block: +37088 = the scene, +37076 and +37092 = 0; then each group's reset as in `PartsPoints::PartsPoints`, the single records (+2656 `cool**_**_shape`, +4592 `ssmg**_shape`, +23760 `sm**_L_**_shape`, +24000 `sm**_R_**_shape`, +24240 `sm**_**_shape`) cleared and named inline; `PartsPoints::ResetLeftDoor` for +6032, `ResetRightDoor` +12128, `ResetHeadlights` +24480, `ResetMufflers` +34640. From `SceneParts::Reset` only. |
+| `sub_820E2C10` | `PartsPoints::~PartsPoints` | | r3 = the block: the empty destructor (`sub_82106540`) on each point record, last first. Only caller `SceneParts::~SceneParts`. Not read in detail (197 lines of the same loops). |
+| `sub_820E0258` | `PartsPoints::Find` | | r3 = the block, r4 = 17 part models by kind (0 for one not there): first +2648 = [+37076], +2644 = `[[+37084] + 24] + 6700` and +4580 = `[[+37084] + 24] + 6708` (two words of the car model's loading object; +37076 to +37084 aren't set in this file). By the scene's model set (`[+37088] + 4`): set a (0): +12112 and +18208 = [+37076], +12116 and +18212 = [+37080], +12032 and +18128 = [+37092]; else +23744 and +37056 = [+37080]. Then for each kind with a model: 0 `FindFrontBumper(+0)`, 1 `FindShape(+2656)`, 2 `FindRearBumper(+2896)`, 3 `FindShape(+4592)`, 4 `FindRearSpoiler(+4832)`, 5 `FindBonnet(+5552)`; set a: 6 `FindLeftDoor(+6032)`, 7 `FindRightDoor(+12128)`, 8 and 9 `FindShape` (+23760, +24000), 14 two `FindShape` (+34160); set b: 6 `FindDoors(+18224)`, 8 `FindShape(+24240)`, 14 the same two, 16 four `FindShape` (+36096); both: 10 `FindHeadlights(+24480)`, 11 `FindTailLights(+27680)`, 12 `FindFenders(+31280)`, 13 `FindCabin(+32960)`, 15 `FindMufflers(+34640)` (jump tables at `0x82006000` and `0x82005FE8`). Only caller `sub_820E05E0` (the load poll's lead). |
+| `sub_820DE0E0` | `PartsPoints::ResetFrontBumper` | | r3 = the group (block + 0): +2640 = 1, +2644 and +2648 = 0; 11 records cleared and named (`SetShape`) from the table at `0x826025F4` (`fb**punch_shape`, `fb**punch_cc1_shape`, `fb**punch_cc2_shape`, `fog**_shape`, `fb**wink_L_shape`, `fb**wink_R_shape`, `fb**cover_shape`, `fbmg**_shape`, `fb**num_C_shape`, `fb**num_L_shape`, `fb**num_R_shape`). From `PartsPoints::PartsPoints` and `Reset`. |
+| `sub_820DF410` | `PartsPoints::InitCooling` | | r3 = a record (block + 2656): `PointRecord::PointRecord`, `Clear`, `SetShape` with `[0x82602620]` (`cool**_**_shape`). Returns r3. Only caller `PartsPoints::PartsPoints`. |
+| `sub_820DE2C8` | `PartsPoints::ResetRearBumper` | | r3 = the group (block + 2896): +1680 = 1, +1684 = 0; 7 records named from `0x82602624` (`rb**punch_shape`, `pos**_shape`, `rb**back_shape`, `rb**wink_L_shape`, `rb**wink_R_shape`, `rbmg**_shape`, `rb**num_shape`). From `PartsPoints::PartsPoints` and `Reset`. |
+| `sub_820DF570` | `PartsPoints::InitSideSkirts` | | As `InitCooling` with `[0x82602640]` (`ssmg**_shape`), r3 = block + 4592. Only caller `PartsPoints::PartsPoints`. |
+| `sub_820DE498` | `PartsPoints::ResetRearSpoiler` | | r3 = the group (block + 4832): 3 records named from `0x82602644` (`rsmg**_shape`, `rs**_hb_shape`, `rs**_hb_01_shape`). From `PartsPoints::PartsPoints` and `Reset`. |
+| `sub_820DE548` | `PartsPoints::ResetBonnet` | | r3 = the group (block + 5552): 2 records from `0x82602650`: the first a node (`bn_**`, `SetNode`), the second a shape (`bnmg**_shape`). From `PartsPoints::PartsPoints` and `Reset`. |
+| `sub_820DF5B8` | `PartsPoints::InitLeftDoor` | | r3 = the group (block + 6032): 25 `PointRecord::PointRecord`, the w's of a matrix at +6016 (+6028 to +6076) = 1.0, `ResetLeftDoor`. Returns r3. Only caller `PartsPoints::PartsPoints`. |
+| `sub_820DE600` | `PartsPoints::ResetLeftDoor` | | r3 = the group: +6080 = 0; 25 records from `0x82602658`, the first two nodes (`dl**_rot_00`, `dl**_rot_01`), then shapes (`window_L_02_shape` and the window, door panel, mirror wink (4), `dlmg**_shape`, `normal**_L_shape`, `lambo**_L_shape` and `dp**_L_00` to `_10` shapes). From `InitLeftDoor` and `PartsPoints::Reset`. |
+| `sub_820DF610` | `PartsPoints::InitRightDoor` | | As `InitLeftDoor` over `ResetRightDoor`, r3 = block + 12128. Only caller `PartsPoints::PartsPoints`. |
+| `sub_820DE7E8` | `PartsPoints::ResetRightDoor` | | r3 = the group: 25 records from `0x826026C0` (the right door's names, `dr**_rot_00` and `_01` nodes); then `PartModel::ScaleBlended(record +4, record +228, 5.0)` (`[0x82005FE4]`) on records 7 to 10 (the mirror winkers), which does nothing as their +4 is 0 after `Clear`. Doesn't set +6080 (unlike the left door's). From `InitRightDoor` and `PartsPoints::Reset`. |
+| `sub_820DE9D0` | `PartsPoints::ResetDoors` | | r3 = the group (block + 18224): 23 records from `0x82602728` (set b's doors: `window_LR_01_shape`, the door panel, eight mirror winkers, `domg**_shape`, `dp**_LR_00` to `_10`). From `PartsPoints::PartsPoints` and `Reset`. |
+| `sub_820DF668` | `PartsPoints::InitLeftMirror` | | As `InitCooling` with `[0x826026BC]` (`sm**_L_**_shape`), r3 = block + 23760. Only caller `PartsPoints::PartsPoints`. |
+| `sub_820DF6B0` | `PartsPoints::InitRightMirror` | | As `InitCooling` with `[0x82602724]` (`sm**_R_**_shape`), r3 = block + 24000. Only caller `PartsPoints::PartsPoints`. |
+| `sub_820DF6F8` | `PartsPoints::InitMirror` | | As `InitCooling` with `[0x82602784]` (`sm**_**_shape`, set b's), r3 = block + 24240. Only caller `PartsPoints::PartsPoints`. |
+| `sub_820E1388` | `PartsPoints::InitHeadlights` | | r3 = the group (block + 24480): 13 `PointRecord::PointRecord`, the w's of a matrix at +3120 (+3132 to +3180) = 1.0, `ResetHeadlights`. Returns r3. Only caller `PartsPoints::PartsPoints`. |
+| `sub_820DF740` | `PartsPoints::ResetHeadlights` | | r3 = the group: 13 records from `0x82602788`, the first seven nodes (`hl_**`, `hl**ef_l00` to `_l03`, `_h00`, `_h01`), then shapes (`hl**add_low_shape`, `hl**add_hi_shape`, the two winkers, `hl**cover_shape`, `hlmg**_shape`); the identity into +3120 (`memcpy` from its frame). From `InitHeadlights` and `PartsPoints::Reset`. |
+| `sub_820DEBF0` | `PartsPoints::ResetTailLights` | | r3 = the group (block + 27680): 15 records from `0x826027BC`, eight nodes (`tl**_00_ef` to `_03_ef`, `br**_00_ef` to `_03_ef`, probably the tail and brake lights), then seven shapes (`tl**add_on_shape`, `br**add_on_shape`, back, two winkers, cover, `tlmg**_shape`). From `PartsPoints::PartsPoints` and `Reset`. |
+| `sub_820DECD0` | `PartsPoints::ResetFenders` | | r3 = the group (block + 31280): 7 records from `0x826027F8` (`fn**punch_shape`, two `_cc` variants, two winkers, `fnmg**_shape`, `fn**mizo_shape`). From `PartsPoints::PartsPoints` and `Reset`. |
+| `sub_820DEE88` | `PartsPoints::ResetCabin` (probably) | | r3 = the group (block + 32960): 5 records from `0x82602814` (`fender_hb_01_shape`, `fender_hb_shape`, `window01_shape`, `window02_shape`, `cpmg**_shape`). From `PartsPoints::PartsPoints` and `Reset`. |
+| `sub_820DF020` | `PartsPoints::ResetEngine` (probably) | | r3 = the group (block + 34160): 2 records from `0x82602828` (`enmg**_shape`, `bot**_shape`). From `PartsPoints::PartsPoints` and `Reset`. |
+| `sub_820E0010` | `PartsPoints::InitMufflers` | | r3 = the group (block + 34640): the w's of four matrices at +0 (+12 + 16k, 16 rows) = 1.0, five `PointRecord::PointRecord` at +256, `ResetMufflers`. Returns r3. Only caller `PartsPoints::PartsPoints`. |
+| `sub_820DF0C0` | `PartsPoints::ResetMufflers` | | r3 = the group: 5 records at +256 from `0x82602830`, four nodes (`mf**_00_ef` to `_03_ef`), then `mf**_shape`. From `InitMufflers` and `PartsPoints::Reset`. |
+| `sub_820DF128` | `PartsPoints::ResetShadows` | | r3 = the group (block + 36096): +960 = 0; 4 records from `0x82602844` (`shadow_a_00_shape` to `_02`, `shadow_b_00_shape`). From `PartsPoints::PartsPoints` and `Reset`. |
+| `sub_820DE140` | `PartsPoints::FindFrontBumper` | | r3 = the group, r4 = the bumper's part model: `ModelPoint::FindShape` on its 11 records; `PartModel::ScaleBlended(record +4, record +228, 5.0)` on records 3 to 5 (fog, two winkers); when record 8 (`fb**num_C`) found a model (+1924), that model's +456 = the group's +2644 (the car model's word, `PartsPoints::Find`). Only caller `PartsPoints::Find`. |
+| `sub_820DE328` | `PartsPoints::FindRearBumper` | | r3 = the group, r4 = a part model: `FindShape` on its 7 records; `ScaleBlended` by 1.0 on record 1 (`pos`), by 5.0 on records 2 to 4; when record 6 (`rb**num`) found a model, its +456 = the group's +1684 (block +4580). Only caller `PartsPoints::Find`. |
+| `sub_820DE4E8` | `PartsPoints::FindRearSpoiler` | | r3 = the group, r4 = a part model: `FindShape` on its 3 records; `ScaleBlended` by 5.0 on record 2, then record 1 (the `hb` shapes, probably the high brake light). Only caller `PartsPoints::Find`. |
+| `sub_820DE5B0` | `PartsPoints::FindBonnet` | | r3 = the group, r4 = a part model: `ModelPoint::Find` on record 0 (the node), `FindShape` on record 1. Only caller `PartsPoints::Find`. |
+| `sub_820DE668` | `PartsPoints::FindLeftDoor` | | r3 = the group, r4 = a part model: `ModelPoint::Find` on records 0 and 1, `FindShape` on the other 23; `ScaleBlended` by 5.0 on records 7 to 10 (the mirror winkers). Only caller `PartsPoints::Find`. |
+| `sub_820DE878` | `PartsPoints::FindRightDoor` | | As `FindLeftDoor` without the `ScaleBlended` calls. Only caller `PartsPoints::Find`. |
+| `sub_820DEA20` | `PartsPoints::FindDoors` | | r3 = the group, r4 = a part model: `FindShape` on its 23 records; `ScaleBlended` by 5.0 on records 3 to 10 (the eight winkers). Only caller `PartsPoints::Find` (set b). |
+| `sub_820DF7F0` | `PartsPoints::FindHeadlights` | | r3 = the group, r4 = a part model: `ModelPoint::Find` on records 0 to 6, `FindShape` on 7 to 12. When record 0 was found (+4 set): +3184 = the float at +16 of its node's entry in the skeleton (`[record +0] + 136`, 144 bytes an entry, by +224), then `ScaleBlended` by 5.0 on records 7 to 10 (the add-ons and winkers). Only caller `PartsPoints::Find`. |
+| `sub_820DEC58` | `PartsPoints::FindTailLights` | | r3 = the group, r4 = a part model: `ModelPoint::Find` on records 0 to 7, `FindShape` on 8 to 14; `ScaleBlended` by 5.0 on records 8 to 12. Only caller `PartsPoints::Find`. |
+| `sub_820DED20` | `PartsPoints::FindFenders` | | r3 = the group, r4 = a part model: `FindShape` on its 7 records; `ScaleBlended` by 5.0 on records 3 and 4 (the winkers). Only caller `PartsPoints::Find`. |
+| `sub_820DEED8` | `PartsPoints::FindCabin` (probably) | | r3 = the group, r4 = a part model: `FindShape` on its 5 records; `ScaleBlended` by 5.0 on records 0 and 1 (the `fender_hb` shapes). Only caller `PartsPoints::Find`. |
+| `sub_820E0080` | `PartsPoints::FindMufflers` | | r3 = the group, r4 = a part model: for records 0 to 3 (at +256), `ModelPoint::Find`, then the record's matrix (+16) copied to its frame (`memcpy`, 64) and from there to the group's matrix i (+64i, `Matrix::Copy`, whether found or not); record 4 `FindShape`. Only caller `PartsPoints::Find`. |
+| `sub_820DC3E8` | `SceneCockpit::SceneCockpit` | | Pool 2 (4,320 bytes): r3 = the object, r4 = its list: `PoolNode::PoolNode`, vtable `0x8200527C`, +16 = 0, +20 = -1; `CockpitPoints::CockpitPoints(+192)`; `SceneCockpit::Reset`. Returns r3. Only caller `sub_820C8DE8`. |
+| `sub_820DBE20` | `SceneCockpit::Reset` | | r3 = the object: +24, +28 (its interior, pool 3 of the second set), +32 (the first set's cockpit body) and +4312 = 0; +4316 = the scene; `sub_820D34B8` on the cockpit record (+36); `CockpitPoints::Reset(+192)`; +4272 = the record (+36); +4288 to +4311 = 0. From `SceneCockpit::SceneCockpit` and `SceneCockpit::Release`. |
+| `sub_820DBF88` | `SceneCockpit::Release` | | r3 = the object: when +32 is set, `ScenePools::ReleaseA([0x826C2E40], 2, its +20)`; when +28 (its interior) is set, `ScenePools::ReleaseB(+4316, 3, its +20)` (`sub_820C5C88`, Wrapped in `functions.md`); then `SceneCockpit::Reset`. From `ScenePools::ReleaseB` (pool 2) and `SceneCockpit::~SceneCockpit`. |
+| `sub_820DC2F8` | `SceneCockpit::~SceneCockpit` | | r3 = the object: vtable `0x8200527C`, `SceneCockpit::Release`, `CockpitPoints::~CockpitPoints(+192)`, vtable `0x82004F90`, `PoolNode::~PoolNode`. Only caller `SceneCockpit::DeletingDestructor`. |
+| `sub_820DC448` | `SceneCockpit::DeletingDestructor` (probably) | | As `SceneCarModel::DeletingDestructor` over `SceneCockpit::~SceneCockpit` (vtable `0x8200527C` slot 0). No direct callers. |
+| `sub_820DC190` | `CockpitPoints::CockpitPoints` | | r3 = the cockpit's point block (object + 192): `PointRecord::PointRecord` on each group's records, then its reset: 3 at +0 (`ResetFenders`), 2 at +720 (`ResetCabin`), `InitBonnet(+1200)`, 2 at +1440 (`ResetDoors`), `InitMirror(+1920)`, 8 at +2160 (`ResetHeadlights`). Returns r3. Only caller `SceneCockpit::SceneCockpit`. |
+| `sub_820DBC10` | `CockpitPoints::Reset` | | r3 = the block: `ResetFenders(+0)`, `ResetCabin(+720)`, +1200 cleared and named `[0x8200524C]` (`bnmg**_shape`), `ResetDoors(+1440)`, +1920 cleared and named `[0x82005258]` (`sm**_**_shape`), `ResetHeadlights(+2160)`; +4080 = 0. Only caller `SceneCockpit::Reset`. |
+| `sub_820DC258` | `CockpitPoints::~CockpitPoints` | | r3 = the block: the empty destructor (`sub_82106540`) on its 17 records, last first. Only caller `SceneCockpit::~SceneCockpit`. |
+| `sub_820DB878` | `CockpitPoints::ResetFenders` | | r3 = the group: 3 records named from `0x82005238` (`fn**punch_shape`, `fnmg**_shape`, `fn**mizo_shape`). From `CockpitPoints::CockpitPoints` and `Reset`. |
+| `sub_820DB930` | `CockpitPoints::ResetCabin` (probably) | | r3 = the group (+720): 2 records from `0x82005244` (`cpmg**_shape`, `window02_shape`). From `CockpitPoints::CockpitPoints` and `Reset`. |
+| `sub_820DB9E8` | `CockpitPoints::ResetDoors` | | r3 = the group (+1440): 2 records from `0x82005250` (`window_LR_02_shape`, `domg**_shape`). From `CockpitPoints::CockpitPoints` and `Reset`. |
+| `sub_820DBAA0` | `CockpitPoints::ResetHeadlights` | | r3 = the group (+2160): 8 records from `0x8200525C`, four nodes (`hl**ef_00` to `_03`), then `hlmg**_shape`, `hl**add_low`, `hl**add_hi`, `hl**cover`. From `CockpitPoints::CockpitPoints` and `Reset`. |
+| `sub_820DC0A8` | `CockpitPoints::InitBonnet` | | r3 = a record (+1200): `PointRecord::PointRecord`, `Clear`, `SetShape([0x8200524C])`. Returns r3. Only caller `CockpitPoints::CockpitPoints`. |
+| `sub_820DC0F0` | `CockpitPoints::InitMirror` | | As `InitBonnet` with `[0x82005258]`, r3 = +1920. Only caller `CockpitPoints::CockpitPoints`. |
+| `sub_820DBC88` | `CockpitPoints::Find` | | r3 = the block, r4 = six part models: `FindShape` on the fenders (3, model 4), the cabin (2 at +720, model 5), the bonnet (+1200, model 0), the doors (2 at +1440, model 1), the mirror (+1920, model 2), then `FindHeadlights(+2160, model 3)`. Only caller `sub_820DBFF8` (Wrapped, `functions.md`, the cockpit's finisher). |
+| `sub_820DBB08` | `CockpitPoints::FindHeadlights` | | r3 = the group, r4 = a part model: `ModelPoint::Find` on records 0 to 3, `FindShape` on 4 to 7; `PartModel::ScaleBlended` by 1.0 on records 5 and 6 (the add-ons). Only caller `CockpitPoints::Find`. |
+| `sub_820E5340` | `SceneInterior::SceneInterior` | | Pool 3 (11,680 bytes): r3 = the object, r4 = its list: `PoolNode::PoolNode`, vtable `0x820062E4`, +16 = 0, +20 = -1; `InteriorPoints::InteriorPoints(+160)`; `SceneInterior::Reset`. Returns r3. Only caller `sub_820C8DE8`. |
+| `sub_820E3748` | `SceneInterior::Reset` | | r3 = the object: +24 to +36 (the car model, the skeleton, the texture set and the first set's interior, `SceneInterior::Link` in `scene-models.md`) and +11656 to +11664 (+11656 the cockpit set) = 0; `sub_820D3840` on the interior record (+40); `InteriorPoints::Reset(+160)`; +11668 = the scene; the six words at +11632 (the part models `SceneInterior::Apply` sets) = 0. From `SceneInterior::SceneInterior` and `SceneInterior::Release`. |
+| `sub_820E3890` | `SceneInterior::Release` | | r3 = the object: when +36 is set, `ScenePools::ReleaseA([0x826C2E40], 3, its +20)`; then `SceneInterior::Reset`. From `ScenePools::ReleaseB` (pool 3) and `SceneInterior::~SceneInterior`. |
+| `sub_820E5178` | `SceneInterior::~SceneInterior` | | r3 = the object: vtable `0x820062E4`, `SceneInterior::Release`, `InteriorPoints::~InteriorPoints(+160)`, vtable `0x82004F90`, `PoolNode::~PoolNode`. Only caller `SceneInterior::DeletingDestructor`. |
+| `sub_820E53A0` | `SceneInterior::DeletingDestructor` (probably) | | As `SceneCarModel::DeletingDestructor` over `SceneInterior::~SceneInterior` (vtable `0x820062E4` slot 0). No direct callers. |
+| `sub_820E4FD8` | `InteriorPoints::InteriorPoints` | | r3 = the interior's point block (object + 160): `InitBody(+0)`; then `PointRecord::PointRecord` on each group's records at its +16 and the group's reset: 12 at +240 (`ResetDials`), 22 at +3152 (`ResetMeters`), 4 at +8512 (`ResetSteering`), 4 at +9488 (`ResetSeats`), 4 at +10464 (`ResetRollCage`). Returns r3. Only caller `SceneInterior::SceneInterior`. |
+| `sub_820E39B0` | `InteriorPoints::InitBody` | | r3 = a record (block + 0): `PointRecord::PointRecord`, `Clear`, `SetShape([0x82602864])` (`inmg00_Shape`). Returns r3. Only caller `InteriorPoints::InteriorPoints`. |
+| `sub_820E35D8` | `InteriorPoints::Reset` | | r3 = the block: +11440 to +11452 = 0, +11456 = 1; +0 cleared and named `inmg00_Shape`; `ResetDials(+240)`, `ResetMeters(+3152)`, `ResetSteering(+8512)`, `ResetSeats(+9488)`, `ResetRollCage(+10464)`. Only caller `SceneInterior::Reset`. |
+| `sub_820E50C0` | `InteriorPoints::~InteriorPoints` | | r3 = the block: the empty destructor on each record, last first. Only caller `SceneInterior::~SceneInterior`. Not read in detail (74 lines of the same loops). |
+| `sub_820E2FC8` | `InteriorPoints::ResetDials` | | r3 = the group: +0 = 0, +4 = -1, +8 = 0; 12 records at +16 from `0x82602868`, two nodes (`sm_hari`, `tm_hari`: the needles, `../cockpit-dial-interpolation.md`), then `sm_hari00_shape`, `tm_hari00_shape`, `speed00_shape`, `speed01_shape`, `tacho00_shape` to `02`, `digi_01_num_shape` to `03`. From `InteriorPoints::InteriorPoints` and `Reset`. |
+| `sub_820E3200` | `InteriorPoints::ResetMeters` | | r3 = the group: +0 = 0, +4 = -1, +5324 = 0; 22 records at +16 from `0x82602898`, seven nodes (`pm_00`, `pm_01`, `rm_00`, `rm_01`, `dm_00` to `_02`), then the meters' and needles' shapes (`p_meter`, `pm_hari`, `r_meter`, `rm_hari`, `d_meter`, `dm_hari`, `d_meter_box_shape`); the seven words at +5296 = 0. From `InteriorPoints::InteriorPoints` and `Reset`. |
+| `sub_820E33F0` | `InteriorPoints::ResetSteering` | | r3 = the group: 4 records at +16 from `0x826028F0` (`steer00_shape` to `03`). From `InteriorPoints::InteriorPoints` and `Reset`. |
+| `sub_820E3440` | `InteriorPoints::ResetSeats` | | r3 = the group: 4 records at +16 from `0x82602900`, two nodes (`seat_L`, `seat_R`), then `seat00_L_shape`, `seat00_R_shape`. From `InteriorPoints::InteriorPoints` and `Reset`. |
+| `sub_820E34F8` | `InteriorPoints::ResetRollCage` (probably) | | r3 = the group: 4 records at +16 from `0x82602910` (`roll01_shape`, `roll02_shape`, `tower00_shape`, `tower01_shape`). From `InteriorPoints::InteriorPoints` and `Reset`. |
+| `sub_820E3660` | `InteriorPoints::Find` | | r3 = the block, r4 = six part models: the groups' +0 (+240, +3152, +8512, +9488, +10464) = [+11444] (probably the interior record), +9492 = [+11440]; when that record's +100 isn't 0, +9496 = the scene + 784 + 464 × it (as `SceneInterior::Apply`'s +9656, `scene-models.md`). Then `FindShape(+0, model 2)`, `FindDials(+240, model 3)`, `FindMeters(+3152, model 0)`, `FindShape` on the steering's 4 records (model 5), `FindSeats(+9488, model 4)`, `FindShape` on the roll cage's 4 (model 1). Only caller `sub_820E4140` (Wrapped, `functions.md`, the interior's finisher). |
+| `sub_820E30C0` | `InteriorPoints::FindDials` | | r3 = the group, r4 = a part model: `ModelPoint::Find` on records 0 and 1 (+16, the needles), `FindShape` on 2 to 11; when the group's +4 (-1 from the reset; probably the car block) is one `sub_820D3638` or `sub_820D3600` accepts (`material-passes.md`), `PartModel::ScaleBlended` by 1.0 on records 9 to 11 (the digits). Only caller `InteriorPoints::Find`. |
+| `sub_820E3298` | `InteriorPoints::FindMeters` | | r3 = the group, r4 = a part model: `ModelPoint::Find` on records 0 to 6 (+16), `FindShape` on 7 to 21. Only caller `InteriorPoints::Find`. |
+| `sub_820E34A8` | `InteriorPoints::FindSeats` | | r3 = the group, r4 = a part model: `ModelPoint::Find` on records 0 and 1 (+16), `FindShape` on 2 and 3. Only caller `InteriorPoints::Find`. |
+| `sub_820DE030` | `SceneLights::SceneLights` | | Pool 4 (13,168 bytes; the light kit, by its names): r3 = the object, r4 = its list: `PoolNode::PoolNode`, vtable `0x820056E0`, +16 = 0, +20 = -1; `LightPoints::LightPoints(+96)`; `SceneLights::Reset`. Returns r3. Only caller `sub_820C8DE8`. |
+| `sub_820DCA40` | `SceneLights::Reset` | | r3 = the object: +24, +28 (the first set's pool 4 object), +13152 and +13156 = 0; `sub_820D34E0` on the 52-byte record (+32); `LightPoints::Reset(+96)`; +13160 = the scene; the block's +0 and its three groups' +0 (+48, +4384, +8720) = the record (+32). From `SceneLights::SceneLights` and `SceneLights::Release`. |
+| `sub_820DCB20` | `SceneLights::Release` | | r3 = the object: when +28 is set, `ScenePools::ReleaseA([0x826C2E40], 4, its +20)`; then `SceneLights::Reset`. From `ScenePools::ReleaseB` (pool 4) and `SceneLights::~SceneLights`. |
+| `sub_820DDE00` | `SceneLights::~SceneLights` | | r3 = the object: vtable `0x820056E0`, `SceneLights::Release`, `LightPoints::~LightPoints(+96)`, vtable `0x82004F90`, `PoolNode::~PoolNode`. Only caller `SceneLights::DeletingDestructor`. |
+| `sub_820DE090` | `SceneLights::DeletingDestructor` (probably) | | As `SceneCarModel::DeletingDestructor` over `SceneLights::~SceneLights` (vtable `0x820056E0` slot 0). No direct callers. |
+| `sub_820DDCF8` | `LightPoints::LightPoints` | | r3 = the block (object + 96): for its three groups (+48, +4384, +8720), 18 `PointRecord::PointRecord` at the group's +16, then the group's reset (`ResetFront`, `ResetSides`, `ResetRear`). Returns r3. Only caller `SceneLights::SceneLights`. |
+| `sub_820DC8A8` | `LightPoints::Reset` | | r3 = the block: `ResetFront(+48)`, `ResetSides(+4384)`, `ResetRear(+8720)`; +8 to +39 = 0. Only caller `SceneLights::Reset`. |
+| `sub_820DDD90` | `LightPoints::~LightPoints` | | r3 = the block: the empty destructor on each group's 18 records, last first (the rear's, the sides', the front's). Only caller `SceneLights::~SceneLights`. |
+| `sub_820DC748` | `LightPoints::ResetFront` | | r3 = the group: +0 = 0; 18 records at +16 from `0x820055F0` (`fb_neon01_shape`, `fb_led01_shape` to `11`, `fb_spot01_shape` to `06`: the front bumper's). From `LightPoints::LightPoints` and `Reset`. |
+| `sub_820DC7A0` | `LightPoints::ResetSides` | | As `ResetFront` with `0x82005638` (the side skirts' `ss_` names). From `LightPoints::LightPoints` and `Reset`. |
+| `sub_820DC7F8` | `LightPoints::ResetRear` | | As `ResetFront` with `0x82005680` (the rear bumper's `rb_` names). From `LightPoints::LightPoints` and `Reset`. |
+| `sub_820DC900` | `LightPoints::Find` | | r3 = the block, r4 = a part model: `FindGroup` on the three groups with that model. Only caller `sub_820DDA60` (Wrapped, `functions.md`, pool 4's finisher). |
+| `sub_820DC850` | `LightPoints::FindGroup` | | r3 = a group, r4 = a part model: for its 18 records, `FindShape`, then `PartModel::ScaleBlended(record +4, record +228, 1.0)`. Only caller `LightPoints::Find`. |
+| `sub_820ECE40` | `SceneWheels::SceneWheels` | | Pool 5 (16,800 bytes): r3 = the object, r4 = its list: `PoolNode::PoolNode`, vtable `0x82006638`, +16 = 0, +20 = -1; `sub_820D3B38` on the wheels record's +44 and +56 (+76, +88); `WheelPoints::WheelPoints(+192)`; `SceneWheels::Reset`. Returns r3. Only caller `sub_820C8DE8`. |
+| `sub_820E88A8` | `SceneWheels::Reset` | | r3 = the object: +24, +28 (the first set's wheels) and +16768 to +16780 (+16776 the traffic record, `sub_820E7378`) = 0; +16784 = the scene; `sub_820D3900` on the wheels record (+32); `WheelPoints::Reset(+192)`. From `SceneWheels::SceneWheels` and `SceneWheels::Release`. |
+| `sub_820E89B0` | `SceneWheels::Release` | | r3 = the object: when +28 is set, `ScenePools::ReleaseA([0x826C2E40], 5, its +20)`; then `SceneWheels::Reset`. From `ScenePools::ReleaseB` (pool 5) and `SceneWheels::~SceneWheels`. |
+| `sub_820ECDD0` | `SceneWheels::~SceneWheels` | | r3 = the object: vtable `0x82006638`, `SceneWheels::Release`, `WheelPoints::~WheelPoints(+192)`, vtable `0x82004F90`, `PoolNode::~PoolNode`. Only caller `SceneWheels::DeletingDestructor`. |
+| `sub_820ECEB8` | `SceneWheels::DeletingDestructor` (probably) | | As `SceneCarModel::DeletingDestructor` over `SceneWheels::~SceneWheels` (vtable `0x82006638` slot 0). No direct callers. |
+| `sub_820ECC48` | `WheelPoints::WheelPoints` | | r3 = the wheels' point block (object + 192), a group per part for the front and the rear: `InitTire` at +32 and +1872, `InitRimA` at +3712 and +5456, `InitRimB` at +7200 and +8944, `InitBrakes` at +10688 and +13632. Returns r3. Only caller `SceneWheels::SceneWheels`. |
+| `sub_820E85C8` | `WheelPoints::Reset` | | r3 = the block: +0 to +24 = 0 (+0 the car model, +4 a record and +8 a matrix used without one, +12 the wheels record, +16 to +24 the tire, rim and brake models, `WheelPoints::SetUp`); each group's reset (`ResetTire`, `ResetRimA`, `ResetRimB`, `ResetBrakes`, front then rear); then the rear groups' front flags = 0 (the tire's +300, +2172; the others' +12: +5468, +8956, +13644). Only caller `SceneWheels::Reset`. |
+| `sub_820ECCB8` | `WheelPoints::~WheelPoints` | | r3 = the block: the empty destructor on each record, last first. Only caller `SceneWheels::~SceneWheels`. Not read in detail (110 lines of the same loops). |
+| `sub_820E8A80` | `WheelPoints::InitTire` | | r3 = a tire group (1,840 bytes): six `PointRecord::PointRecord` at +368, the w's of two rows at +1808 (+1820, +1836) = 1.0, `ResetTire`. Returns r3. Only caller `WheelPoints::WheelPoints`. |
+| `sub_820E74B8` | `WheelPoints::ResetTire` | | r3 = the group: +352 and +356 = 0.0, +0 to +8 = 0, +300 = 1 (the front); six records at +368 from `0x8260299C` (`base_shape`, `target_00_shape` to `_04`: the morph's base and targets); the six words at +304 = -1 and at +328 = 0.0; two rows at +1808 = (0.0, 0.0, 0.0, 1.0); then `memset(+12, 0, 288)` (a tail call; the 12 entries `sub_820E6F28` fills). From `InitTire` and `WheelPoints::Reset`. |
+| `sub_820E99C0` | `WheelPoints::InitRimA` | | r3 = a rim group (1,744 bytes): seven `PointRecord::PointRecord` at +32, the w's of two rows at +1712 = 1.0, `ResetRimA`. Returns r3. Only caller `WheelPoints::WheelPoints`. |
+| `sub_820E7918` | `WheelPoints::ResetRimA` | | r3 = the group: +0 and +8 = 0, +12 = 1 (the front); seven records at +32 from `0x826029B4` (`punch_12_shape`, `punch_20_shape`, `A0_12_shape`, `A0_20_shape`, `Nut_5_n_shape`, `Nut_5_s_shape`, `Nut_4_n_shape`: probably a rim's 12- and 20-inch shapes and its nuts); two rows at +1712 = (0.0, 0.0, 0.0, 1.0) (through its frame). From `InitRimA` and `WheelPoints::Reset`. |
+| `sub_820EA8E8` | `WheelPoints::InitRimB` | | As `InitRimA` over `ResetRimB`. Only caller `WheelPoints::WheelPoints`. |
+| `sub_820E7C08` | `WheelPoints::ResetRimB` | | As `ResetRimA` with `0x826029D0` (`B0_12_shape`, `B0_20_shape`, `B1_12`, `B1_20`, `B2_12`, `B2_20`, `b_space_shape`), the rows stored directly. From `InitRimB` and `WheelPoints::Reset`. |
+| `sub_820EB320` | `WheelPoints::InitBrakes` (probably) | | r3 = a group (2,944 bytes): twelve `PointRecord::PointRecord` at +32, the w's of two rows at +2912 = 1.0, `ResetBrakes`. Returns r3. Only caller `WheelPoints::WheelPoints`. |
+| `sub_820E7F90` | `WheelPoints::ResetBrakes` (probably) | | As `ResetRimB` with twelve records from `0x826029EC` (`c_normal_09_shape`, `c_normal_18_shape`, `c_tune_09`, `c_tune_18`, `r_normal_09`, `r_normal_18`, `r_tune_09`, `r_tune_18`, `logo_09`, `logo_18`, `eff_09`, `eff_18`; probably the caliper and the rotor, stock or tuned, at two sizes) and the rows at +2912. From `InitBrakes` and `WheelPoints::Reset`. |
+| `sub_820E8668` | `WheelPoints::SetUp` | | r3 = the block: for the tires (+32, +1872): their +4 = the car record and +0 = the matrix at +6976 of the car model's loading object (`[[+0] + 24]` + 32, + 6976) when +0 is set, else the block's +4 and +8; their +8 = +12 (the wheels record); `SetUpTire` with the tire model (+16, the rear's + 464). Then, by the scene's model set (`[[0x826C2E44] + 4]`), set a's rims (+3712, +5456) or set b's (+7200, +8944): +16 and +20 = the tires' +352 and +356, +0 the same matrix (+8 without a car model), +8 = +12, `SetUpRimA` or `SetUpRimB` with the rim model (+20, + 464). Then the brakes (+10688, +13632) as the tires, `SetUpBrakes` with +24 (+ 464). Only caller `sub_820E8908` (Wrapped, `functions.md`, the wheels' finisher). |
+| `sub_820E7598` | `WheelPoints::SetUpTire` | | r3 = a tire group, r4 = the tire model: `FindShape` on its six records; +304 to +320 = the five targets' shape indices (records 1 to 5, +228). By the front flag (+300), the wheels record's (+8) +44 with its +48 and +52 (the front; the rear's +56, +60, +64), or when that is -1 the same three from the table at `0x82003EF8` (24 bytes an entry by the car record's +0, the block; from +1080 for traffic, kind 3), go to `sub_820E6F28(+12, …)`; the rows at +1808 from registers (not read). Then `sub_820E7010` (an index from the record or the table at `0x820044B0` + 1980, 44 bytes an entry, or + the record's +72 or +76; outputs +328, +352, +356). When the wheels record's +8 is 0: two buffers (`sub_820D0960`) sized by `Model::StreamSize` and `StreamSize2` of the base shape (+596), `Morph::SetUp` (the base, the five targets, the weights at +328), `Morph::Run` into them, copied over the shape's `StreamData` and `StreamData2` (`memcpy`), freed (`FreePagesIn`). Not read in detail past the calls (283 lines). Only caller `WheelPoints::SetUp`. |
+| `sub_820E79C8` | `WheelPoints::SetUpRimA` | | r3 = a rim group, r4 = the rim model: `FindShape` on its seven records; the rows at +1712 from registers (the same stores either way of +12). When the wheels record's +8 is 0: when record 0 found its model (+36), record 0's shape morphed toward record 1's by the weight at +16 (one target, as in `SetUpTire`); then record 2's toward record 3's (no check). The second morph's second copy uses the first stream's size (`StreamSize`), not `StreamSize2`, as the original does. Only caller `WheelPoints::SetUp`. |
+| `sub_820E7CA0` | `WheelPoints::SetUpRimB` | | As `SetUpRimA` with three morphs (records 0 to 1, 2 to 3, 4 to 5, each by +16), none checked, each copying both streams by their own sizes. Only caller `WheelPoints::SetUp`. |
+| `sub_820E8028` | `WheelPoints::SetUpBrakes` (probably) | | r3 = a group, r4 = the model: `FindShape` on its twelve records; `PartModel::ScaleBlended` by 1.0 on records 10 and 11 (`eff`); the rows at +2912; `PartModel::SetTexture` (`material-passes.md`); when the wheels record's +8 is 0, a weight by the record's +0 (kinds 3 and 6 apart, `[0x82006634]`) and six morphs (record 2k toward 2k + 1). Not read in detail (463 lines). Only caller `WheelPoints::SetUp`. |
+| `sub_820E6F28` | | | r3 = a tire group + 12 (12 entries of 24 bytes), r4 = an index, r5 = a float, f1 = a float: fills the entries from them with constants (`[0x8200222C]`, `[0x820021E8]`, `[0x82002D0C]`, `[0x82002A0C]`, `[0x82001BE4]`), the entry before r4 apart. Leaf. Not read in detail. From `WheelPoints::SetUpTire` and `sub_820E9318` (the per-frame passes' lead). |
+| `sub_820E7010` | | | r3 = an index into r4 (`sub_820E6F28`'s entries): a float4 to r5 (+12 = 0.0), floats to r6 and r7 (the tire's +328, +352, +356), with constants. Leaf. Not read in detail. From `WheelPoints::SetUpTire` and `sub_820E9318`. |
+| `sub_820E6E70` | `SceneTraffic::SceneTraffic` | | Pool 6 (9,808 bytes): r3 = the object, r4 = its list: `PoolNode::PoolNode`, vtable `0x82006424`, +16 = 0, +20 = -1; `sub_820D45B0` on the car record (+32); `TrafficPoints::TrafficPoints(+3728)`; `SceneTraffic::Reset`. Returns r3. Only caller `sub_820C8DE8`. |
+| `sub_820E5930` | `SceneTraffic::Reset` | | r3 = the object: `CarRecord::Reset(+32)`; `TrafficPoints::Reset(+3728)`; +9760 (the first set's traffic body), +9764, +9792 and the six words at +9768 = 0. From `SceneTraffic::SceneTraffic` and `SceneTraffic::Release`. |
+| `sub_820E5A18` | `SceneTraffic::Release` | | r3 = the object: when +9760 is set, `ScenePools::ReleaseA([0x826C2E40], 6, its +20)`; then `SceneTraffic::Reset`. Only caller `ScenePools::ReleaseB` (pool 6; the destructor doesn't release). |
+| `sub_820E69F0` | `SceneTraffic::~SceneTraffic` | | r3 = the object: vtable `0x82006424`, `TrafficPoints::~TrafficPoints(+3728)`, vtable `0x82004F90`, `PoolNode::~PoolNode`. Only caller `SceneTraffic::DeletingDestructor`. |
+| `sub_820E6ED8` | `SceneTraffic::DeletingDestructor` (probably) | | As `SceneCarModel::DeletingDestructor` over `SceneTraffic::~SceneTraffic` (vtable `0x82006424` slot 0). No direct callers. |
+| `sub_820E68E8` | `TrafficPoints::TrafficPoints` | | r3 = the block (object + 3728): `PointRecord::PointRecord` on 6 records at +16, 7 at +1472, 12 at +3152, then `ResetBody`, `ResetHeadlights`, `ResetTailLights` on them. Returns r3. Only caller `SceneTraffic::SceneTraffic`. |
+| `sub_820E5880` | `TrafficPoints::Reset` | | r3 = the block: +0 = 0; `ResetBody(+16)`, `ResetHeadlights(+1472)`, `ResetTailLights(+3152)`. Only caller `SceneTraffic::Reset`. |
+| `sub_820E6980` | `TrafficPoints::~TrafficPoints` | | r3 = the block: the empty destructor on the 12, 7 and 6 records, last first. Only caller `SceneTraffic::~SceneTraffic`. |
+| `sub_820E54E8` | `TrafficPoints::ResetBody` | | r3 = the group: 6 records from `0x8260292C` (`inmg**_shape`, `fnmg**_shape`, `fb00num_f_shape`, `fb00num_r_shape`, `fn00punch_shape`, `window01_shape`). From `TrafficPoints::TrafficPoints` and `Reset`. |
+| `sub_820E56D0` | `TrafficPoints::ResetHeadlights` | | r3 = the group: 7 records from `0x82602944`, four nodes (`hl00ef_l00` to `_l03`), then `hlmg**_shape`, `hl00add_low_shape`, `hl00cover_shape`. From `TrafficPoints::TrafficPoints` and `Reset`. |
+| `sub_820E57A0` | `TrafficPoints::ResetTailLights` | | r3 = the group: 12 records from `0x82602960`, eight nodes (`tl00_00_ef` to `br00_03_ef`), then `tlmg**_shape`, `tl00add_on_shape`, `br00add_on_shape`, `tl00cover_shape`. From `TrafficPoints::TrafficPoints` and `Reset`. |
+| `sub_820E58C8` | `TrafficPoints::Find` | | r3 = the block, r4 = six part models: `FindBody(+16, models 0 to 3)`, `FindHeadlights(+1472, model 4)`, `FindTailLights(+3152, model 5)`. Only caller `sub_820E5A68` (Wrapped, `functions.md`, the traffic body's finisher). |
+| `sub_820E5538` | `TrafficPoints::FindBody` | | r3 = the group, r4 to r7 = models 0 to 3: `FindShape` on its six records with models 3, 0, 2, 2, 0, 1. Only caller `TrafficPoints::Find`. |
+| `sub_820E5738` | `TrafficPoints::FindHeadlights` | | r3 = the group, r4 = a part model: `ModelPoint::Find` on records 0 to 3, `FindShape` on 4 to 6; `PartModel::ScaleBlended` by 3.0 (`[0x82006420]`) on record 5 (the add-on). Only caller `TrafficPoints::Find`. |
+| `sub_820E5808` | `TrafficPoints::FindTailLights` | | r3 = the group, r4 = a part model: `ModelPoint::Find` on records 0 to 7, `FindShape` on 8 to 11; `ScaleBlended` by 3.0 on records 9 and 10 (the add-ons). Only caller `TrafficPoints::Find`. |
+| `sub_820DB330` | `SceneModel::SceneModel` | | Pool 7 (5,120 bytes): r3 = the scene model, r4 = its list: `PoolNode::PoolNode`, vtable `0x82004F90` (the pool objects' base, no class vtable of its own), +20 = -1, +16 = 0; `SceneModelRecord::SceneModelRecord(+32)`; `SceneModelBlock::SceneModelBlock(+4288)`; `SceneModelRecord::Reset(+32)`; `SceneModelBlock::Reset(+4288)`; +5024 to +5112 = 0; +5116 = the scene. Returns r3. Only caller `sub_820C8DE8`. |
+| `sub_820DA5D0` | `SceneModel::Release` | | r3 = a scene model: when +5044 (the frames until the build) is 0, its parts released through `ScenePools::ReleaseB(+5116, pool, the part's +20)`: the car model (+5048, pool 0; not for traffic, kind 3 at +32), the parts (+5060, 1), the interior (+5068, 3), pool 4 (+5084, 4), the wheels (+5100, 5), the cockpit (+5076, 2), the traffic body (+5092, 6); the second wheels (+5108) aren't. Then always `SceneModelRecord::Reset(+32)`, `SceneModelBlock::Reset(+4288)`, +5024 to +5112 = 0 except +5044 = 3, +5116 = the scene. Only caller `ScenePools::ReleaseB` (pool 7). |
+| `sub_820DB400` | `PoolObject::DeletingDestructor` (probably) | | r3 = an object, r4 = flags: vtable `0x82004F90`, `PoolNode::~PoolNode`, then `operator delete` when bit 0 is set; returns r3. No direct callers: vtable `0x82004F90` slot 0, the scene models' (nothing of their own released). |
+| `sub_820DA108` | `SceneModelBlock::SceneModelBlock` (probably) | | r3 = a scene model + 4288 (736 bytes, probably its matrices): 1.0 into the w's of a matrix at +16 (+28 to +76), of four at +80 and four at +336 (+92 + 16k, +348 + 16k), and +668, +684. Leaf. From `SceneModel::SceneModel` and `sub_820DDE58` (Wrapped, `functions.md`). |
+| `sub_820D9F50` | `SceneModelBlock::Reset` (probably) | | r3 = the block: +0 (8 bytes), +8, +12 = 0; the identity at +16 and at the four matrices at +80 and the four at +336 (`memcpy` from its frame); +592 = 0; +596 to +608 = 2 and +612 to +624 = 0.0; +628 = `[0x8200296C]` (0.3), +632 = `[0x82002A10]` (0.4), +636 = `[0x82002208]` (0.2), +640 = 0.0; +656 to +684 and +692 to +700 = 0.0; +688, +724, +728 = 0; +732 = 1. From `SceneModel::SceneModel` and `SceneModel::Release`. |
+| `sub_82594A60` | `Model::StreamData` (probably) | | r3 = a model, r4 = a shape: the shape's (+40, 544 bytes each) +388. Leaf. From the wheels' four set-ups. |
+| `sub_82594A78` | `Model::StreamSize` (probably) | | As `Model::StreamData` for the shape's +268 (the size `SetUpTire` allocates and copies into +388). Leaf. From the wheels' four set-ups. |
+| `sub_82594A90` | `Model::StreamData2` (probably) | | As `Model::StreamData` for the shape's +392. Leaf. From the wheels' four set-ups. |
+| `sub_82594AA8` | `Model::StreamSize2` (probably) | | As `Model::StreamData` for the shape's +284. Leaf. From the wheels' four set-ups. |
+| `sub_82594C18` | `Morph::SetUp` (probably) | | r3 = a model, r4 = a morph record (on the caller's stack), r5 = the base shape, r6 = the targets' shape indices, r7 = their weights, r8 = the count (at most 7): +0 and +4 = the base's two streams (`[shape + 400]` + 16, `[shape + 404]` + 16), +116 = `[[shape + 400]]` (probably the vertex count), +120 = `[[shape + 404] + 4]` (the kind `Morph::Blend` picks by), +112 = the count; for each target, +16 + 4i its first stream, +48 + 4i the base's second, +80 + 4i its weight, with `DebugPrintf` (`sub_825A1318`, formats at `0x8206CD20`, `0x8206CD4C`) when its counts differ from the base's (that call never ran). 8 callers: the wheels' four set-ups and `sub_820E9318`, `sub_820EA148`, `sub_820EB388`, `sub_820EBEB8` (the per-frame passes' lead). |
+| `sub_82594D10` | `Morph::Run` (probably) | | r4 = a morph record, r5 and r6 = two output buffers: +8 = r5, +12 = r6, then `Morph::Blend(record)` (a tail call). From the wheels' four set-ups. |
+| `sub_8258BD28` | `Morph::Blend` (probably) | | r3 = a morph record: by +120, 6 `Morph::Blend6`, 7 `Morph::Blend7`, 8 `sub_8258B7E0`, else nothing (tail calls). From `Morph::Run`, `sub_82595110` (the per-frame morphs) and `sub_820AC998` (a lead). |
+| `sub_8258B578` | `Morph::Blend6` (probably) | | r3 = a morph record: the base's first stream (+0, +116 × 16 bytes) copied to the output (+8, `memcpy`); then for each target (+112), each 16-byte vector of the output += (the target's − the base's) × its weight (+80 + 4i), probably (the vector loop's operands not read in detail); then an empty loop over the output by 128 bytes (probably a cache flush the recompiler left empty). Only caller `Morph::Blend`. |
+| `sub_8258B678` | `Morph::Blend7` (probably) | | As `Morph::Blend6` for kind 7, probably with the second stream too. Not read in detail (125 lines). Only caller `Morph::Blend`. |
+| `sub_8258B7E0` | | | Not seen in play. Kind 8 of `Morph::Blend` (147 lines). Not read. |

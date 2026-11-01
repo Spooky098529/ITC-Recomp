@@ -479,6 +479,12 @@ Rows not yet moved stay in the table below. So far:
   and their load callback, its update, the first set's deferred
   texture releases, and its teardown (the two pool sets destroyed, the
   assets released, the scene freed) (B7).
+- [`second-set.md`](second-set.md): the scene's second set of object
+  pools: the eight objects' constructors, resets, releases and
+  destructors, their 240-byte point records named after the part
+  models' nodes and shapes (bumpers, doors, lights, dials, wheels) and
+  the point set-ups the parts' finishers call, with the wheels' morphs
+  to the car's tire and rim sizes (B7).
 
 These files hold functions only. What used to follow the table here moved
 out on 2026-10-20: how frame interpolation works, its options and what

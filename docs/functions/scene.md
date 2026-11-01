@@ -75,7 +75,8 @@ and `SceneModel::Build` in `scene-models.md`; `cos` in `c-runtime.md`;
 empty `sub_82106540` in `audio.md`. Not here: the scene's draw
 (`sub_820C5DE8`, with `sub_820C4EB8` and `sub_820C4FB8`, rows in
 `functions.md`), the second set's objects' makers under `sub_820C8DE8`
-and the point records they use, the parts' finishers
+and the point records they use (`second-set.md` since 2026-11-01), the
+parts' finishers
 `CarScene::LoadsDone` calls (`functions.md`, the load poll's lead), and
 the front end's scene owners (`sub_82180B00`, `sub_82179AE8`): leads in
 `../loops/leads.md`. The callers in the race and the parking area are
