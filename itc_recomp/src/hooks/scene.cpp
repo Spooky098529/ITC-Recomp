@@ -253,13 +253,12 @@ ITC_SCENE(820D09A0, SceneFreePagesIn)
 ITC_SCENE(820C4D88, SceneStartTeardown)
 ITC_SCENE(820C8950, SceneSetInteriorWord)
 ITC_SCENE(820C3DA0, SceneUpdateA)
-ITC_SCENE(820C89A8, SceneCarSceneConstruct)
-ITC_SCENE(820C4A70, SceneAssetsReset)
 ITC_SCENE(820C9110, SceneCarSceneDestruct)
-ITC_SCENE(820C8528, SceneInitLighting)
 ITC_SCENE(820C4C80, SceneAssetsRelease)
 ITC_SCENE(820C8A50, SceneCreate)
 // No adapters (their callers in play are native; the register steps above
 // are the harness's): ScenePools::StartTeardownA sub_820C3C80, DestroyA
 // sub_820C3CF8, SceneAssets::SceneAssets sub_820C5008 and ~SceneAssets
-// sub_820C5168, List::DeleteAll sub_82593FF8 and ~List sub_82594188.
+// sub_820C5168, List::DeleteAll sub_82593FF8 and ~List sub_82594188,
+// CarScene::InitLighting sub_820C8528, CarScene::CarScene sub_820C89A8 and
+// SceneAssets::Reset sub_820C4A70.
