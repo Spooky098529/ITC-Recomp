@@ -331,4 +331,5 @@ ITC_ACCESSORIES(820EF568, AccessorySetTexture)
 ITC_ACCESSORIES(820EF660, MatrixFromScaleRotationTranslation)
 ITC_ACCESSORIES(820F0820, AccessoryEntryOnLoaded)
 ITC_ACCESSORIES(820F0EB8, AccessoriesAcquire)
-ITC_ACCESSORIES(820F0A90, AccessoriesRelease)
+// Accessories::Release sub_820F0A90: no adapter (its only caller in play,
+// Interior::Release, is native; AccessoriesRelease above is the harness's).

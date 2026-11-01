@@ -501,6 +501,13 @@ void SceneLoadersCreateA(PPCContext& ctx, uint8_t* base) {
 // TrafficLoads::TrafficLoads, TrafficCar::Reset, ~TrafficCar,
 // ~TrafficLoads, and the seven constructors ScenePools::CreateA calls.
 
+// No adapters either (their callers in play are native: ScenePools::ReleaseA
+// and the destructors call their plain C++; the steps above are the
+// harness's): CarParts::Release sub_820D6D00, Cockpit::Release sub_820D6238,
+// Pool4Object::Release sub_820D6A20, Wheels::Release sub_820D8E68,
+// TrafficCar::Release sub_820D7B90, Interior::Release sub_820D75F8 and
+// ~Interior sub_820D76D8 (the B7 loop, 2026-11-01).
+
 #define ITC_SCENE_LOADERS(address, step)   \
   extern "C" REX_FUNC(sub_##address) {     \
     REX_FUNC_PROLOGUE();                   \
@@ -531,21 +538,14 @@ ITC_SCENE_LOADERS(820D4588, SceneLoadersCarModelSelectedTexture)
 ITC_SCENE_LOADERS(820D7690, SceneLoadersInteriorApplyPalette)
 ITC_SCENE_LOADERS(820D7840, SceneLoadersInteriorSetPaint)
 ITC_SCENE_LOADERS(820D7BF8, SceneLoadersTrafficApplyPalette)
-ITC_SCENE_LOADERS(820D75F8, SceneLoadersInteriorRelease)
-ITC_SCENE_LOADERS(820D76D8, SceneLoadersInteriorDestruct)
 ITC_SCENE_LOADERS(820D7960, SceneLoadersInteriorDeletingDestruct)
 ITC_SCENE_LOADERS(820C4488, SceneLoadersReleaseA)
 ITC_SCENE_LOADERS(820D7790, SceneLoadersInteriorIsLoaded)
 ITC_SCENE_LOADERS(820CE800, SceneLoadersNameMatches)
 ITC_SCENE_LOADERS(820D09B8, SceneLoadersXprFindByName)
-ITC_SCENE_LOADERS(820D6D00, SceneLoadersCarPartsRelease)
-ITC_SCENE_LOADERS(820D6238, SceneLoadersCockpitRelease)
-ITC_SCENE_LOADERS(820D6A20, SceneLoadersPool4Release)
 ITC_SCENE_LOADERS(820D6BC0, SceneLoadersPool4DeletingDestruct)
-ITC_SCENE_LOADERS(820D8E68, SceneLoadersWheelsRelease)
 ITC_SCENE_LOADERS(820D95E8, SceneLoadersWheelsDeletingDestruct)
 ITC_SCENE_LOADERS(820D5988, SceneLoadersCarModelDeletingDestruct)
 ITC_SCENE_LOADERS(820D74C0, SceneLoadersCarPartsDeletingDestruct)
 ITC_SCENE_LOADERS(820D6798, SceneLoadersCockpitDeletingDestruct)
-ITC_SCENE_LOADERS(820D7B90, SceneLoadersTrafficRelease)
 ITC_SCENE_LOADERS(820D89B8, SceneLoadersTrafficDeletingDestruct)
