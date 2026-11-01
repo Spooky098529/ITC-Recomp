@@ -561,6 +561,48 @@ std::optional<uint64_t> AfterRaceDraw(uint8_t* base, uint64_t r3, uint32_t sp,
   return callees.Call(kDrawAfterRaceMenu, frame, 0x8216C770, Holder(base, machine));
 }
 
+std::optional<uint64_t> PauseDraw(uint8_t* base, uint64_t r3, uint32_t sp, const Calls& callees) {
+  ITC_NATIVE_RUNNING("sub_8216CF08 RaceHudMachine::PauseDraw");
+  const uint32_t machine = uint32_t(r3);
+  const uint32_t kind = Load(base, machine + kKind);
+  if (kind == 0 || kind == 4) {
+    return std::nullopt;
+  }
+  const uint32_t frame = Frame(base, sp, 96);
+  if (kind > 6) {
+    return r3;
+  }
+  if (kind != 5 && !ReplayBit(base, Holder(base, machine))) {
+    callees.Call(kHudDraw, frame, 0x8216CF58, uint64_t(Holder(base, machine)) + kHud);
+    callees.Call(kHudDrawWarning, frame, 0x8216CF64, uint64_t(Holder(base, machine)) + kHud);
+    return callees.Call(kDrawPauseMenu, frame, 0x8216CF6C, Holder(base, machine));
+  }
+  callees.Call(kDrawPauseMenu, frame, 0x8216CF78, Holder(base, machine));
+  return callees.Call(kAltRunMovie, frame, 0x8216CF84, uint64_t(Holder(base, machine)) + kAltHud);
+}
+
+std::optional<uint64_t> RacePauseDraw(uint8_t* base, uint64_t r3, uint32_t sp,
+                                      const Calls& callees) {
+  ITC_NATIVE_RUNNING("sub_8216CFE0 RaceHudMachine::RacePauseDraw");
+  const uint32_t machine = uint32_t(r3);
+  const uint32_t kind = Load(base, machine + kKind);
+  if (kind == 0 || kind == 4) {
+    return std::nullopt;
+  }
+  const uint32_t frame = Frame(base, sp, 96);
+  if (kind > 6) {
+    return r3;
+  }
+  if (kind != 5 && !ReplayBit(base, Holder(base, machine))) {
+    callees.Call(kHudDraw, frame, 0x8216D030, uint64_t(Holder(base, machine)) + kHud);
+    callees.Call(kHudRunMovie, frame, 0x8216D040, uint64_t(Holder(base, machine)) + kHud, 1);
+    callees.Call(kHudDrawWarning, frame, 0x8216D04C, uint64_t(Holder(base, machine)) + kHud);
+    return callees.Call(kDrawPauseMenu, frame, 0x8216D054, Holder(base, machine));
+  }
+  callees.Call(kDrawPauseMenu, frame, 0x8216D060, Holder(base, machine));
+  return callees.Call(kAltRunMovie, frame, 0x8216D06C, uint64_t(Holder(base, machine)) + kAltHud);
+}
+
 namespace {
 
 // PauseMenu::Open(holder +1012, page, flag) as a tail call.

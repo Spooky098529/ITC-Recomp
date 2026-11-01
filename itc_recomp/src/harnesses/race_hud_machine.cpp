@@ -1281,6 +1281,27 @@ void Handlers(Context& h) {
     guest::StoreU32(h.base, data + 4, r.Below(5));
     guest::StoreU32(h.base, 0x826D851C, w.misc.address + 0x4480);
   };
+  // PauseDraw and RacePauseDraw: the draws' kinds (0 and 4, the originals'
+  // unseen screens, left out); the pause menu (holder +1012) a block of the
+  // misc one (+0x4500) whose movie (+0) is the world's, its page object
+  // ([0x826D84D8], +0x4540) with a negative running transition (+12: -1 the
+  // run of its movie, another the pages finished) and pages (+0, +4) the
+  // confirm dialog's draw doesn't follow (its draw and the transitions are
+  // the in-race screens' harness's cases).
+  const HandlerSetupFn pause_draw = [&h, &by_draw, any_movie](PPCContext& t, Random& r,
+                                                             const HudWorld& w) {
+    by_draw(t, r, w);
+    const uint32_t screen = w.misc.address + 0x4500, pages = w.misc.address + 0x4540;
+    guest::StoreU32(h.base, w.holder.address + 1012, screen);
+    guest::StoreU32(h.base, screen, any_movie(r, w));
+    guest::StoreU32(h.base, 0x826D84D8, pages);
+    guest::StoreU32(h.base, pages + 12,
+                    r.Below(2) == 0 ? 0xFFFFFFFFu : uint32_t(-2 - int32_t(r.Below(50))));
+    guest::StoreU32(h.base, pages + 16, r.Below(2) == 0 ? 0xFFFFFFFFu : r.Below(21));
+    const uint32_t page_words[6] = {0xFFFFFFFFu, 0, 1, 2, 3, 5};
+    guest::StoreU32(h.base, pages, page_words[r.Below(6)]);
+    guest::StoreU32(h.base, pages + 4, page_words[r.Below(6)]);
+  };
   struct G {
     const char* name;
     int cases;
@@ -1343,6 +1364,10 @@ void Handlers(Context& h) {
        hooks::RaceHudMachineResultsDraw, f96, true, never},
       {"RaceHudMachine::AfterRaceDraw (sub_8216C6D8, with sub_82211D10)", 150, &after_race_draw,
        __imp__sub_8216C6D8, hooks::RaceHudMachineAfterRaceDraw, f96, true, never},
+      {"RaceHudMachine::PauseDraw (sub_8216CF08, with sub_82211D08)", 150, &pause_draw,
+       __imp__sub_8216CF08, hooks::RaceHudMachinePauseDraw, f96, true, countdown_draw},
+      {"RaceHudMachine::RacePauseDraw (sub_8216CFE0, with sub_82211D08)", 150, &pause_draw,
+       __imp__sub_8216CFE0, hooks::RaceHudMachineRacePauseDraw, f96, true, countdown_draw},
   };
   for (const G& g : groups) {
     Results results(g.name);

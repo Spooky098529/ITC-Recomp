@@ -36,9 +36,12 @@ ITC_FLAG_BOOL(native_race_hud_machine, true, "ITC",
               "sub_8216CA28 (Stages::Type's and RaceScreens::Create's plain C++, Create's with "
               "--native_heap), ClosePause sub_8216C658 (PauseMenu::Close's and ApplyOptions' "
               "plain C++), ResultsDraw sub_8216D6D0 (CareerResults::Draw's and RaceHud::Draw's "
-              "plain C++; the unseen results' draws and kind 4 the original) and AfterRaceDraw "
+              "plain C++; the unseen results' draws and kind 4 the original), AfterRaceDraw "
               "sub_8216C6D8 (RaceHud::Draw's and RaceScreens::DrawAfterRaceMenu's plain C++; "
-              "kinds 0 and 4 and kind 6's unseen screen the original) natively instead of through the translated "
+              "kinds 0 and 4 and kind 6's unseen screen the original), PauseDraw sub_8216CF08 and "
+              "RacePauseDraw sub_8216CFE0 (RaceHud::Draw's, RunMovie's, DrawWarning's, "
+              "RaceScreens::DrawPauseMenu's and AltHud::RunMovie's plain C++; kinds 0 and 4 the "
+              "original) natively instead of through the translated "
               "code (the same writes; checked by --run_harnesses=race_hud_machine)");
 ITC_FLAG_DECLARE(bool, native_action_mappers);
 
@@ -141,6 +144,10 @@ class Calls {
         return race_screens::CareerResultsDraw(base, r3, r1, self.calls());
       case rhm::kDrawAfterRaceMenu:
         return rh::DrawAfterRaceMenu(base, r3, r1, self.calls());
+      case rhm::kDrawPauseMenu:
+        return rh::DrawPauseMenu(base, r3, r1, self.calls());
+      case rhm::kHudDrawWarning:
+        return rh::DrawWarning(base, r3, r1, lr, self.calls());
       case rhm::kScreensCreate:
         // As its adapter (src/hooks/race_hud_object.cpp): over the
         // allocation layer, else the guest call.
@@ -410,6 +417,18 @@ void RaceHudMachineAfterRaceDraw(PPCContext& ctx, uint8_t* base) {
   });
 }
 
+void RaceHudMachinePauseDraw(PPCContext& ctx, uint8_t* base) {
+  Handle(ctx, base, __imp__sub_8216CF08, [&](const rh::Calls& callees) {
+    return rhm::PauseDraw(base, ctx.r3.u64, ctx.r1.u32, callees);
+  });
+}
+
+void RaceHudMachineRacePauseDraw(PPCContext& ctx, uint8_t* base) {
+  Handle(ctx, base, __imp__sub_8216CFE0, [&](const rh::Calls& callees) {
+    return rhm::RacePauseDraw(base, ctx.r3.u64, ctx.r1.u32, callees);
+  });
+}
+
 void RaceHudMachineIsFirstDay(PPCContext& ctx, uint8_t* base) {
   ctx.r3.u64 = rhm::IsFirstDay(base, ctx.r1.u32);
 }
@@ -482,3 +501,5 @@ ITC_RACE_HUD_MACHINE(8216CA28, RaceHudMachineCreateScreens)
 ITC_RACE_HUD_MACHINE(8216C658, RaceHudMachineClosePause)
 ITC_RACE_HUD_MACHINE(8216D6D0, RaceHudMachineResultsDraw)
 ITC_RACE_HUD_MACHINE(8216C6D8, RaceHudMachineAfterRaceDraw)
+ITC_RACE_HUD_MACHINE(8216CF08, RaceHudMachinePauseDraw)
+ITC_RACE_HUD_MACHINE(8216CFE0, RaceHudMachineRacePauseDraw)

@@ -36,6 +36,9 @@ void RaceHudMachineCreateScreens(PPCContext& ctx, uint8_t* base);   // sub_8216C
 void RaceHudMachineClosePause(PPCContext& ctx, uint8_t* base);      // sub_8216C658
 void RaceHudMachineResultsDraw(PPCContext& ctx, uint8_t* base);     // sub_8216D6D0
 void RaceHudMachineAfterRaceDraw(PPCContext& ctx, uint8_t* base);   // sub_8216C6D8
+// PauseDraw sub_8216CF08 and RacePauseDraw sub_8216CFE0 (r3 = the machine).
+void RaceHudMachinePauseDraw(PPCContext& ctx, uint8_t* base);       // sub_8216CF08
+void RaceHudMachineRacePauseDraw(PPCContext& ctx, uint8_t* base);   // sub_8216CFE0
 // The helpers: IsFirstDay sub_8216D3F0 (no arguments), OpponentPrize
 // sub_8216C820 and ItemBonus sub_8216C938 (r4 = the item id).
 void RaceHudMachineIsFirstDay(PPCContext& ctx, uint8_t* base);

@@ -73,6 +73,8 @@ constexpr uint32_t kPauseMenuUpdate = 0x8220F638;      // PauseMenu::Update (rac
 constexpr uint32_t kPauseMenuClose = 0x8220D890;       // PauseMenu::Close (race-screens.md)
 constexpr uint32_t kCareerResultsDraw = 0x8221A2F8;    // CareerResults::Draw (race-screens.md)
 constexpr uint32_t kDrawAfterRaceMenu = 0x82211D10;    // RaceScreens::DrawAfterRaceMenu
+constexpr uint32_t kDrawPauseMenu = 0x82211D08;        // RaceScreens::DrawPauseMenu
+constexpr uint32_t kHudDrawWarning = 0x82212AC8;       // RaceHud::DrawWarning
 constexpr uint32_t kScreensCreate = 0x82211F40;        // RaceScreens::Create (race-hud-object.md)
 constexpr uint32_t kAfterRaceUpdate = 0x8221BD20;      // AfterRaceMenu::Update (race-screens.md)
 // The in-race screens' holder ([0x826D84F0]), which the pause's update reads
@@ -207,6 +209,17 @@ std::optional<uint64_t> ResultsDraw(uint8_t* base, uint64_t r3, uint32_t sp,
 // with nothing done, for kinds 0 and 4 and kind 6 with the word 1 or 3
 // (sub_8220B9E8, sub_82215D58, sub_8221EF60), never seen in play.
 std::optional<uint64_t> AfterRaceDraw(uint8_t* base, uint64_t r3, uint32_t sp,
+                                      const Calls& callees);
+// sub_8216CF08 RaceHudMachine::PauseDraw: kinds 1 to 3 and 6 without the
+// replay bit RaceHud::Draw(holder +16), DrawWarning(holder +16) and
+// DrawPauseMenu(holder); with it, and kind 5, DrawPauseMenu(holder) and
+// AltHud::RunMovie; above 6 nothing (r3 the machine). The last call's r3.
+// nullopt, with nothing done, for kinds 0 and 4 (sub_8220B9E8; sub_82215D58
+// and sub_82211590), never seen in play.
+std::optional<uint64_t> PauseDraw(uint8_t* base, uint64_t r3, uint32_t sp, const Calls& callees);
+// sub_8216CFE0 RaceHudMachine::RacePauseDraw: as PauseDraw, with
+// RaceHud::RunMovie(holder +16, 1) between Draw and DrawWarning.
+std::optional<uint64_t> RacePauseDraw(uint8_t* base, uint64_t r3, uint32_t sp,
                                       const Calls& callees);
 
 // The pause menu's openers (tail calls to PauseMenu::Open, sub_8220FA88,
