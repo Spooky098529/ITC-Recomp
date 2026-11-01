@@ -454,7 +454,8 @@ void RaceHudObjectTickPanel(PPCContext& ctx, uint8_t* base) {
 // AfterRaceUpdate went native); RaceScreens::Init (from Create, native);
 // DrawAfterRaceMenu (from the race HUD machine's AfterRaceDraw, native);
 // RaceScreens::Create (from the race HUD machine's CreateScreens, native,
-// with --native_heap; without it the original).
+// with --native_heap; without it the original); ApplyOptions (from the race
+// HUD machine's SetUp, PauseUpdate and ClosePause, native).
 
 #define ITC_RACE_HUD_OBJECT(address, step)              \
   extern "C" REX_FUNC(sub_##address) {                  \
@@ -466,7 +467,6 @@ void RaceHudObjectTickPanel(PPCContext& ctx, uint8_t* base) {
     hooks::step(ctx, base);                             \
   }
 
-ITC_RACE_HUD_OBJECT(82212768, RaceHudObjectApplyOptions)
 ITC_RACE_HUD_OBJECT(822141A0, RaceHudObjectTearDown)
 ITC_RACE_HUD_OBJECT(82212270, RaceHudObjectStartCountdown)
 ITC_RACE_HUD_OBJECT(82212AC8, RaceHudObjectDrawWarning)
