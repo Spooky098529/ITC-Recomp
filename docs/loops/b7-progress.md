@@ -147,6 +147,10 @@ file's history. What's left to see in a drive, from every run:
   in `itc_3143`; ran to its end): 11 of 11 harness lines, 10 ran in the
   race, 1 in the replay, none to drive. Done.
 
+- Cleanup lead (no mapping, not counted): `ScenePools::ReleaseB`
+  `sub_820C5C88` (Wrapped by `frame_state_diff`), then the second set's
+  last four. Step: migration agent running.
+
 ## Done
 
 - The car scene's second set (subsystem 4): `second-set.md`, 148 of
