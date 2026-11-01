@@ -39,6 +39,13 @@ When the user has reviewed a run's section, its heading gets
   `PauseMenu::Draw` harness group sets the pause list's +68 to 0, so
   `ShowMain`'s `ColorItems` reads guest address 0: it passes only by
   how its random cases fall (left unchanged, a latent harness gap).
+- The PauseDraw cleanup lead (acac516d..0c9db58c): 5 rows in
+  `race-hud-machine.md` and `race-hud-object.md`. For review:
+  `PauseDraw`'s and `RacePauseDraw`'s kinds 0 and 4 run the original
+  (`sub_8220B9E8`, `sub_82215D58`, `sub_82211590`, never seen in play);
+  their prints come first, so they also log on those hand-backs; the
+  harness's pause menu set up with a negative running transition and
+  without the confirm dialog (`race_screens` covers it).
 
 ## Run 2026-10-31 16:54 (`b7-loop-31-10-26`, continued)
 

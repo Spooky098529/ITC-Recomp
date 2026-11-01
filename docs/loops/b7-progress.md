@@ -30,7 +30,12 @@ file's history. What's left to see in a drive, from every run:
   in the replay, 5 to drive. Done.
 - Cleanup lead (no mapping, not counted): `RaceHudMachine::PauseDraw`
   `sub_8216CF08` and `sub_8216CFE0` (`race-hud-machine.md`), then
-  `sub_82211D08`'s adapter. Step: migration agent running.
+  `sub_82211D08`'s adapter. Migration checked (acac516d: both, kinds 0
+  and 4 handing back to the original; 0a96f03b..0c9db58c: the
+  adapters of `DrawPauseMenu`, `RaceHud::DrawWarning`, `RaceHud::Draw`
+  removed, a counter at 0 in an attract race and the replay; three
+  harnesses 0 differing, races 24-25 s with them, 0 errors; no
+  subagents). Step: validation agent running.
 
 ## Done
 
@@ -75,5 +80,8 @@ file's history. What's left to see in a drive, from every run:
 - After its validation (`itc_3072`, 120 s: race 54 s, 0 errors, every
   harness 0 differing but the expected groups): ours 3718, work left
   2681.
+- After the PauseDraw lead's migration (`itc_3079`: race 25 s, 0
+  errors, three harnesses 0 differing): ours 3720, work left 2679
+  (wrapped 100, known 505, unknown 2074).
 
 ## Stopped
