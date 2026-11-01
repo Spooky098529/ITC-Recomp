@@ -1029,7 +1029,13 @@ and taken as made), and logs a line every 5 s. Nothing calls
 made again while held; ~2,750-3,065 held, 32-37 MB of vertices and
 2.5-3.3 MB of indices; at the race's end 3,045 freed and 0 held, then
 ~3,250 made for the next. The work memory made none (attract races draw
-no morphed wheels): its size is for a drive.
+no morphed wheels): its size is for a drive. The user's drive
+(`itc_3278`, ~95 s: the front end, a race): 0 error or warning lines, 0
+bound never made, up to ~3,660 held (32 MB vertices, 2.9 MB indices); the
+work memory made none there either. The wheels' morphs ran at their
+set-up (`WheelPoints::SetUpTire` and the rest), writing over shape data
+already made (memcpy through `Buffers_Memcpy`): part 2's memcpy records
+make that a `BufferWritten`.
 
 ## 7. Risks, and what's still unknown
 
