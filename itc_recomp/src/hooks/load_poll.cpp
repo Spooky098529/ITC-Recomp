@@ -31,7 +31,9 @@ ITC_FLAG_BOOL(native_load_poll, true, "ITC",
               "(inside the wraps), SceneParts::Build sub_820E05E0 (with SetSelectedTexture "
               "sub_820DF250, no adapter), SceneWheels::Finish sub_820E7328 (with Wheels::BindTextures "
               "sub_820D9638, no adapter), Wheels::ApplyPalette sub_820D92A0, SceneParts::Finish "
-              "sub_820E2E68 and SceneCockpit::Finish sub_820DBFF8 (inside the wraps)) natively "
+              "sub_820E2E68 and SceneCockpit::Finish sub_820DBFF8 (inside the wraps), "
+              "SceneModel::ApplyPalettes sub_820D9EA0 (inside the wrap) and the poll itself, "
+              "SceneModel::PollLoad sub_820DA318) natively "
               "instead of through "
               "the translated code, with --native_second_set, --native_scene_loaders, "
               "--native_car_models, native memcpy, --native_heap, --native_models and "
@@ -298,7 +300,14 @@ ITC_LOAD_POLL_STEP(SceneWheelsFinish, 820E7328, SceneWheelsFinish)
 ITC_LOAD_POLL_STEP(WheelsApplyPalette, 820D92A0, WheelsApplyPalette)
 ITC_LOAD_POLL_STEP(ScenePartsFinish, 820E2E68, ScenePartsFinish)
 ITC_LOAD_POLL_STEP(SceneCockpitFinish, 820DBFF8, SceneCockpitFinish)
+ITC_LOAD_POLL_STEP(SceneModelPollLoad, 820DA318, SceneModelPollLoad)
 #undef ITC_LOAD_POLL_STEP
+
+void LoadPollSceneModelApplyPalettes(PPCContext& ctx, uint8_t* base) {
+  ITC_LOAD_POLL_ORIGINAL(820D9EA0)
+  lp::Calls calls = LoadPollCalls(ctx, base);
+  ctx.r3.u64 = lp::SceneModelApplyPalettes(base, ctx.r3.u32, ctx.r3.u64, ctx.r1.u32, calls);
+}
 
 #undef ITC_LOAD_POLL_PAINT
 #undef ITC_LOAD_POLL_ORIGINAL
@@ -327,3 +336,4 @@ ITC_LOAD_POLL_STEP(SceneCockpitFinish, 820DBFF8, SceneCockpitFinish)
 ITC_LOAD_POLL(820D8EC0, LoadPollWheelsSetRecord)
 ITC_LOAD_POLL(820E3938, LoadPollSceneInteriorSetGauges)
 ITC_LOAD_POLL(820E05E0, LoadPollScenePartsBuild)
+ITC_LOAD_POLL(820DA318, LoadPollSceneModelPollLoad)

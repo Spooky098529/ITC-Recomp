@@ -713,4 +713,130 @@ uint64_t SceneCockpitFinish(uint8_t* base, uint32_t cockpit, uint32_t stack, Cal
   return 1;
 }
 
+// --- The poll ---
+
+uint64_t SceneModelApplyPalettes(uint8_t* base, uint32_t model, uint64_t r3, uint32_t stack,
+                                 Calls& calls) {
+  ITC_NATIVE_RUNNING("sub_820D9EA0 SceneModel::ApplyPalettes");
+  const uint32_t sp = Frame(base, stack, 96);
+  if (LoadS(base, model + 32) == 3) {
+    const uint32_t body = Load(base, model + 5092);
+    if (body != 0) {
+      const uint32_t traffic = Load(base, body + 9760);
+      r3 = sl::TrafficApplyPalette(base, traffic, traffic, sp);
+    }
+  } else {
+    if (const uint32_t parts = Load(base, model + 5060); parts != 0) {
+      const uint32_t first = Load(base, parts + 104);
+      r3 = sl::PartsApplyPalette(base, first, first, sp);
+    }
+    if (const uint32_t interior = Load(base, model + 5068); interior != 0) {
+      const uint32_t first = Load(base, interior + 36);
+      r3 = sl::InteriorApplyPalette(base, first, first, sp);
+    }
+    if (const uint32_t cockpit = Load(base, model + 5076); cockpit != 0) {
+      const uint32_t body = Load(base, cockpit + 32);
+      r3 = sl::CockpitApplyPalette(base, body, body, sp);
+    }
+  }
+  if (const uint32_t wheels = Load(base, model + 5100); wheels != 0) {
+    r3 = WheelsApplyPalette(base, Load(base, wheels + 28), sp, calls);
+  }
+  return r3;
+}
+
+uint64_t SceneModelPollLoad(uint8_t* base, uint32_t model, uint32_t stack, Calls& calls) {
+  ITC_NATIVE_RUNNING("sub_820DA318 SceneModel::PollLoad");
+  const uint32_t sp = Frame(base, stack, 96);
+  auto set = [&](uint32_t at) { return LoadS(base, model + at) != 0; };
+  if (set(5028) || set(5040)) {
+    return 0;
+  }
+  if (LoadS(base, model + 32) == 3) {
+    const uint32_t body = Load(base, model + 5092);
+    if (body != 0 && !set(5096)) {
+      if (int32_t(SceneTrafficFinish(base, body, sp, calls)) == 0) {
+        return 0;
+      }
+      const uint32_t traffic_body = Load(base, model + 5092);
+      const uint32_t wheels = Load(base, model + 5100);
+      Store(base, wheels + 16780, Load(base, traffic_body + 9760) + 7072);
+    }
+  } else {
+    if (const uint32_t car = Load(base, model + 5048); car != 0) {
+      if (int32_t(CarModelIsReady(base, Load(base, car + 24))) == 0) {
+        return 0;
+      }
+      if (LoadS(base, Load(base, Load(base, model + 5048) + 24) + 4088) != 3) {
+        return 0;
+      }
+    }
+    if (const uint32_t parts = Load(base, model + 5060); parts != 0) {
+      if (int32_t(ScenePartsFinish(base, parts, sp, calls)) == 0) {
+        return 0;
+      }
+    }
+    if (const uint32_t interior = Load(base, model + 5068); interior != 0) {
+      if (int32_t(SceneInteriorFinish(base, interior, sp, calls)) == 0) {
+        return 0;
+      }
+    }
+    if (const uint32_t cockpit = Load(base, model + 5076); cockpit != 0) {
+      if (int32_t(SceneCockpitFinish(base, cockpit, sp, calls)) == 0) {
+        return 0;
+      }
+    }
+    if (const uint32_t kit = Load(base, model + 5084); kit != 0) {
+      if (int32_t(SceneLightsFinish(base, kit, sp, calls)) == 0) {
+        return 0;
+      }
+    }
+  }
+  if (const uint32_t wheels = Load(base, model + 5100); wheels != 0 && !set(5104)) {
+    if (int32_t(SceneWheelsFinish(base, wheels, sp, calls)) == 0) {
+      return 0;
+    }
+  }
+  if (LoadS(base, model + 32) == 3) {
+    return 1;
+  }
+  if (Load(base, model + 5048) == 0 && Load(base, model + 5060) == 0 &&
+      Load(base, model + 5068) == 0 && Load(base, model + 5100) == 0) {
+    return 1;
+  }
+  // The ready flags: the cockpit's (+5080) only in a race (the scene's +4).
+  const bool race = LoadS(base, Load(base, model + 5116) + 4) != 0;
+  bool ready = set(5052) && set(5064) && set(5072) && set(5056);
+  if (ready && race) {
+    ready = set(5080);
+  }
+  if (ready && set(5104) && set(5088)) {
+    Store(base, model + 5036, 1);
+  }
+  if (set(5036)) {
+    return 1;
+  }
+  for (uint32_t at : {5036u, 5088u, 5080u, 5072u, 5064u, 5056u, 5052u, 5104u}) {
+    Store(base, model + at, 1);
+  }
+  SceneModelApplyPalettes(base, model, model, sp, calls);
+  if (set(5104)) {
+    if (const uint32_t wheels = Load(base, model + 5100); wheels != 0) {
+      SceneWheelsSetUpPoints(base, wheels, wheels, sp, calls);
+    }
+  }
+  if (const uint32_t parts = Load(base, model + 5060); parts != 0) {
+    const uint32_t first = Load(base, parts + 104);
+    CarPartsSetVinylTextures(base, first, first, sp);
+  }
+  SceneModelApplyPaint(base, model, model, sp);
+  if (set(5036) && LoadS(base, model + 32) != 3) {
+    if (const uint32_t kit = Load(base, model + 5084); kit != 0) {
+      SceneLightsApplyRecord(base, kit, model + 4224, sp, calls);
+    }
+  }
+  SceneModelApplyWheelPaint(base, model, model, sp, calls);
+  return 1;
+}
+
 }  // namespace load_poll

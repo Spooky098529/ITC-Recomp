@@ -81,5 +81,9 @@ void LoadPollSceneWheelsFinish(PPCContext& ctx, uint8_t* base);
 void LoadPollWheelsApplyPalette(PPCContext& ctx, uint8_t* base);
 void LoadPollScenePartsFinish(PPCContext& ctx, uint8_t* base);
 void LoadPollSceneCockpitFinish(PPCContext& ctx, uint8_t* base);
+// SceneModel::ApplyPalettes sub_820D9EA0 (r3 the scene model; the wrap's)
+// and SceneModel::PollLoad sub_820DA318 (r3 the scene model; r3 = 0 or 1).
+void LoadPollSceneModelApplyPalettes(PPCContext& ctx, uint8_t* base);
+void LoadPollSceneModelPollLoad(PPCContext& ctx, uint8_t* base);
 
 }  // namespace hooks

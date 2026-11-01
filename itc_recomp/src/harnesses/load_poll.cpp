@@ -30,7 +30,7 @@ namespace harness {
 
 namespace {
 
-constexpr uint32_t kBlockBytes = 0x48000;
+constexpr uint32_t kBlockBytes = 0x4A000;
 constexpr uint32_t kStackBytes = 1024;  // below the call's r1
 constexpr uint32_t kArgBytes = 256;     // above it (the parameter area)
 constexpr uint32_t kSceneGlobal = 0x826C2E44;
@@ -47,6 +47,7 @@ constexpr uint32_t kModels = 0x29000;   // 8 free part models of 0x200
 constexpr uint32_t kSubs = 0x2A000;     // 4 small objects of 0x400
 constexpr uint32_t kInterior = 0x2B000; // a first-set interior (3,104 bytes)
 constexpr uint32_t kParts = 0x2C000;    // the first set's car parts (106,016 bytes)
+constexpr uint32_t kOther2 = 0x48000;   // a second first-set object (the cockpit body)
 constexpr uint32_t kTrafficBody = 0x1400;  // a scene traffic body beside a scene model
 
 void RandomBytes(uint8_t* base, uint32_t address, uint32_t bytes, Random& r) {
@@ -797,6 +798,162 @@ void Finishers(Context& h, Random& r, uint32_t block) {
   }
 }
 
+// --- The poll ---
+
+// The poll's scene model (kObject) and its parts' second-set objects, each
+// present or not, finished or not (an unfinished one's first-set object
+// still loading, so its finisher answers 0 before building anything; the
+// builds have their own cases): the car model (+5048, kSubs: its +24 the
+// car at kCar with its model set and slots, its decals' state +4088), the
+// parts (+5060, +100 finished, +104 the car parts), the interior (+5068,
+// +11660, +36), the cockpit (+5076, +4312, +32 the body at kOther2, +28
+// the interior), the light kit (+5084, +13156, +28 pool 4's object), the
+// wheels (+5100, +16768, +28 the wheels; +16772 set: the point set-up has
+// its own cases) and the traffic body (+5092, +9792, +9760 the traffic
+// car); the ready flags (+5036 to +5104), the scene (+5116, its +4) and the
+// record's colors and light kit record (+4224).
+void PollWorld(uint8_t* base, uint32_t block, uint32_t model, Random& r, bool traffic) {
+  const uint32_t parts = model + 0x1400, interior = model + 0xA800, cockpit = model + 0xD800,
+                 kit = model + 0xEA00, wheels = model + 0x12000, body = model + 0x16400;
+  const uint32_t scene_car = block + kSubs;
+  const uint32_t car = block + kCar, w = block + kOther, cb = block + kOther2;
+  const uint32_t pool4 = block + kOther + 0x1000;
+  MakeCar(base, block, r);
+  auto present = [&](uint32_t at, uint32_t object) {
+    Put(base, model + at, r.Below(5) == 0 ? 0 : object);
+  };
+  auto finished = [&](uint32_t at) {
+    const bool done = r.Below(6) != 0;
+    Put(base, at, done ? 1 : 0);
+    return done;
+  };
+  // The car model.
+  present(5048, scene_car);
+  Put(base, scene_car + 24, car);
+  const uint32_t car_set = block + kSmall + 0x500;
+  Put(base, car + 7256, car_set);
+  Put(base, car_set + 8, r.Below(6) == 0 ? 2 : r.Below(2));
+  for (uint32_t i = 0; i < 2; i++) {
+    Put(base, car + 3972 + 24 * i, r.Below(6) == 0 ? 2 : 3);
+  }
+  Put(base, car + 3748, r.Below(6) == 0 ? 2 : 3);
+  Put(base, car + 4088, r.Below(6) == 0 ? 2 : 3);
+  // The parts: their car parts as the paint's cases build them.
+  present(5060, parts);
+  Put(base, parts + 104, block + kParts);
+  const uint32_t set = block + kSmall + 0x400;
+  Put(base, block + kParts + 106000, set);
+  Put(base, set + 8, r.Below(2));
+  MakeModels(base, block, block + kParts + 5280, block + kParts + 116, 216, r);
+  if (!finished(parts + 100)) {
+    Put(base, block + kParts + 116, 2);
+  }
+  // The interior.
+  present(5068, interior);
+  Put(base, interior + 36, block + kInterior);
+  Put(base, block + kInterior + 3092, block + kSmall + 0x580);
+  Put(base, block + kSmall + 0x580 + 8, r.Below(2));
+  MakeModels(base, block, block + kInterior + 304, block + kInterior + 180, 6, r);
+  if (!finished(interior + 11660)) {
+    Put(base, block + kInterior + 180, 2);
+  }
+  // The cockpit.
+  present(5076, cockpit);
+  Put(base, cockpit + 32, cb);
+  Put(base, cockpit + 28, interior);
+  Put(base, cb + 24, car);
+  MakeModels(base, block, cb + 688, cb + 556, 6, r);
+  if (!finished(cockpit + 4312)) {
+    Put(base, cb + 556, 2);
+  }
+  // The light kit.
+  present(5084, kit);
+  Put(base, kit + 28, pool4);
+  MakeModel(base, block, pool4 + 112, 3, r);
+  Put(base, kit + 13152, pool4 + 112);
+  Put(base, kit + 13160, block + kScene);
+  if (!finished(kit + 13156)) {
+    Put(base, pool4 + 100, 2);
+  }
+  // The wheels.
+  present(5100, wheels);
+  if (traffic) {
+    // The poll writes the traffic body's tire positions into the wheels.
+    Put(base, model + 5100, wheels);
+  }
+  Put(base, wheels + 28, w);
+  for (uint32_t m : {240u, 704u, 1216u, 1680u, 2336u, 2800u}) {
+    MakeModel(base, block, w + m, m / 464, r);
+  }
+  for (uint32_t at = 48; at < 72; at += 4) {
+    Put(base, w + at, SmallFloat(r));
+  }
+  Put(base, wheels + 16772, 1);
+  if (!finished(wheels + 16768)) {
+    Put(base, w + 2324, 2);
+  }
+  // The traffic body.
+  Put(base, model + 5092, traffic && r.Below(5) != 0 ? body : 0);
+  Put(base, model + 5096, r.Below(4) == 0 ? 1 : 0);
+  Put(base, body + 9760, w);
+  MakeModels(base, block, w + 4256, w + 4124, 6, r);
+  Put(base, w + 192, 0);
+  Put(base, w + 32, r.Below(4));
+  if (!finished(body + 9792)) {
+    Put(base, w + 3764, 2);
+  }
+  // The flags, the scene, the record.
+  Put(base, model + 5028, r.Below(8) == 0 ? 1 : 0);
+  Put(base, model + 5040, r.Below(8) == 0 ? 1 : 0);
+  Put(base, model + 32, traffic ? 3 : r.Below(3));
+  for (uint32_t at = 5036; at <= 5104; at += 4) {
+    if (at != 5048 && at != 5060 && at != 5068 && at != 5076 && at != 5084 && at != 5092 &&
+        at != 5100 && at != 5096) {
+      Put(base, model + at, r.Below(4) == 0 ? 0 : 1);
+    }
+  }
+  if (r.Below(2) == 0) {
+    Put(base, model + 5036, 0);
+  }
+  const uint32_t scene = block + kSmall + 0x7E0;
+  Put(base, model + 5116, scene);
+  Put(base, scene + 4, r.Below(2));
+  for (uint32_t c = 0; c < 9; c++) {
+    PutColor(base, model + 64 + 16 * c, r);
+  }
+  Put(base, model + 4072, r.Below(3));
+}
+
+void Poll(Context& h, Random& r, uint32_t block) {
+  {
+    Results results("SceneModel::ApplyPalettes (sub_820D9EA0)");
+    for (int c = 0; c < 12; c++) {
+      Case(h, results, block, r,
+           [&](PPCContext& t) {
+             const uint32_t model = block + kObject;
+             PollWorld(h.base, block, model, r, c % 4 == 1);
+             t.r3.u64 = model;
+           },
+           __imp__sub_820D9EA0, hooks::LoadPollSceneModelApplyPalettes,
+           fmt::format("case {}", c));
+    }
+    results.Report();
+  }
+  {
+    Results results("SceneModel::PollLoad (sub_820DA318)");
+    for (int c = 0; c < 48; c++) {
+      Case(h, results, block, r,
+           [&](PPCContext& t) {
+             const uint32_t model = block + kObject;
+             PollWorld(h.base, block, model, r, c % 4 == 1);
+             t.r3.u64 = model;
+           },
+           __imp__sub_820DA318, hooks::LoadPollSceneModelPollLoad, fmt::format("case {}", c));
+    }
+    results.Report();
+  }
+}
+
 }  // namespace
 
 void LoadPoll(Context& h) {
@@ -813,6 +970,7 @@ void LoadPoll(Context& h) {
   Paint(h, h.random, block);
   Builds(h, h.random, block);
   Finishers(h, h.random, block);
+  Poll(h, h.random, block);
   memory::Free(allocation);
 }
 

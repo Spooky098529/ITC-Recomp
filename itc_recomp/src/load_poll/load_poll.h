@@ -229,4 +229,27 @@ uint64_t ScenePartsFinish(uint8_t* base, uint32_t parts, uint32_t stack, Calls& 
 // +4288 + 4i = [+32] + 688 + 464i and CockpitPoints::Find(+192, +4288); 1.
 uint64_t SceneCockpitFinish(uint8_t* base, uint32_t cockpit, uint32_t stack, Calls& calls);
 
+// --- The poll ---
+
+// SceneModel::ApplyPalettes (sub_820D9EA0): the paint palette on the part
+// models: traffic (+32 = 3) the traffic car's (sub_820D7BF8([[+5092] +
+// 9760]) when there); cars the parts' (sub_820D6F20([[+5060] + 104])), the
+// interior's (sub_820D7690([[+5068] + 36])) and the cockpit's
+// (sub_820D5FC8([[+5076] + 32])), each when there; then the wheels'
+// (Wheels::ApplyPalette([[+5100] + 28])) when there. `r3` is r3 at entry
+// (left when nothing is called).
+uint64_t SceneModelApplyPalettes(uint8_t* base, uint32_t model, uint64_t r3, uint32_t stack,
+                                 Calls& calls);
+// SceneModel::PollLoad (sub_820DA318): 0 while +5028 or +5040 is set, or
+// while a part it finishes isn't done (traffic: the body +5092 unless +5096,
+// then the wheels' +16780; cars: the car model +5048 (CarModel::IsReady
+// and its decals' state +4088 at 3), the parts, the interior, the cockpit
+// and the light kit; then the wheels +5100 unless +5104). 1 at once for
+// traffic and for cars with none of +5048, +5060, +5068, +5100. Else +5036
+// = 1 when the ready flags are all set (+5080 only when the scene's +4 is
+// set); when +5036 is still 0, it and the flags = 1 and the record applied
+// once (ApplyPalettes, SceneWheels::SetUpPoints, CarParts::SetVinylTextures,
+// ApplyPaint, SceneLights::ApplyRecord, ApplyWheelPaint). Returns 1.
+uint64_t SceneModelPollLoad(uint8_t* base, uint32_t model, uint32_t stack, Calls& calls);
+
 }  // namespace load_poll
