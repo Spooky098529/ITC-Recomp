@@ -13,6 +13,7 @@
 #include <vector>
 
 #include "device_context.h"
+#include "render/device.h"
 #include "state.h"
 #include "textures.h"
 #include "vulkan_functions.h"
@@ -54,6 +55,22 @@ class Passes {
                     uint32_t rect, uint32_t destination, uint32_t point, uint32_t clear_color,
                     float clear_z, uint32_t tile, uint32_t tiles);
   void EndTiling();
+  // The conventional renderer (render/device.h, docs/conventional-renderer.md
+  // step 1): draws, clears, resolves and tiling from our interface's state,
+  // the registers made from it (interface_registers.h) instead of read from
+  // the device. set_interface also has FrontBufferResolve and DrawMovie take
+  // render target 0 from it (null: the device).
+  void set_interface(render::State* state);
+  void InterfaceDraw(VkCommandBuffer commands, uint8_t* base, render::State& state,
+                     const render::DrawIndexed& draw);
+  void InterfaceInlineDraw(VkCommandBuffer commands, uint8_t* base, render::State& state,
+                           const render::DrawInline& draw);
+  void InterfaceClear(VkCommandBuffer commands, uint8_t* base, render::State& state,
+                      const render::Clear& clear);
+  void InterfaceResolve(VkCommandBuffer commands, uint8_t* base, render::State& state,
+                        const render::Resolve& resolve);
+  void InterfaceBeginTiling(VkCommandBuffer commands, uint8_t* base, render::State& state,
+                            uint32_t width, uint32_t height, float clear);
   // A movie's frame (docs/native-movies.md), drawn over render target 0 of
   // `device` at the place of the command that drew it (command 28): the Y
   // plane (width x height) and the half-size U and V, rows with no padding,

@@ -53,13 +53,6 @@ constexpr uint32_t kPrimitiveDrawerShaders[2] = {0x82970F2C, 0x82970F44};
 constexpr uint32_t kResourceRelease = 0x822A67B0;
 constexpr uint32_t kPushBack = 0x82591540;
 
-// The primitive types' index counts: count × a + b (the table at
-// 0x82000950, as the draw handlers apply it).
-uint32_t IndexCount(uint8_t* base, uint32_t type, uint32_t count) {
-  return count * guest::LoadU32(base, 0x82000950 + 8 * type) +
-         guest::LoadU32(base, 0x82000950 + 8 * type + 4);
-}
-
 float Float(uint32_t bits) {
   return std::bit_cast<float>(bits);
 }
@@ -755,6 +748,9 @@ void Commands::Resolve(uint8_t* base, uint32_t item) {
 uint32_t Commands::Run(uint8_t* base, uint32_t id, uint32_t payload, uint32_t count,
                        uint32_t arg2, const GameCall& call) {
   State& s = state_;
+  // Calls into game code: only when ours replace the game's handlers (the
+  // check runs both).
+  const bool conventional = ConventionalRenderer();
   auto u32 = [&](uint32_t address) { return guest::LoadU32(base, address); };
   switch (id) {
     case 1:
@@ -800,7 +796,7 @@ uint32_t Commands::Run(uint8_t* base, uint32_t id, uint32_t payload, uint32_t co
       return (count * (arg2 ? 4 : 2) + 15) / 16;
     }
     case 7:
-      if (!backend_) {
+      if (!ConventionalRenderer()) {
         return 0;  // the check: decoded from interpolation's wrapper of the game's
       }
       interpolation::BlendState_ReplayConstants(
@@ -877,7 +873,7 @@ uint32_t Commands::Run(uint8_t* base, uint32_t id, uint32_t payload, uint32_t co
         const uint32_t type = u32(item), base_start = u32(item + 4);
         if (backend_) {
           backend_->DrawIndexed(s, {Primitive(type), int32_t(base_start) >> 16,
-                                    base_start & 0xFFFF, IndexCount(base, type, u32(item + 8))});
+                                    base_start & 0xFFFF, u32(item + 8)});
         }
       }
       return count;
@@ -889,7 +885,7 @@ uint32_t Commands::Run(uint8_t* base, uint32_t id, uint32_t payload, uint32_t co
       }
       return count;
     case 20:
-      for (uint32_t i = 0; backend_ && i < count; i++) {
+      for (uint32_t i = 0; conventional && i < count; i++) {
         if (const uint32_t object = u32(payload + 16 * i)) {
           call(kResourceRelease, 1, object, 0, 0);
         }
@@ -898,7 +894,7 @@ uint32_t Commands::Run(uint8_t* base, uint32_t id, uint32_t payload, uint32_t co
     case 21:
       return (count + 15) / 16;
     case 22:
-      for (uint32_t i = 0; backend_ && i < count; i++) {
+      for (uint32_t i = 0; conventional && i < count; i++) {
         const uint32_t item = payload + 16 * i;
         const uint32_t object = u32(item + 4);
         auto slot = [&](uint32_t n) { return u32(u32(object) + 4 * n); };
@@ -941,7 +937,7 @@ uint32_t Commands::Run(uint8_t* base, uint32_t id, uint32_t payload, uint32_t co
       LogOnce("command (not drawn)", id);
       return (count * 32 + 15) / 16;
     case 28:
-      for (uint32_t i = 0; backend_ && i < count; i++) {
+      for (uint32_t i = 0; conventional && i < count; i++) {
         const uint32_t object = u32(payload + 16 * i + 4);
         LogOnce("callback command's object", object);
         call(u32(u32(object)), 2, object, u32(kDevice), 0);
@@ -1027,12 +1023,12 @@ uint32_t Commands::Run(uint8_t* base, uint32_t id, uint32_t payload, uint32_t co
       saved_viewport_ = s.viewport;
       for (uint32_t t = 0; t < kTargets; t++) {
         saved_targets_[t] = s.targets[t];
-        if (backend_ && s.targets[t]) {
+        if (conventional && s.targets[t]) {
           refcount::AddRef(base, s.targets[t].address);  // as GetRenderTarget
         }
       }
       saved_depth_ = s.depth;
-      if (backend_ && s.depth) {
+      if (conventional && s.depth) {
         refcount::AddRef(base, s.depth.address);
       }
       return count;
@@ -1104,7 +1100,7 @@ uint32_t Commands::RunSingle(uint8_t* base, uint32_t slot, const GameCall& call)
       return 0;
     case 28: {
       const uint32_t object = u32(slot + 4);
-      if (backend_) call(u32(u32(object)), 2, object, u32(kDevice), 0);
+      if (ConventionalRenderer()) call(u32(u32(object)), 2, object, u32(kDevice), 0);
       return 0;
     }
     default:

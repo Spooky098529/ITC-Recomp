@@ -177,7 +177,9 @@ void InterfaceCheck_Draw(uint8_t* base, uint32_t device, const rex::graphics::Re
     } else if (u32(vs + 24) == declaration_id) {
       theirs = PhysicalHostAddress(base, GpuPhysicalAddress(u32(vs + 48)));
     }
-    const std::vector<uint8_t>* ours = c.registers.PatchedVertexShader(base, state, inline_stride);
+    const InterfaceRegisters::PatchedShader* patched =
+        c.registers.PatchedVertexShader(base, state, inline_stride);
+    const std::vector<uint8_t>* ours = patched ? &patched->microcode : nullptr;
     if (theirs && ours) {
       uint32_t first = UINT32_MAX;
       for (uint32_t i = 0; i < size && i < ours->size(); i += 4) {

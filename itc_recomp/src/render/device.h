@@ -240,10 +240,12 @@ struct State {
   uint32_t dirty = kDirtyAll;
 };
 
+// The game's primitive count: the index count is count × a + b (the
+// table at 0x82000950).
 struct DrawIndexed {
   Primitive primitive;
   int32_t base_vertex;
-  uint32_t start_index, index_count;
+  uint32_t start_index, primitive_count;
 };
 
 // Inline vertices (in the game's byte order), drawn with stream 0's
@@ -287,18 +289,19 @@ struct Resolve {
   bool apply_clears = true;
 };
 
-// What draws with the state. The backend reads Device::state at each call.
+// What draws with the state. The backend reads the state at each call and
+// clears the dirty bits it has taken.
 class Backend {
  public:
   virtual ~Backend() = default;
-  virtual void DrawIndexed(const State& state, const render::DrawIndexed& draw) = 0;
-  virtual void DrawInline(const State& state, const render::DrawInline& draw) = 0;
-  virtual void Clear(const State& state, const render::Clear& clear) = 0;
-  virtual void Resolve(const State& state, const render::Resolve& resolve) = 0;
+  virtual void DrawIndexed(State& state, const render::DrawIndexed& draw) = 0;
+  virtual void DrawInline(State& state, const render::DrawInline& draw) = 0;
+  virtual void Clear(State& state, const render::Clear& clear) = 0;
+  virtual void Resolve(State& state, const render::Resolve& resolve) = 0;
   // Predicated tiling: the targets are drawn whole, `width` × `height`
   // (the tiles' extent), each cleared to `clear` first.
-  virtual void BeginTiling(const State& state, uint32_t width, uint32_t height, float clear) = 0;
-  virtual void EndTiling(const State& state) = 0;
+  virtual void BeginTiling(State& state, uint32_t width, uint32_t height, float clear) = 0;
+  virtual void EndTiling(State& state) = 0;
 };
 
 }  // namespace render

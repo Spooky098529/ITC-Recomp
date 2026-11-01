@@ -32,9 +32,14 @@ class InterfaceRegisters {
 
   // The vertex shader's microcode patched for the declaration and stream
   // strides (stride / 4 a stream; `inline_stride` replaces stream 0's for an
-  // inline draw), kept by all three. Null without a vertex shader.
-  const std::vector<uint8_t>* PatchedVertexShader(uint8_t* base, const render::State& state,
-                                                  uint32_t inline_stride);
+  // inline draw), kept by all three, with a number of its own (1 up). Null
+  // without a vertex shader.
+  struct PatchedShader {
+    std::vector<uint8_t> microcode;
+    uint32_t id;
+  };
+  const PatchedShader* PatchedVertexShader(uint8_t* base, const render::State& state,
+                                           uint32_t inline_stride);
 
   // The registers compared by the check, and their names.
   static std::span<const uint32_t> CheckedRegisters();
@@ -50,7 +55,7 @@ class InterfaceRegisters {
   // while no texture is), and each stream's vertex fetch constant.
   uint32_t texture_words_[render::kStages][6] = {};
   uint32_t stream_words_[render::kStreams][2] = {};
-  std::map<std::tuple<uint32_t, uint32_t, uint32_t, std::vector<uint8_t>>, std::vector<uint8_t>>
+  std::map<std::tuple<uint32_t, uint32_t, uint32_t, std::vector<uint8_t>>, PatchedShader>
       patched_;
 };
 

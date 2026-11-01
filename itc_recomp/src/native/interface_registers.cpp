@@ -332,9 +332,8 @@ void InterfaceRegisters::Build(uint8_t* base, render::State& state, int32_t base
   }
 }
 
-const std::vector<uint8_t>* InterfaceRegisters::PatchedVertexShader(uint8_t* base,
-                                                                    const render::State& state,
-                                                                    uint32_t inline_stride) {
+const InterfaceRegisters::PatchedShader* InterfaceRegisters::PatchedVertexShader(
+    uint8_t* base, const render::State& state, uint32_t inline_stride) {
   const uint32_t vs = state.vertex_shader.address;
   if (!vs) {
     return nullptr;
@@ -363,7 +362,8 @@ const std::vector<uint8_t>* InterfaceRegisters::PatchedVertexShader(uint8_t* bas
     PatchVertexFetches(tables_, inputs.fetches(), inputs.declaration(), strides.data(),
                        code.data(), code.size());
   }
-  return &patched_.emplace(std::move(key), std::move(code)).first->second;
+  const uint32_t id = uint32_t(patched_.size()) + 1;
+  return &patched_.emplace(std::move(key), PatchedShader{std::move(code), id}).first->second;
 }
 
 }  // namespace native
