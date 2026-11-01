@@ -114,10 +114,15 @@ void Case(Context& h, Results& results, uint32_t block, uint32_t bytes, Random& 
 
 // The frames' words compared, the saved registers' and v127's slots left out
 // (the plain C++ doesn't write them): a case through both versions with the
-// words at r1 - `frame_bytes` + [from, to) compared.
+// words at r1 - `below` + [0, bytes) compared, for each window.
+struct Window {
+  uint32_t below;
+  uint32_t bytes;
+};
+
 void FrameCase(Context& h, Results& results, uint32_t block, uint32_t bytes, Random& r,
                const std::function<void(PPCContext&)>& setup, GuestFunction recompiled,
-               GuestFunction native, uint32_t frame_bytes, uint32_t from, uint32_t to,
+               GuestFunction native, const std::vector<Window>& windows,
                const std::string& what) {
   PPCContext start = CallContext(h);
   start.r1.u64 &= ~0xFull;
@@ -127,7 +132,6 @@ void FrameCase(Context& h, Results& results, uint32_t block, uint32_t bytes, Ran
   setup(start);
   const std::vector<uint8_t> inputs = Read(h.base, block, bytes);
   const std::vector<uint8_t> frames = Read(h.base, stack, kStackBytes);
-  const uint32_t frame = start.r1.u32 - frame_bytes;
   Outputs out[2];
   for (int v = 0; v < 2; v++) {
     Write(h.base, block, inputs.data(), bytes);
@@ -135,11 +139,18 @@ void FrameCase(Context& h, Results& results, uint32_t block, uint32_t bytes, Ran
     PPCContext t = start;
     RunSide(v, recompiled, native, t, h.base);
     out[v].Bytes(Read(h.base, block, bytes));
-    out[v].Bytes(Read(h.base, frame + from, to - from));
+    for (const Window& w : windows) {
+      out[v].Bytes(Read(h.base, start.r1.u32 - w.below, w.bytes));
+    }
     out[v].Word(t.r3.u32);
     out[v].Word(uint32_t(t.r3.u64 >> 32));
   }
   results.Check(out[0], out[1], what);
+}
+
+// Clear's frame words (+80 to +160) under a caller's frame of `outer` bytes.
+Window ClearWindow(uint32_t outer) {
+  return {outer + ss::kClearFrameBytes - 80, 80};
 }
 
 // --- The point records ---
@@ -170,7 +181,7 @@ void Points(Context& h, Random& r, uint32_t block) {
           [&](PPCContext& t) {
             t.r3.u64 = block + 16 * r.Below(8);
           },
-          __imp__sub_820CEA08, hooks::SecondSetPointClear, ss::kClearFrameBytes, 80, 160,
+          __imp__sub_820CEA08, hooks::SecondSetPointClear, {ClearWindow(0)},
           fmt::format("case {}", c));
     }
     results.Report();
@@ -184,7 +195,7 @@ void Points(Context& h, Random& r, uint32_t block) {
             t.r3.u64 = block + 16 * r.Below(8);
           },
           __imp__sub_820D0270, hooks::SecondSetPointConstruct,
-          ss::kConstructFrameBytes + ss::kClearFrameBytes, 80, 160, fmt::format("case {}", c));
+          {ClearWindow(ss::kConstructFrameBytes)}, fmt::format("case {}", c));
     }
     results.Report();
   }
@@ -225,8 +236,90 @@ void Points(Context& h, Random& r, uint32_t block) {
             t.r3.u64 = record;
             t.r4.u64 = model;
           },
-          __imp__sub_820CEB30, hooks::SecondSetFindShape, ss::kFindShapeFrameBytes, 80, 144,
-          fmt::format("case {}", c));
+          __imp__sub_820CEB30, hooks::SecondSetFindShape,
+          {{ss::kFindShapeFrameBytes - 80, 64}}, fmt::format("case {}", c));
+    }
+    results.Report();
+  }
+}
+
+// The point groups' resets and inits: the group (or record) at the block,
+// its words random; the names from the image's tables. The block, the last
+// Clear's frame words (and ResetHeadlights' identity) and r3 compared.
+void Groups(Context& h, Random& r, uint32_t block) {
+  struct Group {
+    const char* name;
+    GuestFunction recompiled, native;
+    uint32_t frame;  // the function's own frame
+    uint32_t bytes;  // what it touches from r3
+    bool init;       // a single record's init (Clear under PointRecord's too)
+  };
+  const Group groups[] = {
+      {"PartsPoints::ResetFrontBumper (sub_820DE0E0)", __imp__sub_820DE0E0,
+       hooks::SecondSetPartsResetFrontBumper, 112, 2656, false},
+      {"PartsPoints::ResetRearBumper (sub_820DE2C8)", __imp__sub_820DE2C8,
+       hooks::SecondSetPartsResetRearBumper, 112, 1696, false},
+      {"PartsPoints::ResetRearSpoiler (sub_820DE498)", __imp__sub_820DE498,
+       hooks::SecondSetPartsResetRearSpoiler, 112, 720, false},
+      {"PartsPoints::ResetBonnet (sub_820DE548)", __imp__sub_820DE548,
+       hooks::SecondSetPartsResetBonnet, 128, 480, false},
+      {"PartsPoints::ResetLeftDoor (sub_820DE600)", __imp__sub_820DE600,
+       hooks::SecondSetPartsResetLeftDoor, 128, 6096, false},
+      {"PartsPoints::ResetRightDoor (sub_820DE7E8)", __imp__sub_820DE7E8,
+       hooks::SecondSetPartsResetRightDoor, 128, 6096, false},
+      {"PartsPoints::ResetDoors (sub_820DE9D0)", __imp__sub_820DE9D0,
+       hooks::SecondSetPartsResetDoors, 112, 5520, false},
+      {"PartsPoints::ResetHeadlights (sub_820DF740)", __imp__sub_820DF740,
+       hooks::SecondSetPartsResetHeadlights, 192, 3200, false},
+      {"PartsPoints::ResetTailLights (sub_820DEBF0)", __imp__sub_820DEBF0,
+       hooks::SecondSetPartsResetTailLights, 128, 3600, false},
+      {"PartsPoints::ResetFenders (sub_820DECD0)", __imp__sub_820DECD0,
+       hooks::SecondSetPartsResetFenders, 112, 1680, false},
+      {"PartsPoints::ResetCabin (sub_820DEE88)", __imp__sub_820DEE88,
+       hooks::SecondSetPartsResetCabin, 112, 1200, false},
+      {"PartsPoints::ResetEngine (sub_820DF020)", __imp__sub_820DF020,
+       hooks::SecondSetPartsResetEngine, 112, 480, false},
+      {"PartsPoints::ResetMufflers (sub_820DF0C0)", __imp__sub_820DF0C0,
+       hooks::SecondSetPartsResetMufflers, 128, 1456, false},
+      {"PartsPoints::ResetShadows (sub_820DF128)", __imp__sub_820DF128,
+       hooks::SecondSetPartsResetShadows, 112, 976, false},
+      {"PartsPoints::InitCooling (sub_820DF410)", __imp__sub_820DF410,
+       hooks::SecondSetPartsInitCooling, 96, 240, true},
+      {"PartsPoints::InitSideSkirts (sub_820DF570)", __imp__sub_820DF570,
+       hooks::SecondSetPartsInitSideSkirts, 96, 240, true},
+      {"PartsPoints::InitLeftMirror (sub_820DF668)", __imp__sub_820DF668,
+       hooks::SecondSetPartsInitLeftMirror, 96, 240, true},
+      {"PartsPoints::InitRightMirror (sub_820DF6B0)", __imp__sub_820DF6B0,
+       hooks::SecondSetPartsInitRightMirror, 96, 240, true},
+      {"PartsPoints::InitMirror (sub_820DF6F8)", __imp__sub_820DF6F8,
+       hooks::SecondSetPartsInitMirror, 96, 240, true},
+      {"CockpitPoints::InitBonnet (sub_820DC0A8)", __imp__sub_820DC0A8,
+       hooks::SecondSetCockpitInitBonnet, 96, 240, true},
+      {"CockpitPoints::InitMirror (sub_820DC0F0)", __imp__sub_820DC0F0,
+       hooks::SecondSetCockpitInitMirror, 96, 240, true},
+      {"CockpitPoints::ResetFenders (sub_820DB878)", __imp__sub_820DB878,
+       hooks::SecondSetCockpitResetFenders, 112, 720, false},
+      {"CockpitPoints::ResetCabin (sub_820DB930)", __imp__sub_820DB930,
+       hooks::SecondSetCockpitResetCabin, 112, 480, false},
+      {"CockpitPoints::ResetDoors (sub_820DB9E8)", __imp__sub_820DB9E8,
+       hooks::SecondSetCockpitResetDoors, 112, 480, false},
+      {"CockpitPoints::ResetHeadlights (sub_820DBAA0)", __imp__sub_820DBAA0,
+       hooks::SecondSetCockpitResetHeadlights, 128, 1920, false},
+  };
+  for (const Group& g : groups) {
+    Results results(g.name);
+    std::vector<Window> windows = {ClearWindow(g.frame)};
+    if (g.init) {
+      windows.push_back(ClearWindow(g.frame + ss::kConstructFrameBytes));
+    }
+    if (g.frame == 192) {
+      windows.push_back({192 - 80, 64});  // ResetHeadlights' identity
+    }
+    for (int c = 0; c < 4; c++) {
+      FrameCase(
+          h, results, block, 0x2000, r,
+          [&](PPCContext& t) { t.r3.u64 = block + 16 * r.Below(8); }, g.recompiled, g.native,
+          windows, fmt::format("case {} ({} bytes)", c, g.bytes));
     }
     results.Report();
   }
@@ -239,6 +332,7 @@ void SecondSet(Context& h) {
   const uint32_t allocation = memory::Alloc(kBlockBytes + 16, 0);
   const uint32_t block = (allocation + 15) & ~15u;
   Points(h, r, block);
+  Groups(h, r, block);
   memory::Free(allocation);
 }
 

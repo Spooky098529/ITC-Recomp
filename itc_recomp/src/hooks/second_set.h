@@ -22,4 +22,33 @@ void SecondSetPointConstruct(PPCContext& ctx, uint8_t* base);
 // r3 = 1 or 0.
 void SecondSetFindShape(PPCContext& ctx, uint8_t* base);
 
+// The point groups' resets and inits (src/second_set/point_groups.h): r3 =
+// the group or record; r3 as the original leaves it. ResetRightDoor
+// natively only with --native_material_passes (else the original).
+void SecondSetPartsResetFrontBumper(PPCContext& ctx, uint8_t* base);
+void SecondSetPartsResetRearBumper(PPCContext& ctx, uint8_t* base);
+void SecondSetPartsResetRearSpoiler(PPCContext& ctx, uint8_t* base);
+void SecondSetPartsResetBonnet(PPCContext& ctx, uint8_t* base);
+void SecondSetPartsResetLeftDoor(PPCContext& ctx, uint8_t* base);
+void SecondSetPartsResetRightDoor(PPCContext& ctx, uint8_t* base);
+void SecondSetPartsResetDoors(PPCContext& ctx, uint8_t* base);
+void SecondSetPartsResetHeadlights(PPCContext& ctx, uint8_t* base);
+void SecondSetPartsResetTailLights(PPCContext& ctx, uint8_t* base);
+void SecondSetPartsResetFenders(PPCContext& ctx, uint8_t* base);
+void SecondSetPartsResetCabin(PPCContext& ctx, uint8_t* base);
+void SecondSetPartsResetEngine(PPCContext& ctx, uint8_t* base);
+void SecondSetPartsResetMufflers(PPCContext& ctx, uint8_t* base);
+void SecondSetPartsResetShadows(PPCContext& ctx, uint8_t* base);
+void SecondSetPartsInitCooling(PPCContext& ctx, uint8_t* base);
+void SecondSetPartsInitSideSkirts(PPCContext& ctx, uint8_t* base);
+void SecondSetPartsInitLeftMirror(PPCContext& ctx, uint8_t* base);
+void SecondSetPartsInitRightMirror(PPCContext& ctx, uint8_t* base);
+void SecondSetPartsInitMirror(PPCContext& ctx, uint8_t* base);
+void SecondSetCockpitInitBonnet(PPCContext& ctx, uint8_t* base);
+void SecondSetCockpitInitMirror(PPCContext& ctx, uint8_t* base);
+void SecondSetCockpitResetFenders(PPCContext& ctx, uint8_t* base);
+void SecondSetCockpitResetCabin(PPCContext& ctx, uint8_t* base);
+void SecondSetCockpitResetDoors(PPCContext& ctx, uint8_t* base);
+void SecondSetCockpitResetHeadlights(PPCContext& ctx, uint8_t* base);
+
 }  // namespace hooks

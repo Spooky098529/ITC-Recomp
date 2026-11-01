@@ -2,7 +2,8 @@
 // the 240-byte records a node or a shape of a part model is found into. Guest
 // data shared with the recompiled code, so these work on guest memory with
 // the original's stores, their frames' words included (the saved registers
-// and v127's slot aren't written). `stack` is the guest r1 at entry.
+// and v127's slot aren't written; Clear's back chain is, as a caller's
+// Clear frame words lie under it). `stack` is the guest r1 at entry.
 // Adapters: src/hooks/second_set.cpp.
 
 #pragma once

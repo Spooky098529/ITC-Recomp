@@ -67,6 +67,7 @@ void PointRecordSetShape(uint8_t* base, uint32_t record, uint32_t name) {
 uint32_t PointRecordClear(uint8_t* base, uint32_t record, uint32_t stack) {
   ITC_NATIVE_RUNNING("sub_820CEA08 PointRecord::Clear");
   const uint32_t f = stack - kClearFrameBytes;
+  Store(base, f, stack);  // stwu's back chain
   Store(base, record + 224, 0xFFFFFFFFu);
   Store(base, record + 228, 0xFFFFFFFFu);
   Store(base, record + 0, 0);

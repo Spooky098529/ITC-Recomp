@@ -151,6 +151,7 @@ set(ITC_SOURCES
     src/scene_loaders/model_point.cpp
     src/hooks/second_set.cpp
     src/second_set/points.cpp
+    src/second_set/point_groups.cpp
     src/hooks/car_models.cpp
     src/car_models/load_slots.cpp
     src/car_models/car_model.cpp
