@@ -166,7 +166,14 @@ file's history. What's left to see in a drive, from every run:
   since the second set is ours). Map checked (103db371:
   `load-poll.md`, 32 rows, 29 in play, 14 Wrapped finishers moved from
   `functions.md`; the poll's 13 blockers are its own finishers, ready;
-  14 ready groups; 2 leads added; no subagents). Step: migration agent
+  14 ready groups; 2 leads added; no subagents). Migration checked
+  (87124abd..fdcd3ccb: the finishers, the paint, `SceneParts::Build`,
+  the poll; 31 of 32 ours (`ApplyLightKit` front end only, left); 2
+  adapters removed; `--native_load_poll`, native only with its callees'
+  flags; the finishers run inside their `frame_state_diff` wraps; the
+  stack words the original never writes passed on as left; harness
+  load_poll and second_set 0 differing, frame dumps alike, race 38 s,
+  0 errors; no subagents). Nothing ready left. Step: validation agent
   running.
 
 ## Done
@@ -307,5 +314,9 @@ file's history. What's left to see in a drive, from every run:
 
 - After the load poll's map: ours 3930, work left 2469 (wrapped 96,
   known 504, unknown 1869).
+
+- After the load poll's migration (`itc_3214`: race 38 s, 0 errors,
+  load_poll and second_set 0 differing): ours 3962, work left 2441
+  (wrapped 82, known 490, unknown 1869).
 
 ## Stopped

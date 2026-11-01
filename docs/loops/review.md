@@ -175,6 +175,18 @@ When the user has reviewed a run's section, its heading gets
   per-frame passes' lead (they run once). `known-data.md`: the scene
   model's paint values, +4072, +4224, the second set's finished flags
   and part-model arrays.
+- The load poll's migration (87124abd..fdcd3ccb, `--native_load_poll`,
+  `src/load_poll/`): 32 rows in `load-poll.md`, 1 in
+  `material-passes.md`. For review: the flag takes effect only with
+  every callee's flag on (`--native_second_set`,
+  `--native_scene_loaders`, `--native_car_models`, native memcpy, the
+  heap, `--native_models`, `--native_material_passes`); the finishers
+  run inside a new `ITC_FRAME_STATE_WRAP_LOAD_POLL` in
+  `frame_state_diff.cpp`; the second set's point set-ups' call builder
+  split out as `SecondSetFindCalls`; the four never seen in play ported
+  with harness cases; the wheels' `SetMaterials` frames as the original
+  leaves them; the harness points `[0x826C2E44]` and `[0x826C5510]` at
+  its block per case and puts them back.
 
 ## Run 2026-10-31 16:54 (`b7-loop-31-10-26`, continued)
 
