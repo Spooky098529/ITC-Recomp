@@ -117,8 +117,14 @@ file's history. What's left to see in a drive, from every run:
   pools' objects, their point records, the point set-ups, the wheels'
   morph; the release and point set-up leads folded in, the load poll's
   and per-frame passes' trimmed; 23 ready groups; blocked by
-  `ScenePools::ReleaseB` `sub_820C5C88`, Wrapped; no subagents). Step:
-  migration agent running.
+  `ScenePools::ReleaseB` `sub_820C5C88`, Wrapped; no subagents). First
+  migration checked (c9c70345..92e9be10: the point records, point
+  groups' resets and inits, the point set-ups' finds, 84 rows, 81 of
+  152 in play ours, 38 adapters removed; `--native_second_set`; harness
+  second_set 0 differing, frame dumps alike, race 38 s, 0 errors; no
+  subagents). Left: the objects' resets, releases, constructors, the
+  blocks' destructors, the wheels' groups and the morph (32 roots).
+  Step: validation agent running.
 
 ## Done
 
@@ -223,5 +229,9 @@ file's history. What's left to see in a drive, from every run:
 
 - After the second set's map: ours 3777, work left 2622 (wrapped 97,
   known 641, unknown 1884).
+
+- After the second set's first migration (`itc_3162`: race 38 s, 0
+  errors, second_set 0 differing): ours 3858, work left 2541 (wrapped
+  97, known 560, unknown 1884).
 
 ## Stopped

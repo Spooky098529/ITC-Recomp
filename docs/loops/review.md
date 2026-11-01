@@ -120,6 +120,16 @@ When the user has reviewed a run's section, its heading gets
   +37084, set nowhere in the file. `known-data.md`: "model point" now
   "point record"; the eight layouts. Leads folded: the release, the
   point set-ups; trimmed: the load poll, the per-frame passes.
+- The second set's first migration (c9c70345..92e9be10,
+  `--native_second_set`, `src/second_set/`): 84 rows. For review:
+  `PointRecord::Clear` writes its stack back chain as the original
+  does; the harness builds its own skeletons (valid parents and root,
+  seeded Bind arrays: the scene loaders' random ones made the original
+  read unmapped memory); the cockpit's, interior's and traffic's models
+  never 0 in the harness (the original faults on 0, as in play); the
+  Find adapters leave flush-to-zero as the last float step left it;
+  `PartsPoints::Find`'s read of +37076 to +37084 and `ResetRightDoor`'s
+  scaling with model 0 copied.
 
 ## Run 2026-10-31 16:54 (`b7-loop-31-10-26`, continued)
 
