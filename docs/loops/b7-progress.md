@@ -11,7 +11,10 @@ file's history. What's left to see in a drive, from every run:
 - Run started 2026-11-01 12:56 on `b7-loop-01-11-26`, from d8348c7b;
   summary `b7-loop-2026-11-01-1256.md`. Limit: 3 subsystems.
 - Subsystem 1 of 3: the boot mode (`boot-mode.md`). Done.
-- Next: picking subsystem 2 of 3 from `leads.md`.
+- Subsystem 2 of 3: `Car::DrawUpdate` `sub_820DAC68` (the scene
+  model's per-pass update; its lead from `leads.md`, ready: 78
+  functions, 16,029 lines, split for the migration). Step: mapping
+  (agent running).
 
 ## Done
 
