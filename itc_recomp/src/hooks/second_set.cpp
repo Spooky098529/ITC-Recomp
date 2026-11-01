@@ -72,8 +72,10 @@ ITC_FLAG_BOOL(native_second_set, true, "ITC",
               "groups' finds under them, no adapters: only they call them; "
               "Skeleton::UpdateMatrices' original where its plain C++ declines)) natively instead of through the translated "
               "code (the same writes; checked by --run_harnesses=second_set); the point groups' "
-              "resets and inits, SetNode, Clear, SetShape and the cockpit's, interior's, light kit's and "
-              "traffic body's block resets have no adapters (their callers are native)");
+              "resets and inits, SetNode, Clear, SetShape, PointRecord::PointRecord, the point blocks' "
+              "constructors and the cockpit's, interior's, light kit's and traffic body's block "
+              "resets, the wheels' groups and WheelPoints::Reset, and the objects' resets but "
+              "SceneCockpit's and SceneModelBlock's have no adapters (their callers are native)");
 
 namespace hooks {
 
@@ -404,39 +406,26 @@ void SecondSetPartsResetRightDoor(PPCContext& ctx, uint8_t* base) {
 // PointRecord::Clear sub_820CEA08 and SetShape sub_820CE900, CockpitPoints::Reset
 // sub_820DBC10, InteriorPoints::Reset sub_820E35D8, LightPoints::Reset
 // sub_820DC8A8 and TrafficPoints::Reset sub_820E5880 (2026-11-01, their callers
-// in play native).
-ITC_SECOND_SET(820D0270, SecondSetPointConstruct)
+// in play native); PointRecord::PointRecord sub_820D0270, the objects' resets
+// SceneParts sub_820E0510, SceneInterior sub_820E3748, SceneLights sub_820DCA40,
+// SceneWheels sub_820E88A8 and SceneTraffic sub_820E5930, the point blocks'
+// constructors PartsPoints sub_820E2A10, CockpitPoints sub_820DC190,
+// InteriorPoints sub_820E4FD8, LightPoints sub_820DDCF8, TrafficPoints
+// sub_820E68E8 and WheelPoints sub_820ECC48, WheelPoints::Reset sub_820E85C8,
+// the wheels' group inits and resets (sub_820E8A80, sub_820E74B8, sub_820E99C0,
+// sub_820E7918, sub_820EA8E8, sub_820E7C08, sub_820EB320, sub_820E7F90)
+// (2026-11-01, their callers in play native).
 ITC_SECOND_SET(820CEB30, SecondSetFindShape)
 ITC_SECOND_SET(820E0258, SecondSetPartsFind)
 ITC_SECOND_SET(820DBC88, SecondSetCockpitFind)
 ITC_SECOND_SET(820E3660, SecondSetInteriorFind)
 ITC_SECOND_SET(820DC900, SecondSetLightsFind)
 ITC_SECOND_SET(820E58C8, SecondSetTrafficFind)
-ITC_SECOND_SET(820E2A10, SecondSetPartsPointsConstruct)
 ITC_SECOND_SET(820E00F0, SecondSetPartsPointsReset)
-ITC_SECOND_SET(820DC190, SecondSetCockpitPointsConstruct)
-ITC_SECOND_SET(820E4FD8, SecondSetInteriorPointsConstruct)
-ITC_SECOND_SET(820DDCF8, SecondSetLightPointsConstruct)
-ITC_SECOND_SET(820E68E8, SecondSetTrafficPointsConstruct)
-ITC_SECOND_SET(820E74B8, SecondSetWheelsResetTire)
-ITC_SECOND_SET(820E7918, SecondSetWheelsResetRimA)
-ITC_SECOND_SET(820E7C08, SecondSetWheelsResetRimB)
-ITC_SECOND_SET(820E7F90, SecondSetWheelsResetBrakes)
-ITC_SECOND_SET(820E0510, SecondSetScenePartsReset)
 ITC_SECOND_SET(820DBE20, SecondSetSceneCockpitReset)
-ITC_SECOND_SET(820E3748, SecondSetSceneInteriorReset)
-ITC_SECOND_SET(820DCA40, SecondSetSceneLightsReset)
-ITC_SECOND_SET(820E5930, SecondSetSceneTrafficReset)
 ITC_SECOND_SET(820DB6C0, SecondSetSceneCarModelRelease)
 ITC_SECOND_SET(820DA108, SecondSetSceneModelBlockConstruct)
 ITC_SECOND_SET(820D9F50, SecondSetSceneModelBlockReset)
-ITC_SECOND_SET(820E88A8, SecondSetSceneWheelsReset)
-ITC_SECOND_SET(820E85C8, SecondSetWheelPointsReset)
-ITC_SECOND_SET(820ECC48, SecondSetWheelPointsConstruct)
-ITC_SECOND_SET(820E8A80, SecondSetWheelsInitTire)
-ITC_SECOND_SET(820E99C0, SecondSetWheelsInitRimA)
-ITC_SECOND_SET(820EA8E8, SecondSetWheelsInitRimB)
-ITC_SECOND_SET(820EB320, SecondSetWheelsInitBrakes)
 ITC_SECOND_SET(820E0590, SecondSetScenePartsRelease)
 ITC_SECOND_SET(820E3890, SecondSetSceneInteriorRelease)
 ITC_SECOND_SET(820DCB20, SecondSetSceneLightsRelease)
