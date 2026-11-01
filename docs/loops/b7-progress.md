@@ -124,7 +124,9 @@ file's history. What's left to see in a drive, from every run:
   second_set 0 differing, frame dumps alike, race 38 s, 0 errors; no
   subagents). Left: the objects' resets, releases, constructors, the
   blocks' destructors, the wheels' groups and the morph (32 roots).
-  Step: validation agent running.
+  Validated (`itc_3163`, 120 s: race 54 s, 0 errors; replay `itc_3164`
+  ok): 81 of 81 harness lines, 79 ran in the race, 2 in the replay,
+  none to drive. Second migration: migration agent running.
 
 ## Done
 
