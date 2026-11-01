@@ -53,6 +53,15 @@ The user's decisions:
    not the renderer's: left out of this plan.
 6. **The work goes on its own branch** after the B7 loop's run; this
    doc is committed where the tree is.
+10. **Not GPU emulation: the bar is frames that look correct** (the
+   user's call, 2026-11-01). Nothing on the render path has to reproduce
+   the game's Direct3D or the 360's device state (the register shadow,
+   the packets). No harnesses compare render-path code with the
+   recompiled version, and no step exists only to match device state.
+   This isn't B7 work: B7's "match the recompiled code exactly" and its
+   harness rule don't apply. Changes are checked by frame dumps against
+   the current renderer (differences explained), interpolation's logs and
+   the user's drives.
 
 ## Summary
 
@@ -107,10 +116,10 @@ The user's decisions:
 - **Recommended first step**: step 0 measures and logs. It gives a
   profile baseline, so nothing gets slower unseen, and a log of each
   pass's resolves: what each source is drawn into after, which
-  destinations are sampled before being written. Step 1 then ports the
-  command handlers as they are (same Direct3D calls) to have them native.
-  Step 2 makes them feed our interface beside the Direct3D path and
-  compares the two.
+  destinations are sampled before being written (done: "Step 0's
+  findings"). Step 1 then writes our own command handlers feeding our
+  interface, and takes the game's Direct3D off the render path, checked
+  by how the frames look (decision 10; it was three steps before).
 
 ## 1. How a frame is made today
 
@@ -488,8 +497,8 @@ The checks:
   compare resolve destinations and passes by draw IDs. Where a dump can't
   show a step's effect, use the doc's own method: a temporary check that
   computes both ways on every draw and logs the mismatches over a race.
-- **The harnesses** (`--run_harnesses`) for every game function a step
-  makes native, with cases in the same change.
+- **No harnesses** (decision 10): render-path code isn't compared with
+  the recompiled code; the dumps and the drives judge it.
 - **Render thread profiles** (`profile_render_thread.sh`, two or three
   runs a build, alternating): a step may be faster, but none should be
   slower unseen.
@@ -499,9 +508,7 @@ The checks:
 | Step | What | Removes | Checked by | Size, risk |
 |---|---|---|---|---|
 | **0** | **Measure and log.** A render thread profile on the current code (a baseline: none since the setters, shaders and render queue went native). A pass log for one race frame and one menu frame. For each pass it records: the targets set; the draws; each resolve (rect, flags, destination); whether the source is drawn into again before the next clear; and whether each destination is sampled before it's resolved into, within the frame. Also whether game code outside the replay reads the register shadow (a watch on its blocks for a race) | Nothing; it settles the open rows of section 2 | The log; the profile | Small. **Needs the user to run it** (or the tree free of the B7 loop) |
-| **1** | **Native command handlers, as they are**: the 33 handlers and the single commands in plain C++, still calling the game's (native) Direct3D, command 7 with interpolation's substitution where it is. The renderer's hooks called directly | The guest round trip per command; `REPLAY_COUNTED_HANDLER` | Harness cases per handler; `draws.txt` identical; `--log_blend_state`; a drive | Medium (a B7-style port, so B7's rules) |
-| **2** | **The interface, fed beside the Direct3D path.** The interface defined; the native handlers also call it; the Vulkan renderer builds each draw's state both ways (from the interface, and from the registers as now) and logs mismatches | Nothing yet | 0 mismatches over an attract race, a drive and the menus | Large: the render states' and formats' mapping is the work |
-| **3** | **The renderer switched to the interface.** `State::Draw` reads the interface's state. The handlers stop calling the game's Direct3D. The Vulkan backend makes the translator's registers itself, and translates (vertex shader, declaration) pairs itself in place of the game's patch. Resolves and clears are still made by the renderer as now (copies), from the handlers' arguments | The register shadow's writes and reads on the render path, `ReadRegisters`, the dirty masks, the PM4 packets, the kick, the shader load and patch, `replay_hooks.cpp`, `draw_packets.cpp`, `gpu_link.cpp` | Dumps identical (`draws.txt` and pixels); the menus and tiling by the user; profile; a drive | Large. After it, the game's Direct3D is off the render path |
+| **1** | **Our command handlers, feeding our interface, the game's Direct3D off the render path** (steps 1-3 merged, decision 10). The interface defined (`src/render/device.h`, no Vulkan types). Native handlers decode each command (`functions/render-commands.md`) into it: state blocks, textures, streams, shaders and declarations, constants (command 7 keeps interpolation's substitution where it is), draws, targets, viewport and scissor, clears, resolves and tiling as the renderer's own operations. The primitive drawer's draw (`PrimitiveDrawer::Draw`, under command 15) feeds it too. The Vulkan renderer reads the interface instead of the registers, and makes the translator's registers and the (vertex shader, declaration) pairs itself. Resolves are still made as copies, as now. The old path stays behind a flag until this is checked | The register shadow's writes and reads on the render path, `ReadRegisters`, the dirty masks, the PM4 packets, the kick, the shader load and patch, the recompiled handlers, `replay_hooks.cpp`, `draw_packets.cpp`, `gpu_link.cpp` | Dumps against the current renderer (`draws.txt` and pixels; differences explained); the menus and tiling by the user; `--log_blend_state`, `--log_stepping_constants`; a drive; a profile against step 0's | Large. After it, the game's Direct3D is off the render path. Its parts can land one after another behind the flag |
 | **4** | **Resources through the interface.** Textures and buffers made and filled when the game makes them (`XPR::GetTexture`, `Resource::Lock` and Unlock, `Mesh::Parse`, the loaders, the native texture writers), bound by handle. The Vulkan backend keeps fetch by address over its own arena until vertex input is per-stream | The mirrors, the fetch-constant-keyed texture lookups, most of memcpy's tracking | A check of every bound buffer and texture against guest memory over a drive (as `--native_renderer_verify_mirror` did); dumps identical; the hitch log | Medium |
 | **4b** | **GPU data out of guest memory** ("GPU data out of guest memory" in section 3). First the read watch: which resource data the CPU reads after a draw first uses it. Then each native writer whose data the CPU doesn't read hands it to `UpdateBuffer` or `UpdateTexture` into device-local memory and leaves guest memory unwritten (headers kept); data the CPU reads is written to both; memcpy's tracking stays for recompiled writers. Buffers and textures device-local; per-frame vertices through an upload ring | The mirrors (for native writers' data), most of the guest memory physical allocations for GPU data, vertex reads across PCIe | The read watch over a race and a drive (0 reads of moved data); dumps identical; a GPU-bound run (4K) and the render thread profile, before and after | Medium; risk in data the CPU reads that the watch didn't see |
 | **5** | **Passes into their textures.** The destination scan (section 5): each pass draws into its destination; depth maps sampled as depth; the swap and the format changes gone; the glow's steps into their own textures; grab passes as `CopyTexture`; tiling as one target. MSAA keeps the game's sample counts for now (resolved at the pass's end) | The resolve copies but the grab passes, `ResolveInto`'s conversions, the resolve destinations' separate images | Dumps: each destination against the step before; differences explained (precision) | Medium. The exponent bias (section 2) is decided here |
@@ -510,8 +517,7 @@ The checks:
 | **8** | **The Vulkan backend behind the interface**: the Vulkan code moved under `src/render/vulkan/`, the interface free of Vulkan types; the shader blobs' format defined for other backends | Nothing at runtime | Builds and dumps identical | Medium, mechanical |
 | later | **Tick replay** (`tick-replay.md`): with draws in the interface's terms, a tick's draws kept and replayed on render-only frames | The per-draw work on ~14 of 15 frames | Its own diagnostic first | Large; needs interpolation's join keyed by draw |
 
-Steps 1 and 3 are where most of the 360 machinery leaves the render
-path. Step 5 is where the resolves go.
+Step 1 is where most of the 360 machinery leaves the render path. Step 5 is where the resolves go.
 
 ## Step 0's findings (2026-11-01, on `conventional-renderer`)
 
@@ -660,8 +666,16 @@ Steps from 1 on compare against these (alternating runs).
   render path. The game's getters (one seen in play), the video output's
   set-up and the movie code (gone) may read it. Step 0's watch answers
   it. Probably little: the replay is where the state is set.
-- **The command handlers' callbacks** (commands 20, 22, 28) call game
-  objects that may reach the game's Direct3D; not read.
+- **The command handlers' callbacks** (commands 20, 22, 28): read
+  (`functions/render-commands.md`): 20 releases a resource, 22 retires
+  objects onto the release list, 28 calls an object's slot 0 (not seen in
+  play). None calls the draw functions itself; what 22's and 28's
+  objects do in their slots isn't read.
+- **The primitive drawer draws under command 15** (found mapping the
+  handlers): `PrimitiveDrawer::Draw` (`sub_825A17A0`, recompiled) makes
+  the screen-space quads and the minimap triangle through BeginVertices.
+  Taking the game's Direct3D off the render path needs its draw feeding
+  the interface too, not only the handlers.
 - **The vertex declaration patch**: what the game's patcher changes in
   the microcode (fetch strides and formats, probably) has to be
   reproduced in our translation step. Read `sub_822AE340` first.
