@@ -46,7 +46,7 @@ file's history. What's left to see in a drive, from every run:
   `RaceDialog::SetText` and `RaceDialog::Open`; no adapter removable.
   No validation needed.
 - Limit for this run: 5 subsystems (the user's call, 2026-11-01; 3
-  before); 4 taken.
+  before); 5 taken.
 - Subsystem 2 of 5: the render queue's methods (`sub_8258EDC8`,
   `sub_8258E5F8`, `sub_8258E618`, `sub_8258E5E0`, `sub_8258ED78`),
   from `leads.md` (all ready, every pass). Map checked (ee891a3a: 24
@@ -160,6 +160,10 @@ file's history. What's left to see in a drive, from every run:
   race-end change, after `ModeType9::ModeType9`, before
   `Career::NextDay`): 14 of 14 harness lines, 6 ran in the race, 8 in
   the replay, none to drive. Done.
+
+- Subsystem 5 of 5: the scene models' load poll (`sub_820DA318`, with
+  the parts' finishers), from `leads.md` (28 functions left under it
+  since the second set is ours). Step: mapping agent running.
 
 ## Done
 
