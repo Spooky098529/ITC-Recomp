@@ -150,6 +150,8 @@ set(ITC_SOURCES
     src/scene_loaders/file_loaded.cpp
     src/scene_loaders/model_point.cpp
     src/hooks/second_set.cpp
+    src/hooks/load_poll.cpp
+    src/load_poll/load_poll.cpp
     src/second_set/points.cpp
     src/second_set/point_groups.cpp
     src/second_set/blocks.cpp
@@ -454,6 +456,7 @@ set(ITC_SOURCES
     src/harnesses/app_states.cpp
     src/harnesses/scene_loaders.cpp
     src/harnesses/second_set.cpp
+    src/harnesses/load_poll.cpp
     src/harnesses/car_models.cpp
     src/harnesses/save_data.cpp
     src/harnesses/race_world.cpp
@@ -649,6 +652,7 @@ set_source_files_properties(src/c_runtime/math.cpp src/ui_movies/keys.cpp
     src/car_models/raster.cpp src/car_models/decals.cpp src/car_models/file_loaded.cpp
     src/scene_loaders/file_loaded.cpp src/scene_loaders/model_point.cpp
     src/second_set/finds.cpp src/second_set/morph.cpp src/second_set/wheels.cpp
+    src/load_poll/load_poll.cpp
     src/car_sounds/x3daudio.cpp
     src/car_sounds/car_sound_3d.cpp src/car_sounds/car_sound_voices.cpp
     src/car_sounds/car_sound_parts.cpp src/xact/voices.cpp src/xact/waves.cpp

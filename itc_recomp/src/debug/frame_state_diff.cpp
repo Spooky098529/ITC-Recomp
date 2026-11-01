@@ -5,6 +5,7 @@
 #include "cameras/cameras.h"
 #include "hooks/cameras.h"
 #include "hooks/framework.h"
+#include "hooks/load_poll.h"
 #include "hooks/second_set.h"
 #include "matrix_math/matrix_math.h"
 #include "models/xpr.h"
@@ -29,6 +30,7 @@ ITC_FLAG_DECLARE(bool, native_matrix_math);
 ITC_FLAG_DECLARE(bool, native_cameras);
 ITC_FLAG_DECLARE(bool, native_models);
 ITC_FLAG_DECLARE(bool, native_second_set);
+ITC_FLAG_DECLARE(bool, native_load_poll);
 
 ITC_FLAG_BOOL(find_per_frame_state, false, "ITC",
               "Find game state that advances on render-only passes, and the code that "
@@ -582,8 +584,25 @@ extern "C" REX_FUNC(sub_820C5C88) {
   }
   debug::FrameStateDiff_After(base, "draw step part", 0x820C5C88);
 }
-ITC_FRAME_STATE_WRAP(820D4048)
-ITC_FRAME_STATE_WRAP(820D72D8)
+// The scene models' finishers and apply steps natively under
+// --native_load_poll (src/load_poll/; their native callers call the plain
+// C++, not these wraps), inside the same wrap.
+#define ITC_FRAME_STATE_WRAP_LOAD_POLL(address, step)               \
+  extern "C" REX_FUNC(sub_##address) {                              \
+    REX_FUNC_PROLOGUE();                                            \
+    if (debug::IsHidden(0x##address)) {                             \
+      return;                                                       \
+    }                                                               \
+    debug::FrameStateDiff_Before(base);                             \
+    if (ITC_FLAG(native_load_poll)) {                               \
+      hooks::step(ctx, base);                                       \
+    } else {                                                        \
+      __imp__sub_##address(ctx, base);                              \
+    }                                                               \
+    debug::FrameStateDiff_After(base, "draw step part", 0x##address); \
+  }
+ITC_FRAME_STATE_WRAP_LOAD_POLL(820D4048, LoadPollCarModelIsReady)
+ITC_FRAME_STATE_WRAP_LOAD_POLL(820D72D8, LoadPollCarPartsSetVinylTextures)
 ITC_FRAME_STATE_WRAP(820D92A0)
 ITC_FRAME_STATE_WRAP(820D9B68)
 ITC_FRAME_STATE_WRAP(820D9C50)
@@ -591,18 +610,19 @@ ITC_FRAME_STATE_WRAP(820D9EA0)
 ITC_FRAME_STATE_WRAP(820DAB58)
 ITC_FRAME_STATE_WRAP(820DBFF8)
 ITC_FRAME_STATE_WRAP(820DC498)
-ITC_FRAME_STATE_WRAP(820DCBC0)
-ITC_FRAME_STATE_WRAP(820DDA60)
+ITC_FRAME_STATE_WRAP_LOAD_POLL(820DCBC0, LoadPollSceneLightsApplyRecord)
+ITC_FRAME_STATE_WRAP_LOAD_POLL(820DDA60, LoadPollSceneLightsFinish)
 ITC_FRAME_STATE_WRAP(820DDE58)
 ITC_FRAME_STATE_WRAP(820E2E68)
 ITC_FRAME_STATE_WRAP(820E2EE8)
 ITC_FRAME_STATE_WRAP(820E4140)
 ITC_FRAME_STATE_WRAP(820E53F0)
-ITC_FRAME_STATE_WRAP(820E5A68)
+ITC_FRAME_STATE_WRAP_LOAD_POLL(820E5A68, LoadPollSceneTrafficFinish)
 ITC_FRAME_STATE_WRAP(820E6A40)
 ITC_FRAME_STATE_WRAP(820E7328)
 ITC_FRAME_STATE_WRAP(820E8908)
 ITC_FRAME_STATE_WRAP(820ECE28)
+#undef ITC_FRAME_STATE_WRAP_LOAD_POLL
 #undef ITC_FRAME_STATE_WRAP
 
 // Draw step part 0x82133960, rewritten to also name each view's draw: for

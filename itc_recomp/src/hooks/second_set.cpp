@@ -626,12 +626,7 @@ void SecondSetSceneModelBlockConstruct(PPCContext& ctx, uint8_t* base) {
   ss::SceneModelBlockConstruct(base, ctx.r3.u32);
 }
 
-void SecondSetFindStep(PPCContext& ctx, uint8_t* base, FindFunction find) {
-  if (!native::Buffers_NativeMemcpy() || !ITC_FLAG(native_models) ||
-      !ITC_FLAG(native_material_passes)) {
-    return;
-  }
-  ctx.fpscr.disableFlushMode();
+ss::FindCalls SecondSetFindCalls(PPCContext& ctx, uint8_t* base) {
   ss::FindCalls calls;
   calls.update_matrices = [&ctx, base](uint32_t skeleton, uint32_t frame) {
     const uint64_t stack = ctx.r1.u64, link = ctx.lr;
@@ -645,6 +640,16 @@ void SecondSetFindStep(PPCContext& ctx, uint8_t* base, FindFunction find) {
     ctx.lr = link;
     ctx.fpscr.disableFlushMode();
   };
+  return calls;
+}
+
+void SecondSetFindStep(PPCContext& ctx, uint8_t* base, FindFunction find) {
+  if (!native::Buffers_NativeMemcpy() || !ITC_FLAG(native_models) ||
+      !ITC_FLAG(native_material_passes)) {
+    return;
+  }
+  ctx.fpscr.disableFlushMode();
+  ss::FindCalls calls = SecondSetFindCalls(ctx, base);
   ctx.r3.u64 = find(base, ctx.r3.u32, ctx.r4.u32, ctx.r1.u32, calls);
   if (calls.flush) {
     ctx.fpscr.enableFlushMode();

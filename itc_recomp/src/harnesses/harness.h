@@ -262,5 +262,6 @@ void RaceScreens(Context& h);
 void Scene(Context& h);
 // The second set's objects (src/harnesses/second_set.cpp).
 void SecondSet(Context& h);
+void LoadPoll(Context& h);
 
 }  // namespace harness

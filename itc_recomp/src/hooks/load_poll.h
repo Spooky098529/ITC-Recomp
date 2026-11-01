@@ -1,0 +1,47 @@
+// The scene models' load poll's register steps (src/load_poll/,
+// docs/functions/load-poll.md), shared by the adapters
+// (src/hooks/load_poll.cpp and the diagnostics' wraps in
+// src/debug/frame_state_diff.cpp, behind --native_load_poll) and the
+// harness (without the flag). Each runs the original unless
+// LoadPollCalleesNative(), leaves r3 as the original does and the flush mode
+// as the original's last float step.
+
+#pragma once
+
+#include "guest.h"
+#include "load_poll/load_poll.h"
+
+namespace hooks {
+
+// Whether the plain C++'s callees run natively: --native_second_set,
+// --native_scene_loaders, --native_car_models and the point set-ups' checks
+// (native memcpy, --native_models, --native_material_passes).
+bool LoadPollCalleesNative();
+// The guest calls the plain C++ makes where a callee's plain C++ declines.
+load_poll::Calls LoadPollCalls(PPCContext& ctx, uint8_t* base);
+
+// Wheels::SetRecord sub_820D8EC0 (r3 the wheels, r4 the record) and
+// SetCaliperTexture sub_820D8ED0 (r3 the wheels).
+void LoadPollWheelsSetRecord(PPCContext& ctx, uint8_t* base);
+void LoadPollWheelsSetCaliperTexture(PPCContext& ctx, uint8_t* base);
+// CarModel::IsReady sub_820D4048 (r3 the car model; a wrap's) and
+// CarParts::SetVinylTextures sub_820D72D8 (r3 the parts; a wrap's).
+void LoadPollCarModelIsReady(PPCContext& ctx, uint8_t* base);
+void LoadPollCarPartsSetVinylTextures(PPCContext& ctx, uint8_t* base);
+// InteriorDials::SetBlock sub_820E3040 (r3 the dials, r4 the block),
+// InteriorMeters::SetGauge sub_820E32E8 (no adapter: only SetGauges calls
+// it; r3 the meters, r4 the gauge, r5 the entry) and SceneInterior::SetGauges
+// sub_820E3938 (r3 the interior).
+void LoadPollInteriorDialsSetBlock(PPCContext& ctx, uint8_t* base);
+void LoadPollInteriorMetersSetGauge(PPCContext& ctx, uint8_t* base);
+void LoadPollSceneInteriorSetGauges(PPCContext& ctx, uint8_t* base);
+// SceneLights::Finish sub_820DDA60 (r3 the light kit; a wrap's),
+// SetRecord sub_820DCB70 (no adapter: only ApplyRecord calls it; r4 the
+// record) and ApplyRecord sub_820DCBC0 (r4 the record; a wrap's);
+// SceneTraffic::Finish sub_820E5A68 (r3 the traffic body; a wrap's).
+void LoadPollSceneLightsFinish(PPCContext& ctx, uint8_t* base);
+void LoadPollSceneLightsSetRecord(PPCContext& ctx, uint8_t* base);
+void LoadPollSceneLightsApplyRecord(PPCContext& ctx, uint8_t* base);
+void LoadPollSceneTrafficFinish(PPCContext& ctx, uint8_t* base);
+
+}  // namespace hooks

@@ -189,6 +189,9 @@ void SecondSetTrafficPointsDestruct(PPCContext& ctx, uint8_t* base);
 using FindFunction = uint32_t (*)(uint8_t*, uint32_t, uint32_t, uint32_t,
                                   second_set::FindCalls&);
 bool SecondSetFindsNative();
+// The guest calls the set-ups' plain C++ makes (Skeleton::UpdateMatrices'
+// original from ModelPoint::Find's frame), for native callers.
+second_set::FindCalls SecondSetFindCalls(PPCContext& ctx, uint8_t* base);
 // One set-up's plain C++ (nothing done unless SecondSetFindsNative()), for
 // the adapters and the harness.
 void SecondSetFindStep(PPCContext& ctx, uint8_t* base, FindFunction find);
