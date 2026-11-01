@@ -513,7 +513,7 @@ The checks:
 | **1** | **Our command handlers, feeding our interface, the game's Direct3D off the render path** (steps 1-3 merged, decision 10). The interface defined (`src/render/device.h`, no Vulkan types). Native handlers decode each command (`functions/render-commands.md`) into it: state blocks, textures, streams, shaders and declarations, constants (command 7 keeps interpolation's substitution where it is), draws, targets, viewport and scissor, clears, resolves and tiling as the renderer's own operations. The primitive drawer's draw (`PrimitiveDrawer::Draw`, under command 15) feeds it too. The Vulkan renderer reads the interface instead of the registers, and makes the translator's registers and the (vertex shader, declaration) pairs itself. Resolves are still made as copies, as now. The old path stays behind a flag until this is checked | The register shadow's writes and reads on the render path, `ReadRegisters`, the dirty masks, the PM4 packets, the kick, the shader load and patch, the recompiled handlers, `replay_hooks.cpp`, `draw_packets.cpp`, `gpu_link.cpp` | Dumps against the current renderer (`draws.txt` and pixels; differences explained); the menus and tiling by the user; `--log_blend_state`, `--log_stepping_constants`; a drive; a profile against step 0's | Large. After it, the game's Direct3D is off the render path. Its parts can land one after another behind the flag |
 | **2** | **Textures through the interface** (buffers moved to 2b, the user's call, 2026-11-01; design in "Step 2" below). Textures created, written and destroyed through the interface where the game makes, fills and frees them (the five creation paths, the four free points, the plate, the vinyl sheet), bound by handle; still uploaded at first bind (the user's call) | The fetch-constant-keyed texture lookups, memcpy's marking of written textures, the texture lifetimes' guesses (`RetireOverwritten`, `RetireMovedResolveDestinations`, the race-end flush) | Bound textures never created logged; `--native_renderer_verify_textures` over a drive (no unannounced changes); dumps against two runs' spread; the hitch log; `--log_gpu_memory` over races (no growth) | Medium |
 | **2b** | **Buffers through the interface, and GPU data out of guest memory** (the mirrors replaced by a device-local arena 2026-11-01, buffers only, native writers still writing guest memory; reopened the same day for buffer writes announced where the game makes them, then done: "Step 2b" below; the rest of this row is the plan as first written) ("GPU data out of guest memory" in section 3). Buffers' records first (created by `Mesh::Parse`'s relocations, `CreateVertexBuffer` and `CreateIndexBuffer`, the work memory's headers; destroyed where freed), the backend fetching by address over its own arena until vertex input is per-stream. First the read watch: which resource data the CPU reads after a draw first uses it. Then each native writer whose data the CPU doesn't read hands it to `UpdateBuffer` or `UpdateTexture` into device-local memory and leaves guest memory unwritten (headers kept); data the CPU reads is written to both; memcpy's tracking stays for recompiled writers. Buffers and textures device-local; per-frame vertices through an upload ring | The mirrors (for native writers' data), most of the guest memory physical allocations for GPU data, vertex reads across PCIe | The read watch over a race and a drive (0 reads of moved data); dumps identical; a GPU-bound run (4K) and the render thread profile, before and after | Medium; risk in data the CPU reads that the watch didn't see |
-| **3** | **Passes into their textures.** The destination scan (section 5): each pass draws into its destination; depth maps sampled as depth; the swap and the format changes gone; the glow's steps into their own textures; grab passes as `CopyTexture`; tiling as one target. MSAA keeps the game's sample counts for now (resolved at the pass's end) | The resolve copies but the grab passes, `ResolveInto`'s conversions, the resolve destinations' separate images | Dumps: each destination against the step before; differences explained (precision) | Medium. The exponent bias (section 2) is decided here |
+| **3** | **Passes into their textures.** The destination scan (section 5): each pass draws into its destination; depth maps sampled as depth; the swap and the format changes gone; the glow's steps into their own textures; grab passes as `CopyTexture`; tiling as one target. MSAA keeps the game's sample counts for now (resolved at the pass's end); design and parts in "Step 3" below | The resolve copies but the grab passes, `ResolveInto`'s conversions, the resolve destinations' separate images | Dumps: each destination against the step before; differences explained (precision) | Medium. The exponent bias (section 2) is decided here |
 | **4** | **MSAA as a player option** (`itc.toml`; off, 2x, 4x, 8x): one value for every target the game drew with MSAA (decision 4; the default to pick) | The 360's fixed sample counts | Dumps at each setting; the user | Small |
 | **5** | **The frame composed natively** (`unlocked-res.md`, "Later"): first read the upscale's pixel shader and check that nothing else reads `1ECB9000`; then the 3D view drawn into the frame (or its region) and the HUD over it | The partial-rect resolve and the upscale draw | Dumps; the user at 4K | Small to medium |
 | **6** | **The Vulkan backend behind the interface**: the Vulkan code moved under `src/render/vulkan/`, the interface free of Vulkan types; the shader blobs' format defined for other backends | Nothing at runtime | Builds and dumps identical | Medium, mechanical |
@@ -1171,6 +1171,163 @@ checks per 5 s, 0 changed with no `BufferWritten`; 54 buffers written
 (the wheels' set-ups' morphs, in two 5 s windows with ~1,600 made and
 freed), drawn from their new data. Step 2b done.
 
+## Step 3 (2026-11-01, on `conventional-renderer`; planned, not started)
+
+Passes draw straight into their textures; the resolve copies go, except
+the grab passes, the partial rect and the multisample resolves. This
+section is the plan the user asked to have written down (2026-11-01).
+The three choices marked **(recommended)** are the plan's; their
+alternatives are noted beside them.
+
+### What the survey found (2026-11-01)
+
+- **The race frame's passes** (a dump of step 2b's build,
+  `passes.txt` and `draws.txt`): as "The passes of a race frame" above,
+  with these details:
+  - most ping-pongs read the destination's last contents in the draw
+    that writes its next ones: the filter's draws 16 and 17 read
+    `1E73D000` and are resolved into it again; each glow step pair
+    (draws 2415-2422) reads the texture the next step rewrites; draw 2414
+    (the history cross-fade) reads last frame's `1B1AE000`, resolved
+    into again by resolve 11;
+  - the glow steps draw opaque (`RB_BLENDCONTROL` `00010001`), except the
+    history cross-fade, draw 2414 (`00010706`: color by source alpha and
+    one minus source alpha);
+  - the readers of the biased copies have `exp_adjust` 0 in their fetch
+    constants (word 3 `01280D10`, `01080D10`, `01000D10`): the game undoes
+    the 1/8 in its own math (the cross-fade's vertex color 8, 8, 8;
+    "the glow" in `native-renderer.md`'s known issues);
+  - only format 54 destinations have a swapped swizzle (`1ECBD000`'s word
+    3 `01280C14`: X from Z); the glow textures and `1B44E000` don't.
+- **The SDK's SPIR-V translator**:
+  - applies the texture fetch constant's `exp_adjust` (word 3, bits
+    13-18) to every texture fetch, read at runtime from the constant
+    (`spirv_translator_fetch.cpp`, "Apply the exponent bias from the bits
+    13:18"). Section 2's "not checked further": it is applied;
+  - applies `RB_COLOR_INFO`'s `color_exp_bias` to the pixel shader's
+    output, all four components, before blending
+    (`spirv_translator_rb.cpp`); `State::Draw` passes it in the system
+    constants.
+- **Single commands** never bind targets (`Commands::RunSingle`: 5, 7,
+  13-15, 28).
+- **The render queue** (`graphics/render_queue.cpp`, `Replay`) sorts each
+  bucket and then runs its chains, bucket by bucket. A scan of the whole
+  frame before it's replayed needs every bucket sorted first.
+
+### The design
+
+**1. A pass plan, made before the replay** (in `render/`, above the
+interface, as section 5 puts the destination scan):
+
+- `Replay` sorts every bucket first, keeping the chain heads in order in a
+  host vector, then a scanner walks the whole list once, then the chains
+  run in that order.
+- The scanner decodes only target binds (23, 24, 29, 34, 35), clears
+  (26), resolves (25) and tiling (32, 33), and skips every other command
+  by its size. The sizes move into one `Commands::Slots`, which `Run`
+  returns too, so they're written once.
+- The plan cuts each target's draws into **segments**, each ending at a
+  resolve of that target (a target unbound and bound again continues its
+  segment), and gives each resolve a kind:
+  - **drawn into**: the segment draws straight into the destination;
+  - **multisample resolve**: an MSAA source, resolved at the pass's end;
+  - **copy**: everything else (the partial rect, a level or slice, a
+    rect or point that isn't the whole destination at 0,0).
+- The replay checks the plan at each resolve (the segment's target and
+  destination as planned), counting and logging mismatches. A list the
+  scanner can't walk (chain kinds 1 and 2, never seen in play) is planned
+  as all copies: today's path for that frame.
+- Alternative not taken: the previous frame's plan, checked at each
+  resolve (no change to `Replay`, but the first frame of every new layout
+  falls back to copies). **The scan is recommended**: deterministic, and
+  section 5's design.
+
+**2. Drawn into**: non-MSAA sources whose resolve covers the whole
+destination at 0,0. In the race frame resolves 0-5, 8 and 11-22; in the
+menus, the side targets cleared and resolved with no draws.
+
+- **Two images per drawn destination.** A segment draws into the image
+  that isn't current; draws during the segment read the current one; at
+  the resolve the new image becomes current (the texture cache's handle
+  table gains the versions; the views' answers are made again by the
+  generation, as now). This gives the ping-pongs and the glow history
+  their right contents without knowing what each draw samples. About 20
+  MB more GPU memory (the two 1024x1024 depth maps most of it).
+- **Clears at the segment's start.** A pending clear (command 26, a
+  resolve's `0x100` or `0x200`, BeginTiling's) is applied to the image
+  the target's next segment draws into, when it starts.
+- **Load copies keep EDRAM's retention.** A segment that starts without a
+  clear first copies in the image that last stood for its target (a blit
+  or the fullscreen copy, as formats may differ). About 5 small copies a
+  frame (in 0-2, 20-22 and the glow target's first segment).
+- **A segment with no draws** (the menus' side targets) gets its clear or
+  load at the resolve, so the destination still holds what the resolve
+  copied before.
+- **Formats.** Each destination is drawn in its own format (decision 7):
+  the motion blur into 16_16 UNORM instead of drawn in float and copied;
+  20-22 into 16_16_16_16 UNORM. The depth maps (4 and 5) are drawn into
+  depth images of their own (the depth target's format) and sampled
+  through a depth view, instead of the R32F copy. The exception is the
+  biased destinations (3, below).
+- The depth targets drawn beside a drawn-into color destination (pass 0's
+  depth) stay targets as now; the render area is the smaller of the two.
+
+**3. The exponent bias (−3 on resolves 11-19).** **Recommended:** those
+destinations are drawn in float (R16G16B16A16_SFLOAT), unscaled, and the
+resolve's bias moves to their readers: added to `exp_adjust` in the
+fetch constant of a stage bound to such an image, when it's bound (each
+image keeps the bias its readers need). Readers get v/8 as before, and
+blending is exact, the cross-fade's included. The one difference: the
+copy clamped v/8 to [0, 1] in UNORM, this doesn't; the glow's inputs are
+already clamped copies of the main view, so values over 8 are unlikely
+(dumps to show it). Alternative not taken: `color_exp_bias` at the
+output in the destination's format, exact for the opaque steps but not
+the cross-fade (alpha scaled before blending), which would then stay a
+copy.
+
+**4. Multisample resolves stay at the pass's end** (decision 4; step 4
+rewrites MSAA): 6 (the reflection face), 7 (the 256x256 copy), the menu's
+tiled 3D view (EndTiling), and the main view's 9, 10, 23 (grab copies)
+and 24 (the partial rect, until step 5). They keep today's shader
+(`glsl/resolve.frag`: the samples averaged, the bias applied), in the
+target's format, so the main view's copies keep their 1/8. Drawing MSAA
+images in the destination's format with a resolve attachment is left to
+step 4.
+
+**5. The red and blue swap goes into the view.** No resolve swaps any
+more: each image keeps whether its contents are swapped, and its views'
+component mapping is the fetch constant's swizzle with that composed in
+(format 54's readers).
+
+**6. Diagnostics.** `passes.txt` (`--native_renderer_log_passes`) gives
+each resolve's kind and each load copy; the 5 s stats count resolves by
+kind, load copies, plan mismatches and planless frames; the dump's
+`resolve_NN` images are copied at each resolve (the two images are
+reused within a frame).
+
+**Interpolation** is untouched: command 7 is unchanged, and the glow
+history (forced on render-only passes by `glow.cpp`) stays a per-frame
+segment in order, drawing into the history's other image.
+
+### The parts, in order
+
+Behind `--draw_into_destinations` (on once checked; the old copies stay
+the fallback until 3f):
+
+| Part | What | Checked by |
+|---|---|---|
+| 3a | `Replay` sorts the frame first; the scanner, `Commands::Slots` and the plan, checked at each resolve and logged in `passes.txt`; nothing drawn differently | An attract race: 0 plan mismatches, 0 planless frames; dumps the same |
+| 3b | The swap moved into the views | Dumps: format 54 destinations within the runs' spread |
+| 3c | Drawn into, color, no bias (0-3, 8, 20-22, the menus' side targets): the two images, clears at the segment's start, load copies | Dumps; each destination's differences explained (decision 7) |
+| 3d | The depth maps drawn into their own depth images, sampled as depth | Dumps (the shadow maps' readers in the main view) |
+| 3e | The glow's biased destinations (11-19) in float, the bias in their readers' `exp_adjust` | Dumps (the glow chain and the shown frame); `--log_glow` |
+| 3f | The flag and the copies' leftover code for drawn-into resolves removed; `ResolveInto` kept only for multisample resolves and copies | An attract race and dumps |
+
+Then: `--log_blend_state` and `--log_stepping_constants` (0
+mismatched); `--log_gpu_memory` over several races (no growth, ~20 MB
+more); the user's drive for the menus (tiling) and a race. No profiles
+(until all the conventional renderer's work is done).
+
 ## 7. Risks, and what's still unknown
 
 - **Readers of the register shadow outside the replay.** Once the
@@ -1203,7 +1360,8 @@ freed), drawn from their new data. Step 2b done.
   check: log surfaces sharing an EDRAM base with different keys within
   a frame (step 0).
 - **The exponent bias** (section 2): how readers get the 1/8 scale
-  without a copy is open.
+  without a copy is planned in "Step 3" (float destinations, the bias in
+  the readers' `exp_adjust`).
 - **Resolve 4** (the cleared 1024x1024 texture) and the second 1024x576
   copy: their readers aren't known (probably transparent objects for the
   copy).
