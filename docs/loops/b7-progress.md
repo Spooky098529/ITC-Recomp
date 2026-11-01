@@ -163,7 +163,11 @@ file's history. What's left to see in a drive, from every run:
 
 - Subsystem 5 of 5: the scene models' load poll (`sub_820DA318`, with
   the parts' finishers), from `leads.md` (28 functions left under it
-  since the second set is ours). Step: mapping agent running.
+  since the second set is ours). Map checked (103db371:
+  `load-poll.md`, 32 rows, 29 in play, 14 Wrapped finishers moved from
+  `functions.md`; the poll's 13 blockers are its own finishers, ready;
+  14 ready groups; 2 leads added; no subagents). Step: migration agent
+  running.
 
 ## Done
 
@@ -300,5 +304,8 @@ file's history. What's left to see in a drive, from every run:
 - After its validation (`itc_3193`, 120 s: race 54 s, 0 errors, every
   harness 0 differing but the expected groups): ours 3930, work left
   2469.
+
+- After the load poll's map: ours 3930, work left 2469 (wrapped 96,
+  known 504, unknown 1869).
 
 ## Stopped

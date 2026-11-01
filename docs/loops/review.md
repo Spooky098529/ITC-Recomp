@@ -163,6 +163,18 @@ When the user has reviewed a run's section, its heading gets
   quit, `RaceStates::FadeOut`, `Progress::AfterRace` and
   `ModeType9::ModeType9`, a 51 ms long frame and two textures loaded,
   before `Career::NextDay`: the race-end change each time.
+- `load-poll.md` (new, 103db371): 32 rows: the scene models' load poll
+  `sub_820DA318`, its 13 part finishers (14 rows moved from
+  `functions.md`, Wrapped for `--find_per_frame_state`),
+  `SceneParts::Build` `sub_820E05E0`, `SceneInterior::SetGauges`
+  `sub_820E3938`, `SceneModel::ApplyLightKit` `sub_820D9D10`. Noted for
+  the port: `sub_820D9638` and `sub_820D92A0` pass stack words they
+  never write to `PartModel::SetMaterials`; `sub_820E5A68` checks its
+  +9792 but never sets it; the poll never sets traffic's +5036 (traffic
+  paint never ran). `sub_820D91E0` and `sub_820D9638` moved here from the
+  per-frame passes' lead (they run once). `known-data.md`: the scene
+  model's paint values, +4072, +4224, the second set's finished flags
+  and part-model arrays.
 
 ## Run 2026-10-31 16:54 (`b7-loop-31-10-26`, continued)
 
