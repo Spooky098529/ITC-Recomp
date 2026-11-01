@@ -473,6 +473,12 @@ Rows not yet moved stay in the table below. So far:
   scene + 64 that makes the drawer, with its two pass lists, its
   methods (the add, the flip, the replay with its sort) and the chunk
   walker under the replay (B7).
+- [`scene.md`](scene.md): the car scene at `[0x826C2E44]` that holds
+  the cars' models in the race and the front end: its making, the
+  shared assets it loads (XPR2 bundles, part models, the TGA images)
+  and their load callback, its update, the first set's deferred
+  texture releases, and its teardown (the two pool sets destroyed, the
+  assets released, the scene freed) (B7).
 
 These files hold functions only. What used to follow the table here moved
 out on 2026-10-20: how frame interpolation works, its options and what
