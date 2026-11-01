@@ -16,7 +16,7 @@ ITC_FLAG_BOOL(native_render_queue, true, "ITC",
               "Run the render queue's methods (docs/functions/device-shaders.md: "
               "RenderQueue::Init sub_8258ED00, ClearRecording sub_8258ED78, Flip sub_8258E5E0, "
               "Recording sub_8258E5F8, Replaying sub_8258E618, QueueEntry::Sequence "
-              "sub_8258E5C0) natively instead of through the translated code (the same "
+              "sub_8258E5C0, Add sub_8258EDC8 with PassList::Add sub_8258EB88) natively instead of through the translated code (the same "
               "writes; guest calls for the drawer's Init and vtable slots that aren't the "
               "queue's own; checked by --run_harnesses=render_queue)");
 
@@ -45,6 +45,28 @@ void hooks::NativeRenderQueueClearRecording(PPCContext& ctx, uint8_t* base) {
 
 void hooks::NativeRenderQueueInit(PPCContext& ctx, uint8_t* base) {
   ctx.r3.u64 = rq::Init(base, ctx.r3.u32, ctx.r4.u32, ctx.r1.u32, RenderQueueCall(ctx, base));
+}
+
+void hooks::NativeRenderQueueAdd(PPCContext& ctx, uint8_t* base) {
+  const auto r3 = rq::Add(base, ctx.r3.u32, ctx.r4.u32, ctx.r5.u32, ctx.f1.f64, ctx.r1.u32,
+                          RenderQueueCall(ctx, base));
+  if (!r3) {
+    __imp__sub_8258EDC8(ctx, base);
+    return;
+  }
+  ctx.r3.u64 = *r3;
+}
+
+// Add: r3 = the queue, r4 = the chunk, r5 = the bucket, f1 = the key.
+// PassList::Add (sub_8258EB88) has no adapter: only Add calls it.
+extern "C" REX_FUNC(sub_8258EDC8) {
+  REX_FUNC_PROLOGUE();
+  if (!ITC_FLAG(native_render_queue)) {
+    __imp__sub_8258EDC8(ctx, base);
+    return;
+  }
+  ctx.fpscr.disableFlushMode();
+  hooks::NativeRenderQueueAdd(ctx, base);
 }
 
 // Init: r3 = the queue, r4 = the device.

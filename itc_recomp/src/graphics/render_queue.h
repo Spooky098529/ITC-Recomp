@@ -14,6 +14,7 @@
 
 #include <cstdint>
 #include <functional>
+#include <optional>
 
 namespace graphics::render_queue {
 
@@ -52,5 +53,29 @@ uint32_t ClearRecording(uint8_t* base, uint32_t queue, uint32_t sp, const GuestC
 // Device::GetRenderTarget(device, i) for i 0 to 3, +64 =
 // GetDepthStencilSurface(device). Returns r3 (the depth surface).
 uint32_t Init(uint8_t* base, uint32_t queue, uint32_t device, uint32_t sp, const GuestCall& call);
+
+// PassList::Add (sub_8258EB88), a leaf from its caller's frame `sp`:
+// `chunk_key` = {the chunk, the key's bits} and `sequence` = {the
+// sequence's bits, a word PassList::Add doesn't read} stored at sp + 32 and
+// sp + 40 (the caller's frame, as the original), then read back from there.
+// 0 when `bucket` isn't below the bucket count (+12) or the items used (+16)
+// aren't below the item count (+8); else the item at +20 + 20 x (+16): +0 =
+// 0, +4 = the chunk, +8 = the key, +12 = the sequence, appended to the
+// bucket (+24 + 16 x bucket: +0 the first when empty, else the last's +0;
+// +4 the last; +12 += 1); +16 += 1; returns 1.
+uint32_t PassListAdd(uint8_t* base, uint32_t list, uint64_t chunk_key, uint64_t sequence,
+                     uint32_t bucket, uint32_t sp);
+
+// RenderQueue::Add (sub_8258EDC8, slot 4): `chunk` (or 0) into `bucket`
+// with `key` (f1). nullopt for a bucket above 2,056 or a key above
+// 10,000.0 or below -10,000.0 (the warning's path, never seen in play: the
+// original runs). Nothing when `chunk` is 0 (r3 the queue). Otherwise, in
+// its 144-byte frame below `sp`: +80 = {the chunk, the key as a single},
+// +88 = {the sequence (state +84), the frame's word at +92 as it is};
+// PassList::Add on the list the queue's slot 7 returns; then the sequence
+// += 0.1 (0x82001FBC, single precision). Returns r3 as the original leaves
+// it (PassList::Add's answer).
+std::optional<uint32_t> Add(uint8_t* base, uint32_t queue, uint32_t chunk, uint32_t bucket,
+                            double key, uint32_t sp, const GuestCall& call);
 
 }  // namespace graphics::render_queue

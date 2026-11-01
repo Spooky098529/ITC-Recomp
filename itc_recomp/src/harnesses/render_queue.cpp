@@ -218,12 +218,150 @@ void Init(Context& h) {
   memory::Free(device);
 }
 
+// --- RenderQueue::Add and PassList::Add ---
+
+constexpr uint32_t kItemsA = 1536;  // up to 25 items of 20 bytes each
+constexpr uint32_t kItemsB = 2560;
+constexpr uint32_t kMaxItems = 25;
+
+void NativePassListAdd(PPCContext& ctx, uint8_t* base) {
+  ctx.fpscr.disableFlushMode();
+  ctx.r3.u64 =
+      rq::PassListAdd(base, ctx.r3.u32, ctx.r4.u64, ctx.r5.u64, ctx.r6.u32, ctx.r1.u32);
+}
+void NativeAdd(PPCContext& ctx, uint8_t* base) {
+  ctx.fpscr.disableFlushMode();
+  hooks::NativeRenderQueueAdd(ctx, base);
+}
+
+// A pass list at `list` in `words` with its items at `items` (a count of
+// up to kMaxItems, some used) and its buckets' links: random words, the
+// buckets' first and last 0 or items.
+void MakeItems(Context& h, Random& r, std::vector<uint32_t>& words, uint32_t list, uint32_t items,
+               uint32_t buckets_at) {
+  auto at = [&](uint32_t offset) -> uint32_t& { return words[offset / 4]; };
+  const uint32_t count = r.Below(kMaxItems + 1);
+  at(list + 8) = count;
+  at(list + 16) = r.Below(4) == 0 ? count : r.Below(count + 1);
+  at(list + 20) = h.data + items;
+  for (uint32_t b = 0; b < at(list + 12); b++) {
+    const uint32_t bucket = buckets_at + 16 * b;
+    if (r.Below(2) == 0) {
+      at(bucket + 0) = 0;
+    } else {
+      at(bucket + 0) = h.data + items + 20 * r.Below(kMaxItems);
+      at(bucket + 4) = h.data + items + 20 * r.Below(kMaxItems);
+    }
+    at(bucket + 12) = r.Below(100);
+  }
+}
+
+// The scratch area by role: the floats the functions store (the state's
+// sequence, the items' keys and sequences) as floats, the rest exactly.
+void ScratchOutputs(uint8_t* base, uint32_t data, Outputs& out) {
+  std::vector<uint8_t> bytes = Read(base, data, kScratchBytes);
+  std::vector<uint32_t> floats = {kState + 84};
+  for (uint32_t items : {kItemsA, kItemsB}) {
+    for (uint32_t i = 0; i < kMaxItems; i++) {
+      floats.push_back(items + 20 * i + 8);
+      floats.push_back(items + 20 * i + 12);
+    }
+  }
+  for (uint32_t f : floats) {
+    out.Float(guest::LoadU32(base, data + f));
+    for (int b = 0; b < 4; b++) bytes[f + b] = 0;
+  }
+  out.Bytes(bytes);
+}
+
+void Adds(Context& h) {
+  Random& r = h.random;
+  {
+    Results results("PassList::Add (sub_8258EB88)");
+    for (int c = 0; c < 64; c++) {
+      std::vector<uint32_t> words = MakeQueue(h, r, false, 0, r.Below(33));
+      MakeItems(h, r, words, kListA, kItemsA, kBucketsA);
+      const uint32_t bucket = r.Below(8) == 0 ? uint32_t(r.Next()) : r.Below(34);
+      const uint64_t chunk_key = (uint64_t(uint32_t(r.Next())) << 32) | RandomFloat(r);
+      const uint64_t sequence = (uint64_t(RandomFloat(r)) << 32) | uint32_t(r.Next());
+      // The caller's frame, where PassList::Add stores r4 and r5.
+      const uint32_t sp = h.data - 1024 - 144;
+      Outputs out[2];
+      for (int v = 0; v < 2; v++) {
+        guest::StoreU32s(h.base, h.data, words.data(), uint32_t(words.size()));
+        Fill(h.base, sp, 144);
+        PPCContext t = CallContext(h);
+        t.r1.u64 = sp;
+        t.r3.u64 = h.data + kListA;
+        t.r4.u64 = chunk_key;
+        t.r5.u64 = sequence;
+        t.r6.u64 = bucket;
+        (v == 0 ? __imp__sub_8258EB88 : NativePassListAdd)(t, h.base);
+        ScratchOutputs(h.base, h.data, out[v]);
+        out[v].Bytes(Read(h.base, sp + 32, 16));
+        out[v].Word(t.r3.u32);
+      }
+      results.Check(out[0], out[1], fmt::format("case {}: bucket {}", c, bucket));
+    }
+    results.Report();
+  }
+  {
+    Results results("RenderQueue::Add (sub_8258EDC8)");
+    for (int c = 0; c < 96; c++) {
+      const bool fake = r.Below(6) == 0;
+      const uint32_t index = r.Below(2);
+      std::vector<uint32_t> words = MakeQueue(h, r, fake, index, r.Below(33));
+      MakeItems(h, r, words, kListA, kItemsA, kBucketsA);
+      MakeItems(h, r, words, kListB, kItemsB, kBucketsB);
+      words[(kState + 84) / 4] = RandomFloat(r);
+      const uint32_t chunk = r.Below(6) == 0 ? 0 : uint32_t(r.Next());
+      // A bucket above 2,056 or a key past +-10,000.0 now and then (the
+      // warning's path: the original in both).
+      const uint32_t bucket = r.Below(10) == 0 ? 2057 + r.Below(100) : r.Below(34);
+      double key = std::bit_cast<float>(RandomFloat(r));
+      if (r.Below(10) == 0) key = (r.Below(2) ? 1.0 : -1.0) * (10000.0 + r.Below(3));
+      std::vector<uint8_t> frame(144);
+      for (uint8_t& b : frame) b = uint8_t(r.Next());
+      const uint32_t stack = h.data - 1024;
+      Outputs out[2];
+      for (int v = 0; v < 2; v++) {
+        guest::StoreU32s(h.base, h.data, words.data(), uint32_t(words.size()));
+        Write(h.base, stack - 144, frame.data(), 144);
+        PPCContext t = CallContext(h);
+        t.r3.u64 = h.data + kQueue;
+        t.r4.u64 = chunk;
+        t.r5.u64 = bucket;
+        t.f1.f64 = key;
+        (v == 0 ? __imp__sub_8258EDC8 : NativeAdd)(t, h.base);
+        ScratchOutputs(h.base, h.data, out[v]);
+        // Add's frame: what PassList::Add stores at +32 and +40, Add's own
+        // {chunk, key} and {sequence, the leftover} at +80 and +88.
+        const uint32_t f = stack - 144;
+        out[v].Word(guest::LoadU32(h.base, f + 32));
+        out[v].Float(guest::LoadU32(h.base, f + 36));
+        out[v].Float(guest::LoadU32(h.base, f + 40));
+        out[v].Word(guest::LoadU32(h.base, f + 44));
+        out[v].Word(guest::LoadU32(h.base, f + 80));
+        out[v].Float(guest::LoadU32(h.base, f + 84));
+        out[v].Float(guest::LoadU32(h.base, f + 88));
+        out[v].Word(guest::LoadU32(h.base, f + 92));
+        out[v].Word(t.r3.u32);
+      }
+      results.Check(out[0], out[1],
+                    fmt::format("case {}: {} vtable, chunk {:08X}, bucket {}, key {}", c,
+                                fake ? "fake" : "real", chunk, bucket, key));
+    }
+    results.Report();
+  }
+}
+
 }  // namespace
 
 void RenderQueue(Context& h) {
   SmallMethods(h);
   ClearRecording(h);
   Init(h);
+  Adds(h);
 }
 
 }  // namespace harness

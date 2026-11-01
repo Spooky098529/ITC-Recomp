@@ -15,7 +15,10 @@ namespace graphics::render_queue {
 
 namespace {
 
-constexpr uint32_t kZero = 0x82000A34;  // 0.0
+constexpr uint32_t kZero = 0x82000A34;          // 0.0
+constexpr uint32_t kKeyMax = 0x82002814;        // 10,000.0
+constexpr uint32_t kKeyMin = 0x82001C00;        // -10,000.0
+constexpr uint32_t kSequenceStep = 0x82001FBC;  // 0.1
 
 constexpr uint32_t kRecordingSlot = 28;  // slot 7
 constexpr uint32_t kRecordingFunction = 0x8258E5F8;
@@ -92,6 +95,69 @@ uint32_t Init(uint8_t* base, uint32_t queue, uint32_t device, uint32_t sp, const
   const uint32_t depth = GetDepthStencilSurface(base, device);
   guest::StoreU32(base, state + 64, depth);
   return depth;
+}
+
+uint32_t PassListAdd(uint8_t* base, uint32_t list, uint64_t chunk_key, uint64_t sequence,
+                     uint32_t bucket, uint32_t sp) {
+  ITC_NATIVE_RUNNING("sub_8258EB88 PassList::Add");
+  REX_STORE_U64(sp + 32, chunk_key);
+  REX_STORE_U64(sp + 40, sequence);
+  if (bucket >= guest::LoadU32(base, list + 12)) {
+    return 0;
+  }
+  const uint32_t items = guest::LoadU32(base, list + 8);
+  const uint32_t used = guest::LoadU32(base, list + 16);
+  if (used >= items) {
+    return 0;
+  }
+  const uint32_t buckets = guest::LoadU32(base, list + 24);
+  const uint32_t item_block = guest::LoadU32(base, list + 20);
+  // lfs, then stfs: each float through a double, as the original.
+  const double key = guest::LoadFloat(base, sp + 36);
+  const double seq = guest::LoadFloat(base, sp + 40);
+  const uint32_t at = (bucket << 4) + buckets;
+  const uint32_t item = ((used + (used << 2)) << 2) + item_block;
+  const uint32_t chunk = guest::LoadU32(base, sp + 32);
+  guest::StoreU32(base, item + 0, 0);
+  guest::StoreFloat(base, item + 8, float(key));
+  guest::StoreFloat(base, item + 12, float(seq));
+  guest::StoreU32(base, item + 4, chunk);
+  if (guest::LoadU32(base, at + 0) == 0) {
+    guest::StoreU32(base, at + 0, item);
+  } else {
+    guest::StoreU32(base, guest::LoadU32(base, at + 4), item);
+  }
+  guest::StoreU32(base, at + 4, item);
+  guest::StoreU32(base, at + 12, guest::LoadU32(base, at + 12) + 1);
+  guest::StoreU32(base, list + 16, guest::LoadU32(base, list + 16) + 1);
+  return 1;
+}
+
+std::optional<uint32_t> Add(uint8_t* base, uint32_t queue, uint32_t chunk, uint32_t bucket,
+                            double key, uint32_t sp, const GuestCall& call) {
+  if (bucket > 2056 || key > double(guest::LoadFloat(base, kKeyMax)) ||
+      key < double(guest::LoadFloat(base, kKeyMin))) {
+    return std::nullopt;  // the warning (DebugPrintf), never seen in play
+  }
+  ITC_NATIVE_RUNNING("sub_8258EDC8 RenderQueue::Add");
+  if (chunk == 0) {
+    return queue;
+  }
+  const uint32_t frame = Frame(base, sp, 144);
+  const uint32_t state = State(base, queue);
+  guest::StoreFloat(base, frame + 84, float(key));
+  guest::StoreU32(base, frame + 80, chunk);
+  const double sequence = guest::LoadFloat(base, state + 84);
+  guest::StoreFloat(base, frame + 88, float(sequence));
+  const uint32_t list = QueueSlot(base, queue, kRecordingSlot, kRecordingFunction, Recording,
+                                  frame, 0x8258EE60, call);
+  const uint32_t r3 = PassListAdd(base, list, REX_LOAD_U64(frame + 80),
+                                  REX_LOAD_U64(frame + 88), bucket, frame);
+  const uint32_t now = State(base, queue);
+  const double before = guest::LoadFloat(base, now + 84);
+  const double step = guest::LoadFloat(base, kSequenceStep);
+  guest::StoreFloat(base, now + 84, float(double(float(before + step))));
+  return r3;
 }
 
 }  // namespace graphics::render_queue
