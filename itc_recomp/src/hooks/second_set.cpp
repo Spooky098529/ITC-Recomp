@@ -50,7 +50,8 @@ ITC_FLAG_BOOL(native_second_set, true, "ITC",
               "TrafficPoints::Find sub_820E58C8 (with the "
               "groups' finds under them, no adapters: only they call them; "
               "Skeleton::UpdateMatrices' original where its plain C++ declines)) natively instead of through the translated "
-              "code (the same writes; checked by --run_harnesses=second_set)");
+              "code (the same writes; checked by --run_harnesses=second_set); the point groups' "
+              "resets and inits and SetNode have no adapters (their callers are native)");
 
 namespace hooks {
 
@@ -265,51 +266,16 @@ void SecondSetPartsResetRightDoor(PPCContext& ctx, uint8_t* base) {
     hooks::step(ctx, base);              \
   }
 
-// No adapter: PointRecord::SetNode sub_820CE8D8 (its callers in play are
-// native and call its plain C++; the step above is the harness's).
+// No adapters (their callers in play are native and call their plain C++;
+// the steps above are the harness's): PointRecord::SetNode sub_820CE8D8, and
+// the point groups' resets and inits (2026-11-01): the parts' 19, the
+// cockpit's 6, the interior's 6, the light kit's 3 and the traffic body's 3.
 ITC_SECOND_SET(820CE900, SecondSetPointSetShape)
 ITC_SECOND_SET(820CEA08, SecondSetPointClear)
 ITC_SECOND_SET(820D0270, SecondSetPointConstruct)
 ITC_SECOND_SET(820CEB30, SecondSetFindShape)
-ITC_SECOND_SET(820DE0E0, SecondSetPartsResetFrontBumper)
-ITC_SECOND_SET(820DE2C8, SecondSetPartsResetRearBumper)
-ITC_SECOND_SET(820DE498, SecondSetPartsResetRearSpoiler)
-ITC_SECOND_SET(820DE548, SecondSetPartsResetBonnet)
-ITC_SECOND_SET(820DE600, SecondSetPartsResetLeftDoor)
-ITC_SECOND_SET(820DE7E8, SecondSetPartsResetRightDoor)
-ITC_SECOND_SET(820DE9D0, SecondSetPartsResetDoors)
-ITC_SECOND_SET(820DF740, SecondSetPartsResetHeadlights)
-ITC_SECOND_SET(820DEBF0, SecondSetPartsResetTailLights)
-ITC_SECOND_SET(820DECD0, SecondSetPartsResetFenders)
-ITC_SECOND_SET(820DEE88, SecondSetPartsResetCabin)
-ITC_SECOND_SET(820DF020, SecondSetPartsResetEngine)
-ITC_SECOND_SET(820DF0C0, SecondSetPartsResetMufflers)
-ITC_SECOND_SET(820DF128, SecondSetPartsResetShadows)
-ITC_SECOND_SET(820DF410, SecondSetPartsInitCooling)
-ITC_SECOND_SET(820DF570, SecondSetPartsInitSideSkirts)
-ITC_SECOND_SET(820DF668, SecondSetPartsInitLeftMirror)
-ITC_SECOND_SET(820DF6B0, SecondSetPartsInitRightMirror)
-ITC_SECOND_SET(820DF6F8, SecondSetPartsInitMirror)
-ITC_SECOND_SET(820DC0A8, SecondSetCockpitInitBonnet)
-ITC_SECOND_SET(820DC0F0, SecondSetCockpitInitMirror)
-ITC_SECOND_SET(820DB878, SecondSetCockpitResetFenders)
-ITC_SECOND_SET(820DB930, SecondSetCockpitResetCabin)
-ITC_SECOND_SET(820DB9E8, SecondSetCockpitResetDoors)
-ITC_SECOND_SET(820DBAA0, SecondSetCockpitResetHeadlights)
 ITC_SECOND_SET(820E0258, SecondSetPartsFind)
 ITC_SECOND_SET(820DBC88, SecondSetCockpitFind)
-ITC_SECOND_SET(820E39B0, SecondSetInteriorInitBody)
-ITC_SECOND_SET(820E2FC8, SecondSetInteriorResetDials)
-ITC_SECOND_SET(820E3200, SecondSetInteriorResetMeters)
-ITC_SECOND_SET(820E33F0, SecondSetInteriorResetSteering)
-ITC_SECOND_SET(820E3440, SecondSetInteriorResetSeats)
-ITC_SECOND_SET(820E34F8, SecondSetInteriorResetRollCage)
-ITC_SECOND_SET(820DC748, SecondSetLightsResetFront)
-ITC_SECOND_SET(820DC7A0, SecondSetLightsResetSides)
-ITC_SECOND_SET(820DC7F8, SecondSetLightsResetRear)
-ITC_SECOND_SET(820E54E8, SecondSetTrafficResetBody)
-ITC_SECOND_SET(820E56D0, SecondSetTrafficResetHeadlights)
-ITC_SECOND_SET(820E57A0, SecondSetTrafficResetTailLights)
 ITC_SECOND_SET(820E3660, SecondSetInteriorFind)
 ITC_SECOND_SET(820DC900, SecondSetLightsFind)
 ITC_SECOND_SET(820E58C8, SecondSetTrafficFind)
