@@ -101,9 +101,19 @@ file's history. What's left to see in a drive, from every run:
   groups 0 differing; frame dumps alike; race 38 s, 0 errors; the
   teardown path not seen in an attract race; no subagents). Left
   blocked: `CarScene::Update`, `ScenePools::DestroyB`,
-  `CarScene::LoadsDone`. Step: validation agent running.
+  `CarScene::LoadsDone`. Validated (`itc_3142`, 120 s: race 54 s, 0
+  errors; replay `itc_3143` broke: the SDK's "BaseHeap::Release failed
+  because address is not a region start" twice at the race-end change,
+  as in `itc_2936`, `itc_2974`, `itc_2987` before this run, not in
+  `itc_3081`, `itc_3093`, `itc_3106`; ran to its end): 19 of 19 harness
+  lines, 10 ran in the race, 9 in the replay (the teardown, at the
+  attract race's end, with no error there), none to drive. Done.
 
 ## Done
+
+- The car scene (subsystem 3): `scene.md`, 19 of 22 in play, one
+  migration; `--native_scene`; e8dcd16c..613dd3db. Validated
+  (`itc_3142`).
 
 - `XPR::GetTexture` and the rest of the scene loaders (cleanup lead):
   `functions.md`, `location-screen.md` (the picture callbacks),
@@ -195,5 +205,9 @@ file's history. What's left to see in a drive, from every run:
 - After the car scene's migration (`itc_3139`: race 38 s, 0 errors,
   scene 0 differing): ours 3777, work left 2622 (wrapped 97, known 489,
   unknown 2036).
+
+- After its validation (`itc_3142`, 120 s: race 54 s, 0 errors, every
+  harness 0 differing but the expected groups): ours 3777, work left
+  2622.
 
 ## Stopped

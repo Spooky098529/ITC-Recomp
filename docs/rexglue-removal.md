@@ -2698,6 +2698,7 @@ B7. **The game logic inside**: everything else, subsystem by subsystem,
 | 2026-10-31 | The other in-race screens (the race HUD holder's: the pause menu `PauseMenu::` with its six pages and options, the confirm dialog `RaceDialog::` with the replay save's steps, the career results `CareerResults::` with the prize tally, the menu after the race `AfterRaceMenu::`, four unseen screens' makers and teardowns, the menu list's and page object's helpers; with the race HUD machine's handlers they unblocked) | `race-screens.md` | 93 of 116 in play (three migrations; the rest waits on the UI movie calls `sub_8211C740` and `sub_8211CBD8` and the options screens) | `--native_race_screens` |
 | 2026-11-01 | The device's shader setters and the render queue (`D3DDevice_SetVertexShader` with `Device::SetVertexShader`, keeping `refcount.cpp`'s rebind skip; `SetPixelShader`, `SetVertexDeclaration`; `RenderQueue::RenderQueue` at scene + 64 with its two `PassList`s and `PassList::Clear`) | `device-shaders.md` | 7 of 7 in play (one migration; the render queue's methods a lead) | `--native_device_shaders` |
 | 2026-11-01 | The render queue's methods (the game's `OT`, an ordering table at scene + 64, vtable `0x8206CB8C`: `Init`, `Flip`, `ClearRecording`, `Add` with `PassList::Add`, `Recording`, `Replaying`, the release list's `PtrVector`, and the per-frame `Replay` with its quicksort and chunk walker) | `device-shaders.md` | 25 of 25 in play (with the shader setters and the queue's constructor; one migration) | `--native_render_queue` |
+| 2026-11-01 | The car scene (`CarScene::` at `[0x826C2E44]`: `Create`, the constructor, its set-up record, the lighting block, the shared assets at +64, `LoadAssets` and `OnFileLoaded`, the first set's update, the teardown and destructor) | `scene.md` | 19 of 22 in play (one migration; the rest waits on the scene models' updates and the parts' finishers) | `--native_scene` |
 
     The first run (2026-10-22, branch `b7-loop-test`): every harness at 0 differing, attract races at 20-21 s with no errors,
     and a race the user drove looked right. Ours went from 162 to 335 (work
@@ -4342,3 +4343,17 @@ pairs): overridden 108, Native 34, Dropped 26, never called 70, live
 211. Imports: 186 called, 56 with a live caller. B7 (`b7_status.py`):
 ours 3,738, work left 2,661 (Wrapped 98, with a row 505, no row yet
 2,058), from 2,679.
+
+**2026-11-01, the car scene (branch `b7-loop-31-10-26-2`):** the
+twenty-ninth run's third subsystem, mapped and made native in one
+migration (`scene.md`, `--native_scene`, `src/scene/`): the scene at
+`[0x826C2E44]` the race and the front end's car screens build, its
+assets' loads and its teardown, 19 of the 22 in play (made ready by the
+scene loaders, 78 of 78 this run with `XPR::GetTexture`). What blocks
+the rest: `CarScene::Update` waits on the scene models' updates
+(`sub_820C5A60`), `ScenePools::DestroyB` and `CarScene::LoadsDone` on
+the parts' finishers (Wrapped in `functions.md`). The boundary: 449
+functions (916 pairs): overridden 108, Native 34, Dropped 26, never
+called 70, live 211. Imports: 186 called, 56 with a live caller. B7
+(`b7_status.py`): ours 3,777, work left 2,622 (Wrapped 97, with a row
+489, no row yet 2,036), from 2,661.

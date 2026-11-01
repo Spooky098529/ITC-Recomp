@@ -100,7 +100,13 @@ When the user has reviewed a run's section, its heading gets
   texture branches (`Model::Load` on a real part file) have no harness
   cases, only the game run and the frame dump; the teardown
   (`StartTeardown`, `~CarScene`, `SceneAssets::Release`, `UpdateA`'s
-  teardown) checked by harness only until a race end is seen.
+  teardown) checked by harness only until a race end is seen; the
+  validation's replay (`itc_3143`) ran them at the attract race's
+  teardown with no error. That replay logged the SDK's "BaseHeap::Release
+  failed because address is not a region start" twice at the driven
+  race's end change, as `itc_2936`, `itc_2974` and `itc_2987` did
+  before this run (not `itc_3081`, `itc_3093`, `itc_3106`):
+  intermittent, not debugged, worth a look.
 
 ## Run 2026-10-31 16:54 (`b7-loop-31-10-26`, continued)
 
