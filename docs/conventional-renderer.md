@@ -1,4 +1,4 @@
-# A conventional renderer (a plan; step 1 done)
+# A conventional renderer (a plan; steps 1 and 2 done)
 
 Written 2026-11-01. This is a map and a plan only. No code has changed,
 and nothing here was built, run or profiled for it. It is built from
@@ -239,7 +239,7 @@ any more.
 | **The guest memory mirrors** (512 MB host-visible buffers, one per frame in flight; front and back with `mirror_by_tick`; `passes.cpp:675`, `:1503`) | memcpy (`sub_825A7410`, `buffers.cpp:718`) and `Buffers_Memcpy` record writes; the render thread applies them at frame start | The GPU: the translated shaders fetch vertices by physical address from one storage buffer; the index buffer binds from it | Buffers made through the interface when the game creates and fills them (`Mesh::Parse`'s and the loaders' native writers, or memcpy's records), bound per stream | Fetch by address from one buffer is the SDK translator's model. The Vulkan backend can keep it over an arena of its own (addresses rebased) until vertex input is per-stream. The offline translation (decision 3) could emit per-stream vertex input |
 | **The constant replay** (command 7, `sub_8258FD48`) | The recorded payloads; interpolation substitutes blends into them and puts them back (`blend_state.cpp:4100-4115`) | The native constant setters copy into the shadow; `State::Draw` copies each shader's used registers into the ring (`passes.cpp:3795-3830`) | A native command 7: substitution, then the interface's `SetConstants` | Interpolation's join is the payload address plus an exact value (`Substitute`, `blend_state.cpp:2656`); the substitution must stay at that point |
 | **The vertex shader patch for the declaration** (`sub_822AE340`, the copy in the command buffer when "the GPU may still use it") | The game's Direct3D at the shader load | The renderer (`g_loaded_vertex_shader`, `replay_hooks.cpp:50-70`) | The backend translates each (vertex shader, declaration) pair itself: the declaration is part of the shader's key | Re-implementing the patch's result in the translation step (or offline): read the patcher first |
-| **Textures reloaded on memcpy writes** (`textures.cpp`; `MarkWritten` `:1236`; views keyed by the fetch constant's six words) | memcpy into texture memory (the archive and XPR loaders) | `TextureCache::BeginFrame` marks the textures overlapped; they reload on next use | Textures made and uploaded through the interface when the game creates or loads them (`XPR::GetTexture`, `Resource::Lock` and Unlock are native), bound by handle | Textures the game writes after creating them (the license plate, the vinyl sheet: `car-models.md`) need their native writers to call `UpdateTexture`, or the write tracking kept for them |
+| **Textures reloaded on memcpy writes** (gone in step 2: was `MarkWritten`, views keyed by the fetch constant's six words) | — | — | Textures made, written and freed through the interface (`render/resources.h`), found by handle (step 2) | Uploaded from guest memory at first bind still; the data leaving guest memory is 2b |
 | **Shader microcode translation** (the SDK's SPIR-V translator, `shaders.cpp:272`; disk cache `cache/`; lookups by the objects' fields) | Game data; the 14 stored boot shaders (`compiled_shaders.h`) | Our renderer, per pipeline | Vulkan: the runtime translator stays, inside the backend. Other backends: offline blobs of the game's shader and declaration pairs (decision 3) | — |
 | **`replay_hooks.cpp`, `draw_packets.cpp`, `gpu_link.cpp`, `refcount.cpp`'s render-thread skip** | — | — | Native handlers | Go when the handlers are native and no longer call the game's Direct3D |
 
@@ -795,7 +795,7 @@ handlers with the recompiled ones; decision 10); its other cases pass.
 after (`itc_3267`): every draw drawn, `passes.txt` the same,
 interpolation paired, pixels within the runs' spread.
 
-## Step 2 (2026-11-01, on `conventional-renderer`; design agreed)
+## Step 2 (2026-11-01, on `conventional-renderer`; done, a drive to come)
 
 Textures only (the user's calls, 2026-11-01): buffers go to 2b with the
 mirrors, where their records are used; textures are still uploaded at
@@ -849,6 +849,89 @@ byte stores, then the header given new data: a destroy and a create).
   the race-end flush).
 - **Interpolation** doesn't touch textures; the glow history's resolve is
   unchanged.
+
+**What was built** (`f4753458`, `1eee2b06`, `a9897ae4`):
+
+- **The interface**, `src/render/resources.h`: `TextureCreated`,
+  `TextureWritten`, `TextureDestroyed` by handle, from any thread (a
+  harness's calls are skipped), queued and tagged with the list handed
+  over after them (`Renderer_OnListHandedOver`); the render thread hands
+  them to the backend at the next replay's start (`Renderer_OnReplayStart`,
+  and at the renderer's start). **Frees go one list later** than the rest:
+  at a race's end two textures (`4_4_4_4`, `XGSetTextureHeaderEx`'s
+  headers) were freed before the hand-over of a list that still drew them
+  (`itc_3272`: "freed 1 frames before"). A texture made again while its
+  free is held back is freed first. `render::Backend` has the three calls.
+- **The callers** (all native): made at `Device::CreateTexture`,
+  `XGSetTextureHeaderEx` (when it writes a header) and
+  `TextureHeader::Relocate` (the XPR textures, and the second half of
+  `Texture::Create` and `RenderTexture::Create`, so no wrapper of
+  `sub_821330D0` was needed: it calls `XGSetTextureHeader` and
+  `Resource::Relocate`, both native); freed at `Resource::Destroy`
+  (type 3), `Texture::Free`, `RenderTexture::Release` and `XPR::Release`
+  (each `TX` record of its header block, at the release rather than at
+  `FreeDue`: lists recorded after the release don't draw them); written
+  at `MakePlate`'s end, after each decal drawn into the vinyl sheet and
+  its corner cleared (`OnDecalLoaded`), and after `XGCompressSurface` in
+  `Vinyl::Compress` (whose new texture replaces the sheet: the old one is
+  freed by `Texture::Free`). Model textures come through their XPR.
+- **The texture cache by handle** (`src/native/textures.cpp`): a table
+  from handle to its images: loaded from guest memory (one per mip range
+  the sampler merges into word 4, nearly always one) and resolved into
+  (one per scale; draws of that handle get the one written last). A stage
+  with nothing bound keeps the last handle bound there, as
+  `InterfaceRegisters` keeps its words (`StageTexture`). Each fetch
+  constant's last view is kept by handle, words and generation. Images
+  are retired when the handle is made again or freed, and destroyed
+  after the frames in flight.
+- **Removed**: the views' table by the fetch constant's words
+  (`BindingTable` stays for samplers), `MarkWritten` and
+  `Buffers_TakeNewWrites` with the marking's stats and time,
+  `RetireOverwritten`, `RetireMovedResolveDestinations`,
+  `TextureCache_RaceLeft` (and its call from `GameMessages_OnPassFinished`),
+  `--log_gpu_memory`'s overlap counts, and the first-load memcpy coverage
+  of `--native_renderer_log_texture_writes` (it now logs, with
+  `--native_renderer_verify_textures`, which bytes of a texture changed
+  with no `TextureWritten`).
+- **Diagnostics kept or added**: a texture bound or resolved into that was
+  never made is logged once with its header words and whether it was
+  freed, and taken as made; a header changed with no `TextureCreated`, and
+  a texture reading memory another handle's resolve destination stands
+  for, are logged once (both drawn from guest memory); the textures line
+  every 5 s counts made, made again, written, freed and held.
+
+**Checked** (attract races):
+
+- `itc_3270` (90 s, `--native_renderer_verify_textures`): no change of a
+  texture's memory without `TextureWritten`; no header changed
+  unannounced; no texture reading another's resolve destination.
+- `itc_3273` (100 s, across a race's end, after frees were held back): 0
+  bound never made. Held handles ~1,330-1,530 in a race; at the race's end
+  1,302 freed, 320 held, then back to ~1,500: no growth without the old
+  race-end flush (`--log_gpu_memory`: ~70 MB of loaded textures).
+- Dumps (`--native_renderer_log_passes`), two runs of each build (part 2's
+  `1eee2b06`, which draws as step 1, and `a9897ae4`): `passes.txt` and
+  `draws.txt` the same once addresses are masked. Pixels: old run 2, new
+  runs 1 and 2 are nearly the same frame (0.2-0.3% of the shown frame,
+  every resolve destination 0-1%); old run 1 is the outlier of the four
+  (40%, another glow chain address).
+- Interpolation: `--log_blend_state` ~349 replayed camera products a
+  draw, 0 mismatched, 240 live poses, the same as part 2's build;
+  `--log_stepping_constants` the same constants.
+- **Render thread profile** (`profile_render_thread.sh`, alternating,
+  `step2-old-*` and `step2-new-*` in `itc_recomp/out/profiles/`):
+
+  | Run | Part 2 (`1eee2b06`), Mcycles a frame | By handle (`a9897ae4`) |
+  |---|---|---|
+  | 1 | 9.579 | 9.813 |
+  | 2 | 9.536 | 9.603 |
+  | 3 | 9.479 | 9.681 |
+
+  About +1.7%: a fetch constant's last answer missing now costs a lookup
+  of the handle, its loaded map and its swizzled views
+  (`GetSwizzledView` ~40 kcycles a frame, the handle table ~20). Left for
+  later (the user's call, 2026-11-01: working first, optimized later); a
+  one-entry memo per handle was tried in code but not measured.
 
 ## 7. Risks, and what's still unknown
 

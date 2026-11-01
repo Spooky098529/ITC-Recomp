@@ -1000,8 +1000,10 @@ memory).
   instead of answering from the table by what the draw reads from the
   shader objects (on by default; see "Shader lookup").
 - `--native_renderer_cache_texture_bindings=false`: look every texture view
-  and sampler up in full instead of answering from the table by the fetch
-  constant's words (on by default; see "Texture binding").
+  and sampler up in full instead of answering from each fetch constant's
+  last view and the samplers' table by the fetch constant's words (on by
+  default; see "Texture binding"; views by handle since the conventional
+  renderer's step 2).
 - `--native_renderer_reuse_texture_sets=false`: build every draw's texture
   sets instead of reusing a stage's last one when nothing it was built
   from changed (on by default; see "Texture binding").
@@ -1244,7 +1246,10 @@ To be fixed (or accepted) in milestone 7.
   a race aren't written by memcpy at all, and their writer isn't known;
   they didn't change. Details in `texture-handling-optimization.md`.
 
-- Textures are never freed (fixed 2026-10-19, `memory-leak`): memory
+- Textures are never freed (fixed 2026-10-19, `memory-leak`; since the
+  conventional renderer's step 2, 2026-11-01, the guesses below are gone:
+  textures are freed when the game frees them, through the interface,
+  `conventional-renderer.md`, "Step 2"): memory
   reused for different textures (another race) left the old images behind. Measured 2026-10-19 (`memory-leak`,
   `--log_gpu_memory`, a 5-minute attract loop of 5 races): textures grew
   from 65 MB (427) to 611 MB (5,256), ~60 MB at each race load and
@@ -2669,7 +2674,8 @@ unsigned one's, below, `itc_808.log`: 2,150-2,690 views a frame, the same
 as the fetch constant's last 42-46%, as for samplers.)
 
 **Done: answers kept by the fetch constant's words** (`06c72d2`; the
-check removed in `0ab2ff7`). `TextureCache::GetView` and `GetSampler`
+check removed in `0ab2ff7`; views by handle since the conventional
+renderer's step 2, 2026-11-01, the table kept for samplers). `TextureCache::GetView` and `GetSampler`
 look the words up in a flat hash table (`BindingTable`, `textures.cpp`):
 views by the 6 words and the view type, samplers by the 6 words and the
 packed filter overrides. A view's entry holds while

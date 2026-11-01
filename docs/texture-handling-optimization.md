@@ -11,15 +11,16 @@ This file is what's been measured, what's done, and what's left to try.
 
 ## How a texture is loaded
 
-`TextureCache::GetView`, per draw, per texture binding. Since 2026-10-16
-it first looks the fetch constant's words up in a table of earlier
-answers, which holds until a texture is marked written or a resolve
-changes an address's image; the steps below run only when it doesn't
-answer (first use, or after a write; see "Texture binding" in
-`native-renderer.md`). A draw whose shader and fetch constants are the
-same as the last draw's also reuses the last texture set without asking.
+`TextureCache::GetView`, per draw, per texture binding. Since the
+conventional renderer's step 2 (2026-11-01, `conventional-renderer.md`)
+textures are found by handle (the header's guest address), made, written
+and freed through the interface (`src/render/resources.h`) where the game
+does so. GetView first checks the fetch constant's last answer (handle,
+words, generation); the steps below run only when it doesn't answer. A
+draw whose shader and fetch constants are the same as the last draw's
+also reuses the last texture set without asking.
 
-1. Look the texture up by its fetch constant's data fields.
+1. Look the texture up by handle (its images loaded or resolved into).
 2. First use: `State::Upload`:
    - for every level and layer, row by row: gather the row from the 360's
      tiled layout (`GatherTiledRow`) into a row buffer, byte-swap it
@@ -27,12 +28,10 @@ same as the last draw's also reuses the last texture set without asking.
      into this frame's 64 MB staging buffer;
    - record a barrier, `vkCmdCopyBufferToImage` and a barrier into the
      upload command buffer (submitted before the frame's drawing).
-3. Later uses: reload it if it's marked written. At the start of each
-   frame (`MarkWritten`), the writes the library's memcpy made into the
-   physical views since the last frame (`Buffers_TakeNewWrites`) mark the
-   textures they overlap (found through `by_address`, the textures'
-   ranges by start address). Nothing is hashed (since 2026-10-15; see
-   "Who writes textures' memory").
+3. Later uses: reload it after a `TextureWritten` (the plate, the vinyl
+   sheet). Nothing is hashed. (Until step 2, memcpy's writes marked the
+   textures they overlapped, `MarkWritten`; see "Who writes textures'
+   memory".)
 
 A texture that doesn't fit in what's left of staging is deferred to a
 later frame; meanwhile draws get a white 1x1 placeholder.
@@ -46,7 +45,8 @@ automated attract race (see `CLAUDE.md`). The log gives:
   MB, time loading and time hashing (`frame_costs.h`);
 - every 5 s, in the "textures:" line: textures loaded and reloaded, MB,
   the time spent loading and hashing, and the worst frame; and a line with
-  memcpy's writes, the textures they marked and the time marking took.
+  the textures made, written and freed through the interface (memcpy's
+  marking, and its line, went in step 2).
 
 These need info logging (`--log_level=info`); released builds turn it off
 (`itc.toml`) and the timing with it (`base::InfoLogEnabled`, `src/base/log.h`).
