@@ -1,7 +1,7 @@
 // The cockpit body's and the traffic body's file-loaded callbacks and
 // textures bound to their part models, as plain C++
 // (docs/functions/scene-loaders.md): Cockpit::OnFileLoaded (sub_820D6528),
-// Cockpit::BindTextures (sub_820D6108) and TrafficCar::BindTextures
+// TrafficCar::OnFileLoaded (sub_820D8430), Cockpit::BindTextures (sub_820D6108) and TrafficCar::BindTextures
 // (sub_820D7D38). Guest data
 // shared with the recompiled code, so these work on guest memory with the
 // originals' loads and stores in their order; sprintf's text goes into the
@@ -14,6 +14,7 @@
 #include <functional>
 #include <optional>
 
+#include "car_models/plate.h"
 #include "models/model_load.h"
 
 namespace scene_loaders {
@@ -49,7 +50,8 @@ std::optional<uint32_t> TrafficBindTextures(uint8_t* base, uint32_t traffic, uin
 // (`model_load`), and the originals of Model::Load (r5 = 0), XPR::Create,
 // Skeleton::Bind (r5 = 0) and Skeleton::UpdateMatrices where their plain C++
 // declines; the texture provider's vtable slot +16 (r4 = 0, r5 = the XPR),
-// answering the r3 it leaves.
+// answering the r3 it leaves; MakePlate's Resource::Release (from its frame
+// below the callback's).
 struct FileLoadedCalls {
   models::LoadCalls model_load;
   std::function<void(uint32_t model, uint32_t file)> model_load_original;
@@ -57,6 +59,7 @@ struct FileLoadedCalls {
   std::function<uint64_t(uint32_t provider, uint32_t xpr)> provider_set;
   std::function<void(uint32_t skeleton, uint32_t file)> skeleton_bind;
   std::function<void(uint32_t skeleton)> update_matrices;
+  car_models::ReleaseCall plate_release;
 };
 
 constexpr uint32_t kCockpitLoadedFrameBytes = 272;
@@ -85,5 +88,35 @@ bool CockpitFileLoadedNative(uint8_t* base, uint32_t request, uint32_t cockpit);
 // CockpitFileLoadedNative and the models' lifetime are native.
 uint64_t CockpitFileLoaded(uint8_t* base, uint32_t request, uint32_t buffer, uint32_t cockpit,
                            uint32_t stack, const FileLoadedCalls& calls);
+
+constexpr uint32_t kTrafficLoadedFrameBytes = 1360;
+
+// Whether TrafficCar::OnFileLoaded runs natively (nothing changed): memcpy
+// native, and for the file's request (+3748) the slot's (+3744) buffer
+// releasable natively.
+bool TrafficFileLoadedNative(uint8_t* base, uint32_t request, uint32_t traffic);
+
+// TrafficCar::OnFileLoaded (sub_820D8430, Archive::Load's callback for
+// TrafficCar::Load): r3 = the request, r6 = the traffic car. "%s%s" of the
+// name ([0x82601980 + 4 x +32]) and the suffix at 0x820050B8 into the
+// frame's +240 (sprintf); then only for the file's request (+3748), the
+// container [+3760]: entry 0 (DataFile::GetEntry(file, 0, 1), asked twice)
+// made the XPR +4016 (XPR::Create) and handed to the provider +4064 (its
+// slot +16); the plate's textures (MakePlate into +7040 to +7052, the 48
+// bytes at +3664 by value: 16 of them memcpy'd to the frame's +80); +7056 =
+// XPR::FindByName(+4016, the name); entry 1 the skeleton +3776 bound and
+// posed; the nodes "tire_fl", "tire_fr", "tire_rl", "tire_rr" (names at
+// [+3860] + 160n, plain byte compares, every match) copied (Matrix::Copy
+// from [+3924] + 64n) to +7136, +7200, +7264, +7328; their row 3 to +7072 +
+// 16i, w = 1.0, x, y, z times 0.1, each transformed by the identity turned a
+// quarter about y (the frame's +112 copied to +176, the angle at +96), then
+// w = 0.0; entries 2 to 7 into the six part models (Model::Load(+4256 +
+// 464i, entry, 0)); LoadSlot::ReleaseBuffer (+3744), +3764 = 3. Returns the
+// r3 the original leaves (sprintf's count, or ReleaseBuffer's); nullopt,
+// with nothing done, where sprintf's plain C++ declines. `stack` is the
+// guest r1 at entry. Only where TrafficFileLoadedNative and the models'
+// lifetime are native.
+std::optional<uint64_t> TrafficFileLoaded(uint8_t* base, uint32_t request, uint32_t traffic,
+                                          uint32_t stack, const FileLoadedCalls& calls);
 
 }  // namespace scene_loaders

@@ -6,6 +6,7 @@
 
 #include "base/flags.h"
 #include "base/log.h"
+#include "car_models/plate.h"
 #include "hooks/accessories.h"
 #include "hooks/guest_call.h"
 #include "hooks/heap.h"
@@ -61,7 +62,8 @@ ITC_FLAG_BOOL(native_scene_loaders, true, "ITC",
               "Interior::OnPartLoaded sub_820D7578 (Model::Load's original where its plain C++ "
               "declines), Cockpit::OnFileLoaded sub_820D6528 (Model::Load's, XPR::Create's, "
               "Skeleton::Bind's and UpdateMatrices' originals where their plain C++ declines, "
-              "the texture provider's slot +16 through its vtable); with those and the accessories' release native Interior::Release "
+              "the texture provider's slot +16 through its vtable), with native memcpy "
+              "TrafficCar::OnFileLoaded sub_820D8430 (the same, and MakePlate's Resource::Release); with those and the accessories' release native Interior::Release "
               "sub_820D75F8, ~Interior sub_820D76D8, its deleting destructor sub_820D7960 and "
               "ScenePools::ReleaseA sub_820C4488 (pool 0 with --native_car_models)) natively instead of through the "
               "translated code (the same writes; checked by --run_harnesses=scene_loaders); "
@@ -364,6 +366,13 @@ sl::FileLoadedCalls MakeFileLoadedCalls(PPCContext& ctx, uint8_t* base,
     ctx.lr = at.update_matrices;
     __imp__sub_825998A0(ctx, base);
   };
+  calls.plate_release = [&ctx, base](uint32_t surface) {
+    // From MakePlate's frame, below the callback's.
+    guest_call::InFrame(ctx, base, car_models::kPlateFrameBytes, 0x820ED8E4, [&](uint32_t) {
+      ctx.r3.u64 = surface;
+      sub_822A67B0(ctx, base);
+    });
+  };
   return calls;
 }
 
@@ -388,6 +397,33 @@ void SceneLoadersCockpitOnFileLoaded(PPCContext& ctx, uint8_t* base) {
   });
   ctx.lr = lr;
   ctx.r3.u64 = r3;
+  ctx.fpscr.disableFlushMode();
+}
+
+void SceneLoadersTrafficOnFileLoaded(PPCContext& ctx, uint8_t* base) {
+  const uint32_t request = ctx.r3.u32, traffic = ctx.r6.u32;
+  if (!hooks::ModelsNativeLifetime() || !sl::TrafficFileLoadedNative(base, request, traffic)) {
+    __imp__sub_820D8430(ctx, base);
+    return;
+  }
+  ctx.fpscr.disableFlushMode();
+  const uint32_t stack = ctx.r1.u32;
+  const uint64_t lr = ctx.lr;
+  std::optional<uint64_t> r3;
+  // The guest calls from the original's frame (1,360 bytes).
+  guest_call::InFrame(ctx, base, sl::kTrafficLoadedFrameBytes, 0x820D88E0, [&](uint32_t) {
+    hooks::ModelLoadGuest model_guest{ctx, base};
+    const sl::FileLoadedCalls calls = MakeFileLoadedCalls(
+        ctx, base, model_guest, {0x820D88E0, 0x820D84B0, 0x820D84CC, 0x820D854C, 0x820D8564});
+    r3 = sl::TrafficFileLoaded(base, request, traffic, stack, calls);
+  });
+  ctx.lr = lr;
+  if (!r3) {
+    ctx.r3.u64 = request;  // sprintf declined: nothing done
+    __imp__sub_820D8430(ctx, base);
+    return;
+  }
+  ctx.r3.u64 = *r3;
   ctx.fpscr.disableFlushMode();
 }
 
@@ -673,6 +709,7 @@ ITC_SCENE_LOADERS(820D6108, SceneLoadersCockpitBindTextures)
 ITC_SCENE_LOADERS(820D7D38, SceneLoadersTrafficBindTextures)
 ITC_SCENE_LOADERS(820D02D0, SceneLoadersModelPointFind)
 ITC_SCENE_LOADERS(820D6528, SceneLoadersCockpitOnFileLoaded)
+ITC_SCENE_LOADERS(820D8430, SceneLoadersTrafficOnFileLoaded)
 ITC_SCENE_LOADERS(820D7960, SceneLoadersInteriorDeletingDestruct)
 ITC_SCENE_LOADERS(820C4488, SceneLoadersReleaseA)
 ITC_SCENE_LOADERS(820D7790, SceneLoadersInteriorIsLoaded)

@@ -8,11 +8,14 @@
 #include "c_runtime/format.h"
 #include "car_models/load_slots.h"
 #include "car_physics/float_ops.h"
+#include "game_data/data_file.h"
 #include "guest.h"
+#include "interpolation/blend_state.h"
 #include "matrix_math/matrix_math.h"
 #include "model_animation/model_animation.h"
 #include "models/part_model.h"
 #include "models/xpr.h"
+#include "native/buffers.h"
 #include "scene_loaders/pools.h"
 
 #include <bit>
@@ -278,6 +281,118 @@ uint64_t CockpitFileLoaded(uint8_t* base, uint32_t request, uint32_t buffer, uin
   Stfs(base, point + 8, Fmuls(z, tenth));
   matrix_math::Vec4Transform(base, point, turn, point);
   return point;
+}
+
+bool TrafficFileLoadedNative(uint8_t* base, uint32_t request, uint32_t traffic) {
+  if (!native::Buffers_NativeMemcpy()) {
+    return false;
+  }
+  if (Load(base, traffic + 3748) != request) {
+    return true;
+  }
+  uint32_t freed = 0;
+  return car_models::LoadSlotReleasable(base, traffic + 3744, &freed);
+}
+
+std::optional<uint64_t> TrafficFileLoaded(uint8_t* base, uint32_t request, uint32_t traffic,
+                                          uint32_t stack, const FileLoadedCalls& calls) {
+  ITC_NATIVE_RUNNING("sub_820D8430 TrafficCar::OnFileLoaded");
+  constexpr uint32_t kSuffix = 0x820050B8;
+  const uint32_t f = stack - kTrafficLoadedFrameBytes;
+  // sprintf's call: r5 the name, r6 the suffix (r7 to r10, which the call
+  // doesn't set, as 0: only dead frame words differ).
+  const uint32_t name = Load(base, (Load(base, traffic + 32) << 2) + kTrafficNames);
+  const uint64_t args[6] = {name, Constant(kSuffix), 0, 0, 0, 0};
+  for (uint32_t i = 0; i < 6; i++) {
+    Store(base, f + 32 + 8 * i, uint32_t(args[i] >> 32));
+    Store(base, f + 36 + 8 * i, uint32_t(args[i]));
+  }
+  int32_t written;
+  if (!c_runtime::Sprintf(base, f + 240, kTwoStrings, f + 32, f - 144 - 1328, &written)) {
+    return std::nullopt;
+  }
+  if (Load(base, traffic + 3748) != request) {
+    return uint64_t(uint32_t(written));
+  }
+  const uint32_t file = Load(base, traffic + 3760);
+  const auto entry = [&](uint32_t index) {
+    game_data::GetEntry(base, file, index, true);  // asked twice, as the original
+    return game_data::GetEntry(base, file, index, true);
+  };
+  const uint32_t xpr = traffic + 4016;
+  XprArrived(base, xpr, entry(0), traffic + 4064, calls);
+  // The plate: the struct's last 16 bytes into the frame's parameter area.
+  Require(native::Buffers_Memcpy(base, f + 80, traffic + 3696, 16, 0x820D84E0), "memcpy");
+  const uint32_t plate = traffic + 3664;
+  const uint64_t regs[4] = {
+      (uint64_t(Load(base, plate + 0)) << 32) | Load(base, plate + 4),
+      (uint64_t(Load(base, plate + 8)) << 32) | Load(base, plate + 12),
+      (uint64_t(Load(base, plate + 16)) << 32) | Load(base, plate + 20),
+      (uint64_t(Load(base, plate + 24)) << 32) | Load(base, plate + 28)};
+  Require(car_models::MakePlate(base, traffic + 7040, traffic + 7044, traffic + 7048,
+                                traffic + 7052, regs, f, calls.plate_release)
+              .has_value(),
+          "MakePlate");
+  Store(base, traffic + 7056, uint32_t(XprFindByName(base, xpr, f + 240)));
+  // The node file: the skeleton bound and posed, the tires' nodes found.
+  const uint32_t skeleton = traffic + 3776;
+  BindAndPose(base, skeleton, entry(1), f, calls);
+  const int32_t nodes = int32_t(model_animation::SkeletonNodeCount(base, skeleton));
+  static constexpr uint32_t kTireNames[4] = {0x82004FAC, 0x82004FB4, 0x82004FBC, 0x82004FC4};
+  static constexpr uint32_t kTireReturns[4] = {0x820D85EC, 0x820D8630, 0x820D8674, 0x820D86B8};
+  if (nodes > 0) {
+    for (uint32_t n = 0; n < uint32_t(nodes); n++) {
+      const uint32_t node_name = Load(base, traffic + 3860) + 160 * n;
+      for (uint32_t k = 0; k < 4; k++) {
+        if (SameName(base, kTireNames[k], node_name)) {
+          const uint32_t to = traffic + 7136 + 64 * k;
+          const uint32_t from = Load(base, traffic + 3924) + 64 * n;
+          matrix_math::Copy(base, to, from);
+          interpolation::BlendState_OnCopy(base, to, from, kTireReturns[k]);
+        }
+      }
+    }
+  }
+  const uint32_t turn = f + 176;
+  QuarterTurn(base, f + 112, turn, f + 96, f);
+  // The tires' positions: their matrices' rows 3, w = 1.0, x, y, z scaled
+  // (every word read before it's written: the order of the original's
+  // multiplies doesn't matter), turned, then w = 0.0.
+  for (uint32_t k = 0; k < 4; k++) {
+    const uint32_t at = traffic + 7072 + 16 * k;
+    Move8(base, traffic + 7136 + 64 * k + 48, at);
+    Move8(base, traffic + 7136 + 64 * k + 56, at + 8);
+    if (k < 3) {
+      CopyWord(base, kOne, at + 12);
+    }
+  }
+  const double tenth = Lfs(base, kTenth);
+  for (uint32_t k = 0; k < 4; k++) {
+    for (uint32_t w = 0; w < 3; w++) {
+      const uint32_t at = traffic + 7072 + 16 * k + 4 * w;
+      Stfs(base, at, Fmuls(Lfs(base, at), tenth));
+    }
+  }
+  CopyWord(base, kOne, traffic + 7132);
+  for (uint32_t k = 0; k < 4; k++) {
+    const uint32_t at = traffic + 7072 + 16 * k;
+    matrix_math::Vec4Transform(base, at, turn, at);
+  }
+  for (uint32_t k = 0; k < 4; k++) {
+    CopyWord(base, kZero, traffic + 7072 + 16 * k + 12);
+  }
+  // The six part models.
+  for (uint32_t i = 0; i < 6; i++) {
+    const uint32_t model = traffic + 4256 + 464 * i;
+    const uint32_t part = entry(2 + i);
+    if (!models::ModelLoad(base, model, part, 0, calls.model_load)) {
+      calls.model_load_original(model, part);
+    }
+  }
+  const auto r3 = car_models::LoadSlotReleaseBuffer(base, traffic + 3744);
+  Require(r3.has_value(), "LoadSlot::ReleaseBuffer");
+  Store(base, traffic + 3764, 3);
+  return *r3;
 }
 
 }  // namespace scene_loaders

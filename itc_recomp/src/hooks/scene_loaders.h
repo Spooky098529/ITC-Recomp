@@ -190,6 +190,12 @@ void SceneLoadersModelPointFind(PPCContext& ctx, uint8_t* base);
 // their plain C++ declines.
 void SceneLoadersCockpitOnFileLoaded(PPCContext& ctx, uint8_t* base);
 
+// TrafficCar::OnFileLoaded sub_820D8430 (r3 = the request, r6 = the
+// traffic car; r3 as the original leaves it), only while
+// hooks::ModelsNativeLifetime() and memcpy is native: its callees'
+// originals from its frame where their plain C++ declines.
+void SceneLoadersTrafficOnFileLoaded(PPCContext& ctx, uint8_t* base);
+
 // ScenePools::CreateA sub_820C3FD8 (r3 = the set, r4 = the record; r3 as
 // the original leaves it), only while hooks::ModelsNativeLifetime(): the
 // constructors' originals called from its frame where their plain C++
