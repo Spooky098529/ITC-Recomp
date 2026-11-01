@@ -65,6 +65,11 @@ file's history. What's left to see in a drive, from every run:
   54 s, 0 errors; replay `itc_3093` ok): 19 of 19 harness lines, 17
   ran in the race, 2 to drive. Done.
 
+- Cleanup lead (no mapping, not counted): `XPR::GetTexture`
+  `sub_82597118` (Wrapped by `frame_state_diff`), then the parking
+  area's `OnPictureLoadedA` and `B` and what else it unblocks. Step:
+  migration agent running.
+
 ## Done
 
 - The render queue's methods (subsystem 2): `device-shaders.md`, 25 of
