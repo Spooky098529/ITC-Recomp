@@ -447,7 +447,8 @@ void RaceScreensCareerResultsPage1(PPCContext& ctx, uint8_t* base) {
 // ShowItems, SetUpItems and ColorItems (their callers in play, SetUpItems,
 // Open and Start, call their plain C++), and ScreenPages::Finish (its
 // callers in play, the draws, call its plain C++), PauseMenu::SaveOptions
-// and SaveHudOptions (Close and OptionsPage), SetUpOptions (OpenOptions),
+// and SaveHudOptions (Close and OptionsPage), PauseMenu::Close (the race HUD
+// machine's ClosePause), SetUpOptions (OpenOptions),
 // RaceDialog::Update (the two ConfirmPages) and RaceDialog::Draw (the pause
 // menu's and the menu after the race's draws), the eight makers
 // (RaceScreens::Create, race-hud-object.md), PauseMenu::Update and
@@ -482,7 +483,6 @@ ITC_RACE_SCREENS(82219170, RaceScreensCareerResultsDestroy)
 ITC_RACE_SCREENS(8221F3C8, RaceScreensRaceResultsDestroy)
 ITC_RACE_SCREENS(8221FA68, RaceScreensSplitResultsDestroy)
 ITC_RACE_SCREENS(8221BE30, RaceScreensKind6MenuDestroy)
-ITC_RACE_SCREENS(8220D890, RaceScreensPauseMenuClose)
 ITC_RACE_SCREENS(8220C5D0, RaceScreensPauseMenuAnswerPage)
 ITC_RACE_SCREENS(8221A720, RaceScreensAfterRaceMenuAnswerPage)
 ITC_RACE_SCREENS(82217D40, RaceScreensRaceDialogAnswer)
