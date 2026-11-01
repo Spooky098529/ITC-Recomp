@@ -1037,6 +1037,44 @@ set-up (`WheelPoints::SetUpTire` and the rest), writing over shape data
 already made (memcpy through `Buffers_Memcpy`): part 2's memcpy records
 make that a `BufferWritten`.
 
+**Part 2, built** (`9079e07d`): `native/buffer_arena.cpp`, one
+device-local buffer (128 MB for buffers, then the built-in index lists,
+then 16 MB of inline vertices) with 64 MB of staging a frame and its own
+copy command buffer, submitted before the texture uploads and the frame,
+between two barriers (earlier submissions' reads before the copies; the
+copies before this frame's index and shader reads). `BufferTable` gives
+each buffer its space (freed space reused after the frames in flight) and
+copies its data from guest memory at the first draw that uses it after it
+was made or written; memcpy's records of writes into the physical views,
+taken at each frame's start, mark the buffers they touch written. `Draw`
+puts each used stream's arena offset (plus the stream's offset, the type
+bits kept) into its vertex fetch constant's word 0 before the constants
+are copied, and binds the arena as the index buffer at the indices'
+offset; inline vertices are copied into the inline region. A draw whose
+buffer has no space, or whose data doesn't fit this frame's staging, is
+left out and counted. No measurement found a draw reading vertices past
+its buffer's size (`itc_3279`, with the per-draw check), so separate
+spaces are safe. The read watch doesn't watch buffers with the arena (the
+fetch constants hold arena offsets).
+
+Checked (attract races):
+
+- `itc_3280` (100 s, across a race's end): 0 error lines; 0 draws left
+  out; 38-41 MB of the arena used; 0 staging full; each buffer copied once
+  at its first draw; no buffer marked written by memcpy (step 0's finding:
+  nothing rewrites buffers there).
+- Dumps (`--native_renderer_log_passes`), two runs each way
+  (`itc_3281`-`itc_3284`): `passes.txt` and `draws.txt` the same once
+  addresses are masked. Pixels of the shown frame: the arena's two runs
+  0.6% apart, each 2.1-2.4% from the mirrors' second run; the mirrors'
+  first run the outlier of the four (~40%, as in step 2). Every resolve
+  destination within the same spread.
+- Interpolation (`itc_3285`): ~316-454 replayed camera products a draw,
+  0 mismatched in 39 of 40 intervals, 1 product in one (older runs show
+  1-2 a run now and then: `itc_1754` to `itc_1775`); 240-300 live poses.
+- The user: "the game looks fine". Profiles were left for later (the
+  user's call, 2026-11-01).
+
 ## 7. Risks, and what's still unknown
 
 - **Readers of the register shadow outside the replay.** Once the
