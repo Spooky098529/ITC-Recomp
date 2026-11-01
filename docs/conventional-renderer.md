@@ -583,6 +583,26 @@ mean shared EDRAM, not shared data.
 - the partial rect: 24;
 - read before written: only the glow history (11).
 
+### The passes of a menu frame (the user's drive, `itc_3240`)
+
+A front-end frame with the 3D car (tiling), dumped at the first tiling: 3
+passes, 377 draws, 12 targets, 15 resolves:
+
+- resolves 0-11: the race scene's side targets (the projected texture,
+  the 1024x1024 copy, both depth maps, the reflection, the 256x256
+  copy), each cleared twice and resolved twice **with no draws**, and
+  read by no pass. In a PC renderer these are nothing (or one clear of
+  the texture, if a later frame reads it);
+- pass 1: the 3D view, 1280x720, 4x MSAA, 2_10_10_10_FLOAT, 245 draws,
+  cleared by BeginTiling and command 26, then resolved in three tiles
+  (rects of 1280x256, flags `0x303`) into `1ECBD000` (1280x720, format
+  54), the address the race frame's upscale reads;
+- pass 2: the frame (pitch 1280), 118 draws, sampling `1ECBD000`, then
+  the front buffer.
+
+Every target is cleared before its first draw except the frame's (as in
+the race). No grab pass, glow or partial rect in the menus.
+
 ### Register shadow readers (attract race, `itc_3233`)
 
 Outside the replay, nothing reads or writes the register blocks, the
@@ -595,9 +615,9 @@ float, bool and loop constants or the fetch constants. Inside +0 to
 - a kernel critical section in the device (+11356 to +11368) is entered
   and left from that thread.
 
-None of these are render state, so section 3's "whether game code outside
-the replay reads the shadow" is answered no for the attract race. A drive
-through the menus is the next check.
+None of these are render state. The user's drive (`itc_3240`, the menus
+and a race) saw the same three and nothing else. So section 3's "whether
+game code outside the replay reads the shadow" is answered no.
 
 ### CPU reads of GPU data (attract races, `itc_3234` to `itc_3237`)
 
@@ -605,8 +625,20 @@ The self-test passed on all three views. Over a 148 s attract session
 (68,717 pages armed, across a race's end and the next load), no CPU code
 read or wrote vertex, index or texture data after a draw had used it. The
 only writes were 7 file reads into watched pages (the next load's data
-over memory freed from the last), which dropped 34,604 pages. A drive (the
-garage, the parking area, another course) is the next check.
+over memory freed from the last), which dropped 34,604 pages.
+
+In the user's drive (`itc_3240`, 40,604 pages armed), one reader of
+GPU data: `texture_compression::DecodeA8R8G8B8Row`, on a guest thread
+during the race (about 10,700 faults on texture pages and a few hundred
+on pages also used for vertices or indices). That's `XGCompressSurface`
+reading the vinyl sheet (A8R8G8B8, `Vinyl::Compress`, once per car
+load). The sheet is drawn on the CPU (the decal path's rasterizer), so
+probably its pages were used by a draw before, as the sheet or as other
+data in memory reused for it; the page-level watch can't tell which. It
+is a texture the game writes and reads itself (section 3's table): it
+stays in guest memory, and the renderer gets a copy. One write by `libc`
+(memcpy) to an index page, and 2 file reads, dropped pages as expected.
+Nothing else read vertex, index or texture data after its first draw.
 
 ## 7. Risks, and what's still unknown
 
