@@ -64,6 +64,15 @@ std::optional<uint32_t> XprRelease(uint8_t* base, uint32_t xpr) {
   return r3;
 }
 
+uint64_t XprGetTexture(uint8_t* base, uint32_t xpr, uint32_t index) {
+  ITC_NATIVE_RUNNING("sub_82597118 XPR::GetTexture");
+  if (index >= Load(base, xpr + 20)) {
+    index = 0;
+  }
+  const uint32_t record = Load(base, xpr + 16) + (index << 4);
+  return uint64_t(Load(base, record + 4)) + Load(base, xpr + kXprHeader);
+}
+
 std::optional<uint32_t> XprDestruct(uint8_t* base, uint32_t xpr) {
   ITC_NATIVE_RUNNING("sub_82597148 XPR::~XPR");
   return XprRelease(base, xpr);

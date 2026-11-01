@@ -6,6 +6,7 @@
 #include "hooks/cameras.h"
 #include "hooks/framework.h"
 #include "matrix_math/matrix_math.h"
+#include "models/xpr.h"
 
 #include "base/flags.h"
 #include "base/log.h"
@@ -25,6 +26,7 @@
 
 ITC_FLAG_DECLARE(bool, native_matrix_math);
 ITC_FLAG_DECLARE(bool, native_cameras);
+ITC_FLAG_DECLARE(bool, native_models);
 
 ITC_FLAG_BOOL(find_per_frame_state, false, "ITC",
               "Find game state that advances on render-only passes, and the code that "
@@ -513,7 +515,21 @@ ITC_FRAME_STATE_WRAP(820C4FB8)
 ITC_FRAME_STATE_WRAP(820DAA38)
 ITC_FRAME_STATE_WRAP(820DAAC8)
 ITC_FRAME_STATE_WRAP(820DAB10)
-ITC_FRAME_STATE_WRAP(82597118)
+// XPR::GetTexture: r3 = the XPR, r4 = the index; r3 the record's header.
+// Natively under --native_models (src/models/xpr.cpp), inside the same wrap.
+extern "C" REX_FUNC(sub_82597118) {
+  REX_FUNC_PROLOGUE();
+  if (debug::IsHidden(0x82597118)) {
+    return;
+  }
+  debug::FrameStateDiff_Before(base);
+  if (ITC_FLAG(native_models)) {
+    ctx.r3.u64 = models::XprGetTexture(base, ctx.r3.u32, ctx.r4.u32);
+  } else {
+    __imp__sub_82597118(ctx, base);
+  }
+  debug::FrameStateDiff_After(base, "draw step part", 0x82597118);
+}
 ITC_FRAME_STATE_WRAP(82597518)
 ITC_FRAME_STATE_WRAP(82597610)
 ITC_FRAME_STATE_WRAP(82598768)

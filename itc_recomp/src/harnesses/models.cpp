@@ -339,6 +339,54 @@ void XprConstructs(Context& h, const Block& block) {
   results.Report();
 }
 
+void NativeXprGetTexture(PPCContext& ctx, uint8_t* base) {
+  ctx.r3.u64 = models::XprGetTexture(base, ctx.r3.u32, ctx.r4.u32);
+}
+
+// The records inside the block, the header block any word; the index below,
+// at or past the count (and the count 0).
+void XprGetTextures(Context& h, const Block& block) {
+  Results results("XPR::GetTexture (sub_82597118)");
+  for (int c = 0; c < 48; c++) {
+    const uint32_t xpr = block.address + 4 * h.random.Below(8);
+    const uint32_t records = block.address + 64 + 16 * h.random.Below(4);
+    const uint32_t count = c < 4 ? uint32_t(c) : h.random.Below(8);
+    uint32_t index = h.random.Below(12);
+    if (c % 5 == 0) {
+      index = count;
+    } else if (c % 7 == 0) {
+      index = 0xFFFFFFF0u + h.random.Below(16);
+    }
+    const uint32_t header = uint32_t(h.random.Next());
+    uint32_t offsets[8];
+    for (uint32_t& word : offsets) {
+      word = uint32_t(h.random.Next());
+    }
+    Outputs out[2];
+    for (int v = 0; v < 2; v++) {
+      Fill(h.base, h.data, kScratchBytes);
+      Fill(h.base, block.address, block.bytes);
+      Store(h.base, xpr + models::kXprHeader, header);
+      Store(h.base, xpr + 16, records);
+      Store(h.base, xpr + 20, count);
+      for (uint32_t i = 0; i < 8; i++) {
+        Store(h.base, records + 16 * i + 4, offsets[i]);
+      }
+      PPCContext t = CallContext(h);
+      t.r3.u64 = xpr;
+      t.r4.u64 = index;
+      Side(v, [&] { (v == 0 ? __imp__sub_82597118 : NativeXprGetTexture)(t, h.base); });
+      out[v].Bytes(Read(h.base, block.address, block.bytes));
+      out[v].Bytes(Read(h.base, h.data, kScratchBytes));
+      out[v].Word(t.r3.u32);
+      out[v].Word(uint32_t(t.r3.u64 >> 32));
+    }
+    results.Check(out[0], out[1],
+                  fmt::format("case {} (count {}, index {:#x})", c, count, index));
+  }
+  results.Report();
+}
+
 void XprReleases(Context& h, const Block& block) {
   Results results("XPR::Release, XPR::~XPR (sub_825970A8, sub_82597148, on the game's list)");
   if (!hooks::ModelsHostLock()) {
@@ -1403,6 +1451,7 @@ void Models(Context& h) {
     FreesLater(h, block);
     XprConstructs(h, block);
     XprReleases(h, block);
+    XprGetTextures(h, block);
     Allocates(h);
     UninitializedCopies(h, block);
   }

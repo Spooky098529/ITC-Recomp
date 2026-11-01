@@ -64,4 +64,11 @@ uint32_t RelocateResource(uint8_t* base, uint32_t resource, uint32_t address);
 constexpr uint32_t kXprDataAllocation = 0xBC7F0000;
 std::optional<uint32_t> XprCreate(uint8_t* base, uint32_t xpr, uint32_t file);
 
+// sub_82597118 XPR::GetTexture: the `index`-th record's resource header,
+// the header block (+0) plus the record's +4 (the records at +16, 16 bytes
+// each); an index not below the count (+20) gives record 0. Any record
+// type. A leaf: no stores. The sum is 64-bit, as the original's add of the
+// two zero-extended words leaves r3 (a carry reaches bit 32).
+uint64_t XprGetTexture(uint8_t* base, uint32_t xpr, uint32_t index);
+
 }  // namespace models
