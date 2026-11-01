@@ -491,6 +491,12 @@ Rows not yet moved stay in the table below. So far:
   arrived part models to the second set's objects, the ready flags,
   and the record applied once (palettes, vinyl sheet, paint, the light
   kit's record, the wheels' points and paint) (B7).
+- [`boot-mode.md`](boot-mode.md): the boot mode (the game mode of
+  type 3 that plays the boot movies and asks for the front end after
+  them), its state machine's handlers, and the modes' other methods
+  beside it: the base's deleting destructor, the delegate's next-mode
+  query, the front-end screens' state machine constructor, the type 8
+  mode's constructors and the app's shut-down (B7).
 
 These files hold functions only. What used to follow the table here moved
 out on 2026-10-20: how frame interpolation works, its options and what
@@ -524,9 +530,6 @@ old performance notes to the end of `../native-renderer.md`.
 | `sub_8215B4F8` | `Race::DrawStep` | Wrapped | The race's draw step (Draw message). Its running marks the pass as in a race. |
 | `sub_8258FD48` | `Command::SetShaderConstants` | Wrapped | Render thread, command 7: r3 = payload, r4 = register count, r5 = stage << 24 \| type << 16 \| start << 8 \| count. Interpolation substitutes blended values here. |
 | `sub_82146A38` | | | Finds the animation in set r3 whose texture is r4; -1 if none. |
-| `sub_82107B90` | `Boot::StartMovie` | | Message handler: plays the next boot movie, id from the table at `0x826C5BAC` (index at `0x826C5BC8`), via `Movies::Play` (`sub_820A43A8`, the path table at `0x82600BEC`; `movies.md`). See "The title screen" in `../title-screen.md`. |
-| `sub_82107C58` | `Boot::WaitForMovie` | Wrapped | Message handler, every tick while a boot movie plays; ends the step on a button press if skippable (`0x826C5BC4`) or when the movie has finished. The movie started (`Movies::Start`) when its state (`Movies::State`, twice a tick) is 1 with +9608 = 0 (then 1); finished when the state is 1 again with +9608 = 1. `--skip_intro` makes it finish at once. |
-| `sub_82107BF8` | `Boot::EndMovie` | | Message handler: stops the movie (`Movies::Stop`, `Movies::Release`, then `sub_825895A0`); the front end (Genki logo, title) follows. |
 | `sub_82296270` | `OutputDebugStringA` | Overridden | r3 = text: puts it in an `ANSI_STRING` (`RtlInitAnsiString`) and passes the text to `sub_822972D0`, which ends in `sub_82297DC0`, an empty function (the retail game drops its debug output). Called from 19 files. Ours (`src/hooks/debug_output.cpp`, in front of `helpers::DebugOutput`, `src/helpers/debug_output.cpp`) does nothing. See B6 in `docs/rexglue-removal.md`. |
 | `sub_822970A8` | `InitNamedObjectAttributes` | Overridden | r3 = attributes (12 bytes), r4 = an `ANSI_STRING` (8 bytes), r5 = the name's text; returns r3. Fills the string by `RtlInitAnsiString`'s rule and the attributes as root directory -4 (the named objects' root; -3 is `ObDosDevices`), name, attributes `0x80` (probably `OBJ_OPENIF`). Callers: named event and timer creation (`sub_82295E78`, `sub_825BA2B0`), only when given a name; a boot and an attract race make none. Plain C++ in `src/helpers/object_attributes.cpp` behind `src/hooks/object_attributes.cpp`; a temporary self-test (5 strings: a name, empty, none, 300 characters, one character) gave the same 20 bytes as the recompiled version. See B6 in `docs/rexglue-removal.md`. |
 | `sub_825BA4A0` | `OutputDebugStringW` | Overridden | r3 = UTF-16 text: converts it to ANSI on the kernel's heap (`RtlInitUnicodeString`, `RtlUnicodeStringToAnsiString`), passes it to `OutputDebugStringA` (`sub_82296270`, which drops it) and frees it. Ours (`src/hooks/debug_output.cpp`) does nothing. See B6 in `docs/rexglue-removal.md`. |

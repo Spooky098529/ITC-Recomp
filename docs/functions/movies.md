@@ -6,7 +6,7 @@ of their playback. The game reaches them only through `Movies::*`, one-line
 calls of the movie class (`Movie`, vtable `0x82002910`) that the app's
 start-up keeps at `0x826C1CDC`, from the boot sequence's handlers
 (`Boot::StartMovie`, `Boot::WaitForMovie`, `Boot::EndMovie` in
-`functions.md`; the stage openings come through them too). The class
+`boot-mode.md`; the stage openings come through them too). The class
 keeps its state at +308 (0 none, 1 loaded or ended, 2 playing, 3 paused)
 and reaches the movie library, linked into the game (`82481A70`-
 `8257FFFF`, ~615 functions seen in play: the player, its threads, the
@@ -83,8 +83,8 @@ run it after changing either, on any branch.
 | `sub_820A43A8` | `Movies::Play` | | r3 = a movie number: the path from the table at `0x82600BEC` (0 `OPENING`, 1 `STAGE1_OPENING`, 2 `SHIBUYA_OPEN`, 3 `STAGE2_OPENING`, 4 `SHINJUKU_OPEN`, 5 `STAGE3_OPENING`, 6 `ENDING`, 7 `STAFFROLL1`, 8 `PERFECT_ENDING`, 9 `STAFFROLL2`, 10 `UBI_LOGO`; `UBI_LOGO_SD.wmv` isn't in it) to the movie class's slot 1. From `Boot::StartMovie`. |
 | `sub_820A43D8` | `Movies::Start` | | The movie class's slot 2. From `Boot::WaitForMovie`. |
 | `sub_820A43F0` | `Movies::Stop` | | Slot 3. From `Boot::EndMovie`. |
-| `sub_820A4408` | `Movies::Pause` | | Slot 4. From `sub_82108018`. Never called in play. |
-| `sub_820A4420` | `Movies::Resume` | | Slot 5. From `sub_82108018`. Never called in play. |
+| `sub_820A4408` | `Movies::Pause` | | Slot 4. From `sub_82108018` (`BootMode::NextMode`, `boot-mode.md`). Never called in play. |
+| `sub_820A4420` | `Movies::Resume` | | Slot 5. From `sub_82108018` (`BootMode::NextMode`, `boot-mode.md`). Never called in play. |
 | `sub_820A4450` | `Movies::State` | Wrapped | Slot 6 (the state: 1 loaded or ended; named `Movie::IsFinished` before). From `Boot::WaitForMovie`, twice a tick. `src/hooks/title_screen.cpp`: with `--skip_intro`, 1 from `Boot::WaitForMovie` once `Movie::RenderFrame` has returned. |
 | `sub_820A4438` | `Movies::Release` | | Slot 7. From `Boot::EndMovie`. |
 | `sub_820AEA88` | `Movie::Movie` | Overridden | r3 = it (312 bytes, `operator new` in `App::App`), r4 = the set-up block (+0 the run loop, +4 a word kept at +4; `App::App`'s {app + 20, app + 8}). Read 2026-10-30 (B7 loop, the app's start-up): +0 the vtable `0x82002910`, +4 the block's +4; the command at +12 (+12 `0x820066DC`, +16 `0x82000AB4` then `0x82002908`, +20 and +24 0, bytes +28 0, +29 1, +30 0, +36 `0x82002850` (a delegate's vtable), +40 and +44 0; byte +31 not written); +8 an 8-byte `MovieWrapper` (`operator new`, `sub_82593DC0`) or 0; the run loop's slot 2 (`AddTickHandler`, key 1, a 12-byte delegate {`0x82002850`, it, `0x820AE808`} at its frame's +88) and slot 1 (`AddListener`, key 1, {`0x82002850`, it, `0x820AE818`} at +104; +88 left `0x82000ABC`); +308 (the state) = 0. Returns it. 160-byte frame, `__savegprlr_28`. Once at boot. Ours (B7 loop, 2026-10-30; `app_start_up::MovieConstruct`, `src/app_start_up/movie.cpp`, adapter in `src/hooks/app_start_up.cpp`, `--native_app_start_up` with `--native_heap`): the same stores, the wrapper's plain C++, the run loop's slots guest calls from a frame like the original's (the prologue's saves written); operator new's plain C++ (the original from the start where it can't answer). Harness `app_start_up`: `Movie::Movie (sub_820AEA88) with MovieWrapper::MovieWrapper (sub_82593DC0)`, a fake run loop whose slots 2 and 1 are a counter and a recorder. Ran in the attract race (`itc_2618`). Called by `App::App`'s plain C++ through its adapter (as `App::StartUp`'s callees: the harness's recorder sees each call there), and by `App::App`'s original with the flag off, so its adapter stays. |
@@ -114,7 +114,6 @@ run it after changing either, on any branch.
 | `sub_82481B58` | `MoviePlayer::Pause` | | Probably: the player's +88. A thunk. No longer called with `--play_movies_with_ffmpeg`. |
 | `sub_82481B68` | `MoviePlayer::Resume` | | Probably: the player's +92. A thunk. No longer called with `--play_movies_with_ffmpeg`. |
 | `sub_82481B78` | `MoviePlayer::Stop` | | Probably: the player's +96. A thunk. No longer called with `--play_movies_with_ffmpeg`. |
-| `sub_82108018` | | | Pauses (`Movies::Pause`) or resumes the movie when the flags at `0x826C7960`/`64` change, probably the system menu; more not read. Never called in play. |
 | `sub_82486BC0` | | | The movie player's stream set-up (from `sub_82481B98`): r3 the player, r4 and r5 two streams' formats, set up through the player's +56, +60 and +64 objects (buffers by `sub_8248F2B8`); a third (r6) only with a `DbgPrint`. Twice a session, r6 0 each time, so the print never runs. Not read in detail. No longer called with `--play_movies_with_ffmpeg`. |
 | `sub_824E1750` | | | Movie code (4,497 lines): r3 = the movie player's object, whose +15144, +15156 and +14724 are its own (not the device's, though the offsets match). Not read in detail. No longer called with `--play_movies_with_ffmpeg`. |
 | `sub_825169A0` | | | Movie decoder: reads its object's +3852, +14776 and +15148 (compared with -1; not the device's vblank count). Called through a pointer from `824D40F8`, about once a frame during the boot movie (r3 = `40B0AB40`, +15148 = -1). Not read in detail. No longer called with `--play_movies_with_ffmpeg`. |
