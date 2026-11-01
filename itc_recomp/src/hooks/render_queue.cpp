@@ -11,12 +11,14 @@
 #include "base/flags.h"
 #include "debug/menu_selection_scan.h"
 #include "graphics/render_queue.h"
+#include "hooks/models.h"
 
 ITC_FLAG_BOOL(native_render_queue, true, "ITC",
               "Run the render queue's methods (docs/functions/device-shaders.md: "
               "RenderQueue::Init sub_8258ED00, ClearRecording sub_8258ED78, Flip sub_8258E5E0, "
               "Recording sub_8258E5F8, Replaying sub_8258E618, QueueEntry::Sequence "
-              "sub_8258E5C0, Add sub_8258EDC8 with PassList::Add sub_8258EB88) natively instead of through the translated code (the same "
+              "sub_8258E5C0, Add sub_8258EDC8 with PassList::Add sub_8258EB88; PtrVector::PushBack sub_82591540 with Insert "
+              "sub_825911C8, which allocates only with --native_models and the native heap) natively instead of through the translated code (the same "
               "writes; guest calls for the drawer's Init and vtable slots that aren't the "
               "queue's own; checked by --run_harnesses=render_queue)");
 
@@ -67,6 +69,20 @@ extern "C" REX_FUNC(sub_8258EDC8) {
   }
   ctx.fpscr.disableFlushMode();
   hooks::NativeRenderQueueAdd(ctx, base);
+}
+
+// PtrVector::PushBack: r3 = the vector, r4 = the value's address. Insert
+// (sub_825911C8) has no adapter: only PushBack calls it.
+extern "C" REX_FUNC(sub_82591540) {
+  REX_FUNC_PROLOGUE();
+  if (ITC_FLAG(native_render_queue)) {
+    if (const auto r3 = rq::PushBack(base, ctx.r3.u32, ctx.r4.u32, ctx.r1.u32,
+                                     hooks::ModelsNativeLifetime())) {
+      ctx.r3.u64 = *r3;
+      return;
+    }
+  }
+  __imp__sub_82591540(ctx, base);
 }
 
 // Init: r3 = the queue, r4 = the device.

@@ -12,7 +12,9 @@
 #include "base/flags.h"
 #include "base/log.h"
 #include "graphics/render_queue.h"
+#include "hooks/models.h"
 #include "hooks/render_queue.h"
+#include "memory/c_runtime_heap.h"
 #include "memory/heap.h"
 
 #include <fmt/format.h>
@@ -355,6 +357,92 @@ void Adds(Context& h) {
   }
 }
 
+// --- PtrVector::PushBack and Insert ---
+//
+// The vector at the scratch area's +0 (+4 first, +8 last, +12 end), the
+// value at +64. With room, the storage is in the scratch area and the
+// whole area is compared. Without (an empty or full vector: Insert
+// reallocates through operator new and delete), the storage comes from
+// operator new for each version, and the vector is compared by role: its
+// size, capacity, elements, the answer as an offset from first, and r3.
+
+constexpr uint32_t kVector = 0;
+constexpr uint32_t kValue = 64;
+constexpr uint32_t kStorage = 256;  // up to 64 pointers
+
+void NativePushBack(PPCContext& ctx, uint8_t* base) {
+  const auto r3 = rq::PushBack(base, ctx.r3.u32, ctx.r4.u32, ctx.r1.u32, true);
+  if (!r3) {
+    __imp__sub_82591540(ctx, base);
+    return;
+  }
+  ctx.r3.u64 = *r3;
+}
+
+void VectorOutputs(uint8_t* base, uint32_t vector, uint32_t answer, Outputs& out) {
+  const uint32_t first = guest::LoadU32(base, vector + 4);
+  const uint32_t last = guest::LoadU32(base, vector + 8);
+  const uint32_t end = guest::LoadU32(base, vector + 12);
+  out.Word(first != 0);
+  out.Word(last - first);
+  out.Word(end - first);
+  if (first != 0) out.Bytes(Read(base, first, last - first));
+  out.Word(guest::LoadU32(base, answer) - first);
+}
+
+void PushBacks(Context& h) {
+  Random& r = h.random;
+  Results results("PtrVector::PushBack (sub_82591540)");
+  const bool allocate = hooks::ModelsNativeLifetime();
+  if (!allocate) {
+    ITC_LOG_INFO("harness: render_queue: PushBack's Insert cases need --native_models and the "
+                 "native heap");
+  }
+  for (int c = 0; c < 64; c++) {
+    const uint32_t kind = allocate ? r.Below(3) : 0;  // 0 room, 1 empty, 2 full
+    const uint32_t size = kind == 1 ? 0 : r.Below(32);
+    const uint32_t capacity = kind == 0 ? size + 1 + r.Below(32) : size;
+    std::vector<uint32_t> words(kScratchBytes / 4);
+    for (uint32_t& w : words) w = uint32_t(r.Next());
+    std::vector<uint32_t> elements(size);
+    for (uint32_t& e : elements) e = uint32_t(r.Next());
+    const uint32_t value = h.data + kValue + 4 * r.Below(4);
+    const uint32_t stack = h.data - 1024;
+    Outputs out[2];
+    for (int v = 0; v < 2; v++) {
+      guest::StoreU32s(h.base, h.data, words.data(), uint32_t(words.size()));
+      uint32_t first = 0;
+      if (kind == 0) {
+        first = h.data + kStorage;
+      } else if (kind == 2 && capacity != 0) {
+        first = memory::crt::OperatorNew(h.base, capacity * 4).value_or(0);
+      }
+      if (first != 0 && size != 0) {
+        guest::StoreU32s(h.base, first, elements.data(), size);
+      }
+      guest::StoreU32(h.base, h.data + kVector + 4, first);
+      guest::StoreU32(h.base, h.data + kVector + 8, first == 0 ? 0 : first + 4 * size);
+      guest::StoreU32(h.base, h.data + kVector + 12, first == 0 ? 0 : first + 4 * capacity);
+      Fill(h.base, stack - 96, 96);
+      PPCContext t = CallContext(h);
+      t.r3.u64 = h.data + kVector;
+      t.r4.u64 = value;
+      (v == 0 ? __imp__sub_82591540 : NativePushBack)(t, h.base);
+      if (kind == 0) {
+        out[v].Bytes(Read(h.base, h.data, kScratchBytes));
+      } else {
+        VectorOutputs(h.base, h.data + kVector, stack - 96 + 80, out[v]);
+        memory::crt::OperatorDelete(guest::LoadU32(h.base, h.data + kVector + 4));
+      }
+      out[v].Word(t.r3.u32);
+    }
+    results.Check(out[0], out[1],
+                  fmt::format("case {}: {}, size {}, capacity {}", c,
+                              kind == 0 ? "room" : kind == 1 ? "empty" : "full", size, capacity));
+  }
+  results.Report();
+}
+
 }  // namespace
 
 void RenderQueue(Context& h) {
@@ -362,6 +450,7 @@ void RenderQueue(Context& h) {
   ClearRecording(h);
   Init(h);
   Adds(h);
+  PushBacks(h);
 }
 
 }  // namespace harness

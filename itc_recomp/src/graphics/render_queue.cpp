@@ -8,6 +8,7 @@
 #include "base/log.h"
 #include "graphics/device_shaders.h"
 #include "graphics/resources.h"
+#include "models/texture_provider.h"
 
 #include <cstdint>
 
@@ -157,6 +158,53 @@ std::optional<uint32_t> Add(uint8_t* base, uint32_t queue, uint32_t chunk, uint3
   const double before = guest::LoadFloat(base, now + 84);
   const double step = guest::LoadFloat(base, kSequenceStep);
   guest::StoreFloat(base, now + 84, float(double(float(before + step))));
+  return r3;
+}
+
+namespace {
+
+// A vector's size or capacity from two of its pointers: the byte difference
+// shifted right as a signed word (srawi), as the original.
+uint32_t Count(uint32_t from, uint32_t to) { return uint32_t(int32_t(to - from) >> 2); }
+
+}  // namespace
+
+std::optional<uint32_t> PtrVectorInsert(uint8_t* base, uint32_t answer, uint32_t vector,
+                                        uint32_t where, uint32_t value) {
+  const uint32_t first = guest::LoadU32(base, vector + 4);
+  uint32_t index = 0;
+  if (first != 0 && Count(first, guest::LoadU32(base, vector + 8)) != 0) {
+    index = Count(first, where);
+  }
+  if (!models::PointersInsertN(base, vector, where, 1, guest::LoadU32(base, value))) {
+    return std::nullopt;
+  }
+  ITC_NATIVE_RUNNING("sub_825911C8 PtrVector::Insert");
+  guest::StoreU32(base, answer, (index << 2) + guest::LoadU32(base, vector + 4));
+  return answer;
+}
+
+std::optional<uint32_t> PushBack(uint8_t* base, uint32_t vector, uint32_t value, uint32_t sp,
+                                 bool may_allocate) {
+  const uint32_t first = guest::LoadU32(base, vector + 4);
+  const uint32_t size = first == 0 ? 0 : Count(first, guest::LoadU32(base, vector + 8));
+  if (first != 0 && size < Count(first, guest::LoadU32(base, vector + 12))) {
+    ITC_NATIVE_RUNNING("sub_82591540 PtrVector::PushBack");
+    const uint32_t last = guest::LoadU32(base, vector + 8);
+    guest::StoreU32(base, last, guest::LoadU32(base, value));
+    guest::StoreU32(base, vector + 8, last + 4);
+    return vector;
+  }
+  if (!may_allocate) {
+    return std::nullopt;
+  }
+  const uint32_t frame = Frame(base, sp, 96);
+  const uint32_t last = guest::LoadU32(base, vector + 8);
+  guest::StoreU32(base, frame + 80, last);
+  const auto r3 = PtrVectorInsert(base, frame + 80, vector, last, value);
+  if (r3) {
+    ITC_NATIVE_RUNNING("sub_82591540 PtrVector::PushBack");
+  }
   return r3;
 }
 

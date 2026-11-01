@@ -78,4 +78,21 @@ uint32_t PassListAdd(uint8_t* base, uint32_t list, uint64_t chunk_key, uint64_t 
 std::optional<uint32_t> Add(uint8_t* base, uint32_t queue, uint32_t chunk, uint32_t bucket,
                             double key, uint32_t sp, const GuestCall& call);
 
+// PtrVector::PushBack (sub_82591540, std::vector<T*>::push_back): r3 = the
+// vector (+4 first, +8 last, +12 end), `value` the value's address. With
+// room (first not 0, the size below the capacity) the value stored at last
+// and +8 moved on; returns the vector (r3 as given). Otherwise, when
+// `may_allocate`, PtrVector::Insert from its 96-byte frame below `sp` (+80 =
+// last, where the answer goes); returns that address (the original's r3).
+// nullopt where the original must run (no `may_allocate`, or
+// TextureProvider::InsertN's refusal, models/texture_provider.h).
+std::optional<uint32_t> PushBack(uint8_t* base, uint32_t vector, uint32_t value, uint32_t sp,
+                                 bool may_allocate);
+// PtrVector::Insert (sub_825911C8, std::vector<T*>::insert): the index
+// (where - first; 0 for an empty vector), TextureProvider::InsertN(vector,
+// where, 1, the value at `value`), then [answer] = first + 4 x the index;
+// returns `answer`. nullopt (nothing changed) where InsertN refuses.
+std::optional<uint32_t> PtrVectorInsert(uint8_t* base, uint32_t answer, uint32_t vector,
+                                        uint32_t where, uint32_t value);
+
 }  // namespace graphics::render_queue
