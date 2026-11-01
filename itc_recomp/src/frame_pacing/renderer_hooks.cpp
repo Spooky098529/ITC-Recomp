@@ -18,6 +18,7 @@
 #include "debug/idle_timer_scan.h"
 #include "debug/image_dump.h"
 #include "debug/menu_selection_scan.h"
+#include "debug/render_watch.h"
 #include "debug/replay_stats.h"
 #include "debug/state_capture.h"
 #include "frame_pacer.h"
@@ -156,12 +157,14 @@ void Renderer_DrawFrame(PPCContext& ctx, uint8_t* base, uint32_t renderer) {
   bool timing = ITC_FLAG(log_frame_times);
   auto start = FrameTimes::Clock::now();
   auto cpu_start = timing ? ThreadCpuTime() : FrameTimes::Clock::duration{};
+  debug::RenderWatch_OnDrawStart(base);
   interpolation::BlendState_OnReplayFrameStart();
   native::Renderer_OnReplayStart();
   ctx.r3.u64 = renderer;
   sub_82091E58(ctx, base);
   debug::ReplayStats_OnFrame();
   native::Renderer_EndFrame();
+  debug::RenderWatch_OnDrawEnd(base);
   if (timing) {
     GetFrameTimes().Add(FrameTimes::kDraw, FrameTimes::Clock::now() - start);
     GetFrameTimes().Add(FrameTimes::kDrawCpu, ThreadCpuTime() - cpu_start);
@@ -262,6 +265,17 @@ extern "C" REX_FUNC(sub_820920D8) {
   uint32_t r1 = ctx.r1.u32;
   Renderer_WaitForFrame(ctx, base, ctx.r3.u32);
   ctx.r1.u32 = r1;
+}
+
+// Renderer::SignalTick: r3 = renderer. A tick handler on the main thread,
+// after the scene update: signals the render thread to draw the tick's list
+// (the event at renderer+388; a tail call to Event::Signal). Wrapped only
+// for --watch_register_shadow, which waits here for that frame's replay.
+extern "C" REX_FUNC(sub_82091A58) {
+  REX_FUNC_PROLOGUE();
+  uint64_t token = debug::RenderWatch_BeforeHandOver();
+  __imp__sub_82091A58(ctx, base);
+  debug::RenderWatch_AfterHandOver(token);
 }
 
 // Renderer::Present: r3 = renderer. Wrapped only to time it

@@ -4,6 +4,7 @@
 #include "graphics/render_queue.h"
 
 #include "guest.h"
+#include "debug/render_watch.h"
 
 #include "base/log.h"
 #include "graphics/device_shaders.h"
@@ -383,6 +384,7 @@ void Replay(uint8_t* base, uint32_t queue, uint32_t device, uint32_t video_outpu
             const GuestCall& call) {
   ITC_NATIVE_RUNNING("sub_82591238 RenderQueue::Replay");
   const uint32_t frame = Frame(base, sp, 192);
+  debug::RenderWatch_OnReplay(device);
   guest::StoreU32(base, kDevice, device);
   guest::StoreU32(base, State(base, queue) + 44, video_output);
   for (uint32_t field : {24u, 28u, 32u, 36u}) {

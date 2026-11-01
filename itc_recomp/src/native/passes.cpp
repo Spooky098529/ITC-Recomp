@@ -12,6 +12,7 @@
 #include "generated_resolve_vert.h"
 
 #include "buffers.h"
+#include "debug/render_watch.h"
 #include "gpu_memory.h"
 #include "guest.h"
 #include "renderer.h"
@@ -4049,6 +4050,21 @@ void Passes::State::Draw(VkCommandBuffer commands, uint8_t* base, uint32_t devic
       }
     }
     s.Mirror(base, word0 & 0x1FFFFFFCu, size, false);
+  }
+  // --watch_gpu_data_reads: the data this draw uses.
+  if (!call.inline_vertices && debug::RenderWatch_WatchingGpuData()) {
+    if (index_address) {
+      debug::RenderWatch_OnGpuData(index_address, index_count * (index_32bit ? 4 : 2),
+                                   debug::GpuData::kIndex);
+    }
+    for (uint32_t k = 0; k < 96; k++) {
+      if (vertex->vertex_fetch_constants[k >> 5] & (1u << (k & 31))) {
+        uint32_t word0 = regs.values[XE_GPU_REG_SHADER_CONSTANT_FETCH_00_0 + 2 * k];
+        uint32_t word1 = regs.values[XE_GPU_REG_SHADER_CONSTANT_FETCH_00_0 + 2 * k + 1];
+        debug::RenderWatch_OnGpuData(word0 & 0x1FFFFFFCu, ((word1 >> 2) & 0xFFFFFFu) * 4,
+                                     debug::GpuData::kVertex);
+      }
+    }
   }
 
   // Draw.

@@ -1,5 +1,7 @@
 #include "game_data.h"
 
+#include "debug/render_watch.h"
+
 #include <array>
 #include <cctype>
 #include <cstdio>
@@ -209,6 +211,7 @@ std::optional<uint32_t> Read(uint32_t handle, uint8_t* out, uint32_t size) {
   if (!SeekFile(file->file, file->position)) {
     return std::nullopt;
   }
+  debug::RenderWatch_BeforeHostWrite(out, size);  // a diagnostic's pages
   size_t read = std::fread(out, 1, size, file->file);
   if (read < size && std::ferror(file->file)) {
     std::clearerr(file->file);
@@ -227,6 +230,7 @@ std::optional<uint32_t> ReadAt(uint32_t handle, uint64_t offset, uint8_t* out, u
   if (!SeekFile(file->file, offset)) {
     return std::nullopt;
   }
+  debug::RenderWatch_BeforeHostWrite(out, size);  // a diagnostic's pages
   size_t read = std::fread(out, 1, size, file->file);
   if (read < size && std::ferror(file->file)) {
     std::clearerr(file->file);

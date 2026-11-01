@@ -2,6 +2,7 @@
 #include "frame_costs.h"
 
 #include "buffers.h"
+#include "debug/render_watch.h"
 #include "gpu_memory.h"
 #include "state.h"
 
@@ -833,6 +834,11 @@ VkCommandBuffer TextureCache::State::Uploads() {
 }
 
 bool TextureCache::State::Upload(uint8_t* base, Texture& t) {
+  if (debug::RenderWatch_WatchingGpuData()) {
+    for (const auto& [address, size] : t.ranges) {
+      debug::RenderWatch_OnGpuData(address, size, debug::GpuData::kTexture);
+    }
+  }
   const Layout& l = t.layout;
   const Format& f = t.format;
   uint32_t out_bytes_per_block = f.conversion == Conversion::k4444To8888 ? 4 : f.bytes_per_block;
