@@ -79,7 +79,11 @@ file's history. What's left to see in a drive, from every run:
   54 s, 0 errors; replay `itc_3106` ok; `OnPictureLoadedB`'s print,
   shared with A's in one call site, split, 06f85ec9): 21 of 21 harness
   lines, 12 ran in the race, 7 in the replay, 2 to drive. Second
-  migration (the five left in `scene-loaders.md`): migration agent
+  migration checked (cc03a279..1ff4d670: the five, all ran in the
+  game; `scene-loaders.md` 78 of 78 ours; `XPR::FindByName`'s adapter
+  kept for `CarModel::OnFileLoaded`'s hand-back that runs in play;
+  harness scene_loaders 0 differing, frame dumps alike, race 38 s, 0
+  errors; no subagents). Nothing ready left. Step: validation agent
   running.
 
 ## Done
@@ -154,5 +158,9 @@ file's history. What's left to see in a drive, from every run:
 - After the GetTexture lead's migration (`itc_3103`: race 38 s, 0
   errors, four files' harnesses 0 differing): ours 3753, work left 2646
   (wrapped 97, known 491, unknown 2058).
+
+- After the scene loaders' second migration (`itc_3124`: race 38 s, 0
+  errors, scene_loaders 0 differing): ours 3758, work left 2641
+  (wrapped 97, known 486, unknown 2058).
 
 ## Stopped

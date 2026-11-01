@@ -74,6 +74,13 @@ When the user has reviewed a run's section, its heading gets
   skip the wrap, so `--debug_hide=82597118` no longer hides their calls;
   the native paths need their callees' flags (`--native_material_passes`,
   `--native_accessories`, `--native_car_models`).
+- The scene loaders' second migration (cc03a279..1ff4d670): 5 rows in
+  `scene-loaders.md` (now 78 of 78 ours). For review: `XPR::FindByName`'s
+  adapter kept (the car model's texture set 0 hand-back, run in play,
+  calls it); the provider's slot +16 and declining callees' originals
+  are guest calls from the original's frame; sprintf's unset arguments
+  as 0 (the `UiMovie::SetText` precedent); the new files build with
+  `-ffp-model=strict`.
 
 ## Run 2026-10-31 16:54 (`b7-loop-31-10-26`, continued)
 
