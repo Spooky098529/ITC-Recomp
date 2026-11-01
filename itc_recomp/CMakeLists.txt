@@ -149,6 +149,8 @@ set(ITC_SOURCES
     src/scene_loaders/objects.cpp
     src/scene_loaders/file_loaded.cpp
     src/scene_loaders/model_point.cpp
+    src/hooks/second_set.cpp
+    src/second_set/points.cpp
     src/hooks/car_models.cpp
     src/car_models/load_slots.cpp
     src/car_models/car_model.cpp
@@ -445,6 +447,7 @@ set(ITC_SOURCES
     src/harnesses/vehicle.cpp
     src/harnesses/app_states.cpp
     src/harnesses/scene_loaders.cpp
+    src/harnesses/second_set.cpp
     src/harnesses/car_models.cpp
     src/harnesses/save_data.cpp
     src/harnesses/race_world.cpp

@@ -260,5 +260,7 @@ void Accessories(Context& h);
 void RaceHudMachine(Context& h);
 void RaceScreens(Context& h);
 void Scene(Context& h);
+// The second set's objects (src/harnesses/second_set.cpp).
+void SecondSet(Context& h);
 
 }  // namespace harness
