@@ -55,7 +55,13 @@ file's history. What's left to see in a drive, from every run:
   the replay `sub_82591238` with its sort and chunk walker; 2 rows
   moved from `functions.md`; 9 ready groups; the indirect calls reach
   `PrimitiveDrawer::Init` and the render command tables; 1 lead added;
-  no subagents). Step: migration agent running.
+  no subagents). Migration checked (77d89868..f1c2a45a, 6e542f59: the 9
+  groups, 19 rows, `PassList::Clear`'s adapter removed; 25 of 25 in
+  play ours; `--native_render_queue`; the `--find_menu_selection`
+  wrappers moved into the new adapters, the renderer's command hooks
+  untouched; frame dump pixel-identical against the flag off; harness
+  render_queue and device_shaders 0 differing, race 38 s, 0 errors; no
+  subagents). Nothing ready left. Step: validation agent running.
 
 ## Done
 
@@ -113,5 +119,9 @@ file's history. What's left to see in a drive, from every run:
 
 - After the render queue's map: ours 3720, work left 2679 (wrapped
   100, known 521, unknown 2058).
+
+- After its migration (`itc_3091`: race 38 s, 0 errors, render_queue
+  0 differing): ours 3738, work left 2661 (wrapped 98, known 505,
+  unknown 2058).
 
 ## Stopped

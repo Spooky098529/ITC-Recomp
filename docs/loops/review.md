@@ -55,6 +55,17 @@ When the user has reviewed a run's section, its heading gets
   `known-data.md`'s scene + 64 buckets (+0, +4 first and last, +12 a
   count `Clear` never resets; not next pointers at +8). `known-data.md`:
   the replay's globals `0x8296BD8C`-`0x82970BC0`.
+- The render queue's migration (77d89868..f1c2a45a,
+  `--native_render_queue`): 19 rows to Native or Overridden. For
+  review: the `--find_menu_selection` wrappers moved from
+  `src/debug/menu_selection_scan.cpp` into the queue's adapters; the
+  replay's indirect calls (the command tables, `PrimitiveDrawer::Init`,
+  the release list's destructors, walker kinds 1 and 2) are guest calls
+  through `ctx`; `RenderQueue::Add`'s warning path and
+  `PtrVector::PushBack` without the models' native lifetime run the
+  original; the replay's harness holds the device lock and saves and
+  restores the replay's globals, with only the game's harmless command
+  handlers.
 
 ## Run 2026-10-31 16:54 (`b7-loop-31-10-26`, continued)
 
