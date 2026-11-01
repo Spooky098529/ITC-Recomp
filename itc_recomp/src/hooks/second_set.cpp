@@ -6,10 +6,13 @@
 
 #include "base/flags.h"
 #include "native/buffers.h"
+#include "second_set/finds.h"
 #include "second_set/point_groups.h"
 #include "second_set/points.h"
+#include "scene_loaders/model_point.h"
 
 ITC_FLAG_DECLARE(bool, native_material_passes);
+ITC_FLAG_DECLARE(bool, native_models);
 
 ITC_FLAG_BOOL(native_second_set, true, "ITC",
               "Run the second set of the car scene's objects (docs/functions/second-set.md: "
@@ -25,7 +28,11 @@ ITC_FLAG_BOOL(native_second_set, true, "ITC",
               "sub_820DF410, InitSideSkirts sub_820DF570, InitLeftMirror sub_820DF668, "
               "InitRightMirror sub_820DF6B0, InitMirror sub_820DF6F8, CockpitPoints::ResetFenders "
               "sub_820DB878, ResetCabin sub_820DB930, ResetDoors sub_820DB9E8, ResetHeadlights "
-              "sub_820DBAA0, InitBonnet sub_820DC0A8 and InitMirror sub_820DC0F0) natively instead of through the translated "
+              "sub_820DBAA0, InitBonnet sub_820DC0A8 and InitMirror sub_820DC0F0; with "
+              "--native_models and --native_material_passes the point set-ups "
+              "PartsPoints::Find sub_820E0258 and CockpitPoints::Find sub_820DBC88 (with the "
+              "groups' finds under them, no adapters: only they call them; "
+              "Skeleton::UpdateMatrices' original where its plain C++ declines)) natively instead of through the translated "
               "code (the same writes; checked by --run_harnesses=second_set)");
 
 namespace hooks {
@@ -113,6 +120,54 @@ ITC_SECOND_SET_GROUP(820DB930, CockpitResetCabin)
 ITC_SECOND_SET_GROUP(820DB9E8, CockpitResetDoors)
 ITC_SECOND_SET_GROUP(820DBAA0, CockpitResetHeadlights)
 
+void SecondSetFindStep(PPCContext& ctx, uint8_t* base, FindFunction find) {
+  if (!native::Buffers_NativeMemcpy() || !ITC_FLAG(native_models) ||
+      !ITC_FLAG(native_material_passes)) {
+    return;
+  }
+  ctx.fpscr.disableFlushMode();
+  ss::FindCalls calls;
+  calls.update_matrices = [&ctx, base](uint32_t skeleton, uint32_t frame) {
+    const uint64_t stack = ctx.r1.u64, link = ctx.lr;
+    // ModelPoint::Find's frame (its back chain written, as the original's).
+    guest::StoreU32(base, frame, frame + scene_loaders::kModelPointFrameBytes);
+    ctx.r1.u64 = frame;
+    ctx.r3.u64 = skeleton;
+    ctx.lr = 0x820D03EC;
+    __imp__sub_825998A0(ctx, base);
+    ctx.r1.u64 = stack;
+    ctx.lr = link;
+    ctx.fpscr.disableFlushMode();
+  };
+  ctx.r3.u64 = find(base, ctx.r3.u32, ctx.r4.u32, ctx.r1.u32, calls);
+  if (calls.flush) {
+    ctx.fpscr.enableFlushMode();
+  } else {
+    ctx.fpscr.disableFlushMode();
+  }
+}
+
+bool SecondSetFindsNative() {
+  return native::Buffers_NativeMemcpy() && ITC_FLAG(native_models) &&
+         ITC_FLAG(native_material_passes);
+}
+
+void SecondSetPartsFind(PPCContext& ctx, uint8_t* base) {
+  if (!SecondSetFindsNative()) {
+    __imp__sub_820E0258(ctx, base);
+    return;
+  }
+  SecondSetFindStep(ctx, base, ss::PartsFind);
+}
+
+void SecondSetCockpitFind(PPCContext& ctx, uint8_t* base) {
+  if (!SecondSetFindsNative()) {
+    __imp__sub_820DBC88(ctx, base);
+    return;
+  }
+  SecondSetFindStep(ctx, base, ss::CockpitFind);
+}
+
 void SecondSetPartsResetRightDoor(PPCContext& ctx, uint8_t* base) {
   if (!ITC_FLAG(native_material_passes)) {
     __imp__sub_820DE7E8(ctx, base);
@@ -163,3 +218,5 @@ ITC_SECOND_SET(820DB878, SecondSetCockpitResetFenders)
 ITC_SECOND_SET(820DB930, SecondSetCockpitResetCabin)
 ITC_SECOND_SET(820DB9E8, SecondSetCockpitResetDoors)
 ITC_SECOND_SET(820DBAA0, SecondSetCockpitResetHeadlights)
+ITC_SECOND_SET(820E0258, SecondSetPartsFind)
+ITC_SECOND_SET(820DBC88, SecondSetCockpitFind)

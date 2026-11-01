@@ -7,6 +7,7 @@
 #pragma once
 
 #include "guest.h"
+#include "second_set/finds.h"
 
 namespace hooks {
 
@@ -50,5 +51,20 @@ void SecondSetCockpitResetFenders(PPCContext& ctx, uint8_t* base);
 void SecondSetCockpitResetCabin(PPCContext& ctx, uint8_t* base);
 void SecondSetCockpitResetDoors(PPCContext& ctx, uint8_t* base);
 void SecondSetCockpitResetHeadlights(PPCContext& ctx, uint8_t* base);
+
+
+// The point set-ups (src/second_set/finds.h): r3 = the group or block, r4 =
+// the part model or the models' words; r3 as the original leaves it, the
+// flush mode as its last float step. PartsPoints::Find sub_820E0258 and
+// CockpitPoints::Find sub_820DBC88 natively only with native memcpy,
+// --native_models and --native_material_passes (else the original).
+using FindFunction = uint32_t (*)(uint8_t*, uint32_t, uint32_t, uint32_t,
+                                  second_set::FindCalls&);
+bool SecondSetFindsNative();
+// One set-up's plain C++ (nothing done unless SecondSetFindsNative()), for
+// the adapters and the harness.
+void SecondSetFindStep(PPCContext& ctx, uint8_t* base, FindFunction find);
+void SecondSetPartsFind(PPCContext& ctx, uint8_t* base);
+void SecondSetCockpitFind(PPCContext& ctx, uint8_t* base);
 
 }  // namespace hooks
