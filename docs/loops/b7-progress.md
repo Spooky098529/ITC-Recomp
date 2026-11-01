@@ -10,17 +10,15 @@ file's history. What's left to see in a drive, from every run:
 
 - Run started 2026-11-01 12:56 on `b7-loop-01-11-26`, from d8348c7b;
   summary `b7-loop-2026-11-01-1256.md`. Limit: 3 subsystems.
-- Subsystem 1 of 3: the boot mode (`boot-mode.md`; from the top of
-  `leads.md`, the modes' constructors beside the string table, which
-  were already ours in `game-modes.md`). Map checked (49161912: 24
-  rows, 0 errors, 10 ready groups, 1 lead added). Migration checked
-  (49f60a69, `--native_boot_mode`: 12 of 12 in play with 7 movie
-  callees in `movies.md`; `itc_3218`: race 38 s, 0 errors, boot_mode
-  0 differing; no subagents). Step: validation (agent running).
+- Subsystem 1 of 3: the boot mode (`boot-mode.md`). Done.
+- Next: picking subsystem 2 of 3 from `leads.md`.
 
 ## Done
 
-(none yet)
+- The boot mode: `boot-mode.md` (map 49161912, migration 49f60a69,
+  `--native_boot_mode`, 12 of 12 in play with 7 in `movies.md`;
+  validated `itc_3219`: race 53 s, 0 errors, 19 of 19 harness lines,
+  16 ran in the race, replay `itc_3220` ok, 3 to drive).
 
 ## Rows to review
 
@@ -45,3 +43,6 @@ file's history. What's left to see in a drive, from every run:
 - After its migration (`itc_3218`: race 38 s, 0 errors, boot_mode 0
   differing): ours 3981, work left 2424 (wrapped 80, known 483,
   unknown 1861).
+- After its validation (`itc_3219`, 120 s: race 53 s, 0 errors, every
+  harness 0 differing but the expected groups): ours 3981, work left
+  2424.

@@ -16,6 +16,13 @@ function goes from this list when a log shows its `native running
 (game):` line (say which log in the commit). A run with nothing left
 here loses its heading.
 
+## Run 2026-11-01 12:56 (`b7-loop-01-11-26`)
+
+- The boot mode (attract race `itc_3219`, replay `itc_3220` ok;
+  `boot-mode.md`, `movies.md`): `sub_82107358`
+  ScreenMachine::ScreenMachine, `sub_820A4408` Movies::Pause,
+  `sub_820A4420` Movies::Resume (the last two never seen in play).
+
 ## Run 2026-10-31 23:57 (`b7-loop-31-10-26-2`)
 
 - The race HUD machine cleanup lead (attract race `itc_3072`, replay

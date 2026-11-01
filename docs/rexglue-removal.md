@@ -2709,6 +2709,7 @@ B7. **The game logic inside**: everything else, subsystem by subsystem,
 | 2026-11-01 | The car scene (`CarScene::` at `[0x826C2E44]`: `Create`, the constructor, its set-up record, the lighting block, the shared assets at +64, `LoadAssets` and `OnFileLoaded`, the first set's update, the teardown and destructor) | `scene.md` | 19 of 22 in play (one migration; the rest waits on the scene models' updates and the parts' finishers) | `--native_scene` |
 | 2026-11-01 | The car scene's second set of pools (`sub_820C8DE8`'s eight objects: the car model, parts, cockpit, interior, the neon and LED kit, wheels, traffic car and scene model; their 240-byte point records, point groups and point set-ups, the wheels' morph of the tire, rim and brake shapes) | `second-set.md` | 148 of 152 in play (three migrations; the rest waits on `ScenePools::ReleaseB`) | `--native_second_set` |
 | 2026-11-01 | The scene models' load poll (`SceneModel::PollLoad`: each part's finisher, the ready flags, the palettes and paint applied once; `SceneParts::Build`, `SceneInterior::SetGauges`) | `load-poll.md` | 31 of 32 (one migration; `ApplyLightKit` is the front end's) | `--native_load_poll` |
+| 2026-11-01 | The boot mode (mode type 3: the movie list at `0x826C5BAC` played through its state machine at +848, `BootMode::Init`, `NextMode`, the destructors, `Boot::StartMovie`, `WaitForMovie` (inside `title_screen.cpp`'s `--skip_intro` wrap, kept) and `EndMovie` with the movie class's state calls; `ScreenMachine::ScreenMachine`, the mode delegate's thunk) | `boot-mode.md` | 12 of 12 in play (one migration; with 7 movie calls in `movies.md`; the rest never ran: the +32 interface's slots, the type 8 mode, the app's shut-down) | `--native_boot_mode` |
 
     The first run (2026-10-22, branch `b7-loop-test`): every harness at 0 differing, attract races at 20-21 s with no errors,
     and a race the user drove looked right. Ours went from 162 to 335 (work
@@ -4401,3 +4402,17 @@ boundary: 449 functions (916 pairs): overridden 108, Native 34, Dropped
 caller. B7 (`b7_status.py`): ours 3,962, work left 2,441 (Wrapped 82,
 with a row 490, no row yet 1,869), from 2,469 (from 2,694 at the run's
 start).
+
+**2026-11-01, the boot mode (branch `b7-loop-01-11-26`):** the
+thirtieth run's first subsystem, mapped and made native in one
+migration (`boot-mode.md`, `--native_boot_mode`, `src/boot_mode/`): the
+game mode that plays the boot movies from its list and then answers
+the front end, its state machine, the movie steps and the movie
+class's state calls under them, 12 of 12 in play. The lead it came
+from (the modes' constructors beside the string table) was already
+ours in `game-modes.md`. `title_screen.cpp`'s `--skip_intro` wraps now
+wrap the native bodies. The boundary: 449 functions (916 pairs):
+overridden 108, Native 34, Dropped 26, never called 70, live 211.
+Imports: 186 called, 56 with a live caller. B7 (`b7_status.py`): ours
+3,981, work left 2,424 (Wrapped 80, with a row 483, no row yet 1,861),
+from 2,441.
