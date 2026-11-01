@@ -83,7 +83,9 @@ void RaceHudObjectRunMovie1(PPCContext& ctx, uint8_t* base);
 void RaceHudObjectRunItem(PPCContext& ctx, uint8_t* base);
 void RaceHudObjectMovieMask(PPCContext& ctx, uint8_t* base);
 void RaceHudObjectInit(PPCContext& ctx, uint8_t* base);
-// RaceHud::Draw sub_822128A8, UpdateWarning sub_82212C50: r3 = the HUD;
+// RaceHud::Draw sub_822128A8, UpdateWarning sub_82212C50: r3 = the HUD (Draw
+// has no adapter: its callers in play, the race HUD machine's draws, call its
+// plain C++; the step for the harness);
 // UpdateRecordingFull sub_82212E60: r3 = the HUD, r4 = HasRoom's.
 void RaceHudObjectDraw(PPCContext& ctx, uint8_t* base);
 void RaceHudObjectUpdateWarning(PPCContext& ctx, uint8_t* base);

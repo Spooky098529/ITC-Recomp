@@ -39,7 +39,8 @@ ITC_FLAG_BOOL(native_race_hud_object, true, "ITC",
               "machine's PauseDraw's and RacePauseDraw's plain C++ reach it in play), RunMovie1 sub_82212AF8, "
               "RunItem sub_82212B08 (UiMovie::Run and FinishNamed through their overrides), "
               "RaceScreens::MovieMask sub_82211BE8, RaceHud::Init sub_82215260, Draw sub_822128A8 "
-              "(UiMovie::Run and the mirror's sub_8211BEE8 through their overrides), "
+              "(UiMovie::Run and the mirror's sub_8211BEE8 through their overrides; no adapter: "
+              "only the race HUD machine's draws' plain C++ reach it in play), "
               "UpdateWarning sub_82212C50, UpdateRecordingFull sub_82212E60 (UiMovie::Finish "
               "and FinishNamed through their overrides), ShowItem sub_82213638 (UiMovie::SetNodeText "
               "through its override, its varargs 0), UpdateItem sub_82214238, RaceScreens::Init sub_82211DA0, Create sub_82211F40 (with --native_heap; the in-race screens' makers' plain C++) and Make1004 sub_82216A60 "
@@ -455,7 +456,8 @@ void RaceHudObjectTickPanel(PPCContext& ctx, uint8_t* base) {
 // AfterRaceUpdate went native); RaceScreens::Init (from Create, native);
 // DrawAfterRaceMenu (from the race HUD machine's AfterRaceDraw, native);
 // DrawPauseMenu and DrawWarning (from the race HUD machine's PauseDraw and
-// RacePauseDraw, native);
+// RacePauseDraw, native); Draw (from the race HUD machine's eight draws in
+// play, native);
 // RaceScreens::Create (from the race HUD machine's CreateScreens, native,
 // with --native_heap; without it the original); ApplyOptions (from the race
 // HUD machine's SetUp, PauseUpdate and ClosePause, native).
@@ -472,5 +474,4 @@ void RaceHudObjectTickPanel(PPCContext& ctx, uint8_t* base) {
 
 ITC_RACE_HUD_OBJECT(822141A0, RaceHudObjectTearDown)
 ITC_RACE_HUD_OBJECT(82212270, RaceHudObjectStartCountdown)
-ITC_RACE_HUD_OBJECT(822128A8, RaceHudObjectDraw)
 ITC_RACE_HUD_OBJECT(82213638, RaceHudObjectShowItem)
