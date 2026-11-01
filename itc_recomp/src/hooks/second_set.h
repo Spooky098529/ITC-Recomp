@@ -118,6 +118,23 @@ void SecondSetSceneLightsConstruct(PPCContext& ctx, uint8_t* base);
 void SecondSetSceneWheelsConstruct(PPCContext& ctx, uint8_t* base);
 void SecondSetSceneTrafficConstruct(PPCContext& ctx, uint8_t* base);
 void SecondSetSceneModelConstruct(PPCContext& ctx, uint8_t* base);
+// The morph and the tire's helpers (morph.h): the shape accessors (r3 the
+// model, r4 the shape; r3 the word), Morph::SetUp (r3 the model, r4 the
+// record, r5 the base shape, r6 and r7 the indices and weights, r8 the
+// count), Blend (r3 the record) and Run (r4 the record, r5 and r6 the
+// outputs; the original where the plain C++ declines), sub_820E6F28 (r3 the
+// entries, r4 an index, r5 a float's address, f1) and sub_820E7010 (r3 an
+// index, r4 the entries, r5 to r7 the outputs); the flush mode as the
+// originals leave it.
+void SecondSetModelStreamData(PPCContext& ctx, uint8_t* base);
+void SecondSetModelStreamSize(PPCContext& ctx, uint8_t* base);
+void SecondSetModelStreamData2(PPCContext& ctx, uint8_t* base);
+void SecondSetModelStreamSize2(PPCContext& ctx, uint8_t* base);
+void SecondSetMorphSetUp(PPCContext& ctx, uint8_t* base);
+void SecondSetMorphBlend(PPCContext& ctx, uint8_t* base);
+void SecondSetMorphRun(PPCContext& ctx, uint8_t* base);
+void SecondSetTireFillEntries(PPCContext& ctx, uint8_t* base);
+void SecondSetTireReadEntry(PPCContext& ctx, uint8_t* base);
 // The destructors and deleting destructors (objects.h; r3 the object, left;
 // r4 the flags), natively where their releases are (else the original), and
 // the point blocks' destructors (blocks.h; r3 as the original leaves it).

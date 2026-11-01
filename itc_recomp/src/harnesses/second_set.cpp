@@ -16,6 +16,7 @@
 #include "hooks/models.h"
 #include "hooks/second_set.h"
 #include "models/memory_blocks.h"
+#include "native/buffers.h"
 #include "scene/scene.h"
 #include "scene_loaders/objects.h"
 #include "memory/c_runtime_heap.h"
@@ -23,6 +24,7 @@
 #include "model_animation/model_animation.h"
 #include "second_set/blocks.h"
 #include "second_set/finds.h"
+#include "second_set/morph.h"
 #include "second_set/objects.h"
 #include "second_set/points.h"
 
@@ -659,6 +661,275 @@ void CarModelReleases(Context& h, Random& r, uint32_t block) {
   Put(h.base, scene::kFirstSet, saved_set);
 }
 
+// --- The morph and the tire's helpers ---
+//
+// Float words from a mix: small values, zeros of both signs, denormals
+// (the vector steps flush them), infinities, NaNs and random bits.
+uint32_t MixedFloat(Random& r) {
+  switch (r.Below(10)) {
+    case 0: return r.Below(2) == 0 ? 0u : 0x80000000u;
+    case 1: return (r.Below(2) << 31) | (1 + r.Below(0x7FFFFF));  // denormal
+    case 2: return r.Below(2) == 0 ? 0x7F800000u : 0xFF800000u;
+    case 3: return 0x7FC00000u | r.Below(0x400000) | (r.Below(2) << 31);  // NaN
+    case 4: return 0x7F800001u + r.Below(0x3FFFFF);  // signaling NaN
+    case 5: return uint32_t(r.Next());
+    default:
+      return std::bit_cast<uint32_t>(float(int32_t(r.Below(2001)) - 1000) / 64.0f);
+  }
+}
+
+// One morph case through both versions: `setup` writes the block (its bytes
+// random first) and the registers; the block's words compared exactly but
+// `floats` (address, count) ranges as floats, the frame `windows` (their
+// float words given as offsets from r1 too), r3 (both halves) and the flush
+// mode left. Both sides start with the flush mode `flush_on`.
+struct FloatRange {
+  uint32_t address, count;
+};
+void MorphCase(Context& h, Results& results, uint32_t block, uint32_t bytes, Random& r,
+               bool flush_on, const std::function<void(PPCContext&, std::vector<FloatRange>&)>& setup,
+               GuestFunction recompiled, GuestFunction native, const std::vector<Window>& windows,
+               const std::vector<uint32_t>& float_frame_words, const std::string& what) {
+  PPCContext start = CallContext(h);
+  start.r1.u64 &= ~0xFull;
+  const uint32_t stack = start.r1.u32 - kStackBytes;
+  RandomBytes(h.base, block, bytes, r);
+  RandomBytes(h.base, stack, kStackBytes, r);
+  std::vector<FloatRange> floats;
+  setup(start, floats);
+  const std::vector<uint8_t> inputs = Read(h.base, block, bytes);
+  const std::vector<uint8_t> frames = Read(h.base, stack, kStackBytes);
+  std::vector<bool> is_float(bytes / 4, false);
+  for (const FloatRange& f : floats) {
+    for (uint32_t w = 0; w < f.count; w++) {
+      const uint32_t at = f.address + 4 * w - block;
+      if (at / 4 < is_float.size()) is_float[at / 4] = true;
+    }
+  }
+  Outputs out[2];
+  for (int v = 0; v < 2; v++) {
+    Write(h.base, block, inputs.data(), bytes);
+    Write(h.base, stack, frames.data(), kStackBytes);
+    PPCContext t = start;
+    if (flush_on) {
+      t.fpscr.enableFlushModeUnconditional();
+    } else {
+      t.fpscr.disableFlushModeUnconditional();
+    }
+    RunSide(v, recompiled, native, t, h.base);
+    const bool left_on =
+        (t.fpscr.getcsr() & uint32_t(decltype(t.fpscr)::FlushMask)) != 0;
+    t.fpscr.disableFlushModeUnconditional();
+    uint32_t w = 0;
+    while (w < is_float.size()) {
+      uint32_t end = w;
+      while (end < is_float.size() && is_float[end] == is_float[w]) end++;
+      if (is_float[w]) {
+        out[v].Floats(h.base, block + 4 * w, end - w);
+      } else {
+        out[v].Bytes(Read(h.base, block + 4 * w, 4 * (end - w)));
+      }
+      w = end;
+    }
+    for (const Window& win : windows) {
+      for (uint32_t at = 0; at < win.bytes; at += 4) {
+        const uint32_t address = start.r1.u32 - win.below + at;
+        const uint32_t offset = uint32_t(-int32_t(win.below) + int32_t(at));
+        bool is_f = false;
+        for (const uint32_t f : float_frame_words) is_f |= f == offset;
+        if (is_f) {
+          out[v].Float(guest::LoadU32(h.base, address));
+        } else {
+          out[v].Word(guest::LoadU32(h.base, address));
+        }
+      }
+    }
+    out[v].Word(t.r3.u32);
+    out[v].Word(uint32_t(t.r3.u64 >> 32));
+    out[v].Word(left_on);
+  }
+  results.Check(out[0], out[1], what);
+}
+
+void Morphs(Context& h, Random& r, uint32_t block) {
+  if (!native::Buffers_NativeMemcpy()) {
+    ITC_LOG_WARN("harness: second_set: the morph's cases skipped (memcpy not native)");
+    return;
+  }
+  // The model's shapes: [model + 40] = 8 shapes of 544 bytes at +0x100;
+  // the streams' headers at +0x1300 (64 bytes each); the streams at +0x2000
+  // (0x100 bytes each).
+  const uint32_t model = block, shapes = block + 0x100, headers = block + 0x1300;
+  const uint32_t streams = block + 0x2000;
+  constexpr uint32_t kBytes = 0x4000;
+  struct Accessor {
+    const char* name;
+    GuestFunction recompiled, native;
+  };
+  const Accessor accessors[] = {
+      {"Model::StreamData (sub_82594A60)", __imp__sub_82594A60, hooks::SecondSetModelStreamData},
+      {"Model::StreamSize (sub_82594A78)", __imp__sub_82594A78, hooks::SecondSetModelStreamSize},
+      {"Model::StreamData2 (sub_82594A90)", __imp__sub_82594A90, hooks::SecondSetModelStreamData2},
+      {"Model::StreamSize2 (sub_82594AA8)", __imp__sub_82594AA8, hooks::SecondSetModelStreamSize2},
+  };
+  for (const Accessor& a : accessors) {
+    Results results(a.name);
+    for (int c = 0; c < 8; c++) {
+      MorphCase(
+          h, results, block, kBytes, r, false,
+          [&](PPCContext& t, std::vector<FloatRange>&) {
+            Put(h.base, model + 40, shapes);
+            t.r3.u64 = model;
+            t.r4.u64 = r.Below(8);
+          },
+          a.recompiled, a.native, {}, {}, fmt::format("case {}", c));
+    }
+    results.Report();
+  }
+  // Morph::SetUp: the record at +0x3000, the indices at +0x3100 and weights
+  // at +0x3140; every shape's first header +0 the vertex count, its second's
+  // +4 the kind (the same for all: DebugPrintf never runs, as in play).
+  const uint32_t record = block + 0x3000, indices = block + 0x3100, weights = block + 0x3140;
+  {
+    Results results("Morph::SetUp (sub_82594C18)");
+    for (int c = 0; c < 24; c++) {
+      const bool flush_on = r.Below(2) == 0;
+      MorphCase(
+          h, results, block, kBytes, r, flush_on,
+          [&](PPCContext& t, std::vector<FloatRange>& floats) {
+            Put(h.base, model + 40, shapes);
+            const uint32_t vertices = r.Below(9), kind = 6 + r.Below(3);
+            for (uint32_t s = 0; s < 8; s++) {
+              const uint32_t first = headers + 128 * s, second = first + 64;
+              Put(h.base, shapes + 544 * s + 400, first);
+              Put(h.base, shapes + 544 * s + 404, second);
+              Put(h.base, first + 0, vertices);
+              Put(h.base, second + 4, kind);
+            }
+            for (uint32_t i = 0; i < 8; i++) {
+              Put(h.base, indices + 4 * i, r.Below(8));
+              Put(h.base, weights + 4 * i, MixedFloat(r));
+            }
+            floats.push_back({record + 80, 8});
+            t.r3.u64 = model;
+            t.r4.u64 = record;
+            t.r5.u64 = r.Below(8);
+            t.r6.u64 = indices;
+            t.r7.u64 = weights;
+            t.r8.u64 = r.Below(4) == 0 ? 8 + r.Below(4) : r.Below(8);
+          },
+          __imp__sub_82594C18, hooks::SecondSetMorphSetUp, {}, {},
+          fmt::format("case {}", c));
+    }
+    results.Report();
+  }
+  // Morph::Blend and Run: the record's streams in the stream area (base
+  // streams, up to 7 targets' first streams and +48's second streams, the
+  // two outputs), each 0x100 bytes (up to 16 vertices of 16), their words
+  // mixed floats; the kind 6, 7 or another (not 8: the original's, left to
+  // it). The outputs (and every stream) compared as floats, Blend6's and
+  // Blend7's frame words (their weights as floats).
+  for (int run = 0; run < 2; run++) {
+    Results results(run == 0 ? "Morph::Blend (sub_8258BD28, with Blend6 sub_8258B578 and "
+                               "Blend7 sub_8258B678)"
+                             : "Morph::Run (sub_82594D10)");
+    for (int c = 0; c < 48; c++) {
+      const uint32_t kind = c % 8 == 7 ? 9 : 6 + uint32_t(c % 2);
+      const bool flush_on = r.Below(2) == 0;
+      MorphCase(
+          h, results, block, kBytes, r, flush_on,
+          [&](PPCContext& t, std::vector<FloatRange>& floats) {
+            const uint32_t vertices = r.Below(5) == 0 ? 0 : 1 + r.Below(16);
+            const uint32_t targets = r.Below(8);
+            for (uint32_t w = 0; w < 0x2000 / 4; w++) {
+              Put(h.base, streams + 4 * w, MixedFloat(r));
+            }
+            floats.push_back({streams, 0x2000 / 4});
+            auto stream = [&](uint32_t n) { return streams + 0x100 * n; };
+            Put(h.base, record + 0, stream(0));
+            Put(h.base, record + 4, stream(1));
+            Put(h.base, record + 8, stream(2));
+            Put(h.base, record + 12, stream(3));
+            for (uint32_t i = 0; i < 7; i++) {
+              Put(h.base, record + 16 + 4 * i, stream(4 + i));
+              Put(h.base, record + 48 + 4 * i, r.Below(2) == 0 ? stream(1) : stream(11 + i % 5));
+              Put(h.base, record + 80 + 4 * i, MixedFloat(r));
+            }
+            floats.push_back({record + 80, 7});
+            Put(h.base, record + 112, targets);
+            Put(h.base, record + 116, vertices);
+            Put(h.base, record + 120, kind);
+            if (run == 0) {
+              t.r3.u64 = record;
+            } else {
+              t.r3.u64 = r.Next();
+              t.r4.u64 = record;
+              t.r5.u64 = stream(2);
+              t.r6.u64 = stream(3);
+            }
+          },
+          run == 0 ? __imp__sub_8258BD28 : __imp__sub_82594D10,
+          run == 0 ? hooks::SecondSetMorphBlend : hooks::SecondSetMorphRun,
+          // Blend7's +80 to +112 (r1 - 80: the sizes words, then the
+          // weights), Blend6's +80 to +96 (r1 - 48: the weights); the saved
+          // registers' slots above them left out.
+          kind == 7 ? std::vector<Window>{{160 - 80, 32}}
+                    : (kind == 6 ? std::vector<Window>{{128 - 80, 16}} : std::vector<Window>{}),
+          {uint32_t(-64), uint32_t(-60), uint32_t(-56), uint32_t(-52), uint32_t(-48),
+           uint32_t(-44), uint32_t(-40), uint32_t(-36)},
+          fmt::format("case {} (kind {})", c, kind));
+    }
+    results.Report();
+  }
+  // sub_820E6F28: the 12 entries at +0x1000 (an index of 0 to 26: entry
+  // index - 12, before them for the small ones), the value at +0x0F00, f1 a
+  // mixed float; sub_820E7010: an index of 0 to 26 into the entries (their
+  // words mixed floats), the outputs at +0x1200. Their floats compared as
+  // floats, the red-zone word at r1 - 16 exactly.
+  const uint32_t entries = block + 0x1000;
+  {
+    Results results("sub_820E6F28 (the tire's entries)");
+    for (int c = 0; c < 32; c++) {
+      MorphCase(
+          h, results, block, kBytes, r, r.Below(2) == 0,
+          [&](PPCContext& t, std::vector<FloatRange>& floats) {
+            Put(h.base, block + 0x0F00, MixedFloat(r));
+            // Entry index - 12 lies from 12 before the entries to 2 past.
+            floats.push_back({entries - 12 * 24, 27 * 24 / 4});
+            t.r3.u64 = entries;
+            t.r4.u64 = r.Below(4) == 0 ? r.Below(27) : 12 + r.Below(12);
+            t.r5.u64 = block + 0x0F00;
+            t.f1.f64 = double(std::bit_cast<float>(MixedFloat(r)));
+          },
+          __imp__sub_820E6F28, hooks::SecondSetTireFillEntries, {{16, 8}}, {},
+          fmt::format("case {}", c));
+    }
+    results.Report();
+  }
+  {
+    Results results("sub_820E7010 (the tire's entry read)");
+    for (int c = 0; c < 32; c++) {
+      MorphCase(
+          h, results, block, kBytes, r, r.Below(2) == 0,
+          [&](PPCContext& t, std::vector<FloatRange>& floats) {
+            for (uint32_t w = 0; w < 24 * 24 / 4; w++) {
+              Put(h.base, entries - 12 * 24 + 4 * w, MixedFloat(r));
+            }
+            floats.push_back({entries - 12 * 24, 24 * 24 / 4});
+            floats.push_back({block + 0x1200, 8});
+            t.r3.u64 = r.Below(4) == 0 ? r.Below(27) : 12 + r.Below(12);
+            t.r4.u64 = entries;
+            t.r5.u64 = block + 0x1200;
+            t.r6.u64 = block + 0x1210;
+            t.r7.u64 = block + 0x1214;
+          },
+          __imp__sub_820E7010, hooks::SecondSetTireReadEntry, {{16, 8}}, {},
+          fmt::format("case {}", c));
+    }
+    results.Report();
+  }
+}
+
 // --- The point set-ups ---
 //
 // A world of two part models, each with up to 8 nodes (192 bytes, +40 a
@@ -1097,6 +1368,7 @@ void SecondSet(Context& h) {
   Finds(h, r, block);
   Objects(h, r, block);
   CarModelReleases(h, r, block);
+  Morphs(h, r, block);
   memory::Free(allocation);
 }
 

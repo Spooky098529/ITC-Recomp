@@ -10,6 +10,7 @@
 #include "native/buffers.h"
 #include "second_set/blocks.h"
 #include "second_set/finds.h"
+#include "second_set/morph.h"
 #include "second_set/objects.h"
 #include "second_set/point_groups.h"
 #include "second_set/points.h"
@@ -71,7 +72,12 @@ ITC_FLAG_BOOL(native_second_set, true, "ITC",
               "sub_820ECEB8, sub_820E6ED8 and the pool objects' base class's sub_820DB400 (without "
               "operator delete: r4 bit 0 goes to the original), the point blocks' destructors "
               "sub_820E2C10, sub_820DC258, sub_820E50C0, sub_820DDD90, sub_820ECCB8 and "
-              "sub_820E6980; with "
+              "sub_820E6980, the model's shape accessors Model::StreamData sub_82594A60, StreamSize "
+              "sub_82594A78, StreamData2 sub_82594A90 and StreamSize2 sub_82594AA8, the morph "
+              "Morph::SetUp sub_82594C18, Run sub_82594D10 and Blend sub_8258BD28 (with Blend6 "
+              "sub_8258B578 and Blend7 sub_8258B678, no adapters: only Blend calls them; kind 8 "
+              "sub_8258B7E0 and memcpys that would go to the original the original), and the "
+              "tire's sub_820E6F28 and sub_820E7010; with "
               "--native_models and --native_material_passes the point set-ups "
               "PartsPoints::Find sub_820E0258, CockpitPoints::Find sub_820DBC88, "
               "InteriorPoints::Find sub_820E3660, LightPoints::Find sub_820DC900 and "
@@ -363,6 +369,84 @@ void SecondSetSceneTrafficDestruct(PPCContext& ctx, uint8_t* base) {
   ss::SceneTrafficDestruct(base, ctx.r3.u32);
 }
 
+namespace {
+
+// The morph's plain C++ runs with the flush mode off (its scalar steps follow
+// the originals' disableFlushMode; its vector steps turn it on themselves);
+// after, the mode as the original leaves it: `was_on` put back when it's
+// left unchanged.
+bool FlushOffForMorph(PPCContext& ctx) {
+  const bool was_on = (ctx.fpscr.csr & uint32_t(decltype(ctx.fpscr)::FlushMask)) != 0;
+  ctx.fpscr.disableFlushMode();
+  return was_on;
+}
+
+void SetFlush(PPCContext& ctx, ss::Flush flush, bool was_on) {
+  if (flush == ss::Flush::kOn || (flush == ss::Flush::kUnchanged && was_on)) {
+    ctx.fpscr.enableFlushMode();
+  } else {
+    ctx.fpscr.disableFlushMode();
+  }
+}
+
+}  // namespace
+
+void SecondSetModelStreamData(PPCContext& ctx, uint8_t* base) {
+  ctx.r3.u64 = ss::ModelStreamData(base, ctx.r3.u32, ctx.r4.u32);
+}
+void SecondSetModelStreamSize(PPCContext& ctx, uint8_t* base) {
+  ctx.r3.u64 = ss::ModelStreamSize(base, ctx.r3.u32, ctx.r4.u32);
+}
+void SecondSetModelStreamData2(PPCContext& ctx, uint8_t* base) {
+  ctx.r3.u64 = ss::ModelStreamData2(base, ctx.r3.u32, ctx.r4.u32);
+}
+void SecondSetModelStreamSize2(PPCContext& ctx, uint8_t* base) {
+  ctx.r3.u64 = ss::ModelStreamSize2(base, ctx.r3.u32, ctx.r4.u32);
+}
+
+void SecondSetMorphSetUp(PPCContext& ctx, uint8_t* base) {
+  const bool was_on = FlushOffForMorph(ctx);
+  SetFlush(ctx,
+           ss::MorphSetUp(base, ctx.r3.u32, ctx.r4.u32, ctx.r5.u32, ctx.r6.u32, ctx.r7.u32,
+                          ctx.r8.u32),
+           was_on);
+}
+
+void SecondSetMorphBlend(PPCContext& ctx, uint8_t* base) {
+  const bool was_on = FlushOffForMorph(ctx);
+  const auto result = ss::MorphBlend(base, ctx.r3.u32, ctx.r1.u32);
+  if (!result) {
+    SetFlush(ctx, ss::Flush::kUnchanged, was_on);
+    __imp__sub_8258BD28(ctx, base);
+    return;
+  }
+  ctx.r3.u64 = result->r3;
+  SetFlush(ctx, result->flush, was_on);
+}
+
+void SecondSetMorphRun(PPCContext& ctx, uint8_t* base) {
+  const bool was_on = FlushOffForMorph(ctx);
+  const auto result = ss::MorphRun(base, ctx.r4.u32, ctx.r5.u32, ctx.r6.u32, ctx.r1.u32);
+  if (!result) {
+    SetFlush(ctx, ss::Flush::kUnchanged, was_on);
+    __imp__sub_82594D10(ctx, base);
+    return;
+  }
+  ctx.r3.u64 = result->r3;
+  SetFlush(ctx, result->flush, was_on);
+}
+
+void SecondSetTireFillEntries(PPCContext& ctx, uint8_t* base) {
+  ctx.fpscr.disableFlushMode();
+  ss::TireFillEntries(base, ctx.r3.u32, ctx.r4.u32, ctx.r5.u32, ctx.f1.f64, ctx.r1.u32);
+}
+
+void SecondSetTireReadEntry(PPCContext& ctx, uint8_t* base) {
+  ctx.fpscr.disableFlushMode();
+  ss::TireReadEntry(base, ctx.r3.u32, ctx.r4.u32, ctx.r5.u32, ctx.r6.u32, ctx.r7.u32,
+                    ctx.r1.u32);
+}
+
 void SecondSetScenePartsConstruct(PPCContext& ctx, uint8_t* base) {
   if (!ITC_FLAG(native_material_passes)) {
     __imp__sub_820E2F18(ctx, base);
@@ -516,6 +600,15 @@ ITC_SECOND_SET(820DBE20, SecondSetSceneCockpitReset)
 ITC_SECOND_SET(820DB6C0, SecondSetSceneCarModelRelease)
 ITC_SECOND_SET(820DA108, SecondSetSceneModelBlockConstruct)
 ITC_SECOND_SET(820D9F50, SecondSetSceneModelBlockReset)
+ITC_SECOND_SET(82594A60, SecondSetModelStreamData)
+ITC_SECOND_SET(82594A78, SecondSetModelStreamSize)
+ITC_SECOND_SET(82594A90, SecondSetModelStreamData2)
+ITC_SECOND_SET(82594AA8, SecondSetModelStreamSize2)
+ITC_SECOND_SET(82594C18, SecondSetMorphSetUp)
+ITC_SECOND_SET(8258BD28, SecondSetMorphBlend)
+ITC_SECOND_SET(82594D10, SecondSetMorphRun)
+ITC_SECOND_SET(820E6F28, SecondSetTireFillEntries)
+ITC_SECOND_SET(820E7010, SecondSetTireReadEntry)
 ITC_SECOND_SET(820DB7C8, SecondSetSceneCarModelDeletingDestruct)
 ITC_SECOND_SET(820E2F78, SecondSetScenePartsDeletingDestruct)
 ITC_SECOND_SET(820E53A0, SecondSetSceneInteriorDeletingDestruct)

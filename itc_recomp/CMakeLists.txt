@@ -155,6 +155,7 @@ set(ITC_SOURCES
     src/second_set/blocks.cpp
     src/second_set/finds.cpp
     src/second_set/objects.cpp
+    src/second_set/morph.cpp
     src/hooks/car_models.cpp
     src/car_models/load_slots.cpp
     src/car_models/car_model.cpp
@@ -646,7 +647,7 @@ set_source_files_properties(src/c_runtime/math.cpp src/ui_movies/keys.cpp
     src/texture_compression/blitter.cpp src/texture_compression/compress_surface.cpp
     src/car_models/raster.cpp src/car_models/decals.cpp src/car_models/file_loaded.cpp
     src/scene_loaders/file_loaded.cpp src/scene_loaders/model_point.cpp
-    src/second_set/finds.cpp
+    src/second_set/finds.cpp src/second_set/morph.cpp
     src/car_sounds/x3daudio.cpp
     src/car_sounds/car_sound_3d.cpp src/car_sounds/car_sound_voices.cpp
     src/car_sounds/car_sound_parts.cpp src/xact/voices.cpp src/xact/waves.cpp
