@@ -20,6 +20,7 @@
 
 #include <fmt/format.h>
 
+#include <bit>
 #include <functional>
 #include <string>
 #include <vector>
@@ -28,8 +29,9 @@ namespace harness {
 
 namespace {
 
-constexpr uint32_t kBlockBytes = 0x30000;
+constexpr uint32_t kBlockBytes = 0x48000;
 constexpr uint32_t kStackBytes = 1024;  // below the call's r1
+constexpr uint32_t kArgBytes = 256;     // above it (the parameter area)
 constexpr uint32_t kSceneGlobal = 0x826C2E44;
 
 // The block's areas.
@@ -40,6 +42,10 @@ constexpr uint32_t kSmall = 0x20000;    // records, sets, tables
 constexpr uint32_t kScene = 0x20800;    // the scene (its +4 the race flag)
 constexpr uint32_t kShapes = 0x21000;   // 8 shape areas of 0x1000
 constexpr uint32_t kModels = 0x29000;   // 8 free part models of 0x200
+constexpr uint32_t kSubs = 0x2A000;     // 4 small objects of 0x400
+constexpr uint32_t kInterior = 0x2B000; // a first-set interior (3,104 bytes)
+constexpr uint32_t kParts = 0x2C000;    // the first set's car parts (106,016 bytes)
+constexpr uint32_t kTrafficBody = 0x1400;  // a scene traffic body beside a scene model
 
 void RandomBytes(uint8_t* base, uint32_t address, uint32_t bytes, Random& r) {
   for (uint32_t i = 0; i < bytes; i += 4) {
@@ -85,19 +91,19 @@ void Case(Context& h, Results& results, uint32_t block, Random& r,
   start.r1.u64 &= ~0xFull;
   const uint32_t stack = start.r1.u32 - kStackBytes;
   RandomBytes(h.base, block, kBlockBytes, r);
-  RandomBytes(h.base, stack, kStackBytes, r);
+  RandomBytes(h.base, stack, kStackBytes + kArgBytes, r);
   for (uint32_t m = 0; m < 8; m++) {
     MakeModel(h.base, block, block + kModels + 0x200 * m, m, r);
   }
   Put(h.base, block + kScene + 4, r.Below(2));
   setup(start);
   const std::vector<uint8_t> inputs = Read(h.base, block, kBlockBytes);
-  const std::vector<uint8_t> frames = Read(h.base, stack, kStackBytes);
+  const std::vector<uint8_t> frames = Read(h.base, stack, kStackBytes + kArgBytes);
   const uint32_t saved_scene = guest::LoadU32(h.base, kSceneGlobal);
   Outputs out[2];
   for (int v = 0; v < 2; v++) {
     Write(h.base, block, inputs.data(), kBlockBytes);
-    Write(h.base, stack, frames.data(), kStackBytes);
+    Write(h.base, stack, frames.data(), kStackBytes + kArgBytes);
     Put(h.base, kSceneGlobal, block + kScene);
     PPCContext t = start;
     (v == 0 ? recompiled : native)(t, h.base);
@@ -337,6 +343,171 @@ void LightsAndTraffic(Context& h, Random& r, uint32_t block) {
   }
 }
 
+// --- The paint ---
+
+// A color as the record keeps them: hue, saturation, value, 1.0 (a hue
+// below 0 now and then).
+void PutColor(uint8_t* base, uint32_t at, Random& r) {
+  const float hue = float(int32_t(r.Below(400)) - 20);
+  const float sat = float(r.Below(101)) / 100.0f;
+  const float value = float(r.Below(101)) / 100.0f;
+  const float w = 1.0f;
+  for (uint32_t i = 0; i < 4; i++) {
+    const float f = i == 0 ? hue : i == 1 ? sat : i == 2 ? value : w;
+    guest::StoreU32(base, at + 4 * i, std::bit_cast<uint32_t>(f));
+  }
+}
+
+// `count` part models from `models` (464 bytes apart) and their slot states
+// from `states` (24 bytes apart).
+void MakeModels(uint8_t* base, uint32_t block, uint32_t models, uint32_t states, uint32_t count,
+                Random& r) {
+  for (uint32_t i = 0; i < count; i++) {
+    MakeModel(base, block, models + 464 * i, i, r);
+    Put(base, states + 24 * i, SlotState(r));
+  }
+}
+
+// A scene model's parts: the scene parts (+5060, its +104 the car parts
+// with 216 slots and the model set), the interior (+5068, its +36 the
+// interior with six slots), the cockpit (+5076 or 0: its +32 the body with
+// six slots and its car model at +24, its +28 the interior), the traffic
+// body (+5092, its +9760 the traffic car with six slots) and the wheels
+// (+5100, its +28 the wheels with their four painted models).
+void PaintWorld(uint8_t* base, uint32_t block, uint32_t model, Random& r, bool traffic) {
+  const uint32_t parts = block + kSubs, interior = block + kSubs + 0x400,
+                 cockpit = block + kSubs + 0x800, wheels = block + kSubs + 0xC00;
+  Put(base, model + 5060, parts);
+  Put(base, parts + 104, block + kParts);
+  const uint32_t set = block + kSmall + 0x400;
+  Put(base, block + kParts + 106000, set);
+  Put(base, set + 8, r.Below(3));
+  MakeModels(base, block, block + kParts + 5280, block + kParts + 116, 216, r);
+  Put(base, model + 5068, interior);
+  Put(base, interior + 36, block + kInterior);
+  MakeModels(base, block, block + kInterior + 304, block + kInterior + 180, 6, r);
+  Put(base, model + 5076, r.Below(4) == 0 ? 0 : cockpit);
+  Put(base, cockpit + 28, interior);
+  Put(base, model + 5100, wheels);
+  Put(base, wheels + 28, block + kOther);
+  if (traffic) {
+    const uint32_t body = block + kTrafficBody;
+    Put(base, model + 5092, body);
+    Put(base, body + 9760, block + kOther);
+    MakeModels(base, block, block + kOther + 4256, block + kOther + 4124, 6, r);
+  } else {
+    Put(base, cockpit + 32, block + kOther);
+    Put(base, block + kOther + 24, block + kCar);
+    MakeModels(base, block, block + kOther + 688, block + kOther + 556, 6, r);
+    for (uint32_t m : {240u, 704u, 1216u, 1680u}) {
+      // The wheels' models over the cockpit body's (the cases use one or
+      // the other; both stay valid part models).
+      MakeModel(base, block, block + kOther + m, m / 240, r);
+    }
+  }
+  for (uint32_t c = 0; c < 9; c++) {
+    PutColor(base, model + 64 + 16 * c, r);
+  }
+}
+
+void Paint(Context& h, Random& r, uint32_t block) {
+  {
+    Results results("SceneModel::ApplyPaint (sub_820D9B68)");
+    for (int c = 0; c < 16; c++) {
+      Case(h, results, block, r,
+           [&](PPCContext& t) {
+             const uint32_t model = block + kObject;
+             const bool traffic = c % 4 == 1;
+             PaintWorld(h.base, block, model, r, traffic);
+             Put(h.base, model + 5036, c % 8 == 0 ? 0 : 1);
+             Put(h.base, model + 32, traffic ? 3 : r.Below(3));
+             t.r3.u64 = model;
+           },
+           __imp__sub_820D9B68, hooks::LoadPollSceneModelApplyPaint, fmt::format("case {}", c));
+    }
+    results.Report();
+  }
+  {
+    Results results("SceneModel::ApplyWheelPaint (sub_820D9C50)");
+    for (int c = 0; c < 16; c++) {
+      Case(h, results, block, r,
+           [&](PPCContext& t) {
+             const uint32_t model = block + kObject;
+             PaintWorld(h.base, block, model, r, false);
+             Put(h.base, model + 5036, c % 8 == 0 ? 0 : 1);
+             Put(h.base, model + 32, c % 8 == 1 ? 3 : r.Below(3));
+             Put(h.base, model + 4072, c % 8 == 2 ? 0 : 1 + r.Below(3));
+             if (c % 8 == 3) {
+               Put(h.base, model + 5100, 0);
+             }
+             t.r3.u64 = model;
+           },
+           __imp__sub_820D9C50, hooks::LoadPollSceneModelApplyWheelPaint,
+           fmt::format("case {}", c));
+    }
+    results.Report();
+  }
+  // The steps under them, r4 to r10 the record's colors.
+  auto colors = [&](PPCContext& t, uint32_t model) {
+    const uint32_t at = model + 112;
+    uint64_t* regs[7] = {&t.r4.u64, &t.r5.u64, &t.r6.u64, &t.r7.u64,
+                         &t.r8.u64, &t.r9.u64, &t.r10.u64};
+    for (uint32_t i = 0; i < 7; i++) {
+      *regs[i] = (uint64_t(guest::LoadU32(h.base, at + 8 * i)) << 32) |
+                 guest::LoadU32(h.base, at + 8 * i + 4);
+    }
+    // v3's second half, v4 and v5 in the caller's parameter area.
+    for (uint32_t i = 0; i < 2; i++) {
+      Put(h.base, t.r1.u32 + 88 + 4 * i, guest::LoadU32(h.base, at + 56 + 4 * i));
+    }
+    for (uint32_t i = 0; i < 8; i++) {
+      Put(h.base, t.r1.u32 + 96 + 4 * i, guest::LoadU32(h.base, at + 64 + 4 * i));
+    }
+  };
+  struct Step {
+    const char* name;
+    GuestFunction recompiled, native;
+    uint32_t object;  // r3: 0 the scene parts, 1 the interior, 2 the cockpit, 3 the
+                      // traffic body, 4 the traffic car, 5 the scene wheels, 6 the wheels
+  };
+  const Step steps[] = {
+      {"SceneParts::ApplyPaint (sub_820E0908)", __imp__sub_820E0908,
+       hooks::LoadPollScenePartsApplyPaint, 0},
+      {"SceneInterior::ApplyPaint (sub_820E4250)", __imp__sub_820E4250,
+       hooks::LoadPollSceneInteriorApplyPaint, 1},
+      {"SceneCockpit::ApplyPaint (sub_820DC138)", __imp__sub_820DC138,
+       hooks::LoadPollSceneCockpitApplyPaint, 2},
+      {"SceneTraffic::ApplyPaint (sub_820E61D0)", __imp__sub_820E61D0,
+       hooks::LoadPollSceneTrafficApplyPaint, 3},
+      {"TrafficCar::SetPaint (sub_820D7E18)", __imp__sub_820D7E18,
+       hooks::LoadPollTrafficCarSetPaint, 4},
+      {"SceneWheels::ApplyPaint (sub_820E8A00)", __imp__sub_820E8A00,
+       hooks::LoadPollSceneWheelsApplyPaint, 5},
+      {"Wheels::ApplyPaint (sub_820D91E0)", __imp__sub_820D91E0,
+       hooks::LoadPollWheelsApplyPaint, 6},
+  };
+  for (const Step& step : steps) {
+    Results results(step.name);
+    for (int c = 0; c < 8; c++) {
+      Case(h, results, block, r,
+           [&](PPCContext& t) {
+             const uint32_t model = block + kObject;
+             const bool traffic = step.object == 3 || step.object == 4;
+             PaintWorld(h.base, block, model, r, traffic);
+             if (step.object == 2) {
+               Put(h.base, model + 5076, block + kSubs + 0x800);
+             }
+             static const uint32_t kObjects[7] = {kSubs, kSubs + 0x400, kSubs + 0x800,
+                                                  kTrafficBody, kOther, kSubs + 0xC00, kOther};
+             t.r3.u64 = block + kObjects[step.object];
+             colors(t, model);
+           },
+           step.recompiled, step.native, fmt::format("case {}", c));
+    }
+    results.Report();
+  }
+}
+
 }  // namespace
 
 void LoadPoll(Context& h) {
@@ -350,6 +521,7 @@ void LoadPoll(Context& h) {
   CarModels(h, h.random, block);
   Interiors(h, h.random, block);
   LightsAndTraffic(h, h.random, block);
+  Paint(h, h.random, block);
   memory::Free(allocation);
 }
 

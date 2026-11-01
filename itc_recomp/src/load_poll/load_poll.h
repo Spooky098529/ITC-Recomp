@@ -99,4 +99,61 @@ uint64_t SceneLightsApplyRecord(uint8_t* base, uint32_t kit, uint32_t record, ui
 // +9768); 1.
 uint64_t SceneTrafficFinish(uint8_t* base, uint32_t body, uint32_t stack, Calls& calls);
 
+// --- The paint ---
+//
+// The paint's registers: r4 to r9 (three 16-byte colors, two doublewords
+// each), passed on as they came.
+
+// SceneParts::ApplyPaint (sub_820E0908): sub_820D7388([+104], regs) (a tail
+// call).
+uint64_t ScenePartsApplyPaint(uint8_t* base, uint32_t parts, const uint64_t regs[6],
+                              uint32_t stack);
+// SceneInterior::ApplyPaint (sub_820E4250): sub_820D7840([+36], regs) (a
+// tail call).
+uint64_t SceneInteriorApplyPaint(uint8_t* base, uint32_t interior, const uint64_t regs[6],
+                                 uint32_t stack);
+// SceneCockpit::ApplyPaint (sub_820DC138): sub_820D6328([+32], regs), then
+// SceneInterior::ApplyPaint([+28], regs).
+uint64_t SceneCockpitApplyPaint(uint8_t* base, uint32_t cockpit, const uint64_t regs[6],
+                                uint32_t stack);
+// TrafficCar::SetPaint (sub_820D7E18; never seen in play): PartModel::SetPaint
+// on each of the six part models (+4256 + 464i) whose slot state (+4124 +
+// 24i) is 3. `r3` is r3 at entry (left when nothing is called).
+uint64_t TrafficCarSetPaint(uint8_t* base, uint32_t traffic, uint64_t r3, const uint64_t regs[6],
+                            uint32_t stack);
+// SceneTraffic::ApplyPaint (sub_820E61D0; never seen in play):
+// TrafficCar::SetPaint([+9760], regs) (a tail call).
+uint64_t SceneTrafficApplyPaint(uint8_t* base, uint32_t body, const uint64_t regs[6],
+                                uint32_t stack);
+// SceneModel::ApplyPaint (sub_820D9B68): when ready (+5036), the record's
+// three colors (+64, +80, +96) to SceneTraffic::ApplyPaint([+5092]) for
+// traffic (+32 = 3), else to SceneParts::ApplyPaint([+5060]),
+// SceneInterior::ApplyPaint([+5068]) and, with a cockpit (+5076),
+// CarModel::SetVinylTextures([[+5076] + 32]) and
+// SceneCockpit::ApplyPaint([+5076]). `r3` is r3 at entry (left when
+// nothing is called).
+uint64_t SceneModelApplyPaint(uint8_t* base, uint32_t model, uint64_t r3, uint32_t stack);
+
+// The wheels' paint: six 16-byte values v0 to v5, the first three and
+// v3's first half in r4 to r10 (`regs`), v3's second half, v4 and v5 in the
+// caller's frame (`stack` + 88, + 96, + 112: the parameter area as the
+// original passes them).
+//
+// Wheels::ApplyPaint (sub_820D91E0): PartModel::SetPaintBody on the tires
+// +240 with (v1, v0, v2) and +704 with (v4, v3, v5), the rims or brakes
+// +1216 with (v0, v1, v2) and +1680 with (v3, v4, v5).
+uint64_t WheelsApplyPaint(uint8_t* base, uint32_t wheels, const uint64_t regs[7], uint32_t stack);
+// SceneWheels::ApplyPaint (sub_820E8A00): v5 and v4 copied (memcpy) into its
+// frame's +112 and +96 and v3's second half to +88, then
+// Wheels::ApplyPaint([+28], the same).
+uint64_t SceneWheelsApplyPaint(uint8_t* base, uint32_t object, const uint64_t regs[7],
+                               uint32_t stack, Calls& calls);
+// SceneModel::ApplyWheelPaint (sub_820D9C50): when ready (+5036), not
+// traffic (+32 = 3), with +4072 set and wheels (+5100): the record's +112
+// to +207 as v0 to v5 (v5 and v4 copied into its frame first) to
+// SceneWheels::ApplyPaint([+5100]). `r3` is r3 at entry (left when nothing
+// is called).
+uint64_t SceneModelApplyWheelPaint(uint8_t* base, uint32_t model, uint64_t r3, uint32_t stack,
+                                   Calls& calls);
+
 }  // namespace load_poll

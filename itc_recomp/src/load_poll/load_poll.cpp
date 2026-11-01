@@ -7,6 +7,7 @@
 #include "guest.h"
 #include "material_passes/material_passes.h"
 #include "models/part_model.h"
+#include "car_models/car_model.h"
 #include "native/buffers.h"
 #include "scene_loaders/file_loaded.h"
 #include "scene_loaders/pools.h"
@@ -29,6 +30,9 @@ int32_t LoadS(uint8_t* base, uint32_t address) {
 }
 void Store(uint8_t* base, uint32_t address, uint32_t value) {
   guest::StoreU32(base, address, value);
+}
+uint64_t Load64(uint8_t* base, uint32_t address) {
+  return (uint64_t(guest::LoadU32(base, address)) << 32) | guest::LoadU32(base, address + 4);
 }
 void Store64(uint8_t* base, uint32_t address, uint64_t value) {
   guest::StoreU32(base, address, uint32_t(value >> 32));
@@ -254,6 +258,135 @@ uint64_t SceneTrafficFinish(uint8_t* base, uint32_t body, uint32_t stack, Calls&
   Store(base, body + 3728 + 1456, first);
   ss::TrafficFind(base, body + 3728, body + 9768, sp, calls.find);
   return 1;
+}
+
+// --- The paint ---
+
+uint64_t ScenePartsApplyPaint(uint8_t* base, uint32_t parts, const uint64_t regs[6],
+                              uint32_t stack) {
+  ITC_NATIVE_RUNNING("sub_820E0908 SceneParts::ApplyPaint");
+  const uint32_t first = Load(base, parts + 104);
+  return sl::PartsSetPaint(base, first, first, regs, stack);
+}
+
+uint64_t SceneInteriorApplyPaint(uint8_t* base, uint32_t interior, const uint64_t regs[6],
+                                 uint32_t stack) {
+  ITC_NATIVE_RUNNING("sub_820E4250 SceneInterior::ApplyPaint");
+  const uint32_t first = Load(base, interior + 36);
+  return sl::InteriorSetPaint(base, first, first, regs, stack);
+}
+
+uint64_t SceneCockpitApplyPaint(uint8_t* base, uint32_t cockpit, const uint64_t regs[6],
+                                uint32_t stack) {
+  ITC_NATIVE_RUNNING("sub_820DC138 SceneCockpit::ApplyPaint");
+  const uint32_t sp = Frame(base, stack, 144);
+  const uint32_t body = Load(base, cockpit + 32);
+  sl::CockpitSetPaint(base, body, body, regs, sp);
+  return SceneInteriorApplyPaint(base, Load(base, cockpit + 28), regs, sp);
+}
+
+uint64_t TrafficCarSetPaint(uint8_t* base, uint32_t traffic, uint64_t r3, const uint64_t regs[6],
+                            uint32_t stack) {
+  ITC_NATIVE_RUNNING("sub_820D7E18 TrafficCar::SetPaint");
+  const uint32_t sp = Frame(base, stack, 160);
+  for (uint32_t i = 0; i < 6; i++) {
+    if (LoadS(base, traffic + 4124 + 24 * i) == 3) {
+      r3 = mp::SetPaint(base, traffic + 4256 + 464 * i, regs, sp);
+    }
+  }
+  return r3;
+}
+
+uint64_t SceneTrafficApplyPaint(uint8_t* base, uint32_t body, const uint64_t regs[6],
+                                uint32_t stack) {
+  ITC_NATIVE_RUNNING("sub_820E61D0 SceneTraffic::ApplyPaint");
+  const uint32_t traffic = Load(base, body + 9760);
+  return TrafficCarSetPaint(base, traffic, traffic, regs, stack);
+}
+
+uint64_t SceneModelApplyPaint(uint8_t* base, uint32_t model, uint64_t r3, uint32_t stack) {
+  ITC_NATIVE_RUNNING("sub_820D9B68 SceneModel::ApplyPaint");
+  const uint32_t sp = Frame(base, stack, 96);
+  if (LoadS(base, model + 5036) == 0) {
+    return r3;
+  }
+  // The record's three colors, read again before each call.
+  auto colors = [&](uint64_t regs[6]) {
+    for (uint32_t i = 0; i < 6; i++) {
+      regs[i] = Load64(base, model + 64 + 8 * i);
+    }
+  };
+  uint64_t regs[6];
+  if (LoadS(base, model + 32) == 3) {
+    colors(regs);
+    return SceneTrafficApplyPaint(base, Load(base, model + 5092), regs, sp);
+  }
+  colors(regs);
+  r3 = ScenePartsApplyPaint(base, Load(base, model + 5060), regs, sp);
+  colors(regs);
+  r3 = SceneInteriorApplyPaint(base, Load(base, model + 5068), regs, sp);
+  const uint32_t cockpit = Load(base, model + 5076);
+  if (cockpit == 0) {
+    return r3;
+  }
+  car_models::CarModelSetVinylTextures(base, Load(base, cockpit + 32));
+  colors(regs);
+  return SceneCockpitApplyPaint(base, Load(base, model + 5076), regs, sp);
+}
+
+uint64_t WheelsApplyPaint(uint8_t* base, uint32_t wheels, const uint64_t regs[7],
+                          uint32_t stack) {
+  ITC_NATIVE_RUNNING("sub_820D91E0 Wheels::ApplyPaint");
+  const uint32_t sp = Frame(base, stack, 192);
+  const uint64_t v0[2] = {regs[0], regs[1]};
+  const uint64_t v1[2] = {regs[2], regs[3]};
+  const uint64_t v2[2] = {regs[4], regs[5]};
+  auto paint = [&](uint32_t model, const uint64_t* a, const uint64_t* b, const uint64_t* c) {
+    const uint64_t r[6] = {a[0], a[1], b[0], b[1], c[0], c[1]};
+    return mp::SetPaintBody(base, model, r, sp);
+  };
+  paint(wheels + 240, v1, v0, v2);
+  // v3 (r10 and the frame's +88), v4 (+96) and v5 (+112), read after the
+  // first call as the original does.
+  const uint64_t v5[2] = {Load64(base, stack + 112), Load64(base, stack + 120)};
+  const uint64_t v3[2] = {regs[6], Load64(base, stack + 88)};
+  const uint64_t v4[2] = {Load64(base, stack + 96), Load64(base, stack + 104)};
+  paint(wheels + 704, v4, v3, v5);
+  paint(wheels + 1216, v0, v1, v2);
+  return paint(wheels + 1680, v3, v4, v5);
+}
+
+uint64_t SceneWheelsApplyPaint(uint8_t* base, uint32_t object, const uint64_t regs[7],
+                               uint32_t stack, Calls& calls) {
+  ITC_NATIVE_RUNNING("sub_820E8A00 SceneWheels::ApplyPaint");
+  const uint32_t sp = Frame(base, stack, 208);
+  Copy(base, sp + 112, sp + 320, 16, sp, 0x820E8A3C, calls);
+  Copy(base, sp + 96, sp + 304, 16, sp, 0x820E8A4C, calls);
+  Store64(base, sp + 88, Load64(base, sp + 296));
+  return WheelsApplyPaint(base, Load(base, object + 28), regs, sp);
+}
+
+uint64_t SceneModelApplyWheelPaint(uint8_t* base, uint32_t model, uint64_t r3, uint32_t stack,
+                                   Calls& calls) {
+  ITC_NATIVE_RUNNING("sub_820D9C50 SceneModel::ApplyWheelPaint");
+  const uint32_t sp = Frame(base, stack, 160);
+  if (LoadS(base, model + 5036) == 0 || LoadS(base, model + 32) == 3 ||
+      LoadS(base, model + 4072) == 0) {
+    return r3;
+  }
+  const uint32_t wheels = Load(base, model + 5100);
+  if (wheels == 0) {
+    return r3;
+  }
+  Copy(base, sp + 112, model + 192, 16, sp, 0x820D9CA8, calls);
+  Copy(base, sp + 96, model + 176, 16, sp, 0x820D9CB8, calls);
+  const uint64_t last = Load64(base, model + 168);
+  uint64_t regs[7];
+  for (uint32_t i = 0; i < 7; i++) {
+    regs[i] = Load64(base, model + 112 + 8 * i);
+  }
+  Store64(base, sp + 88, last);
+  return SceneWheelsApplyPaint(base, wheels, regs, sp, calls);
 }
 
 }  // namespace load_poll

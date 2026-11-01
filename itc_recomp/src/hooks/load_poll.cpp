@@ -21,7 +21,13 @@ ITC_FLAG_BOOL(native_load_poll, true, "ITC",
               "(with InteriorMeters::SetGauge sub_820E32E8 and sub_820D3658, never seen in play, "
               "no adapters), SceneLights::Finish sub_820DDA60 and ApplyRecord sub_820DCBC0 "
               "(inside the wraps; with SetRecord sub_820DCB70, no adapter) and "
-              "SceneTraffic::Finish sub_820E5A68 (inside the wrap)) natively instead of through "
+              "SceneTraffic::Finish sub_820E5A68 (inside the wrap), SceneModel::ApplyPaint "
+              "sub_820D9B68 and ApplyWheelPaint sub_820D9C50 (inside the wraps; with "
+              "SceneParts::ApplyPaint sub_820E0908, SceneInterior::ApplyPaint sub_820E4250, "
+              "SceneCockpit::ApplyPaint sub_820DC138, SceneWheels::ApplyPaint sub_820E8A00 and "
+              "Wheels::ApplyPaint sub_820D91E0, and SceneTraffic::ApplyPaint sub_820E61D0 and "
+              "TrafficCar::SetPaint sub_820D7E18, never seen in play, no adapters)) natively "
+              "instead of through "
               "the translated code, with --native_second_set, --native_scene_loaders, "
               "--native_car_models, native memcpy, --native_models and --native_material_passes "
               "(else the originals; the same writes; checked by --run_harnesses=load_poll)");
@@ -163,6 +169,69 @@ void LoadPollSceneTrafficFinish(PPCContext& ctx, uint8_t* base) {
   LeaveFlush(ctx, calls);
 }
 
+namespace {
+
+void PaintRegs(const PPCContext& ctx, uint64_t regs[7]) {
+  regs[0] = ctx.r4.u64;
+  regs[1] = ctx.r5.u64;
+  regs[2] = ctx.r6.u64;
+  regs[3] = ctx.r7.u64;
+  regs[4] = ctx.r8.u64;
+  regs[5] = ctx.r9.u64;
+  regs[6] = ctx.r10.u64;
+}
+
+}  // namespace
+
+void LoadPollSceneModelApplyPaint(PPCContext& ctx, uint8_t* base) {
+  ITC_LOAD_POLL_ORIGINAL(820D9B68)
+  ctx.r3.u64 = lp::SceneModelApplyPaint(base, ctx.r3.u32, ctx.r3.u64, ctx.r1.u32);
+}
+
+void LoadPollSceneModelApplyWheelPaint(PPCContext& ctx, uint8_t* base) {
+  ITC_LOAD_POLL_ORIGINAL(820D9C50)
+  lp::Calls calls = LoadPollCalls(ctx, base);
+  ctx.r3.u64 = lp::SceneModelApplyWheelPaint(base, ctx.r3.u32, ctx.r3.u64, ctx.r1.u32, calls);
+}
+
+#define ITC_LOAD_POLL_PAINT(address, call)  \
+  ITC_LOAD_POLL_ORIGINAL(address)           \
+  uint64_t regs[7];                         \
+  PaintRegs(ctx, regs);                     \
+  ctx.r3.u64 = call;
+
+void LoadPollScenePartsApplyPaint(PPCContext& ctx, uint8_t* base) {
+  ITC_LOAD_POLL_PAINT(820E0908, lp::ScenePartsApplyPaint(base, ctx.r3.u32, regs, ctx.r1.u32))
+}
+
+void LoadPollSceneInteriorApplyPaint(PPCContext& ctx, uint8_t* base) {
+  ITC_LOAD_POLL_PAINT(820E4250, lp::SceneInteriorApplyPaint(base, ctx.r3.u32, regs, ctx.r1.u32))
+}
+
+void LoadPollSceneCockpitApplyPaint(PPCContext& ctx, uint8_t* base) {
+  ITC_LOAD_POLL_PAINT(820DC138, lp::SceneCockpitApplyPaint(base, ctx.r3.u32, regs, ctx.r1.u32))
+}
+
+void LoadPollSceneTrafficApplyPaint(PPCContext& ctx, uint8_t* base) {
+  ITC_LOAD_POLL_PAINT(820E61D0, lp::SceneTrafficApplyPaint(base, ctx.r3.u32, regs, ctx.r1.u32))
+}
+
+void LoadPollTrafficCarSetPaint(PPCContext& ctx, uint8_t* base) {
+  ITC_LOAD_POLL_PAINT(820D7E18,
+                      lp::TrafficCarSetPaint(base, ctx.r3.u32, ctx.r3.u64, regs, ctx.r1.u32))
+}
+
+void LoadPollSceneWheelsApplyPaint(PPCContext& ctx, uint8_t* base) {
+  lp::Calls calls = LoadPollCalls(ctx, base);
+  ITC_LOAD_POLL_PAINT(820E8A00,
+                      lp::SceneWheelsApplyPaint(base, ctx.r3.u32, regs, ctx.r1.u32, calls))
+}
+
+void LoadPollWheelsApplyPaint(PPCContext& ctx, uint8_t* base) {
+  ITC_LOAD_POLL_PAINT(820D91E0, lp::WheelsApplyPaint(base, ctx.r3.u32, regs, ctx.r1.u32))
+}
+
+#undef ITC_LOAD_POLL_PAINT
 #undef ITC_LOAD_POLL_ORIGINAL
 
 }  // namespace hooks
