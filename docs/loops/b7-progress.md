@@ -133,8 +133,11 @@ file's history. What's left to see in a drive, from every run:
   differing, frame dumps alike, races 38 s, 0 errors; no subagents).
   The teardown functions not seen in an attract race. Left:
   `WheelPoints::SetUp` `sub_820E8668` (5 functions, 1,368 lines, a
-  third migration); blocked by `ScenePools::ReleaseB`. Step: validation
-  agent running.
+  third migration); blocked by `ScenePools::ReleaseB`. Validated
+  (`itc_3178`, 120 s: race 54 s, 0 errors; replay `itc_3179` ok, the
+  teardown reached): 74 of 74 harness lines, 51 ran in the race, 23 in
+  the replay, none to drive. Third migration (`WheelPoints::SetUp`):
+  migration agent running.
 
 ## Done
 
