@@ -1,4 +1,4 @@
-# A conventional renderer (a plan, not started)
+# A conventional renderer (a plan; step 0 in progress)
 
 Written 2026-11-01. This is a map and a plan only. No code has changed,
 and nothing here was built, run or profiled for it. It is built from
@@ -512,6 +512,101 @@ The checks:
 
 Steps 1 and 3 are where most of the 360 machinery leaves the render
 path. Step 5 is where the resolves go.
+
+## Step 0's findings (2026-11-01, on `conventional-renderer`)
+
+The diagnostics (all off by default):
+
+- `--native_renderer_log_passes` with `--native_renderer_dump`: the
+  dumped frame's `passes.txt` beside `draws.txt` (same draw numbers):
+  - its draws grouped into passes by the targets bound, with the clears
+    (and why) and the resolves in order;
+  - per resolve: the source's draws before its next clear, and the
+    passes sampling the destination after it and before it;
+  - the targets' EDRAM ranges and what first touched each
+    (`Passes::State::DescribePasses`).
+- `--watch_register_shadow`: the device's +0 to +12440 protected outside
+  the render thread's replay. The main thread waits for each replay after
+  `Renderer::SignalTick` (`sub_82091A58`, the list's hand-over, wrapped
+  for it), so every access outside the replay faults and is noted
+  (`src/debug/render_watch.cpp`). Other guest threads running during the
+  replay aren't seen.
+- `--watch_gpu_data_reads`: the vertex, index and texture data draws used
+  (from `State::Draw` and `TextureCache::Upload`), protected in the
+  guest's three virtual views of physical memory (`0xA0000000`,
+  `0xC0000000`, `0xE0000000`). The renderer reads the physical view, so it
+  isn't seen. A write, or a file read into the data (`fread`, hooked), stops
+  watching a page until a draw uses it again. A self-test reads the first
+  page armed through each view and logs whether each read was noted.
+- `tools/resolve_watch_reads.py <build dir> <sdk lib dir> <log>` names the
+  watches' instructions (addr2line; guest addresses for `generated/`).
+
+### The passes of a race frame
+
+Attract race, a logic frame and two render-only frames (`itc_3230` and
+the runs after it; 2,430 draws in the logic frame). Each has 11 passes,
+15 targets, and 25 resolves inside the list, plus the front buffer. The
+render-only frames have the same passes and resolves. The numbers are
+`passes.txt`'s, which differ from section 2's older trace:
+
+| # | Source | Destination | Read by (this frame) | Notes |
+|---|---|---|---|---|
+| 0-2 | 8_8_8_8, pitch 560 | `1E73D000` 512x512 (format 6), three times | Pass 1 between them (the filter in place); the main view after the last | The source is drawn into again after 0 and 1: a ping-pong in one target |
+| 3 | 8_8_8_8, pitch 1040 (3 draws, not only cleared) | `1E33D000` 1024x1024 | The main view, by 436 draws | Section 2's resolve 4: its reader is the main view |
+| 4 | Depth, pitch 1040, flags `0x204` | `1E83D000` 1024x1024 (format 23) | The main view, by 436 draws | Cleared after |
+| 5 | The same depth target (0 draws since 4's clear in the logic frame, 4 in render-only frames) | `1DBFD000` 1024x1024 | The main view, by 50 draws | Section 2's resolve 6 |
+| 6 | 2_10_10_10_FLOAT, pitch 280, 4x MSAA, flags `0x300` | `1EC3D000` 256x256 (format 54) | The main view, by 102 draws | One reflection face a frame |
+| 7 | 8_8_8_8, pitch 280, 4x MSAA, flags `0x300` | `1DFFD000` 256x256 | **None in the frame** | The minimap's (section 2's 9)? The attract race may not show it |
+| 8 | 16_16, pitch 560 | `1B071000` 512x288 | The main view | The motion blur's |
+| 9 | Main view (7e3, 2x MSAA), flags `F4000000`, rect 1024x576 | `1B44E000` 1024x576 | The main view's next 266 draws | **The grab pass** |
+| 10 | The same, after 264 more draws | `1B44E000` again | The glow (pass 8) and pass 9 | |
+| 11 | 2_10_10_10_FLOAT, pitch 320, EDRAM base 936 | `1B101000` 256x144 (`1B1AE000` in another run) | Pass 8, **before** it: the last frame's | **The glow history**: the only destination in the frame read before it's written |
+| 12-19 | The same target, cleared after each | Four 256x144 textures, each twice | Pass 8 | The bloom chain's steps |
+| 20-22 | The same, no clear between | `1B206000` three times | Pass 8, then pass 9 | A ping-pong in one target |
+| 23 | Main view, flags 0 (no exponent bias), rect 1024x576 | `1B44E000` | Pass 9 | After the glow's combine |
+| 24 | Main view, rect 1024x576 | `1ECBD000` 1280x720 (format 54) | Pass 10 (the upscale) | The partial rect |
+| front | 8_8_8_8, pitch 1280 | — | The window | |
+
+**EDRAM**: every color target at EDRAM base 0 is cleared (command 26)
+before its first draw in the frame. Three targets start with a draw
+instead: the glow's (base 936, overlapping the main view's depth), and
+the frame's color and depth (pitch 1280). Each first draw neither blends
+(`RB_BLENDCONTROL` `00010001`: one and zero) nor tests depth
+(`RB_DEPTHCONTROL` `00700760`). So in this frame no pass reads what
+another target left in EDRAM, and drawing each pass into its own texture
+(step 5) keeps the same pixels. Ranges overlapping by EDRAM base only
+mean shared EDRAM, not shared data.
+
+**Section 5's cases**:
+- copies in the middle of a pass: 9 (the grab pass) and 23;
+- reused targets after their resolve: 0-2 and 20-22 (ping-pongs);
+- the partial rect: 24;
+- read before written: only the glow history (11).
+
+### Register shadow readers (attract race, `itc_3233`)
+
+Outside the replay, nothing reads or writes the register blocks, the
+float, bool and loop constants or the fetch constants. Inside +0 to
++12440, only these were seen:
+- `VideoOutput::LockDevice` and `UnlockDevice` write the device's thread
+  word (+10760), in the front end;
+- the library's worker thread (`sub_822B69A8`) reads its flag word
+  (+10808, the bit at +10810), about 3 times a second;
+- a kernel critical section in the device (+11356 to +11368) is entered
+  and left from that thread.
+
+None of these are render state, so section 3's "whether game code outside
+the replay reads the shadow" is answered no for the attract race. A drive
+through the menus is the next check.
+
+### CPU reads of GPU data (attract races, `itc_3234` to `itc_3237`)
+
+The self-test passed on all three views. Over a 148 s attract session
+(68,717 pages armed, across a race's end and the next load), no CPU code
+read or wrote vertex, index or texture data after a draw had used it. The
+only writes were 7 file reads into watched pages (the next load's data
+over memory freed from the last), which dropped 34,604 pages. A drive (the
+garage, the parking area, another course) is the next check.
 
 ## 7. Risks, and what's still unknown
 
