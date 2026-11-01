@@ -574,6 +574,176 @@ void UpdateA(Context& h, const Block& block) {
   results.Report();
 }
 
+
+// CarScene::InitLighting: the block in the scratch block, the frame below
+// the call's stack compared too (its float4s are built there; the saved
+// registers above +192 left out).
+void Lighting(Context& h, const Block& block) {
+  Results results("CarScene::InitLighting (sub_820C8528)");
+  for (int c = 0; c < 4; c++) {
+    const uint64_t seed = h.random.Next();
+    Outputs out[2];
+    for (int v = 0; v < 2; v++) {
+      Random r(seed);
+      WriteRandom(h.base, block.address, block.bytes, r);
+      PPCContext t = CallContext(h);
+      const uint32_t frame = t.r1.u32 - 288;
+      WriteRandom(h.base, frame, 288, r);
+      const uint32_t target = block.address + 0x200 + 16 * r.Below(4);
+      t.r3.u64 = target;
+      (v == 0 ? Original<__imp__sub_820C8528> : hooks::SceneInitLighting)(t, h.base);
+      out[v].Floats(h.base, target, 69);
+      out[v].Floats(h.base, frame + 4, 47);
+      out[v].Word(Load(h.base, frame));
+      out[v].Bytes(Read(h.base, block.address, 0x200));
+      out[v].Word(t.r3.u32);
+      out[v].Word(uint32_t(t.r3.u64 >> 32));
+    }
+    results.Check(out[0], out[1], fmt::format("case {}", c));
+  }
+  results.Report();
+}
+
+// A word that may hold the case's pages: compared as whether it does (its
+// pages freed then), else the word.
+void TakePagesWord(uint8_t* base, uint32_t word, Outputs& out) {
+  const uint32_t value = Load(base, word);
+  if (value != 0 && memory::IsPages(value)) {
+    out.Word(kStorageMarker);
+    memory::FreePages(value);
+    Store(base, word, kStorageMarker);
+  } else {
+    out.Word(value);
+  }
+}
+
+// SceneAssets::Release: the assets made, their slots shared, empty or
+// holding the case's pages (each its own), the TGA pixels' words the case's
+// pages; compared: which pages were freed, the pending frees, the block.
+void Releases(Context& h, const Block& block) {
+  if (!hooks::ModelsNativeLifetime() || !hooks::ModelsHostLock() || !hooks::NativeHeapActive()) {
+    return;
+  }
+  std::lock_guard<std::recursive_mutex> lock(models::MemoryBlocksMutex());
+  Results results("SceneAssets::Release (sub_820C4C80, on the game's list)");
+  const uint32_t assets = block.address + 0x100;
+  const uint32_t headers = block.address + 0x8000;
+  std::vector<uint32_t> slots = {0, 48, 72, 184, 252, 320, 388, 880, 904, 952, 1020,
+                                 4048, 4072, 4560};
+  for (uint32_t i = 0; i < 4; i++) {
+    slots.push_back(1088 + 24 * i);
+    slots.push_back(3040 + 24 * i);
+    slots.push_back(4608 + 24 * i);
+  }
+  for (uint32_t i = 0; i < 19; i++) {
+    slots.push_back(3136 + 24 * i);
+  }
+  for (int c = 0; c < 8; c++) {
+    const uint64_t seed = h.random.Next();
+    Outputs out[2];
+    for (int v = 0; v < 2; v++) {
+      Random r(seed);
+      WriteRandom(h.base, block.address, block.bytes, r);
+      PPCContext t = CallContext(h);
+      MakeAssets(t, h.base, assets);
+      if (c > 0) {
+        WriteAssetBlocks(h.base, assets, headers, r);
+      }
+      std::vector<uint32_t> pages;
+      for (const uint32_t slot : slots) {
+        const uint32_t kind = r.Below(3);
+        Store(h.base, assets + slot + 12, kind == 0 ? 1 : 0);
+        uint32_t buffer = 0;
+        if (kind == 2) {
+          buffer = memory::AllocPages(4096, 4096);
+          pages.push_back(buffer);
+        } else if (kind == 0) {
+          buffer = r.Next() | 1;
+        }
+        Store(h.base, assets + slot + 16, buffer);
+      }
+      for (uint32_t i = 0; i < 20; i++) {
+        const uint32_t pixels = memory::AllocPages(4096, 4096);
+        pages.push_back(pixels);
+        Store(h.base, assets + (i == 0 ? 948 : 3592 + 4 * (i - 1)), pixels);
+      }
+      const pending_frees::ListState was = pending_frees::SaveList(h.base);
+      t.r3.u64 = assets;
+      (v == 0 ? Original<__imp__sub_820C4C80> : hooks::SceneAssetsRelease)(t, h.base);
+      pending_frees::TakeAddedNodes(h.base, was, out[v]);
+      TakeAssetProviders(h.base, assets, out[v]);
+      for (const uint32_t p : pages) {
+        const bool freed = !memory::IsPages(p);
+        out[v].Word(freed);
+        if (!freed) {
+          memory::FreePages(p);
+        }
+      }
+      out[v].Bytes(Read(h.base, block.address, block.bytes));
+      out[v].Word(t.r3.u32);
+      out[v].Word(uint32_t(t.r3.u64 >> 32));
+    }
+    results.Check(out[0], out[1], fmt::format("case {}", c));
+  }
+  results.Report();
+}
+
+// CarScene::Create: the scene, the first set and the accessories' set none
+// before (their globals and the palette and draw words put back after each
+// side); compared: the scene's 5,536 bytes (its first set's pointer and the
+// providers' storage as markers), the first set's 140 and the accessories'
+// set's 32, the palette, the two words, r3.
+void Creates(Context& h, const Block& block) {
+  if (!hooks::ModelsNativeLifetime() || !hooks::ModelsHostLock() || !hooks::NativeHeapActive()) {
+    return;
+  }
+  std::lock_guard<std::recursive_mutex> lock(models::MemoryBlocksMutex());
+  Results results("CarScene::Create (sub_820C8A50)");
+  constexpr uint32_t kPalette = 0x826C5110, kPaletteBytes = 1024, kWords = 0x82601854;
+  for (int c = 0; c < 2; c++) {
+    Outputs out[2];
+    for (int v = 0; v < 2; v++) {
+      Globals globals(h.base);
+      const std::vector<uint8_t> palette = Read(h.base, kPalette, kPaletteBytes);
+      const std::vector<uint8_t> words = Read(h.base, kWords, 8);
+      Store(h.base, scene::kScene, 0);
+      Store(h.base, scene::kFirstSet, 0);
+      Store(h.base, accessories::kSet, 0);
+      PPCContext t = CallContext(h);
+      (v == 0 ? Original<__imp__sub_820C8A50> : hooks::SceneCreate)(t, h.base);
+      const uint32_t scene = Load(h.base, scene::kScene);
+      const uint32_t first = Load(h.base, scene::kFirstSet);
+      const uint32_t set = Load(h.base, accessories::kSet);
+      out[v].Word(memory::IsPages(scene));
+      out[v].Word(memory::IsPages(first));
+      out[v].Word(memory::IsPages(set));
+      out[v].Word(t.r3.u32 == set);
+      if (memory::IsPages(scene)) {
+        TakeAssetProviders(h.base, scene + scene::kAssets, out[v]);
+        out[v].Word(Load(h.base, scene + 5040) == first);
+        Store(h.base, scene + 5040, 0);
+        out[v].Bytes(Read(h.base, scene, scene::kSceneBytes));
+        memory::FreePages(scene);
+      }
+      if (memory::IsPages(first)) {
+        out[v].Bytes(Read(h.base, first, 140));
+        memory::FreePages(first);
+      }
+      if (memory::IsPages(set)) {
+        out[v].Bytes(Read(h.base, set, 32));
+        memory::FreePages(set);
+      }
+      out[v].Bytes(Read(h.base, kPalette, kPaletteBytes));
+      out[v].Bytes(Read(h.base, kWords, 8));
+      Write(h.base, kPalette, palette.data(), kPaletteBytes);
+      Write(h.base, kWords, words.data(), 8);
+      out[v].Word(uint32_t(t.r3.u64 >> 32));
+    }
+    results.Check(out[0], out[1], fmt::format("case {}", c));
+  }
+  results.Report();
+}
+
 }  // namespace
 
 void Scene(Context& h) {
@@ -585,6 +755,9 @@ void Scene(Context& h) {
   Lists(h, block);
   Scenes(h, block);
   UpdateA(h, block);
+  Lighting(h, block);
+  Releases(h, block);
+  Creates(h, block);
 }
 
 }  // namespace harness

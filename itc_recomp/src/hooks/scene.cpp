@@ -26,7 +26,11 @@ ITC_FLAG_BOOL(native_scene, true, "ITC",
               "and the models' lifetime SceneAssets::SceneAssets sub_820C5008, Reset "
               "sub_820C4A70 and ~SceneAssets sub_820C5168, CarScene::CarScene sub_820C89A8 and "
               "~CarScene sub_820C9110, List::DeleteAll sub_82593FF8 and ~List sub_82594188 (the "
-              "nodes' destructors guest calls)) natively instead of through the "
+              "nodes' destructors guest calls), CarScene::InitLighting sub_820C8528, with --native_heap "
+              "and the models' lifetime SceneAssets::Release sub_820C4C80 (the original "
+              "VirtualFree for a TGA pixels' word that isn't the layer's) and CarScene::Create "
+              "sub_820C8A50 (over ScenePools::MakeA's, PaintPalette::Init's and the accessories' "
+              "plain C++)) natively instead of through the "
               "translated code (the same writes; checked by --run_harnesses=scene)");
 
 namespace hooks {
@@ -194,6 +198,41 @@ void SceneUpdateA(PPCContext& ctx, uint8_t* base) {
   ctx.r3.u64 = r3 ? *r3 : r3_in;
 }
 
+void SceneInitLighting(PPCContext& ctx, uint8_t* base) {
+  ctx.fpscr.disableFlushMode();
+  ctx.r3.u64 = scene::InitLighting(base, ctx.r3.u32, ctx.r1.u32);
+}
+
+void SceneAssetsRelease(PPCContext& ctx, uint8_t* base) {
+  if (ModelsNativeLifetime()) {
+    const auto r3 = scene::AssetsRelease(base, ctx.r3.u32, [&](uint32_t at) {
+      // FreePagesIn's original, from Release's 128-byte frame.
+      const uint64_t stack = ctx.r1.u64, link = ctx.lr;
+      ctx.r1.u64 = ctx.r1.u32 - 128;
+      guest::StoreU32(base, ctx.r1.u32, uint32_t(stack));
+      ctx.r3.u64 = at;
+      ctx.lr = 0x820C4CDC;
+      __imp__sub_820D09A0(ctx, base);
+      ctx.r1.u64 = stack;
+      ctx.lr = link;
+    });
+    if (r3) {
+      ctx.r3.u64 = *r3;
+      return;
+    }
+  }
+  __imp__sub_820C4C80(ctx, base);
+}
+
+void SceneCreate(PPCContext& ctx, uint8_t* base) {
+  if (!hooks::NativeHeapActive() || !ModelsNativeLifetime() || !scene::CreateNative(base)) {
+    __imp__sub_820C8A50(ctx, base);
+    return;
+  }
+  ctx.fpscr.disableFlushMode();
+  ctx.r3.u64 = scene::Create(base, ctx.r1.u32);
+}
+
 }  // namespace hooks
 
 // The adapters: the register steps above, or the originals with the flag
@@ -217,6 +256,9 @@ ITC_SCENE(820C3DA0, SceneUpdateA)
 ITC_SCENE(820C89A8, SceneCarSceneConstruct)
 ITC_SCENE(820C4A70, SceneAssetsReset)
 ITC_SCENE(820C9110, SceneCarSceneDestruct)
+ITC_SCENE(820C8528, SceneInitLighting)
+ITC_SCENE(820C4C80, SceneAssetsRelease)
+ITC_SCENE(820C8A50, SceneCreate)
 // No adapters (their callers in play are native; the register steps above
 // are the harness's): ScenePools::StartTeardownA sub_820C3C80, DestroyA
 // sub_820C3CF8, SceneAssets::SceneAssets sub_820C5008 and ~SceneAssets

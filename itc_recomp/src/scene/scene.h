@@ -105,6 +105,37 @@ bool AssetsDestructible(uint8_t* base, uint32_t assets);
 
 // --- The scene ---
 
+// CarScene::InitLighting (sub_820C8528): r3 = the scene + 5248. Its float4s
+// (the image's constants and 12 cos calls on the doubles at 0x82002FE0,
+// 0x82002FD8, 0x82002FC8 and 0x82002FB8) built in its 288-byte frame below
+// `sp` (left as the original leaves it) and copied into +0 to +271 as
+// doublewords, then the float at 0x8200256C into +272. Returns the r3 it
+// leaves (the doubleword at the frame's +96).
+uint64_t InitLighting(uint8_t* base, uint32_t block, uint32_t sp);
+
+// SceneAssets::Release (sub_820C4C80): LoadSlot::ReleaseBuffer on the
+// slots and FreePagesIn on the TGA pixels' words (scene.md's row), in its
+// order, Model::Release(+4096), then SceneAssets::Reset. `free_pages_in(at)`
+// for a pixels' word that isn't the layer's pages (0 too: the original's
+// VirtualFree, a guest call). Returns the r3 it leaves (Reset's); nullopt,
+// with nothing done, where AssetsReleasable says no.
+std::optional<uint32_t> AssetsRelease(uint8_t* base, uint32_t assets,
+                                      const std::function<void(uint32_t at)>& free_pages_in);
+bool AssetsReleasable(uint8_t* base, uint32_t assets);
+
+// CarScene::Create (sub_820C8A50): the scene's pages (VirtualAlloc(5536),
+// the layer's) into [0x826C2E44], CarScene::CarScene on them when given;
+// the scene's +0 = 0, [0x82601854] = 167, [0x82601858] = 270,
+// ScenePools::MakeA, +5040 = [0x826C2E40], InitLighting(+5248),
+// SceneAssets::Reset(+64), +5044, +5048, +5052 = 0, PaintPalette::Init,
+// Accessories::Create, then Accessories::SetScale(the set, {x, x, x, 1.0})
+// with x the float at 0x82002FE8 built at its 128-byte frame's +80 below
+// `sp`. Returns the r3 it leaves (the accessories' set). Only where
+// CreateNative (the adapter's check, with the layer and the models'
+// lifetime).
+uint64_t Create(uint8_t* base, uint32_t sp);
+bool CreateNative(uint8_t* base);
+
 // CarScene::CarScene (sub_820C89A8): SceneSetUp::SceneSetUp (+4),
 // SceneAssets::SceneAssets (+64), List::Init on the eight lists at +4944 +
 // 12i, then the float at 0x82000A30 (1.0) into +5180 + 16i (five), +5260 +

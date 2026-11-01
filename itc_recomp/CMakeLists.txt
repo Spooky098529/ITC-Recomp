@@ -284,6 +284,7 @@ set(ITC_SOURCES
     src/accessories/accessories.cpp
     src/hooks/scene.cpp
     src/scene/scene.cpp
+    src/scene/lighting.cpp
     src/save_interface/save_interface.cpp
     src/save_interface/save_layer.cpp
     src/hooks/file_layer.cpp
@@ -632,6 +633,7 @@ set_source_files_properties(src/c_runtime/math.cpp src/ui_movies/keys.cpp
     src/race_scene/race_scene.cpp
     src/menu_sounds/menu_sounds.cpp
     src/accessories/accessories.cpp
+    src/scene/lighting.cpp
     src/texture_compression/dxt_alpha.cpp src/texture_compression/dxt_color.cpp
     src/texture_compression/dxt45.cpp src/texture_compression/codecs.cpp
     src/texture_compression/blitter.cpp src/texture_compression/compress_surface.cpp

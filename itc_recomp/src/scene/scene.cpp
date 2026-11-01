@@ -14,11 +14,16 @@
 #include "models/part_model.h"
 #include "models/texture_provider.h"
 #include "models/xpr.h"
+#include "accessories/accessories.h"
+#include "material_passes/material_passes.h"
 #include "scene_loaders/loads.h"
+#include "scene_loaders/pools.h"
 #include "scenery_lists/scenery_lists.h"
 #include "vehicle_accessors/vehicle_accessors.h"
 
 #include <cstdlib>
+#include <unordered_set>
+#include <vector>
 
 namespace scene {
 
@@ -479,6 +484,141 @@ std::optional<uint32_t> UpdateA(uint8_t* base, uint32_t sp, const DestroyCall& d
   Require(memory::IsPages(pages) && memory::FreePages(pages), "VirtualFree");
   Store(base, kFirstSet, 0);
   return 1;
+}
+
+
+// --- The release and the maker ---
+
+namespace {
+
+// SceneAssets::Release's steps in its order: a slot's buffer released, or
+// a pixels' word's pages freed.
+struct ReleaseStep {
+  bool pixels;
+  uint32_t offset;
+};
+
+std::vector<ReleaseStep> ReleaseSteps() {
+  std::vector<ReleaseStep> steps;
+  for (uint32_t at : {0u, 48u, 72u, 184u, 252u, 320u, 388u, 880u, 904u}) {
+    steps.push_back({false, at});
+  }
+  steps.push_back({true, 948});
+  for (uint32_t at : {952u, 1020u, 4048u, 4072u}) {
+    steps.push_back({false, at});
+  }
+  return steps;
+}
+
+std::vector<ReleaseStep> ReleaseStepsAfterModel() {
+  std::vector<ReleaseStep> steps{{false, 4560}};
+  for (uint32_t i = 0; i < 4; i++) {
+    steps.push_back({false, 1088 + 24 * i});
+    steps.push_back({false, 3040 + 24 * i});
+  }
+  for (uint32_t i = 0; i < 19; i++) {
+    steps.push_back({false, 3136 + 24 * i});
+    steps.push_back({true, 3592 + 4 * i});
+  }
+  for (uint32_t i = 0; i < 4; i++) {
+    steps.push_back({false, 4608 + 24 * i});
+  }
+  return steps;
+}
+
+}  // namespace
+
+bool AssetsReleasable(uint8_t* base, uint32_t assets) {
+  std::unordered_set<uint32_t> pages;
+  std::vector<ReleaseStep> all = ReleaseSteps();
+  for (const ReleaseStep& step : ReleaseStepsAfterModel()) {
+    all.push_back(step);
+  }
+  for (const ReleaseStep& step : all) {
+    uint32_t freed = 0;
+    if (step.pixels) {
+      const uint32_t word = Load(base, assets + step.offset);
+      freed = word != 0 && memory::IsPages(word) ? word : 0;
+    } else if (!car_models::LoadSlotReleasable(base, assets + step.offset, &freed)) {
+      return false;
+    }
+    if (freed != 0 && !pages.insert(freed).second) {
+      return false;
+    }
+  }
+  for (const uint32_t provider : kAssetsProviders) {
+    const uint32_t vtable = Load(base, assets + provider);
+    if (Load(base, vtable + 8) != scene_loaders::kTextureProviderClearAll) {
+      return false;
+    }
+  }
+  return Room(base, PendingNodes(base, assets) + models::ModelReleaseNodes(base, assets + 4096));
+}
+
+std::optional<uint32_t> AssetsRelease(uint8_t* base, uint32_t assets,
+                                      const std::function<void(uint32_t at)>& free_pages_in) {
+  ITC_NATIVE_RUNNING("sub_820C4C80 SceneAssets::Release");
+  if (!AssetsReleasable(base, assets)) {
+    return std::nullopt;
+  }
+  auto run = [&](const ReleaseStep& step) {
+    const uint32_t at = assets + step.offset;
+    if (!step.pixels) {
+      Require(car_models::LoadSlotReleaseBuffer(base, at).has_value(), "LoadSlot::ReleaseBuffer");
+    } else if (!FreePagesIn(base, at)) {
+      free_pages_in(at);
+    }
+  };
+  for (const ReleaseStep& step : ReleaseSteps()) {
+    run(step);
+  }
+  ReleaseModel(base, assets + 4096);
+  for (const ReleaseStep& step : ReleaseStepsAfterModel()) {
+    run(step);
+  }
+  const auto r3 = AssetsReset(base, assets);
+  Require(r3.has_value(), "SceneAssets::Reset");
+  return r3;
+}
+
+bool CreateNative(uint8_t* base) {
+  // CarScene::CarScene's storage, and the fresh assets' Reset (XPR::Release
+  // checks for two nodes each; the fresh models' blocks are 0).
+  return models::CanAllocatePointers(base, models::kTextureProviderSlots) &&
+         Room(base, 2 * std::size(kAssetsXprs) + 2 * std::size(kAssetsModels));
+}
+
+uint64_t Create(uint8_t* base, uint32_t sp) {
+  ITC_NATIVE_RUNNING("sub_820C8A50 CarScene::Create");
+  const uint32_t frame = sp - 128;
+  Store(base, frame, sp);
+  const uint32_t pages = memory::AllocPages(kSceneBytes, 4096);
+  Store(base, kScene, pages);
+  uint32_t scene = pages;
+  if (pages != 0) {
+    Require(CarSceneConstruct(base, pages), "CarScene::CarScene");
+    scene = Load(base, kScene);
+  }
+  Store(base, scene + 0, 0);
+  Store(base, 0x82601854, 167);
+  Store(base, 0x82601858, 270);
+  scene_loaders::MakeA(base);
+  Store(base, Load(base, kScene) + 5040, Load(base, kFirstSet));
+  InitLighting(base, Load(base, kScene) + 5248, frame);
+  Require(AssetsReset(base, Load(base, kScene) + kAssets).has_value(), "SceneAssets::Reset");
+  Store(base, Load(base, kScene) + 5044, 0);
+  Store(base, Load(base, kScene) + 5048, 0);
+  Store(base, Load(base, kScene) + 5052, 0);
+  material_passes::PaintPaletteInit(base, frame);
+  accessories::SetCreate(base);
+  const uint32_t x = Load(base, 0x82002FE8);
+  Store(base, frame + 80, x);
+  Store(base, frame + 84, x);
+  Store(base, frame + 88, x);
+  Store(base, frame + 92, Load(base, 0x82000A30));  // 1.0
+  const uint32_t set = Load(base, accessories::kSet);  // sub_820F0E50
+  accessories::SetScale(base, set, frame + 80);
+  return set;
 }
 
 }  // namespace scene

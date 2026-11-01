@@ -45,5 +45,12 @@ void SceneCarSceneDestruct(PPCContext& ctx, uint8_t* base);
 // Texture::Free's plain C++ where its adapter would run it, else the
 // original from UpdateA's frame.
 void SceneUpdateA(PPCContext& ctx, uint8_t* base);
+// CarScene::InitLighting sub_820C8528: r3 = the scene + 5248.
+void SceneInitLighting(PPCContext& ctx, uint8_t* base);
+// SceneAssets::Release sub_820C4C80: r3 = the assets; FreePagesIn's
+// original for a pixels' word that isn't the layer's pages.
+void SceneAssetsRelease(PPCContext& ctx, uint8_t* base);
+// CarScene::Create sub_820C8A50: over the layer with the models' lifetime.
+void SceneCreate(PPCContext& ctx, uint8_t* base);
 
 }  // namespace hooks
