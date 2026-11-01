@@ -155,9 +155,17 @@ file's history. What's left to see in a drive, from every run:
   destructor; 10 adapters removed; `second-set.md` 152 of 152 ours;
   harness 0 differing, race 38 s, 0 errors; replays `itc_3190` clean,
   `itc_3191` with one BaseHeap line; no native path frees without
-  `memory::IsPages`; no subagents). Step: validation agent running.
+  `memory::IsPages`; no subagents). Validated (`itc_3193`, 120 s: race
+  54 s, 0 errors; replay `itc_3194` ok but for 2 BaseHeap lines at the
+  race-end change, after `ModeType9::ModeType9`, before
+  `Career::NextDay`): 14 of 14 harness lines, 6 ran in the race, 8 in
+  the replay, none to drive. Done.
 
 ## Done
+
+- `ScenePools::ReleaseB` (cleanup lead): with the cockpit's and scene
+  model's releases and 10 adapters removed; `second-set.md` 152 of 152;
+  caab6e04..f0896384. Validated (`itc_3193`).
 
 - The car scene's second set (subsystem 4): `second-set.md`, 148 of
   152 in play, three migrations; `--native_second_set`;
@@ -284,5 +292,9 @@ file's history. What's left to see in a drive, from every run:
 - After the ReleaseB lead's migration (`itc_3192`: race 38 s, 0 errors,
   second_set and scene_loaders 0 differing): ours 3930, work left 2469
   (wrapped 96, known 489, unknown 1884).
+
+- After its validation (`itc_3193`, 120 s: race 54 s, 0 errors, every
+  harness 0 differing but the expected groups): ours 3930, work left
+  2469.
 
 ## Stopped

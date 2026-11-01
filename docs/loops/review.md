@@ -158,7 +158,11 @@ When the user has reviewed a run's section, its heading gets
   `frame_state_diff` wrap kept as an explicit wrap around the native
   adapter, nested native calls skipping it. Its replays: `itc_3190`
   clean, `itc_3191` one BaseHeap line at the race end; the agent found
-  no native path freeing without `memory::IsPages`.
+  no native path freeing without `memory::IsPages`. Its validation's
+  replay (`itc_3194`) logged 2 at 07:43:06.657, after the pause menu's
+  quit, `RaceStates::FadeOut`, `Progress::AfterRace` and
+  `ModeType9::ModeType9`, a 51 ms long frame and two textures loaded,
+  before `Career::NextDay`: the race-end change each time.
 
 ## Run 2026-10-31 16:54 (`b7-loop-31-10-26`, continued)
 
