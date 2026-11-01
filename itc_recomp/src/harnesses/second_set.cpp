@@ -431,6 +431,8 @@ void Objects(Context& h, Random& r, uint32_t block) {
     std::vector<Window> windows;
     uint32_t zero = kNone;  // a word set to 0 (a release's first-set object)
     bool list = false;      // r4 a list (the constructors'), past the object
+    bool node = false;      // the object on a list past it (the destructors')
+    bool flags = false;     // r4 the deleting destructors' flags (bit 0 clear)
   };
   const Object objects[] = {
       {"SceneParts::Reset (sub_820E0510)", __imp__sub_820E0510, hooks::SecondSetScenePartsReset,
@@ -494,6 +496,47 @@ void Objects(Context& h, Random& r, uint32_t block) {
        hooks::SecondSetSceneTrafficConstruct, 9808, {}, kNone, true},
       {"SceneModel::SceneModel (sub_820DB330)", __imp__sub_820DB330,
        hooks::SecondSetSceneModelConstruct, 5120, {}, kNone, true},
+      {"PartsPoints::~PartsPoints (sub_820E2C10)", __imp__sub_820E2C10,
+       hooks::SecondSetPartsPointsDestruct, 37120, {}},
+      {"CockpitPoints::~CockpitPoints (sub_820DC258)", __imp__sub_820DC258,
+       hooks::SecondSetCockpitPointsDestruct, 4128, {}},
+      {"InteriorPoints::~InteriorPoints (sub_820E50C0)", __imp__sub_820E50C0,
+       hooks::SecondSetInteriorPointsDestruct, 11520, {}},
+      {"LightPoints::~LightPoints (sub_820DDD90)", __imp__sub_820DDD90,
+       hooks::SecondSetLightPointsDestruct, 13072, {}},
+      {"WheelPoints::~WheelPoints (sub_820ECCB8)", __imp__sub_820ECCB8,
+       hooks::SecondSetWheelPointsDestruct, 16608, {}},
+      {"TrafficPoints::~TrafficPoints (sub_820E6980)", __imp__sub_820E6980,
+       hooks::SecondSetTrafficPointsDestruct, 6080, {}},
+      // The destructors without their first-set objects (the releases' cases
+      // above).
+      {"SceneCarModel::~SceneCarModel (sub_820DB720, no car model)", __imp__sub_820DB720,
+       hooks::SecondSetSceneCarModelDestruct, 3744, {}, 24, false, true},
+      {"SceneParts::~SceneParts (sub_820E2E10, no first-set object)", __imp__sub_820E2E10,
+       hooks::SecondSetScenePartsDestruct, 37296, {}, 104, false, true},
+      {"SceneInterior::~SceneInterior (sub_820E5178, no first-set object)", __imp__sub_820E5178,
+       hooks::SecondSetSceneInteriorDestruct, 11680, {}, 36, false, true},
+      {"SceneLights::~SceneLights (sub_820DDE00, no first-set object)", __imp__sub_820DDE00,
+       hooks::SecondSetSceneLightsDestruct, 13168, {}, 28, false, true},
+      {"SceneWheels::~SceneWheels (sub_820ECDD0, no first-set object)", __imp__sub_820ECDD0,
+       hooks::SecondSetSceneWheelsDestruct, 16800, {}, 28, false, true},
+      {"SceneTraffic::~SceneTraffic (sub_820E69F0)", __imp__sub_820E69F0,
+       hooks::SecondSetSceneTrafficDestruct, 9808, {}, kNone, false, true},
+      {"SceneCarModel's deleting destructor (sub_820DB7C8, no car model)", __imp__sub_820DB7C8,
+       hooks::SecondSetSceneCarModelDeletingDestruct, 3744, {}, 24, false, true, true},
+      {"SceneParts' deleting destructor (sub_820E2F78, no first-set object)", __imp__sub_820E2F78,
+       hooks::SecondSetScenePartsDeletingDestruct, 37296, {}, 104, false, true, true},
+      {"SceneInterior's deleting destructor (sub_820E53A0, no first-set object)",
+       __imp__sub_820E53A0, hooks::SecondSetSceneInteriorDeletingDestruct, 11680, {}, 36, false,
+       true, true},
+      {"SceneLights' deleting destructor (sub_820DE090, no first-set object)", __imp__sub_820DE090,
+       hooks::SecondSetSceneLightsDeletingDestruct, 13168, {}, 28, false, true, true},
+      {"SceneWheels' deleting destructor (sub_820ECEB8, no first-set object)", __imp__sub_820ECEB8,
+       hooks::SecondSetSceneWheelsDeletingDestruct, 16800, {}, 28, false, true, true},
+      {"SceneTraffic's deleting destructor (sub_820E6ED8)", __imp__sub_820E6ED8,
+       hooks::SecondSetSceneTrafficDeletingDestruct, 9808, {}, kNone, false, true, true},
+      {"PoolObject::DeletingDestructor (sub_820DB400)", __imp__sub_820DB400,
+       hooks::SecondSetPoolObjectDeletingDestruct, 5120, {}, kNone, false, true, true},
   };
   for (const Object& o : objects) {
     Results results(o.name);
@@ -516,6 +559,24 @@ void Objects(Context& h, Random& r, uint32_t block) {
               Put(h.base, list + 0x40 + 8, 0);
               Put(h.base, list + 0x40 + 12, 0);
               t.r4.u64 = list;
+            }
+            if (o.node) {
+              // Off any list, alone on one, last after a node, or between two.
+              const uint32_t object = t.r3.u32, before = list + 0x40, after = list + 0x80;
+              const uint32_t kind = r.Below(4);
+              Put(h.base, object + 4, kind == 0 ? 0 : list);
+              Put(h.base, object + 8, kind == 3 ? after : 0);
+              Put(h.base, object + 12, kind >= 2 ? before : 0);
+              Put(h.base, list + 0, kind >= 2 ? before : object);
+              Put(h.base, list + 4, kind == 3 ? after : object);
+              Put(h.base, list + 8, kind == 1 ? 1 : kind);
+              Put(h.base, before + 8, object);
+              Put(h.base, before + 12, 0);
+              Put(h.base, after + 8, 0);
+              Put(h.base, after + 12, object);
+            }
+            if (o.flags) {
+              t.r4.u64 = r.Next() & ~1ull;
             }
           },
           o.recompiled, o.native, o.windows, fmt::format("case {} ({} bytes)", c, o.bytes));

@@ -87,6 +87,36 @@ uint32_t SceneWheelsConstruct(uint8_t* base, uint32_t object, uint32_t list, uin
 uint32_t SceneTrafficConstruct(uint8_t* base, uint32_t object, uint32_t list, uint32_t stack);
 uint32_t SceneModelConstruct(uint8_t* base, uint32_t object, uint32_t list, uint32_t stack);
 
+// The destructors: the class's vtable, its release, its point block's
+// destructor, the pool objects' base vtable (0x82004F90),
+// PoolNode::~PoolNode. False where the release declines (only the vtable
+// word written, which the original writes again the same). The object is the
+// r3 they leave. ~SceneCarModel (sub_820DB720, no point block), ~SceneParts
+// (sub_820E2E10), ~SceneInterior (sub_820E5178), ~SceneLights (sub_820DDE00)
+// and ~SceneWheels (sub_820ECDD0); ~SceneTraffic (sub_820E69F0) doesn't
+// release, as the original (its +9760 object isn't handed back).
+bool SceneCarModelDestruct(uint8_t* base, uint32_t object, uint32_t stack);
+bool ScenePartsDestruct(uint8_t* base, uint32_t object, uint32_t stack);
+bool SceneInteriorDestruct(uint8_t* base, uint32_t object, uint32_t stack);
+bool SceneLightsDestruct(uint8_t* base, uint32_t object, uint32_t stack);
+bool SceneWheelsDestruct(uint8_t* base, uint32_t object, uint32_t stack);
+void SceneTrafficDestruct(uint8_t* base, uint32_t object);
+// The deleting destructors (vtable slot 0, which ScenePools::DestroyB calls
+// with r4 = 0): the destructor; operator delete when bit 0 of `flags` is
+// set, which these leave to the original (false, nothing done: never in
+// play). r3 = the object. SceneCarModel's (sub_820DB7C8), SceneParts'
+// (sub_820E2F78), SceneInterior's (sub_820E53A0), SceneLights' (sub_820DE090),
+// SceneWheels' (sub_820ECEB8), SceneTraffic's (sub_820E6ED8) and the pool
+// objects' base class's (sub_820DB400, the scene model's: the base vtable and
+// PoolNode::~PoolNode only, nothing of its own released).
+bool SceneCarModelDeletingDestruct(uint8_t* base, uint32_t object, uint32_t flags, uint32_t stack);
+bool ScenePartsDeletingDestruct(uint8_t* base, uint32_t object, uint32_t flags, uint32_t stack);
+bool SceneInteriorDeletingDestruct(uint8_t* base, uint32_t object, uint32_t flags, uint32_t stack);
+bool SceneLightsDeletingDestruct(uint8_t* base, uint32_t object, uint32_t flags, uint32_t stack);
+bool SceneWheelsDeletingDestruct(uint8_t* base, uint32_t object, uint32_t flags, uint32_t stack);
+bool SceneTrafficDeletingDestruct(uint8_t* base, uint32_t object, uint32_t flags, uint32_t stack);
+bool PoolObjectDeletingDestruct(uint8_t* base, uint32_t object, uint32_t flags, uint32_t stack);
+
 // SceneModelBlock::SceneModelBlock (sub_820DA108): 1.0 into the w's of the
 // matrix at +16, the four at +80 and the four at +336, and +668, +684. Leaf;
 // r3 left.

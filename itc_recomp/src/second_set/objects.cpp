@@ -301,6 +301,119 @@ uint32_t SceneModelConstruct(uint8_t* base, uint32_t object, uint32_t list, uint
   return object;
 }
 
+namespace {
+
+constexpr uint32_t kPoolObjectVtable = 0x82004F90;
+
+// A destructor: the vtable, `release` (false where it declines), the point
+// block's destructor, the base vtable, ~PoolNode.
+bool Destruct(uint8_t* base, uint32_t object, uint32_t vtable, uint32_t stack,
+              std::optional<uint32_t> (*release)(uint8_t*, uint32_t, uint32_t),
+              uint32_t points, uint32_t (*destruct_points)(uint32_t)) {
+  const uint32_t sp = stack - 96;
+  Store(base, object + 0, vtable);
+  if (!release(base, object, sp)) {
+    return false;
+  }
+  if (destruct_points != nullptr) {
+    destruct_points(object + points);
+  }
+  Store(base, object + 0, kPoolObjectVtable);
+  scene_loaders::PoolNodeDestruct(base, object);
+  return true;
+}
+
+// A deleting destructor: bit 0 (operator delete) left to the original.
+bool DeletingDestruct(uint8_t* base, uint32_t object, uint32_t flags, uint32_t stack,
+                      bool (*destruct)(uint8_t*, uint32_t, uint32_t)) {
+  return (flags & 1) == 0 && destruct(base, object, stack - 112);
+}
+
+}  // namespace
+
+bool SceneCarModelDestruct(uint8_t* base, uint32_t object, uint32_t stack) {
+  ITC_NATIVE_RUNNING("sub_820DB720 SceneCarModel::~SceneCarModel");
+  return Destruct(base, object, 0x82005130, stack, SceneCarModelRelease, 0, nullptr);
+}
+
+bool ScenePartsDestruct(uint8_t* base, uint32_t object, uint32_t stack) {
+  ITC_NATIVE_RUNNING("sub_820E2E10 SceneParts::~SceneParts");
+  return Destruct(base, object, 0x82006024, stack, ScenePartsRelease, 176, PartsPointsDestruct);
+}
+
+bool SceneInteriorDestruct(uint8_t* base, uint32_t object, uint32_t stack) {
+  ITC_NATIVE_RUNNING("sub_820E5178 SceneInterior::~SceneInterior");
+  return Destruct(base, object, 0x820062E4, stack, SceneInteriorRelease, 160,
+                  InteriorPointsDestruct);
+}
+
+bool SceneLightsDestruct(uint8_t* base, uint32_t object, uint32_t stack) {
+  ITC_NATIVE_RUNNING("sub_820DDE00 SceneLights::~SceneLights");
+  return Destruct(base, object, 0x820056E0, stack, SceneLightsRelease, 96, LightPointsDestruct);
+}
+
+bool SceneWheelsDestruct(uint8_t* base, uint32_t object, uint32_t stack) {
+  ITC_NATIVE_RUNNING("sub_820ECDD0 SceneWheels::~SceneWheels");
+  return Destruct(base, object, 0x82006638, stack, SceneWheelsRelease, 192, WheelPointsDestruct);
+}
+
+void SceneTrafficDestruct(uint8_t* base, uint32_t object) {
+  ITC_NATIVE_RUNNING("sub_820E69F0 SceneTraffic::~SceneTraffic");
+  Store(base, object + 0, 0x82006424);
+  TrafficPointsDestruct(object + 3728);
+  Store(base, object + 0, kPoolObjectVtable);
+  scene_loaders::PoolNodeDestruct(base, object);
+}
+
+bool SceneCarModelDeletingDestruct(uint8_t* base, uint32_t object, uint32_t flags,
+                                   uint32_t stack) {
+  ITC_NATIVE_RUNNING("sub_820DB7C8 SceneCarModel::DeletingDestructor");
+  return DeletingDestruct(base, object, flags, stack, SceneCarModelDestruct);
+}
+
+bool ScenePartsDeletingDestruct(uint8_t* base, uint32_t object, uint32_t flags, uint32_t stack) {
+  ITC_NATIVE_RUNNING("sub_820E2F78 SceneParts::DeletingDestructor");
+  return DeletingDestruct(base, object, flags, stack, ScenePartsDestruct);
+}
+
+bool SceneInteriorDeletingDestruct(uint8_t* base, uint32_t object, uint32_t flags,
+                                   uint32_t stack) {
+  ITC_NATIVE_RUNNING("sub_820E53A0 SceneInterior::DeletingDestructor");
+  return DeletingDestruct(base, object, flags, stack, SceneInteriorDestruct);
+}
+
+bool SceneLightsDeletingDestruct(uint8_t* base, uint32_t object, uint32_t flags, uint32_t stack) {
+  ITC_NATIVE_RUNNING("sub_820DE090 SceneLights::DeletingDestructor");
+  return DeletingDestruct(base, object, flags, stack, SceneLightsDestruct);
+}
+
+bool SceneWheelsDeletingDestruct(uint8_t* base, uint32_t object, uint32_t flags, uint32_t stack) {
+  ITC_NATIVE_RUNNING("sub_820ECEB8 SceneWheels::DeletingDestructor");
+  return DeletingDestruct(base, object, flags, stack, SceneWheelsDestruct);
+}
+
+bool SceneTrafficDeletingDestruct(uint8_t* base, uint32_t object, uint32_t flags,
+                                  uint32_t stack) {
+  ITC_NATIVE_RUNNING("sub_820E6ED8 SceneTraffic::DeletingDestructor");
+  (void)stack;
+  if ((flags & 1) != 0) {
+    return false;
+  }
+  SceneTrafficDestruct(base, object);
+  return true;
+}
+
+bool PoolObjectDeletingDestruct(uint8_t* base, uint32_t object, uint32_t flags, uint32_t stack) {
+  ITC_NATIVE_RUNNING("sub_820DB400 PoolObject::DeletingDestructor");
+  (void)stack;
+  if ((flags & 1) != 0) {
+    return false;
+  }
+  Store(base, object + 0, kPoolObjectVtable);
+  scene_loaders::PoolNodeDestruct(base, object);
+  return true;
+}
+
 void SceneModelBlockConstruct(uint8_t* base, uint32_t block) {
   ITC_NATIVE_RUNNING("sub_820DA108 SceneModelBlock::SceneModelBlock");
   for (const uint32_t at : {28u, 44u, 60u, 76u}) {

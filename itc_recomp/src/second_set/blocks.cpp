@@ -324,4 +324,34 @@ uint32_t WheelPointsReset(uint8_t* base, uint32_t block, uint32_t stack) {
   return r3;
 }
 
+uint32_t PartsPointsDestruct(uint32_t block) {
+  ITC_NATIVE_RUNNING("sub_820E2C10 PartsPoints::~PartsPoints");
+  return block;
+}
+
+uint32_t CockpitPointsDestruct(uint32_t block) {
+  ITC_NATIVE_RUNNING("sub_820DC258 CockpitPoints::~CockpitPoints");
+  return block;
+}
+
+uint32_t InteriorPointsDestruct(uint32_t block) {
+  ITC_NATIVE_RUNNING("sub_820E50C0 InteriorPoints::~InteriorPoints");
+  return block;
+}
+
+uint32_t LightPointsDestruct(uint32_t block) {
+  ITC_NATIVE_RUNNING("sub_820DDD90 LightPoints::~LightPoints");
+  return block + 64;
+}
+
+uint32_t WheelPointsDestruct(uint32_t block) {
+  ITC_NATIVE_RUNNING("sub_820ECCB8 WheelPoints::~WheelPoints");
+  return block + 400;
+}
+
+uint32_t TrafficPointsDestruct(uint32_t block) {
+  ITC_NATIVE_RUNNING("sub_820E6980 TrafficPoints::~TrafficPoints");
+  return block + 16;
+}
+
 }  // namespace second_set

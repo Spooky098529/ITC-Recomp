@@ -61,4 +61,17 @@ uint32_t WheelPointsConstruct(uint8_t* base, uint32_t block, uint32_t stack);
 // Returns the last reset's r3.
 uint32_t WheelPointsReset(uint8_t* base, uint32_t block, uint32_t stack);
 
+// The point blocks' destructors: the empty destructor (sub_82106540) on each
+// record, last first, so nothing is written. Return the r3 the original
+// leaves (the last record given to it: the block's first). PartsPoints
+// (sub_820E2C10), CockpitPoints (sub_820DC258), InteriorPoints
+// (sub_820E50C0), LightPoints (sub_820DDD90; +64), WheelPoints (sub_820ECCB8;
+// +400) and TrafficPoints (sub_820E6980; +16).
+uint32_t PartsPointsDestruct(uint32_t block);
+uint32_t CockpitPointsDestruct(uint32_t block);
+uint32_t InteriorPointsDestruct(uint32_t block);
+uint32_t LightPointsDestruct(uint32_t block);
+uint32_t WheelPointsDestruct(uint32_t block);
+uint32_t TrafficPointsDestruct(uint32_t block);
+
 }  // namespace second_set

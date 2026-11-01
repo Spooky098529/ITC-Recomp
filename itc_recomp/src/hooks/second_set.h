@@ -118,6 +118,28 @@ void SecondSetSceneLightsConstruct(PPCContext& ctx, uint8_t* base);
 void SecondSetSceneWheelsConstruct(PPCContext& ctx, uint8_t* base);
 void SecondSetSceneTrafficConstruct(PPCContext& ctx, uint8_t* base);
 void SecondSetSceneModelConstruct(PPCContext& ctx, uint8_t* base);
+// The destructors and deleting destructors (objects.h; r3 the object, left;
+// r4 the flags), natively where their releases are (else the original), and
+// the point blocks' destructors (blocks.h; r3 as the original leaves it).
+void SecondSetSceneCarModelDestruct(PPCContext& ctx, uint8_t* base);
+void SecondSetScenePartsDestruct(PPCContext& ctx, uint8_t* base);
+void SecondSetSceneInteriorDestruct(PPCContext& ctx, uint8_t* base);
+void SecondSetSceneLightsDestruct(PPCContext& ctx, uint8_t* base);
+void SecondSetSceneWheelsDestruct(PPCContext& ctx, uint8_t* base);
+void SecondSetSceneTrafficDestruct(PPCContext& ctx, uint8_t* base);
+void SecondSetSceneCarModelDeletingDestruct(PPCContext& ctx, uint8_t* base);
+void SecondSetScenePartsDeletingDestruct(PPCContext& ctx, uint8_t* base);
+void SecondSetSceneInteriorDeletingDestruct(PPCContext& ctx, uint8_t* base);
+void SecondSetSceneLightsDeletingDestruct(PPCContext& ctx, uint8_t* base);
+void SecondSetSceneWheelsDeletingDestruct(PPCContext& ctx, uint8_t* base);
+void SecondSetSceneTrafficDeletingDestruct(PPCContext& ctx, uint8_t* base);
+void SecondSetPoolObjectDeletingDestruct(PPCContext& ctx, uint8_t* base);
+void SecondSetPartsPointsDestruct(PPCContext& ctx, uint8_t* base);
+void SecondSetCockpitPointsDestruct(PPCContext& ctx, uint8_t* base);
+void SecondSetInteriorPointsDestruct(PPCContext& ctx, uint8_t* base);
+void SecondSetLightPointsDestruct(PPCContext& ctx, uint8_t* base);
+void SecondSetWheelPointsDestruct(PPCContext& ctx, uint8_t* base);
+void SecondSetTrafficPointsDestruct(PPCContext& ctx, uint8_t* base);
 
 
 // The point set-ups (src/second_set/finds.h): r3 = the group or block, r4 =
