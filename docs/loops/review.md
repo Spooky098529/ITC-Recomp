@@ -107,6 +107,19 @@ When the user has reviewed a run's section, its heading gets
   race's end change, as `itc_2936`, `itc_2974` and `itc_2987` did
   before this run (not `itc_3081`, `itc_3093`, `itc_3106`):
   intermittent, not debugged, worth a look.
+- `second-set.md` (new, f40c2fd7): 153 rows, the car scene's second set
+  of pools (`sub_820C8DE8`'s eight objects: `SceneCarModel`,
+  `SceneParts`, `SceneCockpit`, `SceneInterior`, `SceneLights` (pool 4,
+  the neon, LED and spot kit; `scene-models.md` had it unknown),
+  `SceneWheels`, `SceneTraffic`, `SceneModel`), their 240-byte
+  `PointRecord`s named from the image's string tables, the point
+  set-ups, the wheels' morph (`Morph::SetUp`, `Run`, `Blend`). Quirks
+  for the port: `SetUpRimA`'s second morph sized by the first stream;
+  `ResetRightDoor` scaling records whose model is 0; `SceneTraffic`'s
+  destructor not releasing; `PartsPoints::Find` reading block +37076 to
+  +37084, set nowhere in the file. `known-data.md`: "model point" now
+  "point record"; the eight layouts. Leads folded: the release, the
+  point set-ups; trimmed: the load poll, the per-frame passes.
 
 ## Run 2026-10-31 16:54 (`b7-loop-31-10-26`, continued)
 

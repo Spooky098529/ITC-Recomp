@@ -112,8 +112,13 @@ file's history. What's left to see in a drive, from every run:
 - Subsystem 4 of 5: the second set's objects' makers (`sub_820C8DE8`'s
   eight calls, `sub_820DB330`..`sub_820ECE40`, with the point record
   helpers `sub_820CEA08`, `sub_820CEB30`), from `leads.md` (under the
-  load poll and the parts' finishers the car scene waits on). Step:
-  mapping agent running.
+  load poll and the parts' finishers the car scene waits on). Map
+  checked (f40c2fd7: `second-set.md`, 153 rows, 152 in play: the eight
+  pools' objects, their point records, the point set-ups, the wheels'
+  morph; the release and point set-up leads folded in, the load poll's
+  and per-frame passes' trimmed; 23 ready groups; blocked by
+  `ScenePools::ReleaseB` `sub_820C5C88`, Wrapped; no subagents). Step:
+  migration agent running.
 
 ## Done
 
@@ -215,5 +220,8 @@ file's history. What's left to see in a drive, from every run:
 - After its validation (`itc_3142`, 120 s: race 54 s, 0 errors, every
   harness 0 differing but the expected groups): ours 3777, work left
   2622.
+
+- After the second set's map: ours 3777, work left 2622 (wrapped 97,
+  known 641, unknown 1884).
 
 ## Stopped
