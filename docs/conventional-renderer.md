@@ -1,4 +1,4 @@
-# A conventional renderer (a plan; step 0 in progress)
+# A conventional renderer (a plan; step 1 in progress)
 
 Written 2026-11-01. This is a map and a plan only. No code has changed,
 and nothing here was built, run or profiled for it. It is built from
@@ -658,6 +658,120 @@ Nothing else read vertex, index or texture data after its first draw.
 | 3 | 5,865 | 10.192 | 6.63%, 676 kcycles |
 
 Steps from 1 on compare against these (alternating runs).
+
+## Step 1's progress (2026-11-01, on `conventional-renderer`)
+
+Behind `--conventional_renderer` (off by default until the user's checks
+below). The code:
+
+- **The interface**, `src/render/device.h`: `render::State` (plain state
+  with dirty bits; the game's objects' guest addresses as handles until
+  step 4; enum values equal to the game's encodings) and
+  `render::Backend` (`DrawIndexed`, `DrawInline`, `Clear`, `Resolve`,
+  `BeginTiling`, `EndTiling`; each takes the state and clears the dirty
+  bits it reads).
+- **Our command handlers**, `src/render/commands.cpp`: every command and
+  single command decoded into the state; render and sampler states
+  dispatched by the setter's address in the image's tables (`0x826388F8`,
+  `0x82638D78`); the game's defaults applied at the first replay. They
+  keep the game's Direct3D's behavior where a frame shows it: render
+  target 0 resets the viewport and scissor (through `0x82013600` and
+  `0x82013618`); `SetViewport` clips; the blend render states set all
+  four targets, command 3 one; command 34 AddRefs the saved surfaces;
+  `[0x82970BC0]` points to the saved set; the drawer's commands 13-15 run
+  `PrimitiveDrawer::Draw` natively. Command 7 goes through
+  `BlendState_ReplayConstants` with our upload, so interpolation's
+  substitution point is unchanged. Calls into game code that isn't
+  Direct3D (`Release`, the retire list, callbacks, `AddRef`) are guest
+  calls. Not drawn, logged once if met (none seen in play): commands 16,
+  17 and 27 and some single commands.
+- **The vertex shader's fetch patch**, `src/native/vertex_fetch_patch.cpp`
+  (`sub_822AE340`'s port): a copy of the microcode patched per (shader,
+  declaration, strides), with an id the renderer keys its translation on.
+- **The translator's registers made from the state**,
+  `src/native/interface_registers.cpp`, the way the game's setters made
+  them: the texture fetch constants are the sampler's part merged with
+  the texture's, as `SetTexture` does; stream `n` is vertex fetch
+  constant `95 - n`; `SQ_PROGRAM_CNTL`, `SQ_CONTEXT_MISC` and the rest
+  come from the shader headers, as `sub_822AED18` does; bits the game's
+  device always has are set: `0x2205` bit 16 (`vtx_window_offset_enable`),
+  `0x2204` bit 19 (`dx_clip_space_def`) and `0x2302` bit 2 (the round
+  mode); the high-precision blend switches the
+  format in `RB_COLOR_INFO` (2 and 10, 3 and 12).
+- **The renderer reads the interface**, `src/native/passes.cpp`:
+  `State::Bound` gives the bound objects from the interface (else the
+  device's); `InterfaceDraw`, `InterfaceInlineDraw`, `InterfaceClear`,
+  `InterfaceResolve` and `InterfaceBeginTiling` draw from it; the front
+  buffer resolve and the movies take render target 0 from it. The
+  backend in `src/native/renderer.cpp` forwards to these with the
+  frame's command buffer.
+
+With the flag, the render queue (`src/graphics/render_queue.cpp`) calls
+only our handlers (and `ReplayStats_OnCommand` and
+`Renderer_OnCommand`): the recompiled handlers, the game's setters, the
+register shadow, the packets and the shader load aren't called on the
+render path.
+
+**The temporary check** (`--check_conventional_renderer`, with
+`--check_vertex_fetch_patch`): our handlers run beside the game's on the
+state alone, and at every old-path draw the bound objects, registers,
+fetch constants of bound textures and streams, constants and patched
+microcode are compared. An attract race: 5,830,965 draws, 40 differing,
+all in `RB_DEPTH_INFO`'s EDRAM base (the renderer takes depth from the
+depth surface's header, so harmless); the fetch patch 125,000 patches,
+205 pairs, 0 differing. Left out as artifacts of the check, not
+differences: the drawer's inline draws' `0x2204`/`0x2206` (our handler
+puts the flag back before the game's draw runs), fetch constants 93-95
+on inline draws, the device's texture and stream slots (the game's own
+clears and resolves rebind them; the renderer reads the fetch constants)
+and `RB_COLOR_MASK` but target 0's bits.
+
+**Drawn from the interface** (attract races, `itc_3252` to `itc_3258`):
+
+- every draw drawn: ~2,200 a frame, 0 unsupported, 0 failed; no unknown
+  commands or drawer vtables logged; 0 error lines.
+- Dumps with `--native_renderer_log_passes`, two runs each way:
+  `passes.txt` the same passes, clears and resolves; `draws.txt` the same
+  draws, shaders and states, but for two fields, both explained:
+  - **The color mask**: `0000FFF1` against `00000001`. The game binds
+    target 1 to target 0's surface; our register keeps slots 1-3's write
+    masks (0xF, the default), the game's only target 0's bits. The
+    renderer draws target 0 only and reads only its bits.
+  - **The 2x MSAA pass's format label** (resolved into the 256x256
+    format 54 texture): 3 against 12. The game's `HighPrecisionBlendEnable`
+    and `SetRenderTarget` write the switched format into the bound
+    surface's header (+28); ours don't (it's in our `RB_COLOR_INFO`), so
+    the target's label, read from the header, is 3. Formats 3 and 12 are
+    the same Vulkan format, the same extent (12 isn't 64bpp) and the same
+    target key: the same image.
+- Pixels: no run reproduces another's frame (the attract race's timing).
+  Two old-path runs differ by 16.1% of the shown frame's pixels and two
+  of ours by 15.5%; old run 2 against ours run 2 by 2.3%, the closest
+  pair. Every pass's destination was within the spread of the same-path
+  pairs; the frames and the reflection map look the same.
+- Interpolation: `--log_blend_state` the same as the old path's (~342 to
+  ~400 replayed camera products a draw, 0 mismatched, the same live
+  poses), and `--log_stepping_constants` the same constants, interval by
+  interval.
+- **Render thread profile** (same build, flag off and on alternating,
+  `step1-old-*` and `step1-conv-*` in `itc_recomp/out/profiles/`):
+
+  | Run | Old path, Mcycles a frame | Ours, Mcycles a frame |
+  |---|---|---|
+  | 1 | 10.226 | 9.230 |
+  | 2 | 10.586 | 9.352 |
+  | 3 | 10.603 | 9.373 |
+
+  -11% (step 0's baseline: 9.4-10.2). Ours' top symbols:
+  `InterfaceRegisters::BuildTextureFetch` 13.1% (all 26 stages rebuilt
+  on any texture change: a lead, per-stage dirty bits), `Passes::State::Draw`
+  8.6%, `Commands::Run` 6.8%, `BlendState_ReplayConstants` 6.3%.
+
+**Left in step 1**: the user's checks with the flag on (the menus and
+tiling, a drive, interpolation); then the flag on by default and the old
+path removed: `replay_hooks.cpp`'s wrappers, `draw_packets.cpp`,
+`state.cpp`'s `ReadRegisters`, the check's files and both temporary
+flags. `gpu_link.cpp` stays (Swap's fences outside the replay).
 
 ## 7. Risks, and what's still unknown
 
