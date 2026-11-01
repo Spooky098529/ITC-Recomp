@@ -41,9 +41,6 @@ bool CarDrawBlinkTimersHeld();
 void CarDrawModelDraw(PPCContext& ctx, uint8_t* base);
 // CarPart::Draw (sub_820D06F0): r3 = the point record, r4, r5, r6, r7.
 void CarDrawCarPartDraw(PPCContext& ctx, uint8_t* base);
-// Matrix::Shadow (sub_82597FE0): r3 = out, r4 = the light, r5 = the point,
-// r6 = the normal.
-void CarDrawMatrixShadow(PPCContext& ctx, uint8_t* base);
 // CarLighting::Gather (sub_820C9170): r3 = the record, r4 = the world
 // matrix, r5 = the flag.
 void CarDrawCarLightingGather(PPCContext& ctx, uint8_t* base);

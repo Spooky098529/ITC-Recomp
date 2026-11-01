@@ -206,6 +206,14 @@ void Case(Context& h, Results& results, uint32_t block, Random& r,
 
 // --- Matrix::Shadow ---
 
+// Matrix::Shadow's register steps (its adapter is gone: its only caller,
+// CarLighting::Gather, calls the plain C++): r3 = out, r4 = the light, r5 =
+// the point, r6 = the normal.
+void NativeMatrixShadow(PPCContext& ctx, uint8_t* base) {
+  ctx.fpscr.disableFlushMode();
+  car_draw::MatrixShadow(base, ctx.r3.u32, ctx.r4.u32, ctx.r5.u32, ctx.r6.u32, ctx.r1.u32);
+}
+
 void Shadows(Context& h, Random& r, uint32_t block) {
   Results results("Matrix::Shadow (sub_82597FE0)");
   const uint32_t out = block + 0x100, light = block + 0x200, point = block + 0x300,
@@ -236,7 +244,7 @@ void Shadows(Context& h, Random& r, uint32_t block) {
           t.r5.u64 = point;
           t.r6.u64 = normal;
         },
-        __imp__sub_82597FE0, hooks::CarDrawMatrixShadow, {{0x100, 16}},
+        __imp__sub_82597FE0, NativeMatrixShadow, {{0x100, 16}},
         fmt::format("case {}", c), [&](const PPCContext& t, Outputs& o) {
           o.Floats(h.base, t.r1.u32 - 16, 4);  // the normalized normal
         });

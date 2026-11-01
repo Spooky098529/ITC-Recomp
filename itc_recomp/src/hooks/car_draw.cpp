@@ -24,7 +24,7 @@ ITC_FLAG_BOOL(native_car_draw, true, "ITC",
               "Run the car draw (docs/functions/car-draw.md: Model::Draw sub_820D04E8 and "
               "CarPart::Draw sub_820D06F0 (the recorders, Model::RecordMaterials and "
               "Model::DrawShapeDepth as plain C++, the render queue's slot 4 a guest call), "
-              "Matrix::Shadow sub_82597FE0, CarLighting::Gather sub_820C9170 (with "
+              "Matrix::Shadow sub_82597FE0 (no adapter: Gather's plain C++ calls it), CarLighting::Gather sub_820C9170 (with "
               "Lights::FindNearest, Vec4::Transform and cos as plain C++), "
               "LightKit::BlinkLevel sub_820DC4B0, BlinkTimers::Advance sub_820DC958 (inside "
               "its render-only skip, --per_tick_blink_timers) and "
@@ -152,11 +152,6 @@ void CarDrawCarPartDraw(PPCContext& ctx, uint8_t* base) {
   LeaveDraw(ctx, *draw);
 }
 
-void CarDrawMatrixShadow(PPCContext& ctx, uint8_t* base) {
-  ctx.fpscr.disableFlushMode();
-  car_draw::MatrixShadow(base, ctx.r3.u32, ctx.r4.u32, ctx.r5.u32, ctx.r6.u32, ctx.r1.u32);
-}
-
 void CarDrawCarLightingGather(PPCContext& ctx, uint8_t* base) {
   if (!CarDrawLightingCalleesNative()) {
     __imp__sub_820C9170(ctx, base);
@@ -211,10 +206,10 @@ void CarDrawIsNearPlayerHeight(PPCContext& ctx, uint8_t* base) {
   }
 
 // CarPart::Draw's adapter is also what the native cockpit dials call
-// (src/hooks/cockpit_dials.cpp).
+// (src/hooks/cockpit_dials.cpp). No adapter: Matrix::Shadow sub_82597FE0
+// (2026-11-01; its only caller, CarLighting::Gather, calls the plain C++).
 ITC_CAR_DRAW(820D04E8, CarDrawModelDraw)
 ITC_CAR_DRAW(820D06F0, CarDrawCarPartDraw)
-ITC_CAR_DRAW(82597FE0, CarDrawMatrixShadow)
 ITC_CAR_DRAW(820C9170, CarDrawCarLightingGather)
 ITC_CAR_DRAW(820DC4B0, CarDrawBlinkLevel)
 #undef ITC_CAR_DRAW
