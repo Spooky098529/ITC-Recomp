@@ -8,7 +8,10 @@
 // sub_822A8958, whose adapter calls its plain C++, so it has no adapter of
 // its own; the entry's fallback runs it recompiled with the wrapper's skip.
 // PassList::PassList (sub_82590B38) likewise: only RenderQueue::RenderQueue
-// calls it.
+// calls it. PassList::Clear (sub_8258EB38) has no adapter either: its
+// callers in play (the queue's constructor, PassList::PassList and
+// RenderQueue::ClearRecording, src/hooks/render_queue.cpp) call its plain
+// C++.
 
 #include "guest.h"
 
@@ -22,7 +25,7 @@ ITC_FLAG_BOOL(native_device_shaders, true, "ITC",
               "D3DDevice_SetVertexShader sub_822A8958 with Device::SetVertexShader "
               "sub_822A8808, SetPixelShader sub_822A8618, SetVertexDeclaration sub_822A8960) "
               "and the render queue: RenderQueue::RenderQueue sub_825915E0, PassList::PassList "
-              "sub_82590B38 (both with the native heap only) and PassList::Clear sub_8258EB38 natively instead of through "
+              "sub_82590B38 (both with the native heap only; PassList::Clear sub_8258EB38 under them and RenderQueue::ClearRecording) natively instead of through "
               "the translated code (the same writes to the bound objects, the register shadow "
               "and the dirty masks; checked by --run_harnesses=device_shaders)");
 ITC_FLAG_DECLARE(bool, refcount_global_lock);
@@ -97,15 +100,6 @@ extern "C" REX_FUNC(sub_822A8960) {
     return;
   }
   dsh::SetVertexDeclaration(base, ctx.r3.u32, ctx.r4.u32);  // r3: the device, as given
-}
-
-extern "C" REX_FUNC(sub_8258EB38) {
-  REX_FUNC_PROLOGUE();
-  if (!ITC_FLAG(native_device_shaders)) {
-    __imp__sub_8258EB38(ctx, base);
-    return;
-  }
-  dsh::PassListClear(base, ctx.r3.u32);  // r3: the list, as given
 }
 
 // r3: the queue, as given (the original returns it).
