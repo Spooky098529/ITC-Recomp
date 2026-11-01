@@ -798,7 +798,8 @@ memory).
 - **Everything is written by the library's memcpy (`sub_825A7410`)**:
   - Headers: copied in whole blocks (25-315 KB) from a read buffer at
     `002B0000` by the resource loader `sub_825963F0` (`Mesh::Parse`, `functions/models.md`; call at
-    `0x82596448`), a few by `sub_8258B678` (`0x8258B6B4`) from the heap.
+    `0x82596448`). (`0x8258B6B4`, once listed here as a header copy, is
+    `Morph::Blend7`'s (`sub_8258B678`) copy of a second vertex stream.)
     The final data addresses must then be written into the headers by
     plain stores (not seen by the memcpy wrapper).
   - Data: 1-3 MB copies from read buffers (`002B5500`, `003EBFBC`) into

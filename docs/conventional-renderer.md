@@ -509,15 +509,15 @@ The checks:
 |---|---|---|---|---|
 | **0** | **Measure and log.** A render thread profile on the current code (a baseline: none since the setters, shaders and render queue went native). A pass log for one race frame and one menu frame. For each pass it records: the targets set; the draws; each resolve (rect, flags, destination); whether the source is drawn into again before the next clear; and whether each destination is sampled before it's resolved into, within the frame. Also whether game code outside the replay reads the register shadow (a watch on its blocks for a race) | Nothing; it settles the open rows of section 2 | The log; the profile | Small. **Needs the user to run it** (or the tree free of the B7 loop) |
 | **1** | **Our command handlers, feeding our interface, the game's Direct3D off the render path** (steps 1-3 merged, decision 10). The interface defined (`src/render/device.h`, no Vulkan types). Native handlers decode each command (`functions/render-commands.md`) into it: state blocks, textures, streams, shaders and declarations, constants (command 7 keeps interpolation's substitution where it is), draws, targets, viewport and scissor, clears, resolves and tiling as the renderer's own operations. The primitive drawer's draw (`PrimitiveDrawer::Draw`, under command 15) feeds it too. The Vulkan renderer reads the interface instead of the registers, and makes the translator's registers and the (vertex shader, declaration) pairs itself. Resolves are still made as copies, as now. The old path stays behind a flag until this is checked | The register shadow's writes and reads on the render path, `ReadRegisters`, the dirty masks, the PM4 packets, the kick, the shader load and patch, the recompiled handlers, `replay_hooks.cpp`, `draw_packets.cpp`, `gpu_link.cpp` | Dumps against the current renderer (`draws.txt` and pixels; differences explained); the menus and tiling by the user; `--log_blend_state`, `--log_stepping_constants`; a drive; a profile against step 0's | Large. After it, the game's Direct3D is off the render path. Its parts can land one after another behind the flag |
-| **2** | **Resources through the interface.** Textures and buffers made and filled when the game makes them (`XPR::GetTexture`, `Resource::Lock` and Unlock, `Mesh::Parse`, the loaders, the native texture writers), bound by handle. The Vulkan backend keeps fetch by address over its own arena until vertex input is per-stream | The mirrors, the fetch-constant-keyed texture lookups, most of memcpy's tracking | A check of every bound buffer and texture against guest memory over a drive (as `--native_renderer_verify_mirror` did); dumps identical; the hitch log | Medium |
-| **2b** | **GPU data out of guest memory** ("GPU data out of guest memory" in section 3). First the read watch: which resource data the CPU reads after a draw first uses it. Then each native writer whose data the CPU doesn't read hands it to `UpdateBuffer` or `UpdateTexture` into device-local memory and leaves guest memory unwritten (headers kept); data the CPU reads is written to both; memcpy's tracking stays for recompiled writers. Buffers and textures device-local; per-frame vertices through an upload ring | The mirrors (for native writers' data), most of the guest memory physical allocations for GPU data, vertex reads across PCIe | The read watch over a race and a drive (0 reads of moved data); dumps identical; a GPU-bound run (4K) and the render thread profile, before and after | Medium; risk in data the CPU reads that the watch didn't see |
+| **2** | **Textures through the interface** (buffers moved to 2b, the user's call, 2026-11-01; design in "Step 2" below). Textures created, written and destroyed through the interface where the game makes, fills and frees them (the five creation paths, the four free points, the plate, the vinyl sheet), bound by handle; still uploaded at first bind (the user's call) | The fetch-constant-keyed texture lookups, memcpy's marking of written textures, the texture lifetimes' guesses (`RetireOverwritten`, `RetireMovedResolveDestinations`, the race-end flush) | Bound textures never created logged; `--native_renderer_verify_textures` over a drive (no unannounced changes); dumps against two runs' spread; the hitch log; `--log_gpu_memory` over races (no growth) | Medium |
+| **2b** | **Buffers through the interface, and GPU data out of guest memory** ("GPU data out of guest memory" in section 3). Buffers' records first (created by `Mesh::Parse`'s relocations, `CreateVertexBuffer` and `CreateIndexBuffer`, the work memory's headers; destroyed where freed), the backend fetching by address over its own arena until vertex input is per-stream. First the read watch: which resource data the CPU reads after a draw first uses it. Then each native writer whose data the CPU doesn't read hands it to `UpdateBuffer` or `UpdateTexture` into device-local memory and leaves guest memory unwritten (headers kept); data the CPU reads is written to both; memcpy's tracking stays for recompiled writers. Buffers and textures device-local; per-frame vertices through an upload ring | The mirrors (for native writers' data), most of the guest memory physical allocations for GPU data, vertex reads across PCIe | The read watch over a race and a drive (0 reads of moved data); dumps identical; a GPU-bound run (4K) and the render thread profile, before and after | Medium; risk in data the CPU reads that the watch didn't see |
 | **3** | **Passes into their textures.** The destination scan (section 5): each pass draws into its destination; depth maps sampled as depth; the swap and the format changes gone; the glow's steps into their own textures; grab passes as `CopyTexture`; tiling as one target. MSAA keeps the game's sample counts for now (resolved at the pass's end) | The resolve copies but the grab passes, `ResolveInto`'s conversions, the resolve destinations' separate images | Dumps: each destination against the step before; differences explained (precision) | Medium. The exponent bias (section 2) is decided here |
 | **4** | **MSAA as a player option** (`itc.toml`; off, 2x, 4x, 8x): one value for every target the game drew with MSAA (decision 4; the default to pick) | The 360's fixed sample counts | Dumps at each setting; the user | Small |
 | **5** | **The frame composed natively** (`unlocked-res.md`, "Later"): first read the upscale's pixel shader and check that nothing else reads `1ECB9000`; then the 3D view drawn into the frame (or its region) and the HUD over it | The partial-rect resolve and the upscale draw | Dumps; the user at 4K | Small to medium |
 | **6** | **The Vulkan backend behind the interface**: the Vulkan code moved under `src/render/vulkan/`, the interface free of Vulkan types; the shader blobs' format defined for other backends | Nothing at runtime | Builds and dumps identical | Medium, mechanical |
 | later | **Tick replay** (`tick-replay.md`): with draws in the interface's terms, a tick's draws kept and replayed on render-only frames | The per-draw work on ~14 of 15 frames | Its own diagnostic first | Large; needs interpolation's join keyed by draw |
 
-Step 1 is where most of the 360 machinery leaves the render path. Step 3 is where the resolves go.
+Step 1 is where most of the 360 machinery leaves the render path. Step 3 is where the resolves go. The mirrors go in 2b.
 
 The steps were numbered 0, 1, 4, 4b, 5, 6, 7, 8 until step 1 was done
 (old steps 1-3 merged into it); renumbered 2026-11-01, so commit
@@ -794,6 +794,61 @@ handlers with the recompiled ones; decision 10); its other cases pass.
 `gpu_link.cpp` stays (Swap's fences outside the replay). An attract race
 after (`itc_3267`): every draw drawn, `passes.txt` the same,
 interpolation paired, pixels within the runs' spread.
+
+## Step 2 (2026-11-01, on `conventional-renderer`; design agreed)
+
+Textures only (the user's calls, 2026-11-01): buffers go to 2b with the
+mirrors, where their records are used; textures are still uploaded at
+first bind, as now (no GPU memory for textures never drawn).
+
+**Where the game makes and frees textures** (a survey of `src/`,
+2026-11-01): there is no single place.
+
+| Path | Where | Native? |
+|---|---|---|
+| `Device::CreateTexture` (`sub_822A5D08`): render targets (`cameras.cpp`'s `MakeRenderTarget`, `SceneTarget`), the video output's front buffers, `ScreenObject::Init` | `graphics/resources.cpp` | Yes (`ScreenObject::Init` recompiled, calling it) |
+| `XGSetTextureHeader` (`sub_8235A920`) and `Ex` | `graphics/resources.cpp` | Yes |
+| `Texture::Create` (`sub_820ECF08`): the vinyl sheet, the plates, the decals | `car_models/vinyl.cpp` | Yes |
+| `RenderTexture::Create` (`sub_821330D0`): the post effects' pool (the glow chain, the color filter, the motion blur) | recompiled | No |
+| XPR textures: headers relocated in place in the XPR's header block (`RelocateTexture`), data in the XPR's one physical block | `models/xpr.cpp` | Yes |
+
+Freed at `Resource::Destroy` (the refcount path, render targets),
+`Texture::Free` (through `DeferRelease`, two scene updates later),
+`XPR::Release` and `Model::Release` (freed at `PendingFrees::FreeDue`)
+and `RenderTexture::Release`. Written after creation: the plate
+(`MakePlate`, memcpy rows), the vinyl sheet (the decal rasterizer's plain
+stores, on a loader thread) and `Vinyl::Compress` (`XGCompressSurface`'s
+byte stores, then the header given new data: a destroy and a create).
+
+**The design:**
+
+- **The interface gains** `TextureCreated`, `TextureWritten` and
+  `TextureDestroyed`, by handle. The handle stays the header's guest
+  address (what the command list binds; dumps stay comparable). The
+  renderer keeps its own table from handle to image, filled only by
+  these.
+- **Callers**: the five creation paths (XPR textures at
+  `RelocateTexture`, their data already copied; `RenderTexture::Create`
+  through a thin wrapper), the four free points (where the memory is
+  freed; images still destroyed after the frames in flight), the plate's
+  and `Vinyl::Compress`'s ends, the vinyl sheet where it's drawn from.
+- **Order**: main and loader threads queue the events; the render thread
+  applies them before the next list it replays, so a list never binds a
+  texture destroyed after it was recorded.
+- **The renderer stops** looking textures up by the fetch constant's six
+  words (by handle instead), marking textures written from memcpy's
+  records, and guessing lifetimes (`RetireOverwritten`,
+  `RetireMovedResolveDestinations`, `TextureCache_RaceLeft`'s flush).
+  Resolve destinations are keyed by handle. The fetch constants are still
+  built from the header (the translated shaders read them).
+- **Checked by**: a bound texture never created is created there and
+  logged once with its header (a path missed); `--native_renderer_verify_textures`
+  over a drive (guest data changed with no `TextureWritten`: a writer
+  missed); dumps against two runs' spread; the hitch log (texture time
+  per 5 s, long frames); `--log_gpu_memory` over races (no growth without
+  the race-end flush).
+- **Interpolation** doesn't touch textures; the glow history's resolve is
+  unchanged.
 
 ## 7. Risks, and what's still unknown
 
