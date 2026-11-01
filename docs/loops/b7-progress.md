@@ -13,8 +13,10 @@ file's history. What's left to see in a drive, from every run:
 - Subsystem 1 of 3: the boot mode (`boot-mode.md`; from the top of
   `leads.md`, the modes' constructors beside the string table, which
   were already ours in `game-modes.md`). Map checked (49161912: 24
-  rows, 0 errors, 10 ready groups, 1 lead added). Step: migration
-  (agent running).
+  rows, 0 errors, 10 ready groups, 1 lead added). Migration checked
+  (49f60a69, `--native_boot_mode`: 12 of 12 in play with 7 movie
+  callees in `movies.md`; `itc_3218`: race 38 s, 0 errors, boot_mode
+  0 differing; no subagents). Step: validation (agent running).
 
 ## Done
 
@@ -40,3 +42,6 @@ file's history. What's left to see in a drive, from every run:
   before the run.
 - After the boot mode's map: ours 3962, work left 2441 (wrapped 82,
   known 498, unknown 1861).
+- After its migration (`itc_3218`: race 38 s, 0 errors, boot_mode 0
+  differing): ours 3981, work left 2424 (wrapped 80, known 483,
+  unknown 1861).

@@ -24,6 +24,16 @@ When the user has reviewed a run's section, its heading gets
   mode, `0x826C5BA4`, `0x826C5BA8`, `0x826C5BAC`, `0x826C7960`.
   `leads.md`: the front-end screens' constructors over
   `ScreenMachine::ScreenMachine`.
+- `boot-mode.md` migration (49f60a69, `--native_boot_mode`): 12 rows
+  in `boot-mode.md`, 7 in `movies.md` (the movie class's state calls,
+  Native from the start; `sub_820A4408`, `sub_820A4420` not seen in
+  play, covered by the harness only). For review: the `--skip_intro`
+  wraps in `title_screen.cpp` kept around the native bodies, and
+  `Movies::State` `sub_820A4450`'s adapter kept though `--removable`
+  lists it (the wrap the fallback still needs); the XMP drops'
+  adapters (`sub_825894C8`, `sub_825895A0`) kept, their native callers
+  leaving the calls out but clearing the last error as the drops do
+  (as `Presence::SetForMode`).
 
 ## Run 2026-10-31 23:57 (`b7-loop-31-10-26-2`)
 
