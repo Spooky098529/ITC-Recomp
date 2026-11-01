@@ -15,7 +15,8 @@ namespace hooks {
 
 // Whether the plain C++'s callees run natively: --native_second_set,
 // --native_scene_loaders, --native_car_models and the point set-ups' checks
-// (native memcpy, --native_models, --native_material_passes).
+// (native memcpy, --native_models, --native_material_passes) and the wheels'
+// (native memcpy, --native_heap, --native_material_passes).
 bool LoadPollCalleesNative();
 // The guest calls the plain C++ makes where a callee's plain C++ declines.
 load_poll::Calls LoadPollCalls(PPCContext& ctx, uint8_t* base);
@@ -61,5 +62,13 @@ void LoadPollSceneTrafficApplyPaint(PPCContext& ctx, uint8_t* base);
 void LoadPollTrafficCarSetPaint(PPCContext& ctx, uint8_t* base);
 void LoadPollSceneWheelsApplyPaint(PPCContext& ctx, uint8_t* base);
 void LoadPollWheelsApplyPaint(PPCContext& ctx, uint8_t* base);
+// SceneInterior::Finish sub_820E4140 and SceneWheels::SetUpPoints
+// sub_820E8908 (r3 the object; the wraps'), SceneParts::SetSelectedTexture
+// sub_820DF250 (no adapter: only Build calls it) and Build sub_820E05E0 (r3
+// the parts object).
+void LoadPollSceneInteriorFinish(PPCContext& ctx, uint8_t* base);
+void LoadPollSceneWheelsSetUpPoints(PPCContext& ctx, uint8_t* base);
+void LoadPollScenePartsSetSelectedTexture(PPCContext& ctx, uint8_t* base);
+void LoadPollScenePartsBuild(PPCContext& ctx, uint8_t* base);
 
 }  // namespace hooks

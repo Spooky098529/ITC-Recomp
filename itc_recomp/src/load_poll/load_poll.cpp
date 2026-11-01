@@ -11,6 +11,7 @@
 #include "native/buffers.h"
 #include "scene_loaders/file_loaded.h"
 #include "scene_loaders/pools.h"
+#include "second_set/blocks.h"
 
 namespace load_poll {
 
@@ -52,6 +53,16 @@ void Copy(uint8_t* base, uint32_t to, uint32_t from, uint32_t bytes, uint32_t sp
           Calls& calls) {
   if (!native::Buffers_Memcpy(base, to, from, bytes, lr)) {
     calls.memcpy(to, from, bytes, sp, lr);
+  }
+}
+
+// The flush mode after a point set-up: its last float step's.
+void AfterFind(Calls& calls) {
+  calls.flush = calls.find.flush ? ss::Flush::kOn : ss::Flush::kOff;
+}
+void AfterWheels(Calls& calls) {
+  if (calls.wheel.flush != ss::Flush::kUnchanged) {
+    calls.flush = calls.wheel.flush;
   }
 }
 
@@ -199,10 +210,10 @@ uint64_t SceneLightsFinish(uint8_t* base, uint32_t kit, uint32_t stack, Calls& c
   Store(base, kit + 13156, 1);
   Store(base, kit + 13152, model);
   mp::SetTexture(base, model, texture, -1, sp);
-  calls.find.flush = false;
   const uint32_t scene = Load(base, kit + 13160);
   Store(base, Load(base, kit + 13152) + 48, scene + 364);
   ss::LightsFind(base, kit + 96, Load(base, kit + 13152), sp, calls.find);
+  AfterFind(calls);
   return 1;
 }
 
@@ -257,6 +268,7 @@ uint64_t SceneTrafficFinish(uint8_t* base, uint32_t body, uint32_t stack, Calls&
   Store(base, body + 3728 + 1460, second);
   Store(base, body + 3728 + 1456, first);
   ss::TrafficFind(base, body + 3728, body + 9768, sp, calls.find);
+  AfterFind(calls);
   return 1;
 }
 
@@ -387,6 +399,131 @@ uint64_t SceneModelApplyWheelPaint(uint8_t* base, uint32_t model, uint64_t r3, u
   }
   Store64(base, sp + 88, last);
   return SceneWheelsApplyPaint(base, wheels, regs, sp, calls);
+}
+
+// --- The finishers' builds ---
+
+uint64_t SceneInteriorFinish(uint8_t* base, uint32_t interior, uint32_t stack, Calls& calls) {
+  ITC_NATIVE_RUNNING("sub_820E4140 SceneInterior::Finish");
+  const uint32_t sp = Frame(base, stack, 128);
+  if (LoadS(base, interior + 11660) != 0) {
+    return 1;
+  }
+  const uint64_t loaded = sl::InteriorIsLoaded(base, Load(base, interior + 36));
+  if (int32_t(loaded) == 0) {
+    return loaded;
+  }
+  for (uint32_t i = 0; i < 6; i++) {
+    const uint32_t model = Load(base, interior + 36) + 464 * i + 304;
+    Store(base, interior + 11632 + 4 * i, model);
+    if (int32_t(model) == 0) {
+      continue;
+    }
+    Store(base, model + 48, Load(base, interior + 32));
+    if (LoadS(base, interior + 11656) != 0) {
+      const uint32_t at = Load(base, interior + 11632 + 4 * i);
+      Store(base, at + 452, Load(base, interior + 11664));
+    } else {
+      const uint64_t texture =
+          sl::CarModelSelectedTexture(base, Load(base, Load(base, interior + 24) + 24));
+      Store(base, Load(base, interior + 11632 + 4 * i) + 452, uint32_t(texture));
+    }
+  }
+  const uint32_t points = interior + 160;
+  const uint32_t block = Load(base, Load(base, Load(base, interior + 24) + 24) + 32);
+  InteriorDialsSetBlock(base, points + 240, block);
+  Store(base, points + 3156, block);
+  const uint32_t provider = Load(base, interior + 32);
+  const uint32_t scene_model = Load(base, interior + 24);
+  Store(base, interior + 8636, provider);
+  const uint32_t car = Load(base, scene_model + 24);
+  Store(base, interior + 11604, interior + 40);
+  Store(base, interior + 11600, car + 7168);
+  Store(base, interior + 11608, Load(base, scene_model + 24) + 3760);
+  ss::InteriorFind(base, points, interior + 11632, sp, calls.find);
+  AfterFind(calls);
+  SceneInteriorSetGauges(base, interior, interior, sp);
+  Store(base, interior + 11660, 1);
+  return loaded;
+}
+
+uint64_t SceneWheelsSetUpPoints(uint8_t* base, uint32_t object, uint64_t r3, uint32_t stack,
+                                Calls& calls) {
+  ITC_NATIVE_RUNNING("sub_820E8908 SceneWheels::SetUpPoints");
+  const uint32_t sp = Frame(base, stack, 112);
+  if (LoadS(base, object + 16772) != 0) {
+    return r3;
+  }
+  const uint32_t car = Load(base, object + 24);
+  if (car != 0) {
+    Store(base, object + 192, car);
+  } else {
+    const uint32_t record = Load(base, object + 16776);
+    const uint32_t tires = Load(base, object + 16780);
+    Store(base, object + 196, record);
+    Store(base, object + 200, tires);
+  }
+  const uint32_t wheels = Load(base, object + 28);
+  Store(base, object + 204, object + 32);
+  Store(base, object + 208, wheels + 240);
+  Store(base, object + 212, wheels + 1216);
+  Store(base, object + 216, wheels + 2336);
+  ss::WheelPointsSetUp(base, object + 192, sp, calls.wheel);
+  AfterWheels(calls);
+  WheelsSetRecord(base, Load(base, object + 28), object + 32, sp, calls);
+  const uint64_t left = WheelsSetCaliperTexture(base, Load(base, object + 28), sp);
+  Store(base, object + 16772, 1);
+  return left;
+}
+
+uint64_t ScenePartsSetSelectedTexture(uint8_t* base, uint32_t parts, uint64_t r3,
+                                      uint32_t stack) {
+  ITC_NATIVE_RUNNING("sub_820DF250 SceneParts::SetSelectedTexture");
+  Frame(base, stack, 112);
+  for (uint32_t k = 0; k < 17; k++) {
+    if (Load(base, parts + 32 + 4 * k) == 0) {
+      continue;
+    }
+    r3 = sl::CarModelSelectedTexture(base, Load(base, Load(base, parts + 24) + 24));
+    Store(base, Load(base, parts + 32 + 4 * k) + 452, uint32_t(r3));
+  }
+  return r3;
+}
+
+uint64_t ScenePartsBuild(uint8_t* base, uint32_t parts, uint32_t stack, Calls& calls) {
+  ITC_NATIVE_RUNNING("sub_820E05E0 SceneParts::Build");
+  const uint32_t sp = Frame(base, stack, 112);
+  // Each kind's record words (r5, r6): an offset into the parts object, or
+  // 0 for the constant 0.
+  struct Words {
+    uint32_t a, b;
+  };
+  static constexpr Words kWords[17] = {
+      {108, 0},   {112, 108}, {116, 0},   {120, 0}, {124, 0},   {128, 0},
+      {132, 0},   {132, 0},   {136, 132}, {136, 132}, {140, 0}, {144, 0},
+      {148, 0},   {0, 0},     {152, 0},   {156, 0}, {0, 0}};
+  for (uint32_t k = 0; k < 17; k++) {
+    const uint32_t a = kWords[k].a == 0 ? 0 : Load(base, parts + kWords[k].a);
+    const uint32_t b = kWords[k].b == 0 ? 0 : Load(base, parts + kWords[k].b);
+    if (k == 4 && int32_t(a) == 13) {
+      Store(base, parts + 48, 0);
+      continue;
+    }
+    const uint32_t model = sl::PartsPart(base, Load(base, parts + 104), int32_t(k), a, b);
+    Store(base, parts + 32 + 4 * k, model);
+  }
+  const uint32_t points = parts + 176;
+  ss::PartsPointsReset(base, points, sp);
+  const uint32_t scene_model = Load(base, parts + 24);
+  Store(base, parts + 37260, scene_model);
+  const uint32_t car = Load(base, scene_model + 24);
+  Store(base, parts + 37256, parts + 108);
+  Store(base, parts + 37252, car + 32);
+  Store(base, parts + 37268, Load(base, scene_model + 24) + 3760);
+  ss::PartsFind(base, points, parts + 32, sp, calls.find);
+  AfterFind(calls);
+  sl::PartsWalkMaterials(base, Load(base, parts + 104));
+  return ScenePartsSetSelectedTexture(base, parts, parts, sp);
 }
 
 }  // namespace load_poll

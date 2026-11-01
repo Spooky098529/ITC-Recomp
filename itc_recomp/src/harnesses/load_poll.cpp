@@ -3,8 +3,9 @@
 // and the stack below the call's r1 with random bytes, writes the objects'
 // pointers (the part models with no nodes, so the point set-ups find
 // nothing, and zero to two shapes of up to two materials each, so the
-// material passes walk real materials), points the scene ([0x826C2E44]) at
-// the block for the case (put back after), runs the original and the
+// material passes walk real materials), points the scene ([0x826C2E44]) and
+// the accessories' set ([0x826C5510]) at the block for the case (put back
+// after), runs the original and the
 // register step (hooks/load_poll.h) from the same inputs, and compares the
 // block and r3. The callees run as their adapters run them on both sides
 // (their own harnesses check them). The functions here copy words without
@@ -33,6 +34,7 @@ constexpr uint32_t kBlockBytes = 0x48000;
 constexpr uint32_t kStackBytes = 1024;  // below the call's r1
 constexpr uint32_t kArgBytes = 256;     // above it (the parameter area)
 constexpr uint32_t kSceneGlobal = 0x826C2E44;
+constexpr uint32_t kAccessoriesGlobal = 0x826C5510;  // the accessories' set
 
 // The block's areas.
 constexpr uint32_t kObject = 0x0;       // the object (the car parts' 106,016 bytes)
@@ -96,18 +98,31 @@ void Case(Context& h, Results& results, uint32_t block, Random& r,
     MakeModel(h.base, block, block + kModels + 0x200 * m, m, r);
   }
   Put(h.base, block + kScene + 4, r.Below(2));
+  // The accessories' set (Interior::IsLoaded): no entries, or one loaded or
+  // loading.
+  const uint32_t accessories = block + kSmall + 0x780;
+  for (uint32_t i = 0; i < 3; i++) {
+    Put(h.base, accessories + 4 + 4 * i, 0);
+  }
+  if (r.Below(3) == 0) {
+    Put(h.base, accessories + 4, block + kSmall + 0x7C0 - 1096);
+    Put(h.base, block + kSmall + 0x7C0, r.Below(2));
+  }
   setup(start);
   const std::vector<uint8_t> inputs = Read(h.base, block, kBlockBytes);
   const std::vector<uint8_t> frames = Read(h.base, stack, kStackBytes + kArgBytes);
   const uint32_t saved_scene = guest::LoadU32(h.base, kSceneGlobal);
+  const uint32_t saved_accessories = guest::LoadU32(h.base, kAccessoriesGlobal);
   Outputs out[2];
   for (int v = 0; v < 2; v++) {
     Write(h.base, block, inputs.data(), kBlockBytes);
     Write(h.base, stack, frames.data(), kStackBytes + kArgBytes);
     Put(h.base, kSceneGlobal, block + kScene);
+    Put(h.base, kAccessoriesGlobal, accessories);
     PPCContext t = start;
     (v == 0 ? recompiled : native)(t, h.base);
     Put(h.base, kSceneGlobal, saved_scene);
+    Put(h.base, kAccessoriesGlobal, saved_accessories);
     out[v].Bytes(Read(h.base, block, kBlockBytes));
     out[v].Word(t.r3.u32);
     out[v].Word(uint32_t(t.r3.u64 >> 32));
@@ -508,6 +523,157 @@ void Paint(Context& h, Random& r, uint32_t block) {
   }
 }
 
+// --- The finishers' builds ---
+
+// A small float (eighths from -4 to 4).
+uint32_t SmallFloat(Random& r) {
+  return std::bit_cast<uint32_t>(float(int32_t(r.Below(65)) - 32) / 8.0f);
+}
+
+// The first-set car model (kCar): its car record's +0 (+32: a block below
+// 40, an index into the image's tables), its selected texture (+3712, the
+// words at +7232; -1 gives none) from its XPR (+4000: +16 the records, +20
+// the count) and its matrix (+6976).
+void MakeCar(uint8_t* base, uint32_t block, Random& r) {
+  const uint32_t car = block + kCar;
+  Put(base, car + 32, r.Below(3) == 0 ? 5 : r.Below(40));
+  Put(base, car + 3712, r.Below(6));
+  for (uint32_t i = 0; i < 6; i++) {
+    Put(base, car + 7232 + 4 * i, r.Below(3) == 0 ? 0xFFFFFFFFu : r.Below(6));
+  }
+  Put(base, car + 4000 + 16, block + kSmall + 0x600);
+  Put(base, car + 4000 + 20, 4);
+  for (uint32_t w = 0; w < 16; w++) {
+    Put(base, car + 6976 + 4 * w, SmallFloat(r));
+  }
+}
+
+void Builds(Context& h, Random& r, uint32_t block) {
+  // The interior as SetGauges' cases build it, its first-set interior
+  // (+36: six slots, the model set at [+3092] + 8), its finished flag
+  // (+11660), the cockpit's flag and texture (+11656, +11664).
+  {
+    Results results("SceneInterior::Finish (sub_820E4140)");
+    for (int c = 0; c < 16; c++) {
+      Case(h, results, block, r,
+           [&](PPCContext& t) {
+             const uint32_t object = block + kObject;
+             // The interior lambda's world (the car at kCar, the gauges).
+             const uint32_t scene_model = block + kSmall;
+             Put(h.base, object + 24, scene_model);
+             Put(h.base, scene_model + 24, block + kCar);
+             MakeCar(h.base, block, r);
+             for (uint32_t i = 0; i < 7; i++) {
+               Put(h.base, object + 48 + 12 * i, 0);
+             }
+             Put(h.base, object + 11660, c % 6 == 0 ? 1 : 0);
+             Put(h.base, object + 36, block + kInterior);
+             const uint32_t set = block + kSmall + 0x400;
+             Put(h.base, block + kInterior + 3092, set);
+             Put(h.base, set + 8, r.Below(3));
+             MakeModels(h.base, block, block + kInterior + 304, block + kInterior + 180, 6, r);
+             Put(h.base, object + 11656, r.Below(2));
+             t.r3.u64 = object;
+           },
+           __imp__sub_820E4140, hooks::LoadPollSceneInteriorFinish, fmt::format("case {}", c));
+    }
+    results.Report();
+  }
+  // The wheels object: +24 the car model (second set, its +24 the first
+  // set's) or 0 (then +16776 a traffic car record and +16780 the tire
+  // positions), +28 the first set's wheels (the models at +240, +1216,
+  // +2336 and the rears 464 after), +32 the wheels record (+8 set: the
+  // morph left out; see the second_set harness for it), +16772 done.
+  {
+    Results results("SceneWheels::SetUpPoints (sub_820E8908)");
+    for (int c = 0; c < 16; c++) {
+      Case(h, results, block, r,
+           [&](PPCContext& t) {
+             const uint32_t object = block + kObject;
+             const uint32_t scene_car = block + kSmall + 0x200;
+             MakeCar(h.base, block, r);
+             const bool traffic = c % 4 == 1;
+             Put(h.base, object + 24, traffic ? 0 : scene_car);
+             Put(h.base, object + 192, 0);  // the point block's car model, as reset
+             Put(h.base, scene_car + 24, block + kCar);
+             const uint32_t record = block + kSmall + 0x700;
+             Put(h.base, record, r.Below(4));
+             Put(h.base, object + 16776, record);
+             Put(h.base, object + 16780, block + kCar + 6976);
+             Put(h.base, object + 16772, c % 7 == 0 ? 1 : 0);
+             const uint32_t wheels = block + kOther;
+             Put(h.base, object + 28, wheels);
+             for (uint32_t m : {240u, 704u, 1216u, 1680u, 2336u, 2800u}) {
+               MakeModel(h.base, block, wheels + m, m / 464, r);
+             }
+             const uint32_t w = object + 32;
+             Put(h.base, w + 0, traffic ? 3 : r.Below(7));
+             Put(h.base, w + 8, 1 + r.Below(3));
+             for (const uint32_t at : {44u, 56u}) {
+               Put(h.base, w + at, 0xFFFFFFFFu);
+             }
+             Put(h.base, w + 68, r.Below(8));
+             Put(h.base, w + 72, r.Below(3));
+             Put(h.base, w + 76, r.Below(3));
+             Put(h.base, w + 108, 9 + r.Below(12));
+             Put(h.base, w + 112, 9 + r.Below(12));
+             if (traffic) {
+               Put(h.base, block + kCar + 32, r.Below(4));
+             }
+             t.r3.u64 = object;
+           },
+           __imp__sub_820E8908, hooks::LoadPollSceneWheelsSetUpPoints,
+           fmt::format("case {}", c));
+    }
+    results.Report();
+  }
+  // The parts object: +104 the first set's car parts (216 slots, the model
+  // set), the record's words at +108 to +156 (small slot numbers; +124 13
+  // now and then), +24 the car model (second set; its +24 the first set's).
+  auto parts = [&](PPCContext& t) {
+    const uint32_t object = block + kObject;
+    const uint32_t scene_car = block + kSmall + 0x200;
+    MakeCar(h.base, block, r);
+    Put(h.base, object + 24, scene_car);
+    Put(h.base, scene_car + 24, block + kCar);
+    Put(h.base, object + 104, block + kParts);
+    const uint32_t set = block + kSmall + 0x400;
+    Put(h.base, block + kParts + 106000, set);
+    Put(h.base, set + 8, r.Below(4) == 0 ? 2 : r.Below(2));
+    MakeModels(h.base, block, block + kParts + 5280, block + kParts + 116, 216, r);
+    for (uint32_t at = 108; at <= 156; at += 4) {
+      Put(h.base, object + at, r.Below(3));
+    }
+    if (r.Below(3) == 0) {
+      Put(h.base, object + 124, 13);
+    }
+    t.r3.u64 = object;
+  };
+  {
+    Results results("SceneParts::Build (sub_820E05E0)");
+    for (int c = 0; c < 12; c++) {
+      Case(h, results, block, r, parts, __imp__sub_820E05E0, hooks::LoadPollScenePartsBuild,
+           fmt::format("case {}", c));
+    }
+    results.Report();
+  }
+  {
+    Results results("SceneParts::SetSelectedTexture (sub_820DF250)");
+    for (int c = 0; c < 8; c++) {
+      Case(h, results, block, r,
+           [&](PPCContext& t) {
+             parts(t);
+             for (uint32_t k = 0; k < 17; k++) {
+               Put(h.base, block + kObject + 32 + 4 * k, ModelWord(h.base, block, r, true));
+             }
+           },
+           __imp__sub_820DF250, hooks::LoadPollScenePartsSetSelectedTexture,
+           fmt::format("case {}", c));
+    }
+    results.Report();
+  }
+}
+
 }  // namespace
 
 void LoadPoll(Context& h) {
@@ -522,6 +688,7 @@ void LoadPoll(Context& h) {
   Interiors(h, h.random, block);
   LightsAndTraffic(h, h.random, block);
   Paint(h, h.random, block);
+  Builds(h, h.random, block);
   memory::Free(allocation);
 }
 

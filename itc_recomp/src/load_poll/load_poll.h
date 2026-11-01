@@ -16,6 +16,7 @@
 #include <functional>
 
 #include "second_set/finds.h"
+#include "second_set/wheels.h"
 
 namespace load_poll {
 
@@ -25,6 +26,11 @@ struct Calls {
   // The point set-ups' (Skeleton::UpdateMatrices' original; the flush mode
   // their last float step left, which the adapters leave).
   second_set::FindCalls find;
+  // The wheels' point set-up's (WheelPoints::SetUp).
+  second_set::WheelCalls wheel;
+  // Out: the flush mode as the last float step left it (a point set-up's;
+  // unchanged when none ran).
+  second_set::Flush flush = second_set::Flush::kUnchanged;
   // memcpy's original (sub_825A7410) from the frame at `sp` with `lr`, where
   // native::Buffers_Memcpy declines.
   std::function<void(uint32_t to, uint32_t from, uint32_t bytes, uint32_t sp, uint32_t lr)>
@@ -155,5 +161,36 @@ uint64_t SceneWheelsApplyPaint(uint8_t* base, uint32_t object, const uint64_t re
 // is called).
 uint64_t SceneModelApplyWheelPaint(uint8_t* base, uint32_t model, uint64_t r3, uint32_t stack,
                                    Calls& calls);
+
+// --- The finishers' builds ---
+
+// SceneInterior::Finish (sub_820E4140): 1 when +11660 is set. Else
+// Interior::IsLoaded([+36]), returned as is; when it's nonzero: the six
+// part models +11632 + 4i = [+36] + 304 + 464i, each (when not 0) with +48 =
+// +32 and +452 = +11664 under a cockpit (+11656), else
+// CarModel::SelectedTexture([[+24] + 24]); InteriorDials::SetBlock(+400,
+// the car's block [[[+24] + 24] + 32]); +3316 = the block, +8636 = +32,
+// +11604 = +40, +11600 = [[+24] + 24] + 7168, +11608 = [[+24] + 24] + 3760;
+// InteriorPoints::Find(+160, +11632), SceneInterior::SetGauges, +11660 = 1.
+uint64_t SceneInteriorFinish(uint8_t* base, uint32_t interior, uint32_t stack, Calls& calls);
+// SceneWheels::SetUpPoints (sub_820E8908): nothing when +16772 is set. Else
+// the point block (+192): +0 = +24 when set, else +4 = +16776 and +8 =
+// +16780; +12 = the object + 32, +16, +20, +24 = [+28] + 240, + 1216, +
+// 2336; WheelPoints::SetUp(+192), Wheels::SetRecord([+28], +32),
+// Wheels::SetCaliperTexture([+28]), +16772 = 1. `r3` is r3 at entry (left
+// when nothing is done).
+uint64_t SceneWheelsSetUpPoints(uint8_t* base, uint32_t object, uint64_t r3, uint32_t stack,
+                                Calls& calls);
+// SceneParts::SetSelectedTexture (sub_820DF250): each of the 17 part models
+// present (+32 + 4k) gets +452 = CarModel::SelectedTexture([[+24] + 24]).
+// `r3` is r3 at entry (left when none is present).
+uint64_t ScenePartsSetSelectedTexture(uint8_t* base, uint32_t parts, uint64_t r3, uint32_t stack);
+// SceneParts::Build (sub_820E05E0): +32 + 4k = CarParts::Part([+104], k, a,
+// b) for the 17 kinds (the record's words at +108 to +156, see the row;
+// kind 4's +124 at 13 gives 0 without the call); PartsPoints::Reset(+176);
+// +37260 = +24, +37256 = +108, +37252 = [[+24] + 24] + 32, +37268 = [[+24] +
+// 24] + 3760; PartsPoints::Find(+176, +32), CarParts::WalkMaterials([+104])
+// and SetSelectedTexture.
+uint64_t ScenePartsBuild(uint8_t* base, uint32_t parts, uint32_t stack, Calls& calls);
 
 }  // namespace load_poll
