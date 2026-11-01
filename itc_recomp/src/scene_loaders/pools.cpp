@@ -313,27 +313,49 @@ uint64_t PartsSetPaint(uint8_t* base, uint32_t parts, uint64_t r3, const uint64_
   return r3;
 }
 
-uint64_t CockpitApplyPalette(uint8_t* base, uint32_t cockpit, uint64_t r3, uint32_t sp) {
-  ITC_NATIVE_RUNNING("sub_820D5FC8 Cockpit::ApplyPalette");
-  for (uint32_t i = 0; i < kCockpitParts; i++) {
-    if (LoadS(base, cockpit + kCockpitStates + kSlotBytes * i) == kSlotArrived) {
-      r3 = material_passes::ApplyPalette(base, cockpit + kCockpitModels + kPartModelBytes * i,
-                                         sp - 112);
+namespace {
+
+// ApplyPalette (regs null) or SetPaint on each of the six part models from
+// `models_at` whose state (from `states`, 24 bytes apart) is 3.
+uint64_t PaintSix(uint8_t* base, uint32_t states, uint32_t models_at, uint64_t r3,
+                  const uint64_t* regs, uint32_t sp) {
+  for (uint32_t i = 0; i < 6; i++) {
+    if (LoadS(base, states + kSlotBytes * i) == kSlotArrived) {
+      const uint32_t model = models_at + kPartModelBytes * i;
+      r3 = regs == nullptr ? material_passes::ApplyPalette(base, model, sp - 112)
+                           : material_passes::SetPaint(base, model, regs, sp - 160);
     }
   }
   return r3;
 }
 
+}  // namespace
+
+uint64_t CockpitApplyPalette(uint8_t* base, uint32_t cockpit, uint64_t r3, uint32_t sp) {
+  ITC_NATIVE_RUNNING("sub_820D5FC8 Cockpit::ApplyPalette");
+  return PaintSix(base, cockpit + kCockpitStates, cockpit + kCockpitModels, r3, nullptr, sp);
+}
+
 uint64_t CockpitSetPaint(uint8_t* base, uint32_t cockpit, uint64_t r3, const uint64_t regs[6],
                          uint32_t sp) {
   ITC_NATIVE_RUNNING("sub_820D6328 Cockpit::SetPaint");
-  for (uint32_t i = 0; i < kCockpitParts; i++) {
-    if (LoadS(base, cockpit + kCockpitStates + kSlotBytes * i) == kSlotArrived) {
-      r3 = material_passes::SetPaint(base, cockpit + kCockpitModels + kPartModelBytes * i, regs,
-                                     sp - 160);
-    }
-  }
-  return r3;
+  return PaintSix(base, cockpit + kCockpitStates, cockpit + kCockpitModels, r3, regs, sp);
+}
+
+uint64_t InteriorApplyPalette(uint8_t* base, uint32_t interior, uint64_t r3, uint32_t sp) {
+  ITC_NATIVE_RUNNING("sub_820D7690 Interior::ApplyPalette");
+  return PaintSix(base, interior + 180, interior + 304, r3, nullptr, sp);
+}
+
+uint64_t InteriorSetPaint(uint8_t* base, uint32_t interior, uint64_t r3, const uint64_t regs[6],
+                          uint32_t sp) {
+  ITC_NATIVE_RUNNING("sub_820D7840 Interior::SetPaint");
+  return PaintSix(base, interior + 180, interior + 304, r3, regs, sp);
+}
+
+uint64_t TrafficApplyPalette(uint8_t* base, uint32_t traffic, uint64_t r3, uint32_t sp) {
+  ITC_NATIVE_RUNNING("sub_820D7BF8 TrafficCar::ApplyPalette");
+  return PaintSix(base, traffic + 4124, traffic + 4256, r3, nullptr, sp);
 }
 
 uint64_t CarModelSelectedTexture(uint8_t* base, uint32_t car_model) {

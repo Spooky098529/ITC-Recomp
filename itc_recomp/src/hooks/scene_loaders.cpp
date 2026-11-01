@@ -6,6 +6,7 @@
 
 #include "base/flags.h"
 #include "base/log.h"
+#include "hooks/accessories.h"
 #include "hooks/guest_call.h"
 #include "hooks/heap.h"
 #include "hooks/models.h"
@@ -15,6 +16,8 @@
 
 ITC_FLAG_DECLARE(bool, native_material_passes);
 ITC_FLAG_DECLARE(bool, native_models);
+ITC_FLAG_DECLARE(bool, native_accessories);
+ITC_FLAG_DECLARE(bool, native_car_models);
 
 ITC_FLAG_BOOL(native_scene_loaders, true, "ITC",
               "Run the scene's loading objects (docs/functions/scene-loaders.md: with "
@@ -23,7 +26,8 @@ ITC_FLAG_BOOL(native_scene_loaders, true, "ITC",
               "Pool4Object::IsLoaded sub_820D6A08 and SetRecord sub_820D6A60, CarParts::Part "
               "sub_820D6E10 (with SlotOf sub_820D6D48, no adapter), IsLoaded sub_820D7258 and "
               "WalkMaterials sub_820D6EB8 (with sub_820D2270, no adapter), with --native_material_passes "
-              "the paint walks sub_820D6F20, sub_820D7388, sub_820D5FC8 and sub_820D6328 (over "
+              "the paint walks sub_820D6F20, sub_820D7388, sub_820D5FC8, sub_820D6328, sub_820D7690, "
+              "sub_820D7840 and sub_820D7BF8 (over "
               "PartModel::ApplyPalette's and SetPaint's plain C++), with --native_models "
               "CarModel::SelectedTexture sub_820D4588 (over XPR::GetTexture's), Interior::IsLoaded "
               "sub_820D7790 (with Accessories::AllLoaded sub_820F07D8, no adapter); NameMatches "
@@ -48,7 +52,9 @@ ITC_FLAG_BOOL(native_scene_loaders, true, "ITC",
               "and its deleting destructor sub_820D89B8, ScenePools::CreateA sub_820C3FD8 (the "
               "constructors' originals called where their plain C++ declines), "
               "Interior::OnPartLoaded sub_820D7578 (Model::Load's original where its plain C++ "
-              "declines)) natively instead of through the "
+              "declines); with those and the accessories' release native Interior::Release "
+              "sub_820D75F8, ~Interior sub_820D76D8, its deleting destructor sub_820D7960 and "
+              "ScenePools::ReleaseA sub_820C4488 (pool 0 with --native_car_models)) natively instead of through the "
               "translated code (the same writes; checked by --run_harnesses=scene_loaders); "
               "the ones only these native callers reach (the members' constructors, resets and "
               "destructors, the destructors under the deleting ones) have no adapters");
@@ -169,6 +175,81 @@ void SceneLoadersCockpitSetPaint(PPCContext& ctx, uint8_t* base) {
             [&](uint32_t object, uint64_t r3, const uint64_t* regs, uint32_t sp) {
               return sl::CockpitSetPaint(base, object, r3, regs, sp);
             });
+}
+
+void SceneLoadersInteriorApplyPalette(PPCContext& ctx, uint8_t* base) {
+  PaintWalk(ctx, base, __imp__sub_820D7690,
+            [&](uint32_t object, uint64_t r3, const uint64_t*, uint32_t sp) {
+              return sl::InteriorApplyPalette(base, object, r3, sp);
+            });
+}
+
+void SceneLoadersInteriorSetPaint(PPCContext& ctx, uint8_t* base) {
+  PaintWalk(ctx, base, __imp__sub_820D7840,
+            [&](uint32_t object, uint64_t r3, const uint64_t* regs, uint32_t sp) {
+              return sl::InteriorSetPaint(base, object, r3, regs, sp);
+            });
+}
+
+void SceneLoadersTrafficApplyPalette(PPCContext& ctx, uint8_t* base) {
+  PaintWalk(ctx, base, __imp__sub_820D7BF8,
+            [&](uint32_t object, uint64_t r3, const uint64_t*, uint32_t sp) {
+              return sl::TrafficApplyPalette(base, object, r3, sp);
+            });
+}
+
+namespace {
+
+// The interior's release's callees native: the models' lifetime and the
+// accessories' release.
+bool InteriorNative() {
+  return hooks::ModelsNativeLifetime() && ITC_FLAG(native_accessories) &&
+         hooks::AccessoriesNativeLoads();
+}
+
+}  // namespace
+
+void SceneLoadersInteriorRelease(PPCContext& ctx, uint8_t* base) {
+  if (InteriorNative()) {
+    ctx.fpscr.disableFlushMode();
+    if (const auto r3 = sl::InteriorRelease(base, ctx.r3.u32)) {
+      ctx.r3.u64 = *r3;
+      return;
+    }
+  }
+  __imp__sub_820D75F8(ctx, base);
+}
+
+void SceneLoadersInteriorDestruct(PPCContext& ctx, uint8_t* base) {
+  if (InteriorNative()) {
+    ctx.fpscr.disableFlushMode();
+    if (sl::InteriorDestruct(base, ctx.r3.u32)) {
+      return;
+    }
+  }
+  __imp__sub_820D76D8(ctx, base);
+}
+
+void SceneLoadersInteriorDeletingDestruct(PPCContext& ctx, uint8_t* base) {
+  if (InteriorNative()) {
+    ctx.fpscr.disableFlushMode();
+    if (sl::InteriorDeletingDestruct(base, ctx.r3.u32, ctx.r4.u32)) {
+      return;
+    }
+  }
+  __imp__sub_820D7960(ctx, base);
+}
+
+void SceneLoadersReleaseA(PPCContext& ctx, uint8_t* base) {
+  const uint32_t pool = ctx.r4.u32;
+  if (InteriorNative() && (pool != 0 || ITC_FLAG(native_car_models))) {
+    ctx.fpscr.disableFlushMode();
+    if (const auto r3 = sl::ReleaseA(base, ctx.r3.u32, pool, ctx.r5.u32)) {
+      ctx.r3.u64 = *r3;
+      return;
+    }
+  }
+  __imp__sub_820C4488(ctx, base);
 }
 
 void SceneLoadersCarModelSelectedTexture(PPCContext& ctx, uint8_t* base) {
@@ -447,6 +528,13 @@ ITC_SCENE_LOADERS(820D7388, SceneLoadersPartsSetPaint)
 ITC_SCENE_LOADERS(820D5FC8, SceneLoadersCockpitApplyPalette)
 ITC_SCENE_LOADERS(820D6328, SceneLoadersCockpitSetPaint)
 ITC_SCENE_LOADERS(820D4588, SceneLoadersCarModelSelectedTexture)
+ITC_SCENE_LOADERS(820D7690, SceneLoadersInteriorApplyPalette)
+ITC_SCENE_LOADERS(820D7840, SceneLoadersInteriorSetPaint)
+ITC_SCENE_LOADERS(820D7BF8, SceneLoadersTrafficApplyPalette)
+ITC_SCENE_LOADERS(820D75F8, SceneLoadersInteriorRelease)
+ITC_SCENE_LOADERS(820D76D8, SceneLoadersInteriorDestruct)
+ITC_SCENE_LOADERS(820D7960, SceneLoadersInteriorDeletingDestruct)
+ITC_SCENE_LOADERS(820C4488, SceneLoadersReleaseA)
 ITC_SCENE_LOADERS(820D7790, SceneLoadersInteriorIsLoaded)
 ITC_SCENE_LOADERS(820CE800, SceneLoadersNameMatches)
 ITC_SCENE_LOADERS(820D09B8, SceneLoadersXprFindByName)

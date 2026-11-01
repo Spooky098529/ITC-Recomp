@@ -52,6 +52,22 @@ void SceneLoadersPartsApplyPalette(PPCContext& ctx, uint8_t* base);
 void SceneLoadersPartsSetPaint(PPCContext& ctx, uint8_t* base);
 void SceneLoadersCockpitApplyPalette(PPCContext& ctx, uint8_t* base);
 void SceneLoadersCockpitSetPaint(PPCContext& ctx, uint8_t* base);
+// The interior's sub_820D7690 (ApplyPalette) and sub_820D7840 (SetPaint),
+// the traffic car's sub_820D7BF8 (ApplyPalette): as the cockpit's.
+void SceneLoadersInteriorApplyPalette(PPCContext& ctx, uint8_t* base);
+void SceneLoadersInteriorSetPaint(PPCContext& ctx, uint8_t* base);
+void SceneLoadersTrafficApplyPalette(PPCContext& ctx, uint8_t* base);
+// Interior::Release sub_820D75F8 (r3 the interior; r3 as the original
+// leaves it), ~Interior sub_820D76D8 and its deleting destructor
+// sub_820D7960 (r4 the flags; r3 left), ScenePools::ReleaseA sub_820C4488
+// (r3 the set, r4 the pool, r5 the index; r3 as the original leaves it):
+// natively only while hooks::ModelsNativeLifetime() and the accessories'
+// release is native (--native_accessories, AccessoriesNativeLoads), and for
+// ReleaseA's pool 0 --native_car_models (else the original).
+void SceneLoadersInteriorRelease(PPCContext& ctx, uint8_t* base);
+void SceneLoadersInteriorDestruct(PPCContext& ctx, uint8_t* base);
+void SceneLoadersInteriorDeletingDestruct(PPCContext& ctx, uint8_t* base);
+void SceneLoadersReleaseA(PPCContext& ctx, uint8_t* base);
 // CarModel::SelectedTexture sub_820D4588: r3 = the car model; r3 the
 // texture or 0. Natively only with --native_models (else the original).
 void SceneLoadersCarModelSelectedTexture(PPCContext& ctx, uint8_t* base);

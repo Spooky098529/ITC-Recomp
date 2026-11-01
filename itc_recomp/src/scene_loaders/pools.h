@@ -143,6 +143,16 @@ uint64_t CockpitApplyPalette(uint8_t* base, uint32_t cockpit, uint64_t r3, uint3
 uint64_t CockpitSetPaint(uint8_t* base, uint32_t cockpit, uint64_t r3, const uint64_t regs[6],
                          uint32_t sp);
 
+// sub_820D7690: ApplyPalette on each of the interior's six part models
+// (+304 + 464i) whose slot state (+180 + 24i) is 3; sub_820D7840: SetPaint
+// on the same.
+uint64_t InteriorApplyPalette(uint8_t* base, uint32_t interior, uint64_t r3, uint32_t sp);
+uint64_t InteriorSetPaint(uint8_t* base, uint32_t interior, uint64_t r3, const uint64_t regs[6],
+                          uint32_t sp);
+// sub_820D7BF8: ApplyPalette on each of the traffic car's six part models
+// (+4256 + 464i) whose slot state (+4124 + 24i) is 3.
+uint64_t TrafficApplyPalette(uint8_t* base, uint32_t traffic, uint64_t r3, uint32_t sp);
+
 // CarModel::SelectedTexture (sub_820D4588): the word at +7232 + 4 x [+3712]
 // (unsigned, wrapping as the original's add); -1 gives 0, else
 // XPR::GetTexture(+4000, it) (models::XprGetTexture; its diagnostics' wrap

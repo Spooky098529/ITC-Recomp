@@ -260,4 +260,34 @@ bool TrafficDestruct(uint8_t* base, uint32_t traffic);
 // sub_820D89B8 (the deleting destructor): TrafficDestruct.
 bool TrafficDeletingDestruct(uint8_t* base, uint32_t traffic, uint32_t flags);
 
+// --- The interior's release and destructors, ScenePools::ReleaseA ---
+//
+// Only while the accessories' release runs natively (the adapters'
+// condition: --native_accessories, its loads native).
+
+// Interior::Release (sub_820D75F8): for the six parts LoadSlot::ReleaseBuffer
+// (+160 + 24i), Model::Release and PartModel::Clear (+304 + 464i); by the
+// model set ([[+3092] + 8]): set a Accessories::Release(the set, 0 to 2),
+// set b Accessories::Release(the set, +140), others nothing; +3088 = 0.
+// Returns the original's r3 (the last Accessories::Release's, or the last
+// model); nullopt, with nothing done, where a callee would go to the
+// original.
+std::optional<uint32_t> InteriorRelease(uint8_t* base, uint32_t interior);
+// Interior::~Interior (sub_820D76D8): the vtable, Interior::Release,
+// PartModel::~PartModel on the six part models (last first), the base
+// vtable, PoolNode::~PoolNode. False, with nothing done, where a callee
+// would go to the original.
+bool InteriorDestruct(uint8_t* base, uint32_t interior);
+// sub_820D7960 (the deleting destructor): InteriorDestruct.
+bool InteriorDeletingDestruct(uint8_t* base, uint32_t interior, uint32_t flags);
+
+// ScenePools::ReleaseA (sub_820C4488): r3 = the first set, r4 = a pool, r5
+// = an index: the object (List::At on +56 + 12 x pool), its pool's release
+// (0 CarModel::Release, 1 CarParts::Release, 2 Cockpit::Release, 3
+// Interior::Release, 4 Pool4Object::Release, 5 Wheels::Release, 6
+// TrafficCar::Release; nothing for others), its +16 = 0. Returns the
+// release's r3 (the object for other pools); nullopt, with nothing done,
+// where the release would go to the original.
+std::optional<uint32_t> ReleaseA(uint8_t* base, uint32_t set, uint32_t pool, uint32_t index);
+
 }  // namespace scene_loaders

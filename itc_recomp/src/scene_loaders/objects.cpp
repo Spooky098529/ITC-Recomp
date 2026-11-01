@@ -2,6 +2,7 @@
 
 #include "scene_loaders/objects.h"
 
+#include "accessories/accessories.h"
 #include "base/log.h"
 #include "car_models/car_model.h"
 #include "car_models/load_slots.h"
@@ -17,6 +18,7 @@
 #include "scene_loaders/loads.h"
 #include "scene_loaders/pools.h"
 #include "scene_models/scene_models.h"
+#include "vehicle_accessors/vehicle_accessors.h"
 
 #include <cstdlib>
 #include <unordered_set>
@@ -863,6 +865,138 @@ bool TrafficDestruct(uint8_t* base, uint32_t traffic) {
 bool TrafficDeletingDestruct(uint8_t* base, uint32_t traffic, uint32_t flags) {
   ITC_NATIVE_RUNNING("sub_820D89B8 TrafficCar::DeletingDestructor");
   return (flags & 1) == 0 && TrafficDestruct(base, traffic);
+}
+
+// --- The interior's release and destructors, ScenePools::ReleaseA ---
+
+namespace {
+
+constexpr uint32_t kInteriorSlots = 160;
+constexpr uint32_t kInteriorModels = 304;
+
+// Interior::Release's checks (nothing changed), with `extra` nodes more for
+// what follows it: the six slots' buffers, the pending frees' room for the
+// models' release, and the accessories' release by the model set (set a's
+// three as ReleaseAll's check, the entries distinct).
+bool InteriorReleasable(uint8_t* base, uint32_t interior, uint64_t extra) {
+  uint64_t nodes = extra;
+  for (uint32_t i = 0; i < 6; i++) {
+    nodes += models::ModelReleaseNodes(base, interior + kInteriorModels + kPartModelBytes * i);
+  }
+  if (!SlotsReleasable(base, interior + kInteriorSlots, 6) || !Room(base, nodes)) {
+    return false;
+  }
+  const uint32_t set = Load(base, Load(base, interior + 3092) + 8);
+  const uint32_t accessories = scene_models::Accessories(base);
+  if (set == 0) {
+    return accessories::SetReleasable(base, accessories);
+  }
+  if (set == 1) {
+    return accessories::SetReleaseNative(base, accessories, int32_t(Load(base, interior + 140)));
+  }
+  return true;
+}
+
+// Interior::Release's work, its checks made.
+uint32_t InteriorReleaseWork(uint8_t* base, uint32_t interior) {
+  uint32_t r3 = 0;
+  for (uint32_t i = 0; i < 6; i++) {
+    const uint32_t model = interior + kInteriorModels + kPartModelBytes * i;
+    Require(car_models::LoadSlotReleaseBuffer(base, interior + kInteriorSlots + kSlotBytes * i)
+                .has_value(),
+            "LoadSlot::ReleaseBuffer");
+    Require(models::ModelRelease(base, model).has_value(), "Model::Release");
+    models::PartModelClear(base, model);
+    r3 = model;
+  }
+  const uint32_t set = Load(base, Load(base, interior + 3092) + 8);
+  if (set == 0) {
+    for (int32_t i = 0; i < 3; i++) {
+      const uint32_t accessories = scene_models::Accessories(base);
+      r3 = accessories::SetRelease(base, accessories, i).value_or(accessories);
+    }
+  } else if (set == 1) {
+    const int32_t index = int32_t(Load(base, interior + 140));
+    const uint32_t accessories = scene_models::Accessories(base);
+    r3 = accessories::SetRelease(base, accessories, index).value_or(accessories);
+  }
+  Store(base, interior + 3088, 0);
+  return r3;
+}
+
+}  // namespace
+
+std::optional<uint32_t> InteriorRelease(uint8_t* base, uint32_t interior) {
+  ITC_NATIVE_RUNNING("sub_820D75F8 Interior::Release");
+  if (!InteriorReleasable(base, interior, 0)) {
+    return std::nullopt;
+  }
+  return InteriorReleaseWork(base, interior);
+}
+
+bool InteriorDestruct(uint8_t* base, uint32_t interior) {
+  ITC_NATIVE_RUNNING("sub_820D76D8 Interior::~Interior");
+  // The release's checks, then ~PartModel's on the released models (their
+  // members untouched, two nodes each).
+  for (uint32_t i = 0; i < 6; i++) {
+    if (!models::ModelMembersDestructible(base,
+                                          interior + kInteriorModels + kPartModelBytes * i)) {
+      return false;
+    }
+  }
+  if (!InteriorReleasable(base, interior, 6 * kFreshNodes)) {
+    return false;
+  }
+  Store(base, interior + 0, kInteriorVtable);
+  InteriorReleaseWork(base, interior);
+  for (uint32_t i = 6; i-- > 0;) {
+    Require(models::PartModelDestruct(base, interior + kInteriorModels + kPartModelBytes * i)
+                .has_value(),
+            "PartModel::~PartModel");
+  }
+  DestructNode(base, interior);
+  return true;
+}
+
+bool InteriorDeletingDestruct(uint8_t* base, uint32_t interior, uint32_t flags) {
+  ITC_NATIVE_RUNNING("sub_820D7960 Interior::DeletingDestructor");
+  return (flags & 1) == 0 && InteriorDestruct(base, interior);
+}
+
+std::optional<uint32_t> ReleaseA(uint8_t* base, uint32_t set, uint32_t pool, uint32_t index) {
+  ITC_NATIVE_RUNNING("sub_820C4488 ScenePools::ReleaseA");
+  const uint32_t object = vehicle_accessors::ListAt(base, pool * 12 + set + 56, index);
+  std::optional<uint32_t> r3 = object;
+  switch (pool) {
+    case 0:
+      r3 = car_models::CarModelRelease(base, object);
+      break;
+    case 1:
+      r3 = CarPartsRelease(base, object);
+      break;
+    case 2:
+      r3 = CockpitRelease(base, object);
+      break;
+    case 3:
+      r3 = InteriorRelease(base, object);
+      break;
+    case 4:
+      r3 = Pool4Release(base, object);
+      break;
+    case 5:
+      r3 = WheelsRelease(base, object);
+      break;
+    case 6:
+      r3 = TrafficRelease(base, object);
+      break;
+    default:
+      break;
+  }
+  if (!r3) {
+    return std::nullopt;
+  }
+  Store(base, object + 16, 0);
+  return r3;
 }
 
 }  // namespace scene_loaders

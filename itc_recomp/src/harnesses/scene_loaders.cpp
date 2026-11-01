@@ -38,6 +38,7 @@
 ITC_FLAG_DECLARE(bool, native_scene_loaders);
 ITC_FLAG_DECLARE(bool, native_car_models);
 ITC_FLAG_DECLARE(bool, native_models);
+ITC_FLAG_DECLARE(bool, native_accessories);
 
 namespace harness {
 
@@ -407,6 +408,7 @@ void Queries(Context& h, Random& r, uint32_t block) {
     const char* name;
     GuestFunction recompiled, native;
     bool cockpit, paint;
+    uint32_t states = 556, models_at = 688;  // the six part models' (not the car parts)
   };
   const Walk walks[] = {
       {"sub_820D6F20 (CarParts' ApplyPalette walk)", __imp__sub_820D6F20,
@@ -417,6 +419,12 @@ void Queries(Context& h, Random& r, uint32_t block) {
        hooks::SceneLoadersCockpitApplyPalette, true, false},
       {"sub_820D6328 (the cockpit's SetPaint walk)", __imp__sub_820D6328,
        hooks::SceneLoadersCockpitSetPaint, true, true},
+      {"sub_820D7690 (the interior's ApplyPalette walk)", __imp__sub_820D7690,
+       hooks::SceneLoadersInteriorApplyPalette, true, false, 180, 304},
+      {"sub_820D7840 (the interior's SetPaint walk)", __imp__sub_820D7840,
+       hooks::SceneLoadersInteriorSetPaint, true, true, 180, 304},
+      {"sub_820D7BF8 (the traffic car's ApplyPalette walk)", __imp__sub_820D7BF8,
+       hooks::SceneLoadersTrafficApplyPalette, true, false, 4124, 4256},
   };
   for (const Walk& walk : walks) {
     Results results(walk.name);
@@ -426,8 +434,8 @@ void Queries(Context& h, Random& r, uint32_t block) {
           [&](PPCContext& t) {
             if (walk.cockpit) {
               for (uint32_t i = 0; i < 6; i++) {
-                Put(h.base, block + 556 + sl::kSlotBytes * i, RandomState(r, 6));
-                part_model(block + 688 + sl::kPartModelBytes * i, block + 0x1A100,
+                Put(h.base, block + walk.states + sl::kSlotBytes * i, RandomState(r, 6));
+                part_model(block + walk.models_at + sl::kPartModelBytes * i, block + 0x1A100,
                            block + 0x1AA00 + 0x100 * r.Below(4));
               }
             } else {
@@ -1159,6 +1167,168 @@ void Cockpits(Context& h, Random& r, uint32_t block) {
   Put(h.base, sl::kFirstSet, saved_set);
 }
 
+// --- The interior's release and destructors, ScenePools::ReleaseA ---
+//
+// As the cockpit's release cases: the interior built (Interior::Interior's
+// plain C++) at the block's +0x400 on a list, the first set at +0x3800 (its
+// +8 the model set: a, b, another), its six slots' buffers (pages or none,
+// shared now and then) and a model's blocks to put off; the accessories'
+// set (0x826C5510, put back after) at +0x3900 with entries at +0x3A00 (0
+// or an entry whose count stays above 0; now and then two slots on one
+// entry, which the native side hands to the original), the interior's +140
+// the index (0-3). ReleaseA: pool 3 (the interior, alone on the set's list
+// at +92), or a pool of 7 or more whose list's first node is a fake at
+// +0x3C00.
+void InteriorReleases(Context& h, Random& r, uint32_t block) {
+  if (!hooks::ModelsHostLock()) {
+    ITC_LOG_WARN("harness: scene_loaders: --native_models was off at start-up: the interior's "
+                 "release cases skipped");
+    return;
+  }
+  std::lock_guard<std::recursive_mutex> lock(models::MemoryBlocksMutex());
+  constexpr uint32_t kBytes = 0x4000;
+  constexpr uint32_t kAccessoriesSet = 0x826C5510;
+  const uint32_t object = block + 0x400;
+  const uint32_t headers = block + 0x3000;
+  const uint32_t set = block + 0x3800;
+  const uint32_t accessories = block + 0x3900;
+  const uint32_t entries = block + 0x3A00;
+  const uint32_t fake = block + 0x3C00;
+  const uint32_t saved_set = guest::LoadU32(h.base, sl::kFirstSet);
+  const uint32_t saved_accessories = guest::LoadU32(h.base, kAccessoriesSet);
+  enum Kind { kRelease, kDestruct, kDeleting, kReleaseA };
+  struct Function {
+    const char* name;
+    GuestFunction recompiled;
+    GuestFunction native;
+    Kind kind;
+  };
+  const Function functions[] = {
+      {"Interior::Release (sub_820D75F8, on the game's list)", __imp__sub_820D75F8,
+       hooks::SceneLoadersInteriorRelease, kRelease},
+      {"Interior::~Interior (sub_820D76D8, on the game's list)", __imp__sub_820D76D8,
+       hooks::SceneLoadersInteriorDestruct, kDestruct},
+      {"Interior's deleting destructor (sub_820D7960, on the game's list)", __imp__sub_820D7960,
+       hooks::SceneLoadersInteriorDeletingDestruct, kDeleting},
+      {"ScenePools::ReleaseA (sub_820C4488, the interior or no release)", __imp__sub_820C4488,
+       hooks::SceneLoadersReleaseA, kReleaseA},
+  };
+  auto providers = [&]() {
+    std::vector<uint32_t> list_of;
+    for (uint32_t i = 0; i < 6; i++) {
+      list_of.push_back(object + 304 + sl::kPartModelBytes * i + models::kModelTextures);
+    }
+    return list_of;
+  };
+  for (const Function& f : functions) {
+    Results results(f.name);
+    for (int c = 0; c < 32; c++) {
+      const uint64_t seed = r.Next();
+      Outputs out[2];
+      for (int v = 0; v < 2; v++) {
+        Random in(seed);
+        RandomBytes(h.base, block, kBytes, in);
+        Put(h.base, sl::kFirstSet, set);
+        Put(h.base, set + 8, RandomModelSet(in) % 3 == 0 ? 0 : in.Below(3));
+        const uint32_t pool = f.kind == kReleaseA && in.Below(4) == 0 ? 7 + in.Below(4) : 3;
+        const uint32_t list = f.kind == kReleaseA ? set + 56 + 12 * (pool == 3 ? 3 : 0)
+                                                  : block + 0x2000;
+        MakeList(h.base, list, list + 0x100, 0);
+        std::unordered_set<uint32_t> held;
+        std::vector<uint32_t> storages;
+        if (!sl::InteriorConstruct(h.base, object, list)) {
+          ITC_LOG_WARN("harness: scene_loaders: the interior's constructor refused");
+          return;
+        }
+        for (const uint32_t provider : providers()) {
+          storages.push_back(guest::LoadU32(
+              h.base, provider + models::kTextureProviderVector + models::kVectorFirst));
+        }
+        if (in.Below(2) == 0) {
+          PutBlocks(h.base, object + 304 + sl::kPartModelBytes * in.Below(6), headers, in);
+        }
+        for (uint32_t i = 0; i < 6; i++) {
+          const uint32_t slot = object + 160 + sl::kSlotBytes * i;
+          Put(h.base, slot + 12, in.Below(4) == 0 ? 1 : 0);
+          uint32_t pages = 0;
+          if (in.Below(3) == 0) {
+            pages = memory::AllocPages(1 + in.Below(0x4000), 4096);
+            held.insert(pages);
+          }
+          Put(h.base, slot + 16, pages);
+        }
+        // The accessories' set: entries 0 or distinct (now and then shared),
+        // their counts 4 to 6 (none reaches 0).
+        Put(h.base, kAccessoriesSet, accessories);
+        for (uint32_t i = 0; i < 3; i++) {
+          uint32_t entry = in.Below(3) == 0 ? 0 : entries + 0x40 * i;
+          if (i > 0 && in.Below(8) == 0) {
+            entry = entries;
+          }
+          Put(h.base, accessories + 4 + 4 * i, entry);
+          Put(h.base, entries + 0x40 * i, 4 + in.Below(3));
+        }
+        Put(h.base, object + 140, in.Below(4));
+        // ReleaseA's other pools: the list's first node a fake.
+        const uint32_t index = 0;
+        if (f.kind == kReleaseA) {
+          if (pool != 3) {
+            Put(h.base, set + 56 + 12 * pool, fake);
+          }
+        }
+        const pending_frees::ListState was = pending_frees::SaveList(h.base);
+        PPCContext t = CallContext(h);
+        t.r1.u64 &= ~0xFull;
+        if (f.kind == kReleaseA) {
+          t.r3.u64 = set;
+          t.r4.u64 = pool;
+          t.r5.u64 = index;
+        } else {
+          t.r3.u64 = object;
+          t.r4.u64 = f.kind == kDeleting ? 0 : list;
+        }
+        ITC_FLAG(native_accessories) = true;
+        RunSide(v, f.recompiled, f.native, t, h.base);
+        pending_frees::TakeAddedNodes(h.base, was, out[v]);
+        for (const uint32_t address : held) {
+          const bool alive = memory::IsPages(address) || memory::IsHeapBlock(address);
+          out[v].Word(alive);
+          if (memory::IsPages(address)) {
+            memory::FreePages(address);
+          } else if (alive) {
+            memory::Free(address);
+          }
+        }
+        if (f.kind == kDestruct || f.kind == kDeleting) {
+          for (const uint32_t storage : storages) {
+            const bool alive = storage != 0 && memory::IsHeapBlock(storage);
+            out[v].Word(alive);
+            if (alive) {
+              memory::crt::OperatorDelete(storage);
+            }
+            held.insert(storage);
+          }
+        } else {
+          for (const uint32_t provider : providers()) {
+            TakeProvider(h.base, provider, out[v]);
+          }
+        }
+        held.erase(0);
+        Mark(h.base, block, kBytes, held);
+        out[v].Bytes(Read(h.base, block, kBytes));
+        out[v].Word(guest::LoadU32(h.base, sl::kFirstSet));
+        out[v].Word(guest::LoadU32(h.base, kAccessoriesSet));
+        out[v].Word(t.r3.u32);
+        out[v].Word(uint32_t(t.r3.u64 >> 32));
+      }
+      results.Check(out[0], out[1], fmt::format("case {}", c));
+    }
+    results.Report();
+  }
+  Put(h.base, sl::kFirstSet, saved_set);
+  Put(h.base, kAccessoriesSet, saved_accessories);
+}
+
 // --- The wheels and the traffic body ---
 //
 // As the cockpit's cases, table-driven: each function's object (the wheels
@@ -1864,6 +2034,7 @@ void SceneLoaders(Context& h) {
   Resets(h, r, block);
   Parts(h, r, block);
   Cockpits(h, r, block);
+  InteriorReleases(h, r, block);
   WheelsAndTraffic(h, r, block);
   Lifetimes(h, r, block);
   CreateCases(h, r, block);
