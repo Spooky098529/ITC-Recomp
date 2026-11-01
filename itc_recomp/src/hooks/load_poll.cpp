@@ -284,12 +284,13 @@ void LoadPollScenePartsBuild(PPCContext& ctx, uint8_t* base) {
 
 // No adapters (only their callers here call them; the steps above are the
 // harness's): InteriorMeters::SetGauge sub_820E32E8, SceneLights::SetRecord
-// sub_820DCB70. In the diagnostics' wraps (src/debug/frame_state_diff.cpp):
+// sub_820DCB70, the paint's steps under SceneModel::ApplyPaint and
+// ApplyWheelPaint, SceneParts::SetSelectedTexture sub_820DF250;
+// Wheels::SetCaliperTexture sub_820D8ED0 and InteriorDials::SetBlock
+// sub_820E3040 (2026-11-01, their callers in play native). In the diagnostics' wraps (src/debug/frame_state_diff.cpp):
 // CarModel::IsReady sub_820D4048, CarParts::SetVinylTextures sub_820D72D8,
 // SceneLights::Finish sub_820DDA60 and ApplyRecord sub_820DCBC0,
 // SceneTraffic::Finish sub_820E5A68.
 ITC_LOAD_POLL(820D8EC0, LoadPollWheelsSetRecord)
-ITC_LOAD_POLL(820D8ED0, LoadPollWheelsSetCaliperTexture)
-ITC_LOAD_POLL(820E3040, LoadPollInteriorDialsSetBlock)
 ITC_LOAD_POLL(820E3938, LoadPollSceneInteriorSetGauges)
 ITC_LOAD_POLL(820E05E0, LoadPollScenePartsBuild)
