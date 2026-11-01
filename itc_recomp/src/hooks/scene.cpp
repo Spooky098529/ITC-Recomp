@@ -211,15 +211,13 @@ void SceneUpdateA(PPCContext& ctx, uint8_t* base) {
 
 ITC_SCENE(820D0D50, SceneSetUpConstruct)
 ITC_SCENE(820D09A0, SceneFreePagesIn)
-ITC_SCENE(820C3C80, SceneStartTeardownA)
 ITC_SCENE(820C4D88, SceneStartTeardown)
 ITC_SCENE(820C8950, SceneSetInteriorWord)
-ITC_SCENE(820C3CF8, SceneDestroyA)
 ITC_SCENE(820C3DA0, SceneUpdateA)
-ITC_SCENE(820C5008, SceneAssetsConstruct)
 ITC_SCENE(820C89A8, SceneCarSceneConstruct)
 ITC_SCENE(820C4A70, SceneAssetsReset)
-ITC_SCENE(820C5168, SceneAssetsDestruct)
-ITC_SCENE(82593FF8, SceneListDeleteAll)
-ITC_SCENE(82594188, SceneListDestruct)
 ITC_SCENE(820C9110, SceneCarSceneDestruct)
+// No adapters (their callers in play are native; the register steps above
+// are the harness's): ScenePools::StartTeardownA sub_820C3C80, DestroyA
+// sub_820C3CF8, SceneAssets::SceneAssets sub_820C5008 and ~SceneAssets
+// sub_820C5168, List::DeleteAll sub_82593FF8 and ~List sub_82594188.
