@@ -2699,6 +2699,7 @@ B7. **The game logic inside**: everything else, subsystem by subsystem,
 | 2026-11-01 | The device's shader setters and the render queue (`D3DDevice_SetVertexShader` with `Device::SetVertexShader`, keeping `refcount.cpp`'s rebind skip; `SetPixelShader`, `SetVertexDeclaration`; `RenderQueue::RenderQueue` at scene + 64 with its two `PassList`s and `PassList::Clear`) | `device-shaders.md` | 7 of 7 in play (one migration; the render queue's methods a lead) | `--native_device_shaders` |
 | 2026-11-01 | The render queue's methods (the game's `OT`, an ordering table at scene + 64, vtable `0x8206CB8C`: `Init`, `Flip`, `ClearRecording`, `Add` with `PassList::Add`, `Recording`, `Replaying`, the release list's `PtrVector`, and the per-frame `Replay` with its quicksort and chunk walker) | `device-shaders.md` | 25 of 25 in play (with the shader setters and the queue's constructor; one migration) | `--native_render_queue` |
 | 2026-11-01 | The car scene (`CarScene::` at `[0x826C2E44]`: `Create`, the constructor, its set-up record, the lighting block, the shared assets at +64, `LoadAssets` and `OnFileLoaded`, the first set's update, the teardown and destructor) | `scene.md` | 19 of 22 in play (one migration; the rest waits on the scene models' updates and the parts' finishers) | `--native_scene` |
+| 2026-11-01 | The car scene's second set of pools (`sub_820C8DE8`'s eight objects: the car model, parts, cockpit, interior, the neon and LED kit, wheels, traffic car and scene model; their 240-byte point records, point groups and point set-ups, the wheels' morph of the tire, rim and brake shapes) | `second-set.md` | 148 of 152 in play (three migrations; the rest waits on `ScenePools::ReleaseB`) | `--native_second_set` |
 
     The first run (2026-10-22, branch `b7-loop-test`): every harness at 0 differing, attract races at 20-21 s with no errors,
     and a race the user drove looked right. Ours went from 162 to 335 (work
@@ -4357,3 +4358,21 @@ functions (916 pairs): overridden 108, Native 34, Dropped 26, never
 called 70, live 211. Imports: 186 called, 56 with a live caller. B7
 (`b7_status.py`): ours 3,777, work left 2,622 (Wrapped 97, with a row
 489, no row yet 2,036), from 2,661.
+
+**2026-11-01, the car scene's second set (branch `b7-loop-31-10-26-2`):**
+the twenty-ninth run's fourth subsystem (the run's limit raised to 5 by
+the user's call), mapped and made native in three migrations
+(`second-set.md`, `--native_second_set`, `src/second_set/`): the eight
+pools' objects with their constructors, resets, releases and
+destructors, the point records and the parts' point set-ups, and the
+wheels' morph (`Morph::SetUp`, `Run`, `Blend`), 148 of the 152 in play,
+with the original's quirks copied. What blocks the rest: `ScenePools::ReleaseB`
+(`sub_820C5C88`, Wrapped by `frame_state_diff`; a lead), for the
+cockpit's and the scene model's releases. The replays of the car scene's
+and this subsystem's validations logged the SDK's intermittent
+"BaseHeap::Release failed" at the race-end change, as replays before
+the run did (`review.md`). The boundary: 449 functions (916 pairs):
+overridden 108, Native 34, Dropped 26, never called 70, live 211.
+Imports: 186 called, 56 with a live caller. B7 (`b7_status.py`): ours
+3,925, work left 2,474 (Wrapped 97, with a row 493, no row yet 1,884),
+from 2,622.

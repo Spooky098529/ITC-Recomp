@@ -141,10 +141,17 @@ file's history. What's left to see in a drive, from every run:
   set-ups; 6 adapters removed; 148 of 152 ours; harness second_set 0
   differing, frame dump alike, race 38 s, 0 errors; no subagents).
   Nothing ready left: the last four wait on `ScenePools::ReleaseB`
-  `sub_820C5C88` (Wrapped by `frame_state_diff`; a lead added). Step:
-  validation agent running.
+  `sub_820C5C88` (Wrapped by `frame_state_diff`; a lead added).
+  Validated (`itc_3186`, 120 s: race 53 s, 0 errors; replay `itc_3187`
+  broke: 5 "BaseHeap::Release failed" lines at the race-end change, as
+  in `itc_3143`; ran to its end): 11 of 11 harness lines, 10 ran in the
+  race, 1 in the replay, none to drive. Done.
 
 ## Done
+
+- The car scene's second set (subsystem 4): `second-set.md`, 148 of
+  152 in play, three migrations; `--native_second_set`;
+  f40c2fd7..76b512a3. Validated (`itc_3163`, `itc_3178`, `itc_3186`).
 
 - The car scene (subsystem 3): `scene.md`, 19 of 22 in play, one
   migration; `--native_scene`; e8dcd16c..613dd3db. Validated
@@ -259,5 +266,9 @@ file's history. What's left to see in a drive, from every run:
 - After the second set's third migration (`itc_3185`: race 38 s, 0
   errors, second_set 0 differing): ours 3925, work left 2474 (wrapped
   97, known 493, unknown 1884).
+
+- After its validation (`itc_3186`, 120 s: race 53 s, 0 errors, every
+  harness 0 differing but the expected groups): ours 3925, work left
+  2474.
 
 ## Stopped

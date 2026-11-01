@@ -106,7 +106,9 @@ When the user has reviewed a run's section, its heading gets
   failed because address is not a region start" twice at the driven
   race's end change, as `itc_2936`, `itc_2974` and `itc_2987` did
   before this run (not `itc_3081`, `itc_3093`, `itc_3106`):
-  intermittent, not debugged, worth a look.
+  intermittent, not debugged, worth a look. It came again in
+  `itc_3187` (5 lines, the second set's third validation), not in
+  `itc_3164` or `itc_3179`.
 - `second-set.md` (new, f40c2fd7): 153 rows, the car scene's second set
   of pools (`sub_820C8DE8`'s eight objects: `SceneCarModel`,
   `SceneParts`, `SceneCockpit`, `SceneInterior`, `SceneLights` (pool 4,

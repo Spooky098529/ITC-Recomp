@@ -37,6 +37,12 @@ here loses its heading.
   `sub_82228E88` LocationScreen::OnPictureLoadedA, `sub_82228FC8`
   LocationScreen::OnPictureLoadedB.
 
+- The car scene and its second set: nothing to drive (every function
+  seen in `itc_3142`-`itc_3187`); the replays `itc_3143` and `itc_3187`
+  broke with the SDK's "BaseHeap::Release failed because address is
+  not a region start" at the race-end change (seen in replays before
+  this run too; the native code under test not ruled out).
+
 ## Run 2026-10-31 16:54 (`b7-loop-31-10-26`, continued)
 
 - The in-race screens, third migration (attract race `itc_3046`,
