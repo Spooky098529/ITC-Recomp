@@ -18,7 +18,10 @@
 // one bound (device +12436), also when they're the same object. Then the
 // pair changes nothing (the device's own reference keeps the count above 0
 // throughout), so both are skipped; the rest of the call runs as before.
-// How many calls bind the same shader is logged every 5 s.
+// How many calls bind the same shader is logged every 5 s. SetVertexShader
+// is native since the B7 loop (src/graphics/device_shaders.cpp, which skips
+// the pair itself); its adapter (src/hooks/device_shaders.cpp) marks the
+// shader here only for the recompiled fallback.
 //
 // --refcount_global_lock=true runs the library's own functions instead
 // (for the recompiled callers; native callers, src/graphics/, call
@@ -41,7 +44,6 @@ namespace {
 
 constexpr uint32_t kCount = 4;
 constexpr uint32_t kChild = 24;
-constexpr uint32_t kDeviceVertexShader = 12436;
 
 // The object whose AddRef and Release SetVertexShader makes no-ops.
 thread_local uint32_t g_unchanged_shader = 0;
@@ -85,6 +87,22 @@ uint32_t AddRef(uint8_t* base, uint32_t object) {
   return count;
 }
 
+void SetUnchangedShader(uint32_t object) { g_unchanged_shader = object; }
+
+void NoteSetVertexShader(bool same) {
+  g_set_calls++;
+  g_set_same += same;
+  if (g_set_calls % 65536 == 0) {
+    auto now = std::chrono::steady_clock::now();
+    if (now - g_last_log >= std::chrono::seconds(5)) {
+      g_last_log = now;
+      ITC_LOG_INFO("refcount: SetVertexShader: {} calls on this thread, {} binding the shader "
+                   "already bound (AddRef and Release skipped)",
+                   g_set_calls, g_set_same);
+    }
+  }
+}
+
 }  // namespace refcount
 
 extern "C" REX_FUNC(sub_822A6738) {
@@ -121,29 +139,4 @@ extern "C" REX_FUNC(sub_822A67B0) {
   ctx.lr = 0x822A6818;
   sub_822A6210(ctx, base);
   ctx.r3.u64 = 0;
-}
-
-extern "C" REX_FUNC(sub_822A8808) {
-  REX_FUNC_PROLOGUE();
-  if (ITC_FLAG(refcount_global_lock)) {
-    __imp__sub_822A8808(ctx, base);
-    return;
-  }
-  uint32_t shader = ctx.r4.u32;
-  bool same = shader && shader == guest::LoadU32(base, ctx.r3.u32 + kDeviceVertexShader);
-  g_set_calls++;
-  g_set_same += same;
-  if (same) g_unchanged_shader = shader;
-  __imp__sub_822A8808(ctx, base);
-  g_unchanged_shader = 0;
-
-  if (g_set_calls % 65536 == 0) {
-    auto now = std::chrono::steady_clock::now();
-    if (now - g_last_log >= std::chrono::seconds(5)) {
-      g_last_log = now;
-      ITC_LOG_INFO("refcount: SetVertexShader: {} calls on this thread, {} binding the shader "
-                   "already bound (AddRef and Release skipped)",
-                   g_set_calls, g_set_same);
-    }
-  }
 }

@@ -320,6 +320,8 @@ set(ITC_SOURCES
     src/graphics/video_output.cpp
     src/hooks/device_state.cpp
     src/graphics/device_state.cpp
+    src/hooks/device_shaders.cpp
+    src/graphics/device_shaders.cpp
     src/hooks/post_effects.cpp
     src/post_effects/post_effects.cpp
     src/hooks/framework.cpp
@@ -474,6 +476,7 @@ set(ITC_SOURCES
     src/harnesses/graphics_resources.cpp
     src/harnesses/video_output.cpp
     src/harnesses/device_state.cpp
+    src/harnesses/device_shaders.cpp
     src/harnesses/course_scenery.cpp
     src/harnesses/post_effects.cpp
     src/harnesses/screen_objects.cpp

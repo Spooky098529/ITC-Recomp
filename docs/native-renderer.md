@@ -727,7 +727,10 @@ step 1's logs are there to find them before anything is stubbed.
   calls a second** are (logged every 5 s); the pair then changes nothing,
   and the device's own reference keeps the count above 0, so both are
   skipped (a thread-local "unchanged shader" the two overrides check;
-  the rest of SetVertexShader runs as before). A first version counted
+  the rest of SetVertexShader runs as before; since the B7 loop,
+  2026-11-01, SetVertexShader is native, `src/graphics/device_shaders.cpp`,
+  and skips the pair itself, the thread-local kept for its fallback;
+  `docs/functions/device-shaders.md`). A first version counted
   those calls with shared atomic counters, which alone cost 5%: counters
   on this thread are kept per thread now.
 

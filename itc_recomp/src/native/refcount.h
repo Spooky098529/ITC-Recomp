@@ -12,4 +12,12 @@ namespace refcount {
 // SetVertexShader is binding is left as it is (its count returned).
 uint32_t AddRef(uint8_t* base, uint32_t object);
 
+// The rebind skip's object for the recompiled SetVertexShader (its fallback
+// adapter, src/hooks/device_shaders.cpp): AddRef's and Release's overrides
+// leave this object's count alone while it's set (0: none). Per thread.
+void SetUnchangedShader(uint32_t object);
+// Counts SetVertexShader's calls and those binding the shader already bound
+// (on this thread), logged every 5 s.
+void NoteSetVertexShader(bool same);
+
 }  // namespace refcount
