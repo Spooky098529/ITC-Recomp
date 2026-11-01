@@ -2283,6 +2283,220 @@ void ModelPoints(Context& h, Random& r, uint32_t block) {
   }
   results.Report();
 }
+
+// --- The file-loaded callbacks ---
+
+constexpr uint32_t kPartFileBytes = 0x5000;
+constexpr uint32_t kPartHeader = 0x4000;
+constexpr uint32_t kPartVertices = 0x800;
+
+// A minimal part file in new pages (as Interior::OnPartLoaded's cases).
+uint32_t MakePartFile(uint8_t* base, Random& in) {
+  const uint32_t pages = memory::AllocPages(kPartFileBytes, 4096);
+  std::vector<uint32_t> words(kPartFileBytes / 4, 0);
+  auto put = [&](uint32_t at, uint32_t value) { words[at / 4] = value; };
+  put(0, in.Below(5) == 0 ? 0x00140000 : 0x00150000);
+  put(4, 7);
+  put(8, 9);
+  put(16, 3);
+  put(20, 0x80);
+  put(24, 0x90);
+  put(28, 0x100);
+  put(32, 0xA0);
+  put(44, 0x2000);
+  put(64, kPartHeader);
+  put(68, kPartVertices);
+  put(72, kPartHeader + kPartVertices);
+  for (uint32_t k = kPartHeader; k < kPartHeader + kPartVertices; k += 4) {
+    put(k, uint32_t(in.Next()) & 0x0FFFFFFFu);
+  }
+  for (uint32_t k = 0; k < words.size(); k++) {
+    guest::StoreU32(base, pages + 4 * k, words[k]);
+  }
+  return pages;
+}
+
+// An XPR2 file at `file` of 0 to 8 records named from `names` or others (as
+// car_models' harness builds them); its header and data sizes out.
+void MakeXprFile(uint8_t* base, uint32_t file, const std::vector<std::string>& wanted,
+                 Random& in, uint32_t* header_bytes, uint32_t* data_bytes) {
+  const uint32_t records = in.Below(9);
+  std::vector<std::string> names;
+  for (uint32_t i = 0; i < records; i++) {
+    names.push_back(in.Below(2) == 0 && !wanted.empty() ? wanted[in.Below(uint32_t(wanted.size()))]
+                                                         : RandomName(in, 1 + in.Below(8)));
+  }
+  const uint32_t names_at = 4 + 16 * records;
+  uint32_t header = names_at;
+  for (const auto& n : names) header += uint32_t(n.size()) + 1;
+  header = (header + 3) & ~3u;
+  *header_bytes = header;
+  *data_bytes = 64;
+  RandomBytes(base, file, (12 + header + 64 + 3) & ~3u, in);
+  Put(base, file + 0, 0x58505232);
+  Put(base, file + 4, header);
+  Put(base, file + 8, 64);
+  Put(base, file + 12, records);
+  uint32_t name_at = names_at;
+  for (uint32_t i = 0; i < records; i++) {
+    const uint32_t record = file + 16 + 16 * i;
+    Put(base, record + 0, 0x56420000u | (guest::LoadU32(base, record) & 0xFFFF));
+    Put(base, record + 12, name_at);
+    PutString(base, file + 12 + name_at, names[i]);
+    name_at += uint32_t(names[i].size()) + 1;
+  }
+}
+
+// Cockpit::OnFileLoaded (sub_820D6528): a cockpit the plain C++ constructor
+// made (at the block's +0x100), its slots' requests distinct, r3 one of a
+// part's (its buffer a minimal part file in pages, shared now and then), an
+// XPR2's (r4 an XPR2 file in the block, the real provider), the node
+// file's (a node file of 1 to 8 nodes, "acce_null" among them now and
+// then; +3472 0 or an earlier matrix in the block) or none. The recompiled
+// side with the flags off. Compared: the pending frees' nodes, the buffer's
+// pages alive, the providers (TakeProvider), the cockpit's bytes and the
+// blocks the callees made (pointers into them as offsets), the skeleton's
+// arrays, the frame's +80 to +224, r3.
+void CockpitLoadedCases(Context& h, Random& r, uint32_t block) {
+  if (!hooks::ModelsNativeLifetime()) {
+    ITC_LOG_WARN("harness: scene_loaders: Cockpit::OnFileLoaded's cases skipped (models' "
+                 "lifetime not native)");
+    return;
+  }
+  std::lock_guard<std::recursive_mutex> lock(models::MemoryBlocksMutex());
+  constexpr uint32_t kBytes = 0x2000;
+  const uint32_t cockpit = block + 0x100;
+  const uint32_t list = block + 0x1000;
+  const uint32_t file = block + 0x3000;   // the node file (4 KB) or the XPR2
+  const uint32_t earlier = block + 0x1800;  // an earlier +3472 matrix
+  const uint32_t skeleton = cockpit + 208;
+  const uint32_t saved_set = guest::LoadU32(h.base, sl::kFirstSet);
+  static const char* kNames[] = {"acce_null", "acce_nul", "ACCE_NULL", "body", "seat_L"};
+  Results results("Cockpit::OnFileLoaded (sub_820D6528)");
+  for (int c = 0; c < 40; c++) {
+    const uint64_t seed = r.Next();
+    const uint32_t first_set = uint32_t(r.Next());
+    const uint32_t which = c % 10;  // 0-5 a part, 6-7 an XPR2, 8 the node file, 9 none
+    Outputs out[2];
+    for (int v = 0; v < 2; v++) {
+      Random in(seed);
+      RandomBytes(h.base, block, kBytes, in);
+      Put(h.base, sl::kFirstSet, first_set);
+      MakeList(h.base, list, list + 0x100, 0);
+      if (!sl::CockpitConstruct(h.base, cockpit, list)) {
+        ITC_LOG_WARN("harness: scene_loaders: the cockpit's constructor refused");
+        return;
+      }
+      for (uint32_t i = 0; i < 6; i++) Put(h.base, cockpit + 540 + 24 * i, 0x10000u * (i + 1));
+      for (uint32_t i = 0; i < 2; i++) Put(h.base, cockpit + 404 + 24 * i, 0x100000u * (i + 1));
+      Put(h.base, cockpit + 180, 0x1000000u);
+      for (uint32_t at = 0; at < 64; at += 4) Put(h.base, earlier + at, SmallFloat(in));
+      Put(h.base, cockpit + 3472, in.Below(3) == 0 ? earlier : 0);
+      uint32_t request = 0x123, buffer = uint32_t(in.Next()), pages = 0;
+      uint32_t header_bytes = 0, data_bytes = 0;
+      if (which < 6) {
+        const uint32_t slot = cockpit + 536 + 24 * which;
+        pages = MakePartFile(h.base, in);
+        Put(h.base, slot + 12, in.Below(4) == 0 ? 1 : 0);
+        Put(h.base, slot + 16, pages);
+        request = guest::LoadU32(h.base, slot + 4);
+      } else if (which < 8) {
+        MakeXprFile(h.base, file, {"tex", "body"}, in, &header_bytes, &data_bytes);
+        buffer = file;
+        request = 0x100000u * (which - 5);
+      } else if (which == 8) {
+        std::vector<std::string> names(1 + in.Below(8));
+        for (auto& n : names) n = kNames[in.Below(std::size(kNames))];
+        MakeNodeFile(h.base, file, names, in);
+        Put(h.base, cockpit + 192, file);
+        for (const SkeletonArray& a : SkeletonArrays(h.base, file)) {
+          Put(h.base, skeleton + a.offset, 0);
+        }
+        request = 0x1000000u;
+      }
+      const pending_frees::ListState was = pending_frees::SaveList(h.base);
+      PPCContext t = CallContext(h);
+      t.r1.u64 &= ~0xFull;
+      const uint32_t frame = t.r1.u32 - sl::kCockpitLoadedFrameBytes;
+      RandomBytes(h.base, frame - 512, sl::kCockpitLoadedFrameBytes + 512, in);
+      t.r3.u64 = request;
+      t.r4.u64 = buffer;
+      t.r6.u64 = cockpit;
+      RunSide(v, __imp__sub_820D6528, hooks::SceneLoadersCockpitOnFileLoaded, t, h.base);
+      pending_frees::TakeAddedNodes(h.base, was, out[v]);
+      const bool alive = pages != 0 && memory::IsPages(pages);
+      out[v].Word(alive);
+      std::vector<PageRegion> regions = {{block, kBytes}, {file, 4096}};
+      std::vector<std::pair<uint32_t, bool>> blocks;  // made: (block, physical)
+      if (which < 6) {
+        const uint32_t model = cockpit + 688 + sl::kPartModelBytes * which;
+        for (uint32_t k = 0; k < 2; k++) {
+          const uint32_t at = guest::LoadU32(h.base, model + 16 + 4 * k);
+          if (at != 0) {
+            regions.push_back({at, k == 0 ? kPartHeader : kPartVertices});
+            blocks.push_back({at, k == 1});
+          }
+        }
+      }
+      uint32_t xpr_header = 0, xpr_data = 0;
+      if (which == 6 || which == 7) {
+        const uint32_t xpr = cockpit + 448 + 24 * (which - 6);
+        xpr_header = guest::LoadU32(h.base, xpr + 0);
+        xpr_data = guest::LoadU32(h.base, xpr + 8);
+        if (xpr_header != 0) regions.push_back({xpr_header, header_bytes});
+        if (xpr_data != 0) regions.push_back({xpr_data, data_bytes});
+      }
+      if (pages != 0) regions.push_back({pages, kPartFileBytes});
+      if (which == 8) {
+        for (const SkeletonArray& a : SkeletonArrays(h.base, file)) {
+          const uint32_t at = guest::LoadU32(h.base, skeleton + a.offset);
+          if (at != 0) regions.push_back({at - a.header, a.bytes});
+        }
+      }
+      for (uint32_t i = 0; i < 2; i++) TakeProvider(h.base, cockpit + 496 + 20 * i, out[v]);
+      for (uint32_t i = 0; i < 6; i++) {
+        TakeProvider(h.base, cockpit + 688 + sl::kPartModelBytes * i + models::kModelTextures,
+                     out[v]);
+      }
+      out[v].Bytes(Normalized(h.base, regions, block, kBytes));
+      for (size_t k = 2; k < regions.size(); k++) {
+        if (regions[k].start != pages) {
+          out[v].Bytes(Normalized(h.base, regions, regions[k].start, regions[k].bytes));
+        }
+      }
+      out[v].Floats(h.base, frame + 80, 36);
+      const uint32_t r3 = t.r3.u32;
+      uint32_t r3_marker = r3;
+      for (size_t k = 0; k < regions.size(); k++) {
+        if (r3 >= regions[k].start && r3 - regions[k].start < regions[k].bytes + 16) {
+          r3_marker = 0xB0000000u + (uint32_t(k) << 20) + (r3 - regions[k].start);
+          break;
+        }
+      }
+      out[v].Word(r3_marker);
+      out[v].Word(uint32_t(t.r3.u64 >> 32));
+      for (const auto& [at, physical] : blocks) {
+        if (physical) {
+          memory::FreePhysical(at - models::kBlockHeaderBytes);
+        } else {
+          memory::FreePages(at - models::kBlockHeaderBytes);
+        }
+      }
+      if (xpr_header != 0) memory::FreePages(xpr_header - models::kBlockHeaderBytes);
+      if (xpr_data != 0) {
+        memory::crt::XMemFree(xpr_data - models::kBlockHeaderBytes, models::kXprDataAllocation);
+      }
+      if (alive) memory::FreePages(pages);
+      if (which == 8) {
+        Outputs ignored;
+        TakeSkeleton(h.base, skeleton, file, ignored);
+      }
+    }
+    results.Check(out[0], out[1], fmt::format("case {} (path {})", c, which));
+  }
+  results.Report();
+  Put(h.base, sl::kFirstSet, saved_set);
+}
 }  // namespace
 
 void SceneLoaders(Context& h) {
@@ -2304,6 +2518,7 @@ void SceneLoaders(Context& h) {
   PartLoadedCases(h, r, block);
   Binds(h, r, block);
   ModelPoints(h, r, block);
+  CockpitLoadedCases(h, r, block);
   memory::Free(allocation);
 }
 

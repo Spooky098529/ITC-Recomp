@@ -59,7 +59,9 @@ ITC_FLAG_BOOL(native_scene_loaders, true, "ITC",
               "and its deleting destructor sub_820D89B8, ScenePools::CreateA sub_820C3FD8 (the "
               "constructors' originals called where their plain C++ declines), "
               "Interior::OnPartLoaded sub_820D7578 (Model::Load's original where its plain C++ "
-              "declines); with those and the accessories' release native Interior::Release "
+              "declines), Cockpit::OnFileLoaded sub_820D6528 (Model::Load's, XPR::Create's, "
+              "Skeleton::Bind's and UpdateMatrices' originals where their plain C++ declines, "
+              "the texture provider's slot +16 through its vtable); with those and the accessories' release native Interior::Release "
               "sub_820D75F8, ~Interior sub_820D76D8, its deleting destructor sub_820D7960 and "
               "ScenePools::ReleaseA sub_820C4488 (pool 0 with --native_car_models)) natively instead of through the "
               "translated code (the same writes; checked by --run_harnesses=scene_loaders); "
@@ -314,6 +316,79 @@ void SceneLoadersModelPointFind(PPCContext& ctx, uint8_t* base) {
   } else {
     ctx.fpscr.disableFlushMode();
   }
+}
+
+namespace {
+
+// The file-loaded callbacks' guest calls, each with the original's return
+// address (the callback's frame made by the caller).
+struct FileLoadedReturns {
+  uint32_t model_load, xpr_create, provider_set, skeleton_bind, update_matrices;
+};
+
+sl::FileLoadedCalls MakeFileLoadedCalls(PPCContext& ctx, uint8_t* base,
+                                        hooks::ModelLoadGuest& model_guest,
+                                        const FileLoadedReturns& at) {
+  sl::FileLoadedCalls calls;
+  calls.model_load = model_guest.Calls();
+  calls.model_load_original = [&ctx, base, at](uint32_t model, uint32_t file) {
+    ctx.r3.u64 = model;
+    ctx.r4.u64 = file;
+    ctx.r5.u64 = 0;
+    ctx.lr = at.model_load;
+    __imp__sub_82596920(ctx, base);
+  };
+  calls.xpr_create = [&ctx, base, at](uint32_t xpr, uint32_t file) {
+    ctx.r3.u64 = xpr;
+    ctx.r4.u64 = file;
+    ctx.lr = at.xpr_create;
+    __imp__sub_82596F68(ctx, base);
+  };
+  calls.provider_set = [&ctx, base, at](uint32_t provider, uint32_t xpr) -> uint64_t {
+    ctx.r3.u64 = provider;
+    ctx.r4.u64 = 0;
+    ctx.r5.u64 = xpr;
+    ctx.lr = at.provider_set;
+    REX_CALL_INDIRECT_FUNC(guest::LoadU32(base, guest::LoadU32(base, provider) + 16));
+    return ctx.r3.u64;
+  };
+  calls.skeleton_bind = [&ctx, base, at](uint32_t skeleton, uint32_t file) {
+    ctx.r3.u64 = skeleton;
+    ctx.r4.u64 = file;
+    ctx.r5.u64 = 0;
+    ctx.lr = at.skeleton_bind;
+    __imp__sub_82599A20(ctx, base);
+  };
+  calls.update_matrices = [&ctx, base, at](uint32_t skeleton) {
+    ctx.r3.u64 = skeleton;
+    ctx.lr = at.update_matrices;
+    __imp__sub_825998A0(ctx, base);
+  };
+  return calls;
+}
+
+}  // namespace
+
+void SceneLoadersCockpitOnFileLoaded(PPCContext& ctx, uint8_t* base) {
+  const uint32_t request = ctx.r3.u32, buffer = ctx.r4.u32, cockpit = ctx.r6.u32;
+  if (!hooks::ModelsNativeLifetime() || !sl::CockpitFileLoadedNative(base, request, cockpit)) {
+    __imp__sub_820D6528(ctx, base);
+    return;
+  }
+  ctx.fpscr.disableFlushMode();
+  const uint32_t stack = ctx.r1.u32;
+  const uint64_t lr = ctx.lr;
+  uint64_t r3 = 0;
+  // The guest calls from the original's frame (272 bytes).
+  guest_call::InFrame(ctx, base, sl::kCockpitLoadedFrameBytes, 0x820D6738, [&](uint32_t) {
+    hooks::ModelLoadGuest model_guest{ctx, base};
+    const sl::FileLoadedCalls calls = MakeFileLoadedCalls(
+        ctx, base, model_guest, {0x820D6738, 0x820D6768, 0x820D678C, 0x820D65A0, 0x820D65B8});
+    r3 = sl::CockpitFileLoaded(base, request, buffer, cockpit, stack, calls);
+  });
+  ctx.lr = lr;
+  ctx.r3.u64 = r3;
+  ctx.fpscr.disableFlushMode();
 }
 
 void SceneLoadersNameMatches(PPCContext& ctx, uint8_t* base) {
@@ -597,6 +672,7 @@ ITC_SCENE_LOADERS(820D7BF8, SceneLoadersTrafficApplyPalette)
 ITC_SCENE_LOADERS(820D6108, SceneLoadersCockpitBindTextures)
 ITC_SCENE_LOADERS(820D7D38, SceneLoadersTrafficBindTextures)
 ITC_SCENE_LOADERS(820D02D0, SceneLoadersModelPointFind)
+ITC_SCENE_LOADERS(820D6528, SceneLoadersCockpitOnFileLoaded)
 ITC_SCENE_LOADERS(820D7960, SceneLoadersInteriorDeletingDestruct)
 ITC_SCENE_LOADERS(820C4488, SceneLoadersReleaseA)
 ITC_SCENE_LOADERS(820D7790, SceneLoadersInteriorIsLoaded)
