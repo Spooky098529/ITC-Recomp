@@ -8,7 +8,12 @@ pixel shader and a vertex declaration on the device, and the render
 queue (scene + 64, vtable `0x8206CB8C`) whose constructor makes the
 primitive drawer, with its two pass lists. Mapped by the B7 loop
 (`../loops/b7-loop.md`) from its lead in `../loops/leads.md` (found by
-the model animation's mapping agent, 2026-10-23), 2026-11-01.
+the model animation's mapping agent, 2026-10-23), 2026-11-01. The render
+queue's methods (its vtable's slots, the pass list's `Add`, the replay's
+sort and the chunk walker under it) were added the same day by the B7
+loop's mapping agent from their own lead (found by the device shaders'
+mapping agent), read in our `generated/` code, with the vtables and
+constants read from the image.
 
 **The setters.** Each writes the device's shader state the way the
 setters in `device-state.md` do: the bound object (device +12436 the
@@ -50,18 +55,72 @@ and the declaration take no reference.
 **The render queue** (scene + 64, `[0x8296B91C]` and `[0x82970BD4]`,
 `../known-data.md`; called "the game mode object" in
 `../frame-interpolation.md`): 16 bytes made in place by the scene's
-constructor `sub_82098A98` (a lead in `../loops/leads.md`). +0 the vtable
-`0x8206CB8C` (slot 2 `sub_8258ED78` clears the list being recorded, slot
-6 `sub_8258E5E0` flips the replay index, both Wrapped in `functions.md`;
-slot 4 `sub_8258EDC8` queues a chunk, 7 `sub_8258E5F8` and 8
-`sub_8258E618` the lists being recorded and replayed: no rows, a lead),
-+4 its 88-byte state (+0 the replay index, +4 the primitive drawer, +68
-a `std::vector`'s allocator, first, last and end at +72, +76, +80, +84 a
+constructor `sub_82098A98` (a lead in `../loops/leads.md`). The game's
+own name for it, in `RenderQueue::Add`'s warning, is `OT` (an ordering
+table: `warning!!! : call OT::Add( %x, %u, %f )`). +0 the vtable
+`0x8206CB8C` (ten slots, below), +4 its 88-byte state (+0 the replay
+index, +4 the primitive drawer, +12 a field whose address the replay
+publishes at `0x82970BBC` (probably the drawer's state, as
+`../gpu-functions.md` calls it; not read further), +24 to
++36 four words the replay zeroes, +44 the video output the replay was
+given, +48 to +60 render targets 0-3 and +64 the depth surface
+(`RenderQueue::Init`), +68 the release list, a `std::vector` of object
+pointers (its allocator, first, last and end at +72, +76, +80), +84 a
 float sequence), +8 and +12 the two pass lists (36 bytes each: vtable
-`0x8206CB88`, +4 a byte set to 1, +8 4,096 and +12 1,024 (the counts
-asked for), +16 a count, +20 4,096 × 20 bytes, +24 1,024 16-byte
-buckets with their next pointers at +8, +28 and +32 counts). How the
-pass lists are filled and replayed is the lead's.
+`0x8206CB88`, one slot, the destructor; +4 a byte, the replay's "bucket
+done" flag, +8 4,096 and +12 1,024 (the item and bucket counts asked
+for), +16 the items used, +20 4,096 items of 20 bytes (+0 the next item,
++4 the chunk, +8 the key, +12 the sequence; +16 never written here),
++24 1,024 16-byte buckets (+0 the first item, +4 the last, +12 a count
+`PassList::Clear` never resets, which nothing here reads; +8 untouched
+here), +28 zeroed by `Clear` and the replay, +32 the replay's current
+item).
+
+**How it's used.** The queue is double-buffered: the pass list being
+recorded is +12 when the replay index is 0 and +8 when it's 1, the one
+replayed the other (slots 7 and 8). Every pass, `Scene::Update`
+(`sub_820988C8`, `functions.md`) flips the index (slot 6) and empties
+the new recording list, the sequence put back to 0.0 (slot 2); the
+recorders then hand each closed chunk of the scene's command list
+(`command-list.md`) to slot 4 with a bucket (the layer, 0-1,023) and a
+float key, which appends it to that bucket and moves the sequence on by
+0.1. On the render thread, `Scene::Draw` (`sub_82098940`,
+`functions.md`) calls slot 5 with the device and the video output: the
+replay walks the list being replayed bucket by bucket, sorts each
+bucket's entries by key (ascending) and, among equal keys, by sequence
+(submission order), and runs each chunk's item chain
+(`ChunkChain::Run`), whose kinds dispatch the render commands through
+the tables `0x8265EDE0` (command lists, the `Command::*` handlers,
+Wrapped in `functions.md` for the native renderer;
+`../gpu-functions.md`'s command table) and `0x8265ED48` (single
+commands, "Single commands" in `../gpu-functions.md`). It ends by
+destroying what command 22 (`sub_82591798`, `functions.md`) put on the
+release list during the replay. `RenderQueue::Init` (slot 0) runs once,
+from the scene's constructor under the device lock. The callers of slot
+4 seen in play are the recorders in `scenery-lists.md`, `mode-tick.md`,
+`minimap.md` and `sprites.md` (the last through `[0x826C5D5C]`, set by
+`Overlays::SetRenderTargets` in `race-overlays.md`), among others.
+
+The vtable `0x8206CB8C` (read from the image; the pass list's
+`0x8206CB88` holds only `PassList::~PassList` before it): 0
+`RenderQueue::Init` `sub_8258ED00`, 1 `sub_8258E5C8` (not seen in play),
+2 `RenderQueue::ClearRecording` `sub_8258ED78`, 3 the empty destructor
+`sub_82106540` (`c-runtime.md`), 4 `RenderQueue::Add` `sub_8258EDC8`, 5
+`RenderQueue::Replay` `sub_82591238`, 6 `RenderQueue::Flip`
+`sub_8258E5E0`, 7 `RenderQueue::Recording` `sub_8258E5F8`, 8
+`RenderQueue::Replaying` `sub_8258E618`, 9 the deleting destructor
+`sub_82590EA0` (not seen in play).
+
+Where the indirect calls go: `RenderQueue::Init` calls the drawer's
+slot 0, `PrimitiveDrawer::Init` (`sub_825A1438`, recompiled,
+`model-animation.md`), and slot 1 the drawer's slot 1 (`sub_825A1610`,
+never ran); `ClearRecording` and `Add` call the queue's own slot 7; the
+replay calls its own slot 8, the sort's key getters (`RigidBody::Mass`
+`sub_820B6708`, a float at +4, Overridden in `vehicle-accessors.md`,
+for the key; `QueueEntry::Sequence` `sub_8258E5C0` for the sequence),
+the release list's objects' slot 0 with r4 = 1 (probably their deleting
+destructors; which objects command 22 hands over isn't read), and,
+through the chain walker, the two command tables (above).
 
 Shared rows: `VertexShader::Create` (`sub_822AA018`) and
 `PixelShader::Create` (`sub_822A9EE8`), which make the drawer's shaders,
@@ -85,6 +144,20 @@ it (`8229DC28`-`8229F228`, already a lead in `../loops/leads.md`).
 (`--native_device_shaders`, harness `device_shaders`).
 `PassList::Clear`'s adapter stays while the queue's slot 2
 `sub_8258ED78` (Wrapped) calls it through `ctx`.
+
+For the migration of the render queue's methods (`b7_groups.py`,
+2026-11-01): ready are `RenderQueue::Init`, `ClearRecording`, `Add`
+(with `PassList::Add`), `Flip`, `Recording`, `Replaying`, `Replay`
+(with the sort and the chunk walker's kinds), `QueueEntry::Sequence`
+and `PtrVector::PushBack` (with `Insert`). Their indirect calls reach
+code still recompiled: `PrimitiveDrawer::Init` (`Init`'s), the render
+command handlers of both tables and the release list's objects
+(`Replay`'s); the replay runs on the render thread, where the native
+renderer's hooks (`src/native/replay_hooks.cpp`) see each command. The
+slots 2 and 6 keep `--find_menu_selection`'s wrappers
+(`src/debug/menu_selection_scan.cpp`). Not seen in play: slot 1, slot 9,
+the walker's kinds 1 and 2, the debug print and the vector's subscript
+error.
 
 Status:
 
@@ -141,3 +214,27 @@ run it after changing either, on any branch.
 | `sub_8258EB38` | `PassList::Clear` | Overridden | r3 = a pass list: each bucket's (+12 of them at +24, 16 bytes each) +0 and +4 = 0; then +16, +28 and +32 = 0 (the bucket links at +8 and the items at +20 are left). Leaf, 25 lines. Callers seen in play: `PassList::PassList`, `RenderQueue::RenderQueue` (twice) and the queue's slot 2 `sub_8258ED78` (Wrapped, `functions.md`: every pass from `Scene::Update`, on the list being recorded, with the state's +84 sequence then set to 0.0). `../frame-interpolation.md` already noted it "empties a pass list". Read in full (B7 loop, 2026-11-01). Ours (B7 loop, 2026-11-01): `graphics::device_shaders::PassListClear` (`src/graphics/device_shaders.cpp`), adapter in `src/hooks/device_shaders.cpp` (`--native_device_shaders`; it stays while the queue's slot 2 `sub_8258ED78`, Wrapped, calls it through `ctx`). Harness `device_shaders`: 64 cases (0 to 199 buckets), 0 differ. |
 | `sub_82590C48` | `PassList::~PassList` (probably the deleting destructor, vtable `0x8206CB88` slot 0) | | Not seen in play. r3 = a pass list, r4 = flags: +0 = vtable `0x8206CB88`, frees +20 and +24 (`sub_825A71C0`), and the list itself when r4 bit 0 is set (`sub_825A70E8`); returns r3. Called by `RenderQueue::~RenderQueue` through the vtable. Read in full (B7 loop, 2026-11-01). |
 | `sub_82590DE0` | `RenderQueue::~RenderQueue` (probably) | | Not seen in play. r3 = the render queue: +0 = vtable `0x8206CB8C`; the pass lists at +8 and +12 destroyed through their vtable's slot 0 with r4 = 1 when not 0; then the state (+4), when not 0: its vector's memory (+72) freed when not 0 (`sub_825A70E8`), +72, +76, +80 = 0, `sub_825A13C0` on state + 4 (probably `PrimitiveDrawer::~PrimitiveDrawer`, not read), and the state freed (`sub_825A70E8`). No direct callers (probably the queue's vtable). Read in full (B7 loop, 2026-11-01). |
+| `sub_8258ED00` | `RenderQueue::Init` | | Slot 0 of `0x8206CB8C` (no direct callers): r3 = the render queue, r4 = the device. Calls the drawer's (state + 4) vtable slot 0, `PrimitiveDrawer::Init` (`sub_825A1438`, recompiled, `model-animation.md`), with r3 = the drawer and r4 still the device; then state +48 + 4 × i = `Device::GetRenderTarget(device, i)` (`sub_822A3998`, `graphics-resources.md`, AddRef'ed) for i = 0 to 3, and state +64 = `Device::GetDepthStencilSurface(device)` (`sub_822A39E0`). A 128-byte frame (r27-r31 saved). Once at boot, from the scene's constructor `sub_82098A98` with the device `VideoOutput::LockDevice` returned. Seen in play. Read in full (B7 loop, 2026-11-01; it was in the graphics resources' users lead in `../loops/leads.md`, "reads the device's render target and depth surface"). |
+| `sub_8258E5C8` | | | Not seen in play. Slot 1 of `0x8206CB8C` (no direct callers): r3 = the render queue: tail-calls the drawer's (state + 4) vtable slot 1 (`sub_825A1610`, never ran, `model-animation.md`) with r3 = the drawer, the other registers passed on. 6 instructions. Read in full (B7 loop, 2026-11-01). |
+| `sub_8258ED78` | `RenderQueue::ClearRecording` | Wrapped | Named in `--find_menu_selection`'s log (`ITC_MENU_SCAN_WRAP`): `Scene::Update`'s two screen calls and others. Slot 2 of `0x8206CB8C` (no direct callers): r3 = the render queue: the list being recorded (its own slot 7, `RenderQueue::Recording`) emptied (`PassList::Clear` `sub_8258EB38`, above, with the list the slot returned), then state +84 (the sequence) = 0.0 (the float at `0x82000A34`). A 96-byte frame (r31 saved). Every pass, from `Scene::Update` (`sub_820988C8`, `functions.md`) after slot 6. Read in full (B7 loop, 2026-11-01; the row moved from `functions.md`). |
+| `sub_8258EDC8` | `RenderQueue::Add` (the game's `OT::Add`) | | Slot 4 of `0x8206CB8C` (no direct callers): r3 = the render queue, r4 = a closed chunk (or 0), r5 = the bucket (the layer, unsigned), f1 = the key. When the bucket is above 2,056, or the key above 10,000.0 (`0x82002814`) or below -10,000.0 (`0x82001C00`; a NaN key passes), a warning: `DebugPrintf` (`sub_825A1318`, below) with `warning!!! : call OT::Add( %x, %u, %f )\n` (`0x8206CB38`), the chunk, the bucket and the key as a double; never ran. Nothing more when r4 is 0. Otherwise, in a 144-byte frame (r29-r31 and f31 saved): the doubleword at r1 + 80 = {the chunk, the key as a single}, at r1 + 88 = {the sequence (state +84), the frame's word at r1 + 92, a stack leftover `PassList::Add` doesn't read}; the list being recorded (its own slot 7) and `PassList::Add(list, r4 = r1 + 80's, r5 = r1 + 88's, r6 = the bucket)` (`sub_8258EB88`), its answer not read; then state +84 += 0.1 (`0x82001FBC`, single precision), whether the item fitted or not. Callers in play: the recorders in `scenery-lists.md`, `mode-tick.md`, `minimap.md`, `sprites.md` and others (through the vtable; some native callers make the guest call, `src/hooks/mode_tick.cpp`, `minimap.cpp`, `sprites.cpp`). Read in full (B7 loop, 2026-11-01). |
+| `sub_8258EB88` | `PassList::Add` | | r3 = a pass list, r4 = the doubleword {chunk, key}, r5 = {sequence, unused}, r6 = the bucket. No frame of its own: r4 and r5 are stored into its caller's frame at r1 + 32 and r1 + 40 (`RenderQueue::Add`'s; memory it leaves written) and read back from there as two words and two floats. Returns 0 when r6 isn't below the bucket count (+12) or the items used (+16) aren't below the item count (+8). Otherwise the item at +20 + 20 × (+16): +0 = 0, +4 = the chunk, +8 = the key, +12 = the sequence (+16 not written); appended to the bucket at +24 + 16 × r6 (its +0 = the item when that's 0, else the last item's (+4) +0 = the item; +4 = the item; +12 += 1); +16 += 1; returns 1. Leaf. Only caller `RenderQueue::Add`. Read in full (B7 loop, 2026-11-01). |
+| `sub_82591238` | `RenderQueue::Replay` | | Slot 5 of `0x8206CB8C` (no direct callers): r3 = the render queue, r4 = the device, r5 = the video output. Once a frame on the render thread, from `Scene::Draw` (`sub_82098940`, `functions.md`). In a 192-byte frame: `[0x8296BD90]` = the device (where the command handlers find it, `../gpu-functions.md`), state +44 = r5, state +24, +28, +32, +36 = 0, `[0x82970BB8]` = state + 4 (the drawer), `[0x82970BBC]` = state + 12, `[0x82970BC0]` = state + 48 (the render targets `Init` kept), `[0x8296BD8C]` = state + 68 (the release list), which is emptied (`TextureProvider::Clear` `sub_82590D68`, `models.md`, shared). Then the list being replayed (its own slot 8); for each of its buckets (+12 of them, at +24): list +28 = 0, +32 = the bucket's first item, the byte +4 = 1 when there's none (else 0); the bucket's items (by their +0) put in the array at `0x8296BD98` as item + 4 (room for 5,000 before `0x82970BB8`, not checked; a list holds at most 4,096 items), +32 and +4 following along. With n entries: when n > 1 sorted by key (`RenderQueue::Partition` over 0 to n - 1, then `RenderQueue::QuickSort` on each side, with `RigidBody::Mass` `sub_820B6708` as the getter: the float at the entry's +4, the item's key; `vehicle-accessors.md`); then each run of equal keys (compared inline, `fcmpu`) longer than one sorted the same way by `QueueEntry::Sequence` (`sub_8258E5C0`); then `ChunkChain::Run(queue, the entry's chunk)` (`sub_8258EE98`) for each entry in order. After the buckets: the release list's size taken once; for each element (the vector read again from `[0x8296BD8C]` each time; `sub_825944B0`, the subscript error, when its first is 0 or the index isn't below its size, never), when not 0 its vtable slot 0 with r4 = 1 (probably its deleting destructor) and the element = 0 (the size left; the next replay's `Clear` empties it). Then `[0x8296BD90]` = 0. Read in full (B7 loop, 2026-11-01). |
+| `sub_8258EC38` | `RenderQueue::Partition` | | Quicksort's partition over an array of pointers: r3 = the array, r4 = lo, r5 = hi, r6 = a key getter (r3 = an element, returns f1). The pivot is a[hi]; i from lo - 1 up while key(a[i]) < the pivot's key (no bound: the pivot stops it), j from hi down while j > i and the pivot's key < key(a[j]); when j > i, a[i] and a[j] swapped and both scans go on (the pivot's key asked again each round); at the end a[i] and a[hi] swapped; returns i. A 160-byte frame (r24-r31 and f31 saved). From `RenderQueue::Replay` (twice) and `RenderQueue::QuickSort`. Read in full (B7 loop, 2026-11-01). |
+| `sub_82590CB0` | `RenderQueue::QuickSort` | | r3 = the array, r4 = lo, r5 = hi, r6 = the key getter: while lo < hi, p = `RenderQueue::Partition(array, lo, hi, getter)`, `QuickSort(array, lo, p - 1, getter)` and lo = p + 1 (recursive on the left, a loop on the right). A 128-byte frame. From `RenderQueue::Replay` (four calls: each side of its two partitions) and itself. Read in full (B7 loop, 2026-11-01). |
+| `sub_8258E5C0` | `QueueEntry::Sequence` | | r3 = a queue entry (an item + 4): returns the float at +8 (the item's sequence). Leaf, 2 instructions. Reached only through its address (`0x8258E5C0`), the replay's sort getter for equal keys. Seen in play. Read in full (B7 loop, 2026-11-01). |
+| `sub_8258EE98` | `ChunkChain::Run` (`../gpu-functions.md`'s chain walker) | | r3 = the render queue (passed on, not read by the kinds), r4 = an item (a chunk). While r4 isn't 0: the kind is the first word's low halfword, sign-extended (bytes +2 and +3; `../gpu-functions.md` said the first halfword); kinds 0-5 go to the six walkers below (a jump table at `0x8258EEDC`, recompiled as a switch), each returning the next item (r4); kind 6 ends the walk; any other kind (above 6 unsigned) loops on the same item for ever (never seen). A 96-byte frame (r31 saved). Only caller `RenderQueue::Replay`, once an entry. Read in full (B7 loop, 2026-11-01). |
+| `sub_8258E630` | `ChunkChain::RunSingles` (kind 0) | | r4 = the item: +8 the count of single commands; slot i (from 0) at item + 16 × (i + 1), its handler from the table `0x8265ED48` by the slot's +0 (the id; "Single commands" in `../gpu-functions.md`), called with r3 = the slot; i += its answer + 1 while below the count. Returns 0 (the chain ends). A 128-byte frame. From `ChunkChain::Run`. Read in full (B7 loop, 2026-11-01). |
+| `sub_8258E698` | `ChunkChain::RunInline` (kind 1) | | Not seen in play. r4 = the item: commands inline from item + 16 ("Command format" in `../gpu-functions.md`): each slot's handler from the table `0x8265EDE0` by its +0 (the id), with r3 = the payload (slot + 16), r4 = the slot's +4, r5 = its +8; the next slot (answer + 1) × 16 on; until id 36. Returns the slot after the end one (the next item follows inline). A 112-byte frame. From `ChunkChain::Run`. Read in full (B7 loop, 2026-11-01). |
+| `sub_8258E718` | `ChunkChain::RunInlineLinked` (kind 2) | | Not seen in play. As kind 1 (commands inline from item + 16 through `0x8265EDE0`, until id 36), but returns the item's +4 (the next item by pointer). From `ChunkChain::Run`. Read in full (B7 loop, 2026-11-01). |
+| `sub_8258E780` | `ChunkChain::RunOutOfLine` (kind 3) | | r4 = the item: the commands at the item's +4 (through `0x8265EDE0`, until id 36, as kind 1); returns item + 16 (the next item inline). A 112-byte frame. From `ChunkChain::Run`. Read in full (B7 loop, 2026-11-01). |
+| `sub_8258E7E8` | `ChunkChain::RunOutOfLineLast` (kind 4) | | r4 = the item: the commands at the item's +4 (as kind 3); returns 0 (the chain ends). A 112-byte frame. From `ChunkChain::Run`. Read in full (B7 loop, 2026-11-01). |
+| `sub_8258E868` | `ChunkChain::RunInlineLast` (kind 5) | | r4 = the item: commands inline from item + 16 (as kind 1); returns 0 (the chain ends). A 112-byte frame. From `ChunkChain::Run`. Read in full (B7 loop, 2026-11-01). |
+| `sub_8258E5E0` | `RenderQueue::Flip` | Wrapped | Named in `--find_menu_selection`'s log (`ITC_MENU_SCAN_WRAP`): `Scene::Update`'s two screen calls and others. Slot 6 of `0x8206CB8C` (no direct callers): r3 = the render queue: the state's +0 (the replay index) = 1 when it was 0, else 0. Leaf, 5 instructions. Every pass, from `Scene::Update` (`sub_820988C8`, `functions.md`), before slot 2. Read in full (B7 loop, 2026-11-01; the row moved from `functions.md`). |
+| `sub_8258E5F8` | `RenderQueue::Recording` | | Slot 7 of `0x8206CB8C` (no direct callers): r3 = the render queue: returns the pass list being recorded, the word at r3 + 4 × (2 + (index == 0)) (+12 when the replay index, state +0, is 0, else +8). Leaf, 7 instructions. From `RenderQueue::ClearRecording` and `Add` through the vtable (other callers not traced). Read in full (B7 loop, 2026-11-01). |
+| `sub_8258E618` | `RenderQueue::Replaying` | | Slot 8 of `0x8206CB8C` (no direct callers): r3 = the render queue: returns the pass list being replayed, the word at r3 + 4 × (2 + index) (+8 for 0, +12 for 1). Leaf, 5 instructions. From `RenderQueue::Replay` through the vtable (other callers not traced). Read in full (B7 loop, 2026-11-01). |
+| `sub_82590EA0` | `RenderQueue::~RenderQueue` (probably the deleting destructor) | | Not seen in play. Slot 9 of `0x8206CB8C` (no direct callers): r3 = the render queue, r4 = flags: `RenderQueue::~RenderQueue` (`sub_82590DE0`, above), then the queue freed (`sub_825A70E8`, `c-runtime.md`) when r4 bit 0 is set; returns r3. Read in full (B7 loop, 2026-11-01). |
+| `sub_82591540` | `PtrVector::PushBack` | | `std::vector<T*>::push_back`: r3 = the vector (+4 first, +8 last, +12 end), r4 = the value's address: with room (first not 0 and the size below the capacity) the value stored at last and +8 moved on by 4; otherwise `PtrVector::Insert(r1 + 80, vector, last, value address)` (`sub_825911C8`). A 96-byte frame. From command 22 (`sub_82591798`, `functions.md`; the release list `[0x8296BD8C]`, `../gpu-functions.md`) and the single commands' 22 (`sub_825916F0`, not seen in play). Read in full (B7 loop, 2026-11-01). |
+| `sub_825911C8` | `PtrVector::Insert` | | `std::vector<T*>::insert(where, value)`: r3 = where the answer goes, r4 = the vector, r5 = where, r6 = the value's address: the index (where - first, 0 for an empty vector), `TextureProvider::InsertN(vector, where, 1, value)` (`sub_82590EF0`, `models.md`, shared), then [r3] = first + 4 × index (the new element). A 112-byte frame. Only caller `PtrVector::PushBack`. Read in full (B7 loop, 2026-11-01). |
+| `sub_825A1318` | `DebugPrintf` (probably) | | Not seen in play. r3 = a format, r4-r10 its arguments (stored into its caller's frame at r1 + 24 to + 79 before its own 4,208-byte frame, with a stack probe): formats into a buffer at r1 + 96 (`sub_825A71B0`, probably `vsprintf`, not read) and passes it to `OutputDebugStringA` (`sub_82296270`, `functions.md`, which drops it in the retail game). From `RenderQueue::Add`'s warning and the command list's overflow and nesting checks (`command-list.md`). Read in full (B7 loop, 2026-11-01). |
+| `sub_825944B0` | `std::_Xran` (probably) | | Not seen in play. Builds a string from `invalid vector<T> subscript` (`0x8200220C`, 27 characters; `sub_82091808`, `sub_820919B8`, not read), probably a `std::out_of_range`, and throws it. Not read in detail. From `RenderQueue::Replay`'s release list loop (its check can't fail there) and the texture provider (`scenery-lists.md`, which called it the provider's resize). |

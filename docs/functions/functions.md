@@ -470,7 +470,9 @@ Rows not yet moved stay in the table below. So far:
 - [`device-shaders.md`](device-shaders.md): the device's shader
   setters under the primitive drawer (`SetVertexShader`,
   `SetPixelShader`, `SetVertexDeclaration`) and the render queue at
-  scene + 64 that makes the drawer, with its two pass lists (B7).
+  scene + 64 that makes the drawer, with its two pass lists, its
+  methods (the add, the flip, the replay with its sort) and the chunk
+  walker under the replay (B7).
 
 These files hold functions only. What used to follow the table here moved
 out on 2026-10-20: how frame interpolation works, its options and what
@@ -708,8 +710,6 @@ old performance notes to the end of `../native-renderer.md`.
 | `sub_8210BA68` | | Wrapped | The action mappers' read slots (vtable `0x82007F78`; r3 the mapper, r4 the action id 151-180); logged for `--log_pause_menu` (`PAUSE_MENU_READ_SLOT`). |
 | `sub_8210BED8` | | Wrapped | The action mappers' read slots (vtable `0x82007F78`; r3 the mapper, r4 the action id 151-180); logged for `--log_pause_menu` (`PAUSE_MENU_READ_SLOT`). |
 | `sub_8210BFA8` | | Wrapped | The action mappers' read slots (vtable `0x82007F78`; r3 the mapper, r4 the action id 151-180); logged for `--log_pause_menu` (`PAUSE_MENU_READ_SLOT`). |
-| `sub_8258E5E0` | | Wrapped | Named in `--find_menu_selection`'s log (`ITC_MENU_SCAN_WRAP`): `Scene::Update`'s two screen calls and others. |
-| `sub_8258ED78` | | Wrapped | Named in `--find_menu_selection`'s log (`ITC_MENU_SCAN_WRAP`): `Scene::Update`'s two screen calls and others. |
 | `sub_82094B10` | | Wrapped | Named in `--find_menu_selection`'s log (`ITC_MENU_SCAN_WRAP`): `Scene::Update`'s two screen calls and others. |
 | `sub_820C5DE8` | | Wrapped | The race draw step's parts and the per-car update's callees, wrapped only to name which one advances per-frame state (`--find_per_frame_state`) and to skip one (`--debug_hide`) (`ITC_FRAME_STATE_WRAP`, `src/debug/frame_state_diff.cpp`). |
 | `sub_820C4EB8` | | Wrapped | The race draw step's parts and the per-car update's callees, wrapped only to name which one advances per-frame state (`--find_per_frame_state`) and to skip one (`--debug_hide`) (`ITC_FRAME_STATE_WRAP`, `src/debug/frame_state_diff.cpp`). |
