@@ -126,7 +126,15 @@ file's history. What's left to see in a drive, from every run:
   blocks' destructors, the wheels' groups and the morph (32 roots).
   Validated (`itc_3163`, 120 s: race 54 s, 0 errors; replay `itc_3164`
   ok): 81 of 81 harness lines, 79 ran in the race, 2 in the replay,
-  none to drive. Second migration: migration agent running.
+  none to drive. Second migration checked (c6ca2920..d07ffc2b: the
+  objects' resets, constructors, releases, destructors, the wheels'
+  groups, the morph and the shape accessors; 74 rows, 143 of 152 ours,
+  38 adapters removed; harness second_set and scene_loaders 0
+  differing, frame dumps alike, races 38 s, 0 errors; no subagents).
+  The teardown functions not seen in an attract race. Left:
+  `WheelPoints::SetUp` `sub_820E8668` (5 functions, 1,368 lines, a
+  third migration); blocked by `ScenePools::ReleaseB`. Step: validation
+  agent running.
 
 ## Done
 
@@ -235,5 +243,9 @@ file's history. What's left to see in a drive, from every run:
 - After the second set's first migration (`itc_3162`: race 38 s, 0
   errors, second_set 0 differing): ours 3858, work left 2541 (wrapped
   97, known 560, unknown 1884).
+
+- After the second set's second migration (`itc_3175`: race 38 s, 0
+  errors, second_set 0 differing): ours 3920, work left 2479 (wrapped
+  97, known 498, unknown 1884).
 
 ## Stopped

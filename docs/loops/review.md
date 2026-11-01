@@ -130,6 +130,16 @@ When the user has reviewed a run's section, its heading gets
   Find adapters leave flush-to-zero as the last float step left it;
   `PartsPoints::Find`'s read of +37076 to +37084 and `ResetRightDoor`'s
   scaling with model 0 copied.
+- The second set's second migration (c6ca2920..d07ffc2b): 74 rows. For
+  review: `~SceneTraffic` not releasing and the scene model's deleting
+  destructor being the base class's copied; `Morph::SetUp`'s
+  `DebugPrintf` messages (never ran) logged instead, as in
+  `shader_objects`; the deleting destructors leave operator delete (r4
+  bit 0, never in play) to the original; the releases' and destructors'
+  cases for pools 1 and 3-6 built without their first-set object; a new
+  `hooks::SceneLoadersReleaseANative(pool)` from `hooks/scene_loaders`;
+  the morph's flush-to-zero as the translated code sets it, put back by
+  the adapters.
 
 ## Run 2026-10-31 16:54 (`b7-loop-31-10-26`, continued)
 
