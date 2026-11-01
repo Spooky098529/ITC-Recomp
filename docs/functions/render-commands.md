@@ -19,7 +19,7 @@ The library calls they reach are in `device-state.md`,
 `device-shaders.md`, `graphics-resources.md` and `functions.md`
 (`Device::Resolve`, `Device::Clear`, the inline vertex draws and the
 tiling). Names are ours. "Not seen in play" is by the coverage list
-(`../coverage.md`). Statuses as defined at the top of `functions.md`.
+(`../coverage.md`). Statuses as defined at the top of `functions.md`. Since 2026-11-01, `--conventional_renderer` (off by default until checked) runs our own handlers instead (`src/render/commands.cpp`, decoding into `src/render/device.h`; `../conventional-renderer.md`, step 1); the statuses below change when it goes on by default.
 
 | Address | Name | Status | Notes |
 |---|---|---|---|
