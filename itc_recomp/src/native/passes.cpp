@@ -4550,6 +4550,18 @@ void Passes::set_interface(render::State* state) {
   state_->interface = state;
 }
 
+void Passes::TextureCreated(uint32_t handle) {
+  state_->textures.Created(handle);
+}
+
+void Passes::TextureWritten(uint32_t handle) {
+  state_->textures.Written(handle);
+}
+
+void Passes::TextureDestroyed(uint32_t handle) {
+  state_->textures.Destroyed(handle);
+}
+
 void Passes::InterfaceDraw(VkCommandBuffer commands, uint8_t* base, render::State& state,
                            const render::DrawIndexed& draw) {
   State& s = *state_;

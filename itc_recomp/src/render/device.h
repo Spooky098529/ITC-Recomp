@@ -4,9 +4,10 @@
 // game's command list; a backend (the Vulkan renderer in src/native/) reads
 // the state at each operation.
 //
-// Until step 4 (resources made through the interface), resources are named
-// by the game's objects: the guest addresses of its surfaces, textures,
-// buffers, shaders and vertex declarations, whose headers the backend reads.
+// Resources are named by the game's objects: the guest addresses of its
+// surfaces, textures, buffers, shaders and vertex declarations, whose
+// headers the backend reads. Textures are made, written and freed through
+// the interface (render/resources.h, step 2); buffers still are not (2b).
 //
 // Enum values are chosen to equal the game's (the Xbox 360's) encodings, so
 // the handlers pass them through; a backend maps them by name.
@@ -302,6 +303,11 @@ class Backend {
   // (the tiles' extent), each cleared to `clear` first.
   virtual void BeginTiling(State& state, uint32_t width, uint32_t height, float clear) = 0;
   virtual void EndTiling(State& state) = 0;
+
+  // Textures made, written and freed (render/resources.h), between lists.
+  virtual void TextureCreated(Texture texture) = 0;
+  virtual void TextureWritten(Texture texture) = 0;
+  virtual void TextureDestroyed(Texture texture) = 0;
 };
 
 }  // namespace render

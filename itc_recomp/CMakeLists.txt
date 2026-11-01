@@ -578,6 +578,7 @@ set(ITC_SOURCES
     src/native/vertex_fetch_patch.cpp
     src/native/interface_registers.cpp
     src/render/commands.cpp
+    src/render/resources.cpp
     src/native/vulkan_functions.cpp
     src/interpolation/transform.cpp
     src/frame_pacing/game_messages.cpp

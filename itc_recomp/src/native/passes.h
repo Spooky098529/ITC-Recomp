@@ -42,6 +42,11 @@ class Passes {
   // the first frame, is the state everything binds from (FrontBufferResolve
   // and DrawMovie take render target 0 from it too).
   void set_interface(render::State* state);
+  // Textures made, written and freed (render/resources.h), between lists:
+  // the texture cache's table by handle.
+  void TextureCreated(uint32_t handle);
+  void TextureWritten(uint32_t handle);
+  void TextureDestroyed(uint32_t handle);
   void InterfaceDraw(VkCommandBuffer commands, uint8_t* base, render::State& state,
                      const render::DrawIndexed& draw);
   void InterfaceInlineDraw(VkCommandBuffer commands, uint8_t* base, render::State& state,

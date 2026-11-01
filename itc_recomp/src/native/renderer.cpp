@@ -9,6 +9,7 @@
 
 #include "passes.h"
 #include "render/commands.h"
+#include "render/resources.h"
 #include "shaders.h"
 #include "vulkan_functions.h"
 
@@ -315,6 +316,9 @@ class Renderer {
     passes_.DrawMovie(BeginFrame(), base, device, planes);
   }
   void EndFrame();
+  // Textures made, written and freed before the list now replayed
+  // (render/resources.h).
+  void ApplyResourceEvents() { render::ResourceEvents_Apply(*interface_backend_); }
 
  private:
   bool CreateWindowAndInstance();
@@ -373,6 +377,15 @@ class Renderer {
                                              clear);
     }
     void EndTiling(render::State&) override { renderer_.passes_.EndTiling(); }
+    void TextureCreated(render::Texture texture) override {
+      renderer_.passes_.TextureCreated(texture.address);
+    }
+    void TextureWritten(render::Texture texture) override {
+      renderer_.passes_.TextureWritten(texture.address);
+    }
+    void TextureDestroyed(render::Texture texture) override {
+      renderer_.passes_.TextureDestroyed(texture.address);
+    }
 
    private:
     Renderer& renderer_;
@@ -693,6 +706,7 @@ bool Renderer::Init(uint8_t* base) {
   interface_backend_ = std::make_unique<InterfaceBackend>(*this, base);
   commands->set_backend(interface_backend_.get());
   passes_.set_interface(&commands->state());
+  ApplyResourceEvents();
   return true;
 }
 
@@ -1062,8 +1076,8 @@ void Renderer::LogStats() {
                double(t.resolved_mismatched) / frames);
   texture_ns_ = texture_ns_max_ = 0;
   ITC_LOG_INFO("native renderer: textures: {} memcpy writes, {} textures marked written ({:.1f} "
-               "ms marking)",
-               t.writes, t.marked, mark_ns_ / 1e6);
+               "ms marking); through the interface {} made, {} written, {} freed ({} held)",
+               t.writes, t.marked, mark_ns_ / 1e6, t.created, t.written, t.destroyed, t.handles);
   mark_ns_ = 0;
   if (t.unrecorded) {
     ITC_LOG_INFO("native renderer: {} textures changed in memory with no write recorded, e.g. "
@@ -1237,11 +1251,16 @@ uint64_t g_lists_missing = 0, g_lists_queued_most = 0;
 }  // namespace
 
 void Renderer_OnListHandedOver(bool logic_pass) {
+  render::ResourceEvents_OnListHandedOver();
   std::lock_guard lock(g_lists_mutex);
   g_lists.push_back(logic_pass);
 }
 
 void Renderer_OnReplayStart() {
+  render::ResourceEvents_OnReplayStart();
+  if (g_renderer) {
+    g_renderer->ApplyResourceEvents();  // else when it starts
+  }
   std::lock_guard lock(g_lists_mutex);
   g_lists_queued_most = std::max<uint64_t>(g_lists_queued_most, g_lists.size());
   if (g_lists.empty()) {

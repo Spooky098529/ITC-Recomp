@@ -564,6 +564,11 @@ struct TextureCache::State {
   static uint64_t ResolveKey(uint32_t page, float scale) {
     return uint64_t(std::bit_cast<uint32_t>(scale)) << 32 | page;
   }
+  // Textures by handle, as made through the interface (Created).
+  struct Handle {
+    bool written = false;
+  };
+  std::unordered_map<uint32_t, Handle> handles;
   std::unordered_map<uint64_t, VkSampler> samplers;
   BindingTable view_answers, sampler_answers;
   // Each fetch constant's last answer from them (a copy of the entry, so
@@ -1230,6 +1235,26 @@ void TextureCache::State::DestroyRetired() {
   retired.erase(retired.begin(), due);
 }
 
+void TextureCache::Created(uint32_t handle) {
+  State& s = *state_;
+  s.stats.created++;
+  s.handles[handle] = {};
+}
+
+void TextureCache::Written(uint32_t handle) {
+  State& s = *state_;
+  s.stats.written++;
+  if (auto it = s.handles.find(handle); it != s.handles.end()) {
+    it->second.written = true;
+  }
+}
+
+void TextureCache::Destroyed(uint32_t handle) {
+  State& s = *state_;
+  s.stats.destroyed++;
+  s.handles.erase(handle);
+}
+
 TextureCache::GenerationEvents TextureCache::TakeGenerationEvents() {
   GenerationEvents events = events_;
   events_ = {};
@@ -1726,6 +1751,7 @@ VkCommandBuffer TextureCache::EndUploads() {
 
 TextureCache::Stats TextureCache::TakeStats() {
   Stats stats = state_->stats;
+  stats.handles = uint32_t(state_->handles.size());
   uint32_t textures = stats.textures, samplers = stats.samplers;
   state_->stats = {};
   state_->stats.textures = textures;

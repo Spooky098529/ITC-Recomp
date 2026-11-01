@@ -33,6 +33,13 @@ class TextureCache {
   // Render thread. After the frame's fence has been waited on.
   void BeginFrame(uint32_t frame_index);
 
+  // Textures made, written and freed through the interface
+  // (render/resources.h), by handle (the header's guest address); render
+  // thread, between lists.
+  void Created(uint32_t handle);
+  void Written(uint32_t handle);
+  void Destroyed(uint32_t handle);
+
   // The fetch constant's texture as a view of the given type, with the
   // fetch constant's swizzle; loaded as needed, and reloaded after the
   // library's memcpy writes its memory. Null if the texture can't be had (unsupported format or
@@ -138,6 +145,9 @@ class TextureCache {
     uint64_t unrecorded = 0;
     uint32_t unrecorded_sample = UINT32_MAX, unrecorded_frames = 0;
     uint32_t textures = 0, samplers = 0;
+    // Through the interface (Created, Written, Destroyed), and handles held.
+    uint64_t created = 0, written = 0, destroyed = 0;
+    uint32_t handles = 0;
     uint32_t unsupported_sample = UINT32_MAX;  // format << 8 | dimension
     // A texture of another dimension than the shader declares: declared view
     // type << 16 | format << 8 | dimension, and its size.
