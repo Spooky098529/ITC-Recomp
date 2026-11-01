@@ -499,7 +499,12 @@ void SecondSetPartsResetRightDoor(PPCContext& ctx, uint8_t* base) {
 // sub_820E68E8 and WheelPoints sub_820ECC48, WheelPoints::Reset sub_820E85C8,
 // the wheels' group inits and resets (sub_820E8A80, sub_820E74B8, sub_820E99C0,
 // sub_820E7918, sub_820EA8E8, sub_820E7C08, sub_820EB320, sub_820E7F90)
-// (2026-11-01, their callers in play native).
+// (2026-11-01, their callers in play native); the destructors the deleting
+// destructors call (~SceneCarModel sub_820DB720, ~SceneParts sub_820E2E10,
+// ~SceneInterior sub_820E5178, ~SceneLights sub_820DDE00, ~SceneWheels
+// sub_820ECDD0, ~SceneTraffic sub_820E69F0) and their point blocks'
+// (sub_820E2C10, sub_820E50C0, sub_820DDD90, sub_820ECCB8, sub_820E6980)
+// (2026-11-01, their callers native).
 ITC_SECOND_SET(820CEB30, SecondSetFindShape)
 ITC_SECOND_SET(820E0258, SecondSetPartsFind)
 ITC_SECOND_SET(820DBC88, SecondSetCockpitFind)
@@ -511,12 +516,6 @@ ITC_SECOND_SET(820DBE20, SecondSetSceneCockpitReset)
 ITC_SECOND_SET(820DB6C0, SecondSetSceneCarModelRelease)
 ITC_SECOND_SET(820DA108, SecondSetSceneModelBlockConstruct)
 ITC_SECOND_SET(820D9F50, SecondSetSceneModelBlockReset)
-ITC_SECOND_SET(820DB720, SecondSetSceneCarModelDestruct)
-ITC_SECOND_SET(820E2E10, SecondSetScenePartsDestruct)
-ITC_SECOND_SET(820E5178, SecondSetSceneInteriorDestruct)
-ITC_SECOND_SET(820DDE00, SecondSetSceneLightsDestruct)
-ITC_SECOND_SET(820ECDD0, SecondSetSceneWheelsDestruct)
-ITC_SECOND_SET(820E69F0, SecondSetSceneTrafficDestruct)
 ITC_SECOND_SET(820DB7C8, SecondSetSceneCarModelDeletingDestruct)
 ITC_SECOND_SET(820E2F78, SecondSetScenePartsDeletingDestruct)
 ITC_SECOND_SET(820E53A0, SecondSetSceneInteriorDeletingDestruct)
@@ -524,12 +523,7 @@ ITC_SECOND_SET(820DE090, SecondSetSceneLightsDeletingDestruct)
 ITC_SECOND_SET(820ECEB8, SecondSetSceneWheelsDeletingDestruct)
 ITC_SECOND_SET(820E6ED8, SecondSetSceneTrafficDeletingDestruct)
 ITC_SECOND_SET(820DB400, SecondSetPoolObjectDeletingDestruct)
-ITC_SECOND_SET(820E2C10, SecondSetPartsPointsDestruct)
 ITC_SECOND_SET(820DC258, SecondSetCockpitPointsDestruct)
-ITC_SECOND_SET(820E50C0, SecondSetInteriorPointsDestruct)
-ITC_SECOND_SET(820DDD90, SecondSetLightPointsDestruct)
-ITC_SECOND_SET(820ECCB8, SecondSetWheelPointsDestruct)
-ITC_SECOND_SET(820E6980, SecondSetTrafficPointsDestruct)
 ITC_SECOND_SET(820E0590, SecondSetScenePartsRelease)
 ITC_SECOND_SET(820E3890, SecondSetSceneInteriorRelease)
 ITC_SECOND_SET(820DCB20, SecondSetSceneLightsRelease)
