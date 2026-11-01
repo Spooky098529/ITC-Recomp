@@ -6,11 +6,17 @@
 #include "guest.h"
 #include "renderer.h"
 #include "state.h"
+#include "vertex_fetch_patch.h"
 
+#include "base/flags.h"
 #include "base/log.h"
 
+#include <cstring>
 #include <set>
+#include <string>
+#include <tuple>
 #include <utility>
+#include <vector>
 
 // Command handlers, wrapped so the stats logger and the native renderer
 // see every command. Command 7 (sub_8258FD48) is wrapped in blend_state.cpp.
@@ -41,6 +47,75 @@ uint32_t g_current_command = 0;
 uint32_t g_command_serial = 0;
 }
 
+// --check_vertex_fetch_patch (temporary, for the conventional renderer's
+// port of the patcher): the library's patch, and the native one
+// (vertex_fetch_patch.cpp) on a copy of the same microcode, compared.
+ITC_FLAG_BOOL(check_vertex_fetch_patch, false, "ITC",
+              "Patch each vertex shader the graphics library patches for its declaration "
+              "(sub_822AE340) natively as well (src/native/vertex_fetch_patch.cpp) and log "
+              "where the two differ (a temporary check of the port)");
+
+namespace {
+struct PatchCheck {
+  uint64_t patches = 0, differ = 0, unread = 0;
+  std::set<std::tuple<uint32_t, uint32_t, std::vector<uint8_t>>> seen;  // (shader, declaration, strides)
+} g_patch_check;
+
+void CheckVertexFetchPatch(PPCContext& ctx, uint8_t* base) {
+  static const native::VertexFetchTables tables = [&] {
+    native::VertexFetchTables t = native::LoadVertexFetchTables(base);
+    std::string masks, sizes;
+    for (uint16_t m : t.select_masks) masks += fmt::format(" {:04X}", m);
+    for (uint8_t s : t.format_sizes) sizes += fmt::format(" {}", s);
+    ITC_LOG_INFO("vertex fetch patch: select masks{}; format sizes{}", masks, sizes);
+    return t;
+  }();
+  PatchCheck& c = g_patch_check;
+  uint32_t object = ctx.r3.u32, microcode = ctx.r4.u32, declaration = ctx.r5.u32;
+  uint8_t strides[16];
+  std::memcpy(strides, base + ctx.r6.u32, sizeof(strides));
+  uint32_t size = guest::LoadU32(base, object + 600);
+  native::GuestVertexFetchInputs inputs;
+  bool read = native::ReadGuestVertexFetchInputs(base, object, declaration, inputs);
+  std::vector<uint8_t> ours(base + microcode, base + microcode + size);
+  bool inside = read && native::PatchVertexFetches(tables, inputs.fetches(), inputs.declaration(),
+                                                   strides, ours.data(), ours.size());
+  __imp__sub_822AE340(ctx, base);
+  c.patches++;
+  if (!read) {
+    c.unread++;
+    return;
+  }
+  bool same = std::memcmp(ours.data(), base + microcode, size) == 0;
+  bool first = c.seen.insert({object, guest::LoadU32(base, declaration + 48),
+                              std::vector<uint8_t>(strides, strides + 16)})
+                   .second;
+  if (!same) {
+    c.differ++;
+    if (c.differ <= 20) {
+      std::string words;
+      for (uint32_t at = 0; at + 4 <= size; at += 4) {
+        uint32_t theirs = guest::LoadU32(base, microcode + at);
+        uint32_t mine = uint32_t(ours[at]) << 24 | uint32_t(ours[at + 1]) << 16 |
+                        uint32_t(ours[at + 2]) << 8 | ours[at + 3];
+        if (theirs != mine) {
+          words += fmt::format(" [{}] {:08X} ours {:08X};", at / 4, theirs, mine);
+        }
+      }
+      ITC_LOG_INFO("vertex fetch patch: differs: shader {:08X} ({} fetches), declaration {:08X} "
+                   "({} elements){}:{}",
+                   object, inputs.fetch_count, declaration, inputs.element_count,
+                   inside ? "" : " (out of range)", words);
+    }
+  }
+  if (first || c.patches % 1000 == 0) {
+    ITC_LOG_INFO("vertex fetch patch: {} patches, {} differ, {} unread; {} distinct (shader, "
+                 "declaration, strides)",
+                 c.patches, c.differ, c.unread, c.seen.size());
+  }
+}
+}  // namespace
+
 // When the GPU may still be using a vertex shader's microcode, the library
 // can't patch it in place: sub_822AEBF0 copies it into the command buffer
 // (IM_LOAD_IMMEDIATE) and patches the copy, leaving the object's microcode
@@ -55,6 +130,10 @@ extern "C" REX_FUNC(sub_822AE340) {
   native::g_last_patch[0] = object;
   native::g_last_patch[1] = declaration;
   native::g_last_patch[2] = declaration ? guest::LoadU32(base, declaration + 48) : 0;
+  if (ITC_FLAG(check_vertex_fetch_patch)) {
+    CheckVertexFetchPatch(ctx, base);
+    return;
+  }
   __imp__sub_822AE340(ctx, base);
   if (copy) {
     native::LoadedVertexShader& loaded = native::g_loaded_vertex_shader;

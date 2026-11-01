@@ -577,6 +577,7 @@ set(ITC_SOURCES
     src/native/shaders.cpp
     src/native/state.cpp
     src/native/textures.cpp
+    src/native/vertex_fetch_patch.cpp
     src/native/vulkan_functions.cpp
     src/interpolation/transform.cpp
     src/frame_pacing/game_messages.cpp
