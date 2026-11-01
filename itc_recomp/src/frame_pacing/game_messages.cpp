@@ -10,7 +10,6 @@
 #include "hooks/framework.h"
 #include "hooks/input_update.h"
 #include "interpolation/blend_state.h"
-#include "native/textures.h"
 
 #include "base/flags.h"
 #include "base/log.h"
@@ -465,9 +464,6 @@ void GameMessages_OnPassFinished() {
     if (g_in_race != g_race_draw_step_seen) {
       if (ITC_FLAG(log_race_changes)) {
         ITC_LOG_INFO("game messages: {} a race", g_race_draw_step_seen ? "entered" : "left");
-      }
-      if (!g_race_draw_step_seen) {
-        native::TextureCache_RaceLeft();
       }
     }
     g_in_race = g_race_draw_step_seen;

@@ -5,6 +5,7 @@
 #include "debug/render_watch.h"
 #include "gpu_memory.h"
 #include "state.h"
+#include "guest.h"
 
 #include <algorithm>
 #include <array>
@@ -17,6 +18,7 @@
 #include <span>
 #include <string>
 #include <unordered_map>
+#include <unordered_set>
 #include <vector>
 #include <rex/graphics/xenos.h>
 #include "base/flags.h"
@@ -29,21 +31,16 @@
 #endif
 
 ITC_FLAG_BOOL(native_renderer_log_texture_writes, false, "ITC",
-              "Log which code writes textures' memory: on first load and when a texture "
-              "is found changed, what the library's memcpy wrote there (a debugging aid; "
-              "with --native_renderer_verify_textures every change is found)");
+              "With --native_renderer_verify_textures, log which bytes of textures changed "
+              "with no TextureWritten, and a summary every 5 s (a debugging aid)");
 
 ITC_FLAG_DECLARE(bool, log_gpu_memory);
 ITC_FLAG_BOOL(native_renderer_cache_texture_bindings, true, "ITC",
-              "Answer texture views and samplers from a table of earlier answers by the "
-              "fetch constant's words, instead of looking the texture up every binding");
+              "Answer texture views from each fetch constant's last answer, and samplers "
+              "from a table of earlier answers by the fetch constant's words, instead of "
+              "looking them up every binding");
 
 namespace native {
-
-namespace {
-// Races left (TextureCache_RaceLeft), counted on the main thread.
-std::atomic<uint64_t> g_races_left{0};
-}  // namespace
 
 namespace xenos = rex::graphics::xenos;
 
@@ -516,7 +513,6 @@ struct TextureCache::State {
   bool recording = false;
 
   struct Texture {
-    TextureKey key{};
     Layout layout{};
     Format format{};
     xenos::Endian endian = xenos::Endian::kNone;
@@ -528,8 +524,9 @@ struct TextureCache::State {
     uint32_t last_drawn_s = 0;
     uint32_t levels = 0;
     bool loaded = false;
-    // The library's memcpy wrote its memory since it was loaded: reload.
-    bool changed = false;
+    // Written through the interface (TextureWritten) since it was loaded:
+    // reload.
+    bool written = false;
     // With verify_every_frame_: its memory's hash when loaded or last
     // checked, and when that was.
     uint64_t hash = 0;
@@ -544,35 +541,44 @@ struct TextureCache::State {
     uint32_t host_width = 0, host_height = 0;  // the image's (scaled)
     float scale = 1.0f;
     VkImageView attachment_view = VK_NULL_HANDLE;
-    // A resolve destination's last resolve (GetResolveDestination).
-    std::chrono::steady_clock::time_point last_resolved{};
   };
-  std::map<TextureKey, Texture> textures;
-  // Loaded textures' ranges by start address (with the longest range's
-  // size, to find those overlapping a write), and memcpy's writes taken
-  // this frame.
-  std::multimap<uint32_t, std::pair<uint32_t, Texture*>> by_address;
-  uint32_t longest_range = 0;
-  std::vector<std::pair<uint32_t, uint32_t>> new_writes;
-  void MarkWritten();
-  // Resolve destinations by base address (page) and the scale they're
-  // drawn at (ResolveKey): one image per scale, for an address resolved
-  // into from targets of different scales (the menus' frame and the race's
-  // 3D view share one); draws sample the one written last (`current`).
-  std::unordered_map<uint64_t, Texture> resolved;
-  std::unordered_map<uint32_t, Texture*> current;
-  static uint64_t ResolveKey(uint32_t page, float scale) {
-    return uint64_t(std::bit_cast<uint32_t>(scale)) << 32 | page;
-  }
-  // Textures by handle, as made through the interface (Created).
+  // Textures by handle (the header's guest address), as made through the
+  // interface (Created) or first bound (FindHandle). A handle's images:
+  // loaded from guest memory, one per mip range the sampler merges into the
+  // fetch constant (word 4's levels; nearly always one), or resolved into,
+  // one per scale (the scale of the target first resolved into it; see
+  // "Resolution" in docs/native-renderer.md), drawn from the one written
+  // last (`current`) instead of guest memory.
   struct Handle {
-    bool written = false;
+    TextureKey key{};  // the fetch constant's identity when first loaded, levels aside
+    bool keyed = false;
+    std::map<uint32_t, Texture> loaded;          // by word 4's levels
+    std::unordered_map<uint32_t, Texture> resolved;  // by the scale's bits
+    Texture* current = nullptr;
   };
   std::unordered_map<uint32_t, Handle> handles;
+  // Resolve destinations' base pages and their handle (a diagnostic: a
+  // texture of another handle reading that memory).
+  std::unordered_map<uint32_t, uint32_t> resolved_pages;
+  Handle& FindHandle(uint32_t handle, const uint32_t fetch[6]);
+  uint8_t* base = nullptr;  // guest memory, from the first lookup (FindHandle's log)
+  // Handles freed, and the frame (FindHandle's log; cleared when large).
+  std::unordered_map<uint32_t, uint64_t> freed_at;
+  // Every image of the handle retired; whether it had any.
+  bool RetireImages(Handle& h);
   std::unordered_map<uint64_t, VkSampler> samplers;
-  BindingTable view_answers, sampler_answers;
-  // Each fetch constant's last answer from them (a copy of the entry, so
-  // with its generation: an answer not kept never matches).
+  BindingTable sampler_answers;
+  // Each fetch constant's last view (GetView), while the generation holds,
+  // and its last sampler (a copy of the table's entry, so with its
+  // generation: an answer not kept never matches).
+  struct LastView {
+    uint32_t handle = 0;
+    uint32_t words[6] = {};
+    VkImageViewType view_type = VK_IMAGE_VIEW_TYPE_2D;
+    uint64_t generation = UINT64_MAX;
+    VkImageView view = VK_NULL_HANDLE;
+  };
+  std::array<LastView, 32> last_views{};
   static std::array<BindingTable::Entry, 32> Unfilled() {
     std::array<BindingTable::Entry, 32> entries{};
     for (BindingTable::Entry& e : entries) {
@@ -580,24 +586,18 @@ struct TextureCache::State {
     }
     return entries;
   }
-  std::array<BindingTable::Entry, 32> last_views = Unfilled(), last_samplers = Unfilled();
+  std::array<BindingTable::Entry, 32> last_samplers = Unfilled();
   Stats stats;
 
-  // --native_renderer_log_texture_writes: who wrote textures' memory.
-  struct WriteStats {
-    uint64_t first = 0, first_bytes = 0, covered = 0, partly = 0, uncovered = 0,
-             uncovered_bytes = 0;
-    std::map<uint32_t, uint64_t> first_callers;
-    // Textures changed without a recorded write (found by verify_every_frame_):
-    // address: changes, and a description.
-    std::map<uint32_t, std::pair<uint64_t, std::string>> unrecorded_by;
-  } writes;
-  // Textures changed without a recorded write: their memory when last
-  // checked, to log which bytes changed.
+  // --native_renderer_log_texture_writes: textures changed without a
+  // TextureWritten (found by verify_every_frame_): address: changes, and a
+  // description; and their memory when last checked, to log which bytes
+  // changed.
+  std::map<uint32_t, std::pair<uint64_t, std::string>> unrecorded_by;
   std::unordered_map<uint32_t, std::vector<uint8_t>> write_snapshots;
 
-  // Textures freed after a race: destroyed once the frames that may still
-  // use them are done (RetireLoaded, DestroyRetired).
+  // Textures freed: destroyed once the frames that may still use them are
+  // done (Retire, DestroyRetired).
   struct Retired {
     uint64_t frame_number;
     gpu_memory::Kind kind;
@@ -608,30 +608,22 @@ struct TextureCache::State {
   };
   std::vector<Retired> retired;
   void Retire(const Texture& t);
-  void RetireOverwritten(const Texture& t);
-  void RetireResolveDestination(uint64_t key);
-  void RetireMovedResolveDestinations(const Texture& t);
-  static std::pair<uint32_t, uint32_t> ResolveRange(const Texture& t);
-  void RetireLoaded();
   void DestroyRetired();
 
   // --log_gpu_memory: seconds since the cache started (set each frame), and
-  // what new textures overlapped (NoteOverlaps), logged every 5 s
-  // (LogAges).
+  // what was freed through the interface, logged every 5 s (LogAges).
   bool log_memory = false;
   std::chrono::steady_clock::time_point start_time = std::chrono::steady_clock::now();
   uint32_t now_s = 0, logged_s = 0;
-  struct Overlaps {
-    uint64_t created = 0, overlapping = 0, old = 0, old_changed = 0, old_bytes = 0;
-    uint64_t freed = 0, freed_bytes = 0;
-  } overlaps;
-  void NoteOverlaps(const Texture& t);
+  uint64_t freed = 0, freed_bytes = 0;
   void LogAges();
   uint32_t write_lines = 200;
   std::chrono::steady_clock::time_point writes_logged = std::chrono::steady_clock::now();
-  void LogFirstLoad(const Texture& t);
-  void LogUnrecordedChange(uint8_t* base, const Texture& t);
+  void LogUnrecordedChange(uint8_t* base, uint32_t handle, const Texture& t);
   void LogWriteSummary();
+  // Handles whose header changed with no TextureCreated, and textures
+  // reading a resolve destination's memory (each logged once).
+  std::unordered_set<uint32_t> logged_header_changes, logged_aliases;
 
   bool CreateTexture(Texture& texture);
   uint64_t Hash(uint8_t* base, const Texture& texture) const;
@@ -640,66 +632,19 @@ struct TextureCache::State {
   VkCommandBuffer Uploads();
 };
 
-std::string WriteCallers(const std::map<uint32_t, uint64_t>& callers) {
-  std::string text;
-  for (auto& [caller, count] : callers) {
-    text += fmt::format(" {:08X}={}", caller, count);
-  }
-  return text.empty() ? " none" : text;
-}
-
-// A texture loaded for the first time: what the library's memcpy wrote
-// into its memory.
-void TextureCache::State::LogFirstLoad(const Texture& t) {
-  uint64_t size = 0, bytes = 0;
-  uint32_t first_caller = 0;
-  for (const auto& [address, range_size] : t.ranges) {
-    if (!range_size) {
-      continue;
-    }
-    Buffers_Coverage c = Buffers_CoverageOf(address, range_size);
-    size += range_size;
-    bytes += c.bytes;
-    if (c.bytes && !first_caller) {
-      first_caller = c.first_caller;
-    }
-  }
-  uint32_t address = t.layout.base_address ? t.layout.base_address : t.layout.mip_address;
-  WriteStats& w = writes;
-  w.first++;
-  w.first_bytes += size;
-  if (bytes >= size) {
-    w.covered++;
-  } else if (bytes) {
-    w.partly++;
-  } else {
-    w.uncovered++;
-    w.uncovered_bytes += size;
-  }
-  if (bytes) {
-    w.first_callers[first_caller]++;
-  }
-  if (bytes < size && write_lines) {
-    write_lines--;
-    ITC_LOG_INFO("native renderer: texture writes: {:08X} ({}x{}, {} bytes) first loaded with "
-                 "{} bytes written by memcpy{}",
-                 address, t.layout.width, t.layout.height, size, bytes,
-                 bytes ? fmt::format(" (first from {:08X})", first_caller) : std::string());
-  }
-}
-
-// A texture whose memory changed with no write recorded: which bytes of its
+// A texture whose memory changed with no TextureWritten: which bytes of its
 // first range changed since the last such change.
-void TextureCache::State::LogUnrecordedChange(uint8_t* base, const Texture& t) {
-  uint32_t address = t.layout.base_address ? t.layout.base_address : t.layout.mip_address;
-  auto& [count, text] = writes.unrecorded_by[address];
+void TextureCache::State::LogUnrecordedChange(uint8_t* base, uint32_t handle, const Texture& t) {
+  auto& [count, text] = unrecorded_by[handle];
   if (!count++) {
-    text = fmt::format("{}x{} format {} levels {}-{}", t.layout.width, t.layout.height,
-                       int(t.format.format), t.layout.min_level, t.layout.max_level);
+    text = fmt::format("{}x{} format {} levels {}-{}, data {:08X}", t.layout.width,
+                       t.layout.height, int(t.format.format), t.layout.min_level,
+                       t.layout.max_level,
+                       t.layout.base_address ? t.layout.base_address : t.layout.mip_address);
   }
   auto [start, range_size] = t.ranges[0].second ? t.ranges[0] : t.ranges[1];
   const uint8_t* now = PhysicalHostAddress(base, start);
-  std::vector<uint8_t>& was = write_snapshots[address];
+  std::vector<uint8_t>& was = write_snapshots[handle];
   if (was.size() == range_size && write_lines) {
     uint32_t first = UINT32_MAX, last = 0, changed = 0;
     for (uint32_t i = 0; i < range_size; i++) {
@@ -711,7 +656,7 @@ void TextureCache::State::LogUnrecordedChange(uint8_t* base, const Texture& t) {
     }
     write_lines--;
     ITC_LOG_INFO("native renderer: texture writes: {:08X}: {} bytes changed, offsets {}-{}",
-                 address, changed, first, last);
+                 handle, changed, first, last);
   }
   was.assign(now, now + range_size);
 }
@@ -722,17 +667,12 @@ void TextureCache::State::LogWriteSummary() {
     return;
   }
   writes_logged = now;
-  WriteStats& w = writes;
-  ITC_LOG_INFO("native renderer: texture writes: {} first loads ({:.1f} MB): {} written wholly by "
-               "memcpy, {} partly, {} not at all ({:.1f} MB); by first writer:{}",
-               w.first, w.first_bytes / 1048576.0, w.covered, w.partly, w.uncovered,
-               w.uncovered_bytes / 1048576.0, WriteCallers(w.first_callers));
-  for (auto& [address, entry] : w.unrecorded_by) {
+  for (auto& [handle, entry] : unrecorded_by) {
     ITC_LOG_INFO("native renderer: texture writes: {:08X} ({}) changed {} times without a "
-                 "recorded write",
-                 address, entry.second, entry.first);
+                 "TextureWritten",
+                 handle, entry.second, entry.first);
   }
-  w = WriteStats{};
+  unrecorded_by.clear();
 }
 
 bool TextureCache::State::CreateTexture(Texture& t) {
@@ -995,7 +935,6 @@ bool TextureCache::Init(const DeviceContext& context, uint32_t frames_in_flight)
   }
   return true;
 }
-
 void TextureCache::BeginFrame(uint32_t frame_index) {
   State& s = *state_;
   s.frame = frame_index;
@@ -1019,100 +958,44 @@ void TextureCache::BeginFrame(uint32_t frame_index) {
       s.LogAges();
     }
   }
-  if (uint64_t races = g_races_left.load(std::memory_order_relaxed); races != races_seen_) {
-    races_seen_ = races;
-    s.RetireLoaded();
-    generation_++;  // answers and last texture sets hold their views
-  }
-  uint64_t marked = s.stats.marked;
-  s.MarkWritten();
-  if (s.stats.marked != marked) {
-    generation_++;
-    events_.marked_frames++;
-  }
 }
 
-// The textures already held that a new one's memory overlaps: the game
-// putting a texture where another was (the old one is then likely dead).
-void TextureCache::State::NoteOverlaps(const Texture& t) {
-  overlaps.created++;
-  std::vector<const Texture*> found;
-  for (const auto& [start, size] : t.ranges) {
-    if (!size) {
-      continue;
-    }
-    uint32_t end = start + size;
-    auto it = by_address.lower_bound(start > longest_range ? start - longest_range : 0);
-    for (; it != by_address.end() && it->first < end; ++it) {
-      const Texture* old = it->second.second;
-      if (it->first + it->second.first > start &&
-          std::find(found.begin(), found.end(), old) == found.end()) {
-        found.push_back(old);
-      }
-    }
-  }
-  overlaps.overlapping += !found.empty();
-  for (const Texture* old : found) {
-    overlaps.old++;
-    overlaps.old_changed += old->changed;
-    overlaps.old_bytes += old->memory_size;
-  }
-}
-
-// Textures held by time since last looked up, and the overlaps since the
-// last log.
+// Textures loaded from guest memory by time since last looked up, and what
+// was freed through the interface since the last log.
 void TextureCache::State::LogAges() {
   static constexpr uint32_t kLimits[] = {1, 10, 30, 60, UINT32_MAX};
   static constexpr const char* kNames[] = {"<1 s", "1-10 s", "10-30 s", "30-60 s", ">60 s"};
   uint64_t counts[5] = {}, bytes[5] = {};
-  for (const auto& [key, t] : textures) {
-    uint32_t age = now_s - t.last_drawn_s;
-    size_t i = 0;
-    while (age >= kLimits[i]) {
-      i++;
+  for (const auto& [handle, h] : handles) {
+    for (const auto& [levels, t] : h.loaded) {
+      uint32_t age = now_s - t.last_drawn_s;
+      size_t i = 0;
+      while (age >= kLimits[i]) {
+        i++;
+      }
+      counts[i]++;
+      bytes[i] += t.memory_size;
     }
-    counts[i]++;
-    bytes[i] += t.memory_size;
   }
   std::string ages;
   for (size_t i = 0; i < 5; i++) {
     ages += fmt::format("{}{} {} ({:.1f} MB)", i ? ", " : "", kNames[i], counts[i],
                         bytes[i] / 1048576.0);
   }
-  ITC_LOG_INFO("native renderer: textures by time since drawn: {}; new {}, {} overlapping "
-               "held textures: {} of them ({} written since loaded, {:.1f} MB); overwritten "
-               "freed {} ({:.1f} MB)",
-               ages, overlaps.created, overlaps.overlapping, overlaps.old, overlaps.old_changed,
-               overlaps.old_bytes / 1048576.0, overlaps.freed, overlaps.freed_bytes / 1048576.0);
-  overlaps = {};
-}
-
-void TextureCache_RaceLeft() {
-  g_races_left.fetch_add(1, std::memory_order_relaxed);
-}
-
-// Every texture loaded from guest memory (not resolve destinations, which
-// guest memory doesn't hold) leaves the cache; draws load them again.
-// Called before this frame's draws, so only earlier frames can use them.
-void TextureCache::State::RetireLoaded() {
-  VkDeviceSize bytes = 0;
-  for (auto& [key, t] : textures) {
-    bytes += t.memory_size;
-    Retire(t);
-  }
-  if (log_memory) {
-    ITC_LOG_INFO("native renderer: a race ended: {} textures freed ({:.1f} MB)", textures.size(),
-                 bytes / 1048576.0);
-  }
-  textures.clear();
-  by_address.clear();
-  longest_range = 0;
-  write_snapshots.clear();
+  ITC_LOG_INFO("native renderer: textures by time since drawn: {}; {} handles; freed {} "
+               "({:.1f} MB)",
+               ages, handles.size(), freed, freed_bytes / 1048576.0);
+  freed = freed_bytes = 0;
 }
 
 // Its image, memory and views are destroyed once the frames that may
-// use them are done; the caller drops it from the maps.
+// use them are done; the caller drops it.
 void TextureCache::State::Retire(const Texture& t) {
+  if (!t.image) {
+    return;
+  }
+  freed++;
+  freed_bytes += t.memory_size;
   Retired r{frame_number,
             t.resolved ? gpu_memory::Kind::kResolved : gpu_memory::Kind::kTexture,
             t.image,
@@ -1130,88 +1013,19 @@ void TextureCache::State::Retire(const Texture& t) {
   retired.push_back(std::move(r));
 }
 
-// A resolve destination leaves `resolved` (and `current`, if it's the one
-// drawn from its address).
-void TextureCache::State::RetireResolveDestination(uint64_t key) {
-  auto it = resolved.find(key);
-  uint32_t page = it->second.layout.base_address >> 12;
-  if (auto c = current.find(page); c != current.end() && c->second == &it->second) {
-    current.erase(c);
+bool TextureCache::State::RetireImages(Handle& h) {
+  bool any = !h.loaded.empty() || !h.resolved.empty();
+  for (const auto& [levels, t] : h.loaded) {
+    Retire(t);
   }
-  Retire(it->second);
-  resolved.erase(it);
-}
-
-// The guest memory a resolve destination stands for: its size in 32x32
-// tiles (the game's own spacing of them matches).
-std::pair<uint32_t, uint32_t> TextureCache::State::ResolveRange(const Texture& t) {
-  uint32_t width = (t.layout.width + 31) & ~31u, height = (t.layout.height + 31) & ~31u;
-  return {t.layout.base_address, t.layout.base_address + width * height * t.format.bytes_per_block};
-}
-
-// A new resolve destination t (not yet held) is made: the held ones at
-// other addresses whose memory it overlaps were moved there by the game
-// (its glow chain is allocated again per race), so they go. Not one
-// resolved into in the last 2 s: a resolve into part of a bigger one.
-void TextureCache::State::RetireMovedResolveDestinations(const Texture& t) {
-  auto [start, end] = ResolveRange(t);
-  auto now = std::chrono::steady_clock::now();
-  std::vector<uint64_t> moved;
-  for (const auto& [key, old] : resolved) {
-    auto [old_start, old_end] = ResolveRange(old);
-    if (old.layout.base_address != t.layout.base_address && old_start < end && start < old_end &&
-        now - old.last_resolved >= std::chrono::seconds(2)) {
-      if (log_memory) {
-        ITC_LOG_INFO("native renderer: resolve destination at {:08X} (format {} {}x{}) freed: "
-                     "one made at {:08X} (format {} {}x{}) over its memory",
-                     old.layout.base_address, old.guest_format, old.layout.width,
-                     old.layout.height, t.layout.base_address, t.guest_format, t.layout.width,
-                     t.layout.height);
-      }
-      moved.push_back(key);
+  for (const auto& [scale, t] : h.resolved) {
+    if (auto p = resolved_pages.find(t.layout.base_address >> 12); p != resolved_pages.end()) {
+      resolved_pages.erase(p);
     }
+    Retire(t);
   }
-  for (uint64_t key : moved) {
-    RetireResolveDestination(key);
-  }
-}
-
-// A new texture t (not yet held) is loaded: the held textures its memory
-// overlaps that the game wrote over since they were loaded are dead (the
-// memory holds t now; drawn again, they'd reload t's data), so they go.
-// Not those unwritten: two textures reading the same memory both stay.
-void TextureCache::State::RetireOverwritten(const Texture& t) {
-  std::vector<Texture*> found;
-  for (const auto& [start, size] : t.ranges) {
-    if (!size) {
-      continue;
-    }
-    uint32_t end = start + size;
-    auto it = by_address.lower_bound(start > longest_range ? start - longest_range : 0);
-    for (; it != by_address.end() && it->first < end; ++it) {
-      Texture* old = it->second.second;
-      if (it->first + it->second.first > start && old->changed &&
-          std::find(found.begin(), found.end(), old) == found.end()) {
-        found.push_back(old);
-      }
-    }
-  }
-  for (Texture* old : found) {
-    overlaps.freed++;
-    overlaps.freed_bytes += old->memory_size;
-    Retire(*old);
-    for (const auto& [address, size] : old->ranges) {
-      if (!size) {
-        continue;
-      }
-      auto [first, last] = by_address.equal_range(address);
-      for (auto it = first; it != last;) {
-        it = it->second.second == old ? by_address.erase(it) : std::next(it);
-      }
-    }
-    TextureKey key = old->key;  // not a reference into the node erased
-    textures.erase(key);
-  }
+  h = {};
+  return any;
 }
 
 // Each frame's start waits for its slot's last use, so a texture retired
@@ -1235,38 +1049,76 @@ void TextureCache::State::DestroyRetired() {
   retired.erase(retired.begin(), due);
 }
 
+// Made again (its header changed): what it had goes, and it loads anew.
 void TextureCache::Created(uint32_t handle) {
   State& s = *state_;
   s.stats.created++;
-  s.handles[handle] = {};
+  auto [it, added] = s.handles.try_emplace(handle);
+  if (!added && s.RetireImages(it->second)) {
+    s.stats.remade++;
+    generation_++;  // answers and last texture sets may hold its views
+  }
 }
 
 void TextureCache::Written(uint32_t handle) {
   State& s = *state_;
   s.stats.written++;
-  if (auto it = s.handles.find(handle); it != s.handles.end()) {
-    it->second.written = true;
+  auto it = s.handles.find(handle);
+  if (it == s.handles.end()) {
+    return;
+  }
+  bool any = false;
+  for (auto& [levels, t] : it->second.loaded) {
+    any |= t.loaded && !t.written;
+    t.written = true;
+  }
+  if (any) {
+    generation_++;
+    events_.written++;
   }
 }
 
 void TextureCache::Destroyed(uint32_t handle) {
   State& s = *state_;
   s.stats.destroyed++;
-  s.handles.erase(handle);
-}
-
-void TextureCache::NoteBound(uint32_t handle, const uint32_t fetch_words[6]) {
-  State& s = *state_;
-  if (!handle || s.handles.contains(handle)) {
+  if (s.freed_at.size() > 100000) {
+    s.freed_at.clear();
+  }
+  s.freed_at[handle] = s.frame_number;
+  auto it = s.handles.find(handle);
+  if (it == s.handles.end()) {
     return;
   }
-  s.stats.never_created++;
-  s.handles[handle] = {};
-  xenos::xe_gpu_texture_fetch_t fetch = ToFetch(fetch_words);
-  ITC_LOG_WARN("native renderer: texture {:08X} bound but never made through the interface: "
-               "format {} {}x{}, data {:08X}, mips {:08X}; taken as made",
-               handle, uint32_t(fetch.format), fetch.size_2d.width + 1u,
-               fetch.size_2d.height + 1u, fetch.base_address << 12, fetch.mip_address << 12);
+  s.write_snapshots.erase(handle);
+  if (s.RetireImages(it->second)) {
+    generation_++;
+  }
+  s.handles.erase(it);
+}
+
+// A texture bound or resolved into that was never made through the
+// interface (a creation path missed) is logged once and taken as made.
+TextureCache::State::Handle& TextureCache::State::FindHandle(uint32_t handle,
+                                                             const uint32_t fetch_words[6]) {
+  auto [it, added] = handles.try_emplace(handle);
+  if (added) {
+    stats.never_created++;
+    xenos::xe_gpu_texture_fetch_t fetch = ToFetch(fetch_words);
+    std::string words;
+    for (uint32_t i = 0; base && i < 13; i++) {
+      words += fmt::format(" {:08X}", guest::LoadU32(base, handle + 4 * i));
+    }
+    auto freed = freed_at.find(handle);
+    ITC_LOG_WARN("native renderer: texture {:08X} bound but never made through the interface{}: "
+                 "format {} {}x{}, data {:08X}, mips {:08X}; taken as made; header:{}",
+                 handle,
+                 freed == freed_at.end()
+                     ? std::string()
+                     : fmt::format(" (freed {} frames before)", frame_number - freed->second),
+                 uint32_t(fetch.format), fetch.size_2d.width + 1u, fetch.size_2d.height + 1u,
+                 fetch.base_address << 12, fetch.mip_address << 12, words);
+  }
+  return it->second;
 }
 
 TextureCache::GenerationEvents TextureCache::TakeGenerationEvents() {
@@ -1275,32 +1127,16 @@ TextureCache::GenerationEvents TextureCache::TakeGenerationEvents() {
   return events;
 }
 
-// The textures memcpy has written since the last frame are marked to be
-// reloaded (the game writes textures' memory with the library's memcpy:
-// see docs/texture-handling-optimization.md).
-void TextureCache::State::MarkWritten() {
-  new_writes.clear();
-  Buffers_TakeNewWrites(new_writes);
-  ScopedCost cost(g_frame_costs.mark_ns);
-  stats.writes += new_writes.size();
-  for (const auto& [start, end] : new_writes) {
-    auto it = by_address.lower_bound(start > longest_range ? start - longest_range : 0);
-    for (; it != by_address.end() && it->first < end; ++it) {
-      auto& [size, texture] = it->second;
-      if (it->first + size > start && !texture->changed) {
-        texture->changed = true;
-        stats.marked++;
-      }
-    }
-  }
-}
-
+// A diagnostic's (buffers.cpp's logged writes): a scan of every texture
+// loaded from guest memory.
 bool TextureCache::Holds(uint32_t start, uint32_t end) const {
-  const State& s = *state_;
-  auto it = s.by_address.lower_bound(start > s.longest_range ? start - s.longest_range : 0);
-  for (; it != s.by_address.end() && it->first < end; ++it) {
-    if (it->first + it->second.first > start) {
-      return true;
+  for (const auto& [handle, h] : state_->handles) {
+    for (const auto& [levels, t] : h.loaded) {
+      for (const auto& [address, size] : t.ranges) {
+        if (size && address < end && start < address + size) {
+          return true;
+        }
+      }
     }
   }
   return false;
@@ -1317,48 +1153,53 @@ Handle FromBits(uint64_t bits) {
 }
 }  // namespace
 
-VkImageView TextureCache::GetView(uint8_t* base, const uint32_t fetch_words[6],
+VkImageView TextureCache::GetView(uint8_t* base, uint32_t handle, const uint32_t fetch_words[6],
                                   VkImageViewType view_type, uint32_t fetch_constant) {
   bool cacheable;
   // Hashing every texture every frame needs every call.
   if (!cache_bindings_ || verify_every_frame_) {
     unkept_answers_++;
-    return LookUpView(base, fetch_words, view_type, cacheable);
+    return LookUpView(base, handle, fetch_words, view_type, cacheable);
   }
   State& s = *state_;
-  BindingTable::Key key(fetch_words, uint32_t(view_type));
-  // The same as this fetch constant's last call (about 44% of calls in a
-  // race): no need to hash.
-  BindingTable::Entry& last = s.last_views[fetch_constant & 31];
-  if (last.generation == generation_ && last.key == key) {
-    return FromBits<VkImageView>(last.value);
+  // The same as this fetch constant's last call: the same texture (handle),
+  // and the same words (its swizzle, or a header changed unannounced).
+  State::LastView& last = s.last_views[fetch_constant & 31];
+  if (last.generation == generation_ && last.handle == handle && last.view_type == view_type &&
+      !std::memcmp(last.words, fetch_words, sizeof(last.words))) {
+    return last.view;
   }
-  BindingTable::Entry& e = s.view_answers.Find(key);
-  if (e.generation != generation_) {
-    VkImageView view = LookUpView(base, fetch_words, view_type, cacheable);
-    e.value = HandleBits(view);
+  VkImageView view = LookUpView(base, handle, fetch_words, view_type, cacheable);
+  if (cacheable && view) {
+    last.handle = handle;
+    std::memcpy(last.words, fetch_words, sizeof(last.words));
+    last.view_type = view_type;
+    last.generation = generation_;
+    last.view = view;
+  } else {
     // Not kept: nothing (a placeholder, maybe only until staging has room),
     // or a texture still to be reloaded.
-    e.generation = cacheable && view ? generation_ : UINT64_MAX;
-    unkept_answers_ += e.generation == UINT64_MAX;
+    last.generation = UINT64_MAX;
+    unkept_answers_++;
   }
-  last = e;
-  return FromBits<VkImageView>(e.value);
+  return view;
 }
 
-VkImageView TextureCache::LookUpView(uint8_t* base, const uint32_t fetch_words[6],
-                                     VkImageViewType view_type, bool& cacheable) {
+VkImageView TextureCache::LookUpView(uint8_t* base, uint32_t handle,
+                                     const uint32_t fetch_words[6], VkImageViewType view_type,
+                                     bool& cacheable) {
   State& s = *state_;
+  s.base = base;
   cacheable = false;
   xenos::xe_gpu_texture_fetch_t fetch = ToFetch(fetch_words);
-  if (fetch.type != xenos::FetchConstantType::kTexture) {
+  if (fetch.type != xenos::FetchConstantType::kTexture || !handle) {
     s.stats.unsupported++;
     return VK_NULL_HANDLE;
   }
-  // A resolve destination at this address takes the place of guest memory.
-  if (auto r = s.current.find(fetch.base_address & 0x1FFFF);
-      r != s.current.end() && r->second->loaded) {
-    State::Texture& t = *r->second;
+  State::Handle& h = s.FindHandle(handle, fetch_words);
+  // Resolved into: that image takes the place of guest memory.
+  if (h.current && h.current->loaded) {
+    State::Texture& t = *h.current;
     s.stats.resolved_hits++;
     if (debug_hide_ == Hide::kResolved ||
         (debug_hide_ == Hide::kResolvedAddress && debug_hide_value_ == t.layout.base_address)) {
@@ -1370,7 +1211,7 @@ VkImageView TextureCache::LookUpView(uint8_t* base, const uint32_t fetch_words[6
     }
     if (view_type != VK_IMAGE_VIEW_TYPE_2D_ARRAY) {
       s.stats.mismatched++;
-    s.mismatched_total++;
+      s.mismatched_total++;
       return VK_NULL_HANDLE;
     }
     cacheable = true;
@@ -1381,9 +1222,26 @@ VkImageView TextureCache::LookUpView(uint8_t* base, const uint32_t fetch_words[6
       (debug_hide_ == Hide::kMemoryFormat && debug_hide_value_ == uint32_t(fetch.format))) {
     return VK_NULL_HANDLE;
   }
+  // The header changed with no TextureCreated (a path that remakes it
+  // missed): logged once, and loaded anew.
   TextureKey key = KeyOf(fetch_words);
-  auto it = s.textures.find(key);
-  if (it == s.textures.end()) {
+  const uint32_t levels = key[4];
+  key[4] = 0;
+  if (h.keyed && key != h.key) {
+    s.stats.unannounced++;
+    if (s.logged_header_changes.insert(handle).second) {
+      ITC_LOG_WARN("native renderer: texture {:08X}'s header changed with no TextureCreated "
+                   "(format {} {}x{}, data {:08X} now); loaded anew",
+                   handle, uint32_t(fetch.format), fetch.size_2d.width + 1u,
+                   fetch.size_2d.height + 1u, fetch.base_address << 12);
+    }
+    s.RetireImages(h);
+    generation_++;  // other answers may hold its views
+  }
+  h.key = key;
+  h.keyed = true;
+  auto it = h.loaded.find(levels);
+  if (it == h.loaded.end()) {
     State::Texture t;
     if (!GetLayout(fetch, t.layout) || !GetFormat(fetch.format, t.format)) {
       s.stats.unsupported++;
@@ -1398,32 +1256,27 @@ VkImageView TextureCache::LookUpView(uint8_t* base, const uint32_t fetch_words[6
     }
     if (t.format.block_width == 1) {
       // Uncompressed: few, and the likeliest to be decoded wrong.
-      ITC_LOG_INFO("native renderer: texture at {:08X}: format {} {}x{}x{} levels {}-{}, endian "
-                   "{}, tiled {}, pitch {}, signs {:02X}, swizzle {:03o}, exp adjust {}",
-                   t.layout.base_address ? t.layout.base_address : t.layout.mip_address,
+      ITC_LOG_INFO("native renderer: texture {:08X} at {:08X}: format {} {}x{}x{} levels {}-{}, "
+                   "endian {}, tiled {}, pitch {}, signs {:02X}, swizzle {:03o}, exp adjust {}",
+                   handle, t.layout.base_address ? t.layout.base_address : t.layout.mip_address,
                    uint32_t(fetch.format), t.layout.width, t.layout.height, t.layout.layers,
                    t.layout.min_level, t.layout.max_level, uint32_t(t.endian), t.layout.tiled,
                    t.layout.pitch_texels, (fetch.dword_0 >> 2) & 0xFF, uint32_t(fetch.swizzle),
                    int32_t(fetch.exp_adjust));
     }
-    if (s.log_memory) {
-      s.NoteOverlaps(t);
-    }
-    size_t held = s.textures.size();
-    s.RetireOverwritten(t);
-    if (s.textures.size() != held) {
-      generation_++;  // answers and last texture sets may hold their views
-    }
-    t.key = key;
-    it = s.textures.emplace(key, std::move(t)).first;
-    events_.created++;
-    State::Texture& added = it->second;
-    for (const auto& [address, size] : added.ranges) {
-      if (size) {
-        s.by_address.emplace(address, std::make_pair(size, &added));
-        s.longest_range = std::max(s.longest_range, size);
+    // Memory another handle's resolve destination stands for: drawn from
+    // guest memory, not from what was resolved there.
+    if (auto p = s.resolved_pages.find(t.layout.base_address >> 12);
+        t.layout.base_address && p != s.resolved_pages.end() && p->second != handle) {
+      s.stats.aliased++;
+      if (s.logged_aliases.insert(handle).second) {
+        ITC_LOG_WARN("native renderer: texture {:08X} reads {:08X}, where resolve destination "
+                     "{:08X} is drawn; drawn from guest memory",
+                     handle, t.layout.base_address, p->second);
       }
     }
+    it = h.loaded.emplace(levels, std::move(t)).first;
+    events_.created++;
   }
   State::Texture& t = it->second;
   VkImageViewType natural = t.layout.cube ? VK_IMAGE_VIEW_TYPE_CUBE : VK_IMAGE_VIEW_TYPE_2D_ARRAY;
@@ -1438,10 +1291,9 @@ VkImageView TextureCache::LookUpView(uint8_t* base, const uint32_t fetch_words[6
     return VK_NULL_HANDLE;
   }
 
-  // Load; reload when memcpy has written its memory since (MarkWritten).
-  // With verify_every_frame_, also hash it every frame, and reload it (and
-  // log it) if it changed without a recorded write.
-  bool log_writes = log_writes_;
+  // Load; reload when written through the interface since. With
+  // verify_every_frame_, also hash it every frame, and reload it (and log
+  // it) if it changed with no TextureWritten.
   if (!t.loaded) {
     if (verify_every_frame_) {
       t.hash = s.Hash(base, t);
@@ -1450,15 +1302,12 @@ VkImageView TextureCache::LookUpView(uint8_t* base, const uint32_t fetch_words[6
     if (!s.Upload(base, t)) {
       return VK_NULL_HANDLE;
     }
-    t.changed = false;
+    t.written = false;
     t.loaded_frame = s.frame_number;
-    if (log_writes) {
-      s.LogFirstLoad(t);
-    }
-  } else if (t.changed) {
+  } else if (t.written) {
     uint64_t hash = verify_every_frame_ ? s.Hash(base, t) : 0;
     if (s.Upload(base, t)) {  // else the old contents until it fits
-      t.changed = false;
+      t.written = false;
       t.hash = hash;
       t.verified_frame = s.frame_number;
     }
@@ -1467,12 +1316,11 @@ VkImageView TextureCache::LookUpView(uint8_t* base, const uint32_t fetch_words[6
     if (uint64_t hash = s.Hash(base, t); hash != t.hash) {
       s.stats.unrecorded++;
       if (s.stats.unrecorded_sample == UINT32_MAX) {
-        s.stats.unrecorded_sample =
-            t.layout.base_address ? t.layout.base_address : t.layout.mip_address;
+        s.stats.unrecorded_sample = handle;
         s.stats.unrecorded_frames = uint32_t(s.frame_number - t.loaded_frame);
       }
-      if (log_writes) {
-        s.LogUnrecordedChange(base, t);
+      if (log_writes_) {
+        s.LogUnrecordedChange(base, handle, t);
       }
       if (s.Upload(base, t)) {
         t.hash = hash;
@@ -1480,7 +1328,7 @@ VkImageView TextureCache::LookUpView(uint8_t* base, const uint32_t fetch_words[6
     }
   }
 
-  cacheable = !t.changed;  // else staging was full: try again next call
+  cacheable = !t.written;  // else staging was full: try again next call
   t.last_drawn_s = s.now_s;
   return s.GetSwizzledView(t, fetch.swizzle, natural);
 }
@@ -1514,28 +1362,35 @@ VkImageView TextureCache::State::GetSwizzledView(Texture& t, uint32_t swizzle,
   }
   return view;
 }
-
-bool TextureCache::GetResolveDestination(const uint32_t fetch_words[6], float scale,
-                                         ResolveDestination& out) {
+bool TextureCache::GetResolveDestination(uint32_t handle, const uint32_t fetch_words[6],
+                                         float scale, ResolveDestination& out) {
   State& s = *state_;
   xenos::xe_gpu_texture_fetch_t fetch = ToFetch(fetch_words);
   uint32_t page = fetch.base_address & 0x1FFFF;
   uint32_t width = fetch.size_2d.width + 1, height = fetch.size_2d.height + 1;
-  uint64_t key = State::ResolveKey(page, scale);
-  auto it = s.resolved.find(key);
-  if (it != s.resolved.end() && (it->second.guest_format != uint32_t(fetch.format) ||
+  State::Handle& h = s.FindHandle(handle, fetch_words);
+  const uint32_t key = std::bit_cast<uint32_t>(scale);
+  auto it = h.resolved.find(key);
+  if (it != h.resolved.end() && (it->second.guest_format != uint32_t(fetch.format) ||
                                  it->second.layout.width != width ||
-                                 it->second.layout.height != height)) {
-    // Another texture at the same address: start over (the old image is
-    // destroyed once the frames in flight that may use it are done).
-    ITC_LOG_WARN("native renderer: resolve destination at {:08X} changed from format {} {}x{} "
-                 "to format {} {}x{}",
-                 page << 12, it->second.guest_format, it->second.layout.width,
-                 it->second.layout.height, uint32_t(fetch.format), width, height);
-    s.RetireResolveDestination(key);
-    it = s.resolved.end();
+                                 it->second.layout.height != height ||
+                                 it->second.layout.base_address != page << 12)) {
+    // Its header changed with no TextureCreated: start over (the old image
+    // is destroyed once the frames in flight that may use it are done).
+    ITC_LOG_WARN("native renderer: resolve destination {:08X} changed from format {} {}x{} at "
+                 "{:08X} to format {} {}x{} at {:08X} with no TextureCreated",
+                 handle, it->second.guest_format, it->second.layout.width,
+                 it->second.layout.height, it->second.layout.base_address,
+                 uint32_t(fetch.format), width, height, page << 12);
+    if (h.current == &it->second) {
+      h.current = nullptr;
+    }
+    s.Retire(it->second);
+    h.resolved.erase(it);
+    generation_++;
+    it = h.resolved.end();
   }
-  if (it == s.resolved.end()) {
+  if (it == h.resolved.end()) {
     State::Texture t;
     t.resolved = true;
     t.guest_format = uint32_t(fetch.format);
@@ -1556,22 +1411,17 @@ bool TextureCache::GetResolveDestination(const uint32_t fetch_words[6], float sc
     if (!s.CreateTexture(t)) {
       return false;
     }
-    ITC_LOG_INFO("native renderer: resolve destination at {:08X}: format {} {}x{} (host format {}, "
-                 "{}x{}, scale {})",
-                 page << 12, t.guest_format, width, height, int(t.format.format), t.host_width,
-                 t.host_height, scale);
-    size_t held = s.resolved.size();
-    s.RetireMovedResolveDestinations(t);
-    if (s.resolved.size() != held) {
-      generation_++;  // answers and last texture sets may hold their views
-    }
-    it = s.resolved.emplace(key, std::move(t)).first;
+    ITC_LOG_INFO("native renderer: resolve destination {:08X} at {:08X}: format {} {}x{} (host "
+                 "format {}, {}x{}, scale {})",
+                 handle, page << 12, t.guest_format, width, height, int(t.format.format),
+                 t.host_width, t.host_height, scale);
+    it = h.resolved.emplace(key, std::move(t)).first;
+    s.resolved_pages[page] = handle;
     events_.created++;
   }
   State::Texture& t = it->second;
-  t.last_resolved = std::chrono::steady_clock::now();
-  if (State::Texture*& current = s.current[page]; current != &t || !t.loaded) {
-    current = &t;
+  if (h.current != &t || !t.loaded) {
+    h.current = &t;
     generation_++;
     events_.resolve_changes++;
   }

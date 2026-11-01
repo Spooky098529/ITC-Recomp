@@ -161,6 +161,7 @@ void InterfaceRegisters::BuildTextureFetch(uint8_t* base, const render::State& s
   bool bound = false;
   if (const uint32_t texture = state.textures[stage].address) {
     bound = true;
+    texture_handles_[stage] = texture;
     t[0] = guest::LoadU32(base, texture + 28);
     t[1] = Physical(guest::LoadU32(base, texture + 32));
     t[2] = guest::LoadU32(base, texture + 36);

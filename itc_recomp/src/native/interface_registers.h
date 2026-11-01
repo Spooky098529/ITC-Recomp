@@ -44,6 +44,13 @@ class InterfaceRegisters {
   // The registers compared by the check, and their names.
   static std::span<const uint32_t> CheckedRegisters();
 
+  // The texture whose words the stage's fetch constant holds: the one
+  // bound, or the last one bound while none is (0 for none yet, or a stage
+  // past the interface's).
+  uint32_t StageTexture(uint32_t stage) const {
+    return stage < render::kStages ? texture_handles_[stage] : 0;
+  }
+
  private:
   void BuildTextureFetch(uint8_t* base, const render::State& state, uint32_t stage,
                          uint32_t* words);
@@ -54,6 +61,7 @@ class InterfaceRegisters {
   // The texture's part of each stage's fetch constant as last bound (kept
   // while no texture is), and each stream's vertex fetch constant.
   uint32_t texture_words_[render::kStages][6] = {};
+  uint32_t texture_handles_[render::kStages] = {};
   uint32_t stream_words_[render::kStreams][2] = {};
   std::map<std::tuple<uint32_t, uint32_t, uint32_t, std::vector<uint8_t>>, PatchedShader>
       patched_;

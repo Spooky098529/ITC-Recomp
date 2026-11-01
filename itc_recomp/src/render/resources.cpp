@@ -2,6 +2,7 @@
 
 #include "base/log.h"
 
+#include <algorithm>
 #include <cstdint>
 #include <deque>
 #include <mutex>
@@ -24,6 +25,8 @@ std::deque<Event> g_events;
 uint64_t g_first = 0;
 std::deque<uint64_t> g_marks;
 uint64_t g_due = 0;
+// Render thread: the frees held back until the next list.
+std::vector<uint32_t> g_held_frees;
 
 void Queue(Event::Kind kind, uint32_t handle) {
   // A harness's calls build their own world in scratch memory: not the
@@ -67,6 +70,7 @@ void ResourceEvents_OnReplayStart() {
 
 void ResourceEvents_Apply(Backend& backend) {
   static thread_local std::vector<Event> due;
+  static thread_local std::vector<uint32_t> frees;
   due.clear();
   {
     std::lock_guard lock(g_mutex);
@@ -76,19 +80,30 @@ void ResourceEvents_Apply(Backend& backend) {
       g_first++;
     }
   }
+  // The last list's frees: it's replayed.
+  for (uint32_t handle : g_held_frees) {
+    backend.TextureDestroyed({handle});
+  }
+  g_held_frees.clear();
+  frees.clear();
   for (const Event& e : due) {
     switch (e.kind) {
       case Event::kTextureCreated:
+        if (auto it = std::find(frees.begin(), frees.end(), e.handle); it != frees.end()) {
+          frees.erase(it);
+          backend.TextureDestroyed({e.handle});
+        }
         backend.TextureCreated({e.handle});
         break;
       case Event::kTextureWritten:
         backend.TextureWritten({e.handle});
         break;
       case Event::kTextureDestroyed:
-        backend.TextureDestroyed({e.handle});
+        frees.push_back(e.handle);
         break;
     }
   }
+  g_held_frees.swap(frees);
 }
 
 }  // namespace render

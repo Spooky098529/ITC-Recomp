@@ -124,7 +124,7 @@ ITC_FLAG_BOOL(native_renderer_base_level_only, false, "ITC",
               "Sample only each texture's first level (a debugging aid)");
 ITC_FLAG_BOOL(native_renderer_verify_textures, false, "ITC",
               "Hash every texture used each frame, logging and reloading those whose "
-              "memory changed with no memcpy write recorded (a debugging aid)");
+              "memory changed with no TextureWritten (a debugging aid)");
 ITC_FLAG_BOOL(native_renderer_no_index_clamp, false, "ITC",
               "Don't clamp indices to VGT_MIN/MAX_VTX_INDX (a debugging aid)");
 ITC_FLAG_BOOL(native_renderer_log_passes, false, "ITC",
@@ -429,7 +429,7 @@ class Renderer {
   uint64_t frames_presented_ = 0, frames_skipped_ = 0, commands_ = 0, draws_ = 0;
   // Texture loading and hashing (frame_costs.h) since the last stats: total
   // and the frame that spent the most.
-  int64_t texture_ns_ = 0, texture_ns_max_ = 0, mark_ns_ = 0;
+  int64_t texture_ns_ = 0, texture_ns_max_ = 0;
   Clock::time_point start_ = Clock::now(), last_log_ = Clock::now();
   Clock::time_point last_present_ = Clock::now();
 };
@@ -942,7 +942,6 @@ void Renderer::EndFrame() {
           c.shaders, c.shader_ns / 1e6, c.pipelines, c.pipeline_ns / 1e6);
     }
     texture_ns_ += g_frame_costs.texture_ns + g_frame_costs.hash_ns;
-    mark_ns_ += g_frame_costs.mark_ns;
     texture_ns_max_ =
         std::max(texture_ns_max_, g_frame_costs.texture_ns + g_frame_costs.hash_ns);
     g_frame_costs = {};
@@ -1075,13 +1074,13 @@ void Renderer::LogStats() {
                t.mismatched, double(t.resolved_hits) / frames,
                double(t.resolved_mismatched) / frames);
   texture_ns_ = texture_ns_max_ = 0;
-  ITC_LOG_INFO("native renderer: textures: {} memcpy writes, {} textures marked written ({:.1f} "
-               "ms marking); through the interface {} made, {} written, {} freed ({} held), {} bound never made",
-               t.writes, t.marked, mark_ns_ / 1e6, t.created, t.written, t.destroyed, t.handles,
-               t.never_created);
-  mark_ns_ = 0;
+  ITC_LOG_INFO("native renderer: textures through the interface: {} made ({} again holding "
+               "images), {} written, {} freed, {} held; {} bound never made, {} headers changed "
+               "unannounced, {} reading another's resolve destination",
+               t.created, t.remade, t.written, t.destroyed, t.handles, t.never_created,
+               t.unannounced, t.aliased);
   if (t.unrecorded) {
-    ITC_LOG_INFO("native renderer: {} textures changed in memory with no write recorded, e.g. "
+    ITC_LOG_INFO("native renderer: {} textures changed in memory with no TextureWritten, e.g. "
                  "{:08X}, {} frames after it was first loaded",
                  t.unrecorded, t.unrecorded_sample, t.unrecorded_frames);
   }

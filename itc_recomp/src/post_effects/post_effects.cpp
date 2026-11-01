@@ -11,6 +11,7 @@
 #include "graphics/video_output.h"
 #include "memory/c_runtime_heap.h"
 #include "memory/heap.h"
+#include "render/resources.h"
 
 #include <bit>
 #include <cmath>
@@ -487,6 +488,7 @@ std::optional<uint32_t> RenderTextureRelease(uint8_t* base, uint32_t entry) {
     return std::nullopt;
   }
   guest::StoreU32(base, entry + 20, 0);
+  render::TextureDestroyed({guest::LoadU32(base, entry + 24)});
   memory::FreePhysical(guest::LoadU32(base, entry + 28));
   const uint32_t header = guest::LoadU32(base, entry + 24);
   memory::crt::OperatorDelete(header);

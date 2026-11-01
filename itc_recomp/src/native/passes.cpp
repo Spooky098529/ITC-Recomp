@@ -2066,13 +2066,10 @@ VkDescriptorSet Passes::State::BuildTextureSet(uint8_t* base, const TranslatedSh
       uint32_t extra[4] = {uint32_t(texture.view_type), 0, 0, 0};
       CountBinding(true, texture.fetch_constant, fetch, extra);
     }
-    if (texture.fetch_constant < render::kStages) {
-      textures.NoteBound(interface->textures[texture.fetch_constant].address, fetch);
-    }
     VkImageView view = hide_cubes && texture.view_type == VK_IMAGE_VIEW_TYPE_CUBE
                            ? VK_NULL_HANDLE
-                           : textures.GetView(base, fetch, texture.view_type,
-                                                              texture.fetch_constant);
+                           : textures.GetView(base, interface_registers.StageTexture(texture.fetch_constant), fetch,
+                                              texture.view_type, texture.fetch_constant);
     bool mismatched = false;
     if (uint64_t total = textures.mismatched_total(); total != mismatched_seen) {
       mismatched = true;
@@ -2869,9 +2866,8 @@ bool Passes::State::ResolveInto(VkCommandBuffer commands, uint8_t* base, Target&
   }
   fetch[1] = (fetch[1] & 0xFFFu) | GpuPhysicalAddress(fetch[1] & 0xFFFFF000u);
   fetch[5] = (fetch[5] & 0xFFFu) | GpuPhysicalAddress(fetch[5] & 0xFFFFF000u);
-  textures.NoteBound(destination, fetch);
   TextureCache::ResolveDestination dest;
-  if (!textures.GetResolveDestination(fetch, source.scale, dest)) {
+  if (!textures.GetResolveDestination(destination, fetch, source.scale, dest)) {
     return false;
   }
   // Source rectangle (left, top, right, bottom) and destination point.
@@ -4826,14 +4822,14 @@ std::string Passes::TakeTextureBindings() {
       "fetch constant's last {:.1f}% ({:.1f}% ignoring generations), seen this generation "
       "{:.1f}%; {:.1f} samplers a frame, the same as the fetch constant's last {:.1f}%, seen "
       "before {:.1f}%; {:.1f} sets a frame, found this frame {:.1f}%; in {} frames, {} "
-      "generations (frames with textures marked written {}, resolves changing an address's "
-      "image {}), {} textures made",
+      "generations (textures written {}, resolves changing a texture's image {}), {} "
+      "textures made",
       c.draws / frames, c.draws_textured / frames, share(c.draws_same, c.draws),
       share(c.draws_same_words, c.draws), share(c.vertex_same, c.draws),
       share(c.pixel_same, c.draws), c.views / frames, share(c.view_same_slot, c.views),
       share(c.view_same_slot_words, c.views), share(c.view_seen, c.views), c.samplers / frames,
       share(c.sampler_same_slot, c.samplers), share(c.sampler_seen, c.samplers), c.sets / frames,
-      share(c.sets_found, c.sets), c.frames, generations, e.marked_frames,
+      share(c.sets_found, c.sets), c.frames, generations, e.written,
       e.resolve_changes, e.created);
   c = {};
   c.generation = s.textures.generation();

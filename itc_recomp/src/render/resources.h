@@ -8,6 +8,12 @@
 // A texture is named by its header's guest address (what the command list
 // binds), as everywhere in the interface until resources leave guest
 // memory (step 2b).
+//
+// Events are tagged with the list handed over after them, and the list may
+// be recorded before some of them: at a race's end, two textures were freed
+// before the hand-over of a list that still drew them (2026-11-01). So
+// frees go one list later than the rest; a texture made again while its
+// free is held back is freed first.
 
 #pragma once
 
