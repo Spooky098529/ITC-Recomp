@@ -72,5 +72,14 @@ void LoadPollSceneInteriorFinish(PPCContext& ctx, uint8_t* base);
 void LoadPollSceneWheelsSetUpPoints(PPCContext& ctx, uint8_t* base);
 void LoadPollScenePartsSetSelectedTexture(PPCContext& ctx, uint8_t* base);
 void LoadPollScenePartsBuild(PPCContext& ctx, uint8_t* base);
+// Wheels::BindTextures sub_820D9638 (no adapter: only SceneWheels::Finish
+// calls it), SceneWheels::Finish sub_820E7328, Wheels::ApplyPalette
+// sub_820D92A0, SceneParts::Finish sub_820E2E68 and SceneCockpit::Finish
+// sub_820DBFF8 (r3 the object; the wraps').
+void LoadPollWheelsBindTextures(PPCContext& ctx, uint8_t* base);
+void LoadPollSceneWheelsFinish(PPCContext& ctx, uint8_t* base);
+void LoadPollWheelsApplyPalette(PPCContext& ctx, uint8_t* base);
+void LoadPollScenePartsFinish(PPCContext& ctx, uint8_t* base);
+void LoadPollSceneCockpitFinish(PPCContext& ctx, uint8_t* base);
 
 }  // namespace hooks

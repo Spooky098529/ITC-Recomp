@@ -4,6 +4,7 @@
 #include "load_poll/load_poll.h"
 
 #include "base/log.h"
+#include "camera_modes/steps.h"
 #include "guest.h"
 #include "material_passes/material_passes.h"
 #include "models/part_model.h"
@@ -524,6 +525,192 @@ uint64_t ScenePartsBuild(uint8_t* base, uint32_t parts, uint32_t stack, Calls& c
   AfterFind(calls);
   sl::PartsWalkMaterials(base, Load(base, parts + 104));
   return ScenePartsSetSelectedTexture(base, parts, parts, sp);
+}
+
+// --- The wheels' materials and the last finishers ---
+
+namespace {
+
+constexpr uint32_t kOne = 0x82000A30;   // 1.0
+constexpr uint32_t kZero = 0x82000A34;  // 0.0
+
+// A float word copied with lfs and stfs, as the original does.
+void CopyFloat(uint8_t* base, uint32_t to, uint32_t from) {
+  camera_modes::steps::Stfs(base, to, camera_modes::steps::Lfs(base, from));
+}
+
+// PartModel::SetMaterials from the frame at `sp`: its plain C++, else its
+// original. Returns its r3.
+uint64_t SetMaterialsFrom(uint8_t* base, uint32_t model, const uint64_t regs[7], uint32_t sp,
+                          uint32_t lr, Calls& calls) {
+  std::optional<uint64_t> r3;
+  if (!mp::SetMaterials(base, model, regs, sp, &r3)) {
+    return calls.set_materials(model, regs, sp, lr);
+  }
+  return r3 ? *r3 : model;
+}
+
+// The frame's words SetMaterials takes in registers: r4 to r6 the flags
+// (+160, +168, +176), r7 to r10 the first two float4s (+192 to +223).
+void MaterialRegs(uint8_t* base, uint32_t sp, uint64_t regs[7]) {
+  regs[0] = Load64(base, sp + 160);
+  regs[1] = Load64(base, sp + 168);
+  regs[2] = Load64(base, sp + 176);
+  regs[3] = Load64(base, sp + 192);
+  regs[4] = Load64(base, sp + 200);
+  regs[5] = Load64(base, sp + 208);
+  regs[6] = Load64(base, sp + 216);
+}
+
+// The shape, category and shared pair (+132, +140, +148) and the third
+// float4's half and the 24 bytes (+224 copied to +96), before each call.
+void MaterialArgs(uint8_t* base, uint32_t sp, uint32_t category, uint32_t lr, Calls& calls) {
+  Store(base, sp + 148, 0xFFFFFFFFu);
+  Store(base, sp + 140, category);
+  Store(base, sp + 132, 0xFFFFFFFFu);
+  Copy(base, sp + 96, sp + 224, 32, sp, lr, calls);
+}
+
+}  // namespace
+
+uint64_t WheelsBindTextures(uint8_t* base, uint32_t wheels, uint32_t stack, Calls& calls) {
+  ITC_NATIVE_RUNNING("sub_820D9638 Wheels::BindTextures");
+  const uint32_t sp = Frame(base, stack, 352);
+  if (LoadS(base, wheels + 2324) == 2) {
+    return 0;
+  }
+  const uint32_t texture = Load(base, wheels + 40);
+  Store(base, wheels + 288, Load(base, kScene) + 208);
+  const uint32_t scene = Load(base, kScene);
+  Store(base, wheels + 1264, wheels + 2240);
+  Store(base, wheels + 1728, wheels + 2260);
+  Store(base, wheels + 752, scene + 208);
+  Store(base, wheels + 2384, Load(base, kScene) + 296);
+  Store(base, wheels + 2848, Load(base, kScene) + 296);
+  mp::SetTexture(base, wheels + 240, texture, -1, sp);
+  mp::SetTexture(base, wheels + 704, Load(base, wheels + 56), -1, sp);
+  CopyFloat(base, sp + 204, kOne);
+  Store(base, sp + 148, 0xFFFFFFFFu);
+  CopyFloat(base, sp + 220, kOne);
+  Store(base, sp + 140, 0xFFFFFFFFu);
+  CopyFloat(base, sp + 236, kOne);
+  Store(base, sp + 132, 0xFFFFFFFFu);
+  CopyFloat(base, sp + 244, kZero);
+  for (uint32_t at : {180u, 172u, 168u, 164u, 160u}) {
+    Store(base, sp + at, 0);
+  }
+  Store(base, sp + 176, 1);
+  Copy(base, sp + 96, sp + 224, 32, sp, 0x820D9728, calls);
+  uint64_t regs[7];
+  MaterialRegs(base, sp, regs);
+  SetMaterialsFrom(base, wheels + 240, regs, sp, 0x820D9768, calls);
+  MaterialArgs(base, sp, 0xFFFFFFFFu, 0x820D9784, calls);
+  SetMaterialsFrom(base, wheels + 704, regs, sp, 0x820D97A8, calls);
+  return 1;
+}
+
+uint64_t SceneWheelsFinish(uint8_t* base, uint32_t object, uint32_t stack, Calls& calls) {
+  ITC_NATIVE_RUNNING("sub_820E7328 SceneWheels::Finish");
+  const uint32_t sp = Frame(base, stack, 96);
+  if (LoadS(base, object + 16768) != 0) {
+    return 1;
+  }
+  const uint64_t bound = WheelsBindTextures(base, Load(base, object + 28), sp, calls);
+  if (int32_t(bound) == 0) {
+    return bound;
+  }
+  Store(base, object + 16768, 1);
+  return 1;
+}
+
+uint64_t WheelsApplyPalette(uint8_t* base, uint32_t wheels, uint32_t stack, Calls& calls) {
+  ITC_NATIVE_RUNNING("sub_820D92A0 Wheels::ApplyPalette");
+  const uint32_t sp = Frame(base, stack, 384);
+  CopyFloat(base, sp + 204, kOne);
+  CopyFloat(base, sp + 220, kOne);
+  CopyFloat(base, sp + 236, kOne);
+  for (uint32_t at : {180u, 168u, 164u, 160u}) {
+    Store(base, sp + at, 0);
+  }
+  for (uint32_t m : {240u, 704u, 1216u, 1680u, 2336u, 2800u}) {
+    mp::ApplyPalette(base, wheels + m, sp);
+  }
+  CopyFloat(base, sp + 240, wheels + 48);
+  CopyFloat(base, sp + 244, wheels + 52);
+  Store(base, sp + 176, 1);
+  Store(base, sp + 148, 0xFFFFFFFFu);
+  Store(base, sp + 140, 1);
+  Store(base, sp + 172, 1);
+  Store(base, sp + 132, 0xFFFFFFFFu);
+  Copy(base, sp + 96, sp + 224, 32, sp, 0x820D9354, calls);
+  uint64_t regs[7];
+  MaterialRegs(base, sp, regs);
+  SetMaterialsFrom(base, wheels + 240, regs, sp, 0x820D9394, calls);
+  MaterialArgs(base, sp, 2, 0x820D93B4, calls);
+  SetMaterialsFrom(base, wheels + 240, regs, sp, 0x820D93D8, calls);
+  MaterialArgs(base, sp, 1, 0x820D93F4, calls);
+  SetMaterialsFrom(base, wheels + 1216, regs, sp, 0x820D9418, calls);
+  MaterialArgs(base, sp, 2, 0x820D9434, calls);
+  SetMaterialsFrom(base, wheels + 1216, regs, sp, 0x820D9458, calls);
+  CopyFloat(base, sp + 240, wheels + 64);
+  CopyFloat(base, sp + 244, wheels + 68);
+  MaterialArgs(base, sp, 1, 0x820D9484, calls);
+  SetMaterialsFrom(base, wheels + 704, regs, sp, 0x820D94A8, calls);
+  MaterialArgs(base, sp, 2, 0x820D94C4, calls);
+  SetMaterialsFrom(base, wheels + 704, regs, sp, 0x820D94E8, calls);
+  MaterialArgs(base, sp, 1, 0x820D9504, calls);
+  SetMaterialsFrom(base, wheels + 1680, regs, sp, 0x820D9528, calls);
+  MaterialArgs(base, sp, 2, 0x820D9544, calls);
+  return SetMaterialsFrom(base, wheels + 1680, regs, sp, 0x820D9568, calls);
+}
+
+uint64_t ScenePartsFinish(uint8_t* base, uint32_t parts, uint32_t stack, Calls& calls) {
+  ITC_NATIVE_RUNNING("sub_820E2E68 SceneParts::Finish");
+  const uint32_t sp = Frame(base, stack, 112);
+  if (LoadS(base, parts + 100) != 0) {
+    return 1;
+  }
+  const uint64_t loaded = sl::PartsIsLoaded(base, Load(base, parts + 104));
+  Store(base, parts + 100, uint32_t(loaded));
+  if (int32_t(loaded) == 0) {
+    return loaded;
+  }
+  const uint32_t set = Load(base, Load(base, parts + 37284) + 4);
+  if (set <= 1) {
+    ScenePartsBuild(base, parts, sp, calls);
+  }
+  return loaded;
+}
+
+uint64_t SceneCockpitFinish(uint8_t* base, uint32_t cockpit, uint32_t stack, Calls& calls) {
+  ITC_NATIVE_RUNNING("sub_820DBFF8 SceneCockpit::Finish");
+  const uint32_t sp = Frame(base, stack, 96);
+  if (LoadS(base, cockpit + 4312) != 0) {
+    return 1;
+  }
+  const uint32_t body = Load(base, cockpit + 32);
+  uint64_t bound;
+  if (const auto r3 = sl::CockpitBindTextures(base, body, sp)) {
+    bound = *r3;
+  } else {
+    bound = calls.cockpit_bind(body, sp, 0x820DC020);
+  }
+  if (int32_t(bound) == 0) {
+    return 0;
+  }
+  const uint32_t texture_of = Load(base, cockpit + 32);
+  const uint32_t interior = Load(base, cockpit + 28);
+  Store(base, interior + 11664, Load(base, texture_of + 3504));
+  if (int32_t(SceneInteriorFinish(base, Load(base, cockpit + 28), sp, calls)) == 0) {
+    return 0;
+  }
+  Store(base, cockpit + 4312, 1);
+  for (uint32_t i = 0; i < 6; i++) {
+    Store(base, cockpit + 4288 + 4 * i, Load(base, cockpit + 32) + 464 * i + 688);
+  }
+  ss::CockpitFind(base, cockpit + 192, cockpit + 4288, sp, calls.find);
+  AfterFind(calls);
+  return 1;
 }
 
 }  // namespace load_poll

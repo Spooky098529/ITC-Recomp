@@ -29,7 +29,9 @@ ITC_FLAG_BOOL(native_load_poll, true, "ITC",
               "TrafficCar::SetPaint sub_820D7E18, never seen in play, no adapters), "
               "SceneInterior::Finish sub_820E4140 and SceneWheels::SetUpPoints sub_820E8908 "
               "(inside the wraps), SceneParts::Build sub_820E05E0 (with SetSelectedTexture "
-              "sub_820DF250, no adapter)) natively "
+              "sub_820DF250, no adapter), SceneWheels::Finish sub_820E7328 (with Wheels::BindTextures "
+              "sub_820D9638, no adapter), Wheels::ApplyPalette sub_820D92A0, SceneParts::Finish "
+              "sub_820E2E68 and SceneCockpit::Finish sub_820DBFF8 (inside the wraps)) natively "
               "instead of through "
               "the translated code, with --native_second_set, --native_scene_loaders, "
               "--native_car_models, native memcpy, --native_heap, --native_models and "
@@ -100,6 +102,23 @@ lp::Calls LoadPollCalls(PPCContext& ctx, uint8_t* base) {
     FromFrame(ctx, sp, lr, [&] {
       ctx.r3.u64 = object;
       __imp__sub_820D7D38(ctx, base);
+      r3 = ctx.r3.u64;
+    });
+    return r3;
+  };
+  calls.set_materials = [&ctx, base](uint32_t model, const uint64_t regs[7], uint32_t sp,
+                                     uint32_t lr) {
+    uint64_t r3 = 0;
+    FromFrame(ctx, sp, lr, [&] {
+      ctx.r3.u64 = model;
+      ctx.r4.u64 = regs[0];
+      ctx.r5.u64 = regs[1];
+      ctx.r6.u64 = regs[2];
+      ctx.r7.u64 = regs[3];
+      ctx.r8.u64 = regs[4];
+      ctx.r9.u64 = regs[5];
+      ctx.r10.u64 = regs[6];
+      __imp__sub_820D3318(ctx, base);
       r3 = ctx.r3.u64;
     });
     return r3;
@@ -266,6 +285,20 @@ void LoadPollScenePartsBuild(PPCContext& ctx, uint8_t* base) {
   ctx.r3.u64 = lp::ScenePartsBuild(base, ctx.r3.u32, ctx.r1.u32, calls);
   LeaveFlush(ctx, calls, was_on);
 }
+
+#define ITC_LOAD_POLL_STEP(name, address, call)                \
+  void LoadPoll##name(PPCContext& ctx, uint8_t* base) {        \
+    ITC_LOAD_POLL_ORIGINAL(address)                            \
+    lp::Calls calls = LoadPollCalls(ctx, base);                \
+    ctx.r3.u64 = lp::call(base, ctx.r3.u32, ctx.r1.u32, calls); \
+    LeaveFlush(ctx, calls, was_on);                            \
+  }
+ITC_LOAD_POLL_STEP(WheelsBindTextures, 820D9638, WheelsBindTextures)
+ITC_LOAD_POLL_STEP(SceneWheelsFinish, 820E7328, SceneWheelsFinish)
+ITC_LOAD_POLL_STEP(WheelsApplyPalette, 820D92A0, WheelsApplyPalette)
+ITC_LOAD_POLL_STEP(ScenePartsFinish, 820E2E68, ScenePartsFinish)
+ITC_LOAD_POLL_STEP(SceneCockpitFinish, 820DBFF8, SceneCockpitFinish)
+#undef ITC_LOAD_POLL_STEP
 
 #undef ITC_LOAD_POLL_PAINT
 #undef ITC_LOAD_POLL_ORIGINAL

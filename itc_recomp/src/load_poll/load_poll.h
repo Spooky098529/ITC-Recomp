@@ -40,6 +40,11 @@ struct Calls {
   // `lr`, where their plain C++ declines; their r3.
   std::function<uint64_t(uint32_t object, uint32_t sp, uint32_t lr)> cockpit_bind;
   std::function<uint64_t(uint32_t object, uint32_t sp, uint32_t lr)> traffic_bind;
+  // PartModel::SetMaterials' original (sub_820D3318; r3 the model, r4 to
+  // r10 `regs`) from the frame at `sp` with `lr`, where its plain C++
+  // declines; its r3.
+  std::function<uint64_t(uint32_t model, const uint64_t regs[7], uint32_t sp, uint32_t lr)>
+      set_materials;
 };
 
 // --- The first set's wheels ---
@@ -192,5 +197,36 @@ uint64_t ScenePartsSetSelectedTexture(uint8_t* base, uint32_t parts, uint64_t r3
 // 24] + 3760; PartsPoints::Find(+176, +32), CarParts::WalkMaterials([+104])
 // and SetSelectedTexture.
 uint64_t ScenePartsBuild(uint8_t* base, uint32_t parts, uint32_t stack, Calls& calls);
+
+// --- The wheels' materials and the last finishers ---
+
+// Wheels::BindTextures (sub_820D9638): 0 while the calipers' second slot
+// (+2324) is loading (2). Else the models' texture providers (+48: the
+// tires the scene + 208, the rims or brakes +2240 and +2260, the calipers
+// the scene + 296), PartModel::SetTexture on the tires with +40 and +56,
+// then PartModel::SetMaterials on each tire from its frame (flag 5 at
+// +176, -1 at +132, +140, +148, 1.0 at +204, +220, +236 and 0.0 at +244,
+// +224 copied to +96 by memcpy; the words it never writes passed on as they
+// are). Returns 1.
+uint64_t WheelsBindTextures(uint8_t* base, uint32_t wheels, uint32_t stack, Calls& calls);
+// SceneWheels::Finish (sub_820E7328): 1 when +16768 is set; else
+// Wheels::BindTextures([+28]), returned when 0; then +16768 = 1 and 1.
+uint64_t SceneWheelsFinish(uint8_t* base, uint32_t object, uint32_t stack, Calls& calls);
+// Wheels::ApplyPalette (sub_820D92A0): PartModel::ApplyPalette on its six
+// models, then PartModel::SetMaterials twice on each tire and rim or brake
+// (the category at +140 1, then 2), the floats at the frame's +240 and +244
+// the record's +20 and +24 (+48, +52) for +240 and +1216, +36 and +40 (+64,
+// +68) for +704 and +1680; the frame as Wheels::BindTextures' (its
+// unwritten words passed on).
+uint64_t WheelsApplyPalette(uint8_t* base, uint32_t wheels, uint32_t stack, Calls& calls);
+// SceneParts::Finish (sub_820E2E68): 1 when +100 is set; else +100 =
+// CarParts::IsLoaded([+104]); when it's set and the scene's ([+37284]) +4
+// is 0 or 1, SceneParts::Build. Returns the loaded answer.
+uint64_t ScenePartsFinish(uint8_t* base, uint32_t parts, uint32_t stack, Calls& calls);
+// SceneCockpit::Finish (sub_820DBFF8): 1 when +4312 is set. Else 0 unless
+// Cockpit::BindTextures([+32]); its interior's (+28) +11664 = [[+32] +
+// 3504] and SceneInterior::Finish(+28), 0 unless done; then +4312 = 1,
+// +4288 + 4i = [+32] + 688 + 464i and CockpitPoints::Find(+192, +4288); 1.
+uint64_t SceneCockpitFinish(uint8_t* base, uint32_t cockpit, uint32_t stack, Calls& calls);
 
 }  // namespace load_poll
