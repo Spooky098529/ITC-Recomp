@@ -67,8 +67,15 @@ file's history. What's left to see in a drive, from every run:
 
 - Cleanup lead (no mapping, not counted): `XPR::GetTexture`
   `sub_82597118` (Wrapped by `frame_state_diff`), then the parking
-  area's `OnPictureLoadedA` and `B` and what else it unblocks. Step:
-  migration agent running.
+  area's `OnPictureLoadedA` and `B` and what else it unblocks.
+  Migration checked (b409aa64..b82b56b5: GetTexture under
+  `--native_models` inside the diagnostics' wrap; the two picture
+  callbacks; 15 in `scene-loaders.md`; 8 adapters removed; every
+  harness 0 differing, races 30-38 s, 0 errors; no subagents). Left
+  ready in `scene-loaders.md`: `Cockpit::BindTextures`,
+  `TrafficCar::BindTextures`, `ModelPoint::Find`,
+  `Cockpit::OnFileLoaded`, `TrafficCar::OnFileLoaded` (a second
+  migration after the validation). Step: validation agent running.
 
 ## Done
 
@@ -138,5 +145,9 @@ file's history. What's left to see in a drive, from every run:
 - After its validation (`itc_3092`, 120 s: race 54 s, 0 errors, every
   harness 0 differing but the expected groups): ours 3738, work left
   2661.
+
+- After the GetTexture lead's migration (`itc_3103`: race 38 s, 0
+  errors, four files' harnesses 0 differing): ours 3753, work left 2646
+  (wrapped 97, known 491, unknown 2058).
 
 ## Stopped

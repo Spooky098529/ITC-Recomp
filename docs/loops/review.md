@@ -66,6 +66,14 @@ When the user has reviewed a run's section, its heading gets
   original; the replay's harness holds the device lock and saves and
   restores the replay's globals, with only the game's harmless command
   handlers.
+- The `XPR::GetTexture` cleanup lead (b409aa64..b82b56b5): 21 rows in
+  `functions.md`, `location-screen.md`, `scene-loaders.md`. For review:
+  GetTexture under `--native_models` (`src/models/xpr.cpp`), run inside
+  `frame_state_diff`'s wrap as `Vec4Transform` is; its r3 is the full
+  64-bit sum, as the original's; native callers calling its plain C++
+  skip the wrap, so `--debug_hide=82597118` no longer hides their calls;
+  the native paths need their callees' flags (`--native_material_passes`,
+  `--native_accessories`, `--native_car_models`).
 
 ## Run 2026-10-31 16:54 (`b7-loop-31-10-26`, continued)
 
