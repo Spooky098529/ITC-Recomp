@@ -13,8 +13,11 @@ file's history. What's left to see in a drive, from every run:
 - Subsystem 1 of 3: the boot mode (`boot-mode.md`). Done.
 - Subsystem 2 of 3: `Car::DrawUpdate` `sub_820DAC68` (the scene
   model's per-pass update; its lead from `leads.md`, ready: 78
-  functions, 16,029 lines, split for the migration). Step: mapping
-  (agent running).
+  functions, 16,029 lines, split for the migration). Map checked
+  (24c2b1c1, `car-draw.md`: 86 rows, 14 moved from `functions.md`; 0
+  errors; 1 ready group; the second set's per-frame passes lead
+  covered and deleted; the reading split over six subagents, one at a
+  time). Step: migration (agent running).
 
 ## Done
 
@@ -49,3 +52,5 @@ file's history. What's left to see in a drive, from every run:
 - After its validation (`itc_3219`, 120 s: race 53 s, 0 errors, every
   harness 0 differing but the expected groups): ours 3981, work left
   2424.
+- After the car draw's map: ours 3981, work left 2424 (wrapped 80,
+  known 547, unknown 1797).

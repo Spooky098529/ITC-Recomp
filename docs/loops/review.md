@@ -34,6 +34,16 @@ When the user has reviewed a run's section, its heading gets
   adapters (`sub_825894C8`, `sub_825895A0`) kept, their native callers
   leaving the calls out but clearing the last error as the drops do
   (as `Presence::SetForMode`).
+- `car-draw.md` (new, 24c2b1c1): 86 rows (14 moved from
+  `functions.md`): `Car::DrawUpdate` and the scene model's per-pass
+  draws (cockpit, light kit, parts, interior, traffic car, wheels with
+  their morphs; 8 not seen in play). `known-data.md`: the scene model
+  block, the pass description, the car draw records, the lighting
+  globals, the work memory. Corrected: `framework.md`'s
+  `sub_820AC848` (the pool maker's slot 1 runs in play, from
+  `Model::MorphShape`); the worker-job lead's vtable (`0x8200286C`).
+  `leads.md`: the second set's per-frame passes lead deleted (covered),
+  the model draws' lead cut to `sub_820C8480`.
 
 ## Run 2026-10-31 23:57 (`b7-loop-31-10-26-2`)
 
