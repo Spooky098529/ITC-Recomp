@@ -236,7 +236,7 @@ any more.
 | **The register shadow and dirty masks** (device +0 to +12440) | The native setters; the recompiled shader load (SQ_PROGRAM_CNTL at +10400, and +10408, +10432, +10452, +12440) | `ReadRegisters` per draw (`state.cpp:139`), through `MarkDeviceDirty` (`draw_packets.cpp:221`) and the wrapped flush helpers (`:135-160`), then `State::Draw` throughout; the game's getters (one seen in play, `device-state.md`); interpolation's blends land there | The interface's state, set by the native handlers | The SDK translator takes registers (SQ_PROGRAM_CNTL, SQ_CONTEXT_MISC, fetch constants, system constants from PA and RB registers). The Vulkan backend makes the few it needs from its own state and the shader pair, inside the backend. Whether game code outside the replay reads the shadow: to log (section 7) |
 | **The PM4 command buffer**, packets and kick | The shader load (IM_LOAD), BeginVertices (DRAW_INDX, fetch constant 95, the inline vertices' space), Resolve (RB_COPY_*), Clear (not read), tiling (BeginTiling, EndTiling, the worker callback insert `sub_822B6BF8`), DrawVertices, `sub_822AE1D0` on the library path, Swap's fences | `gpu_link.cpp`'s `ApplyBuffer`, for fences, memory writes and the tiling worker's interrupt; no draw is taken from it | Nothing: off the render path with the handlers | Resource locks and destruction outside the replay wait on fences (`graphics-resources.md`, Dropped-kind): with nothing writing packets, every fence is passed at once |
 | **The single commands** (table `0x8265ED48`) | Main thread recorders | Native `RunSingles` (`render_queue.cpp:262`), recompiled handlers (15 wrapped: the minimap triangle) | Native handlers calling the interface | — |
-| **The guest memory mirrors** (512 MB host-visible buffers, one per frame in flight; front and back with `mirror_by_tick`; `passes.cpp:675`, `:1503`) | memcpy (`sub_825A7410`, `buffers.cpp:718`) and `Buffers_Memcpy` record writes; the render thread applies them at frame start | The GPU: the translated shaders fetch vertices by physical address from one storage buffer; the index buffer binds from it | Buffers made through the interface when the game creates and fills them (`Mesh::Parse`'s and the loaders' native writers, or memcpy's records), bound per stream | Fetch by address from one buffer is the SDK translator's model. The Vulkan backend can keep it over an arena of its own (addresses rebased) until vertex input is per-stream. The offline translation (decision 3) could emit per-stream vertex input |
+| **The guest memory mirrors** (gone in step 2b: a device-local buffer arena, `native/buffer_arena.cpp`; were 512 MB host-visible buffers, one per frame in flight; front and back with `mirror_by_tick`; `passes.cpp:675`, `:1503`) | memcpy (`sub_825A7410`, `buffers.cpp:718`) and `Buffers_Memcpy` record writes; the render thread applies them at frame start | The GPU: the translated shaders fetch vertices by physical address from one storage buffer; the index buffer binds from it | Buffers made through the interface when the game creates and fills them (`Mesh::Parse`'s and the loaders' native writers, or memcpy's records), bound per stream | Fetch by address from one buffer is the SDK translator's model. The Vulkan backend can keep it over an arena of its own (addresses rebased) until vertex input is per-stream. The offline translation (decision 3) could emit per-stream vertex input |
 | **The constant replay** (command 7, `sub_8258FD48`) | The recorded payloads; interpolation substitutes blends into them and puts them back (`blend_state.cpp:4100-4115`) | The native constant setters copy into the shadow; `State::Draw` copies each shader's used registers into the ring (`passes.cpp:3795-3830`) | A native command 7: substitution, then the interface's `SetConstants` | Interpolation's join is the payload address plus an exact value (`Substitute`, `blend_state.cpp:2656`); the substitution must stay at that point |
 | **The vertex shader patch for the declaration** (`sub_822AE340`, the copy in the command buffer when "the GPU may still use it") | The game's Direct3D at the shader load | The renderer (`g_loaded_vertex_shader`, `replay_hooks.cpp:50-70`) | The backend translates each (vertex shader, declaration) pair itself: the declaration is part of the shader's key | Re-implementing the patch's result in the translation step (or offline): read the patcher first |
 | **Textures reloaded on memcpy writes** (gone in step 2: was `MarkWritten`, views keyed by the fetch constant's six words) | — | — | Textures made, written and freed through the interface (`render/resources.h`), found by handle (step 2) | Uploaded from guest memory at first bind still; the data leaving guest memory is 2b |
@@ -1074,6 +1074,20 @@ Checked (attract races):
   1-2 a run now and then: `itc_1754` to `itc_1775`); 240-300 live poses.
 - The user: "the game looks fine". Profiles were left for later (the
   user's call, 2026-11-01).
+
+**The mirrors removed** (`a2bac698`): the arena is the only path. Gone:
+the mirrors and `--native_renderer_buffer_arena`, `_mirror_by_tick`,
+`_mirror_to_both`, `_verify_mirror`, `_copy_all`, `_check_mirror`,
+`_check_late_writes`, `_check_clobbers`, `_log_index_ranges`,
+`_cache_index_ranges` and `_log_physical_writes` (its drawn ranges came
+from the mirror), the index range cache and scans, `buffers.cpp`'s
+segment map and coverage (memcpy's writes are now only taken for the
+arena, `Buffers_TakeWrites`), `BufferTable::Bound` (`Use` logs a buffer
+never made); ~1,775 lines. The read watch covers textures only. Attract
+race `itc_3293` (60 s): 0 error lines, 0 draws left out, 0 bound never
+made, ~39 MB used. Dump `itc_3294`: `passes.txt` and `draws.txt` the same
+masked; the shown frame 4.0-5.1% from the arena's and the mirrors' runs
+(within the runs' spread, the mirrors' two ~40% apart).
 
 ## 7. Risks, and what's still unknown
 
