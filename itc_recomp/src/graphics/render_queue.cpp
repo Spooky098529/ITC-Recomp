@@ -7,6 +7,9 @@
 #include "debug/render_watch.h"
 
 #include "base/log.h"
+#include "debug/replay_stats.h"
+#include "native/renderer.h"
+#include "render/commands.h"
 #include "graphics/device_shaders.h"
 #include "graphics/resources.h"
 #include "models/texture_provider.h"
@@ -246,14 +249,52 @@ uint32_t Element(uint8_t* base, uint32_t array, int32_t index) {
 }
 
 // The commands from `command` through the table 0x8265EDE0, until id 36.
+// Our handlers' guest calls, from the walker's frame.
+render::GameCall GameCall(uint32_t frame, uint32_t return_address, const GuestCall& call) {
+  return [&call, frame, return_address](uint32_t function, int count, uint64_t r3, uint64_t r4,
+                                        uint64_t r5) {
+    return call(function, frame, return_address, count, r3, r4, r5).r3;
+  };
+}
+
+// The slots our handler and the game's answered differently (the check).
+void CheckSlots(uint32_t id, uint64_t ours, uint64_t theirs) {
+  if (uint32_t(ours) != uint32_t(theirs)) {
+    static uint32_t logged = 0;
+    if (logged++ < 20) {
+      ITC_LOG_INFO("conventional renderer check: command {} took {} slots by ours, {} by the "
+                   "game's",
+                   id, uint32_t(ours), uint32_t(theirs));
+    }
+  }
+}
+
+// The commands from `command` through the table 0x8265EDE0, until id 36:
+// with --conventional_renderer through our handlers (render/commands.h),
+// with its check through both.
 void RunCommands(uint8_t* base, uint32_t command, uint32_t frame, uint32_t return_address,
                  const GuestCall& call) {
+  render::Commands* native = render::GetCommands();
+  const bool conventional = native && render::ConventionalRenderer();
   uint32_t id = guest::LoadU32(base, command);
   while (int32_t(id) != int32_t(kEndCommand)) {
     const uint32_t r5 = guest::LoadU32(base, command + 8);
     const uint32_t r4 = guest::LoadU32(base, command + 4);
-    const uint32_t handler = guest::LoadU32(base, (id << 2) + kCommands);
-    const uint64_t r3 = call(handler, frame, return_address, 3, command + 16, r4, r5).r3;
+    uint64_t r3;
+    if (conventional) {
+      debug::ReplayStats_OnCommand(base, id, command + 16, r4, r5);
+      native::Renderer_OnCommand(base, id, command + 16, r4, r5);
+      r3 = native->Run(base, id, command + 16, r4, r5, GameCall(frame, return_address, call));
+    } else {
+      const uint32_t ours =
+          native ? native->Run(base, id, command + 16, r4, r5, GameCall(frame, return_address, call))
+                 : 0;
+      const uint32_t handler = guest::LoadU32(base, (id << 2) + kCommands);
+      r3 = call(handler, frame, return_address, 3, command + 16, r4, r5).r3;
+      if (native && id != 7) {
+        CheckSlots(id, ours, r3);
+      }
+    }
     command += uint32_t(r3 + 1) << 4;
     id = guest::LoadU32(base, command);
   }
@@ -268,9 +309,19 @@ uint32_t RunSingles(uint8_t* base, uint32_t item, uint32_t sp, const GuestCall& 
     uint32_t i = 0;
     do {
       const uint32_t slot = ((i + 1) << 4) + item;
-      const uint32_t handler =
-          guest::LoadU32(base, (guest::LoadU32(base, slot) << 2) + kSingleCommands);
-      const uint64_t r3 = call(handler, frame, 0x8258E678, 1, slot, 0, 0).r3;
+      render::Commands* native = render::GetCommands();
+      uint64_t r3;
+      if (native && render::ConventionalRenderer()) {
+        r3 = native->RunSingle(base, slot, GameCall(frame, 0x8258E678, call));
+      } else {
+        const uint32_t ours = native ? native->RunSingle(base, slot, GameCall(frame, 0x8258E678, call)) : 0;
+        const uint32_t handler =
+            guest::LoadU32(base, (guest::LoadU32(base, slot) << 2) + kSingleCommands);
+        r3 = call(handler, frame, 0x8258E678, 1, slot, 0, 0).r3;
+        if (native) {
+          CheckSlots(100 + guest::LoadU32(base, slot), ours, r3);
+        }
+      }
       i = uint32_t(r3 + i) + 1;
     } while (i < count);
   }
@@ -384,6 +435,9 @@ void Replay(uint8_t* base, uint32_t queue, uint32_t device, uint32_t video_outpu
             const GuestCall& call) {
   ITC_NATIVE_RUNNING("sub_82591238 RenderQueue::Replay");
   const uint32_t frame = Frame(base, sp, 192);
+  if (render::Commands* native = render::GetCommands()) {
+    native->BeginReplay(base);
+  }
   debug::RenderWatch_OnReplay(device);
   guest::StoreU32(base, kDevice, device);
   guest::StoreU32(base, State(base, queue) + 44, video_output);

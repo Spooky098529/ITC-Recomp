@@ -14,6 +14,7 @@
 #include "buffers.h"
 #include "debug/render_watch.h"
 #include "gpu_memory.h"
+#include "interface_check.h"
 #include "guest.h"
 #include "renderer.h"
 #include "shaders.h"
@@ -4418,6 +4419,7 @@ void Passes::AfterDraw(VkCommandBuffer commands, uint8_t* base, uint32_t id, uin
     call.type = guest::LoadU32(base, item);
     call.base_start = guest::LoadU32(base, item + 4);
     call.primitive_count = guest::LoadU32(base, item + 8);
+    InterfaceCheck_Draw(base, device, s.regs, false, int32_t(call.base_start) >> 16, 0);
     s.Draw(commands, base, device, call);
   }
 }
@@ -4453,6 +4455,7 @@ void Passes::InlineDraw(VkCommandBuffer commands, uint8_t* base, uint32_t type, 
   fetch[2 * kInlineFetchConstant + 1] =
       0x10000000u | ((size / 4) << 2) | uint32_t(xenos::Endian::k8in32);
   s.regs.values[XE_GPU_REG_VGT_INDX_OFFSET] = 0;
+  InterfaceCheck_Draw(base, device, s.regs, true, 0, stride);
   s.Draw(commands, base, device, call);
   // Read them from the shadow again next time.
   static_assert((kInlineFetchConstant - 2) / 3 == kInlineFetchConstant / 3);

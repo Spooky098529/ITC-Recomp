@@ -37,6 +37,7 @@
 #include "transform.h"
 
 #include "base/flags.h"
+#include "render/commands.h"
 #include "base/log.h"
 
 #include <algorithm>
@@ -4347,12 +4348,19 @@ void interpolation::BlendState_TakeReplayTimes(int64_t& blend_ns, int64_t& uploa
 
 extern "C" REX_FUNC(sub_8258FD48) {
   REX_FUNC_PROLOGUE();
-  uint32_t payload = ctx.r3.u32, packed = ctx.r5.u32;
+  uint32_t payload = ctx.r3.u32, packed = ctx.r5.u32, count = ctx.r4.u32;
   debug::ReplayStats_OnCommand(base, 7, payload, ctx.r4.u32, packed);
   native::Renderer_OnCommand(base, 7, payload, ctx.r4.u32, packed);
+  // --check_conventional_renderer: our handlers' state takes the same upload
+  // (src/render/commands.h).
+  render::Commands* check = render::GetCommands();
   if (!ITC_FLAG(log_frame_times)) {
-    interpolation::BlendState_ReplayConstants(base, payload, packed,
-                                              [&] { __imp__sub_8258FD48(ctx, base); });
+    interpolation::BlendState_ReplayConstants(base, payload, packed, [&] {
+      __imp__sub_8258FD48(ctx, base);
+      if (check) {
+        check->SetShaderConstants(base, payload, count, packed);
+      }
+    });
     return;
   }
   using Clock = std::chrono::steady_clock;
