@@ -147,6 +147,7 @@ set(ITC_SOURCES
     src/scene_loaders/pools.cpp
     src/scene_loaders/loads.cpp
     src/scene_loaders/objects.cpp
+    src/scene_loaders/file_loaded.cpp
     src/hooks/car_models.cpp
     src/car_models/load_slots.cpp
     src/car_models/car_model.cpp

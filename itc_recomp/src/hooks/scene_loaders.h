@@ -172,6 +172,12 @@ void SceneLoadersTrafficRelease(PPCContext& ctx, uint8_t* base);
 void SceneLoadersTrafficDestruct(PPCContext& ctx, uint8_t* base);
 void SceneLoadersTrafficDeletingDestruct(PPCContext& ctx, uint8_t* base);
 
+// Cockpit::BindTextures sub_820D6108 and TrafficCar::BindTextures
+// sub_820D7D38 (r3 = the object; r3 = 1, or 0 while loading), only with
+// --native_models (their callees' plain C++).
+void SceneLoadersCockpitBindTextures(PPCContext& ctx, uint8_t* base);
+void SceneLoadersTrafficBindTextures(PPCContext& ctx, uint8_t* base);
+
 // ScenePools::CreateA sub_820C3FD8 (r3 = the set, r4 = the record; r3 as
 // the original leaves it), only while hooks::ModelsNativeLifetime(): the
 // constructors' originals called from its frame where their plain C++

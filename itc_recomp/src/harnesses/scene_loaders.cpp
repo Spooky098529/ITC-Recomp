@@ -18,6 +18,7 @@
 #include "memory/c_runtime_heap.h"
 #include "memory/heap.h"
 #include "models/texture_provider.h"
+#include "scene_loaders/file_loaded.h"
 #include "scene_loaders/loads.h"
 #include "scene_loaders/objects.h"
 #include "models/memory_blocks.h"
@@ -2020,6 +2021,126 @@ void PartLoadedCases(Context& h, Random& r, uint32_t block) {
   Put(h.base, sl::kFirstSet, saved_set);
 }
 
+
+// --- The texture binds ---
+//
+// The cockpit body (or the traffic body) at the block, its XPR's records at
+// +0x2000 (16 bytes each, +12 a name at +0x2100 + 48i, now and then the name
+// the bind prints, its case varied), each side from the same random bytes,
+// the recompiled side with the flags off (RunSide). The block, the
+// printed name (the frame's +80, up to its terminator) and r3 compared.
+
+// A guest string (up to 64 bytes, without the terminator).
+std::string GuestString(uint8_t* base, uint32_t address) {
+  std::string s;
+  for (uint32_t i = 0; i < 64; i++) {
+    const char ch = char(guest::LoadU8(base, address + i));
+    if (ch == 0) break;
+    s.push_back(ch);
+  }
+  return s;
+}
+
+// A name table's index below `below` whose entry points into the xex (else
+// 0).
+uint32_t NameIndex(uint8_t* base, uint32_t table, uint32_t below, Random& r) {
+  for (int tries = 0; tries < 8; tries++) {
+    const uint32_t i = r.Below(below);
+    const uint32_t at = guest::LoadU32(base, table + 4 * i);
+    if (at >= 0x82000000u && at < 0x83000000u) return i;
+  }
+  return 0;
+}
+
+// The XPR object at `xpr`: records at block + 0x2000, `count` of them (0-6),
+// their names random or `wanted` varied.
+void BindXpr(uint8_t* base, uint32_t block, uint32_t xpr, const std::string& wanted, Random& r) {
+  const uint32_t records = block + 0x2000;
+  Put(base, xpr + 16, records);
+  Put(base, xpr + 20, r.Below(7));
+  for (uint32_t i = 0; i < 6; i++) {
+    const uint32_t name = block + 0x2100 + 48 * i;
+    Put(base, records + 16 * i + 12, name);
+    PutString(base, name,
+              r.Below(2) == 0 ? (r.Below(2) == 0 ? wanted : Variant(r, wanted))
+                              : RandomName(r, r.Below(10)));
+  }
+}
+
+void BindCase(Context& h, Results& results, uint32_t block, Random& r,
+              const std::function<void(PPCContext&)>& setup, uint32_t frame_bytes,
+              GuestFunction recompiled, GuestFunction native, const std::string& what) {
+  constexpr uint32_t kBytes = 0x4000;
+  RandomBytes(h.base, block, kBytes, r);
+  PPCContext start = CallContext(h);
+  start.r1.u64 &= ~0xFull;
+  setup(start);
+  const std::vector<uint8_t> inputs = Read(h.base, block, kBytes);
+  const uint32_t text = start.r1.u32 - frame_bytes + 80;
+  Outputs out[2];
+  for (int v = 0; v < 2; v++) {
+    Write(h.base, block, inputs.data(), kBytes);
+    Put(h.base, text, 0);
+    PPCContext t = start;
+    RunSide(v, recompiled, native, t, h.base);
+    out[v].Bytes(Read(h.base, block, kBytes));
+    out[v].Bytes(Read(h.base, text, uint32_t(GuestString(h.base, text).size())));
+    out[v].Word(t.r3.u32);
+    out[v].Word(uint32_t(t.r3.u64 >> 32));
+  }
+  results.Check(out[0], out[1], what);
+}
+
+void Binds(Context& h, Random& r, uint32_t block) {
+  {
+    Results results("Cockpit::BindTextures (sub_820D6108)");
+    for (int c = 0; c < 64; c++) {
+      BindCase(
+          h, results, block, r,
+          [&](PPCContext& t) {
+            for (uint32_t i = 0; i < 6; i++) Put(h.base, block + 556 + 24 * i, RandomState(r, 40));
+            for (uint32_t i = 0; i < 2; i++) Put(h.base, block + 420 + 24 * i, RandomState(r, 40));
+            Put(h.base, block + 196, RandomState(r, 40));
+            const uint32_t record = block + 0x1000;
+            Put(h.base, block + 24, record);
+            const uint32_t index = r.Below(4) == 0 ? 18 + r.Below(8) : NameIndex(h.base, 0x826018C8, 18, r);
+            Put(h.base, record + 32, index);
+            const uint32_t number = r.Below(2) == 0 ? 0 : r.Below(4) == 0 ? uint32_t(r.Next()) : r.Below(10);
+            Put(h.base, block + 48, number);
+            std::string wanted = GuestString(h.base, guest::LoadU32(h.base, 0x826018C8 + 4 * index));
+            wanted += number == 0 ? GuestString(h.base, 0x82005008)
+                                  : GuestString(h.base, 0x82004FFC) + std::to_string(int32_t(number));
+            BindXpr(h.base, block, block + 448, wanted, r);
+            t.r3.u64 = block;
+          },
+          sl::kCockpitBindFrameBytes, __imp__sub_820D6108, hooks::SceneLoadersCockpitBindTextures,
+          fmt::format("case {}", c));
+    }
+    results.Report();
+  }
+  {
+    Results results("TrafficCar::BindTextures (sub_820D7D38)");
+    for (int c = 0; c < 64; c++) {
+      BindCase(
+          h, results, block, r,
+          [&](PPCContext& t) {
+            Put(h.base, block + 3764, RandomState(r, 8));
+            const uint32_t index = NameIndex(h.base, 0x82601980, 8, r);
+            Put(h.base, block + 32, index);
+            const uint32_t number = r.Below(4) == 0 ? uint32_t(-int32_t(r.Below(3))) : r.Below(8) == 0 ? uint32_t(r.Next()) : r.Below(10);
+            Put(h.base, block + 192, number);
+            Put(h.base, block + 7056, r.Below(4) == 0 ? 0xFFFFFFFFu : r.Below(10));
+            const std::string wanted = GuestString(h.base, guest::LoadU32(h.base, 0x82601980 + 4 * index)) +
+                                       GuestString(h.base, 0x820050AC) + std::to_string(int32_t(number));
+            BindXpr(h.base, block, block + 4016, wanted, r);
+            t.r3.u64 = block;
+          },
+          sl::kTrafficBindFrameBytes, __imp__sub_820D7D38, hooks::SceneLoadersTrafficBindTextures,
+          fmt::format("case {}", c));
+    }
+    results.Report();
+  }
+}
 }  // namespace
 
 void SceneLoaders(Context& h) {
@@ -2039,6 +2160,7 @@ void SceneLoaders(Context& h) {
   Lifetimes(h, r, block);
   CreateCases(h, r, block);
   PartLoadedCases(h, r, block);
+  Binds(h, r, block);
   memory::Free(allocation);
 }
 

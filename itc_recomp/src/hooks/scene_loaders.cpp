@@ -10,6 +10,7 @@
 #include "hooks/guest_call.h"
 #include "hooks/heap.h"
 #include "hooks/models.h"
+#include "scene_loaders/file_loaded.h"
 #include "scene_loaders/loads.h"
 #include "scene_loaders/objects.h"
 #include "scene_loaders/pools.h"
@@ -29,7 +30,9 @@ ITC_FLAG_BOOL(native_scene_loaders, true, "ITC",
               "the paint walks sub_820D6F20, sub_820D7388, sub_820D5FC8, sub_820D6328, sub_820D7690, "
               "sub_820D7840 and sub_820D7BF8 (over "
               "PartModel::ApplyPalette's and SetPaint's plain C++), with --native_models "
-              "CarModel::SelectedTexture sub_820D4588 (over XPR::GetTexture's), Interior::IsLoaded "
+              "CarModel::SelectedTexture sub_820D4588 (over XPR::GetTexture's), Cockpit::BindTextures "
+              "sub_820D6108 and TrafficCar::BindTextures sub_820D7D38 (over XPR::GetTexture's, "
+              "Model::SetVinylTextures' and sprintf's), Interior::IsLoaded "
               "sub_820D7790 (with Accessories::AllLoaded sub_820F07D8, no adapter); NameMatches "
               "sub_820CE800 and XPR::FindByName sub_820D09B8 (with XPR::Count sub_82596F20 and "
               "RecordName sub_82596F40, no adapters); with --native_heap and the memory blocks' host lock "
@@ -258,6 +261,28 @@ void SceneLoadersCarModelSelectedTexture(PPCContext& ctx, uint8_t* base) {
     return;
   }
   ctx.r3.u64 = sl::CarModelSelectedTexture(base, ctx.r3.u32);
+}
+
+// The texture binds: their callees' plain C++ (XPR::GetTexture's and
+// Model::SetVinylTextures' under --native_models), or the original.
+void SceneLoadersCockpitBindTextures(PPCContext& ctx, uint8_t* base) {
+  if (ITC_FLAG(native_models)) {
+    if (const auto r3 = sl::CockpitBindTextures(base, ctx.r3.u32, ctx.r1.u32)) {
+      ctx.r3.u64 = *r3;
+      return;
+    }
+  }
+  __imp__sub_820D6108(ctx, base);
+}
+
+void SceneLoadersTrafficBindTextures(PPCContext& ctx, uint8_t* base) {
+  if (ITC_FLAG(native_models)) {
+    if (const auto r3 = sl::TrafficBindTextures(base, ctx.r3.u32, ctx.r1.u32)) {
+      ctx.r3.u64 = *r3;
+      return;
+    }
+  }
+  __imp__sub_820D7D38(ctx, base);
 }
 
 void SceneLoadersNameMatches(PPCContext& ctx, uint8_t* base) {
@@ -538,6 +563,8 @@ ITC_SCENE_LOADERS(820D4588, SceneLoadersCarModelSelectedTexture)
 ITC_SCENE_LOADERS(820D7690, SceneLoadersInteriorApplyPalette)
 ITC_SCENE_LOADERS(820D7840, SceneLoadersInteriorSetPaint)
 ITC_SCENE_LOADERS(820D7BF8, SceneLoadersTrafficApplyPalette)
+ITC_SCENE_LOADERS(820D6108, SceneLoadersCockpitBindTextures)
+ITC_SCENE_LOADERS(820D7D38, SceneLoadersTrafficBindTextures)
 ITC_SCENE_LOADERS(820D7960, SceneLoadersInteriorDeletingDestruct)
 ITC_SCENE_LOADERS(820C4488, SceneLoadersReleaseA)
 ITC_SCENE_LOADERS(820D7790, SceneLoadersInteriorIsLoaded)
