@@ -1357,6 +1357,276 @@ void Finds(Context& h, Random& r, uint32_t block) {
 #undef ITC_FIND_STEP
 }
 
+
+// --- The wheels' set-up ---
+//
+// A world for WheelPoints::SetUp and the tire's, rims' and brakes' set-ups:
+// the wheels block (at +0x400; the tire's entries may lie before a group),
+// the wheels record, two car records and matrices (the block's +4 and +8,
+// and the car model's loading object's +32 and +6976), the scene (its +4
+// the model set, [0x826C2E44] pointed at it for the cases and put back
+// after), a part model pair (+464 apart: each kind's model and the rear's)
+// with up to 8 nodes and 8 shapes, a shape before them (index -1, the
+// morph's shape for a record not found), their streams (one vertex count
+// and kind a model, so Morph::SetUp's DebugPrintf never runs, as in play;
+// the sizes a multiple of 16 that may differ from the vertices' and each
+// other) and two material blocks. Each case through both versions from the
+// same random block and stack, the recompiled one with --native_second_set
+// off (FindShape and the morph the originals; AllocPages, FreePagesIn,
+// memcpy, ScaleBlended and SetTexture the native adapters on both sides).
+// The block (the streams, the materials' first four words, the tires'
+// entries and outputs, the rims' and brakes' weights as floats), the
+// frames' words but the saved registers' slots (the morph records' weights
+// as floats), r3 and the flush mode compared.
+constexpr uint32_t kWheelBlock = 0x400;
+constexpr uint32_t kWheelsRecord = 0x4600;
+constexpr uint32_t kCarRecordA = 0x4680;
+constexpr uint32_t kMatrixA = 0x46C0;
+constexpr uint32_t kLoading = 0x4700;
+constexpr uint32_t kWheelScene = 0x4780;
+constexpr uint32_t kLoadTarget = 0x4800;  // +32 car record B, +6976 matrix B
+constexpr uint32_t kWheelModels = 0x6400;
+constexpr uint32_t kWheelNodes = 0x6800;   // 0x600 a model
+constexpr uint32_t kWheelShapes = 0x7400;  // 0x1400 a model, shape -1 first
+constexpr uint32_t kWheelMaterials = 0x9C00;  // two blocks 0x900 apart
+constexpr uint32_t kWheelStreams = 0xB000;    // 0x420 a shape: H1, H2 at +0x210
+constexpr uint32_t kWheelWorldBytes = 0x10000;
+
+uint32_t WheelShape(uint32_t b, uint32_t m, int32_t s) {
+  return b + kWheelShapes + 0x1400 * m + 544 * uint32_t(s + 1);
+}
+uint32_t WheelHeader(uint32_t b, uint32_t m, int32_t s) {
+  return b + kWheelStreams + 0x420 * (9 * m + uint32_t(s + 1));
+}
+
+// The groups: (offset in the wheels block, first record, records).
+struct WheelGroup {
+  uint32_t at, first, records;
+};
+const WheelGroup kWheelGroups[] = {
+    {32, 368, 6},     {1872, 368, 6},   {3712, 32, 7},   {5456, 32, 7},
+    {7200, 32, 7},    {8944, 32, 7},    {10688, 32, 12}, {13632, 32, 12}};
+
+void BuildWheelWorld(uint8_t* base, uint32_t b, Random& r) {
+  for (uint32_t m = 0; m < 2; m++) {
+    const uint32_t model = b + kWheelModels + 464 * m;
+    const uint32_t nodes = b + kWheelNodes + 0x600 * m;
+    Put(base, model + 36, nodes);
+    Put(base, model + 40, WheelShape(b, m, 0));
+    Put(base, model + 408, 1 + r.Below(8));
+    Put(base, model + 412, r.Below(9));
+    for (uint32_t n = 0; n < 8; n++) {
+      Put(base, nodes + 192 * n + 40, r.Below(6) == 0 ? 0xFFFFFFFFu : r.Below(8));
+    }
+    const uint32_t vertices = 1 + r.Below(16);
+    const uint32_t kind = r.Below(6) == 0 ? 9 : 6 + r.Below(2);
+    for (int32_t s = -1; s < 8; s++) {
+      const uint32_t shape = WheelShape(b, m, s);
+      const uint32_t h1 = WheelHeader(b, m, s), h2 = h1 + 0x210;
+      PutString(base, shape, kShapeNames[r.Below(std::size(kShapeNames))]);
+      Put(base, shape + 268, 16 * (1 + r.Below(32)));
+      Put(base, shape + 284, 16 * (1 + r.Below(32)));
+      Put(base, shape + 388, h1 + 16);
+      Put(base, shape + 392, h2 + 16);
+      Put(base, shape + 396, b + kWheelMaterials + 0x900 * r.Below(2));
+      Put(base, shape + 400, h1);
+      Put(base, shape + 404, h2);
+      Put(base, h1 + 0, vertices);
+      Put(base, h2 + 4, kind);
+      for (uint32_t w = 0; w < 0x200 / 4; w++) {
+        Put(base, h1 + 16 + 4 * w, MixedFloat(r));
+        Put(base, h2 + 16 + 4 * w, MixedFloat(r));
+      }
+    }
+  }
+  for (uint32_t k = 0; k < 2; k++) {
+    const uint32_t materials = b + kWheelMaterials + 0x900 * k;
+    Put(base, materials + 8, r.Below(3));
+    Put(base, materials + 12, r.Below(3));
+    for (uint32_t i = 0; i < 4; i++) {
+      for (uint32_t w = 0; w < 4; w++) {
+        Put(base, materials + 16 + 512 * i + 4 * w, MixedFloat(r));
+      }
+    }
+  }
+  // The wheels record: +0 the kind (3 traffic), +8 the morph's switch (0
+  // runs it), +44 and +56 an entry's index or -1 (with +48, +52, +60 and +64
+  // a float's address and a float), +68 the brakes' kind, +72 and +76 added
+  // to the table's index, +88 the texture, +108 and +112 the brakes' steps.
+  const uint32_t wheels = b + kWheelsRecord;
+  const uint32_t kind = r.Below(4) == 0 ? 3 : r.Below(7);
+  Put(base, wheels + 0, kind);
+  Put(base, wheels + 8, r.Below(4) == 0 ? 1 + r.Below(3) : 0);
+  for (const uint32_t at : {44u, 56u}) {
+    Put(base, wheels + at, r.Below(2) == 0 ? 0xFFFFFFFFu : 12 + r.Below(12));
+    Put(base, wheels + at + 4, MixedFloat(r));
+    Put(base, wheels + at + 8, MixedFloat(r));
+  }
+  Put(base, wheels + 68, r.Below(8));
+  Put(base, wheels + 72, r.Below(3));
+  Put(base, wheels + 76, r.Below(3));
+  Put(base, wheels + 88, uint32_t(r.Next()));
+  Put(base, wheels + 108, 9 + r.Below(12));
+  Put(base, wheels + 112, 9 + r.Below(12));
+  // The car records' +0 (an index into the image's tables: 45 cars, 4 for
+  // traffic) and the matrices.
+  for (const uint32_t car : {b + kCarRecordA, b + kLoadTarget + 32}) {
+    Put(base, car + 0, kind == 3 ? r.Below(4) : r.Below(45));
+  }
+  for (const uint32_t matrix : {b + kMatrixA, b + kLoadTarget + 6976}) {
+    for (uint32_t w = 0; w < 16; w++) Put(base, matrix + 4 * w, SmallFloat(r));
+  }
+  Put(base, b + kLoading + 24, b + kLoadTarget);
+  // The records' shape names.
+  const uint32_t block = b + kWheelBlock;
+  for (const WheelGroup& g : kWheelGroups) {
+    for (uint32_t i = 0; i < g.records; i++) {
+      PutString(base, block + g.at + g.first + kPointRecordBytes * i + 192,
+                PickName(r, kShapeNames, std::size(kShapeNames)));
+    }
+  }
+}
+
+// The block's float ranges.
+void WheelFloats(uint32_t b, std::vector<FloatRange>& floats) {
+  const uint32_t block = b + kWheelBlock;
+  for (const uint32_t tire : {32u, 1872u}) {
+    floats.push_back({block + tire + 12, 288 / 4});
+    floats.push_back({block + tire + 328, 32 / 4});
+  }
+  for (const uint32_t rim : {3712u, 5456u, 7200u, 8944u}) floats.push_back({block + rim + 16, 2});
+  for (const uint32_t brakes : {10688u, 13632u}) floats.push_back({block + brakes + 16, 1});
+  for (uint32_t m = 0; m < 2; m++) {
+    for (int32_t s = -1; s < 8; s++) {
+      floats.push_back({WheelHeader(b, m, s) + 16, 0x200 / 4});
+      floats.push_back({WheelHeader(b, m, s) + 0x210 + 16, 0x200 / 4});
+    }
+  }
+  for (uint32_t k = 0; k < 2; k++) {
+    for (uint32_t i = 0; i < 4; i++) {
+      floats.push_back({b + kWheelMaterials + 0x900 * k + 16 + 512 * i, 4});
+    }
+  }
+}
+
+// The frame's words at offsets from r1 (`from` to `to`, step 4).
+std::vector<uint32_t> FrameWords(int32_t from, int32_t to) {
+  std::vector<uint32_t> words;
+  for (int32_t at = from; at < to; at += 4) words.push_back(uint32_t(at));
+  return words;
+}
+
+void Wheels(Context& h, Random& r, uint32_t b) {
+  if (!hooks::SecondSetWheelsNative()) {
+    ITC_LOG_WARN("harness: second_set: the wheels' set-up skipped (memcpy, the heap or "
+                 "--native_material_passes not native)");
+    return;
+  }
+  const uint32_t saved_scene = guest::LoadU32(h.base, scene::kScene);
+  Put(h.base, scene::kScene, b + kWheelScene);
+  const uint32_t block = b + kWheelBlock;
+  const uint32_t model = b + kWheelModels;
+#define ITC_WHEEL_STEP(function) \
+  [](PPCContext& c, uint8_t* base) { hooks::SecondSetWheelStep(c, base, ss::function); }
+  struct Step {
+    const char* name;
+    GuestFunction recompiled, native;
+    uint32_t front, rear;  // the groups
+    int kind;              // 0 the tire, 1 a rim, 2 the brakes
+  };
+  const Step steps[] = {
+      {"WheelPoints::SetUpTire (sub_820E7598)", __imp__sub_820E7598,
+       ITC_WHEEL_STEP(WheelsSetUpTire), 32, 1872, 0},
+      {"WheelPoints::SetUpRimA (sub_820E79C8)", __imp__sub_820E79C8,
+       ITC_WHEEL_STEP(WheelsSetUpRimA), 3712, 5456, 1},
+      {"WheelPoints::SetUpRimB (sub_820E7CA0)", __imp__sub_820E7CA0,
+       ITC_WHEEL_STEP(WheelsSetUpRimB), 7200, 8944, 1},
+      {"WheelPoints::SetUpBrakes (sub_820E8028)", __imp__sub_820E8028,
+       ITC_WHEEL_STEP(WheelsSetUpBrakes), 10688, 13632, 2},
+  };
+#undef ITC_WHEEL_STEP
+  // Each set-up's frame (its size; the back chain, the words from +80 on
+  // below the saved registers) and the morph
+  // records' weights (and the rims' and brakes' frame weight) as floats.
+  for (const Step& step : steps) {
+    Results results(step.name);
+    const uint32_t frame = step.kind == 0 ? 288 : (step.kind == 1 ? 336 : 368);
+    std::vector<Window> windows = {{frame, 4}};
+    std::vector<uint32_t> float_words;
+    if (step.kind == 0) {
+      // (Not its red-zone word at r1 - 304, which sub_820E6F28 and
+      // sub_820E7010 write: once the morph runs, its callees' saved
+      // registers go there.)
+      windows.push_back({208, 140});
+      float_words = FrameWords(-112, -84);
+    } else if (step.kind == 1) {
+      windows.push_back({256, 204});
+      float_words = FrameWords(-96, -68);
+      float_words.push_back(uint32_t(-208));
+    } else {
+      windows.push_back({288, 220});
+      float_words = FrameWords(-112, -84);
+      float_words.push_back(uint32_t(-224));
+    }
+    for (int c = 0; c < 16; c++) {
+      const bool rear = c % 2 == 1;
+      MorphCase(
+          h, results, b, kWheelWorldBytes, r, r.Below(2) == 0,
+          [&](PPCContext& t, std::vector<FloatRange>& floats) {
+            BuildWheelWorld(h.base, b, r);
+            WheelFloats(b, floats);
+            const uint32_t group = block + (rear ? step.rear : step.front);
+            const bool b_side = r.Below(2) == 0;
+            Put(h.base, group + 0, b_side ? b + kLoadTarget + 6976 : b + kMatrixA);
+            Put(h.base, group + 8, b + kWheelsRecord);
+            if (step.kind == 0) {
+              Put(h.base, group + 4, b_side ? b + kLoadTarget + 32 : b + kCarRecordA);
+              Put(h.base, group + 300, r.Below(4) == 0 ? uint32_t(r.Next()) : r.Below(2));
+            } else {
+              Put(h.base, group + 12, r.Below(2) == 0 ? 0 : uint32_t(r.Next()));
+              if (step.kind == 1) Put(h.base, group + 16, MixedFloat(r));
+            }
+            t.r3.u64 = group;
+            t.r4.u64 = model + (rear ? 464 : 0);
+          },
+          step.recompiled, step.native, windows, float_words,
+          fmt::format("case {} ({})", c, rear ? "rear" : "front"));
+    }
+    results.Report();
+  }
+  // WheelPoints::SetUp: the frames of the tires (r1 - 400), rims (- 448)
+  // and brakes (- 480) under its own (- 112): their back chains and the
+  // words from - 400 to - 168 (the callees' saved registers above, and
+  // below the tire's frame its callees'), compared exactly (their floats
+  // are copies, or the brakes' weight from an integer).
+  {
+    Results results("WheelPoints::SetUp (sub_820E8668)");
+    for (int c = 0; c < 16; c++) {
+      const uint32_t set = c % 3 == 0 ? 0 : (c % 3 == 1 ? 1 : uint32_t(r.Next()));
+      MorphCase(
+          h, results, b, kWheelWorldBytes, r, r.Below(2) == 0,
+          [&](PPCContext& t, std::vector<FloatRange>& floats) {
+            BuildWheelWorld(h.base, b, r);
+            WheelFloats(b, floats);
+            Put(h.base, b + kWheelScene + 4, set);
+            Put(h.base, block + 0, r.Below(2) == 0 ? 0 : b + kLoading);
+            Put(h.base, block + 4, b + kCarRecordA);
+            Put(h.base, block + 8, b + kMatrixA);
+            Put(h.base, block + 12, b + kWheelsRecord);
+            Put(h.base, block + 16, model);
+            Put(h.base, block + 20, model);
+            Put(h.base, block + 24, model);
+            t.r3.u64 = block;
+          },
+          __imp__sub_820E8668, hooks::SecondSetWheelPointsSetUp,
+          {{112, 4}, {448, 4}, {480, 4}, {400, 232}}, {},
+          fmt::format("case {} (set {:#x})", c, set));
+    }
+    results.Report();
+  }
+  Put(h.base, scene::kScene, saved_scene);
+}
+
 }  // namespace
 
 void SecondSet(Context& h) {
@@ -1369,6 +1639,7 @@ void SecondSet(Context& h) {
   Objects(h, r, block);
   CarModelReleases(h, r, block);
   Morphs(h, r, block);
+  Wheels(h, r, block);
   memory::Free(allocation);
 }
 

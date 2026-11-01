@@ -16,6 +16,8 @@
 #include "second_set/points.h"
 #include "scene_loaders/model_point.h"
 #include "hooks/scene_loaders.h"
+#include "hooks/heap.h"
+#include "second_set/wheels.h"
 
 ITC_FLAG_DECLARE(bool, native_material_passes);
 ITC_FLAG_DECLARE(bool, native_models);
@@ -77,7 +79,10 @@ ITC_FLAG_BOOL(native_second_set, true, "ITC",
               "Morph::SetUp sub_82594C18, Run sub_82594D10 and Blend sub_8258BD28 (with Blend6 "
               "sub_8258B578 and Blend7 sub_8258B678, no adapters: only Blend calls them; kind 8 "
               "sub_8258B7E0 and memcpys that would go to the original the original), and the "
-              "tire's sub_820E6F28 and sub_820E7010; with "
+              "tire's sub_820E6F28 and sub_820E7010, the wheels' set-up WheelPoints::SetUp "
+              "sub_820E8668 (with SetUpTire sub_820E7598, SetUpRimA sub_820E79C8, SetUpRimB "
+              "sub_820E7CA0 and SetUpBrakes sub_820E8028, no adapters: only SetUp calls them; "
+              "with native memcpy, the native heap and --native_material_passes); with "
               "--native_models and --native_material_passes the point set-ups "
               "PartsPoints::Find sub_820E0258, CockpitPoints::Find sub_820DBC88, "
               "InteriorPoints::Find sub_820E3660, LightPoints::Find sub_820DC900 and "
@@ -447,6 +452,82 @@ void SecondSetTireReadEntry(PPCContext& ctx, uint8_t* base) {
                     ctx.r1.u32);
 }
 
+bool SecondSetWheelsNative() {
+  return native::Buffers_NativeMemcpy() && NativeHeapActive() &&
+         ITC_FLAG(native_material_passes);
+}
+
+namespace {
+
+// A call to an original from the plain C++'s frame at `sp`, r1 and lr put
+// back after, the flush mode left off.
+template <typename Body>
+void FromFrame(PPCContext& ctx, uint32_t sp, uint32_t lr, Body body) {
+  const uint64_t stack = ctx.r1.u64, link = ctx.lr;
+  ctx.r1.u64 = sp;
+  ctx.lr = lr;
+  body();
+  ctx.r1.u64 = stack;
+  ctx.lr = link;
+  ctx.fpscr.disableFlushMode();
+}
+
+}  // namespace
+
+ss::WheelCalls SecondSetWheelCalls(PPCContext& ctx, uint8_t* base) {
+  ss::WheelCalls calls;
+  calls.morph_run = [&ctx, base](uint32_t model, uint32_t record, uint32_t out1, uint32_t out2,
+                                 uint32_t sp, uint32_t lr) {
+    bool on = false;
+    FromFrame(ctx, sp, lr, [&] {
+      ctx.r3.u64 = model;
+      ctx.r4.u64 = record;
+      ctx.r5.u64 = out1;
+      ctx.r6.u64 = out2;
+      __imp__sub_82594D10(ctx, base);
+      on = (ctx.fpscr.csr & uint32_t(decltype(ctx.fpscr)::FlushMask)) != 0;
+    });
+    return on;
+  };
+  calls.memcpy = [&ctx, base](uint32_t to, uint32_t from, uint32_t bytes, uint32_t sp,
+                              uint32_t lr) {
+    FromFrame(ctx, sp, lr, [&] {
+      ctx.r3.u64 = to;
+      ctx.r4.u64 = from;
+      ctx.r5.u64 = bytes;
+      __imp__sub_825A7410(ctx, base);
+    });
+  };
+  calls.free_pages_in = [&ctx, base](uint32_t at, uint32_t sp, uint32_t lr) {
+    uint64_t r3 = 0;
+    FromFrame(ctx, sp, lr, [&] {
+      ctx.r3.u64 = at;
+      __imp__sub_820D09A0(ctx, base);
+      r3 = ctx.r3.u64;
+    });
+    return r3;
+  };
+  return calls;
+}
+
+void SecondSetWheelStep(PPCContext& ctx, uint8_t* base, WheelFunction step) {
+  const bool was_on = FlushOffForMorph(ctx);
+  ss::WheelCalls calls = SecondSetWheelCalls(ctx, base);
+  ctx.r3.u64 = step(base, ctx.r3.u32, ctx.r4.u32, ctx.r1.u32, calls);
+  SetFlush(ctx, calls.flush, was_on);
+}
+
+void SecondSetWheelPointsSetUp(PPCContext& ctx, uint8_t* base) {
+  if (!SecondSetWheelsNative()) {
+    __imp__sub_820E8668(ctx, base);
+    return;
+  }
+  const bool was_on = FlushOffForMorph(ctx);
+  ss::WheelCalls calls = SecondSetWheelCalls(ctx, base);
+  ctx.r3.u64 = ss::WheelPointsSetUp(base, ctx.r3.u32, ctx.r1.u32, calls);
+  SetFlush(ctx, calls.flush, was_on);
+}
+
 void SecondSetScenePartsConstruct(PPCContext& ctx, uint8_t* base) {
   if (!ITC_FLAG(native_material_passes)) {
     __imp__sub_820E2F18(ctx, base);
@@ -609,6 +690,7 @@ ITC_SECOND_SET(8258BD28, SecondSetMorphBlend)
 ITC_SECOND_SET(82594D10, SecondSetMorphRun)
 ITC_SECOND_SET(820E6F28, SecondSetTireFillEntries)
 ITC_SECOND_SET(820E7010, SecondSetTireReadEntry)
+ITC_SECOND_SET(820E8668, SecondSetWheelPointsSetUp)
 ITC_SECOND_SET(820DB7C8, SecondSetSceneCarModelDeletingDestruct)
 ITC_SECOND_SET(820E2F78, SecondSetScenePartsDeletingDestruct)
 ITC_SECOND_SET(820E53A0, SecondSetSceneInteriorDeletingDestruct)

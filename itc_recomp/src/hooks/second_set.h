@@ -8,6 +8,7 @@
 
 #include "guest.h"
 #include "second_set/finds.h"
+#include "second_set/wheels.h"
 
 namespace hooks {
 
@@ -177,5 +178,20 @@ void SecondSetCockpitFind(PPCContext& ctx, uint8_t* base);
 void SecondSetInteriorFind(PPCContext& ctx, uint8_t* base);
 void SecondSetLightsFind(PPCContext& ctx, uint8_t* base);
 void SecondSetTrafficFind(PPCContext& ctx, uint8_t* base);
+
+
+// The wheels' set-up (src/second_set/wheels.h): WheelPoints::SetUp
+// sub_820E8668 (r3 = the block) natively only with native memcpy, the native
+// heap and --native_material_passes (else the original); SetUpTire
+// sub_820E7598, SetUpRimA sub_820E79C8, SetUpRimB sub_820E7CA0 and
+// SetUpBrakes sub_820E8028 have no adapters (only SetUp calls them): their
+// step (r3 the group, r4 the model) for the harness. r3 as the original
+// leaves it, the flush mode as its last float step; the originals of
+// Morph::Run, memcpy and FreePagesIn where their plain C++ declines.
+using WheelFunction = uint64_t (*)(uint8_t*, uint32_t, uint32_t, uint32_t, second_set::WheelCalls&);
+bool SecondSetWheelsNative();
+second_set::WheelCalls SecondSetWheelCalls(PPCContext& ctx, uint8_t* base);
+void SecondSetWheelStep(PPCContext& ctx, uint8_t* base, WheelFunction step);
+void SecondSetWheelPointsSetUp(PPCContext& ctx, uint8_t* base);
 
 }  // namespace hooks
