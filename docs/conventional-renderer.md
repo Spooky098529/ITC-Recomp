@@ -640,6 +640,19 @@ stays in guest memory, and the renderer gets a copy. One write by `libc`
 (memcpy) to an index page, and 2 file reads, dropped pages as expected.
 Nothing else read vertex, index or texture data after its first draw.
 
+### The baseline profile (2026-11-01, `fa713794`'s build)
+
+`profile_render_thread.sh`, uncapped attract race, three runs in a row
+(profiles `itc_recomp/out/profiles/step0-baseline-{1,2,3}.data`):
+
+| Run | Frames recorded | Render thread, Mcycles a frame | `BlendState_ReplayConstants` |
+|---|---|---|---|
+| 1 | 6,359 | 9.433 | 6.64%, 626 kcycles |
+| 2 | 5,854 | 10.196 | 6.45%, 658 kcycles |
+| 3 | 5,865 | 10.192 | 6.63%, 676 kcycles |
+
+Steps from 1 on compare against these (alternating runs).
+
 ## 7. Risks, and what's still unknown
 
 - **Readers of the register shadow outside the replay.** Once the
