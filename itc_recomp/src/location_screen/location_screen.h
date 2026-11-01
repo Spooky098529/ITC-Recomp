@@ -207,6 +207,11 @@ constexpr uint32_t kXprRelease = 0x82108860;   // XPR::Release of a slot
 constexpr uint32_t kVirtualAlloc = 0x82295398;
 constexpr uint32_t kVirtualFree = 0x82295330;
 constexpr uint32_t kArchiveLoad = 0x8209DE48;
+constexpr uint32_t kOperatorNew = 0x825A6880;
+constexpr uint32_t kXprConstruct = 0x82596E68;  // XPR::XPR
+constexpr uint32_t kXprCreate = 0x82596F68;     // XPR::Create
+constexpr uint32_t kXprGetTexture = 0x82597118;  // XPR::GetTexture
+constexpr uint32_t kGetLevelDesc = 0x822A5B78;  // Texture::GetLevelDesc
 
 // memcpy natively (c_runtime::Memcpy), or through `calls` from the frame at
 // `r1` with the return address `lr` where that refuses. Returns the
@@ -252,6 +257,22 @@ uint64_t PictureFree(uint8_t* base, uint32_t sp, uint32_t picture, const Calls& 
 // (Picture::Free, VirtualFree(MEM_RELEASE)). Returns the last VirtualFree's
 // r3, or the screen.
 uint64_t FreePictures(uint8_t* base, uint32_t sp, uint32_t screen, const Calls& calls);
+
+// sub_82228E88 LocationScreen::OnPictureLoadedA and sub_82228FC8
+// OnPictureLoadedB (`list` 0 or 1), the archive's load callbacks (r4 =
+// `buffer`, r6 = `screen`): a 16-byte picture (VirtualAlloc; +0 = 0, +4 =
+// -1, +8 = +12 = 0), +12 an XPR (operator new(24), XPR::XPR when not 0)
+// made from the buffer (XPR::Create), +8 a texture record (operator
+// new(12), cleared when not 0) whose +0 is the XPR's texture 0
+// (XPR::GetTexture); +4 the id from the list's ring's front (A +140, B +408:
+// its count +128 down, its start +132 up); the record's +4 and +8 the
+// texture's width and height (Texture::GetLevelDesc into the 160-byte
+// frame's +80: its +24, +28); the buffer freed (VirtualFree, MEM_RELEASE),
+// +0 = 1, and the picture appended to the list (A +8, B +276; the count at
+// +128). Returns VirtualFree's r3. The calls through `calls`, as the
+// original makes them.
+uint64_t OnPictureLoaded(uint8_t* base, uint32_t sp, uint32_t screen, uint32_t buffer,
+                         uint32_t list, const Calls& calls);
 
 // --- The transitions that set texts (src/location_screen/transitions.cpp) ---
 //

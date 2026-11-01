@@ -33,7 +33,8 @@ ITC_FLAG_BOOL(native_location_screen, true, "ITC",
               "sub_8222F258 over StateMachine::Add's plain C++; Page9 sub_822280D8 and Page11 "
               "sub_82228138 over the career's and the race set-up's register steps, "
               "NextOpponentText sub_82227430, LoadPicture sub_8222C270, Picture::Free "
-              "sub_82228438 and FreePictures sub_82228498, their heap and archive calls "
+              "sub_82228438 and FreePictures sub_82228498, OnPictureLoadedA sub_82228E88 and "
+              "OnPictureLoadedB sub_82228FC8, their heap, XPR, texture and archive calls "
               "through those adapters; with the UI movies' heap native (their text setters' "
               "plain C++), ResetMovie sub_8222CD60, Transition29 sub_8222CFF0, ShowUnlockEntry "
               "sub_8222A978, Transition25 sub_8222D1A8, ShowListEntry sub_8222B048, "
@@ -330,6 +331,18 @@ void LocationScreenFreePictures(PPCContext& ctx, uint8_t* base) {
   ctx.r3.u64 = ls::FreePictures(base, sp, screen, calls.get());
 }
 
+void LocationScreenOnPictureLoadedA(PPCContext& ctx, uint8_t* base) {
+  const uint32_t sp = ctx.r1.u32, buffer = ctx.r4.u32, screen = ctx.r6.u32;
+  LocationScreenCalls calls(ctx, base);
+  ctx.r3.u64 = ls::OnPictureLoaded(base, sp, screen, buffer, 0, calls.get());
+}
+
+void LocationScreenOnPictureLoadedB(PPCContext& ctx, uint8_t* base) {
+  const uint32_t sp = ctx.r1.u32, buffer = ctx.r4.u32, screen = ctx.r6.u32;
+  LocationScreenCalls calls(ctx, base);
+  ctx.r3.u64 = ls::OnPictureLoaded(base, sp, screen, buffer, 1, calls.get());
+}
+
 bool LocationScreenTextsNative(uint8_t* base) {
   return ITC_FLAG(native_ui_movies_game) && ITC_FLAG(native_c_runtime_heap) &&
          NativeHeapActive() && memory::crt::GetProcessHeap(base) != 0;
@@ -495,6 +508,9 @@ LOCATION_SCREEN_ADAPTER(82228138, LocationScreenPage11)
 LOCATION_SCREEN_ADAPTER(82227430, LocationScreenNextOpponentText)
 LOCATION_SCREEN_ADAPTER(8222C270, LocationScreenLoadPicture)
 LOCATION_SCREEN_ADAPTER(82228498, LocationScreenFreePictures)
+// The archive's load callbacks (no direct callers: their adapters stay).
+LOCATION_SCREEN_ADAPTER(82228E88, LocationScreenOnPictureLoadedA)
+LOCATION_SCREEN_ADAPTER(82228FC8, LocationScreenOnPictureLoadedB)
 LOCATION_SCREEN_ADAPTER(8222CFF0, LocationScreenTransition29)
 LOCATION_SCREEN_ADAPTER(8222D1A8, LocationScreenTransition25)
 LOCATION_SCREEN_ADAPTER(8222D610, LocationScreenTransition2)

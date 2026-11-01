@@ -102,6 +102,10 @@ void LocationScreenNextOpponentText(PPCContext& ctx, uint8_t* base);
 void LocationScreenLoadPicture(PPCContext& ctx, uint8_t* base);
 void LocationScreenPictureFree(PPCContext& ctx, uint8_t* base);
 void LocationScreenFreePictures(PPCContext& ctx, uint8_t* base);
+// sub_82228E88 OnPictureLoadedA and sub_82228FC8 OnPictureLoadedB (r4 = the
+// buffer, r6 = the screen; the archive's callbacks).
+void LocationScreenOnPictureLoadedA(PPCContext& ctx, uint8_t* base);
+void LocationScreenOnPictureLoadedB(PPCContext& ctx, uint8_t* base);
 
 // Whether the texts' functions run natively: the UI movies' text setters'
 // conditions (--native_ui_movies_game, --native_c_runtime_heap,

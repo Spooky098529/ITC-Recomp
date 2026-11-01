@@ -27,6 +27,8 @@
 #include "location_screen/location_screen.h"
 #include "memory/c_runtime_heap.h"
 #include "memory/heap.h"
+#include "models/memory_blocks.h"
+#include "models/xpr.h"
 #include "race_event/race_event.h"
 #include "race_setup/race_setup.h"
 #include "ui_movies/game.h"
@@ -944,6 +946,78 @@ void Pictures(Context& h, const World& w) {
   Group(h, w, "LocationScreen::FreePictures (sub_82228498)", 200, lists,
         [](PPCContext& t, Random&, const World& w) { t.r3.u64 = w.screen.address; },
         __imp__sub_82228498, hooks::LocationScreenFreePictures, lists_spec);
+
+  // OnPictureLoadedA and B: an XPR2 file of 1 to 4 records (the first a
+  // texture with random words, the others textures or not) in VirtualAlloc's
+  // pages (the callback frees them); the list's count below 8, the ring's
+  // count and start any. The picture's words, its record's (the texture as
+  // its offset in the XPR's header block) and the XPR's (+16 as an offset),
+  // the list's new slot made comparable; then the blocks freed. The
+  // description in the frame (+80, 32 bytes) compared too.
+  uint32_t buffer = 0;
+  const SetupFn file = [base, &buffer](Random& r, const World& w) {
+    const uint32_t records = 1 + r.Below(4);
+    const uint32_t textures_at = 4 + 16 * records;
+    const uint32_t header_bytes = textures_at + 52 * records + 4 * r.Below(16);
+    const uint32_t data_bytes = 1 + r.Below(4000);
+    const uint32_t bytes = 12 + header_bytes + data_bytes;
+    buffer = memory::AllocPages(bytes, 4096);
+    WriteRandom(base, buffer, bytes & ~3u, r);
+    guest::StoreU32(base, buffer + 0, 0x58505232);
+    guest::StoreU32(base, buffer + 4, header_bytes);
+    guest::StoreU32(base, buffer + 8, data_bytes);
+    const uint32_t header = buffer + 12;
+    guest::StoreU32(base, header, records);
+    for (uint32_t i = 0; i < records; i++) {
+      const uint32_t record = header + 4 + 16 * i;
+      const bool texture = i == 0 || r.Below(2) == 0;
+      guest::StoreU32(base, record, (texture ? 0x54580000u : 0x56420000u) | r.Below(0x10000));
+      guest::StoreU32(base, record + 4, textures_at + 52 * i);
+    }
+    for (uint32_t list = 0; list < 2; list++) {
+      guest::StoreU32(base, w.screen.address + (list == 0 ? 136 : 404), r.Below(8));
+    }
+  };
+  const ArgsFn file_args = [&buffer](PPCContext& t, Random&, const World& w) {
+    t.r4.u64 = buffer;
+    t.r6.u64 = w.screen.address;
+  };
+  for (uint32_t list = 0; list < 2; list++) {
+    Spec loaded_spec{{{-160 + 80, 32}}, [base, &w, list](PPCContext&, Outputs& out) {
+                       const uint32_t at = w.screen.address + (list == 0 ? 8 : 276);
+                       const uint32_t count = guest::LoadU32(base, at + 128);
+                       const uint32_t slot = at + 4 * (count - 1);
+                       const uint32_t picture = guest::LoadU32(base, slot);
+                       guest::StoreU32(base, slot, 0xF00D0000u);
+                       out.Word(guest::LoadU32(base, picture + 0));
+                       out.Word(guest::LoadU32(base, picture + 4));
+                       const uint32_t record = guest::LoadU32(base, picture + 8);
+                       const uint32_t xpr = guest::LoadU32(base, picture + 12);
+                       out.Word(record != 0);
+                       out.Word(xpr != 0);
+                       const uint32_t header = guest::LoadU32(base, xpr + 0);
+                       const uint32_t data = guest::LoadU32(base, xpr + 8);
+                       out.Word(guest::LoadU32(base, xpr + 4));
+                       out.Word(guest::LoadU32(base, xpr + 12));
+                       out.Word(guest::LoadU32(base, xpr + 16) - header);
+                       out.Word(guest::LoadU32(base, xpr + 20));
+                       out.Word(guest::LoadU32(base, record + 0) - header);
+                       out.Word(guest::LoadU32(base, record + 4));
+                       out.Word(guest::LoadU32(base, record + 8));
+                       memory::FreePages(header - models::kBlockHeaderBytes);
+                       memory::crt::XMemFree(data - models::kBlockHeaderBytes,
+                                             models::kXprDataAllocation);
+                       memory::crt::OperatorDelete(record);
+                       memory::crt::OperatorDelete(xpr);
+                       memory::FreePages(picture);
+                     }};
+    Group(h, w,
+          list == 0 ? "LocationScreen::OnPictureLoadedA (sub_82228E88)"
+                    : "LocationScreen::OnPictureLoadedB (sub_82228FC8)",
+          60, file, file_args, list == 0 ? __imp__sub_82228E88 : __imp__sub_82228FC8,
+          list == 0 ? hooks::LocationScreenOnPictureLoadedA : hooks::LocationScreenOnPictureLoadedB,
+          loaded_spec);
+  }
 }
 
 // --- The transitions that set texts ---
