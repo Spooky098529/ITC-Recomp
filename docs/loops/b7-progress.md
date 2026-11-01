@@ -25,9 +25,18 @@ file's history. What's left to see in a drive, from every run:
   harnesses 0 differing, race 25 s with them, 0 errors; unseen callees
   left on the recompiled path behind the flags; no subagents). Left:
   `PauseDraw` `sub_8216CF08` and `sub_8216CFE0`, ready now (a new
-  cleanup lead). Step: validation agent running.
+  cleanup lead). Validated (`itc_3072`, 120 s: race 54 s, 0 errors;
+  replay `itc_3073` ok): 12 of 12 harness lines, 2 ran in the race, 5
+  in the replay, 5 to drive. Done.
+- Cleanup lead (no mapping, not counted): `RaceHudMachine::PauseDraw`
+  `sub_8216CF08` and `sub_8216CFE0` (`race-hud-machine.md`), then
+  `sub_82211D08`'s adapter. Step: migration agent running.
 
 ## Done
+
+- The race HUD machine's `CreateScreens`, `ClosePause`, `ResultsDraw`,
+  `AfterRaceDraw` (cleanup lead): with `sub_82211D08`, `sub_82211D10`
+  and 6 adapters removed; 61f7966b..7476d237. Validated (`itc_3072`).
 
 - The device's shader setters and the render queue (subsystem 1):
   `device-shaders.md`, 7 of 7 in play, one migration;
@@ -63,5 +72,8 @@ file's history. What's left to see in a drive, from every run:
 - After the race HUD machine cleanup's migration (`itc_3071`: race 25 s,
   0 errors, three harnesses 0 differing): ours 3718, work left 2681
   (wrapped 100, known 507, unknown 2074).
+- After its validation (`itc_3072`, 120 s: race 54 s, 0 errors, every
+  harness 0 differing but the expected groups): ours 3718, work left
+  2681.
 
 ## Stopped

@@ -16,6 +16,16 @@ function goes from this list when a log shows its `native running
 (game):` line (say which log in the commit). A run with nothing left
 here loses its heading.
 
+## Run 2026-10-31 23:57 (`b7-loop-31-10-26-2`)
+
+- The race HUD machine cleanup lead (attract race `itc_3072`, replay
+  `itc_3073` ok; `race-hud-machine.md`, `race-hud-object.md`,
+  `race-screens.md`): `sub_8216D6D0` RaceHudMachine::ResultsDraw,
+  `sub_8216C6D8` RaceHudMachine::AfterRaceDraw, `sub_82211D10`
+  RaceScreens::DrawAfterRaceMenu (`sub_8221A2F8` CareerResults::Draw
+  and `sub_8221BB48` AfterRaceMenu::Draw, adapters removed this run,
+  are under the previous run already).
+
 ## Run 2026-10-31 16:54 (`b7-loop-31-10-26`, continued)
 
 - The in-race screens, third migration (attract race `itc_3046`,
