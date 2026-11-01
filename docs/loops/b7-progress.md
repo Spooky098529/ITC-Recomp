@@ -9,9 +9,10 @@ file's history. What's left to see in a drive, from every run:
 ## Now
 
 - Run started 2026-11-01 12:56 on `b7-loop-01-11-26`, from d8348c7b;
-  summary `b7-loop-2026-11-01-1256.md`. Limit: 3 subsystems.
-- Subsystem 1 of 3: the boot mode (`boot-mode.md`). Done.
-- Subsystem 2 of 3: `Car::DrawUpdate` `sub_820DAC68` (the scene
+  summary `b7-loop-2026-11-01-1256.md`. Limit: 2 subsystems (the
+  user's call, 2026-11-01; 3 before): the run stops after the car draw.
+- Subsystem 1 of 2: the boot mode (`boot-mode.md`). Done.
+- Subsystem 2 of 2: `Car::DrawUpdate` `sub_820DAC68` (the scene
   model's per-pass update; its lead from `leads.md`, ready: 78
   functions, 16,029 lines, split for the migration). Map checked
   (24c2b1c1, `car-draw.md`: 86 rows, 14 moved from `functions.md`; 0
