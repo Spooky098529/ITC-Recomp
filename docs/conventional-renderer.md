@@ -1,4 +1,4 @@
-# A conventional renderer (a plan; step 1 in progress)
+# A conventional renderer (a plan; step 1 done)
 
 Written 2026-11-01. This is a map and a plan only. No code has changed,
 and nothing here was built, run or profiled for it. It is built from
@@ -659,10 +659,10 @@ Nothing else read vertex, index or texture data after its first draw.
 
 Steps from 1 on compare against these (alternating runs).
 
-## Step 1's progress (2026-11-01, on `conventional-renderer`)
+## Step 1 (2026-11-01, on `conventional-renderer`; done)
 
-Behind `--conventional_renderer` (off by default until the user's checks
-below). The code:
+Built behind `--conventional_renderer`, checked (below), then made the
+only path (`c65b3c3e`). The code:
 
 - **The interface**, `src/render/device.h`: `render::State` (plain state
   with dirty bits; the game's objects' guest addresses as handles until
@@ -706,11 +706,15 @@ below). The code:
   backend in `src/native/renderer.cpp` forwards to these with the
   frame's command buffer.
 
-With the flag, the render queue (`src/graphics/render_queue.cpp`) calls
-only our handlers (and `ReplayStats_OnCommand` and
-`Renderer_OnCommand`): the recompiled handlers, the game's setters, the
-register shadow, the packets and the shader load aren't called on the
-render path.
+The render queue (`src/graphics/render_queue.cpp`) calls only our
+handlers (and `ReplayStats_OnCommand` and `Renderer_OnCommand`): the
+recompiled handlers, the game's setters, the register shadow, the packets
+and the shader load aren't called on the render path. Outside the command
+list the frame's end (`sub_8258D998`) still calls the game's `Resolve`
+into the front buffer; `src/native/replay_hooks.cpp` passes it on to the
+renderer and logs `Resolve`'s callers once (the boot marker,
+`scripted_run.sh`). `--native_render_queue=false` now draws nothing (the
+recompiled replay's commands reach no renderer).
 
 **The temporary check** (`--check_conventional_renderer`, with
 `--check_vertex_fetch_patch`): our handlers run beside the game's on the
@@ -767,11 +771,25 @@ and `RB_COLOR_MASK` but target 0's bits.
   on any texture change: a lead, per-stage dirty bits), `Passes::State::Draw`
   8.6%, `Commands::Run` 6.8%, `BlendState_ReplayConstants` 6.3%.
 
-**Left in step 1**: the user's checks with the flag on (the menus and
-tiling, a drive, interpolation); then the flag on by default and the old
-path removed: `replay_hooks.cpp`'s wrappers, `draw_packets.cpp`,
-`state.cpp`'s `ReadRegisters`, the check's files and both temporary
-flags. `gpu_link.cpp` stays (Swap's fences outside the replay).
+**The user's checks** (2026-11-01, `itc_3265`, flag on): the menus
+(107-151 tilings per 5 s, all through our path), a race and interpolation
+looked correct.
+
+**The old path removed** (`c65b3c3e`): the recompiled handlers'
+wrappers and the library's draw hooks (`replay_hooks.cpp`),
+`draw_packets.cpp` (the indexed draw without its packets and
+`--native_renderer_check_draw_writes`), `state.cpp` (`ReadRegisters`, the
+dirty masks, `--native_renderer_log_register_reads`), the check
+(`interface_check.cpp`, `--check_conventional_renderer`,
+`--check_vertex_fetch_patch`), `Passes`' and `Renderer`'s entry points
+for the device's state, the library's patched-copy and declaration
+diagnostics, and interpolation's command 7 wrapper (its
+`--log_frame_times` timing is in ours). The render queue harness's
+`ChunkChain::Run` and `Replay` cases were dropped (they compared our
+handlers with the recompiled ones; decision 10); its other cases pass.
+`gpu_link.cpp` stays (Swap's fences outside the replay). An attract race
+after (`itc_3267`): every draw drawn, `passes.txt` the same,
+interpolation paired, pixels within the runs' spread.
 
 ## 7. Risks, and what's still unknown
 
