@@ -152,6 +152,8 @@ set(ITC_SOURCES
     src/hooks/second_set.cpp
     src/hooks/load_poll.cpp
     src/load_poll/load_poll.cpp
+    src/hooks/boot_mode.cpp
+    src/boot_mode/boot_mode.cpp
     src/second_set/points.cpp
     src/second_set/point_groups.cpp
     src/second_set/blocks.cpp
@@ -457,6 +459,7 @@ set(ITC_SOURCES
     src/harnesses/scene_loaders.cpp
     src/harnesses/second_set.cpp
     src/harnesses/load_poll.cpp
+    src/harnesses/boot_mode.cpp
     src/harnesses/car_models.cpp
     src/harnesses/save_data.cpp
     src/harnesses/race_world.cpp

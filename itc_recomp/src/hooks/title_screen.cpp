@@ -9,6 +9,8 @@
 
 #include "title_screen.h"
 
+#include "hooks/boot_mode.h"
+
 #include "guest.h"
 
 #include "base/flags.h"
@@ -39,6 +41,12 @@ bool g_in_movie_wait = false;
 // Set by the render thread once it has started the boot movie (see
 // sub_820AE958).
 std::atomic<bool> g_movie_started{false};
+
+// --skip_intro: the movie step's Movies::State answers 1 (finished) once the
+// render thread has started the movie.
+bool MovieFinishedEarly() {
+  return g_in_movie_wait && g_movie_started;
+}
 
 }  // namespace
 
@@ -93,8 +101,9 @@ extern "C" REX_FUNC(sub_820988C8) {
   __imp__sub_820988C8(ctx, base);
 }
 
-// The boot's movie step, run every tick while a movie plays (the Ubisoft
-// logo): ends the step when the movie is skippable (0x826C5BC4) and a button
+// Boot::WaitForMovie, the boot's movie step, run every tick while a movie
+// plays (the Ubisoft logo; its plain C++ with --native_boot_mode,
+// src/boot_mode/): ends the step when the movie is skippable (0x826C5BC4) and a button
 // is pressed, or when the movie has finished (sub_820A4450 returns 1) and
 // this+9608 is 1. With --skip_intro the movie reports finished as soon as
 // the render thread has started it.
@@ -105,14 +114,24 @@ extern "C" REX_FUNC(sub_82107C58) {
                  guest::LoadU32(base, ctx.r3.u32 + 9608));
   }
   g_in_movie_wait = ITC_FLAG(skip_intro);
-  __imp__sub_82107C58(ctx, base);
+  if (hooks::BootModeNative()) {
+    hooks::BootWaitForMovie(ctx, base, MovieFinishedEarly);
+  } else {
+    __imp__sub_82107C58(ctx, base);
+  }
   g_in_movie_wait = false;
 }
 
-// Whether the playing movie has finished (1 = finished).
+// Whether the playing movie has finished (1 = finished). With
+// --native_boot_mode, Boot::WaitForMovie's plain C++ asks the same through
+// MovieFinishedEarly; this wrap is reached by the recompiled callers only.
 extern "C" REX_FUNC(sub_820A4450) {
   REX_FUNC_PROLOGUE();
-  if (g_in_movie_wait && g_movie_started) {
+  if (hooks::BootModeNative()) {
+    hooks::BootMoviesState(ctx, base, MovieFinishedEarly);
+    return;
+  }
+  if (MovieFinishedEarly()) {
     ctx.r3.u64 = 1;
     return;
   }

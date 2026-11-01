@@ -23,7 +23,9 @@ end's state objects are at `[0x82814E2C]`, `[0x82814E30]` and
 Options for automated runs (both off by default):
 
 - `--skip_intro`: the movie step reports the movie finished at once
-  (`sub_820A4450` returns 1 inside `sub_82107C58`), and menus run without
+  (`sub_820A4450` returns 1 inside `sub_82107C58`; since the boot mode is
+  native, `--native_boot_mode`, `docs/functions/boot-mode.md`, the movie
+  step's plain C++ asks the wrap's answer itself), and menus run without
   the 30 Hz tick wait until the first race, so the tick-counted Genki logo
   and title animation pass in a fraction of a second.
   Failing the movie file's open instead makes the game show the dirty disc
