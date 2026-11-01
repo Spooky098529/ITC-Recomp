@@ -68,6 +68,9 @@ void SceneLoadersInteriorRelease(PPCContext& ctx, uint8_t* base);
 void SceneLoadersInteriorDestruct(PPCContext& ctx, uint8_t* base);
 void SceneLoadersInteriorDeletingDestruct(PPCContext& ctx, uint8_t* base);
 void SceneLoadersReleaseA(PPCContext& ctx, uint8_t* base);
+// Whether ReleaseA's plain C++ runs for `pool` (the conditions above), for
+// native callers (the second set's releases).
+bool SceneLoadersReleaseANative(uint32_t pool);
 // CarModel::SelectedTexture sub_820D4588: r3 = the car model; r3 the
 // texture or 0. Natively only with --native_models (else the original).
 void SceneLoadersCarModelSelectedTexture(PPCContext& ctx, uint8_t* base);

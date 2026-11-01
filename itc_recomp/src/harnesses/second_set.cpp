@@ -8,15 +8,22 @@
 // exactly.
 
 #include "harness.h"
+#include "car_model_inputs.h"
+#include "pending_frees.h"
 
 #include "base/flags.h"
 #include "base/log.h"
+#include "hooks/models.h"
 #include "hooks/second_set.h"
+#include "models/memory_blocks.h"
+#include "scene/scene.h"
+#include "scene_loaders/objects.h"
 #include "memory/c_runtime_heap.h"
 #include "memory/heap.h"
 #include "model_animation/model_animation.h"
 #include "second_set/blocks.h"
 #include "second_set/finds.h"
+#include "second_set/objects.h"
 #include "second_set/points.h"
 
 #include <fmt/format.h>
@@ -24,12 +31,14 @@
 #include <algorithm>
 #include <bit>
 #include <functional>
+#include <mutex>
 #include <string>
 #include <vector>
 
 ITC_FLAG_DECLARE(bool, native_second_set);
 ITC_FLAG_DECLARE(bool, native_scene_loaders);
 ITC_FLAG_DECLARE(bool, native_material_passes);
+ITC_FLAG_DECLARE(bool, native_car_models);
 
 namespace harness {
 
@@ -345,6 +354,14 @@ void Groups(Context& h, Random& r, uint32_t block) {
        hooks::SecondSetTrafficResetHeadlights, 128, 1680, false},
       {"TrafficPoints::ResetTailLights (sub_820E57A0)", __imp__sub_820E57A0,
        hooks::SecondSetTrafficResetTailLights, 128, 2880, false},
+      {"WheelPoints::ResetTire (sub_820E74B8)", __imp__sub_820E74B8,
+       hooks::SecondSetWheelsResetTire, 128, 1840, false},
+      {"WheelPoints::ResetRimA (sub_820E7918)", __imp__sub_820E7918,
+       hooks::SecondSetWheelsResetRimA, 144, 1744, false},
+      {"WheelPoints::ResetRimB (sub_820E7C08)", __imp__sub_820E7C08,
+       hooks::SecondSetWheelsResetRimB, 128, 1744, false},
+      {"WheelPoints::ResetBrakes (sub_820E7F90)", __imp__sub_820E7F90,
+       hooks::SecondSetWheelsResetBrakes, 128, 2944, false},
       {"PartsPoints::InitLeftDoor (sub_820DF5B8)", __imp__sub_820DF5B8,
        ITC_GROUP_STEP(PartsInitLeftDoor), 112, 6096, false, false},
       {"PartsPoints::InitRightDoor (sub_820DF610)", __imp__sub_820DF610,
@@ -386,6 +403,9 @@ void Groups(Context& h, Random& r, uint32_t block) {
     if (g.frame == 192 && g.frames) {
       windows.push_back({192 - 80, 64});  // ResetHeadlights' identity
     }
+    if (g.frame == 144 && g.bytes == 1744) {
+      windows.push_back({144 - 80, 16});  // ResetRimA's row
+    }
     for (int c = 0; c < 4; c++) {
       FrameCase(
           h, results, block, std::max<uint32_t>(0x2000, (g.bytes + 0x8F) & ~0xFu), r,
@@ -395,6 +415,131 @@ void Groups(Context& h, Random& r, uint32_t block) {
     results.Report();
   }
 #undef ITC_GROUP_STEP
+}
+
+// --- The objects ---
+
+// The objects' resets and the scene model's block: the object at the block,
+// its words random. The block, the frames' words the function writes itself
+// and r3 compared (the nested Clear frames aren't: as the blocks' resets').
+void Objects(Context& h, Random& r, uint32_t block) {
+  struct Object {
+    const char* name;
+    GuestFunction recompiled, native;
+    uint32_t bytes;
+    std::vector<Window> windows;
+  };
+  const Object objects[] = {
+      {"SceneParts::Reset (sub_820E0510)", __imp__sub_820E0510, hooks::SecondSetScenePartsReset,
+       37296, {}},
+      {"SceneCockpit::Reset (sub_820DBE20)", __imp__sub_820DBE20,
+       hooks::SecondSetSceneCockpitReset, 4320, {}},
+      {"SceneInterior::Reset (sub_820E3748)", __imp__sub_820E3748,
+       hooks::SecondSetSceneInteriorReset, 11680, {}},
+      {"SceneLights::Reset (sub_820DCA40)", __imp__sub_820DCA40,
+       hooks::SecondSetSceneLightsReset, 13168, {}},
+      {"SceneTraffic::Reset (sub_820E5930)", __imp__sub_820E5930,
+       hooks::SecondSetSceneTrafficReset, 9808, {}},
+      {"SceneModelBlock::SceneModelBlock (sub_820DA108)", __imp__sub_820DA108,
+       hooks::SecondSetSceneModelBlockConstruct, 736, {}},
+      {"SceneModelBlock::Reset (sub_820D9F50)", __imp__sub_820D9F50,
+       hooks::SecondSetSceneModelBlockReset, 736,
+       {{ss::kSceneModelBlockResetFrameBytes - 80, 128}}},
+      // Without its first-set car model (+24 = 0): CarRecord::Reset and the
+      // words (with one, below).
+      {"SceneCarModel::Release (sub_820DB6C0, no car model)", __imp__sub_820DB6C0,
+       hooks::SecondSetSceneCarModelRelease, 3744, {}},
+  };
+  for (const Object& o : objects) {
+    Results results(o.name);
+    const bool release = o.recompiled == __imp__sub_820DB6C0;
+    for (int c = 0; c < 4; c++) {
+      FrameCase(
+          h, results, block, (o.bytes + 0x8F) & ~0xFu, r,
+          [&](PPCContext& t) {
+            t.r3.u64 = block + 16 * r.Below(8);
+            if (release) {
+              Put(h.base, t.r3.u32 + 24, 0);
+            }
+          },
+          o.recompiled, o.native, o.windows, fmt::format("case {} ({} bytes)", c, o.bytes));
+    }
+    results.Report();
+  }
+}
+
+// SceneCarModel::Release with its first-set car model (+24): the car model's
+// inputs as car_models' CarModel::Release cases build them
+// (car_model_inputs.h), the first pool set ([0x826C2E40]) a block whose pool
+// 0 list (+56) holds it (List::At by its +20, 0 or past the end). The
+// recompiled side with --native_second_set, --native_scene_loaders and
+// --native_car_models off. The block, the pending frees' added nodes, the
+// allocations' states and r3 compared.
+void CarModelReleases(Context& h, Random& r, uint32_t block) {
+  namespace cmi = car_model_inputs;
+  namespace sl = scene_loaders;
+  if (!hooks::ModelsHostLock()) {
+    ITC_LOG_WARN("harness: second_set: --native_models was off at start-up: "
+                 "SceneCarModel::Release's cases with a car model skipped");
+    return;
+  }
+  std::lock_guard<std::recursive_mutex> lock(models::MemoryBlocksMutex());
+  constexpr uint32_t kBytes = 0x6000;
+  const uint32_t scratch = block + 0x100;
+  const uint32_t car = block + 0x1000;
+  const uint32_t loads = car + sl::kCarModelLoads;
+  const uint32_t set = block + 0x3000;
+  const uint32_t records = set + 0x100;
+  const uint32_t first_set = block + 0x3800;
+  const uint32_t object = block + 0x4000;
+  const uint32_t saved_set = guest::LoadU32(h.base, scene::kFirstSet);
+  Results results("SceneCarModel::Release (sub_820DB6C0, with a car model)");
+  for (int c = 0; c < 24; c++) {
+    const uint64_t seed = r.Next();
+    const cmi::Plan plan = cmi::MakePlan(r);
+    const uint32_t a = r.Below(3), b = r.Below(3);
+    const uint32_t index = r.Below(2) == 0 ? 0 : 1 + r.Below(4);
+    PPCContext start = CallContext(h);
+    start.r1.u64 &= ~0xFull;
+    Outputs out[2];
+    for (int v = 0; v < 2; v++) {
+      Random bytes(seed);
+      RandomBytes(h.base, block, kBytes, bytes);
+      cmi::Held held;
+      cmi::Write(h.base, loads, scratch, plan, true, held);
+      Put(h.base, car + sl::kCarModelSet, set);
+      Put(h.base, set + 40, a);
+      Put(h.base, set + 12, b);
+      Put(h.base, set + 52, records);
+      for (uint32_t i = 0; i < 4 * (a + b); i++) {
+        Put(h.base, records + 20 * i + 16, bytes.Below(4) == 0 ? 0 : 2);
+      }
+      Put(h.base, car + 8, 0);  // the list's last node
+      Put(h.base, car + 20, index);
+      Put(h.base, first_set + 56, car);
+      Put(h.base, object + 24, car);
+      Put(h.base, scene::kFirstSet, first_set);
+      const pending_frees::ListState was = pending_frees::SaveList(h.base);
+      PPCContext t = start;
+      t.r3.u64 = object;
+      ITC_FLAG(native_second_set) = v == 1;
+      ITC_FLAG(native_scene_loaders) = v == 1;
+      ITC_FLAG(native_car_models) = v == 1;
+      (v == 0 ? __imp__sub_820DB6C0 : hooks::SecondSetSceneCarModelRelease)(t, h.base);
+      ITC_FLAG(native_second_set) = true;
+      ITC_FLAG(native_scene_loaders) = true;
+      ITC_FLAG(native_car_models) = true;
+      Put(h.base, scene::kFirstSet, saved_set);
+      pending_frees::TakeAddedNodes(h.base, was, out[v]);
+      cmi::Take(h.base, loads, held, out[v]);
+      out[v].Bytes(Read(h.base, block, kBytes));
+      out[v].Word(t.r3.u32);
+      out[v].Word(uint32_t(t.r3.u64 >> 32));
+    }
+    results.Check(out[0], out[1], fmt::format("case {} (index {})", c, index));
+  }
+  results.Report();
+  Put(h.base, scene::kFirstSet, saved_set);
 }
 
 // --- The point set-ups ---
@@ -833,6 +978,8 @@ void SecondSet(Context& h) {
   Points(h, r, block);
   Groups(h, r, block);
   Finds(h, r, block);
+  Objects(h, r, block);
+  CarModelReleases(h, r, block);
   memory::Free(allocation);
 }
 

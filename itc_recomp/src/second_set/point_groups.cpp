@@ -4,6 +4,7 @@
 #include "second_set/point_groups.h"
 
 #include "base/log.h"
+#include "car_physics/float_ops.h"
 #include "guest.h"
 #include "material_passes/material_passes.h"
 #include "native/buffers.h"
@@ -285,6 +286,86 @@ uint32_t TrafficResetHeadlights(uint8_t* base, uint32_t group, uint32_t stack) {
 uint32_t TrafficResetTailLights(uint8_t* base, uint32_t group, uint32_t stack) {
   ITC_NATIVE_RUNNING("sub_820E57A0 TrafficPoints::ResetTailLights");
   return NameRecords(base, group, 0x82602960, 12, 8, stack - 128);
+}
+
+namespace {
+
+using car_physics::ops::CopyWord;
+using car_physics::ops::kOne;
+using car_physics::ops::kZero;
+
+// Two rows at `rows` (16 bytes apart) = (0.0, 0.0, 0.0, 1.0), each stored
+// +4, +0, -4 (from +4), then +8.
+void ZeroOneRows(uint8_t* base, uint32_t rows) {
+  for (uint32_t row = 0; row < 2; row++) {
+    const uint32_t at = rows + 4 + 16 * row;
+    CopyWord(base, kZero, at + 4);
+    CopyWord(base, kZero, at + 0);
+    CopyWord(base, kZero, at - 4);
+    CopyWord(base, kOne, at + 8);
+  }
+}
+
+}  // namespace
+
+uint32_t WheelsResetTire(uint8_t* base, uint32_t group, uint32_t stack) {
+  ITC_NATIVE_RUNNING("sub_820E74B8 WheelPoints::ResetTire");
+  const uint32_t sp = stack - 128;
+  CopyWord(base, kZero, group + 352);
+  CopyWord(base, kZero, group + 356);
+  Store(base, group + 0, 0);
+  Store(base, group + 4, 0);
+  Store(base, group + 8, 0);
+  Store(base, group + 300, 1);
+  NameRecords(base, group + 368, 0x8260299C, 6, 0, sp);
+  for (uint32_t i = 0; i < 6; i++) {
+    CopyWord(base, kZero, group + 328 + 4 * i);
+    Store(base, group + 304 + 4 * i, 0xFFFFFFFFu);
+  }
+  ZeroOneRows(base, group + 1808);
+  for (uint32_t i = 0; i < 288; i++) {
+    base[group + 12 + i] = 0;
+  }
+  return group + 12;
+}
+
+uint32_t WheelsResetRimA(uint8_t* base, uint32_t group, uint32_t stack) {
+  ITC_NATIVE_RUNNING("sub_820E7918 WheelPoints::ResetRimA");
+  const uint32_t sp = stack - 144;
+  Store(base, group + 0, 0);
+  Store(base, group + 8, 0);
+  Store(base, group + 12, 1);
+  const uint32_t r3 = NameRecords(base, group + 32, 0x826029B4, 7, 0, sp);
+  CopyWord(base, kZero, sp + 80);
+  CopyWord(base, kZero, sp + 84);
+  CopyWord(base, kZero, sp + 88);
+  CopyWord(base, kOne, sp + 92);
+  for (uint32_t row = 0; row < 2; row++) {
+    for (uint32_t w = 0; w < 4; w++) {
+      Store(base, group + 1712 + 16 * row + 4 * w, Load(base, sp + 80 + 4 * w));
+    }
+  }
+  return r3;
+}
+
+uint32_t WheelsResetRimB(uint8_t* base, uint32_t group, uint32_t stack) {
+  ITC_NATIVE_RUNNING("sub_820E7C08 WheelPoints::ResetRimB");
+  Store(base, group + 0, 0);
+  Store(base, group + 8, 0);
+  Store(base, group + 12, 1);
+  const uint32_t r3 = NameRecords(base, group + 32, 0x826029D0, 7, 0, stack - 128);
+  ZeroOneRows(base, group + 1712);
+  return r3;
+}
+
+uint32_t WheelsResetBrakes(uint8_t* base, uint32_t group, uint32_t stack) {
+  ITC_NATIVE_RUNNING("sub_820E7F90 WheelPoints::ResetBrakes");
+  Store(base, group + 0, 0);
+  Store(base, group + 8, 0);
+  Store(base, group + 12, 1);
+  const uint32_t r3 = NameRecords(base, group + 32, 0x826029EC, 12, 0, stack - 128);
+  ZeroOneRows(base, group + 2912);
+  return r3;
 }
 
 }  // namespace second_set

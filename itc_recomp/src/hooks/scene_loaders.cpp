@@ -251,9 +251,13 @@ void SceneLoadersInteriorDeletingDestruct(PPCContext& ctx, uint8_t* base) {
   __imp__sub_820D7960(ctx, base);
 }
 
+bool SceneLoadersReleaseANative(uint32_t pool) {
+  return InteriorNative() && (pool != 0 || ITC_FLAG(native_car_models));
+}
+
 void SceneLoadersReleaseA(PPCContext& ctx, uint8_t* base) {
   const uint32_t pool = ctx.r4.u32;
-  if (InteriorNative() && (pool != 0 || ITC_FLAG(native_car_models))) {
+  if (SceneLoadersReleaseANative(pool)) {
     ctx.fpscr.disableFlushMode();
     if (const auto r3 = sl::ReleaseA(base, ctx.r3.u32, pool, ctx.r5.u32)) {
       ctx.r3.u64 = *r3;

@@ -77,6 +77,23 @@ void SecondSetLightPointsConstruct(PPCContext& ctx, uint8_t* base);
 void SecondSetLightPointsReset(PPCContext& ctx, uint8_t* base);
 void SecondSetTrafficPointsConstruct(PPCContext& ctx, uint8_t* base);
 void SecondSetTrafficPointsReset(PPCContext& ctx, uint8_t* base);
+// The wheels' group resets (point_groups.h) and the objects' resets
+// (objects.h): r3 = the group or object; r3 as the original leaves it.
+// SceneParts::Reset natively only with --native_material_passes,
+// SceneCarModel::Release only where ScenePools::ReleaseA's plain C++ runs
+// (hooks::SceneLoadersReleaseANative; else the original).
+void SecondSetWheelsResetTire(PPCContext& ctx, uint8_t* base);
+void SecondSetWheelsResetRimA(PPCContext& ctx, uint8_t* base);
+void SecondSetWheelsResetRimB(PPCContext& ctx, uint8_t* base);
+void SecondSetWheelsResetBrakes(PPCContext& ctx, uint8_t* base);
+void SecondSetScenePartsReset(PPCContext& ctx, uint8_t* base);
+void SecondSetSceneCockpitReset(PPCContext& ctx, uint8_t* base);
+void SecondSetSceneInteriorReset(PPCContext& ctx, uint8_t* base);
+void SecondSetSceneLightsReset(PPCContext& ctx, uint8_t* base);
+void SecondSetSceneTrafficReset(PPCContext& ctx, uint8_t* base);
+void SecondSetSceneCarModelRelease(PPCContext& ctx, uint8_t* base);
+void SecondSetSceneModelBlockConstruct(PPCContext& ctx, uint8_t* base);
+void SecondSetSceneModelBlockReset(PPCContext& ctx, uint8_t* base);
 
 
 // The point set-ups (src/second_set/finds.h): r3 = the group or block, r4 =

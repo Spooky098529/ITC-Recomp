@@ -123,4 +123,23 @@ uint32_t TrafficResetHeadlights(uint8_t* base, uint32_t group, uint32_t stack);
 // 0x82602960.
 uint32_t TrafficResetTailLights(uint8_t* base, uint32_t group, uint32_t stack);
 
+// --- The wheels' (WheelPoints, the block at the wheels + 192; a tire, two
+// rims' and a brakes' group for the front and the rear) ---
+
+// WheelPoints::ResetTire (sub_820E74B8): +352, +356 = 0.0, +0 to +8 = 0,
+// +300 = 1 (the front); 6 shapes at +368 from 0x8260299C; the six words at
+// +328 = 0.0 and at +304 = -1; the rows at +1808 and +1824 = (0.0, 0.0, 0.0,
+// 1.0); memset(+12, 0, 288). Returns memset's r3 (+12).
+uint32_t WheelsResetTire(uint8_t* base, uint32_t group, uint32_t stack);
+// WheelPoints::ResetRimA (sub_820E7918): +0, +8 = 0, +12 = 1; 7 shapes at
+// +32 from 0x826029B4; (0.0, 0.0, 0.0, 1.0) built at the frame's +80 and
+// copied to the rows at +1712 and +1728.
+uint32_t WheelsResetRimA(uint8_t* base, uint32_t group, uint32_t stack);
+// WheelPoints::ResetRimB (sub_820E7C08): as ResetRimA with 0x826029D0, the
+// rows stored directly.
+uint32_t WheelsResetRimB(uint8_t* base, uint32_t group, uint32_t stack);
+// WheelPoints::ResetBrakes (sub_820E7F90): as ResetRimB with 12 shapes from
+// 0x826029EC and the rows at +2912 and +2928.
+uint32_t WheelsResetBrakes(uint8_t* base, uint32_t group, uint32_t stack);
+
 }  // namespace second_set

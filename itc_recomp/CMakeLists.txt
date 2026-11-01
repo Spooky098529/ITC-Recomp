@@ -154,6 +154,7 @@ set(ITC_SOURCES
     src/second_set/point_groups.cpp
     src/second_set/blocks.cpp
     src/second_set/finds.cpp
+    src/second_set/objects.cpp
     src/hooks/car_models.cpp
     src/car_models/load_slots.cpp
     src/car_models/car_model.cpp
