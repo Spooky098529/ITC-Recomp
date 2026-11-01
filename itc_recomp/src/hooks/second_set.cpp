@@ -5,6 +5,8 @@
 #include "hooks/second_set.h"
 
 #include "base/flags.h"
+
+#include <optional>
 #include "native/buffers.h"
 #include "second_set/blocks.h"
 #include "second_set/finds.h"
@@ -53,7 +55,16 @@ ITC_FLAG_BOOL(native_second_set, true, "ITC",
               "SceneLights::Reset sub_820DCA40 and SceneTraffic::Reset sub_820E5930, "
               "SceneCarModel::Release sub_820DB6C0 (where ScenePools::ReleaseA's plain C++ "
               "runs), the scene model's block SceneModelBlock::SceneModelBlock sub_820DA108 and "
-              "Reset sub_820D9F50; with "
+              "Reset sub_820D9F50, SceneWheels::Reset sub_820E88A8, WheelPoints::Reset sub_820E85C8 and "
+              "WheelPoints sub_820ECC48 with InitTire sub_820E8A80, InitRimA sub_820E99C0, InitRimB "
+              "sub_820EA8E8 and InitBrakes sub_820EB320, the releases SceneParts::Release "
+              "sub_820E0590 (with --native_material_passes), SceneInterior::Release sub_820E3890, "
+              "SceneLights::Release sub_820DCB20, SceneWheels::Release sub_820E89B0 and "
+              "SceneTraffic::Release sub_820E5A18 (where ScenePools::ReleaseA's plain C++ runs), the "
+              "constructors SceneCarModel sub_820DB770, SceneParts sub_820E2F18 (with "
+              "--native_material_passes), SceneCockpit sub_820DC3E8, SceneInterior sub_820E5340, "
+              "SceneLights sub_820DE030, SceneWheels sub_820ECE40, SceneTraffic sub_820E6E70 and "
+              "SceneModel sub_820DB330; with "
               "--native_models and --native_material_passes the point set-ups "
               "PartsPoints::Find sub_820E0258, CockpitPoints::Find sub_820DBC88, "
               "InteriorPoints::Find sub_820E3660, LightPoints::Find sub_820DC900 and "
@@ -197,6 +208,80 @@ void SecondSetSceneCarModelRelease(PPCContext& ctx, uint8_t* base) {
     return;
   }
   __imp__sub_820DB6C0(ctx, base);
+}
+
+ITC_SECOND_SET_GROUP(820E88A8, SceneWheelsReset)
+ITC_SECOND_SET_GROUP(820E85C8, WheelPointsReset)
+ITC_SECOND_SET_GROUP(820ECC48, WheelPointsConstruct)
+ITC_SECOND_SET_GROUP(820E8A80, WheelsInitTire)
+ITC_SECOND_SET_GROUP(820E99C0, WheelsInitRimA)
+ITC_SECOND_SET_GROUP(820EA8E8, WheelsInitRimB)
+ITC_SECOND_SET_GROUP(820EB320, WheelsInitBrakes)
+
+namespace {
+
+using Release = std::optional<uint32_t> (*)(uint8_t*, uint32_t, uint32_t);
+using Construct = uint32_t (*)(uint8_t*, uint32_t, uint32_t, uint32_t);
+
+// A release: natively where memcpy is native and ReleaseA's plain C++ runs
+// for `pool` (and with --native_material_passes for the parts'); r3 as the
+// plain C++ returns it, else the original.
+void ReleaseStep(PPCContext& ctx, uint8_t* base, void (*original)(PPCContext&, uint8_t*),
+                 uint32_t pool, Release release) {
+  if (!native::Buffers_NativeMemcpy() || !SceneLoadersReleaseANative(pool) ||
+      (pool == 1 && !ITC_FLAG(native_material_passes))) {
+    original(ctx, base);
+    return;
+  }
+  ctx.fpscr.disableFlushMode();
+  if (const auto r3 = release(base, ctx.r3.u32, ctx.r1.u32)) {
+    ctx.r3.u64 = *r3;
+    return;
+  }
+  original(ctx, base);
+}
+
+// A constructor: r3 = the object, r4 = its list; r3 = the object.
+void ConstructStep(PPCContext& ctx, uint8_t* base, void (*original)(PPCContext&, uint8_t*),
+                   Construct construct) {
+  if (!native::Buffers_NativeMemcpy()) {
+    original(ctx, base);
+    return;
+  }
+  ctx.fpscr.disableFlushMode();
+  ctx.r3.u64 = construct(base, ctx.r3.u32, ctx.r4.u32, ctx.r1.u32);
+}
+
+}  // namespace
+
+#define ITC_SECOND_SET_RELEASE(address, pool, name)                       \
+  void SecondSet##name(PPCContext& ctx, uint8_t* base) {                  \
+    ReleaseStep(ctx, base, __imp__sub_##address, pool, ss::name);         \
+  }
+#define ITC_SECOND_SET_CONSTRUCT(address, name)                           \
+  void SecondSet##name(PPCContext& ctx, uint8_t* base) {                  \
+    ConstructStep(ctx, base, __imp__sub_##address, ss::name);             \
+  }
+
+ITC_SECOND_SET_RELEASE(820E0590, 1, ScenePartsRelease)
+ITC_SECOND_SET_RELEASE(820E3890, 3, SceneInteriorRelease)
+ITC_SECOND_SET_RELEASE(820DCB20, 4, SceneLightsRelease)
+ITC_SECOND_SET_RELEASE(820E89B0, 5, SceneWheelsRelease)
+ITC_SECOND_SET_RELEASE(820E5A18, 6, SceneTrafficRelease)
+ITC_SECOND_SET_CONSTRUCT(820DB770, SceneCarModelConstruct)
+ITC_SECOND_SET_CONSTRUCT(820DC3E8, SceneCockpitConstruct)
+ITC_SECOND_SET_CONSTRUCT(820E5340, SceneInteriorConstruct)
+ITC_SECOND_SET_CONSTRUCT(820DE030, SceneLightsConstruct)
+ITC_SECOND_SET_CONSTRUCT(820ECE40, SceneWheelsConstruct)
+ITC_SECOND_SET_CONSTRUCT(820E6E70, SceneTrafficConstruct)
+ITC_SECOND_SET_CONSTRUCT(820DB330, SceneModelConstruct)
+
+void SecondSetScenePartsConstruct(PPCContext& ctx, uint8_t* base) {
+  if (!ITC_FLAG(native_material_passes)) {
+    __imp__sub_820E2F18(ctx, base);
+    return;
+  }
+  ConstructStep(ctx, base, __imp__sub_820E2F18, ss::ScenePartsConstruct);
 }
 
 void SecondSetSceneModelBlockConstruct(PPCContext& ctx, uint8_t* base) {
@@ -345,3 +430,23 @@ ITC_SECOND_SET(820E5930, SecondSetSceneTrafficReset)
 ITC_SECOND_SET(820DB6C0, SecondSetSceneCarModelRelease)
 ITC_SECOND_SET(820DA108, SecondSetSceneModelBlockConstruct)
 ITC_SECOND_SET(820D9F50, SecondSetSceneModelBlockReset)
+ITC_SECOND_SET(820E88A8, SecondSetSceneWheelsReset)
+ITC_SECOND_SET(820E85C8, SecondSetWheelPointsReset)
+ITC_SECOND_SET(820ECC48, SecondSetWheelPointsConstruct)
+ITC_SECOND_SET(820E8A80, SecondSetWheelsInitTire)
+ITC_SECOND_SET(820E99C0, SecondSetWheelsInitRimA)
+ITC_SECOND_SET(820EA8E8, SecondSetWheelsInitRimB)
+ITC_SECOND_SET(820EB320, SecondSetWheelsInitBrakes)
+ITC_SECOND_SET(820E0590, SecondSetScenePartsRelease)
+ITC_SECOND_SET(820E3890, SecondSetSceneInteriorRelease)
+ITC_SECOND_SET(820DCB20, SecondSetSceneLightsRelease)
+ITC_SECOND_SET(820E89B0, SecondSetSceneWheelsRelease)
+ITC_SECOND_SET(820E5A18, SecondSetSceneTrafficRelease)
+ITC_SECOND_SET(820DB770, SecondSetSceneCarModelConstruct)
+ITC_SECOND_SET(820E2F18, SecondSetScenePartsConstruct)
+ITC_SECOND_SET(820DC3E8, SecondSetSceneCockpitConstruct)
+ITC_SECOND_SET(820E5340, SecondSetSceneInteriorConstruct)
+ITC_SECOND_SET(820DE030, SecondSetSceneLightsConstruct)
+ITC_SECOND_SET(820ECE40, SecondSetSceneWheelsConstruct)
+ITC_SECOND_SET(820E6E70, SecondSetSceneTrafficConstruct)
+ITC_SECOND_SET(820DB330, SecondSetSceneModelConstruct)

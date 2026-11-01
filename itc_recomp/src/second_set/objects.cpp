@@ -9,6 +9,7 @@
 #include "native/buffers.h"
 #include "scene/scene.h"
 #include "scene_loaders/objects.h"
+#include "scene_loaders/pools.h"
 #include "scene_models/scene_models.h"
 #include "second_set/blocks.h"
 
@@ -145,6 +146,159 @@ uint32_t SceneTrafficReset(uint8_t* base, uint32_t object, uint32_t stack) {
     Store(base, object + 9768 + 4 * i, 0);
   }
   return r3;
+}
+
+uint32_t SceneWheelsReset(uint8_t* base, uint32_t object, uint32_t stack) {
+  ITC_NATIVE_RUNNING("sub_820E88A8 SceneWheels::Reset");
+  const uint32_t sp = stack - 96;
+  for (const uint32_t at : {24u, 28u, 16768u, 16772u, 16776u, 16780u}) {
+    Store(base, object + at, 0);
+  }
+  Store(base, object + 16784, Load(base, scene::kScene));
+  scene_models::WheelsRecordReset(base, object + 32);
+  return WheelPointsReset(base, object + 192, sp);
+}
+
+namespace {
+
+// A release: ReleaseA on the first set's object in the word at `first`, if
+// any, then `reset`.
+std::optional<uint32_t> Release(uint8_t* base, uint32_t object, uint32_t first, uint32_t pool,
+                                uint32_t stack,
+                                uint32_t (*reset)(uint8_t*, uint32_t, uint32_t)) {
+  const uint32_t sp = stack - 96;
+  const uint32_t held = Load(base, object + first);
+  if (held != 0) {
+    if (!scene_loaders::ReleaseA(base, Load(base, scene::kFirstSet), pool,
+                                 Load(base, held + 20))) {
+      return std::nullopt;
+    }
+  }
+  return reset(base, object, sp);
+}
+
+// The constructors' start: PoolNode::PoolNode, +16 = 0, the vtable, +20 = -1.
+void Node(uint8_t* base, uint32_t object, uint32_t list, uint32_t vtable) {
+  scene_loaders::PoolNodeConstruct(base, object, list);
+  Store(base, object + 16, 0);
+  Store(base, object + 0, vtable);
+  Store(base, object + 20, 0xFFFFFFFFu);
+}
+
+}  // namespace
+
+std::optional<uint32_t> ScenePartsRelease(uint8_t* base, uint32_t object, uint32_t stack) {
+  ITC_NATIVE_RUNNING("sub_820E0590 SceneParts::Release");
+  return Release(base, object, 104, 1, stack, ScenePartsReset);
+}
+
+std::optional<uint32_t> SceneInteriorRelease(uint8_t* base, uint32_t object, uint32_t stack) {
+  ITC_NATIVE_RUNNING("sub_820E3890 SceneInterior::Release");
+  return Release(base, object, 36, 3, stack, SceneInteriorReset);
+}
+
+std::optional<uint32_t> SceneLightsRelease(uint8_t* base, uint32_t object, uint32_t stack) {
+  ITC_NATIVE_RUNNING("sub_820DCB20 SceneLights::Release");
+  return Release(base, object, 28, 4, stack, SceneLightsReset);
+}
+
+std::optional<uint32_t> SceneWheelsRelease(uint8_t* base, uint32_t object, uint32_t stack) {
+  ITC_NATIVE_RUNNING("sub_820E89B0 SceneWheels::Release");
+  return Release(base, object, 28, 5, stack, SceneWheelsReset);
+}
+
+std::optional<uint32_t> SceneTrafficRelease(uint8_t* base, uint32_t object, uint32_t stack) {
+  ITC_NATIVE_RUNNING("sub_820E5A18 SceneTraffic::Release");
+  return Release(base, object, 9760, 6, stack, SceneTrafficReset);
+}
+
+uint32_t SceneCarModelConstruct(uint8_t* base, uint32_t object, uint32_t list, uint32_t stack) {
+  ITC_NATIVE_RUNNING("sub_820DB770 SceneCarModel::SceneCarModel");
+  (void)stack;
+  scene_loaders::PoolNodeConstruct(base, object, list);
+  Store(base, object + 20, 0xFFFFFFFFu);
+  Store(base, object + 0, 0x82005130);
+  Store(base, object + 16, 0);
+  scene_models::CarRecordSetW(base, object + 32);
+  scene_models::CarRecordReset(base, object + 32);
+  Store(base, object + 24, 0);
+  Store(base, object + 3728, 0);
+  return object;
+}
+
+uint32_t ScenePartsConstruct(uint8_t* base, uint32_t object, uint32_t list, uint32_t stack) {
+  ITC_NATIVE_RUNNING("sub_820E2F18 SceneParts::SceneParts");
+  const uint32_t sp = stack - 96;
+  Node(base, object, list, 0x82006024);
+  PartsPointsConstruct(base, object + 176, sp);
+  ScenePartsReset(base, object, sp);
+  return object;
+}
+
+uint32_t SceneCockpitConstruct(uint8_t* base, uint32_t object, uint32_t list, uint32_t stack) {
+  ITC_NATIVE_RUNNING("sub_820DC3E8 SceneCockpit::SceneCockpit");
+  const uint32_t sp = stack - 96;
+  Node(base, object, list, 0x8200527C);
+  CockpitPointsConstruct(base, object + 192, sp);
+  SceneCockpitReset(base, object, sp);
+  return object;
+}
+
+uint32_t SceneInteriorConstruct(uint8_t* base, uint32_t object, uint32_t list, uint32_t stack) {
+  ITC_NATIVE_RUNNING("sub_820E5340 SceneInterior::SceneInterior");
+  const uint32_t sp = stack - 96;
+  Node(base, object, list, 0x820062E4);
+  InteriorPointsConstruct(base, object + 160, sp);
+  SceneInteriorReset(base, object, sp);
+  return object;
+}
+
+uint32_t SceneLightsConstruct(uint8_t* base, uint32_t object, uint32_t list, uint32_t stack) {
+  ITC_NATIVE_RUNNING("sub_820DE030 SceneLights::SceneLights");
+  const uint32_t sp = stack - 96;
+  Node(base, object, list, 0x820056E0);
+  LightPointsConstruct(base, object + 96, sp);
+  SceneLightsReset(base, object, sp);
+  return object;
+}
+
+uint32_t SceneWheelsConstruct(uint8_t* base, uint32_t object, uint32_t list, uint32_t stack) {
+  ITC_NATIVE_RUNNING("sub_820ECE40 SceneWheels::SceneWheels");
+  const uint32_t sp = stack - 112;
+  Node(base, object, list, 0x82006638);
+  scene_models::Record12Reset(base, object + 32 + 44);
+  scene_models::Record12Reset(base, object + 32 + 56);
+  WheelPointsConstruct(base, object + 192, sp);
+  SceneWheelsReset(base, object, sp);
+  return object;
+}
+
+uint32_t SceneTrafficConstruct(uint8_t* base, uint32_t object, uint32_t list, uint32_t stack) {
+  ITC_NATIVE_RUNNING("sub_820E6E70 SceneTraffic::SceneTraffic");
+  const uint32_t sp = stack - 96;
+  Node(base, object, list, 0x82006424);
+  scene_models::CarRecordSetW(base, object + 32);
+  TrafficPointsConstruct(base, object + 3728, sp);
+  SceneTrafficReset(base, object, sp);
+  return object;
+}
+
+uint32_t SceneModelConstruct(uint8_t* base, uint32_t object, uint32_t list, uint32_t stack) {
+  ITC_NATIVE_RUNNING("sub_820DB330 SceneModel::SceneModel");
+  const uint32_t sp = stack - 128;
+  scene_loaders::PoolNodeConstruct(base, object, list);
+  Store(base, object + 20, 0xFFFFFFFFu);
+  Store(base, object + 0, 0x82004F90);
+  Store(base, object + 16, 0);
+  scene_models::SceneModelRecordConstruct(base, object + 32);
+  SceneModelBlockConstruct(base, object + 4288);
+  scene_models::SceneModelRecordReset(base, object + 32);
+  SceneModelBlockReset(base, object + 4288, sp);
+  for (uint32_t at = 5024; at <= 5112; at += 4) {
+    Store(base, object + at, 0);
+  }
+  Store(base, object + 5116, Load(base, scene::kScene));
+  return object;
 }
 
 void SceneModelBlockConstruct(uint8_t* base, uint32_t block) {

@@ -42,4 +42,23 @@ uint32_t LightPointsReset(uint8_t* base, uint32_t block, uint32_t stack);
 uint32_t TrafficPointsConstruct(uint8_t* base, uint32_t block, uint32_t stack);
 uint32_t TrafficPointsReset(uint8_t* base, uint32_t block, uint32_t stack);
 
+// The wheels' group inits: the records PointRecord::PointRecord, 1.0 into
+// the w's of the two rows at +1808 (the tire's), +1712 (the rims') or +2912
+// (the brakes'), then the group's reset. WheelPoints::InitTire
+// (sub_820E8A80, 6 records at +368), InitRimA (sub_820E99C0, 7 at +32),
+// InitRimB (sub_820EA8E8, 7 at +32) and InitBrakes (sub_820EB320, 12 at +32).
+// Return the group.
+uint32_t WheelsInitTire(uint8_t* base, uint32_t group, uint32_t stack);
+uint32_t WheelsInitRimA(uint8_t* base, uint32_t group, uint32_t stack);
+uint32_t WheelsInitRimB(uint8_t* base, uint32_t group, uint32_t stack);
+uint32_t WheelsInitBrakes(uint8_t* base, uint32_t group, uint32_t stack);
+// WheelPoints::WheelPoints (sub_820ECC48): the inits at +32 and +1872
+// (tires), +3712 and +5456 (rims A), +7200 and +8944 (rims B), +10688 and
+// +13632 (brakes). Returns the block.
+uint32_t WheelPointsConstruct(uint8_t* base, uint32_t block, uint32_t stack);
+// WheelPoints::Reset (sub_820E85C8): +0 to +24 = 0; the resets at the same
+// offsets; the rear groups' front flags (+2172, +5468, +8956, +13644) = 0.
+// Returns the last reset's r3.
+uint32_t WheelPointsReset(uint8_t* base, uint32_t block, uint32_t stack);
+
 }  // namespace second_set

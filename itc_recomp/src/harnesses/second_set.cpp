@@ -423,11 +423,14 @@ void Groups(Context& h, Random& r, uint32_t block) {
 // its words random. The block, the frames' words the function writes itself
 // and r3 compared (the nested Clear frames aren't: as the blocks' resets').
 void Objects(Context& h, Random& r, uint32_t block) {
+  constexpr uint32_t kNone = 0xFFFFFFFFu;
   struct Object {
     const char* name;
     GuestFunction recompiled, native;
     uint32_t bytes;
     std::vector<Window> windows;
+    uint32_t zero = kNone;  // a word set to 0 (a release's first-set object)
+    bool list = false;      // r4 a list (the constructors'), past the object
   };
   const Object objects[] = {
       {"SceneParts::Reset (sub_820E0510)", __imp__sub_820E0510, hooks::SecondSetScenePartsReset,
@@ -448,18 +451,71 @@ void Objects(Context& h, Random& r, uint32_t block) {
       // Without its first-set car model (+24 = 0): CarRecord::Reset and the
       // words (with one, below).
       {"SceneCarModel::Release (sub_820DB6C0, no car model)", __imp__sub_820DB6C0,
-       hooks::SecondSetSceneCarModelRelease, 3744, {}},
+       hooks::SecondSetSceneCarModelRelease, 3744, {}, 24},
+      {"SceneWheels::Reset (sub_820E88A8)", __imp__sub_820E88A8, hooks::SecondSetSceneWheelsReset,
+       16800, {}},
+      {"WheelPoints::Reset (sub_820E85C8)", __imp__sub_820E85C8, hooks::SecondSetWheelPointsReset,
+       16608, {}},
+      {"WheelPoints::WheelPoints (sub_820ECC48)", __imp__sub_820ECC48,
+       hooks::SecondSetWheelPointsConstruct, 16608, {}},
+      {"WheelPoints::InitTire (sub_820E8A80)", __imp__sub_820E8A80,
+       hooks::SecondSetWheelsInitTire, 1840, {}},
+      {"WheelPoints::InitRimA (sub_820E99C0)", __imp__sub_820E99C0,
+       hooks::SecondSetWheelsInitRimA, 1744, {}},
+      {"WheelPoints::InitRimB (sub_820EA8E8)", __imp__sub_820EA8E8,
+       hooks::SecondSetWheelsInitRimB, 1744, {}},
+      {"WheelPoints::InitBrakes (sub_820EB320)", __imp__sub_820EB320,
+       hooks::SecondSetWheelsInitBrakes, 2944, {}},
+      // The releases without their first-set object (ScenePools::ReleaseA's
+      // path is SceneCarModel::Release's, below, with ReleaseA's own cases).
+      {"SceneParts::Release (sub_820E0590, no first-set object)", __imp__sub_820E0590,
+       hooks::SecondSetScenePartsRelease, 37296, {}, 104},
+      {"SceneInterior::Release (sub_820E3890, no first-set object)", __imp__sub_820E3890,
+       hooks::SecondSetSceneInteriorRelease, 11680, {}, 36},
+      {"SceneLights::Release (sub_820DCB20, no first-set object)", __imp__sub_820DCB20,
+       hooks::SecondSetSceneLightsRelease, 13168, {}, 28},
+      {"SceneWheels::Release (sub_820E89B0, no first-set object)", __imp__sub_820E89B0,
+       hooks::SecondSetSceneWheelsRelease, 16800, {}, 28},
+      {"SceneTraffic::Release (sub_820E5A18, no first-set object)", __imp__sub_820E5A18,
+       hooks::SecondSetSceneTrafficRelease, 9808, {}, 9760},
+      {"SceneCarModel::SceneCarModel (sub_820DB770)", __imp__sub_820DB770,
+       hooks::SecondSetSceneCarModelConstruct, 3744, {}, kNone, true},
+      {"SceneParts::SceneParts (sub_820E2F18)", __imp__sub_820E2F18,
+       hooks::SecondSetScenePartsConstruct, 37296, {}, kNone, true},
+      {"SceneCockpit::SceneCockpit (sub_820DC3E8)", __imp__sub_820DC3E8,
+       hooks::SecondSetSceneCockpitConstruct, 4320, {}, kNone, true},
+      {"SceneInterior::SceneInterior (sub_820E5340)", __imp__sub_820E5340,
+       hooks::SecondSetSceneInteriorConstruct, 11680, {}, kNone, true},
+      {"SceneLights::SceneLights (sub_820DE030)", __imp__sub_820DE030,
+       hooks::SecondSetSceneLightsConstruct, 13168, {}, kNone, true},
+      {"SceneWheels::SceneWheels (sub_820ECE40)", __imp__sub_820ECE40,
+       hooks::SecondSetSceneWheelsConstruct, 16800, {}, kNone, true},
+      {"SceneTraffic::SceneTraffic (sub_820E6E70)", __imp__sub_820E6E70,
+       hooks::SecondSetSceneTrafficConstruct, 9808, {}, kNone, true},
+      {"SceneModel::SceneModel (sub_820DB330)", __imp__sub_820DB330,
+       hooks::SecondSetSceneModelConstruct, 5120, {}, kNone, true},
   };
   for (const Object& o : objects) {
     Results results(o.name);
-    const bool release = o.recompiled == __imp__sub_820DB6C0;
+    // The constructors' list past the object: empty, or one node (at +0x40)
+    // the new one is appended after.
+    const uint32_t list = block + ((o.bytes + 0x17F) & ~0xFu);
     for (int c = 0; c < 4; c++) {
       FrameCase(
-          h, results, block, (o.bytes + 0x8F) & ~0xFu, r,
+          h, results, block, (o.bytes + 0x28F) & ~0xFu, r,
           [&](PPCContext& t) {
             t.r3.u64 = block + 16 * r.Below(8);
-            if (release) {
-              Put(h.base, t.r3.u32 + 24, 0);
+            if (o.zero != kNone) {
+              Put(h.base, t.r3.u32 + o.zero, 0);
+            }
+            if (o.list) {
+              const bool one = r.Below(2) == 0;
+              Put(h.base, list + 0, one ? list + 0x40 : 0);
+              Put(h.base, list + 4, one ? list + 0x40 : 0);
+              Put(h.base, list + 8, one ? 1 : 0);
+              Put(h.base, list + 0x40 + 8, 0);
+              Put(h.base, list + 0x40 + 12, 0);
+              t.r4.u64 = list;
             }
           },
           o.recompiled, o.native, o.windows, fmt::format("case {} ({} bytes)", c, o.bytes));

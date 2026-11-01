@@ -94,6 +94,30 @@ void SecondSetSceneTrafficReset(PPCContext& ctx, uint8_t* base);
 void SecondSetSceneCarModelRelease(PPCContext& ctx, uint8_t* base);
 void SecondSetSceneModelBlockConstruct(PPCContext& ctx, uint8_t* base);
 void SecondSetSceneModelBlockReset(PPCContext& ctx, uint8_t* base);
+// The wheels' block and inits (blocks.h), SceneWheels::Reset, the releases
+// (natively where ReleaseA's plain C++ runs, the parts' with
+// --native_material_passes) and the constructors (r4 the list; the parts'
+// with --native_material_passes) (objects.h): r3 as the original leaves it.
+void SecondSetSceneWheelsReset(PPCContext& ctx, uint8_t* base);
+void SecondSetWheelPointsReset(PPCContext& ctx, uint8_t* base);
+void SecondSetWheelPointsConstruct(PPCContext& ctx, uint8_t* base);
+void SecondSetWheelsInitTire(PPCContext& ctx, uint8_t* base);
+void SecondSetWheelsInitRimA(PPCContext& ctx, uint8_t* base);
+void SecondSetWheelsInitRimB(PPCContext& ctx, uint8_t* base);
+void SecondSetWheelsInitBrakes(PPCContext& ctx, uint8_t* base);
+void SecondSetScenePartsRelease(PPCContext& ctx, uint8_t* base);
+void SecondSetSceneInteriorRelease(PPCContext& ctx, uint8_t* base);
+void SecondSetSceneLightsRelease(PPCContext& ctx, uint8_t* base);
+void SecondSetSceneWheelsRelease(PPCContext& ctx, uint8_t* base);
+void SecondSetSceneTrafficRelease(PPCContext& ctx, uint8_t* base);
+void SecondSetSceneCarModelConstruct(PPCContext& ctx, uint8_t* base);
+void SecondSetScenePartsConstruct(PPCContext& ctx, uint8_t* base);
+void SecondSetSceneCockpitConstruct(PPCContext& ctx, uint8_t* base);
+void SecondSetSceneInteriorConstruct(PPCContext& ctx, uint8_t* base);
+void SecondSetSceneLightsConstruct(PPCContext& ctx, uint8_t* base);
+void SecondSetSceneWheelsConstruct(PPCContext& ctx, uint8_t* base);
+void SecondSetSceneTrafficConstruct(PPCContext& ctx, uint8_t* base);
+void SecondSetSceneModelConstruct(PPCContext& ctx, uint8_t* base);
 
 
 // The point set-ups (src/second_set/finds.h): r3 = the group or block, r4 =

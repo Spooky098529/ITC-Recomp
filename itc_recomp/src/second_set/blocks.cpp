@@ -253,4 +253,75 @@ uint32_t TrafficPointsReset(uint8_t* base, uint32_t block, uint32_t stack) {
   return TrafficResetTailLights(base, block + 3152, sp);
 }
 
+namespace {
+
+// A wheels group's init: `count` records at `records` constructed, the w's
+// of the two rows at `rows` = 1.0, then `reset`.
+uint32_t InitWheelsGroup(uint8_t* base, uint32_t group, uint32_t records, uint32_t count,
+                         uint32_t rows, uint32_t stack,
+                         uint32_t (*reset)(uint8_t*, uint32_t, uint32_t)) {
+  const uint32_t sp = stack - 112;
+  Construct(base, records, count, sp);
+  CopyWord(base, kOne, rows + 12);
+  CopyWord(base, kOne, rows + 28);
+  reset(base, group, sp);
+  return group;
+}
+
+}  // namespace
+
+uint32_t WheelsInitTire(uint8_t* base, uint32_t group, uint32_t stack) {
+  ITC_NATIVE_RUNNING("sub_820E8A80 WheelPoints::InitTire");
+  return InitWheelsGroup(base, group, group + 368, 6, group + 1808, stack, WheelsResetTire);
+}
+
+uint32_t WheelsInitRimA(uint8_t* base, uint32_t group, uint32_t stack) {
+  ITC_NATIVE_RUNNING("sub_820E99C0 WheelPoints::InitRimA");
+  return InitWheelsGroup(base, group, group + 32, 7, group + 1712, stack, WheelsResetRimA);
+}
+
+uint32_t WheelsInitRimB(uint8_t* base, uint32_t group, uint32_t stack) {
+  ITC_NATIVE_RUNNING("sub_820EA8E8 WheelPoints::InitRimB");
+  return InitWheelsGroup(base, group, group + 32, 7, group + 1712, stack, WheelsResetRimB);
+}
+
+uint32_t WheelsInitBrakes(uint8_t* base, uint32_t group, uint32_t stack) {
+  ITC_NATIVE_RUNNING("sub_820EB320 WheelPoints::InitBrakes");
+  return InitWheelsGroup(base, group, group + 32, 12, group + 2912, stack, WheelsResetBrakes);
+}
+
+uint32_t WheelPointsConstruct(uint8_t* base, uint32_t block, uint32_t stack) {
+  ITC_NATIVE_RUNNING("sub_820ECC48 WheelPoints::WheelPoints");
+  const uint32_t sp = stack - 96;
+  WheelsInitTire(base, block + 32, sp);
+  WheelsInitTire(base, block + 1872, sp);
+  WheelsInitRimA(base, block + 3712, sp);
+  WheelsInitRimA(base, block + 5456, sp);
+  WheelsInitRimB(base, block + 7200, sp);
+  WheelsInitRimB(base, block + 8944, sp);
+  WheelsInitBrakes(base, block + 10688, sp);
+  WheelsInitBrakes(base, block + 13632, sp);
+  return block;
+}
+
+uint32_t WheelPointsReset(uint8_t* base, uint32_t block, uint32_t stack) {
+  ITC_NATIVE_RUNNING("sub_820E85C8 WheelPoints::Reset");
+  const uint32_t sp = stack - 112;
+  for (uint32_t at = 0; at <= 24; at += 4) {
+    Store(base, block + at, 0);
+  }
+  WheelsResetTire(base, block + 32, sp);
+  WheelsResetTire(base, block + 1872, sp);
+  WheelsResetRimA(base, block + 3712, sp);
+  WheelsResetRimA(base, block + 5456, sp);
+  WheelsResetRimB(base, block + 7200, sp);
+  WheelsResetRimB(base, block + 8944, sp);
+  WheelsResetBrakes(base, block + 10688, sp);
+  const uint32_t r3 = WheelsResetBrakes(base, block + 13632, sp);
+  for (const uint32_t at : {2172u, 5468u, 8956u, 13644u}) {
+    Store(base, block + at, 0);
+  }
+  return r3;
+}
+
 }  // namespace second_set
