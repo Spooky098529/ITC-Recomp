@@ -11,25 +11,23 @@ file's history. What's left to see in a drive, from every run:
 - Run started 2026-10-31 23:57 on `b7-loop-31-10-26-2`, from
   2eb33a3f; summary `b7-loop-2026-10-31-2357.md`.
 - Limit for this run: 3 subsystems; 1 taken.
-- Subsystem 1 of 3: the graphics device's side under the primitive
-  drawer (`sub_822AA018`, `sub_822A9EE8`, `sub_822A8958`,
-  `sub_822A8618`, `sub_822A8960`, `sub_825915E0`), the top of
-  `leads.md` (the first two already in `shader-objects.md`). Map
-  checked (112775ae: `device-shaders.md`, 9 rows, 7 in play: the
-  device's SetVertexShader with its entry, SetPixelShader,
-  SetVertexDeclaration, the render queue's constructor and pass lists;
-  `sub_822A8808`'s row moved from `functions.md`, Wrapped by
-  `src/native/refcount.cpp`; 4 ready groups, no outside blockers; 1
-  lead added; no subagents). Migration checked (657efc7b..e727bc39:
-  the 7 in play native, 2 adapters removed, `--native_device_shaders`;
-  SetVertexShader keeps `refcount.cpp`'s rebind skip, its wrapper made
-  helpers; harness device_shaders 0 differing, graphics_resources 0
-  outside its expected groups; frame dumps alike; race 38 s, 0 errors;
-  no subagents). Nothing ready left; `PassList::Clear`'s and the
-  setters' adapters stay for recompiled callers. Step: validation agent
-  running.
+- Subsystem 1 of 3: the device's shader setters and the render queue
+  (`device-shaders.md`). Done (map 112775ae, migration
+  657efc7b..e727bc39, validated `itc_3054`: 120 s, race 55 s, 0 errors,
+  7 of 7 harness lines, all 7 ran in the race, replay not needed).
+- Cleanup lead (no mapping, not counted): `RaceHudMachine::CreateScreens`
+  `sub_8216CA28`, `ClosePause` `sub_8216C658`, `ResultsDraw`
+  `sub_8216D6D0`, `AfterRaceDraw` `sub_8216C6D8` with `sub_82211D10`,
+  and `sub_82211D08` (`race-hud-machine.md`, `race-hud-object.md`),
+  all ready; then `--removable` on the three files. Step: migration
+  agent running.
 
 ## Done
+
+- The device's shader setters and the render queue (subsystem 1):
+  `device-shaders.md`, 7 of 7 in play, one migration;
+  `--native_device_shaders`; 112775ae..e727bc39. Validated
+  (`itc_3054`).
 
 ## Rows to review
 
@@ -54,5 +52,8 @@ file's history. What's left to see in a drive, from every run:
 - After its migration (`itc_3053`: race 38 s, 0 errors, device_shaders
   0 differing): ours 3712, work left 2687 (wrapped 100, known 513,
   unknown 2074).
+- After its validation (`itc_3054`, 120 s: race 55 s, 0 errors, every
+  harness 0 differing but the expected groups): ours 3712, work left
+  2687.
 
 ## Stopped

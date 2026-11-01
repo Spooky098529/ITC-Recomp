@@ -2696,6 +2696,7 @@ B7. **The game logic inside**: everything else, subsystem by subsystem,
 | 2026-10-31 | The interior accessories (`Accessories::` at `[0x826C5510]`, three reference-counted 1,104-byte entries loaded from the archive, assets 23008-23010; the accessory, a part model with a small skeleton whose nodes swing as a chain, probably a hanging ornament; its 36-byte file class) | `accessories.md` | 31 of 31 in play (two migrations; the anchor, the skeleton's step and swing, the draws and the deleting destructors never ran in play, and the step and draw wait on the skeleton's unread callees) | `--native_accessories` |
 | 2026-10-31 | The race HUD machine (`RaceHudMachine::`, the race mode's state machine at +128664: `Init` with its 65 transitions, the handlers that set up, update and draw the race HUD and the in-race screens' holder by the race kind at +9612, the prize lookups after a career race; with the race HUD's `RunCountdown`, `UpdateRacerBar`, `RunWarning`, `TickPanel` and `TickRacers` as cleanup leads, and 18 race HUD and alternate HUD adapters removed by the user's call) | `race-hud-machine.md` | 16 of 33 in play (one migration and a harness rewrite; the rest waits on the other in-race screens: the pause menu, the menu after the race, the career results) | `--native_race_hud_machine` |
 | 2026-10-31 | The other in-race screens (the race HUD holder's: the pause menu `PauseMenu::` with its six pages and options, the confirm dialog `RaceDialog::` with the replay save's steps, the career results `CareerResults::` with the prize tally, the menu after the race `AfterRaceMenu::`, four unseen screens' makers and teardowns, the menu list's and page object's helpers; with the race HUD machine's handlers they unblocked) | `race-screens.md` | 93 of 116 in play (three migrations; the rest waits on the UI movie calls `sub_8211C740` and `sub_8211CBD8` and the options screens) | `--native_race_screens` |
+| 2026-11-01 | The device's shader setters and the render queue (`D3DDevice_SetVertexShader` with `Device::SetVertexShader`, keeping `refcount.cpp`'s rebind skip; `SetPixelShader`, `SetVertexDeclaration`; `RenderQueue::RenderQueue` at scene + 64 with its two `PassList`s and `PassList::Clear`) | `device-shaders.md` | 7 of 7 in play (one migration; the render queue's methods a lead) | `--native_device_shaders` |
 
     The first run (2026-10-22, branch `b7-loop-test`): every harness at 0 differing, attract races at 20-21 s with no errors,
     and a race the user drove looked right. Ours went from 162 to 335 (work
@@ -4310,3 +4311,18 @@ are ready (a cleanup lead). The run stopped at its limit. The boundary:
 never called 70, live 211. Imports: 186 called, 56 with a live caller.
 B7 (`b7_status.py`): ours 3,705, work left 2,694 (Wrapped 101, with a
 row 513, no row yet 2,080), from 2,794 (from 2,846 at the run's start).
+
+**2026-11-01, the device's shader setters and the render queue (branch
+`b7-loop-31-10-26-2`):** the twenty-ninth run's first subsystem, the
+graphics device's side under the primitive drawer, mapped and made
+native in one migration (`device-shaders.md`, `--native_device_shaders`,
+`src/graphics/device_shaders.cpp`): the vertex and pixel shader and
+vertex declaration setters (kept: the renderer reads what they write)
+and the render queue's constructor with its pass lists, 7 of 7 in play.
+SetVertexShader's rebind skip (`src/native/refcount.cpp`) is done by the
+native setter itself. Left: the render queue's methods (a lead) and the
+setters' recompiled callers. The boundary: 449 functions (916 pairs):
+overridden 108, Native 34, Dropped 26, never called 70, live 211.
+Imports: 186 called, 56 with a live caller. B7 (`b7_status.py`): ours
+3,712, work left 2,687 (Wrapped 100, with a row 513, no row yet 2,074),
+from 2,694.
