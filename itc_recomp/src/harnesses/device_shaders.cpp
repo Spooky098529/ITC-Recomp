@@ -12,8 +12,8 @@
 // then. Compared: the device block, the shaders' block and r3, all exactly
 // (the setters do no float work). The recompiled SetVertexShader calls
 // AddRef's and Release's overrides (the lock-free count); the entry's
-// recompiled version runs with --native_device_shaders off, so its tail
-// call reaches the recompiled SetVertexShader with refcount.cpp's skip. The
+// recompiled version runs with --native_device_shaders off (its tail call
+// reaches the recompiled SetVertexShader). The
 // render queue's constructors are compared by role (below).
 
 #include "harness.h"
@@ -278,14 +278,8 @@ void NativeRenderQueueConstruct(PPCContext& ctx, uint8_t* base) {
     __imp__sub_825915E0(ctx, base);
   }
 }
-// The recompiled ones with the flag off, so their callees (PassList::PassList
+// The recompiled queue with the flag off, so its callees (PassList::PassList
 // and Clear) are the recompiled ones too.
-void RecompiledPassListConstruct(PPCContext& ctx, uint8_t* base) {
-  const bool saved = ITC_FLAG(native_device_shaders);
-  ITC_FLAG(native_device_shaders) = false;
-  __imp__sub_82590B38(ctx, base);
-  ITC_FLAG(native_device_shaders) = saved;
-}
 void RecompiledRenderQueueConstruct(PPCContext& ctx, uint8_t* base) {
   const bool saved = ITC_FLAG(native_device_shaders);
   ITC_FLAG(native_device_shaders) = false;
@@ -312,7 +306,7 @@ void Constructors(Context& h) {
         t.r3.u64 = list;
         t.r4.u64 = items;
         t.r5.u64 = buckets;
-        (v == 0 ? RecompiledPassListConstruct : NativePassListConstruct)(t, h.base);
+        (v == 0 ? __imp__sub_82590B38 : NativePassListConstruct)(t, h.base);
         PassListOutputs(h.base, list, out[v]);
         out[v].Word(t.r3.u32);
         FreePassList(list, h.base, false);

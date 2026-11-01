@@ -4,7 +4,11 @@
 //
 // Device::SetVertexShader (sub_822A8808) was Wrapped by src/native/refcount.cpp
 // (the rebind skip: AddRef and Release of the shader already bound skipped);
-// the native one skips the pair itself, and the fallback keeps the wrapper.
+// the native one skips the pair itself. Its only caller in play is
+// sub_822A8958, whose adapter calls its plain C++, so it has no adapter of
+// its own; the entry's fallback runs it recompiled with the wrapper's skip.
+// PassList::PassList (sub_82590B38) likewise: only RenderQueue::RenderQueue
+// calls it.
 
 #include "guest.h"
 
@@ -48,7 +52,7 @@ dsh::ShaderCalls Calls(PPCContext& ctx, uint8_t* base, uint32_t release_at) {
 }
 
 // The recompiled SetVertexShader with refcount.cpp's rebind skip around it
-// (the wrapper as it was), for the fallback.
+// (the wrapper as it was), for the entry's fallback.
 void RecompiledSetVertexShader(PPCContext& ctx, uint8_t* base) {
   if (ITC_FLAG(refcount_global_lock)) {
     __imp__sub_822A8808(ctx, base);
@@ -67,21 +71,13 @@ void RecompiledSetVertexShader(PPCContext& ctx, uint8_t* base) {
 extern "C" REX_FUNC(sub_822A8958) {
   REX_FUNC_PROLOGUE();
   if (!ITC_FLAG(native_device_shaders)) {
-    __imp__sub_822A8958(ctx, base);  // its tail call reaches the override below
-    return;
-  }
-  const dsh::ShaderCalls calls = Calls(ctx, base, 0x822A883C);
-  ctx.r3.u64 = dsh::SetVertexShaderEntry(base, ctx.r3.u32, ctx.r4.u32, calls);
-}
-
-extern "C" REX_FUNC(sub_822A8808) {
-  REX_FUNC_PROLOGUE();
-  if (!ITC_FLAG(native_device_shaders)) {
+    // The original's store, then its tail call with refcount.cpp's skip.
+    guest::StoreU32(base, ctx.r3.u32 + 13156, ctx.r4.u32);
     RecompiledSetVertexShader(ctx, base);
     return;
   }
   const dsh::ShaderCalls calls = Calls(ctx, base, 0x822A883C);
-  ctx.r3.u64 = dsh::SetVertexShader(base, ctx.r3.u32, ctx.r4.u32, calls);
+  ctx.r3.u64 = dsh::SetVertexShaderEntry(base, ctx.r3.u32, ctx.r4.u32, calls);
 }
 
 extern "C" REX_FUNC(sub_822A8618) {
@@ -112,16 +108,7 @@ extern "C" REX_FUNC(sub_8258EB38) {
   dsh::PassListClear(base, ctx.r3.u32);  // r3: the list, as given
 }
 
-// r3: the list or queue, as given (the originals return it).
-extern "C" REX_FUNC(sub_82590B38) {
-  REX_FUNC_PROLOGUE();
-  if (ITC_FLAG(native_device_shaders) && hooks::NativeHeapActive() &&
-      dsh::PassListConstruct(base, ctx.r3.u32, ctx.r4.u32, ctx.r5.u32)) {
-    return;
-  }
-  __imp__sub_82590B38(ctx, base);
-}
-
+// r3: the queue, as given (the original returns it).
 extern "C" REX_FUNC(sub_825915E0) {
   REX_FUNC_PROLOGUE();
   if (ITC_FLAG(native_device_shaders) && hooks::NativeHeapActive()) {
