@@ -52,5 +52,19 @@ void SetVertexDeclaration(uint8_t* base, uint32_t device, uint32_t declaration);
 // PassList::Clear (sub_8258EB38): each bucket's (+12 of them at +24, 16
 // bytes each) +0 and +4 = 0; +16, +28, +32 = 0.
 void PassListClear(uint8_t* base, uint32_t list);
+// PassList::PassList (sub_82590B38): +0 the vtable 0x8206CB88, +4 = 1 (a
+// byte), +8 = `items`, +12 = `buckets`, +16 = 0; +20 = operator new[](items
+// x 20), +24 = operator new[](buckets x 16) (-1 asked for past the 32-bit
+// sizes); Clear; then each bucket's +8 = the next bucket and +12 = 0, the
+// last's +8 and +12 = 0. False where operator new[] would take its error path
+// (the original then runs from the start; never in play).
+bool PassListConstruct(uint8_t* base, uint32_t list, uint32_t items, uint32_t buckets);
+// RenderQueue::RenderQueue (sub_825915E0): +0 the vtable 0x8206CB8C; +4 =
+// operator new(88) with PrimitiveDrawer::PrimitiveDrawer on its +4 and its
+// vector (+72, +76, +80) = 0; +8 and +12 = operator new(36) each made a
+// PassList(4096, 1024) (0 when operator new gives 0); both cleared again;
+// the state's +0 = 0, +84 = 0.0 (the image's 0x82000A34), +48 to +64 = 0.
+// False where an operator new would take its error path (as above).
+bool RenderQueueConstruct(uint8_t* base, uint32_t queue);
 
 }  // namespace graphics::device_shaders

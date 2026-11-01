@@ -10,13 +10,15 @@
 
 #include "base/flags.h"
 #include "graphics/device_shaders.h"
+#include "hooks/heap.h"
 #include "native/refcount.h"
 
 ITC_FLAG_BOOL(native_device_shaders, true, "ITC",
               "Run the graphics device's shader setters (docs/functions/device-shaders.md: "
               "D3DDevice_SetVertexShader sub_822A8958 with Device::SetVertexShader "
               "sub_822A8808, SetPixelShader sub_822A8618, SetVertexDeclaration sub_822A8960) "
-              "and the render queue's PassList::Clear sub_8258EB38 natively instead of through "
+              "and the render queue: RenderQueue::RenderQueue sub_825915E0, PassList::PassList "
+              "sub_82590B38 (both with the native heap only) and PassList::Clear sub_8258EB38 natively instead of through "
               "the translated code (the same writes to the bound objects, the register shadow "
               "and the dirty masks; checked by --run_harnesses=device_shaders)");
 ITC_FLAG_DECLARE(bool, refcount_global_lock);
@@ -108,4 +110,25 @@ extern "C" REX_FUNC(sub_8258EB38) {
     return;
   }
   dsh::PassListClear(base, ctx.r3.u32);  // r3: the list, as given
+}
+
+// r3: the list or queue, as given (the originals return it).
+extern "C" REX_FUNC(sub_82590B38) {
+  REX_FUNC_PROLOGUE();
+  if (ITC_FLAG(native_device_shaders) && hooks::NativeHeapActive() &&
+      dsh::PassListConstruct(base, ctx.r3.u32, ctx.r4.u32, ctx.r5.u32)) {
+    return;
+  }
+  __imp__sub_82590B38(ctx, base);
+}
+
+extern "C" REX_FUNC(sub_825915E0) {
+  REX_FUNC_PROLOGUE();
+  if (ITC_FLAG(native_device_shaders) && hooks::NativeHeapActive()) {
+    ctx.fpscr.disableFlushMode();
+    if (dsh::RenderQueueConstruct(base, ctx.r3.u32)) {
+      return;
+    }
+  }
+  __imp__sub_825915E0(ctx, base);
 }

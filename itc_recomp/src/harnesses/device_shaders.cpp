@@ -13,13 +13,16 @@
 // (the setters do no float work). The recompiled SetVertexShader calls
 // AddRef's and Release's overrides (the lock-free count); the entry's
 // recompiled version runs with --native_device_shaders off, so its tail
-// call reaches the recompiled SetVertexShader with refcount.cpp's skip.
+// call reaches the recompiled SetVertexShader with refcount.cpp's skip. The
+// render queue's constructors are compared by role (below).
 
 #include "harness.h"
 
 #include "base/flags.h"
 #include "base/log.h"
 #include "graphics/device_shaders.h"
+#include "hooks/heap.h"
+#include "memory/c_runtime_heap.h"
 #include "memory/heap.h"
 
 #include <fmt/format.h>
@@ -228,6 +231,136 @@ void PassLists(Context& h) {
   results.Report();
 }
 
+// --- The render queue's constructors ---
+//
+// Both versions allocate (operator new and new[] through the native heap),
+// so the blocks are compared by role: each pointer's being 0 or not, and
+// what it points at, the bucket links as offsets from their bucket. The
+// items (+20) and the state's other words aren't written by either.
+
+// A pass list's written fields by role.
+void PassListOutputs(uint8_t* base, uint32_t list, Outputs& out) {
+  out.Word(list != 0);
+  if (list == 0) return;
+  out.Bytes(Read(base, list, 20));
+  out.Bytes(Read(base, list + 28, 8));
+  const uint32_t items = guest::LoadU32(base, list + 20);
+  const uint32_t buckets = guest::LoadU32(base, list + 24);
+  out.Word(items != 0);
+  out.Word(buckets != 0);
+  if (buckets == 0) return;
+  const uint32_t count = guest::LoadU32(base, list + 12);
+  for (uint32_t i = 0; i < count; i++) {
+    const uint32_t bucket = buckets + 16 * i;
+    const uint32_t next = guest::LoadU32(base, bucket + 8);
+    out.Word(guest::LoadU32(base, bucket + 0));
+    out.Word(guest::LoadU32(base, bucket + 4));
+    out.Word(next == 0 ? 0 : next - bucket);
+    out.Word(guest::LoadU32(base, bucket + 12));
+  }
+}
+
+void FreePassList(uint32_t list, uint8_t* base, bool itself) {
+  if (list == 0) return;
+  memory::crt::OperatorDeleteArray(guest::LoadU32(base, list + 20));
+  memory::crt::OperatorDeleteArray(guest::LoadU32(base, list + 24));
+  if (itself) memory::crt::OperatorDelete(list);
+}
+
+void NativePassListConstruct(PPCContext& ctx, uint8_t* base) {
+  if (!dsh::PassListConstruct(base, ctx.r3.u32, ctx.r4.u32, ctx.r5.u32)) {
+    __imp__sub_82590B38(ctx, base);
+  }
+}
+void NativeRenderQueueConstruct(PPCContext& ctx, uint8_t* base) {
+  ctx.fpscr.disableFlushMode();
+  if (!dsh::RenderQueueConstruct(base, ctx.r3.u32)) {
+    __imp__sub_825915E0(ctx, base);
+  }
+}
+// The recompiled ones with the flag off, so their callees (PassList::PassList
+// and Clear) are the recompiled ones too.
+void RecompiledPassListConstruct(PPCContext& ctx, uint8_t* base) {
+  const bool saved = ITC_FLAG(native_device_shaders);
+  ITC_FLAG(native_device_shaders) = false;
+  __imp__sub_82590B38(ctx, base);
+  ITC_FLAG(native_device_shaders) = saved;
+}
+void RecompiledRenderQueueConstruct(PPCContext& ctx, uint8_t* base) {
+  const bool saved = ITC_FLAG(native_device_shaders);
+  ITC_FLAG(native_device_shaders) = false;
+  __imp__sub_825915E0(ctx, base);
+  ITC_FLAG(native_device_shaders) = saved;
+}
+
+void Constructors(Context& h) {
+  if (!hooks::NativeHeapActive()) {
+    ITC_LOG_INFO("harness: device_shaders: the constructors need the native heap");
+    return;
+  }
+  Random& r = h.random;
+  {
+    Results results("PassList::PassList (sub_82590B38)");
+    for (int c = 0; c < 48; c++) {
+      const uint32_t items = c < 3 ? uint32_t(c + 1) : 1 + r.Below(300);
+      const uint32_t buckets = c < 3 ? uint32_t(c + 1) : 1 + r.Below(64);
+      const uint32_t list = h.data + 4 * r.Below(16);
+      Outputs out[2];
+      for (int v = 0; v < 2; v++) {
+        Fill(h.base, h.data, kScratchBytes);
+        PPCContext t = CallContext(h);
+        t.r3.u64 = list;
+        t.r4.u64 = items;
+        t.r5.u64 = buckets;
+        (v == 0 ? RecompiledPassListConstruct : NativePassListConstruct)(t, h.base);
+        PassListOutputs(h.base, list, out[v]);
+        out[v].Word(t.r3.u32);
+        FreePassList(list, h.base, false);
+      }
+      results.Check(out[0], out[1],
+                    fmt::format("case {}: {} items, {} buckets", c, items, buckets));
+    }
+    results.Report();
+  }
+  {
+    Results results("RenderQueue::RenderQueue (sub_825915E0)");
+    for (int c = 0; c < 4; c++) {
+      const uint32_t queue = h.data + 4 * r.Below(16);
+      Outputs out[2];
+      for (int v = 0; v < 2; v++) {
+        Fill(h.base, h.data, kScratchBytes);
+        PPCContext t = CallContext(h);
+        t.r3.u64 = queue;
+        (v == 0 ? RecompiledRenderQueueConstruct : NativeRenderQueueConstruct)(t, h.base);
+        out[v].Word(guest::LoadU32(h.base, queue + 0));
+        const uint32_t state = guest::LoadU32(h.base, queue + 4);
+        out[v].Word(state != 0);
+        if (state != 0) {
+          const uint32_t drawer_block = guest::LoadU32(h.base, state + 8);
+          out[v].Bytes(Read(h.base, state, 8));
+          out[v].Word(drawer_block != 0);
+          out[v].Bytes(Read(h.base, state + 48, 20));
+          out[v].Bytes(Read(h.base, state + 72, 12));
+          out[v].Float(guest::LoadU32(h.base, state + 84));
+        }
+        for (uint32_t field : {8u, 12u}) {
+          PassListOutputs(h.base, guest::LoadU32(h.base, queue + field), out[v]);
+        }
+        out[v].Word(t.r3.u32);
+        for (uint32_t field : {8u, 12u}) {
+          FreePassList(guest::LoadU32(h.base, queue + field), h.base, true);
+        }
+        if (state != 0) {
+          memory::crt::OperatorDelete(guest::LoadU32(h.base, state + 8));
+          memory::crt::OperatorDelete(state);
+        }
+      }
+      results.Check(out[0], out[1], fmt::format("case {}: queue at +{}", c, queue - h.data));
+    }
+    results.Report();
+  }
+}
+
 }  // namespace
 
 void DeviceShaders(Context& h) {
@@ -250,6 +383,7 @@ void DeviceShaders(Context& h) {
   memory::Free(device);
   memory::Free(shaders);
   PassLists(h);
+  Constructors(h);
 }
 
 }  // namespace harness

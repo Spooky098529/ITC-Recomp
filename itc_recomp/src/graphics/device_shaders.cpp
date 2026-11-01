@@ -9,6 +9,8 @@
 
 #include "base/log.h"
 #include "native/buffers.h"
+#include "memory/c_runtime_heap.h"
+#include "model_animation/model_animation.h"
 #include "native/refcount.h"
 
 #include <cstdint>
@@ -30,6 +32,10 @@ constexpr uint32_t kTitleVertexShader = 13156;  // the entry's copy (read by not
 
 constexpr uint64_t kVertexShaderBit = 1ull << 51;
 constexpr uint64_t kPixelShaderBits[] = {1ull << 52, 1ull << 49};
+
+constexpr uint32_t kPassListVtable = 0x8206CB88;
+constexpr uint32_t kRenderQueueVtable = 0x8206CB8C;
+constexpr uint32_t kZero = 0x82000A34;  // 0.0
 
 constexpr uint32_t kVertexPatches = 592;  // where the vertex shader's file header was copied
 constexpr uint32_t kPixelPatches = 56;    // the pixel shader's
@@ -178,6 +184,83 @@ void PassListClear(uint8_t* base, uint32_t list) {
   guest::StoreU32(base, list + 16, 0);
   guest::StoreU32(base, list + 28, 0);
   guest::StoreU32(base, list + 32, 0);
+}
+
+bool PassListConstruct(uint8_t* base, uint32_t list, uint32_t items, uint32_t buckets) {
+  ITC_NATIVE_RUNNING("sub_82590B38 PassList::PassList");
+  guest::StoreU32(base, list + 8, items);
+  guest::StoreU32(base, list + 0, kPassListVtable);
+  guest::StoreU32(base, list + 16, 0);
+  guest::StoreU8(base, list + 4, 1);
+  guest::StoreU32(base, list + 12, buckets);
+  const auto item_block =
+      memory::crt::OperatorNewArray(base, items > 0x0CCCCCCCu ? 0xFFFFFFFFu : items * 20);
+  if (!item_block) {
+    return false;
+  }
+  guest::StoreU32(base, list + 20, *item_block);
+  const uint32_t count = guest::LoadU32(base, list + 12);
+  const auto bucket_block =
+      memory::crt::OperatorNewArray(base, count > 0x0FFFFFFFu ? 0xFFFFFFFFu : count << 4);
+  if (!bucket_block) {
+    return false;
+  }
+  guest::StoreU32(base, list + 24, *bucket_block);
+  PassListClear(base, list);
+  if (guest::LoadU32(base, list + 12) - 1 != 0) {
+    uint32_t i = 0, offset = 0;
+    do {
+      const uint32_t bucket = guest::LoadU32(base, list + 24) + offset;
+      i++;
+      guest::StoreU32(base, bucket + 8, bucket + 16);
+      guest::StoreU32(base, guest::LoadU32(base, list + 24) + offset + 12, 0);
+      offset += 16;
+    } while (i < guest::LoadU32(base, list + 12) - 1);
+  }
+  guest::StoreU32(base, (guest::LoadU32(base, list + 12) << 4) + guest::LoadU32(base, list + 24) - 8,
+                  0);
+  guest::StoreU32(base, (guest::LoadU32(base, list + 12) << 4) + guest::LoadU32(base, list + 24) - 4,
+                  0);
+  return true;
+}
+
+bool RenderQueueConstruct(uint8_t* base, uint32_t queue) {
+  ITC_NATIVE_RUNNING("sub_825915E0 RenderQueue::RenderQueue");
+  guest::StoreU32(base, queue + 0, kRenderQueueVtable);
+  const auto state_block = memory::crt::OperatorNew(base, 88);
+  if (!state_block) {
+    return false;
+  }
+  const uint32_t state = *state_block;
+  if (state != 0) {
+    if (!model_animation::PrimitiveDrawerConstruct(base, state + 4)) {
+      return false;
+    }
+    guest::StoreU32(base, state + 72, 0);
+    guest::StoreU32(base, state + 76, 0);
+    guest::StoreU32(base, state + 80, 0);
+  }
+  guest::StoreU32(base, queue + 4, state);
+  for (uint32_t field : {8u, 12u}) {
+    const auto block = memory::crt::OperatorNew(base, 36);
+    if (!block) {
+      return false;
+    }
+    if (*block != 0 && !PassListConstruct(base, *block, 4096, 1024)) {
+      return false;
+    }
+    guest::StoreU32(base, queue + field, *block);
+  }
+  PassListClear(base, guest::LoadU32(base, queue + 8));
+  PassListClear(base, guest::LoadU32(base, queue + 12));
+  guest::StoreU32(base, guest::LoadU32(base, queue + 4) + 0, 0);
+  // lfs, then stfs: the float through a double, as the original.
+  const double zero = guest::LoadFloat(base, kZero);
+  guest::StoreFloat(base, guest::LoadU32(base, queue + 4) + 84, float(zero));
+  for (uint32_t field : {48u, 52u, 56u, 60u, 64u}) {
+    guest::StoreU32(base, guest::LoadU32(base, queue + 4) + field, 0);
+  }
+  return true;
 }
 
 }  // namespace graphics::device_shaders
