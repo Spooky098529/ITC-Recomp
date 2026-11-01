@@ -28,9 +28,16 @@ ITC_FLAG_BOOL(native_second_set, true, "ITC",
               "sub_820DF410, InitSideSkirts sub_820DF570, InitLeftMirror sub_820DF668, "
               "InitRightMirror sub_820DF6B0, InitMirror sub_820DF6F8, CockpitPoints::ResetFenders "
               "sub_820DB878, ResetCabin sub_820DB930, ResetDoors sub_820DB9E8, ResetHeadlights "
-              "sub_820DBAA0, InitBonnet sub_820DC0A8 and InitMirror sub_820DC0F0; with "
+              "sub_820DBAA0, InitBonnet sub_820DC0A8 and InitMirror sub_820DC0F0, "
+              "InteriorPoints::InitBody sub_820E39B0, ResetDials sub_820E2FC8, ResetMeters "
+              "sub_820E3200, ResetSteering sub_820E33F0, ResetSeats sub_820E3440, ResetRollCage "
+              "sub_820E34F8, LightPoints::ResetFront sub_820DC748, ResetSides sub_820DC7A0, "
+              "ResetRear sub_820DC7F8, TrafficPoints::ResetBody sub_820E54E8, ResetHeadlights "
+              "sub_820E56D0 and ResetTailLights sub_820E57A0; with "
               "--native_models and --native_material_passes the point set-ups "
-              "PartsPoints::Find sub_820E0258 and CockpitPoints::Find sub_820DBC88 (with the "
+              "PartsPoints::Find sub_820E0258, CockpitPoints::Find sub_820DBC88, "
+              "InteriorPoints::Find sub_820E3660, LightPoints::Find sub_820DC900 and "
+              "TrafficPoints::Find sub_820E58C8 (with the "
               "groups' finds under them, no adapters: only they call them; "
               "Skeleton::UpdateMatrices' original where its plain C++ declines)) natively instead of through the translated "
               "code (the same writes; checked by --run_harnesses=second_set)");
@@ -119,6 +126,18 @@ ITC_SECOND_SET_GROUP(820DB878, CockpitResetFenders)
 ITC_SECOND_SET_GROUP(820DB930, CockpitResetCabin)
 ITC_SECOND_SET_GROUP(820DB9E8, CockpitResetDoors)
 ITC_SECOND_SET_GROUP(820DBAA0, CockpitResetHeadlights)
+ITC_SECOND_SET_GROUP(820E39B0, InteriorInitBody)
+ITC_SECOND_SET_GROUP(820E2FC8, InteriorResetDials)
+ITC_SECOND_SET_GROUP(820E3200, InteriorResetMeters)
+ITC_SECOND_SET_GROUP(820E33F0, InteriorResetSteering)
+ITC_SECOND_SET_GROUP(820E3440, InteriorResetSeats)
+ITC_SECOND_SET_GROUP(820E34F8, InteriorResetRollCage)
+ITC_SECOND_SET_GROUP(820DC748, LightsResetFront)
+ITC_SECOND_SET_GROUP(820DC7A0, LightsResetSides)
+ITC_SECOND_SET_GROUP(820DC7F8, LightsResetRear)
+ITC_SECOND_SET_GROUP(820E54E8, TrafficResetBody)
+ITC_SECOND_SET_GROUP(820E56D0, TrafficResetHeadlights)
+ITC_SECOND_SET_GROUP(820E57A0, TrafficResetTailLights)
 
 void SecondSetFindStep(PPCContext& ctx, uint8_t* base, FindFunction find) {
   if (!native::Buffers_NativeMemcpy() || !ITC_FLAG(native_models) ||
@@ -166,6 +185,30 @@ void SecondSetCockpitFind(PPCContext& ctx, uint8_t* base) {
     return;
   }
   SecondSetFindStep(ctx, base, ss::CockpitFind);
+}
+
+void SecondSetInteriorFind(PPCContext& ctx, uint8_t* base) {
+  if (!SecondSetFindsNative()) {
+    __imp__sub_820E3660(ctx, base);
+    return;
+  }
+  SecondSetFindStep(ctx, base, ss::InteriorFind);
+}
+
+void SecondSetLightsFind(PPCContext& ctx, uint8_t* base) {
+  if (!SecondSetFindsNative()) {
+    __imp__sub_820DC900(ctx, base);
+    return;
+  }
+  SecondSetFindStep(ctx, base, ss::LightsFind);
+}
+
+void SecondSetTrafficFind(PPCContext& ctx, uint8_t* base) {
+  if (!SecondSetFindsNative()) {
+    __imp__sub_820E58C8(ctx, base);
+    return;
+  }
+  SecondSetFindStep(ctx, base, ss::TrafficFind);
 }
 
 void SecondSetPartsResetRightDoor(PPCContext& ctx, uint8_t* base) {
@@ -220,3 +263,18 @@ ITC_SECOND_SET(820DB9E8, SecondSetCockpitResetDoors)
 ITC_SECOND_SET(820DBAA0, SecondSetCockpitResetHeadlights)
 ITC_SECOND_SET(820E0258, SecondSetPartsFind)
 ITC_SECOND_SET(820DBC88, SecondSetCockpitFind)
+ITC_SECOND_SET(820E39B0, SecondSetInteriorInitBody)
+ITC_SECOND_SET(820E2FC8, SecondSetInteriorResetDials)
+ITC_SECOND_SET(820E3200, SecondSetInteriorResetMeters)
+ITC_SECOND_SET(820E33F0, SecondSetInteriorResetSteering)
+ITC_SECOND_SET(820E3440, SecondSetInteriorResetSeats)
+ITC_SECOND_SET(820E34F8, SecondSetInteriorResetRollCage)
+ITC_SECOND_SET(820DC748, SecondSetLightsResetFront)
+ITC_SECOND_SET(820DC7A0, SecondSetLightsResetSides)
+ITC_SECOND_SET(820DC7F8, SecondSetLightsResetRear)
+ITC_SECOND_SET(820E54E8, SecondSetTrafficResetBody)
+ITC_SECOND_SET(820E56D0, SecondSetTrafficResetHeadlights)
+ITC_SECOND_SET(820E57A0, SecondSetTrafficResetTailLights)
+ITC_SECOND_SET(820E3660, SecondSetInteriorFind)
+ITC_SECOND_SET(820DC900, SecondSetLightsFind)
+ITC_SECOND_SET(820E58C8, SecondSetTrafficFind)

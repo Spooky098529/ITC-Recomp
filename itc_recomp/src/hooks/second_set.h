@@ -51,12 +51,26 @@ void SecondSetCockpitResetFenders(PPCContext& ctx, uint8_t* base);
 void SecondSetCockpitResetCabin(PPCContext& ctx, uint8_t* base);
 void SecondSetCockpitResetDoors(PPCContext& ctx, uint8_t* base);
 void SecondSetCockpitResetHeadlights(PPCContext& ctx, uint8_t* base);
+void SecondSetInteriorInitBody(PPCContext& ctx, uint8_t* base);
+void SecondSetInteriorResetDials(PPCContext& ctx, uint8_t* base);
+void SecondSetInteriorResetMeters(PPCContext& ctx, uint8_t* base);
+void SecondSetInteriorResetSteering(PPCContext& ctx, uint8_t* base);
+void SecondSetInteriorResetSeats(PPCContext& ctx, uint8_t* base);
+void SecondSetInteriorResetRollCage(PPCContext& ctx, uint8_t* base);
+void SecondSetLightsResetFront(PPCContext& ctx, uint8_t* base);
+void SecondSetLightsResetSides(PPCContext& ctx, uint8_t* base);
+void SecondSetLightsResetRear(PPCContext& ctx, uint8_t* base);
+void SecondSetTrafficResetBody(PPCContext& ctx, uint8_t* base);
+void SecondSetTrafficResetHeadlights(PPCContext& ctx, uint8_t* base);
+void SecondSetTrafficResetTailLights(PPCContext& ctx, uint8_t* base);
 
 
 // The point set-ups (src/second_set/finds.h): r3 = the group or block, r4 =
 // the part model or the models' words; r3 as the original leaves it, the
 // flush mode as its last float step. PartsPoints::Find sub_820E0258 and
-// CockpitPoints::Find sub_820DBC88 natively only with native memcpy,
+// CockpitPoints::Find sub_820DBC88, InteriorPoints::Find sub_820E3660,
+// LightPoints::Find sub_820DC900 (r4 one part model) and TrafficPoints::Find
+// sub_820E58C8 natively only with native memcpy,
 // --native_models and --native_material_passes (else the original).
 using FindFunction = uint32_t (*)(uint8_t*, uint32_t, uint32_t, uint32_t,
                                   second_set::FindCalls&);
@@ -66,5 +80,8 @@ bool SecondSetFindsNative();
 void SecondSetFindStep(PPCContext& ctx, uint8_t* base, FindFunction find);
 void SecondSetPartsFind(PPCContext& ctx, uint8_t* base);
 void SecondSetCockpitFind(PPCContext& ctx, uint8_t* base);
+void SecondSetInteriorFind(PPCContext& ctx, uint8_t* base);
+void SecondSetLightsFind(PPCContext& ctx, uint8_t* base);
+void SecondSetTrafficFind(PPCContext& ctx, uint8_t* base);
 
 }  // namespace hooks

@@ -10,6 +10,7 @@
 #include "material_passes/material_passes.h"
 #include "matrix_math/matrix_math.h"
 #include "native/buffers.h"
+#include "scene/scene.h"
 #include "scene_loaders/model_point.h"
 #include "second_set/points.h"
 
@@ -27,7 +28,8 @@ void Store(uint8_t* base, uint32_t address, uint32_t value) {
   guest::StoreU32(base, address, value);
 }
 
-constexpr uint32_t kFive = 0x82005FE4;  // 5.0
+constexpr uint32_t kFive = 0x82005FE4;   // 5.0
+constexpr uint32_t kThree = 0x82006420;  // 3.0
 constexpr uint32_t R = kPointRecordBytes;
 
 // ModelPoint::Find from a frame at `sp`.
@@ -294,6 +296,123 @@ uint32_t CockpitFind(uint8_t* base, uint32_t block, uint32_t models, uint32_t st
   shapes(1440, 2, Load(base, models + 4));
   ModelPointFindShape(base, block + 1920, Load(base, models + 8), sp);
   return CockpitFindHeadlights(base, block + 2160, Load(base, models + 12), sp, calls);
+}
+
+uint32_t InteriorFindDials(uint8_t* base, uint32_t group, uint32_t model, uint32_t stack,
+                           FindCalls& calls) {
+  ITC_NATIVE_RUNNING("sub_820E30C0 InteriorPoints::FindDials");
+  const uint32_t sp = stack - 128;
+  const uint32_t records = group + 16;
+  FindRecords(base, records, model, 0, 12, 2, sp, calls);
+  if (material_passes::IsBlockSetB(int32_t(Load(base, group + 4))) == 0 &&
+      material_passes::IsBlockSetA(int32_t(Load(base, group + 4))) == 0) {
+    return 0;
+  }
+  return ScaleRecords(base, records, 9, 11, kOne, sp, calls);
+}
+
+uint32_t InteriorFindMeters(uint8_t* base, uint32_t group, uint32_t model, uint32_t stack,
+                            FindCalls& calls) {
+  ITC_NATIVE_RUNNING("sub_820E3298 InteriorPoints::FindMeters");
+  return FindRecords(base, group + 16, model, 0, 22, 7, stack - 112, calls);
+}
+
+uint32_t InteriorFindSeats(uint8_t* base, uint32_t group, uint32_t model, uint32_t stack,
+                           FindCalls& calls) {
+  ITC_NATIVE_RUNNING("sub_820E34A8 InteriorPoints::FindSeats");
+  return FindRecords(base, group + 16, model, 0, 4, 2, stack - 112, calls);
+}
+
+uint32_t InteriorFind(uint8_t* base, uint32_t block, uint32_t models, uint32_t stack,
+                      FindCalls& calls) {
+  ITC_NATIVE_RUNNING("sub_820E3660 InteriorPoints::Find");
+  const uint32_t sp = stack - 144;
+  const uint32_t record = Load(base, block + 11444);
+  const uint32_t w11440 = Load(base, block + 11440);
+  Store(base, block + 240, record);
+  Store(base, block + 9492, w11440);
+  Store(base, block + 3152, record);
+  Store(base, block + 8512, record);
+  Store(base, block + 9488, record);
+  const uint32_t index = Load(base, record + 100);
+  if (index != 0) {
+    Store(base, block + 9496, index * 464 + Load(base, scene::kScene) + 784);
+  }
+  Store(base, block + 10464, record);
+  ModelPointFindShape(base, block + 0, Load(base, models + 8), sp);
+  InteriorFindDials(base, block + 240, Load(base, models + 12), sp, calls);
+  InteriorFindMeters(base, block + 3152, Load(base, models + 0), sp, calls);
+  const uint32_t steering = Load(base, models + 20);
+  for (uint32_t i = 0; i < 4; i++) {
+    ModelPointFindShape(base, block + 8528 + R * i, steering, sp);
+  }
+  InteriorFindSeats(base, block + 9488, Load(base, models + 16), sp, calls);
+  const uint32_t cage = Load(base, models + 4);
+  uint32_t r3 = 0;
+  for (uint32_t i = 0; i < 4; i++) {
+    r3 = ModelPointFindShape(base, block + 10480 + R * i, cage, sp);
+  }
+  return r3;
+}
+
+uint32_t LightsFindGroup(uint8_t* base, uint32_t group, uint32_t model, uint32_t stack,
+                         FindCalls& calls) {
+  ITC_NATIVE_RUNNING("sub_820DC850 LightPoints::FindGroup");
+  const uint32_t sp = stack - 128;
+  uint32_t r3 = 0;
+  for (uint32_t i = 0; i < 18; i++) {
+    const uint32_t record = group + 16 + R * i;
+    ModelPointFindShape(base, record, model, sp);
+    r3 = Scale(base, record, kOne, sp, calls);
+  }
+  return r3;
+}
+
+uint32_t LightsFind(uint8_t* base, uint32_t block, uint32_t model, uint32_t stack,
+                    FindCalls& calls) {
+  ITC_NATIVE_RUNNING("sub_820DC900 LightPoints::Find");
+  const uint32_t sp = stack - 112;
+  LightsFindGroup(base, block + 48, model, sp, calls);
+  LightsFindGroup(base, block + 4384, model, sp, calls);
+  return LightsFindGroup(base, block + 8720, model, sp, calls);
+}
+
+uint32_t TrafficFindBody(uint8_t* base, uint32_t group, uint32_t m0, uint32_t m1, uint32_t m2,
+                         uint32_t m3, uint32_t stack) {
+  ITC_NATIVE_RUNNING("sub_820E5538 TrafficPoints::FindBody");
+  const uint32_t sp = stack - 128;
+  const uint32_t models[6] = {m3, m0, m2, m2, m0, m1};
+  uint32_t r3 = 0;
+  for (uint32_t i = 0; i < 6; i++) {
+    r3 = ModelPointFindShape(base, group + R * i, models[i], sp);
+  }
+  return r3;
+}
+
+uint32_t TrafficFindHeadlights(uint8_t* base, uint32_t group, uint32_t model, uint32_t stack,
+                               FindCalls& calls) {
+  ITC_NATIVE_RUNNING("sub_820E5738 TrafficPoints::FindHeadlights");
+  const uint32_t sp = stack - 128;
+  FindRecords(base, group, model, 0, 7, 4, sp, calls);
+  return Scale(base, group + 5 * R, kThree, sp, calls);
+}
+
+uint32_t TrafficFindTailLights(uint8_t* base, uint32_t group, uint32_t model, uint32_t stack,
+                               FindCalls& calls) {
+  ITC_NATIVE_RUNNING("sub_820E5808 TrafficPoints::FindTailLights");
+  const uint32_t sp = stack - 128;
+  FindRecords(base, group, model, 0, 12, 8, sp, calls);
+  return ScaleRecords(base, group, 9, 10, kThree, sp, calls);
+}
+
+uint32_t TrafficFind(uint8_t* base, uint32_t block, uint32_t models, uint32_t stack,
+                     FindCalls& calls) {
+  ITC_NATIVE_RUNNING("sub_820E58C8 TrafficPoints::Find");
+  const uint32_t sp = stack - 112;
+  TrafficFindBody(base, block + 16, Load(base, models + 0), Load(base, models + 4),
+                  Load(base, models + 8), Load(base, models + 12), sp);
+  TrafficFindHeadlights(base, block + 1472, Load(base, models + 16), sp, calls);
+  return TrafficFindTailLights(base, block + 3152, Load(base, models + 20), sp, calls);
 }
 
 }  // namespace second_set

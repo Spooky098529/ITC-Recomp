@@ -97,4 +97,49 @@ uint32_t CockpitFindHeadlights(uint8_t* base, uint32_t group, uint32_t model, ui
 uint32_t CockpitFind(uint8_t* base, uint32_t block, uint32_t models, uint32_t stack,
                      FindCalls& calls);
 
+// InteriorPoints::FindDials (sub_820E30C0): ModelPoint::Find on records 0
+// and 1 (at +16), FindShape on 2 to 11; when the group's +4 is one
+// IsBlockSetB or IsBlockSetA accepts, ScaleBlended by 1.0 on 9 to 11.
+uint32_t InteriorFindDials(uint8_t* base, uint32_t group, uint32_t model, uint32_t stack,
+                           FindCalls& calls);
+// InteriorPoints::FindMeters (sub_820E3298): ModelPoint::Find on records 0
+// to 6 (at +16), FindShape on 7 to 21.
+uint32_t InteriorFindMeters(uint8_t* base, uint32_t group, uint32_t model, uint32_t stack,
+                            FindCalls& calls);
+// InteriorPoints::FindSeats (sub_820E34A8): ModelPoint::Find on 0 and 1 (at
+// +16), FindShape on 2 and 3.
+uint32_t InteriorFindSeats(uint8_t* base, uint32_t group, uint32_t model, uint32_t stack,
+                           FindCalls& calls);
+// InteriorPoints::Find (sub_820E3660): r4 = six part models (words): the
+// groups' +0 = [+11444], +9492 = [+11440], +9496 = the scene + 784 + 464 x
+// [[+11444] + 100] when that isn't 0; then FindShape(+0, model 2),
+// FindDials(+240, 3), FindMeters(+3152, 0), the steering's 4 (model 5),
+// FindSeats(+9488, 4), the roll cage's 4 (model 1).
+uint32_t InteriorFind(uint8_t* base, uint32_t block, uint32_t models, uint32_t stack,
+                      FindCalls& calls);
+// LightPoints::FindGroup (sub_820DC850): for its 18 records (at +16),
+// FindShape then ScaleBlended by 1.0.
+uint32_t LightsFindGroup(uint8_t* base, uint32_t group, uint32_t model, uint32_t stack,
+                         FindCalls& calls);
+// LightPoints::Find (sub_820DC900): FindGroup on +48, +4384, +8720.
+uint32_t LightsFind(uint8_t* base, uint32_t block, uint32_t model, uint32_t stack,
+                    FindCalls& calls);
+// TrafficPoints::FindBody (sub_820E5538): r4 to r7 models 0 to 3:
+// FindShape on its 6 records with models 3, 0, 2, 2, 0, 1.
+uint32_t TrafficFindBody(uint8_t* base, uint32_t group, uint32_t m0, uint32_t m1, uint32_t m2,
+                         uint32_t m3, uint32_t stack);
+// TrafficPoints::FindHeadlights (sub_820E5738): ModelPoint::Find on 0 to 3,
+// FindShape on 4 to 6; ScaleBlended by 3.0 on 5.
+uint32_t TrafficFindHeadlights(uint8_t* base, uint32_t group, uint32_t model, uint32_t stack,
+                               FindCalls& calls);
+// TrafficPoints::FindTailLights (sub_820E5808): ModelPoint::Find on 0 to 7,
+// FindShape on 8 to 11; ScaleBlended by 3.0 on 9 and 10.
+uint32_t TrafficFindTailLights(uint8_t* base, uint32_t group, uint32_t model, uint32_t stack,
+                               FindCalls& calls);
+// TrafficPoints::Find (sub_820E58C8): r4 = six part models (words):
+// FindBody(+16, models 0 to 3), FindHeadlights(+1472, 4),
+// FindTailLights(+3152, 5).
+uint32_t TrafficFind(uint8_t* base, uint32_t block, uint32_t models, uint32_t stack,
+                     FindCalls& calls);
+
 }  // namespace second_set

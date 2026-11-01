@@ -214,4 +214,77 @@ uint32_t CockpitResetHeadlights(uint8_t* base, uint32_t group, uint32_t stack) {
   return NameRecords(base, group, 0x8200525C, 8, 4, stack - 128);
 }
 
+uint32_t InteriorInitBody(uint8_t* base, uint32_t record, uint32_t stack) {
+  ITC_NATIVE_RUNNING("sub_820E39B0 InteriorPoints::InitBody");
+  return InitRecord(base, record, 0x82602864, stack);
+}
+
+uint32_t InteriorResetDials(uint8_t* base, uint32_t group, uint32_t stack) {
+  ITC_NATIVE_RUNNING("sub_820E2FC8 InteriorPoints::ResetDials");
+  Store(base, group + 0, 0);
+  Store(base, group + 8, 0);
+  Store(base, group + 4, 0xFFFFFFFFu);
+  return NameRecords(base, group + 16, 0x82602868, 12, 2, stack - 128);
+}
+
+uint32_t InteriorResetMeters(uint8_t* base, uint32_t group, uint32_t stack) {
+  ITC_NATIVE_RUNNING("sub_820E3200 InteriorPoints::ResetMeters");
+  Store(base, group + 0, 0);
+  Store(base, group + 4, 0xFFFFFFFFu);
+  Store(base, group + 5324, 0);
+  const uint32_t r3 = NameRecords(base, group + 16, 0x82602898, 22, 7, stack - 144);
+  for (uint32_t w = 0; w < 7; w++) {
+    Store(base, group + 5296 + 4 * w, 0);
+  }
+  return r3;
+}
+
+uint32_t InteriorResetSteering(uint8_t* base, uint32_t group, uint32_t stack) {
+  ITC_NATIVE_RUNNING("sub_820E33F0 InteriorPoints::ResetSteering");
+  return NameRecords(base, group + 16, 0x826028F0, 4, 0, stack - 112);
+}
+
+uint32_t InteriorResetSeats(uint8_t* base, uint32_t group, uint32_t stack) {
+  ITC_NATIVE_RUNNING("sub_820E3440 InteriorPoints::ResetSeats");
+  return NameRecords(base, group + 16, 0x82602900, 4, 2, stack - 128);
+}
+
+uint32_t InteriorResetRollCage(uint8_t* base, uint32_t group, uint32_t stack) {
+  ITC_NATIVE_RUNNING("sub_820E34F8 InteriorPoints::ResetRollCage");
+  return NameRecords(base, group + 16, 0x82602910, 4, 0, stack - 112);
+}
+
+uint32_t LightsResetFront(uint8_t* base, uint32_t group, uint32_t stack) {
+  ITC_NATIVE_RUNNING("sub_820DC748 LightPoints::ResetFront");
+  Store(base, group + 0, 0);
+  return NameRecords(base, group + 16, 0x820055F0, 18, 0, stack - 112);
+}
+
+uint32_t LightsResetSides(uint8_t* base, uint32_t group, uint32_t stack) {
+  ITC_NATIVE_RUNNING("sub_820DC7A0 LightPoints::ResetSides");
+  Store(base, group + 0, 0);
+  return NameRecords(base, group + 16, 0x82005638, 18, 0, stack - 112);
+}
+
+uint32_t LightsResetRear(uint8_t* base, uint32_t group, uint32_t stack) {
+  ITC_NATIVE_RUNNING("sub_820DC7F8 LightPoints::ResetRear");
+  Store(base, group + 0, 0);
+  return NameRecords(base, group + 16, 0x82005680, 18, 0, stack - 112);
+}
+
+uint32_t TrafficResetBody(uint8_t* base, uint32_t group, uint32_t stack) {
+  ITC_NATIVE_RUNNING("sub_820E54E8 TrafficPoints::ResetBody");
+  return NameRecords(base, group, 0x8260292C, 6, 0, stack - 112);
+}
+
+uint32_t TrafficResetHeadlights(uint8_t* base, uint32_t group, uint32_t stack) {
+  ITC_NATIVE_RUNNING("sub_820E56D0 TrafficPoints::ResetHeadlights");
+  return NameRecords(base, group, 0x82602944, 7, 4, stack - 128);
+}
+
+uint32_t TrafficResetTailLights(uint8_t* base, uint32_t group, uint32_t stack) {
+  ITC_NATIVE_RUNNING("sub_820E57A0 TrafficPoints::ResetTailLights");
+  return NameRecords(base, group, 0x82602960, 12, 8, stack - 128);
+}
+
 }  // namespace second_set

@@ -312,6 +312,30 @@ void Groups(Context& h, Random& r, uint32_t block) {
        hooks::SecondSetCockpitResetDoors, 112, 480, false},
       {"CockpitPoints::ResetHeadlights (sub_820DBAA0)", __imp__sub_820DBAA0,
        hooks::SecondSetCockpitResetHeadlights, 128, 1920, false},
+      {"InteriorPoints::InitBody (sub_820E39B0)", __imp__sub_820E39B0,
+       hooks::SecondSetInteriorInitBody, 96, 240, true},
+      {"InteriorPoints::ResetDials (sub_820E2FC8)", __imp__sub_820E2FC8,
+       hooks::SecondSetInteriorResetDials, 128, 2896, false},
+      {"InteriorPoints::ResetMeters (sub_820E3200)", __imp__sub_820E3200,
+       hooks::SecondSetInteriorResetMeters, 144, 5328, false},
+      {"InteriorPoints::ResetSteering (sub_820E33F0)", __imp__sub_820E33F0,
+       hooks::SecondSetInteriorResetSteering, 112, 976, false},
+      {"InteriorPoints::ResetSeats (sub_820E3440)", __imp__sub_820E3440,
+       hooks::SecondSetInteriorResetSeats, 128, 976, false},
+      {"InteriorPoints::ResetRollCage (sub_820E34F8)", __imp__sub_820E34F8,
+       hooks::SecondSetInteriorResetRollCage, 112, 976, false},
+      {"LightPoints::ResetFront (sub_820DC748)", __imp__sub_820DC748,
+       hooks::SecondSetLightsResetFront, 112, 4336, false},
+      {"LightPoints::ResetSides (sub_820DC7A0)", __imp__sub_820DC7A0,
+       hooks::SecondSetLightsResetSides, 112, 4336, false},
+      {"LightPoints::ResetRear (sub_820DC7F8)", __imp__sub_820DC7F8,
+       hooks::SecondSetLightsResetRear, 112, 4336, false},
+      {"TrafficPoints::ResetBody (sub_820E54E8)", __imp__sub_820E54E8,
+       hooks::SecondSetTrafficResetBody, 112, 1440, false},
+      {"TrafficPoints::ResetHeadlights (sub_820E56D0)", __imp__sub_820E56D0,
+       hooks::SecondSetTrafficResetHeadlights, 128, 1680, false},
+      {"TrafficPoints::ResetTailLights (sub_820E57A0)", __imp__sub_820E57A0,
+       hooks::SecondSetTrafficResetTailLights, 128, 2880, false},
   };
   for (const Group& g : groups) {
     Results results(g.name);
@@ -353,7 +377,7 @@ uint32_t SmallFloat(Random& r) {
 }
 
 // A node file (4 KB at `file`) of `names.size()` nodes, as scene_loaders'
-// harness builds them (ModelPoint::Find's cases).
+// harness builds them (ModelPoint::Find's cases), with valid parents.
 void MakeNodeFile(uint8_t* base, uint32_t file, const std::vector<std::string>& names,
                   Random& r) {
   const uint32_t nodes = uint32_t(names.size());
@@ -377,6 +401,10 @@ void MakeNodeFile(uint8_t* base, uint32_t file, const std::vector<std::string>& 
     const uint32_t record = file + kRecords + 160 * n;
     PutString(base, record, names[n]);
     Put(base, record + 92, n == 0 || r.Below(4) == 0 ? 0xFFFFFFFFu : r.Below(n));
+    // The parent (Skeleton::UpdateNodeMatrices multiplies by its matrix): an
+    // earlier node or none, as a file's are (scene_loaders' harness leaves it
+    // random, which can reach unmapped guest memory).
+    Put(base, record + 128, n == 0 || r.Below(4) == 0 ? 0xFFFFFFFFu : r.Below(n));
     static const uint32_t kTypes[] = {0, 1, 2, 3, 4, 5, 0x80, 0x81, 32};
     Put(base, record + 132, kTypes[r.Below(std::size(kTypes))]);
   }
@@ -441,6 +469,10 @@ const Span kPartsSpans[] = {{0, 11},     {2656, 1},  {2896, 7},   {4592, 1},  {4
                             {24000, 1},  {24240, 1}, {24480, 13}, {27680, 15}, {31280, 7},
                             {32960, 5},  {34160, 2}, {34896, 5},  {36096, 4}};
 const Span kCockpitSpans[] = {{0, 3}, {720, 2}, {1200, 1}, {1440, 2}, {1920, 1}, {2160, 8}};
+const Span kInteriorSpans[] = {{0, 1},     {256, 12},  {3168, 22},
+                               {8528, 4},  {9504, 4},  {10480, 4}};
+const Span kLightsSpans[] = {{64, 18}, {4400, 18}, {8736, 18}};
+const Span kTrafficSpans[] = {{16, 6}, {1472, 7}, {3152, 12}};
 
 std::string PickName(Random& r, const char* const* names, size_t count) {
   std::string name = names[r.Below(uint32_t(count))];
@@ -481,6 +513,19 @@ void BuildWorld(uint8_t* base, uint32_t block, uint64_t seed, const Span* spans,
     if (!model_animation::SkeletonBind(base, skeleton, file, 0)) {
       ITC_LOG_WARN("harness: second_set: Skeleton::Bind declined");
     }
+    // The arrays Bind allocates and leaves as the heap had them (a side's
+    // would hold the other side's results) filled from the seed.
+    for (const SkeletonArray& a : SkeletonArrays(base, file)) {
+      const uint32_t at = guest::LoadU32(base, skeleton + a.offset);
+      if (at != 0 && (a.offset == 132 || a.offset == 136 || a.offset == 144)) {
+        for (uint32_t w = 0; w < (a.bytes - a.header) / 4; w++) {
+          Put(base, at + 4 * w, SmallFloat(g));
+        }
+      }
+    }
+    // The root node (+156, Skeleton::UpdateNodeMatrices' first multiply):
+    // one of the nodes, as the game's are.
+    Put(base, skeleton + 156, g.Below(uint32_t(names.size())));
   }
   for (uint32_t b = 0; b < 2; b++) {
     const uint32_t materials = block + kMaterials + 0x800 * b;
@@ -505,6 +550,14 @@ void BuildWorld(uint8_t* base, uint32_t block, uint64_t seed, const Span* spans,
     const uint32_t which = g.Below(5);
     Put(base, block + kModelWords + 4 * k,
         which == 0 && kinds == 17 ? 0 : block + kModels + 0x400 * (which & 1));
+  }
+  // The interior's record ([+11444], its +100 an index or 0) and the dials'
+  // car block (+244); the parts' and others' words there are random anyway.
+  if (kinds == 6) {
+    Put(base, block + 11444, block + kCarObject);
+    Put(base, block + kCarObject + 100, g.Below(3) == 0 ? 0 : g.Below(8));
+    static const uint32_t kBlocks[] = {1, 10, 26, 37, 5, 0xFFFFFFFFu};
+    Put(base, block + 244, kBlocks[g.Below(std::size(kBlocks))]);
   }
   Put(base, block + 37084, block + kCarLoads);
   Put(base, block + kCarLoads + 24, block + kCarObject);
@@ -558,7 +611,8 @@ void FindSide(int v, GuestFunction recompiled, GuestFunction native, PPCContext&
 // One set-up case: the world from `seed`, r3 = the block + `at`, r4 = model
 // `model` (0 or 1) or, for -1, the models' words.
 void FindCase(Context& h, Results& results, uint32_t block, uint64_t seed, const Span* spans,
-              size_t span_count, bool parts, uint32_t kinds, uint32_t set, uint32_t at,
+              size_t span_count, uint32_t bytes, bool parts, uint32_t kinds, uint32_t set,
+              uint32_t at,
               int model, GuestFunction recompiled, GuestFunction native, const std::string& what) {
   PPCContext start = CallContext(h);
   start.r1.u64 &= ~0xFull;
@@ -573,8 +627,11 @@ void FindCase(Context& h, Results& results, uint32_t block, uint64_t seed, const
     PPCContext t = start;
     t.r3.u64 = block + at;
     t.r4.u64 = model < 0 ? block + kModelWords : block + kModels + 0x400 * uint32_t(model);
+    t.r5.u64 = block + kModels + 0x400;  // FindBody's models 1 to 3
+    t.r6.u64 = block + kModels;
+    t.r7.u64 = block + kModels + 0x400;
     FindSide(v, recompiled, native, t, h.base);
-    TakeBlock(h.base, block, parts ? 37096 : 4096, spans, span_count, parts, out[v]);
+    TakeBlock(h.base, block, bytes, spans, span_count, parts, out[v]);
     for (uint32_t m = 0; m < 2; m++) {
       const uint32_t object = block + kModels + 0x400 * m;
       const uint32_t file = block + kFiles + 0x1000 * m;
@@ -641,7 +698,7 @@ void Finds(Context& h, Random& r, uint32_t block) {
   for (const Find& f : finds) {
     Results results(f.name);
     for (int c = 0; c < 8; c++) {
-      FindCase(h, results, block, r.Next(), kPartsSpans, std::size(kPartsSpans), true, 17,
+      FindCase(h, results, block, r.Next(), kPartsSpans, std::size(kPartsSpans), 37096, true, 17,
                r.Below(2), f.at, int(r.Below(2)), f.recompiled, f.native,
                fmt::format("case {}", c));
     }
@@ -651,7 +708,7 @@ void Finds(Context& h, Random& r, uint32_t block) {
     Results results("PartsPoints::Find (sub_820E0258)");
     for (int c = 0; c < 16; c++) {
       const uint32_t set = c % 2 == 0 ? 0 : (c % 4 == 1 ? 1 : uint32_t(r.Next()));
-      FindCase(h, results, block, r.Next(), kPartsSpans, std::size(kPartsSpans), true, 17, set,
+      FindCase(h, results, block, r.Next(), kPartsSpans, std::size(kPartsSpans), 37096, true, 17, set,
                0, -1, __imp__sub_820E0258, hooks::SecondSetPartsFind,
                fmt::format("case {} (set {:#x})", c, set));
     }
@@ -660,7 +717,7 @@ void Finds(Context& h, Random& r, uint32_t block) {
   {
     Results results("CockpitPoints::FindHeadlights (sub_820DBB08)");
     for (int c = 0; c < 8; c++) {
-      FindCase(h, results, block, r.Next(), kCockpitSpans, std::size(kCockpitSpans), false, 6,
+      FindCase(h, results, block, r.Next(), kCockpitSpans, std::size(kCockpitSpans), 4096, false, 6,
                0, 2160, int(r.Below(2)), __imp__sub_820DBB08,
                ITC_FIND_STEP(CockpitFindHeadlights), fmt::format("case {}", c));
     }
@@ -669,9 +726,57 @@ void Finds(Context& h, Random& r, uint32_t block) {
   {
     Results results("CockpitPoints::Find (sub_820DBC88)");
     for (int c = 0; c < 12; c++) {
-      FindCase(h, results, block, r.Next(), kCockpitSpans, std::size(kCockpitSpans), false, 6,
+      FindCase(h, results, block, r.Next(), kCockpitSpans, std::size(kCockpitSpans), 4096, false, 6,
                0, 0, -1, __imp__sub_820DBC88, hooks::SecondSetCockpitFind,
                fmt::format("case {}", c));
+    }
+    results.Report();
+  }
+  // The interior's, the light kit's and the traffic body's.
+  struct Other {
+    const char* name;
+    GuestFunction recompiled, native;
+    const Span* spans;
+    size_t span_count;
+    uint32_t bytes, at;
+    bool words;  // r4 the models' words, else one model
+  };
+  const Other others[] = {
+      {"InteriorPoints::FindDials (sub_820E30C0)", __imp__sub_820E30C0,
+       ITC_FIND_STEP(InteriorFindDials), kInteriorSpans, std::size(kInteriorSpans), 11460, 240,
+       false},
+      {"InteriorPoints::FindMeters (sub_820E3298)", __imp__sub_820E3298,
+       ITC_FIND_STEP(InteriorFindMeters), kInteriorSpans, std::size(kInteriorSpans), 11460, 3152,
+       false},
+      {"InteriorPoints::FindSeats (sub_820E34A8)", __imp__sub_820E34A8,
+       ITC_FIND_STEP(InteriorFindSeats), kInteriorSpans, std::size(kInteriorSpans), 11460, 9488,
+       false},
+      {"InteriorPoints::Find (sub_820E3660)", __imp__sub_820E3660, hooks::SecondSetInteriorFind,
+       kInteriorSpans, std::size(kInteriorSpans), 11460, 0, true},
+      {"LightPoints::FindGroup (sub_820DC850)", __imp__sub_820DC850,
+       ITC_FIND_STEP(LightsFindGroup), kLightsSpans, std::size(kLightsSpans), 13072, 48, false},
+      {"LightPoints::Find (sub_820DC900)", __imp__sub_820DC900, hooks::SecondSetLightsFind,
+       kLightsSpans, std::size(kLightsSpans), 13072, 0, false},
+      {"TrafficPoints::FindBody (sub_820E5538)", __imp__sub_820E5538,
+       [](PPCContext& c, uint8_t* b) {
+         c.r3.u64 = ss::TrafficFindBody(b, c.r3.u32, c.r4.u32, c.r5.u32, c.r6.u32, c.r7.u32,
+                                        c.r1.u32);
+       },
+       kTrafficSpans, std::size(kTrafficSpans), 6080, 16, false},
+      {"TrafficPoints::FindHeadlights (sub_820E5738)", __imp__sub_820E5738,
+       ITC_FIND_STEP(TrafficFindHeadlights), kTrafficSpans, std::size(kTrafficSpans), 6080, 1472,
+       false},
+      {"TrafficPoints::FindTailLights (sub_820E5808)", __imp__sub_820E5808,
+       ITC_FIND_STEP(TrafficFindTailLights), kTrafficSpans, std::size(kTrafficSpans), 6080, 3152,
+       false},
+      {"TrafficPoints::Find (sub_820E58C8)", __imp__sub_820E58C8, hooks::SecondSetTrafficFind,
+       kTrafficSpans, std::size(kTrafficSpans), 6080, 0, true},
+  };
+  for (const Other& o : others) {
+    Results results(o.name);
+    for (int c = 0; c < 12; c++) {
+      FindCase(h, results, block, r.Next(), o.spans, o.span_count, o.bytes, false, 6, 0, o.at,
+               o.words ? -1 : int(r.Below(2)), o.recompiled, o.native, fmt::format("case {}", c));
     }
     results.Report();
   }

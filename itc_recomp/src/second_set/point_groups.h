@@ -81,4 +81,46 @@ uint32_t CockpitResetDoors(uint8_t* base, uint32_t group, uint32_t stack);
 // 0x8200525C.
 uint32_t CockpitResetHeadlights(uint8_t* base, uint32_t group, uint32_t stack);
 
+// --- The interior's (InteriorPoints, the block at the interior + 160) ---
+
+// InteriorPoints::InitBody (sub_820E39B0): an init with [0x82602864].
+uint32_t InteriorInitBody(uint8_t* base, uint32_t record, uint32_t stack);
+// InteriorPoints::ResetDials (sub_820E2FC8): +0 = 0, +8 = 0, +4 = -1; 2
+// nodes and 10 shapes at +16 from 0x82602868.
+uint32_t InteriorResetDials(uint8_t* base, uint32_t group, uint32_t stack);
+// InteriorPoints::ResetMeters (sub_820E3200): +0 = 0, +4 = -1, +5324 = 0;
+// 7 nodes and 15 shapes at +16 from 0x82602898; the seven words at +5296 =
+// 0. Returns the last record named.
+uint32_t InteriorResetMeters(uint8_t* base, uint32_t group, uint32_t stack);
+// InteriorPoints::ResetSteering (sub_820E33F0): 4 shapes at +16 from
+// 0x826028F0.
+uint32_t InteriorResetSteering(uint8_t* base, uint32_t group, uint32_t stack);
+// InteriorPoints::ResetSeats (sub_820E3440): 2 nodes and 2 shapes at +16
+// from 0x82602900.
+uint32_t InteriorResetSeats(uint8_t* base, uint32_t group, uint32_t stack);
+// InteriorPoints::ResetRollCage (sub_820E34F8): 4 shapes at +16 from
+// 0x82602910.
+uint32_t InteriorResetRollCage(uint8_t* base, uint32_t group, uint32_t stack);
+
+// --- The light kit's (LightPoints, the block at pool 4's object + 96) ---
+
+// LightPoints::ResetFront (sub_820DC748), ResetSides (sub_820DC7A0) and
+// ResetRear (sub_820DC7F8): +0 = 0; 18 shapes at +16 from 0x820055F0,
+// 0x82005638 and 0x82005680.
+uint32_t LightsResetFront(uint8_t* base, uint32_t group, uint32_t stack);
+uint32_t LightsResetSides(uint8_t* base, uint32_t group, uint32_t stack);
+uint32_t LightsResetRear(uint8_t* base, uint32_t group, uint32_t stack);
+
+// --- The traffic body's (TrafficPoints, the block at the traffic body +
+// 3728) ---
+
+// TrafficPoints::ResetBody (sub_820E54E8): 6 shapes from 0x8260292C.
+uint32_t TrafficResetBody(uint8_t* base, uint32_t group, uint32_t stack);
+// TrafficPoints::ResetHeadlights (sub_820E56D0): 4 nodes and 3 shapes from
+// 0x82602944.
+uint32_t TrafficResetHeadlights(uint8_t* base, uint32_t group, uint32_t stack);
+// TrafficPoints::ResetTailLights (sub_820E57A0): 8 nodes and 4 shapes from
+// 0x82602960.
+uint32_t TrafficResetTailLights(uint8_t* base, uint32_t group, uint32_t stack);
+
 }  // namespace second_set
