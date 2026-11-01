@@ -7,6 +7,7 @@
 #include "graphics/resources.h"
 #include "models/memory_blocks.h"
 #include "native/buffers.h"
+#include "render/resources.h"
 
 #include <cstdlib>
 #include <cstring>
@@ -48,6 +49,14 @@ std::optional<uint32_t> XprRelease(uint8_t* base, uint32_t xpr) {
   }
   const uint32_t header = Load(base, xpr + kXprHeader);
   if (header != 0) {
+    // Its textures' headers are in the header block: for the renderer,
+    // freed now (lists recorded after this don't draw them).
+    for (uint32_t i = 0; i < Load(base, xpr + 20); i++) {
+      const uint32_t record = Load(base, xpr + 16) + 16 * i;
+      if ((Load(base, record) & 0xFFFF0000u) == 0x54580000u) {  // 'TX'
+        render::TextureDestroyed({Load(base, record + 4) + header});
+      }
+    }
     Require(FreeLater(base, header), "Memory::FreeLater");
   }
   const uint32_t data = Load(base, xpr + kXprData);
@@ -95,6 +104,7 @@ uint32_t RelocateTexture(uint8_t* base, uint32_t header, uint32_t base_address,
   if (levels > 1) {
     Store(base, header + 0x30, Moved(Load(base, header + 0x30), mip_address));
   }
+  render::TextureCreated({header});  // its data is in place
   return levels;
 }
 

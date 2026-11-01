@@ -2066,6 +2066,9 @@ VkDescriptorSet Passes::State::BuildTextureSet(uint8_t* base, const TranslatedSh
       uint32_t extra[4] = {uint32_t(texture.view_type), 0, 0, 0};
       CountBinding(true, texture.fetch_constant, fetch, extra);
     }
+    if (texture.fetch_constant < render::kStages) {
+      textures.NoteBound(interface->textures[texture.fetch_constant].address, fetch);
+    }
     VkImageView view = hide_cubes && texture.view_type == VK_IMAGE_VIEW_TYPE_CUBE
                            ? VK_NULL_HANDLE
                            : textures.GetView(base, fetch, texture.view_type,
@@ -2866,6 +2869,7 @@ bool Passes::State::ResolveInto(VkCommandBuffer commands, uint8_t* base, Target&
   }
   fetch[1] = (fetch[1] & 0xFFFu) | GpuPhysicalAddress(fetch[1] & 0xFFFFF000u);
   fetch[5] = (fetch[5] & 0xFFFu) | GpuPhysicalAddress(fetch[5] & 0xFFFFF000u);
+  textures.NoteBound(destination, fetch);
   TextureCache::ResolveDestination dest;
   if (!textures.GetResolveDestination(fetch, source.scale, dest)) {
     return false;

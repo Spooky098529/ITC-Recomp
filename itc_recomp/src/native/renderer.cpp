@@ -1076,8 +1076,9 @@ void Renderer::LogStats() {
                double(t.resolved_mismatched) / frames);
   texture_ns_ = texture_ns_max_ = 0;
   ITC_LOG_INFO("native renderer: textures: {} memcpy writes, {} textures marked written ({:.1f} "
-               "ms marking); through the interface {} made, {} written, {} freed ({} held)",
-               t.writes, t.marked, mark_ns_ / 1e6, t.created, t.written, t.destroyed, t.handles);
+               "ms marking); through the interface {} made, {} written, {} freed ({} held), {} bound never made",
+               t.writes, t.marked, mark_ns_ / 1e6, t.created, t.written, t.destroyed, t.handles,
+               t.never_created);
   mark_ns_ = 0;
   if (t.unrecorded) {
     ITC_LOG_INFO("native renderer: {} textures changed in memory with no write recorded, e.g. "

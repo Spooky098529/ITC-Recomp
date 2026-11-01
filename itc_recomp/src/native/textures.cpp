@@ -1255,6 +1255,20 @@ void TextureCache::Destroyed(uint32_t handle) {
   s.handles.erase(handle);
 }
 
+void TextureCache::NoteBound(uint32_t handle, const uint32_t fetch_words[6]) {
+  State& s = *state_;
+  if (!handle || s.handles.contains(handle)) {
+    return;
+  }
+  s.stats.never_created++;
+  s.handles[handle] = {};
+  xenos::xe_gpu_texture_fetch_t fetch = ToFetch(fetch_words);
+  ITC_LOG_WARN("native renderer: texture {:08X} bound but never made through the interface: "
+               "format {} {}x{}, data {:08X}, mips {:08X}; taken as made",
+               handle, uint32_t(fetch.format), fetch.size_2d.width + 1u,
+               fetch.size_2d.height + 1u, fetch.base_address << 12, fetch.mip_address << 12);
+}
+
 TextureCache::GenerationEvents TextureCache::TakeGenerationEvents() {
   GenerationEvents events = events_;
   events_ = {};

@@ -39,6 +39,10 @@ class TextureCache {
   void Created(uint32_t handle);
   void Written(uint32_t handle);
   void Destroyed(uint32_t handle);
+  // A texture bound or resolved into (fetch: its fetch constant): one never
+  // made through the interface (a creation path missed) is logged once and
+  // taken as made.
+  void NoteBound(uint32_t handle, const uint32_t fetch[6]);
 
   // The fetch constant's texture as a view of the given type, with the
   // fetch constant's swizzle; loaded as needed, and reloaded after the
@@ -146,7 +150,7 @@ class TextureCache {
     uint32_t unrecorded_sample = UINT32_MAX, unrecorded_frames = 0;
     uint32_t textures = 0, samplers = 0;
     // Through the interface (Created, Written, Destroyed), and handles held.
-    uint64_t created = 0, written = 0, destroyed = 0;
+    uint64_t created = 0, written = 0, destroyed = 0, never_created = 0;
     uint32_t handles = 0;
     uint32_t unsupported_sample = UINT32_MAX;  // format << 8 | dimension
     // A texture of another dimension than the shader declares: declared view

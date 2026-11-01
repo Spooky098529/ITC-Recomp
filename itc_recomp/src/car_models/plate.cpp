@@ -11,6 +11,7 @@
 #include "graphics/resources.h"
 #include "guest.h"
 #include "native/buffers.h"
+#include "render/resources.h"
 
 #include <cstdlib>
 
@@ -279,6 +280,8 @@ std::optional<uint32_t> MakePlate(uint8_t* base, uint32_t header_a, uint32_t dat
   for (int k = 0; k < 5; k++) {
     c_runtime::EmptyDestructor();
   }
+  render::TextureWritten({Load(base, header_a)});
+  render::TextureWritten({Load(base, header_b)});
   return f + 336;
 }
 

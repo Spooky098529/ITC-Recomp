@@ -8,6 +8,7 @@
 #include "guest.h"
 #include "memory/heap.h"
 #include "models/xpr.h"
+#include "render/resources.h"
 #include "texture_compression/compress_surface.h"
 
 #include <cstdlib>
@@ -81,6 +82,7 @@ bool TextureFreeable(uint8_t* base, uint32_t header_in) {
 uint32_t TextureFree(uint8_t* base, uint32_t header_in, uint32_t data_in) {
   ITC_NATIVE_RUNNING("sub_820ECFC8 Texture::Free");
   if (const uint32_t header = Load(base, header_in); header != 0) {
+    render::TextureDestroyed({header});
     memory::FreePages(header);  // VirtualFree(header, 0, MEM_RELEASE)
     Store(base, header_in, 0);
   }
@@ -128,6 +130,7 @@ std::optional<uint32_t> VinylCompress(uint8_t* base, uint32_t width, uint32_t he
       double(guest::LoadFloat(base, kVinylAlphaReference))};
   Require(texture_compression::CompressSurface(base, arguments, f, calls.compress).has_value(),
           "XGCompressSurface");
+  render::TextureWritten({texture});
   graphics::UnlockSurface(base, made);
   graphics::UnlockSurface(base, sheet);
   calls.release(made, 0);

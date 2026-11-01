@@ -10,6 +10,7 @@
 #include "memory/c_runtime_heap.h"
 #include "c_runtime/strings.h"
 #include "native/refcount.h"
+#include "render/resources.h"
 
 #include <array>
 #include <bit>
@@ -948,6 +949,7 @@ uint32_t CreateTexture(uint8_t* base, uint32_t width, uint32_t height, uint32_t 
   }
   Store(base, header + 32, (Load(base, header + 32) & 0xFFF) | (data & 0xFFFFF000));
   Store(base, header + 48, (Load(base, header + 48) & 0xFFF) | (mips & 0xFFFFF000));
+  render::TextureCreated({header});
   return header;
 }
 
@@ -1051,6 +1053,7 @@ uint32_t XGSetTextureHeaderEx(uint8_t* base, const XgTextureHeader& a) {
     for (uint32_t i = 0; i < 13; i++) {
       Store(base, a.header + 4 * i, words[i]);
     }
+    render::TextureCreated({a.header});
   }
   return base_size + sizes.mip_size;
 }
@@ -1305,6 +1308,7 @@ uint32_t DestroyResource(uint8_t* base, uint32_t resource) {
       memory::crt::XMemFree(Load(base, resource + 24), kDataFreeAttributes);
       break;
     case 3: {
+      render::TextureDestroyed({resource});
       const uint32_t mips = Load(base, resource + 48) & 0xFFFFF000;
       memory::crt::XMemFree(Load(base, resource + 32) & 0xFFFFF000, kDataFreeAttributes);
       memory::crt::XMemFree(mips, kDataFreeAttributes);

@@ -11,6 +11,7 @@
 #include "car_models/vinyl.h"
 #include "guest.h"
 #include "memory/heap.h"
+#include "render/resources.h"
 
 #include <cstdlib>
 #include <cstring>
@@ -237,6 +238,7 @@ uint32_t OnDecalLoaded(uint8_t* base, uint32_t request, uint32_t car, uint32_t s
   if (const uint32_t slot = MatchingSlot(base, request, car); slot != 0) {
     Store(base, slot + 20, 3);
     DrawDecals(base, car, f);
+    render::TextureWritten({Load(base, car + kSheetHeader)});
     LoadSlotReset(base, slot);
     r3 = slot;
   }
@@ -244,6 +246,7 @@ uint32_t OnDecalLoaded(uint8_t* base, uint32_t request, uint32_t car, uint32_t s
     return r3;
   }
   ClearCorner(base, car);
+  render::TextureWritten({Load(base, car + kSheetHeader)});
   r3 = compress(Load(base, kVinylSheetWidth + 0), Load(base, kVinylSheetWidth + 4),
                 car + kSheetHeader, car + kSheetData);
   Store(base, car + 4088, 3);
