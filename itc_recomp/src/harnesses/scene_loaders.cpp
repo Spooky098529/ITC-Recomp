@@ -20,6 +20,8 @@
 #include "models/texture_provider.h"
 #include "scene_loaders/file_loaded.h"
 #include "scene_loaders/loads.h"
+#include "scene_loaders/model_point.h"
+#include "model_animation/model_animation.h"
 #include "scene_loaders/objects.h"
 #include "models/memory_blocks.h"
 #include "models/model.h"
@@ -29,6 +31,7 @@
 
 #include <fmt/format.h>
 
+#include <algorithm>
 #include <bit>
 #include <functional>
 #include <mutex>
@@ -2141,6 +2144,145 @@ void Binds(Context& h, Random& r, uint32_t block) {
     results.Report();
   }
 }
+
+// --- The skeletons' searches ---
+
+// A small float (eighths from -4 to 4).
+uint32_t SmallFloat(Random& r) {
+  return std::bit_cast<uint32_t>(float(int32_t(r.Below(65)) - 32) / 8.0f);
+}
+
+// A node file (4 KB at `file`, as car_models' harness builds them) of
+// `names.size()` nodes named `names`, with random parents, types (none
+// UpdateMatrices hands back), sources and matrices (small floats).
+void MakeNodeFile(uint8_t* base, uint32_t file, const std::vector<std::string>& names,
+                  Random& r) {
+  const uint32_t nodes = uint32_t(names.size());
+  const uint32_t bones = r.Below(nodes + 1);
+  const uint32_t first_bone = r.Below(nodes - bones + 1);
+  RandomBytes(base, file, 4096, r);
+  Put(base, file + 4, nodes);
+  Put(base, file + 8, bones);
+  Put(base, file + 12, first_bone);
+  const uint32_t kRecords = 256, kSources = 1536, kMatrices = 1920, kTail = 2432;
+  Put(base, file + 16, kRecords);
+  Put(base, file + 20, kSources);
+  Put(base, file + 24, kSources + 128);
+  Put(base, file + 28, kSources + 256);
+  Put(base, file + 32, kTail + 64);
+  Put(base, file + 36, kMatrices);
+  Put(base, file + 40, kTail + 128);
+  Put(base, file + 44, kTail);
+  Put(base, file + 48, kTail + 192);
+  for (uint32_t n = 0; n < nodes; n++) {
+    const uint32_t record = file + kRecords + 160 * n;
+    PutString(base, record, names[n]);
+    Put(base, record + 92, n == 0 || r.Below(4) == 0 ? 0xFFFFFFFFu : r.Below(n));
+    static const uint32_t kTypes[] = {0, 1, 2, 3, 4, 5, 0x80, 0x81, 32};
+    Put(base, record + 132, kTypes[r.Below(std::size(kTypes))]);
+  }
+  for (uint32_t at = kSources; at < kTail; at += 4) Put(base, file + at, SmallFloat(r));
+}
+
+// A skeleton's arrays (offset, bytes, header bytes before the address) as
+// Skeleton::Bind makes them for `nodes` nodes and `bones` bones.
+struct SkeletonArray {
+  uint32_t offset, bytes, header;
+};
+std::vector<SkeletonArray> SkeletonArrays(uint8_t* base, uint32_t file) {
+  const uint32_t nodes = guest::LoadU32(base, file + 4);
+  const uint32_t bones = guest::LoadU32(base, file + 8);
+  return {{128, 20, 0},
+          {136, 16 + 144 * nodes, 16},
+          {132, 16 + 64 * nodes, 16},
+          {144, 16 + 64 * bones, 16},
+          {176, 16 * nodes, 0}};
+}
+
+// A skeleton at `skeleton` bound to `file` (its array words cleared first).
+bool BindSkeleton(uint8_t* base, uint32_t skeleton, uint32_t file) {
+  for (const SkeletonArray& a : SkeletonArrays(base, file)) Put(base, skeleton + a.offset, 0);
+  return model_animation::SkeletonBind(base, skeleton, file, 0);
+}
+
+// The skeleton's arrays' contents into `out` (past their headers), each
+// then freed, and their words in the skeleton cleared.
+void TakeSkeleton(uint8_t* base, uint32_t skeleton, uint32_t file, Outputs& out) {
+  for (const SkeletonArray& a : SkeletonArrays(base, file)) {
+    const uint32_t at = guest::LoadU32(base, skeleton + a.offset);
+    out.Word(at != 0);
+    if (at == 0) continue;
+    if (a.offset != 128) {
+      out.Bytes(Read(base, at, a.bytes - a.header));
+    }
+    memory::crt::OperatorDeleteArray(at - a.header);
+    Put(base, skeleton + a.offset, 0);
+  }
+}
+
+// ModelPoint::Find (sub_820D02D0): a point record (240 bytes at the block)
+// and a part model (at +0x400, its skeleton at +112 bound to a node file of
+// 1 to 8 nodes at +0x1000), the record's name one of the nodes', a variant
+// of one (case, `*`) or another; the model's +408 0 now and then. Each side
+// from the same random bytes (the skeleton bound again), the recompiled side
+// with the flags off. The record (its matrices and translation as floats),
+// the model (the skeleton's array words left out), the skeleton's arrays,
+// the frame's +80 to +224 and r3 compared.
+void ModelPoints(Context& h, Random& r, uint32_t block) {
+  if (!hooks::ModelsNativeLifetime()) {
+    ITC_LOG_WARN("harness: scene_loaders: ModelPoint::Find skipped (models' lifetime not native)");
+    return;
+  }
+  static const char* kNames[] = {"tire_fl", "seat_L", "acce_null", "Body", "lamp_*", "x"};
+  Results results("ModelPoint::Find (sub_820D02D0)");
+  const uint32_t point = block, model = block + 0x400, skeleton = model + 112;
+  const uint32_t file = block + 0x1000;
+  for (int c = 0; c < 48; c++) {
+    std::vector<std::string> names(1 + r.Below(8));
+    for (auto& n : names) n = kNames[r.Below(std::size(kNames))];
+    std::string wanted = names[r.Below(uint32_t(names.size()))];
+    switch (r.Below(4)) {
+      case 0: wanted = Variant(r, wanted); break;
+      case 1: wanted = RandomName(r, r.Below(9)); break;
+      default: break;
+    }
+    const bool loaded = r.Below(6) != 0;
+    const uint64_t seed = r.Next();
+    Outputs out[2];
+    for (int v = 0; v < 2; v++) {
+      Random g(seed);
+      RandomBytes(h.base, block, 0x2000, g);
+      for (uint32_t at = 16; at < 160; at += 4) Put(h.base, point + at, SmallFloat(g));
+      PutString(h.base, point + 160, wanted);
+      MakeNodeFile(h.base, file, names, g);
+      if (!BindSkeleton(h.base, skeleton, file)) {
+        ITC_LOG_WARN("harness: scene_loaders: ModelPoint::Find case {}: Bind declined", c);
+      }
+      Put(h.base, model + 408, loaded ? 1 + g.Below(4) : 0);
+      PPCContext t = CallContext(h);
+      t.r1.u64 &= ~0xFull;
+      const uint32_t frame = t.r1.u32 - sl::kModelPointFrameBytes;
+      RandomBytes(h.base, frame - 512, sl::kModelPointFrameBytes + 512, g);
+      t.r3.u64 = point;
+      t.r4.u64 = model;
+      RunSide(v, __imp__sub_820D02D0, hooks::SceneLoadersModelPointFind, t, h.base);
+      out[v].Bytes(Read(h.base, point, 16));
+      out[v].Floats(h.base, point + 16, 36);
+      out[v].Bytes(Read(h.base, point + 160, 80));
+      out[v].Floats(h.base, frame + 80, 36);
+      out[v].Word(t.r3.u32);
+      out[v].Word(uint32_t(t.r3.u64 >> 32));
+      std::vector<uint8_t> m = Read(h.base, model, 464);
+      for (const SkeletonArray& a : SkeletonArrays(h.base, file)) {
+        std::fill_n(m.begin() + 112 + a.offset, 4, 0);
+      }
+      out[v].Bytes(m);
+      TakeSkeleton(h.base, skeleton, file, out[v]);
+    }
+    results.Check(out[0], out[1], fmt::format("case {} ({} nodes, '{}')", c, names.size(), wanted));
+  }
+  results.Report();
+}
 }  // namespace
 
 void SceneLoaders(Context& h) {
@@ -2161,6 +2303,7 @@ void SceneLoaders(Context& h) {
   CreateCases(h, r, block);
   PartLoadedCases(h, r, block);
   Binds(h, r, block);
+  ModelPoints(h, r, block);
   memory::Free(allocation);
 }
 

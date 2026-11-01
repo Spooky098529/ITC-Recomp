@@ -178,6 +178,12 @@ void SceneLoadersTrafficDeletingDestruct(PPCContext& ctx, uint8_t* base);
 void SceneLoadersCockpitBindTextures(PPCContext& ctx, uint8_t* base);
 void SceneLoadersTrafficBindTextures(PPCContext& ctx, uint8_t* base);
 
+// ModelPoint::Find sub_820D02D0 (r3 = the point record, r4 = the part
+// model; r3 = 1 or 0), only with --native_models and native memcpy:
+// Skeleton::UpdateMatrices' original from its frame where its plain C++
+// declines.
+void SceneLoadersModelPointFind(PPCContext& ctx, uint8_t* base);
+
 // ScenePools::CreateA sub_820C3FD8 (r3 = the set, r4 = the record; r3 as
 // the original leaves it), only while hooks::ModelsNativeLifetime(): the
 // constructors' originals called from its frame where their plain C++
