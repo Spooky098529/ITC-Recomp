@@ -92,6 +92,15 @@ When the user has reviewed a run's section, its heading gets
   and teardown objects (`sub_820C5008`), the TGA getter `sub_820C4E68`
   (now a row, not seen in play but ran in `itc_2848`). `known-data.md`:
   the scene's layout, `0x82601854`-`0x8260185C`.
+- The car scene's migration (9a461ba8..613dd3db, `--native_scene`,
+  `src/scene/`): 19 rows. For review: allocations through
+  `memory::AllocPages` and `FreePages`; the pool objects' destructors
+  guest calls through `ctx`; frame words left as the original leaves
+  them (`InitLighting`, `OnFileLoaded`'s r1 + 28); `OnFileLoaded`'s
+  texture branches (`Model::Load` on a real part file) have no harness
+  cases, only the game run and the frame dump; the teardown
+  (`StartTeardown`, `~CarScene`, `SceneAssets::Release`, `UpdateA`'s
+  teardown) checked by harness only until a race end is seen.
 
 ## Run 2026-10-31 16:54 (`b7-loop-31-10-26`, continued)
 

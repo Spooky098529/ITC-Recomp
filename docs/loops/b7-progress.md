@@ -96,7 +96,12 @@ file's history. What's left to see in a drive, from every run:
   loading, update and teardown; three leads folded in and deleted, 3
   added; 11 ready groups; blocked by the scene models' updates
   `sub_820C5A60` and the parts' finishers (Wrapped in `functions.md`);
-  no subagents). Step: migration agent running.
+  no subagents). Migration checked (9a461ba8..613dd3db: the 11 groups,
+  19 of 22 ours, 9 adapters removed, `--native_scene`; harness scene 19
+  groups 0 differing; frame dumps alike; race 38 s, 0 errors; the
+  teardown path not seen in an attract race; no subagents). Left
+  blocked: `CarScene::Update`, `ScenePools::DestroyB`,
+  `CarScene::LoadsDone`. Step: validation agent running.
 
 ## Done
 
@@ -186,5 +191,9 @@ file's history. What's left to see in a drive, from every run:
 
 - After the car scene's map: ours 3758, work left 2641 (wrapped 97,
   known 508, unknown 2036).
+
+- After the car scene's migration (`itc_3139`: race 38 s, 0 errors,
+  scene 0 differing): ours 3777, work left 2622 (wrapped 97, known 489,
+  unknown 2036).
 
 ## Stopped
