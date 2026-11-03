@@ -2,11 +2,13 @@
 // against the recompiled functions, under the car_draw harness (its Case and
 // model draws' world, car_draw_shared.h). The parts' group at the block's
 // +0xC000 (records of 240 bytes: +4 the model, the block's +0x100, or 0, +228
-// the shape; the door's matrix +6016, the parts record's pointer +6084 and
-// +5520, the bumpers' plate words), the scene model's block at +0xF380 (its
+// the shape; the hinges' matrices, record 0's and 1's +16 and +80; the
+// door's matrix +6016, the car record's pointer +6080, the parts record's
+// pointer +6084 and +5520, the headlights' pop-up matrix +3120 and angle
+// +3184, the bumpers' plate words), the scene model's block at +0xF380 (its
 // flag bits, its world at +16 the model draws' world, its alphas and the
-// bonnet's angle), the parts record at +0xF700, the bumpers' car record's
-// +3684 at +0xF800; the scene at the race block's +0x10000 (its +4, the
+// bonnet's, doors' and pop-up's angles), the parts record at +0xF700, the
+// car record's +3684 and +3688 at +0xF800; the scene at the race block's +0x10000 (its +4, the
 // pass description at +5072, the XPR at +4648 with its records at
 // +0x11800), the race mode at the race block's +0xA3AF4, the command list's
 // slots at the race block's +0x20000 (room for every draw: the originals
@@ -144,15 +146,33 @@ void PartsWorld(Context& h, Random& r, uint32_t block, uint32_t race, uint32_t s
   guest::StoreU32(base, source + 640,
                   r.Below(6) == 0 ? RandomFloat(r)
                                   : std::bit_cast<uint32_t>(Spread(r, 4.0f) + 1.5f));
-  // The bonnet's hinge (record 0's +16 and +80 matrices): near a turn, or
-  // anything finite.
-  if (r.Below(3) == 0) {
-    FiniteFloats(base, group + 16, 32, r);
-  } else {
-    const float y = Spread(r, 1.0f), z = Spread(r, 1.0f);
-    StoreFloats(base, group + 16, {1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1, 0, 0, y, z, 1});
-    StoreFloats(base, group + 80, {1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1, 0, 0, -y, -z, 1});
+  // The bonnet's, doors' and headlights' hinges (record 0's +16 and +80
+  // matrices; the scissor doors' record 1's, +256 and +320): near a turn,
+  // or anything finite.
+  for (uint32_t hinge : {16u, 256u}) {
+    if (r.Below(3) == 0) {
+      FiniteFloats(base, group + hinge, 32, r);
+    } else {
+      const float y = Spread(r, 1.0f), z = Spread(r, 1.0f);
+      StoreFloats(base, group + hinge, {1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1, 0, 0, y, z, 1});
+      StoreFloats(base, group + hinge + 64, {1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1, 0, 0, -y, -z, 1});
+    }
   }
+  // The doors' car record (its +3688: a scissor door when set; beside the
+  // bumpers' +3684) and angles; the headlights' pop-up angle (+688 set: the
+  // block's +692) and the node's own angle (+3184, over record 13).
+  guest::StoreU32(base, group + 6080, block + kCarRecord - 3684);
+  guest::StoreU32(base, block + kCarRecord + 4,
+                  r.Below(3) == 0 ? (r.Below(4) == 0 ? uint32_t(r.Next()) | 1u : 1u) : 0);
+  for (uint32_t at : {660u, 664u, 676u, 680u, 692u}) {
+    guest::StoreU32(base, source + at,
+                    r.Below(6) == 0 ? RandomFloat(r)
+                                    : std::bit_cast<uint32_t>(Spread(r, 4.0f) + 1.5f));
+  }
+  guest::StoreU32(base, source + 688, r.Below(2) ? 0 : r.Below(4) == 0 ? uint32_t(r.Next()) : 1);
+  guest::StoreU32(base, group + 3184,
+                  r.Below(6) == 0 ? RandomFloat(r)
+                                  : std::bit_cast<uint32_t>(Spread(r, 1.0f) + 1.0f));
 }
 
 struct Target {
@@ -162,6 +182,7 @@ struct Target {
   uint32_t temporary;  // its frame's temporaries (from +80, as floats), bytes
   bool record;         // r3 a record (the mirrors), not a group
   int cases;
+  uint32_t kept = 0;   // the matrix it keeps in the group (+6016, +3120), or 0
 };
 
 }  // namespace
@@ -202,6 +223,13 @@ void PartsDraws(Context& h, Random& r, uint32_t block, uint32_t race) {
        hooks::CarDrawPartsRearBumper, car_draw::kPartsSmallFrame, 0, false, 384},
       {"PartsPoints::DrawBonnet (sub_820E0998)", __imp__sub_820E0998, hooks::CarDrawPartsBonnet,
        car_draw::kPartsBonnetFrame, 400, false, 384},
+      {"PartsPoints::DrawLeftDoor (sub_820E0B40)", __imp__sub_820E0B40,
+       hooks::CarDrawPartsLeftDoor, car_draw::kPartsDoorFrame, 592, false, 512, 6016},
+      {"PartsPoints::DrawRightDoor (sub_820E0E38)", __imp__sub_820E0E38,
+       hooks::CarDrawPartsRightDoor, car_draw::kPartsDoorFrame, 592, false, 512, 6016},
+      {"PartsPoints::DrawHeadlightBody (sub_820E13E0)", __imp__sub_820E13E0,
+       hooks::CarDrawPartsHeadlightBody, car_draw::kPartsHeadlightBodyFrame, 656, false, 512,
+       3120},
       {"PartsPoints::DrawMirror (sub_820E1138)", __imp__sub_820E1138, hooks::CarDrawPartsMirror,
        car_draw::kPartsShadowFrame, 128, true, 384},
       {"PartsPoints::DrawWithShadow (sub_820E1260)", __imp__sub_820E1260,
@@ -214,6 +242,11 @@ void PartsDraws(Context& h, Random& r, uint32_t block, uint32_t race) {
                                                                    : Plate::kNone;
     int queued = 0;
     std::vector<uint8_t> scene_bytes;
+    // The kept matrix as floats (from the rotations' sines and cosines).
+    FloatRanges floats = AlphaFloats();
+    if (target.kept != 0) {
+      floats.push_back({kGroup + target.kept, 16});
+    }
     for (int c = 0; c < target.cases; c++) {
       Case(
           h, results, block, r,
@@ -234,7 +267,7 @@ void PartsDraws(Context& h, Random& r, uint32_t block, uint32_t race) {
             t.r24.u64 = r.Next();
             t.r28.u64 = r.Next();
           },
-          target.recompiled, target.native, AlphaFloats(), fmt::format("case {}", c),
+          target.recompiled, target.native, floats, fmt::format("case {}", c),
           [&](const PPCContext& t, Outputs& o) {
             const uint32_t frame = t.r1.u32 - target.frame;
             o.Word(guest::LoadU32(h.base, frame));

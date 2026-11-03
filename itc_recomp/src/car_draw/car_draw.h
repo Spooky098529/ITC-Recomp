@@ -412,6 +412,34 @@ Left PartsDrawRearBumper(uint8_t* base, const Calls& calls, uint32_t stack, uint
 // the original); in a race the block's world. Then record 1 with it.
 Left PartsDrawBonnet(uint8_t* base, const Calls& calls, uint32_t stack, uint32_t group,
                      uint32_t block, uint32_t pass, uint32_t caller_r24);
+// The doors' and the headlight body's frames.
+constexpr uint32_t kPartsDoorFrame = 720;
+constexpr uint32_t kPartsHeadlightBodyFrame = 784;
+
+// PartsPoints::DrawLeftDoor (sub_820E0B40, 720) and DrawRightDoor
+// (sub_820E0E38, the same code; the block's +676 and +680 for +660 and
+// +664, the turn by -theta): nothing unless record 0 has a model (r3 the
+// group); theta (+660) and phi (+664) clamped to [0.0, pi]; the door's
+// matrix kept at the group's +6016 for the later door draws: with the car
+// record's ([group + 6080]) +3688 0, record 0's inverse (+80, memcpy'd to
+// +544) x the identity turned by theta about y (+480, Matrix::RotateY) x
+// its matrix (+16, to +608), else the identity turned by -phi about x and
+// theta about y (+288) about record 1's matrices (+256 to +544, +320 to
+// +608); then x the block's world (into +224, copied back). Records 11, 12
+// (or 13 with +3688 set) and 14 + k (k the parts record's +12, below 11)
+// drawn with it, r28 = the pass. The multiplies and copies noted for
+// interpolation with the original's return addresses.
+Left PartsDrawDoor(uint8_t* base, const Calls& calls, bool right, uint32_t stack,
+                   uint32_t group, uint32_t block, uint32_t pass, uint32_t caller_r24);
+// PartsPoints::DrawHeadlightBody (sub_820E13E0, 784): nothing unless record
+// 0 has a model (r3 the group); the pop-up's matrix kept at the group's
+// +3120 for DrawHeadlights: the angle, with the block's +688 set its +692
+// clamped to [0.0, the group's +3184], else +3184 or 0.0 with the block's
+// bits 0x1 or 0x40; record 0's inverse x the identity turned by -angle
+// about x x its matrix x the block's world (the identity at +480 or +608
+// by the path). Record 12 drawn with it, r28 = the pass.
+Left PartsDrawHeadlightBody(uint8_t* base, const Calls& calls, uint32_t stack, uint32_t group,
+                            uint32_t block, uint32_t pass, uint32_t caller_r24);
 // PartsPoints::DrawMirror (sub_820E1138, 256; `world` its r6) and
 // DrawWithShadow (sub_820E1260; `world` the block's +16): the record
 // drawn, then when the pass description's (the scene's +5072) camera pass

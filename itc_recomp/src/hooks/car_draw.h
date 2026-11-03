@@ -86,6 +86,9 @@ void CarDrawPartsEngine(PPCContext& ctx, uint8_t* base);             // sub_820D
 void CarDrawPartsFrontBumper(PPCContext& ctx, uint8_t* base);        // sub_820DF308
 void CarDrawPartsRearBumper(PPCContext& ctx, uint8_t* base);         // sub_820DF458
 void CarDrawPartsBonnet(PPCContext& ctx, uint8_t* base);             // sub_820E0998
+void CarDrawPartsLeftDoor(PPCContext& ctx, uint8_t* base);           // sub_820E0B40
+void CarDrawPartsRightDoor(PPCContext& ctx, uint8_t* base);          // sub_820E0E38
+void CarDrawPartsHeadlightBody(PPCContext& ctx, uint8_t* base);      // sub_820E13E0
 void CarDrawPartsMirror(PPCContext& ctx, uint8_t* base);             // sub_820E1138
 void CarDrawPartsWithShadow(PPCContext& ctx, uint8_t* base);         // sub_820E1260
 // The head and tail lights (src/car_draw/lamps.cpp): r3 = the group, r4 =

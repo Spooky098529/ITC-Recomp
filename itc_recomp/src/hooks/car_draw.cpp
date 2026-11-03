@@ -46,7 +46,9 @@ ITC_FLAG_BOOL(native_car_draw, true, "ITC",
               "sub_820DEA88, DrawDoorsWindows sub_820DEAF0, DrawFendersBody sub_820DED88, "
               "DrawFenderLights sub_820DEDD8, DrawCabinWindow02 sub_820DEF38, DrawCabinWindow01 "
               "sub_820DEFA8, DrawEngine sub_820DF070, DrawFrontBumper sub_820DF308, "
-              "DrawRearBumper sub_820DF458, DrawBonnet sub_820E0998, DrawMirror sub_820E1138 "
+              "DrawRearBumper sub_820DF458, DrawBonnet sub_820E0998, DrawLeftDoor sub_820E0B40 and "
+              "DrawRightDoor sub_820E0E38 (the doors' matrices), DrawHeadlightBody sub_820E13E0 "
+              "(the pop-up's matrix), DrawMirror sub_820E1138 "
               "and DrawWithShadow sub_820E1260; PartModel::SetPair1002Alpha, XPR::GetTexture "
               "and the matrix functions as plain C++), the head and tail lights with their "
               "camera-facing glows (PartsPoints::DrawTailLights sub_820DF8B0 and "
@@ -370,6 +372,10 @@ ITC_CAR_DRAW_PARTS(Engine, 820DF070, PartsDrawEngine(base, calls, r1, r3, r4, r5
 ITC_CAR_DRAW_PARTS(FrontBumper, 820DF308, PartsDrawFrontBumper(base, calls, r1, r3, r4, r5, r24))
 ITC_CAR_DRAW_PARTS(RearBumper, 820DF458, PartsDrawRearBumper(base, calls, r1, r3, r4, r5, r24))
 ITC_CAR_DRAW_PARTS(Bonnet, 820E0998, PartsDrawBonnet(base, calls, r1, r3, r4, r5, r24))
+ITC_CAR_DRAW_PARTS(LeftDoor, 820E0B40, PartsDrawDoor(base, calls, false, r1, r3, r4, r5, r24))
+ITC_CAR_DRAW_PARTS(RightDoor, 820E0E38, PartsDrawDoor(base, calls, true, r1, r3, r4, r5, r24))
+ITC_CAR_DRAW_PARTS(HeadlightBody, 820E13E0,
+                   PartsDrawHeadlightBody(base, calls, r1, r3, r4, r5, r24))
 ITC_CAR_DRAW_PARTS(Mirror, 820E1138, PartsDrawShadowed(base, calls, true, r1, r3, r5, r6, r24))
 ITC_CAR_DRAW_PARTS(WithShadow, 820E1260,
                    PartsDrawShadowed(base, calls, false, r1, r3, r5, r4 + 16, r24))
@@ -432,6 +438,9 @@ ITC_CAR_DRAW(820DF070, CarDrawPartsEngine)
 ITC_CAR_DRAW(820DF308, CarDrawPartsFrontBumper)
 ITC_CAR_DRAW(820DF458, CarDrawPartsRearBumper)
 ITC_CAR_DRAW(820E0998, CarDrawPartsBonnet)
+ITC_CAR_DRAW(820E0B40, CarDrawPartsLeftDoor)
+ITC_CAR_DRAW(820E0E38, CarDrawPartsRightDoor)
+ITC_CAR_DRAW(820E13E0, CarDrawPartsHeadlightBody)
 ITC_CAR_DRAW(820E1138, CarDrawPartsMirror)
 ITC_CAR_DRAW(820E1260, CarDrawPartsWithShadow)
 // The head and tail lights (their callers, the parts' top, are recompiled).

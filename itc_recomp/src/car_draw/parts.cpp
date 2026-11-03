@@ -447,6 +447,218 @@ Left PartsDrawBonnet(uint8_t* base, const Calls& calls, uint32_t stack, uint32_t
               0x820E0B30);
 }
 
+// --- The doors and the headlights' pop-up: matrices kept for later draws ---
+
+namespace {
+
+// The identity's four rows (vupkd3d of zeros and its shuffles) stored at
+// +96 as stvx stores them, then the 64 bytes from +96 copied doubleword by
+// doubleword to `to`.
+void IdentityTo(uint8_t* base, uint32_t frame, uint32_t to) {
+  const uint32_t identity = (frame + 96) & ~0xFu;
+  for (uint32_t i = 0; i < 16; i++) {
+    Store(base, identity + 4 * i, i % 5 == 0 ? 0x3F800000u : 0);
+  }
+  for (uint32_t i = 0; i < 64; i += 8) {
+    const uint32_t hi = Load(base, frame + 96 + i);
+    const uint32_t lo = Load(base, frame + 96 + i + 4);
+    Store(base, to + i, hi);
+    Store(base, to + i + 4, lo);
+  }
+}
+
+// The 1.0 w's (f31) of the matrix at `m`, stored before it's written.
+void Ws(uint8_t* base, uint32_t m, double one) {
+  for (uint32_t at = 12; at < 64; at += 16) {
+    Stfs(base, m + at, one);
+  }
+}
+
+// Matrix::Multiply and Matrix::Copy, noted as their wrappers note the
+// originals' calls returning to `lr`.
+void NotedMultiply(uint8_t* base, uint32_t out, uint32_t a, uint32_t b, uint32_t lr) {
+  matrix_math::Multiply(base, out, a, b);
+  interpolation::BlendState_OnMultiply(base, out, a, b, lr);
+}
+void NotedCopy(uint8_t* base, uint32_t to, uint32_t from, uint32_t lr) {
+  matrix_math::Copy(base, to, from);
+  interpolation::BlendState_OnCopy(base, to, from, lr);
+}
+
+// The doors' call sites (the right door's code is the left's with an fneg
+// more in each path, so its addresses run 0x2F8 or 0x2FC on).
+struct DoorSites {
+  uint32_t node_memcpy[2], node_multiply[2];  // the normal door's
+  uint32_t scissor_memcpy[2], scissor_multiply[2];
+  uint32_t copy, multiply, copy_back, draws[3];
+};
+constexpr DoorSites kLeftDoor{{0x820E0C40, 0x820E0C50}, {0x820E0C7C, 0x820E0C9C},
+                              {0x820E0D18, 0x820E0D28}, {0x820E0D54, 0x820E0D74},
+                              0x820E0D84,               0x820E0DA4,
+                              0x820E0DB0,               {0x820E0DCC, 0x820E0DF8, 0x820E0E28}};
+constexpr DoorSites kRightDoor{{0x820E0F3C, 0x820E0F4C}, {0x820E0F78, 0x820E0F98},
+                               {0x820E1018, 0x820E1028}, {0x820E1054, 0x820E1074},
+                               0x820E1084,               0x820E10A4,
+                               0x820E10B0,               {0x820E10CC, 0x820E10F8, 0x820E1128}};
+
+}  // namespace
+
+Left PartsDrawDoor(uint8_t* base, const Calls& calls, bool right, uint32_t stack,
+                   uint32_t group, uint32_t block, uint32_t pass, uint32_t caller_r24) {
+  if (right) {
+    ITC_NATIVE_RUNNING("sub_820E0E38 PartsPoints::DrawRightDoor");
+  } else {
+    ITC_NATIVE_RUNNING("sub_820E0B40 PartsPoints::DrawLeftDoor");
+  }
+  const DoorSites& sites = right ? kRightDoor : kLeftDoor;
+  const uint32_t frame = Frame(base, stack, kPartsDoorFrame);
+  Left left;
+  left.r3 = group;
+  // The angles: the turn (theta) and the scissor door's lift (phi), each
+  // into [0.0, pi] (a NaN stays).
+  double theta = Lfs(base, block + (right ? 676 : 660));
+  double phi = Lfs(base, block + (right ? 680 : 664));
+  if (Load(base, group + 4) == 0) {
+    return left;
+  }
+  const double low = Lfs(base, kZero);
+  if (theta < low) {
+    theta = low;
+  }
+  const double high = Lfs(base, kPi);
+  if (theta > high) {
+    theta = high;
+  }
+  if (phi < low) {
+    phi = low;
+  }
+  if (phi > high) {
+    phi = high;
+  }
+  // The right door turns the other way.
+  const double turn = right ? -theta : theta;
+  const bool scissor = int32_t(Load(base, Load(base, group + 6080) + 3688)) != 0;
+  uint32_t product;
+  if (!scissor) {
+    // dl**_rot_00's inverse x the turn about y x its matrix.
+    IdentityTo(base, frame, frame + 480);
+    Stfs(base, frame + 80, turn);
+    matrix_math::RotateY(base, frame + 480, frame + 480, frame + 80, frame - 80);
+    Memcpy(base, calls, frame + 608, group + 16, 64, frame, sites.node_memcpy[0]);
+    Memcpy(base, calls, frame + 544, group + 80, 64, frame, sites.node_memcpy[1]);
+    const double one = Lfs(base, kOne);
+    Ws(base, frame + 96, one);
+    NotedMultiply(base, frame + 96, frame + 544, frame + 480, sites.node_multiply[0]);
+    Ws(base, frame + 416, one);
+    NotedMultiply(base, frame + 416, frame + 96, frame + 608, sites.node_multiply[1]);
+    product = frame + 416;
+  } else {
+    // Probably a scissor door: lifted about x by -phi, then turned, about
+    // dl**_rot_01 (record 1's matrices).
+    IdentityTo(base, frame, frame + 288);
+    Stfs(base, frame + 80, -phi);
+    matrix_math::RotateX(base, frame + 288, frame + 288, frame + 80, frame - 80);
+    Stfs(base, frame + 80, turn);
+    matrix_math::RotateY(base, frame + 288, frame + 288, frame + 80, frame - 80);
+    Memcpy(base, calls, frame + 544, group + 256, 64, frame, sites.scissor_memcpy[0]);
+    Memcpy(base, calls, frame + 608, group + 320, 64, frame, sites.scissor_memcpy[1]);
+    const double one = Lfs(base, kOne);
+    Ws(base, frame + 160, one);
+    NotedMultiply(base, frame + 160, frame + 608, frame + 288, sites.scissor_multiply[0]);
+    Ws(base, frame + 352, one);
+    NotedMultiply(base, frame + 352, frame + 160, frame + 544, sites.scissor_multiply[1]);
+    product = frame + 352;
+  }
+  // The door's matrix (+6016, read by the later door draws and the mirror):
+  // that times the block's world.
+  const uint32_t door = group + 6016;
+  NotedCopy(base, door, product, sites.copy);
+  Ws(base, frame + 224, Lfs(base, kOne));
+  NotedMultiply(base, frame + 224, door, block + 16, sites.multiply);
+  NotedCopy(base, door, frame + 224, sites.copy_back);
+  // The handle, the normal or scissor door, and the panel's design k (below
+  // 11, signed). r28 is the pass here.
+  const uint32_t vp = pass + 144;
+  Part(base, calls, frame, group + Record(11), vp, door, 0, caller_r24, pass, sites.draws[0]);
+  const bool lambo = int32_t(Load(base, Load(base, group + 6080) + 3688)) != 0;
+  left = Part(base, calls, frame, group + (lambo ? Record(13) : Record(12)), vp, door, 0,
+              caller_r24, pass, sites.draws[1]);
+  const uint32_t k = Load(base, Load(base, group + 6084) + 12);
+  if (int32_t(k) >= 11) {
+    return left;
+  }
+  return Part(base, calls, frame, group + (k + 14) * 240, vp, door, 0, caller_r24, pass,
+              sites.draws[2]);
+}
+
+Left PartsDrawHeadlightBody(uint8_t* base, const Calls& calls, uint32_t stack, uint32_t group,
+                            uint32_t block, uint32_t pass, uint32_t caller_r24) {
+  ITC_NATIVE_RUNNING("sub_820E13E0 PartsPoints::DrawHeadlightBody");
+  const uint32_t frame = Frame(base, stack, kPartsHeadlightBodyFrame);
+  Left left;
+  left.r3 = group;
+  if (Load(base, group + 4) == 0) {
+    return left;
+  }
+  // The pop-up's matrix (+3120, read by DrawHeadlights later in the pass):
+  // hl_**'s inverse x the turn about x by -angle x its matrix x the block's
+  // world.
+  const uint32_t popup = group + 3120;
+  uint32_t product;
+  if (int32_t(Load(base, block + 688)) != 0) {
+    // The angle the block's +692 into [0.0, the node's own angle +3184].
+    IdentityTo(base, frame, frame + 480);
+    double angle = Lfs(base, block + 692);
+    const double low = Lfs(base, kZero);
+    if (angle < low) {
+      angle = low;
+    }
+    const double top = Lfs(base, group + 3184);
+    if (top < angle) {
+      angle = top;
+    }
+    Stfs(base, frame + 80, -angle);
+    matrix_math::RotateX(base, frame + 480, frame + 480, frame + 80, frame - 80);
+    Memcpy(base, calls, frame + 672, group + 16, 64, frame, 0x820E14C0);
+    Memcpy(base, calls, frame + 544, group + 80, 64, frame, 0x820E14D0);
+    const double one = Lfs(base, kOne);
+    Ws(base, frame + 96, one);
+    NotedMultiply(base, frame + 96, frame + 544, frame + 480, 0x820E14F8);
+    Ws(base, frame + 288, one);
+    NotedMultiply(base, frame + 288, frame + 96, frame + 672, 0x820E1518);
+    NotedCopy(base, popup, frame + 288, 0x820E1528);
+    Ws(base, frame + 416, one);
+    NotedMultiply(base, frame + 416, popup, block + 16, 0x820E1548);
+    product = frame + 416;
+  } else {
+    // Up (+3184) while the lights are off, down (0.0) with the low or high
+    // beams (bits 0x1, 0x40).
+    IdentityTo(base, frame, frame + 608);
+    double angle = Lfs(base, group + 3184);
+    const uint32_t bits = Bits(base, block);
+    if ((bits & 0x1) != 0 || (bits & 0x40) != 0) {
+      angle = Lfs(base, kZero);
+    }
+    Stfs(base, frame + 80, -angle);
+    matrix_math::RotateX(base, frame + 608, frame + 608, frame + 80, frame - 80);
+    Memcpy(base, calls, frame + 544, group + 16, 64, frame, 0x820E15D8);
+    Memcpy(base, calls, frame + 672, group + 80, 64, frame, 0x820E15E8);
+    const double one = Lfs(base, kOne);
+    Ws(base, frame + 352, one);
+    NotedMultiply(base, frame + 352, frame + 672, frame + 608, 0x820E1610);
+    Ws(base, frame + 160, one);
+    NotedMultiply(base, frame + 160, frame + 352, frame + 544, 0x820E1630);
+    NotedCopy(base, popup, frame + 160, 0x820E1640);
+    Ws(base, frame + 224, one);
+    NotedMultiply(base, frame + 224, popup, block + 16, 0x820E1660);
+    product = frame + 224;
+  }
+  NotedCopy(base, popup, product, 0x820E166C);
+  // hlmg**_shape with it; r28 is the pass here.
+  return Part(base, calls, frame, group + Record(12), pass + 144, popup, 0, caller_r24, pass,
+              0x820E1684);
+}
+
 // --- The mirrors and the spoiler: drawn, then into the shadow's depth ---
 
 Left PartsDrawShadowed(uint8_t* base, const Calls& calls, bool mirror, uint32_t stack,
