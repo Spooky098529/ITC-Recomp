@@ -1301,6 +1301,7 @@ void CarDraw(Context& h) {
   car_draw_shared::PartsDraws(h, r, block, race);
   car_draw_shared::LampsDraws(h, r, block, race);
   car_draw_shared::ShadowsDraws(h, r, block, race);
+  car_draw_shared::TopDraws(h, r, block, race);
   memory::Free(race_allocation);
   memory::Free(allocation);
 }

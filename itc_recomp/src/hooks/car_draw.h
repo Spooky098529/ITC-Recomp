@@ -100,5 +100,9 @@ void CarDrawPartsHeadlights(PPCContext& ctx, uint8_t* base);         // sub_820E
 // callees native): r3 = the group, r4 = the block.
 bool CarDrawShadowsCalleesNative();
 void CarDrawPartsShadows(PPCContext& ctx, uint8_t* base);            // sub_820E1D88
+// The parts' top, SceneParts::Draw (sub_820E2EE8; inside the diagnostics'
+// wrap, src/debug/frame_state_diff.cpp; the shadows' callees native): r3 =
+// the parts object, r4 = the block.
+void CarDrawSceneParts(PPCContext& ctx, uint8_t* base);
 
 }  // namespace hooks

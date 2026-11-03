@@ -472,6 +472,7 @@ set(ITC_SOURCES
     src/harnesses/car_draw_parts.cpp
     src/harnesses/car_draw_lamps.cpp
     src/harnesses/car_draw_shadows.cpp
+    src/harnesses/car_draw_top.cpp
     src/harnesses/boot_mode.cpp
     src/harnesses/car_models.cpp
     src/harnesses/save_data.cpp

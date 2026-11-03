@@ -65,6 +65,13 @@ struct Calls {
   std::function<uint64_t(uint32_t function, const uint64_t* regs, int count, uint32_t sp,
                          uint32_t lr, uint64_t r24)>
       call_r24;
+  // As `call`, with r24 and r28 both set during the call (put back after):
+  // CarPart::Draw's original where its plain C++ declines under a native
+  // caller (its Model::Draw records r24, its depth pass r28, as the
+  // original caller's registers hold them).
+  std::function<uint64_t(uint32_t function, const uint64_t* regs, int count, uint32_t sp,
+                         uint32_t lr, uint64_t r24, uint64_t r28)>
+      call_r24_r28;
 };
 
 // What a function leaves in r3: in the context already (`in_ctx`, the last
@@ -328,9 +335,10 @@ Left SceneLightsDraw(uint8_t* base, const Calls& calls, uint32_t stack, uint32_t
 // draws nothing, else the last draw's.
 
 // CarPart::Draw(part, view_projection, world, 0, depth) from `frame`
-// returning to `lr`: its plain C++, else its original from that frame (r28 =
-// `r28` during it, for the depth pass's recorder context). What it leaves in
-// r3. The parts' draws share it.
+// returning to `lr`: its plain C++, else its original from that frame (r24 =
+// `r24` and r28 = `r28` during it, for its Model::Draw's and the depth
+// pass's recorder contexts). What it leaves in r3. The parts' draws share
+// it.
 Left PartsDrawRecord(uint8_t* base, const Calls& calls, uint32_t frame, uint32_t part,
                      uint32_t view_projection, uint32_t world, uint32_t depth, uint32_t r24,
                      uint32_t r28, uint32_t lr);
@@ -512,5 +520,37 @@ constexpr uint32_t kPartsShadowsFrame = 1808;
 // read as the original reads them. r3 as the original leaves it.
 Left PartsDrawShadows(uint8_t* base, const Calls& calls, uint32_t stack, uint32_t group,
                       uint32_t block);
+
+// --- The parts' top (parts.cpp) ---
+//
+// Part 6: SceneParts::Draw and the two lists it picks from, which call every
+// draw above in the original's order from their frames (the parts' draws'
+// plain C++, CarPart::Draw's for the single records), with r24 and r28 as
+// the original's registers hold them at each call (r24 the caller's, then
+// the rear bumper's group in the front end from the rear bumper on, the
+// cabin's group in the race from the cabin's windows on; r28 the block's
+// world).
+
+constexpr uint32_t kPartsFrontEndFrame = 240;
+constexpr uint32_t kPartsRaceFrame = 176;
+
+// PartsPoints::DrawFrontEnd (sub_820E2448): r3 = the parts' point block, r4
+// = the block; every part with camera pass 0 (0x826BAC00); the mirrors'
+// worlds the doors' matrices memcpy'd to the frame's +80. See the row in
+// car-draw.md. r3 as the last draw (the headlights') leaves it.
+Left PartsDrawFrontEnd(uint8_t* base, const Calls& calls, uint32_t stack, uint32_t points,
+                       uint32_t block, uint32_t caller_r24);
+// PartsPoints::DrawRace (sub_820E2760): r3 = the parts' point block, r4 =
+// the block; the camera pass the scene's current one ([[0x826C2E44] +
+// 5072], 0 when disabled), the shadows first. r3 as the last draw (the rear
+// bumper's lights') leaves it.
+Left PartsDrawRace(uint8_t* base, const Calls& calls, uint32_t stack, uint32_t points,
+                   uint32_t block, uint32_t caller_r24);
+// SceneParts::Draw (sub_820E2EE8, no frame: tail calls): r3 = the parts
+// object (`parts`, all 64 bits), r4 = the block: by its scene's ([r3 +
+// 37284]) +4, 0 the front end's list, 1 the race's (each with r3 + 176),
+// nothing above (r3 as it came).
+Left ScenePartsDraw(uint8_t* base, const Calls& calls, uint32_t stack, uint64_t parts,
+                    uint32_t block, uint32_t caller_r24);
 
 }  // namespace car_draw

@@ -54,7 +54,10 @@ ITC_FLAG_BOOL(native_car_draw, true, "ITC",
               "camera-facing glows (PartsPoints::DrawTailLights sub_820DF8B0 and "
               "DrawHeadlights sub_820E1690; the material passes, Projector::Matrices and "
               "Model::Draw as plain C++), the shadows PartsPoints::DrawShadows sub_820E1D88 "
-              "(CarLighting::Gather and Model::DrawShapeDepth as plain C++)) "
+              "(CarLighting::Gather and Model::DrawShapeDepth as plain C++), and the parts' top "
+              "SceneParts::Draw sub_820E2EE8 (inside the diagnostics' wrap) with "
+              "PartsPoints::DrawFrontEnd sub_820E2448 and DrawRace sub_820E2760 (no adapters: "
+              "only it calls them; the parts' draws above as plain C++)) "
               "natively instead of through the translated code, with --native_scenery_lists, "
               "--native_models, --native_matrix_math, --native_math, --native_nearest_lights, "
               "--native_vehicle_accessors, --native_track_zones, --native_second_set, "
@@ -169,6 +172,18 @@ car_draw::Calls CarDrawCalls(SceneryDrawGuest* guest) {
     ctx.r24.u64 = r24;
     const uint64_t r3 = call(function, regs, count, sp, lr);
     ctx.r24.u64 = saved;
+    return r3;
+  };
+  calls.call_r24_r28 = [guest, call = calls.call](uint32_t function, const uint64_t* regs,
+                                                  int count, uint32_t sp, uint32_t lr,
+                                                  uint64_t r24, uint64_t r28) {
+    PPCContext& ctx = guest->ctx;
+    const uint64_t saved24 = ctx.r24.u64, saved28 = ctx.r28.u64;
+    ctx.r24.u64 = r24;
+    ctx.r28.u64 = r28;
+    const uint64_t r3 = call(function, regs, count, sp, lr);
+    ctx.r24.u64 = saved24;
+    ctx.r28.u64 = saved28;
     return r3;
   };
   return calls;
@@ -414,6 +429,21 @@ void CarDrawPartsShadows(PPCContext& ctx, uint8_t* base) {
   const car_draw::Calls calls = CarDrawCalls(&guest);
   const car_draw::Left left =
       car_draw::PartsDrawShadows(base, calls, ctx.r1.u32, ctx.r3.u32, ctx.r4.u32);
+  ctx.lr = lr;
+  LeaveLeft(ctx, left);
+}
+
+void CarDrawSceneParts(PPCContext& ctx, uint8_t* base) {
+  if (!CarDrawShadowsCalleesNative()) {
+    __imp__sub_820E2EE8(ctx, base);
+    return;
+  }
+  ctx.fpscr.disableFlushMode();
+  const uint64_t lr = ctx.lr;
+  SceneryDrawGuest guest{ctx, base};
+  const car_draw::Calls calls = CarDrawCalls(&guest);
+  const car_draw::Left left =
+      car_draw::ScenePartsDraw(base, calls, ctx.r1.u32, ctx.r3.u64, ctx.r4.u32, ctx.r24.u32);
   ctx.lr = lr;
   LeaveLeft(ctx, left);
 }

@@ -95,7 +95,7 @@ Left PartsDrawRecord(uint8_t* base, const Calls& calls, uint32_t frame, uint32_t
   Left left;
   if (!draw) {
     const uint64_t regs[5] = {part, view_projection, world, 0, depth};
-    calls.call_r28(kCarPartDraw, regs, 5, frame, lr, r28);
+    calls.call_r24_r28(kCarPartDraw, regs, 5, frame, lr, r24, r28);
     left.in_ctx = true;
   } else if (draw->queued) {
     left.in_ctx = true;
@@ -705,6 +705,164 @@ Left PartsDrawShadowed(uint8_t* base, const Calls& calls, bool mirror, uint32_t 
   const uint32_t depth = Load(base, description + 76);
   Store(base, kOtherKey, other);
   Store(base, kDepthKey, depth);
+  return left;
+}
+
+// --- The parts' top ---
+
+namespace {
+
+// The parts' point block's groups (pb + offset; docs/functions/car-draw.md's
+// rows of DrawFrontEnd and DrawRace) and its pointers.
+constexpr uint32_t kFrontBumper = 0, kCooling = 2656, kRearBumper = 2896, kSkirts = 4592;
+constexpr uint32_t kSpoiler = 4832, kSpoilerLight = 5072, kSpoilerLight01 = 5312;
+constexpr uint32_t kBonnet = 5552, kLeftDoorGroup = 6032, kRightDoorGroup = 12128, kDoors = 18224;
+constexpr uint32_t kLeftMirror = 23760, kRightMirror = 24000, kMirror = 24240;
+constexpr uint32_t kHeadlights = 24480, kTailLights = 27680, kTailBody = 31040;
+constexpr uint32_t kFenders = 31280, kCabin = 32960, kCabinBody = 33920, kEngine = 34160;
+constexpr uint32_t kMuffler = 35856, kShadows = 36096;
+constexpr uint32_t kSceneModelRecord = 37072, kCarRecordPointer = 37076;
+constexpr uint32_t kPartsRecordPointer = 37080;
+constexpr uint32_t kDoorMatrix = 6016;
+
+}  // namespace
+
+Left PartsDrawFrontEnd(uint8_t* base, const Calls& calls, uint32_t stack, uint32_t points,
+                       uint32_t block, uint32_t caller_r24) {
+  ITC_NATIVE_RUNNING("sub_820E2448 PartsPoints::DrawFrontEnd");
+  const uint32_t frame = Frame(base, stack, kPartsFrontEndFrame);
+  // Camera pass 0, whatever the scene's pass; r28 the block's world.
+  const uint32_t pass = kCameraPasses, world = block + 16;
+  uint32_t r24 = caller_r24;
+  auto part = [&](uint32_t at, uint32_t lr) {
+    return Part(base, calls, frame, points + at, pass + 144, world, 0, r24, world, lr);
+  };
+  part(kCooling, 0x820E2480);
+  PartsDrawEngine(base, calls, frame, points + kEngine, block, pass, r24);
+  part(kMuffler, 0x820E24B0);
+  PartsDrawFrontBumper(base, calls, frame, points + kFrontBumper, block, pass, r24);
+  PartsDrawBonnet(base, calls, frame, points + kBonnet, block, pass, r24);
+  PartsDrawFendersBody(base, calls, frame, points + kFenders, block, pass, r24);
+  part(kCabinBody, 0x820E2500);
+  PartsDrawDoor(base, calls, false, frame, points + kLeftDoorGroup, block, pass, r24);
+  PartsDrawDoor(base, calls, true, frame, points + kRightDoorGroup, block, pass, r24);
+  part(kSkirts, 0x820E2540);
+  // A compare of the car record's +3688 whose result isn't used.
+  (void)Load(base, Load(base, points + kCarRecordPointer) + 3688);
+  // The mirrors, each with a copy of its door's matrix at +80.
+  Memcpy(base, calls, frame + 80, points + kLeftDoorGroup + kDoorMatrix, 64, frame, 0x820E2564);
+  PartsDrawShadowed(base, calls, true, frame, points + kLeftMirror, pass, frame + 80, r24);
+  Memcpy(base, calls, frame + 80, points + kRightDoorGroup + kDoorMatrix, 64, frame, 0x820E2588);
+  PartsDrawShadowed(base, calls, true, frame, points + kRightMirror, pass, frame + 80, r24);
+  // r24 the rear bumper's group from here on (the original keeps it there).
+  r24 = points + kRearBumper;
+  PartsDrawRearBumper(base, calls, frame, points + kRearBumper, block, pass, r24);
+  PartsDrawShadowed(base, calls, false, frame, points + kSpoiler, pass, world, r24);
+  PartsDrawHeadlightBody(base, calls, frame, points + kHeadlights, block, pass, r24);
+  part(kTailBody, 0x820E25EC);
+  if (int32_t(Load(base, block + 728)) == 0) {
+    PartsDrawDoorWindows(base, calls, false, frame, points + kLeftDoorGroup, block, pass, r24);
+    PartsDrawDoorWindows(base, calls, false, frame, points + kRightDoorGroup, block, pass, r24);
+  }
+  if (Bits(base, block) & 0x8) {
+    part(kSpoilerLight01, 0x820E2640);
+  }
+  PartsDrawCabinWindow02(base, calls, frame, points + kCabin, block, pass, r24);
+  if (int32_t(Load(base, block + 728)) == 0) {
+    PartsDrawDoorWindows(base, calls, true, frame, points + kLeftDoorGroup, block, pass, r24);
+    PartsDrawDoorWindows(base, calls, true, frame, points + kRightDoorGroup, block, pass, r24);
+  }
+  PartsDrawCabinWindow01(base, calls, frame, points + kCabin, block, pass, r24);
+  PartsDrawFenderLights(base, calls, frame, points + kFenders, block, pass,
+                        Load(base, Load(base, points + kPartsRecordPointer) + 56), r24);
+  if (Bits(base, block) & 0x8) {
+    part(kSpoilerLight, 0x820E26DC);
+  }
+  PartsDrawDoorPanel(base, calls, false, frame, points + kLeftDoorGroup, block, pass, r24);
+  PartsDrawDoorPanel(base, calls, true, frame, points + kRightDoorGroup, block, pass, r24);
+  PartsDrawFrontBumperLights(base, calls, frame, points + kFrontBumper, block, pass,
+                             Load(base, Load(base, points + kPartsRecordPointer) + 56), r24);
+  PartsDrawTailLights(base, calls, frame, points + kTailLights, block, pass, r24, world);
+  PartsDrawRearBumperLights(base, calls, frame, points + kRearBumper, block, pass, r24);
+  // The headlights: r7 the parts record's +32, r6 the car record's +0.
+  const uint32_t parts_record = Load(base, points + kPartsRecordPointer);
+  const uint32_t car_record = Load(base, points + kCarRecordPointer);
+  const uint64_t sub = Load(base, parts_record + 32);
+  const uint64_t index = Load(base, car_record);
+  return PartsDrawHeadlights(base, calls, frame, points + kHeadlights, block, pass, index, sub,
+                             r24);
+}
+
+Left PartsDrawRace(uint8_t* base, const Calls& calls, uint32_t stack, uint32_t points,
+                   uint32_t block, uint32_t caller_r24) {
+  ITC_NATIVE_RUNNING("sub_820E2760 PartsPoints::DrawRace");
+  const uint32_t frame = Frame(base, stack, kPartsRaceFrame);
+  // The scene's current camera pass (0 when disabled: its view-projection
+  // read from address 144, as the original).
+  const uint32_t index = Load(base, Load(base, kScene) + 5072);
+  uint32_t pass = kCameraPasses + index * 592;
+  if (pass == 0 || int32_t(Load(base, pass + 588)) == 0) {
+    pass = 0;
+  }
+  // r6 for the shadows (1 for kind 2; not read there).
+  (void)Load(base, Load(base, points + kSceneModelRecord));
+  PartsDrawShadows(base, calls, frame, points + kShadows, block);
+  const uint32_t world = block + 16;
+  uint32_t r24 = caller_r24;
+  auto part = [&](uint32_t at, uint32_t lr) {
+    return Part(base, calls, frame, points + at, pass + 144, world, 0, r24, world, lr);
+  };
+  part(kCooling, 0x820E27F4);
+  PartsDrawEngine(base, calls, frame, points + kEngine, block, pass, r24);
+  part(kMuffler, 0x820E2824);
+  PartsDrawFrontBumper(base, calls, frame, points + kFrontBumper, block, pass, r24);
+  PartsDrawBonnet(base, calls, frame, points + kBonnet, block, pass, r24);
+  PartsDrawFendersBody(base, calls, frame, points + kFenders, block, pass, r24);
+  part(kCabinBody, 0x820E2874);
+  part(kSkirts, 0x820E288C);
+  PartsDrawDoorsBody(base, calls, frame, points + kDoors, block, pass, r24);
+  PartsDrawShadowed(base, calls, false, frame, points + kMirror, pass, world, r24);
+  PartsDrawRearBumper(base, calls, frame, points + kRearBumper, block, pass, r24);
+  PartsDrawShadowed(base, calls, false, frame, points + kSpoiler, pass, world, r24);
+  PartsDrawHeadlightBody(base, calls, frame, points + kHeadlights, block, pass, r24);
+  part(kTailBody, 0x820E2900);
+  if (Bits(base, block) & 0x8) {
+    part(kSpoilerLight01, 0x820E2928);
+  }
+  // r24 the cabin's group from here on (the original keeps it there).
+  r24 = points + kCabin;
+  PartsDrawCabinWindow02(base, calls, frame, points + kCabin, block, pass, r24);
+  PartsDrawCabinWindow01(base, calls, frame, points + kCabin, block, pass, r24);
+  PartsDrawDoorsWindows(base, calls, frame, points + kDoors, block, pass, r24);
+  PartsDrawFenderLights(base, calls, frame, points + kFenders, block, pass,
+                        Load(base, Load(base, points + kPartsRecordPointer) + 56), r24);
+  if (Bits(base, block) & 0x8) {
+    part(kSpoilerLight, 0x820E29A8);
+  }
+  // The headlights before the front bumper's lights here: r7 the parts
+  // record's +32, r6 the car record's +0.
+  const uint64_t sub = Load(base, Load(base, points + kPartsRecordPointer) + 32);
+  const uint64_t color = Load(base, Load(base, points + kCarRecordPointer));
+  PartsDrawHeadlights(base, calls, frame, points + kHeadlights, block, pass, color, sub, r24);
+  PartsDrawFrontBumperLights(base, calls, frame, points + kFrontBumper, block, pass,
+                             Load(base, Load(base, points + kPartsRecordPointer) + 56), r24);
+  PartsDrawTailLights(base, calls, frame, points + kTailLights, block, pass, r24, world);
+  return PartsDrawRearBumperLights(base, calls, frame, points + kRearBumper, block, pass, r24);
+}
+
+Left ScenePartsDraw(uint8_t* base, const Calls& calls, uint32_t stack, uint64_t parts,
+                    uint32_t block, uint32_t caller_r24) {
+  ITC_NATIVE_RUNNING("sub_820E2EE8 SceneParts::Draw");
+  const uint32_t object = uint32_t(parts);
+  const uint32_t set = Load(base, Load(base, object + 37284) + 4);
+  if (set == 0) {
+    return PartsDrawFrontEnd(base, calls, stack, object + 176, block, caller_r24);
+  }
+  if (set == 1) {
+    return PartsDrawRace(base, calls, stack, object + 176, block, caller_r24);
+  }
+  Left left;
+  left.r3 = parts;
   return left;
 }
 
