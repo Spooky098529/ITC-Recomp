@@ -34,7 +34,12 @@ ITC_FLAG_BOOL(native_car_draw, true, "ITC",
               "SceneModel::IsNearPlayerHeight sub_820DAB58 (inside the diagnostics' wrap), "
               "the morph Model::MorphShape sub_82595110 (the job maker a guest call), "
               "WorkMem::AllocVertexBuffer sub_8258A9E8, Model::QueueJobRelease sub_82594E88 and "
-              "XGSetVertexBufferHeader sub_8235A688 (no adapter: its caller calls it)) "
+              "XGSetVertexBufferHeader sub_8235A688 (no adapter: its caller calls it), the light "
+              "kit SceneLights::Draw sub_820DDE58 (inside the diagnostics' wrap; it skips "
+              "BlinkTimers::Advance as --per_tick_blink_timers says) with LightPoints::DrawFront "
+              "sub_820DDAE8, DrawSides sub_820DDB98, DrawRear sub_820DDC48 and their neons "
+              "sub_820DCC10, sub_820DD0B0 and sub_820DD5C0 (no adapters: only it calls them; the "
+              "LEDs and spots guest calls)) "
               "natively instead of through the translated code, with --native_scenery_lists, "
               "--native_models, --native_matrix_math, --native_math, --native_nearest_lights, "
               "--native_vehicle_accessors, --native_track_zones, --native_second_set, "
@@ -289,6 +294,22 @@ void CarDrawMorphShape(PPCContext& ctx, uint8_t* base) {
   }
   ctx.lr = lr;
   LeaveLeft(ctx, *left);
+}
+
+void CarDrawSceneLightsDraw(PPCContext& ctx, uint8_t* base) {
+  if (!CarDrawLightKitCalleesNative()) {
+    __imp__sub_820DDE58(ctx, base);
+    return;
+  }
+  ctx.fpscr.disableFlushMode();
+  const uint64_t lr = ctx.lr;
+  SceneryDrawGuest guest{ctx, base};
+  const car_draw::Calls calls = CarDrawCalls(&guest);
+  const auto left =
+      car_draw::SceneLightsDraw(base, calls, ctx.r1.u32, ctx.r3.u32, ctx.r4.u32,
+                                !CarDrawBlinkTimersHeld(), ctx.r24.u32, ctx.r28.u32);
+  ctx.lr = lr;
+  LeaveLeft(ctx, left);
 }
 
 }  // namespace hooks

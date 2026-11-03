@@ -55,6 +55,8 @@ constexpr Region kRegions[] = {
     // to 1,279 of each buffer).
     {0x8296B780, 0x30}, {0x82957780, 0x100}, {0x82957780 + 32 * 1272, 0x100},
     {0x82957780 + 32 * 1280, 0x100}, {0x82957780 + 32 * 2552, 0x100},
+    // The first four camera passes (the light kit's view-projections).
+    {0x826BAC00, 592 * 4},
 };
 // The scene lights' slots CarLighting::Gather writes (floats), and pixel c43.
 constexpr uint32_t kLightSlots = 0x8296B9E0;
@@ -988,6 +990,217 @@ void Morphs(Context& h, Random& r, uint32_t block) {
   }
 }
 
+// --- The light kit ---
+
+template <car_draw::LightGroup W>
+void NativeLightPointsDraw(PPCContext& ctx, uint8_t* base) {
+  ctx.fpscr.disableFlushMode();
+  hooks::SceneryDrawGuest guest{ctx, base};
+  const car_draw::Calls calls = hooks::CarDrawCalls(&guest);
+  const auto left = car_draw::LightPointsDraw(base, calls, W, ctx.r1.u32, ctx.r3.u32, ctx.r4.u64,
+                                              ctx.r5.u32, ctx.r6.u32, ctx.r24.u32, ctx.r28.u32);
+  if (!left.in_ctx) {
+    ctx.r3.u64 = left.r3;
+  }
+  ctx.fpscr.disableFlushMode();
+}
+
+template <car_draw::LightGroup W>
+void NativeLightPointsDrawNeon(PPCContext& ctx, uint8_t* base) {
+  ctx.fpscr.disableFlushMode();
+  hooks::SceneryDrawGuest guest{ctx, base};
+  const car_draw::Calls calls = hooks::CarDrawCalls(&guest);
+  const auto left =
+      car_draw::LightPointsDrawNeon(base, calls, W, ctx.r1.u32, ctx.r3.u32, ctx.r4.u64,
+                                    ctx.r5.u32, ctx.r6.u32, ctx.r24.u32, ctx.r28.u32);
+  if (!left.in_ctx) {
+    ctx.r3.u64 = left.r3;
+  }
+  ctx.fpscr.disableFlushMode();
+}
+
+// The light kit at the block's +0xC000 (its point block +96 with the
+// record at +0xF700, the groups at +144, +4480 and +8816, each record
+// 240 bytes from the group's +16: +4 the model, +228 the shape; the neon's
+// SetAlpha the group's +20 and +244), the scene model's block at +0xF380
+// (its world, +16, the model draws' world), the scene at the race block's
+// +0x10000 (read only), the camera passes 0 to 3 (their view-projections
+// the identity, now and then something else). The
+// model's world as the model draws' harness builds it.
+void KitWorld(Context& h, Random& r, uint32_t block, uint32_t race, uint32_t shape) {
+  ModelWorld(h, r, block, shape);
+  // Room for every draw the kit can make (the originals write through a
+  // refused slot, address 0, when the list is full).
+  guest::StoreU32(h.base, block + 0x3000 + 12, r.Below(64));
+  const uint32_t kit = block + 0xC000, record = block + 0xF700, source = block + 0xF380;
+  const uint32_t scene = race + 0x10000;
+  guest::StoreU32(h.base, kScene, scene);
+  guest::StoreU32(h.base, scene + 5132,
+                  r.Below(8) == 0 ? uint32_t(r.Next()) & ~0x8u : uint32_t(r.Next()) | 0x8u);
+  guest::StoreU32(h.base, scene + 5084, r.Below(4));
+  guest::StoreU32(h.base, scene + 4, r.Below(3) == 0 ? 0 : r.Below(4) == 0 ? r.Below(3) : 1);
+  guest::StoreU32(h.base, scene + 5048, r.Below(4) == 0 ? 1 + r.Below(3) : 0);
+  guest::StoreU32(h.base, kRaceData, race);
+  guest::StoreU32(h.base, race + 32, r.Below(2) ? 2 : r.Below(5));
+  guest::StoreU32(h.base, kit + 13160, scene);
+  for (uint32_t p = 0; p < 4; p++) {
+    const uint32_t pass = 0x826BAC00 + 592 * p;
+    if (r.Below(6) == 0) {
+      RandomFloats(h.base, pass + 144, 16, r);
+    } else {
+      StoreFloats(h.base, pass + 144, {1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1});
+    }
+    // Enabled (a disabled pass reads address 144, unmapped; never in play).
+    guest::StoreU32(h.base, pass + 588, r.Below(5) == 0 ? uint32_t(r.Next()) | 1u : 1);
+  }
+  guest::StoreU32(h.base, kit + 96, record);
+  for (uint32_t i = 0; i < 4; i++) {
+    StoreU64(h.base, kit + 104 + 8 * i, r.Below(8) == 0 ? r.Next() : r.Below(300));
+  }
+  // The modes: the neon (1) most of the time, none (0), now and then the
+  // LEDs and spots (2 to 12) or anything. The LEDs' and spots' records have
+  // no model (their originals, guest calls on both sides, aren't what's
+  // checked; drawing them wrote through address 0 in one case).
+  for (uint32_t g = 0; g < 3; g++) {
+    uint32_t mode = r.Below(4) == 0 ? 0 : 1;
+    if (r.Below(8) == 0) {
+      mode = r.Below(16) == 0 ? uint32_t(r.Next()) : 2 + r.Below(11);
+    }
+    guest::StoreU32(h.base, record + 4 + 16 * g, mode);
+    guest::StoreFloat(h.base, record + 8 + 16 * g,
+                      r.Below(8) == 0 ? std::bit_cast<float>(RandomFloat(r))
+                                      : float(r.Below(1201)) / 1000.0f);
+    guest::StoreFloat(h.base, record + 12 + 16 * g,
+                      r.Below(4) == 0 ? 0.0f : float(r.Below(1201)) / 1000.0f);
+    guest::StoreFloat(h.base, record + 16 + 16 * g, float(r.Below(4000)) / 100.0f + 0.5f);
+  }
+  static constexpr uint32_t kGroups[3] = {144, 4480, 8816};
+  for (uint32_t g : kGroups) {
+    const uint32_t group = kit + g;
+    guest::StoreU32(h.base, group, record);
+    for (uint32_t k = 0; k < 18; k++) {
+      const uint32_t part = group + 16 + 240 * k;
+      const bool drawn = k == 0 && r.Below(10) != 0;
+      guest::StoreU32(h.base, part + 4, drawn ? block + 0x100 : 0);
+      guest::StoreU32(h.base, part + 228, shape);
+    }
+  }
+  for (uint32_t i = 0; i < 64; i += 4) {
+    guest::StoreU32(h.base, source + 16 + i, guest::LoadU32(h.base, block + 0x500 + i));
+  }
+  guest::StoreU32(h.base, source + 724, r.Below(3) == 0 ? 1 : 0);
+}
+
+// The materials' alphas (SetAlpha's +12) as floats.
+FloatRanges AlphaFloats() {
+  FloatRanges floats;
+  for (uint32_t m = 0; m < 7; m++) {
+    floats.push_back({0x6000 + 16 + 512 * m + 12, 1});
+  }
+  return floats;
+}
+
+void LightKits(Context& h, Random& r, uint32_t block, uint32_t race) {
+  const uint32_t kit = block + 0xC000, source = block + 0xF380;
+  using car_draw::LightGroup;
+  // A frame's matrices (from +80 to `end`) as floats.
+  auto frame_words = [&](Outputs& o, uint32_t frame, uint32_t end) {
+    o.Word(guest::LoadU32(h.base, frame));
+    o.Floats(h.base, frame + 80, (end - 80) / 4);
+  };
+  {
+    Results results("SceneLights::Draw (sub_820DDE58)");
+    int queued = 0;
+    for (int c = 0; c < 768; c++) {
+      Case(
+          h, results, block, r,
+          [&](PPCContext& t) {
+            g_flush_on_entry = r.Below(2) != 0;
+            KitWorld(h, r, block, race, r.Below(4));
+            t.r3.u64 = kit;
+            t.r4.u64 = source;
+            t.r24.u64 = r.Next();
+            t.r28.u64 = r.Next();
+          },
+          __imp__sub_820DDE58, hooks::CarDrawSceneLightsDraw, AlphaFloats(),
+          fmt::format("case {}", c),
+          [&](const PPCContext& t, Outputs& o) {
+            const uint32_t frame = t.r1.u32 - car_draw::kSceneLightsDrawFrame;
+            frame_words(o, frame, 208);
+            o.Bytes(Read(h.base, frame + 208, 736));
+            const uint32_t points = frame - car_draw::kLightPointsDrawFrame;
+            frame_words(o, points, 272);
+            o.Word(guest::LoadU32(h.base, points - car_draw::kNeonDrawFrame));
+            if (t.r3.u32 == block + 0x7C0) {
+              queued++;
+              o.Word(t.r4.u32);
+              o.Word(t.r5.u32);
+              o.Double(t.f1.u64);
+            }
+          },
+          {}, true);
+    }
+    ITC_LOG_INFO("harness: SceneLights::Draw: {} of 768 cases ended handing an entry to the "
+                 "render queue",
+                 queued / 2);
+    results.Report();
+  }
+  struct Target {
+    const char* name;
+    GuestFunction recompiled, native;
+    uint32_t group;
+    bool neon;
+  };
+  const Target targets[] = {
+      {"LightPoints::DrawFront (sub_820DDAE8)", __imp__sub_820DDAE8,
+       NativeLightPointsDraw<LightGroup::kFront>, 144, false},
+      {"LightPoints::DrawSides (sub_820DDB98)", __imp__sub_820DDB98,
+       NativeLightPointsDraw<LightGroup::kSides>, 4480, false},
+      {"LightPoints::DrawRear (sub_820DDC48)", __imp__sub_820DDC48,
+       NativeLightPointsDraw<LightGroup::kRear>, 8816, false},
+      {"LightPoints::DrawFrontNeon (sub_820DCC10)", __imp__sub_820DCC10,
+       NativeLightPointsDrawNeon<LightGroup::kFront>, 144, true},
+      {"LightPoints::DrawSidesNeon (sub_820DD0B0)", __imp__sub_820DD0B0,
+       NativeLightPointsDrawNeon<LightGroup::kSides>, 4480, true},
+      {"LightPoints::DrawRearNeon (sub_820DD5C0)", __imp__sub_820DD5C0,
+       NativeLightPointsDrawNeon<LightGroup::kRear>, 8816, true},
+  };
+  for (const Target& target : targets) {
+    Results results(target.name);
+    for (int c = 0; c < 384; c++) {
+      Case(
+          h, results, block, r,
+          [&](PPCContext& t) {
+            g_flush_on_entry = r.Below(2) != 0;
+            KitWorld(h, r, block, race, r.Below(4));
+            t.r3.u64 = kit + target.group;
+            t.r4.u64 = r.Below(8) == 0 ? r.Next() : r.Below(300);
+            t.r5.u64 = source;
+            t.r6.u64 = block + 0x400;
+            t.r24.u64 = r.Next();
+            t.r28.u64 = r.Next();
+          },
+          target.recompiled, target.native, AlphaFloats(), fmt::format("case {}", c),
+          [&](const PPCContext& t, Outputs& o) {
+            if (target.neon) {
+              o.Word(guest::LoadU32(h.base, t.r1.u32 - car_draw::kNeonDrawFrame));
+            } else {
+              const uint32_t points = t.r1.u32 - car_draw::kLightPointsDrawFrame;
+              frame_words(o, points, 272);
+              o.Word(guest::LoadU32(h.base, points - car_draw::kNeonDrawFrame));
+            }
+            if (t.r3.u32 == block + 0x7C0) {
+              o.Word(t.r4.u32);
+              o.Word(t.r5.u32);
+              o.Double(t.f1.u64);
+            }
+          },
+          {}, true);
+    }
+    results.Report();
+  }
+}
+
 }  // namespace
 
 void CarDraw(Context& h) {
@@ -1002,6 +1215,7 @@ void CarDraw(Context& h) {
   Heights(h, r, block, race);
   ModelDraws(h, r, block);
   Morphs(h, r, block);
+  LightKits(h, r, block, race);
   memory::Free(race_allocation);
   memory::Free(allocation);
 }

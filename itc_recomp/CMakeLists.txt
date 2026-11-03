@@ -157,6 +157,7 @@ set(ITC_SOURCES
     src/car_draw/lighting.cpp
     src/car_draw/blink.cpp
     src/car_draw/morph.cpp
+    src/car_draw/light_kit.cpp
     src/hooks/boot_mode.cpp
     src/boot_mode/boot_mode.cpp
     src/second_set/points.cpp
@@ -665,6 +666,7 @@ set_source_files_properties(src/c_runtime/math.cpp src/ui_movies/keys.cpp
     src/load_poll/load_poll.cpp
     src/car_draw/car_draw.cpp src/car_draw/lighting.cpp src/car_draw/blink.cpp
     src/car_draw/morph.cpp
+    src/car_draw/light_kit.cpp
     src/car_sounds/x3daudio.cpp
     src/car_sounds/car_sound_3d.cpp src/car_sounds/car_sound_voices.cpp
     src/car_sounds/car_sound_parts.cpp src/xact/voices.cpp src/xact/waves.cpp

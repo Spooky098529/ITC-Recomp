@@ -629,7 +629,22 @@ ITC_FRAME_STATE_WRAP_LOAD_POLL(820DBFF8, LoadPollSceneCockpitFinish)
 ITC_FRAME_STATE_WRAP(820DC498)
 ITC_FRAME_STATE_WRAP_LOAD_POLL(820DCBC0, LoadPollSceneLightsApplyRecord)
 ITC_FRAME_STATE_WRAP_LOAD_POLL(820DDA60, LoadPollSceneLightsFinish)
-ITC_FRAME_STATE_WRAP(820DDE58)
+// SceneLights::Draw natively under --native_car_draw (src/car_draw/; it
+// skips BlinkTimers::Advance on render-only passes as that one's adapter
+// does), inside the same wrap.
+extern "C" REX_FUNC(sub_820DDE58) {
+  REX_FUNC_PROLOGUE();
+  if (debug::IsHidden(0x820DDE58)) {
+    return;
+  }
+  debug::FrameStateDiff_Before(base);
+  if (ITC_FLAG(native_car_draw)) {
+    hooks::CarDrawSceneLightsDraw(ctx, base);
+  } else {
+    __imp__sub_820DDE58(ctx, base);
+  }
+  debug::FrameStateDiff_After(base, "draw step part", 0x820DDE58);
+}
 ITC_FRAME_STATE_WRAP_LOAD_POLL(820E2E68, LoadPollScenePartsFinish)
 ITC_FRAME_STATE_WRAP(820E2EE8)
 ITC_FRAME_STATE_WRAP_LOAD_POLL(820E4140, LoadPollSceneInteriorFinish)

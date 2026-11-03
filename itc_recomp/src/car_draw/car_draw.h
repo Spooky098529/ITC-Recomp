@@ -244,4 +244,60 @@ constexpr uint32_t kMorphShapeFrame = 128;
 std::optional<Left> ModelMorphShape(uint8_t* base, const Calls& calls, uint32_t model,
                                     uint32_t morph, uint64_t shape_index, uint32_t stack);
 
+// --- The light kit (light_kit.cpp) ---
+//
+// Part 2: SceneLights::Draw, LightPoints::DrawFront, DrawSides, DrawRear and
+// their neons. The LEDs and spots (not seen in play) and
+// LightKit::ChaseLevel stay guest calls from the original's frames.
+
+// SceneLights::Draw's frame, LightPoints::Draw*'s and the neons'.
+constexpr uint32_t kSceneLightsDrawFrame = 976;
+constexpr uint32_t kLightPointsDrawFrame = 304;
+constexpr uint32_t kNeonDrawFrame = 112;
+
+// The light kit's three groups: the front bumper (kit + 144, the record's
+// mode +4, its fractions and rate +8 to +16), the side skirts (+4480, +20,
+// +24 to +32) and the rear bumper (+8816, +36, +40 to +48).
+enum class LightGroup { kFront, kSides, kRear };
+
+// LightPoints::DrawFrontNeon (sub_820DCC10), DrawSidesNeon (sub_820DD0B0),
+// DrawRearNeon (sub_820DD5C0): r3 = the group (+0 the record), r4 = its
+// counter, r5 = the block, r6 = the view-projection: the level
+// LightKit::BlinkLevel(counter, the record's fractions and rate) (at this
+// frame), PartModel::SetAlpha(group +20, +244, level), CarPart::Draw(group
+// + 16, r6, the block's +16, 0, 0) (its original where it declines,
+// returning after its call). `caller_r24` and `caller_r28` the registers
+// CarPart::Draw sees (its callers don't change them).
+Left LightPointsDrawNeon(uint8_t* base, const Calls& calls, LightGroup which, uint32_t stack,
+                         uint32_t group, uint64_t counter, uint32_t block,
+                         uint32_t view_projection, uint32_t caller_r24, uint32_t caller_r28);
+
+// LightPoints::DrawFront (sub_820DDAE8), DrawSides (sub_820DDB98),
+// DrawRear (sub_820DDC48): by the record's mode (unsigned): 0 nothing (r3
+// the group); 1 the neon; up to 6 the LEDs (sub_820DCC70, sub_820DD110,
+// sub_820DD620); up to 9 (the sides 11) the spots (sub_820DCF98,
+// sub_820DD438, sub_820DD948); above, nothing. Each with the
+// view-projection copied (memcpy) into this frame (+208 the neon's, +80 the
+// LEDs', +144 the spots'). The LEDs and spots are guest calls.
+Left LightPointsDraw(uint8_t* base, const Calls& calls, LightGroup which, uint32_t stack,
+                     uint32_t group, uint64_t counter, uint32_t block, uint32_t view_projection,
+                     uint32_t caller_r24, uint32_t caller_r28);
+
+// SceneLights::Draw (sub_820DDE58): r3 = the light kit, r4 = the scene
+// model's block; see the row in car-draw.md. The local SceneModelBlock at
+// the frame's +208 (its w's at +144), nothing more without bit 0x8 of the
+// scene's ([0x826C2E44]) pass mask +5132; the block copied in (memcpy); the
+// view-projection at +144 (Matrix::Copy, noted for interpolation): camera
+// pass 0's in the front end (the kit's scene's +4 0; the copy's +68 the
+// float at 0x820029D8, its world the identity first with the block's +724
+// set), else the scene's +5084's (address 144 when disabled);
+// BlinkTimers::Advance(kit + 96) when the kit's scene's +5048 is 0 and
+// `advance_blink` (false on a render-only pass with --per_tick_blink_timers:
+// hooks::CarDrawBlinkTimersHeld); [0x826C5104] flipped, the three groups
+// drawn (each with a fresh copy of the view-projection at +80) and it
+// flipped back.
+Left SceneLightsDraw(uint8_t* base, const Calls& calls, uint32_t stack, uint32_t kit,
+                     uint32_t block, bool advance_blink, uint32_t caller_r24,
+                     uint32_t caller_r28);
+
 }  // namespace car_draw
