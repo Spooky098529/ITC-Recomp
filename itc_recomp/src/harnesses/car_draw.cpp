@@ -261,6 +261,14 @@ void Shadows(Context& h, Random& r, uint32_t block) {
 
 // --- The blink ---
 
+// LightKit::BlinkLevel's register steps (its adapter is gone: its callers,
+// the neons, are plain C++).
+void NativeBlinkLevel(PPCContext& ctx, uint8_t* base) {
+  ctx.fpscr.disableFlushMode();
+  ctx.f1.f64 = car_draw::LightKitBlinkLevel(base, ctx.r3.u64, ctx.f1.f64, ctx.f2.f64,
+                                            ctx.f3.f64, ctx.r1.u32);
+}
+
 void Blinks(Context& h, Random& r, uint32_t block, uint32_t race) {
   {
     Results results("LightKit::BlinkLevel (sub_820DC4B0)");
@@ -304,7 +312,7 @@ void Blinks(Context& h, Random& r, uint32_t block, uint32_t race) {
             }
             t.f3.f64 = double(rate);
           },
-          __imp__sub_820DC4B0, hooks::CarDrawBlinkLevel, {}, fmt::format("case {}", c),
+          __imp__sub_820DC4B0, NativeBlinkLevel, {}, fmt::format("case {}", c),
           [&](const PPCContext& t, Outputs& o) {
             o.Double(t.f1.u64);
             o.Bytes(Read(h.base, t.r1.u32 - 16, 16));  // the period and remainder

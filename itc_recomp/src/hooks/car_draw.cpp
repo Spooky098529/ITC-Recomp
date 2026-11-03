@@ -29,7 +29,7 @@ ITC_FLAG_BOOL(native_car_draw, true, "ITC",
               "Model::DrawShapeDepth as plain C++, the render queue's slot 4 a guest call), "
               "Matrix::Shadow sub_82597FE0 (no adapter: Gather's plain C++ calls it), CarLighting::Gather sub_820C9170 (with "
               "Lights::FindNearest, Vec4::Transform and cos as plain C++), "
-              "LightKit::BlinkLevel sub_820DC4B0, BlinkTimers::Advance sub_820DC958 (inside "
+              "LightKit::BlinkLevel sub_820DC4B0 (no adapter: the neons call it), BlinkTimers::Advance sub_820DC958 (inside "
               "its render-only skip, --per_tick_blink_timers), "
               "SceneModel::IsNearPlayerHeight sub_820DAB58 (inside the diagnostics' wrap), "
               "the morph Model::MorphShape sub_82595110 (the job maker a guest call), "
@@ -208,12 +208,6 @@ void CarDrawCarLightingGather(PPCContext& ctx, uint8_t* base) {
   ctx.fpscr.disableFlushMode();
 }
 
-void CarDrawBlinkLevel(PPCContext& ctx, uint8_t* base) {
-  ctx.fpscr.disableFlushMode();
-  ctx.f1.f64 = car_draw::LightKitBlinkLevel(base, ctx.r3.u64, ctx.f1.f64, ctx.f2.f64,
-                                            ctx.f3.f64, ctx.r1.u32);
-}
-
 void CarDrawBlinkTimersAdvance(PPCContext& ctx, uint8_t* base) {
   ctx.fpscr.disableFlushMode();
   car_draw::BlinkTimersAdvance(base, ctx.r3.u32, ctx.r1.u32);
@@ -297,10 +291,10 @@ void CarDrawSceneLightsDraw(PPCContext& ctx, uint8_t* base) {
 // (2026-11-01; its only caller, CarLighting::Gather, calls the plain C++),
 // WorkMem::AllocVertexBuffer sub_8258A9E8 and Model::QueueJobRelease
 // sub_82594E88 (2026-11-03; their caller in play, Model::MorphShape, calls
-// the plain C++).
+// the plain C++), LightKit::BlinkLevel sub_820DC4B0 (2026-11-03; its
+// callers, the neons, are plain C++).
 ITC_CAR_DRAW(820D04E8, CarDrawModelDraw)
 ITC_CAR_DRAW(820D06F0, CarDrawCarPartDraw)
 ITC_CAR_DRAW(820C9170, CarDrawCarLightingGather)
-ITC_CAR_DRAW(820DC4B0, CarDrawBlinkLevel)
 ITC_CAR_DRAW(82595110, CarDrawMorphShape)
 #undef ITC_CAR_DRAW

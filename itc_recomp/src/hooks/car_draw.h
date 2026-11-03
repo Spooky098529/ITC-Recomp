@@ -3,7 +3,7 @@
 // SceneModel::IsNearPlayerHeight's in the diagnostics' wrap,
 // src/debug/frame_state_diff.cpp, and BlinkTimers::Advance's in its
 // render-only skip, src/frame_pacing/per_frame_logic.cpp) and the harness
-// (without the flag). Each leaves r3 (f1 for BlinkLevel) as the original
+// (without the flag). Each leaves r3 as the original
 // does, and runs the original where the plain C++ declines or its callees'
 // plain C++ isn't native.
 
@@ -50,9 +50,6 @@ void CarDrawCarPartDraw(PPCContext& ctx, uint8_t* base);
 // CarLighting::Gather (sub_820C9170): r3 = the record, r4 = the world
 // matrix, r5 = the flag.
 void CarDrawCarLightingGather(PPCContext& ctx, uint8_t* base);
-// LightKit::BlinkLevel (sub_820DC4B0): r3 = the counter, f1 to f3; f1 =
-// the level.
-void CarDrawBlinkLevel(PPCContext& ctx, uint8_t* base);
 // BlinkTimers::Advance (sub_820DC958): r3 = the point block (no skip here).
 void CarDrawBlinkTimersAdvance(PPCContext& ctx, uint8_t* base);
 // SceneModel::IsNearPlayerHeight (sub_820DAB58): r3 = the pass
