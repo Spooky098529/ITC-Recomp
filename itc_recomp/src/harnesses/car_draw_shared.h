@@ -1,6 +1,7 @@
 // What the car draw's harness files share (src/harnesses/car_draw.cpp, which
-// defines these, car_draw_parts.cpp and car_draw_lamps.cpp): one case through both versions and
-// the model draws' world, all under the harness name car_draw.
+// defines these, car_draw_parts.cpp, car_draw_lamps.cpp and
+// car_draw_shadows.cpp): one case through both versions and the model draws'
+// world, all under the harness name car_draw.
 
 #pragma once
 
@@ -43,9 +44,16 @@ void FiniteFloats(uint8_t* base, uint32_t address, uint32_t count, Random& r);
 void StoreFloats(uint8_t* base, uint32_t address, std::initializer_list<float> values);
 float Spread(Random& r, float range);
 
+// CarLighting::Gather's light sets: their owner at `owner` with one set of
+// one group of `count` lights around (px, py, pz), mostly above it.
+void LightSets(uint8_t* base, uint32_t owner, uint32_t count, float px, float py, float pz,
+               Random& r);
+
 // The parts' small draws' cases (car_draw_parts.cpp).
 void PartsDraws(Context& h, Random& r, uint32_t block, uint32_t race);
 // The head and tail lights' cases (car_draw_lamps.cpp).
 void LampsDraws(Context& h, Random& r, uint32_t block, uint32_t race);
+// The shadows' cases (car_draw_shadows.cpp).
+void ShadowsDraws(Context& h, Random& r, uint32_t block, uint32_t race);
 
 }  // namespace harness::car_draw_shared

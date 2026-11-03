@@ -1278,6 +1278,10 @@ void StoreFloats(uint8_t* base, uint32_t address, std::initializer_list<float> v
 float Spread(Random& r, float range) {
   return harness::Spread(r, range);
 }
+void LightSets(uint8_t* base, uint32_t owner, uint32_t count, float px, float py, float pz,
+               Random& r) {
+  harness::LightSets(base, owner, count, px, py, pz, r);
+}
 
 }  // namespace car_draw_shared
 
@@ -1296,6 +1300,7 @@ void CarDraw(Context& h) {
   LightKits(h, r, block, race);
   car_draw_shared::PartsDraws(h, r, block, race);
   car_draw_shared::LampsDraws(h, r, block, race);
+  car_draw_shared::ShadowsDraws(h, r, block, race);
   memory::Free(race_allocation);
   memory::Free(allocation);
 }

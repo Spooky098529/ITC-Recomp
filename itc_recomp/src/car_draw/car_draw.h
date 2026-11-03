@@ -53,10 +53,11 @@ struct Calls {
   std::function<uint64_t(uint32_t function, const uint64_t* regs, int count, uint32_t sp,
                          uint32_t lr)>
       call;
-  // As `call`, with r28 = `r28` during the call (put back after): what
-  // CarPart::Draw's depth pass hands its recorder's context.
+  // As `call`, with r28 = `r28` (all 64 bits) during the call (put back
+  // after): what CarPart::Draw's depth pass and Model::DrawShapeDepth hand
+  // their recorder's context.
   std::function<uint64_t(uint32_t function, const uint64_t* regs, int count, uint32_t sp,
-                         uint32_t lr, uint32_t r28)>
+                         uint32_t lr, uint64_t r28)>
       call_r28;
   // As `call`, with r24 = `r24` (all 64 bits) during the call (put back
   // after): what Model::Draw hands its recorder's context, for draws whose
@@ -484,5 +485,32 @@ Left PartsDrawTailLights(uint8_t* base, const Calls& calls, uint32_t stack, uint
 Left PartsDrawHeadlights(uint8_t* base, const Calls& calls, uint32_t stack, uint32_t group,
                          uint32_t block, uint32_t pass, uint64_t index, uint64_t sub,
                          uint32_t caller_r24);
+
+// --- The shadows (shadows.cpp) ---
+//
+// Part 5: PartsPoints::DrawShadows, the shadow shapes into the depth
+// passes, plain and flattened away from up to three nearby lights.
+
+constexpr uint32_t kPartsShadowsFrame = 1808;
+
+// PartsPoints::DrawShadows (sub_820E1D88): r3 = the shadows group (pb +
+// 36096), r4 = the block (r5 and r6 aren't read). The ten w words of the
+// record at +1040 set to 1.0; in a race (the scene's +4 1)
+// CarLighting::Gather(frame + 1040, the block's world, 1). Nothing more
+// unless records 0 and 3 have models (r3 the gather's, or the group); the
+// block's world memcpy'd to +80. Then, each under its key (the render
+// queue's [0x8296B8FC] and [0x8296B8F8] saved to the pass description's
+// +76 and +80, both set to the key, put back), four Model::DrawShapeDepth
+// draws (record 0's model, the shapes of records 0 and 3, groups 0 and 1;
+// r28 0x82970000 in their recorder's context): with the pass at d +4
+// enabled and d +60 bit 0x4, its view-projection (memcpy'd to +976), key d
+// +32; with the pass at d +8 enabled (else nothing more), its
+// view-projection (to +144): bit 0x10, key d +36; then for lights 0 to 2,
+// with the gathered word at +1040 + 4i set and bit 0x20 << i, key d + 40 +
+// 4i, the world times the light's shadow matrix (+1088 + 64i) into the
+// original's products. Outside a race the gathered words are the stack's,
+// read as the original reads them. r3 as the original leaves it.
+Left PartsDrawShadows(uint8_t* base, const Calls& calls, uint32_t stack, uint32_t group,
+                      uint32_t block);
 
 }  // namespace car_draw

@@ -53,7 +53,8 @@ ITC_FLAG_BOOL(native_car_draw, true, "ITC",
               "and the matrix functions as plain C++), the head and tail lights with their "
               "camera-facing glows (PartsPoints::DrawTailLights sub_820DF8B0 and "
               "DrawHeadlights sub_820E1690; the material passes, Projector::Matrices and "
-              "Model::Draw as plain C++)) "
+              "Model::Draw as plain C++), the shadows PartsPoints::DrawShadows sub_820E1D88 "
+              "(CarLighting::Gather and Model::DrawShapeDepth as plain C++)) "
               "natively instead of through the translated code, with --native_scenery_lists, "
               "--native_models, --native_matrix_math, --native_math, --native_nearest_lights, "
               "--native_vehicle_accessors, --native_track_zones, --native_second_set, "
@@ -153,7 +154,7 @@ car_draw::Calls CarDrawCalls(SceneryDrawGuest* guest) {
     return ctx.r3.u64;
   };
   calls.call_r28 = [guest, call = calls.call](uint32_t function, const uint64_t* regs, int count,
-                                              uint32_t sp, uint32_t lr, uint32_t r28) {
+                                              uint32_t sp, uint32_t lr, uint64_t r28) {
     PPCContext& ctx = guest->ctx;
     const uint64_t saved = ctx.r28.u64;
     ctx.r28.u64 = r28;
@@ -398,6 +399,25 @@ void CarDrawPartsHeadlights(PPCContext& ctx, uint8_t* base) {
   });
 }
 
+bool CarDrawShadowsCalleesNative() {
+  return CarDrawPartsCalleesNative() && CarDrawLightingCalleesNative();
+}
+
+void CarDrawPartsShadows(PPCContext& ctx, uint8_t* base) {
+  if (!CarDrawShadowsCalleesNative()) {
+    __imp__sub_820E1D88(ctx, base);
+    return;
+  }
+  ctx.fpscr.disableFlushMode();
+  const uint64_t lr = ctx.lr;
+  SceneryDrawGuest guest{ctx, base};
+  const car_draw::Calls calls = CarDrawCalls(&guest);
+  const car_draw::Left left =
+      car_draw::PartsDrawShadows(base, calls, ctx.r1.u32, ctx.r3.u32, ctx.r4.u32);
+  ctx.lr = lr;
+  LeaveLeft(ctx, left);
+}
+
 }  // namespace hooks
 
 #define ITC_CAR_DRAW(address, step)     \
@@ -446,4 +466,6 @@ ITC_CAR_DRAW(820E1260, CarDrawPartsWithShadow)
 // The head and tail lights (their callers, the parts' top, are recompiled).
 ITC_CAR_DRAW(820DF8B0, CarDrawPartsTailLights)
 ITC_CAR_DRAW(820E1690, CarDrawPartsHeadlights)
+// The shadows (its caller, the race's parts' top, is recompiled).
+ITC_CAR_DRAW(820E1D88, CarDrawPartsShadows)
 #undef ITC_CAR_DRAW

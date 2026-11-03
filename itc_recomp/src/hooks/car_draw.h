@@ -96,5 +96,9 @@ void CarDrawPartsWithShadow(PPCContext& ctx, uint8_t* base);         // sub_820E
 // table's index and sub-index).
 void CarDrawPartsTailLights(PPCContext& ctx, uint8_t* base);         // sub_820DF8B0
 void CarDrawPartsHeadlights(PPCContext& ctx, uint8_t* base);         // sub_820E1690
+// The shadows (src/car_draw/shadows.cpp; the parts' and the lighting's
+// callees native): r3 = the group, r4 = the block.
+bool CarDrawShadowsCalleesNative();
+void CarDrawPartsShadows(PPCContext& ctx, uint8_t* base);            // sub_820E1D88
 
 }  // namespace hooks
