@@ -19,6 +19,9 @@ ITC_FLAG_DECLARE(bool, native_nearest_lights);
 ITC_FLAG_DECLARE(bool, native_vehicle_accessors);
 ITC_FLAG_DECLARE(bool, native_track_zones);
 ITC_FLAG_DECLARE(bool, per_tick_blink_timers);
+ITC_FLAG_DECLARE(bool, native_second_set);
+ITC_FLAG_DECLARE(bool, native_c_runtime);
+ITC_FLAG_DECLARE(bool, native_material_passes);
 
 ITC_FLAG_BOOL(native_car_draw, true, "ITC",
               "Run the car draw (docs/functions/car-draw.md: Model::Draw sub_820D04E8 and "
@@ -27,11 +30,15 @@ ITC_FLAG_BOOL(native_car_draw, true, "ITC",
               "Matrix::Shadow sub_82597FE0 (no adapter: Gather's plain C++ calls it), CarLighting::Gather sub_820C9170 (with "
               "Lights::FindNearest, Vec4::Transform and cos as plain C++), "
               "LightKit::BlinkLevel sub_820DC4B0, BlinkTimers::Advance sub_820DC958 (inside "
-              "its render-only skip, --per_tick_blink_timers) and "
-              "SceneModel::IsNearPlayerHeight sub_820DAB58 (inside the diagnostics' wrap)) "
+              "its render-only skip, --per_tick_blink_timers), "
+              "SceneModel::IsNearPlayerHeight sub_820DAB58 (inside the diagnostics' wrap), "
+              "the morph Model::MorphShape sub_82595110 (the job maker a guest call), "
+              "WorkMem::AllocVertexBuffer sub_8258A9E8, Model::QueueJobRelease sub_82594E88 and "
+              "XGSetVertexBufferHeader sub_8235A688 (no adapter: its caller calls it)) "
               "natively instead of through the translated code, with --native_scenery_lists, "
               "--native_models, --native_matrix_math, --native_math, --native_nearest_lights, "
-              "--native_vehicle_accessors and --native_track_zones (else the originals; the "
+              "--native_vehicle_accessors, --native_track_zones, --native_second_set, "
+              "--native_c_runtime and --native_material_passes (else the originals; the "
               "same writes; checked by --run_harnesses=car_draw)");
 
 namespace hooks {
@@ -49,6 +56,16 @@ bool CarDrawLightingCalleesNative() {
 bool CarDrawHeightCalleesNative() {
   return ITC_FLAG(native_vehicle_accessors) && ITC_FLAG(native_track_zones) &&
          ITC_FLAG(native_matrix_math);
+}
+
+bool CarDrawMorphCalleesNative() {
+  return !SceneryListsSlotDiagnostics() && ITC_FLAG(native_second_set) &&
+         ITC_FLAG(native_models) && ITC_FLAG(native_c_runtime);
+}
+
+bool CarDrawLightKitCalleesNative() {
+  return CarDrawModelCalleesNative() && ITC_FLAG(native_material_passes) &&
+         ITC_FLAG(native_second_set) && ITC_FLAG(native_matrix_math);
 }
 
 bool CarDrawCalleesNative() {
@@ -88,6 +105,25 @@ car_draw::Calls CarDrawCalls(SceneryDrawGuest* guest) {
     ctx.f3.f64 = f3;
     ctx.fpscr.disableFlushMode();
     __imp__sub_820F4128(ctx, base);
+    ctx.r1.u64 = stack;
+    ctx.fpscr.disableFlushMode();
+    return ctx.r3.u64;
+  };
+  calls.call = [guest](uint32_t function, const uint64_t* regs, int count, uint32_t sp,
+                       uint32_t lr) {
+    PPCContext& ctx = guest->ctx;
+    uint8_t* base = guest->base;
+    const uint64_t stack = ctx.r1.u64;
+    ctx.r1.u64 = sp;
+    ctx.lr = lr;
+    PPCRegister* registers[8] = {&ctx.r3, &ctx.r4, &ctx.r5, &ctx.r6,
+                                 &ctx.r7, &ctx.r8, &ctx.r9, &ctx.r10};
+    for (int i = 0; i < count; i++) {
+      registers[i]->u64 = regs[i];
+    }
+    ctx.fpscr.disableFlushMode();
+    ctx.ctr.u64 = function;
+    REX_CALL_INDIRECT_FUNC(function);
     ctx.r1.u64 = stack;
     ctx.fpscr.disableFlushMode();
     return ctx.r3.u64;
@@ -193,6 +229,68 @@ void CarDrawIsNearPlayerHeight(PPCContext& ctx, uint8_t* base) {
   ctx.fpscr.disableFlushMode();
 }
 
+void CarDrawAllocVertexBuffer(PPCContext& ctx, uint8_t* base) {
+  if (!CarDrawMorphCalleesNative()) {
+    __imp__sub_8258A9E8(ctx, base);
+    return;
+  }
+  ctx.fpscr.disableFlushMode();
+  const auto memory = car_draw::WorkMemAllocVertexBuffer(base, ctx.r3.u32, ctx.r4.u32, ctx.r1.u32);
+  if (!memory) {
+    __imp__sub_8258A9E8(ctx, base);
+    return;
+  }
+  ctx.r3.u64 = *memory;
+}
+
+namespace {
+
+void LeaveLeft(PPCContext& ctx, const car_draw::Left& left) {
+  if (!left.in_ctx) {
+    ctx.r3.u64 = left.r3;
+  }
+  ctx.fpscr.disableFlushMode();
+}
+
+}  // namespace
+
+void CarDrawQueueJobRelease(PPCContext& ctx, uint8_t* base) {
+  if (!CarDrawMorphCalleesNative()) {
+    __imp__sub_82594E88(ctx, base);
+    return;
+  }
+  ctx.fpscr.disableFlushMode();
+  const uint64_t lr = ctx.lr;
+  SceneryDrawGuest guest{ctx, base};
+  const car_draw::Calls calls = CarDrawCalls(&guest);
+  const auto left = car_draw::ModelQueueJobRelease(base, calls, ctx.r4.u32, ctx.r1.u32);
+  if (!left) {
+    __imp__sub_82594E88(ctx, base);
+    return;
+  }
+  ctx.lr = lr;
+  LeaveLeft(ctx, *left);
+}
+
+void CarDrawMorphShape(PPCContext& ctx, uint8_t* base) {
+  if (!CarDrawMorphCalleesNative()) {
+    __imp__sub_82595110(ctx, base);
+    return;
+  }
+  ctx.fpscr.disableFlushMode();
+  const uint64_t lr = ctx.lr;
+  SceneryDrawGuest guest{ctx, base};
+  const car_draw::Calls calls = CarDrawCalls(&guest);
+  const auto left = car_draw::ModelMorphShape(base, calls, ctx.r3.u32, ctx.r4.u32, ctx.r5.u64,
+                                              ctx.r1.u32);
+  if (!left) {
+    __imp__sub_82595110(ctx, base);
+    return;
+  }
+  ctx.lr = lr;
+  LeaveLeft(ctx, *left);
+}
+
 }  // namespace hooks
 
 #define ITC_CAR_DRAW(address, step)     \
@@ -212,4 +310,7 @@ ITC_CAR_DRAW(820D04E8, CarDrawModelDraw)
 ITC_CAR_DRAW(820D06F0, CarDrawCarPartDraw)
 ITC_CAR_DRAW(820C9170, CarDrawCarLightingGather)
 ITC_CAR_DRAW(820DC4B0, CarDrawBlinkLevel)
+ITC_CAR_DRAW(8258A9E8, CarDrawAllocVertexBuffer)
+ITC_CAR_DRAW(82594E88, CarDrawQueueJobRelease)
+ITC_CAR_DRAW(82595110, CarDrawMorphShape)
 #undef ITC_CAR_DRAW

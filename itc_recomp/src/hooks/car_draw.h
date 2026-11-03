@@ -26,6 +26,12 @@ bool CarDrawModelCalleesNative();
 bool CarDrawLightingCalleesNative();
 bool CarDrawHeightCalleesNative();
 bool CarDrawCalleesNative();
+// The morph's (the command list's diagnostics off, --native_second_set,
+// --native_models, --native_c_runtime) and the light kit's (the model
+// draws', --native_material_passes, --native_second_set,
+// --native_matrix_math).
+bool CarDrawMorphCalleesNative();
+bool CarDrawLightKitCalleesNative();
 
 // The guest calls (car_draw::Calls) through `guest`'s context: the draws'
 // (hooks::SceneryListsDrawCalls) and memcpy's original.
@@ -52,5 +58,14 @@ void CarDrawBlinkTimersAdvance(PPCContext& ctx, uint8_t* base);
 // SceneModel::IsNearPlayerHeight (sub_820DAB58): r3 = the pass
 // description, r4 = the position.
 void CarDrawIsNearPlayerHeight(PPCContext& ctx, uint8_t* base);
+
+// WorkMem::AllocVertexBuffer (sub_8258A9E8): r3 = where the header's
+// address goes, r4 = the bytes.
+void CarDrawAllocVertexBuffer(PPCContext& ctx, uint8_t* base);
+// Model::QueueJobRelease (sub_82594E88): r3 = the model, r4 = the job.
+void CarDrawQueueJobRelease(PPCContext& ctx, uint8_t* base);
+// Model::MorphShape (sub_82595110): r3 = the model, r4 = the morph record,
+// r5 = the shape's index.
+void CarDrawMorphShape(PPCContext& ctx, uint8_t* base);
 
 }  // namespace hooks

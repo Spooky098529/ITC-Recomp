@@ -50,6 +50,11 @@ constexpr Region kRegions[] = {
     {0x8265ECA0, 0xA0}, {0x8296B940, 0x3A0}, {0x8296B8F0, 0x10}, {0x8296B7B0, 0x140},
     {0x8265EC00, 0x90}, {0x826C5100, 0x10}, {0x826C2E30, 0x20}, {0x826C5510, 0x10},
     {0x826C7820, 0x10}, {0x826D82F0, 0x10},
+    // The work memory's index, header counts, bytes used and starts, and
+    // the header windows the morph cases take from (counts 0 to 7 and 1,272
+    // to 1,279 of each buffer).
+    {0x8296B780, 0x30}, {0x82957780, 0x100}, {0x82957780 + 32 * 1272, 0x100},
+    {0x82957780 + 32 * 1280, 0x100}, {0x82957780 + 32 * 2552, 0x100},
 };
 // The scene lights' slots CarLighting::Gather writes (floats), and pixel c43.
 constexpr uint32_t kLightSlots = 0x8296B9E0;
@@ -755,6 +760,234 @@ void ModelDraws(Context& h, Random& r, uint32_t block) {
   }
 }
 
+
+// --- The morph ---
+
+constexpr uint32_t kWorkStarts = 0x8296B7A8;
+
+// XGSetVertexBufferHeader's register steps (no adapter: its only caller,
+// WorkMem::AllocVertexBuffer, calls the plain C++).
+void NativeXgSetVertexBufferHeader(PPCContext& ctx, uint8_t* base) {
+  ctx.fpscr.disableFlushMode();
+  ctx.r3.u64 = car_draw::XgSetVertexBufferHeader(base, ctx.r3.u32, ctx.r4.u32, ctx.r6.u32,
+                                                 ctx.r7.u32, ctx.r1.u32);
+}
+
+// The work memory: buffer i (0 or 1) current, its header count near 0 or
+// near the 1,280 limit (now and then at it), the bytes used and the capacity
+// around `bytes` (now and then not fitting), its start at the block's
+// +0x9000.
+void WorkMemory(uint8_t* base, uint32_t block, Random& r, uint32_t bytes) {
+  const uint32_t i = r.Below(2);
+  guest::StoreU32(base, 0x8296B780, i);
+  for (uint32_t b = 0; b < 2; b++) {
+    const uint32_t count = r.Below(4) == 0 ? 1272 + r.Below(r.Below(8) == 0 ? 10 : 8)
+                                           : r.Below(6);
+    guest::StoreU32(base, 0x8296B798 + 4 * b, count);
+    guest::StoreU32(base, 0x8296B7A0 + 4 * b,
+                    r.Below(4) == 0 ? r.Below(0x400) : 128 * r.Below(8));
+    guest::StoreU32(base, kWorkStarts + 4 * b, block + 0x9000);
+  }
+  const uint32_t used = guest::LoadU32(base, 0x8296B7A0 + 4 * i);
+  guest::StoreU32(base, 0x8296B7B0,
+                  r.Below(6) == 0 ? used + bytes - r.Below(2) + r.Below(2)
+                                  : used + bytes + 0x200 + r.Below(0x1000));
+}
+
+void Morphs(Context& h, Random& r, uint32_t block) {
+  {
+    Results results("XGSetVertexBufferHeader (sub_8235A688)");
+    const uint32_t header = block + 0x200;
+    for (int c = 0; c < 512; c++) {
+      Case(
+          h, results, block, r,
+          [&](PPCContext& t) {
+            t.r3.u64 = r.Below(4) == 0 ? r.Next() : r.Below(0x10000);
+            t.r4.u64 = r.Below(2) ? 0 : r.Next() & (r.Below(2) ? 0x204u : 0xFFFFFFFFu);
+            t.r5.u64 = r.Below(2) ? 1 : r.Next();
+            t.r6.u64 = r.Below(4) == 0 ? r.Next() : 16 * r.Below(0x1000);
+            t.r7.u64 = header;
+          },
+          __imp__sub_8235A688, NativeXgSetVertexBufferHeader, {}, fmt::format("case {}", c),
+          [&](const PPCContext& t, Outputs& o) {
+            o.Word(guest::LoadU32(h.base, t.r1.u32 - car_draw::kXgVertexBufferHeaderFrame));
+          });
+    }
+    results.Report();
+  }
+  {
+    Results results("WorkMem::AllocVertexBuffer (sub_8258A9E8)");
+    const uint32_t out = block + 0x300;
+    int over = 0;
+    for (int c = 0; c < 512; c++) {
+      Case(
+          h, results, block, r,
+          [&](PPCContext& t) {
+            const uint32_t bytes = r.Below(8) == 0 ? r.Below(0x400) : 16 * r.Below(17);
+            WorkMemory(h.base, block, r, bytes);
+            const uint32_t i = guest::LoadU32(h.base, 0x8296B780);
+            const uint32_t used = guest::LoadU32(h.base, 0x8296B7A0 + 4 * i);
+            if (used + bytes >= guest::LoadU32(h.base, 0x8296B7B0) ||
+                guest::LoadU32(h.base, 0x8296B798 + 4 * i) >= 1280) {
+              over++;
+            }
+            t.r3.u64 = out;
+            t.r4.u64 = bytes;
+          },
+          __imp__sub_8258A9E8, hooks::CarDrawAllocVertexBuffer, {}, fmt::format("case {}", c),
+          [&](const PPCContext& t, Outputs& o) {
+            const uint32_t frame = t.r1.u32 - car_draw::kAllocVertexBufferFrame;
+            o.Word(guest::LoadU32(h.base, frame));
+            o.Word(guest::LoadU32(h.base, frame - car_draw::kXgVertexBufferHeaderFrame));
+          },
+          {}, true);
+    }
+    ITC_LOG_INFO("harness: WorkMem::AllocVertexBuffer: {} of 512 cases over a limit (the "
+                 "debug message)",
+                 over);
+    results.Report();
+  }
+  const uint32_t queue = block + 0x7C0;
+  auto render_queue = [&]() {
+    guest::StoreU32(h.base, kRenderQueue, queue);
+    guest::StoreU32(h.base, queue, queue + 0x20);
+    guest::StoreU32(h.base, queue + 0x20 + 16, kEmptyFunction);
+    RandomBytes(h.base, 0x8296B900, 16, r);
+  };
+  auto queued = [&](const PPCContext& t, Outputs& o, int& count) {
+    if (t.r3.u32 == queue) {
+      count++;
+      o.Word(t.r4.u32);
+      o.Word(t.r5.u32);
+      o.Double(t.f1.u64);
+    }
+  };
+  {
+    Results results("Model::QueueJobRelease (sub_82594E88)");
+    int count = 0;
+    for (int c = 0; c < 512; c++) {
+      Case(
+          h, results, block, r,
+          [&](PPCContext& t) {
+            RandomList(h.base, block, r, 4);
+            render_queue();
+            t.r3.u64 = r.Next();
+            t.r4.u64 = r.Next();
+          },
+          __imp__sub_82594E88, hooks::CarDrawQueueJobRelease, {}, fmt::format("case {}", c),
+          [&](const PPCContext& t, Outputs& o) {
+            o.Word(guest::LoadU32(h.base, t.r1.u32 - car_draw::kQueueJobReleaseFrame));
+            queued(t, o, count);
+          },
+          {}, true);
+    }
+    ITC_LOG_INFO("harness: Model::QueueJobRelease: {} of 512 cases handed the chunk to the "
+                 "render queue",
+                 count / 2);
+    results.Report();
+  }
+  {
+    // The model at +0x100 (its shapes at +0x2000), the streams' headers at
+    // +0xA000 and +0xA100, the weights record at +0xA200, the morph record
+    // at +0xA300, the pool maker at +0xA400 (its slot 1 the empty function:
+    // the "job" is the maker), the blend's streams at +0xB000. The work
+    // memory's outputs (+0x9000) compared as floats.
+    Results results("Model::MorphShape (sub_82595110)");
+    const uint32_t model = block + 0x100, morph = block + 0xA300, maker = block + 0xA400;
+    int with_maker = 0, blended = 0;
+    for (int c = 0; c < 1024; c++) {
+      bool has_maker = false;
+      uint32_t kind = 9;
+      Case(
+          h, results, block, r,
+          [&](PPCContext& t) {
+            g_flush_on_entry = r.Below(2) != 0;
+            RandomList(h.base, block, r, 4);
+            render_queue();
+            const uint32_t index = r.Below(4);
+            guest::StoreU32(h.base, model + 40, block + 0x2000);
+            const uint32_t shape = block + 0x2000 + 544 * index;
+            const uint32_t s0 = block + 0xA000, s1 = block + 0xA100;
+            guest::StoreU32(h.base, shape + 400, s0);
+            guest::StoreU32(h.base, shape + 404, s1);
+            guest::StoreU32(h.base, shape + 408, block + 0xA200);
+            const uint32_t vertices = r.Below(17);
+            const uint32_t bytes0 = r.Below(8) == 0 ? r.Below(0x400) : 16 * (vertices + r.Below(3));
+            const uint32_t bytes1 =
+                r.Below(3) == 0 ? 0 : r.Below(8) == 0 ? r.Below(0x400) : 16 * (vertices + r.Below(3));
+            guest::StoreU32(h.base, s0 + 12, bytes0);
+            guest::StoreU32(h.base, s1 + 12, bytes1);
+            WorkMemory(h.base, block, r, bytes0 + bytes1 + (r.Below(2) ? 0 : 128));
+            has_maker = r.Below(3) != 0;
+            guest::StoreU32(h.base, 0x8296B914, has_maker ? maker : 0);
+            guest::StoreU32(h.base, maker, maker + 0x10);
+            guest::StoreU32(h.base, maker + 0x10 + 4, kEmptyFunction);
+            // The blend (without a maker): kind 6 or 7 now and then, its
+            // vertices fitting both outputs (7 only with a second stream).
+            kind = 9;
+            if (!has_maker && r.Below(2) == 0 && bytes0 >= 16 * vertices &&
+                bytes0 < 0x400) {
+              kind = bytes1 != 0 && bytes1 >= 16 * vertices && r.Below(2) ? 7 : 6;
+              if (kind == 6 || bytes1 < 0x400) {
+                blended++;
+              } else {
+                kind = 9;
+              }
+            }
+            const uint32_t streams = block + 0xB000;
+            for (uint32_t w = 0; w < 0x1200 / 4; w++) {
+              guest::StoreU32(h.base, streams + 4 * w, RandomFloat(r));
+            }
+            guest::StoreU32(h.base, morph + 0, streams);
+            guest::StoreU32(h.base, morph + 4, streams + 0x100);
+            for (uint32_t i = 0; i < 7; i++) {
+              guest::StoreU32(h.base, morph + 16 + 4 * i, streams + 0x200 + 0x100 * i);
+              guest::StoreU32(h.base, morph + 48 + 4 * i,
+                              r.Below(2) ? streams + 0x100 : streams + 0x900 + 0x100 * (i % 5));
+              guest::StoreU32(h.base, morph + 80 + 4 * i, RandomFloat(r));
+            }
+            guest::StoreU32(h.base, morph + 112, r.Below(8));
+            guest::StoreU32(h.base, morph + 116, vertices);
+            guest::StoreU32(h.base, morph + 120, kind);
+            t.r3.u64 = model;
+            t.r4.u64 = morph;
+            t.r5.u64 = index;
+          },
+          __imp__sub_82595110, hooks::CarDrawMorphShape, {{0x9000, 0xC00 / 4}},
+          fmt::format("case {}", c),
+          [&](const PPCContext& t, Outputs& o) {
+            const uint32_t frame = t.r1.u32 - car_draw::kMorphShapeFrame;
+            o.Word(guest::LoadU32(h.base, frame));
+            if (has_maker) {
+              with_maker++;
+              o.Word(guest::LoadU32(h.base, frame - car_draw::kAllocVertexBufferFrame));
+              o.Word(guest::LoadU32(h.base, frame - car_draw::kAllocVertexBufferFrame -
+                                                car_draw::kXgVertexBufferHeaderFrame));
+              o.Word(guest::LoadU32(h.base, frame - car_draw::kQueueJobReleaseFrame));
+              int unused = 0;
+              queued(t, o, unused);
+            } else if (kind == 7) {
+              // Blend7's sizes, and its weights once a target ran.
+              o.Word(guest::LoadU32(h.base, frame - 80));
+              o.Word(guest::LoadU32(h.base, frame - 76));
+              if (guest::LoadU32(h.base, morph + 112) != 0) {
+                o.Floats(h.base, frame - 64, 4);
+              }
+            } else if (kind == 6 && guest::LoadU32(h.base, morph + 112) != 0) {
+              // Blend6's weights once a target ran (else the recompiled
+              // allocation's saved r27 is left there).
+              o.Floats(h.base, frame - 48, 4);
+            }
+          },
+          {}, true);
+    }
+    ITC_LOG_INFO("harness: Model::MorphShape: {} of 1024 cases with the pool maker, {} blended "
+                 "here (kinds 6, 7)",
+                 with_maker / 2, blended);
+    results.Report();
+  }
+}
+
 }  // namespace
 
 void CarDraw(Context& h) {
@@ -768,6 +1001,7 @@ void CarDraw(Context& h) {
   Gathers(h, r, block);
   Heights(h, r, block, race);
   ModelDraws(h, r, block);
+  Morphs(h, r, block);
   memory::Free(race_allocation);
   memory::Free(allocation);
 }

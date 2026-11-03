@@ -46,6 +46,20 @@ struct Calls {
   std::function<uint64_t(const uint64_t regs[7], double f1, double f2, double f3, uint32_t sp,
                          uint32_t lr)>
       find_nearest;
+  // Any guest function `function` from the frame at `sp` with `lr`, r3 on
+  // from `regs` (`count` of them, all 64 bits); its r3 (64 bits). The
+  // callees still recompiled (the morph's job maker, the light kit's LEDs
+  // and spots) and the originals where a plain C++ declines.
+  std::function<uint64_t(uint32_t function, const uint64_t* regs, int count, uint32_t sp,
+                         uint32_t lr)>
+      call;
+};
+
+// What a function leaves in r3: in the context already (`in_ctx`, the last
+// guest call's or render queue call's), or `r3` (all 64 bits).
+struct Left {
+  bool in_ctx = false;
+  uint64_t r3 = 0;
 };
 
 // What a draw leaves in r3: the last render queue call's r3 (`queued`; the
@@ -164,5 +178,70 @@ constexpr uint32_t kNearPlayerHeightFrame = 192;
 // place); 0 when |its y - the position's y| is above [0x82002DF4], else 1.
 uint32_t SceneModelIsNearPlayerHeight(uint8_t* base, const Calls& calls, uint32_t stack,
                                       uint32_t pass, uint32_t position);
+
+// --- The morph (morph.cpp) ---
+//
+// Part 2: XGSetVertexBufferHeader, WorkMem::AllocVertexBuffer,
+// Model::QueueJobRelease and Model::MorphShape.
+
+// XGSetVertexBufferHeader's frame.
+constexpr uint32_t kXgVertexBufferHeaderFrame = 128;
+
+// XGSetVertexBufferHeader (sub_8235A688): r3 = the length in bytes, r4 =
+// the usage, r5 = the pool (not read), r6 = the offset, r7 = the header:
+// the 32 bytes cleared (memset), +0 = 1 (0x00200001 with usage bit 0x4, |
+// 0x00400000 with bit 0x200), +4 = 1, +20 = 0xFFFF0000, +24 = offset | 3,
+// +28 = (length & 0x03FFFFFC) | (+28's bit 0x08000000, 0 after the clear) |
+// 0x10000000 | 2. Its frame's back chain. Returns r3: the header (memset's).
+uint32_t XgSetVertexBufferHeader(uint8_t* base, uint32_t length, uint32_t usage, uint32_t offset,
+                                 uint32_t header, uint32_t stack);
+
+// WorkMem::AllocVertexBuffer's frame.
+constexpr uint32_t kAllocVertexBufferFrame = 128;
+
+// WorkMem::AllocVertexBuffer (sub_8258A9E8): r3 = where the header's
+// address goes, r4 = bytes: from the current buffer i ([0x8296B780]), the
+// header 0x82957780 + 32 x (1,280 i + [0x8296B798 + 4i]) set up
+// (XGSetVertexBufferHeader(bytes, 0, 1, the bytes used, header), its frame
+// below this one) and made absolute (Resource::Relocate with the buffer's
+// start [0x8296B7A8 + 4i]), the header count up by 1, the bytes used
+// ([0x8296B7A0 + 4i]) up by r4 and rounded up to 128, [r3] = the header.
+// Returns r3: the memory, the start plus the bytes used before. nullopt,
+// with nothing done, where the original would print a debug message
+// (WorkMemFits false; it returns the buffer's start then).
+std::optional<uint32_t> WorkMemAllocVertexBuffer(uint8_t* base, uint32_t header_out,
+                                                 uint32_t bytes, uint32_t stack);
+
+// Model::QueueJobRelease's frame.
+constexpr uint32_t kQueueJobReleaseFrame = 144;
+
+// Model::QueueJobRelease (sub_82594E88): r3 = the model (not read), r4 = a
+// job: on the command list [0x8296B918] a chunk of four slots, the head
+// (+2 = 4, +4 = the second slot), command 22 (+0 = 22, +4 = 1, +8 = 0), its
+// argument (+4 = the job, +8 = 1) and command 36 (+4, +8 = 0), handed to
+// the render queue (its slot 4, a guest call from this frame returning to
+// 0x82594F4C) with the bucket [0x8296B904] and the key [0x82000A34]. r3 the
+// queue call's (in the context). nullopt, with nothing done, where the
+// list has no room for the four slots (or a chunk is open on another list).
+std::optional<Left> ModelQueueJobRelease(uint8_t* base, const Calls& calls, uint32_t job,
+                                         uint32_t stack);
+
+// Model::MorphShape's frame.
+constexpr uint32_t kMorphShapeFrame = 128;
+
+// Model::MorphShape (sub_82595110): r3 = the model, r4 = a morph record
+// (Morph::SetUp's), r5 = the base shape's index (64 bits: the shape at
+// [model + 40] + 544 x r5): stream 0's bytes ([[shape + 400] + 12]) from the
+// work memory (the header's address to the shape's +412, the memory to
+// +416), stream 1's the same (+420, +424) unless 0 (+424 = 0); the record's
+// +8 and +12 = +416 and +424. With the pool maker [0x8296B914], its slot 1
+// (a guest call, r3 the maker, r4 the record, returning to 0x825951A4)
+// makes the job, which goes to [shape + 408] + 20 and to
+// Model::QueueJobRelease; without one, Morph::Blend(record) (its plain C++,
+// else its original returning to 0x825951CC) and [+408] + 20 = 0. Either
+// way +428 = 1. nullopt, with nothing done, where an allocation would print
+// its debug message or the release has no room.
+std::optional<Left> ModelMorphShape(uint8_t* base, const Calls& calls, uint32_t model,
+                                    uint32_t morph, uint64_t shape_index, uint32_t stack);
 
 }  // namespace car_draw
