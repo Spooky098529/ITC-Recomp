@@ -7,6 +7,9 @@
 
 #include "harness.h"
 
+#include "car_draw/car_draw.h"
+#include "hooks/car_draw.h"
+
 #include <cstdint>
 #include <functional>
 #include <string>
@@ -48,6 +51,23 @@ float Spread(Random& r, float range);
 // one group of `count` lights around (px, py, pz), mostly above it.
 void LightSets(uint8_t* base, uint32_t owner, uint32_t count, float px, float py, float pz,
                Random& r);
+
+// A part draw's register steps for the cases whose adapter is gone (its
+// callers are plain C++): `draw` runs the plain C++ with the calls, r3 as
+// it leaves it.
+template <typename Draw>
+void NativeStep(PPCContext& ctx, uint8_t* base, Draw draw) {
+  ctx.fpscr.disableFlushMode();
+  const uint64_t lr = ctx.lr;
+  hooks::SceneryDrawGuest guest{ctx, base};
+  const ::car_draw::Calls calls = hooks::CarDrawCalls(&guest);
+  const ::car_draw::Left left = draw(calls);
+  ctx.lr = lr;
+  if (!left.in_ctx) {
+    ctx.r3.u64 = left.r3;
+  }
+  ctx.fpscr.disableFlushMode();
+}
 
 // The parts' small draws' cases (car_draw_parts.cpp).
 void PartsDraws(Context& h, Random& r, uint32_t block, uint32_t race);

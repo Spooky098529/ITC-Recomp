@@ -67,30 +67,6 @@ void CarDrawMorphShape(PPCContext& ctx, uint8_t* base);
 // BlinkTimers::Advance as CarDrawBlinkTimersHeld says).
 void CarDrawSceneLightsDraw(PPCContext& ctx, uint8_t* base);
 
-// The parts' small draws (src/car_draw/parts.cpp): r3 = the group (or the
-// record), r4 = the block, r5 = the camera pass, r6 (the front bumper's and
-// fenders' lights: the parts record's +56; the mirror: the world).
-void CarDrawPartsFrontBumperLights(PPCContext& ctx, uint8_t* base);  // sub_820DE1C8
-void CarDrawPartsRearBumperLights(PPCContext& ctx, uint8_t* base);   // sub_820DE3C0
-void CarDrawPartsLeftDoorPanel(PPCContext& ctx, uint8_t* base);      // sub_820DE6E0
-void CarDrawPartsDoorWindows02(PPCContext& ctx, uint8_t* base);      // sub_820DE760
-void CarDrawPartsRightDoorPanel(PPCContext& ctx, uint8_t* base);     // sub_820DE8C8
-void CarDrawPartsDoorWindows01(PPCContext& ctx, uint8_t* base);      // sub_820DE948
-void CarDrawPartsDoorsBody(PPCContext& ctx, uint8_t* base);          // sub_820DEA88
-void CarDrawPartsDoorsWindows(PPCContext& ctx, uint8_t* base);       // sub_820DEAF0
-void CarDrawPartsFendersBody(PPCContext& ctx, uint8_t* base);        // sub_820DED88
-void CarDrawPartsFenderLights(PPCContext& ctx, uint8_t* base);       // sub_820DEDD8
-void CarDrawPartsCabinWindow02(PPCContext& ctx, uint8_t* base);      // sub_820DEF38
-void CarDrawPartsCabinWindow01(PPCContext& ctx, uint8_t* base);      // sub_820DEFA8
-void CarDrawPartsEngine(PPCContext& ctx, uint8_t* base);             // sub_820DF070
-void CarDrawPartsFrontBumper(PPCContext& ctx, uint8_t* base);        // sub_820DF308
-void CarDrawPartsRearBumper(PPCContext& ctx, uint8_t* base);         // sub_820DF458
-void CarDrawPartsBonnet(PPCContext& ctx, uint8_t* base);             // sub_820E0998
-void CarDrawPartsLeftDoor(PPCContext& ctx, uint8_t* base);           // sub_820E0B40
-void CarDrawPartsRightDoor(PPCContext& ctx, uint8_t* base);          // sub_820E0E38
-void CarDrawPartsHeadlightBody(PPCContext& ctx, uint8_t* base);      // sub_820E13E0
-void CarDrawPartsMirror(PPCContext& ctx, uint8_t* base);             // sub_820E1138
-void CarDrawPartsWithShadow(PPCContext& ctx, uint8_t* base);         // sub_820E1260
 // The head and tail lights (src/car_draw/lamps.cpp): r3 = the group, r4 =
 // the block, r5 = the camera pass (the headlights' r6 and r7 the color
 // table's index and sub-index).

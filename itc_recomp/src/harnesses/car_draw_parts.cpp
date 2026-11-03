@@ -16,7 +16,8 @@
 // passes 0 to 3. The race block's scene and slots are put back before each
 // version and compared after it, with the frames' temporaries, r3 and what
 // went to the render queue. The recompiled side runs with --native_car_draw
-// off (its CarPart::Draw calls the originals).
+// off (its CarPart::Draw calls the originals); the native side the plain
+// C++ through register steps of its own (the adapters are gone).
 
 #include "harness.h"
 #include "harnesses/car_draw_shared.h"
@@ -175,6 +176,42 @@ void PartsWorld(Context& h, Random& r, uint32_t block, uint32_t race, uint32_t s
                                   : std::bit_cast<uint32_t>(Spread(r, 1.0f) + 1.0f));
 }
 
+// The parts' small draws' register steps (their adapters are gone: their
+// callers, the parts' top, are plain C++); r3 the group (or the record), r4
+// the block, r5 the pass, r6 the lights' choice or the mirror's world.
+#define ITC_NATIVE_PARTS(name, ...)                                         \
+  void Native##name(PPCContext& ctx, uint8_t* base) {                        \
+    const uint32_t r3 = ctx.r3.u32, r4 = ctx.r4.u32, r5 = ctx.r5.u32;        \
+    const uint32_t r6 = ctx.r6.u32, r1 = ctx.r1.u32, r24 = ctx.r24.u32;      \
+    (void)r4;                                                                \
+    (void)r6;                                                                \
+    NativeStep(ctx, base, [&](const ::car_draw::Calls& calls) {              \
+      return ::car_draw::__VA_ARGS__;                                        \
+    });                                                                      \
+  }
+ITC_NATIVE_PARTS(FrontBumperLights, PartsDrawFrontBumperLights(base, calls, r1, r3, r4, r5, r6, r24))
+ITC_NATIVE_PARTS(RearBumperLights, PartsDrawRearBumperLights(base, calls, r1, r3, r4, r5, r24))
+ITC_NATIVE_PARTS(LeftDoorPanel, PartsDrawDoorPanel(base, calls, false, r1, r3, r4, r5, r24))
+ITC_NATIVE_PARTS(DoorWindows02, PartsDrawDoorWindows(base, calls, false, r1, r3, r4, r5, r24))
+ITC_NATIVE_PARTS(RightDoorPanel, PartsDrawDoorPanel(base, calls, true, r1, r3, r4, r5, r24))
+ITC_NATIVE_PARTS(DoorWindows01, PartsDrawDoorWindows(base, calls, true, r1, r3, r4, r5, r24))
+ITC_NATIVE_PARTS(DoorsBody, PartsDrawDoorsBody(base, calls, r1, r3, r4, r5, r24))
+ITC_NATIVE_PARTS(DoorsWindows, PartsDrawDoorsWindows(base, calls, r1, r3, r4, r5, r24))
+ITC_NATIVE_PARTS(FendersBody, PartsDrawFendersBody(base, calls, r1, r3, r4, r5, r24))
+ITC_NATIVE_PARTS(FenderLights, PartsDrawFenderLights(base, calls, r1, r3, r4, r5, r6, r24))
+ITC_NATIVE_PARTS(CabinWindow02, PartsDrawCabinWindow02(base, calls, r1, r3, r4, r5, r24))
+ITC_NATIVE_PARTS(CabinWindow01, PartsDrawCabinWindow01(base, calls, r1, r3, r4, r5, r24))
+ITC_NATIVE_PARTS(Engine, PartsDrawEngine(base, calls, r1, r3, r4, r5, r24))
+ITC_NATIVE_PARTS(FrontBumper, PartsDrawFrontBumper(base, calls, r1, r3, r4, r5, r24))
+ITC_NATIVE_PARTS(RearBumper, PartsDrawRearBumper(base, calls, r1, r3, r4, r5, r24))
+ITC_NATIVE_PARTS(Bonnet, PartsDrawBonnet(base, calls, r1, r3, r4, r5, r24))
+ITC_NATIVE_PARTS(LeftDoor, PartsDrawDoor(base, calls, false, r1, r3, r4, r5, r24))
+ITC_NATIVE_PARTS(RightDoor, PartsDrawDoor(base, calls, true, r1, r3, r4, r5, r24))
+ITC_NATIVE_PARTS(HeadlightBody, PartsDrawHeadlightBody(base, calls, r1, r3, r4, r5, r24))
+ITC_NATIVE_PARTS(Mirror, PartsDrawShadowed(base, calls, true, r1, r3, r5, r6, r24))
+ITC_NATIVE_PARTS(WithShadow, PartsDrawShadowed(base, calls, false, r1, r3, r5, r4 + 16, r24))
+#undef ITC_NATIVE_PARTS
+
 struct Target {
   const char* name;
   GuestFunction recompiled, native;
@@ -192,48 +229,48 @@ void PartsDraws(Context& h, Random& r, uint32_t block, uint32_t race) {
   const uint32_t scene = race + 0x10000;
   const Target targets[] = {
       {"PartsPoints::DrawFrontBumperLights (sub_820DE1C8)", __imp__sub_820DE1C8,
-       hooks::CarDrawPartsFrontBumperLights, car_draw::kPartsFrame, 0, false, 256},
+       NativeFrontBumperLights, car_draw::kPartsFrame, 0, false, 256},
       {"PartsPoints::DrawRearBumperLights (sub_820DE3C0)", __imp__sub_820DE3C0,
-       hooks::CarDrawPartsRearBumperLights, car_draw::kPartsFrame, 0, false, 256},
+       NativeRearBumperLights, car_draw::kPartsFrame, 0, false, 256},
       {"PartsPoints::DrawLeftDoorPanel (sub_820DE6E0)", __imp__sub_820DE6E0,
-       hooks::CarDrawPartsLeftDoorPanel, car_draw::kPartsFrame, 0, false, 256},
+       NativeLeftDoorPanel, car_draw::kPartsFrame, 0, false, 256},
       {"PartsPoints::DrawDoorWindows02 (sub_820DE760)", __imp__sub_820DE760,
-       hooks::CarDrawPartsDoorWindows02, car_draw::kPartsSmallFrame, 0, false, 256},
+       NativeDoorWindows02, car_draw::kPartsSmallFrame, 0, false, 256},
       {"PartsPoints::DrawRightDoorPanel (sub_820DE8C8)", __imp__sub_820DE8C8,
-       hooks::CarDrawPartsRightDoorPanel, car_draw::kPartsFrame, 0, false, 256},
+       NativeRightDoorPanel, car_draw::kPartsFrame, 0, false, 256},
       {"PartsPoints::DrawDoorWindows01 (sub_820DE948)", __imp__sub_820DE948,
-       hooks::CarDrawPartsDoorWindows01, car_draw::kPartsSmallFrame, 0, false, 256},
+       NativeDoorWindows01, car_draw::kPartsSmallFrame, 0, false, 256},
       {"PartsPoints::DrawDoorsBody (sub_820DEA88)", __imp__sub_820DEA88,
-       hooks::CarDrawPartsDoorsBody, car_draw::kPartsSmallFrame, 0, false, 256},
+       NativeDoorsBody, car_draw::kPartsSmallFrame, 0, false, 256},
       {"PartsPoints::DrawDoorsWindows (sub_820DEAF0)", __imp__sub_820DEAF0,
-       hooks::CarDrawPartsDoorsWindows, car_draw::kPartsFrame, 0, false, 256},
+       NativeDoorsWindows, car_draw::kPartsFrame, 0, false, 256},
       {"PartsPoints::DrawFendersBody (sub_820DED88)", __imp__sub_820DED88,
-       hooks::CarDrawPartsFendersBody, car_draw::kPartsSmallFrame, 0, false, 256},
+       NativeFendersBody, car_draw::kPartsSmallFrame, 0, false, 256},
       {"PartsPoints::DrawFenderLights (sub_820DEDD8)", __imp__sub_820DEDD8,
-       hooks::CarDrawPartsFenderLights, car_draw::kPartsFrame, 0, false, 256},
+       NativeFenderLights, car_draw::kPartsFrame, 0, false, 256},
       {"PartsPoints::DrawCabinWindow02 (sub_820DEF38)", __imp__sub_820DEF38,
-       hooks::CarDrawPartsCabinWindow02, car_draw::kPartsSmallFrame, 0, false, 256},
+       NativeCabinWindow02, car_draw::kPartsSmallFrame, 0, false, 256},
       {"PartsPoints::DrawCabinWindow01 (sub_820DEFA8)", __imp__sub_820DEFA8,
-       hooks::CarDrawPartsCabinWindow01, car_draw::kPartsFrame, 0, false, 256},
-      {"PartsPoints::DrawEngine (sub_820DF070)", __imp__sub_820DF070, hooks::CarDrawPartsEngine,
+       NativeCabinWindow01, car_draw::kPartsFrame, 0, false, 256},
+      {"PartsPoints::DrawEngine (sub_820DF070)", __imp__sub_820DF070, NativeEngine,
        car_draw::kPartsSmallFrame, 0, false, 256},
       {"PartsPoints::DrawFrontBumper (sub_820DF308)", __imp__sub_820DF308,
-       hooks::CarDrawPartsFrontBumper, car_draw::kPartsSmallFrame, 0, false, 384},
+       NativeFrontBumper, car_draw::kPartsSmallFrame, 0, false, 384},
       {"PartsPoints::DrawRearBumper (sub_820DF458)", __imp__sub_820DF458,
-       hooks::CarDrawPartsRearBumper, car_draw::kPartsSmallFrame, 0, false, 384},
-      {"PartsPoints::DrawBonnet (sub_820E0998)", __imp__sub_820E0998, hooks::CarDrawPartsBonnet,
+       NativeRearBumper, car_draw::kPartsSmallFrame, 0, false, 384},
+      {"PartsPoints::DrawBonnet (sub_820E0998)", __imp__sub_820E0998, NativeBonnet,
        car_draw::kPartsBonnetFrame, 400, false, 384},
       {"PartsPoints::DrawLeftDoor (sub_820E0B40)", __imp__sub_820E0B40,
-       hooks::CarDrawPartsLeftDoor, car_draw::kPartsDoorFrame, 592, false, 512, 6016},
+       NativeLeftDoor, car_draw::kPartsDoorFrame, 592, false, 512, 6016},
       {"PartsPoints::DrawRightDoor (sub_820E0E38)", __imp__sub_820E0E38,
-       hooks::CarDrawPartsRightDoor, car_draw::kPartsDoorFrame, 592, false, 512, 6016},
+       NativeRightDoor, car_draw::kPartsDoorFrame, 592, false, 512, 6016},
       {"PartsPoints::DrawHeadlightBody (sub_820E13E0)", __imp__sub_820E13E0,
-       hooks::CarDrawPartsHeadlightBody, car_draw::kPartsHeadlightBodyFrame, 656, false, 512,
+       NativeHeadlightBody, car_draw::kPartsHeadlightBodyFrame, 656, false, 512,
        3120},
-      {"PartsPoints::DrawMirror (sub_820E1138)", __imp__sub_820E1138, hooks::CarDrawPartsMirror,
+      {"PartsPoints::DrawMirror (sub_820E1138)", __imp__sub_820E1138, NativeMirror,
        car_draw::kPartsShadowFrame, 128, true, 384},
       {"PartsPoints::DrawWithShadow (sub_820E1260)", __imp__sub_820E1260,
-       hooks::CarDrawPartsWithShadow, car_draw::kPartsShadowFrame, 128, true, 384},
+       NativeWithShadow, car_draw::kPartsShadowFrame, 128, true, 384},
   };
   for (const Target& target : targets) {
     Results results(target.name);
