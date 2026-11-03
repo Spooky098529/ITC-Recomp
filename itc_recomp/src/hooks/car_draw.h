@@ -88,5 +88,9 @@ void CarDrawPartsRearBumper(PPCContext& ctx, uint8_t* base);         // sub_820D
 void CarDrawPartsBonnet(PPCContext& ctx, uint8_t* base);             // sub_820E0998
 void CarDrawPartsMirror(PPCContext& ctx, uint8_t* base);             // sub_820E1138
 void CarDrawPartsWithShadow(PPCContext& ctx, uint8_t* base);         // sub_820E1260
+// The head and tail lights (src/car_draw/lamps.cpp): r3 = the group, r4 =
+// the block, r5 = the camera pass (the headlights' r6 and r7 the color
+// table's index and sub-index).
+void CarDrawPartsTailLights(PPCContext& ctx, uint8_t* base);         // sub_820DF8B0
 
 }  // namespace hooks

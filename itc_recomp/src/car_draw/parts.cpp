@@ -67,25 +67,10 @@ void Memcpy(uint8_t* base, const Calls& calls, uint32_t to, uint32_t from, uint3
   }
 }
 
-// CarPart::Draw(part, view_projection, world, 0, depth) from `frame`
-// returning to `lr`: its plain C++, else its original (r28 = `r28` for the
-// depth pass's recorder context). What it leaves in r3.
 Left Part(uint8_t* base, const Calls& calls, uint32_t frame, uint32_t part,
           uint32_t view_projection, uint32_t world, uint32_t depth, uint32_t r24, uint32_t r28,
           uint32_t lr) {
-  const auto draw =
-      CarPartDraw(base, calls, frame, part, view_projection, world, 0, depth, r24, r28);
-  Left left;
-  if (!draw) {
-    const uint64_t regs[5] = {part, view_projection, world, 0, depth};
-    calls.call_r28(kCarPartDraw, regs, 5, frame, lr, r28);
-    left.in_ctx = true;
-  } else if (draw->queued) {
-    left.in_ctx = true;
-  } else {
-    left.r3 = draw->r3;
-  }
-  return left;
+  return PartsDrawRecord(base, calls, frame, part, view_projection, world, depth, r24, r28, lr);
 }
 
 // PartModel::SetPair1002Alpha(record's model, its shape, the float at
@@ -101,6 +86,24 @@ constexpr uint32_t Record(uint32_t index) {
 }
 
 }  // namespace
+
+Left PartsDrawRecord(uint8_t* base, const Calls& calls, uint32_t frame, uint32_t part,
+                     uint32_t view_projection, uint32_t world, uint32_t depth, uint32_t r24,
+                     uint32_t r28, uint32_t lr) {
+  const auto draw =
+      CarPartDraw(base, calls, frame, part, view_projection, world, 0, depth, r24, r28);
+  Left left;
+  if (!draw) {
+    const uint64_t regs[5] = {part, view_projection, world, 0, depth};
+    calls.call_r28(kCarPartDraw, regs, 5, frame, lr, r28);
+    left.in_ctx = true;
+  } else if (draw->queued) {
+    left.in_ctx = true;
+  } else {
+    left.r3 = draw->r3;
+  }
+  return left;
+}
 
 // --- The lights ---
 

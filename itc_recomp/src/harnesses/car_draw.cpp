@@ -1295,6 +1295,7 @@ void CarDraw(Context& h) {
   Morphs(h, r, block);
   LightKits(h, r, block, race);
   car_draw_shared::PartsDraws(h, r, block, race);
+  car_draw_shared::LampsDraws(h, r, block, race);
   memory::Free(race_allocation);
   memory::Free(allocation);
 }

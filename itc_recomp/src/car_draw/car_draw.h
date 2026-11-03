@@ -58,6 +58,12 @@ struct Calls {
   std::function<uint64_t(uint32_t function, const uint64_t* regs, int count, uint32_t sp,
                          uint32_t lr, uint32_t r28)>
       call_r28;
+  // As `call`, with r24 = `r24` (all 64 bits) during the call (put back
+  // after): what Model::Draw hands its recorder's context, for draws whose
+  // caller changed r24 (the head and tail lights' glows).
+  std::function<uint64_t(uint32_t function, const uint64_t* regs, int count, uint32_t sp,
+                         uint32_t lr, uint64_t r24)>
+      call_r24;
 };
 
 // What a function leaves in r3: in the context already (`in_ctx`, the last
@@ -320,6 +326,14 @@ Left SceneLightsDraw(uint8_t* base, const Calls& calls, uint32_t stack, uint32_t
 // declines. Each returns r3 as the original leaves it: the group where it
 // draws nothing, else the last draw's.
 
+// CarPart::Draw(part, view_projection, world, 0, depth) from `frame`
+// returning to `lr`: its plain C++, else its original from that frame (r28 =
+// `r28` during it, for the depth pass's recorder context). What it leaves in
+// r3. The parts' draws share it.
+Left PartsDrawRecord(uint8_t* base, const Calls& calls, uint32_t frame, uint32_t part,
+                     uint32_t view_projection, uint32_t world, uint32_t depth, uint32_t r24,
+                     uint32_t r28, uint32_t lr);
+
 // The frames.
 constexpr uint32_t kPartsSmallFrame = 112;
 constexpr uint32_t kPartsFrame = 128;
@@ -409,5 +423,30 @@ Left PartsDrawBonnet(uint8_t* base, const Calls& calls, uint32_t stack, uint32_t
 // recorder's context) and the keys put back.
 Left PartsDrawShadowed(uint8_t* base, const Calls& calls, bool mirror, uint32_t stack,
                        uint32_t record, uint32_t pass, uint32_t world, uint32_t caller_r24);
+
+// --- The head and tail lights (lamps.cpp) ---
+//
+// Part 4: PartsPoints::DrawTailLights with its
+// camera-facing glows: the lamps' records through CarPart::Draw, then, by
+// the block's bits, the scene's glow model ([0x826C2E44] + 480) colored
+// (PartModel::SetMaterials) and drawn through Model::Draw at each glow node,
+// turned to face the camera (Matrix::TransposeRotation of the pass's view,
+// Projector::Matrices), with [0x826C5104] flipped around them. The matrices
+// built in the original's frame at its offsets (the identities as stvx
+// stores them, copied doubleword by doubleword), the multiplies and copies
+// matrix_math's noted for interpolation with the original's return
+// addresses; the material passes' and the projector's plain C++ (their
+// originals from this frame where they decline). The glows' Model::Draw
+// sees r24 = 0 (the tail lights) or 0x826C0000 (the headlights), as the
+// original's registers hold it there; the lamps' records `caller_r24`.
+
+constexpr uint32_t kPartsTailLightsFrame = 1568;
+
+// PartsPoints::DrawTailLights (sub_820DF8B0): r3 = the group (pb + 27680),
+// r4 = the block, r5 = the camera pass; `caller_r28` r28 at entry (the
+// lamps' CarPart::Draw sees it). See the row in car-draw.md.
+Left PartsDrawTailLights(uint8_t* base, const Calls& calls, uint32_t stack, uint32_t group,
+                         uint32_t block, uint32_t pass, uint32_t caller_r24,
+                         uint32_t caller_r28);
 
 }  // namespace car_draw
