@@ -26,6 +26,10 @@ file's history. What's left to see in a drive, from every run:
   2,430 draws), then a6ae298c, `Matrix::Shadow`'s adapter removed (the
   lead finished it at the pause: `itc_3228`, race 38 s, 0 errors,
   car_draw 0 differing). Not yet validated.
+- Resumed 2026-11-03 on `b7-loop-03-11-26`, which the user made at
+  f6472b69 (the paused run's last commit) and checked out: the run goes
+  on there. Step now: the car draw's migration, parts 2 on, one
+  migration agent handing parts to subagents one at a time.
 - **To pick up** (the user's call, 2026-11-01: the next loop continues
   this run on this branch, not a new one): start a migration agent for
   the rest of `car-draw.md` (71 of the group's 78 left, still one ready
