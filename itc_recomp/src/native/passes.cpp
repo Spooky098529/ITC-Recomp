@@ -27,6 +27,7 @@
 #include <cstdio>
 #include <cstring>
 #include <filesystem>
+#include <deque>
 #include <map>
 #include <string>
 #include <unordered_map>
@@ -42,6 +43,10 @@
 #include "base/log.h"
 
 ITC_FLAG_DECLARE(std::string, log_level);
+ITC_FLAG_BOOL(draw_into_destinations, false, "ITC",
+              "Draw each pass the pass plan marks drawn into straight into the texture it's "
+              "resolved into, instead of drawing it into a target and copying it there "
+              "(docs/conventional-renderer.md, step 3)");
 ITC_FLAG_BOOL(native_renderer_verify_buffers, false, "ITC",
               "Hash each vertex and index buffer's data when it's copied to the GPU and "
               "check it once a frame when it's drawn again, logging buffers whose memory "
@@ -412,6 +417,20 @@ struct Target {
   VkImageAspectFlags aspects() const {
     return depth ? kDepthStencilAspects : VK_IMAGE_ASPECT_COLOR_BIT;
   }
+
+  // Step 3 (docs/conventional-renderer.md): the target's draws are cut into
+  // passes, each ending at a resolve of it (the pass plan). A pass is drawn
+  // into this image, or into the texture it's resolved into, through a
+  // Target of its own (`into`, whose `owner` is this one). Nothing carries
+  // what one pass drew into the next: a pass starts cleared or with
+  // whatever its image holds.
+  render::TargetId id;
+  uint32_t segment = 0;  // resolves of it this list: its pass's number
+  enum Mode : uint8_t { kUndecided, kOwnImage, kDrawnInto } mode = kUndecided;
+  bool cleared = false, drew = false;  // this pass, so far
+  Target* into = nullptr;
+  Target* owner = nullptr;  // a pass's Target: the target it stands for
+  uint32_t handle = 0;      // a pass's Target: the texture drawn into
 };
 
 // Texture descriptor sets (sets 2 and 3) in each of a frame's texture
@@ -736,9 +755,14 @@ struct Passes::State {
     bool as_planned = true;
   };
   std::vector<PassEvent> pass_events;
-  // The frame's pass plan (step 3) and the next resolve's place in it.
+  // The frame's pass plan (step 3) and the next resolve's place in it; each
+  // target's planned resolves (their indices), in order.
   render::PassPlan plan;
   size_t plan_next = 0;
+  std::vector<std::pair<render::TargetId, std::vector<uint32_t>>> plan_by_target;
+  // The drawn-into passes' Targets this list (step 3).
+  std::deque<Target> pass_targets;
+  std::unordered_set<uint32_t> logged_uncleared;
   uint32_t logged_plan_mismatches = 0;
   // The planned resolve the next one is (null past the plan's end), and
   // whether it's that one; counted in the stats.
@@ -957,6 +981,21 @@ struct Passes::State {
   // Clears the whole target (aspects: all if 0).
   void ClearTarget(VkCommandBuffer commands, Target& target, const VkClearValue& value,
                    VkImageAspectFlags aspects = 0);
+  // Step 3: the Target `t`'s current pass draws into: itself, or the
+  // texture it's resolved into, as the plan says (decided at the pass's
+  // first draw, clear or resolve).
+  Target* Pass(uint8_t* base, Target& t);
+  // The planned resolve ending `t`'s current pass (null: none this list).
+  const render::PlannedResolve* PlannedFor(const Target& t) const;
+  // The end of `t`'s pass at a resolve: the next pass starts.
+  void NextPass(Target& t);
+  // Before a draw into `color` (a pass's Target): a drawn-into pass's first
+  // draw with no clear before it is counted and logged once per texture,
+  // with what shows whether it covers its image.
+  void CheckPassStart(Target& color);
+  // A list's end: an unfinished drawn-into pass's image left readable (a
+  // plan mismatch), the passes' state reset.
+  void EndPasses(VkCommandBuffer commands);
   // Draws the source's rectangle (left, top, right, bottom; the whole
   // destination if null) into the resolve's destination texture at the
   // point (x, y; 0, 0 if null).
@@ -1948,6 +1987,7 @@ Target* Passes::State::GetTarget(VkCommandBuffer commands, uint8_t* base, uint32
   }
   t.depth = depth;
   t.surface = surface;
+  t.id = render::SurfaceTarget(base, object, depth, tiling);
   t.format = format;
   t.samples = SampleCount(surface.msaa);
   t.guest_extent = SurfaceExtent(surface, depth);
@@ -2000,7 +2040,7 @@ void Passes::State::ClearTarget(VkCommandBuffer commands, Target& target,
   if (LoggingPasses()) {
     PassEvent& e = pass_events.emplace_back();
     e.kind = PassEvent::kClear;
-    e.color = &target;
+    e.color = target.owner ? target.owner : &target;
     e.reason = clear_reason;
   }
   EndRendering(commands);
@@ -2263,23 +2303,127 @@ VkPipeline Passes::State::MakeFullscreenPipeline(VkShaderModule pixel, VkPipelin
   return pipeline;
 }
 
-bool Passes::State::ResolveInto(VkCommandBuffer commands, uint8_t* base, Target& source,
-                                uint32_t destination, const int32_t* rect,
-                                const int32_t* point, uint32_t flags) {
-  // The destination texture's fetch constant (+28..+48), its addresses
-  // made physical as SetTexture makes them.
-  uint32_t fetch[6];
+// The destination texture's fetch constant (+28..+48), its addresses made
+// physical as SetTexture makes them.
+void DestinationFetch(uint8_t* base, uint32_t destination, uint32_t fetch[6]) {
   for (uint32_t k = 0; k < 6; k++) {
     fetch[k] = guest::LoadU32(base, destination + 28 + 4 * k);
   }
   fetch[1] = (fetch[1] & 0xFFFu) | GpuPhysicalAddress(fetch[1] & 0xFFFFF000u);
   fetch[5] = (fetch[5] & 0xFFFu) | GpuPhysicalAddress(fetch[5] & 0xFFFFF000u);
-  // The library's Resolve sets RB_COPY_DEST_INFO's copy_dest_swap when the
-  // destination's swizzle takes X from another component than the first
-  // (bits 1-3 of fetch word 3): memory holds red and blue exchanged, and
-  // the swizzle exchanges them back. Our image holds them in order; its
-  // views exchange them (step 3), so readers get the same.
-  const bool exchanged = !source.depth && ((fetch[3] >> 1) & 7) != 0;
+}
+
+// The library's Resolve sets RB_COPY_DEST_INFO's copy_dest_swap when the
+// destination's swizzle takes X from another component than the first
+// (bits 1-3 of fetch word 3): memory holds red and blue exchanged, and the
+// swizzle exchanges them back. Our image holds them in order; its views
+// exchange them (step 3), so readers get the same.
+bool Exchanged(const uint32_t fetch[6]) { return ((fetch[3] >> 1) & 7) != 0; }
+
+Target* Passes::State::Pass(uint8_t* base, Target& t) {
+  if (t.mode == Target::kUndecided) {
+    t.mode = Target::kOwnImage;
+    const render::PlannedResolve* p = PlannedFor(t);
+    // Color passes without MSAA or an exponent bias for now (3d and 3e add
+    // depth and the bias).
+    if (ITC_FLAG(draw_into_destinations) && p && p->kind == render::ResolveKind::kDrawnInto &&
+        !t.depth && t.samples == VK_SAMPLE_COUNT_1_BIT && (int32_t(p->flags) >> 26) == 0) {
+      uint32_t fetch[6];
+      DestinationFetch(base, p->destination, fetch);
+      TextureCache::ResolveDestination dest;
+      if (textures.GetResolveDestination(p->destination, fetch, t.scale, Exchanged(fetch), dest,
+                                         true)) {
+        Target& d = pass_targets.emplace_back();
+        d.depth = false;
+        d.surface = t.surface;
+        d.id = t.id;
+        d.format = dest.format;
+        d.samples = VK_SAMPLE_COUNT_1_BIT;
+        d.guest_extent = {dest.width, dest.height};
+        d.extent = {dest.host_width, dest.host_height};
+        d.scale = dest.scale;
+        d.image.image = dest.image;
+        d.image.view = dest.view;
+        d.sample_view = dest.view;
+        d.layout = dest.fresh ? VK_IMAGE_LAYOUT_UNDEFINED : VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
+        d.mode = Target::kDrawnInto;
+        d.owner = &t;
+        d.handle = p->destination;
+        t.into = &d;
+        t.mode = Target::kDrawnInto;
+      }
+    }
+  }
+  return t.mode == Target::kDrawnInto ? t.into : &t;
+}
+
+const render::PlannedResolve* Passes::State::PlannedFor(const Target& t) const {
+  for (const auto& [id, indices] : plan_by_target) {
+    if (id == t.id) {
+      return t.segment < indices.size() ? &plan.resolves[indices[t.segment]] : nullptr;
+    }
+  }
+  return nullptr;
+}
+
+void Passes::State::NextPass(Target& t) {
+  t.segment++;
+  t.mode = Target::kUndecided;
+  t.into = nullptr;
+  t.cleared = t.drew = false;
+}
+
+void Passes::State::CheckPassStart(Target& color) {
+  Target& t = color.owner ? *color.owner : color;
+  if (t.drew) {
+    return;
+  }
+  t.drew = true;
+  if (!color.owner || t.cleared) {
+    return;
+  }
+  stats.uncleared_starts++;
+  if (!logged_uncleared.insert(color.handle).second) {
+    return;
+  }
+  const render::Blend& blend = interface->blend[0];
+  const render::Viewport& v = interface->viewport;
+  ITC_LOG_INFO("native renderer: pass drawn into {:08X} ({}x{}) starts with no clear: its first "
+               "draw {}, viewport {},{} {}x{}, scissor {}, depth {}",
+               color.handle, color.guest_extent.width, color.guest_extent.height,
+               blend == render::Blend{} ? "doesn't blend" : "blends", v.x, v.y, v.width,
+               v.height,
+               interface->scissor
+                   ? fmt::format("{},{}-{},{}", interface->scissor_rect.left,
+                                 interface->scissor_rect.top, interface->scissor_rect.right,
+                                 interface->scissor_rect.bottom)
+                   : std::string("off"),
+               interface->depth ? (interface->depth_stencil.depth_test ? "tested" : "bound, not tested")
+                                : "none");
+}
+
+void Passes::State::EndPasses(VkCommandBuffer commands) {
+  for (auto& [key, t] : targets) {
+    if (t.into) {
+      // Not resolved as planned (counted at the resolve): left readable.
+      EndRendering(commands);
+      Transition(commands, t.into->image.image, VK_IMAGE_ASPECT_COLOR_BIT, t.into->layout,
+                 VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL);
+    }
+    t.segment = 0;
+    t.mode = Target::kUndecided;
+    t.into = nullptr;
+    t.cleared = t.drew = false;
+  }
+  pass_targets.clear();
+}
+
+bool Passes::State::ResolveInto(VkCommandBuffer commands, uint8_t* base, Target& source,
+                                uint32_t destination, const int32_t* rect,
+                                const int32_t* point, uint32_t flags) {
+  uint32_t fetch[6];
+  DestinationFetch(base, destination, fetch);
+  const bool exchanged = !source.depth && Exchanged(fetch);
   TextureCache::ResolveDestination dest;
   if (!textures.GetResolveDestination(destination, fetch, source.scale, exchanged, dest)) {
     return false;
@@ -2842,6 +2986,8 @@ void Passes::State::Draw(VkCommandBuffer commands, uint8_t* base, uint32_t devic
   }
   Target* color = color_object ? s.GetTarget(commands, base, color_object, false) : nullptr;
   Target* depth = depth_object ? s.GetTarget(commands, base, depth_object, true) : nullptr;
+  color = color ? s.Pass(base, *color) : nullptr;  // step 3: maybe its texture
+  depth = depth ? s.Pass(base, *depth) : nullptr;
   if (!color && !depth) {
     s.stats.failed++;
     s.stats.failed_by[0]++;
@@ -3051,8 +3197,8 @@ void Passes::State::Draw(VkCommandBuffer commands, uint8_t* base, uint32_t devic
       }
       PassEvent& e = pass_events.emplace_back();
       e.kind = PassEvent::kDraw;
-      e.color = color;
-      e.depth = depth;
+      e.color = color && color->owner ? color->owner : color;
+      e.depth = depth && depth->owner ? depth->owner : depth;
       e.draw = uint32_t(recorded_draws.size());
     }
     RecordedDraw& r = recorded_draws.emplace_back();
@@ -3409,6 +3555,12 @@ void Passes::State::Draw(VkCommandBuffer commands, uint8_t* base, uint32_t devic
   // indices (the arena's copies are taken from guest memory at first use).
 
   // Draw.
+  if (color) {
+    s.CheckPassStart(*color);
+  }
+  if (depth) {
+    (depth->owner ? depth->owner : depth)->drew = true;
+  }
   s.BeginRendering(commands, color, depth);
   if (color && color->surface.pitch == kMainViewPitch && color->samples == VK_SAMPLE_COUNT_2_BIT &&
       color->format == VK_FORMAT_R16G16B16A16_SFLOAT) {
@@ -3757,7 +3909,8 @@ void Passes::State::ClearBound(VkCommandBuffer commands, uint8_t* base, uint32_t
       }
       if (uint32_t object = bound.targets[0]; object && (flags & 1)) {
         if (Target* target = s.GetTarget(commands, base, object, false)) {
-          s.ClearTarget(commands, *target, value);
+          s.ClearTarget(commands, *s.Pass(base, *target), value);
+          target->cleared = true;
         }
       }
     }
@@ -3768,7 +3921,8 @@ void Passes::State::ClearBound(VkCommandBuffer commands, uint8_t* base, uint32_t
         VkClearValue value{};
         std::memcpy(&value.depthStencil.depth, &z, 4);
         value.depthStencil.stencil = stencil & 0xFF;
-        s.ClearTarget(commands, *target, value,
+        target->cleared = true;
+        s.ClearTarget(commands, *s.Pass(base, *target), value,
                       ((flags & 0x10) ? VK_IMAGE_ASPECT_DEPTH_BIT : 0) |
                           ((flags & 0x20) ? VK_IMAGE_ASPECT_STENCIL_BIT : 0));
       }
@@ -3797,12 +3951,30 @@ void Passes::State::Resolve(VkCommandBuffer commands, uint8_t* base, uint32_t de
   const render::PlannedResolve* planned =
       CheckPlan(base, source_object, from_depth, destination, flags, as_planned);
   Target* source = source_object ? GetTarget(commands, base, source_object, from_depth) : nullptr;
+  // Step 3: the pass's image (its texture, if it was drawn into it).
+  Target* image = source ? Pass(base, *source) : nullptr;
   size_t resolves_before = frame_resolves.size();
-  if (source && destination && !level_or_slice &&
-      ResolveInto(commands, base, *source, destination, rect, point, flags)) {
+  if (source && source->mode == Target::kDrawnInto && as_planned && planned == PlannedFor(*source)) {
+    // Drawn into: nothing to copy; the texture's image becomes current.
+    EndRendering(commands);
+    Transition(commands, image->image.image, VK_IMAGE_ASPECT_COLOR_BIT, image->layout,
+               VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL);
+    textures.DrawnInto(image->handle, image->image.image);
+    uint32_t fetch[6];
+    DestinationFetch(base, destination, fetch);
+    frame_resolves.push_back({image->image.image, image->extent, fetch[1] & 0xFFFFF000u,
+                              fetch[1] & 0x3F, flags, image->format});
+    std::copy(fetch, fetch + 6, frame_resolves.back().fetch);
+    stats.resolves++;
+    stats.drawn_into++;
+  } else if (image && destination && !level_or_slice &&
+             ResolveInto(commands, base, *image, destination, rect, point, flags)) {
     stats.resolves++;
   } else {
     stats.resolves_skipped++;
+  }
+  if (source && destination && !level_or_slice) {
+    NextPass(*source);  // as the plan counts passes
   }
   if (LoggingPasses()) {
     PassEvent& e = pass_events.emplace_back();
@@ -3833,13 +4005,15 @@ void Passes::State::Resolve(VkCommandBuffer commands, uint8_t* base, uint32_t de
     return;
   }
   clear_reason = "the resolve's clear";
+  // The clears after it: the next pass's start, on its image.
   if ((flags & 0x100) && color_object) {
     if (Target* target = GetTarget(commands, base, color_object, false)) {
       VkClearValue value{};
       for (uint32_t c = 0; clear_color && c < 4; c++) {
         value.color.float32[c] = clear_color[c];
       }
-      ClearTarget(commands, *target, value);
+      ClearTarget(commands, *Pass(base, *target), value);
+      target->cleared = true;
     }
   }
   if ((flags & 0x200) && depth_object) {
@@ -3847,7 +4021,8 @@ void Passes::State::Resolve(VkCommandBuffer commands, uint8_t* base, uint32_t de
       VkClearValue value{};
       value.depthStencil.depth = clear_z;
       value.depthStencil.stencil = clear_stencil & 0xFF;
-      ClearTarget(commands, *target, value);
+      ClearTarget(commands, *Pass(base, *target), value);
+      target->cleared = true;
     }
   }
   clear_reason = "other";
@@ -3925,6 +4100,21 @@ void Passes::PassPlanned(const render::PassPlan& plan) {
   }
   s.plan = plan;
   s.plan_next = 0;
+  s.plan_by_target.clear();
+  for (uint32_t i = 0; i < plan.resolves.size(); i++) {
+    const render::PlannedResolve& r = plan.resolves[i];
+    if (r.kind == render::ResolveKind::kSkipped) {
+      continue;
+    }
+    auto it = std::find_if(s.plan_by_target.begin(), s.plan_by_target.end(),
+                           [&](const auto& e) { return e.first == r.source; });
+    if (it == s.plan_by_target.end()) {
+      it = s.plan_by_target.insert(s.plan_by_target.end(), {r.source, {}});
+    }
+    // Each target's resolves by its pass number (skipped ones don't end a
+    // pass: the renderer doesn't count them).
+    it->second.push_back(i);
+  }
   if (!plan.complete) {
     s.stats.plans_incomplete++;
   }
@@ -4413,6 +4603,7 @@ VkExtent2D Passes::EndFrame(VkCommandBuffer commands, int32_t show_resolve, bool
                             const std::string& dump_prefix, bool dump_resolves) {
   State& s = *state_;
   s.EndRendering(commands);
+  s.EndPasses(commands);
   s.last_frame_resolves = s.frame_resolves.size();
   if (s.log_glow) {
     s.LogGlow();

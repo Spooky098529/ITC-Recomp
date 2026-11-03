@@ -83,8 +83,12 @@ class TextureCache {
     float scale;                       // the scale it was made at
     bool fresh;
   };
+  // for_drawing (step 3): the image a pass draws into instead, the one of
+  // the two at this scale that isn't current (draws during the pass read
+  // the current one), made current by DrawnInto at its resolve.
   bool GetResolveDestination(uint32_t handle, const uint32_t fetch[6], float scale,
-                             bool exchanged, ResolveDestination& out);
+                             bool exchanged, ResolveDestination& out, bool for_drawing = false);
+  void DrawnInto(uint32_t handle, VkImage image);
 
   // A debugging aid: the texture's first level (first layer) decoded from
   // guest memory into the host format's bytes, uncompressed formats only.

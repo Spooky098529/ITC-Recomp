@@ -540,6 +540,7 @@ struct TextureCache::State {
     // Red and blue held in order where guest memory would hold them
     // exchanged: the views exchange them (GetResolveDestination).
     bool exchanged = false;
+    uint32_t version = 0;  // a resolve destination's: 0 or 1
     uint32_t guest_format = 0;
     uint32_t host_width = 0, host_height = 0;  // the image's (scaled)
     float scale = 1.0f;
@@ -556,7 +557,10 @@ struct TextureCache::State {
     TextureKey key{};  // the fetch constant's identity when first loaded, levels aside
     bool keyed = false;
     std::map<uint32_t, Texture> loaded;          // by word 4's levels
-    std::unordered_map<uint32_t, Texture> resolved;  // by the scale's bits
+    // By the scale's bits, and the version above them: a destination drawn
+    // into (step 3) has two, drawn alternately, so a pass can read the one
+    // current while it draws the other.
+    std::unordered_map<uint64_t, Texture> resolved;
     Texture* current = nullptr;
   };
   std::unordered_map<uint32_t, Handle> handles;
@@ -693,7 +697,7 @@ bool TextureCache::State::CreateTexture(Texture& t) {
   info.samples = VK_SAMPLE_COUNT_1_BIT;
   info.tiling = VK_IMAGE_TILING_OPTIMAL;
   info.usage = t.resolved ? VK_IMAGE_USAGE_SAMPLED_BIT | VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT |
-                                VK_IMAGE_USAGE_TRANSFER_SRC_BIT
+                                VK_IMAGE_USAGE_TRANSFER_SRC_BIT | VK_IMAGE_USAGE_TRANSFER_DST_BIT
                           : VK_IMAGE_USAGE_SAMPLED_BIT | VK_IMAGE_USAGE_TRANSFER_DST_BIT;
   info.initialLayout = VK_IMAGE_LAYOUT_UNDEFINED;
   if (VkResult result = vk::vkCreateImage(device, &info, nullptr, &t.image);
@@ -1354,13 +1358,21 @@ VkImageView TextureCache::State::GetSwizzledView(Texture& t, uint32_t swizzle,
   return view;
 }
 bool TextureCache::GetResolveDestination(uint32_t handle, const uint32_t fetch_words[6],
-                                         float scale, bool exchanged, ResolveDestination& out) {
+                                         float scale, bool exchanged, ResolveDestination& out,
+                                         bool for_drawing) {
   State& s = *state_;
   xenos::xe_gpu_texture_fetch_t fetch = ToFetch(fetch_words);
   uint32_t page = fetch.base_address & 0x1FFFF;
   uint32_t width = fetch.size_2d.width + 1, height = fetch.size_2d.height + 1;
   State::Handle& h = s.FindHandle(handle, fetch_words);
-  const uint32_t key = std::bit_cast<uint32_t>(scale);
+  // A copy goes into the current image at this scale; a pass draws into the
+  // other one.
+  const uint32_t scale_bits = std::bit_cast<uint32_t>(scale);
+  uint32_t version = 0;
+  if (h.current && h.current->resolved && std::bit_cast<uint32_t>(h.current->scale) == scale_bits) {
+    version = for_drawing ? 1 - h.current->version : h.current->version;
+  }
+  const uint64_t key = scale_bits | uint64_t(version) << 32;
   auto it = h.resolved.find(key);
   if (it != h.resolved.end() && (it->second.guest_format != uint32_t(fetch.format) ||
                                  it->second.layout.width != width ||
@@ -1385,6 +1397,7 @@ bool TextureCache::GetResolveDestination(uint32_t handle, const uint32_t fetch_w
     State::Texture t;
     t.resolved = true;
     t.exchanged = exchanged;
+    t.version = version;
     t.guest_format = uint32_t(fetch.format);
     if (fetch.format == xenos::TextureFormat::k_24_8 ||
         fetch.format == xenos::TextureFormat::k_24_8_FLOAT) {
@@ -1404,9 +1417,9 @@ bool TextureCache::GetResolveDestination(uint32_t handle, const uint32_t fetch_w
       return false;
     }
     ITC_LOG_INFO("native renderer: resolve destination {:08X} at {:08X}: format {} {}x{} (host "
-                 "format {}, {}x{}, scale {})",
+                 "format {}, {}x{}, scale {}, image {})",
                  handle, page << 12, t.guest_format, width, height, int(t.format.format),
-                 t.host_width, t.host_height, scale);
+                 t.host_width, t.host_height, scale, version);
     it = h.resolved.emplace(key, std::move(t)).first;
     s.resolved_pages[page] = handle;
     events_.created++;
@@ -1418,15 +1431,37 @@ bool TextureCache::GetResolveDestination(uint32_t handle, const uint32_t fetch_w
     ITC_LOG_WARN("native renderer: resolve destination {:08X}'s red and blue order changed",
                  handle);
   }
+  out = {t.image,        t.attachment_view, t.format.format, width, height, t.host_width,
+         t.host_height, t.scale,           !t.loaded};
+  if (for_drawing) {
+    return true;  // current once drawn (DrawnInto)
+  }
   if (h.current != &t || !t.loaded) {
     h.current = &t;
     generation_++;
     events_.resolve_changes++;
   }
-  out = {t.image,        t.attachment_view, t.format.format, width, height, t.host_width,
-         t.host_height, t.scale,           !t.loaded};
   t.loaded = true;  // written by the caller
   return true;
+}
+
+void TextureCache::DrawnInto(uint32_t handle, VkImage image) {
+  State& s = *state_;
+  auto h = s.handles.find(handle);
+  if (h == s.handles.end()) {
+    return;
+  }
+  for (auto& [key, t] : h->second.resolved) {
+    if (t.image == image) {
+      if (h->second.current != &t || !t.loaded) {
+        h->second.current = &t;
+        generation_++;
+        events_.resolve_changes++;
+      }
+      t.loaded = true;
+      return;
+    }
+  }
 }
 
 uint64_t TextureCache::mismatched_total() const {

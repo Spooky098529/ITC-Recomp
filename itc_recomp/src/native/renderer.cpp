@@ -1020,12 +1020,14 @@ void Renderer::LogStats() {
                view.tiled_resolves);
   ITC_LOG_INFO("native renderer: pass plan: per frame {:.1f} resolves drawn into, {:.1f} "
                "multisample resolves, {:.1f} copies, {:.1f} skipped; {} not as planned, {} "
-               "lists planned without a whole walk",
+               "lists planned without a whole walk; per frame {:.1f} passes drawn straight into "
+               "their texture, {:.1f} of them starting with no clear",
                double(view.planned_kinds[size_t(render::ResolveKind::kDrawnInto)]) / frames,
                double(view.planned_kinds[size_t(render::ResolveKind::kMultisample)]) / frames,
                double(view.planned_kinds[size_t(render::ResolveKind::kCopy)]) / frames,
                double(view.planned_kinds[size_t(render::ResolveKind::kSkipped)]) / frames,
-               view.plan_mismatches, view.plans_incomplete);
+               view.plan_mismatches, view.plans_incomplete, double(view.drawn_into) / frames,
+               double(view.uncleared_starts) / frames);
   frames_presented_ = frames_skipped_ = commands_ = draws_ = 0;
   const TextureCache::Stats& t = view.textures;
   ITC_LOG_INFO("native renderer: textures: {} ({} samplers); {} loaded, {} reloaded, {:.1f} MB "

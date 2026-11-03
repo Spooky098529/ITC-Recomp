@@ -227,6 +227,9 @@ class Passes {
     // plan's end), and lists planned without a whole walk.
     std::array<uint64_t, 4> planned_kinds{};
     uint64_t plan_mismatches = 0, plans_incomplete = 0;
+    // Passes drawn straight into their texture, and of those, ones whose
+    // first draw had no clear before it.
+    uint64_t drawn_into = 0, uncleared_starts = 0;
     uint32_t resolve_flags_sample = 0;
     TextureCache::Stats textures;
     BufferTable::Stats buffers;
