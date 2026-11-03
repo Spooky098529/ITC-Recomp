@@ -59,9 +59,6 @@ void CarDrawBlinkTimersAdvance(PPCContext& ctx, uint8_t* base);
 // description, r4 = the position.
 void CarDrawIsNearPlayerHeight(PPCContext& ctx, uint8_t* base);
 
-// WorkMem::AllocVertexBuffer (sub_8258A9E8): r3 = where the header's
-// address goes, r4 = the bytes.
-void CarDrawAllocVertexBuffer(PPCContext& ctx, uint8_t* base);
 // Model::QueueJobRelease (sub_82594E88): r3 = the model, r4 = the job.
 void CarDrawQueueJobRelease(PPCContext& ctx, uint8_t* base);
 // Model::MorphShape (sub_82595110): r3 = the model, r4 = the morph record,

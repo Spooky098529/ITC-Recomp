@@ -775,6 +775,20 @@ void NativeXgSetVertexBufferHeader(PPCContext& ctx, uint8_t* base) {
                                                  ctx.r7.u32, ctx.r1.u32);
 }
 
+// WorkMem::AllocVertexBuffer's register steps (its adapter is gone: its
+// caller in play, Model::MorphShape, calls the plain C++): the original
+// where the plain C++ declines (a debug message).
+void NativeAllocVertexBuffer(PPCContext& ctx, uint8_t* base) {
+  ctx.fpscr.disableFlushMode();
+  const auto memory =
+      car_draw::WorkMemAllocVertexBuffer(base, ctx.r3.u32, ctx.r4.u32, ctx.r1.u32);
+  if (!memory) {
+    __imp__sub_8258A9E8(ctx, base);
+    return;
+  }
+  ctx.r3.u64 = *memory;
+}
+
 // The work memory: buffer i (0 or 1) current, its header count near 0 or
 // near the 1,280 limit (now and then at it), the bytes used and the capacity
 // around `bytes` (now and then not fitting), its start at the block's
@@ -836,7 +850,7 @@ void Morphs(Context& h, Random& r, uint32_t block) {
             t.r3.u64 = out;
             t.r4.u64 = bytes;
           },
-          __imp__sub_8258A9E8, hooks::CarDrawAllocVertexBuffer, {}, fmt::format("case {}", c),
+          __imp__sub_8258A9E8, NativeAllocVertexBuffer, {}, fmt::format("case {}", c),
           [&](const PPCContext& t, Outputs& o) {
             const uint32_t frame = t.r1.u32 - car_draw::kAllocVertexBufferFrame;
             o.Word(guest::LoadU32(h.base, frame));
