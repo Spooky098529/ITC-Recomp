@@ -161,6 +161,8 @@ void LampsDraws(Context& h, Random& r, uint32_t block, uint32_t race) {
   const Target targets[] = {
       {"PartsPoints::DrawTailLights (sub_820DF8B0)", __imp__sub_820DF8B0,
        hooks::CarDrawPartsTailLights, car_draw::kPartsTailLightsFrame, false},
+      {"PartsPoints::DrawHeadlights (sub_820E1690)", __imp__sub_820E1690,
+       hooks::CarDrawPartsHeadlights, car_draw::kPartsHeadlightsFrame, true},
   };
   for (const Target& target : targets) {
     Results results(target.name);

@@ -426,7 +426,7 @@ Left PartsDrawShadowed(uint8_t* base, const Calls& calls, bool mirror, uint32_t 
 
 // --- The head and tail lights (lamps.cpp) ---
 //
-// Part 4: PartsPoints::DrawTailLights with its
+// Part 4: PartsPoints::DrawTailLights and DrawHeadlights with their
 // camera-facing glows: the lamps' records through CarPart::Draw, then, by
 // the block's bits, the scene's glow model ([0x826C2E44] + 480) colored
 // (PartModel::SetMaterials) and drawn through Model::Draw at each glow node,
@@ -441,6 +441,7 @@ Left PartsDrawShadowed(uint8_t* base, const Calls& calls, bool mirror, uint32_t 
 // original's registers hold it there; the lamps' records `caller_r24`.
 
 constexpr uint32_t kPartsTailLightsFrame = 1568;
+constexpr uint32_t kPartsHeadlightsFrame = 1552;
 
 // PartsPoints::DrawTailLights (sub_820DF8B0): r3 = the group (pb + 27680),
 // r4 = the block, r5 = the camera pass; `caller_r28` r28 at entry (the
@@ -448,5 +449,12 @@ constexpr uint32_t kPartsTailLightsFrame = 1568;
 Left PartsDrawTailLights(uint8_t* base, const Calls& calls, uint32_t stack, uint32_t group,
                          uint32_t block, uint32_t pass, uint32_t caller_r24,
                          uint32_t caller_r28);
+// PartsPoints::DrawHeadlights (sub_820E1690): r3 = the group (pb + 24480),
+// r4 = the block, r5 = the camera pass, r6 and r7 the color table's index
+// and sub-index (TableVector). Nothing when record 0 has no model (r3 the
+// group).
+Left PartsDrawHeadlights(uint8_t* base, const Calls& calls, uint32_t stack, uint32_t group,
+                         uint32_t block, uint32_t pass, uint64_t index, uint64_t sub,
+                         uint32_t caller_r24);
 
 }  // namespace car_draw

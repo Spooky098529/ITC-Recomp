@@ -92,5 +92,6 @@ void CarDrawPartsWithShadow(PPCContext& ctx, uint8_t* base);         // sub_820E
 // the block, r5 = the camera pass (the headlights' r6 and r7 the color
 // table's index and sub-index).
 void CarDrawPartsTailLights(PPCContext& ctx, uint8_t* base);         // sub_820DF8B0
+void CarDrawPartsHeadlights(PPCContext& ctx, uint8_t* base);         // sub_820E1690
 
 }  // namespace hooks

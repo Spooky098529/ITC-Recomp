@@ -48,8 +48,9 @@ ITC_FLAG_BOOL(native_car_draw, true, "ITC",
               "sub_820DEFA8, DrawEngine sub_820DF070, DrawFrontBumper sub_820DF308, "
               "DrawRearBumper sub_820DF458, DrawBonnet sub_820E0998, DrawMirror sub_820E1138 "
               "and DrawWithShadow sub_820E1260; PartModel::SetPair1002Alpha, XPR::GetTexture "
-              "and the matrix functions as plain C++), the tail lights with their "
-              "camera-facing glows (PartsPoints::DrawTailLights sub_820DF8B0; the material passes, Projector::Matrices and "
+              "and the matrix functions as plain C++), the head and tail lights with their "
+              "camera-facing glows (PartsPoints::DrawTailLights sub_820DF8B0 and "
+              "DrawHeadlights sub_820E1690; the material passes, Projector::Matrices and "
               "Model::Draw as plain C++)) "
               "natively instead of through the translated code, with --native_scenery_lists, "
               "--native_models, --native_matrix_math, --native_math, --native_nearest_lights, "
@@ -382,6 +383,15 @@ void CarDrawPartsTailLights(PPCContext& ctx, uint8_t* base) {
   });
 }
 
+void CarDrawPartsHeadlights(PPCContext& ctx, uint8_t* base) {
+  const uint32_t r3 = ctx.r3.u32, r4 = ctx.r4.u32, r5 = ctx.r5.u32, r1 = ctx.r1.u32;
+  const uint64_t r6 = ctx.r6.u64, r7 = ctx.r7.u64;
+  const uint32_t r24 = ctx.r24.u32;
+  PartsStep(ctx, base, __imp__sub_820E1690, [&](const car_draw::Calls& calls) {
+    return car_draw::PartsDrawHeadlights(base, calls, r1, r3, r4, r5, r6, r7, r24);
+  });
+}
+
 }  // namespace hooks
 
 #define ITC_CAR_DRAW(address, step)     \
@@ -426,4 +436,5 @@ ITC_CAR_DRAW(820E1138, CarDrawPartsMirror)
 ITC_CAR_DRAW(820E1260, CarDrawPartsWithShadow)
 // The head and tail lights (their callers, the parts' top, are recompiled).
 ITC_CAR_DRAW(820DF8B0, CarDrawPartsTailLights)
+ITC_CAR_DRAW(820E1690, CarDrawPartsHeadlights)
 #undef ITC_CAR_DRAW
