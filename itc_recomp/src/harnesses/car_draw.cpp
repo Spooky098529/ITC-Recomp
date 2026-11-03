@@ -13,6 +13,7 @@
 // harness's (src/harnesses/scenery_lists.cpp), built the same way here.
 
 #include "harness.h"
+#include "harnesses/car_draw_shared.h"
 
 #include "base/flags.h"
 #include "base/log.h"
@@ -57,6 +58,8 @@ constexpr Region kRegions[] = {
     {0x82957780 + 32 * 1280, 0x100}, {0x82957780 + 32 * 2552, 0x100},
     // The first four camera passes (the light kit's view-projections).
     {0x826BAC00, 592 * 4},
+    // The number plates' flag (the bumpers' draws read [0x82816E3C]).
+    {0x82816E30, 0x10},
 };
 // The scene lights' slots CarLighting::Gather writes (floats), and pixel c43.
 constexpr uint32_t kLightSlots = 0x8296B9E0;
@@ -1240,6 +1243,44 @@ void LightKits(Context& h, Random& r, uint32_t block, uint32_t race) {
 
 }  // namespace
 
+// For the other harness files (car_draw_shared.h).
+namespace car_draw_shared {
+
+void Case(Context& h, Results& results, uint32_t block, Random& r,
+          const std::function<void(PPCContext&)>& setup, GuestFunction recompiled,
+          GuestFunction native, const FloatRanges& floats, const std::string& what,
+          const std::function<void(const PPCContext&, Outputs&)>& extra,
+          const std::function<void(int)>& before, bool recompiled_flag_off) {
+  harness::Case(h, results, block, r, setup, recompiled, native, floats, what, extra, before,
+                recompiled_flag_off);
+}
+void SetFlushOnEntry(bool on) {
+  g_flush_on_entry = on;
+}
+bool ModelWorld(Context& h, Random& r, uint32_t block, uint32_t shape) {
+  return harness::ModelWorld(h, r, block, shape);
+}
+FloatRanges AlphaFloats() {
+  return harness::AlphaFloats();
+}
+uint32_t RandomFloat(Random& r) {
+  return harness::RandomFloat(r);
+}
+void RandomFloats(uint8_t* base, uint32_t address, uint32_t count, Random& r) {
+  harness::RandomFloats(base, address, count, r);
+}
+void FiniteFloats(uint8_t* base, uint32_t address, uint32_t count, Random& r) {
+  harness::FiniteFloats(base, address, count, r);
+}
+void StoreFloats(uint8_t* base, uint32_t address, std::initializer_list<float> values) {
+  harness::StoreFloats(base, address, values);
+}
+float Spread(Random& r, float range) {
+  return harness::Spread(r, range);
+}
+
+}  // namespace car_draw_shared
+
 void CarDraw(Context& h) {
   Random r(0x63617264726177ull);  // "cardraw"
   const uint32_t allocation = memory::Alloc(kBlockBytes + 16, 0);
@@ -1253,6 +1294,7 @@ void CarDraw(Context& h) {
   ModelDraws(h, r, block);
   Morphs(h, r, block);
   LightKits(h, r, block, race);
+  car_draw_shared::PartsDraws(h, r, block, race);
   memory::Free(race_allocation);
   memory::Free(allocation);
 }

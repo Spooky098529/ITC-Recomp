@@ -32,6 +32,9 @@ bool CarDrawCalleesNative();
 // --native_matrix_math).
 bool CarDrawMorphCalleesNative();
 bool CarDrawLightKitCalleesNative();
+// The parts' small draws' (the model draws', --native_material_passes,
+// --native_matrix_math).
+bool CarDrawPartsCalleesNative();
 
 // The guest calls (car_draw::Calls) through `guest`'s context: the draws'
 // (hooks::SceneryListsDrawCalls) and memcpy's original.
@@ -63,5 +66,27 @@ void CarDrawMorphShape(PPCContext& ctx, uint8_t* base);
 // (inside the diagnostics' wrap, src/debug/frame_state_diff.cpp; it skips
 // BlinkTimers::Advance as CarDrawBlinkTimersHeld says).
 void CarDrawSceneLightsDraw(PPCContext& ctx, uint8_t* base);
+
+// The parts' small draws (src/car_draw/parts.cpp): r3 = the group (or the
+// record), r4 = the block, r5 = the camera pass, r6 (the front bumper's and
+// fenders' lights: the parts record's +56; the mirror: the world).
+void CarDrawPartsFrontBumperLights(PPCContext& ctx, uint8_t* base);  // sub_820DE1C8
+void CarDrawPartsRearBumperLights(PPCContext& ctx, uint8_t* base);   // sub_820DE3C0
+void CarDrawPartsLeftDoorPanel(PPCContext& ctx, uint8_t* base);      // sub_820DE6E0
+void CarDrawPartsDoorWindows02(PPCContext& ctx, uint8_t* base);      // sub_820DE760
+void CarDrawPartsRightDoorPanel(PPCContext& ctx, uint8_t* base);     // sub_820DE8C8
+void CarDrawPartsDoorWindows01(PPCContext& ctx, uint8_t* base);      // sub_820DE948
+void CarDrawPartsDoorsBody(PPCContext& ctx, uint8_t* base);          // sub_820DEA88
+void CarDrawPartsDoorsWindows(PPCContext& ctx, uint8_t* base);       // sub_820DEAF0
+void CarDrawPartsFendersBody(PPCContext& ctx, uint8_t* base);        // sub_820DED88
+void CarDrawPartsFenderLights(PPCContext& ctx, uint8_t* base);       // sub_820DEDD8
+void CarDrawPartsCabinWindow02(PPCContext& ctx, uint8_t* base);      // sub_820DEF38
+void CarDrawPartsCabinWindow01(PPCContext& ctx, uint8_t* base);      // sub_820DEFA8
+void CarDrawPartsEngine(PPCContext& ctx, uint8_t* base);             // sub_820DF070
+void CarDrawPartsFrontBumper(PPCContext& ctx, uint8_t* base);        // sub_820DF308
+void CarDrawPartsRearBumper(PPCContext& ctx, uint8_t* base);         // sub_820DF458
+void CarDrawPartsBonnet(PPCContext& ctx, uint8_t* base);             // sub_820E0998
+void CarDrawPartsMirror(PPCContext& ctx, uint8_t* base);             // sub_820E1138
+void CarDrawPartsWithShadow(PPCContext& ctx, uint8_t* base);         // sub_820E1260
 
 }  // namespace hooks

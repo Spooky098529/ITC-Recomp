@@ -53,6 +53,11 @@ struct Calls {
   std::function<uint64_t(uint32_t function, const uint64_t* regs, int count, uint32_t sp,
                          uint32_t lr)>
       call;
+  // As `call`, with r28 = `r28` during the call (put back after): what
+  // CarPart::Draw's depth pass hands its recorder's context.
+  std::function<uint64_t(uint32_t function, const uint64_t* regs, int count, uint32_t sp,
+                         uint32_t lr, uint32_t r28)>
+      call_r28;
 };
 
 // What a function leaves in r3: in the context already (`in_ctx`, the last
@@ -299,5 +304,110 @@ Left LightPointsDraw(uint8_t* base, const Calls& calls, LightGroup which, uint32
 Left SceneLightsDraw(uint8_t* base, const Calls& calls, uint32_t stack, uint32_t kit,
                      uint32_t block, bool advance_blink, uint32_t caller_r24,
                      uint32_t caller_r28);
+
+// --- The parts' small draws (parts.cpp) ---
+//
+// Part 3: the PartsPoints draws of docs/functions/car-draw.md that only
+// draw records (CarPart::Draw), with PartModel::SetPair1002Alpha's
+// window alphas, the number plates' textures, the bonnet's hinge and the
+// mirrors' depth draws. r3 = the group (or the record), r4 = the scene
+// model's block (+4 its flag bits, +16 the world, +628 to +640 its
+// alphas and angle), r5 = the camera pass (its +144 the view-projection).
+// Each keeps the original's frame (its back chain, its temporaries) and
+// draws from it; `caller_r24` is r24 at its entry (Model::Draw's recorder
+// context; none of them changes it). CarPart::Draw's original runs from
+// the same frame (with the same return address) where its plain C++
+// declines. Each returns r3 as the original leaves it: the group where it
+// draws nothing, else the last draw's.
+
+// The frames.
+constexpr uint32_t kPartsSmallFrame = 112;
+constexpr uint32_t kPartsFrame = 128;
+constexpr uint32_t kPartsBonnetFrame = 528;
+constexpr uint32_t kPartsShadowFrame = 256;
+
+// PartsPoints::DrawFrontBumperLights (sub_820DE1C8, a 128-byte frame):
+// records 0, 1 (r6 0) or 2, by the block's bits 0x1, 0x2, 0x4 records 3, 4,
+// 5, then SetPair1002Alpha(record 6, the block's +636) and record 6.
+Left PartsDrawFrontBumperLights(uint8_t* base, const Calls& calls, uint32_t stack,
+                                uint32_t group, uint32_t block, uint32_t pass, uint32_t r6,
+                                uint32_t caller_r24);
+// PartsPoints::DrawRearBumperLights (sub_820DE3C0, 128): record 0, by the
+// block's bits 0x1, 0x10, 0x2, 0x4 records 1, 2, 3, 4.
+Left PartsDrawRearBumperLights(uint8_t* base, const Calls& calls, uint32_t stack, uint32_t group,
+                               uint32_t block, uint32_t pass, uint32_t caller_r24);
+// PartsPoints::DrawLeftDoorPanel (sub_820DE6E0, 128) and DrawRightDoorPanel
+// (sub_820DE8C8): nothing unless record 0 has a model; record 6 with the
+// door's matrix (+6016), then with the block's bit 0x2 (left) or 0x4
+// (right) record 7 + the parts record's (+6084) +28, the same matrix.
+Left PartsDrawDoorPanel(uint8_t* base, const Calls& calls, bool right, uint32_t stack,
+                        uint32_t group, uint32_t block, uint32_t pass, uint32_t caller_r24);
+// PartsPoints::DrawDoorWindows02 (sub_820DE760, 112; records 2 and 3, the
+// block's +628) and DrawDoorWindows01 (sub_820DE948; records 4 and 5,
+// +632): nothing unless record 0 has a model; SetPair1002Alpha on both,
+// then both drawn with the door's matrix.
+Left PartsDrawDoorWindows(uint8_t* base, const Calls& calls, bool first, uint32_t stack,
+                          uint32_t group, uint32_t block, uint32_t pass, uint32_t caller_r24);
+// PartsPoints::DrawDoorsBody (sub_820DEA88, 112): record 11, then record 12
+// + k where k, the parts record's (+5520) +12, is below 11 (signed).
+Left PartsDrawDoorsBody(uint8_t* base, const Calls& calls, uint32_t stack, uint32_t group,
+                        uint32_t block, uint32_t pass, uint32_t caller_r24);
+// PartsPoints::DrawDoorsWindows (sub_820DEAF0, 128): SetPair1002Alpha on
+// records 0 and 1 (the block's +632), records 0, 1, 2, then with bit 0x2
+// record 3 + k, with 0x4 record 7 + k (k the parts record's +28).
+Left PartsDrawDoorsWindows(uint8_t* base, const Calls& calls, uint32_t stack, uint32_t group,
+                           uint32_t block, uint32_t pass, uint32_t caller_r24);
+// PartsPoints::DrawFendersBody (sub_820DED88, 112): records 5 and 6.
+Left PartsDrawFendersBody(uint8_t* base, const Calls& calls, uint32_t stack, uint32_t group,
+                          uint32_t block, uint32_t pass, uint32_t caller_r24);
+// PartsPoints::DrawFenderLights (sub_820DEDD8, 128): records 0, 1 (r6 0) or
+// 2, by bits 0x2 and 0x4 records 3 and 4.
+Left PartsDrawFenderLights(uint8_t* base, const Calls& calls, uint32_t stack, uint32_t group,
+                           uint32_t block, uint32_t pass, uint32_t r6, uint32_t caller_r24);
+// PartsPoints::DrawCabinWindow02 (sub_820DEF38, 112): with bit 0x8 record
+// 0; SetPair1002Alpha(record 3, +628), record 3.
+Left PartsDrawCabinWindow02(uint8_t* base, const Calls& calls, uint32_t stack, uint32_t group,
+                            uint32_t block, uint32_t pass, uint32_t caller_r24);
+// PartsPoints::DrawCabinWindow01 (sub_820DEFA8, 128):
+// SetPair1002Alpha(record 2, +632), record 2, with bit 0x8 record 1.
+Left PartsDrawCabinWindow01(uint8_t* base, const Calls& calls, uint32_t stack, uint32_t group,
+                            uint32_t block, uint32_t pass, uint32_t caller_r24);
+// PartsPoints::DrawEngine (sub_820DF070, 112): records 0 and 1.
+Left PartsDrawEngine(uint8_t* base, const Calls& calls, uint32_t stack, uint32_t group,
+                     uint32_t block, uint32_t pass, uint32_t caller_r24);
+// PartsPoints::DrawFrontBumper (sub_820DF308, 112) and DrawRearBumper
+// (sub_820DF458): the body (record 7, or 5 at the rear), then the number
+// plate's model m (+1924, or +1444) gets its texture (+456: the group's
+// +2644, or +1684, with the group's +2640, or +1680, set, m set, the race
+// mode not 7 or 8 and [0x82816E3C] 0; else XPR::GetTexture(the scene's
+// +4648, 0)) and +432 = 1 around the plate's draw (record 8 + the car
+// record's (+2648) +3684, or record 6). The front draws no plate without
+// m; the rear still writes m's +456 and +432 (guest words 456 and 432
+// with no model), as the original.
+Left PartsDrawFrontBumper(uint8_t* base, const Calls& calls, uint32_t stack, uint32_t group,
+                          uint32_t block, uint32_t pass, uint32_t caller_r24);
+Left PartsDrawRearBumper(uint8_t* base, const Calls& calls, uint32_t stack, uint32_t group,
+                         uint32_t block, uint32_t pass, uint32_t caller_r24);
+// PartsPoints::DrawBonnet (sub_820E0998, 528): nothing unless record 0 has
+// a model; in the front end (the scene's +4 0) the world opened about the
+// hinge: the block's +640 clamped to [0.0, pi] (at +80), an identity (+96,
+// copied to +160) turned by it (Matrix::RotateX), times record 0's
+// inverse (+80, copied to +352) on the left, its matrix (+16, copied to
+// +416) and the block's world on the right (Matrix::Multiply and Copy,
+// noted for interpolation, the 1.0 w's written before each multiply as
+// the original); in a race the block's world. Then record 1 with it.
+Left PartsDrawBonnet(uint8_t* base, const Calls& calls, uint32_t stack, uint32_t group,
+                     uint32_t block, uint32_t pass, uint32_t caller_r24);
+// PartsPoints::DrawMirror (sub_820E1138, 256; `world` its r6) and
+// DrawWithShadow (sub_820E1260; `world` the block's +16): the record
+// drawn, then when the pass description's (the scene's +5072) camera pass
+// (+16) is enabled and its +60 has bit 0x100, that pass's view-projection
+// (memcpy to +144) times the description's +112 on the left (into +80,
+// its w's 1.0 first; copied back to +144), the render queue's keys
+// [0x8296B8FC] and [0x8296B8F8] saved to its +76 and +80 and set to its
+// +56, the record drawn depth-only with it (r28 = the world for its
+// recorder's context) and the keys put back.
+Left PartsDrawShadowed(uint8_t* base, const Calls& calls, bool mirror, uint32_t stack,
+                       uint32_t record, uint32_t pass, uint32_t world, uint32_t caller_r24);
 
 }  // namespace car_draw

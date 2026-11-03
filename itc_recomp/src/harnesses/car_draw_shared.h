@@ -1,0 +1,49 @@
+// What the car draw's harness files share (src/harnesses/car_draw.cpp, which
+// defines these, and car_draw_parts.cpp): one case through both versions and
+// the model draws' world, all under the harness name car_draw.
+
+#pragma once
+
+#include "harness.h"
+
+#include <cstdint>
+#include <functional>
+#include <string>
+#include <utility>
+#include <vector>
+
+namespace harness::car_draw_shared {
+
+using FloatRanges = std::vector<std::pair<uint32_t, uint32_t>>;
+
+// The block's size (0x10000 bytes, filled at random by each case).
+constexpr uint32_t kBlockBytes = 0x10000;
+
+// One case through both versions (car_draw.cpp's Case): the block filled at
+// random, `setup(t)` writing the inputs and registers; the block compared
+// (`floats`, offsets in it, as floats), the globals exactly, then `extra`'s
+// outputs and r3. `before(v)` runs before each version (v 0 the recompiled,
+// run with --native_car_draw off when `recompiled_flag_off`).
+void Case(Context& h, Results& results, uint32_t block, Random& r,
+          const std::function<void(PPCContext&)>& setup, GuestFunction recompiled,
+          GuestFunction native, const FloatRanges& floats, const std::string& what,
+          const std::function<void(const PPCContext&, Outputs&)>& extra = {},
+          const std::function<void(int)>& before = {}, bool recompiled_flag_off = false);
+// Whether the next case starts with flush-to-zero on.
+void SetFlushOnEntry(bool on);
+// A model draw's world (the model at +0x100, the shape, its materials, the
+// list at +0x3000, the render queue, the identity view-projection at +0x400
+// and the world at +0x500).
+bool ModelWorld(Context& h, Random& r, uint32_t block, uint32_t shape);
+// The materials' alphas (+12) as floats.
+FloatRanges AlphaFloats();
+uint32_t RandomFloat(Random& r);
+void RandomFloats(uint8_t* base, uint32_t address, uint32_t count, Random& r);
+void FiniteFloats(uint8_t* base, uint32_t address, uint32_t count, Random& r);
+void StoreFloats(uint8_t* base, uint32_t address, std::initializer_list<float> values);
+float Spread(Random& r, float range);
+
+// The parts' small draws' cases (car_draw_parts.cpp).
+void PartsDraws(Context& h, Random& r, uint32_t block, uint32_t race);
+
+}  // namespace harness::car_draw_shared
