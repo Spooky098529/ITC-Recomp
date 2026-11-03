@@ -15,7 +15,8 @@
 // compared after it, with the frame's temporaries, the gather's saved r3
 // and r5, r3 and what went to the render queue. The recompiled side runs
 // with --native_car_draw off (its Gather and DrawShapeDepth the originals or
-// their own adapters).
+// their own adapters), the native side the plain C++ through a register step
+// of its own (the adapter is gone).
 
 #include "harness.h"
 #include "harnesses/car_draw_shared.h"
@@ -118,6 +119,15 @@ void ShadowsWorld(Context& h, Random& r, uint32_t block, uint32_t race, uint32_t
   }
 }
 
+// The shadows' register steps (its adapter is gone: its caller, the race's
+// parts' top, is plain C++): r3 the group, r4 the block.
+void NativeShadows(PPCContext& ctx, uint8_t* base) {
+  const uint32_t r3 = ctx.r3.u32, r4 = ctx.r4.u32, r1 = ctx.r1.u32;
+  NativeStep(ctx, base, [&](const ::car_draw::Calls& calls) {
+    return ::car_draw::PartsDrawShadows(base, calls, r1, r3, r4);
+  });
+}
+
 }  // namespace
 
 void ShadowsDraws(Context& h, Random& r, uint32_t block, uint32_t race) {
@@ -144,7 +154,7 @@ void ShadowsDraws(Context& h, Random& r, uint32_t block, uint32_t race) {
           t.r24.u64 = r.Next();
           t.r28.u64 = r.Next();
         },
-        __imp__sub_820E1D88, hooks::CarDrawPartsShadows, AlphaFloats(),
+        __imp__sub_820E1D88, NativeShadows, AlphaFloats(),
         fmt::format("case {}", c),
         [&](const PPCContext& t, Outputs& o) {
           const uint32_t frame = t.r1.u32 - car_draw::kPartsShadowsFrame;

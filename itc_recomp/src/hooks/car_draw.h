@@ -67,15 +67,8 @@ void CarDrawMorphShape(PPCContext& ctx, uint8_t* base);
 // BlinkTimers::Advance as CarDrawBlinkTimersHeld says).
 void CarDrawSceneLightsDraw(PPCContext& ctx, uint8_t* base);
 
-// The head and tail lights (src/car_draw/lamps.cpp): r3 = the group, r4 =
-// the block, r5 = the camera pass (the headlights' r6 and r7 the color
-// table's index and sub-index).
-void CarDrawPartsTailLights(PPCContext& ctx, uint8_t* base);         // sub_820DF8B0
-void CarDrawPartsHeadlights(PPCContext& ctx, uint8_t* base);         // sub_820E1690
-// The shadows (src/car_draw/shadows.cpp; the parts' and the lighting's
-// callees native): r3 = the group, r4 = the block.
+// The shadows' callees' plain C++ native (the parts' and the lighting's).
 bool CarDrawShadowsCalleesNative();
-void CarDrawPartsShadows(PPCContext& ctx, uint8_t* base);            // sub_820E1D88
 // The parts' top, SceneParts::Draw (sub_820E2EE8; inside the diagnostics'
 // wrap, src/debug/frame_state_diff.cpp; the shadows' callees native): r3 =
 // the parts object, r4 = the block.

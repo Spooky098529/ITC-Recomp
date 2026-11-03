@@ -11,7 +11,9 @@
 // +400 and direction at +464). The scene is put back before each version and
 // compared after it, with the frame's temporaries, r3, r24, r28 and what
 // went to the render queue. The recompiled side runs with --native_car_draw
-// off (its CarPart::Draw and Model::Draw calls run the originals).
+// off (its CarPart::Draw and Model::Draw calls run the originals); the
+// native side the plain C++ through register steps of its own (the adapters
+// are gone).
 
 #include "harness.h"
 #include "harnesses/car_draw_shared.h"
@@ -146,6 +148,27 @@ void LampsWorld(Context& h, Random& r, uint32_t block, uint32_t race, uint32_t s
                                   : std::bit_cast<uint32_t>(float(r.Below(1001)) / 1000.0f));
 }
 
+// The head and tail lights' register steps (their adapters are gone: their
+// callers, the parts' top, are plain C++): r3 the group, r4 the block, r5
+// the pass (the headlights' r6 and r7 the color table's index and
+// sub-index; the tail lights' lamps see r28).
+void NativeTailLights(PPCContext& ctx, uint8_t* base) {
+  const uint32_t r3 = ctx.r3.u32, r4 = ctx.r4.u32, r5 = ctx.r5.u32, r1 = ctx.r1.u32;
+  const uint32_t r24 = ctx.r24.u32, r28 = ctx.r28.u32;
+  NativeStep(ctx, base, [&](const ::car_draw::Calls& calls) {
+    return ::car_draw::PartsDrawTailLights(base, calls, r1, r3, r4, r5, r24, r28);
+  });
+}
+
+void NativeHeadlights(PPCContext& ctx, uint8_t* base) {
+  const uint32_t r3 = ctx.r3.u32, r4 = ctx.r4.u32, r5 = ctx.r5.u32, r1 = ctx.r1.u32;
+  const uint64_t r6 = ctx.r6.u64, r7 = ctx.r7.u64;
+  const uint32_t r24 = ctx.r24.u32;
+  NativeStep(ctx, base, [&](const ::car_draw::Calls& calls) {
+    return ::car_draw::PartsDrawHeadlights(base, calls, r1, r3, r4, r5, r6, r7, r24);
+  });
+}
+
 struct Target {
   const char* name;
   GuestFunction recompiled, native;
@@ -160,9 +183,9 @@ void LampsDraws(Context& h, Random& r, uint32_t block, uint32_t race) {
   const uint32_t scene = race + 0x10000;
   const Target targets[] = {
       {"PartsPoints::DrawTailLights (sub_820DF8B0)", __imp__sub_820DF8B0,
-       hooks::CarDrawPartsTailLights, car_draw::kPartsTailLightsFrame, false},
+       NativeTailLights, car_draw::kPartsTailLightsFrame, false},
       {"PartsPoints::DrawHeadlights (sub_820E1690)", __imp__sub_820E1690,
-       hooks::CarDrawPartsHeadlights, car_draw::kPartsHeadlightsFrame, true},
+       NativeHeadlights, car_draw::kPartsHeadlightsFrame, true},
   };
   for (const Target& target : targets) {
     Results results(target.name);
