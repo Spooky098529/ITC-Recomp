@@ -33,7 +33,7 @@ ITC_FLAG_BOOL(native_car_draw, true, "ITC",
               "its render-only skip, --per_tick_blink_timers), "
               "SceneModel::IsNearPlayerHeight sub_820DAB58 (inside the diagnostics' wrap), "
               "the morph Model::MorphShape sub_82595110 (the job maker a guest call), "
-              "WorkMem::AllocVertexBuffer sub_8258A9E8 (no adapter: MorphShape calls it), Model::QueueJobRelease sub_82594E88 and "
+              "WorkMem::AllocVertexBuffer sub_8258A9E8 (no adapter: MorphShape calls it), Model::QueueJobRelease sub_82594E88 (no adapter: MorphShape calls it) and "
               "XGSetVertexBufferHeader sub_8235A688 (no adapter: its caller calls it), the light "
               "kit SceneLights::Draw sub_820DDE58 (inside the diagnostics' wrap; it skips "
               "BlinkTimers::Advance as --per_tick_blink_timers says) with LightPoints::DrawFront "
@@ -245,24 +245,6 @@ void LeaveLeft(PPCContext& ctx, const car_draw::Left& left) {
 
 }  // namespace
 
-void CarDrawQueueJobRelease(PPCContext& ctx, uint8_t* base) {
-  if (!CarDrawMorphCalleesNative()) {
-    __imp__sub_82594E88(ctx, base);
-    return;
-  }
-  ctx.fpscr.disableFlushMode();
-  const uint64_t lr = ctx.lr;
-  SceneryDrawGuest guest{ctx, base};
-  const car_draw::Calls calls = CarDrawCalls(&guest);
-  const auto left = car_draw::ModelQueueJobRelease(base, calls, ctx.r4.u32, ctx.r1.u32);
-  if (!left) {
-    __imp__sub_82594E88(ctx, base);
-    return;
-  }
-  ctx.lr = lr;
-  LeaveLeft(ctx, *left);
-}
-
 void CarDrawMorphShape(PPCContext& ctx, uint8_t* base) {
   if (!CarDrawMorphCalleesNative()) {
     __imp__sub_82595110(ctx, base);
@@ -313,12 +295,12 @@ void CarDrawSceneLightsDraw(PPCContext& ctx, uint8_t* base) {
 // CarPart::Draw's adapter is also what the native cockpit dials call
 // (src/hooks/cockpit_dials.cpp). No adapter: Matrix::Shadow sub_82597FE0
 // (2026-11-01; its only caller, CarLighting::Gather, calls the plain C++),
-// WorkMem::AllocVertexBuffer sub_8258A9E8 (2026-11-03; its caller in play,
-// Model::MorphShape, calls the plain C++).
+// WorkMem::AllocVertexBuffer sub_8258A9E8 and Model::QueueJobRelease
+// sub_82594E88 (2026-11-03; their caller in play, Model::MorphShape, calls
+// the plain C++).
 ITC_CAR_DRAW(820D04E8, CarDrawModelDraw)
 ITC_CAR_DRAW(820D06F0, CarDrawCarPartDraw)
 ITC_CAR_DRAW(820C9170, CarDrawCarLightingGather)
 ITC_CAR_DRAW(820DC4B0, CarDrawBlinkLevel)
-ITC_CAR_DRAW(82594E88, CarDrawQueueJobRelease)
 ITC_CAR_DRAW(82595110, CarDrawMorphShape)
 #undef ITC_CAR_DRAW

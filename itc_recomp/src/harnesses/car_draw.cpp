@@ -789,6 +789,21 @@ void NativeAllocVertexBuffer(PPCContext& ctx, uint8_t* base) {
   ctx.r3.u64 = *memory;
 }
 
+// Model::QueueJobRelease's register steps (its adapter is gone: its caller
+// in play, Model::MorphShape, calls the plain C++): the original where the
+// plain C++ declines (no room).
+void NativeQueueJobRelease(PPCContext& ctx, uint8_t* base) {
+  ctx.fpscr.disableFlushMode();
+  hooks::SceneryDrawGuest guest{ctx, base};
+  const car_draw::Calls calls = hooks::CarDrawCalls(&guest);
+  const auto left = car_draw::ModelQueueJobRelease(base, calls, ctx.r4.u32, ctx.r1.u32);
+  if (!left) {
+    __imp__sub_82594E88(ctx, base);
+    return;
+  }
+  ctx.fpscr.disableFlushMode();
+}
+
 // The work memory: buffer i (0 or 1) current, its header count near 0 or
 // near the 1,280 limit (now and then at it), the bytes used and the capacity
 // around `bytes` (now and then not fitting), its start at the block's
@@ -890,7 +905,7 @@ void Morphs(Context& h, Random& r, uint32_t block) {
             t.r3.u64 = r.Next();
             t.r4.u64 = r.Next();
           },
-          __imp__sub_82594E88, hooks::CarDrawQueueJobRelease, {}, fmt::format("case {}", c),
+          __imp__sub_82594E88, NativeQueueJobRelease, {}, fmt::format("case {}", c),
           [&](const PPCContext& t, Outputs& o) {
             o.Word(guest::LoadU32(h.base, t.r1.u32 - car_draw::kQueueJobReleaseFrame));
             queued(t, o, count);
