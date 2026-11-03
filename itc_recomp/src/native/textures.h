@@ -71,6 +71,9 @@ class TextureCache {
   // draws sampling that handle then get instead of guest memory (resolves
   // aren't written back). Left in SHADER_READ_ONLY_OPTIMAL, or UNDEFINED
   // while `fresh`. False if its format can't be a color attachment.
+  // exchanged: what's drawn into it holds red and blue in order where the
+  // guest's memory would hold them exchanged (the resolve's
+  // copy_dest_swap); its views exchange them back.
   struct ResolveDestination {
     VkImage image;
     VkImageView view;  // all components as is, for drawing into
@@ -81,7 +84,7 @@ class TextureCache {
     bool fresh;
   };
   bool GetResolveDestination(uint32_t handle, const uint32_t fetch[6], float scale,
-                             ResolveDestination& out);
+                             bool exchanged, ResolveDestination& out);
 
   // A debugging aid: the texture's first level (first layer) decoded from
   // guest memory into the host format's bytes, uncompressed formats only.

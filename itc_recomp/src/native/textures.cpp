@@ -537,6 +537,9 @@ struct TextureCache::State {
     std::unordered_map<uint32_t, VkImageView> views;  // by swizzle
     // A resolve destination: drawn into, never loaded.
     bool resolved = false;
+    // Red and blue held in order where guest memory would hold them
+    // exchanged: the views exchange them (GetResolveDestination).
+    bool exchanged = false;
     uint32_t guest_format = 0;
     uint32_t host_width = 0, host_height = 0;  // the image's (scaled)
     float scale = 1.0f;
@@ -623,7 +626,7 @@ struct TextureCache::State {
   void LogWriteSummary();
   // Handles whose header changed with no TextureCreated, and textures
   // reading a resolve destination's memory (each logged once).
-  std::unordered_set<uint32_t> logged_header_changes, logged_aliases;
+  std::unordered_set<uint32_t> logged_header_changes, logged_aliases, logged_exchanges;
 
   bool CreateTexture(Texture& texture);
   uint64_t Hash(uint8_t* base, const Texture& texture) const;
@@ -1324,6 +1327,9 @@ VkImageView TextureCache::State::GetSwizzledView(Texture& t, uint32_t swizzle,
   if (!view) {
     auto component = [&](uint32_t i) {
       uint32_t select = (swizzle >> (3 * i)) & 7;
+      if (t.exchanged && (select == 0 || select == 2)) {
+        select = 2 - select;
+      }
       if (select == 4) {
         return VK_COMPONENT_SWIZZLE_ZERO;
       }
@@ -1348,7 +1354,7 @@ VkImageView TextureCache::State::GetSwizzledView(Texture& t, uint32_t swizzle,
   return view;
 }
 bool TextureCache::GetResolveDestination(uint32_t handle, const uint32_t fetch_words[6],
-                                         float scale, ResolveDestination& out) {
+                                         float scale, bool exchanged, ResolveDestination& out) {
   State& s = *state_;
   xenos::xe_gpu_texture_fetch_t fetch = ToFetch(fetch_words);
   uint32_t page = fetch.base_address & 0x1FFFF;
@@ -1378,6 +1384,7 @@ bool TextureCache::GetResolveDestination(uint32_t handle, const uint32_t fetch_w
   if (it == h.resolved.end()) {
     State::Texture t;
     t.resolved = true;
+    t.exchanged = exchanged;
     t.guest_format = uint32_t(fetch.format);
     if (fetch.format == xenos::TextureFormat::k_24_8 ||
         fetch.format == xenos::TextureFormat::k_24_8_FLOAT) {
@@ -1405,6 +1412,12 @@ bool TextureCache::GetResolveDestination(uint32_t handle, const uint32_t fetch_w
     events_.created++;
   }
   State::Texture& t = it->second;
+  if (t.exchanged != exchanged && s.logged_exchanges.insert(handle).second) {
+    // Its swizzle changed with no TextureCreated (never seen): its views
+    // keep the first.
+    ITC_LOG_WARN("native renderer: resolve destination {:08X}'s red and blue order changed",
+                 handle);
+  }
   if (h.current != &t || !t.loaded) {
     h.current = &t;
     generation_++;

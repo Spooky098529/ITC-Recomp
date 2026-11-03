@@ -2028,7 +2028,7 @@ bool Passes::State::CreateResolveResources() {
       VK_SUCCESS) {
     return false;
   }
-  VkPushConstantRange push{VK_SHADER_STAGE_FRAGMENT_BIT, 0, 20};
+  VkPushConstantRange push{VK_SHADER_STAGE_FRAGMENT_BIT, 0, 16};
   VkPipelineLayoutCreateInfo layout_info{VK_STRUCTURE_TYPE_PIPELINE_LAYOUT_CREATE_INFO};
   layout_info.setLayoutCount = 1;
   layout_info.pSetLayouts = &resolve_set_layout;
@@ -2274,8 +2274,14 @@ bool Passes::State::ResolveInto(VkCommandBuffer commands, uint8_t* base, Target&
   }
   fetch[1] = (fetch[1] & 0xFFFu) | GpuPhysicalAddress(fetch[1] & 0xFFFFF000u);
   fetch[5] = (fetch[5] & 0xFFFu) | GpuPhysicalAddress(fetch[5] & 0xFFFFF000u);
+  // The library's Resolve sets RB_COPY_DEST_INFO's copy_dest_swap when the
+  // destination's swizzle takes X from another component than the first
+  // (bits 1-3 of fetch word 3): memory holds red and blue exchanged, and
+  // the swizzle exchanges them back. Our image holds them in order; its
+  // views exchange them (step 3), so readers get the same.
+  const bool exchanged = !source.depth && ((fetch[3] >> 1) & 7) != 0;
   TextureCache::ResolveDestination dest;
-  if (!textures.GetResolveDestination(destination, fetch, source.scale, dest)) {
+  if (!textures.GetResolveDestination(destination, fetch, source.scale, exchanged, dest)) {
     return false;
   }
   // Source rectangle (left, top, right, bottom) and destination point.
@@ -2370,19 +2376,13 @@ bool Passes::State::ResolveInto(VkCommandBuffer commands, uint8_t* base, Target&
                               &set, 0, nullptr);
   // The exponent bias: flags bits 26-31, signed (likely; 0xF4000000 is -3
   // on the main view's HDR copies).
-  // Red and blue swapped as the library's Resolve sets RB_COPY_DEST_INFO's
-  // copy_dest_swap: when the destination's swizzle takes X from another
-  // component than the first (bits 1-3 of fetch word 3), so sampling it
-  // through the swizzle swaps them back.
-  bool swap = !source.depth && ((fetch[3] >> 1) & 7) != 0;
   struct {
     int32_t offset[2];
     int32_t samples;
     float scale;
-    int32_t swap_red_blue;
   } constants{{host_left - host_x, host_top - host_y},
               source.depth ? 1 : int32_t(source.samples),
-              std::ldexp(1.0f, int32_t(flags) >> 26), swap ? 1 : 0};
+              std::ldexp(1.0f, int32_t(flags) >> 26)};
   vk::vkCmdPushConstants(commands, resolve_layout, VK_SHADER_STAGE_FRAGMENT_BIT, 0,
                          sizeof(constants), &constants);
   vk::vkCmdDraw(commands, 3, 1, 0, 0);
