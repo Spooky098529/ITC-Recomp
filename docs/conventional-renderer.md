@@ -1253,16 +1253,23 @@ menus, the side targets cleared and resolved with no draws.
   generation, as now). This gives the ping-pongs and the glow history
   their right contents without knowing what each draw samples. About 20
   MB more GPU memory (the two 1024x1024 depth maps most of it).
-- **Clears at the segment's start.** A pending clear (command 26, a
-  resolve's `0x100` or `0x200`, BeginTiling's) is applied to the image
-  the target's next segment draws into, when it starts.
-- **Load copies keep EDRAM's retention.** A segment that starts without a
-  clear first copies in the image that last stood for its target (a blit
-  or the fullscreen copy, as formats may differ). About 5 small copies a
-  frame (in 0-2, 20-22 and the glow target's first segment).
-- **A segment with no draws** (the menus' side targets) gets its clear or
-  load at the resolve, so the destination still holds what the resolve
-  copied before.
+- **No EDRAM behavior is kept** (the user's call, 2026-11-03: the game's
+  drawing into EDRAM and the resolves out of it are skipped, not
+  imitated; this replaces "load copies" in the first version of this
+  plan). A pass starts either cleared, when the game clears it (command
+  26, or the `0x100`/`0x200` clear after the resolve that ended the pass
+  before), the clear made on the image the pass draws into; or with
+  whatever its image holds (Vulkan's "don't care"). Nothing carries a
+  target's contents from one pass to the next.
+- **That holds while each pass started without a clear covers its whole
+  image** and doesn't blend or test depth at its first draw (step 0's
+  finding for the frame's targets; the blur's draws 16 and 17 to check).
+  A check logs each drawn-into pass that starts without a clear, with its
+  first draw's blend, depth test and viewport against the image. A pass
+  that needs what's under it gets an explicit copy of the texture it
+  reads (a normal PC copy), decided from that log.
+- **A pass with no draws** (the menus' side targets, cleared and resolved)
+  is its clear, made on its destination's image.
 - **Formats.** Each destination is drawn in its own format (decision 7):
   the motion blur into 16_16 UNORM instead of drawn in float and copied;
   20-22 into 16_16_16_16 UNORM. The depth maps (4 and 5) are drawn into
@@ -1300,10 +1307,11 @@ component mapping is the fetch constant's swizzle with that composed in
 (format 54's readers).
 
 **6. Diagnostics.** `passes.txt` (`--native_renderer_log_passes`) gives
-each resolve's kind and each load copy; the 5 s stats count resolves by
-kind, load copies, plan mismatches and planless frames; the dump's
-`resolve_NN` images are copied at each resolve (the two images are
-reused within a frame).
+each resolve's kind; the 5 s stats count resolves by kind, drawn-into
+passes started without a clear, plan mismatches and planless frames. The
+dump's `resolve_NN` images are each image as the frame ends (as before:
+a destination resolved twice shows its last contents; with two images,
+resolves into the same one show the same).
 
 **Interpolation** is untouched: command 7 is unchanged, and the glow
 history (forced on render-only passes by `glow.cpp`) stays a per-frame
@@ -1318,7 +1326,7 @@ the fallback until 3f):
 |---|---|---|
 | 3a | `Replay` sorts the frame first; the scanner, `Commands::Slots` and the plan, checked at each resolve and logged in `passes.txt`; nothing drawn differently | An attract race: 0 plan mismatches, 0 planless frames; dumps the same |
 | 3b | The swap moved into the views | Dumps: format 54 destinations within the runs' spread |
-| 3c | Drawn into, color, no bias (0-3, 8, 20-22, the menus' side targets): the two images, clears at the segment's start, load copies | Dumps; each destination's differences explained (decision 7) |
+| 3c | Drawn into, color, no bias (0-3, 8, 20-22, the menus' side targets): the two images, each pass cleared on its own image or not at all, the check of passes started without a clear | The check's log; dumps; each destination's differences explained (decision 7) |
 | 3d | The depth maps drawn into their own depth images, sampled as depth | Dumps (the shadow maps' readers in the main view) |
 | 3e | The glow's biased destinations (11-19) in float, the bias in their readers' `exp_adjust` | Dumps (the glow chain and the shown frame); `--log_glow` |
 | 3f | The flag and the copies' leftover code for drawn-into resolves removed; `ResolveInto` kept only for multisample resolves and copies | An attract race and dumps |
