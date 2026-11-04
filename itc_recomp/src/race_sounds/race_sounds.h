@@ -64,6 +64,42 @@ constexpr uint32_t kCarSoundPauseAll = 0x8210E2B8;
 constexpr uint32_t kCarSoundResumeAll = 0x8210E350;
 constexpr uint32_t kCarSoundsStopAll = 0x8210F7C8;
 constexpr uint32_t kCarSoundsRelease = 0x8210F750;
+constexpr uint32_t kCarSoundStop = 0x8210E218;
+constexpr uint32_t kCarSoundStart = 0x8210E030;
+constexpr uint32_t kCarSoundUpdate = 0x82110048;
+constexpr uint32_t kMusicPlay = 0x821063B0;          // Music::Play (mode-tick.md)
+constexpr uint32_t kRaceSoundsPauseCars = 0x82175C00;
+constexpr uint32_t kRaceSoundsResumeCars = 0x82175C58;
+
+// The scene models' sound slots (seven each; scene-models.md loads into
+// them): the two files' buffers, asked again, both files arrived; the cars'
+// two wave bank views (24-byte objects, two pointers a car); the cars'
+// sound parameters' indexes (CarSounds::SetBanks).
+constexpr uint32_t kSlotBuffer0 = 0x826D8358;
+constexpr uint32_t kSlotBuffer1 = 0x826D8374;
+constexpr uint32_t kSlotAsked = 0x826D8390;
+constexpr uint32_t kSlotArrived = 0x826D83AC;
+constexpr uint32_t kCarViews = 0x826D82FC;
+constexpr uint32_t kBankIndexI = 0x826C5C48;
+constexpr uint32_t kBankIndexJ = 0x826C5C64;
+// The racers' entries ([[0x826D82F4] + 2308 + 4n], +20 the vehicle's
+// index), the race's progress ([0x826D82E8]: +2184 the results' count, 972
+// bytes each from +2188, +4 the item), the race data ([0x826C5B2C]: +32
+// probably the course), the music names' table, the system UI's words, the
+// float 1.0.
+constexpr uint32_t kRace = 0x826D82F4;
+constexpr uint32_t kProgress = 0x826D82E8;
+constexpr uint32_t kRaceData = 0x826C5B2C;
+constexpr uint32_t kMusicNames = 0x826193D4;
+constexpr uint32_t kSystemUi0 = 0x826C7960;
+constexpr uint32_t kSystemUi1 = 0x826C7964;
+constexpr uint32_t kOne = 0x82000A30;
+
+// More of the machine's words.
+constexpr uint32_t kEffectsView = 9608;
+constexpr uint32_t kEffectsBank = 9632;
+constexpr uint32_t kCarsPaused = 9640;
+constexpr uint32_t kSetUpWait = 9656;
 
 // A guest function called from the frame at `r1`, with the first `set` of
 // r3 to r6 given (the others left as they are) and the link register `lr`
@@ -73,10 +109,30 @@ struct Calls {
   void* user;
   uint64_t (*call)(void* user, uint32_t function, const uint64_t args[4], int set, uint32_t r1,
                    uint32_t lr);
+  // r4 and r5 as a native step the original makes as a call leaves them
+  // (CarSounds::SetBanks' r4 and r5), given to the next call that doesn't
+  // set them (the original's leftovers), then forgotten.
+  mutable bool left = false;
+  mutable uint64_t left_r4 = 0, left_r5 = 0;
 
+  void Leave(uint64_t r4, uint64_t r5) const {
+    left = true;
+    left_r4 = r4;
+    left_r5 = r5;
+  }
   uint64_t Call(uint32_t function, uint32_t r1, uint32_t lr, int set, uint64_t r3,
                 uint64_t r4 = 0, uint64_t r5 = 0, uint64_t r6 = 0) const {
-    const uint64_t args[4] = {r3, r4, r5, r6};
+    uint64_t args[4] = {r3, r4, r5, r6};
+    if (left) {
+      if (set < 2) {
+        args[1] = left_r4;
+      }
+      if (set < 3) {
+        args[2] = left_r5;
+        set = 3;
+      }
+      left = false;
+    }
     return call(user, function, args, set, r1, lr);
   }
 };
@@ -120,5 +176,23 @@ uint64_t OnRollingStartDone(uint8_t* base, uint64_t r3, uint32_t sp, const Calls
 // sub_82175ED0 RaceSounds::OnEffectsBankLoaded (leaf): the effects' bank
 // arrived (r3 left).
 void OnEffectsBankLoaded(uint8_t* base);
+
+// --- The cars' sounds and the music's picks (race_sounds_cars.cpp) ---
+
+// sub_82176188 RaceSounds::SetUpCars (224 bytes): +9656 = 10; each car
+// whose files and the effects' bank have arrived stopped, its views set up,
+// started, given its banks and its vehicle (the cars' step 2 and 0x20000
+// set for each).
+uint64_t SetUpCars(uint8_t* base, uint64_t r3, uint32_t sp, const Calls& calls);
+// sub_82175F20 RaceSounds::UpdateCars (240 bytes): the wait counted down,
+// or each racer's car set up again when asked, each racer's car sound
+// updated, the car sounds paused or resumed by the system UI.
+uint64_t UpdateCars(uint8_t* base, uint64_t r3, uint32_t sp, const Calls& calls);
+// sub_821764F0 RaceSounds::PickRivalMusic (112 bytes): the next music's flag
+// from the last result's item.
+uint64_t PickRivalMusic(uint8_t* base, uint64_t r3, uint32_t sp);
+// sub_821762F8 RaceSounds::PlayRivalMusic (144 bytes): each music flag set
+// played (Music::Play) and cleared.
+uint64_t PlayRivalMusic(uint8_t* base, uint64_t r3, uint32_t sp, const Calls& calls);
 
 }  // namespace race_sounds

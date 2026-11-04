@@ -8,6 +8,7 @@
 
 #include "base/flags.h"
 #include "hooks/car_sounds.h"
+#include "hooks/mode_tick.h"
 #include "race_sounds/race_sounds.h"
 
 ITC_FLAG_BOOL(native_race_sounds, true, "ITC",
@@ -15,8 +16,9 @@ ITC_FLAG_BOOL(native_race_sounds, true, "ITC",
               "machine at +138284; SetListener sub_821758A0, FadeMusic sub_82175908, "
               "RestoreMusicVolume sub_821759C8, EndTick sub_82175A40, Pause sub_82175AE8, Resume "
               "sub_82175B80, PauseCars sub_82175C00, ResumeCars sub_82175C58, OnStageCountdown "
-              "sub_82175D20, OnRollingStartDone sub_82175D48, OnEffectsBankLoaded sub_82175ED0; "
-              "the car sounds through their plain C++, the sound manager's slots through the "
+              "sub_82175D20, OnRollingStartDone sub_82175D48, OnEffectsBankLoaded sub_82175ED0, "
+              "SetUpCars sub_82176188, UpdateCars sub_82175F20, PickRivalMusic sub_821764F0, "
+              "PlayRivalMusic sub_821762F8; the car sounds and Music::Play through their plain C++, the sound manager's slots through the "
               "function table) natively instead of through the translated code (the same "
               "words; checked by --run_harnesses=race_sounds)");
 
@@ -64,6 +66,18 @@ class GuestCalls {
         break;
       case rs::kCarSoundsRelease:
         CarSoundsReleaseAll(ctx, base);
+        break;
+      case rs::kCarSoundStop:
+        CarSoundsStop(ctx, base);
+        break;
+      case rs::kCarSoundStart:
+        CarSoundsCarSoundStart(ctx, base);
+        break;
+      case rs::kCarSoundUpdate:
+        CarSoundsUpdate(ctx, base);
+        break;
+      case rs::kMusicPlay:
+        ModeTickMusicPlay(ctx, base);
         break;
       default:
         ctx.ctr.u64 = function;
@@ -149,6 +163,28 @@ void RaceSoundsOnEffectsBankLoaded(PPCContext&, uint8_t* base) {
   race_sounds::OnEffectsBankLoaded(base);
 }
 
+void RaceSoundsSetUpCars(PPCContext& ctx, uint8_t* base) {
+  const uint64_t r3 = ctx.r3.u64;
+  const uint32_t sp = ctx.r1.u32;
+  Step(ctx, base, [&](const rs::Calls& c) { return rs::SetUpCars(base, r3, sp, c); });
+}
+
+void RaceSoundsUpdateCars(PPCContext& ctx, uint8_t* base) {
+  const uint64_t r3 = ctx.r3.u64;
+  const uint32_t sp = ctx.r1.u32;
+  Step(ctx, base, [&](const rs::Calls& c) { return rs::UpdateCars(base, r3, sp, c); });
+}
+
+void RaceSoundsPickRivalMusic(PPCContext& ctx, uint8_t* base) {
+  ctx.r3.u64 = rs::PickRivalMusic(base, ctx.r3.u64, ctx.r1.u32);
+}
+
+void RaceSoundsPlayRivalMusic(PPCContext& ctx, uint8_t* base) {
+  const uint64_t r3 = ctx.r3.u64;
+  const uint32_t sp = ctx.r1.u32;
+  Step(ctx, base, [&](const rs::Calls& c) { return rs::PlayRivalMusic(base, r3, sp, c); });
+}
+
 }  // namespace hooks
 
 // Defines an adapter: the flag, else the original.
@@ -173,3 +209,7 @@ ITC_RACE_SOUNDS(82175C58, RaceSoundsResumeCars)
 ITC_RACE_SOUNDS(82175D20, RaceSoundsOnStageCountdown)
 ITC_RACE_SOUNDS(82175D48, RaceSoundsOnRollingStartDone)
 ITC_RACE_SOUNDS(82175ED0, RaceSoundsOnEffectsBankLoaded)
+ITC_RACE_SOUNDS(82176188, RaceSoundsSetUpCars)
+ITC_RACE_SOUNDS(82175F20, RaceSoundsUpdateCars)
+ITC_RACE_SOUNDS(821764F0, RaceSoundsPickRivalMusic)
+ITC_RACE_SOUNDS(821762F8, RaceSoundsPlayRivalMusic)

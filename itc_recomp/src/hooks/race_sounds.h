@@ -21,5 +21,9 @@ void RaceSoundsResumeCars(PPCContext& ctx, uint8_t* base);           // sub_8217
 void RaceSoundsOnStageCountdown(PPCContext& ctx, uint8_t* base);     // sub_82175D20
 void RaceSoundsOnRollingStartDone(PPCContext& ctx, uint8_t* base);   // sub_82175D48
 void RaceSoundsOnEffectsBankLoaded(PPCContext& ctx, uint8_t* base);  // sub_82175ED0
+void RaceSoundsSetUpCars(PPCContext& ctx, uint8_t* base);            // sub_82176188
+void RaceSoundsUpdateCars(PPCContext& ctx, uint8_t* base);           // sub_82175F20
+void RaceSoundsPickRivalMusic(PPCContext& ctx, uint8_t* base);       // sub_821764F0
+void RaceSoundsPlayRivalMusic(PPCContext& ctx, uint8_t* base);       // sub_821762F8
 
 }  // namespace hooks
