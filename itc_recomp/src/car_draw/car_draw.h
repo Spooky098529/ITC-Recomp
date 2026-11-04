@@ -785,6 +785,7 @@ constexpr uint32_t kWheelsTireMorphedFrame = 1648;
 constexpr uint32_t kWheelsRimAFrame = 2032;
 constexpr uint32_t kWheelsRimAMorphedFrame = 2256;
 constexpr uint32_t kWheelsRimBFrame = 2528;
+constexpr uint32_t kWheelsBrakesFrame = 2560;
 
 // WheelPoints::DrawTire (sub_820E8AE8): r3 = a tire group (the point block's
 // +32 or +1872), r4 = the camera pass, r5 = the block. Side 1 (T from +1808):
@@ -855,5 +856,30 @@ Left WheelsDrawRimAMorphed(uint8_t* base, const Calls& calls, uint32_t stack, ui
 // flips, no morph, no depth pass.
 Left WheelsDrawRimB(uint8_t* base, const Calls& calls, uint32_t stack, uint32_t group,
                     uint32_t camera, uint32_t block);
+
+// WheelPoints::DrawBrakes (sub_820EB388): r3 = a brake group (the point
+// block's +10688 or +13632), r4 = the camera pass, r5 = the block; the discs
+// and calipers (twelve records at +32 + 240k). Fresh identities at the
+// frame's +2144, +2016, +2400, +2272, T (+224) and T' (+288), then Z (+96);
+// unless the block's +732 is set, T's row 3 + the group's +2912 and T''s +
+// +2928 (one test for both). Z = RotateZ by the wheels record's (+8) +100
+// (the rear's +104; front by the group's +12) x [0x82002948] (pi / 180):
+// side 1's spinning Z x S_0 x R_0 x T x world into +2144 and still Z x R_0 x
+// T x world into +2016 (the rear's S_2, R_2). Z' = RotY (pi) then RotateZ by
+// (that word - [0x82002C34], 180.0) x pi / 180: side 2's Z' x S_1 x R_1 x T'
+// x world into +2400 and Z' x R_1 x T' x world into +2272 (the rear's S_3,
+// R_3). With the wheels record's +8 set (never in play), five morphs on
+// record 0's model ([+36]): Morph::SetUp(model, the frame's +288, base,
+// &target (the frame's +224), &weight (the group's +16 at the frame's +160),
+// 1) and Model::MorphShape (its plain C++, else its original from this
+// frame): records 0 toward 1, 2 toward 3, 8 toward 9, 4 toward 5, 6 toward 7.
+// Each side: spinning, record 4 (+992) when the wheels record's +68 is below
+// 4, else record 6 (+1472); still, record 0 (+32) when +68 and +84 are 0,
+// else record 2 (+512); still, record 8 (+1952) when +68 is 0 and +88 isn't
+// 1; PartModel::SetAlpha(record 10's model and shape, the block's float
+// +612 + 8 x rear, side 2's +616 + 8 x rear) and record 10 (+2432)
+// spinning. r24 `caller_r24` and r28 the block at every draw.
+Left WheelsDrawBrakes(uint8_t* base, const Calls& calls, uint32_t stack, uint32_t group,
+                      uint32_t camera, uint32_t block, uint64_t caller_r24);
 
 }  // namespace car_draw

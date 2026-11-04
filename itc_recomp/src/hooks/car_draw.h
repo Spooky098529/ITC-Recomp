@@ -106,5 +106,8 @@ void CarDrawWheelsDrawRimAMorphed(PPCContext& ctx, uint8_t* base);
 // WheelPoints::DrawRimB (sub_820EA950; the wheels' callees native): r3 = the
 // rim group, r4 = the camera pass, r5 = the block.
 void CarDrawWheelsDrawRimB(PPCContext& ctx, uint8_t* base);
+// WheelPoints::DrawBrakes (sub_820EB388; the wheels' callees native): r3 =
+// the brake group, r4 = the camera pass, r5 = the block (r24 its draws').
+void CarDrawWheelsDrawBrakes(PPCContext& ctx, uint8_t* base);
 
 }  // namespace hooks

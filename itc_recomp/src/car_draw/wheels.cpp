@@ -737,4 +737,196 @@ Left WheelsDrawRimB(uint8_t* base, const Calls& calls, uint32_t stack, uint32_t 
                    turned_world, r24, s, false, kSide2);
 }
 
+// --- The brakes ---
+
+namespace {
+
+constexpr uint32_t kDegrees = 0x82002948;   // pi / 180
+constexpr uint32_t kHalfTurn = 0x82002C34;  // 180.0, side 2's turn
+
+// A side's two products, front or rear: the spinning Z x S x R x T x world
+// and the still Z x R x T x world, their outputs and return addresses.
+struct BrakesChains {
+  uint32_t spin_outs[4], spin_lrs[4], still_outs[3], still_lrs[3];
+  uint32_t spin_copy_lr, still_copy_lr;
+};
+
+// Where a brake draw keeps its matrices (DrawBrakes' and
+// DrawBrakesMorphed's frames differ only in offsets): the six fresh
+// identities' destinations in their order, the side matrices' (spinning,
+// still for each side) and the chains.
+struct BrakesLayout {
+  uint32_t fresh[6];
+  uint32_t spin1, still1, spin2, still2;
+  BrakesChains front1, rear1, front2, rear2;
+};
+
+constexpr BrakesLayout kBrakes = {
+    {2144, 2016, 2400, 2272, 224, 288},
+    2144,
+    2016,
+    2400,
+    2272,
+    {{1312, 544, 1952, 672},
+     {0x820EB6B0, 0x820EB6D4, 0x820EB6F4, 0x820EB718},
+     {1568, 800, 2208},
+     {0x820EB744, 0x820EB764, 0x820EB784},
+     0x820EB724,
+     0x820EB790},
+    {{2336, 1440, 480, 608},
+     {0x820EB96C, 0x820EB990, 0x820EB9B0, 0x820EB9D4},
+     {736, 864, 992},
+     {0x820EBA00, 0x820EBA20, 0x820EBA40},
+     0x820EB9E0,
+     0x820EBA4C},
+    {{928, 1696, 1056, 2080},
+     {0x820EB850, 0x820EB874, 0x820EB894, 0x820EB8B4},
+     {1184, 1824, 416},
+     {0x820EB8E0, 0x820EB900, 0x820EB920},
+     0x820EB8C0,
+     0x820EBBE8},
+    {{1120, 1248, 1376, 1504},
+     {0x820EBB0C, 0x820EBB30, 0x820EBB50, 0x820EBB70},
+     {1632, 1760, 1888},
+     {0x820EBB9C, 0x820EBBBC, 0x820EBBDC},
+     0x820EBB7C,
+     0x820EBBE8},
+};
+
+// One side's products from Z (the frame's +96) into the layout's spinning
+// and still matrices.
+void BrakesSide(uint8_t* base, uint32_t frame, uint32_t s, uint32_t r, uint32_t t,
+                uint32_t world, uint32_t spin, uint32_t still, const BrakesChains& c,
+                double one) {
+  const uint32_t z = frame + 96;
+  uint32_t outs[4];
+  for (int i = 0; i < 4; i++) outs[i] = frame + c.spin_outs[i];
+  NotedCopy(base, frame + spin, Chain(base, {z, s, r, t, world}, outs, c.spin_lrs, one),
+            c.spin_copy_lr);
+  for (int i = 0; i < 3; i++) outs[i] = frame + c.still_outs[i];
+  NotedCopy(base, frame + still, Chain(base, {z, r, t, world}, outs, c.still_lrs, one),
+            c.still_copy_lr);
+}
+
+// Both sides' matrices (see car_draw.h): the identities, T (+224) and T'
+// (+288) from +2912 and +2928 unless the block's +732 is set, Z by the
+// wheels record's +100 (rear +104) in degrees, Z' = RotY turned by (that -
+// 180) degrees, and each side's products.
+void BrakesMatrices(uint8_t* base, uint32_t frame, uint32_t group, uint32_t block,
+                    const BrakesLayout& l) {
+  for (const uint32_t to : l.fresh) {
+    FreshIdentity(base, frame + 96, frame + to);
+  }
+  FreshIdentity(base, frame + 160, frame + 96);
+  const uint32_t t = frame + 224, t2 = frame + 288, world = block + 16;
+  const simde__m128 w = VectorOf(0, 0, 0, kOneBits);
+  Translate(base, block, t + 48, w, group + 2912);
+  Translate(base, block, t2 + 48, w, group + 2928);
+  const bool front = int32_t(Load(base, group + 12)) != 0;
+  const uint32_t angle_at = front ? 100 : 104;
+  const uint32_t z = frame + 96, angle = frame + 80, turn = frame - 80;
+  const double degrees = Lfs(base, kDegrees);
+  Stfs(base, angle, Fmuls(Lfs(base, Load(base, group + 8) + angle_at), degrees));
+  matrix_math::RotateZ(base, z, z, angle, turn);
+  const double one = Lfs(base, kOne);
+  if (front) {
+    BrakesSide(base, frame, block + 336, block + 80, t, world, l.spin1, l.still1, l.front1, one);
+  } else {
+    BrakesSide(base, frame, block + 464, block + 208, t, world, l.spin1, l.still1, l.rear1, one);
+  }
+  FreshIdentity(base, frame + 160, z);
+  Stfs(base, angle, Lfs(base, kPi));
+  matrix_math::RotateY(base, z, z, angle, turn);
+  {
+    const double f13 = Lfs(base, Load(base, group + 8) + angle_at);
+    Stfs(base, angle, Fmuls(Fsubs(f13, Lfs(base, kHalfTurn)), degrees));
+  }
+  matrix_math::RotateZ(base, z, z, angle, turn);
+  if (front) {
+    BrakesSide(base, frame, block + 400, block + 144, t2, world, l.spin2, l.still2, l.front2, one);
+  } else {
+    BrakesSide(base, frame, block + 528, block + 272, t2, world, l.spin2, l.still2, l.rear2, one);
+  }
+}
+
+// A side's discs and calipers: spinning, record 4 (+992) when the wheels
+// record's +68 is below 4, else record 6 (+1472); still, record 0 (+32) when
+// +68 and +84 are 0, else record 2 (+512); still, record 8 (+1952) when +68
+// is 0 and +88 isn't 1. The wheels record read again before each test, as
+// the original does.
+Left BrakesDraws(uint8_t* base, const Calls& calls, uint32_t frame, uint32_t group,
+                 uint32_t vp, uint32_t spin, uint32_t still, uint64_t r24, uint64_t r28,
+                 const uint32_t lrs[3]) {
+  const auto wheels = [&] { return Load(base, group + 8); };
+  const uint32_t first = int32_t(Load(base, wheels() + 68)) < 4 ? 992 : 1472;
+  PartsDrawRecord(base, calls, frame, group + first, vp, spin, 0, r24, r28, lrs[0]);
+  uint32_t second = 512;
+  if (int32_t(Load(base, wheels() + 68)) == 0 && int32_t(Load(base, wheels() + 84)) == 0) {
+    second = 32;
+  }
+  Left left =
+      PartsDrawRecord(base, calls, frame, group + second, vp, still, 0, r24, r28, lrs[1]);
+  if (int32_t(Load(base, wheels() + 68)) == 0 && int32_t(Load(base, wheels() + 88)) != 1) {
+    left = PartsDrawRecord(base, calls, frame, group + 1952, vp, still, 0, r24, r28, lrs[2]);
+  }
+  return left;
+}
+
+// Record `from`'s shape (the group's word at `from` + 228) toward record
+// `to`'s: the target's index to the frame's +224 (the weight already at
+// +160), Morph::SetUp into the frame's +288, then Model::MorphShape (its
+// plain C++, else its original returning to `lr`).
+void BrakesMorph(uint8_t* base, const Calls& calls, uint32_t frame, uint32_t group,
+                 uint32_t model, uint32_t from, uint32_t to, uint32_t lr) {
+  Store(base, frame + 224, Load(base, group + to + 228));
+  const uint32_t morph = frame + 288;
+  second_set::MorphSetUp(base, model, morph, Load(base, group + from + 228), frame + 224,
+                         frame + 160, 1);
+  const uint64_t shape = Load(base, group + from + 228);
+  if (!ModelMorphShape(base, calls, model, morph, shape, frame)) {
+    const uint64_t regs[3] = {model, morph, shape};
+    calls.call(kMorphShape, regs, 3, frame, lr);
+  }
+}
+
+}  // namespace
+
+Left WheelsDrawBrakes(uint8_t* base, const Calls& calls, uint32_t stack, uint32_t group,
+                      uint32_t camera, uint32_t block, uint64_t caller_r24) {
+  ITC_NATIVE_RUNNING("sub_820EB388 WheelPoints::DrawBrakes");
+  const uint32_t frame = Frame(base, stack, kWheelsBrakesFrame);
+  BrakesMatrices(base, frame, group, block, kBrakes);
+  // The morphs when the wheels record's +8 is set (never in play: its caller
+  // runs only when it's 0), all on record 0's model, the weight the group's
+  // +16 (to the frame's +160 once).
+  if (int32_t(Load(base, Load(base, group + 8) + 8)) != 0) {
+    const uint32_t model = Load(base, group + 36);
+    Stfs(base, frame + 160, Lfs(base, group + 16));
+    BrakesMorph(base, calls, frame, group, model, 32, 272, 0x820EBC38);
+    BrakesMorph(base, calls, frame, group, model, 512, 752, 0x820EBC6C);
+    BrakesMorph(base, calls, frame, group, model, 1952, 2192, 0x820EBCA0);
+    BrakesMorph(base, calls, frame, group, model, 992, 1232, 0x820EBCD4);
+    BrakesMorph(base, calls, frame, group, model, 1472, 1712, 0x820EBD08);
+  }
+  // r24 the caller's, r28 the block at every draw; record 10's materials'
+  // alpha by the block's +612 + 8 x rear (side 2 +616) before it's drawn.
+  const uint32_t vp = camera + 144;
+  const uint32_t rear = int32_t(Load(base, group + 12)) != 0 ? 0 : 8;
+  const uint64_t r24 = caller_r24, r28 = block;
+  static constexpr uint32_t kSide1[] = {0x820EBD38, 0x820EBD70, 0x820EBDA4};
+  static constexpr uint32_t kSide2[] = {0x820EBE04, 0x820EBE3C, 0x820EBE70};
+  BrakesDraws(base, calls, frame, group, vp, frame + kBrakes.spin1, frame + kBrakes.still1, r24,
+              r28, kSide1);
+  material_passes::SetAlpha(base, Load(base, group + 2436), Load(base, group + 2660),
+                            Lfs(base, block + 612 + rear), frame);
+  PartsDrawRecord(base, calls, frame, group + 2432, vp, frame + kBrakes.spin1, 0, r24, r28,
+                  0x820EBDD8);
+  BrakesDraws(base, calls, frame, group, vp, frame + kBrakes.spin2, frame + kBrakes.still2, r24,
+              r28, kSide2);
+  material_passes::SetAlpha(base, Load(base, group + 2436), Load(base, group + 2660),
+                            Lfs(base, block + 616 + rear), frame);
+  return PartsDrawRecord(base, calls, frame, group + 2432, vp, frame + kBrakes.spin2, 0, r24,
+                         r28, 0x820EBEA0);
+}
+
 }  // namespace car_draw
