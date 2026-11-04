@@ -23,8 +23,12 @@ file's history. What's left to see in a drive, from every run:
   subtree; the thirtieth run's car draw waits on it). Map checked
   (c98bcea2: `car-scene-draw.md`, 21 rows, 11 moved from
   `functions.md`; 0 errors; 11 ready groups; 9 Wrapped by
-  `frame_state_diff.cpp`, kept around native bodies). Step: migration,
-  agent running.
+  `frame_state_diff.cpp`, kept around native bodies). Migration
+  d5d7449c..6e318bb5 (`--native_car_scene_draw`, 21 of 21 ours, 12
+  adapters removed; four parts, subagents one at a time, brief
+  `car-scene-draw-brief.md`; `itc_3444`: race 33 s, 0 errors, every
+  harness 0 differing; frame dumps on and off the same 2,430 draws).
+  Step: validation, agent running.
 
 ## Done
 
@@ -58,3 +62,5 @@ file's history. What's left to see in a drive, from every run:
   2345.
 - After the car scene's draw's map: ours 4060, work left 2345
   (wrapped 71, known 492, unknown 1782).
+- After its migration (`itc_3444`): ours 4081, work left 2324
+  (wrapped 62, known 480, unknown 1782).
