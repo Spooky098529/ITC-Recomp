@@ -202,7 +202,11 @@ goes in `src/` as overrides), American English.
   (`boot-mode.md`, 12 of 12 in play) and mapped the car draw
   (`car-draw.md`, `Car::DrawUpdate` and the scene model's per-pass
   draws, 86 rows), its migration paused after part 1 of about 16 (7 of
-  78; ours 3,988; to pick up from `docs/loops/b7-progress.md`). The runs' rows wait for the user's review (`docs/loops/review.md`). See
+  78; ours 3,988), then resumed on `b7-loop-03-11-26` (2026-11-03 to
+  04) and finished (78 of 78 ours, `--native_car_draw`; ours 4,059);
+  halted at its validation: under `--run_harnesses=all` the car draw's
+  `PartsPoints::DrawShadows` harness loops on a guest access violation
+  (it passes alone; `docs/loops/b7-progress.md`, "Stopped"). The runs' rows wait for the user's review (`docs/loops/review.md`). See
   "B7's loop runs" under B7, and `docs/loops/b7-progress.md`. Guest
   allocation is no longer a block (`docs/native-memory.md`); what the
   rest waits on is in `docs/loops/leads.md` (the archive loader, the

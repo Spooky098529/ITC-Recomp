@@ -30,8 +30,8 @@ file's history. What's left to see in a drive, from every run:
   f6472b69 (the paused run's last commit) and checked out: the run goes
   on there. The car draw's migration finished (2026-11-04: parts 2 to
   16, 64ca2adf..d0f3ca85, 15 subagents one at a time; 78 of 78 ours,
-  every harness 0 differing, races 30-37 s, 0 errors). Step now: the
-  validation agent (part 1's functions and every removal included).
+  every harness 0 differing, races 30-37 s, 0 errors). Validation
+  halted the run (see "Stopped").
 - **To pick up** (the user's call, 2026-11-01: the next loop continues
   this run on this branch, not a new one): start a migration agent for
   the rest of `car-draw.md` (71 of the group's 78 left, still one ready
@@ -111,11 +111,31 @@ file's history. What's left to see in a drive, from every run:
 
 ## Stopped
 
-2026-11-01, paused by the user (working on something else) in the car
-draw's migration, after its part 1 (a036f833) and `Matrix::Shadow`'s
-adapter removal (a6ae298c). Not a halt: nothing failed (every harness
-run 0 differing, no attract race errors), nothing uncommitted,
-`check_function_statuses.py` 0 errors. The next loop continues this
-run from "To pick up" under "Now" (the user's call): it doesn't start
-the progress file afresh, and it finishes the car draw (migration,
-validation, records), then stops at the run's limit of 2.
+2026-11-04, halted at the car draw's validation (a validation `missing:`
+and a harness that doesn't finish are halts, "When to halt"):
+
+- `attract_race.sh 120 --run_harnesses=all` (`itc_3410`, again
+  `itc_3412`): the `car_draw` harness hangs in `PartsPoints::DrawShadows`
+  `sub_820E1D88`'s cases (`src/harnesses/car_draw_shadows.cpp`): after
+  its `native running (harness)` line, "Unhandled guest access
+  violation: read of guest 0x7000006F" repeats ~6.4 million times on the
+  harness thread until the timeout (each log ~1 GB); the harnesses after
+  it and the race never run (0 s). Which side reads `0x7000006F` isn't
+  known yet. Run alone (`--run_harnesses=car_draw`, `itc_3411`) every
+  car_draw case matches and nothing loops: probably guest state left by
+  the harnesses before it, meeting the gap in the shadows harness world
+  the migration noted (part 9: more draws from the shared Random made
+  the original read `0xA4` forever, case 70; avoided, not fixed). As
+  the `ai_drivers` wild-address case (dbc8ee0), a harness fix, likely
+  its own Random and a fully set-up world.
+- So 34 of the 78 had no harness line in the all-harness run
+  (`missing:`: the cockpit, the parts' and interior's tops, the traffic,
+  the wheels, the root). Every summary line printed was 0 differing.
+- The pad replay (`itc_3413`, `race_test.jsonl`, 127 s, 0 errors) was
+  ok: 69 of the 78 ran in it; 9 not in game (`to-drive.md`).
+- Nothing uncommitted; `check_function_statuses.py` 0 errors.
+
+To pick up: fix the shadows harness's world, then validate again
+(`attract_race.sh 120 --run_harnesses=all`), then step 9's records for
+the car draw (its row under "B7's loop runs", the boundary over time);
+the run's limit (2) is then reached.

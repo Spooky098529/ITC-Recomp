@@ -22,6 +22,15 @@ here loses its heading.
   `boot-mode.md`, `movies.md`): `sub_82107358`
   ScreenMachine::ScreenMachine, `sub_820A4408` Movies::Pause,
   `sub_820A4420` Movies::Resume (the last two never seen in play).
+- The car draw (replay `itc_3413` ok; the all-harness attract race
+  hung in a harness, `b7-progress.md`'s "Stopped"; `car-draw.md`):
+  `sub_820E39F8` InteriorDials::DrawDigitalSpeed, `sub_820ECB68`
+  WheelPoints::DrawMorphed, `sub_820E9318` WheelPoints::DrawTireMorphed,
+  `sub_820EA148` WheelPoints::DrawRimAMorphed, `sub_820EBEB8`
+  WheelPoints::DrawBrakesMorphed, `sub_82595110` Model::MorphShape,
+  `sub_8258A9E8` WorkMem::AllocVertexBuffer, `sub_82594E88`
+  Model::QueueJobRelease, `sub_8235A688` XGSetVertexBufferHeader (the
+  morph chain and the morphed wheels).
 
 ## Run 2026-10-31 23:57 (`b7-loop-31-10-26-2`)
 
