@@ -85,7 +85,9 @@ ITC_FLAG_BOOL(native_car_draw, true, "ITC",
               "tires WheelPoints::DrawTire sub_820E8AE8 and DrawTireMorphed sub_820E9318 and set "
               "a's rims DrawRimA sub_820E9A28 and DrawRimAMorphed sub_820EA148 and set b's "
               "DrawRimB sub_820EA950 and the brakes DrawBrakes sub_820EB388 and "
-              "DrawBrakesMorphed sub_820EBEB8 (the matrix "
+              "DrawBrakesMorphed sub_820EBEB8, and the wheels' top SceneWheels::Draw "
+              "sub_820ECE28 (inside the diagnostics' wrap) with WheelPoints::Draw sub_820ECA30 "
+              "and DrawMorphed sub_820ECB68 (no adapters: only it calls them) (the matrix "
               "functions, memcpy, CarPart::Draw, PartModel::FlipCulling and SetAlpha, the "
               "tire's weights, "
               "Morph::SetUp and Model::MorphShape as plain C++) "
@@ -493,6 +495,21 @@ void CarDrawWheelsDrawBrakesMorphed(PPCContext& ctx, uint8_t* base) {
   const car_draw::Calls calls = CarDrawCalls(&guest);
   const car_draw::Left left = car_draw::WheelsDrawBrakesMorphed(
       base, calls, ctx.r1.u32, ctx.r3.u32, ctx.r4.u32, ctx.r5.u32, ctx.r24.u64);
+  ctx.lr = lr;
+  LeaveLeft(ctx, left);
+}
+
+void CarDrawSceneWheels(PPCContext& ctx, uint8_t* base) {
+  if (!CarDrawWheelsCalleesNative()) {
+    __imp__sub_820ECE28(ctx, base);
+    return;
+  }
+  ctx.fpscr.disableFlushMode();
+  const uint64_t lr = ctx.lr;
+  SceneryDrawGuest guest{ctx, base};
+  const car_draw::Calls calls = CarDrawCalls(&guest);
+  const car_draw::Left left =
+      car_draw::SceneWheelsDraw(base, calls, ctx.r1.u32, ctx.r3.u32, ctx.r4.u32, ctx.r24.u64);
   ctx.lr = lr;
   LeaveLeft(ctx, left);
 }

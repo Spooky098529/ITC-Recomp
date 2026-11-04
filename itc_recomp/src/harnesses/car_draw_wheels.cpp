@@ -100,11 +100,12 @@ uint32_t Flag(Random& r) {
 }
 
 // The morph's world: for a tire (`tire`) the weights' inputs and the targets,
-// then the shapes' streams, the work memory and the pool maker. Returns
-// whether there's a maker.
-bool MorphWorld(Context& h, Random& r, uint32_t block, uint32_t top, bool tire) {
+// then the shapes' streams, the work memory and the pool maker (the tire
+// group at `at_group`, else top + kGroup). Returns whether there's a maker.
+bool MorphWorld(Context& h, Random& r, uint32_t block, uint32_t top, bool tire,
+                uint32_t at_group = 0) {
   uint8_t* base = h.base;
-  const uint32_t group = top + kGroup, wheels = top + kWheels;
+  const uint32_t group = at_group ? at_group : top + kGroup, wheels = top + kWheels;
   if (tire) {
     guest::StoreU32(base, group + 368 + 4, block + 0x100);
     guest::StoreU32(base, wheels + 0, r.Below(4) == 0 ? 3 : r.Below(3));
@@ -157,6 +158,24 @@ bool MorphWorld(Context& h, Random& r, uint32_t block, uint32_t top, bool tire) 
   return maker;
 }
 
+// A tire group's fields at `group` (the car and wheels records at top +
+// kCar and + kWheels): see the top.
+void TireGroupWorld(uint8_t* base, Random& r, uint32_t block, uint32_t top, uint32_t group,
+                    uint32_t shape) {
+  guest::StoreU32(base, group + 4, top + kCar);
+  guest::StoreU32(base, group + 8, top + kWheels);
+  guest::StoreU32(base, group + 300, Flag(r));
+  guest::StoreU32(base, group + 368 + 4, r.Below(8) == 0 ? 0 : block + 0x100);
+  guest::StoreU32(base, group + 368 + 228, shape);
+  for (uint32_t at : {1808u, 1824u}) {
+    if (r.Below(6) == 0) {
+      RandomFloats(base, group + at, 4, r);
+    } else {
+      FiniteFloats(base, group + at, 4, r);
+    }
+  }
+}
+
 // The world; see the top. `set` the scene's +4.
 void WheelsWorld(Context& h, Random& r, uint32_t block, uint32_t race, uint32_t top,
                  uint32_t shape, uint32_t set) {
@@ -170,19 +189,8 @@ void WheelsWorld(Context& h, Random& r, uint32_t block, uint32_t race, uint32_t 
   const std::vector<uint8_t> zero(kRecordsEnd, 0);
   Write(base, top, zero.data(), kRecordsEnd);
   // The tire group and its records.
-  const uint32_t group = top + kGroup, wheels = top + kWheels, car = top + kCar;
-  guest::StoreU32(base, group + 4, car);
-  guest::StoreU32(base, group + 8, wheels);
-  guest::StoreU32(base, group + 300, Flag(r));
-  guest::StoreU32(base, group + 368 + 4, r.Below(8) == 0 ? 0 : block + 0x100);
-  guest::StoreU32(base, group + 368 + 228, shape);
-  for (uint32_t at : {1808u, 1824u}) {
-    if (r.Below(6) == 0) {
-      RandomFloats(base, group + at, 4, r);
-    } else {
-      FiniteFloats(base, group + at, 4, r);
-    }
-  }
+  const uint32_t wheels = top + kWheels, car = top + kCar;
+  TireGroupWorld(base, r, block, top, top + kGroup, shape);
   guest::StoreU32(base, wheels + 0, r.Below(8) == 0 ? uint32_t(r.Next()) : r.Below(4));
   guest::StoreU32(base, wheels + 56,
                   r.Below(8) == 0 ? uint32_t(r.Next()) : uint32_t(int32_t(r.Below(9)) - 2));
@@ -233,9 +241,9 @@ void WheelsWorld(Context& h, Random& r, uint32_t block, uint32_t race, uint32_t 
 // morphs' bases' shapes, +228, the case's, the targets' (records 1 and 3)
 // any of the four; every shape a copy of the case's, the model's +412 shapes
 // 0 to 4), and the materials' cull modes (+344) 2 or 6 now and then
-// for the flips.
+// for the flips (the group at `at_group`, else top + kGroup).
 void RimAWorld(Context& h, Random& r, uint32_t block, uint32_t top, uint32_t shape,
-               bool morphed) {
+               bool morphed, uint32_t at_group = 0) {
   uint8_t* base = h.base;
   // Every shape a copy of the drawn one, as the interior's harness (the
   // flips walk all the model's shapes, its +412).
@@ -246,7 +254,7 @@ void RimAWorld(Context& h, Random& r, uint32_t block, uint32_t top, uint32_t sha
     }
   }
   guest::StoreU32(base, block + 0x100 + 412, r.Below(8) == 0 ? 0 : 1 + r.Below(4));
-  const uint32_t group = top + kGroup;
+  const uint32_t group = at_group ? at_group : top + kGroup;
   guest::StoreU32(base, group + 12, Flag(r));
   guest::StoreU32(base, group + 16, RandomFloat(r));
   if (r.Below(6) == 0) {
@@ -286,9 +294,9 @@ void RimAWorld(Context& h, Random& r, uint32_t block, uint32_t top, uint32_t sha
 // targets' (records 1, 3, 5, 7, 9) any of the four; every shape a copy of
 // the case's), and the scene model block's alphas (+612 to +624). Returns whether it
 // morphs; with the morphs, the morph's world (MorphWorld) and `makers`
-// counted.
+// counted (the group at `at_group`, else top + kBrakesGroup).
 bool BrakesWorld(Context& h, Random& r, uint32_t block, uint32_t source, uint32_t top,
-                 uint32_t shape, int& makers, bool morphed) {
+                 uint32_t shape, int& makers, bool morphed, uint32_t at_group = 0) {
   uint8_t* base = h.base;
   for (uint32_t k = 0; k < 4; k++) {
     if (k != shape) {
@@ -297,7 +305,7 @@ bool BrakesWorld(Context& h, Random& r, uint32_t block, uint32_t source, uint32_
     }
   }
   guest::StoreU32(base, block + 0x100 + 412, r.Below(8) == 0 ? 0 : 1 + r.Below(4));
-  const uint32_t group = top + kBrakesGroup, wheels = top + kWheels;
+  const uint32_t group = at_group ? at_group : top + kBrakesGroup, wheels = top + kWheels;
   const bool morphs = morphed ? r.Below(8) != 0 : r.Below(4) == 0;
   if (morphed) {
     // DrawBrakesMorphed's: the 64-byte matrix at [+0] its +2912 to +2943
@@ -360,6 +368,200 @@ struct Target {
   int cases;
   Kind kind;
 };
+
+// --- The wheels' top ---
+
+// The wheels' top's allocation: the object at +0x100 (+40 its wheels
+// record's +8, the dispatch), its point block at +192 (+12 the wheels record
+// at the leaves' top + kWheels; the groups at their offsets), the command
+// list's slots from +0x4400 (up to six leaves' draws a case).
+constexpr uint32_t kTopObject = 0x100;
+constexpr uint32_t kTopPointsBytes = 0x4100;
+constexpr uint32_t kTopEnd = kTopObject + 192 + kTopPointsBytes;
+constexpr uint32_t kTopSlots = 0x4400;
+constexpr uint32_t kTopSlotCount = 24000;
+constexpr uint32_t kTopBytes = kTopSlots + kTopSlotCount * 16;
+
+// The point block's world at `points` over the leaves' (`top`, WheelsWorld
+// already run): the tires (+32, +1872), set a's rims (+3712, +5456), set
+// b's (+7200, +8944) and the brakes (+10688, +13632), each group's world as
+// its leaf's harness builds it; `morphed` the morphed leaves' (the tires'
+// weights, the rims' morphs, the brakes' side matrix). With the wheels
+// record's +8 left set, every brake group's record 0 model set (the
+// brakes morph on it unchecked). Returns whether the brakes morph.
+bool TopPointsWorld(Context& h, Random& r, uint32_t block, uint32_t source, uint32_t top,
+                    uint32_t points, uint32_t shape, bool morphed, int& makers) {
+  uint8_t* base = h.base;
+  const std::vector<uint8_t> zero(kTopPointsBytes, 0);
+  Write(base, points, zero.data(), kTopPointsBytes);
+  guest::StoreU32(base, points + 12, top + kWheels);
+  for (const uint32_t at : {32u, 1872u}) {
+    TireGroupWorld(base, r, block, top, points + at, shape);
+    if (morphed) {
+      makers += MorphWorld(h, r, block, top, true, points + at);
+    }
+    // The floats the lists copy into the rims (the last pass's weights'
+    // floats for the morphed tires).
+    RandomFloats(base, points + at + 352, 2, r);
+  }
+  for (const uint32_t at : {3712u, 5456u}) {
+    TireGroupWorld(base, r, block, top, points + at, shape);
+    RimAWorld(h, r, block, top, shape, morphed, points + at);
+    if (morphed) {
+      makers += MorphWorld(h, r, block, top, false);
+    }
+  }
+  for (const uint32_t at : {7200u, 8944u}) {
+    TireGroupWorld(base, r, block, top, points + at, shape);
+    RimAWorld(h, r, block, top, shape, false, points + at);
+  }
+  for (uint32_t at = 596; at <= 608; at += 4) {
+    guest::StoreU32(base, source + at, r.Below(8) == 0 ? uint32_t(r.Next()) : r.Below(4));
+  }
+  bool morphs = false;
+  for (const uint32_t at : {10688u, 13632u}) {
+    morphs = BrakesWorld(h, r, block, source, top, shape, makers, morphed, points + at);
+  }
+  if (guest::LoadU32(base, top + kWheels + 8) != 0) {
+    for (const uint32_t at : {10688u, 13632u}) {
+      guest::StoreU32(base, points + at + 36, block + 0x100);
+    }
+  }
+  return morphs;
+}
+
+enum class TopKind { kScene, kDraw, kDrawMorphed };
+
+struct TopTarget {
+  const char* name;
+  GuestFunction recompiled, native;
+  int cases;
+  TopKind kind;
+};
+
+void NativeWheelsPointsDraw(PPCContext& ctx, uint8_t* base) {
+  const uint32_t r3 = ctx.r3.u32, r4 = ctx.r4.u32, r1 = ctx.r1.u32;
+  const uint64_t r24 = ctx.r24.u64;
+  NativeStep(ctx, base, [&](const ::car_draw::Calls& calls) {
+    return ::car_draw::WheelsPointsDraw(base, calls, r1, r3, r4, r24);
+  });
+}
+
+void NativeWheelsPointsDrawMorphed(PPCContext& ctx, uint8_t* base) {
+  const uint32_t r3 = ctx.r3.u32, r4 = ctx.r4.u32, r1 = ctx.r1.u32;
+  const uint64_t r24 = ctx.r24.u64;
+  NativeStep(ctx, base, [&](const ::car_draw::Calls& calls) {
+    return ::car_draw::WheelsPointsDrawMorphed(base, calls, r1, r3, r4, r24);
+  });
+}
+
+// SceneWheels::Draw and the point block's two draws against the recompiled
+// ones (run with --native_car_draw off), a random generator of their own:
+// the frame's back chain, the last tire's temporaries, the object, the
+// leaves' records, the scene, the command list and r3, r24, r28 compared.
+void WheelsTopDraws(Context& h, uint32_t block, uint32_t race, uint32_t top) {
+  Random r(0x7768656C746F70ull);  // "wheltop"
+  const uint32_t allocation = memory::Alloc(kTopBytes + 16, 0);
+  const uint32_t mine = (allocation + 15) & ~15u;
+  const uint32_t object = mine + kTopObject, points = object + 192;
+  const uint32_t source = block + kSource;
+  const uint32_t scene = race + 0x10000;
+  const TopTarget targets[] = {
+      {"SceneWheels::Draw (sub_820ECE28)", __imp__sub_820ECE28, hooks::CarDrawSceneWheels, 192,
+       TopKind::kScene},
+      {"WheelPoints::Draw (sub_820ECA30)", __imp__sub_820ECA30, NativeWheelsPointsDraw, 128,
+       TopKind::kDraw},
+      {"WheelPoints::DrawMorphed (sub_820ECB68)", __imp__sub_820ECB68,
+       NativeWheelsPointsDrawMorphed, 128, TopKind::kDrawMorphed},
+  };
+  for (const TopTarget& target : targets) {
+    Results results(target.name);
+    int morphed_cases = 0, front_end = 0, copies = 0, brake_morphs = 0, makers = 0, queued = 0;
+    std::vector<uint8_t> scene_bytes, records, own;
+    const std::vector<uint8_t> zero(kTopSlotCount * 16, 0);
+    uint32_t sp = 0;
+    bool morphed = false;
+    for (int c = 0; c < target.cases; c++) {
+      Case(
+          h, results, block, r,
+          [&](PPCContext& t) {
+            SetFlushOnEntry(r.Below(2) != 0);
+            const uint32_t set = r.Below(8) ? r.Below(2) : 2 + r.Below(4);
+            const uint32_t shape = r.Below(4);
+            WheelsWorld(h, r, block, race, top, shape, set);
+            morphed = target.kind == TopKind::kDrawMorphed ||
+                      (target.kind == TopKind::kScene && r.Below(2) == 0);
+            brake_morphs +=
+                TopPointsWorld(h, r, block, source, top, points, shape, morphed, makers);
+            guest::StoreU32(h.base, object + 40,
+                            morphed ? (r.Below(4) == 0 ? uint32_t(r.Next()) | 1u : 1) : 0);
+            // The command list's slots in this allocation; the scene's
+            // current camera pass (+5072) enabled (a disabled one makes the
+            // leaves read address 144).
+            const uint32_t list = block + 0x3000;
+            guest::StoreU32(h.base, list + 8, kTopSlotCount);
+            guest::StoreU32(h.base, list + 32, mine + kTopSlots);
+            guest::StoreU32(h.base, list + 44, mine + kTopSlots);
+            const uint32_t index = r.Below(4);
+            guest::StoreU32(h.base, scene + 5072, index);
+            guest::StoreU32(h.base, kPasses + 592 * index + 588, uint32_t(r.Next()) | 1u);
+            morphed_cases += morphed;
+            front_end += set == 0;
+            copies += !morphed && guest::LoadU32(h.base, top + kWheels + 8) != 0;
+            scene_bytes = Read(h.base, scene, kSceneBytes);
+            records = Read(h.base, top, kRecordsEnd);
+            own = Read(h.base, mine, kTopEnd);
+            sp = t.r1.u32;
+            t.r3.u64 = target.kind == TopKind::kScene ? object : points;
+            t.r4.u64 = source;
+            t.r24.u64 = r.Next();
+            t.r28.u64 = r.Next();
+          },
+          target.recompiled, target.native, AlphaFloats(), fmt::format("case {}", c),
+          [&](const PPCContext& t, Outputs& o) {
+            const uint32_t frame = t.r1.u32 - car_draw::kWheelsPointsFrame;
+            o.Word(guest::LoadU32(h.base, frame));
+            // The last tire's frame below it: its back chain and
+            // temporaries (above them its saved registers).
+            const uint32_t tire_frame =
+                morphed ? car_draw::kWheelsTireMorphedFrame : car_draw::kWheelsTireFrame;
+            const uint32_t tire_end = morphed ? 1520 : 1888;
+            o.Word(guest::LoadU32(h.base, frame - tire_frame));
+            o.Floats(h.base, frame - tire_frame + 80, (tire_end - 80) / 4);
+            o.Floats(h.base, mine, kTopEnd / 4);
+            o.Floats(h.base, top, kRecordsEnd / 4);
+            o.Bytes(Read(h.base, scene, kSceneBytes));
+            const uint32_t written =
+                guest::LoadU32(h.base, block + 0x3000 + 44) - (mine + kTopSlots);
+            o.Word(written);
+            o.Floats(h.base, mine + kTopSlots, std::min(written, kTopSlotCount * 16) / 4);
+            o.Word(uint32_t(t.r24.u64));
+            o.Word(uint32_t(t.r28.u64));
+            if (t.r3.u32 == block + 0x7C0) {
+              queued++;
+              o.Word(t.r4.u32);
+              o.Word(t.r5.u32);
+              o.Double(t.f1.u64);
+            }
+          },
+          [&](int) {
+            Write(h.base, scene, scene_bytes.data(), kSceneBytes);
+            Write(h.base, top, records.data(), kRecordsEnd);
+            Write(h.base, mine, own.data(), kTopEnd);
+            Fill(h.base, sp - 2048 - kDeepStackBytes, kDeepStackBytes);
+            Write(h.base, mine + kTopSlots, zero.data(), uint32_t(zero.size()));
+          },
+          true);
+    }
+    ITC_LOG_INFO("harness: {}: {} of {} cases morphed ({} with the brakes' morphs, {} pool "
+                 "makers), {} in the front end, {} copied the tires' floats unmorphed, {} ended "
+                 "handing an entry to the render queue",
+                 target.name, morphed_cases, target.cases, brake_morphs, makers, front_end,
+                 copies, queued / 2);
+    results.Report();
+  }
+  memory::Free(allocation);
+}
 
 }  // namespace
 
@@ -502,6 +704,7 @@ void WheelsDraws(Context& h, uint32_t block, uint32_t race) {
     }
     results.Report();
   }
+  WheelsTopDraws(h, block, race, top);
   memory::Free(allocation);
 }
 

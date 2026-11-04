@@ -898,4 +898,27 @@ Left WheelsDrawBrakes(uint8_t* base, const Calls& calls, uint32_t stack, uint32_
 Left WheelsDrawBrakesMorphed(uint8_t* base, const Calls& calls, uint32_t stack, uint32_t group,
                              uint32_t camera, uint32_t block, uint64_t caller_r24);
 
+// The wheels' top. WheelPoints::Draw (sub_820ECA30): r3 = the wheels' point
+// block (the object's +192), r4 = the block. A 128-byte frame; the camera
+// pass at the scene's ([0x826C2E44]) +5072 (0 when its +588 is clear); the
+// brakes (+10688, +13632); by the scene's +4, 0 set a's rims (+3712, +5456),
+// else set b's (+7200, +8944), the tires' +352 and +356 copied into the
+// set's rims' +16 and +20 first when the wheels record's ([+12]) +8 is set;
+// then the tires (+32, +1872). r24 `caller_r24` at the brakes and set a's
+// rims. r3 as the last tire's draw leaves it.
+constexpr uint32_t kWheelsPointsFrame = 128;
+Left WheelsPointsDraw(uint8_t* base, const Calls& calls, uint32_t stack, uint32_t points,
+                      uint32_t block, uint64_t caller_r24);
+// WheelPoints::DrawMorphed (sub_820ECB68): as Draw with the morphed brakes,
+// only in the front end (scene +4 0) set a's morphed rims (the copy made
+// regardless), the morphed tires (r28 0xFFFFFFFF826C0000 at their entry).
+Left WheelsPointsDrawMorphed(uint8_t* base, const Calls& calls, uint32_t stack, uint32_t points,
+                             uint32_t block, uint64_t caller_r24);
+// SceneWheels::Draw (sub_820ECE28): r3 = the wheels object (pool 5 of the
+// second set), r4 = the block: by the object's +40 (its wheels record's
+// +8), 0 WheelPoints::Draw(+192), else DrawMorphed(+192); no frame (tail
+// calls). Car::DrawUpdate's native body calls this with its r24.
+Left SceneWheelsDraw(uint8_t* base, const Calls& calls, uint32_t stack, uint32_t wheels,
+                     uint32_t block, uint64_t caller_r24);
+
 }  // namespace car_draw

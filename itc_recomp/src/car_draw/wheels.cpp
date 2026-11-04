@@ -1023,4 +1023,91 @@ Left WheelsDrawBrakesMorphed(uint8_t* base, const Calls& calls, uint32_t stack, 
                      frame + kBrakesMorphed.still2, r24, r28, kSide2);
 }
 
+// --- The wheels' top ---
+
+namespace {
+
+// The lists' r28 at their callees' entry: lis's sign-extended 0x826C0000.
+constexpr uint64_t kListsR28 = 0xFFFFFFFF826C0000ull;
+
+// The scene's current camera pass ([0x826C2E44] + 5072; 0 when disabled,
+// so its view-projection is read from address 144, as the original).
+uint32_t CurrentCamera(uint8_t* base) {
+  const uint32_t index = Load(base, Load(base, kScene) + 5072);
+  const uint32_t pass = kCameraPasses + index * 592;
+  if (pass == 0 || int32_t(Load(base, pass + 588)) == 0) {
+    return 0;
+  }
+  return pass;
+}
+
+// The tires' +352 and +356 (the point block's +384, +388 and +2224, +2228)
+// into the rims' +16 and +20 (lfs, lfs, lfs, lfs, then the four stfs).
+void CopyTireFloats(uint8_t* base, uint32_t points, uint32_t front, uint32_t rear) {
+  const double f0 = Lfs(base, points + 384), f13 = Lfs(base, points + 388);
+  const double f12 = Lfs(base, points + 2224), f11 = Lfs(base, points + 2228);
+  Stfs(base, points + front + 16, f0);
+  Stfs(base, points + front + 20, f13);
+  Stfs(base, points + rear + 16, f12);
+  Stfs(base, points + rear + 20, f11);
+}
+
+}  // namespace
+
+Left WheelsPointsDraw(uint8_t* base, const Calls& calls, uint32_t stack, uint32_t points,
+                      uint32_t block, uint64_t caller_r24) {
+  ITC_NATIVE_RUNNING("sub_820ECA30 WheelPoints::Draw");
+  const uint32_t frame = Frame(base, stack, kWheelsPointsFrame);
+  const uint32_t camera = CurrentCamera(base);
+  WheelsDrawBrakes(base, calls, frame, points + 10688, camera, block, caller_r24);
+  WheelsDrawBrakes(base, calls, frame, points + 13632, camera, block, caller_r24);
+  // The scene's model set, then the wheels record's ([+12]) +8: with it,
+  // the tires' floats copied into the set's rims first.
+  const int32_t set = int32_t(Load(base, Load(base, kScene) + 4));
+  const int32_t copy = int32_t(Load(base, Load(base, points + 12) + 8));
+  if (set == 0) {
+    if (copy != 0) {
+      CopyTireFloats(base, points, 3712, 5456);
+    }
+    WheelsDrawRimA(base, calls, frame, points + 3712, camera, block, caller_r24);
+    WheelsDrawRimA(base, calls, frame, points + 5456, camera, block, caller_r24);
+  } else {
+    if (copy != 0) {
+      CopyTireFloats(base, points, 7200, 8944);
+    }
+    WheelsDrawRimB(base, calls, frame, points + 7200, camera, block);
+    WheelsDrawRimB(base, calls, frame, points + 8944, camera, block);
+  }
+  WheelsDrawTire(base, calls, frame, points + 32, camera, block);
+  return WheelsDrawTire(base, calls, frame, points + 1872, camera, block);
+}
+
+Left WheelsPointsDrawMorphed(uint8_t* base, const Calls& calls, uint32_t stack, uint32_t points,
+                             uint32_t block, uint64_t caller_r24) {
+  ITC_NATIVE_RUNNING("sub_820ECB68 WheelPoints::DrawMorphed");
+  const uint32_t frame = Frame(base, stack, kWheelsPointsFrame);
+  const uint32_t camera = CurrentCamera(base);
+  WheelsDrawBrakesMorphed(base, calls, frame, points + 10688, camera, block, caller_r24);
+  WheelsDrawBrakesMorphed(base, calls, frame, points + 13632, camera, block, caller_r24);
+  // Only in the front end: set a's rims, the tires' floats copied into them
+  // first (unconditionally).
+  if (int32_t(Load(base, Load(base, kScene) + 4)) == 0) {
+    CopyTireFloats(base, points, 3712, 5456);
+    WheelsDrawRimAMorphed(base, calls, frame, points + 3712, camera, block, caller_r24);
+    WheelsDrawRimAMorphed(base, calls, frame, points + 5456, camera, block, caller_r24);
+  }
+  WheelsDrawTireMorphed(base, calls, frame, points + 32, camera, block, kListsR28);
+  return WheelsDrawTireMorphed(base, calls, frame, points + 1872, camera, block, kListsR28);
+}
+
+Left SceneWheelsDraw(uint8_t* base, const Calls& calls, uint32_t stack, uint32_t wheels,
+                     uint32_t block, uint64_t caller_r24) {
+  ITC_NATIVE_RUNNING("sub_820ECE28 SceneWheels::Draw");
+  // By the wheels record's +8 (the object's +40); both tail calls.
+  if (int32_t(Load(base, wheels + 40)) == 0) {
+    return WheelsPointsDraw(base, calls, stack, wheels + 192, block, caller_r24);
+  }
+  return WheelsPointsDrawMorphed(base, calls, stack, wheels + 192, block, caller_r24);
+}
+
 }  // namespace car_draw

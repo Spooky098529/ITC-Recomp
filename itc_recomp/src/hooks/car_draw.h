@@ -108,5 +108,9 @@ void CarDrawWheelsDrawRimB(PPCContext& ctx, uint8_t* base);
 void CarDrawWheelsDrawBrakes(PPCContext& ctx, uint8_t* base);
 // WheelPoints::DrawBrakesMorphed (sub_820EBEB8): as DrawBrakes'.
 void CarDrawWheelsDrawBrakesMorphed(PPCContext& ctx, uint8_t* base);
+// The wheels' top, SceneWheels::Draw (sub_820ECE28; inside the diagnostics'
+// wrap, src/debug/frame_state_diff.cpp; the wheels' callees native): r3 =
+// the wheels object, r4 = the block (r24 its leaves').
+void CarDrawSceneWheels(PPCContext& ctx, uint8_t* base);
 
 }  // namespace hooks
