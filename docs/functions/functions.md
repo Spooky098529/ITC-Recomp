@@ -516,6 +516,12 @@ Rows not yet moved stay in the table below. So far:
   with the other cars' headlights as lights, with the projectors'
   matrices and `TextureProjection::Fit`'s geometry (frustum, planes, a
   box over a `std::vector` of points) (B7).
+- [`front-end-car-draw.md`](front-end-car-draw.md): the front end's
+  car draw (`sub_8217FE60`) on its stand: the stand's camera presets,
+  animations (the turn, the bonnet and the doors) and commands, its
+  lights, the car posed with its wheels, the number plates and the light
+  kit, and the mirrored pass with the floor model for the reflection
+  (B7).
 
 These files hold functions only. What used to follow the table here moved
 out on 2026-10-20: how frame interpolation works, its options and what
