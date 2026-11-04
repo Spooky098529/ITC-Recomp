@@ -16,6 +16,15 @@ function goes from this list when a log shows its `native running
 (game):` line (say which log in the commit). A run with nothing left
 here loses its heading.
 
+## Run 2026-11-04 08:44 (`b7-loop-03-11-26`)
+
+- The front end's car draw (attract race `itc_3478`, replay `itc_3479`
+  ok; `front-end-car-draw.md`): `sub_820DF190` Plates::Hide,
+  `sub_820DF180` Plates::Show, `sub_82178B40` GarageStage::SetDrawWord,
+  `sub_82179C88` GarageStage::StepAngles, `sub_82179D78`
+  GarageAnims::Turn, `sub_82179678` GarageStage::SetLightKit (Show,
+  StepAngles and Turn never seen in play).
+
 ## Run 2026-11-01 12:56 (`b7-loop-01-11-26`)
 
 - The boot mode (attract race `itc_3219`, replay `itc_3220` ok;

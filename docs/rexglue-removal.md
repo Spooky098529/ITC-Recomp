@@ -52,7 +52,7 @@ goes in `src/` as overrides), American English.
   the leftovers above (the movie player, Voice::Init skipped as high as
   is safe), or the main thread's performance leads
   (`sub_821298C0`, `sub_8209C6E0`, in `docs/native-renderer.md`).
-- **B7 in progress (2026-11-01):** its measure is `b7_status.py`
+- **B7 in progress (2026-11-04):** its measure is `b7_status.py`
   (`docs/coverage.md`), and the B7 loop (`docs/loops/b7-loop.md`, a
   `/loop` session handing each subsystem to a mapping agent, then
   migration agents) did its first run on the branch `b7-loop-test` (merged 2026-10-22): five
@@ -205,7 +205,12 @@ goes in `src/` as overrides), American English.
   78; ours 3,988), then resumed on `b7-loop-03-11-26` (2026-11-03 to
   04) and finished (78 of 78 ours, `--native_car_draw`; ours 4,059),
   validated after a harness fix (the shadows harness's record 3 shape),
-  and stopped at its limit. The runs' rows wait for the user's review (`docs/loops/review.md`). See
+  and stopped at its limit; its thirty-first run (the same branch,
+  the user's call, 2026-11-04, 3 subsystems) made the race flow's
+  set-up (`race-flow.md`, 1 of 1 in play), the car scene's draw
+  (`car-scene-draw.md`, 21 of 21) and the front end's car draw
+  (`front-end-car-draw.md`, 17 of 18 in play) native (ours 4,059 ->
+  4,099) and stopped at its limit. The runs' rows wait for the user's review (`docs/loops/review.md`). See
   "B7's loop runs" under B7, and `docs/loops/b7-progress.md`. Guest
   allocation is no longer a block (`docs/native-memory.md`); what the
   rest waits on is in `docs/loops/leads.md` (the archive loader, the
@@ -2722,6 +2727,7 @@ B7. **The game logic inside**: everything else, subsystem by subsystem,
 | 2026-11-04 | The car draw (`Car::DrawUpdate` `sub_820DAC68` and the scene model's per-pass draws: the cockpit, the light kit, the parts with their lamps, doors and shadows, the interior, the traffic car, the wheels with their morphs, the shared `Model::Draw`, `CarPart::Draw`, `CarLighting::Gather` and the morph chain) | `car-draw.md` | 78 of 78 (16 parts, one subagent each, one at a time; 69 Native, 9 Overridden for their recompiled caller, the frame-state wraps, the cockpit dials and `--per_tick_blink_timers`) | `--native_car_draw` |
 | 2026-11-04 | The race flow's set-up (`RaceFlow::Init` `sub_82160AE0`, from `RaceMode::Init`: the race flow's state and players, its 53 transitions registered through `StateMachine::Add`, the functors' stack leftovers replayed in the original's frame) | `race-flow.md` | 1 of 1 in play (one migration; the four handlers it registers that never ran stay recompiled) | `--native_race_flow` |
 | 2026-11-04 | The car scene's draw (`CarScene::Draw` `sub_820C5DE8`: the headlight projectors and their texture projections, the other cars' light slots, the pass loop over `Car::DrawUpdate`; the frustum, plane, box and `Vector16` helpers under `TextureProjection::Fit`) | `car-scene-draw.md` | 21 of 21 (four parts, one subagent each, one at a time; 12 Native, 9 Overridden for their recompiled callers and the frame-state wraps) | `--native_car_scene_draw` |
+| 2026-11-04 | The front end's car draw (the garage stage: `GarageStage::Command` and its setters, the animation list with the car's turn and the doors, the deferred camera preset, the scene lights, the car's and wheels' pose, the floor reflection's draw, with `SceneModel::ApplyLightKit` in `load-poll.md`) | `front-end-car-draw.md` | 17 of 18 in play (one migration, one subagent for `PoseCar`; the root `GarageStage::Draw` waits on `CarScene::Update`) | `--native_front_end_car_draw` |
 
     The first run (2026-10-22, branch `b7-loop-test`): every harness at 0 differing, attract races at 20-21 s with no errors,
     and a race the user drove looked right. Ours went from 162 to 335 (work
@@ -4471,3 +4477,19 @@ draws). The boundary: 449 functions (916 pairs): overridden 108, Native
 34, Dropped 26, never called 70, live 211. Imports: 186 called, 56 with
 a live caller. B7 (`b7_status.py`): ours 4,081, work left 2,324
 (Wrapped 62, with a row 480, no row yet 1,782), from 2,345.
+
+**2026-11-04, the front end's car draw (branch `b7-loop-03-11-26`):**
+the thirty-first run's third and last subsystem
+(`front-end-car-draw.md`, `--native_front_end_car_draw`,
+`src/front_end_car_draw/`): the garage stage the front end's screens
+draw the player's car on (the garage, the shops), 17 of the 18 seen in
+play, with `SceneModel::ApplyLightKit`. The root `GarageStage::Draw`
+`sub_8217FE60` waits on `CarScene::Update` `sub_820C9608` (`scene.md`),
+whose subtree is still blocked. Checked in the pad replay, which reaches
+the garage and the tuning shop (frame dumps there pixel-identical on and
+off; how to dump a front-end frame in a replay: `docs/pad-replay.md`).
+The run stopped at its limit. The boundary: 449 functions (916 pairs):
+overridden 108, Native 34, Dropped 26, never called 70, live 211.
+Imports: 186 called, 56 with a live caller. B7 (`b7_status.py`): ours
+4,099, work left 2,309 (Wrapped 62, with a row 480, no row yet 1,767),
+from 2,324.

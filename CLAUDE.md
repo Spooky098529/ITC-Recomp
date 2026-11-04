@@ -479,6 +479,17 @@ pointers, unmapped only after the other harnesses; fixed, 44a55624),
 then passed, and the run stopped at its limit; the rest waits on the
 car scene's update `sub_820C5DE8` (`Car::DrawUpdate`'s caller), the
 scene's draw and the leads in `docs/loops/leads.md`.
+Its thirty-first run (`b7-loop-03-11-26` again, the user's call,
+2026-11-04, not yet merged; summary
+`docs/loops/b7-loop-2026-11-04-0844.md`; 3 subsystems) made the race
+flow's set-up (`race-flow.md`, `--native_race_flow`: `RaceFlow::Init`
+and its 53 transitions), the car scene's draw (`car-scene-draw.md`,
+`--native_car_scene_draw`, 21 of 21: `CarScene::Draw` above
+`Car::DrawUpdate`, its frame-state wraps kept) and the front end's car
+draw (`front-end-car-draw.md`, `--native_front_end_car_draw`, 17 of 18
+in play: the garage stage) native (ours 4,059 -> 4,099); the rest
+waits on `CarScene::Update` `sub_820C9608` (the garage stage's draw),
+`RaceMode::Init` and the leads in `docs/loops/leads.md`.
 Harness runs use `attract_race.sh 40` (the user's call,
 2026-10-23); a race short only because the harnesses took longer is
 no halt. B7 loop migration agents run only their subsystem's harnesses

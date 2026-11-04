@@ -39,11 +39,14 @@ file's history. What's left to see in a drive, from every run:
   removed, with `ApplyLightKit` in `load-poll.md`; the root waits on
   `CarScene::Update`; one subagent for `PoseCar`; `itc_3474`: race 38
   s, 0 errors, every harness 0 differing; replays reach the garage and
-  the tuning shop, dumps there pixel-identical on and off). Step:
-  validation, agent running.
+  the tuning shop, dumps there pixel-identical on and off). Done.
 
 ## Done
 
+- The front end's car draw: `front-end-car-draw.md` (map 3beadd5a,
+  migration 38b4a134..43fa606c, `--native_front_end_car_draw`, 17 of 18
+  in play; validated `itc_3478`: race 48 s, 0 errors, 18 of 18 harness
+  lines, 12 ran in the replay `itc_3479` (ok), 6 to drive).
 - The car scene's draw: `car-scene-draw.md` (map c98bcea2, migration
   d5d7449c..6e318bb5, `--native_car_scene_draw`, 21 of 21; validated
   `itc_3448`: race 49 s, 0 errors, 21 of 21 harness lines, 20 ran in
@@ -88,3 +91,12 @@ file's history. What's left to see in a drive, from every run:
   (wrapped 62, known 495, unknown 1767).
 - After its migration (`itc_3474`): ours 4099, work left 2309 (wrapped
   62, known 480, unknown 1767).
+- After its validation (`itc_3478`, 120 s: race 48 s, 0 errors, every
+  harness 0 differing but the expected groups): ours 4099, work left
+  2309.
+
+## Stopped
+
+2026-11-04, at the run's limit (3 subsystems), after the front end's
+car draw's validation. No halts in the run. Nothing uncommitted. The
+user reviews and merges.
