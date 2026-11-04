@@ -254,6 +254,8 @@ void AltHud(Context& h);
 void RaceScene(Context& h);
 // The menu sounds (src/harnesses/menu_sounds.cpp).
 void MenuSounds(Context& h);
+// The race's sounds (src/harnesses/race_sounds.cpp).
+void RaceSounds(Context& h);
 // The interior accessories (src/harnesses/accessories.cpp).
 void Accessories(Context& h);
 // The race HUD machine (src/harnesses/race_hud_machine.cpp).

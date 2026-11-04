@@ -1,0 +1,175 @@
+// The race's sounds natively: adapters in front of src/race_sounds/
+// (docs/functions/race-sounds.md), with the register steps the harness
+// shares (hooks/race_sounds.h). The handlers are reached through the race
+// mode's state machine (functors) and the callbacks through function
+// pointers, so the adapters stay.
+
+#include "hooks/race_sounds.h"
+
+#include "base/flags.h"
+#include "hooks/car_sounds.h"
+#include "race_sounds/race_sounds.h"
+
+ITC_FLAG_BOOL(native_race_sounds, true, "ITC",
+              "Run the race's sounds (docs/functions/race-sounds.md: the race mode's sound "
+              "machine at +138284; SetListener sub_821758A0, FadeMusic sub_82175908, "
+              "RestoreMusicVolume sub_821759C8, EndTick sub_82175A40, Pause sub_82175AE8, Resume "
+              "sub_82175B80, PauseCars sub_82175C00, ResumeCars sub_82175C58, OnStageCountdown "
+              "sub_82175D20, OnRollingStartDone sub_82175D48, OnEffectsBankLoaded sub_82175ED0; "
+              "the car sounds through their plain C++, the sound manager's slots through the "
+              "function table) natively instead of through the translated code (the same "
+              "words; checked by --run_harnesses=race_sounds)");
+
+namespace hooks {
+
+namespace {
+
+namespace rs = race_sounds;
+
+// The guest calls the plain C++ makes (race_sounds::Calls), through this
+// context: r1, the first `set` of r3 to r6 and lr set; the car sounds run as
+// their register steps (their plain C++), the rest through the function
+// table (its override when it has one); r1 put back. The adapter's lr is
+// put back when it ends.
+class GuestCalls {
+ public:
+  GuestCalls(PPCContext& ctx, uint8_t* base) : ctx_(ctx), base_(base), lr_(ctx.lr) {}
+  ~GuestCalls() { ctx_.lr = lr_; }
+  GuestCalls(const GuestCalls&) = delete;
+  GuestCalls& operator=(const GuestCalls&) = delete;
+  rs::Calls calls() { return {this, &GuestCalls::Call}; }
+
+ private:
+  static uint64_t Call(void* user, uint32_t function, const uint64_t args[4], int set,
+                       uint32_t r1, uint32_t lr) {
+    auto& self = *static_cast<GuestCalls*>(user);
+    PPCContext& ctx = self.ctx_;
+    uint8_t* base = self.base_;
+    const uint64_t stack = ctx.r1.u64;
+    ctx.r1.u64 = r1;
+    PPCRegister* registers[4] = {&ctx.r3, &ctx.r4, &ctx.r5, &ctx.r6};
+    for (int i = 0; i < set; i++) {
+      registers[i]->u64 = args[i];
+    }
+    ctx.lr = lr;
+    switch (function) {
+      case rs::kCarSoundPauseAll:
+        CarSoundsPauseAll(ctx, base);
+        break;
+      case rs::kCarSoundResumeAll:
+        CarSoundsResumeAll(ctx, base);
+        break;
+      case rs::kCarSoundsStopAll:
+        CarSoundsStopAll(ctx, base);
+        break;
+      case rs::kCarSoundsRelease:
+        CarSoundsReleaseAll(ctx, base);
+        break;
+      default:
+        ctx.ctr.u64 = function;
+        REX_CALL_INDIRECT_FUNC(function);
+    }
+    ctx.r1.u64 = stack;
+    ctx.fpscr.disableFlushMode();
+    return ctx.r3.u64;
+  }
+  PPCContext& ctx_;
+  uint8_t* base_;
+  uint64_t lr_;
+};
+
+// Runs `body(calls)` with the guest calls through `ctx`, its r3 into r3.
+template <typename Body>
+void Step(PPCContext& ctx, uint8_t* base, Body body) {
+  ctx.fpscr.disableFlushMode();
+  uint64_t r3;
+  {
+    GuestCalls guest(ctx, base);
+    r3 = body(guest.calls());
+  }
+  ctx.r3.u64 = r3;
+}
+
+}  // namespace
+
+void RaceSoundsSetListener(PPCContext& ctx, uint8_t* base) {
+  const uint64_t r3 = ctx.r3.u64, r4 = ctx.r4.u64, r5 = ctx.r5.u64, r6 = ctx.r6.u64;
+  const uint32_t sp = ctx.r1.u32;
+  Step(ctx, base,
+       [&](const rs::Calls& c) { return rs::SetListener(base, r3, r4, r5, r6, sp, c); });
+}
+
+void RaceSoundsFadeMusic(PPCContext& ctx, uint8_t* base) {
+  const uint32_t sp = ctx.r1.u32;
+  Step(ctx, base, [&](const rs::Calls& c) { return rs::FadeMusic(base, sp, c); });
+}
+
+void RaceSoundsRestoreMusicVolume(PPCContext& ctx, uint8_t* base) {
+  const uint32_t sp = ctx.r1.u32;
+  Step(ctx, base, [&](const rs::Calls& c) { return rs::RestoreMusicVolume(base, sp, c); });
+}
+
+void RaceSoundsEndTick(PPCContext& ctx, uint8_t* base) {
+  const uint64_t r3 = ctx.r3.u64;
+  const uint32_t sp = ctx.r1.u32;
+  Step(ctx, base, [&](const rs::Calls& c) { return rs::EndTick(base, r3, sp, c); });
+}
+
+void RaceSoundsPause(PPCContext& ctx, uint8_t* base) {
+  const uint32_t sp = ctx.r1.u32;
+  Step(ctx, base, [&](const rs::Calls& c) { return rs::Pause(base, sp, c); });
+}
+
+void RaceSoundsResume(PPCContext& ctx, uint8_t* base) {
+  const uint32_t sp = ctx.r1.u32;
+  Step(ctx, base, [&](const rs::Calls& c) { return rs::Resume(base, sp, c); });
+}
+
+void RaceSoundsPauseCars(PPCContext& ctx, uint8_t* base) {
+  const uint32_t sp = ctx.r1.u32;
+  Step(ctx, base, [&](const rs::Calls& c) { return rs::PauseCars(base, sp, c); });
+}
+
+void RaceSoundsResumeCars(PPCContext& ctx, uint8_t* base) {
+  const uint32_t sp = ctx.r1.u32;
+  Step(ctx, base, [&](const rs::Calls& c) { return rs::ResumeCars(base, sp, c); });
+}
+
+void RaceSoundsOnStageCountdown(PPCContext& ctx, uint8_t* base) {
+  ctx.r3.u64 = rs::OnStageCountdown(base, ctx.r3.u64);
+}
+
+void RaceSoundsOnRollingStartDone(PPCContext& ctx, uint8_t* base) {
+  const uint64_t r3 = ctx.r3.u64;
+  const uint32_t sp = ctx.r1.u32;
+  Step(ctx, base, [&](const rs::Calls& c) { return rs::OnRollingStartDone(base, r3, sp, c); });
+}
+
+void RaceSoundsOnEffectsBankLoaded(PPCContext&, uint8_t* base) {
+  race_sounds::OnEffectsBankLoaded(base);
+}
+
+}  // namespace hooks
+
+// Defines an adapter: the flag, else the original.
+#define ITC_RACE_SOUNDS(address, step)   \
+  extern "C" REX_FUNC(sub_##address) {   \
+    REX_FUNC_PROLOGUE();                 \
+    if (!ITC_FLAG(native_race_sounds)) { \
+      __imp__sub_##address(ctx, base);   \
+      return;                            \
+    }                                    \
+    hooks::step(ctx, base);              \
+  }
+
+ITC_RACE_SOUNDS(821758A0, RaceSoundsSetListener)
+ITC_RACE_SOUNDS(82175908, RaceSoundsFadeMusic)
+ITC_RACE_SOUNDS(821759C8, RaceSoundsRestoreMusicVolume)
+ITC_RACE_SOUNDS(82175A40, RaceSoundsEndTick)
+ITC_RACE_SOUNDS(82175AE8, RaceSoundsPause)
+ITC_RACE_SOUNDS(82175B80, RaceSoundsResume)
+ITC_RACE_SOUNDS(82175C00, RaceSoundsPauseCars)
+ITC_RACE_SOUNDS(82175C58, RaceSoundsResumeCars)
+ITC_RACE_SOUNDS(82175D20, RaceSoundsOnStageCountdown)
+ITC_RACE_SOUNDS(82175D48, RaceSoundsOnRollingStartDone)
+ITC_RACE_SOUNDS(82175ED0, RaceSoundsOnEffectsBankLoaded)
