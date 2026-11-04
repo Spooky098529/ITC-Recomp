@@ -19,8 +19,8 @@ nine others at +736, +792 (a looping roll noise by the speed), +840,
 `sub_8210EDB0`), +1072 (the horn, `HornSound::Update`, probably) and +1136
 (a pass by); its X3DAudio listener at +4, emitter at +52 and DSP settings at
 +176 (the matrix, one source and six destination channels). The race
-code above (`821767A8`-`82176E60`, the lead "the readers of the scene
-models' sound slots" in `../loops/leads.md`) gives each racer its two
+code above (`821767A8`-`82176E60`, `race-sounds.md` since 2026-11-04)
+gives each racer its two
 wave banks once both files arrived (`CarSounds::SetBanks`, `Start`),
 and every tick runs `CarSounds::Update`, which positions the car's
 sound (`CarSounds::Update3D`: X3DAudioCalculate with the matrix, the

@@ -528,6 +528,12 @@ Rows not yet moved stay in the table below. So far:
   into the input recordings' two blocks at the countdown and before the
   replay and put back for and after it, the replay kept after a race,
   and their destructors (B7).
+- [`race-sounds.md`](race-sounds.md): the race's sounds: the race
+  mode's state machine at +138284 that allocates the scene models' sound
+  buffers, loads the effects' wave bank, gives each car its wave banks
+  and updates the car sounds, pauses and resumes them and the music,
+  picks and changes the race's music (fades, bank 2's load by name) and
+  frees it all at the end (B7).
 
 These files hold functions only. What used to follow the table here moved
 out on 2026-10-20: how frame interpolation works, its options and what

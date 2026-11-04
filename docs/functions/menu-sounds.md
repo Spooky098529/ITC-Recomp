@@ -64,7 +64,7 @@ aren't sound code (the car objects' makers and the career, in
 Not here: the race's sound handlers (`82175908`-`82177130`, the music
 fades, the pause and resume of the car sounds and the music category,
 the listener's update), with the race mode's sound set-up
-`sub_82177378`, in `../loops/leads.md`; the options screens that call
+`sub_82177378`, in `race-sounds.md` (since 2026-11-04); the options screens that call
 the volume setters (`sub_821BBF00`, `sub_821C1498`, `sub_8220E988`,
 `sub_82210E58`), in `../loops/leads.md`.
 
