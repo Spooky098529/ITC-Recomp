@@ -786,6 +786,7 @@ constexpr uint32_t kWheelsRimAFrame = 2032;
 constexpr uint32_t kWheelsRimAMorphedFrame = 2256;
 constexpr uint32_t kWheelsRimBFrame = 2528;
 constexpr uint32_t kWheelsBrakesFrame = 2560;
+constexpr uint32_t kWheelsBrakesMorphedFrame = 2544;
 
 // WheelPoints::DrawTire (sub_820E8AE8): r3 = a tire group (the point block's
 // +32 or +1872), r4 = the camera pass, r5 = the block. Side 1 (T from +1808):
@@ -881,5 +882,20 @@ Left WheelsDrawRimB(uint8_t* base, const Calls& calls, uint32_t stack, uint32_t 
 // spinning. r24 `caller_r24` and r28 the block at every draw.
 Left WheelsDrawBrakes(uint8_t* base, const Calls& calls, uint32_t stack, uint32_t group,
                       uint32_t camera, uint32_t block, uint64_t caller_r24);
+
+// WheelPoints::DrawBrakesMorphed (sub_820EBEB8): as DrawBrakes at its own
+// frame offsets (fresh identities at +2336, +2016, +2400, +2144, T, T';
+// side 1 into +2336 and +2016, side 2 into +2400 and +2144), then the
+// group's +2912 to +2943 copied from the 64-byte matrix at [+0] (the front
+// its first half, the rear its second). With the wheels record's +8 set
+// (always, from its caller): the weight (the wheels record's +108, rear
+// +112, + 1 when +68 is 3 to 5, + 2 when it is 6, - 9) x [0x82006634] (1 /
+// 9) to the frame's +160 and the group's +16, five morphs as DrawBrakes'
+// (records 0, 2, 4, 6, 8 toward the next; returning to 0x820EC810 to
+// 0x820EC8E0 where MorphShape declines). Each side's three conditional
+// records as DrawBrakes'; no record 10, no SetAlpha. r24 `caller_r24` and
+// r28 side 1's R (the block's +80 front, +208 rear) at every draw.
+Left WheelsDrawBrakesMorphed(uint8_t* base, const Calls& calls, uint32_t stack, uint32_t group,
+                             uint32_t camera, uint32_t block, uint64_t caller_r24);
 
 }  // namespace car_draw

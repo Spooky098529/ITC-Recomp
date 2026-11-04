@@ -1,5 +1,6 @@
 // The wheels (src/car_draw/wheels.cpp, docs/functions/car-draw.md: the
-// tires, set a's rims, plain and morphed, set b's rim and the brakes; the
+// tires, set a's rims, plain and morphed, set b's rim and the brakes, plain and
+// morphed (those from a generator of their own); the
 // rims' world in RimAWorld, the brakes' in BrakesWorld) against the recompiled functions, under the car_draw harness (its
 // Case and model draws' world, car_draw_shared.h), with a random generator
 // of its own (so its cases don't shift the other files' inputs; it runs
@@ -55,6 +56,8 @@ constexpr uint32_t kWork = 0x1000;
 // The brake group (twelve records and the side float4s at +2912 and +2928,
 // past the work memory's reach).
 constexpr uint32_t kBrakesGroup = 0x2800;
+// The morphed brakes' side matrix ([+0] of the brake group).
+constexpr uint32_t kBrakesSides = 0x3A00;
 // The empty function the fake vtables' slots point at.
 constexpr uint32_t kEmptyFunction = 0x82106540;
 constexpr uint32_t kRecordsEnd = 0x4000;
@@ -285,7 +288,7 @@ void RimAWorld(Context& h, Random& r, uint32_t block, uint32_t top, uint32_t sha
 // morphs; with the morphs, the morph's world (MorphWorld) and `makers`
 // counted.
 bool BrakesWorld(Context& h, Random& r, uint32_t block, uint32_t source, uint32_t top,
-                 uint32_t shape, int& makers) {
+                 uint32_t shape, int& makers, bool morphed) {
   uint8_t* base = h.base;
   for (uint32_t k = 0; k < 4; k++) {
     if (k != shape) {
@@ -295,7 +298,16 @@ bool BrakesWorld(Context& h, Random& r, uint32_t block, uint32_t source, uint32_
   }
   guest::StoreU32(base, block + 0x100 + 412, r.Below(8) == 0 ? 0 : 1 + r.Below(4));
   const uint32_t group = top + kBrakesGroup, wheels = top + kWheels;
-  const bool morphs = r.Below(4) == 0;
+  const bool morphs = morphed ? r.Below(8) != 0 : r.Below(4) == 0;
+  if (morphed) {
+    // DrawBrakesMorphed's: the 64-byte matrix at [+0] its +2912 to +2943
+    // come from, and the brakes' size words (+108, +112).
+    guest::StoreU32(base, group, top + kBrakesSides);
+    FiniteFloats(base, top + kBrakesSides, 16, r);
+    for (uint32_t at : {108u, 112u}) {
+      guest::StoreU32(base, wheels + at, r.Below(8) == 0 ? uint32_t(r.Next()) : r.Below(19));
+    }
+  }
   guest::StoreU32(base, group + 8, wheels);
   guest::StoreU32(base, group + 12, Flag(r));
   guest::StoreU32(base, group + 16, RandomFloat(r));
@@ -338,7 +350,7 @@ bool BrakesWorld(Context& h, Random& r, uint32_t block, uint32_t source, uint32_
   return morphs;
 }
 
-enum class Kind { kTire, kTireMorphed, kRimA, kRimAMorphed, kRimB, kBrakes };
+enum class Kind { kTire, kTireMorphed, kRimA, kRimAMorphed, kRimB, kBrakes, kBrakesMorphed };
 
 struct Target {
   const char* name;
@@ -352,7 +364,7 @@ struct Target {
 }  // namespace
 
 void WheelsDraws(Context& h, uint32_t block, uint32_t race) {
-  Random r(0x776865656C73ull);  // "wheels"
+  Random wheels_random(0x776865656C73ull);  // "wheels"
   const uint32_t allocation = memory::Alloc(kWheelsBytes + 16, 0);
   const uint32_t top = (allocation + 15) & ~15u;
   const uint32_t source = block + kSource;
@@ -372,8 +384,17 @@ void WheelsDraws(Context& h, uint32_t block, uint32_t race) {
        hooks::CarDrawWheelsDrawRimB, car_draw::kWheelsRimBFrame, 2400, 256, Kind::kRimB},
       {"WheelPoints::DrawBrakes (sub_820EB388)", __imp__sub_820EB388,
        hooks::CarDrawWheelsDrawBrakes, car_draw::kWheelsBrakesFrame, 2464, 256, Kind::kBrakes},
+      {"WheelPoints::DrawBrakesMorphed (sub_820EBEB8)", __imp__sub_820EBEB8,
+       hooks::CarDrawWheelsDrawBrakesMorphed, car_draw::kWheelsBrakesMorphedFrame, 2464, 256,
+       Kind::kBrakesMorphed},
+  };
+  // The morphed brakes' cases from a generator of their own.
+  Random morphed_brakes(0x6D6F72706862726Bull);  // "morphbrk"
+  const auto brakes = [](Kind kind) {
+    return kind == Kind::kBrakes || kind == Kind::kBrakesMorphed;
   };
   for (const Target& target : targets) {
+    Random& r = target.kind == Kind::kBrakesMorphed ? morphed_brakes : wheels_random;
     Results results(target.name);
     int queued = 0, depth = 0, weights = 0, makers = 0, flips = 0, seconds = 0, morphs = 0;
     std::vector<uint8_t> scene_bytes, records;
@@ -407,13 +428,14 @@ void WheelsDraws(Context& h, uint32_t block, uint32_t race) {
               }
               seconds += guest::LoadU32(h.base, source + 592) != 0;
             }
-            if (target.kind == Kind::kBrakes) {
-              morphs += BrakesWorld(h, r, block, source, top, shape, makers);
+            if (brakes(target.kind)) {
+              morphs += BrakesWorld(h, r, block, source, top, shape, makers,
+                                    target.kind == Kind::kBrakesMorphed);
             }
             scene_bytes = Read(h.base, scene, kSceneBytes);
             records = Read(h.base, top, kRecordsEnd);
             sp = t.r1.u32;
-            t.r3.u64 = top + (target.kind == Kind::kBrakes ? kBrakesGroup : kGroup);
+            t.r3.u64 = top + (brakes(target.kind) ? kBrakesGroup : kGroup);
             t.r4.u64 = kPasses + 592 * r.Below(4);
             t.r5.u64 = source;
             t.r24.u64 = r.Next();
@@ -458,7 +480,7 @@ void WheelsDraws(Context& h, uint32_t block, uint32_t race) {
       ITC_LOG_INFO("harness: {}: {} of {} cases with a depth pass, {} ended handing an entry to "
                    "the render queue",
                    target.name, depth, target.cases, queued / 2);
-    } else if (target.kind == Kind::kBrakes) {
+    } else if (brakes(target.kind)) {
       ITC_LOG_INFO("harness: {}: {} of {} cases morphed ({} with the pool maker), {} ended "
                    "handing an entry to the render queue",
                    target.name, morphs, target.cases, makers, queued / 2);

@@ -743,6 +743,7 @@ namespace {
 
 constexpr uint32_t kDegrees = 0x82002948;   // pi / 180
 constexpr uint32_t kHalfTurn = 0x82002C34;  // 180.0, side 2's turn
+constexpr uint32_t kNinth = 0x82006634;     // 1 / 9, the morphed brake's weight
 
 // A side's two products, front or rear: the spinning Z x S x R x T x world
 // and the still Z x R x T x world, their outputs and return addresses.
@@ -791,6 +792,41 @@ constexpr BrakesLayout kBrakes = {
      {0x820EBB9C, 0x820EBBBC, 0x820EBBDC},
      0x820EBB7C,
      0x820EBBE8},
+};
+
+// DrawBrakesMorphed's: the same chains' temporaries but the rear side 1's
+// first, its spinning matrices at +2336 and +2400 and still ones at +2016 and
+// +2144 (fresh in that order).
+constexpr BrakesLayout kBrakesMorphed = {
+    {2336, 2016, 2400, 2144, 224, 288},
+    2336,
+    2016,
+    2400,
+    2144,
+    {{1312, 544, 1952, 672},
+     {0x820EC1DC, 0x820EC200, 0x820EC220, 0x820EC244},
+     {1568, 800, 2208},
+     {0x820EC270, 0x820EC290, 0x820EC2B0},
+     0x820EC250,
+     0x820EC2BC},
+    {{2272, 1440, 480, 608},
+     {0x820EC494, 0x820EC4B8, 0x820EC4D8, 0x820EC4FC},
+     {736, 864, 992},
+     {0x820EC528, 0x820EC548, 0x820EC568},
+     0x820EC508,
+     0x820EC574},
+    {{928, 1696, 1056, 2080},
+     {0x820EC37C, 0x820EC3A0, 0x820EC3C0, 0x820EC3E0},
+     {1184, 1824, 416},
+     {0x820EC40C, 0x820EC42C, 0x820EC44C},
+     0x820EC3EC,
+     0x820EC710},
+    {{1120, 1248, 1376, 1504},
+     {0x820EC634, 0x820EC658, 0x820EC678, 0x820EC698},
+     {1632, 1760, 1888},
+     {0x820EC6C4, 0x820EC6E4, 0x820EC704},
+     0x820EC6A4,
+     0x820EC710},
 };
 
 // One side's products from Z (the frame's +96) into the layout's spinning
@@ -927,6 +963,64 @@ Left WheelsDrawBrakes(uint8_t* base, const Calls& calls, uint32_t stack, uint32_
                             Lfs(base, block + 616 + rear), frame);
   return PartsDrawRecord(base, calls, frame, group + 2432, vp, frame + kBrakes.spin2, 0, r24,
                          r28, 0x820EBEA0);
+}
+
+Left WheelsDrawBrakesMorphed(uint8_t* base, const Calls& calls, uint32_t stack, uint32_t group,
+                             uint32_t camera, uint32_t block, uint64_t caller_r24) {
+  ITC_NATIVE_RUNNING("sub_820EBEB8 WheelPoints::DrawBrakesMorphed");
+  const uint32_t frame = Frame(base, stack, kWheelsBrakesMorphedFrame);
+  BrakesMatrices(base, frame, group, block, kBrakesMorphed);
+  // The group's +2912 to +2943 copied doubleword by doubleword from the
+  // 64-byte matrix at [+0] (the front its first half, the rear its second),
+  // [+0] read again for the second pair; then the brake's size word, the
+  // wheels record's +108 (rear +112).
+  const bool front = int32_t(Load(base, group + 12)) != 0;
+  const uint32_t half = front ? 0 : 32;
+  for (uint32_t at = 0; at < 32; at += 16) {
+    const uint32_t from = Load(base, group) + half + at;
+    CopyDoublewords(base, group + 2912 + at, from, 8);
+    CopyDoublewords(base, group + 2920 + at, from + 8, 8);
+  }
+  const uint32_t wheels = Load(base, group + 8);
+  int32_t size = int32_t(Load(base, wheels + (front ? 108 : 112)));
+  if (int32_t(Load(base, wheels + 8)) != 0) {
+    // The weight (size, + 1 for the kinds 3 to 5, + 2 for 6, - 9) / 9,
+    // through fcfid at the frame's +80, to the frame's +160 and the group's
+    // +16; five morphs on record 0's model, records 0, 2, 4, 6, 8 toward the
+    // next.
+    const int32_t kind = int32_t(Load(base, wheels + 68));
+    const uint32_t model = Load(base, group + 36);
+    if (kind >= 3 && kind < 6) size += 1;
+    if (kind == 6) size += 2;
+    const int64_t count = int64_t(int32_t(uint32_t(size) - 9u));
+    Store(base, frame + 224, Load(base, group + 500));
+    Store64(base, frame + 80, uint64_t(count));
+    const double weight = Fmuls(Single(double(count)), Lfs(base, kNinth));
+    Stfs(base, frame + 160, weight);
+    Stfs(base, group + 16, weight);
+    const uint32_t morph = frame + 288;
+    second_set::MorphSetUp(base, model, morph, Load(base, group + 260), frame + 224, frame + 160,
+                           1);
+    const uint64_t shape = Load(base, group + 260);
+    if (!ModelMorphShape(base, calls, model, morph, shape, frame)) {
+      const uint64_t regs[3] = {model, morph, shape};
+      calls.call(kMorphShape, regs, 3, frame, 0x820EC810);
+    }
+    BrakesMorph(base, calls, frame, group, model, 512, 752, 0x820EC844);
+    BrakesMorph(base, calls, frame, group, model, 992, 1232, 0x820EC878);
+    BrakesMorph(base, calls, frame, group, model, 1472, 1712, 0x820EC8AC);
+    BrakesMorph(base, calls, frame, group, model, 1952, 2192, 0x820EC8E0);
+  }
+  // r24 the caller's, r28 the side 1 R (the block's +80 front, +208 rear)
+  // at every draw; no record 10, no SetAlpha.
+  const uint32_t vp = camera + 144;
+  const uint64_t r24 = caller_r24, r28 = block + (front ? 80 : 208);
+  static constexpr uint32_t kSide1[] = {0x820EC910, 0x820EC948, 0x820EC97C};
+  static constexpr uint32_t kSide2[] = {0x820EC9A8, 0x820EC9E0, 0x820ECA14};
+  BrakesDraws(base, calls, frame, group, vp, frame + kBrakesMorphed.spin1,
+              frame + kBrakesMorphed.still1, r24, r28, kSide1);
+  return BrakesDraws(base, calls, frame, group, vp, frame + kBrakesMorphed.spin2,
+                     frame + kBrakesMorphed.still2, r24, r28, kSide2);
 }
 
 }  // namespace car_draw
