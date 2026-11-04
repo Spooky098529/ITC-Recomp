@@ -472,11 +472,12 @@ movies' mode and its state machine) and mapped the car draw
 `--native_car_draw`); paused by the user after the car draw's part 1,
 then resumed on `b7-loop-03-11-26` (2026-11-03 to 04, not yet merged),
 which finished the car draw's migration (78 of 78 ours; ours 3,962 ->
-4,059) and halted at its validation: under `--run_harnesses=all` the
-`PartsPoints::DrawShadows` harness (`car_draw_shadows.cpp`) loops on a
-guest access violation reading `0x7000006F` (it passes run alone; a
-gap in its harness world the migration noted), so 34 functions had no
-harness line (`docs/loops/b7-progress.md`, "Stopped").
+4,059); its validation first halted on the shadows harness (record 3's
+shape left as random bytes, the original reading through its wild
+pointers, unmapped only after the other harnesses; fixed, 44a55624),
+then passed, and the run stopped at its limit; the rest waits on the
+car scene's update `sub_820C5DE8` (`Car::DrawUpdate`'s caller), the
+scene's draw and the leads in `docs/loops/leads.md`.
 Harness runs use `attract_race.sh 40` (the user's call,
 2026-10-23); a race short only because the harnesses took longer is
 no halt. B7 loop migration agents run only their subsystem's harnesses

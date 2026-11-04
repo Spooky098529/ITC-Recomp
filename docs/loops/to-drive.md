@@ -22,8 +22,8 @@ here loses its heading.
   `boot-mode.md`, `movies.md`): `sub_82107358`
   ScreenMachine::ScreenMachine, `sub_820A4408` Movies::Pause,
   `sub_820A4420` Movies::Resume (the last two never seen in play).
-- The car draw (replay `itc_3413` ok; the all-harness attract race
-  hung in a harness, `b7-progress.md`'s "Stopped"; `car-draw.md`):
+- The car draw (attract race `itc_3416`, replay `itc_3413` ok;
+  `car-draw.md`):
   `sub_820E39F8` InteriorDials::DrawDigitalSpeed, `sub_820ECB68`
   WheelPoints::DrawMorphed, `sub_820E9318` WheelPoints::DrawTireMorphed,
   `sub_820EA148` WheelPoints::DrawRimAMorphed, `sub_820EBEB8`

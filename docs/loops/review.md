@@ -82,6 +82,10 @@ When the user has reviewed a run's section, its heading gets
   harnesses so far: the morph chain and morphed wheel draws, the
   front-end-only draws, `DrawDigitalSpeed`, the accessory path and the
   whole cockpit (no cockpit view in attract races).
+- The shadows harness fix (44a55624, by the lead at the user's request
+  after the validation halted): record 3's shape (+948) gets a copy of
+  record 0's shape record when the indices differ (no extra Random
+  draws), as `ModelWorld` builds only that one.
 
 ## Run 2026-10-31 23:57 (`b7-loop-31-10-26-2`)
 

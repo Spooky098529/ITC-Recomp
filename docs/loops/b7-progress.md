@@ -31,7 +31,7 @@ file's history. What's left to see in a drive, from every run:
   on there. The car draw's migration finished (2026-11-04: parts 2 to
   16, 64ca2adf..d0f3ca85, 15 subagents one at a time; 78 of 78 ours,
   every harness 0 differing, races 30-37 s, 0 errors). Validation
-  halted the run (see "Stopped").
+  halted the run, then passed after the harness fix (see "Stopped").
 - **To pick up** (the user's call, 2026-11-01: the next loop continues
   this run on this branch, not a new one): start a migration agent for
   the rest of `car-draw.md` (71 of the group's 78 left, still one ready
@@ -69,6 +69,11 @@ file's history. What's left to see in a drive, from every run:
 
 ## Done
 
+- The car draw: `car-draw.md` (map 24c2b1c1, migration a036f833,
+  a6ae298c, 64ca2adf..d0f3ca85, harness fix 44a55624;
+  `--native_car_draw`, 78 of 78; validated `itc_3416`: race 49 s, 0
+  errors, 78 of 78 harness lines, 52 ran in the race, replay
+  `itc_3413` ok, 9 to drive).
 - The boot mode: `boot-mode.md` (map 49161912, migration 49f60a69,
   `--native_boot_mode`, 12 of 12 in play with 7 in `movies.md`;
   validated `itc_3219`: race 53 s, 0 errors, 19 of 19 harness lines,
@@ -108,34 +113,22 @@ file's history. What's left to see in a drive, from every run:
 - After the car draw's migration (`itc_3409`: race 33 s, 0 errors,
   car_draw 0 differing): ours 4059, work left 2346 (wrapped 71, known
   482, unknown 1793).
+- After its validation (`itc_3416`, 120 s: race 49 s, 0 errors, every
+  harness 0 differing but the expected groups): ours 4059, work left
+  2346.
 
 ## Stopped
 
-2026-11-04, halted at the car draw's validation (a validation `missing:`
-and a harness that doesn't finish are halts, "When to halt"):
-
-- `attract_race.sh 120 --run_harnesses=all` (`itc_3410`, again
-  `itc_3412`): the `car_draw` harness hangs in `PartsPoints::DrawShadows`
-  `sub_820E1D88`'s cases (`src/harnesses/car_draw_shadows.cpp`): after
-  its `native running (harness)` line, "Unhandled guest access
-  violation: read of guest 0x7000006F" repeats ~6.4 million times on the
-  harness thread until the timeout (each log ~1 GB); the harnesses after
-  it and the race never run (0 s). Which side reads `0x7000006F` isn't
-  known yet. Run alone (`--run_harnesses=car_draw`, `itc_3411`) every
-  car_draw case matches and nothing loops: probably guest state left by
-  the harnesses before it, meeting the gap in the shadows harness world
-  the migration noted (part 9: more draws from the shared Random made
-  the original read `0xA4` forever, case 70; avoided, not fixed). As
-  the `ai_drivers` wild-address case (dbc8ee0), a harness fix, likely
-  its own Random and a fully set-up world.
-- So 34 of the 78 had no harness line in the all-harness run
-  (`missing:`: the cockpit, the parts' and interior's tops, the traffic,
-  the wheels, the root). Every summary line printed was 0 differing.
-- The pad replay (`itc_3413`, `race_test.jsonl`, 127 s, 0 errors) was
-  ok: 69 of the 78 ran in it; 9 not in game (`to-drive.md`).
-- Nothing uncommitted; `check_function_statuses.py` 0 errors.
-
-To pick up: fix the shadows harness's world, then validate again
-(`attract_race.sh 120 --run_harnesses=all`), then step 9's records for
-the car draw (its row under "B7's loop runs", the boundary over time);
-the run's limit (2) is then reached.
+2026-11-04, at the run's limit (2 subsystems), after the car draw's
+validation. It first halted (the `car_draw` harness looped on a guest
+access violation under `--run_harnesses=all`, `itc_3410`, `itc_3412`):
+`PartsPoints::DrawShadows`' harness stored a shape index for record 3
+(+948) whose record `ModelWorld` doesn't build, so the original's
+`RecordShapeDepthSlots` read through random pointers (gdb: case 112,
+the recompiled side, guest `0x7000006F`; mapped or not by what earlier
+harnesses left). At the user's request the lead fixed it (44a55624:
+record 3's shape gets a copy of the built record) and validated again
+(`itc_3416`, `attract_race.sh 120 --run_harnesses=all`: race 49 s, 0
+errors, every harness 0 differing outside the expected groups, 78 of
+78 harness lines, 52 ran in the race; the replay `itc_3413`, same game
+code, ok: 69 of 78). Nothing uncommitted. The user reviews and merges.
