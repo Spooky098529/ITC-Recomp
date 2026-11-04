@@ -463,14 +463,15 @@ kept around native bodies. Its replays logged the SDK's intermittent
 (seen before the run too; `docs/loops/review.md`). The rest waits on
 the scene models' updates, the scene's draw, `Car::DrawUpdate` and the
 leads in `docs/loops/leads.md`.
-Its thirtieth run (`b7-loop-01-11-26`, 2026-11-01, not yet merged;
+Its thirtieth run (`b7-loop-01-11-26`, 2026-11-01 to 04;
 limit 2 subsystems, the user's call; summary
 `docs/loops/b7-loop-2026-11-01-1256.md`) made the boot mode native
 (`boot-mode.md`, `--native_boot_mode`, 12 of 12 in play: the boot
 movies' mode and its state machine) and mapped the car draw
 (`car-draw.md`, `Car::DrawUpdate` and the per-pass part draws,
 `--native_car_draw`); paused by the user after the car draw's part 1,
-then resumed on `b7-loop-03-11-26` (2026-11-03 to 04, not yet merged),
+then resumed on `b7-loop-03-11-26` (2026-11-03 to 04, merged into
+`rexglue-removal-project` 2026-11-04 before a drive),
 which finished the car draw's migration (78 of 78 ours; ours 3,962 ->
 4,059); its validation first halted on the shadows harness (record 3's
 shape left as random bytes, the original reading through its wild

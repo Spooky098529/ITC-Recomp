@@ -198,7 +198,7 @@ goes in `src/` as overrides), American English.
   scene loaders (78 of 78, with `XPR::GetTexture`) and the race HUD
   machine's draws (ours 3,962); its thirtieth run (branch
   `b7-loop-01-11-26`, 2026-11-01, 2 subsystems by the user's call,
-  paused by the user, not merged) made the boot mode native
+  paused by the user, merged into `rexglue-removal-project` 2026-11-04) made the boot mode native
   (`boot-mode.md`, 12 of 12 in play) and mapped the car draw
   (`car-draw.md`, `Car::DrawUpdate` and the scene model's per-pass
   draws, 86 rows), its migration paused after part 1 of about 16 (7 of
