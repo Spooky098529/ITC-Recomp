@@ -31,7 +31,14 @@ file's history. What's left to see in a drive, from every run:
   handlers `sub_82175908` and the rest, 8 of 8 ready, all in play,
   with the readers of the scene models' sound slots `sub_82175F20`,
   `sub_82176188` beside them, 2 of 2 ready; both lines deleted from
-  `leads.md`). Step: mapping agent running.
+  `leads.md`). Map checked (53aa7a89: `race-sounds.md`, 31 rows, all
+  new, 29 in play; 0 errors; 15 ready groups; the race mode's machine
+  at +138284; `RaceSounds::Init` 1,680 lines, split the migration).
+  `rand` `sub_825A9BB8` (per-thread seed over `_getptd`, left for the
+  core 2026-10-25) blocks `PlayStartMusic` `sub_82175DB0`, `Begin`
+  `sub_82176618` and `IdleTick` `sub_821767A8`: raised with the user
+  (the call's own condition). Step: migration agent running (the
+  ready groups).
 
 ## Done
 
@@ -60,5 +67,7 @@ file's history. What's left to see in a drive, from every run:
 - After its migration: ours 4125, work left 2283 (wrapped 62, known
   480, unknown 1741).
 - After its validation (`itc_3487`): ours 4125, work left 2283.
+- After the race's sounds' map: ours 4125, work left 2283 (wrapped
+  62, known 509, unknown 1712).
 
 ## Stopped
