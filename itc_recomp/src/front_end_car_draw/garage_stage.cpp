@@ -9,6 +9,7 @@
 #include "car_scene_draw/ops.h"
 #include "guest.h"
 #include "load_poll/load_poll.h"
+#include "menu_sounds/menu_sounds.h"
 #include "native/buffers.h"
 #include "vehicle_accessors/vehicle_accessors.h"
 
@@ -27,8 +28,13 @@ constexpr uint32_t k360 = 0x82002244;         // 360.0
 constexpr uint32_t kSixty = 0x82000F14;       // 60.0
 constexpr uint32_t kTwenty = 0x82002568;      // 20.0
 
+constexpr uint32_t kMaxima = 0x82635E90;     // the cars' opening maxima (48 bytes a car)
+constexpr uint32_t kOpenCue = 15;             // MenuSound::Play's cue for the opening
+
 constexpr uint32_t kMemcpy = 0x825A7410;
 constexpr uint32_t kTan = 0x825A8A50;
+constexpr uint32_t kOpenDoors = 0x8217B6B8;
+constexpr uint32_t kCloseDoors = 0x8217B740;
 
 int32_t LoadS(uint8_t* base, uint32_t address) { return int32_t(Load(base, address)); }
 
@@ -65,6 +71,19 @@ double Wrap(uint8_t* base, double v) {
     return minus_pi;
   }
   return v;
+}
+
+// MenuSound::Play's plain C++ from the frame at `sp`, its slot call through
+// `calls`.
+uint64_t PlayMenuSound(uint8_t* base, const Calls& calls, uint32_t cue, uint32_t sp) {
+  const menu_sounds::Calls sounds{
+      const_cast<Calls*>(&calls),
+      [](void* user, uint32_t function, const uint64_t args[4], int set, uint32_t r1,
+         uint32_t lr) -> uint64_t {
+        return static_cast<Calls*>(user)->call(function, args, set, nullptr, 0, r1, lr,
+                                               nullptr);
+      }};
+  return menu_sounds::PlayMenuSound(base, cue, sp, sounds);
 }
 
 }  // namespace
@@ -354,6 +373,150 @@ uint64_t GarageStageCommand(uint8_t* base, const Calls& calls, uint64_t r3, uint
     default:
       return r3;  // negative: nothing
   }
+}
+
+uint32_t GarageAnimsTurn(uint8_t* base, uint32_t entry) {
+  ITC_NATIVE_RUNNING("sub_82179D78 GarageAnims::Turn");
+  const uint32_t angles = Load(base, entry + 12) + 48;
+  const double yaw = Wrap(base, Fsubs(Lfs(base, angles + 4), Lfs(base, kHalfDegree)));
+  Stfs(base, angles + 4, yaw);
+  if (LoadS(base, entry + 8) != 0) {
+    return 0;
+  }
+  if (yaw != Lfs(base, kZero)) {
+    return 0;
+  }
+  Store(base, entry + 20, 1);
+  return 1;
+}
+
+uint32_t GarageAnimsOpen(uint8_t* base, const Calls& calls, uint32_t entry, uint32_t stack) {
+  ITC_NATIVE_RUNNING("sub_82179DF0 GarageAnims::Open");
+  const uint32_t f = Frame(base, stack, 128);
+  const uint32_t model =
+      vehicle_accessors::ScenePoolsGetB(base, Load(base, kScene), 7, Load(base, entry + 16));
+  const uint32_t car = Load(base, model + 48);
+  const double steps = Lfs(base, entry + 4);
+  const uint32_t value = Load(base, entry + 12);
+  const double now = Lfs(base, value);
+  const double max = Lfs(base, kMaxima + car * 48);
+  const double step = Fdivs(max, steps);
+  double v = Fadds(now, step);
+  const double zero = Lfs(base, kZero);
+  if (v < zero) {
+    v = zero;
+  } else if (v > max) {
+    v = max;
+  }
+  Stfs(base, value, v);
+  if (!(v > step)) {
+    PlayMenuSound(base, calls, kOpenCue, f);
+  }
+  if (Lfs(base, value) < max) {
+    return 0;
+  }
+  Store(base, entry + 20, 1);
+  Stfs(base, value, max);
+  return 1;
+}
+
+uint32_t GarageAnimsClose(uint8_t* base, const Calls& calls, uint32_t entry, uint32_t stack) {
+  ITC_NATIVE_RUNNING("sub_82179EA8 GarageAnims::Close");
+  const uint32_t f = Frame(base, stack, 112);
+  const uint32_t model =
+      vehicle_accessors::ScenePoolsGetB(base, Load(base, kScene), 7, Load(base, entry + 16));
+  const uint32_t car = Load(base, model + 48);
+  const double steps = Lfs(base, entry + 4);
+  const uint32_t value = Load(base, entry + 12);
+  const double now = Lfs(base, value);
+  const double max = Lfs(base, kMaxima + car * 48);
+  const double v = Fsubs(now, Fdivs(max, steps));
+  const double zero = Lfs(base, kZero);
+  double stored = max;
+  if (v < zero) {
+    stored = zero;
+  } else if (!(v > max)) {
+    stored = v;
+  }
+  Stfs(base, value, stored);
+  if (stored > zero) {
+    return 0;
+  }
+  Store(base, entry + 20, 1);
+  Stfs(base, value, zero);
+  PlayMenuSound(base, calls, kOpenCue, f);
+  return 1;
+}
+
+uint32_t GarageAnimsRun(uint8_t* base, const Calls& calls, uint32_t list, uint32_t stack) {
+  ITC_NATIVE_RUNNING("sub_8217D120 GarageAnims::Run");
+  const uint32_t f = Frame(base, stack, 624);
+  uint32_t any = 0;
+  if (Load(base, list + 448) == 0) {
+    return any;
+  }
+  uint32_t i = 0, e = list, count = 0;
+  do {
+    const int32_t type = LoadS(base, e);
+    bool ran = true;
+    uint64_t r3 = 0;
+    const uint64_t regs[2] = {list, e};
+    switch (type) {
+      case 0:
+        r3 = GarageAnimsTurn(base, e);
+        break;
+      case 2:
+        r3 = GarageAnimsOpen(base, calls, e, f);
+        break;
+      case 3:
+        r3 = GarageAnimsClose(base, calls, e, f);
+        break;
+      case 4:
+        r3 = calls.call(kOpenDoors, regs, 2, nullptr, 0, f, 0x8217D190, nullptr);
+        break;
+      case 5:
+        r3 = calls.call(kCloseDoors, regs, 2, nullptr, 0, f, 0x8217D180, nullptr);
+        break;
+      default:
+        ran = false;
+        break;
+    }
+    if (ran && int32_t(r3) != 0) {
+      any = 1;
+    }
+    i++;
+    e += 28;
+    count = Load(base, list + 448);
+  } while (i < count);
+  if (any == 0) {
+    return any;
+  }
+  // The list rebuilt without the done ones: popped from the end into +80,
+  // the others kept at +112 on (their count at +560), pushed back.
+  const uint32_t entry = f + 80, kept = f + 112, kept_count = f + 560;
+  uint32_t n = count, k = 0;
+  if (n != 0) {
+    do {
+      n = n - 1;
+      Store(base, list + 448, n);
+      const uint32_t from = list + 28 * n;
+      Memcpy(base, calls, entry, from, 28, f, 0x8217D21C);
+      if (LoadS(base, entry + 20) == 0) {
+        Store(base, kept_count, k + 1);
+        Memcpy(base, calls, kept + 28 * k, from, 28, f, 0x8217D24C);
+        k = Load(base, kept_count);
+      }
+    } while (Load(base, list + 448) != 0);
+  }
+  Store(base, list + 448, 0);
+  while (k != 0) {
+    k = k - 1;
+    const uint32_t at = Load(base, list + 448);
+    Store(base, kept_count, k);
+    Store(base, list + 448, at + 1);
+    Memcpy(base, calls, list + 28 * at, kept + 28 * k, 28, f, 0x8217D298);
+  }
+  return any;
 }
 
 }  // namespace front_end_car_draw

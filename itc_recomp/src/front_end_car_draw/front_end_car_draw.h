@@ -88,4 +88,25 @@ uint64_t GarageStageApplyPreset(uint8_t* base, const Calls& calls, uint64_t r3, 
 uint64_t GarageStageCommand(uint8_t* base, const Calls& calls, uint64_t r3, uint32_t command,
                             uint32_t stack);
 
+// --- The animations (garage_stage.cpp) ---
+// An entry (28 bytes): +0 the type, +4 the steps, +8 a word, +12 the
+// value's address, +16 the scene model's index, +20 done, +24 a float.
+
+// sub_82179D78 GarageAnims::Turn: the yaw at [entry + 12] + 52 less 0.5°
+// (wrapped); done (+20 = 1, returns 1) when +8 is 0 and the yaw is 0.0.
+uint32_t GarageAnimsTurn(uint8_t* base, uint32_t entry);
+// sub_82179DF0 GarageAnims::Open and sub_82179EA8 Close: the value at
+// [entry + 12] stepped up (Open) or down (Close) by the car's maximum
+// (0x82635E90 + 48 x the scene model's +48) / +4, clamped; MenuSound::Play
+// (15) on the first step (Open) or at 0.0 (Close); 1 when done. Their
+// 128- and 112-byte frames below `stack`.
+uint32_t GarageAnimsOpen(uint8_t* base, const Calls& calls, uint32_t entry, uint32_t stack);
+uint32_t GarageAnimsClose(uint8_t* base, const Calls& calls, uint32_t entry, uint32_t stack);
+// sub_8217D120 GarageAnims::Run: each entry's runner by its type (0 Turn,
+// 2 Open, 3 Close, 4 and 5 the doors' OpenDoors sub_8217B6B8 and CloseDoors
+// sub_8217B740, never seen in play: guest calls); when any finished, the
+// list rebuilt without the done ones through its 624-byte frame (memcpy,
+// as the original). Returns whether any finished.
+uint32_t GarageAnimsRun(uint8_t* base, const Calls& calls, uint32_t list, uint32_t stack);
+
 }  // namespace front_end_car_draw

@@ -104,11 +104,25 @@ void AddRanges(Outputs& out, uint8_t* base, uint32_t address, uint32_t bytes,
   }
 }
 
+// The sound manager MenuSound::Play calls through.
+constexpr uint32_t kSoundManagerPointer = 0x826C5C80;
+constexpr uint32_t kManager = 0xB000;  // the fake manager, its vtable at +0x400
+// A leaf that stores r4's low byte, r5 and r6 at r3 + 320, 332 and 336 (the
+// menu sounds' harness's recorder): the manager's slot 10, PlayCue2D.
+constexpr uint32_t kRecordR4R6 = 0x820A8420;
+
 struct Saved {
-  explicit Saved(uint8_t* base) : base(base), scene(guest::LoadU32(base, kScenePointer)) {}
-  void Restore() const { guest::StoreU32(base, kScenePointer, scene); }
+  explicit Saved(uint8_t* base)
+      : base(base),
+        scene(guest::LoadU32(base, kScenePointer)),
+        manager(guest::LoadU32(base, kSoundManagerPointer)) {}
+  void Restore() const {
+    guest::StoreU32(base, kScenePointer, scene);
+    guest::StoreU32(base, kSoundManagerPointer, manager);
+  }
   uint8_t* base;
   uint32_t scene;
+  uint32_t manager;
 };
 
 // One case through both versions: the block filled at random, `setup(t)`
@@ -123,6 +137,8 @@ void Case(Context& h, Results& results, uint32_t block, Random& r,
   const Saved saved(h.base);
   RandomBytes(h.base, block, kBlockBytes, r);
   guest::StoreU32(h.base, kScenePointer, block + kScene);
+  guest::StoreU32(h.base, block + kManager, block + kManager + 0x400);
+  guest::StoreU32(h.base, block + kManager + 0x400 + 40, kRecordR4R6);
   PPCContext start = CallContext(h);
   start.r1.u64 &= ~0xFull;
   setup(start);
@@ -132,6 +148,7 @@ void Case(Context& h, Results& results, uint32_t block, Random& r,
   for (int v = 0; v < 2; v++) {
     Write(h.base, block, inputs.data(), kBlockBytes);
     guest::StoreU32(h.base, kScenePointer, block + kScene);
+    guest::StoreU32(h.base, kSoundManagerPointer, block + kManager);
     Fill(h.base, sp - kStackBytes, kStackBytes + kArgBytes);
     PPCContext t = start;
     t.fpscr.disableFlushModeUnconditional();
@@ -434,6 +451,134 @@ void Commands(Context& h, uint32_t block, Random& r) {
   }
 }
 
+// An animation entry at `e`: `type`, its value the stage's +32 (the angles
+// at +80 for the turns), the steps mostly a command's, the index 0 to 2,
+// the word and done flag 0 or 1.
+void LayEntry(uint8_t* base, const World& w, Random& r, uint32_t e, uint32_t type) {
+  guest::StoreU32(base, e, type);
+  const float steps[] = {60.0f, 20.0f, 1.0f, 0.0f, -60.0f};
+  guest::StoreU32(base, e + 4,
+                  r.Below(6) == 0 ? RandomFloat(r)
+                                  : std::bit_cast<uint32_t>(steps[r.Below(5)]));
+  guest::StoreU32(base, e + 8, r.Below(2));
+  guest::StoreU32(base, e + 12, w.stage() + 32);
+  guest::StoreU32(base, e + 16, r.Below(3));
+  guest::StoreU32(base, e + 20, r.Below(2));
+}
+
+// The opening values: the bonnet's (+32), the doors' (+52, +56), mostly
+// within 0 to a little over the cars' maxima, now and then any float; the
+// angles; the doors' kind on the models (+3736).
+void LayValues(uint8_t* base, const World& w, Random& r) {
+  for (const uint32_t at : {32u, 52u, 56u}) {
+    guest::StoreU32(base, w.stage() + at,
+                    r.Below(5) == 0 ? RandomFloat(r)
+                                    : std::bit_cast<uint32_t>(float(r.Below(130)) / 100.0f));
+  }
+  for (uint32_t k = 0; k < 3; k++) {
+    guest::StoreU32(base, w.stage() + 80 + 4 * k, RandomAngle(r));
+  }
+  if (r.Below(3) == 0) {
+    guest::StoreFloat(base, w.stage() + 84, 0.0f);
+  }
+  for (int i = 0; i < 2; i++) {
+    guest::StoreU32(base, w.model(i) + 3736, r.Below(3));
+  }
+}
+
+FloatRanges ValueFloats(const World& w) {
+  const uint32_t s = w.stage();
+  return {{s + 32, 1}, {s + 52, 2}, {s + 80, 3}};
+}
+
+void Anims(Context& h, uint32_t block, Random& r) {
+  const uint32_t sp = CallContext(h).r1.u32 & ~0xFu;
+  struct Runner {
+    const char* name;
+    GuestFunction recompiled, native;
+    uint32_t type, saves, count;
+  };
+  const Runner runners[] = {
+      {"GarageAnims::Turn (sub_82179D78)", __imp__sub_82179D78, hooks::FrontEndCarDrawAnimsTurn,
+       0, 0, 150},
+      {"GarageAnims::Open (sub_82179DF0)", __imp__sub_82179DF0, hooks::FrontEndCarDrawAnimsOpen,
+       2, 40, 150},
+      {"GarageAnims::Close (sub_82179EA8)", __imp__sub_82179EA8,
+       hooks::FrontEndCarDrawAnimsClose, 3, 24, 150},
+  };
+  for (const Runner& runner : runners) {
+    Results results(runner.name);
+    for (uint32_t c = 0; c < runner.count; c++) {
+      World w{block};
+      Case(
+          h, results, block, r,
+          [&](PPCContext& t) {
+            w = Lay(h.base, block, r, true);
+            LayValues(h.base, w, r);
+            const uint32_t list = w.stage() + 5600;
+            LayList(h.base, w, r, 4);
+            const uint32_t e = list + 28 * r.Below(4);
+            LayEntry(h.base, w, r, e, runner.type);
+            t.r3.u64 = list;
+            t.r4.u64 = e;
+          },
+          runner.recompiled, runner.native, runner.saves,
+          [&] {
+            FloatRanges floats = ListFloats(w, sp);
+            const FloatRanges values = ValueFloats(w);
+            floats.insert(floats.end(), values.begin(), values.end());
+            return floats;
+          }(),
+          fmt::format("case {}", c));
+    }
+    results.Report();
+  }
+  {
+    Results results("GarageAnims::Run (sub_8217D120)");
+    for (int c = 0; c < 200; c++) {
+      World w{block};
+      uint32_t floor_of = 0;
+      Case(
+          h, results, block, r,
+          [&](PPCContext& t) {
+            w = Lay(h.base, block, r, true);
+            LayValues(h.base, w, r);
+            const uint32_t list = w.stage() + 5600;
+            const uint32_t count = r.Below(5) == 0 ? 0 : 1 + r.Below(12);
+            LayList(h.base, w, r, count);
+            bool doors = false;
+            for (uint32_t i = 0; i < count; i++) {
+              const uint32_t type = r.Below(8);
+              doors = doors || type == 4 || type == 5;
+              LayEntry(h.base, w, r, list + 28 * i, type);
+            }
+            // With the doors' runners (their originals on both sides,
+            // saving the callers' registers, which differ), the stack from
+            // Run's frame up.
+            floor_of = doors ? sp - 624 : sp - kStackBytes;
+            t.r3.u64 = list;
+          },
+          __imp__sub_8217D120, hooks::FrontEndCarDrawAnimsRun, 48,
+          [&] {
+            FloatRanges floats = ListFloats(w, sp);
+            const FloatRanges values = ValueFloats(w);
+            floats.insert(floats.end(), values.begin(), values.end());
+            for (const uint32_t frame : {sp - 624}) {
+              floats.push_back({frame + 84, 1});
+              floats.push_back({frame + 104, 1});
+              for (uint32_t i = 0; i < 16; i++) {
+                floats.push_back({frame + 112 + 28 * i + 4, 1});
+                floats.push_back({frame + 112 + 28 * i + 24, 1});
+              }
+            }
+            return floats;
+          }(),
+          fmt::format("case {}", c), &floor_of);
+    }
+    results.Report();
+  }
+}
+
 }  // namespace
 
 void FrontEndCarDraw(Context& h) {
@@ -442,6 +587,7 @@ void FrontEndCarDraw(Context& h) {
   const uint32_t block = (allocation + 15) & ~15u;
   Small(h, block, r);
   Commands(h, block, r);
+  Anims(h, block, r);
   memory::Free(allocation);
 }
 

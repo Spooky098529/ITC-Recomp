@@ -36,5 +36,11 @@ void FrontEndCarDrawStepAngles(PPCContext& ctx, uint8_t* base);
 void FrontEndCarDrawAnimsAdd(PPCContext& ctx, uint8_t* base);
 void FrontEndCarDrawApplyPreset(PPCContext& ctx, uint8_t* base);
 void FrontEndCarDrawCommand(PPCContext& ctx, uint8_t* base);
+// GarageAnims::Turn sub_82179D78, Open sub_82179DF0 and Close sub_82179EA8
+// (r3 the list, r4 an entry) and Run sub_8217D120 (r3 the list).
+void FrontEndCarDrawAnimsTurn(PPCContext& ctx, uint8_t* base);
+void FrontEndCarDrawAnimsOpen(PPCContext& ctx, uint8_t* base);
+void FrontEndCarDrawAnimsClose(PPCContext& ctx, uint8_t* base);
+void FrontEndCarDrawAnimsRun(PPCContext& ctx, uint8_t* base);
 
 }  // namespace hooks

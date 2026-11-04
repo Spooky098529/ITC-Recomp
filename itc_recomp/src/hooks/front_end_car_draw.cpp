@@ -18,7 +18,9 @@ ITC_FLAG_BOOL(native_front_end_car_draw, true, "ITC",
               "Plates::Hide sub_820DF190 and Show sub_820DF180, GarageStage::IsBusy "
               "sub_82179BE0, SyncPlates sub_8217AFE8, SetDrawWord sub_82178B40, StepAngles "
               "sub_82179C88, ApplyPreset sub_8217D2B0 and Command sub_82180108, and "
-              "GarageAnims::Add sub_8217F9E0, natively instead of through the translated code, "
+              "GarageAnims::Add sub_8217F9E0, Run sub_8217D120, Turn sub_82179D78, Open "
+              "sub_82179DF0 and Close sub_82179EA8 (the doors' runners left to their "
+              "originals), natively instead of through the translated code, "
               "with --native_vehicle_accessors, --native_math, --native_menu_sounds and "
               "--native_load_poll with its callees (else the originals; the same writes; "
               "checked by --run_harnesses=front_end_car_draw)");
@@ -131,6 +133,32 @@ void FrontEndCarDrawCommand(PPCContext& ctx, uint8_t* base) {
   ctx.fpscr.disableFlushMode();
 }
 
+void FrontEndCarDrawAnimsTurn(PPCContext& ctx, uint8_t* base) {
+  ctx.fpscr.disableFlushMode();
+  ctx.r3.u64 = fe::GarageAnimsTurn(base, ctx.r4.u32);
+}
+
+void FrontEndCarDrawAnimsOpen(PPCContext& ctx, uint8_t* base) {
+  ITC_FRONT_END_ORIGINAL(82179DF0)
+  const fe::Calls calls = FrontEndCarDrawCalls(ctx, base);
+  ctx.r3.u64 = fe::GarageAnimsOpen(base, calls, ctx.r4.u32, ctx.r1.u32);
+  ctx.fpscr.disableFlushMode();
+}
+
+void FrontEndCarDrawAnimsClose(PPCContext& ctx, uint8_t* base) {
+  ITC_FRONT_END_ORIGINAL(82179EA8)
+  const fe::Calls calls = FrontEndCarDrawCalls(ctx, base);
+  ctx.r3.u64 = fe::GarageAnimsClose(base, calls, ctx.r4.u32, ctx.r1.u32);
+  ctx.fpscr.disableFlushMode();
+}
+
+void FrontEndCarDrawAnimsRun(PPCContext& ctx, uint8_t* base) {
+  ITC_FRONT_END_ORIGINAL(8217D120)
+  const fe::Calls calls = FrontEndCarDrawCalls(ctx, base);
+  ctx.r3.u64 = fe::GarageAnimsRun(base, calls, ctx.r3.u32, ctx.r1.u32);
+  ctx.fpscr.disableFlushMode();
+}
+
 #undef ITC_FRONT_END_ORIGINAL
 
 }  // namespace hooks
@@ -154,3 +182,7 @@ ITC_FRONT_END_CAR_DRAW(82179C88, FrontEndCarDrawStepAngles)
 ITC_FRONT_END_CAR_DRAW(8217F9E0, FrontEndCarDrawAnimsAdd)
 ITC_FRONT_END_CAR_DRAW(8217D2B0, FrontEndCarDrawApplyPreset)
 ITC_FRONT_END_CAR_DRAW(82180108, FrontEndCarDrawCommand)
+ITC_FRONT_END_CAR_DRAW(82179D78, FrontEndCarDrawAnimsTurn)
+ITC_FRONT_END_CAR_DRAW(82179DF0, FrontEndCarDrawAnimsOpen)
+ITC_FRONT_END_CAR_DRAW(82179EA8, FrontEndCarDrawAnimsClose)
+ITC_FRONT_END_CAR_DRAW(8217D120, FrontEndCarDrawAnimsRun)
