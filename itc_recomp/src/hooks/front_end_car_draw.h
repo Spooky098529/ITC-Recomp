@@ -49,5 +49,7 @@ void FrontEndCarDrawAnimsRun(PPCContext& ctx, uint8_t* base);
 void FrontEndCarDrawApplyLightKit(PPCContext& ctx, uint8_t* base);
 void FrontEndCarDrawSetLightKit(PPCContext& ctx, uint8_t* base);
 void FrontEndCarDrawFloorDraw(PPCContext& ctx, uint8_t* base);
+// GarageStage::SetLights sub_8217BA20 (r3 the stage's lights, r4 mirrored).
+void FrontEndCarDrawSetLights(PPCContext& ctx, uint8_t* base);
 
 }  // namespace hooks

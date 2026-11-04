@@ -24,7 +24,8 @@ ITC_FLAG_BOOL(native_front_end_car_draw, true, "ITC",
               "sub_82179DF0 and Close sub_82179EA8 (the doors' runners left to their "
               "originals), GarageStage::SetLightKit sub_82179678 with "
               "SceneModel::ApplyLightKit sub_820D9D10, and Floor::Draw sub_820C8480 (with "
-              "--native_scenery_lists and the command list's diagnostics off), natively instead of through the translated code, "
+              "--native_scenery_lists and the command list's diagnostics off), "
+              "GarageStage::SetLights sub_8217BA20, natively instead of through the translated code, "
               "with --native_vehicle_accessors, --native_math, --native_menu_sounds and "
               "--native_load_poll with its callees (else the originals; the same writes; "
               "checked by --run_harnesses=front_end_car_draw)");
@@ -200,6 +201,12 @@ void FrontEndCarDrawFloorDraw(PPCContext& ctx, uint8_t* base) {
   ctx.fpscr.disableFlushMode();
 }
 
+void FrontEndCarDrawSetLights(PPCContext& ctx, uint8_t* base) {
+  ITC_FRONT_END_ORIGINAL(8217BA20)
+  ctx.r3.u64 = fe::GarageStageSetLights(base, ctx.r3.u32, ctx.r4.u32, ctx.r1.u32);
+  ctx.fpscr.disableFlushMode();
+}
+
 #undef ITC_FRONT_END_ORIGINAL
 
 }  // namespace hooks
@@ -223,6 +230,7 @@ ITC_FRONT_END_CAR_DRAW(8217D120, FrontEndCarDrawAnimsRun)
 ITC_FRONT_END_CAR_DRAW(820D9D10, FrontEndCarDrawApplyLightKit)
 ITC_FRONT_END_CAR_DRAW(82179678, FrontEndCarDrawSetLightKit)
 ITC_FRONT_END_CAR_DRAW(820C8480, FrontEndCarDrawFloorDraw)
+ITC_FRONT_END_CAR_DRAW(8217BA20, FrontEndCarDrawSetLights)
 
 // No adapters (2026-11-04: their callers in play are native, which call
 // their plain C++; the steps above are the harness's): Plates::Hide

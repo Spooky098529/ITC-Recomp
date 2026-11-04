@@ -137,4 +137,15 @@ uint64_t GarageStageSetLightKit(uint8_t* base, const Calls& calls, uint32_t hold
 uint64_t FloorDraw(uint8_t* base, const Calls& calls, uint32_t scene, uint32_t matrix,
                    uint32_t word, uint32_t caller_r24, uint32_t stack);
 
+// --- The scene lights (lights.cpp) ---
+
+// sub_8217BA20 GarageStage::SetLights: the scene lights' constants
+// (0x8265ED00, 0x8296B950 to 0x8296BCDF; docs/known-data.md) from the
+// stage's lights at `lights` (stage + 4512), y negated when `mirrored`:
+// three lights, four spots (each spot's direction normalized as the vector
+// unit does, its cone from cos, c_runtime::Cos), through its 368-byte frame
+// below `stack` as the original. Returns r3 as the original leaves it (its
+// frame's +128).
+uint32_t GarageStageSetLights(uint8_t* base, uint32_t lights, uint32_t mirrored, uint32_t stack);
+
 }  // namespace front_end_car_draw

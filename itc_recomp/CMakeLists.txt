@@ -305,6 +305,7 @@ set(ITC_SOURCES
     src/car_scene_draw/scene_draw.cpp
     src/hooks/front_end_car_draw.cpp
     src/front_end_car_draw/garage_stage.cpp
+    src/front_end_car_draw/lights.cpp
     src/hooks/race_screens.cpp
     src/race_screens/menu_list.cpp
     src/race_screens/screens.cpp
@@ -711,7 +712,7 @@ set_source_files_properties(src/c_runtime/math.cpp src/ui_movies/keys.cpp
     src/car_scene_draw/geometry.cpp src/car_scene_draw/projectors.cpp
     src/car_scene_draw/lights.cpp src/car_scene_draw/texture_projection.cpp
     src/car_scene_draw/scene_draw.cpp
-    src/front_end_car_draw/garage_stage.cpp
+    src/front_end_car_draw/garage_stage.cpp src/front_end_car_draw/lights.cpp
     src/car_sounds/x3daudio.cpp
     src/car_sounds/car_sound_3d.cpp src/car_sounds/car_sound_voices.cpp
     src/car_sounds/car_sound_parts.cpp src/xact/voices.cpp src/xact/waves.cpp

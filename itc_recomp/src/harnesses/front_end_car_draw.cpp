@@ -138,7 +138,8 @@ void Case(Context& h, Results& results, uint32_t block, Random& r,
           const std::function<void(PPCContext&)>& setup, GuestFunction recompiled,
           GuestFunction native, uint32_t saves, const FloatRanges& floats,
           const std::string& what, const uint32_t* floor = nullptr,
-          const FloatRanges& skips = {}) {
+          const FloatRanges& skips = {},
+          const std::function<void(Outputs&)>& extra = {}) {
   const Saved saved(h.base);
   RandomBytes(h.base, block, kBlockBytes, r);
   guest::StoreU32(h.base, kScenePointer, block + kScene);
@@ -165,6 +166,9 @@ void Case(Context& h, Results& results, uint32_t block, Random& r,
     const uint32_t low = floor != nullptr ? *floor : sp - kStackBytes;
     AddRanges(out[v], h.base, low, sp - saves - low, floats);
     out[v].Bytes(Read(h.base, sp, kArgBytes));
+    if (extra) {
+      extra(out[v]);
+    }
     out[v].Word(t.r1.u32);
     out[v].Word(t.r3.u32);
     out[v].Word(uint32_t(t.r3.u64 >> 32));
@@ -662,11 +666,78 @@ void LightKit(Context& h, uint32_t block, Random& r) {
   }
 }
 
+// GarageStage::SetLights: the stage's lights (stage + 4512, 1,088 bytes)
+// random, the spots' cone angles mostly in degrees; the scene lights'
+// constants compared (as floats where computed: the lights' and spots'
+// positions, the spots' directions and cones; the copies exactly) and put
+// back after each case, its frame's temporaries (floats at +80 to +143).
+void Lights(Context& h, uint32_t block, Random& r) {
+  constexpr uint32_t kGlobals = 0x8296B950, kGlobalBytes = 0x8296BCE0 - 0x8296B950;
+  constexpr uint32_t kAmbient = 0x8265ED00;
+  const std::vector<uint8_t> globals = Read(h.base, kGlobals, kGlobalBytes);
+  const std::vector<uint8_t> ambient = Read(h.base, kAmbient, 16);
+  const uint32_t sp = CallContext(h).r1.u32 & ~0xFu;
+  Results results("GarageStage::SetLights (sub_8217BA20)");
+  for (int c = 0; c < 200; c++) {
+    World w{block};
+    const uint32_t lights = block + kStage + 4512;
+    Case(
+        h, results, block, r,
+        [&](PPCContext& t) {
+          w = Lay(h.base, block, r, true);
+          // Mostly finite values, a case in four with NaNs, infinities and
+          // denormals among them.
+          const bool any = r.Below(4) == 0;
+          for (uint32_t k = 0; k < 1088 / 4; k++) {
+            guest::StoreU32(h.base, lights + 4 * k,
+                            any ? RandomFloat(r)
+                                : std::bit_cast<uint32_t>(car_draw_shared::Spread(r, 50.0f)));
+          }
+          for (uint32_t i = 0; i < 4; i++) {
+            const uint32_t q = lights + 304 + 96 * i;
+            if (r.Below(4) != 0) {
+              guest::StoreFloat(h.base, q + 64, float(r.Below(90)));
+              guest::StoreFloat(h.base, q + 68, float(r.Below(120)));
+            }
+            if (r.Below(8) == 0) {
+              // A zero-length direction.
+              for (uint32_t k = 0; k < 3; k++) {
+                guest::StoreU32(h.base, q + 16 + 4 * k, guest::LoadU32(h.base, q + 4 * k));
+              }
+            }
+          }
+          for (uint32_t k = 0; k < kGlobalBytes / 4; k++) {
+            guest::StoreU32(h.base, kGlobals + 4 * k, uint32_t(r.Next()));
+          }
+          t.r3.u64 = lights;
+          t.r4.u64 = r.Below(3) == 0 ? r.Next() : r.Below(2);
+        },
+        __imp__sub_8217BA20, hooks::FrontEndCarDrawSetLights, 208,
+        {{sp - 368 + 80, 16}},
+        fmt::format("case {}", c), nullptr, {},
+        [&](Outputs& o) {
+          o.Bytes(Read(h.base, kAmbient, 16));
+          o.Floats(h.base, 0x8296B950, 12);       // the lights' +32 (y negated)
+          o.Bytes(Read(h.base, 0x8296B980, 96));  // their +48 and +64
+          o.Floats(h.base, 0x8296B9E0, 16);       // the spots' positions
+          o.Bytes(Read(h.base, 0x8296BA20, 0x8296BBE0 - 0x8296BA20));
+          o.Floats(h.base, 0x8296BBE0, 16);       // the directions
+          o.Bytes(Read(h.base, 0x8296BC20, 0x40));
+          o.Floats(h.base, 0x8296BC60, 16);       // the cones
+          o.Bytes(Read(h.base, 0x8296BCA0, 0x8296BCE0 - 0x8296BCA0));
+        });
+  }
+  Write(h.base, kGlobals, globals.data(), kGlobalBytes);
+  Write(h.base, kAmbient, ambient.data(), 16);
+  results.Report();
+}
+
 // Floor::Draw over the model draws' world of the car draw's harness
 // (car_draw_shared: the part model at its block's +0x100, shape 1 a copy
 // of shape 0),
 // the scene 4,160 bytes before the model (so its +4572 is the model's shape
-// count, +412), camera pass 0's view-projection the identity (put back
+// count, +412), a texture provider always, camera pass 0's view-projection
+// the identity (put back
 // after, as the car draw's globals). Floor::Draw's frame compared (its
 // saved registers left out) and Model::DrawShape's back chain; not
 // Model::DrawShape's frame and below: where its plain C++ declines, its
@@ -690,6 +761,9 @@ void Floors(Context& h, Random& r) {
           // +40).
           const std::vector<uint8_t> shape0 = Read(h.base, block + 0x2000, 544);
           Write(h.base, block + 0x2000 + 544, shape0.data(), 544);
+          // Always a texture provider (the world's at +0x700): Model::DrawShape
+          // binds its textures through it.
+          guest::StoreU32(h.base, model + 48, block + 0x700);
           const uint32_t counts[] = {0, 1, 2, 2, 0xFFFFFFFFu};
           guest::StoreU32(h.base, model + 412, counts[r.Below(5)]);
           guest::StoreU32(h.base, scene + 4, r.Below(4) == 0 ? 1 : 0);
@@ -723,6 +797,7 @@ void FrontEndCarDraw(Context& h) {
   Commands(h, block, r);
   Anims(h, block, r);
   LightKit(h, block, r);
+  Lights(h, block, r);
   memory::Free(allocation);
   Floors(h, r);
 }
