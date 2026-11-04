@@ -101,5 +101,7 @@ void CarDrawWheelsDrawTireMorphed(PPCContext& ctx, uint8_t* base);
 // WheelPoints::DrawRimA (sub_820E9A28; the wheels' callees native): r3 = the
 // rim group, r4 = the camera pass, r5 = the block (r24 its first draws').
 void CarDrawWheelsDrawRimA(PPCContext& ctx, uint8_t* base);
+// WheelPoints::DrawRimAMorphed (sub_820EA148): as DrawRimA's.
+void CarDrawWheelsDrawRimAMorphed(PPCContext& ctx, uint8_t* base);
 
 }  // namespace hooks

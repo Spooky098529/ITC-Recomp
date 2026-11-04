@@ -418,6 +418,35 @@ constexpr RimALayout kRimA = {
     false,
 };
 
+constexpr RimALayout kRimAMorphed = {
+    kWheelsRimAMorphedFrame,
+    0x820EA2BC,
+    {1040, 528, 1296},
+    {0x820EA324, 0x820EA344, 0x820EA364},
+    {656, 1680, 784},
+    {0x820EA38C, 0x820EA3AC, 0x820EA3CC},
+    0x820EA3D8,
+    {0x820EA3F8, 0x820EA414, 0x820EA430, 0x820EA44C, 0x820EA468},
+    1872,
+    1936,
+    1808,
+    144,
+    160,
+    {1424, 912, 1616, 400},
+    {0x820EA630, 0x820EA654, 0x820EA674, 0x820EA694},
+    {1552, 1168, 1744, 464},
+    {0x820EA6C0, 0x820EA6E0, 0x820EA700, 0x820EA720},
+    {592, 720, 848, 976},
+    {0x820EA748, 0x820EA76C, 0x820EA78C, 0x820EA7AC},
+    {1104, 1232, 1360, 1488},
+    {0x820EA7D8, 0x820EA7F8, 0x820EA818, 0x820EA838},
+    0x820EA6A0,
+    0x820EA7B8,
+    0x820EA844,
+    {0x820EA864, 0x820EA87C, 0x820EA894, 0x820EA8AC, 0x820EA8CC},
+    true,
+};
+
 // T (+240) and the side's world (+176), fresh: the identity stvx'd at +176
 // and copied to +240, then one stvx'd at `scratch` and copied to +176.
 void RimAIdentities(uint8_t* base, uint32_t frame, uint32_t scratch) {
@@ -506,6 +535,27 @@ Left RimASides(uint8_t* base, const Calls& calls, uint32_t frame, uint32_t group
                          l.side2_draw_lrs[4]);
 }
 
+// Record `from`'s shape (the group's word at `from` + 228) toward record
+// `to`'s by the group's +16, as WheelPoints::SetUpRimA: the target's index
+// to the frame's +304, the weight to +368, Morph::SetUp into the frame's
+// +2000, then Model::MorphShape (its plain C++, else its original returning
+// to `lr`).
+void RimAMorph(uint8_t* base, const Calls& calls, uint32_t frame, uint32_t group,
+               uint32_t model, uint32_t from, uint32_t to, uint32_t lr) {
+  const uint32_t target = Load(base, group + to + 228);
+  const double weight = Lfs(base, group + 16);
+  const uint32_t shape = Load(base, group + from + 228);
+  Stfs(base, frame + 368, weight);
+  Store(base, frame + 304, target);
+  const uint32_t morph = frame + 2000;
+  second_set::MorphSetUp(base, model, morph, shape, frame + 304, frame + 368, 1);
+  const uint64_t again = Load(base, group + from + 228);
+  if (!ModelMorphShape(base, calls, model, morph, again, frame)) {
+    const uint64_t regs[3] = {model, morph, again};
+    calls.call(kMorphShape, regs, 3, frame, lr);
+  }
+}
+
 }  // namespace
 
 Left WheelsDrawRimA(uint8_t* base, const Calls& calls, uint32_t stack, uint32_t group,
@@ -514,6 +564,21 @@ Left WheelsDrawRimA(uint8_t* base, const Calls& calls, uint32_t stack, uint32_t 
   const uint32_t frame = Frame(base, stack, kWheelsRimAFrame);
   RimAIdentities(base, frame, 80);
   return RimASides(base, calls, frame, group, camera, block, caller_r24, kRimA);
+}
+
+Left WheelsDrawRimAMorphed(uint8_t* base, const Calls& calls, uint32_t stack, uint32_t group,
+                           uint32_t camera, uint32_t block, uint64_t caller_r24) {
+  ITC_NATIVE_RUNNING("sub_820EA148 WheelPoints::DrawRimAMorphed");
+  const uint32_t frame = Frame(base, stack, kWheelsRimAMorphedFrame);
+  RimAIdentities(base, frame, 304);
+  // Record 0 toward record 1 when record 0 has a model; record 2 toward
+  // record 3 on that model regardless.
+  const uint32_t model = Load(base, group + 36);
+  if (model != 0) {
+    RimAMorph(base, calls, frame, group, model, 32, 272, 0x820EA270);
+  }
+  RimAMorph(base, calls, frame, group, model, 512, 752, 0x820EA2AC);
+  return RimASides(base, calls, frame, group, camera, block, caller_r24, kRimAMorphed);
 }
 
 }  // namespace car_draw

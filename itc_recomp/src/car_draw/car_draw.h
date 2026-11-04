@@ -783,6 +783,7 @@ Left SceneTrafficDraw(uint8_t* base, const Calls& calls, uint32_t stack, uint32_
 constexpr uint32_t kWheelsTireFrame = 2032;
 constexpr uint32_t kWheelsTireMorphedFrame = 1648;
 constexpr uint32_t kWheelsRimAFrame = 2032;
+constexpr uint32_t kWheelsRimAMorphedFrame = 2256;
 
 // WheelPoints::DrawTire (sub_820E8AE8): r3 = a tire group (the point block's
 // +32 or +1872), r4 = the camera pass, r5 = the block. Side 1 (T from +1808):
@@ -826,5 +827,15 @@ Left WheelsDrawTireMorphed(uint8_t* base, const Calls& calls, uint32_t stack, ui
 // side 1's draws, the side's R (block + 144 front, + 272 rear) at side 2's.
 Left WheelsDrawRimA(uint8_t* base, const Calls& calls, uint32_t stack, uint32_t group,
                     uint32_t camera, uint32_t block, uint64_t caller_r24);
+
+// WheelPoints::DrawRimAMorphed (sub_820EA148): as DrawRimA at its own frame
+// offsets (side 2's turned world at +1872), with two morphs first, each
+// Morph::SetUp(model = [+36], the frame's +2000, base, &target (the frame's
+// +304), &weight (the group's +16 at the frame's +368), 1) and
+// Model::MorphShape (its plain C++, else its original returning to
+// 0x820EA270, 0x820EA2AC): record 0 (+260) toward record 1 (+500) when [+36]
+// isn't 0, record 2 (+740) toward record 3 (+980) regardless.
+Left WheelsDrawRimAMorphed(uint8_t* base, const Calls& calls, uint32_t stack, uint32_t group,
+                           uint32_t camera, uint32_t block, uint64_t caller_r24);
 
 }  // namespace car_draw

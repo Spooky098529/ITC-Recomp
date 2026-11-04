@@ -1,5 +1,5 @@
 // The wheels (src/car_draw/wheels.cpp, docs/functions/car-draw.md: the
-// tires, plain and morphed) against the recompiled functions, under the car_draw harness (its
+// tires and set a's rims, plain and morphed; the rims' world in RimAWorld) against the recompiled functions, under the car_draw harness (its
 // Case and model draws' world, car_draw_shared.h), with a random generator
 // of its own (so its cases don't shift the other files' inputs; it runs
 // last). The wheels in an allocation of their own: the tire group at +0x100
@@ -297,6 +297,9 @@ void WheelsDraws(Context& h, uint32_t block, uint32_t race) {
        Kind::kTireMorphed},
       {"WheelPoints::DrawRimA (sub_820E9A28)", __imp__sub_820E9A28,
        hooks::CarDrawWheelsDrawRimA, car_draw::kWheelsRimAFrame, 1904, 256, Kind::kRimA},
+      {"WheelPoints::DrawRimAMorphed (sub_820EA148)", __imp__sub_820EA148,
+       hooks::CarDrawWheelsDrawRimAMorphed, car_draw::kWheelsRimAMorphedFrame, 2128, 256,
+       Kind::kRimAMorphed},
   };
   for (const Target& target : targets) {
     Results results(target.name);
