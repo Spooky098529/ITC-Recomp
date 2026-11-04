@@ -6,6 +6,7 @@
 
 #include "base/log.h"
 #include "c_runtime/math.h"
+#include "debug/frame_state_diff.h"
 #include "car_scene_draw/ops.h"
 #include "guest.h"
 #include "load_poll/load_poll.h"
@@ -33,6 +34,9 @@ constexpr uint32_t kOpenCue = 15;             // MenuSound::Play's cue for the o
 
 constexpr uint32_t kMemcpy = 0x825A7410;
 constexpr uint32_t kTan = 0x825A8A50;
+constexpr uint32_t kApplyRecord = 0x820DCBC0;
+constexpr uint32_t kDrawShape = 0x82596B18;
+constexpr uint32_t kCameraPasses = 0x826BAC00;
 constexpr uint32_t kOpenDoors = 0x8217B6B8;
 constexpr uint32_t kCloseDoors = 0x8217B740;
 
@@ -517,6 +521,124 @@ uint32_t GarageAnimsRun(uint8_t* base, const Calls& calls, uint32_t list, uint32
     Memcpy(base, calls, list + 28 * at, kept + 28 * k, 28, f, 0x8217D298);
   }
   return any;
+}
+
+uint64_t SceneModelApplyLightKit(uint8_t* base, const Calls& calls, uint32_t model,
+                                 uint32_t stack) {
+  ITC_NATIVE_RUNNING("sub_820D9D10 SceneModel::ApplyLightKit");
+  if (LoadS(base, model + 5036) == 0 || LoadS(base, model + 32) == 3) {
+    return model;
+  }
+  const uint32_t kit = Load(base, model + 5084);
+  if (kit == 0) {
+    return 0;
+  }
+  // The tail call, inside its wrap (src/debug/frame_state_diff.cpp).
+  if (debug::IsHidden(kApplyRecord)) {
+    return kit;
+  }
+  debug::FrameStateDiff_Before(base);
+  Fpscr::setcsr(Fpscr::getcsr() & ~uint32_t(Fpscr::FlushMask));
+  const uint64_t r3 = load_poll::SceneLightsApplyRecord(base, kit, model + 4224, stack, *calls.poll);
+  Fpscr::setcsr(Fpscr::getcsr() & ~uint32_t(Fpscr::FlushMask));
+  debug::FrameStateDiff_After(base, "draw step part", kApplyRecord);
+  return r3;
+}
+
+uint64_t GarageStageSetLightKit(uint8_t* base, const Calls& calls, uint32_t holder,
+                                uint32_t group, uint32_t word, uint32_t index, double f1,
+                                double f2, double f3, uint32_t stack) {
+  ITC_NATIVE_RUNNING("sub_82179678 GarageStage::SetLightKit");
+  const uint32_t f = Frame(base, stack, 176);
+  const uint32_t m = StageModel(base, holder);
+  const uint32_t table[8] = {0, 4, 3, 5, 2, 7, 1, 6};
+  for (uint32_t i = 0; i < 8; i++) {
+    Store(base, f + 80 + 4 * i, table[i]);
+  }
+  const int32_t g = int32_t(group);
+  bool known = true;
+  switch (g) {
+    case 1:
+      Stfs(base, m + 4248, f1);
+      Store(base, m + 4244, word);
+      Stfs(base, m + 4252, f2);
+      Stfs(base, m + 4256, f3);
+      break;
+    case 2:
+      Stfs(base, m + 4264, f1);
+      Store(base, m + 4260, word);
+      Stfs(base, m + 4268, f2);
+      Stfs(base, m + 4272, f3);
+      break;
+    case 3:
+      Stfs(base, m + 4248, f1);
+      Store(base, m + 4244, word);
+      Stfs(base, m + 4252, f2);
+      Store(base, m + 4260, word);
+      Stfs(base, m + 4256, f3);
+      Stfs(base, m + 4264, f1);
+      Stfs(base, m + 4268, f2);
+      Stfs(base, m + 4272, f3);
+      [[fallthrough]];
+    case 0:
+      Stfs(base, m + 4240, f3);
+      Store(base, m + 4228, word);
+      Stfs(base, m + 4236, f2);
+      Stfs(base, m + 4232, f1);
+      break;
+    default:
+      known = false;
+      break;
+  }
+  if (known) {
+    Store(base, m + 4224, Load(base, f + 80 + (index << 2)));
+  }
+  return SceneModelApplyLightKit(base, calls, m, f);
+}
+
+uint64_t FloorDraw(uint8_t* base, const Calls& calls, uint32_t scene, uint32_t matrix,
+                   uint32_t word, uint32_t caller_r24, uint32_t stack) {
+  ITC_NATIVE_RUNNING("sub_820C8480 Floor::Draw");
+  const uint32_t f = Frame(base, stack, 144);
+  uint64_t r3 = scene;
+  if (int32_t(word) == 0 || LoadS(base, scene + 4) != 0) {
+    return r3;
+  }
+  // The last row (0, 0, 0, 1) at +80, copied as two doublewords.
+  const double zero = Lfs(base, kZero);
+  Stfs(base, f + 80, zero);
+  Stfs(base, f + 84, zero);
+  Stfs(base, f + 88, zero);
+  Stfs(base, f + 92, Lfs(base, kOne));
+  const uint32_t w0 = Load(base, f + 80), w1 = Load(base, f + 84);
+  const uint32_t w2 = Load(base, f + 88), w3 = Load(base, f + 92);
+  Store(base, matrix + 48, w0);
+  Store(base, matrix + 52, w1);
+  Store(base, matrix + 56, w2);
+  Store(base, matrix + 60, w3);
+  const int32_t count = LoadS(base, scene + 4572);
+  const uint32_t model = scene + 4160;
+  const uint32_t view_projection = kCameraPasses + 144;
+  for (int32_t i = 0; i < count; i++) {
+    // Its back chain first (as its adapter: the plain C++ writes into the
+    // frame), put back where it declines.
+    const uint32_t frame = f - scenery_lists::kModelDrawShapeFrame;
+    const uint32_t chain = Load(base, frame);
+    Store(base, frame, f);
+    const auto draw = scenery_lists::ModelDrawShape(base, calls.draw, frame, model,
+                                                    view_projection, matrix, uint32_t(i), 0, 0,
+                                                    0, caller_r24);
+    if (draw) {
+      r3 = draw->r3;
+    } else {
+      Store(base, frame, chain);
+      // Its original (through its adapter, which declines the same way),
+      // with the caller's r24 as the adapter's.
+      const uint64_t regs[7] = {model, view_projection, matrix, uint32_t(i), 0, 0, 0};
+      r3 = calls.call(kDrawShape, regs, 7, nullptr, 0, f, 0x820C8514, nullptr);
+    }
+  }
+  return r3;
 }
 
 }  // namespace front_end_car_draw

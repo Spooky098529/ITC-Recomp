@@ -6,12 +6,14 @@
 
 #include "base/flags.h"
 #include "hooks/load_poll.h"
+#include "hooks/scenery_lists.h"
 #include "load_poll/load_poll.h"
 
 ITC_FLAG_DECLARE(bool, native_vehicle_accessors);
 ITC_FLAG_DECLARE(bool, native_math);
 ITC_FLAG_DECLARE(bool, native_menu_sounds);
 ITC_FLAG_DECLARE(bool, native_load_poll);
+ITC_FLAG_DECLARE(bool, native_scenery_lists);
 
 ITC_FLAG_BOOL(native_front_end_car_draw, true, "ITC",
               "Run the front end's car draw (docs/functions/front-end-car-draw.md): so far "
@@ -20,7 +22,9 @@ ITC_FLAG_BOOL(native_front_end_car_draw, true, "ITC",
               "sub_82179C88, ApplyPreset sub_8217D2B0 and Command sub_82180108, and "
               "GarageAnims::Add sub_8217F9E0, Run sub_8217D120, Turn sub_82179D78, Open "
               "sub_82179DF0 and Close sub_82179EA8 (the doors' runners left to their "
-              "originals), natively instead of through the translated code, "
+              "originals), GarageStage::SetLightKit sub_82179678 with "
+              "SceneModel::ApplyLightKit sub_820D9D10, and Floor::Draw sub_820C8480 (with "
+              "--native_scenery_lists and the command list's diagnostics off), natively instead of through the translated code, "
               "with --native_vehicle_accessors, --native_math, --native_menu_sounds and "
               "--native_load_poll with its callees (else the originals; the same writes; "
               "checked by --run_harnesses=front_end_car_draw)");
@@ -159,6 +163,43 @@ void FrontEndCarDrawAnimsRun(PPCContext& ctx, uint8_t* base) {
   ctx.fpscr.disableFlushMode();
 }
 
+void FrontEndCarDrawApplyLightKit(PPCContext& ctx, uint8_t* base) {
+  ITC_FRONT_END_ORIGINAL(820D9D10)
+  load_poll::Calls poll = LoadPollCalls(ctx, base);
+  fe::Calls calls = FrontEndCarDrawCalls(ctx, base);
+  calls.poll = &poll;
+  ctx.r3.u64 = fe::SceneModelApplyLightKit(base, calls, ctx.r3.u32, ctx.r1.u32);
+  ctx.fpscr.disableFlushMode();
+}
+
+void FrontEndCarDrawSetLightKit(PPCContext& ctx, uint8_t* base) {
+  ITC_FRONT_END_ORIGINAL(82179678)
+  load_poll::Calls poll = LoadPollCalls(ctx, base);
+  fe::Calls calls = FrontEndCarDrawCalls(ctx, base);
+  calls.poll = &poll;
+  ctx.r3.u64 = fe::GarageStageSetLightKit(base, calls, ctx.r3.u32, ctx.r4.u32, ctx.r5.u32,
+                                          ctx.r6.u32, ctx.f1.f64, ctx.f2.f64, ctx.f3.f64,
+                                          ctx.r1.u32);
+  ctx.fpscr.disableFlushMode();
+}
+
+void FrontEndCarDrawFloorDraw(PPCContext& ctx, uint8_t* base) {
+  // Model::DrawShape's plain C++ only with its flag and without the command
+  // list's diagnostics (as its adapter).
+  if (!FrontEndCarDrawCalleesNative() || !ITC_FLAG(native_scenery_lists) ||
+      SceneryListsSlotDiagnostics()) {
+    __imp__sub_820C8480(ctx, base);
+    return;
+  }
+  ctx.fpscr.disableFlushMode();
+  SceneryDrawGuest guest{ctx, base};
+  fe::Calls calls = FrontEndCarDrawCalls(ctx, base);
+  calls.draw = SceneryListsDrawCalls(&guest);
+  ctx.r3.u64 = fe::FloorDraw(base, calls, ctx.r3.u32, ctx.r4.u32, ctx.r5.u32, ctx.r24.u32,
+                             ctx.r1.u32);
+  ctx.fpscr.disableFlushMode();
+}
+
 #undef ITC_FRONT_END_ORIGINAL
 
 }  // namespace hooks
@@ -186,3 +227,6 @@ ITC_FRONT_END_CAR_DRAW(82179D78, FrontEndCarDrawAnimsTurn)
 ITC_FRONT_END_CAR_DRAW(82179DF0, FrontEndCarDrawAnimsOpen)
 ITC_FRONT_END_CAR_DRAW(82179EA8, FrontEndCarDrawAnimsClose)
 ITC_FRONT_END_CAR_DRAW(8217D120, FrontEndCarDrawAnimsRun)
+ITC_FRONT_END_CAR_DRAW(820D9D10, FrontEndCarDrawApplyLightKit)
+ITC_FRONT_END_CAR_DRAW(82179678, FrontEndCarDrawSetLightKit)
+ITC_FRONT_END_CAR_DRAW(820C8480, FrontEndCarDrawFloorDraw)

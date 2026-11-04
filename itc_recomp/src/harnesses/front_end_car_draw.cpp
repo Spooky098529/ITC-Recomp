@@ -15,6 +15,7 @@
 // everything else exactly. The globals are put back after each case.
 
 #include "harness.h"
+#include "harnesses/car_draw_shared.h"
 
 #include "hooks/front_end_car_draw.h"
 #include "memory/heap.h"
@@ -47,6 +48,8 @@ constexpr uint32_t kParts = 0x7000;    // +176 + 4576
 constexpr uint32_t kTable = 0x9000;    // the presets' indexes (4 x 290 words)
 constexpr uint32_t kPresets = 0xA400;  // 8 presets of 64 bytes
 constexpr uint32_t kPresetCount = 8;
+constexpr uint32_t kKit = 0xBC00;      // a light kit (13,160 bytes)
+constexpr uint32_t kPool4 = 0xF000;    // its pool 4 object
 
 // Absolute guest ranges compared as floats: (address, count).
 using FloatRanges = std::vector<std::pair<uint32_t, uint32_t>>;
@@ -579,6 +582,126 @@ void Anims(Context& h, uint32_t block, Random& r) {
   }
 }
 
+// The light kit: the scene models ready or not, traffic or not, with or
+// without a light kit (its pool 4 object, no model, so
+// PartModel::SetTexture does nothing).
+void LayKit(uint8_t* base, const World& w, Random& r) {
+  for (int i = 0; i < 2; i++) {
+    const uint32_t m = w.model(i);
+    guest::StoreU32(base, m + 5036, r.Below(4) == 0 ? 0 : 1 + r.Below(3));
+    guest::StoreU32(base, m + 32, r.Below(4) == 0 ? 3 : r.Below(3));
+    guest::StoreU32(base, m + 5084, r.Below(5) == 0 ? 0 : w.block + kKit);
+  }
+  guest::StoreU32(base, w.block + kKit + 28, w.block + kPool4);
+  guest::StoreU32(base, w.block + kKit + 13152, 0);
+}
+
+FloatRanges KitFloats(const World& w) {
+  FloatRanges floats;
+  for (int i = 0; i < 2; i++) {
+    const uint32_t m = w.model(i);
+    floats.push_back({m + 4232, 3});
+    floats.push_back({m + 4248, 3});
+    floats.push_back({m + 4264, 3});
+  }
+  return floats;
+}
+
+void LightKit(Context& h, uint32_t block, Random& r) {
+  {
+    Results results("SceneModel::ApplyLightKit (sub_820D9D10)");
+    for (int c = 0; c < 80; c++) {
+      World w{block};
+      Case(
+          h, results, block, r,
+          [&](PPCContext& t) {
+            w = Lay(h.base, block, r, true);
+            LayKit(h.base, w, r);
+            t.r3.u64 = w.model(int(r.Below(2)));
+          },
+          __imp__sub_820D9D10, hooks::FrontEndCarDrawApplyLightKit, 0, KitFloats(w),
+          fmt::format("case {}", c));
+    }
+    results.Report();
+  }
+  {
+    Results results("GarageStage::SetLightKit (sub_82179678)");
+    for (int c = 0; c < 150; c++) {
+      World w{block};
+      Case(
+          h, results, block, r,
+          [&](PPCContext& t) {
+            w = Lay(h.base, block, r, true);
+            LayKit(h.base, w, r);
+            t.r3.u64 = w.holder();
+            t.r4.u64 = r.Below(8) == 0 ? r.Next() : r.Below(5);
+            t.r5.u64 = r.Next();
+            // The table's 8 words, or the word after them (unwritten): an
+            // index past 8 reads the original's saved registers (f29 on),
+            // which the plain C++ doesn't save (no caller in play passes one).
+            t.r6.u64 = r.Below(9);
+            t.f1.f64 = double(std::bit_cast<float>(RandomFloat(r)));
+            t.f2.f64 = r.Below(10) == 0 ? 1e300 : double(std::bit_cast<float>(RandomFloat(r)));
+            t.f3.f64 = double(std::bit_cast<float>(RandomFloat(r)));
+          },
+          __imp__sub_82179678, hooks::FrontEndCarDrawSetLightKit, 56, KitFloats(w),
+          fmt::format("case {}", c));
+    }
+    results.Report();
+  }
+}
+
+// Floor::Draw over the model draws' world of the car draw's harness
+// (car_draw_shared: the part model at its block's +0x100, shape 1 a copy
+// of shape 0),
+// the scene 4,160 bytes before the model (so its +4572 is the model's shape
+// count, +412), camera pass 0's view-projection the identity (put back
+// after, as the car draw's globals). Floor::Draw's frame compared (its
+// saved registers left out) and Model::DrawShape's back chain; not
+// Model::DrawShape's frame and below: where its plain C++ declines, its
+// original runs on both sides and saves Floor::Draw's registers there,
+// which differ (Model::DrawShape's own cases compare its frames).
+void Floors(Context& h, Random& r) {
+  constexpr uint32_t kBefore = 0x2000;
+  const uint32_t allocation = memory::Alloc(kBefore + kBlockBytes + 16, 0);
+  const uint32_t block = (allocation + kBefore + 15) & ~15u;
+  const uint32_t model = block + 0x100;
+  const uint32_t scene = model - 4160;
+  Results results("Floor::Draw (sub_820C8480)");
+  car_draw_shared::FloatRanges floats = car_draw_shared::AlphaFloats();
+  floats.push_back({0x500 + 48, 4});
+  for (int c = 0; c < 60; c++) {
+    car_draw_shared::Case(
+        h, results, block, r,
+        [&](PPCContext& t) {
+          car_draw_shared::ModelWorld(h, r, block, 0);
+          // Shape 1 a copy of shape 0's record (544 bytes at the model's
+          // +40).
+          const std::vector<uint8_t> shape0 = Read(h.base, block + 0x2000, 544);
+          Write(h.base, block + 0x2000 + 544, shape0.data(), 544);
+          const uint32_t counts[] = {0, 1, 2, 2, 0xFFFFFFFFu};
+          guest::StoreU32(h.base, model + 412, counts[r.Below(5)]);
+          guest::StoreU32(h.base, scene + 4, r.Below(4) == 0 ? 1 : 0);
+          car_draw_shared::StoreFloats(h.base, 0x826BAC00 + 144,
+                                       {1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1});
+          t.r3.u64 = scene;
+          t.r4.u64 = block + 0x500;
+          t.r5.u64 = r.Below(5) == 0 ? 0 : r.Next() | 1;
+          t.r24.u64 = r.Next();
+        },
+        __imp__sub_820C8480, hooks::FrontEndCarDrawFloorDraw, floats, fmt::format("case {}", c),
+        [&](const PPCContext& t, Outputs& o) {
+          const uint32_t sp = t.r1.u32;
+          o.Bytes(Read(h.base, sp - 144, 144 - 64));
+          o.Floats(h.base, sp - 64, 4);
+          o.Word(guest::LoadU32(h.base, sp - 144 - 208));
+          o.Word(guest::LoadU32(h.base, scene + 4));
+        });
+  }
+  results.Report();
+  memory::Free(allocation);
+}
+
 }  // namespace
 
 void FrontEndCarDraw(Context& h) {
@@ -588,7 +711,9 @@ void FrontEndCarDraw(Context& h) {
   Small(h, block, r);
   Commands(h, block, r);
   Anims(h, block, r);
+  LightKit(h, block, r);
   memory::Free(allocation);
+  Floors(h, r);
 }
 
 }  // namespace harness

@@ -16,6 +16,8 @@
 
 #pragma once
 
+#include "scenery_lists/scenery_lists.h"
+
 #include <cstdint>
 #include <functional>
 
@@ -42,6 +44,8 @@ struct Calls {
   // SceneModel::PollLoad's calls (hooks::LoadPollCalls), for the functions
   // that poll the scene model.
   load_poll::Calls* poll = nullptr;
+  // Model::DrawShape's guest calls (hooks::SceneryListsDrawCalls).
+  scenery_lists::DrawCalls draw;
 };
 
 // --- The number plates and the stage's small helpers (garage_stage.cpp) ---
@@ -108,5 +112,29 @@ uint32_t GarageAnimsClose(uint8_t* base, const Calls& calls, uint32_t entry, uin
 // list rebuilt without the done ones through its 624-byte frame (memcpy,
 // as the original). Returns whether any finished.
 uint32_t GarageAnimsRun(uint8_t* base, const Calls& calls, uint32_t list, uint32_t stack);
+
+// --- The light kit and the floor (garage_stage.cpp) ---
+
+// sub_820D9D10 SceneModel::ApplyLightKit (docs/functions/load-poll.md):
+// when the model is ready (+5036), not traffic and has a light kit
+// (+5084), SceneLights::ApplyRecord(kit, model + 4224) (a tail call from
+// `stack`, inside its diagnostics' wrap). Returns r3 as the original leaves
+// it (`model`, 0 for no kit, the kit when --debug_hide names ApplyRecord,
+// else ApplyRecord's).
+uint64_t SceneModelApplyLightKit(uint8_t* base, const Calls& calls, uint32_t model,
+                                 uint32_t stack);
+// sub_82179678 GarageStage::SetLightKit: the light kit's group `group` (0
+// to 3, 3 all three) set to `word` and the colors, +4224 the table's word
+// at `index` (its 176-byte frame's +80), then ApplyLightKit from its frame.
+uint64_t GarageStageSetLightKit(uint8_t* base, const Calls& calls, uint32_t holder,
+                                uint32_t group, uint32_t word, uint32_t index, double f1,
+                                double f2, double f3, uint32_t stack);
+// sub_820C8480 Floor::Draw: with `word` set and the scene's +4 0, the
+// matrix's last row (0, 0, 0, 1) (built at its 144-byte frame's +80) and
+// each shape of the part model at scene + 4160 drawn
+// (Model::DrawShape(model, 0x826BAC90, matrix, i, 0, 0, 0), `caller_r24`
+// its r24). Returns r3 as the original leaves it.
+uint64_t FloorDraw(uint8_t* base, const Calls& calls, uint32_t scene, uint32_t matrix,
+                   uint32_t word, uint32_t caller_r24, uint32_t stack);
 
 }  // namespace front_end_car_draw

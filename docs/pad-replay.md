@@ -77,7 +77,12 @@ node gets the user's ACL from udev.
   functions to run; it doesn't reproduce a drive.
 - The virtual pad is seen system-wide while a replay runs.
 - `--native_renderer_dump` slows the frames it writes, which threw a replay
-  off; replay without it.
+  off; replay without it. To dump a menu frame anyway, start the replay
+  after the dump the renderer makes on its own in the title's background
+  race (~4 s after the boot mark): `PAD_DELAY=8` (the title waits for the
+  input), then `touch <dir>/now` at the moment wanted. With
+  `race_test.jsonl`, 24.5 s after the boot mark is the tuning shop with the
+  car and its floor reflection (2026-11-04, the front end's car draw).
 
 ## Recordings
 

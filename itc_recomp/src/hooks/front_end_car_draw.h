@@ -42,5 +42,12 @@ void FrontEndCarDrawAnimsTurn(PPCContext& ctx, uint8_t* base);
 void FrontEndCarDrawAnimsOpen(PPCContext& ctx, uint8_t* base);
 void FrontEndCarDrawAnimsClose(PPCContext& ctx, uint8_t* base);
 void FrontEndCarDrawAnimsRun(PPCContext& ctx, uint8_t* base);
+// SceneModel::ApplyLightKit sub_820D9D10 (r3 the scene model),
+// GarageStage::SetLightKit sub_82179678 (r3 the holder, r4 the group, r5
+// the word, r6 the index, f1 to f3) and Floor::Draw sub_820C8480 (r3 the
+// scene, r4 the matrix, r5 the draw word; r24 handed to Model::DrawShape).
+void FrontEndCarDrawApplyLightKit(PPCContext& ctx, uint8_t* base);
+void FrontEndCarDrawSetLightKit(PPCContext& ctx, uint8_t* base);
+void FrontEndCarDrawFloorDraw(PPCContext& ctx, uint8_t* base);
 
 }  // namespace hooks
