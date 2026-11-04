@@ -29,7 +29,10 @@ file's history. What's left to see in a drive, from every run:
   `car-scene-draw-brief.md`; `itc_3444`: race 33 s, 0 errors, every
   harness 0 differing; frame dumps on and off the same 2,430 draws).
   Done.
-- Subsystem 3 of 3: being picked.
+- Subsystem 3 of 3: the front end's car draw `sub_8217FE60` (lead
+  picked, with the model draws' lead `sub_820C8480` it calls: 4 of 4
+  roots ready, 28 ready groups; `CarScene::Draw`'s caller in the front
+  end). Step: mapping, agent running.
 
 ## Done
 
