@@ -555,8 +555,8 @@ extern "C" REX_FUNC(sub_82597118) {
   }
   debug::FrameStateDiff_After(base, "draw step part", 0x82597118);
 }
-ITC_FRAME_STATE_WRAP(82597518)
-ITC_FRAME_STATE_WRAP(82597610)
+ITC_FRAME_STATE_WRAP_CAR_SCENE_DRAW(82597518, CarSceneDrawProjectorBuildOrtho)
+ITC_FRAME_STATE_WRAP_CAR_SCENE_DRAW(82597610, CarSceneDrawProjectorBuild)
 ITC_FRAME_STATE_WRAP(82598768)
 // Stages::Copy (sub_820FFD88) and List::At (sub_82593FC0) were wrapped here
 // too; their native adapters (src/hooks/vehicle_accessors.cpp) do the same.

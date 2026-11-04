@@ -146,6 +146,9 @@ void Case(Context& h, Results& results, Setup setup, Args args, GuestFunction re
     h.random = start;
     Fill(h.base, h.data, kScratchBytes);
     PPCContext t = CallContext(h);
+    // Flush-to-zero off for the inputs too (the last version run may leave
+    // it on, and it would turn a denormal float made into a double to 0).
+    t.fpscr.disableFlushModeUnconditional();
     Fill(h.base, t.r1.u32 - kStackBytes, kStackBytes);
     Blocks blocks;
     setup(blocks);
@@ -770,6 +773,76 @@ void Projectors(Context& h) {
   }
 }
 
+// The projectors: Build with the headlight's arguments (a field of view
+// around the scene's +5436, aspect and near 1.0, a far plane) and random
+// ones, BuildOrtho with the light's (width and height, near 0.0, far) and
+// random ones; special values a quarter of the time (a NaN or infinite field
+// of view sends Build to its original). Their frames' temporaries are
+// compared but not the area below them where Matrix::LookAt's temporaries
+// meet Matrix::Perspective's saved registers (not written by the plain C++)
+// in Build.
+void ProjectorBuilds(Context& h) {
+  const uint32_t out = h.data;
+  const uint32_t eye = h.data + 64;
+  const uint32_t target = h.data + 96;
+  const uint32_t up = h.data + 128;
+  for (int ortho = 0; ortho < 2; ortho++) {
+    Results results(ortho ? "Projector::BuildOrtho (sub_82597518)"
+                          : "Projector::Build (sub_82597610)");
+    const uint32_t frame = ortho ? 272 : 256;
+    for (int k = 0; k < 200; k++) {
+      double f[4];
+      Case(
+          h, results,
+          [&](Blocks&) {
+            WriteView(h, eye, target, up, k);
+            const bool special = k % 4 == 3;
+            if (ortho) {
+              f[0] = Single(special ? Value(h.random, 100.0f) : Uniform(h.random, 1.0f, 200.0f));
+              f[1] = Single(special ? Value(h.random, 100.0f) : Uniform(h.random, 1.0f, 200.0f));
+              f[2] = k % 2 == 0 ? 0.0 : Single(Uniform(h.random, -10.0f, 10.0f));
+              f[3] = Single(special ? Value(h.random, 500.0f) : Uniform(h.random, 20.0f, 500.0f));
+            } else {
+              f[0] = Single(special ? Value(h.random, 3.0f) : Uniform(h.random, 0.2f, 2.5f));
+              f[1] = k % 2 == 0 ? 1.0 : Single(Uniform(h.random, 0.5f, 2.5f));
+              f[2] = k % 2 == 0 ? 1.0 : Single(Uniform(h.random, 0.05f, 5.0f));
+              f[3] = Single(special ? Value(h.random, 500.0f) : Uniform(h.random, 20.0f, 500.0f));
+            }
+            if (k % 16 == 9) {
+              f[3] = f[2];  // no depth
+            }
+          },
+          [&](PPCContext& t) {
+            t.r3.u64 = out;
+            t.r4.u64 = eye;
+            t.r5.u64 = target;
+            t.r6.u64 = up;
+            t.f1.f64 = f[0];
+            t.f2.f64 = f[1];
+            t.f3.f64 = f[2];
+            t.f4.f64 = f[3];
+          },
+          ortho ? __imp__sub_82597518 : __imp__sub_82597610,
+          ortho ? hooks::CarSceneDrawProjectorBuildOrtho : hooks::CarSceneDrawProjectorBuild,
+          [&](Outputs& o, const PPCContext& t, Blocks& blocks) {
+            const uint32_t fr = t.r1.u32 - frame;
+            o.Floats(h.base, out, 16);
+            o.Word(Load(h.base, fr));  // the back chain
+            o.Floats(h.base, fr + 80, 32);  // the two matrices
+            if (ortho) {
+              o.Floats(h.base, fr - 32, 8);  // LookAt's temporaries
+            } else {
+              o.Word(Load(h.base, fr - 128));  // Perspective's back chain
+            }
+            o.Word(t.r3.u32);
+            blocks.Out(o);
+          },
+          fmt::format("case {}", k));
+    }
+    results.Report();
+  }
+}
+
 // --- Part 2: the root's leaves ---
 
 // A guest word put back when the scope ends.
@@ -953,6 +1026,7 @@ void CarSceneDraw(Context& h) {
   Box(h);
   Vector(h);
   Projectors(h);
+  ProjectorBuilds(h);
   Leaves(h);
 }
 
