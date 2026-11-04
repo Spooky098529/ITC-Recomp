@@ -18,8 +18,12 @@ file's history. What's left to see in a drive, from every run:
   Map checked (dcfccb78: `replay-snapshots.md`, 30 rows, all new, 26
   in play; 0 errors; 3 ready groups, `sub_821044D8`, `sub_82104AB8`,
   `sub_82104F68`; not resets: the replay's start and end snapshots;
-  the input recordings' lead taken with it). Step: migration agent
-  running.
+  the input recordings' lead taken with it). Migration
+  e9389918..1a5be4a1 (`--native_replay_snapshots`, 26 of 26 in play
+  ours, 2 adapters removed; RaceReplay's four in the `race_world`
+  harness; `itc_3484`/`itc_3486`: race 28 s (the harnesses' time), 0
+  errors, every harness 0 differing; none runs in an attract race; no
+  subagents). Step: validation agent running.
 
 ## Done
 
@@ -41,5 +45,7 @@ file's history. What's left to see in a drive, from every run:
   unknown 1767).
 - After the replay snapshots' map: ours 4099, work left 2309 (wrapped
   62, known 506, unknown 1741).
+- After its migration: ours 4125, work left 2283 (wrapped 62, known
+  480, unknown 1741).
 
 ## Stopped
