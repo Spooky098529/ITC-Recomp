@@ -2,7 +2,9 @@
 // (docs/functions/race-sounds.md), with the register steps the harness
 // shares (hooks/race_sounds.h). The handlers are reached through the race
 // mode's state machine (functors) and the callbacks through function
-// pointers, so the adapters stay.
+// pointers, so the adapters stay; PickRivalMusic's and PlayRivalMusic's
+// are gone (their callers are all native: their register steps stay for
+// the harness).
 
 #include "hooks/race_sounds.h"
 
@@ -272,8 +274,6 @@ ITC_RACE_SOUNDS(82175D48, RaceSoundsOnRollingStartDone)
 ITC_RACE_SOUNDS(82175ED0, RaceSoundsOnEffectsBankLoaded)
 ITC_RACE_SOUNDS(82176188, RaceSoundsSetUpCars)
 ITC_RACE_SOUNDS(82175F20, RaceSoundsUpdateCars)
-ITC_RACE_SOUNDS(821764F0, RaceSoundsPickRivalMusic)
-ITC_RACE_SOUNDS(821762F8, RaceSoundsPlayRivalMusic)
 ITC_RACE_SOUNDS(821769D0, RaceSoundsRaceTick)
 ITC_RACE_SOUNDS(82176F28, RaceSoundsStageTick)
 ITC_RACE_SOUNDS(82177130, RaceSoundsRollingStartTick)
