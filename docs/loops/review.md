@@ -53,6 +53,35 @@ When the user has reviewed a run's section, its heading gets
   to the original as a guest call when their plain C++ answers nullopt;
   `CarPart::Draw`'s adapter kept for the cockpit dials. The rest of the
   migration paused by the user.
+- `car-draw.md` migration, parts 2 to 16 (64ca2adf..d0f3ca85, resumed
+  2026-11-03 on `b7-loop-03-11-26`; one agent, 15 parts' subagents one
+  at a time): 78 of 78 ours (69 Native, 9 Overridden: `Car::DrawUpdate`,
+  its caller `sub_820C5DE8` recompiled; `IsNearPlayerHeight` and the
+  six `Scene*::Draw` tops, whose overrides are the frame-state wraps
+  calling the native step, their Status Wrapped -> Overridden as part
+  1's `IsNearPlayerHeight`; `CarPart::Draw` for the cockpit dials;
+  `BlinkTimers::Advance`, holding `--per_tick_blink_timers`' skip).
+  For review: left as guest calls from the native frames: the LEDs,
+  spots and `LightKit::ChaseLevel` (7, not seen in play), the morph's
+  worker job `sub_820AC7F0`, `Accessory::Draw` `820EFA78`,
+  `Dash::PoseTachometer`/`PoseDials` (through their
+  `--native_cockpit_dials` adapters, with `BlendState_SetLivePose`);
+  `Model::SkinShape` `sub_82594FD0` untouched (not seen in play).
+  `Car::DrawUpdate`'s row corrected: a car not ready after its
+  finishers returns without drawing (the map said it drew). Harness
+  choices: the lamps' command-list slots compared as Floats (a NaN
+  product is compiler-dependent); the turn at frame-80 not compared
+  (a dead slot later frames overwrite with saved registers); a gap in
+  the shadows harness world (cases drawing more from the shared Random
+  made the original read `0xA4` forever, case 70) avoided, not fixed.
+  New helpers: `Calls::call`, `call_r24`, `call_r28`, `call_r24_r28`,
+  `car_draw::Left`, `hooks::CarDraw*CalleesNative()`,
+  `PartsDrawRecord`, `StoreIdentity`, `CopyDoublewords`, the wheels'
+  layout structs, the root's Wrapped helpers repeating the callees'
+  `--debug_hide` and `--find_per_frame_state` checks. Covered only by
+  harnesses so far: the morph chain and morphed wheel draws, the
+  front-end-only draws, `DrawDigitalSpeed`, the accessory path and the
+  whole cockpit (no cockpit view in attract races).
 
 ## Run 2026-10-31 23:57 (`b7-loop-31-10-26-2`)
 

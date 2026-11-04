@@ -28,8 +28,10 @@ file's history. What's left to see in a drive, from every run:
   car_draw 0 differing). Not yet validated.
 - Resumed 2026-11-03 on `b7-loop-03-11-26`, which the user made at
   f6472b69 (the paused run's last commit) and checked out: the run goes
-  on there. Step now: the car draw's migration, parts 2 on, one
-  migration agent handing parts to subagents one at a time.
+  on there. The car draw's migration finished (2026-11-04: parts 2 to
+  16, 64ca2adf..d0f3ca85, 15 subagents one at a time; 78 of 78 ours,
+  every harness 0 differing, races 30-37 s, 0 errors). Step now: the
+  validation agent (part 1's functions and every removal included).
 - **To pick up** (the user's call, 2026-11-01: the next loop continues
   this run on this branch, not a new one): start a migration agent for
   the rest of `car-draw.md` (71 of the group's 78 left, still one ready
@@ -103,6 +105,9 @@ file's history. What's left to see in a drive, from every run:
 - After the car draw's first part and `Matrix::Shadow`'s removal
   (`itc_3228`: race 38 s, 0 errors, car_draw 0 differing): ours 3988,
   work left 2417 (wrapped 78, known 546, unknown 1793).
+- After the car draw's migration (`itc_3409`: race 33 s, 0 errors,
+  car_draw 0 differing): ours 4059, work left 2346 (wrapped 71, known
+  482, unknown 1793).
 
 ## Stopped
 
