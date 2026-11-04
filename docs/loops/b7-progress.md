@@ -20,7 +20,10 @@ file's history. What's left to see in a drive, from every run:
   s, 0 errors, race_flow 12 cases 0 differing; no subagents). Done.
 - Subsystem 2 of 3: the car scene's draw `sub_820C5DE8` (lead picked:
   runs every frame, 11 ready groups under it, 21 functions left in its
-  subtree; the thirtieth run's car draw waits on it). Step: mapping,
+  subtree; the thirtieth run's car draw waits on it). Map checked
+  (c98bcea2: `car-scene-draw.md`, 21 rows, 11 moved from
+  `functions.md`; 0 errors; 11 ready groups; 9 Wrapped by
+  `frame_state_diff.cpp`, kept around native bodies). Step: migration,
   agent running.
 
 ## Done
@@ -53,3 +56,5 @@ file's history. What's left to see in a drive, from every run:
 - After its validation (`itc_3418`, 120 s: race 49 s, 0 errors, every
   harness 0 differing but the expected groups): ours 4060, work left
   2345.
+- After the car scene's draw's map: ours 4060, work left 2345
+  (wrapped 71, known 492, unknown 1782).
