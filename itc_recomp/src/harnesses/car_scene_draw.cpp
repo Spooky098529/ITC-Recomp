@@ -1169,6 +1169,9 @@ void Fit(Context& h) {
 
 }  // namespace
 
+// The root's cases (car_scene_draw_root.cpp).
+void CarSceneDrawRoot(Context& h);
+
 void CarSceneDraw(Context& h) {
   Planes(h);
   Frustum(h);
@@ -1178,6 +1181,7 @@ void CarSceneDraw(Context& h) {
   ProjectorBuilds(h);
   Leaves(h);
   Fit(h);
+  CarSceneDrawRoot(h);
 }
 
 }  // namespace harness

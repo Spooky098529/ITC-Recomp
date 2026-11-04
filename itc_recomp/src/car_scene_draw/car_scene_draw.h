@@ -227,8 +227,10 @@ struct SceneDrawFrame {
 // path; for each scene model in use with a car model, the other cars'
 // headlight slots in the second path with the scene's +5052 0, the render
 // queue's keys and the mask set around Car::DrawUpdate), and pass 0's
-// view-projection put back. Leaves flush-to-zero off.
-void CarSceneDraw(uint8_t* base, const SceneDrawCalls& calls, uint32_t stack, uint32_t scene,
-                  uint32_t matrix);
+// view-projection put back. Leaves flush-to-zero off. Returns the original's
+// r3 (the scene when its +0 is 4, else Matrix::Copy's destination, pass 0's
+// +144; no caller reads it).
+uint32_t CarSceneDraw(uint8_t* base, const SceneDrawCalls& calls, uint32_t stack, uint32_t scene,
+                      uint32_t matrix);
 
 }  // namespace car_scene_draw

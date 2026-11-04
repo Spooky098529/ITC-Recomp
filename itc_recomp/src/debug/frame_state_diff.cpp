@@ -452,7 +452,6 @@ void Vec4Transform(uint8_t* base, uint32_t out, uint32_t m, uint32_t v) {
   }
 ITC_FRAME_STATE_WRAP_RECORDS(8209F8A0, hooks::CameraPassesRecordBegins)
 ITC_FRAME_STATE_WRAP_RECORDS(8209F900, hooks::CameraPassesRecordEnds)
-ITC_FRAME_STATE_WRAP(820C5DE8)
 ITC_FRAME_STATE_WRAP(820F6068)
 ITC_FRAME_STATE_WRAP(82130978)
 // The render orchestrator's (sub_820C5DE8) callees. The camera passes'
@@ -535,6 +534,9 @@ extern "C" REX_FUNC(sub_820AB560) {
     }                                                                 \
     debug::FrameStateDiff_After(base, "draw step part", 0x##address); \
   }
+// CarScene::Draw, the root (it calls its callees' plain C++ inside the same
+// checks as their wraps).
+ITC_FRAME_STATE_WRAP_CAR_SCENE_DRAW(820C5DE8, CarSceneDrawRoot)
 ITC_FRAME_STATE_WRAP_CAR_SCENE_DRAW(820C4EB8, CarSceneDrawSetLight)
 ITC_FRAME_STATE_WRAP_CAR_SCENE_DRAW(820C4FB8, CarSceneDrawPlayerModel)
 ITC_FRAME_STATE_WRAP_CAR_SCENE_DRAW(820DAA38, CarSceneDrawBeamColor)

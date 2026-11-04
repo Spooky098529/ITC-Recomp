@@ -9,6 +9,15 @@
 #include "hooks/car_draw.h"
 
 ITC_FLAG_DECLARE(bool, native_car_draw);
+ITC_FLAG_DECLARE(bool, native_models);
+ITC_FLAG_DECLARE(bool, native_matrix_math);
+ITC_FLAG_DECLARE(bool, native_vehicle_accessors);
+// The command list's diagnostics (blend_state.cpp) see who allocates slots:
+// with any of them on, the root runs the original (as the cameras'
+// recording does).
+ITC_FLAG_DECLARE(bool, log_overlay_uploads);
+ITC_FLAG_DECLARE(bool, log_slot_callers);
+ITC_FLAG_DECLARE(bool, log_recording_by_pass);
 
 ITC_FLAG_BOOL(native_car_scene_draw, true, "ITC",
               "Run the car scene's draw (docs/functions/car-scene-draw.md): so far "
@@ -21,9 +30,11 @@ ITC_FLAG_BOOL(native_car_scene_draw, true, "ITC",
               "sub_82597378, Matrix::Perspective sub_825972A8, Projector::Build sub_82597610 and "
               "BuildOrtho sub_82597518, ScenePass::SetLight sub_820C4EB8, SceneModel::BeamColor "
               "sub_820DAA38, Beam sub_820DAAC8 and BeamShape sub_820DAB10, "
-              "CarScene::PlayerModel sub_820C4FB8 and TextureProjection::Fit sub_82598768 (the "
-              "wrapped ones inside their "
-              "--find_per_frame_state wraps), natively instead of "
+              "CarScene::PlayerModel sub_820C4FB8, TextureProjection::Fit sub_82598768 and the "
+              "root CarScene::Draw sub_820C5DE8 (the wrapped ones inside their "
+              "--find_per_frame_state wraps; the root with --native_models, "
+              "--native_matrix_math and --native_vehicle_accessors and the command list's "
+              "diagnostics off, else its original), natively instead of "
               "through the translated code (the same writes; checked by "
               "--run_harnesses=car_scene_draw)");
 
@@ -256,6 +267,25 @@ car_scene_draw::SceneDrawCalls CarSceneDrawRootCalls(PPCContext& ctx, uint8_t* b
     ctx.fpscr.disableFlushMode();
   };
   return calls;
+}
+
+void CarSceneDrawRoot(PPCContext& ctx, uint8_t* base) {
+  // The callees' fallbacks the car draw also declines on (its
+  // CarDraw*CalleesNative), and the command list's diagnostics.
+  if (!ITC_FLAG(native_models) || !ITC_FLAG(native_matrix_math) ||
+      !ITC_FLAG(native_vehicle_accessors) || ITC_FLAG(log_overlay_uploads) ||
+      ITC_FLAG(log_slot_callers) || ITC_FLAG(log_recording_by_pass)) {
+    __imp__sub_820C5DE8(ctx, base);
+    return;
+  }
+  ctx.fpscr.disableFlushMode();
+  const uint64_t lr = ctx.lr;
+  const car_scene_draw::SceneDrawCalls calls = CarSceneDrawRootCalls(ctx, base);
+  const uint32_t r3 =
+      car_scene_draw::CarSceneDraw(base, calls, ctx.r1.u32, ctx.r3.u32, ctx.r4.u32);
+  ctx.lr = lr;
+  ctx.r3.u64 = r3;
+  ctx.fpscr.disableFlushMode();
 }
 
 }  // namespace hooks

@@ -512,6 +512,7 @@ set(ITC_SOURCES
     src/harnesses/race_hud_machine.cpp
     src/harnesses/race_flow.cpp
     src/harnesses/car_scene_draw.cpp
+    src/harnesses/car_scene_draw_root.cpp
     src/harnesses/race_screens.cpp
     src/harnesses/menu_sounds.cpp
     src/harnesses/accessories.cpp

@@ -1111,15 +1111,15 @@ void SceneDraw::End() {
 
 }  // namespace
 
-void CarSceneDraw(uint8_t* base, const SceneDrawCalls& calls, uint32_t stack, uint32_t scene,
-                  uint32_t matrix) {
+uint32_t CarSceneDraw(uint8_t* base, const SceneDrawCalls& calls, uint32_t stack, uint32_t scene,
+                      uint32_t matrix) {
   ITC_NATIVE_RUNNING("sub_820C5DE8 CarScene::Draw");
   const uint32_t f = stack - kSceneDrawFrame;
   Store(base, f, stack);  // the back chain, as stwu
   const int32_t state = LoadS(base, scene + 0);
   Store(base, f + 1716, scene);
   if (state == 4) {
-    return;
+    return scene;  // r3 as it came
   }
   SceneDraw draw(base, calls, f, scene);
   draw.SetUp(matrix);
@@ -1133,6 +1133,8 @@ void CarSceneDraw(uint8_t* base, const SceneDrawCalls& calls, uint32_t stack, ui
   draw.PassLoop(frame.second_path, r24);
   draw.End();
   FlushOff();
+  // r3 as Matrix::Copy leaves it: its destination, pass 0's view-projection.
+  return Load(base, f + 88) + 144;
 }
 
 }  // namespace car_scene_draw
