@@ -11,10 +11,8 @@
 
 namespace hooks {
 
-// Part 1: TextureProjection::Fit's geometry library (its only caller, Fit
-// sub_82598768, still recompiled). Intersect3's, Extend's, Size's, Insert's,
-// InsertN's and Allocate's steps have no adapter (their callers in play are
-// native): the harness's.
+// Part 1: TextureProjection::Fit's geometry library. None of these has an
+// adapter (their callers in play are native): the harness's steps.
 // Frustum::FromMatrix sub_82597878: r3 = the frustum, r4 = the matrix.
 void CarSceneDrawFrustumFromMatrix(PPCContext& ctx, uint8_t* base);
 // Plane::Intersect3 sub_825976C8: r3 = out, r4, r5, r6 = the planes.
@@ -38,10 +36,10 @@ void CarSceneDrawVector16InsertN(PPCContext& ctx, uint8_t* base);
 void CarSceneDrawVector16Allocate(PPCContext& ctx, uint8_t* base);
 
 // Part 2: the projectors and the root's leaves. Matrix::LookAt sub_82597378
-// (r3 = out, r4 = eye, r5 = target, r6 = up; no adapter: its callers are
-// native, the harness's step) and Matrix::Perspective
+// (r3 = out, r4 = eye, r5 = target, r6 = up) and Matrix::Perspective
 // sub_825972A8 (r3 = out, f1 to f4 = field of view, aspect, near, far; r3
-// as it was: the original's is tan's _ctrlfp word, read by no caller).
+// as it was: the original's is tan's _ctrlfp word, read by no caller); no
+// adapters (their callers are native): the harness's steps.
 void CarSceneDrawLookAt(PPCContext& ctx, uint8_t* base);
 void CarSceneDrawPerspective(PPCContext& ctx, uint8_t* base);
 // The wrapped ones (their wraps in src/debug/frame_state_diff.cpp call

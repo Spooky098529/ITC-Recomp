@@ -187,28 +187,11 @@ void CarSceneDrawTextureProjectionFit(PPCContext& ctx, uint8_t* base) {
 
 }  // namespace hooks
 
-// The adapters: TextureProjection::Fit (recompiled) calls them. None for
-// Plane::Intersect3, Box::Extend, Vector16::Size, Vector16::Insert, InsertN
-// and Allocate (removed 2026-11-04: in play only Frustum::FromMatrix's,
-// Box::FromPoints', PushBack's and their callees' plain C++ call them; their
-// register steps above stay for the harness).
-#define ITC_CAR_SCENE_DRAW_ADAPTER(address, step) \
-  extern "C" REX_FUNC(sub_##address) {            \
-    REX_FUNC_PROLOGUE();                          \
-    if (!ITC_FLAG(native_car_scene_draw)) {       \
-      __imp__sub_##address(ctx, base);            \
-      return;                                     \
-    }                                             \
-    hooks::step(ctx, base);                       \
-  }
-
-ITC_CAR_SCENE_DRAW_ADAPTER(82597878, CarSceneDrawFrustumFromMatrix)
-ITC_CAR_SCENE_DRAW_ADAPTER(82597E58, CarSceneDrawPlaneSegmentCrossing)
-ITC_CAR_SCENE_DRAW_ADAPTER(82597210, CarSceneDrawBoxFromPoints)
-ITC_CAR_SCENE_DRAW_ADAPTER(825986B8, CarSceneDrawVector16PushBack)
-// Part 2: Matrix::Perspective's (TextureProjection::Fit, recompiled, calls
-// it). None for Matrix::LookAt (removed 2026-11-04: its callers in play,
-// Projector::Build and BuildOrtho, call its plain C++; its register step
-// above stays for the harness). The wrapped ones are in
-// src/debug/frame_state_diff.cpp (ITC_FRAME_STATE_WRAP_CAR_SCENE_DRAW).
-ITC_CAR_SCENE_DRAW_ADAPTER(825972A8, CarSceneDrawPerspective)
+// No REX_FUNC adapters are left here (all removed 2026-11-04 once their
+// callers in play were native: Frustum::FromMatrix, Plane::SegmentCrossing,
+// Box::FromPoints, Vector16::PushBack and Matrix::Perspective are called by
+// TextureProjection::Fit's and Projector::Build's plain C++, Plane::Intersect3,
+// Box::Extend, Vector16::Size, Insert, InsertN and Allocate by their callees'
+// and Matrix::LookAt by the projectors'). The register steps above stay for
+// the harness and the wraps: the wrapped functions' are called by their wraps
+// in src/debug/frame_state_diff.cpp (ITC_FRAME_STATE_WRAP_CAR_SCENE_DRAW).
