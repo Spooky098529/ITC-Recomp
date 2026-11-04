@@ -11,6 +11,8 @@ functions to check in a drive in the progress file.
 When the user has reviewed a run's section, its heading gets
 "(reviewed <date>)"; the section stays for the record.
 
+## Run 2026-11-04 19:51 (`b7-loop-03-11-26`, continued)
+
 ## Run 2026-11-04 08:44 (`b7-loop-03-11-26`)
 
 - Leads deleted as covered: the containers (`sub_82093400` and the rest, all in `framework.md`, `screen-objects.md`, `app-states.md`, `models.md`, `input.md`) and the route's users in the race states (`sub_82162330` and the rest, all in `race-states.md`).
