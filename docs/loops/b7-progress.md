@@ -27,6 +27,11 @@ file's history. What's left to see in a drive, from every run:
   harness lines, every harness 0 differing but the expected groups);
   none ran in the race or the replay `itc_3488` (ok): 26 to drive.
   Done.
+- Subsystem 2 of 3: the race's sounds (lead picked: the race's sound
+  handlers `sub_82175908` and the rest, 8 of 8 ready, all in play,
+  with the readers of the scene models' sound slots `sub_82175F20`,
+  `sub_82176188` beside them, 2 of 2 ready; both lines deleted from
+  `leads.md`). Step: mapping agent running.
 
 ## Done
 
