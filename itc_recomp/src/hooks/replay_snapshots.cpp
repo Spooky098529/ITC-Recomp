@@ -20,7 +20,7 @@ ITC_FLAG_BOOL(native_replay_snapshots, true, "ITC",
               "sub_821046F8 and RestoreEnd sub_82104898, the last three only while "
               "--native_heap routes the game's heap to the allocation layer) "
               "natively instead of through the translated code (the same writes; checked by "
-              "--run_harnesses=replay_snapshots)");
+              "--run_harnesses=replay_snapshots, RaceReplay's four by race_world)");
 
 namespace hooks {
 
@@ -80,16 +80,6 @@ replay_snapshots::ReplayCalls ReplayCalls(PPCContext& ctx, uint8_t* base, uint32
 
 }  // namespace
 
-void Record5232Restore(PPCContext& ctx, uint8_t* base) {
-  ctx.fpscr.disableFlushMode();
-  ctx.r3.u64 = replay_snapshots::Record5232Restore(base, ctx.r3.u32, ctx.r4.u32);
-}
-
-void RaceSnapshotSave(PPCContext& ctx, uint8_t* base) {
-  ctx.fpscr.disableFlushMode();
-  ctx.r3.u64 = replay_snapshots::RaceSnapshotSave(base, ctx.r3.u32);
-}
-
 void ReplayKeep(PPCContext& ctx, uint8_t* base) {
   ctx.fpscr.disableFlushMode();
   ctx.r3.u64 = replay_snapshots::ReplayKeep(
@@ -145,25 +135,9 @@ bool Native() {
 }  // namespace
 
 // The adapters: the register steps above, or the original.
-// Callers: RaceReplay::SaveStart, RestoreStart, RestoreEnd (recompiled).
-extern "C" REX_FUNC(sub_821044D8) {
-  REX_FUNC_PROLOGUE();
-  if (!Native()) {
-    __imp__sub_821044D8(ctx, base);
-    return;
-  }
-  hooks::Record5232Restore(ctx, base);
-}
-
-// Callers: RaceReplay::SaveStart, SaveEnd (recompiled).
-extern "C" REX_FUNC(sub_82104AB8) {
-  REX_FUNC_PROLOGUE();
-  if (!Native()) {
-    __imp__sub_82104AB8(ctx, base);
-    return;
-  }
-  hooks::RaceSnapshotSave(ctx, base);
-}
+// Record5232::Restore sub_821044D8 and RaceSnapshot::Save sub_82104AB8 have
+// none: their callers in play, RaceReplay's four functions, are native and
+// call their plain C++.
 
 // Caller: RaceStates::OnRaceEnd (recompiled).
 extern "C" REX_FUNC(sub_82104F68) {

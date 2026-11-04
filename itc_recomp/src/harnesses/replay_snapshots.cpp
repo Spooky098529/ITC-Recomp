@@ -1,7 +1,8 @@
 // The replay's snapshots (src/replay_snapshots/,
 // docs/functions/replay-snapshots.md) against the recompiled functions. The
 // original runs with --native_replay_snapshots off, the plain C++ through
-// the register steps (hooks/replay_snapshots.h). Every block is filled with
+// the register steps (hooks/replay_snapshots.h, or below for the functions
+// whose adapters went). Every block is filled with
 // the same random words for both sides (NaN and infinity words planted
 // among them), and every block, the scratch area and r3 are compared
 // exactly (the lfs and stfs pairs keep the words' bits in both).
@@ -61,6 +62,17 @@ struct Block {
   uint32_t address;
 };
 
+// Record5232::Restore's and RaceSnapshot::Save's register steps (their
+// adapters removed: their callers in play are native).
+void NativeRecord5232Restore(PPCContext& ctx, uint8_t* base) {
+  ctx.fpscr.disableFlushMode();
+  ctx.r3.u64 = rs::Record5232Restore(base, ctx.r3.u32, ctx.r4.u32);
+}
+void NativeRaceSnapshotSave(PPCContext& ctx, uint8_t* base) {
+  ctx.fpscr.disableFlushMode();
+  ctx.r3.u64 = rs::RaceSnapshotSave(base, ctx.r3.u32);
+}
+
 // Random words, with NaNs (quiet and signaling, either sign) and
 // infinities planted at random words.
 void WriteRandom(uint8_t* base, uint32_t address, uint32_t bytes, Random& r) {
@@ -110,7 +122,7 @@ void Restores(Context& h) {
         __imp__sub_821044D8(t, h.base);
         ITC_FLAG(native_replay_snapshots) = true;
       } else {
-        hooks::Record5232Restore(t, h.base);
+        NativeRecord5232Restore(t, h.base);
       }
       for (const Block* b : blocks) {
         out[v].Bytes(Read(h.base, b->address, b->bytes));
@@ -212,7 +224,7 @@ void SnapshotSaves(Context& h) {
           __imp__sub_82104AB8(t, h.base);
           ITC_FLAG(native_replay_snapshots) = true;
         } else {
-          hooks::RaceSnapshotSave(t, h.base);
+          NativeRaceSnapshotSave(t, h.base);
         }
       }
       out[v].Bytes(Read(h.base, snapshot.address, snapshot.bytes));
