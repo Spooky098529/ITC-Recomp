@@ -296,6 +296,9 @@ set(ITC_SOURCES
     src/race_hud_machine/race_hud_machine_init.cpp
     src/hooks/race_flow.cpp
     src/race_flow/race_flow_init.cpp
+    src/hooks/race_loading.cpp
+    src/race_loading/race_loading.cpp
+    src/race_loading/race_loading_init.cpp
     src/hooks/car_scene_draw.cpp
     src/car_scene_draw/geometry.cpp
     src/car_scene_draw/vector16.cpp
@@ -524,6 +527,7 @@ set(ITC_SOURCES
     src/harnesses/race_scene.cpp
     src/harnesses/race_hud_machine.cpp
     src/harnesses/race_flow.cpp
+    src/harnesses/race_loading.cpp
     src/harnesses/car_scene_draw.cpp
     src/harnesses/car_scene_draw_root.cpp
     src/harnesses/front_end_car_draw.cpp
