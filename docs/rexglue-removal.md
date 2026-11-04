@@ -2720,6 +2720,7 @@ B7. **The game logic inside**: everything else, subsystem by subsystem,
 | 2026-11-01 | The scene models' load poll (`SceneModel::PollLoad`: each part's finisher, the ready flags, the palettes and paint applied once; `SceneParts::Build`, `SceneInterior::SetGauges`) | `load-poll.md` | 31 of 32 (one migration; `ApplyLightKit` is the front end's) | `--native_load_poll` |
 | 2026-11-01 | The boot mode (mode type 3: the movie list at `0x826C5BAC` played through its state machine at +848, `BootMode::Init`, `NextMode`, the destructors, `Boot::StartMovie`, `WaitForMovie` (inside `title_screen.cpp`'s `--skip_intro` wrap, kept) and `EndMovie` with the movie class's state calls; `ScreenMachine::ScreenMachine`, the mode delegate's thunk) | `boot-mode.md` | 12 of 12 in play (one migration; with 7 movie calls in `movies.md`; the rest never ran: the +32 interface's slots, the type 8 mode, the app's shut-down) | `--native_boot_mode` |
 | 2026-11-04 | The car draw (`Car::DrawUpdate` `sub_820DAC68` and the scene model's per-pass draws: the cockpit, the light kit, the parts with their lamps, doors and shadows, the interior, the traffic car, the wheels with their morphs, the shared `Model::Draw`, `CarPart::Draw`, `CarLighting::Gather` and the morph chain) | `car-draw.md` | 78 of 78 (16 parts, one subagent each, one at a time; 69 Native, 9 Overridden for their recompiled caller, the frame-state wraps, the cockpit dials and `--per_tick_blink_timers`) | `--native_car_draw` |
+| 2026-11-04 | The race flow's set-up (`RaceFlow::Init` `sub_82160AE0`, from `RaceMode::Init`: the race flow's state and players, its 53 transitions registered through `StateMachine::Add`, the functors' stack leftovers replayed in the original's frame) | `race-flow.md` | 1 of 1 in play (one migration; the four handlers it registers that never ran stay recompiled) | `--native_race_flow` |
 
     The first run (2026-10-22, branch `b7-loop-test`): every harness at 0 differing, attract races at 20-21 s with no errors,
     and a race the user drove looked right. Ours went from 162 to 335 (work
@@ -4441,3 +4442,16 @@ limit. The boundary: 449 functions (916 pairs): overridden 108, Native
 34, Dropped 26, never called 70, live 211. Imports: 186 called, 56 with
 a live caller. B7 (`b7_status.py`): ours 4,059, work left 2,346
 (Wrapped 71, with a row 482, no row yet 1,793), from 2,424.
+
+**2026-11-04, the race flow's set-up (branch `b7-loop-03-11-26`):** the
+thirty-first run's first subsystem (`race-flow.md`,
+`--native_race_flow`, `src/race_flow/`): `RaceFlow::Init`, one function
+of 1,661 lines, made native in one migration by replaying its 562
+stores and copies into the original's 3,600-byte frame from a table
+(as `RaceHudMachine::Init`); its adapter stays until `RaceMode::Init`
+is ours. The registration helpers and the handlers seen in play were
+already in other files. The boundary: 449 functions (916 pairs):
+overridden 108, Native 34, Dropped 26, never called 70, live 211.
+Imports: 186 called, 56 with a live caller. B7 (`b7_status.py`): ours
+4,060, work left 2,345 (Wrapped 71, with a row 482, no row yet 1,792),
+from 2,346.
