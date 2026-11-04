@@ -22,9 +22,30 @@
 
 namespace car_draw {
 
-namespace {
-
 using namespace camera_modes::steps;
+
+// The identity's four rows (vupkd3d of zeros and its shuffles), stored as
+// stvx stores them.
+void StoreIdentity(uint8_t* base, uint32_t at) {
+  constexpr uint32_t kOneBits = 0x3F800000;
+  for (uint32_t row = 0; row < 4; row++) {
+    Stvx(base, at + 16 * row,
+         VectorOf(row == 0 ? kOneBits : 0, row == 1 ? kOneBits : 0, row == 2 ? kOneBits : 0,
+                  row == 3 ? kOneBits : 0));
+  }
+}
+
+// `bytes` from `from` to `to`, doubleword by doubleword in order (ld, std).
+void CopyDoublewords(uint8_t* base, uint32_t to, uint32_t from, uint32_t bytes) {
+  for (uint32_t i = 0; i < bytes; i += 8) {
+    const uint32_t hi = guest::LoadU32(base, from + i);
+    const uint32_t lo = guest::LoadU32(base, from + i + 4);
+    guest::StoreU32(base, to + i, hi);
+    guest::StoreU32(base, to + i + 4, lo);
+  }
+}
+
+namespace {
 
 constexpr uint32_t kScene = 0x826C2E44;
 constexpr uint32_t kCullFlip = 0x826C5104;
@@ -32,7 +53,6 @@ constexpr uint32_t kOne = 0x82000A30;    // 1.0
 constexpr uint32_t kZero = 0x82000A34;   // 0.0
 constexpr uint32_t kHalf = 0x82001BE4;   // 0.5
 constexpr uint32_t kTwo = 0x820021E8;    // 2.0
-constexpr uint32_t kOneBits = 0x3F800000;
 constexpr uint32_t kTransposeRotation = 0x820D1CB0;
 constexpr uint32_t kSetMaterials = 0x820D3318;
 constexpr uint32_t kProjectorMatrices = 0x820D1EB8;
@@ -79,24 +99,11 @@ simde__m128 Lvx(uint8_t* base, uint32_t address) {
   return VectorOf(Load(base, at), Load(base, at + 4), Load(base, at + 8), Load(base, at + 12));
 }
 
-// The identity's four rows (vupkd3d of zeros and its shuffles), stored as
-// stvx stores them.
 void Identity(uint8_t* base, uint32_t at) {
-  for (uint32_t row = 0; row < 4; row++) {
-    Stvx(base, at + 16 * row,
-         VectorOf(row == 0 ? kOneBits : 0, row == 1 ? kOneBits : 0, row == 2 ? kOneBits : 0,
-                  row == 3 ? kOneBits : 0));
-  }
+  StoreIdentity(base, at);
 }
-
-// `bytes` from `from` to `to`, doubleword by doubleword in order (ld, std).
 void Copy(uint8_t* base, uint32_t to, uint32_t from, uint32_t bytes) {
-  for (uint32_t i = 0; i < bytes; i += 8) {
-    const uint32_t hi = Load(base, from + i);
-    const uint32_t lo = Load(base, from + i + 4);
-    Store(base, to + i, hi);
-    Store(base, to + i + 4, lo);
-  }
+  CopyDoublewords(base, to, from, bytes);
 }
 
 // An identity built at `at` and copied to `to` (the original's fresh
@@ -251,36 +258,34 @@ Left GlowDraw(uint8_t* base, const Calls& calls, uint32_t frame, uint32_t model,
 
 // --- The tail lights ---
 
-Left PartsDrawTailLights(uint8_t* base, const Calls& calls, uint32_t stack, uint32_t group,
-                         uint32_t block, uint32_t pass, uint32_t caller_r24,
-                         uint32_t caller_r28) {
-  ITC_NATIVE_RUNNING("sub_820DF8B0 PartsPoints::DrawTailLights");
-  const uint32_t frame = Frame(base, stack, kPartsTailLightsFrame);
-  const uint32_t vp = pass + 144, world = block + 16;
-  auto lamp = [&](uint32_t record, uint32_t lr) {
-    return PartsDrawRecord(base, calls, frame, group + record, vp, world, 0, caller_r24,
-                           caller_r28, lr);
-  };
-  Left left;
-  // The lamps: on, brake, reversing, the winkers; the cover.
-  if (Bits(base, block) & 0x1) {
-    lamp(1920, 0x820DF900);
-  }
-  if (Bits(base, block) & 0x8) {
-    lamp(2160, 0x820DF928);
-  }
-  if (Bits(base, block) & 0x10) {
-    lamp(2400, 0x820DF950);
-  }
-  if (Bits(base, block) & 0x2) {
-    lamp(2640, 0x820DF978);
-  }
-  if (Bits(base, block) & 0x4) {
-    lamp(2880, 0x820DF9A0);
-  }
-  CoverAlpha(base, group + 3120, block, frame);
-  lamp(3120, 0x820DF9D0);
+namespace {
 
+// The tail lights' glows' call sites (the parts' and the traffic's), in
+// order.
+struct TailSites {
+  uint32_t view, color_memcpy, color, multiply1, copy1, multiply2, copy2, copy_world,
+      memcpy_world, project, multiply3, multiply4, copy3, multiply5, multiply6, copy4, fade_draw,
+      draw;
+};
+
+constexpr TailSites kPartsTailSites = {
+    0x820DFA28, 0x820DFB34, 0x820DFB58, 0x820DFC0C, 0x820DFC18, 0x820DFC50,
+    0x820DFC5C, 0x820DFD70, 0x820DFDA8, 0x820DFDCC, 0x820DFED8, 0x820DFEF8,
+    0x820DFF04, 0x820DFF24, 0x820DFF44, 0x820DFF50, 0x820DFF9C, 0x820DFFCC};
+constexpr TailSites kTrafficTailSites = {
+    0x820E5BF8, 0x820E5CF8, 0x820E5D1C, 0x820E5DD0, 0x820E5DDC, 0x820E5E14,
+    0x820E5E20, 0x820E5F34, 0x820E5F6C, 0x820E5F90, 0x820E609C, 0x820E60BC,
+    0x820E60C8, 0x820E60E8, 0x820E6108, 0x820E6114, 0x820E6160, 0x820E6190};
+
+// What both tail lights' draws do after their lamps (the same code at the
+// same frame offsets): the view's transposed rotation, the red color, then
+// the glows at nodes 0 to 3 with [0x826C5104] flipped around them. They draw
+// glows with bit 0x1 and not 0x20 of the block's bits, the parts' also with
+// 0x40 (`any_with_0x40`).
+Left TailGlows(uint8_t* base, const Calls& calls, uint32_t frame, uint32_t group, uint32_t block,
+               uint32_t pass, bool any_with_0x40, const TailSites& sites) {
+  const uint32_t vp = pass + 144, world = block + 16;
+  Left left;
   // The 1.0 w's of the view's transposed rotation and of the matrix at +336.
   const double one = Lfs(base, kOne);
   for (uint32_t at : {668u, 684u, 700u, 716u, 348u}) {
@@ -290,7 +295,7 @@ Left PartsDrawTailLights(uint8_t* base, const Calls& calls, uint32_t stack, uint
   for (uint32_t at : {364u, 380u, 396u, 412u, 428u, 444u, 460u}) {
     Stfs(base, frame + at, one);
   }
-  left = ViewTransposed(base, calls, frame, pass, 0x820DFA28);
+  left = ViewTransposed(base, calls, frame, pass, sites.view);
   FreshIdentity(base, frame + 400, frame + 208);
   // The color (1, 0, 0, 1) at +160 (copied to +272) and SetMaterials'
   // flags at +176 (the first field only).
@@ -315,14 +320,14 @@ Left PartsDrawTailLights(uint8_t* base, const Calls& calls, uint32_t stack, uint
   Store(base, frame + 280, c2);
   Store(base, frame + 284, c3);
   const uint32_t bits = Bits(base, block);
-  if ((bits & 0x40) == 0 && ((bits & 0x1) == 0 || (bits & 0x20) != 0)) {
+  if ((!any_with_0x40 || (bits & 0x40) == 0) && ((bits & 0x1) == 0 || (bits & 0x20) != 0)) {
     Flip(base);
     return left;
   }
 
   // The glows: the scene's glow model in red at the four tl**_0k_ef nodes.
   const uint32_t model = Load(base, kScene) + 480;
-  left = GlowColor(base, calls, frame, model, 176, 0x820DFB34, 0x820DFB58);
+  left = GlowColor(base, calls, frame, model, 176, sites.color_memcpy, sites.color);
   const int32_t shapes = int32_t(Load(base, model + 412));
   const double two = Lfs(base, kTwo);
   const double half = Lfs(base, kHalf);
@@ -342,55 +347,109 @@ Left PartsDrawTailLights(uint8_t* base, const Calls& calls, uint32_t stack, uint
     Stfs(base, frame + 780, one);
     Store(base, frame + 392, uint32_t(p1 >> 32));
     Store(base, frame + 396, uint32_t(p1));
-    Multiply(base, frame + 720, frame + 336, world, 0x820DFC0C);
-    CopyMatrix(base, frame + 336, frame + 720, 0x820DFC18);
+    Multiply(base, frame + 720, frame + 336, world, sites.multiply1);
+    CopyMatrix(base, frame + 336, frame + 720, sites.copy1);
     Ones(base, frame, {988, 1004, 1020, 1036});
     Copy(base, frame + 448, frame + 384, 16);
-    Multiply(base, frame + 976, frame + 656, frame + 400, 0x820DFC50);
-    CopyMatrix(base, frame + 336, frame + 976, 0x820DFC5C);
+    Multiply(base, frame + 976, frame + 656, frame + 400, sites.multiply2);
+    CopyMatrix(base, frame + 336, frame + 976, sites.copy2);
     // The scale (+848), the projector's view (+1296) and the world's
     // rotation (+1168, its last row (0, 0, 0, 1), copied to +1360).
     FreshIdentity(base, frame + 848, frame + 528);
     FreshIdentity(base, frame + 1296, frame + 464);
     FreshIdentity(base, frame + 1168, frame + 592);
-    left = CopyMatrix(base, frame + 1168, world, 0x820DFD70);
+    left = CopyMatrix(base, frame + 1168, world, sites.copy_world);
     Stfs(base, frame + 176, zero);
     Stfs(base, frame + 180, zero);
     Stfs(base, frame + 184, zero);
     Stfs(base, frame + 188, one);
     Copy(base, frame + 1216, frame + 176, 16);
-    Memcpy(base, calls, frame + 1360, frame + 1168, 64, frame, 0x820DFDA8);
-    if (Project(base, calls, frame, pass, frame + 848, 0, 0x820DFDCC, left) == 0) {
+    Memcpy(base, calls, frame + 1360, frame + 1168, 64, frame, sites.memcpy_world);
+    if (Project(base, calls, frame, pass, frame + 848, 0, sites.project, left) == 0) {
       continue;
     }
     TowardEye(base, frame, pass, {924, 940, 956, 972});
-    Multiply(base, frame + 912, frame + 848, frame + 336, 0x820DFED8);
+    Multiply(base, frame + 912, frame + 848, frame + 336, sites.multiply3);
     Ones(base, frame, {1116, 1132, 1148, 1164});
-    Multiply(base, frame + 1104, frame + 912, frame + 1232, 0x820DFEF8);
-    CopyMatrix(base, frame + 336, frame + 1104, 0x820DFF04);
+    Multiply(base, frame + 1104, frame + 912, frame + 1232, sites.multiply4);
+    CopyMatrix(base, frame + 336, frame + 1104, sites.copy3);
     // The world: the scale x the view's transposed rotation x the
     // translation at +400.
     Ones(base, frame, {1052, 1068, 1084, 1100});
-    Multiply(base, frame + 1040, frame + 848, frame + 656, 0x820DFF24);
+    Multiply(base, frame + 1040, frame + 848, frame + 656, sites.multiply5);
     Ones(base, frame, {796, 812, 828, 844});
-    Multiply(base, frame + 784, frame + 1040, frame + 400, 0x820DFF44);
-    left = CopyMatrix(base, frame + 336, frame + 784, 0x820DFF50);
+    Multiply(base, frame + 784, frame + 1040, frame + 400, sites.multiply6);
+    left = CopyMatrix(base, frame + 336, frame + 784, sites.copy4);
     // Small glows fade: each shape's alpha |s d| x 2.0 first (NaN draws
     // plainly, as the original's bge).
     if (std::fabs(Lfs(base, frame + 848)) < half) {
       for (int32_t shape = 0; shape < shapes; shape++) {
         const double alpha = Fmuls(std::fabs(Lfs(base, frame + 848)), two);
         left = Left{false, material_passes::SetAlpha(base, model, uint32_t(shape), alpha, frame)};
-        left = GlowDraw(base, calls, frame, model, vp, uint32_t(shape), 0, 0x820DFF9C);
+        left = GlowDraw(base, calls, frame, model, vp, uint32_t(shape), 0, sites.fade_draw);
       }
     } else {
       for (int32_t shape = 0; shape < shapes; shape++) {
-        left = GlowDraw(base, calls, frame, model, vp, uint32_t(shape), 0, 0x820DFFCC);
+        left = GlowDraw(base, calls, frame, model, vp, uint32_t(shape), 0, sites.draw);
       }
     }
   }
   Flip(base);
   return left;
+}
+
+}  // namespace
+
+Left PartsDrawTailLights(uint8_t* base, const Calls& calls, uint32_t stack, uint32_t group,
+                         uint32_t block, uint32_t pass, uint32_t caller_r24,
+                         uint32_t caller_r28) {
+  ITC_NATIVE_RUNNING("sub_820DF8B0 PartsPoints::DrawTailLights");
+  const uint32_t frame = Frame(base, stack, kPartsTailLightsFrame);
+  const uint32_t vp = pass + 144, world = block + 16;
+  auto lamp = [&](uint32_t record, uint32_t lr) {
+    return PartsDrawRecord(base, calls, frame, group + record, vp, world, 0, caller_r24,
+                           caller_r28, lr);
+  };
+  // The lamps: on, brake, reversing, the winkers; the cover.
+  if (Bits(base, block) & 0x1) {
+    lamp(1920, 0x820DF900);
+  }
+  if (Bits(base, block) & 0x8) {
+    lamp(2160, 0x820DF928);
+  }
+  if (Bits(base, block) & 0x10) {
+    lamp(2400, 0x820DF950);
+  }
+  if (Bits(base, block) & 0x2) {
+    lamp(2640, 0x820DF978);
+  }
+  if (Bits(base, block) & 0x4) {
+    lamp(2880, 0x820DF9A0);
+  }
+  CoverAlpha(base, group + 3120, block, frame);
+  lamp(3120, 0x820DF9D0);
+  return TailGlows(base, calls, frame, group, block, pass, true, kPartsTailSites);
+}
+
+Left TrafficDrawTailLights(uint8_t* base, const Calls& calls, uint32_t stack, uint32_t group,
+                           uint32_t block, uint32_t pass, uint32_t caller_r24,
+                           uint32_t caller_r28) {
+  ITC_NATIVE_RUNNING("sub_820E5B08 TrafficPoints::DrawTailLights");
+  const uint32_t frame = Frame(base, stack, kTrafficTailLightsFrame);
+  const uint32_t vp = pass + 144, world = block + 16;
+  auto lamp = [&](uint32_t record, uint32_t lr) {
+    return PartsDrawRecord(base, calls, frame, group + record, vp, world, 0, caller_r24,
+                           caller_r28, lr);
+  };
+  // The lamps: on, brake; the cover (no alpha call).
+  if (Bits(base, block) & 0x1) {
+    lamp(2160, 0x820E5B58);
+  }
+  if (Bits(base, block) & 0x8) {
+    lamp(2400, 0x820E5B80);
+  }
+  lamp(2640, 0x820E5BA0);
+  return TailGlows(base, calls, frame, group, block, pass, false, kTrafficTailSites);
 }
 
 // --- The headlights ---
@@ -520,6 +579,118 @@ Left PartsDrawHeadlights(uint8_t* base, const Calls& calls, uint32_t stack, uint
     for (int32_t shape = 0; shape < shapes; shape++) {
       left = GlowDraw(base, calls, frame, model, vp, uint32_t(shape), 0xFFFFFFFF826C0000ull,
                       0x820E1D40);
+    }
+  }
+  Flip(base);
+  return left;
+}
+
+// --- The traffic's headlights ---
+
+Left TrafficDrawHeadlights(uint8_t* base, const Calls& calls, uint32_t stack, uint32_t group,
+                           uint32_t block, uint32_t pass, uint32_t caller_r24,
+                           uint32_t caller_r28) {
+  ITC_NATIVE_RUNNING("sub_820E61D8 TrafficPoints::DrawHeadlights");
+  const uint32_t frame = Frame(base, stack, kTrafficHeadlightsFrame);
+  const uint32_t vp = pass + 144, world = block + 16;
+  // hl00add_low with bit 0x1 (r28 the caller's), then the cover with its
+  // alpha (r28 the block's world from here on).
+  if (Bits(base, block) & 0x1) {
+    PartsDrawRecord(base, calls, frame, group + 1200, vp, world, 0, caller_r24, caller_r28,
+                    0x820E6228);
+  }
+  CoverAlpha(base, group + 1440, block, frame);
+  PartsDrawRecord(base, calls, frame, group + 1440, vp, world, 0, caller_r24, world, 0x820E6258);
+
+  const double one = Lfs(base, kOne);
+  for (uint32_t at : {668u, 684u, 700u, 716u, 348u}) {
+    Stfs(base, frame + at, one);
+  }
+  Flip(base);
+  for (uint32_t at : {364u, 380u, 396u, 412u, 428u, 444u, 460u}) {
+    Stfs(base, frame + at, one);
+  }
+  Left left = ViewTransposed(base, calls, frame, pass, 0x820E62B0);
+  FreshIdentity(base, frame + 400, frame + 208);
+  // The color (1, 1, 1, 1) at +160 (copied to +272) and SetMaterials' flags
+  // at +176 (the first field only).
+  for (uint32_t at : {160u, 164u, 168u, 172u, 284u}) {
+    Stfs(base, frame + at, one);
+  }
+  Store(base, frame + 176, 1);
+  const uint32_t bits = Bits(base, block);
+  const uint64_t c0 = Load64(base, frame + 160);
+  Stfs(base, frame + 300, one);
+  const uint64_t c1 = Load64(base, frame + 168);
+  Stfs(base, frame + 316, one);
+  Store(base, frame + 196, 0);
+  Store(base, frame + 192, 0);
+  Store(base, frame + 272, uint32_t(c0 >> 32));
+  Store(base, frame + 276, uint32_t(c0));
+  Store(base, frame + 188, 0);
+  Store(base, frame + 184, 0);
+  Store(base, frame + 180, 0);
+  Store(base, frame + 280, uint32_t(c1 >> 32));
+  Store(base, frame + 284, uint32_t(c1));
+  if ((bits & 0x1) == 0 || (bits & 0x20) != 0) {
+    Flip(base);
+    return left;
+  }
+
+  // The glows: the scene's glow model in white at nodes 0 to 3, each facing
+  // the camera, with the block's world.
+  const uint32_t model = Load(base, kScene) + 480;
+  left = GlowColor(base, calls, frame, model, 176, 0x820E63A8, 0x820E63CC);
+  const int32_t shapes = int32_t(Load(base, model + 412));
+  const double zero = Lfs(base, kZero);
+  for (uint32_t node = 0; node < 4; node++) {
+    const uint32_t record = group + 240 * node;
+    if (Load(base, record + 4) == 0) {
+      continue;
+    }
+    FreshIdentity(base, frame + 336, frame + 208);
+    const uint64_t p0 = Load64(base, record + 144), p1 = Load64(base, record + 152);
+    Stfs(base, frame + 732, one);
+    Stfs(base, frame + 748, one);
+    Stfs(base, frame + 764, one);
+    Store(base, frame + 384, uint32_t(p0 >> 32));
+    Store(base, frame + 388, uint32_t(p0));
+    Stfs(base, frame + 780, one);
+    Store(base, frame + 392, uint32_t(p1 >> 32));
+    Store(base, frame + 396, uint32_t(p1));
+    Multiply(base, frame + 720, frame + 336, world, 0x820E6478);
+    CopyMatrix(base, frame + 336, frame + 720, 0x820E6484);
+    Ones(base, frame, {1052, 1068, 1084, 1100});
+    Copy(base, frame + 448, frame + 384, 16);
+    Multiply(base, frame + 1040, frame + 656, frame + 400, 0x820E64BC);
+    CopyMatrix(base, frame + 336, frame + 1040, 0x820E64C8);
+    // The scale (+1168), the projector's view (+1296) and the world's
+    // rotation (+1104, its last row (0, 0, 0, 1), copied to +1360).
+    FreshIdentity(base, frame + 1168, frame + 528);
+    FreshIdentity(base, frame + 1296, frame + 464);
+    FreshIdentity(base, frame + 1104, frame + 592);
+    left = CopyMatrix(base, frame + 1104, world, 0x820E65DC);
+    Stfs(base, frame + 176, zero);
+    Stfs(base, frame + 180, zero);
+    Stfs(base, frame + 184, zero);
+    Stfs(base, frame + 188, one);
+    Copy(base, frame + 1152, frame + 176, 16);
+    Memcpy(base, calls, frame + 1360, frame + 1104, 64, frame, 0x820E6614);
+    if (Project(base, calls, frame, pass, frame + 1168, 1, 0x820E6638, left) == 0) {
+      continue;
+    }
+    TowardEye(base, frame, pass, {988, 1004, 1020, 1036});
+    Multiply(base, frame + 976, frame + 1168, frame + 336, 0x820E6744);
+    Ones(base, frame, {860, 876, 892, 908});
+    Multiply(base, frame + 848, frame + 976, frame + 1232, 0x820E6764);
+    CopyMatrix(base, frame + 336, frame + 848, 0x820E6770);
+    Ones(base, frame, {924, 940, 956, 972});
+    Multiply(base, frame + 912, frame + 1168, frame + 656, 0x820E6790);
+    Ones(base, frame, {796, 812, 828, 844});
+    Multiply(base, frame + 784, frame + 912, frame + 400, 0x820E67B0);
+    left = CopyMatrix(base, frame + 336, frame + 784, 0x820E67BC);
+    for (int32_t shape = 0; shape < shapes; shape++) {
+      left = GlowDraw(base, calls, frame, model, vp, uint32_t(shape), 0, 0x820E67E0);
     }
   }
   Flip(base);

@@ -1,5 +1,5 @@
-// The head and tail lights (src/car_draw/lamps.cpp, docs/functions/car-draw.md)
-// against the recompiled functions, under the car_draw harness (its Case and
+// The head and tail lights (src/car_draw/lamps.cpp, docs/functions/car-draw.md:
+// the parts' and the traffic body's) against the recompiled functions, under the car_draw harness (its Case and
 // model draws' world, car_draw_shared.h). The lights' group at the block's
 // +0xC000 (records of 240 bytes: +4 the model, the block's +0x100, or 0,
 // +228 the shape, +144 the glow nodes' positions; the headlights' pop-up
@@ -169,27 +169,56 @@ void NativeHeadlights(PPCContext& ctx, uint8_t* base) {
   });
 }
 
+// The traffic's (their adapters' work, without the flag): the lamps see r28.
+void NativeTrafficTailLights(PPCContext& ctx, uint8_t* base) {
+  const uint32_t r3 = ctx.r3.u32, r4 = ctx.r4.u32, r5 = ctx.r5.u32, r1 = ctx.r1.u32;
+  const uint32_t r24 = ctx.r24.u32, r28 = ctx.r28.u32;
+  NativeStep(ctx, base, [&](const ::car_draw::Calls& calls) {
+    return ::car_draw::TrafficDrawTailLights(base, calls, r1, r3, r4, r5, r24, r28);
+  });
+}
+
+void NativeTrafficHeadlights(PPCContext& ctx, uint8_t* base) {
+  const uint32_t r3 = ctx.r3.u32, r4 = ctx.r4.u32, r5 = ctx.r5.u32, r1 = ctx.r1.u32;
+  const uint32_t r24 = ctx.r24.u32, r28 = ctx.r28.u32;
+  NativeStep(ctx, base, [&](const ::car_draw::Calls& calls) {
+    return ::car_draw::TrafficDrawHeadlights(base, calls, r1, r3, r4, r5, r24, r28);
+  });
+}
+
 struct Target {
   const char* name;
   GuestFunction recompiled, native;
   uint32_t frame;
   bool head;
+  int cases;
+  bool traffic;
 };
 
 }  // namespace
 
-void LampsDraws(Context& h, Random& r, uint32_t block, uint32_t race) {
+void LampsDraws(Context& h, Random& shared, uint32_t block, uint32_t race) {
+  // The traffic's cases draw from a generator of their own, so the cases
+  // after these (in car_draw.cpp's order) see the numbers they saw before.
+  Random traffic(0x74726166666963ull);  // "traffic"
   const uint32_t group = block + kGroup, source = block + kSource;
   const uint32_t scene = race + 0x10000;
   const Target targets[] = {
       {"PartsPoints::DrawTailLights (sub_820DF8B0)", __imp__sub_820DF8B0,
-       NativeTailLights, car_draw::kPartsTailLightsFrame, false},
+       NativeTailLights, car_draw::kPartsTailLightsFrame, false, 512, false},
       {"PartsPoints::DrawHeadlights (sub_820E1690)", __imp__sub_820E1690,
-       NativeHeadlights, car_draw::kPartsHeadlightsFrame, true},
+       NativeHeadlights, car_draw::kPartsHeadlightsFrame, true, 512, false},
+      // The traffic's groups (12 and 7 records) in the same world: no
+      // pop-up matrix.
+      {"TrafficPoints::DrawTailLights (sub_820E5B08)", __imp__sub_820E5B08,
+       NativeTrafficTailLights, car_draw::kTrafficTailLightsFrame, false, 384, true},
+      {"TrafficPoints::DrawHeadlights (sub_820E61D8)", __imp__sub_820E61D8,
+       NativeTrafficHeadlights, car_draw::kTrafficHeadlightsFrame, false, 384, true},
   };
   for (const Target& target : targets) {
+    Random& r = target.traffic ? traffic : shared;
     Results results(target.name);
-    const int cases = 512;
+    const int cases = target.cases;
     int queued = 0, glows = 0;
     std::vector<uint8_t> scene_bytes;
     const std::vector<uint8_t> zero(kSlotCount * 16, 0);

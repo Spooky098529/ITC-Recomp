@@ -699,4 +699,56 @@ Left SceneCockpitDrawBody(uint8_t* base, const Calls& calls, uint32_t stack, uin
 Left SceneCockpitDraw(uint8_t* base, const Calls& calls, uint32_t stack, uint64_t cockpit,
                       uint32_t block, uint32_t caller_r24, uint32_t caller_r28);
 
+// --- The traffic body (traffic.cpp, lamps.cpp, shadows.cpp) ---
+//
+// Part 9: the traffic cars' body (pool 6 of the second set): its point
+// block's draws (the body's records, the window, the head and tail lights
+// with their glows, near copies of the parts' in lamps.cpp), TrafficPoints::
+// Draw over them with the scene's current camera pass, and SceneTraffic::Draw
+// (the lights' shadows gathered, the point block, every shape of the six part
+// models into the depth passes, as PartsPoints::DrawShadows). Records through
+// CarPart::Draw's plain C++ (its original from the same frame and return
+// address where it declines). Each returns r3 as the original leaves it.
+
+constexpr uint32_t kTrafficBodyFrame = 144;
+constexpr uint32_t kTrafficWindowFrame = 128;
+constexpr uint32_t kTrafficPointsFrame = 144;
+constexpr uint32_t kTrafficTailLightsFrame = 1568;
+constexpr uint32_t kTrafficHeadlightsFrame = 1552;
+constexpr uint32_t kSceneTrafficFrame = 1248;
+
+// An identity's four rows stored at `at` as stvx stores them, and `bytes`
+// copied from `from` to `to` doubleword by doubleword (ld, std): the
+// originals' fresh matrices (lamps.cpp).
+void StoreIdentity(uint8_t* base, uint32_t at);
+void CopyDoublewords(uint8_t* base, uint32_t to, uint32_t from, uint32_t bytes);
+
+// TrafficPoints::DrawBody (sub_820E55A0, 144): r3 = the body's records (the
+// point block + 16), r4 = the block, r5 = the camera pass: records 0 to 3
+// (r28 the pass at their draws); the plates (records 2 and 3) only with a
+// model, which gets +456 = the records' +1440 (or +1444) and +432 = 1 around
+// the draw, +432 = 0 after.
+Left TrafficDrawBody(uint8_t* base, const Calls& calls, uint32_t stack, uint32_t records,
+                     uint32_t block, uint32_t pass, uint32_t caller_r24);
+// TrafficPoints::DrawWindow (sub_820E5668, 128): SetPair1002Alpha(record 5's
+// model, its shape, the block's +632), then records 4 and 5 (r28 the block's
+// world).
+Left TrafficDrawWindow(uint8_t* base, const Calls& calls, uint32_t stack, uint32_t records,
+                       uint32_t block, uint32_t pass, uint32_t caller_r24);
+// TrafficPoints::DrawTailLights (sub_820E5B08): r3 = the group (the point
+// block + 3152), r4 = the block, r5 = the pass: as PartsPoints::
+// DrawTailLights with bit 0x1 record 9, 0x8 record 10, the cover (11) with
+// no alpha call, the glows with bit 0x1 and not 0x20. `caller_r28` the lamps'.
+Left TrafficDrawTailLights(uint8_t* base, const Calls& calls, uint32_t stack, uint32_t group,
+                           uint32_t block, uint32_t pass, uint32_t caller_r24,
+                           uint32_t caller_r28);
+// TrafficPoints::DrawHeadlights (sub_820E61D8): r3 = the group (the point
+// block + 1472), r4 = the block, r5 = the pass: bit 0x1 record 5 (r28
+// `caller_r28`), the cover (6, its alpha the block's +636; r28 the block's
+// world), the glows with bit 0x1 and not 0x20 in white at nodes 0 to 3 with
+// the block's world (Model::Draw's r24 0).
+Left TrafficDrawHeadlights(uint8_t* base, const Calls& calls, uint32_t stack, uint32_t group,
+                           uint32_t block, uint32_t pass, uint32_t caller_r24,
+                           uint32_t caller_r28);
+
 }  // namespace car_draw

@@ -75,7 +75,10 @@ ITC_FLAG_BOOL(native_car_draw, true, "ITC",
               "SceneCockpit::DrawBody sub_820DC350 (CarLighting::Gather and SceneInterior::Draw "
               "as plain C++), CockpitPoints::Draw sub_820DBD38, DrawFenders sub_820DB8C8, "
               "DrawCabinWindow sub_820DB980, DrawDoorWindow sub_820DBA38 and DrawHeadlights "
-              "sub_820DBB88 (no adapters: only the cockpit's top reaches them) "
+              "sub_820DBB88 (no adapters: only the cockpit's top reaches them), the traffic "
+              "body's TrafficPoints::DrawBody sub_820E55A0, DrawWindow sub_820E5668, "
+              "DrawTailLights sub_820E5B08 and DrawHeadlights sub_820E61D8 (their glows as the "
+              "parts' lamps') "
               "natively instead of through the translated code, with --native_scenery_lists, "
               "--native_models, --native_matrix_math, --native_math, --native_nearest_lights, "
               "--native_vehicle_accessors, --native_track_zones, --native_second_set, "
@@ -409,6 +412,35 @@ void CarDrawSceneCockpit(PPCContext& ctx, uint8_t* base) {
   LeaveLeft(ctx, left);
 }
 
+// --- The traffic body ---
+
+#define ITC_CAR_DRAW_TRAFFIC(name, address, call)                         \
+  void CarDrawTraffic##name(PPCContext& ctx, uint8_t* base) {             \
+    if (!CarDrawPartsCalleesNative()) {                                   \
+      __imp__sub_##address(ctx, base);                                    \
+      return;                                                             \
+    }                                                                     \
+    ctx.fpscr.disableFlushMode();                                         \
+    const uint64_t lr = ctx.lr;                                           \
+    SceneryDrawGuest guest{ctx, base};                                    \
+    const car_draw::Calls calls = CarDrawCalls(&guest);                   \
+    const uint32_t r1 = ctx.r1.u32, r3 = ctx.r3.u32, r4 = ctx.r4.u32;     \
+    const uint32_t r5 = ctx.r5.u32, r24 = ctx.r24.u32, r28 = ctx.r28.u32; \
+    (void)r28;                                                            \
+    const car_draw::Left left = call;                                     \
+    ctx.lr = lr;                                                          \
+    LeaveLeft(ctx, left);                                                 \
+  }
+ITC_CAR_DRAW_TRAFFIC(Body, 820E55A0,
+                     car_draw::TrafficDrawBody(base, calls, r1, r3, r4, r5, r24))
+ITC_CAR_DRAW_TRAFFIC(Window, 820E5668,
+                     car_draw::TrafficDrawWindow(base, calls, r1, r3, r4, r5, r24))
+ITC_CAR_DRAW_TRAFFIC(TailLights, 820E5B08,
+                     car_draw::TrafficDrawTailLights(base, calls, r1, r3, r4, r5, r24, r28))
+ITC_CAR_DRAW_TRAFFIC(Headlights, 820E61D8,
+                     car_draw::TrafficDrawHeadlights(base, calls, r1, r3, r4, r5, r24, r28))
+#undef ITC_CAR_DRAW_TRAFFIC
+
 }  // namespace hooks
 
 #define ITC_CAR_DRAW(address, step)     \
@@ -441,4 +473,8 @@ ITC_CAR_DRAW(820D04E8, CarDrawModelDraw)
 ITC_CAR_DRAW(820D06F0, CarDrawCarPartDraw)
 ITC_CAR_DRAW(820C9170, CarDrawCarLightingGather)
 ITC_CAR_DRAW(82595110, CarDrawMorphShape)
+ITC_CAR_DRAW(820E55A0, CarDrawTrafficBody)
+ITC_CAR_DRAW(820E5668, CarDrawTrafficWindow)
+ITC_CAR_DRAW(820E5B08, CarDrawTrafficTailLights)
+ITC_CAR_DRAW(820E61D8, CarDrawTrafficHeadlights)
 #undef ITC_CAR_DRAW
