@@ -669,7 +669,7 @@ ITC_CAR_SOUNDS_ADAPTER(8210E030, CarSoundsCarSoundStart)
 ITC_CAR_SOUNDS_ADAPTER(8210E218, CarSoundsStop)
 ITC_CAR_SOUNDS_ADAPTER(8210F7C8, CarSoundsStopAll)
 // No adapter (removed 2026-10-29: only CarSounds::Release's plain C++ calls it in play) for CarSound::Release sub_8210E170.
-ITC_CAR_SOUNDS_ADAPTER(8210F750, CarSoundsReleaseAll)
+// No adapter (removed 2026-11-04: only RaceSounds::Unload's plain C++ calls it in play, through its register step) for CarSounds::Release sub_8210F750.
 ITC_CAR_SOUNDS_ADAPTER(8210FE00, CarSoundsInit)
 // No adapter (removed 2026-10-29: only HitSounds::Update's plain C++ calls it in play) for sub_8210E778 (the impact).
 // No adapter (removed 2026-10-29: only HitSounds::Update's plain C++ calls it in play) for sub_8210E938 (the scrape).
