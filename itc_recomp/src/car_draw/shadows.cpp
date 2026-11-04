@@ -201,4 +201,114 @@ Left PartsDrawShadows(uint8_t* base, const Calls& calls, uint32_t stack, uint32_
   return left;
 }
 
+// --- The traffic body's top ---
+
+Left SceneTrafficDraw(uint8_t* base, const Calls& calls, uint32_t stack, uint32_t traffic,
+                      uint32_t block, uint32_t caller_r24) {
+  ITC_NATIVE_RUNNING("sub_820E6A40 SceneTraffic::Draw");
+  const uint32_t frame = Frame(base, stack, kSceneTrafficFrame);
+  Left left;
+  // The identity at +80, copied to +144 (the world below).
+  StoreIdentity(base, frame + 80);
+  CopyDoublewords(base, frame + 144, frame + 80, 64);
+  // The gathered record at +464: its ten matrices' w words 1.0 first.
+  const float one = guest::LoadFloat(base, kOne);
+  for (uint32_t i = 0; i < 10; i++) {
+    for (uint32_t at = 524; at < 588; at += 16) {
+      guest::StoreFloat(base, frame + at + 64 * i, one);
+    }
+  }
+  // In a race, which of up to three nearby lights cast a shadow (+464 to
+  // +472) and their planar shadows (+512 + 64i). Outside one those words are
+  // what the stack held, read as the original does.
+  if (int32_t(Load(base, Load(base, traffic + 9796) + 4)) == 1) {
+    left = Left{false, CarLightingGather(base, calls, frame, frame + 464, block + 16, 1)};
+  }
+  left = TrafficPointsDraw(base, calls, frame, traffic + 3728, block, caller_r24);
+  const uint32_t d = Load(base, kScene) + 5072;  // the pass description
+  // The world: the identity times the block's world, in place.
+  matrix_math::Multiply(base, frame + 144, frame + 144, block + 16);
+  interpolation::BlendState_OnMultiply(base, frame + 144, frame + 144, block + 16, 0x820E6B28);
+  left = Left{false, frame + 144};
+  const uint32_t world = frame + 144;
+  // Each draw under its key: the keys saved to d +76 and +80, both set to
+  // it, put back after; `saved` the depth key the original keeps in r30.
+  uint32_t saved = Load(base, kDepthKey);
+  auto keys = [&](uint32_t key_at) {
+    Store(base, d + 76, saved);
+    const uint32_t other = Load(base, kOtherKey);
+    const uint32_t key = Load(base, d + key_at);
+    Store(base, d + 80, other);
+    Store(base, kDepthKey, key);
+    Store(base, kOtherKey, key);
+  };
+  auto restore = [&]() {
+    Store(base, kOtherKey, Load(base, d + 80));
+    saved = Load(base, d + 76);
+    Store(base, kDepthKey, saved);
+  };
+  // The lights' sets: the gathered word, d +60's bit, the key, the product
+  // (its 1.0 w's written first), the light's shadow matrix and the sites.
+  struct Light {
+    uint32_t word, bit, key_at, product, shadow, multiply, draw;
+  };
+  static constexpr Light kLights[3] = {
+      {464, 0x20, 40, 80, 512, 0x820E6D18, 0x820E6D38},
+      {468, 0x40, 44, 272, 576, 0x820E6D98, 0x820E6DB8},
+      {472, 0x80, 48, 208, 640, 0x820E6E18, 0x820E6E38},
+  };
+  for (uint32_t m = 0; m < 6; m++) {
+    const uint32_t models = traffic + 9768 + 4 * m;
+    const int32_t shapes = int32_t(Load(base, Load(base, models) + 412));
+    for (int32_t s = 0; s < shapes; s++) {
+      const uint32_t shape = uint32_t(s);
+      // The camera pass at d +4 (bit 0x4 of d +60): its view-projection at
+      // +400, groups 0 and 1, key d +32.
+      if (EnabledPass(base, Load(base, d + 4)) != 0 && (Load(base, d + 60) & 0x4) != 0) {
+        const uint32_t camera = EnabledPass(base, Load(base, d + 4));
+        left = Memcpy(base, calls, frame + 400, camera + 144, 64, frame, 0x820E6BB8);
+        keys(32);
+        left = ShapeDepth(base, calls, frame, Load(base, models), frame + 400, world, shape, 0,
+                          0x820E6BF0);
+        left = ShapeDepth(base, calls, frame, Load(base, models), frame + 400, world, shape, 1,
+                          0x820E6C10);
+        restore();
+      }
+      // The rest with the camera pass at d +8's view-projection (+336).
+      const uint32_t camera = EnabledPass(base, Load(base, d + 8));
+      if (camera == 0) {
+        continue;
+      }
+      left = Memcpy(base, calls, frame + 336, camera + 144, 64, frame, 0x820E6C74);
+      // Bit 0x10, key d +36: the block's world.
+      if ((Load(base, d + 60) & 0x10) != 0) {
+        keys(36);
+        left = ShapeDepth(base, calls, frame, Load(base, models), frame + 336, world, shape, 0,
+                          0x820E6CB8);
+        restore();
+      }
+      // Bits 0x20, 0x40, 0x80: flattened away from each light the gather
+      // found casting a shadow.
+      for (const Light& light : kLights) {
+        if (int32_t(Load(base, frame + light.word)) == 0 ||
+            (Load(base, d + 60) & light.bit) == 0) {
+          continue;
+        }
+        keys(light.key_at);
+        const uint32_t product = frame + light.product;
+        for (uint32_t at = 12; at < 64; at += 16) {
+          guest::StoreFloat(base, product + at, one);
+        }
+        matrix_math::Multiply(base, product, world, frame + light.shadow);
+        interpolation::BlendState_OnMultiply(base, product, world, frame + light.shadow,
+                                             light.multiply);
+        left = ShapeDepth(base, calls, frame, Load(base, models), frame + 336, product, shape, 0,
+                          light.draw);
+        restore();
+      }
+    }
+  }
+  return left;
+}
+
 }  // namespace car_draw

@@ -90,13 +90,9 @@ bool CarDrawCockpitCalleesNative();
 // native): r3 = the cockpit, r4 = the block.
 void CarDrawSceneCockpit(PPCContext& ctx, uint8_t* base);
 
-// The traffic body's leaves (the parts' callees native): TrafficPoints::
-// DrawBody (sub_820E55A0), DrawWindow (sub_820E5668), DrawTailLights
-// (sub_820E5B08) and DrawHeadlights (sub_820E61D8): r3 = the records or the
-// group, r4 = the block, r5 = the camera pass.
-void CarDrawTrafficBody(PPCContext& ctx, uint8_t* base);
-void CarDrawTrafficWindow(PPCContext& ctx, uint8_t* base);
-void CarDrawTrafficTailLights(PPCContext& ctx, uint8_t* base);
-void CarDrawTrafficHeadlights(PPCContext& ctx, uint8_t* base);
+// The traffic body's top, SceneTraffic::Draw (sub_820E6A40; inside the
+// diagnostics' wrap, src/debug/frame_state_diff.cpp; the shadows' callees
+// native): r3 = the traffic body, r4 = the block.
+void CarDrawSceneTraffic(PPCContext& ctx, uint8_t* base);
 
 }  // namespace hooks

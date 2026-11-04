@@ -751,4 +751,21 @@ Left TrafficDrawHeadlights(uint8_t* base, const Calls& calls, uint32_t stack, ui
                            uint32_t block, uint32_t pass, uint32_t caller_r24,
                            uint32_t caller_r28);
 
+// TrafficPoints::Draw (sub_820E6820, 144): r3 = the point block (traffic +
+// 3728), r4 = the block; with the scene's current camera pass (0 when
+// disabled; r28 = the point block + 16): the body, the headlights' body
+// (+2432) and the tail lights' (+5072), the window, the headlights, the tail
+// lights.
+Left TrafficPointsDraw(uint8_t* base, const Calls& calls, uint32_t stack, uint32_t points,
+                       uint32_t block, uint32_t caller_r24);
+// SceneTraffic::Draw (sub_820E6A40, 1,248; shadows.cpp): r3 = the traffic
+// body, r4 = the block. The record at +464 (the ten matrices' w words 1.0);
+// in a race (its scene's, [+9796], +4 1) CarLighting::Gather(it, the block's
+// world, 1); TrafficPoints::Draw(+3728); the identity (+80, copied to +144)
+// times the block's world in place; then for each of the six part models
+// (+9768 + 4i) and each of its shapes (+412), Model::DrawShapeDepth under
+// the pass description's keys as PartsPoints::DrawShadows.
+Left SceneTrafficDraw(uint8_t* base, const Calls& calls, uint32_t stack, uint32_t traffic,
+                      uint32_t block, uint32_t caller_r24);
+
 }  // namespace car_draw

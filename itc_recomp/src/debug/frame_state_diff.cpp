@@ -692,7 +692,21 @@ extern "C" REX_FUNC(sub_820E53F0) {
   debug::FrameStateDiff_After(base, "draw step part", 0x820E53F0);
 }
 ITC_FRAME_STATE_WRAP_LOAD_POLL(820E5A68, LoadPollSceneTrafficFinish)
-ITC_FRAME_STATE_WRAP(820E6A40)
+// SceneTraffic::Draw natively under --native_car_draw (src/car_draw/; its
+// native caller to come calls the plain C++), inside the same wrap.
+extern "C" REX_FUNC(sub_820E6A40) {
+  REX_FUNC_PROLOGUE();
+  if (debug::IsHidden(0x820E6A40)) {
+    return;
+  }
+  debug::FrameStateDiff_Before(base);
+  if (ITC_FLAG(native_car_draw)) {
+    hooks::CarDrawSceneTraffic(ctx, base);
+  } else {
+    __imp__sub_820E6A40(ctx, base);
+  }
+  debug::FrameStateDiff_After(base, "draw step part", 0x820E6A40);
+}
 ITC_FRAME_STATE_WRAP_LOAD_POLL(820E7328, LoadPollSceneWheelsFinish)
 ITC_FRAME_STATE_WRAP_LOAD_POLL(820E8908, LoadPollSceneWheelsSetUpPoints)
 ITC_FRAME_STATE_WRAP(820ECE28)

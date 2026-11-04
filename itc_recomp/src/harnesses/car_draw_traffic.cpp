@@ -1,5 +1,6 @@
 // The traffic body (src/car_draw/traffic.cpp, docs/functions/car-draw.md:
-// TrafficPoints::DrawBody and DrawWindow) against the recompiled functions,
+// TrafficPoints::DrawBody, DrawWindow and Draw, SceneTraffic::Draw in
+// src/car_draw/shadows.cpp) against the recompiled functions,
 // under the car_draw harness (its Case and model draws' world,
 // car_draw_shared.h; the traffic's head and tail lights are in
 // car_draw_lamps.cpp). The traffic body in an allocation of its own (the
@@ -15,8 +16,12 @@
 // reads), the light sets' owner at the race block's +0x14000, the camera
 // passes 0 to 3, the scene model's block at the block's +0xF380. The
 // allocation's object and models and the scene are put back before each
-// version and compared after it, with the frame's back chain, r3, r24, r28
-// and what went to the render queue. The recompiled side runs with
+// version and compared after it, with the frame's back chain (SceneTraffic::
+// Draw's temporaries too: the world, the view-projections, the products, the
+// gathered words and shadow matrices, Gather's saved r3 and r5), r3, r24, r28
+// and what went to the render queue. Outside a race SceneTraffic::Draw's
+// gathered words are the filled stack's (the same for both versions), as the
+// original reads them. The recompiled side runs with
 // --native_car_draw off (its callees the originals); the native side the
 // plain C++ through register steps of its own.
 
@@ -231,6 +236,14 @@ void NativeWindow(PPCContext& ctx, uint8_t* base) {
   });
 }
 
+void NativePoints(PPCContext& ctx, uint8_t* base) {
+  const uint32_t r3 = ctx.r3.u32, r4 = ctx.r4.u32, r1 = ctx.r1.u32;
+  const uint32_t r24 = ctx.r24.u32;
+  NativeStep(ctx, base, [&](const ::car_draw::Calls& calls) {
+    return ::car_draw::TrafficPointsDraw(base, calls, r1, r3, r4, r24);
+  });
+}
+
 // Which function a target runs on: the records (point block + 16) with a
 // camera pass, or the point block, or the object.
 enum class On { kRecords, kPoints, kObject };
@@ -255,6 +268,10 @@ void TrafficDraws(Context& h, Random& r, uint32_t block, uint32_t race) {
        car_draw::kTrafficBodyFrame, On::kRecords, 256},
       {"TrafficPoints::DrawWindow (sub_820E5668)", __imp__sub_820E5668, NativeWindow,
        car_draw::kTrafficWindowFrame, On::kRecords, 256},
+      {"TrafficPoints::Draw (sub_820E6820)", __imp__sub_820E6820, NativePoints,
+       car_draw::kTrafficPointsFrame, On::kPoints, 256},
+      {"SceneTraffic::Draw (sub_820E6A40)", __imp__sub_820E6A40, hooks::CarDrawSceneTraffic,
+       car_draw::kSceneTrafficFrame, On::kObject, 384},
   };
   for (const Target& target : targets) {
     Results results(target.name);
@@ -292,7 +309,18 @@ void TrafficDraws(Context& h, Random& r, uint32_t block, uint32_t race) {
           },
           target.recompiled, target.native, AlphaFloats(), fmt::format("case {}", c),
           [&](const PPCContext& t, Outputs& o) {
-            o.Word(guest::LoadU32(h.base, t.r1.u32 - target.frame));
+            const uint32_t frame = t.r1.u32 - target.frame;
+            o.Word(guest::LoadU32(h.base, frame));
+            if (target.on == On::kObject) {
+              // Gather's r3 and r5 saved in this frame; the world (+144),
+              // the view-projections (+336, +400) and the products (+80,
+              // +208, +272); the gathered words; the shadow matrices.
+              o.Word(guest::LoadU32(h.base, frame + 20));
+              o.Word(guest::LoadU32(h.base, frame + 36));
+              o.Floats(h.base, frame + 80, (464 - 80) / 4);
+              o.Bytes(Read(h.base, frame + 464, 48));
+              o.Floats(h.base, frame + 512, 640 / 4);
+            }
             o.Bytes(Read(h.base, top, kRecordsEnd));
             o.Bytes(Read(h.base, scene, kSceneBytes));
             const uint32_t written = guest::LoadU32(h.base, block + 0x3000 + 44) - (top + kSlots);

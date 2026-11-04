@@ -78,4 +78,27 @@ Left TrafficDrawWindow(uint8_t* base, const Calls& calls, uint32_t stack, uint32
   return left;
 }
 
+Left TrafficPointsDraw(uint8_t* base, const Calls& calls, uint32_t stack, uint32_t points,
+                       uint32_t block, uint32_t caller_r24) {
+  ITC_NATIVE_RUNNING("sub_820E6820 TrafficPoints::Draw");
+  const uint32_t frame = Frame(base, stack, kTrafficPointsFrame);
+  // The scene's current camera pass (0 when its address's low word is 0 or
+  // it isn't enabled).
+  uint32_t pass = kCameraPasses + Load(base, Load(base, kScene) + 5072) * 592;
+  if (pass == 0 || int32_t(Load(base, pass + 588)) == 0) {
+    pass = 0;
+  }
+  const uint32_t records = points + 16;  // r28 from here on
+  const uint32_t vp = pass + 144, world = block + 16;
+  TrafficDrawBody(base, calls, frame, records, block, pass, caller_r24);
+  PartsDrawRecord(base, calls, frame, points + 2432, vp, world, 0, caller_r24, records,
+                  0x820E6898);
+  PartsDrawRecord(base, calls, frame, points + 5072, vp, world, 0, caller_r24, records,
+                  0x820E68B0);
+  TrafficDrawWindow(base, calls, frame, records, block, pass, caller_r24);
+  TrafficDrawHeadlights(base, calls, frame, points + 1472, block, pass, caller_r24, records);
+  return TrafficDrawTailLights(base, calls, frame, points + 3152, block, pass, caller_r24,
+                               records);
+}
+
 }  // namespace car_draw
