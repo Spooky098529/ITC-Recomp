@@ -55,16 +55,6 @@ uint32_t StageModel(uint8_t* base, uint32_t holder) {
                                            Load(base, Load(base, holder) + 8));
 }
 
-// memcpy from the frame at `sp` with `lr`; its r3 (the destination).
-uint64_t Memcpy(uint8_t* base, const Calls& calls, uint32_t to, uint32_t from, uint32_t bytes,
-                uint32_t sp, uint32_t lr) {
-  if (!native::Buffers_Memcpy(base, to, from, bytes, lr)) {
-    const uint64_t regs[3] = {to, from, bytes};
-    return calls.call(kMemcpy, regs, 3, nullptr, 0, sp, lr, nullptr);
-  }
-  return to;
-}
-
 // A yaw or pitch wrapped: below -π to π, above π to -π (NaN kept).
 double Wrap(uint8_t* base, double v) {
   const double minus_pi = Lfs(base, kMinusPi);
@@ -91,6 +81,15 @@ uint64_t PlayMenuSound(uint8_t* base, const Calls& calls, uint32_t cue, uint32_t
 }
 
 }  // namespace
+
+uint64_t Memcpy(uint8_t* base, const Calls& calls, uint32_t to, uint32_t from, uint32_t bytes,
+                uint32_t sp, uint32_t lr) {
+  if (!native::Buffers_Memcpy(base, to, from, bytes, lr)) {
+    const uint64_t regs[3] = {to, from, bytes};
+    return calls.call(kMemcpy, regs, 3, nullptr, 0, sp, lr, nullptr);
+  }
+  return to;
+}
 
 void PlatesHide(uint8_t* base, uint32_t points) {
   ITC_NATIVE_RUNNING("sub_820DF190 Plates::Hide");

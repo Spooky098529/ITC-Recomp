@@ -732,6 +732,62 @@ void Lights(Context& h, uint32_t block, Random& r) {
   results.Report();
 }
 
+// GarageStage::PoseCar: the stage's pose fields random (mostly finite, a
+// case in four with NaNs, infinities, zeros and denormals among them; now
+// and then a zero wheelbase or level heights), the yaw at +84; the scene
+// model 0's block (m + 4288) and out in the block. Compared: the block's
+// matrices and out as floats, the stage's +6144 and +6148, the 800-byte
+// frame's temporaries (its +80 to +671, floats; its saved registers left
+// out) and the callees' turns and Matrix::FromScaleRotationTranslation's
+// frame below it (floats).
+void Pose(Context& h, uint32_t block, Random& r) {
+  constexpr uint32_t kOut = 0x1A00;  // between the stage and the scene
+  const uint32_t sp = CallContext(h).r1.u32 & ~0xFu;
+  const uint32_t f = sp - 800;
+  const uint32_t b = block + kModel0 + 4288;
+  const uint32_t s = block + kStage;
+  const FloatRanges floats = {{b + 16, 16},     {b + 80, 64},     {b + 336, 64},
+                              {block + kOut, 16}, {s + 6144, 2},    {f + 80, 80},
+                              {f + 416, 64},    {f - 288, 16},    {f - 128, 28}};
+  Results results("GarageStage::PoseCar (sub_8217CAB8)");
+  for (int c = 0; c < 200; c++) {
+    Case(
+        h, results, block, r,
+        [&](PPCContext& t) {
+          const World w = Lay(h.base, block, r, true);
+          const bool any = r.Below(4) == 0;
+          const auto value = [&](float range) {
+            return any ? RandomFloat(r) : std::bit_cast<uint32_t>(car_draw_shared::Spread(r, range));
+          };
+          for (const uint32_t at : {6104u, 6108u, 6136u, 6140u}) {
+            guest::StoreU32(h.base, w.stage() + at, value(1.0f));
+          }
+          for (const uint32_t at : {6112u, 6116u, 6120u, 6124u}) {
+            guest::StoreU32(h.base, w.stage() + at, any ? RandomAngle(r) : value(0.2f));
+          }
+          guest::StoreU32(h.base, w.stage() + 6152, value(3.0f));
+          guest::StoreU32(h.base, w.stage() + 6184, value(1.0f));
+          guest::StoreU32(h.base, w.stage() + 6200, value(1.0f));
+          for (const uint32_t at : {80u, 84u, 88u}) {
+            guest::StoreU32(h.base, w.stage() + at, RandomAngle(r));
+          }
+          if (r.Below(10) == 0) {
+            guest::StoreU32(h.base, w.stage() + 6152, r.Below(2) << 31);
+          }
+          if (r.Below(10) == 0) {
+            guest::StoreU32(h.base, w.stage() + 6140, guest::LoadU32(h.base, w.stage() + 6136));
+          }
+          t.r3.u64 = w.holder();
+          t.r4.u64 = b;
+          t.r5.u64 = block + kOut;
+          t.r6.u64 = 1 + r.Below(2);
+        },
+        __imp__sub_8217CAB8, hooks::FrontEndCarDrawPoseCar, 128, floats,
+        fmt::format("case {}", c));
+  }
+  results.Report();
+}
+
 // Floor::Draw over the model draws' world of the car draw's harness
 // (car_draw_shared: the part model at its block's +0x100, shape 1 a copy
 // of shape 0),
@@ -798,6 +854,7 @@ void FrontEndCarDraw(Context& h) {
   Anims(h, block, r);
   LightKit(h, block, r);
   Lights(h, block, r);
+  Pose(h, block, r);
   memory::Free(allocation);
   Floors(h, r);
 }

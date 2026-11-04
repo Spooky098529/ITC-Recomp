@@ -48,6 +48,12 @@ struct Calls {
   scenery_lists::DrawCalls draw;
 };
 
+// memcpy (native::Buffers_Memcpy, else a guest call from the frame at `sp`
+// with `lr`, `lr` standing for the call's return address); its r3 (the
+// destination). Shared by the files (garage_stage.cpp).
+uint64_t Memcpy(uint8_t* base, const Calls& calls, uint32_t to, uint32_t from, uint32_t bytes,
+                uint32_t sp, uint32_t lr);
+
 // --- The number plates and the stage's small helpers (garage_stage.cpp) ---
 
 // sub_820DF190 Plates::Hide and sub_820DF180 Plates::Show: the parts'
@@ -147,5 +153,20 @@ uint64_t FloorDraw(uint8_t* base, const Calls& calls, uint32_t scene, uint32_t m
 // below `stack` as the original. Returns r3 as the original leaves it (its
 // frame's +128).
 uint32_t GarageStageSetLights(uint8_t* base, uint32_t lights, uint32_t mirrored, uint32_t stack);
+
+// --- The car's pose (pose.cpp) ---
+
+// sub_8217CAB8 GarageStage::PoseCar: ScenePools::GetB (its answer unused);
+// the scene model's block `block` (m + 4288): +732 = 1, the world matrix
+// (+16) the identity raised by the body's height (stage +6144 = the mean of
+// +6136 and +6140) and turned by its pitch (+6148 = atan2 of their
+// difference over the wheelbase +6152) and the yaw (+84); the four wheels'
+// turns (+336 + 64i: camber and toe) and placements (+80 + 64i); `out` the
+// mirror (Matrix::FromScaleRotationTranslation, scale (1, -1, 1)). Through
+// its 800-byte frame below `stack`, every matrix at the original's offsets
+// and every Matrix::Multiply noted for interpolation with the original's
+// return address. Returns r3 as the original leaves it (`out`).
+uint32_t GarageStagePoseCar(uint8_t* base, const Calls& calls, uint32_t holder, uint32_t block,
+                            uint32_t out, uint32_t stack);
 
 }  // namespace front_end_car_draw

@@ -8,12 +8,15 @@
 #include "hooks/load_poll.h"
 #include "hooks/scenery_lists.h"
 #include "load_poll/load_poll.h"
+#include "native/buffers.h"
 
 ITC_FLAG_DECLARE(bool, native_vehicle_accessors);
 ITC_FLAG_DECLARE(bool, native_math);
 ITC_FLAG_DECLARE(bool, native_menu_sounds);
 ITC_FLAG_DECLARE(bool, native_load_poll);
 ITC_FLAG_DECLARE(bool, native_scenery_lists);
+ITC_FLAG_DECLARE(bool, native_matrix_math);
+ITC_FLAG_DECLARE(bool, native_accessories);
 
 ITC_FLAG_BOOL(native_front_end_car_draw, true, "ITC",
               "Run the front end's car draw (docs/functions/front-end-car-draw.md): so far "
@@ -25,7 +28,9 @@ ITC_FLAG_BOOL(native_front_end_car_draw, true, "ITC",
               "originals), GarageStage::SetLightKit sub_82179678 with "
               "SceneModel::ApplyLightKit sub_820D9D10, and Floor::Draw sub_820C8480 (with "
               "--native_scenery_lists and the command list's diagnostics off), "
-              "GarageStage::SetLights sub_8217BA20, natively instead of through the translated code, "
+              "GarageStage::SetLights sub_8217BA20, and GarageStage::PoseCar sub_8217CAB8 (with "
+              "--native_matrix_math, --native_accessories and --native_memcpy), natively instead "
+              "of through the translated code, "
               "with --native_vehicle_accessors, --native_math, --native_menu_sounds and "
               "--native_load_poll with its callees (else the originals; the same writes; "
               "checked by --run_harnesses=front_end_car_draw)");
@@ -207,6 +212,21 @@ void FrontEndCarDrawSetLights(PPCContext& ctx, uint8_t* base) {
   ctx.fpscr.disableFlushMode();
 }
 
+void FrontEndCarDrawPoseCar(PPCContext& ctx, uint8_t* base) {
+  // The matrix math's and Matrix::FromScaleRotationTranslation's plain C++
+  // only where their adapters would run it.
+  if (!FrontEndCarDrawCalleesNative() || !ITC_FLAG(native_matrix_math) ||
+      !ITC_FLAG(native_accessories) || !native::Buffers_NativeMemcpy()) {
+    __imp__sub_8217CAB8(ctx, base);
+    return;
+  }
+  ctx.fpscr.disableFlushMode();
+  const fe::Calls calls = FrontEndCarDrawCalls(ctx, base);
+  ctx.r3.u64 = fe::GarageStagePoseCar(base, calls, ctx.r3.u32, ctx.r4.u32, ctx.r5.u32,
+                                      ctx.r1.u32);
+  ctx.fpscr.disableFlushMode();
+}
+
 #undef ITC_FRONT_END_ORIGINAL
 
 }  // namespace hooks
@@ -231,6 +251,7 @@ ITC_FRONT_END_CAR_DRAW(820D9D10, FrontEndCarDrawApplyLightKit)
 ITC_FRONT_END_CAR_DRAW(82179678, FrontEndCarDrawSetLightKit)
 ITC_FRONT_END_CAR_DRAW(820C8480, FrontEndCarDrawFloorDraw)
 ITC_FRONT_END_CAR_DRAW(8217BA20, FrontEndCarDrawSetLights)
+ITC_FRONT_END_CAR_DRAW(8217CAB8, FrontEndCarDrawPoseCar)
 
 // No adapters (2026-11-04: their callers in play are native, which call
 // their plain C++; the steps above are the harness's): Plates::Hide

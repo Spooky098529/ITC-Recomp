@@ -51,5 +51,9 @@ void FrontEndCarDrawSetLightKit(PPCContext& ctx, uint8_t* base);
 void FrontEndCarDrawFloorDraw(PPCContext& ctx, uint8_t* base);
 // GarageStage::SetLights sub_8217BA20 (r3 the stage's lights, r4 mirrored).
 void FrontEndCarDrawSetLights(PPCContext& ctx, uint8_t* base);
+// GarageStage::PoseCar sub_8217CAB8 (r3 the holder, r4 the scene model's
+// block, r5 out; with --native_matrix_math, --native_accessories and
+// --native_memcpy, else the original).
+void FrontEndCarDrawPoseCar(PPCContext& ctx, uint8_t* base);
 
 }  // namespace hooks
