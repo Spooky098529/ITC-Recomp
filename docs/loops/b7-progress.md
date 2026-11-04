@@ -63,7 +63,11 @@ file's history. What's left to see in a drive, from every run:
   errors; 9 ready groups; `CourseSetup::` the +848 machine,
   `RaceMode::NextMode`, the loading screen; blocked parts wait on
   `Scenery::IsLoaded`, `CarScene::Update` and the `sub_82150E00` lead).
-  Step: migration agent running.
+  Migration e3e7b130..f6bb8df4 (`--native_race_loading`, 10 of 13 in
+  play ours, no adapters removed; `itc_3506`: race 38 s, 0 errors,
+  every harness 0 differing, all ran in the race; loading screen dumps
+  on and off the same but the animation's phase; no subagents). Step:
+  validation agent running.
 
 ## Done
 
@@ -106,5 +110,7 @@ file's history. What's left to see in a drive, from every run:
 - After its validation (`itc_3502`): ours 4157, work left 2253.
 - After the race's loading's map: ours 4157, work left 2253 (wrapped
   62, known 492, unknown 1699).
+- After its migration: ours 4167, work left 2243 (wrapped 62, known
+  482, unknown 1699).
 
 ## Stopped
