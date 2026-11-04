@@ -268,5 +268,7 @@ void BootMode(Context& h);
 void CarDraw(Context& h);
 // The race flow (src/harnesses/race_flow.cpp).
 void RaceFlow(Context& h);
+// The car scene's draw (src/harnesses/car_scene_draw.cpp).
+void CarSceneDraw(Context& h);
 
 }  // namespace harness
