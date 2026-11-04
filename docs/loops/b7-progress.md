@@ -18,7 +18,10 @@ file's history. What's left to see in a drive, from every run:
   group, `sub_82160AE0`, 1,661 lines, split the migration). Migration
   1e19350e (`--native_race_flow`, 1 of 1 in play; `itc_3417`: race 38
   s, 0 errors, race_flow 12 cases 0 differing; no subagents). Done.
-- Subsystem 2 of 3: being picked.
+- Subsystem 2 of 3: the car scene's draw `sub_820C5DE8` (lead picked:
+  runs every frame, 11 ready groups under it, 21 functions left in its
+  subtree; the thirtieth run's car draw waits on it). Step: mapping,
+  agent running.
 
 ## Done
 
