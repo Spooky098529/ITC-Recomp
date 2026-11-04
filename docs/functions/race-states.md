@@ -121,9 +121,10 @@ format string (probably a debug text print compiled out).
 
 Not here (leads in `../loops/leads.md`, or already in their own): the
 loading screen (`sub_822478D0`, `sub_82247898`, `sub_82247A60`), the
-achievements after a race (`sub_82290788`), the input recordings saved
-and rewound (`sub_82104F68`, `sub_82104E68`), the code that puts the
-cars back on the road (`sub_82104D40`, `sub_82104898`, `sub_821046F8`),
+achievements after a race (`sub_82290788`), the replay kept and the
+race's snapshots saved and put back (`sub_82104F68`, `sub_82104E68`,
+`sub_82104D40`, `sub_82104898`, `sub_821046F8`; since 2026-11-04 in
+`replay-snapshots.md`),
 the player's items after a cruise (`sub_82115190`), the race event's
 lookups (`sub_821442D8`, `sub_821434A0`), the scene models' load poll
 (`sub_820DA318`), the archive's queue (`sub_8209D7B0`) and the camera
@@ -236,7 +237,7 @@ Status:
 | `sub_82168500` | `RaceStates::QuitTick` | Overridden | (27, 0), r4 = the dispatcher: posts 29 (the pause left); the flags lose 0x20000; then kind 5 (+0xA3AF0): posts 48 (→ 36); a replay (0x80): 36 (→ 28); else the progress's +6104 = 3 (retired), +6108 = 1 with +9608 set, else 2, posts 34 (→ 26). No direct callers. Read in full. Native: `race_states::QuitTick`, adapter behind `--native_race_states`. Harness `race_states` (24 cases: kind 5 or not, the flags random, +9608 0 or not). |
 | `sub_82167970` | `RaceStates::AfterRaceTick` | Overridden | (26, 0): a replay (the flags' 0x80): posts 42 (→ 18, the replay again) for kind 5, else 36 (→ 28); else 38 (→ 30, the menu); +9616 = 0. No direct callers. Read in full. Native: `race_states::AfterRaceTick`, adapter behind `--native_race_states`. Harness `race_states` (24 cases). |
 | `sub_821647B0` | `RaceStates::OnReplay` | Overridden | (26, 42) and (30, 42) → 18: `ScreenFades::FadeOut`(15); +9612, +9628, +9632 = 0; the flags \|= 0x2000. No direct callers. Read in full. Native: `race_states::OnReplay`, adapter behind `--native_race_states`. Harness `race_states` (24 cases). |
-| `sub_82168708` | `RaceStates::ReplaySetUpTick` | | (18, 0), r4 = the dispatcher: when the fades are done: the flags lose 0x2000 and 0x4000 and get 0x80 (a replay) and 0x40 (the input replayed); unless kind 5, the input recordings rewound (`sub_82104E68`); posts 31; the flags \|= 0x100; the cars put back (`sub_821046F8`); posts 43 (→ 17). No direct callers. Read in full. |
+| `sub_82168708` | `RaceStates::ReplaySetUpTick` | | (18, 0), r4 = the dispatcher: when the fades are done: the flags lose 0x2000 and 0x4000 and get 0x80 (a replay) and 0x40 (the input replayed); unless kind 5, the race as it ended saved into the recordings' block B (`RaceReplay::SaveEnd`, `sub_82104E68`, `replay-snapshots.md`; corrected 2026-11-04, first called the recordings rewound); posts 31; the flags \|= 0x100; the cars put back (`sub_821046F8`); posts 43 (→ 17). No direct callers. Read in full. |
 | `sub_82168858` | | | (19, 0) (kind 5's replay, from (3, 42)): the flags \|= 0x80 and 0x40, `sub_821046F8`, posts 43 (→ 17). Not seen in play. Read in full. |
 | `sub_82164820` | `RaceStates::OnReplayStart` | | (18, 43) and (19, 43) → 17: +9612, +9616 = 0; the current stage of type 2 or 3, or kind 6 with its +0 not 1: the flags \|= 0x2000; the loading screen (`sub_822478D0`(0, 2, 671)). No direct callers. Read in full. |
 | `sub_82168910` | `RaceStates::ReplayLoadTick` | | (17, 0), r3 = the machine, r4 = the dispatcher: the loading wait (`sub_8209D7B0`, +9616 above 30, else counted with a debug print and the loading screen run from 30); then `ScreenFades::FadeIn`(5), posts 31, the flags lose 0x100, posts 32, +9612 = 1, `RaceStates::SetUpStage` (the stage set up again for the replay), posts 26 (→ 22), the loading screen finished. No direct callers. Read in full. |

@@ -42,7 +42,8 @@ iterator (`c-runtime.md`); `operator new` and `operator delete`
 Not here: the callers, which are other subsystems' (the race's states
 and manager at `82165000`-`82175000`, the camera modes at
 `82152028`-`82156CC0`, the car sounds' `sub_8210E5C0`, the race code at
-`82104310`-`82104E00`; leads in `../loops/leads.md`). Callees never seen
+`82104310`-`82104E00`, since 2026-11-04 in `replay-snapshots.md`; leads
+in `../loops/leads.md`). Callees never seen
 in play (no rows): the shift and digital-control setters under
 `Vehicle::ApplyInput` (`sub_820B0098`, `sub_820B00A8`, `sub_820B00B8`:
 bytes +2284, +2285, +2286 = 1; `sub_820B03E0`, `sub_820B0428`: the

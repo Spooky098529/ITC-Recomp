@@ -85,7 +85,8 @@ Not here: the race's other states (since 2026-10-28 in `race-states.md`, the sta
 `sub_82165C78`, `sub_82166E50`, `sub_82166F98`, `sub_821692C8`; never
 seen: `sub_82167D88`, `sub_82168018`, `sub_82168C80`) and the code that
 moves cars back on the road (`sub_821046F8`, `sub_82104898`,
-`sub_82104D40`): leads in `../loops/leads.md`. `sub_821743A8`'s callees
+`sub_82104D40`): leads in `../loops/leads.md` (since 2026-11-04 in
+`replay-snapshots.md`). `sub_821743A8`'s callees
 never ran (`sub_8214AA70` is in `system-services.md`).
 
 Status:

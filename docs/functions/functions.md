@@ -522,6 +522,12 @@ Rows not yet moved stay in the table below. So far:
   lights, the car posed with its wheels, the number plates and the light
   kit, and the mirrored pass with the floor model for the reflection
   (B7).
+- [`replay-snapshots.md`](replay-snapshots.md): the race's snapshots
+  for its replay: the seven vehicles' state (track positions, rigid
+  body, physics part, collision object) and the racers' manager saved
+  into the input recordings' two blocks at the countdown and before the
+  replay and put back for and after it, the replay kept after a race,
+  and their destructors (B7).
 
 These files hold functions only. What used to follow the table here moved
 out on 2026-10-20: how frame interpolation works, its options and what
