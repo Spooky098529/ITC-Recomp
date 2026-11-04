@@ -12,5 +12,8 @@ namespace hooks {
 // Record5232::Restore sub_821044D8: r3 = a record, r4 = a vehicle; r3 as
 // the original leaves it.
 void Record5232Restore(PPCContext& ctx, uint8_t* base);
+// RaceSnapshot::Save sub_82104AB8: r3 = a snapshot block; r3 as the
+// original leaves it.
+void RaceSnapshotSave(PPCContext& ctx, uint8_t* base);
 
 }  // namespace hooks

@@ -29,6 +29,8 @@ namespace replay_snapshots {
 // The input recordings' pointer (docs/known-data.md) and its blocks.
 constexpr uint32_t kRecordings = 0x826C5B4C;
 constexpr uint32_t kRecordBytes = 5232;
+// The racers' manager's pointer (docs/functions/race-world.md).
+constexpr uint32_t kManager = 0x826D82F4;
 
 // --- A vehicle's record: the restores (record to vehicle) ---
 
@@ -52,5 +54,32 @@ uint32_t Member4080Restore(uint8_t* base, uint32_t part, uint32_t object);
 // (+608, the vehicle's [+336]), Member1136::Restore (+1136),
 // Member4080::Restore (+4080, [+340]). Returns r3 (Member4080::Restore's).
 uint32_t Record5232Restore(uint8_t* base, uint32_t record, uint32_t vehicle);
+
+// --- A vehicle's record: the saves (vehicle to record) ---
+
+// Record5232::SaveTrack (sub_82104380): the reverse of RestoreTrack.
+void Record5232SaveTrack(uint8_t* base, uint32_t record, uint32_t vehicle);
+// BodyState::Save (sub_821039F0): the rigid body's first 516 bytes into the
+// record's +608.
+void BodyStateSave(uint8_t* base, uint32_t state, uint32_t body);
+// Member1136::Save (sub_821034B8): the vehicle's physics part packed into
+// the record's +1136.
+void Member1136Save(uint8_t* base, uint32_t part, uint32_t vehicle);
+// Part464::Save (sub_82103300): a placed shape copy into a record part.
+void Part464Save(uint8_t* base, uint32_t part, uint32_t shape);
+// Member4080::Save (sub_821033F0): with no object, +0 = 0 (r3 the part);
+// else +0 = 1 and the object's fields (r3 the part + 1136).
+uint32_t Member4080Save(uint8_t* base, uint32_t part, uint32_t object);
+// Record5232::Save (sub_82104538): SaveTrack, BodyState::Save,
+// Member1136::Save, Member4080::Save. Returns r3 (Member4080::Save's).
+uint32_t Record5232Save(uint8_t* base, uint32_t record, uint32_t vehicle);
+
+// --- The race's snapshot (a 38,928-byte block) ---
+
+// RaceSnapshot::Save (sub_82104AB8): +2292 = 0; each vehicle in use
+// (Vehicle::Get, +6148 not 0) into its record (+2304 + 5,232 i; the others
+// left); the manager's entries and counts into the head (memcpy of 77 and
+// 3 entries of 28 bytes, then words). Returns r3 (the last memcpy's).
+uint32_t RaceSnapshotSave(uint8_t* base, uint32_t block);
 
 }  // namespace replay_snapshots

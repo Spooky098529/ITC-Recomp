@@ -11,6 +11,7 @@
 #include "native/buffers.h"
 #include "vehicle/vehicle.h"
 #include "vehicle_accessors/vectors.h"
+#include "vehicle_accessors/vehicle_accessors.h"
 
 namespace replay_snapshots {
 
@@ -295,6 +296,261 @@ uint32_t Record5232Restore(uint8_t* base, uint32_t record, uint32_t vehicle) {
   BodyStateRestore(base, record + 608, guest::LoadU32(base, vehicle + 336));
   Member1136Restore(base, record + 1136, vehicle);
   return Member4080Restore(base, record + 4080, guest::LoadU32(base, vehicle + 340));
+}
+
+// --- The saves ---
+
+void Record5232SaveTrack(uint8_t* base, uint32_t record, uint32_t vehicle) {
+  ITC_NATIVE_RUNNING("sub_82104380 Record5232::SaveTrack");
+  const uint32_t to = record, from = vehicle;
+  Word(base, to + 0, from + 6148);
+  Word(base, to + 4, from + 6152);
+  Memcpy(base, to + 16, from + 6160, 112, 0x821043B4);
+  for (uint32_t i = 0; i < 5; i++) {
+    TrackPosition(base, to + 128 + 96 * i, from + 5232 + 96 * i);
+  }
+}
+
+void BodyStateSave(uint8_t* base, uint32_t state, uint32_t body) {
+  ITC_NATIVE_RUNNING("sub_821039F0 BodyState::Save");
+  const uint32_t to = state, from = body;
+  Byte(base, to + 0, from + 0);
+  FloatWord(base, to + 4, from + 4);
+  FloatWord(base, to + 8, from + 8);
+  Vec4(base, to + 16, from + 16);
+  Vec4(base, to + 32, from + 32);
+  FloatWord(base, to + 48, from + 48);
+  Vec4(base, to + 64, from + 64);
+  Dword(base, to + 80, from + 80);
+  Dword(base, to + 88, from + 88);
+  Vec4(base, to + 96, from + 96);
+  FloatWord(base, to + 112, from + 112);
+  Vec4(base, to + 128, from + 128);
+  Vec4(base, to + 144, from + 144);
+  FloatWord(base, to + 160, from + 160);
+  FloatWord(base, to + 164, from + 164);
+  for (uint32_t at = 176; at < 224; at += 16) {
+    Vec4(base, to + at, from + at);
+  }
+  Matrix(base, to + 224, from + 224);
+  Matrix(base, to + 288, from + 288);
+  Vec4(base, to + 352, from + 352);
+  Vec4(base, to + 368, from + 368);
+  FloatWord(base, to + 384, from + 384);
+  Vec4(base, to + 400, from + 400);
+  Matrix(base, to + 416, from + 416);
+  Vec4(base, to + 480, from + 480);
+  Vec4(base, to + 496, from + 496);
+  FloatWord(base, to + 512, from + 512);
+}
+
+void Member1136Save(uint8_t* base, uint32_t part, uint32_t vehicle) {
+  ITC_NATIVE_RUNNING("sub_821034B8 Member1136::Save");
+  const uint32_t to = part, from = vehicle;
+  for (uint32_t at = 0; at < 48; at += 16) {
+    Vec4(base, to + at, from + at);
+  }
+  FloatWord(base, to + 48, from + 48);
+  FloatWord(base, to + 52, from + 52);
+  Vec4(base, to + 64, from + 64);
+  for (uint32_t at = 80; at < 96; at += 4) {
+    FloatWord(base, to + at, from + at);
+  }
+  for (uint32_t at = 96; at < 144; at += 16) {
+    Vec4(base, to + at, from + at);
+  }
+  Matrix(base, to + 144, from + 144);
+  Matrix(base, to + 208, from + 208);
+  Byte(base, to + 272, from + 276);
+  for (uint32_t i = 0; i < 14; i++) {
+    FloatWord(base, to + 276 + 4 * i, from + 280 + 4 * i);
+  }
+  Word(base, to + 332, from + 348);
+  for (uint32_t i = 0; i < 4; i++) {
+    Vec4(base, to + 336 + 16 * i, from + 352 + 16 * i);
+  }
+  for (uint32_t i = 0; i < 4; i++) {
+    Wheel(base, to + 400 + 368 * i, from + 416 + 368 * i);
+  }
+  WheelRecord2(base, to + 1872, from + 1888);
+  WheelRecord2(base, to + 2000, from + 2016);
+  for (uint32_t i = 0; i < 4; i++) {
+    Word(base, to + 2128 + 4 * i, from + 2176 + 4 * i);
+  }
+  for (uint32_t i = 0; i < 3; i++) {
+    FloatWord(base, to + 2144 + 4 * i, from + 2192 + 4 * i);
+  }
+  Memcpy(base, to + 2156, from + 2204, 144, 0x8210369C);
+  for (uint32_t i = 0; i < 5; i++) {
+    FloatWord(base, to + 2300 + 4 * i, from + 2348 + 4 * i);
+  }
+  for (uint32_t i = 0; i < 3; i++) {
+    Word(base, to + 2320 + 4 * i, from + 2368 + 4 * i);
+  }
+  for (uint32_t i = 0; i < 8; i++) {
+    Byte(base, to + 2332 + 1 * i, from + 2380 + 1 * i);
+  }
+  FloatWord(base, to + 2340, from + 2388);
+  Word(base, to + 2344, from + 2392);
+  FloatWord(base, to + 2348, from + 2396);
+  Byte(base, to + 2352, from + 2400);
+  Byte(base, to + 2353, from + 2401);
+  for (uint32_t i = 0; i < 3; i++) {
+    FloatWord(base, to + 2356 + 4 * i, from + 2404 + 4 * i);
+  }
+  for (uint32_t i = 0; i < 3; i++) {
+    FloatWord(base, to + 2368 + 4 * i, from + 2428 + 4 * i);
+  }
+  FloatWord(base, to + 2380, from + 2416);
+  FloatWord(base, to + 2384, from + 2420);
+  Byte(base, to + 2388, from + 2424);
+  FloatWord(base, to + 2392, from + 2440);
+  Byte(base, to + 2396, from + 2444);
+  Byte(base, to + 2397, from + 2445);
+  FloatWord(base, to + 2400, from + 2448);
+  FloatWord(base, to + 2404, from + 2452);
+  Byte(base, to + 2408, from + 2456);
+  Vec4(base, to + 2416, from + 2464);
+  Vec4(base, to + 2432, from + 2480);
+  Word(base, to + 2448, from + 2496);
+  FloatWord(base, to + 2452, from + 2500);
+  Byte(base, to + 2456, from + 2504);
+  FloatWord(base, to + 2460, from + 2508);
+  Byte(base, to + 2464, from + 2512);
+  FloatWord(base, to + 2468, from + 2516);
+  FloatWord(base, to + 2472, from + 2520);
+  Word(base, to + 2476, from + 2524);
+  for (uint32_t i = 0; i < 6; i++) {
+    Vec4(base, to + 2480 + 16 * i, from + 2528 + 16 * i);
+  }
+  Byte(base, to + 2576, from + 2624);
+  Byte(base, to + 2577, from + 2625);
+  for (uint32_t i = 0; i < 9; i++) {
+    FloatWord(base, to + 2580 + 4 * i, from + 2628 + 4 * i);
+  }
+  Byte(base, to + 2616, from + 2664);
+  FloatWord(base, to + 2620, from + 2924);
+  Byte(base, to + 2624, from + 2928);
+  for (uint32_t i = 0; i < 4; i++) {
+    FloatWord(base, to + 2628 + 4 * i, from + 2932 + 4 * i);
+  }
+  Byte(base, to + 2644, from + 2948);
+  FloatWord(base, to + 2648, from + 2952);
+  FloatWord(base, to + 2652, from + 2956);
+  Byte(base, to + 2656, from + 2960);
+  for (uint32_t i = 0; i < 5; i++) {
+    FloatWord(base, to + 2660 + 4 * i, from + 2964 + 4 * i);
+  }
+  Word(base, to + 2680, from + 2984);
+  Memcpy(base, to + 2684, from + 2988, 60, 0x82103928);
+  Memcpy(base, to + 2744, from + 3048, 60, 0x82103928);
+  for (uint32_t i = 0; i < 6; i++) {
+    FloatWord(base, to + 2804 + 4 * i, from + 3108 + 4 * i);
+  }
+  Byte(base, to + 2828, from + 3132);
+  for (uint32_t i = 0; i < 5; i++) {
+    FloatWord(base, to + 2832 + 4 * i, from + 3136 + 4 * i);
+  }
+  Word(base, to + 2852, from + 3156);
+  for (uint32_t i = 0; i < 4; i++) {
+    Vec4(base, to + 2864 + 16 * i, from + 3168 + 16 * i);
+  }
+  FloatWord(base, to + 2928, from + 3232);
+  FloatWord(base, to + 2932, from + 3236);
+  Byte(base, to + 2936, from + 3240);
+  Byte(base, to + 2937, from + 3241);
+}
+
+void Part464Save(uint8_t* base, uint32_t part, uint32_t shape) {
+  ITC_NATIVE_RUNNING("sub_82103300 Part464::Save");
+  const uint32_t to = part, from = shape;
+  for (uint32_t i = 0; i < 5; i++) {
+    FloatWord(base, to + 352 + 4 * i, from + 16 + 4 * i);
+  }
+  for (uint32_t i = 0; i < 4; i++) {
+    Vec4(base, to + 384 + 16 * i, from + 48 + 16 * i);
+  }
+  HalfToWord(base, to + 448, from + 112);
+  Vec4(base, to + 0, from + 128);
+  Vec4(base, to + 16, from + 144);
+  for (uint32_t i = 0; i < 8; i++) {
+    Vec4(base, to + 32 + 16 * i, from + 176 + 16 * i);
+  }
+  FloatWord(base, to + 160, from + 304);
+  Vec4(base, to + 176, from + 320);
+  FloatWord(base, to + 192, from + 336);
+  Vec4(base, to + 208, from + 352);
+  FloatWord(base, to + 224, from + 368);
+  Vec4(base, to + 240, from + 384);
+  FloatWord(base, to + 256, from + 400);
+  Vec4(base, to + 272, from + 416);
+  FloatWord(base, to + 288, from + 432);
+  Vec4(base, to + 304, from + 448);
+  FloatWord(base, to + 320, from + 464);
+  Vec4(base, to + 336, from + 480);
+}
+
+uint32_t Member4080Save(uint8_t* base, uint32_t part, uint32_t object) {
+  ITC_NATIVE_RUNNING("sub_821033F0 Member4080::Save");
+  if (object == 0) {
+    guest::StoreU32(base, part, 0);
+    return part;
+  }
+  const uint32_t to = part, from = object;
+  guest::StoreU32(base, to, 1);
+  Vec4(base, to + 944, from + 48);
+  Vec4(base, to + 960, from + 64);
+  Matrix(base, to + 976, from + 80);
+  FloatWord(base, to + 1040, from + 144);
+  const uint32_t second = guest::LoadU32(base, from + 40);
+  const uint32_t first = guest::LoadU32(base, from + 36);
+  Part464Save(base, to + 16, first);
+  Part464Save(base, to + 480, second);
+  Vec4(base, to + 1056, from + 160);
+  Vec4(base, to + 1072, from + 176);
+  Word(base, to + 1088, from + 192);
+  Vec4(base, to + 1104, from + 208);
+  FloatWord(base, to + 1120, from + 224);
+  Word(base, to + 1124, from + 288);
+  Vec4(base, to + 1136, from + 304);
+  return to + 1136;
+}
+
+uint32_t Record5232Save(uint8_t* base, uint32_t record, uint32_t vehicle) {
+  ITC_NATIVE_RUNNING("sub_82104538 Record5232::Save");
+  Record5232SaveTrack(base, record, vehicle);
+  BodyStateSave(base, record + 608, guest::LoadU32(base, vehicle + 336));
+  Member1136Save(base, record + 1136, vehicle);
+  return Member4080Save(base, record + 4080, guest::LoadU32(base, vehicle + 340));
+}
+
+uint32_t RaceSnapshotSave(uint8_t* base, uint32_t block) {
+  ITC_NATIVE_RUNNING("sub_82104AB8 RaceSnapshot::Save");
+  guest::StoreU32(base, block + 2292, 0);
+  for (uint32_t i = 0; i < 7; i++) {
+    const uint32_t vehicle = vehicle_accessors::VehicleGet(base, i);
+    if (guest::LoadU32(base, vehicle + 6148) != 0) {
+      Record5232Save(base, block + 2304 + kRecordBytes * i, vehicle);
+    }
+  }
+  // The manager's entries and counts into the block's head.
+  const uint32_t manager = guest::LoadU32(base, kManager);
+  for (uint32_t i = 0; i < 77; i++) {
+    Memcpy(base, block + 28 * i, manager + 4 + 28 * i, 28, 0x82104B28);
+  }
+  for (uint32_t i = 0; i < 3; i++) {
+    Memcpy(base, block + 2156 + 28 * i, manager + 2160 + 28 * i, 28, 0x82104B54);
+  }
+  for (uint32_t i = 0; i < 7; i++) {
+    Word(base, block + 2240 + 4 * i, manager + 2336 + 4 * i);
+  }
+  Word(base, block + 2268, manager + 2364);
+  Word(base, block + 2272, manager + 2368);
+  Word(base, block + 2276, manager + 2372);
+  Word(base, block + 2280, manager + 2376);
+  Word(base, block + 2284, manager + 2380);
+  Word(base, block + 2288, manager + 2388);
+  return block + 2156 + 28 * 2;  // the last memcpy's r3
 }
 
 }  // namespace replay_snapshots

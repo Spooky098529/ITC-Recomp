@@ -10,7 +10,8 @@
 
 ITC_FLAG_BOOL(native_replay_snapshots, true, "ITC",
               "Run the replay's snapshots (docs/functions/replay-snapshots.md: a vehicle's "
-              "5,232-byte record put back, Record5232::Restore sub_821044D8 and its parts) "
+              "5,232-byte record put back, Record5232::Restore sub_821044D8, and the race "
+              "saved into a snapshot block, RaceSnapshot::Save sub_82104AB8, with their parts) "
               "natively instead of through the translated code (the same writes; checked by "
               "--run_harnesses=replay_snapshots)");
 
@@ -19,6 +20,11 @@ namespace hooks {
 void Record5232Restore(PPCContext& ctx, uint8_t* base) {
   ctx.fpscr.disableFlushMode();
   ctx.r3.u64 = replay_snapshots::Record5232Restore(base, ctx.r3.u32, ctx.r4.u32);
+}
+
+void RaceSnapshotSave(PPCContext& ctx, uint8_t* base) {
+  ctx.fpscr.disableFlushMode();
+  ctx.r3.u64 = replay_snapshots::RaceSnapshotSave(base, ctx.r3.u32);
 }
 
 }  // namespace hooks
@@ -42,4 +48,14 @@ extern "C" REX_FUNC(sub_821044D8) {
     return;
   }
   hooks::Record5232Restore(ctx, base);
+}
+
+// Callers: RaceReplay::SaveStart, SaveEnd (recompiled).
+extern "C" REX_FUNC(sub_82104AB8) {
+  REX_FUNC_PROLOGUE();
+  if (!Native()) {
+    __imp__sub_82104AB8(ctx, base);
+    return;
+  }
+  hooks::RaceSnapshotSave(ctx, base);
 }
