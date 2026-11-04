@@ -40,8 +40,13 @@ file's history. What's left to see in a drive, from every run:
   (the call's own condition). The user's call (2026-11-04): `rand`
   native, over the thread's guest seed (+20 of `_getptd`'s block, found
   as the original does), `_getptd` and `_mtinit` left for the core;
-  given to the migration agent for after the ready groups. Step:
-  migration agent running.
+  given to the migration agent for after the ready groups. Migration
+  508c7be5..d4d1905e (`--native_race_sounds`, 28 of 29 in play ours,
+  8 adapters removed, with `rand` under `--native_c_runtime`; one
+  subagent for `RaceSounds::Init`; `itc_3496`/`itc_3497`: race 38 s,
+  0 errors, every harness 0 differing; `Unload` `sub_821772D8` left,
+  ready, at the batch limit). Step: validation agent running; another
+  migration agent for `Unload` after it.
 
 ## Done
 
@@ -72,5 +77,7 @@ file's history. What's left to see in a drive, from every run:
 - After its validation (`itc_3487`): ours 4125, work left 2283.
 - After the race's sounds' map: ours 4125, work left 2283 (wrapped
   62, known 509, unknown 1712).
+- After its first migration: ours 4154, work left 2254 (wrapped 62,
+  known 480, unknown 1712).
 
 ## Stopped
