@@ -453,6 +453,7 @@ set(ITC_SOURCES
     src/c_runtime/parse.cpp
     src/c_runtime/arrays.cpp
     src/c_runtime/exit.cpp
+    src/c_runtime/random.cpp
     src/game_data/game_data.cpp
     src/game_data/data_file.cpp
     src/hooks/data_file.cpp

@@ -13,6 +13,7 @@
 #include "c_runtime/exit.h"
 #include "c_runtime/format.h"
 #include "c_runtime/parse.h"
+#include "c_runtime/random.h"
 #include "c_runtime/start_up.h"
 #include "c_runtime/strings.h"
 
@@ -38,7 +39,8 @@ ITC_FLAG_BOOL(native_c_runtime, true, "ITC",
               "sub_825B36B8, sub_825B7F10); _fltout2 and $I10_OUTPUT (sub_825B6458, sub_825B8B48); %f's "
               "_cfltcvt_l, _cftof_l, _cftof2_l and _fptostr (sub_825AEB20, sub_825AE8E0, sub_825AE708, "
               "sub_825B61E8); write_char "
-              "(sub_825AF000), write_multi_char (sub_825AF098), sprintf and _vsnprintf (sub_825A93D0, "
+              "(sub_825AF000), write_multi_char (sub_825AF098), rand (sub_825A9BB8, the "
+              "seed in the thread's guest C runtime data, found as _getptd does), sprintf and _vsnprintf (sub_825A93D0, "
               "sub_825AB010) with _vsnprintf_l and _output_l (sub_825AAF18, sub_825AF130), the wide write_char and _putwc_nolock "
               "(sub_825B1368, sub_825B7A80); __iob_func (sub_825AD4C0); the start-up's _cfltcvt_init (sub_825A6DB0, "
               "sub_825A6E48), _init_pointers (sub_825AA398) with its setters (sub_825AD140, "
@@ -708,4 +710,49 @@ extern "C" REX_FUNC(sub_820900C0) {
   ArrayCall call{&ctx, base, 0x820900F4};
   c_runtime::VectorDestruct(base, ctx.r3.u64, ctx.r4.u64, ctx.r5.u64, ctx.r6.u64, CallElement,
                             &call);
+}
+
+// rand: the guest calls of the per-thread data's lookup through the function
+// table (r1, r3 and r4 as set, lr), r1 and lr put back.
+namespace {
+struct ThreadDataUser {
+  PPCContext& ctx;
+  uint8_t* base;
+};
+uint64_t ThreadDataGuest(void* user, uint32_t function, uint32_t r1, uint32_t lr, int set,
+                         uint64_t r3, uint64_t r4) {
+  auto& self = *static_cast<ThreadDataUser*>(user);
+  PPCContext& ctx = self.ctx;
+  uint8_t* base = self.base;
+  const uint64_t stack = ctx.r1.u64, saved_lr = ctx.lr;
+  ctx.r1.u64 = r1;
+  if (set >= 1) {
+    ctx.r3.u64 = r3;
+  }
+  if (set >= 2) {
+    ctx.r4.u64 = r4;
+  }
+  ctx.lr = lr;
+  ctx.ctr.u64 = function;
+  REX_CALL_INDIRECT_FUNC(function);
+  ctx.r1.u64 = stack;
+  ctx.lr = saved_lr;
+  return ctx.r3.u64;
+}
+}  // namespace
+
+void hooks::CRuntimeRand(PPCContext& ctx, uint8_t* base) {
+  ThreadDataUser user{ctx, base};
+  const c_runtime::ThreadDataCall call{&ThreadDataGuest, &user};
+  const uint64_t r3 = c_runtime::Rand(base, ctx.r1.u32, call);
+  ctx.r3.u64 = r3;
+}
+
+extern "C" REX_FUNC(sub_825A9BB8) {
+  REX_FUNC_PROLOGUE();
+  if (!ITC_FLAG(native_c_runtime)) {
+    __imp__sub_825A9BB8(ctx, base);
+    return;
+  }
+  hooks::CRuntimeRand(ctx, base);
 }

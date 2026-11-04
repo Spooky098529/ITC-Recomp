@@ -5,6 +5,7 @@
 
 #include "base/log.h"
 #include "c_runtime/format.h"
+#include "hooks/c_runtime.h"
 #include "c_runtime/parse.h"
 #include "c_runtime/start_up.h"
 #include "c_runtime/strings.h"
@@ -463,8 +464,58 @@ void NativeSetSbcs(PPCContext& ctx, uint8_t* base) {
 
 }  // namespace
 
+// rand (sub_825A9BB8) on the harness's thread: the seed (+20 of its C
+// runtime data, from the recompiled _getptd) set to random words, edge
+// values and runs of calls, and the last error set before; compared: r3,
+// the seed after and the last error after (put back after the cases).
+void Rand(Context& h) {
+  Results results("rand (sub_825A9BB8)");
+  PPCContext probe = CallContext(h);
+  __imp__sub_825AA580(probe, h.base);
+  const uint32_t data = probe.r3.u32;
+  if (data == 0) {
+    ITC_LOG_ERROR("harness: c_runtime: rand: no thread data");
+    return;
+  }
+  const uint32_t saved_seed = guest::LoadU32(h.base, data + 20);
+  PPCContext e = CallContext(h);
+  __imp__sub_82295F18(e, h.base);
+  const uint32_t saved_error = e.r3.u32;
+  for (int c = 0; c < 200; c++) {
+    const uint32_t seed = c < 4 ? std::array<uint32_t, 4>{0u, 1u, 0xFFFFFFFFu, 0x80000000u}[c]
+                                : uint32_t(h.random.Next());
+    const uint32_t error = c % 3 == 0 ? 0 : uint32_t(h.random.Next());
+    const int calls = 1 + int(h.random.Below(3));
+    Outputs out[2];
+    for (int v = 0; v < 2; v++) {
+      guest::StoreU32(h.base, data + 20, seed);
+      PPCContext set = CallContext(h);
+      set.r3.u64 = error;
+      __imp__sub_82296FD0(set, h.base);
+      for (int k = 0; k < calls; k++) {
+        PPCContext t = CallContext(h);
+        (v == 0 ? __imp__sub_825A9BB8 : hooks::CRuntimeRand)(t, h.base);
+        out[v].Word(uint32_t(t.r3.u64 >> 32));
+        out[v].Word(t.r3.u32);
+        out[v].Word(t.r1.u32);
+      }
+      out[v].Word(guest::LoadU32(h.base, data + 20));
+      PPCContext get = CallContext(h);
+      __imp__sub_82295F18(get, h.base);
+      out[v].Word(get.r3.u32);
+    }
+    results.Check(out[0], out[1], "case " + std::to_string(c));
+  }
+  guest::StoreU32(h.base, data + 20, saved_seed);
+  PPCContext put = CallContext(h);
+  put.r3.u64 = saved_error;
+  __imp__sub_82296FD0(put, h.base);
+  results.Report();
+}
+
 void CRuntime(Context& h) {
   const Places places = MakePlaces(h);
+  Rand(h);
   // The stack probe: frame sizes below, at and above whole pages (the
   // callers' are 4 KB to 64 KB). It only reads, so the scratch area and the
   // registers the callers use after it (r1, r12) and r3 must be the same.
