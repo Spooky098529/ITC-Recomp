@@ -28,10 +28,16 @@ file's history. What's left to see in a drive, from every run:
   adapters removed; four parts, subagents one at a time, brief
   `car-scene-draw-brief.md`; `itc_3444`: race 33 s, 0 errors, every
   harness 0 differing; frame dumps on and off the same 2,430 draws).
-  Step: validation, agent running.
+  Done.
+- Subsystem 3 of 3: being picked.
 
 ## Done
 
+- The car scene's draw: `car-scene-draw.md` (map c98bcea2, migration
+  d5d7449c..6e318bb5, `--native_car_scene_draw`, 21 of 21; validated
+  `itc_3448`: race 49 s, 0 errors, 21 of 21 harness lines, 20 ran in
+  the race, `Projector::BuildOrtho` in the replay `itc_3449` (ok);
+  none to drive).
 - The race flow's set-up: `race-flow.md` (map ef6eef64, migration
   1e19350e, `--native_race_flow`, 1 of 1 in play; validated `itc_3418`:
   race 49 s, 0 errors, 1 of 1 harness lines, ran in the race, replay
@@ -64,3 +70,6 @@ file's history. What's left to see in a drive, from every run:
   (wrapped 71, known 492, unknown 1782).
 - After its migration (`itc_3444`): ours 4081, work left 2324
   (wrapped 62, known 480, unknown 1782).
+- After its validation (`itc_3448`, 120 s: race 49 s, 0 errors, every
+  harness 0 differing but the expected groups): ours 4081, work left
+  2324.

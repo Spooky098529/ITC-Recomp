@@ -2721,6 +2721,7 @@ B7. **The game logic inside**: everything else, subsystem by subsystem,
 | 2026-11-01 | The boot mode (mode type 3: the movie list at `0x826C5BAC` played through its state machine at +848, `BootMode::Init`, `NextMode`, the destructors, `Boot::StartMovie`, `WaitForMovie` (inside `title_screen.cpp`'s `--skip_intro` wrap, kept) and `EndMovie` with the movie class's state calls; `ScreenMachine::ScreenMachine`, the mode delegate's thunk) | `boot-mode.md` | 12 of 12 in play (one migration; with 7 movie calls in `movies.md`; the rest never ran: the +32 interface's slots, the type 8 mode, the app's shut-down) | `--native_boot_mode` |
 | 2026-11-04 | The car draw (`Car::DrawUpdate` `sub_820DAC68` and the scene model's per-pass draws: the cockpit, the light kit, the parts with their lamps, doors and shadows, the interior, the traffic car, the wheels with their morphs, the shared `Model::Draw`, `CarPart::Draw`, `CarLighting::Gather` and the morph chain) | `car-draw.md` | 78 of 78 (16 parts, one subagent each, one at a time; 69 Native, 9 Overridden for their recompiled caller, the frame-state wraps, the cockpit dials and `--per_tick_blink_timers`) | `--native_car_draw` |
 | 2026-11-04 | The race flow's set-up (`RaceFlow::Init` `sub_82160AE0`, from `RaceMode::Init`: the race flow's state and players, its 53 transitions registered through `StateMachine::Add`, the functors' stack leftovers replayed in the original's frame) | `race-flow.md` | 1 of 1 in play (one migration; the four handlers it registers that never ran stay recompiled) | `--native_race_flow` |
+| 2026-11-04 | The car scene's draw (`CarScene::Draw` `sub_820C5DE8`: the headlight projectors and their texture projections, the other cars' light slots, the pass loop over `Car::DrawUpdate`; the frustum, plane, box and `Vector16` helpers under `TextureProjection::Fit`) | `car-scene-draw.md` | 21 of 21 (four parts, one subagent each, one at a time; 12 Native, 9 Overridden for their recompiled callers and the frame-state wraps) | `--native_car_scene_draw` |
 
     The first run (2026-10-22, branch `b7-loop-test`): every harness at 0 differing, attract races at 20-21 s with no errors,
     and a race the user drove looked right. Ours went from 162 to 335 (work
@@ -4455,3 +4456,18 @@ overridden 108, Native 34, Dropped 26, never called 70, live 211.
 Imports: 186 called, 56 with a live caller. B7 (`b7_status.py`): ours
 4,060, work left 2,345 (Wrapped 71, with a row 482, no row yet 1,792),
 from 2,346.
+
+**2026-11-04, the car scene's draw (branch `b7-loop-03-11-26`):** the
+thirty-first run's second subsystem (`car-scene-draw.md`,
+`--native_car_scene_draw`, `src/car_scene_draw/`): `CarScene::Draw`,
+the per-frame draw above `Car::DrawUpdate`, with its whole subtree, 21
+of 21, in four parts (the root in three). The root falls back to the
+recompiled code when `--native_models`, `--native_matrix_math` or
+`--native_vehicle_accessors` is off or a command list diagnostic is on;
+the `frame_state_diff` wraps are kept around the native bodies. Frame
+dumps with the flag on and off: the same 2,430 draws. Its adapter stays
+for its recompiled callers (the race's draw step, the front end's car
+draws). The boundary: 449 functions (916 pairs): overridden 108, Native
+34, Dropped 26, never called 70, live 211. Imports: 186 called, 56 with
+a live caller. B7 (`b7_status.py`): ours 4,081, work left 2,324
+(Wrapped 62, with a row 480, no row yet 1,782), from 2,345.
