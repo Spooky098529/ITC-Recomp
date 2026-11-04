@@ -32,7 +32,9 @@ file's history. What's left to see in a drive, from every run:
 - Subsystem 3 of 3: the front end's car draw `sub_8217FE60` (lead
   picked, with the model draws' lead `sub_820C8480` it calls: 4 of 4
   roots ready, 28 ready groups; `CarScene::Draw`'s caller in the front
-  end). Step: mapping, agent running.
+  end). Map checked (3beadd5a: `front-end-car-draw.md`, 24 rows, all
+  new, 15 in play; 0 errors; 9 ready groups; the root waits on
+  `CarScene::Update` `sub_820C9608`). Step: migration, agent running.
 
 ## Done
 
@@ -76,3 +78,5 @@ file's history. What's left to see in a drive, from every run:
 - After its validation (`itc_3448`, 120 s: race 49 s, 0 errors, every
   harness 0 differing but the expected groups): ours 4081, work left
   2324.
+- After the front end's car draw's map: ours 4081, work left 2324
+  (wrapped 62, known 495, unknown 1767).
