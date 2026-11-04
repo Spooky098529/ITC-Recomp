@@ -6,6 +6,9 @@
 
 #include "base/flags.h"
 #include "car_scene_draw/car_scene_draw.h"
+#include "hooks/car_draw.h"
+
+ITC_FLAG_DECLARE(bool, native_car_draw);
 
 ITC_FLAG_BOOL(native_car_scene_draw, true, "ITC",
               "Run the car scene's draw (docs/functions/car-scene-draw.md): so far "
@@ -231,6 +234,25 @@ car_scene_draw::SceneDrawCalls CarSceneDrawRootCalls(PPCContext& ctx, uint8_t* b
     ctx.r4.u64 = value;
     __imp__sub_825986B8(ctx, base);
     ctx.r1.u64 = stack;
+    ctx.fpscr.disableFlushMode();
+  };
+  // Car::DrawUpdate's body as its wrap in src/debug/frame_state_diff.cpp
+  // runs it (the root makes the wrap's checks).
+  calls.car_draw_update = [&ctx, base](uint64_t model, uint64_t r24, uint32_t sp, uint32_t lr) {
+    const uint64_t stack = ctx.r1.u64;
+    const uint64_t saved_r24 = ctx.r24.u64;
+    ctx.r1.u64 = sp;
+    ctx.lr = lr;
+    ctx.r3.u64 = model;
+    ctx.r24.u64 = r24;
+    ctx.fpscr.disableFlushMode();
+    if (ITC_FLAG(native_car_draw)) {
+      CarDrawUpdate(ctx, base);
+    } else {
+      __imp__sub_820DAC68(ctx, base);
+    }
+    ctx.r1.u64 = stack;
+    ctx.r24.u64 = saved_r24;
     ctx.fpscr.disableFlushMode();
   };
   return calls;

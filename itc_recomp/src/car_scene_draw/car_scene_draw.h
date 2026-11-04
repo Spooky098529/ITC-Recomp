@@ -189,6 +189,12 @@ struct SceneDrawCalls {
   MemcpyCall memcpy;
   // Vector16::PushBack's original, for TextureProjection::Fit.
   PushBackCall push_back;
+  // Car::DrawUpdate (sub_820DAC68) from the frame at `sp` with `lr`: r3 =
+  // the scene model, r24 = the root's r24 (its callees get it): its plain
+  // C++ under --native_car_draw (hooks::CarDrawUpdate), else the original;
+  // the caller makes the wrap's checks (--debug_hide,
+  // --find_per_frame_state) around it. Leaves flush-to-zero off.
+  std::function<void(uint64_t model, uint64_t r24, uint32_t sp, uint32_t lr)> car_draw_update;
 };
 
 // The root's state shared between its halves (4a's set-up and records, 4b's
@@ -216,7 +222,12 @@ struct SceneDrawFrame {
 // (docs/functions/car-scene-draw.md), its callees' plain C++ inside their
 // diagnostics' wrap checks (--debug_hide, --find_per_frame_state), each
 // Matrix::Multiply and Copy noted for frame interpolation by the original's
-// return address. 4b: the pass loop and the end. Leaves flush-to-zero off.
+// return address. Then both paths' pass descriptions (each copied to the
+// scene's +5072; the player's and model 1's +4296 by its type in the second
+// path; for each scene model in use with a car model, the other cars'
+// headlight slots in the second path with the scene's +5052 0, the render
+// queue's keys and the mask set around Car::DrawUpdate), and pass 0's
+// view-projection put back. Leaves flush-to-zero off.
 void CarSceneDraw(uint8_t* base, const SceneDrawCalls& calls, uint32_t stack, uint32_t scene,
                   uint32_t matrix);
 

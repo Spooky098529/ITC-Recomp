@@ -57,6 +57,10 @@ constexpr uint32_t kBeam = 0x820DAAC8;
 constexpr uint32_t kBuildOrtho = 0x82597518;
 constexpr uint32_t kBuild = 0x82597610;
 constexpr uint32_t kFit = 0x82598768;
+constexpr uint32_t kBeamShape = 0x820DAB10;
+constexpr uint32_t kBeamColor = 0x820DAA38;
+constexpr uint32_t kStagesCopy = 0x820FFD88;  // its adapter's wrap does the same checks
+constexpr uint32_t kCarDrawUpdate = 0x820DAC68;
 // The command list's (their adapters run the originals where the plain C++
 // declines).
 constexpr uint32_t kOpenChunk = 0x8258C9D0;
@@ -105,8 +109,25 @@ class SceneDraw {
       : base_(base), calls_(calls), f_(f), scene_(scene) {}
 
   void SetUp(uint32_t matrix);
-  void FirstPath();
-  void SecondPath();
+  // Each returns the original's r24 at loc_820C7C50 (Car::DrawUpdate's
+  // callees get it): the last record's chunk where it was drawn, else its
+  // scene model (first path) or its camera pass (second path).
+  uint64_t FirstPath();
+  uint64_t SecondPath();
+  // Part 4b: the pass descriptions' loop (loc_820C7C50) and the end.
+  void PassLoop(bool second_path, uint64_t r24);
+  void End();
+  // The other cars' headlights for model i (the second path with the
+  // scene's +5052 0): the original's r24 after (the last model looked at).
+  uint64_t OtherHeadlights(uint32_t i, uint32_t lights);
+  // The description's keys and mask around Car::DrawUpdate(model).
+  void DrawModel(uint32_t i, uint32_t p, uint32_t model, uint64_t r24);
+  uint32_t list_at_(uint32_t n) {
+    const uint32_t list = scene_ + 5028;
+    return uint32_t(Wrapped(base_, kListAt, list, [&] {
+      return uint64_t(vehicle_accessors::ListAt(base_, list, n));
+    }));
+  }
 
  private:
   // --- Guest calls ---
@@ -235,9 +256,9 @@ class SceneDraw {
   // sampler's states 20, 16 = `state` and 24 = 2, command 4 with the sampler
   // = RenderTarget(`target`), then `pixel(slot)` after command 7 pixel
   // c<pixel_reg> when steps.pixel isn't 0, command 36; closed and handed to
-  // the queue with `key`.
+  // the queue with `key`. Returns the chunk (the original's r24 after it).
   template <typename Pixel>
-  void ProjectionChunk(const ChunkSteps& steps, uint32_t reg, uint32_t matrix, uint32_t sampler,
+  uint32_t ProjectionChunk(const ChunkSteps& steps, uint32_t reg, uint32_t matrix, uint32_t sampler,
                        uint32_t state, uint32_t target, uint32_t pixel_reg, Pixel pixel,
                        uint32_t key);
   // The pass's size (+504, +508) as floats, 0.0, 0.0 (through `temp` and
@@ -249,7 +270,7 @@ class SceneDraw {
   // --- The second path's records ---
   void HeadlightProjector(uint32_t record, uint32_t model);
   void SharedTextures(uint32_t record);
-  void Projections(uint32_t record, uint32_t model, uint32_t pass);
+  uint32_t Projections(uint32_t record, uint32_t model, uint32_t pass);
   void LightArrays();
 
   uint8_t* base_;
@@ -278,7 +299,7 @@ void SceneDraw::Fit(uint32_t out, uint32_t pass, uint32_t direction, double high
 }
 
 template <typename Pixel>
-void SceneDraw::ProjectionChunk(const ChunkSteps& s, uint32_t reg, uint32_t matrix,
+uint32_t SceneDraw::ProjectionChunk(const ChunkSteps& s, uint32_t reg, uint32_t matrix,
                                 uint32_t sampler, uint32_t state, uint32_t target,
                                 uint32_t pixel_reg, Pixel pixel, uint32_t key) {
   Open(s.open);
@@ -307,6 +328,7 @@ void SceneDraw::ProjectionChunk(const ChunkSteps& s, uint32_t reg, uint32_t matr
   Command(s.end, 36, 0, 0);
   Close(s.close);
   Submit(chunk, key, s.submit);
+  return chunk;
 }
 
 void SceneDraw::SizeConstant(uint32_t slot, uint32_t pass, uint32_t temp) {
@@ -354,7 +376,7 @@ void SceneDraw::SetUp(uint32_t matrix) {
 
 // --- Path +4 = 0 ---
 
-void SceneDraw::FirstPath() {
+uint64_t SceneDraw::FirstPath() {
   // The shared assets' texture when slot 0 is done.
   uint32_t texture = 0;
   if (LoadS(base_, scene_ + 84) == 3) {
@@ -391,10 +413,12 @@ void SceneDraw::FirstPath() {
       0x820C611C, 0x820C6144, 0x820C617C, 0x820C61BC, 0x820C61F0, 0x820C6228,
       0x820C6260, 0x820C6298, 0x820C62D0, 0x820C6308, 0x820C6348, 0x820C6388,
       0x820C6410, 0x820C6448, 0x820C6470, 0x820C61DC, 0x820C6330, 0};
+  uint64_t r24 = 0;
   for (uint32_t r = 0; r < 3; r++) {
     const uint32_t record = kRecords + r * kRecordSize;
     const uint32_t pass = Pass(base_, Load(base_, record + 0));
     const uint32_t model = RecordModel(Load(base_, record + 36));
+    r24 = model;
     if (LoadS(base_, pass + 588) != 0 && model != 0) {
       SetLight(f_ + 128, light_distance);
       // The model's position (its matrix's (0, 0, 0, 1)) at +272.
@@ -439,13 +463,14 @@ void SceneDraw::FirstPath() {
       });
       const uint32_t light_pass = Pass(base_, Load(base_, record + 16));  // w4
       CopyMatrix(light_pass + 144, out, 0x820C6108);
-      ProjectionChunk(
+      r24 = ProjectionChunk(
           kSteps, 14, out, 7, 0, Load(base_, record + 32), 77,
           [&](uint32_t slot) { SizeConstant(slot, light_pass, f_ + 144); },
           Load(base_, record + 56));
     }
     Store(base_, f_ + 80, 2 - r);
   }
+  return r24;
 }
 
 // --- Path +4 != 0 ---
@@ -647,7 +672,7 @@ void SceneDraw::SharedTextures(uint32_t record) {
   Submit(chunk, Load(base_, record + 44), 0x820C70D8);
 }
 
-void SceneDraw::Projections(uint32_t record, uint32_t model, uint32_t pass) {
+uint32_t SceneDraw::Projections(uint32_t record, uint32_t model, uint32_t pass) {
   const double scale = Lfs(base_, 0x82002FAC);
   const double band = Lfs(base_, 0x820021F4);
   const double raise = Lfs(base_, 0x82001FD8);
@@ -733,13 +758,13 @@ void SceneDraw::Projections(uint32_t record, uint32_t model, uint32_t pass) {
         0x820C7980, 0x820C79A8, 0x820C79E0, 0x820C7A20, 0x820C7A54, 0x820C7A8C,
         0x820C7AC4, 0x820C7AFC, 0x820C7B34, 0x820C7B6C, 0,          0,
         0x820C7BAC, 0x820C7BE4, 0x820C7C0C, 0x820C7A40, 0x820C7B94, 0};
-    ProjectionChunk(
+    return ProjectionChunk(
         kSteps, 14, f_ + 880, 7, 0, Load(base_, record + 32), 0, [](uint32_t) {},
         Load(base_, record + 56));
   }
 }
 
-void SceneDraw::SecondPath() {
+uint64_t SceneDraw::SecondPath() {
   Store(base_, f_ + 192, 1);
   // [0x8296B8F0]: the shared assets' texture when the scene's +5044 is set,
   // else render target 1.
@@ -772,17 +797,316 @@ void SceneDraw::SecondPath() {
   }
 
   Store(base_, f_ + 160, 3);
+  uint64_t r24 = 0;
   for (uint32_t r = 0; r < 3; r++) {
     const uint32_t record = kRecords + r * kRecordSize;
     const uint32_t pass = Load(base_, f_ + 88) + Load(base_, record + 0) * kPassSize;
+    r24 = pass;
     const uint32_t model = RecordModel(Load(base_, record + 36));
     if (LoadS(base_, pass + 588) != 0 && model != 0) {
       HeadlightProjector(record, model);
       SharedTextures(record);
-      Projections(record, model, pass);
+      r24 = Projections(record, model, pass);
     }
     Store(base_, f_ + 160, 2 - r);
   }
+  return r24;
+}
+
+
+// --- Both paths: the pass descriptions (loc_820C7C50) ---
+
+constexpr uint32_t kQueueKeyA = 0x8296B90C;  // the render queue's keys
+constexpr uint32_t kQueueKeyB = 0x8296B900;
+constexpr uint32_t kQueueKeyC = 0x8296B908;
+constexpr uint32_t kRaceData = 0x826C5B2C;
+constexpr uint32_t kViewports = 0x826C2CE8;
+
+void SceneDraw::PassLoop(bool second_path, uint64_t r24) {
+  const uint32_t count = Load(base_, scene_ + 5036);
+  Store(base_, f_ + 96, count);
+  Store(base_, kQueueKeyA, Load(base_, 0x82601854));
+  Store(base_, kQueueKeyB, Load(base_, 0x82601858));
+  uint32_t descriptions = second_path ? 4 : 1;  // r26
+  // The player's model p (CarScene::PlayerModel(0) inlined).
+  uint32_t p = 0;
+  Store(base_, f_ + 160, p);
+  {
+    const uint32_t race = Load(base_, kRaceData);
+    const int32_t kind = LoadS(base_, race + 0xA3AF0);
+    const uint32_t word = Load(base_, race + 0x59614);
+    if (kind == 6 && word == 2) {
+      p = Load(base_, 0x826C7820 + 4) == 0 ? 1 : 0;
+      Store(base_, f_ + 160, p);
+    }
+  }
+  // The frame's words the original keeps its addresses in (left there).
+  uint32_t offset = 0;  // r14
+  Store(base_, f_ + 80, descriptions);
+  Store(base_, f_ + 84, offset);
+  Store(base_, f_ + 240, 0x8296BA60);
+  Store(base_, f_ + 256, 0x8296BC60);
+  Store(base_, f_ + 288, 0x8296B9E0);
+  Store(base_, f_ + 336, 0x8296BBE0);
+  Store(base_, f_ + 340, 0x8265ECA0);
+  Store(base_, f_ + 344, 0x8265ECE0);
+  Store(base_, f_ + 368, 0x82002EF8);
+  Store(base_, f_ + 348, 0x82002F38);
+  Store(base_, f_ + 92, 0x82002DF8);
+  const uint32_t description = scene_ + 5072;  // r20
+  const uint32_t lights = scene_ + 5248;  // r22
+
+  // The description's camera pass, or 0 when it isn't active (the
+  // original's add. and +588 checks, made again at each use).
+  auto active_pass = [&]() -> uint32_t {
+    const uint32_t pass = Load(base_, description + 0) * kPassSize + Load(base_, f_ + 88);
+    if (pass == 0 || LoadS(base_, pass + 588) == 0) {
+      return 0;
+    }
+    return pass;
+  };
+  auto list_at = [&](uint32_t n) { return list_at_(n); };
+  // Viewport v's view mode is 2 (probably the cockpit).
+  auto cockpit_view = [&](uint32_t v) {
+    const uint32_t viewport = Load(base_, Load(base_, kViewports) + 4 * v);
+    return viewport != 0 && LoadS(base_, viewport + 1860) == 2;
+  };
+  // List::At(n)'s +4296 = value when it exists (two List::At calls, as the
+  // original).
+  auto show = [&](uint32_t n, uint32_t value) {
+    if (list_at(n) != 0) {
+      Store(base_, list_at(n) + 4296, value);
+    }
+  };
+
+  do {
+    uint32_t table;
+    if (second_path) {
+      table = Load(base_, f_ + 92);
+    } else {
+      table = LoadS(base_, 0x826032DC) == 8 ? Load(base_, f_ + 348) : Load(base_, f_ + 368);
+    }
+    Memcpy(description, offset + table, 64, 0x820C7D9C);
+    if (active_pass() != 0) {
+      // The pass's eye to 0x8265ECE0 and its view to 0x8265ECA0.
+      Copy16(base_, Load(base_, f_ + 344), active_pass() + 400);
+      CopyMatrix(Load(base_, f_ + 340), active_pass() + 16, 0x820C7E28);
+      if (second_path) {
+        // The player's and model 1's +4296 by the pass's type.
+        const uint32_t type = Load(base_, active_pass() + 584);
+        if (type == 0) {
+          const uint32_t stage = f_ + 1120;
+          const uint32_t stages = Load(base_, kRaceData) + 0x59620;
+          if (!debug::IsHidden(kStagesCopy)) {
+            debug::FrameStateDiff_Before(base_);
+            FlushOff();
+            const bool copied = vehicle_accessors::StagesCopy(base_, stage, stages, 0xFFFFFFFF);
+            FlushOff();
+            debug::FrameStateDiff_After(base_, "draw step part", kStagesCopy);
+            if (!copied) {
+              // The original through its adapter (never in play: the copy
+              // goes to the frame).
+              Call(kStagesCopy, {stage, stages, 0xFFFFFFFFFFFFFFFFull}, 0x820C7F54);
+            }
+          }
+          const uint32_t race = Load(base_, kRaceData);
+          if ((LoadS(base_, race + 0xA3AF0) != 6 || LoadS(base_, stage) == 1) &&
+              (Load(base_, race + 0x59AE4) & 0x80) == 0 && list_at(p) != 0) {
+            const uint32_t value = cockpit_view(0) ? 0 : 1;
+            Store(base_, list_at(p) + 4296, value);
+          }
+        } else if (type == 1) {
+          show(1, 1);
+          if (cockpit_view(0)) {
+            show(p, 0);
+          }
+        } else if (type == 2) {
+          show(p, 1);
+          if (cockpit_view(1)) {
+            show(1, 0);
+          }
+        } else if (type == 3) {
+          show(p, 0);
+        }
+      }
+      const int32_t models = LoadS(base_, f_ + 96);  // r28
+      for (uint32_t i = 0; int32_t(i) < models; i++) {
+        const uint32_t model = list_at(i);  // r18
+        if (LoadS(base_, model + 16) != 3 || Load(base_, model + 5048) == 0) {
+          continue;
+        }
+        if (second_path && LoadS(base_, scene_ + 5052) == 0) {
+          r24 = OtherHeadlights(i, lights);
+        }
+        DrawModel(i, p, model, r24);
+      }
+    }
+    descriptions--;
+    offset += 64;
+    Store(base_, f_ + 80, descriptions);
+    Store(base_, f_ + 84, offset);
+  } while (descriptions != 0);
+}
+
+uint64_t SceneDraw::OtherHeadlights(uint32_t i, uint32_t lights) {
+  // Slots 0 to 7 of 0x8296BAE0 and 0x8296BB60 cleared (from the frame's
+  // +208 and +144).
+  for (const uint32_t at : {f_ + 208u, f_ + 212u, f_ + 216u, f_ + 220u, f_ + 144u, f_ + 148u,
+                            f_ + 152u, f_ + 156u}) {
+    Stfs(base_, at, zero_);
+  }
+  for (uint32_t k = 0; k < 128; k += 16) {
+    const uint32_t a = Load(base_, f_ + 224) + k, b = Load(base_, f_ + 228) + k;
+    CopyDoubleword(base_, a, f_ + 208);
+    CopyDoubleword(base_, b, f_ + 144);
+    CopyDoubleword(base_, a + 8, f_ + 216);
+    CopyDoubleword(base_, b + 8, f_ + 152);
+  }
+  Stfs(base_, f_ + 620, one_);
+  Stfs(base_, f_ + 460, one_);
+  Copy16(base_, f_ + 672, lights + 128);  // the scene's +5376
+  uint32_t slot = 2;  // r23 (the root's r25)
+  uint32_t j = 0;     // r24
+  const int32_t models = LoadS(base_, f_ + 96);  // r28 (at least 1 here)
+  for (; int32_t(j) < models; j++) {
+    const uint32_t other = list_at_(j);
+    const uint32_t beam = f_ + 624;
+    Wrapped(base_, kBeam, beam, [&] {
+      SceneModelBeam(base_, beam, other);
+      return uint64_t(beam);
+    });
+    if (j == i || other == 0 || LoadS(base_, other + 16) != 3 ||
+        Load(base_, other + 5048) == 0 || LoadS(base_, other + 32) == 3) {
+      continue;
+    }
+    const uint32_t at = slot << 4;
+    if (int32_t(slot++) >= 8) {
+      return j;
+    }
+    // Its position (the scene's +5376 through its matrix) at +608, its beam
+    // through it at +448, the beam's minus (+128) normalized at +480.
+    Memcpy(f_ + 528, other + 4304, 64, 0x820C8134);
+    Transform(f_ + 608, f_ + 528, f_ + 672);
+    Stfs(base_, f_ + 588, zero_);
+    Stfs(base_, f_ + 584, zero_);
+    Stfs(base_, f_ + 580, zero_);
+    Stfs(base_, f_ + 576, zero_);
+    Transform(f_ + 448, f_ + 528, beam);
+    for (uint32_t k = 0; k < 16; k += 4) {
+      Stfs(base_, f_ + 128 + k, Fneg(Lfs(base_, f_ + 448 + k)));
+    }
+    Copy16(base_, f_ + 656, lights + 192);  // the scene's +5440
+    {
+      const simde__m128 v = Lvx(base_, f_ + 128);
+      FlushToZero flush;
+      Stvx(base_, f_ + 480, Normalized(v, Dot3(v, v)));
+    }
+    // BeamShape's vector at +640.
+    const uint32_t shape = uint32_t(Wrapped(base_, kBeamShape, f_ + 1088, [&] {
+      SceneModelBeamShape(base_, f_ + 1088, other);
+      return uint64_t(f_ + 1088);
+    }));
+    Copy16Interleaved(base_, f_ + 640, shape);
+    // The two colors times the scene's +5248 to +5256 (+112) and +5264 to
+    // +5272 (+400).
+    const uint32_t color1 = uint32_t(Wrapped(base_, kBeamColor, f_ + 1072, [&] {
+      return uint64_t(SceneModelBeamColor(base_, f_ + 1072, other, f_));
+    }));
+    {
+      const double s0 = Lfs(base_, lights + 0);
+      const double s1 = Lfs(base_, lights + 4);
+      const double s2 = Lfs(base_, lights + 8);
+      Stfs(base_, f_ + 124, one_);
+      Stfs(base_, f_ + 112, Fmuls(s0, Lfs(base_, color1 + 0)));
+      const double c1 = Lfs(base_, color1 + 4);
+      const double c2 = Lfs(base_, color1 + 8);
+      const double y = Fmuls(c1, s1);
+      const double z = Fmuls(c2, s2);
+      Stfs(base_, f_ + 116, y);
+      Stfs(base_, f_ + 120, z);
+    }
+    const uint32_t color2 = uint32_t(Wrapped(base_, kBeamColor, f_ + 1104, [&] {
+      return uint64_t(SceneModelBeamColor(base_, f_ + 1104, other, f_));
+    }));
+    {
+      Stfs(base_, f_ + 412, one_);
+      const double c0 = Lfs(base_, color2 + 0);
+      Stfs(base_, f_ + 400, Fmuls(c0, Lfs(base_, lights + 16)));
+      const double c1 = Lfs(base_, color2 + 4);
+      const double s1 = Lfs(base_, lights + 20);
+      const double c2 = Lfs(base_, color2 + 8);
+      Stfs(base_, f_ + 404, Fmuls(c1, s1));
+      Stfs(base_, f_ + 408, Fmuls(c2, Lfs(base_, lights + 24)));
+    }
+    // Slot `slot` of the six arrays: 0x8296BBE0 the direction, 0x8296B9E0
+    // the position, 0x8296BAE0 the first color, 0x8296BB60 the second,
+    // 0x8296BC60 the scene's +5440, 0x8296BA60 the shape.
+    Copy16(base_, at + Load(base_, f_ + 336), f_ + 480);
+    Copy16(base_, at + Load(base_, f_ + 288), f_ + 608);
+    Copy16(base_, at + Load(base_, f_ + 224), f_ + 112);
+    Copy16(base_, at + Load(base_, f_ + 228), f_ + 400);
+    Copy16(base_, at + Load(base_, f_ + 256), f_ + 656);
+    Copy16(base_, at + Load(base_, f_ + 240), f_ + 640);
+  }
+  return j;
+}
+
+void SceneDraw::DrawModel(uint32_t i, uint32_t p, uint32_t model, uint64_t r24) {
+  const uint32_t description = scene_ + 5072;
+  // The render queue's keys: the description's +64 to +72 keep them, they
+  // take its +20 to +28.
+  const uint32_t key_b = Load(base_, description + 24);
+  const uint32_t key_a = Load(base_, description + 20);
+  Store(base_, description + 64, Load(base_, kQueueKeyA));
+  Store(base_, description + 68, Load(base_, kQueueKeyB));
+  const uint32_t key_c = Load(base_, kQueueKeyC);
+  Store(base_, kQueueKeyB, key_b);
+  Store(base_, kQueueKeyA, key_a);
+  Store(base_, description + 72, key_c);
+  Store(base_, kQueueKeyC, Load(base_, description + 28));
+  // The mask (+5132, the description's +60) for the call, by the pass's
+  // type (pass 0's address, 584, read when the pass isn't active, as the
+  // original).
+  uint32_t pass = Load(base_, description + 0) * kPassSize + Load(base_, f_ + 88);
+  const uint32_t saved = Load(base_, scene_ + 5132);
+  uint32_t mask = saved;
+  if (pass == 0 || LoadS(base_, pass + 588) == 0) {
+    pass = 0;
+  }
+  const uint32_t type = Load(base_, pass + 584);
+  if (type == 0) {
+    if (p == i) {
+      mask &= ~0x4u;
+    }
+    if (LoadS(base_, scene_ + 5052) != 0) {
+      mask &= ~0x8u;
+      mask &= ~0xE0u;
+    }
+  } else if (type == 1) {
+    if (p == i) {
+      mask &= ~0x4u;
+    }
+  } else if (type == 2) {
+    if (i == 1) {
+      mask &= ~0x4u;
+    }
+  }
+  Store(base_, scene_ + 5132, mask);
+  Wrapped(base_, kCarDrawUpdate, model, [&] {
+    calls_.car_draw_update(model, r24, f_, 0x820C840C);
+    return uint64_t(0);
+  });
+  const uint32_t key = Load(base_, scene_ + 5144);
+  Store(base_, scene_ + 5132, saved);
+  Store(base_, kQueueKeyC, key);
+  const uint32_t b = Load(base_, description + 68);
+  const uint32_t a = Load(base_, description + 64);
+  Store(base_, kQueueKeyB, b);
+  Store(base_, kQueueKeyA, a);
+}
+
+void SceneDraw::End() {
+  CopyMatrix(Load(base_, f_ + 88) + 144, f_ + 1328, 0x820C8460);
 }
 
 }  // namespace
@@ -803,15 +1127,11 @@ void CarSceneDraw(uint8_t* base, const SceneDrawCalls& calls, uint32_t stack, ui
   frame.f = f;
   frame.scene = scene;
   frame.second_path = LoadS(base, scene + 4) != 0;
-  if (frame.second_path) {
-    draw.SecondPath();
-  } else {
-    draw.FirstPath();
-  }
-  // 4b: the pass loop (loc_820C7C50, "Then, both paths" in the row), then
-  // pass 0's view-projection put back from f + 1328 (Matrix::Copy, return
-  // address 0x820C8460).
-  (void)frame;
+  const uint64_t r24 = frame.second_path ? draw.SecondPath() : draw.FirstPath();
+  // Both paths: the pass descriptions, then pass 0's view-projection put
+  // back.
+  draw.PassLoop(frame.second_path, r24);
+  draw.End();
   FlushOff();
 }
 
