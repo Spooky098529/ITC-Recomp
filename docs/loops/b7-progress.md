@@ -54,6 +54,11 @@ file's history. What's left to see in a drive, from every run:
   harness 0 differing). Validated `itc_3502` (race 46 s, 0 errors, 4
   of 4 harness lines; `Unload` and `CarSounds::Release` ran in the
   replay `itc_3503` (ok), 2 to drive). Done.
+- Subsystem 3 of 3: the loading screen and the race mode's +848
+  machine (the loading screen's lead `sub_82247898`, `sub_82247A60`,
+  `sub_82290B30`, `sub_822478D0`, with what's left of the race mode's
+  set-ups lead: +848 `sub_821517D8` and the delegate's `0x82235C08`;
+  both lines deleted from `leads.md`). Step: mapping agent running.
 
 ## Done
 
