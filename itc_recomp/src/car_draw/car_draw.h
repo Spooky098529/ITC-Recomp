@@ -782,6 +782,7 @@ Left SceneTrafficDraw(uint8_t* base, const Calls& calls, uint32_t stack, uint32_
 
 constexpr uint32_t kWheelsTireFrame = 2032;
 constexpr uint32_t kWheelsTireMorphedFrame = 1648;
+constexpr uint32_t kWheelsRimAFrame = 2032;
 
 // WheelPoints::DrawTire (sub_820E8AE8): r3 = a tire group (the point block's
 // +32 or +1872), r4 = the camera pass, r5 = the block. Side 1 (T from +1808):
@@ -810,5 +811,20 @@ Left WheelsDrawTire(uint8_t* base, const Calls& calls, uint32_t stack, uint32_t 
 // at side 1's first, then 0xFFFFFFFF82970000.
 Left WheelsDrawTireMorphed(uint8_t* base, const Calls& calls, uint32_t stack, uint32_t group,
                            uint32_t camera, uint32_t block, uint64_t caller_r28);
+
+// WheelPoints::DrawRimA (sub_820E9A28): r3 = a set a rim group (the point
+// block's +3712 or +5456), r4 = the camera pass, r5 = the block; the front
+// end's rims. The side's world (+176) first the block's world (copied), T
+// (+240) from +1712 with its z + the group's +20 (the tire's +356, fadds
+// whatever +732 says); front (+12 set) S_0 x R_0 x T x world, rear S_2 x R_2
+// x T x world; records 2, 4, 5, 6, 0 (+512, +992, +1232, +1472, +32) drawn
+// with it. Side 2: T from +1728, z - +20; Mz (the identity with z scaled by
+// [0x82001BE0]) x S_1 x R_1 x T x world into +176 and RotY x S_1 x R_1 x T x
+// world (the rear's S_3, R_3) into +1840; PartModel::FlipCulling([+36]),
+// records 2, 4, 5, 6 mirrored, FlipCulling again, record 0 turned. r24 is
+// `caller_r24` at the first three draws, then group + 1472; r28 the block at
+// side 1's draws, the side's R (block + 144 front, + 272 rear) at side 2's.
+Left WheelsDrawRimA(uint8_t* base, const Calls& calls, uint32_t stack, uint32_t group,
+                    uint32_t camera, uint32_t block, uint64_t caller_r24);
 
 }  // namespace car_draw

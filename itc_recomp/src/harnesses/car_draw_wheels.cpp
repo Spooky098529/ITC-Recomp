@@ -92,26 +92,28 @@ uint32_t Flag(Random& r) {
   return r.Below(8) == 0 ? uint32_t(r.Next()) : r.Below(2);
 }
 
-// The morphed tire's world: the weights' inputs, the targets, the shapes'
-// streams, the work memory and the pool maker. Returns whether there's a
-// maker.
-bool MorphWorld(Context& h, Random& r, uint32_t block, uint32_t top) {
+// The morph's world: for a tire (`tire`) the weights' inputs and the targets,
+// then the shapes' streams, the work memory and the pool maker. Returns
+// whether there's a maker.
+bool MorphWorld(Context& h, Random& r, uint32_t block, uint32_t top, bool tire) {
   uint8_t* base = h.base;
   const uint32_t group = top + kGroup, wheels = top + kWheels;
-  guest::StoreU32(base, group + 368 + 4, block + 0x100);
-  guest::StoreU32(base, wheels + 0, r.Below(4) == 0 ? 3 : r.Below(3));
-  for (const uint32_t at : {44u, 56u}) {
-    guest::StoreU32(base, wheels + at, r.Below(2) == 0 ? 0xFFFFFFFFu : 12 + r.Below(12));
-    guest::StoreU32(base, wheels + at + 4, RandomFloat(r));
-    guest::StoreU32(base, wheels + at + 8, RandomFloat(r));
+  if (tire) {
+    guest::StoreU32(base, group + 368 + 4, block + 0x100);
+    guest::StoreU32(base, wheels + 0, r.Below(4) == 0 ? 3 : r.Below(3));
+    for (const uint32_t at : {44u, 56u}) {
+      guest::StoreU32(base, wheels + at, r.Below(2) == 0 ? 0xFFFFFFFFu : 12 + r.Below(12));
+      guest::StoreU32(base, wheels + at + 4, RandomFloat(r));
+      guest::StoreU32(base, wheels + at + 8, RandomFloat(r));
+    }
+    guest::StoreU32(base, wheels + 72, r.Below(3));
+    guest::StoreU32(base, wheels + 76, r.Below(3));
+    RandomFloats(base, group + 12, 288 / 4, r);
+    for (uint32_t k = 0; k < 5; k++) {
+      guest::StoreU32(base, group + 304 + 4 * k, r.Below(4));
+    }
+    RandomFloats(base, group + 328, 8, r);
   }
-  guest::StoreU32(base, wheels + 72, r.Below(3));
-  guest::StoreU32(base, wheels + 76, r.Below(3));
-  RandomFloats(base, group + 12, 288 / 4, r);
-  for (uint32_t k = 0; k < 5; k++) {
-    guest::StoreU32(base, group + 304 + 4 * k, r.Below(4));
-  }
-  RandomFloats(base, group + 328, 8, r);
   // The streams: every shape's, shared (the same counts, no debug message).
   const uint32_t s0 = top + kStream0, s1 = top + kStream1;
   for (uint32_t k = 0; k < 4; k++) {
@@ -216,13 +218,67 @@ void WheelsWorld(Context& h, Random& r, uint32_t block, uint32_t race, uint32_t 
   guest::StoreU32(base, source + 732, r.Below(4) == 0 ? Flag(r) : 0);
 }
 
+// A set a rim's world over the tire's (the rim group at the same +0x100):
+// the front flag (+12), the weight (+16), the z offset (+20), the side
+// float4s (+1712, +1728), records 0 to 6 at +32 + 240k (their models, +4,
+// the block's +0x100 or now and then 0, record 0's always set when
+// `morphed`: the original morphs on it unchecked; the drawn records' and the
+// morphs' bases' shapes, +228, the case's, the targets' (records 1 and 3)
+// any of the four; every shape a copy of the case's, the model's +412 shapes
+// 0 to 4), and the materials' cull modes (+344) 2 or 6 now and then
+// for the flips.
+void RimAWorld(Context& h, Random& r, uint32_t block, uint32_t top, uint32_t shape,
+               bool morphed) {
+  uint8_t* base = h.base;
+  // Every shape a copy of the drawn one, as the interior's harness (the
+  // flips walk all the model's shapes, its +412).
+  for (uint32_t k = 0; k < 4; k++) {
+    if (k != shape) {
+      const std::vector<uint8_t> bytes = Read(base, block + 0x2000 + 544 * shape, 544);
+      Write(base, block + 0x2000 + 544 * k, bytes.data(), 544);
+    }
+  }
+  guest::StoreU32(base, block + 0x100 + 412, r.Below(8) == 0 ? 0 : 1 + r.Below(4));
+  const uint32_t group = top + kGroup;
+  guest::StoreU32(base, group + 12, Flag(r));
+  guest::StoreU32(base, group + 16, RandomFloat(r));
+  if (r.Below(6) == 0) {
+    RandomFloats(base, group + 20, 1, r);
+  } else {
+    guest::StoreFloat(base, group + 20, Spread(r, 0.2f));
+  }
+  for (uint32_t at : {1712u, 1728u}) {
+    if (r.Below(6) == 0) {
+      RandomFloats(base, group + at, 4, r);
+    } else {
+      FiniteFloats(base, group + at, 4, r);
+    }
+  }
+  for (uint32_t k = 0; k < 7; k++) {
+    const uint32_t record = group + 32 + 240 * k;
+    const bool target = k == 1 || k == 3;
+    const bool model = (morphed && k == 0) || r.Below(8) != 0;
+    guest::StoreU32(base, record + 4, model ? block + 0x100 : 0);
+    guest::StoreU32(base, record + 228, target ? r.Below(4) : shape);
+  }
+  const uint32_t materials = block + 0x6000;
+  const uint32_t count = guest::LoadU32(base, materials + 8) + guest::LoadU32(base, materials + 12);
+  for (uint32_t m = 0; m < count && m < 16; m++) {
+    if (r.Below(2) == 0) {
+      guest::StoreU32(base, materials + 16 + 512 * m + 344, r.Below(2) ? 2 : 6);
+    }
+  }
+}
+
+enum class Kind { kTire, kTireMorphed, kRimA, kRimAMorphed };
+
 struct Target {
   const char* name;
   GuestFunction recompiled, native;
   uint32_t frame;
   uint32_t temporaries_end;  // below the saved registers
   int cases;
-  bool morphed;
+  Kind kind;
 };
 
 }  // namespace
@@ -235,13 +291,16 @@ void WheelsDraws(Context& h, uint32_t block, uint32_t race) {
   const uint32_t scene = race + 0x10000;
   const Target targets[] = {
       {"WheelPoints::DrawTire (sub_820E8AE8)", __imp__sub_820E8AE8,
-       hooks::CarDrawWheelsDrawTire, car_draw::kWheelsTireFrame, 1888, 384, false},
+       hooks::CarDrawWheelsDrawTire, car_draw::kWheelsTireFrame, 1888, 384, Kind::kTire},
       {"WheelPoints::DrawTireMorphed (sub_820E9318)", __imp__sub_820E9318,
-       hooks::CarDrawWheelsDrawTireMorphed, car_draw::kWheelsTireMorphedFrame, 1520, 384, true},
+       hooks::CarDrawWheelsDrawTireMorphed, car_draw::kWheelsTireMorphedFrame, 1520, 384,
+       Kind::kTireMorphed},
+      {"WheelPoints::DrawRimA (sub_820E9A28)", __imp__sub_820E9A28,
+       hooks::CarDrawWheelsDrawRimA, car_draw::kWheelsRimAFrame, 1904, 256, Kind::kRimA},
   };
   for (const Target& target : targets) {
     Results results(target.name);
-    int queued = 0, depth = 0, weights = 0, makers = 0;
+    int queued = 0, depth = 0, weights = 0, makers = 0, flips = 0;
     std::vector<uint8_t> scene_bytes, records;
     const std::vector<uint8_t> zero(kSlotCount * 16, 0);
     uint32_t sp = 0;
@@ -251,10 +310,17 @@ void WheelsDraws(Context& h, uint32_t block, uint32_t race) {
           [&](PPCContext& t) {
             SetFlushOnEntry(r.Below(2) != 0);
             const uint32_t set = r.Below(4) ? 1 : r.Below(2) ? 0 : 2 + r.Below(4);
-            WheelsWorld(h, r, block, race, top, r.Below(4), set);
-            if (target.morphed) {
-              makers += MorphWorld(h, r, block, top);
+            const uint32_t shape = r.Below(4);
+            WheelsWorld(h, r, block, race, top, shape, set);
+            const bool morphed = target.kind == Kind::kTireMorphed ||
+                                 target.kind == Kind::kRimAMorphed;
+            if (morphed) {
+              makers += MorphWorld(h, r, block, top, target.kind == Kind::kTireMorphed);
               weights += guest::LoadU32(h.base, top + kWheels) != 3;
+            }
+            if (target.kind == Kind::kRimA || target.kind == Kind::kRimAMorphed) {
+              RimAWorld(h, r, block, top, shape, morphed);
+              flips += guest::LoadU32(h.base, top + kGroup + 36) != 0;
             }
             scene_bytes = Read(h.base, scene, kSceneBytes);
             records = Read(h.base, top, kRecordsEnd);
@@ -299,12 +365,22 @@ void WheelsDraws(Context& h, uint32_t block, uint32_t race) {
           },
           true);
     }
-    ITC_LOG_INFO("harness: {}: {} of {} cases with a depth pass, {} ended handing an entry to "
-                 "the render queue",
-                 target.name, depth, target.cases, queued / 2);
-    if (target.morphed) {
+    const bool tire = target.kind == Kind::kTire || target.kind == Kind::kTireMorphed;
+    if (tire) {
+      ITC_LOG_INFO("harness: {}: {} of {} cases with a depth pass, {} ended handing an entry to "
+                   "the render queue",
+                   target.name, depth, target.cases, queued / 2);
+    } else {
+      ITC_LOG_INFO("harness: {}: {} of {} cases with a rim model to flip, {} ended handing an "
+                   "entry to the render queue",
+                   target.name, flips, target.cases, queued / 2);
+    }
+    if (target.kind == Kind::kTireMorphed) {
       ITC_LOG_INFO("harness: {}: {} of {} cases worked the weights out, {} with the pool maker",
                    target.name, weights, target.cases, makers);
+    } else if (target.kind == Kind::kRimAMorphed) {
+      ITC_LOG_INFO("harness: {}: {} of {} cases with the pool maker", target.name, makers,
+                   target.cases);
     }
     results.Report();
   }

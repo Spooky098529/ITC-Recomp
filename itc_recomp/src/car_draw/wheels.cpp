@@ -17,6 +17,7 @@
 #include "camera_modes/steps.h"
 #include "guest.h"
 #include "interpolation/blend_state.h"
+#include "material_passes/material_passes.h"
 #include "matrix_math/matrix_math.h"
 #include "native/buffers.h"
 #include "second_set/morph.h"
@@ -363,6 +364,156 @@ Left WheelsDrawTireMorphed(uint8_t* base, const Calls& calls, uint32_t stack, ui
   left = PartsDrawRecord(base, calls, frame, record, vp, main, 0, r24, r28, 0x820E98EC);
   return TireDepth(base, calls, frame, group, record, main, frame + 1264, 0, 0, vp, r24, r28,
                    {0x820E995C, 0x820E9990, 0}, left);
+}
+
+// --- The set a rims ---
+
+namespace {
+
+// Where a set a rim draw keeps its matrices and the return addresses of its
+// calls (DrawRimA's and DrawRimAMorphed's frames differ only in offsets).
+struct RimALayout {
+  uint32_t frame_bytes;
+  uint32_t world_copy_lr;
+  uint32_t front_outs[3], front_lrs[3], rear_outs[3], rear_lrs[3];
+  uint32_t side1_copy_lr;
+  uint32_t side1_draw_lrs[5];
+  uint32_t turned_world, mirror, turned, angle, row;
+  uint32_t mirror_front_outs[4], mirror_front_lrs[4], turned_front_outs[4],
+      turned_front_lrs[4];
+  uint32_t mirror_rear_outs[4], mirror_rear_lrs[4], turned_rear_outs[4], turned_rear_lrs[4];
+  uint32_t mirror_front_copy_lr, mirror_rear_copy_lr, turned_copy_lr;
+  uint32_t side2_draw_lrs[5];
+  bool z_add_swapped;  // fadds f0,f0,f13 (the morphed) against f13,f0
+};
+
+constexpr uint32_t kMirrorZ = 0x82001BE0;  // Mz's z scale
+
+constexpr RimALayout kRimA = {
+    kWheelsRimAFrame,
+    0x820E9B18,
+    {1392, 1136, 496},
+    {0x820E9B80, 0x820E9BA0, 0x820E9BC0},
+    {1520, 624, 1264},
+    {0x820E9BE8, 0x820E9C08, 0x820E9C28},
+    0x820E9C34,
+    {0x820E9C54, 0x820E9C70, 0x820E9C8C, 0x820E9CA8, 0x820E9CC4},
+    1840,
+    1776,
+    1712,
+    160,
+    144,
+    {752, 1648, 880, 304},
+    {0x820E9E8C, 0x820E9EB0, 0x820E9ED0, 0x820E9EF0},
+    {1008, 1584, 368, 432},
+    {0x820E9F1C, 0x820E9F3C, 0x820E9F5C, 0x820E9F7C},
+    {560, 688, 816, 944},
+    {0x820E9FA4, 0x820E9FC8, 0x820E9FE8, 0x820EA008},
+    {1072, 1200, 1328, 1456},
+    {0x820EA034, 0x820EA054, 0x820EA074, 0x820EA094},
+    0x820E9EFC,
+    0x820EA014,
+    0x820EA0A0,
+    {0x820EA0C0, 0x820EA0D8, 0x820EA0F0, 0x820EA108, 0x820EA128},
+    false,
+};
+
+// T (+240) and the side's world (+176), fresh: the identity stvx'd at +176
+// and copied to +240, then one stvx'd at `scratch` and copied to +176.
+void RimAIdentities(uint8_t* base, uint32_t frame, uint32_t scratch) {
+  FreshIdentity(base, frame + 176, frame + 240);
+  FreshIdentity(base, frame + scratch, frame + 176);
+}
+
+// Both sides of a set a rim, from the world copy on (see car_draw.h).
+Left RimASides(uint8_t* base, const Calls& calls, uint32_t frame, uint32_t group,
+               uint32_t camera, uint32_t block, uint64_t caller_r24, const RimALayout& l) {
+  const uint32_t t = frame + 240, main = frame + 176, world = block + 16;
+  NotedCopy(base, main, world, l.world_copy_lr);
+  Translate(base, block, t + 48, VectorOf(0, 0, 0, kOneBits), group + 1712);
+  const bool front = int32_t(Load(base, group + 12)) != 0;
+  {
+    const double z = Lfs(base, t + 56), add = Lfs(base, group + 20);
+    Stfs(base, t + 56, l.z_add_swapped ? Fadds(add, z) : Fadds(z, add));
+  }
+  const double one = Lfs(base, kOne);
+  uint32_t outs[4];
+  if (front) {
+    for (int i = 0; i < 3; i++) outs[i] = frame + l.front_outs[i];
+    NotedCopy(base, main, Chain(base, {block + 336, block + 80, t, world}, outs, l.front_lrs, one),
+              l.side1_copy_lr);
+  } else {
+    for (int i = 0; i < 3; i++) outs[i] = frame + l.rear_outs[i];
+    NotedCopy(base, main, Chain(base, {block + 464, block + 208, t, world}, outs, l.rear_lrs, one),
+              l.side1_copy_lr);
+  }
+  // Records 2, 4, 5, 6, then 0; r24 the caller's until record 6's is loaded.
+  const uint32_t vp = camera + 144;
+  const uint32_t records[5] = {512, 992, 1232, 1472, 32};
+  const uint64_t r24s[5] = {caller_r24, caller_r24, caller_r24, group + 1472, group + 1472};
+  Left left;
+  for (int i = 0; i < 5; i++) {
+    left = PartsDrawRecord(base, calls, frame, group + records[i], vp, main, 0, r24s[i], block,
+                           l.side1_draw_lrs[i]);
+  }
+  // Side 2: the turned world's identity, the mirror (z scaled by
+  // [0x82001BE0]) and the turn by pi about y.
+  const uint32_t turned_world = frame + l.turned_world, mirror = frame + l.mirror,
+                 turned = frame + l.turned;
+  FreshIdentity(base, frame + 80, turned_world);
+  FreshIdentity(base, frame + 80, mirror);
+  Stfs(base, mirror + 40, Lfs(base, kMirrorZ));
+  FreshIdentity(base, frame + 80, turned);
+  Stfs(base, frame + l.angle, Lfs(base, kPi));
+  matrix_math::RotateY(base, turned, turned, frame + l.angle, frame - 80);
+  // T's row 3 back to (0, 0, 0, 1), through the row's temporary.
+  const uint32_t row = frame + l.row;
+  Stfs(base, row + 12, one);
+  const double zero = Lfs(base, kZero);
+  Stfs(base, row + 0, zero);
+  Stfs(base, row + 4, zero);
+  Stfs(base, row + 8, zero);
+  CopyDoublewords(base, t + 48, row, 16);
+  Translate(base, block, t + 48, Lvx(base, row), group + 1728);
+  {
+    const double z = Lfs(base, t + 56), add = Lfs(base, group + 20);
+    Stfs(base, t + 56, Fsubs(z, add));
+  }
+  const bool front2 = int32_t(Load(base, group + 12)) != 0;
+  const uint32_t s = front2 ? block + 400 : block + 528;
+  const uint32_t r = front2 ? block + 144 : block + 272;
+  const uint32_t* mirror_outs = front2 ? l.mirror_front_outs : l.mirror_rear_outs;
+  const uint32_t* mirror_lrs = front2 ? l.mirror_front_lrs : l.mirror_rear_lrs;
+  const uint32_t* turned_outs = front2 ? l.turned_front_outs : l.turned_rear_outs;
+  const uint32_t* turned_lrs = front2 ? l.turned_front_lrs : l.turned_rear_lrs;
+  for (int i = 0; i < 4; i++) outs[i] = frame + mirror_outs[i];
+  NotedCopy(base, main, Chain(base, {mirror, s, r, t, world}, outs, mirror_lrs, one),
+            front2 ? l.mirror_front_copy_lr : l.mirror_rear_copy_lr);
+  for (int i = 0; i < 4; i++) outs[i] = frame + turned_outs[i];
+  NotedCopy(base, turned_world, Chain(base, {turned, s, r, t, world}, outs, turned_lrs, one),
+            l.turned_copy_lr);
+  // Records 2, 4, 5, 6 mirrored between two flips of the rim model's
+  // culling, then record 0 turned; r28 the side's R from here on.
+  const uint64_t r28 = r;
+  const uint64_t r24 = group + 1472;
+  material_passes::FlipCulling(base, Load(base, group + 36), frame);
+  for (int i = 0; i < 4; i++) {
+    left = PartsDrawRecord(base, calls, frame, group + records[i], vp, main, 0, r24, r28,
+                           l.side2_draw_lrs[i]);
+  }
+  material_passes::FlipCulling(base, Load(base, group + 36), frame);
+  return PartsDrawRecord(base, calls, frame, group + 32, vp, turned_world, 0, r24, r28,
+                         l.side2_draw_lrs[4]);
+}
+
+}  // namespace
+
+Left WheelsDrawRimA(uint8_t* base, const Calls& calls, uint32_t stack, uint32_t group,
+                    uint32_t camera, uint32_t block, uint64_t caller_r24) {
+  ITC_NATIVE_RUNNING("sub_820E9A28 WheelPoints::DrawRimA");
+  const uint32_t frame = Frame(base, stack, kWheelsRimAFrame);
+  RimAIdentities(base, frame, 80);
+  return RimASides(base, calls, frame, group, camera, block, caller_r24, kRimA);
 }
 
 }  // namespace car_draw
