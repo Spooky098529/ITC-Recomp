@@ -34,7 +34,8 @@ ITC_FLAG_BOOL(native_car_draw, true, "ITC",
               "LightKit::BlinkLevel sub_820DC4B0 (no adapter: the neons call it), BlinkTimers::Advance sub_820DC958 (inside "
               "its render-only skip, --per_tick_blink_timers), "
               "SceneModel::IsNearPlayerHeight sub_820DAB58 (inside the diagnostics' wrap), "
-              "the morph Model::MorphShape sub_82595110 (the job maker a guest call), "
+              "the morph Model::MorphShape sub_82595110 (no adapter: the wheels' draws call it; the job "
+              "maker a guest call), "
               "WorkMem::AllocVertexBuffer sub_8258A9E8 (no adapter: MorphShape calls it), Model::QueueJobRelease sub_82594E88 (no adapter: MorphShape calls it) and "
               "XGSetVertexBufferHeader sub_8235A688 (no adapter: its caller calls it), the light "
               "kit SceneLights::Draw sub_820DDE58 (inside the diagnostics' wrap; it skips "
@@ -288,25 +289,6 @@ void LeaveLeft(PPCContext& ctx, const car_draw::Left& left) {
 
 }  // namespace
 
-void CarDrawMorphShape(PPCContext& ctx, uint8_t* base) {
-  if (!CarDrawMorphCalleesNative()) {
-    __imp__sub_82595110(ctx, base);
-    return;
-  }
-  ctx.fpscr.disableFlushMode();
-  const uint64_t lr = ctx.lr;
-  SceneryDrawGuest guest{ctx, base};
-  const car_draw::Calls calls = CarDrawCalls(&guest);
-  const auto left = car_draw::ModelMorphShape(base, calls, ctx.r3.u32, ctx.r4.u32, ctx.r5.u64,
-                                              ctx.r1.u32);
-  if (!left) {
-    __imp__sub_82595110(ctx, base);
-    return;
-  }
-  ctx.lr = lr;
-  LeaveLeft(ctx, *left);
-}
-
 void CarDrawSceneLightsDraw(PPCContext& ctx, uint8_t* base) {
   if (!CarDrawLightKitCalleesNative()) {
     __imp__sub_820DDE58(ctx, base);
@@ -549,9 +531,10 @@ void CarDrawWheelsDrawBrakesMorphed(PPCContext& ctx, uint8_t* base) {
 // TrafficPoints::Draw and SceneTraffic::Draw, are plain C++), Model::Draw
 // sub_820D04E8 and CarLighting::Gather sub_820C9170 (2026-11-04; their
 // callers in play, CarPart::Draw, the lamps, the seats, the shadows, the
-// cockpit's body and SceneTraffic::Draw, are plain C++).
+// cockpit's body and SceneTraffic::Draw, are plain C++), and
+// Model::MorphShape sub_82595110 (2026-11-04; its callers, the morphed wheel
+// draws and WheelPoints::DrawBrakes, are plain C++).
 ITC_CAR_DRAW(820D06F0, CarDrawCarPartDraw)
-ITC_CAR_DRAW(82595110, CarDrawMorphShape)
 ITC_CAR_DRAW(820E8AE8, CarDrawWheelsDrawTire)
 ITC_CAR_DRAW(820E9318, CarDrawWheelsDrawTireMorphed)
 ITC_CAR_DRAW(820E9A28, CarDrawWheelsDrawRimA)

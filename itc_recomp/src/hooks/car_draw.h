@@ -53,9 +53,6 @@ void CarDrawBlinkTimersAdvance(PPCContext& ctx, uint8_t* base);
 // description, r4 = the position.
 void CarDrawIsNearPlayerHeight(PPCContext& ctx, uint8_t* base);
 
-// Model::MorphShape (sub_82595110): r3 = the model, r4 = the morph record,
-// r5 = the shape's index.
-void CarDrawMorphShape(PPCContext& ctx, uint8_t* base);
 // SceneLights::Draw (sub_820DDE58): r3 = the light kit, r4 = the block
 // (inside the diagnostics' wrap, src/debug/frame_state_diff.cpp; it skips
 // BlinkTimers::Advance as CarDrawBlinkTimersHeld says).

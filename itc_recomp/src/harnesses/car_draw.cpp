@@ -860,6 +860,32 @@ void NativeQueueJobRelease(PPCContext& ctx, uint8_t* base) {
   ctx.fpscr.disableFlushMode();
 }
 
+// Model::MorphShape's register steps (its adapter is gone: its callers in
+// play, the morphed wheel draws and WheelPoints::DrawBrakes, call the plain
+// C++): the original where its callees aren't native or the plain C++
+// declines (an allocation or the release wouldn't fit).
+void NativeMorphShape(PPCContext& ctx, uint8_t* base) {
+  if (!hooks::CarDrawMorphCalleesNative()) {
+    __imp__sub_82595110(ctx, base);
+    return;
+  }
+  ctx.fpscr.disableFlushMode();
+  const uint64_t lr = ctx.lr;
+  hooks::SceneryDrawGuest guest{ctx, base};
+  const car_draw::Calls calls = hooks::CarDrawCalls(&guest);
+  const auto left = car_draw::ModelMorphShape(base, calls, ctx.r3.u32, ctx.r4.u32, ctx.r5.u64,
+                                              ctx.r1.u32);
+  if (!left) {
+    __imp__sub_82595110(ctx, base);
+    return;
+  }
+  ctx.lr = lr;
+  if (!left->in_ctx) {
+    ctx.r3.u64 = left->r3;
+  }
+  ctx.fpscr.disableFlushMode();
+}
+
 // The work memory: buffer i (0 or 1) current, its header count near 0 or
 // near the 1,280 limit (now and then at it), the bytes used and the capacity
 // around `bytes` (now and then not fitting), its start at the block's
@@ -1040,7 +1066,7 @@ void Morphs(Context& h, Random& r, uint32_t block) {
             t.r4.u64 = morph;
             t.r5.u64 = index;
           },
-          __imp__sub_82595110, hooks::CarDrawMorphShape, {{0x9000, 0xC00 / 4}},
+          __imp__sub_82595110, NativeMorphShape, {{0x9000, 0xC00 / 4}},
           fmt::format("case {}", c),
           [&](const PPCContext& t, Outputs& o) {
             const uint32_t frame = t.r1.u32 - car_draw::kMorphShapeFrame;
