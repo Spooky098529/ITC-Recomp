@@ -161,6 +161,7 @@ set(ITC_SOURCES
     src/car_draw/parts.cpp
     src/car_draw/lamps.cpp
     src/car_draw/shadows.cpp
+    src/car_draw/interior.cpp
     src/hooks/boot_mode.cpp
     src/boot_mode/boot_mode.cpp
     src/second_set/points.cpp
@@ -473,6 +474,7 @@ set(ITC_SOURCES
     src/harnesses/car_draw_lamps.cpp
     src/harnesses/car_draw_shadows.cpp
     src/harnesses/car_draw_top.cpp
+    src/harnesses/car_draw_interior.cpp
     src/harnesses/boot_mode.cpp
     src/harnesses/car_models.cpp
     src/harnesses/save_data.cpp
@@ -675,6 +677,7 @@ set_source_files_properties(src/c_runtime/math.cpp src/ui_movies/keys.cpp
     src/car_draw/morph.cpp
     src/car_draw/light_kit.cpp src/car_draw/parts.cpp src/car_draw/lamps.cpp
     src/car_draw/shadows.cpp
+    src/car_draw/interior.cpp
     src/car_sounds/x3daudio.cpp
     src/car_sounds/car_sound_3d.cpp src/car_sounds/car_sound_voices.cpp
     src/car_sounds/car_sound_parts.cpp src/xact/voices.cpp src/xact/waves.cpp

@@ -74,4 +74,15 @@ bool CarDrawShadowsCalleesNative();
 // the parts object, r4 = the block.
 void CarDrawSceneParts(PPCContext& ctx, uint8_t* base);
 
+// The interior's callees' plain C++ native (the parts' draws').
+bool CarDrawInteriorCalleesNative();
+// The interior's leaves (their callers, the interior's lists, are
+// recompiled): r3 = the group, r4 = the block, r5 = the camera pass.
+void CarDrawInteriorDialFaces(PPCContext& ctx, uint8_t* base);
+void CarDrawInteriorRollCage(PPCContext& ctx, uint8_t* base);
+void CarDrawInteriorDigitalSpeed(PPCContext& ctx, uint8_t* base);
+void CarDrawInteriorReadouts(PPCContext& ctx, uint8_t* base);
+void CarDrawInteriorMeterFaces(PPCContext& ctx, uint8_t* base);
+void CarDrawInteriorSeats(PPCContext& ctx, uint8_t* base);
+
 }  // namespace hooks

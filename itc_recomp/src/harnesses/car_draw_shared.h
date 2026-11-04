@@ -1,7 +1,8 @@
 // What the car draw's harness files share (src/harnesses/car_draw.cpp, which
 // defines these, car_draw_parts.cpp, car_draw_lamps.cpp,
-// car_draw_shadows.cpp and car_draw_top.cpp): one case through both versions and the model draws'
-// world, all under the harness name car_draw.
+// car_draw_shadows.cpp, car_draw_top.cpp and car_draw_interior.cpp): one
+// case through both versions and the model draws' world, all under the
+// harness name car_draw.
 
 #pragma once
 
@@ -77,5 +78,7 @@ void LampsDraws(Context& h, Random& r, uint32_t block, uint32_t race);
 void ShadowsDraws(Context& h, Random& r, uint32_t block, uint32_t race);
 // The parts' top's cases (car_draw_top.cpp).
 void TopDraws(Context& h, Random& r, uint32_t block, uint32_t race);
+// The interior's cases (car_draw_interior.cpp).
+void InteriorDraws(Context& h, Random& r, uint32_t block, uint32_t race);
 
 }  // namespace harness::car_draw_shared

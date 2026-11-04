@@ -553,4 +553,73 @@ Left PartsDrawRace(uint8_t* base, const Calls& calls, uint32_t stack, uint32_t p
 Left ScenePartsDraw(uint8_t* base, const Calls& calls, uint32_t stack, uint64_t parts,
                     uint32_t block, uint32_t caller_r24);
 
+
+// --- The interior (interior.cpp) ---
+//
+// Part 7: the interior's draws (pool 3 of the second set): the dial and
+// meter faces, the digital speedometer, the seats, the roll cage, the
+// steering wheel and the body, the front end's and the race's lists and
+// SceneInterior::Draw over them with the accessory. Every record through
+// CarPart::Draw's plain C++ (its original from the same frame and return
+// address where it declines), the aftermarket seats through Model::Draw's,
+// PartModel::SetTexture's and Accessory::SetTexture's plain C++; the
+// cockpit dials' needles (Dash::PoseTachometer sub_820E42E8 and
+// Dash::PoseDials sub_820E45A8, src/hooks/cockpit_dials.cpp) and
+// Accessory::Draw (not seen in play) guest calls from the original's frame.
+// `caller_r24` and `caller_r28` are r24 and r28 at entry (CarPart::Draw's
+// recorder contexts; each function's own changes to them are applied).
+
+constexpr uint32_t kInteriorSmallFrame = 112;
+constexpr uint32_t kInteriorMetersFrame = 128;
+constexpr uint32_t kInteriorDigitsFrame = 160;
+constexpr uint32_t kInteriorSeatsFrame = 592;
+constexpr uint32_t kInteriorFrontEndFrame = 128;
+constexpr uint32_t kInteriorRaceFrame = 144;
+
+// InteriorDials::DrawFaces (sub_820E3170, 112): the speedometer's face,
+// record 4 when the interior record's ([group]) +0 is 0, else 5; the
+// tachometer's by its +4: 0, 1, 2 records 6, 7, 8, else none.
+Left InteriorDrawDialFaces(uint8_t* base, const Calls& calls, uint32_t stack, uint32_t group,
+                           uint32_t block, uint32_t pass, uint32_t caller_r24,
+                           uint32_t caller_r28);
+// InteriorPoints::DrawRollCage (sub_820E3548, 112): by the interior
+// record's +104, 1 record 0, 2 record 1, else none; then record 2 when its
+// +108 is 0, else 3.
+Left InteriorDrawRollCage(uint8_t* base, const Calls& calls, uint32_t stack, uint32_t group,
+                          uint32_t block, uint32_t pass, uint32_t caller_r24,
+                          uint32_t caller_r28);
+// InteriorDials::DrawDigitalSpeed (sub_820E39F8, 160): the block's +696
+// truncated (fctiwz, stored at the frame's +80 and read back) to n; record
+// 9's model's +48 = the group's +8 (the old kept); PartModel::SetTexture on
+// that model with n mod 10, n / 10 mod 10 and n / 100 (records 9, 10 and
+// 11's shapes); records 9, 10, 11 drawn (r28 the pass's view-projection);
+// the +48 put back.
+Left InteriorDrawDigitalSpeed(uint8_t* base, const Calls& calls, uint32_t stack, uint32_t group,
+                              uint32_t block, uint32_t pass, uint32_t caller_r24);
+// InteriorDials::DrawReadouts (sub_820E51D0, 112): Dash::PoseTachometer
+// (a guest call, returning to 0x820E51F8) when [group + 20] is set, then
+// DrawDigitalSpeed when [group + 2180] is. r3 the group (`group64`, all 64
+// bits) when neither.
+Left InteriorDrawReadouts(uint8_t* base, const Calls& calls, uint32_t stack, uint64_t group64,
+                          uint32_t block, uint32_t pass, uint32_t caller_r24,
+                          uint32_t caller_r28);
+// InteriorMeters::DrawFaces (sub_820E3AD8, 128): the seven gauge faces by
+// the interior record's entries and their models, each model's +48 = the
+// group's +5296 + 4i first (gauge 1 in mode 5, the group's +4: no checks,
+// +5324); record 21 when any of gauges 4 to 6 was drawn (r28 1 from the
+// first of them on, 0 before). r3 the group (`group64`) when nothing is
+// drawn.
+Left InteriorDrawMeterFaces(uint8_t* base, const Calls& calls, uint32_t stack, uint64_t group64,
+                            uint32_t block, uint32_t pass, uint32_t caller_r24);
+// InteriorPoints::DrawSeats (sub_820E3CF0, 592): the two seat worlds (a
+// translation to each of [group + 4]'s two float4s, w + 1.0 by vaddfp,
+// times the block's world, at +208 and +144 through +272 and +400, noted
+// for interpolation); with the interior record's +100 0, records 2 and 3
+// with the block's world; else the worlds built again (through +336 and
+// +464), PartModel::SetTexture([group + 8], the record's +96, or 0 when
+// +100 and +96 are both 3, -1) and every shape of that model drawn through
+// Model::Draw at the first seat, then the second.
+Left InteriorDrawSeats(uint8_t* base, const Calls& calls, uint32_t stack, uint32_t group,
+                       uint32_t block, uint32_t pass, uint32_t caller_r24, uint32_t caller_r28);
+
 }  // namespace car_draw
