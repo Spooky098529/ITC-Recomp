@@ -65,8 +65,8 @@ ITC_FLAG_BOOL(native_car_draw, true, "ITC",
               "sub_820E3548, InteriorDials::DrawDigitalSpeed sub_820E39F8, DrawReadouts "
               "sub_820E51D0 (the cockpit dials' Dash::PoseTachometer a guest call), "
               "InteriorMeters::DrawFaces sub_820E3AD8 and InteriorPoints::DrawSeats "
-              "sub_820E3CF0 (PartModel::SetTexture, Model::Draw and the matrix functions as "
-              "plain C++), and the interior's top SceneInterior::Draw sub_820E53F0 (inside the "
+              "sub_820E3CF0 (no adapters: the interior's lists call them; PartModel::SetTexture, "
+              "Model::Draw and the matrix functions as plain C++), and the interior's top SceneInterior::Draw sub_820E53F0 (inside the "
               "diagnostics' wrap; Accessory::SetTexture and the accessories' set as plain C++ "
               "with --native_accessories and --native_scene_models, Accessory::Draw a guest "
               "call) with InteriorPoints::DrawFrontEnd sub_820E4078 and DrawRace sub_820E5220 "
@@ -366,53 +366,6 @@ bool CarDrawInteriorCalleesNative() {
   return CarDrawPartsCalleesNative();
 }
 
-namespace {
-
-// An interior draw's register steps: the original unless the callees'
-// plain C++ is native; `draw` runs the plain C++ with the calls.
-template <typename Draw>
-void InteriorStep(PPCContext& ctx, uint8_t* base, void (*original)(PPCContext&, uint8_t*),
-                  Draw draw) {
-  if (!CarDrawInteriorCalleesNative()) {
-    original(ctx, base);
-    return;
-  }
-  ctx.fpscr.disableFlushMode();
-  const uint64_t lr = ctx.lr;
-  SceneryDrawGuest guest{ctx, base};
-  const car_draw::Calls calls = CarDrawCalls(&guest);
-  const car_draw::Left left = draw(calls);
-  ctx.lr = lr;
-  LeaveLeft(ctx, left);
-}
-
-}  // namespace
-
-#define ITC_CAR_DRAW_INTERIOR(name, address, ...)                                  \
-  void CarDrawInterior##name(PPCContext& ctx, uint8_t* base) {                     \
-    const uint64_t r3 = ctx.r3.u64;                                                \
-    const uint32_t r4 = ctx.r4.u32, r5 = ctx.r5.u32, r1 = ctx.r1.u32;              \
-    const uint32_t r24 = ctx.r24.u32, r28 = ctx.r28.u32;                           \
-    (void)r28;                                                                     \
-    InteriorStep(ctx, base, __imp__sub_##address, [&](const car_draw::Calls& calls) { \
-      return car_draw::__VA_ARGS__;                                                \
-    });                                                                            \
-  }
-
-ITC_CAR_DRAW_INTERIOR(DialFaces, 820E3170,
-                      InteriorDrawDialFaces(base, calls, r1, uint32_t(r3), r4, r5, r24, r28))
-ITC_CAR_DRAW_INTERIOR(RollCage, 820E3548,
-                      InteriorDrawRollCage(base, calls, r1, uint32_t(r3), r4, r5, r24, r28))
-ITC_CAR_DRAW_INTERIOR(DigitalSpeed, 820E39F8,
-                      InteriorDrawDigitalSpeed(base, calls, r1, uint32_t(r3), r4, r5, r24))
-ITC_CAR_DRAW_INTERIOR(Readouts, 820E51D0,
-                      InteriorDrawReadouts(base, calls, r1, r3, r4, r5, r24, r28))
-ITC_CAR_DRAW_INTERIOR(MeterFaces, 820E3AD8,
-                      InteriorDrawMeterFaces(base, calls, r1, r3, r4, r5, r24))
-ITC_CAR_DRAW_INTERIOR(Seats, 820E3CF0,
-                      InteriorDrawSeats(base, calls, r1, uint32_t(r3), r4, r5, r24, r28))
-#undef ITC_CAR_DRAW_INTERIOR
-
 void CarDrawSceneInterior(PPCContext& ctx, uint8_t* base) {
   if (!CarDrawInteriorCalleesNative() || !ITC_FLAG(native_accessories) ||
       !ITC_FLAG(native_scene_models)) {
@@ -452,17 +405,13 @@ void CarDrawSceneInterior(PPCContext& ctx, uint8_t* base) {
 // sub_820E1260, the head and tail lights PartsPoints::DrawHeadlights
 // sub_820E1690 and DrawTailLights sub_820DF8B0 and the shadows
 // PartsPoints::DrawShadows sub_820E1D88 (2026-11-03; their callers, the
-// parts' top, are plain C++).
+// parts' top, are plain C++), and the interior's leaves
+// InteriorDials::DrawFaces sub_820E3170, DrawDigitalSpeed sub_820E39F8 and
+// DrawReadouts sub_820E51D0, InteriorMeters::DrawFaces sub_820E3AD8,
+// InteriorPoints::DrawSeats sub_820E3CF0 and DrawRollCage sub_820E3548
+// (2026-11-04; their callers, the interior's lists, are plain C++).
 ITC_CAR_DRAW(820D04E8, CarDrawModelDraw)
 ITC_CAR_DRAW(820D06F0, CarDrawCarPartDraw)
 ITC_CAR_DRAW(820C9170, CarDrawCarLightingGather)
 ITC_CAR_DRAW(82595110, CarDrawMorphShape)
-// The interior's leaves (their callers, the interior's lists, are
-// recompiled).
-ITC_CAR_DRAW(820E3170, CarDrawInteriorDialFaces)
-ITC_CAR_DRAW(820E3548, CarDrawInteriorRollCage)
-ITC_CAR_DRAW(820E39F8, CarDrawInteriorDigitalSpeed)
-ITC_CAR_DRAW(820E51D0, CarDrawInteriorReadouts)
-ITC_CAR_DRAW(820E3AD8, CarDrawInteriorMeterFaces)
-ITC_CAR_DRAW(820E3CF0, CarDrawInteriorSeats)
 #undef ITC_CAR_DRAW

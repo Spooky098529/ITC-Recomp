@@ -293,6 +293,29 @@ struct Target {
   int cases;
 };
 
+// The leaves' register steps (their adapters are gone: the lists are plain
+// C++): r3 = the group, r4 = the block, r5 = the camera pass.
+#define ITC_INTERIOR_STEP(name, ...)                                         \
+  void NativeInterior##name(PPCContext& ctx, uint8_t* base) {                \
+    const uint64_t r3 = ctx.r3.u64;                                          \
+    const uint32_t r4 = ctx.r4.u32, r5 = ctx.r5.u32, r1 = ctx.r1.u32;        \
+    const uint32_t r24 = ctx.r24.u32, r28 = ctx.r28.u32;                     \
+    (void)r28;                                                               \
+    NativeStep(ctx, base, [&](const ::car_draw::Calls& calls) {              \
+      return ::car_draw::__VA_ARGS__;                                        \
+    });                                                                      \
+  }
+ITC_INTERIOR_STEP(DialFaces,
+                  InteriorDrawDialFaces(base, calls, r1, uint32_t(r3), r4, r5, r24, r28))
+ITC_INTERIOR_STEP(RollCage,
+                  InteriorDrawRollCage(base, calls, r1, uint32_t(r3), r4, r5, r24, r28))
+ITC_INTERIOR_STEP(DigitalSpeed,
+                  InteriorDrawDigitalSpeed(base, calls, r1, uint32_t(r3), r4, r5, r24))
+ITC_INTERIOR_STEP(Readouts, InteriorDrawReadouts(base, calls, r1, r3, r4, r5, r24, r28))
+ITC_INTERIOR_STEP(MeterFaces, InteriorDrawMeterFaces(base, calls, r1, r3, r4, r5, r24))
+ITC_INTERIOR_STEP(Seats, InteriorDrawSeats(base, calls, r1, uint32_t(r3), r4, r5, r24, r28))
+#undef ITC_INTERIOR_STEP
+
 // The lists' register steps (no adapters: only SceneInterior::Draw calls
 // them): r3 = the point block, r4 = the block.
 void NativeInteriorFrontEnd(PPCContext& ctx, uint8_t* base) {
@@ -317,17 +340,17 @@ void InteriorDraws(Context& h, Random& r, uint32_t block, uint32_t race) {
   const uint32_t scene = race + 0x10000;
   const Target targets[] = {
       {"InteriorDials::DrawFaces (sub_820E3170)", __imp__sub_820E3170,
-       hooks::CarDrawInteriorDialFaces, Takes::kGroup, kDials, car_draw::kInteriorSmallFrame, 192},
+       NativeInteriorDialFaces, Takes::kGroup, kDials, car_draw::kInteriorSmallFrame, 192},
       {"InteriorPoints::DrawRollCage (sub_820E3548)", __imp__sub_820E3548,
-       hooks::CarDrawInteriorRollCage, Takes::kGroup, kRollCage, car_draw::kInteriorSmallFrame, 192},
+       NativeInteriorRollCage, Takes::kGroup, kRollCage, car_draw::kInteriorSmallFrame, 192},
       {"InteriorDials::DrawDigitalSpeed (sub_820E39F8)", __imp__sub_820E39F8,
-       hooks::CarDrawInteriorDigitalSpeed, Takes::kGroup, kDials, car_draw::kInteriorDigitsFrame, 192},
+       NativeInteriorDigitalSpeed, Takes::kGroup, kDials, car_draw::kInteriorDigitsFrame, 192},
       {"InteriorDials::DrawReadouts (sub_820E51D0)", __imp__sub_820E51D0,
-       hooks::CarDrawInteriorReadouts, Takes::kGroup, kDials, car_draw::kInteriorSmallFrame, 192},
+       NativeInteriorReadouts, Takes::kGroup, kDials, car_draw::kInteriorSmallFrame, 192},
       {"InteriorMeters::DrawFaces (sub_820E3AD8)", __imp__sub_820E3AD8,
-       hooks::CarDrawInteriorMeterFaces, Takes::kGroup, kMeters, car_draw::kInteriorMetersFrame, 256},
+       NativeInteriorMeterFaces, Takes::kGroup, kMeters, car_draw::kInteriorMetersFrame, 256},
       {"InteriorPoints::DrawSeats (sub_820E3CF0)", __imp__sub_820E3CF0,
-       hooks::CarDrawInteriorSeats, Takes::kGroup, kSeats, car_draw::kInteriorSeatsFrame, 256},
+       NativeInteriorSeats, Takes::kGroup, kSeats, car_draw::kInteriorSeatsFrame, 256},
       {"InteriorPoints::DrawFrontEnd (sub_820E4078)", __imp__sub_820E4078,
        NativeInteriorFrontEnd, Takes::kPoints, 0, car_draw::kInteriorFrontEndFrame, 256},
       {"InteriorPoints::DrawRace (sub_820E5220)", __imp__sub_820E5220, NativeInteriorRace,
@@ -343,8 +366,8 @@ void InteriorDraws(Context& h, Random& r, uint32_t block, uint32_t race) {
     int queued = 0, accessories = 0;
     uint32_t set = 0;
     bool drawn_accessory = false;
-    const bool seats = target.native == hooks::CarDrawInteriorSeats;
-    const bool digits = target.native == hooks::CarDrawInteriorDigitalSpeed;
+    const bool seats = target.native == NativeInteriorSeats;
+    const bool digits = target.native == NativeInteriorDigitalSpeed;
     for (int c = 0; c < target.cases; c++) {
       Case(
           h, results, block, r,
@@ -370,7 +393,7 @@ void InteriorDraws(Context& h, Random& r, uint32_t block, uint32_t race) {
                               guest::LoadU32(h.base, top + kInterior + 11616) != 0 &&
                               guest::LoadU32(h.base, top + kInterior + 152) != 3 &&
                               accessory_entry != 0;
-            if (digits || target.native == hooks::CarDrawInteriorReadouts) {
+            if (digits || target.native == NativeInteriorReadouts) {
               // The readouts' two models: each set or not (the digits' always
               // set for DrawDigitalSpeed itself, as its only caller checks).
               const uint32_t dials = top + kPoints + kDials;

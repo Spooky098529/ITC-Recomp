@@ -76,14 +76,6 @@ void CarDrawSceneParts(PPCContext& ctx, uint8_t* base);
 
 // The interior's callees' plain C++ native (the parts' draws').
 bool CarDrawInteriorCalleesNative();
-// The interior's leaves (their callers, the interior's lists, are
-// recompiled): r3 = the group, r4 = the block, r5 = the camera pass.
-void CarDrawInteriorDialFaces(PPCContext& ctx, uint8_t* base);
-void CarDrawInteriorRollCage(PPCContext& ctx, uint8_t* base);
-void CarDrawInteriorDigitalSpeed(PPCContext& ctx, uint8_t* base);
-void CarDrawInteriorReadouts(PPCContext& ctx, uint8_t* base);
-void CarDrawInteriorMeterFaces(PPCContext& ctx, uint8_t* base);
-void CarDrawInteriorSeats(PPCContext& ctx, uint8_t* base);
 // The interior's top, SceneInterior::Draw (sub_820E53F0; inside the
 // diagnostics' wrap, src/debug/frame_state_diff.cpp; the interior's callees
 // native, with --native_accessories and --native_scene_models for the
