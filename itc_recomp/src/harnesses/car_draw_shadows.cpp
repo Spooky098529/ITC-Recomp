@@ -3,7 +3,8 @@
 // car_draw harness (its Case and model draws' world, car_draw_shared.h).
 // The shadows group at the block's +0xC000 (record 0's model +4, the model
 // draws' model or now and then 0, and shape +228; record 3's model word
-// +724 and shape +948), the scene model's block at +0xF380 (its world at
+// +724 and shape +948, a copy of record 0's shape's record when it's
+// another), the scene model's block at +0xF380 (its world at
 // +16), the scene at the race block's +0x10000 (its +4: a race when 1; the
 // lighting block at +5248 and the cone at +5500 CarLighting::Gather reads;
 // the pass description at +5072 with its camera passes at +4 and +8, keys
@@ -66,7 +67,17 @@ void ShadowsWorld(Context& h, Random& r, uint32_t block, uint32_t race, uint32_t
   guest::StoreU32(base, group + 4, r.Below(8) == 0 ? 0 : block + 0x100);
   guest::StoreU32(base, group + 228, shape);
   guest::StoreU32(base, group + 724, r.Below(8) == 0 ? 0 : uint32_t(r.Next()) | 1u);
-  guest::StoreU32(base, group + 948, r.Below(4));
+  // Record 3's shape: ModelWorld builds only `shape`'s record (at the
+  // block's +0x2000 + 544 shape), so another one gets a copy of it; left as
+  // the block's random bytes, its material and index pointers were wild
+  // and the original read through them (mapped or not, by what the earlier
+  // harnesses left in guest memory).
+  const uint32_t shape3 = r.Below(4);
+  guest::StoreU32(base, group + 948, shape3);
+  if (shape3 != shape) {
+    const std::vector<uint8_t> record = Read(base, block + 0x2000 + 544 * shape, 544);
+    Write(base, block + 0x2000 + 544 * shape3, record.data(), 544);
+  }
   // The block's world: the model draws' (near the origin), or a turn with a
   // translation.
   const uint32_t source = block + kSource;
