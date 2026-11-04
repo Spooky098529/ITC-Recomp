@@ -591,6 +591,32 @@ void WheelsTopDraws(Context& h, uint32_t block, uint32_t race, uint32_t top) {
 
 }  // namespace
 
+static_assert(kSharedWheelsLeavesBytes == kWheelsBytes);
+static_assert(kSharedWheelsLeavesEnd == kRecordsEnd);
+static_assert(kSharedWheelsTopBytes == kTopBytes);
+static_assert(kSharedWheelsTopEnd == kTopEnd);
+static_assert(kSharedWheelsSlots == kTopSlots && kSharedWheelsSlotCount == kTopSlotCount);
+static_assert(kSharedWheelsObject == kTopObject);
+
+uint32_t SharedWheelsWorld(Context& h, Random& r, uint32_t block, uint32_t race, uint32_t top,
+                           uint32_t mine, uint32_t set, bool morphed) {
+  const uint32_t object = mine + kTopObject, points = object + 192;
+  const uint32_t shape = r.Below(4);
+  WheelsWorld(h, r, block, race, top, shape, set);
+  int makers = 0;
+  TopPointsWorld(h, r, block, block + kSource, top, points, shape, morphed, makers);
+  guest::StoreU32(h.base, object + 40,
+                  morphed ? (r.Below(4) == 0 ? uint32_t(r.Next()) | 1u : 1) : 0);
+  const uint32_t list = block + 0x3000;
+  guest::StoreU32(h.base, list + 8, kTopSlotCount);
+  guest::StoreU32(h.base, list + 32, mine + kTopSlots);
+  guest::StoreU32(h.base, list + 44, mine + kTopSlots);
+  const uint32_t index = r.Below(4);
+  guest::StoreU32(h.base, race + 0x10000 + 5072, index);
+  guest::StoreU32(h.base, kPasses + 592 * index + 588, uint32_t(r.Next()) | 1u);
+  return object;
+}
+
 void WheelsDraws(Context& h, uint32_t block, uint32_t race) {
   Random wheels_random(0x776865656C73ull);  // "wheels"
   const uint32_t allocation = memory::Alloc(kWheelsBytes + 16, 0);

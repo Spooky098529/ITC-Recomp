@@ -10,6 +10,8 @@
 
 #include "base/flags.h"
 #include "frame_pacing/game_messages.h"
+#include "hooks/load_poll.h"
+#include "hooks/second_set.h"
 
 ITC_FLAG_DECLARE(bool, native_scenery_lists);
 ITC_FLAG_DECLARE(bool, native_models);
@@ -24,6 +26,7 @@ ITC_FLAG_DECLARE(bool, native_c_runtime);
 ITC_FLAG_DECLARE(bool, native_material_passes);
 ITC_FLAG_DECLARE(bool, native_accessories);
 ITC_FLAG_DECLARE(bool, native_scene_models);
+ITC_FLAG_DECLARE(bool, native_load_poll);
 
 ITC_FLAG_BOOL(native_car_draw, true, "ITC",
               "Run the car draw (docs/functions/car-draw.md: Model::Draw sub_820D04E8 and "
@@ -87,7 +90,10 @@ ITC_FLAG_BOOL(native_car_draw, true, "ITC",
               "DrawRimB sub_820EA950 and the brakes DrawBrakes sub_820EB388 and "
               "DrawBrakesMorphed sub_820EBEB8 (no adapters: the wheels' lists call them), and the wheels' top SceneWheels::Draw "
               "sub_820ECE28 (inside the diagnostics' wrap) with WheelPoints::Draw sub_820ECA30 "
-              "and DrawMorphed sub_820ECB68 (no adapters: only it calls them) (the matrix "
+              "and DrawMorphed sub_820ECB68 (no adapters: only it calls them), and the root "
+              "Car::DrawUpdate sub_820DAC68 (inside the diagnostics' wrap; the scene models' "
+              "finishers and apply steps, ScenePools::ReleaseB, Vec4::Transform and the draws "
+              "above as plain C++, each inside its wrap's checks, with --native_load_poll) (the matrix "
               "functions, memcpy, CarPart::Draw, PartModel::FlipCulling and SetAlpha, the "
               "tire's weights, "
               "Morph::SetUp and Model::MorphShape as plain C++) "
@@ -405,6 +411,33 @@ void CarDrawSceneWheels(PPCContext& ctx, uint8_t* base) {
   const car_draw::Calls calls = CarDrawCalls(&guest);
   const car_draw::Left left =
       car_draw::SceneWheelsDraw(base, calls, ctx.r1.u32, ctx.r3.u32, ctx.r4.u32, ctx.r24.u64);
+  ctx.lr = lr;
+  LeaveLeft(ctx, left);
+}
+
+// --- The root ---
+
+bool CarDrawUpdateCalleesNative() {
+  return CarDrawHeightCalleesNative() && CarDrawLightKitCalleesNative() &&
+         CarDrawShadowsCalleesNative() && CarDrawCockpitCalleesNative() &&
+         CarDrawWheelsCalleesNative() && ITC_FLAG(native_load_poll) && LoadPollCalleesNative() &&
+         ITC_FLAG(native_second_set);
+}
+
+void CarDrawUpdate(PPCContext& ctx, uint8_t* base) {
+  if (!CarDrawUpdateCalleesNative()) {
+    __imp__sub_820DAC68(ctx, base);
+    return;
+  }
+  ctx.fpscr.disableFlushMode();
+  const uint64_t lr = ctx.lr;
+  SceneryDrawGuest guest{ctx, base};
+  const car_draw::Calls calls = CarDrawCalls(&guest);
+  load_poll::Calls poll = LoadPollCalls(ctx, base);
+  const second_set::ReleaseCalls release = SecondSetReleaseCalls(ctx, base);
+  const car_draw::Left left =
+      car_draw::CarDrawUpdate(base, calls, poll, release, ctx.r1.u32, ctx.r3.u64, ctx.r24.u64,
+                              !CarDrawBlinkTimersHeld());
   ctx.lr = lr;
   LeaveLeft(ctx, left);
 }

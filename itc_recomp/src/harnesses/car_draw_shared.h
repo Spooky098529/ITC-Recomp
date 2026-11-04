@@ -1,7 +1,8 @@
 // What the car draw's harness files share (src/harnesses/car_draw.cpp, which
 // defines these, car_draw_parts.cpp, car_draw_lamps.cpp,
 // car_draw_shadows.cpp, car_draw_top.cpp, car_draw_interior.cpp,
-// car_draw_cockpit.cpp, car_draw_traffic.cpp and car_draw_wheels.cpp): one case through both
+// car_draw_cockpit.cpp, car_draw_traffic.cpp, car_draw_wheels.cpp and
+// car_draw_root.cpp): one case through both
 // versions and the model draws' world, all under the harness name car_draw.
 
 #pragma once
@@ -101,5 +102,27 @@ void TrafficDraws(Context& h, Random& r, uint32_t block, uint32_t race);
 // The wheels' cases (car_draw_wheels.cpp), with a random generator of their
 // own (run last).
 void WheelsDraws(Context& h, uint32_t block, uint32_t race);
+// The wheels' top's world (car_draw_wheels.cpp, as SceneWheels::Draw's cases
+// build it), for Car::DrawUpdate's cases: the leaves' records in an
+// allocation at `top` of kSharedWheelsLeavesBytes (what they write below top
+// + kSharedWheelsLeavesEnd), the wheels object at `mine` + kSharedWheelsObject
+// in one of kSharedWheelsTopBytes (its point block and what the draws write
+// below mine + kSharedWheelsTopEnd; the command list's kSharedWheelsSlotCount
+// slots from mine + kSharedWheelsSlots), the model draws' world, the scene
+// at the race block's +0x10000 with `set` at its +4 and its current camera
+// pass (+5072) enabled, the scene model's block at the block's +0xF380;
+// `morphed` the object's +40. Returns the object.
+constexpr uint32_t kSharedWheelsLeavesBytes = 0x4000 + 4000 * 16;
+constexpr uint32_t kSharedWheelsLeavesEnd = 0x4000;
+constexpr uint32_t kSharedWheelsObject = 0x100;
+constexpr uint32_t kSharedWheelsTopEnd = 0x100 + 192 + 0x4100;
+constexpr uint32_t kSharedWheelsSlots = 0x4400;
+constexpr uint32_t kSharedWheelsSlotCount = 24000;
+constexpr uint32_t kSharedWheelsTopBytes = kSharedWheelsSlots + kSharedWheelsSlotCount * 16;
+uint32_t SharedWheelsWorld(Context& h, Random& r, uint32_t block, uint32_t race, uint32_t top,
+                           uint32_t mine, uint32_t set, bool morphed);
+// Car::DrawUpdate's cases (car_draw_root.cpp), with a random generator of
+// their own (run after the wheels').
+void RootDraws(Context& h, uint32_t block, uint32_t race);
 
 }  // namespace harness::car_draw_shared

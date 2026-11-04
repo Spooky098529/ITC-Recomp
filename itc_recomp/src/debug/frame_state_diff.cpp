@@ -568,7 +568,22 @@ extern "C" REX_FUNC(sub_8209CC38) {
   debug::FrameStateDiff_After(base, "draw step part", 0x8209CC38);
 }
 // The per-car update called from Draw (sub_820DAC68), and its callees.
-ITC_FRAME_STATE_WRAP(820DAC68)
+// Car::DrawUpdate natively under --native_car_draw (src/car_draw/update.cpp;
+// it calls its callees' plain C++ inside the same checks as their wraps
+// below), inside the same wrap.
+extern "C" REX_FUNC(sub_820DAC68) {
+  REX_FUNC_PROLOGUE();
+  if (debug::IsHidden(0x820DAC68)) {
+    return;
+  }
+  debug::FrameStateDiff_Before(base);
+  if (ITC_FLAG(native_car_draw)) {
+    hooks::CarDrawUpdate(ctx, base);
+  } else {
+    __imp__sub_820DAC68(ctx, base);
+  }
+  debug::FrameStateDiff_After(base, "draw step part", 0x820DAC68);
+}
 // ScenePools::ReleaseB: r3 = the second set, r4 = the pool, r5 = the index.
 // Natively under --native_second_set (src/second_set/objects.cpp; the
 // releases it reaches call its plain C++, not this wrap), inside the same

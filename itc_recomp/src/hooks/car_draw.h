@@ -93,4 +93,14 @@ bool CarDrawWheelsCalleesNative();
 // the wheels object, r4 = the block (r24 its leaves').
 void CarDrawSceneWheels(PPCContext& ctx, uint8_t* base);
 
+// Every callee of the root natively: the height cull's, the light kit's,
+// the shadows' (the parts' and the traffic body's), the cockpit's (with the
+// interior's), the wheels', the load poll's (--native_load_poll and its
+// callees) and ScenePools::ReleaseB's (--native_second_set).
+bool CarDrawUpdateCalleesNative();
+// The root, Car::DrawUpdate (sub_820DAC68; inside the diagnostics' wrap,
+// src/debug/frame_state_diff.cpp; every callee native): r3 = the scene
+// model (r24 the caller's, handed to the draws that take it).
+void CarDrawUpdate(PPCContext& ctx, uint8_t* base);
+
 }  // namespace hooks

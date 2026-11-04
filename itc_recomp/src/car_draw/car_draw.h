@@ -28,6 +28,13 @@
 #include <functional>
 #include <optional>
 
+namespace load_poll {
+struct Calls;
+}
+namespace second_set {
+struct ReleaseCalls;
+}
+
 namespace car_draw {
 
 // What the plain C++ can't do itself: the guest calls it makes from the
@@ -920,5 +927,42 @@ Left WheelsPointsDrawMorphed(uint8_t* base, const Calls& calls, uint32_t stack, 
 // calls). Car::DrawUpdate's native body calls this with its r24.
 Left SceneWheelsDraw(uint8_t* base, const Calls& calls, uint32_t stack, uint32_t wheels,
                      uint32_t block, uint64_t caller_r24);
+
+// --- The root (update.cpp) ---
+
+// Car::DrawUpdate's frame.
+constexpr uint32_t kCarDrawUpdateFrame = 304;
+
+// Car::DrawUpdate (sub_820DAC68): r3 = the scene model (`model_r3`, all 64
+// bits; its +4288 the block every draw below gets); see the row in
+// car-draw.md. The boost (+4992) lowered by 1.0; nothing more when +4296 is
+// 0 or +5028 set. In a race ([[+5116] + 4]) the position (0, 0, 0, 1) at the
+// frame's +80 through the model's matrix (+4304) and the current camera
+// pass's view-projection into +160 (its w at +172 1.0 first; address 144
+// read when the pass is disabled), nothing more when that w is below
+// [0x82002A24], then SceneModel::IsNearPlayerHeight (0: the pass mask's bits
+// 0xF8 cleared). Traffic (+32 3): the body's and wheels' finishers until
+// +5036, the set-up and palettes on the call it's set, then
+// SceneTraffic::Draw and SceneWheels::Draw (r24 `caller_r24`). Cars: until
+// ready (+5036), each finisher whose flag is 0, ready when all are set (the
+// cockpit's only in a race), nothing more while not; on the call it's set
+// the apply steps once (the load poll's plain C++); the second wheels
+// swapped in once finished (ScenePools::ReleaseB on the old ones from this
+// frame, returning to 0x820DB01C); the cockpit view's model (+32 2 with
+// +4300) only SceneCockpit::Draw once finished; else SceneLights::Draw
+// under the scene's key (+5124; the render queue's keys [0x8296B90C] and
+// [0x8296B900] saved to the scene's +5136 and +5140 and put back) when the
+// scene's +5084 pass is enabled (`advance_blink` false on a render-only
+// pass with --per_tick_blink_timers), SceneParts::Draw, the per-object
+// light slots 2 to 5 reset through the frame's +96 to +159,
+// SceneWheels::Draw and SceneInterior::Draw (r24 0xFFFFFFFF8296BAE0, the
+// interior's r28 0xFFFFFFFF8296BA60, as the original's registers hold
+// them; the others r28 0xFFFFFFFF826C0000). Every callee inside its
+// diagnostics' wrap's checks (--debug_hide, --find_per_frame_state). Returns
+// r3 as the original leaves it. Only with every callee's plain C++ native
+// (the adapter's check, hooks::CarDrawUpdateCalleesNative).
+Left CarDrawUpdate(uint8_t* base, const Calls& calls, load_poll::Calls& poll,
+                   const second_set::ReleaseCalls& release, uint32_t stack, uint64_t model_r3,
+                   uint64_t caller_r24, bool advance_blink);
 
 }  // namespace car_draw
