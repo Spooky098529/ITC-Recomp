@@ -185,6 +185,57 @@ void CarSceneDrawTextureProjectionFit(PPCContext& ctx, uint8_t* base) {
   ctx.fpscr.enableFlushMode();
 }
 
+car_scene_draw::SceneDrawCalls CarSceneDrawRootCalls(PPCContext& ctx, uint8_t* base) {
+  car_scene_draw::SceneDrawCalls calls;
+  calls.call = [&ctx, base](uint32_t function, const uint64_t* regs, int count,
+                            const double* fregs, int fcount, uint32_t sp,
+                            uint32_t lr) -> uint64_t {
+    const uint64_t stack = ctx.r1.u64;
+    ctx.r1.u64 = sp;
+    ctx.lr = lr;
+    PPCRegister* gprs[8] = {&ctx.r3, &ctx.r4, &ctx.r5, &ctx.r6,
+                            &ctx.r7, &ctx.r8, &ctx.r9, &ctx.r10};
+    for (int i = 0; i < count; i++) {
+      gprs[i]->u64 = regs[i];
+    }
+    if (fcount > 0) {
+      ctx.fpscr.disableFlushMode();
+    }
+    PPCRegister* fprs[5] = {&ctx.f1, &ctx.f2, &ctx.f3, &ctx.f4, &ctx.f5};
+    for (int i = 0; i < fcount; i++) {
+      fprs[i]->f64 = fregs[i];
+    }
+    ctx.ctr.u64 = function;
+    REX_CALL_INDIRECT_FUNC(function);
+    ctx.r1.u64 = stack;
+    ctx.fpscr.disableFlushMode();
+    return ctx.r3.u64;
+  };
+  calls.memcpy = [&ctx, base](uint32_t to, uint32_t from, uint32_t bytes, uint32_t sp,
+                              uint32_t lr) {
+    const uint64_t stack = ctx.r1.u64;
+    ctx.r1.u64 = sp;
+    ctx.lr = lr;
+    ctx.r3.u64 = to;
+    ctx.r4.u64 = from;
+    ctx.r5.u64 = bytes;
+    __imp__sub_825A7410(ctx, base);
+    ctx.r1.u64 = stack;
+    ctx.fpscr.disableFlushMode();
+  };
+  calls.push_back = [&ctx, base](uint32_t vector, uint32_t value, uint32_t sp, uint32_t lr) {
+    const uint64_t stack = ctx.r1.u64;
+    ctx.r1.u64 = sp;
+    ctx.lr = lr;
+    ctx.r3.u64 = vector;
+    ctx.r4.u64 = value;
+    __imp__sub_825986B8(ctx, base);
+    ctx.r1.u64 = stack;
+    ctx.fpscr.disableFlushMode();
+  };
+  return calls;
+}
+
 }  // namespace hooks
 
 // No REX_FUNC adapters are left here (all removed 2026-11-04 once their

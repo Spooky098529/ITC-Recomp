@@ -20,7 +20,9 @@
 // projectors' matrices (look-at, perspective, Projector::Build and
 // BuildOrtho) and the root's small leaves (the pass's light, the scene
 // models' beams, the player's model). Part 3: TextureProjection::Fit
-// over them. The float helpers they share: ops.h.
+// over them. Part 4 (scene_draw.cpp): the root, CarScene::Draw
+// (sub_820C5DE8): 4a its set-up and the records of both paths, 4b the pass
+// loop, 4c its wrap and harness. The float helpers they share: ops.h.
 
 #pragma once
 
@@ -164,5 +166,58 @@ void SceneModelBeamShape(uint8_t* base, uint32_t out, uint32_t model);
 // sub_820C4FB8 CarScene::PlayerModel: the index, or for 0, 1 when the race
 // kind is 6 with its +0x59614 2 and [0x826C7824] 0, else 0.
 uint32_t CarScenePlayerModel(uint8_t* base, uint32_t index);
+
+// --- The root (scene_draw.cpp) ---
+
+// CarScene::Draw's frame (its caller's r1 less this).
+constexpr uint32_t kSceneDrawFrame = 1696;
+
+// What the root's plain C++ can't do itself: its guest calls, made from the
+// root's frame with the original's return addresses.
+struct SceneDrawCalls {
+  // Any guest function `function` from the frame at `sp` with `lr`: r3 on
+  // from `regs` (`count`, all 64 bits), f1 on from `fregs` (`fcount`); its
+  // r3 (64 bits). Leaves flush-to-zero off. The render manager's, the
+  // command list's, the render queue's and the texture provider's vtable
+  // calls, CameraPasses::RecordBegins and RecordEnds (their wraps), the
+  // command list's originals where the plain C++ declines, and the wraps of
+  // Projector::Build and TextureProjection::Fit where theirs would.
+  std::function<uint64_t(uint32_t function, const uint64_t* regs, int count, const double* fregs,
+                         int fcount, uint32_t sp, uint32_t lr)>
+      call;
+  // memcpy's original where native::Buffers_Memcpy declines.
+  MemcpyCall memcpy;
+  // Vector16::PushBack's original, for TextureProjection::Fit.
+  PushBackCall push_back;
+};
+
+// The root's state shared between its halves (4a's set-up and records, 4b's
+// pass loop and end). The rest is on the frame, at the original's offsets:
+//   f + 80   the records' counter (path +4 = 0; 4b reuses it)
+//   f + 88   0x826BAC00 (the camera passes)
+//   f + 160  the records' counter (path +4 != 0)
+//   f + 192  0 for path +4 = 0, 1 for the other
+//   f + 224, f + 228  0x8296BAE0, 0x8296BB60 (the headlight slots)
+//   f + 1328 pass 0's view-projection as it was (put back at the end)
+//   f + 1716 the scene (the caller's frame's +20)
+// and the original's registers at loc_820C7C50, where 4b goes on: r21 = the
+// scene, r27 = 1, r30 = 0, r26 = 4 (path +4 = 0: 4b sets 1), f30 = 1.0
+// ([0x82000A30]), f31 = 0.0 ([0x82000A34]).
+struct SceneDrawFrame {
+  uint32_t f = 0;      // the root's r1
+  uint32_t scene = 0;  // r3 at entry
+  bool second_path = false;  // the scene's +4 not 0
+};
+
+// sub_820C5DE8 CarScene::Draw: r3 = the scene ([0x826C2E44]), r4 = a matrix
+// or 0; `stack` the caller's r1. Its frame (back chain as stwu writes it),
+// nothing more when the scene's +0 is 4; pass 0's view-projection saved (and
+// times the matrix), then the path's set-up and its three records' chunks
+// (docs/functions/car-scene-draw.md), its callees' plain C++ inside their
+// diagnostics' wrap checks (--debug_hide, --find_per_frame_state), each
+// Matrix::Multiply and Copy noted for frame interpolation by the original's
+// return address. 4b: the pass loop and the end. Leaves flush-to-zero off.
+void CarSceneDraw(uint8_t* base, const SceneDrawCalls& calls, uint32_t stack, uint32_t scene,
+                  uint32_t matrix);
 
 }  // namespace car_scene_draw

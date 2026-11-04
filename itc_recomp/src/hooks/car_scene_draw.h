@@ -7,6 +7,7 @@
 
 #pragma once
 
+#include "car_scene_draw/car_scene_draw.h"
 #include "guest.h"
 
 namespace hooks {
@@ -65,5 +66,11 @@ void CarSceneDrawPlayerModel(PPCContext& ctx, uint8_t* base);
 // f5 = the high and low heights, the far cut, the least distance and the
 // distance's scale; r3 as the original leaves it, flush-to-zero on.
 void CarSceneDrawTextureProjectionFit(PPCContext& ctx, uint8_t* base);
+
+// Part 4: CarScene::Draw sub_820C5DE8's guest calls (car_scene_draw::
+// SceneDrawCalls) through `ctx`, each from the frame and with the return
+// address the plain C++ gives, r1 put back after. Not wired yet: 4c's
+// adapter (r3 = the scene, r4 = the matrix) builds these.
+car_scene_draw::SceneDrawCalls CarSceneDrawRootCalls(PPCContext& ctx, uint8_t* base);
 
 }  // namespace hooks
