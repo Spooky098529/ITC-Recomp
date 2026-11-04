@@ -17,8 +17,9 @@ ITC_FLAG_BOOL(native_car_scene_draw, true, "ITC",
               "C++; _Xlen and bad_alloc's paths left to the originals), Matrix::LookAt "
               "sub_82597378, Matrix::Perspective sub_825972A8, Projector::Build sub_82597610 and "
               "BuildOrtho sub_82597518, ScenePass::SetLight sub_820C4EB8, SceneModel::BeamColor "
-              "sub_820DAA38, Beam sub_820DAAC8 and BeamShape sub_820DAB10 and "
-              "CarScene::PlayerModel sub_820C4FB8 (the wrapped ones inside their "
+              "sub_820DAA38, Beam sub_820DAAC8 and BeamShape sub_820DAB10, "
+              "CarScene::PlayerModel sub_820C4FB8 and TextureProjection::Fit sub_82598768 (the "
+              "wrapped ones inside their "
               "--find_per_frame_state wraps), natively instead of "
               "through the translated code (the same writes; checked by "
               "--run_harnesses=car_scene_draw)");
@@ -159,6 +160,29 @@ void CarSceneDrawBeamShape(PPCContext& ctx, uint8_t* base) {
 
 void CarSceneDrawPlayerModel(PPCContext& ctx, uint8_t* base) {
   ctx.r3.u64 = csd::CarScenePlayerModel(base, ctx.r3.u32);
+}
+
+void CarSceneDrawTextureProjectionFit(PPCContext& ctx, uint8_t* base) {
+  ctx.fpscr.disableFlushMode();
+  const auto push_back = [&](uint32_t vector, uint32_t value, uint32_t sp, uint32_t lr) {
+    const uint64_t stack = ctx.r1.u64;
+    ctx.r1.u64 = sp;
+    ctx.lr = lr;
+    ctx.r3.u64 = vector;
+    ctx.r4.u64 = value;
+    __imp__sub_825986B8(ctx, base);
+    ctx.r1.u64 = stack;
+    ctx.fpscr.disableFlushMode();
+  };
+  uint32_t r3 = 0;
+  if (!csd::TextureProjectionFit(base, ctx.r3.u32, ctx.r4.u32, ctx.r5.u32, ctx.f1.f64,
+                                 ctx.f2.f64, ctx.f3.f64, ctx.f4.f64, ctx.f5.f64, ctx.r1.u32,
+                                 push_back, &r3)) {
+    __imp__sub_82598768(ctx, base);
+    return;
+  }
+  ctx.r3.u64 = r3;
+  ctx.fpscr.enableFlushMode();
 }
 
 }  // namespace hooks

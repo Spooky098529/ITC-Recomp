@@ -62,4 +62,10 @@ void CarSceneDrawBeam(PPCContext& ctx, uint8_t* base);
 void CarSceneDrawBeamShape(PPCContext& ctx, uint8_t* base);
 void CarSceneDrawPlayerModel(PPCContext& ctx, uint8_t* base);
 
+// Part 3: TextureProjection::Fit sub_82598768 (wrapped: its wrap calls this
+// under the flag): r3 = out, r4 = the camera pass, r5 = the direction, f1 to
+// f5 = the high and low heights, the far cut, the least distance and the
+// distance's scale; r3 as the original leaves it, flush-to-zero on.
+void CarSceneDrawTextureProjectionFit(PPCContext& ctx, uint8_t* base);
+
 }  // namespace hooks

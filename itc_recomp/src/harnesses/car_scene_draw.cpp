@@ -132,13 +132,14 @@ struct Blocks {
 };
 
 // One case through both versions: the scratch area and the stack below r1
-// filled, `setup(blocks)` writes the inputs (the same both times: it's
+// filled (stack_bytes of it), `setup(blocks)` writes the inputs (the same both times: it's
 // handed a copy of the generator's state), `args(t)` sets the registers,
 // the original (flag off) or the step runs, then `collect(out, t, blocks)`
 // keeps what's compared (and frees the blocks: Blocks::Out).
 template <typename Setup, typename Args, typename Collect>
 void Case(Context& h, Results& results, Setup setup, Args args, GuestFunction recompiled,
-          GuestFunction native, Collect collect, const std::string& what) {
+          GuestFunction native, Collect collect, const std::string& what,
+          uint32_t stack_bytes = kStackBytes) {
   Outputs out[2];
   const Random start = h.random;
   Random after;
@@ -149,7 +150,7 @@ void Case(Context& h, Results& results, Setup setup, Args args, GuestFunction re
     // Flush-to-zero off for the inputs too (the last version run may leave
     // it on, and it would turn a denormal float made into a double to 0).
     t.fpscr.disableFlushModeUnconditional();
-    Fill(h.base, t.r1.u32 - kStackBytes, kStackBytes);
+    Fill(h.base, t.r1.u32 - stack_bytes, stack_bytes);
     Blocks blocks;
     setup(blocks);
     args(t);
@@ -1018,6 +1019,154 @@ void Leaves(Context& h) {
   }
 }
 
+// --- Part 3: TextureProjection::Fit ---
+
+// A camera pass as the fit reads it: its view (+16, a look-at from an eye
+// with the yaw and pitch, row vectors), its projection (+80), field of view
+// (+368), the aspect's width and height (+376, +380) and near and far
+// (+384, +388; sometimes in the other order).
+void WritePass(Context& h, uint32_t pass, float eye_y, float pitch, bool swapped) {
+  const float yaw = Uniform(h.random, -3.1f, 3.1f);
+  const float eye[3] = {Plain(h.random, 9000.0f), eye_y, Plain(h.random, 9000.0f)};
+  const float z[3] = {std::cos(pitch) * std::sin(yaw), std::sin(pitch),
+                      std::cos(pitch) * std::cos(yaw)};
+  // x = (0, 1, 0) x z normalized, y = z x x.
+  float x[3] = {z[2], 0.0f, -z[0]};
+  const float length = std::sqrt(x[0] * x[0] + x[2] * x[2]);
+  x[0] /= length;
+  x[2] /= length;
+  const float y[3] = {z[1] * x[2] - z[2] * x[1], z[2] * x[0] - z[0] * x[2],
+                      z[0] * x[1] - z[1] * x[0]};
+  const float view[16] = {x[0], y[0], z[0], 0.0f, x[1], y[1], z[1], 0.0f, x[2], y[2], z[2], 0.0f,
+                          -(x[0] * eye[0] + x[1] * eye[1] + x[2] * eye[2]),
+                          -(y[0] * eye[0] + y[1] * eye[1] + y[2] * eye[2]),
+                          -(z[0] * eye[0] + z[1] * eye[1] + z[2] * eye[2]), 1.0f};
+  for (uint32_t i = 0; i < 16; i++) {
+    StoreFloat(h.base, pass + 16 + 4 * i, view[i]);
+  }
+  const float fov = Uniform(h.random, 0.3f, 1.4f);
+  const float width = h.random.Below(2) ? 1280.0f : Uniform(h.random, 600.0f, 2000.0f);
+  const float height = h.random.Below(2) ? 720.0f : Uniform(h.random, 400.0f, 1200.0f);
+  const float near_plane = Uniform(h.random, 0.1f, 2.0f);
+  const float far_plane =
+      h.random.Below(2) ? 5000.0f : near_plane + Uniform(h.random, 20.0f, 6000.0f);
+  const float ys = 1.0f / std::tan(fov * 0.5f);
+  float p[16] = {};
+  p[0] = ys / (width / height);
+  p[5] = ys;
+  p[10] = far_plane / (far_plane - near_plane);
+  p[11] = 1.0f;
+  p[14] = -near_plane * far_plane / (far_plane - near_plane);
+  for (uint32_t i = 0; i < 16; i++) {
+    StoreFloat(h.base, pass + 80 + 4 * i, p[i]);
+  }
+  StoreFloat(h.base, pass + 368, fov);
+  StoreFloat(h.base, pass + 376, width);
+  StoreFloat(h.base, pass + 380, height);
+  StoreFloat(h.base, pass + 384, swapped ? far_plane : near_plane);
+  StoreFloat(h.base, pass + 388, swapped ? near_plane : far_plane);
+}
+
+// Real-looking passes (the race's: a camera a few meters above the car,
+// heights around the car, the direction straight up or a light's) with
+// pitches over the branches (looking down far enough that every far
+// corner's segment crosses the low plane, up for the high one, level for
+// neither), random words for the view and projection, special values in the
+// fields, the arguments and the direction (a NaN or infinite field of view
+// sends the fit to its original), a zero direction, near = far, a zero
+// height. The vector grows from empty past its capacity in every case.
+// Compared: out, the fit's frame (its back chain, the unwritten linkage
+// area, every word it stores, all floats or copies of floats: the vector's
+// words are overwritten with floats before the end) and r3 (out, or the
+// vector's storage, freed). The saved registers' slots above the frame and
+// the callees' frames below it aren't compared (the plain C++ doesn't write
+// saved registers; the callees' own harnesses compare theirs).
+void Fit(Context& h) {
+  const uint32_t out = h.data;
+  const uint32_t pass = h.data + 64;
+  const uint32_t direction = h.data + 512;
+  Results results("TextureProjection::Fit (sub_82598768)");
+  for (int k = 0; k < 400; k++) {
+    // 0: level-ish, 1: down, 2: up, 3: random words, 4: special values.
+    const int kind = k < 160 ? k % 3 : k < 260 ? 3 : 4;
+    double f[5];
+    Case(
+        h, results,
+        [&](Blocks&) {
+          const float car_y = Plain(h.random, 200.0f);
+          const float eye_y = car_y + Uniform(h.random, 0.5f, 30.0f);
+          const float pitch = kind == 1   ? Uniform(h.random, -1.5f, -0.5f)
+                              : kind == 2 ? Uniform(h.random, 0.5f, 1.5f)
+                                          : Uniform(h.random, -1.5f, 1.5f);
+          WritePass(h, pass, eye_y, pitch, k % 5 == 2);
+          // The race's: the heights the car's and 10 or 15 above, a far cut
+          // around 300, at least 11 to 18 away, the far plane's 0.05 or
+          // 0.08 (seen in an attract race, 2026-11-04); or wider.
+          const float below_car = Uniform(h.random, 0.0f, 10.0f);
+          f[0] = Single(car_y + Uniform(h.random, 0.5f, 30.0f));
+          f[1] = Single(car_y - below_car);
+          f[2] = Single(Uniform(h.random, 10.0f, 500.0f));
+          f[3] = Single(Uniform(h.random, 1.0f, 300.0f));
+          f[4] = Single(k % 2 == 0 ? Uniform(h.random, 0.03f, 0.1f) : Uniform(h.random, 0.05f, 3.0f));
+          if (k % 2 == 0) {
+            WriteVector(h, direction, 0.0f, false, 0.0f);
+            StoreFloat(h.base, direction + 4, 1.0f);
+          } else {
+            WriteVector(h, direction, 1.0f, false, Plain(h.random, 2.0f));
+          }
+          if (kind == 3) {
+            for (uint32_t i = 0; i < 32; i++) {
+              StoreFloat(h.base, pass + 16 + 4 * i, Plain(h.random, 50.0f));
+            }
+          } else if (kind == 4) {
+            const uint32_t fields[] = {16, 20, 24, 28, 32, 36, 40, 44, 48, 52, 56, 60, 64, 68,
+                                       72, 76, 80, 84, 100, 120, 136, 368, 376, 380, 384, 388};
+            for (int n = 0; n < 3; n++) {
+              StoreFloat(h.base, pass + fields[h.random.Below(26)], Value(h.random, 100.0f));
+            }
+            WriteVector(h, direction, 1.0f, k % 3 == 0, Value(h.random, 2.0f));
+            for (double& value : f) {
+              if (h.random.Below(4) == 0) {
+                value = Single(Value(h.random, 100.0f));
+              }
+            }
+          }
+          if (k % 23 == 7) {
+            WriteVector(h, direction, 0.0f, false, 0.0f);  // a zero direction
+          } else if (k % 29 == 11) {
+            Store(h.base, pass + 388, Load(h.base, pass + 384));  // near = far
+          } else if (k % 31 == 13) {
+            StoreFloat(h.base, pass + 380, 0.0f);  // no height
+          } else if (k % 37 == 17) {
+            f[0] = f[1];  // no height between the planes
+          }
+        },
+        [&](PPCContext& t) {
+          t.r3.u64 = out;
+          t.r4.u64 = pass;
+          t.r5.u64 = direction;
+          t.f1.f64 = f[0];
+          t.f2.f64 = f[1];
+          t.f3.f64 = f[2];
+          t.f4.f64 = f[3];
+          t.f5.f64 = f[4];
+        },
+        __imp__sub_82598768, hooks::CarSceneDrawTextureProjectionFit,
+        [&](Outputs& o, const PPCContext& t, Blocks& blocks) {
+          const uint32_t sp = t.r1.u32 - 1248;
+          o.Floats(h.base, out, 16);
+          o.Word(Load(h.base, sp));               // the back chain
+          o.Bytes(Read(h.base, sp + 4, 76));      // the linkage area (unwritten)
+          o.Floats(h.base, sp + 80, 240);         // the frame's words
+          const uint32_t r3 = t.r3.u32;
+          o.Word(r3 == out ? 0 : r3 != 0 && !memory::IsHeapBlock(r3) ? 1 : 2);
+          blocks.Out(o);
+        },
+        fmt::format("kind {} case {}", kind, k), 4096);
+  }
+  results.Report();
+}
+
 }  // namespace
 
 void CarSceneDraw(Context& h) {
@@ -1028,6 +1177,7 @@ void CarSceneDraw(Context& h) {
   Projectors(h);
   ProjectorBuilds(h);
   Leaves(h);
+  Fit(h);
 }
 
 }  // namespace harness

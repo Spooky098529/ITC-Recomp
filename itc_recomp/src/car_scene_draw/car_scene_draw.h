@@ -19,8 +19,8 @@
 // std::vector of 16-byte points and the vector's growth. Part 2: the
 // projectors' matrices (look-at, perspective, Projector::Build and
 // BuildOrtho) and the root's small leaves (the pass's light, the scene
-// models' beams, the player's model). The float helpers they share:
-// ops.h.
+// models' beams, the player's model). Part 3: TextureProjection::Fit
+// over them. The float helpers they share: ops.h.
 
 #pragma once
 
@@ -109,6 +109,33 @@ bool ProjectorBuild(uint8_t* base, uint32_t out, uint32_t eye, uint32_t target, 
 void ProjectorBuildOrtho(uint8_t* base, uint32_t out, uint32_t eye, uint32_t target,
                          uint32_t up, double width, double height, double near_plane,
                          double far_plane, uint32_t stack);
+
+// --- The fit (texture_projection.cpp) ---
+
+// Vector16::PushBack's original (sub_825986B8) from the frame at `sp` with
+// `lr`, where its plain C++ declines; leaves flush-to-zero off.
+using PushBackCall =
+    std::function<void(uint32_t vector, uint32_t value, uint32_t sp, uint32_t lr)>;
+
+// Whether TextureProjectionFit would decline for this camera pass (its
+// Matrix::Perspective would: PerspectiveDeclines on the pass's +368).
+bool TextureProjectionFitDeclines(uint8_t* base, uint32_t pass);
+// sub_82598768 TextureProjection::Fit: out = the texture projection fitted
+// to the camera pass's view between the heights `low` and `high` along the
+// direction, its far plane cut to far_cut, the eye's distance far x
+// distance_scale or at least min_distance (f1 to f5), in its 1,248-byte
+// frame below `stack` (the back chain, the 256-byte frustum and the
+// std::vector of the frustum's corners on it, its matrices at the
+// original's offsets, every Matrix::Multiply noted for frame interpolation
+// by its return address). r3 = what the original leaves (the vector's
+// storage, freed, or out). False, with nothing written, where
+// Matrix::Perspective would decline: the original then runs. Leaves
+// flush-to-zero off (the original leaves it on, Matrix::Multiply's last
+// step: the adapter turns it on).
+bool TextureProjectionFit(uint8_t* base, uint32_t out, uint32_t pass, uint32_t direction,
+                          double high, double low, double far_cut, double min_distance,
+                          double distance_scale, uint32_t stack, const PushBackCall& push_back,
+                          uint32_t* r3);
 
 // --- The root's leaves (lights.cpp) ---
 
