@@ -77,6 +77,7 @@ constexpr uint32_t kOnEffectsBankLoaded = 0x82175ED0;
 constexpr uint32_t kEffectsBankId = 22889;          // Sound::Play (menu-sounds.md)
 constexpr uint32_t kRaceSoundsPauseCars = 0x82175C00;
 constexpr uint32_t kRaceSoundsResumeCars = 0x82175C58;
+constexpr uint32_t kCarSoundsInit = 0x8210FE00;
 
 // The scene models' sound slots (seven each; scene-models.md loads into
 // them): the two files' buffers, asked again, both files arrived; the cars'
@@ -256,5 +257,17 @@ uint64_t IdleTick(uint8_t* base, uint64_t r3, uint32_t sp, const Calls& calls);
 // cars' views made (operator new, XPR::XPR), PlayStartMusic, the listener
 // at the origin (SetListener), the cars' step 1.
 uint64_t Begin(uint8_t* base, uint64_t r3, uint32_t sp, const Calls& calls);
+
+// --- The machine's set-up (race_sounds_init.cpp) ---
+
+// Init's frame (its r1 is `sp` less this).
+constexpr uint32_t kInitFrame = 3280;
+// sub_82177378 RaceSounds::Init: the race kind (+9652) from the race data,
+// the seven sound slots reset, their buffers allocated (XPhysicalAlloc) and
+// cleared, CarSounds::Init, the state (+9604) = 1 and the transitions for
+// the kind (StateMachine::Add), replayed in the original's frame (see
+// race_sounds_init.cpp). Returns the last Add's answer (`replaced` as it
+// says).
+uint32_t Init(uint8_t* base, uint32_t machine, uint32_t sp, const Calls& calls, bool* replaced);
 
 }  // namespace race_sounds

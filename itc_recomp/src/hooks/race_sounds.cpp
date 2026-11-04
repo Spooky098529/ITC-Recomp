@@ -26,7 +26,7 @@ ITC_FLAG_BOOL(native_race_sounds, true, "ITC",
               "RollingStartTick sub_82177130, AfterRaceTick sub_82176C10, OnCountdown "
               "sub_82176968, OnRaceEnd sub_82176BA0, OnLeaveAfterRace sub_82176E60, OnNextStage "
               "sub_82176EC8, OnRollingStart sub_821770C0, PlayStartMusic sub_82175DB0 (rand's plain "
-              "C++), IdleTick sub_821767A8, Begin sub_82176618; the car sounds, Music::Play and Sound::Play through their plain C++, the sound manager's slots through the "
+              "C++), IdleTick sub_821767A8, Begin sub_82176618, Init sub_82177378 (XPhysicalAlloc through the function table, CarSounds::Init's and StateMachine::Add's plain C++); the car sounds, Music::Play and Sound::Play through their plain C++, the sound manager's slots through the "
               "function table) natively instead of through the translated code (the same "
               "words; checked by --run_harnesses=race_sounds)");
 
@@ -95,6 +95,9 @@ class GuestCalls {
         break;
       case rs::kSoundPlay:
         SoundPlay(ctx, base);
+        break;
+      case rs::kCarSoundsInit:
+        CarSoundsInit(ctx, base);
         break;
       default:
         ctx.ctr.u64 = function;
@@ -274,6 +277,21 @@ void RaceSoundsBegin(PPCContext& ctx, uint8_t* base) {
   Step(ctx, base, [&](const rs::Calls& c) { return rs::Begin(base, r3, sp, c); });
 }
 
+void RaceSoundsInit(PPCContext& ctx, uint8_t* base) {
+  const uint64_t machine_r3 = ctx.r3.u64;
+  const uint32_t machine = ctx.r3.u32;
+  const uint32_t sp = ctx.r1.u32;
+  bool replaced = false;
+  uint32_t r3 = 0;
+  Step(ctx, base, [&](const rs::Calls& c) {
+    r3 = rs::Init(base, machine, sp, c, &replaced);
+    return uint64_t(0);
+  });
+  // StateMachine::Add's adapter's r3 (src/hooks/game_modes.cpp): a new
+  // transition's address from the machine's 64-bit r3.
+  ctx.r3.u64 = replaced ? r3 : machine_r3 + (r3 - machine);
+}
+
 }  // namespace hooks
 
 // Defines an adapter: the flag, else the original.
@@ -306,3 +324,4 @@ ITC_RACE_SOUNDS(82176EC8, RaceSoundsOnNextStage)
 ITC_RACE_SOUNDS(821770C0, RaceSoundsOnRollingStart)
 ITC_RACE_SOUNDS(821767A8, RaceSoundsIdleTick)
 ITC_RACE_SOUNDS(82176618, RaceSoundsBegin)
+ITC_RACE_SOUNDS(82177378, RaceSoundsInit)

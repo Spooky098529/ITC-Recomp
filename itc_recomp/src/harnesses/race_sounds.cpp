@@ -27,6 +27,7 @@
 #include "harness.h"
 
 #include "base/log.h"
+#include "game_modes/game_modes.h"
 #include "hooks/heap.h"
 #include "hooks/race_sounds.h"
 #include "hooks/xaudio.h"
@@ -572,6 +573,183 @@ void BeginCases(Context& h, uint32_t block) {
   results.Report();
 }
 
+// Init: a machine of its own (an empty state machine or one with random
+// transitions already, some with keys Init adds; the last, (10, 32), among
+// them in some cases: its r3 is then the index), the kind from the race
+// data's +0xA3AF0 (every class: 5, 1, 2, 4 and 6, the others), the frame
+// filled with the same random words for both (the words the original never
+// writes go into the transitions). Its allocations are real: the seven
+// slots' two buffers (XPhysicalAlloc, compared as whether they're set and
+// cleared, freed after each version) and CarSounds::Init's array, matrices
+// and submix voice (compared as the car sounds' harness does: the matrices
+// as whether they're set, the submix's allocator block with pointers into
+// it as offsets; then the submix released and the blocks freed). The
+// machine, the slots' globals 0x826D8334 to 0x826D83C8, the frame (but its
+// saved registers), r1 and r3 compared.
+void InitCases(Context& h, uint32_t block) {
+  namespace gm = game_modes;
+  constexpr uint32_t kMachineBytes = 0x2600;
+  constexpr uint32_t kSaves = 112;  // __savegprlr_19: r19 at -112, lr at -8
+  constexpr uint32_t kSlots = 0x826D8334, kSlotsBytes = 0x94;
+  constexpr uint32_t kSlotBuffers = 0x826D8358, kSlotBuffersEnd = 0x826D8390;
+  constexpr uint32_t kBufferBytes[2] = {0x5D2D0, 0x6B080};  // kSlotBuffer0's, kSlotBuffer1's
+  constexpr uint32_t kCarSoundsUnknown = 0x826C5C40;
+  constexpr uint32_t kMatrix = 176;
+  Results results("RaceSounds::Init (sub_82177378)");
+  uint8_t* base = h.base;
+  const uint32_t machine = memory::Alloc(kMachineBytes, 0);
+  if (machine == 0) {
+    ITC_LOG_ERROR("harness: race_sounds: no machine block: Init's cases skipped");
+    return;
+  }
+  const std::vector<uint32_t> globals = Globals();
+  std::vector<uint32_t> saved;
+  for (const uint32_t at : globals) {
+    saved.push_back(guest::LoadU32(base, at));
+  }
+  const std::vector<uint8_t> saved_slots = Read(base, kSlots, kSlotsBytes);
+  const uint32_t saved_unknown = guest::LoadU32(base, kCarSoundsUnknown);
+  const uint32_t saved_submix = guest::LoadU32(base, kSubmix);
+  constexpr uint32_t kPlanted[][2] = {{1, 4}, {38, 0}, {23, 0}, {30, 49}, {10, 32}};
+  for (uint64_t seed = 0; seed < 18; seed++) {
+    Outputs out[2];
+    for (int v = 0; v < 2; v++) {
+      Random r(seed * 131 + 17);
+      for (uint32_t i = 0; i < kMachineBytes; i += 4) {
+        Store(base, machine + i, uint32_t(r.Next()));
+      }
+      if (seed % 2 == 0) {
+        gm::StateMachineConstruct(base, machine);
+        Store(base, machine + gm::kTransitionCount, 0);
+      } else {
+        const uint32_t count = 8 + r.Below(120);
+        Store(base, machine + gm::kTransitionCount, count);
+        for (uint32_t i = 0; i < gm::kTransitions; i++) {  // keys of small numbers, some matching
+          for (uint32_t k = 0; k < 4; k++) {
+            Store(base, machine + gm::kTransitionBytes * i + 4 * k, r.Below(k < 2 ? 60 : 2));
+          }
+        }
+        for (const auto& key : kPlanted) {
+          if (seed % 4 == 1 && key[0] == 10) {
+            continue;  // the last Add makes a new transition
+          }
+          const uint32_t at = machine + gm::kTransitionBytes * r.Below(count);
+          Store(base, at, key[0]);
+          Store(base, at + 4, key[1]);
+          Store(base, at + 8, 0);
+          Store(base, at + 12, 0);
+        }
+      }
+      static constexpr uint32_t kKinds[] = {5, 1, 2, 4, 6, 0, 3, 7};
+      const uint32_t kind = seed < 16 ? kKinds[seed % 8] : uint32_t(r.Next());
+      Store(base, rs::kRaceData, block + kRaceDataAt - 0xA3AF0);
+      Store(base, block + kRaceDataAt, kind);
+      for (uint32_t i = 0; i < kSlotsBytes; i += 4) {
+        Store(base, kSlots + i, uint32_t(r.Next()));
+      }
+      PPCContext t = CallContext(h);
+      const uint32_t sp = t.r1.u32;
+      const uint32_t frame = sp - rs::kInitFrame;
+      for (uint32_t i = 0; i < rs::kInitFrame; i += 4) {
+        Store(base, frame + i, uint32_t(r.Next()));
+      }
+      Store(base, kCarSoundsUnknown, uint32_t(r.Next()));
+      Store(base, kSubmix, 0);
+      CriticalSection(h, kMixLock, true);
+      const uint32_t mastering = MasteringVoice(base);
+      const uint32_t count = guest::LoadU32(base, mastering + 4);
+      const uint32_t active = guest::LoadU32(base, mastering + 40);
+      t.r3.u64 = machine;
+      (v == 0 ? __imp__sub_82177378 : hooks::RaceSoundsInit)(t, base);
+      out[v].Word(t.r1.u32);
+      out[v].Word(uint32_t(t.r3.u64 >> 32));
+      out[v].Word(t.r3.u32);
+      out[v].Bytes(Read(base, machine, kMachineBytes));
+      out[v].Bytes(Read(base, frame, rs::kInitFrame - kSaves));
+      // The slots' globals, the buffers as whether they're set and cleared.
+      std::vector<uint32_t> buffers;
+      for (uint32_t at = kSlots; at < kSlots + kSlotsBytes; at += 4) {
+        const uint32_t word = guest::LoadU32(base, at);
+        if (at < kSlotBuffers || at >= kSlotBuffersEnd) {
+          out[v].Word(word);
+          continue;
+        }
+        out[v].Word(word != 0);
+        if (word != 0) {
+          const uint32_t bytes = kBufferBytes[at < rs::kSlotBuffer1 ? 0 : 1];
+          bool clear = true;
+          for (uint32_t i = 0; i < bytes && clear; i += 4) {
+            clear = guest::LoadU32(base, word + i) == 0;
+          }
+          out[v].Word(clear);
+          buffers.push_back(word);
+        }
+      }
+      // CarSounds::Init's effects.
+      const uint32_t array = guest::LoadU32(base, rs::kCarSounds);
+      const uint32_t submix = guest::LoadU32(base, kSubmix);
+      std::vector<RealVoice> made;
+      if (submix != 0) {
+        const uint32_t allocator = guest::LoadU32(base, submix + 8);
+        made.push_back({submix, allocator, guest::LoadU32(base, allocator + 16) + 28});
+      }
+      out[v].Word(array != 0);
+      out[v].Word(uint32_t(made.size()));
+      out[v].Word(guest::LoadU32(base, kCarSoundsUnknown));
+      uint32_t matrices[7] = {};
+      if (array != 0) {
+        out[v].Word(guest::LoadU32(base, array - 16));
+        for (uint32_t k = 0; k < 7; k++) {
+          const uint32_t sound = array + rs::kCarSoundBytes * k;
+          matrices[k] = guest::LoadU32(base, sound + kMatrix);
+          out[v].Word(matrices[k] != 0);
+          Store(base, sound + kMatrix, 0);
+          if (matrices[k] != 0) {
+            out[v].Bytes(Read(base, matrices[k], 24));
+          }
+        }
+        Relative(out[v], base, array, 7 * rs::kCarSoundBytes, made);
+      }
+      for (const RealVoice& m : made) {
+        Relative(out[v], base, m.allocator, m.bytes, made);
+      }
+      if (submix != 0) {
+        PPCContext release = CallContext(h);
+        release.r3.u64 = submix;
+        hooks::XAudioApiRelease(release, base);
+        out[v].Word(release.r3.u32);
+      }
+      out[v].Word(guest::LoadU32(base, mastering + 4) - count);
+      out[v].Word(guest::LoadU32(base, mastering + 40) - active);
+      Store(base, mastering + 4, count);
+      Store(base, mastering + 40, active);
+      CriticalSection(h, kMixLock, false);
+      for (const uint32_t matrix : matrices) {
+        if (matrix != 0) {
+          memory::crt::OperatorDeleteArray(matrix);
+        }
+      }
+      if (array != 0) {
+        memory::crt::OperatorDeleteArray(array - 16);
+      }
+      for (const uint32_t buffer : buffers) {
+        memory::FreePhysical(buffer);
+      }
+      for (size_t i = 0; i < globals.size(); i++) {
+        guest::StoreU32(base, globals[i], saved[i]);
+      }
+      for (uint32_t i = 0; i < kSlotsBytes; i++) {
+        guest::StoreU8(base, kSlots + i, saved_slots[i]);
+      }
+      Store(base, kCarSoundsUnknown, saved_unknown);
+      Store(base, kSubmix, saved_submix);
+    }
+    results.Check(out[0], out[1], "seed " + std::to_string(seed));
+  }
+  memory::Free(machine);
+  results.Report();
+}
+
 void Keep(Random&, uint64_t*) {}
 
 }  // namespace
@@ -741,6 +919,11 @@ void RaceSounds(Context& h) {
     BeginCases(h, block);
   } else {
     ITC_LOG_ERROR("harness: race_sounds: no thread data or native heap: Begin's cases skipped");
+  }
+  if (real) {
+    InitCases(h, block);
+  } else {
+    ITC_LOG_ERROR("harness: race_sounds: no XAudio engine or native heap: Init's cases skipped");
   }
 }
 

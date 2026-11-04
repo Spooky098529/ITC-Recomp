@@ -326,6 +326,7 @@ set(ITC_SOURCES
     src/race_sounds/race_sounds.cpp
     src/race_sounds/race_sounds_cars.cpp
     src/race_sounds/race_sounds_ticks.cpp
+    src/race_sounds/race_sounds_init.cpp
     src/hooks/accessories.cpp
     src/accessories/accessories.cpp
     src/hooks/scene.cpp
@@ -705,6 +706,7 @@ set_source_files_properties(src/c_runtime/math.cpp src/ui_movies/keys.cpp
     src/race_sounds/race_sounds.cpp
     src/race_sounds/race_sounds_cars.cpp
     src/race_sounds/race_sounds_ticks.cpp
+    src/race_sounds/race_sounds_init.cpp
     src/accessories/accessories.cpp
     src/scene/lighting.cpp
     src/texture_compression/dxt_alpha.cpp src/texture_compression/dxt_color.cpp
