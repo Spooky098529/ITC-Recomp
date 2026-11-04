@@ -34,7 +34,13 @@ file's history. What's left to see in a drive, from every run:
   roots ready, 28 ready groups; `CarScene::Draw`'s caller in the front
   end). Map checked (3beadd5a: `front-end-car-draw.md`, 24 rows, all
   new, 15 in play; 0 errors; 9 ready groups; the root waits on
-  `CarScene::Update` `sub_820C9608`). Step: migration, agent running.
+  `CarScene::Update` `sub_820C9608`). Migration 38b4a134..43fa606c
+  (`--native_front_end_car_draw`, 17 of 18 in play ours, 7 adapters
+  removed, with `ApplyLightKit` in `load-poll.md`; the root waits on
+  `CarScene::Update`; one subagent for `PoseCar`; `itc_3474`: race 38
+  s, 0 errors, every harness 0 differing; replays reach the garage and
+  the tuning shop, dumps there pixel-identical on and off). Step:
+  validation, agent running.
 
 ## Done
 
@@ -80,3 +86,5 @@ file's history. What's left to see in a drive, from every run:
   2324.
 - After the front end's car draw's map: ours 4081, work left 2324
   (wrapped 62, known 495, unknown 1767).
+- After its migration (`itc_3474`): ours 4099, work left 2309 (wrapped
+  62, known 480, unknown 1767).
