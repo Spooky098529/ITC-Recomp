@@ -48,7 +48,10 @@ file's history. What's left to see in a drive, from every run:
   ready, at the batch limit). Validated `itc_3498` (race 46 s, 0
   errors, 29 of 29 harness lines, every harness 0 differing but the
   expected groups; 9 ran in the race, 13 more in the replay `itc_3499`
-  (ok), 7 to drive). Step: second migration agent running (`Unload`).
+  (ok), 7 to drive). Second migration 4d319832..7a28543f (`Unload`,
+  `OnAbort`, `OnAbortDone`; `CarSounds::Release`'s adapter removed;
+  31 of 31 ours; `itc_3500`/`itc_3501`: race 38 s, 0 errors, every
+  harness 0 differing). Step: validation agent running.
 
 ## Done
 
@@ -81,5 +84,7 @@ file's history. What's left to see in a drive, from every run:
   62, known 509, unknown 1712).
 - After its first migration: ours 4154, work left 2254 (wrapped 62,
   known 480, unknown 1712).
+- After its second migration: ours 4157, work left 2253 (wrapped 62,
+  known 479, unknown 1712).
 
 ## Stopped
