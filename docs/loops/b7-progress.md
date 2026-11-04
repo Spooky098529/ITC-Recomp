@@ -51,10 +51,17 @@ file's history. What's left to see in a drive, from every run:
   (ok), 7 to drive). Second migration 4d319832..7a28543f (`Unload`,
   `OnAbort`, `OnAbortDone`; `CarSounds::Release`'s adapter removed;
   31 of 31 ours; `itc_3500`/`itc_3501`: race 38 s, 0 errors, every
-  harness 0 differing). Step: validation agent running.
+  harness 0 differing). Validated `itc_3502` (race 46 s, 0 errors, 4
+  of 4 harness lines; `Unload` and `CarSounds::Release` ran in the
+  replay `itc_3503` (ok), 2 to drive). Done.
 
 ## Done
 
+- The race's sounds: `race-sounds.md` (map 53aa7a89, migrations
+  508c7be5..d4d1905e and 4d319832..7a28543f, `--native_race_sounds`,
+  31 of 31, with `rand` under `--native_c_runtime` by the user's call;
+  validated `itc_3498` and `itc_3502`: 0 errors, every harness line,
+  replays `itc_3499`, `itc_3503` ok, 9 to drive).
 - The replay's snapshots: `replay-snapshots.md` (map dcfccb78,
   migration e9389918..1a5be4a1, `--native_replay_snapshots`, 26 of 26
   in play; validated `itc_3487`: race 47 s, 0 errors, 26 of 26 harness
@@ -86,5 +93,6 @@ file's history. What's left to see in a drive, from every run:
   known 480, unknown 1712).
 - After its second migration: ours 4157, work left 2253 (wrapped 62,
   known 479, unknown 1712).
+- After its validation (`itc_3502`): ours 4157, work left 2253.
 
 ## Stopped

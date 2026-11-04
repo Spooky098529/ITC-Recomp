@@ -26,6 +26,9 @@ here loses its heading.
   RaceSounds::OnRollingStartDone, `sub_82175AE8` RaceSounds::Pause,
   `sub_82175B80` RaceSounds::Resume, `sub_82175C58`
   RaceSounds::ResumeCars.
+- The race's sounds, second migration (attract race `itc_3502`, replay
+  `itc_3503` ok): `sub_82175CA0` RaceSounds::OnAbort, `sub_82175CF8`
+  RaceSounds::OnAbortDone (both never seen in play).
 
 - The replay's snapshots (attract race `itc_3487`, replay `itc_3488`
   ok, reached a race but no replay; `replay-snapshots.md`; they run at

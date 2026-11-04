@@ -2729,6 +2729,7 @@ B7. **The game logic inside**: everything else, subsystem by subsystem,
 | 2026-11-04 | The car scene's draw (`CarScene::Draw` `sub_820C5DE8`: the headlight projectors and their texture projections, the other cars' light slots, the pass loop over `Car::DrawUpdate`; the frustum, plane, box and `Vector16` helpers under `TextureProjection::Fit`) | `car-scene-draw.md` | 21 of 21 (four parts, one subagent each, one at a time; 12 Native, 9 Overridden for their recompiled callers and the frame-state wraps) | `--native_car_scene_draw` |
 | 2026-11-04 | The front end's car draw (the garage stage: `GarageStage::Command` and its setters, the animation list with the car's turn and the doors, the deferred camera preset, the scene lights, the car's and wheels' pose, the floor reflection's draw, with `SceneModel::ApplyLightKit` in `load-poll.md`) | `front-end-car-draw.md` | 17 of 18 in play (one migration, one subagent for `PoseCar`; the root `GarageStage::Draw` waits on `CarScene::Update`) | `--native_front_end_car_draw` |
 | 2026-11-04 | The replay's snapshots (`RaceReplay::SaveStart` at the countdown, `SaveEnd`, `RestoreStart`, `RestoreEnd` around the replay; the 5,232-byte per-vehicle records' save, restore and copy; `Replay::Keep`) | `replay-snapshots.md` | 26 of 26 in play (one migration; RaceReplay's four cased in the `race_world` harness; none runs in an attract race or the pad replay) | `--native_replay_snapshots` |
+| 2026-11-04 | The race's sounds (the race mode's sound machine at +138284: `RaceSounds::Init` and its transitions, the cars' wave banks and sound updates, the pause and resume of the cars and the music, the start and rival music picked and faded, the unload; with `rand`) | `race-sounds.md` | 31 of 31 (two migrations, one subagent for `Init`) | `--native_race_sounds` (`rand` under `--native_c_runtime`) |
 
     The first run (2026-10-22, branch `b7-loop-test`): every harness at 0 differing, attract races at 20-21 s with no errors,
     and a race the user drove looked right. Ours went from 162 to 335 (work
@@ -4506,3 +4507,17 @@ them (to drive). The boundary: 449 functions (916 pairs): overridden
 108, Native 34, Dropped 26, never called 70, live 211. Imports: 186
 called, 56 with a live caller. B7 (`b7_status.py`): ours 4,125, work
 left 2,283 (Wrapped 62, with a row 480, no row yet 1,741), from 2,309.
+
+**2026-11-04, the race's sounds (branch `b7-loop-03-11-26`):** the
+thirty-second run's second subsystem (`race-sounds.md`,
+`--native_race_sounds`, `src/race_sounds/`): the race mode's sound
+machine at +138284, 31 of 31, with `CarSounds::Release`'s adapter
+removed. `rand` `sub_825A9BB8` blocked three of its functions: by the
+user's call (2026-11-04) it is native over the calling thread's guest
+seed, found through the guest TLS as the original does
+(`src/c_runtime/random.cpp`, `--native_c_runtime`), while `_getptd`
+and `_mtinit` stay for the core. The boundary: 449 functions (916
+pairs): overridden 108, Native 34, Dropped 26, never called 70, live
+211. Imports: 186 called, 56 with a live caller. B7 (`b7_status.py`):
+ours 4,157, work left 2,253 (Wrapped 62, with a row 479, no row yet
+1,712), from 2,283.
