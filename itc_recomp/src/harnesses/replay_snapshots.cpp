@@ -17,6 +17,14 @@
 // racers' manager ([0x826D82F4] at a block) saved into a snapshot block;
 // vehicles in use or not (+6148), with or without an object. The game's
 // two pointers are put back after each side.
+//
+// Replay::Keep: the race data, the recordings (block A's records and head
+// random, so the copies cover every field) and the kept replay random; the
+// game's race data pointer at the race data (its kept results' count 1 to
+// 60, so the last is inside); the stage the last or the current - 1, its
+// racers entries 0 to 92 or -1; with and without the save data. The
+// replay, the race data, the recordings, the frame's stage copy, the
+// scratch area and r3 compared.
 
 #include "harness.h"
 
@@ -218,11 +226,74 @@ void SnapshotSaves(Context& h) {
   results.Report();
 }
 
+void Keeps(Context& h) {
+  constexpr uint32_t kMargin = 4096;  // below the replay: a racer -1 reads there
+  const Block replay_room(kMargin + 0x34E20 + 0x107AC4), race(0xA4000),
+      recordings(0x20F590 + kSnapshotBytes), save(64);
+  const uint32_t replay = replay_room.address + kMargin;
+  if (!replay_room.address || !race.address || !recordings.address || !save.address) {
+    ITC_LOG_ERROR("harness: replay_snapshots: no block from the allocation layer");
+    return;
+  }
+  const Block* blocks[] = {&replay_room, &race, &recordings, &save};
+  const uint32_t frame = CallContext(h).r1.u32 - 272;
+  const uint32_t stages = race.address + 0x59620;
+  Results results("Replay::Keep (sub_82104F68)");
+  for (uint64_t seed = 0; seed < 12; seed++) {
+    Outputs out[2];
+    for (int v = 0; v < 2; v++) {
+      Random r(seed * 389 + 11);
+      WriteRandom(h.base, h.data, kScratchBytes, r);
+      WriteRandom(h.base, frame, 272, r);
+      for (const Block* b : blocks) {
+        WriteRandom(h.base, b->address, b->bytes, r);
+      }
+      // The kept results' count, and the stage list: 1 to 10 stages, each
+      // naming four racers.
+      guest::StoreU32(h.base, race.address + 0x59AE8 + 0x49FE0, 1 + r.Below(60));
+      const uint32_t count = 1 + r.Below(10);
+      guest::StoreU32(h.base, stages + 804, count);
+      for (uint32_t s = 0; s <= count; s++) {
+        for (uint32_t i = 0; i < 4; i++) {
+          guest::StoreU32(h.base, stages + 80 * s + 44 + 8 * i,
+                          r.Below(8) == 0 ? 0xFFFFFFFFu : r.Below(93));
+        }
+      }
+      const uint32_t saved_race = guest::LoadU32(h.base, rs::kRaceData);
+      guest::StoreU32(h.base, rs::kRaceData, race.address);
+      PPCContext t = CallContext(h);
+      t.r3.u64 = replay;
+      t.r4.u64 = race.address;
+      t.r5.u64 = recordings.address;
+      t.r6.u64 = seed % 3 == 1 ? 0 : save.address;
+      t.r7.u64 = seed % 2;
+      if (v == 0) {
+        ITC_FLAG(native_replay_snapshots) = false;
+        __imp__sub_82104F68(t, h.base);
+        ITC_FLAG(native_replay_snapshots) = true;
+      } else {
+        hooks::ReplayKeep(t, h.base);
+      }
+      guest::StoreU32(h.base, rs::kRaceData, saved_race);
+      for (const Block* b : blocks) {
+        out[v].Bytes(Read(h.base, b->address, b->bytes));
+      }
+      out[v].Bytes(Read(h.base, frame + 80, 80));
+      out[v].Bytes(Read(h.base, h.data, kScratchBytes));
+      out[v].Word(t.r3.u32);
+      out[v].Word(uint32_t(t.r3.u64 >> 32));
+    }
+    results.Check(out[0], out[1], fmt::format("seed {}", seed));
+  }
+  results.Report();
+}
+
 }  // namespace
 
 void ReplaySnapshots(Context& h) {
   Restores(h);
   SnapshotSaves(h);
+  Keeps(h);
 }
 
 }  // namespace harness

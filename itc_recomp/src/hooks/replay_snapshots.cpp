@@ -11,7 +11,8 @@
 ITC_FLAG_BOOL(native_replay_snapshots, true, "ITC",
               "Run the replay's snapshots (docs/functions/replay-snapshots.md: a vehicle's "
               "5,232-byte record put back, Record5232::Restore sub_821044D8, and the race "
-              "saved into a snapshot block, RaceSnapshot::Save sub_82104AB8, with their parts) "
+              "saved into a snapshot block, RaceSnapshot::Save sub_82104AB8, with their parts; "
+              "the race kept for its replay, Replay::Keep sub_82104F68, with the copies) "
               "natively instead of through the translated code (the same writes; checked by "
               "--run_harnesses=replay_snapshots)");
 
@@ -25,6 +26,22 @@ void Record5232Restore(PPCContext& ctx, uint8_t* base) {
 void RaceSnapshotSave(PPCContext& ctx, uint8_t* base) {
   ctx.fpscr.disableFlushMode();
   ctx.r3.u64 = replay_snapshots::RaceSnapshotSave(base, ctx.r3.u32);
+}
+
+void ReplayKeep(PPCContext& ctx, uint8_t* base) {
+  ctx.fpscr.disableFlushMode();
+  ctx.r3.u64 = replay_snapshots::ReplayKeep(
+      base, ctx.r3.u32, ctx.r4.u32, ctx.r5.u32, ctx.r6.u32, ctx.r7.u32, ctx.r1.u32 - 272,
+      [&ctx, base](uint32_t out, uint32_t stages, uint32_t stage, uint32_t sp) {
+        const uint64_t r1 = ctx.r1.u64;
+        ctx.r1.u64 = sp;
+        ctx.r3.u64 = out;
+        ctx.r4.u64 = stages;
+        ctx.r5.u64 = int64_t(int32_t(stage));
+        __imp__sub_820FFD88(ctx, base);
+        ctx.r1.u64 = r1;
+        ctx.fpscr.disableFlushMode();
+      });
 }
 
 }  // namespace hooks
@@ -58,4 +75,14 @@ extern "C" REX_FUNC(sub_82104AB8) {
     return;
   }
   hooks::RaceSnapshotSave(ctx, base);
+}
+
+// Caller: RaceStates::OnRaceEnd (recompiled).
+extern "C" REX_FUNC(sub_82104F68) {
+  REX_FUNC_PROLOGUE();
+  if (!Native()) {
+    __imp__sub_82104F68(ctx, base);
+    return;
+  }
+  hooks::ReplayKeep(ctx, base);
 }

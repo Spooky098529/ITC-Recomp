@@ -23,6 +23,7 @@
 #pragma once
 
 #include <cstdint>
+#include <functional>
 
 namespace replay_snapshots {
 
@@ -31,6 +32,8 @@ constexpr uint32_t kRecordings = 0x826C5B4C;
 constexpr uint32_t kRecordBytes = 5232;
 // The racers' manager's pointer (docs/functions/race-world.md).
 constexpr uint32_t kManager = 0x826D82F4;
+// The race data's pointer (docs/known-data.md).
+constexpr uint32_t kRaceData = 0x826C5B2C;
 
 // --- A vehicle's record: the restores (record to vehicle) ---
 
@@ -81,5 +84,47 @@ uint32_t Record5232Save(uint8_t* base, uint32_t record, uint32_t vehicle);
 // left); the manager's entries and counts into the head (memcpy of 77 and
 // 3 entries of 28 bytes, then words). Returns r3 (the last memcpy's).
 uint32_t RaceSnapshotSave(uint8_t* base, uint32_t block);
+
+// --- A vehicle's record: the copies (record to record; r3 = out) ---
+
+// Record5232::CopyTrack (sub_821043F0): words +0, +4, memcpy of +16 (112
+// bytes), the five track positions.
+uint32_t Record5232CopyTrack(uint8_t* base, uint32_t out, uint32_t record);
+// BodyState::Copy (sub_82103B50): the 516 bytes at the same offsets.
+uint32_t BodyStateCopy(uint8_t* base, uint32_t out, uint32_t record);
+// Member1136::Copy (sub_82103CB8): the 2,944 bytes at the same offsets.
+uint32_t Member1136Copy(uint8_t* base, uint32_t out, uint32_t record);
+// Part464::Copy (sub_821041C0): the 452 bytes at the same offsets.
+uint32_t Part464Copy(uint8_t* base, uint32_t out, uint32_t record);
+// Member4080::CopyShapes (sub_82104460): Part464::Copy at +0 and +464,
+// vectors +928, +944, the matrix +960, the float +1024.
+uint32_t Member4080CopyShapes(uint8_t* base, uint32_t out, uint32_t record);
+// Member4080::Copy (sub_82104598): word +0, CopyShapes (+16), then +1056 to
+// +1136.
+uint32_t Member4080Copy(uint8_t* base, uint32_t out, uint32_t record);
+// Record5232::Copy (sub_82104BC0): CopyTrack, BodyState::Copy (+608),
+// Member1136::Copy (+1136), Member4080::Copy (+4080).
+uint32_t Record5232Copy(uint8_t* base, uint32_t out, uint32_t record);
+// RaceSnapshot::Copy (sub_82104EA8): memcpy of the head (2,292 bytes),
+// +2292, Record5232::Copy of the seven records.
+uint32_t RaceSnapshotCopy(uint8_t* base, uint32_t out, uint32_t block);
+
+// --- The kept replay ---
+
+// Stages::Copy's original where its plain C++ refuses (a copy memcpy's
+// override must see), run with r1 = `sp`.
+using StagesCopyOriginal =
+    std::function<void(uint32_t out, uint32_t stages, uint32_t stage, uint32_t sp)>;
+// Replay::Keep (sub_82104F68): the race's set-up (`race`, the race data),
+// its 93 racer records' entries, the stage (the last, or the list's current
+// - 1 with `from_stage`, through `frame` + 80), the last kept result, the
+// snapshot of the race's start (RaceSnapshot::Copy of block A at
+// `recordings` + 0x20F590), player 0's recording and its count (memcpy of
+// 0x107AC4 bytes) and the save data's five words (`save`, or the defaults)
+// into the kept replay. `frame`: the original's 272 bytes. Returns r3 (the
+// recording's memcpy's: replay + 0x34E20).
+uint32_t ReplayKeep(uint8_t* base, uint32_t replay, uint32_t race, uint32_t recordings,
+                    uint32_t save, uint32_t from_stage, uint32_t frame,
+                    const StagesCopyOriginal& stages_copy);
 
 }  // namespace replay_snapshots
