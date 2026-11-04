@@ -82,6 +82,8 @@ constexpr uint32_t kSaveAt = 0x3FC0;        // its +6100 in the block
 constexpr uint32_t kBigBytes = 0x4B000;
 constexpr uint32_t kTables = 0x826C5CA0;
 constexpr uint32_t kSoundParameters = 0x82616318;
+constexpr uint32_t kTocLow = 0x826A5120;  // the TOC of assets below 23011
+constexpr uint32_t kTocEntry = 0x3FD0;    // the effects' bank's TOC entry in the block
 
 // The manager's slots the functions call (and Music::Play's slot 4,
 // Sound::Play's slot 10).
@@ -102,6 +104,10 @@ constexpr uint32_t kSlots[] = {16,
 
 // The globals put back after each side; the first four floats.
 constexpr int kFloatGlobals = 4;
+// The harness thread's rand seed (+20 of its C runtime data), put back
+// with the globals once known.
+uint32_t g_seed = 0;
+
 std::vector<uint32_t> Globals() {
   std::vector<uint32_t> g = {rs::kMusicVolume, rs::kKeptMusicVolume, rs::kEffectsVolume,
                              rs::kEffectsVolume2, rs::kSoundManager, rs::kCarSounds,
@@ -118,6 +124,10 @@ std::vector<uint32_t> Globals() {
   }
   for (uint32_t i = 0; i < 4; i++) {
     g.push_back(kSoundParameters + 16 * i);
+  }
+  g.push_back(kTocLow);
+  if (g_seed != 0) {
+    g.push_back(g_seed);
   }
   return g;
 }
@@ -480,6 +490,88 @@ void Group(Context& h, uint32_t block, const std::string& name, int count,
   results.Report();
 }
 
+// Begin: its allocations real (XPhysicalAlloc's block and the 14 views from
+// operator new, freed after each version), Archive::Load recorded
+// (ArchiveLoads), the TOC of assets below 23011 pointed so asset 22889's
+// entry is in the block (+4 the stored size, +8 the unpacked one). The
+// allocated pointers are compared as whether they're 0, and the effects'
+// buffer in the load's call as whether it is the buffer.
+void BeginCases(Context& h, uint32_t block) {
+  Results results("RaceSounds::Begin (sub_82176618)");
+  const std::vector<uint32_t> globals = Globals();
+  std::vector<uint32_t> saved;
+  for (const uint32_t at : globals) {
+    saved.push_back(guest::LoadU32(h.base, at));
+  }
+  uint8_t* base = h.base;
+  const uint32_t machine = block + kMachineWords - 9600;
+  for (int c = 0; c < 30; c++) {
+    const Random start = h.random;
+    Random random = start;
+    Outputs out[2];
+    for (int v = 0; v < 2; v++) {
+      random = start;
+      Lay(h, block, Random(random.Next()), false);
+      Store(base, kTocLow, block + kTocEntry - 0x596A0);
+      Store(base, block + kTocEntry + 4, 0x100 * (1 + random.Below(16)));
+      Store(base, block + kTocEntry + 8, random.Below(2) == 0 ? 0 : 0x100 * (1 + random.Below(16)));
+      Store(base, machine + rs::kKind, Pick(random, {0u, 1u, 2u, 3u, 4u, 5u, 6u, 7u}));
+      Store(base, g_seed, uint32_t(random.Next()));
+      const uint32_t fill = uint32_t(random.Next());
+      PPCContext t = CallContext(h);
+      const uint32_t sp = t.r1.u32;
+      for (uint32_t k = 0; k < 0x400; k += 4) {
+        Store(base, sp - 0x400 + k, fill + k);
+      }
+      t.r3.u64 = machine;
+      ArchiveLoads loads({1});
+      (v == 0 ? __imp__sub_82176618 : hooks::RaceSoundsBegin)(t, base);
+      const uint32_t buffer = guest::LoadU32(base, machine + rs::kEffectsBank);
+      out[v].Word(buffer != 0);
+      Store(base, machine + rs::kEffectsBank, 0);
+      uint32_t views[14];
+      for (uint32_t i = 0; i < 14; i++) {
+        views[i] = guest::LoadU32(base, rs::kCarViews + 4 * i);
+        out[v].Word(views[i] != 0);
+        if (views[i] != 0) {
+          out[v].Bytes(Read(base, views[i], 24));
+        }
+        Store(base, rs::kCarViews + 4 * i, 0);
+      }
+      std::vector<uint32_t> calls = loads.calls();
+      for (size_t i = 1; i < calls.size(); i += 6) {
+        calls[i] = calls[i] == buffer;
+      }
+      for (const uint32_t word : calls) {
+        out[v].Word(word);
+      }
+      out[v].Word(t.r1.u32);
+      out[v].Word(uint32_t(t.r3.u64 >> 32));
+      out[v].Word(t.r3.u32);
+      out[v].Bytes(Read(base, h.data, kCompared));
+      out[v].Bytes(Read(base, block, kBlockBytes));
+      out[v].Bytes(Read(base, sp - 192, 192 - 40));
+      for (size_t i = 0; i < globals.size(); i++) {
+        out[v].Word(guest::LoadU32(base, globals[i]));
+      }
+      if (buffer != 0) {
+        memory::FreePhysical(buffer);
+      }
+      for (const uint32_t view : views) {
+        if (view != 0) {
+          memory::crt::OperatorDelete(view);
+        }
+      }
+      for (size_t i = 0; i < globals.size(); i++) {
+        guest::StoreU32(base, globals[i], saved[i]);
+      }
+    }
+    h.random = random;
+    results.Check(out[0], out[1], "case " + std::to_string(c));
+  }
+  results.Report();
+}
+
 void Keep(Random&, uint64_t*) {}
 
 }  // namespace
@@ -492,6 +584,11 @@ void RaceSounds(Context& h) {
   }
   const uint32_t block = owned.address;
   uint8_t* base = h.base;
+  {
+    PPCContext probe = CallContext(h);
+    __imp__sub_825AA580(probe, base);
+    g_seed = probe.r3.u32 != 0 ? probe.r3.u32 + 20 : 0;
+  }
   const uint32_t engine = guest::LoadU32(base, xaudio::kEngine);
   const bool real = engine != 0 && MasteringVoice(base) != 0 && hooks::NativeHeapActive();
   const uint32_t machine = block + kMachineWords - 9600;
@@ -613,6 +710,37 @@ void RaceSounds(Context& h) {
             true);
       memory::Free(big);
     }
+  }
+  // rand's callers (the seed set per case).
+  Group(h, block, "RaceSounds::PlayStartMusic (sub_82175DB0)", 200, __imp__sub_82175DB0,
+        hooks::RaceSoundsPlayStartMusic, 144, 8, [&](Random& r, uint64_t*) {
+          Store(base, machine + rs::kKind,
+                Pick(r, {0u, 1u, 2u, 3u, 4u, 5u, 6u, 7u, 0xFFFFFFFFu, uint32_t(r.Next())}));
+          if (g_seed != 0) {
+            Store(base, g_seed, uint32_t(r.Next()));
+          }
+        });
+  if (real) {
+    Group(h, block, "RaceSounds::IdleTick (sub_821767A8)", 200, __imp__sub_821767A8,
+          hooks::RaceSoundsIdleTick, 160, 40,
+          [&](Random& r, uint64_t*) {
+            Store(base, machine + rs::kCarsStep, Pick(r, {1u, 2u, 2u, 2u, 0u, 3u}));
+            if (r.Below(4) != 0) {
+              Store(base, machine + rs::kSetUpWait, 0);
+              Store(base, machine + rs::kFlags,
+                    (guest::LoadU32(base, machine + rs::kFlags) | 0x20000) & ~0x4000u);
+            }
+            Store(base, machine + rs::kKind, Pick(r, {0u, 1u, 2u, 4u, 6u}));
+            if (g_seed != 0) {
+              Store(base, g_seed, uint32_t(r.Next()));
+            }
+          },
+          true);
+  }
+  if (g_seed != 0 && hooks::NativeHeapActive()) {
+    BeginCases(h, block);
+  } else {
+    ITC_LOG_ERROR("harness: race_sounds: no thread data or native heap: Begin's cases skipped");
   }
 }
 

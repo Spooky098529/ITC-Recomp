@@ -24,7 +24,8 @@ ITC_FLAG_BOOL(native_race_sounds, true, "ITC",
               "PlayRivalMusic sub_821762F8, RaceTick sub_821769D0, StageTick sub_82176F28, "
               "RollingStartTick sub_82177130, AfterRaceTick sub_82176C10, OnCountdown "
               "sub_82176968, OnRaceEnd sub_82176BA0, OnLeaveAfterRace sub_82176E60, OnNextStage "
-              "sub_82176EC8, OnRollingStart sub_821770C0; the car sounds, Music::Play and Sound::Play through their plain C++, the sound manager's slots through the "
+              "sub_82176EC8, OnRollingStart sub_821770C0, PlayStartMusic sub_82175DB0 (rand's plain "
+              "C++), IdleTick sub_821767A8, Begin sub_82176618; the car sounds, Music::Play and Sound::Play through their plain C++, the sound manager's slots through the "
               "function table) natively instead of through the translated code (the same "
               "words; checked by --run_harnesses=race_sounds)");
 
@@ -56,8 +57,14 @@ class GuestCalls {
     const uint64_t stack = ctx.r1.u64;
     ctx.r1.u64 = r1;
     PPCRegister* registers[4] = {&ctx.r3, &ctx.r4, &ctx.r5, &ctx.r6};
-    for (int i = 0; i < set; i++) {
+    for (int i = 0; i < set && i < 4; i++) {
       registers[i]->u64 = args[i];
+    }
+    if (set > 4) {
+      ctx.r7.u64 = args[4];
+    }
+    if (set > 5) {
+      ctx.r8.u64 = args[5];
     }
     ctx.lr = lr;
     switch (function) {
@@ -248,6 +255,24 @@ void RaceSoundsOnRollingStart(PPCContext& ctx, uint8_t* base) {
   Step(ctx, base, [&](const rs::Calls& c) { return rs::OnRollingStart(base, r3, sp, c); });
 }
 
+void RaceSoundsPlayStartMusic(PPCContext& ctx, uint8_t* base) {
+  const uint64_t r3 = ctx.r3.u64;
+  const uint32_t sp = ctx.r1.u32;
+  Step(ctx, base, [&](const rs::Calls& c) { return rs::PlayStartMusic(base, r3, sp, c); });
+}
+
+void RaceSoundsIdleTick(PPCContext& ctx, uint8_t* base) {
+  const uint64_t r3 = ctx.r3.u64;
+  const uint32_t sp = ctx.r1.u32;
+  Step(ctx, base, [&](const rs::Calls& c) { return rs::IdleTick(base, r3, sp, c); });
+}
+
+void RaceSoundsBegin(PPCContext& ctx, uint8_t* base) {
+  const uint64_t r3 = ctx.r3.u64;
+  const uint32_t sp = ctx.r1.u32;
+  Step(ctx, base, [&](const rs::Calls& c) { return rs::Begin(base, r3, sp, c); });
+}
+
 }  // namespace hooks
 
 // Defines an adapter: the flag, else the original.
@@ -283,3 +308,6 @@ ITC_RACE_SOUNDS(82176BA0, RaceSoundsOnRaceEnd)
 ITC_RACE_SOUNDS(82176E60, RaceSoundsOnLeaveAfterRace)
 ITC_RACE_SOUNDS(82176EC8, RaceSoundsOnNextStage)
 ITC_RACE_SOUNDS(821770C0, RaceSoundsOnRollingStart)
+ITC_RACE_SOUNDS(82175DB0, RaceSoundsPlayStartMusic)
+ITC_RACE_SOUNDS(821767A8, RaceSoundsIdleTick)
+ITC_RACE_SOUNDS(82176618, RaceSoundsBegin)

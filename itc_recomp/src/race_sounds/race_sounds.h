@@ -68,7 +68,13 @@ constexpr uint32_t kCarSoundStop = 0x8210E218;
 constexpr uint32_t kCarSoundStart = 0x8210E030;
 constexpr uint32_t kCarSoundUpdate = 0x82110048;
 constexpr uint32_t kMusicPlay = 0x821063B0;          // Music::Play (mode-tick.md)
-constexpr uint32_t kSoundPlay = 0x82175850;          // Sound::Play (menu-sounds.md)
+constexpr uint32_t kSoundPlay = 0x82175850;
+constexpr uint32_t kXPhysicalAlloc = 0x822964C8;
+constexpr uint32_t kArchiveLoad = 0x8209DE48;
+constexpr uint32_t kOperatorNew = 0x825A6880;
+constexpr uint32_t kXprConstruct = 0x82596E68;    // XPR::XPR (models.md)
+constexpr uint32_t kOnEffectsBankLoaded = 0x82175ED0;
+constexpr uint32_t kEffectsBankId = 22889;          // Sound::Play (menu-sounds.md)
 constexpr uint32_t kRaceSoundsPauseCars = 0x82175C00;
 constexpr uint32_t kRaceSoundsResumeCars = 0x82175C58;
 
@@ -128,6 +134,13 @@ struct Calls {
     left = true;
     left_r4 = r4;
     left_r5 = r5;
+  }
+  // With up to r3 to r8 (`set` of them; the adapter reads `args` past r6
+  // only when `set` is above 4).
+  uint64_t CallArgs(uint32_t function, uint32_t r1, uint32_t lr, int set,
+                    const uint64_t (&args)[8]) const {
+    left = false;
+    return call(user, function, args, set, r1, lr);
   }
   uint64_t Call(uint32_t function, uint32_t r1, uint32_t lr, int set, uint64_t r3,
                 uint64_t r4 = 0, uint64_t r5 = 0, uint64_t r6 = 0) const {
@@ -231,5 +244,17 @@ uint64_t OnRaceEnd(uint8_t* base, uint64_t r3, uint32_t sp, const Calls& calls);
 uint64_t OnLeaveAfterRace(uint8_t* base, uint64_t r3, uint32_t sp, const Calls& calls);
 uint64_t OnNextStage(uint8_t* base, uint64_t r3, uint32_t sp, const Calls& calls);
 uint64_t OnRollingStart(uint8_t* base, uint64_t r3, uint32_t sp, const Calls& calls);
+// sub_82175DB0 RaceSounds::PlayStartMusic (144 bytes): the start's music by
+// the race kind (entry 0, or one of entries 1 to 5 by rand() % 5 for kinds
+// 2 and 4 to 6; rand natively, c_runtime::Rand).
+uint64_t PlayStartMusic(uint8_t* base, uint64_t r3, uint32_t sp, const Calls& calls);
+// sub_821767A8 RaceSounds::IdleTick (160 bytes): as RaceTick without the
+// effects' volume, the next music PlayStartMusic's.
+uint64_t IdleTick(uint8_t* base, uint64_t r3, uint32_t sp, const Calls& calls);
+// sub_82176618 RaceSounds::Begin (192 bytes): the effects' bank allocated
+// (XPhysicalAlloc) and loaded (Archive::Load with OnEffectsBankLoaded), the
+// cars' views made (operator new, XPR::XPR), PlayStartMusic, the listener
+// at the origin (SetListener), the cars' step 1.
+uint64_t Begin(uint8_t* base, uint64_t r3, uint32_t sp, const Calls& calls);
 
 }  // namespace race_sounds
