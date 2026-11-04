@@ -490,6 +490,19 @@ draw (`front-end-car-draw.md`, `--native_front_end_car_draw`, 17 of 18
 in play: the garage stage) native (ours 4,059 -> 4,099); the rest
 waits on `CarScene::Update` `sub_820C9608` (the garage stage's draw),
 `RaceMode::Init` and the leads in `docs/loops/leads.md`.
+Its thirty-second run (`b7-loop-03-11-26` again, the user's call,
+2026-11-04, not yet merged; summary
+`docs/loops/b7-loop-2026-11-04-1951.md`; 3 subsystems) made the
+replay's snapshots (`replay-snapshots.md`, `--native_replay_snapshots`,
+26 of 26 in play: the countdown's and the race end's, restored around
+the replay), the race's sounds (`race-sounds.md`,
+`--native_race_sounds`, 31 of 31: the race mode's sound machine) and
+the race's loading (`race-loading.md`, `--native_race_loading`, 10 of
+13 in play: the +848 machine and the loading screen) native (ours
+4,099 -> 4,167); by the user's call (2026-11-04), `rand` is native
+over the calling thread's guest seed (`--native_c_runtime`), `_getptd`
+and `_mtinit` left for the core. The rest waits on `Scenery::IsLoaded`,
+`CarScene::Update` and the leads in `docs/loops/leads.md`.
 Harness runs use `attract_race.sh 40` (the user's call,
 2026-10-23); a race short only because the harnesses took longer is
 no halt. B7 loop migration agents run only their subsystem's harnesses

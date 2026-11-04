@@ -66,11 +66,17 @@ file's history. What's left to see in a drive, from every run:
   Migration e3e7b130..f6bb8df4 (`--native_race_loading`, 10 of 13 in
   play ours, no adapters removed; `itc_3506`: race 38 s, 0 errors,
   every harness 0 differing, all ran in the race; loading screen dumps
-  on and off the same but the animation's phase; no subagents). Step:
-  validation agent running.
+  on and off the same but the animation's phase; no subagents).
+  Validated `itc_3519` (race 46 s, 0 errors, 10 of 10 harness lines;
+  9 ran in the race, `LoadingScreen::Finish` in the replay `itc_3520`
+  (ok); none to drive). Done.
 
 ## Done
 
+- The race's loading: `race-loading.md` (map 4ba4c0f4, migration
+  e3e7b130..f6bb8df4, `--native_race_loading`, 10 of 13 in play;
+  validated `itc_3519`: race 46 s, 0 errors, 10 of 10 harness lines,
+  replay `itc_3520` ok, none to drive).
 - The race's sounds: `race-sounds.md` (map 53aa7a89, migrations
   508c7be5..d4d1905e and 4d319832..7a28543f, `--native_race_sounds`,
   31 of 31, with `rand` under `--native_c_runtime` by the user's call;
@@ -112,5 +118,10 @@ file's history. What's left to see in a drive, from every run:
   62, known 492, unknown 1699).
 - After its migration: ours 4167, work left 2243 (wrapped 62, known
   482, unknown 1699).
+- After its validation (`itc_3519`): ours 4167, work left 2243.
 
 ## Stopped
+
+2026-11-04, at the run's limit (3 subsystems), after the race's
+loading's validation. No halts in the run; one question to the user
+(`rand`, answered). Nothing uncommitted. The user reviews and merges.

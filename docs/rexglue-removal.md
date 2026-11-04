@@ -210,7 +210,13 @@ goes in `src/` as overrides), American English.
   set-up (`race-flow.md`, 1 of 1 in play), the car scene's draw
   (`car-scene-draw.md`, 21 of 21) and the front end's car draw
   (`front-end-car-draw.md`, 17 of 18 in play) native (ours 4,059 ->
-  4,099) and stopped at its limit. The runs' rows wait for the user's review (`docs/loops/review.md`). See
+  4,099) and stopped at its limit; its thirty-second run (the same
+  branch, the user's call, 2026-11-04, 3 subsystems) made the replay's
+  snapshots (`replay-snapshots.md`, 26 of 26 in play), the race's
+  sounds (`race-sounds.md`, 31 of 31, with `rand` by the user's call)
+  and the race's loading (`race-loading.md`, 10 of 13 in play: the
+  race mode's +848 machine and the loading screen) native (ours 4,099
+  -> 4,167) and stopped at its limit. The runs' rows wait for the user's review (`docs/loops/review.md`). See
   "B7's loop runs" under B7, and `docs/loops/b7-progress.md`. Guest
   allocation is no longer a block (`docs/native-memory.md`); what the
   rest waits on is in `docs/loops/leads.md` (the archive loader, the
@@ -2730,6 +2736,7 @@ B7. **The game logic inside**: everything else, subsystem by subsystem,
 | 2026-11-04 | The front end's car draw (the garage stage: `GarageStage::Command` and its setters, the animation list with the car's turn and the doors, the deferred camera preset, the scene lights, the car's and wheels' pose, the floor reflection's draw, with `SceneModel::ApplyLightKit` in `load-poll.md`) | `front-end-car-draw.md` | 17 of 18 in play (one migration, one subagent for `PoseCar`; the root `GarageStage::Draw` waits on `CarScene::Update`) | `--native_front_end_car_draw` |
 | 2026-11-04 | The replay's snapshots (`RaceReplay::SaveStart` at the countdown, `SaveEnd`, `RestoreStart`, `RestoreEnd` around the replay; the 5,232-byte per-vehicle records' save, restore and copy; `Replay::Keep`) | `replay-snapshots.md` | 26 of 26 in play (one migration; RaceReplay's four cased in the `race_world` harness; none runs in an attract race or the pad replay) | `--native_replay_snapshots` |
 | 2026-11-04 | The race's sounds (the race mode's sound machine at +138284: `RaceSounds::Init` and its transitions, the cars' wave banks and sound updates, the pause and resume of the cars and the music, the start and rival music picked and faded, the unload; with `rand`) | `race-sounds.md` | 31 of 31 (two migrations, one subagent for `Init`) | `--native_race_sounds` (`rand` under `--native_c_runtime`) |
+| 2026-11-04 | The race's loading (the race mode's +848 machine `CourseSetup::`: its `Init` and handlers up to the course and draw waits; the loading screen's `Show`, `Run`, `Finish` with `UiMovie::SetFrames`; `sub_82293460`) | `race-loading.md` | 10 of 13 in play (one migration; `WaitCourse`, `EndTick`, `RaceMode::NextMode` wait on `Scenery::IsLoaded`, `CarScene::Update` and `sub_82150E00`) | `--native_race_loading` |
 
     The first run (2026-10-22, branch `b7-loop-test`): every harness at 0 differing, attract races at 20-21 s with no errors,
     and a race the user drove looked right. Ours went from 162 to 335 (work
@@ -4521,3 +4528,17 @@ pairs): overridden 108, Native 34, Dropped 26, never called 70, live
 211. Imports: 186 called, 56 with a live caller. B7 (`b7_status.py`):
 ours 4,157, work left 2,253 (Wrapped 62, with a row 479, no row yet
 1,712), from 2,283.
+
+**2026-11-04, the race's loading (branch `b7-loop-03-11-26`):** the
+thirty-second run's third and last subsystem (`race-loading.md`,
+`--native_race_loading`, `src/race_loading/`): the race mode's +848
+machine (`CourseSetup::`, the course's and the draw's waits) and the
+loading screen every load in the race's states shows, 10 of the 13
+seen in play. `WaitCourse`, `EndTick` and `RaceMode::NextMode` wait on
+`Scenery::IsLoaded` (`course-scenery.md`), `CarScene::Update`
+`sub_820C9608` (`scene.md`) and the career's `sub_82150E00`. The run
+stopped at its limit. The boundary: 449 functions (916 pairs):
+overridden 108, Native 34, Dropped 26, never called 70, live 211.
+Imports: 186 called, 56 with a live caller. B7 (`b7_status.py`): ours
+4,167, work left 2,243 (Wrapped 62, with a row 482, no row yet 1,699),
+from 2,253.
