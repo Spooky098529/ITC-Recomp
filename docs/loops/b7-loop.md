@@ -562,7 +562,12 @@ Calls so far for decisions the loop meets often:
   `sub_825AA708`, `_getptd` and the rest in `c-runtime.md`'s "Not
   here"): left for the core, not taken (2026-10-25). Only when it
   becomes a blocker (a subsystem's ready work waits on it) does the lead
-  raise it with the user (AskUserQuestion), with what it blocks.
+  raise it with the user (AskUserQuestion), with what it blocks. A C
+  runtime function over that data that blocks work, like `rand`: native
+  plain C++ reading and writing the same per-thread guest words, found
+  through the guest TLS as the original does (the original's results,
+  one state for recompiled and native callers), while `_getptd` and
+  `_mtinit` stay for the core (`rand`, 2026-11-04).
 
 Only something new (no call covers it, or it's unclear whether one
 does) goes to the user. Then the lead asks the user directly

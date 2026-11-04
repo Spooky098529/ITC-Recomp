@@ -37,8 +37,11 @@ file's history. What's left to see in a drive, from every run:
   `rand` `sub_825A9BB8` (per-thread seed over `_getptd`, left for the
   core 2026-10-25) blocks `PlayStartMusic` `sub_82175DB0`, `Begin`
   `sub_82176618` and `IdleTick` `sub_821767A8`: raised with the user
-  (the call's own condition). Step: migration agent running (the
-  ready groups).
+  (the call's own condition). The user's call (2026-11-04): `rand`
+  native, over the thread's guest seed (+20 of `_getptd`'s block, found
+  as the original does), `_getptd` and `_mtinit` left for the core;
+  given to the migration agent for after the ready groups. Step:
+  migration agent running.
 
 ## Done
 
