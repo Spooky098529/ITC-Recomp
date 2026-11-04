@@ -85,7 +85,7 @@ ITC_FLAG_BOOL(native_car_draw, true, "ITC",
               "tires WheelPoints::DrawTire sub_820E8AE8 and DrawTireMorphed sub_820E9318 and set "
               "a's rims DrawRimA sub_820E9A28 and DrawRimAMorphed sub_820EA148 and set b's "
               "DrawRimB sub_820EA950 and the brakes DrawBrakes sub_820EB388 and "
-              "DrawBrakesMorphed sub_820EBEB8, and the wheels' top SceneWheels::Draw "
+              "DrawBrakesMorphed sub_820EBEB8 (no adapters: the wheels' lists call them), and the wheels' top SceneWheels::Draw "
               "sub_820ECE28 (inside the diagnostics' wrap) with WheelPoints::Draw sub_820ECA30 "
               "and DrawMorphed sub_820ECB68 (no adapters: only it calls them) (the matrix "
               "functions, memcpy, CarPart::Draw, PartModel::FlipCulling and SetAlpha, the "
@@ -394,111 +394,6 @@ bool CarDrawWheelsCalleesNative() {
   return CarDrawPartsCalleesNative() && CarDrawMorphCalleesNative();
 }
 
-void CarDrawWheelsDrawTire(PPCContext& ctx, uint8_t* base) {
-  if (!CarDrawWheelsCalleesNative()) {
-    __imp__sub_820E8AE8(ctx, base);
-    return;
-  }
-  ctx.fpscr.disableFlushMode();
-  const uint64_t lr = ctx.lr;
-  SceneryDrawGuest guest{ctx, base};
-  const car_draw::Calls calls = CarDrawCalls(&guest);
-  const car_draw::Left left =
-      car_draw::WheelsDrawTire(base, calls, ctx.r1.u32, ctx.r3.u32, ctx.r4.u32, ctx.r5.u32);
-  ctx.lr = lr;
-  LeaveLeft(ctx, left);
-}
-
-void CarDrawWheelsDrawTireMorphed(PPCContext& ctx, uint8_t* base) {
-  if (!CarDrawWheelsCalleesNative()) {
-    __imp__sub_820E9318(ctx, base);
-    return;
-  }
-  ctx.fpscr.disableFlushMode();
-  const uint64_t lr = ctx.lr;
-  SceneryDrawGuest guest{ctx, base};
-  const car_draw::Calls calls = CarDrawCalls(&guest);
-  const car_draw::Left left = car_draw::WheelsDrawTireMorphed(
-      base, calls, ctx.r1.u32, ctx.r3.u32, ctx.r4.u32, ctx.r5.u32, ctx.r28.u64);
-  ctx.lr = lr;
-  LeaveLeft(ctx, left);
-}
-
-void CarDrawWheelsDrawRimA(PPCContext& ctx, uint8_t* base) {
-  if (!CarDrawWheelsCalleesNative()) {
-    __imp__sub_820E9A28(ctx, base);
-    return;
-  }
-  ctx.fpscr.disableFlushMode();
-  const uint64_t lr = ctx.lr;
-  SceneryDrawGuest guest{ctx, base};
-  const car_draw::Calls calls = CarDrawCalls(&guest);
-  const car_draw::Left left = car_draw::WheelsDrawRimA(
-      base, calls, ctx.r1.u32, ctx.r3.u32, ctx.r4.u32, ctx.r5.u32, ctx.r24.u64);
-  ctx.lr = lr;
-  LeaveLeft(ctx, left);
-}
-
-void CarDrawWheelsDrawRimAMorphed(PPCContext& ctx, uint8_t* base) {
-  if (!CarDrawWheelsCalleesNative()) {
-    __imp__sub_820EA148(ctx, base);
-    return;
-  }
-  ctx.fpscr.disableFlushMode();
-  const uint64_t lr = ctx.lr;
-  SceneryDrawGuest guest{ctx, base};
-  const car_draw::Calls calls = CarDrawCalls(&guest);
-  const car_draw::Left left = car_draw::WheelsDrawRimAMorphed(
-      base, calls, ctx.r1.u32, ctx.r3.u32, ctx.r4.u32, ctx.r5.u32, ctx.r24.u64);
-  ctx.lr = lr;
-  LeaveLeft(ctx, left);
-}
-
-void CarDrawWheelsDrawRimB(PPCContext& ctx, uint8_t* base) {
-  if (!CarDrawWheelsCalleesNative()) {
-    __imp__sub_820EA950(ctx, base);
-    return;
-  }
-  ctx.fpscr.disableFlushMode();
-  const uint64_t lr = ctx.lr;
-  SceneryDrawGuest guest{ctx, base};
-  const car_draw::Calls calls = CarDrawCalls(&guest);
-  const car_draw::Left left =
-      car_draw::WheelsDrawRimB(base, calls, ctx.r1.u32, ctx.r3.u32, ctx.r4.u32, ctx.r5.u32);
-  ctx.lr = lr;
-  LeaveLeft(ctx, left);
-}
-
-void CarDrawWheelsDrawBrakes(PPCContext& ctx, uint8_t* base) {
-  if (!CarDrawWheelsCalleesNative()) {
-    __imp__sub_820EB388(ctx, base);
-    return;
-  }
-  ctx.fpscr.disableFlushMode();
-  const uint64_t lr = ctx.lr;
-  SceneryDrawGuest guest{ctx, base};
-  const car_draw::Calls calls = CarDrawCalls(&guest);
-  const car_draw::Left left = car_draw::WheelsDrawBrakes(
-      base, calls, ctx.r1.u32, ctx.r3.u32, ctx.r4.u32, ctx.r5.u32, ctx.r24.u64);
-  ctx.lr = lr;
-  LeaveLeft(ctx, left);
-}
-
-void CarDrawWheelsDrawBrakesMorphed(PPCContext& ctx, uint8_t* base) {
-  if (!CarDrawWheelsCalleesNative()) {
-    __imp__sub_820EBEB8(ctx, base);
-    return;
-  }
-  ctx.fpscr.disableFlushMode();
-  const uint64_t lr = ctx.lr;
-  SceneryDrawGuest guest{ctx, base};
-  const car_draw::Calls calls = CarDrawCalls(&guest);
-  const car_draw::Left left = car_draw::WheelsDrawBrakesMorphed(
-      base, calls, ctx.r1.u32, ctx.r3.u32, ctx.r4.u32, ctx.r5.u32, ctx.r24.u64);
-  ctx.lr = lr;
-  LeaveLeft(ctx, left);
-}
-
 void CarDrawSceneWheels(PPCContext& ctx, uint8_t* base) {
   if (!CarDrawWheelsCalleesNative()) {
     __imp__sub_820ECE28(ctx, base);
@@ -550,13 +445,11 @@ void CarDrawSceneWheels(PPCContext& ctx, uint8_t* base) {
 // callers in play, CarPart::Draw, the lamps, the seats, the shadows, the
 // cockpit's body and SceneTraffic::Draw, are plain C++), and
 // Model::MorphShape sub_82595110 (2026-11-04; its callers, the morphed wheel
-// draws and WheelPoints::DrawBrakes, are plain C++).
+// draws and WheelPoints::DrawBrakes, are plain C++), and the wheels' tires,
+// rims and brakes WheelPoints::DrawTire sub_820E8AE8, DrawTireMorphed
+// sub_820E9318, DrawRimA sub_820E9A28, DrawRimAMorphed sub_820EA148, DrawRimB
+// sub_820EA950, DrawBrakes sub_820EB388 and DrawBrakesMorphed sub_820EBEB8
+// (2026-11-04; their callers, WheelPoints::Draw and DrawMorphed, are plain
+// C++).
 ITC_CAR_DRAW(820D06F0, CarDrawCarPartDraw)
-ITC_CAR_DRAW(820E8AE8, CarDrawWheelsDrawTire)
-ITC_CAR_DRAW(820E9318, CarDrawWheelsDrawTireMorphed)
-ITC_CAR_DRAW(820E9A28, CarDrawWheelsDrawRimA)
-ITC_CAR_DRAW(820EA148, CarDrawWheelsDrawRimAMorphed)
-ITC_CAR_DRAW(820EA950, CarDrawWheelsDrawRimB)
-ITC_CAR_DRAW(820EB388, CarDrawWheelsDrawBrakes)
-ITC_CAR_DRAW(820EBEB8, CarDrawWheelsDrawBrakesMorphed)
 #undef ITC_CAR_DRAW

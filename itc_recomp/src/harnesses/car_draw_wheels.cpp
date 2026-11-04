@@ -22,7 +22,7 @@
 // after it, with the frame (its back chain and temporaries from +80), r3,
 // r24, r28 and what went to the render queue. The recompiled side runs with
 // --native_car_draw off (its callees the originals); the native side the
-// adapter's register step.
+// register steps below (the leaves' adapters are gone).
 
 #include "harness.h"
 #include "harnesses/car_draw_shared.h"
@@ -358,6 +358,32 @@ bool BrakesWorld(Context& h, Random& r, uint32_t block, uint32_t source, uint32_
   return morphs;
 }
 
+// The tires', rims' and brakes' register steps (their adapters are gone:
+// their callers, WheelPoints::Draw and DrawMorphed, are plain C++): r3 the
+// group, r4 the camera pass, r5 the block (r24 or r28 the first draws').
+#define ITC_WHEELS_NATIVE_STEP(name, call)                               \
+  void name(PPCContext& ctx, uint8_t* base) {                            \
+    const uint32_t r1 = ctx.r1.u32, r3 = ctx.r3.u32, r4 = ctx.r4.u32,    \
+                   r5 = ctx.r5.u32;                                      \
+    const uint64_t r24 = ctx.r24.u64, r28 = ctx.r28.u64;                 \
+    (void)r24;                                                           \
+    (void)r28;                                                           \
+    NativeStep(ctx, base, [&](const ::car_draw::Calls& calls) { return call; }); \
+  }
+ITC_WHEELS_NATIVE_STEP(NativeDrawTire, ::car_draw::WheelsDrawTire(base, calls, r1, r3, r4, r5))
+ITC_WHEELS_NATIVE_STEP(NativeDrawTireMorphed,
+                       ::car_draw::WheelsDrawTireMorphed(base, calls, r1, r3, r4, r5, r28))
+ITC_WHEELS_NATIVE_STEP(NativeDrawRimA,
+                       ::car_draw::WheelsDrawRimA(base, calls, r1, r3, r4, r5, r24))
+ITC_WHEELS_NATIVE_STEP(NativeDrawRimAMorphed,
+                       ::car_draw::WheelsDrawRimAMorphed(base, calls, r1, r3, r4, r5, r24))
+ITC_WHEELS_NATIVE_STEP(NativeDrawRimB, ::car_draw::WheelsDrawRimB(base, calls, r1, r3, r4, r5))
+ITC_WHEELS_NATIVE_STEP(NativeDrawBrakes,
+                       ::car_draw::WheelsDrawBrakes(base, calls, r1, r3, r4, r5, r24))
+ITC_WHEELS_NATIVE_STEP(NativeDrawBrakesMorphed,
+                       ::car_draw::WheelsDrawBrakesMorphed(base, calls, r1, r3, r4, r5, r24))
+#undef ITC_WHEELS_NATIVE_STEP
+
 enum class Kind { kTire, kTireMorphed, kRimA, kRimAMorphed, kRimB, kBrakes, kBrakesMorphed };
 
 struct Target {
@@ -573,21 +599,21 @@ void WheelsDraws(Context& h, uint32_t block, uint32_t race) {
   const uint32_t scene = race + 0x10000;
   const Target targets[] = {
       {"WheelPoints::DrawTire (sub_820E8AE8)", __imp__sub_820E8AE8,
-       hooks::CarDrawWheelsDrawTire, car_draw::kWheelsTireFrame, 1888, 384, Kind::kTire},
+       NativeDrawTire, car_draw::kWheelsTireFrame, 1888, 384, Kind::kTire},
       {"WheelPoints::DrawTireMorphed (sub_820E9318)", __imp__sub_820E9318,
-       hooks::CarDrawWheelsDrawTireMorphed, car_draw::kWheelsTireMorphedFrame, 1520, 384,
+       NativeDrawTireMorphed, car_draw::kWheelsTireMorphedFrame, 1520, 384,
        Kind::kTireMorphed},
       {"WheelPoints::DrawRimA (sub_820E9A28)", __imp__sub_820E9A28,
-       hooks::CarDrawWheelsDrawRimA, car_draw::kWheelsRimAFrame, 1904, 256, Kind::kRimA},
+       NativeDrawRimA, car_draw::kWheelsRimAFrame, 1904, 256, Kind::kRimA},
       {"WheelPoints::DrawRimAMorphed (sub_820EA148)", __imp__sub_820EA148,
-       hooks::CarDrawWheelsDrawRimAMorphed, car_draw::kWheelsRimAMorphedFrame, 2128, 256,
+       NativeDrawRimAMorphed, car_draw::kWheelsRimAMorphedFrame, 2128, 256,
        Kind::kRimAMorphed},
       {"WheelPoints::DrawRimB (sub_820EA950)", __imp__sub_820EA950,
-       hooks::CarDrawWheelsDrawRimB, car_draw::kWheelsRimBFrame, 2400, 256, Kind::kRimB},
+       NativeDrawRimB, car_draw::kWheelsRimBFrame, 2400, 256, Kind::kRimB},
       {"WheelPoints::DrawBrakes (sub_820EB388)", __imp__sub_820EB388,
-       hooks::CarDrawWheelsDrawBrakes, car_draw::kWheelsBrakesFrame, 2464, 256, Kind::kBrakes},
+       NativeDrawBrakes, car_draw::kWheelsBrakesFrame, 2464, 256, Kind::kBrakes},
       {"WheelPoints::DrawBrakesMorphed (sub_820EBEB8)", __imp__sub_820EBEB8,
-       hooks::CarDrawWheelsDrawBrakesMorphed, car_draw::kWheelsBrakesMorphedFrame, 2464, 256,
+       NativeDrawBrakesMorphed, car_draw::kWheelsBrakesMorphedFrame, 2464, 256,
        Kind::kBrakesMorphed},
   };
   // The morphed brakes' cases from a generator of their own.

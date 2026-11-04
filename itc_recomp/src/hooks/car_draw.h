@@ -88,26 +88,6 @@ void CarDrawSceneTraffic(PPCContext& ctx, uint8_t* base);
 
 // The wheels' callees' plain C++ native (the parts' and the morph's).
 bool CarDrawWheelsCalleesNative();
-// WheelPoints::DrawTire (sub_820E8AE8; the wheels' callees native): r3 = the
-// tire group, r4 = the camera pass, r5 = the block.
-void CarDrawWheelsDrawTire(PPCContext& ctx, uint8_t* base);
-// WheelPoints::DrawTireMorphed (sub_820E9318; the wheels' callees native):
-// r3 = the tire group, r4 = the camera pass, r5 = the block (r28 its first
-// draw's).
-void CarDrawWheelsDrawTireMorphed(PPCContext& ctx, uint8_t* base);
-// WheelPoints::DrawRimA (sub_820E9A28; the wheels' callees native): r3 = the
-// rim group, r4 = the camera pass, r5 = the block (r24 its first draws').
-void CarDrawWheelsDrawRimA(PPCContext& ctx, uint8_t* base);
-// WheelPoints::DrawRimAMorphed (sub_820EA148): as DrawRimA's.
-void CarDrawWheelsDrawRimAMorphed(PPCContext& ctx, uint8_t* base);
-// WheelPoints::DrawRimB (sub_820EA950; the wheels' callees native): r3 = the
-// rim group, r4 = the camera pass, r5 = the block.
-void CarDrawWheelsDrawRimB(PPCContext& ctx, uint8_t* base);
-// WheelPoints::DrawBrakes (sub_820EB388; the wheels' callees native): r3 =
-// the brake group, r4 = the camera pass, r5 = the block (r24 its draws').
-void CarDrawWheelsDrawBrakes(PPCContext& ctx, uint8_t* base);
-// WheelPoints::DrawBrakesMorphed (sub_820EBEB8): as DrawBrakes'.
-void CarDrawWheelsDrawBrakesMorphed(PPCContext& ctx, uint8_t* base);
 // The wheels' top, SceneWheels::Draw (sub_820ECE28; inside the diagnostics'
 // wrap, src/debug/frame_state_diff.cpp; the wheels' callees native): r3 =
 // the wheels object, r4 = the block (r24 its leaves').
