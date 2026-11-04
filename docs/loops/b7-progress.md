@@ -13,8 +13,10 @@ file's history. What's left to see in a drive, from every run:
   on it), from c9283680; summary `b7-loop-2026-11-04-0844.md`. Limit: 3
   subsystems.
 - Subsystem 1 of 3: the race flow's set-up `sub_82160AE0` (lead picked;
-  the two leads above it deleted as covered by existing files). Step:
-  mapping, agent running.
+  the two leads above it deleted as covered by existing files). Map
+  checked (ef6eef64: `race-flow.md`, 5 rows, all new; 0 errors; 1 ready
+  group, `sub_82160AE0`, 1,661 lines, split the migration). Step:
+  migration, agent running.
 
 ## Done
 
@@ -36,3 +38,5 @@ file's history. What's left to see in a drive, from every run:
 
 - At the start: ours 4059, work left 2346 (wrapped 71, known 482,
   unknown 1793).
+- After the race flow's map: ours 4059, work left 2346 (wrapped 71,
+  known 483, unknown 1792).

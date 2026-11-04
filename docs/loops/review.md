@@ -14,6 +14,7 @@ When the user has reviewed a run's section, its heading gets
 ## Run 2026-11-04 08:44 (`b7-loop-03-11-26`)
 
 - Leads deleted as covered: the containers (`sub_82093400` and the rest, all in `framework.md`, `screen-objects.md`, `app-states.md`, `models.md`, `input.md`) and the route's users in the race states (`sub_82162330` and the rest, all in `race-states.md`).
+- `race-flow.md` (new, ef6eef64): 5 rows: `RaceFlow::Init` `sub_82160AE0` (its 53 transitions listed in the intro, the states' meanings marked probably), four handlers not seen in play (`sub_8215F7B0`, `sub_821022B0`, `sub_8215FC30`, `sub_8215FB08`) that `racer-controllers.md` named without rows; the lead's functor vtable `0x82006ABC` corrected to `0x820069BC`. `known-data.md` (the race flow), `game-modes.md` (`RaceMode::Init`'s row) and `racer-controllers.md`'s intro changed.
 
 ## Run 2026-11-01 12:56 (`b7-loop-01-11-26`)
 
